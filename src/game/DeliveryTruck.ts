@@ -43,6 +43,7 @@ export class DeliveryTruck {
     for (let z = gz + 1; z < gz + 150; z += 3) north.push([roadX(z) - 0.25, z]);
     this._out = [...[...drive].reverse(), ...north];
     this._inLen = lineLength(this._in);
+    this.driveLength = lineLength(drive);
     this._outLen = lineLength(this._out);
   }
 
@@ -73,6 +74,7 @@ export class DeliveryTruck {
 
   /** Path length in (QA: d for "on the driveway"). */
   get inLength(): number { return this._inLen; }
+  readonly driveLength: number;
 
   update(dt: number, speedK: number): void {
     if (this._held) return;

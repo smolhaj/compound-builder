@@ -150,7 +150,8 @@ export class HomesteadWorld {
     if (this._stockpile) { this._root.remove(this._stockpile); this._stockpile.traverse(o => (o as THREE.Mesh).geometry?.dispose()); }
     const y = this.access.yard;
     const g = buildStockpile(shown);
-    g.position.set(y.x - 0.3, this.groundAt(y.x, y.z), y.z - 0.55);
+    // beside the truck's stopping place (it pulls up along the yard's camp side)
+    g.position.set(y.x - 0.4, this.groundAt(y.x, y.z - 1), y.z - 1.35);
     this._stockpile = g;
     this._root.add(g);
     this._ws.invalidateShadows();
