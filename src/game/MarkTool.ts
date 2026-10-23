@@ -66,7 +66,7 @@ export class MarkTool {
     this._hover = t;
     if (!t) { this._ring.visible = false; useGameStore.getState().setToolProblem(null); return; }
     const own = t.x >= 0 && t.z >= 0 && t.x <= PARCEL_SIZE && t.z <= PARCEL_SIZE;
-    const s = trunkRadius(t.scale) * 3.2;
+    const s = trunkRadius(t.scale, t.kind) * 3.2;
     this._ring.scale.set(s, 1, s);
     this._ring.position.set(t.x, this._world.groundAt(t.x, t.z) + 0.03, t.z);
     (this._ring.material as THREE.MeshBasicMaterial).color.set(own ? 0xffb04a : 0xe36a5a);

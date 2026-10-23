@@ -235,7 +235,7 @@ export class HomesteadWorld {
       const hgt = 3 * t.scale * t.sy;
       a.set(t.x, t.y, t.z); b.set(t.x, t.y + hgt * 0.75, t.z);
       ray.distanceSqToSegment(a, b, onRay, onSeg);
-      const d = onRay.distanceTo(onSeg), reach = trunkRadius(t.scale) + 0.25 * t.scale * Math.min(1, (onSeg.y - t.y) / (hgt * 0.4));
+      const d = onRay.distanceTo(onSeg), reach = trunkRadius(t.scale, t.kind) + 0.25 * t.scale * Math.min(1, (onSeg.y - t.y) / (hgt * 0.4));
       if (d > reach) continue;
       const along = onRay.distanceTo(ray.origin);
       if (along < bestD) { bestD = along; best = t; }
