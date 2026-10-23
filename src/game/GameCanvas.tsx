@@ -95,6 +95,9 @@ export function GameCanvas() {
         useWorldStore.getState().syncClock(hourOf(game.clock.t), cal.doy, game.clock.t);
       }
       world.syncProgress(game.structures);
+      const speedK = game.clock.speed === 0 ? 0 : 60 / SECONDS_PER_DAY[game.clock.speed];
+      world.updatePeople(dt, game, hourOf(game.clock.t), speedK);
+      world.updateDeliveries(dt, game, speedK);
       const speed = game.clock.speed;
       const { timeOfDay: t, dayOfYear, totalDays, seasonMode, weatherMode } = useWorldStore.getState();
       ws.setNightSky(moonPhase(dayOfYear + t / 24), skyDarkness('mountain_west', false));

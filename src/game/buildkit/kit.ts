@@ -94,6 +94,8 @@ export interface SiteQuery {
   owned(x: number, z: number): boolean;
   /** Water (creek channel) at (x, z). */
   water(x: number, z: number): boolean;
+  /** Something already there that isn't a kit piece (the camp). */
+  blocked?(x: number, z: number): boolean;
 }
 
 export type PlaceProblem = 'off_parcel' | 'water' | 'too_steep' | 'overlaps';
@@ -109,6 +111,7 @@ export function placementProblem(def: KitPieceDef, x: number, z: number, rot: nu
       const px = r.x0 + (r.x1 - r.x0) * i / N, pz = r.z0 + (r.z1 - r.z0) * j / N;
       if (!site.owned(px, pz)) return 'off_parcel';
       if (site.water(px, pz)) return 'water';
+      if (site.blocked?.(px, pz)) return 'overlaps';
       row.push(site.height(px, pz));
     }
     hs.push(row);
