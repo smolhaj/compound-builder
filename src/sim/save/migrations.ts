@@ -18,6 +18,8 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   }),
   // 2 → 3: concrete joins the stockpile (workshop slab, cellar, log house footings)
   2: s => ({ ...s, version: 3, stock: { concrete: 0, ...(s.stock as object) } }),
+  // 3 → 4: the perimeter (fences, hedges, walls) and its materials
+  3: s => ({ ...s, version: 4, perimeter: [], stock: { wire: 0, seedlings: 0, container: 0, ...(s.stock as object) } }),
 };
 
 export class SaveVersionError extends Error {}
@@ -34,7 +36,7 @@ export function migrate(raw: unknown): GameState {
     if (!up) throw new SaveVersionError(`No migration from version ${s.version}`);
     s = up(s);
   }
-  for (const k of ['seed', 'clock', 'money', 'stock', 'orders', 'people', 'personState', 'structures', 'forestry', 'heat', 'log', 'nextId'] as const) {
+  for (const k of ['seed', 'clock', 'money', 'stock', 'orders', 'people', 'personState', 'structures', 'forestry', 'heat', 'perimeter', 'log', 'nextId'] as const) {
     if (!(k in s)) throw new SaveVersionError(`Save is missing "${k}"`);
   }
   return s as unknown as GameState;

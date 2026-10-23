@@ -3,7 +3,7 @@
  * bulk units a pickup / flatbed load is counted in. Prices are 2020s rural
  * Mountain West retail (lumber yard / farm store), rounded.
  */
-export type MaterialId = 'lumber' | 'logs' | 'firewood' | 'fieldstone' | 'concrete' | 'roofing' | 'hardware';
+export type MaterialId = 'lumber' | 'logs' | 'firewood' | 'fieldstone' | 'concrete' | 'roofing' | 'hardware' | 'wire' | 'seedlings' | 'container';
 
 export interface MaterialDef {
   id: MaterialId;
@@ -22,6 +22,9 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   concrete: { id: 'concrete', name: 'Concrete', unit: 'cubic yard (ready-mix)', price: 165 },
   roofing: { id: 'roofing', name: 'Metal roofing', unit: 'bundle of sheets', price: 180 },
   hardware: { id: 'hardware', name: 'Doors, windows & hardware', unit: 'kit', price: 400 },
+  wire: { id: 'wire', name: 'Fence wire', unit: 'roll (400 m barbed / 100 m woven)', price: 110 },
+  seedlings: { id: 'seedlings', name: 'Hedge whips', unit: 'bundle of 25 bare-root', price: 55 },
+  container: { id: 'container', name: 'Shipping container', unit: '40 ft used, delivered', price: 3800 },
 };
 
 export const MATERIAL_IDS = Object.keys(MATERIALS) as MaterialId[];
@@ -29,7 +32,7 @@ export const MATERIAL_IDS = Object.keys(MATERIALS) as MaterialId[];
 export type Stock = Record<MaterialId, number>;
 
 export function emptyStock(): Stock {
-  return { lumber: 0, logs: 0, firewood: 0, fieldstone: 0, concrete: 0, roofing: 0, hardware: 0 };
+  return { lumber: 0, logs: 0, firewood: 0, fieldstone: 0, concrete: 0, roofing: 0, hardware: 0, wire: 0, seedlings: 0, container: 0 };
 }
 
 /** Cost of a bill of materials at retail (unbuyable items count 0). */
