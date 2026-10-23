@@ -7,6 +7,7 @@ import { FarTreeRenderer } from '../engine/world/trees/FarTreeRenderer';
 import { planParcelTrees, type ParcelTree } from './parcel/parcelTrees';
 import { buildWoods, fallHeading, trunkRadius } from './forestry/woodsGeometry';
 import type { Forestry } from '../sim/state';
+import { plant, serviceOf } from '../sim/utilities';
 import { StreamRenderer } from '../engine/world/water/StreamRenderer';
 import { RegionalWaterRenderer } from '../engine/world/water/RegionalWaterRenderer';
 import { updateWaterGlobals } from '../engine/world/water/waterShading';
@@ -66,6 +67,8 @@ interface Built {
   padY: number;
   /** Lamplight inside (warm point light, brighter at night). */
   light: THREE.PointLight | null;
+  /** Services the interior was built with ('pws' bits). */
+  services: string;
 }
 
 /** See-through variants of the kit materials (x-ray view), shared. */
@@ -520,7 +523,7 @@ export class HomesteadWorld {
       light.visible = false;
       group.add(light);
     }
-    this._built.set(p.id, { placed: p, group, smoke, key: '', finished: false, padY: y, light });
+    this._built.set(p.id, { placed: p, group, smoke, key: '', finished: false, padY: y, light, services: '000' });
     this.terrain.refresh(this._terrainSource, pad.x0 - pad.skirt - 1, pad.z0 - pad.skirt - 1, pad.x1 + pad.skirt + 1, pad.z1 + pad.skirt + 1);
     if (this._quality) this._plant(this._quality);
     this._ws.invalidateShadows();
@@ -546,6 +549,54 @@ export class HomesteadWorld {
       if (done !== b.finished) { b.finished = done; if (b.light) b.light.visible = done; this._ws.invalidateShadows(); }
       this._applyView(b);
     }
+  }
+
+  /**
+   * Services changed (plumbed / wired / septic): rebuild those buildings so
+   * their interiors match (faucets, lights, fridge, flush toilet), and
+   * warm lamplight turns to electric light.
+   */
+  syncServices(game: GameState): void {
+    const p = plant(game);
+    for (const b of this._built.values()) {
+      if (!b.finished) continue;
+      const sv = serviceOf(game, p, b.placed.id);
+      const opts = { plumbed: sv.plumbed, wired: sv.wired, septic: sv.septic };
+      const key = `${+opts.plumbed}${+opts.wired}${+opts.septic}`;
+      if (key === b.services) continue;
+      b.services = key;
+      if (key === '000' && !b.group.userData.opts?.plumbed && !b.group.userData.opts?.wired) continue;
+      this._rebuild(b, opts);
+      if (b.light) b.light.color.set(opts.wired ? 0xfff0d8 : 0xffc27a);
+    }
+  }
+
+  private _rebuild(b: Built, opts: { plumbed: boolean; wired: boolean; septic: boolean }): void {
+    const def = KIT[b.placed.kind];
+    const g = buildLayers(def, hashStr(b.placed.id + ':' + this.parcel.seed), opts);
+    Object.assign(g.userData, { type: 'building', buildingId: b.placed.id });
+    g.position.copy(b.group.position);
+    g.rotation.copy(b.group.rotation);
+    if (b.light) { b.group.remove(b.light); g.add(b.light); }
+    this._ws.scene.remove(b.group);
+    b.group.traverse(o => (o as THREE.Mesh).geometry?.dispose());
+    b.group = g;
+    this._ws.scene.add(g);
+    b.key = '';
+    showStage(g, 5, 0);
+    this._applyView(b);
+    this._ws.invalidateShadows();
+  }
+
+  /** The building a screen ray hits (click to select), or null. */
+  pickBuilding(ray: THREE.Ray): string | null {
+    const rc = new THREE.Raycaster(ray.origin, ray.direction);
+    let best: { id: string; d: number } | null = null;
+    for (const b of this._built.values()) {
+      const hit = rc.intersectObject(b.group, true)[0];
+      if (hit && (!best || hit.distance < best.d)) best = { id: b.placed.id, d: hit.distance };
+    }
+    return best?.id ?? null;
   }
 
   /** Cutaway (walls cut at waist height, roof and loft off) / x-ray (see-through shell) / full. */

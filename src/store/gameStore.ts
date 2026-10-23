@@ -6,6 +6,7 @@ import { placeOrder } from '../sim/economy';
 import { planStructure } from '../sim/construction';
 import { markTree, unmarkTree, isMarked, type TreeRef } from '../sim/forestry';
 import { planRun, type Gate, type PerimeterKind, type Pt } from '../sim/perimeter';
+import { fitProblem, orderFit, plant, repairPump } from '../sim/utilities';
 import { saveGame, AUTOSAVE } from '../sim/save/saveSystem';
 
 /** Game state (the simulation) + transient UI state for the build tool. */
@@ -27,6 +28,9 @@ export interface GameStore {
   load: (g: GameState) => void;
   /** Lay out a fence / hedge / wall run for the family to build. */
   planRun: (kind: PerimeterKind, pts: Pt[], gates: Gate[]) => void;
+  /** Plumb or wire a building (a fitting job for the family). */
+  fit: (buildingId: string, kind: 'plumb' | 'wire') => string | null;
+  repairPump: (id: string) => boolean;
   /** Mark a tree to fell, or unmark it if it is marked and not yet cut. */
   toggleMark: (t: TreeRef, haulDist: number) => void;
   setTool: (kind: string | null) => void;
@@ -70,6 +74,22 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     planRun(g, kind, pts, gates);
     set({ game: g });
     void saveGame(AUTOSAVE, g);
+  },
+  fit: (id, kind) => {
+    const g = structuredClone(get().game);
+    const st = g.structures.find(x => x.id === id);
+    if (!st) return 'no such building';
+    const why = fitProblem(g, plant(g), st, kind);
+    if (why) return why;
+    orderFit(g, id, kind);
+    set({ game: g });
+    return null;
+  },
+  repairPump: (id) => {
+    const g = structuredClone(get().game);
+    const ok = repairPump(g, id);
+    if (ok) set({ game: g });
+    return ok;
   },
   toggleMark: (t, haulDist) => {
     const g = structuredClone(get().game);

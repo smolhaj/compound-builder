@@ -56,8 +56,18 @@ export function GameCanvas() {
     const vsRay = new THREE.Raycaster(), vsNdc = new THREE.Vector2();
     let vsDown: { x: number; y: number } | null = null;
     const onVsDown = (e: PointerEvent) => { vsDown = { x: e.clientX, y: e.clientY }; };
+    let servicesKey = '';
     const onVsUp = (e: PointerEvent) => {
       const d = vsDown; vsDown = null;
+      // click a building (no tool, no viewshed) to select it
+      if (d && Math.hypot(e.clientX - d.x, e.clientY - d.y) <= 5 && e.button === 0 && !useGameStore.getState().tool && useWorldStore.getState().sightMode !== 'viewshed') {
+        const r = canvas.getBoundingClientRect();
+        vsNdc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+        vsRay.setFromCamera(vsNdc, ws.camera);
+        const id = world.pickBuilding(vsRay.ray);
+        if (id) useGameStore.getState().select(id);
+        return;
+      }
       if (!d || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 5 || useWorldStore.getState().sightMode !== 'viewshed' || useGameStore.getState().tool || !world.terrain.mesh) return;
       const r = canvas.getBoundingClientRect();
       vsNdc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
@@ -134,6 +144,8 @@ export function GameCanvas() {
       world.syncForestry(game.forestry);
       world.simTime = game.clock.t;
       world.syncPerimeter(game.perimeter, game.clock.t);
+      const svKey = `${game.structures.filter(x => x.stage >= 5).length}|${game.perimeter.filter(r => r.finishedAt !== null).length}|${game.utilities.fittings.filter(f => f.finishedAt !== null).length}`;
+      if (svKey !== servicesKey) { servicesKey = svKey; world.syncServices(game); }
       sight.update(6);
       const speedK = game.clock.speed === 0 ? 0 : 60 / SECONDS_PER_DAY[game.clock.speed];
       world.updatePeople(dt, game, hourOf(game.clock.t), speedK);

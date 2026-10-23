@@ -19,7 +19,7 @@ export type KitMaterialId = 'timber_lap' | 'trim' | 'fieldstone' | 'metal_roof' 
   // more buildings
   | 'concrete' | 'metal_siding' | 'log_wall' | 'log_end' | 'board_batten' | 'wire_mesh' | 'straw' | 'soil' | 'crop' | 'earth' | 'pegboard' | 'steel' | 'paint_red' | 'paint_green'
   // perimeter
-  | 'hedge' | 'hedge_berry' | 'container_red' | 'container_blue' | 'container_green' | 'container_tan'
+  | 'hedge' | 'hedge2' | 'hedge_berry' | 'container_red' | 'container_blue' | 'container_green' | 'container_tan'
   // homey decor (procedural art)
   | 'solar_cell' | 'poly_tank' | 'blue_tank' |
   'art_mountains' | 'art_sunset' | 'art_lake' | 'photo_family' | 'photo_couple' | 'poster_map' | 'poster_seeds' | 'sampler' | 'curtain' | 'curtain_red' | 'flowers';
@@ -27,7 +27,7 @@ export type KitMaterialId = 'timber_lap' | 'trim' | 'fieldstone' | 'metal_roof' 
 /** World units covered by one texture repeat. */
 const TEX_WORLD: Partial<Record<KitMaterialId, number>> = {
   timber_lap: 0.5, fieldstone: 0.5, metal_roof: 0.5, deck: 0.5, door: 0.2,
-  curtain: 0.15, curtain_red: 0.15, solar_cell: 0.283,
+  curtain: 0.15, curtain_red: 0.15, solar_cell: 0.283, hedge: 0.25, hedge2: 0.25,
   pine_panel: 0.5, quilt_red: 0.12, quilt_blue: 0.12, rug: 0.3, books: 0.1,
   concrete: 0.6, metal_siding: 0.5, container_red: 0.4, container_blue: 0.4, container_green: 0.4, container_tan: 0.4, log_wall: 0.5, board_batten: 0.5, wire_mesh: 0.15, straw: 0.3, soil: 0.4, earth: 0.8, pegboard: 0.2,
 };
@@ -472,6 +472,23 @@ function paintGingham(col: [number, number, number]): () => HTMLCanvasElement {
   };
 }
 
+/** Dense small-leaved foliage (hawthorn / rose hedge): layered leaf flecks with dark gaps. */
+function paintLeaves(base: [number, number, number], seed: number): () => HTMLCanvasElement {
+  return () => {
+    const N = 256;
+    const [c, g] = canvas(N);
+    const r = lcg(seed);
+    g.fillStyle = rgb(base[0] * 0.45, base[1] * 0.45, base[2] * 0.45); g.fillRect(0, 0, N, N);
+    for (let i = 0; i < 2600; i++) {
+      const t = 0.6 + r() * 0.75, x = r() * N, y = r() * N, a = r() * Math.PI;
+      g.fillStyle = rgb(base[0] * t, base[1] * t, base[2] * t);
+      g.beginPath(); g.ellipse(x, y, 2.2 + r() * 2.5, 1.2 + r() * 1.2, a, 0, Math.PI * 2); g.fill();
+    }
+    for (let i = 0; i < 40; i++) { g.fillStyle = 'rgba(240,235,220,0.8)'; g.beginPath(); g.arc(r() * N, r() * N, 1.4, 0, Math.PI * 2); g.fill(); }
+    return c;
+  };
+}
+
 /** Solar panel face: dark blue cells with silver busbars and a frame line. */
 function paintSolar(): HTMLCanvasElement {
   const N = 256;
@@ -567,7 +584,8 @@ export function kitMaterial(id: KitMaterialId): THREE.MeshStandardMaterial {
     case 'poly_tank': m = new THREE.MeshStandardMaterial({ color: 0x3b4a32, roughness: 0.55 }); break;
     case 'blue_tank': m = new THREE.MeshStandardMaterial({ color: 0x3a63a0, roughness: 0.4, metalness: 0.2 }); break;
     case 'flowers': m = new THREE.MeshStandardMaterial({ color: 0xe0a33a, roughness: 0.6, emissive: new THREE.Color(0.12, 0.06, 0) }); break;
-    case 'hedge': m = new THREE.MeshStandardMaterial({ color: 0x34532c, roughness: 0.92, flatShading: true }); break;
+    case 'hedge': m = texMat(id, paintLeaves([52, 84, 44], 131), 3.5, 0.9, 0, 1.6); break;
+    case 'hedge2': m = texMat(id, paintLeaves([70, 96, 48], 137), 3.5, 0.9, 0, 1.6); break;
     case 'hedge_berry': m = new THREE.MeshStandardMaterial({ color: 0xa3261e, roughness: 0.5 }); break;
     case 'container_red': case 'container_blue': case 'container_green': case 'container_tan': {
       const tint = { container_red: 0xb0473a, container_blue: 0x4a6f9a, container_green: 0x6f8f62, container_tan: 0xc7aa7c }[id];

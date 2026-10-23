@@ -107,7 +107,7 @@ export function buildRun(run: PerimeterRun, ground: Ground, t: number): THREE.Gr
         const p = along(run.pts, s), side = (k % 2 ? 1 : -1) * 0.25 * M, jitter = Math.sin(k * 12.9898) * 0.5 + 0.5;
         const x = p.x - p.dz * side, z = p.z + p.dx * side, y = ground(x, z);
         const r = w * (0.8 + 0.4 * jitter);
-        add('hedge', new THREE.IcosahedronGeometry(r, 1).scale(1, Math.max(0.6, h / r) * (0.85 + 0.3 * jitter), 1).translate(x, y + h * 0.5, z));
+        add(k % 3 === 0 ? 'hedge2' : 'hedge', new THREE.SphereGeometry(r, 10, 7).scale(1, Math.max(0.6, h / r) * (0.85 + 0.3 * jitter), 1).rotateY(jitter * 6).translate(x, y + h * 0.5, z));
         add('wood_dark', new THREE.CylinderGeometry(0.02 * M, 0.03 * M, h * 0.5, 4).translate(x, y + h * 0.25, z));
         if (g > 0.5 && k % 3 === 0) add('hedge_berry', new THREE.IcosahedronGeometry(0.05 * M, 0).translate(x + p.dz * r * 0.9, y + h * (0.4 + 0.4 * jitter), z - p.dx * r * 0.9));
         k++;
@@ -138,8 +138,14 @@ export function buildRun(run: PerimeterRun, ground: Ground, t: number): THREE.Gr
         const e = Math.min(s1, s + L);
         const a = along(run.pts, s), b = along(run.pts, e);
         const m = cols[k++ % cols.length];
-        const y = Math.min(ground(a.x, a.z), ground(b.x, b.z)) - 0.01;
+        // set level on concrete piers at the high point (containers don't bend to the ground)
         const len = Math.hypot(b.x - a.x, b.z - a.z);
+        const samples = [0, 0.25, 0.5, 0.75, 1].map(f => ground(a.x + (b.x - a.x) * f, a.z + (b.z - a.z) * f));
+        const y = Math.max(...samples) + 0.015;
+        for (const f of [0.03, 0.5, 0.97]) for (const side of [-1, 1]) {
+          const px = a.x + (b.x - a.x) * f - a.dz * side * W * 0.42, pz = a.z + (b.z - a.z) * f + a.dx * side * W * 0.42, gy = ground(px, pz) - 0.02;
+          if (y - gy > 0.005) add('concrete', new THREE.BoxGeometry(0.06, y - gy, 0.06).translate(px, gy + (y - gy) / 2, pz));
+        }
         const g = new THREE.BoxGeometry(len - 0.02 * M, H, W).translate(0, H / 2, 0).rotateY(-Math.atan2(b.z - a.z, b.x - a.x)).translate((a.x + b.x) / 2, y, (a.z + b.z) / 2);
         add(m, g);
         // corner castings and the door end
@@ -172,9 +178,33 @@ export function buildRun(run: PerimeterRun, ground: Ground, t: number): THREE.Gr
       for (const p of [p0, p1]) post(p.x, p.z, tall, 0.1 * M, 'wood_dark', true);
       const wall = run.kind === 'log_palisade' || run.kind === 'container_wall';
       const leafH = wall ? Math.abs(def.height) * 0.95 : 1.3 * M;
-      const leaf = new THREE.BoxGeometry(g.w * 0.96, leafH, wall ? 0.08 * M : 0.04 * M).translate(g.w * 0.48, leafH / 2, 0);
-      leaf.rotateY(-Math.atan2(p0.dz, p0.dx) + 1.35).translate(p0.x, ground(p0.x, p0.z) + 0.01, p0.z);
-      add(wall ? (run.kind === 'container_wall' ? 'steel' : 'wood_dark') : 'scaffold', leaf);
+      const ang = -Math.atan2(p0.dz, p0.dx);
+      /** A gate leaf, hinged at (hx, hz), `w` wide, swung open by `open` radians. */
+      const leaf = (hx: number, hz: number, w: number, open: number, mirror: number) => {
+        const parts: Array<[KitMaterialId, THREE.BufferGeometry]> = [];
+        const fm: KitMaterialId = run.kind === 'log_palisade' ? 'wood_dark' : 'steel';
+        const bar = (x: number, y: number, bw: number, bh: number, m: KitMaterialId = fm) => parts.push([m, new THREE.BoxGeometry(bw, bh, 0.02 * M).translate(x, y, 0)]);
+        // frame
+        bar(w / 2, 0.08 * M, w, 0.06 * M); bar(w / 2, leafH - 0.04 * M, w, 0.06 * M);
+        bar(0.03 * M, leafH / 2, 0.06 * M, leafH); bar(w - 0.03 * M, leafH / 2, 0.06 * M, leafH);
+        if (run.kind === 'log_palisade') {
+          // planks with a Z brace
+          for (let x = 0.12 * M; x < w - 0.06 * M; x += 0.16 * M) bar(x, leafH / 2, 0.14 * M, leafH - 0.06 * M, 'wood_mid');
+          parts.push(['wood_dark', new THREE.BoxGeometry(Math.hypot(w, leafH) * 0.9, 0.08 * M, 0.03 * M).rotateZ(Math.atan2(leafH, w)).translate(w / 2, leafH / 2, 0.02 * M)]);
+        } else if (wall) {
+          // steel bars
+          for (let x = 0.1 * M; x < w - 0.05 * M; x += 0.12 * M) bar(x, leafH / 2, 0.025 * M, leafH - 0.1 * M);
+          bar(w / 2, leafH * 0.5, w, 0.05 * M);
+        } else {
+          // tube farm gate: five rails and a diagonal
+          for (const f of [0.3, 0.5, 0.7]) bar(w / 2, leafH * f, w, 0.035 * M, 'scaffold');
+          parts.push(['scaffold', new THREE.BoxGeometry(Math.hypot(w, leafH) * 0.92, 0.03 * M, 0.02 * M).rotateZ(Math.atan2(leafH, w)).translate(w / 2, leafH / 2, 0)]);
+        }
+        const gy = ground(hx, hz) + 0.01;
+        for (const [m, g] of parts) add(m, g.scale(mirror, 1, 1).rotateY(ang + mirror * open).translate(hx, gy, hz));
+      };
+      if (wall) { leaf(p0.x, p0.z, g.w / 2 - 0.01, 1.3, 1); leaf(p1.x, p1.z, g.w / 2 - 0.01, -1.3, -1); }
+      else leaf(p0.x, p0.z, g.w * 0.96, 1.35, 1);
     }
   }
 
