@@ -75,6 +75,11 @@ Grouped by what they do. Each has a furnished interior, construction stages, upk
 **Making and fixing**
 - Workshop, blacksmith forge, sawmill and lumber kiln, machine shop, vehicle bay with pit, reloading bench, sewing / leather room, pottery kiln, soap and candle making, a print room or radio repair bench.
 
+**Sanitation and utilities** (user: plumbing / electricity possible, but only with the infrastructure, and it must cost something)
+- Outhouse (first, cheap), composting toilet, bathhouse, septic tank + leach field, greywater wetland.
+- Water: hand pump → pressure tank / gravity water tower → plumbed fixtures (sink, shower, water heater, flush toilet); pipes buried below frost line or they freeze.
+- Power: oil / candle → generator → solar + batteries + inverter → wired buildings (lights, freezer, well pump, radio). Upkeep: battery ageing, panel cleaning, pump repairs, fuel.
+
 **Health and people**
 - Infirmary / clinic with a quarantine room, dental chair, herb garden + drying room, bathhouse / sauna, laundry, composting toilets, school room, chapel or meeting hall, mess hall, children's play yard, cemetery (a quiet, real part of a long game), trading post at the gate.
 
