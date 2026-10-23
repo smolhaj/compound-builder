@@ -104,7 +104,7 @@ function rootCellar(def: KitPieceDef, seed = 1): THREE.Group {
   parts.oz = hz - D / 2 - 0.02;                // door wall near the front of the lot
   const { group } = buildGabled({
     W, D, floor: 0.02, wallH: 0.3, wallT: 0.05, rise: 0.12, eave: 0.03, gableOver: 0.03, porch: 0,
-    foundation: 'concrete', floorMat: 'concrete', outer: 'fieldstone', inner: 'fieldstone', roof: 'metal_roof', trim: 'wood_dark',
+    foundation: 'concrete', floorMat: 'concrete', outer: 'fieldstone', inner: 'fieldstone', roof: 'earth', trim: 'wood_dark',
     front: [{ kind: 'door', at: 0, w: 0.14, h: 0.3 }], ceiling: 'wood_dark', corners: 'none',
   }, (c: FurnishCtx) => {
     const { I, left, right, back } = c;
@@ -123,7 +123,8 @@ function rootCellar(def: KitPieceDef, seed = 1): THREE.Group {
   }, parts, p => {
     // the earth berm over the vault (with a sod cap), stone wing walls flanking the door, a vent pipe
     const oz = hz - D / 2 - 0.02;
-    const mound = new THREE.SphereGeometry(1, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2).scale(0.5, 0.56, 0.52).translate(0, 0, oz - 0.2);
+    // sod-covered berm over the whole vault, banked against the stone headwall
+    const mound = new THREE.SphereGeometry(1, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2).scale(0.6, 0.62, 0.62).translate(0, -0.02, oz - 0.24);
     p.add('earth', mound, 'roof');
     for (const sx of [-1, 1]) {
       const g = new THREE.BoxGeometry(0.06, 0.42, 0.24).translate(sx * (W / 2 + 0.02), 0.21, oz + D / 2 - 0.1).rotateY(sx * 0.0);

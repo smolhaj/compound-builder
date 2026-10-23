@@ -201,7 +201,7 @@ SETS.buildings = [
   { name: 'workshop-cutaway', time: 13, season: 'summer', setup: compound + cut + at('workshop', 3.2, 0.95, 0.2), cam: D, frames: 12 },
   { name: 'workshop-inside', time: 15, season: 'summer', setup: compound + inside2('workshop', 0.3, 0.27, 0.75, -0.1, 0.12, -0.95), cam: D, frames: 12 },
   { name: 'root-cellar', time: 10, season: 'summer', setup: compound + at('root_cellar', 2.2, 0.25, 0.5), cam: D, frames: 12 },
-  { name: 'root-cellar-inside', time: 10, season: 'summer', setup: compound + inside2('root_cellar', 0.0, 0.25, 0.42, 0.0, 0.08, -0.2), cam: D, frames: 12 },
+  { name: 'root-cellar-cutaway', time: 11, season: 'summer', setup: compound + cut + at('root_cellar', 1.6, 0.85, 0.3), cam: D, frames: 12 },
   { name: 'coop-and-run', time: 9.5, season: 'summer', setup: compound + at('chicken_coop', 2.0, 0.4, 0.6), cam: D, frames: 12 },
   { name: 'garden', time: 15.5, season: 'summer', setup: compound + at('garden', 2.6, 0.55, -0.5), cam: D, frames: 12 },
   { name: 'outhouse', time: 10, season: 'summer', setup: compound + at('outhouse', 1.4, 0.22, 0.5), cam: D, frames: 12 },
