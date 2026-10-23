@@ -221,7 +221,7 @@ export const Furniture = {
   },
 
   /** Kitchen counter len (m): cabinets, butcher-block top, enamel sink, a pot and crockery. */
-  counter(add: Add, lm = 2.4, sinkAt = 0.25): void {
+  counter(add: Add, lm = 2.4, sinkAt = 0.25, faucet = false): void {
     const l = lm * M, d = 0.6 * M, h = 0.9 * M;
     add('wood_mid', box(l, h - 0.1 * M, d - 0.05 * M, 0, 0.1 * M, -0.025 * M));
     add('wood_dark', box(l, 0.1 * M, d - 0.1 * M, 0, 0, -0.05 * M));                    // toe kick
@@ -231,7 +231,15 @@ export const Furniture = {
     for (let i = 0; i < n; i++) add('wood_dark', box(l / n - 0.04 * M, h - 0.3 * M, 0.015 * M, -l / 2 + (i + 0.5) * l / n, 0.15 * M, d / 2 - 0.04 * M));
     const sx = (sinkAt - 0.5) * l;
     add('enamel', box(0.6 * M, 0.06 * M, 0.45 * M, sx, h - 0.03 * M, 0));
-    add('iron', box(0.03 * M, 0.3 * M, 0.03 * M, sx, h, -d / 2 + 0.06 * M));            // pump spout
+    if (faucet) {
+      add('steel', box(0.03 * M, 0.3 * M, 0.03 * M, sx, h, -d / 2 + 0.06 * M));
+      add('steel', box(0.03 * M, 0.03 * M, 0.18 * M, sx, h + 0.28 * M, -d / 2 + 0.14 * M));                  // gooseneck faucet
+      for (const e of [-1, 1]) add('steel', cyl(0.02 * M, 0.05 * M, sx + e * 0.08 * M, h, -d / 2 + 0.06 * M, 6));
+    } else {
+      add('iron', box(0.03 * M, 0.3 * M, 0.03 * M, sx, h, -d / 2 + 0.06 * M));            // pitcher pump
+      add('iron', box(0.04 * M, 0.04 * M, 0.2 * M, sx, h + 0.3 * M, -d / 2 + 0.12 * M).rotateX(0.25));
+      add('iron', box(0.02 * M, 0.02 * M, 0.3 * M, sx, h + 0.32 * M, -d / 2 - 0.05 * M).rotateX(-0.6));    // handle
+    }
     add('iron', cyl(0.11 * M, 0.14 * M, -sx * 0.6, h, 0.02 * M));                         // pot
     for (let i = 0; i < 3; i++) add('crockery', cyl(0.05 * M, 0.1 * M, l * 0.32 + i * 0.12 * M - l * 0.05, h, -0.12 * M, 8));
   },
@@ -505,6 +513,40 @@ export const Furniture = {
     for (let i = 0; i < 4; i++) add('wood_mid', box(0.06 * M, 1.0 * M, 1.0 * M, -1.5 * M + i * 1.0 * M, 0, 0));
     add('wood_mid', box(3.0 * M, 1.0 * M, 0.06 * M, 0, 0, -0.5 * M));
     for (let i = 0; i < 3; i++) add(i === 2 ? 'straw' : 'soil', box(0.9 * M, (0.4 + i * 0.15) * M, 0.9 * M, -1.0 * M + i * 1.0 * M, 0, 0));
+  },
+
+  // ── Services (plumbed / wired) ────────────────────────────────────────
+  /** Refrigerator. */
+  fridge(add: Add): void {
+    add('enamel', box(0.7 * M, 1.75 * M, 0.7 * M, 0, 0, 0));
+    add('steel', box(0.03 * M, 0.5 * M, 0.04 * M, 0.27 * M, 1.05 * M, 0.37 * M));
+    add('steel', box(0.03 * M, 0.3 * M, 0.04 * M, 0.27 * M, 0.45 * M, 0.37 * M));
+    add('iron', box(0.68 * M, 0.01 * M, 0.01 * M, 0, 0.95 * M, 0.355 * M));
+  },
+  /** Electric water heater (tank) with pipes up into the wall. */
+  waterHeater(add: Add): void {
+    add('enamel', cyl(0.25 * M, 1.4 * M, 0, 0.05 * M, 0, 14));
+    add('steel', cyl(0.25 * M, 0.05 * M, 0, 1.45 * M, 0, 14));
+    for (const x of [-0.08, 0.08]) add(x < 0 ? 'blue_tank' : 'paint_red', cyl(0.025 * M, 1.0 * M, x * M, 1.5 * M, 0, 6));
+  },
+  /** A pendant lamp hanging `drop` m from the ceiling (place at the ceiling height). */
+  pendant(add: Add, drop = 0.6): void {
+    add('iron', cyl(0.006 * M, drop * M, 0, -drop * M, 0, 4));
+    add('iron', new THREE.ConeGeometry(0.18 * M, 0.16 * M, 12, 1, true).translate(0, -drop * M - 0.06 * M, 0));
+    add('lamp', new THREE.SphereGeometry(0.06 * M, 8, 6).translate(0, -drop * M - 0.12 * M, 0));
+  },
+  /** Flush toilet (bowl and tank). */
+  flushToilet(add: Add): void {
+    add('enamel', new THREE.CylinderGeometry(0.2 * M, 0.15 * M, 0.4 * M, 12).scale(1, 1, 1.25).translate(0, 0.2 * M, 0.05 * M));
+    add('enamel', box(0.45 * M, 0.4 * M, 0.2 * M, 0, 0.42 * M, -0.2 * M));
+    add('wood_dark', new THREE.CylinderGeometry(0.21 * M, 0.21 * M, 0.03 * M, 12).scale(1, 1, 1.25).translate(0, 0.41 * M, 0.05 * M));
+  },
+  /** Shower: tiled corner tray, curtain on a rail, a head. */
+  shower(add: Add): void {
+    add('enamel', box(0.9 * M, 0.08 * M, 0.9 * M, 0, 0, 0));
+    add('steel', box(0.9 * M, 0.02 * M, 0.02 * M, 0, 2.0 * M, 0.44 * M));
+    add('curtain', box(0.85 * M, 1.7 * M, 0.01 * M, 0, 0.3 * M, 0.44 * M));
+    add('steel', box(0.03 * M, 0.03 * M, 0.25 * M, 0, 1.9 * M, -0.35 * M));
   },
 
   // ── House ─────────────────────────────────────────────────────────────

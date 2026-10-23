@@ -57,6 +57,9 @@ export function worldUV(g: THREE.BufferGeometry): THREE.BufferGeometry {
   return geo;
 }
 
+/** Services fitted to a building. */
+export interface BuildOpts { plumbed?: boolean; wired?: boolean; septic?: boolean }
+
 /** Collects geometry per layer × material. */
 export class Parts {
   layer: BuildLayer = 'stakes';
@@ -64,7 +67,9 @@ export class Parts {
   ox = 0; oz = 0;
   /** Seeded random for this building (clutter varies house to house). */
   readonly rnd: () => number;
-  constructor(seed = 1) { this.rnd = rng(seed); }
+  /** Services the building has (interiors change: faucets, lights, fridge, flush toilet). */
+  readonly opts: BuildOpts;
+  constructor(seed = 1, opts: BuildOpts = {}) { this.rnd = rng(seed); this.opts = opts; }
   readonly map = new Map<string, THREE.BufferGeometry[]>();
   readonly colliders: Collider[] = [];
   add(m: KitMaterialId, g: THREE.BufferGeometry, layer: BuildLayer = this.layer): void {
@@ -106,12 +111,16 @@ export const box = (w: number, h: number, d: number, x: number, y: number, z: nu
   new THREE.BoxGeometry(w, h, d).translate(x, y + h / 2, z);
 
 /** A gable-end triangle, thickness t, in the x/y plane at z, with an optional window hole. */
-export function gable(halfW: number, rise: number, t: number, y0: number, z: number, hole?: { w: number; y: number; h: number }): THREE.BufferGeometry {
+export function gable(halfW: number, rise: number, t: number, y0: number, z: number, hole?: ReadonlyArray<[number, number]>): THREE.BufferGeometry {
   const s = new THREE.Shape();
   s.moveTo(-halfW, 0); s.lineTo(halfW, 0); s.lineTo(0, rise); s.closePath();
   if (hole) {
+    // holes wind the other way round
     const p = new THREE.Path();
-    p.moveTo(-hole.w / 2, hole.y); p.lineTo(-hole.w / 2, hole.y + hole.h); p.lineTo(hole.w / 2, hole.y + hole.h); p.lineTo(hole.w / 2, hole.y); p.closePath();
+    const rev = [...hole].reverse();
+    p.moveTo(rev[0][0], rev[0][1]);
+    for (const [x, y] of rev.slice(1)) p.lineTo(x, y);
+    p.closePath();
     s.holes.push(p);
   }
   return new THREE.ExtrudeGeometry(s, { depth: t, bevelEnabled: false }).translate(0, y0, z - t / 2);
@@ -138,6 +147,83 @@ export function windowAt(parts: Parts, cx: number, cz: number, y: number, nx: nu
   }
   parts.add(trim, bx(w + 0.05, 0.012, 0.035, 0, y - t - 0.012, c + out + 0.01));
 }
+
+/** Clearance kept between any opening and a roof rake, corner or another opening (world units ≈ 30 cm). */
+export const OPENING_MARGIN = 0.05;
+
+/**
+ * The outline of a gable window (gable-local x, y above the eave) that
+ * always stays inside the gable triangle by OPENING_MARGIN: a rake window
+ * follows both roof slopes to a point under the ridge; a plain one is cut
+ * down in height until its top corners clear the rakes.
+ */
+export function gableWindowPoly(hw: number, rise: number, T: number, gw: { w: number; h: number; y: number; rake?: boolean }): Array<[number, number]> {
+  const m = OPENING_MARGIN, inner = hw - T;
+  /** Height of the inside of the roof line above the eave at |x|, less the margin. */
+  const roofY = (x: number) => rise * (1 - (Math.abs(x) + m) / inner) - m;
+  const w = Math.min(gw.w, 2 * (inner - m) * 0.95);
+  const y0 = gw.y;
+  if (gw.rake) return [[-w / 2, y0], [w / 2, y0], [w / 2, Math.max(y0 + 0.02, roofY(w / 2))], [0, roofY(0)], [-w / 2, Math.max(y0 + 0.02, roofY(w / 2))]];
+  const top = Math.min(y0 + gw.h, roofY(w / 2));
+  return [[-w / 2, y0], [w / 2, y0], [w / 2, top], [-w / 2, top]];
+}
+
+/** Glass, frame and muntins for a gable window outline, on the gable at z (outward normal nz). */
+function gablePane(parts: Parts, poly: ReadonlyArray<[number, number]>, z: number, nz: number, yE: number, T: number, trim: KitMaterialId): void {
+  const sh = new THREE.Shape();
+  sh.moveTo(poly[0][0], poly[0][1]);
+  for (const [x, y] of poly.slice(1)) sh.lineTo(x, y);
+  sh.closePath();
+  const out = nz * 0.004;
+  const glass = new THREE.ShapeGeometry(sh).translate(0, yE, z + out - nz * 0.002);
+  if (nz < 0) glass.rotateY(Math.PI).translate(0, 0, 2 * z);
+  parts.add('glass', glass);
+  // frame along every edge
+  for (let i = 0; i < poly.length; i++) {
+    const [ax, ay] = poly[i], [bx, by] = poly[(i + 1) % poly.length];
+    const l = Math.hypot(bx - ax, by - ay);
+    const g = new THREE.BoxGeometry(l + 0.012, 0.012, 0.016).rotateZ(Math.atan2(by - ay, bx - ax)).translate((ax + bx) / 2, yE + (ay + by) / 2, z + out);
+    parts.add(trim, g);
+  }
+  // muntins: verticals every ≈ 60 cm up to the outline, one transom
+  const xs = poly.map(p => p[0]), x0 = Math.min(...xs), x1 = Math.max(...xs), ys = poly.map(p => p[1]), yB = Math.min(...ys);
+  const topAt = (x: number) => { let best = yB; for (let i = 0; i < poly.length; i++) { const [ax, ay] = poly[i], [bx, by] = poly[(i + 1) % poly.length]; if ((x - ax) * (x - bx) <= 0 && ax !== bx) best = Math.max(best, ay + (by - ay) * (x - ax) / (bx - ax)); } return best; };
+  const n = Math.max(1, Math.round((x1 - x0) / 0.1));
+  for (let k = 1; k < n; k++) { const x = x0 + (x1 - x0) * k / n, t = topAt(x) - yB; if (t > 0.02) parts.add(trim, box(0.008, t, 0.012, x, yE + yB, z + out)); }
+  const midY = yB + Math.min(0.2, (topAt(0) - yB) * 0.45);
+  parts.add(trim, box(x1 - x0, 0.008, 0.012, (x0 + x1) / 2, yE + midY, z + out));
+  void T;
+}
+
+/** Geometry rules a gabled spec must keep (docs: no window corners through the roof). Returns the problems, empty if sound. */
+export function validateSpec(s: GabledSpec): string[] {
+  const out: string[] = [];
+  const hw = s.W / 2, hd = s.D / 2, m = OPENING_MARGIN * 0.6;
+  const walls: Array<[string, WallOpening[] | undefined, number]> = [['front', s.front, hw], ['back', s.back, hw], ['left', s.left, hd], ['right', s.right, hd]];
+  for (const [name, list, half] of walls) {
+    const ops = (list ?? []).map(o => {
+      const w = o.w ?? (o.kind === 'window' ? WIN.w : o.kind === 'bay' ? 0.5 : DOOR.w);
+      const h = o.h ?? (o.kind === 'window' ? WIN.h : o.kind === 'bay' ? 0.38 : DOOR.h);
+      const sill = o.kind === 'window' ? o.sill ?? WIN.sill : 0;
+      return { o, a0: o.at - w / 2, a1: o.at + w / 2, top: sill + h };
+    });
+    for (const p of ops) {
+      if (p.a0 < -half + s.wallT + m || p.a1 > half - s.wallT - m) out.push(`${name} ${p.o.kind} at ${p.o.at} runs into a corner`);
+      if (p.top > s.wallH - 0.02) out.push(`${name} ${p.o.kind} at ${p.o.at} is taller than the wall (${p.top.toFixed(2)} > ${s.wallH})`);
+    }
+    for (let i = 0; i < ops.length; i++) for (let j = i + 1; j < ops.length; j++) if (ops[i].a0 < ops[j].a1 + 0.02 && ops[j].a0 < ops[i].a1 + 0.02) out.push(`${name} openings at ${ops[i].o.at} and ${ops[j].o.at} overlap`);
+  }
+  if (s.gableWindow) {
+    const poly = gableWindowPoly(hw, s.rise, s.wallT, s.gableWindow), inner = hw - s.wallT;
+    for (const [x, y] of poly) if (y > s.rise * (1 - Math.abs(x) / inner) - OPENING_MARGIN * 0.5 + 1e-6) out.push(`gable window corner (${x.toFixed(2)}, ${y.toFixed(2)}) breaks the roof line`);
+    const ys = poly.map(p => p[1]);
+    if (Math.max(...ys) - Math.min(...ys) < 0.05) out.push('gable window too small to fit under the roof');
+  }
+  return out;
+}
+
+/** Problems found while building shells (tests fail if any). */
+export const SPEC_PROBLEMS: string[] = [];
 
 // ─────────────────────────────────────────────────────────────────────────
 // Construction stages → layer fractions
@@ -217,7 +303,7 @@ export interface GabledSpec {
   roof: KitMaterialId; trim: KitMaterialId;
   front?: WallOpening[]; back?: WallOpening[]; left?: WallOpening[]; right?: WallOpening[];
   /** Window high in a gable (loft window); `tall` = a great-room glass wall up into the front gable. */
-  gableWindow?: { back?: boolean; front?: boolean; w: number; h: number; y: number };
+  gableWindow?: { back?: boolean; front?: boolean; w: number; h: number; y: number; /** Glass that follows the roof pitch up into the peak (A-frame glass gable). */ rake?: boolean };
   /** Fieldstone chimney on the back gable at x, or a stovepipe through the roof at (x, z). */
   chimney?: { kind: 'stone'; x: number } | { kind: 'pipe'; x: number; z: number };
   /** Pine (or other) ceiling boards under the roof. */
@@ -263,6 +349,7 @@ export interface GabledResult {
  * userData.chimneyTop.
  */
 export function buildGabled(s: GabledSpec, furnish?: (c: FurnishCtx) => void, parts = new Parts(), extras?: (p: Parts) => void): GabledResult {
+  for (const p of validateSpec(s)) if (!SPEC_PROBLEMS.includes(p)) SPEC_PROBLEMS.push(p);
   const { W, D } = s;
   const hw = W / 2, hd = D / 2;
   const y0 = s.floor, yE = s.floor + s.wallH;
@@ -403,7 +490,8 @@ export function buildGabled(s: GabledSpec, furnish?: (c: FurnishCtx) => void, pa
   parts.collide(...shell('walls'));
   shell('cutwalls', CUT_H);
   const gw = s.gableWindow;
-  const hole = (on?: boolean) => (gw && on ? { w: gw.w, y: gw.y, h: gw.h } : undefined);
+  const gpoly = gw ? gableWindowPoly(hw, s.rise, T, gw) : null;
+  const hole = (on?: boolean) => (gpoly && on ? gpoly : undefined);
   const tO = s.inner ? Math.min(0.022, T * 0.63) : T;
   for (const sz of [1, -1]) {
     const h = hole(sz > 0 ? gw?.front : gw?.back);
@@ -461,8 +549,8 @@ export function buildGabled(s: GabledSpec, furnish?: (c: FurnishCtx) => void, pa
       for (const e of [-1, 1]) parts.add('iron', onWall(box(0.012, p.h, 0.02, e * (p.w / 2 - 0.006), y0, -T - 0.01)));
     }
   }
-  if (gw?.back) windowAt(parts, 0, -hd, yE + gw.y, 0, -1, T, gw.w, gw.h, s.trim);
-  if (gw?.front) windowAt(parts, 0, hd, yE + gw.y, 0, 1, T, gw.w, gw.h, s.trim);
+  if (gpoly && gw?.back) gablePane(parts, gpoly, -hd, -1, yE, T, s.trim);
+  if (gpoly && gw?.front) gablePane(parts, gpoly, hd, 1, yE, T, s.trim);
   if (s.porch > 0) {
     for (const sx of [-1, 1]) parts.add(s.trim, box(0.032, yE - 0.01 - y0, 0.032, sx * (hw - 0.03), y0, pz1 - 0.03));
     parts.add(s.trim, box(W + 0.004, 0.037, 0.032, 0, yE - 0.031, pz1 - 0.03));

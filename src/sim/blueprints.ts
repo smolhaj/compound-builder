@@ -103,8 +103,22 @@ export const LOG_HOUSE_BLUEPRINT: Blueprint = {
   ],
 };
 
+// ── Water & power (docs/DECISIONS.md: only through costed infrastructure) ──
+const bp = (kind: string, stages: Array<[StageId, string, number, Partial<Stock>]>): Blueprint => ({ kind, stages: stages.map(([id, name, hours, materials]) => ({ id, name, hours, materials })) });
+
+export const UTILITY_BLUEPRINTS: Blueprint[] = [
+  bp('well_hand', [['site', 'Witch the spot, stake it', 2, {}], ['foundation', 'Dig the well by hand (≈ 7 m)', 70, {}], ['frame', 'Stone the shaft', 24, { fieldstone: 3 }], ['roof', 'Well-house roof', 6, { lumber: 1, roofing: 1 }], ['finish', 'Hand pump and cover', 5, { hardware: 1 }]]),
+  bp('well_drilled', [['site', 'Stake the bore', 2, {}], ['foundation', 'Drill the well (contractor, ≈ 60 m)', 8, { drilling: 1 }], ['frame', 'Pump-house frame', 16, { lumber: 2 }], ['roof', 'Roof', 4, { roofing: 1 }], ['finish', 'Pump, pressure tank and controls', 12, { pump: 1, hardware: 1 }]]),
+  bp('cistern', [['site', 'Stake it out', 2, {}], ['foundation', 'Level a gravel pad', 10, { concrete: 1 }], ['frame', 'Set the tank', 6, { tank: 1 }], ['roof', 'Gutters and downspouts', 10, { pipe: 1, hardware: 1 }], ['finish', 'First-flush filter and overflow', 6, { hardware: 1 }]]),
+  bp('water_tower', [['site', 'Stake it out', 4, {}], ['foundation', 'Footings', 24, { concrete: 3 }], ['frame', 'Timber stand', 60, { lumber: 8 }], ['roof', 'Hoist the tank', 16, { tank: 1 }], ['finish', 'Plumbing, ladder and the lookout deck', 20, { pipe: 2, lumber: 2 }]]),
+  bp('solar_array', [['site', 'Stake the rows (facing south)', 4, {}], ['foundation', 'Post footings', 16, { concrete: 2 }], ['frame', 'Racking', 24, { lumber: 2, hardware: 1 }], ['roof', 'Mount 12 panels', 16, { solar_panel: 12 }], ['finish', 'Combiner box and conduit', 8, { cable: 1, hardware: 1 }]]),
+  bp('battery_shed', [['site', 'Stake it out', 2, {}], ['foundation', 'Slab', 10, { concrete: 1 }], ['frame', 'Frame and insulate', 20, { lumber: 3 }], ['roof', 'Roof', 6, { roofing: 1 }], ['finish', 'Batteries, inverter, charge controller', 16, { battery: 4, inverter: 1, cable: 1 }]]),
+  bp('generator_shed', [['site', 'Stake it out', 2, {}], ['foundation', 'Slab', 8, { concrete: 1 }], ['frame', 'Lean-to frame', 12, { lumber: 2 }], ['roof', 'Roof', 4, { roofing: 1 }], ['finish', 'Generator, transfer switch, fuel rack', 8, { generator: 1, hardware: 1, fuel: 4 }]]),
+  bp('septic', [['site', 'Perc test and stake the field', 6, {}], ['foundation', 'Dig the tank hole and leach trenches', 60, {}], ['frame', 'Set the tank', 8, { septic_tank: 1 }], ['roof', 'Leach pipe in gravel', 20, { pipe: 3, concrete: 2 }], ['finish', 'Backfill, vent and lids', 10, {}]]),
+];
+
 export const BLUEPRINTS: Record<string, Blueprint> = Object.fromEntries(
-  [CABIN_BLUEPRINT, OUTHOUSE_BLUEPRINT, WORKSHOP_BLUEPRINT, ROOT_CELLAR_BLUEPRINT, COOP_BLUEPRINT, GARDEN_BLUEPRINT, LOG_HOUSE_BLUEPRINT].map(b => [b.kind, b]));
+  [CABIN_BLUEPRINT, OUTHOUSE_BLUEPRINT, WORKSHOP_BLUEPRINT, ROOT_CELLAR_BLUEPRINT, COOP_BLUEPRINT, GARDEN_BLUEPRINT, LOG_HOUSE_BLUEPRINT, ...UTILITY_BLUEPRINTS].map(b => [b.kind, b]));
 
 /** Total bill of materials for a blueprint. */
 export function totalBill(bp: Blueprint): Partial<Stock> {

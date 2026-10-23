@@ -8,8 +8,9 @@ import { emptyStock, type Stock, type MaterialId } from './materials';
 import { generateFamily, type Person } from './family';
 import type { StageId } from './blueprints';
 import type { PerimeterRun } from './perimeter';
+import { emptyUtilities, type Utilities } from './utilities';
 
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 5;
 
 /** Starting savings (GDS §1 peacetime money constraint). */
 export const STARTING_MONEY = 30000;
@@ -115,6 +116,8 @@ export interface GameState {
   heat: Heat;
   /** Fences, hedges, walls, berms, ditches. */
   perimeter: PerimeterRun[];
+  /** Water and power: fittings, battery, storage, the last day's balance. */
+  utilities: Utilities;
   /** Recent events for the HUD log (newest last, capped). */
   log: LogEntry[];
   /** Next id counter. */
@@ -136,6 +139,7 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027): GameSta
     forestry: { jobs: [], cleared: [] },
     heat: { burned: 0, warned: -1 },
     perimeter: [],
+    utilities: emptyUtilities(),
     log: [{ t: 0, text: `The ${people[0].last} family arrives on the land.` }],
     nextId: 1,
   };

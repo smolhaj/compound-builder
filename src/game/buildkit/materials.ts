@@ -21,12 +21,13 @@ export type KitMaterialId = 'timber_lap' | 'trim' | 'fieldstone' | 'metal_roof' 
   // perimeter
   | 'hedge' | 'hedge_berry' | 'container_red' | 'container_blue' | 'container_green' | 'container_tan'
   // homey decor (procedural art)
-  | 'art_mountains' | 'art_sunset' | 'art_lake' | 'photo_family' | 'photo_couple' | 'poster_map' | 'poster_seeds' | 'sampler' | 'curtain' | 'curtain_red' | 'flowers';
+  | 'solar_cell' | 'poly_tank' | 'blue_tank' |
+  'art_mountains' | 'art_sunset' | 'art_lake' | 'photo_family' | 'photo_couple' | 'poster_map' | 'poster_seeds' | 'sampler' | 'curtain' | 'curtain_red' | 'flowers';
 
 /** World units covered by one texture repeat. */
 const TEX_WORLD: Partial<Record<KitMaterialId, number>> = {
   timber_lap: 0.5, fieldstone: 0.5, metal_roof: 0.5, deck: 0.5, door: 0.2,
-  curtain: 0.15, curtain_red: 0.15,
+  curtain: 0.15, curtain_red: 0.15, solar_cell: 0.283,
   pine_panel: 0.5, quilt_red: 0.12, quilt_blue: 0.12, rug: 0.3, books: 0.1,
   concrete: 0.6, metal_siding: 0.5, container_red: 0.4, container_blue: 0.4, container_green: 0.4, container_tan: 0.4, log_wall: 0.5, board_batten: 0.5, wire_mesh: 0.15, straw: 0.3, soil: 0.4, earth: 0.8, pegboard: 0.2,
 };
@@ -471,6 +472,23 @@ function paintGingham(col: [number, number, number]): () => HTMLCanvasElement {
   };
 }
 
+/** Solar panel face: dark blue cells with silver busbars and a frame line. */
+function paintSolar(): HTMLCanvasElement {
+  const N = 256;
+  const [c, g] = canvas(N);
+  g.fillStyle = '#1b2a4a'; g.fillRect(0, 0, N, N);
+  const n = 6, m = 10, cw = N / n, ch = N / m;
+  for (let i = 0; i < n; i++) for (let j = 0; j < m; j++) {
+    const grd = g.createLinearGradient(i * cw, j * ch, (i + 1) * cw, (j + 1) * ch);
+    grd.addColorStop(0, '#22375e'); grd.addColorStop(1, '#16243f');
+    g.fillStyle = grd; g.fillRect(i * cw + 1.5, j * ch + 1.5, cw - 3, ch - 3);
+  }
+  g.fillStyle = 'rgba(200,205,215,0.55)';
+  for (let i = 0; i < n; i++) for (const f of [0.33, 0.66]) g.fillRect(i * cw + cw * f, 0, 1, N);
+  g.strokeStyle = '#b8bcc4'; g.lineWidth = 4; g.strokeRect(2, 2, N - 4, N - 4);
+  return c;
+}
+
 const _cache = new Map<KitMaterialId, THREE.MeshStandardMaterial>();
 
 function texMat(id: KitMaterialId, paint: () => HTMLCanvasElement, strength: number, roughness: number, metalness = 0, ns = 1): THREE.MeshStandardMaterial {
@@ -545,6 +563,9 @@ export function kitMaterial(id: KitMaterialId): THREE.MeshStandardMaterial {
     case 'sampler': m = texMat(id, paintSampler, 0.8, 0.95); break;
     case 'curtain': m = texMat(id, paintGingham([60, 90, 140]), 0.6, 0.95); (m as THREE.MeshStandardMaterial).side = THREE.DoubleSide; break;
     case 'curtain_red': m = texMat(id, paintGingham([170, 50, 40]), 0.6, 0.95); (m as THREE.MeshStandardMaterial).side = THREE.DoubleSide; break;
+    case 'solar_cell': m = texMat(id, paintSolar, 0.3, 0.15, 0.4); break;
+    case 'poly_tank': m = new THREE.MeshStandardMaterial({ color: 0x3b4a32, roughness: 0.55 }); break;
+    case 'blue_tank': m = new THREE.MeshStandardMaterial({ color: 0x3a63a0, roughness: 0.4, metalness: 0.2 }); break;
     case 'flowers': m = new THREE.MeshStandardMaterial({ color: 0xe0a33a, roughness: 0.6, emissive: new THREE.Color(0.12, 0.06, 0) }); break;
     case 'hedge': m = new THREE.MeshStandardMaterial({ color: 0x34532c, roughness: 0.92, flatShading: true }); break;
     case 'hedge_berry': m = new THREE.MeshStandardMaterial({ color: 0xa3261e, roughness: 0.5 }); break;

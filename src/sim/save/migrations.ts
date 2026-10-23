@@ -4,6 +4,7 @@
  * rule 5). Pure — tested in migrations.test.ts.
  */
 import { SAVE_VERSION, type GameState } from '../state';
+import { emptyUtilities } from '../utilities';
 
 type Raw = Record<string, unknown> & { version?: number };
 
@@ -20,6 +21,8 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   2: s => ({ ...s, version: 3, stock: { concrete: 0, ...(s.stock as object) } }),
   // 3 → 4: the perimeter (fences, hedges, walls) and its materials
   3: s => ({ ...s, version: 4, perimeter: [], stock: { wire: 0, seedlings: 0, container: 0, ...(s.stock as object) } }),
+  // 4 → 5: water and power (utilities state, their materials)
+  4: s => ({ ...s, version: 5, utilities: emptyUtilities(), stock: { pipe: 0, cable: 0, fixtures: 0, pump: 0, drilling: 0, solar_panel: 0, battery: 0, inverter: 0, generator: 0, fuel: 0, tank: 0, septic_tank: 0, ...(s.stock as object) } }),
 };
 
 export class SaveVersionError extends Error {}
@@ -36,7 +39,7 @@ export function migrate(raw: unknown): GameState {
     if (!up) throw new SaveVersionError(`No migration from version ${s.version}`);
     s = up(s);
   }
-  for (const k of ['seed', 'clock', 'money', 'stock', 'orders', 'people', 'personState', 'structures', 'forestry', 'heat', 'perimeter', 'log', 'nextId'] as const) {
+  for (const k of ['seed', 'clock', 'money', 'stock', 'orders', 'people', 'personState', 'structures', 'forestry', 'heat', 'perimeter', 'utilities', 'log', 'nextId'] as const) {
     if (!(k in s)) throw new SaveVersionError(`Save is missing "${k}"`);
   }
   return s as unknown as GameState;

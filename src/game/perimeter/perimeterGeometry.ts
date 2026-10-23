@@ -147,6 +147,21 @@ export function buildRun(run: PerimeterRun, ground: Ground, t: number): THREE.Gr
       }
       break;
     }
+    case 'water_pipe': case 'power_cable': {
+      // an open trench while it's being laid, then a backfilled strip that greens over; marker posts at the bends
+      const open = run.finishedAt === null, age = open ? 0 : Math.min(1, (t - run.finishedAt!) / 120);
+      const w = (open ? 0.5 : 0.7) * M, mat: KitMaterialId = open ? 'soil' : age < 0.6 ? 'soil' : 'earth';
+      if (!(age >= 1)) for (const [s0, s1] of spans) {
+        const n = Math.max(1, Math.ceil((s1 - s0) / 0.4));
+        for (let i = 0; i < n; i++) {
+          const a = along(run.pts, s0 + (s1 - s0) * i / n), b = along(run.pts, s0 + (s1 - s0) * (i + 1) / n);
+          beam(a.x, a.z, b.x, b.z, -0.004, 0.008, w, mat);
+          if (open) { const o = w * 0.9; beam(a.x - a.dz * o, a.z + a.dx * o, b.x - b.dz * o, b.z + b.dx * o, 0, 0.025, 0.25 * M, 'soil'); }
+        }
+      }
+      for (const p of run.pts) post(p[0], p[1], 0.9 * M, 0.04 * M, run.kind === 'water_pipe' ? 'blue_tank' : 'paint_red');
+      break;
+    }
     default: break;  // berm, ditch: earthworks in the terrain
   }
   // gates: posts each side and a leaf swung open (wire / rail fences: tube gate; walls: plank or steel gates)

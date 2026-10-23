@@ -8,8 +8,9 @@ import * as THREE from 'three';
 import { CELL, KIT, type KitPieceDef } from './kit';
 import { Furniture, M, wallRun } from './interior';
 import { buildCabinLayers } from './cabinGeometry';
-import { box, buildGabled, CUT_H, Parts, showStage, type FurnishCtx } from './shell';
+import { box, buildGabled, CUT_H, Parts, showStage, type BuildOpts, type FurnishCtx } from './shell';
 import { Clutter } from './clutter';
+import { UTILITY_BUILDERS } from './utilityBuildings';
 
 /** Seats for evenings at home: local x, z and the point the sitter faces. */
 export type Seat = [number, number, number, number];
@@ -52,7 +53,7 @@ function outhouse(_def: KitPieceDef, seed = 1): THREE.Group {
 // Workshop & garage
 // ─────────────────────────────────────────────────────────────────────────
 
-function workshop(def: KitPieceDef, seed = 1): THREE.Group {
+function workshop(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
   const W = def.cellsX * CELL, D = def.cellsZ * CELL;
   const forgeX = -0.4;
   const { group } = buildGabled({
@@ -89,7 +90,7 @@ function workshop(def: KitPieceDef, seed = 1): THREE.Group {
     c.C({ x: 0.5, z: c.front - 0.08, rot: 0.4 }, a => Clutter.boots(a, 'paint_green'), 0.7);
     c.C({ x: -0.55, z: back + 0.25 }, a => Clutter.bucket(a), 0.7);
     c.C({ x: -0.62, z: -0.35 }, a => Clutter.dogBed(a, c.rnd() < 0.5), 0.4);
-  }, new Parts(seed));
+  }, new Parts(seed, opts));
   return group;
 }
 
@@ -103,7 +104,7 @@ function rootCellar(def: KitPieceDef, seed = 1): THREE.Group {
   const parts = new Parts(seed);
   parts.oz = hz - D / 2 - 0.02;                // door wall near the front of the lot
   const { group } = buildGabled({
-    W, D, floor: 0.02, wallH: 0.3, wallT: 0.05, rise: 0.12, eave: 0.03, gableOver: 0.03, porch: 0,
+    W, D, floor: 0.02, wallH: 0.34, wallT: 0.05, rise: 0.12, eave: 0.03, gableOver: 0.03, porch: 0,
     foundation: 'concrete', floorMat: 'concrete', outer: 'fieldstone', inner: 'fieldstone', roof: 'earth', trim: 'wood_dark',
     front: [{ kind: 'door', at: 0, w: 0.14, h: 0.3 }], ceiling: 'wood_dark', corners: 'none',
   }, (c: FurnishCtx) => {
@@ -143,7 +144,7 @@ function rootCellar(def: KitPieceDef, seed = 1): THREE.Group {
 
 function chickenCoop(def: KitPieceDef, seed = 1): THREE.Group {
   const LW = def.cellsX * CELL, LD = def.cellsZ * CELL;
-  const W = 0.32, D = 0.38;
+  const W = 0.36, D = 0.4;
   const parts = new Parts(seed);
   parts.oz = -LD / 2 + D / 2 + 0.05;            // coop at the back of the lot, the run in front
   const hens: Array<[number, number, number, 'paint_red' | 'linen' | 'wood_dark']> = [
@@ -152,7 +153,7 @@ function chickenCoop(def: KitPieceDef, seed = 1): THREE.Group {
   const { group } = buildGabled({
     W, D, floor: 0.12, wallH: 0.24, wallT: 0.018, rise: 0.1, eave: 0.04, gableOver: 0.04, porch: 0,
     foundation: 'piers', floorMat: 'straw', outer: 'board_batten', inner: null, roof: 'metal_roof', trim: 'trim',
-    front: [{ kind: 'door', at: 0.06, w: 0.12, h: 0.21 }, { kind: 'window', at: -0.09, w: 0.08, h: 0.08, sill: 0.12 }],
+    front: [{ kind: 'door', at: 0.06, w: 0.12, h: 0.21 }, { kind: 'window', at: -0.08, w: 0.08, h: 0.08, sill: 0.12 }],
     left: [{ kind: 'arch', at: 0.05, w: 0.05, h: 0.06 }],
     corners: 'boards',
   }, (c: FurnishCtx) => {
@@ -255,7 +256,7 @@ function garden(def: KitPieceDef, seed = 1): THREE.Group {
 /** Bath / bedroom partitions (back right). */
 const LH = { px: 0.15, bedZ: -0.45, bathZ: 0.15, loftZ: -0.32 };
 
-function logHouse(def: KitPieceDef, seed = 1): THREE.Group {
+function logHouse(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
   const W = def.cellsX * CELL, D = def.cellsZ * CELL;
   const { group } = buildGabled({
     W, D, floor: 0.1, wallH: 0.55, wallT: 0.05, rise: 0.6, eave: 0.08, gableOver: 0.06, porch: 0.45,
@@ -264,7 +265,7 @@ function logHouse(def: KitPieceDef, seed = 1): THREE.Group {
     back: [{ kind: 'door', at: 0.55 }, { kind: 'window', at: 0.05 }],
     left: [{ kind: 'window', at: -0.95 }, { kind: 'window', at: -0.3 }, { kind: 'window', at: 0.45 }, { kind: 'window', at: 0.95 }],
     right: [{ kind: 'window', at: -0.85 }, { kind: 'window', at: -0.15, w: 0.1, h: 0.1, sill: 0.3 }, { kind: 'window', at: 0.55 }, { kind: 'window', at: 0.95 }],
-    gableWindow: { front: true, back: true, w: 0.7, h: 0.4, y: 0.04 },
+    gableWindow: { front: true, back: true, w: 0.9, h: 0.4, y: 0.04, rake: true },
     chimney: { kind: 'stone', x: -0.4 },
     ceiling: 'pine_panel', corners: 'logs', curtains: 'curtain_red',
   }, (c: FurnishCtx) => {
@@ -282,7 +283,13 @@ function logHouse(def: KitPieceDef, seed = 1): THREE.Group {
     I({ x: left + 0.03, z: -0.12, rot: Math.PI / 2 }, a => Furniture.shelfUnit(a, 1.4, 2.0, 'books'));
     I({ x: -0.62, z: back + 0.06 }, a => Furniture.woodbox(a));
     // kitchen and dining by the glass gable
-    I({ x: left + 0.05, z: 0.68, rot: Math.PI / 2 }, a => Furniture.counter(a, 3.4, 0.4));
+    const o = c.parts.opts;
+    I({ x: left + 0.05, z: 0.68, rot: Math.PI / 2 }, a => Furniture.counter(a, 3.4, 0.4, !!o.plumbed));
+    if (o.wired) {
+      I({ x: left + 0.065, z: 0.06, rot: Math.PI / 2 }, a => Furniture.fridge(a));
+      for (const [x, z] of [[-0.32, 0.55], [-0.32, 0.72], [0.35, 0.78], [-0.4, -0.65], [0.45, -0.8]]) I({ x, z, y: z < -0.3 ? yE - 0.07 : yE + 0.2 }, a => Furniture.pendant(a, z < -0.3 ? 0.5 : 1.6), false);
+    }
+    if (o.plumbed) I({ x: 0.24, z: 0.08 }, a => Furniture.waterHeater(a));
     I({ x: left + 0.02, z: 0.8, rot: Math.PI / 2 }, a => Furniture.wallShelf(a, 1.5, 1.5, 2, 'jars'), false);
     I({ x: left + 0.06, z: 0.22, rot: Math.PI / 2 }, a => Furniture.cookstove(a));
     I({ x: -0.32, z: 0.62, rot: Math.PI / 2 }, a => Furniture.island(a, 1.8));
@@ -299,7 +306,7 @@ function logHouse(def: KitPieceDef, seed = 1): THREE.Group {
     // bath: clawfoot tub, washstand, composting toilet
     I({ x: 0.5, z: LH.bedZ + 0.08 }, a => Furniture.tub(a));
     I({ x: right - 0.04, z: 0.02, rot: -Math.PI / 2 }, a => Furniture.washstand(a));
-    I({ x: 0.25, z: LH.bedZ + 0.1 }, a => Furniture.toilet(a));
+    I({ x: 0.25, z: LH.bedZ + 0.1 }, a => (o.plumbed && o.septic ? Furniture.flushToilet(a) : Furniture.toilet(a)));
     // the loft over the back: floor, beam, rail; bunks and a bed under the roof
     const FW = right - left;
     parts.add('deck', box(FW, 0.025, LH.loftZ - back, 0, yE - 0.025, (LH.loftZ + back) / 2), 'loft');
@@ -312,7 +319,7 @@ function logHouse(def: KitPieceDef, seed = 1): THREE.Group {
     L({ x: 0, z: -0.6 }, a => Furniture.rug(a, 1.6, 1.2));
     dressLogHouse(c);
     void y0;
-  }, new Parts(seed));
+  }, new Parts(seed, opts));
   return group;
 }
 
@@ -390,7 +397,7 @@ const SEATS: Record<string, Seat[]> = {
   log_house: [[-0.3, -0.45, -0.4, -1.1], [-0.5, -0.45, -0.4, -1.1], [0.35, 0.62, 0.35, 0.78], [0.35, 0.94, 0.35, 0.78]],
 };
 
-const BUILDERS: Record<string, (def: KitPieceDef, seed?: number) => THREE.Group> = {
+const BUILDERS: Record<string, (def: KitPieceDef, seed?: number, opts?: BuildOpts) => THREE.Group> = {
   timber_cabin: buildCabinLayers,
   outhouse,
   workshop,
@@ -398,11 +405,13 @@ const BUILDERS: Record<string, (def: KitPieceDef, seed?: number) => THREE.Group>
   chicken_coop: chickenCoop,
   garden,
   log_house: logHouse,
+  ...UTILITY_BUILDERS,
 };
 
 /** Every layer of a kit piece (construction shows them stage by stage). */
-export function buildLayers(def: KitPieceDef, seed = 1): THREE.Group {
-  const g = BUILDERS[def.id](def, seed);
+export function buildLayers(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
+  const g = BUILDERS[def.id](def, seed, opts);
+  g.userData.opts = opts;
   g.userData.seats ??= SEATS[def.id] ?? [];
   g.userData.chimneyTop ??= null;
   return g;

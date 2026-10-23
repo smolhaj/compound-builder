@@ -15,7 +15,7 @@ import * as THREE from 'three';
 import { CELL, type KitPieceDef } from './kit';
 import { Furniture, M } from './interior';
 import { Clutter } from './clutter';
-import { box, buildGabled, Parts, layerFractions, showStage, BUILD_LAYERS, CUTAWAY_HIDE, CUT_H, XRAY_LAYERS, type BuildLayer, type FurnishCtx, type GabledSpec } from './shell';
+import { box, buildGabled, Parts, layerFractions, showStage, BUILD_LAYERS, CUTAWAY_HIDE, CUT_H, XRAY_LAYERS, type BuildLayer, type BuildOpts, type FurnishCtx, type GabledSpec } from './shell';
 
 export { layerFractions, CUTAWAY_HIDE, XRAY_LAYERS, CUT_H };
 export type CabinLayer = BuildLayer;
@@ -67,10 +67,14 @@ function furnishCabin(c: FurnishCtx): void {
   I({ x: 0.24, z: -0.36 }, a => Furniture.rug(a, 2.2, 1.5), false);
   I({ x: 0.11, z: -0.34, rot: Math.PI - 0.35 }, a => Furniture.armchair(a, 'quilt_red'));
   I({ x: 0.38, z: -0.33, rot: Math.PI + 0.35 }, a => Furniture.armchair(a, 'quilt_blue'));
-  I({ x: left + 0.05, z: -0.48, rot: Math.PI / 2 }, a => Furniture.counter(a, 2.5, 0.62));
+  const o = c.parts.opts;
+  I({ x: left + 0.05, z: -0.48, rot: Math.PI / 2 }, a => Furniture.counter(a, 2.5, 0.62, !!o.plumbed));
   I({ x: left + 0.02, z: -0.6, rot: Math.PI / 2 }, a => Furniture.wallShelf(a, 1.1, 1.45, 2, 'jars'), false);
   I({ x: -0.3, z: back + 0.03 }, a => Furniture.shelfUnit(a, 1.2, 1.9, 'jars'));
-  I({ x: left + 0.05, z: -0.17 }, a => Furniture.barrel(a));
+  if (o.wired) I({ x: left + 0.065, z: -0.17, rot: Math.PI / 2 }, a => Furniture.fridge(a));
+  else I({ x: left + 0.05, z: -0.17 }, a => Furniture.barrel(a));
+  if (o.wired) for (const [x, z] of [[-0.25, 0.05], [0.24, 0.4]]) I({ x, z, y: c.yE - 0.03 }, a => Furniture.pendant(a, 0.5), false);
+  if (o.plumbed) I({ x: left + 0.01, z: -0.25, y: y0 + 1.5 * M, rot: Math.PI / 2 }, a => { a('enamel', box(0.35 * M, 0.5 * M, 0.2 * M, 0, 0, 0.1 * M)); }, false);
   const tx = -0.25, tz = 0.02;
   I({ x: tx, z: tz }, a => { Furniture.table(a, 1.2, 0.85); Furniture.oilLamp(a, 0, 0.76, 0); });
   for (const sx of [-1, 1]) {
@@ -169,8 +173,8 @@ function dressCabin(c: FurnishCtx): void {
 export const CABIN_SEATS: ReadonlyArray<[number, number, number, number]> = [[-0.295, -0.08, -0.25, 0.02], [-0.205, 0.12, -0.25, 0.02], [0.11, -0.34, 0.26, -0.62], [0.38, -0.33, 0.26, -0.62]];
 
 /** All layers of the cabin as meshes tagged userData.layer (one per layer × material). */
-export function buildCabinLayers(def: KitPieceDef, seed = 1): THREE.Group {
-  const { group } = buildGabled(cabinSpec(def), c => { furnishCabin(c); dressCabin(c); }, new Parts(seed));
+export function buildCabinLayers(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
+  const { group } = buildGabled(cabinSpec(def), c => { furnishCabin(c); dressCabin(c); }, new Parts(seed, opts));
   group.userData.seats = CABIN_SEATS;
   return group;
 }

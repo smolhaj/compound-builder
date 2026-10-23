@@ -52,3 +52,26 @@ describe('building registry', () => {
     expect(new Set([a, b, verts(3), verts(4)]).size).toBeGreaterThan(1);
   });
 });
+
+import { SPEC_PROBLEMS, gableWindowPoly } from './shell';
+import { UTILITY_ORDER } from './kit';
+
+describe('procedural geometry stays sound', () => {
+  it('no building has openings through corners, past the eaves, or gable glass through the roof line', () => {
+    for (const kind of [...KIT_ORDER, ...UTILITY_ORDER]) buildLayers(KIT[kind]);
+    expect(SPEC_PROBLEMS).toEqual([]);
+  });
+  it('a too-big plain gable window is cut down to fit; rake glass follows the slopes', () => {
+    const plain = gableWindowPoly(0.75, 0.6, 0.05, { w: 0.7, h: 0.5, y: 0.04 });
+    for (const [x, y] of plain) expect(y).toBeLessThan(0.6 * (1 - Math.abs(x) / 0.7) - 0.02);
+    const rake = gableWindowPoly(0.75, 0.6, 0.05, { w: 0.9, h: 0.4, y: 0.04, rake: true });
+    expect(rake.length).toBe(5);
+    for (const [x, y] of rake) expect(y).toBeLessThan(0.6 * (1 - Math.abs(x) / 0.7) - 0.02);
+  });
+  it('utility buildings build with their layers', () => {
+    for (const kind of UTILITY_ORDER) {
+      const g = buildLayers(KIT[kind]);
+      expect(g.children.length).toBeGreaterThan(2);
+    }
+  });
+});
