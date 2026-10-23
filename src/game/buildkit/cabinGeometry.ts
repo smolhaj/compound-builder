@@ -392,6 +392,7 @@ export function showCabinStage(group: THREE.Group, stage: number, f: number, sup
   const fr = layerFractions(stage, f, supplied);
   for (const o of group.children) {
     const m = o as THREE.Mesh;
+    if (!m.isMesh) continue;            // lights etc. are managed by the world
     const layer = m.userData.layer as CabinLayer;
     const k = fr[layer];
     m.visible = k > 0.001;
