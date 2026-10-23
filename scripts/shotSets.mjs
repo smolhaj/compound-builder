@@ -246,3 +246,39 @@ SETS.perimeter = [
   { name: 'sightlines-night-lights', time: 12, season: 'summer', setup: perimeter + sight('night') + atCampV(48, 1.0, 0.0), cam: D, frames: 10 },
   { name: 'viewshed-from-tower', time: 12, season: 'summer', setup: perimeter + sight('viewshed', [9.5, 9.5, 1.7]) + atCampV(48, 1.0, 0.0), cam: D, frames: 10 },
 ];
+
+/**
+ * Water and power round the sample compound: drilled well + pump house,
+ * cistern, water tower, septic; solar array, battery shed, generator shed;
+ * buried lines joining them to the log house and cabin; both houses plumbed
+ * and wired; a day of balance run.
+ */
+const utilities = compound + `{ if (!window.__util) { window.__util = true;
+  const G = cb.game, W = cb.world, c = W.camp, lh = window.__b.log_house, cab = window.__b.timber_cabin;
+  const place = (kind, dx, dz, rot = 0) => { const sp = cb.tool.findSpot(kind, c.x + dx, c.z + dz, rot); if (!sp) return null; G.getState().plan(kind, sp[0], sp[1], rot); const st = G.getState().game.structures.at(-1); window.__b[kind] = st; return st; };
+  const well = place('well_drilled', -8, -1), cis = place('cistern', -7, -5), tower = place('water_tower', -9, 3), sep = place('septic', -2, -8);
+  const sol = place('solar_array', 1, 8), bat = place('battery_shed', 4, 7), gen = place('generator_shed', 5, 9), hw = place('well_hand', 7, -2);
+  G.setState(s => { const g = structuredClone(s.game); for (const st of g.structures) { st.stage = 5; st.done = 0; st.finishedAt = 0; } g.stock.fuel = 10; return { game: g }; });
+  const pts = (...a) => a.filter(Boolean).map(st => [st.x, st.z]);
+  G.getState().planRun('water_pipe', pts(well, tower, lh, cab), []);
+  G.getState().planRun('water_pipe', pts(cis, lh), []);
+  G.getState().planRun('water_pipe', pts(lh, sep), []);
+  G.getState().planRun('power_cable', pts(sol, bat, gen), []);
+  G.getState().planRun('power_cable', pts(bat, cab, lh, well), []);
+  G.setState(s => { const g = structuredClone(s.game); for (const r of g.perimeter) { r.done = r.hours; r.supplied = true; r.finishedAt = g.clock.t - 400; }
+    for (const id of [lh.id, cab.id]) for (const kind of ['plumb', 'wire']) g.utilities.fittings.push({ building: id, kind, done: 40, hours: 40, supplied: true, finishedAt: 0 });
+    return { game: g }; });
+  G.getState().advance(1);
+} }`;
+SETS.utilities = [
+  { name: 'aerial-water-and-power', time: 11, season: 'summer', setup: utilities + atCampV(22, 0.85, 0.3), cam: D, frames: 24 },
+  { name: 'solar-array-and-battery-shed', time: 12.5, season: 'summer', setup: utilities + at('solar_array', 2.6, 0.35, 0.5), cam: D, frames: 14 },
+  { name: 'battery-shed-cutaway', time: 13, season: 'summer', setup: utilities + cut + at('battery_shed', 1.2, 0.9, 0.3), cam: D, frames: 14 },
+  { name: 'generator-shed', time: 15, season: 'summer', setup: utilities + at('generator_shed', 1.5, 0.3, 0.2), cam: D, frames: 14 },
+  { name: 'water-tower-and-well-house', time: 10, season: 'summer', setup: utilities + at('water_tower', 3.2, 0.25, 0.6), cam: D, frames: 14 },
+  { name: 'cistern', time: 16, season: 'summer', setup: utilities + at('cistern', 1.8, 0.3, 0.4), cam: D, frames: 14 },
+  { name: 'pump-house-inside', time: 11, season: 'summer', setup: utilities + inside2('well_drilled', 0.04, 0.27, 0.28, -0.06, 0.12, -0.15), cam: D, frames: 14 },
+  { name: 'log-house-wired-kitchen-night', time: 21, season: 'fall', setup: utilities + inside2('log_house', -0.45, 0.29, -0.25, -0.3, 0.12, 1.0), cam: D, frames: 14 },
+  { name: 'log-house-plumbed-bath', time: 11, season: 'summer', setup: utilities + inside2('log_house', 0.2, 0.29, 0.1, 0.6, 0.06, -0.35), cam: D, frames: 14 },
+  { name: 'compound-night-electric', time: 21.5, season: 'fall', setup: utilities + atCampV(14, 0.45, 2.6), cam: D, frames: 20 },
+];
