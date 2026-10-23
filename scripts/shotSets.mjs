@@ -207,3 +207,42 @@ SETS.buildings = [
   { name: 'outhouse', time: 10, season: 'summer', setup: compound + at('outhouse', 1.4, 0.22, 0.5), cam: D, frames: 12 },
   { name: 'compound-night', time: 21.5, season: 'fall', setup: compound + "{ const c = cb.world.camp; cb.cam.target.set(c.x, 0, c.z); cb.cam.radius = 12; cb.cam.pitch = 0.45; cb.cam.yaw = 2.6; }", cam: D, frames: 20 },
 ];
+
+/**
+ * A perimeter round the sample compound: container wall (front), log
+ * palisade (west), a grown thorn hedge (back), barbed + game fence (east),
+ * a ditch and berm outside the front; gates wherever a line crosses the
+ * driveway, plus a front gate. Everything finished; the hedge planted 6
+ * years ago.
+ */
+const perimeter = compound + `{ if (!window.__perim) { window.__perim = true;
+  const G = cb.game, W = cb.world, c = W.camp, R = 9.5, drive = W.access.drive;
+  const near = (pts) => { const gates = []; let acc = 0; for (let i = 1; i < pts.length; i++) { const [ax, az] = pts[i - 1], [bx, bz] = pts[i], l = Math.hypot(bx - ax, bz - az); for (let s = 0; s < l; s += 0.1) { const x = ax + (bx - ax) * s / l, z = az + (bz - az) * s / l; if (drive.some(p => Math.hypot(p[0] - x, p[1] - z) < 0.35) && !gates.some(g => Math.abs(g.at - (acc + s)) < 1.2)) gates.push({ at: acc + s, w: 0.6 }); } acc += l; } return gates; };
+  const x0 = c.x - R, x1 = c.x + R, z0 = c.z - R, z1 = c.z + R;
+  const runs = [
+    ['container_wall', [[x0, z1], [x1, z1]], [{ at: R, w: 0.6 }]],
+    ['log_palisade', [[x0, z0], [x0, z1]], []],
+    ['thorn_hedge', [[x0, z0], [x1, z0]], []],
+    ['barbed_wire', [[x1, z0], [x1, c.z]], []],
+    ['woven_wire', [[x1, c.z], [x1, z1]], []],
+    ['ditch', [[x0 - 1.5, z1 + 1.6], [x1 + 1.5, z1 + 1.6]], [{ at: R + 1.5, w: 0.6 }]],
+    ['earth_berm', [[x0 - 1.5, z1 + 2.6], [x1 + 1.5, z1 + 2.6]], [{ at: R + 1.5, w: 0.6 }]],
+  ];
+  for (const [kind, pts, gates] of runs) G.getState().planRun(kind, pts, [...gates, ...near(pts)]);
+  G.setState(s => { const g = structuredClone(s.game); for (const r of g.perimeter) { r.done = r.hours; r.supplied = true; r.finishedAt = g.clock.t - 6 * 365; } return { game: g }; });
+} }`;
+const sight = (m, eye) => `cb.store.getState().setSightMode('${m}');` + (eye ? `{ const c = cb.world.camp; cb.sight.set('viewshed', { x: c.x + ${eye[0]}, z: c.z + ${eye[1]}, eye: ${eye[2]} }); }` : '') + 'cb.sight.update(600000);';
+const atCampV = (r, pitch, yaw) => `{ const c = cb.world.camp; cb.cam.target.set(c.x, 0, c.z); cb.cam.radius = ${r}; cb.cam.pitch = ${pitch}; cb.cam.yaw = ${yaw}; }`;
+const eyeAt = (dx, dz, lx, lz, eye = 0.3) => `{ const c = cb.world.camp; cb.cam.placeEye(c.x + ${dx}, c.z + ${dz}, c.x + ${lx}, c.z + ${lz}, ${eye}); }`;
+SETS.perimeter = [
+  { name: 'aerial-walled-compound', time: 11, season: 'summer', setup: perimeter + atCampV(26, 0.8, 0.4), cam: D, frames: 20 },
+  { name: 'container-wall-and-gate-eye-level', time: 10, season: 'summer', setup: perimeter + eyeAt(1.5, 13.5, 0, 9.5), cam: D, frames: 14 },
+  { name: 'ditch-and-berm', time: 16, season: 'summer', setup: perimeter + atCampV(7, 0.32, 0.5) + "{ const c = cb.world.camp; cb.cam.target.set(c.x + 4, 0, c.z + 11); }", cam: D, frames: 14 },
+  { name: 'thorn-hedge-grown', time: 14, season: 'summer', setup: perimeter + eyeAt(2, -12, 0, -9.5), cam: D, frames: 14 },
+  { name: 'palisade-from-inside', time: 15, season: 'fall', setup: perimeter + eyeAt(-6, -2, -9.5, 1.5), cam: D, frames: 14 },
+  { name: 'barbed-and-game-fence', time: 9, season: 'summer', setup: perimeter + eyeAt(12, -2, 9.5, 2), cam: D, frames: 14 },
+  { name: 'sightlines-from-road', time: 12, season: 'summer', setup: perimeter + sight('road') + atCampV(48, 1.0, 0.0), cam: D, frames: 10 },
+  { name: 'sightlines-from-ridge', time: 12, season: 'summer', setup: perimeter + sight('ridge') + atCampV(48, 1.0, 0.0), cam: D, frames: 10 },
+  { name: 'sightlines-night-lights', time: 12, season: 'summer', setup: perimeter + sight('night') + atCampV(48, 1.0, 0.0), cam: D, frames: 10 },
+  { name: 'viewshed-from-tower', time: 12, season: 'summer', setup: perimeter + sight('viewshed', [9.5, 9.5, 1.7]) + atCampV(48, 1.0, 0.0), cam: D, frames: 10 },
+];
