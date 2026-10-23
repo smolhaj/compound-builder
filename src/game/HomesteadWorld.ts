@@ -13,6 +13,12 @@ import { RegionalProps } from '../engine/world/houses/regionalProps';
 import { buildFarmstead, type FarmTree } from '../engine/world/houses/regionalFarmsteads';
 import { onFarmstead, type Farmstead } from '../engine/world/houses/farmstead';
 import { planNeighbours } from './region/neighbours';
+import { buildCamp, flickerCampfire } from './props/campGeometry';
+import { FamilyRenderer } from './people/FamilyRenderer';
+import type { GoalCtx, Site } from './people/peopleGoals';
+import { CELL } from './buildkit/kit';
+import type { GameState } from '../sim/state';
+import type { WearSeason } from '../engine/world/people/crowdWear';
 import type { TourBuildingInfo } from '../engine/world/camera/TourController';
 import { footprint, KIT, type Placed } from './buildkit/kit';
 import { buildCabinLayers, cabinChimneyTop, showCabinStage } from './buildkit/cabinGeometry';
@@ -52,6 +58,10 @@ export class HomesteadWorld {
   readonly air = { hour: 12, wind: 0.2, daylight: 1, viewportH: 800 };
   /** Neighbouring farmsteads (seeded). */
   readonly farms: Farmstead[];
+  /** The family's camp (until a home stands; it stays as the work yard). */
+  readonly camp: { x: number; z: number; rot: number };
+  private readonly _campGroup: THREE.Group;
+  readonly family: FamilyRenderer;
   /** Planted parcel trees (QA: clear eye-level spots). */
   treeSpecs: ReadonlyArray<{ x: number; y: number; z: number; scale: number; sx: number; sy: number; kind: string }> = [];
   private _clock = 0;
@@ -65,11 +75,17 @@ export class HomesteadWorld {
     ws.setSite({ x0: 0, z0: 0, x1: PARCEL_SIZE, z1: PARCEL_SIZE });
     this.parcel = new ParcelTerrain(seed);
     this.farms = planNeighbours(this.parcel);
+    this.camp = this._pickCamp();
     this.terrain = new TerrainRenderer(ws.scene);
     this.forest = new ForestRenderer(ws.scene);
     this.farTrees = new FarTreeRenderer(ws.scene);
     this.stream = new StreamRenderer(ws.scene);
     this.lakes = new RegionalWaterRenderer(ws.scene);
+    this.family = new FamilyRenderer(ws.scene);
+    this._campGroup = buildCamp();
+    this._campGroup.position.set(this.camp.x, this.parcel.height(this.camp.x, this.camp.z), this.camp.z);
+    this._campGroup.rotation.y = this.camp.rot;
+    this._root.add(this._campGroup);
     const zc = this.parcel.creek.zAt(this.center.x + 3);
     this._root.add(scaleFigure(this.center.x + 3, zc + 4, this.parcel.height(this.center.x + 3, zc + 4)));
     ws.scene.add(this._root);
@@ -92,7 +108,7 @@ export class HomesteadWorld {
   /** Parcel trees (near, detailed) inside the margin; regional far trees beyond it. */
   private _plant(q: Quality): void {
     const margin = TREE_MARGIN;
-    const specs = planParcelTrees(this.parcel, { margin, density: q === 'low' ? 0.5 : 1, blocked: (x, z) => this.onBuilding(x, z, 0.6) });
+    const specs = planParcelTrees(this.parcel, { margin, density: q === 'low' ? 0.5 : 1, blocked: (x, z) => this.onBuilding(x, z, 0.6) || this.onCamp(x, z, 0.6) });
     for (const t of specs) t.y = this.terrain.surfaceAt(t.x, t.z) - 0.03;
     this.treeSpecs = specs;
     this.forest.build(specs, q, { oval: FOREST_ASPEN, broad: FOREST_ASPEN });
@@ -155,6 +171,37 @@ export class HomesteadWorld {
     }));
   }
 
+  /**
+   * The camp: open, level, dry ground a short walk from the creek (water),
+   * nearest the middle of the parcel. Deterministic per seed.
+   */
+  private _pickCamp(): { x: number; z: number; rot: number } {
+    const p = this.parcel;
+    let best: { x: number; z: number; rot: number } | null = null, bestScore = Infinity;
+    for (let x = 8; x <= PARCEL_SIZE - 8; x += 1) {
+      for (let z = 8; z <= PARCEL_SIZE - 8; z += 1) {
+        const dc = Math.abs(z - p.creek.zAt(x));
+        if (dc < 5 || dc > 14) continue;
+        const s = p.natural(x, z);
+        if (s.forest > 0.05) continue;
+        const slope = Math.hypot(p.height(x + 1, z) - p.height(x - 1, z), p.height(x, z + 1) - p.height(x, z - 1)) / 2;
+        if (slope > 0.08) continue;
+        const score = Math.hypot(x - PARCEL_SIZE / 2, z - PARCEL_SIZE / 2) + slope * 40;
+        if (score < bestScore) {
+          bestScore = score;
+          // tent door toward the creek
+          best = { x, z, rot: Math.atan2(0, p.creek.zAt(x) - z) };
+        }
+      }
+    }
+    return best ?? { x: PARCEL_SIZE / 2, z: PARCEL_SIZE / 2, rot: 0 };
+  }
+
+  /** Is (x, z) on the camp (plus `pad`)? */
+  onCamp(x: number, z: number, pad = 0): boolean {
+    return Math.hypot(x - this.camp.x, z - this.camp.z) < 1.1 + pad;
+  }
+
   /** Is (x, z) within `pad` of a built footprint (porch included)? */
   onBuilding(x: number, z: number, pad = 0, withPorch = true): boolean {
     for (const { placed } of this._built.values()) {
@@ -211,10 +258,28 @@ export class HomesteadWorld {
     }
   }
 
+  /** People: walk the family to their tasks; tend the campfire. */
+  updatePeople(dt: number, game: GameState, hour: number, speedK: number): void {
+    const site = (id: string): Site | null => {
+      const b = this._built.get(id);
+      if (!b) return null;
+      const def = KIT[b.placed.kind];
+      return { x: b.placed.x, z: b.placed.z, rot: b.placed.rot * Math.PI / 2, w: def.cellsX * CELL, d: def.cellsZ * CELL };
+    };
+    const homeB = [...this._built.values()].find(b => b.finished);
+    const ctx: GoalCtx = { camp: this.camp, site, home: homeB ? site(homeB.placed.id) : null };
+    const season = (seasonState.visual === 'winter' && !seasonState.climate.freeze ? 'fall' : seasonState.visual) as WearSeason;
+    this.family.update(dt, game.people, game.personState, hour, game.clock.t, ctx, this.groundAt, season, speedK);
+    // fire lit at mealtimes and evenings, and on cold days, while the camp is home
+    const meals = (hour > 5.5 && hour < 8.5) || (hour > 11.8 && hour < 13) || (hour > 17 && hour < 22.5);
+    flickerCampfire(this._clock, !homeB && (meals || seasonState.params.cold > 0.4) ? 1 : 0);
+  }
+
   /** Walk mode: can a body of radius r stand at (x, z)? Creek water and tree trunks block. */
   walkBlocked = (x: number, z: number, r: number): boolean => {
     if (this.stream.depthAt(x, z) > 0.04) return true;
     if (this.onBuilding(x, z, r, false)) return true;
+    if (Math.hypot(x - this.camp.x, z - this.camp.z) < 0.4 + r) return true;
     for (const t of this.treeSpecs) {
       const dx = t.x - x, dz = t.z - z;
       const tr = r + 0.07 * t.scale;
@@ -291,6 +356,7 @@ export class HomesteadWorld {
     this.farTrees.dispose();
     this._props?.dispose();
     this.stream.dispose();
+    this.family.dispose();
     this.lakes.dispose();
     this._ws.scene.remove(this._root);
     this._root.traverse(o => {

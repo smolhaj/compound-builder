@@ -102,3 +102,14 @@ SETS.construction = [
   { name: 'stage-4-siding', time: 15, season: 'spring', setup: buildTo(4, 0.5) + viewCabin(4.5, 0.3, 0.7), cam: { x: C, z: C, yaw: 0, pitch: 0.5, radius: 5 }, frames: 8 },
   { name: 'stage-5-finished', time: 17.5, season: 'spring', setup: buildTo(5, 0) + viewCabin(5, 0.25, 0.7), cam: { x: C, z: C, yaw: 0, pitch: 0.5, radius: 5 }, frames: 8 },
 ];
+
+/** Run the sim on to the next given hour (people shots: the view clock matches the sim). */
+const toHour = (h) => `{ const G = cb.game; const hr = () => { const t = G.getState().game.clock.t; return ((t % 1) * 24 + 6) % 24; }; for (let i = 0; i < 200 && Math.abs(hr() - ${h}) > 0.13; i++) G.getState().advance(0.25 / 24); }`;
+const atCamp = (r, pitch, yaw) => `const c = cb.world.camp; cb.cam.target.set(c.x, 0, c.z); cb.cam.radius = ${r}; cb.cam.pitch = ${pitch}; cb.cam.yaw = c.rot + ${yaw};`;
+SETS.people = [
+  { name: 'camp-morning-school', time: 9.5, season: 'spring', setup: toHour(9.5) + atCamp(3.2, 0.42, 0.5), cam: { x: C, z: C, yaw: 0, pitch: 0.4, radius: 3 }, frames: 40 },
+  { name: 'camp-evening-fire', time: 20.5, season: 'spring', setup: toHour(20.5) + atCamp(2.6, 0.3, 0.3), cam: { x: C, z: C, yaw: 0, pitch: 0.3, radius: 3 }, frames: 40 },
+  { name: 'builders-framing', time: 10.5, season: 'spring', setup: buildTo(2, 0.3) + toHour(10.5) + viewCabin(3.5, 0.35, 0.8), cam: { x: C, z: C, yaw: 0, pitch: 0.4, radius: 4 }, frames: 60 },
+  { name: 'builders-eye-level', time: 14, season: 'spring', setup: buildTo(4, 0.2) + toHour(14) + "const q = s.rot * Math.PI / 2; const ex = s.x + Math.sin(q + 0.5) * 3.6, ez = s.z + Math.cos(q + 0.5) * 3.6; const [px, pz] = cb.world.openSpotNear(ex, ez, 0.5); cb.cam.placeEye(px, pz, s.x, s.z, 0.32);", cam: { x: C, z: C, yaw: 0, pitch: 0.1, radius: 4 }, frames: 60 },
+  { name: 'homestead-overview-people', time: 15, season: 'spring', setup: atCamp(14, 0.6, 0.9), cam: { x: C, z: C, yaw: 0, pitch: 0.5, radius: 14 }, frames: 20 },
+];

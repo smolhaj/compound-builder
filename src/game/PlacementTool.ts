@@ -36,6 +36,7 @@ export class PlacementTool {
       height: (x, z) => _world.parcel.natural(x, z).h,
       owned: (x, z) => x >= 0 && z >= 0 && x <= PARCEL_SIZE && z <= PARCEL_SIZE,
       water: (x, z) => _world.parcel.isCreek(x, z) || _world.stream.depthAt(x, z) > 0,
+      blocked: (x, z) => _world.onCamp(x, z),
     };
     const on = <K extends keyof HTMLElementEventMap>(el: HTMLElement | Window, t: K, f: (e: HTMLElementEventMap[K]) => void) => {
       el.addEventListener(t, f as EventListener);
