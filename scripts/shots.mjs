@@ -58,6 +58,9 @@ try {
       st.setSeasonMode(s.season ?? 'auto');
       if (s.doy) st.setDayOfYear(s.doy);
       st.setWeatherMode(s.weather ?? 'clear');
+      // per-shot resets: the page is shared by the whole set
+      window.__cb.qa.pose = null;
+      st.setBuildingView?.('full');
       const c = s.cam;
       if (c.eye) {
         // eye level: stand at (x, z), look toward (lx, lz)

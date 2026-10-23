@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { WorldScene } from '../engine/world/WorldScene';
 import { moonPhase, skyDarkness } from '../engine/world/sky/skyState';
-import { useWorldStore } from '../store/worldStore';
+import { BUILDING_VIEWS, useWorldStore } from '../store/worldStore';
 import { DioramaCamera } from './DioramaCamera';
 import { HomesteadWorld } from './HomesteadWorld';
 import { seasonState, type VisualSeason } from '../engine/world/season/seasonState';
@@ -36,7 +36,7 @@ export function GameCanvas() {
     const tour = new TourController({
       camera: ws.camera, dom: canvas, scene: ws.scene,
       getBlocked: () => world.walkBlocked,
-      heightAt: world.groundAt,
+      heightAt: world.walkHeight,
       describeBuildings: () => world.describeBuildings(),
       siteBounds: () => ({ w: PARCEL_SIZE, h: PARCEL_SIZE }),
       onCaption: c => useWorldStore.getState().setTourCaption(c),
@@ -52,6 +52,11 @@ export function GameCanvas() {
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.code === 'Escape' && useWorldStore.getState().cameraMode !== 'diorama') useWorldStore.getState().setCameraMode('diorama');
+      // V cycles the building view: full → cutaway → x-ray
+      if (e.code === 'KeyV' && !(e.target instanceof HTMLInputElement)) {
+        const w = useWorldStore.getState();
+        w.setBuildingView(BUILDING_VIEWS[(BUILDING_VIEWS.indexOf(w.buildingView) + 1) % BUILDING_VIEWS.length]);
+      }
     };
     window.addEventListener('keydown', onKey);
 
@@ -76,6 +81,7 @@ export function GameCanvas() {
       useWorldStore.subscribe(s => s.cameraMode, applyCameraMode),
       useGameStore.subscribe(s => s.game.structures, list => { world.syncStructures(list); occluders.invalidate(); }),
       useGameStore.subscribe(s => s.tool, k => { tool.setKind(k); marker.setOn(k === 'fell'); }),
+      useWorldStore.subscribe(s => s.buildingView, v => world.setBuildingView(v)),
     ];
 
     let lastVisual = '';
@@ -83,7 +89,8 @@ export function GameCanvas() {
     let lastWetKey = -1;
     let last = performance.now();
     let raf = 0;
-    const qa = { frames: 0, frameMs: 0 };
+    /** QA hooks: frame counter, and an exact camera pose (eye → look) for interior shots. */
+    const qa: { frames: number; frameMs: number; pose: null | { x: number; y: number; z: number; lx: number; ly: number; lz: number; fov?: number } } = { frames: 0, frameMs: 0, pose: null };
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
       const t0 = performance.now();
@@ -128,7 +135,18 @@ export function GameCanvas() {
       setWindowGlow(Math.max(0, Math.min(1, (ws.nightFactor - 0.25) / 0.4)) * (t > 23.5 || t < 5 ? 0.25 : 1));
       if (tour.active) {
         const f = tour.update(dt);
+        // walking indoors: a near plane short enough that walls and furniture never clip
+        const near = useWorldStore.getState().cameraMode === 'walk' ? 0.02 : 0.05;
+        if (ws.camera.near !== near) { ws.camera.near = near; ws.camera.updateProjectionMatrix(); }
         ws.setShadowFocus(f.x, f.z, 30);
+      } else if (qa.pose) {
+        const p = qa.pose;
+        ws.camera.position.set(p.x, p.y, p.z);
+        ws.camera.lookAt(p.lx, p.ly, p.lz);
+        ws.camera.near = 0.02;
+        ws.camera.fov = p.fov ?? 64;
+        ws.camera.updateProjectionMatrix();
+        ws.setShadowFocus(p.x, p.z, 6);
       } else {
         cam.apply(ws.camera);
         occluders.keepOut(ws.camera, cam.target.x, cam.target.z, cam.target.y);

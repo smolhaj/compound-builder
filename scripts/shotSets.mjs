@@ -149,3 +149,20 @@ SETS.woods = [
   { name: 'mark-tool-hover', time: 11, season: 'summer', setup: woods(11) + "cb.game.getState().setTool('fell'); const t0 = window.__woods[0]; cb.marker.hoverTree(cb.world.treeSpecs.filter(s => !window.__woods.includes(s)).sort((a, b) => Math.hypot(a.x - t0.x, a.z - t0.z) - Math.hypot(b.x - t0.x, b.z - t0.z))[0].id);" + atTree(0, 4, 0.5, 1.2), cam: { x: C, z: C, yaw: 0, pitch: 0.5, radius: 4 }, frames: 20 },
   { name: 'stumps-and-yard-logs', time: 16, season: 'fall', setup: woods(16) + "const y = cb.world.access.yard; cb.cam.target.set(y.x, 0, y.z); cb.cam.radius = 6; cb.cam.pitch = 0.5; cb.cam.yaw = 0.4;", cam: { x: C, z: C, yaw: 0, pitch: 0.5, radius: 6 }, frames: 30 },
 ];
+
+/** Camera at a point inside the first building (local coords, y above the floor), looking at another. */
+const inside = (ex, ey, ez, lx, ly, lz, fov = 66) => `{ const id = cb.game.getState().game.structures[0].id; const W = cb.world;
+  const e = W.localToWorld(id, ${ex}, ${ey}, ${ez}), l = W.localToWorld(id, ${lx}, ${ly}, ${lz});
+  cb.qa.pose = { x: e.x, y: e.y, z: e.z, lx: l.x, ly: l.y, lz: l.z, fov: ${fov} }; }`;
+const view = (v) => `cb.store.getState().setBuildingView('${v}');`;
+SETS.interiors = [
+  { name: 'cabin-front-door-open', time: 10.5, season: 'summer', setup: buildTo(5, 0) + viewCabin(2.6, 0.18, 0.35), cam: { x: C, z: C, yaw: 0, pitch: 0.2, radius: 3 }, frames: 12 },
+  { name: 'cutaway-day', time: 11, season: 'summer', setup: buildTo(5, 0) + view('cutaway') + viewCabin(2.6, 0.85, 0.5), cam: { x: C, z: C, yaw: 0, pitch: 0.8, radius: 3 }, frames: 12 },
+  { name: 'xray-day', time: 11, season: 'summer', setup: buildTo(5, 0) + view('xray') + viewCabin(2.8, 0.6, -0.6), cam: { x: C, z: C, yaw: 0, pitch: 0.6, radius: 3 }, frames: 12 },
+  { name: 'inside-main-room', time: 10, season: 'summer', setup: buildTo(5, 0) + inside(-0.12, 0.27, 0.62, 0.15, 0.12, -0.6), cam: { x: C, z: C, yaw: 0, pitch: 0.2, radius: 3 }, frames: 12 },
+  { name: 'inside-kitchen-and-table', time: 16, season: 'summer', setup: buildTo(5, 0) + inside(0.3, 0.27, -0.2, -0.4, 0.13, -0.15), cam: { x: C, z: C, yaw: 0, pitch: 0.2, radius: 3 }, frames: 12 },
+  { name: 'inside-bedroom', time: 9, season: 'summer', setup: buildTo(5, 0) + inside(0.09, 0.27, 0.66, 0.32, 0.06, 0.25), cam: { x: C, z: C, yaw: 0, pitch: 0.2, radius: 3 }, frames: 12 },
+  { name: 'inside-loft', time: 14, season: 'summer', setup: buildTo(5, 0) + inside(0.02, 0.62, -0.13, 0.0, 0.47, -0.6), cam: { x: C, z: C, yaw: 0, pitch: 0.2, radius: 3 }, frames: 12 },
+  { name: 'cutaway-night-lamplight', time: 21, season: 'fall', setup: buildTo(5, 0) + view('cutaway') + viewCabin(2.6, 0.8, 0.9), cam: { x: C, z: C, yaw: 0, pitch: 0.8, radius: 3 }, frames: 12 },
+  { name: 'cabin-night-windows', time: 21.5, season: 'fall', setup: buildTo(5, 0) + viewCabin(3.2, 0.2, 0.6), cam: { x: C, z: C, yaw: 0, pitch: 0.2, radius: 3 }, frames: 12 },
+];

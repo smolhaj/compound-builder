@@ -1,5 +1,5 @@
 import { useState, type CSSProperties, type ReactNode } from 'react';
-import { useWorldStore, type CameraMode } from '../store/worldStore';
+import { useWorldStore, type BuildingView, type CameraMode } from '../store/worldStore';
 import { useGameStore } from '../store/gameStore';
 import type { Quality } from '../engine/world/WorldScene';
 import { SEASON_MODES, type SeasonMode } from '../engine/world/season/seasonState';
@@ -14,6 +14,7 @@ import { KIT } from '../game/buildkit/kit';
 
 const QUALITIES: Quality[] = ['high', 'medium', 'low'];
 const CAMERAS: Array<[CameraMode, string]> = [['diorama', 'Diorama'], ['walk', 'Walk'], ['fly', 'Fly'], ['cinematic', 'Tour']];
+const VIEWS: Array<[BuildingView, string, string]> = [['full', 'Walls', 'Whole buildings'], ['cutaway', 'Cutaway', 'Walls cut at waist height, roof and loft off (V)'], ['xray', 'X-ray', 'See-through walls and roof (V)']];
 const SPEEDS: Array<[Speed, string]> = [[0, '❚❚'], [1, '▶'], [2, '▶▶'], [3, '▶▶▶'], [4, '⏩']];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const MONTH_START = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
@@ -142,8 +143,10 @@ export function Hud() {
         </Section>
       </div>
 
-      {/* Bottom right: cameras */}
-      <div style={{ ...panel, position: 'fixed', right: 10, bottom: 10, padding: 4, display: 'flex', gap: 4 }}>
+      {/* Bottom right: cameras, building view */}
+      <div style={{ ...panel, position: 'fixed', right: 10, bottom: 10, padding: 4, display: 'flex', gap: 4, alignItems: 'center' }}>
+        {VIEWS.map(([v, label, tip]) => <button key={v} title={tip} style={btn(w.buildingView === v)} onClick={() => w.setBuildingView(v)}>{label}</button>)}
+        <span style={{ width: 1, height: 18, background: '#555', margin: '0 3px' }} />
         {CAMERAS.map(([m, label]) => <button key={m} style={btn(w.cameraMode === m)} onClick={() => w.setCameraMode(m)}>{label}</button>)}
       </div>
       {w.cameraMode !== 'diorama' && (

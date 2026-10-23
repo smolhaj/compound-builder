@@ -105,6 +105,15 @@ export function goalFor(i: number, kid: boolean, task: TaskKind, target: string 
       return { x, z, pose: FIG_POSE.STAND, face: null, hidden: true, work: false };
     }
     case 'leisure': {
+      if (ctx.home && (hour >= 18 || hour < 6)) {
+        // evenings at home: round the table, or in the armchairs by the stove (cabin seats, local frame)
+        const seats: Array<[number, number, number, number]> = [[-0.295, -0.08, -0.25, 0.02], [-0.205, 0.12, -0.25, 0.02], [0.11, -0.34, 0.26, -0.62], [0.38, -0.33, 0.26, -0.62]];
+        const [sx, sz, fx, fz] = seats[i % seats.length];
+        const h = ctx.home, c = Math.cos(h.rot), sn = Math.sin(h.rot);
+        const w = (lx: number, lz: number): [number, number] => [h.x + lx * c + lz * sn, h.z - lx * sn + lz * c];
+        const [x, z] = w(sx, sz), [tx, tz] = w(fx, fz);
+        return { x, z, pose: FIG_POSE.BENCH, face: faceTo(x, z, tx, tz), hidden: false, work: false };
+      }
       if (hour >= 18 || hour < 6 || !kid) {
         // round the fire, each in their own place
         const a = (i / 4) * Math.PI * 2 + 0.4;

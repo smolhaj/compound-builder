@@ -6,6 +6,9 @@ import type { WeatherMode } from '../engine/world/weather/weatherState';
 import type { TourCaption, TourMode } from '../engine/world/camera/TourController';
 
 export type CameraMode = 'diorama' | TourMode;
+/** How buildings are drawn: whole, cut to waist height with the roof off, or with see-through walls. */
+export type BuildingView = 'full' | 'cutaway' | 'xray';
+export const BUILDING_VIEWS: BuildingView[] = ['full', 'cutaway', 'xray'];
 
 /** Seed for this run's parcel: ?seed=N (QA) or random (seeded per run, docs/DECISIONS.md). */
 function initialSeed(): number {
@@ -29,6 +32,8 @@ export interface WorldState {
   weatherMode: WeatherMode;
   quality: Quality;
   cameraMode: CameraMode;
+  buildingView: BuildingView;
+  setBuildingView: (v: BuildingView) => void;
   /** Cinematic tour caption card (null = none). */
   tourCaption: TourCaption | null;
   setCameraMode: (m: CameraMode) => void;
@@ -57,6 +62,8 @@ export const useWorldStore = create<WorldState>()(subscribeWithSelector((set) =>
   weatherMode: 'auto',
   quality: 'high',
   cameraMode: 'diorama',
+  buildingView: 'full',
+  setBuildingView: (buildingView) => set({ buildingView }),
   tourCaption: null,
   setCameraMode: (cameraMode) => set({ cameraMode }),
   setTourCaption: (tourCaption) => set({ tourCaption }),
