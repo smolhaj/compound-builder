@@ -375,7 +375,8 @@ export class HomesteadWorld {
     }
     // the highest ground in a band 40–90 units west of the parcel
     const cand: Array<Observer & { h: number }> = [];
-    for (let x = -90; x <= -40; x += 6) for (let z = -30; z <= PARCEL_SIZE + 30; z += 8) cand.push({ x, z, eye: 0.3, h: this.groundAt(x, z) });
+    // open high points only (a spotter picks bare rock or a clearing, not the middle of the timber)
+    for (let x = -90; x <= -30; x += 4) for (let z = -30; z <= PARCEL_SIZE + 30; z += 6) if (this.parcel.region.sample(x, z).forest < 0.3) cand.push({ x, z, eye: 0.3, h: this.groundAt(x, z) });
     cand.sort((a, b) => b.h - a.h);
     const picked: Observer[] = [];
     for (const c of cand) { if (picked.every(p => Math.hypot(p.x - c.x, p.z - c.z) > 18)) picked.push({ x: c.x, z: c.z, eye: 0.3 }); if (picked.length >= 6) break; }
