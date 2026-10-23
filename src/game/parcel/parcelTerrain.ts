@@ -137,7 +137,7 @@ export class ParcelTerrain {
     const dz = Math.abs(z - this.creek.zAt(x));
     const fp = this._floodplainY(x);
     const valley = fp + 0.25 * Math.max(0, dz - FLOODPLAIN_HALF) ** 1.2;
-    const along = 1 - sstep(PARCEL_SIZE + 60, PARCEL_SIZE + 160, Math.abs(x - PARCEL_SIZE / 2) + PARCEL_SIZE / 2);
+    const along = 1 - sstep(PARCEL_SIZE + 20, PARCEL_SIZE + 65, Math.abs(x - PARCEL_SIZE / 2) + PARCEL_SIZE / 2);
     if (along > 0) {
       h = h + (Math.min(h, valley) - h) * along;
       if (dz < CREEK_HALF + 1.1) {
@@ -148,9 +148,10 @@ export class ParcelTerrain {
     // Cover: timber on the upper bench on one side of the creek; cottonwoods on the banks
     const side = Math.sign(z - this.creek.zAt(x)) === this._timberSide ? 1 : 0;
     const upper = sstep(this._benchAmp * 0.35, this._benchAmp * 0.6, this._bench(x, z));
-    const patch = sstep(-0.25, 0.25, this._noise(x * 0.04 + 5, z * 0.04 - 2));
+    const patch = sstep(-0.45, 0.4, this._noise(x * 0.04 + 5, z * 0.04 - 2) + 0.35 * this._noise(x * 0.13 - 3, z * 0.13 + 8));
     const timber = side * upper * patch * w;
-    const riparian = (1 - sstep(1.2, 3.5, dz)) * sstep(CREEK_HALF + 0.2, CREEK_HALF + 0.8, dz) * along;
+    const riparian = (1 - sstep(1.5, 6 + 3 * this._noise(x * 0.05, 3.3), dz)) * sstep(CREEK_HALF + 0.2, CREEK_HALF + 0.8, dz) * along
+      * (0.55 + 0.45 * sstep(-0.3, 0.3, this._noise(x * 0.09 + 11, z * 0.09)));
     const forest = Math.max(r.forest * (1 - w), 0.92 * timber, 0.75 * riparian);
     return { h, forest, field: r.field * (1 - w) };
   }

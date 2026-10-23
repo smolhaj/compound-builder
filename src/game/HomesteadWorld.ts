@@ -1,7 +1,10 @@
 import * as THREE from 'three';
 import type { Quality, WorldScene } from '../engine/world/WorldScene';
 import { TerrainRenderer } from '../engine/world/terrain/TerrainRenderer';
-import { regionWaterY } from '../engine/world/terrain/regionalLandscape';
+import { regionLookFor, regionWaterY } from '../engine/world/terrain/regionalLandscape';
+import { ForestRenderer, FOREST_ASPEN } from '../engine/world/trees/ForestRenderer';
+import { FarTreeRenderer } from '../engine/world/trees/FarTreeRenderer';
+import { planParcelTrees } from './parcel/parcelTrees';
 import { SeasonController, climateFor, type SeasonMode } from '../engine/world/season/seasonState';
 import { writeSeasonUniforms } from '../engine/world/season/seasonShader';
 import { PARCEL_SIZE, ParcelTerrain } from './parcel/parcelTerrain';
@@ -11,6 +14,8 @@ export { PARCEL_SIZE };
 export const PERSON_H = 0.28;
 /** Climate / region of the M1 parcel. */
 export const CLIMATE_ID = 'mountain_west';
+/** Parcel trees are planted this far beyond the parcel; regional far trees beyond. */
+const TREE_MARGIN = 26;
 
 /**
  * Everything in the world that is Compound Builder's: the parcel terrain set
@@ -20,6 +25,9 @@ export class HomesteadWorld {
   readonly center = new THREE.Vector3(PARCEL_SIZE / 2, 0, PARCEL_SIZE / 2);
   readonly parcel: ParcelTerrain;
   readonly terrain: TerrainRenderer;
+  readonly forest: ForestRenderer;
+  readonly farTrees: FarTreeRenderer;
+  private _clock = 0;
   readonly seasons = new SeasonController();
   private readonly _root = new THREE.Group();
   private readonly _ws: WorldScene;
@@ -30,6 +38,8 @@ export class HomesteadWorld {
     ws.setSite({ x0: 0, z0: 0, x1: PARCEL_SIZE, z1: PARCEL_SIZE });
     this.parcel = new ParcelTerrain(seed);
     this.terrain = new TerrainRenderer(ws.scene);
+    this.forest = new ForestRenderer(ws.scene);
+    this.farTrees = new FarTreeRenderer(ws.scene);
     const zc = this.parcel.creek.zAt(this.center.x + 3);
     this._root.add(scaleFigure(this.center.x + 3, zc + 4, this.parcel.height(this.center.x + 3, zc + 4)));
     ws.scene.add(this._root);
@@ -40,10 +50,28 @@ export class HomesteadWorld {
     if (q === this._quality) return;
     this._quality = q;
     this.terrain.build({
-      source: this.parcel, kind: 'mountain', cx: this.center.x, cz: this.center.z,
-      core: PARCEL_SIZE / 2 + 22, quality: q, waterY: regionWaterY('mountain'),
+      // the forest floor under the parcel's own trees is a shade, not a dark blot (the trees are the canopy)
+      source: { sample: (x, z) => { const t = this.parcel.sample(x, z); const o = Math.max(-x, x - PARCEL_SIZE, -z, z - PARCEL_SIZE, 0); t.forest *= o < TREE_MARGIN ? 0.62 : 1; return t; } },
+      kind: 'mountain', cx: this.center.x, cz: this.center.z,
+      core: { x: PARCEL_SIZE / 2 + 70, z: PARCEL_SIZE / 2 + 22 }, quality: q, waterY: regionWaterY('mountain'),
     });
+    this._plant(q);
     this._ws.invalidateShadows();
+  }
+
+  /** Parcel trees (near, detailed) inside the margin; regional far trees beyond it. */
+  private _plant(q: Quality): void {
+    const margin = TREE_MARGIN;
+    const specs = planParcelTrees(this.parcel, { margin, density: q === 'low' ? 0.5 : 1 });
+    for (const t of specs) t.y = this.terrain.surfaceAt(t.x, t.z) - 0.03;
+    this.forest.build(specs, q, { oval: FOREST_ASPEN, broad: FOREST_ASPEN });
+    const inside = (x: number, z: number) => x > -margin && x < PARCEL_SIZE + margin && z > -margin && z < PARCEL_SIZE + margin;
+    this.farTrees.build({
+      kind: 'mountain', look: regionLookFor('mountain'),
+      sample: (x, z) => this.parcel.region.sample(x, z), height: (x, z) => this.parcel.region.height(x, z),
+      cx: this.center.x, cz: this.center.z, siteW: PARCEL_SIZE, siteH: PARCEL_SIZE, r0: margin + 2,
+      waterY: regionWaterY('mountain'), quality: q, blocked: inside,
+    });
   }
 
   groundAt = (x: number, z: number): number => this.terrain.surfaceAt(x, z);
@@ -53,10 +81,14 @@ export class HomesteadWorld {
     const p = this.seasons.update({ locationId: CLIMATE_ID, doy, totalDays, mode, dt });
     writeSeasonUniforms(p, climateFor(CLIMATE_ID));
     this.terrain.update();
+    this._clock += dt;
+    ForestRenderer.setWindTime(this._clock);
   }
 
   dispose(): void {
     this.terrain.dispose();
+    this.forest.dispose();
+    this.farTrees.dispose();
     this._ws.scene.remove(this._root);
     this._root.traverse(o => {
       const m = o as THREE.Mesh;
