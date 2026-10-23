@@ -4,7 +4,9 @@ import { TerrainRenderer } from '../engine/world/terrain/TerrainRenderer';
 import { regionLookFor, regionWaterY } from '../engine/world/terrain/regionalLandscape';
 import { ForestRenderer, FOREST_ASPEN } from '../engine/world/trees/ForestRenderer';
 import { FarTreeRenderer } from '../engine/world/trees/FarTreeRenderer';
-import { planParcelTrees } from './parcel/parcelTrees';
+import { planParcelTrees, type ParcelTree } from './parcel/parcelTrees';
+import { buildWoods, fallHeading, trunkRadius } from './forestry/woodsGeometry';
+import type { Forestry } from '../sim/state';
 import { StreamRenderer } from '../engine/world/water/StreamRenderer';
 import { RegionalWaterRenderer } from '../engine/world/water/RegionalWaterRenderer';
 import { updateWaterGlobals } from '../engine/world/water/waterShading';
@@ -77,7 +79,13 @@ export class HomesteadWorld {
   private _stockKey = '';
   private readonly _seenOrders = new Set<string>();
   /** Planted parcel trees (QA: clear eye-level spots). */
-  treeSpecs: ReadonlyArray<{ x: number; y: number; z: number; scale: number; sx: number; sy: number; kind: string }> = [];
+  treeSpecs: readonly ParcelTree[] = [];
+  /** Every planned parcel tree by id (standing or not), for marks, stumps and goals. */
+  private _treeById = new Map<number, ParcelTree>();
+  /** Trees no longer standing (felled, bucked or hauled). */
+  private _down = new Set<number>();
+  private _woods: THREE.Group | null = null;
+  private _woodsKey = '';
   private _clock = 0;
   readonly seasons = new SeasonController();
   private readonly _root = new THREE.Group();
@@ -177,8 +185,11 @@ export class HomesteadWorld {
     const margin = TREE_MARGIN;
     const specs = planParcelTrees(this.parcel, { margin, density: q === 'low' ? 0.5 : 1, blocked: (x, z) => this.onBuilding(x, z, 0.6) || this.onCamp(x, z, 0.6) || this.onAccess(x, z, 0.5) });
     for (const t of specs) t.y = this.terrain.surfaceAt(t.x, t.z) - 0.03;
-    this.treeSpecs = specs;
-    this.forest.build(specs, q, { oval: FOREST_ASPEN, broad: FOREST_ASPEN });
+    this._planted = specs;
+    // lookups cover every tree a full-density plan has (marks made on High survive a switch to Low)
+    const all = q === 'low' ? planParcelTrees(this.parcel, { margin, blocked: (x, z) => this.onBuilding(x, z, 0.6) || this.onCamp(x, z, 0.6) || this.onAccess(x, z, 0.5) }) : specs;
+    this._treeById = new Map(all.map(t => [t.id, t]));
+    this._plantForest();
     const inside = (x: number, z: number) => x > -margin && x < PARCEL_SIZE + margin && z > -margin && z < PARCEL_SIZE + margin;
     // Neighbouring farmsteads (houses, hay barns, corrals, poplar windbreaks)
     this._props?.dispose();
@@ -196,6 +207,57 @@ export class HomesteadWorld {
       waterY: regionWaterY('mountain'), quality: q,
       blocked: (x, z) => inside(x, z) || onFarmstead(this.farms, x, z, 2.5) || this.onAccess(x, z, 1.2),
     });
+  }
+
+  private _planted: ParcelTree[] = [];
+
+  /** (Re)build the near forest from the planted trees, less the ones the family has cut. */
+  private _plantForest(): void {
+    if (!this._quality) return;
+    this.treeSpecs = this._planted.filter(t => !this._down.has(t.id));
+    this.forest.build(this.treeSpecs, this._quality, { oval: FOREST_ASPEN, broad: FOREST_ASPEN });
+  }
+
+  /** A parcel tree by id (standing or not). */
+  treeById(id: number): ParcelTree | undefined {
+    return this._treeById.get(id);
+  }
+
+  /**
+   * The standing tree a ray points at: the trunk (or the lower crown) passing
+   * nearest the ray, nearest the eye first. Null if none within reach.
+   */
+  pickTree(ray: THREE.Ray): ParcelTree | null {
+    let best: ParcelTree | null = null, bestD = Infinity;
+    const a = new THREE.Vector3(), b = new THREE.Vector3(), onRay = new THREE.Vector3(), onSeg = new THREE.Vector3();
+    for (const t of this.treeSpecs) {
+      if (t.x < -0.5 || t.z < -0.5 || t.x > PARCEL_SIZE + 0.5 || t.z > PARCEL_SIZE + 0.5) continue;
+      const hgt = 3 * t.scale * t.sy;
+      a.set(t.x, t.y, t.z); b.set(t.x, t.y + hgt * 0.75, t.z);
+      ray.distanceSqToSegment(a, b, onRay, onSeg);
+      const d = onRay.distanceTo(onSeg), reach = trunkRadius(t.scale) + 0.25 * t.scale * Math.min(1, (onSeg.y - t.y) / (hgt * 0.4));
+      if (d > reach) continue;
+      const along = onRay.distanceTo(ray.origin);
+      if (along < bestD) { bestD = along; best = t; }
+    }
+    return best;
+  }
+
+  /** Show the woods at work: paint marks, felled and bucked trees, stumps; cut trees leave the forest. */
+  syncForestry(f: Forestry): void {
+    const key = f.jobs.map(j => `${j.treeId}${j.stage[0]}`).join(',') + '|' + f.cleared.length;
+    if (key === this._woodsKey) return;
+    this._woodsKey = key;
+    const down = new Set<number>(f.cleared);
+    for (const j of f.jobs) if (j.stage !== 'marked') down.add(j.treeId);
+    if (down.size !== this._down.size || [...down].some(id => !this._down.has(id))) {
+      this._down = down;
+      this._plantForest();
+      this._ws.invalidateShadows();
+    }
+    if (this._woods) { this._root.remove(this._woods); this._woods.traverse(o => (o as THREE.Mesh).geometry?.dispose()); }
+    this._woods = buildWoods({ jobs: f.jobs, cleared: f.cleared, tree: id => this._treeById.get(id), ground: this.groundAt });
+    this._root.add(this._woods);
   }
 
   /** The creek (sloped stream) and the regional reservoir. */
@@ -334,7 +396,12 @@ export class HomesteadWorld {
       return { x: b.placed.x, z: b.placed.z, rot: b.placed.rot * Math.PI / 2, w: def.cellsX * CELL, d: def.cellsZ * CELL };
     };
     const homeB = [...this._built.values()].find(b => b.finished);
-    const ctx: GoalCtx = { camp: this.camp, site, home: homeB ? site(homeB.placed.id) : null };
+    const tree = (jobId: string) => {
+      const j = game.forestry.jobs.find(x => x.id === jobId);
+      const t = j && this._treeById.get(j.treeId);
+      return j && t ? { x: t.x, z: t.z, scale: t.scale, stage: j.stage, fall: fallHeading(t.id), len: 2.6 * t.scale * t.sy } : null;
+    };
+    const ctx: GoalCtx = { camp: this.camp, site, home: homeB ? site(homeB.placed.id) : null, tree, yard: this.access.yard };
     const season = (seasonState.visual === 'winter' && !seasonState.climate.freeze ? 'fall' : seasonState.visual) as WearSeason;
     this.family.update(dt, game.people, game.personState, hour, game.clock.t, ctx, this.groundAt, season, speedK);
     // fire lit at mealtimes and evenings, and on cold days, while the camp is home

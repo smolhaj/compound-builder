@@ -125,3 +125,27 @@ SETS.access = [
   { name: 'stockpile-close', time: 15, season: 'summer', setup: stocked + atYard(2.2, 0.38, -0.6), cam: { x: C, z: C, yaw: 0, pitch: 0.4, radius: 2 }, frames: 12 },
   { name: 'county-road-golden', time: 18.5, season: 'fall', setup: "const g = cb.world.access.gate; cb.cam.target.set(g.x + 3, 0, g.z - 20); cb.cam.radius = 26; cb.cam.pitch = 0.22; cb.cam.yaw = Math.PI + 0.25;", cam: { x: C, z: C, yaw: 0, pitch: 0.2, radius: 26 }, frames: 12 },
 ];
+
+/**
+ * Woods at work near the yard: the 8 nearest parcel trees, marked; then two
+ * felled, two bucked, two hauled (stumps), two still marked. Runs the sim to
+ * work hours so someone is at a tree.
+ */
+const woods = (h) => `{ const W = cb.world, G = cb.game, y = W.access.yard;
+  const near = W.treeSpecs.filter(t => t.x > 1 && t.z > 1 && t.x < 66 && t.z < 66).map(t => [Math.hypot(t.x - y.x, t.z - y.z), t]).sort((a, b) => a[0] - b[0]).slice(0, 8).map(e => e[1]);
+  window.__woods = near;
+  for (const t of near) G.getState().toggleMark({ id: t.id, x: t.x, z: t.z, kind: t.kind, scale: t.scale }, Math.hypot(t.x - y.x, t.z - y.z));
+  G.setState(s => { const g = structuredClone(s.game); const J = g.forestry.jobs;
+    J.slice(2, 4).forEach(j => { j.stage = 'felled'; }); J.slice(4, 6).forEach(j => { j.stage = 'bucked'; });
+    for (const j of J.splice(6, 2)) { g.forestry.cleared.push(j.treeId); g.stock.logs += 3; g.stock.firewood += 1; }
+    return { game: g }; });
+  const hr = () => { const t = G.getState().game.clock.t; return ((t % 1) * 24 + 6) % 24; };
+  for (let i = 0; i < 200 && Math.abs(hr() - ${h}) > 0.13; i++) { G.setState(s => ({ game: { ...s.game, forestry: { ...s.game.forestry, jobs: s.game.forestry.jobs.map(j => ({ ...j, done: 0 })) } } })); G.getState().advance(0.25 / 24); } }`;
+const atTree = (k, r, pitch, yaw) => `const t = window.__woods[${k}]; cb.cam.target.set(t.x, 0, t.z); cb.cam.radius = ${r}; cb.cam.pitch = ${pitch}; cb.cam.yaw = ${yaw};`;
+SETS.woods = [
+  { name: 'aerial-woods-at-work', time: 10.5, season: 'summer', setup: woods(10.5) + atTree(2, 9, 0.75, 0.6), cam: { x: C, z: C, yaw: 0, pitch: 0.7, radius: 9 }, frames: 40 },
+  { name: 'felling-a-marked-pine', time: 10.5, season: 'summer', setup: woods(10.5) + atTree(0, 2.6, 0.3, 2.2), cam: { x: C, z: C, yaw: 0, pitch: 0.3, radius: 2.6 }, frames: 60 },
+  { name: 'felled-and-bucked', time: 14.5, season: 'summer', setup: woods(14.5) + atTree(4, 3.2, 0.42, -0.8), cam: { x: C, z: C, yaw: 0, pitch: 0.4, radius: 3.2 }, frames: 40 },
+  { name: 'mark-tool-hover', time: 11, season: 'summer', setup: woods(11) + "cb.game.getState().setTool('fell'); const t = window.__woods[0]; cb.marker.hoverTree(cb.world.treeSpecs.filter(s => !window.__woods.includes(s)).sort((a, b) => Math.hypot(a.x - t.x, a.z - t.z) - Math.hypot(b.x - t.x, b.z - t.z))[0].id);" + atTree(0, 4, 0.5, 1.2), cam: { x: C, z: C, yaw: 0, pitch: 0.5, radius: 4 }, frames: 20 },
+  { name: 'stumps-and-yard-logs', time: 16, season: 'fall', setup: woods(16) + "const y = cb.world.access.yard; cb.cam.target.set(y.x, 0, y.z); cb.cam.radius = 6; cb.cam.pitch = 0.5; cb.cam.yaw = 0.4;", cam: { x: C, z: C, yaw: 0, pitch: 0.5, radius: 6 }, frames: 30 },
+];

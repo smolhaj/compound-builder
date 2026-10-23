@@ -60,7 +60,9 @@ export class PlacementTool {
   get active(): boolean { return this._kind !== null; }
 
   setKind(kind: string | null): void {
+    if (kind && !KIT[kind]) kind = null;          // another tool (tree marking) is active
     if (kind === this._kind) return;
+    const wasPlacing = this._kind !== null;
     this._kind = kind;
     if (this._ghost) { this._scene.remove(this._ghost); this._ghost.traverse(o => (o as THREE.Mesh).geometry?.dispose()); this._ghost = null; }
     if (kind) {
@@ -69,7 +71,8 @@ export class PlacementTool {
       this._ghost.visible = false;
       this._scene.add(this._ghost);
     }
-    if (useGameStore.getState().tool !== kind) useGameStore.getState().setTool(kind);
+    const st = useGameStore.getState();
+    if (st.tool !== kind && (kind || (wasPlacing && st.tool && KIT[st.tool]))) st.setTool(kind);
   }
 
   /** QA: put the ghost at a world point. */
