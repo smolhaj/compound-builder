@@ -469,6 +469,33 @@ export class TerrainRenderer {
   }
 
   /**
+   * Re-sample the mesh inside a world rect (after the ground was graded under
+   * a new building): positions, cover attributes, normals and surfaceAt.
+   */
+  refresh(source: TerrainSource, x0: number, z0: number, x1: number, z1: number): void {
+    const mesh = this._mesh, H = this._gh;
+    if (!mesh || !H) return;
+    const geo = mesh.geometry;
+    const pos = geo.getAttribute('position') as THREE.BufferAttribute;
+    const aF = geo.getAttribute('aForest') as THREE.BufferAttribute;
+    const aD = geo.getAttribute('aField') as THREE.BufferAttribute;
+    const xs = this._gx, zs = this._gz, NX = xs.length;
+    const i0 = Math.max(0, xs.findIndex(v => v >= x0) - 1), i1 = xs.findIndex(v => v > x1);
+    const j0 = Math.max(0, zs.findIndex(v => v >= z0) - 1), j1 = zs.findIndex(v => v > z1);
+    for (let j = j0; j <= (j1 < 0 ? zs.length - 1 : j1); j++) {
+      for (let i = i0; i <= (i1 < 0 ? NX - 1 : i1); i++) {
+        const k = j * NX + i;
+        const sm = source.sample(xs[i], zs[j]);
+        pos.setY(k, sm.h);
+        aF.setX(k, sm.forest); aD.setX(k, sm.field);
+        H[k] = sm.h;
+      }
+    }
+    pos.needsUpdate = aF.needsUpdate = aD.needsUpdate = true;
+    geo.computeVertexNormals();
+  }
+
+  /**
    * Height of the drawn surface at (x, z): the same two triangles per cell
    * the mesh uses, so anything draped on it sits exactly on the ground.
    */

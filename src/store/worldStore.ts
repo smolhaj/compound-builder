@@ -2,6 +2,10 @@ import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import type { Quality } from '../engine/world/WorldScene';
 import type { SeasonMode } from '../engine/world/season/seasonState';
+import type { WeatherMode } from '../engine/world/weather/weatherState';
+import type { TourCaption, TourMode } from '../engine/world/camera/TourController';
+
+export type CameraMode = 'diorama' | TourMode;
 
 /** Seed for this run's parcel: ?seed=N (QA) or random (seeded per run, docs/DECISIONS.md). */
 function initialSeed(): number {
@@ -22,7 +26,14 @@ export interface WorldState {
   hourSeconds: number;
   /** 'auto' follows the calendar; a season pins the look. */
   seasonMode: SeasonMode;
+  weatherMode: WeatherMode;
   quality: Quality;
+  cameraMode: CameraMode;
+  /** Cinematic tour caption card (null = none). */
+  tourCaption: TourCaption | null;
+  setCameraMode: (m: CameraMode) => void;
+  setTourCaption: (c: TourCaption | null) => void;
+  setWeatherMode: (m: WeatherMode) => void;
   setTimeOfDay: (t: number) => void;
   advanceHours: (h: number) => void;
   setDayOfYear: (d: number) => void;
@@ -40,7 +51,13 @@ export const useWorldStore = create<WorldState>()(subscribeWithSelector((set) =>
   totalDays: 0,
   hourSeconds: 0,
   seasonMode: 'auto',
+  weatherMode: 'auto',
   quality: 'high',
+  cameraMode: 'diorama',
+  tourCaption: null,
+  setCameraMode: (cameraMode) => set({ cameraMode }),
+  setTourCaption: (tourCaption) => set({ tourCaption }),
+  setWeatherMode: (weatherMode) => set({ weatherMode }),
   setTimeOfDay: (t) => set({ timeOfDay: ((t % 24) + 24) % 24 }),
   advanceHours: (h) => set(s => {
     const t = s.timeOfDay + h;
