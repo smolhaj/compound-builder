@@ -9,7 +9,7 @@
  * scene a few frames to settle (PMREM bake, shadows) before each capture.
  */
 import { spawn } from 'node:child_process';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createRequire } from 'node:module';
 
@@ -42,6 +42,7 @@ const browser = await chromium.launch({
 });
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  page.setDefaultTimeout(180000);
   page.on('pageerror', e => console.error('pageerror:', e.message));
   page.on('console', m => { if (m.type() === 'error') console.error('console:', m.text()); });
   await page.goto(`http://localhost:${port}/?clean&seed=${opt('--seed', '7')}`);
@@ -53,7 +54,8 @@ try {
       const st = store.getState();
       st.setHourSeconds(0);
       st.setTimeOfDay(s.time ?? 10);
-      if (s.season) st.setSeason(s.season);
+      st.setSeasonMode(s.season ?? 'auto');
+      if (s.doy) st.setDayOfYear(s.doy);
       world.setWeatherOverride?.(s.weather ?? null);
       const c = s.cam;
       if (c.eye) {
@@ -66,10 +68,16 @@ try {
       }
       if (s.setup) new Function('cb', s.setup)(window.__cb);
     }, s);
-    await page.waitForTimeout(s.settle ?? 2500);
+    // let the scene settle: a few rendered frames after the change (PMREM bake, shadows, season ease)
+    const f0 = await page.evaluate(() => window.__cb.qa.frames);
+    await page.waitForFunction(n => window.__cb.qa.frames >= n, f0 + (s.frames ?? 6), { timeout: 180000, polling: 200 });
+    if (s.settle) await page.waitForTimeout(s.settle);
     const file = `${outDir}/${String(i + 1).padStart(2, '0')}-${s.name}.png`;
-    await page.screenshot({ path: file });
-    console.log(file);
+    // read the canvas directly (preserveDrawingBuffer): no compositor wait on slow swiftshader
+    const png = await page.evaluate(() => document.querySelector('canvas').toDataURL('image/png'));
+    writeFileSync(file, Buffer.from(png.split(',')[1], 'base64'));
+    const ms = await page.evaluate(() => window.__cb.qa.frameMs);
+    console.log(file, `${ms.toFixed(0)} ms/frame`);
   }
 } finally {
   await browser.close();

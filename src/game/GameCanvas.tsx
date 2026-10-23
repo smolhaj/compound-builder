@@ -5,6 +5,7 @@ import { moonPhase, skyDarkness } from '../engine/world/sky/skyState';
 import { useWorldStore } from '../store/worldStore';
 import { DioramaCamera } from './DioramaCamera';
 import { HomesteadWorld } from './HomesteadWorld';
+import { seasonState } from '../engine/world/season/seasonState';
 
 /** React ↔ three.js bridge: owns the WorldScene, the camera and the frame loop. */
 export function GameCanvas() {
@@ -13,7 +14,7 @@ export function GameCanvas() {
   useEffect(() => {
     const canvas = ref.current!;
     const ws = new WorldScene(canvas);
-    const world = new HomesteadWorld(ws);
+    const world = new HomesteadWorld(ws, useWorldStore.getState().seed);
     const cam = new DioramaCamera(canvas);
     cam.groundAt = world.groundAt;
     cam.target.set(world.center.x, 0, world.center.z);
@@ -29,37 +30,42 @@ export function GameCanvas() {
     const applyLook = () => {
       const s = useWorldStore.getState();
       ws.setGraphicsQuality(s.quality);
-      ws.setSeasonGrade(s.season);
-      ws.setSeasonalParticles(s.season);
-      world.setSeason(s.season);
+      world.setQuality(s.quality);
     };
     applyLook();
     const unsub = [
       useWorldStore.subscribe(s => s.quality, applyLook),
-      useWorldStore.subscribe(s => s.season, applyLook),
     ];
 
+    let lastVisual = '';
     let last = performance.now();
     let raf = 0;
+    const qa = { frames: 0, frameMs: 0 };
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
+      const t0 = performance.now();
       const dt = Math.min(0.1, (now - last) / 1000);
       last = now;
       const st = useWorldStore.getState();
-      if (st.hourSeconds > 0) st.setTimeOfDay(st.timeOfDay + dt / st.hourSeconds);
-      const t = useWorldStore.getState().timeOfDay;
-      ws.setNightSky(moonPhase(world.dayIndex + t / 24), skyDarkness('mountain_west', false));
+      if (st.hourSeconds > 0) st.advanceHours(dt / st.hourSeconds);
+      const { timeOfDay: t, dayOfYear, totalDays, seasonMode } = useWorldStore.getState();
+      ws.setNightSky(moonPhase(dayOfYear + t / 24), skyDarkness('mountain_west', false));
+      world.tick(dt, dayOfYear, totalDays, seasonMode);
+      // Season grade + particles follow the drawn (eased) visual season
+      const vis = seasonState.visual;
+      if (vis !== lastVisual) { lastVisual = vis; ws.setSeasonGrade(vis); ws.setSeasonalParticles(vis); }
       cam.apply(ws.camera);
       ws.setShadowFocus(cam.target.x, cam.target.z, cam.radius);
-      world.tick(dt, t);
       ws.tick(dt);
       ws.updateDayNight(t);
       ws.renderFrame();
+      qa.frames++;
+      qa.frameMs = performance.now() - t0;
     };
     raf = requestAnimationFrame(frame);
 
     // QA hook (screenshot harness, console poking).
-    (window as unknown as Record<string, unknown>).__cb = { ws, world, cam, store: useWorldStore, THREE };
+    (window as unknown as Record<string, unknown>).__cb = { ws, world, cam, store: useWorldStore, THREE, qa };
 
     return () => {
       cancelAnimationFrame(raf);

@@ -27,6 +27,7 @@ import {
 } from './sky/ProceduralSky';
 import { godRayStrength, milkyWayVisibility, moonAngle, moonIllumination, starVisibility } from './sky/skyState';
 import { phaseWeights, type DayPhase } from './sky/dayPhase';
+import { installSeasonShaderPatch } from './season/seasonShader';
 
 export type Quality = 'high' | 'medium' | 'low';
 
@@ -143,6 +144,8 @@ export class WorldScene {
   private readonly _gradeBase = { contrast: 0.5, saturation: 1.04, warm: 0.18, threshold: 0.55 };
 
   constructor(canvas: HTMLCanvasElement) {
+    // Season surface patch must be in place before any standard material compiles.
+    installSeasonShaderPatch();
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
