@@ -137,7 +137,7 @@ export class ParcelTerrain {
     const dz = Math.abs(z - this.creek.zAt(x));
     const fp = this._floodplainY(x);
     const valley = fp + 0.25 * Math.max(0, dz - FLOODPLAIN_HALF) ** 1.2;
-    const along = 1 - sstep(PARCEL_SIZE + 40, PARCEL_SIZE + 100, Math.abs(x - PARCEL_SIZE / 2) + PARCEL_SIZE / 2);
+    const along = 1 - sstep(PARCEL_SIZE + 20, PARCEL_SIZE + 65, Math.abs(x - PARCEL_SIZE / 2) + PARCEL_SIZE / 2);
     if (along > 0) {
       h = h + (Math.min(h, valley) - h) * along;
       if (dz < CREEK_HALF + 1.1) {
