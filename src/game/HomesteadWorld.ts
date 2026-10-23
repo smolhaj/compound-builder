@@ -1,44 +1,62 @@
 import * as THREE from 'three';
-import type { WorldScene } from '../engine/world/WorldScene';
-import type { Season } from '../store/worldStore';
+import type { Quality, WorldScene } from '../engine/world/WorldScene';
+import { TerrainRenderer } from '../engine/world/terrain/TerrainRenderer';
+import { regionWaterY } from '../engine/world/terrain/regionalLandscape';
+import { SeasonController, climateFor, type SeasonMode } from '../engine/world/season/seasonState';
+import { writeSeasonUniforms } from '../engine/world/season/seasonShader';
+import { PARCEL_SIZE, ParcelTerrain } from './parcel/parcelTerrain';
 
-/** 40-acre parcel ≈ 402 m square; 1 world unit ≈ 6 m (UE SCALE v2). */
-export const PARCEL_SIZE = 67;
+export { PARCEL_SIZE };
 /** Person height in world units (≈ 1.7 m). */
 export const PERSON_H = 0.28;
+/** Climate / region of the M1 parcel. */
+export const CLIMATE_ID = 'mountain_west';
 
 /**
- * Everything in the world that is Compound Builder's (terrain, parcel,
- * structures). For now: a flat placeholder ground and a scale figure.
+ * Everything in the world that is Compound Builder's: the parcel terrain set
+ * into the regional landscape, seasons, and (later) structures.
  */
 export class HomesteadWorld {
   readonly center = new THREE.Vector3(PARCEL_SIZE / 2, 0, PARCEL_SIZE / 2);
-  /** Visual day index (moon phase). */
-  dayIndex = 120;
+  readonly parcel: ParcelTerrain;
+  readonly terrain: TerrainRenderer;
+  readonly seasons = new SeasonController();
   private readonly _root = new THREE.Group();
   private readonly _ws: WorldScene;
+  private _quality: Quality | null = null;
 
-  constructor(ws: WorldScene) {
+  constructor(ws: WorldScene, seed: number) {
     this._ws = ws;
     ws.setSite({ x0: 0, z0: 0, x1: PARCEL_SIZE, z1: PARCEL_SIZE });
-    const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(1200, 1200).rotateX(-Math.PI / 2),
-      new THREE.MeshStandardMaterial({ color: 0x6b7a45, roughness: 0.95 }),
-    );
-    ground.position.set(this.center.x, 0, this.center.z);
-    ground.receiveShadow = true;
-    this._root.add(ground);
-    this._root.add(scaleFigure(this.center.x, this.center.z));
+    this.parcel = new ParcelTerrain(seed);
+    this.terrain = new TerrainRenderer(ws.scene);
+    const zc = this.parcel.creek.zAt(this.center.x + 3);
+    this._root.add(scaleFigure(this.center.x + 3, zc + 4, this.parcel.height(this.center.x + 3, zc + 4)));
     ws.scene.add(this._root);
   }
 
-  groundAt = (_x: number, _z: number): number => 0;
+  /** (Re)build the terrain mesh at a quality tier. */
+  setQuality(q: Quality): void {
+    if (q === this._quality) return;
+    this._quality = q;
+    this.terrain.build({
+      source: this.parcel, kind: 'mountain', cx: this.center.x, cz: this.center.z,
+      core: PARCEL_SIZE / 2 + 22, quality: q, waterY: regionWaterY('mountain'),
+    });
+    this._ws.invalidateShadows();
+  }
 
-  setSeason(_s: Season): void { /* terrain increment */ }
+  groundAt = (x: number, z: number): number => this.terrain.surfaceAt(x, z);
 
-  tick(_dt: number, _hour: number): void { /* weather / wind increments */ }
+  /** Per frame: seasons (eased toward the calendar / pinned season) then terrain uniforms. */
+  tick(dt: number, doy: number, totalDays: number, mode: SeasonMode): void {
+    const p = this.seasons.update({ locationId: CLIMATE_ID, doy, totalDays, mode, dt });
+    writeSeasonUniforms(p, climateFor(CLIMATE_ID));
+    this.terrain.update();
+  }
 
   dispose(): void {
+    this.terrain.dispose();
     this._ws.scene.remove(this._root);
     this._root.traverse(o => {
       const m = o as THREE.Mesh;

@@ -1,7 +1,15 @@
-import { useWorldStore, type Season } from '../store/worldStore';
+import { useWorldStore } from '../store/worldStore';
+import { SEASON_MODES, type SeasonMode } from '../engine/world/season/seasonState';
 import type { Quality } from '../engine/world/WorldScene';
 
-const SEASONS: Season[] = ['spring', 'summer', 'fall', 'winter'];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONTH_START = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+
+function dateLabel(doy: number): string {
+  let m = 11;
+  while (m > 0 && doy <= MONTH_START[m]) m--;
+  return `${MONTHS[m]} ${doy - MONTH_START[m]}`;
+}
 const QUALITIES: Quality[] = ['high', 'medium', 'low'];
 
 /** Minimal world controls: time of day, speed, season, quality. Hidden with ?clean (QA shots). */
@@ -17,9 +25,12 @@ export function Hud() {
         <option value={0}>Paused</option>
         <option value={10}>1 h / 10 s</option>
         <option value={2}>1 h / 2 s</option>
+        <option value={0.05}>1 day / 1.2 s</option>
       </select>
-      <select value={s.season} onChange={e => s.setSeason(e.target.value as Season)}>
-        {SEASONS.map(x => <option key={x}>{x}</option>)}
+      <span style={{ minWidth: 48 }}>{dateLabel(s.dayOfYear)}</span>
+      <input type="range" min={1} max={365} step={1} value={s.dayOfYear} onChange={e => s.setDayOfYear(+e.target.value)} />
+      <select value={s.seasonMode} onChange={e => s.setSeasonMode(e.target.value as SeasonMode)}>
+        {SEASON_MODES.map(x => <option key={x}>{x}</option>)}
       </select>
       <select value={s.quality} onChange={e => s.setQuality(e.target.value as Quality)}>
         {QUALITIES.map(x => <option key={x}>{x}</option>)}
