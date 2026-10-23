@@ -9,7 +9,13 @@ type Raw = Record<string, unknown> & { version?: number };
 
 /** version n → n + 1 upgraders. */
 const STEPS: Record<number, (s: Raw) => Raw> = {
-  // 1 → 2: (none yet) — add steps here as `1: s => ({ ...s, version: 2, newField: … })`
+  // 1 → 2: felling jobs, firewood stock and the stove's burn (M2 step 5)
+  1: s => ({
+    ...s, version: 2,
+    stock: { firewood: 0, ...(s.stock as object) },
+    forestry: { jobs: [], cleared: [] },
+    heat: { burned: 0, warned: -1 },
+  }),
 };
 
 export class SaveVersionError extends Error {}
@@ -26,7 +32,7 @@ export function migrate(raw: unknown): GameState {
     if (!up) throw new SaveVersionError(`No migration from version ${s.version}`);
     s = up(s);
   }
-  for (const k of ['seed', 'clock', 'money', 'stock', 'orders', 'people', 'personState', 'structures', 'log', 'nextId'] as const) {
+  for (const k of ['seed', 'clock', 'money', 'stock', 'orders', 'people', 'personState', 'structures', 'forestry', 'heat', 'log', 'nextId'] as const) {
     if (!(k in s)) throw new SaveVersionError(`Save is missing "${k}"`);
   }
   return s as unknown as GameState;

@@ -8,10 +8,13 @@ import { emptyStock, type Stock, type MaterialId } from './materials';
 import { generateFamily, type Person } from './family';
 import type { StageId } from './blueprints';
 
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 /** Starting savings (GDS §1 peacetime money constraint). */
 export const STARTING_MONEY = 30000;
+
+/** Ricks of firewood brought along (a couple of weeks of spring nights). */
+export const STARTING_FIREWOOD = 2;
 
 export type Speed = 0 | 1 | 2 | 3 | 4;
 /** Real seconds per in-game day at each speed (docs/DECISIONS.md: 1× = 60 s … 1.5 s). */
@@ -56,13 +59,43 @@ export interface Structure {
   finishedAt: number | null;
 }
 
-export type TaskKind = 'idle' | 'build' | 'sleep' | 'chores' | 'school' | 'leisure';
+export type TaskKind = 'idle' | 'build' | 'forestry' | 'sleep' | 'chores' | 'school' | 'leisure';
 
 export interface PersonState {
   id: string;
   task: TaskKind;
-  /** Structure id when building. */
+  /** Structure id when building, felling job id when in the woods. */
   target: string | null;
+}
+
+/** A tree marked for felling (GDS §2.1 "fell own timber"; docs/DECISIONS.md). */
+export interface FellJob {
+  id: string;
+  /** Stable parcel tree id (planParcelTrees cell index). */
+  treeId: number;
+  x: number;
+  z: number;
+  kind: 'conifer' | 'oval' | 'broad';
+  scale: number;
+  /** marked → felled (on the ground) → bucked (cut to length) → hauled (done). */
+  stage: 'marked' | 'felled' | 'bucked';
+  /** Person-hours done on the current stage. */
+  done: number;
+  /** Hours to skid the logs to the yard (from the distance, set when marked). */
+  haulHours: number;
+}
+
+export interface Forestry {
+  jobs: FellJob[];
+  /** Trees felled and hauled (stumps). */
+  cleared: number[];
+}
+
+export interface Heat {
+  /** Firewood burned toward the next whole rick. */
+  burned: number;
+  /** Day index of the last "out of firewood" warning. */
+  warned: number;
 }
 
 export interface LogEntry { t: number; text: string }
@@ -77,6 +110,8 @@ export interface GameState {
   people: Person[];
   personState: PersonState[];
   structures: Structure[];
+  forestry: Forestry;
+  heat: Heat;
   /** Recent events for the HUD log (newest last, capped). */
   log: LogEntry[];
   /** Next id counter. */
@@ -90,11 +125,13 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027): GameSta
     seed,
     clock: { t: 0, ticks: 0, startDoy, startYear, speed: 1 },
     money: STARTING_MONEY,
-    stock: emptyStock(),
+    stock: { ...emptyStock(), firewood: STARTING_FIREWOOD },
     orders: [],
     people,
     personState: people.map(p => ({ id: p.id, task: 'idle', target: null })),
     structures: [],
+    forestry: { jobs: [], cleared: [] },
+    heat: { burned: 0, warned: -1 },
     log: [{ t: 0, text: `The ${people[0].last} family arrives on the land.` }],
     nextId: 1,
   };

@@ -29,8 +29,9 @@ export function routineAt(p: Person, hour: number): Slot {
   return 'leisure';
 }
 
-/** Task for a slot, given whether there is building work to do. */
-export function taskFor(slot: Slot, canBuild: boolean): TaskKind {
-  if (slot === 'work') return canBuild ? 'build' : 'chores';
-  return slot;
+/** Task for a slot, given the work there is: building first, then the woods. */
+export function taskFor(slot: Slot, canBuild: boolean, canFell = false, preferWoods = false): TaskKind {
+  if (slot !== 'work') return slot;
+  if (canBuild && canFell) return preferWoods ? 'forestry' : 'build';
+  return canBuild ? 'build' : canFell ? 'forestry' : 'chores';
 }

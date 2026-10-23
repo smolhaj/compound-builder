@@ -3,7 +3,7 @@
  * bulk units a pickup / flatbed load is counted in. Prices are 2020s rural
  * Mountain West retail (lumber yard / farm store), rounded.
  */
-export type MaterialId = 'lumber' | 'logs' | 'fieldstone' | 'roofing' | 'hardware';
+export type MaterialId = 'lumber' | 'logs' | 'firewood' | 'fieldstone' | 'roofing' | 'hardware';
 
 export interface MaterialDef {
   id: MaterialId;
@@ -17,6 +17,7 @@ export interface MaterialDef {
 export const MATERIALS: Record<MaterialId, MaterialDef> = {
   lumber: { id: 'lumber', name: 'Lumber', unit: 'bundle (≈ 50 boards)', price: 250 },
   logs: { id: 'logs', name: 'Logs', unit: 'log', price: null },
+  firewood: { id: 'firewood', name: 'Firewood', unit: 'rick (⅓ cord)', price: null },
   fieldstone: { id: 'fieldstone', name: 'Fieldstone', unit: 'pallet', price: 120 },
   roofing: { id: 'roofing', name: 'Metal roofing', unit: 'bundle of sheets', price: 180 },
   hardware: { id: 'hardware', name: 'Doors, windows & hardware', unit: 'kit', price: 400 },
@@ -27,7 +28,7 @@ export const MATERIAL_IDS = Object.keys(MATERIALS) as MaterialId[];
 export type Stock = Record<MaterialId, number>;
 
 export function emptyStock(): Stock {
-  return { lumber: 0, logs: 0, fieldstone: 0, roofing: 0, hardware: 0 };
+  return { lumber: 0, logs: 0, firewood: 0, fieldstone: 0, roofing: 0, hardware: 0 };
 }
 
 /** Cost of a bill of materials at retail (unbuyable items count 0). */

@@ -23,4 +23,17 @@ describe('save migrations', () => {
     delete g.people;
     expect(() => migrate(g)).toThrow(/people/);
   });
+
+  it('upgrades a version 1 save (no forestry, no firewood)', () => {
+    const v1 = structuredClone(newGame(3)) as unknown as Record<string, unknown>;
+    v1.version = 1;
+    delete v1.forestry; delete v1.heat;
+    delete (v1.stock as Record<string, number>).firewood;
+    const g = migrate(v1);
+    expect(g.version).toBe(SAVE_VERSION);
+    expect(g.stock.firewood).toBe(0);
+    expect(g.forestry).toEqual({ jobs: [], cleared: [] });
+    expect(g.heat.burned).toBe(0);
+    expect(() => step(g, 2)).not.toThrow();
+  });
 });

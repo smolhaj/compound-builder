@@ -6,7 +6,7 @@ import { SEASON_MODES, type SeasonMode } from '../engine/world/season/seasonStat
 import { WEATHER_MODES, type WeatherMode } from '../engine/world/weather/weatherState';
 import { calendarOf, hourOf, type Speed } from '../sim/state';
 import { fullName } from '../sim/family';
-import { MATERIALS, MATERIAL_IDS, type MaterialId } from '../sim/materials';
+import { MATERIALS, MATERIAL_IDS, emptyStock, type MaterialId } from '../sim/materials';
 import { onOrder, orderCost, orderProblem } from '../sim/economy';
 import { blockedReason, isFinished, progress } from '../sim/construction';
 import { BLUEPRINTS, totalBill, totalHours } from '../sim/blueprints';
@@ -39,7 +39,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 export function Hud() {
   const w = useWorldStore();
   const g = useGameStore();
-  const [qty, setQty] = useState<Record<MaterialId, number>>({ lumber: 0, logs: 0, fieldstone: 0, roofing: 0, hardware: 0 });
+  const [qty, setQty] = useState<Record<MaterialId, number>>(emptyStock());
   if (new URLSearchParams(location.search).has('clean')) return null;
   const game = g.game;
   const cal = calendarOf(game.clock);
@@ -121,7 +121,7 @@ export function Hud() {
           ))}
           <div style={{ display: 'flex', gap: 4, marginTop: 6, flexWrap: 'wrap' }}>
             {lines.length > 0 && <button style={btn(true)} disabled={!!problem}
-              onClick={() => { if (g.order(lines)) setQty({ lumber: 0, logs: 0, fieldstone: 0, roofing: 0, hardware: 0 }); }}>
+              onClick={() => { if (g.order(lines)) setQty(emptyStock()); }}>
               Order {usd(orderCost(lines))}{problem === 'cannot_afford' ? ' (too much)' : ''}
             </button>}
             {needLines.length > 0 && <button style={btn()} disabled={!!orderProblem(game, needLines)} onClick={() => g.order(needLines)}>

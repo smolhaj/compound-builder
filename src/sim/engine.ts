@@ -5,6 +5,8 @@
  */
 import { addWork, blockedReason, isFinished } from './construction';
 import { deliverOrders } from './economy';
+import { addFellWork, nextFellJob } from './forestry';
+import { burnFirewood } from './heating';
 import { buildRate } from './family';
 import { routineAt, taskFor } from './schedule';
 import { hourOf, type GameState, type Structure } from './state';
@@ -22,13 +24,17 @@ function subStep(s: GameState): void {
   deliverOrders(s);
   const h = hourOf(s.clock.t);
   const target = nextBuildTarget(s);
-  for (const p of s.people) {
+  const job = nextFellJob(s);
+  // with both building and felling to do, the family splits: every other person to the woods
+  s.people.forEach((p, i) => {
     const ps = s.personState.find(x => x.id === p.id)!;
-    const task = taskFor(routineAt(p, h), target !== null);
+    const task = taskFor(routineAt(p, h), target !== null, job !== null, i % 2 === 1);
     ps.task = task;
-    ps.target = task === 'build' && target ? target.id : null;
+    ps.target = task === 'build' && target ? target.id : task === 'forestry' && job ? job.id : null;
     if (task === 'build' && target) addWork(s, target, SUBSTEP * 24 * buildRate(p));
-  }
+    else if (task === 'forestry' && job) addFellWork(s, job, SUBSTEP * 24 * buildRate(p));
+  });
+  burnFirewood(s, SUBSTEP);
 }
 
 /** Advance `days` of game time. Returns a new state (the input is not mutated). */

@@ -16,3 +16,6 @@ Decisions made with the user where the GDS was silent or open. Newest last.
 | 2026-10-23 | Deliveries | **Truck on a gravel county road** along a parcel edge with a driveway gate; orders arrive after a lead time and unload to a visible stockpile. |
 | 2026-10-23 | Self-supply (M2) | **Fell own timber:** mark trees, fell, buck into logs, haul to the stockpile. |
 | 2026-10-23 | Saves | **IndexedDB autosave now** (version 1 + migrations, autosave each in-game day, JSON export / import). |
+| 2026-10-23 | What logs are for | **Log cabin blueprint + firewood.** Conifers give saw logs (2–4), aspen 1, cottonwood firewood only; tops and limbs give firewood. No sawmill / selling for now. |
+| 2026-10-23 | How felling plays | **Mark trees, the family works them** as a scheduled task: fell → buck → skid to the yard (haul time grows with distance). With building and felling both waiting, every other person goes to the woods. |
+| 2026-10-23 | Firewood (provisional) | The stove burns firewood on cold days (≈ 0.12 rick/day in January, none in summer, ≈ 4–5 cords a winter). Running out is logged; comfort / health effects wait for the needs system. Start with 2 ricks. |
