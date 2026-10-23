@@ -15,7 +15,9 @@ import { onFarmstead, type Farmstead } from '../engine/world/houses/farmstead';
 import { planNeighbours } from './region/neighbours';
 import type { TourBuildingInfo } from '../engine/world/camera/TourController';
 import { footprint, KIT, type Placed } from './buildkit/kit';
-import { buildCabinGroup, cabinChimneyTop } from './buildkit/cabinGeometry';
+import { buildCabinLayers, cabinChimneyTop, showCabinStage } from './buildkit/cabinGeometry';
+import type { Structure } from '../sim/state';
+import { BLUEPRINTS } from '../sim/blueprints';
 import { SmokePlume } from '../engine/world/fx/SmokePlume';
 import type { Pad } from './parcel/parcelTerrain';
 import { SeasonController, climateFor, type SeasonMode } from '../engine/world/season/seasonState';
@@ -45,7 +47,7 @@ export class HomesteadWorld {
   private _plantSeason = '';
   private _props: RegionalProps | null = null;
   /** Built structures by id (scene groups tagged userData.type = 'building'). */
-  private readonly _built = new Map<string, { placed: Placed; group: THREE.Group; smoke: SmokePlume }>();
+  private readonly _built = new Map<string, { placed: Placed; group: THREE.Group; smoke: SmokePlume; key: string; finished: boolean }>();
   /** Atmosphere for the frame (set by the canvas before tick). */
   readonly air = { hour: 12, wind: 0.2, daylight: 1, viewportH: 800 };
   /** Neighbouring farmsteads (seeded). */
@@ -174,22 +176,39 @@ export class HomesteadWorld {
     const y = this.parcel.padHeight(r.x0, r.z0, r.x1, r.z1);
     const pad: Pad = { x0: r.x0 - 0.05, z0: r.z0 - 0.05, x1: r.x1 + 0.05, z1: r.z1 + 0.05, y, skirt: 0.9 };
     this.parcel.setPads([...this.parcel.pads, pad]);
-    const group = buildCabinGroup(def);
+    const group = buildCabinLayers(def);
+    showCabinStage(group, 0, 0);
     group.position.set(p.x, y, p.z);
     group.rotation.y = p.rot * Math.PI / 2;
     group.userData = { type: 'building', buildingId: p.id };
     this._ws.scene.add(group);
     const smoke = new SmokePlume(group.localToWorld(cabinChimneyTop(def)));
     this._ws.scene.add(smoke.points);
-    this._built.set(p.id, { placed: p, group, smoke });
+    this._built.set(p.id, { placed: p, group, smoke, key: '', finished: false });
     this.terrain.refresh(this._terrainSource, pad.x0 - pad.skirt - 1, pad.z0 - pad.skirt - 1, pad.x1 + pad.skirt + 1, pad.z1 + pad.skirt + 1);
     if (this._quality) this._plant(this._quality);
     this._ws.invalidateShadows();
   }
 
-  /** Sync with the game store's structures (adds new ones). */
+  /** Sync with the game's structures (adds new ones). */
   syncStructures(list: readonly Placed[]): void {
     for (const p of list) this.addStructure(p);
+  }
+
+  /** Show each structure at its construction stage (scaffold → frame → roof → siding). */
+  syncProgress(list: readonly Structure[]): void {
+    for (const st of list) {
+      const b = this._built.get(st.id);
+      if (!b) continue;
+      const stages = BLUEPRINTS[st.kind].stages;
+      const done = st.stage >= stages.length;
+      const f = done ? 0 : st.done / stages[st.stage].hours;
+      const key = `${st.stage}:${Math.round(f * 200)}:${st.supplied ? 1 : 0}`;
+      if (key === b.key) continue;
+      b.key = key;
+      showCabinStage(b.group, done ? 5 : st.stage, f, st.supplied);
+      if (done !== b.finished) { b.finished = done; this._ws.invalidateShadows(); }
+    }
   }
 
   /** Walk mode: can a body of radius r stand at (x, z)? Creek water and tree trunks block. */
@@ -252,7 +271,7 @@ export class HomesteadWorld {
     const heating = Math.min(1, p.cold * 1.2 + p.snow * 0.5 + (seasonState.visual === 'summer' ? 0 : 0.25));
     const fire = Math.max(cooking, heating * (h > 23 || h < 5 ? 0.5 : 1));
     const wx = 0.08 + a.wind * 0.45, wz = 0.03 + a.wind * 0.12;   // prevailing westerlies off the range
-    for (const { smoke } of this._built.values()) smoke.update(this._clock, fire, wx, wz, a.daylight, a.viewportH);
+    for (const { smoke, finished } of this._built.values()) smoke.update(this._clock, finished ? fire : 0, wx, wz, a.daylight, a.viewportH);
     if (seasonState.plants !== this._plantSeason) {
       this._plantSeason = seasonState.plants;
       this.stream.setSeason(this._plantSeason);

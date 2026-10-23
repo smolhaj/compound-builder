@@ -12,6 +12,7 @@ import { CameraOccluders } from '../engine/world/camera/cameraOcclusion';
 import { PARCEL_SIZE } from './HomesteadWorld';
 import { PlacementTool } from './PlacementTool';
 import { useGameStore } from '../store/gameStore';
+import { calendarOf, hourOf, SECONDS_PER_DAY } from '../sim/state';
 import { setWindowGlow } from './buildkit/materials';
 
 /** Background damp of the season (ground darkens a little in the shoulder seasons). */
@@ -24,8 +25,8 @@ export function GameCanvas() {
   useEffect(() => {
     const canvas = ref.current!;
     const ws = new WorldScene(canvas);
-    const world = new HomesteadWorld(ws, useWorldStore.getState().seed);
-    const weather = new WeatherRenderer(ws.scene, useWorldStore.getState().seed);
+    const world = new HomesteadWorld(ws, useGameStore.getState().game.seed);
+    const weather = new WeatherRenderer(ws.scene, useGameStore.getState().game.seed);
     const cam = new DioramaCamera(canvas);
     cam.groundAt = world.groundAt;
     cam.solidAt = world.crownAt;
@@ -67,10 +68,11 @@ export function GameCanvas() {
       world.setQuality(s.quality);
     };
     applyLook();
+    world.syncStructures(useGameStore.getState().game.structures);
     const unsub = [
       useWorldStore.subscribe(s => s.quality, applyLook),
       useWorldStore.subscribe(s => s.cameraMode, applyCameraMode),
-      useGameStore.subscribe(s => s.structures, list => { world.syncStructures(list); occluders.invalidate(); }),
+      useGameStore.subscribe(s => s.game.structures, list => { world.syncStructures(list); occluders.invalidate(); }),
       useGameStore.subscribe(s => s.tool, k => tool.setKind(k)),
     ];
 
@@ -85,9 +87,16 @@ export function GameCanvas() {
       const t0 = performance.now();
       const dt = Math.min(0.1, (now - last) / 1000);
       last = now;
-      const st = useWorldStore.getState();
-      if (st.hourSeconds > 0) st.advanceHours(dt / st.hourSeconds);
-      const { timeOfDay: t, dayOfYear, totalDays, seasonMode, weatherMode, hourSeconds } = useWorldStore.getState();
+      // the sim advances in real time at its speed; the view clock follows it (outside photo mode)
+      useGameStore.getState().tick(dt);
+      const game = useGameStore.getState().game;
+      if (!useWorldStore.getState().photo) {
+        const cal = calendarOf(game.clock);
+        useWorldStore.getState().syncClock(hourOf(game.clock.t), cal.doy, game.clock.t);
+      }
+      world.syncProgress(game.structures);
+      const speed = game.clock.speed;
+      const { timeOfDay: t, dayOfYear, totalDays, seasonMode, weatherMode } = useWorldStore.getState();
       ws.setNightSky(moonPhase(dayOfYear + t / 24), skyDarkness('mountain_west', false));
       Object.assign(world.air, { hour: t, wind: weather.outputs.wind, daylight: 1 - ws.nightFactor * 0.85, viewportH: canvas.clientHeight || 800 });
       world.tick(dt, dayOfYear, totalDays, seasonMode);
@@ -103,7 +112,7 @@ export function GameCanvas() {
       // Weather → sky / light / fog (next frame), wet + snowy surfaces.
       const wxSeason = vis === 'winter' && seasonState.weatherSnow <= 0 ? 'fall' : vis;
       const wx = weather.update({
-        dt, speed: hourSeconds > 0 ? Math.max(1, 10 / hourSeconds) : 1, season: wxSeason, hour: t,
+        dt, speed: speed === 0 ? 1 : 60 / SECONDS_PER_DAY[speed], season: wxSeason, hour: t,
         mode: weatherMode, eventWetness: ws.eventWetness, night: ws.nightFactor,
         camera: ws.camera, focus: cam.target,
         snowBase: sp.snow, snowAllow: seasonState.weatherSnow, region: seasonState.climate.id,

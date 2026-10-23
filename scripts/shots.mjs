@@ -53,7 +53,7 @@ try {
     await page.evaluate(s => {
       const { store, cam, world } = window.__cb;
       const st = store.getState();
-      st.setHourSeconds(0);
+      window.__cb.game.getState().setSpeed(0);
       st.setTimeOfDay(s.time ?? 10);
       st.setSeasonMode(s.season ?? 'auto');
       if (s.doy) st.setDayOfYear(s.doy);

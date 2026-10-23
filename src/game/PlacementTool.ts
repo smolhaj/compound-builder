@@ -82,7 +82,7 @@ export class PlacementTool {
   private _place(): void {
     if (!this._kind || !this._at || !this._ok) return;
     const [x, z] = this._at;
-    useGameStore.getState().place({ kind: this._kind, x, z, rot: this._rot });
+    useGameStore.getState().plan(this._kind, x, z, this._rot);
     this._update();
   }
 
@@ -105,7 +105,7 @@ export class PlacementTool {
     const def = KIT[kind];
     const [x, z] = snapCentre(def, this._at[0], this._at[1], this._rot);
     this._at = [x, z];
-    const problem = placementProblem(def, x, z, this._rot, this._site, useGameStore.getState().structures);
+    const problem = placementProblem(def, x, z, this._rot, this._site, useGameStore.getState().game.structures);
     this._ok = problem === null;
     const fp = footprint(def, x, z, this._rot);
     g.position.set(x, this._world.parcel.padHeight(fp.x0, fp.z0, fp.x1, fp.z1), z);
