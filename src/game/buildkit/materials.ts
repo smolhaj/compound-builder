@@ -13,7 +13,7 @@
 import * as THREE from 'three';
 import { generateNormalMap } from '../../engine/world/materials/normalMapGen';
 
-export type KitMaterialId = 'timber_lap' | 'trim' | 'fieldstone' | 'metal_roof' | 'deck' | 'door' | 'glass' | 'chimney_cap';
+export type KitMaterialId = 'timber_lap' | 'trim' | 'fieldstone' | 'metal_roof' | 'deck' | 'door' | 'glass' | 'chimney_cap' | 'frame' | 'scaffold' | 'string';
 
 /** World units covered by one texture repeat. */
 const TEX_WORLD: Partial<Record<KitMaterialId, number>> = {
@@ -182,6 +182,9 @@ export function kitMaterial(id: KitMaterialId): THREE.MeshStandardMaterial {
     case 'deck': m = texMat(id, paintDeck, 1.6, 0.85); break;
     case 'door': m = texMat(id, paintDoor, 1.5, 0.75); break;
     case 'trim': m = new THREE.MeshStandardMaterial({ color: 0xe9e2cf, roughness: 0.7 }); break;
+    case 'frame': m = new THREE.MeshStandardMaterial({ color: 0xd8b98a, roughness: 0.8 }); break;   // fresh-sawn studs
+    case 'scaffold': m = new THREE.MeshStandardMaterial({ color: 0x9aa0a4, roughness: 0.45, metalness: 0.6 }); break;
+    case 'string': m = new THREE.MeshStandardMaterial({ color: 0xff7a1a, roughness: 0.6, emissive: new THREE.Color(0.3, 0.08, 0) }); break;
     case 'chimney_cap': m = new THREE.MeshStandardMaterial({ color: 0x5a5650, roughness: 0.6, metalness: 0.3 }); break;
     case 'glass': m = new THREE.MeshStandardMaterial({ color: 0x1d2730, roughness: 0.08, metalness: 0.6, emissive: new THREE.Color(1.0, 0.72, 0.42), emissiveIntensity: 0 }); break;
   }

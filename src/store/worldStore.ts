@@ -22,8 +22,8 @@ export interface WorldState {
   dayOfYear: number;
   /** Total days elapsed (season easing, moon). */
   totalDays: number;
-  /** Real seconds per in-game hour (0 = paused). */
-  hourSeconds: number;
+  /** Photo mode: the view clock is set by hand (QA shots, photo mode); otherwise it follows the sim. */
+  photo: boolean;
   /** 'auto' follows the calendar; a season pins the look. */
   seasonMode: SeasonMode;
   weatherMode: WeatherMode;
@@ -34,10 +34,13 @@ export interface WorldState {
   setCameraMode: (m: CameraMode) => void;
   setTourCaption: (c: TourCaption | null) => void;
   setWeatherMode: (m: WeatherMode) => void;
+  /** Set the view hour by hand (enters photo mode). */
   setTimeOfDay: (t: number) => void;
-  advanceHours: (h: number) => void;
+  /** Set the view date by hand (enters photo mode). */
   setDayOfYear: (d: number) => void;
-  setHourSeconds: (s: number) => void;
+  setPhoto: (on: boolean) => void;
+  /** Follow the sim clock (outside photo mode). */
+  syncClock: (hour: number, doy: number, totalDays: number) => void;
   setSeasonMode: (s: SeasonMode) => void;
   setQuality: (q: Quality) => void;
 }
@@ -49,7 +52,7 @@ export const useWorldStore = create<WorldState>()(subscribeWithSelector((set) =>
   timeOfDay: 10,
   dayOfYear: 226,
   totalDays: 0,
-  hourSeconds: 0,
+  photo: false,
   seasonMode: 'auto',
   weatherMode: 'auto',
   quality: 'high',
@@ -58,14 +61,10 @@ export const useWorldStore = create<WorldState>()(subscribeWithSelector((set) =>
   setCameraMode: (cameraMode) => set({ cameraMode }),
   setTourCaption: (tourCaption) => set({ tourCaption }),
   setWeatherMode: (weatherMode) => set({ weatherMode }),
-  setTimeOfDay: (t) => set({ timeOfDay: ((t % 24) + 24) % 24 }),
-  advanceHours: (h) => set(s => {
-    const t = s.timeOfDay + h;
-    const days = Math.floor(t / 24);
-    return { timeOfDay: t - days * 24, dayOfYear: wrapDoy(s.dayOfYear + days), totalDays: s.totalDays + h / 24 };
-  }),
-  setDayOfYear: (d) => set(s => ({ dayOfYear: wrapDoy(d), totalDays: s.totalDays + 100 })),
-  setHourSeconds: (s) => set({ hourSeconds: s }),
+  setTimeOfDay: (t) => set({ timeOfDay: ((t % 24) + 24) % 24, photo: true }),
+  setDayOfYear: (d) => set(s => ({ dayOfYear: wrapDoy(d), totalDays: s.totalDays + 100, photo: true })),
+  setPhoto: (photo) => set({ photo }),
+  syncClock: (timeOfDay, dayOfYear, totalDays) => set({ timeOfDay, dayOfYear, totalDays }),
   setSeasonMode: (seasonMode) => set({ seasonMode }),
   setQuality: (quality) => set({ quality }),
 })));

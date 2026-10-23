@@ -61,7 +61,7 @@ SETS.farms = [
 
 /** Place a cabin on the first valid spot 5–9 units from the creek, near the parcel centre (door toward the creek). */
 const placeCabin = `
-  const w = cb.world, p = w.parcel; let done = cb.game.getState().structures.length > 0;
+  const w = cb.world, p = w.parcel; let done = cb.game.getState().game.structures.length > 0;
   for (let r = 0; r < 25 && !done; r += 1) for (let a = 0; a < 6.28 && !done; a += 0.5) {
     const x = 33 + Math.cos(a) * r, z0 = p.creek.zAt(x);
     for (const side of [1, -1]) {
@@ -73,7 +73,7 @@ const placeCabin = `
     }
   }
   cb.game.getState().setTool(null);
-  const s = cb.game.getState().structures[0]; window.__cabin = s;`;
+  const s = cb.game.getState().game.structures[0]; window.__cabin = s;`;
 const atCabin = (r, pitch, yaw) => placeCabin + `cb.cam.target.set(s.x, 0, s.z); cb.cam.radius = ${r}; cb.cam.pitch = ${pitch}; cb.cam.yaw = (s.rot * Math.PI / 2) + ${yaw};`;
 const eyeCabin = (d, side) => placeCabin + `const q = s.rot * Math.PI / 2; const fx = Math.sin(q), fz = Math.cos(q); const sx = Math.cos(q), sz = -Math.sin(q); const ex = s.x + fx * ${d} + sx * ${side}, ez = s.z + fz * ${d} + sz * ${side}; const [px, pz] = cb.world.openSpotNear(ex, ez, 0.4); cb.cam.placeEye(px, pz, s.x, s.z, 0.26);`;
 SETS.cabin = [
@@ -84,4 +84,21 @@ SETS.cabin = [
   { name: 'cabin-winter', time: 12, season: 'winter', setup: atCabin(8, 0.35, 2.4), cam: { x: C, z: C, yaw: 0, pitch: 0.35, radius: 8 }, frames: 10 },
   { name: 'homestead-overview', time: 16, season: 'summer', setup: atCabin(45, 0.55, 0.7), cam: { x: C, z: C, yaw: 0, pitch: 0.5, radius: 45 }, frames: 10 },
   { name: 'cabin-ghost-red', time: 11, season: 'summer', setup: placeCabin + "cb.game.getState().setTool('timber_cabin'); cb.tool.hoverAt(s.x + 0.3, s.z + 0.3, 1); cb.cam.target.set(s.x, 0, s.z); cb.cam.radius = 7; cb.cam.pitch = 0.5; cb.cam.yaw = 0.5;", cam: { x: C, z: C, yaw: 0, pitch: 0.5, radius: 7 }, frames: 6 },
+];
+
+/** Stake out a cabin (placeCabin), order its materials, then run the sim until the given stage / fraction. */
+const buildTo = (stage, frac) => placeCabin + `
+  const G = cb.game.getState();
+  if (!window.__ordered) { window.__ordered = true; G.order([{ material: 'fieldstone', qty: 6 }, { material: 'lumber', qty: 24 }, { material: 'roofing', qty: 8 }, { material: 'hardware', qty: 3 }]); }
+  const want = ${stage} + ${frac};
+  const at = () => { const st = cb.game.getState().game.structures[0]; const sg = [24, 40, 120, 60, 100]; return st.stage >= 5 ? 5 : st.stage + st.done / sg[st.stage]; };
+  for (let i = 0; i < 4000 && at() < want; i++) cb.game.getState().advance(0.25 / 24);`;
+const viewCabin = (r, pitch, yaw) => `cb.cam.target.set(s.x, 0, s.z); cb.cam.radius = ${r}; cb.cam.pitch = ${pitch}; cb.cam.yaw = (s.rot * Math.PI / 2) + ${yaw};`;
+SETS.construction = [
+  { name: 'stage-0-staked-out', time: 10, season: 'spring', setup: buildTo(0, 0.5) + viewCabin(5, 0.5, 0.7), cam: { x: C, z: C, yaw: 0, pitch: 0.5, radius: 5 }, frames: 8 },
+  { name: 'stage-1-foundation', time: 10, season: 'spring', setup: buildTo(1, 0.6) + viewCabin(5, 0.45, 0.7), cam: { x: C, z: C, yaw: 0, pitch: 0.5, radius: 5 }, frames: 8 },
+  { name: 'stage-2-framing', time: 11, season: 'spring', setup: buildTo(2, 0.55) + viewCabin(4.5, 0.35, 0.7), cam: { x: C, z: C, yaw: 0, pitch: 0.5, radius: 5 }, frames: 8 },
+  { name: 'stage-3-roofing', time: 12, season: 'spring', setup: buildTo(3, 0.6) + viewCabin(6, 0.55, 0.7), cam: { x: C, z: C, yaw: 0, pitch: 0.5, radius: 5 }, frames: 8 },
+  { name: 'stage-4-siding', time: 15, season: 'spring', setup: buildTo(4, 0.5) + viewCabin(4.5, 0.3, 0.7), cam: { x: C, z: C, yaw: 0, pitch: 0.5, radius: 5 }, frames: 8 },
+  { name: 'stage-5-finished', time: 17.5, season: 'spring', setup: buildTo(5, 0) + viewCabin(5, 0.25, 0.7), cam: { x: C, z: C, yaw: 0, pitch: 0.5, radius: 5 }, frames: 8 },
 ];
