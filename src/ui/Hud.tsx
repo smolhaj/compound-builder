@@ -14,6 +14,9 @@ import { KIT, KIT_ORDER } from '../game/buildkit/kit';
 import { PERIMETER, PERIMETER_ORDER, runBill, runHours, runFinished, runProgress, runBlocked, runGrowth } from '../sim/perimeter';
 
 const QUALITIES: Quality[] = ['high', 'medium', 'low'];
+const SIGHTS: Array<['off' | 'road' | 'ridge' | 'night' | 'viewshed', string, string]> = [
+  ['off', 'Off', 'No sightline overlay'], ['road', 'Road', 'How exposed each spot is to people on the county road'], ['ridge', 'Ridge', 'Seen from the high ground to the west'],
+  ['night', 'Night', 'Where your lit windows give you away after dark'], ['viewshed', 'View from…', 'Click a spot to see what can be seen from there (Shift-click: from a 10 m tower)']];
 const CAMERAS: Array<[CameraMode, string]> = [['diorama', 'Diorama'], ['walk', 'Walk'], ['fly', 'Fly'], ['cinematic', 'Tour']];
 const VIEWS: Array<[BuildingView, string, string]> = [['full', 'Walls', 'Whole buildings'], ['cutaway', 'Cutaway', 'Walls cut at waist height, roof and loft off (V)'], ['xray', 'X-ray', 'See-through walls and roof (V)']];
 const SPEEDS: Array<[Speed, string]> = [[0, '❚❚'], [1, '▶'], [2, '▶▶'], [3, '▶▶▶'], [4, '⏩']];
@@ -200,6 +203,8 @@ export function Hud() {
         <select value={w.quality} onChange={e => w.setQuality(e.target.value as Quality)} title="Graphics quality">
           {QUALITIES.map(x => <option key={x}>{x}</option>)}
         </select>
+        <span style={{ opacity: 0.7 }}>Sightlines</span>
+        {SIGHTS.map(([m, label, tip]) => <button key={m} title={tip} style={btn(w.sightMode === m)} onClick={() => w.setSightMode(m)}>{label}</button>)}
         <button style={btn(w.photo)} onClick={() => w.setPhoto(!w.photo)}>Photo</button>
         {w.photo && <>
           <span>{clock(w.timeOfDay)}</span>

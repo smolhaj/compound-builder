@@ -29,6 +29,7 @@ import { hashStr } from './buildkit/clutter';
 import { buildRun, solidSpans } from './perimeter/perimeterGeometry';
 import { PERIMETER, runGrowth, runProgress, wallLength, type PerimeterRun } from '../sim/perimeter';
 import { closestOnLine, earthworkReach, type Earthwork } from './parcel/parcelTerrain';
+import { exposure, Sight, type Observer, type SightWorld } from './sightlines/visibility';
 import { hitsColliders, type Collider } from './buildkit/interior';
 import type { BuildingView } from '../store/worldStore';
 import type { Structure } from '../sim/state';
@@ -346,6 +347,51 @@ export class HomesteadWorld {
   private _simT = 0;
   /** Sim time for growth-dependent checks (set by the canvas). */
   set simTime(t: number) { this._simT = t; }
+
+  // ── Sightlines ────────────────────────────────────────────────────────
+  /** What blocks sight now: terrain, standing trees, the regional forest, grown hedges / walls, buildings. */
+  sightWorld(): SightWorld {
+    const boxes = [...this._built.values()].map(b => {
+      const box = new THREE.Box3().setFromObject(b.group);
+      return { x0: box.min.x, z0: box.min.z, x1: box.max.x, z1: box.max.z, top: box.max.y };
+    });
+    const walls = this._runs.filter(r => r.kind !== 'earth_berm' && r.kind !== 'ditch' && PERIMETER[r.kind].sight > 0).map(r => {
+      const g = runGrowth(r, this._simT);
+      return { pts: r.pts, top: PERIMETER[r.kind].height * (r.kind === 'thorn_hedge' ? g : 1), cut: PERIMETER[r.kind].sight * (r.kind === 'thorn_hedge' ? g : r.finishedAt !== null ? 1 : runProgress(r)), gates: r.gates };
+    });
+    const inside = (x: number, z: number) => x > -TREE_MARGIN && z > -TREE_MARGIN && x < PARCEL_SIZE + TREE_MARGIN && z < PARCEL_SIZE + TREE_MARGIN;
+    return { ground: this.groundAt, trees: this.treeSpecs, forestAt: (x, z) => this.parcel.region.sample(x, z).forest, inside, walls, boxes };
+  }
+
+  /** Who looks: people driving / walking the county road, or someone up on the ridge to the west. */
+  observers(kind: 'road' | 'ridge'): Observer[] {
+    if (kind === 'road') {
+      const out: Observer[] = [];
+      for (let z = -12; z <= PARCEL_SIZE + 12; z += 5) out.push({ x: roadX(z), z, eye: 0.3 });
+      return out;
+    }
+    // the highest ground in a band 40–90 units west of the parcel
+    const cand: Array<Observer & { h: number }> = [];
+    for (let x = -90; x <= -40; x += 6) for (let z = -30; z <= PARCEL_SIZE + 30; z += 8) cand.push({ x, z, eye: 0.3, h: this.groundAt(x, z) });
+    cand.sort((a, b) => b.h - a.h);
+    const picked: Observer[] = [];
+    for (const c of cand) { if (picked.every(p => Math.hypot(p.x - c.x, p.z - c.z) > 18)) picked.push({ x: c.x, z: c.z, eye: 0.3 }); if (picked.length >= 6) break; }
+    return picked;
+  }
+
+  /** Lit windows at night (finished buildings with a lamp, and the campfire until a home stands). */
+  nightLights(): Array<{ x: number; z: number; h: number; k: number }> {
+    const out = [...this._built.values()].filter(b => b.finished && KIT[b.placed.kind].light).map(b => ({ x: b.placed.x, z: b.placed.z, h: KIT[b.placed.kind].floorY + 0.25, k: KIT[b.placed.kind].sleeps > 0 ? 1 : 0.6 }));
+    if (!out.some(l => l.k === 1)) out.push({ x: this.camp.x, z: this.camp.z, h: 0.15, k: 0.8 });
+    return out;
+  }
+
+  /** Share of the county road that can see each building (its windows, ≈ 1.5 m up). */
+  buildingExposure(): Record<string, number> {
+    const s = new Sight(this.sightWorld()), obs = this.observers('road'), out: Record<string, number> = {};
+    for (const b of this._built.values()) out[b.placed.id] = exposure(s, { ground: this.groundAt }, b.placed.x, b.placed.z, KIT[b.placed.kind].floorY + 0.25, obs);
+    return out;
+  }
 
   /** Show the woods at work: paint marks, felled and bucked trees, stumps; cut trees leave the forest. */
   syncForestry(f: Forestry): void {

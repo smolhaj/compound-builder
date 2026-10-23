@@ -13,6 +13,8 @@ import { PARCEL_SIZE } from './HomesteadWorld';
 import { PlacementTool } from './PlacementTool';
 import { MarkTool } from './MarkTool';
 import { PerimeterTool } from './PerimeterTool';
+import { SightOverlay } from './sightlines/SightOverlay';
+import { PARCEL_SIZE as PS } from './parcel/parcelTerrain';
 import type { PerimeterKind } from '../sim/perimeter';
 import { useGameStore } from '../store/gameStore';
 import { calendarOf, hourOf, SECONDS_PER_DAY } from '../sim/state';
@@ -46,6 +48,25 @@ export function GameCanvas() {
     const tool = new PlacementTool(ws.scene, ws.camera, canvas, world);
     const marker = new MarkTool(ws.scene, ws.camera, canvas, world);
     const fence = new PerimeterTool(ws.scene, ws.camera, canvas, world);
+    const sight = new SightOverlay(ws.scene, {
+      sightWorld: () => world.sightWorld(), bounds: { x0: -6, z0: -6, x1: PS + 6, z1: PS + 6 },
+      observers: k => world.observers(k), lights: () => world.nightLights(),
+    });
+    // viewshed: with the overlay in viewshed mode, a click on the ground sets the eye (Shift: from a 10 m tower)
+    const vsRay = new THREE.Raycaster(), vsNdc = new THREE.Vector2();
+    let vsDown: { x: number; y: number } | null = null;
+    const onVsDown = (e: PointerEvent) => { vsDown = { x: e.clientX, y: e.clientY }; };
+    const onVsUp = (e: PointerEvent) => {
+      const d = vsDown; vsDown = null;
+      if (!d || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 5 || useWorldStore.getState().sightMode !== 'viewshed' || useGameStore.getState().tool || !world.terrain.mesh) return;
+      const r = canvas.getBoundingClientRect();
+      vsNdc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+      vsRay.setFromCamera(vsNdc, ws.camera);
+      const h = vsRay.intersectObject(world.terrain.mesh, false)[0];
+      if (h) sight.set('viewshed', { x: h.point.x, z: h.point.z, eye: e.shiftKey ? 1.7 : 0.3 });
+    };
+    canvas.addEventListener('pointerdown', onVsDown);
+    canvas.addEventListener('pointerup', onVsUp);
     const applyCameraMode = () => {
       const m = useWorldStore.getState().cameraMode;
       if (m === 'diorama') { if (tour.active) tour.exit(); cam.enabled = true; return; }
@@ -85,6 +106,9 @@ export function GameCanvas() {
       useGameStore.subscribe(s => s.game.structures, list => { world.syncStructures(list); occluders.invalidate(); }),
       useGameStore.subscribe(s => s.tool, k => { tool.setKind(k); marker.setOn(k === 'fell'); fence.setKind(k?.startsWith('fence:') ? k.slice(6) as PerimeterKind : null); }),
       useWorldStore.subscribe(s => s.buildingView, v => world.setBuildingView(v)),
+      useWorldStore.subscribe(s => s.sightMode, m => sight.set(m)),
+      // the compound changed: recompute the overlay
+      useGameStore.subscribe(s => `${s.game.structures.map(x => x.id + x.stage).join()}|${s.game.perimeter.map(r => r.id + (r.finishedAt === null ? Math.round(r.done) : 'f')).join()}`, () => sight.refresh()),
     ];
 
     let lastVisual = '';
@@ -110,6 +134,7 @@ export function GameCanvas() {
       world.syncForestry(game.forestry);
       world.simTime = game.clock.t;
       world.syncPerimeter(game.perimeter, game.clock.t);
+      sight.update(6);
       const speedK = game.clock.speed === 0 ? 0 : 60 / SECONDS_PER_DAY[game.clock.speed];
       world.updatePeople(dt, game, hourOf(game.clock.t), speedK);
       world.updateDeliveries(dt, game, speedK);
@@ -166,7 +191,7 @@ export function GameCanvas() {
     raf = requestAnimationFrame(frame);
 
     // QA hook (screenshot harness, console poking).
-    (window as unknown as Record<string, unknown>).__cb = { ws, world, weather, cam, tour, tool, marker, fence, game: useGameStore, store: useWorldStore, THREE, qa };
+    (window as unknown as Record<string, unknown>).__cb = { ws, world, weather, cam, tour, tool, marker, fence, sight, game: useGameStore, store: useWorldStore, THREE, qa };
 
     return () => {
       cancelAnimationFrame(raf);
@@ -177,6 +202,9 @@ export function GameCanvas() {
       tool.dispose();
       marker.dispose();
       fence.dispose();
+      sight.dispose();
+      canvas.removeEventListener('pointerdown', onVsDown);
+      canvas.removeEventListener('pointerup', onVsUp);
       cam.dispose();
       weather.dispose();
       world.dispose();
