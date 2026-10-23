@@ -29,6 +29,13 @@ import type { Pad } from './parcel/parcelTerrain';
 import { SeasonController, climateFor, type SeasonMode } from '../engine/world/season/seasonState';
 import { writeSeasonUniforms } from '../engine/world/season/seasonShader';
 import { PARCEL_SIZE, ParcelTerrain } from './parcel/parcelTerrain';
+import { DRIVE_W, ROAD_W, distToLine, planAccess, roadLine, roadX, type Access } from './region/access';
+import { buildRibbon } from '../engine/world/roads/RoadRibbon';
+import { gravelMaterial } from '../engine/world/roads/roadTextures';
+import { buildGate } from './props/gateGeometry';
+import { buildStockpile } from './props/stockpileGeometry';
+import { DeliveryTruck } from './DeliveryTruck';
+import { MATERIAL_IDS, emptyStock } from '../sim/materials';
 
 export { PARCEL_SIZE };
 /** Person height in world units (≈ 1.7 m). */
@@ -62,6 +69,13 @@ export class HomesteadWorld {
   readonly camp: { x: number; z: number; rot: number };
   private readonly _campGroup: THREE.Group;
   readonly family: FamilyRenderer;
+  /** County road, driveway, gate and stockpile yard. */
+  readonly access: Access;
+  private readonly _roads = new THREE.Group();
+  readonly truck: DeliveryTruck;
+  private _stockpile: THREE.Group | null = null;
+  private _stockKey = '';
+  private readonly _seenOrders = new Set<string>();
   /** Planted parcel trees (QA: clear eye-level spots). */
   treeSpecs: ReadonlyArray<{ x: number; y: number; z: number; scale: number; sx: number; sy: number; kind: string }> = [];
   private _clock = 0;
@@ -76,6 +90,7 @@ export class HomesteadWorld {
     this.parcel = new ParcelTerrain(seed);
     this.farms = planNeighbours(this.parcel);
     this.camp = this._pickCamp();
+    this.access = planAccess(this.camp);
     this.terrain = new TerrainRenderer(ws.scene);
     this.forest = new ForestRenderer(ws.scene);
     this.farTrees = new FarTreeRenderer(ws.scene);
@@ -89,6 +104,56 @@ export class HomesteadWorld {
     const zc = this.parcel.creek.zAt(this.center.x + 3);
     this._root.add(scaleFigure(this.center.x + 3, zc + 4, this.parcel.height(this.center.x + 3, zc + 4)));
     ws.scene.add(this._root);
+    this.truck = new DeliveryTruck(ws.scene, this.access.drive, this.groundAt);
+  }
+
+  /** Is (x, z) on the county road or the driveway (plus `pad`)? */
+  onAccess(x: number, z: number, pad = 0): boolean {
+    if (Math.abs(x - roadX(z)) < ROAD_W / 2 + pad) return true;
+    const a = this.access;
+    if (x < PARCEL_SIZE + 2 && Math.abs(z - a.gate.z) < 12 + pad && distToLine(a.drive, x, z) < DRIVE_W / 2 + pad) return true;
+    return Math.hypot(x - a.yard.x, z - a.yard.z) < 0.8 + pad;
+  }
+
+  /** Road + driveway ribbons draped on the rendered terrain, and the gate. */
+  private _buildRoads(): void {
+    this._roads.traverse(o => { if (o !== this._roads) (o as THREE.Mesh).geometry?.dispose(); });
+    this._roads.clear();
+    const mat = gravelMaterial();
+    const road = new THREE.Mesh(buildRibbon(roadLine(1), ROAD_W, this.groundAt, 0.02, 6), mat);
+    const drive = new THREE.Mesh(buildRibbon(this.access.drive, DRIVE_W, this.groundAt, 0.024, 4), mat);
+    for (const m of [road, drive]) { m.receiveShadow = true; this._roads.add(m); }
+    const gate = buildGate(DRIVE_W);
+    const { gate: gp } = this.access;
+    gate.position.set(gp.x, this.groundAt(gp.x, gp.z), gp.z);
+    this._roads.add(gate);
+    if (!this._roads.parent) this._ws.scene.add(this._roads);
+  }
+
+  /**
+   * Deliveries: a newly delivered order sends the truck in; the stockpile at
+   * the yard shows what is in stock less what is still on the truck.
+   */
+  updateDeliveries(dt: number, game: GameState, speedK: number): void {
+    for (const o of game.orders) {
+      if (o.status !== 'delivered' || this._seenOrders.has(o.id)) continue;
+      this._seenOrders.add(o.id);
+      // orders already delivered when the world loads don't replay
+      if (this._clock > 0.5) this.truck.enqueue(o.lines);
+    }
+    this.truck.update(dt, speedK);
+    const pending = this.truck.onTruck(), shown = emptyStock();
+    for (const m of MATERIAL_IDS) shown[m] = Math.max(0, game.stock[m] - pending[m]);
+    const key = MATERIAL_IDS.map(m => Math.min(shown[m], 40)).join(',');
+    if (key === this._stockKey) return;
+    this._stockKey = key;
+    if (this._stockpile) { this._root.remove(this._stockpile); this._stockpile.traverse(o => (o as THREE.Mesh).geometry?.dispose()); }
+    const y = this.access.yard;
+    const g = buildStockpile(shown);
+    g.position.set(y.x - 0.3, this.groundAt(y.x, y.z), y.z - 0.55);
+    this._stockpile = g;
+    this._root.add(g);
+    this._ws.invalidateShadows();
   }
 
   /** (Re)build the terrain mesh at a quality tier. */
@@ -102,13 +167,14 @@ export class HomesteadWorld {
     });
     this._plant(q);
     this._water(q);
+    this._buildRoads();
     this._ws.invalidateShadows();
   }
 
   /** Parcel trees (near, detailed) inside the margin; regional far trees beyond it. */
   private _plant(q: Quality): void {
     const margin = TREE_MARGIN;
-    const specs = planParcelTrees(this.parcel, { margin, density: q === 'low' ? 0.5 : 1, blocked: (x, z) => this.onBuilding(x, z, 0.6) || this.onCamp(x, z, 0.6) });
+    const specs = planParcelTrees(this.parcel, { margin, density: q === 'low' ? 0.5 : 1, blocked: (x, z) => this.onBuilding(x, z, 0.6) || this.onCamp(x, z, 0.6) || this.onAccess(x, z, 0.5) });
     for (const t of specs) t.y = this.terrain.surfaceAt(t.x, t.z) - 0.03;
     this.treeSpecs = specs;
     this.forest.build(specs, q, { oval: FOREST_ASPEN, broad: FOREST_ASPEN });
@@ -127,7 +193,7 @@ export class HomesteadWorld {
       sample: (x, z) => this.parcel.region.sample(x, z), height: (x, z) => this.parcel.region.height(x, z),
       cx: this.center.x, cz: this.center.z, siteW: PARCEL_SIZE, siteH: PARCEL_SIZE, r0: margin + 2,
       waterY: regionWaterY('mountain'), quality: q,
-      blocked: (x, z) => inside(x, z) || onFarmstead(this.farms, x, z, 2.5),
+      blocked: (x, z) => inside(x, z) || onFarmstead(this.farms, x, z, 2.5) || this.onAccess(x, z, 1.2),
     });
   }
 
@@ -352,6 +418,9 @@ export class HomesteadWorld {
       group.traverse(o => (o as THREE.Mesh).geometry?.dispose());
     }
     this._built.clear();
+    this.truck.dispose();
+    this._ws.scene.remove(this._roads);
+    this._roads.traverse(o => (o as THREE.Mesh).geometry?.dispose());
     this.forest.dispose();
     this.farTrees.dispose();
     this._props?.dispose();
