@@ -5,6 +5,19 @@ import { regionLookFor, regionWaterY } from '../engine/world/terrain/regionalLan
 import { ForestRenderer, FOREST_ASPEN } from '../engine/world/trees/ForestRenderer';
 import { FarTreeRenderer } from '../engine/world/trees/FarTreeRenderer';
 import { planParcelTrees } from './parcel/parcelTrees';
+import { StreamRenderer } from '../engine/world/water/StreamRenderer';
+import { RegionalWaterRenderer } from '../engine/world/water/RegionalWaterRenderer';
+import { updateWaterGlobals } from '../engine/world/water/waterShading';
+import { seasonState } from '../engine/world/season/seasonState';
+import { RegionalProps } from '../engine/world/houses/regionalProps';
+import { buildFarmstead, type FarmTree } from '../engine/world/houses/regionalFarmsteads';
+import { onFarmstead, type Farmstead } from '../engine/world/houses/farmstead';
+import { planNeighbours } from './region/neighbours';
+import type { TourBuildingInfo } from '../engine/world/camera/TourController';
+import { footprint, KIT, type Placed } from './buildkit/kit';
+import { buildCabinGroup, cabinChimneyTop } from './buildkit/cabinGeometry';
+import { SmokePlume } from '../engine/world/fx/SmokePlume';
+import type { Pad } from './parcel/parcelTerrain';
 import { SeasonController, climateFor, type SeasonMode } from '../engine/world/season/seasonState';
 import { writeSeasonUniforms } from '../engine/world/season/seasonShader';
 import { PARCEL_SIZE, ParcelTerrain } from './parcel/parcelTerrain';
@@ -27,6 +40,18 @@ export class HomesteadWorld {
   readonly terrain: TerrainRenderer;
   readonly forest: ForestRenderer;
   readonly farTrees: FarTreeRenderer;
+  readonly stream: StreamRenderer;
+  readonly lakes: RegionalWaterRenderer;
+  private _plantSeason = '';
+  private _props: RegionalProps | null = null;
+  /** Built structures by id (scene groups tagged userData.type = 'building'). */
+  private readonly _built = new Map<string, { placed: Placed; group: THREE.Group; smoke: SmokePlume }>();
+  /** Atmosphere for the frame (set by the canvas before tick). */
+  readonly air = { hour: 12, wind: 0.2, daylight: 1, viewportH: 800 };
+  /** Neighbouring farmsteads (seeded). */
+  readonly farms: Farmstead[];
+  /** Planted parcel trees (QA: clear eye-level spots). */
+  treeSpecs: ReadonlyArray<{ x: number; y: number; z: number; scale: number; sx: number; sy: number; kind: string }> = [];
   private _clock = 0;
   readonly seasons = new SeasonController();
   private readonly _root = new THREE.Group();
@@ -37,9 +62,12 @@ export class HomesteadWorld {
     this._ws = ws;
     ws.setSite({ x0: 0, z0: 0, x1: PARCEL_SIZE, z1: PARCEL_SIZE });
     this.parcel = new ParcelTerrain(seed);
+    this.farms = planNeighbours(this.parcel);
     this.terrain = new TerrainRenderer(ws.scene);
     this.forest = new ForestRenderer(ws.scene);
     this.farTrees = new FarTreeRenderer(ws.scene);
+    this.stream = new StreamRenderer(ws.scene);
+    this.lakes = new RegionalWaterRenderer(ws.scene);
     const zc = this.parcel.creek.zAt(this.center.x + 3);
     this._root.add(scaleFigure(this.center.x + 3, zc + 4, this.parcel.height(this.center.x + 3, zc + 4)));
     ws.scene.add(this._root);
@@ -50,31 +78,165 @@ export class HomesteadWorld {
     if (q === this._quality) return;
     this._quality = q;
     this.terrain.build({
-      // the forest floor under the parcel's own trees is a shade, not a dark blot (the trees are the canopy)
-      source: { sample: (x, z) => { const t = this.parcel.sample(x, z); const o = Math.max(-x, x - PARCEL_SIZE, -z, z - PARCEL_SIZE, 0); t.forest *= o < TREE_MARGIN ? 0.62 : 1; return t; } },
+      source: this._terrainSource,
       kind: 'mountain', cx: this.center.x, cz: this.center.z,
       core: { x: PARCEL_SIZE / 2 + 70, z: PARCEL_SIZE / 2 + 22 }, quality: q, waterY: regionWaterY('mountain'),
     });
     this._plant(q);
+    this._water(q);
     this._ws.invalidateShadows();
   }
 
   /** Parcel trees (near, detailed) inside the margin; regional far trees beyond it. */
   private _plant(q: Quality): void {
     const margin = TREE_MARGIN;
-    const specs = planParcelTrees(this.parcel, { margin, density: q === 'low' ? 0.5 : 1 });
+    const specs = planParcelTrees(this.parcel, { margin, density: q === 'low' ? 0.5 : 1, blocked: (x, z) => this.onBuilding(x, z, 0.6) });
     for (const t of specs) t.y = this.terrain.surfaceAt(t.x, t.z) - 0.03;
+    this.treeSpecs = specs;
     this.forest.build(specs, q, { oval: FOREST_ASPEN, broad: FOREST_ASPEN });
     const inside = (x: number, z: number) => x > -margin && x < PARCEL_SIZE + margin && z > -margin && z < PARCEL_SIZE + margin;
+    // Neighbouring farmsteads (houses, hay barns, corrals, poplar windbreaks)
+    this._props?.dispose();
+    const props = new RegionalProps(this._ws.scene, 'mountain');
+    const farmTrees: FarmTree[] = [];
+    const slope = (x: number, z: number) => this.parcel.region.slope(x, z);
+    for (const f of this.farms) buildFarmstead(f, 'mountain', props, this.groundAt, slope, t => farmTrees.push(t));
+    props.finish();
+    this._props = props;
     this.farTrees.build({
+      extra: farmTrees.map(t => ({ x: t.x, y: this.groundAt(t.x, t.z) - 0.05, z: t.z, h: t.h, sp: t.sp })),
       kind: 'mountain', look: regionLookFor('mountain'),
       sample: (x, z) => this.parcel.region.sample(x, z), height: (x, z) => this.parcel.region.height(x, z),
       cx: this.center.x, cz: this.center.z, siteW: PARCEL_SIZE, siteH: PARCEL_SIZE, r0: margin + 2,
-      waterY: regionWaterY('mountain'), quality: q, blocked: inside,
+      waterY: regionWaterY('mountain'), quality: q,
+      blocked: (x, z) => inside(x, z) || onFarmstead(this.farms, x, z, 2.5),
     });
   }
 
+  /** The creek (sloped stream) and the regional reservoir. */
+  private _water(q: Quality): void {
+    const c = this.parcel.creek;
+    this.stream.build({
+      x0: this.center.x - 62, x1: this.center.x + 62, zAt: c.zAt, waterY: c.waterY, band: 3,
+      site: {
+        ground: this.groundAt,
+        blocked: (x, z, r, tree) => tree && this.treeClearance(x, z) < r,
+      },
+      quality: q, season: seasonState.plants, seed: this.parcel.seed,
+    });
+    const wy = regionWaterY('mountain');
+    if (wy !== null) {
+      this.lakes.build({
+        kind: 'mountain', height: (x, z) => this.parcel.region.height(x, z), waterY: wy,
+        cx: this.center.x, cz: this.center.z, reedInner: PARCEL_SIZE, quality: q, season: seasonState.plants,
+      });
+    }
+  }
+
   groundAt = (x: number, z: number): number => this.terrain.surfaceAt(x, z);
+
+  /** What the terrain mesh draws: the parcel with its pads; the forest floor under the parcel's own trees is a shade, not a dark blot. */
+  private readonly _terrainSource = {
+    sample: (x: number, z: number) => {
+      const t = this.parcel.sample(x, z);
+      const o = Math.max(-x, x - PARCEL_SIZE, -z, z - PARCEL_SIZE, 0);
+      t.forest *= o < TREE_MARGIN ? 0.62 : 1;
+      return t;
+    },
+  };
+
+  /** Buildings the cinematic tour may visit (boxes come from the scene's 'building' groups). */
+  describeBuildings(): Array<Omit<TourBuildingInfo, 'box'>> {
+    return [...this._built.values()].map(({ placed }, i) => ({
+      id: placed.id, defId: placed.kind, name: KIT[placed.kind].name, typeName: KIT[placed.kind].name,
+      tier: 1, builtDay: i + 1, historic: i === 0, solid: true, highlight: i === 0 ? 'The homestead' : undefined,
+    }));
+  }
+
+  /** Is (x, z) within `pad` of a built footprint (porch included)? */
+  onBuilding(x: number, z: number, pad = 0, withPorch = true): boolean {
+    for (const { placed } of this._built.values()) {
+      const r = footprint(KIT[placed.kind], placed.x, placed.z, placed.rot, withPorch);
+      if (x > r.x0 - pad && x < r.x1 + pad && z > r.z0 - pad && z < r.z1 + pad) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Build a placed structure: grade a pad under it (the ground eases back to
+   * natural over a short skirt), clear the trees off the site, stand the
+   * building on the pad.
+   */
+  addStructure(p: Placed): void {
+    if (this._built.has(p.id)) return;
+    const def = KIT[p.kind];
+    const r = footprint(def, p.x, p.z, p.rot);
+    const y = this.parcel.padHeight(r.x0, r.z0, r.x1, r.z1);
+    const pad: Pad = { x0: r.x0 - 0.05, z0: r.z0 - 0.05, x1: r.x1 + 0.05, z1: r.z1 + 0.05, y, skirt: 0.9 };
+    this.parcel.setPads([...this.parcel.pads, pad]);
+    const group = buildCabinGroup(def);
+    group.position.set(p.x, y, p.z);
+    group.rotation.y = p.rot * Math.PI / 2;
+    group.userData = { type: 'building', buildingId: p.id };
+    this._ws.scene.add(group);
+    const smoke = new SmokePlume(group.localToWorld(cabinChimneyTop(def)));
+    this._ws.scene.add(smoke.points);
+    this._built.set(p.id, { placed: p, group, smoke });
+    this.terrain.refresh(this._terrainSource, pad.x0 - pad.skirt - 1, pad.z0 - pad.skirt - 1, pad.x1 + pad.skirt + 1, pad.z1 + pad.skirt + 1);
+    if (this._quality) this._plant(this._quality);
+    this._ws.invalidateShadows();
+  }
+
+  /** Sync with the game store's structures (adds new ones). */
+  syncStructures(list: readonly Placed[]): void {
+    for (const p of list) this.addStructure(p);
+  }
+
+  /** Walk mode: can a body of radius r stand at (x, z)? Creek water and tree trunks block. */
+  walkBlocked = (x: number, z: number, r: number): boolean => {
+    if (this.stream.depthAt(x, z) > 0.04) return true;
+    if (this.onBuilding(x, z, r, false)) return true;
+    for (const t of this.treeSpecs) {
+      const dx = t.x - x, dz = t.z - z;
+      const tr = r + 0.07 * t.scale;
+      if (dx * dx + dz * dz < tr * tr) return true;
+    }
+    return false;
+  };
+
+  /** Is the point inside a parcel tree's crown (camera keep-out)? */
+  crownAt = (x: number, y: number, z: number): boolean => {
+    for (const t of this.treeSpecs) {
+      const r = (t.kind === 'conifer' ? 0.78 : 0.9) * t.scale * t.sx + 0.12;
+      const dx = t.x - x, dz = t.z - z;
+      if (dx * dx + dz * dz > r * r) continue;
+      const top = t.y + 3 * t.scale * t.sy;
+      if (y > t.y + 0.25 * t.scale && y < top + 0.1) return true;
+    }
+    return false;
+  };
+
+  /** Distance from (x, z) to the nearest parcel tree crown edge (≈ 0.8 × scale crown radius). */
+  treeClearance(x: number, z: number): number {
+    let best = Infinity;
+    for (const t of this.treeSpecs) best = Math.min(best, Math.hypot(t.x - x, t.z - z) - 0.8 * t.scale);
+    return best;
+  }
+
+  /**
+   * QA: an open eye-level spot near (x, z) — out of the creek and at least
+   * `clear` from any crown — searched in a growing spiral.
+   */
+  openSpotNear(x: number, z: number, clear = 1.5): [number, number] {
+    for (let r = 0; r < 30; r += 0.5) {
+      for (let a = 0; a < Math.PI * 2; a += 0.4) {
+        const px = x + Math.cos(a) * r, pz = z + Math.sin(a) * r;
+        if (this.parcel.isCreek(px, pz) || Math.abs(pz - this.parcel.creek.zAt(px)) < 1.5) continue;
+        if (this.treeClearance(px, pz) > clear) return [px, pz];
+      }
+    }
+    return [x, z];
+  }
 
   /** Per frame: seasons (eased toward the calendar / pinned season) then terrain uniforms. */
   tick(dt: number, doy: number, totalDays: number, mode: SeasonMode): void {
@@ -83,12 +245,34 @@ export class HomesteadWorld {
     this.terrain.update();
     this._clock += dt;
     ForestRenderer.setWindTime(this._clock);
+    updateWaterGlobals(this._ws.scene, this._clock);
+    // Wood smoke: the stove is lit when it's cold, and for cooking morning and evening
+    const a = this.air, h = a.hour;
+    const cooking = (h > 5.5 && h < 8.5) || (h > 17 && h < 21) ? 0.55 : 0;
+    const heating = Math.min(1, p.cold * 1.2 + p.snow * 0.5 + (seasonState.visual === 'summer' ? 0 : 0.25));
+    const fire = Math.max(cooking, heating * (h > 23 || h < 5 ? 0.5 : 1));
+    const wx = 0.08 + a.wind * 0.45, wz = 0.03 + a.wind * 0.12;   // prevailing westerlies off the range
+    for (const { smoke } of this._built.values()) smoke.update(this._clock, fire, wx, wz, a.daylight, a.viewportH);
+    if (seasonState.plants !== this._plantSeason) {
+      this._plantSeason = seasonState.plants;
+      this.stream.setSeason(this._plantSeason);
+      this.lakes.setSeason(this._plantSeason);
+    }
   }
 
   dispose(): void {
     this.terrain.dispose();
+    for (const { group, smoke } of this._built.values()) {
+      this._ws.scene.remove(group, smoke.points);
+      smoke.dispose();
+      group.traverse(o => (o as THREE.Mesh).geometry?.dispose());
+    }
+    this._built.clear();
     this.forest.dispose();
     this.farTrees.dispose();
+    this._props?.dispose();
+    this.stream.dispose();
+    this.lakes.dispose();
     this._ws.scene.remove(this._root);
     this._root.traverse(o => {
       const m = o as THREE.Mesh;

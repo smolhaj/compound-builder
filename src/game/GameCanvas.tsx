@@ -5,7 +5,17 @@ import { moonPhase, skyDarkness } from '../engine/world/sky/skyState';
 import { useWorldStore } from '../store/worldStore';
 import { DioramaCamera } from './DioramaCamera';
 import { HomesteadWorld } from './HomesteadWorld';
-import { seasonState } from '../engine/world/season/seasonState';
+import { seasonState, type VisualSeason } from '../engine/world/season/seasonState';
+import { WeatherRenderer } from '../engine/world/weather/WeatherRenderer';
+import { TourController } from '../engine/world/camera/TourController';
+import { CameraOccluders } from '../engine/world/camera/cameraOcclusion';
+import { PARCEL_SIZE } from './HomesteadWorld';
+import { PlacementTool } from './PlacementTool';
+import { useGameStore } from '../store/gameStore';
+import { setWindowGlow } from './buildkit/materials';
+
+/** Background damp of the season (ground darkens a little in the shoulder seasons). */
+const SEASON_WETNESS: Record<VisualSeason, number> = { spring: 0.22, fall: 0.28, winter: 0.14, summer: 0 };
 
 /** React ↔ three.js bridge: owns the WorldScene, the camera and the frame loop. */
 export function GameCanvas() {
@@ -15,9 +25,32 @@ export function GameCanvas() {
     const canvas = ref.current!;
     const ws = new WorldScene(canvas);
     const world = new HomesteadWorld(ws, useWorldStore.getState().seed);
+    const weather = new WeatherRenderer(ws.scene, useWorldStore.getState().seed);
     const cam = new DioramaCamera(canvas);
     cam.groundAt = world.groundAt;
+    cam.solidAt = world.crownAt;
+    const occluders = new CameraOccluders(ws.scene, () => []);   // the diorama camera keeps its own ground clearance
     cam.target.set(world.center.x, 0, world.center.z);
+    const tour = new TourController({
+      camera: ws.camera, dom: canvas, scene: ws.scene,
+      getBlocked: () => world.walkBlocked,
+      heightAt: world.groundAt,
+      describeBuildings: () => world.describeBuildings(),
+      siteBounds: () => ({ w: PARCEL_SIZE, h: PARCEL_SIZE }),
+      onCaption: c => useWorldStore.getState().setTourCaption(c),
+    });
+    const tool = new PlacementTool(ws.scene, ws.camera, canvas, world);
+    const applyCameraMode = () => {
+      const m = useWorldStore.getState().cameraMode;
+      if (m === 'diorama') { if (tour.active) tour.exit(); cam.enabled = true; return; }
+      cam.enabled = false;
+      if (tour.active) tour.setMode(m);
+      else tour.enter(m, { x: cam.target.x, z: cam.target.z, theta: cam.yaw, phi: cam.pitch });
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code === 'Escape' && useWorldStore.getState().cameraMode !== 'diorama') useWorldStore.getState().setCameraMode('diorama');
+    };
+    window.addEventListener('keydown', onKey);
 
     const resize = () => {
       const w = canvas.clientWidth, h = canvas.clientHeight;
@@ -30,14 +63,20 @@ export function GameCanvas() {
     const applyLook = () => {
       const s = useWorldStore.getState();
       ws.setGraphicsQuality(s.quality);
+      weather.setQuality(s.quality);
       world.setQuality(s.quality);
     };
     applyLook();
     const unsub = [
       useWorldStore.subscribe(s => s.quality, applyLook),
+      useWorldStore.subscribe(s => s.cameraMode, applyCameraMode),
+      useGameStore.subscribe(s => s.structures, list => { world.syncStructures(list); occluders.invalidate(); }),
+      useGameStore.subscribe(s => s.tool, k => tool.setKind(k)),
     ];
 
     let lastVisual = '';
+    let lastParticles = '-';
+    let lastWetKey = -1;
     let last = performance.now();
     let raf = 0;
     const qa = { frames: 0, frameMs: 0 };
@@ -48,14 +87,38 @@ export function GameCanvas() {
       last = now;
       const st = useWorldStore.getState();
       if (st.hourSeconds > 0) st.advanceHours(dt / st.hourSeconds);
-      const { timeOfDay: t, dayOfYear, totalDays, seasonMode } = useWorldStore.getState();
+      const { timeOfDay: t, dayOfYear, totalDays, seasonMode, weatherMode, hourSeconds } = useWorldStore.getState();
       ws.setNightSky(moonPhase(dayOfYear + t / 24), skyDarkness('mountain_west', false));
+      Object.assign(world.air, { hour: t, wind: weather.outputs.wind, daylight: 1 - ws.nightFactor * 0.85, viewportH: canvas.clientHeight || 800 });
       world.tick(dt, dayOfYear, totalDays, seasonMode);
-      // Season grade + particles follow the drawn (eased) visual season
-      const vis = seasonState.visual;
-      if (vis !== lastVisual) { lastVisual = vis; ws.setSeasonGrade(vis); ws.setSeasonalParticles(vis); }
-      cam.apply(ws.camera);
-      ws.setShadowFocus(cam.target.x, cam.target.z, cam.radius);
+      const sp = world.seasons.params;
+      // Season grade, particles and damp ground follow the drawn (eased) visual season
+      const vis: VisualSeason = seasonState.visual;
+      if (vis !== lastVisual) { lastVisual = vis; ws.setSeasonGrade(vis); }
+      const pKey = vis === 'fall' && sp.fall > 0.45 && sp.bare < 0.9 && seasonState.climate.blaze >= 0.5 ? 'fall'
+        : vis === 'spring' && sp.bloom > 0.3 ? 'spring' : '';
+      if (pKey !== lastParticles) { lastParticles = pKey; ws.setSeasonalParticles(pKey); }
+      const wetKey = Math.round((SEASON_WETNESS[vis] * (1 - sp.snow) + sp.wet * 0.45) * 50);
+      if (wetKey !== lastWetKey) { lastWetKey = wetKey; ws.setWetness(wetKey / 50); }
+      // Weather → sky / light / fog (next frame), wet + snowy surfaces.
+      const wxSeason = vis === 'winter' && seasonState.weatherSnow <= 0 ? 'fall' : vis;
+      const wx = weather.update({
+        dt, speed: hourSeconds > 0 ? Math.max(1, 10 / hourSeconds) : 1, season: wxSeason, hour: t,
+        mode: weatherMode, eventWetness: ws.eventWetness, night: ws.nightFactor,
+        camera: ws.camera, focus: cam.target,
+        snowBase: sp.snow, snowAllow: seasonState.weatherSnow, region: seasonState.climate.id,
+      });
+      ws.setWeather(wx, weather.flash, weather.skyLightning);
+      // lamps on inside from dusk (a little after sunset, off by late night)
+      setWindowGlow(Math.max(0, Math.min(1, (ws.nightFactor - 0.25) / 0.4)) * (t > 23.5 || t < 5 ? 0.25 : 1));
+      if (tour.active) {
+        const f = tour.update(dt);
+        ws.setShadowFocus(f.x, f.z, 30);
+      } else {
+        cam.apply(ws.camera);
+        occluders.keepOut(ws.camera, cam.target.x, cam.target.z, cam.target.y);
+        ws.setShadowFocus(cam.target.x, cam.target.z, cam.radius);
+      }
       ws.tick(dt);
       ws.updateDayNight(t);
       ws.renderFrame();
@@ -65,13 +128,17 @@ export function GameCanvas() {
     raf = requestAnimationFrame(frame);
 
     // QA hook (screenshot harness, console poking).
-    (window as unknown as Record<string, unknown>).__cb = { ws, world, cam, store: useWorldStore, THREE, qa };
+    (window as unknown as Record<string, unknown>).__cb = { ws, world, weather, cam, tour, tool, game: useGameStore, store: useWorldStore, THREE, qa };
 
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', resize);
       unsub.forEach(u => u());
+      window.removeEventListener('keydown', onKey);
+      tour.dispose();
+      tool.dispose();
       cam.dispose();
+      weather.dispose();
       world.dispose();
       ws.dispose();
     };
