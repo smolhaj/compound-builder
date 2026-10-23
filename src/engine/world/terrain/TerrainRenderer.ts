@@ -26,10 +26,10 @@ export interface TerrainSource {
 export interface TerrainBuildOptions {
   source: TerrainSource;
   kind: RegionKind;
-  /** Centre and half-size of the fine core (the site plus a margin). */
+  /** Centre and half-size of the fine core (the site plus a margin); per axis or both. */
   cx: number;
   cz: number;
-  core: number;
+  core: number | { x: number; z: number };
   quality: Quality;
   /** Regional water line (lakes / reservoir) for the shore mud; null = none. */
   waterY?: number | null;
@@ -414,8 +414,9 @@ export class TerrainRenderer {
     this._look = look;
     this._kind = o.kind;
     this._cropDoy = -1;
-    const xs = terrainAxis(o.cx, o.core, CORE_CELL[o.quality], GROWTH[o.quality]);
-    const zs = terrainAxis(o.cz, o.core, CORE_CELL[o.quality], GROWTH[o.quality]);
+    const core = typeof o.core === 'number' ? { x: o.core, z: o.core } : o.core;
+    const xs = terrainAxis(o.cx, core.x, CORE_CELL[o.quality], GROWTH[o.quality]);
+    const zs = terrainAxis(o.cz, core.z, CORE_CELL[o.quality], GROWTH[o.quality]);
     const NX = xs.length, NZ = zs.length;
     const pos = new Float32Array(NX * NZ * 3);
     const aF = new Float32Array(NX * NZ);
