@@ -25,6 +25,7 @@ import type { TourBuildingInfo } from '../engine/world/camera/TourController';
 import { footprint, KIT, type Placed } from './buildkit/kit';
 import { showStage, CUTAWAY_HIDE, XRAY_LAYERS, type BuildLayer as CabinLayer } from './buildkit/shell';
 import { buildLayers, type Seat } from './buildkit/buildings';
+import { hashStr } from './buildkit/clutter';
 import { hitsColliders, type Collider } from './buildkit/interior';
 import type { BuildingView } from '../store/worldStore';
 import type { Structure } from '../sim/state';
@@ -387,7 +388,7 @@ export class HomesteadWorld {
     const y = this.parcel.padHeight(r.x0, r.z0, r.x1, r.z1);
     const pad: Pad = { x0: r.x0 - 0.05, z0: r.z0 - 0.05, x1: r.x1 + 0.05, z1: r.z1 + 0.05, y, skirt: 0.9 };
     this.parcel.setPads([...this.parcel.pads, pad]);
-    const group = buildLayers(def);
+    const group = buildLayers(def, hashStr(p.id + ':' + this.parcel.seed));
     showStage(group, 0, 0);
     group.position.set(p.x, y, p.z);
     group.rotation.y = p.rot * Math.PI / 2;

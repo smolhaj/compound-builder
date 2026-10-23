@@ -44,4 +44,11 @@ describe('building registry', () => {
       expect(hitsColliders(cs, gateX + 0.3 * (kind === 'garden' ? 1 : -1), hz, 0.03)).toBe(true);
     }
   });
+
+  it('homes are dressed with clutter that differs house to house (seeded)', () => {
+    const verts = (seed: number) => buildLayers(KIT.timber_cabin, seed).children.filter(m => m.userData.layer === 'interior').reduce((n, m) => n + (m.userData.vertexCount as number), 0);
+    const a = verts(1), b = verts(2), a2 = verts(1);
+    expect(a).toBe(a2);
+    expect(new Set([a, b, verts(3), verts(4)]).size).toBeGreaterThan(1);
+  });
 });

@@ -9,6 +9,7 @@ import { CELL, KIT, type KitPieceDef } from './kit';
 import { Furniture, M, wallRun } from './interior';
 import { buildCabinLayers } from './cabinGeometry';
 import { box, buildGabled, CUT_H, Parts, showStage, type FurnishCtx } from './shell';
+import { Clutter } from './clutter';
 
 /** Seats for evenings at home: local x, z and the point the sitter faces. */
 export type Seat = [number, number, number, number];
@@ -17,7 +18,7 @@ export type Seat = [number, number, number, number];
 // Outhouse
 // ─────────────────────────────────────────────────────────────────────────
 
-function outhouse(): THREE.Group {
+function outhouse(_def: KitPieceDef, seed = 1): THREE.Group {
   const { group } = buildGabled({
     W: 0.24, D: 0.28, floor: 0.03, wallH: 0.38, wallT: 0.018, rise: 0.07, eave: 0.04, gableOver: 0.03, porch: 0,
     foundation: 'fieldstone', floorMat: 'deck', outer: 'board_batten', inner: null, roof: 'metal_roof', trim: 'wood_dark',
@@ -34,7 +35,9 @@ function outhouse(): THREE.Group {
     c.I({ x: 0.075, z: c.back + 0.004 }, a => a('linen', new THREE.CylinderGeometry(0.012, 0.012, 0.02, 10).rotateZ(Math.PI / 2).translate(0, 0.12, 0.015)), false);
     c.I({ x: -0.08, z: 0.06 }, a => { a('steel', new THREE.CylinderGeometry(0.03, 0.026, 0.06, 10).translate(0, 0.03, 0)); a('enamel', new THREE.CylinderGeometry(0.028, 0.028, 0.004, 10).translate(0, 0.058, 0)); }, false);
     c.I({ x: -0.09, z: c.back + 0.01 }, a => Furniture.oilLamp(a, 0, 1.4, 0.06), false);
-  }, new Parts(), p => {
+    c.C({ x: -0.04, z: c.back + 0.03, y: c.y0 + 0.08 }, a => Clutter.mail(a), 0.8);
+    c.C({ x: 0.0, z: c.back + 0.002, y: c.y0 + 1.3 * M }, a => Clutter.calendar(a), 0.4);
+  }, new Parts(seed), p => {
     // crescent moon cut into the front gable (dark), and a vent stack out the back
     const moon = new THREE.Shape();
     moon.absarc(0, 0, 0.025, Math.PI * 0.35, Math.PI * 1.65, false);
@@ -49,7 +52,7 @@ function outhouse(): THREE.Group {
 // Workshop & garage
 // ─────────────────────────────────────────────────────────────────────────
 
-function workshop(def: KitPieceDef): THREE.Group {
+function workshop(def: KitPieceDef, seed = 1): THREE.Group {
   const W = def.cellsX * CELL, D = def.cellsZ * CELL;
   const forgeX = -0.4;
   const { group } = buildGabled({
@@ -75,7 +78,18 @@ function workshop(def: KitPieceDef): THREE.Group {
     I({ x: -0.22, z: 0.4 }, a => Furniture.atv(a));
     // two hanging shop lights
     for (const z of [-0.45, 0.35]) c.parts.add('lamp', box(0.2, 0.012, 0.03, 0, c.yE - 0.06, z), 'interior');
-  });
+    // a shop in use: a chair half built on the sawhorses, the radio, coffee, rags, a broom, boots
+    const benchY = c.y0 + 0.004 + 0.92 * M;
+    c.C({ x: 0.28, z: 0.22, rot: Math.PI / 2 }, a => Clutter.sawhorsesProject(a), 0.85);
+    c.C({ x: 0.45, z: back + 0.07, y: benchY }, a => Clutter.radio(a), 0.8);
+    c.C({ x: 0.0, z: back + 0.09, y: benchY }, a => Clutter.mug(a), 0.8);
+    c.C({ x: 0.1, z: back + 0.05, y: benchY }, a => Clutter.jars(a, 4), 0.8);
+    c.C({ x: right - 0.03, z: 0.55, rot: -Math.PI / 2 }, a => Clutter.broom(a), 0.8);
+    c.C({ x: right - 0.002, z: 0.3, y: c.y0 + 1.4 * M, rot: -Math.PI / 2 }, a => Clutter.calendar(a), 0.8);
+    c.C({ x: 0.5, z: c.front - 0.08, rot: 0.4 }, a => Clutter.boots(a, 'paint_green'), 0.7);
+    c.C({ x: -0.55, z: back + 0.25 }, a => Clutter.bucket(a), 0.7);
+    c.C({ x: -0.62, z: -0.35 }, a => Clutter.dogBed(a, c.rnd() < 0.5), 0.4);
+  }, new Parts(seed));
   return group;
 }
 
@@ -83,10 +97,10 @@ function workshop(def: KitPieceDef): THREE.Group {
 // Root cellar: stone vault dug into the ground, earth bermed over
 // ─────────────────────────────────────────────────────────────────────────
 
-function rootCellar(def: KitPieceDef): THREE.Group {
+function rootCellar(def: KitPieceDef, seed = 1): THREE.Group {
   const W = 0.5, D = 0.72;
   const hz = def.cellsZ * CELL / 2;
-  const parts = new Parts();
+  const parts = new Parts(seed);
   parts.oz = hz - D / 2 - 0.02;                // door wall near the front of the lot
   const { group } = buildGabled({
     W, D, floor: 0.02, wallH: 0.3, wallT: 0.05, rise: 0.12, eave: 0.03, gableOver: 0.03, porch: 0,
@@ -103,6 +117,9 @@ function rootCellar(def: KitPieceDef): THREE.Group {
     I({ x: 0, z: 0.0 }, a => Furniture.crocks(a));
     I({ x: 0, z: -0.1, rot: 0 }, a => Furniture.hangingStrings(a, 2.0, 1.85), false);
     I({ x: 0.12, z: 0.2 }, a => Furniture.barrel(a));
+    c.C({ x: 0, z: 0.0, y: c.y0 + 0.43 * M }, a => Clutter.candle(a), 0.8);
+    c.C({ x: -0.12, z: 0.22 }, a => Clutter.laundryBasket(a), 0.5);
+    c.C({ x: 0.1, z: 0.3 }, a => Clutter.bucket(a), 0.6);
   }, parts, p => {
     // the earth berm over the vault (with a sod cap), stone wing walls flanking the door, a vent pipe
     const oz = hz - D / 2 - 0.02;
@@ -123,10 +140,10 @@ function rootCellar(def: KitPieceDef): THREE.Group {
 // Chicken coop & run
 // ─────────────────────────────────────────────────────────────────────────
 
-function chickenCoop(def: KitPieceDef): THREE.Group {
+function chickenCoop(def: KitPieceDef, seed = 1): THREE.Group {
   const LW = def.cellsX * CELL, LD = def.cellsZ * CELL;
   const W = 0.32, D = 0.38;
-  const parts = new Parts();
+  const parts = new Parts(seed);
   parts.oz = -LD / 2 + D / 2 + 0.05;            // coop at the back of the lot, the run in front
   const hens: Array<[number, number, number, 'paint_red' | 'linen' | 'wood_dark']> = [
     [-0.25, 0.1, 0.4, 'paint_red'], [0.05, 0.2, 2.2, 'linen'], [0.28, 0.05, -1.2, 'wood_dark'], [-0.1, 0.32, 3.4, 'paint_red'], [0.2, 0.32, 1.0, 'linen'], [-0.32, 0.3, -0.6, 'wood_dark'],
@@ -167,6 +184,8 @@ function chickenCoop(def: KitPieceDef): THREE.Group {
     place(0.1, 0.32, 0, a => Furniture.feeder(a));
     for (const [x, z, r, col] of hens) place(x, z, r, a => Furniture.hen(a, col));
     p.add('straw', box(x1 - x0 - 0.02, 0.004, z1 - runZ0 - 0.02, 0, 0, (runZ0 + z1) / 2), 'deck');
+    if (p.rnd() < 0.8) place(-0.32, 0.4, 0, a => Clutter.bucket(a));
+    if (p.rnd() < 0.7) place(0.35, LD / 2 + 0.05, 0.4, a => Clutter.fruitBowl(a));
   });
   return group;
 }
@@ -175,9 +194,9 @@ function chickenCoop(def: KitPieceDef): THREE.Group {
 // Kitchen garden
 // ─────────────────────────────────────────────────────────────────────────
 
-function garden(def: KitPieceDef): THREE.Group {
+function garden(def: KitPieceDef, seed = 1): THREE.Group {
   const LW = def.cellsX * CELL, LD = def.cellsZ * CELL;
-  const p = new Parts();
+  const p = new Parts(seed);
   const x0 = -LW / 2 + 0.04, x1 = LW / 2 - 0.04, z0 = -LD / 2 + 0.04, z1 = LD / 2 - 0.04, H = 0.33;
   // site: corner stakes and lines
   p.layer = 'stakes';
@@ -218,6 +237,11 @@ function garden(def: KitPieceDef): THREE.Group {
   put(-0.42, z0 + 0.1, 0, a => Furniture.compost(a));
   put(0.62, z0 + 0.08, 0, a => Furniture.barrel(a));
   put(0.4, z0 + 0.04, 0, a => Furniture.bench(a, 1.2));
+  // work in progress: the wheelbarrow in the path, tools against the fence, a bucket, the day's picking
+  if (p.rnd() < 0.85) put(0.0, -0.05 + p.rnd() * 0.2, 0.3, a => Clutter.wheelbarrow(a), false);
+  if (p.rnd() < 0.85) put(x1 - 0.03, 0.05, -Math.PI / 2, a => Clutter.gardenTools(a), false);
+  if (p.rnd() < 0.7) put(-0.08, 0.6, 0, a => Clutter.bucket(a), false);
+  if (p.rnd() < 0.7) put(0.33, z0 + 0.06, 0, a => { const add = (m: Parameters<typeof p.add>[0], g: THREE.BufferGeometry) => a(m, g.translate(0, 0.4 * M, 0)); Clutter.fruitBowl(add); }, false);
   const g = p.finish();
   g.userData.chimneyTop = null;
   return g;
@@ -230,7 +254,7 @@ function garden(def: KitPieceDef): THREE.Group {
 /** Bath / bedroom partitions (back right). */
 const LH = { px: 0.15, bedZ: -0.45, bathZ: 0.15, loftZ: -0.32 };
 
-function logHouse(def: KitPieceDef): THREE.Group {
+function logHouse(def: KitPieceDef, seed = 1): THREE.Group {
   const W = def.cellsX * CELL, D = def.cellsZ * CELL;
   const { group } = buildGabled({
     W, D, floor: 0.1, wallH: 0.55, wallT: 0.05, rise: 0.6, eave: 0.08, gableOver: 0.06, porch: 0.45,
@@ -285,9 +309,68 @@ function logHouse(def: KitPieceDef): THREE.Group {
     L({ x: 0.32, z: -0.85 }, a => Furniture.single(a, 'quilt_blue'));
     L({ x: 0, z: back + 0.06 }, a => { Furniture.trunk(a); Furniture.oilLamp(a, 0, 0.5, 0); });
     L({ x: 0, z: -0.6 }, a => Furniture.rug(a, 1.6, 1.2));
+    dressLogHouse(c);
     void y0;
-  });
+  }, new Parts(seed));
   return group;
+}
+
+/** Life in the log house. */
+function dressLogHouse(c: FurnishCtx): void {
+  const { C, L, y0, yE, left, right, front, back, hw, hd } = c;
+  const tableY = y0 + 0.004 + 0.76 * M, islandY = y0 + 0.004 + 0.92 * M, counterY = y0 + 0.004 + 0.9 * M;
+  const loft = (p: { x: number; z: number; rot?: number }, fn: Parameters<FurnishCtx['L']>[1], prob = 0.75) => { if (c.rnd() < prob) L({ ...p, y: yE + 0.002 }, fn); };
+  // dining by the glass: places laid, mugs, the fruit bowl, a candle
+  for (const [z, x, r] of [[0.68, 0.31, 1.57], [0.88, 0.31, 1.57], [0.68, 0.39, -1.57], [0.88, 0.39, -1.57]] as const) C({ x, z, y: tableY, rot: r }, a => Clutter.plate(a), 0.7);
+  C({ x: 0.36, z: 0.78, y: tableY }, a => Clutter.fruitBowl(a), 0.8);
+  C({ x: 0.33, z: 0.75, y: tableY }, a => Clutter.candle(a), 0.6);
+  C({ x: 0.4, z: 0.72, y: tableY }, a => Clutter.mug(a), 0.8);
+  C({ x: 0.31, z: 0.95, y: tableY, rot: 0.4 }, a => Clutter.crayons(a), 0.5);
+  // kitchen: bread and the board on the island, dishes in the sink, a pot on the range, herbs on the sill
+  C({ x: -0.32, z: 0.52, y: islandY, rot: Math.PI / 2 }, a => Clutter.bread(a), 0.85);
+  C({ x: -0.32, z: 0.72, y: islandY, rot: Math.PI / 2 + 0.3 }, a => Clutter.cuttingBoard(a), 0.85);
+  C({ x: left + 0.05, z: 0.74, y: counterY - 0.006 }, a => Clutter.dishes(a), 0.9);
+  C({ x: left + 0.05, z: 0.5, y: counterY }, a => Clutter.jars(a, 3), 0.8);
+  C({ x: left + 0.03, z: 0.92, y: counterY + 0.01 }, a => Clutter.herbsPot(a), 0.7);
+  C({ x: left + 0.06, z: 0.2, y: y0 + 0.004 + 0.87 * M }, a => Clutter.potOnStove(a), 0.8);
+  // living: the dog on the rug, the cat on the sofa, books, toys, the guitar
+  C({ x: -0.62, z: -0.62 }, a => Clutter.dogBed(a, true), 0.85);
+  C({ x: -0.5, z: -0.45, y: y0 + 0.004 + 0.36 * M, rot: Math.PI }, a => Clutter.cat(a), 0.5);
+  C({ x: -0.25, z: -0.45, y: y0 + 0.004 + 0.38 * M, rot: 0.4 }, a => Clutter.openBook(a), 0.6);
+  C({ x: -0.3, z: -0.7, rot: 1.1 }, a => Clutter.toys(a), 0.8);
+  C({ x: -0.4, z: -0.66, rot: 0.2 }, a => Clutter.checkers(a), 0.4);
+  C({ x: left + 0.06, z: 0.06, rot: Math.PI / 2 }, a => Clutter.guitar(a), 0.6);
+  C({ x: left + 0.002, z: -0.55, y: y0 + 1.6 * M, rot: Math.PI / 2 }, a => Clutter.picture(a, 0.7, 0.5, 'rug'), 0.9);
+  C({ x: left + 0.002, z: -0.95, y: y0 + 1.5 * M, rot: Math.PI / 2 }, a => Clutter.picture(a, 0.4, 0.5, 'quilt_blue'), 0.7);
+  C({ x: -0.4, z: back + 0.06 + 0.36 * M, y: y0 + 2.2 * M }, a => Clutter.clock(a), 0.6);
+  C({ x: 0.138, z: 0.08, y: y0 + 1.4 * M, rot: -Math.PI / 2 }, a => Clutter.calendar(a), 0.8);
+  // entry: boots, the rifle over the coats, a fishing rod
+  C({ x: 0.1, z: front - 0.06, rot: 0.2 }, a => Clutter.boots(a), 0.95);
+  C({ x: -0.3, z: front - 0.07, rot: -0.3 }, a => Clutter.boots(a, 'paint_green'), 0.7);
+  C({ x: -0.15, z: front - 0.005, y: y0 + 2.1 * M, rot: Math.PI }, a => Clutter.riflePegs(a), 0.6);
+  C({ x: -0.04, z: front - 0.03 }, a => Clutter.fishingRod(a), 0.5);
+  // bedroom: unmade bed, slippers, laundry, a picture over the bed
+  C({ x: 0.45, z: -0.98, y: y0 + 0.004 + 0.55 * M }, a => Clutter.rumple(a, 'quilt_red'), 0.7);
+  C({ x: 0.28, z: -0.78, rot: -0.3 }, a => Clutter.slippers(a), 0.7);
+  C({ x: 0.62, z: -0.6 }, a => Clutter.laundryBasket(a), 0.7);
+  C({ x: 0.45, z: back + 0.002, y: y0 + 1.45 * M }, a => Clutter.picture(a, 0.6, 0.4, 'quilt_red'), 0.8);
+  // bath: towels, a bucket
+  C({ x: LH.px + 0.012, z: -0.2, y: y0 + 1.5 * M, rot: Math.PI / 2 }, a => Clutter.towel(a, 'quilt_blue'), 0.8);
+  C({ x: 0.3, z: 0.05 }, a => Clutter.bucket(a), 0.5);
+  // the kids' loft: toys, drawings, a book
+  loft({ x: 0.05, z: -0.55, rot: 0.5 }, a => Clutter.toys(a), 0.9);
+  loft({ x: -0.2, z: -0.6, rot: -0.3 }, a => Clutter.crayons(a), 0.7);
+  loft({ x: 0.3, z: -0.62 }, a => Clutter.laundryBasket(a), 0.5);
+  // outside: woodpile, chopping block, laundry line, rockers on the porch, the bike, the dog's house
+  C({ x: -hw - 0.06, z: -0.5, y: 0.004, rot: -Math.PI / 2 }, a => Clutter.woodpile(a, 6.0, 1.4), 1);
+  C({ x: -hw - 0.2, z: 0.4, y: 0.004 }, a => Clutter.choppingBlock(a), 0.9);
+  C({ x: 0, z: -hd - 0.38, y: 0.004 }, a => Clutter.laundryLine(a, 5.0), 0.85);
+  C({ x: -0.4, z: hd + 0.25, y: y0, rot: 0.25 }, a => Clutter.rocker(a), 0.95);
+  C({ x: -0.55, z: hd + 0.22, y: y0, rot: -0.3 }, a => Clutter.rocker(a), 0.8);
+  C({ x: hw + 0.1, z: 0.9, y: 0.004, rot: 1.2 }, a => Clutter.bike(a), 0.7);
+  C({ x: hw + 0.18, z: -0.7, y: 0.004, rot: -Math.PI / 2 }, a => Clutter.dogHouse(a), 0.7);
+  C({ x: 0.55, z: -hd - 0.12, y: 0.004 }, a => Clutter.washtub(a), 0.6);
+  void right;
 }
 
 /** Evening seats per kind (local). */
@@ -295,7 +378,7 @@ const SEATS: Record<string, Seat[]> = {
   log_house: [[-0.3, -0.45, -0.4, -1.1], [-0.5, -0.45, -0.4, -1.1], [0.35, 0.62, 0.35, 0.78], [0.35, 0.94, 0.35, 0.78]],
 };
 
-const BUILDERS: Record<string, (def: KitPieceDef) => THREE.Group> = {
+const BUILDERS: Record<string, (def: KitPieceDef, seed?: number) => THREE.Group> = {
   timber_cabin: buildCabinLayers,
   outhouse,
   workshop,
@@ -306,8 +389,8 @@ const BUILDERS: Record<string, (def: KitPieceDef) => THREE.Group> = {
 };
 
 /** Every layer of a kit piece (construction shows them stage by stage). */
-export function buildLayers(def: KitPieceDef): THREE.Group {
-  const g = BUILDERS[def.id](def);
+export function buildLayers(def: KitPieceDef, seed = 1): THREE.Group {
+  const g = BUILDERS[def.id](def, seed);
   g.userData.seats ??= SEATS[def.id] ?? [];
   g.userData.chimneyTop ??= null;
   return g;

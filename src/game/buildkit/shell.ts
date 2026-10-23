@@ -15,6 +15,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { kitMaterial, type KitMaterialId } from './materials';
 import { piece, wallRun, type Collider, type Opening, type Place, type Sink } from './interior';
+import { rng } from './clutter';
 
 /** Build-order layers: each is drawn (and grown) separately as construction proceeds. */
 export type BuildLayer = 'stakes' | 'foundation' | 'deck' | 'frame' | 'rafters' | 'roof' | 'walls' | 'openings' | 'chimney' | 'scaffold'
@@ -59,6 +60,9 @@ export class Parts {
   layer: BuildLayer = 'stakes';
   /** Shift applied to everything added (and to colliders): a shell set off-centre in its footprint. */
   ox = 0; oz = 0;
+  /** Seeded random for this building (clutter varies house to house). */
+  readonly rnd: () => number;
+  constructor(seed = 1) { this.rnd = rng(seed); }
   readonly map = new Map<string, THREE.BufferGeometry[]>();
   readonly colliders: Collider[] = [];
   add(m: KitMaterialId, g: THREE.BufferGeometry, layer: BuildLayer = this.layer): void {
@@ -235,6 +239,10 @@ export interface FurnishCtx {
   I(p: Place, fn: Parameters<typeof piece>[3], solid?: boolean): void;
   /** Place an upper-floor / loft piece (hidden in cutaway). `p.y` defaults to the eave height. */
   L(p: Place, fn: Parameters<typeof piece>[3], solid?: boolean): void;
+  /** Seeded random (clutter choices). */
+  rnd: () => number;
+  /** Maybe place a clutter piece (probability p), never solid. */
+  C(p: Place, fn: Parameters<typeof piece>[3], prob?: number): void;
   /** An interior partition a→b (full height in 'walls', cut copy in 'cutwalls'), with optional doorways. */
   partition(ax: number, az: number, bx: number, bz: number, openings?: Opening[], mat?: KitMaterialId, h?: number): void;
 }
@@ -489,6 +497,8 @@ export function buildGabled(s: GabledSpec, furnish?: (c: FurnishCtx) => void, pa
     const ctx: FurnishCtx = {
       parts, spec: s, hw, hd, y0, yE,
       left: -hw + T, right: hw - T, front: hd - T, back: -hd + T,
+      rnd: parts.rnd,
+      C: (p, fn, prob = 0.75) => { if (parts.rnd() < prob) piece(parts.sink, 'interior', { ...p, y: p.y ?? y0 + 0.004 }, fn, false); },
       I: (p, fn, solid = true) => { const c = piece(parts.sink, 'interior', { ...p, y: p.y ?? y0 + 0.004 }, fn, solid); if (c) parts.collide(c); },
       L: (p, fn, solid = false) => { const c = piece(parts.sink, 'loft', { ...p, y: p.y ?? yE }, fn, solid); if (c) parts.collide(c); },
       partition: (ax, az, bx, bz, openings = [], mat = s.inner ?? 'pine_panel', h = s.wallH) => {

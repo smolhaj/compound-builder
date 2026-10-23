@@ -126,7 +126,7 @@ export function wallRun(sink: Sink, layer: string, mat: KitMaterialId, w: WallSp
 // Furniture library (front faces +z, floor at y = 0, sizes in metres × M)
 // ─────────────────────────────────────────────────────────────────────────
 
-type Add = (m: KitMaterialId, g: THREE.BufferGeometry) => void;
+export type Add = (m: KitMaterialId, g: THREE.BufferGeometry) => void;
 
 /** Four legs under a top w × d at height h. */
 function legs(add: Add, w: number, d: number, h: number, r = 0.03 * M, mat: KitMaterialId = 'wood_dark'): void {
