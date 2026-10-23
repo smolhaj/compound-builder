@@ -13,11 +13,14 @@
 import * as THREE from 'three';
 import { generateNormalMap } from '../../engine/world/materials/normalMapGen';
 
-export type KitMaterialId = 'timber_lap' | 'trim' | 'fieldstone' | 'metal_roof' | 'deck' | 'door' | 'glass' | 'chimney_cap' | 'frame' | 'scaffold' | 'string';
+export type KitMaterialId = 'timber_lap' | 'trim' | 'fieldstone' | 'metal_roof' | 'deck' | 'door' | 'glass' | 'chimney_cap' | 'frame' | 'scaffold' | 'string'
+  // interior finishes and furnishings
+  | 'pine_panel' | 'wood_dark' | 'wood_mid' | 'iron' | 'enamel' | 'quilt_red' | 'quilt_blue' | 'linen' | 'rug' | 'books' | 'lamp' | 'cutcap' | 'crockery';
 
 /** World units covered by one texture repeat. */
 const TEX_WORLD: Partial<Record<KitMaterialId, number>> = {
   timber_lap: 0.5, fieldstone: 0.5, metal_roof: 0.5, deck: 0.5, door: 0.2,
+  pine_panel: 0.5, quilt_red: 0.12, quilt_blue: 0.12, rug: 0.3, books: 0.1,
 };
 
 function lcg(seed: number): () => number {
@@ -155,6 +158,79 @@ function paintDoor(): HTMLCanvasElement {
   return c;
 }
 
+/** Knotty pine tongue-and-groove: vertical 10 cm boards, honey tone, knots and V-groove shadows. */
+function paintPinePanel(): HTMLCanvasElement {
+  const N = 512, n = 30, bw = N / n;
+  const [c, g] = canvas(N);
+  const r = lcg(61);
+  for (let i = 0; i < n; i++) {
+    const t = 0.88 + r() * 0.2;
+    g.fillStyle = rgb(196 * t, 150 * t, 96 * t);
+    g.fillRect(i * bw, 0, bw, N);
+    for (let k = 0; k < 18; k++) {
+      g.fillStyle = `rgba(150,100,55,${0.08 + r() * 0.14})`;
+      g.fillRect(i * bw + r() * bw, r() * N, 1, 30 + r() * 140);
+    }
+    if (r() < 0.55) {
+      const ky = r() * N, kx = i * bw + bw * (0.3 + r() * 0.4);
+      g.fillStyle = 'rgba(95,55,25,0.75)';
+      g.beginPath(); g.ellipse(kx, ky, 2.2 + r() * 2, 3 + r() * 3, 0, 0, Math.PI * 2); g.fill();
+    }
+    g.fillStyle = 'rgba(70,42,20,0.7)';
+    g.fillRect(i * bw, 0, 1.5, N);
+  }
+  return c;
+}
+
+/** Patchwork / plaid quilt in a base colour. */
+function paintQuilt(base: [number, number, number], seed: number): () => HTMLCanvasElement {
+  return () => {
+    const N = 128, k = 8, s = N / k;
+    const [c, g] = canvas(N);
+    const r = lcg(seed);
+    for (let i = 0; i < k; i++) for (let j = 0; j < k; j++) {
+      const t = (i + j) % 2 ? 0.75 + r() * 0.15 : 1 + r() * 0.1;
+      g.fillStyle = rgb(base[0] * t, base[1] * t, base[2] * t);
+      g.fillRect(i * s, j * s, s, s);
+    }
+    g.fillStyle = 'rgba(240,230,210,0.35)';
+    for (let i = 0; i < k; i++) { g.fillRect(i * s + s / 2 - 1, 0, 2, N); g.fillRect(0, i * s + s / 2 - 1, N, 2); }
+    return c;
+  };
+}
+
+/** Braided rag rug: concentric bands of muted colours. */
+function paintRug(): HTMLCanvasElement {
+  const N = 128;
+  const [c, g] = canvas(N);
+  const cols = ['#8a3b2c', '#c49a5a', '#4f5f6e', '#7b6a4e', '#a65a3a', '#5d6b4a'];
+  for (let i = 0; i < 12; i++) {
+    g.fillStyle = cols[i % cols.length];
+    const m = i * 5;
+    g.fillRect(m, m, N - 2 * m, N - 2 * m);
+  }
+  return c;
+}
+
+/** Book spines: varied colours and heights along u. */
+function paintBooks(): HTMLCanvasElement {
+  const N = 128;
+  const [c, g] = canvas(N);
+  const r = lcg(71);
+  g.fillStyle = '#3a2a1c';
+  g.fillRect(0, 0, N, N);
+  const cols = [[120, 40, 35], [40, 60, 90], [50, 80, 50], [150, 120, 70], [90, 50, 80], [30, 30, 30], [170, 150, 120]];
+  for (let x = 0; x < N;) {
+    const w = 3 + r() * 6, col = cols[Math.floor(r() * cols.length)], h = N * (0.7 + r() * 0.3);
+    g.fillStyle = rgb(col[0], col[1], col[2]);
+    g.fillRect(x, N - h, w - 0.6, h);
+    g.fillStyle = 'rgba(230,210,150,0.5)';
+    g.fillRect(x + 0.5, N - h + h * 0.2, w - 1.6, 1.5);
+    x += w;
+  }
+  return c;
+}
+
 const _cache = new Map<KitMaterialId, THREE.MeshStandardMaterial>();
 
 function texMat(id: KitMaterialId, paint: () => HTMLCanvasElement, strength: number, roughness: number, metalness = 0, ns = 1): THREE.MeshStandardMaterial {
@@ -186,7 +262,21 @@ export function kitMaterial(id: KitMaterialId): THREE.MeshStandardMaterial {
     case 'scaffold': m = new THREE.MeshStandardMaterial({ color: 0x9aa0a4, roughness: 0.45, metalness: 0.6 }); break;
     case 'string': m = new THREE.MeshStandardMaterial({ color: 0xff7a1a, roughness: 0.6, emissive: new THREE.Color(0.3, 0.08, 0) }); break;
     case 'chimney_cap': m = new THREE.MeshStandardMaterial({ color: 0x5a5650, roughness: 0.6, metalness: 0.3 }); break;
-    case 'glass': m = new THREE.MeshStandardMaterial({ color: 0x1d2730, roughness: 0.08, metalness: 0.6, emissive: new THREE.Color(1.0, 0.72, 0.42), emissiveIntensity: 0 }); break;
+    // see-through (rooms are furnished); a little reflection, warm glow from the lamps at night
+    case 'glass': m = new THREE.MeshStandardMaterial({ color: 0x9fb4c0, roughness: 0.05, metalness: 0.2, transparent: true, opacity: 0.28, depthWrite: false, emissive: new THREE.Color(1.0, 0.72, 0.42), emissiveIntensity: 0 }); break;
+    case 'pine_panel': m = texMat(id, paintPinePanel, 1.2, 0.7); break;
+    case 'wood_dark': m = new THREE.MeshStandardMaterial({ color: 0x5a3b24, roughness: 0.6 }); break;
+    case 'wood_mid': m = new THREE.MeshStandardMaterial({ color: 0x9a6a3e, roughness: 0.65 }); break;
+    case 'iron': m = new THREE.MeshStandardMaterial({ color: 0x1e1e1f, roughness: 0.55, metalness: 0.7 }); break;
+    case 'enamel': m = new THREE.MeshStandardMaterial({ color: 0xece8de, roughness: 0.25 }); break;
+    case 'crockery': m = new THREE.MeshStandardMaterial({ color: 0x8fa6b6, roughness: 0.35 }); break;
+    case 'linen': m = new THREE.MeshStandardMaterial({ color: 0xeee6d6, roughness: 0.9 }); break;
+    case 'quilt_red': m = texMat(id, paintQuilt([168, 52, 44], 81), 0.6, 0.95); break;
+    case 'quilt_blue': m = texMat(id, paintQuilt([52, 78, 128], 83), 0.6, 0.95); break;
+    case 'rug': m = texMat(id, paintRug, 0.8, 0.95); break;
+    case 'books': m = texMat(id, paintBooks, 0.8, 0.8); break;
+    case 'lamp': m = new THREE.MeshStandardMaterial({ color: 0xffe6b0, roughness: 0.3, emissive: new THREE.Color(1.0, 0.75, 0.4), emissiveIntensity: 0.4, transparent: true, opacity: 0.85 }); break;
+    case 'cutcap': m = new THREE.MeshStandardMaterial({ color: 0x3b2a1d, roughness: 0.9 }); break;
   }
   m.name = `kit_${id}`;
   _cache.set(id, m);
@@ -196,5 +286,7 @@ export function kitMaterial(id: KitMaterialId): THREE.MeshStandardMaterial {
 /** Interior lights behind the glass (0 = off … 1 = a warm lit room at night). */
 export function setWindowGlow(k: number): void {
   const g = _cache.get('glass');
-  if (g) g.emissiveIntensity = 1.6 * k;
+  if (g) g.emissiveIntensity = 1.1 * k;
+  const l = _cache.get('lamp');
+  if (l) l.emissiveIntensity = 0.4 + 2.6 * k;
 }

@@ -16,6 +16,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { kitMaterial, type KitMaterialId } from './materials';
 import { CELL, type KitPieceDef } from './kit';
+import { Furniture, piece, wallRun, M, type Collider, type Opening, type Sink } from './interior';
 
 /** Cabin dimensions (world units). */
 export const CABIN = {
@@ -33,8 +34,16 @@ export const CABIN = {
 } as const;
 
 /** Build-order layers: each is drawn (and grown) separately as construction proceeds. */
-export type CabinLayer = 'stakes' | 'foundation' | 'deck' | 'frame' | 'rafters' | 'roof' | 'walls' | 'openings' | 'chimney' | 'scaffold';
-export const CABIN_LAYERS: readonly CabinLayer[] = ['stakes', 'foundation', 'deck', 'frame', 'rafters', 'roof', 'walls', 'openings', 'chimney', 'scaffold'];
+export type CabinLayer = 'stakes' | 'foundation' | 'deck' | 'frame' | 'rafters' | 'roof' | 'walls' | 'openings' | 'chimney' | 'scaffold'
+  | 'interior' | 'loft' | 'cutwalls';
+export const CABIN_LAYERS: readonly CabinLayer[] = ['stakes', 'foundation', 'deck', 'frame', 'rafters', 'roof', 'walls', 'openings', 'chimney', 'scaffold', 'interior', 'loft', 'cutwalls'];
+
+/** Layers hidden in the cutaway view (upper floor, roof, full-height walls) and the one shown instead. */
+export const CUTAWAY_HIDE: readonly CabinLayer[] = ['roof', 'walls', 'openings', 'loft', 'rafters'];
+/** Layers drawn see-through in the x-ray view. */
+export const XRAY_LAYERS: readonly CabinLayer[] = ['roof', 'walls', 'openings', 'chimney', 'rafters'];
+/** Waist-high cut for the cutaway view (above the floor). */
+export const CUT_H = 0.2;
 
 interface Parts { layer: CabinLayer; map: Map<string, THREE.BufferGeometry[]> }
 
@@ -67,9 +76,14 @@ const box = (w: number, h: number, d: number, x: number, y: number, z: number) =
   new THREE.BoxGeometry(w, h, d).translate(x, y + h / 2, z);
 
 /** A gable-end triangle (wall infill above the eave line), thickness t, in the x/y plane at z. */
-function gable(halfW: number, rise: number, t: number, y0: number, z: number): THREE.BufferGeometry {
+function gable(halfW: number, rise: number, t: number, y0: number, z: number, hole?: { w: number; y: number; h: number }): THREE.BufferGeometry {
   const s = new THREE.Shape();
   s.moveTo(-halfW, 0); s.lineTo(halfW, 0); s.lineTo(0, rise); s.closePath();
+  if (hole) {
+    const p = new THREE.Path();
+    p.moveTo(-hole.w / 2, hole.y); p.lineTo(-hole.w / 2, hole.y + hole.h); p.lineTo(hole.w / 2, hole.y + hole.h); p.lineTo(hole.w / 2, hole.y); p.closePath();
+    s.holes.push(p);
+  }
   return new THREE.ExtrudeGeometry(s, { depth: t, bevelEnabled: false }).translate(0, y0, z - t / 2);
 }
 
@@ -175,20 +189,47 @@ export function buildCabinLayers(def: KitPieceDef): THREE.Group {
   }
   add(parts, 'chimney_cap', box(0.035, 0.02, z1 - z0, 0, yE + C.rise + 0.012, (z0 + z1) / 2));
 
-  // ── Walls: lap siding and corner boards ──
+  // ── Walls: lap siding outside, knotty-pine lining inside, real openings through both ──
+  const sink: Sink = (layer, m, g) => { const keep = parts.layer; parts.layer = layer as CabinLayer; add(parts, m, g); parts.layer = keep; };
+  const colliders: Collider[] = [];
+  const shell = (layer: CabinLayer, cut?: number) => {
+    const out: Collider[] = [];
+    const tO = 0.022, tI = C.wallT - tO;
+    const leaves: Array<[number, number, 'timber_lap' | 'pine_panel']> = [[tO / 2, tO, 'timber_lap'], [tO + tI / 2, tI, 'pine_panel']];
+    const winOp = (at: number): Opening => ({ at, w: C.win.w, sill: C.win.sill, h: C.win.h });
+    for (const [inset, t, m] of leaves) {
+      // front (door + window), back, two sides (two windows each)
+      out.push(...wallRun(sink, layer, m, { ax: -hw, az: hd - inset, bx: hw, bz: hd - inset, y0, h: C.wallH, t, cut,
+        openings: [{ at: C.door.x + hw, w: C.door.w, sill: 0, h: C.door.h }, winOp(0.22 + hw)] }));
+      out.push(...wallRun(sink, layer, m, { ax: -hw, az: -hd + inset, bx: hw, bz: -hd + inset, y0, h: C.wallH, t, cut }));
+      for (const sx of [-1, 1]) {
+        const za = -hd + C.wallT, zb = hd - C.wallT;
+        out.push(...wallRun(sink, layer, m, { ax: sx * (hw - inset), az: za, bx: sx * (hw - inset), bz: zb, y0, h: C.wallH, t, cut,
+          openings: [winOp(-0.36 - za), winOp(0.3 - za)] }));
+      }
+    }
+    // bedroom partitions (front right): along z at x = PX with a doorway, along x at z = PZ
+    out.push(...wallRun(sink, layer, 'pine_panel', { ax: PX, az: PZ, bx: PX, bz: hd - C.wallT, y0, h: C.wallH, t: 0.02, cut, openings: [{ at: 0.025 + 0.065, w: 0.13, sill: 0, h: C.door.h }] }));
+    out.push(...wallRun(sink, layer, 'pine_panel', { ax: PX - 0.01, az: PZ, bx: hw - C.wallT, bz: PZ, y0, h: C.wallH, t: 0.02, cut }));
+    return out;
+  };
+  const PX = 0.06, PZ = 0.18;
   parts.layer = 'walls';
-  add(parts, 'timber_lap', box(W, C.wallH, C.wallT, 0, y0, hd - C.wallT / 2));
-  add(parts, 'timber_lap', box(C.wallT, C.wallH, D - 2 * C.wallT, hw - C.wallT / 2, y0, 0));
-  add(parts, 'timber_lap', box(W, C.wallH, C.wallT, 0, y0, -hd + C.wallT / 2));
-  add(parts, 'timber_lap', box(C.wallT, C.wallH, D - 2 * C.wallT, -hw + C.wallT / 2, y0, 0));
-  add(parts, 'timber_lap', gable(hw, C.rise, C.wallT, yE, hd - C.wallT / 2));
-  add(parts, 'timber_lap', gable(hw, C.rise, C.wallT, yE, -hd + C.wallT / 2));
+  colliders.push(...shell('walls'));
+  add(parts, 'timber_lap', gable(hw, C.rise, 0.022, yE, hd - 0.011));
+  add(parts, 'pine_panel', gable(hw - C.wallT, C.rise * (hw - C.wallT) / hw, 0.013, yE, hd - 0.0285));
+  const gh = { w: C.win.w, y: 0.05, h: C.win.h };
+  add(parts, 'timber_lap', gable(hw, C.rise, 0.022, yE, -hd + 0.011, gh));
+  add(parts, 'pine_panel', gable(hw - C.wallT, C.rise * (hw - C.wallT) / hw, 0.013, yE, -hd + 0.0285, gh));
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) add(parts, 'trim', box(0.028, C.wallH, 0.028, sx * (hw + 0.002), y0, sz * (hd + 0.002)));
+  shell('cutwalls', CUT_H);
 
   // ── Openings: door, windows, porch posts painted ──
   parts.layer = 'openings';
   const dz = hd + 0.004;
-  add(parts, 'door', box(C.door.w, C.door.h, 0.012, C.door.x, y0, dz));
+  // plank door standing open into the room (hinged on its left jamb)
+  const hinge = C.door.x - C.door.w / 2, inZ = hd - C.wallT;
+  add(parts, 'door', box(C.door.w, C.door.h, 0.012, C.door.w / 2, 0, -0.006).rotateY(1.35).translate(hinge + 0.006, y0, inZ));
   add(parts, 'trim', box(C.door.w + 0.04, 0.02, 0.018, C.door.x, y0 + C.door.h, dz + 0.002));
   add(parts, 'trim', box(0.02, C.door.h, 0.018, C.door.x - C.door.w / 2 - 0.01, y0, dz + 0.002));
   add(parts, 'trim', box(0.02, C.door.h, 0.018, C.door.x + C.door.w / 2 + 0.01, y0, dz + 0.002));
@@ -206,6 +247,67 @@ export function buildCabinLayers(def: KitPieceDef): THREE.Group {
   const cc = 8;
   for (let i = 0; i < cc; i++) add(parts, 'fieldstone', box(chW, (chTop + 0.03) / cc, chW, cx, -0.03 + i * (chTop + 0.03) / cc, -hd - chW / 2 + 0.01));
   add(parts, 'chimney_cap', box(chW + 0.02, 0.02, chW + 0.02, cx, chTop - 0.03, -hd - chW / 2 + 0.01));
+
+  // ── Ceiling: pine boards under the roof, tie beams over the front room ──
+  parts.layer = 'roof';
+  const cLen = Math.hypot(hw - C.wallT, C.rise * (hw - C.wallT) / hw);
+  for (const s2 of [-1, 1]) {
+    const g = new THREE.BoxGeometry(cLen, 0.008, D - 2 * C.wallT);
+    g.translate(s2 * cLen / 2, 0, 0);
+    g.rotateZ(s2 * -pitch);
+    g.translate(0, yE + C.rise - 0.03, 0);
+    add(parts, 'pine_panel', g);
+  }
+  for (const z of [0.05, 0.4]) add(parts, 'wood_dark', box(W - 2 * C.wallT, 0.03, 0.025, 0, yE - 0.03, z));
+
+  // ── Interior: main room (stove, sitting corner, kitchen, table), entry, bedroom ──
+  const I = (p: { x: number; z: number; rot?: number }, fn: Parameters<typeof piece>[3], solid = true) => {
+    const c = piece(sink, 'interior', { ...p, y: y0 + 0.004 }, fn, solid);
+    if (c) colliders.push(c);
+  };
+  const back = -hd + C.wallT, left = -hw + C.wallT, right = hw - C.wallT, front = hd - C.wallT;
+  I({ x: cx, z: back + 0.075 }, a => Furniture.woodStove(a, 1.55, 0.32));
+  I({ x: 0.43, z: back + 0.055 }, a => Furniture.woodbox(a));
+  I({ x: 0.24, z: -0.36 }, a => Furniture.rug(a, 2.2, 1.5), false);
+  I({ x: 0.11, z: -0.34, rot: Math.PI - 0.35 }, a => Furniture.armchair(a, 'quilt_red'));
+  I({ x: 0.38, z: -0.33, rot: Math.PI + 0.35 }, a => Furniture.armchair(a, 'quilt_blue'));
+  // kitchen along the left wall (front faces +x), shelves over it clear of the window
+  I({ x: left + 0.05, z: -0.48, rot: Math.PI / 2 }, a => Furniture.counter(a, 2.5, 0.62));
+  I({ x: left + 0.02, z: -0.6, rot: Math.PI / 2 }, a => Furniture.wallShelf(a, 1.1, 1.45, 2, 'jars'), false);
+  I({ x: -0.3, z: back + 0.03 }, a => Furniture.shelfUnit(a, 1.2, 1.9, 'jars'));
+  I({ x: left + 0.05, z: -0.17 }, a => Furniture.barrel(a));
+  // dining table with four chairs and the lamp
+  const tx = -0.25, tz = 0.02;
+  I({ x: tx, z: tz }, a => { Furniture.table(a, 1.2, 0.85); Furniture.oilLamp(a, 0, 0.76, 0); });
+  for (const sx of [-1, 1]) {
+    I({ x: tx + sx * 0.045, z: tz - 0.1 }, a => Furniture.chair(a));
+    I({ x: tx + sx * 0.045, z: tz + 0.1, rot: Math.PI }, a => Furniture.chair(a));
+  }
+  I({ x: left + 0.03, z: 0.1, rot: Math.PI / 2 }, a => Furniture.shelfUnit(a, 0.9, 1.8, 'books'));
+  // entry: boot bench and coat pegs by the door
+  I({ x: -0.38, z: front - 0.035, rot: Math.PI }, a => Furniture.bench(a, 0.9));
+  I({ x: -0.38, z: front - 0.008, rot: Math.PI }, a => Furniture.coatPegs(a, 0.9), false);
+  // bedroom: double bed against the partition, nightstand, dresser
+  I({ x: 0.29, z: PZ + 0.01 + 1.0 * M + 0.04 * M }, a => Furniture.bed(a, true, 'quilt_red'));
+  I({ x: right - 0.04, z: PZ + 0.05 }, a => Furniture.nightstand(a));
+  I({ x: right - 0.045, z: 0.6, rot: -Math.PI / 2 }, a => Furniture.dresser(a, 1.0));
+  I({ x: 0.22, z: 0.6 }, a => Furniture.rug(a, 1.2, 0.8), false);
+
+  // ── Sleeping loft over the back half (kids), ladder up from the main room ──
+  const LZ = -0.16;
+  const L = (p: { x: number; z: number; rot?: number; y?: number }, fn: Parameters<typeof piece>[3], solid = false) => {
+    const c = piece(sink, 'loft', { ...p, y: p.y ?? yE }, fn, solid);
+    if (c) colliders.push(c);
+  };
+  parts.layer = 'loft';
+  add(parts, 'deck', box(W - 2 * C.wallT, 0.02, LZ - back, 0, yE - 0.02, (LZ + back) / 2));
+  add(parts, 'wood_dark', box(W - 2 * C.wallT, 0.035, 0.03, 0, yE - 0.055, LZ - 0.015));
+  L({ x: -0.2975, z: LZ - 0.01 }, a => Furniture.rail(a, 0.335 / M));
+  L({ x: 0.2275, z: LZ - 0.01 }, a => Furniture.rail(a, 0.475 / M));
+  L({ x: -0.07, z: LZ + 0.094, y: y0 }, a => Furniture.ladder(a, C.wallH / M), true);
+  L({ x: -0.2, z: -0.47 }, a => Furniture.mattress(a, 'quilt_blue'));
+  L({ x: 0.2, z: -0.47 }, a => Furniture.mattress(a, 'quilt_red'));
+  L({ x: 0, z: back + 0.06 }, a => { Furniture.trunk(a); Furniture.oilLamp(a, 0, 0.5, 0); });
 
   // ── Scaffold: tube frame and plank walks round the walls ──
   parts.layer = 'scaffold';
@@ -243,6 +345,8 @@ export function buildCabinLayers(def: KitPieceDef): THREE.Group {
     mesh.userData = { layer, vertexCount: g.getAttribute('position').count };
     group.add(mesh);
   }
+  // walk / people collision (finished building): walls between doorways, partitions, furniture
+  group.userData.colliders = colliders;
   return group;
 }
 
@@ -250,7 +354,7 @@ export function buildCabinLayers(def: KitPieceDef): THREE.Group {
 export function buildCabinGroup(def: KitPieceDef): THREE.Group {
   const g = buildCabinLayers(def);
   showCabinStage(g, 5, 0);
-  for (const m of [...g.children]) if (!m.visible) { g.remove(m); (m as THREE.Mesh).geometry.dispose(); }
+  for (const m of [...g.children]) if (!m.visible || m.userData.layer === 'cutwalls' || m.userData.layer === 'interior' || m.userData.layer === 'loft') { g.remove(m); (m as THREE.Mesh).geometry.dispose(); }
   return g;
 }
 
@@ -263,7 +367,8 @@ export function layerFractions(stage: number, f: number, supplied: boolean): Rec
   const r = {} as Record<CabinLayer, number>;
   for (const l of CABIN_LAYERS) r[l] = 0;
   if (stage >= 5) {
-    for (const l of ['foundation', 'deck', 'roof', 'walls', 'openings', 'chimney'] as CabinLayer[]) r[l] = 1;
+    // cutwalls are drawn whole; the view (cutaway or not) decides whether they show
+    for (const l of ['foundation', 'deck', 'roof', 'walls', 'openings', 'chimney', 'interior', 'loft', 'cutwalls'] as CabinLayer[]) r[l] = 1;
     return r;
   }
   r.stakes = stage <= 2 ? 1 : 0;
@@ -275,6 +380,9 @@ export function layerFractions(stage: number, f: number, supplied: boolean): Rec
   r.walls = stage === 4 ? Math.min(1, k / 0.7) : 0;
   r.openings = stage === 4 ? Math.max(0, (k - 0.6) / 0.4) : 0;
   r.chimney = stage === 4 ? Math.min(1, k / 0.8) : 0;
+  // moving in: the loft floor goes down with the finish work, the furniture comes last
+  r.loft = stage === 4 ? Math.max(0, (k - 0.5) / 0.5) : 0;
+  r.interior = stage === 4 ? Math.max(0, (k - 0.75) / 0.25) : 0;
   r.scaffold = stage >= 2 && stage <= 4 && !(stage === 4 && k > 0.9) ? 1 : 0;
   return r;
 }

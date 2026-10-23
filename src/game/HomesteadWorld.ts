@@ -23,7 +23,9 @@ import type { GameState } from '../sim/state';
 import type { WearSeason } from '../engine/world/people/crowdWear';
 import type { TourBuildingInfo } from '../engine/world/camera/TourController';
 import { footprint, KIT, type Placed } from './buildkit/kit';
-import { buildCabinLayers, cabinChimneyTop, showCabinStage } from './buildkit/cabinGeometry';
+import { buildCabinLayers, cabinChimneyTop, showCabinStage, CABIN, CUTAWAY_HIDE, XRAY_LAYERS, type CabinLayer } from './buildkit/cabinGeometry';
+import { hitsColliders, type Collider } from './buildkit/interior';
+import type { BuildingView } from '../store/worldStore';
 import type { Structure } from '../sim/state';
 import { BLUEPRINTS } from '../sim/blueprints';
 import { SmokePlume } from '../engine/world/fx/SmokePlume';
@@ -47,6 +49,35 @@ export const CLIMATE_ID = 'mountain_west';
 /** Parcel trees are planted this far beyond the parcel; regional far trees beyond. */
 const TREE_MARGIN = 26;
 
+interface Built {
+  placed: Placed;
+  group: THREE.Group;
+  smoke: SmokePlume;
+  key: string;
+  finished: boolean;
+  /** Floor level of the pad the building stands on. */
+  padY: number;
+  /** Lamplight inside (warm point light, brighter at night). */
+  light: THREE.PointLight;
+}
+
+/** See-through variants of the kit materials (x-ray view), shared. */
+const _xray = new Map<THREE.Material, THREE.Material>();
+function xrayOf(m: THREE.Material): THREE.Material {
+  let x = _xray.get(m);
+  if (!x) {
+    x = m.clone();
+    x.transparent = true;
+    x.opacity = 0.16;
+    x.depthWrite = false;
+    _xray.set(m, x);
+  }
+  return x;
+}
+
+/** Body radius used inside buildings (doorways are ≈ 1 m wide). */
+const INDOOR_R = 0.04;
+
 /**
  * Everything in the world that is Compound Builder's: the parcel terrain set
  * into the regional landscape, seasons, and (later) structures.
@@ -62,7 +93,9 @@ export class HomesteadWorld {
   private _plantSeason = '';
   private _props: RegionalProps | null = null;
   /** Built structures by id (scene groups tagged userData.type = 'building'). */
-  private readonly _built = new Map<string, { placed: Placed; group: THREE.Group; smoke: SmokePlume; key: string; finished: boolean }>();
+  private readonly _built = new Map<string, Built>();
+  /** Current building view (cutaway / x-ray toggle). */
+  private _view: BuildingView = 'full';
   /** Atmosphere for the frame (set by the canvas before tick). */
   readonly air = { hour: 12, wind: 0.2, daylight: 1, viewportH: 800 };
   /** Neighbouring farmsteads (seeded). */
@@ -296,7 +329,7 @@ export class HomesteadWorld {
   describeBuildings(): Array<Omit<TourBuildingInfo, 'box'>> {
     return [...this._built.values()].map(({ placed }, i) => ({
       id: placed.id, defId: placed.kind, name: KIT[placed.kind].name, typeName: KIT[placed.kind].name,
-      tier: 1, builtDay: i + 1, historic: i === 0, solid: true, highlight: i === 0 ? 'The homestead' : undefined,
+      tier: 1, builtDay: i + 1, historic: i === 0, solid: !this._built.get(placed.id)?.finished, highlight: i === 0 ? 'The homestead' : undefined,
     }));
   }
 
@@ -360,7 +393,11 @@ export class HomesteadWorld {
     this._ws.scene.add(group);
     const smoke = new SmokePlume(group.localToWorld(cabinChimneyTop(def)));
     this._ws.scene.add(smoke.points);
-    this._built.set(p.id, { placed: p, group, smoke, key: '', finished: false });
+    const light = new THREE.PointLight(0xffc27a, 0, 1.4, 2);
+    light.position.set(-0.2, CABIN.floor + 0.32, -0.05);
+    light.visible = false;
+    group.add(light);
+    this._built.set(p.id, { placed: p, group, smoke, key: '', finished: false, padY: y, light });
     this.terrain.refresh(this._terrainSource, pad.x0 - pad.skirt - 1, pad.z0 - pad.skirt - 1, pad.x1 + pad.skirt + 1, pad.z1 + pad.skirt + 1);
     if (this._quality) this._plant(this._quality);
     this._ws.invalidateShadows();
@@ -383,7 +420,42 @@ export class HomesteadWorld {
       if (key === b.key) continue;
       b.key = key;
       showCabinStage(b.group, done ? 5 : st.stage, f, st.supplied);
-      if (done !== b.finished) { b.finished = done; this._ws.invalidateShadows(); }
+      if (done !== b.finished) { b.finished = done; b.light.visible = done; this._ws.invalidateShadows(); }
+      this._applyView(b);
+    }
+  }
+
+  /** Cutaway (walls cut at waist height, roof and loft off) / x-ray (see-through shell) / full. */
+  setBuildingView(v: BuildingView): void {
+    if (v === this._view) return;
+    this._view = v;
+    for (const b of this._built.values()) { b.key = ''; this._applyView(b); }
+    this._ws.invalidateShadows();
+  }
+
+  private _applyView(b: Built): void {
+    const v = this._view;
+    for (const o of b.group.children) {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) continue;
+      const layer = m.userData.layer as CabinLayer;
+      const ud = m.userData as { baseMat?: THREE.Material };
+      ud.baseMat ??= m.material as THREE.Material;
+      // x-ray: the shell goes see-through, the furniture stays solid
+      m.material = v === 'xray' && XRAY_LAYERS.includes(layer) ? xrayOf(ud.baseMat) : ud.baseMat;
+      m.castShadow = !(v === 'xray' && XRAY_LAYERS.includes(layer)) && ud.baseMat.name !== 'kit_glass' && ud.baseMat.name !== 'kit_string';
+      if (layer === 'cutwalls') m.visible = v === 'cutaway' && b.finished;
+      else if (v === 'cutaway' && CUTAWAY_HIDE.includes(layer) && (b.finished || layer !== 'walls')) m.visible = false;
+    }
+  }
+
+  /** Lamplight inside finished buildings: a low fill by day, warm lamps at night. */
+  private _updateLights(): void {
+    const night = 1 - this.air.daylight;
+    const lit = this.air.hour > 5.5 && this.air.hour < 23;
+    for (const b of this._built.values()) {
+      if (!b.finished) continue;
+      b.light.intensity = (this._view === 'full' ? 0.25 : 0.12) + (lit ? night * 1.6 : night * 0.25);
     }
   }
 
@@ -409,10 +481,55 @@ export class HomesteadWorld {
     flickerCampfire(this._clock, !homeB && (meals || seasonState.params.cold > 0.4) ? 1 : 0);
   }
 
+  /** A point in a building's local frame (y above its floor) in world coordinates (QA camera poses). */
+  localToWorld(id: string, lx: number, ly: number, lz: number): { x: number; y: number; z: number } | null {
+    const b = this._built.get(id);
+    if (!b) return null;
+    const v = new THREE.Vector3(lx, ly + CABIN.floor, lz).applyEuler(new THREE.Euler(0, b.placed.rot * Math.PI / 2, 0));
+    return { x: b.placed.x + v.x, y: b.padY + v.y, z: b.placed.z + v.z };
+  }
+
+  /** A world point in a building's local frame. */
+  private _local(b: Built, x: number, z: number): [number, number] {
+    const th = b.placed.rot * Math.PI / 2, c = Math.cos(th), s = Math.sin(th);
+    const dx = x - b.placed.x, dz = z - b.placed.z;
+    return [dx * c - dz * s, dx * s + dz * c];
+  }
+
+  /** Finished buildings: walls (between doorways), partitions and furniture block; unfinished ones block their footprint. */
+  private _buildingBlocked(x: number, z: number, r: number): boolean {
+    for (const b of this._built.values()) {
+      const def = KIT[b.placed.kind];
+      const reach = Math.max(def.cellsX, def.cellsZ) * CELL + 1;
+      if (Math.abs(x - b.placed.x) > reach || Math.abs(z - b.placed.z) > reach) continue;
+      const cs = b.group.userData.colliders as Collider[] | undefined;
+      if (b.finished && cs) {
+        const [lx, lz] = this._local(b, x, z);
+        if (hitsColliders(cs, lx, lz, Math.min(r, INDOOR_R))) return true;
+      } else if (this.onBuilding(x, z, r, false) && footprintHas(b, x, z, r)) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Walking height: the floor inside (and on the porch of) a finished
+   * building, the ground elsewhere.
+   */
+  walkHeight = (x: number, z: number): number => {
+    for (const b of this._built.values()) {
+      if (!b.finished) continue;
+      const def = KIT[b.placed.kind];
+      const [lx, lz] = this._local(b, x, z);
+      const hw = def.cellsX * CELL / 2, hd = def.cellsZ * CELL / 2;
+      if (Math.abs(lx) < hw && lz > -hd && lz < hd + CABIN.porch) return b.padY + CABIN.floor;
+    }
+    return this.groundAt(x, z);
+  };
+
   /** Walk mode: can a body of radius r stand at (x, z)? Creek water and tree trunks block. */
   walkBlocked = (x: number, z: number, r: number): boolean => {
     if (this.stream.depthAt(x, z) > 0.04) return true;
-    if (this.onBuilding(x, z, r, false)) return true;
+    if (this._buildingBlocked(x, z, r)) return true;
     if (Math.hypot(x - this.camp.x, z - this.camp.z) < 0.4 + r) return true;
     for (const t of this.treeSpecs) {
       const dx = t.x - x, dz = t.z - z;
@@ -470,6 +587,7 @@ export class HomesteadWorld {
     const heating = Math.min(1, p.cold * 1.2 + p.snow * 0.5 + (seasonState.visual === 'summer' ? 0 : 0.25));
     const fire = Math.max(cooking, heating * (h > 23 || h < 5 ? 0.5 : 1));
     const wx = 0.08 + a.wind * 0.45, wz = 0.03 + a.wind * 0.12;   // prevailing westerlies off the range
+    this._updateLights();
     for (const { smoke, finished } of this._built.values()) smoke.update(this._clock, finished ? fire : 0, wx, wz, a.daylight, a.viewportH);
     if (seasonState.plants !== this._plantSeason) {
       this._plantSeason = seasonState.plants;
@@ -502,6 +620,12 @@ export class HomesteadWorld {
       (m.material as THREE.Material | undefined)?.dispose?.();
     });
   }
+}
+
+/** Is (x, z) inside this building's footprint (plus r)? */
+function footprintHas(b: Built, x: number, z: number, r: number): boolean {
+  const f = footprint(KIT[b.placed.kind], b.placed.x, b.placed.z, b.placed.rot, false);
+  return x > f.x0 - r && x < f.x1 + r && z > f.z0 - r && z < f.z1 + r;
 }
 
 /** A plain human-scale reference figure (QA scale check). */
