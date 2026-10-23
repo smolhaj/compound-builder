@@ -40,6 +40,52 @@ export interface CreekLine {
 }
 
 /** A graded building pad: flat at `y` inside the rect, easing to natural ground over `skirt`. */
+/**
+ * A berm (bank of earth, height > 0) or ditch (trench, height < 0) along a
+ * polyline, `k` built (0–1 scales the height), with gaps for gates.
+ * Profiles: berm ≈ 4 m base, 1 m crest; ditch ≈ 3 m top, 1 m bottom.
+ */
+export interface Earthwork {
+  pts: Array<[number, number]>;
+  height: number;
+  k: number;
+  gates: Array<{ at: number; w: number }>;
+  bbox?: [number, number, number, number];
+}
+
+const BERM_HALF_BASE = 0.34, BERM_HALF_TOP = 0.08, DITCH_HALF_TOP = 0.26, DITCH_HALF_BOT = 0.08;
+export const earthworkReach = (w: Earthwork) => (w.height > 0 ? BERM_HALF_BASE : DITCH_HALF_TOP) + 0.02;
+
+function polyBox(pts: ReadonlyArray<[number, number]>, pad: number): [number, number, number, number] {
+  let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
+  for (const [x, z] of pts) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+  return [x0 - pad, z0 - pad, x1 + pad, z1 + pad];
+}
+
+/** Distance to a polyline and the distance along it of the closest point. */
+export function closestOnLine(pts: ReadonlyArray<[number, number]>, x: number, z: number): { d: number; s: number } {
+  let best = Infinity, bestS = 0, acc = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const [ax, az] = pts[i - 1], [bx, bz] = pts[i];
+    const dx = bx - ax, dz = bz - az, l2 = dx * dx + dz * dz, l = Math.sqrt(l2);
+    const t = l2 > 0 ? Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / l2)) : 0;
+    const d = Math.hypot(x - (ax + dx * t), z - (az + dz * t));
+    if (d < best) { best = d; bestS = acc + t * l; }
+    acc += l;
+  }
+  return { d: best, s: bestS };
+}
+
+/** Height change an earthwork makes at (x, z). */
+export function earthworkOffset(w: Earthwork, x: number, z: number): number {
+  const { d, s } = closestOnLine(w.pts, x, z);
+  for (const g of w.gates) if (Math.abs(s - g.at) < g.w / 2) return 0;
+  const [top, base] = w.height > 0 ? [BERM_HALF_TOP, BERM_HALF_BASE] : [DITCH_HALF_BOT, DITCH_HALF_TOP];
+  if (d >= base) return 0;
+  const f = d <= top ? 1 : 1 - sstep(top, base, d);
+  return w.height * w.k * f;
+}
+
 export interface Pad {
   x0: number; z0: number; x1: number; z1: number;
   y: number;
@@ -158,6 +204,11 @@ export class ParcelTerrain {
 
   /** Graded pads (buildings): replaces the natural ground under them. */
   setPads(pads: readonly Pad[]): void { this._pads = pads.slice(); }
+
+  private _works: Earthwork[] = [];
+  /** Berms (raised banks) and ditches (cut trenches) along polylines. */
+  setEarthworks(works: readonly Earthwork[]): void { this._works = works.map(w => ({ ...w, bbox: polyBox(w.pts, earthworkReach(w)) })); }
+  get earthworks(): readonly Earthwork[] { return this._works; }
   get pads(): readonly Pad[] { return this._pads; }
 
   sample(x: number, z: number): ParcelSample {
@@ -168,6 +219,12 @@ export class ParcelTerrain {
       const k = 1 - sstep(0, p.skirt, d);
       s.h += (p.y - s.h) * k;
       s.forest *= 1 - k;
+    }
+    for (const w of this._works) {
+      const b = w.bbox!;
+      if (x < b[0] || x > b[2] || z < b[1] || z > b[3]) continue;
+      const dy = earthworkOffset(w, x, z);
+      if (dy !== 0) { s.h += dy; s.forest = 0; }
     }
     return s;
   }

@@ -12,6 +12,8 @@ import { CameraOccluders } from '../engine/world/camera/cameraOcclusion';
 import { PARCEL_SIZE } from './HomesteadWorld';
 import { PlacementTool } from './PlacementTool';
 import { MarkTool } from './MarkTool';
+import { PerimeterTool } from './PerimeterTool';
+import type { PerimeterKind } from '../sim/perimeter';
 import { useGameStore } from '../store/gameStore';
 import { calendarOf, hourOf, SECONDS_PER_DAY } from '../sim/state';
 import { setWindowGlow } from './buildkit/materials';
@@ -43,6 +45,7 @@ export function GameCanvas() {
     });
     const tool = new PlacementTool(ws.scene, ws.camera, canvas, world);
     const marker = new MarkTool(ws.scene, ws.camera, canvas, world);
+    const fence = new PerimeterTool(ws.scene, ws.camera, canvas, world);
     const applyCameraMode = () => {
       const m = useWorldStore.getState().cameraMode;
       if (m === 'diorama') { if (tour.active) tour.exit(); cam.enabled = true; return; }
@@ -80,7 +83,7 @@ export function GameCanvas() {
       useWorldStore.subscribe(s => s.quality, applyLook),
       useWorldStore.subscribe(s => s.cameraMode, applyCameraMode),
       useGameStore.subscribe(s => s.game.structures, list => { world.syncStructures(list); occluders.invalidate(); }),
-      useGameStore.subscribe(s => s.tool, k => { tool.setKind(k); marker.setOn(k === 'fell'); }),
+      useGameStore.subscribe(s => s.tool, k => { tool.setKind(k); marker.setOn(k === 'fell'); fence.setKind(k?.startsWith('fence:') ? k.slice(6) as PerimeterKind : null); }),
       useWorldStore.subscribe(s => s.buildingView, v => world.setBuildingView(v)),
     ];
 
@@ -105,6 +108,8 @@ export function GameCanvas() {
       }
       world.syncProgress(game.structures);
       world.syncForestry(game.forestry);
+      world.simTime = game.clock.t;
+      world.syncPerimeter(game.perimeter, game.clock.t);
       const speedK = game.clock.speed === 0 ? 0 : 60 / SECONDS_PER_DAY[game.clock.speed];
       world.updatePeople(dt, game, hourOf(game.clock.t), speedK);
       world.updateDeliveries(dt, game, speedK);
@@ -161,7 +166,7 @@ export function GameCanvas() {
     raf = requestAnimationFrame(frame);
 
     // QA hook (screenshot harness, console poking).
-    (window as unknown as Record<string, unknown>).__cb = { ws, world, weather, cam, tour, tool, marker, game: useGameStore, store: useWorldStore, THREE, qa };
+    (window as unknown as Record<string, unknown>).__cb = { ws, world, weather, cam, tour, tool, marker, fence, game: useGameStore, store: useWorldStore, THREE, qa };
 
     return () => {
       cancelAnimationFrame(raf);
@@ -171,6 +176,7 @@ export function GameCanvas() {
       tour.dispose();
       tool.dispose();
       marker.dispose();
+      fence.dispose();
       cam.dispose();
       weather.dispose();
       world.dispose();

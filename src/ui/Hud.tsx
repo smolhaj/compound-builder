@@ -11,6 +11,7 @@ import { onOrder, orderCost, orderProblem } from '../sim/economy';
 import { blockedReason, isFinished, progress } from '../sim/construction';
 import { BLUEPRINTS, totalBill, totalHours } from '../sim/blueprints';
 import { KIT, KIT_ORDER } from '../game/buildkit/kit';
+import { PERIMETER, PERIMETER_ORDER, runBill, runHours, runFinished, runProgress, runBlocked, runGrowth } from '../sim/perimeter';
 
 const QUALITIES: Quality[] = ['high', 'medium', 'low'];
 const CAMERAS: Array<[CameraMode, string]> = [['diorama', 'Diorama'], ['walk', 'Walk'], ['fly', 'Fly'], ['cinematic', 'Tour']];
@@ -85,10 +86,22 @@ export function Hud() {
               <div style={{ fontSize: 11, opacity: 0.75 }}>~{usd(costOf(kind))}{own ? ` + ${own}` : ''} · {totalHours(BLUEPRINTS[kind])} h</div>
             </button>;
           })}
+          <div style={{ ...h3, marginTop: 6 }}>Perimeter (per 100 m)</div>
+          {PERIMETER_ORDER.map(kind => {
+            const len = 100 / 6, bill = runBill(kind, len);
+            const buy = Object.entries(bill).filter(([m]) => MATERIALS[m as MaterialId].price !== null).map(([material, qty]) => ({ material: material as MaterialId, qty: qty as number }));
+            const own = Object.entries(bill).filter(([m]) => MATERIALS[m as MaterialId].price === null).map(([m, q]) => `${q} ${MATERIALS[m as MaterialId].name.toLowerCase()}`).join(', ');
+            const tool = `fence:${kind}`;
+            return <button key={kind} title={PERIMETER[kind].blurb} style={{ ...btn(g.tool === tool), width: '100%', textAlign: 'left', marginBottom: 3, display: 'block' }} onClick={() => g.setTool(g.tool === tool ? null : tool)}>
+              <div>{PERIMETER[kind].name}</div>
+              <div style={{ fontSize: 11, opacity: 0.75 }}>{buy.length ? `~${usd(orderCost(buy))}` : 'no materials'}{own ? ` + ${own}` : ''} · {Math.round(runHours(kind, len))} h</div>
+            </button>;
+          })}
           <button style={{ ...btn(g.tool === 'fell'), width: '100%', textAlign: 'left', marginTop: 4 }} onClick={() => g.setTool(g.tool === 'fell' ? null : 'fell')}>
             Mark trees to fell
           </button>
           {g.tool && <div style={{ marginTop: 4, opacity: 0.85 }}>{g.toolProblem ?? (g.tool === 'fell' ? 'Point at a tree · click marks / unmarks · Esc stops' : 'Click to stake it out · R rotates · Esc cancels')}</div>}
+          {g.tool?.startsWith('fence:') && <div style={{ marginTop: 2, opacity: 0.65, fontSize: 11 }}>Click corners · Shift-click the line for a gate · Enter / double-click lays it out · Backspace undoes · Esc cancels</div>}
         </Section>
         {sel && (
           <Section title="Construction">
@@ -97,6 +110,15 @@ export function Hud() {
               <div style={{ width: `${progress(sel) * 100}%`, height: '100%', background: '#c9b27a', borderRadius: 3 }} />
             </div>
             {!isFinished(sel) && <div style={{ opacity: 0.8 }}>{blockedReason(game, sel) ?? `${Math.round(progress(sel) * 100)} % done`}</div>}
+          </Section>
+        )}
+        {game.perimeter.some(r => !runFinished(r) || runGrowth(r, game.clock.t) < 1) && (
+          <Section title="Perimeter">
+            {game.perimeter.filter(r => !runFinished(r) || runGrowth(r, game.clock.t) < 1).slice(0, 4).map(r => (
+              <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>
+                <span>{PERIMETER[r.kind].name}</span>
+                <span style={{ opacity: 0.75 }}>{runFinished(r) ? `growing ${Math.round(runGrowth(r, game.clock.t) * 100)} %` : runBlocked(game, r) ?? `${Math.round(runProgress(r) * 100)} %`}</span>
+              </div>))}
           </Section>
         )}
         {game.forestry.jobs.length > 0 && (

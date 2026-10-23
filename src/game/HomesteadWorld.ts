@@ -26,6 +26,9 @@ import { footprint, KIT, type Placed } from './buildkit/kit';
 import { showStage, CUTAWAY_HIDE, XRAY_LAYERS, type BuildLayer as CabinLayer } from './buildkit/shell';
 import { buildLayers, type Seat } from './buildkit/buildings';
 import { hashStr } from './buildkit/clutter';
+import { buildRun, solidSpans } from './perimeter/perimeterGeometry';
+import { PERIMETER, runGrowth, runProgress, wallLength, type PerimeterRun } from '../sim/perimeter';
+import { closestOnLine, earthworkReach, type Earthwork } from './parcel/parcelTerrain';
 import { hitsColliders, type Collider } from './buildkit/interior';
 import type { BuildingView } from '../store/worldStore';
 import type { Structure } from '../sim/state';
@@ -219,7 +222,7 @@ export class HomesteadWorld {
   /** Parcel trees (near, detailed) inside the margin; regional far trees beyond it. */
   private _plant(q: Quality): void {
     const margin = TREE_MARGIN;
-    const specs = planParcelTrees(this.parcel, { margin, density: q === 'low' ? 0.5 : 1, blocked: (x, z) => this.onBuilding(x, z, 0.6) || this.onCamp(x, z, 0.6) || this.onAccess(x, z, 0.5) });
+    const specs = planParcelTrees(this.parcel, { margin, density: q === 'low' ? 0.5 : 1, blocked: (x, z) => this.onBuilding(x, z, 0.6) || this.onCamp(x, z, 0.6) || this.onAccess(x, z, 0.5) || this.onPerimeterLine(x, z, 0.25) });
     for (const t of specs) t.y = this.terrain.surfaceAt(t.x, t.z) - 0.03;
     this._planted = specs;
     // lookups cover every tree a full-density plan has (marks made on High survive a switch to Low)
@@ -278,6 +281,71 @@ export class HomesteadWorld {
     }
     return best;
   }
+
+  // ── Perimeter ─────────────────────────────────────────────────────────
+  private _runs: readonly PerimeterRun[] = [];
+  private readonly _runGroups = new Map<string, { key: string; group: THREE.Group }>();
+  private _runIds = '';
+  private _worksKey = '';
+
+  /** Is (x, z) within `pad` of a planned perimeter line (trees are cleared off fence lines)? */
+  onPerimeterLine(x: number, z: number, pad = 0): boolean {
+    for (const r of this._runs) if (closestOnLine(r.pts, x, z).d < pad) return true;
+    return false;
+  }
+
+  /** Fences, hedges and walls drawn as built (hedges by growth); berms and ditches shape the terrain. */
+  syncPerimeter(runs: readonly PerimeterRun[], t: number): void {
+    this._runs = runs;
+    const ids = runs.map(r => r.id).join(',');
+    for (const r of runs) {
+      const key = `${Math.round(runProgress(r) * 60)}:${Math.round(runGrowth(r, t) * 40)}:${r.finishedAt === null ? 0 : 1}:${r.gates.length}`;
+      const cur = this._runGroups.get(r.id);
+      if (cur?.key === key) continue;
+      if (cur) { this._root.remove(cur.group); cur.group.traverse(o => (o as THREE.Mesh).geometry?.dispose()); }
+      const group = buildRun(r, this.groundAt, t);
+      this._root.add(group);
+      this._runGroups.set(r.id, { key, group });
+      this._ws.invalidateShadows();
+    }
+    // earthworks (berms raise, ditches cut) as they are dug
+    const works: Earthwork[] = runs.filter(r => r.kind === 'earth_berm' || r.kind === 'ditch').map(r => ({ pts: r.pts, gates: r.gates, height: PERIMETER[r.kind].height, k: r.finishedAt !== null ? 1 : runProgress(r) }));
+    const wk = works.map(w => `${w.pts.length}:${Math.round(w.k * 20)}`).join('|');
+    if (wk !== this._worksKey) {
+      this._worksKey = wk;
+      this.parcel.setEarthworks(works);
+      for (const w of works) {
+        const pad = earthworkReach(w) + 0.5;
+        const xs = w.pts.map(p => p[0]), zs = w.pts.map(p => p[1]);
+        this.terrain.refresh(this._terrainSource, Math.min(...xs) - pad, Math.min(...zs) - pad, Math.max(...xs) + pad, Math.max(...zs) + pad);
+      }
+      for (const g of this._runGroups.values()) g.key = '';
+      this._ws.invalidateShadows();
+    }
+    // a new line clears the trees off it
+    if (ids !== this._runIds) {
+      const before = this._runIds;
+      this._runIds = ids;
+      for (const [id, g] of this._runGroups) if (!runs.some(r => r.id === id)) { this._root.remove(g.group); this._runGroups.delete(id); }
+      if (before !== '' || ids !== '') { if (this._quality) this._plant(this._quality); }
+    }
+  }
+
+  /** Walk / people collision with built perimeter runs (gates and unbuilt stretches are open). */
+  private _perimeterBlocked(x: number, z: number, r: number): boolean {
+    for (const run of this._runs) {
+      const th = run.kind === 'container_wall' ? 0.21 : run.kind === 'thorn_hedge' ? 0.15 * runGrowth(run, this._simT) : run.kind === 'log_palisade' ? 0.03 : run.kind === 'earth_berm' || run.kind === 'ditch' ? 0 : 0.01;
+      if (th < 0.01) continue;
+      const { d, s } = closestOnLine(run.pts, x, z);
+      if (d > th + r) continue;
+      const built = run.finishedAt !== null ? wallLength(run) : wallLength(run) * runProgress(run);
+      if (solidSpans(run, built).some(([a, b]) => s >= a - 0.01 && s <= b + 0.01)) return true;
+    }
+    return false;
+  }
+  private _simT = 0;
+  /** Sim time for growth-dependent checks (set by the canvas). */
+  set simTime(t: number) { this._simT = t; }
 
   /** Show the woods at work: paint marks, felled and bucked trees, stumps; cut trees leave the forest. */
   syncForestry(f: Forestry): void {
@@ -540,6 +608,7 @@ export class HomesteadWorld {
   walkBlocked = (x: number, z: number, r: number): boolean => {
     if (this.stream.depthAt(x, z) > 0.04) return true;
     if (this._buildingBlocked(x, z, r)) return true;
+    if (this._perimeterBlocked(x, z, Math.min(r, INDOOR_R))) return true;
     if (Math.hypot(x - this.camp.x, z - this.camp.z) < 0.4 + r) return true;
     for (const t of this.treeSpecs) {
       const dx = t.x - x, dz = t.z - z;
