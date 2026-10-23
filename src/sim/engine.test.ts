@@ -55,7 +55,7 @@ describe('sim engine', () => {
     expect(done.finishedAt! - LEAD_TIME_DAYS).toBeGreaterThan(14);
     expect(done.finishedAt!).toBeLessThan(30);
     expect(progress(done)).toBe(1);
-    expect(Object.values(g.stock).every(v => v === 0)).toBe(true);
+    expect(Object.entries(g.stock).every(([k, v]) => k === 'firewood' || v === 0)).toBe(true);
   });
 
   it('keeps the routine: nobody builds at night, kids are in school in the morning', () => {

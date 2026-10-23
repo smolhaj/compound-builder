@@ -33,4 +33,19 @@ describe('peopleGoals', () => {
     const c = goalFor(0, false, 'build', 'gone', 10, ctx);
     expect(Math.hypot(c.x - 10, c.z - 10)).toBeLessThan(1);
   });
+
+  it('fellers work at the trunk, then along the fallen log; skidders go to the yard', () => {
+    const tree = { x: 30, z: 30, scale: 1, stage: 'marked' as const, fall: 0, len: 2.6 };
+    const c: GoalCtx = { ...ctx, tree: id => (id === 'f1' ? tree : null), yard: { x: 12, z: 12 } };
+    const saw = goalFor(0, false, 'forestry', 'f1', 10, c);
+    expect(Math.hypot(saw.x - 30, saw.z - 30)).toBeLessThan(0.25);
+    expect(saw.z).toBeLessThan(30);                         // back-cut side, away from the fall (+z)
+    expect(saw.work).toBe(true);
+    const buck = goalFor(1, false, 'forestry', 'f1', 10, { ...c, tree: () => ({ ...tree, stage: 'felled' }) });
+    expect(buck.z).toBeGreaterThan(30.3);                   // out along the log
+    const spots = Array.from({ length: 40 }, (_, k) => goalFor(0, false, 'forestry', 'f1', 10, { ...c, tree: () => ({ ...tree, stage: 'bucked' }) }, k * 0.03));
+    expect(spots.some(g => Math.hypot(g.x - 12, g.z - 12) < 1.5)).toBe(true);
+    expect(spots.some(g => Math.hypot(g.x - 30, g.z - 30) < 1.5)).toBe(true);
+    expect(goalFor(0, false, 'forestry', 'gone', 10, c).work).toBeDefined();   // no tree → chores
+  });
 });

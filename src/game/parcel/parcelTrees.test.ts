@@ -31,3 +31,18 @@ describe('planParcelTrees', () => {
     expect(some.some(s => blocked(s.x, s.z))).toBe(false);
   });
 });
+
+describe('parcel tree ids', () => {
+  it('are stable across density and exclusions (marks and stumps survive replanting)', () => {
+    const t = new ParcelTerrain(5);
+    const full = planParcelTrees(t, { margin: 4 });
+    const half = planParcelTrees(t, { margin: 4, density: 0.5, blocked: (x) => x < 20 });
+    const byId = new Map(full.map(s => [s.id, s]));
+    expect(new Set(full.map(s => s.id)).size).toBe(full.length);
+    for (const s of half) {
+      const f = byId.get(s.id)!;
+      expect(f).toBeDefined();
+      expect([f.x, f.z, f.kind]).toEqual([s.x, s.z, s.kind]);
+    }
+  });
+});

@@ -6,7 +6,7 @@ import { SEASON_MODES, type SeasonMode } from '../engine/world/season/seasonStat
 import { WEATHER_MODES, type WeatherMode } from '../engine/world/weather/weatherState';
 import { calendarOf, hourOf, type Speed } from '../sim/state';
 import { fullName } from '../sim/family';
-import { MATERIALS, MATERIAL_IDS, type MaterialId } from '../sim/materials';
+import { MATERIALS, MATERIAL_IDS, emptyStock, type MaterialId } from '../sim/materials';
 import { onOrder, orderCost, orderProblem } from '../sim/economy';
 import { blockedReason, isFinished, progress } from '../sim/construction';
 import { BLUEPRINTS, totalBill, totalHours } from '../sim/blueprints';
@@ -17,7 +17,7 @@ const CAMERAS: Array<[CameraMode, string]> = [['diorama', 'Diorama'], ['walk', '
 const SPEEDS: Array<[Speed, string]> = [[0, '❚❚'], [1, '▶'], [2, '▶▶'], [3, '▶▶▶'], [4, '⏩']];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const MONTH_START = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
-const TASK_TEXT: Record<string, string> = { build: 'Building', chores: 'Chores', sleep: 'Asleep', school: 'School', leisure: 'Free time', idle: 'Idle' };
+const TASK_TEXT: Record<string, string> = { build: 'Building', forestry: 'In the woods', chores: 'Chores', sleep: 'Asleep', school: 'School', leisure: 'Free time', idle: 'Idle' };
 
 function dateLabel(doy: number): string {
   let m = 11;
@@ -39,7 +39,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 export function Hud() {
   const w = useWorldStore();
   const g = useGameStore();
-  const [qty, setQty] = useState<Record<MaterialId, number>>({ lumber: 0, logs: 0, fieldstone: 0, roofing: 0, hardware: 0 });
+  const [qty, setQty] = useState<Record<MaterialId, number>>(emptyStock());
   if (new URLSearchParams(location.search).has('clean')) return null;
   const game = g.game;
   const cal = calendarOf(game.clock);
@@ -80,7 +80,10 @@ export function Hud() {
           <button style={{ ...btn(g.tool === 'timber_cabin'), width: '100%', textAlign: 'left' }} onClick={() => g.setTool(g.tool ? null : 'timber_cabin')}>
             {KIT.timber_cabin.name} · ~{usd(cabinCost)} · {totalHours(cabin)} h
           </button>
-          {g.tool && <div style={{ marginTop: 4, opacity: 0.85 }}>{g.toolProblem ?? 'Click to stake it out · R rotates · Esc cancels'}</div>}
+          <button style={{ ...btn(g.tool === 'fell'), width: '100%', textAlign: 'left', marginTop: 4 }} onClick={() => g.setTool(g.tool === 'fell' ? null : 'fell')}>
+            Mark trees to fell
+          </button>
+          {g.tool && <div style={{ marginTop: 4, opacity: 0.85 }}>{g.toolProblem ?? (g.tool === 'fell' ? 'Point at a tree · click marks / unmarks · Esc stops' : 'Click to stake it out · R rotates · Esc cancels')}</div>}
         </Section>
         {sel && (
           <Section title="Construction">
@@ -89,6 +92,14 @@ export function Hud() {
               <div style={{ width: `${progress(sel) * 100}%`, height: '100%', background: '#c9b27a', borderRadius: 3 }} />
             </div>
             {!isFinished(sel) && <div style={{ opacity: 0.8 }}>{blockedReason(game, sel) ?? `${Math.round(progress(sel) * 100)} % done`}</div>}
+          </Section>
+        )}
+        {game.forestry.jobs.length > 0 && (
+          <Section title="Woods">
+            {(['marked', 'felled', 'bucked'] as const).map(st => {
+              const n = game.forestry.jobs.filter(j => j.stage === st).length;
+              return n ? <div key={st}>{n} {st === 'marked' ? 'marked to fell' : st === 'felled' ? 'down, to limb and buck' : 'bucked, to skid to the yard'}</div> : null;
+            })}
           </Section>
         )}
         <Section title="Log">
@@ -121,7 +132,7 @@ export function Hud() {
           ))}
           <div style={{ display: 'flex', gap: 4, marginTop: 6, flexWrap: 'wrap' }}>
             {lines.length > 0 && <button style={btn(true)} disabled={!!problem}
-              onClick={() => { if (g.order(lines)) setQty({ lumber: 0, logs: 0, fieldstone: 0, roofing: 0, hardware: 0 }); }}>
+              onClick={() => { if (g.order(lines)) setQty(emptyStock()); }}>
               Order {usd(orderCost(lines))}{problem === 'cannot_afford' ? ' (too much)' : ''}
             </button>}
             {needLines.length > 0 && <button style={btn()} disabled={!!orderProblem(game, needLines)} onClick={() => g.order(needLines)}>

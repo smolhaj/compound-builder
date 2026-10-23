@@ -4,12 +4,13 @@ import { newGame, SECONDS_PER_DAY, dayIndex, type GameState, type OrderLine, typ
 import { step } from '../sim/engine';
 import { placeOrder } from '../sim/economy';
 import { planStructure } from '../sim/construction';
+import { markTree, unmarkTree, isMarked, type TreeRef } from '../sim/forestry';
 import { saveGame, AUTOSAVE } from '../sim/save/saveSystem';
 
 /** Game state (the simulation) + transient UI state for the build tool. */
 export interface GameStore {
   game: GameState;
-  /** Build tool: the kit piece being placed (null = no tool). */
+  /** Build tool: the kit piece being placed, 'fell' for marking trees (null = no tool). */
   tool: string | null;
   /** Placement feedback for the HUD (null = valid or no tool). */
   toolProblem: string | null;
@@ -23,6 +24,8 @@ export interface GameStore {
   order: (lines: OrderLine[]) => boolean;
   plan: (kind: string, x: number, z: number, rot: number) => void;
   load: (g: GameState) => void;
+  /** Mark a tree to fell, or unmark it if it is marked and not yet cut. */
+  toggleMark: (t: TreeRef, haulDist: number) => void;
   setTool: (kind: string | null) => void;
   setToolProblem: (t: string | null) => void;
   select: (id: string | null) => void;
@@ -59,6 +62,11 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     void saveGame(AUTOSAVE, g);
   },
   load: (game) => set({ game, selected: null, tool: null }),
+  toggleMark: (t, haulDist) => {
+    const g = structuredClone(get().game);
+    const changed = isMarked(g, t.id) ? unmarkTree(g, t.id) : markTree(g, t, haulDist) !== null;
+    if (changed) set({ game: g });
+  },
   setTool: (tool) => set({ tool, toolProblem: null }),
   setToolProblem: (toolProblem) => set({ toolProblem }),
   select: (selected) => set({ selected }),

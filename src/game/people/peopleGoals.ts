@@ -21,7 +21,13 @@ export interface GoalCtx {
   site: (id: string) => Site | null;
   /** Finished home (cabin centre) — the family sleeps there once it stands. */
   home: Site | null;
+  /** A felling job's tree: where it stands, which way it fell, how long it is. */
+  tree?: (jobId: string) => WorkTree | null;
+  /** Stockpile yard (logs are skidded here). */
+  yard?: { x: number; z: number };
 }
+
+export interface WorkTree { x: number; z: number; scale: number; stage: 'marked' | 'felled' | 'bucked'; fall: number; len: number }
 
 export interface Goal {
   x: number;
@@ -65,6 +71,28 @@ export function goalFor(i: number, kid: boolean, task: TaskKind, target: string 
         return { x, z, pose: FIG_POSE.REACH, face: faceTo(x, z, st.x, st.z), hidden: false, work: true };
       }
       break;
+    }
+    case 'forestry': {
+      const t = target && ctx.tree ? ctx.tree(target) : null;
+      if (!t) break;
+      const dx = Math.sin(t.fall), dz = Math.cos(t.fall), side = i % 2 ? 1 : -1;
+      if (t.stage === 'marked') {
+        // at the trunk on the back-cut side (away from the fall), saw in hand
+        const x = t.x - dx * (0.07 * t.scale + 0.06) + dz * 0.05 * side, z = t.z - dz * (0.07 * t.scale + 0.06) - dx * 0.05 * side;
+        return { x, z, pose: FIG_POSE.KNEEL, face: faceTo(x, z, t.x, t.z), hidden: false, work: true };
+      }
+      if (t.stage === 'felled') {
+        // limbing and bucking along the log, each at their own cut
+        const f = 0.2 + 0.25 * (i % 3);
+        const lx = t.x + dx * t.len * f, lz = t.z + dz * t.len * f;
+        const x = lx + dz * 0.09 * side, z = lz - dx * 0.09 * side;
+        return { x, z, pose: FIG_POSE.REACH, face: faceTo(x, z, lx, lz), hidden: false, work: true };
+      }
+      // skidding: back and forth between the log sections and the yard
+      const y = ctx.yard ?? ctx.camp;
+      const toYard = wobble(i, clock, 0.03) < 0.5;
+      const [tx, tz] = toYard ? [y.x - 0.3 + 0.1 * i, y.z - 0.9] : [t.x + dx * t.len * 0.3, t.z + dz * t.len * 0.3];
+      return { x: tx + dz * 0.08 * side, z: tz - dx * 0.08 * side, pose: FIG_POSE.CARRY, face: null, hidden: false, work: false };
     }
     case 'school': {
       const [x, z] = campPt(ctx, CAMP.table.x + (i % 2 ? 0.07 : -0.07), CAMP.table.z + 0.12);

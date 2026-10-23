@@ -32,13 +32,18 @@ export interface PlantOptions {
   blocked?: (x: number, z: number) => boolean;
 }
 
-export function planParcelTrees(t: ParcelTerrain, o: PlantOptions): ForestTreeSpec[] {
+/** A parcel tree: a forest spec plus a stable id (its grid cell), so marks and stumps survive replanting. */
+export type ParcelTree = ForestTreeSpec & { id: number };
+
+export function planParcelTrees(t: ParcelTerrain, o: PlantOptions): ParcelTree[] {
   const rnd = mulberry32(t.seed * 7919 + 17);
-  const out: ForestTreeSpec[] = [];
+  const out: ParcelTree[] = [];
+  let cell = -1;
   const lo = -o.margin, hi = PARCEL_SIZE + o.margin;
   const density = o.density ?? 1;
   for (let gz = lo; gz < hi; gz += CELL) {
     for (let gx = lo; gx < hi; gx += CELL) {
+      cell++;
       const x = gx + rnd() * CELL, z = gz + rnd() * CELL;
       const roll = rnd(), kindRoll = rnd(), sRoll = rnd();
       const cr: [number, number, number, number] = [rnd(), rnd(), rnd(), rnd()];
@@ -65,7 +70,7 @@ export function planParcelTrees(t: ParcelTerrain, o: PlantOptions): ForestTreeSp
         scale = 0.75 + sRoll * 0.55;
       }
       out.push({
-        x, y: s.h, z, kind, scale,
+        id: cell, x, y: s.h, z, kind, scale,
         sx: 0.88 + sxR * 0.24, sy: kind === 'oval' ? 1.1 + syR * 0.3 : 0.9 + syR * 0.25,
         rotY, cr,
       });
