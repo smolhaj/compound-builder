@@ -22,8 +22,8 @@ export const trunkRadius = (scale: number, kind = 'conifer') => (kind === 'conif
 const BARK = new THREE.MeshStandardMaterial({ color: 0x5b4532, roughness: 0.95 });
 const CUT = new THREE.MeshStandardMaterial({ color: 0xd9b98a, roughness: 0.85 });
 const PAINT = new THREE.MeshStandardMaterial({ color: 0xff6a1a, roughness: 0.6, emissive: new THREE.Color(0.25, 0.06, 0) });
-const NEEDLES = new THREE.MeshStandardMaterial({ color: 0x3a5f40, roughness: 0.95, flatShading: true });
-const LEAVES = new THREE.MeshStandardMaterial({ color: 0x4f7a34, roughness: 0.95, flatShading: true });
+const NEEDLES = new THREE.MeshStandardMaterial({ color: 0x2f4f36, roughness: 0.95 });
+const LEAVES = new THREE.MeshStandardMaterial({ color: 0x3d6129, roughness: 0.95 });
 const FLAG = new THREE.MeshStandardMaterial({ color: 0xff7a1a, roughness: 0.55, emissive: new THREE.Color(0.3, 0.08, 0), side: THREE.DoubleSide });
 const DRY = new THREE.MeshStandardMaterial({ color: 0x6d5a3c, roughness: 0.95 });
 
@@ -55,7 +55,7 @@ export function buildWoods(o: WoodsInput): THREE.Group {
     const y = o.ground(t.x, t.z), r = trunkRadius(t.scale, t.kind), h = fallHeading(t.id);
     if (j.stage === 'marked') {
       // paint band round the trunk, and a flagging stake out past the crown so the mark reads from above
-      paint.push(new THREE.CylinderGeometry(r * 1.1, r * 1.1, 0.04, 12, 1, true).translate(t.x, y + 0.12, t.z));
+      paint.push(new THREE.CylinderGeometry(r * 1.05, r * 1.05, 0.05, 12, 1, true).translate(t.x, y + 0.34, t.z));
       const fx = t.x - Math.sin(h) * 0.85 * t.scale * t.sx, fz = t.z - Math.cos(h) * 0.85 * t.scale * t.sx, fy = o.ground(fx, fz);
       bark.push(new THREE.CylinderGeometry(0.006, 0.006, 0.26, 5).translate(fx, fy + 0.13, fz));
       flags.push(new THREE.PlaneGeometry(0.1, 0.05).translate(0.05, 0, 0).rotateY(h).translate(fx, fy + 0.23, fz));
@@ -72,10 +72,10 @@ export function buildWoods(o: WoodsInput): THREE.Group {
         const cl = len * 0.8, cr = 0.75 * t.scale * t.sx;
         needles.push(new THREE.ConeGeometry(cr, cl, 9, 3).scale(1, 1, 0.5).rotateX(Math.PI / 2).translate(0, cr * 0.42, len * 0.2 + cl / 2).rotateY(h).translate(bx, ly, bz));
       } else {
-        const R = 0.6 * t.scale * t.sx;
+        const R = 0.38 * t.scale * t.sx;
         for (let k = 0; k < 4; k++) {
           const f = 0.62 + k * 0.1, rr = R * (1 - k * 0.12), side = (k % 2 ? 1 : -1) * R * 0.35;
-          leaves.push(new THREE.IcosahedronGeometry(rr, 1).scale(1, 0.5, 1).translate(bx + dx * len * f + dz * side, ly + rr * 0.35, bz + dz * len * f - dx * side));
+          leaves.push(new THREE.IcosahedronGeometry(rr, 2).scale(1, 0.4, 1).translate(bx + dx * len * f + dz * side, ly + rr * 0.35, bz + dz * len * f - dx * side));
         }
       }
     } else {
