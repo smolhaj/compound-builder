@@ -19,11 +19,14 @@ export type KitMaterialId = 'timber_lap' | 'trim' | 'fieldstone' | 'metal_roof' 
   // more buildings
   | 'concrete' | 'metal_siding' | 'log_wall' | 'log_end' | 'board_batten' | 'wire_mesh' | 'straw' | 'soil' | 'crop' | 'earth' | 'pegboard' | 'steel' | 'paint_red' | 'paint_green'
   // perimeter
-  | 'hedge' | 'hedge_berry' | 'container_red' | 'container_blue' | 'container_green' | 'container_tan';
+  | 'hedge' | 'hedge_berry' | 'container_red' | 'container_blue' | 'container_green' | 'container_tan'
+  // homey decor (procedural art)
+  | 'art_mountains' | 'art_sunset' | 'art_lake' | 'photo_family' | 'photo_couple' | 'poster_map' | 'poster_seeds' | 'sampler' | 'curtain' | 'curtain_red' | 'flowers';
 
 /** World units covered by one texture repeat. */
 const TEX_WORLD: Partial<Record<KitMaterialId, number>> = {
   timber_lap: 0.5, fieldstone: 0.5, metal_roof: 0.5, deck: 0.5, door: 0.2,
+  curtain: 0.15, curtain_red: 0.15,
   pine_panel: 0.5, quilt_red: 0.12, quilt_blue: 0.12, rug: 0.3, books: 0.1,
   concrete: 0.6, metal_siding: 0.5, container_red: 0.4, container_blue: 0.4, container_green: 0.4, container_tan: 0.4, log_wall: 0.5, board_batten: 0.5, wire_mesh: 0.15, straw: 0.3, soil: 0.4, earth: 0.8, pegboard: 0.2,
 };
@@ -363,6 +366,111 @@ function paintPegboard(): HTMLCanvasElement {
   return c;
 }
 
+/** Oil painting: mountains over a valley, a band of pines, a sky gradient; brushy. */
+function paintLandscape(seed: number, sky: [string, string], hills: string[], water = false): () => HTMLCanvasElement {
+  return () => {
+    const N = 256;
+    const [c, g] = canvas(N);
+    const r = lcg(seed);
+    const grd = g.createLinearGradient(0, 0, 0, N * 0.6);
+    grd.addColorStop(0, sky[0]); grd.addColorStop(1, sky[1]);
+    g.fillStyle = grd; g.fillRect(0, 0, N, N);
+    if (sky[1].includes('230')) { g.fillStyle = 'rgba(255,220,140,0.9)'; g.beginPath(); g.arc(N * 0.7, N * 0.45, 18, 0, Math.PI * 2); g.fill(); }
+    hills.forEach((col, k) => {
+      g.fillStyle = col;
+      g.beginPath(); g.moveTo(0, N);
+      const base = N * (0.38 + k * 0.13);
+      for (let x = 0; x <= N; x += 8) g.lineTo(x, base - (k === 0 ? 60 : 25) * Math.abs(Math.sin(x / (k === 0 ? 40 : 22) + seed)) - r() * 6);
+      g.lineTo(N, N); g.fill();
+      if (k === 0) { g.fillStyle = 'rgba(255,255,255,0.75)'; for (let x = 20; x < N; x += 60) { g.beginPath(); g.moveTo(x - 10, base - 38); g.lineTo(x + 6, base - 58); g.lineTo(x + 22, base - 38); g.fill(); } }
+    });
+    if (water) { g.fillStyle = 'rgba(90,130,170,0.85)'; g.fillRect(0, N * 0.72, N, N * 0.12); g.fillStyle = 'rgba(255,255,255,0.3)'; for (let i = 0; i < 20; i++) g.fillRect(r() * N, N * 0.72 + r() * N * 0.12, 10 + r() * 20, 1); }
+    // pines in the foreground
+    for (let i = 0; i < 14; i++) { const x = r() * N, y = N * (0.8 + r() * 0.2), h = 30 + r() * 40; g.fillStyle = 'rgba(25,45,30,0.9)'; g.beginPath(); g.moveTo(x, y - h); g.lineTo(x - h * 0.25, y); g.lineTo(x + h * 0.25, y); g.fill(); }
+    // brush texture
+    for (let i = 0; i < 1400; i++) { g.fillStyle = `rgba(${r() < 0.5 ? '255,255,255' : '0,0,0'},0.05)`; g.fillRect(r() * N, r() * N, 2 + r() * 6, 1 + r() * 2); }
+    return c;
+  };
+}
+
+/** A family photo: faded print, a few figures in front of a house / trees, white border. */
+function paintPhoto(seed: number, people: number): () => HTMLCanvasElement {
+  return () => {
+    const N = 128;
+    const [c, g] = canvas(N);
+    const r = lcg(seed);
+    g.fillStyle = '#eee8da'; g.fillRect(0, 0, N, N);
+    const grd = g.createLinearGradient(0, 8, 0, N - 8);
+    grd.addColorStop(0, '#9fb7c7'); grd.addColorStop(0.55, '#c8c2a2'); grd.addColorStop(1, '#6e7a4e');
+    g.fillStyle = grd; g.fillRect(8, 8, N - 16, N - 22);
+    g.fillStyle = 'rgba(80,60,40,0.8)'; g.fillRect(14, 40, 40, 34);
+    g.fillStyle = 'rgba(60,40,30,0.9)'; g.beginPath(); g.moveTo(10, 42); g.lineTo(34, 24); g.lineTo(58, 42); g.fill();
+    const cols = ['#7a2b22', '#2b4a7a', '#d0c090', '#3d5a3a', '#6a4a7a'];
+    for (let i = 0; i < people; i++) {
+      const x = 30 + i * (70 / people) + r() * 6, h = i >= 2 ? 30 : 46;
+      g.fillStyle = cols[(i + seed) % cols.length]; g.fillRect(x - 6, N - 18 - h * 0.7, 12, h * 0.7);
+      g.fillStyle = '#d8b090'; g.beginPath(); g.arc(x, N - 18 - h * 0.7 - 6, 6, 0, Math.PI * 2); g.fill();
+      g.fillStyle = 'rgba(60,40,25,0.9)'; g.fillRect(x - 6, N - 18 - h * 0.7 - 12, 12, 4);
+    }
+    g.fillStyle = 'rgba(255,240,200,0.12)'; g.fillRect(0, 0, N, N);
+    return c;
+  };
+}
+
+/** A topographic quad map (contours, the creek in blue, a red route). */
+function paintMap(): HTMLCanvasElement {
+  const N = 256;
+  const [c, g] = canvas(N);
+  g.fillStyle = '#e9e1c8'; g.fillRect(0, 0, N, N);
+  g.strokeStyle = 'rgba(150,100,60,0.55)'; g.lineWidth = 1;
+  for (let k = 0; k < 14; k++) { g.beginPath(); for (let a = 0; a <= 64; a++) { const t = a / 64 * Math.PI * 2, rr = 20 + k * 9 + 6 * Math.sin(t * 3 + k); const x = 110 + Math.cos(t) * rr, y = 120 + Math.sin(t) * rr * 0.8; if (a) g.lineTo(x, y); else g.moveTo(x, y); } g.stroke(); }
+  g.strokeStyle = '#3d6fa8'; g.lineWidth = 3; g.beginPath(); g.moveTo(0, 200); g.bezierCurveTo(80, 170, 150, 230, N, 190); g.stroke();
+  g.strokeStyle = '#b02a20'; g.setLineDash([6, 4]); g.lineWidth = 2; g.beginPath(); g.moveTo(30, 40); g.lineTo(110, 120); g.lineTo(220, 90); g.stroke(); g.setLineDash([]);
+  g.fillStyle = '#b02a20'; g.beginPath(); g.arc(110, 120, 5, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = 'rgba(40,30,20,0.8)'; g.lineWidth = 4; g.strokeRect(2, 2, N - 4, N - 4);
+  g.fillStyle = 'rgba(40,30,20,0.85)'; g.fillRect(10, N - 30, 90, 16);
+  return c;
+}
+
+/** Vintage seed-catalogue poster: a big tomato and corn on a cream ground, a red title band. */
+function paintSeedPoster(): HTMLCanvasElement {
+  const N = 256;
+  const [c, g] = canvas(N);
+  g.fillStyle = '#efe3c2'; g.fillRect(0, 0, N, N);
+  g.fillStyle = '#9c2f26'; g.fillRect(0, 0, N, 50);
+  g.fillStyle = '#efe3c2'; for (let i = 0; i < 6; i++) g.fillRect(24 + i * 36, 16, 24, 18);
+  g.fillStyle = '#c8392c'; g.beginPath(); g.arc(90, 150, 50, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#4f8a34'; g.beginPath(); g.moveTo(70, 100); g.lineTo(90, 112); g.lineTo(110, 100); g.lineTo(90, 106); g.fill();
+  g.fillStyle = '#e8c04a'; for (let y = 90; y < 230; y += 10) for (let x = 170; x < 200; x += 10) { g.beginPath(); g.arc(x, y, 4.5, 0, Math.PI * 2); g.fill(); }
+  g.fillStyle = '#6f9a3c'; g.beginPath(); g.moveTo(160, 230); g.lineTo(185, 70); g.lineTo(165, 235); g.fill();
+  g.fillStyle = 'rgba(60,40,20,0.8)'; g.fillRect(30, 215, 110, 10);
+  return c;
+}
+
+/** Cross-stitch sampler: a border of hearts round a blocky HOME. */
+function paintSampler(): HTMLCanvasElement {
+  const N = 128;
+  const [c, g] = canvas(N);
+  g.fillStyle = '#f2ead6'; g.fillRect(0, 0, N, N);
+  const st = (x: number, y: number, col: string) => { g.fillStyle = col; g.fillRect(x * 4, y * 4, 3, 3); };
+  for (let i = 1; i < 31; i++) { st(i, 1, '#4a6a3a'); st(i, 30, '#4a6a3a'); st(1, i, '#4a6a3a'); st(30, i, '#4a6a3a'); }
+  const H = ['10001', '10001', '11111', '10001', '10001'], O = ['01110', '10001', '10001', '10001', '01110'], Mm = ['10001', '11011', '10101', '10001', '10001'], E = ['11111', '10000', '11110', '10000', '11111'];
+  [H, O, Mm, E].forEach((L, k) => L.forEach((row, y) => [...row].forEach((ch, x) => { if (ch === '1') st(5 + k * 6 + x, 13 + y, '#9c2f26'); })));
+  for (const [hx, hy] of [[8, 6], [22, 6], [8, 23], [22, 23]]) for (const [dx, dy] of [[0, 0], [2, 0], [-1, 1], [0, 1], [1, 1], [2, 1], [3, 1], [0, 2], [1, 2], [2, 2], [1, 3]]) st(hx + dx, hy + dy, '#c8392c');
+  return c;
+}
+
+/** Gingham curtain fabric. */
+function paintGingham(col: [number, number, number]): () => HTMLCanvasElement {
+  return () => {
+    const N = 64, k = 8, s = N / k;
+    const [c, g] = canvas(N);
+    g.fillStyle = '#f4efe2'; g.fillRect(0, 0, N, N);
+    for (let i = 0; i < k; i++) { g.fillStyle = rgb(col[0], col[1], col[2]).replace('rgb', 'rgba').replace(')', ',0.45)'); g.fillRect(i * s, 0, s / 2, N); g.fillRect(0, i * s, N, s / 2); }
+    return c;
+  };
+}
+
 const _cache = new Map<KitMaterialId, THREE.MeshStandardMaterial>();
 
 function texMat(id: KitMaterialId, paint: () => HTMLCanvasElement, strength: number, roughness: number, metalness = 0, ns = 1): THREE.MeshStandardMaterial {
@@ -427,6 +535,17 @@ export function kitMaterial(id: KitMaterialId): THREE.MeshStandardMaterial {
     case 'steel': m = new THREE.MeshStandardMaterial({ color: 0x7c8186, roughness: 0.4, metalness: 0.75 }); break;
     case 'paint_red': m = new THREE.MeshStandardMaterial({ color: 0x9c2f26, roughness: 0.6 }); break;
     case 'paint_green': m = new THREE.MeshStandardMaterial({ color: 0x3f5f3a, roughness: 0.6 }); break;
+    case 'art_mountains': m = texMat(id, paintLandscape(3, ['rgb(120,160,200)', 'rgb(200,215,225)'], ['rgb(110,120,140)', 'rgb(70,100,70)', 'rgb(90,120,60)']), 0.4, 0.6); break;
+    case 'art_sunset': m = texMat(id, paintLandscape(7, ['rgb(90,70,120)', 'rgb(240,170,90)'], ['rgb(70,60,90)', 'rgb(60,70,60)']), 0.4, 0.6); break;
+    case 'art_lake': m = texMat(id, paintLandscape(11, ['rgb(150,190,220)', 'rgb(230,230,215)'], ['rgb(120,130,150)', 'rgb(80,110,80)'], true), 0.4, 0.6); break;
+    case 'photo_family': m = texMat(id, paintPhoto(5, 4), 0.2, 0.35); break;
+    case 'photo_couple': m = texMat(id, paintPhoto(9, 2), 0.2, 0.35); break;
+    case 'poster_map': m = texMat(id, paintMap, 0.3, 0.8); break;
+    case 'poster_seeds': m = texMat(id, paintSeedPoster, 0.3, 0.8); break;
+    case 'sampler': m = texMat(id, paintSampler, 0.8, 0.95); break;
+    case 'curtain': m = texMat(id, paintGingham([60, 90, 140]), 0.6, 0.95); (m as THREE.MeshStandardMaterial).side = THREE.DoubleSide; break;
+    case 'curtain_red': m = texMat(id, paintGingham([170, 50, 40]), 0.6, 0.95); (m as THREE.MeshStandardMaterial).side = THREE.DoubleSide; break;
+    case 'flowers': m = new THREE.MeshStandardMaterial({ color: 0xe0a33a, roughness: 0.6, emissive: new THREE.Color(0.12, 0.06, 0) }); break;
     case 'hedge': m = new THREE.MeshStandardMaterial({ color: 0x34532c, roughness: 0.92, flatShading: true }); break;
     case 'hedge_berry': m = new THREE.MeshStandardMaterial({ color: 0xa3261e, roughness: 0.5 }); break;
     case 'container_red': case 'container_blue': case 'container_green': case 'container_tan': {

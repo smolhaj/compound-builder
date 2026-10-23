@@ -49,7 +49,7 @@ export function cabinSpec(def: KitPieceDef): GabledSpec {
     right: [{ kind: 'window', at: -0.36 }, { kind: 'window', at: 0.3 }],
     gableWindow: { back: true, w: C.win.w, h: C.win.h, y: 0.05 },
     chimney: { kind: 'stone', x: 0.26 },
-    ceiling: 'pine_panel', tieBeams: [0.05, 0.4], corners: 'boards',
+    ceiling: 'pine_panel', tieBeams: [0.05, 0.4], corners: 'boards', curtains: 'curtain',
   };
 }
 
@@ -113,7 +113,8 @@ function dressCabin(c: FurnishCtx): void {
   else if (tableTop < 0.66) C({ x: tx + 0.03, z: tz, y: tableY }, a => Clutter.checkers(a), 1);
   else C({ x: tx - 0.01, z: tz + 0.01, y: tableY, rot: -0.2 }, a => Clutter.crayons(a), 1);
   C({ x: tx - 0.075, z: tz - 0.045, y: tableY }, a => Clutter.mail(a), 0.6);
-  C({ x: tx + 0.08, z: tz + 0.005, y: tableY }, a => Clutter.fruitBowl(a), 0.5);
+  if (c.rnd() < 0.5) C({ x: tx + 0.08, z: tz + 0.005, y: tableY }, a => Clutter.fruitBowl(a), 1);
+  else C({ x: tx + 0.075, z: tz + 0.005, y: tableY }, a => Clutter.vaseFlowers(a), 1);
   // kitchen: bread, cutting board with the veg, dishes in the sink, jars, a pot on the stove
   C({ x: left + 0.05, z: -0.66, y: counterY, rot: Math.PI / 2 }, a => Clutter.bread(a), 0.85);
   C({ x: left + 0.05, z: -0.35, y: counterY, rot: Math.PI / 2 + 0.2 }, a => Clutter.cuttingBoard(a), 0.85);
@@ -133,7 +134,15 @@ function dressCabin(c: FurnishCtx): void {
   C({ x: -0.455, z: front - 0.03 }, a => Clutter.fishingRod(a), 0.5);
   C({ x: -0.38, z: front - 0.005, y: y0 + 2.1 * M, rot: Math.PI }, a => Clutter.riflePegs(a), 0.6);
   // walls: pictures, the calendar, a clock, the kids' drawings
-  C({ x: right - 0.002, z: -0.15, y: y0 + 1.5 * M, rot: -Math.PI / 2 }, a => Clutter.picture(a, 0.5, 0.4, 'quilt_blue'), 0.9);
+  // homey: a painting, the family photos, the trail map, the sampler, antlers over the door, flowers, a plant
+  const art = (['art_mountains', 'art_sunset', 'art_lake'] as const)[Math.floor(c.rnd() * 3)];
+  C({ x: right - 0.002, z: -0.12, y: y0 + 1.25 * M, rot: -Math.PI / 2 }, a => Clutter.picture(a, 0.6, 0.45, art), 1);
+  C({ x: 0.02, z: back + 0.002, y: y0 + 1.2 * M }, a => Clutter.poster(a, 0.6, 0.75, c.rnd() < 0.5 ? 'poster_map' : 'poster_seeds'), 0.9);
+  C({ x: left + 0.03, z: 0.1, y: y0 + 1.82 * M, rot: Math.PI / 2 }, a => Clutter.photoFrames(a), 0.95);
+  C({ x: -0.13, z: front - 0.002, y: y0 + 2.25 * M, rot: Math.PI }, a => Clutter.antlers(a), 0.6);
+  C({ x: -0.3, z: c.hd + 0.004, y: y0 + 1.35 * M }, a => Clutter.wreath(a), 0.5);
+  C({ x: 0.43, z: 0.08 }, a => Clutter.plant(a), 0.75);
+  C({ x: 0.048, z: 0.4, y: y0 + 0.95 * M, rot: -Math.PI / 2 }, a => Clutter.picture(a, 0.3, 0.38, 'sampler', 'wood_mid'), 0.7);
   C({ x: -0.1, z: back + 0.002, y: y0 + 1.4 * M }, a => Clutter.calendar(a), 0.9);
   C({ x: 0.048, z: 0.5, y: y0 + 1.7 * M, rot: -Math.PI / 2 }, a => Clutter.clock(a), 0.7);
   C({ x: 0.048, z: 0.28, y: y0 + 1.15 * M, rot: -Math.PI / 2 }, a => Clutter.drawings(a), 0.8);
@@ -141,7 +150,9 @@ function dressCabin(c: FurnishCtx): void {
   C({ x: 0.29, z: 0.36, y: y0 + 0.004 + 0.55 * M }, a => Clutter.rumple(a, 'quilt_red'), 0.7);
   C({ x: 0.13, z: 0.25, rot: -0.4 }, a => Clutter.slippers(a), 0.7);
   C({ x: 0.17, z: 0.64 }, a => Clutter.laundryBasket(a), 0.7);
-  C({ x: 0.29, z: 0.18 + 0.012, y: y0 + 1.45 * M }, a => Clutter.picture(a, 0.6, 0.4, 'rug'), 0.8);
+  C({ x: 0.29, z: 0.18 + 0.012, y: y0 + 1.15 * M }, a => Clutter.picture(a, 0.7, 0.5, c.rnd() < 0.5 ? 'photo_couple' : 'art_lake'), 0.95);
+  C({ x: right - 0.045, z: 0.6, y: y0 + 0.004 + 0.89 * M, rot: -Math.PI / 2 }, a => Clutter.photoFrames(a), 0.9);
+  C({ x: right - 0.002, z: 0.55, y: y0 + 0.95 * M, rot: -Math.PI / 2 }, a => Clutter.wallQuilt(a, 'quilt_blue'), 0.4);
   C({ x: right - 0.002, z: 0.48, y: y0 + 1.6 * M, rot: -Math.PI / 2 }, a => Clutter.towel(a, 'quilt_blue'), 0.5);
   // outside: woodpile along the west wall, chopping block, porch rockers, a kid's bike, a bucket
   const hw = c.hw, hd = c.hd;

@@ -40,6 +40,8 @@ export const WIN = { w: 0.17, h: 0.2, sill: 0.17 } as const;
 /** World-scaled UVs from position by dominant normal axis (walls: u along the face, v up). */
 export function worldUV(g: THREE.BufferGeometry): THREE.BufferGeometry {
   const geo = g.index ? g.toNonIndexed() : g;
+  // pictures, photos, posters: their own 0–1 UVs (one image per face)
+  if (g.userData.keepUV) { if (!geo.getAttribute('normal')) geo.computeVertexNormals(); return geo; }
   geo.computeVertexNormals();
   const p = geo.getAttribute('position'), n = geo.getAttribute('normal');
   const uv = new Float32Array(p.count * 2);
@@ -224,6 +226,8 @@ export interface GabledSpec {
   tieBeams?: number[];
   /** Corner boards (lap siding) or crossed log ends (log walls). */
   corners?: 'boards' | 'logs' | 'none';
+  /** Curtains inside every window (homes), in this fabric. */
+  curtains?: KitMaterialId;
 }
 
 /** What a furnishing callback gets. */
@@ -427,7 +431,19 @@ export function buildGabled(s: GabledSpec, furnish?: (c: FurnishCtx) => void, pa
   for (const [list, side] of wallOps) for (const o of list ?? []) {
     const nx = side === 'left' ? -1 : side === 'right' ? 1 : 0, nz = side === 'front' ? 1 : side === 'back' ? -1 : 0;
     const fx = nx !== 0 ? nx * hw : o.at, fz = nz !== 0 ? nz * hd : o.at;
-    if (o.kind === 'window') { windowAt(parts, fx, fz, y0 + (o.sill ?? WIN.sill), nx, nz, T, o.w ?? WIN.w, o.h ?? WIN.h, s.trim); continue; }
+    if (o.kind === 'window') {
+      windowAt(parts, fx, fz, y0 + (o.sill ?? WIN.sill), nx, nz, T, o.w ?? WIN.w, o.h ?? WIN.h, s.trim);
+      if (s.curtains && (o.h ?? WIN.h) > 0.09) {
+        // gathered panels each side and a rod, on the inside face (they come with the furniture)
+        const w = o.w ?? WIN.w, h = o.h ?? WIN.h, sill = o.sill ?? WIN.sill;
+        const rot = nx !== 0 ? (nx > 0 ? Math.PI / 2 : -Math.PI / 2) : (nz > 0 ? 0 : Math.PI);
+        const inner = (g: THREE.BufferGeometry) => g.rotateY(rot).translate(fx, 0, fz);
+        const pw = Math.min(0.06, w * 0.3);
+        for (const e of [-1, 1]) parts.add(s.curtains, inner(box(pw, h + 0.045, 0.012, e * (w / 2 + pw / 2 - 0.012), y0 + sill - 0.03, -T - 0.012)), 'interior');
+        parts.add('iron', inner(new THREE.CylinderGeometry(0.003, 0.003, w + 2 * pw + 0.02, 6).rotateZ(Math.PI / 2).translate(0, y0 + sill + h + 0.02, -T - 0.016)), 'interior');
+      }
+      continue;
+    }
     const p = asOpening(o);
     const rot = nx !== 0 ? (nx > 0 ? Math.PI / 2 : -Math.PI / 2) : (nz > 0 ? 0 : Math.PI);
     // casing in the wall's own frame (a = along the wall, outward = +z), then turned onto the wall

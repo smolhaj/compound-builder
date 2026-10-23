@@ -265,7 +265,7 @@ function logHouse(def: KitPieceDef, seed = 1): THREE.Group {
     right: [{ kind: 'window', at: -0.85 }, { kind: 'window', at: -0.15, w: 0.1, h: 0.1, sill: 0.3 }, { kind: 'window', at: 0.55 }, { kind: 'window', at: 0.95 }],
     gableWindow: { front: true, back: true, w: 0.7, h: 0.4, y: 0.04 },
     chimney: { kind: 'stone', x: -0.4 },
-    ceiling: 'pine_panel', corners: 'logs',
+    ceiling: 'pine_panel', corners: 'logs', curtains: 'curtain_red',
   }, (c: FurnishCtx) => {
     const { I, L, left, right, front, back, y0, yE, parts } = c;
     // bedroom (back right) and bath (middle right)
@@ -340,10 +340,17 @@ function dressLogHouse(c: FurnishCtx): void {
   C({ x: -0.3, z: -0.7, rot: 1.1 }, a => Clutter.toys(a), 0.8);
   C({ x: -0.4, z: -0.66, rot: 0.2 }, a => Clutter.checkers(a), 0.4);
   C({ x: left + 0.06, z: 0.06, rot: Math.PI / 2 }, a => Clutter.guitar(a), 0.6);
-  C({ x: left + 0.002, z: -0.55, y: y0 + 1.6 * M, rot: Math.PI / 2 }, a => Clutter.picture(a, 0.7, 0.5, 'rug'), 0.9);
-  C({ x: left + 0.002, z: -0.95, y: y0 + 1.5 * M, rot: Math.PI / 2 }, a => Clutter.picture(a, 0.4, 0.5, 'quilt_blue'), 0.7);
-  C({ x: -0.4, z: back + 0.06 + 0.36 * M, y: y0 + 2.2 * M }, a => Clutter.clock(a), 0.6);
-  C({ x: 0.138, z: 0.08, y: y0 + 1.4 * M, rot: -Math.PI / 2 }, a => Clutter.calendar(a), 0.8);
+  C({ x: left + 0.002, z: -0.6, y: y0 + 1.3 * M, rot: Math.PI / 2 }, a => Clutter.picture(a, 0.9, 0.6, c.rnd() < 0.5 ? 'art_mountains' : 'art_sunset'), 1);
+  C({ x: left + 0.002, z: -0.98, y: y0 + 1.3 * M, rot: Math.PI / 2 }, a => Clutter.picture(a, 0.45, 0.55, 'photo_family'), 0.9);
+  C({ x: -0.4, z: back + 0.06 + 0.42 * M, y: y0 + 0.004 + 1.47 * M }, a => Clutter.photoFrames(a), 0.95);
+  C({ x: -0.4, z: back + 0.06 + 0.36 * M, y: y0 + 2.4 * M }, a => Clutter.antlers(a), 0.7);
+  C({ x: 0.138, z: -0.12, y: y0 + 1.2 * M, rot: -Math.PI / 2 }, a => Clutter.poster(a, 0.6, 0.75, 'poster_map'), 0.8);
+  C({ x: -0.62, z: -0.25 }, a => Clutter.plant(a), 0.8);
+  C({ x: 0.36, z: 0.78, y: tableY + 0.002 }, a => Clutter.vaseFlowers(a), 0.6);
+  C({ x: 0.0, z: c.hd + 0.004, y: y0 + 2.4 * M }, a => Clutter.wreath(a), 0.6);
+  C({ x: -0.05, z: front - 0.002, y: y0 + 1.0 * M, rot: Math.PI }, a => Clutter.picture(a, 0.3, 0.38, 'sampler', 'wood_mid'), 0.7);
+  C({ x: 0.138, z: 0.06, y: y0 + 1.9 * M, rot: -Math.PI / 2 }, a => Clutter.clock(a), 0.6);
+  C({ x: 0.138, z: 0.06, y: y0 + 1.1 * M, rot: -Math.PI / 2 }, a => Clutter.calendar(a), 0.8);
   // entry: boots, the rifle over the coats, a fishing rod
   C({ x: 0.1, z: front - 0.06, rot: 0.2 }, a => Clutter.boots(a), 0.95);
   C({ x: -0.3, z: front - 0.07, rot: -0.3 }, a => Clutter.boots(a, 'paint_green'), 0.7);
@@ -353,7 +360,8 @@ function dressLogHouse(c: FurnishCtx): void {
   C({ x: 0.45, z: -0.98, y: y0 + 0.004 + 0.55 * M }, a => Clutter.rumple(a, 'quilt_red'), 0.7);
   C({ x: 0.28, z: -0.78, rot: -0.3 }, a => Clutter.slippers(a), 0.7);
   C({ x: 0.62, z: -0.6 }, a => Clutter.laundryBasket(a), 0.7);
-  C({ x: 0.45, z: back + 0.002, y: y0 + 1.45 * M }, a => Clutter.picture(a, 0.6, 0.4, 'quilt_red'), 0.8);
+  C({ x: 0.45, z: back + 0.002, y: y0 + 1.2 * M }, a => Clutter.picture(a, 0.8, 0.55, c.rnd() < 0.5 ? 'art_lake' : 'photo_couple'), 0.95);
+  C({ x: right - 0.05, z: LH.bedZ - 0.1, y: y0 + 0.004 + 0.89 * M, rot: -Math.PI / 2 }, a => Clutter.photoFrames(a), 0.9);
   // bath: towels, a bucket
   C({ x: LH.px + 0.012, z: -0.2, y: y0 + 1.5 * M, rot: Math.PI / 2 }, a => Clutter.towel(a, 'quilt_blue'), 0.8);
   C({ x: 0.3, z: 0.05 }, a => Clutter.bucket(a), 0.5);
@@ -361,6 +369,9 @@ function dressLogHouse(c: FurnishCtx): void {
   loft({ x: 0.05, z: -0.55, rot: 0.5 }, a => Clutter.toys(a), 0.9);
   loft({ x: -0.2, z: -0.6, rot: -0.3 }, a => Clutter.crayons(a), 0.7);
   loft({ x: 0.3, z: -0.62 }, a => Clutter.laundryBasket(a), 0.5);
+  if (c.rnd() < 0.85) L({ x: -0.3, z: back + 0.004, y: yE + 0.03 }, a => Clutter.poster(a, 0.45, 0.6, 'poster_seeds'));
+  if (c.rnd() < 0.85) L({ x: 0.3, z: back + 0.004, y: yE + 0.03 }, a => Clutter.drawings(a));
+  if (c.rnd() < 0.6) L({ x: -0.32, z: -0.85, y: yE + 0.002 }, a => Clutter.wallQuilt(a, 'quilt_blue'));
   // outside: woodpile, chopping block, laundry line, rockers on the porch, the bike, the dog's house
   C({ x: -hw - 0.06, z: -0.5, y: 0.004, rot: -Math.PI / 2 }, a => Clutter.woodpile(a, 6.0, 1.4), 1);
   C({ x: -hw - 0.2, z: 0.4, y: 0.004 }, a => Clutter.choppingBlock(a), 0.9);

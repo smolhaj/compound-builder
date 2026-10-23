@@ -135,9 +135,64 @@ export const Clutter = {
   slippers(add: Add): void { for (const s of [-1, 1]) add('quilt_red', box(0.09 * M, 0.04 * M, 0.25 * M, s * 0.06 * M, 0, 0).rotateY(s * 0.25)); },
 
   // ── On walls (back at -z, hung at y) ─────────────────────────────────
-  picture(add: Add, w = 0.4, h = 0.3, art: KitMaterialId = 'quilt_blue'): void {
-    add('wood_dark', box(w * M, h * M, 0.02 * M, 0, 0, 0));
-    add(art, box((w - 0.06) * M, (h - 0.06) * M, 0.005 * M, 0, 0.03 * M, 0.01 * M));
+  /** A framed picture on the wall (back at -z, bottom edge at y): painting, photo, poster or sampler. */
+  picture(add: Add, w = 0.4, h = 0.3, art: KitMaterialId = 'art_mountains', frame: KitMaterialId = 'wood_dark'): void {
+    const fw = 0.04;
+    for (const [bw, bh, x, y] of [[w, fw, 0, 0], [w, fw, 0, h - fw], [fw, h, -w / 2 + fw / 2, 0], [fw, h, w / 2 - fw / 2, 0]] as const) add(frame, box(bw * M, bh * M, 0.03 * M, x * M, y * M, 0.015 * M));
+    add('linen', box((w - 0.04) * M, (h - 0.04) * M, 0.006 * M, 0, 0.02 * M, 0.006 * M));
+    add(art, artPlane((w - fw * 2 - 0.02) * M, (h - fw * 2 - 0.02) * M, 0, (h / 2) * M, 0.02 * M));
+  },
+  /** An unframed poster pinned to the wall. */
+  poster(add: Add, w = 0.6, h = 0.8, art: KitMaterialId = 'poster_map'): void {
+    add(art, artPlane(w * M, h * M, 0, (h / 2) * M, 0.004 * M));
+    for (const sx of [-1, 1]) for (const sy of [0, 1]) add('paint_red', cyl(0.012 * M, 0.01 * M, sx * (w / 2 - 0.03) * M, (sy ? h - 0.03 : 0.03) * M, 0.006 * M, 6).rotateX(Math.PI / 2));
+  },
+  /** A few standing photo frames (on a shelf, mantel, dresser or nightstand top). */
+  photoFrames(add: Add): void {
+    const items: Array<[KitMaterialId, number, number, number, number]> = [['photo_family', 0.2, 0.25, -0.15, 0.15], ['photo_couple', 0.15, 0.2, 0.08, -0.2], ['photo_family', 0.13, 0.17, 0.25, 0.3]];
+    for (const [art, w, h, x, r] of items) {
+      const g: THREE.BufferGeometry[] = [];
+      g.push(box(w * M, h * M, 0.02 * M, 0, 0, 0));
+      for (const geo of g) add('wood_dark', geo.rotateX(-0.12).rotateY(r).translate(x * M, 0, 0));
+      add(art, artPlane((w - 0.04) * M, (h - 0.04) * M, 0, (h / 2) * M, 0.011 * M).rotateX(-0.12).rotateY(r).translate(x * M, 0, 0));
+    }
+  },
+  /** Mule-deer antlers on a wooden plaque. */
+  antlers(add: Add): void {
+    add('wood_dark', new THREE.CylinderGeometry(0.12 * M, 0.12 * M, 0.03 * M, 10).rotateX(Math.PI / 2).translate(0, 0, 0.015 * M));
+    for (const s of [-1, 1]) {
+      add('linen', new THREE.CylinderGeometry(0.012 * M, 0.02 * M, 0.45 * M, 5).rotateZ(s * -0.8).translate(s * 0.15 * M, 0.15 * M, 0.06 * M));
+      for (let k = 0; k < 3; k++) add('linen', new THREE.CylinderGeometry(0.008 * M, 0.012 * M, 0.2 * M, 4).rotateZ(s * (-0.2 + k * 0.2)).translate(s * (0.12 + k * 0.08) * M, (0.28 + k * 0.05) * M, 0.06 * M));
+    }
+  },
+  /** Evergreen wreath with a red bow. */
+  wreath(add: Add): void {
+    add('hedge', new THREE.TorusGeometry(0.2 * M, 0.06 * M, 6, 14).translate(0, 0, 0.04 * M));
+    add('hedge_berry', box(0.12 * M, 0.08 * M, 0.04 * M, 0, -0.24 * M, 0.08 * M));
+  },
+  /** A vase of wildflowers (on a table or sill). */
+  vaseFlowers(add: Add): void {
+    add('crockery', new THREE.CylinderGeometry(0.05 * M, 0.07 * M, 0.2 * M, 10).translate(0, 0.1 * M, 0));
+    for (let i = 0; i < 7; i++) {
+      const a = i * 0.9, lean = 0.12 + (i % 3) * 0.06;
+      add('crop', new THREE.CylinderGeometry(0.004 * M, 0.004 * M, 0.25 * M, 4).rotateZ(lean).rotateY(a).translate(0, 0.3 * M, 0));
+      add(i % 2 ? 'flowers' : 'hedge_berry', new THREE.SphereGeometry(0.03 * M, 6, 4).translate(Math.cos(a) * lean * 0.25 * M, 0.43 * M, Math.sin(a) * lean * 0.25 * M));
+    }
+  },
+  /** A patchwork quilt hung on a rod (back at -z). */
+  wallQuilt(add: Add, mat: KitMaterialId = 'quilt_red'): void {
+    add('wood_dark', new THREE.CylinderGeometry(0.02 * M, 0.02 * M, 1.5 * M, 6).rotateZ(Math.PI / 2).translate(0, 1.4 * M, 0.04 * M));
+    add(mat, box(1.4 * M, 1.4 * M, 0.02 * M, 0, 0, 0.03 * M));
+  },
+  /** A big houseplant in a clay pot (floor). */
+  plant(add: Add): void {
+    add('paint_red', new THREE.CylinderGeometry(0.18 * M, 0.13 * M, 0.35 * M, 10).translate(0, 0.175 * M, 0));
+    add('soil', cyl(0.17 * M, 0.02 * M, 0, 0.33 * M, 0, 10));
+    for (let i = 0; i < 9; i++) {
+      const a = i * 0.7, h = 0.5 + (i % 3) * 0.25;
+      add('crop', new THREE.SphereGeometry(0.16 * M, 6, 4).scale(1, 0.45, 0.7).rotateZ(0.5).rotateY(a).translate(Math.cos(a) * 0.15 * M, (0.35 + h) * M, Math.sin(a) * 0.15 * M));
+    }
+    add('wood_mid', new THREE.CylinderGeometry(0.015 * M, 0.02 * M, 0.9 * M, 5).translate(0, 0.78 * M, 0));
   },
   calendar(add: Add): void { add('linen', box(0.3 * M, 0.42 * M, 0.005 * M, 0, 0, 0)); add('paint_red', box(0.3 * M, 0.08 * M, 0.006 * M, 0, 0.34 * M, 0)); for (let i = 0; i < 4; i++) add('iron', box(0.24 * M, 0.004 * M, 0.007 * M, 0, (0.05 + i * 0.06) * M, 0)); },
   clock(add: Add): void { add('wood_dark', new THREE.CylinderGeometry(0.16 * M, 0.16 * M, 0.04 * M, 16).rotateX(Math.PI / 2)); add('linen', new THREE.CircleGeometry(0.13 * M, 16).translate(0, 0, 0.021 * M)); add('iron', box(0.012 * M, 0.1 * M, 0.004 * M, 0, 0.04 * M, 0.024 * M)); add('iron', box(0.07 * M, 0.012 * M, 0.004 * M, 0.03 * M, 0, 0.024 * M)); },
@@ -220,6 +275,13 @@ export const Clutter = {
     add('straw', box(0.6 * M, 0.01 * M, 0.5 * M, 0.1 * M, 0, 0.3 * M));                                    // sawdust
   },
 } as const;
+
+/** A flat image plane (its own 0–1 UVs, not world-scaled) facing +z, centred at (x, y, z). */
+function artPlane(w: number, h: number, x: number, y: number, z: number): THREE.BufferGeometry {
+  const g = new THREE.PlaneGeometry(w, h).translate(x, y, z);
+  g.userData.keepUV = true;
+  return g;
+}
 
 /** Pick `n` distinct entries from a list with a seeded random. */
 export function pick<T>(r: () => number, list: readonly T[], n: number): T[] {
