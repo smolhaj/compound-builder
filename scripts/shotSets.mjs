@@ -166,3 +166,44 @@ SETS.interiors = [
   { name: 'cutaway-night-lamplight', time: 21, season: 'fall', setup: buildTo(5, 0) + view('cutaway') + viewCabin(2.6, 0.8, 0.9), cam: { x: C, z: C, yaw: 0, pitch: 0.8, radius: 3 }, frames: 12 },
   { name: 'cabin-night-windows', time: 21.5, season: 'fall', setup: buildTo(5, 0) + viewCabin(3.2, 0.2, 0.6), cam: { x: C, z: C, yaw: 0, pitch: 0.2, radius: 3 }, frames: 12 },
 ];
+
+/**
+ * A small compound round the camp, every building finished (placed once per
+ * page; each shot then frames one). window.__b[kind] = the placed record.
+ */
+const compound = `{ if (!window.__b) { window.__b = {};
+  const G = cb.game, W = cb.world, c = W.camp;
+  const plan = [['log_house', -4, -3, 0], ['timber_cabin', 3, -3.5, 0], ['workshop', 6, 2, 3], ['garden', -2, 4, 0], ['chicken_coop', 1.5, 4.5, 0], ['root_cellar', -6, 1.5, 1], ['outhouse', 4.5, -7, 0]];
+  for (const [kind, dx, dz, rot] of plan) {
+    const sp = cb.tool.findSpot(kind, c.x + dx, c.z + dz, rot);
+    if (!sp) continue;
+    G.getState().plan(kind, sp[0], sp[1], rot);
+    const st = G.getState().game.structures.at(-1);
+    window.__b[kind] = st;
+  }
+  G.setState(s => { const g = structuredClone(s.game); for (const st of g.structures) { st.stage = 5; st.done = 0; st.finishedAt = 0; } return { game: g }; });
+} }`;
+const at = (kind, r, pitch, yaw) => `{ const b = window.__b['${kind}']; if (b) { cb.cam.target.set(b.x, 0, b.z); cb.cam.radius = ${r}; cb.cam.pitch = ${pitch}; cb.cam.yaw = b.rot * Math.PI / 2 + ${yaw}; } }`;
+const inside2 = (kind, ex, ey, ez, lx, ly, lz, fov = 68) => `{ const b = window.__b['${kind}']; const W = cb.world;
+  const e = W.localToWorld(b.id, ${ex}, ${ey}, ${ez}), l = W.localToWorld(b.id, ${lx}, ${ly}, ${lz});
+  cb.qa.pose = { x: e.x, y: e.y, z: e.z, lx: l.x, ly: l.y, lz: l.z, fov: ${fov} }; }`;
+const cut = "cb.store.getState().setBuildingView('cutaway');";
+const D = { x: C, z: C, yaw: 0, pitch: 0.4, radius: 4 };
+SETS.buildings = [
+  { name: 'compound-aerial', time: 10.5, season: 'summer', setup: compound + "{ const c = cb.world.camp; cb.cam.target.set(c.x, 0, c.z); cb.cam.radius = 16; cb.cam.pitch = 0.75; cb.cam.yaw = 0.6; }", cam: D, frames: 20 },
+  { name: 'log-house-glass-gable', time: 17.5, season: 'summer', setup: compound + at('log_house', 4.2, 0.2, 0.45), cam: D, frames: 12 },
+  { name: 'log-house-cutaway', time: 12, season: 'summer', setup: compound + cut + at('log_house', 4, 0.9, 0.3), cam: D, frames: 12 },
+  { name: 'log-house-great-room', time: 16, season: 'summer', setup: compound + inside2('log_house', 0.3, 0.29, 1.0, -0.45, 0.15, -1.0), cam: D, frames: 12 },
+  { name: 'log-house-kitchen', time: 9, season: 'summer', setup: compound + inside2('log_house', -0.45, 0.29, -0.25, -0.3, 0.12, 1.0), cam: D, frames: 12 },
+  { name: 'log-house-loft', time: 14, season: 'summer', setup: compound + inside2('log_house', 0.0, 0.85, -0.38, -0.1, 0.62, -1.1), cam: D, frames: 12 },
+  { name: 'log-house-bath', time: 11, season: 'summer', setup: compound + inside2('log_house', 0.2, 0.29, 0.1, 0.6, 0.06, -0.35), cam: D, frames: 12 },
+  { name: 'workshop-exterior', time: 11, season: 'summer', setup: compound + at('workshop', 3.2, 0.22, 0.4), cam: D, frames: 12 },
+  { name: 'workshop-cutaway', time: 13, season: 'summer', setup: compound + cut + at('workshop', 3.2, 0.95, 0.2), cam: D, frames: 12 },
+  { name: 'workshop-inside', time: 15, season: 'summer', setup: compound + inside2('workshop', 0.3, 0.27, 0.75, -0.1, 0.12, -0.95), cam: D, frames: 12 },
+  { name: 'root-cellar', time: 10, season: 'summer', setup: compound + at('root_cellar', 2.2, 0.25, 0.5), cam: D, frames: 12 },
+  { name: 'root-cellar-inside', time: 10, season: 'summer', setup: compound + inside2('root_cellar', 0.0, 0.25, 0.42, 0.0, 0.08, -0.2), cam: D, frames: 12 },
+  { name: 'coop-and-run', time: 9.5, season: 'summer', setup: compound + at('chicken_coop', 2.0, 0.4, 0.6), cam: D, frames: 12 },
+  { name: 'garden', time: 15.5, season: 'summer', setup: compound + at('garden', 2.6, 0.55, -0.5), cam: D, frames: 12 },
+  { name: 'outhouse', time: 10, season: 'summer', setup: compound + at('outhouse', 1.4, 0.22, 0.5), cam: D, frames: 12 },
+  { name: 'compound-night', time: 21.5, season: 'fall', setup: compound + "{ const c = cb.world.camp; cb.cam.target.set(c.x, 0, c.z); cb.cam.radius = 12; cb.cam.pitch = 0.45; cb.cam.yaw = 2.6; }", cam: D, frames: 20 },
+];

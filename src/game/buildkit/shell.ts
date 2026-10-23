@@ -1,0 +1,508 @@
+/**
+ * Building shells — the shared construction kit every building uses:
+ * build-order layers (stakes → foundation → deck → frame → rafters → roof →
+ * walls → openings → chimney → interior), and a parametric gabled building
+ * (foundation, framing, walls with real openings, gable roof over an
+ * optional front porch, chimney or stovepipe, ceiling, scaffold) that each
+ * building describes with a spec and furnishes with a callback.
+ *
+ * Local frame: origin at the footprint centre on the pad (y = 0), ridge
+ * along z, the main door / porch on the +z gable. One merged mesh per
+ * layer × material; faces carry world-scaled UVs (1 UV = 1 unit) so kit
+ * textures keep their real size. Scale: 1 unit ≈ 6 m; door ≈ 0.36 (2.15 m).
+ */
+import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { kitMaterial, type KitMaterialId } from './materials';
+import { piece, wallRun, type Collider, type Opening, type Place, type Sink } from './interior';
+
+/** Build-order layers: each is drawn (and grown) separately as construction proceeds. */
+export type BuildLayer = 'stakes' | 'foundation' | 'deck' | 'frame' | 'rafters' | 'roof' | 'walls' | 'openings' | 'chimney' | 'scaffold'
+  | 'interior' | 'loft' | 'cutwalls';
+export const BUILD_LAYERS: readonly BuildLayer[] = ['stakes', 'foundation', 'deck', 'frame', 'rafters', 'roof', 'walls', 'openings', 'chimney', 'scaffold', 'interior', 'loft', 'cutwalls'];
+
+/** Layers hidden in the cutaway view (upper floor, roof, full-height walls). */
+export const CUTAWAY_HIDE: readonly BuildLayer[] = ['roof', 'walls', 'openings', 'loft', 'rafters'];
+/** Layers drawn see-through in the x-ray view. */
+export const XRAY_LAYERS: readonly BuildLayer[] = ['roof', 'walls', 'openings', 'chimney', 'rafters'];
+/** Waist-high cut for the cutaway view (above the floor). */
+export const CUT_H = 0.2;
+
+/** Standard openings (world units). */
+export const DOOR = { w: 0.16, h: 0.36 } as const;
+export const WIN = { w: 0.17, h: 0.2, sill: 0.17 } as const;
+
+// ─────────────────────────────────────────────────────────────────────────
+// Parts: geometry collected by layer × material, merged at the end
+// ─────────────────────────────────────────────────────────────────────────
+
+/** World-scaled UVs from position by dominant normal axis (walls: u along the face, v up). */
+export function worldUV(g: THREE.BufferGeometry): THREE.BufferGeometry {
+  const geo = g.index ? g.toNonIndexed() : g;
+  geo.computeVertexNormals();
+  const p = geo.getAttribute('position'), n = geo.getAttribute('normal');
+  const uv = new Float32Array(p.count * 2);
+  for (let i = 0; i < p.count; i++) {
+    const ax = Math.abs(n.getX(i)), ay = Math.abs(n.getY(i)), az = Math.abs(n.getZ(i));
+    let u: number, v: number;
+    if (ay >= ax && ay >= az) { u = p.getX(i); v = p.getZ(i); }
+    else if (ax >= az) { u = p.getZ(i); v = p.getY(i); }
+    else { u = p.getX(i); v = p.getY(i); }
+    uv[i * 2] = u; uv[i * 2 + 1] = v;
+  }
+  geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  return geo;
+}
+
+/** Collects geometry per layer × material. */
+export class Parts {
+  layer: BuildLayer = 'stakes';
+  /** Shift applied to everything added (and to colliders): a shell set off-centre in its footprint. */
+  ox = 0; oz = 0;
+  readonly map = new Map<string, THREE.BufferGeometry[]>();
+  readonly colliders: Collider[] = [];
+  add(m: KitMaterialId, g: THREE.BufferGeometry, layer: BuildLayer = this.layer): void {
+    const k = `${layer}|${m}`;
+    let l = this.map.get(k);
+    if (!l) this.map.set(k, l = []);
+    if (this.ox || this.oz) g.translate(this.ox, 0, this.oz);
+    l.push(worldUV(g));
+  }
+  /** Add colliders given in the current (offset) frame. */
+  collide(...cs: Collider[]): void {
+    for (const c of cs) this.colliders.push({ x0: c.x0 + this.ox, z0: c.z0 + this.oz, x1: c.x1 + this.ox, z1: c.z1 + this.oz });
+  }
+  /** A sink for the interior kit. */
+  readonly sink: Sink = (layer, m, g) => this.add(m, g, layer as BuildLayer);
+
+  /** One mesh per layer × material, tagged userData.layer; colliders on the group. */
+  finish(): THREE.Group {
+    const group = new THREE.Group();
+    for (const [k, list] of this.map) {
+      const [layer, m] = k.split('|') as [BuildLayer, KitMaterialId];
+      const g = mergeGeometries(list);
+      list.forEach(x => x.dispose());
+      if (!g) continue;
+      g.computeBoundingSphere();
+      const mesh = new THREE.Mesh(g, kitMaterial(m));
+      mesh.castShadow = m !== 'glass' && m !== 'string' && m !== 'wire_mesh';
+      mesh.receiveShadow = true;
+      mesh.name = `bldg_${layer}_${m}`;
+      mesh.userData = { layer, vertexCount: g.getAttribute('position').count };
+      group.add(mesh);
+    }
+    group.userData.colliders = this.colliders;
+    return group;
+  }
+}
+
+export const box = (w: number, h: number, d: number, x: number, y: number, z: number) =>
+  new THREE.BoxGeometry(w, h, d).translate(x, y + h / 2, z);
+
+/** A gable-end triangle, thickness t, in the x/y plane at z, with an optional window hole. */
+export function gable(halfW: number, rise: number, t: number, y0: number, z: number, hole?: { w: number; y: number; h: number }): THREE.BufferGeometry {
+  const s = new THREE.Shape();
+  s.moveTo(-halfW, 0); s.lineTo(halfW, 0); s.lineTo(0, rise); s.closePath();
+  if (hole) {
+    const p = new THREE.Path();
+    p.moveTo(-hole.w / 2, hole.y); p.lineTo(-hole.w / 2, hole.y + hole.h); p.lineTo(hole.w / 2, hole.y + hole.h); p.lineTo(hole.w / 2, hole.y); p.closePath();
+    s.holes.push(p);
+  }
+  return new THREE.ExtrudeGeometry(s, { depth: t, bevelEnabled: false }).translate(0, y0, z - t / 2);
+}
+
+/** A window on a wall face: frame, glass, muntins, sill. (cx, cz) on the face, `nx/nz` the outward normal. */
+export function windowAt(parts: Parts, cx: number, cz: number, y: number, nx: number, nz: number, wallT: number, w: number = WIN.w, h: number = WIN.h, trim: KitMaterialId = 'trim'): void {
+  const t = 0.012, out = wallT / 2 + 0.004;
+  const alongX = nx === 0;
+  const bx = (a: number, hh: number, depth: number, oa: number, oy: number, oo: number) =>
+    alongX ? box(a, hh, depth, cx + oa, oy, cz + nz * oo) : box(depth, hh, a, cx + nx * oo, oy, cz + oa);
+  // the face point is the wall's outer surface; pull the frame back to the wall centre line
+  const c = -wallT / 2;
+  parts.add('glass', bx(w, h, 0.006, 0, y, c + out - 0.006));
+  parts.add(trim, bx(w + 2 * t, t, 0.016, 0, y + h, c + out));
+  parts.add(trim, bx(w + 2 * t, t, 0.016, 0, y - t, c + out));
+  parts.add(trim, bx(t, h, 0.016, -w / 2 - t / 2, y, c + out));
+  parts.add(trim, bx(t, h, 0.016, w / 2 + t / 2, y, c + out));
+  if (w < 0.3) {
+    parts.add(trim, bx(0.006, h, 0.01, 0, y, c + out));
+    parts.add(trim, bx(w, 0.006, 0.01, 0, y + h / 2, c + out));
+  } else {
+    for (let k = 1; k < Math.round(w / 0.1); k++) parts.add(trim, bx(0.008, h, 0.012, -w / 2 + k * w / Math.round(w / 0.1), y, c + out));
+  }
+  parts.add(trim, bx(w + 0.05, 0.012, 0.035, 0, y - t - 0.012, c + out + 0.01));
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Construction stages → layer fractions
+// ─────────────────────────────────────────────────────────────────────────
+
+/**
+ * How much of each layer shows at a construction stage (0 site … 4 finish,
+ * 5 done) and fraction through it. Pure (tested).
+ */
+export function layerFractions(stage: number, f: number, supplied: boolean): Record<BuildLayer, number> {
+  const k = Math.max(0, Math.min(1, supplied ? f : 0));
+  const r = {} as Record<BuildLayer, number>;
+  for (const l of BUILD_LAYERS) r[l] = 0;
+  if (stage >= 5) {
+    // cutwalls are drawn whole; the view (cutaway or not) decides whether they show
+    for (const l of ['foundation', 'deck', 'roof', 'walls', 'openings', 'chimney', 'interior', 'loft', 'cutwalls'] as BuildLayer[]) r[l] = 1;
+    return r;
+  }
+  r.stakes = stage <= 2 ? 1 : 0;
+  r.foundation = stage > 1 ? 1 : stage === 1 ? k : 0;
+  r.deck = stage > 2 ? 1 : stage === 2 ? Math.min(1, k * 4) : 0;
+  r.frame = stage > 2 ? 1 : stage === 2 ? k : 0;
+  r.rafters = stage > 3 ? 1 : stage === 3 ? Math.min(1, k * 2) : 0;
+  r.roof = stage > 3 ? 1 : stage === 3 ? Math.max(0, (k - 0.35) / 0.65) : 0;
+  r.walls = stage === 4 ? Math.min(1, k / 0.7) : 0;
+  r.openings = stage === 4 ? Math.max(0, (k - 0.6) / 0.4) : 0;
+  r.chimney = stage === 4 ? Math.min(1, k / 0.8) : 0;
+  r.scaffold = stage >= 2 && stage <= 4 && !(stage === 4 && k > 0.9) ? 1 : 0;
+  // moving in: the loft floor goes down with the finish work, the furniture comes last
+  r.loft = stage === 4 ? Math.max(0, (k - 0.5) / 0.5) : 0;
+  r.interior = stage === 4 ? Math.max(0, (k - 0.75) / 0.25) : 0;
+  return r;
+}
+
+/** Show a layered building group at a stage: each layer drawn up to its fraction (pieces in build order). */
+export function showStage(group: THREE.Group, stage: number, f: number, supplied = true): void {
+  const fr = layerFractions(stage, f, supplied);
+  for (const o of group.children) {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh) continue;            // lights etc. are managed by the world
+    const layer = m.userData.layer as BuildLayer;
+    const k = fr[layer];
+    m.visible = k > 0.001;
+    const n = m.userData.vertexCount as number;
+    // whole triangles only, so partial layers end on a finished piece edge
+    m.geometry.setDrawRange(0, k >= 0.999 ? Infinity : Math.floor((n * k) / 3) * 3);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Gabled building
+// ─────────────────────────────────────────────────────────────────────────
+
+/**
+ * An opening in an outside wall. `at` is the local coordinate along the
+ * wall (x on the front / back walls, z on the sides).
+ *  door    plank door standing open inward, with casing
+ *  window  four-light window (w / h / sill optional)
+ *  bay     a wide vehicle opening with the roll-up door rolled up at the head
+ *  arch    a plain open doorway (no door; runs, sheds)
+ */
+export interface WallOpening { kind: 'door' | 'window' | 'bay' | 'arch'; at: number; w?: number; h?: number; sill?: number }
+
+export interface GabledSpec {
+  /** Footprint (world units): width across the ridge, depth along it. */
+  W: number; D: number;
+  /** Floor above the pad, wall height (floor to eave), wall thickness. */
+  floor: number; wallH: number; wallT: number;
+  /** Roof rise over half the width, eave overhang, gable overhang. */
+  rise: number; eave: number; gableOver: number;
+  /** Front porch depth (0 = none) under the roof run-out. */
+  porch: number;
+  foundation: 'fieldstone' | 'concrete' | 'piers';
+  floorMat: KitMaterialId;
+  /** Outer cladding, inner lining (null = single skin, studs show inside). */
+  outer: KitMaterialId; inner: KitMaterialId | null;
+  roof: KitMaterialId; trim: KitMaterialId;
+  front?: WallOpening[]; back?: WallOpening[]; left?: WallOpening[]; right?: WallOpening[];
+  /** Window high in a gable (loft window); `tall` = a great-room glass wall up into the front gable. */
+  gableWindow?: { back?: boolean; front?: boolean; w: number; h: number; y: number };
+  /** Fieldstone chimney on the back gable at x, or a stovepipe through the roof at (x, z). */
+  chimney?: { kind: 'stone'; x: number } | { kind: 'pipe'; x: number; z: number };
+  /** Pine (or other) ceiling boards under the roof. */
+  ceiling?: KitMaterialId;
+  /** Tie beams across at these z (above the main floor). */
+  tieBeams?: number[];
+  /** Corner boards (lap siding) or crossed log ends (log walls). */
+  corners?: 'boards' | 'logs' | 'none';
+}
+
+/** What a furnishing callback gets. */
+export interface FurnishCtx {
+  parts: Parts;
+  spec: GabledSpec;
+  hw: number; hd: number;
+  /** Floor and eave heights (local). */
+  y0: number; yE: number;
+  /** Inner wall faces. */
+  left: number; right: number; front: number; back: number;
+  /** Place a ground-floor piece (interior layer). */
+  I(p: Place, fn: Parameters<typeof piece>[3], solid?: boolean): void;
+  /** Place an upper-floor / loft piece (hidden in cutaway). `p.y` defaults to the eave height. */
+  L(p: Place, fn: Parameters<typeof piece>[3], solid?: boolean): void;
+  /** An interior partition a→b (full height in 'walls', cut copy in 'cutwalls'), with optional doorways. */
+  partition(ax: number, az: number, bx: number, bz: number, openings?: Opening[], mat?: KitMaterialId, h?: number): void;
+}
+
+export interface GabledResult {
+  group: THREE.Group;
+  /** Smoke source (local), or null. */
+  chimneyTop: THREE.Vector3 | null;
+}
+
+/**
+ * Build a gabled building from a spec, then furnish it. The group carries
+ * userData.colliders (walls between doorways, partitions, furniture) and
+ * userData.chimneyTop.
+ */
+export function buildGabled(s: GabledSpec, furnish?: (c: FurnishCtx) => void, parts = new Parts(), extras?: (p: Parts) => void): GabledResult {
+  const { W, D } = s;
+  const hw = W / 2, hd = D / 2;
+  const y0 = s.floor, yE = s.floor + s.wallH;
+  const pitch = Math.atan2(s.rise, hw);
+  const z0 = -hd - s.gableOver, z1 = hd + (s.porch > 0 ? s.porch + 0.03 : s.gableOver);
+  const pz1 = hd + s.porch;
+  const T = s.wallT;
+
+  // ── Stakes and string lines (site layout) ──
+  parts.layer = 'stakes';
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) parts.add('trim', box(0.012, 0.09, 0.012, sx * (hw + 0.04), -0.02, sz * (hd + 0.04)));
+  for (const sz of [-1, 1]) parts.add('string', box(W + 0.08, 0.003, 0.003, 0, 0.055, sz * (hd + 0.04)));
+  for (const sx of [-1, 1]) parts.add('string', box(0.003, 0.003, D + 0.08, sx * (hw + 0.04), 0.055, 0));
+
+  // ── Foundation ──
+  parts.layer = 'foundation';
+  if (s.foundation === 'fieldstone') {
+    const courses = 4, ch = (y0 + 0.03) / courses;
+    for (let i = 0; i < courses; i++) parts.add('fieldstone', box(W + 0.03, ch, D + 0.03, 0, -0.03 + i * ch, 0));
+    if (s.porch > 0) parts.add('fieldstone', box(W, y0 - 0.025 + 0.03, 0.04, 0, -0.03, pz1 - 0.02));
+  } else if (s.foundation === 'concrete') {
+    parts.add('concrete', box(W + 0.02, y0 + 0.03, D + 0.02, 0, -0.03, 0));
+    if (s.porch > 0) parts.add('concrete', box(W + 0.02, y0 + 0.02, s.porch, 0, -0.03, hd + s.porch / 2));
+  } else {
+    // piers (posts on footing blocks)
+    for (let x = -hw + 0.03; x <= hw - 0.03 + 1e-6; x += (W - 0.06) / Math.max(1, Math.round(W / 0.3))) {
+      for (let z = -hd + 0.03; z <= hd - 0.03 + 1e-6; z += (D - 0.06) / Math.max(1, Math.round(D / 0.3))) {
+        parts.add('concrete', box(0.05, 0.03, 0.05, x, -0.02, z));
+        parts.add('frame', box(0.025, y0 - 0.01, 0.025, x, 0.01, z));
+      }
+    }
+  }
+
+  // ── Floor deck + porch deck + steps ──
+  parts.layer = 'deck';
+  if (s.foundation !== 'concrete') parts.add(s.floorMat, box(W - 0.01, 0.012, D - 0.01, 0, y0 - 0.004, 0));
+  else parts.add(s.floorMat, box(W - 0.01, 0.004, D - 0.01, 0, y0 - 0.002, 0));
+  const frontDoor = (s.front ?? []).find(o => o.kind === 'door' || o.kind === 'arch');
+  if (s.porch > 0) {
+    parts.add('deck', box(W + 0.02, 0.025, s.porch, 0, y0 - 0.025, (hd + pz1) / 2));
+  }
+  if (frontDoor && y0 > 0.04) {
+    const sz = hd + Math.max(0, s.porch);
+    parts.add('deck', box(0.32, 0.03, 0.06, frontDoor.at, y0 * 0.5 - 0.03, sz + 0.03));
+    parts.add('deck', box(0.32, 0.03, 0.06, frontDoor.at, -0.03, sz + 0.09));
+  }
+
+  // ── Wall framing: plates, studs ~40 cm apart, gable studs, porch posts ──
+  parts.layer = 'frame';
+  const sw = 0.012, sd = 0.022, sp = 0.068;
+  for (const sz of [-1, 1]) {
+    const z = sz * (hd - sd / 2);
+    parts.add('frame', box(W, 0.01, sd, 0, y0, z));
+    for (let x = -hw + sw / 2; x <= hw - sw / 2 + 1e-6; x += sp) parts.add('frame', box(sw, s.wallH - 0.02, sd, x, y0 + 0.01, z));
+    parts.add('frame', box(W, 0.01, sd, 0, yE - 0.01, z));
+    for (let x = -hw + sp; x < hw - 0.02; x += sp) {
+      const hh = s.rise * (1 - Math.abs(x) / hw);
+      if (hh > 0.02) parts.add('frame', box(sw, hh, sd, x, yE, z));
+    }
+  }
+  for (const sx of [-1, 1]) {
+    const x = sx * (hw - sd / 2);
+    parts.add('frame', box(sd, 0.01, D, x, y0, 0));
+    for (let z = -hd + sp; z < hd - 0.02; z += sp) parts.add('frame', box(sd, s.wallH - 0.02, sw, x, y0 + 0.01, z));
+    parts.add('frame', box(sd, 0.01, D, x, yE - 0.01, 0));
+  }
+  if (s.porch > 0) {
+    for (const sx of [-1, 1]) parts.add('frame', box(0.03, yE - 0.01 - y0, 0.03, sx * (hw - 0.03), y0, pz1 - 0.03));
+    parts.add('frame', box(W, 0.035, 0.03, 0, yE - 0.03, pz1 - 0.03));
+  }
+
+  // ── Rafters + ridge beam ──
+  parts.layer = 'rafters';
+  const rLen = Math.hypot(hw + s.eave, s.rise + s.eave * s.rise / hw);
+  parts.add('frame', box(0.02, 0.03, z1 - z0, 0, yE + s.rise - 0.02, (z0 + z1) / 2));
+  for (let z = z0 + 0.02; z <= z1 - 0.02; z += 0.11) {
+    for (const s2 of [-1, 1]) {
+      const g = new THREE.BoxGeometry(rLen, 0.018, 0.012);
+      g.translate(s2 * rLen / 2, -0.009, 0);
+      g.rotateZ(s2 * -pitch);
+      g.translate(0, yE + s.rise, z);
+      parts.add('frame', g);
+    }
+  }
+
+  // ── Roof: two slabs in strips (sheet by sheet), ridge cap; ceiling under it ──
+  parts.layer = 'roof';
+  const slopeLen = Math.hypot(hw + s.eave, (s.eave * s.rise) / hw + s.rise);
+  const roofT = 0.022;
+  const strips = Math.max(3, Math.round((z1 - z0) / 0.3)), sl = (z1 - z0) / strips;
+  for (let i = 0; i < strips; i++) {
+    for (const s2 of [-1, 1]) {
+      const g = new THREE.BoxGeometry(slopeLen, roofT, sl + 0.001);
+      g.translate(s2 * slopeLen / 2, roofT / 2, 0);
+      g.rotateZ(s2 * -pitch);
+      g.translate(0, yE + s.rise + 0.012, z0 + sl * (i + 0.5));
+      parts.add(s.roof, g);
+    }
+  }
+  parts.add('chimney_cap', box(0.035, 0.02, z1 - z0, 0, yE + s.rise + 0.012, (z0 + z1) / 2));
+  if (s.ceiling) {
+    const cLen = Math.hypot(hw - T, s.rise * (hw - T) / hw);
+    for (const s2 of [-1, 1]) {
+      const g = new THREE.BoxGeometry(cLen, 0.008, D - 2 * T);
+      g.translate(s2 * cLen / 2, 0, 0);
+      g.rotateZ(s2 * -pitch);
+      g.translate(0, yE + s.rise - 0.03, 0);
+      parts.add(s.ceiling, g);
+    }
+  }
+  for (const z of s.tieBeams ?? []) parts.add('wood_dark', box(W - 2 * T, 0.03, 0.025, 0, yE - 0.03, z));
+
+  // ── Walls: outer cladding, inner lining, openings through both ──
+  const asOpening = (o: WallOpening): Opening => {
+    if (o.kind === 'window') return { at: o.at, w: o.w ?? WIN.w, sill: o.sill ?? WIN.sill, h: o.h ?? WIN.h };
+    if (o.kind === 'bay') return { at: o.at, w: o.w ?? 0.5, sill: 0, h: o.h ?? 0.38 };
+    return { at: o.at, w: o.w ?? DOOR.w, sill: 0, h: o.h ?? DOOR.h };
+  };
+  const shell = (layer: BuildLayer, cut?: number): Collider[] => {
+    const out: Collider[] = [];
+    const tO = s.inner ? Math.min(0.022, T * 0.63) : T, tI = T - tO;
+    const leaves: Array<[number, number, KitMaterialId]> = [[tO / 2, tO, s.outer]];
+    if (s.inner) leaves.push([tO + tI / 2, tI, s.inner]);
+    const za = -hd + T, zb = hd - T;
+    for (const [inset, t, m] of leaves) {
+      out.push(...wallRun(parts.sink, layer, m, { ax: -hw, az: hd - inset, bx: hw, bz: hd - inset, y0, h: s.wallH, t, cut,
+        openings: (s.front ?? []).map(o => { const p = asOpening(o); return { ...p, at: p.at + hw }; }) }));
+      out.push(...wallRun(parts.sink, layer, m, { ax: -hw, az: -hd + inset, bx: hw, bz: -hd + inset, y0, h: s.wallH, t, cut,
+        openings: (s.back ?? []).map(o => { const p = asOpening(o); return { ...p, at: p.at + hw }; }) }));
+      for (const [sx, list] of [[-1, s.left], [1, s.right]] as const) {
+        out.push(...wallRun(parts.sink, layer, m, { ax: sx * (hw - inset), az: za, bx: sx * (hw - inset), bz: zb, y0, h: s.wallH, t, cut,
+          openings: (list ?? []).map(o => { const p = asOpening(o); return { ...p, at: p.at - za }; }) }));
+      }
+    }
+    return out;
+  };
+  parts.layer = 'walls';
+  parts.collide(...shell('walls'));
+  shell('cutwalls', CUT_H);
+  const gw = s.gableWindow;
+  const hole = (on?: boolean) => (gw && on ? { w: gw.w, y: gw.y, h: gw.h } : undefined);
+  const tO = s.inner ? Math.min(0.022, T * 0.63) : T;
+  for (const sz of [1, -1]) {
+    const h = hole(sz > 0 ? gw?.front : gw?.back);
+    parts.add(s.outer, gable(hw, s.rise, tO, yE, sz * (hd - tO / 2), h));
+    if (s.inner) parts.add(s.inner, gable(hw - T, s.rise * (hw - T) / hw, T - tO, yE, sz * (hd - tO - (T - tO) / 2), h));
+  }
+  if (s.corners === 'boards' || s.corners === undefined) {
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) parts.add(s.trim, box(0.028, s.wallH, 0.028, sx * (hw + 0.002), y0, sz * (hd + 0.002)));
+  } else if (s.corners === 'logs') {
+    // crossed log ends sticking out at each corner, alternating courses
+    const n = Math.round(s.wallH / 0.045);
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) for (let i = 0; i < n; i++) {
+      const y = y0 + (i + 0.5) * s.wallH / n;
+      const along = i % 2 === 0;
+      const g = new THREE.CylinderGeometry(0.022, 0.022, 0.07, 8);
+      if (along) g.rotateZ(Math.PI / 2).translate(sx * (hw + 0.012), y, sz * (hd - 0.01));
+      else g.rotateX(Math.PI / 2).translate(sx * (hw - 0.01), y, sz * (hd + 0.012));
+      parts.add('log_end', g);
+    }
+  }
+
+  // ── Openings: doors, windows, bays, porch posts painted ──
+  parts.layer = 'openings';
+  const wallOps: Array<[WallOpening[] | undefined, 'front' | 'back' | 'left' | 'right']> = [[s.front, 'front'], [s.back, 'back'], [s.left, 'left'], [s.right, 'right']];
+  for (const [list, side] of wallOps) for (const o of list ?? []) {
+    const nx = side === 'left' ? -1 : side === 'right' ? 1 : 0, nz = side === 'front' ? 1 : side === 'back' ? -1 : 0;
+    const fx = nx !== 0 ? nx * hw : o.at, fz = nz !== 0 ? nz * hd : o.at;
+    if (o.kind === 'window') { windowAt(parts, fx, fz, y0 + (o.sill ?? WIN.sill), nx, nz, T, o.w ?? WIN.w, o.h ?? WIN.h, s.trim); continue; }
+    const p = asOpening(o);
+    const rot = nx !== 0 ? (nx > 0 ? Math.PI / 2 : -Math.PI / 2) : (nz > 0 ? 0 : Math.PI);
+    // casing in the wall's own frame (a = along the wall, outward = +z), then turned onto the wall
+    const onWall = (g: THREE.BufferGeometry) => g.rotateY(rot).translate(fx, 0, fz);
+    const ow = 0.004;
+    parts.add(s.trim, onWall(box(p.w + 0.04, 0.02, 0.018, 0, y0 + p.h, ow)));
+    for (const e of [-1, 1]) parts.add(s.trim, onWall(box(0.02, p.h, 0.018, e * (p.w / 2 + 0.01), y0, ow)));
+    if (o.kind === 'door') {
+      // plank door standing open into the room, hinged on its left jamb
+      const g = box(p.w, p.h, 0.012, p.w / 2, 0, -0.006).rotateY(1.35).translate(-p.w / 2 + 0.006, y0, -T);
+      parts.add('door', onWall(g));
+    } else if (o.kind === 'bay') {
+      // roll-up door rolled at the head, a track down each side
+      parts.add('metal_siding', onWall(new THREE.CylinderGeometry(0.03, 0.03, p.w, 10).rotateZ(Math.PI / 2).translate(0, y0 + p.h - 0.03, -T - 0.03)));
+      for (const e of [-1, 1]) parts.add('iron', onWall(box(0.012, p.h, 0.02, e * (p.w / 2 - 0.006), y0, -T - 0.01)));
+    }
+  }
+  if (gw?.back) windowAt(parts, 0, -hd, yE + gw.y, 0, -1, T, gw.w, gw.h, s.trim);
+  if (gw?.front) windowAt(parts, 0, hd, yE + gw.y, 0, 1, T, gw.w, gw.h, s.trim);
+  if (s.porch > 0) {
+    for (const sx of [-1, 1]) parts.add(s.trim, box(0.032, yE - 0.01 - y0, 0.032, sx * (hw - 0.03), y0, pz1 - 0.03));
+    parts.add(s.trim, box(W + 0.004, 0.037, 0.032, 0, yE - 0.031, pz1 - 0.03));
+  }
+
+  // ── Chimney (fieldstone, built in courses) or stovepipe through the roof ──
+  parts.layer = 'chimney';
+  let chimneyTop: THREE.Vector3 | null = null;
+  if (s.chimney?.kind === 'stone') {
+    const cx = s.chimney.x, chW = 0.14;
+    const chTop = yE + s.rise + 0.16;
+    const cc = 8;
+    for (let i = 0; i < cc; i++) parts.add('fieldstone', box(chW, (chTop + 0.03) / cc, chW, cx, -0.03 + i * (chTop + 0.03) / cc, -hd - chW / 2 + 0.01));
+    parts.add('chimney_cap', box(chW + 0.02, 0.02, chW + 0.02, cx, chTop - 0.03, -hd - chW / 2 + 0.01));
+    chimneyTop = new THREE.Vector3(cx, chTop, -hd - 0.06);
+  } else if (s.chimney?.kind === 'pipe') {
+    const { x, z } = s.chimney;
+    const roofY = yE + s.rise * (1 - Math.abs(x) / hw);
+    parts.add('iron', new THREE.CylinderGeometry(0.014, 0.014, 0.14, 10).translate(x, roofY + 0.06, z));
+    parts.add('iron', new THREE.ConeGeometry(0.03, 0.025, 10).translate(x, roofY + 0.14, z));
+    chimneyTop = new THREE.Vector3(x, roofY + 0.15, z);
+  }
+
+  // ── Scaffold: tube frame and plank walks round the walls ──
+  parts.layer = 'scaffold';
+  const off = 0.07, tube = 0.008;
+  const ring: Array<[number, number, number, number]> = [[-hw - off, -hd - off, hw + off, -hd - off], [hw + off, -hd - off, hw + off, hd + off], [-hw - off, -hd - off, -hw - off, hd + off]];
+  for (const [ax, az, bx, bz] of ring) {
+    const len = Math.hypot(bx - ax, bz - az), n = Math.max(2, Math.round(len / 0.28));
+    for (let i = 0; i <= n; i++) {
+      const x = ax + (bx - ax) * i / n, z = az + (bz - az) * i / n;
+      parts.add('scaffold', box(tube, yE + 0.05, tube, x, -0.03, z));
+    }
+    for (const yy of [y0 + 0.2, yE - 0.02]) {
+      const g = box(len, tube, tube, 0, yy, 0);
+      g.rotateY(-Math.atan2(bz - az, bx - ax));
+      g.translate((ax + bx) / 2, 0, (az + bz) / 2);
+      parts.add('scaffold', g);
+      const pl = box(len, 0.008, 0.05, 0, yy + tube, 0);
+      pl.rotateY(-Math.atan2(bz - az, bx - ax));
+      pl.translate((ax + bx) / 2 + (bz - az === 0 ? 0 : Math.sign(ax) * 0.02), 0, (az + bz) / 2 + (bz - az === 0 ? Math.sign(az) * 0.02 : 0));
+      parts.add('deck', pl);
+    }
+  }
+
+  // ── Interior ──
+  if (furnish) {
+    const ctx: FurnishCtx = {
+      parts, spec: s, hw, hd, y0, yE,
+      left: -hw + T, right: hw - T, front: hd - T, back: -hd + T,
+      I: (p, fn, solid = true) => { const c = piece(parts.sink, 'interior', { ...p, y: p.y ?? y0 + 0.004 }, fn, solid); if (c) parts.collide(c); },
+      L: (p, fn, solid = false) => { const c = piece(parts.sink, 'loft', { ...p, y: p.y ?? yE }, fn, solid); if (c) parts.collide(c); },
+      partition: (ax, az, bx, bz, openings = [], mat = s.inner ?? 'pine_panel', h = s.wallH) => {
+        parts.collide(...wallRun(parts.sink, 'walls', mat, { ax, az, bx, bz, y0, h, t: 0.02, openings }));
+        wallRun(parts.sink, 'cutwalls', mat, { ax, az, bx, bz, y0, h, t: 0.02, openings, cut: CUT_H });
+      },
+    };
+    furnish(ctx);
+  }
+  if (chimneyTop) chimneyTop.add(new THREE.Vector3(parts.ox, 0, parts.oz));
+  // anything else on the lot (runs, fences, earth berms), in the footprint frame
+  parts.ox = 0; parts.oz = 0;
+  extras?.(parts);
+  const group = parts.finish();
+  group.userData.chimneyTop = chimneyTop;
+  return { group, chimneyTop };
+}

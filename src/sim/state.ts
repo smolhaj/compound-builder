@@ -8,7 +8,7 @@ import { emptyStock, type Stock, type MaterialId } from './materials';
 import { generateFamily, type Person } from './family';
 import type { StageId } from './blueprints';
 
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 /** Starting savings (GDS §1 peacetime money constraint). */
 export const STARTING_MONEY = 30000;

@@ -1,0 +1,47 @@
+import { describe, expect, it, vi } from 'vitest';
+import * as THREE from 'three';
+
+// materials paint canvases (no DOM in tests): plain materials stand in
+vi.mock('./materials', () => ({ kitMaterial: () => new THREE.MeshStandardMaterial(), setWindowGlow: () => {} }));
+
+import { buildLayers, buildGhost } from './buildings';
+import { KIT, KIT_ORDER } from './kit';
+import { hitsColliders, type Collider } from './interior';
+import { BLUEPRINTS } from '../../sim/blueprints';
+
+describe('building registry', () => {
+  for (const kind of KIT_ORDER) {
+    it(`${kind}: builds every construction layer, is furnished, has colliders and a blueprint`, () => {
+      const g = buildLayers(KIT[kind]);
+      const layers = new Set(g.children.map(m => m.userData.layer));
+      for (const l of ['foundation', 'interior']) expect(layers.has(l)).toBe(true);
+      expect((g.userData.colliders as Collider[]).length).toBeGreaterThan(3);
+      expect(BLUEPRINTS[kind]?.stages.length).toBe(5);
+      const ghost = buildGhost(KIT[kind]);
+      expect(ghost.children.every(m => !['interior', 'loft', 'cutwalls'].includes(m.userData.layer))).toBe(true);
+    });
+  }
+
+  it('homes have evening seats; only stove buildings smoke', () => {
+    for (const kind of ['timber_cabin', 'log_house']) expect((buildLayers(KIT[kind]).userData.seats as unknown[]).length).toBeGreaterThan(1);
+    expect(buildLayers(KIT.outhouse).userData.chimneyTop).toBeNull();
+    expect(buildLayers(KIT.garden).userData.chimneyTop).toBeNull();
+    expect(buildLayers(KIT.log_house).userData.chimneyTop).not.toBeNull();
+  });
+
+  it('log house: walk in through the front door, past the porch', () => {
+    const cs = buildLayers(KIT.log_house).userData.colliders as Collider[];
+    const hd = KIT.log_house.cellsZ * 0.25;
+    for (let z = hd + 0.1; z > hd - 0.15; z -= 0.02) expect(hitsColliders(cs, 0, z, 0.04)).toBe(false);
+  });
+
+  it('garden and run fences have a gate you can walk through', () => {
+    for (const kind of ['garden', 'chicken_coop']) {
+      const cs = buildLayers(KIT[kind]).userData.colliders as Collider[];
+      const hz = KIT[kind].cellsZ * 0.25 - 0.04;
+      const gateX = kind === 'garden' ? 0 : 0.2 - (KIT[kind].cellsX * 0.25 - 0.04) + (KIT[kind].cellsX * 0.25 - 0.04);
+      expect(hitsColliders(cs, gateX, hz, 0.03)).toBe(false);
+      expect(hitsColliders(cs, gateX + 0.3 * (kind === 'garden' ? 1 : -1), hz, 0.03)).toBe(true);
+    }
+  });
+});

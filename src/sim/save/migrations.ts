@@ -16,6 +16,8 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
     forestry: { jobs: [], cleared: [] },
     heat: { burned: 0, warned: -1 },
   }),
+  // 2 → 3: concrete joins the stockpile (workshop slab, cellar, log house footings)
+  2: s => ({ ...s, version: 3, stock: { concrete: 0, ...(s.stock as object) } }),
 };
 
 export class SaveVersionError extends Error {}

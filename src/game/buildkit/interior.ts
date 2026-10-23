@@ -328,6 +328,285 @@ export const Furniture = {
     add('wood_mid', box(l, 0.05 * M, 0.05 * M, 0, 0.9 * M, 0));
     for (let x = -l / 2; x <= l / 2 + 1e-6; x += Math.max(0.15 * M, l / Math.max(1, Math.round(lm / 0.9)))) add('wood_dark', box(0.05 * M, 0.9 * M, 0.05 * M, x, 0, 0));
   },
+
+  // ── Workshop ──────────────────────────────────────────────────────────
+  /** Heavy workbench len (m) with a vise, a lower shelf and clutter. */
+  workbench(add: Add, lm = 2.4): void {
+    const l = lm * M, d = 0.75 * M, h = 0.92 * M;
+    add('wood_mid', box(l, 0.07 * M, d, 0, h - 0.07 * M, 0));
+    add('wood_dark', box(l - 0.1 * M, 0.04 * M, d - 0.1 * M, 0, 0.18 * M, 0));
+    legs(add, l, d, h - 0.07 * M, 0.05 * M);
+    add('steel', box(0.22 * M, 0.14 * M, 0.2 * M, l / 2 - 0.2 * M, h, d / 2 - 0.08 * M));          // vise
+    add('steel', box(0.04 * M, 0.04 * M, 0.3 * M, l / 2 - 0.2 * M, h + 0.05 * M, d / 2 + 0.08 * M));
+    add('paint_red', box(0.5 * M, 0.22 * M, 0.25 * M, -l / 2 + 0.4 * M, h, -0.15 * M));               // toolbox
+    add('iron', box(0.35 * M, 0.08 * M, 0.08 * M, 0.1 * M, h, 0.1 * M));
+    for (let i = 0; i < 4; i++) add(i % 2 ? 'crockery' : 'steel', cyl(0.05 * M, 0.12 * M, -0.3 * M + i * 0.14 * M, h, -0.2 * M, 6));
+  },
+
+  /** Pegboard tool wall (back at -z): saws, hammers, wrenches, coiled cord. */
+  toolWall(add: Add, lm = 2.4, ym = 1.0): void {
+    const l = lm * M;
+    add('pegboard', box(l, 1.1 * M, 0.02 * M, 0, ym * M, 0));
+    for (let i = 0; i < Math.floor(lm / 0.2); i++) {
+      const x = -l / 2 + 0.15 * M + i * 0.2 * M, k = i % 4;
+      if (k === 0) add('steel', box(0.07 * M, 0.45 * M, 0.01 * M, x, (ym + 0.45) * M, 0.03 * M));         // hand saw
+      else if (k === 1) { add('wood_mid', box(0.03 * M, 0.32 * M, 0.03 * M, x, (ym + 0.5) * M, 0.03 * M)); add('iron', box(0.12 * M, 0.04 * M, 0.04 * M, x, (ym + 0.8) * M, 0.03 * M)); }
+      else if (k === 2) for (let j = 0; j < 4; j++) add('steel', box(0.025 * M, (0.14 + j * 0.03) * M, 0.012 * M, x - 0.06 * M + j * 0.04 * M, (ym + 0.15) * M, 0.03 * M));
+      else add('paint_red', new THREE.TorusGeometry(0.1 * M, 0.025 * M, 6, 12).translate(x, (ym + 0.62) * M, 0.04 * M));
+    }
+  },
+
+  /** Steel shelving rack with parts bins and boxes. */
+  rack(add: Add, lm = 1.8, hm = 2.0): void {
+    const l = lm * M, d = 0.5 * M, h = hm * M;
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) add('steel', box(0.04 * M, h, 0.04 * M, sx * (l / 2 - 0.02 * M), 0, sz * (d / 2 - 0.02 * M)));
+    for (let k = 0; k < 4; k++) {
+      const y = 0.1 * M + k * (h - 0.15 * M) / 3;
+      add('steel', box(l, 0.025 * M, d, 0, y, 0));
+      if (k === 3) break;
+      for (let i = 0; i < Math.floor(lm / 0.36); i++) add(i % 3 === 0 ? 'paint_green' : i % 3 === 1 ? 'wood_mid' : 'paint_red', box(0.3 * M, 0.25 * M, 0.38 * M, -l / 2 + 0.2 * M + i * 0.36 * M, y + 0.025 * M, 0));
+    }
+  },
+
+  /** Anvil on a stump, and a coal forge with its hood and flue. */
+  forge(add: Add): void {
+    add('wood_dark', cyl(0.22 * M, 0.55 * M, 0.7 * M, 0, 0, 10));
+    add('iron', box(0.55 * M, 0.2 * M, 0.16 * M, 0.7 * M, 0.55 * M, 0));
+    add('iron', new THREE.ConeGeometry(0.08 * M, 0.25 * M, 6).rotateZ(Math.PI / 2).translate(0.39 * M, 0.7 * M, 0));
+    add('fieldstone', box(0.9 * M, 0.8 * M, 0.7 * M, -0.4 * M, 0, 0));
+    add('lamp', box(0.4 * M, 0.04 * M, 0.3 * M, -0.4 * M, 0.8 * M, 0));                                       // coals
+    add('iron', new THREE.CylinderGeometry(0.12 * M, 0.45 * M, 0.5 * M, 4).rotateY(Math.PI / 4).translate(-0.4 * M, 1.6 * M, 0));
+    add('iron', cyl(0.12 * M, 1.4 * M, -0.4 * M, 1.85 * M, 0));
+  },
+
+  /** Table saw on a stand. */
+  tableSaw(add: Add): void {
+    add('steel', box(1.0 * M, 0.06 * M, 0.7 * M, 0, 0.86 * M, 0));
+    add('paint_green', box(0.6 * M, 0.6 * M, 0.5 * M, 0, 0.26 * M, 0));
+    legs(add, 0.8 * M, 0.6 * M, 0.26 * M, 0.025 * M, 'steel');
+    add('steel', new THREE.CylinderGeometry(0.13 * M, 0.13 * M, 0.01 * M, 16).rotateX(Math.PI / 2).translate(0, 0.92 * M, 0));
+  },
+
+  /** Lumber rack: arms off the wall (back at -z) with boards and offcuts. */
+  lumberRack(add: Add, lm = 3.0): void {
+    const l = lm * M;
+    for (let i = 0; i < 3; i++) add('steel', box(0.06 * M, 2.0 * M, 0.06 * M, -l / 2 + 0.2 * M + i * (l - 0.4 * M) / 2, 0, -0.25 * M));
+    for (let k = 0; k < 3; k++) {
+      for (let i = 0; i < 3; i++) add('steel', box(0.04 * M, 0.04 * M, 0.45 * M, -l / 2 + 0.2 * M + i * (l - 0.4 * M) / 2, (0.5 + k * 0.6) * M, 0));
+      add('frame', box(l, 0.12 * M, 0.35 * M, 0, (0.54 + k * 0.6) * M, 0.02 * M));
+    }
+  },
+
+  /** Generator on a cart, with jerry cans of fuel beside it. */
+  generator(add: Add): void {
+    add('paint_red', box(0.7 * M, 0.5 * M, 0.5 * M, 0, 0.15 * M, 0));
+    add('iron', box(0.75 * M, 0.04 * M, 0.55 * M, 0, 0.65 * M, 0));
+    for (const sx of [-1, 1]) add('iron', new THREE.CylinderGeometry(0.12 * M, 0.12 * M, 0.06 * M, 10).rotateX(Math.PI / 2).translate(sx * 0.3 * M, 0.12 * M, 0.28 * M));
+    for (let i = 0; i < 3; i++) add(i === 2 ? 'paint_green' : 'paint_red', box(0.18 * M, 0.45 * M, 0.34 * M, 0.55 * M + i * 0.21 * M, 0, -0.05 * M));
+  },
+
+  /** ATV (front faces +z) with a small dump trailer behind. */
+  atv(add: Add): void {
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) add('iron', new THREE.CylinderGeometry(0.28 * M, 0.28 * M, 0.25 * M, 12).rotateZ(Math.PI / 2).translate(sx * 0.55 * M, 0.28 * M, sz * 0.6 * M));
+    add('paint_green', box(1.05 * M, 0.35 * M, 1.6 * M, 0, 0.45 * M, 0));
+    add('iron', box(0.5 * M, 0.15 * M, 0.7 * M, 0, 0.8 * M, -0.1 * M));                                          // seat
+    add('steel', box(0.9 * M, 0.04 * M, 0.04 * M, 0, 1.05 * M, 0.55 * M));                                       // bars
+    add('steel', box(1.1 * M, 0.04 * M, 0.4 * M, 0, 0.85 * M, 0.75 * M));                                        // front rack
+    add('steel', box(0.06 * M, 0.06 * M, 0.9 * M, 0, 0.3 * M, -1.15 * M));                                       // hitch
+    add('paint_green', box(1.1 * M, 0.45 * M, 1.2 * M, 0, 0.4 * M, -2.1 * M));
+    for (const sx of [-1, 1]) add('iron', new THREE.CylinderGeometry(0.2 * M, 0.2 * M, 0.15 * M, 10).rotateZ(Math.PI / 2).translate(sx * 0.62 * M, 0.2 * M, -2.1 * M));
+  },
+
+  /** Work stool. */
+  stool(add: Add): void {
+    add('wood_mid', cyl(0.18 * M, 0.05 * M, 0, 0.65 * M, 0, 10));
+    for (let i = 0; i < 3; i++) { const a = i * 2.09; add('wood_dark', box(0.04 * M, 0.66 * M, 0.04 * M, Math.cos(a) * 0.13 * M, 0, Math.sin(a) * 0.13 * M)); }
+  },
+
+  // ── Cellar / pantry ───────────────────────────────────────────────────
+  /** Slatted bin of potatoes / roots. */
+  rootBin(add: Add, crop: KitMaterialId = 'log_end'): void {
+    add('wood_mid', box(0.8 * M, 0.6 * M, 0.6 * M, 0, 0, 0));
+    for (let i = 0; i < 10; i++) add(crop, new THREE.SphereGeometry(0.07 * M, 6, 5).translate(((i % 5) - 2) * 0.13 * M, 0.6 * M + Math.floor(i / 5) * 0.04 * M, ((i * 7) % 3 - 1) * 0.15 * M));
+  },
+
+  /** Stoneware crocks (sauerkraut, pickles, lard). */
+  crocks(add: Add): void {
+    const r = [0.18, 0.14, 0.16];
+    r.forEach((rr, i) => { add('crockery', new THREE.CylinderGeometry(rr * M, rr * 0.9 * M, rr * 2.4 * M, 12).translate((i - 1) * 0.38 * M, rr * 1.2 * M, (i % 2) * 0.15 * M)); add('wood_dark', cyl(rr * 0.9 * M, 0.03 * M, (i - 1) * 0.38 * M, rr * 2.4 * M, (i % 2) * 0.15 * M, 12)); });
+  },
+
+  /** Herbs / onions hanging from a pole across the ceiling (back at -z). */
+  hangingStrings(add: Add, lm = 1.6, ym = 1.9): void {
+    const l = lm * M;
+    add('wood_dark', box(l, 0.04 * M, 0.04 * M, 0, ym * M, 0));
+    for (let i = 0; i < 7; i++) add(i % 2 ? 'crop' : 'straw', new THREE.ConeGeometry(0.07 * M, 0.45 * M, 6).rotateX(Math.PI).translate(-l / 2 + 0.12 * M + i * (l - 0.24 * M) / 6, (ym - 0.25) * M, 0));
+  },
+
+  // ── Coop ──────────────────────────────────────────────────────────────
+  /** Roost ladder: rungs at rising heights. */
+  roosts(add: Add, lm = 1.2): void {
+    const l = lm * M;
+    for (let k = 0; k < 3; k++) {
+      add('wood_mid', box(l, 0.05 * M, 0.05 * M, 0, (0.4 + k * 0.3) * M, -0.05 * M + k * 0.25 * M));
+      for (const sx of [-1, 1]) add('wood_dark', box(0.04 * M, (0.4 + k * 0.3) * M, 0.04 * M, sx * (l / 2 - 0.05 * M), 0, -0.05 * M + k * 0.25 * M));
+    }
+  },
+
+  /** A row of nest boxes with straw (back at -z), mounted at `ym`. */
+  nestBoxes(add: Add, n = 4, ym = 0.45): void {
+    const w = 0.32 * M, l = n * w;
+    add('wood_mid', box(l, 0.02 * M, 0.35 * M, 0, ym * M, 0));
+    add('wood_mid', box(l, 0.3 * M, 0.02 * M, 0, ym * M, -0.17 * M));
+    for (let i = 0; i <= n; i++) add('wood_dark', box(0.02 * M, 0.3 * M, 0.35 * M, -l / 2 + i * w, ym * M, 0));
+    for (let i = 0; i < n; i++) {
+      add('straw', box(w - 0.04 * M, 0.06 * M, 0.3 * M, -l / 2 + (i + 0.5) * w, (ym + 0.02) * M, 0));
+      if (i % 2 === 0) add('enamel', new THREE.SphereGeometry(0.03 * M, 6, 5).scale(1, 1.3, 1).translate(-l / 2 + (i + 0.5) * w, (ym + 0.1) * M, 0.03 * M));
+    }
+    add('wood_dark', box(l, 0.06 * M, 0.04 * M, 0, ym * M, 0.19 * M));
+  },
+
+  /** Hanging feeder and a waterer. */
+  feeder(add: Add): void {
+    add('steel', new THREE.CylinderGeometry(0.12 * M, 0.12 * M, 0.45 * M, 10).translate(0, 0.35 * M, 0));
+    add('steel', new THREE.CylinderGeometry(0.22 * M, 0.2 * M, 0.06 * M, 12).translate(0, 0.3 * M, 0));
+    add('enamel', new THREE.CylinderGeometry(0.14 * M, 0.17 * M, 0.38 * M, 12).translate(0.5 * M, 0.19 * M, 0));
+  },
+
+  /** A hen (faces +z): body, tail, head, comb. */
+  hen(add: Add, color: KitMaterialId = 'paint_red'): void {
+    add(color, new THREE.SphereGeometry(0.13 * M, 8, 6).scale(1, 0.85, 1.25).translate(0, 0.22 * M, 0));
+    add(color, new THREE.ConeGeometry(0.08 * M, 0.18 * M, 6).rotateX(-0.8).translate(0, 0.32 * M, -0.15 * M));
+    add(color, new THREE.SphereGeometry(0.065 * M, 7, 6).translate(0, 0.36 * M, 0.13 * M));
+    add('paint_red', box(0.015 * M, 0.05 * M, 0.06 * M, 0, 0.41 * M, 0.13 * M));
+    add('straw', new THREE.ConeGeometry(0.02 * M, 0.05 * M, 5).rotateX(Math.PI / 2).translate(0, 0.35 * M, 0.2 * M));
+    for (const sx of [-1, 1]) add('straw', box(0.015 * M, 0.12 * M, 0.015 * M, sx * 0.05 * M, 0.02 * M, 0));
+  },
+
+  // ── Garden ────────────────────────────────────────────────────────────
+  /** Raised bed w × l (m) with crops of a kind. */
+  raisedBed(add: Add, wm = 1.2, lm = 3.0, crop: 'greens' | 'tall' | 'squash' | 'roots' = 'greens'): void {
+    const w = wm * M, l = lm * M, h = 0.35 * M;
+    for (const sx of [-1, 1]) add('wood_mid', box(0.06 * M, h, l, sx * (w / 2 - 0.03 * M), 0, 0));
+    for (const sz of [-1, 1]) add('wood_mid', box(w, h, 0.06 * M, 0, 0, sz * (l / 2 - 0.03 * M)));
+    add('soil', box(w - 0.1 * M, h - 0.04 * M, l - 0.1 * M, 0, 0, 0));
+    const rows = Math.max(2, Math.round(wm / 0.4)), per = Math.round(lm / 0.35);
+    for (let i = 0; i < rows; i++) for (let j = 0; j < per; j++) {
+      const x = -w / 2 + (i + 0.5) * w / rows, z = -l / 2 + (j + 0.5) * l / per, y = h - 0.04 * M;
+      if (crop === 'greens') add('crop', new THREE.SphereGeometry(0.11 * M, 6, 4).scale(1, 0.6, 1).translate(x, y + 0.05 * M, z));
+      else if (crop === 'roots') add('crop', new THREE.ConeGeometry(0.07 * M, 0.28 * M, 5).translate(x, y + 0.14 * M, z));
+      else if (crop === 'tall') { add('crop', new THREE.CylinderGeometry(0.03 * M, 0.04 * M, 1.3 * M, 5).translate(x, y + 0.65 * M, z)); add('crop', new THREE.ConeGeometry(0.14 * M, 0.5 * M, 6).translate(x, y + 1.0 * M, z)); }
+      else if ((i + j) % 2 === 0) { add('crop', new THREE.SphereGeometry(0.2 * M, 7, 5).scale(1.3, 0.45, 1.3).translate(x, y + 0.07 * M, z)); add('paint_red', new THREE.SphereGeometry(0.09 * M, 8, 6).scale(1.3, 1, 1).translate(x + 0.08 * M, y + 0.06 * M, z)); }
+    }
+  },
+
+  /** Three-bay compost bin. */
+  compost(add: Add): void {
+    for (let i = 0; i < 4; i++) add('wood_mid', box(0.06 * M, 1.0 * M, 1.0 * M, -1.5 * M + i * 1.0 * M, 0, 0));
+    add('wood_mid', box(3.0 * M, 1.0 * M, 0.06 * M, 0, 0, -0.5 * M));
+    for (let i = 0; i < 3; i++) add(i === 2 ? 'straw' : 'soil', box(0.9 * M, (0.4 + i * 0.15) * M, 0.9 * M, -1.0 * M + i * 1.0 * M, 0, 0));
+  },
+
+  // ── House ─────────────────────────────────────────────────────────────
+  /** Three-seat sofa with cushions and a throw; sitter faces +z. */
+  sofa(add: Add, quilt: KitMaterialId = 'quilt_blue'): void {
+    const w = 2.1 * M, d = 0.9 * M;
+    add('wood_dark', box(w, 0.1 * M, d, 0, 0.06 * M, 0));
+    legs(add, w, d, 0.06 * M, 0.025 * M);
+    add('linen', box(w - 0.3 * M, 0.2 * M, d - 0.2 * M, 0, 0.16 * M, 0.08 * M));
+    add('linen', box(w - 0.1 * M, 0.6 * M, 0.2 * M, 0, 0.16 * M, -d / 2 + 0.1 * M));
+    for (const sx of [-1, 1]) add('linen', box(0.16 * M, 0.5 * M, d, sx * (w / 2 - 0.08 * M), 0.16 * M, 0));
+    add(quilt, box(0.8 * M, 0.04 * M, 0.7 * M, w * 0.22, 0.37 * M, 0.05 * M));
+  },
+
+  /** Stone fireplace with hearth, firebox and a mantel; the chimney breast runs up `hm`. */
+  fireplace(add: Add, hm = 3.0): void {
+    add('fieldstone', box(1.9 * M, hm * M, 0.7 * M, 0, 0, 0));
+    add('fieldstone', box(2.1 * M, 0.25 * M, 0.75 * M, 0, 0, 0.6 * M));
+    add('iron', box(0.9 * M, 0.75 * M, 0.04 * M, 0, 0.35 * M, 0.34 * M));
+    add('lamp', box(0.6 * M, 0.25 * M, 0.02 * M, 0, 0.4 * M, 0.37 * M));
+    add('wood_dark', box(2.0 * M, 0.12 * M, 0.3 * M, 0, 1.35 * M, 0.42 * M));
+    add('crockery', cyl(0.06 * M, 0.25 * M, -0.6 * M, 1.47 * M, 0.42 * M, 8));
+    Furniture.oilLamp(add, 0.6, 1.47, 0.42);
+  },
+
+  /** Kitchen island with a butcher-block top and stools on the far side. */
+  island(add: Add, lm = 1.8): void {
+    const l = lm * M, d = 0.9 * M, h = 0.92 * M;
+    add('wood_mid', box(l, h - 0.06 * M, d - 0.1 * M, 0, 0.06 * M, 0));
+    add('wood_dark', box(l + 0.1 * M, 0.06 * M, d + 0.1 * M, 0, h - 0.06 * M, 0));
+    add('iron', cyl(0.15 * M, 0.2 * M, -0.4 * M, h, 0, 10));
+    add('crop', new THREE.SphereGeometry(0.1 * M, 6, 5).translate(0.4 * M, h + 0.08 * M, 0));
+  },
+
+  /** Clawfoot tub (along x). */
+  tub(add: Add): void {
+    add('enamel', new THREE.CapsuleGeometry(0.36 * M, 0.95 * M, 4, 12).rotateZ(Math.PI / 2).scale(1, 0.8, 1).translate(0, 0.42 * M, 0));
+    add('linen', box(1.2 * M, 0.02 * M, 0.5 * M, 0, 0.62 * M, 0));
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) add('steel', cyl(0.04 * M, 0.15 * M, sx * 0.5 * M, 0, sz * 0.22 * M, 6));
+  },
+
+  /** Washstand with basin and pitcher, mirror above (back at -z). */
+  washstand(add: Add): void {
+    add('wood_mid', box(0.8 * M, 0.8 * M, 0.45 * M, 0, 0, 0));
+    add('enamel', cyl(0.2 * M, 0.08 * M, 0, 0.8 * M, 0, 12));
+    add('enamel', cyl(0.08 * M, 0.25 * M, 0.25 * M, 0.8 * M, 0, 10));
+    add('glass', box(0.5 * M, 0.6 * M, 0.02 * M, 0, 1.25 * M, -0.2 * M));
+    add('wood_dark', box(0.58 * M, 0.68 * M, 0.015 * M, 0, 1.21 * M, -0.215 * M));
+  },
+
+  /** Composting toilet (a wooden box seat with a lid, sawdust bucket). */
+  toilet(add: Add): void {
+    add('wood_mid', box(0.55 * M, 0.45 * M, 0.6 * M, 0, 0, 0));
+    add('wood_dark', box(0.45 * M, 0.03 * M, 0.45 * M, 0, 0.45 * M, 0.04 * M));
+    add('steel', cyl(0.13 * M, 0.3 * M, 0.45 * M, 0, 0.1 * M, 10));
+    add('straw', cyl(0.12 * M, 0.02 * M, 0.45 * M, 0.3 * M, 0.1 * M, 10));
+  },
+
+  /** Single bed (0.95 × 2 m) with a quilt. */
+  single(add: Add, quilt: KitMaterialId = 'quilt_blue'): void { Furniture.bed(add, false, quilt); },
+
+  /** Bunk bed: two singles stacked on corner posts with a ladder. */
+  bunk(add: Add, q1: KitMaterialId = 'quilt_red', q2: KitMaterialId = 'quilt_blue'): void {
+    const w = 0.95 * M, l = 2.0 * M;
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) add('wood_dark', box(0.07 * M, 1.7 * M, 0.07 * M, sx * w / 2, 0, sz * l / 2));
+    for (const [y, q] of [[0.2, q1], [1.1, q2]] as const) {
+      add('wood_mid', box(w, 0.1 * M, l, 0, y * M, 0));
+      add('linen', box(w - 0.05 * M, 0.16 * M, l - 0.06 * M, 0, (y + 0.1) * M, 0));
+      add(q, box(w + 0.02 * M, 0.04 * M, l * 0.68, 0, (y + 0.25) * M, l * 0.15));
+      add('linen', box(0.6 * M, 0.1 * M, 0.35 * M, 0, (y + 0.26) * M, -l / 2 + 0.25 * M));
+    }
+    for (let k = 0; k < 4; k++) add('wood_mid', box(0.04 * M, 0.04 * M, 0.4 * M, w / 2 + 0.03 * M, (0.4 + k * 0.3) * M, l / 2 - 0.3 * M));
+  },
+
+  /** Straight stair run rising toward -z: `rise` (m) over `run` (m), width (m), with a handrail on the +x side. */
+  stairs(add: Add, rise = 3.0, run = 3.6, wm = 0.9): void {
+    const n = Math.round(rise / 0.19), w = wm * M, tr = run * M / n, rr = rise * M / n;
+    for (let i = 0; i < n; i++) {
+      add('wood_mid', box(w, 0.04 * M, tr + 0.02 * M, 0, (i + 1) * rr - 0.04 * M, run * M / 2 - (i + 0.5) * tr));
+      add('wood_dark', box(w, rr, 0.02 * M, 0, i * rr, run * M / 2 - i * tr));
+    }
+    const len = Math.hypot(rise * M, run * M), ang = Math.atan2(rise * M, run * M);
+    for (const sx of [-1, 1]) add('wood_dark', box(0.05 * M, 0.25 * M, len, sx * w / 2, 0, 0).rotateX(ang).translate(0, rise * M / 2 - 0.05 * M, 0));
+    add('wood_mid', box(0.05 * M, 0.05 * M, len, w / 2, 0, 0).rotateX(ang).translate(0, rise * M / 2 + 0.85 * M, 0));
+  },
+
+  /** Six-seat dining table with benches. */
+  diningTable(add: Add): void {
+    Furniture.table(add, 2.0, 0.95);
+    for (const sz of [-1, 1]) { const g: THREE.BufferGeometry[] = []; Furniture.bench((m, geo) => { g.push(geo); add(m, geo.translate(0, 0, sz * 0.7 * M)); }, 1.8); }
+    Furniture.oilLamp(add, 0, 0.76, 0);
+  },
+
+  /** Bathroom / kitchen: a cast-iron cookstove (wood range) with oven door and warming shelf. */
+  cookstove(add: Add): void {
+    add('iron', box(1.1 * M, 0.75 * M, 0.65 * M, 0, 0.12 * M, 0));
+    legs(add, 1.1 * M, 0.65 * M, 0.12 * M, 0.035 * M, 'iron');
+    add('steel', box(0.45 * M, 0.35 * M, 0.02 * M, 0.2 * M, 0.25 * M, 0.33 * M));
+    add('iron', box(1.1 * M, 0.3 * M, 0.25 * M, 0, 1.2 * M, -0.2 * M));
+    add('iron', cyl(0.07 * M, 1.4 * M, -0.35 * M, 0.87 * M, -0.2 * M));
+    add('enamel', cyl(0.12 * M, 0.16 * M, 0.25 * M, 0.87 * M, 0.05 * M));
+  },
 } as const;
 
 /** Point-in-collider test with a body radius (local frame). */

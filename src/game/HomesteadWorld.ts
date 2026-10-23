@@ -23,7 +23,8 @@ import type { GameState } from '../sim/state';
 import type { WearSeason } from '../engine/world/people/crowdWear';
 import type { TourBuildingInfo } from '../engine/world/camera/TourController';
 import { footprint, KIT, type Placed } from './buildkit/kit';
-import { buildCabinLayers, cabinChimneyTop, showCabinStage, CABIN, CUTAWAY_HIDE, XRAY_LAYERS, type CabinLayer } from './buildkit/cabinGeometry';
+import { showStage, CUTAWAY_HIDE, XRAY_LAYERS, type BuildLayer as CabinLayer } from './buildkit/shell';
+import { buildLayers, type Seat } from './buildkit/buildings';
 import { hitsColliders, type Collider } from './buildkit/interior';
 import type { BuildingView } from '../store/worldStore';
 import type { Structure } from '../sim/state';
@@ -52,13 +53,14 @@ const TREE_MARGIN = 26;
 interface Built {
   placed: Placed;
   group: THREE.Group;
-  smoke: SmokePlume;
+  /** Wood smoke from the chimney / stovepipe (null: no stove). */
+  smoke: SmokePlume | null;
   key: string;
   finished: boolean;
   /** Floor level of the pad the building stands on. */
   padY: number;
   /** Lamplight inside (warm point light, brighter at night). */
-  light: THREE.PointLight;
+  light: THREE.PointLight | null;
 }
 
 /** See-through variants of the kit materials (x-ray view), shared. */
@@ -385,18 +387,24 @@ export class HomesteadWorld {
     const y = this.parcel.padHeight(r.x0, r.z0, r.x1, r.z1);
     const pad: Pad = { x0: r.x0 - 0.05, z0: r.z0 - 0.05, x1: r.x1 + 0.05, z1: r.z1 + 0.05, y, skirt: 0.9 };
     this.parcel.setPads([...this.parcel.pads, pad]);
-    const group = buildCabinLayers(def);
-    showCabinStage(group, 0, 0);
+    const group = buildLayers(def);
+    showStage(group, 0, 0);
     group.position.set(p.x, y, p.z);
     group.rotation.y = p.rot * Math.PI / 2;
-    group.userData = { type: 'building', buildingId: p.id };
+    // keep the builder's userData (colliders, seats, chimney) and tag it for the tour camera
+    Object.assign(group.userData, { type: 'building', buildingId: p.id });
     this._ws.scene.add(group);
-    const smoke = new SmokePlume(group.localToWorld(cabinChimneyTop(def)));
-    this._ws.scene.add(smoke.points);
-    const light = new THREE.PointLight(0xffc27a, 0, 1.4, 2);
-    light.position.set(-0.2, CABIN.floor + 0.32, -0.05);
-    light.visible = false;
-    group.add(light);
+    group.updateMatrixWorld(true);
+    const top = group.userData.chimneyTop as THREE.Vector3 | null;
+    const smoke = top ? new SmokePlume(group.localToWorld(top.clone())) : null;
+    if (smoke) this._ws.scene.add(smoke.points);
+    let light: THREE.PointLight | null = null;
+    if (def.light) {
+      light = new THREE.PointLight(0xffc27a, 0, def.cellsX * CELL * 1.4 + 0.6, 2);
+      light.position.set(def.light[0], def.floorY + def.light[1], def.light[2]);
+      light.visible = false;
+      group.add(light);
+    }
     this._built.set(p.id, { placed: p, group, smoke, key: '', finished: false, padY: y, light });
     this.terrain.refresh(this._terrainSource, pad.x0 - pad.skirt - 1, pad.z0 - pad.skirt - 1, pad.x1 + pad.skirt + 1, pad.z1 + pad.skirt + 1);
     if (this._quality) this._plant(this._quality);
@@ -419,8 +427,8 @@ export class HomesteadWorld {
       const key = `${st.stage}:${Math.round(f * 200)}:${st.supplied ? 1 : 0}`;
       if (key === b.key) continue;
       b.key = key;
-      showCabinStage(b.group, done ? 5 : st.stage, f, st.supplied);
-      if (done !== b.finished) { b.finished = done; b.light.visible = done; this._ws.invalidateShadows(); }
+      showStage(b.group, done ? 5 : st.stage, f, st.supplied);
+      if (done !== b.finished) { b.finished = done; if (b.light) b.light.visible = done; this._ws.invalidateShadows(); }
       this._applyView(b);
     }
   }
@@ -454,7 +462,7 @@ export class HomesteadWorld {
     const night = 1 - this.air.daylight;
     const lit = this.air.hour > 5.5 && this.air.hour < 23;
     for (const b of this._built.values()) {
-      if (!b.finished) continue;
+      if (!b.finished || !b.light) continue;
       b.light.intensity = (this._view === 'full' ? 0.25 : 0.12) + (lit ? night * 1.6 : night * 0.25);
     }
   }
@@ -465,9 +473,10 @@ export class HomesteadWorld {
       const b = this._built.get(id);
       if (!b) return null;
       const def = KIT[b.placed.kind];
-      return { x: b.placed.x, z: b.placed.z, rot: b.placed.rot * Math.PI / 2, w: def.cellsX * CELL, d: def.cellsZ * CELL };
+      return { x: b.placed.x, z: b.placed.z, rot: b.placed.rot * Math.PI / 2, w: def.cellsX * CELL, d: def.cellsZ * CELL, seats: b.group.userData.seats as Seat[] };
     };
-    const homeB = [...this._built.values()].find(b => b.finished);
+    // home: the finished house that sleeps the most
+    const homeB = [...this._built.values()].filter(b => b.finished && KIT[b.placed.kind].sleeps > 0).sort((a, b) => KIT[b.placed.kind].sleeps - KIT[a.placed.kind].sleeps)[0];
     const tree = (jobId: string) => {
       const j = game.forestry.jobs.find(x => x.id === jobId);
       const t = j && this._treeById.get(j.treeId);
@@ -485,7 +494,7 @@ export class HomesteadWorld {
   localToWorld(id: string, lx: number, ly: number, lz: number): { x: number; y: number; z: number } | null {
     const b = this._built.get(id);
     if (!b) return null;
-    const v = new THREE.Vector3(lx, ly + CABIN.floor, lz).applyEuler(new THREE.Euler(0, b.placed.rot * Math.PI / 2, 0));
+    const v = new THREE.Vector3(lx, ly + KIT[b.placed.kind].floorY, lz).applyEuler(new THREE.Euler(0, b.placed.rot * Math.PI / 2, 0));
     return { x: b.placed.x + v.x, y: b.padY + v.y, z: b.placed.z + v.z };
   }
 
@@ -521,7 +530,7 @@ export class HomesteadWorld {
       const def = KIT[b.placed.kind];
       const [lx, lz] = this._local(b, x, z);
       const hw = def.cellsX * CELL / 2, hd = def.cellsZ * CELL / 2;
-      if (Math.abs(lx) < hw && lz > -hd && lz < hd + CABIN.porch) return b.padY + CABIN.floor;
+      if (Math.abs(lx) < hw && lz > -hd && lz < hd + def.porch && def.floorY > 0.02) return b.padY + def.floorY;
     }
     return this.groundAt(x, z);
   };
@@ -588,7 +597,7 @@ export class HomesteadWorld {
     const fire = Math.max(cooking, heating * (h > 23 || h < 5 ? 0.5 : 1));
     const wx = 0.08 + a.wind * 0.45, wz = 0.03 + a.wind * 0.12;   // prevailing westerlies off the range
     this._updateLights();
-    for (const { smoke, finished } of this._built.values()) smoke.update(this._clock, finished ? fire : 0, wx, wz, a.daylight, a.viewportH);
+    for (const { smoke, finished } of this._built.values()) smoke?.update(this._clock, finished ? fire : 0, wx, wz, a.daylight, a.viewportH);
     if (seasonState.plants !== this._plantSeason) {
       this._plantSeason = seasonState.plants;
       this.stream.setSeason(this._plantSeason);
@@ -599,8 +608,8 @@ export class HomesteadWorld {
   dispose(): void {
     this.terrain.dispose();
     for (const { group, smoke } of this._built.values()) {
-      this._ws.scene.remove(group, smoke.points);
-      smoke.dispose();
+      this._ws.scene.remove(group);
+      if (smoke) { this._ws.scene.remove(smoke.points); smoke.dispose(); }
       group.traverse(o => (o as THREE.Mesh).geometry?.dispose());
     }
     this._built.clear();

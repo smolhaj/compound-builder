@@ -15,12 +15,15 @@ import { generateNormalMap } from '../../engine/world/materials/normalMapGen';
 
 export type KitMaterialId = 'timber_lap' | 'trim' | 'fieldstone' | 'metal_roof' | 'deck' | 'door' | 'glass' | 'chimney_cap' | 'frame' | 'scaffold' | 'string'
   // interior finishes and furnishings
-  | 'pine_panel' | 'wood_dark' | 'wood_mid' | 'iron' | 'enamel' | 'quilt_red' | 'quilt_blue' | 'linen' | 'rug' | 'books' | 'lamp' | 'cutcap' | 'crockery';
+  | 'pine_panel' | 'wood_dark' | 'wood_mid' | 'iron' | 'enamel' | 'quilt_red' | 'quilt_blue' | 'linen' | 'rug' | 'books' | 'lamp' | 'cutcap' | 'crockery'
+  // more buildings
+  | 'concrete' | 'metal_siding' | 'log_wall' | 'log_end' | 'board_batten' | 'wire_mesh' | 'straw' | 'soil' | 'crop' | 'earth' | 'pegboard' | 'steel' | 'paint_red' | 'paint_green';
 
 /** World units covered by one texture repeat. */
 const TEX_WORLD: Partial<Record<KitMaterialId, number>> = {
   timber_lap: 0.5, fieldstone: 0.5, metal_roof: 0.5, deck: 0.5, door: 0.2,
   pine_panel: 0.5, quilt_red: 0.12, quilt_blue: 0.12, rug: 0.3, books: 0.1,
+  concrete: 0.6, metal_siding: 0.5, log_wall: 0.5, board_batten: 0.5, wire_mesh: 0.15, straw: 0.3, soil: 0.4, earth: 0.8, pegboard: 0.2,
 };
 
 function lcg(seed: number): () => number {
@@ -231,6 +234,133 @@ function paintBooks(): HTMLCanvasElement {
   return c;
 }
 
+/** Poured concrete: grey with mottling, trowel swirls and a few cracks. */
+function paintConcrete(): HTMLCanvasElement {
+  const N = 256;
+  const [c, g] = canvas(N);
+  const r = lcg(91);
+  g.fillStyle = rgb(150, 148, 142);
+  g.fillRect(0, 0, N, N);
+  for (let k = 0; k < 900; k++) {
+    const t = r();
+    g.fillStyle = `rgba(${t < 0.5 ? '110,108,104' : '185,182,176'},${0.05 + r() * 0.12})`;
+    g.fillRect(r() * N, r() * N, 2 + r() * 10, 2 + r() * 10);
+  }
+  g.strokeStyle = 'rgba(80,78,74,0.5)';
+  for (let k = 0; k < 3; k++) { g.beginPath(); let x = r() * N, y = r() * N; g.moveTo(x, y); for (let i = 0; i < 6; i++) { x += (r() - 0.5) * 40; y += (r() - 0.3) * 30; g.lineTo(x, y); } g.stroke(); }
+  return c;
+}
+
+/** Corrugated / ribbed steel siding: vertical ribs, galvanised grey-green with streaks. */
+function paintMetalSiding(): HTMLCanvasElement {
+  const N = 256, ribs = 12, pw = N / ribs;
+  const [c, g] = canvas(N);
+  const r = lcg(97);
+  for (let i = 0; i < ribs; i++) {
+    const grd = g.createLinearGradient(i * pw, 0, (i + 1) * pw, 0);
+    grd.addColorStop(0, rgb(70, 82, 74)); grd.addColorStop(0.5, rgb(112, 126, 116)); grd.addColorStop(1, rgb(64, 74, 68));
+    g.fillStyle = grd;
+    g.fillRect(i * pw, 0, pw, N);
+  }
+  for (let k = 0; k < 40; k++) { g.fillStyle = `rgba(120,90,60,${0.04 + r() * 0.08})`; g.fillRect(r() * N, r() * N * 0.5 + N * 0.5, 1 + r() * 3, 20 + r() * 60); }
+  return c;
+}
+
+/** Log wall: horizontal round logs (~30 cm) with pale chinking between. */
+function paintLogWall(): HTMLCanvasElement {
+  const N = 512, n = 10, lh = N / n;
+  const [c, g] = canvas(N);
+  const r = lcg(103);
+  for (let i = 0; i < n; i++) {
+    const t = 0.85 + r() * 0.25;
+    const grd = g.createLinearGradient(0, i * lh, 0, (i + 1) * lh);
+    grd.addColorStop(0, rgb(70 * t, 46 * t, 26 * t));
+    grd.addColorStop(0.35, rgb(150 * t, 102 * t, 58 * t));
+    grd.addColorStop(0.7, rgb(128 * t, 86 * t, 48 * t));
+    grd.addColorStop(1, rgb(58 * t, 38 * t, 22 * t));
+    g.fillStyle = grd;
+    g.fillRect(0, i * lh, N, lh);
+    for (let k = 0; k < 30; k++) { g.fillStyle = `rgba(60,38,20,${0.1 + r() * 0.2})`; g.fillRect(r() * N, i * lh + lh * (0.2 + r() * 0.6), 30 + r() * 120, 1); }
+    g.fillStyle = 'rgba(214,200,170,0.9)';
+    g.fillRect(0, i * lh - 2, N, 4);
+  }
+  return c;
+}
+
+/** Board-and-batten: vertical boards with raised battens, barn red or weathered grey. */
+function paintBoardBatten(): HTMLCanvasElement {
+  const N = 256, n = 8, bw = N / n;
+  const [c, g] = canvas(N);
+  const r = lcg(107);
+  for (let i = 0; i < n; i++) {
+    const t = 0.88 + r() * 0.18;
+    g.fillStyle = rgb(126 * t, 58 * t, 44 * t);
+    g.fillRect(i * bw, 0, bw, N);
+    for (let k = 0; k < 10; k++) { g.fillStyle = `rgba(80,40,30,${0.08 + r() * 0.12})`; g.fillRect(i * bw + r() * bw, r() * N, 1, 40 + r() * 100); }
+    g.fillStyle = 'rgba(40,18,12,0.55)'; g.fillRect(i * bw - 3, 0, 2, N);
+    g.fillStyle = rgb(142, 68, 52); g.fillRect(i * bw - 1, 0, 5, N);
+  }
+  return c;
+}
+
+/** Welded wire / chicken wire mesh (alpha). */
+function paintMesh(): HTMLCanvasElement {
+  const N = 128;
+  const [c, g] = canvas(N);
+  g.clearRect(0, 0, N, N);
+  g.strokeStyle = 'rgba(170,175,170,1)';
+  g.lineWidth = 2;
+  for (let i = 0; i <= 8; i++) { g.beginPath(); g.moveTo(i * 16, 0); g.lineTo(i * 16, N); g.stroke(); g.beginPath(); g.moveTo(0, i * 16); g.lineTo(N, i * 16); g.stroke(); }
+  return c;
+}
+
+/** Straw bedding: tangled pale stalks. */
+function paintStraw(): HTMLCanvasElement {
+  const N = 128;
+  const [c, g] = canvas(N);
+  const r = lcg(109);
+  g.fillStyle = rgb(196, 168, 98);
+  g.fillRect(0, 0, N, N);
+  for (let k = 0; k < 400; k++) {
+    g.strokeStyle = `rgba(${r() < 0.5 ? '230,205,130' : '150,120,60'},0.7)`;
+    g.beginPath(); const x = r() * N, y = r() * N, a = r() * Math.PI; g.moveTo(x, y); g.lineTo(x + Math.cos(a) * 12, y + Math.sin(a) * 12); g.stroke();
+  }
+  return c;
+}
+
+/** Tilled garden soil: dark loam with clods. */
+function paintSoil(): HTMLCanvasElement {
+  const N = 128;
+  const [c, g] = canvas(N);
+  const r = lcg(113);
+  g.fillStyle = rgb(72, 52, 36);
+  g.fillRect(0, 0, N, N);
+  for (let k = 0; k < 500; k++) { const t = r(); g.fillStyle = `rgba(${t < 0.5 ? '40,28,18' : '110,84,60'},${0.3 + r() * 0.4})`; g.fillRect(r() * N, r() * N, 1 + r() * 4, 1 + r() * 3); }
+  return c;
+}
+
+/** Sod over an earth-bermed roof: grass with patches of soil. */
+function paintEarth(): HTMLCanvasElement {
+  const N = 128;
+  const [c, g] = canvas(N);
+  const r = lcg(127);
+  g.fillStyle = rgb(92, 104, 60);
+  g.fillRect(0, 0, N, N);
+  for (let k = 0; k < 600; k++) { const t = r(); g.fillStyle = `rgba(${t < 0.3 ? '96,74,48' : t < 0.7 ? '120,132,72' : '70,84,46'},${0.3 + r() * 0.4})`; g.fillRect(r() * N, r() * N, 1 + r() * 3, 2 + r() * 4); }
+  return c;
+}
+
+/** Pegboard: brown hardboard with a hole grid. */
+function paintPegboard(): HTMLCanvasElement {
+  const N = 128;
+  const [c, g] = canvas(N);
+  g.fillStyle = rgb(150, 112, 74);
+  g.fillRect(0, 0, N, N);
+  g.fillStyle = 'rgba(40,26,16,0.85)';
+  for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) { g.beginPath(); g.arc(8 + i * 16, 8 + j * 16, 2.2, 0, Math.PI * 2); g.fill(); }
+  return c;
+}
+
 const _cache = new Map<KitMaterialId, THREE.MeshStandardMaterial>();
 
 function texMat(id: KitMaterialId, paint: () => HTMLCanvasElement, strength: number, roughness: number, metalness = 0, ns = 1): THREE.MeshStandardMaterial {
@@ -277,6 +407,24 @@ export function kitMaterial(id: KitMaterialId): THREE.MeshStandardMaterial {
     case 'books': m = texMat(id, paintBooks, 0.8, 0.8); break;
     case 'lamp': m = new THREE.MeshStandardMaterial({ color: 0xffe6b0, roughness: 0.3, emissive: new THREE.Color(1.0, 0.75, 0.4), emissiveIntensity: 0.4, transparent: true, opacity: 0.85 }); break;
     case 'cutcap': m = new THREE.MeshStandardMaterial({ color: 0x3b2a1d, roughness: 0.9 }); break;
+    case 'concrete': m = texMat(id, paintConcrete, 1.2, 0.92); break;
+    case 'metal_siding': m = texMat(id, paintMetalSiding, 2.5, 0.5, 0.5); break;
+    case 'log_wall': m = texMat(id, paintLogWall, 4, 0.85, 0, 1.4); break;
+    case 'log_end': m = new THREE.MeshStandardMaterial({ color: 0x8a6440, roughness: 0.85 }); break;
+    case 'board_batten': m = texMat(id, paintBoardBatten, 2, 0.85); break;
+    case 'wire_mesh': {
+      const mm = texMat(id, paintMesh, 0.5, 0.5, 0.6);
+      mm.transparent = true; mm.alphaTest = 0.3; mm.side = THREE.DoubleSide; mm.normalMap = null;
+      m = mm; break;
+    }
+    case 'straw': m = texMat(id, paintStraw, 1, 0.95); break;
+    case 'soil': m = texMat(id, paintSoil, 2, 0.98); break;
+    case 'earth': m = texMat(id, paintEarth, 1.5, 0.97); break;
+    case 'pegboard': m = texMat(id, paintPegboard, 1, 0.8); break;
+    case 'crop': m = new THREE.MeshStandardMaterial({ color: 0x4f8a34, roughness: 0.85 }); break;
+    case 'steel': m = new THREE.MeshStandardMaterial({ color: 0x7c8186, roughness: 0.4, metalness: 0.75 }); break;
+    case 'paint_red': m = new THREE.MeshStandardMaterial({ color: 0x9c2f26, roughness: 0.6 }); break;
+    case 'paint_green': m = new THREE.MeshStandardMaterial({ color: 0x3f5f3a, roughness: 0.6 }); break;
   }
   m.name = `kit_${id}`;
   _cache.set(id, m);

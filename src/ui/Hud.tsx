@@ -10,7 +10,7 @@ import { MATERIALS, MATERIAL_IDS, emptyStock, type MaterialId } from '../sim/mat
 import { onOrder, orderCost, orderProblem } from '../sim/economy';
 import { blockedReason, isFinished, progress } from '../sim/construction';
 import { BLUEPRINTS, totalBill, totalHours } from '../sim/blueprints';
-import { KIT } from '../game/buildkit/kit';
+import { KIT, KIT_ORDER } from '../game/buildkit/kit';
 
 const QUALITIES: Quality[] = ['high', 'medium', 'low'];
 const CAMERAS: Array<[CameraMode, string]> = [['diorama', 'Diorama'], ['walk', 'Walk'], ['fly', 'Fly'], ['cinematic', 'Tour']];
@@ -60,8 +60,8 @@ export function Hud() {
   for (const k of MATERIAL_IDS) need[k] = Math.max(0, (need[k] ?? 0) - game.stock[k] - (pending[k] ?? 0));
   const needLines = MATERIAL_IDS.filter(k => (need[k] ?? 0) > 0 && MATERIALS[k].price !== null).map(k => ({ material: k, qty: need[k]! }));
   const sel = game.structures.find(s => s.id === g.selected) ?? game.structures.find(s => !isFinished(s)) ?? null;
-  const cabin = BLUEPRINTS.timber_cabin;
-  const cabinCost = orderCost(Object.entries(totalBill(cabin)).map(([material, qty]) => ({ material: material as MaterialId, qty: qty as number })));
+  const costOf = (kind: string) => orderCost(Object.entries(totalBill(BLUEPRINTS[kind])).filter(([m]) => MATERIALS[m as MaterialId].price !== null).map(([material, qty]) => ({ material: material as MaterialId, qty: qty as number })));
+  const ownNeeds = (kind: string) => Object.entries(totalBill(BLUEPRINTS[kind])).filter(([m]) => MATERIALS[m as MaterialId].price === null).map(([m, q]) => `${q} ${MATERIALS[m as MaterialId].name.toLowerCase()}`).join(', ');
 
   return (
     <>
@@ -78,9 +78,13 @@ export function Hud() {
       {/* Left: build menu + construction */}
       <div style={{ ...panel, position: 'fixed', left: 10, top: 10, width: 230 }}>
         <Section title="Build">
-          <button style={{ ...btn(g.tool === 'timber_cabin'), width: '100%', textAlign: 'left' }} onClick={() => g.setTool(g.tool ? null : 'timber_cabin')}>
-            {KIT.timber_cabin.name} · ~{usd(cabinCost)} · {totalHours(cabin)} h
-          </button>
+          {KIT_ORDER.map(kind => {
+            const own = ownNeeds(kind);
+            return <button key={kind} title={KIT[kind].blurb} style={{ ...btn(g.tool === kind), width: '100%', textAlign: 'left', marginBottom: 3, display: 'block' }} onClick={() => g.setTool(g.tool === kind ? null : kind)}>
+              <div>{KIT[kind].name}</div>
+              <div style={{ fontSize: 11, opacity: 0.75 }}>~{usd(costOf(kind))}{own ? ` + ${own}` : ''} · {totalHours(BLUEPRINTS[kind])} h</div>
+            </button>;
+          })}
           <button style={{ ...btn(g.tool === 'fell'), width: '100%', textAlign: 'left', marginTop: 4 }} onClick={() => g.setTool(g.tool === 'fell' ? null : 'fell')}>
             Mark trees to fell
           </button>
