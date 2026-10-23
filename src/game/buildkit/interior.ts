@@ -539,11 +539,18 @@ export const Furniture = {
     add('crop', new THREE.SphereGeometry(0.1 * M, 6, 5).translate(0.4 * M, h + 0.08 * M, 0));
   },
 
-  /** Clawfoot tub (along x). */
+  /** Clawfoot tub (along x): an oval bowl with a rolled rim on four claw feet, water in it. */
   tub(add: Add): void {
-    add('enamel', new THREE.CapsuleGeometry(0.36 * M, 0.95 * M, 4, 12).rotateZ(Math.PI / 2).scale(1, 0.8, 1).translate(0, 0.42 * M, 0));
-    add('linen', box(1.2 * M, 0.02 * M, 0.5 * M, 0, 0.62 * M, 0));
-    for (const sx of [-1, 1]) for (const sz of [-1, 1]) add('steel', cyl(0.04 * M, 0.15 * M, sx * 0.5 * M, 0, sz * 0.22 * M, 6));
+    const rim = 0.62 * M;
+    add('enamel', new THREE.SphereGeometry(1, 20, 10, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2).scale(0.82 * M, 0.47 * M, 0.38 * M).translate(0, rim, 0));
+    add('enamel', new THREE.TorusGeometry(1, 0.045, 6, 28).rotateX(Math.PI / 2).scale(0.82 * M, 1, 0.38 * M).translate(0, rim, 0));
+    add('crockery', new THREE.CircleGeometry(1, 24).rotateX(-Math.PI / 2).scale(0.74 * M, 1, 0.32 * M).translate(0, rim - 0.08 * M, 0));
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+      add('steel', new THREE.CylinderGeometry(0.03 * M, 0.05 * M, 0.2 * M, 6).translate(sx * 0.5 * M, 0.1 * M, sz * 0.2 * M));
+      add('steel', new THREE.SphereGeometry(0.05 * M, 6, 4).scale(1, 0.5, 1).translate(sx * 0.5 * M, 0.02 * M, sz * 0.2 * M));
+    }
+    add('steel', box(0.04 * M, 0.25 * M, 0.04 * M, -0.78 * M, rim, 0));                                       // taps
+    add('linen', box(0.5 * M, 0.02 * M, 0.35 * M, 0.95 * M, 0, 0.3 * M));                                       // bath mat
   },
 
   /** Washstand with basin and pitcher, mirror above (back at -z). */
