@@ -134,6 +134,8 @@ export interface FarTreeOptions {
   quality: Quality;
   /** Extra exclusions (roads, farmyards, the site's own trees). */
   blocked?: (x: number, z: number) => boolean;
+  /** Placed trees (farm windbreaks, yard trees): base y and height. */
+  extra?: ReadonlyArray<{ x: number; y: number; z: number; h: number; sp: TreeSpecies }>;
 }
 
 export class FarTreeRenderer {
@@ -202,6 +204,12 @@ export class FarTreeRenderer {
         add(sp, m.clone(), c);
         n++;
       }
+    }
+    for (const t of o.extra ?? []) {
+      const sh = SPECIES_SHAPE[t.sp];
+      q.setFromAxisAngle(up, hash(t.x, t.z * 3) * Math.PI * 2);
+      m.compose(v.set(t.x, t.y, t.z), q, s.set(t.h * sh.w, t.h, t.h * sh.w));
+      add(t.sp, m.clone(), new THREE.Color(sh.col).multiplyScalar(0.85 + 0.3 * hash(t.x, t.z)));
     }
     const makeMat = (decid: boolean): THREE.MeshStandardMaterial => {
       const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0 });
