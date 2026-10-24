@@ -7,7 +7,7 @@
  * ~19000× sun disc overflowed the half-float PMREM targets (NaN → black).
  *
  * Model (all linear HDR, bounded — no term can exceed a few units):
- *   • zenith → horizon gradient; the horizon colour is azimuth-dependent so the
+ *   • zenith → horizon gradient; the horizon color is azimuth-dependent so the
  *     sun side of the sky warms at golden hour while the anti-sun side stays
  *     rose/violet (Belt-of-Venus look);
  *   • thin horizon haze band so the skyline dissolves into the sky;
@@ -32,7 +32,7 @@ export interface SkyPalette {
   zenith: THREE.Color;
   horizonSun: THREE.Color;
   horizonAnti: THREE.Color;
-  /** Fog / aerial-perspective colour. Matches the horizon so distance dissolves into the sky. */
+  /** Fog / aerial-perspective color. Matches the horizon so distance dissolves into the sky. */
   fog: THREE.Color;
   sunColor: THREE.Color;
   sunDisc: number;
@@ -106,7 +106,7 @@ const VERT = /* glsl */`
   varying vec3 vDir;
   void main() {
     vDir = position;
-    // Rotate with the camera but never translate: the dome is always centred
+    // Rotate with the camera but never translate: the dome is always centered
     // on the eye. z = w pins it to the far plane.
     vec4 p = projectionMatrix * vec4(mat3(viewMatrix) * position, 1.0);
     gl_Position = p.xyww;
@@ -218,7 +218,7 @@ const FRAG = /* glsl */`
     float az = clamp(dot(dxz, sxz) * 0.5 + 0.5, 0.0, 1.0);
     vec3 horizon = mix(uHorizonAnti, uHorizonSun, az * az);
 
-    // Zenith gradient — horizon colour dominates the lowest ~15° (optical depth).
+    // Zenith gradient — horizon color dominates the lowest ~15° (optical depth).
     float g = 1.0 - exp(-hp * 3.2);
     vec3 sky = mix(horizon, uZenith, g);
     // Haze band hugging the horizon: thick in a humid Gulf summer, thin in crisp fall air.
@@ -280,7 +280,7 @@ const FRAG = /* glsl */`
         }
       }
 
-      // ── Stratus deck: overcast grey, darker scud racing under it in rain,
+      // ── Stratus deck: overcast gray, darker scud racing under it in rain,
       //    near-black slate under a thunderstorm ───────────────────────────
       if (uStratus > 0.01) {
         vec2 su = d.xz / (hp + 0.04) * 0.32 + wind * 0.6;
@@ -290,7 +290,7 @@ const FRAG = /* glsl */`
         // cloud-base texture: stratocumulus rolls (soft banding across the
         // wind) and darker undersides overhead, lighter toward the horizon
         float roll = 0.5 + 0.5 * sin(dot(su, vec2(2.1, 0.8)) * 2.6 + sn * 5.0);
-        // (under overcast the palette's lit / shade greys nearly meet, so the
+        // (under overcast the palette's lit / shade grays nearly meet, so the
         // texture is a brightness modulation of its own)
         float base2 = fbm3(su * 4.3 - wind * 1.5);
         sc *= 0.72 + 0.22 * roll + 0.22 * (sn - 0.5) * 2.0 + 0.1 * (base2 - 0.5) * 2.0;
@@ -416,7 +416,7 @@ const FRAG = /* glsl */`
     sky += vec3(0.55, 0.65, 0.85) * uNight * uMoonBright * illum * (0.012 * pow(mm, 900.0) + (0.006 + 0.025 * cloudOcc) * pow(mm, 12.0));
   #endif
 
-    // Below the horizon: fade into the ground / fog colour.
+    // Below the horizon: fade into the ground / fog color.
     sky = mix(sky, uGround, smoothstep(0.0, 0.08, -h));
 
     gl_FragColor = vec4(max(sky, vec3(0.0)), 1.0);
@@ -427,12 +427,12 @@ const FRAG = /* glsl */`
 
 /**
  * The live sky dome's uniforms (set when the dome is created), so far
- * surfaces such as the open ocean can dissolve into exactly the colour the
+ * surfaces such as the open ocean can dissolve into exactly the color the
  * dome shows just below the horizon — no visible water edge or pale band.
  */
 export const SKY_SHARED: { uniforms: Record<string, THREE.IUniform> | null } = { uniforms: null };
 
-/** GLSL: the dome colour for a direction just at / below the horizon (matches FRAG, no clouds). */
+/** GLSL: the dome color for a direction just at / below the horizon (matches FRAG, no clouds). */
 export const SKY_HORIZON_GLSL = /* glsl */`
 uniform vec3 uSkyHS; uniform vec3 uSkyHA; uniform vec3 uSkyGround; uniform vec3 uSkyGlow;
 uniform vec3 uSkySunDir; uniform vec3 uSkySunColor; uniform float uSkySunGlow;
@@ -533,7 +533,7 @@ export class ProceduralSky {
     this.mesh.renderOrder = -1000;
     this.mesh.userData = { type: 'sky' };
 
-    // The bake variant shares every uniform except the ground colour (IBL wants
+    // The bake variant shares every uniform except the ground color (IBL wants
     // a dark ground bounce below the horizon, the visible dome wants fog).
     this._bakeUniforms = { ...this.uniforms, uGround: { value: new THREE.Color() } };
     this._bakeMat = new THREE.ShaderMaterial({
@@ -551,7 +551,7 @@ export class ProceduralSky {
     this.bakeMesh.frustumCulled = false;
   }
 
-  /** Copy a blended palette into the uniforms. `ground` = fog colour for the visible dome. */
+  /** Copy a blended palette into the uniforms. `ground` = fog color for the visible dome. */
   apply(p: SkyPalette, bakeGround: THREE.Color): void {
     const u = this.uniforms;
     (u['uZenith'].value as THREE.Color).copy(p.zenith);

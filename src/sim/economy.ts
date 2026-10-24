@@ -5,23 +5,29 @@
  */
 import { MATERIALS, type Stock } from './materials';
 import type { GameState, OrderLine } from './state';
+import { canOrder, priceFactor } from './disaster';
 
 /** Days from order to delivery. */
 export const LEAD_TIME_DAYS = 2;
 /** Flat delivery fee per order. */
 export const DELIVERY_FEE = 75;
 
-export type OrderProblem = 'empty' | 'not_for_sale' | 'cannot_afford';
+export type OrderProblem = 'empty' | 'not_for_sale' | 'cannot_afford' | 'no_deliveries';
 
-export function orderCost(lines: readonly OrderLine[]): number {
-  return lines.reduce((a, l) => a + (MATERIALS[l.material].price ?? 0) * l.qty, 0) + (lines.length ? DELIVERY_FEE : 0);
+/** Cost of an order; `factor` is the price level (panic buying in the warning signs, scarcity after; disaster.priceFactor). */
+export function orderCost(lines: readonly OrderLine[], factor = 1): number {
+  return Math.round(lines.reduce((a, l) => a + (MATERIALS[l.material].price ?? 0) * l.qty, 0) * factor) + (lines.length ? DELIVERY_FEE : 0);
 }
+
+/** Today's price level. */
+export const prices = (s: GameState) => priceFactor(s.disaster, s.clock.t);
 
 export function orderProblem(s: GameState, lines: readonly OrderLine[]): OrderProblem | null {
   const real = lines.filter(l => l.qty > 0);
   if (real.length === 0) return 'empty';
   if (real.some(l => MATERIALS[l.material].price === null)) return 'not_for_sale';
-  if (orderCost(real) > s.money) return 'cannot_afford';
+  if (!canOrder(s.disaster, s.clock.t)) return 'no_deliveries';
+  if (orderCost(real, prices(s)) > s.money) return 'cannot_afford';
   return null;
 }
 
@@ -29,7 +35,7 @@ export function orderProblem(s: GameState, lines: readonly OrderLine[]): OrderPr
 export function placeOrder(s: GameState, lines: readonly OrderLine[]): string | null {
   if (orderProblem(s, lines)) return null;
   const real = lines.filter(l => l.qty > 0).map(l => ({ ...l }));
-  const cost = orderCost(real);
+  const cost = orderCost(real, prices(s));
   const id = `o${s.nextId++}`;
   s.money -= cost;
   s.orders.push({ id, lines: real, cost, placedAt: s.clock.t, dueAt: s.clock.t + LEAD_TIME_DAYS, status: 'ordered' });

@@ -9,7 +9,7 @@ Design input for `COMPOUND_BUILDER_GDS.md`. It covers how each of the 16 disaste
   - **(verified)**: checked this session against the cited source or a reliable secondary;
   - **(commonly cited)**: widely repeated in the field, but not checked against a primary;
   - **(design estimate)**: my own extrapolation, for tuning.
-- Setting assumption: a rural Mountain West homestead (Montana, Wyoming, Idaho, Colorado or Utah high country). Winter matters, wells are deep, neighbours are miles apart, and the nearest metros are Denver, Salt Lake City, Boise and Billings.
+- Setting assumption: a rural Mountain West homestead (Montana, Wyoming, Idaho, Colorado or Utah high country). Winter matters, wells are deep, neighbors are miles apart, and the nearest metros are Denver, Salt Lake City, Boise and Billings.
 
 ---
 
@@ -58,12 +58,12 @@ The cause is undetermined or local: a cascading regional blackout, a substation 
   - Local news about substation vandalism. Real cases: Moore County, NC, 2022, and Metcalf, CA, 2013, where rifle fire disabled transformers (commonly cited).
   - Utility rate shocks.
   - Power flickers that reset clocks.
-  - A neighbour says the co-op linemen are "working 18-hour shifts".
+  - A neighbor says the co-op linemen are "working 18-hour shifts".
 - **First 72 h:**
   - Day 1 feels like a snow day.
   - Day 2: freezers thawing, and gas stations shut because the pumps need power.
   - Day 3: town water pressure drops, and the first boil notice arrives by word of mouth. Phones are mostly dead.
-- **First month:** generator owners burn through fuel in 1–2 weeks. Neighbours ask to fill water jugs from your well. Insulin and dialysis patients start dying. Rural people do better because they already have wood stoves and wells, but only if those wells don't depend on grid-powered submersible pumps.
+- **First month:** generator owners burn through fuel in 1–2 weeks. Neighbors ask to fill water jugs from your well. Insulin and dialysis patients start dying. Rural people do better because they already have wood stoves and wells, but only if those wells don't depend on grid-powered submersible pumps.
 - **Months 2–12:** if the outage is multi-regional and transformers were damaged, restoration is measured in months. Barter starts. Hunting pressure strips local deer and elk. Refugees from the city edges reach the county roads around week 3–6.
 - **Year 2+:** power comes back unevenly, hospitals and towns first. You are the last on the line, as in Puerto Rico, where rural customers waited the longest.
 
@@ -76,9 +76,9 @@ What becomes scarce:
 - information (rumours replace news).
 
 **3. Human dynamics:**
-- **Week 1:** curious neighbours and friendly requests.
-- **Week 2–4:** desperate neighbours, and "can I charge my phone off your solar?". That is an OPSEC failure: everyone now knows you have power.
-- **Month 2+:** organised theft of fuel and livestock, at night.
+- **Week 1:** curious neighbors and friendly requests.
+- **Week 2–4:** desperate neighbors, and "can I charge my phone off your solar?". That is an OPSEC failure: everyone now knows you have power.
+- **Month 2+:** organized theft of fuel and livestock, at night.
 
 What preppers say goes wrong:
 - the generator is noisy and advertises you;
@@ -93,14 +93,14 @@ What preppers say goes wrong:
 - **RULE:** a generator emits a noise radius of about 400 m (and about 1 km at night for unmuffled units, design estimate). A baffle box or a buried exhaust halves it. Any `Encounter` roll while it runs gets a visibility bonus.
 - **RULE:** solar panels in view of the road raise `Visibility` (they are glints by day and "the house with power"). Ground-mounted arrays behind berms or roof arrays on the far side of the house don't.
 - **RULE:** lit windows at night add `LightSignature`, which you can reduce with blackout curtains (a cheap build), cellar living or exterior shutters. This is why the night windows from University Empire matter for gameplay, not just looks.
-- **RULE:** freezer meat becomes `spoiling` at D+2 unless there is power, cold weather (night temperature below -5 °C) or a root cellar. You get a prompt to can, smoke, jerk or share it. Sharing raises `NeighbourGoodwill`.
+- **RULE:** freezer meat becomes `spoiling` at D+2 unless there is power, cold weather (night temperature below -5 °C) or a root cellar. You get a prompt to can, smoke, jerk or share it. Sharing raises `NeighborGoodwill`.
 - **RULE (untested gear):** any device the player never ran during a peacetime drill has a 20–35% chance of a first-use fault (a missing part, a bad seal, stale fuel). Each drill clears it.
 - **RULE:** the medical dependency trait on a family member (insulin, CPAP, oxygen, dialysis) sets a hard countdown. Insulin keeps about 28 days at room temperature once opened (commonly cited) and needs cold storage for long-term stock.
 
 **5. Fiction beats:**
-- *One Second After* (Forstchen): the diabetic daughter's insulin runs out, a slow, telegraphed countdown that is unbearable. The town council organises, then hangs looters publicly. The nursing home fills with dead in week 2. Refugees on the interstate are turned back at a roadblock.
+- *One Second After* (Forstchen): the diabetic daughter's insulin runs out, a slow, telegraphed countdown that is unbearable. The town council organizes, then hangs looters publicly. The nursing home fills with dead in week 2. Refugees on the interstate are turned back at a roadblock.
 - *Into the Forest* (Hegland): power fades out, not off. The sisters ration the last gasoline for the one thing that matters.
-- *Leave the World Behind*: the uncanny early silence. No phones, a strange noise, deer herds in the yard, and the neighbour (Danny) who prepped and won't share.
+- *Leave the World Behind*: the uncanny early silence. No phones, a strange noise, deer herds in the yard, and the neighbor (Danny) who prepped and won't share.
 
 **6. Chained aftermath:** end of the rule of law (in severe cases), pandemic (cholera or dysentery in towns), or financial collapse (if it is long enough).
 
@@ -117,7 +117,7 @@ A banking crisis, sovereign debt failure, hyperinflation or currency devaluation
   - Shrinkflation, then empty shelves for specific items such as baby formula or eggs.
   - Gold spikes. Fuel prices whipsaw.
   - "Temporary" withdrawal limits.
-  - A neighbour laid off from the mine or mill. A local business closes.
+  - A neighbor laid off from the mine or mill. A local business closes.
 - **First 72 h:**
   - A bank holiday: ATMs show "temporarily unavailable".
   - Argentina 2001: the *corralito* capped withdrawals at 250 pesos a week and froze accounts for 90 days. Card payments still worked (verified, [Wikipedia: Corralito](https://en.wikipedia.org/wiki/Corralito)).
@@ -133,11 +133,11 @@ A banking crisis, sovereign debt failure, hyperinflation or currency devaluation
   - Crime grows: express kidnappings, home invasions, theft of copper and livestock.
 - **Year 2+:** a dual economy (dollar, barter, local). Emigration. Infrastructure decays slowly because there is no money for maintenance. Rolling blackouts become routine.
 
-**2. What breaks:** savings → imports (medicine, spare parts, tyres, electronics) → the maintenance budget for public services → policing quality (corruption) → rural roads and power lines.
+**2. What breaks:** savings → imports (medicine, spare parts, tires, electronics) → the maintenance budget for public services → policing quality (corruption) → rural roads and power lines.
 
 What becomes scarce:
 - imported medicines;
-- spare parts and tyres;
+- spare parts and tires;
 - formula and diapers;
 - vehicle parts;
 - ammunition;
@@ -166,12 +166,12 @@ Preppers' failure modes:
 
 **4. Systems tested:** self-sufficiency of the homestead economy (eggs, garden, crafts), barter, maintenance and repair, security while the place is staffed but not under siege.
 - **RULE:** prices index to inflation weekly. Store goods get a `scarcity` multiplier by category (imported medicine ×5, fuel ×3). The player can sell surplus eggs, meat, firewood and repair labour. **A workshop with a mechanic skill generates barter income.**
-- **RULE (unattended compound):** if every adult leaves the compound (a supply run, a job), the burglary chance per day = base × `Visibility` × (1 − dogs − alarm − neighbour watch).
+- **RULE (unattended compound):** if every adult leaves the compound (a supply run, a job), the burglary chance per day = base × `Visibility` × (1 − dogs − alarm − neighbor watch).
 - **RULE:** a fresh build or upgrade during a collapse raises `WealthSignal` for 30 days, which draws attention. So does a shiny vehicle.
 - **RULE (requisition):** with a law level of `Corrupt` or `Authoritarian`, the "county agricultural officer" visits and demands a quota of production. Options: pay, hide the production (needs a concealed root cellar or storage), or refuse (raises `HeatWithState`).
 
 **5. Fiction beats:**
-- *Parable of the Sower* (Butler): a slow collapse with jobs gone and water costing more than gas. The walled neighbourhood thinks it is safe until the arsonists come.
+- *Parable of the Sower* (Butler): a slow collapse with jobs gone and water costing more than gas. The walled neighborhood thinks it is safe until the arsonists come.
 - *Leave the World Behind*: Danny's hoarded supplies and his refusal to share.
 - Real: the Argentine *trueque* barter clubs, and the Lebanese generator mafias.
 
@@ -190,7 +190,7 @@ Policing and courts stop working: a fiscal collapse, a mass police walk-off, a c
   - Prison or jail releases due to staffing.
   - Highway robberies on the interstate.
   - Gun stores sold out.
-  - A neighbour's quad gets stolen and nobody comes.
+  - A neighbor's quad gets stolen and nobody comes.
 - **First 72 h:** opportunistic looting in towns. Score-settling. Rural areas are quiet at first, because criminals hit the dense, easy targets.
 - **First month:** gangs form around drug crews and ex-cons. Roadblocks appear, some community-run and some predatory. In Selco's Bosnia, the first weeks were chaos, and then factions with weapons controlled food and movement.
 - **Months 2–12:**
@@ -199,7 +199,7 @@ Policing and courts stop working: a fiscal collapse, a mass police walk-off, a c
   - Kidnapping for ransom.
   - Night raids on isolated places.
   - Community watch networks or posses form.
-  - A Rhodesia-style farm-defence pattern: every farmhouse linked by an *Agric-Alert* radio net with morning and night roll calls, grenade screens on windows, security fences with simple alarms, dogs, and a designated safe room (verified, [Feral Jundi repost of *A Farmer at War*](https://feraljundi.com/strategy-the-defense-of-farms-and-ranches/); [CSM 1986](https://www.csmonitor.com/1986/1208/owar.html)).
+  - A Rhodesia-style farm-defense pattern: every farmhouse linked by an *Agric-Alert* radio net with morning and night roll calls, grenade screens on windows, security fences with simple alarms, dogs, and a designated safe room (verified, [Feral Jundi repost of *A Farmer at War*](https://feraljundi.com/strategy-the-defense-of-farms-and-ranches/); [CSM 1986](https://www.csmonitor.com/1986/1208/owar.html)).
 - **Year 2+:** a local strongman, a county-level militia government, or a returning state with reprisals and amnesties.
 
 **2. What breaks:** deterrence → property rights → road travel safety → markets (they move to "safe" zones) → reporting of crimes (nobody records them).
@@ -209,18 +209,18 @@ What becomes scarce: safety, trusted people, ammunition, fuel (it gets hijacked)
 **3. Human dynamics:**
 - **Week 1:** nothing.
 - **Week 2–6:** probing visits ("looking for my dog"), thefts from outbuildings.
-- **Month 2+:** organised raids by 4–15 people, usually at night or dawn. Some of them first try a pretext parley.
+- **Month 2+:** organized raids by 4–15 people, usually at night or dawn. Some of them first try a pretext parley.
 
 What goes wrong:
 - people talk at the feed store about their stores ("loose lips");
 - sentry fatigue, because sustained watch rotations exhaust a small family. This is the most common critique of the "lone family fortress" in prepper forums, often summarised as "you can't stand watch 24/7 with four people";
 - a single point of failure at the gate;
 - no plan for treating casualties;
-- shooting the wrong person (a neighbour's kid) and the legal and social fallout.
+- shooting the wrong person (a neighbor's kid) and the legal and social fallout.
 
 **4. Systems tested:** layout and perimeter, watch rotation, community, alarms, the safe room or bunker, morale.
 - **RULE (watch math):** each adult provides about 8 h of alert watch a day before `Fatigue` builds. Encounter detection probability scales with watch coverage hours ÷ 24 × the sightline score. A 4-adult family can't cover 24 h *and* do chores, which forces trade-offs or alliances.
-- **RULE (radio net):** a `CommsRadio` plus at least one allied neighbour with a radio creates a `MutualAid` link. A raid on either gives the other a response roll (1–3 helpers arriving in 10–30 minutes). Daily roll-call check-ins cost 5 minutes and keep the link alive.
+- **RULE (radio net):** a `CommsRadio` plus at least one allied neighbor with a radio creates a `MutualAid` link. A raid on either gives the other a response roll (1–3 helpers arriving in 10–30 minutes). Daily roll-call check-ins cost 5 minutes and keep the link alive.
 - **RULE:** window grilles or shutters lower the `Breach` chance for each structure. Bedrooms placed away from the exterior wall, or behind an earth berm, lower night-raid casualties.
 - **RULE (safe room):** a defended core room or bunker turns a "lost" raid into "raiders loot outbuildings and leave" instead of casualties. The bunker should make losing survivable, not make you win.
 - **RULE (sightlines):** cleared ground out to 100–300 m around the core gives raiders no cover, so detection comes earlier. Trees close to the house give cover and concealment both ways, which helps hiding but hurts defending. This is a deliberate trade-off against the `Visibility` and `gray man` strategy.
@@ -246,7 +246,7 @@ A multi-year megadrought, plausible for the Mountain West and Colorado River bas
   - Burn bans. Hay prices doubling.
   - Ranchers selling herds early at the sale barn.
   - The well driller is booked out 6 months.
-  - A neighbour's well "sucks air in August".
+  - A neighbor's well "sucks air in August".
 - **First 72 h:** not applicable. This is a slow disaster, so model it in seasons, not days.
 - **Season 1:**
   - Irrigation curtailment ("call on the river": senior water rights first).
@@ -260,21 +260,21 @@ A multi-year megadrought, plausible for the Mountain West and Colorado River bas
 What becomes scarce: water, hay, feed grain, well-drilling services, seeds for drought-tolerant crops.
 
 **3. Human dynamics:**
-- Neighbours ask for water. "Can I fill my tank?" quickly becomes a weekly expectation.
+- Neighbors ask for water. "Can I fill my tank?" quickly becomes a weekly expectation.
 - Water rights conflict: the state or ditch company enforces curtailment and can confiscate illegal pumping.
 - Theft from stock tanks.
 
 Preppers' lessons:
 - a cistern and roof catchment beat a single well;
-- greywater reuse;
+- graywater reuse;
 - mulch and shade cloth;
 - don't rely on a single shallow well;
 - Western water law is hostile: rainwater catchment was historically restricted in Colorado until a 2016 law allowed two rain barrels (commonly cited).
 
-**4. Systems tested:** water redundancy, storage, catchment, garden efficiency, livestock count, fire defences.
+**4. Systems tested:** water redundancy, storage, catchment, garden efficiency, livestock count, fire defenses.
 - **RULE:** each well has a `depth` and a regional `waterTable` that drops each drought season. When the table falls below the pump intake, yield → 0 and deepening costs money and a contractor. Deeper wells cost more upfront.
 - **RULE:** roof catchment yield = roof area × precipitation × 0.6 per gallon-per-sq-ft-inch factor (about 0.62 gal per sq ft per inch). Cistern size caps storage. Bigger roofs (barn, workshop) mean more water, so outbuilding placement and roof material matter. A metal roof is cleaner than shingles.
-- **RULE:** greywater reuse (a build) returns about 50% of household water to the garden.
+- **RULE:** graywater reuse (a build) returns about 50% of household water to the garden.
 - **RULE (water law):** with the `Curtailment` flag set, using surface or irrigation water triggers an inspector event. A cistern hidden behind the barn and drip lines lower detection.
 - **RULE:** livestock water demand is shown up front. During a drought, each animal costs water per day, which forces culling decisions (slaughter and preserve, or sell before prices crash).
 
@@ -298,7 +298,7 @@ A naturally emerging high-mortality respiratory pathogen. Calibrate it between C
   - WHO statements. Airport screening.
   - The first domestic case. Hospitals restrict visitors.
   - Masks and thermometers sell out. Runs on toilet paper and rubbing alcohol, as in COVID March 2020.
-  - A neighbour's nurse daughter says "it's bad in the ER".
+  - A neighbor's nurse daughter says "it's bad in the ER".
 - **First 72 h after declaration:** school closures, stay-at-home orders, panic buying, and the travel lockdown.
 - **First month:**
   - Hospital capacity exceeded.
@@ -365,7 +365,7 @@ Two variants with random severity:
   - Bank runs.
   - Emergency alert tests.
   - "Missile convoys moving at Malmstrom."
-  - The neighbour says to fill the tub.
+  - The neighbor says to fill the tub.
 - **H+0 (nearby):**
   - A flash: don't look at it.
   - Blast, which breaks windows tens of km away.
@@ -399,7 +399,7 @@ What becomes scarce:
 - antibiotics (radiation suppresses immunity).
 
 **3. Human dynamics:**
-- **H+0–48:** neighbours beg to share your shelter. This is the "who do you let in?" moment, the iconic dilemma (*The Twilight Zone* "The Shelter").
+- **H+0–48:** neighbors beg to share your shelter. This is the "who do you let in?" moment, the iconic dilemma (*The Twilight Zone* "The Shelter").
 - **D+3–14:** refugees on foot, many with radiation sickness.
 - **M+1:** military or FEMA requisition and martial law checkpoints.
 - **M+3:** raiders who survived.
@@ -418,16 +418,16 @@ Preppers' lessons:
 - **RULE (time out):** the dose budget per outdoor task drops with time per the 7-10 rule. Tending animals at H+7 costs 10× more dose than at H+49. Animals left outside take full dose, so an earth-sheltered barn or a buried coop is a deliberate build.
 - **RULE (ventilation):** shelter occupancy × hours → heat and CO2. Without forced air (a KAP, an electric fan or the NBC blower), occupancy above design causes heat stress after 24–48 h in summer.
 - **RULE (decon):** an entry vestibule with a brush-off and clothing drop prevents carried-in contamination (+X dose to the room otherwise).
-- **RULE (who gets in):** shelter space = beds + standing room. Admitting neighbours lowers stores per person but raises `Community` and the labour pool later.
+- **RULE (who gets in):** shelter space = beds + standing room. Admitting neighbors lowers stores per person but raises `Community` and the labour pool later.
 - **RULE (contaminated food):** food and water stored outside or uncovered is `contaminated` for M+1 (milk and leafy greens until about 2 months for iodine-131). Root cellar and bunker stores are safe. Well water from deep, covered wells is safe, while open cisterns and ponds are contaminated. **A covered cistern vs an open pond is a build choice.**
 - **RULE (EMP, nearby variant):** unshielded electronics in a high-altitude burst footprint get a % failure roll. A Faraday cage protects spares. Pre-1980 vehicles are mostly unaffected (commonly cited; actual testing in the 2004 EMP Commission report showed modern cars mostly stalled briefly rather than being destroyed, a nuance worth reflecting).
 
 **5. Fiction beats:**
-- *Threads* (1984): Sheffield. Rationing centres. Food hoarders shot. The survivors' children speak a degraded English 13 years later. Wartime "Protect and Survive" leaflets: the government tells you to take your doors off and build an inner refuge.
+- *Threads* (1984): Sheffield. Rationing centers. Food hoarders shot. The survivors' children speak a degraded English 13 years later. Wartime "Protect and Survive" leaflets: the government tells you to take your doors off and build an inner refuge.
 - *The Day After*: Lawrence, KS. Cars stall from EMP. The farmer's family in the basement. Squatters on his land, and he is shot for objecting.
 - *Alas, Babylon*: Fort Repose, FL. Money becomes worthless overnight. Salt runs out. Looters die from radioactive jewelry looted from a ground-zero city. Ham radio and Morse code as lifelines.
 - *Swan Song*: the "Earthmound" bunker (hubris of the bunker-rich). Sister and the glass ring.
-- *Jericho*: a Kansas town. Salt as currency. Rivalry with neighbouring New Bern (a community versus community conflict).
+- *Jericho*: a Kansas town. Salt as currency. Rivalry with neighboring New Bern (a community versus community conflict).
 - *Fallout*: Vault-Tec. Bunkers as social experiments, a tone reference for the pulpy end.
 
 **6. Chained aftermath:** nuclear winter (large exchange), financial collapse (definitely), end of the rule of law, pandemic (cholera and typhus in camps).
@@ -446,7 +446,7 @@ A severe coronal mass ejection (CME) causes geomagnetically induced currents in 
   - GPS errors (tractor auto-steer drifting).
   - News: "utilities preparing for possible outages".
   - The CME's arrival is typically 15–72 h after the flare, with about a 15–60 minute final warning from the DSCOVR / ACE satellites at L1 (commonly cited).
-  - Neighbour gossip: "Did you see the northern lights? Red ones!"
+  - Neighbor gossip: "Did you see the northern lights? Red ones!"
 - **H+0:**
   - Lights flicker, then the grid collapses in minutes. Quebec, 1989: the Hydro-Québec grid collapsed in 90 seconds and 6 million people were out for 9 hours (verified, [siliconcanals](https://siliconcanals.com/sc-c-in-1859-a-solar-storm-now-called-the-carrington-event-pushed-auroras-as-far-south-as-cuba-and-induced-currents-so-strong-in-north-american-telegraph-lines-that-operators-disconnected-their-batter/)).
   - Long wired lines spark. In 1859, telegraph operators got shocks and some sent messages with the batteries disconnected (verified, same).
@@ -485,7 +485,7 @@ A wind-driven fire in the wildland-urban interface. A fast-onset local disaster:
   - Ash falling and an orange sky.
   - Power utility "public safety power shutoffs".
   - Evacuation "Ready, Set, Go" levels.
-  - The neighbour's scanner says the fire jumped the highway.
+  - The neighbor's scanner says the fire jumped the highway.
 - **H-6 to H-0:**
   - Embers arrive *before* the flame front, and can land 1 mile or more ahead.
   - **Embers cause up to 90% of home ignitions** (verified, [IBHS](https://ibhs.org/ibhs-news-releases/damage-analysis-of-2017-2018-wildfires-shows-importance-of-mitigation/)).
@@ -508,7 +508,7 @@ What becomes scarce: everything locally, temporarily. Housing for evacuees. Hay 
 
 **3. Human dynamics:**
 - Evacuate or stay and defend. Many deaths happen in late evacuation.
-- After the fire: looters in the evacuated zone, and burned-out neighbours seeking shelter.
+- After the fire: looters in the evacuated zone, and burned-out neighbors seeking shelter.
 - Preppers' lessons:
   - clean gutters;
   - a 0–5 ft non-combustible zone ("Zone 0");
@@ -521,7 +521,7 @@ What becomes scarce: everything locally, temporarily. Housing for evacuees. Hay 
 
 **4. Systems tested:** materials, spacing, vegetation management, water for firefighting, the bunker as a last-resort refuge (air!).
 - **RULE (ember ignition):** each structure has `EmberResistance` from its roof (metal, tile > asphalt > wood shake), its vents (mesh or not), and its 0–5 ft zone (gravel vs bark mulch vs woodpile against the wall). During a fire event, each structure rolls ignition = ember density × (1 − EmberResistance).
-- **RULE (spacing):** a burning structure ignites any structure within 10 m (about 30 ft) with a chance based on the target's siding and window type. Clustering buildings (good for defence) hurts in fire. **A real trade-off.**
+- **RULE (spacing):** a burning structure ignites any structure within 10 m (about 30 ft) with a chance based on the target's siding and window type. Clustering buildings (good for defense) hurts in fire. **A real trade-off.**
 - **RULE (fuel load):** trees within 30 m (100 ft) of structures add flame-front intensity. Thinned and limbed trees add little. The player maintains this with a recurring `Clearing` chore, so it costs labour.
 - **RULE (firefighting water):** a cistern or pond plus a gas or solar pump plus hoses lets the family "stay and defend". Without them, staying is a death roll.
 - **RULE (bunker refuge):** a bunker shelters people during the front only if its air intake is filtered or sealed. Otherwise smoke and CO kill (it happened in Australian bushfire bunkers, commonly cited). The NBC filter or a seal-and-wait (about 30 min of air for N people) handles it.
@@ -548,10 +548,10 @@ A Yellowstone supereruption or a large VEI-7 eruption. For a Mountain West compo
   - Strange animal behaviour. Bison leaving the park.
   - USGS Yellowstone Volcano Observatory alert level raised to Watch, then Warning.
   - Sulphur smell. Geyser behaviour changing.
-  - The neighbour says the Old Faithful schedule is off.
+  - The neighbor says the Old Faithful schedule is off.
 - **H+0 to D+7:**
   - The eruption, lasting days to weeks.
-  - Ash fall is the key hazard. The USGS model (Mastin et al. 2014): decimetres to metres in the northern Rockies, centimetres to decimetres in the Midwest, millimetres to centimetres on the coasts. Reported about 1.4 m at Billings and about 10 cm at Denver (verified, [USGS](https://www.usgs.gov/publications/modeling-ash-fall-distribution-a-yellowstone-supereruption); secondary for the city figures).
+  - Ash fall is the key hazard. The USGS model (Mastin et al. 2014): decimeters to meters in the northern Rockies, centimeters to decimeters in the Midwest, millimeters to centimeters on the coasts. Reported about 1.4 m at Billings and about 10 cm at Denver (verified, [USGS](https://www.usgs.gov/publications/modeling-ash-fall-distribution-a-yellowstone-supereruption); secondary for the city figures).
   - Pyroclastic flows within roughly 60 km.
 - **Ash effects:**
   - It is not soft. It is pulverised rock and glass, abrasive and conductive when wet.
@@ -611,7 +611,7 @@ A state-actor attack on power, water, pipelines, banking and communications, pos
   - A news story on Volt Typhoon-style pre-positioning in utilities (commonly cited, CISA advisories 2023–24).
   - Ransomware hitting hospitals and city governments. Card payment outages at major chains.
   - Gas station shortages after a pipeline shutdown. Colonial Pipeline, 2021: up to 69% of North Carolina stations ran dry from panic buying (verified, [ABC7](https://abc7news.com/gas-shortage-2021-colonial-pipeline-prices-panic-buying/10625599/)).
-  - The neighbour's bank app shows zero balance "temporarily".
+  - The neighbor's bank app shows zero balance "temporarily".
 - **First 72 h:**
   - Multiple simultaneous failures: grid blackout in several regions, banking and card networks down, water treatment SCADA failures, GPS spoofing, phones partly up.
   - Ukraine 2015: about 225,000 customers out for 1–6 h. Restored by sending operators to substations to switch breakers by hand, while the attackers had bricked converter firmware (verified, [CCDCOE](https://cyberlaw.ccdcoe.org/wiki/Power_grid_cyberattack_in_Ukraine_(2015))).
@@ -662,8 +662,8 @@ A reanimation plague. To keep the abstract-combat model, treat zombies as a **de
   - "Rabies-like" violent outbreaks abroad.
   - Bite injuries at the ER. Reports of "riots" at hospitals. Quarantined towns.
   - The military suddenly in the city. A government denial.
-  - The neighbour's brother says the National Guard is "shooting sick people".
-- **First 72 h:** the hospital is the epicentre. Panic flight on the highways (traffic jams become death traps). Governments use military force with mixed results.
+  - The neighbor's brother says the National Guard is "shooting sick people".
+- **First 72 h:** the hospital is the epicenter. Panic flight on the highways (traffic jams become death traps). Governments use military force with mixed results.
 - **First month:** cities fall. Survivors hide or flee to rural areas. Infrastructure fails from staffing (as in a pandemic), plus there are no repair crews.
 - **Months 2–12:** herds (hordes) migrate, slowly but in very large numbers, drawn by noise. Human survivors become the real threat: raiders and cults. Seasonal: in cold climates the dead freeze in winter (*WWZ*'s "go north" logic). That makes **the Mountain West winter a gameplay boon**.
 - **Year 2+:** the dead decay or don't, depending on the canon chosen. Fortified communities establish themselves.
@@ -675,7 +675,7 @@ What becomes scarce: ammunition (noise is a problem anyway), medical, safe peopl
 **3. Human dynamics:** survivors at the gate. "Were you bitten?" is the new quarantine question. Human gangs and settlements: The Walking Dead's Governor, Negan and Alexandria.
 
 **4. Systems tested:** walls (finally walls matter straightforwardly), noise discipline, quarantine, fortification layout.
-- **RULE (noise attracts):** each noise event (gunshot, generator, dog barking, hammering) adds to the local horde-attraction field. Gunfire attracts more than it kills. **Melee and silent defences (spike pits, moats, fences) become efficient.**
+- **RULE (noise attracts):** each noise event (gunshot, generator, dog barking, hammering) adds to the local horde-attraction field. Gunfire attracts more than it kills. **Melee and silent defenses (spike pits, moats, fences) become efficient.**
 - **RULE (horde pressure):** a horde pushes on the wall as `pressure = density × time`. Wall integrity by material: chain-link < wood palisade < cinderblock < earth berm + ditch. A ditch or moat in front cuts pressure by about 50% (they fall in).
 - **RULE (winter freeze):** at temperatures below -10 °C the dead are inactive. Winter is a working season for repairs and scavenging.
 - **RULE:** a bitten person goes through a `Turn` timer (hours to days). The isolation cabin doubles as a holding cell.
@@ -701,7 +701,7 @@ A foreign military occupies or invades part of the US. The Red Dawn scenario. Tr
   - Unusual air traffic. Satellite outages.
   - Military mobilisation and call-ups of reserves and National Guard.
   - Rumours of paratroops.
-  - The neighbour's son in the Guard gets called up.
+  - The neighbor's son in the Guard gets called up.
 - **First 72 h:** air and missile strikes on bases and infrastructure (the Mountain West has Malmstrom, Hill AFB, F.E. Warren). The grid goes down. An airborne or seaborne landing elsewhere. Communications jammed.
 - **First month:** front lines. Occupied zones with curfews, checkpoints and ID cards. Collaboration versus resistance. Your homestead is either behind the lines, a supply source, or on a road the army uses.
 - **Months 2–12:**
@@ -741,10 +741,10 @@ Domestic political fracture into armed factions. A mix of end of the rule of law
   - Contested elections. States refusing federal orders.
   - Militia rallies. Political violence in the news.
   - Ammo and gun sales spike.
-  - Neighbours start flying faction flags, and the neighbour asks "whose side are you on?".
+  - Neighbors start flying faction flags, and the neighbor asks "whose side are you on?".
 - **First 72 h:** a precipitating event (an assassination, a refused election, a standoff). The federal response. Cities lock down.
 - **First month:** front lines along state and county lines and highways. Checkpoints. Purges of "the other side" in towns.
-- **Months 2–12:** Selco-style local war. Neighbours become enemies. A sniper on the ridge. Faction militias recruit or conscript. Food requisition.
+- **Months 2–12:** Selco-style local war. Neighbors become enemies. A sniper on the ridge. Faction militias recruit or conscript. Food requisition.
 - **Year 2+:** armistice or a fractured nation.
 
 **2. What breaks:** trust → roads (checkpoints and ambushes) → supply chains → the grid (sabotage) → courts and policing (factionalised).
@@ -754,10 +754,10 @@ What becomes scarce: neutrality, trusted information, fuel, ammunition, medical.
 **3. Human dynamics:**
 - A faction recruiter comes asking for "contributions", then for your sons.
 - Refugees from the other faction.
-- Neighbours denounce one another.
+- Neighbors denounce one another.
 - Selco: in the Bosnian war, people you had known for years changed sides or turned predatory, and having a group was the difference between life and death (secondary, [ancientwarhistory](https://ancientwarhistory.com/?p=24734)).
 
-**4. Systems tested:** neutrality and diplomacy, community ties, concealment, defence.
+**4. Systems tested:** neutrality and diplomacy, community ties, concealment, defense.
 - **RULE (faction standing):** each faction has `Standing` with you. Helping one lowers the others. Neutrality is possible but needs a high `Community` score or high concealment.
 - **RULE (conscription):** a faction may demand adults of fighting age. Options: comply (lose labour), hide them (bunker, concealment roll), negotiate (trade supplies), resist.
 - **RULE (sniper):** a sniper on the ridge is a persistent threat that makes outdoor tasks dangerous within his sightline. Earth berms, walls and covered paths between buildings negate it. **Covered walkways become a defensive build.**
@@ -780,7 +780,7 @@ A designed pathogen, more lethal and faster than natural, possibly targeted. The
   - A terror threat. A lab leak story.
   - A cluster of deaths at an airport or stadium.
   - Government evasions. CDC teams in hazmat.
-  - The neighbour's son works at the hospital and says they're burning bodies.
+  - The neighbor's son works at the hospital and says they're burning bodies.
   - (The *Dark Winter* exercise in 2001 modelled a smallpox attack spreading to 25 states in two weeks, commonly cited.)
 - **First 72 h:** high-lethality outbreaks in several cities at once. Martial law and quarantine. Airports closed.
 - **First month:** spread with high mortality (designer pathogen: 30–90%). Medical system collapse. Cities die.
@@ -820,7 +820,7 @@ A regional impact or an ocean strike. Ejecta, fires, tsunamis, then an impact wi
   - The discovery announced by NASA ("1 in 200 probability, refining"). Probability creeping up in the news.
   - Panic buying. "Hammer parties."
   - A military evacuation of the coasts.
-  - The neighbour building a root cellar, or one who doesn't believe it.
+  - The neighbor building a root cellar, or one who doesn't believe it.
 - **H+0:** the impact. If within about 1,000 km: an air blast, a thermal pulse, earthquakes. Ejecta re-entering triggers fires globally. Ocean impacts cause tsunamis on the coasts.
 - **First month:** firestorms, darkened skies, acid rain. Cold. Possibly an "impact winter" of months to years. Massive refugee flows from coasts and burned areas.
 - **Months 2–12:** famine (ash-winter logic). Societal breakdown. Survivor communities.
@@ -835,7 +835,7 @@ A regional impact or an ocean strike. Ejecta, fires, tsunamis, then an impact wi
 - **RULE (impact winter):** reuse the volcanic winter rules with stronger values.
 
 **5. Fiction beats:**
-- *Lucifer's Hammer* (Niven & Pournelle): the Senator's ranch "Stronghold" as an organised community. The New Brotherhood cannibal army. Saving the nuclear power plant as a symbol of civilization. A rain that never stops (the ocean impacts).
+- *Lucifer's Hammer* (Niven & Pournelle): the Senator's ranch "Stronghold" as an organized community. The New Brotherhood cannibal army. Saving the nuclear power plant as a symbol of civilization. A rain that never stops (the ocean impacts).
 - *Seveneves* (Stephenson): the moon breaking up and the "hard rain".
 - *Don't Look Up*: denial, politics and the crowd's reactions.
 - *The Last Policeman* (Winters): a pre-impact detective story, about a society that knows the end is coming.
@@ -852,7 +852,7 @@ Something without explanation: aliens, a "Change" in physics (*Dies the Fire*), 
 - **Warning signs:**
   - Strange lights in the sky, unusual animal behaviour, unexplained radio signals.
   - Government secrecy, a "UFO hearing". Satellite failures.
-  - The neighbour swears he saw something in the pasture.
+  - The neighbor swears he saw something in the pasture.
 - **H+0:** pick a mode:
   - (a) *Dies the Fire*: the Change. Electricity, explosives and combustion engines stop working, so medieval tech only.
   - (b) *A Quiet Place*: noise-hunting creatures.
@@ -887,11 +887,11 @@ Something without explanation: aliens, a "Change" in physics (*Dies the Fire*), 
 2. **Visibility invites raids.** Light, noise, smoke, smell and wealth signals draw attention.
    `RULE:` `Visibility` = sum of light + noise + smoke + smell + wealth + traffic, each per structure and activity, discounted by terrain and trees. It feeds the encounter generator. A visibility overlay (already planned) shows it.
 3. **The gray man.** Look poor, look like everyone else, don't stand out.
-   `RULE:` a compound that looks "ordinary" (no visible walls, panels or fortifications) gets fewer targeted raids but less deterrence. A "fortress look" deters opportunists but attracts organised groups. The trade-off is deliberate.
+   `RULE:` a compound that looks "ordinary" (no visible walls, panels or fortifications) gets fewer targeted raids but less deterrence. A "fortress look" deters opportunists but attracts organized groups. The trade-off is deliberate.
 4. **Sanitation kills more than bullets.** In camps and sieges, dysentery, cholera and typhoid killed more people than violence did (commonly cited across humanitarian and military history).
    `RULE:` `Sanitation` per person (latrine, septic, handwashing, water treatment) affects disease risk per week. The septic system without water, or an overflowing latrine near the well, is a big disease multiplier. Show "distance from latrine to well" as a build constraint (at least 30 m, commonly cited guidance is 50–100 ft).
-5. **Community beats a lone wolf.** Selco, FerFAL, Rhodesia, *Lucifer's Hammer* and *Jericho* all agree. Lone families don't last against organised threats.
-   `RULE:` `Community` = allies and neighbours with a working relationship. Each gives mutual aid, labour, trade, intel. Raids on a compound within a community network get help rolls.
+5. **Community beats a lone wolf.** Selco, FerFAL, Rhodesia, *Lucifer's Hammer* and *Jericho* all agree. Lone families don't last against organized threats.
+   `RULE:` `Community` = allies and neighbors with a working relationship. Each gives mutual aid, labour, trade, intel. Raids on a compound within a community network get help rolls.
 6. **OPSEC: loose lips.** Telling people about your stores makes you a target.
    `RULE:` every peacetime trip to town where you talk about prep (an event choice) adds `Known` to the town's rumour pool. After the disaster, a `Known` compound gets targeted earlier. Hidden stores reduce losses.
 7. **Water first.** Rule of threes: about 3 minutes without air, 3 days without water, 3 weeks without food (commonly cited).
@@ -930,8 +930,8 @@ Something without explanation: aliens, a "Change" in physics (*Dies the Fire*), 
     `RULE:` each living space has a heat loss rate (insulation, size). Wood heat needs cords. Running out of wood in January is lethal.
 24. **Carbon monoxide.** Grills and generators run indoors.
     `RULE:` an unvented indoor heater or generator rolls CO poisoning. A CO detector (cheap build) warns.
-25. **Your neighbours are your first and best defence, or your first threat.**
-    `RULE:` each neighbour has a disposition that responds to your actions: helping, sharing, OPSEC and trades.
+25. **Your neighbors are your first and best defense, or your first threat.**
+    `RULE:` each neighbor has a disposition that responds to your actions: helping, sharing, OPSEC and trades.
 
 ### 3.2 Recurring failure modes for the report card
 
@@ -940,14 +940,14 @@ The report card at the end of a run could call these out by name. Each one is co
 | Failure mode | Where it shows up | Report card line |
 |---|---|---|
 | Single point of failure | Grid-down, cyberattack, drought | "Your only water source was a grid-powered pump." |
-| OPSEC failure | Financial collapse, end of the rule of law | "Your neighbours knew you had six months of food." |
+| OPSEC failure | Financial collapse, end of the rule of law | "Your neighbors knew you had six months of food." |
 | Untested gear | Grid-down | "Your generator didn't start on day 1: stale fuel." |
 | Light and noise discipline | End of the rule of law, zombies | "Raiders found you by your lit windows." |
 | Sanitation | Pandemic, long sieges | "Dysentery from a latrine too close to the well." |
 | Medical | Every disaster | "A broken tooth turned septic." |
 | Morale | Long isolation | "Cabin fever: two family members fought and one left." |
 | Lone wolf | End of the rule of law, civil war | "No allies came when you were raided." |
-| Hoarding without sharing | Grid-down, pandemic | "The neighbours you turned away came back with a gang." |
+| Hoarding without sharing | Grid-down, pandemic | "The neighbors you turned away came back with a gang." |
 | Fortress mentality | Every disaster | "Your walls deterred opportunists but drew the militia." |
 | Over-reliance on stores | Long disasters | "Your stores ran out in month 9 and the garden wasn't ready." |
 | Tech fragility | Cyberattack, flare | "Your smart well controller bricked." |
@@ -962,7 +962,7 @@ The report card at the end of a run could call these out by name. Each one is co
 - **Water law.** Western water rights (prior appropriation), with restrictions on catchment and well drilling.
 - **Yellowstone** is close, so a supervolcano is near-field.
 - **Wildfire country.** Wildfire risk is high, so materials and defensible space matter.
-- **Culture.** The LDS food storage tradition, ranching and hunting, and an armed population make neighbours better prepared and armed. Community potential is high.
+- **Culture.** The LDS food storage tradition, ranching and hunting, and an armed population make neighbors better prepared and armed. Community potential is high.
 - **Game hunting gets depleted quickly** when everyone hunts. Depression-era deer populations were nearly wiped out in many states (commonly cited).
 
 ---
@@ -971,7 +971,7 @@ The report card at the end of a run could call these out by name. Each one is co
 
 **Official and data:** ATA *When Trucks Stop, America Stops*; NEJM / Harvard on Hurricane Maria deaths; Texas DSHS (Uri); Lloyd's 2013; Wood Mackenzie and NREL on transformers; Ready.gov nuclear; Kearny *Nuclear War Survival Skills*; Science News on the 7-10 rule; USGS Yellowstone ash and roof loading; Xia et al. 2022 *Nature Food*; IBHS Camp Fire; CSIRO *Wildfire*; CCDCOE (Ukraine 2015); OPB / Klamath wells; UNHCR VASyR (Lebanon); Wikipedia *Corralito* and *Cacerolazo*; CNN and Caracas Chronicles (Venezuela ENCOVI).
 
-**Prepper and lived accounts:** Selco (SHTF School; secondary coverage); FerFAL (*The Survival Podcast* interviews); the Argentinian urban-survival essay; Rhodesian farm defence (*A Farmer at War*, Feral Jundi, CSM 1986); r/preppers and blogs (power outage lessons).
+**Prepper and lived accounts:** Selco (SHTF School; secondary coverage); FerFAL (*The Survival Podcast* interviews); the Argentinian urban-survival essay; Rhodesian farm defense (*A Farmer at War*, Feral Jundi, CSM 1986); r/preppers and blogs (power outage lessons).
 
 **Fiction:** *One Second After*, *Lucifer's Hammer*, *Alas, Babylon*, *The Road*, *Station Eleven*, *Earth Abides*, *A Canticle for Leibowitz*, *Threads*, *The Day After*, *Swan Song*, *World War Z*, *The Stand*, *Parable of the Sower*, *Ashfall*, *Dies the Fire*, *The Walking Dead*, *Fallout*, *Jericho*, *The Last of Us*, *Z Nation*, *Children of Men*, *Into the Forest*, *The Postman*, *Leave the World Behind*, plus *Red Dawn*, *Civil War* (2024), *American War*, *A Quiet Place*, *The 5th Wave*, *Seveneves*, *The Last Policeman*.
 

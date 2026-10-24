@@ -1,7 +1,7 @@
 /**
  * StreamRenderer — a creek whose surface falls along its course (UE's water
  * bodies are flat planes; a mountain creek is not). The surface is a ribbon
- * following the centre line at the water level of each station; the shoreline
+ * following the center line at the water level of each station; the shoreline
  * is the smooth zero contour of a signed-depth raster (no stair-stepped
  * banks), and the UE water look does the rest: bed showing through the
  * shallows, flow-advected ripples and foam from a computed flow field,

@@ -2,7 +2,7 @@
  * The family's first camp (until the cabin is up): a canvas wall tent on a
  * low frame, a stone fire ring with a fire, a camp table with benches and a
  * water barrel. Procedural; one mesh per material. Local frame: origin at
- * the camp centre, tent door facing +z toward the fire.
+ * the camp center, tent door facing +z toward the fire.
  */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -23,7 +23,7 @@ function canvasMat(): THREE.MeshStandardMaterial {
   return _canvas ??= new THREE.MeshStandardMaterial({ color: 0xd9ceb0, roughness: 0.95, side: THREE.DoubleSide });
 }
 
-/** Flame material (its colour flickers: see flickerCampfire). */
+/** Flame material (its color flickers: see flickerCampfire). */
 function flameMat(): THREE.MeshBasicMaterial {
   return _flame ??= new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 1.0, 0.3), transparent: true, opacity: 0.9, depthWrite: false });
 }

@@ -78,7 +78,7 @@ function paintLapSiding(): HTMLCanvasElement {
   return c;
 }
 
-/** Fieldstone: rounded irregular stones in grey-buff tones with dark mortar. */
+/** Fieldstone: rounded irregular stones in gray-buff tones with dark mortar. */
 function paintFieldstone(): HTMLCanvasElement {
   const N = 512;
   const [c, g] = canvas(N);
@@ -133,7 +133,7 @@ function paintMetalRoof(): HTMLCanvasElement {
   return c;
 }
 
-/** Deck planks: 14 cm boards along u with gaps, grey-brown. */
+/** Deck planks: 14 cm boards along u with gaps, gray-brown. */
 function paintDeck(): HTMLCanvasElement {
   const N = 256, n = 21, pw = N / n;
   const [c, g] = canvas(N);
@@ -191,7 +191,7 @@ function paintPinePanel(): HTMLCanvasElement {
   return c;
 }
 
-/** Patchwork / plaid quilt in a base colour. */
+/** Patchwork / plaid quilt in a base color. */
 function paintQuilt(base: [number, number, number], seed: number): () => HTMLCanvasElement {
   return () => {
     const N = 128, k = 8, s = N / k;
@@ -208,7 +208,7 @@ function paintQuilt(base: [number, number, number], seed: number): () => HTMLCan
   };
 }
 
-/** Braided rag rug: concentric bands of muted colours. */
+/** Braided rag rug: concentric bands of muted colors. */
 function paintRug(): HTMLCanvasElement {
   const N = 128;
   const [c, g] = canvas(N);
@@ -221,7 +221,7 @@ function paintRug(): HTMLCanvasElement {
   return c;
 }
 
-/** Book spines: varied colours and heights along u. */
+/** Book spines: varied colors and heights along u. */
 function paintBooks(): HTMLCanvasElement {
   const N = 128;
   const [c, g] = canvas(N);
@@ -240,7 +240,7 @@ function paintBooks(): HTMLCanvasElement {
   return c;
 }
 
-/** Poured concrete: grey with mottling, trowel swirls and a few cracks. */
+/** Poured concrete: gray with mottling, trowel swirls and a few cracks. */
 function paintConcrete(): HTMLCanvasElement {
   const N = 256;
   const [c, g] = canvas(N);
@@ -285,7 +285,7 @@ function paintWhitewash(): HTMLCanvasElement {
   return c;
 }
 
-/** Corrugated / ribbed steel siding: vertical ribs, galvanised grey-green with streaks. */
+/** Corrugated / ribbed steel siding: vertical ribs, galvanised gray-green with streaks. */
 function paintMetalSiding(): HTMLCanvasElement {
   const N = 256, ribs = 12, pw = N / ribs;
   const [c, g] = canvas(N);
@@ -321,7 +321,7 @@ function paintLogWall(): HTMLCanvasElement {
   return c;
 }
 
-/** Board-and-batten: vertical boards with raised battens, barn red or weathered grey. */
+/** Board-and-batten: vertical boards with raised battens, barn red or weathered gray. */
 function paintBoardBatten(): HTMLCanvasElement {
   const N = 256, n = 8, bw = N / n;
   const [c, g] = canvas(N);

@@ -1,5 +1,5 @@
 /**
- * neighbours — the farms around the homestead (GDS §5.5: neighbours with
+ * neighbors — the farms around the homestead (GDS §5.5: neighbors with
  * history; for now just their farmsteads on the land). Seeded per parcel:
  * a few Cache Valley / Gallatin Valley style farms on the plain east and
  * south of the parcel, on gentle ground clear of the creek and the reservoir.
@@ -18,7 +18,7 @@ function mulberry32(seed: number): () => number {
   };
 }
 
-export function planNeighbours(t: ParcelTerrain, count = 3): Farmstead[] {
+export function planNeighbors(t: ParcelTerrain, count = 3): Farmstead[] {
   const rnd = mulberry32(t.seed * 31 + 5);
   const out: Farmstead[] = [];
   const c = PARCEL_SIZE / 2;

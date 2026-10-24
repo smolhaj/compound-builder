@@ -1,7 +1,7 @@
 /**
  * r14: exact (oriented-rectangle) footprints of town houses, garages, porches and
  * front walks. The occupancy mask is 0.5 u a cell and ignores its edge cells, so
- * a 0.3-deep garage front or porch never saw a neighbour on a fanned cul-de-sac;
+ * a 0.3-deep garage front or porch never saw a neighbor on a fanned cul-de-sac;
  * a garage stood in front of the next house's porch. These rectangles are
  * tested with the separating-axis theorem instead.
  */

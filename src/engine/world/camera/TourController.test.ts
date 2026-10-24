@@ -155,7 +155,7 @@ describe('TourController — cinematic tour', () => {
 
   it('scores blocked sight lines and frames buildings from a clear side', () => {
     const target = box(20, 20, 24, 24, 4);
-    const wall = box(10, 14, 18, 30, 12); // tall block on the west (site-centre) side
+    const wall = box(10, 14, 18, 30, 12); // tall block on the west (site-center) side
     expect(occlusionScore({ x: 8, y: 5, z: 22 }, { x: 22, y: 2, z: 22 }, [wall, target], target)).toBeGreaterThan(0);
     expect(occlusionScore({ x: 36, y: 5, z: 22 }, { x: 22, y: 2, z: 22 }, [wall, target], target)).toBe(0);
     const path = buildCinematicPath([{ info: info('t', 'cabin', target), reason: 'x' }], { x: 0, z: 22 }, () => 0, [wall, target])!;

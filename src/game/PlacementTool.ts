@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { KIT, PROBLEM_TEXT, snapCentre, footprint, type SiteQuery } from './buildkit/kit';
+import { KIT, PROBLEM_TEXT, snapCenter, footprint, type SiteQuery } from './buildkit/kit';
 import { DEPTH, isUnderground, previewDatum, siteProblem } from './buildkit/underground';
 import { useWorldStore } from '../store/worldStore';
 import { buildGhost } from './buildkit/buildings';
@@ -103,7 +103,7 @@ export class PlacementTool {
       const n = Math.max(1, Math.ceil(2 * Math.PI * r / 0.5));
       for (let i = 0; i < n; i++) {
         const a = (i / n) * Math.PI * 2;
-        const [sx, sz] = snapCentre(def, x + Math.cos(a) * r, z + Math.sin(a) * r, rot);
+        const [sx, sz] = snapCenter(def, x + Math.cos(a) * r, z + Math.sin(a) * r, rot);
         if (siteProblem(def, sx, sz, rot, this._site, placed) === null) return [sx, sz];
       }
     }
@@ -125,7 +125,7 @@ export class PlacementTool {
     const g = this._ghost, kind = this._kind;
     if (!g || !kind || !this._at) return;
     const def = KIT[kind];
-    const [x, z] = snapCentre(def, this._at[0], this._at[1], this._rot);
+    const [x, z] = snapCenter(def, this._at[0], this._at[1], this._rot);
     this._at = [x, z];
     const placed = useGameStore.getState().game.structures;
     const problem = siteProblem(def, x, z, this._rot, this._site, placed);

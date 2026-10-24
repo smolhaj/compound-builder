@@ -7,9 +7,9 @@ Vite, TypeScript (strict), React, Zustand (with subscribeWithSelector), a custom
 
 ## The graphics bar
 Compound Builder must look at least as good as **University Empire** (`smolhaj/UniversityEmpire`, `src/three/`). Do not rebuild rendering from scratch. Port UE's stack following GDS §8.1:
-1. Extract the game-agnostic world rendering into `src/engine/world/`. This covers the light rig and sky, post-processing (SSAO, bloom, colour grading, god rays), weather, seasons, instanced trees with wind, regional terrain and site grading, water, regional houses, barns and fences, procedural normal maps and materials, geometry merging and LOD, instanced people, night windows, the walk/fly camera, and the Playwright screenshot QA harness.
+1. Extract the game-agnostic world rendering into `src/engine/world/`. This covers the light rig and sky, post-processing (SSAO, bloom, color grading, god rays), weather, seasons, instanced trees with wind, regional terrain and site grading, water, regional houses, barns and fences, procedural normal maps and materials, geometry merging and LOD, instanced people, night windows, the walk/fly camera, and the Playwright screenshot QA harness.
 2. Strip the campus, era and university hooks behind thin adapters (terrain grid, region, season, weather, time of day).
-3. Then build the Compound Builder layers on top: the modular build kit and its materials, weathering, construction stages, damage states, and the defence, visibility, sun, fire and flow overlays.
+3. Then build the Compound Builder layers on top: the modular build kit and its materials, weathering, construction stages, damage states, and the defense, visibility, sun, fire and flow overlays.
 
 ## Rules
 1. **Procedural art only.** No external assets, HDRIs or downloaded models.

@@ -12,6 +12,9 @@ import { blockedReason, isFinished, progress } from '../sim/construction';
 import { BLUEPRINTS, totalBill, totalHours } from '../sim/blueprints';
 import { BUNKER_ORDER, KIT, KIT_ORDER, UTILITY_ORDER } from '../game/buildkit/kit';
 import { FIT, fitProblem, plant, serviceOf, FUEL_UNIT_L } from '../sim/utilities';
+import { DISASTERS, TRACKS, TRACK_NAME, type DisasterKind } from '../sim/disaster';
+import { prices } from '../sim/economy';
+import { LIVING_PER_DAY } from '../sim/engine';
 import { HARDEN, HARDEN_IDS, type TierDef, hardenCost, hardenProblem, isBunkerRoom, protectionOf, tierOf } from '../sim/hardening';
 import { PERIMETER, PERIMETER_ORDER, UTILITY_LINES, runBill, runHours, runFinished, runProgress, runBlocked, runGrowth } from '../sim/perimeter';
 
@@ -24,7 +27,7 @@ const VIEWS: Array<[BuildingView, string, string]> = [['full', 'Walls', 'Whole b
 const SPEEDS: Array<[Speed, string]> = [[0, '❚❚'], [1, '▶'], [2, '▶▶'], [3, '▶▶▶'], [4, '⏩']];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const MONTH_START = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
-const TASK_TEXT: Record<string, string> = { build: 'Building', forestry: 'In the woods', chores: 'Chores', sleep: 'Asleep', school: 'School', leisure: 'Free time', idle: 'Idle' };
+const TASK_TEXT: Record<string, string> = { build: 'Building', forestry: 'In the woods', chores: 'Chores', sleep: 'Asleep', school: 'School', leisure: 'Free time', idle: 'Idle', job: 'At work in town' };
 
 function dateLabel(doy: number): string {
   let m = 11;
@@ -40,6 +43,24 @@ const h3: CSSProperties = { margin: '0 0 4px', fontSize: 12, textTransform: 'upp
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return <div style={{ marginBottom: 8 }}><div style={h3}>{title}</div>{children}</div>;
+}
+
+/** Free build: start any disaster when you are ready. */
+function FreeBuild() {
+  const g = useGameStore();
+  const [kind, setKind] = useState<DisasterKind>('grid_down');
+  const [warn, setWarn] = useState(14);
+  return <Section title="Free build">
+    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+      <select value={kind} onChange={e => setKind(e.target.value as DisasterKind)}>
+        {(Object.keys(DISASTERS) as DisasterKind[]).map(k => <option key={k} value={k}>{DISASTERS[k]!.name}</option>)}
+      </select>
+      <select value={warn} onChange={e => setWarn(+e.target.value)} title="Warning signs before it hits">
+        <option value={0}>no warning</option><option value={7}>a week's warning</option><option value={14}>two weeks'</option><option value={45}>six weeks'</option>
+      </select>
+      <button style={btn(true)} onClick={() => g.trigger(kind, warn)}>Trigger</button>
+    </div>
+  </Section>;
 }
 
 /** Game HUD. Hidden with ?clean (QA shots). */
@@ -82,6 +103,7 @@ export function Hud() {
         <span>{dateLabel(cal.doy)}, {cal.year}</span>
         <span style={{ fontVariantNumeric: 'tabular-nums' }}>{clock(hourOf(game.clock.t))}</span>
         <span style={{ fontWeight: 600, color: '#cfe0a8' }}>{usd(game.money)}</span>
+        <button style={btn()} title="New game" onClick={() => g.openSetup(true, true)}>New</button>
         <span style={{ display: 'flex', gap: 3 }}>
           {SPEEDS.map(([s, label]) => <button key={s} style={btn(game.clock.speed === s)} onClick={() => g.setSpeed(s)}>{label}</button>)}
         </span>
@@ -228,6 +250,15 @@ export function Hud() {
               <span style={{ opacity: 0.7 }}>{TASK_TEXT[st?.task ?? 'idle']}</span>
             </div>;
           })}
+          {game.disaster.tracks.banks > 0.5 && game.disaster.tracks.stores > 0.5 && <div style={{ fontSize: 11.5, opacity: 0.7, marginTop: 2 }}>Household costs ${LIVING_PER_DAY}/day</div>}
+          {game.people.filter(p => p.job).map(p => {
+            const st = game.personState.find(x => x.id === p.id);
+            const over = game.disaster.phase === 'impact' || game.disaster.phase === 'survival' || game.disaster.phase === 'over';
+            return <div key={'job' + p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, fontSize: 11.5, opacity: 0.85, marginTop: 2 }}>
+              <span>{p.first}: {over ? <s>{p.job!.title}</s> : st?.employed ? `${p.job!.title}, $${p.job!.wage}/day` : 'quit the job'}</span>
+              {!over && <button style={btn()} onClick={() => g.setEmployed(p.id, !st?.employed)}>{st?.employed ? 'Quit' : 'Go back'}</button>}
+            </div>;
+          })}
         </Section>
         {(game.utilities.report.solarKwh + game.utilities.report.genKwh + game.utilities.report.waterL > 0) && (() => {
           const r = game.utilities.report;
@@ -240,6 +271,21 @@ export function Hud() {
             {(r.shortKwh > 0.5 || r.shortL > 0) && <div style={{ color: '#f0a070' }}>{r.shortKwh > 0.5 ? 'Power ran short. ' : ''}{r.shortL > 0 ? 'Water ran short.' : ''}</div>}
           </Section>;
         })()}
+        {(game.disaster.phase === 'warning' || (game.disaster.kind && game.clock.t >= game.disaster.warnAt)) && (
+          <Section title="Outside world">
+            {game.disaster.tracks.deliveries <= 0.25 ? <div style={{ color: '#f08060' }}>No deliveries: the yard and the stores are shut</div>
+              : prices(game) > 1.02 && <div style={{ color: '#f0c070' }}>Prices up {Math.round((prices(game) - 1) * 100)} %</div>}
+            {game.clock.t >= game.disaster.hitAt && TRACKS.map(k => (
+              <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ width: 120 }}>{TRACK_NAME[k]}</span>
+                <div style={{ flex: 1, height: 5, background: '#333', borderRadius: 3 }}>
+                  <div style={{ width: `${game.disaster.tracks[k] * 100}%`, height: '100%', borderRadius: 3, background: game.disaster.tracks[k] > 0.66 ? '#9cc070' : game.disaster.tracks[k] > 0.25 ? '#e0b050' : '#e06a50' }} />
+                </div>
+              </div>
+            ))}
+          </Section>
+        )}
+        {game.disaster.mode === 'sandbox' && !game.disaster.kind && <FreeBuild />}
         <Section title="Stockpile">
           {MATERIAL_IDS.filter(m => game.stock[m] > 0 || (pending[m] ?? 0) > 0 || qty[m] > 0).length === 0 && <div style={{ opacity: 0.6 }}>Empty. Order below or fell timber.</div>}
           {MATERIAL_IDS.filter(m => game.stock[m] > 0 || (pending[m] ?? 0) > 0 || qty[m] > 0).map(m => (
@@ -260,17 +306,17 @@ export function Hud() {
           <div style={{ display: 'flex', gap: 4, marginTop: 6, flexWrap: 'wrap' }}>
             {lines.length > 0 && <button style={btn(true)} disabled={!!problem}
               onClick={() => { if (g.order(lines)) setQty(emptyStock()); }}>
-              Order {usd(orderCost(lines))}{problem === 'cannot_afford' ? ' (too much)' : ''}
+              Order {usd(orderCost(lines, prices(game)))}{problem === 'cannot_afford' ? ' (too much)' : problem === 'no_deliveries' ? ' (no deliveries)' : ''}
             </button>}
             {needLines.length > 0 && <button style={btn()} disabled={!!orderProblem(game, needLines)} onClick={() => g.order(needLines)}>
-              Order what the plans need ({usd(orderCost(needLines))})
+              Order what the plans need ({usd(orderCost(needLines, prices(game)))})
             </button>}
           </div>
         </Section>
       </div>
 
       {/* Bottom right: cameras, building view */}
-      <div style={{ ...panel, position: 'fixed', right: 10, bottom: 10, padding: 4, display: 'flex', gap: 4, alignItems: 'center' }}>
+      <div style={{ ...panel, position: 'fixed', right: 10, bottom: 34, padding: 4, display: 'flex', gap: 4, alignItems: 'center' }}>
         {VIEWS.map(([v, label, tip]) => <button key={v} title={tip} style={btn(w.buildingView === v)} onClick={() => w.setBuildingView(v)}>{label}</button>)}
         <button title="Underground: see-through ground, bunker rooms cut open (U)" style={btn(w.underground)} onClick={() => w.setUnderground(!w.underground)}>Underground</button>
         <span style={{ width: 1, height: 18, background: '#555', margin: '0 3px' }} />
@@ -291,7 +337,7 @@ export function Hud() {
       )}
 
       {/* Bottom left: view (season / weather / quality / photo mode) */}
-      <div style={{ ...panel, position: 'fixed', left: 10, bottom: 10, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', maxWidth: 560 }}>
+      <div style={{ ...panel, position: 'fixed', left: 10, bottom: 34, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', maxWidth: 560 }}>
         <select value={w.seasonMode} onChange={e => w.setSeasonMode(e.target.value as SeasonMode)} title="Season look">
           {SEASON_MODES.map(x => <option key={x}>{x}</option>)}
         </select>

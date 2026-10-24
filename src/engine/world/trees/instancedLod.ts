@@ -75,7 +75,7 @@ export interface InstancedLodOptions {
    *  instance) compacted alongside the matrices. Only valid when every level
    *  geometry is exclusive to this set — the GPU copies live on it. */
   instanceAttributes?: Array<{ name: string; itemSize: number; data: Float32Array }>;
-  /** Whether per-instance colours are used (allocates instanceColor). */
+  /** Whether per-instance colors are used (allocates instanceColor). */
   colors?: boolean;
 }
 
@@ -102,7 +102,7 @@ export class InstancedLodSet {
   private readonly _levels: LodLevel[];
   /** Source instance matrices (16 floats each). */
   private readonly _mtx: Float32Array;
-  /** Source colours (3 floats each) — null when colours are unused. */
+  /** Source colors (3 floats each) — null when colors are unused. */
   private readonly _col: Float32Array | null;
   /** World-space cull sphere per instance: x, y, z, r. */
   private readonly _bound: Float32Array;

@@ -5,8 +5,8 @@
  * the ground `opts.depth` above it. Built in the usual layers, timed for a
  * dig: stakes on the surface → floor slab → walls (timed like a frame) →
  * roof slab → vents, doors and the fit-out. Doorways go through the walls
- * a room shares with its neighbours (opts.doors); furniture is packed
- * along the walls clear of them. Sizes in metres × M (scale.test.ts).
+ * a room shares with its neighbors (opts.doors); furniture is packed
+ * along the walls clear of them. Sizes in meters × M (scale.test.ts).
  */
 import * as THREE from 'three';
 import { CELL, type KitPieceDef } from './kit';
@@ -555,7 +555,7 @@ function plant(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
   });
 }
 
-/** NBC air filter: a grey cabinet with a hand crank, ducts up into the ceiling to the vents. */
+/** NBC air filter: a gray cabinet with a hand crank, ducts up into the ceiling to the vents. */
 function nbcFilter(a: Add): void {
   a('steel', box(1.1 * M, 1.5 * M, 0.55 * M, 0, 0, 0));
   a('iron', box(0.9 * M, 0.3 * M, 0.02 * M, 0, 1.1 * M, 0.28 * M));

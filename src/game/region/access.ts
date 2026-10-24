@@ -14,12 +14,12 @@ export const ROAD_EXTENT = 700;
 
 export type Pt = [number, number];
 
-/** County road centre x at z: a few units east of the parcel, gently wandering. */
+/** County road center x at z: a few units east of the parcel, gently wandering. */
 export function roadX(z: number): number {
   return PARCEL_SIZE + 3.2 + 1.6 * Math.sin(z / 85 + 0.7) + 0.6 * Math.sin(z / 31);
 }
 
-/** County road centre line, sampled every `step` units. */
+/** County road center line, sampled every `step` units. */
 export function roadLine(step = 4): Pt[] {
   const out: Pt[] = [];
   for (let z = -ROAD_EXTENT; z <= PARCEL_SIZE + ROAD_EXTENT; z += step) out.push([roadX(z), z]);
@@ -27,7 +27,7 @@ export function roadLine(step = 4): Pt[] {
 }
 
 export interface Access {
-  /** Driveway centre line from the road to the yard (first point on the road). */
+  /** Driveway center line from the road to the yard (first point on the road). */
   drive: Pt[];
   /** Gate on the property line. */
   gate: { x: number; z: number; rot: number };
@@ -89,7 +89,7 @@ export function distToLine(pts: readonly Pt[], x: number, z: number): number {
 /**
  * Driveway from the county road to the camp: leaves the road square, enters
  * through the gate a few units in from the property corner line, and swings
- * to a yard beside the camp. `camp` is the camp centre; the yard sits on its
+ * to a yard beside the camp. `camp` is the camp center; the yard sits on its
  * road side.
  */
 export function planAccess(camp: { x: number; z: number }): Access {

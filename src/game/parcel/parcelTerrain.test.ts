@@ -10,7 +10,7 @@ describe('ParcelTerrain', () => {
     expect(diff).toBeGreaterThan(1);
   });
 
-  it('rises westward (benches toward the range) with tens of metres of relief', () => {
+  it('rises westward (benches toward the range) with tens of meters of relief', () => {
     for (const seed of [1, 2, 3, 7, 42]) {
       const t = new ParcelTerrain(seed);
       // sample away from the creek

@@ -73,7 +73,7 @@ export class MarkTool {
     this._ring.visible = true;
     const name = t.kind === 'conifer' ? 'Ponderosa pine' : t.kind === 'oval' ? 'Aspen' : 'Cottonwood';
     const marked = isMarked(useGameStore.getState().game, t.id);
-    useGameStore.getState().setToolProblem(own ? `${name}: click to ${marked ? 'unmark' : 'mark for felling'}` : 'Not your land (a neighbour\'s tree)');
+    useGameStore.getState().setToolProblem(own ? `${name}: click to ${marked ? 'unmark' : 'mark for felling'}` : 'Not your land (a neighbor\'s tree)');
   }
 
   /** Mark / unmark the hovered tree (also QA). */

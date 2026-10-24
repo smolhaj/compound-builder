@@ -1,7 +1,7 @@
 /**
  * A bunker dig while it is open: bare earth draped over the cut, the spoil
  * heap beside it, and the hired mini excavator at the edge (while it is
- * digging or backfilling). Sizes in metres × M.
+ * digging or backfilling). Sizes in meters × M.
  */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';

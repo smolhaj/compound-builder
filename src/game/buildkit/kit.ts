@@ -133,7 +133,7 @@ export const BUNKER_KIT: KitPieceDef[] = [
   room('bunker_stores', 'Storeroom', 2, 2, 'Rows of shelving: cans, rice and beans in buckets, water drums, medicine, seed.', 0),
   room('bunker_plant', 'Plant room', 2, 2, 'Air: an NBC filter and blast valves. Power: a battery bank and a vented generator. Water: a 2,000 L tank.', 0),
   room('bunker_medical', 'Medical bay', 2, 2, 'An exam table, a cot, a sink, cabinets of supplies and an oxygen bottle.', 1),
-  room('bunker_comms', 'Comms & armoury', 1, 2, 'Radios and maps on one wall, a gun safe and ammunition on the other.', 1),
+  room('bunker_comms', 'Comms & armory', 1, 2, 'Radios and maps on one wall, a gun safe and ammunition on the other.', 1),
 ];
 /** Underground menu order. */
 export const BUNKER_ORDER: readonly string[] = BUNKER_KIT.map(d => d.id);
@@ -148,14 +148,14 @@ export const UTILITY_ORDER: readonly string[] = ['well_hand', 'well_drilled', 'c
 export interface Placed {
   id: string;
   kind: string;
-  /** Centre of the footprint (world units). */
+  /** Center of the footprint (world units). */
   x: number;
   z: number;
   /** Quarter turns (0..3); 0 = door side facing +z. */
   rot: number;
 }
 
-/** Footprint rect (world) of a piece at a centre, including the front clearance. */
+/** Footprint rect (world) of a piece at a center, including the front clearance. */
 export function footprint(def: KitPieceDef, x: number, z: number, rot: number, withFront = true): { x0: number; z0: number; x1: number; z1: number } {
   const q = ((rot % 4) + 4) % 4;
   const hx = def.cellsX * CELL / 2, hz = def.cellsZ * CELL / 2;
@@ -183,9 +183,9 @@ export function rotQ(lx: number, lz: number, q: number): [number, number] {
 
 /**
  * Snap a cursor point to the build grid so the footprint's cell edges sit on
- * grid lines (odd-sized footprints centre on a cell, even ones on a line).
+ * grid lines (odd-sized footprints center on a cell, even ones on a line).
  */
-export function snapCentre(def: KitPieceDef, x: number, z: number, rot: number): [number, number] {
+export function snapCenter(def: KitPieceDef, x: number, z: number, rot: number): [number, number] {
   const odd = (n: number) => n % 2 === 1;
   const q = ((rot % 4) + 4) % 4;
   const nx = q % 2 === 0 ? def.cellsX : def.cellsZ;

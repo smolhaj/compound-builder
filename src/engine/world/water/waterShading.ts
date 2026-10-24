@@ -4,7 +4,7 @@
  * the Puget sound).
  *
  * `patchWaterMaterial()` turns a MeshStandardMaterial into water:
- *   • depth: shallow shelf → deep channel colour, the pebbly / sandy bed
+ *   • depth: shallow shelf → deep channel color, the pebbly / sandy bed
  *     showing through the shallows, lighter toward the shore;
  *   • flow (optional flow texture from waterFlow.ts): ripples and foam
  *     streaks advected along the river (two-phase flow map, no stretching),
@@ -34,7 +34,7 @@ export const WATER_GLOBALS = {
   uSkyHor:   { value: new THREE.Color(0.45, 0.5, 0.55) },
   /** Key light direction (toward the sun by day, the moon by night). */
   uSunDir:   { value: new THREE.Vector3(0.3, 0.8, 0.5).normalize() },
-  /** Key light colour × glint strength (HDR). */
+  /** Key light color × glint strength (HDR). */
   uSunCol:   { value: new THREE.Color(1, 1, 1) },
   /** 0 = day … 1 = night. */
   uWNight:   { value: 0 },
@@ -160,7 +160,7 @@ function colorGLSL(o: WaterPatchOptions): string {
   vec2 wOff0 = wVel * wPh0 * W_PERIOD;
   vec2 wOff1 = wVel * wPh1 * W_PERIOD;
 
-  // ── Body colour: shallows lighter / greener with the bed showing, deep channel dark
+  // ── Body color: shallows lighter / greener with the bed showing, deep channel dark
   float wShelf = 1.0 - wDepth;
   vec3 wCol = mix(uWShallow, uWDeep, smoothstep(0.0, 0.85, wDepth));
   // bed: soft silt / sand (low-contrast mottling, no cell pattern); small
@@ -170,7 +170,7 @@ function colorGLSL(o: WaterPatchOptions): string {
   vec3 wBedC = uWBed * (0.82 + 0.3 * wSilt);
   float wPebK = 0.35 * smoothstep(0.82, 0.97, wShelf) * (1.0 - smoothstep(6.0, 18.0, wCamD));
   if (wPebK > 0.001) wBedC = mix(wBedC, uWBed * (0.7 + 0.3 * wPebbles(wp * 42.0 + vec2(wNoise(wp * 7.0) * 0.6))), wPebK);
-  // the bed shows only in the first metre or so, then the water goes opaque
+  // the bed shows only in the first meter or so, then the water goes opaque
   float wSee = uWClarity * pow(smoothstep(0.45, 1.0, wShelf), 2.5) * (1.0 - 0.6 * wRiver * smoothstep(0.1, 0.4, wSpeed));
   wCol = mix(wCol, wBedC * 0.4, wSee * 0.5);   // (r9: a dark, peaty margin — a bright bed read as an icy rim)
 
@@ -180,7 +180,7 @@ function colorGLSL(o: WaterPatchOptions): string {
     float lap = 0.5 + 0.5 * sin(uWTime * 1.3 + wNoise(wp * 0.8) * 6.2831 + (wp.x * 0.6 + wp.y * 0.9));
     float edgeN = wNoise(wp * 5.0 + uWTime * vec2(0.15, -0.1));
     // a thin broken line right at the waterline — a wide band turned whole
-    // narrow ponds / channels (all 'edge') into a pale grey sheet like ice
+    // narrow ponds / channels (all 'edge') into a pale gray sheet like ice
     float band = smoothstep(0.8, 1.0, wEdge) * (0.35 + 0.65 * lap);
     wFoam = band * smoothstep(0.45, 0.85, edgeN + 0.25 * lap) * 0.3;
   }
@@ -288,10 +288,10 @@ function outGLSL(): string {
     }
 #endif
     vec3 body = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse;
-    // water scatters blue-green whatever the light colour
+    // water scatters blue-green whatever the light color
     float bodyL = dot(body, vec3(0.2126, 0.7152, 0.0722));
     // (r9: less on the shallow shelf — there the green-brown of the shallows
-    // and the bed show; a blue-grey wash over the bright shelf read as ice)
+    // and the bed show; a blue-gray wash over the bright shelf read as ice)
     body = mix(body, bodyL * vec3(0.42, 1.08, 1.12), 0.5 * (1.0 - wSee) * (1.0 - wFoam) * (0.35 + 0.65 * smoothstep(0.0, 0.55, wDepth)));
     // Sun / moon glitter path: sharp lobe on the full ripple normal, sparkling
     vec3 Rf = reflect(-Vw, wNw);

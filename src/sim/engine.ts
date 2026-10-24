@@ -10,10 +10,15 @@ import { burnFirewood } from './heating';
 import { addRunWork, nextRun } from './perimeter';
 import { addFitWork, balanceDay, nextFit, plant } from './utilities';
 import { addHardenWork, nextHardenJob } from './hardening';
+import { updateDisaster } from './disaster';
+import { log } from './economy';
 import { dayIndex } from './state';
 import { buildRate } from './family';
 import { routineAt, taskFor } from './schedule';
 import { hourOf, type GameState, type Structure } from './state';
+
+/** Household running costs a day in peacetime: groceries, the truck, insurance, phone, property tax (rural Mountain West, 2020s). Stops once the stores and banks are gone. */
+export const LIVING_PER_DAY = 160;
 
 /** Sub-step in days (15 game minutes). */
 export const SUBSTEP = 0.25 / 24;
@@ -33,9 +38,17 @@ function subStep(s: GameState): void {
   const harden = target || run || fit ? null : nextHardenJob(s);
   const job = nextFellJob(s);
   // with both building and felling to do, the family splits: every other person to the woods
+  const weekday = dayIndex(s.clock.t) % 7 < 5;
   s.people.forEach((p, i) => {
     const ps = s.personState.find(x => x.id === p.id)!;
-    const task = taskFor(routineAt(p, h), target !== null || run !== null || fit !== null || harden !== null, job !== null, i % 2 === 1);
+    const slot = routineAt(p, h);
+    // the day job: weekdays in town during work hours, paid by the hour
+    if (slot === 'work' && weekday && ps.employed && p.job) {
+      ps.task = 'job'; ps.target = null;
+      s.money += p.job.wage / 8 * SUBSTEP * 24;
+      return;
+    }
+    const task = taskFor(slot, target !== null || run !== null || fit !== null || harden !== null, job !== null, i % 2 === 1);
     ps.task = task;
     ps.target = task === 'build' ? (target?.id ?? run?.id ?? fit?.building ?? harden?.building ?? null) : task === 'forestry' && job ? job.id : null;
     if (task === 'build' && target) addWork(s, target, SUBSTEP * 24 * buildRate(p));
@@ -44,7 +57,20 @@ function subStep(s: GameState): void {
     else if (task === 'build' && harden) addHardenWork(s, harden, SUBSTEP * 24 * buildRate(p));
     else if (task === 'forestry' && job) addFellWork(s, job, SUBSTEP * 24 * buildRate(p));
   });
+  if (s.disaster.tracks.banks > 0.5 && s.disaster.tracks.stores > 0.5) s.money -= LIVING_PER_DAY * SUBSTEP;
   burnFirewood(s, SUBSTEP);
+  // the collapse clock, once a day: warning signs, the hit, the outside world's services
+  if (dayIndex(s.clock.t) !== s.disaster.day) {
+    const before = s.disaster.phase;
+    for (const line of updateDisaster(s.disaster, s.clock.t, s.seed)) log(s, line);
+    if (before !== 'impact' && s.disaster.phase === 'impact') {
+      for (const ps of s.personState) if (ps.employed) {
+        ps.employed = false;
+        const p = s.people.find(x => x.id === ps.id);
+        if (p?.job) log(s, `${p.first}'s job is gone: nobody is going to work now.`);
+      }
+    }
+  }
   // once a day (at midnight): balance water and power
   const day = dayIndex(s.clock.t);
   if (day !== s.utilities.lastDay && h < 0.3) {

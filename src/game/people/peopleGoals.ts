@@ -15,11 +15,11 @@ import type { TaskKind } from '../../sim/state';
 export interface Site { x: number; z: number; rot: number; w: number; d: number; /** Evening seats (local x, z, face x, z). */ seats?: ReadonlyArray<readonly [number, number, number, number]> }
 
 export interface GoalCtx {
-  /** Camp centre (world) and its rotation. */
+  /** Camp center (world) and its rotation. */
   camp: { x: number; z: number; rot: number };
   /** The structure a builder works on. */
   site: (id: string) => Site | null;
-  /** Finished home (cabin centre) — the family sleeps there once it stands. */
+  /** Finished home (cabin center) — the family sleeps there once it stands. */
   home: Site | null;
   /** A felling job's tree: where it stands, which way it fell, how long it is. */
   tree?: (jobId: string) => WorkTree | null;
@@ -93,6 +93,10 @@ export function goalFor(i: number, kid: boolean, task: TaskKind, target: string 
       const toYard = wobble(i, clock, 0.03) < 0.5;
       const [tx, tz] = toYard ? [y.x - 0.3 + 0.1 * i, y.z - 0.9] : [t.x + dx * t.len * 0.3, t.z + dz * t.len * 0.3];
       return { x: tx + dz * 0.08 * side, z: tz - dx * 0.08 * side, pose: FIG_POSE.CARRY, face: null, hidden: false, work: false };
+    }
+    case 'job': {
+      // in town at the day job: off the land
+      return { x: ctx.camp.x, z: ctx.camp.z, pose: FIG_POSE.STAND, face: null, hidden: true, work: false };
     }
     case 'school': {
       const [x, z] = campPt(ctx, CAMP.table.x + (i % 2 ? 0.07 : -0.07), CAMP.table.z + 0.12);

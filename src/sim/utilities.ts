@@ -20,9 +20,9 @@ import { hasAll, type Stock } from './materials';
 
 /** What utility buildings provide. */
 export interface UtilityDef {
-  /** Water: litres a day it can deliver; pressurised (piped) or carried. */
+  /** Water: liters a day it can deliver; pressurised (piped) or carried. */
   water?: { lpd: number; pressure: boolean; needsPower?: number };
-  /** Water storage (litres) and roof catchment it collects (m² of the connected roofs count). */
+  /** Water storage (liters) and roof catchment it collects (m² of the connected roofs count). */
   store?: number;
   /** Power: solar kW (peak), generator kW, battery kWh. */
   solarKw?: number; genKw?: number; batteryKwh?: number;
@@ -51,9 +51,9 @@ export const FIT = {
   plumb: { hours: 40, materials: { pipe: 2, fixtures: 1 } as Partial<Stock> },
   wire: { hours: 30, materials: { cable: 3, hardware: 1 } as Partial<Stock> },
 };
-/** Generator fuel: litres per kWh (a small gas generator). */
+/** Generator fuel: liters per kWh (a small gas generator). */
 export const FUEL_L_PER_KWH = 0.45;
-/** Litres in one stock unit of fuel (a 20 L jerry can). */
+/** Liters in one stock unit of fuel (a 20 L jerry can). */
 export const FUEL_UNIT_L = 20;
 
 export interface Fitting { building: string; kind: 'plumb' | 'wire'; done: number; hours: number; supplied: boolean; finishedAt: number | null }
@@ -63,7 +63,7 @@ export interface Utilities {
   /** Battery state of charge (kWh) and capacity fade (0–1 of nameplate lost). */
   batteryKwh: number;
   batteryFade: number;
-  /** Water in storage (litres). */
+  /** Water in storage (liters). */
   storedL: number;
   /** Fuel burned toward the next can. */
   fuelL: number;
@@ -87,7 +87,7 @@ export function emptyUtilities(): Utilities {
 // Networks
 // ─────────────────────────────────────────────────────────────────────────
 
-/** A building's footprint centre and half-size (for "does this line reach it"). */
+/** A building's footprint center and half-size (for "does this line reach it"). */
 export interface Node { id: string; kind: string; x: number; z: number; r: number }
 
 const segDist = (x: number, z: number, ax: number, az: number, bx: number, bz: number) => {
@@ -252,9 +252,9 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
     // generator for the rest, while there's fuel
     if (bal < 0 && genKw > 0) {
       const need = Math.min(-bal, genKw * 8);
-      const litres = need * FUEL_L_PER_KWH;
+      const liters = need * FUEL_L_PER_KWH;
       const have = s.stock.fuel * FUEL_UNIT_L - u.fuelL;
-      const run = Math.min(litres, Math.max(0, have));
+      const run = Math.min(liters, Math.max(0, have));
       u.fuelL += run;
       while (u.fuelL >= FUEL_UNIT_L) { u.fuelL -= FUEL_UNIT_L; s.stock.fuel--; }
       const made = run / FUEL_L_PER_KWH;

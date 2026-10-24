@@ -3,7 +3,7 @@
  * and day of the year (pure, no Three.js; regional terrain shader input).
  *
  * Each region gets its real crop mix (share of the fields) and every crop a
- * colour calendar keyed on the day of the year: bare tilled soil at
+ * color calendar keyed on the day of the year: bare tilled soil at
  * planting, green-up, full canopy, ripening, harvest stubble, winter
  * residue. The terrain shader picks a crop slot per field from the field's
  * hash, so a region's fields change together through the year the way
@@ -38,16 +38,16 @@
  */
 import type { RegionKind } from './regionalLandscape';
 
-/** Linear-ish diffuse colour as used by the terrain shader (0–1 per channel). */
+/** Linear-ish diffuse color as used by the terrain shader (0–1 per channel). */
 export type Rgb = [number, number, number];
-/** [day of year, colour] key; the calendar wraps round the new year. */
+/** [day of year, color] key; the calendar wraps round the new year. */
 export type CropKey = [number, Rgb];
 
 export type CropId =
   | 'corn' | 'soy' | 'hay' | 'pasture' | 'wheat' | 'cotton' | 'grassSeed'
   | 'alfalfa' | 'rangePasture' | 'fallow' | 'rowVeg' | 'warmPasture' | 'silage';
 
-// shared colours
+// shared colors
 const STUBBLE: Rgb = [0.44, 0.37, 0.25];
 const BLACK_SOIL: Rgb = [0.21, 0.17, 0.12];
 const RED_CLAY: Rgb = [0.47, 0.27, 0.17];
@@ -143,7 +143,7 @@ export const REGION_CROPS: Record<RegionKind, Array<[CropId, number]>> = {
 /** Number of crop slots the shader takes. */
 export const CROP_SLOTS = 6;
 
-/** Colour of one crop on a day of the year (linear interpolation, wrapping round the new year). */
+/** Color of one crop on a day of the year (linear interpolation, wrapping round the new year). */
 export function cropColor(keys: ReadonlyArray<CropKey>, doy: number): Rgb {
   const d = ((doy - 1) % 365 + 365) % 365 + 1;
   const n = keys.length;
@@ -164,7 +164,7 @@ export function cropColor(keys: ReadonlyArray<CropKey>, doy: number): Rgb {
 }
 
 export interface CropSlots {
-  /** Colours of the CROP_SLOTS slots (unused slots repeat the last). */
+  /** Colors of the CROP_SLOTS slots (unused slots repeat the last). */
   colors: Rgb[];
   /** Cumulative upper share of each slot (field hash < cum[i] → slot i); last is 1. */
   cum: number[];

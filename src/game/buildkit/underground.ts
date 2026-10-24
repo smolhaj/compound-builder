@@ -55,7 +55,7 @@ export function sharedEdge(a: Rect, b: Rect, eps = 1e-6): { side: 'x0' | 'x1' | 
 const rectOf = (p: Placed) => footprint(KIT[p.kind], p.x, p.z, p.rot, false);
 
 /** Rooms that connect to `r` (share at least one cell of wall). */
-function neighbours(r: Rect, placed: readonly Placed[], skip?: string): Placed[] {
+function neighbors(r: Rect, placed: readonly Placed[], skip?: string): Placed[] {
   return placed.filter(p => p.id !== skip && KIT[p.kind] && isUnderground(KIT[p.kind]) && (() => {
     const e = sharedEdge(r, rectOf(p));
     return e !== null && e.to - e.from >= CELL - 1e-6;
@@ -72,7 +72,7 @@ export function bunkerRoots(placed: readonly Placed[]): Map<string, string | nul
   const ug = placed.filter(p => KIT[p.kind] && isUnderground(KIT[p.kind]));
   const parent = new Map(ug.map(p => [p.id, p.id]));
   const find = (id: string): string => { let r = id; while (parent.get(r) !== r) r = parent.get(r)!; parent.set(id, r); return r; };
-  for (const p of ug) for (const q of neighbours(rectOf(p), ug, p.id)) {
+  for (const p of ug) for (const q of neighbors(rectOf(p), ug, p.id)) {
     const a = find(p.id), b = find(q.id);
     if (a !== b) parent.set(a, b);
   }
@@ -105,12 +105,12 @@ export type Side = 'front' | 'back' | 'left' | 'right';
 /**
  * Doorways of an underground piece, by local side, at the local coordinate
  * along that wall (x for front / back, z for left / right): the middle of
- * the length it shares with each neighbour.
+ * the length it shares with each neighbor.
  */
 export function doorsOf(p: Placed, placed: readonly Placed[]): Partial<Record<Side, number>> {
   const r = rectOf(p), out: Partial<Record<Side, number>> = {};
   const q = ((p.rot % 4) + 4) % 4;
-  for (const n of neighbours(r, placed, p.id)) {
+  for (const n of neighbors(r, placed, p.id)) {
     const e = sharedEdge(r, rectOf(n))!;
     const mid = (e.from + e.to) / 2;
     // the world point at the middle of the shared edge, back into the piece's local frame
@@ -128,9 +128,9 @@ export function doorsOf(p: Placed, placed: readonly Placed[]): Partial<Record<Si
 
 export type UndergroundProblem = 'not_connected' | 'thin_cover' | 'too_deep';
 
-/** Floor level a piece would have here: its neighbours' bunker, or (an entrance) a new one; null if it can't join. */
+/** Floor level a piece would have here: its neighbors' bunker, or (an entrance) a new one; null if it can't join. */
 export function previewDatum(def: KitPieceDef, x: number, z: number, rot: number, height: (x: number, z: number) => number, placed: readonly Placed[]): number | null {
-  const near = neighbours(footprint(def, x, z, rot, false), placed);
+  const near = neighbors(footprint(def, x, z, rot, false), placed);
   if (near.length) {
     const ds = datums(placed, height);
     for (const n of near) { const d = ds.get(n.id); if (d !== undefined) return d; }
@@ -146,7 +146,7 @@ export function previewDatum(def: KitPieceDef, x: number, z: number, rot: number
 export function undergroundProblem(def: KitPieceDef, x: number, z: number, rot: number, height: (x: number, z: number) => number, placed: readonly Placed[]): UndergroundProblem | null {
   if (!isUnderground(def)) return null;
   const r = footprint(def, x, z, rot, false);
-  const near = neighbours(r, placed);
+  const near = neighbors(r, placed);
   const datum = previewDatum(def, x, z, rot, height, placed);
   if (datum === null) return 'not_connected';
   // an entrance's own shaft or stair is its cover; check the rooms

@@ -14,12 +14,12 @@
  *                 family move round furniture.
  *
  * Scale (UE SCALE v2): 1 unit ≈ 6 m, so 1 m = 1/6 unit (M). Furniture sizes
- * are written in metres × M so they read as real furniture.
+ * are written in meters × M so they read as real furniture.
  */
 import * as THREE from 'three';
 import type { KitMaterialId } from './materials';
 
-/** One metre in world units. */
+/** One meter in world units. */
 export const M = 1 / 6;
 
 /** Where geometry goes: a building layer × material. */
@@ -59,14 +59,14 @@ export function piece(sink: Sink, layer: string, p: Place, fn: (add: (m: KitMate
 // Walls with openings
 // ─────────────────────────────────────────────────────────────────────────
 
-/** An opening along a wall: centre `at` (distance from the start), width, sill and height above the wall base. */
+/** An opening along a wall: center `at` (distance from the start), width, sill and height above the wall base. */
 export interface Opening { at: number; w: number; sill: number; h: number }
 
 export interface WallSpec {
   ax: number; az: number; bx: number; bz: number;
   /** Base height and full height. */
   y0: number; h: number;
-  /** Thickness, and offset of the wall's centre line to its left (+) of a→b. */
+  /** Thickness, and offset of the wall's center line to its left (+) of a→b. */
   t: number; offset?: number;
   openings?: readonly Opening[];
   /** Cut the wall off at this height above its base (cutaway view); a dark cap marks the cut. */
@@ -123,7 +123,7 @@ export function wallRun(sink: Sink, layer: string, mat: KitMaterialId, w: WallSp
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Furniture library (front faces +z, floor at y = 0, sizes in metres × M)
+// Furniture library (front faces +z, floor at y = 0, sizes in meters × M)
 // ─────────────────────────────────────────────────────────────────────────
 
 export type Add = (m: KitMaterialId, g: THREE.BufferGeometry) => void;
@@ -289,7 +289,7 @@ export const Furniture = {
     Furniture.oilLamp(add, 0, 0.63, 0);
   },
 
-  /** Hurricane oil lamp (glows at night). Position in metres in the piece frame. */
+  /** Hurricane oil lamp (glows at night). Position in meters in the piece frame. */
   oilLamp(add: Add, xm = 0, ym = 0, zm = 0): void {
     add('iron', cyl(0.07 * M, 0.06 * M, xm * M, ym * M, zm * M, 8));
     add('lamp', new THREE.SphereGeometry(0.075 * M, 10, 8).scale(1, 1.4, 1).translate(xm * M, (ym + 0.15) * M, zm * M));

@@ -31,7 +31,7 @@ export function isSeasonMode(v: unknown): v is SeasonMode {
 
 /** Drawn seasonal state. All values 0–1. */
 export interface SeasonParams {
-  /** Deciduous foliage turning (0 green → 1 every tree at its fall colour). */
+  /** Deciduous foliage turning (0 green → 1 every tree at its fall color). */
   fall: number;
   /** Leaf drop (0 full crowns → 1 bare branches). Capped per region. */
   bare: number;
@@ -66,11 +66,11 @@ export function zeroSeasonParams(): SeasonParams {
 /** Climate of one location. Days are days of the year (Jan 1 = 1). */
 export interface SeasonClimate {
   id: string;
-  /** Fall colour intensity (1 = New England peak blaze, 0.15 = SoCal). */
+  /** Fall color intensity (1 = New England peak blaze, 0.15 = SoCal). */
   blaze: number;
   /** Fall palette shares: [scarlet, orange, gold/yellow, bronze/brown]. */
   palette: readonly [number, number, number, number];
-  /** First trees turn / peak colour / last leaves down. */
+  /** First trees turn / peak color / last leaves down. */
   turnStart: number;
   peak: number;
   dropEnd: number;
@@ -78,7 +78,7 @@ export interface SeasonClimate {
   bareMax: number;
   /**
    * Share of the broadleaf trees that are evergreen (live oak, southern
-   * magnolia, coast live oak): no fall colour, no leaf drop, no winter holes.
+   * magnolia, coast live oak): no fall color, no leaf drop, no winter holes.
    */
   broadEvergreen: number;
   /** Spring leaf-out (fresh green crowns) and blossom peak. */
@@ -163,7 +163,7 @@ export function dayOfYear(month: number, monthDay: number): number {
   return MONTH_START[Math.max(1, Math.min(12, month)) - 1] + monthDay;
 }
 
-/** Representative day for a forced season (fall = the region's peak colour). */
+/** Representative day for a forced season (fall = the region's peak color). */
 export function overrideDay(mode: VisualSeason, c: SeasonClimate): number {
   switch (mode) {
     case 'spring': return 116;   // late April: leaf-out, blossom, greening lawns
@@ -194,7 +194,7 @@ export function seasonTargets(c: SeasonClimate, d: number): SeasonParams {
     p.fall = sstep(c.turnStart, c.peak, d);
     p.bare = c.bareMax * sstep(c.peak + 2, c.dropEnd, d);
   } else {
-    // Winter colour state lingers until just before leaf-out, so the new year
+    // Winter color state lingers until just before leaf-out, so the new year
     // never flips a half-bare southern tree back to summer green
     p.fall = 1 - sstep(c.leafOut - 26, c.leafOut - 12, d);
     p.bare = c.bareMax * (1 - sstep(c.leafOut - 16, c.leafOut + 6, d));

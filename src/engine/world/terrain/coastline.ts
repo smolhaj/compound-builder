@@ -190,7 +190,7 @@ export function coastColumns(z: number, c: CoastSpec, s: CoastSection = coastSec
     { x: xs + wet + (xf - xs - wet) * 0.55, y: SEA_Y + 0.05 + (BEACH_Y - SEA_Y - 0.05) * 0.45 + 0.18 * s.mouth, kind: 'sand' },
     { x: xf, y: BEACH_Y, kind: 'toe' },
     // Talus apron, then a ledged face (harder caprock bands stand proud,
-    // softer beds recess) cut by rain gullies every few metres.
+    // softer beds recess) cut by rain gullies every few meters.
     { x: xt, y: topY, kind: 'crest' },
   ];
   const gully = gullyAt(z) * (1 + 1.5 * (1 - lotBandWeight(z, c)));

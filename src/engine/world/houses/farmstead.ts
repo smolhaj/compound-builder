@@ -1,5 +1,5 @@
 /**
- * Farmstead layout record (UE regionalRoads): yard centre, facing, size and
+ * Farmstead layout record (UE regionalRoads): yard center, facing, size and
  * an optional annex block behind the yard. Local frame: +z away from the
  * road; the yard is the ±7.5 square.
  */

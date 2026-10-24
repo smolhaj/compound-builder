@@ -7,14 +7,14 @@
  * Custom vertex attributes (consumed by the tree material shader):
  *   color  (vec3)  baked ambient occlusion / lobe tint, multiplied into albedo
  *   aLeaf  (float) 1 = foliage (tinted by instanceColor), 0 = bark (uBarkColor)
- *   aLobe  (vec3)  centre of the foliage lobe the vertex belongs to — lets the
+ *   aLobe  (vec3)  center of the foliage lobe the vertex belongs to — lets the
  *                  shader thin the canopy toward its branches (winter) and
  *                  flutter lobes independently in the wind
  *
  * Canopies are a single sphere shell wrapped around a cluster of lobe spheres
  * (plus value noise), so the silhouette is clumped without paying for hidden
  * interior faces. Normals blend the surface normal with the direction from
- * the crown centre — the standard stylised-realistic foliage trick: the crown
+ * the crown center — the standard stylised-realistic foliage trick: the crown
  * shades as one soft volume while the lobes still catch light.
  *
  * No external assets — all shapes are generated here from seeded noise.
@@ -99,7 +99,7 @@ function finalize(
 //   kind [1, 2)   leaf-cluster card; fract = per-card random (leaf drop order)
 //   kind [2, 3)   r21 conifer bough: a ragged spray of needle tufts; fract = per-card random
 //   kind [3, 4)   palm frond (pinnate leaflets cut by the shader)
-//   kind [-2, -1) Spanish moss strand (own grey-green, not the canopy tint)
+//   kind [-2, -1) Spanish moss strand (own gray-green, not the canopy tint)
 // The leaf / frond / strand cut-outs are computed in the fragment shader from
 // (u, v) — no textures.
 
@@ -189,7 +189,7 @@ function makeLeafCards(lobes: LobeSpec[], crown: THREE.Vector3, crownR: number, 
     if (d.y < -0.35 && rng() > (opts.under ?? 0.45)) continue;
     p.copy(L.c).addScaledVector(d, L.r * (0.86 + rng() * 0.26));
     p.y = L.c.y + (p.y - L.c.y) * squash;
-    // buried inside a neighbouring lobe → invisible, skip
+    // buried inside a neighboring lobe → invisible, skip
     let buried = false;
     for (const o of lobes) if (o !== L && p.distanceTo(o.c) < o.r * 0.72) { buried = true; break; }
     if (buried) continue;
@@ -258,7 +258,7 @@ function makeCrownShell(
   let rMin = Infinity, rMax = 0;
   for (let i = 0; i < n; i++) {
     d.fromBufferAttribute(pos, i).normalize();
-    // Far hit of the ray (crown centre → d) against every lobe sphere
+    // Far hit of the ray (crown center → d) against every lobe sphere
     let best = 0, bi = 0;
     for (let k = 0; k < lobes.length; k++) {
       const L = lobes[k];
@@ -567,7 +567,7 @@ export function buildBroadleafTree(species: BroadleafSpecies, detail: VegDetail,
     }
   }
 
-  // Spanish moss: grey-green beards hanging from the limbs under the crown.
+  // Spanish moss: gray-green beards hanging from the limbs under the crown.
   // r16: each beard is two crossed cards of different lengths (it reads as a
   // soft hanging mass from every side, not a flat comb), its top edge ragged,
   // its strands gathered into irregular tapering locks in the shader
@@ -615,13 +615,13 @@ export function buildBroadleafTree(species: BroadleafSpecies, detail: VegDetail,
  *               (they fall with the leaves);
  *   magnolia  — southern magnolia: a dense, glossy, dark pyramidal evergreen
  *               crown down to the ground, a few big white flowers.
- * Blossom / fruit cards keep their own vertex colour (card kinds −3 / −4).
+ * Blossom / fruit cards keep their own vertex color (card kinds −3 / −4).
  */
 export type OrnamentalSpecies = 'jacaranda' | 'citrus' | 'crepe' | 'magnolia';
 
 const ORN_SALT: Record<OrnamentalSpecies, number> = { jacaranda: 401, citrus: 503, crepe: 601, magnolia: 701 };
 
-/** Small round cards (blossom trusses or fruit) over the outer crown, with their own colours. */
+/** Small round cards (blossom trusses or fruit) over the outer crown, with their own colors. */
 function makeBlossomCards(lobes: LobeSpec[], count: number, size: number, rng: () => number, colors: number[], fruit: boolean, topBias: number): THREE.BufferGeometry {
   const s = newSoup();
   const cols: number[] = [];
@@ -822,7 +822,7 @@ export function buildConiferTree(detail: VegDetail, seed: number, lod: TreeLod =
   const rng = makeRng(seed + 999);
   const parts: THREE.BufferGeometry[] = [];
   // r10: close-up (LOD 0) conifers get many more, shorter whorls with ragged,
-  // drooping branch tips and per-whorl colour, so they read as a spruce / fir
+  // drooping branch tips and per-whorl color, so they read as a spruce / fir
   // rather than a stack of low-poly cones; the far LODs stay cheap.
   const tiers = lod === 0
     ? (detail === 'high' ? 8 : detail === 'medium' ? 7 : 6)
@@ -855,7 +855,7 @@ export function buildConiferTree(detail: VegDetail, seed: number, lod: TreeLod =
     const yApex = Math.min(topY, yBase + tierH);
     // slightly concave profile: the lower whorls spread wide, the top tapers to a leader
     const r = maxR * Math.pow(1 - f * 0.88, 0.92) * (0.9 + rng() * 0.2);
-    // per-whorl colour: some branches darker / bluer, some lighter new growth
+    // per-whorl color: some branches darker / bluer, some lighter new growth
     tint = 1 + (rng() - 0.5) * 0.22 * ragged;
     warm = (rng() - 0.5) * 0.08 * ragged;
     const apex = new THREE.Vector3((rng() - 0.5) * 0.03, yApex, (rng() - 0.5) * 0.03);
@@ -1138,7 +1138,7 @@ export function buildShrub(seed: number, cards = false): THREE.BufferGeometry {
 }
 
 /**
- * r15 hedge sprig: a small clump of leaf cards (≈ unit radius, centred on the
+ * r15 hedge sprig: a small clump of leaf cards (≈ unit radius, centered on the
  * origin) laid over the box body of a clipped hedge by HedgeSkin, so a hedge
  * reads as foliage with a broken outline instead of a smooth green slab.
  */
@@ -1157,7 +1157,7 @@ export function buildHedgeSprig(seed: number): THREE.BufferGeometry {
 // Every renderer that draws trees (campus trees + shrubs, decorative lot trees,
 // off-campus street / park trees) uses these geometries with this material so
 // all vegetation shares one look: bark tinted by uBarkColor, foliage by the
-// per-instance colour, baked AO, wind sway, leaf flutter and clump speckle.
+// per-instance color, baked AO, wind sway, leaf flutter and clump speckle.
 
 /** Global wind clock shared by every vegetation material (seconds). */
 export const VEG_WIND: { value: number } = { value: 0 };
@@ -1311,7 +1311,7 @@ float vegBlossomMask(vec2 uv, bool fruit, float fw) {
 
 /** Vertex: crown thinning (winter / seasonal leaf drop), wind sway, leaf flutter. */
 const VEG_BEGIN_VERTEX = `#include <begin_vertex>
-      // Winter / sparse crowns: pull foliage toward its lobe centre
+      // Winter / sparse crowns: pull foliage toward its lobe center
       transformed = mix(transformed, aLobe + (transformed - aLobe) * (uLeafFill * (1.0 - 0.22 * seaBare)), aLeaf);
       float wHash = 0.0;
       #ifdef USE_INSTANCING
@@ -1352,7 +1352,7 @@ const VEG_DISCARD = `#include <clipping_planes_fragment>
           if (vegFrondMask(vCard.xy, cfw) < 0.0) discard;
         }
       }
-      // r10: a bare crown keeps a denser twig haze (grey-brown mass, not a sieve)
+      // r10: a bare crown keeps a denser twig haze (gray-brown mass, not a sieve)
       float vegFill = uLeafFill * (1.0 - 0.3 * vSeaBare);
       if (vegFill < 0.999 && vLeaf > 0.5) {
         // Bare crowns: finer holes so what is left reads as a twig lattice
@@ -1369,18 +1369,18 @@ export interface VegetationMaterialOptions {
   barkColor: { value: THREE.Color };
   /** Wind clock; defaults to the global VEG_WIND. */
   wind?: { value: number };
-  /** Evergreen foliage (conifers, shrubs): no fall colour / leaf drop. */
+  /** Evergreen foliage (conifers, shrubs): no fall color / leaf drop. */
   evergreen?: boolean;
 }
 
 /**
  * Vegetation material: MeshStandardMaterial + onBeforeCompile injection.
  *   vertex   — wind sway (height-weighted, per-instance phase) + per-lobe
- *              flutter; winter crown thinning toward lobe centres; bark vs
+ *              flutter; winter crown thinning toward lobe centers; bark vs
  *              foliage tint selection (foliage = instanceColor)
- *   fragment — leaf-clump speckle (colour + normal jitter), High/Medium only
+ *   fragment — leaf-clump speckle (color + normal jitter), High/Medium only
  *   seasons  — deciduous crowns follow the shared season uniforms
- *              (season/seasonShader.ts): per-tree fall colour + timing,
+ *              (season/seasonShader.ts): per-tree fall color + timing,
  *              spring flush / blossom, leaf drop to a see-through twig shell
  */
 export function createVegetationMaterial(o: VegetationMaterialOptions): THREE.MeshStandardMaterial {
@@ -1413,8 +1413,8 @@ export function createVegetationMaterial(o: VegetationMaterialOptions): THREE.Me
       #else
         vColor.rgb *= mix(uBarkColor, vec3(1.0), aLeaf);
       #endif
-      // Spanish moss keeps its own grey-green (not the canopy tint / fall colour)
-      if (aCard.z < -2.5) vColor.rgb = color;   // r16 blossoms / fruit keep their own colour
+      // Spanish moss keeps its own gray-green (not the canopy tint / fall color)
+      if (aCard.z < -2.5) vColor.rgb = color;   // r16 blossoms / fruit keep their own color
       else if (aCard.z < -0.5) vColor.rgb = color * vec3(0.16, 0.175, 0.135);
       vCard = aCard;
       vLeafDown = aLeaf * max(0.0, -normalize(normal).y);
@@ -1470,7 +1470,7 @@ export function createVegetationMaterial(o: VegetationMaterialOptions): THREE.Me
         diffuseColor.rgb *= mix(1.0, 0.62 + 0.62 * leafN, vLeaf);
         // r15: each leaf of a card / frond / moss strand gets its own tone
         diffuseColor.rgb *= vegCardShade;
-        // r15 bark: vertical furrows and ridges, lichen-grey patches
+        // r15 bark: vertical furrows and ridges, lichen-gray patches
         if (vLeaf < 0.5) {
           float fur = vegNoise(vec3(vLeafP.x * 4.5, vLeafP.y * 0.55, vLeafP.z * 4.5));
           float fin = vegNoise(vLeafP * vec3(11.0, 2.5, 11.0) + 3.0);

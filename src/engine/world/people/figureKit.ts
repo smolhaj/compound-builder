@@ -3,12 +3,12 @@
  * The one person model every crowd layer draws (UE: campus walkers,
  * townspeople, event-day people; here the family and, later, newcomers):
  * a merged low-poly figure whose vertices carry a part +
- * limb id, and a MeshStandardMaterial patch that colours each part from
+ * limb id, and a MeshStandardMaterial patch that colors each part from
  * per-instance attributes, swings arms and legs about the shoulder / hip
  * pivots and poses the figure.
  *
  * Per-instance attributes:
- *   aShirt / aPants / aSkin / aHair / aPack  (vec3 sRGB→linear colours)
+ *   aShirt / aPants / aSkin / aHair / aPack  (vec3 sRGB→linear colors)
  *   aStyle  (pose, hasPack, longHair, shoeTone)
  *   aWear   (coat 0 none / 1 hip / 2 mid-thigh / 3 gown, shorts, hat code, idle phase)
  *   aAnim   (walkPhase, swingAmp)
@@ -158,7 +158,7 @@ export const FIGURE_ATTRS: ReadonlyArray<readonly [string, number]> = [
 /**
  * Vertex-shader skeleton: limbs rotate about hip / shoulder pivots by the
  * per-instance walk phase; poses (see FIG_POSE). Standing people idle
- * (weight shift, head turns, a hand gesture now and then). Colour is picked
+ * (weight shift, head turns, a hand gesture now and then). Color is picked
  * per part from the instance palette; coats / gowns / shorts are cut in the
  * fragment shader at a figure height.
  */
@@ -278,7 +278,7 @@ export function injectFigureShader(mat: THREE.MeshStandardMaterial): void {
         transformed.z -= agBike * 0.07;
         // Weight shift while standing around
         transformed.x += agStill * sin(agT * 0.8) * transformed.y * 0.035;
-        // Per-part colour (hat replaces the hair cap)
+        // Per-part color (hat replaces the hair cap)
         vec3 shoeC = mix(vec3(0.08), vec3(0.86), step(0.55, aStyle.w));
         vec3 hairC = aWear.z > 0.5 ? agHatColor(aWear.z) : aHair;
         vAgCol = aPart < 0.5 ? aSkin
@@ -296,7 +296,7 @@ export function injectFigureShader(mat: THREE.MeshStandardMaterial): void {
                : aPart < 8.5 ? vec3(0.06)
                : aPart < 9.5 ? vec3(0.02)
                : vec3(0.52, 0.38, 0.22);
-        // Trousers: coat / gown hem (shirt colour above) / shorts (skin below the knee)
+        // Trousers: coat / gown hem (shirt color above) / shorts (skin below the knee)
         float agPants = step(2.5, aPart) * step(aPart, 3.5);
         vAgAlt = aWear.x > 0.5 ? aShirt : aSkin;
         vAgCut = agPants > 0.5

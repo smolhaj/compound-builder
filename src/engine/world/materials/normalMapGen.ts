@@ -16,7 +16,7 @@
  *   (mortar is darker than the brick face → lower luminance → lower "height").
  *   Using the color source therefore gives free, consistent results with zero
  *   extra canvas draw calls.  If you later want finer control you can pass a
- *   dedicated greyscale heightmap canvas instead — the function signature is
+ *   dedicated grayscale heightmap canvas instead — the function signature is
  *   identical.
  *
  * THREE.JS COLOR-SPACE GOTCHA:
@@ -167,7 +167,7 @@ export function generateNormalMap(
       // The standard encoding maps [-1, +1] → [0, 255]:
       //   encoded = floor( (component * 0.5 + 0.5) * 255 + 0.5 )
       // A flat surface (0, 0, 1) encodes to (128, 128, 255) — the familiar
-      // "flat normal map" blue colour.
+      // "flat normal map" blue color.
       const i = (y * width + x) * 4;
       dst[i]     = Math.round((ux * 0.5 + 0.5) * 255); // R → X (tangent)
       dst[i + 1] = Math.round((uy * 0.5 + 0.5) * 255); // G → Y (bitangent)
@@ -235,9 +235,9 @@ export const STRENGTH_PRESETS = {
   roofTile: 2.5,   // tile ridges are mid-depth
 } as const;
 
-// Strengths for textures that ship a dedicated greyscale height canvas
+// Strengths for textures that ship a dedicated grayscale height canvas
 // (BuildingRenderer paints mortar joints / bevels / slate butts explicitly),
-// whose gradients are clean steps rather than colour noise.
+// whose gradients are clean steps rather than color noise.
 export const HEIGHT_STRENGTH_PRESETS = {
   brick:    2.2,
   stone:    2.6,

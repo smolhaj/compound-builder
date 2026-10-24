@@ -20,7 +20,7 @@ export interface OccBox { minX: number; minY: number; minZ: number; maxX: number
  * along the ray toward the orbit target `t` (ground point) to just before the
  * box it entered — a third-person "camera boom" — or, when the target itself
  * is right at / inside the box, lift it just above the roof. Repeats a few
- * times so a camera moved out of one box into a neighbour also clears that
+ * times so a camera moved out of one box into a neighbor also clears that
  * one. Returns true when `p` was moved.
  */
 export function pullOutOfBoxes(

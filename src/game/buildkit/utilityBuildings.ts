@@ -4,7 +4,7 @@
  * array, battery shed, generator shed, septic system. Built in the same
  * layers as everything else; the sheds are furnished with working kit
  * (pressure tank, battery racks, inverter, generator, fuel drums). Sizes in
- * metres × M (scale.test.ts).
+ * meters × M (scale.test.ts).
  */
 import * as THREE from 'three';
 import { CELL, type KitPieceDef } from './kit';
@@ -239,7 +239,7 @@ function solarArray(def: KitPieceDef, seed = 1): THREE.Group {
   const pw = 1.13 * M, ph = 1.72 * M, tilt = 0.6, low = 0.8 * M;
   const sinT = Math.sin(tilt), cosT = Math.cos(tilt);
   const hy = (s: number) => low + (ph / 2 - s) * sinT;          // height of a point s along the slope (s = +ph/2 low edge … −ph/2 high edge)
-  const hz = (s: number) => s * cosT;                           // its z offset from the row centre
+  const hz = (s: number) => s * cosT;                           // its z offset from the row center
   const slab = (w: number, t: number, len: number, s: number, up: number, x: number, rz: number) =>
     box(w, t, len, 0, -t / 2, 0).rotateX(tilt).translate(x, hy(s) + up, rz + hz(s));
   p.layer = 'stakes';
@@ -262,7 +262,7 @@ function solarArray(def: KitPieceDef, seed = 1): THREE.Group {
     }
     // two purlins (rails) the length of the row, under the panels
     for (const s of [ph * 0.28, -ph * 0.28]) p.add('steel', slab(2 * half + 0.1 * M, 0.06 * M, 0.06 * M, s, -0.07 * M, 0, rz), 'frame');
-    // panels: cells on top, an aluminium frame round each, a pale backsheet underneath
+    // panels: cells on top, an aluminum frame round each, a pale backsheet underneath
     for (let i = 0; i < perRow; i++) {
       const x = -half + (i + 0.5) * pw;
       const g = new THREE.PlaneGeometry(pw - 0.03 * M, ph - 0.03 * M).rotateX(-Math.PI / 2 + tilt).translate(x, hy(0) + 0.002, rz);

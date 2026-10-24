@@ -20,10 +20,10 @@ import { DEPTH, MIN_COVER, ROOF_TOP } from './buildkit/underground';
 import { Equipment } from './buildkit/utilityBuildings';
 
 const PERSON_H = 0.28;
-/** Metres of a world-unit length. */
+/** Meters of a world-unit length. */
 const m = (u: number) => u / M;
 
-/** Bounding size (metres) of a furniture / clutter piece. */
+/** Bounding size (meters) of a furniture / clutter piece. */
 function size(fn: (a: Add) => void): { w: number; h: number; d: number } {
   const bb = new THREE.Box3(), t = new THREE.Box3();
   let any = false;

@@ -21,7 +21,7 @@ describe('weatherState', () => {
     }
   });
 
-  it('pickNextKind honours season weights (no snow outside winter)', () => {
+  it('pickNextKind honors season weights (no snow outside winter)', () => {
     const counts: Record<string, number> = {};
     for (let i = 0; i < 2000; i++) {
       const k = pickNextKind('summer', hash01(7, i));

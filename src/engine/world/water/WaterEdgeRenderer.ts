@@ -3,7 +3,7 @@
  *
  *   reeds    cattail / bulrush stands in the shallows of still water and slow
  *            river reaches (≈ 1.5–2.3 m: 0.25–0.38 u), clumped in stands with
- *            gaps, swaying in the wind (vertex shader), straw-coloured in
+ *            gaps, swaying in the wind (vertex shader), straw-colored in
  *            fall / winter;
  *   rushes   lower, finer clumps on the damp bank just above the waterline;
  *   pebbles  flat river stones on the bank where the current runs, plus the
@@ -67,7 +67,7 @@ function colorize(g: THREE.BufferGeometry, fn: (x: number, y: number, z: number)
 /**
  * A clump of tapered blades (each a 2-segment bent triangle strip) radiating
  * from a small base, height 1, radius ≈ 0.5; `heads` adds cattail spikes.
- * Vertex colour: darker at the base (AO), lighter tips; heads dark brown
+ * Vertex color: darker at the base (AO), lighter tips; heads dark brown
  * (blue channel flag 0 → the shader keeps them out of the season tint).
  */
 function reedClumpGeometry(blades: number, heads: number, seed: number, bend: number): THREE.BufferGeometry {
@@ -158,7 +158,7 @@ function stoneGeometry(): THREE.BufferGeometry {
 /**
  * Weeping willow, height 1: a short leaning trunk forking into a broad
  * rounded crown whose rim hangs in a curtain of long drooping streamers
- * almost to the ground. Vertex colour R = shade, G = 1 for foliage.
+ * almost to the ground. Vertex color R = shade, G = 1 for foliage.
  */
 function willowGeometry(seed: number): THREE.BufferGeometry {
   const r = rng(seed);
@@ -311,14 +311,14 @@ export class WaterEdgeRenderer {
       sh.vertexShader = sh.vertexShader
         .replace('#include <common>', '#include <common>\nuniform float uWTime;\nuniform float uSwayAmt;\nattribute vec3 aEdge;\nvarying vec3 vEdge;')
         .replace('#include <begin_vertex>', '#include <begin_vertex>\nvEdge = aEdge;\n' + SWAY_VERT);
-      // vertex colour: R = shade, G = 1 → tinted part (instance colour), B = 1 → also tinted;
-      // heads / flowers / bark keep a fixed colour
+      // vertex color: R = shade, G = 1 → tinted part (instance color), B = 1 → also tinted;
+      // heads / flowers / bark keep a fixed color
       sh.fragmentShader = sh.fragmentShader
         .replace('#include <common>', '#include <common>\nvarying vec3 vEdge;')
         .replace('#include <color_fragment>', /* glsl */`
         vec3 eInst = vec3(1.0);
         #if defined( USE_COLOR )
-          eInst = vColor.rgb;   // instance colour (three folds it into vColor)
+          eInst = vColor.rgb;   // instance color (three folds it into vColor)
         #endif
         float eShade = vEdge.r;
         ${shade === 'veg' ? 'vec3 eFixed = vec3(0.30, 0.17, 0.08);   // cattail heads' : ''}
@@ -338,7 +338,7 @@ export class WaterEdgeRenderer {
     return { color: tints[pal % tints.length], pal };
   }
 
-  /** Re-tint for a new visual season (reeds straw-coloured in fall / winter, no lilies in winter). */
+  /** Re-tint for a new visual season (reeds straw-colored in fall / winter, no lilies in winter). */
   setSeason(season: string): void {
     const c = new THREE.Color();
     for (const sp of this._spawned) {
@@ -479,7 +479,7 @@ export class WaterEdgeRenderer {
 
   /**
    * Regional reed fringes: along still / slow shores within `radius` of the
-   * campus centre (sampled from the regional field; nothing in the town).
+   * campus center (sampled from the regional field; nothing in the town).
    */
   buildRegional(o: {
     cx: number; cz: number; radius: number; inner: number;

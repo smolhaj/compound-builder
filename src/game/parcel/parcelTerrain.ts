@@ -31,7 +31,7 @@ export interface ParcelSample {
 }
 
 export interface CreekLine {
-  /** Creek centre z at world x. */
+  /** Creek center z at world x. */
   zAt(x: number): number;
   /** Water surface y at world x (falls gently eastward). */
   waterY(x: number): number;

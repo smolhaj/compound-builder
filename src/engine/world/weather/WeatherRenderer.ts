@@ -116,9 +116,9 @@ if ( uWx.x + uWx.y > 0.002 ) {
   }
 
   // ── Lying snow ───────────────────────────────────────────────────────────
-  // seaSnowK (season patch): ploughed roads / paths, bare crowns, snowbanks
+  // seaSnowK (season patch): plowed roads / paths, bare crowns, snowbanks
   float wxS = uWx.y * wxPorous * smoothstep( 0.42, 0.8, wxUp ) * seaSnowK;
-  // Ploughed roads: dark, unsaturated surfaces only keep slushy patches
+  // Plowed roads: dark, unsaturated surfaces only keep slushy patches
   float wxLum = dot( diffuseColor.rgb, vec3( 0.3, 0.55, 0.15 ) );
   float wxSat = max( diffuseColor.r, max( diffuseColor.g, diffuseColor.b ) ) - min( diffuseColor.r, min( diffuseColor.g, diffuseColor.b ) );
   wxS *= 1.0 - 0.6 * ( 1.0 - smoothstep( 0.03, 0.08, wxSat ) ) * ( 1.0 - smoothstep( 0.1, 0.2, wxLum ) );
@@ -132,9 +132,9 @@ if ( uWx.x + uWx.y > 0.002 ) {
     wxM = smoothstep( wxT - 0.22, wxT + 0.22, wxNv * 0.75 + wxUp * 0.25 ) * 0.88;
 #endif
     // Snowfields are not flat white: low-frequency drift brightness, wind
-    // sastrugi (stretched along the prevailing wind), cool blue-grey in
+    // sastrugi (stretched along the prevailing wind), cool blue-gray in
     // hollows / on tilted lee faces (sky-lit), albedo kept below clipping;
-    // seaSnowTint (season patch) greys plough banks and kerbs.
+    // seaSnowTint (season patch) grays plow banks and curbs.
     float wxLo = wxNoise( wxP.xz * 0.06 + 1.3 ) * 0.55 + wxNoise( wxP.xz * 0.21 + 7.9 ) * 0.45;
     float wxSa = wxNoise( vec2( wxP.x * 0.35 + wxP.z * 0.12, wxP.z * 2.6 - wxP.x * 0.9 ) );
     float wxDr = wxLo * 0.55 + wxSa * 0.25 + wxNoise( wxP.xz * 4.0 ) * 0.2;
@@ -263,7 +263,7 @@ const PRECIP_FRAG = /* glsl */`
 // ── Fog banks ─────────────────────────────────────────────────────────────────
 // Five stacked horizontal sheets of drifting noise just above the ground: from
 // the air a fog bank lying over the campus and the water, from eye level a
-// grey wall that thickens toward the horizon. One draw call, hidden unless
+// gray wall that thickens toward the horizon. One draw call, hidden unless
 // the fog is up. Fades round the camera so it never reads as a slab when the
 // eye sits inside a layer.
 const BANK_VERT = /* glsl */`

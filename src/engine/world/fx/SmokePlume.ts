@@ -84,7 +84,7 @@ export class SmokePlume {
 
   /**
    * `amount` 0..1 (fire lit); `wind` world units/s on x/z; `light` scales the
-   * smoke colour with the daylight (grey-blue at night); `viewportH` for size.
+   * smoke color with the daylight (gray-blue at night); `viewportH` for size.
    */
   update(time: number, amount: number, windX: number, windZ: number, light: number, viewportH: number): void {
     const u = this._u;

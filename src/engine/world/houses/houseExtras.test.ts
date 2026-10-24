@@ -200,9 +200,9 @@ describe('r19 loggia arcade', () => {
       expect(y - o.floorY).toBeGreaterThan(0.18);                       // piers ≥ ≈ 1.1 m
     }
   });
-  it('centres an arch on the door when asked, else null when 3 arches do not fit', () => {
+  it('centers an arch on the door when asked, else null when 3 arches do not fit', () => {
     const a = loggiaArcade({ ...o, align: -0.51 })!;
-    expect(a.centres.some(c => Math.abs(c + 0.51) < 1e-6)).toBe(true);
+    expect(a.centers.some(c => Math.abs(c + 0.51) < 1e-6)).toBe(true);
     expect(loggiaArcade({ ...o, hi: -0.1 })).toBeNull();
   });
   it('the opening clears the walk-up steps (opening ≥ ≈ 0.85 m)', () => {

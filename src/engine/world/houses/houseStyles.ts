@@ -83,7 +83,7 @@ export interface HouseSpec {
   garageCars: 1 | 2;
   walls: number[];
   roofs: number[];
-  /** Trim colour (window frames, fascia); null = the shader's white. */
+  /** Trim color (window frames, fascia); null = the shader's white. */
   trim: number | null;
   /** Chimney: chance, and fieldstone rather than brick. */
   chimney: number; stoneChimney: boolean;
@@ -95,8 +95,8 @@ export interface HouseSpec {
 const STUCCO = [0xf0e6d2, 0xeadcc0, 0xe8d2b0, 0xf2dcc4, 0xf4f0e6, 0xe6cba6, 0xefd9bd];  // cream, sand, peach, white
 const BARREL_TILE = [0xb4532e, 0xa84a2a, 0xbe5f36, 0x9e4a2c, 0xc0683e];
 const EARTH = [0x7a6a4e, 0x6a5a3e, 0x8a7656, 0x5e6a4e, 0x8c6e4c, 0xa48a62, 0x6e5040];     // olive, umber, ochre, moss green
-const MC_WALLS = [0xe8e4d8, 0xd8cbb0, 0xc9cfc8, 0xb8a888, 0xece6d6, 0x9ab0a8, 0xd4b48c];   // pale stucco, sand, sage, turquoise-grey
-const PNW_CEDAR = [0x8a6a4a, 0x7a5c40, 0x9a7a58, 0x6e5640, 0x5e5a4e, 0x7e8478, 0x6a6e66];  // cedar, weathered grey
+const MC_WALLS = [0xe8e4d8, 0xd8cbb0, 0xc9cfc8, 0xb8a888, 0xece6d6, 0x9ab0a8, 0xd4b48c];   // pale stucco, sand, sage, turquoise-gray
+const PNW_CEDAR = [0x8a6a4a, 0x7a5c40, 0x9a7a58, 0x6e5640, 0x5e5a4e, 0x7e8478, 0x6a6e66];  // cedar, weathered gray
 const PNW_DARK = [0x2e3234, 0x3a4038, 0x2a3a34, 0x4a4a48, 0x26282a, 0x3e4a52];             // charcoal, black-green, slate blue
 const MTN_LOG = [0x8a6440, 0x7a5636, 0x9a7048, 0xa47a50];
 const MTN_TIMBER = [0x7a5a3c, 0x6e5a48, 0xb8ab92, 0x8a7a64, 0x5e5448, 0xc8bca4];

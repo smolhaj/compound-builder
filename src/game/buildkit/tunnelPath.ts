@@ -2,7 +2,7 @@
  * The escape tunnel's long section (pure, tested): along its route the
  * floor starts at the bunker's floor and follows the land at a gentle grade
  * (≤ 8 %) so there is always MIN_COVER of earth over the vault; it can run
- * on under neighbouring land (user: "half a mile or longer"; an exit far
+ * on under neighboring land (user: "half a mile or longer"; an exit far
  * from any fighting). Sampled every STEP world units.
  */
 import { footprint, KIT, type Placed } from './kit';
@@ -38,7 +38,7 @@ export function tunnelPath(pts: readonly Pt[], datum: number, ground: (x: number
   for (let i = 1; i < f.length; i++) f[i] = Math.min(f[i], f[i - 1] + TUNNEL_GRADE * (out[i].s - out[i - 1].s));
   out.forEach((p, i) => { p.floor = f[i]; });
   let problem: PathProblem | null = null;
-  // the first stretch leaves through the room's door: it must be at the room's floor for a few metres
+  // the first stretch leaves through the room's door: it must be at the room's floor for a few meters
   if (out.slice(0, 3).some(p => p.floor < datum - 0.01)) problem = 'start_too_shallow';
   const e = out[out.length - 1];
   if (!problem && ground(e.x, e.z) - e.floor > MAX_EXIT_DEPTH) problem = 'exit_too_deep';
@@ -63,7 +63,7 @@ export const TUNNEL_MIN_LEN = 10, TUNNEL_EXIT_CLEAR = 8;
  * A route from a room wall (pts[0]) out to an exit: long enough, its exit
  * well clear of every building, not under the creek, not through another
  * room or a deep surface piece, and a floor that can keep its cover at a
- * walkable grade (tunnelPath). It may run on under neighbouring land.
+ * walkable grade (tunnelPath). It may run on under neighboring land.
  */
 export function tunnelProblem(pts: readonly Pt[], datum: number, height: (x: number, z: number) => number, water: (x: number, z: number) => boolean, placed: readonly Placed[]): TunnelProblem | null {
   let L = 0;
