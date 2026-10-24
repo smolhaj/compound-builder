@@ -1,4 +1,6 @@
 import { useEffect, useRef } from 'react';
+import { MushroomCloud } from './fx/MushroomCloud';
+import { nuclearSky } from '../sim/nuclear';
 import * as THREE from 'three';
 import { WorldScene } from '../engine/world/WorldScene';
 import { moonPhase, skyDarkness } from '../engine/world/sky/skyState';
@@ -127,6 +129,7 @@ export function GameCanvas() {
 
     let lastVisual = '';
     let lastParticles = '-';
+    let mushroom: MushroomCloud | null = null;
     let lastWetKey = -1;
     let last = performance.now();
     let raf = 0;
@@ -176,7 +179,20 @@ export function GameCanvas() {
         camera: ws.camera, focus: cam.target,
         snowBase: sp.snow, snowAllow: seasonState.weatherSnow, region: seasonState.climate.id,
       });
-      ws.setWeather(wx, weather.flash, weather.skyLightning);
+      // nuclear war: the flash, a mushroom cloud on the northern skyline, a sickly hazed sky, grey dust falling
+      const gs = useGameStore.getState().game, nk = nuclearSky(gs);
+      if (gs.disaster.kind === 'nuclear' && gs.clock.t >= gs.disaster.hitAt && gs.disaster.variant !== 'exchange') {
+        if (!mushroom) { // within the far plane, sized to the angle it would fill: ≈ 6° for the missile fields 100+ km off, ≈ 20° for the base
+          mushroom = new MushroomCloud(PARCEL_SIZE * 0.3, -2250, gs.disaster.variant === 'nearby' ? 220 : 70); ws.scene.add(mushroom.group); }
+        mushroom.update((gs.clock.t - gs.disaster.hitAt) * 24);
+      } else if (mushroom) { ws.scene.remove(mushroom.group); mushroom.dispose(); mushroom = null; }
+      if (nk.haze + nk.dust + nk.flash > 0) {
+        wx.cloud = Math.max(wx.cloud, 0.55 * nk.haze + 0.3 * nk.dust);
+        wx.fog = Math.max(wx.fog, 0.35 * nk.haze + 0.4 * nk.dust);
+        wx.haze = Math.max(wx.haze ?? 0.4, 0.9 * nk.haze);
+        wx.snow = Math.max(wx.snow, 0.6 * nk.dust);
+      }
+      ws.setWeather(wx, Math.max(weather.flash, nk.flash), weather.skyLightning);
       // lamps on inside from dusk (a little after sunset, off by late night)
       setWindowGlow(Math.max(0, Math.min(1, (ws.nightFactor - 0.25) / 0.4)) * (t > 23.5 || t < 5 ? 0.25 : 1));
       if (tour.active) {

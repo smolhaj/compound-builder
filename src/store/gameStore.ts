@@ -6,7 +6,7 @@ import { placeOrder } from '../sim/economy';
 import { planStructure } from '../sim/construction';
 import { markTree, unmarkTree, isMarked, type TreeRef } from '../sim/forestry';
 import { planRun, type Gate, type PerimeterKind, type Pt } from '../sim/perimeter';
-import { fitProblem, orderFit, plant, repairPump } from '../sim/utilities';
+import { fitProblem, orderFit, plant, repairPump, replaceFried } from '../sim/utilities';
 
 /** Reconnection fee to get back on the grid after leaving it. */
 const GRID_RECONNECT = 250;
@@ -48,6 +48,8 @@ export interface GameStore {
   /** Answer whoever is at the gate. */
   answer: (stance: Stance) => void;
   dismissCard: () => void;
+  /** Put a spare into an EMP-fried building. */
+  fixFried: (id: string) => string | null;
   /** Leave the county grid, or get back on it (a reconnection fee). */
   setGrid: (on: boolean) => void;
   /** A building's breaker. */
@@ -142,6 +144,12 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     resolve(g, stance);
     set({ game: g });
     void saveGame(AUTOSAVE, g);
+  },
+  fixFried: (id) => {
+    const g = structuredClone(get().game);
+    const why = replaceFried(g, id);
+    if (!why) set({ game: g });
+    return why;
   },
   dismissCard: () => {
     const g = structuredClone(get().game);

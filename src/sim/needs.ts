@@ -13,6 +13,7 @@
 import { calendarOf, type GameState } from './state';
 import { log } from './economy';
 import { isFinished } from './construction';
+import { winterFactor } from './nuclear';
 
 export type FoodId = 'fresh' | 'frozen' | 'canned' | 'staples';
 /** Food is kept in the stockpile in these units; kcal in one unit. */
@@ -49,7 +50,7 @@ export function produce(s: GameState): number {
   const season = doy < 160 || doy > 295 ? 0 : doy < 205 ? (doy - 160) / 45 : doy < 260 ? 1 : (295 - doy) / 35;
   const skill = Math.max(...s.people.map(p => p.skills.gardener), 0);
   const veg = gardens * 2500 * season * (0.6 + 0.08 * skill);
-  return Math.max(0, eggs) + veg;
+  return (Math.max(0, eggs) + veg) * winterFactor(s).grow;
 }
 
 /** Fraction of fresh food that spoils a day: in the open vs a root cellar. */

@@ -11,7 +11,8 @@ import { onOrder, orderCost, orderProblem } from '../sim/economy';
 import { blockedReason, isFinished, progress } from '../sim/construction';
 import { BLUEPRINTS, totalBill, totalHours } from '../sim/blueprints';
 import { BUNKER_ORDER, KIT, KIT_ORDER, UTILITY_ORDER } from '../game/buildkit/kit';
-import { FIT, fitProblem, plant, serviceOf, FUEL_UNIT_L, UTILITY } from '../sim/utilities';
+import { FIT, fitProblem, plant, serviceOf, FUEL_UNIT_L, UTILITY, SPARE_FOR } from '../sim/utilities';
+import { bestShelter, doseRate, isNuclear, SHELTER_DAYS } from '../sim/nuclear';
 import { DISASTERS, TRACKS, TRACK_NAME, type DisasterKind } from '../sim/disaster';
 import { prices } from '../sim/economy';
 import { LIVING_PER_DAY } from '../sim/engine';
@@ -29,7 +30,7 @@ const VIEWS: Array<[BuildingView, string, string]> = [['full', 'Walls', 'Whole b
 const SPEEDS: Array<[Speed, string]> = [[0, '❚❚'], [1, '▶'], [2, '▶▶'], [3, '▶▶▶'], [4, '⏩']];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const MONTH_START = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
-const TASK_TEXT: Record<string, string> = { build: 'Building', forestry: 'In the woods', chores: 'Chores', sleep: 'Asleep', school: 'School', leisure: 'Free time', idle: 'Idle', job: 'At work in town', gone: 'Died' };
+const TASK_TEXT: Record<string, string> = { build: 'Building', forestry: 'In the woods', chores: 'Chores', sleep: 'Asleep', school: 'School', leisure: 'Free time', idle: 'Idle', job: 'At work in town', gone: 'Died', shelter: 'Sheltering' };
 
 function dateLabel(doy: number): string {
   let m = 11;
@@ -195,6 +196,7 @@ export function Hud() {
                   <span>Breaker: {game.utilities.off.includes(sel.id) ? 'off' : game.utilities.lit.includes(sel.id) ? 'on, powered' : 'on, no power'}</span>
                   <button style={btn()} onClick={() => g.setBreaker(sel.id, game.utilities.off.includes(sel.id))}>{game.utilities.off.includes(sel.id) ? 'Switch on' : 'Switch off'}</button>
                 </div>}
+                {game.utilities.fried.includes(sel.id) && <button style={{ ...btn(true), marginTop: 3 }} title={`Fried by the EMP: needs a spare ${SPARE_FOR[sel.kind]} and a hardware kit`} onClick={() => g.fixFried(sel.id)}>Replace the fried {SPARE_FOR[sel.kind]} ({game.stock[SPARE_FOR[sel.kind]] >= 1 ? 'spare on hand' : 'no spare'})</button>}
                 {game.utilities.broken.includes(sel.id) && <button style={{ ...btn(true), marginTop: 3 }} onClick={() => g.repairPump(sel.id)}>Repair the pump (1 hardware kit)</button>}
               </>;
             })()}
@@ -298,6 +300,13 @@ export function Hud() {
           <Section title="Outside world">
             {game.disaster.tracks.deliveries <= 0.25 ? <div style={{ color: '#f08060' }}>No deliveries: the yard and the stores are shut</div>
               : prices(game) > 1.02 && <div style={{ color: '#f0c070' }}>Prices up {Math.round((prices(game) - 1) * 100)} %</div>}
+            {isNuclear(game) && (() => {
+              const h = (game.clock.t - game.disaster.hitAt) * 24, rate = doseRate(game.disaster.variant, h) * 1000, [pf, where] = bestShelter(game);
+              return <div style={{ marginBottom: 4 }}>
+                <div style={{ color: rate > 10 ? '#f08060' : rate > 1 ? '#f0c070' : '#a8d080' }}>Outside: {rate >= 10 ? Math.round(rate) : rate.toFixed(1)} mSv/h{h < SHELTER_DAYS * 24 ? ` · sheltering in ${where} (PF ${Math.round(pf).toLocaleString('en-US')})` : ''}</div>
+                {h < SHELTER_DAYS * 24 && <div style={{ fontSize: 11.5, opacity: 0.75 }}>Out to work in {Math.ceil(SHELTER_DAYS - h / 24)} days (by then it's a hundredth of day one)</div>}
+              </div>;
+            })()}
             {game.clock.t >= game.disaster.hitAt && TRACKS.map(k => (
               <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ width: 120 }}>{TRACK_NAME[k]}</span>
