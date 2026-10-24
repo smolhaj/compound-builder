@@ -189,6 +189,7 @@ function chickenCoop(def: KitPieceDef, seed = 1): THREE.Group {
     if (p.rnd() < 0.8) place(-0.32, 0.4, 0, a => Clutter.bucket(a));
     if (p.rnd() < 0.7) place(0.35, LD / 2 + 0.05, 0.4, a => Clutter.fruitBowl(a));
   });
+  group.userData.keep = ['rafters'];       // the run's posts and top rails stay when it is finished
   return group;
 }
 
@@ -246,6 +247,7 @@ function garden(def: KitPieceDef, seed = 1): THREE.Group {
   if (p.rnd() < 0.7) put(0.33, z0 + 0.06, 0, a => { const add = (m: Parameters<typeof p.add>[0], g: THREE.BufferGeometry) => a(m, g.translate(0, 0.4 * M, 0)); Clutter.fruitBowl(add); }, false);
   const g = p.finish();
   g.userData.chimneyTop = null;
+  g.userData.keep = ['frame', 'rafters'];
   return g;
 }
 

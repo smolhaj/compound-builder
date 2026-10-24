@@ -17,7 +17,7 @@ export type KitMaterialId = 'timber_lap' | 'trim' | 'fieldstone' | 'metal_roof' 
   // interior finishes and furnishings
   | 'pine_panel' | 'wood_dark' | 'wood_mid' | 'iron' | 'enamel' | 'quilt_red' | 'quilt_blue' | 'linen' | 'rug' | 'books' | 'lamp' | 'cutcap' | 'crockery'
   // more buildings
-  | 'concrete' | 'metal_siding' | 'log_wall' | 'log_end' | 'board_batten' | 'wire_mesh' | 'straw' | 'soil' | 'crop' | 'earth' | 'pegboard' | 'steel' | 'paint_red' | 'paint_green'
+  | 'concrete' | 'metal_siding' | 'log_wall' | 'log_end' | 'board_batten' | 'wire_mesh' | 'straw' | 'soil' | 'crop' | 'earth' | 'pegboard' | 'steel' | 'paint_red' | 'paint_green' | 'paint_yellow'
   // perimeter
   | 'hedge' | 'hedge2' | 'hedge_berry' | 'container_red' | 'container_blue' | 'container_green' | 'container_tan'
   // homey decor (procedural art)
@@ -27,7 +27,7 @@ export type KitMaterialId = 'timber_lap' | 'trim' | 'fieldstone' | 'metal_roof' 
 /** World units covered by one texture repeat. */
 const TEX_WORLD: Partial<Record<KitMaterialId, number>> = {
   timber_lap: 0.5, fieldstone: 0.5, metal_roof: 0.5, deck: 0.5, door: 0.2,
-  curtain: 0.15, curtain_red: 0.15, solar_cell: 0.283, hedge: 0.25, hedge2: 0.25,
+  curtain: 0.15, curtain_red: 0.15, hedge: 0.25, hedge2: 0.25,
   pine_panel: 0.5, quilt_red: 0.12, quilt_blue: 0.12, rug: 0.3, books: 0.1,
   concrete: 0.6, metal_siding: 0.5, container_red: 0.4, container_blue: 0.4, container_green: 0.4, container_tan: 0.4, log_wall: 0.5, board_batten: 0.5, wire_mesh: 0.15, straw: 0.3, soil: 0.4, earth: 0.8, pegboard: 0.2,
 };
@@ -569,6 +569,7 @@ export function kitMaterial(id: KitMaterialId): THREE.MeshStandardMaterial {
     case 'crop': m = new THREE.MeshStandardMaterial({ color: 0x4f8a34, roughness: 0.85 }); break;
     case 'steel': m = new THREE.MeshStandardMaterial({ color: 0x7c8186, roughness: 0.4, metalness: 0.75 }); break;
     case 'paint_red': m = new THREE.MeshStandardMaterial({ color: 0x9c2f26, roughness: 0.6 }); break;
+    case 'paint_yellow': m = new THREE.MeshStandardMaterial({ color: 0xd9a92a, roughness: 0.55 }); break;
     case 'paint_green': m = new THREE.MeshStandardMaterial({ color: 0x3f5f3a, roughness: 0.6 }); break;
     case 'art_mountains': m = texMat(id, paintLandscape(3, ['rgb(120,160,200)', 'rgb(200,215,225)'], ['rgb(110,120,140)', 'rgb(70,100,70)', 'rgb(90,120,60)']), 0.4, 0.6); break;
     case 'art_sunset': m = texMat(id, paintLandscape(7, ['rgb(90,70,120)', 'rgb(240,170,90)'], ['rgb(70,60,90)', 'rgb(60,70,60)']), 0.4, 0.6); break;
@@ -580,7 +581,7 @@ export function kitMaterial(id: KitMaterialId): THREE.MeshStandardMaterial {
     case 'sampler': m = texMat(id, paintSampler, 0.8, 0.95); break;
     case 'curtain': m = texMat(id, paintGingham([60, 90, 140]), 0.6, 0.95); (m as THREE.MeshStandardMaterial).side = THREE.DoubleSide; break;
     case 'curtain_red': m = texMat(id, paintGingham([170, 50, 40]), 0.6, 0.95); (m as THREE.MeshStandardMaterial).side = THREE.DoubleSide; break;
-    case 'solar_cell': m = texMat(id, paintSolar, 0.3, 0.15, 0.4); break;
+    case 'solar_cell': m = texMat(id, paintSolar, 0.3, 0.32, 0.1); break;
     case 'poly_tank': m = new THREE.MeshStandardMaterial({ color: 0x3b4a32, roughness: 0.55 }); break;
     case 'blue_tank': m = new THREE.MeshStandardMaterial({ color: 0x3a63a0, roughness: 0.4, metalness: 0.2 }); break;
     case 'flowers': m = new THREE.MeshStandardMaterial({ color: 0xe0a33a, roughness: 0.6, emissive: new THREE.Color(0.12, 0.06, 0) }); break;

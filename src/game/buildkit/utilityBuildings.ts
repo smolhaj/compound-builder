@@ -24,12 +24,46 @@ export const Equipment = {
     add('iron', box(0.25 * M, 0.3 * M, 0.12 * M, 0.55 * M, 1.1 * M, -0.1 * M));                  // pressure switch box
   },
   wellCap(add: Add): void { add('steel', cyl(0.09 * M, 0.5 * M, 0, 0, 0, 10)); add('steel', cyl(0.12 * M, 0.06 * M, 0, 0.5 * M, 0, 10)); },
-  batteryRack(add: Add, n = 4): void {
-    add('steel', box(1.2 * M, 1.6 * M, 0.5 * M, 0, 0, 0));
+  batteryRack(add: Add, n = 4, wm = 1.0): void {
+    add('steel', box(wm * M, 0.06 * M, 0.5 * M, 0, 0, 0));
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) add('steel', box(0.05 * M, 1.6 * M, 0.05 * M, sx * (wm / 2 - 0.025) * M, 0, sz * 0.22 * M));
     for (let k = 0; k < n; k++) {
-      add('iron', box(1.05 * M, 0.3 * M, 0.42 * M, 0, (0.1 + k * 0.38) * M, 0.05 * M));
-      add('paint_green', box(0.12 * M, 0.05 * M, 0.01 * M, 0.4 * M, (0.28 + k * 0.38) * M, 0.27 * M));   // charge LEDs
+      const y = (0.08 + k * 0.38) * M;
+      add('steel', box(wm * M, 0.03 * M, 0.5 * M, 0, y, 0));                                       // shelf
+      add('iron', box((wm - 0.12) * M, 0.28 * M, 0.42 * M, 0, y + 0.03 * M, 0.02 * M));           // battery module
+      add('paint_green', box(0.1 * M, 0.04 * M, 0.01 * M, (wm / 2 - 0.16) * M, y + 0.22 * M, 0.235 * M));   // charge LED
+      add('steel', box(0.5 * M, 0.02 * M, 0.02 * M, -0.1 * M, y + 0.26 * M, 0.235 * M));          // bus bar
     }
+  },
+  /** Wall extinguisher on a bracket (y = mounting height of its foot). */
+  extinguisher(add: Add): void {
+    add('paint_red', cyl(0.08 * M, 0.5 * M, 0, 0, 0.09 * M, 10));
+    add('iron', cyl(0.03 * M, 0.08 * M, 0, 0.5 * M, 0.09 * M, 6));
+    add('iron', box(0.14 * M, 0.03 * M, 0.04 * M, 0.04 * M, 0.58 * M, 0.09 * M));
+    add('steel', box(0.12 * M, 0.06 * M, 0.02 * M, 0, 0.3 * M, 0.01 * M));
+  },
+  /** A yellow warning placard on a wall (art: plain sign). */
+  sign(add: Add, w = 0.35, h = 0.25): void {
+    add('paint_yellow', box(w * M, h * M, 0.01 * M, 0, 0, 0.005 * M));
+    add('iron', box(w * 0.8 * M, h * 0.18 * M, 0.004 * M, 0, h * 0.62 * M, 0.011 * M));
+    add('iron', box(w * 0.6 * M, h * 0.1 * M, 0.004 * M, 0, h * 0.3 * M, 0.011 * M));
+  },
+  /** Louvred wall vent (hydrogen / heat out). */
+  vent(add: Add): void {
+    add('steel', box(0.4 * M, 0.3 * M, 0.03 * M, 0, 0, 0.015 * M));
+    for (let k = 0; k < 5; k++) add('iron', box(0.36 * M, 0.025 * M, 0.02 * M, 0, (0.03 + k * 0.055) * M, 0.035 * M));
+  },
+  /** Small parts shelf: a toolbox, fuse boxes, a coil of cable, a multimeter. */
+  partsShelf(add: Add): void {
+    add('wood_mid', box(0.9 * M, 0.03 * M, 0.3 * M, 0, 1.0 * M, 0));
+    add('wood_mid', box(0.9 * M, 0.03 * M, 0.3 * M, 0, 1.45 * M, 0));
+    for (const sx of [-1, 1]) add('iron', box(0.03 * M, 0.2 * M, 0.25 * M, sx * 0.38 * M, 0.8 * M, -0.02 * M));
+    add('paint_red', box(0.4 * M, 0.18 * M, 0.2 * M, -0.2 * M, 1.03 * M, 0));                      // toolbox
+    add('iron', box(0.3 * M, 0.02 * M, 0.04 * M, -0.2 * M, 1.21 * M, 0));
+    add('paint_yellow', box(0.08 * M, 0.14 * M, 0.04 * M, 0.15 * M, 1.03 * M, 0.06 * M));          // multimeter
+    add('iron', new THREE.TorusGeometry(0.09 * M, 0.03 * M, 6, 12).rotateX(Math.PI / 2).translate(0.28 * M, 1.05 * M, 0));   // cable coil
+    for (let k = 0; k < 3; k++) add('paint_green', box(0.12 * M, 0.1 * M, 0.08 * M, (-0.3 + k * 0.15) * M, 1.48 * M, 0));       // fuse boxes
+    add('iron', box(0.22 * M, 0.12 * M, 0.15 * M, 0.25 * M, 1.48 * M, 0));
   },
   inverterWall(add: Add): void {
     add('iron', box(0.55 * M, 0.75 * M, 0.2 * M, 0, 1.0 * M, 0));
@@ -66,6 +100,7 @@ function wellHand(_def: KitPieceDef, seed = 1): THREE.Group {
   put(0.0, 0.2, a => Clutter.bucket(a));
   p.collide({ x0: -0.17, z0: -0.17, x1: 0.17, z1: 0.17 });
   const g = p.finish();
+  g.userData.keep = ['frame', 'rafters'];
   g.userData.chimneyTop = null;
   return g;
 }
@@ -89,10 +124,16 @@ function wellDrilled(_def: KitPieceDef, seed = 1): THREE.Group {
 
 function batteryShed(_def: KitPieceDef, seed = 1): THREE.Group {
   return shed({ W: 0.42, D: 0.42, outer: 'board_batten', front: [{ kind: 'door', at: 0.08, w: 0.14, h: 0.33 }] }, c => {
-    c.I({ x: -0.06, z: c.back + 0.05 }, a => Equipment.batteryRack(a, 4));
+    c.I({ x: -0.085, z: c.back + 0.05 }, a => Equipment.batteryRack(a, 4, 1.0));
+    c.I({ x: 0.085, z: c.back + 0.05 }, a => Equipment.batteryRack(a, 3, 1.0));
     c.I({ x: c.left + 0.02, z: 0.0, rot: Math.PI / 2 }, a => Equipment.inverterWall(a), false);
-    c.I({ x: 0.12, z: c.back + 0.05 }, a => Equipment.batteryRack(a, 3));
-    c.C({ x: c.right - 0.002, z: 0.05, y: c.y0 + 1.2 * M, rot: -Math.PI / 2 }, a => Clutter.calendar(a), 0.5);
+    c.I({ x: c.right - 0.03, z: 0.02, rot: -Math.PI / 2 }, a => Equipment.partsShelf(a), false);
+    c.I({ x: 0.04, z: 0.06 }, a => Furniture.stool(a));
+    c.C({ x: c.right - 0.002, z: 0.13, y: c.y0 + 0.5 * M, rot: -Math.PI / 2 }, a => Equipment.extinguisher(a), 1);
+    c.C({ x: c.left + 0.002, z: -0.13, y: c.y0 + 1.75 * M, rot: Math.PI / 2 }, a => Equipment.sign(a), 1);
+    c.C({ x: 0.0, z: c.back + 0.002, y: c.y0 + 1.9 * M }, a => Equipment.vent(a), 1);
+    c.C({ x: c.right - 0.002, z: -0.1, y: c.y0 + 1.2 * M, rot: -Math.PI / 2 }, a => Clutter.calendar(a), 0.6);
+    c.C({ x: -0.1, z: 0.12 }, a => Clutter.broom(a), 0.5);
     c.parts.add('lamp', box(0.12, 0.01, 0.025, 0, c.yE - 0.03, 0), 'interior');
   }, seed);
 }
@@ -102,6 +143,10 @@ function generatorShed(_def: KitPieceDef, seed = 1): THREE.Group {
     c.I({ x: -0.05, z: -0.04 }, a => Furniture.generator(a));
     c.I({ x: 0.05, z: c.back + 0.06 }, a => Equipment.fuelDrums(a));
     c.I({ x: c.right - 0.02, z: -0.05, rot: -Math.PI / 2 }, a => Equipment.inverterWall(a), false);
+    c.C({ x: c.left + 0.002, z: 0.1, y: c.y0 + 0.5 * M, rot: Math.PI / 2 }, a => Equipment.extinguisher(a), 1);
+    c.C({ x: c.left + 0.002, z: -0.08, y: c.y0 + 1.6 * M, rot: Math.PI / 2 }, a => Equipment.sign(a), 1);
+    c.C({ x: c.left + 0.05, z: c.back + 0.04 }, a => { for (let k = 0; k < 3; k++) a('paint_yellow', box(0.14 * M, 0.3 * M, 0.1 * M, k * 0.16 * M, 0, 0)); }, 0.8);   // oil jugs
+    c.C({ x: 0.1, z: 0.12 }, a => Clutter.bucket(a), 0.6);
   }, seed, p => p.add('iron', new THREE.CylinderGeometry(0.012, 0.012, 0.2, 8).translate(-0.12, 0.6, -0.12), 'chimney'));
 }
 
@@ -122,6 +167,7 @@ function cistern(_def: KitPieceDef, seed = 1): THREE.Group {
   for (let k = 0; k < 8; k++) p.add('steel', box(0.06, 0.008, 0.008, -r - 0.012, 0.05 + k * 0.045, 0), 'openings');   // ladder rungs
   p.collide({ x0: -r, z0: -r, x1: r, z1: r });
   const g = p.finish();
+  g.userData.keep = ['frame', 'rafters'];
   g.userData.chimneyTop = null;
   return g;
 }
@@ -154,6 +200,7 @@ function waterTower(_def: KitPieceDef, seed = 1): THREE.Group {
   p.add('steel', cyl(0.015, deck + 0.03, -0.08, 0, -0.08, 8), 'openings');
   p.collide({ x0: -legX - 0.03, z0: -legX - 0.03, x1: legX + 0.03, z1: legX + 0.03 });
   const g = p.finish();
+  g.userData.keep = ['frame', 'rafters'];
   g.userData.chimneyTop = null;
   return g;
 }
@@ -161,35 +208,51 @@ function waterTower(_def: KitPieceDef, seed = 1): THREE.Group {
 function solarArray(def: KitPieceDef, seed = 1): THREE.Group {
   const p = new Parts(seed);
   const W = def.cellsX * CELL, D = def.cellsZ * CELL;
-  const pw = 1.13 * M, ph = 1.72 * M, tilt = 0.6;          // 400 W panels, ≈ 35° toward +z
+  // 400 W panels (1.13 × 1.72 m, portrait), tilted ≈ 34° toward +z; low edge ≈ 0.8 m off the ground
+  const pw = 1.13 * M, ph = 1.72 * M, tilt = 0.6, low = 0.8 * M;
+  const sinT = Math.sin(tilt), cosT = Math.cos(tilt);
+  const hy = (s: number) => low + (ph / 2 - s) * sinT;          // height of a point s along the slope (s = +ph/2 low edge … −ph/2 high edge)
+  const hz = (s: number) => s * cosT;                           // its z offset from the row centre
+  const slab = (w: number, t: number, len: number, s: number, up: number, x: number, rz: number) =>
+    box(w, t, len, 0, -t / 2, 0).rotateX(tilt).translate(x, hy(s) + up, rz + hz(s));
   p.layer = 'stakes';
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) p.add('trim', box(0.012, 0.09, 0.012, sx * (W / 2 - 0.05), -0.02, sz * (D / 2 - 0.05)));
-  const rows = [-0.22, 0.25], perRow = 6;
+  const rows = [-0.24, 0.25], perRow = 6;
   for (const rz of rows) {
-    const x0 = -(perRow * pw) / 2;
-    // footings and racking
+    const half = (perRow * pw) / 2;
+    const fs = ph / 2 - 0.12 * M, bs = -ph / 2 + 0.12 * M;     // front / rear post positions along the slope
+    // trestles: front and rear posts on concrete footings, a sloped rafter, a diagonal brace
     for (let i = 0; i <= 3; i++) {
-      const x = x0 + i * (perRow * pw) / 3;
-      p.add('concrete', box(0.05, 0.04, 0.05, x, -0.02, rz - 0.08), 'foundation');
-      p.add('concrete', box(0.05, 0.04, 0.05, x, -0.02, rz + 0.08), 'foundation');
-      p.add('steel', box(0.02, 0.06, 0.02, x, 0, rz + 0.08), 'frame');
-      p.add('steel', box(0.02, 0.2, 0.02, x, 0, rz - 0.08), 'frame');
-      p.add('steel', box(0.015, 0.015, ph + 0.02, 0, 0, 0).rotateX(tilt).translate(x, 0.13, rz), 'frame');
+      const x = -half + 0.1 * M + i * (2 * half - 0.2 * M) / 3;
+      for (const s of [fs, bs]) {
+        p.add('concrete', box(0.3 * M, 0.25 * M, 0.3 * M, x, -0.1 * M, rz + hz(s)), 'foundation');
+        p.add('steel', box(0.09 * M, hy(s) - 0.32 * M, 0.09 * M, x, 0.1 * M, rz + hz(s)), 'frame');
+      }
+      p.add('steel', slab(0.08 * M, 0.12 * M, ph, 0, -0.16 * M, x, rz), 'frame');
+      const dy = hy(bs) - 0.3 * M, dz = hz(bs) - hz(fs);
+      const br = new THREE.BoxGeometry(0.05 * M, 0.05 * M, Math.hypot(dy, dz)).rotateX(Math.atan2(dy, -dz)).translate(x, 0.3 * M + dy / 2, rz + hz(fs) + dz / 2);
+      p.add('steel', br, 'frame');
     }
-    // panels (portrait, one row of 6)
+    // two purlins (rails) the length of the row, under the panels
+    for (const s of [ph * 0.28, -ph * 0.28]) p.add('steel', slab(2 * half + 0.1 * M, 0.06 * M, 0.06 * M, s, -0.07 * M, 0, rz), 'frame');
+    // panels: cells on top, an aluminium frame round each, a pale backsheet underneath
     for (let i = 0; i < perRow; i++) {
-      const x = x0 + (i + 0.5) * pw;
-      const g = new THREE.PlaneGeometry(pw - 0.004, ph).rotateX(-Math.PI / 2 + tilt).translate(x, 0.145, rz);
+      const x = -half + (i + 0.5) * pw;
+      const g = new THREE.PlaneGeometry(pw - 0.03 * M, ph - 0.03 * M).rotateX(-Math.PI / 2 + tilt).translate(x, hy(0) + 0.002, rz);
       g.userData.keepUV = true;
       p.add('solar_cell', g, 'roof');
-      p.add('steel', box(pw - 0.004, 0.008, ph, 0, -0.005, 0).rotateX(tilt).translate(x, 0.145, rz), 'roof');
+      p.add('trim', slab(pw - 0.02 * M, 0.035 * M, ph - 0.02 * M, 0, -0.02 * M, x, rz), 'roof');                           // backsheet
+      for (const s of [ph / 2 - 0.01 * M, -ph / 2 + 0.01 * M]) p.add('steel', slab(pw - 0.01 * M, 0.04 * M, 0.025 * M, s, 0.012 * M, x, rz), 'roof');
+      for (const dx of [-1, 1]) p.add('steel', slab(0.025 * M, 0.04 * M, ph, 0, 0.012 * M, x + dx * (pw / 2 - 0.0125 * M), rz), 'roof');
     }
-    p.collide({ x0: x0, z0: rz - 0.15, x1: -x0, z1: rz + 0.15 });
+    p.collide({ x0: -half, z0: rz - 0.15, x1: half, z1: rz + 0.15 });
   }
-  // combiner box and conduit
-  p.add('iron', box(0.05, 0.07, 0.03, W / 2 - 0.1, 0.05, 0), 'openings');
-  p.add('steel', box(0.012, 0.05, 0.012, W / 2 - 0.1, 0, 0), 'openings');
+  // combiner box on a post and a conduit to the ground (the cable trench leaves from here)
+  p.add('steel', box(0.06 * M, 1.1 * M, 0.06 * M, W / 2 - 0.1, 0, 0.05), 'openings');
+  p.add('iron', box(0.4 * M, 0.5 * M, 0.18 * M, W / 2 - 0.1, 0.7 * M, 0.05 + 0.06 * M), 'openings');
+  p.add('paint_red', box(0.06 * M, 0.06 * M, 0.02 * M, W / 2 - 0.1 + 0.1 * M, 0.95 * M, 0.05 + 0.16 * M), 'openings');
   const g = p.finish();
+  g.userData.keep = ['frame', 'rafters'];
   g.userData.chimneyTop = null;
   return g;
 }

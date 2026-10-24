@@ -261,11 +261,14 @@ export function layerFractions(stage: number, f: number, supplied: boolean): Rec
 /** Show a layered building group at a stage: each layer drawn up to its fraction (pieces in build order). */
 export function showStage(group: THREE.Group, stage: number, f: number, supplied = true): void {
   const fr = layerFractions(stage, f, supplied);
+  // pieces whose frame is the finished thing (posts, stands, racking) keep it; stageAs times a layer like another
+  const keep = (group.userData.keep ?? []) as BuildLayer[];
+  const stageAs = (group.userData.stageAs ?? {}) as Partial<Record<BuildLayer, BuildLayer>>;
   for (const o of group.children) {
     const m = o as THREE.Mesh;
     if (!m.isMesh) continue;            // lights etc. are managed by the world
     const layer = m.userData.layer as BuildLayer;
-    const k = fr[layer];
+    const k = stage >= 5 && keep.includes(layer) ? 1 : fr[stageAs[layer] ?? layer];
     m.visible = k > 0.001;
     const n = m.userData.vertexCount as number;
     // whole triangles only, so partial layers end on a finished piece edge
