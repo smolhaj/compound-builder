@@ -1,4 +1,5 @@
 import { planProblem } from '../sim/construction';
+import { dismissCrew, hireCrew } from '../sim/crews';
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { newGame, SECONDS_PER_DAY, dayIndex, type GameState, type OrderLine, type Speed } from '../sim/state';
@@ -42,6 +43,9 @@ export interface GameStore {
   /** Order the next tier of a hardening upgrade for one bunker room, or (all) for every room of the bunker up to that tier. */
   harden: (buildingId: string, upgrade: HardenId, all?: boolean) => string | null;
   repairPump: (id: string) => boolean;
+  /** Hire a crew for a building, or send one home. */
+  hire: (buildingId: string) => string | null;
+  dismiss: (crewId: string) => void;
   /** Mark a tree to fell, or unmark it if it is marked and not yet cut. */
   toggleMark: (t: TreeRef, haulDist: number) => void;
   setTool: (kind: string | null) => void;
@@ -150,6 +154,17 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
   setTool: (tool) => set({ tool, toolProblem: null }),
   setToolProblem: (toolProblem) => set({ toolProblem }),
   select: (selected) => set({ selected }),
+  hire: (id) => {
+    const g = structuredClone(get().game);
+    const why = hireCrew(g, id);
+    if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); }
+    return why;
+  },
+  dismiss: (crewId) => {
+    const g = structuredClone(get().game);
+    dismissCrew(g, crewId);
+    set({ game: g });
+  },
   answer: (stance) => {
     const g = structuredClone(get().game);
     resolve(g, stance);

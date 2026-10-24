@@ -46,8 +46,8 @@ export const HARDEN: Record<HardenId, HardenDef> = {
   blast: {
     id: 'blast', name: 'Blast hardening', tiers: [
       { name: 'Blast doors', blurb: 'Blast doors on every opening (15 psi)', hours: 24, materials: { blast_door: 1, hardware: 1 } },
-      { name: 'Reinforced', blurb: 'Thicker roof slab, shock-mounted bunks and shelves (50 psi)', hours: 80, materials: { rebar: 10, concrete: 12, hardware: 3 } },
-      { name: 'Hardened shell', blurb: 'Heavily reinforced shell, blast valves (100 psi)', hours: 140, materials: { rebar: 20, concrete: 20, blast_valve: 2 } },
+      { name: 'Reinforced', blurb: 'Thicker roof slab, shock-mounted bunks and shelves, blast valves (50 psi)', hours: 160, materials: { rebar: 20, concrete: 24, hardware: 4, blast_valve: 2 } },
+      { name: 'Hardened shell', blurb: 'Heavily reinforced shell, a second blast door, more valves (100 psi)', hours: 300, materials: { rebar: 40, concrete: 40, blast_valve: 4, blast_door: 1 } },
     ],
   },
 };

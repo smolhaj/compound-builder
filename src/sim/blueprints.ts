@@ -23,15 +23,15 @@ export interface Blueprint {
   stages: StageDef[];
 }
 
-/** 6 × 9 m timber cabin: ≈ 340 person-hours — two adults ≈ 3 weeks. */
+/** 6 × 9 m timber cabin, insulated and finished: ≈ 1,400 person-hours (owner-builders report 1,200–1,600); ≈ $47k of materials. */
 export const CABIN_BLUEPRINT: Blueprint = {
   kind: 'timber_cabin',
   stages: [
-    { id: 'site', name: 'Stake out & level the pad', hours: 24, materials: {} },
-    { id: 'foundation', name: 'Fieldstone foundation', hours: 40, materials: { fieldstone: 6 } },
-    { id: 'frame', name: 'Timber frame', hours: 120, materials: { lumber: 16 } },
-    { id: 'roof', name: 'Roof', hours: 60, materials: { lumber: 4, roofing: 8 } },
-    { id: 'finish', name: 'Siding, doors & windows', hours: 100, materials: { lumber: 4, hardware: 3 } },
+    { id: 'site', name: 'Stake out & level the pad', hours: 40, materials: {} },
+    { id: 'foundation', name: 'Fieldstone foundation', hours: 120, materials: { fieldstone: 10 } },
+    { id: 'frame', name: 'Timber frame and subfloor', hours: 500, materials: { lumber: 24 } },
+    { id: 'roof', name: 'Rafters, sheathing and metal roof', hours: 240, materials: { lumber: 8, roofing: 12 } },
+    { id: 'finish', name: 'Siding, insulation, doors, windows and interior', hours: 500, materials: { lumber: 8, hardware: 14 } },
   ],
 };
 
@@ -39,23 +39,23 @@ export const CABIN_BLUEPRINT: Blueprint = {
 export const OUTHOUSE_BLUEPRINT: Blueprint = {
   kind: 'outhouse',
   stages: [
-    { id: 'site', name: 'Pick the spot (downhill, away from water)', hours: 2, materials: {} },
-    { id: 'foundation', name: 'Dig the pit, set the stone sill', hours: 12, materials: { fieldstone: 1 } },
-    { id: 'frame', name: 'Frame and seat', hours: 8, materials: { lumber: 2 } },
-    { id: 'roof', name: 'Roof', hours: 3, materials: { roofing: 1 } },
-    { id: 'finish', name: 'Siding and door', hours: 6, materials: { lumber: 1 } },
+    { id: 'site', name: 'Pick the spot (downhill, away from water)', hours: 4, materials: {} },
+    { id: 'foundation', name: 'Dig the pit, set the stone sill', hours: 20, materials: { fieldstone: 1 } },
+    { id: 'frame', name: 'Frame and seat', hours: 14, materials: { lumber: 1 } },
+    { id: 'roof', name: 'Roof', hours: 5, materials: { roofing: 1 } },
+    { id: 'finish', name: 'Siding and door', hours: 10, materials: { lumber: 1 } },
   ],
 };
 
-/** 9 × 12 m steel shop on a slab: ≈ 420 person-hours. */
+/** 9 × 12 m steel shop on a slab: ≈ 1,000 person-hours; ≈ $54k of materials. */
 export const WORKSHOP_BLUEPRINT: Blueprint = {
   kind: 'workshop',
   stages: [
-    { id: 'site', name: 'Stake out & grade the pad', hours: 24, materials: {} },
-    { id: 'foundation', name: 'Pour the slab', hours: 50, materials: { concrete: 12 } },
-    { id: 'frame', name: 'Post and girt frame', hours: 140, materials: { lumber: 20 } },
-    { id: 'roof', name: 'Trusses and roof', hours: 80, materials: { lumber: 6, roofing: 14 } },
-    { id: 'finish', name: 'Steel siding, bay door, benches', hours: 120, materials: { roofing: 10, hardware: 4, lumber: 4 } },
+    { id: 'site', name: 'Stake out & grade the pad', hours: 40, materials: {} },
+    { id: 'foundation', name: 'Pour the slab', hours: 100, materials: { concrete: 18 } },
+    { id: 'frame', name: 'Post and girt frame', hours: 350, materials: { lumber: 22 } },
+    { id: 'roof', name: 'Trusses and roof', hours: 200, materials: { lumber: 8, roofing: 18 } },
+    { id: 'finish', name: 'Steel siding, bay door, benches', hours: 310, materials: { roofing: 18, hardware: 8 } },
   ],
 };
 
@@ -63,11 +63,11 @@ export const WORKSHOP_BLUEPRINT: Blueprint = {
 export const ROOT_CELLAR_BLUEPRINT: Blueprint = {
   kind: 'root_cellar',
   stages: [
-    { id: 'site', name: 'Stake out', hours: 8, materials: {} },
-    { id: 'foundation', name: 'Dig into the slope, footings', hours: 90, materials: { concrete: 3 } },
-    { id: 'frame', name: 'Stone walls and vault beams', hours: 80, materials: { fieldstone: 10, lumber: 4 } },
-    { id: 'roof', name: 'Waterproof and berm the earth back over', hours: 50, materials: { roofing: 2 } },
-    { id: 'finish', name: 'Door, vent, shelves and bins', hours: 30, materials: { lumber: 3, hardware: 1 } },
+    { id: 'site', name: 'Stake out', hours: 12, materials: {} },
+    { id: 'foundation', name: 'Dig into the slope, footings', hours: 180, materials: { concrete: 8 } },
+    { id: 'frame', name: 'Stone walls and vault beams', hours: 160, materials: { fieldstone: 14, lumber: 4 } },
+    { id: 'roof', name: 'Waterproof and berm the earth back over', hours: 90, materials: { roofing: 2, membrane: 2 } },
+    { id: 'finish', name: 'Door, vent, shelves and bins', hours: 60, materials: { lumber: 2, hardware: 2 } },
   ],
 };
 
@@ -75,21 +75,21 @@ export const COOP_BLUEPRINT: Blueprint = {
   kind: 'chicken_coop',
   stages: [
     { id: 'site', name: 'Stake out', hours: 3, materials: {} },
-    { id: 'foundation', name: 'Piers and run posts', hours: 10, materials: { fieldstone: 1 } },
-    { id: 'frame', name: 'Coop frame, roosts, nest boxes', hours: 24, materials: { lumber: 4 } },
-    { id: 'roof', name: 'Roof', hours: 6, materials: { roofing: 2 } },
-    { id: 'finish', name: 'Siding, wire run, ramp', hours: 18, materials: { lumber: 1, hardware: 2 } },
+    { id: 'foundation', name: 'Piers and run posts', hours: 16, materials: { fieldstone: 1 } },
+    { id: 'frame', name: 'Coop frame, roosts, nest boxes', hours: 40, materials: { lumber: 2 } },
+    { id: 'roof', name: 'Roof', hours: 10, materials: { roofing: 1 } },
+    { id: 'finish', name: 'Siding, wire run, ramp', hours: 30, materials: { wire: 2, hardware: 1 } },
   ],
 };
 
 export const GARDEN_BLUEPRINT: Blueprint = {
   kind: 'garden',
   stages: [
-    { id: 'site', name: 'Lay out the beds', hours: 4, materials: {} },
-    { id: 'foundation', name: 'Break sod and double-dig', hours: 30, materials: {} },
-    { id: 'frame', name: 'Build the raised beds', hours: 20, materials: { lumber: 5 } },
-    { id: 'roof', name: 'Deer fence and gate', hours: 20, materials: { lumber: 3, hardware: 1 } },
-    { id: 'finish', name: 'Compost, soil and planting', hours: 14, materials: { hardware: 1 } },
+    { id: 'site', name: 'Lay out the beds', hours: 6, materials: {} },
+    { id: 'foundation', name: 'Break sod and double-dig', hours: 50, materials: {} },
+    { id: 'frame', name: 'Build the raised beds', hours: 40, materials: { lumber: 3 } },
+    { id: 'roof', name: 'Deer fence and gate', hours: 30, materials: { lumber: 1, wire: 2, hardware: 1 } },
+    { id: 'finish', name: 'Compost, soil and planting', hours: 24, materials: {} },
   ],
 };
 
@@ -97,23 +97,23 @@ export const GARDEN_BLUEPRINT: Blueprint = {
 export const FIELD_BLUEPRINT: Blueprint = {
   kind: 'field',
   stages: [
-    { id: 'site', name: 'Stake the corners', hours: 2, materials: {} },
-    { id: 'foundation', name: 'Plow, pick rock and harrow', hours: 40, materials: {} },
-    { id: 'frame', name: 'Plant potatoes, beans and wheat', hours: 30, materials: { seed: 1 } },
-    { id: 'roof', name: 'Deer fence and gate', hours: 36, materials: { lumber: 4, wire: 2, hardware: 1 } },
-    { id: 'finish', name: 'Hill the potatoes, set the drying racks', hours: 16, materials: { lumber: 1 } },
+    { id: 'site', name: 'Stake the corners', hours: 3, materials: {} },
+    { id: 'foundation', name: 'Plow, pick rock and harrow (rented tiller)', hours: 60, materials: {} },
+    { id: 'frame', name: 'Plant potatoes, beans and wheat', hours: 50, materials: { seed: 1 } },
+    { id: 'roof', name: 'Deer fence and gate', hours: 60, materials: { lumber: 3, wire: 2, hardware: 1 } },
+    { id: 'finish', name: 'Hill the potatoes, set the drying racks', hours: 30, materials: { lumber: 1 } },
   ],
 };
 
-/** 9 × 15 m log house from your own timber: ≈ 800 person-hours (a season for two). */
+/** 9 × 15 m log house from your own timber: ≈ 3,200 person-hours (two years of weekends for two, or a crew); ≈ $80k of bought materials. */
 export const LOG_HOUSE_BLUEPRINT: Blueprint = {
   kind: 'log_house',
   stages: [
-    { id: 'site', name: 'Stake out & level the pad', hours: 32, materials: {} },
-    { id: 'foundation', name: 'Stone foundation and footings', hours: 80, materials: { fieldstone: 14, concrete: 4 } },
-    { id: 'frame', name: 'Raise the log walls', hours: 320, materials: { logs: 40, lumber: 6 } },
-    { id: 'roof', name: 'Ridge beam, rafters and roof', hours: 130, materials: { lumber: 10, roofing: 18 } },
-    { id: 'finish', name: 'Glass gable, floors, stairs, kitchen & bath', hours: 240, materials: { lumber: 12, hardware: 8 } },
+    { id: 'site', name: 'Stake out & level the pad', hours: 60, materials: {} },
+    { id: 'foundation', name: 'Stone foundation and footings', hours: 300, materials: { fieldstone: 20, concrete: 10 } },
+    { id: 'frame', name: 'Raise the log walls', hours: 1300, materials: { logs: 40, lumber: 10 } },
+    { id: 'roof', name: 'Ridge beam, rafters and roof', hours: 500, materials: { lumber: 16, roofing: 24 } },
+    { id: 'finish', name: 'Glass gable, floors, stairs, kitchen & bath', hours: 1040, materials: { lumber: 24, hardware: 30 } },
   ],
 };
 
@@ -121,14 +121,14 @@ export const LOG_HOUSE_BLUEPRINT: Blueprint = {
 const bp = (kind: string, stages: Array<[StageId, string, number, Partial<Stock>]>): Blueprint => ({ kind, stages: stages.map(([id, name, hours, materials]) => ({ id, name, hours, materials })) });
 
 export const UTILITY_BLUEPRINTS: Blueprint[] = [
-  bp('well_hand', [['site', 'Witch the spot, stake it', 2, {}], ['foundation', 'Dig the well by hand (≈ 7 m)', 70, {}], ['frame', 'Stone the shaft', 24, { fieldstone: 3 }], ['roof', 'Well-house roof', 6, { lumber: 1, roofing: 1 }], ['finish', 'Hand pump and cover', 5, { hardware: 1 }]]),
-  bp('well_drilled', [['site', 'Stake the bore', 2, {}], ['foundation', 'Drill the well (contractor, ≈ 60 m)', 8, { drilling: 1 }], ['frame', 'Pump-house frame', 16, { lumber: 2 }], ['roof', 'Roof', 4, { roofing: 1 }], ['finish', 'Pump, pressure tank and controls', 12, { pump: 1, hardware: 1 }]]),
+  bp('well_hand', [['site', 'Witch the spot, stake it', 2, {}], ['foundation', 'Dig the well by hand (≈ 7 m)', 120, {}], ['frame', 'Stone the shaft', 50, { fieldstone: 3 }], ['roof', 'Well-house roof', 10, { lumber: 1, roofing: 1 }], ['finish', 'Hand pump and cover', 8, { hardware: 1 }]]),
+  bp('well_drilled', [['site', 'Stake the bore', 2, {}], ['foundation', 'Drill the well (contractor, ≈ 60 m)', 8, { drilling: 1 }], ['frame', 'Pump-house frame', 16, { lumber: 2 }], ['roof', 'Roof', 4, { roofing: 1 }], ['finish', 'Pump, pressure tank and controls', 16, { pump: 1, hardware: 1 }]]),
   bp('cistern', [['site', 'Stake it out', 2, {}], ['foundation', 'Level a gravel pad', 10, { concrete: 1 }], ['frame', 'Set the tank', 6, { tank: 1 }], ['roof', 'Gutters and downspouts', 10, { pipe: 1, hardware: 1 }], ['finish', 'First-flush filter and overflow', 6, { hardware: 1 }]]),
-  bp('water_tower', [['site', 'Stake it out', 4, {}], ['foundation', 'Footings', 24, { concrete: 3 }], ['frame', 'Timber stand', 60, { lumber: 8 }], ['roof', 'Hoist the tank', 16, { tank: 1 }], ['finish', 'Plumbing, ladder and the lookout deck', 20, { pipe: 2, lumber: 2 }]]),
-  bp('solar_array', [['site', 'Stake the rows (facing south)', 4, {}], ['foundation', 'Post footings', 16, { concrete: 2 }], ['frame', 'Racking', 24, { lumber: 2, hardware: 1 }], ['roof', 'Mount 12 panels', 16, { solar_panel: 12 }], ['finish', 'Combiner box and conduit', 8, { cable: 1, hardware: 1 }]]),
+  bp('water_tower', [['site', 'Stake it out', 4, {}], ['foundation', 'Footings', 40, { concrete: 3 }], ['frame', 'Timber stand', 140, { lumber: 8 }], ['roof', 'Hoist the tank', 24, { tank: 1 }], ['finish', 'Plumbing, ladder and the lookout deck', 50, { pipe: 2, lumber: 2 }]]),
+  bp('solar_array', [['site', 'Stake the rows (facing south)', 4, {}], ['foundation', 'Post footings', 16, { concrete: 2 }], ['frame', 'Racking', 40, { lumber: 2, hardware: 2 }], ['roof', 'Mount 12 panels', 24, { solar_panel: 12 }], ['finish', 'Combiner box and conduit', 16, { cable: 1, hardware: 1 }]]),
   bp('battery_shed', [['site', 'Stake it out', 2, {}], ['foundation', 'Slab', 10, { concrete: 1 }], ['frame', 'Frame and insulate', 20, { lumber: 3 }], ['roof', 'Roof', 6, { roofing: 1 }], ['finish', 'Batteries, inverter, charge controller', 16, { battery: 4, inverter: 1, cable: 1 }]]),
   bp('generator_shed', [['site', 'Stake it out', 2, {}], ['foundation', 'Slab', 8, { concrete: 1 }], ['frame', 'Lean-to frame', 12, { lumber: 2 }], ['roof', 'Roof', 4, { roofing: 1 }], ['finish', 'Generator, transfer switch, fuel rack', 8, { generator: 1, hardware: 1, fuel: 4 }]]),
-  bp('septic', [['site', 'Perc test and stake the field', 6, {}], ['foundation', 'Dig the tank hole and leach trenches', 60, {}], ['frame', 'Set the tank', 8, { septic_tank: 1 }], ['roof', 'Leach pipe in gravel', 20, { pipe: 3, concrete: 2 }], ['finish', 'Backfill, vent and lids', 10, {}]]),
+  bp('septic', [['site', 'Perc test and stake the field', 6, {}], ['foundation', 'Dig the tank hole and leach trenches (hired excavator)', 40, { excavator: 2 }], ['frame', 'Set the tank', 8, { septic_tank: 1 }], ['roof', 'Leach pipe in gravel', 30, { pipe: 3, concrete: 4 }], ['finish', 'Backfill, vent and lids', 16, { excavator: 1 }]]),
 ];
 
 // ── Underground: dug with a hired excavator; the net earth dug out becomes spoil for berms ──
@@ -137,11 +137,11 @@ type Fit = Partial<Stock>;
 const vaultBp = (kind: string, spoil: number, conc: [number, number, number], rebar: [number, number, number], dig: number, walls: number, roof: number, fitHours: number, fit: Fit, fitName = 'Vents, doors, wiring and the fit-out'): Blueprint => ({
   kind,
   stages: [
-    { id: 'site', name: 'Stake out the dig', hours: 6, materials: {} },
-    { id: 'foundation', name: 'Dig out (hired excavator), gravel bed, floor slab', hours: dig, materials: { excavator: Math.max(1, Math.round(spoil / 90)), concrete: conc[0], rebar: rebar[0] }, yields: { spoil } },
-    { id: 'frame', name: 'Form, tie the rebar and pour the walls', hours: walls, materials: { concrete: conc[1], rebar: rebar[1], lumber: Math.ceil(conc[1] / 4) } },
-    { id: 'roof', name: 'Pour the roof slab, waterproof, backfill', hours: roof, materials: { concrete: conc[2], rebar: rebar[2], membrane: Math.max(1, Math.round(spoil / 60)), excavator: 1 } },
-    { id: 'finish', name: fitName, hours: fitHours, materials: fit },
+    { id: 'site', name: 'Stake out the dig', hours: 8, materials: {} },
+    { id: 'foundation', name: 'Dig out (hired excavator), gravel bed, floor slab', hours: Math.round(dig * 2.5), materials: { excavator: Math.max(1, Math.round(spoil / 90)), concrete: conc[0], rebar: rebar[0] }, yields: { spoil } },
+    { id: 'frame', name: 'Form, tie the rebar and pour the walls', hours: Math.round(walls * 2.5), materials: { concrete: conc[1], rebar: rebar[1], lumber: Math.ceil(conc[1] / 4) } },
+    { id: 'roof', name: 'Pour the roof slab, waterproof, backfill', hours: Math.round(roof * 2.5), materials: { concrete: conc[2], rebar: rebar[2], membrane: Math.max(1, Math.round(spoil / 60)), excavator: 1 } },
+    { id: 'finish', name: fitName, hours: Math.round(fitHours * 2), materials: fit },
   ],
 });
 export const BUNKER_BLUEPRINTS: Blueprint[] = [

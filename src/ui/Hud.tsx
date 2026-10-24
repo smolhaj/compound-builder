@@ -11,6 +11,7 @@ import { onOrder, orderCost, orderProblem } from '../sim/economy';
 import { blockedReason, isFinished, planProblem, progress } from '../sim/construction';
 import { drillExtra } from '../sim/site';
 import { REGIONS } from '../sim/regions';
+import { CREW_RATE, CREW_SIZE, crewProblem, crewQuote } from '../sim/crews';
 import { BLUEPRINTS, totalBill, totalHours } from '../sim/blueprints';
 import { BUNKER_ORDER, KIT, UTILITY_ORDER } from '../game/buildkit/kit';
 import { FIT, fitProblem, plant, serviceOf, FUEL_UNIT_L, UTILITY, SPARE_FOR } from '../sim/utilities';
@@ -238,6 +239,21 @@ export function Hud() {
                   <div style={{ width: `${progress(sel) * 100}%`, height: '100%', background: '#c9b27a', borderRadius: 3 }} />
                 </div>
                 {!isFinished(sel) && <Note tone={blockedReason(game, sel) ? 'warn' : undefined}>{blockedReason(game, sel) ?? `${Math.round(progress(sel) * 100)} % done`}</Note>}
+                {!isFinished(sel) && (() => {
+                  const crew = game.crews.find(c => c.target === sel.id), q = crewQuote(sel), why = crewProblem(game, sel);
+                  return crew
+                    ? <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                        <span style={{ color: DIM }}>Crew of {CREW_SIZE} on it · ${Math.round(crew.paid).toLocaleString('en-US')} so far</span>
+                        <button style={btn()} onClick={() => g.dismiss(crew.id)}>Send home</button>
+                      </div>
+                    : <button style={{ ...btn(), width: '100%', marginTop: 4 }} disabled={!!why} title={why ?? `${CREW_SIZE} workers at $${CREW_RATE}/h, weekdays 8 to 5; you still buy the materials`} onClick={() => g.hire(sel.id)}>
+                        Hire a crew: ~{usd(q.usd)}, about {q.weeks} week{q.weeks > 1 ? 's' : ''}
+                      </button>;
+                })()}
+                {!isFinished(sel) && !game.crews.some(c => c.target === sel.id) && game.money < crewQuote(sel).usd && !crewProblem(game, sel) && (() => {
+                  const wk = Math.floor(game.money / (CREW_RATE * CREW_SIZE * 45));
+                  return <Note tone="warn">Money for about {wk} week{wk === 1 ? '' : 's'} of a crew; they go home when it runs out.</Note>;
+                })()}
                 {isFinished(sel) && (() => {
                   const p = plant(game), sv = serviceOf(game, p, sel.id);
                   const job = (k: 'plumb' | 'wire') => game.utilities.fittings.find(f => f.building === sel.id && f.kind === k);

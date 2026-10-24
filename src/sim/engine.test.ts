@@ -40,7 +40,7 @@ describe('sim engine', () => {
     expect(orderProblem(g, [{ material: 'logs', qty: 1 }])).toBe('not_for_sale');
   });
 
-  it('waits for materials, then the family builds a cabin in about three weeks', () => {
+  it('waits for materials, then the family builds a cabin in a few months (≈ 1,400 person-hours)', () => {
     let g = newGame(7);
     const st = planStructure(g, 'timber_cabin', 20, 20, 0);
     g = step(g, 1);
@@ -48,12 +48,13 @@ describe('sim engine', () => {
     g = step(g, 3);
     expect(g.structures[0].stage).toBe(1);
     expect(blockedReason(g, g.structures[0])).toMatch(/fieldstone/);
+    g.money = 200_000;
     placeOrder(g, fullCabinOrder());
-    g = step(g, 25);
+    g = step(g, 200);
     const done = g.structures.find(x => x.id === st.id)!;
     expect(isFinished(done)).toBe(true);
-    expect(done.finishedAt! - LEAD_TIME_DAYS).toBeGreaterThan(14);
-    expect(done.finishedAt!).toBeLessThan(30);
+    expect(done.finishedAt! - LEAD_TIME_DAYS).toBeGreaterThan(50);
+    expect(done.finishedAt!).toBeLessThan(160);
     expect(progress(done)).toBe(1);
     expect(Object.entries(g.stock).every(([k, v]) => ['firewood', 'canned'].includes(k) || v === 0)).toBe(true);
   });
