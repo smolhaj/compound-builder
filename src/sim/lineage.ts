@@ -195,7 +195,7 @@ export function lineageDay(s: GameState): string[] {
     }, r);
     mate.kin = true; mate.gen ??= p.gen;
     p.partner = mate.id; mate.partner = p.id;
-    if (!here && town) mate.job = dayJob(mate, s.seed + day);
+    if (!here && town) { mate.job = dayJob(mate, s.seed + day); const ms = s.personState.find(x => x.id === mate.id); if (ms) ms.employed = true; }
     say('partner', here ? `${p.first} and ${mate.first} are together now.` : `${p.first} married ${fullName(mate)}, ${lawful ? 'from town' : 'who came up the road one spring and stayed'}.`);
   }
   // births (and, for couples who can't, adoption or a child with no one left)

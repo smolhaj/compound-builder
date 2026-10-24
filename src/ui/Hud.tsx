@@ -185,7 +185,7 @@ export function Hud() {
   return (
     <>
       {/* Top bar: date, time, money, speed */}
-      <div style={{ ...panel, position: 'fixed', top: 10, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 12, alignItems: 'center', fontSize: 13.5 }}>
+      <div style={{ ...panel, position: 'fixed', top: 10, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 12, alignItems: 'center', fontSize: 13.5, whiteSpace: 'nowrap' }}>
         <span>{dateLabel(cal.doy)}, {cal.year}</span>
         <span style={{ fontVariantNumeric: 'tabular-nums' }}>{clock(hourOf(game.clock.t))}</span>
         {game.lineage.era > 1 && <span style={{ color: '#d8c08a' }} title={`The ${game.lineage.family} family: era ${game.lineage.era}`}>Era {roman(game.lineage.era)}</span>}
@@ -411,7 +411,7 @@ export function Hud() {
             </Section>
             <Section title="Hunting & fishing">
               {(['big', 'small', 'fish'] as const).map(c => <div key={c} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '1px 0' }}>
-                <span style={{ color: DIM, width: 96 }}>{c === 'big' ? REGIONS[game.site.region].game.filter(x => ['elk', 'deer', 'moose', 'antelope', 'javelina'].includes(x)).slice(0, 2).join(', ') || 'Big game' : c === 'small' ? 'Rabbits, grouse' : REGIONS[game.site.region].game.filter(x => ['trout', 'bass', 'catfish', 'salmon', 'panfish'].includes(x)).slice(0, 2).join(', ') || 'Fish'}</span>
+                <span style={{ color: DIM, width: 96 }}>{cap(c === 'big' ? REGIONS[game.site.region].game.filter(x => ['elk', 'deer', 'moose', 'antelope', 'javelina'].includes(x)).slice(0, 2).join(', ') || 'Big game' : c === 'small' ? 'Rabbits, grouse' : REGIONS[game.site.region].game.filter(x => ['trout', 'bass', 'catfish', 'salmon', 'panfish'].includes(x)).slice(0, 2).join(', ') || 'Fish')}</span>
                 <div style={{ flex: 1, height: 4, background: '#333', borderRadius: 2 }}><div style={{ width: `${game.wild.abundance[c] * 100}%`, height: '100%', background: game.wild.abundance[c] < 0.4 ? TONE.bad : '#9cc070', borderRadius: 2 }} /></div>
               </div>)}
               {lawful(game) ? <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
@@ -646,6 +646,7 @@ export function Hud() {
   );
 }
 
+const cap = (x: string) => x[0].toUpperCase() + x.slice(1);
 const KIND_MARK: Record<string, string> = { era: '◆', birth: '✦', death: '✝', partner: '♥', coming: '▲', milestone: '★', retire: '·' };
 
 /** The long game: the family over the years, the eras, milestones and the dynasty score. */
