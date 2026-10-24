@@ -16,12 +16,12 @@
 import type { GameState } from './state';
 import type { MaterialId } from './materials';
 
-export const KIT_GOODS: MaterialId[] = ['plate_carrier', 'ifak', 'nvg', 'thermal', 'radios'];
+export const KIT_GOODS: MaterialId[] = ['plate_carrier', 'ifak', 'nvg', 'thermal', 'radios', 'sw_radio', 'ham_rig'];
 export const WATCH_GOODS: MaterialId[] = ['cameras', 'thermal_cam', 'driveway_alarm', 'floodlights', 'tripwire', 'dog'];
 export const HARDEN_GOODS: MaterialId[] = ['steel_door', 'window_bars', 'sandbags', 'safe_room'];
 
 const n = (s: GameState, m: MaterialId) => Math.floor(s.stock[m] ?? 0);
-const powered = (s: GameState) => s.utilities.lit.length > 0 || (s.utilities.grid && s.disaster.tracks.grid > 0.5);
+export const powered = (s: GameState) => s.utilities.lit.length > 0 || (s.utilities.grid && s.disaster.tracks.grid > 0.5);
 
 /** What the gear adds at the gate. */
 export function gearPosture(s: GameState, fighters: number): { detection: number; barrier: number; fight: number; visibility: number; deter: number; safeRoom: boolean } {

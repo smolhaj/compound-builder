@@ -16,9 +16,11 @@
 import { mulberry32, pick } from './rng';
 import { gearPosture, softenWound } from './gear';
 import { armed, firepower, spendInFight } from './armory';
+import { forewarned } from './radio';
 import { isHome } from './blueprints';
 import { log } from './economy';
 import { isFinished } from './construction';
+import { raidPressure } from './opsec';
 import { PERIMETER, runFinished, runGrowth, wallLength } from './perimeter';
 import { freshNeeds } from './needs';
 import { contagion, infect } from './effects';
@@ -126,7 +128,7 @@ export function postureOf(s: GameState): Posture {
   const watch = Math.max(0, ...adults.map(p => p.skills.hunter));
   const radioNet = s.neighbors.some(n => n.radio && n.status === 'home' && n.disposition > 30);
   const gear = gearPosture(s, fighters);
-  const detection = Math.min(100, 25 + watch * 5 + (radioNet ? 20 : 0) + (barrier > 50 ? 10 : 0) + gear.detection);
+  const detection = Math.min(100, 25 + watch * 5 + (radioNet ? 20 : 0) + (barrier > 50 ? 10 : 0) + gear.detection + forewarned(s));
   return { visibility: Math.min(100, visibility + gear.visibility), fortress, barrier: Math.min(100, barrier + gear.barrier), detection, fighters, deter: gear.deter, safeRoom: gear.safeRoom, armed: armed(s), firepower: firepower(s) * gear.fight, bunker: fin.some(st => st.kind === 'bunker_hatch' || st.kind === 'bunker_stairs') };
 }
 
@@ -224,7 +226,7 @@ function cadence(s: GameState, p: Posture): number {
   const law = s.disaster.tracks.law;
   // playtest: every 3–6 days was relentless; real accounts are weeks between visits, more as order fails
   const base = 45 - 30 * (1 - law);
-  return Math.max(10, base * (1.3 - p.visibility / 200));
+  return Math.max(10, base * (1.3 - p.visibility / 200) / raidPressure(s));
 }
 
 /**
@@ -251,6 +253,9 @@ export function whoComes(s: GameState, p: Posture, r: () => number): EncounterKi
   if (k === 'pandemic' || k === 'bioweapon') { scale('arrival', 1.4); scale('refugees', 1.5); scale('trader', 0.5); }
   if (k === 'drought') { scale('refugees', 1.6); scale('looters', 1.3); }
   if (k === 'unknown') { scale('arrival', 0.4); scale('looters', 0.3); scale('gang', 0.3); scale('trader', 0.1); }
+  // OPSEC: the more the county knows, the more of them come for what you have
+  const rp = raidPressure(s);
+  for (const kind of ['looters', 'gang', 'requisition', 'horde', 'militia'] as EncounterKind[]) scale(kind, rp);
   const tot = w.reduce((a, [, x]) => a + Math.max(0, x), 0);
   let x = r() * tot;
   for (const [k, v] of w) { x -= Math.max(0, v); if (x <= 0) return k; }

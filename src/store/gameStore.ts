@@ -20,6 +20,7 @@ import { triggerDisaster, type DisasterKind } from '../sim/disaster';
 import { resolve, type Stance } from '../sim/encounters';
 import { buyLand, type LandKind } from '../sim/land';
 import { log } from '../sim/economy';
+import { opsecOf } from '../sim/opsec';
 import { hardenProblem, orderHarden, orderHardenAll, tierOf, type HardenId } from '../sim/hardening';
 import { saveGame, AUTOSAVE } from '../sim/save/saveSystem';
 
@@ -74,6 +75,8 @@ export interface GameStore {
   sweep: () => void;
   /** Eat what you store (rotate the pantry). */
   setRotate: (on: boolean) => void;
+  /** OPSEC choices: pick deliveries up in town; blackout curtains. */
+  setOpsec: (k: 'quietDeliveries' | 'blackout', on: boolean) => void;
   /** Fill everyone's prescriptions 90 days ahead. */
   stockUpRx: () => void;
   /** After the report card: play on (endless). */
@@ -216,6 +219,12 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     const g = structuredClone(get().game);
     const cost = stockUpRx(g);
     if (cost > 0) { log(g, `Filled everyone's prescriptions three months ahead ($${cost.toLocaleString('en-US')}).`); set({ game: g }); }
+  },
+  setOpsec: (k, on) => {
+    const g = structuredClone(get().game);
+    opsecOf(g)[k] = on;
+    log(g, k === 'quietDeliveries' ? (on ? 'Picking deliveries up in town from now on: fewer people see the truck.' : 'Deliveries come to the place again.') : (on ? 'Blackout curtains up: the lights don\'t show from the road.' : 'Blackout curtains down.'));
+    set({ game: g });
   },
   setRotate: (on) => {
     const g = structuredClone(get().game);

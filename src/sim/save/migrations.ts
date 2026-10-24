@@ -43,6 +43,8 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   // 6 → 7: the escape tunnel (culvert, egress hatch)
   6: s => ({ ...s, version: 7, stock: { culvert: 0, egress_hatch: 0, ...(s.stock as object) } }),
   // 7 → 8: bunker hardening (lead, Faraday mesh, blast valves, HEPA sets; the retrofit job list)
+  // 30 → 31: livestock, radios, black-market goods (new goods at zero); vehicles, OPSEC, weather, barter and radio state are made on first use
+  30: s => ({ ...s, version: 31, stock: { goat: 0, pig: 0, steer: 0, rabbit: 0, hay: 0, feed: 0, sw_radio: 0, ham_rig: 0, grenades: 0, rpg_launcher: 0, rpg_rounds: 0, suppressor: 0, ...(s.stock as object) } }),
   // 29 → 30: the long game (kinship on the family already here, no eras yet)
   29: s => {
     const people = s.people as Person[];

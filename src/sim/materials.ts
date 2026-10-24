@@ -9,8 +9,9 @@ export type MaterialId = 'lumber' | 'logs' | 'firewood' | 'fieldstone' | 'concre
   | 'pipe' | 'cable' | 'fixtures' | 'pump' | 'drilling' | 'solar_panel' | 'battery' | 'inverter' | 'generator' | 'fuel' | 'tank' | 'septic_tank'
   | 'rebar' | 'membrane' | 'excavator' | 'blast_door' | 'nbc_filter' | 'spoil' | 'culvert' | 'egress_hatch'
   | 'lead_sheet' | 'faraday_mesh' | 'blast_valve' | 'filter_set'
-  | 'fresh' | 'frozen' | 'canned' | 'staples' | 'meds' | 'seed' | 'lids' | 'plow' | 'stabilizer' | 'traps' | 'hygiene' | 'gun_safe' | 'gun_cleaning' | 'fishing_gear' | 'snares' | 'smoker' | 'water_jugs' | 'ibc_tote' | 'water_trailer' | 'water_filter' | 'ro_system' | 'softener' | 'greywater'
-  | 'plate_carrier' | 'ifak' | 'nvg' | 'thermal' | 'radios' | 'cameras' | 'thermal_cam' | 'driveway_alarm' | 'floodlights' | 'tripwire' | 'dog' | 'steel_door' | 'window_bars' | 'sandbags' | 'safe_room';
+  | 'fresh' | 'frozen' | 'canned' | 'staples' | 'meds' | 'seed' | 'lids' | 'plow' | 'stabilizer' | 'traps' | 'hygiene' | 'gun_safe' | 'gun_cleaning' | 'fishing_gear' | 'snares' | 'smoker' | 'goat' | 'pig' | 'steer' | 'rabbit' | 'hay' | 'feed' | 'water_jugs' | 'ibc_tote' | 'water_trailer' | 'water_filter' | 'ro_system' | 'softener' | 'greywater'
+  | 'plate_carrier' | 'ifak' | 'nvg' | 'thermal' | 'radios' | 'cameras' | 'thermal_cam' | 'driveway_alarm' | 'floodlights' | 'tripwire' | 'dog' | 'steel_door' | 'window_bars' | 'sandbags' | 'safe_room' | 'sw_radio' | 'ham_rig'
+  | 'grenades' | 'rpg_launcher' | 'rpg_rounds' | 'suppressor';
 
 export interface MaterialDef {
   id: MaterialId;
@@ -68,6 +69,8 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   nvg: { id: 'nvg', name: 'Night vision', unit: 'gen 3 monocular and a head mount', price: 3500 },
   thermal: { id: 'thermal', name: 'Thermal monocular', unit: 'handheld thermal: people and deer in the dark', price: 2200 },
   radios: { id: 'radios', name: 'GMRS radios', unit: 'a pair of handheld radios with chargers', price: 150 },
+  sw_radio: { id: 'sw_radio', name: 'Emergency radio', unit: 'hand-crank AM/FM/shortwave receiver with a solar panel', price: 60 },
+  ham_rig: { id: 'ham_rig', name: 'Ham radio (HF)', unit: 'HF transceiver, wire antenna and tuner (needs power and someone who knows radio)', price: 1200 },
   cameras: { id: 'cameras', name: 'Security cameras', unit: '4 IR night-vision cameras and a recorder (needs power)', price: 450 },
   thermal_cam: { id: 'thermal_cam', name: 'Thermal camera', unit: 'a fixed thermal security camera on the drive (needs power)', price: 2800 },
   driveway_alarm: { id: 'driveway_alarm', name: 'Driveway alarm', unit: 'wireless motion sensors along the drive, a base unit in the house', price: 150 },
@@ -78,6 +81,11 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   window_bars: { id: 'window_bars', name: 'Window bars', unit: 'security bars for the house windows', price: 900 },
   sandbags: { id: 'sandbags', name: 'Sandbags', unit: '100 bags (fill them with your own dirt) for a fighting position', price: 300 },
   safe_room: { id: 'safe_room', name: 'Safe room', unit: 'a reinforced interior room: steel door, lined walls, supplies shelf', price: 8500 },
+  // Black market only (sim/blackMarket.ts): price null, so the catalog never sells them.
+  grenades: { id: 'grenades', name: 'Hand grenades', unit: 'grenade', price: null },
+  rpg_launcher: { id: 'rpg_launcher', name: 'RPG-type launcher', unit: 'launcher tube', price: null },
+  rpg_rounds: { id: 'rpg_rounds', name: 'Launcher rounds', unit: 'round', price: null },
+  suppressor: { id: 'suppressor', name: 'Suppressor (unregistered)', unit: 'can', price: null },
   water_jugs: { id: 'water_jugs', name: 'Drinking water', unit: 'a 5-gallon jug (19 L), sealed', price: 9 },
   ibc_tote: { id: 'ibc_tote', name: 'IBC tote', unit: '1,000 L food-grade tote on a pallet: more storage', price: 180 },
   water_trailer: { id: 'water_trailer', name: 'Water trailer', unit: 'a 1,000 L tank on a utility trailer: haul from the standpipe or the creek', price: 2800 },
@@ -87,6 +95,12 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   greywater: { id: 'greywater', name: 'Greywater system', unit: 'diverter, surge tank and mulch basins: sink and shower water to the garden', price: 900 },
   fishing_gear: { id: 'fishing_gear', name: 'Fishing gear', unit: 'rods, reels, tackle box, waders', price: 120 },
   snares: { id: 'snares', name: 'Snares', unit: 'a dozen wire snares for rabbits and grouse', price: 40 },
+  goat: { id: 'goat', name: 'Dairy goat', unit: 'a bred doe in milk: about 2 quarts a day (hay and a little grain)', price: 350 },
+  pig: { id: 'pig', name: 'Feeder pig', unit: 'a weaned feeder pig: to the butcher in November (bagged feed)', price: 150 },
+  steer: { id: 'steer', name: 'Beef steer', unit: 'a weaned steer calf: beef after a summer on grass (hay in winter)', price: 1800 },
+  rabbit: { id: 'rabbit', name: 'Meat rabbit', unit: 'a meat rabbit for the hutch: a buck and two does make a colony', price: 35 },
+  hay: { id: 'hay', name: 'Hay', unit: 'a 50 lb small square bale (cheapest bought at the fall cutting)', price: 12 },
+  feed: { id: 'feed', name: 'Livestock feed', unit: 'a 50 lb bag of pellets and grain for pigs, goats, rabbits', price: 20 },
   smoker: { id: 'smoker', name: 'Smoker', unit: 'a smokehouse kit and curing salt: jerky that keeps without a freezer', price: 300 },
   gun_safe: { id: 'gun_safe', name: 'Gun safe', unit: '24-gun fire-rated safe, bolted down', price: 1800 },
   gun_cleaning: { id: 'gun_cleaning', name: 'Gun cleaning kit', unit: 'rods, brushes, solvent, oil, patches: about a year', price: 60 },
@@ -101,7 +115,8 @@ export const MATERIAL_IDS = Object.keys(MATERIALS) as MaterialId[];
 export type Stock = Record<MaterialId, number>;
 
 export function emptyStock(): Stock {
-  return { lumber: 0, logs: 0, firewood: 0, fieldstone: 0, concrete: 0, roofing: 0, hardware: 0, wire: 0, seedlings: 0, container: 0, pipe: 0, cable: 0, fixtures: 0, pump: 0, drilling: 0, solar_panel: 0, battery: 0, inverter: 0, generator: 0, fuel: 0, tank: 0, septic_tank: 0, rebar: 0, membrane: 0, excavator: 0, blast_door: 0, nbc_filter: 0, spoil: 0, culvert: 0, egress_hatch: 0, lead_sheet: 0, faraday_mesh: 0, blast_valve: 0, filter_set: 0, fresh: 0, frozen: 0, canned: 0, staples: 0, meds: 0, seed: 0, lids: 0, plow: 0, stabilizer: 0, traps: 0, hygiene: 0, gun_safe: 0, gun_cleaning: 0, fishing_gear: 0, snares: 0, smoker: 0, water_jugs: 0, ibc_tote: 0, water_trailer: 0, water_filter: 0, ro_system: 0, softener: 0, greywater: 0, plate_carrier: 0, ifak: 0, nvg: 0, thermal: 0, radios: 0, cameras: 0, thermal_cam: 0, driveway_alarm: 0, floodlights: 0, tripwire: 0, dog: 0, steel_door: 0, window_bars: 0, sandbags: 0, safe_room: 0 };
+  // every material at zero (new goods need no edit here)
+  return Object.fromEntries(MATERIAL_IDS.map(k => [k, 0])) as Stock;
 }
 
 /** Cost of a bill of materials at retail (unbuyable items count 0). */

@@ -16,6 +16,7 @@ import { keeping, KEPT } from '../sim/shelf';
 import { CONDITION, pharmacyOpen } from '../sim/body';
 import { netWorth } from '../sim/finance';
 import { JUG_L, orderTanker } from '../sim/water';
+import { buyVehicle, startingVehicles, VEHICLES, type VehicleKind } from '../sim/vehicles';
 import { buyLicense, hasLicense, inSeason, lawful, TAG_USD, type License } from '../sim/wildfood';
 import { chimneyState, greenRicks, SEASON_DAYS, SWEEP_USD } from '../sim/upkeep';
 import { countyWorks, needsPermit, permitFee, premium, yearlyTax } from '../sim/paperwork';
@@ -30,7 +31,10 @@ import { livingPerDay } from '../sim/engine';
 import { roman } from '../sim/eras';
 import { MILESTONE_COUNT, MILESTONE_NAME } from '../sim/lineage';
 import { daysOfFood, KCAL, needOf } from '../sim/needs';
+import { ANIMALS, feedDemand, winterHay } from '../sim/livestock';
+import { barterPrices, moneyWorks, type Good } from '../sim/barter';
 import { NEIGHBOR_BLURB } from '../sim/encounters';
+import { EXPOSURE_NAME, exposure, raidPressure, topExposure } from '../sim/opsec';
 import { acresOf, buyProblem, LAND_NAME, priceOf } from '../sim/land';
 import { HARDEN, HARDEN_IDS, type TierDef, hardenCost, hardenProblem, isBunkerRoom, protectionOf, tierOf } from '../sim/hardening';
 import { PERIMETER, PERIMETER_ORDER, UTILITY_LINES, runBill, runHours, runFinished, runProgress, runBlocked, runGrowth } from '../sim/perimeter';
@@ -422,6 +426,14 @@ export function Hud() {
               {game.wild.hotUntil >= Math.floor(game.clock.t) && <Note tone="bad">Fallout: game and fish read hot for months.</Note>}
               {game.stock.fishing_gear < 1 && game.site.creek && <Note>A creek full of {REGIONS[game.site.region].game.find(x => ['trout', 'bass', 'catfish', 'salmon', 'panfish'].includes(x)) ?? 'fish'}, and no fishing gear.</Note>}
             </Section>
+            {ANIMALS.some(a => (game.stock[a] ?? 0) >= 1) && <Section title="Livestock">
+              {ANIMALS.filter(a => (game.stock[a] ?? 0) >= 1).map(a => { const c = game.livestock?.condition[a] ?? 1; return <Row key={a} label={MATERIALS[a].name} value={<span style={{ color: c < 0.5 ? TONE.bad : c < 0.9 ? TONE.warn : undefined }}>{Math.floor(game.stock[a])} head, {Math.round(c * 100)} % condition</span>} />; })}
+              {(() => { const d = feedDemand(game), hd = d.hay > 0 ? (game.stock.hay ?? 0) / d.hay : Infinity, fd = d.feed > 0 ? (game.stock.feed ?? 0) / d.feed : Infinity; return <>
+                {d.hay > 0 && <Row label="Hay" value={<span style={{ color: hd < 14 ? TONE.warn : undefined }}>{Math.floor(game.stock.hay ?? 0)} bales ({hd > 999 ? 'plenty' : `${Math.floor(hd)} days`})</span>} />}
+                {d.feed > 0 && <Row label="Feed" value={<span style={{ color: fd < 14 ? TONE.warn : undefined }}>{Math.floor(game.stock.feed ?? 0)} bags ({fd > 999 ? 'plenty' : `${Math.floor(fd)} days`})</span>} />}
+                {winterHay(game) > (game.stock.hay ?? 0) && <Note>Put up about {winterHay(game)} bales of hay for the winter.</Note>}
+              </>; })()}
+            </Section>}
             <Section title="Food">
               {(() => {
                 const f = game.food, d = daysOfFood(game);
@@ -502,6 +514,9 @@ export function Hud() {
                 <Row label="Stored" value={`${Math.round(r.storedL)} of ${storageCapacity(game).toLocaleString('en-US')} L`} />
                 {game.stock.water_jugs >= 1 && <Row label="Drinking water put by" value={`${Math.floor(game.stock.water_jugs)} jugs (${Math.round(game.stock.water_jugs * JUG_L)} L)`} />}
                 {storageCapacity(game) - r.storedL > 1000 && game.disaster.tracks.deliveries >= 0.5 && game.disaster.tracks.banks >= 0.5 && <button style={{ ...btn(), width: '100%', marginTop: 3 }} title="A tanker load from town: 15,000 L" onClick={() => g.money(d => orderTanker(d, storageCapacity(d)))}>Order a tanker load ($450)</button>}
+                <div style={{ marginTop: 6, fontWeight: 600 }}>Vehicles</div>
+                {(game.vehicles ?? startingVehicles()).map(v => <Row key={v.id} label={VEHICLES[v.kind].name} value={v.fried ? 'killed by the EMP' : v.condition <= 0 ? 'dead' : `${Math.round(v.mileage).toLocaleString('en-US')} mi · ${Math.round(v.condition * 100)} % · ${Math.round(v.fuel)} L`} />)}
+                {(['tractor', 'atv', 'old_pickup', 'trailer'] as VehicleKind[]).filter(k => !(game.vehicles ?? []).some(v => v.kind === k)).map(k => <button key={k} style={{ ...btn(), width: '100%', marginTop: 3 }} onClick={() => g.money(d => buyVehicle(d, k))}>Buy {VEHICLES[k].name.toLowerCase()} (${VEHICLES[k].price.toLocaleString('en-US')})</button>)}
                 <Row label="Well depth here" value={`${game.site.gwDepth} m`} />
                 {game.utilities.hauling && <Note tone="warn">{game.utilities.haulFar ? 'Hauling water a quarter mile from the creek on the neighbor\'s land: a well or cistern would end it.' : 'Hauling water from the creek by the bucket: a well or cistern would end it.'}</Note>}
                 {r.shortL > 0 && <Note tone="bad">Water ran short.</Note>}
@@ -589,6 +604,17 @@ export function Hud() {
                 ))}
               </Section>
             )}
+            {(() => {
+              const ex = exposure(game), o = game.opsec ?? { quietDeliveries: false, blackout: false };
+              return <Section title="OPSEC">
+                <Row label="Exposure" value={`${ex} / 100 · raids ×${raidPressure(game).toFixed(2)}`} tone={ex > 60 ? 'bad' : ex > 30 ? 'warn' : 'good'} title="How much the county knows you're prepared" />
+                {topExposure(game).map(([k, v]) => <Row key={k} label={EXPOSURE_NAME[k]} value={`+${Math.round(v)}`} />)}
+                <div style={{ display: 'flex', gap: 4, padding: '2px 0', flexWrap: 'wrap' }}>
+                  <button style={btn(o.quietDeliveries)} title="Pick deliveries up in town: fewer people see the truck" onClick={() => g.setOpsec('quietDeliveries', !o.quietDeliveries)}>Pick up in town</button>
+                  <button style={btn(o.blackout)} title="Blackout curtains: lights at night show half as much" onClick={() => g.setOpsec('blackout', !o.blackout)}>Blackout curtains</button>
+                </div>
+              </Section>;
+            })()}
             {game.disaster.kind && game.clock.t >= game.disaster.warnAt && <Section title="Neighbors">
               {game.neighbors.map(n => (
                 <Row key={n.id} title={NEIGHBOR_BLURB[n.kind]} label={<>{n.name[0].toUpperCase() + n.name.slice(1)}{n.radio ? ' · radio' : ''}</>}
@@ -596,6 +622,14 @@ export function Hud() {
                   tone={n.disposition > 50 ? 'good' : n.disposition < -20 ? 'bad' : undefined} />))}
               {game.clock.t >= game.disaster.hitAt && <Note>Humanity {Math.round(game.gate.humanity)} · took in {game.gate.tookIn} · turned away {game.gate.turnedAway}</Note>}
             </Section>}
+            {game.clock.t >= game.disaster.hitAt && !moneyWorks(game) && (() => {
+              const p = barterPrices(game);
+              const rows: Array<[string, Good]> = [['Canned food (case)', 'canned'], ['Staples (25 kg)', 'staples'], ['Fuel (20 L)', 'fuel'], ['Meds (kit)', 'meds'], ['Firewood (rick)', 'firewood'], ['Seed (season)', 'seed'], ['Hygiene (month)', 'hygiene'], ['Silver coin', 'metal:silver_coin'], ['A day\'s labor', 'labor']];
+              return <Section title="Trade with neighbors">
+                <Note>Money is gone; goods change hands at what they're worth now (2025 dollars-equivalent). Friendly neighbors (allies) trade at par.</Note>
+                {rows.map(([label, k]) => <Row key={k} label={label} value={`$${Math.round(p[k]).toLocaleString('en-US')}`} />)}
+              </Section>;
+            })()}
           </>}
         </div>
       </div>

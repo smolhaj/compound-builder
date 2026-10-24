@@ -5,6 +5,7 @@
  * field changes (CLAUDE.md rule 5).
  */
 import { foundLineage, newLineage, type Lineage } from './lineage';
+import type { RadioState } from './radio';
 import { emptyStock, type Stock, type MaterialId } from './materials';
 import { generateFamily, type Person } from './family';
 import type { StageId } from './blueprints';
@@ -24,11 +25,15 @@ import { conditionsFor, newBody, type Body } from './body';
 import { newFin, type Fin } from './finance';
 import { newArmory, type Armory } from './armory';
 import { newWild, type Wild } from './wildfood';
+import type { Livestock } from './livestock';
+import type { Vehicle } from './vehicles';
 import { emptyStats, type Ending, type RunStats } from './report';
 import { generateNeighbors, newGate, type GateState, type Neighbor } from './encounters';
 import { freshNeeds, type FoodReport, type Needs } from './needs';
+import type { WeatherState } from './weatherThreats';
 import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
-export const SAVE_VERSION = 30;
+export const SAVE_VERSION = 31;
+import type { BlackMarket } from './blackMarket';
 
 /** Starting savings (GDS §1 peacetime money constraint). */
 export const STARTING_MONEY = 30000;
@@ -155,6 +160,8 @@ export interface GameState {
   perimeter: PerimeterRun[];
   /** Water and power: fittings, battery, storage, the last day's balance. */
   utilities: Utilities;
+  /** The family's vehicles (lazily created: `s.vehicles ??= startingVehicles()`). */
+  vehicles?: Vehicle[];
   /** Bunker hardening retrofits, ordered and in progress. */
   hardenJobs: HardenJob[];
   /** The neighbor parcels on the survey grid (who owns them, for sale, what they are). */
@@ -173,6 +180,8 @@ export interface GameState {
   paper: Paper;
   /** Seasoning firewood, creosote in the flue. */
   upkeep: Upkeep;
+  /** Severe weather: the storm on or warned of (sim/weatherThreats.ts; lazily set, absent in old saves). */
+  weather?: WeatherState;
   /** How old the stores are, rotation, traps. */
   shelf: Shelf;
   /** Medicine on hand per person. */
@@ -181,14 +190,22 @@ export interface GameState {
   fin: Fin;
   /** Guns, ammo by caliber, who can shoot. */
   armory: Armory;
+  /** OPSEC choices (sim/opsec.ts); made lazily. */
+  opsec?: { quietDeliveries: boolean; blackout: boolean };
   /** The game in the woods and the creek, licenses. */
   wild: Wild;
   /** The long game: eras, the chronicle, milestones, the dynasty score. */
   lineage: Lineage;
+  /** Goats, pigs, the steer, rabbits (lazily made: `s.livestock ??= newLivestock()`). */
+  livestock?: Livestock;
+  /** The black market contact, deals and heat (lazily created by sim/blackMarket.ts; optional, no save bump). */
+  blackMarket?: BlackMarket;
   /** The households round the place. */
   neighbors: Neighbor[];
   /** Who comes to the gate: the pending encounter, the last result, humanity and tallies. */
   gate: GateState;
+  /** Radio and rumors after the collapse (radio.ts); made on first use. */
+  radio?: RadioState;
   /** Tallies since the hit (the report card), and how the run ended (null while it goes on). */
   stats: RunStats;
   ending: Ending | null;

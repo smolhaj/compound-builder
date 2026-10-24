@@ -12,11 +12,14 @@ import { paperworkDay } from './paperwork';
 import { addFellWork, nextFellJob } from './forestry';
 import { burnFirewood, demandNow } from './heating';
 import { upkeepDay } from './upkeep';
+import { snowedIn, weatherDay } from './weatherThreats';
 import { shelfDay } from './shelf';
 import { bodyDay } from './body';
 import { financeDay } from './finance';
 import { armoryDay } from './armory';
 import { gearDay } from './gear';
+import { vehiclesDay } from './vehicles';
+import { radioDay } from './radio';
 import { waterDay } from './water';
 import { addRunWork, nextRun } from './perimeter';
 import { addFitWork, balanceDay, nextFit, plant } from './utilities';
@@ -24,6 +27,7 @@ import { addHardenWork, nextHardenJob } from './hardening';
 import { updateDisaster } from './disaster';
 import { liveDay, workFactor } from './needs';
 import { gateDay, neighborGossip } from './encounters';
+import { mutualAidDay } from './barter';
 import { falloutDay, isNuclear, SHELTER_DAYS, strike } from './nuclear';
 import { tallyDay } from './report';
 import { lineageDay } from './lineage';
@@ -72,7 +76,7 @@ function subStep(s: GameState): void {
     const rate = buildRate(p) * workFactor(ps.needs);
     const slot = routineAt(p, h);
     // the day job: weekdays in town during work hours, paid by the hour
-    if (slot === 'work' && weekday && ps.employed && p.job) {
+    if (slot === 'work' && weekday && ps.employed && p.job && !snowedIn(s)) {
       ps.task = 'job'; ps.target = null;
       s.money += p.job.wage / 8 * SUBSTEP * 24;
       return;
@@ -109,7 +113,11 @@ function subStep(s: GameState): void {
     for (const line of financeDay(s)) log(s, line);
     for (const line of armoryDay(s)) log(s, line);
     for (const line of gearDay(s)) log(s, line);
+    for (const line of vehiclesDay(s)) log(s, line);
+    for (const line of radioDay(s)) log(s, line);
     for (const line of upkeepDay(s, demandNow(s), s.heat.warned !== dayIndex(s.clock.t) - 1 && s.heat.warned !== dayIndex(s.clock.t))) log(s, line);
+    for (const line of mutualAidDay(s)) log(s, line);
+    for (const line of weatherDay(s)) log(s, line);
     const e = gateDay(s);
     if (e) log(s, `${e.title}.`);
     if (before !== 'impact' && s.disaster.phase === 'impact' && s.disaster.kind === 'nuclear') for (const line of strike(s)) log(s, line);
