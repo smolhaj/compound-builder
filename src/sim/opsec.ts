@@ -20,10 +20,10 @@ export interface Opsec { quietDeliveries: boolean; blackout: boolean }
 
 export const opsecOf = (s: GameState): Opsec => (s.opsec ??= { quietDeliveries: false, blackout: false });
 
-export type ExposureSource = 'deliveries' | 'structures' | 'guns' | 'metals' | 'lights' | 'smoke' | 'talk';
+export type ExposureSource = 'deliveries' | 'structures' | 'guns' | 'metals' | 'lights' | 'smoke' | 'talk' | 'news';
 export const EXPOSURE_NAME: Record<ExposureSource, string> = {
   deliveries: 'Deliveries seen', structures: 'Visible structures', guns: 'Gun sales on record', metals: 'Metal & cash on the books',
-  lights: 'Lights after the grid', smoke: 'Smoke & cooking', talk: 'Talk in town',
+  lights: 'Lights after the grid', smoke: 'Smoke & cooking', talk: 'Talk in town', news: 'On the local news',
 };
 
 const STRUCTURE_WEIGHT: Record<string, number> = { bunker_hatch: 10, bunker_stairs: 8, water_tower: 8, solar_array: 7 };
@@ -46,7 +46,10 @@ export function exposureParts(s: GameState): Record<ExposureSource, number> {
   const smoke = hungry ? 6 + (s.stock.smoker ? 4 : 0) : 0;
   const adults = s.people.filter((p, i) => !p.kid && s.personState[i]?.needs.died == null);
   const talk = -Math.max(0, ...adults.map(p => p.skills.negotiator)) * 2;
-  return { deliveries, structures, guns, metals, lights, smoke, talk };
+  // a shooting on the local news (sim/breakins.ts), fading over about a year
+  const at = s.breakins?.newsAt ?? -1;
+  const news = at >= 0 ? 15 * Math.exp(-Math.max(0, s.clock.t - at) / 365) : 0;
+  return { deliveries, structures, guns, metals, lights, smoke, talk, news };
 }
 
 /** 0–100: how much the county knows. */

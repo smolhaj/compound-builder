@@ -18,6 +18,7 @@ import { forewarned } from './radio';
 import { gearPosture } from './gear';
 import { armed, firepower } from './armory';
 import { applyBattle, planBattle } from './battle';
+import { breakInDay, resolveBreakIn } from './breakins';
 import type { Aftermath, Prisoner } from './aftermath';
 import { isHome } from './blueprints';
 import { log } from './economy';
@@ -139,8 +140,8 @@ export function postureOf(s: GameState): Posture {
 // Encounters
 // ─────────────────────────────────────────────────────────────────────────
 
-export type EncounterKind = 'arrival' | 'looters' | 'gang' | 'refugees' | 'requisition' | 'neighbor_help' | 'trader' | 'horde' | 'patrol' | 'militia';
-export type Stance = 'hide' | 'parley' | 'warn' | 'defend' | 'trade' | 'take_in' | 'trial' | 'turn_away';
+export type EncounterKind = 'arrival' | 'looters' | 'gang' | 'refugees' | 'requisition' | 'neighbor_help' | 'trader' | 'horde' | 'patrol' | 'militia' | 'break_in';
+export type Stance = 'hide' | 'parley' | 'warn' | 'defend' | 'trade' | 'take_in' | 'trial' | 'turn_away' | 'call_911' | 'shout' | 'confront';
 
 export interface Encounter {
   id: string;
@@ -190,6 +191,8 @@ export interface GateState {
   /** Tallies: wounded raiders patched up and let go; executed. */
   mercy?: number;
   executed?: number;
+  /** 0–1: word that this place shoots back (raids thin out); fades over months. */
+  respect?: number;
   /** A prisoner told you how his crew comes in: they're spotted sooner. */
   forewarned?: boolean;
 }
@@ -239,7 +242,9 @@ function makeArrival(r: () => number, id: string, day: number, seed: number): En
 function cadence(s: GameState, p: Posture): number {
   const law = s.disaster.tracks.law;
   // playtest: every 3–6 days was relentless; real accounts are weeks between visits, more as order fails
-  const base = 45 - 30 * (1 - law);
+  // after the first year the desperate have died, moved on or settled somewhere: the visits thin out (up to half as often by year three)
+  const since = s.disaster.kind ? s.clock.t - s.disaster.hitAt : 0;
+  const base = (45 - 30 * (1 - law)) * (1 + Math.max(0, Math.min(1, (since - 365) / 730)));
   return Math.max(10, base * (1.3 - p.visibility / 200) / raidPressure(s));
 }
 
@@ -253,8 +258,8 @@ export function whoComes(s: GameState, p: Posture, r: () => number): EncounterKi
   const w: Array<[EncounterKind, number]> = [
     ['arrival', 30],
     ['refugees', 12 * (p.visibility / 50)],
-    ['looters', 30 * (1 - law) * (1 - p.fortress / 130)],
-    ['gang', 18 * (1 - law) * (0.3 + p.fortress / 100 + p.visibility / 150)],
+    ['looters', 30 * (1 - law) * (1 - p.fortress / 130) * (1 - 0.5 * (s.gate.respect ?? 0))],
+    ['gang', 18 * (1 - law) * (0.3 + p.fortress / 100 + p.visibility / 150) * (1 - 0.5 * (s.gate.respect ?? 0))],
     ['requisition', s.gate.government === 'hindrance' ? 10 * (0.5 + p.visibility / 100) : 0],
     ['trader', 10],
     ['neighbor_help', s.gate.government === 'help' ? 8 : 4],
@@ -324,8 +329,11 @@ export function gateDay(s: GameState): Encounter | null {
   const g = s.gate;
   if (day === g.day) return null;
   g.day = day;
+  g.respect = (g.respect ?? 0) * 0.995;   // a reputation fades (half in ~4½ months)
   if (g.pending) return null;
   const d = s.disaster;
+  // while the law works (before the collapse, or once it's back): now and then a break-in (sim/breakins.ts)
+  if (d.tracks.law >= 0.5) { const b = breakInDay(s, day); if (b) { g.pending = b; return b; } }
   if (!d.kind || s.clock.t < d.hitAt + 1) return null;
   // fallout keeps everyone indoors for the first two weeks of a nuclear war
   if (d.kind === 'nuclear' && s.clock.t < d.hitAt + 14) return null;
@@ -384,7 +392,10 @@ export function resolve(s: GameState, stance: Stance): Outcome {
   const negotiator = Math.max(0, ...s.people.filter((x, i) => !x.kid && s.personState[i]?.needs.died == null).map(x => x.skills.negotiator));
   const lines: string[] = [];
   let title = '', text = '', tone: Outcome['tone'] = 'mixed';
-  if (e.kind === 'arrival') {
+  if (e.kind === 'break_in') {
+    const o = resolveBreakIn(s, e, stance);
+    title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines);
+  } else if (e.kind === 'arrival') {
     if (stance === 'take_in' || stance === 'trial') {
       for (const person of e.people ?? []) { s.people.push(person); s.personState.push({ id: person.id, task: 'idle', target: null, needs: freshNeeds() }); }
       give(s, e.brings ?? {});
@@ -453,10 +464,17 @@ export function resolve(s: GameState, stance: Stance): Outcome {
       if (b.result === 'repelled' || b.result === 'fled') {
         title = 'The line held'; text = `${help ? `${allies.map(a => a.name).join(' and ')} came over the ridge when they heard the shooting. ` : ''}${b.result === 'fled' ? 'They broke off and ran.' : 'None of them got past the line.'}`; tone = 'good';
         for (const n of allies) n.disposition = Math.min(100, n.disposition + 5);
+        // word gets around: this place shoots back (more so if they left people on the drive)
+        const downed = (b.leftBehind?.wounded ?? 0) + (b.leftBehind?.dead ?? 0);
+        g.respect = Math.min(1, (g.respect ?? 0) + 0.25 + 0.1 * downed);
+        g.next = Math.max(g.next, e.day + Math.round(15 + 35 * g.respect));
       } else {
         const lost = take(s, e.wants ?? {}, 1);
         title = 'They got in'; text = b.result === 'overrun' ? 'They overran the place and took what they came for.' : 'They broke through the line and took what they came for.'; tone = 'bad';
         if (lost.length) lines.push(`Lost: ${lost.join(', ')}`);
+        // picked over: for a while there's not much left worth coming for; but the place is known to be soft
+        g.respect = Math.max(0, (g.respect ?? 0) - 0.3);
+        g.next = Math.max(g.next, e.day + 30);
       }
       if (e.kind === 'refugees') g.humanity = Math.max(0, g.humanity - 10);
     }

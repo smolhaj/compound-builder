@@ -32,8 +32,9 @@ import { generateNeighbors, newGate, type GateState, type Neighbor } from './enc
 import { freshNeeds, type FoodReport, type Needs } from './needs';
 import type { WeatherState } from './weatherThreats';
 import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
-export const SAVE_VERSION = 33;
+export const SAVE_VERSION = 34;
 import type { BlackMarket } from './blackMarket';
+import { newBreakins, type Breakins } from './breakins';
 
 /** Starting savings (GDS §1 peacetime money constraint). */
 export const STARTING_MONEY = 30000;
@@ -200,6 +201,8 @@ export interface GameState {
   livestock?: Livestock;
   /** The black market contact, deals and heat (lazily created by sim/blackMarket.ts; optional, no save bump). */
   blackMarket?: BlackMarket;
+  /** Peacetime break-ins and their legal aftermath (sim/breakins.ts): the evidence locker, a felony record, the news. Save v34; `??=` for safety. */
+  breakins?: Breakins;
   /** The households round the place. */
   neighbors: Neighbor[];
   /** Who comes to the gate: the pending encounter, the last result, humanity and tallies. */
@@ -249,6 +252,7 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     neighbors: generateNeighbors(seed),
     land: newLand(seed, generateNeighbors(seed).map(n => n.id), (setup.site ?? CLASSIC).home),
     gate: newGate(seed),
+    breakins: newBreakins(),
     stats: emptyStats(),
     ending: null,
     food: { needKcal: 0, ateKcal: 0, producedKcal: 0, spoiledKcal: 0, fromStores: true, kinds: [], daysLeft: 0 },

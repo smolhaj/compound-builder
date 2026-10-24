@@ -18,6 +18,7 @@ import { newShelf } from '../shelf';
 import { conditionsFor, newBody } from '../body';
 import { newFin } from '../finance';
 import { newArmory } from '../armory';
+import { newBreakins } from '../breakins';
 import { newWild } from '../wildfood';
 import { dayJob, type Person } from '../family';
 
@@ -42,7 +43,9 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   5: s => ({ ...s, version: 6, stock: { rebar: 0, membrane: 0, excavator: 0, blast_door: 0, nbc_filter: 0, spoil: 0, ...(s.stock as object) } }),
   // 6 → 7: the escape tunnel (culvert, egress hatch)
   6: s => ({ ...s, version: 7, stock: { culvert: 0, egress_hatch: 0, ...(s.stock as object) } }),
-  // 7 → 8: bunker hardening (lead, Faraday mesh, blast valves, HEPA sets; the retrofit job list)
+  // 33 → 34: peacetime break-ins and the law (the evidence locker,
+  // a felony record (no guns), legal costs, the last local-news story: sim/breakins.ts); a raid reputation starting at nothing.
+  33: s => ({ ...s, version: 34, breakins: (s.breakins as object | undefined) ?? newBreakins(), gate: { respect: 0, ...(s.gate as object) } }),
   // 32 → 33: after the shooting (sim/aftermath.ts): no decision waiting, no prisoners yet
   32: s => ({ ...s, version: 33, gate: { aftermath: null, prisoners: [], mercy: 0, executed: 0, ...(s.gate as object) } }),
   // 31 → 32: helmets and soft armor (none yet)
@@ -98,6 +101,7 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   9: s => ({ ...s, version: 10, utilities: { ...(s.utilities as object), grid: false, off: [], lit: [], report: { gridKwh: 0, billUsd: 0, shed: [], ...((s.utilities as { report: object }).report) } } }),
   // 8 → 9: the collapse clock (old saves become Free build) and day jobs (off: they've been building full time)
   8: s => ({ ...s, version: 9, disaster: newDisaster(s.seed as number, 'sandbox'), people: (s.people as Person[]).map(p => (p.kid || p.job ? p : { ...p, job: dayJob(p, s.seed as number) })) }),
+  // 7 → 8: bunker hardening (lead, Faraday mesh, blast valves, HEPA sets; the retrofit job list)
   7: s => ({ ...s, version: 8, hardenJobs: [], stock: { lead_sheet: 0, faraday_mesh: 0, blast_valve: 0, filter_set: 0, ...(s.stock as object) } }),
 };
 

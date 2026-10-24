@@ -26,6 +26,9 @@ import { planRun } from '../src/sim/perimeter';
 import { orderFit, fitProblem, plant } from '../src/sim/utilities';
 import { orderHardenAll } from '../src/sim/hardening';
 import { resolve, type Stance } from '../src/sim/encounters';
+import { resolveAftermath, type AftermathChoice } from '../src/sim/aftermath';
+import type { PlannedBattle } from '../src/sim/battle';
+const AFTER: Record<string, AftermathChoice> = { idle: 'leave', homestead: 'treat_release', prepper: 'hold', fortress: 'leave' };
 import { reportCard } from '../src/sim/report';
 import { daysOfFood } from '../src/sim/needs';
 import { MATERIAL_IDS, MATERIALS, type MaterialId } from '../src/sim/materials';
@@ -84,7 +87,7 @@ function orderNeeds(s: GameState, strat: Strategy): void {
   if (lines.length && !orderProblem(s, lines)) placeOrder(s, lines);
 }
 
-interface RunResult { site: string; strat: Strategy; kind: DisasterKind; variant: string; ending: string; grade: string; alive: string; hungry: number; days: number; moneyAtHit: number; builtAtHit: number; bugs: string[]; lines: string[] }
+interface RunResult { site: string; strat: Strategy; kind: DisasterKind; variant: string; ending: string; grade: string; alive: string; hungry: number; days: number; moneyAtHit: number; builtAtHit: number; bugs: string[]; lines: string[]; fights: string[]; prisoners: number }
 
 function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' | 'medium', site: Site = CLASSIC, years = 0): RunResult & { s: GameState } {
   let s = newGame(seed, 105, 2027, { site: site === CLASSIC ? undefined : site, mode: 'scenario', peace, kind, dayJobs: true, grid: true });
@@ -102,6 +105,8 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
   if (strat === 'prepper' || strat === 'homestead') s.shelf.rotate = true;
   // raw land: the line and the drive first thing
   for (const what of ['drive', 'power'] as const) orderHookup(s, what);
+  const fights: string[] = [];
+  let lastBattle: PlannedBattle | undefined;
   let planned = 0, moneyAtHit = 0, builtAtHit = 0, hitSeen = false;
   const maxDays = years ? years * 365 : s.disaster.hitAt + 730;
   for (let day = 0; day < maxDays; day++) {
@@ -162,7 +167,13 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
     if (!hitSeen && s.clock.t >= s.disaster.hitAt) { hitSeen = true; moneyAtHit = Math.round(s.money); builtAtHit = s.structures.filter(isFinished).length; }
     // answer the gate
     let guard = 0;
-    while (s.gate.pending && guard++ < 5) { const e = s.gate.pending; resolve(s, STANCE[strat](e.stances, e.kind, s, e.size)); s.gate.card = null; }
+    while (s.gate.pending && guard++ < 5) {
+      const e = s.gate.pending; resolve(s, STANCE[strat](e.stances, e.kind, s, e.size)); s.gate.card = null;
+      const b = s.gate.battle as (PlannedBattle | undefined);
+      if (b && b !== lastBattle) { lastBattle = b; fights.push(`${b.result}${b.events.some(x => x.kind === 'death' && x.unit.startsWith('h_')) ? ' (lost people)' : ''}`); }
+      // after the shooting: what each kind of family does with the wounded raiders
+      if (s.gate.aftermath) resolveAftermath(s, AFTER[strat]);
+    }
     if (s.gate.pending) bugs.push(`gate stuck on day ${day}`);
     // sanity
     if (!Number.isFinite(s.money)) bugs.push(`money is ${s.money} on day ${day}`);
@@ -175,7 +186,7 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
   }
   const r = reportCard(s);
   const alive = s.personState.filter(ps => ps.needs.died == null).length;
-  return { site: `${s.site.acres} ac ${s.site.creek ? 'creek' : s.site.spring ? 'spring' : 'dry'} ${s.site.gwDepth} m ${s.site.improvements.house ? s.site.improvements.house.kind + ' ' : 'raw '}$${Math.round(s.site.price / 1000)}k`, strat, kind, variant: s.disaster.variant, ending: s.ending?.kind ?? 'still going (2 yrs)', grade: r.grade, alive: `${alive}/${s.personState.length}`, hungry: s.stats.hungryDays, days: s.stats.days, moneyAtHit, builtAtHit, bugs: [...new Set(bugs)].slice(0, 5), lines: r.lines, s };
+  return { site: `${s.site.acres} ac ${s.site.creek ? 'creek' : s.site.spring ? 'spring' : 'dry'} ${s.site.gwDepth} m ${s.site.improvements.house ? s.site.improvements.house.kind + ' ' : 'raw '}$${Math.round(s.site.price / 1000)}k`, strat, kind, variant: s.disaster.variant, ending: s.ending?.kind ?? 'still going (2 yrs)', grade: r.grade, alive: `${alive}/${s.personState.length}`, hungry: s.stats.hungryDays, days: s.stats.days, moneyAtHit, builtAtHit, bugs: [...new Set(bugs)].slice(0, 5), lines: r.lines, fights, prisoners: s.gate.prisoners?.length ?? 0, s };
 }
 
 describe.skipIf(process.env.PLAYTEST !== 'long')('the long game', () => {
@@ -207,8 +218,8 @@ describe.skipIf(!process.env.PLAYTEST || process.env.PLAYTEST === 'long')('playt
     const results: RunResult[] = [];
     let seed = 11;
     for (const kind of kinds) for (const strat of strats) { const site = listings(seed)[seed % 4]; results.push(play(strat, kind, seed++, 'medium', site)); }
-    const md = ['# Playtest report (scripted)', '', '| Site | Disaster | Strategy | Variant | Ending | Grade | Alive | Hungry days | Days | $ at hit | Built at hit | Bugs |', '|---|---|---|---|---|---|---|---|---|---|---|---|',
-      ...results.map(r => `| ${r.site} | ${r.kind} | ${r.strat} | ${r.variant} | ${r.ending} | ${r.grade} | ${r.alive} | ${r.hungry} | ${r.days} | ${r.moneyAtHit.toLocaleString('en-US')} | ${r.builtAtHit} | ${r.bugs.join('; ')} |`),
+    const md = ['# Playtest report (scripted)', '', '| Site | Disaster | Strategy | Variant | Ending | Grade | Alive | Hungry days | Days | $ at hit | Built at hit | Fights | Bugs |', '|---|---|---|---|---|---|---|---|---|---|---|---|---|',
+      ...results.map(r => `| ${r.site} | ${r.kind} | ${r.strat} | ${r.variant} | ${r.ending} | ${r.grade} | ${r.alive} | ${r.hungry} | ${r.days} | ${r.moneyAtHit.toLocaleString('en-US')} | ${r.builtAtHit} | ${r.fights.join(', ') || '-'}${r.prisoners ? ` · ${r.prisoners} held` : ''} | ${r.bugs.join('; ')} |`),
       '', '## Report card lines', '', ...results.map(r => `- **${r.kind} / ${r.strat}:** ${r.lines.join(' ')}`)];
     writeFileSync('playtest-report.md', md.join('\n'));
     expect(results.flatMap(r => r.bugs)).toEqual([]);
