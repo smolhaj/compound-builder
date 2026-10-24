@@ -21,11 +21,12 @@ import { newUpkeep, type Upkeep } from './upkeep';
 import { newShelf, type Shelf } from './shelf';
 import { conditionsFor, newBody, type Body } from './body';
 import { newFin, type Fin } from './finance';
+import { newArmory, type Armory } from './armory';
 import { emptyStats, type Ending, type RunStats } from './report';
 import { generateNeighbors, newGate, type GateState, type Neighbor } from './encounters';
 import { freshNeeds, type FoodReport, type Needs } from './needs';
 import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
-export const SAVE_VERSION = 25;
+export const SAVE_VERSION = 26;
 
 /** Starting savings (GDS §1 peacetime money constraint). */
 export const STARTING_MONEY = 30000;
@@ -174,6 +175,8 @@ export interface GameState {
   body: Body;
   /** Savings, the brokerage account, cash in the safe, gold and silver. */
   fin: Fin;
+  /** Guns, ammo by caliber, who can shoot. */
+  armory: Armory;
   /** The households round the place. */
   neighbors: Neighbor[];
   /** Who comes to the gate: the pending encounter, the last result, humanity and tallies. */
@@ -212,6 +215,7 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     shelf: newShelf(),
     body: newBody(),
     fin: newFin(),
+    armory: newArmory(),
     site,
     stock: { ...emptyStock(), firewood: STARTING_FIREWOOD, canned: 2 },
     neighbors: generateNeighbors(seed),

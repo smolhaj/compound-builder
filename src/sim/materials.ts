@@ -9,7 +9,7 @@ export type MaterialId = 'lumber' | 'logs' | 'firewood' | 'fieldstone' | 'concre
   | 'pipe' | 'cable' | 'fixtures' | 'pump' | 'drilling' | 'solar_panel' | 'battery' | 'inverter' | 'generator' | 'fuel' | 'tank' | 'septic_tank'
   | 'rebar' | 'membrane' | 'excavator' | 'blast_door' | 'nbc_filter' | 'spoil' | 'culvert' | 'egress_hatch'
   | 'lead_sheet' | 'faraday_mesh' | 'blast_valve' | 'filter_set'
-  | 'fresh' | 'frozen' | 'canned' | 'staples' | 'meds' | 'seed' | 'lids' | 'plow' | 'stabilizer' | 'traps' | 'hygiene';
+  | 'fresh' | 'frozen' | 'canned' | 'staples' | 'meds' | 'seed' | 'lids' | 'plow' | 'stabilizer' | 'traps' | 'hygiene' | 'gun_safe' | 'gun_cleaning';
 
 export interface MaterialDef {
   id: MaterialId;
@@ -62,6 +62,8 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   seed: { id: 'seed', name: 'Field seed', unit: 'a season for a quarter acre: seed potatoes, dry beans, seed wheat', price: 200 },
   stabilizer: { id: 'stabilizer', name: 'Fuel stabilizer', unit: 'a bottle: keeps ten cans of gas good for two years', price: 15 },
   hygiene: { id: 'hygiene', name: 'Hygiene supplies', unit: 'a person-month: soap, toilet paper, toothpaste, shampoo, pads', price: 25 },
+  gun_safe: { id: 'gun_safe', name: 'Gun safe', unit: '24-gun fire-rated safe, bolted down', price: 1800 },
+  gun_cleaning: { id: 'gun_cleaning', name: 'Gun cleaning kit', unit: 'rods, brushes, solvent, oil, patches: about a year', price: 60 },
   traps: { id: 'traps', name: 'Traps & bait stations', unit: 'snap traps, bait stations and bait: about two months', price: 35 },
   plow: { id: 'plow', name: 'Plow blade', unit: 'a snowplow blade for the truck (keep the drive open)', price: 3500 },
   lids: { id: 'lids', name: 'Canning lids', unit: 'sleeve of 12 lids (one case of quarts put up; the jars come back, the lids don\'t)', price: 6 },
@@ -73,7 +75,7 @@ export const MATERIAL_IDS = Object.keys(MATERIALS) as MaterialId[];
 export type Stock = Record<MaterialId, number>;
 
 export function emptyStock(): Stock {
-  return { lumber: 0, logs: 0, firewood: 0, fieldstone: 0, concrete: 0, roofing: 0, hardware: 0, wire: 0, seedlings: 0, container: 0, pipe: 0, cable: 0, fixtures: 0, pump: 0, drilling: 0, solar_panel: 0, battery: 0, inverter: 0, generator: 0, fuel: 0, tank: 0, septic_tank: 0, rebar: 0, membrane: 0, excavator: 0, blast_door: 0, nbc_filter: 0, spoil: 0, culvert: 0, egress_hatch: 0, lead_sheet: 0, faraday_mesh: 0, blast_valve: 0, filter_set: 0, fresh: 0, frozen: 0, canned: 0, staples: 0, meds: 0, seed: 0, lids: 0, plow: 0, stabilizer: 0, traps: 0, hygiene: 0 };
+  return { lumber: 0, logs: 0, firewood: 0, fieldstone: 0, concrete: 0, roofing: 0, hardware: 0, wire: 0, seedlings: 0, container: 0, pipe: 0, cable: 0, fixtures: 0, pump: 0, drilling: 0, solar_panel: 0, battery: 0, inverter: 0, generator: 0, fuel: 0, tank: 0, septic_tank: 0, rebar: 0, membrane: 0, excavator: 0, blast_door: 0, nbc_filter: 0, spoil: 0, culvert: 0, egress_hatch: 0, lead_sheet: 0, faraday_mesh: 0, blast_valve: 0, filter_set: 0, fresh: 0, frozen: 0, canned: 0, staples: 0, meds: 0, seed: 0, lids: 0, plow: 0, stabilizer: 0, traps: 0, hygiene: 0, gun_safe: 0, gun_cleaning: 0 };
 }
 
 /** Cost of a bill of materials at retail (unbuyable items count 0). */
