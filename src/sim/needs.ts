@@ -12,6 +12,7 @@
  */
 import { calendarOf, type GameState } from './state';
 import { wildDay } from './wildfood';
+import { livestockDay } from './livestock';
 import { isHome } from './blueprints';
 import { log } from './economy';
 import { isFinished } from './construction';
@@ -117,6 +118,8 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
   s.stock.fresh += (grown - dry) / KCAL.fresh;
   // hunting, fishing and snares (wildfood.ts: the region's game, seasons and tags, the game thinning out)
   const meat = wildDay(s, freezer);
+  // goats, pigs, the steer, rabbits (livestock.ts: feed, hunger, milk, November butchering, litters)
+  const stock = livestockDay(s, freezer);
   // eating
   const need = s.people.reduce((a, p, i) => a + (alive(s, i) ? needOf(p) : 0), 0);
   let ate = 0;
@@ -183,7 +186,7 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
       s.people.splice(i, 1); s.personState.splice(i, 1);
     }
   }
-  return { needKcal: need, ateKcal: ate, producedKcal: grown + meat, spoiledKcal: spoiled, fromStores, kinds, daysLeft: daysOfFood(s) };
+  return { needKcal: need, ateKcal: ate, producedKcal: grown + meat + stock, spoiledKcal: spoiled, fromStores, kinds, daysLeft: daysOfFood(s) };
 }
 
 /** Work rate multiplier from health and morale (the hungry, hurt or hopeless get less done). */

@@ -24,6 +24,7 @@ import { conditionsFor, newBody, type Body } from './body';
 import { newFin, type Fin } from './finance';
 import { newArmory, type Armory } from './armory';
 import { newWild, type Wild } from './wildfood';
+import type { Livestock } from './livestock';
 import { emptyStats, type Ending, type RunStats } from './report';
 import { generateNeighbors, newGate, type GateState, type Neighbor } from './encounters';
 import { freshNeeds, type FoodReport, type Needs } from './needs';
@@ -185,6 +186,8 @@ export interface GameState {
   wild: Wild;
   /** The long game: eras, the chronicle, milestones, the dynasty score. */
   lineage: Lineage;
+  /** Goats, pigs, the steer, rabbits (lazily made: `s.livestock ??= newLivestock()`). */
+  livestock?: Livestock;
   /** The households round the place. */
   neighbors: Neighbor[];
   /** Who comes to the gate: the pending encounter, the last result, humanity and tallies. */
