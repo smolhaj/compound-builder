@@ -17,6 +17,7 @@ import { newShelf } from '../shelf';
 import { conditionsFor, newBody } from '../body';
 import { newFin } from '../finance';
 import { newArmory } from '../armory';
+import { newWild } from '../wildfood';
 import { dayJob, type Person } from '../family';
 
 type Raw = Record<string, unknown> & { version?: number };
@@ -41,6 +42,8 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   // 6 → 7: the escape tunnel (culvert, egress hatch)
   6: s => ({ ...s, version: 7, stock: { culvert: 0, egress_hatch: 0, ...(s.stock as object) } }),
   // 7 → 8: bunker hardening (lead, Faraday mesh, blast valves, HEPA sets; the retrofit job list)
+  // 28 → 29: wild food (game as it was), fishing gear, snares, smoker
+  28: s => ({ ...s, version: 29, wild: newWild(), stock: { fishing_gear: 0, snares: 0, smoker: 0, ...(s.stock as object) } }),
   // 27 → 28: water goods (jugs, totes, the trailer, filter, RO, softener, greywater)
   27: s => ({ ...s, version: 28, stock: { water_jugs: 0, ibc_tote: 0, water_trailer: 0, water_filter: 0, ro_system: 0, softener: 0, greywater: 0, ...(s.stock as object) } }),
   // 26 → 27: personal kit, watching the place, hardening (all goods in the stockpile)
@@ -98,7 +101,7 @@ export function migrate(raw: unknown): GameState {
     if (!up) throw new SaveVersionError(`No migration from version ${s.version}`);
     s = up(s);
   }
-  for (const k of ['seed', 'clock', 'money', 'stock', 'orders', 'people', 'personState', 'structures', 'forestry', 'heat', 'perimeter', 'utilities', 'hardenJobs', 'disaster', 'food', 'neighbors', 'gate', 'stats', 'land', 'site', 'lifestyle', 'crews', 'siteJobs', 'roadside', 'paper', 'upkeep', 'shelf', 'body', 'fin', 'armory', 'log', 'nextId'] as const) {
+  for (const k of ['seed', 'clock', 'money', 'stock', 'orders', 'people', 'personState', 'structures', 'forestry', 'heat', 'perimeter', 'utilities', 'hardenJobs', 'disaster', 'food', 'neighbors', 'gate', 'stats', 'land', 'site', 'lifestyle', 'crews', 'siteJobs', 'roadside', 'paper', 'upkeep', 'shelf', 'body', 'fin', 'armory', 'wild', 'log', 'nextId'] as const) {
     if (!(k in s)) throw new SaveVersionError(`Save is missing "${k}"`);
   }
   return s as unknown as GameState;

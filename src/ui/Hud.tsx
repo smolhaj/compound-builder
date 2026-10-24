@@ -16,6 +16,7 @@ import { keeping, KEPT } from '../sim/shelf';
 import { CONDITION, pharmacyOpen } from '../sim/body';
 import { netWorth } from '../sim/finance';
 import { JUG_L, orderTanker } from '../sim/water';
+import { buyLicense, hasLicense, inSeason, lawful, TAG_USD, type License } from '../sim/wildfood';
 import { chimneyState, greenRicks, SEASON_DAYS, SWEEP_USD } from '../sim/upkeep';
 import { countyWorks, needsPermit, permitFee, premium, yearlyTax } from '../sim/paperwork';
 import { DRIVE_PER_FT, driveQuote, fixBill, fixBlocked, fixDef, hookupProblem, pendingFixes, POLE_PER_FT, powerQuote } from '../sim/improvements';
@@ -404,6 +405,19 @@ export function Hud() {
               </div>
               <Row label="Mouse traps" value={game.shelf.traps > 0 ? `set (${game.shelf.traps} days)` : game.stock.traps >= 1 ? 'a box in the shed' : <span style={{ color: TONE.warn }}>none: mice in the stores</span>} />
               {game.stock.fuel > 0 && game.stock.stabilizer < Math.ceil(game.stock.fuel / 10) && <Note tone="warn">The gas has no stabilizer: it goes stale in about six months.</Note>}
+            </Section>
+            <Section title="Hunting & fishing">
+              {(['big', 'small', 'fish'] as const).map(c => <div key={c} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '1px 0' }}>
+                <span style={{ color: DIM, width: 96 }}>{c === 'big' ? REGIONS[game.site.region].game.filter(x => ['elk', 'deer', 'moose', 'antelope', 'javelina'].includes(x)).slice(0, 2).join(', ') || 'Big game' : c === 'small' ? 'Rabbits, grouse' : REGIONS[game.site.region].game.filter(x => ['trout', 'bass', 'catfish', 'salmon', 'panfish'].includes(x)).slice(0, 2).join(', ') || 'Fish'}</span>
+                <div style={{ flex: 1, height: 4, background: '#333', borderRadius: 2 }}><div style={{ width: `${game.wild.abundance[c] * 100}%`, height: '100%', background: game.wild.abundance[c] < 0.4 ? TONE.bad : '#9cc070', borderRadius: 2 }} /></div>
+              </div>)}
+              {lawful(game) ? <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
+                {(['deer', 'elk', 'small', 'fishing'] as License[]).filter(l => l !== 'elk' || REGIONS[game.site.region].game.includes('elk')).map(l => hasLicense(game, l)
+                  ? <span key={l} style={{ fontSize: 11, color: TONE.good, padding: '2px 6px' }}>✓ {l === 'fishing' ? 'fishing' : l === 'small' ? 'small game' : `${l} tag`}</span>
+                  : <button key={l} style={btn()} title={inSeason(game, l) ? 'In season now' : 'Out of season now'} onClick={() => g.money(d => buyLicense(d, l))}>{l === 'fishing' ? 'Fishing license' : l === 'small' ? 'Small game' : `${l[0].toUpperCase() + l.slice(1)} tag`} ${TAG_USD[l]}</button>)}
+              </div> : <Note>No seasons, no wardens now. Everyone is hunting: the game is thinning out.</Note>}
+              {game.wild.hotUntil >= Math.floor(game.clock.t) && <Note tone="bad">Fallout: game and fish read hot for months.</Note>}
+              {game.stock.fishing_gear < 1 && game.site.creek && <Note>A creek full of {REGIONS[game.site.region].game.find(x => ['trout', 'bass', 'catfish', 'salmon', 'panfish'].includes(x)) ?? 'fish'}, and no fishing gear.</Note>}
             </Section>
             <Section title="Food">
               {(() => {
