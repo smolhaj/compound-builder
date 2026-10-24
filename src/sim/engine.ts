@@ -112,7 +112,7 @@ function subStep(s: GameState): void {
     const y = Math.sin(day * 12.9898 + s.seed * 3.1) * 43758.5453;
     s.food = liveDay(s, y - Math.floor(y));
     const end = tallyDay(s);
-    if (end) log(s, end.kind === 'wipe' ? 'The last of the family is gone.' : end.kind === 'recovered' ? 'The outside world is coming back.' : 'A full year the place has fed itself.');
+    if (end) log(s, end.kind === 'wipe' ? 'The last of the family is gone.' : end.kind === 'recovered' ? 'The outside world is coming back.' : end.kind === 'new_normal' ? 'The outside world has come back as far as it will.' : 'A full year the place has fed itself.');
   }
 }
 

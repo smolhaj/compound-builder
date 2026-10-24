@@ -214,6 +214,40 @@ export function surpriseKind(u: number, odds: Partial<Record<DisasterKind, numbe
   return SURPRISE_POOL[SURPRISE_POOL.length - 1];
 }
 
+/**
+ * How the world comes out of it (decided with the user: "it's not a given
+ * that the world recovers, each playthrough is random … should vary based on
+ * what the disaster is"). Rolled per run, hidden from the player:
+ *   full     services come all the way back (on the variant's curves);
+ *   partial  they come back late and only part way, and stay there (a thinner
+ *            world: power some hours, the store open some days);
+ *   never    nobody is coming.
+ * Odds by disaster [full, partial, never]; variants that never come back
+ * (a strike on the nearby base, the pulpy ones) stay that way.
+ */
+export type Fate = 'full' | 'partial' | 'never';
+export const FATE_ODDS: Partial<Record<DisasterKind, [number, number, number]>> = {
+  wildfire: [0.92, 0.07, 0.01], grid_down: [0.68, 0.24, 0.08], cyberattack: [0.65, 0.27, 0.08], pandemic: [0.62, 0.3, 0.08],
+  lawless: [0.45, 0.38, 0.17], financial: [0.4, 0.42, 0.18], drought: [0.35, 0.45, 0.2], solar_flare: [0.3, 0.42, 0.28],
+  ash_winter: [0.2, 0.45, 0.35], nuclear: [0.12, 0.43, 0.45],
+};
+export function rollFate(kind: DisasterKind, u: number): Fate {
+  const [f, p] = FATE_ODDS[kind] ?? [0, 0, 1];
+  return u < f ? 'full' : u < f + p ? 'partial' : 'never';
+}
+/** A partial recovery: each service settles somewhere between a third and four fifths of what it was. */
+function rollCeiling(r: () => number): Partial<Record<Track, number>> {
+  const out: Partial<Record<Track, number>> = {};
+  for (const k of TRACKS) out[k] = Math.round((0.35 + 0.45 * r()) * 100) / 100;
+  return out;
+}
+/** Apply the fate to rolled return days: late for a partial recovery, none for never. */
+function fateBack(back: Partial<Record<Track, number>>, fate: Fate): Partial<Record<Track, number>> {
+  if (fate === 'never') return {};
+  if (fate === 'partial') return Object.fromEntries(Object.entries(back).map(([k, v]) => [k, Math.round((v as number) * 1.5)]));
+  return back;
+}
+
 export interface Chained { kind: DisasterKind; variant: string; hitAt: number; back: Partial<Record<Track, number>> }
 
 export interface DisasterState {
@@ -231,6 +265,9 @@ export interface DisasterState {
   back: Partial<Record<Track, number>>;
   /** Follow-ons. */
   chained: Chained[];
+  /** How the world comes out of it (hidden), and where each service settles in a partial recovery. */
+  fate: Fate;
+  ceiling: Partial<Record<Track, number>>;
   /** The levels as of the last daily update. */
   tracks: Record<Track, number>;
   /** Headlines for the ticker (newest last). */
@@ -269,11 +306,14 @@ export function newDisaster(seed: number, mode: Mode, peace: PeaceLength = 'rand
   const v = def ? (variant && def.variants.some(x => x.id === variant) ? variant : pick(def.variants, r()).id) : '';
   const len = mode === 'sandbox' ? NEVER : peace === 'random' || mode === 'surprise' ? Math.round(3 * 365 + r() * 3 * 365) : PEACE_DAYS[peace];
   const warn = def ? Math.max(1, Math.round(roll(r, def.warn) * WARN_SCALE[difficulty])) : 0;
+  // the fate on its own stream (the rest of the run's rolls don't move)
+  const rf = rng(seed * 6007 + 29);
+  const fate = k ? rollFate(k, rf()) : 'full';
   return {
     mode, difficulty, peace, kind: k, variant: v, phase: 'peace',
     warnAt: len - warn, hitAt: len,
-    back: def ? rollBack(def, v, r) : {},
-    chained: [], tracks: { ...FULL }, news: [], day: -1,
+    back: def ? fateBack(rollBack(def, v, r), fate) : {},
+    chained: [], fate, ceiling: fate === 'partial' ? rollCeiling(rf) : {}, tracks: { ...FULL }, news: [], day: -1,
   };
 }
 
@@ -285,34 +325,39 @@ export function triggerDisaster(d: DisasterState, now: number, kind: DisasterKin
   d.kind = kind;
   d.variant = variant && def.variants.some(x => x.id === variant) ? variant : pick(def.variants, r()).id;
   d.warnAt = now; d.hitAt = now + warnDays;
-  d.back = rollBack(def, d.variant, r);
+  const rf = rng(seed * 6007 + 29 + Math.floor(now));
+  d.fate = rollFate(kind, rf());
+  d.ceiling = d.fate === 'partial' ? rollCeiling(rf) : {};
+  d.back = fateBack(rollBack(def, d.variant, r), d.fate);
   d.chained = [];
   d.phase = warnDays > 0 ? 'warning' : 'peace';
 }
 
 /** One track's level `days` after the hit. */
-export function curveLevel(c: TrackCurve | undefined, back: number | undefined, days: number): number {
+export function curveLevel(c: TrackCurve | undefined, back: number | undefined, days: number, ceil = 1): number {
   if (!c || days < c.at) return 1;
   const fell = c.fall <= 0 ? 1 : Math.min(1, (days - c.at) / c.fall);
   let lv = 1 - (1 - c.floor) * fell;
-  if (back !== undefined && days > back) lv = Math.min(1, lv + (1 - lv) * Math.min(1, (days - back) / Math.max(1, c.ramp)));
+  // coming back: all the way, or (a partial recovery) to where it settles
+  const top = Math.max(lv, ceil);
+  if (back !== undefined && days > back) lv = Math.min(top, lv + (top - lv) * Math.min(1, (days - back) / Math.max(1, c.ramp)));
   return lv;
 }
 
-function levelsOf(kind: DisasterKind, variant: string, back: Partial<Record<Track, number>>, days: number): Record<Track, number> {
+function levelsOf(kind: DisasterKind, variant: string, back: Partial<Record<Track, number>>, days: number, ceiling: Partial<Record<Track, number>> = {}): Record<Track, number> {
   const def = DISASTERS[kind], v = def?.variants.find(x => x.id === variant);
   const out = { ...FULL };
   if (!v || days < 0) return out;
-  for (const t of TRACKS) out[t] = curveLevel(v.curves[t], back[t], days);
+  for (const t of TRACKS) out[t] = curveLevel(v.curves[t], back[t], days, ceiling[t] ?? 1);
   return out;
 }
 
 /** All tracks at game day t (the main disaster and its follow-ons; the worse wins). */
 export function tracksAt(d: DisasterState, t: number): Record<Track, number> {
   if (!d.kind) return { ...FULL };
-  const out = levelsOf(d.kind, d.variant, d.back, t - d.hitAt);
+  const out = levelsOf(d.kind, d.variant, d.back, t - d.hitAt, d.ceiling);
   for (const c of d.chained) {
-    const lv = levelsOf(c.kind, c.variant, c.back, t - c.hitAt);
+    const lv = levelsOf(c.kind, c.variant, c.back, t - c.hitAt, d.ceiling);
     for (const k of TRACKS) out[k] = Math.min(out[k], lv[k]);
   }
   return out;
@@ -370,7 +415,7 @@ export function updateDisaster(d: DisasterState, t: number, seed: number): strin
       const cd = DISASTERS[c.kind];
       if (!cd) continue;
       const v = pick(cd.variants, r());
-      d.chained.push({ kind: c.kind, variant: v.id, hitAt: d.hitAt + roll(r, c.after), back: rollBack(cd, v.id, r) });
+      d.chained.push({ kind: c.kind, variant: v.id, hitAt: d.hitAt + roll(r, c.after), back: fateBack(rollBack(cd, v.id, r), d.fate ?? 'full') });
     }
   } else if (d.phase === 'impact' && t >= d.hitAt + 3) d.phase = 'survival';
   // chained follow-ons announce themselves when they hit
@@ -380,6 +425,13 @@ export function updateDisaster(d: DisasterState, t: number, seed: number): strin
     const w = tension(d, t), stage = w < 0.4 ? 0 : w < 0.8 ? 1 : 2;
     if (r() < 0.35 + 0.5 * w) say(def.hints[stage][Math.floor(r() * def.hints[stage].length)].replace('{cause}', cause), (stage + 1) as 1 | 2 | 3);
   } else if (d.phase === 'peace' && r() < 0.25) say(PEACE_NEWS[Math.floor(r() * PEACE_NEWS.length)], 0);
+  // how it's going out there (the fate shows itself only slowly)
+  if (def && d.phase === 'survival') {
+    const since = day - Math.floor(d.hitAt + 0.25), first = Math.min(...Object.values(d.back).map(Number), Infinity);
+    if (d.fate === 'partial' && Number.isFinite(first) && since === first + 20) say('The county says some things are coming back, but "not the way they were".', 1);
+    if (d.fate === 'never' && since === 120) say('Still nothing from the state. People are starting to say nobody is coming.', 2);
+    if (d.fate === 'never' && since === 365) say('A year on. No trucks, no power, no word. This is how it is now.', 2);
+  }
   d.tracks = tracksAt(d, t);
   return out;
 }

@@ -38,7 +38,7 @@ export const emptyStats = (): RunStats => ({ days: 0, hungryDays: 0, dryDays: 0,
 /** The place feeds everyone: over the last year (and at least 13 months in) it grew 95 % of what was eaten. */
 export const selfSufficient = (st: RunStats) => st.days >= 400 && st.grownYear >= 0.95 * st.needYear;
 
-export type EndKind = 'recovered' | 'equilibrium' | 'wipe';
+export type EndKind = 'recovered' | 'new_normal' | 'equilibrium' | 'wipe';
 export interface Ending { kind: EndKind; day: number; continued: boolean }
 
 const living = (s: GameState) => s.personState.filter(ps => ps.needs.died == null).length;
@@ -62,13 +62,14 @@ export function tallyDay(s: GameState): Ending | null {
   st.selfFed = f.producedKcal >= f.needKcal * 0.9 ? st.selfFed + 1 : 0;
   st.grownYear = st.grownYear * (1 - 1 / 365) + f.producedKcal;
   st.needYear = st.needYear * (1 - 1 / 365) + f.needKcal;
-  const ok = TRACKS.every(k => d.tracks[k] >= 0.9);
+  // back as far as it's coming: all the way, or (a partial recovery) where it settles
+  const ok = d.fate === 'never' ? false : TRACKS.every(k => d.tracks[k] >= Math.min(0.9, (d.ceiling?.[k] ?? 1) - 0.03));
   if (!ok) st.okSince = -1; else if (st.okSince < 0) st.okSince = day;
   if (s.ending) return null;          // playing on after the card
   // the run ends: everyone gone; the world back for a month (and at least three months in); a year and more feeding yourselves
   let kind: EndKind | null = null;
   if (living(s) === 0) kind = 'wipe';
-  else if (ok && st.okSince >= 0 && day - st.okSince >= 30 && day >= 90) kind = 'recovered';
+  else if (ok && st.okSince >= 0 && day - st.okSince >= 30 && day >= 90) kind = d.fate === 'partial' ? 'new_normal' : 'recovered';
   else if (selfSufficient(st)) kind = 'equilibrium';
   if (!kind) return null;
   s.ending = { kind, day: Math.floor(s.clock.t), continued: false };
@@ -96,9 +97,11 @@ export function reportCard(s: GameState): ReportCard {
   const family = s.people[0]?.last ?? 'The family';
   const headline = end === 'wipe' ? `No one left at the ${family} place`
     : end === 'recovered' ? `${family} family came through ${name.toLowerCase()}`
+    : end === 'new_normal' ? `A thinner world: ${family} family settles in after ${name.toLowerCase()}`
     : `${family} homestead feeds itself a year on`;
   const sub = end === 'wipe' ? `${days} days after it hit, the last of them was gone.`
     : end === 'recovered' ? `${days} days after it hit, the lights are back on in the valley. ${alive} of ${total} made it.`
+    : end === 'new_normal' ? `${days} days on, the power runs some hours and the store opens some days. It won't be like before. ${alive} of ${total} made it.`
     : `A year without a store. ${alive} people live off what the place grows.`;
   const lines: string[] = [];
   // water
