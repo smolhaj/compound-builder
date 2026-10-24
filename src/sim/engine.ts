@@ -10,7 +10,8 @@ import { addCarryWork, deliverOrders } from './economy';
 import { addFixWork, nextFix, siteJobsDay } from './improvements';
 import { paperworkDay } from './paperwork';
 import { addFellWork, nextFellJob } from './forestry';
-import { burnFirewood } from './heating';
+import { burnFirewood, demandNow } from './heating';
+import { upkeepDay } from './upkeep';
 import { addRunWork, nextRun } from './perimeter';
 import { addFitWork, balanceDay, nextFit, plant } from './utilities';
 import { addHardenWork, nextHardenJob } from './hardening';
@@ -93,6 +94,7 @@ function subStep(s: GameState): void {
     landMarketDay(s, dayIndex(s.clock.t));
     siteJobsDay(s);
     for (const line of paperworkDay(s)) log(s, line);
+    for (const line of upkeepDay(s, demandNow(s), s.heat.warned !== dayIndex(s.clock.t) - 1 && s.heat.warned !== dayIndex(s.clock.t))) log(s, line);
     const e = gateDay(s);
     if (e) log(s, `${e.title}.`);
     if (before !== 'impact' && s.disaster.phase === 'impact' && s.disaster.kind === 'nuclear') for (const line of strike(s)) log(s, line);

@@ -5,6 +5,7 @@
  * Running out is logged (comfort / health effects come with needs). Pure.
  */
 import { log } from './economy';
+import { burnRick } from './upkeep';
 import { calendarOf, dayIndex, type GameState } from './state';
 import { climate } from './effects';
 import { REGIONS } from './regions';
@@ -19,19 +20,23 @@ export function heatDemand(doy: number): number {
 /** Ricks burned per day at full demand. */
 export const BURN_PER_DAY = 0.12;
 
+/** Today's heating demand (0 = none, ~1.6 = a bitter cold snap), with a leaky roof. */
+export function demandNow(s: GameState): number {
+  return Math.min(2, (heatDemand(calendarOf(s.clock).doy) * REGIONS[s.site.region].cold + climate(s).cold) * roofLoss(s));
+}
+
 /** Burn `days` worth of firewood (called each sub-step). */
 export function burnFirewood(s: GameState, days: number): void {
-  const d = Math.min(2, (heatDemand(calendarOf(s.clock).doy) * REGIONS[s.site.region].cold + climate(s).cold) * roofLoss(s));
+  const d = demandNow(s);
   if (d <= 0) return;
   s.heat.burned += d * BURN_PER_DAY * days;
   while (s.heat.burned >= 1) {
-    if (s.stock.firewood <= 0) {
+    if (!burnRick(s)) {
       s.heat.burned = 1;
       const day = dayIndex(s.clock.t);
       if (s.heat.warned !== day) { s.heat.warned = day; log(s, 'Out of firewood: a cold night at camp. Mark some trees to fell.'); }
       return;
     }
-    s.stock.firewood--;
     s.heat.burned -= 1;
   }
 }

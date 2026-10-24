@@ -6,6 +6,7 @@
  * firewood. Pure (tested).
  */
 import { log } from './economy';
+import { stackGreen } from './upkeep';
 import type { FellJob, GameState } from './state';
 
 export interface TreeRef { id: number; x: number; z: number; kind: FellJob['kind']; scale: number }
@@ -68,11 +69,11 @@ export function addFellWork(s: GameState, j: FellJob, hours: number): void {
     else {
       const y = yieldOf(j.kind, j.scale);
       s.stock.logs += y.logs;
-      s.stock.firewood += y.firewood;
+      stackGreen(s, y.firewood);
       s.forestry.jobs.splice(s.forestry.jobs.indexOf(j), 1);
       s.forestry.cleared.push(j.treeId);
       const name = j.kind === 'conifer' ? 'pine' : j.kind === 'oval' ? 'aspen' : 'cottonwood';
-      log(s, `Felled a ${name}: ${y.logs ? `${y.logs} log${y.logs > 1 ? 's' : ''} and ` : ''}${y.firewood} rick${y.firewood > 1 ? 's' : ''} of firewood.`);
+      log(s, `Felled a ${name}: ${y.logs ? `${y.logs} log${y.logs > 1 ? 's' : ''} and ` : ''}${y.firewood} rick${y.firewood > 1 ? 's' : ''} of green firewood (it burns well once it's seasoned, in about nine months).`);
     }
   }
 }

@@ -17,6 +17,8 @@ import { BLUEPRINTS, isHome } from '../src/sim/blueprints';
 import { fixBill, fixBlocked, orderHookup, pendingFixes, placeImprovements } from '../src/sim/improvements';
 import { hireCrew, hoursLeft } from '../src/sim/crews';
 import { applyForPermit } from '../src/sim/paperwork';
+import { sweepChimney } from '../src/sim/upkeep';
+import { calendarOf } from '../src/sim/state';
 import { planRun } from '../src/sim/perimeter';
 import { orderFit, fitProblem, plant } from '../src/sim/utilities';
 import { orderHardenAll } from '../src/sim/hardening';
@@ -65,6 +67,8 @@ function orderNeeds(s: GameState, strat: Strategy): void {
   if (haveKcal < kcalYear) lines.push({ material: 'staples', qty: Math.ceil((kcalYear - haveKcal) / 80000) });
   const jars = strat === 'prepper' ? 400 : strat === 'homestead' ? 200 : 0;
   if (s.stock.lids + (pending.lids ?? 0) < jars / 2) lines.push({ material: 'lids', qty: jars });
+  // a winter's firewood (about 4 cords) in by fall
+  if (strat !== 'idle' && s.stock.firewood + (pending.firewood ?? 0) < 12) lines.push({ material: 'firewood', qty: 12 });
   if (strat === 'prepper' && s.stock.meds + (pending.meds ?? 0) < 4) lines.push({ material: 'meds', qty: 2 });
   if (strat === 'prepper' && s.stock.fuel + (pending.fuel ?? 0) < 20) lines.push({ material: 'fuel', qty: 10 });
   if (strat === 'prepper' && s.stock.inverter + (pending.inverter ?? 0) < 1) lines.push({ material: 'inverter', qty: 1 });
@@ -109,6 +113,8 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
     if (strat === 'fortress' && day === 120) planRun(s, 'log_palisade', [M(15, 15), M(50, 15), M(50, 50), M(15, 50), M(15, 15)]);
     if (strat === 'prepper' && day === 600) for (const id of ['fallout', 'faraday', 'nbc'] as const) orderHardenAll(s, id, 1);
     if (day % 3 === 0 && s.clock.t < s.disaster.hitAt) orderNeeds(s, strat);
+    // sweep the chimney each fall
+    if (strat !== 'idle' && calendarOf(s.clock).doy === 260) sweepChimney(s);
     // wire and plumb the house once it can be; order what its repairs need
     const cabin = s.structures.find(x => isHome(x.kind) && isFinished(x));
     if (cabin && day % 5 === 0) for (const f of pendingFixes(cabin)) if (fixBlocked(s, f) && !orderProblem(s, Object.entries(fixBill(f)).map(([material, qty]) => ({ material: material as MaterialId, qty: qty as number })))) { placeOrder(s, Object.entries(fixBill(f)).map(([material, qty]) => ({ material: material as MaterialId, qty: qty as number }))); break; }
