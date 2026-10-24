@@ -83,7 +83,8 @@ function garageShell(def: KitPieceDef, seed: number, opts: BuildOpts, solar: boo
     // 20 × 400 W panels (1.13 × 1.72 m, portrait up the slope) in two rows of 10 on the +x roof slope
     const pitch = Math.atan2(rise, hw);
     const pw = 1.13 * M, ph = 1.72 * M, gap = 0.02 * M;
-    const roofY = (x: number) => yE + rise * (1 - x / hw) + 0.03;
+    // the roof sheets sit 0.034 above the rafter line; the panels stand ≈ 10 cm off them on rails
+    const roofY = (x: number) => yE + rise * (1 - x / hw) + 0.034 + 0.016;
     const cosP = Math.cos(pitch);
     for (let row = 0; row < 2; row++) {
       // distance down the slope from just below the ridge to the row center
