@@ -13,6 +13,7 @@ import { addFellWork, nextFellJob } from './forestry';
 import { burnFirewood, demandNow } from './heating';
 import { upkeepDay } from './upkeep';
 import { shelfDay } from './shelf';
+import { bodyDay } from './body';
 import { addRunWork, nextRun } from './perimeter';
 import { addFitWork, balanceDay, nextFit, plant } from './utilities';
 import { addHardenWork, nextHardenJob } from './hardening';
@@ -117,6 +118,7 @@ function subStep(s: GameState): void {
     balanceDay(s, plant(s), x - Math.floor(x));
     const y = Math.sin(day * 12.9898 + s.seed * 3.1) * 43758.5453;
     s.food = liveDay(s, y - Math.floor(y));
+    for (const line of bodyDay(s)) log(s, line);
     const end = tallyDay(s);
     if (end) log(s, end.kind === 'wipe' ? 'The last of the family is gone.' : end.kind === 'recovered' ? 'The outside world is coming back.' : end.kind === 'new_normal' ? 'The outside world has come back as far as it will.' : 'A full year the place has fed itself.');
   }

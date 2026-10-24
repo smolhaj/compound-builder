@@ -4,6 +4,7 @@
  * one leads the building and the other the garden / care; kids help a little.
  */
 import { mulberry32, pick } from './rng';
+import type { Condition } from './body';
 
 export type SkillId = 'builder' | 'gardener' | 'medic' | 'mechanic' | 'hunter' | 'negotiator' | 'teacher' | 'radio';
 export const SKILL_IDS: readonly SkillId[] = ['builder', 'gardener', 'medic', 'mechanic', 'hunter', 'negotiator', 'teacher', 'radio'];
@@ -24,6 +25,8 @@ export interface Person {
   job?: { title: string; wage: number };
   /** A grandparent: retired (no job), slower at heavy work, long on know-how. */
   elder?: boolean;
+  /** Chronic conditions that need a daily medicine (sim/body.ts). */
+  conditions?: Condition[];
 }
 
 const FIRST_F = ['Abigail', 'Ava', 'Beth', 'Carmen', 'Dana', 'Elena', 'Grace', 'Hannah', 'Ivy', 'June', 'Kate', 'Laura', 'Maya', 'Nora', 'Rosa', 'Ruth', 'Sara', 'Tessa', 'Wren'];

@@ -19,11 +19,12 @@ import { improvementStructures, type Fix, type SiteJobs } from './improvements';
 import { CLOSING_COSTS, newPaper, type Paper } from './paperwork';
 import { newUpkeep, type Upkeep } from './upkeep';
 import { newShelf, type Shelf } from './shelf';
+import { conditionsFor, newBody, type Body } from './body';
 import { emptyStats, type Ending, type RunStats } from './report';
 import { generateNeighbors, newGate, type GateState, type Neighbor } from './encounters';
 import { freshNeeds, type FoodReport, type Needs } from './needs';
 import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
-export const SAVE_VERSION = 23;
+export const SAVE_VERSION = 24;
 
 /** Starting savings (GDS §1 peacetime money constraint). */
 export const STARTING_MONEY = 30000;
@@ -168,6 +169,8 @@ export interface GameState {
   upkeep: Upkeep;
   /** How old the stores are, rotation, traps. */
   shelf: Shelf;
+  /** Medicine on hand per person. */
+  body: Body;
   /** The households round the place. */
   neighbors: Neighbor[];
   /** Who comes to the gate: the pending encounter, the last result, humanity and tallies. */
@@ -190,6 +193,7 @@ export interface RunSetup { site?: Site; lifestyle?: Lifestyle; difficulty?: Dif
 
 export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: RunSetup = {}): GameState {
   const people = setup.family ? structuredClone(setup.family) : generateFamily(seed);
+  for (const p of people) p.conditions ??= conditionsFor(p, seed);
   const site = setup.site ?? CLASSIC;
   const g: GameState = {
     version: SAVE_VERSION,
@@ -203,6 +207,7 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     paper: newPaper(),
     upkeep: newUpkeep(),
     shelf: newShelf(),
+    body: newBody(),
     site,
     stock: { ...emptyStock(), firewood: STARTING_FIREWOOD, canned: 2 },
     neighbors: generateNeighbors(seed),
