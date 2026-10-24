@@ -19,7 +19,7 @@ import { isFinished } from './construction';
 import { PERIMETER, runFinished, runGrowth, wallLength } from './perimeter';
 import { freshNeeds } from './needs';
 import { dayJob, type Person, type SkillId, SKILL_IDS } from './family';
-import type { GameState } from './state';
+import { dayIndex, type GameState } from './state';
 import type { Stock } from './materials';
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -272,7 +272,7 @@ function makeThreat(kind: EncounterKind, r: () => number, id: string, day: numbe
 
 /** Once a day after the hit: maybe someone comes. Returns the encounter set as pending (the UI pauses), or null. */
 export function gateDay(s: GameState): Encounter | null {
-  const day = Math.floor(s.clock.t);
+  const day = dayIndex(s.clock.t);
   const g = s.gate;
   if (day === g.day) return null;
   g.day = day;
