@@ -1,19 +1,22 @@
 import { create } from 'zustand';
 import type { Battle } from '../sim/battleTypes';
 
+/** A line in the fight: who said it (a unit id) and what. */
+export interface BattleLine { who?: string; text: string }
+
 /** The battle being watched (playback only; the sim builds the Battle). */
 interface BattleStore {
   battle: Battle | null;
   /** Playback clock (s), written by the renderer for the overlay. */
   t: number;
   /** Latest 'say' lines (newest last). */
-  lines: string[];
+  lines: BattleLine[];
   /** Bumped to ask the renderer to skip to the end. */
   skipReq: number;
   playBattle: (b: Battle) => void;
   endBattle: () => void;
   skip: () => void;
-  setProgress: (t: number, lines: string[]) => void;
+  setProgress: (t: number, lines: BattleLine[]) => void;
 }
 
 export const useBattleStore = create<BattleStore>(set => ({

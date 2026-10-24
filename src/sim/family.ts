@@ -165,6 +165,20 @@ export function workHoursPerDay(p: Person): number {
   return p.kid ? (p.age < 12 ? 1.5 : 3) : p.elder ? 4 : 8;
 }
 
+/** A past in uniform: most people never served; some did, a few were police. */
+export type Background = 'military' | 'police' | null;
+export const BACKGROUND_NAME: Record<'military' | 'police', string> = { military: 'Army veteran', police: 'former police officer' };
+/** Seeded by the person (stable across saves): about 7 % of adults are veterans (15 % of the elders), 2 % were police. */
+export function backgroundOf(p: Person): Background {
+  if (p.kid || p.age < 22) return null;
+  let h = 2166136261;
+  for (const c of p.id + p.first + p.last) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0;
+  const u = (h % 10000) / 10000;
+  if (u < (p.elder ? 0.15 : 0.07)) return 'military';
+  if (u < (p.elder ? 0.17 : 0.09)) return 'police';
+  return null;
+}
+
 export function fullName(p: Person): string {
   return `${p.first} ${p.last}`;
 }

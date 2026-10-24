@@ -5,7 +5,7 @@ import type { Quality } from '../engine/world/WorldScene';
 import { SEASON_MODES, type SeasonMode } from '../engine/world/season/seasonState';
 import { WEATHER_MODES, type WeatherMode } from '../engine/world/weather/weatherState';
 import { calendarOf, hourOf, type Speed } from '../sim/state';
-import { fullName } from '../sim/family';
+import { BACKGROUND_NAME, backgroundOf, fullName } from '../sim/family';
 import { MATERIALS, MATERIAL_IDS, emptyStock, type MaterialId } from '../sim/materials';
 import { onOrder, orderCost, orderProblem } from '../sim/economy';
 import { blockedReason, isFinished, planProblem, progress } from '../sim/construction';
@@ -182,6 +182,8 @@ export function Hud() {
   const foodAlert: Tone | undefined = !game.food.fromStores && game.food.ateKcal < game.food.needKcal * 0.95 ? 'bad' : warned && (game.food.fromStores ? daysFood < 180 : daysFood < 30) ? 'warn' : undefined;
   const utilAlert: Tone | undefined = game.utilities.report.shortL > 0 ? 'bad' : game.utilities.hauling || game.utilities.report.shortKwh > 0.5 ? 'warn' : undefined;
   const outsideAlert: Tone | undefined = game.clock.t >= game.disaster.hitAt && game.disaster.kind ? 'bad' : warned ? 'warn' : undefined;
+  // fight wounds heal only with meds, a medic (skill 3+) or the bunker's medical bay
+  const treating = game.stock.meds >= 0.1 || game.people.some((q, j) => !q.kid && game.personState[j]?.needs.died == null && q.skills.medic >= 3) || game.structures.some(st => st.kind === 'bunker_medical' && isFinished(st));
   const familyAlert: Tone | undefined = game.personState.some(ps => ps.needs.died == null && (ps.needs.health < 40 || ps.needs.hurt.length > 0)) ? 'bad' : game.personState.some(ps => ps.needs.died == null && ps.needs.hunger > 5000) ? 'warn' : undefined;
   const projectsAlert: Tone | undefined = game.structures.some(st => !isFinished(st) && blockedReason(game, st)) ? 'warn' : undefined;
   const ownNeeds = (kind: string) => Object.entries(totalBill(BLUEPRINTS[kind])).filter(([m]) => MATERIALS[m as MaterialId].price === null).map(([m, q]) => `${q} ${MATERIALS[m as MaterialId].name.toLowerCase()}`).join(', ');
@@ -365,10 +367,10 @@ export function Hud() {
             {game.people.map((p, i) => {
               const st = game.personState[i], n = st?.needs;
               const bar = (v: number, c: string, t: string) => <div title={t} style={{ flex: 1, height: 4, background: '#333', borderRadius: 2 }}><div style={{ width: `${Math.max(0, v)}%`, height: '100%', background: c, borderRadius: 2 }} /></div>;
-              const notes = n ? [n.hunger > 5000 ? 'hungry' : '', ...n.hurt.map(h => h.what), n.dose > 0.05 ? `${n.dose.toFixed(2)} Sv` : ''].filter(Boolean).join(', ') : '';
+              const notes = n && n.died == null ? [n.hunger > 5000 ? 'hungry' : '', ...n.hurt.map(h => h.trauma ? `${h.what}: ${treating ? 'being treated' : 'needs dressings and antibiotics'}` : h.what), n.dose > 0.05 ? `${n.dose.toFixed(2)} Sv` : ''].filter(Boolean).join(', ') : '';
               return <div key={p.id} style={{ padding: '5px 0', borderBottom: `1px solid ${LINE}` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>
-                  <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 4, background: '#' + p.shirt.toString(16).padStart(6, '0'), marginRight: 6 }} />{fullName(p)}, {p.age}</span>
+                  <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 4, background: '#' + p.shirt.toString(16).padStart(6, '0'), marginRight: 6 }} />{fullName(p)}, {p.age}{backgroundOf(p) && <span style={{ color: '#c9b27a', fontSize: 11 }}> · {BACKGROUND_NAME[backgroundOf(p)!]}</span>}</span>
                   <span style={{ color: DIM }}>{n?.died != null ? 'Died' : TASK_TEXT[st?.task ?? 'idle']}</span>
                 </div>
                 {n && n.died == null && <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 4, fontSize: 11 }}>

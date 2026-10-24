@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { newGame, type GameState } from './state';
 import { planRun } from './perimeter';
+import { backgroundOf } from './family';
+import { skillOf } from './armory';
 import { applyBattle, canRigMines, planBattle, type PlannedBattle } from './battle';
 
 function afterHit(seed = 1): GameState {
@@ -102,4 +104,75 @@ describe('the battle at the compound', () => {
     expect(recovered).toBeGreaterThan(0);
   });
 
+
+  it('a wounded fighter shoots worse and slower: the hurt start weaker', () => {
+    let fitHits = 0, fitShots = 0, hurtHits = 0, hurtShots = 0;
+    for (let seed = 1; seed <= 25; seed++) {
+      const fit = planBattle(fortify(afterHit(seed)), 6, seed);
+      const hurtG = fortify(afterHit(seed));
+      for (const ps of hurtG.personState) ps.needs.health = 30;
+      const hurt = planBattle(hurtG, 6, seed);
+      for (const [b, h] of [[fit, true], [hurt, false]] as const) for (const e of b.events) if (e.kind === 'shot' && e.from.startsWith('h_')) {
+        if (h) { fitShots++; if (e.hit) fitHits++; } else { hurtShots++; if (e.hit) hurtHits++; }
+      }
+    }
+    expect(hurtShots).toBeLessThan(fitShots);
+    expect(hurtHits / Math.max(1, hurtShots)).toBeLessThan(fitHits / Math.max(1, fitShots));
+  });
+
+  it('the dialogue names who is talking: the wounded call it out themselves', () => {
+    let checked = 0;
+    for (let seed = 1; seed <= 40 && checked < 3; seed++) {
+      const b = planBattle(afterHit(seed), 6, seed);
+      const w = b.events.find(e => e.kind === 'wound' && e.unit.startsWith('h_'));
+      if (!w || w.kind !== 'wound') continue;
+      expect(b.events.some(e => e.kind === 'say' && e.who === w.unit && e.t >= w.t)).toBe(true);
+      checked++;
+    }
+    expect(checked).toBeGreaterThan(0);
+    const any = planBattle(fortify(afterHit(2)), 6, 2);
+    expect(any.events.some(e => e.kind === 'say' && e.who?.startsWith('r'))).toBe(true);   // the raiders shout too
+  });
+
+  it('a fight wound is a trauma wound that needs treating', () => {
+    for (let seed = 1; seed <= 40; seed++) {
+      const g = afterHit(seed);
+      const b = planBattle(g, 6, seed);
+      if (!b.events.some(e => e.kind === 'wound' && e.unit.startsWith('h_'))) continue;
+      applyBattle(g, b);
+      const w = g.personState.flatMap(ps => ps.needs.hurt).find(h => h.trauma);
+      expect(w).toBeTruthy();
+      expect(w!.what).toMatch(/grazed|shot/);
+      return;
+    }
+    throw new Error('no wounded resident in 40 seeds');
+  });
+
+  it('body armor and helmets keep people alive; some rounds are stopped outright', () => {
+    let bare = 0, armored = 0, stopped = 0;
+    for (let seed = 1; seed <= 40; seed++) {
+      const a = planBattle(fortify(afterHit(seed)), 8, seed, { grenades: 0, rockets: 0 });
+      const gArm = fortify(afterHit(seed)); gArm.stock.plate_carrier = 6; gArm.stock.helmet = 6;
+      const b = planBattle(gArm, 8, seed, { grenades: 0, rockets: 0 });
+      bare += a.events.filter(e => e.kind === 'death' && e.unit.startsWith('h_')).length;
+      armored += b.events.filter(e => e.kind === 'death' && e.unit.startsWith('h_')).length;
+      stopped += b.events.filter(e => e.kind === 'wound' && e.stopped).length;
+    }
+    expect(armored).toBeLessThan(bare);
+    expect(stopped).toBeGreaterThan(0);
+  });
+
+  it('veterans and ex-police start as better shots; most people never served', () => {
+    let vets = 0, total = 0;
+    for (let seed = 1; seed <= 200; seed++) for (const p of newGame(seed).people) if (!p.kid && p.age >= 22) { total++; if (backgroundOf(p)) vets++; }
+    expect(vets / total).toBeGreaterThan(0.03);
+    expect(vets / total).toBeLessThan(0.2);
+    const g = newGame(7);
+    const p = g.people.find(q => !q.kid)!;
+    const base = skillOf(g, p.id);
+    p.first = 'Vet'; p.id = 'vet_search';
+    for (let k = 0; k < 500 && backgroundOf(p) !== 'military'; k++) p.id = `vet_${k}`;
+    expect(backgroundOf(p)).toBe('military');
+    expect(skillOf(g, p.id)).toBeGreaterThanOrEqual(Math.max(6, base > 6 ? base : 6));
+  });
 });

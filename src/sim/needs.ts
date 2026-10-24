@@ -41,7 +41,8 @@ export interface Needs {
   /** Radiation dose (sieverts). */
   dose: number;
   /** Wounds / illness being treated: severity 0–100, what it is. */
-  hurt: Array<{ what: string; sev: number }>;
+  /** `trauma`: a wound from a fight (gunshot, shrapnel) that needs treating: meds, a medic or a medical bay. Untreated it barely heals and can go septic. */
+  hurt: Array<{ what: string; sev: number; trauma?: boolean }>;
   /** Dead (day), or null. */
   died: number | null;
 }
@@ -159,12 +160,19 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
     n.hunger = Math.max(0, n.hunger + short * mine - (short === 0 ? 600 : 0));
     // health: hunger, wounds and radiation take it; rest and food bring it back
     let dh = n.hunger > 15000 ? -1.5 : n.hunger > 5000 ? -0.5 : 0.6;
-    for (const h of n.hurt) {
+    n.hurt.forEach((h, k) => {
       dh -= h.sev / 60;
       const meds = s.stock.meds >= 0.1;
       if (meds) s.stock.meds -= 0.1;            // a kit lasts about ten wound-days
+      // a fight wound needs treating: dressings and antibiotics, someone who knows how, or the bay
+      if (h.trauma && !meds && medic < 3 && !bay) {
+        h.sev = Math.max(0, h.sev - 0.3);
+        const u = ((rnd * 9973 + i * 131 + k * 17) % 1 + 1) % 1;
+        if (u < 0.04 && !h.what.includes('infected')) { h.sev = Math.min(100, h.sev + 15); h.what += ' (infected)'; log(s, `${p.first}'s wound has gone bad: it needs dressings and antibiotics.`); }
+        return;
+      }
       h.sev = Math.max(0, h.sev - (1 + 0.5 * medic + (bay ? 2.5 : 0) + (meds ? 1.5 : 0)));
-    }
+    });
     n.hurt = n.hurt.filter(h => h.sev > 0);
     if (n.dose > 1) dh -= (n.dose - 1) * 2;           // radiation sickness above ~1 Sv
     if (s.utilities.report.shortL > s.utilities.report.useL * 0.5) dh -= 2;   // not enough to drink
@@ -193,6 +201,8 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
 /** Work rate multiplier from health and morale (the hungry, hurt or hopeless get less done). */
 export function workFactor(n: Needs | undefined): number {
   if (!n || n.died != null) return 0;
+  // a bad fight wound puts you on your back until it's treated and mending
+  if (n.hurt.some(h => h.trauma && h.sev >= 50)) return 0.1;
   const h = n.health >= 60 ? 1 : 0.35 + 0.65 * n.health / 60;
   const m = n.morale >= 35 ? 1 : 0.6 + 0.4 * n.morale / 35;
   return h * m;

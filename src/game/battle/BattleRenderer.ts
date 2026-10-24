@@ -45,7 +45,7 @@ export class BattleRenderer {
   /** Playback clock (s). */
   time = 0;
   /** Latest 'say' lines. */
-  lines: string[] = [];
+  lines: Array<{ who?: string; text: string }> = [];
   /** Called once the battle (and its hold) is over. */
   onEnd: (() => void) | null = null;
   battle: Battle | null = null;
@@ -259,7 +259,7 @@ export class BattleRenderer {
         break;
       }
       case 'breach': this._boom(e.x, this._ground(e.x, e.z), e.z, 0.5, true); break;
-      case 'wound': { const u = U_(e.unit); if (u) { u.wound = Math.min(1, u.wound + Math.max(0.3, e.sev)); this._tint(u); } break; }
+      case 'wound': { const u = U_(e.unit); if (u && !e.stopped) { u.wound = Math.min(1, u.wound + Math.max(0.3, e.sev)); this._tint(u); } break; }
       case 'death': { const u = U_(e.unit); if (u) { u.dead = true; u.wound = 1; this._tint(u); u.y = 0; } break; }
       case 'flee': {
         const u = U_(e.unit); if (!u || u.dead) break;
@@ -267,7 +267,7 @@ export class BattleRenderer {
         u.tx = u.x + dx / d * 60; u.tz = u.z + dz / d * 60; u.ty = 0; u.speed = FLEE; u.crouch = false;
         break;
       }
-      case 'say': this.lines = [...this.lines, e.text].slice(-3); break;
+      case 'say': this.lines = [...this.lines, { who: e.who, text: e.text }].slice(-4); break;
       case 'end': this._endAt = this.time; this._alarmOn = false; break;
     }
   }
