@@ -273,12 +273,16 @@ function field(def: KitPieceDef, seed = 1): THREE.Group {
   bands.forEach((crop, b) => {
     const bx0 = hx0 + b * (band + lane);
     if (crop === 'wheat') {
-      // drilled wheat: a near-solid stand, ≈ 0.9 m, in strips with the drill rows showing
-      const strips = Math.round(band / (0.25 * M * 4));
-      for (let i = 0; i < strips; i++) {
-        const sx = bx0 + (i + 0.5) * band / strips, sw = band / strips * 0.86;
-        p.add('straw', box(sw, 0.85 * M, len, sx, 0.004, zc), 'frame');
-        p.add('straw', box(sw * 0.8, 0.12 * M, len - 0.01, sx, 0.004 + 0.85 * M, zc), 'frame');
+      // drilled wheat (rows 25 cm apart, ≈ 0.9 m): each drill row is a ragged run of stalks with the heads above,
+      // its height wandering a little along the row
+      const drills = Math.round(band / (0.25 * M)), seg = 0.06;
+      for (let i = 0; i < drills; i++) {
+        const sx = bx0 + (i + 0.5) * band / drills;
+        for (let z = zc - len / 2; z < zc + len / 2 - 1e-3; z += seg) {
+          const h = (0.78 + 0.18 * p.rnd()) * M, l = Math.min(seg, zc + len / 2 - z) * 0.92;
+          p.add('straw', box(0.05 * M, h, l, sx + (p.rnd() - 0.5) * 0.004, 0.004, z + l / 2), 'frame');
+          p.add('grain', box(0.09 * M, 0.1 * M, l * 0.9, sx, 0.004 + h, z + l / 2), 'frame');
+        }
       }
       return;
     }
@@ -290,8 +294,8 @@ function field(def: KitPieceDef, seed = 1): THREE.Group {
       const step = crop === 'potato' ? 0.6 * M * 2 : 0.5 * M * 2, n = Math.floor(len / step);
       for (let j = 0; j < n; j++) {
         const z = zc - len / 2 + (j + 0.5) * len / n, j2 = (p.rnd() - 0.5) * 0.02;
-        if (crop === 'potato') p.add('crop', new THREE.IcosahedronGeometry(0.42 * M, 0).scale(1.2, 0.55, 1.6).translate(x + j2, 0.18 * M + 0.2 * M, z), 'interior');
-        else p.add('crop', new THREE.DodecahedronGeometry(0.3 * M, 0).scale(1, 0.75, 1.9).translate(x + j2, 0.18 * M + 0.22 * M, z), 'interior');
+        if (crop === 'potato') p.add('crop', new THREE.IcosahedronGeometry(0.42 * M, 1).scale(1.2, 0.5, 1.5).translate(x + j2, 0.18 * M + 0.2 * M, z), 'interior');
+        else p.add('crop', new THREE.IcosahedronGeometry(0.3 * M, 1).scale(1, 0.8, 1.8).translate(x + j2, 0.18 * M + 0.22 * M, z), 'interior');
       }
     }
   });

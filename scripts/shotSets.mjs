@@ -173,7 +173,7 @@ SETS.interiors = [
  */
 const compound = `{ if (!window.__b) { window.__b = {};
   const G = cb.game, W = cb.world, c = W.camp;
-  const plan = [['log_house', -4, -3, 0], ['timber_cabin', 3, -3.5, 0], ['workshop', 6, 2, 3], ['garden', -2, 4, 0], ['chicken_coop', 1.5, 4.5, 0], ['root_cellar', -6, 1.5, 1], ['outhouse', 4.5, -7, 0]];
+  const plan = [['log_house', -4, -3, 0], ['timber_cabin', 3, -3.5, 0], ['workshop', 6, 2, 3], ['garden', -2, 4, 0], ['chicken_coop', 1.5, 4.5, 0], ['root_cellar', -6, 1.5, 1], ['outhouse', 4.5, -7, 0], ['field', -12, 6, 0]];
   for (const [kind, dx, dz, rot] of plan) {
     const sp = cb.tool.findSpot(kind, c.x + dx, c.z + dz, rot);
     if (!sp) continue;
@@ -204,6 +204,8 @@ SETS.buildings = [
   { name: 'root-cellar-cutaway', time: 11, season: 'summer', setup: compound + cut + at('root_cellar', 1.6, 0.85, 0.3), cam: D, frames: 12 },
   { name: 'coop-and-run', time: 9.5, season: 'summer', setup: compound + at('chicken_coop', 2.0, 0.4, 0.6), cam: D, frames: 12 },
   { name: 'garden', time: 15.5, season: 'summer', setup: compound + at('garden', 2.6, 0.55, -0.5), cam: D, frames: 12 },
+  { name: 'field-plot', time: 16, season: 'summer', setup: compound + at('field', 7.5, 0.5, -0.4), cam: D, frames: 12 },
+  { name: 'field-plot-eye', time: 17.5, season: 'summer', setup: compound + at('field', 3.2, 0.12, 0.25), cam: D, frames: 12 },
   { name: 'outhouse', time: 10, season: 'summer', setup: compound + at('outhouse', 1.4, 0.22, 0.5), cam: D, frames: 12 },
   { name: 'compound-night', time: 21.5, season: 'fall', setup: compound + "{ const c = cb.world.camp; cb.cam.target.set(c.x, 0, c.z); cb.cam.radius = 12; cb.cam.pitch = 0.45; cb.cam.yaw = 2.6; }", cam: D, frames: 20 },
 ];
