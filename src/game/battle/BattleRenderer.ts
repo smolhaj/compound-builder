@@ -37,6 +37,15 @@ function rnd(seed: number): () => number {
   let s = seed >>> 0;
   return () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296; };
 }
+/** A red cross on a white disc (first aid), drawn once. */
+function crossTexture(): THREE.Texture {
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d')!;
+  g.fillStyle = '#ffffff'; g.beginPath(); g.arc(32, 32, 30, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#d02020'; g.fillRect(25, 12, 14, 40); g.fillRect(12, 25, 40, 14);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
 function hashStr(s: string): number { let h = 2166136261; for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619); return h >>> 0; }
 
 export class BattleRenderer {
@@ -78,6 +87,9 @@ export class BattleRenderer {
   private _alarm: THREE.PointLight | null = null;
   private _alarmOn = false;
   private _floods: THREE.SpotLight[] = [];
+  /** First aid under way: a red cross over the wounded until it's done. */
+  private readonly _marks: Array<{ sprite: THREE.Sprite; unit: string; ttl: number }> = [];
+  private _crossTex: THREE.Texture | null = null;
   private _center = new THREE.Vector3();
   private readonly _m = new THREE.Matrix4();
   private readonly _q = new THREE.Quaternion();
@@ -174,6 +186,8 @@ export class BattleRenderer {
   }
 
   stop(): void {
+    for (const m of this._marks) { this._group.remove(m.sprite); m.sprite.material.dispose(); }
+    this._marks.length = 0;
     this.battle = null;
     this._units.clear();
     this._pending = [];
@@ -269,6 +283,19 @@ export class BattleRenderer {
         const u = U_(e.unit); if (!u || u.dead) break;
         const dx = u.x - this._center.x, dz = u.z - this._center.z, d = Math.hypot(dx, dz) || 1;
         u.tx = u.x + dx / d * 60; u.tz = u.z + dz / d * 60; u.ty = 0; u.speed = FLEE; u.crouch = false;
+        break;
+      }
+      case 'reload': case 'jam': { const u = U_(e.unit); if (u && !u.dead) u.crouch = true; break; }   // down behind cover to fix the gun
+      case 'aid': {
+        const u = U_(e.unit), by = U_(e.by);
+        if (by && u && by !== u) { by.tx = u.x + 0.08; by.tz = u.z; by.crouch = true; }
+        if (u) {
+          this._crossTex ??= crossTexture();
+          const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: this._crossTex, depthTest: false, transparent: true }));
+          sp.scale.setScalar(0.16);
+          this._group.add(sp);
+          this._marks.push({ sprite: sp, unit: e.unit, ttl: 4 });
+        }
         break;
       }
       case 'say': this.lines = [...this.lines, { who: e.who, text: e.text }].slice(-4); break;
@@ -412,6 +439,13 @@ export class BattleRenderer {
   }
 
   private _tickFx(dt: number): void {
+    for (let i = this._marks.length - 1; i >= 0; i--) {
+      const m = this._marks[i], u = this._units.get(m.unit);
+      m.ttl -= dt;
+      if (m.ttl <= 0 || !u) { this._group.remove(m.sprite); m.sprite.material.dispose(); this._marks.splice(i, 1); continue; }
+      m.sprite.position.set(u.x, this._ground(u.x, u.z) + u.y + 0.45 + Math.sin(this.time * 4) * 0.02, u.z);
+      m.sprite.material.opacity = Math.min(1, m.ttl);
+    }
     // tracers: a short bright streak racing from muzzle to target
     let k = 0;
     for (let i = this._tracers.length - 1; i >= 0; i--) {

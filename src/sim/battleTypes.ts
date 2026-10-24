@@ -40,6 +40,11 @@ export type BattleEvent =
   | { t: number; kind: 'rocket'; from: string; x: number; z: number; y?: number }
   | { t: number; kind: 'explosion'; x: number; z: number; y?: number; radius: number; hits: string[]; wrecks?: 'post' | 'wall' }
   | { t: number; kind: 'cover'; unit: string; x: number; z: number }
+  /** Changing magazines (or thumbing rounds into a tube) / clearing a jam: no shots for `secs`. */
+  | { t: number; kind: 'reload'; unit: string; secs: number }
+  | { t: number; kind: 'jam'; unit: string; secs: number }
+  /** First aid under fire: a tourniquet, a chest seal, or just hands pressing on it. */
+  | { t: number; kind: 'aid'; unit: string; by: string; what: 'tourniquet' | 'chest seal' | 'pressure' }
   | { t: number; kind: 'end'; result: 'repelled' | 'fled' | 'breached' | 'overrun' };
 
 export interface Battle {

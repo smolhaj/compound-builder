@@ -1,4 +1,5 @@
 import { planProblem } from '../sim/construction';
+import { AFTERMATH_TEXT, joinPrisoner, releasePrisoner, resolveAftermath, type AftermathChoice } from '../sim/aftermath';
 import { dismissCrew, hireCrew } from '../sim/crews';
 import { orderHookup, placeImprovements } from '../sim/improvements';
 import { applyForPermit } from '../sim/paperwork';
@@ -59,6 +60,9 @@ export interface GameStore {
   /** Answer whoever is at the gate. */
   answer: (stance: Stance) => void;
   dismissCard: () => void;
+  decideAftermath: (choice: AftermathChoice) => void;
+  releasePrisoner: (id: string) => void;
+  joinPrisoner: (id: string) => void;
   /** Wildfire: the world's count of trees round each building. */
   setFuel: (fuel: Record<string, number>) => void;
   /** Buy a neighbor parcel. */
@@ -113,7 +117,7 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
   selected: null,
   tick: (realDt) => {
     const g = get().game;
-    if (g.clock.speed === 0 || g.gate.pending || (g.ending && !g.ending.continued)) return;
+    if (g.clock.speed === 0 || g.gate.pending || g.gate.aftermath || (g.ending && !g.ending.continued)) return;
     const days = Math.min(realDt, MAX_DT) / SECONDS_PER_DAY[g.clock.speed];
     const next = step(g, days);
     // someone at the gate: stop the clock until the player decides
@@ -270,6 +274,22 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     const g = structuredClone(get().game);
     g.gate.card = null;
     set({ game: g });
+  },
+  decideAftermath: (choice) => {
+    const g = structuredClone(get().game);
+    const onlyDead = !g.gate.aftermath?.wounded;
+    const lines = resolveAftermath(g, choice);
+    g.gate.card = { title: onlyDead ? 'Buried' : AFTERMATH_TEXT[choice][0], text: lines[0] ?? '', tone: choice === 'treat_release' ? 'good' : choice === 'finish' ? 'bad' : 'mixed', lines: lines.slice(1) };
+    set({ game: g });
+    void saveGame(AUTOSAVE, g);
+  },
+  releasePrisoner: (id) => {
+    const g = structuredClone(get().game);
+    if (!releasePrisoner(g, id)) set({ game: g });
+  },
+  joinPrisoner: (id) => {
+    const g = structuredClone(get().game);
+    if (!joinPrisoner(g, id)) set({ game: g });
   },
   setGrid: (on) => {
     const g = structuredClone(get().game);

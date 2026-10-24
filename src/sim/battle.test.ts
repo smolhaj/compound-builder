@@ -106,17 +106,18 @@ describe('the battle at the compound', () => {
 
 
   it('a wounded fighter shoots worse and slower: the hurt start weaker', () => {
-    let fitHits = 0, fitShots = 0, hurtHits = 0, hurtShots = 0;
+    let fitHits = 0, fitShots = 0, hurtHits = 0, hurtShots = 0, fitTime = 0, hurtTime = 0;
     for (let seed = 1; seed <= 25; seed++) {
       const fit = planBattle(fortify(afterHit(seed)), 6, seed);
       const hurtG = fortify(afterHit(seed));
       for (const ps of hurtG.personState) ps.needs.health = 30;
       const hurt = planBattle(hurtG, 6, seed);
+      fitTime += fit.duration; hurtTime += hurt.duration;
       for (const [b, h] of [[fit, true], [hurt, false]] as const) for (const e of b.events) if (e.kind === 'shot' && e.from.startsWith('h_')) {
         if (h) { fitShots++; if (e.hit) fitHits++; } else { hurtShots++; if (e.hit) hurtHits++; }
       }
     }
-    expect(hurtShots).toBeLessThan(fitShots);
+    expect(hurtShots / hurtTime).toBeLessThan(fitShots / fitTime);
     expect(hurtHits / Math.max(1, hurtShots)).toBeLessThan(fitHits / Math.max(1, fitShots));
   });
 
@@ -228,5 +229,55 @@ describe('the battle at the compound', () => {
     }
     expect(escaped).toBeGreaterThan(0);
     expect(without).toBe(0);
+  });
+  it('guns run dry: magazines get changed, tubes reloaded a round at a time, worn guns jam', () => {
+    let reloads = 0, jams = 0, jamsWorn = 0;
+    for (let seed = 1; seed <= 12; seed++) {
+      const g = fortify(afterHit(seed)); for (const gn of g.armory.guns) gn.model = 'marlin_336'; g.armory.ammo['3030'] = 500;
+      const b = planBattle(g, 8, seed, { grenades: 0, rockets: 0 });
+      reloads += b.events.filter(e => e.kind === 'reload' && e.unit.startsWith('h_')).length;
+      jams += b.events.filter(e => e.kind === 'jam' && e.unit.startsWith('h_')).length;
+      const w = fortify(afterHit(seed)); for (const gn of w.armory.guns) gn.condition = 0.2;
+      jamsWorn += planBattle(w, 8, seed, { grenades: 0, rockets: 0 }).events.filter(e => e.kind === 'jam' && e.unit.startsWith('h_')).length;
+    }
+    expect(reloads).toBeGreaterThan(0);
+    expect(jamsWorn).toBeGreaterThan(jams);
+  });
+
+  it('open wounds bleed: a tourniquet or the medic stops it, and some bleed out', () => {
+    let aid = 0, bledOut = 0;
+    for (let seed = 1; seed <= 30; seed++) {
+      const g = afterHit(seed); g.stock.ifak = 4;
+      const b = planBattle(g, 8, seed);
+      aid += b.events.filter(e => e.kind === 'aid').length;
+      // a death with no fatal hit right before it: bled out
+      for (const d of b.events.filter(e => e.kind === 'death')) if (!b.events.some(e => (e.kind === 'shot' || e.kind === 'explosion') && Math.abs(e.t - d.t) < 0.2)) bledOut++;
+    }
+    expect(aid).toBeGreaterThan(0);
+    expect(bledOut).toBeGreaterThan(0);
+  });
+
+  it('desperate looters break sooner than an organized crew late in the collapse', () => {
+    let earlyFled = 0, lateFled = 0;
+    for (let seed = 1; seed <= 30; seed++) {
+      const early = fortify(afterHit(seed));
+      const late = fortify(afterHit(seed)); late.clock.t = late.disaster.hitAt + 400.25;
+      const be = planBattle(early, 6, seed, { grenades: 0, rockets: 0 }), bl = planBattle(late, 6, seed, { grenades: 0, rockets: 0 });
+      if (be.result === 'fled') earlyFled += be.duration < 60 ? 1 : 0;
+      if (bl.result === 'fled') lateFled += bl.duration < 60 ? 1 : 0;
+    }
+    expect(earlyFled).toBeGreaterThan(lateFled);
+  });
+
+  it('night vision gives back the dark: more hits at night without lights', () => {
+    let blind = 0, nv = 0;
+    for (let seed = 1; seed <= 20; seed++) {
+      const g = fortify(afterHit(seed)); g.clock.t = Math.floor(g.clock.t) + 0.8;   // ~1 a.m.
+      const h = (b: PlannedBattle) => b.events.filter(e => e.kind === 'shot' && e.from.startsWith('h_') && e.hit).length / Math.max(1, b.events.filter(e => e.kind === 'shot' && e.from.startsWith('h_')).length);
+      blind += h(planBattle(g, 6, seed, { grenades: 0, rockets: 0 }));
+      const n = fortify(afterHit(seed)); n.clock.t = g.clock.t; n.stock.nvg = 6;
+      nv += h(planBattle(n, 6, seed, { grenades: 0, rockets: 0 }));
+    }
+    expect(nv).toBeGreaterThan(blind);
   });
 });

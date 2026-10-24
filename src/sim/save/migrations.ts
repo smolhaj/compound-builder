@@ -43,6 +43,8 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   // 6 → 7: the escape tunnel (culvert, egress hatch)
   6: s => ({ ...s, version: 7, stock: { culvert: 0, egress_hatch: 0, ...(s.stock as object) } }),
   // 7 → 8: bunker hardening (lead, Faraday mesh, blast valves, HEPA sets; the retrofit job list)
+  // 32 → 33: after the shooting (sim/aftermath.ts): no decision waiting, no prisoners yet
+  32: s => ({ ...s, version: 33, gate: { aftermath: null, prisoners: [], mercy: 0, executed: 0, ...(s.gate as object) } }),
   // 31 → 32: helmets and soft armor (none yet)
   31: s => ({ ...s, version: 32, stock: { helmet: 0, soft_armor: 0, ...(s.stock as object) } }),
   // 30 → 31: livestock, radios, black-market goods (new goods at zero); vehicles, OPSEC, weather, barter and radio state are made on first use
