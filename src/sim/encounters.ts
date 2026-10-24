@@ -14,8 +14,6 @@
  * ever reaches the family through it. Pure and seeded.
  */
 import { mulberry32, pick } from './rng';
-import { gearPosture, softenWound } from './gear';
-import { armed, firepower, spendInFight } from './armory';
 import { forewarned } from './radio';
 import { gearPosture } from './gear';
 import { armed, firepower } from './armory';
