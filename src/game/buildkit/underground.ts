@@ -164,3 +164,56 @@ export function undergroundProblem(def: KitPieceDef, x: number, z: number, rot: 
 export function siteProblem(def: KitPieceDef, x: number, z: number, rot: number, site: SiteQuery, placed: readonly Placed[]): PlaceProblem | null {
   return placementProblem(def, x, z, rot, site, placed) ?? undergroundProblem(def, x, z, rot, site.height, placed);
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// Escape tunnel (an egress-only way out of a bunker)
+// ─────────────────────────────────────────────────────────────────────────
+
+type Pt = [number, number];
+
+/** The four walls of a placed piece in world coordinates, by local side. */
+function walls(p: Placed): Array<{ side: Side; a: Pt; b: Pt }> {
+  const def = KIT[p.kind], hx = def.cellsX * CELL / 2, hz = def.cellsZ * CELL / 2;
+  const w = (lx: number, lz: number): Pt => { const [x, z] = rotQ(lx, lz, p.rot); return [p.x + x, p.z + z]; };
+  return [
+    { side: 'front', a: w(-hx, hz), b: w(hx, hz) }, { side: 'back', a: w(-hx, -hz), b: w(hx, -hz) },
+    { side: 'left', a: w(-hx, -hz), b: w(-hx, hz) }, { side: 'right', a: w(hx, -hz), b: w(hx, hz) },
+  ];
+}
+
+/**
+ * Where a tunnel leaves a bunker room clicked at (x, z): the middle of the
+ * nearest build cell on the nearest wall that has no doorway yet. Null if the
+ * click isn't in a bunker room or every wall already has one.
+ */
+export function tunnelStart(x: number, z: number, placed: readonly Placed[], tunnelStarts: readonly Pt[] = []): { room: Placed; side: Side; pt: Pt } | null {
+  const room = placed.find(p => KIT[p.kind] && isUnderground(KIT[p.kind]) && (() => { const r = rectOf(p); return x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1; })());
+  if (!room) return null;
+  const used = { ...doorsOf(room, placed), ...tunnelDoorsOf(room, tunnelStarts) };
+  let best: { side: Side; pt: Pt; d: number } | null = null;
+  for (const { side, a, b } of walls(room)) {
+    if (used[side] !== undefined) continue;
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1]), n = Math.round(len / CELL);
+    const t = Math.max(0, Math.min(1, ((x - a[0]) * (b[0] - a[0]) + (z - a[1]) * (b[1] - a[1])) / (len * len)));
+    const k = Math.min(n - 1, Math.floor(t * n)), u = (k + 0.5) / n;
+    const pt: Pt = [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u];
+    const d = Math.hypot(pt[0] - x, pt[1] - z);
+    if (!best || d < best.d) best = { side, pt, d };
+  }
+  return best ? { room, side: best.side, pt: best.pt } : null;
+}
+
+/** Doorways tunnels open in a room: tunnels whose first point lies on one of its walls (local position along it). */
+export function tunnelDoorsOf(p: Placed, starts: readonly Pt[]): Partial<Record<Side, number>> {
+  const out: Partial<Record<Side, number>> = {};
+  const def = KIT[p.kind], hx = def.cellsX * CELL / 2, hz = def.cellsZ * CELL / 2;
+  const q = ((p.rot % 4) + 4) % 4;
+  for (const [x, z] of starts) {
+    const [lx, lz] = rotQ(x - p.x, z - p.z, (4 - q) % 4);
+    const on = (v: number, h: number) => Math.abs(Math.abs(v) - h) < 0.02;
+    if (on(lz, hz) && Math.abs(lx) < hx) out[lz > 0 ? 'front' : 'back'] = lx;
+    else if (on(lx, hx) && Math.abs(lz) < hz) out[lx > 0 ? 'right' : 'left'] = lz;
+  }
+  return out;
+}
+

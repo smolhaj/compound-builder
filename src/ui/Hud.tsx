@@ -116,6 +116,14 @@ export function Hud() {
               <div style={{ fontSize: 11, opacity: 0.75 }}>~{usd(costOf(kind))}{own ? ` + ${own}` : ''} · {totalHours(BLUEPRINTS[kind])} h</div>
             </button>;
           })}
+          {(() => {
+            const kind = 'escape_tunnel' as const, len = 50 / 6, tool = `fence:${kind}`;
+            const buy = Object.entries(runBill(kind, len)).map(([material, qty]) => ({ material: material as MaterialId, qty: qty as number }));
+            return <button key={kind} title={PERIMETER[kind].blurb} style={{ ...btn(g.tool === tool), width: '100%', textAlign: 'left', marginBottom: 3, display: 'block' }} onClick={() => g.setTool(g.tool === tool ? null : tool)}>
+              <div>{PERIMETER[kind].name}</div>
+              <div style={{ fontSize: 11, opacity: 0.75 }}>~{usd(orderCost(buy))} for 50 m · {Math.round(runHours(kind, len))} h · opens only from inside</div>
+            </button>;
+          })()}
           <div style={{ ...h3, marginTop: 6 }}>Perimeter (per 100 m)</div>
           {PERIMETER_ORDER.map(kind => {
             const len = 100 / 6, bill = runBill(kind, len);

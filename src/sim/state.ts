@@ -10,7 +10,7 @@ import type { StageId } from './blueprints';
 import type { PerimeterRun } from './perimeter';
 import { emptyUtilities, type Utilities } from './utilities';
 
-export const SAVE_VERSION = 6;
+export const SAVE_VERSION = 7;
 
 /** Starting savings (GDS §1 peacetime money constraint). */
 export const STARTING_MONEY = 30000;

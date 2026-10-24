@@ -276,6 +276,14 @@ export class WaterEdgeRenderer {
     this._scene = scene;
   }
 
+  private _shown = true;
+  /** Hide or show the shore planting (the underground view looks through the ground). */
+  setVisible(v: boolean): void {
+    this._shown = v;
+    for (const s of this._spawned) s.mesh.visible = v;
+    for (const o of this._objs) o.visible = v;
+  }
+
   private _g(): Record<string, THREE.BufferGeometry> {
     if (!this._geos) {
       this._geos = {
@@ -349,6 +357,7 @@ export class WaterEdgeRenderer {
   private _spawn(list: Inst[], geo: THREE.BufferGeometry, mat: THREE.MeshStandardMaterial, name: string, castShadow = false, kind: EdgeKind = 'reed'): void {
     if (list.length === 0) return;
     const mesh = new THREE.InstancedMesh(geo, mat, list.length);
+    mesh.visible = this._shown;
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
     const v = new THREE.Vector3(), s = new THREE.Vector3(), c = new THREE.Color();
     list.forEach((it, i) => {

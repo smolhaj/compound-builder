@@ -170,6 +170,8 @@ export class StreamRenderer {
   }
 
   setSeason(season: string): void { this._edges.setSeason(season); }
+  /** Shore planting on / off (underground view). */
+  setEdgesVisible(v: boolean): void { this._edges.setVisible(v); }
 
   clear(): void {
     if (this._mesh) this._scene.remove(this._mesh);

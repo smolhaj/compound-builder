@@ -90,6 +90,23 @@ function doorLeaf(p: Parts, hx: number, hz: number, alongX: boolean, inward: num
 }
 
 /**
+ * The escape tunnel's door: a blast door shut in its frame, two heavy steel
+ * drop-bars across it in brackets on the room side, a locking wheel. It is
+ * opened from here or not at all; the tunnel side is plain plate.
+ */
+function barredDoor(p: Parts, alongX: boolean, at: number, face: number, sgn: number): void {
+  const w = DOOR_W + 0.01, inner = face - sgn * 0.004;        // the leaf sits in the frame, flush with the room face
+  const put = (g: THREE.BufferGeometry, m: KitMaterialId) => p.add(m, alongX ? g.translate(at, 0, inner) : g.rotateY(Math.PI / 2).translate(inner, 0, at), 'openings');
+  put(box(w, DOOR_H, 0.1 * M, 0, 0, sgn * 0.05 * M), 'paint_green');
+  for (const y of [0.55, 1.45]) {
+    put(box(DOOR_W + 0.26 * M, 0.1 * M, 0.08 * M, 0, y * M, -sgn * 0.06 * M), 'steel');                       // drop-bar
+    for (const e of [-1, 1]) put(box(0.1 * M, 0.2 * M, 0.12 * M, e * (DOOR_W / 2 + 0.08 * M), y * M - 0.05 * M, -sgn * 0.05 * M), 'iron');   // brackets in the wall
+  }
+  const wheel = new THREE.TorusGeometry(0.2 * M, 0.025 * M, 6, 16).translate(0.15 * M, 1.0 * M, -sgn * 0.09 * M);
+  put(wheel, 'steel');
+}
+
+/**
  * Build a vault: floor, walls (with doorways), roof slab, vents, door frames,
  * lights; then the fit-out. The group carries userData.stageAs so its walls
  * go up with the frame stage, and colliders for walls and furniture.
@@ -173,7 +190,8 @@ function vault(def: KitPieceDef, seed: number, opts: BuildOpts, spec: VaultSpec,
       p.add('steel', alongX ? box(0.012, DOOR_H + 0.012, T + 0.006, o, 0, sgn * (hd - T / 2)) : box(T + 0.006, DOOR_H + 0.012, 0.012, sgn * (hw - T / 2), 0, o), 'openings');
     }
     p.add('steel', alongX ? box(DOOR_W + 0.024, 0.012, T + 0.006, at, DOOR_H, sgn * (hd - T / 2)) : box(T + 0.006, 0.012, DOOR_W + 0.024, sgn * (hw - T / 2), DOOR_H, at), 'openings');
-    if (spec.blastDoors) {
+    if (opts.blast?.includes(side)) barredDoor(p, alongX, at, face, sgn);
+    else if (spec.blastDoors) {
       const hinge = at - DOOR_W / 2;
       if (alongX) doorLeaf(p, hinge, face, false, -sgn, true);
       else doorLeaf(p, face, hinge, true, -sgn, true);

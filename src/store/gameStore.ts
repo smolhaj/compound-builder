@@ -27,7 +27,7 @@ export interface GameStore {
   plan: (kind: string, x: number, z: number, rot: number) => void;
   load: (g: GameState) => void;
   /** Lay out a fence / hedge / wall run for the family to build. */
-  planRun: (kind: PerimeterKind, pts: Pt[], gates: Gate[]) => void;
+  planRun: (kind: PerimeterKind, pts: Pt[], gates: Gate[], offLen?: number) => void;
   /** Plumb or wire a building (a fitting job for the family). */
   fit: (buildingId: string, kind: 'plumb' | 'wire') => string | null;
   repairPump: (id: string) => boolean;
@@ -69,9 +69,9 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     void saveGame(AUTOSAVE, g);
   },
   load: (game) => set({ game, selected: null, tool: null }),
-  planRun: (kind, pts, gates) => {
+  planRun: (kind, pts, gates, offLen = 0) => {
     const g = structuredClone(get().game);
-    planRun(g, kind, pts, gates);
+    planRun(g, kind, pts, gates, offLen);
     set({ game: g });
     void saveGame(AUTOSAVE, g);
   },

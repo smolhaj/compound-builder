@@ -64,6 +64,8 @@ export interface BuildOpts {
   /** Underground pieces: doorways by local side (position along that wall) and the ground's height above the floor. */
   doors?: Partial<Record<'front' | 'back' | 'left' | 'right', number>>;
   depth?: number;
+  /** Doorways that take a blast door, barred from the room side (where an escape tunnel leaves). */
+  blast?: Array<'front' | 'back' | 'left' | 'right'>;
 }
 
 /** Collects geometry per layer × material. */
