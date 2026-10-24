@@ -13,7 +13,7 @@ import {
 } from '../sim/finance';
 import type { OrderLine } from '../sim/state';
 import { HARDEN_GOODS, KIT_GOODS, WATCH_GOODS } from '../sim/gear';
-import { ammoLimit, buyAmmo, buyGun, CALIBER, CALIBERS, CLASS_USD, GUN, GUNS, gunPrices, issue, practice, shopOpen, skillOf, takeClass, type Caliber } from '../sim/armory';
+import { ammoLimit, buyAmmo, buyGun, CALIBER, CALIBERS, CLASS_USD, GUN, GUN_GROUP, GUNS, groupOf, gunPrices, issue, NFA_STAMP, practice, shopOpen, skillOf, stateBan, takeClass, type Caliber, type GunGroup, type GunModel } from '../sim/armory';
 
 type Tab = 'build' | 'bunker' | 'water' | 'food' | 'household' | 'fuel' | 'guns' | 'defense' | 'metals' | 'money';
 const TABS: Array<[Tab, string]> = [['build', 'Building'], ['bunker', 'Bunker'], ['water', 'Water & power'], ['food', 'Food'], ['household', 'Medical & household'], ['fuel', 'Fuel & tools'], ['guns', 'Guns & ammo'], ['defense', 'Kit & security'], ['metals', 'Gold & silver'], ['money', 'Money']];
@@ -95,6 +95,9 @@ function Icon({ id }: { id: string }) {
     case 'gun_safe': return g(<><rect x="10" y="6" width="24" height="32" rx="2" fill="#2a2e2a" stroke="#555" /><circle cx="22" cy="20" r="5" fill="none" stroke="#c8a040" strokeWidth="2" /><path d="M28 26 h3" stroke="#c8a040" strokeWidth="2" /></>);
     case 'gun_cleaning': return g(<><path d="M8 34 L36 10" stroke="#8a8a8a" strokeWidth="3" /><rect x="10" y="22" width="8" height="12" rx="1" fill="#3a6a3a" /></>);
     case 'rifle': return g(<path d="M4 24 h26 l6 -3 h4 v4 h-10 l-4 5 h-6 l2 -5 h-18 z" fill="#b08858" stroke="#5a4028" />);
+    case 'ar': return g(<><path d="M3 22 h7 v-2 h20 l4 -1 h7 v3 h-7 v2 h-9 l-3 7 h-4 l1 -7 h-3 l-2 6 h-4 l1 -6 h-8 z" fill="#2a2c2e" stroke="#6a6e72" /><path d="M20 24 l1 8 h3 l-1 -8 z" fill="#3a3c3e" /></>);
+    case 'ak': return g(<><path d="M3 21 h9 v2 h18 l5 -1 h6 v2 h-6 l-2 1 h-8 l-2 6 h-4 l1 -6 h-6 l-1 4 h-4 v-4 h-6 z" fill="#8a5a30" stroke="#4a3018" /><path d="M14 23 h16 v2 h-16 z" fill="#3a3a3c" /><path d="M21 25 q1 5 4 8 l3 -1 q-3 -3 -3 -7 z" fill="#3a3a3c" /></>);
+    case 'smg': return g(<><path d="M6 19 h24 l3 1 h5 v3 h-8 v2 h-6 l-2 7 h-4 l1 -7 h-4 v4 h-3 v-4 h-6 z" fill="#232528" stroke="#6a6e72" /><path d="M19 25 q0 6 2 9 l3 -1 q-2 -3 -2 -8 z" fill="#232528" /></>);
     case 'shotgun': return g(<path d="M4 23 h30 v3 h-12 l-3 5 h-6 l2 -5 h-11 z" fill="#9a7a58" stroke="#5a4028" />);
     case 'handgun': return g(<path d="M12 16 h20 v6 h-10 l-2 10 h-6 l2 -10 h-4 z" fill="#8a8e92" stroke="#c8ccd0" />);
     case 'ammo': return g(<>{[10, 17, 24, 31].map(x => <g key={x}><rect x={x} y="16" width="5" height="18" fill="#c8a040" /><path d={`M${x} 16 q2.5 -6 5 0`} fill="#b87333" /></g>)}</>);
@@ -252,23 +255,30 @@ function Guns({ onMsg }: { onMsg: (m: string | null) => void }) {
   const g = useGameStore(), game = g.game, a = game.armory;
   const open = shopOpen(game), k = gunPrices(game);
   const run = (op: Parameters<typeof g.money>[0]) => onMsg(g.money(op));
-  const icon = (t: string) => (['pistol', 'revolver'].includes(t) ? 'handgun' : t === 'pump' ? 'shotgun' : 'rifle');
+  const icon = (m: GunModel) => m.look ?? (['pistol', 'revolver'].includes(m.type) ? 'handgun' : m.type === 'pump' ? 'shotgun' : 'rifle');
+  const wait = (readyAt: number) => Math.max(0, Math.ceil(readyAt - game.clock.t));
   const owned = (id: string) => a.guns.filter(x => x.model === id).length + a.pending.filter(x => x.model === id).length;
   return <>
     <div style={{ color: open ? C.dim : C.bad, marginBottom: 8 }}>{open ? `The gun shop in town: a background check at the counter${game.site.region === 'pnw' ? ', and the state\'s 10-business-day wait' : ''}. Every sale goes on the shop's records.${k > 1.05 ? ` Panic buying: prices up ${Math.round((k - 1) * 100)} %, ammo limited to ${ammoLimit(game)} boxes.` : ''}` : 'The gun shop is shut. Guns and ammo come by trade now.'}</div>
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 8 }}>
-      {GUNS.map(m => <div key={m.id} style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 10, display: 'flex', gap: 10 }}>
-        <Icon id={icon(m.type)} />
+    {(['hunting', 'handgun', 'semi', 'nfa'] as GunGroup[]).map(grp => <div key={grp}>
+      <div style={{ fontWeight: 600, margin: '12px 0 4px' }}>{GUN_GROUP[grp]}</div>
+      {grp === 'nfa' && <div style={{ fontSize: 11.5, color: C.dim, marginBottom: 6, lineHeight: 1.4 }}>Full auto. Only machine guns registered before May 1986 can be sold to a civilian, so they go at collector prices. Pay the dealer, send ATF Form 4 with fingerprints and a ${NFA_STAMP} tax stamp, and wait four to nine months. At the gate they hit harder and burn three times the ammo.</div>}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 8 }}>
+      {GUNS.filter(m => groupOf(m) === grp).map(m => { const ban = stateBan(game, m); return <div key={m.id} style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 10, display: 'flex', gap: 10, opacity: ban ? 0.55 : 1 }}>
+        <Icon id={icon(m)} />
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}><b>{m.name}</b><span style={{ color: C.gold }}>{usd(m.price * k)}</span></div>
           <div style={{ fontSize: 11.5, color: C.dim, lineHeight: 1.3, margin: '2px 0 5px' }}>{CALIBER[m.cal].name} · holds {m.capacity} · {m.blurb}</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <button style={btn(open, !open)} disabled={!open} onClick={() => run(d => buyGun(d, m.id))}>Buy</button>
+            <button style={btn(open && !ban, !open || !!ban)} disabled={!open || !!ban} onClick={() => run(d => buyGun(d, m.id))}>{m.nfa ? 'Buy + Form 4' : 'Buy'}</button>
+            {ban && <span style={{ fontSize: 11.5, color: C.bad }}>{ban}</span>}
             {owned(m.id) > 0 && <span style={{ fontSize: 11.5, color: C.dim }}>own {owned(m.id)}</span>}
           </div>
         </div>
-      </div>)}
-    </div>
+      </div>; })}
+      </div>
+    </div>)}
+    {a.pending.length > 0 && <div style={{ marginTop: 10 }}>{a.pending.map((p, i) => <div key={i} style={{ fontSize: 12, color: C.dim }}>{GUN[p.model].name}: {p.form4 ? (wait(p.readyAt) > 0 ? `Form 4 pending at the ATF, about ${Math.ceil(wait(p.readyAt) / 30)} month${wait(p.readyAt) > 45 ? 's' : ''} more` : 'approved: waiting at the dealer for the shop to open') : `ready in ${wait(p.readyAt)} days`}</div>)}</div>}
     <div style={{ fontWeight: 600, margin: '14px 0 6px' }}>Ammunition</div>
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8 }}>
       {CALIBERS.map((c: Caliber) => <div key={c} style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
