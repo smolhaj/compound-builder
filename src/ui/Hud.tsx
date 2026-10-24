@@ -30,6 +30,7 @@ import { prices } from '../sim/economy';
 import { livingPerDay } from '../sim/engine';
 import { roman } from '../sim/eras';
 import { canRigMines, rigMines } from '../sim/battle';
+import { canJoin } from '../sim/aftermath';
 import { MILESTONE_COUNT, MILESTONE_NAME } from '../sim/lineage';
 import { daysOfFood, KCAL, needOf } from '../sim/needs';
 import { ANIMALS, feedDemand, winterHay } from '../sim/livestock';
@@ -607,6 +608,18 @@ export function Hud() {
                 ))}
               </Section>
             )}
+            {(game.gate.prisoners?.length ?? 0) > 0 && <Section title="Prisoners">
+              {game.gate.prisoners!.map(p => (
+                <div key={p.id} style={{ marginBottom: 6 }}>
+                  <Row label={p.name} value={`${Math.floor(game.clock.t) - p.since} days`} title={`Wound ${Math.round(p.sev)} · trust ${Math.round(p.trust)}${p.talked ? ' · has talked' : ''}`} />
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button style={{ ...btn(), flex: 1 }} onClick={() => g.releasePrisoner(p.id)}>Let him go</button>
+                    <button style={{ ...btn(), flex: 1, opacity: canJoin(game, p) ? 1 : 0.4 }} disabled={!canJoin(game, p)} title="After a month, healed, and once he trusts you (70+)" onClick={() => g.joinPrisoner(p.id)}>Let him join</button>
+                  </div>
+                </div>
+              ))}
+              <Note>Each eats about 2,200 kcal a day. Fewer adults to watch them, likelier they slip away.</Note>
+            </Section>}
             {canRigMines(game) && <Section title="Mines">
               <Row label="Rigged on the approaches" value={Math.floor(game.stock.mines ?? 0)} title="They go off as raiders cross the band outside the line" />
               <button style={{ ...btn(), width: '100%' }} title="Four buried charges on pressure switches, from a hardware kit and a can of fuel" onClick={() => { const why = g.money(d => rigMines(d)); if (why) alert(why); }}>Rig 4 mines (1 hardware kit, 1 can of fuel)</button>

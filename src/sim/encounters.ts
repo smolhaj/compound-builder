@@ -18,6 +18,7 @@ import { forewarned } from './radio';
 import { gearPosture } from './gear';
 import { armed, firepower } from './armory';
 import { applyBattle, planBattle } from './battle';
+import type { Aftermath, Prisoner } from './aftermath';
 import { isHome } from './blueprints';
 import { log } from './economy';
 import { isFinished } from './construction';
@@ -182,11 +183,20 @@ export interface GateState {
   history: Array<{ day: number; kind: EncounterKind; stance: Stance; tone: Outcome['tone'] }>;
   /** The last fight at the compound, for playback (optional; not migrated). */
   battle?: Battle;
+  /** Raiders left wounded / dead on the drive after a fight the family won: a decision is waiting (sim/aftermath.ts). */
+  aftermath?: Aftermath | null;
+  /** Raiders held prisoner. */
+  prisoners?: Prisoner[];
+  /** Tallies: wounded raiders patched up and let go; executed. */
+  mercy?: number;
+  executed?: number;
+  /** A prisoner told you how his crew comes in: they're spotted sooner. */
+  forewarned?: boolean;
 }
 
 export function newGate(seed: number): GateState {
   const r = mulberry32(seed * 811 + 5);
-  return { pending: null, card: null, humanity: 70, tookIn: 0, turnedAway: 0, raidsHeld: 0, raidsLost: 0, government: r() < 0.5 ? 'help' : 'hindrance', day: -1, next: -1, history: [] };
+  return { pending: null, card: null, humanity: 70, tookIn: 0, turnedAway: 0, raidsHeld: 0, raidsLost: 0, government: r() < 0.5 ? 'help' : 'hindrance', day: -1, next: -1, history: [], aftermath: null, prisoners: [] };
 }
 
 const FIRST = ['Alex', 'Jordan', 'Casey', 'Morgan', 'Riley', 'Jamie', 'Drew', 'Quinn', 'Avery', 'Rowan', 'Elena', 'Marcus', 'Dolores', 'Hector', 'Lena', 'Walt', 'Tomas', 'Bea'];

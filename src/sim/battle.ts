@@ -26,6 +26,7 @@ import { isHome } from './blueprints';
 import { isFinished } from './construction';
 import { PERIMETER, runFinished } from './perimeter';
 import { mulberry32 } from './rng';
+import { leaveAftermath } from './aftermath';
 import { hourOf, type GameState } from './state';
 
 type Post = NonNullable<BattleUnit['post']>;
@@ -64,6 +65,8 @@ export interface PlannedBattle extends Battle {
   /** Explosives left on raiders who went down (recoverable after a repelled raid). */
   dropped: { grenades: number; rpg_rounds: number };
   result: 'repelled' | 'fled' | 'breached' | 'overrun';
+  /** Raiders who went down and couldn't get away: wounded, dead. */
+  leftBehind?: { wounded: number; dead: number };
 }
 
 interface Fighter {
@@ -233,7 +236,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
   let ifaks = n('ifak');
 
   // ── detection, alarm, lights ──
-  const detection = Math.min(100, 25 + g.detection + Math.max(0, ...fightersP.map(({ p }) => p.skills.hunter)) * 4);
+  const detection = Math.min(100, 25 + (s.gate.forewarned ? 20 : 0) + g.detection + Math.max(0, ...fightersP.map(({ p }) => p.skills.hunter)) * 4);
   // by day, people on watch see a group coming up the drive a couple of hundred meters out; at night it's what the gear hears and sees
   const darkBlind = night && !lightsOn && !n('nvg') && !n('thermal') && !n('thermal_cam');
   const detectAt = Math.max(lineR + 2, (6 + detection * 0.24) * (darkBlind ? 0.7 : 1), night ? 0 : 18 + detection * 0.06);
@@ -592,7 +595,8 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
   ev.push({ t: duration, kind: 'end', result: end });
   ev.sort((a, b) => a.t - b.t);
   const dropped = { grenades: R.filter(f => f.out).reduce((a, f) => a + f.grenades, 0), rpg_rounds: R.filter(f => f.out).reduce((a, f) => a + f.rockets, 0) };
-  return { night, units, events: ev, duration, spent, minesUsed: mines - minesLeft, dropped, result: end };
+  const leftBehind = { wounded: R.filter(f => f.out && !f.dead).length, dead: R.filter(f => f.dead).length };
+  return { night, units, events: ev, duration, spent, minesUsed: mines - minesLeft, dropped, result: end, leftBehind };
 }
 
 /** Write a fought battle into the game: wounds, deaths, ammo, mines, loot, the tallies. */
@@ -641,6 +645,7 @@ export function applyBattle(s: GameState, b: Battle): string[] {
     if (lost.length) out.push(`Lost: ${lost.join(', ')}`);
   } else {
     s.gate.raidsHeld++;
+    if (pb.leftBehind) leaveAftermath(s, pb.leftBehind.wounded, pb.leftBehind.dead);
     const d = pb.dropped;
     if (d && (d.grenades || d.rpg_rounds)) {
       s.stock.grenades = (s.stock.grenades ?? 0) + d.grenades;
