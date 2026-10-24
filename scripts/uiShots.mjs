@@ -56,6 +56,15 @@ try {
   await frames(4);
   await page.screenshot({ path: `${outDir}/04-three-weeks-after.png` });
   console.log('04');
+  // on until someone comes to the gate
+  await page.evaluate(() => { const G = window.__cb.game; for (let i = 0; i < 200 && !G.getState().game.gate.pending; i++) G.getState().advance(1); });
+  await frames(4);
+  await page.screenshot({ path: `${outDir}/05-at-the-gate.png` });
+  console.log('05');
+  await page.evaluate(() => { const G = window.__cb.game; const e = G.getState().game.gate.pending; if (e) G.getState().answer(e.stances[0]); });
+  await frames(3);
+  await page.screenshot({ path: `${outDir}/06-what-happened.png` });
+  console.log('06');
 } finally {
   await browser.close();
   vite.kill();

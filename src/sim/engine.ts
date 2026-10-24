@@ -12,6 +12,8 @@ import { addFitWork, balanceDay, nextFit, plant } from './utilities';
 import { addHardenWork, nextHardenJob } from './hardening';
 import { updateDisaster } from './disaster';
 import { liveDay, workFactor } from './needs';
+import { gateDay, neighborGossip } from './encounters';
+import { mulberry32 } from './rng';
 import { log } from './economy';
 import { dayIndex } from './state';
 import { buildRate } from './family';
@@ -66,6 +68,12 @@ function subStep(s: GameState): void {
   if (dayIndex(s.clock.t) !== s.disaster.day) {
     const before = s.disaster.phase;
     for (const line of updateDisaster(s.disaster, s.clock.t, s.seed)) log(s, line);
+    if (s.disaster.phase === 'warning') {
+      const gossip = neighborGossip(s, mulberry32(s.seed * 17 + dayIndex(s.clock.t)));
+      if (gossip) { s.disaster.news.push({ t: s.clock.t, text: gossip, tone: 1 }); log(s, gossip); }
+    }
+    const e = gateDay(s);
+    if (e) log(s, `${e.title}.`);
     if (before !== 'impact' && s.disaster.phase === 'impact') {
       for (const ps of s.personState) if (ps.employed) {
         ps.employed = false;
