@@ -69,8 +69,8 @@ function furnishCabin(c: FurnishCtx): void {
   I({ x: 0.38, z: -0.33, rot: Math.PI + 0.35 }, a => Furniture.armchair(a, 'quilt_blue'));
   const o = c.parts.opts;
   I({ x: left + 0.05, z: -0.48, rot: Math.PI / 2 }, a => Furniture.counter(a, 2.5, 0.62, !!o.plumbed));
-  I({ x: left + 0.02, z: -0.6, rot: Math.PI / 2 }, a => Furniture.wallShelf(a, 1.1, 1.45, 2, 'jars'), false);
-  I({ x: -0.3, z: back + 0.03 }, a => Furniture.shelfUnit(a, 1.2, 1.9, 'jars'));
+  I({ x: left + 0.02, z: -0.6, rot: Math.PI / 2 }, a => Furniture.wallShelf(a, 1.1, 1.45, 2, 'lids'), false);
+  I({ x: -0.3, z: back + 0.03 }, a => Furniture.shelfUnit(a, 1.2, 1.9, 'lids'));
   if (o.wired) I({ x: left + 0.065, z: -0.17, rot: Math.PI / 2 }, a => Furniture.fridge(a));
   else I({ x: left + 0.05, z: -0.17 }, a => Furniture.barrel(a));
   if (o.wired) for (const [x, z] of [[-0.25, 0.05], [0.24, 0.4]]) I({ x, z, y: c.yE - 0.03 }, a => Furniture.pendant(a, 0.5), false);

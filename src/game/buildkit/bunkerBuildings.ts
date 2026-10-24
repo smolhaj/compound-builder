@@ -433,7 +433,7 @@ function hatch(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
 function corridor(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
   return vault(def, seed, opts, { ...CONCRETE, vents: [[0, -0.3]] }, c => {
     c.pack([
-      { len: 1.2 * M, dep: 0.35 * M, fn: a => Furniture.shelfUnit(a, 1.2, 1.9, 'jars'), sides: ['left', 'right'] },
+      { len: 1.2 * M, dep: 0.35 * M, fn: a => Furniture.shelfUnit(a, 1.2, 1.9, 'lids'), sides: ['left', 'right'] },
       { len: 1.2 * M, dep: 0.4 * M, fn: a => Furniture.bench(a, 1.2), sides: ['right', 'left'] },
     ]);
     c.hang(['left', 'right'], 1.0 * M, 0, a => Furniture.coatPegs(a, 1.0), 0.8);
@@ -447,8 +447,8 @@ function container(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Grou
     c.pack([
       { len: 2.0 * M, dep: 0.95 * M, along: true, fn: a => Furniture.bunk(a, 'quilt_red', 'quilt_blue'), sides: ['left'] },
       { len: 2.0 * M, dep: 0.95 * M, along: true, fn: a => Furniture.bunk(a, 'quilt_blue', 'quilt_red'), sides: ['right'] },
-      { len: 1.0 * M, dep: 0.35 * M, fn: a => Furniture.shelfUnit(a, 1.0, 1.9, 'jars'), sides: ['front', 'left', 'right'] },
-      { len: 1.0 * M, dep: 0.35 * M, fn: a => Furniture.shelfUnit(a, 1.0, 1.9, 'jars'), sides: ['left', 'right'] },
+      { len: 1.0 * M, dep: 0.35 * M, fn: a => Furniture.shelfUnit(a, 1.0, 1.9, 'lids'), sides: ['front', 'left', 'right'] },
+      { len: 1.0 * M, dep: 0.35 * M, fn: a => Furniture.shelfUnit(a, 1.0, 1.9, 'lids'), sides: ['left', 'right'] },
       { len: 0.6 * M, dep: 0.6 * M, fn: a => Furniture.barrel(a), sides: ['right', 'left'] },
     ]);
     c.I(0, 0.05, 0, a => Furniture.table(a, 0.8, 1.4));
@@ -490,8 +490,8 @@ function galley(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
   return vault(def, seed, opts, { ...CONCRETE, vents: [[0.3, -0.3]] }, c => {
     c.pack([
       { len: 2.4 * M, dep: 0.6 * M, fn: a => { Furniture.counter(a, 2.4, 0.3, true); campStove(a); }, sides: ['back', 'left', 'right', 'front'] },
-      { len: 1.0 * M, dep: 0.35 * M, fn: a => Furniture.shelfUnit(a, 1.0, 1.9, 'jars'), sides: ['left', 'right', 'front', 'back'] },
-      { len: 1.0 * M, dep: 0.35 * M, fn: a => Furniture.shelfUnit(a, 1.0, 1.9, 'jars'), sides: ['right', 'left', 'front', 'back'] },
+      { len: 1.0 * M, dep: 0.35 * M, fn: a => Furniture.shelfUnit(a, 1.0, 1.9, 'lids'), sides: ['left', 'right', 'front', 'back'] },
+      { len: 1.0 * M, dep: 0.35 * M, fn: a => Furniture.shelfUnit(a, 1.0, 1.9, 'lids'), sides: ['right', 'left', 'front', 'back'] },
       { len: 0.6 * M, dep: 0.6 * M, fn: a => Furniture.barrel(a), sides: ['front', 'right', 'left'] },
       { len: 0.6 * M, dep: 0.6 * M, fn: a => Furniture.barrel(a), sides: ['front', 'left', 'right'] },
     ]);
@@ -515,7 +515,7 @@ function campStove(a: Add): void {
 
 function stores(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
   return vault(def, seed, opts, { ...CONCRETE, vents: [[0, 0.3]] }, c => {
-    const shelf = (): WallItem => ({ len: 1.0 * M, dep: 0.45 * M, fn: a => { Furniture.shelfUnit(a, 1.0, 2.0, 'jars'); cans(a); } });
+    const shelf = (): WallItem => ({ len: 1.0 * M, dep: 0.45 * M, fn: a => { Furniture.shelfUnit(a, 1.0, 2.0, 'lids'); cans(a); } });
     c.pack([shelf(), shelf(), shelf(), shelf(), shelf(), shelf(), shelf(), shelf()]);
     c.pack([
       { len: 0.6 * M, dep: 0.6 * M, fn: a => Furniture.barrel(a) },
@@ -579,7 +579,7 @@ function medical(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group 
       { len: 2.0 * M, dep: 0.95 * M, along: true, fn: a => Furniture.bed(a, false, 'linen'), sides: ['left', 'right', 'back', 'front'] },
       { len: 2.0 * M, dep: 0.95 * M, along: true, fn: a => Furniture.single(a, 'quilt_blue'), sides: ['right', 'left', 'back', 'front'] },
       { len: 1.2 * M, dep: 0.6 * M, fn: a => Furniture.counter(a, 1.2, 0.4, true), sides: ['back', 'front', 'left', 'right'] },
-      { len: 1.0 * M, dep: 0.45 * M, fn: a => { Furniture.shelfUnit(a, 1.0, 1.9, 'jars'); }, sides: ['front', 'back', 'left', 'right'] },
+      { len: 1.0 * M, dep: 0.45 * M, fn: a => { Furniture.shelfUnit(a, 1.0, 1.9, 'lids'); }, sides: ['front', 'back', 'left', 'right'] },
     ]);
     c.C(0.12, -0.05, 0, a => ivPole(a), 0.9);
     c.C(-0.15, 0.15, 0, a => a('paint_green', cyl(0.1 * M, 1.2 * M, 0, 0, 0, 10)), 0.9);   // oxygen bottle

@@ -34,6 +34,8 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   // 6 → 7: the escape tunnel (culvert, egress hatch)
   6: s => ({ ...s, version: 7, stock: { culvert: 0, egress_hatch: 0, ...(s.stock as object) } }),
   // 7 → 8: bunker hardening (lead, Faraday mesh, blast valves, HEPA sets; the retrofit job list)
+  // 15 → 16: field seed and canning jars; the rolling year of food grown vs needed
+  15: s => ({ ...s, version: 16, stock: { seed: 0, lids: 0, ...(s.stock as object) }, stats: { grownYear: 0, needYear: 0, ...(s.stats as object) } }),
   // 14 → 15: neighbor land
   14: s => ({ ...s, version: 15, land: newLand(s.seed as number, (s.neighbors as Array<{ id: string }>).map(n => n.id)) }),
   // 13 → 14: run stats and the ending

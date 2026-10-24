@@ -214,8 +214,9 @@ function makeArrival(r: () => number, id: string, day: number, seed: number): En
 /** How often someone comes (days between), from law and order outside and how much the place shows. */
 function cadence(s: GameState, p: Posture): number {
   const law = s.disaster.tracks.law;
-  const base = 30 - 24 * (1 - law);
-  return Math.max(3, base * (1.3 - p.visibility / 200));
+  // playtest: every 3–6 days was relentless; real accounts are weeks between visits, more as order fails
+  const base = 45 - 30 * (1 - law);
+  return Math.max(10, base * (1.3 - p.visibility / 200));
 }
 
 /**

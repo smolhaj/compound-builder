@@ -114,7 +114,7 @@ export function falloutDay(s: GameState): string[] {
   const out: string[] = [];
   const sheltering = h0 < SHELTER_DAYS * 24;
   const fin = s.structures.filter(isFinished);
-  const cleanWater = fin.some(st => st.kind === 'well_drilled' || st.kind === 'well_hand' || st.kind === 'cistern' || st.kind === 'water_tower');
+  const cleanWater = !s.utilities.hauling && fin.some(st => st.kind === 'well_drilled' || st.kind === 'well_hand' || st.kind === 'cistern' || st.kind === 'water_tower');
   const day = h0 / 24;
   s.people.forEach((p, i) => {
     const n = s.personState[i]?.needs;
