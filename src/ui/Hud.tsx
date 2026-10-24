@@ -16,7 +16,7 @@ import { bestShelter, doseRate, isNuclear, SHELTER_DAYS } from '../sim/nuclear';
 import { DISASTERS, TRACKS, TRACK_NAME, type DisasterKind } from '../sim/disaster';
 import { prices } from '../sim/economy';
 import { LIVING_PER_DAY } from '../sim/engine';
-import { daysOfFood } from '../sim/needs';
+import { daysOfFood, KCAL, NEED_ADULT, NEED_KID } from '../sim/needs';
 import { NEIGHBOR_BLURB } from '../sim/encounters';
 import { acresOf, buyProblem, LAND_NAME, priceOf } from '../sim/land';
 import { HARDEN, HARDEN_IDS, type TierDef, hardenCost, hardenProblem, isBunkerRoom, protectionOf, tierOf } from '../sim/hardening';
@@ -114,7 +114,7 @@ export function Hud() {
       </div>
 
       {/* Left: build menu + construction */}
-      <div style={{ ...panel, position: 'fixed', left: 10, top: 10, width: 230, maxHeight: 'calc(100vh - 80px)', overflowY: 'auto' }}>
+      <div style={{ ...panel, position: 'fixed', left: 10, top: 10, width: 230, maxHeight: 'calc(100vh - 140px)', overflowY: 'auto' }}>
         <Section title="Build">
           {KIT_ORDER.map(kind => {
             const own = ownNeeds(kind);
@@ -294,6 +294,7 @@ export function Hud() {
             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Fuel</span><span>{game.stock.fuel * FUEL_UNIT_L} L</span></div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Water in / used</span><span>{Math.round(r.waterL)} / {Math.round(r.useL)} L</span></div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Stored</span><span>{Math.round(r.storedL)} L</span></div>
+            {game.utilities.hauling && <div style={{ color: '#e8c880' }}>Hauling water from the creek by the bucket: a well or cistern would end it.</div>}
             {(r.shortKwh > 0.5 || r.shortL > 0) && <div style={{ color: '#f0a070' }}>{r.shortKwh > 0.5 ? 'Power ran short. ' : ''}{r.shortL > 0 ? 'Water ran short.' : ''}</div>}
           </Section>;
         })()}
@@ -334,6 +335,7 @@ export function Hud() {
             return <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 4, fontSize: 12, marginTop: 2 }}>
               <span title={`${acresOf(p.rect)} acres of ${LAND_NAME[p.kind]}`}>{p.name[4].toUpperCase() + p.name.slice(5)}: {LAND_NAME[p.kind]}{p.owner === 'you' ? '' : `, ${n ? n.name : '?'}`}{p.forSale && p.owner !== 'you' ? <span style={{ color: '#e8c880' }}> · for sale</span> : null}</span>
               {p.owner === 'you' ? <span style={{ color: '#a8d080' }}>yours</span>
+                : why === 'nobody sells land for cash now' ? <span style={{ opacity: 0.6 }}>no cash sales</span>
                 : <button style={btn(!why)} disabled={!!why} title={why ?? `Buy ${acresOf(p.rect)} acres`} onClick={() => g.buy(p.id)}>{usd(priceOf(game, p))}</button>}
             </div>;
           })}
@@ -342,10 +344,23 @@ export function Hud() {
           {(() => {
             const f = game.food, d = daysOfFood(game);
             return <>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Put by</span><span>{d === Infinity ? '—' : d >= 365 ? `${(d / 365).toFixed(1)} years` : `${Math.floor(d)} days`} of food</span></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Put by</span><span>{d === Infinity ? '—' : d >= 365 ? `${(d / 365).toFixed(1)} years` : `${Math.floor(d)} ${Math.floor(d) === 1 ? 'day' : 'days'}`} of food</span></div>
               {f.producedKcal > 0 && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Grown yesterday</span><span>{Math.round(f.producedKcal).toLocaleString('en-US')} kcal</span></div>}
               {!f.fromStores && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Ate / needed</span><span style={{ color: f.ateKcal < f.needKcal * 0.95 ? '#f08060' : undefined }}>{Math.round(f.ateKcal).toLocaleString('en-US')} / {Math.round(f.needKcal).toLocaleString('en-US')} kcal</span></div>}
               {f.fromStores && <div style={{ opacity: 0.65, fontSize: 11.5 }}>Groceries from town for now. Stock canned food and bulk staples (Order…) for when the stores close.</div>}
+              {(() => {
+                // a nudge when food is short and the trucks still (or again) bring it: in the warning signs, or after
+                const warned = !!game.disaster.kind && game.clock.t >= game.disaster.warnAt;
+                const short = warned && (f.fromStores ? d < 180 : d < 30);
+                if (!short) return null;
+                const perDay = game.people.reduce((a, p, i) => a + (game.personState[i]?.needs.died == null ? (p.kid ? NEED_KID : NEED_ADULT) : 0), 0);
+                const lines = [{ material: 'staples' as MaterialId, qty: Math.max(1, Math.ceil(90 * perDay / KCAL.staples)) }];
+                const why = orderProblem(game, lines);
+                return <div style={{ marginTop: 4, color: '#f0b070', fontSize: 12 }}>
+                  {f.fromStores ? 'The warning signs are out: if the stores close, this is all there is.' : 'The trucks are running: buy food while you can.'}
+                  <button style={{ ...btn(!why), display: 'block', marginTop: 3 }} disabled={!!why} title={why ?? undefined} onClick={() => g.order(lines)}>Order three months of staples ({usd(orderCost(lines, prices(game)))})</button>
+                </div>;
+              })()}
             </>;
           })()}
         </Section>
