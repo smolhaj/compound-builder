@@ -61,6 +61,7 @@ try {
       // per-shot resets: the page is shared by the whole set
       window.__cb.qa.pose = null;
       st.setBuildingView?.('full');
+      st.setUnderground?.(false);
       const c = s.cam;
       if (c.eye) {
         // eye level: stand at (x, z), look toward (lx, lz)

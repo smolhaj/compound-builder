@@ -1,5 +1,7 @@
 import * as THREE from 'three';
-import { KIT, PROBLEM_TEXT, placementProblem, snapCentre, footprint, type SiteQuery } from './buildkit/kit';
+import { KIT, PROBLEM_TEXT, snapCentre, footprint, type SiteQuery } from './buildkit/kit';
+import { DEPTH, isUnderground, previewDatum, siteProblem } from './buildkit/underground';
+import { useWorldStore } from '../store/worldStore';
 import { buildGhost } from './buildkit/buildings';
 import type { HomesteadWorld } from './HomesteadWorld';
 import { PARCEL_SIZE } from './parcel/parcelTerrain';
@@ -66,6 +68,7 @@ export class PlacementTool {
     this._kind = kind;
     if (this._ghost) { this._scene.remove(this._ghost); this._ghost.traverse(o => (o as THREE.Mesh).geometry?.dispose()); this._ghost = null; }
     if (kind) {
+      if (isUnderground(KIT[kind])) useWorldStore.getState().setUnderground(true);
       this._ghost = buildGhost(KIT[kind]);
       this._ghost.traverse(o => { if ((o as THREE.Mesh).isMesh) { (o as THREE.Mesh).castShadow = false; (o as THREE.Mesh).renderOrder = 5; } });
       this._ghost.visible = false;
@@ -101,7 +104,7 @@ export class PlacementTool {
       for (let i = 0; i < n; i++) {
         const a = (i / n) * Math.PI * 2;
         const [sx, sz] = snapCentre(def, x + Math.cos(a) * r, z + Math.sin(a) * r, rot);
-        if (placementProblem(def, sx, sz, rot, this._site, placed) === null) return [sx, sz];
+        if (siteProblem(def, sx, sz, rot, this._site, placed) === null) return [sx, sz];
       }
     }
     return null;
@@ -124,10 +127,13 @@ export class PlacementTool {
     const def = KIT[kind];
     const [x, z] = snapCentre(def, this._at[0], this._at[1], this._rot);
     this._at = [x, z];
-    const problem = placementProblem(def, x, z, this._rot, this._site, useGameStore.getState().game.structures);
+    const placed = useGameStore.getState().game.structures;
+    const problem = siteProblem(def, x, z, this._rot, this._site, placed);
     this._ok = problem === null;
     const fp = footprint(def, x, z, this._rot);
-    g.position.set(x, this._world.parcel.padHeight(fp.x0, fp.z0, fp.x1, fp.z1), z);
+    // a bunker room's ghost hangs at its bunker's floor level, under the see-through ground
+    const y = isUnderground(def) ? previewDatum(def, x, z, this._rot, this._site.height, placed) ?? this._site.height(x, z) - DEPTH : this._world.parcel.padHeight(fp.x0, fp.z0, fp.x1, fp.z1);
+    g.position.set(x, y, z);
     g.rotation.y = this._rot * Math.PI / 2;
     g.visible = true;
     const m = this._ok ? this._okMat : this._badMat;

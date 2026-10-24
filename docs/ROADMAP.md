@@ -23,7 +23,7 @@ Legend: **[user]** asked for by the user · **[gds]** already in the GDS · **[i
 - **[idea]** Defensible space for wildfire: firebreaks, cleared zones, a firefighting water tank + pump.
 
 ## Underground (GDS §2.2 underground layer)
-- **[user]** Underground bunkers, fully buried, with a separate build view (floor toggle).
+- **[user]** Underground bunkers, fully buried, with a separate build view (floor toggle). **Built (v1):** hatch / stairwell entrances, tunnel, container, bunkroom, galley, storeroom, plant room, medical, comms & armoury; underground view; open pits while digging; spoil → berms.
 - **[user]** Bunker entrances inside a walled compound (hidden hatch in a shed / under a floor).
 - **[gds]** Root cellar, cistern, tunnels between buildings.
 - **[idea]** Escape tunnel to a hidden exit in the woods; storm cellar; fallout shelter with NBC air filtration,

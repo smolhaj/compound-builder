@@ -11,6 +11,7 @@ import { buildCabinLayers } from './cabinGeometry';
 import { box, buildGabled, CUT_H, Parts, showStage, type BuildOpts, type FurnishCtx } from './shell';
 import { Clutter } from './clutter';
 import { UTILITY_BUILDERS } from './utilityBuildings';
+import { BUNKER_BUILDERS } from './bunkerBuildings';
 
 /** Seats for evenings at home: local x, z and the point the sitter faces. */
 export type Seat = [number, number, number, number];
@@ -78,7 +79,7 @@ function workshop(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group
     I({ x: 0.52, z: 0.62, rot: Math.PI }, a => Furniture.generator(a));
     I({ x: -0.22, z: 0.4 }, a => Furniture.atv(a));
     // two hanging shop lights
-    for (const z of [-0.45, 0.35]) c.parts.add('lamp', box(0.2, 0.012, 0.03, 0, c.yE - 0.06, z), 'interior');
+    for (const z of [-0.45, 0.35]) c.parts.add('lamp', box(0.2, 0.012, 0.03, 0, c.yE - 0.06, z), 'decor');
     // a shop in use: a chair half built on the sawhorses, the radio, coffee, rags, a broom, boots
     const benchY = c.y0 + 0.004 + 0.92 * M;
     c.C({ x: 0.28, z: 0.22, rot: Math.PI / 2 }, a => Clutter.sawhorsesProject(a), 0.85);
@@ -291,7 +292,7 @@ function logHouse(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group
       I({ x: left + 0.065, z: 0.06, rot: Math.PI / 2 }, a => Furniture.fridge(a));
       for (const [x, z] of [[-0.32, 0.55], [-0.32, 0.72], [0.35, 0.78], [-0.4, -0.65], [0.45, -0.8]]) I({ x, z, y: z < -0.3 ? yE - 0.07 : yE + 0.2 }, a => Furniture.pendant(a, z < -0.3 ? 0.5 : 1.6), false);
     }
-    if (o.plumbed) I({ x: 0.24, z: 0.08 }, a => Furniture.waterHeater(a));
+    if (o.plumbed) I({ x: LH.px + 0.06, z: LH.bathZ - 0.06, rot: Math.PI }, a => Furniture.waterHeater(a));
     I({ x: left + 0.02, z: 0.8, rot: Math.PI / 2 }, a => Furniture.wallShelf(a, 1.5, 1.5, 2, 'jars'), false);
     I({ x: left + 0.06, z: 0.22, rot: Math.PI / 2 }, a => Furniture.cookstove(a));
     I({ x: -0.32, z: 0.62, rot: Math.PI / 2 }, a => Furniture.island(a, 1.8));
@@ -408,6 +409,7 @@ const BUILDERS: Record<string, (def: KitPieceDef, seed?: number, opts?: BuildOpt
   garden,
   log_house: logHouse,
   ...UTILITY_BUILDERS,
+  ...BUNKER_BUILDERS,
 };
 
 /** Every layer of a kit piece (construction shows them stage by stage). */
@@ -423,7 +425,7 @@ export function buildLayers(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): T
 export function buildGhost(def: KitPieceDef): THREE.Group {
   const g = buildLayers(def);
   showStage(g, 5, 0);
-  for (const m of [...g.children]) if (!m.visible || ['cutwalls', 'interior', 'loft'].includes(m.userData.layer)) { g.remove(m); (m as THREE.Mesh).geometry?.dispose(); }
+  for (const m of [...g.children]) if (!m.visible || ['cutwalls', 'interior', 'decor', 'loft'].includes(m.userData.layer)) { g.remove(m); (m as THREE.Mesh).geometry?.dispose(); }
   return g;
 }
 

@@ -68,6 +68,10 @@ export class ForestRenderer {
 
   /** Every mesh drawn (raycast / QA). */
   get meshes(): THREE.InstancedMesh[] { return this._sets.flatMap(s => s.meshes); }
+  private _shown = true;
+  /** Hide or show the whole forest (the underground view). */
+  set visible(v: boolean) { this._shown = v; for (const s of this._sets) s.visible = v; }
+  get visible(): boolean { return this._shown; }
 
   build(specs: readonly ForestTreeSpec[], quality: Quality, palettes: Partial<Record<ForestKind, Palette>> = {}): void {
     this.clear();

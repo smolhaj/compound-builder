@@ -347,6 +347,11 @@ export interface TourContext {
   /** The site's walk test (null = nothing blocks). */
   getBlocked: () => SiteBlockedFn | null;
   heightAt: HeightFn;
+  /**
+   * After each walk step: a place the walker is carried to instead (a ladder
+   * down a hatch, back up), or null. Lets the site keep levels (a bunker).
+   */
+  portal?: (x: number, z: number) => { x: number; z: number } | null;
   /** Current buildings (name / age) keyed by id — boxes come from the scene. */
   describeBuildings: () => Array<Omit<TourBuildingInfo, 'box'>>;
   /** Fly bounds: the site rectangle (the drone may roam 70 units beyond it). */
@@ -578,6 +583,8 @@ export class TourController {
       // Kill velocity into walls so we don't "stick" and then lurch
       if (dt > 0) { this._vel.x = (p.x - this._pos.x) / dt; this._vel.z = (p.z - this._pos.z) / dt; }
       this._pos.x = p.x; this._pos.z = p.z;
+      const to = this._ctx.portal?.(p.x, p.z);
+      if (to) { this._pos.x = to.x; this._pos.z = to.z; this._vel.set(0, 0, 0); }
     } else {
       this._pos.x += this._vel.x * dt; this._pos.z += this._vel.z * dt;
     }

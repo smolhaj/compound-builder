@@ -19,11 +19,12 @@ import { rng } from './clutter';
 
 /** Build-order layers: each is drawn (and grown) separately as construction proceeds. */
 export type BuildLayer = 'stakes' | 'foundation' | 'deck' | 'frame' | 'rafters' | 'roof' | 'walls' | 'openings' | 'chimney' | 'scaffold'
-  | 'interior' | 'loft' | 'cutwalls';
-export const BUILD_LAYERS: readonly BuildLayer[] = ['stakes', 'foundation', 'deck', 'frame', 'rafters', 'roof', 'walls', 'openings', 'chimney', 'scaffold', 'interior', 'loft', 'cutwalls'];
+  | 'interior' | 'decor' | 'loft' | 'cutwalls';
+export const BUILD_LAYERS: readonly BuildLayer[] = ['stakes', 'foundation', 'deck', 'frame', 'rafters', 'roof', 'walls', 'openings', 'chimney', 'scaffold', 'interior', 'decor', 'loft', 'cutwalls'];
 
 /** Layers hidden in the cutaway view (upper floor, roof, full-height walls). */
-export const CUTAWAY_HIDE: readonly BuildLayer[] = ['roof', 'walls', 'openings', 'loft', 'rafters'];
+/** (`decor` is what hangs on the walls above the cut: pictures, lamps, curtains, signs.) */
+export const CUTAWAY_HIDE: readonly BuildLayer[] = ['roof', 'walls', 'openings', 'loft', 'rafters', 'decor'];
 /** Layers drawn see-through in the x-ray view. */
 export const XRAY_LAYERS: readonly BuildLayer[] = ['roof', 'walls', 'openings', 'chimney', 'rafters'];
 /** Waist-high cut for the cutaway view (above the floor). */
@@ -58,7 +59,12 @@ export function worldUV(g: THREE.BufferGeometry): THREE.BufferGeometry {
 }
 
 /** Services fitted to a building. */
-export interface BuildOpts { plumbed?: boolean; wired?: boolean; septic?: boolean }
+export interface BuildOpts {
+  plumbed?: boolean; wired?: boolean; septic?: boolean;
+  /** Underground pieces: doorways by local side (position along that wall) and the ground's height above the floor. */
+  doors?: Partial<Record<'front' | 'back' | 'left' | 'right', number>>;
+  depth?: number;
+}
 
 /** Collects geometry per layer × material. */
 export class Parts {
@@ -96,7 +102,7 @@ export class Parts {
       if (!g) continue;
       g.computeBoundingSphere();
       const mesh = new THREE.Mesh(g, kitMaterial(m));
-      mesh.castShadow = m !== 'glass' && m !== 'string' && m !== 'wire_mesh';
+      mesh.castShadow = m !== 'glass' && m !== 'glow' && m !== 'string' && m !== 'wire_mesh';
       mesh.receiveShadow = true;
       mesh.name = `bldg_${layer}_${m}`;
       mesh.userData = { layer, vertexCount: g.getAttribute('position').count };
@@ -135,6 +141,10 @@ export function windowAt(parts: Parts, cx: number, cz: number, y: number, nx: nu
   // the face point is the wall's outer surface; pull the frame back to the wall centre line
   const c = -wallT / 2;
   parts.add('glass', bx(w, h, 0.006, 0, y, c + out - 0.006));
+  // lamplight seen from outside: a one-sided glow just outside the glass (from inside you look out into the night)
+  const glow = new THREE.PlaneGeometry(w, h).rotateY(alongX ? (nz > 0 ? 0 : Math.PI) : (nx > 0 ? Math.PI / 2 : -Math.PI / 2));
+  const o = c + out - 0.002;
+  parts.add('glow', glow.translate(cx + nx * o, y + h / 2, cz + nz * o));
   parts.add(trim, bx(w + 2 * t, t, 0.016, 0, y + h, c + out));
   parts.add(trim, bx(w + 2 * t, t, 0.016, 0, y - t, c + out));
   parts.add(trim, bx(t, h, 0.016, -w / 2 - t / 2, y, c + out));
@@ -178,6 +188,7 @@ function gablePane(parts: Parts, poly: ReadonlyArray<[number, number]>, z: numbe
   const glass = new THREE.ShapeGeometry(sh).translate(0, yE, z + out - nz * 0.002);
   if (nz < 0) glass.rotateY(Math.PI).translate(0, 0, 2 * z);
   parts.add('glass', glass);
+  parts.add('glow', glass.clone().translate(0, 0, nz * 0.003));
   // frame along every edge
   for (let i = 0; i < poly.length; i++) {
     const [ax, ay] = poly[i], [bx, by] = poly[(i + 1) % poly.length];
@@ -239,7 +250,7 @@ export function layerFractions(stage: number, f: number, supplied: boolean): Rec
   for (const l of BUILD_LAYERS) r[l] = 0;
   if (stage >= 5) {
     // cutwalls are drawn whole; the view (cutaway or not) decides whether they show
-    for (const l of ['foundation', 'deck', 'roof', 'walls', 'openings', 'chimney', 'interior', 'loft', 'cutwalls'] as BuildLayer[]) r[l] = 1;
+    for (const l of ['foundation', 'deck', 'roof', 'walls', 'openings', 'chimney', 'interior', 'decor', 'loft', 'cutwalls'] as BuildLayer[]) r[l] = 1;
     return r;
   }
   r.stakes = stage <= 2 ? 1 : 0;
@@ -255,6 +266,7 @@ export function layerFractions(stage: number, f: number, supplied: boolean): Rec
   // moving in: the loft floor goes down with the finish work, the furniture comes last
   r.loft = stage === 4 ? Math.max(0, (k - 0.5) / 0.5) : 0;
   r.interior = stage === 4 ? Math.max(0, (k - 0.75) / 0.25) : 0;
+  r.decor = r.interior;
   return r;
 }
 
@@ -268,7 +280,7 @@ export function showStage(group: THREE.Group, stage: number, f: number, supplied
     const m = o as THREE.Mesh;
     if (!m.isMesh) continue;            // lights etc. are managed by the world
     const layer = m.userData.layer as BuildLayer;
-    const k = stage >= 5 && keep.includes(layer) ? 1 : fr[stageAs[layer] ?? layer];
+    const k = stage >= 5 ? (keep.includes(layer) ? 1 : fr[layer]) : fr[stageAs[layer] ?? layer];
     m.visible = k > 0.001;
     const n = m.userData.vertexCount as number;
     // whole triangles only, so partial layers end on a finished piece edge
@@ -530,8 +542,8 @@ export function buildGabled(s: GabledSpec, furnish?: (c: FurnishCtx) => void, pa
         const rot = nx !== 0 ? (nx > 0 ? Math.PI / 2 : -Math.PI / 2) : (nz > 0 ? 0 : Math.PI);
         const inner = (g: THREE.BufferGeometry) => g.rotateY(rot).translate(fx, 0, fz);
         const pw = Math.min(0.06, w * 0.3);
-        for (const e of [-1, 1]) parts.add(s.curtains, inner(box(pw, h + 0.045, 0.012, e * (w / 2 + pw / 2 - 0.012), y0 + sill - 0.03, -T - 0.012)), 'interior');
-        parts.add('iron', inner(new THREE.CylinderGeometry(0.003, 0.003, w + 2 * pw + 0.02, 6).rotateZ(Math.PI / 2).translate(0, y0 + sill + h + 0.02, -T - 0.016)), 'interior');
+        for (const e of [-1, 1]) parts.add(s.curtains, inner(box(pw, h + 0.045, 0.012, e * (w / 2 + pw / 2 - 0.012), y0 + sill - 0.03, -T - 0.012)), 'decor');
+        parts.add('iron', inner(new THREE.CylinderGeometry(0.003, 0.003, w + 2 * pw + 0.02, 6).rotateZ(Math.PI / 2).translate(0, y0 + sill + h + 0.02, -T - 0.016)), 'decor');
       }
       continue;
     }
@@ -605,7 +617,7 @@ export function buildGabled(s: GabledSpec, furnish?: (c: FurnishCtx) => void, pa
       parts, spec: s, hw, hd, y0, yE,
       left: -hw + T, right: hw - T, front: hd - T, back: -hd + T,
       rnd: parts.rnd,
-      C: (p, fn, prob = 0.75) => { if (parts.rnd() < prob) piece(parts.sink, 'interior', { ...p, y: p.y ?? y0 + 0.004 }, fn, false); },
+      C: (p, fn, prob = 0.75) => { if (parts.rnd() < prob) piece(parts.sink, (p.y ?? y0) > y0 + CUT_H ? 'decor' : 'interior', { ...p, y: p.y ?? y0 + 0.004 }, fn, false); },
       I: (p, fn, solid = true) => { const c = piece(parts.sink, 'interior', { ...p, y: p.y ?? y0 + 0.004 }, fn, solid); if (c) parts.collide(c); },
       L: (p, fn, solid = false) => { const c = piece(parts.sink, 'loft', { ...p, y: p.y ?? yE }, fn, solid); if (c) parts.collide(c); },
       partition: (ax, az, bx, bz, openings = [], mat = s.inner ?? 'pine_panel', h = s.wallH) => {

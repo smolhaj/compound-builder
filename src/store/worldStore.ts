@@ -35,6 +35,9 @@ export interface WorldState {
   buildingView: BuildingView;
   /** Sightline overlay: off / exposure from the road / from the ridge / night lights / viewshed from a point. */
   sightMode: 'off' | 'road' | 'ridge' | 'night' | 'viewshed';
+  /** Underground view (bunker rooms; the ground goes see-through). */
+  underground: boolean;
+  setUnderground: (on: boolean) => void;
   setSightMode: (m: WorldState['sightMode']) => void;
   setBuildingView: (v: BuildingView) => void;
   /** Cinematic tour caption card (null = none). */
@@ -67,6 +70,8 @@ export const useWorldStore = create<WorldState>()(subscribeWithSelector((set) =>
   cameraMode: 'diorama',
   buildingView: 'full',
   sightMode: 'off',
+  underground: false,
+  setUnderground: (underground) => set({ underground }),
   setSightMode: (sightMode) => set({ sightMode }),
   setBuildingView: (buildingView) => set({ buildingView }),
   tourCaption: null,

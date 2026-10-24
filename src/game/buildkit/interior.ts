@@ -527,7 +527,12 @@ export const Furniture = {
   waterHeater(add: Add): void {
     add('enamel', cyl(0.25 * M, 1.4 * M, 0, 0.05 * M, 0, 14));
     add('steel', cyl(0.25 * M, 0.05 * M, 0, 1.45 * M, 0, 14));
-    for (const x of [-0.08, 0.08]) add(x < 0 ? 'blue_tank' : 'paint_red', cyl(0.025 * M, 1.0 * M, x * M, 1.5 * M, 0, 6));
+    // cold in, hot out: up from the top, then back into the wall behind (−z)
+    for (const x of [-0.08, 0.08]) {
+      const m: KitMaterialId = x < 0 ? 'blue_tank' : 'paint_red';
+      add(m, cyl(0.02 * M, 0.4 * M, x * M, 1.5 * M, 0, 6));
+      add(m, new THREE.CylinderGeometry(0.02 * M, 0.02 * M, 0.32 * M, 6).rotateX(Math.PI / 2).translate(x * M, 1.9 * M, -0.16 * M));
+    }
   },
   /** A pendant lamp hanging `drop` m from the ceiling (place at the ceiling height). */
   pendant(add: Add, drop = 0.6): void {

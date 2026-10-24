@@ -15,6 +15,9 @@ import { DOOR, WIN } from './buildkit/shell';
 import { CABIN } from './buildkit/cabinGeometry';
 import { PERIMETER } from '../sim/perimeter';
 import { FIG_SCALE } from '../engine/world/people/figureKit';
+import { VAULT_H } from './buildkit/bunkerBuildings';
+import { DEPTH, MIN_COVER, ROOF_TOP } from './buildkit/underground';
+import { Equipment } from './buildkit/utilityBuildings';
 
 const PERSON_H = 0.28;
 /** Metres of a world-unit length. */
@@ -67,6 +70,16 @@ describe('human scale', () => {
     const dog = size(a => Clutter.dogBed(a, true)); expect(dog.w).toBeLessThan(1.0);
     expect(size(a => Clutter.laundryLine(a)).h).toBeGreaterThan(1.7);
     expect(size(a => Clutter.bike(a)).d).toBeLessThan(1.5);
+  });
+
+  it('bunkers: standing room, a real depth of earth, kit at life size', () => {
+    expect(m(VAULT_H)).toBeGreaterThanOrEqual(2.4);
+    expect(m(VAULT_H)).toBeGreaterThan(m(PERSON_H) + 0.6);
+    expect(m(DEPTH)).toBeGreaterThan(4); expect(m(DEPTH)).toBeLessThan(6);
+    expect(m(DEPTH - ROOF_TOP)).toBeGreaterThan(m(MIN_COVER));
+    expect(m(MIN_COVER)).toBeGreaterThan(0.6);
+    expect(size(a => Equipment.extinguisher(a)).h).toBeLessThan(0.75);
+    expect(size(a => Equipment.batteryRack(a, 4)).h).toBeLessThan(1.8);
   });
 
   it('perimeter heights read right next to a person', () => {

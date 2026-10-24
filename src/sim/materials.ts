@@ -4,7 +4,8 @@
  * Mountain West retail (lumber yard / farm store), rounded.
  */
 export type MaterialId = 'lumber' | 'logs' | 'firewood' | 'fieldstone' | 'concrete' | 'roofing' | 'hardware' | 'wire' | 'seedlings' | 'container'
-  | 'pipe' | 'cable' | 'fixtures' | 'pump' | 'drilling' | 'solar_panel' | 'battery' | 'inverter' | 'generator' | 'fuel' | 'tank' | 'septic_tank';
+  | 'pipe' | 'cable' | 'fixtures' | 'pump' | 'drilling' | 'solar_panel' | 'battery' | 'inverter' | 'generator' | 'fuel' | 'tank' | 'septic_tank'
+  | 'rebar' | 'membrane' | 'excavator' | 'blast_door' | 'nbc_filter' | 'spoil';
 
 export interface MaterialDef {
   id: MaterialId;
@@ -38,6 +39,12 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   fuel: { id: 'fuel', name: 'Fuel', unit: '20 L jerry can', price: 26 },
   tank: { id: 'tank', name: 'Water tank', unit: '10,000 L poly tank', price: 2400 },
   septic_tank: { id: 'septic_tank', name: 'Septic tank', unit: '4,000 L concrete tank + leach pipe', price: 2100 },
+  rebar: { id: 'rebar', name: 'Rebar', unit: 'bundle (20 × 6 m #4 bars, ties)', price: 110 },
+  membrane: { id: 'membrane', name: 'Waterproofing membrane', unit: 'roll (≈ 20 m²)', price: 340 },
+  excavator: { id: 'excavator', name: 'Excavator hire', unit: 'day (mini-excavator, delivered)', price: 520 },
+  blast_door: { id: 'blast_door', name: 'Blast door', unit: 'steel blast door and frame', price: 3200 },
+  nbc_filter: { id: 'nbc_filter', name: 'NBC air filter', unit: 'filtration unit, hand crank, blast valves', price: 5800 },
+  spoil: { id: 'spoil', name: 'Spoil (dug earth)', unit: 'm³', price: null },
 };
 
 export const MATERIAL_IDS = Object.keys(MATERIALS) as MaterialId[];
@@ -45,7 +52,7 @@ export const MATERIAL_IDS = Object.keys(MATERIALS) as MaterialId[];
 export type Stock = Record<MaterialId, number>;
 
 export function emptyStock(): Stock {
-  return { lumber: 0, logs: 0, firewood: 0, fieldstone: 0, concrete: 0, roofing: 0, hardware: 0, wire: 0, seedlings: 0, container: 0, pipe: 0, cable: 0, fixtures: 0, pump: 0, drilling: 0, solar_panel: 0, battery: 0, inverter: 0, generator: 0, fuel: 0, tank: 0, septic_tank: 0 };
+  return { lumber: 0, logs: 0, firewood: 0, fieldstone: 0, concrete: 0, roofing: 0, hardware: 0, wire: 0, seedlings: 0, container: 0, pipe: 0, cable: 0, fixtures: 0, pump: 0, drilling: 0, solar_panel: 0, battery: 0, inverter: 0, generator: 0, fuel: 0, tank: 0, septic_tank: 0, rebar: 0, membrane: 0, excavator: 0, blast_door: 0, nbc_filter: 0, spoil: 0 };
 }
 
 /** Cost of a bill of materials at retail (unbuyable items count 0). */

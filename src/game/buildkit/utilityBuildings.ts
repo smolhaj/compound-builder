@@ -65,7 +65,10 @@ export const Equipment = {
     for (let k = 0; k < 3; k++) add('paint_green', box(0.12 * M, 0.1 * M, 0.08 * M, (-0.3 + k * 0.15) * M, 1.48 * M, 0));       // fuse boxes
     add('iron', box(0.22 * M, 0.12 * M, 0.15 * M, 0.25 * M, 1.48 * M, 0));
   },
-  inverterWall(add: Add): void {
+  /** Inverter, charge controller and disconnect on a plywood backboard (its back at z = 0, on the wall). */
+  inverterWall(wallAdd: Add): void {
+    const add: Add = (m, g) => wallAdd(m, g.translate(0, 0, 0.12 * M));
+    add('wood_mid', box(1.75 * M, 1.0 * M, 0.02 * M, 0.05 * M, 0.75 * M, -0.11 * M));
     add('iron', box(0.55 * M, 0.75 * M, 0.2 * M, 0, 1.0 * M, 0));
     add('lamp', box(0.15 * M, 0.08 * M, 0.01 * M, 0, 1.55 * M, 0.1 * M));
     add('steel', box(0.4 * M, 0.5 * M, 0.15 * M, 0.7 * M, 1.1 * M, 0));                          // charge controller
@@ -126,7 +129,7 @@ function batteryShed(_def: KitPieceDef, seed = 1): THREE.Group {
   return shed({ W: 0.42, D: 0.42, outer: 'board_batten', front: [{ kind: 'door', at: 0.08, w: 0.14, h: 0.33 }] }, c => {
     c.I({ x: -0.085, z: c.back + 0.05 }, a => Equipment.batteryRack(a, 4, 1.0));
     c.I({ x: 0.085, z: c.back + 0.05 }, a => Equipment.batteryRack(a, 3, 1.0));
-    c.I({ x: c.left + 0.02, z: 0.0, rot: Math.PI / 2 }, a => Equipment.inverterWall(a), false);
+    c.I({ x: c.left + 0.002, z: 0.0, rot: Math.PI / 2 }, a => Equipment.inverterWall(a), false);
     c.I({ x: c.right - 0.03, z: 0.02, rot: -Math.PI / 2 }, a => Equipment.partsShelf(a), false);
     c.I({ x: 0.04, z: 0.06 }, a => Furniture.stool(a));
     c.C({ x: c.right - 0.002, z: 0.13, y: c.y0 + 0.5 * M, rot: -Math.PI / 2 }, a => Equipment.extinguisher(a), 1);
@@ -134,7 +137,7 @@ function batteryShed(_def: KitPieceDef, seed = 1): THREE.Group {
     c.C({ x: 0.0, z: c.back + 0.002, y: c.y0 + 1.9 * M }, a => Equipment.vent(a), 1);
     c.C({ x: c.right - 0.002, z: -0.1, y: c.y0 + 1.2 * M, rot: -Math.PI / 2 }, a => Clutter.calendar(a), 0.6);
     c.C({ x: -0.1, z: 0.12 }, a => Clutter.broom(a), 0.5);
-    c.parts.add('lamp', box(0.12, 0.01, 0.025, 0, c.yE - 0.03, 0), 'interior');
+    c.parts.add('lamp', box(0.12, 0.01, 0.025, 0, c.yE - 0.03, 0), 'decor');
   }, seed);
 }
 
@@ -142,7 +145,7 @@ function generatorShed(_def: KitPieceDef, seed = 1): THREE.Group {
   return shed({ W: 0.42, D: 0.38, outer: 'metal_siding', front: [{ kind: 'bay', at: 0, w: 0.3, h: 0.34 }] }, c => {
     c.I({ x: -0.05, z: -0.04 }, a => Furniture.generator(a));
     c.I({ x: 0.05, z: c.back + 0.06 }, a => Equipment.fuelDrums(a));
-    c.I({ x: c.right - 0.02, z: -0.05, rot: -Math.PI / 2 }, a => Equipment.inverterWall(a), false);
+    c.I({ x: c.right - 0.002, z: -0.05, rot: -Math.PI / 2 }, a => Equipment.inverterWall(a), false);
     c.C({ x: c.left + 0.002, z: 0.1, y: c.y0 + 0.5 * M, rot: Math.PI / 2 }, a => Equipment.extinguisher(a), 1);
     c.C({ x: c.left + 0.002, z: -0.08, y: c.y0 + 1.6 * M, rot: Math.PI / 2 }, a => Equipment.sign(a), 1);
     c.C({ x: c.left + 0.05, z: c.back + 0.04 }, a => { for (let k = 0; k < 3; k++) a('paint_yellow', box(0.14 * M, 0.3 * M, 0.1 * M, k * 0.16 * M, 0, 0)); }, 0.8);   // oil jugs
@@ -160,11 +163,19 @@ function cistern(_def: KitPieceDef, seed = 1): THREE.Group {
   for (let k = 1; k < 5; k++) p.add('poly_tank', new THREE.TorusGeometry(r + 0.003, 0.004, 4, 24).rotateX(Math.PI / 2).translate(0, 0.02 + k * h / 5, 0), 'frame');
   p.add('poly_tank', new THREE.ConeGeometry(r, 0.06, 24).translate(0, 0.02 + h + 0.03, 0), 'roof');
   p.add('iron', cyl(0.03, 0.04, 0, 0.02 + h + 0.05, 0, 10), 'roof');
-  // inlet from the downspouts, the tap and the overflow
-  p.add('steel', box(0.02, 0.02, 0.2, 0.1, 0.02 + h - 0.04, r + 0.08), 'openings');
+  // inlet: the buried line from the house gutters comes up beside the tank, over the top, through a first-flush filter
+  const pr = 0.05 * M, top = 0.02 + h;
+  p.add('iron', cyl(pr, top + 0.02, 0.06, 0, r + 0.03, 8), 'openings');
+  p.add('iron', box(pr * 2, pr * 2, 0.06, 0.06, top + 0.02 - pr, r + 0.0), 'openings');
+  p.add('enamel', cyl(0.07 * M, 0.5 * M, 0.06, top - 0.5 * M, r + 0.03, 8), 'openings');               // first-flush chamber
+  // the tap on a short stand-pipe, and the overflow elbowing down to a splash stone
   p.add('steel', cyl(0.012, 0.06, r * 0.7, 0.04, r * 0.7, 6), 'openings');
-  p.add('steel', box(0.25, 0.015, 0.015, r + 0.1, 0.02 + h * 0.85, 0), 'openings');
-  for (let k = 0; k < 8; k++) p.add('steel', box(0.06, 0.008, 0.008, -r - 0.012, 0.05 + k * 0.045, 0), 'openings');   // ladder rungs
+  p.add('iron', box(0.06, pr * 2, pr * 2, r + 0.03, top - 0.03, 0), 'openings');
+  p.add('iron', cyl(pr, top - 0.03, r + 0.06, 0, 0, 8), 'openings');
+  p.add('fieldstone', box(0.08, 0.015, 0.08, r + 0.06, -0.005, 0), 'openings');
+  // fixed ladder up the side: two rails and rungs
+  for (const sz of [-1, 1]) p.add('steel', box(0.008, top + 0.06, 0.008, -r - 0.016, 0, sz * 0.03), 'openings');
+  for (let k = 0; k < 8; k++) p.add('steel', box(0.008, 0.008, 0.06, -r - 0.016, 0.05 + k * 0.045, 0), 'openings');
   p.collide({ x0: -r, z0: -r, x1: r, z1: r });
   const g = p.finish();
   g.userData.keep = ['frame', 'rafters'];
@@ -184,10 +195,26 @@ function waterTower(_def: KitPieceDef, seed = 1): THREE.Group {
     const ax = a[0] * legX, az = a[1] * legX, bx = b[0] * legX, bz = b[1] * legX;
     p.add('wood_mid', box(Math.hypot(bx - ax, bz - az), 0.02, 0.02, 0, 0, 0).rotateY(-Math.atan2(bz - az, bx - ax)).translate((ax + bx) / 2, y, (az + bz) / 2), 'frame');
   }
-  p.add('deck', box(legX * 2 + 0.14, 0.025, legX * 2 + 0.14, 0, deck, 0), 'rafters');
-  for (const sx of [-1, 1]) {
-    p.add('wood_mid', box(legX * 2 + 0.14, 0.02, 0.02, 0, deck + 0.17, sx * (legX + 0.07)), 'rafters');
-    p.add('wood_mid', box(0.02, 0.02, legX * 2 + 0.14, sx * (legX + 0.07), deck + 0.17, 0), 'rafters');
+  // X-braces on each face between the two girts
+  for (const [a, b] of [[[-1, -1], [1, -1]], [[-1, 1], [1, 1]], [[-1, -1], [-1, 1]], [[1, -1], [1, 1]]] as const) {
+    const ax = a[0] * legX, az = a[1] * legX, bx = b[0] * legX, bz = b[1] * legX;
+    const run = Math.hypot(bx - ax, bz - az), rise = 0.3, len = Math.hypot(run, rise), yaw = -Math.atan2(bz - az, bx - ax);
+    // nudge each brace a little outboard of the legs so it reads on the face
+    const ox = (a[0] === b[0] ? a[0] : 0) * 0.025, oz = (a[1] === b[1] ? a[1] : 0) * 0.025;
+    for (const sgn of [-1, 1]) p.add('wood_mid', box(len, 0.016, 0.016, 0, 0, 0).rotateZ(sgn * Math.atan2(rise, run)).rotateY(yaw).translate((ax + bx) / 2 + ox, 0.4, (az + bz) / 2 + oz), 'frame');
+  }
+  const half = legX + 0.07;
+  p.add('deck', box(half * 2, 0.025, half * 2, 0, deck, 0), 'rafters');
+  // lookout rail: posts at the corners and mid-sides, a top rail and a mid rail
+  for (const sx of [-1, 0, 1]) for (const sz of [-1, 0, 1]) {
+    if (sx === 0 && sz === 0) continue;
+    if (sz === 1 && sx === 0) continue;                    // the ladder comes up here
+    p.add('wood_dark', box(0.02, 0.18, 0.02, sx * (half - 0.01), deck + 0.025, sz * (half - 0.01)), 'rafters');
+  }
+  for (const y of [0.09, 0.18]) for (const sx of [-1, 1]) {
+    p.add('wood_mid', box(0.016, 0.016, half * 2, sx * (half - 0.01), deck + y, 0), 'rafters');
+    if (sx < 0) p.add('wood_mid', box(half * 2, 0.016, 0.016, 0, deck + y, -(half - 0.01)), 'rafters');
+    else for (const ex of [-1, 1]) p.add('wood_mid', box(half - 0.07, 0.016, 0.016, ex * (half + 0.07) / 2, deck + y, half - 0.01), 'rafters');
   }
   // the tank on the deck
   const r = 1.8 * M / 2, h = 1.6 * M;

@@ -90,6 +90,11 @@ export class WorldScene {
   /** World-space point + radius the shadow frustum is fitted around. */
   private readonly _shadowFocus = { x: 0, z: 0, radius: 60 };
   private _hemiLight: THREE.HemisphereLight;
+  /**
+   * How much outdoor light reaches the camera's surroundings (1 outside; near 0 underground,
+   * where rooms are lit only by their own lamps). Scales sun, sky, fill, rim and the environment.
+   */
+  outdoorLight = 1;
   private _fillLight: THREE.DirectionalLight;
   private _rimLight: THREE.DirectionalLight;
   private _daySkyColor = 0x87ceeb;
@@ -509,6 +514,11 @@ export class WorldScene {
     }
 
     this.scene.environmentIntensity = 0.10 + (1 - wn) * 0.24;
+    if (this.outdoorLight < 0.999) {
+      const k = this.outdoorLight;
+      this._sunLight.intensity *= k; this._hemiLight.intensity *= k; this._fillLight.intensity *= k; this._rimLight.intensity *= k;
+      this.scene.environmentIntensity *= k;
+    }
     if (this._bloomPass) this._bloomPass.threshold = 0.85 + (1 - wn) * 0.75;
     this._applyGradeForTime();
 

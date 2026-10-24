@@ -60,6 +60,7 @@ export function addWork(s: GameState, st: Structure, personHours: number): numbe
     st.done += use;
     left -= use;
     if (st.done >= stage.hours - 1e-9) {
+      for (const [k, n] of Object.entries(stage.yields ?? {}) as Array<[keyof Stock, number]>) s.stock[k] += n;
       st.stage++;
       st.done = 0;
       st.supplied = false;
