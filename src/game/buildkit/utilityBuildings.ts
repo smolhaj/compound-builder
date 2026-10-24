@@ -125,6 +125,27 @@ function wellDrilled(_def: KitPieceDef, seed = 1): THREE.Group {
   }, seed);
 }
 
+/** 1.8 × 2.4 m filtration shed: sediment → carbon → UV on the wall, the pressure tank beside them. */
+function filtrationShed(_def: KitPieceDef, seed = 1): THREE.Group {
+  return shed({ W: 1.8 * M, D: 2.4 * M, outer: 'board_batten', front: [{ kind: 'door', at: 0.03, w: 0.14, h: 0.33 }] }, c => {
+    const z = c.back + 0.035;
+    c.I({ x: -0.09, z: c.back + 0.06 }, a => Equipment.pressureTank(a));
+    // the filter train: two big-blue housings (sediment, carbon) and the UV chamber, joined by a header pipe
+    c.I({ x: 0.0, z }, a => {
+      for (const [k, mat] of [[0, 'blue_tank'], [1, 'enamel']] as const) {
+        const x = k * 0.22 * M;
+        a(mat, cyl(0.09 * M, 0.55 * M, x, 0.55 * M, 0, 12));
+        a('steel', cyl(0.1 * M, 0.08 * M, x, 1.1 * M, 0, 12));
+      }
+      a('steel', cyl(0.06 * M, 0.9 * M, 0, 0, 0, 10).rotateZ(Math.PI / 2).translate(0.55 * M + 0.45 * M, 1.05 * M, 0));   // UV chamber
+      a('lamp', box(0.12 * M, 0.08 * M, 0.04 * M, 0.95 * M, 1.4 * M, 0.04 * M));                                         // UV controller
+      a('iron', box(0.9 * M, 0.04 * M, 0.04 * M, 0.35 * M, 1.22 * M, 0));                                                  // header
+    }, false);
+    c.C({ x: c.right - 0.03, z: 0.1 }, a => Clutter.bucket(a), 0.7);
+    c.C({ x: c.left + 0.002, z: 0.05, y: c.y0 + 1.4 * M, rot: Math.PI / 2 }, a => Equipment.sign(a), 0.8);
+  }, seed);
+}
+
 function batteryShed(_def: KitPieceDef, seed = 1): THREE.Group {
   return shed({ W: 0.42, D: 0.42, outer: 'board_batten', front: [{ kind: 'door', at: 0.08, w: 0.14, h: 0.33 }] }, c => {
     c.I({ x: -0.085, z: c.back + 0.05 }, a => Equipment.batteryRack(a, 4, 1.0));
@@ -302,6 +323,6 @@ function septic(def: KitPieceDef, seed = 1): THREE.Group {
 }
 
 export const UTILITY_BUILDERS: Record<string, (def: KitPieceDef, seed?: number) => THREE.Group> = {
-  well_hand: wellHand, well_drilled: wellDrilled, cistern, water_tower: waterTower,
+  well_hand: wellHand, well_drilled: wellDrilled, filtration_shed: filtrationShed, cistern, water_tower: waterTower,
   solar_array: solarArray, battery_shed: batteryShed, generator_shed: generatorShed, septic,
 };

@@ -21,7 +21,7 @@ import { buyLicense, hasLicense, inSeason, lawful, TAG_USD, type License } from 
 import { chimneyState, greenRicks, SEASON_DAYS, SWEEP_USD } from '../sim/upkeep';
 import { countyWorks, needsPermit, permitFee, premium, yearlyTax } from '../sim/paperwork';
 import { DRIVE_PER_FT, driveQuote, fixBill, fixBlocked, fixDef, hookupProblem, pendingFixes, POLE_PER_FT, powerQuote } from '../sim/improvements';
-import { BLUEPRINTS, totalBill, totalHours } from '../sim/blueprints';
+import { BLUEPRINTS, homeBeds, totalBill, totalHours } from '../sim/blueprints';
 import { BUNKER_ORDER, KIT, UTILITY_ORDER } from '../game/buildkit/kit';
 import { FIT, fitProblem, plant, serviceOf, FUEL_UNIT_L, UTILITY, SPARE_FOR, storageCapacity } from '../sim/utilities';
 import { bestShelter, doseRate, isNuclear, SHELTER_DAYS } from '../sim/nuclear';
@@ -118,7 +118,7 @@ function Item({ name, cost, sub, on, off, title, click }: { name: string; cost: 
 
 /** The build menu's groups (kit pieces by what they are for). */
 const BUILD_GROUPS: Array<[string, string, readonly string[]]> = [
-  ['home', 'Home & work', ['timber_cabin', 'log_house', 'outhouse', 'workshop', 'barn']],
+  ['home', 'Home & work', ['timber_cabin', 'log_house', 'cottage', 'outhouse', 'workshop', 'metal_garage', 'barn']],
   ['food', 'Food', ['garden', 'field', 'chicken_coop', 'root_cellar']],
   ['water', 'Water & power', UTILITY_ORDER],
 ];
@@ -210,7 +210,7 @@ export function Hud() {
         <div style={{ overflowY: 'auto', flex: 1, paddingRight: 2 }}>
           {leftTab === 'build' && <>
             {BUILD_GROUPS.map(([gid, title, kinds]) => (
-              <Group key={gid} id={gid} title={title}>
+              <Group key={gid} id={gid} title={title} extra={gid === 'home' ? `beds ${homeBeds(game)} · ${game.people.length} people` : undefined}>
                 {kinds.map(kind => {
                   const own = ownNeeds(kind), no = planProblem(game, kind), extra = kind === 'well_drilled' ? drillExtra(game.site) : 0;
                   return <Item key={kind} name={KIT[kind].name} cost={`~${usd(costOf(kind) + extra)}`} sub={`${totalHours(BLUEPRINTS[kind])} h${own ? ` · + ${own}` : ''}${kind === 'well_drilled' ? ` · water at ${game.site.gwDepth} m` : ''}${needsPermit(kind) && game.paper.permits && countyWorks(game) ? ` · permit ${usd(permitFee(game, kind))}` : ''}`}
@@ -356,7 +356,7 @@ export function Hud() {
           {leftTab === 'log' && game.log.slice(-14).reverse().map((e, i) => <div key={i} style={{ padding: '3px 0', borderBottom: `1px solid ${LINE}`, opacity: 1 - i * 0.04 }}>{e.text}</div>)}
         </div>
         {g.tool && <div style={{ borderTop: `1px solid ${LINE}`, marginTop: 6, paddingTop: 6 }}>
-          <Note tone={g.toolProblem ? 'warn' : undefined}>{g.toolProblem ?? (g.tool === 'fell' ? 'Point at a tree · click marks or unmarks · Esc stops' : g.tool.startsWith('fence:') ? 'Click corners · Shift-click the line for a gate · Enter lays it out · Backspace undoes · Esc cancels' : 'Click to stake it out · R rotates · Esc cancels')}</Note>
+          <Note tone={g.toolProblem ? 'warn' : undefined}>{g.toolProblem ?? (g.tool === 'fell' ? 'Point at a tree · click marks or unmarks · Esc stops' : g.tool.startsWith('fence:') ? 'Click corners · Shift-click the line for a vehicle gate (Shift+Alt: a pedestrian gate) · Enter lays it out · Backspace undoes · Esc cancels' : 'Click to stake it out · R rotates · Esc cancels')}</Note>
         </div>}
       </div>
 
