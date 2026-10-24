@@ -47,7 +47,11 @@ export function solidSpans(run: Pick<PerimeterRun, 'pts' | 'gates'>, built: numb
 }
 
 /** Geometry of one run (merged per material), in world coordinates. */
-export function buildRun(run: PerimeterRun, ground: Ground, t: number): THREE.Group {
+/**
+ * `under` says whether a point is under a building: pipe and cable trenches
+ * stop at its wall and their marker posts stand outside it.
+ */
+export function buildRun(run: PerimeterRun, ground: Ground, t: number, under: (x: number, z: number) => boolean = () => false): THREE.Group {
   const bits = new Map<KitMaterialId, THREE.BufferGeometry[]>();
   const add = (m: KitMaterialId, g: THREE.BufferGeometry) => { let l = bits.get(m); if (!l) bits.set(m, l = []); l.push(worldUV(g)); };
   const def = PERIMETER[run.kind];
@@ -161,11 +165,26 @@ export function buildRun(run: PerimeterRun, ground: Ground, t: number): THREE.Gr
         const n = Math.max(1, Math.ceil((s1 - s0) / 0.4));
         for (let i = 0; i < n; i++) {
           const a = along(run.pts, s0 + (s1 - s0) * i / n), b = along(run.pts, s0 + (s1 - s0) * (i + 1) / n);
+          if (under((a.x + b.x) / 2, (a.z + b.z) / 2)) continue;
           beam(a.x, a.z, b.x, b.z, -0.004, 0.008, w, mat);
           if (open) { const o = w * 0.9; beam(a.x - a.dz * o, a.z + a.dx * o, b.x - b.dz * o, b.z + b.dx * o, 0, 0.025, 0.25 * M, 'soil'); }
         }
       }
-      for (const p of run.pts) post(p[0], p[1], 0.9 * M, 0.04 * M, run.kind === 'water_pipe' ? 'blue_tank' : 'paint_red');
+      // a marker at each bend; where the line meets a building, one just outside its wall
+      const L = wallLength(run), mark = (s: number) => { const q = along(run.pts, s); post(q.x, q.z, 0.9 * M, 0.04 * M, run.kind === 'water_pipe' ? 'blue_tank' : 'paint_red'); };
+      let acc = 0;
+      run.pts.forEach((p, i) => {
+        if (i > 0) acc += Math.hypot(p[0] - run.pts[i - 1][0], p[1] - run.pts[i - 1][1]);
+        if (!under(p[0], p[1])) { mark(acc); return; }
+        // walk out of the footprint toward the neighbouring points
+        for (const dir of [1, -1]) {
+          if ((dir < 0 && i === 0) || (dir > 0 && i === run.pts.length - 1)) continue;
+          for (let d = 0.05; d < 2; d += 0.05) {
+            const s = Math.max(0, Math.min(L, acc + dir * d)), q = along(run.pts, s);
+            if (!under(q.x, q.z)) { mark(Math.max(0, Math.min(L, s + dir * 0.06))); break; }
+          }
+        }
+      });
       break;
     }
     default: break;  // berm, ditch: earthworks in the terrain

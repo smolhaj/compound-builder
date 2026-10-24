@@ -307,7 +307,7 @@ export class HomesteadWorld {
       const cur = this._runGroups.get(r.id);
       if (cur?.key === key) continue;
       if (cur) { this._root.remove(cur.group); cur.group.traverse(o => (o as THREE.Mesh).geometry?.dispose()); }
-      const group = buildRun(r, this.groundAt, t);
+      const group = buildRun(r, this.groundAt, t, (x, z) => this.onBuilding(x, z, 0.02, false));
       this._root.add(group);
       this._runGroups.set(r.id, { key, group });
       this._ws.invalidateShadows();
