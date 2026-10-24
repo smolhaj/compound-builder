@@ -122,7 +122,11 @@ export function reportCard(s: GameState): ReportCard {
   const grown = st.kcalNeed ? st.kcalGrown / st.kcalNeed : 0;
   if (st.hungryDays === 0) lines.push('Nobody went hungry.');
   else lines.push(`${st.hungryDays} hungry days.`);
-  if (grown > 0.05) lines.push(`The garden, the hens and the hunting covered ${Math.round(grown * 100)} % of what everyone ate.`);
+  if (grown > 0.05) {
+    const src = [has('field') && 'the fields', has('garden') && 'the garden', has('chicken_coop') && 'the hens'].filter(Boolean) as string[];
+    const what = src.length ? src.slice(0, -1).join(', ') + (src.length > 1 ? ' and ' : '') + src[src.length - 1] : 'what the place grew';
+    lines.push(`${what[0].toUpperCase() + what.slice(1)} covered ${Math.round(grown * 100)} % of what everyone ate.`);
+  }
   // people
   const medic = Math.max(0, ...s.people.filter((_, i) => s.personState[i]?.needs.died == null).map(p => p.skills.medic));
   if (st.wounds > 0 && medic < 3 && !has('bunker_medical')) lines.push('No one knew first aid.');
