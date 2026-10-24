@@ -23,6 +23,7 @@ import { conditionsFor, newBody, type Body } from './body';
 import { newFin, type Fin } from './finance';
 import { newArmory, type Armory } from './armory';
 import { newWild, type Wild } from './wildfood';
+import type { Vehicle } from './vehicles';
 import { emptyStats, type Ending, type RunStats } from './report';
 import { generateNeighbors, newGate, type GateState, type Neighbor } from './encounters';
 import { freshNeeds, type FoodReport, type Needs } from './needs';
@@ -152,6 +153,8 @@ export interface GameState {
   perimeter: PerimeterRun[];
   /** Water and power: fittings, battery, storage, the last day's balance. */
   utilities: Utilities;
+  /** The family's vehicles (lazily created: `s.vehicles ??= startingVehicles()`). */
+  vehicles?: Vehicle[];
   /** Bunker hardening retrofits, ordered and in progress. */
   hardenJobs: HardenJob[];
   /** The neighbor parcels on the survey grid (who owns them, for sale, what they are). */

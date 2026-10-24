@@ -16,6 +16,7 @@ import { isHome } from './blueprints';
 import { log } from './economy';
 import { isFinished } from './construction';
 import { climate } from './effects';
+import { tractorBoost } from './vehicles';
 import { SOIL_YIELD } from './site';
 import { REGIONS, seasons } from './regions';
 
@@ -56,7 +57,7 @@ export function fieldHarvest(s: GameState): number {
   if (doy < HARVEST[0] || doy >= HARVEST[1]) return 0;
   const fields = s.structures.filter(st => st.kind === 'field' && isFinished(st)).length;
   const skill = Math.max(...s.people.map(p => p.skills.gardener), 0);
-  return fields * FIELD_KCAL / (HARVEST[1] - HARVEST[0]) * (0.6 + 0.08 * skill) * SOIL_YIELD[s.site.soil] * climate(s).grow;
+  return fields * FIELD_KCAL / (HARVEST[1] - HARVEST[0]) * (0.6 + 0.08 * skill) * SOIL_YIELD[s.site.soil] * climate(s).grow * tractorBoost(s);
 }
 
 /** What the place grows a day (kcal, fresh), by day of year: eggs from the coop, the garden in season, the field harvest. */
