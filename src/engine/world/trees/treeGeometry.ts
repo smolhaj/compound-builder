@@ -818,7 +818,7 @@ export function buildPalmTree(detail: VegDetail, seed: number, lod: TreeLod = 0)
  * notches, tips drooping), each with a dark underside, over a visible trunk.
  * Nominal height ≈ 3.0 at scale 1.
  */
-export function buildConiferTree(detail: VegDetail, seed: number, lod: TreeLod = 0): THREE.BufferGeometry {
+export function buildConiferTree(detail: VegDetail, seed: number, lod: TreeLod = 0, crownBase = 0.42): THREE.BufferGeometry {
   const rng = makeRng(seed + 999);
   const parts: THREE.BufferGeometry[] = [];
   // r10: close-up (LOD 0) conifers get many more, shorter whorls with ragged,
@@ -829,7 +829,7 @@ export function buildConiferTree(detail: VegDetail, seed: number, lod: TreeLod =
     : lod === 1 ? (detail === 'low' ? 3 : 5) : (detail === 'high' ? 4 : 3);
   const k = lod === 0 ? 9 : lod === 1 ? 7 : 6; // branch tips per tier
   const H = 3.0;
-  const base = 0.42;            // lowest skirt height — trunk visible below
+  const base = crownBase;       // lowest skirt height — trunk visible below (higher for trees grown in a stand)
   const topY = H;
   const maxR = 0.78;
   const ragged = lod === 0 ? 1 : lod === 1 ? 0.6 : 0.3;
@@ -1135,6 +1135,59 @@ export function buildShrub(seed: number, cards = false): THREE.BufferGeometry {
     parts.push(lc);
   }
   return mergeVeg(parts, 'shrub');
+}
+
+/**
+ * A patch of big sagebrush (Artemisia tridentata) in world units: eight
+ * plants 0.6–1.1 m across (0.1–0.18 units) scattered over ≈ 6 m, each a
+ * small lumpy crown with a skin of leaf cards (near) or the crown alone
+ * (`cards` false, the far LOD). One instance per patch keeps a whole bench of
+ * sage steppe cheap.
+ */
+export function buildSagePatch(seed: number, cards = true): THREE.BufferGeometry {
+  const rng = makeRng(seed + 5151);
+  const parts: THREE.BufferGeometry[] = [];
+  for (let i = 0; i < 8; i++) {
+    const a = rng() * Math.PI * 2, d = Math.sqrt(rng()) * 0.48;
+    const cx = Math.cos(a) * d, cz = Math.sin(a) * d, r = 0.05 + rng() * 0.04;
+    const lobes: LobeSpec[] = [
+      { c: new THREE.Vector3(cx, r * 0.9, cz), r, tint: (rng() - 0.5) * 0.1 },
+      { c: new THREE.Vector3(cx + (rng() - 0.5) * r, r * 0.7, cz + (rng() - 0.5) * r), r: r * 0.8, tint: (rng() - 0.5) * 0.1 },
+    ];
+    const crown = new THREE.Vector3(cx, r * 0.6, cz);
+    // a small dark core under a ragged skin of gray leaf sprays (sage is twiggy, never a smooth ball)
+    parts.push(makeCrownShell(lobes, crown, cards ? 6 : 5, cards ? 4 : 3, seed + i, 0.6, true, cards ? { shrink: 0.62, holey: true } : {}));
+    if (cards) {
+      const lc = makeLeafCards(lobes, crown, r * 1.7, 18, 0.05, rng, { under: 0.3 });
+      const p = lc.getAttribute('position') as THREE.BufferAttribute;
+      for (let k = 0; k < p.count; k++) if (p.getY(k) < 0.005) p.setY(k, 0.005);
+      parts.push(lc);
+    }
+  }
+  return mergeVeg(parts, 'sage patch');
+}
+
+/**
+ * A creek-bank willow thicket (sandbar / Geyer willow) in world units:
+ * a dense clump of upright lobes 2–4 m tall, leafy to the ground.
+ */
+export function buildWillowClump(seed: number, cards = true): THREE.BufferGeometry {
+  const rng = makeRng(seed + 6262);
+  const lobes: LobeSpec[] = [];
+  const n = 5 + Math.floor(rng() * 3);
+  for (let i = 0; i < n; i++) {
+    const a = rng() * Math.PI * 2, d = rng() * 0.22, h = 0.18 + rng() * 0.32;
+    lobes.push({ c: new THREE.Vector3(Math.cos(a) * d, h, Math.sin(a) * d), r: 0.13 + rng() * 0.08, tint: (rng() - 0.5) * 0.14 });
+  }
+  const crown = new THREE.Vector3(0, 0.3, 0);
+  const parts = [makeCrownShell(lobes, crown, cards ? 9 : 6, cards ? 6 : 4, seed, 0.3, true, cards ? { shrink: 0.86, squashY: 1.1 } : {})];
+  if (cards) {
+    const lc = makeLeafCards(lobes, crown, 0.5, 60, 0.07, rng, { under: 0.15 });
+    const p = lc.getAttribute('position') as THREE.BufferAttribute;
+    for (let k = 0; k < p.count; k++) if (p.getY(k) < 0.01) p.setY(k, 0.01);
+    parts.push(lc);
+  }
+  return mergeVeg(parts, 'willow clump');
 }
 
 /**

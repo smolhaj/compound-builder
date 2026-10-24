@@ -404,3 +404,12 @@ SETS.land = [
   { name: 'west-forty-bought', time: 11, season: 'summer', setup: compound + buyWest + `{ cb.cam.target.set(0, 0, 33); cb.cam.radius = 60; cb.cam.pitch = 0.9; cb.cam.yaw = 0.3; }`, cam: D, frames: 20 },
   { name: 'corner-pin', time: 15, season: 'summer', setup: compound + buyWest + `{ const W = cb.world; cb.cam.placeEye(-66.6, 2, -67, 0, 0.28); }`, cam: D, frames: 14 },
 ];
+
+/** Landscape realism: in the timber, out on the open bench, along the creek, from the air. */
+const eyeWhere = (pick) => `{ const p = cb.world.parcel; let best = null; for (let x = 6; x < 61 && !best; x += 1) for (let z = 6; z < 61; z += 1) { const s = p.sample(x, z), dz = Math.abs(z - p.creek.zAt(x)); if (${pick}) { best = [x, z]; break; } } const [x, z] = best ?? [33, 33]; const [ex, ez] = cb.world.openSpotNear(x, z, 1.1); cb.cam.placeEye(ex, ez, ex + 6, ez + 3, 0.28); }`;
+SETS.landscape = [
+  { name: 'in-the-timber', time: 10, season: 'summer', setup: eyeWhere('s.forest > 0.75 && dz > 10'), cam: D, frames: 16 },
+  { name: 'open-bench', time: 16, season: 'summer', setup: eyeWhere('s.forest < 0.05 && dz > 18'), cam: D, frames: 16 },
+  { name: 'creek-bank', time: 11, season: 'summer', setup: eyeWhere('dz > 2.5 && dz < 3.5 && s.forest > 0.3'), cam: D, frames: 16 },
+  { name: 'aerial', time: 11, season: 'summer', setup: `{ cb.cam.target.set(33, 0, 33); cb.cam.radius = 70; cb.cam.pitch = 0.75; cb.cam.yaw = 0.6; }`, cam: D, frames: 20 },
+];

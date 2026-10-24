@@ -30,6 +30,8 @@ export interface ForestTreeSpec {
   rotY: number;
   /** Stable random draws: palette slot, hue / lightness / saturation jitter. */
   cr: [number, number, number, number];
+  /** Grown in a stand (conifers): lower limbs shed, the crown starts a third of the way up. */
+  stand?: boolean;
 }
 
 /** Forest trees closer than this use the detailed close-up shell (LOD 0). */
@@ -82,14 +84,15 @@ export class ForestRenderer {
     const dummy = new THREE.Object3D();
     const c = new THREE.Color();
     const hsl = { h: 0, s: 0, l: 0 };
-    for (const kind of ['conifer', 'broad', 'oval', 'longleaf'] as ForestKind[]) {
-      const list = specs.filter(t => t.kind === kind);
+    for (const set of ['conifer', 'conifer_stand', 'broad', 'oval', 'longleaf'] as const) {
+      const kind: ForestKind = set === 'conifer_stand' ? 'conifer' : set;
+      const list = specs.filter(t => t.kind === kind && (kind !== 'conifer' || !!t.stand === (set === 'conifer_stand')));
       if (list.length === 0) continue;
       const levels = ([0, 1, 2] as TreeLod[]).map(lod => {
-        const key = `${kind}:${detail}:${lod}`;
+        const key = `${set}:${detail}:${lod}`;
         let geo = this._geos.get(key);
         if (!geo) {
-          geo = kind === 'conifer' ? buildConiferTree(detail, 17, lod)
+          geo = kind === 'conifer' ? buildConiferTree(detail, 17, lod, set === 'conifer_stand' ? 1.0 : 0.42)
             : kind === 'longleaf' ? buildTallCrownTree('longleaf', detail, 31, lod)
             : buildDeciduousTree(kind === 'broad' ? 0 : 1, detail, kind === 'broad' ? 41 : 63, lod);
           this._geos.set(key, geo);
@@ -106,7 +109,7 @@ export class ForestRenderer {
       const evergreen = kind === 'conifer' || kind === 'longleaf';
       const mat = evergreen ? this._matEver : this._matDecid;
       const inst = new InstancedLodSet(this._scene, levels, mat, mats, {
-        name: `forest_${kind}`,
+        name: `forest_${set}`,
         userData: { type: `forest_${kind}` },
         castShadow: quality !== 'low',
         shadowMargin: 10,
