@@ -58,13 +58,21 @@ export const freshNeeds = (): Needs => ({ health: 100, morale: 70, hunger: 0, do
  */
 export const FIELD_KCAL = 700_000, FIELD_DRY = 0.4;
 
+/** This year's hail (weatherThreats.ts): the crop it shredded comes back short from a late replanting. */
+function hailThisYear(s: GameState): number | null {
+  const h = s.weather?.hail;
+  return h && h.year === calendarOf(s.clock).year ? h.doy : null;
+}
+
 /** The day's field harvest (kcal), before it is split into dry and fresh. */
 export function fieldHarvest(s: GameState): number {
   const doy = calendarOf(s.clock).doy, HARVEST = seasons(REGIONS[s.site.region]).harvest;
   if (doy < HARVEST[0] || doy >= HARVEST[1]) return 0;
   const fields = s.structures.filter(st => st.kind === 'field' && isFinished(st)).length;
   const skill = Math.max(...s.people.map(p => p.skills.gardener), 0);
-  return fields * FIELD_KCAL / (HARVEST[1] - HARVEST[0]) * (0.6 + 0.08 * skill) * SOIL_YIELD[s.site.soil] * climate(s).grow * tractorBoost(s);
+  // hail on the standing crop: replanted early in the summer it still makes 70 %; in late summer a quick catch crop, 30 %
+  const hd = hailThisYear(s), hail = hd == null || hd >= HARVEST[1] ? 1 : hd < HARVEST[0] - 60 ? 0.7 : 0.3;
+  return fields * FIELD_KCAL / (HARVEST[1] - HARVEST[0]) * (0.6 + 0.08 * skill) * SOIL_YIELD[s.site.soil] * climate(s).grow * tractorBoost(s) * hail;
 }
 
 /** What the place grows a day (kcal, fresh), by day of year: eggs from the coop, the garden in season, the field harvest. */
@@ -81,7 +89,9 @@ export function produce(s: GameState): number {
   const [g0, g1] = gardenSeason(s);
   const season = doy < g0 || doy > g1 ? 0 : doy < g0 + 45 ? (doy - g0) / 45 : doy < g1 - 35 ? 1 : (g1 - doy) / 35;
   const skill = Math.max(...s.people.map(p => p.skills.gardener), 0);
-  const veg = gardens * 2500 * season * (0.6 + 0.08 * skill) * SOIL_YIELD[s.site.soil] * (hasGreenhouse(s) ? GREENHOUSE_PEAK : 1);
+  // a month to come back after hail (replanted from saved seed), then a shorter season
+  const hd = hailThisYear(s), hail = hd == null || doy < hd ? 1 : doy - hd < 30 ? 0 : 0.7;
+  const veg = gardens * 2500 * season * (0.6 + 0.08 * skill) * SOIL_YIELD[s.site.soil] * (hasGreenhouse(s) ? GREENHOUSE_PEAK : 1) * hail;
   // winter greens on the greenhouse benches; the orchard's fruit, August to October
   const grow = climate(s).grow;
   return Math.max(0, eggs) * Math.max(0.5, grow) + (veg + greenhouseGreens(s) + orchardHarvest(s)) * grow + fieldHarvest(s);
