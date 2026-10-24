@@ -292,4 +292,34 @@ describe('the battle at the compound', () => {
       expect(new Set(lines).size).toBe(lines.length);
     }
   });
+  it('a savage crew that gets in leaves nobody: the wounded are finished, the children taken; a desperate one holds people at gunpoint', () => {
+    let executed = 0, taken = 0, desperateKilledHiding = 0, wiped = 0;
+    for (let seed = 1; seed <= 30; seed++) {
+      const g = afterHit(seed);                       // no guns: they get in
+      const b = planBattle(g, 6, seed, { temper: 'savage' });
+      executed += b.events.filter(e => e.kind === 'death' && e.executed).length;
+      taken += b.events.filter(e => e.kind === 'taken').length;
+      applyBattle(g, b);
+      if (g.personState.every(ps => ps.needs.died != null)) wiped++;
+      for (const ps of g.personState) if (ps.needs.taken) expect(ps.needs.died).not.toBeNull();
+      const d = planBattle(afterHit(seed), 6, seed, { temper: 'desperate' });
+      expect(d.events.some(e => e.kind === 'taken' || (e.kind === 'death' && e.executed))).toBe(false);
+      desperateKilledHiding += d.events.filter(e => e.kind === 'death').length;
+    }
+    expect(taken).toBeGreaterThan(0);
+    expect(wiped).toBeGreaterThan(0);
+    expect(executed + taken).toBeGreaterThan(desperateKilledHiding);
+  });
+
+  it('the tunnel still gets the children out ahead of a savage crew', () => {
+    let out = 0;
+    for (let seed = 1; seed <= 20; seed++) {
+      const g = afterHit(seed);
+      const t = planRun(g, 'escape_tunnel', [[0, 0], [0, -30]]); t.done = t.hours; t.supplied = true; t.finishedAt = 0;
+      const b = planBattle(g, 6, seed, { temper: 'savage' });
+      expect(b.events.some(e => e.kind === 'taken')).toBe(false);
+      if (b.events.some(e => e.kind === 'breach')) out++;
+    }
+    expect(out).toBeGreaterThan(0);
+  });
 });

@@ -31,7 +31,10 @@ export type BattleEvent =
   | { t: number; kind: 'mine'; x: number; z: number; hits: string[] }
   /** `part`: where the round struck (shrapnel has none); `stopped`: armor caught it (a bruise, not a wound). */
   | { t: number; kind: 'wound'; unit: string; sev: number; part?: 'head' | 'torso' | 'arm' | 'leg'; stopped?: boolean }
-  | { t: number; kind: 'death'; unit: string }
+  /** `executed`: killed on the ground after the fight was lost (a ruthless crew). */
+  | { t: number; kind: 'death'; unit: string; executed?: boolean }
+  /** Carried off by the raiders (a ruthless crew takes the children). */
+  | { t: number; kind: 'taken'; unit: string; by: string }
   | { t: number; kind: 'breach'; x: number; z: number }
   | { t: number; kind: 'flee'; unit: string }
   /** A line spoken in the fight: `who` is the unit speaking (a resident or a raider), absent for narration. */

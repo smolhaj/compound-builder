@@ -44,8 +44,9 @@ export interface Needs {
   /** Wounds / illness being treated: severity 0–100, what it is. */
   /** `trauma`: a wound from a fight (gunshot, shrapnel) that needs treating: meds, a medic or a medical bay. Untreated it barely heals and can go septic. */
   hurt: Array<{ what: string; sev: number; trauma?: boolean }>;
-  /** Dead (day), or null. */
+  /** Dead (day), or null. Also set when someone was taken by raiders (`taken`): gone from the place either way. */
   died: number | null;
+  taken?: boolean;
 }
 
 export const freshNeeds = (): Needs => ({ health: 100, morale: 70, hunger: 0, dose: 0, hurt: [], died: null });
