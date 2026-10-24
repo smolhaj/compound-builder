@@ -95,7 +95,7 @@ interface Fighter {
   nvg: boolean;
   /** The gun's condition (a worn gun jams more). */
   wear: number;
-  movedAt?: number; bleedAt?: number; bleedPart?: 'head' | 'torso' | 'arm' | 'leg' | 'frag'; saidAt?: number;
+  movedAt?: number; aided?: boolean; bleedAt?: number; bleedPart?: 'head' | 'torso' | 'arm' | 'leg' | 'frag'; saidAt?: number;
 }
 
 const dist = (a: { x: number; z: number }, b: { x: number; z: number }) => Math.hypot(a.x - b.x, a.z - b.z);
@@ -320,7 +320,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
   };
   // how organized they are: later in the collapse, armored, more of them carry rifles
   const org = peace ? 0 : Math.min(1, late * 0.7 + R.filter(f => f.armor.plate || f.armor.soft).length / Math.max(1, raiders) * 0.4);
-  let shaken = false;
+  let shaken = false, heldUp = false;
   let wallDown = false, breached = false, fled = false, end: PlannedBattle['result'] | null = null, endT = 0;
   let breachT = 0, lineSince = -1;
 
@@ -450,7 +450,8 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
       f.hp -= f.bleed;
       if (f.hp <= 0) { bleedOut(f, t); continue; }
       // still able: put your own tourniquet on (those who served know how and do it fast)
-      if (!f.out && f.side === 'home' && t - (f.bleedAt ?? t) >= (f.vet ? 2 : 6) && ifaks > 0) {
+      if (!f.out && !f.aided && f.side === 'home' && t - (f.bleedAt ?? t) >= (f.vet ? 2 : 6) && ifaks > 0) {
+        f.aided = true;   // one go at it: what's left of the bleeding is for the medic
         stopBleed(f, f, t, !!f.vet);
         sayF(f, t, f.bleedPart === 'leg' || f.bleedPart === 'arm' ? ['Tourniquet — I got it on — oh God, oh God, tighter —', 'I\'m putting the tourniquet on — fuck, it hurts —'] : ['Pressing on it — I\'m pressing on it —', 'There\'s a hole in me — the seal, where\'s the seal —'], ['Tourniquet\'s on. Back in it.', 'Sealed it. I\'m good.'], 0);
       } else if (!f.out && f.side === 'raider' && t - (f.bleedAt ?? t) >= 5 && r() < 0.15) f.bleed *= 0.3;
@@ -533,8 +534,8 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
         const hiding = !fighting && d <= 2 && r() < 0.04 ? H.find(h => near(h) && h.shelter && !hardShelter) : undefined;
         const tg = fighting ?? hiding;
         if (tg && r() < f.arm.rate) { if (tg.shelter) tg.cover = 0.5; shoot(f, tg, t + r() * 0.9); }
-        if (!fighting && d <= 2 && !f.saidAt && r() < 0.3 && H.some(h => h.shelter && !h.dead && !h.escaped && !hardShelter)) {
-          f.saidAt = t;
+        if (!fighting && !heldUp && d <= 2 && r() < 0.3 && H.some(h => h.shelter && !h.dead && !h.escaped && !hardShelter)) {
+          heldUp = true;
           say(t, pick(['Hands where I can see them! Don\'t move!', 'On the floor! Nobody be a hero!', 'Where\'s the food? WHERE\'S THE FOOD?']), f);
           const kid = H.find(h => h.shelter && h.kid && !h.dead && !h.escaped);
           if (kid) say(t + 1, pick(['Please don\'t hurt us — please —', 'Mom? Dad? DAD?', 'Take it, take it all, just go —']), kid);

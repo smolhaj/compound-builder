@@ -280,4 +280,16 @@ describe('the battle at the compound', () => {
     }
     expect(nv).toBeGreaterThan(blind);
   });
+  it('first aid is done once per wound, not every second (a line once, a kit once)', () => {
+    for (let seed = 1; seed <= 30; seed++) {
+      const g = afterHit(seed); g.stock.ifak = 6;
+      const b = planBattle(g, 8, seed);
+      const selfAid = b.events.filter(e => e.kind === 'aid' && e.by === e.unit);
+      const per = new Map<string, number>();
+      for (const e of selfAid) if (e.kind === 'aid') per.set(e.unit, (per.get(e.unit) ?? 0) + 1);
+      for (const n of per.values()) expect(n).toBe(1);
+      const lines = b.events.filter(e => e.kind === 'say').map(e => e.kind === 'say' ? `${e.who}|${e.text}|${Math.floor(e.t)}` : '');
+      expect(new Set(lines).size).toBe(lines.length);
+    }
+  });
 });
