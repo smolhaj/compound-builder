@@ -1227,6 +1227,8 @@ export class HomesteadWorld {
       const [lx, lz] = this._local(b, x, z);
       const hw = def.cellsX * CELL / 2, hd = def.cellsZ * CELL / 2;
       if (Math.abs(lx) < hw && lz > -hd && lz < hd + def.porch && def.floorY > 0.02) return b.padY + def.floorY;
+      // a building whose floor is its graded pad (greenhouse gravel, a garage slab): stand on the pad, not the raw slope under it
+      if (Math.abs(lx) < hw && Math.abs(lz) < hd && def.category !== 'bunker' && (def.category !== 'food' || b.placed.kind === 'greenhouse')) return b.padY + Math.max(0, def.floorY);
     }
     return this.groundAt(x, z);
   };
