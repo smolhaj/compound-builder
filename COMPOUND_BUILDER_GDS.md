@@ -127,6 +127,21 @@ Each disaster is a ruleset: what breaks, what is scarce, and what threat cadence
 - **Zombies and hordes:** herds drift across the map as a pressure field that pushes on walls, drawn by noise and light. Individual infected and small groups arrive as encounter events, like raids.
 - **Radiation:** each person carries a dose. Rooms have a protection factor (PF) and fallout follows the 7-10 decay. Open water, garden crops and grazing livestock take up fallout, so covered cisterns, stored food and washing produce all matter.
 - **Gate choices** move a humanity / morale track that the family feels and the report card grades ("You turned away 14 people"), alongside the practical cost.
+- **Nuclear war:**
+  - **Warning signs, all four:**
+    - news-ticker escalation (crisis headlines, DEFCON changes, embassy evacuations, a market crash);
+    - local tells (military convoys on the county road, jets overhead, the missile-field towns emptying, gas lines);
+    - the neighbours' gossip (they start talking, buying, leaving or digging);
+    - a final "BALLISTIC MISSILE THREAT" emergency alert minutes before the strike.
+  - **The strike:** the sky flashes on the horizon, with a mushroom cloud in the distance if the strike is nearby. Then the EMP drops every unshielded light, the sky turns sickly, and fallout arrives hours later as grey dust.
+  - **The dash:** each person runs to the bunker from wherever they are when the alert sounds. People in the far field or in town may not make it, so a bunker near the house matters.
+  - **Shelter life, about 2 weeks, managed by the player:**
+    - ration food and water;
+    - run the air (by hand crank if there's no power);
+    - deal with sanitation and morale;
+    - listen to the radio for news;
+    - short dashes outside cost dose;
+    - neighbours knock on the hatch, and the player decides whether to let them in.
 - **Grid-down:**
   - **Cause:** a random cause per run (ice-storm cascade, a substation attack, a cyberattack or an aging-grid failure), each with its own hints and restoration curve, from days to months.
   - **Water depends on what you built:** the electric well pump dies unless it runs on solar plus battery or has a hand pump; the pressure tank gives about a day; a gravity cistern keeps flowing; creek water needs filtering.
