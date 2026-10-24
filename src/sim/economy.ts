@@ -28,9 +28,17 @@ export function orderProblem(s: GameState, lines: readonly OrderLine[]): OrderPr
   const real = lines.filter(l => l.qty > 0);
   if (real.length === 0) return 'empty';
   if (real.some(l => MATERIALS[l.material].price === null)) return 'not_for_sale';
-  if (!canOrder(s.disaster, s.clock.t)) return 'no_deliveries';
-  if (orderCost(real, prices(s)) > s.money) return 'cannot_afford';
+  const how = payWith(s);
+  if (!how) return 'no_deliveries';
+  if (orderCost(real, prices(s)) > (how === 'bank' ? s.money : s.fin.cash)) return 'cannot_afford';
   return null;
+}
+
+/** How an order gets paid: from the bank, or (banks shut, trucks still running, the law mostly holding) cash from the safe. */
+export function payWith(s: GameState): 'bank' | 'cash' | null {
+  const t = s.disaster.tracks;
+  if (canOrder(s.disaster, s.clock.t) && t.deliveries > 0.25 && t.banks > 0.25) return 'bank';
+  return t.deliveries > 0.25 && t.law > 0.2 && s.fin?.cash > 0 ? 'cash' : null;
 }
 
 /** Place an order (mutates the draft). Returns the order id or null. */
@@ -39,7 +47,7 @@ export function placeOrder(s: GameState, lines: readonly OrderLine[]): string | 
   const real = lines.filter(l => l.qty > 0).map(l => ({ ...l }));
   const cost = orderCost(real, prices(s));
   const id = `o${s.nextId++}`;
-  s.money -= cost;
+  if (payWith(s) === 'cash') s.fin.cash -= cost; else s.money -= cost;
   const wx = weatherDelay(s, real.map(l => l.material));
   s.orders.push({ id, lines: real, cost, placedAt: s.clock.t, dueAt: s.clock.t + LEAD_TIME_DAYS + Math.floor(s.site.miles / 15) + wx.days, status: 'ordered' });
   log(s, `Ordered ${real.map(l => `${l.qty} × ${MATERIALS[l.material].name.toLowerCase()}`).join(', ')} — $${cost.toLocaleString('en-US')}.${wx.why ? ` It'll be ${wx.days} days late (${wx.why}).` : ''}`);

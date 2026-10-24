@@ -14,6 +14,7 @@ import { burnFirewood, demandNow } from './heating';
 import { upkeepDay } from './upkeep';
 import { shelfDay } from './shelf';
 import { bodyDay } from './body';
+import { financeDay } from './finance';
 import { addRunWork, nextRun } from './perimeter';
 import { addFitWork, balanceDay, nextFit, plant } from './utilities';
 import { addHardenWork, nextHardenJob } from './hardening';
@@ -97,6 +98,7 @@ function subStep(s: GameState): void {
     siteJobsDay(s);
     for (const line of paperworkDay(s)) log(s, line);
     for (const line of shelfDay(s)) log(s, line);
+    for (const line of financeDay(s)) log(s, line);
     for (const line of upkeepDay(s, demandNow(s), s.heat.warned !== dayIndex(s.clock.t) - 1 && s.heat.warned !== dayIndex(s.clock.t))) log(s, line);
     const e = gateDay(s);
     if (e) log(s, `${e.title}.`);
