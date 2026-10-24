@@ -12,6 +12,7 @@ import { paperworkDay } from './paperwork';
 import { addFellWork, nextFellJob } from './forestry';
 import { burnFirewood, demandNow } from './heating';
 import { upkeepDay } from './upkeep';
+import { snowedIn, weatherDay } from './weatherThreats';
 import { shelfDay } from './shelf';
 import { bodyDay } from './body';
 import { financeDay } from './finance';
@@ -68,7 +69,7 @@ function subStep(s: GameState): void {
     const rate = buildRate(p) * workFactor(ps.needs);
     const slot = routineAt(p, h);
     // the day job: weekdays in town during work hours, paid by the hour
-    if (slot === 'work' && weekday && ps.employed && p.job) {
+    if (slot === 'work' && weekday && ps.employed && p.job && !snowedIn(s)) {
       ps.task = 'job'; ps.target = null;
       s.money += p.job.wage / 8 * SUBSTEP * 24;
       return;
@@ -105,6 +106,7 @@ function subStep(s: GameState): void {
     for (const line of armoryDay(s)) log(s, line);
     for (const line of gearDay(s)) log(s, line);
     for (const line of upkeepDay(s, demandNow(s), s.heat.warned !== dayIndex(s.clock.t) - 1 && s.heat.warned !== dayIndex(s.clock.t))) log(s, line);
+    for (const line of weatherDay(s)) log(s, line);
     const e = gateDay(s);
     if (e) log(s, `${e.title}.`);
     if (before !== 'impact' && s.disaster.phase === 'impact' && s.disaster.kind === 'nuclear') for (const line of strike(s)) log(s, line);
