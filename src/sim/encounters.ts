@@ -14,8 +14,9 @@
  * ever reaches the family through it. Pure and seeded.
  */
 import { mulberry32, pick } from './rng';
-import { gearPosture, softenWound } from './gear';
-import { armed, firepower, spendInFight } from './armory';
+import { gearPosture } from './gear';
+import { armed, firepower } from './armory';
+import { applyBattle, planBattle } from './battle';
 import { isHome } from './blueprints';
 import { log } from './economy';
 import { isFinished } from './construction';
@@ -25,6 +26,7 @@ import { contagion, infect } from './effects';
 import { dayJob, type Person, type SkillId, SKILL_IDS } from './family';
 import { dayIndex, type GameState } from './state';
 import type { Stock } from './materials';
+import type { Battle } from './battleTypes';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Neighbors
@@ -176,6 +178,8 @@ export interface GateState {
   day: number;
   next: number;
   history: Array<{ day: number; kind: EncounterKind; stance: Stance; tone: Outcome['tone'] }>;
+  /** The last fight at the compound, for playback (optional; not migrated). */
+  battle?: Battle;
 }
 
 export function newGate(seed: number): GateState {
@@ -365,7 +369,6 @@ export function resolve(s: GameState, stance: Stance): Outcome {
   const negotiator = Math.max(0, ...s.people.filter((x, i) => !x.kid && s.personState[i]?.needs.died == null).map(x => x.skills.negotiator));
   const lines: string[] = [];
   let title = '', text = '', tone: Outcome['tone'] = 'mixed';
-  const def = defenseOf(p);
   if (e.kind === 'arrival') {
     if (stance === 'take_in' || stance === 'trial') {
       for (const person of e.people ?? []) { s.people.push(person); s.personState.push({ id: person.id, task: 'idle', target: null, needs: freshNeeds() }); }
@@ -396,7 +399,6 @@ export function resolve(s: GameState, stance: Stance): Outcome {
     }
   } else {
     // a threat: looters, a gang, refugees, a requisition team
-    const seen = r() * 100 < p.detection + 20;
     // allies on the radio net ride over to help when there's shooting
     const allies = s.neighbors.filter(n => n.status === 'home' && n.radio && n.disposition > 50);
     const help = allies.reduce((a, n) => a + n.members * 6, 0);
@@ -429,21 +431,17 @@ export function resolve(s: GameState, stance: Stance): Outcome {
       else stance = 'defend';
     }
     if (stance === 'defend') {
-      const shots = spendInFight(s, r);
-      if (shots) lines.push(shots);
-      const odds = (def + help + (seen ? 15 : 0)) / Math.max(1, e.strength + def + help);
-      if (r() < odds) {
-        g.raidsHeld++;
-        title = 'The line held'; text = `${help ? `${allies.map(a => a.name).join(' and ')} came over the ridge when they heard the shooting. ` : ''}They pulled back and didn't come again.`; tone = 'good';
-        if (r() < 0.35 * (e.strength / Math.max(20, def))) lines.push(wound(s, r, softenWound(s, 25 + Math.floor(r() * 30), e.armed), 'a gunshot wound'));
+      // the fight itself, second by second (sim/battle.ts); the world can play it back from g.battle
+      const b = planBattle(s, Math.max(1, e.size - Math.floor(help / 12)), s.seed * 131 + e.day * 7 + 1, { armed: e.armed });
+      g.battle = b;
+      lines.push(...applyBattle(s, b));
+      if (b.result === 'repelled' || b.result === 'fled') {
+        title = 'The line held'; text = `${help ? `${allies.map(a => a.name).join(' and ')} came over the ridge when they heard the shooting. ` : ''}${b.result === 'fled' ? 'They broke off and ran.' : 'None of them got past the line.'}`; tone = 'good';
         for (const n of allies) n.disposition = Math.min(100, n.disposition + 5);
       } else {
-        g.raidsLost++;
-        const lost = take(s, e.wants ?? {}, 1.5);
-        title = 'They got in'; text = 'They broke through the line and took what they came for.'; tone = 'bad';
+        const lost = take(s, e.wants ?? {}, 1);
+        title = 'They got in'; text = b.result === 'overrun' ? 'They overran the place and took what they came for.' : 'They broke through the line and took what they came for.'; tone = 'bad';
         if (lost.length) lines.push(`Lost: ${lost.join(', ')}`);
-        lines.push(wound(s, r, softenWound(s, 40 + Math.floor(r() * 40), e.armed), 'shot'));
-        if (r() < 0.4) lines.push(wound(s, r, 20 + Math.floor(r() * 30), 'beaten'));
       }
       if (e.kind === 'refugees') g.humanity = Math.max(0, g.humanity - 10);
     }
