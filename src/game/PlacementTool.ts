@@ -1,10 +1,10 @@
 import * as THREE from 'three';
+import { ownsAt } from '../sim/land';
 import { KIT, PROBLEM_TEXT, snapCenter, footprint, type SiteQuery } from './buildkit/kit';
 import { DEPTH, isUnderground, previewDatum, siteProblem } from './buildkit/underground';
 import { useWorldStore } from '../store/worldStore';
 import { buildGhost } from './buildkit/buildings';
 import type { HomesteadWorld } from './HomesteadWorld';
-import { PARCEL_SIZE } from './parcel/parcelTerrain';
 import { useGameStore } from '../store/gameStore';
 
 /**
@@ -36,7 +36,7 @@ export class PlacementTool {
     const _world = world, _dom = dom;
     this._site = {
       height: (x, z) => _world.parcel.natural(x, z).h,
-      owned: (x, z) => x >= 0 && z >= 0 && x <= PARCEL_SIZE && z <= PARCEL_SIZE,
+      owned: (x, z) => ownsAt(useGameStore.getState().game, x, z),
       water: (x, z) => _world.parcel.isCreek(x, z) || _world.stream.depthAt(x, z) > 0,
       blocked: (x, z) => _world.onCamp(x, z) || _world.onAccess(x, z, 0.1),
     };

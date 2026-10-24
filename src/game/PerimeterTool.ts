@@ -5,6 +5,7 @@
  * Backspace drops the last point; Esc / right-click cancels. The HUD shows
  * length, cost and hours as you draw.
  */
+import { ownsAt } from '../sim/land';
 import * as THREE from 'three';
 import type { HomesteadWorld } from './HomesteadWorld';
 import { PARCEL_SIZE } from './parcel/parcelTerrain';
@@ -25,7 +26,7 @@ function offParcel(pts: readonly Pt[]): number {
     const [ax, az] = pts[i - 1], [bx, bz] = pts[i], l = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.ceil(l / 0.25));
     for (let k = 0; k < n; k++) {
       const x = ax + (bx - ax) * (k + 0.5) / n, z = az + (bz - az) * (k + 0.5) / n;
-      if (x < 0 || z < 0 || x > PARCEL_SIZE || z > PARCEL_SIZE) off += l / n;
+      if (!ownsAt(useGameStore.getState().game, x, z)) off += l / n;
     }
   }
   return off;

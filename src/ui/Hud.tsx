@@ -18,6 +18,7 @@ import { prices } from '../sim/economy';
 import { LIVING_PER_DAY } from '../sim/engine';
 import { daysOfFood } from '../sim/needs';
 import { NEIGHBOR_BLURB } from '../sim/encounters';
+import { acresOf, buyProblem, LAND_NAME, priceOf } from '../sim/land';
 import { HARDEN, HARDEN_IDS, type TierDef, hardenCost, hardenProblem, isBunkerRoom, protectionOf, tierOf } from '../sim/hardening';
 import { PERIMETER, PERIMETER_ORDER, UTILITY_LINES, runBill, runHours, runFinished, runProgress, runBlocked, runGrowth } from '../sim/perimeter';
 
@@ -326,6 +327,17 @@ export function Hud() {
             </div>))}
           {game.clock.t >= game.disaster.hitAt && <div style={{ fontSize: 11.5, opacity: 0.7, marginTop: 3 }}>Humanity {Math.round(game.gate.humanity)} · took in {game.gate.tookIn} · turned away {game.gate.turnedAway}</div>}
         </Section>}
+        <Section title="Land">
+          <div style={{ fontSize: 11.5, opacity: 0.7, marginBottom: 3 }}>Home place: 40 acres. {game.land.parcels.filter(p => p.owner === 'you').length ? `Plus ${game.land.parcels.filter(p => p.owner === 'you').reduce((a, p) => a + acresOf(p.rect), 0)} acres bought.` : ''}</div>
+          {game.land.parcels.map(p => {
+            const n = game.neighbors.find(x => x.id === p.owner), why = buyProblem(game, p);
+            return <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 4, fontSize: 12, marginTop: 2 }}>
+              <span title={`${acresOf(p.rect)} acres of ${LAND_NAME[p.kind]}`}>{p.name[4].toUpperCase() + p.name.slice(5)}: {LAND_NAME[p.kind]}{p.owner === 'you' ? '' : `, ${n ? n.name : '?'}`}{p.forSale && p.owner !== 'you' ? <span style={{ color: '#e8c880' }}> · for sale</span> : null}</span>
+              {p.owner === 'you' ? <span style={{ color: '#a8d080' }}>yours</span>
+                : <button style={btn(!why)} disabled={!!why} title={why ?? `Buy ${acresOf(p.rect)} acres`} onClick={() => g.buy(p.id)}>{usd(priceOf(game, p))}</button>}
+            </div>;
+          })}
+        </Section>
         <Section title="Pantry">
           {(() => {
             const f = game.food, d = daysOfFood(game);

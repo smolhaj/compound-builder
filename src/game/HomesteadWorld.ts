@@ -237,14 +237,21 @@ export class HomesteadWorld {
   /** Parcel trees (near, detailed) inside the margin; regional far trees beyond it. */
   private _plant(q: Quality): void {
     const margin = TREE_MARGIN;
-    const specs = planParcelTrees(this.parcel, { margin, density: q === 'low' ? 0.5 : 1, blocked: (x, z) => this.onBuilding(x, z, 0.6) || this.onCamp(x, z, 0.6) || this.onAccess(x, z, 0.5) || this.onPerimeterLine(x, z, 0.25) });
+    const inHome = (x: number, z: number) => x > -margin && x < PARCEL_SIZE + margin && z > -margin && z < PARCEL_SIZE + margin;
+    const blocked = (x: number, z: number) => this.onBuilding(x, z, 0.6) || this.onCamp(x, z, 0.6) || this.onAccess(x, z, 0.5) || this.onPerimeterLine(x, z, 0.25);
+    // the home square, then each bought neighbor parcel (its own id range; the home square's ids never change)
+    const plantAll = (density: number, block: (x: number, z: number) => boolean) => [
+      ...planParcelTrees(this.parcel, { margin, density, blocked: block }),
+      ...this._ownedLand.flatMap((r, k) => planParcelTrees(this.parcel, { margin, density, rect: r, idBase: 1_000_000 * (k + 1), blocked: (x, z) => inHome(x, z) || block(x, z) })),
+    ];
+    const specs = plantAll(q === 'low' ? 0.5 : 1, blocked);
     for (const t of specs) t.y = this.terrain.surfaceAt(t.x, t.z) - 0.03;
     this._planted = specs;
     // lookups cover every tree a full-density plan has (marks made on High survive a switch to Low)
-    const all = q === 'low' ? planParcelTrees(this.parcel, { margin, blocked: (x, z) => this.onBuilding(x, z, 0.6) || this.onCamp(x, z, 0.6) || this.onAccess(x, z, 0.5) }) : specs;
+    const all = q === 'low' ? plantAll(1, (x, z) => this.onBuilding(x, z, 0.6) || this.onCamp(x, z, 0.6) || this.onAccess(x, z, 0.5)) : specs;
     this._treeById = new Map(all.map(t => [t.id, t]));
     this._plantForest();
-    const inside = (x: number, z: number) => x > -margin && x < PARCEL_SIZE + margin && z > -margin && z < PARCEL_SIZE + margin;
+    const inside = (x: number, z: number) => inHome(x, z) || this._inOwned(x, z);
     // Neighboring farmsteads (houses, hay barns, corrals, poplar windbreaks)
     this._props?.dispose();
     const props = new RegionalProps(this._ws.scene, 'mountain');
@@ -264,6 +271,58 @@ export class HomesteadWorld {
   }
 
   private _planted: ParcelTree[] = [];
+  /** Neighbor parcels the family has bought (their trees are planted near and detailed, markable). */
+  private _ownedLand: Array<{ x0: number; z0: number; x1: number; z1: number }> = [];
+  private _inOwned(x: number, z: number): boolean { return this._ownedLand.some(r => x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1); }
+
+  /** Land bought: replant so its trees are near ones (markable, fellable), and mark its corners. */
+  setOwnedLand(rects: ReadonlyArray<{ x0: number; z0: number; x1: number; z1: number }>): void {
+    const key = JSON.stringify(rects);
+    if (key === JSON.stringify(this._ownedLand)) return;
+    this._ownedLand = rects.map(r => ({ ...r }));
+    if (this._quality) this._plant(this._quality);
+    this._buildCornerPins();
+  }
+
+  /**
+   * What each neighbor parcel is, measured from the land: timber where the
+   * trees are thick, creek bottom where the creek runs through, hay ground on
+   * the level flats along it, dry grazing on the rest.
+   */
+  surveyLand(parcels: ReadonlyArray<{ id: string; rect: { x0: number; z0: number; x1: number; z1: number } }>): Record<string, 'timber' | 'creek_bottom' | 'hay' | 'grazing'> {
+    const out: Record<string, 'timber' | 'creek_bottom' | 'hay' | 'grazing'> = {};
+    for (const p of parcels) {
+      const r = p.rect;
+      let forest = 0, creek = 0, flat = 0, n = 0;
+      for (let x = r.x0 + 3; x < r.x1; x += 6) for (let z = r.z0 + 3; z < r.z1; z += 6) {
+        const s = this.parcel.natural(x, z);
+        forest += s.forest; n++;
+        if (Math.abs(z - this.parcel.creek.zAt(x)) < 8) creek++;
+        if (this.parcel.region.slope(x, z) < 0.06) flat++;
+      }
+      out[p.id] = creek / n > 0.08 ? 'creek_bottom' : forest / n > 0.3 ? 'timber' : flat / n > 0.6 ? 'hay' : 'grazing';
+    }
+    return out;
+  }
+
+  private _pins: THREE.Group | null = null;
+  /** Survey pins at the corners of the land you own: an iron pin in a cap, a lath with orange flagging. */
+  private _buildCornerPins(): void {
+    if (this._pins) { this._ws.scene.remove(this._pins); this._pins.traverse(o => { if (o instanceof THREE.Mesh) o.geometry.dispose(); }); }
+    const g = new THREE.Group();
+    const corners = new Set<string>();
+    for (const r of [{ x0: 0, z0: 0, x1: PARCEL_SIZE, z1: PARCEL_SIZE }, ...this._ownedLand]) for (const [x, z] of [[r.x0, r.z0], [r.x1, r.z0], [r.x0, r.z1], [r.x1, r.z1]]) corners.add(`${x},${z}`);
+    const lath = new THREE.MeshStandardMaterial({ color: 0xd8c39a, roughness: 0.9 }), flag = new THREE.MeshStandardMaterial({ color: 0xff6a1a, roughness: 0.7, side: THREE.DoubleSide });
+    for (const c of corners) {
+      const [x, z] = c.split(',').map(Number);
+      if (x === PARCEL_SIZE) continue;                         // the road side
+      const y = this.groundAt(x, z);
+      const stake = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.2, 0.004), lath); stake.position.set(x, y + 0.1, z); g.add(stake);
+      const f = new THREE.Mesh(new THREE.PlaneGeometry(0.04, 0.012), flag); f.position.set(x + 0.02, y + 0.19, z); g.add(f);
+    }
+    this._ws.scene.add(g);
+    this._pins = g;
+  }
 
   /** (Re)build the near forest from the planted trees, less the ones the family has cut. */
   private _plantForest(): void {
@@ -473,7 +532,7 @@ export class HomesteadWorld {
       const g = runGrowth(r, this._simT);
       return { pts: r.pts, top: PERIMETER[r.kind].height * (r.kind === 'thorn_hedge' ? g : 1), cut: PERIMETER[r.kind].sight * (r.kind === 'thorn_hedge' ? g : r.finishedAt !== null ? 1 : runProgress(r)), gates: r.gates };
     });
-    const inside = (x: number, z: number) => x > -TREE_MARGIN && z > -TREE_MARGIN && x < PARCEL_SIZE + TREE_MARGIN && z < PARCEL_SIZE + TREE_MARGIN;
+    const inside = (x: number, z: number) => (x > -TREE_MARGIN && z > -TREE_MARGIN && x < PARCEL_SIZE + TREE_MARGIN && z < PARCEL_SIZE + TREE_MARGIN) || this._inOwned(x, z);
     return { ground: this.groundAt, trees: this.treeSpecs, forestAt: (x, z) => this.parcel.region.sample(x, z).forest, inside, walls, boxes };
   }
 

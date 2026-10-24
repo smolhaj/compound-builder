@@ -9,6 +9,7 @@ import { newDisaster } from '../disaster';
 import { freshNeeds } from '../needs';
 import { generateNeighbors, newGate } from '../encounters';
 import { emptyStats } from '../report';
+import { newLand } from '../land';
 import { dayJob, type Person } from '../family';
 
 type Raw = Record<string, unknown> & { version?: number };
@@ -33,6 +34,8 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   // 6 → 7: the escape tunnel (culvert, egress hatch)
   6: s => ({ ...s, version: 7, stock: { culvert: 0, egress_hatch: 0, ...(s.stock as object) } }),
   // 7 → 8: bunker hardening (lead, Faraday mesh, blast valves, HEPA sets; the retrofit job list)
+  // 14 → 15: neighbor land
+  14: s => ({ ...s, version: 15, land: newLand(s.seed as number, (s.neighbors as Array<{ id: string }>).map(n => n.id)) }),
   // 13 → 14: run stats and the ending
   13: s => ({ ...s, version: 14, stats: emptyStats(), ending: null }),
   // 12 → 13: electronics fried by an EMP
@@ -62,7 +65,7 @@ export function migrate(raw: unknown): GameState {
     if (!up) throw new SaveVersionError(`No migration from version ${s.version}`);
     s = up(s);
   }
-  for (const k of ['seed', 'clock', 'money', 'stock', 'orders', 'people', 'personState', 'structures', 'forestry', 'heat', 'perimeter', 'utilities', 'hardenJobs', 'disaster', 'food', 'neighbors', 'gate', 'stats', 'log', 'nextId'] as const) {
+  for (const k of ['seed', 'clock', 'money', 'stock', 'orders', 'people', 'personState', 'structures', 'forestry', 'heat', 'perimeter', 'utilities', 'hardenJobs', 'disaster', 'food', 'neighbors', 'gate', 'stats', 'land', 'log', 'nextId'] as const) {
     if (!(k in s)) throw new SaveVersionError(`Save is missing "${k}"`);
   }
   return s as unknown as GameState;

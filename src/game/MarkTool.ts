@@ -3,9 +3,9 @@
  * cursor; click marks it for felling (orange paint band) or unmarks it.
  * Esc / right-click stops. The family fells marked trees in work hours.
  */
+import { ownsAt } from '../sim/land';
 import * as THREE from 'three';
 import type { HomesteadWorld } from './HomesteadWorld';
-import { PARCEL_SIZE } from './parcel/parcelTerrain';
 import type { ParcelTree } from './parcel/parcelTrees';
 import { trunkRadius } from './forestry/woodsGeometry';
 import { useGameStore } from '../store/gameStore';
@@ -65,7 +65,7 @@ export class MarkTool {
   private _setHover(t: ParcelTree | null): void {
     this._hover = t;
     if (!t) { this._ring.visible = false; useGameStore.getState().setToolProblem(null); return; }
-    const own = t.x >= 0 && t.z >= 0 && t.x <= PARCEL_SIZE && t.z <= PARCEL_SIZE;
+    const own = ownsAt(useGameStore.getState().game, t.x, t.z);
     const s = trunkRadius(t.scale, t.kind) * 3.2;
     this._ring.scale.set(s, 1, s);
     this._ring.position.set(t.x, this._world.groundAt(t.x, t.z) + 0.03, t.z);
@@ -79,7 +79,7 @@ export class MarkTool {
   /** Mark / unmark the hovered tree (also QA). */
   markHover(): void {
     const t = this._hover;
-    if (!t || t.x < 0 || t.z < 0 || t.x > PARCEL_SIZE || t.z > PARCEL_SIZE) return;
+    if (!t || !ownsAt(useGameStore.getState().game, t.x, t.z)) return;
     const y = this._world.access.yard;
     useGameStore.getState().toggleMark({ id: t.id, x: t.x, z: t.z, kind: t.kind as 'conifer' | 'oval' | 'broad', scale: t.scale }, Math.hypot(t.x - y.x, t.z - y.z));
     this._setHover(t);
