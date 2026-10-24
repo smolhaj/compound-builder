@@ -18,6 +18,7 @@ import { financeDay } from './finance';
 import { armoryDay } from './armory';
 import { gearDay } from './gear';
 import { vehiclesDay } from './vehicles';
+import { radioDay } from './radio';
 import { waterDay } from './water';
 import { addRunWork, nextRun } from './perimeter';
 import { addFitWork, balanceDay, nextFit, plant } from './utilities';
@@ -112,6 +113,7 @@ function subStep(s: GameState): void {
     for (const line of armoryDay(s)) log(s, line);
     for (const line of gearDay(s)) log(s, line);
     for (const line of vehiclesDay(s)) log(s, line);
+    for (const line of radioDay(s)) log(s, line);
     for (const line of upkeepDay(s, demandNow(s), s.heat.warned !== dayIndex(s.clock.t) - 1 && s.heat.warned !== dayIndex(s.clock.t))) log(s, line);
     for (const line of mutualAidDay(s)) log(s, line);
     const e = gateDay(s);
