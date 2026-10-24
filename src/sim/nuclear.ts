@@ -18,6 +18,7 @@ import { SPARE_FOR } from './utilities';
 import { winterFactor } from './effects';
 export { winterFactor };
 import { mulberry32 } from './rng';
+import { empVehicles } from './vehicles';
 import type { Stock } from './materials';
 
 /** Dose rate at H+1 (Sv/h) at the compound, by variant, and hours until the fallout arrives. */
@@ -89,6 +90,7 @@ export function strike(s: GameState): string[] {
     s.stock[k] = keep + (s.stock[k] - have);
   }
   out.push(`The EMP took out the inverters, the pump controller and the generator's electronics.${lost.length ? ` Spares fried: ${lost.join(', ')}.` : share > 0 ? ' The spares in the Faraday room came through.' : ''}`);
+  out.push(...empVehicles(s));
   // the dash: people in town at work
   s.people.forEach((p, i) => {
     const ps = s.personState[i];
