@@ -837,12 +837,16 @@ export class HomesteadWorld {
       if (!b.finished) continue;
       const sv = serviceOf(game, p, b.placed.id);
       const opts = { plumbed: sv.plumbed, wired: sv.wired, septic: sv.septic };
-      const key = `${+opts.plumbed}${+opts.wired}${+opts.septic}`;
+      // wired but no power yesterday (a blackout, a flat battery): back to lamplight
+      const powered = sv.wired && game.utilities.lit.includes(b.placed.id);
+      const key = `${+opts.plumbed}${+opts.wired}${+opts.septic}${+powered}`;
       if (key === b.services) continue;
+      const geo = key.slice(0, 3) !== (b.services ?? '000').slice(0, 3);
       b.services = key;
-      if (key === '000' && !b.group.userData.opts?.plumbed && !b.group.userData.opts?.wired) continue;
+      if (b.light && !b.under) b.light.color.set(powered ? 0xfff0d8 : 0xffc27a);
+      if (!geo || (key.startsWith('000') && !b.group.userData.opts?.plumbed && !b.group.userData.opts?.wired)) continue;
       this._rebuild(b, { ...b.opts, ...opts });
-      if (b.light && !b.under) b.light.color.set(opts.wired ? 0xfff0d8 : 0xffc27a);
+      if (b.light && !b.under) b.light.color.set(powered ? 0xfff0d8 : 0xffc27a);
     }
   }
 

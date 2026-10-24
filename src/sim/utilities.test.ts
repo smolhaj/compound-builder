@@ -99,3 +99,60 @@ describe('utilities', () => {
     expect(g.utilities.lastDay).toBeGreaterThanOrEqual(0);
   });
 });
+
+describe('the county grid and grid-down', () => {
+  const day = (g: GameState) => balanceDay(g, plant(g), 0.5);
+  const grid = (seed = 1) => { const g = newGame(seed, 172, 2027, { grid: true }); return g; };
+  const outage = (g: GameState) => { g.disaster.tracks = { ...g.disaster.tracks, grid: 0 }; };
+
+  it('on the grid, a wired house and a drilled well just run, and there is a bill', () => {
+    const g = grid();
+    built(g, 'h', 'timber_cabin', 10, 10); built(g, 'w', 'well_drilled', 14, 10);
+    expect(fitProblem(g, plant(g), g.structures[0], 'wire')).toBeNull();     // the grid reaches it
+    g.utilities.fittings.push({ building: 'h', kind: 'wire', done: 30, hours: 30, supplied: true, finishedAt: 0 });
+    const m = g.money;
+    day(g);
+    expect(g.utilities.lit).toEqual(expect.arrayContaining(['h', 'w']));
+    expect(g.utilities.report.waterL).toBeGreaterThan(5000);
+    expect(g.money).toBeLessThan(m);
+  });
+
+  it('when the grid goes down, only what you built runs; grid-tied solar without a battery shuts off', () => {
+    const g = grid();
+    built(g, 'h', 'timber_cabin', 10, 10); built(g, 'w', 'well_drilled', 14, 10); built(g, 's', 'solar_array', 10, 14);
+    g.utilities.fittings.push({ building: 'h', kind: 'wire', done: 30, hours: 30, supplied: true, finishedAt: 0 });
+    line(g, 'power_cable', [[10, 14], [10, 10]]);
+    outage(g);
+    day(g);
+    expect(g.utilities.lit).toEqual([]);                 // anti-islanding: the panels go dead
+    expect(g.utilities.report.waterL).toBe(0);           // the well pump on the grid alone is dead
+    built(g, 'b', 'battery_shed', 12, 14);
+    line(g, 'power_cable', [[12, 14], [10, 14]]);
+    line(g, 'power_cable', [[14, 10], [10, 10]]);
+    g.utilities.batteryKwh = 10;
+    day(g);
+    expect(g.utilities.lit).toEqual(expect.arrayContaining(['h', 'w']));
+    expect(g.utilities.report.waterL).toBeGreaterThan(5000);
+  });
+
+  it('short of power, the pump comes first and the workshop goes without', () => {
+    const g = newGame(1, 355);   // December: little sun, off the grid
+    built(g, 'w', 'well_drilled', 14, 10); built(g, 'k', 'workshop', 10, 6); built(g, 's', 'solar_array', 10, 14);
+    built(g, 'l', 'log_house', 6, 10);
+    for (const b of ['k', 'l']) g.utilities.fittings.push({ building: b, kind: 'wire', done: 30, hours: 30, supplied: true, finishedAt: 0 });
+    line(g, 'power_cable', [[10, 14], [14, 10], [10, 6], [6, 10]]);
+    g.stock.fuel = 0;
+    day(g);
+    expect(g.utilities.lit).toEqual(expect.arrayContaining(['w', 'l']));   // ~9.6 kWh of December sun: pump 1.2 + house 8
+    expect(g.utilities.report.shed).toContain('k');
+  });
+
+  it('a breaker switched off takes a building off the load', () => {
+    const g = grid();
+    built(g, 'h', 'timber_cabin', 10, 10);
+    g.utilities.fittings.push({ building: 'h', kind: 'wire', done: 30, hours: 30, supplied: true, finishedAt: 0 });
+    g.utilities.off = ['h'];
+    day(g);
+    expect(g.utilities.lit).not.toContain('h');
+  });
+});

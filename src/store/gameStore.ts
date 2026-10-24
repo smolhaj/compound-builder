@@ -7,6 +7,9 @@ import { planStructure } from '../sim/construction';
 import { markTree, unmarkTree, isMarked, type TreeRef } from '../sim/forestry';
 import { planRun, type Gate, type PerimeterKind, type Pt } from '../sim/perimeter';
 import { fitProblem, orderFit, plant, repairPump } from '../sim/utilities';
+
+/** Reconnection fee to get back on the grid after leaving it. */
+const GRID_RECONNECT = 250;
 import { triggerDisaster, type DisasterKind } from '../sim/disaster';
 import { log } from '../sim/economy';
 import { hardenProblem, orderHarden, orderHardenAll, tierOf, type HardenId } from '../sim/hardening';
@@ -41,6 +44,10 @@ export interface GameStore {
   setTool: (kind: string | null) => void;
   setToolProblem: (t: string | null) => void;
   select: (id: string | null) => void;
+  /** Leave the county grid, or get back on it (a reconnection fee). */
+  setGrid: (on: boolean) => void;
+  /** A building's breaker. */
+  setBreaker: (id: string, on: boolean) => void;
   /** Keep or quit an adult's day job (peacetime only). */
   setEmployed: (personId: string, on: boolean) => void;
   /** Free build: start a disaster now, after `warnDays` of warning signs. */
@@ -124,6 +131,22 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
   setTool: (tool) => set({ tool, toolProblem: null }),
   setToolProblem: (toolProblem) => set({ toolProblem }),
   select: (selected) => set({ selected }),
+  setGrid: (on) => {
+    const g = structuredClone(get().game);
+    if (g.utilities.grid === on) return;
+    if (on) {
+      if (g.disaster.tracks.grid < 0.5 || g.money < GRID_RECONNECT) return;
+      g.money -= GRID_RECONNECT;
+      log(g, `Back on the county grid ($${GRID_RECONNECT} to reconnect).`);
+    } else log(g, 'The co-op pulled the meter: the place is off the grid.');
+    g.utilities.grid = on;
+    set({ game: g });
+  },
+  setBreaker: (id, on) => {
+    const g = structuredClone(get().game);
+    g.utilities.off = on ? g.utilities.off.filter(x => x !== id) : [...new Set([...g.utilities.off, id])];
+    set({ game: g });
+  },
   setEmployed: (personId, on) => {
     const g = structuredClone(get().game);
     const ps = g.personState.find(x => x.id === personId), p = g.people.find(x => x.id === personId);

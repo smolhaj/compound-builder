@@ -27,7 +27,7 @@ export function SetupScreen() {
   const [diff, setDiff] = useState<Difficulty>('standard');
   const family = generateFamily(seed);
   const start = () => {
-    const game = newGame(seed, 105, 2027, { mode, peace: mode === 'scenario' ? peace : 'random', kind: mode === 'scenario' ? kind : null, dayJobs: jobs, difficulty: diff });
+    const game = newGame(seed, 105, 2027, { mode, peace: mode === 'scenario' ? peace : 'random', kind: mode === 'scenario' ? kind : null, dayJobs: jobs, difficulty: diff, grid: true });
     g.load(game);
     g.openSetup(false);
     void saveGame(AUTOSAVE, game);

@@ -12,7 +12,7 @@ import { emptyUtilities, type Utilities } from './utilities';
 
 import type { HardenId, HardenJob, Tier } from './hardening';
 import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
-export const SAVE_VERSION = 9;
+export const SAVE_VERSION = 10;
 
 /** Starting savings (GDS §1 peacetime money constraint). */
 export const STARTING_MONEY = 30000;
@@ -135,7 +135,7 @@ export interface GameState {
 }
 
 /** New-game choices (the setup screen). Defaults (tests, the dev scene): Free build, no day jobs. */
-export interface RunSetup { difficulty?: Difficulty; mode?: Mode; peace?: PeaceLength; kind?: DisasterKind | null; variant?: string; dayJobs?: boolean }
+export interface RunSetup { difficulty?: Difficulty; mode?: Mode; peace?: PeaceLength; kind?: DisasterKind | null; variant?: string; dayJobs?: boolean; grid?: boolean }
 
 export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: RunSetup = {}): GameState {
   const people = generateFamily(seed);
@@ -152,7 +152,7 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     forestry: { jobs: [], cleared: [] },
     heat: { burned: 0, warned: -1 },
     perimeter: [],
-    utilities: emptyUtilities(),
+    utilities: { ...emptyUtilities(), grid: setup.grid ?? false },
     hardenJobs: [],
     disaster: newDisaster(seed, setup.mode ?? 'sandbox', setup.peace ?? 'random', setup.kind ?? null, setup.variant, setup.difficulty ?? 'standard'),
     log: [{ t: 0, text: `The ${people[0].last} family arrives on the land.` }],

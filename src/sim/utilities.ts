@@ -56,6 +56,14 @@ export const FUEL_L_PER_KWH = 0.45;
 /** Liters in one stock unit of fuel (a 20 L jerry can). */
 export const FUEL_UNIT_L = 20;
 
+/** County grid: price per kWh and the daily service charge (rural co-op, 2020s). */
+export const GRID_USD_PER_KWH = 0.14, GRID_USD_PER_DAY = 0.9;
+/**
+ * Who gets power first when there isn't enough (lower first): pumps, the
+ * root cellar (freezer), homes, then the coop and the workshop.
+ */
+export const LOAD_PRIORITY: Record<string, number> = { well_drilled: 0, root_cellar: 1, timber_cabin: 2, log_house: 2, chicken_coop: 3, workshop: 4 };
+
 export interface Fitting { building: string; kind: 'plumb' | 'wire'; done: number; hours: number; supplied: boolean; finishedAt: number | null }
 
 export interface Utilities {
@@ -69,6 +77,12 @@ export interface Utilities {
   fuelL: number;
   /** Broken pumps (well ids) awaiting repair. */
   broken: string[];
+  /** On the county grid (the account is open; whether it has power is the disaster clock's grid track). */
+  grid: boolean;
+  /** Buildings switched off at their breaker. */
+  off: string[];
+  /** Buildings that had power yesterday (lights on, fridge running). */
+  lit: string[];
   /** Day index of the last balance, and the last day's report (HUD). */
   lastDay: number;
   report: UtilityReport;
@@ -76,11 +90,13 @@ export interface Utilities {
 
 export interface UtilityReport {
   solarKwh: number; drawKwh: number; genKwh: number; shortKwh: number; batteryPct: number;
+  /** From the grid, and what it cost; loads cut for want of power (building ids). */
+  gridKwh: number; billUsd: number; shed: string[];
   waterL: number; useL: number; shortL: number; storedL: number;
 }
 
 export function emptyUtilities(): Utilities {
-  return { fittings: [], batteryKwh: 0, batteryFade: 0, storedL: 0, fuelL: 0, broken: [], lastDay: -1, report: { solarKwh: 0, drawKwh: 0, genKwh: 0, shortKwh: 0, batteryPct: 0, waterL: 0, useL: 0, shortL: 0, storedL: 0 } };
+  return { fittings: [], batteryKwh: 0, batteryFade: 0, storedL: 0, fuelL: 0, broken: [], grid: false, off: [], lit: [], lastDay: -1, report: { solarKwh: 0, drawKwh: 0, genKwh: 0, shortKwh: 0, batteryPct: 0, gridKwh: 0, billUsd: 0, shed: [], waterL: 0, useL: 0, shortL: 0, storedL: 0 } };
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -129,7 +145,7 @@ function linesTouch(a: PerimeterRun, b: PerimeterRun): boolean {
 export interface Service {
   /** Water: a pressurised source (or gravity tower) on its network. */
   water: boolean;
-  /** Power: a source (solar / generator / battery) on its network. */
+  /** Power: the county grid account, or a source (solar / generator / battery) on its network. */
   power: boolean;
   /** Septic on the water network (toilets can flush). */
   septic: boolean;
@@ -161,7 +177,7 @@ function fitted(s: GameState, id: string, kind: Fitting['kind']): boolean {
 export function serviceOf(s: GameState, p: Plant, id: string): Service {
   const net = (m: Map<string, number>, f: (k: string) => boolean) => { const n = m.get(id); return n !== undefined && p.nodes.some(o => m.get(o.id) === n && f(o.kind)); };
   const water = net(p.water, k => !!UTILITY[k]?.water?.pressure || !!UTILITY[k]?.gravity);
-  const power = net(p.power, k => !!(UTILITY[k]?.solarKw || UTILITY[k]?.genKw || UTILITY[k]?.batteryKwh));
+  const power = s.utilities.grid || net(p.power, k => !!(UTILITY[k]?.solarKw || UTILITY[k]?.genKw || UTILITY[k]?.batteryKwh));
   const septic = net(p.water, k => !!UTILITY[k]?.septic);
   return { water, power, septic, plumbed: water && fitted(s, id, 'plumb'), wired: power && fitted(s, id, 'wire') };
 }
@@ -176,7 +192,7 @@ export function fitProblem(s: GameState, p: Plant, st: Structure, kind: Fitting[
   if (s.utilities.fittings.some(f => f.building === st.id && f.kind === kind)) return kind === 'plumb' ? 'already plumbed' : 'already wired';
   const sv = serviceOf(s, p, st.id);
   if (kind === 'plumb' && !sv.water) return 'no pressurised water reaches it (run a pipe from a drilled well or water tower)';
-  if (kind === 'wire' && !sv.power) return 'no power reaches it (run a cable from the solar / battery / generator)';
+  if (kind === 'wire' && !sv.power) return 'no power reaches it (get on the county grid, or run a cable from the solar / battery / generator)';
   return null;
 }
 
@@ -230,40 +246,62 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
   const u = s.utilities, doy = calendarOf(s.clock).doy;
   const fin = s.structures.filter(isFinished);
   const kinds = new Map(fin.map(st => [st.id, st.kind]));
-  // ── power: per network, solar + battery + generator against the wired draw ──
-  let solar = 0, draw = 0, gen = 0, short = 0, capKwh = 0;
-  const nets = new Set([...p.power.values()]);
-  for (const n of nets) {
-    const members = p.nodes.filter(o => p.power.get(o.id) === n);
-    const sol = members.reduce((a, o) => a + (UTILITY[o.kind]?.solarKw ?? 0), 0) * sunHours(doy) * 0.8;
+  // ── power: each network's own sources (solar → battery → grid → generator), loads served by priority ──
+  const gridUp = u.grid && s.disaster.tracks.grid > 0.5;
+  let solar = 0, draw = 0, gen = 0, short = 0, capKwh = 0, gridKwh = 0;
+  const lit = new Set<string>(), shed: string[] = [];
+  const loadOf = (o: Node) => u.off.includes(o.id) ? 0
+    : UTILITY[o.kind]?.water?.needsPower ? (u.broken.includes(o.id) ? 0 : UTILITY[o.kind]!.water!.needsPower!)
+    : fitted(s, o.id, 'wire') ? DRAW_KWH[o.kind] ?? 0 : 0;
+  const isSource = (o: Node) => !!(UTILITY[o.kind]?.solarKw || UTILITY[o.kind]?.genKw || UTILITY[o.kind]?.batteryKwh);
+  const groups = new Map<number | string, Node[]>();
+  for (const o of p.nodes) {
+    const n = p.power.get(o.id);
+    const sourced = n !== undefined && p.nodes.some(x => p.power.get(x.id) === n && isSource(x));
+    const key = sourced ? n! : `solo:${o.id}`;
+    let l = groups.get(key); if (!l) groups.set(key, l = []); l.push(o);
+  }
+  for (const [key, members] of groups) {
+    // a building on no network of its own: the grid or nothing (dark, no shortage to report)
+    if (typeof key === 'string' && !gridUp) continue;
+    const loads = members.filter(o => loadOf(o) > 0).sort((a, b) => (LOAD_PRIORITY[a.kind] ?? 2) - (LOAD_PRIORITY[b.kind] ?? 2));
+    const d = loads.reduce((a, o) => a + loadOf(o), 0);
     const cap = members.reduce((a, o) => a + (UTILITY[o.kind]?.batteryKwh ?? 0), 0) * (1 - u.batteryFade);
     const genKw = members.reduce((a, o) => a + (UTILITY[o.kind]?.genKw ?? 0), 0);
-    let d = members.reduce((a, o) => a + (fitted(s, o.id, 'wire') ? DRAW_KWH[o.kind] ?? 0 : 0), 0);
-    d += members.filter(o => UTILITY[o.kind]?.water?.needsPower && !u.broken.includes(o.id)).reduce((a, o) => a + UTILITY[o.kind]!.water!.needsPower!, 0);
-    if (!sol && !cap && !genKw) continue;
-    solar += sol; draw += d; capKwh += cap;
-    let bal = sol - d;
-    // battery: store the surplus, cover a deficit
+    // grid-tied solar shuts off in a blackout unless a battery (hybrid inverter) is on the network
+    const solarOk = gridUp || cap > 0 || !u.grid;
+    const sol = solarOk ? members.reduce((a, o) => a + (UTILITY[o.kind]?.solarKw ?? 0), 0) * sunHours(doy) * 0.8 : 0;
+    draw += d; solar += sol; capKwh += cap;
+    let have = sol;
+    // battery: bank the surplus, cover the shortfall
     if (cap > 0) {
-      const room = cap - Math.min(u.batteryKwh, cap);
-      if (bal > 0) { u.batteryKwh = Math.min(cap, u.batteryKwh + bal * 0.92); bal = 0; void room; }
-      else { const take = Math.min(-bal, u.batteryKwh); u.batteryKwh -= take; bal += take; }
+      if (have > d) { u.batteryKwh = Math.min(cap, u.batteryKwh + (have - d) * 0.92); have = d; }
+      else { const take = Math.min(d - have, u.batteryKwh); u.batteryKwh -= take; have += take; }
     }
-    // generator for the rest, while there's fuel
-    if (bal < 0 && genKw > 0) {
-      const need = Math.min(-bal, genKw * 8);
-      const liters = need * FUEL_L_PER_KWH;
-      const have = s.stock.fuel * FUEL_UNIT_L - u.fuelL;
-      const run = Math.min(liters, Math.max(0, have));
+    // the county grid, while it's up
+    if (have < d && gridUp) { gridKwh += d - have; have = d; }
+    // the generator for the rest, while there's fuel
+    if (have < d - 0.05 && genKw > 0) {
+      const need = Math.min(d - have, genKw * 8);
+      const fuel = s.stock.fuel * FUEL_UNIT_L - u.fuelL;
+      const run = Math.min(need * FUEL_L_PER_KWH, Math.max(0, fuel));
       u.fuelL += run;
       while (u.fuelL >= FUEL_UNIT_L) { u.fuelL -= FUEL_UNIT_L; s.stock.fuel--; }
       const made = run / FUEL_L_PER_KWH;
-      gen += made; bal += made;
-      if (have <= 0.01) log(s, 'The generator is out of fuel.');
+      gen += made; have += made;
+      if (fuel <= 0.01) log(s, 'The generator is out of fuel.');
     }
-    if (bal < -0.05) short += -bal;
+    // serve the loads in order of priority; the rest go without
+    for (const o of loads) {
+      if (have + 0.05 >= loadOf(o)) { have -= loadOf(o); lit.add(o.id); }
+      else shed.push(o.id);
+    }
+    short += loads.filter(o => shed.includes(o.id)).reduce((a, o) => a + loadOf(o), 0);
   }
   if (short > 0.5) log(s, `Power ran short by ${short.toFixed(1)} kWh: lamps tonight.`);
+  u.lit = [...lit];
+  const bill = u.grid && gridUp ? gridKwh * GRID_USD_PER_KWH + GRID_USD_PER_DAY : 0;
+  s.money -= bill;
   // batteries fade ~2.5 % a year with use
   if (capKwh > 0) u.batteryFade = Math.min(0.4, u.batteryFade + 0.025 / 365);
 
@@ -273,7 +311,7 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
     const def = UTILITY[st.kind];
     if (!def) continue;
     if (def.water) {
-      const powered = !def.water.needsPower || (p.power.has(st.id) && solar + gen + u.batteryKwh > 0.5);
+      const powered = !def.water.needsPower || lit.has(st.id);
       if (!u.broken.includes(st.id) && powered) supply += def.water.lpd;
       // pumps wear out: ~1 failure in 2 years of use
       if (def.water.needsPower && !u.broken.includes(st.id) && rnd < 1 / 700) { u.broken.push(st.id); log(s, 'The well pump has failed: a mechanic and a hardware kit to fix it.'); }
@@ -293,7 +331,7 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
   else u.storedL = Math.min(store, u.storedL + left);
   // no supply at all: water is hauled from the creek (that's the default before any well)
   if (left < 0 && supply + store > 0) { shortL = -left; log(s, `Water ran short by ${Math.round(shortL)} L.`); }
-  u.report = { solarKwh: solar, drawKwh: draw, genKwh: gen, shortKwh: short, batteryPct: capKwh > 0 ? u.batteryKwh / capKwh : 0, waterL: supply + rainL, useL: use, shortL, storedL: u.storedL };
+  u.report = { solarKwh: solar, drawKwh: draw, genKwh: gen, shortKwh: short, batteryPct: capKwh > 0 ? u.batteryKwh / capKwh : 0, gridKwh, billUsd: bill, shed, waterL: supply + rainL, useL: use, shortL, storedL: u.storedL };
   u.lastDay = dayIndex(s.clock.t);
 }
 
