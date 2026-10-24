@@ -32,7 +32,7 @@ import { generateNeighbors, newGate, type GateState, type Neighbor } from './enc
 import { freshNeeds, type FoodReport, type Needs } from './needs';
 import type { WeatherState } from './weatherThreats';
 import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
-export const SAVE_VERSION = 30;
+export const SAVE_VERSION = 31;
 
 /** Starting savings (GDS §1 peacetime money constraint). */
 export const STARTING_MONEY = 30000;
