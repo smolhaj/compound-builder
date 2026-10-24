@@ -146,6 +146,7 @@ export function buyGun(s: GameState, model: string): string | null {
   const m = GUN[model];
   if (!m) return 'no such gun';
   if (m.contraband) return 'no shop sells that';
+  if (s.breakins?.prohibited) return 'a felony record: the background check says no';
   if (!shopOpen(s)) return 'the gun shop is closed';
   const ban = stateBan(s, m);
   if (ban) return ban;
@@ -175,6 +176,7 @@ export function buyGun(s: GameState, model: string): string | null {
 
 export function buyAmmo(s: GameState, cal: Caliber, boxes: number): string | null {
   if (!shopOpen(s)) return 'the gun shop is closed';
+  if (s.breakins?.prohibited) return 'a felony record: no ammunition either';
   if (boxes > ammoLimit(s)) return `limit ${ammoLimit(s)} boxes a caliber (everyone's buying)`;
   const c = CALIBER[cal], cost = Math.round(c.price * boxes * gunPrices(s) * 1.08);
   if (s.money < cost) return 'not enough money';

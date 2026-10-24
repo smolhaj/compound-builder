@@ -18,6 +18,7 @@ import { forewarned } from './radio';
 import { gearPosture } from './gear';
 import { armed, firepower } from './armory';
 import { applyBattle, planBattle } from './battle';
+import { breakInDay, resolveBreakIn } from './breakins';
 import type { Aftermath, Prisoner } from './aftermath';
 import { isHome } from './blueprints';
 import { log } from './economy';
@@ -139,8 +140,8 @@ export function postureOf(s: GameState): Posture {
 // Encounters
 // ─────────────────────────────────────────────────────────────────────────
 
-export type EncounterKind = 'arrival' | 'looters' | 'gang' | 'refugees' | 'requisition' | 'neighbor_help' | 'trader' | 'horde' | 'patrol' | 'militia';
-export type Stance = 'hide' | 'parley' | 'warn' | 'defend' | 'trade' | 'take_in' | 'trial' | 'turn_away';
+export type EncounterKind = 'arrival' | 'looters' | 'gang' | 'refugees' | 'requisition' | 'neighbor_help' | 'trader' | 'horde' | 'patrol' | 'militia' | 'break_in';
+export type Stance = 'hide' | 'parley' | 'warn' | 'defend' | 'trade' | 'take_in' | 'trial' | 'turn_away' | 'call_911' | 'shout' | 'confront';
 
 export interface Encounter {
   id: string;
@@ -326,6 +327,8 @@ export function gateDay(s: GameState): Encounter | null {
   g.day = day;
   if (g.pending) return null;
   const d = s.disaster;
+  // while the law works (before the collapse, or once it's back): now and then a break-in (sim/breakins.ts)
+  if (d.tracks.law >= 0.5) { const b = breakInDay(s, day); if (b) { g.pending = b; return b; } }
   if (!d.kind || s.clock.t < d.hitAt + 1) return null;
   // fallout keeps everyone indoors for the first two weeks of a nuclear war
   if (d.kind === 'nuclear' && s.clock.t < d.hitAt + 14) return null;
@@ -384,7 +387,10 @@ export function resolve(s: GameState, stance: Stance): Outcome {
   const negotiator = Math.max(0, ...s.people.filter((x, i) => !x.kid && s.personState[i]?.needs.died == null).map(x => x.skills.negotiator));
   const lines: string[] = [];
   let title = '', text = '', tone: Outcome['tone'] = 'mixed';
-  if (e.kind === 'arrival') {
+  if (e.kind === 'break_in') {
+    const o = resolveBreakIn(s, e, stance);
+    title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines);
+  } else if (e.kind === 'arrival') {
     if (stance === 'take_in' || stance === 'trial') {
       for (const person of e.people ?? []) { s.people.push(person); s.personState.push({ id: person.id, task: 'idle', target: null, needs: freshNeeds() }); }
       give(s, e.brings ?? {});

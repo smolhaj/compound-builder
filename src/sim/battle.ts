@@ -57,6 +57,13 @@ export interface BattleOptions {
   /** Override the explosives they carry (otherwise from how long since the collapse). */
   grenades?: number;
   rockets?: number;
+  /**
+   * A peacetime break-in while the law works (sim/breakins.ts): the intruders
+   * are already at the house, carry a pistol at most, no armor or explosives;
+   * they run at the first shot from the family (or after a few seconds facing
+   * them), and someone shouts that the police are coming. No breach of a line.
+   */
+  peacetime?: boolean;
 }
 /** A planned battle plus what applyBattle needs (still a Battle for the playback). */
 export interface PlannedBattle extends Battle {
@@ -197,15 +204,16 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
   const daysAfter = s.disaster.kind ? Math.max(0, s.clock.t - s.disaster.hitAt) : 0;
   const late = Math.min(1, daysAfter / 365);
   const armedR = opts.armed !== false;
-  let gLeft = opts.grenades ?? (armedR ? Math.round(raiders * late * 0.6 * r()) : 0);
-  let rLeft = opts.rockets ?? (armedR && daysAfter > 120 && r() < late * 0.5 ? 1 : 0);
+  const peace = !!opts.peacetime;
+  let gLeft = opts.grenades ?? (armedR && !peace ? Math.round(raiders * late * 0.6 * r()) : 0);
+  let rLeft = opts.rockets ?? (armedR && !peace && daysAfter > 120 && r() < late * 0.5 ? 1 : 0);
   for (let i = 0; i < raiders; i++) {
-    const p = at(30 + r() * 4, (r() - 0.5) * 8);
+    const p = peace ? at(1.5 + r() * 2, (r() - 0.5) * 3) : at(30 + r() * 4, (r() - 0.5) * 8);
     const autoR = armedR && late > 0.5 && r() < 0.3;
-    const arm: Arm = !armedR ? FISTS : { ...(autoR ? ARMS.auto_rifle : r() < 0.55 ? ARMS.semi_rifle : r() < 0.6 ? ARMS.pump : ARMS.pistol), cal: null };
+    const arm: Arm = !armedR ? FISTS : peace ? { ...ARMS.pistol, cal: null } : { ...(autoR ? ARMS.auto_rifle : r() < 0.55 ? ARMS.semi_rifle : r() < 0.6 ? ARMS.pump : ARMS.pistol), cal: null };
     const gr = gLeft > 0 ? 1 : 0; gLeft -= gr;
     const rk = rLeft > 0 && i > 0 ? 1 : 0; rLeft -= rk;
-    const f: Fighter = { id: `r${i}`, side: 'raider', ...p, y: 0, hp: 100, out: false, dead: false, arm, skill: 3 + Math.floor(r() * 4), readyAt: 0, post: null, cover: 1, moving: true, nextMove: 0, shelter: false, grenades: gr, rockets: rk, leader: i === 0, armor: { plate: armedR && r() < late * 0.35, soft: armedR && r() < 0.15 + late * 0.2, helmet: armedR && r() < late * 0.3 }, inGun: arm.mag, spare: 2 + Math.round(late * 3), bleed: 0, supp: 0, nvg: armedR && late > 0.6 && r() < 0.25, wear: 0.5 + r() * 0.4 };
+    const f: Fighter = { id: `r${i}`, side: 'raider', ...p, y: 0, hp: 100, out: false, dead: false, arm, skill: 3 + Math.floor(r() * 4), readyAt: 0, post: null, cover: 1, moving: true, nextMove: 0, shelter: false, grenades: gr, rockets: rk, leader: i === 0, armor: { plate: armedR && !peace && r() < late * 0.35, soft: armedR && !peace && r() < 0.15 + late * 0.2, helmet: armedR && !peace && r() < late * 0.3 }, inGun: arm.mag, spare: 2 + Math.round(late * 3), bleed: 0, supp: 0, nvg: armedR && !peace && late > 0.6 && r() < 0.25, wear: 0.5 + r() * 0.4 };
     F.push(f); units.push({ id: f.id, side: 'raider', x: r2(p.x), z: r2(p.z), post: 'open' });
   }
   const H = F.filter(f => f.side === 'home'), R = F.filter(f => f.side === 'raider');
@@ -311,7 +319,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
     ev.push({ t: r2(t), kind: 'explosion', x: r2(x), z: r2(z), radius, hits, ...(wrecks ? { wrecks } : {}) });
   };
   // how organized they are: later in the collapse, armored, more of them carry rifles
-  const org = Math.min(1, late * 0.7 + R.filter(f => f.armor.plate || f.armor.soft).length / Math.max(1, raiders) * 0.4);
+  const org = peace ? 0 : Math.min(1, late * 0.7 + R.filter(f => f.armor.plate || f.armor.soft).length / Math.max(1, raiders) * 0.4);
   let shaken = false;
   let wallDown = false, breached = false, fled = false, end: PlannedBattle['result'] | null = null, endT = 0;
   let breachT = 0, lineSince = -1;
@@ -421,7 +429,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
       ev.push({ t, kind: 'alarm', what });
       if (lightsOn) ev.push({ t: t + 1, kind: 'lights' });
       const l0 = lead();
-      say(t, l0?.vet ? (what === 'dog' ? 'Dog\'s alerting. Contact on the drive — everyone to your spots.' : 'Contact. Everyone up, to your spots. Now.')
+      say(t, peace ? v(l0, ['Who\'s there?! Someone\'s in the house — oh God —', 'I hear you down there — I have a gun!'], ['Intruder, downstairs. Everyone stay put.']) : l0?.vet ? (what === 'dog' ? 'Dog\'s alerting. Contact on the drive — everyone to your spots.' : 'Contact. Everyone up, to your spots. Now.')
         : what === 'dog' ? pick(['The dog — shit, there\'s people out there! Get up, get UP!', 'Why is the dog — oh fuck. Fuck! They\'re coming!'])
         : what === 'camera' ? pick(['There\'s people on the camera — oh shit, they\'ve got guns!', 'Fuck — look at the camera — they\'re coming up the drive!'])
         : what === 'tripwire' ? 'That\'s the tripwire — shit — they\'re in the trees!' : pick(['Shit, shit — there\'s people coming up the drive!', 'Fuck! They\'re coming! Everybody up!']), l0);
@@ -429,7 +437,8 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
         say(t + 1, v(l0, ['Kids — downstairs, NOW! Don\'t come out till I say!', 'Get the kids in the back — go, go, GO!'], ['Kids to the shelter. Stay down, stay quiet.']), l0);
         say(t + 2.2, pick(['What\'s happening?! Is that — are those guns?!', 'I\'m scared — I\'m scared —', 'Is somebody coming?']), H.find(h => h.shelter && h.kid));
       }
-      say(t + 2, pick(['Spread out! Hit the house!', 'Go, go — flank \'em!', 'Come out and nobody gets hurt! We just want the food!', 'Light \'em up!']), R[0]);
+      if (peace) say(t + 1.5, v(l0, ['I called 911! The police are on their way! GET OUT OF MY HOUSE!', 'The sheriff\'s coming — get out, GET OUT!'], ['Sheriff\'s on the way. Leave. Now.']), l0);
+      if (peace) say(t + 2, pick(['Shit — somebody\'s home!', 'Go, go — he\'s got a gun!']), R[0]); else say(t + 2, pick(['Spread out! Hit the house!', 'Go, go — flank \'em!', 'Come out and nobody gets hurt! We just want the food!', 'Light \'em up!']), R[0]);
       for (const f of H) if (f.shelter) toShelter(f, t); else { assignPost(f, t); if (!f.vet) f.readyAt += 1 + r() * 3; }   // civilians freeze a moment; those who served go straight to it
     }
     for (const p of posts) p.fire *= 0.7;
@@ -493,7 +502,9 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
     const losses = R.filter(f => f.out || f.dry).length;
     let firstBlood = false;
     if (!shaken && !fled && !breached && org < 0.35 && losses > 0 && t < 40) { shaken = true; firstBlood = r() < 0.4; }
-    if (!fled && !breached && rUp.length && (losses >= Math.max(1, raiders * (0.25 + 0.3 * org)) || R[0].out || firstBlood)) {
+    // a break-in: they run at the first shot from the family, or soon after they find someone awake and facing them
+    const peaceBreak = peace && alarmed && (losses > 0 || t >= 10 || ev.some(e => e.kind === 'shot' && e.from.startsWith('h_')));
+    if (!fled && !breached && rUp.length && (losses >= Math.max(1, raiders * (0.25 + 0.3 * org)) || R[0].out || firstBlood || peaceBreak)) {
       fled = true;
       const l1 = lead();
       t += 1;   // after this second's shots land
@@ -569,7 +580,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
     const hNow = H.filter(f => !f.out && !f.shelter && f.arm !== FISTS).length;
     // a wall takes time to get over (a ladder, bolt cutters, a truck): ~10 s at it, exposed, before the first are across
     const climbing = wallR > 0 && !wallDown;
-    if (!breached && atLine.length && (wallDown || hNow === 0 || rUp.length > hNow * 2) && (!climbing || (t - lineSince >= 10 && r() < 0.02 * atLine.length))) {
+    if (!breached && !peace && atLine.length && (wallDown || hNow === 0 || rUp.length > hNow * 2) && (!climbing || (t - lineSince >= 10 && r() < 0.02 * atLine.length))) {
       breached = true; breachT = t;
       const p = at(lineR, 0);
       ev.push({ t, kind: 'breach', x: r2(p.x), z: r2(p.z) });
