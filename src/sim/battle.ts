@@ -525,10 +525,20 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
       if (f.dry) { f.fled = true; ev.push({ t, kind: 'flee', unit: f.id }); if (r() < 0.5) say(t, pick(['I\'m dry! I\'m out!', 'No ammo — I\'m outta here!']), f); continue; }
       if (t < f.readyAt) continue;
       if (breached) {
-        // inside: go for the house, shoot anyone not in a hard shelter
+        // inside: go for the house and the stores. They fight whoever still fights; someone hiding unarmed is
+        // mostly found and held at gunpoint, not shot (a panicked shot now and then); the wounded on the ground are left
         if (d > 1.2) { const s2 = Math.min(MOVE, d - 1); f.x += (C.x - f.x) / d * s2; f.z += (C.z - f.z) / d * s2; if (t % 3 === 0) ev.push({ t, kind: 'move', unit: f.id, x: r2(f.x), z: r2(f.z) }); }
-        const tg = H.filter(h => !h.dead && !h.escaped && !(h.shelter && hardShelter) && dist(h, f) <= f.arm.range + 3).sort((a, b) => dist(a, f) - dist(b, f))[0];
+        const near = (h: Fighter) => !h.dead && !h.escaped && dist(h, f) <= f.arm.range + 3;
+        const fighting = H.filter(h => near(h) && !h.out && !h.shelter).sort((a, b) => dist(a, f) - dist(b, f))[0];
+        const hiding = !fighting && d <= 2 && r() < 0.04 ? H.find(h => near(h) && h.shelter && !hardShelter) : undefined;
+        const tg = fighting ?? hiding;
         if (tg && r() < f.arm.rate) { if (tg.shelter) tg.cover = 0.5; shoot(f, tg, t + r() * 0.9); }
+        if (!fighting && d <= 2 && !f.saidAt && r() < 0.3 && H.some(h => h.shelter && !h.dead && !h.escaped && !hardShelter)) {
+          f.saidAt = t;
+          say(t, pick(['Hands where I can see them! Don\'t move!', 'On the floor! Nobody be a hero!', 'Where\'s the food? WHERE\'S THE FOOD?']), f);
+          const kid = H.find(h => h.shelter && h.kid && !h.dead && !h.escaped);
+          if (kid) say(t + 1, pick(['Please don\'t hurt us — please —', 'Mom? Dad? DAD?', 'Take it, take it all, just go —']), kid);
+        }
         continue;
       }
       // rockets at the best post in range
