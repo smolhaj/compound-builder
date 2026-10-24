@@ -17,7 +17,7 @@ export type KitMaterialId = 'timber_lap' | 'trim' | 'fieldstone' | 'metal_roof' 
   // interior finishes and furnishings
   | 'pine_panel' | 'wood_dark' | 'wood_mid' | 'iron' | 'enamel' | 'quilt_red' | 'quilt_blue' | 'linen' | 'rug' | 'books' | 'lamp' | 'cutcap' | 'crockery'
   // more buildings
-  | 'concrete' | 'metal_siding' | 'log_wall' | 'log_end' | 'board_batten' | 'wire_mesh' | 'straw' | 'soil' | 'crop' | 'earth' | 'pegboard' | 'steel' | 'paint_red' | 'paint_green' | 'paint_yellow'
+  | 'concrete' | 'metal_siding' | 'log_wall' | 'log_end' | 'board_batten' | 'wire_mesh' | 'straw' | 'soil' | 'crop' | 'earth' | 'pegboard' | 'steel' | 'paint_red' | 'paint_green' | 'paint_yellow' | 'paint_bunker' | 'bulkhead' | 'glow'
   // perimeter
   | 'hedge' | 'hedge2' | 'hedge_berry' | 'container_red' | 'container_blue' | 'container_green' | 'container_tan'
   // homey decor (procedural art)
@@ -538,12 +538,14 @@ export function kitMaterial(id: KitMaterialId): THREE.MeshStandardMaterial {
     case 'string': m = new THREE.MeshStandardMaterial({ color: 0xff7a1a, roughness: 0.6, emissive: new THREE.Color(0.3, 0.08, 0) }); break;
     case 'chimney_cap': m = new THREE.MeshStandardMaterial({ color: 0x5a5650, roughness: 0.6, metalness: 0.3 }); break;
     // see-through (rooms are furnished); a little reflection, warm glow from the lamps at night
-    case 'glass': m = new THREE.MeshStandardMaterial({ color: 0x9fb4c0, roughness: 0.05, metalness: 0.2, transparent: true, opacity: 0.28, depthWrite: false, emissive: new THREE.Color(1.0, 0.72, 0.42), emissiveIntensity: 0 }); break;
+    case 'glass': m = new THREE.MeshStandardMaterial({ color: 0x9fb4c0, roughness: 0.05, metalness: 0.2, transparent: true, opacity: 0.28, depthWrite: false }); break;
+    // lit windows from outside: one-sided (faces out), invisible by day
+    case 'glow': m = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 1, transparent: true, opacity: 0, depthWrite: false, emissive: new THREE.Color(1.0, 0.72, 0.42), emissiveIntensity: 0, side: THREE.FrontSide }); m.visible = false; break;
     case 'pine_panel': m = texMat(id, paintPinePanel, 1.2, 0.7); break;
     case 'wood_dark': m = new THREE.MeshStandardMaterial({ color: 0x5a3b24, roughness: 0.6 }); break;
     case 'wood_mid': m = new THREE.MeshStandardMaterial({ color: 0x9a6a3e, roughness: 0.65 }); break;
     case 'iron': m = new THREE.MeshStandardMaterial({ color: 0x1e1e1f, roughness: 0.55, metalness: 0.7 }); break;
-    case 'enamel': m = new THREE.MeshStandardMaterial({ color: 0xece8de, roughness: 0.25 }); break;
+    case 'enamel': m = new THREE.MeshStandardMaterial({ color: 0xdcd8ce, roughness: 0.35 }); break;
     case 'crockery': m = new THREE.MeshStandardMaterial({ color: 0x8fa6b6, roughness: 0.35 }); break;
     case 'linen': m = new THREE.MeshStandardMaterial({ color: 0xeee6d6, roughness: 0.9 }); break;
     case 'quilt_red': m = texMat(id, paintQuilt([168, 52, 44], 81), 0.6, 0.95); break;
@@ -569,6 +571,8 @@ export function kitMaterial(id: KitMaterialId): THREE.MeshStandardMaterial {
     case 'crop': m = new THREE.MeshStandardMaterial({ color: 0x4f8a34, roughness: 0.85 }); break;
     case 'steel': m = new THREE.MeshStandardMaterial({ color: 0x7c8186, roughness: 0.4, metalness: 0.75 }); break;
     case 'paint_red': m = new THREE.MeshStandardMaterial({ color: 0x9c2f26, roughness: 0.6 }); break;
+    case 'paint_bunker': m = new THREE.MeshStandardMaterial({ color: 0xc9d3c2, roughness: 0.55 }); break;
+    case 'bulkhead': m = new THREE.MeshStandardMaterial({ color: 0xfff6e0, roughness: 0.3, emissive: new THREE.Color(1.0, 0.93, 0.78), emissiveIntensity: 1.4 }); break;
     case 'paint_yellow': m = new THREE.MeshStandardMaterial({ color: 0xd9a92a, roughness: 0.55 }); break;
     case 'paint_green': m = new THREE.MeshStandardMaterial({ color: 0x3f5f3a, roughness: 0.6 }); break;
     case 'art_mountains': m = texMat(id, paintLandscape(3, ['rgb(120,160,200)', 'rgb(200,215,225)'], ['rgb(110,120,140)', 'rgb(70,100,70)', 'rgb(90,120,60)']), 0.4, 0.6); break;
@@ -602,8 +606,8 @@ export function kitMaterial(id: KitMaterialId): THREE.MeshStandardMaterial {
 
 /** Interior lights behind the glass (0 = off … 1 = a warm lit room at night). */
 export function setWindowGlow(k: number): void {
-  const g = _cache.get('glass');
-  if (g) g.emissiveIntensity = 1.1 * k;
+  const g = _cache.get('glow');
+  if (g) { g.emissiveIntensity = 1.1 * k; g.opacity = Math.min(0.9, k * 1.2); g.visible = k > 0.02; }
   const l = _cache.get('lamp');
   if (l) l.emissiveIntensity = 0.4 + 2.6 * k;
 }

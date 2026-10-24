@@ -23,8 +23,9 @@ import { CELL } from './buildkit/kit';
 import type { GameState } from '../sim/state';
 import type { WearSeason } from '../engine/world/people/crowdWear';
 import type { TourBuildingInfo } from '../engine/world/camera/TourController';
-import { footprint, KIT, type Placed } from './buildkit/kit';
-import { showStage, CUTAWAY_HIDE, XRAY_LAYERS, type BuildLayer as CabinLayer } from './buildkit/shell';
+import { footprint, KIT, rotQ, type Placed } from './buildkit/kit';
+import { showStage, CUTAWAY_HIDE, XRAY_LAYERS, type BuildLayer as CabinLayer, type BuildOpts } from './buildkit/shell';
+import { datums, doorsOf, DEPTH, isEntry, isUnderground } from './buildkit/underground';
 import { buildLayers, type Seat } from './buildkit/buildings';
 import { hashStr } from './buildkit/clutter';
 import { buildRun, solidSpans } from './perimeter/perimeterGeometry';
@@ -36,7 +37,8 @@ import type { BuildingView } from '../store/worldStore';
 import type { Structure } from '../sim/state';
 import { BLUEPRINTS } from '../sim/blueprints';
 import { SmokePlume } from '../engine/world/fx/SmokePlume';
-import type { Pad } from './parcel/parcelTerrain';
+import type { Pad, Pit } from './parcel/parcelTerrain';
+import { pitReach } from './parcel/parcelTerrain';
 import { SeasonController, climateFor, type SeasonMode } from '../engine/world/season/seasonState';
 import { writeSeasonUniforms } from '../engine/world/season/seasonShader';
 import { PARCEL_SIZE, ParcelTerrain } from './parcel/parcelTerrain';
@@ -69,6 +71,10 @@ interface Built {
   light: THREE.PointLight | null;
   /** Services the interior was built with ('pws' bits). */
   services: string;
+  /** What the geometry was built with (services, and for bunker rooms their doorways and depth). */
+  opts: BuildOpts;
+  /** Bunker rooms: floor level (the bunker's datum) and the doorway / depth key they were built for. */
+  under: { datum: number; key: string } | null;
 }
 
 /** See-through variants of the kit materials (x-ray view), shared. */
@@ -354,7 +360,8 @@ export class HomesteadWorld {
   // ── Sightlines ────────────────────────────────────────────────────────
   /** What blocks sight now: terrain, standing trees, the regional forest, grown hedges / walls, buildings. */
   sightWorld(): SightWorld {
-    const boxes = [...this._built.values()].map(b => {
+    // bunker rooms are under the ground (an entrance's hatch or headhouse is too small to count)
+    const boxes = [...this._built.values()].filter(b => !b.under).map(b => {
       const box = new THREE.Box3().setFromObject(b.group);
       return { x0: box.min.x, z0: box.min.z, x1: box.max.x, z1: box.max.z, top: box.max.y };
     });
@@ -385,7 +392,7 @@ export class HomesteadWorld {
 
   /** Lit windows at night (finished buildings with a lamp, and the campfire until a home stands). */
   nightLights(): Array<{ x: number; z: number; h: number; k: number }> {
-    const out = [...this._built.values()].filter(b => b.finished && KIT[b.placed.kind].light).map(b => ({ x: b.placed.x, z: b.placed.z, h: KIT[b.placed.kind].floorY + 0.25, k: KIT[b.placed.kind].sleeps > 0 ? 1 : 0.6 }));
+    const out = [...this._built.values()].filter(b => b.finished && KIT[b.placed.kind].light && !b.under).map(b => ({ x: b.placed.x, z: b.placed.z, h: KIT[b.placed.kind].floorY + 0.25, k: KIT[b.placed.kind].sleeps > 0 ? 1 : 0.6 }));
     if (!out.some(l => l.k === 1)) out.push({ x: this.camp.x, z: this.camp.z, h: 0.15, k: 0.8 });
     return out;
   }
@@ -393,7 +400,7 @@ export class HomesteadWorld {
   /** Share of the county road that can see each building (its windows, ≈ 1.5 m up). */
   buildingExposure(): Record<string, number> {
     const s = new Sight(this.sightWorld()), obs = this.observers('road'), out: Record<string, number> = {};
-    for (const b of this._built.values()) out[b.placed.id] = exposure(s, { ground: this.groundAt }, b.placed.x, b.placed.z, KIT[b.placed.kind].floorY + 0.25, obs);
+    for (const b of this._built.values()) if (!b.under) out[b.placed.id] = exposure(s, { ground: this.groundAt }, b.placed.x, b.placed.z, KIT[b.placed.kind].floorY + 0.25, obs);
     return out;
   }
 
@@ -503,10 +510,28 @@ export class HomesteadWorld {
     if (this._built.has(p.id)) return;
     const def = KIT[p.kind];
     const r = footprint(def, p.x, p.z, p.rot);
-    const y = this.parcel.padHeight(r.x0, r.z0, r.x1, r.z1);
-    const pad: Pad = { x0: r.x0 - 0.05, z0: r.z0 - 0.05, x1: r.x1 + 0.05, z1: r.z1 + 0.05, y, skirt: 0.9 };
-    this.parcel.setPads([...this.parcel.pads, pad]);
-    const group = buildLayers(def, hashStr(p.id + ':' + this.parcel.seed));
+    const below = isUnderground(def);
+    let y = this.parcel.padHeight(r.x0, r.z0, r.x1, r.z1);
+    // bunker rooms take no pad (the yard above stays as it is); an entrance's hatch or headhouse gets a small one
+    const pad: Pad | null = !below || isEntry(def) ? { x0: r.x0 - 0.05, z0: r.z0 - 0.05, x1: r.x1 + 0.05, z1: r.z1 + 0.05, y, skirt: below ? 0.4 : 0.9 } : null;
+    if (below && p.kind === 'bunker_stairs') {
+      // the stairwell's headhouse is at its top (+z) end: grade only there
+      const [hx, hz] = rotQ(0, def.cellsZ * CELL / 2 - 0.25, p.rot);
+      const t = footprint({ ...def, cellsZ: 1 }, p.x + hx, p.z + hz, p.rot);
+      Object.assign(pad!, { x0: t.x0 - 0.05, z0: t.z0 - 0.05, x1: t.x1 + 0.05, z1: t.z1 + 0.05, y: y = this.parcel.padHeight(t.x0, t.z0, t.x1, t.z1) });
+    }
+    if (pad) this.parcel.setPads([...this.parcel.pads, pad]);
+    const opts: BuildOpts = {};
+    let under: Built['under'] = null;
+    if (below) {
+      const placed = [...[...this._built.values()].map(b => b.placed), p];
+      const datum = datums(placed, this._naturalH).get(p.id) ?? this._naturalH(p.x, p.z) - DEPTH;
+      under = { datum, key: '' };
+      Object.assign(opts, this._underOpts(p, placed, datum));
+      under.key = JSON.stringify(opts);
+      y = datum;
+    }
+    const group = buildLayers(def, hashStr(p.id + ':' + this.parcel.seed), opts);
     showStage(group, 0, 0);
     group.position.set(p.x, y, p.z);
     group.rotation.y = p.rot * Math.PI / 2;
@@ -519,13 +544,82 @@ export class HomesteadWorld {
     if (smoke) this._ws.scene.add(smoke.points);
     let light: THREE.PointLight | null = null;
     if (def.light) {
-      light = new THREE.PointLight(0xffc27a, 0, def.cellsX * CELL * 1.4 + 0.6, 2);
+      // reach about the room (point lights cast no shadows here, so a long reach would light the yard through the walls)
+      light = new THREE.PointLight(0xffc27a, 0, Math.hypot(def.cellsX, def.cellsZ) * CELL * 0.6 + 0.1, 2);
       light.position.set(def.light[0], def.floorY + def.light[1], def.light[2]);
       light.visible = false;
       group.add(light);
     }
-    this._built.set(p.id, { placed: p, group, smoke, key: '', finished: false, padY: y, light, services: '000' });
-    this.terrain.refresh(this._terrainSource, pad.x0 - pad.skirt - 1, pad.z0 - pad.skirt - 1, pad.x1 + pad.skirt + 1, pad.z1 + pad.skirt + 1);
+    this._built.set(p.id, { placed: p, group, smoke, key: '', finished: false, padY: y, light, services: '000', opts, under });
+    if (pad) this.terrain.refresh(this._terrainSource, pad.x0 - pad.skirt - 1, pad.z0 - pad.skirt - 1, pad.x1 + pad.skirt + 1, pad.z1 + pad.skirt + 1);
+    if (below) this._syncUnderground();
+    if (this._quality) this._plant(this._quality);
+    this._applyView(this._built.get(p.id)!);
+    this._ws.invalidateShadows();
+  }
+
+  private readonly _naturalH = (x: number, z: number) => this.parcel.natural(x, z).h;
+
+  /** A bunker room's doorways (its neighbours) and the ground above its surface point. */
+  private _underOpts(p: Placed, placed: readonly Placed[], datum: number): BuildOpts {
+    const def = KIT[p.kind];
+    // the surface point: the stairwell's top end, otherwise the middle
+    const [sx, sz] = p.kind === 'bunker_stairs' ? rotQ(0, def.cellsZ * CELL / 2 - 0.25, p.rot) : [0, 0];
+    const ground = this.parcel.sample(p.x + sx, p.z + sz).h;
+    return { doors: doorsOf(p, placed), depth: Math.round((ground - datum) * 1000) / 1000 };
+  }
+
+  /** New neighbours open new doorways: rebuild the bunker rooms whose doorways changed. */
+  private _syncUnderground(): void {
+    const placed = [...this._built.values()].map(b => b.placed);
+    for (const b of this._built.values()) {
+      if (!b.under) continue;
+      const u = this._underOpts(b.placed, placed, b.under.datum);
+      const key = JSON.stringify(u);
+      if (key === b.under.key) continue;
+      b.under.key = key;
+      this._rebuild(b, { ...b.opts, ...u });
+    }
+  }
+
+  // ── Underground ───────────────────────────────────────────────────────
+  private _under = false;
+  /** The underground view: the ground goes see-through, trees hide, surface buildings ghost, bunker rooms show cut open. */
+  setUnderground(on: boolean): void {
+    if (on === this._under) return;
+    this._under = on;
+    this.terrain.setOpacity(on ? 0.2 : 1);
+    this.forest.visible = !on;
+    for (const b of this._built.values()) { b.key = ''; this._applyView(b); }
+    this._ws.invalidateShadows();
+  }
+  get underground(): boolean { return this._under; }
+
+  /** Open digs over bunker rooms under construction (the terrain is cut, then backfilled). */
+  private _pitKey = '';
+  private _syncPits(list: readonly Structure[]): void {
+    const pits: Pit[] = [];
+    for (const st of list) {
+      const b = this._built.get(st.id);
+      if (!b?.under) continue;
+      const stages = BLUEPRINTS[st.kind].stages, done = st.stage >= stages.length;
+      const f = done ? 0 : st.supplied ? st.done / stages[st.stage].hours : 0;
+      // dug out through the dig stage, open while the walls go up, backfilled in the second half of the roof stage
+      const k = done ? 0 : st.stage === 1 ? Math.min(1, f * 1.6) : st.stage === 2 ? 1 : st.stage === 3 ? (f < 0.5 ? 1 : 1 - (f - 0.5) / 0.5) : 0;
+      if (st.stage === 0 && !done) continue;
+      const r = footprint(KIT[st.kind], st.x, st.z, st.rot, false);
+      pits.push({ x0: r.x0 - 0.08, z0: r.z0 - 0.08, x1: r.x1 + 0.08, z1: r.z1 + 0.08, floor: b.under.datum - 0.06, k: Math.round(k * 20) / 20 });
+    }
+    const key = JSON.stringify(pits);
+    if (key === this._pitKey) return;
+    const before = this.parcel.pits;
+    this._pitKey = key;
+    this.parcel.setPits(pits);
+    // refresh the ground over every pit that changed
+    for (const p of [...before, ...pits]) {
+      const reach = pitReach(1.6);
+      this.terrain.refresh(this._terrainSource, p.x0 - reach - 0.5, p.z0 - reach - 0.5, p.x1 + reach + 0.5, p.z1 + reach + 0.5);
+    }
     if (this._quality) this._plant(this._quality);
     this._ws.invalidateShadows();
   }
@@ -550,6 +644,7 @@ export class HomesteadWorld {
       if (done !== b.finished) { b.finished = done; if (b.light) b.light.visible = done; this._ws.invalidateShadows(); }
       this._applyView(b);
     }
+    this._syncPits(list);
   }
 
   /**
@@ -567,13 +662,14 @@ export class HomesteadWorld {
       if (key === b.services) continue;
       b.services = key;
       if (key === '000' && !b.group.userData.opts?.plumbed && !b.group.userData.opts?.wired) continue;
-      this._rebuild(b, opts);
-      if (b.light) b.light.color.set(opts.wired ? 0xfff0d8 : 0xffc27a);
+      this._rebuild(b, { ...b.opts, ...opts });
+      if (b.light && !b.under) b.light.color.set(opts.wired ? 0xfff0d8 : 0xffc27a);
     }
   }
 
-  private _rebuild(b: Built, opts: { plumbed: boolean; wired: boolean; septic: boolean }): void {
+  private _rebuild(b: Built, opts: BuildOpts): void {
     const def = KIT[b.placed.kind];
+    b.opts = opts;
     const g = buildLayers(def, hashStr(b.placed.id + ':' + this.parcel.seed), opts);
     Object.assign(g.userData, { type: 'building', buildingId: b.placed.id });
     g.position.copy(b.group.position);
@@ -584,7 +680,7 @@ export class HomesteadWorld {
     b.group = g;
     this._ws.scene.add(g);
     b.key = '';
-    showStage(g, 5, 0);
+    showStage(g, b.finished ? 5 : 0, 0);
     this._applyView(b);
     this._ws.invalidateShadows();
   }
@@ -594,7 +690,9 @@ export class HomesteadWorld {
     const rc = new THREE.Raycaster(ray.origin, ray.direction);
     let best: { id: string; d: number } | null = null;
     for (const b of this._built.values()) {
-      const hit = rc.intersectObject(b.group, true)[0];
+      if (this._under && !b.under) continue;
+      // from above ground, a bunker room is picked only by what shows above the grass (hatch, vents, headhouse)
+      const hit = rc.intersectObject(b.group, true).find(h => !b.under || this._under || h.point.y > this.groundAt(h.point.x, h.point.z) - 0.02);
       if (hit && (!best || hit.distance < best.d)) best = { id: b.placed.id, d: hit.distance };
     }
     return best?.id ?? null;
@@ -609,7 +707,8 @@ export class HomesteadWorld {
   }
 
   private _applyView(b: Built): void {
-    const v = this._view;
+    // underground view: bunker rooms are shown cut open, everything on the surface is a ghost
+    const v = this._under ? (b.under ? 'cutaway' : 'ghost') : this._view;
     for (const o of b.group.children) {
       const m = o as THREE.Mesh;
       if (!m.isMesh) continue;
@@ -617,8 +716,9 @@ export class HomesteadWorld {
       const ud = m.userData as { baseMat?: THREE.Material };
       ud.baseMat ??= m.material as THREE.Material;
       // x-ray: the shell goes see-through, the furniture stays solid
-      m.material = v === 'xray' && XRAY_LAYERS.includes(layer) ? xrayOf(ud.baseMat) : ud.baseMat;
-      m.castShadow = !(v === 'xray' && XRAY_LAYERS.includes(layer)) && ud.baseMat.name !== 'kit_glass' && ud.baseMat.name !== 'kit_string';
+      const see = v === 'ghost' || (v === 'xray' && XRAY_LAYERS.includes(layer));
+      m.material = see ? xrayOf(ud.baseMat) : ud.baseMat;
+      m.castShadow = !see && !['kit_glass', 'kit_glow', 'kit_string'].includes(ud.baseMat.name) && !b.under;
       if (layer === 'cutwalls') m.visible = v === 'cutaway' && b.finished;
       else if (v === 'cutaway' && CUTAWAY_HIDE.includes(layer) && (b.finished || layer !== 'walls')) m.visible = false;
     }
@@ -630,7 +730,11 @@ export class HomesteadWorld {
     const lit = this.air.hour > 5.5 && this.air.hour < 23;
     for (const b of this._built.values()) {
       if (!b.finished || !b.light) continue;
-      b.light.intensity = (this._view === 'full' ? 0.25 : 0.12) + (lit ? night * 1.6 : night * 0.25);
+      // bunker rooms are lit by their bulkhead lamps day and night
+      if (b.under) { b.light.intensity = this._under ? 0.5 : 1.4; b.light.color.set(0xfff2dc); continue; }
+      // homes are lit in the evening; sheds and shops keep a dim work light
+      const home = KIT[b.placed.kind].sleeps > 0;
+      b.light.intensity = (this._view === 'full' ? 0.25 : 0.12) + (home ? (lit ? night * 1.25 : night * 0.25) : night * 0.1);
     }
   }
 
@@ -675,6 +779,7 @@ export class HomesteadWorld {
   /** Finished buildings: walls (between doorways), partitions and furniture block; unfinished ones block their footprint. */
   private _buildingBlocked(x: number, z: number, r: number): boolean {
     for (const b of this._built.values()) {
+      if (b.under) continue;                 // bunker rooms are below the walker (going down is a later step)
       const def = KIT[b.placed.kind];
       const reach = Math.max(def.cellsX, def.cellsZ) * CELL + 1;
       if (Math.abs(x - b.placed.x) > reach || Math.abs(z - b.placed.z) > reach) continue;

@@ -91,6 +91,8 @@ export function GameCanvas() {
         const w = useWorldStore.getState();
         w.setBuildingView(BUILDING_VIEWS[(BUILDING_VIEWS.indexOf(w.buildingView) + 1) % BUILDING_VIEWS.length]);
       }
+      // U: the underground view (bunker rooms under see-through ground)
+      if (e.code === 'KeyU' && !(e.target instanceof HTMLInputElement)) useWorldStore.getState().setUnderground(!useWorldStore.getState().underground);
     };
     window.addEventListener('keydown', onKey);
 
@@ -116,6 +118,7 @@ export function GameCanvas() {
       useGameStore.subscribe(s => s.game.structures, list => { world.syncStructures(list); occluders.invalidate(); }),
       useGameStore.subscribe(s => s.tool, k => { tool.setKind(k); marker.setOn(k === 'fell'); fence.setKind(k?.startsWith('fence:') ? k.slice(6) as PerimeterKind : null); }),
       useWorldStore.subscribe(s => s.buildingView, v => world.setBuildingView(v)),
+      useWorldStore.subscribe(s => s.underground, on => world.setUnderground(on)),
       useWorldStore.subscribe(s => s.sightMode, m => sight.set(m)),
       // the compound changed: recompute the overlay
       useGameStore.subscribe(s => `${s.game.structures.map(x => x.id + x.stage).join()}|${s.game.perimeter.map(r => r.id + (r.finishedAt === null ? Math.round(r.done) : 'f')).join()}`, () => sight.refresh()),

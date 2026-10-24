@@ -10,7 +10,7 @@ import { MATERIALS, MATERIAL_IDS, emptyStock, type MaterialId } from '../sim/mat
 import { onOrder, orderCost, orderProblem } from '../sim/economy';
 import { blockedReason, isFinished, progress } from '../sim/construction';
 import { BLUEPRINTS, totalBill, totalHours } from '../sim/blueprints';
-import { KIT, KIT_ORDER, UTILITY_ORDER } from '../game/buildkit/kit';
+import { BUNKER_ORDER, KIT, KIT_ORDER, UTILITY_ORDER } from '../game/buildkit/kit';
 import { FIT, fitProblem, plant, serviceOf, FUEL_UNIT_L } from '../sim/utilities';
 import { PERIMETER, PERIMETER_ORDER, UTILITY_LINES, runBill, runHours, runFinished, runProgress, runBlocked, runGrowth } from '../sim/perimeter';
 
@@ -66,6 +66,7 @@ export function Hud() {
   const needLines = MATERIAL_IDS.filter(k => (need[k] ?? 0) > 0 && MATERIALS[k].price !== null).map(k => ({ material: k, qty: need[k]! }));
   const sel = game.structures.find(s => s.id === g.selected) ?? game.structures.find(s => !isFinished(s)) ?? null;
   const costOf = (kind: string) => orderCost(Object.entries(totalBill(BLUEPRINTS[kind])).filter(([m]) => MATERIALS[m as MaterialId].price !== null).map(([material, qty]) => ({ material: material as MaterialId, qty: qty as number })));
+  const shelters = game.structures.filter(isFinished).reduce((a, s) => a + (KIT[s.kind].shelters ?? 0), 0);
   const ownNeeds = (kind: string) => Object.entries(totalBill(BLUEPRINTS[kind])).filter(([m]) => MATERIALS[m as MaterialId].price === null).map(([m, q]) => `${q} ${MATERIALS[m as MaterialId].name.toLowerCase()}`).join(', ');
 
   return (
@@ -81,7 +82,7 @@ export function Hud() {
       </div>
 
       {/* Left: build menu + construction */}
-      <div style={{ ...panel, position: 'fixed', left: 10, top: 10, width: 230 }}>
+      <div style={{ ...panel, position: 'fixed', left: 10, top: 10, width: 230, maxHeight: 'calc(100vh - 80px)', overflowY: 'auto' }}>
         <Section title="Build">
           {KIT_ORDER.map(kind => {
             const own = ownNeeds(kind);
@@ -105,6 +106,14 @@ export function Hud() {
             return <button key={kind} title={PERIMETER[kind].blurb} style={{ ...btn(g.tool === tool), width: '100%', textAlign: 'left', marginBottom: 3, display: 'block' }} onClick={() => g.setTool(g.tool === tool ? null : tool)}>
               <div>{PERIMETER[kind].name}</div>
               <div style={{ fontSize: 11, opacity: 0.75 }}>~{usd(orderCost(buy))} per 100 m · {Math.round(runHours(kind, len))} h</div>
+            </button>;
+          })}
+          <div style={{ ...h3, marginTop: 6 }}>Underground{shelters > 0 ? ` · shelters ${shelters}` : ''}</div>
+          {BUNKER_ORDER.map(kind => {
+            const own = ownNeeds(kind);
+            return <button key={kind} title={KIT[kind].blurb} style={{ ...btn(g.tool === kind), width: '100%', textAlign: 'left', marginBottom: 3, display: 'block' }} onClick={() => g.setTool(g.tool === kind ? null : kind)}>
+              <div>{KIT[kind].name}</div>
+              <div style={{ fontSize: 11, opacity: 0.75 }}>~{usd(costOf(kind))}{own ? ` + ${own}` : ''} · {totalHours(BLUEPRINTS[kind])} h</div>
             </button>;
           })}
           <div style={{ ...h3, marginTop: 6 }}>Perimeter (per 100 m)</div>
@@ -225,6 +234,7 @@ export function Hud() {
       {/* Bottom right: cameras, building view */}
       <div style={{ ...panel, position: 'fixed', right: 10, bottom: 10, padding: 4, display: 'flex', gap: 4, alignItems: 'center' }}>
         {VIEWS.map(([v, label, tip]) => <button key={v} title={tip} style={btn(w.buildingView === v)} onClick={() => w.setBuildingView(v)}>{label}</button>)}
+        <button title="Underground: see-through ground, bunker rooms cut open (U)" style={btn(w.underground)} onClick={() => w.setUnderground(!w.underground)}>Underground</button>
         <span style={{ width: 1, height: 18, background: '#555', margin: '0 3px' }} />
         {CAMERAS.map(([m, label]) => <button key={m} style={btn(w.cameraMode === m)} onClick={() => w.setCameraMode(m)}>{label}</button>)}
       </div>

@@ -90,6 +90,11 @@ export function runHours(kind: PerimeterKind, len: number): number {
   return PERIMETER[kind].hours * len;
 }
 
+/** Earth in a berm and dug out of a ditch, per world unit of length (≈ 6 m), m³. */
+export const BERM_M3 = 36, DITCH_M3 = 24;
+/** Share of a berm's hours saved when its earth comes off the spoil pile (pushed up, not dug). */
+export const SPOIL_SAVES = 0.6;
+
 /** Plan a run (mutates the draft). */
 export function planRun(s: GameState, kind: PerimeterKind, pts: Pt[], gates: Gate[] = []): PerimeterRun {
   const len = wallLength({ pts, gates });
@@ -119,10 +124,18 @@ export function addRunWork(s: GameState, r: PerimeterRun, hours: number): void {
     if (!hasAll(s.stock, bill)) return;
     for (const [k, n] of Object.entries(bill) as Array<[MaterialId, number]>) s.stock[k] -= n;
     r.supplied = true;
+    // a berm takes what it can from the spoil pile (bunker digs, ditches): much less shovel work
+    if (r.kind === 'earth_berm' && s.stock.spoil > 0) {
+      const need = BERM_M3 * wallLength(r), use = Math.min(s.stock.spoil, need);
+      s.stock.spoil -= use;
+      r.hours *= 1 - SPOIL_SAVES * use / need;
+      log(s, `The berm takes ${Math.round(use)} m³ off the spoil pile.`);
+    }
   }
   r.done = Math.min(r.hours, r.done + hours);
   if (r.done >= r.hours - 1e-9) {
     r.finishedAt = s.clock.t;
+    if (r.kind === 'ditch') s.stock.spoil += Math.round(DITCH_M3 * wallLength(r));
     const d = PERIMETER[r.kind];
     log(s, d.growYears ? `${d.name} planted. Give it ${d.growYears} years.` : `${d.name} ${r.kind === 'water_pipe' || r.kind === 'power_cable' ? 'laid' : 'finished'}.`);
   }

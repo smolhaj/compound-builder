@@ -53,6 +53,16 @@ export interface Earthwork {
   bbox?: [number, number, number, number];
 }
 
+/**
+ * An open excavation (a bunker room being dug): the ground inside the rect
+ * comes down to `floor`, battered back 1 : 1 outside it; `k` (0–1) is how
+ * far the dig has gone (and goes back to 0 as it is backfilled). Trees stay
+ * off the site once it has been dug (`k` 0 after backfill still clears).
+ */
+export interface Pit { x0: number; z0: number; x1: number; z1: number; floor: number; k: number }
+/** Horizontal reach of a pit's batter beyond its rect for a dig `depth` deep. */
+export const pitReach = (depth: number) => depth * 1.0 + 0.05;
+
 const BERM_HALF_BASE = 0.34, BERM_HALF_TOP = 0.08, DITCH_HALF_TOP = 0.26, DITCH_HALF_BOT = 0.08;
 export const earthworkReach = (w: Earthwork) => (w.height > 0 ? BERM_HALF_BASE : DITCH_HALF_TOP) + 0.02;
 
@@ -209,6 +219,10 @@ export class ParcelTerrain {
   /** Berms (raised banks) and ditches (cut trenches) along polylines. */
   setEarthworks(works: readonly Earthwork[]): void { this._works = works.map(w => ({ ...w, bbox: polyBox(w.pts, earthworkReach(w)) })); }
   get earthworks(): readonly Earthwork[] { return this._works; }
+  private _pits: Pit[] = [];
+  /** Open excavations (bunker digs). */
+  setPits(pits: readonly Pit[]): void { this._pits = pits.slice(); }
+  get pits(): readonly Pit[] { return this._pits; }
   get pads(): readonly Pad[] { return this._pads; }
 
   sample(x: number, z: number): ParcelSample {
@@ -225,6 +239,16 @@ export class ParcelTerrain {
       if (x < b[0] || x > b[2] || z < b[1] || z > b[3]) continue;
       const dy = earthworkOffset(w, x, z);
       if (dy !== 0) { s.h += dy; s.forest = 0; }
+    }
+    for (const p of this._pits) {
+      const d = Math.max(p.x0 - x, x - p.x1, p.z0 - z, z - p.z1, 0);
+      const reach = pitReach(Math.max(0, s.h - p.floor));
+      if (d > reach) continue;
+      s.forest = 0;
+      if (p.k <= 0) continue;
+      // the cut: floor inside, a 1 : 1 batter up to the ground outside
+      const cut = Math.min(s.h, p.floor + d);
+      s.h += (cut - s.h) * p.k;
     }
     return s;
   }

@@ -23,6 +23,8 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   3: s => ({ ...s, version: 4, perimeter: [], stock: { wire: 0, seedlings: 0, container: 0, ...(s.stock as object) } }),
   // 4 → 5: water and power (utilities state, their materials)
   4: s => ({ ...s, version: 5, utilities: emptyUtilities(), stock: { pipe: 0, cable: 0, fixtures: 0, pump: 0, drilling: 0, solar_panel: 0, battery: 0, inverter: 0, generator: 0, fuel: 0, tank: 0, septic_tank: 0, ...(s.stock as object) } }),
+  // 5 → 6: the underground (bunker materials, and the spoil pile digs turn up)
+  5: s => ({ ...s, version: 6, stock: { rebar: 0, membrane: 0, excavator: 0, blast_door: 0, nbc_filter: 0, spoil: 0, ...(s.stock as object) } }),
 };
 
 export class SaveVersionError extends Error {}

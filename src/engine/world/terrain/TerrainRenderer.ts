@@ -407,6 +407,20 @@ export class TerrainRenderer {
   }
 
   get mesh(): THREE.Mesh | null { return this._mesh; }
+  private _opacity = 1;
+  /** See-through ground (1 = solid): the underground view looks down through it. */
+  setOpacity(k: number): void {
+    this._opacity = k;
+    const m = this._mesh?.material as THREE.MeshStandardMaterial | undefined;
+    if (!m) return;
+    const see = k < 0.999;
+    if (m.transparent !== see) { m.transparent = see; m.needsUpdate = true; }
+    m.opacity = k;
+    m.depthWrite = !see;
+    this._mesh!.receiveShadow = !see;
+    this._mesh!.castShadow = false;
+    this._mesh!.renderOrder = see ? 2 : 0;
+  }
 
   build(o: TerrainBuildOptions): void {
     this.dispose();
@@ -465,6 +479,7 @@ export class TerrainRenderer {
     mesh.frustumCulled = false;
     this._scene.add(mesh);
     this._mesh = mesh;
+    if (this._opacity < 1) this.setOpacity(this._opacity);
     this.update();
   }
 

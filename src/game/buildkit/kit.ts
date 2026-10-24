@@ -24,7 +24,7 @@ export interface KitPieceDef {
   /** Steepest ground (rise / run) under the footprint before it needs a bigger pad. */
   maxSlope: number;
   /** Build-menu group and one-line description. */
-  category: 'home' | 'work' | 'food' | 'sanitation' | 'water' | 'power';
+  category: 'home' | 'work' | 'food' | 'sanitation' | 'water' | 'power' | 'bunker';
   blurb: string;
   /** Floor height above the pad (walking height inside) and porch depth in front of the +z wall (world units). */
   floorY: number;
@@ -33,6 +33,14 @@ export interface KitPieceDef {
   sleeps: number;
   /** Interior lamp position (local, above the floor), or null for no lamplight. */
   light: [number, number, number] | null;
+  /**
+   * Level it occupies (underground.ts): bunker rooms are underground (they
+   * don't clash with what stands above them); entrances, wells, cellars and
+   * septic fields reach both. Default surface.
+   */
+  level?: 'surface' | 'underground' | 'both';
+  /** People it shelters in an emergency (bunker rooms). */
+  shelters?: number;
 }
 
 export const TIMBER_CABIN: KitPieceDef = {
@@ -66,7 +74,7 @@ export const ROOT_CELLAR: KitPieceDef = {
   blurb: 'Earth-bermed stone vault: cool, dark and steady for potatoes, roots, crocks and canning jars.',
   cellsX: 2, cellsZ: 2, frontCells: 1,
   parts: { foundation: 'fieldstone', walls: 'fieldstone', roof: 'earth' },
-  maxSlope: 0.5, floorY: 0.02, porch: 0, sleeps: 0, light: [0, 0.25, -0.1],
+  maxSlope: 0.5, floorY: 0.02, porch: 0, sleeps: 0, light: [0, 0.25, -0.1], level: 'both',
 };
 
 export const CHICKEN_COOP: KitPieceDef = {
@@ -93,8 +101,10 @@ export const LOG_HOUSE: KitPieceDef = {
   maxSlope: 0.3, floorY: 0.1, porch: 0.45, sleeps: 6, light: [0, 0.34, 0],
 };
 
+const DEEP = new Set(['well_hand', 'well_drilled', 'septic']);
 const util = (id: string, name: string, category: 'water' | 'power' | 'sanitation', cx: number, cz: number, blurb: string, light: [number, number, number] | null = null): KitPieceDef => ({
   id, name, category, blurb, cellsX: cx, cellsZ: cz, frontCells: 0, parts: { foundation: 'concrete', walls: 'board_batten', roof: 'metal_roof' }, maxSlope: 0.35, floorY: 0.02, porch: 0, sleeps: 0, light,
+  level: DEEP.has(id) ? 'both' : 'surface',
 });
 export const UTILITY_KIT: KitPieceDef[] = [
   util('well_hand', 'Hand-dug well', 'water', 1, 1, 'A stone-lined well with a hand pump. ≈ 900 L a day, carried by bucket: no pressure, no plumbing.'),
@@ -107,7 +117,28 @@ export const UTILITY_KIT: KitPieceDef[] = [
   util('septic', 'Septic system', 'sanitation', 2, 2, 'Septic tank and leach field. Lets plumbed houses have flush toilets.'),
 ];
 
-export const KIT: Record<string, KitPieceDef> = Object.fromEntries([TIMBER_CABIN, LOG_HOUSE, OUTHOUSE, WORKSHOP, ROOT_CELLAR, CHICKEN_COOP, GARDEN, ...UTILITY_KIT].map(d => [d.id, d]));
+// ── Underground (GDS §2.2; underground.ts) ──
+const room = (id: string, name: string, cx: number, cz: number, blurb: string, shelters = 0, level: 'underground' | 'both' = 'underground'): KitPieceDef => ({
+  id, name, category: 'bunker', blurb, cellsX: cx, cellsZ: cz, frontCells: 0,
+  parts: { foundation: 'concrete', walls: 'concrete', roof: 'concrete' },
+  maxSlope: level === 'both' ? 0.3 : 9, floorY: 0, porch: 0, sleeps: 0, light: [0, 0.36, 0], level, shelters,
+});
+export const BUNKER_KIT: KitPieceDef[] = [
+  room('bunker_hatch', 'Bunker hatch', 1, 1, 'The way down: a steel hatch in a concrete collar, a ladder down a 5 m shaft, a blast door at the bottom. Easy to hide under a woodpile.', 0, 'both'),
+  room('bunker_stairs', 'Bunker stairwell', 1, 3, 'A stair down from a little headhouse on the surface to a blast door 5 m below. Carries stores and the old and young.', 0, 'both'),
+  room('bunker_corridor', 'Tunnel', 1, 2, 'A 3 × 6 m concrete passage between rooms.'),
+  room('bunker_container', 'Buried container', 1, 4, 'A 40 ft shipping container in a gravel bed, braced and waterproofed: the cheap first bunker. Bunks, a table, a pantry.', 4),
+  room('bunker_dorm', 'Bunkroom', 2, 2, 'Bunks for eight, lockers, a rug and the family pictures: somewhere to sleep through a bad week.', 8),
+  room('bunker_galley', 'Galley', 2, 2, 'Kitchen counter, two-burner stove, a table for eight and shelves of food.', 2),
+  room('bunker_stores', 'Storeroom', 2, 2, 'Rows of shelving: cans, rice and beans in buckets, water drums, medicine, seed.', 0),
+  room('bunker_plant', 'Plant room', 2, 2, 'Air: an NBC filter and blast valves. Power: a battery bank and a vented generator. Water: a 2,000 L tank.', 0),
+  room('bunker_medical', 'Medical bay', 2, 2, 'An exam table, a cot, a sink, cabinets of supplies and an oxygen bottle.', 1),
+  room('bunker_comms', 'Comms & armoury', 1, 2, 'Radios and maps on one wall, a gun safe and ammunition on the other.', 1),
+];
+/** Underground menu order. */
+export const BUNKER_ORDER: readonly string[] = BUNKER_KIT.map(d => d.id);
+
+export const KIT: Record<string, KitPieceDef> = Object.fromEntries([TIMBER_CABIN, LOG_HOUSE, OUTHOUSE, WORKSHOP, ROOT_CELLAR, CHICKEN_COOP, GARDEN, ...UTILITY_KIT, ...BUNKER_KIT].map(d => [d.id, d]));
 /** Build-menu order. */
 export const KIT_ORDER: readonly string[] = ['timber_cabin', 'log_house', 'outhouse', 'garden', 'chicken_coop', 'root_cellar', 'workshop'];
 /** Water & power menu order. */
@@ -174,11 +205,16 @@ export interface SiteQuery {
   blocked?(x: number, z: number): boolean;
 }
 
-export type PlaceProblem = 'off_parcel' | 'water' | 'too_steep' | 'overlaps';
+export type PlaceProblem = 'off_parcel' | 'water' | 'too_steep' | 'overlaps' | 'not_connected' | 'thin_cover' | 'too_deep';
 
-/** Why a piece can't go here (null = it can). */
+const levelOf = (d: KitPieceDef) => d.level ?? 'surface';
+/** Do pieces at these levels compete for the same ground? (Bunker rooms go under the yard and houses.) */
+const levelsMeet = (a: KitPieceDef, b: KitPieceDef) => levelOf(a) === 'both' || levelOf(b) === 'both' || levelOf(a) === levelOf(b);
+
+/** Why a piece can't go here (null = it can). Underground pieces also need underground.ts's rules. */
 export function placementProblem(def: KitPieceDef, x: number, z: number, rot: number, site: SiteQuery, placed: readonly Placed[]): PlaceProblem | null {
-  const r = footprint(def, x, z, rot);
+  const below = levelOf(def) === 'underground';
+  const r = footprint(def, x, z, rot, !below);
   const N = 4;
   const hs: number[][] = [];
   for (let i = 0; i <= N; i++) {
@@ -187,7 +223,7 @@ export function placementProblem(def: KitPieceDef, x: number, z: number, rot: nu
       const px = r.x0 + (r.x1 - r.x0) * i / N, pz = r.z0 + (r.z1 - r.z0) * j / N;
       if (!site.owned(px, pz)) return 'off_parcel';
       if (site.water(px, pz)) return 'water';
-      if (site.blocked?.(px, pz)) return 'overlaps';
+      if (!below && site.blocked?.(px, pz)) return 'overlaps';
       row.push(site.height(px, pz));
     }
     hs.push(row);
@@ -198,7 +234,9 @@ export function placementProblem(def: KitPieceDef, x: number, z: number, rot: nu
   for (let i = 0; i <= N; i++) grade = Math.max(grade, Math.abs(hs[i][N] - hs[i][0]) / (r.z1 - r.z0));
   if (grade > def.maxSlope) return 'too_steep';
   for (const p of placed) {
-    const o = footprint(KIT[p.kind], p.x, p.z, p.rot);
+    const od = KIT[p.kind];
+    if (!levelsMeet(def, od)) continue;
+    const o = footprint(od, p.x, p.z, p.rot, levelOf(od) !== 'underground');
     if (r.x0 < o.x1 && r.x1 > o.x0 && r.z0 < o.z1 && r.z1 > o.z0) return 'overlaps';
   }
   return null;
@@ -209,4 +247,7 @@ export const PROBLEM_TEXT: Record<PlaceProblem, string> = {
   water: 'In the creek',
   too_steep: 'Too steep — find flatter ground',
   overlaps: 'Overlaps another building',
+  not_connected: 'Start a bunker at a hatch or stairwell, then add rooms wall to wall',
+  thin_cover: 'Too little earth over it — the ground is too low here',
+  too_deep: 'Too deep below the ground here to dig',
 };

@@ -14,6 +14,8 @@ export interface StageDef {
   /** Person-hours at work rate 1. */
   hours: number;
   materials: Partial<Stock>;
+  /** What finishing the stage adds to the stockpile (the spoil a dig turns up). */
+  yields?: Partial<Stock>;
 }
 
 export interface Blueprint {
@@ -117,8 +119,43 @@ export const UTILITY_BLUEPRINTS: Blueprint[] = [
   bp('septic', [['site', 'Perc test and stake the field', 6, {}], ['foundation', 'Dig the tank hole and leach trenches', 60, {}], ['frame', 'Set the tank', 8, { septic_tank: 1 }], ['roof', 'Leach pipe in gravel', 20, { pipe: 3, concrete: 2 }], ['finish', 'Backfill, vent and lids', 10, {}]]),
 ];
 
+// ── Underground: dug with a hired excavator; the net earth dug out becomes spoil for berms ──
+type Fit = Partial<Stock>;
+/** A poured room: dig + slab, walls, roof slab + waterproofing + backfill, fit-out. `spoil` m³ net. */
+const vaultBp = (kind: string, spoil: number, conc: [number, number, number], rebar: [number, number, number], dig: number, walls: number, roof: number, fitHours: number, fit: Fit, fitName = 'Vents, doors, wiring and the fit-out'): Blueprint => ({
+  kind,
+  stages: [
+    { id: 'site', name: 'Stake out the dig', hours: 6, materials: {} },
+    { id: 'foundation', name: 'Dig out (hired excavator), gravel bed, floor slab', hours: dig, materials: { excavator: Math.max(1, Math.round(spoil / 90)), concrete: conc[0], rebar: rebar[0] }, yields: { spoil } },
+    { id: 'frame', name: 'Form, tie the rebar and pour the walls', hours: walls, materials: { concrete: conc[1], rebar: rebar[1], lumber: Math.ceil(conc[1] / 4) } },
+    { id: 'roof', name: 'Pour the roof slab, waterproof, backfill', hours: roof, materials: { concrete: conc[2], rebar: rebar[2], membrane: Math.max(1, Math.round(spoil / 60)), excavator: 1 } },
+    { id: 'finish', name: fitName, hours: fitHours, materials: fit },
+  ],
+});
+export const BUNKER_BLUEPRINTS: Blueprint[] = [
+  vaultBp('bunker_hatch', 45, [4, 10, 4], [1, 3, 1], 20, 70, 30, 24, { blast_door: 1, hardware: 2 }, 'Blast door, hatch lid and the ladder'),
+  vaultBp('bunker_stairs', 110, [8, 18, 8], [2, 5, 2], 30, 120, 60, 36, { blast_door: 1, hardware: 2, lumber: 3, roofing: 2 }, 'Blast door, handrail and the headhouse'),
+  vaultBp('bunker_corridor', 50, [6, 10, 6], [2, 3, 2], 20, 70, 40, 16, { hardware: 1, cable: 1 }),
+  vaultBp('bunker_dorm', 120, [14, 22, 16], [4, 8, 6], 40, 140, 90, 60, { lumber: 10, hardware: 3, cable: 1 }, 'Vents, bunks, lockers, wiring'),
+  vaultBp('bunker_galley', 120, [14, 22, 16], [4, 8, 6], 40, 140, 90, 70, { lumber: 6, hardware: 3, fixtures: 1, cable: 1 }, 'Vents, counter, sink, stove, wiring'),
+  vaultBp('bunker_stores', 120, [14, 22, 16], [4, 8, 6], 40, 140, 90, 40, { lumber: 8, hardware: 2, cable: 1 }, 'Vents, shelving, wiring'),
+  vaultBp('bunker_plant', 120, [14, 22, 16], [4, 8, 6], 40, 140, 90, 80, { nbc_filter: 1, battery: 2, generator: 1, tank: 1, cable: 2, hardware: 2 }, 'NBC filter, batteries, generator, water tank'),
+  vaultBp('bunker_medical', 120, [14, 22, 16], [4, 8, 6], 40, 140, 90, 60, { fixtures: 1, lumber: 4, hardware: 3, cable: 1 }, 'Vents, sink, beds, cabinets, wiring'),
+  vaultBp('bunker_comms', 50, [6, 10, 6], [2, 3, 2], 20, 70, 40, 40, { hardware: 4, cable: 2, lumber: 2 }, 'Radios, antenna lead, gun safe, wiring'),
+  {
+    kind: 'bunker_container',
+    stages: [
+      { id: 'site', name: 'Stake out the trench', hours: 6, materials: {} },
+      { id: 'foundation', name: 'Dig the trench (hired excavator), gravel bed', hours: 24, materials: { excavator: 2, concrete: 2 }, yields: { spoil: 140 } },
+      { id: 'frame', name: 'Set and brace the container, cut the doorways', hours: 40, materials: { container: 1, lumber: 6, hardware: 2 } },
+      { id: 'roof', name: 'Waterproof and backfill (not too deep: a container crushes)', hours: 40, materials: { membrane: 3, excavator: 1 } },
+      { id: 'finish', name: 'Bunks, table, shelves, vents', hours: 40, materials: { lumber: 6, hardware: 1 } },
+    ],
+  },
+];
+
 export const BLUEPRINTS: Record<string, Blueprint> = Object.fromEntries(
-  [CABIN_BLUEPRINT, OUTHOUSE_BLUEPRINT, WORKSHOP_BLUEPRINT, ROOT_CELLAR_BLUEPRINT, COOP_BLUEPRINT, GARDEN_BLUEPRINT, LOG_HOUSE_BLUEPRINT, ...UTILITY_BLUEPRINTS].map(b => [b.kind, b]));
+  [CABIN_BLUEPRINT, OUTHOUSE_BLUEPRINT, WORKSHOP_BLUEPRINT, ROOT_CELLAR_BLUEPRINT, COOP_BLUEPRINT, GARDEN_BLUEPRINT, LOG_HOUSE_BLUEPRINT, ...UTILITY_BLUEPRINTS, ...BUNKER_BLUEPRINTS].map(b => [b.kind, b]));
 
 /** Total bill of materials for a blueprint. */
 export function totalBill(bp: Blueprint): Partial<Stock> {
