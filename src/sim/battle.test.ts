@@ -194,4 +194,39 @@ describe('the battle at the compound', () => {
     const none = afterHit(1);
     for (let d = 0; d < 365; d++) { none.clock.t = d; expect(minesDay(none)).toEqual([]); }
   });
+
+  it('kids hide; a teenager fights only when there aren\'t two adults who can', () => {
+    const g = afterHit(4);
+    const teen = g.people.find(p => p.kid);
+    if (teen) { teen.age = 16; }
+    const b = planBattle(fortify(g), 6, 4);
+    const adults = g.people.filter(p => !p.kid).length;
+    const teenPosted = teen ? b.events.some(e => e.kind === 'shot' && e.from === `h_${teen.id}`) : false;
+    if (adults >= 2) expect(teenPosted).toBe(false);
+    // with one adult left the teenager picks up a gun
+    const g1 = fortify(afterHit(4));
+    const t1 = g1.people.find(p => p.kid);
+    if (t1) {
+      t1.age = 16;
+      g1.people.filter(p => !p.kid).slice(1).forEach(p => { g1.personState[g1.people.indexOf(p)].needs.died = 1; });
+      const b1 = planBattle(g1, 6, 4);
+      expect(b1.events.some(e => e.kind === 'move' && e.unit === `h_${t1.id}`)).toBe(true);
+      expect(b1.units.find(u => u.id === `h_${t1.id}`)).toBeTruthy();
+    }
+  });
+
+  it('the tunnel gets the sheltering family out of a breach, but only if it was built', () => {
+    let escaped = 0, without = 0;
+    for (let seed = 1; seed <= 40; seed++) {
+      for (const built of [true, false]) {
+        const g = afterHit(seed);           // no guns: breached often
+        if (built) { const t = planRun(g, 'escape_tunnel', [[0, 0], [60, 0]]); t.done = t.hours; t.supplied = true; t.finishedAt = 0; }
+        const b = planBattle(g, 8, seed);
+        const n = b.events.filter(e => e.kind === 'move' && e.x === 60 && e.z === 0).length;
+        if (built) escaped += n; else without += n;
+      }
+    }
+    expect(escaped).toBeGreaterThan(0);
+    expect(without).toBe(0);
+  });
 });
