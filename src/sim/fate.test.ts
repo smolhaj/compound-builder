@@ -14,7 +14,7 @@ describe('how the world comes out of it', () => {
     expect(nuke.never / 600).toBeGreaterThan(0.3);
     expect(nuke.full / 600).toBeLessThan(0.25);
     for (const n of [grid, nuke]) expect(n.full && n.partial && n.never).toBeTruthy();
-    for (const [k, o] of Object.entries(FATE_ODDS)) expect(o!.reduce((a, b) => a + b, 0)).toBeCloseTo(1, 5), void k;
+    for (const o of Object.values(FATE_ODDS)) expect(o!.reduce((a, b) => a + b, 0)).toBeCloseTo(1, 5);
     expect(rollFate('zombies', 0.01)).toBe('never');
   });
 
