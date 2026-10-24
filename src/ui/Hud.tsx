@@ -15,12 +15,13 @@ import { CREW_RATE, CREW_SIZE, crewProblem, crewQuote } from '../sim/crews';
 import { keeping, KEPT } from '../sim/shelf';
 import { CONDITION, pharmacyOpen } from '../sim/body';
 import { netWorth } from '../sim/finance';
+import { JUG_L, orderTanker } from '../sim/water';
 import { chimneyState, greenRicks, SEASON_DAYS, SWEEP_USD } from '../sim/upkeep';
 import { countyWorks, needsPermit, permitFee, premium, yearlyTax } from '../sim/paperwork';
 import { DRIVE_PER_FT, driveQuote, fixBill, fixBlocked, fixDef, hookupProblem, pendingFixes, POLE_PER_FT, powerQuote } from '../sim/improvements';
 import { BLUEPRINTS, totalBill, totalHours } from '../sim/blueprints';
 import { BUNKER_ORDER, KIT, UTILITY_ORDER } from '../game/buildkit/kit';
-import { FIT, fitProblem, plant, serviceOf, FUEL_UNIT_L, UTILITY, SPARE_FOR } from '../sim/utilities';
+import { FIT, fitProblem, plant, serviceOf, FUEL_UNIT_L, UTILITY, SPARE_FOR, storageCapacity } from '../sim/utilities';
 import { bestShelter, doseRate, isNuclear, SHELTER_DAYS } from '../sim/nuclear';
 import { DISASTERS, TRACKS, TRACK_NAME, type DisasterKind } from '../sim/disaster';
 import { prices } from '../sim/economy';
@@ -481,10 +482,15 @@ export function Hud() {
               </Section>
               <Section title="Water (yesterday)">
                 <Row label="In / used" value={`${Math.round(r.waterL)} / ${Math.round(r.useL)} L`} />
-                <Row label="Stored" value={`${Math.round(r.storedL)} L`} />
+                <Row label="Stored" value={`${Math.round(r.storedL)} of ${storageCapacity(game).toLocaleString('en-US')} L`} />
+                {game.stock.water_jugs >= 1 && <Row label="Drinking water put by" value={`${Math.floor(game.stock.water_jugs)} jugs (${Math.round(game.stock.water_jugs * JUG_L)} L)`} />}
+                {storageCapacity(game) - r.storedL > 1000 && game.disaster.tracks.deliveries >= 0.5 && game.disaster.tracks.banks >= 0.5 && <button style={{ ...btn(), width: '100%', marginTop: 3 }} title="A tanker load from town: 15,000 L" onClick={() => g.money(d => orderTanker(d, storageCapacity(d)))}>Order a tanker load ($450)</button>}
                 <Row label="Well depth here" value={`${game.site.gwDepth} m`} />
                 {game.utilities.hauling && <Note tone="warn">{game.utilities.haulFar ? 'Hauling water a quarter mile from the creek on the neighbor\'s land: a well or cistern would end it.' : 'Hauling water from the creek by the bucket: a well or cistern would end it.'}</Note>}
                 {r.shortL > 0 && <Note tone="bad">Water ran short.</Note>}
+                {game.utilities.hauling && game.stock.water_filter < 0.01 && <Note tone="warn">{game.stock.firewood >= 0.05 ? 'Boiling the creek water (firewood): a filter would save the wood.' : 'Drinking the creek water untreated: giardia. Get a filter or boil it.'}</Note>}
+                {game.site.gwQuality === 'arsenic' && game.stock.ro_system < 1 && <Note tone="warn">Arsenic in the well water: get reverse osmosis for drinking water.</Note>}
+                {game.site.gwQuality === 'hard' && game.stock.softener < 1 && <Note>Hard water: scale wears the pump faster without a softener.</Note>}
               </Section>
             </>;
           })()}
