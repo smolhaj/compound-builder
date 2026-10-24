@@ -41,12 +41,10 @@ export function demoBattle(structures: readonly DemoStructure[], people: readonl
   ev.push({ t: 0.3, kind: 'say', text: 'The dog is going off — movement at the gate.' });
   ev.push({ t: 1.0, kind: 'lights' });
   ev.push({ t: 1.2, kind: 'say', text: 'Raid! 6 at the gate.' });
-  let t = 5;
-  for (let k = 0; k < 14; k++) {
-    const from = `h${k % 4}`, to = `r${(k * 5) % 6}`;
-    ev.push({ t, kind: 'shot', from, to, hit: k % 5 === 4, auto: k % 3 === 0 });
-    ev.push({ t: t + 0.4, kind: 'shot', from: `r${k % 6}`, to: `h${(k + 1) % 4}`, hit: false });
-    t += 0.7;
+  // the firefight: every defender fires about twice a second, the raiders answer (the suppressing pair fires while the other pair moves)
+  for (let t = 4, k = 0; t < 15; t += 0.25, k++) {
+    ev.push({ t, kind: 'shot', from: `h${k % 4}`, to: `r${(k * 5) % 6}`, hit: k % 11 === 10, auto: k % 9 === 0 });
+    if (k % 2 === 0) ev.push({ t: t + 0.12, kind: 'shot', from: `r${(k >> 1) % 6}`, to: `h${(k + 1) % 4}`, hit: false, auto: k % 10 === 0 });
   }
   ev.push({ t: 9.5, kind: 'mine', x: c.x - 1.6, z: c.z + 9, hits: ['r1'] });
   ev.push({ t: 9.6, kind: 'wound', unit: 'r1', sev: 0.8 });

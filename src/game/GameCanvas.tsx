@@ -164,6 +164,7 @@ export function GameCanvas() {
     const battle = new BattleRenderer(ws.scene, world.groundAt, () => useGameStore.getState().game.people);
     battle.onEnd = () => useBattleStore.getState().endBattle();
     let battleSkip = useBattleStore.getState().skipReq, battleSync = 0;
+    let battleView: { x: number; z: number; radius: number; pitch: number } | null = null;
     const qa: { frames: number; frameMs: number; pose: null | { x: number; y: number; z: number; lx: number; ly: number; lz: number; fov?: number } } = { frames: 0, frameMs: 0, pose: null };
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
@@ -251,8 +252,19 @@ export function GameCanvas() {
       }
       // battle playback: start / skip / tick, camera shake, overlay progress
       const bs = useBattleStore.getState();
-      if (bs.battle && bs.battle !== battle.battle) battle.play(bs.battle);
+      if (bs.battle && bs.battle !== battle.battle) { battle.play(bs.battle); battleView ??= { x: cam.target.x, z: cam.target.z, radius: cam.radius, pitch: cam.pitch }; }
       else if (!bs.battle && battle.playing) battle.stop();
+      // the camera follows the fight (eased), and goes back where it was afterwards
+      const f = battle.playing ? battle.focus() : null;
+      if (f) {
+        const k = Math.min(1, dt * 1.5);
+        cam.target.x += (f.x - cam.target.x) * k; cam.target.z += (f.z - cam.target.z) * k; cam.target.y += (world.groundAt(cam.target.x, cam.target.z) - cam.target.y) * k;
+        cam.radius += (Math.min(26, Math.max(8, f.spread * 2.2 + 5)) - cam.radius) * k;
+        cam.pitch += (0.45 - cam.pitch) * k;
+      } else if (battleView && !battle.playing) {
+        cam.target.x = battleView.x; cam.target.z = battleView.z; cam.radius = battleView.radius; cam.pitch = battleView.pitch;
+        battleView = null;
+      }
       if (bs.skipReq !== battleSkip) { battleSkip = bs.skipReq; battle.skip(); }
       if (battle.playing) {
         battle.update(dt);
