@@ -15,6 +15,8 @@ import type { GameState } from './state';
 import { isFinished } from './construction';
 import { protectionOf } from './hardening';
 import { SPARE_FOR } from './utilities';
+import { winterFactor } from './effects';
+export { winterFactor };
 import { mulberry32 } from './rng';
 import type { Stock } from './materials';
 
@@ -131,12 +133,18 @@ export function falloutDay(s: GameState): string[] {
   return out;
 }
 
-/** Growing-season and warmth factor after a full exchange: 1–3 years of nuclear winter. */
-export function winterFactor(s: GameState): { grow: number; cold: number } {
-  if (s.disaster.kind !== 'nuclear' || s.disaster.variant !== 'exchange' || s.clock.t < s.disaster.hitAt) return { grow: 1, cold: 0 };
-  const years = (s.clock.t - s.disaster.hitAt) / 365;
-  const k = years < 1 ? 1 : years < 2.5 ? 1 - (years - 1) / 1.5 : 0;
-  return { grow: 1 - 0.8 * k, cold: 0.5 * k };
+/** The sky for any disaster (renderer): ash, smoke, an impact's flash and dark, the strikes. */
+export function disasterSky(s: GameState): { haze: number; flash: number; dust: number } {
+  const d = s.disaster, h = (s.clock.t - d.hitAt) * 24;
+  if (d.kind === 'nuclear') return nuclearSky(s);
+  if (!d.kind || s.clock.t < d.warnAt) return { haze: 0, flash: 0, dust: 0 };
+  const w = winterFactor(s);
+  switch (d.kind) {
+    case 'ash_winter': return h < 0 ? { haze: 0, flash: 0, dust: 0 } : { haze: Math.max(0.5, 1 - w.grow), flash: 0, dust: h < 24 * 10 ? 1 - h / (24 * 10) : 0 };
+    case 'asteroid': return h < 0 ? { haze: 0, flash: 0, dust: 0 } : { haze: Math.max(0.3, Math.min(1, 1 - (h / 24 - 730) / 400)), flash: h < 0.05 ? 1 - h / 0.05 : 0, dust: h < 72 ? 0.6 : 0 };
+    case 'wildfire': return { haze: h < -48 ? 0.3 : h < 24 * 6 ? 0.85 : 0, flash: 0, dust: h > 0 && h < 48 ? 0.5 : 0 };
+    default: return { haze: 0, flash: 0, dust: 0 };
+  }
 }
 
 /** The sky over the strikes (for the renderer): 0 = normal, 1 = sickly; the flash on the hit's first hour. */

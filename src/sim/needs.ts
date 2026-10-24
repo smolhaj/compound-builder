@@ -13,7 +13,7 @@
 import { calendarOf, type GameState } from './state';
 import { log } from './economy';
 import { isFinished } from './construction';
-import { winterFactor } from './nuclear';
+import { climate } from './effects';
 
 export type FoodId = 'fresh' | 'frozen' | 'canned' | 'staples';
 /** Food is kept in the stockpile in these units; kcal in one unit. */
@@ -50,7 +50,7 @@ export function produce(s: GameState): number {
   const season = doy < 160 || doy > 295 ? 0 : doy < 205 ? (doy - 160) / 45 : doy < 260 ? 1 : (295 - doy) / 35;
   const skill = Math.max(...s.people.map(p => p.skills.gardener), 0);
   const veg = gardens * 2500 * season * (0.6 + 0.08 * skill);
-  return (Math.max(0, eggs) + veg) * winterFactor(s).grow;
+  return Math.max(0, eggs) * Math.max(0.5, climate(s).grow) + veg * climate(s).grow;
 }
 
 /** Fraction of fresh food that spoils a day: in the open vs a root cellar. */
@@ -128,6 +128,7 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
     }
     n.hurt = n.hurt.filter(h => h.sev > 0);
     if (n.dose > 1) dh -= (n.dose - 1) * 2;           // radiation sickness above ~1 Sv
+    if (s.utilities.report.shortL > s.utilities.report.useL * 0.5) dh -= 2;   // not enough to drink
     n.health = Math.max(cozy ? 5 : 0, Math.min(100, n.health + dh));
     // morale: drifts to a baseline that variety, a home, light and safety raise; hunger and loss lower
     const target = 45 + 6 * Math.min(variety, 4) + (home ? 8 : -6) + (dark ? -8 : 0) - Math.min(25, n.hunger / 1000) - (s.personState.some(x => x.needs?.died != null) ? 15 : 0);

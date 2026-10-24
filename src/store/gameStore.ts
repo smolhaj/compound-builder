@@ -49,6 +49,8 @@ export interface GameStore {
   /** Answer whoever is at the gate. */
   answer: (stance: Stance) => void;
   dismissCard: () => void;
+  /** Wildfire: the world's count of trees round each building. */
+  setFuel: (fuel: Record<string, number>) => void;
   /** Buy a neighbor parcel. */
   buy: (parcelId: string) => string | null;
   /** The world measured what each parcel is (timber, creek bottom, hay, grazing). */
@@ -151,6 +153,11 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     resolve(g, stance);
     set({ game: g });
     void saveGame(AUTOSAVE, g);
+  },
+  setFuel: (fuel) => {
+    const g = structuredClone(get().game);
+    g.disaster.fuel = fuel;
+    set({ game: g });
   },
   buy: (id) => {
     const g = structuredClone(get().game);

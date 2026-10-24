@@ -18,6 +18,7 @@ import { log } from './economy';
 import { isFinished } from './construction';
 import { PERIMETER, runFinished, runGrowth, wallLength } from './perimeter';
 import { freshNeeds } from './needs';
+import { contagion, infect } from './effects';
 import { dayJob, type Person, type SkillId, SKILL_IDS } from './family';
 import { dayIndex, type GameState } from './state';
 import type { Stock } from './materials';
@@ -125,7 +126,7 @@ export function postureOf(s: GameState): Posture {
 // Encounters
 // ─────────────────────────────────────────────────────────────────────────
 
-export type EncounterKind = 'arrival' | 'looters' | 'gang' | 'refugees' | 'requisition' | 'neighbor_help' | 'trader';
+export type EncounterKind = 'arrival' | 'looters' | 'gang' | 'refugees' | 'requisition' | 'neighbor_help' | 'trader' | 'horde' | 'patrol' | 'militia';
 export type Stance = 'hide' | 'parley' | 'warn' | 'defend' | 'trade' | 'take_in' | 'trial' | 'turn_away';
 
 export interface Encounter {
@@ -233,6 +234,14 @@ export function whoComes(s: GameState, p: Posture, r: () => number): EncounterKi
     ['trader', 10],
     ['neighbor_help', s.gate.government === 'help' ? 8 : 4],
   ];
+  // each disaster has its own crowd at the gate
+  const k = s.disaster.kind, scale = (kind: EncounterKind, f: number) => { for (const e of w) if (e[0] === kind) e[1] *= f; };
+  if (k === 'zombies') { w.push(['horde', 60 * (0.5 + p.visibility / 100)]); scale('trader', 0.2); scale('refugees', 0.5); scale('requisition', 0); }
+  if (k === 'invasion') { w.push(['patrol', 40 * (0.5 + p.visibility / 100)]); scale('requisition', 0); scale('trader', 0.3); }
+  if (k === 'civil_war') { w.push(['militia', 35 * (0.4 + p.fortress / 100 + p.visibility / 150)]); }
+  if (k === 'pandemic' || k === 'bioweapon') { scale('arrival', 1.4); scale('refugees', 1.5); scale('trader', 0.5); }
+  if (k === 'drought') { scale('refugees', 1.6); scale('looters', 1.3); }
+  if (k === 'unknown') { scale('arrival', 0.4); scale('looters', 0.3); scale('gang', 0.3); scale('trader', 0.1); }
   const tot = w.reduce((a, [, x]) => a + Math.max(0, x), 0);
   let x = r() * tot;
   for (const [k, v] of w) { x -= Math.max(0, v); if (x <= 0) return k; }
@@ -265,6 +274,17 @@ function makeThreat(kind: EncounterKind, r: () => number, id: string, day: numbe
       const n = s.neighbors.filter(x => x.status === 'home').sort((a, b) => b.disposition - a.disposition)[0];
       const name = n?.name ?? 'a neighbor';
       return { id, kind, day, title: `${name[0].toUpperCase()}${name.slice(1)} come by`, dossier: [n ? NEIGHBOR_BLURB[n.kind] : '', 'They\'re sharing what they\'ve heard on the radio and asking how you\'re fixed. A chance to swap news, food or a hand.'], size: n?.members ?? 2, armed: false, strength: 0, neighbor: n?.id, brings: { fresh: 5 }, wants: { canned: 1 }, stances: ['trade', 'parley', 'turn_away'] };
+    }
+    case 'horde': {
+      const size = 15 + Math.floor(r() * 40);
+      return { id, kind, day, title: 'A herd of the dead', dossier: [`${size} of them shambling up the county road, drawn by ${s.utilities.report.genKwh > 0.1 ? 'the generator' : 'something'}.`, "They don't talk and they don't stop. Noise and light pull them in; walls hold them; the bunker hides you."], size, armed: false, strength: Math.round(size * 2.2), wants: { fresh: 5, frozen: 2 }, stances: ['hide', 'defend', 'warn'] };
+    }
+    case 'patrol': {
+      return { id, kind, day, title: 'An occupation patrol', dossier: ['Six soldiers and an armored car. They check papers, count heads, take what they like.', 'Resisting brings the rest of them back.'], size: 6, armed: true, strength: 95, wants: { fuel: 4, canned: 6, meds: 1 }, stances: ['hide', 'parley', 'trade', 'defend'] };
+    }
+    case 'militia': {
+      const size = 6 + Math.floor(r() * 8);
+      return { id, kind, day, title: 'Militia at the gate', dossier: [`${size} armed men from the Plains Alliance, a recruiter with a list.`, 'They want food, fuel, and a fighting-age man or woman for the line.'], size, armed: true, strength: size * 11, wants: { canned: 5, fuel: 3 }, stances: ['parley', 'trade', 'hide', 'defend'] };
     }
     default: return makeArrival(r, id, day, s.seed);
   }
@@ -416,6 +436,10 @@ export function resolve(s: GameState, stance: Stance): Outcome {
       if (e.kind === 'refugees') g.humanity = Math.max(0, g.humanity - 10);
     }
   }
+  // a sickness abroad: anyone you let close may bring it in
+  const c = contagion(s);
+  const close = (e.kind === 'arrival' && stance !== 'turn_away') || ((stance === 'trade' || stance === 'parley') && e.kind !== 'horde');
+  if (c.contact > 0 && close && r() < c.contact) { const l = infect(s, r, e.kind === 'arrival' ? 'they brought it in' : 'from the trade at the gate'); if (l) lines.push(l); }
   g.history.push({ day: e.day, kind: e.kind, stance, tone });
   g.pending = null;
   const out: Outcome = { title, text, tone, lines: lines.filter(Boolean) };

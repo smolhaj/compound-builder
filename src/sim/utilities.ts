@@ -17,6 +17,7 @@ import { calendarOf, dayIndex, type GameState, type Structure } from './state';
 import { isFinished } from './construction';
 import { runFinished, type PerimeterRun } from './perimeter';
 import { hasAll, type MaterialId, type Stock } from './materials';
+import { wellYield } from './effects';
 
 /** What utility buildings provide. */
 export interface UtilityDef {
@@ -315,7 +316,7 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
     if (!def) continue;
     if (def.water) {
       const powered = !def.water.needsPower || lit.has(st.id);
-      if (!u.broken.includes(st.id) && powered) supply += def.water.lpd;
+      if (!u.broken.includes(st.id) && powered) supply += def.water.lpd * wellYield(s, st.kind);
       // pumps wear out: ~1 failure in 2 years of use
       if (def.water.needsPower && !u.broken.includes(st.id) && rnd < 1 / 700) { u.broken.push(st.id); log(s, 'The well pump has failed: a mechanic and a hardware kit to fix it.'); }
     }
@@ -333,7 +334,9 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
   if (left < 0) { const take = Math.min(-left, u.storedL); u.storedL -= take; left += take; }
   else u.storedL = Math.min(store, u.storedL + left);
   // no supply at all: water is hauled from the creek (that's the default before any well)
-  if (left < 0 && supply + store > 0) { shortL = -left; log(s, `Water ran short by ${Math.round(shortL)} L.`); }
+  // in a drought the creek stops running: nothing to haul from either
+  const creekDry = s.disaster.kind === 'drought' && s.clock.t >= s.disaster.hitAt;
+  if (left < 0 && (supply + store > 0 || creekDry)) { shortL = -left; log(s, `Water ran short by ${Math.round(shortL)} L.`); }
   u.report = { solarKwh: solar, drawKwh: draw, genKwh: gen, shortKwh: short, batteryPct: capKwh > 0 ? u.batteryKwh / capKwh : 0, gridKwh, billUsd: bill, shed, waterL: supply + rainL, useL: use, shortL, storedL: u.storedL };
   u.lastDay = dayIndex(s.clock.t);
 }

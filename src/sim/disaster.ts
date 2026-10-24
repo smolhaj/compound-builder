@@ -96,10 +96,116 @@ export const DISASTERS: Partial<Record<DisasterKind, DisasterDef>> = {
     hit: ['Nobody is coming: the sheriff\'s office has shut its doors.'],
     chain: [],
   },
+  financial: {
+    kind: 'financial', name: 'Financial collapse', pulpy: false, warn: [30, 90],
+    variants: [
+      { id: 'bank_holiday', name: 'a bank holiday that never ends', weight: 3, curves: { banks: C(0, 1, 0.05, [90, 300], 60), stores: C(3, 20, 0.3, [60, 200], 60), deliveries: C(5, 25, 0.4, [60, 200], 60), fuel: C(10, 30, 0.4, [60, 220], 60), medical: C(20, 40, 0.4, [90, 300], 60), law: C(20, 40, 0.35, [100, 330], 60) } },
+      { id: 'hyperinflation', name: 'hyperinflation', weight: 2, curves: { banks: C(0, 20, 0, [200, 500], 90), stores: C(10, 40, 0.25, [150, 450], 90), deliveries: C(10, 40, 0.3, [150, 450], 90), fuel: C(15, 30, 0.3, [150, 450], 90), medical: C(20, 50, 0.3, [150, 450], 90), law: C(30, 60, 0.3, [150, 450], 90), grid: C(60, 60, 0.5, [150, 450], 60) } },
+    ],
+    hints: [['Two regional banks fail in a week; lines outside a branch in the city.', 'Groceries up 4 % again this month.', 'The mill in town lays off a shift.'], ['"Temporary" withdrawal limits at every bank.', 'Gold hits a record; the pawn shop is buying.', 'Eggs and formula rationed at the store.'], ['ATMs read "temporarily unavailable".', 'The governor asks for calm.', 'Neighbors are swapping eggs for diesel.']],
+    hit: ['The banks don\'t open: accounts frozen "until further notice".'],
+    chain: [{ kind: 'lawless', p: 0.5, after: [45, 120] }],
+  },
+  drought: {
+    kind: 'drought', name: 'Drought', pulpy: false, warn: [90, 200],
+    variants: [
+      { id: 'megadrought', name: 'a megadrought', weight: 1, curves: { stores: C(30, 90, 0.6, [400, 800], 120), deliveries: C(60, 90, 0.7, null), law: C(120, 120, 0.6, [500, 900], 90) } },
+    ],
+    hints: [['Snowpack 40 % of normal.', 'Hay prices double at the sale barn.', 'Burn ban in effect county-wide.'], ['The well driller is booked out six months.', 'Ranchers selling their herds early.', 'The creek is lower than anyone remembers.'], ['A neighbor\'s well is sucking air.', 'Reservoir at dead pool; irrigation called off.', 'The county starts trucking water to the subdivisions.']],
+    hit: ['The creek has stopped running. Wells across the county are failing.'],
+    chain: [{ kind: 'wildfire', p: 0.35, after: [60, 200] }],
+  },
+  pandemic: {
+    kind: 'pandemic', name: 'Pandemic', pulpy: false, warn: [30, 60],
+    variants: [
+      { id: 'wave', name: 'the pandemic', weight: 1, curves: { medical: C(0, 14, 0.1, [200, 420], 60), stores: C(3, 14, 0.4, [60, 200], 30), deliveries: C(5, 20, 0.5, [60, 200], 30), law: C(30, 60, 0.6, [120, 300], 30), banks: C(10, 30, 0.7, [60, 200], 30), fuel: C(10, 30, 0.6, [60, 200], 30) } },
+    ],
+    hints: [['A cluster of "atypical pneumonia" overseas.', 'Airports begin screening.', 'Masks sold out online.'], ['First case in the state.', 'The hospital restricts visitors.', 'A neighbor\'s daughter, a nurse: "it\'s bad in the ER."'], ['Schools close statewide.', 'Toilet paper gone from every shelf.', 'Stay-at-home order expected tonight.']],
+    hit: ['Stay-at-home order: the hospitals are full and the county is locking down.'],
+    chain: [{ kind: 'lawless', p: 0.2, after: [60, 150] }],
+  },
+  solar_flare: {
+    kind: 'solar_flare', name: 'Solar flare (Carrington event)', pulpy: false, warn: [1, 3],
+    variants: [
+      { id: 'carrington', name: 'a Carrington-class solar storm', weight: 1, curves: { grid: C(0, 0, 0, [240, 730], 90), phone: C(0, 1, 0.1, [60, 240], 60), fuel: C(0, 1, 0.1, [250, 740], 60), stores: C(2, 4, 0.1, [250, 740], 60), deliveries: C(0, 2, 0.05, [250, 740], 60), medical: C(5, 10, 0.2, [250, 740], 60), banks: C(0, 1, 0.05, [250, 740], 60), law: C(20, 40, 0.15, [260, 760], 60) } },
+    ],
+    hints: [['Space weather service: an X-class flare.', 'Aurora forecast as far south as Texas.'], ['A coronal mass ejection is on its way: 18–36 hours.', 'The grid operator asks people to unplug what they can.'], ['The northern lights are bright red, straight overhead.', 'Radio full of static.']],
+    hit: ['The aurora fills the sky; transformers across the continent are burning. The grid is gone.'],
+    chain: [{ kind: 'lawless', p: 0.45, after: [21, 60] }],
+  },
+  wildfire: {
+    kind: 'wildfire', name: 'Wildfire', pulpy: false, warn: [2, 6],
+    variants: [
+      { id: 'front', name: 'the fire front', weight: 1, curves: { grid: C(0, 0, 0, [10, 40], 10), phone: C(0, 1, 0.3, [5, 20], 5), deliveries: C(0, 1, 0.2, [10, 30], 10), stores: C(0, 2, 0.4, [10, 30], 10), fuel: C(0, 1, 0.3, [10, 30], 10) } },
+    ],
+    hints: [['Red flag warning: critical fire weather.', 'A smoke column over the range to the west.'], ['Ash falling in town; the sky is orange at noon.', 'The co-op cuts power to the lines in the hills ("public safety shutoff").'], ['Evacuation level GO for the valley.', 'The scanner says it jumped the highway.']],
+    hit: ['The fire front comes over the bench in the night.'],
+    chain: [],
+  },
+  ash_winter: {
+    kind: 'ash_winter', name: 'Supervolcano / ash winter', pulpy: false, warn: [7, 30],
+    variants: [
+      { id: 'yellowstone', name: 'the Yellowstone eruption', weight: 1, curves: { grid: C(0, 2, 0.1, [60, 300], 60), fuel: C(0, 3, 0.1, [90, 400], 60), stores: C(1, 7, 0.1, [120, 500], 60), deliveries: C(0, 3, 0, [120, 500], 60), medical: C(3, 14, 0.3, [120, 500], 60), phone: C(1, 5, 0.3, [30, 200], 30), banks: C(10, 30, 0.3, [120, 500], 60), law: C(20, 60, 0.2, [150, 550], 60) } },
+    ],
+    hints: [['A swarm of earthquakes under Yellowstone.', 'The park closes its roads "for safety".'], ['The ground at Norris has risen a meter.', 'USGS raises the alert level to WARNING.'], ['Steam and ash from the caldera; flights grounded.', 'Ash forecast for the whole Mountain West.']],
+    hit: ['Yellowstone erupts. Gray ash is falling like snow and the sun is a dim disc.'],
+    chain: [{ kind: 'lawless', p: 0.4, after: [30, 90] }],
+  },
+  cyberattack: {
+    kind: 'cyberattack', name: 'Cyberattack on infrastructure', pulpy: false, warn: [5, 20],
+    variants: [
+      { id: 'rolling', name: 'a coordinated cyberattack', weight: 1, curves: { grid: C(0, 0, 0.3, [10, 60], 40), banks: C(0, 0, 0, [14, 90], 30), phone: C(0, 1, 0.3, [7, 45], 20), fuel: C(0, 1, 0.3, [10, 60], 30), deliveries: C(1, 5, 0.3, [15, 70], 30), stores: C(2, 6, 0.3, [15, 70], 30), medical: C(2, 7, 0.5, [15, 70], 30), law: C(14, 30, 0.5, [30, 100], 30) } },
+    ],
+    hints: [['A ransomware attack shuts a pipeline for a week.', 'Bank apps down "for maintenance" in three states.'], ['The water utility in the city reports "anomalies".', 'Gas stations can\'t take cards.'], ['The power flickers off and on across the region.', 'Phones show "No Service" for an hour.']],
+    hit: ['Everything digital stops at once: the grid, the banks, the phones. A cyberattack.'],
+    chain: [{ kind: 'lawless', p: 0.25, after: [20, 60] }],
+  },
+  zombies: {
+    kind: 'zombies', name: 'Zombies', pulpy: true, warn: [5, 15],
+    variants: [{ id: 'outbreak', name: 'the outbreak', weight: 1, curves: { law: C(3, 10, 0, null), medical: C(2, 7, 0, null), stores: C(3, 7, 0, null), deliveries: C(2, 5, 0, null), grid: C(14, 30, 0, null), fuel: C(5, 15, 0, null), banks: C(5, 10, 0, null), phone: C(10, 30, 0, null) } }],
+    hints: [['Riot at a hospital in the city: patients "attacking staff".', 'A strange rabies-like illness in the news.'], ['The National Guard is in the city. Footage is being taken down.', 'Neighbors say the interstate is closed east of here.'], ['The city has gone quiet on the radio.', 'Something is walking up the county road.']],
+    hit: ['They\'re here. The dead are walking out of town.'],
+    chain: [],
+  },
+  invasion: {
+    kind: 'invasion', name: 'Invasion', pulpy: true, warn: [10, 40],
+    variants: [{ id: 'occupation', name: 'the occupation', weight: 1, curves: { law: C(0, 5, 0.2, null), grid: C(0, 2, 0.2, null), phone: C(0, 0, 0, null), banks: C(0, 2, 0, null), fuel: C(0, 5, 0.1, null), stores: C(2, 10, 0.2, null), deliveries: C(0, 3, 0.1, null), medical: C(2, 10, 0.3, null) } }],
+    hints: [['Satellites over the Pacific go dark.', 'Carrier groups recalled; the President addresses the nation.'], ['Paratroopers reported near the missile fields.', 'Martial law declared in three states.'], ['Columns of vehicles on the interstate, not ours.', 'Radio stations off the air one by one.']],
+    hit: ['Foreign troops are in the valley. Checkpoints on every road.'],
+    chain: [],
+  },
+  civil_war: {
+    kind: 'civil_war', name: 'Civil war', pulpy: true, warn: [20, 60],
+    variants: [{ id: 'factions', name: 'the war between the Cascade Compact and the Plains Alliance', weight: 1, curves: { law: C(0, 20, 0.1, null), grid: C(10, 30, 0.3, null), fuel: C(0, 20, 0.2, null), banks: C(0, 10, 0.1, null), stores: C(5, 30, 0.3, null), deliveries: C(5, 30, 0.2, null), medical: C(10, 40, 0.3, null), phone: C(5, 20, 0.4, null) } }],
+    hints: [['The Cascade Compact refuses federal orders.', 'Protests become armed standoffs in two capitals.'], ['The Plains Alliance seizes a federal depot.', 'Checkpoints on the state line.'], ['Fighting around Billings; the interstate is cut.', 'Militia recruiters at the feed store.']],
+    hit: ['The war reaches the valley: the Plains Alliance holds the town, the Compact the passes.'],
+    chain: [],
+  },
+  bioweapon: {
+    kind: 'bioweapon', name: 'Engineered bioweapon', pulpy: true, warn: [7, 20],
+    variants: [{ id: 'release', name: 'the release', weight: 1, curves: { medical: C(0, 5, 0, null), stores: C(1, 5, 0.05, null), deliveries: C(1, 5, 0, null), law: C(7, 20, 0.05, null), grid: C(20, 60, 0.2, null), fuel: C(5, 20, 0.05, null), banks: C(5, 15, 0, null), phone: C(30, 90, 0.2, null) } }],
+    hints: [['An outbreak in three cities at once.', 'Officials won\'t say where it started.'], ['Hospitals in the city overwhelmed in days.', 'The CDC tells everyone to stay home.'], ['Bodies in the streets in the city footage.', 'Roadblocks on the highway into the county.']],
+    hit: ['It\'s here. Anyone from outside could be carrying it.'],
+    chain: [],
+  },
+  asteroid: {
+    kind: 'asteroid', name: 'Asteroid impact', pulpy: true, warn: [90, 200],
+    variants: [{ id: 'impact', name: 'the impact', weight: 1, curves: { grid: C(0, 0, 0, null), fuel: C(0, 2, 0, null), stores: C(0, 3, 0, null), deliveries: C(0, 1, 0, null), medical: C(0, 3, 0.1, null), law: C(2, 20, 0.05, null), phone: C(0, 0, 0, null), banks: C(0, 0, 0, null) } }],
+    hints: [['Astronomers: a 1-in-50 chance of impact next year.', 'The odds firm up: 1 in 3.'], ['Confirmed: impact in the North Atlantic.', 'Seed and canned goods rationed nationwide.'], ['It\'s visible at night now, a smudge brighter every week.', 'Churches full; the roads west are jammed.']],
+    hit: ['A second sunrise in the east, then the sky goes dark for good.'],
+    chain: [],
+  },
+  unknown: {
+    kind: 'unknown', name: 'The unknown event', pulpy: true, warn: [3, 10],
+    variants: [{ id: 'lights', name: 'the lights in the sky', weight: 1, curves: { grid: C(0, 0, 0, null), phone: C(0, 0, 0, null), banks: C(0, 0, 0, null), fuel: C(0, 1, 0, null), stores: C(0, 2, 0.1, null), deliveries: C(0, 0, 0, null), medical: C(0, 2, 0.1, null), law: C(0, 5, 0, null) } }],
+    hints: [['Lights over the range, three nights running.', 'Every compass in the county points west.'], ['Cattle standing in rings in the fields.', 'Radios pick up a tone at 3 a.m.'], ['The sky hums.', 'The Hendersons\' truck is in their drive, doors open, nobody home.']],
+    hit: ['A white light, and then silence. Half the valley is simply gone.'],
+    chain: [],
+  },
 };
 
-/** Grounded disasters a Surprise run may roll (only ones with a ruleset; the rest are added as they are built). */
-export const SURPRISE_POOL: DisasterKind[] = ['grid_down', 'nuclear'];
+/** Grounded disasters a Surprise run may roll (the pulpy ones are unlockables: Scenario and Free build). */
+export const SURPRISE_POOL: DisasterKind[] = ['grid_down', 'nuclear', 'financial', 'lawless', 'drought', 'pandemic', 'solar_flare', 'wildfire', 'ash_winter', 'cyberattack'];
 
 export interface Chained { kind: DisasterKind; variant: string; hitAt: number; back: Partial<Record<Track, number>> }
 
@@ -124,6 +230,10 @@ export interface DisasterState {
   news: Array<{ t: number; text: string; tone: 0 | 1 | 2 | 3 }>;
   /** Day index of the last update. */
   day: number;
+  /** One-time effects already applied (effects.ts). */
+  done?: string[];
+  /** Wildfire: trees close round each building, measured by the world when the fire weather starts. */
+  fuel?: Record<string, number>;
 }
 
 const PEACE_DAYS: Record<Exclude<PeaceLength, 'random'>, number> = { short: 365, medium: 3 * 365, long: 5 * 365 };
@@ -215,9 +325,10 @@ export function priceFactor(d: DisasterState, t: number): number {
   return 1.6 + 2.4 * (1 - Math.min(tr.stores, tr.deliveries));
 }
 
-/** Can the yard still deliver? (Orders fail once deliveries are mostly gone.) */
+/** Can the yard still deliver, and will anyone take your money? (Orders fail once deliveries or the banks are mostly gone.) */
 export function canOrder(d: DisasterState, t: number): boolean {
-  return tracksAt(d, t).deliveries > 0.25;
+  const tr = tracksAt(d, t);
+  return tr.deliveries > 0.25 && tr.banks > 0.25;
 }
 
 /** Ordinary local news in peacetime (the ticker is never empty). */
