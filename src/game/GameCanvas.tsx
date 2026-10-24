@@ -220,7 +220,11 @@ export function GameCanvas() {
       } else {
         cam.apply(ws.camera);
         occluders.keepOut(ws.camera, cam.target.x, cam.target.z, cam.target.y);
-        ws.setShadowFocus(cam.target.x, cam.target.z, cam.radius);
+        // looking down, fit the shadows to the ground actually on screen (the far edge of the view
+        // lies well beyond the target); low views keep the tight fit round the target for sharp shadows
+        const foot = cam.pitch > 0.75 ? viewFootprint(ws.camera, cam.target.y, cam.radius * 3) : null;
+        if (foot) ws.setShadowFocus(foot.x, foot.z, foot.r / 1.1);
+        else ws.setShadowFocus(cam.target.x, cam.target.z, cam.radius);
       }
       ws.tick(dt);
       ws.updateDayNight(t);
@@ -254,3 +258,21 @@ export function GameCanvas() {
 
   return <canvas ref={ref} style={{ width: '100%', height: '100%' }} />;
 }
+
+const _ray = new THREE.Raycaster(), _ndc = new THREE.Vector2(), _hit = new THREE.Vector3();
+/** The bounding circle of the ground (plane y) under the view's corners and center; rays past `maxR` are clamped. */
+function viewFootprint(camera: THREE.PerspectiveCamera, y: number, maxR: number): { x: number; z: number; r: number } | null {
+  const pts: THREE.Vector3[] = [];
+  for (const [u, v] of [[-1, -1], [1, -1], [-1, 1], [1, 1], [0, 0]] as const) {
+    _ndc.set(u, v);
+    _ray.setFromCamera(_ndc, camera);
+    const d = _ray.ray.direction, o = _ray.ray.origin;
+    const t = d.y < -1e-3 ? (y - o.y) / d.y : Infinity;
+    const far = Math.min(t, maxR * 1.5);
+    pts.push(_hit.copy(o).addScaledVector(d, far).clone());
+  }
+  const cx = pts.reduce((a, p) => a + p.x, 0) / pts.length, cz = pts.reduce((a, p) => a + p.z, 0) / pts.length;
+  const r = Math.max(...pts.map(p => Math.hypot(p.x - cx, p.z - cz)));
+  return Number.isFinite(r) ? { x: cx, z: cz, r: Math.min(r, maxR) } : null;
+}
+

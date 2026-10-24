@@ -429,3 +429,8 @@ SETS.plans = [
   { name: 'plans-oblique', time: 16, season: 'summer', setup: planned + "{ const c = cb.world.camp; cb.cam.target.set(c.x - 3, 0, c.z + 1); cb.cam.radius = 12; cb.cam.pitch = 0.5; cb.cam.yaw = 0.5; }", cam: D, frames: 16 },
 ];
 
+SETS.darkrect = [
+  { name: 'aerial-camp', time: 6.2, season: 'spring', setup: "{ const c = cb.world.camp; cb.cam.target.set(c.x, 0, c.z); cb.cam.radius = 22; cb.cam.pitch = 1.1; cb.cam.yaw = 0; }", cam: D, frames: 16 },
+  { name: 'aerial-timber', time: 10, season: 'summer', setup: "{ const c = cb.world.camp; cb.cam.target.set(c.x, 0, c.z - 30); cb.cam.radius = 26; cb.cam.pitch = 1.05; cb.cam.yaw = 0; }", cam: D, frames: 16 },
+  { name: 'aerial-camp-noon', time: 12, season: 'spring', setup: "{ const c = cb.world.camp; cb.cam.target.set(c.x, 0, c.z); cb.cam.radius = 22; cb.cam.pitch = 1.1; cb.cam.yaw = 0; }", cam: D, frames: 16 },
+];
