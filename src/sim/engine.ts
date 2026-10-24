@@ -24,6 +24,7 @@ import { addHardenWork, nextHardenJob } from './hardening';
 import { updateDisaster } from './disaster';
 import { liveDay, workFactor } from './needs';
 import { gateDay, neighborGossip } from './encounters';
+import { mutualAidDay } from './barter';
 import { falloutDay, isNuclear, SHELTER_DAYS, strike } from './nuclear';
 import { tallyDay } from './report';
 import { landMarketDay } from './land';
@@ -105,6 +106,7 @@ function subStep(s: GameState): void {
     for (const line of armoryDay(s)) log(s, line);
     for (const line of gearDay(s)) log(s, line);
     for (const line of upkeepDay(s, demandNow(s), s.heat.warned !== dayIndex(s.clock.t) - 1 && s.heat.warned !== dayIndex(s.clock.t))) log(s, line);
+    for (const line of mutualAidDay(s)) log(s, line);
     const e = gateDay(s);
     if (e) log(s, `${e.title}.`);
     if (before !== 'impact' && s.disaster.phase === 'impact' && s.disaster.kind === 'nuclear') for (const line of strike(s)) log(s, line);
