@@ -26,8 +26,10 @@ import { FIT, fitProblem, plant, serviceOf, FUEL_UNIT_L, UTILITY, SPARE_FOR, sto
 import { bestShelter, doseRate, isNuclear, SHELTER_DAYS } from '../sim/nuclear';
 import { DISASTERS, TRACKS, TRACK_NAME, type DisasterKind } from '../sim/disaster';
 import { prices } from '../sim/economy';
-import { LIVING_PER_DAY } from '../sim/engine';
-import { daysOfFood, KCAL, NEED_ADULT, NEED_KID } from '../sim/needs';
+import { livingPerDay } from '../sim/engine';
+import { roman } from '../sim/eras';
+import { MILESTONE_COUNT, MILESTONE_NAME } from '../sim/lineage';
+import { daysOfFood, KCAL, needOf } from '../sim/needs';
 import { NEIGHBOR_BLURB } from '../sim/encounters';
 import { acresOf, buyProblem, LAND_NAME, priceOf } from '../sim/land';
 import { HARDEN, HARDEN_IDS, type TierDef, hardenCost, hardenProblem, isBunkerRoom, protectionOf, tierOf } from '../sim/hardening';
@@ -140,7 +142,7 @@ export function Hud() {
   const g = useGameStore();
   const [qty, setQty] = useState<Record<MaterialId, number>>(emptyStock());
   const [leftTab, setLeftTab] = useState<'build' | 'projects' | 'log'>('build');
-  const [rightTab, setRightTab] = useState<'family' | 'supplies' | 'utilities' | 'land' | 'outside'>('family');
+  const [rightTab, setRightTab] = useState<'family' | 'supplies' | 'utilities' | 'land' | 'outside' | 'chronicle'>('family');
   // picking a building on the map opens its project card
   const [lastSel, setLastSel] = useState<string | null>(null);
   if (g.selected !== lastSel) { setLastSel(g.selected); if (g.selected) setLeftTab('projects'); }
@@ -186,6 +188,7 @@ export function Hud() {
       <div style={{ ...panel, position: 'fixed', top: 10, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 12, alignItems: 'center', fontSize: 13.5 }}>
         <span>{dateLabel(cal.doy)}, {cal.year}</span>
         <span style={{ fontVariantNumeric: 'tabular-nums' }}>{clock(hourOf(game.clock.t))}</span>
+        {game.lineage.era > 1 && <span style={{ color: '#d8c08a' }} title={`The ${game.lineage.family} family: era ${game.lineage.era}`}>Era {roman(game.lineage.era)}</span>}
         <span style={{ fontWeight: 600, color: '#cfe0a8' }} title={`Checking. Net worth ${usd(netWorth(game))}`}>{usd(game.money)}</span>
         <button style={btn()} title="Town, the catalog, your accounts, gold and silver" onClick={() => g.openShop(true)}>Shop & money</button>
         <button style={btn()} title="New game" onClick={() => g.openSetup(true, true)}>New</button>
@@ -352,7 +355,7 @@ export function Hud() {
 
       {/* Right: the family, supplies, water & power, land, the outside world */}
       <div style={{ ...panel, position: 'fixed', right: 10, top: 10, width: 268, maxHeight: 'calc(100vh - 90px)', display: 'flex', flexDirection: 'column' }}>
-        <Tabs tabs={[['family', 'Family', familyAlert], ['supplies', 'Supplies', foodAlert], ['utilities', 'Utilities', utilAlert], ['land', 'Land'], ['outside', 'Outside', outsideAlert]]} value={rightTab} set={setRightTab} />
+        <Tabs tabs={[['family', 'Family', familyAlert], ['supplies', 'Supplies', foodAlert], ['utilities', 'Utilities', utilAlert], ['land', 'Land'], ['outside', 'Outside', outsideAlert], ['chronicle', 'Years']]} value={rightTab} set={setRightTab} />
         <div style={{ overflowY: 'auto', flex: 1, paddingRight: 2 }}>
           {rightTab === 'family' && <>
             {game.people.map((p, i) => {
@@ -381,7 +384,7 @@ export function Hud() {
               <Row label="Hygiene supplies" value={game.disaster.tracks.stores >= 0.5 ? `bought with groceries · ${Math.floor(game.stock.hygiene)} put by` : `${Math.floor(game.stock.hygiene)} person-months left`} />
             </Section>}
             <Section title="Work and money">
-              {game.disaster.tracks.banks > 0.5 && game.disaster.tracks.stores > 0.5 && <Row label="Household costs" value={`$${LIVING_PER_DAY}/day`} />}
+              {game.disaster.tracks.banks > 0.5 && game.disaster.tracks.stores > 0.5 && <Row label="Household costs" value={`$${livingPerDay(game)}/day`} />}
               {game.people.filter(p => p.job).map(p => {
                 const st = game.personState.find(x => x.id === p.id);
                 const over = game.disaster.phase === 'impact' || game.disaster.phase === 'survival' || game.disaster.phase === 'over';
@@ -424,7 +427,7 @@ export function Hud() {
                 const f = game.food, d = daysOfFood(game);
                 const warned = !!game.disaster.kind && game.clock.t >= game.disaster.warnAt;
                 const short = warned && (f.fromStores ? d < 180 : d < 30);
-                const perDay = game.people.reduce((a, p, i) => a + (game.personState[i]?.needs.died == null ? (p.kid ? NEED_KID : NEED_ADULT) : 0), 0);
+                const perDay = game.people.reduce((a, p, i) => a + (game.personState[i]?.needs.died == null ? needOf(p) : 0), 0);
                 const lines = [{ material: 'staples' as MaterialId, qty: Math.max(1, Math.ceil(90 * perDay / KCAL.staples)) }];
                 const why = orderProblem(game, lines);
                 return <>
@@ -559,6 +562,8 @@ export function Hud() {
             </Section>
           </>}
 
+          {rightTab === 'chronicle' && <Chronicle />}
+
           {rightTab === 'outside' && <>
             {game.disaster.mode === 'sandbox' && !game.disaster.kind && <FreeBuild />}
             {!(game.disaster.phase === 'warning' || (game.disaster.kind && game.clock.t >= game.disaster.warnAt)) && !(game.disaster.mode === 'sandbox' && !game.disaster.kind) && <Note>All quiet. Watch the news ticker, the prices and the neighbors.</Note>}
@@ -639,4 +644,43 @@ export function Hud() {
       </div>
     </>
   );
+}
+
+const KIND_MARK: Record<string, string> = { era: '◆', birth: '✦', death: '✝', partner: '♥', coming: '▲', milestone: '★', retire: '·' };
+
+/** The long game: the family over the years, the eras, milestones and the dynasty score. */
+function Chronicle() {
+  const game = useGameStore(s => s.game);
+  const L = game.lineage;
+  const years = Math.floor(game.clock.t / 365);
+  const living = game.people.filter((_, i) => game.personState[i]?.needs.died == null);
+  const gens = new Set(living.filter(p => p.kin).map(p => p.gen ?? 1)).size;
+  const born = game.people.filter(p => p.bornHere).length;
+  const d = game.disaster;
+  const now = L.settling ? 'the world settling' : d.kind && game.clock.t >= d.hitAt ? 'living through it' : d.kind && game.clock.t >= d.warnAt ? 'warning signs' : 'quiet';
+  return <>
+    <Section title={`The ${L.family} family`}>
+      <Row label="On the place" value={years < 1 ? 'the first year' : `${years} year${years === 1 ? '' : 's'}`} />
+      <Row label="Era" value={`${roman(L.era)} · ${now}`} />
+      <Row label="Living here" value={`${living.length} · ${gens} generation${gens === 1 ? '' : 's'}`} />
+      {born > 0 && <Row label="Born on the place" value={born} />}
+      <Row label="Dynasty score" value={Math.round(L.points).toLocaleString('en-US')} title="A point for each person-year on the place, each era's grade, 25 for each child, and the milestones" />
+    </Section>
+    {L.eras.length > 0 && <Section title="Eras">
+      {L.eras.map(e => <div key={e.n} style={{ display: 'flex', justifyContent: 'space-between', gap: 6, padding: '2px 0' }}>
+        <span><span style={{ color: DIM }}>{roman(e.n)}</span> {e.name}</span>
+        <span style={{ color: e.grade <= 'B' ? TONE.good : e.grade <= 'C' ? TONE.warn : TONE.bad }}>{e.grade} · {e.fate === 'full' ? 'came back' : e.fate === 'partial' ? 'thinner' : 'never back'}</span>
+      </div>)}
+    </Section>}
+    <Section title={`Milestones ${L.milestones.length}/${MILESTONE_COUNT}`}>
+      {L.milestones.length ? L.milestones.map(m => <div key={m} style={{ padding: '1px 0' }}><span style={{ color: '#d8c08a' }}>★</span> {MILESTONE_NAME[m]}</div>) : <Note>None yet. Get through the first winter.</Note>}
+    </Section>
+    <Section title="Chronicle">
+      {L.chronicle.length === 0 && <Note>Births, deaths, weddings, the eras: it all goes here.</Note>}
+      {L.chronicle.slice(-40).reverse().map((e, i) => <div key={i} style={{ display: 'flex', gap: 6, padding: '3px 0', borderBottom: `1px solid ${LINE}` }}>
+        <span style={{ color: DIM, width: 32, flex: 'none', fontVariantNumeric: 'tabular-nums' }}>{e.year}</span>
+        <span style={{ color: e.kind === 'death' ? '#b8a8a0' : e.kind === 'era' ? '#d8c08a' : undefined }}>{KIND_MARK[e.kind]} {e.text}</span>
+      </div>)}
+    </Section>
+  </>;
 }

@@ -4,6 +4,7 @@
  * Bump SAVE_VERSION and add a migration in save/migrations.ts whenever a
  * field changes (CLAUDE.md rule 5).
  */
+import { foundLineage, newLineage, type Lineage } from './lineage';
 import { emptyStock, type Stock, type MaterialId } from './materials';
 import { generateFamily, type Person } from './family';
 import type { StageId } from './blueprints';
@@ -27,7 +28,7 @@ import { emptyStats, type Ending, type RunStats } from './report';
 import { generateNeighbors, newGate, type GateState, type Neighbor } from './encounters';
 import { freshNeeds, type FoodReport, type Needs } from './needs';
 import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
-export const SAVE_VERSION = 29;
+export const SAVE_VERSION = 30;
 
 /** Starting savings (GDS §1 peacetime money constraint). */
 export const STARTING_MONEY = 30000;
@@ -100,6 +101,8 @@ export interface PersonState {
   target: string | null;
   /** Still going to the day job (adults; ends when the disaster hits, or when they quit). */
   employed?: boolean;
+  /** Lost the job when it hit (gets it back if the town comes back). */
+  laidOff?: boolean;
   /** Health, morale, hunger, dose, wounds. */
   needs: Needs;
 }
@@ -180,6 +183,8 @@ export interface GameState {
   armory: Armory;
   /** The game in the woods and the creek, licenses. */
   wild: Wild;
+  /** The long game: eras, the chronicle, milestones, the dynasty score. */
+  lineage: Lineage;
   /** The households round the place. */
   neighbors: Neighbor[];
   /** Who comes to the gate: the pending encounter, the last result, humanity and tallies. */
@@ -203,6 +208,7 @@ export interface RunSetup { site?: Site; lifestyle?: Lifestyle; difficulty?: Dif
 export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: RunSetup = {}): GameState {
   const people = setup.family ? structuredClone(setup.family) : generateFamily(seed);
   for (const p of people) p.conditions ??= conditionsFor(p, seed);
+  foundLineage(people, seed);
   const site = setup.site ?? CLASSIC;
   const g: GameState = {
     version: SAVE_VERSION,
@@ -220,6 +226,7 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     fin: newFin(),
     armory: newArmory(),
     wild: newWild(),
+    lineage: newLineage(people[0].last),
     site,
     stock: { ...emptyStock(), firewood: STARTING_FIREWOOD, canned: 2 },
     neighbors: generateNeighbors(seed),
