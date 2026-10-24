@@ -174,7 +174,7 @@ Each disaster is a ruleset: what breaks, what is scarce, and what threat cadence
 - **Neighbors:** 4–6 named households.
 - **Injuries and death:** wounds, illness and radiation sickness need a medic, meds and the medical bay. People can die on Standard. Cozy prevents death; Hardcore is permadeath with no reloads.
 - **Report card:** a newspaper-style page with a grade, the survivors, and concrete lines from the run ("Your cistern saved 4 lives", "No one knew first aid", "The tunnel was never needed").
-- **End of a run**: the region recovers, the compound reaches a self-sustaining equilibrium, or the family is lost; then the report card. Endless continue is optional.
+- **End of a run**: the region recovers, the compound reaches a self-sustaining equilibrium (over a year it grows 95 % of what everyone eats), or the family is lost; then the report card. Endless continue is optional.
 
 **Buying land** (decided with the user):
 - **Parcels:** the land round the compound is split into named neighbor parcels (the timber quarter, the creek bottom, the hay field, a neighbor's place), each with an owner and a price.

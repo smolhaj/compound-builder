@@ -253,6 +253,82 @@ function garden(def: KitPieceDef, seed = 1): THREE.Group {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
+// Field plot (a quarter acre: potatoes, dry beans, wheat)
+// ─────────────────────────────────────────────────────────────────────────
+
+function field(def: KitPieceDef, seed = 1): THREE.Group {
+  const LW = def.cellsX * CELL, LD = def.cellsZ * CELL;
+  const p = new Parts(seed);
+  const x0 = -LW / 2 + 0.04, x1 = LW / 2 - 0.04, z0 = -LD / 2 + 0.04, z1 = LD / 2 - 0.04, H = 0.3;
+  p.layer = 'stakes';
+  for (const [x, z] of [[x0, z0], [x1, z0], [x0, z1], [x1, z1]]) p.add('trim', box(0.012, 0.09, 0.012, x, -0.02, z));
+  // foundation: the plowed ground, a grass headland round the edge and a lane up the middle
+  p.layer = 'foundation';
+  const hx0 = x0 + 0.12, hx1 = x1 - 0.12, hz0 = z0 + 0.12, hz1 = z1 - 0.32;
+  p.add('soil', box(hx1 - hx0, 0.006, hz1 - hz0, (hx0 + hx1) / 2, -0.002, (hz0 + hz1) / 2));
+  // frame: the crops in three bands across the field (rows run front to back, 0.9 m apart)
+  const rowW = 0.9 * M, lane = 0.16, w = hx1 - hx0, band = (w - 2 * lane) / 3;
+  const len = hz1 - hz0 - 0.04, zc = (hz0 + hz1) / 2;
+  const bands: Array<'potato' | 'bean' | 'wheat'> = ['potato', 'bean', 'wheat'];
+  bands.forEach((crop, b) => {
+    const bx0 = hx0 + b * (band + lane);
+    if (crop === 'wheat') {
+      // drilled wheat (rows 25 cm apart, ≈ 0.9 m): each drill row is a ragged run of stalks with the heads above,
+      // its height wandering a little along the row
+      const drills = Math.round(band / (0.25 * M)), seg = 0.06;
+      for (let i = 0; i < drills; i++) {
+        const sx = bx0 + (i + 0.5) * band / drills;
+        for (let z = zc - len / 2; z < zc + len / 2 - 1e-3; z += seg) {
+          const h = (0.78 + 0.18 * p.rnd()) * M, l = Math.min(seg, zc + len / 2 - z) * 0.92;
+          p.add('straw', box(0.05 * M, h, l, sx + (p.rnd() - 0.5) * 0.004, 0.004, z + l / 2), 'frame');
+          p.add('grain', box(0.09 * M, 0.1 * M, l * 0.9, sx, 0.004 + h, z + l / 2), 'frame');
+        }
+      }
+      return;
+    }
+    const rows = Math.floor(band / rowW);
+    for (let i = 0; i < rows; i++) {
+      const x = bx0 + (i + 0.5) * band / rows;
+      // the hill or the ridge the row is planted in
+      p.add('soil', box(0.35 * M, 0.18 * M, len, x, 0.004, zc), 'frame');
+      const step = crop === 'potato' ? 0.6 * M * 2 : 0.5 * M * 2, n = Math.floor(len / step);
+      for (let j = 0; j < n; j++) {
+        const z = zc - len / 2 + (j + 0.5) * len / n, j2 = (p.rnd() - 0.5) * 0.02;
+        if (crop === 'potato') p.add('crop', new THREE.IcosahedronGeometry(0.42 * M, 1).scale(1.2, 0.5, 1.5).translate(x + j2, 0.18 * M + 0.2 * M, z), 'interior');
+        else p.add('crop', new THREE.IcosahedronGeometry(0.3 * M, 1).scale(1, 0.8, 1.8).translate(x + j2, 0.18 * M + 0.22 * M, z), 'interior');
+      }
+    }
+  });
+  // roof stage: the deer fence (≈ 2.4 m wire on posts) with a gate wide enough for a cart at the front
+  const runs: Array<[number, number, number, number, Array<{ at: number; w: number; sill: number; h: number }>]> = [
+    [x0, z1, x1, z1, [{ at: (x1 - x0) / 2, w: 0.5, sill: 0, h: H }]],
+    [x0, z0, x0, z1, []], [x1, z0, x1, z1, []], [x0, z0, x1, z0, []],
+  ];
+  for (const [ax, az, bx, bz, ops] of runs) {
+    p.collide(...wallRun(p.sink, 'roof', 'wire_mesh', { ax, az, bx, bz, y0: 0, h: H, t: 0.004, openings: ops }));
+    const l = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.round(l / 0.5));
+    for (let k = 0; k <= n; k++) p.add('wood_dark', box(0.022, H + 0.03, 0.022, ax + (bx - ax) * k / n, 0, az + (bz - az) * k / n), 'rafters');
+  }
+  for (const sx of [-0.25, 0.25]) p.add('wood_dark', box(0.03, H + 0.06, 0.03, (x0 + x1) / 2 + sx, 0, z1), 'rafters');
+  // finish: a bean-drying rack, a potato crate stack and a wheelbarrow at the gate
+  p.layer = 'openings';
+  const rx = hx1 - 0.3, rz = z1 - 0.18;
+  for (const dx of [-0.25, 0, 0.25]) p.add('wood_mid', box(0.02, 0.28, 0.02, rx + dx, 0, rz));
+  for (const y of [0.12, 0.22]) p.add('wood_mid', box(0.52, 0.015, 0.015, rx, y, rz));
+  p.add('straw', box(0.48, 0.1, 0.05, rx, 0.14, rz));
+  for (let i = 0; i < 3; i++) p.add('wood_mid', box(0.09, 0.06, 0.07, hx0 + 0.15 + (i % 2) * 0.1, (i > 1 ? 0.06 : 0), z1 - 0.16));
+  if (p.rnd() < 0.85) {
+    const geos: Array<[Parameters<typeof p.add>[0], THREE.BufferGeometry]> = [];
+    Clutter.wheelbarrow((m, g) => geos.push([m, g]));
+    for (const [m, g] of geos) p.add(m, g.rotateY(0.4).translate((x0 + x1) / 2 + 0.35, 0.004, z1 - 0.2), 'openings');
+  }
+  const g = p.finish();
+  g.userData.chimneyTop = null;
+  g.userData.keep = ['frame', 'rafters'];
+  return g;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // Log house
 // ─────────────────────────────────────────────────────────────────────────
 
@@ -407,6 +483,7 @@ const BUILDERS: Record<string, (def: KitPieceDef, seed?: number, opts?: BuildOpt
   root_cellar: rootCellar,
   chicken_coop: chickenCoop,
   garden,
+  field,
   log_house: logHouse,
   ...UTILITY_BUILDERS,
   ...BUNKER_BUILDERS,

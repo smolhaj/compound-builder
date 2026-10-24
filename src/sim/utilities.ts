@@ -45,7 +45,7 @@ export const UTILITY: Record<string, UtilityDef> = {
 };
 
 /** Daily power draw (kWh) of a wired building by kind, and water use (L/person/day) carried vs plumbed. */
-export const DRAW_KWH: Record<string, number> = { timber_cabin: 5, log_house: 8, workshop: 4, root_cellar: 0.2, chicken_coop: 0.3, outhouse: 0, garden: 0 };
+export const DRAW_KWH: Record<string, number> = { timber_cabin: 5, log_house: 8, workshop: 4, root_cellar: 0.2, chicken_coop: 0.3, outhouse: 0, garden: 0, field: 0 };
 export const WATER_CARRIED = 25, WATER_PLUMBED = 130;
 /** Fitting jobs: hours and materials (per building). */
 export const FIT = {
@@ -82,6 +82,8 @@ export interface Utilities {
   grid: boolean;
   /** Electronics killed by an EMP (solar inverter, battery charger, generator, pump controller) until a spare goes in. */
   fried: string[];
+  /** Yesterday the water came in buckets from the creek (the pump or the tank failed). */
+  hauling?: boolean;
   /** Buildings switched off at their breaker. */
   off: string[];
   /** Buildings that had power yesterday (lights on, fridge running). */
@@ -236,7 +238,7 @@ export function sunHours(doy: number): number {
 }
 
 /** Half-size (world units) a line must reach to touch a building, and its roof area (m²) for rain catchment, by kind. */
-export const NODE_R: Record<string, number> = { timber_cabin: 0.5, log_house: 0.75, workshop: 0.75, root_cellar: 0.4, chicken_coop: 0.4, garden: 0.7, outhouse: 0.2, well_hand: 0.25, well_drilled: 0.3, cistern: 0.3, water_tower: 0.35, solar_array: 0.6, battery_shed: 0.3, generator_shed: 0.3, septic: 0.4 };
+export const NODE_R: Record<string, number> = { timber_cabin: 0.5, log_house: 0.75, workshop: 0.75, root_cellar: 0.4, chicken_coop: 0.4, garden: 0.7, field: 2.2, outhouse: 0.2, well_hand: 0.25, well_drilled: 0.3, cistern: 0.3, water_tower: 0.35, solar_array: 0.6, battery_shed: 0.3, generator_shed: 0.3, septic: 0.4 };
 export const ROOF_M2: Record<string, number> = { timber_cabin: 70, log_house: 160, workshop: 120, chicken_coop: 6, outhouse: 2, battery_shed: 8, generator_shed: 8, well_drilled: 6, well_hand: 3 };
 
 /** Rain and snowmelt (mm a day, averaged by month): wet spring, dry late summer. */
@@ -247,6 +249,8 @@ export function rainMm(doy: number): number {
 /** Balance one day. `rnd` is the day's random (pump failures). */
 export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: string) => number = k => ROOF_M2[k] ?? 0): void {
   const u = s.utilities, doy = calendarOf(s.clock).doy;
+  const townOpen = s.disaster.tracks.deliveries > 0.5 && s.disaster.tracks.banks > 0.5;
+  u.hauling = false;
   const fin = s.structures.filter(isFinished);
   const kinds = new Map(fin.map(st => [st.id, st.kind]));
   // ── power: each network's own sources (solar → battery → grid → generator), loads served by priority ──
@@ -318,7 +322,9 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
       const powered = !def.water.needsPower || lit.has(st.id);
       if (!u.broken.includes(st.id) && powered) supply += def.water.lpd * wellYield(s, st.kind);
       // pumps wear out: ~1 failure in 2 years of use
-      if (def.water.needsPower && !u.broken.includes(st.id) && rnd < 1 / 700) { u.broken.push(st.id); log(s, 'The well pump has failed: a mechanic and a hardware kit to fix it.'); }
+      if (def.water.needsPower && !u.broken.includes(st.id) && rnd < 1 / 700) { u.broken.push(st.id); log(s, townOpen ? 'The well pump has failed. The well company is coming out ($850).' : 'The well pump has failed: a mechanic and a hardware kit to fix it.'); }
+      // while the town works, the well company comes out and fixes it (playtest: an unrepaired pump in peacetime killed families)
+      else if (u.broken.includes(st.id) && townOpen && rnd < 0.5) { u.broken = u.broken.filter(x => x !== st.id); s.money -= 850; log(s, 'The well company replaced the pump: $850.'); }
     }
     if (def.store) store += def.store;
   }
@@ -336,7 +342,13 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
   // no supply at all: water is hauled from the creek (that's the default before any well)
   // in a drought the creek stops running: nothing to haul from either
   const creekDry = s.disaster.kind === 'drought' && s.clock.t >= s.disaster.hitAt;
-  if (left < 0 && (supply + store > 0 || creekDry)) { shortL = -left; log(s, `Water ran short by ${Math.round(shortL)} L.`); }
+  if (left < 0 && (supply + store > 0 || creekDry)) {
+    // while the town works, what's short is bought (bottled water, the county water truck) instead of going without
+    if (townOpen) { const cost = Math.round(-left * 0.03); s.money -= cost; if (cost > 30) log(s, `Bought ${Math.round(-left)} L of water in town ($${cost}).`); }
+    // the pump's dead or the tank's dry: back to buckets from the creek (playtest: families died of thirst beside a running creek)
+    else if (!creekDry) { u.hauling = true; }
+    else { shortL = -left; log(s, `Water ran short by ${Math.round(shortL)} L.`); }
+  }
   u.report = { solarKwh: solar, drawKwh: draw, genKwh: gen, shortKwh: short, batteryPct: capKwh > 0 ? u.batteryKwh / capKwh : 0, gridKwh, billUsd: bill, shed, waterL: supply + rainL, useL: use, shortL, storedL: u.storedL };
   u.lastDay = dayIndex(s.clock.t);
 }

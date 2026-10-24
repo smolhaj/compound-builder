@@ -93,6 +93,18 @@ export const GARDEN_BLUEPRINT: Blueprint = {
   ],
 };
 
+/** A quarter-acre field plot: potatoes, dry beans and wheat, plowed by a neighbor's tractor or by hand. */
+export const FIELD_BLUEPRINT: Blueprint = {
+  kind: 'field',
+  stages: [
+    { id: 'site', name: 'Stake the corners', hours: 2, materials: {} },
+    { id: 'foundation', name: 'Plow, pick rock and harrow', hours: 40, materials: {} },
+    { id: 'frame', name: 'Plant potatoes, beans and wheat', hours: 30, materials: { seed: 1 } },
+    { id: 'roof', name: 'Deer fence and gate', hours: 36, materials: { lumber: 4, wire: 2, hardware: 1 } },
+    { id: 'finish', name: 'Hill the potatoes, set the drying racks', hours: 16, materials: { lumber: 1 } },
+  ],
+};
+
 /** 9 × 15 m log house from your own timber: ≈ 800 person-hours (a season for two). */
 export const LOG_HOUSE_BLUEPRINT: Blueprint = {
   kind: 'log_house',
@@ -155,7 +167,7 @@ export const BUNKER_BLUEPRINTS: Blueprint[] = [
 ];
 
 export const BLUEPRINTS: Record<string, Blueprint> = Object.fromEntries(
-  [CABIN_BLUEPRINT, OUTHOUSE_BLUEPRINT, WORKSHOP_BLUEPRINT, ROOT_CELLAR_BLUEPRINT, COOP_BLUEPRINT, GARDEN_BLUEPRINT, LOG_HOUSE_BLUEPRINT, ...UTILITY_BLUEPRINTS, ...BUNKER_BLUEPRINTS].map(b => [b.kind, b]));
+  [CABIN_BLUEPRINT, OUTHOUSE_BLUEPRINT, WORKSHOP_BLUEPRINT, ROOT_CELLAR_BLUEPRINT, COOP_BLUEPRINT, GARDEN_BLUEPRINT, FIELD_BLUEPRINT, LOG_HOUSE_BLUEPRINT, ...UTILITY_BLUEPRINTS, ...BUNKER_BLUEPRINTS].map(b => [b.kind, b]));
 
 /** Total bill of materials for a blueprint. */
 export function totalBill(bp: Blueprint): Partial<Stock> {

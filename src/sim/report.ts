@@ -27,9 +27,15 @@ export interface RunStats {
   okSince: number;
   /** Consecutive days the place fed itself (grown ≥ need). */
   selfFed: number;
+  /** The last year of food grown and needed (kcal; sums that fade over a year, so a winter of eating the harvest counts). */
+  grownYear: number;
+  needYear: number;
 }
 
-export const emptyStats = (): RunStats => ({ days: 0, hungryDays: 0, dryDays: 0, darkDays: 0, kcalNeed: 0, kcalGrown: 0, wounds: 0, maxDose: 0, peak: 0, okSince: -1, selfFed: 0 });
+export const emptyStats = (): RunStats => ({ days: 0, hungryDays: 0, dryDays: 0, darkDays: 0, kcalNeed: 0, kcalGrown: 0, wounds: 0, maxDose: 0, peak: 0, okSince: -1, selfFed: 0, grownYear: 0, needYear: 0 });
+
+/** The place feeds everyone: over the last year (and at least 13 months in) it grew 95 % of what was eaten. */
+export const selfSufficient = (st: RunStats) => st.days >= 400 && st.grownYear >= 0.95 * st.needYear;
 
 export type EndKind = 'recovered' | 'equilibrium' | 'wipe';
 export interface Ending { kind: EndKind; day: number; continued: boolean }
@@ -53,14 +59,16 @@ export function tallyDay(s: GameState): Ending | null {
   st.maxDose = Math.max(st.maxDose, ...s.personState.map(ps => ps.needs.dose));
   st.peak = Math.max(st.peak, living(s));
   st.selfFed = f.producedKcal >= f.needKcal * 0.9 ? st.selfFed + 1 : 0;
+  st.grownYear = st.grownYear * (1 - 1 / 365) + f.producedKcal;
+  st.needYear = st.needYear * (1 - 1 / 365) + f.needKcal;
   const ok = TRACKS.every(k => d.tracks[k] >= 0.9);
   if (!ok) st.okSince = -1; else if (st.okSince < 0) st.okSince = day;
   if (s.ending) return null;          // playing on after the card
-  // the run ends: everyone gone; the world back for a month (and at least three months in); a year feeding yourselves
+  // the run ends: everyone gone; the world back for a month (and at least three months in); a year and more feeding yourselves
   let kind: EndKind | null = null;
   if (living(s) === 0) kind = 'wipe';
   else if (ok && st.okSince >= 0 && day - st.okSince >= 30 && day >= 90) kind = 'recovered';
-  else if (st.selfFed >= 365) kind = 'equilibrium';
+  else if (selfSufficient(st)) kind = 'equilibrium';
   if (!kind) return null;
   s.ending = { kind, day: Math.floor(s.clock.t), continued: false };
   return s.ending;
@@ -114,7 +122,11 @@ export function reportCard(s: GameState): ReportCard {
   const grown = st.kcalNeed ? st.kcalGrown / st.kcalNeed : 0;
   if (st.hungryDays === 0) lines.push('Nobody went hungry.');
   else lines.push(`${st.hungryDays} hungry days.`);
-  if (grown > 0.05) lines.push(`The garden, the hens and the hunting covered ${Math.round(grown * 100)} % of what everyone ate.`);
+  if (grown > 0.05) {
+    const src = [has('field') && 'the fields', has('garden') && 'the garden', has('chicken_coop') && 'the hens'].filter(Boolean) as string[];
+    const what = src.length ? src.slice(0, -1).join(', ') + (src.length > 1 ? ' and ' : '') + src[src.length - 1] : 'what the place grew';
+    lines.push(`${what[0].toUpperCase() + what.slice(1)} covered ${Math.round(grown * 100)} % of what everyone ate.`);
+  }
   // people
   const medic = Math.max(0, ...s.people.filter((_, i) => s.personState[i]?.needs.died == null).map(p => p.skills.medic));
   if (st.wounds > 0 && medic < 3 && !has('bunker_medical')) lines.push('No one knew first aid.');

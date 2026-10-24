@@ -38,7 +38,25 @@ export interface Needs {
 
 export const freshNeeds = (): Needs => ({ health: 100, morale: 70, hunger: 0, dose: 0, hurt: [], died: null });
 
-/** What the place grows a day (kcal, fresh), by day of year: eggs from the coop, the garden in season. */
+/**
+ * A quarter-acre field: potatoes, dry beans and wheat, ≈ 700,000 kcal a
+ * year by hand (a quarter acre of potatoes alone yields 2,000–4,000 lb).
+ * Dug and threshed from mid-August to mid-October; the beans and wheat
+ * keep dry (staples), the potatoes go to the cellar (fresh).
+ */
+export const FIELD_KCAL = 700_000, FIELD_DRY = 0.4;
+const HARVEST = [225, 290] as const;
+
+/** The day's field harvest (kcal), before it is split into dry and fresh. */
+export function fieldHarvest(s: GameState): number {
+  const doy = calendarOf(s.clock).doy;
+  if (doy < HARVEST[0] || doy >= HARVEST[1]) return 0;
+  const fields = s.structures.filter(st => st.kind === 'field' && isFinished(st)).length;
+  const skill = Math.max(...s.people.map(p => p.skills.gardener), 0);
+  return fields * FIELD_KCAL / (HARVEST[1] - HARVEST[0]) * (0.6 + 0.08 * skill) * climate(s).grow;
+}
+
+/** What the place grows a day (kcal, fresh), by day of year: eggs from the coop, the garden in season, the field harvest. */
 export function produce(s: GameState): number {
   const doy = calendarOf(s.clock).doy;
   const fin = s.structures.filter(isFinished);
@@ -50,11 +68,13 @@ export function produce(s: GameState): number {
   const season = doy < 160 || doy > 295 ? 0 : doy < 205 ? (doy - 160) / 45 : doy < 260 ? 1 : (295 - doy) / 35;
   const skill = Math.max(...s.people.map(p => p.skills.gardener), 0);
   const veg = gardens * 2500 * season * (0.6 + 0.08 * skill);
-  return Math.max(0, eggs) * Math.max(0.5, climate(s).grow) + veg * climate(s).grow;
+  return Math.max(0, eggs) * Math.max(0.5, climate(s).grow) + veg * climate(s).grow + fieldHarvest(s);
 }
 
 /** Fraction of fresh food that spoils a day: in the open vs a root cellar. */
 const SPOIL_FRESH = 0.08, SPOIL_CELLAR = 0.015, THAW = 0.3;
+/** Canning: cases a day (two pressure-canner loads), and the kcal kept (trimming, the odd jar that doesn't seal). */
+export const CANNER_CASES = 2, CANNED_YIELD = 0.85;
 
 export interface FoodReport { needKcal: number; ateKcal: number; producedKcal: number; spoiledKcal: number; fromStores: boolean; kinds: FoodId[]; daysLeft: number }
 
@@ -83,8 +103,9 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
   spoil('fresh', cellar ? SPOIL_CELLAR : SPOIL_FRESH);
   if (!freezer) spoil('frozen', fromStores ? 0 : THAW);
   // what grows
-  const grown = produce(s);
-  s.stock.fresh += grown / KCAL.fresh;
+  const grown = produce(s), dry = fieldHarvest(s) * FIELD_DRY;
+  s.stock.staples += dry / KCAL.staples;
+  s.stock.fresh += (grown - dry) / KCAL.fresh;
   // hunting (after the stores close; a hunter in season: elk / deer, ≈ 40,000 kcal of meat)
   const doy = calendarOf(s.clock).doy;
   const hunter = Math.max(...s.people.filter((p, i) => !p.kid && alive(s, i)).map(p => p.skills.hunter), 0);
@@ -105,6 +126,15 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
     }
   }
   const short = Math.max(0, need - ate);
+  // putting up the harvest: fresh beyond five days' eating is canned in the home kitchen, two canner loads a day
+  const kitchen = fin.some(st => ['timber_cabin', 'log_house'].includes(st.kind));
+  const surplus = s.stock.fresh * KCAL.fresh - 5 * need;
+  if (kitchen && surplus > KCAL.canned && s.stock.lids >= 1) {
+    const cases = Math.min(Math.floor(surplus / KCAL.canned), CANNER_CASES, Math.floor(s.stock.lids));
+    s.stock.lids -= cases;
+    s.stock.fresh -= cases * KCAL.canned / KCAL.fresh;
+    s.stock.canned += cases * CANNED_YIELD;
+  }
   if (short > need * 0.25 && !fromStores) log(s, `Short of food: ${Math.round(short)} kcal less than the family needs today.`);
   // needs, person by person
   const cozy = s.disaster.difficulty === 'cozy';
@@ -131,13 +161,23 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
     if (s.utilities.report.shortL > s.utilities.report.useL * 0.5) dh -= 2;   // not enough to drink
     n.health = Math.max(cozy ? 5 : 0, Math.min(100, n.health + dh));
     // morale: drifts to a baseline that variety, a home, light and safety raise; hunger and loss lower
-    const target = 45 + 6 * Math.min(variety, 4) + (home ? 8 : -6) + (dark ? -8 : 0) - Math.min(25, n.hunger / 1000) - (s.personState.some(x => x.needs?.died != null) ? 15 : 0);
+    const target = 45 + 6 * Math.min(variety, 4) + (home ? 8 : -6) + (dark ? -8 : 0) + (s.utilities.hauling ? -4 : 0) - Math.min(25, n.hunger / 1000) - (s.personState.some(x => x.needs?.died != null) ? 15 : 0);
     n.morale += (Math.max(0, Math.min(100, target)) - n.morale) * 0.08;
     if (n.health <= 0) {
       n.died = Math.floor(s.clock.t);
       log(s, `${p.first} ${p.last} has died.`);
     }
   });
+  // people taken in who are going hungry may move on rather than starve at your table
+  if (short > need * 0.3 && !fromStores) {
+    const family = s.people[0]?.last;
+    for (let i = s.people.length - 1; i >= 0; i--) {
+      const ps = s.personState[i];
+      if (!ps || ps.needs.died != null || s.people[i].last === family || ps.needs.hunger < 8000 || rnd > 0.08) continue;
+      log(s, `${s.people[i].first} ${s.people[i].last} left to try their luck elsewhere.`);
+      s.people.splice(i, 1); s.personState.splice(i, 1);
+    }
+  }
   return { needKcal: need, ateKcal: ate, producedKcal: grown, spoiledKcal: spoiled, fromStores, kinds, daysLeft: daysOfFood(s) };
 }
 

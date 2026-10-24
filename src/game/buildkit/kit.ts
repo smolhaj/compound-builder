@@ -93,6 +93,14 @@ export const GARDEN: KitPieceDef = {
   maxSlope: 0.3, floorY: 0.0, porch: 0, sleeps: 0, light: null,
 };
 
+export const FIELD: KitPieceDef = {
+  id: 'field', name: 'Field plot', category: 'food',
+  blurb: 'A quarter acre in potatoes, dry beans and wheat inside a deer fence: the calories a garden can\'t grow.',
+  cellsX: 10, cellsZ: 10, frontCells: 0,
+  parts: { foundation: 'fieldstone', walls: 'board_batten', roof: 'metal_roof' },
+  maxSlope: 0.25, floorY: 0.0, porch: 0, sleeps: 0, light: null,
+};
+
 export const LOG_HOUSE: KitPieceDef = {
   id: 'log_house', name: 'Log house', category: 'home',
   blurb: '9 × 15 m house of your own logs: great room with a glass gable and stone fireplace, bath, three bedrooms.',
@@ -138,9 +146,9 @@ export const BUNKER_KIT: KitPieceDef[] = [
 /** Underground menu order. */
 export const BUNKER_ORDER: readonly string[] = BUNKER_KIT.map(d => d.id);
 
-export const KIT: Record<string, KitPieceDef> = Object.fromEntries([TIMBER_CABIN, LOG_HOUSE, OUTHOUSE, WORKSHOP, ROOT_CELLAR, CHICKEN_COOP, GARDEN, ...UTILITY_KIT, ...BUNKER_KIT].map(d => [d.id, d]));
+export const KIT: Record<string, KitPieceDef> = Object.fromEntries([TIMBER_CABIN, LOG_HOUSE, OUTHOUSE, WORKSHOP, ROOT_CELLAR, CHICKEN_COOP, GARDEN, FIELD, ...UTILITY_KIT, ...BUNKER_KIT].map(d => [d.id, d]));
 /** Build-menu order. */
-export const KIT_ORDER: readonly string[] = ['timber_cabin', 'log_house', 'outhouse', 'garden', 'chicken_coop', 'root_cellar', 'workshop'];
+export const KIT_ORDER: readonly string[] = ['timber_cabin', 'log_house', 'outhouse', 'garden', 'field', 'chicken_coop', 'root_cellar', 'workshop'];
 /** Water & power menu order. */
 export const UTILITY_ORDER: readonly string[] = ['well_hand', 'well_drilled', 'cistern', 'water_tower', 'septic', 'solar_array', 'battery_shed', 'generator_shed'];
 

@@ -31,15 +31,30 @@ describe('endings and the report card', () => {
     expect(reportCard(g).grade).toBe('F');
   });
 
-  it('a year feeding yourselves is the equilibrium ending', () => {
+  it('a year feeding yourselves is the equilibrium ending, counted over the year (the harvest carries the winter)', () => {
     const g = newGame(2, 105, 2027, { mode: 'scenario', peace: 'short', kind: 'grid_down', variant: 'cascade' });
     g.disaster.tracks = { ...g.disaster.tracks, grid: 0 };
-    for (let d = 0; d < 366 && !g.ending; d++) {
+    let ended = -1;
+    for (let d = 0; d < 800 && !g.ending; d++) {
       g.clock.t = g.disaster.hitAt + d + 0.1;
-      g.food = { needKcal: 8000, ateKcal: 8000, producedKcal: 8500, spoiledKcal: 0, fromStores: false, kinds: ['fresh'], daysLeft: 10 };
-      tallyDay(g);
+      // nothing grows ten months of the year; a fall harvest of a little more than the year's need
+      const harvest = d % 365 >= 120 && d % 365 < 180;
+      g.food = { needKcal: 8000, ateKcal: 8000, producedKcal: harvest ? 8000 * 365 / 60 * 1.1 : 0, spoiledKcal: 0, fromStores: false, kinds: ['canned'], daysLeft: 100 };
+      if (tallyDay(g)) ended = d;
     }
     expect(g.ending?.kind).toBe('equilibrium');
+    expect(ended).toBeGreaterThanOrEqual(399);
+  });
+
+  it('a garden that covers a third of the year never makes it an equilibrium', () => {
+    const g = newGame(2, 105, 2027, { mode: 'scenario', peace: 'short', kind: 'grid_down', variant: 'cascade' });
+    g.disaster.tracks = { ...g.disaster.tracks, grid: 0 };
+    for (let d = 0; d < 900 && !g.ending; d++) {
+      g.clock.t = g.disaster.hitAt + d + 0.1;
+      g.food = { needKcal: 8000, ateKcal: 8000, producedKcal: 2700, spoiledKcal: 0, fromStores: false, kinds: ['canned'], daysLeft: 100 };
+      tallyDay(g);
+    }
+    expect(g.ending).toBeNull();
   });
 
   it('the card calls out what mattered', () => {

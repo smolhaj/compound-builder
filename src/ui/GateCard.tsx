@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { defenseOf, postureOf, type Stance } from '../sim/encounters';
+import { daysOfFood } from '../sim/needs';
 
 const STANCE: Record<Stance, [string, string]> = {
   hide: ['Hide', 'Lights out, everyone underground or into the timber. They may never know you\'re here, or they may take what they find.'],
@@ -28,6 +29,10 @@ export function GateCard() {
         <div style={{ fontSize: 11, letterSpacing: 1, opacity: 0.6, textTransform: 'uppercase' }}>At the gate</div>
         <div style={{ fontSize: 19, fontWeight: 700, margin: '2px 0 8px' }}>{e.title}</div>
         {e.dossier.filter(Boolean).map((l, i) => <div key={i} style={{ marginBottom: 4, opacity: 0.9 }}>{l}</div>)}
+        {e.kind === 'arrival' && !g.game.food.fromStores && (() => {
+          const here = g.game.personState.filter(ps => ps.needs.died == null).length, days = daysOfFood(g.game);
+          return <div style={{ margin: '8px 0', fontSize: 12, opacity: 0.75 }}>Put by: {Math.round(days)} days of food for {here}; with them, {Math.round(days * here / (here + e.size))} days.</div>;
+        })()}
         {e.strength > 0 && <div style={{ margin: '8px 0', fontSize: 12, opacity: 0.75 }}>
           {e.size} {e.armed ? 'armed' : 'unarmed'} · their strength {e.strength} vs your defense {Math.round(def)} · walls {Math.round(p.barrier)} % · seen early {Math.round(p.detection)} %{p.bunker ? ' · bunker to hide in' : ''}
         </div>}

@@ -42,6 +42,7 @@ import { exposure, Sight, type Observer, type SightWorld } from './sightlines/vi
 import { hitsColliders, type Collider } from './buildkit/interior';
 import type { BuildingView } from '../store/worldStore';
 import type { Structure } from '../sim/state';
+import { calendarOf } from '../sim/state';
 import { BLUEPRINTS } from '../sim/blueprints';
 import { SmokePlume } from '../engine/world/fx/SmokePlume';
 import type { Pad, Pit } from './parcel/parcelTerrain';
@@ -1063,6 +1064,15 @@ export class HomesteadWorld {
     const ctx: GoalCtx = { camp: this.camp, site, home: homeB ? site(homeB.placed.id) : null, tree, yard: this.access.yard };
     const season = (seasonState.visual === 'winter' && !seasonState.climate.freeze ? 'fall' : seasonState.visual) as WearSeason;
     this.family.update(dt, game.people, game.personState, hour, game.clock.t, ctx, this.walkHeight, season, speedK);
+    // crops stand in the ground from planting (mid-May) to the last of the harvest (late October); bare soil the rest of the year
+    const doy = calendarOf(game.clock).doy, growing = doy >= 135 && doy < 300;
+    for (const b of this._built.values()) {
+      if (b.placed.kind !== 'garden' && b.placed.kind !== 'field') continue;
+      for (const o of b.group.children) {
+        const name = ((o as THREE.Mesh).userData.baseMat as THREE.Material | undefined)?.name ?? ((o as THREE.Mesh).material as THREE.Material | undefined)?.name;
+        if (name === 'kit_crop' || name === 'kit_grain' || (b.placed.kind === 'field' && name === 'kit_straw')) o.visible = growing && (o.userData.layer !== 'interior' || b.finished);
+      }
+    }
     // fire lit at mealtimes and evenings, and on cold days, while the camp is home
     const meals = (hour > 5.5 && hour < 8.5) || (hour > 11.8 && hour < 13) || (hour > 17 && hour < 22.5);
     flickerCampfire(this._clock, !homeB && (meals || seasonState.params.cold > 0.4) ? 1 : 0);

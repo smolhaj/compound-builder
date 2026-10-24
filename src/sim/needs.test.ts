@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { newGame, type GameState, type Structure } from './state';
-import { daysOfFood, KCAL, liveDay, produce, workFactor } from './needs';
+import { CANNER_CASES, CANNED_YIELD, daysOfFood, FIELD_KCAL, fieldHarvest, KCAL, liveDay, produce, workFactor } from './needs';
 
 const built = (g: GameState, id: string, kind: string): Structure => {
   const st: Structure = { id, kind, x: 10, z: 10, rot: 0, stage: 5, done: 0, supplied: true, finishedAt: 0 };
@@ -78,5 +78,33 @@ describe('food and needs', () => {
     const g = newGame(1);
     g.stock.canned = 0; g.stock.staples = 1;
     expect(daysOfFood(g)).toBeCloseTo(KCAL.staples / (2 * 2400 + 2 * 1700));
+  });
+
+  it('a field plot brings in the fall harvest: wheat and beans keep dry, potatoes go in fresh', () => {
+    const g = newGame(1, 250);
+    noStores(g);
+    built(g, 'f', 'field');
+    g.people.length = 0; g.personState.length = 0;
+    const kcal = fieldHarvest(g);
+    expect(kcal).toBeGreaterThan(5000);
+    const st0 = g.stock.staples;
+    liveDay(g, 0.5);
+    expect(g.stock.staples - st0).toBeCloseTo(kcal * 0.4 / KCAL.staples);
+    // the season's total is in the hundreds of thousands of kcal
+    expect(kcal * 65).toBeGreaterThan(FIELD_KCAL * 0.5);
+    expect(fieldHarvest(newGame(1, 120))).toBe(0);
+  });
+
+  it('surplus fresh food is canned in the home kitchen, two canner loads a day, if there are lids', () => {
+    const g = newGame(1, 250);
+    noStores(g);
+    built(g, 'h', 'timber_cabin');
+    g.stock.fresh = 200; g.stock.canned = 0; g.stock.lids = 0;
+    liveDay(g, 0.5);
+    expect(g.stock.canned).toBe(0);                        // no lids
+    g.stock.lids = 24;
+    liveDay(g, 0.5);
+    expect(g.stock.canned).toBeCloseTo(CANNER_CASES * CANNED_YIELD);
+    expect(g.stock.lids).toBe(24 - CANNER_CASES);
   });
 });
