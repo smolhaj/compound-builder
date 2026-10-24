@@ -117,6 +117,42 @@ export const LOG_HOUSE_BLUEPRINT: Blueprint = {
   ],
 };
 
+/** What came with the land (sim/improvements.ts): an old farmhouse, a manufactured home, a barn. Not in the build menu (the barn is). */
+export const FARMHOUSE_BLUEPRINT: Blueprint = {
+  kind: 'farmhouse',
+  stages: [
+    { id: 'site', name: 'Stake out', hours: 60, materials: {} },
+    { id: 'foundation', name: 'Basement and footings', hours: 400, materials: { concrete: 30 } },
+    { id: 'frame', name: 'Two-storey frame', hours: 1400, materials: { lumber: 60 } },
+    { id: 'roof', name: 'Roof', hours: 400, materials: { lumber: 12, roofing: 20 } },
+    { id: 'finish', name: 'Siding, kitchen, baths, finish', hours: 1600, materials: { lumber: 30, hardware: 30, fixtures: 2, cable: 6 } },
+  ],
+};
+export const TRAILER_BLUEPRINT: Blueprint = {
+  kind: 'trailer',
+  stages: [
+    { id: 'site', name: 'Grade the pad', hours: 20, materials: {} },
+    { id: 'foundation', name: 'Piers and tie-downs', hours: 40, materials: { concrete: 4, hardware: 2 } },
+    { id: 'frame', name: 'Set the home (dealer)', hours: 16, materials: {} },
+    { id: 'roof', name: 'Seal the marriage line', hours: 16, materials: { roofing: 1 } },
+    { id: 'finish', name: 'Skirting, steps, hookups', hours: 40, materials: { lumber: 4, hardware: 2 } },
+  ],
+};
+/** 12 × 18 m pole barn with a hay loft: ≈ 900 person-hours; ≈ $36k of materials. */
+export const BARN_BLUEPRINT: Blueprint = {
+  kind: 'barn',
+  stages: [
+    { id: 'site', name: 'Stake out & grade the pad', hours: 40, materials: {} },
+    { id: 'foundation', name: 'Set the poles in concrete', hours: 120, materials: { concrete: 12 } },
+    { id: 'frame', name: 'Girts, trusses and the loft floor', hours: 380, materials: { lumber: 30 } },
+    { id: 'roof', name: 'Metal roof', hours: 180, materials: { roofing: 22, hardware: 4 } },
+    { id: 'finish', name: 'Board siding, big doors, stalls', hours: 180, materials: { lumber: 10, hardware: 6 } },
+  ],
+};
+/** Kinds people live in (a kitchen, a roof over the family). */
+export const HOMES: readonly string[] = ['timber_cabin', 'log_house', 'farmhouse', 'trailer'];
+export const isHome = (kind: string) => HOMES.includes(kind);
+
 // ── Water & power (docs/DECISIONS.md: only through costed infrastructure) ──
 const bp = (kind: string, stages: Array<[StageId, string, number, Partial<Stock>]>): Blueprint => ({ kind, stages: stages.map(([id, name, hours, materials]) => ({ id, name, hours, materials })) });
 
@@ -167,7 +203,7 @@ export const BUNKER_BLUEPRINTS: Blueprint[] = [
 ];
 
 export const BLUEPRINTS: Record<string, Blueprint> = Object.fromEntries(
-  [CABIN_BLUEPRINT, OUTHOUSE_BLUEPRINT, WORKSHOP_BLUEPRINT, ROOT_CELLAR_BLUEPRINT, COOP_BLUEPRINT, GARDEN_BLUEPRINT, FIELD_BLUEPRINT, LOG_HOUSE_BLUEPRINT, ...UTILITY_BLUEPRINTS, ...BUNKER_BLUEPRINTS].map(b => [b.kind, b]));
+  [CABIN_BLUEPRINT, OUTHOUSE_BLUEPRINT, WORKSHOP_BLUEPRINT, ROOT_CELLAR_BLUEPRINT, COOP_BLUEPRINT, GARDEN_BLUEPRINT, FIELD_BLUEPRINT, LOG_HOUSE_BLUEPRINT, FARMHOUSE_BLUEPRINT, TRAILER_BLUEPRINT, BARN_BLUEPRINT, ...UTILITY_BLUEPRINTS, ...BUNKER_BLUEPRINTS].map(b => [b.kind, b]));
 
 /** Total bill of materials for a blueprint. */
 export function totalBill(bp: Blueprint): Partial<Stock> {

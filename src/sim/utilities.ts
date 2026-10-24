@@ -13,6 +13,7 @@
  * repair. Shortages are logged. Pure (tested).
  */
 import { SPRING_LPD } from './site';
+import { sound } from './improvements';
 import { REGIONS } from './regions';
 import { log } from './economy';
 import { calendarOf, dayIndex, type GameState, type Structure } from './state';
@@ -47,7 +48,7 @@ export const UTILITY: Record<string, UtilityDef> = {
 };
 
 /** Daily power draw (kWh) of a wired building by kind, and water use (L/person/day) carried vs plumbed. */
-export const DRAW_KWH: Record<string, number> = { timber_cabin: 5, log_house: 8, workshop: 4, root_cellar: 0.2, chicken_coop: 0.3, outhouse: 0, garden: 0, field: 0 };
+export const DRAW_KWH: Record<string, number> = { timber_cabin: 5, log_house: 8, farmhouse: 9, trailer: 6, barn: 1, workshop: 4, root_cellar: 0.2, chicken_coop: 0.3, outhouse: 0, garden: 0, field: 0 };
 export const WATER_CARRIED = 25, WATER_PLUMBED = 130;
 /** Fitting jobs: hours and materials (per building). */
 export const FIT = {
@@ -65,7 +66,7 @@ export const GRID_USD_PER_KWH = 0.14, GRID_USD_PER_DAY = 0.9;
  * Who gets power first when there isn't enough (lower first): pumps, the
  * root cellar (freezer), homes, then the coop and the workshop.
  */
-export const LOAD_PRIORITY: Record<string, number> = { well_drilled: 0, root_cellar: 1, timber_cabin: 2, log_house: 2, chicken_coop: 3, workshop: 4 };
+export const LOAD_PRIORITY: Record<string, number> = { well_drilled: 0, root_cellar: 1, timber_cabin: 2, log_house: 2, farmhouse: 2, trailer: 2, barn: 4, chicken_coop: 3, workshop: 4 };
 
 export interface Fitting { building: string; kind: 'plumb' | 'wire'; done: number; hours: number; supplied: boolean; finishedAt: number | null }
 
@@ -184,10 +185,11 @@ function fitted(s: GameState, id: string, kind: Fitting['kind']): boolean {
 }
 
 export function serviceOf(s: GameState, p: Plant, id: string): Service {
-  const net = (m: Map<string, number>, f: (k: string) => boolean) => { const n = m.get(id); return n !== undefined && p.nodes.some(o => m.get(o.id) === n && f(o.kind)); };
+  const net = (m: Map<string, number>, f: (k: string, id: string) => boolean) => { const n = m.get(id); return n !== undefined && p.nodes.some(o => m.get(o.id) === n && f(o.kind, o.id)); };
   const water = net(p.water, k => !!UTILITY[k]?.water?.pressure || !!UTILITY[k]?.gravity);
   const power = s.utilities.grid || net(p.power, k => !!(UTILITY[k]?.solarKw || UTILITY[k]?.genKw || UTILITY[k]?.batteryKwh));
-  const septic = net(p.water, k => !!UTILITY[k]?.septic);
+  // a failed leach field (an old system that came with the land) doesn't count until it's fixed
+  const septic = net(p.water, (k, sid) => !!UTILITY[k]?.septic && sound(s.structures.find(x => x.id === sid), 'septic'));
   return { water, power, septic, plumbed: water && fitted(s, id, 'plumb'), wired: power && fitted(s, id, 'wire') };
 }
 
@@ -199,6 +201,8 @@ export function serviceOf(s: GameState, p: Plant, id: string): Service {
 export function fitProblem(s: GameState, p: Plant, st: Structure, kind: Fitting['kind']): string | null {
   if (!isFinished(st)) return 'not built yet';
   if (s.utilities.fittings.some(f => f.building === st.id && f.kind === kind)) return kind === 'plumb' ? 'already plumbed' : 'already wired';
+  // old, unsafe wiring or plumbing that came with the land: redo it first (Projects: the repair)
+  if (!sound(st, kind === 'wire' ? 'wiring' : 'plumbing')) return kind === 'wire' ? 'the old wiring is unsafe: rewire the house first' : 'the old plumbing is shot: replumb it first';
   const sv = serviceOf(s, p, st.id);
   if (kind === 'plumb' && !sv.water) return 'no pressurised water reaches it (run a pipe from a drilled well or water tower)';
   if (kind === 'wire' && !sv.power) return 'no power reaches it (get on the county grid, or run a cable from the solar / battery / generator)';
@@ -242,8 +246,8 @@ export function sunHours(doy: number): number {
 }
 
 /** Half-size (world units) a line must reach to touch a building, and its roof area (m²) for rain catchment, by kind. */
-export const NODE_R: Record<string, number> = { timber_cabin: 0.5, log_house: 0.75, workshop: 0.75, root_cellar: 0.4, chicken_coop: 0.4, garden: 0.7, field: 2.2, outhouse: 0.2, well_hand: 0.25, well_drilled: 0.3, cistern: 0.3, water_tower: 0.35, solar_array: 0.6, battery_shed: 0.3, generator_shed: 0.3, septic: 0.4 };
-export const ROOF_M2: Record<string, number> = { timber_cabin: 70, log_house: 160, workshop: 120, chicken_coop: 6, outhouse: 2, battery_shed: 8, generator_shed: 8, well_drilled: 6, well_hand: 3 };
+export const NODE_R: Record<string, number> = { timber_cabin: 0.5, log_house: 0.75, farmhouse: 0.75, trailer: 0.6, barn: 1.0, workshop: 0.75, root_cellar: 0.4, chicken_coop: 0.4, garden: 0.7, field: 2.2, outhouse: 0.2, well_hand: 0.25, well_drilled: 0.3, cistern: 0.3, water_tower: 0.35, solar_array: 0.6, battery_shed: 0.3, generator_shed: 0.3, septic: 0.4 };
+export const ROOF_M2: Record<string, number> = { timber_cabin: 70, log_house: 160, farmhouse: 140, trailer: 90, barn: 220, workshop: 120, chicken_coop: 6, outhouse: 2, battery_shed: 8, generator_shed: 8, well_drilled: 6, well_hand: 3 };
 
 /** Rain and snowmelt (mm a day, averaged by month): wet spring, dry late summer. */
 export function rainMm(doy: number): number {

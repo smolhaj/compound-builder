@@ -6,6 +6,7 @@
 import { MATERIALS, type Stock } from './materials';
 import type { GameState, OrderLine } from './state';
 import { canOrder, priceFactor } from './disaster';
+import { CARRY_H } from './improvements';
 
 /** Days from order to delivery. */
 export const LEAD_TIME_DAYS = 2;
@@ -48,8 +49,18 @@ export function deliverOrders(s: GameState): void {
   for (const o of s.orders) {
     if (o.status !== 'ordered' || s.clock.t < o.dueAt) continue;
     o.status = 'delivered';
+    const what = o.lines.map(l => `${l.qty} ${MATERIALS[l.material].name.toLowerCase()}`).join(', ');
+    // no drive yet: the truck leaves it at the road and the family carries it in
+    if (!s.site.improvements.drive) {
+      const hours = o.lines.reduce((a, l) => a + (CARRY_H[l.material] ?? 0.2) * l.qty, 0);
+      if (hours > 0.5) {
+        (s.roadside ??= []).push({ lines: o.lines.map(l => ({ ...l })), hours, done: 0 });
+        log(s, `The truck left ${what} at the road: about ${Math.round(hours)} hours of carrying to get it in.`);
+        continue;
+      }
+    }
     for (const l of o.lines) s.stock[l.material] += l.qty;
-    log(s, `The delivery truck dropped off ${o.lines.map(l => `${l.qty} ${MATERIALS[l.material].name.toLowerCase()}`).join(', ')}.`);
+    log(s, `The delivery truck dropped off ${what}.`);
   }
 }
 
@@ -63,4 +74,20 @@ export function onOrder(s: GameState): Partial<Stock> {
 export function log(s: GameState, text: string): void {
   s.log.push({ t: s.clock.t, text });
   if (s.log.length > 60) s.log.splice(0, s.log.length - 60);
+}
+
+/** Carry person-hours of deliveries in from the road (oldest first); returns the hours used. */
+export function addCarryWork(s: GameState, hours: number): number {
+  let left = hours;
+  while (left > 1e-9 && s.roadside.length) {
+    const r = s.roadside[0];
+    const use = Math.min(left, r.hours - r.done);
+    r.done += use; left -= use;
+    if (r.done >= r.hours - 1e-9) {
+      for (const l of r.lines) s.stock[l.material] += l.qty;
+      s.roadside.shift();
+      log(s, 'Carried the last of the delivery in from the road.');
+    }
+  }
+  return hours - left;
 }

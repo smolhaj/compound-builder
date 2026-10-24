@@ -23,6 +23,8 @@ import { useGameStore } from '../store/gameStore';
 import { calendarOf, hourOf, SECONDS_PER_DAY } from '../sim/state';
 import { setWindowGlow } from './buildkit/materials';
 import { homeOutsideForty } from '../sim/site';
+import { ownsAt } from '../sim/land';
+import type { SiteQuery } from './buildkit/kit';
 
 /** Background damp of the season (ground darkens a little in the shoulder seasons). */
 const SEASON_WETNESS: Record<VisualSeason, number> = { spring: 0.22, fall: 0.28, winter: 0.14, summer: 0 };
@@ -116,7 +118,19 @@ export function GameCanvas() {
       world.setQuality(s.quality);
     };
     applyLook();
-    world.syncStructures(useGameStore.getState().game.structures);
+    // what came with the land: the world picks its spots once, then it's laid in like anything built
+    const unplaced = useGameStore.getState().game.structures.filter(x => x.unplaced);
+    if (unplaced.length) {
+      const query: SiteQuery = {
+        height: (x, z) => world.parcel.natural(x, z).h,
+        owned: (x, z) => ownsAt(useGameStore.getState().game, x, z),
+        water: (x, z) => world.parcel.isCreek(x, z) || world.stream.depthAt(x, z) > 0,
+        blocked: (x, z) => world.onCamp(x, z, 0.4) || world.onAccess(x, z, 0.4),
+      };
+      useGameStore.getState().placeImprovements(world.siteImprovements(unplaced, query));
+    }
+    const placedOnly = (list: GameState['structures']) => list.filter(x => !x.unplaced);
+    world.syncStructures(placedOnly(useGameStore.getState().game.structures));
     // the neighbor parcels: survey what each is once (timber, creek bottom, hay ground, dry grazing), and plant what's bought
     const ownedRects = (g: GameState) => [...homeOutsideForty(g.site), ...g.land.parcels.filter(p => p.owner === 'you').map(p => p.rect)];
     if (!useGameStore.getState().game.land.surveyed) useGameStore.getState().survey(world.surveyLand(useGameStore.getState().game.land.parcels));
@@ -127,7 +141,8 @@ export function GameCanvas() {
       useGameStore.subscribe(s => s.game.land, () => world.setOwnedLand(ownedRects(useGameStore.getState().game))),
       useWorldStore.subscribe(s => s.quality, applyLook),
       useWorldStore.subscribe(s => s.cameraMode, applyCameraMode),
-      useGameStore.subscribe(s => s.game.structures, list => { world.syncStructures(list); occluders.invalidate(); }),
+      useGameStore.subscribe(s => s.game.structures, list => { world.syncStructures(placedOnly(list)); occluders.invalidate(); }),
+      useGameStore.subscribe(s => s.game.site.improvements.drive, on => world.setDrive(on)),
       useGameStore.subscribe(s => s.tool, k => { tool.setKind(k); marker.setOn(k === 'fell'); fence.setKind(k?.startsWith('fence:') ? k.slice(6) as PerimeterKind : null); if (k === 'fence:escape_tunnel') useWorldStore.getState().setUnderground(true); }),
       useWorldStore.subscribe(s => s.buildingView, v => world.setBuildingView(v)),
       useWorldStore.subscribe(s => s.underground, on => world.setUnderground(on)),

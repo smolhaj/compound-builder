@@ -1,5 +1,6 @@
 import { planProblem } from '../sim/construction';
 import { dismissCrew, hireCrew } from '../sim/crews';
+import { orderHookup, placeImprovements } from '../sim/improvements';
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { newGame, SECONDS_PER_DAY, dayIndex, type GameState, type OrderLine, type Speed } from '../sim/state';
@@ -60,6 +61,10 @@ export interface GameStore {
   buy: (parcelId: string) => string | null;
   /** The world measured what each parcel is (timber, creek bottom, hay, grazing). */
   survey: (kinds: Record<string, LandKind>) => void;
+  /** Lay in what came with the land at the spots the world picked. */
+  placeImprovements: (spots: Record<string, { x: number; z: number; rot: number }>) => void;
+  /** Pay the co-op for the line, or a contractor for the drive. */
+  hookup: (what: 'power' | 'drive') => string | null;
   /** After the report card: play on (endless). */
   playOn: () => void;
   /** Put a spare into an EMP-fried building. */
@@ -182,6 +187,20 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); }
     return why;
   },
+  placeImprovements: (spots) => {
+    const g = structuredClone(get().game);
+    placeImprovements(g, spots);
+    // anything with no spot (no room for it) is dropped rather than left floating
+    const lost = g.structures.filter(x => x.unplaced);
+    if (lost.length) { g.structures = g.structures.filter(x => !x.unplaced); }
+    set({ game: g });
+  },
+  hookup: (what) => {
+    const g = structuredClone(get().game);
+    const why = orderHookup(g, what);
+    if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); }
+    return why;
+  },
   survey: (kinds) => {
     const g = structuredClone(get().game);
     for (const p of g.land.parcels) if (kinds[p.id]) p.kind = kinds[p.id];
@@ -208,7 +227,7 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     const g = structuredClone(get().game);
     if (g.utilities.grid === on) return;
     if (on) {
-      if (g.disaster.tracks.grid < 0.5 || g.money < GRID_RECONNECT) return;
+      if (!g.site.improvements.power || g.disaster.tracks.grid < 0.5 || g.money < GRID_RECONNECT) return;
       g.money -= GRID_RECONNECT;
       log(g, `Back on the county grid ($${GRID_RECONNECT} to reconnect).`);
     } else log(g, 'The co-op pulled the meter: the place is off the grid.');

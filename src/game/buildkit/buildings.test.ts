@@ -10,7 +10,7 @@ import { hitsColliders, type Collider } from './interior';
 import { BLUEPRINTS } from '../../sim/blueprints';
 
 describe('building registry', () => {
-  for (const kind of KIT_ORDER) {
+  for (const kind of [...KIT_ORDER, 'farmhouse', 'trailer']) {
     it(`${kind}: builds every construction layer, is furnished, has colliders and a blueprint`, () => {
       const g = buildLayers(KIT[kind]);
       const layers = new Set(g.children.map(m => m.userData.layer));
@@ -58,7 +58,7 @@ import { UTILITY_ORDER } from './kit';
 
 describe('procedural geometry stays sound', () => {
   it('no building has openings through corners, past the eaves, or gable glass through the roof line', () => {
-    for (const kind of [...KIT_ORDER, ...UTILITY_ORDER]) buildLayers(KIT[kind]);
+    for (const kind of [...KIT_ORDER, ...UTILITY_ORDER, 'farmhouse', 'trailer']) buildLayers(KIT[kind]);
     expect(SPEC_PROBLEMS).toEqual([]);
   });
   it('a too-big plain gable window is cut down to fit; rake glass follows the slopes', () => {

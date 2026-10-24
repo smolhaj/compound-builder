@@ -49,7 +49,10 @@ export function bestShelter(s: GameState): [number, string] {
   for (const st of fin) {
     if (st.kind.startsWith('bunker_') && st.kind !== 'bunker_hatch' && st.kind !== 'bunker_stairs') consider(protectionOf(st).pf, 'the bunker');
     else if (st.kind === 'root_cellar') consider(40, 'the root cellar');
+    else if (st.kind === 'farmhouse') consider(10, 'the farmhouse basement');
     else if (st.kind === 'log_house') consider(8, 'the log house');
+    else if (st.kind === 'trailer') consider(1.5, 'the trailer');
+    else if (st.kind === 'barn') consider(2, 'the barn');
     else if (st.kind === 'timber_cabin') consider(3, 'the cabin');
     else if (st.kind === 'workshop') consider(2, 'the shop');
   }

@@ -10,6 +10,7 @@
  */
 import { mulberry32 } from './rng';
 import { REGION_IDS, REGIONS, SIZE_FACTOR, type RegionId } from './regions';
+import { driveQuote, HOUSE_NAME, improvementValue, powerQuote, type Condition, type HouseKind, type Improvements } from './improvements';
 
 /** The home square on the survey grid (world units; 67 = a quarter-quarter section, 40 acres). */
 export const FORTY = 67;
@@ -48,6 +49,8 @@ export interface Site {
   soil: Soil;
   /** Miles to town on the county road. */
   miles: number;
+  /** What's on it: a house, barn, well, septic, power, a drive (raw land: nothing). */
+  improvements: Improvements;
   price: number;
 }
 
@@ -78,13 +81,18 @@ export function sitePrice(s: Omit<Site, 'price' | 'id' | 'name'>): number {
   k *= s.timber > 1.1 ? 1.08 : s.timber < 0.5 ? 0.95 : 1;
   k *= s.soil === 'deep' ? 1.1 : s.soil === 'thin' ? 0.9 : 1;
   k *= 1 + 0.2 * Math.max(0, 1 - s.miles / 20);       // close to town costs more
-  return Math.round(s.acres * r.perAcre * SIZE_FACTOR[s.acres] * k / 500) * 500;
+  return Math.round(s.acres * r.perAcre * SIZE_FACTOR[s.acres] * k / 500) * 500 + improvementValue(s.improvements, s.gwDepth);
 }
 
 /** The place as it always was before listings (old saves, tests): 40 acres in the Mountain West, the creek through it. */
+/** Raw land: nothing on it (sim/improvements.ts). */
+export const RAW: Improvements = { house: null, barn: null, well: null, septic: null, power: false, poleFt: 0, drive: false, driveFt: 0 };
+/** The old place (old saves, tests): raw land, with power and a drive at the road. */
+export const CLASSIC_IMPROVEMENTS: Improvements = { ...RAW, power: true, drive: true };
+
 export const CLASSIC: Site = {
   id: 'classic', name: 'The old place', region: 'mountain_west', acres: 40, home: HOME_RECT[40], creek: true, spring: false,
-  gwDepth: 8, gwQuality: 'good', timber: 1, soil: 'fair', miles: 12, price: 0,
+  gwDepth: 8, gwQuality: 'good', timber: 1, soil: 'fair', miles: 12, improvements: CLASSIC_IMPROVEMENTS, price: 0,
 };
 
 /** County roads the listings sit on (each listing is named for its road, so no two read alike). */
@@ -97,8 +105,40 @@ export interface LandWish {
   water: 'creek' | 'spring' | 'dry' | 'any';
   timber: 'open' | 'some' | 'heavy' | 'any';
   town: 'near' | 'far' | 'any';
+  /** Raw land, or with a house on it. */
+  built?: 'raw' | 'house' | 'any';
 }
-export const ANY_WISH: LandWish = { acres: 'any', water: 'any', timber: 'any', town: 'any' };
+export const ANY_WISH: LandWish = { acres: 'any', water: 'any', timber: 'any', town: 'any', built: 'any' };
+
+/**
+ * What's on a listing (`r` its own random stream): about two in five come
+ * improved (more of the small lots near town). Old farmhouses (1920–1975)
+ * and manufactured homes (1985–2005) need work; a newer cabin or log house
+ * (2005–2020) is sound.
+ */
+export function rollImprovements(r: () => number, acres: Acres, miles: number, gwDepth: number, want: 'raw' | 'house' | 'any' = 'any'): Improvements {
+  const improved = want === 'house' ? true : want === 'raw' ? false : r() < (acres === 5 ? 0.55 : 0.4);
+  const driveFt = Math.round((acres === 5 ? 150 + r() * 250 : 300 + r() * 1000) / 10) * 10;
+  if (!improved) {
+    const poleFt = Math.round((acres === 5 ? 80 + r() * 600 : 200 + r() * 1200 + miles * 40 * r()) / 10) * 10;
+    return { ...RAW, poleFt, driveFt };
+  }
+  const cond = (pGood: number, pFair: number): Condition => { const x = r(); return x < pGood ? 'good' : x < pGood + pFair ? 'fair' : 'poor'; };
+  const h = r();
+  const kind: HouseKind = h < 0.45 ? 'farmhouse' : h < 0.8 ? 'trailer' : h < 0.93 ? 'timber_cabin' : 'log_house';
+  const old = kind === 'farmhouse' || kind === 'trailer';
+  const built = kind === 'farmhouse' ? 1920 + Math.round(r() * 55) : kind === 'trailer' ? 1985 + Math.round(r() * 20) : 2005 + Math.round(r() * 15);
+  const house = old
+    ? { kind, built, roof: cond(0.25, 0.45), wiring: cond(kind === 'farmhouse' ? 0.2 : 0.4, 0.45), plumbing: cond(0.3, 0.45) }
+    : { kind, built, roof: 'good' as Condition, wiring: 'good' as Condition, plumbing: 'good' as Condition };
+  const barn = r() < (acres === 5 ? 0.15 : acres === 20 ? 0.4 : 0.6) ? { built: 1910 + Math.round(r() * 90), roof: cond(0.35, 0.4) } : null;
+  return {
+    house, barn,
+    well: { pump: gwDepth > 0 ? cond(0.5, 0.35) : 'good' },
+    septic: { field: cond(0.55, 0.3) },
+    power: true, poleFt: 0, drive: true, driveFt,
+  };
+}
 
 /**
  * Listings for this seed, region and wish: six parcels. With no size asked
@@ -109,6 +149,7 @@ export const ANY_WISH: LandWish = { acres: 'any', water: 'any', timber: 'any', t
 export function listings(seed: number, region: RegionId = 'mountain_west', wish: LandWish = ANY_WISH, n = 6, budget = SAVINGS): Site[] {
   const R = REGIONS[region];
   const r = mulberry32(seed * 977 + 13 + REGION_IDS.indexOf(region) * 7919);
+  const ri = mulberry32(seed * 3301 + 71 + REGION_IDS.indexOf(region) * 104729);
   const sizes: Acres[] = [5, 20, 40, 80];
   const creekAt = Math.floor(r() * 4), dryAt = (creekAt + 1 + Math.floor(r() * 3)) % 4;
   const out: Site[] = [];
@@ -129,13 +170,14 @@ export function listings(seed: number, region: RegionId = 'mountain_west', wish:
     const soil: Soil = s < R.soil.thin ? 'thin' : s > 1 - R.soil.deep ? 'deep' : 'fair';
     const m = r();
     const miles = Math.round(wish.town === 'near' ? 2 + m * 8 : wish.town === 'far' ? 15 + m * 20 : acres === 5 ? 3 + m * 8 : 6 + m * 22);
-    const base = { region, acres, home: HOME_RECT[acres], creek, spring, gwDepth, gwQuality, timber, soil, miles };
+    const improvements = rollImprovements(ri, acres, miles, gwDepth, wish.built ?? 'any');
+    const base = { region, acres, home: HOME_RECT[acres], creek, spring, gwDepth, gwQuality, timber, soil, miles, improvements };
     out.push({ id: `${region}-${k}`, name: `${ROADS[Math.floor(r() * ROADS.length)]} Road ${KIND[acres][Math.floor(r() * 2)]}`, ...base, price: sitePrice(base) });
   }
   // nothing in budget on an open search: the agent finds something that is (small, dry, way out)
   if (wish.acres === 'any' && !out.some(l => affordable(l, budget))) {
     const last = out[n - 1];
-    const cheap = { ...last, acres: 5 as Acres, home: HOME_RECT[5], creek: false, spring: false, timber: Math.min(last.timber, 0.6), miles: 24, name: 'Two Mile Road lot' };
+    const cheap = { ...last, acres: 5 as Acres, home: HOME_RECT[5], creek: false, spring: false, timber: Math.min(last.timber, 0.6), miles: 24, name: 'Two Mile Road lot', improvements: { ...RAW, poleFt: 400, driveFt: 200 } };
     out[n - 1] = { ...cheap, price: sitePrice(cheap) };
   }
   return out;
@@ -153,6 +195,25 @@ export function siteFacts(s: Site): Fact[] {
     { label: 'Town', value: `${s.miles} mi` },
   ];
 }
+/** The listing card's "on the place" rows: the house and its condition, barn, well, septic, power, drive. */
+export function builtFacts(s: Site): Fact[] {
+  const i = s.improvements, out: Fact[] = [];
+  const word = (c: Condition) => c === 'good' ? 'good' : c === 'fair' ? 'fair' : 'poor';
+  const tone = (cs: Condition[]) => cs.includes('poor') ? 'bad' as const : cs.every(c => c === 'good') ? 'good' as const : undefined;
+  if (i.house) {
+    const h = i.house;
+    out.push({ label: 'House', value: `${HOUSE_NAME[h.kind]}, ${h.built}`, tone: tone([h.roof, h.wiring, h.plumbing]) === 'good' ? 'good' : undefined });
+    if (h.kind === 'farmhouse' || h.kind === 'trailer') out.push({ label: '', value: `roof ${word(h.roof)} · wiring ${word(h.wiring)} · plumbing ${word(h.plumbing)}`, tone: tone([h.roof, h.wiring, h.plumbing]) });
+  } else out.push({ label: 'House', value: 'None: raw land' });
+  if (i.barn) out.push({ label: 'Barn', value: `${i.barn.built}, roof ${word(i.barn.roof)}`, tone: i.barn.roof === 'poor' ? 'bad' : undefined });
+  if (i.well) out.push({ label: 'Well', value: i.well.pump === 'poor' ? 'Drilled, pump worn out' : 'Drilled, pump in', tone: i.well.pump === 'poor' ? 'bad' : 'good' });
+  if (i.septic) out.push({ label: 'Septic', value: i.septic.field === 'poor' ? 'In, leach field failing' : 'In', tone: i.septic.field === 'poor' ? 'bad' : 'good' });
+  const pq = powerQuote(i), dq = driveQuote(i);
+  out.push(i.power ? { label: 'Power', value: 'On the grid', tone: 'good' } : { label: 'Power', value: `${i.poleFt.toLocaleString('en-US')} ft to the pole (~$${Math.round(pq.usd / 1000)}k)`, tone: 'bad' });
+  out.push(i.drive ? { label: 'Drive', value: 'Gravel', tone: 'good' } : { label: 'Drive', value: `None: ${i.driveFt.toLocaleString('en-US')} ft (~$${Math.round(dq.usd / 1000)}k)`, tone: 'bad' });
+  return out;
+}
+
 const GW_SHORT: Record<GroundwaterQuality, string> = { good: 'Good', hard: 'Hard', iron: 'Iron', arsenic: 'Arsenic: treat it' };
 
 /** Land beyond the home forty that comes with the place (the 80's west forty), for planting and pins. */

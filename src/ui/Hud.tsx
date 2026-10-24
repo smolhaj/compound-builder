@@ -12,6 +12,7 @@ import { blockedReason, isFinished, planProblem, progress } from '../sim/constru
 import { drillExtra } from '../sim/site';
 import { REGIONS } from '../sim/regions';
 import { CREW_RATE, CREW_SIZE, crewProblem, crewQuote } from '../sim/crews';
+import { DRIVE_PER_FT, driveQuote, fixBill, fixBlocked, fixDef, hookupProblem, pendingFixes, POLE_PER_FT, powerQuote } from '../sim/improvements';
 import { BLUEPRINTS, totalBill, totalHours } from '../sim/blueprints';
 import { BUNKER_ORDER, KIT, UTILITY_ORDER } from '../game/buildkit/kit';
 import { FIT, fitProblem, plant, serviceOf, FUEL_UNIT_L, UTILITY, SPARE_FOR } from '../sim/utilities';
@@ -103,7 +104,7 @@ function Item({ name, cost, sub, on, off, title, click }: { name: string; cost: 
 
 /** The build menu's groups (kit pieces by what they are for). */
 const BUILD_GROUPS: Array<[string, string, readonly string[]]> = [
-  ['home', 'Home & work', ['timber_cabin', 'log_house', 'outhouse', 'workshop']],
+  ['home', 'Home & work', ['timber_cabin', 'log_house', 'outhouse', 'workshop', 'barn']],
   ['food', 'Food', ['garden', 'field', 'chicken_coop', 'root_cellar']],
   ['water', 'Water & power', UTILITY_ORDER],
 ];
@@ -234,12 +235,26 @@ export function Hud() {
             {!sel && !game.perimeter.some(r => !runFinished(r)) && !game.forestry.jobs.length && <Note>Nothing under way. Stake something out from the Build tab.</Note>}
             {sel && (
               <Section title={KIT[sel.kind].name}>
-                <Row label="Stage" value={isFinished(sel) ? 'Finished' : BLUEPRINTS[sel.kind].stages[sel.stage].name} />
+                <Row label="Stage" value={sel.pre ? 'Came with the land' : isFinished(sel) ? 'Finished' : BLUEPRINTS[sel.kind].stages[sel.stage].name} />
+                {(sel.fixes ?? []).length > 0 && <>
+                  {(sel.fixes ?? []).map(f => <div key={f.part} style={{ display: 'flex', justifyContent: 'space-between', gap: 6, marginTop: 3 }}>
+                    <span style={{ color: DIM }} title={Object.entries(fixBill(f)).map(([m, q]) => `${q} ${MATERIALS[m as MaterialId].name.toLowerCase()}`).join(', ')}>{fixDef(f).name} <span style={{ fontSize: 11 }}>({f.cond}, {f.hours} h)</span></span>
+                    <span style={{ color: f.done >= f.hours ? TONE.good : f.done > 0 ? '#eee' : f.cond === 'poor' ? TONE.bad : TONE.warn }}>{f.done >= f.hours ? 'done' : f.done > 0 ? `${Math.round(f.done / f.hours * 100)} %` : fixBlocked(game, f) ? 'needs materials' : 'next up'}</span>
+                  </div>)}
+                  {pendingFixes(sel).some(f => fixBlocked(game, f)) && (() => {
+                    const need: Partial<Record<MaterialId, number>> = {};
+                    for (const f of pendingFixes(sel)) if (!f.supplied) for (const [m, q] of Object.entries(fixBill(f)) as Array<[MaterialId, number]>) need[m] = (need[m] ?? 0) + q;
+                    const lines = (Object.entries(need) as Array<[MaterialId, number]>).map(([material, q]) => ({ material, qty: Math.max(0, q - game.stock[material]) })).filter(l => l.qty > 0);
+                    return lines.length > 0 && <button style={{ ...btn(), width: '100%', marginTop: 4 }} disabled={!!orderProblem(game, lines)} onClick={() => g.order(lines)}>Order the repair materials: {usd(orderCost(lines, prices(game)))}</button>;
+                  })()}
+                  {pendingFixes(sel).some(f => f.part === 'roof') && <Note tone="warn">The roof leaks: the stove burns more to keep the house warm.</Note>}
+                  {pendingFixes(sel).some(f => f.cond === 'poor' && (f.part === 'wiring' || f.part === 'plumbing')) && <Note tone="warn">Unsafe {pendingFixes(sel).filter(f => f.cond === 'poor' && f.part !== 'roof' && f.part !== 'septic').map(f => f.part).join(' and ')}: shut off until it's redone.</Note>}
+                </>}
                 <div style={{ height: 6, background: '#333', borderRadius: 3, margin: '4px 0' }}>
                   <div style={{ width: `${progress(sel) * 100}%`, height: '100%', background: '#c9b27a', borderRadius: 3 }} />
                 </div>
                 {!isFinished(sel) && <Note tone={blockedReason(game, sel) ? 'warn' : undefined}>{blockedReason(game, sel) ?? `${Math.round(progress(sel) * 100)} % done`}</Note>}
-                {!isFinished(sel) && (() => {
+                {(!isFinished(sel) || pendingFixes(sel).length > 0) && (() => {
                   const crew = game.crews.find(c => c.target === sel.id), q = crewQuote(sel), why = crewProblem(game, sel);
                   return crew
                     ? <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginTop: 4 }}>
@@ -250,7 +265,7 @@ export function Hud() {
                         Hire a crew: ~{usd(q.usd)}, about {q.weeks} week{q.weeks > 1 ? 's' : ''}
                       </button>;
                 })()}
-                {!isFinished(sel) && !game.crews.some(c => c.target === sel.id) && game.money < crewQuote(sel).usd && !crewProblem(game, sel) && (() => {
+                {(!isFinished(sel) || pendingFixes(sel).length > 0) && !game.crews.some(c => c.target === sel.id) && game.money < crewQuote(sel).usd && !crewProblem(game, sel) && (() => {
                   const wk = Math.floor(game.money / (CREW_RATE * CREW_SIZE * 45));
                   return <Note tone="warn">Money for about {wk} week{wk === 1 ? '' : 's'} of a crew; they go home when it runs out.</Note>;
                 })()}
@@ -416,7 +431,7 @@ export function Hud() {
                   <span style={{ color: DIM }}>County grid</span>
                   <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                     {!game.utilities.grid ? 'off the grid' : up ? `${r.gridKwh.toFixed(1)} kWh · $${r.billUsd.toFixed(2)}` : <span style={{ color: TONE.bad }}>OUT</span>}
-                    {(up || game.utilities.grid) && <button style={btn()} title={game.utilities.grid ? 'Have the co-op pull the meter: no more bills, but only what you built runs the place' : 'Reconnect: $250'} onClick={() => g.setGrid(!game.utilities.grid)}>{game.utilities.grid ? 'Leave' : 'Rejoin'}</button>}
+                    {(up || game.utilities.grid) && (game.site.improvements.power || game.utilities.grid) && <button style={btn()} title={game.utilities.grid ? 'Have the co-op pull the meter: no more bills, but only what you built runs the place' : 'Reconnect: $250'} onClick={() => g.setGrid(!game.utilities.grid)}>{game.utilities.grid ? 'Leave' : 'Rejoin'}</button>}
                   </span>
                 </div>
                 <Row label="Made / used" value={`${(r.solarKwh + r.genKwh).toFixed(1)} / ${r.drawKwh.toFixed(1)} kWh`} />
@@ -440,6 +455,19 @@ export function Hud() {
             <Section title="The place">
               <Row label="Home place" value={`${game.site.acres} acres`} />
               <Row label="Region" value={REGIONS[game.site.region].name} />
+              {(['power', 'drive'] as const).map(what => {
+                const imp = game.site.improvements, have = what === 'power' ? imp.power : imp.drive, due = game.siteJobs[what];
+                const q = what === 'power' ? powerQuote(imp) : driveQuote(imp), why = hookupProblem(game, what);
+                const label = what === 'power' ? 'Power' : 'Drive';
+                return have ? <Row key={what} label={label} value={what === 'power' ? 'On the grid' : 'Gravel'} />
+                  : due !== null ? <Row key={what} label={label} value={`coming in ${Math.max(1, Math.ceil(due - game.clock.t))} days`} />
+                  : <div key={what} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                      <span style={{ color: DIM }}>{label}: <span style={{ color: TONE.warn }}>{what === 'power' ? `${imp.poleFt.toLocaleString('en-US')} ft to the pole` : `none (${imp.driveFt.toLocaleString('en-US')} ft)`}</span></span>
+                      <button style={btn(!why)} disabled={!!why} title={why ?? (what === 'power' ? `The co-op runs the line ($${POLE_PER_FT}/ft + transformer), about ${Math.round(q.days / 7)} weeks` : `12 ft gravel and a culvert ($${DRIVE_PER_FT}/ft), about ${q.days} days`)} onClick={() => g.hookup(what)}>{usd(q.usd)}</button>
+                    </div>;
+              })}
+              {(game.roadside ?? []).length > 0 && <Note tone="warn">{game.roadside.length} deliver{game.roadside.length > 1 ? 'ies' : 'y'} at the road: about {Math.round(game.roadside.reduce((a, r) => a + r.hours - r.done, 0))} h of carrying before building goes on.</Note>}
+              {!game.site.improvements.power && !game.utilities.grid && <Note>No power at the place: run the line, or go solar or a generator.</Note>}
               {game.land.parcels.some(p => p.owner === 'you') && <Row label="Bought since" value={`${game.land.parcels.filter(p => p.owner === 'you').reduce((a, p) => a + acresOf(p.rect), 0)} acres`} />}
             </Section>
             <Section title="Land next door">

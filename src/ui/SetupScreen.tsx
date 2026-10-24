@@ -5,7 +5,7 @@ import { newGame } from '../sim/state';
 import { generateFamily, fullName } from '../sim/family';
 import { DISASTERS, type Difficulty, type DisasterKind, type Mode, type PeaceLength } from '../sim/disaster';
 import { saveGame, AUTOSAVE } from '../sim/save/saveSystem';
-import { affordable, ANY_WISH, LIFESTYLE, listings, siteFacts, type Acres, type LandWish, type Lifestyle, type Site } from '../sim/site';
+import { affordable, ANY_WISH, builtFacts, LIFESTYLE, listings, siteFacts, type Acres, type LandWish, type Lifestyle, type Site } from '../sim/site';
 import { PLAYABLE, REGION_IDS, REGIONS, type RegionId } from '../sim/regions';
 
 const MODES: Array<[Mode, string, string]> = [
@@ -49,6 +49,12 @@ function ListingCard({ l, on, pick, budget }: { l: Site; on: boolean; pick: () =
         {siteFacts(l).map(f => [
           <span key={f.label + 'l'} style={{ color: C.dim }}>{f.label}</span>,
           <span key={f.label + 'v'} style={{ color: f.tone === 'good' ? C.good : f.tone === 'bad' ? C.bad : '#eee' }}>{f.value}</span>,
+        ])}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', columnGap: 10, rowGap: 3, fontSize: 12.5, borderTop: `1px solid ${C.line}`, paddingTop: 6 }}>
+        {builtFacts(l).map((f, k) => [
+          <span key={k + 'l'} style={{ color: C.dim }}>{f.label}</span>,
+          <span key={k + 'v'} style={{ color: f.tone === 'good' ? C.good : f.tone === 'bad' ? C.bad : '#eee', fontSize: f.label ? 12.5 : 11.5 }}>{f.value}</span>,
         ])}
       </div>
       <div style={{ fontSize: 12, color: ok ? C.dim : C.bad, borderTop: `1px solid ${C.line}`, paddingTop: 6 }}>
@@ -149,6 +155,7 @@ export function SetupScreen() {
             <Chips label="Water" value={wish.water} set={v => setW({ water: v })} opts={[['any', 'Any'], ['creek', 'Creek'], ['spring', 'Spring'], ['dry', 'Dry (cheaper)']]} />
             <Chips label="Timber" value={wish.timber} set={v => setW({ timber: v })} opts={[['any', 'Any'], ['open', 'Open'], ['some', 'Some'], ['heavy', 'Heavy']]} />
             <Chips label="Town" value={wish.town} set={v => setW({ town: v })} opts={[['any', 'Any'], ['near', 'Close in'], ['far', 'Way out']]} />
+            <Chips label="Built" value={wish.built ?? 'any'} set={v => setW({ built: v })} opts={[['any', 'Any'], ['raw', 'Raw land'], ['house', 'With a house']]} />
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', margin: '14px 0 8px' }}>
               <span style={{ fontSize: 11.5, textTransform: 'uppercase', letterSpacing: 0.8, color: C.dim }}>Listings · {usd(budget)} to spend</span>
               <button style={chip(false)} onClick={() => { setBatch(batch + 1); setLotId(null); }}>More listings</button>

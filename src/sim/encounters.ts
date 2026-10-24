@@ -14,6 +14,7 @@
  * ever reaches the family through it. Pure and seeded.
  */
 import { mulberry32, pick } from './rng';
+import { isHome } from './blueprints';
 import { log } from './economy';
 import { isFinished } from './construction';
 import { PERIMETER, runFinished, runGrowth, wallLength } from './perimeter';
@@ -100,7 +101,7 @@ export interface Posture {
 
 export function postureOf(s: GameState): Posture {
   const fin = s.structures.filter(isFinished);
-  const homes = fin.filter(st => ['timber_cabin', 'log_house'].includes(st.kind));
+  const homes = fin.filter(st => isHome(st.kind));
   const lit = s.utilities.lit.some(id => homes.some(h => h.id === id));
   const surface = fin.filter(st => !st.kind.startsWith('bunker_')).length;
   const visibility = Math.min(100, 12 + surface * 5 + (lit ? 18 : 0) + (s.utilities.report.genKwh > 0.1 ? 15 : 0) + (homes.length ? 8 : 0));

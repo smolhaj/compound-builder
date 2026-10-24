@@ -22,6 +22,7 @@ export type KitMaterialId = 'timber_lap' | 'trim' | 'fieldstone' | 'metal_roof' 
   | 'hedge' | 'hedge2' | 'hedge_berry' | 'container_red' | 'container_blue' | 'container_green' | 'container_tan'
   // homey decor (procedural art)
   | 'solar_cell' | 'poly_tank' | 'blue_tank' |
+  'lap_white' | 'vinyl' | 'shingle' |
   'art_mountains' | 'art_sunset' | 'art_lake' | 'photo_family' | 'photo_couple' | 'poster_map' | 'poster_seeds' | 'sampler' | 'curtain' | 'curtain_red' | 'flowers';
 
 /** World units covered by one texture repeat. */
@@ -29,6 +30,7 @@ const TEX_WORLD: Partial<Record<KitMaterialId, number>> = {
   timber_lap: 0.5, fieldstone: 0.5, metal_roof: 0.5, deck: 0.5, door: 0.2,
   curtain: 0.15, curtain_red: 0.15, hedge: 0.25, hedge2: 0.25,
   pine_panel: 0.5, quilt_red: 0.12, quilt_blue: 0.12, rug: 0.3, books: 0.1,
+  lap_white: 0.5, vinyl: 0.5, shingle: 0.5,
   concrete: 0.6, whitewash: 0.5, wet_concrete: 0.6, metal_siding: 0.5, container_red: 0.4, container_blue: 0.4, container_green: 0.4, container_tan: 0.4, log_wall: 0.5, board_batten: 0.5, wire_mesh: 0.15, straw: 0.3, soil: 0.4, earth: 0.8, pegboard: 0.2,
 };
 
@@ -337,6 +339,57 @@ function paintBoardBatten(): HTMLCanvasElement {
   return c;
 }
 
+/** Painted clapboard on an old farmhouse: white lap boards, paint chalking and peeling to gray wood. */
+function paintLapWhite(): HTMLCanvasElement {
+  const N = 512, boards = 18, bh = N / boards;
+  const [c, g] = canvas(N);
+  const r = lcg(211);
+  for (let i = 0; i < boards; i++) {
+    const t = 0.9 + r() * 0.08;
+    g.fillStyle = rgb(232 * t, 228 * t, 214 * t);
+    g.fillRect(0, i * bh, N, bh);
+    // peeling: patches of bare gray wood
+    for (let k = 0; k < 5; k++) if (r() < 0.6) { g.fillStyle = rgb(138 + r() * 20, 130 + r() * 18, 116 + r() * 14); g.fillRect(r() * N, i * bh + bh * 0.3 + r() * bh * 0.4, 6 + r() * 40, 2 + r() * 4); }
+    for (let k = 0; k < 20; k++) { g.fillStyle = `rgba(150,140,120,${0.06 + r() * 0.08})`; g.fillRect(r() * N, i * bh + r() * bh, 30 + r() * 120, 1); }
+    const grd = g.createLinearGradient(0, i * bh, 0, i * bh + bh * 0.3);
+    grd.addColorStop(0, 'rgba(60,55,45,0.6)'); grd.addColorStop(1, 'rgba(60,55,45,0)');
+    g.fillStyle = grd; g.fillRect(0, i * bh, N, bh * 0.3);
+  }
+  return c;
+}
+
+/** Vinyl lap siding on a manufactured home: pale tan, crisp, a faint mildew line along the bottom laps. */
+function paintVinyl(): HTMLCanvasElement {
+  const N = 256, boards = 12, bh = N / boards;
+  const [c, g] = canvas(N);
+  const r = lcg(223);
+  for (let i = 0; i < boards; i++) {
+    g.fillStyle = rgb(206, 196, 172);
+    g.fillRect(0, i * bh, N, bh);
+    g.fillStyle = 'rgba(255,255,255,0.18)'; g.fillRect(0, i * bh + bh * 0.55, N, bh * 0.2);
+    g.fillStyle = 'rgba(70,64,50,0.45)'; g.fillRect(0, i * bh, N, 2);
+    for (let k = 0; k < 6; k++) { g.fillStyle = `rgba(90,96,70,${0.04 + r() * 0.06})`; g.fillRect(r() * N, i * bh + bh - 3, 20 + r() * 60, 3); }
+  }
+  return c;
+}
+
+/** Asphalt shingles: staggered tabs in charcoal, a little moss and streaking. */
+function paintShingle(): HTMLCanvasElement {
+  const N = 256, rows = 16, rh = N / rows, tw = N / 8;
+  const [c, g] = canvas(N);
+  const r = lcg(233);
+  for (let j = 0; j < rows; j++) {
+    for (let i = -1; i < 9; i++) {
+      const t = 0.8 + r() * 0.3;
+      g.fillStyle = rgb(72 * t, 70 * t, 68 * t);
+      g.fillRect(i * tw + (j % 2) * tw / 2, j * rh, tw - 2, rh);
+    }
+    g.fillStyle = 'rgba(15,15,15,0.6)'; g.fillRect(0, j * rh + rh - 2, N, 2);
+    for (let k = 0; k < 3; k++) if (r() < 0.4) { g.fillStyle = 'rgba(90,110,60,0.3)'; g.fillRect(r() * N, j * rh, 10 + r() * 20, rh); }
+  }
+  return c;
+}
+
 /** Welded wire / chicken wire mesh (alpha). */
 function paintMesh(): HTMLCanvasElement {
   const N = 128;
@@ -587,6 +640,9 @@ export function kitMaterial(id: KitMaterialId): THREE.MeshStandardMaterial {
     case 'log_wall': m = texMat(id, paintLogWall, 4, 0.85, 0, 1.4); break;
     case 'log_end': m = new THREE.MeshStandardMaterial({ color: 0x8a6440, roughness: 0.85 }); break;
     case 'board_batten': m = texMat(id, paintBoardBatten, 2, 0.85); break;
+    case 'lap_white': m = texMat(id, paintLapWhite, 2.0, 0.85, 0, 0.7); break;
+    case 'vinyl': m = texMat(id, paintVinyl, 1.2, 0.55, 0, 0.5); break;
+    case 'shingle': m = texMat(id, paintShingle, 2.2, 0.9, 0, 0.9); break;
     case 'wire_mesh': {
       const mm = texMat(id, paintMesh, 0.5, 0.5, 0.6);
       mm.transparent = true; mm.alphaTest = 0.3; mm.side = THREE.DoubleSide; mm.normalMap = null;
