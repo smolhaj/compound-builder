@@ -14,6 +14,7 @@
  * ever reaches the family through it. Pure and seeded.
  */
 import { mulberry32, pick } from './rng';
+import { gearPosture, softenWound } from './gear';
 import { armed, firepower, spendInFight } from './armory';
 import { isHome } from './blueprints';
 import { log } from './economy';
@@ -99,6 +100,9 @@ export interface Posture {
   firepower: number;
   /** A bunker to hide in. */
   bunker: boolean;
+  /** A guard dog's bark (warns them off), a safe room to hide in. */
+  deter?: number;
+  safeRoom?: boolean;
 }
 
 export function postureOf(s: GameState): Posture {
@@ -121,8 +125,9 @@ export function postureOf(s: GameState): Posture {
   const fighters = adults.length + s.people.filter((p, i) => p.kid && p.age >= 15 && s.personState[i]?.needs.died == null).length * 0.5;
   const watch = Math.max(0, ...adults.map(p => p.skills.hunter));
   const radioNet = s.neighbors.some(n => n.radio && n.status === 'home' && n.disposition > 30);
-  const detection = Math.min(100, 25 + watch * 5 + (radioNet ? 20 : 0) + (barrier > 50 ? 10 : 0));
-  return { visibility, fortress, barrier, detection, fighters, armed: armed(s), firepower: firepower(s), bunker: fin.some(st => st.kind === 'bunker_hatch' || st.kind === 'bunker_stairs') };
+  const gear = gearPosture(s, fighters);
+  const detection = Math.min(100, 25 + watch * 5 + (radioNet ? 20 : 0) + (barrier > 50 ? 10 : 0) + gear.detection);
+  return { visibility: Math.min(100, visibility + gear.visibility), fortress, barrier: Math.min(100, barrier + gear.barrier), detection, fighters, deter: gear.deter, safeRoom: gear.safeRoom, armed: armed(s), firepower: firepower(s) * gear.fight, bunker: fin.some(st => st.kind === 'bunker_hatch' || st.kind === 'bunker_stairs') };
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -403,7 +408,8 @@ export function resolve(s: GameState, stance: Stance): Outcome {
         const lost = take(s, e.wants ?? {}, p.bunker ? 1 : 1.5);
         title = 'They took what they found'; text = p.bunker ? 'From the bunker you hear them go through the house and the shop.' : 'From the trees you watch them load your stores into the truck.'; tone = 'bad';
         if (lost.length) lines.push(`Lost: ${lost.join(', ')}`);
-        if (!p.bunker && r() < 0.3) lines.push(wound(s, r, 30, 'hurt running for the timber'));
+        if (!p.bunker && !p.safeRoom && r() < 0.3) lines.push(wound(s, r, 30, 'hurt running for the timber'));
+        if (!p.bunker && p.safeRoom) lines.push('Everyone sat it out behind the safe-room door.');
       }
     } else if (stance === 'parley' || stance === 'trade') {
       const calm = r() * 100 < 35 + negotiator * 7 + (e.kind === 'refugees' ? 30 : 0) + (e.kind === 'requisition' ? 15 : 0) - (e.kind === 'gang' ? 15 : 0);
@@ -418,7 +424,7 @@ export function resolve(s: GameState, stance: Stance): Outcome {
       }
     }
     if (stance === 'warn') {
-      const deterred = r() * 100 < p.fortress * 0.6 + (p.armed ? 15 : -10) + (e.armed ? 0 : 25) + (e.kind === 'looters' ? 20 : 0) - (e.kind === 'gang' ? 25 : 0);
+      const deterred = r() * 100 < p.fortress * 0.6 + (p.deter ?? 0) + (p.armed ? 15 : -10) + (e.armed ? 0 : 25) + (e.kind === 'looters' ? 20 : 0) - (e.kind === 'gang' ? 25 : 0);
       if (deterred) { title = 'They thought better of it'; text = 'A shot over the truck and the walls behind it. They turn around in the road.'; tone = 'good'; if (e.kind === 'refugees') g.humanity = Math.max(0, g.humanity - 5); }
       else stance = 'defend';
     }
@@ -429,14 +435,14 @@ export function resolve(s: GameState, stance: Stance): Outcome {
       if (r() < odds) {
         g.raidsHeld++;
         title = 'The line held'; text = `${help ? `${allies.map(a => a.name).join(' and ')} came over the ridge when they heard the shooting. ` : ''}They pulled back and didn't come again.`; tone = 'good';
-        if (r() < 0.35 * (e.strength / Math.max(20, def))) lines.push(wound(s, r, 25 + Math.floor(r() * 30), 'a gunshot wound'));
+        if (r() < 0.35 * (e.strength / Math.max(20, def))) lines.push(wound(s, r, softenWound(s, 25 + Math.floor(r() * 30), e.armed), 'a gunshot wound'));
         for (const n of allies) n.disposition = Math.min(100, n.disposition + 5);
       } else {
         g.raidsLost++;
         const lost = take(s, e.wants ?? {}, 1.5);
         title = 'They got in'; text = 'They broke through the line and took what they came for.'; tone = 'bad';
         if (lost.length) lines.push(`Lost: ${lost.join(', ')}`);
-        lines.push(wound(s, r, 40 + Math.floor(r() * 40), 'shot'));
+        lines.push(wound(s, r, softenWound(s, 40 + Math.floor(r() * 40), e.armed), 'shot'));
         if (r() < 0.4) lines.push(wound(s, r, 20 + Math.floor(r() * 30), 'beaten'));
       }
       if (e.kind === 'refugees') g.humanity = Math.max(0, g.humanity - 10);
