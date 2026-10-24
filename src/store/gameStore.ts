@@ -3,6 +3,7 @@ import { dismissCrew, hireCrew } from '../sim/crews';
 import { orderHookup, placeImprovements } from '../sim/improvements';
 import { applyForPermit } from '../sim/paperwork';
 import { sweepChimney } from '../sim/upkeep';
+import { stockUpRx } from '../sim/body';
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { newGame, SECONDS_PER_DAY, dayIndex, type GameState, type OrderLine, type Speed } from '../sim/state';
@@ -73,6 +74,8 @@ export interface GameStore {
   sweep: () => void;
   /** Eat what you store (rotate the pantry). */
   setRotate: (on: boolean) => void;
+  /** Fill everyone's prescriptions 90 days ahead. */
+  stockUpRx: () => void;
   /** After the report card: play on (endless). */
   playOn: () => void;
   /** Put a spare into an EMP-fried building. */
@@ -203,6 +206,11 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     const lost = g.structures.filter(x => x.unplaced);
     if (lost.length) { g.structures = g.structures.filter(x => !x.unplaced); }
     set({ game: g });
+  },
+  stockUpRx: () => {
+    const g = structuredClone(get().game);
+    const cost = stockUpRx(g);
+    if (cost > 0) { log(g, `Filled everyone's prescriptions three months ahead ($${cost.toLocaleString('en-US')}).`); set({ game: g }); }
   },
   setRotate: (on) => {
     const g = structuredClone(get().game);

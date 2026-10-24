@@ -18,6 +18,7 @@ import { fixBill, fixBlocked, orderHookup, pendingFixes, placeImprovements } fro
 import { hireCrew, hoursLeft } from '../src/sim/crews';
 import { applyForPermit } from '../src/sim/paperwork';
 import { sweepChimney } from '../src/sim/upkeep';
+import { stockUpRx } from '../src/sim/body';
 import { calendarOf } from '../src/sim/state';
 import { planRun } from '../src/sim/perimeter';
 import { orderFit, fitProblem, plant } from '../src/sim/utilities';
@@ -69,6 +70,9 @@ function orderNeeds(s: GameState, strat: Strategy): void {
   if (s.stock.lids + (pending.lids ?? 0) < jars / 2) lines.push({ material: 'lids', qty: jars });
   // a winter's firewood (about 4 cords) in by fall
   if (strat !== 'idle' && s.stock.firewood + (pending.firewood ?? 0) < 12) lines.push({ material: 'firewood', qty: 12 });
+  // soap and paper for when the stores close: a year (prepper) or three months (homestead) a head
+  const heads = s.people.length, hyg = strat === 'prepper' ? 12 * heads : strat === 'homestead' ? 3 * heads : 0;
+  if (s.stock.hygiene + (pending.hygiene ?? 0) < hyg / 2) lines.push({ material: 'hygiene', qty: hyg });
   // traps in the stores, stabilizer in the gas
   if (strat !== 'idle' && s.stock.traps + (pending.traps ?? 0) < 1) lines.push({ material: 'traps', qty: 3 });
   if (strat === 'prepper' && s.stock.stabilizer + (pending.stabilizer ?? 0) < Math.ceil((s.stock.fuel + (pending.fuel ?? 0)) / 10)) lines.push({ material: 'stabilizer', qty: 2 });
@@ -117,6 +121,8 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
     if (strat === 'fortress' && day === 120) planRun(s, 'log_palisade', [M(15, 15), M(50, 15), M(50, 50), M(15, 50), M(15, 15)]);
     if (strat === 'prepper' && day === 600) for (const id of ['fallout', 'faraday', 'nbc'] as const) orderHardenAll(s, id, 1);
     if (day % 3 === 0 && s.clock.t < s.disaster.hitAt) orderNeeds(s, strat);
+    // the prescriptions, three months ahead, once the news turns
+    if (strat !== 'idle' && s.disaster.phase === 'warning' && day % 30 === 0) stockUpRx(s);
     // sweep the chimney each fall
     if (strat !== 'idle' && calendarOf(s.clock).doy === 260) sweepChimney(s);
     // wire and plumb the house once it can be; order what its repairs need

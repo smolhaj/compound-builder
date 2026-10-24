@@ -13,6 +13,7 @@ import { drillExtra } from '../sim/site';
 import { REGIONS } from '../sim/regions';
 import { CREW_RATE, CREW_SIZE, crewProblem, crewQuote } from '../sim/crews';
 import { keeping, KEPT } from '../sim/shelf';
+import { CONDITION, pharmacyOpen } from '../sim/body';
 import { chimneyState, greenRicks, SEASON_DAYS, SWEEP_USD } from '../sim/upkeep';
 import { countyWorks, needsPermit, permitFee, premium, yearlyTax } from '../sim/paperwork';
 import { DRIVE_PER_FT, driveQuote, fixBill, fixBlocked, fixDef, hookupProblem, pendingFixes, POLE_PER_FT, powerQuote } from '../sim/improvements';
@@ -364,8 +365,17 @@ export function Hud() {
                   <span style={{ color: DIM, width: 36 }}>morale</span>{bar(n.morale, '#7aa0d0', `Morale ${Math.round(n.morale)}`)}
                 </div>}
                 {notes && <Note tone="warn">{notes}</Note>}
+                {n && n.died == null && (p.conditions?.length ?? 0) > 0 && (() => {
+                  const days = Math.floor(game.body.rx[p.id] ?? 30);
+                  return <div style={{ fontSize: 11, color: days < 14 ? TONE.bad : days < 45 ? TONE.warn : DIM, marginTop: 2 }}>{p.conditions!.map(c => CONDITION[c].name).join(', ')}: {days > 0 ? `${days} days of ${p.conditions!.map(c => CONDITION[c].rx).join(' and ')}` : 'out of medicine'}</div>;
+                })()}
               </div>;
             })}
+            {game.people.some(p => p.conditions?.length) && <Section title="Medicine & household">
+              {pharmacyOpen(game) ? <button style={{ ...btn(), width: '100%' }} title="Fill everyone's prescriptions three months past the month in hand (as far ahead as insurance covers)" onClick={() => g.stockUpRx()}>Fill prescriptions 90 days ahead</button>
+                : <Note tone="warn">The pharmacy is shut: what's on hand is all there is.</Note>}
+              <Row label="Hygiene supplies" value={game.disaster.tracks.stores >= 0.5 ? `bought with groceries · ${Math.floor(game.stock.hygiene)} put by` : `${Math.floor(game.stock.hygiene)} person-months left`} />
+            </Section>}
             <Section title="Work and money">
               {game.disaster.tracks.banks > 0.5 && game.disaster.tracks.stores > 0.5 && <Row label="Household costs" value={`$${LIVING_PER_DAY}/day`} />}
               {game.people.filter(p => p.job).map(p => {
