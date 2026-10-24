@@ -15,6 +15,7 @@ import { FIT, fitProblem, plant, serviceOf, FUEL_UNIT_L, UTILITY } from '../sim/
 import { DISASTERS, TRACKS, TRACK_NAME, type DisasterKind } from '../sim/disaster';
 import { prices } from '../sim/economy';
 import { LIVING_PER_DAY } from '../sim/engine';
+import { daysOfFood } from '../sim/needs';
 import { HARDEN, HARDEN_IDS, type TierDef, hardenCost, hardenProblem, isBunkerRoom, protectionOf, tierOf } from '../sim/hardening';
 import { PERIMETER, PERIMETER_ORDER, UTILITY_LINES, runBill, runHours, runFinished, runProgress, runBlocked, runGrowth } from '../sim/perimeter';
 
@@ -27,7 +28,7 @@ const VIEWS: Array<[BuildingView, string, string]> = [['full', 'Walls', 'Whole b
 const SPEEDS: Array<[Speed, string]> = [[0, '❚❚'], [1, '▶'], [2, '▶▶'], [3, '▶▶▶'], [4, '⏩']];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const MONTH_START = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
-const TASK_TEXT: Record<string, string> = { build: 'Building', forestry: 'In the woods', chores: 'Chores', sleep: 'Asleep', school: 'School', leisure: 'Free time', idle: 'Idle', job: 'At work in town' };
+const TASK_TEXT: Record<string, string> = { build: 'Building', forestry: 'In the woods', chores: 'Chores', sleep: 'Asleep', school: 'School', leisure: 'Free time', idle: 'Idle', job: 'At work in town', gone: 'Died' };
 
 function dateLabel(doy: number): string {
   let m = 11;
@@ -245,13 +246,24 @@ export function Hud() {
       </div>
 
       {/* Right: family, stockpile, orders */}
-      <div style={{ ...panel, position: 'fixed', right: 10, top: 10, width: 250 }}>
+      <div style={{ ...panel, position: 'fixed', right: 10, top: 10, width: 250, maxHeight: 'calc(100vh - 90px)', overflowY: 'auto' }}>
         <Section title="Family">
           {game.people.map(p => {
             const st = game.personState.find(x => x.id === p.id);
             return <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 4, background: '#' + p.shirt.toString(16).padStart(6, '0'), marginRight: 5 }} />{fullName(p)}, {p.age}</span>
               <span style={{ opacity: 0.7 }}>{TASK_TEXT[st?.task ?? 'idle']}</span>
+            </div>;
+          })}
+          {game.personState.some(ps => ps.needs.health < 99 || ps.needs.morale < 60 || ps.needs.hurt.length || ps.needs.dose > 0.05) && game.people.map((p, i) => {
+            const n = game.personState[i]?.needs;
+            if (!n || n.died != null) return null;
+            const bar = (v: number, c: string) => <div style={{ width: 40, height: 4, background: '#333', borderRadius: 2 }}><div style={{ width: `${v}%`, height: '100%', background: c, borderRadius: 2 }} /></div>;
+            return <div key={'n' + p.id} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, opacity: 0.85 }}>
+              <span style={{ width: 48 }}>{p.first}</span>
+              <span title="Health">{bar(n.health, n.health > 60 ? '#9cc070' : n.health > 30 ? '#e0b050' : '#e06a50')}</span>
+              <span title="Morale">{bar(n.morale, '#7aa0d0')}</span>
+              <span style={{ opacity: 0.8 }}>{[n.hunger > 5000 ? 'hungry' : '', ...n.hurt.map(h => h.what), n.dose > 0.05 ? `${n.dose.toFixed(2)} Sv` : ''].filter(Boolean).join(', ')}</span>
             </div>;
           })}
           {game.disaster.tracks.banks > 0.5 && game.disaster.tracks.stores > 0.5 && <div style={{ fontSize: 11.5, opacity: 0.7, marginTop: 2 }}>Household costs ${LIVING_PER_DAY}/day</div>}
@@ -296,12 +308,23 @@ export function Hud() {
           </Section>
         )}
         {game.disaster.mode === 'sandbox' && !game.disaster.kind && <FreeBuild />}
+        <Section title="Pantry">
+          {(() => {
+            const f = game.food, d = daysOfFood(game);
+            return <>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Put by</span><span>{d === Infinity ? '—' : d >= 365 ? `${(d / 365).toFixed(1)} years` : `${Math.floor(d)} days`} of food</span></div>
+              {f.producedKcal > 0 && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Grown yesterday</span><span>{Math.round(f.producedKcal).toLocaleString('en-US')} kcal</span></div>}
+              {!f.fromStores && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Ate / needed</span><span style={{ color: f.ateKcal < f.needKcal * 0.95 ? '#f08060' : undefined }}>{Math.round(f.ateKcal).toLocaleString('en-US')} / {Math.round(f.needKcal).toLocaleString('en-US')} kcal</span></div>}
+              {f.fromStores && <div style={{ opacity: 0.65, fontSize: 11.5 }}>Groceries from town for now. Stock canned food and bulk staples (Order…) for when the stores close.</div>}
+            </>;
+          })()}
+        </Section>
         <Section title="Stockpile">
           {MATERIAL_IDS.filter(m => game.stock[m] > 0 || (pending[m] ?? 0) > 0 || qty[m] > 0).length === 0 && <div style={{ opacity: 0.6 }}>Empty. Order below or fell timber.</div>}
           {MATERIAL_IDS.filter(m => game.stock[m] > 0 || (pending[m] ?? 0) > 0 || qty[m] > 0).map(m => (
             <div key={m} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 4 }}>
               <span>{MATERIALS[m].name}</span>
-              <span style={{ marginLeft: 'auto', fontVariantNumeric: 'tabular-nums' }}>{game.stock[m]}{pending[m] ? <span style={{ opacity: 0.6 }}> +{pending[m]}</span> : null}</span>
+              <span style={{ marginLeft: 'auto', fontVariantNumeric: 'tabular-nums' }}>{Math.floor(game.stock[m] + 1e-6)}{pending[m] ? <span style={{ opacity: 0.6 }}> +{pending[m]}</span> : null}</span>
               {MATERIALS[m].price !== null && <>
                 <button style={btn()} onClick={() => setQty({ ...qty, [m]: Math.max(0, qty[m] - 1) })}>−</button>
                 <span style={{ width: 18, textAlign: 'center' }}>{qty[m]}</span>
