@@ -5,6 +5,7 @@ import { orderHookup, placeImprovements } from '../sim/improvements';
 import { applyForPermit } from '../sim/paperwork';
 import { sweepChimney } from '../sim/upkeep';
 import { stockUpRx } from '../sim/body';
+import { askRansom, giveUp, startRescue } from '../sim/rescue';
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { newGame, SECONDS_PER_DAY, dayIndex, type GameState, type OrderLine, type Speed } from '../sim/state';
@@ -63,6 +64,10 @@ export interface GameStore {
   decideAftermath: (choice: AftermathChoice) => void;
   releasePrisoner: (id: string) => void;
   joinPrisoner: (id: string) => void;
+  /** The taken (sim/rescue.ts): send armed adults to the camp, send word you'll pay, stop looking. Return why not, or null. */
+  rescue: (pid: string, team: string[]) => string | null;
+  askRansom: (pid: string) => string | null;
+  giveUp: (pid: string) => string | null;
   /** Wildfire: the world's count of trees round each building. */
   setFuel: (fuel: Record<string, number>) => void;
   /** Buy a neighbor parcel. */
@@ -121,7 +126,8 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     const days = Math.min(realDt, MAX_DT) / SECONDS_PER_DAY[g.clock.speed];
     const next = step(g, days);
     // someone at the gate: stop the clock until the player decides
-    if ((next.gate.pending && !g.gate.pending) || (next.ending && !g.ending)) next.clock = { ...next.clock, speed: 0 };
+    // (and when news of a rescue comes in: the card)
+    if ((next.gate.pending && !g.gate.pending) || (next.gate.card && !g.gate.card) || (next.ending && !g.ending)) next.clock = { ...next.clock, speed: 0 };
     set({ game: next });
     if (dayIndex(next.clock.t) !== dayIndex(g.clock.t)) void saveGame(AUTOSAVE, next);
   },
@@ -286,6 +292,24 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
   releasePrisoner: (id) => {
     const g = structuredClone(get().game);
     if (!releasePrisoner(g, id)) set({ game: g });
+  },
+  rescue: (pid, team) => {
+    const g = structuredClone(get().game);
+    const why = startRescue(g, pid, team);
+    if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); }
+    return why;
+  },
+  askRansom: (pid) => {
+    const g = structuredClone(get().game);
+    const why = askRansom(g, pid);
+    if (!why) set({ game: g });
+    return why;
+  },
+  giveUp: (pid) => {
+    const g = structuredClone(get().game);
+    const why = giveUp(g, pid);
+    if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); }
+    return why;
   },
   joinPrisoner: (id) => {
     const g = structuredClone(get().game);
