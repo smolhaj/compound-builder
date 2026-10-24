@@ -147,6 +147,10 @@ export class BattleRenderer {
         wear.pants = 0x161718; wear.hat = -1; wear.coat = 1;
       }
       wear.hasPack = false; wear.shorts = false;
+      // armor over the clothes: a coyote plate carrier (back panel), a navy soft vest, an olive helmet
+      if (def.armor?.plate) { wear.shirt = 0x6e6446; wear.coat = 1; wear.hasPack = true; wear.pack = 0x4b4a3a; }
+      else if (def.armor?.soft) { wear.shirt = 0x2d3440; wear.coat = 1; }
+      if (def.armor?.helmet) wear.hat = 0x3d4232;
       const y = def.y ?? 0;
       this._units.set(def.id, { def, x: def.x, y, z: def.z, tx: def.x, ty: y, tz: def.z, rot: def.side === 'raider' ? Math.atan2(this._center.x - def.x, this._center.z - def.z) : 0,
         phase: r() * 6, speed: RUN, wear, wound: 0, dead: false, crouch: false, gone: false });

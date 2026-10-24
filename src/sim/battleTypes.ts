@@ -19,6 +19,8 @@ export interface BattleUnit {
   post?: 'tower' | 'building' | 'wall' | 'sandbags' | 'open';
   /** Height above ground when on a post (tower ≈ 0.9). */
   y?: number;
+  /** What they're wearing (drawn: a plate carrier, a soft vest, a helmet). */
+  armor?: { plate: boolean; soft: boolean; helmet: boolean };
 }
 
 export type BattleEvent =
