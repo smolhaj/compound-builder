@@ -21,7 +21,7 @@ const SHELVES: Record<Exclude<Tab, 'metals' | 'money' | 'guns'>, MaterialId[]> =
   build: ['lumber', 'fieldstone', 'concrete', 'roofing', 'hardware', 'wire', 'seedlings'],
   bunker: ['rebar', 'membrane', 'container', 'blast_door', 'blast_valve', 'nbc_filter', 'filter_set', 'culvert', 'egress_hatch', 'lead_sheet', 'faraday_mesh'],
   water: ['water_jugs', 'ibc_tote', 'water_trailer', 'water_filter', 'ro_system', 'softener', 'greywater', 'pipe', 'cable', 'fixtures', 'pump', 'drilling', 'tank', 'septic_tank', 'solar_panel', 'battery', 'inverter', 'generator'],
-  food: ['staples', 'canned', 'frozen', 'seed', 'lids'],
+  food: ['staples', 'canned', 'frozen', 'seed', 'lids', 'fishing_gear', 'snares', 'smoker'],
   household: ['meds', 'hygiene', 'traps'],
   fuel: ['fuel', 'stabilizer', 'firewood', 'excavator', 'plow', 'gun_safe', 'gun_cleaning'],
   defense: [...KIT_GOODS, ...WATCH_GOODS, ...HARDEN_GOODS],
@@ -89,6 +89,9 @@ function Icon({ id }: { id: string }) {
     case 'steel_door': case 'safe_room': return g(<><rect x="12" y="6" width="20" height="32" fill="#6a7068" stroke="#3a3e38" strokeWidth="2" /><circle cx="28" cy="22" r="2" fill="#ccc" /></>);
     case 'window_bars': return g(<><rect x="8" y="8" width="28" height="28" fill="#2a3a4a" />{[14, 20, 26, 32].map(x => <path key={x} d={`M${x} 8 v28`} stroke="#9a9a9a" strokeWidth="2" />)}</>);
     case 'sandbags': return g(<>{[[12, 30], [24, 30], [18, 22], [30, 22]].map(([x, y]) => <ellipse key={x + '' + y} cx={x} cy={y} rx="7" ry="4" fill="#b8a070" stroke="#7a6a48" />)}</>);
+    case 'fishing_gear': return g(<><path d="M10 36 L34 8" stroke="#8a6a40" strokeWidth="2" /><path d="M34 8 q4 14 -6 22" fill="none" stroke="#ccc" strokeWidth="0.8" /><circle cx="14" cy="31" r="3" fill="#555" /></>);
+    case 'snares': return g(<><circle cx="22" cy="24" r="9" fill="none" stroke="#aaa" strokeWidth="1.5" /><path d="M22 15 v-8" stroke="#aaa" strokeWidth="1.5" /></>);
+    case 'smoker': return g(<><rect x="12" y="14" width="20" height="22" fill="#5a4a3a" /><path d="M16 14 l6 -6 l6 6" fill="#3a3028" /><path d="M24 8 q2 -4 0 -6" stroke="#aaa" fill="none" /></>);
     case 'gun_safe': return g(<><rect x="10" y="6" width="24" height="32" rx="2" fill="#2a2e2a" stroke="#555" /><circle cx="22" cy="20" r="5" fill="none" stroke="#c8a040" strokeWidth="2" /><path d="M28 26 h3" stroke="#c8a040" strokeWidth="2" /></>);
     case 'gun_cleaning': return g(<><path d="M8 34 L36 10" stroke="#8a8a8a" strokeWidth="3" /><rect x="10" y="22" width="8" height="12" rx="1" fill="#3a6a3a" /></>);
     case 'rifle': return g(<path d="M4 24 h26 l6 -3 h4 v4 h-10 l-4 5 h-6 l2 -5 h-18 z" fill="#b08858" stroke="#5a4028" />);

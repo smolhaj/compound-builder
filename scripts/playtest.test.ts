@@ -20,6 +20,7 @@ import { applyForPermit } from '../src/sim/paperwork';
 import { sweepChimney } from '../src/sim/upkeep';
 import { stockUpRx } from '../src/sim/body';
 import { buyAmmo, buyGun, takeClass, type Caliber } from '../src/sim/armory';
+import { buyLicense } from '../src/sim/wildfood';
 import { calendarOf } from '../src/sim/state';
 import { planRun } from '../src/sim/perimeter';
 import { orderFit, fitProblem, plant } from '../src/sim/utilities';
@@ -132,10 +133,12 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
       for (const [c, n] of Object.entries(ammo) as Array<[Caliber, number]>) buyAmmo(s, c, n);
       if (strat !== 'homestead') for (const p of s.people.filter(x => !x.kid)) takeClass(s, p.id);
       placeOrder(s, [{ material: 'gun_safe', qty: 1 }, { material: 'gun_cleaning', qty: 2 }]);
-      const gear: Partial<Record<MaterialId, number>> = strat === 'prepper' ? { driveway_alarm: 1, cameras: 1, dog: 1, ifak: 6, radios: 2, plate_carrier: 2, nvg: 1, water_filter: 2, water_jugs: 30, ibc_tote: 4 }
-        : strat === 'fortress' ? { water_filter: 1, water_jugs: 20, sandbags: 3, steel_door: 2, window_bars: 1, driveway_alarm: 1, dog: 2, plate_carrier: 4, ifak: 6, radios: 2 } : { driveway_alarm: 1, ifak: 2, water_filter: 1, water_jugs: 10 };
+      const gear: Partial<Record<MaterialId, number>> = strat === 'prepper' ? { driveway_alarm: 1, cameras: 1, dog: 1, ifak: 6, radios: 2, plate_carrier: 2, nvg: 1, water_filter: 2, water_jugs: 30, ibc_tote: 4, fishing_gear: 1, snares: 2, smoker: 1 }
+        : strat === 'fortress' ? { water_filter: 1, water_jugs: 20, sandbags: 3, steel_door: 2, window_bars: 1, driveway_alarm: 1, dog: 2, plate_carrier: 4, ifak: 6, radios: 2 } : { driveway_alarm: 1, ifak: 2, water_filter: 1, water_jugs: 10, fishing_gear: 1, snares: 1 };
       placeOrder(s, (Object.entries(gear) as Array<[MaterialId, number]>).map(([material, qty]) => ({ material, qty })));
     }
+    // the year's tags and licenses
+    if (strat !== 'idle' && calendarOf(s.clock).doy === 240) for (const l of ['deer', 'elk', 'fishing', 'small'] as const) buyLicense(s, l);
     // sweep the chimney each fall
     if (strat !== 'idle' && calendarOf(s.clock).doy === 260) sweepChimney(s);
     // wire and plumb the house once it can be; order what its repairs need
