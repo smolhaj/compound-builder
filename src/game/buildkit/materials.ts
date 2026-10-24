@@ -25,7 +25,9 @@ export type KitMaterialId = 'timber_lap' | 'trim' | 'fieldstone' | 'metal_roof' 
   'lap_white' | 'vinyl' | 'shingle' |
   'art_mountains' | 'art_sunset' | 'art_lake' | 'photo_family' | 'photo_couple' | 'poster_map' | 'poster_seeds' | 'sampler' | 'curtain' | 'curtain_red' | 'flowers'
   // greenhouse and orchard
-  | 'polycarb' | 'aluminum' | 'fruit';
+  | 'polycarb' | 'aluminum' | 'fruit'
+  // interior floors (greenhouse gravel + paver aisle, cottage boards, the garage's oil drips)
+  | 'gravel' | 'pavers' | 'floorboards' | 'oil_stain';
 
 /** World units covered by one texture repeat. */
 const TEX_WORLD: Partial<Record<KitMaterialId, number>> = {
@@ -34,6 +36,8 @@ const TEX_WORLD: Partial<Record<KitMaterialId, number>> = {
   pine_panel: 0.5, quilt_red: 0.12, quilt_blue: 0.12, rug: 0.3, books: 0.1,
   lap_white: 0.5, vinyl: 0.5, shingle: 0.5,
   concrete: 0.6, whitewash: 0.5, wet_concrete: 0.6, metal_siding: 0.5, container_red: 0.4, container_blue: 0.4, container_green: 0.4, container_tan: 0.4, log_wall: 0.5, board_batten: 0.5, wire_mesh: 0.15, straw: 0.3, soil: 0.4, earth: 0.8, pegboard: 0.2,
+  // 1 repeat: a 1.5 × 1.5 m patch of pea gravel; 2 × 2 pavers of 45 cm; 1.8 m of 13 cm floorboards
+  gravel: 0.25, pavers: 0.15, floorboards: 0.3,
 };
 
 function lcg(seed: number): () => number {
@@ -258,6 +262,60 @@ function paintConcrete(): HTMLCanvasElement {
   }
   g.strokeStyle = 'rgba(80,78,74,0.5)';
   for (let k = 0; k < 3; k++) { g.beginPath(); let x = r() * N, y = r() * N; g.moveTo(x, y); for (let i = 0; i < 6; i++) { x += (r() - 0.5) * 40; y += (r() - 0.3) * 30; g.lineTo(x, y); } g.stroke(); }
+  return c;
+}
+
+/** Pea gravel: rounded stones in buff, gray and rust, dark gaps between them. */
+function paintGravel(): HTMLCanvasElement {
+  const N = 256;
+  const [c, g] = canvas(N);
+  const r = lcg(57);
+  g.fillStyle = rgb(70, 64, 56); g.fillRect(0, 0, N, N);
+  const tones: Array<[number, number, number]> = [[176, 164, 142], [150, 146, 138], [190, 178, 156], [138, 112, 88], [118, 114, 108]];
+  for (let i = 0; i < 2200; i++) {
+    const [R, G, B] = tones[Math.floor(r() * tones.length)], t = 0.8 + r() * 0.35, x = r() * N, y = r() * N, rr = 2 + r() * 2.6;
+    g.fillStyle = rgb(R * t, G * t, B * t);
+    g.beginPath(); g.ellipse(x, y, rr, rr * (0.65 + r() * 0.35), r() * Math.PI, 0, Math.PI * 2); g.fill();
+    g.fillStyle = 'rgba(255,250,235,0.25)';
+    g.beginPath(); g.arc(x - rr * 0.3, y - rr * 0.3, rr * 0.35, 0, Math.PI * 2); g.fill();
+  }
+  return c;
+}
+
+/** Concrete pavers, 2 × 2 per repeat with sanded joints (joints at 0 and ½ so a path's edges land on them). */
+function paintPavers(): HTMLCanvasElement {
+  const N = 256, h = N / 2;
+  const [c, g] = canvas(N);
+  const r = lcg(63);
+  g.fillStyle = rgb(118, 110, 98); g.fillRect(0, 0, N, N);
+  for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) {
+    const t = 0.9 + r() * 0.18;
+    g.fillStyle = rgb(172 * t, 166 * t, 156 * t);
+    g.fillRect(i * h + 3, j * h + 3, h - 6, h - 6);
+    for (let k = 0; k < 160; k++) { g.fillStyle = `rgba(${r() < 0.5 ? '120,116,108' : '205,200,190'},${0.08 + r() * 0.14})`; g.fillRect(i * h + 3 + r() * (h - 10), j * h + 3 + r() * (h - 10), 2 + r() * 6, 2 + r() * 6); }
+    g.fillStyle = 'rgba(90,110,60,0.35)';   // moss in a corner
+    g.fillRect(i * h + 3, j * h + h - 8, 10 + r() * 20, 4);
+  }
+  return c;
+}
+
+/** Interior pine floorboards: narrow honey-colored boards, staggered end joints, grain. */
+function paintFloorboards(): HTMLCanvasElement {
+  const N = 256, n = 14, pw = N / n;
+  const [c, g] = canvas(N);
+  const r = lcg(77);
+  for (let i = 0; i < n; i++) {
+    const t = 0.82 + r() * 0.28;
+    g.fillStyle = rgb(176 * t, 128 * t, 78 * t);
+    g.fillRect(0, i * pw, N, pw);
+    for (let k = 0; k < 9; k++) { g.fillStyle = `rgba(110,70,36,${0.12 + r() * 0.2})`; g.fillRect(r() * N, i * pw + r() * pw, 40 + r() * 90, 1); }
+    g.fillStyle = 'rgba(48,30,16,0.85)';
+    g.fillRect(0, i * pw, N, 1.4);
+    const j = r() * N;
+    g.fillRect(j, i * pw, 1.4, pw);
+    if (r() < 0.6) g.fillRect((j + N / 2) % N, i * pw, 1.4, pw);
+    if (r() < 0.3) { g.fillStyle = 'rgba(70,40,20,0.6)'; g.beginPath(); g.ellipse(r() * N, i * pw + pw / 2, 3, 2, 0, 0, Math.PI * 2); g.fill(); }   // a knot
+  }
   return c;
 }
 
@@ -691,6 +749,11 @@ export function kitMaterial(id: KitMaterialId): THREE.MeshStandardMaterial {
     case 'polycarb': m = new THREE.MeshStandardMaterial({ color: 0xdfeef0, roughness: 0.25, metalness: 0.05, transparent: true, opacity: 0.32, depthWrite: false, side: THREE.DoubleSide }); break;
     case 'aluminum': m = new THREE.MeshStandardMaterial({ color: 0xc4c8cc, roughness: 0.35, metalness: 0.7 }); break;
     case 'fruit': m = new THREE.MeshStandardMaterial({ color: 0xc23a22, roughness: 0.45 }); break;
+    case 'gravel': m = texMat(id, paintGravel, 3.0, 0.95, 0, 1.3); break;
+    case 'pavers': m = texMat(id, paintPavers, 2.0, 0.9); break;
+    case 'floorboards': m = texMat(id, paintFloorboards, 1.4, 0.6); break;
+    // an oil drip on the slab: dark, a little sheen, laid just above the floor
+    case 'oil_stain': m = new THREE.MeshStandardMaterial({ color: 0x1d1a16, roughness: 0.3, metalness: 0.1, transparent: true, opacity: 0.55, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }); break;
     case 'hedge_berry': m = new THREE.MeshStandardMaterial({ color: 0xa3261e, roughness: 0.5 }); break;
     case 'container_red': case 'container_blue': case 'container_green': case 'container_tan': {
       const tint = { container_red: 0xb0473a, container_blue: 0x4a6f9a, container_green: 0x6f8f62, container_tan: 0xc7aa7c }[id];

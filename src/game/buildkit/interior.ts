@@ -36,6 +36,23 @@ const box = (w: number, h: number, d: number, x: number, y: number, z: number) =
 const cyl = (r: number, h: number, x: number, y: number, z: number, seg = 10) =>
   new THREE.CylinderGeometry(r, r, h, seg).translate(x, y + h / 2, z);
 
+type V3 = readonly [number, number, number];
+const _up = new THREE.Vector3(0, 1, 0);
+
+/** A straight pipe (cylinder) of radius r from a to b: plumbing runs, conduit, rails. */
+export function pipe(a: V3, b: V3, r: number, seg = 8): THREE.BufferGeometry {
+  const va = new THREE.Vector3(...a), d = new THREE.Vector3(...b).sub(va), len = d.length();
+  const g = new THREE.CylinderGeometry(r, r, Math.max(1e-5, len), seg, 1, true).translate(0, len / 2, 0);
+  if (len > 1e-6) g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(_up, d.normalize()));
+  return g.translate(va.x, va.y, va.z);
+}
+
+/** A thin flexible tube through points (hoses, drip lines, cords): few segments, 4 sides. */
+export function tube(pts: readonly V3[], r: number, segs = 6): THREE.BufferGeometry {
+  const curve = new THREE.CatmullRomCurve3(pts.map(p => new THREE.Vector3(...p)));
+  return new THREE.TubeGeometry(curve, segs, r, 4, false);
+}
+
 /**
  * Build a piece in its own frame with `fn(add)`, move it to `p`, send it to
  * the sink, and return its footprint (null if `solid` is false).
