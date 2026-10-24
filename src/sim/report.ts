@@ -110,7 +110,7 @@ export function reportCard(s: GameState): ReportCard {
   else if (!water) lines.push('No well, no cistern: water came by the bucket from the creek.');
   else if (st.dryDays > 7) lines.push(`${st.dryDays} days without enough water.`);
   // power
-  const solar = has('solar_array'), battery = has('battery_shed');
+  const solar = has('solar_array') || has('garage_solar'), battery = has('battery_shed');
   if (d.kind === 'grid_down' || d.kind === 'nuclear') {
     if (solar && !battery && s.utilities.grid) lines.push('The solar was grid-tied: when the grid died, so did the panels.');
     else if (st.darkDays === 0 && solar && battery) lines.push('The batteries kept the lights and the freezer on.');

@@ -222,7 +222,9 @@ export function buildRun(run: PerimeterRun, ground: Ground, t: number, under: (x
         const gy = ground(hx, hz) + 0.01;
         for (const [m, g] of parts) add(m, g.scale(mirror, 1, 1).rotateY(ang + mirror * open).translate(hx, gy, hz));
       };
-      if (wall) { leaf(p0.x, p0.z, g.w / 2 - 0.01, 1.3, 1); leaf(p1.x, p1.z, g.w / 2 - 0.01, -1.3, -1); }
+      // a narrow gate is a pedestrian man-door: one leaf, even in a wall; wide ones are a double vehicle gate
+      if (wall && g.w >= 0.35) { leaf(p0.x, p0.z, g.w / 2 - 0.01, 1.3, 1); leaf(p1.x, p1.z, g.w / 2 - 0.01, -1.3, -1); }
+      else if (wall) leaf(p0.x, p0.z, g.w - 0.01, 1.4, 1);
       else leaf(p0.x, p0.z, g.w * 0.96, 1.35, 1);
     }
   }

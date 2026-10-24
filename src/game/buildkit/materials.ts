@@ -23,7 +23,9 @@ export type KitMaterialId = 'timber_lap' | 'trim' | 'fieldstone' | 'metal_roof' 
   // homey decor (procedural art)
   | 'solar_cell' | 'poly_tank' | 'blue_tank' |
   'lap_white' | 'vinyl' | 'shingle' |
-  'art_mountains' | 'art_sunset' | 'art_lake' | 'photo_family' | 'photo_couple' | 'poster_map' | 'poster_seeds' | 'sampler' | 'curtain' | 'curtain_red' | 'flowers';
+  'art_mountains' | 'art_sunset' | 'art_lake' | 'photo_family' | 'photo_couple' | 'poster_map' | 'poster_seeds' | 'sampler' | 'curtain' | 'curtain_red' | 'flowers'
+  // greenhouse and orchard
+  | 'polycarb' | 'aluminum' | 'fruit';
 
 /** World units covered by one texture repeat. */
 const TEX_WORLD: Partial<Record<KitMaterialId, number>> = {
@@ -685,6 +687,10 @@ export function kitMaterial(id: KitMaterialId): THREE.MeshStandardMaterial {
     case 'flowers': m = new THREE.MeshStandardMaterial({ color: 0xe0a33a, roughness: 0.6, emissive: new THREE.Color(0.12, 0.06, 0) }); break;
     case 'hedge': m = texMat(id, paintLeaves([52, 84, 44], 131), 3.5, 0.9, 0, 1.6); break;
     case 'hedge2': m = texMat(id, paintLeaves([70, 96, 48], 137), 3.5, 0.9, 0, 1.6); break;
+    // twin-wall polycarbonate: milky, lets the light through, seen from both sides
+    case 'polycarb': m = new THREE.MeshStandardMaterial({ color: 0xdfeef0, roughness: 0.25, metalness: 0.05, transparent: true, opacity: 0.32, depthWrite: false, side: THREE.DoubleSide }); break;
+    case 'aluminum': m = new THREE.MeshStandardMaterial({ color: 0xc4c8cc, roughness: 0.35, metalness: 0.7 }); break;
+    case 'fruit': m = new THREE.MeshStandardMaterial({ color: 0xc23a22, roughness: 0.45 }); break;
     case 'hedge_berry': m = new THREE.MeshStandardMaterial({ color: 0xa3261e, roughness: 0.5 }); break;
     case 'container_red': case 'container_blue': case 'container_green': case 'container_tan': {
       const tint = { container_red: 0xb0473a, container_blue: 0x4a6f9a, container_green: 0x6f8f62, container_tan: 0xc7aa7c }[id];

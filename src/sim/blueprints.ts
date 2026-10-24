@@ -93,6 +93,30 @@ export const GARDEN_BLUEPRINT: Blueprint = {
   ],
 };
 
+/** A 12 × 24 ft hobby greenhouse kit on a gravel bed and a concrete curb: ≈ 60 person-hours, ≈ $5,600 of materials. */
+export const GREENHOUSE_BLUEPRINT: Blueprint = {
+  kind: 'greenhouse',
+  stages: [
+    { id: 'site', name: 'Square and level the bed (long side to the south)', hours: 4, materials: {} },
+    { id: 'foundation', name: 'Gravel bed and a concrete curb, anchors set', hours: 16, materials: { concrete: 2, fieldstone: 1 } },
+    { id: 'frame', name: 'Bolt up the aluminum frame', hours: 18, materials: { greenhouse_kit: 1 } },
+    { id: 'roof', name: 'Ridge, rafters and roof panels', hours: 10, materials: {} },
+    { id: 'finish', name: 'Wall panels, door, vents and the benches', hours: 12, materials: { lumber: 1 } },
+  ],
+};
+
+/** Twelve bare-root fruit trees on a grid, staked and guarded: ≈ 30 person-hours, ≈ $620. */
+export const ORCHARD_BLUEPRINT: Blueprint = {
+  kind: 'orchard',
+  stages: [
+    { id: 'site', name: 'Stake the rows (4 m apart)', hours: 3, materials: {} },
+    { id: 'foundation', name: 'Strip the sod, dig the planting holes', hours: 12, materials: {} },
+    { id: 'frame', name: 'Plant the trees', hours: 8, materials: { fruit_trees: 12 } },
+    { id: 'roof', name: 'Stakes and trunk guards', hours: 4, materials: { wire: 1 } },
+    { id: 'finish', name: 'Mulch rings and the first watering', hours: 3, materials: {} },
+  ],
+};
+
 /** A quarter-acre field plot: potatoes, dry beans and wheat, plowed by a neighbor's tractor or by hand. */
 export const FIELD_BLUEPRINT: Blueprint = {
   kind: 'field',
@@ -149,9 +173,37 @@ export const BARN_BLUEPRINT: Blueprint = {
     { id: 'finish', name: 'Board siding, big doors, stalls', hours: 180, materials: { lumber: 10, hardware: 6 } },
   ],
 };
+/** 6 × 8 m grandparents' cottage: ≈ 900 person-hours; ≈ $44k of materials (≈ $85k with a contractor). */
+export const COTTAGE_BLUEPRINT: Blueprint = {
+  kind: 'cottage',
+  stages: [
+    { id: 'site', name: 'Stake out & level the pad', hours: 30, materials: {} },
+    { id: 'foundation', name: 'Footings and a stem wall', hours: 80, materials: { concrete: 8 } },
+    { id: 'frame', name: 'Floor, stud walls and sheathing', hours: 330, materials: { lumber: 20 } },
+    { id: 'roof', name: 'Rafters and metal roof', hours: 160, materials: { lumber: 5, roofing: 8 } },
+    { id: 'finish', name: 'Lap siding, porch, windows, kitchen and bath', hours: 300, materials: { lumber: 7, hardware: 13, fixtures: 2, cable: 3 } },
+  ],
+};
+/** 9 × 12 m steel pole building kit on a slab: ≈ 250 person-hours; ≈ $28k. */
+const garageStages = (solar: boolean): StageDef[] => [
+  { id: 'site', name: 'Stake out & grade the pad', hours: 20, materials: {} },
+  { id: 'foundation', name: 'Pour the slab, set the posts', hours: 50, materials: { concrete: 16 } },
+  { id: 'frame', name: 'Steel posts, girts and trusses (kit)', hours: 90, materials: { lumber: 8, hardware: 2 } },
+  { id: 'roof', name: 'Corrugated roof and purlins', hours: 50, materials: { roofing: 12 } },
+  { id: 'finish', name: solar ? 'Wall panels, two roll-up doors, 20 panels on the roof' : 'Wall panels and two roll-up doors', hours: solar ? 80 : 40, materials: solar ? { roofing: 12, hardware: 4, solar_panel: 20, inverter: 1, cable: 2 } : { roofing: 12, hardware: 4 } },
+];
+export const METAL_GARAGE_BLUEPRINT: Blueprint = { kind: 'metal_garage', stages: garageStages(false) };
+export const GARAGE_SOLAR_BLUEPRINT: Blueprint = { kind: 'garage_solar', stages: garageStages(true) };
+
 /** Kinds people live in (a kitchen, a roof over the family). */
-export const HOMES: readonly string[] = ['timber_cabin', 'log_house', 'farmhouse', 'trailer'];
+export const HOMES: readonly string[] = ['timber_cabin', 'log_house', 'farmhouse', 'trailer', 'cottage'];
 export const isHome = (kind: string) => HOMES.includes(kind);
+/** People each home kind sleeps (matches the kit's `sleeps`). */
+export const HOME_BEDS: Record<string, number> = { timber_cabin: 4, log_house: 6, farmhouse: 6, trailer: 4, cottage: 3 };
+/** Beds under a finished roof on the place (shelter for the household and anyone taken in). */
+export function homeBeds(s: { structures: ReadonlyArray<{ kind: string; stage: number }> }): number {
+  return s.structures.reduce((a, st) => a + (BLUEPRINTS[st.kind] && st.stage >= BLUEPRINTS[st.kind].stages.length ? HOME_BEDS[st.kind] ?? 0 : 0), 0);
+}
 
 // ── Water & power (docs/DECISIONS.md: only through costed infrastructure) ──
 const bp = (kind: string, stages: Array<[StageId, string, number, Partial<Stock>]>): Blueprint => ({ kind, stages: stages.map(([id, name, hours, materials]) => ({ id, name, hours, materials })) });
@@ -161,6 +213,7 @@ export const UTILITY_BLUEPRINTS: Blueprint[] = [
   bp('well_drilled', [['site', 'Stake the bore', 2, {}], ['foundation', 'Drill the well (contractor, ≈ 60 m)', 8, { drilling: 1 }], ['frame', 'Pump-house frame', 16, { lumber: 2 }], ['roof', 'Roof', 4, { roofing: 1 }], ['finish', 'Pump, pressure tank and controls', 16, { pump: 1, hardware: 1 }]]),
   bp('cistern', [['site', 'Stake it out', 2, {}], ['foundation', 'Level a gravel pad', 10, { concrete: 1 }], ['frame', 'Set the tank', 6, { tank: 1 }], ['roof', 'Gutters and downspouts', 10, { pipe: 1, hardware: 1 }], ['finish', 'First-flush filter and overflow', 6, { hardware: 1 }]]),
   bp('water_tower', [['site', 'Stake it out', 4, {}], ['foundation', 'Footings', 40, { concrete: 3 }], ['frame', 'Timber stand', 140, { lumber: 8 }], ['roof', 'Hoist the tank', 24, { tank: 1 }], ['finish', 'Plumbing, ladder and the lookout deck', 50, { pipe: 2, lumber: 2 }]]),
+  bp('filtration_shed', [['site', 'Stake it out by the pressure tank', 1, {}], ['foundation', 'Gravel and a small slab', 4, { concrete: 1 }], ['frame', 'Frame the shed', 6, { lumber: 1 }], ['roof', 'Roof', 3, { roofing: 1 }], ['finish', 'Sediment and carbon filters, UV lamp, plumb it in', 6, { hardware: 2, pipe: 1 }]]),
   bp('solar_array', [['site', 'Stake the rows (facing south)', 4, {}], ['foundation', 'Post footings', 16, { concrete: 2 }], ['frame', 'Racking', 40, { lumber: 2, hardware: 2 }], ['roof', 'Mount 12 panels', 24, { solar_panel: 12 }], ['finish', 'Combiner box and conduit', 16, { cable: 1, hardware: 1 }]]),
   bp('battery_shed', [['site', 'Stake it out', 2, {}], ['foundation', 'Slab', 10, { concrete: 1 }], ['frame', 'Frame and insulate', 20, { lumber: 3 }], ['roof', 'Roof', 6, { roofing: 1 }], ['finish', 'Batteries, inverter, charge controller', 16, { battery: 4, inverter: 1, cable: 1 }]]),
   bp('generator_shed', [['site', 'Stake it out', 2, {}], ['foundation', 'Slab', 8, { concrete: 1 }], ['frame', 'Lean-to frame', 12, { lumber: 2 }], ['roof', 'Roof', 4, { roofing: 1 }], ['finish', 'Generator, transfer switch, fuel rack', 8, { generator: 1, hardware: 1, fuel: 4 }]]),
@@ -203,7 +256,7 @@ export const BUNKER_BLUEPRINTS: Blueprint[] = [
 ];
 
 export const BLUEPRINTS: Record<string, Blueprint> = Object.fromEntries(
-  [CABIN_BLUEPRINT, OUTHOUSE_BLUEPRINT, WORKSHOP_BLUEPRINT, ROOT_CELLAR_BLUEPRINT, COOP_BLUEPRINT, GARDEN_BLUEPRINT, FIELD_BLUEPRINT, LOG_HOUSE_BLUEPRINT, FARMHOUSE_BLUEPRINT, TRAILER_BLUEPRINT, BARN_BLUEPRINT, ...UTILITY_BLUEPRINTS, ...BUNKER_BLUEPRINTS].map(b => [b.kind, b]));
+  [CABIN_BLUEPRINT, OUTHOUSE_BLUEPRINT, WORKSHOP_BLUEPRINT, ROOT_CELLAR_BLUEPRINT, COOP_BLUEPRINT, GARDEN_BLUEPRINT, FIELD_BLUEPRINT, GREENHOUSE_BLUEPRINT, ORCHARD_BLUEPRINT, LOG_HOUSE_BLUEPRINT, FARMHOUSE_BLUEPRINT, TRAILER_BLUEPRINT, BARN_BLUEPRINT, COTTAGE_BLUEPRINT, METAL_GARAGE_BLUEPRINT, GARAGE_SOLAR_BLUEPRINT, ...UTILITY_BLUEPRINTS, ...BUNKER_BLUEPRINTS].map(b => [b.kind, b]));
 
 /** Total bill of materials for a blueprint. */
 export function totalBill(bp: Blueprint): Partial<Stock> {

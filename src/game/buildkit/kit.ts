@@ -101,6 +101,22 @@ export const FIELD: KitPieceDef = {
   maxSlope: 0.25, floorY: 0.0, porch: 0, sleeps: 0, light: null,
 };
 
+export const GREENHOUSE: KitPieceDef = {
+  id: 'greenhouse', name: 'Greenhouse', category: 'food',
+  blurb: '12 × 24 ft aluminum and polycarbonate greenhouse with benches of seedling trays: the garden six weeks earlier and later, greens all winter.',
+  cellsX: 2, cellsZ: 3, frontCells: 0,
+  parts: { foundation: 'concrete', walls: 'glass', roof: 'glass' },
+  maxSlope: 0.2, floorY: 0.0, porch: 0, sleeps: 0, light: null,
+};
+
+export const ORCHARD: KitPieceDef = {
+  id: 'orchard', name: 'Orchard', category: 'food',
+  blurb: 'Twelve apple, peach and pear trees on a grid. No fruit for three years; from the sixth, about 1,800 lb a year.',
+  cellsX: 5, cellsZ: 5, frontCells: 0,
+  parts: { foundation: 'fieldstone', walls: 'board_batten', roof: 'metal_roof' },
+  maxSlope: 0.35, floorY: 0.0, porch: 0, sleeps: 0, light: null,
+};
+
 export const LOG_HOUSE: KitPieceDef = {
   id: 'log_house', name: 'Log house', category: 'home',
   blurb: '9 × 15 m house of your own logs: great room with a glass gable and stone fireplace, bath, three bedrooms.',
@@ -132,6 +148,27 @@ export const BARN: KitPieceDef = {
   maxSlope: 0.25, floorY: 0.03, porch: 0, sleeps: 0, light: [0, 0.4, 0],
 };
 
+/** A grandparents' / guest cottage: 6 × 8 m on a 2 × 3-cell lot (the porch takes the front cell). */
+export const COTTAGE: KitPieceDef = {
+  id: 'cottage', name: 'Cottage', category: 'home',
+  blurb: 'A one-storey 6 × 8 m cottage for the grandparents or a family taken in: lap siding, metal roof, a small porch. Sleeps 3.',
+  cellsX: 2, cellsZ: 3, frontCells: 1,
+  parts: { foundation: 'concrete', walls: 'timber_lap', roof: 'metal_roof' },
+  maxSlope: 0.3, floorY: 0.08, porch: 0.28, sleeps: 3, light: [0, 0.3, -0.1],
+};
+/** A 9 × 12 m steel pole building with two roll-up doors (the trucks); `garage_solar` carries 8 kW on the roof. */
+export const METAL_GARAGE: KitPieceDef = {
+  id: 'metal_garage', name: 'Metal garage', category: 'work',
+  blurb: '9 × 12 m steel pole building on a slab: corrugated walls and roof, two roll-up doors for the trucks.',
+  cellsX: 3, cellsZ: 4, frontCells: 1,
+  parts: { foundation: 'concrete', walls: 'metal_siding', roof: 'metal_roof' },
+  maxSlope: 0.25, floorY: 0.03, porch: 0, sleeps: 0, light: [0, 0.4, 0],
+};
+export const GARAGE_SOLAR: KitPieceDef = {
+  ...METAL_GARAGE, id: 'garage_solar', name: 'Metal garage with solar roof', category: 'power',
+  blurb: 'The same 9 × 12 m steel garage with 20 × 400 W panels on its south roof: ≈ 8 kW, about 29 kWh a summer day.',
+};
+
 const DEEP = new Set(['well_hand', 'well_drilled', 'septic']);
 const util = (id: string, name: string, category: 'water' | 'power' | 'sanitation', cx: number, cz: number, blurb: string, light: [number, number, number] | null = null): KitPieceDef => ({
   id, name, category, blurb, cellsX: cx, cellsZ: cz, frontCells: 0, parts: { foundation: 'concrete', walls: 'board_batten', roof: 'metal_roof' }, maxSlope: 0.35, floorY: 0.02, porch: 0, sleeps: 0, light,
@@ -145,6 +182,7 @@ export const UTILITY_KIT: KitPieceDef[] = [
   util('solar_array', 'Solar array', 'power', 3, 2, '12 × 400 W panels on ground racks: ≈ 12 kWh a summer day, 6 in December.'),
   util('battery_shed', 'Battery & inverter shed', 'power', 1, 1, '20 kWh of batteries, an inverter and charge controller: power through the night.', [0, 0.28, 0]),
   util('generator_shed', 'Generator shed', 'power', 1, 1, 'A 7 kW generator and fuel rack. Backup for dark weeks; burns ≈ 0.45 L a kWh.', [0, 0.28, 0]),
+  util('filtration_shed', 'Water filtration shed', 'water', 1, 1, 'A 1.8 × 2.4 m shed by the pressure tank: sediment and carbon filters and a UV lamp. Well, rain and creek water treated for the house.', [0, 0.25, 0]),
   util('septic', 'Septic system', 'sanitation', 2, 2, 'Septic tank and leach field. Lets plumbed houses have flush toilets.'),
 ];
 
@@ -169,11 +207,11 @@ export const BUNKER_KIT: KitPieceDef[] = [
 /** Underground menu order. */
 export const BUNKER_ORDER: readonly string[] = BUNKER_KIT.map(d => d.id);
 
-export const KIT: Record<string, KitPieceDef> = Object.fromEntries([TIMBER_CABIN, LOG_HOUSE, FARMHOUSE, TRAILER, BARN, OUTHOUSE, WORKSHOP, ROOT_CELLAR, CHICKEN_COOP, GARDEN, FIELD, ...UTILITY_KIT, ...BUNKER_KIT].map(d => [d.id, d]));
+export const KIT: Record<string, KitPieceDef> = Object.fromEntries([TIMBER_CABIN, LOG_HOUSE, FARMHOUSE, TRAILER, BARN, COTTAGE, METAL_GARAGE, GARAGE_SOLAR, OUTHOUSE, WORKSHOP, ROOT_CELLAR, CHICKEN_COOP, GARDEN, FIELD, GREENHOUSE, ORCHARD, ...UTILITY_KIT, ...BUNKER_KIT].map(d => [d.id, d]));
 /** Build-menu order. */
-export const KIT_ORDER: readonly string[] = ['timber_cabin', 'log_house', 'outhouse', 'garden', 'field', 'chicken_coop', 'root_cellar', 'workshop', 'barn'];
+export const KIT_ORDER: readonly string[] = ['timber_cabin', 'log_house', 'cottage', 'outhouse', 'garden', 'greenhouse', 'orchard', 'field', 'chicken_coop', 'root_cellar', 'workshop', 'metal_garage', 'barn'];
 /** Water & power menu order. */
-export const UTILITY_ORDER: readonly string[] = ['well_hand', 'well_drilled', 'cistern', 'water_tower', 'septic', 'solar_array', 'battery_shed', 'generator_shed'];
+export const UTILITY_ORDER: readonly string[] = ['well_hand', 'well_drilled', 'cistern', 'water_tower', 'filtration_shed', 'septic', 'solar_array', 'garage_solar', 'battery_shed', 'generator_shed'];
 
 /** A placed structure (the game state record). */
 export interface Placed {

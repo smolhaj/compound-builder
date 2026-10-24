@@ -33,6 +33,8 @@ function offParcel(pts: readonly Pt[]): number {
 }
 /** Gate width: a truck fits (≈ 3.6 m). */
 export const GATE_W = 0.6;
+/** A pedestrian (man-door) gate: ≈ 1.2 m. */
+export const PED_GATE_W = 0.2;
 
 export class PerimeterTool {
   private readonly _ray = new THREE.Raycaster();
@@ -75,7 +77,7 @@ export class PerimeterTool {
       const now = performance.now();
       if (now - this._lastClick < 320 && this._pts.length >= 2) { this.finish(); return; }
       this._lastClick = now;
-      if (e.shiftKey && this._kind !== 'escape_tunnel') this.addGateAt(p[0], p[1]);
+      if (e.shiftKey && this._kind !== 'escape_tunnel') this.addGateAt(p[0], p[1], e.altKey || e.ctrlKey ? PED_GATE_W : GATE_W);
       else this.addPoint(p[0], p[1]);
     });
     on(window, 'keydown', e => {
@@ -125,14 +127,14 @@ export class PerimeterTool {
   }
 
   /** Leave a gate where the line passes nearest (x, z). */
-  addGateAt(x: number, z: number): void {
+  addGateAt(x: number, z: number, w = GATE_W): void {
     if (this._pts.length < 2) return;
     const { d, s } = closestOnLine(this._pts, x, z);
     if (d > 0.6) return;
     const L = this._len();
-    const at = Math.min(L - GATE_W / 2, Math.max(GATE_W / 2, s));
-    if (this._gates.some(g => Math.abs(g.at - at) < GATE_W)) return;
-    this._gates.push({ at, w: GATE_W });
+    const at = Math.min(L - w / 2, Math.max(w / 2, s));
+    if (this._gates.some(g => Math.abs(g.at - at) < (g.w + w) / 2 + 0.02)) return;
+    this._gates.push({ at, w });
     this._redraw();
   }
 

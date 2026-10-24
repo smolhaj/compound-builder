@@ -33,6 +33,7 @@ import { buildTunnel } from './perimeter/tunnelGeometry';
 import { SHAFT_HALF, stairProfile } from './buildkit/bunkerBuildings';
 import { buildExcavator, drapeSoil, spoilHeap } from './props/digSite';
 import { kitMaterial } from './buildkit/materials';
+import { orchardBearing, orchardFrost, ORCHARD_PICK } from '../sim/greenhouse';
 import { buildLayers, type Seat } from './buildkit/buildings';
 import { hashStr } from './buildkit/clutter';
 import { buildRun, solidSpans } from './perimeter/perimeterGeometry';
@@ -1159,7 +1160,20 @@ export class HomesteadWorld {
     this.family.update(dt, game.people, game.personState, hour, game.clock.t, ctx, this.walkHeight, season, speedK);
     // crops stand in the ground from planting (mid-May) to the last of the harvest (late October); bare soil the rest of the year
     const doy = calendarOf(game.clock).doy, [c0, c1] = seasons(REGIONS[game.site.region]).crops, growing = doy >= c0 && doy < c1;
+    // the orchard: leaves from blossom to a month past the first frost, fruit in late summer once the trees bear (and no late frost took it)
+    const [fr0, fr1] = REGIONS[game.site.region].frost, cal = calendarOf(game.clock);
+    const leafy = doy >= fr0 - 15 && doy < fr1 + 25, picking = doy >= ORCHARD_PICK[0] - 25 && doy < ORCHARD_PICK[1] && !orchardFrost(game.seed, cal.year);
     for (const b of this._built.values()) {
+      if (b.placed.kind === 'orchard') {
+        const st = game.structures.find(x => x.id === b.placed.id);
+        const fruit = picking && b.finished && orchardBearing((game.clock.t - (st?.finishedAt ?? game.clock.t)) / 365) > 0;
+        for (const o of b.group.children) {
+          const name = ((o as THREE.Mesh).userData.baseMat as THREE.Material | undefined)?.name ?? ((o as THREE.Mesh).material as THREE.Material | undefined)?.name;
+          if (o.userData.layer === 'interior' && (name === 'kit_hedge' || name === 'kit_hedge2')) o.visible = leafy && b.finished;
+          if (o.userData.layer === 'decor') o.visible = fruit && leafy;
+        }
+        continue;
+      }
       if (b.placed.kind !== 'garden' && b.placed.kind !== 'field') continue;
       for (const o of b.group.children) {
         const name = ((o as THREE.Mesh).userData.baseMat as THREE.Material | undefined)?.name ?? ((o as THREE.Mesh).material as THREE.Material | undefined)?.name;
