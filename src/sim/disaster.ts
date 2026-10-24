@@ -232,7 +232,8 @@ const PEACE_NEWS = [
  * follow-ons rolled at the hit, and headlines for the ticker. Returns lines for the log.
  */
 export function updateDisaster(d: DisasterState, t: number, seed: number): string[] {
-  const day = Math.floor(t);
+  // days turn at midnight (game time 0 is 6 a.m.; same as state.dayIndex)
+  const day = Math.floor(t + 0.25);
   if (day === d.day) return [];
   d.day = day;
   const out: string[] = [];
@@ -255,7 +256,7 @@ export function updateDisaster(d: DisasterState, t: number, seed: number): strin
     }
   } else if (d.phase === 'impact' && t >= d.hitAt + 3) d.phase = 'survival';
   // chained follow-ons announce themselves when they hit
-  for (const c of d.chained) if (day === Math.floor(c.hitAt)) { const cd = DISASTERS[c.kind]; if (cd) { const line = cd.hit[0]; say(line, 3); out.push(line); } }
+  for (const c of d.chained) if (day === Math.floor(c.hitAt + 0.25)) { const cd = DISASTERS[c.kind]; if (cd) { const line = cd.hit[0]; say(line, 3); out.push(line); } }
   // headlines
   if (d.phase === 'warning' && def) {
     const w = tension(d, t), stage = w < 0.4 ? 0 : w < 0.8 ? 1 : 2;

@@ -3,6 +3,7 @@ import { GameCanvas } from './game/GameCanvas';
 import { Hud } from './ui/Hud';
 import { SetupScreen } from './ui/SetupScreen';
 import { Ticker } from './ui/Ticker';
+import { GateCard } from './ui/GateCard';
 import { useGameStore } from './store/gameStore';
 import { useWorldStore } from './store/worldStore';
 import { loadGame, AUTOSAVE } from './sim/save/saveSystem';
@@ -33,6 +34,7 @@ export default function App() {
       <GameCanvas />
       <Hud />
       {!clean && <Ticker />}
+      {!clean && <GateCard />}
       {setup && !clean && <SetupScreen />}
     </>
   );

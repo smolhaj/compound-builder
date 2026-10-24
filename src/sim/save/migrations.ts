@@ -7,6 +7,7 @@ import { SAVE_VERSION, type GameState } from '../state';
 import { emptyUtilities } from '../utilities';
 import { newDisaster } from '../disaster';
 import { freshNeeds } from '../needs';
+import { generateNeighbors, newGate } from '../encounters';
 import { dayJob, type Person } from '../family';
 
 type Raw = Record<string, unknown> & { version?: number };
@@ -31,6 +32,8 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   // 6 → 7: the escape tunnel (culvert, egress hatch)
   6: s => ({ ...s, version: 7, stock: { culvert: 0, egress_hatch: 0, ...(s.stock as object) } }),
   // 7 → 8: bunker hardening (lead, Faraday mesh, blast valves, HEPA sets; the retrofit job list)
+  // 11 → 12: neighbors and the gate
+  11: s => ({ ...s, version: 12, neighbors: generateNeighbors(s.seed as number), gate: newGate(s.seed as number) }),
   // 10 → 11: food in the stockpile, each person's needs, yesterday's eating
   10: s => ({ ...s, version: 11, stock: { fresh: 0, frozen: 0, canned: 0, staples: 0, meds: 0, ...(s.stock as object) }, personState: (s.personState as Array<Record<string, unknown>>).map(ps => ({ needs: freshNeeds(), ...ps })), food: { needKcal: 0, ateKcal: 0, producedKcal: 0, spoiledKcal: 0, fromStores: true, kinds: [], daysLeft: 0 } }),
   // 9 → 10: the county grid (old saves stay off it), breakers, who had power, the bill in the report
@@ -54,7 +57,7 @@ export function migrate(raw: unknown): GameState {
     if (!up) throw new SaveVersionError(`No migration from version ${s.version}`);
     s = up(s);
   }
-  for (const k of ['seed', 'clock', 'money', 'stock', 'orders', 'people', 'personState', 'structures', 'forestry', 'heat', 'perimeter', 'utilities', 'hardenJobs', 'disaster', 'food', 'log', 'nextId'] as const) {
+  for (const k of ['seed', 'clock', 'money', 'stock', 'orders', 'people', 'personState', 'structures', 'forestry', 'heat', 'perimeter', 'utilities', 'hardenJobs', 'disaster', 'food', 'neighbors', 'gate', 'log', 'nextId'] as const) {
     if (!(k in s)) throw new SaveVersionError(`Save is missing "${k}"`);
   }
   return s as unknown as GameState;

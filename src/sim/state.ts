@@ -11,9 +11,10 @@ import type { PerimeterRun } from './perimeter';
 import { emptyUtilities, type Utilities } from './utilities';
 
 import type { HardenId, HardenJob, Tier } from './hardening';
+import { generateNeighbors, newGate, type GateState, type Neighbor } from './encounters';
 import { freshNeeds, type FoodReport, type Needs } from './needs';
 import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
-export const SAVE_VERSION = 11;
+export const SAVE_VERSION = 12;
 
 /** Starting savings (GDS §1 peacetime money constraint). */
 export const STARTING_MONEY = 30000;
@@ -129,6 +130,10 @@ export interface GameState {
   utilities: Utilities;
   /** Bunker hardening retrofits, ordered and in progress. */
   hardenJobs: HardenJob[];
+  /** The households round the place. */
+  neighbors: Neighbor[];
+  /** Who comes to the gate: the pending encounter, the last result, humanity and tallies. */
+  gate: GateState;
   /** Yesterday's eating (HUD). */
   food: FoodReport;
   /** The collapse clock: mode, the disaster to come, the outside world's services, the news ticker. */
@@ -150,6 +155,8 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     clock: { t: 0, ticks: 0, startDoy, startYear, speed: 1 },
     money: STARTING_MONEY,
     stock: { ...emptyStock(), firewood: STARTING_FIREWOOD, canned: 2 },
+    neighbors: generateNeighbors(seed),
+    gate: newGate(seed),
     food: { needKcal: 0, ateKcal: 0, producedKcal: 0, spoiledKcal: 0, fromStores: true, kinds: [], daysLeft: 0 },
     orders: [],
     people,

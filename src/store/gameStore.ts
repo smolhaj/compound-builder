@@ -11,6 +11,7 @@ import { fitProblem, orderFit, plant, repairPump } from '../sim/utilities';
 /** Reconnection fee to get back on the grid after leaving it. */
 const GRID_RECONNECT = 250;
 import { triggerDisaster, type DisasterKind } from '../sim/disaster';
+import { resolve, type Stance } from '../sim/encounters';
 import { log } from '../sim/economy';
 import { hardenProblem, orderHarden, orderHardenAll, tierOf, type HardenId } from '../sim/hardening';
 import { saveGame, AUTOSAVE } from '../sim/save/saveSystem';
@@ -44,6 +45,9 @@ export interface GameStore {
   setTool: (kind: string | null) => void;
   setToolProblem: (t: string | null) => void;
   select: (id: string | null) => void;
+  /** Answer whoever is at the gate. */
+  answer: (stance: Stance) => void;
+  dismissCard: () => void;
   /** Leave the county grid, or get back on it (a reconnection fee). */
   setGrid: (on: boolean) => void;
   /** A building's breaker. */
@@ -69,9 +73,11 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
   selected: null,
   tick: (realDt) => {
     const g = get().game;
-    if (g.clock.speed === 0) return;
+    if (g.clock.speed === 0 || g.gate.pending) return;
     const days = Math.min(realDt, MAX_DT) / SECONDS_PER_DAY[g.clock.speed];
     const next = step(g, days);
+    // someone at the gate: stop the clock until the player decides
+    if (next.gate.pending && !g.gate.pending) next.clock = { ...next.clock, speed: 0 };
     set({ game: next });
     if (dayIndex(next.clock.t) !== dayIndex(g.clock.t)) void saveGame(AUTOSAVE, next);
   },
@@ -131,6 +137,17 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
   setTool: (tool) => set({ tool, toolProblem: null }),
   setToolProblem: (toolProblem) => set({ toolProblem }),
   select: (selected) => set({ selected }),
+  answer: (stance) => {
+    const g = structuredClone(get().game);
+    resolve(g, stance);
+    set({ game: g });
+    void saveGame(AUTOSAVE, g);
+  },
+  dismissCard: () => {
+    const g = structuredClone(get().game);
+    g.gate.card = null;
+    set({ game: g });
+  },
   setGrid: (on) => {
     const g = structuredClone(get().game);
     if (g.utilities.grid === on) return;

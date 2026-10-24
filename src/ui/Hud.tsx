@@ -16,6 +16,7 @@ import { DISASTERS, TRACKS, TRACK_NAME, type DisasterKind } from '../sim/disaste
 import { prices } from '../sim/economy';
 import { LIVING_PER_DAY } from '../sim/engine';
 import { daysOfFood } from '../sim/needs';
+import { NEIGHBOR_BLURB } from '../sim/encounters';
 import { HARDEN, HARDEN_IDS, type TierDef, hardenCost, hardenProblem, isBunkerRoom, protectionOf, tierOf } from '../sim/hardening';
 import { PERIMETER, PERIMETER_ORDER, UTILITY_LINES, runBill, runHours, runFinished, runProgress, runBlocked, runGrowth } from '../sim/perimeter';
 
@@ -308,6 +309,14 @@ export function Hud() {
           </Section>
         )}
         {game.disaster.mode === 'sandbox' && !game.disaster.kind && <FreeBuild />}
+        {game.disaster.kind && game.clock.t >= game.disaster.warnAt && <Section title="Neighbors">
+          {game.neighbors.map(n => (
+            <div key={n.id} title={NEIGHBOR_BLURB[n.kind]} style={{ display: 'flex', justifyContent: 'space-between', gap: 6, fontSize: 12 }}>
+              <span>{n.name[0].toUpperCase() + n.name.slice(1)}{n.radio ? <span style={{ opacity: 0.6 }}> · radio</span> : null}</span>
+              <span style={{ color: n.disposition > 50 ? '#a8d080' : n.disposition < -20 ? '#f08070' : '#ccc', opacity: 0.85 }}>{n.status !== 'home' ? n.status : n.disposition > 50 ? 'allies' : n.disposition > 15 ? 'friendly' : n.disposition < -20 ? 'hostile' : 'wary'}</span>
+            </div>))}
+          {game.clock.t >= game.disaster.hitAt && <div style={{ fontSize: 11.5, opacity: 0.7, marginTop: 3 }}>Humanity {Math.round(game.gate.humanity)} · took in {game.gate.tookIn} · turned away {game.gate.turnedAway}</div>}
+        </Section>}
         <Section title="Pantry">
           {(() => {
             const f = game.food, d = daysOfFood(game);
