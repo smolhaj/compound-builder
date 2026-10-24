@@ -17,7 +17,7 @@ export type KitMaterialId = 'timber_lap' | 'trim' | 'fieldstone' | 'metal_roof' 
   // interior finishes and furnishings
   | 'pine_panel' | 'wood_dark' | 'wood_mid' | 'iron' | 'enamel' | 'quilt_red' | 'quilt_blue' | 'linen' | 'rug' | 'books' | 'lamp' | 'cutcap' | 'crockery'
   // more buildings
-  | 'concrete' | 'metal_siding' | 'log_wall' | 'log_end' | 'board_batten' | 'wire_mesh' | 'straw' | 'soil' | 'crop' | 'earth' | 'pegboard' | 'steel' | 'paint_red' | 'paint_green' | 'paint_yellow' | 'paint_bunker' | 'paint_dado' | 'bulkhead' | 'glow' | 'whitewash' | 'wet_concrete' | 'bulb'
+  | 'concrete' | 'metal_siding' | 'log_wall' | 'log_end' | 'board_batten' | 'wire_mesh' | 'straw' | 'soil' | 'crop' | 'earth' | 'pegboard' | 'steel' | 'paint_red' | 'paint_green' | 'paint_yellow' | 'paint_bunker' | 'paint_dado' | 'bulkhead' | 'glow' | 'whitewash' | 'wet_concrete' | 'bulb' | 'copper' | 'lead' | 'rubber' | 'gauge'
   // perimeter
   | 'hedge' | 'hedge2' | 'hedge_berry' | 'container_red' | 'container_blue' | 'container_green' | 'container_tan'
   // homey decor (procedural art)
@@ -598,6 +598,10 @@ export function kitMaterial(id: KitMaterialId): THREE.MeshStandardMaterial {
     case 'pegboard': m = texMat(id, paintPegboard, 1, 0.8); break;
     case 'crop': m = new THREE.MeshStandardMaterial({ color: 0x4f8a34, roughness: 0.85 }); break;
     case 'steel': m = new THREE.MeshStandardMaterial({ color: 0x7c8186, roughness: 0.4, metalness: 0.75 }); break;
+    case 'copper': m = new THREE.MeshStandardMaterial({ color: 0xb8734a, roughness: 0.35, metalness: 0.85 }); break;
+    case 'lead': m = new THREE.MeshStandardMaterial({ color: 0x4f5659, roughness: 0.55, metalness: 0.5 }); break;
+    case 'rubber': m = new THREE.MeshStandardMaterial({ color: 0x1c1c1e, roughness: 0.9 }); break;
+    case 'gauge': m = new THREE.MeshStandardMaterial({ color: 0xeeeadc, roughness: 0.4, emissive: new THREE.Color(0.05, 0.05, 0.04) }); break;
     case 'paint_red': m = new THREE.MeshStandardMaterial({ color: 0x9c2f26, roughness: 0.6 }); break;
     case 'whitewash': m = texMat(id, paintWhitewash, 1.0, 0.9); break;
     // damp poured floor: darker, a little shine where the light catches the wet

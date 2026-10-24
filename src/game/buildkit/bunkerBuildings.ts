@@ -226,6 +226,78 @@ function vault(def: KitPieceDef, seed: number, opts: BuildOpts, spec: VaultSpec,
     }
   };
   for (const side of ['front', 'back', 'left', 'right'] as Side[]) if (doors[side] !== undefined) placed.push(doorZone(side, doors[side]!));
+  // ── hardening (sim/hardening): what each upgrade tier puts in the room ──
+  const hz = opts.harden ?? {};
+  const fo = hz.fallout ?? 0, fa = hz.faraday ?? 0, nb = hz.nbc ?? 0, bl = hz.blast ?? 0;
+  if (!spec.custom) {
+    for (const side of ['front', 'back', 'left', 'right'] as Side[]) {
+      const at = doors[side];
+      if (at === undefined) continue;
+      const alongX = side === 'front' || side === 'back';
+      const sgn = side === 'front' || side === 'right' ? 1 : -1;
+      const face = alongX ? sgn * (hd - T) : sgn * (hw - T);
+      const jamb = (dx: number, w: number, y: number, h: number, dep: number, m: KitMaterialId) =>
+        p.add(m, alongX ? box(w, h, dep, at + dx, y, face - sgn * dep / 2) : box(dep, h, w, face - sgn * dep / 2, y, at + dx), 'openings');
+      // blast hardening: a blast door hung in every doorway (entrances have theirs already)
+      if (bl >= 1 && !spec.blastDoors && !opts.blast?.includes(side)) {
+        const hinge = at - DOOR_W / 2;
+        if (alongX) doorLeaf(p, hinge, face, false, -sgn, true);
+        else doorLeaf(p, face, hinge, true, -sgn, true);
+      }
+      // fallout shielding: deep concrete reveals (the shielding wall is thicker round the opening)
+      if (fo >= 2) {
+        const dep = (fo >= 3 ? 0.22 : 0.14) * M, w = 0.12 * M;
+        for (const e of [-1, 1]) jamb(e * (DOOR_W / 2 + w / 2 + 0.008), w, 0, DOOR_H + 0.1 * M, dep, 'concrete');
+        jamb(0, DOOR_W + 2 * w + 0.016, DOOR_H, 0.1 * M, dep, 'concrete');
+      }
+      // Faraday cage: a black rubber gasket round the door frame
+      if (fa >= 2) {
+        const g = 0.03 * M;
+        for (const e of [-1, 1]) jamb(e * (DOOR_W / 2 + 0.006 + g / 2 + 0.004), g, 0, DOOR_H + 0.03 * M, 0.02 * M, 'rubber');
+        jamb(0, DOOR_W + 0.04 * M, DOOR_H + 0.012, g, 0.02 * M, 'rubber');
+      }
+    }
+    // a run of thin band along the inner faces, broken at the doorways
+    const band = (m: KitMaterialId, y0: number, h: number, t: number, inset: number, layers: BuildLayer[]) => {
+      for (const layer of layers) {
+        const cut = layer === 'cutwalls' ? CUT_H : undefined;
+        if (cut !== undefined && y0 >= cut) continue;
+        const o = (side: Side) => ops(side).map(q => ({ ...q, at: q.at - T, w: q.w + (fo >= 2 ? 0.3 * M : 0) }));
+        wallRun(p.sink, layer, m, { ax: -hw + T, az: hd - inset, bx: hw - T, bz: hd - inset, y0, h, t, cut, openings: o('front') });
+        wallRun(p.sink, layer, m, { ax: -hw + T, az: -hd + inset, bx: hw - T, bz: -hd + inset, y0, h, t, cut, openings: o('back') });
+        wallRun(p.sink, layer, m, { ax: -hw + inset, az: -hd + T, bx: -hw + inset, bz: hd - T, y0, h, t, cut, openings: o('left') });
+        wallRun(p.sink, layer, m, { ax: hw - inset, az: -hd + T, bx: hw - inset, bz: hd - T, y0, h, t, cut, openings: o('right') });
+      }
+    };
+    // fallout, military: lead sheet lining bolted over the walls
+    if (fo >= 3) {
+      band('lead', 0.15 * M, H - 0.35 * M, 0.008, T + 0.006, ['walls', 'cutwalls']);
+      // the sheets' lapped seams, and a top rail they hang from
+      const ys = 0.15 * M, yh = H - 0.35 * M, gap = 1.0 * M, d = T + 0.014;
+      const skip = (side: Side, t: number) => { const at = doors[side]; return at !== undefined && Math.abs(t - at) < DOOR_W / 2 + 0.3 * M; };
+      for (let x = L + gap; x < R - 0.02; x += gap) for (const [side, z] of [['back', -hd + d], ['front', hd - d]] as Array<[Side, number]>) if (!skip(side, x)) p.add('steel', box(0.03 * M, yh, 0.006, x, ys, z), 'walls');
+      for (let z = B + gap; z < F - 0.02; z += gap) for (const [side, x] of [['left', -hw + d], ['right', hw - d]] as Array<[Side, number]>) if (!skip(side, z)) p.add('steel', box(0.006, yh, 0.03 * M, x, ys, z), 'walls');
+      band('steel', ys + yh, 0.04 * M, 0.01, T + 0.012, ['walls']);
+    }
+    // Faraday cage: a copper bonding strap round the room, mesh showing at the ceiling seams (welded shell)
+    if (fa >= 1) band('copper', 0.3 * M, 0.05 * M, 0.004, T + (fo >= 3 ? 0.012 : 0.004), ['walls', 'cutwalls']);
+    if (fa >= 3) band('wire_mesh', H - 0.14 * M, 0.12 * M, 0.004, T + 0.004, ['walls']);
+    // blast: steel I-beams under the reinforced roof slab; posts at the long walls (hardened shell)
+    if (bl >= 2) {
+      const n = Math.max(2, Math.round((F - B) / 0.35));
+      for (let i = 1; i < n; i++) {
+        const z = B + (F - B) * i / n;
+        p.add('steel', box(R - L, 0.14 * M, 0.04 * M, (L + R) / 2, H - 0.14 * M - 0.004, z), 'roof');
+        p.add('steel', box(R - L, 0.02 * M, 0.12 * M, (L + R) / 2, H - 0.16 * M - 0.004, z), 'roof');
+        if (bl >= 3) for (const x of [L + 0.06 * M, R - 0.06 * M]) {
+          const r = { x0: x - 0.07 * M, x1: x + 0.07 * M, z0: z - 0.07 * M, z1: z + 0.07 * M };
+          if (placed.some(q => hits(q, r))) continue;
+          p.add('steel', box(0.12 * M, H - 0.16 * M, 0.12 * M, x, 0, z), 'walls');
+          placed.push(r);
+        }
+      }
+    }
+  }
   const facing: Record<Side, number> = { back: 0, front: Math.PI, left: Math.PI / 2, right: -Math.PI / 2 };
   const c: VaultCtx = {
     p, left: L, right: R, front: F, back: B, depth, rnd: p.rnd,
@@ -272,7 +344,38 @@ function vault(def: KitPieceDef, seed: number, opts: BuildOpts, spec: VaultSpec,
       }
     },
   };
+  if (!spec.custom) {
+    // wall units go in first, with floor kept clear in front of them (packed like furniture)
+    const units: WallItem[] = [];
+    if (nb >= 1) units.push({ len: 0.6 * M, dep: 0.4 * M, solid: true, sides: ['back', 'left', 'right', 'front'], fn: a => {
+      const z0 = -0.2 * M;
+      a('paint_green', box(0.55 * M, 0.4 * M, 0.3 * M, 0, 0.95 * M, z0 + 0.15 * M));                                     // hand-crank HEPA blower
+      a('steel', new THREE.CylinderGeometry(0.11 * M, 0.11 * M, 0.42 * M, 12).rotateZ(Math.PI / 2).translate(0, 1.47 * M, z0 + 0.15 * M));   // filter canister
+      a('steel', new THREE.TorusGeometry(0.12 * M, 0.015 * M, 6, 14).translate(0.2 * M, 1.15 * M, z0 + 0.32 * M));   // crank wheel
+      a('steel', box(0.03 * M, 0.03 * M, 0.12 * M, 0.3 * M, 1.19 * M, z0 + 0.36 * M));
+      a('steel', box(0.06 * M, H - 1.6 * M, 0.06 * M, -0.18 * M, 1.6 * M, z0 + 0.1 * M));                            // duct to the ceiling
+      a('paint_green', box(0.4 * M, 0.9 * M, 0.25 * M, 0, 0.004, z0 + 0.125 * M));                                     // stand
+    } });
+    if (fa >= 2) units.push({ len: 0.5 * M, dep: 0.25 * M, solid: false, sides: ['left', 'right', 'back', 'front'], fn: a => {
+      const z0 = -0.125 * M;
+      a('steel', box(0.4 * M, 0.5 * M, 0.16 * M, 0, 1.25 * M, z0 + 0.08 * M));                                            // filtered power / signal entry
+      a('copper', box(0.05 * M, H - 1.75 * M, 0.05 * M, 0.1 * M, 1.75 * M, z0 + 0.05 * M));                             // conduit up to the ceiling
+      a('gauge', box(0.08 * M, 0.04 * M, 0.01 * M, -0.1 * M, 1.6 * M, z0 + 0.165 * M));                                 // label
+    } });
+    c.pack(units);
+  }
   fit(c);
+  if (!spec.custom) {
+    if (nb >= 2) for (const [vx, vz] of [[L + 0.12, B + 0.12], [R - 0.12, F - 0.12]] as Array<[number, number]>) {
+      p.add('paint_red', cyl(0.12 * M, 0.1 * M, vx, H - 0.1 * M - 0.004, vz, 14), 'roof');
+      p.add('steel', cyl(0.06 * M, 0.08 * M, vx, H - 0.18 * M - 0.004, vz, 10), 'roof');
+    }
+    if (nb >= 3) c.hang(['front', 'right', 'left', 'back'], 0.2 * M, 1.6 * M, a => {
+      a('steel', new THREE.CylinderGeometry(0.1 * M, 0.1 * M, 0.04 * M, 16).rotateX(Math.PI / 2).translate(0, 0, 0.02 * M));
+      a('gauge', new THREE.CircleGeometry(0.085 * M, 16).translate(0, 0, 0.041 * M));
+      a('paint_red', box(0.008 * M, 0.07 * M, 0.004 * M, 0.02 * M, 0.02 * M, 0.044 * M));
+    });
+  }
   const g = p.finish();
   // walls go up with the frame stage (poured walls, then the roof slab)
   g.userData.stageAs = { walls: 'frame', cutwalls: 'frame' };

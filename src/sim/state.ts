@@ -10,7 +10,8 @@ import type { StageId } from './blueprints';
 import type { PerimeterRun } from './perimeter';
 import { emptyUtilities, type Utilities } from './utilities';
 
-export const SAVE_VERSION = 7;
+import type { HardenId, HardenJob, Tier } from './hardening';
+export const SAVE_VERSION = 8;
 
 /** Starting savings (GDS §1 peacetime money constraint). */
 export const STARTING_MONEY = 30000;
@@ -59,6 +60,8 @@ export interface Structure {
   supplied: boolean;
   /** Game time it was finished (days), or null. */
   finishedAt: number | null;
+  /** Bunker hardening fitted (tier per upgrade; absent = none). */
+  hardening?: Partial<Record<HardenId, Tier>>;
 }
 
 export type TaskKind = 'idle' | 'build' | 'forestry' | 'sleep' | 'chores' | 'school' | 'leisure';
@@ -118,6 +121,8 @@ export interface GameState {
   perimeter: PerimeterRun[];
   /** Water and power: fittings, battery, storage, the last day's balance. */
   utilities: Utilities;
+  /** Bunker hardening retrofits, ordered and in progress. */
+  hardenJobs: HardenJob[];
   /** Recent events for the HUD log (newest last, capped). */
   log: LogEntry[];
   /** Next id counter. */
@@ -140,6 +145,7 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027): GameSta
     heat: { burned: 0, warned: -1 },
     perimeter: [],
     utilities: emptyUtilities(),
+    hardenJobs: [],
     log: [{ t: 0, text: `The ${people[0].last} family arrives on the land.` }],
     nextId: 1,
   };

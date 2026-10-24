@@ -375,3 +375,13 @@ SETS.tunnel = [
   { name: 'hidden-exit-eye-level', time: 15, season: 'summer', setup: tunnel + `{ const t = window.__tun; if (t.pts) { const [ex, ez] = t.exit, a = t.dir; const [px, pz] = cb.world.openSpotNear(ex + Math.cos(a) * 1.0 + Math.sin(a) * 0.5, ez + Math.sin(a) * 1.0 - Math.cos(a) * 0.5, 0.4); cb.cam.placeEye(px, pz, ex, ez, 0.28); } }`, cam: D, frames: 14 },
   { name: 'bunkroom-warm-light', time: 12, season: 'summer', setup: tunnel + inside2('bunker_dorm', 0.3, 0.27, 0.3, -0.25, 0.1, -0.3, 74), cam: D, frames: 12 },
 ];
+
+/** The bunker with every room hardened (tier per upgrade; 3 = military / welded / overpressure / hardened shell). */
+const hardened = (t) => bunker + `{ if (window.__hd !== ${t}) { window.__hd = ${t}; cb.game.setState(s => { const g = structuredClone(s.game); for (const st of g.structures) if (st.kind.startsWith('bunker_') && st.finishedAt !== null) st.hardening = { fallout: ${t}, faraday: ${t}, nbc: ${t}, blast: ${t} }; return { game: g }; }); } }`;
+SETS.hardening = [
+  { name: 'bunkroom-tier2', time: 12, season: 'summer', setup: hardened(2) + inside2('bunker_dorm', 0.3, 0.27, 0.3, -0.25, 0.1, -0.3, 74), cam: D, frames: 12 },
+  { name: 'bunkroom-tier3', time: 12, season: 'summer', setup: hardened(3) + inside2('bunker_dorm', 0.3, 0.27, 0.3, -0.25, 0.1, -0.3, 74), cam: D, frames: 12 },
+  { name: 'galley-tier3-door', time: 12, season: 'summer', setup: hardened(3) + inside2('bunker_galley', -0.3, 0.27, -0.3, 0.25, 0.12, 0.3, 74), cam: D, frames: 12 },
+  { name: 'stores-tier3', time: 12, season: 'summer', setup: hardened(3) + inside2('bunker_stores', -0.3, 0.27, 0.3, 0.25, 0.1, -0.3, 74), cam: D, frames: 12 },
+  { name: 'cutaway-tier3', time: 11, season: 'summer', setup: hardened(3) + under + "cb.store.getState().setBuildingView('cutaway');" + atB('bunker_dorm', 2.6, 0.85, 0.9), cam: D, frames: 14 },
+];
