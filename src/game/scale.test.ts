@@ -18,6 +18,8 @@ import { FIG_SCALE } from '../engine/world/people/figureKit';
 import { VAULT_H } from './buildkit/bunkerBuildings';
 import { DEPTH, MIN_COVER, ROOF_TOP } from './buildkit/underground';
 import { Equipment } from './buildkit/utilityBuildings';
+import { GreenhouseKit } from './buildkit/foodBuildings';
+import { Shop } from './buildkit/compoundBuildings';
 
 const PERSON_H = 0.28;
 /** Meters of a world-unit length. */
@@ -89,5 +91,18 @@ describe('human scale', () => {
     expect(m(PERIMETER.container_wall.height)).toBeCloseTo(2.6, 0);
     expect(m(PERIMETER.log_palisade.height)).toBeGreaterThan(2.5);
     expect(m(PERIMETER.thorn_hedge.height)).toBeGreaterThan(2.0);
+  });
+
+  it('greenhouse and garage kit is life-size', () => {
+    const rnd = () => 0.5;
+    const pot = size(a => GreenhouseKit.pottingBench(a, rnd)); expect(pot.w).toBeCloseTo(1.5, 1); expect(pot.h).toBeGreaterThan(1.3); expect(pot.h).toBeLessThan(1.7);
+    const rack = size(a => GreenhouseKit.seedRack(a, rnd)); expect(rack.h).toBeCloseTo(1.6, 1); expect(rack.w).toBeLessThan(1.3);
+    expect(size(a => GreenhouseKit.wateringCan(a)).h).toBeLessThan(0.45);
+    expect(size(a => GreenhouseKit.heater(a)).h).toBeLessThan(0.8);
+    expect(size(a => GreenhouseKit.hoseReel(a)).h).toBeLessThan(1.0);
+    const tray = size(a => GreenhouseKit.tray(a, rnd)); expect(tray.w).toBeCloseTo(0.3, 1); expect(tray.d).toBeCloseTo(0.5, 1);
+    expect(size(a => Shop.compressor(a)).h).toBeLessThan(1.0);
+    expect(size(a => Shop.tires(a, 4)).h).toBeLessThan(1.0);
+    expect(size(a => Shop.fuelRack(a)).h).toBeLessThan(0.9);
   });
 });

@@ -8,7 +8,7 @@
  */
 import * as THREE from 'three';
 import { CELL, type KitPieceDef } from './kit';
-import { Furniture, M, type Add } from './interior';
+import { Furniture, M, pipe, tube, type Add } from './interior';
 import { box, buildGabled, Parts, type FurnishCtx } from './shell';
 import { Clutter } from './clutter';
 
@@ -125,24 +125,76 @@ function wellDrilled(_def: KitPieceDef, seed = 1): THREE.Group {
   }, seed);
 }
 
-/** 1.8 × 2.4 m filtration shed: sediment → carbon → UV on the wall, the pressure tank beside them. */
+/**
+ * 1.8 × 2.4 m filtration shed: the well line comes up through the slab to the pressure tank's tee, then up
+ * the back wall through a shutoff into the filter train — sediment (blue), carbon (white), the UV chamber —
+ * and out through the side wall to the house. A small breaker panel feeds the UV controller, the pressure
+ * switch and a GFCI outlet in conduit. Floor: the slab with a drain and a mat in front of the filters.
+ */
 function filtrationShed(_def: KitPieceDef, seed = 1): THREE.Group {
   return shed({ W: 1.8 * M, D: 2.4 * M, outer: 'board_batten', front: [{ kind: 'door', at: 0.03, w: 0.14, h: 0.33 }] }, c => {
-    const z = c.back + 0.035;
-    c.I({ x: -0.09, z: c.back + 0.06 }, a => Equipment.pressureTank(a));
-    // the filter train: two big-blue housings (sediment, carbon) and the UV chamber, joined by a header pipe
-    c.I({ x: 0.0, z }, a => {
-      for (const [k, mat] of [[0, 'blue_tank'], [1, 'enamel']] as const) {
-        const x = k * 0.22 * M;
-        a(mat, cyl(0.09 * M, 0.55 * M, x, 0.55 * M, 0, 12));
-        a('steel', cyl(0.1 * M, 0.08 * M, x, 1.1 * M, 0, 12));
+    const P = (x: number, y: number, z: number) => [x * M, y * M, z * M] as const;
+    const r = 0.025, zp = -0.98, hy = 1.35;
+    const run = (a: Add, m: 'copper' | 'steel', ...pts: Array<readonly [number, number, number]>) => {
+      for (let i = 0; i + 1 < pts.length; i++) a(m, pipe(P(...pts[i]), P(...pts[i + 1]), (m === 'copper' ? r : 0.012) * M, 8));
+      for (const q of pts.slice(1, -1)) a(m, new THREE.SphereGeometry((m === 'copper' ? r * 1.35 : 0.018) * M, 8, 5).translate(...P(...q)));
+    };
+    const valve = (a: Add, x: number, y: number, z: number, along: 'x' | 'y') => {
+      a('steel', along === 'y' ? cyl(0.04 * M, 0.08 * M, x * M, (y - 0.04) * M, z * M, 8) : cyl(0.04 * M, 0.08 * M, 0, -0.04 * M, 0, 8).rotateZ(Math.PI / 2).translate(x * M, y * M, z * M));
+      a('paint_red', box(0.14 * M, 0.02 * M, 0.03 * M, (x + 0.06) * M, (y + 0.05) * M, (z + 0.05) * M));
+    };
+    c.I({ x: -0.45 * M, z: -0.72 * M }, a => Equipment.pressureTank(a));
+    c.I({ x: 0, z: 0 }, a => {
+      // well line up through the slab (check valve) to the tank tee; from the tee back to the wall and up through the shutoff
+      run(a, 'copper', [0.08, 0.0, -0.72], [0.08, 0.43, -0.72], [0.05, 0.43, -0.72]);
+      a('steel', cyl(0.045 * M, 0.1 * M, 0.08 * M, 0.18 * M, -0.72 * M, 8));
+      a('steel', cyl(0.07 * M, 0.02 * M, 0.08 * M, 0, -0.72 * M, 10));                                         // floor sleeve
+      run(a, 'copper', [0.08, 0.43, -0.72], [0.08, 0.43, zp], [0.08, hy, zp], [0.12, hy, zp]);
+      valve(a, 0.08, 0.95, zp, 'y');
+      // the train on a plywood backboard: two big-blue housings hung from the header, then the UV chamber
+      a('wood_mid', box(0.95 * M, 1.25 * M, 0.02 * M, 0.38 * M, 0.5 * M, -1.07 * M));
+      for (const [x, m] of [[0.22, 'blue_tank'], [0.44, 'enamel']] as const) {
+        a(m, cyl(0.09 * M, 0.55 * M, x * M, 0.76 * M, zp * M, 14));
+        a('steel', cyl(0.1 * M, 0.1 * M, x * M, 1.3 * M, zp * M, 14));
+        a('steel', box(0.26 * M, 0.04 * M, 0.06 * M, x * M, 1.42 * M, (zp - 0.06) * M));        // mounting bracket
       }
-      a('steel', cyl(0.06 * M, 0.9 * M, 0, 0, 0, 10).rotateZ(Math.PI / 2).translate(0.55 * M + 0.45 * M, 1.05 * M, 0));   // UV chamber
-      a('lamp', box(0.12 * M, 0.08 * M, 0.04 * M, 0.95 * M, 1.4 * M, 0.04 * M));                                         // UV controller
-      a('iron', box(0.9 * M, 0.04 * M, 0.04 * M, 0.35 * M, 1.22 * M, 0));                                                  // header
+      run(a, 'copper', [0.12, hy, zp], [0.56, hy, zp], [0.56, 0.65, zp], [0.6, 0.65, zp]);
+      a('steel', cyl(0.065 * M, 0.95 * M, 0.66 * M, 0.55 * M, zp * M, 14));
+      for (const y of [0.55, 1.5]) a('steel', cyl(0.075 * M, 0.05 * M, 0.66 * M, (y - 0.025) * M, zp * M, 14));
+      for (const y of [0.75, 1.3]) a('steel', box(0.18 * M, 0.04 * M, 0.08 * M, 0.66 * M, y * M, (zp - 0.06) * M));
+      // out the top of the UV, a second shutoff, through the side wall toward the house
+      run(a, 'copper', [0.66, 1.5, zp], [0.66, 1.7, zp], [0.95, 1.7, zp], [0.95, 0.0, zp]);
+      valve(a, 0.75, 1.7, zp, 'x');
+      // UV controller (lit), its cable to the lamp end, the sediment drain bucket under the train
+      a('enamel', box(0.22 * M, 0.3 * M, 0.08 * M, 0.42 * M, 1.62 * M, -1.03 * M));
+      a('lamp', box(0.06 * M, 0.04 * M, 0.01 * M, 0.42 * M, 1.82 * M, -0.988 * M));
+      a('rubber', tube([P(0.5, 1.68, -1.0), P(0.6, 1.62, -0.96), P(0.66, 1.56, zp + 0.02)], 0.012 * M, 5));
+      // the breaker panel on the right wall, conduit down to the GFCI outlet
+      const wx = 0.75;
+      a('steel', box(0.08 * M, 0.45 * M, 0.32 * M, wx * M, 1.2 * M, -0.35 * M));
+      a('iron', box(0.005 * M, 0.38 * M, 0.26 * M, (wx - 0.042) * M, 1.235 * M, -0.35 * M));
+      a('enamel', box(0.004 * M, 0.06 * M, 0.12 * M, (wx - 0.046) * M, 1.5 * M, -0.35 * M));                // circuit label
+      run(a, 'steel', [wx + 0.01, 1.2, -0.35], [wx + 0.01, 0.5, -0.35]);
+      a('enamel', box(0.06 * M, 0.12 * M, 0.08 * M, wx * M, 0.38 * M, -0.35 * M));
+      for (const dy of [0.03, 0.08]) a('iron', box(0.004 * M, 0.02 * M, 0.03 * M, (wx - 0.032) * M, (0.38 + dy) * M, -0.35 * M));
+      // floor: a drain in the slab, a rubber mat to stand on in front of the train
+      a('iron', cyl(0.09 * M, 0.004 * M, 0.2 * M, 0, -0.35 * M, 12));
+      for (let k = -2; k <= 2; k++) a('rubber', box(0.14 * M, 0.005 * M, 0.012 * M, 0.2 * M, 0.001 * M, (-0.35 + k * 0.03) * M));
+      a('rubber', box(0.8 * M, 0.012 * M, 0.5 * M, 0.3 * M, 0, -0.5 * M));
+      // spare cartridges and the housing wrench on a shelf by the window
+      a('wood_mid', box(0.25 * M, 0.025 * M, 0.6 * M, -0.66 * M, 1.0 * M, 0.5 * M));
+      for (const z of [0.32, 0.46]) a('enamel', cyl(0.06 * M, 0.25 * M, -0.66 * M, 1.025 * M, z * M, 10));
+      a('blue_tank', new THREE.TorusGeometry(0.1 * M, 0.025 * M, 4, 12).rotateX(Math.PI / 2).translate(-0.66 * M, 1.05 * M, 0.66 * M));
     }, false);
+    // high runs in conduit (above the cut: they go with the walls in cutaway)
+    const hi = (m: 'steel', ...pts: Array<readonly [number, number, number]>) => {
+      for (let i = 0; i + 1 < pts.length; i++) c.parts.add(m, pipe(P(pts[i][0], pts[i][1] + c.y0 / M, pts[i][2]), P(pts[i + 1][0], pts[i + 1][1] + c.y0 / M, pts[i + 1][2]), 0.012 * M, 6), 'decor');
+    };
+    hi('steel', [0.1, 1.4, -0.82], [0.1, 2.1, -0.82], [0.76, 2.1, -0.82], [0.76, 2.1, -0.35], [0.76, 1.65, -0.35]);
+    hi('steel', [0.42, 1.77, -1.03], [0.42, 2.1, -1.03], [0.42, 2.1, -0.82]);
+    c.parts.collide({ x0: 0.1 * M, z0: -1.08 * M, x1: 0.76 * M, z1: -0.88 * M });
     c.C({ x: c.right - 0.03, z: 0.1 }, a => Clutter.bucket(a), 0.7);
-    c.C({ x: c.left + 0.002, z: 0.05, y: c.y0 + 1.4 * M, rot: Math.PI / 2 }, a => Equipment.sign(a), 0.8);
+    c.C({ x: c.left + 0.002, z: 0.12, y: c.y0 + 1.4 * M, rot: Math.PI / 2 }, a => Equipment.sign(a), 0.8);
   }, seed);
 }
 
