@@ -20,6 +20,9 @@ import { SightOverlay } from './sightlines/SightOverlay';
 import { PARCEL_SIZE as PS } from './parcel/parcelTerrain';
 import type { PerimeterKind } from '../sim/perimeter';
 import { useGameStore } from '../store/gameStore';
+import { useBattleStore } from '../store/battleStore';
+import { BattleRenderer } from './battle/BattleRenderer';
+import { demoBattle } from './battle/demoBattle';
 import { calendarOf, hourOf, SECONDS_PER_DAY } from '../sim/state';
 import { setWindowGlow } from './buildkit/materials';
 import { homeOutsideForty } from '../sim/site';
@@ -158,6 +161,9 @@ export function GameCanvas() {
     let last = performance.now();
     let raf = 0;
     /** QA hooks: frame counter, and an exact camera pose (eye → look) for interior shots. */
+    const battle = new BattleRenderer(ws.scene, world.groundAt, () => useGameStore.getState().game.people);
+    battle.onEnd = () => useBattleStore.getState().endBattle();
+    let battleSkip = useBattleStore.getState().skipReq, battleSync = 0;
     const qa: { frames: number; frameMs: number; pose: null | { x: number; y: number; z: number; lx: number; ly: number; lz: number; fov?: number } } = { frames: 0, frameMs: 0, pose: null };
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
@@ -243,6 +249,17 @@ export function GameCanvas() {
         if (foot) ws.setShadowFocus(foot.x, foot.z, foot.r / 1.1);
         else ws.setShadowFocus(cam.target.x, cam.target.z, cam.radius);
       }
+      // battle playback: start / skip / tick, camera shake, overlay progress
+      const bs = useBattleStore.getState();
+      if (bs.battle && bs.battle !== battle.battle) battle.play(bs.battle);
+      else if (!bs.battle && battle.playing) battle.stop();
+      if (bs.skipReq !== battleSkip) { battleSkip = bs.skipReq; battle.skip(); }
+      if (battle.playing) {
+        battle.update(dt);
+        if (battle.shake > 0) ws.camera.position.add(new THREE.Vector3((Math.random() - 0.5) * battle.shake, (Math.random() - 0.5) * battle.shake, (Math.random() - 0.5) * battle.shake));
+        battleSync += dt;
+        if (battleSync > 0.2 && battle.playing) { battleSync = 0; bs.setProgress(battle.time, battle.lines); }
+      }
       ws.tick(dt);
       ws.updateDayNight(t);
       ws.renderFrame();
@@ -252,13 +269,20 @@ export function GameCanvas() {
     raf = requestAnimationFrame(frame);
 
     // QA hook (screenshot harness, console poking).
-    (window as unknown as Record<string, unknown>).__cb = { ws, world, weather, cam, tour, tool, marker, fence, sight, game: useGameStore, store: useWorldStore, THREE, qa };
+    (window as unknown as Record<string, unknown>).__cb = { ws, world, weather, cam, tour, tool, marker, fence, sight, game: useGameStore, store: useWorldStore, THREE, qa, battle,
+      demoBattle: () => {
+        const g = useGameStore.getState().game;
+        const b = demoBattle(g.structures, g.people, g.structures.length ? undefined : world.camp);
+        useBattleStore.getState().playBattle(b);
+        return b;
+      } };
 
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', resize);
       unsub.forEach(u => u());
       window.removeEventListener('keydown', onKey);
+      battle.dispose();
       tour.dispose();
       tool.dispose();
       marker.dispose();

@@ -32,6 +32,10 @@ export type BattleEvent =
   | { t: number; kind: 'breach'; x: number; z: number }
   | { t: number; kind: 'flee'; unit: string }
   | { t: number; kind: 'say'; text: string }
+  | { t: number; kind: 'throw'; from: string; x: number; z: number; what: 'grenade' }
+  | { t: number; kind: 'rocket'; from: string; x: number; z: number; y?: number }
+  | { t: number; kind: 'explosion'; x: number; z: number; y?: number; radius: number; hits: string[]; wrecks?: 'post' | 'wall' }
+  | { t: number; kind: 'cover'; unit: string; x: number; z: number }
   | { t: number; kind: 'end'; result: 'repelled' | 'fled' | 'breached' | 'overrun' };
 
 export interface Battle {
