@@ -11,8 +11,9 @@ import type { PerimeterRun } from './perimeter';
 import { emptyUtilities, type Utilities } from './utilities';
 
 import type { HardenId, HardenJob, Tier } from './hardening';
+import { freshNeeds, type FoodReport, type Needs } from './needs';
 import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
-export const SAVE_VERSION = 10;
+export const SAVE_VERSION = 11;
 
 /** Starting savings (GDS §1 peacetime money constraint). */
 export const STARTING_MONEY = 30000;
@@ -65,7 +66,7 @@ export interface Structure {
   hardening?: Partial<Record<HardenId, Tier>>;
 }
 
-export type TaskKind = 'idle' | 'build' | 'forestry' | 'sleep' | 'chores' | 'school' | 'leisure' | 'job';
+export type TaskKind = 'idle' | 'build' | 'forestry' | 'sleep' | 'chores' | 'school' | 'leisure' | 'job' | 'gone';
 
 export interface PersonState {
   id: string;
@@ -74,6 +75,8 @@ export interface PersonState {
   target: string | null;
   /** Still going to the day job (adults; ends when the disaster hits, or when they quit). */
   employed?: boolean;
+  /** Health, morale, hunger, dose, wounds. */
+  needs: Needs;
 }
 
 /** A tree marked for felling (GDS §2.1 "fell own timber"; docs/DECISIONS.md). */
@@ -126,6 +129,8 @@ export interface GameState {
   utilities: Utilities;
   /** Bunker hardening retrofits, ordered and in progress. */
   hardenJobs: HardenJob[];
+  /** Yesterday's eating (HUD). */
+  food: FoodReport;
   /** The collapse clock: mode, the disaster to come, the outside world's services, the news ticker. */
   disaster: DisasterState;
   /** Recent events for the HUD log (newest last, capped). */
@@ -144,10 +149,11 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     seed,
     clock: { t: 0, ticks: 0, startDoy, startYear, speed: 1 },
     money: STARTING_MONEY,
-    stock: { ...emptyStock(), firewood: STARTING_FIREWOOD },
+    stock: { ...emptyStock(), firewood: STARTING_FIREWOOD, canned: 2 },
+    food: { needKcal: 0, ateKcal: 0, producedKcal: 0, spoiledKcal: 0, fromStores: true, kinds: [], daysLeft: 0 },
     orders: [],
     people,
-    personState: people.map(p => ({ id: p.id, task: 'idle', target: null, ...(setup.dayJobs && p.job ? { employed: true } : {}) })),
+    personState: people.map(p => ({ id: p.id, task: 'idle', target: null, needs: freshNeeds(), ...(setup.dayJobs && p.job ? { employed: true } : {}) })),
     structures: [],
     forestry: { jobs: [], cleared: [] },
     heat: { burned: 0, warned: -1 },

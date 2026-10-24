@@ -1,0 +1,147 @@
+/**
+ * Food and the family's needs (GDS §4, decided with the user: calories +
+ * variety + spoilage; injuries heal with care, death possible on Standard,
+ * never on Cozy, permanent on Hardcore). Pure, run once a day.
+ *
+ * While the grocery stores work, the family eats from them (it's in the
+ * household costs). Once they're gone, every calorie comes from what was
+ * put by and what the place grows: fresh food first (it spoils), then the
+ * freezer (only while the root cellar has power), then canned, then the
+ * bulk staples. A diet of one thing wears on morale; going hungry wears on
+ * health, and with it how much work people can do.
+ */
+import { calendarOf, type GameState } from './state';
+import { log } from './economy';
+import { isFinished } from './construction';
+
+export type FoodId = 'fresh' | 'frozen' | 'canned' | 'staples';
+/** Food is kept in the stockpile in these units; kcal in one unit. */
+export const KCAL: Record<FoodId, number> = { fresh: 2000, frozen: 10000, canned: 6000, staples: 80000 };
+export const FOODS: FoodId[] = ['fresh', 'frozen', 'canned', 'staples'];
+/** Daily need (kcal): adults working the land, kids. */
+export const NEED_ADULT = 2400, NEED_KID = 1700;
+
+export interface Needs {
+  /** 0–100. */
+  health: number;
+  morale: number;
+  /** Calories short, accumulated (kcal; recovers when fed). */
+  hunger: number;
+  /** Radiation dose (sieverts). */
+  dose: number;
+  /** Wounds / illness being treated: severity 0–100, what it is. */
+  hurt: Array<{ what: string; sev: number }>;
+  /** Dead (day), or null. */
+  died: number | null;
+}
+
+export const freshNeeds = (): Needs => ({ health: 100, morale: 70, hunger: 0, dose: 0, hurt: [], died: null });
+
+/** What the place grows a day (kcal, fresh), by day of year: eggs from the coop, the garden in season. */
+export function produce(s: GameState): number {
+  const doy = calendarOf(s.clock).doy;
+  const fin = s.structures.filter(isFinished);
+  const coops = fin.filter(st => st.kind === 'chicken_coop').length;
+  const gardens = fin.filter(st => st.kind === 'garden').length;
+  // a dozen hens: ~8 eggs a day in summer, ~3 in midwinter (≈ 70 kcal each)
+  const eggs = coops * 70 * (5.5 + 2.5 * Math.cos(2 * Math.PI * (doy - 172) / 365));
+  // a kitchen garden: nothing until mid-June, a peak of ≈ 2,500 kcal a day in August–September, done by late October
+  const season = doy < 160 || doy > 295 ? 0 : doy < 205 ? (doy - 160) / 45 : doy < 260 ? 1 : (295 - doy) / 35;
+  const skill = Math.max(...s.people.map(p => p.skills.gardener), 0);
+  const veg = gardens * 2500 * season * (0.6 + 0.08 * skill);
+  return Math.max(0, eggs) + veg;
+}
+
+/** Fraction of fresh food that spoils a day: in the open vs a root cellar. */
+const SPOIL_FRESH = 0.08, SPOIL_CELLAR = 0.015, THAW = 0.3;
+
+export interface FoodReport { needKcal: number; ateKcal: number; producedKcal: number; spoiledKcal: number; fromStores: boolean; kinds: FoodId[]; daysLeft: number }
+
+/** Days the family can eat from what's put by (not counting what grows). */
+export function daysOfFood(s: GameState): number {
+  const need = s.people.reduce((a, p, i) => a + (alive(s, i) ? (p.kid ? NEED_KID : NEED_ADULT) : 0), 0);
+  const have = FOODS.reduce((a, f) => a + s.stock[f] * KCAL[f], 0);
+  return need > 0 ? have / need : Infinity;
+}
+
+const alive = (s: GameState, i: number) => s.personState[i]?.needs?.died == null;
+
+/**
+ * One day of eating, spoiling, growing, healing and feeling. `rnd` is the
+ * day's random (hunting luck). Returns the report (HUD).
+ */
+export function liveDay(s: GameState, rnd: number): FoodReport {
+  const fin = s.structures.filter(isFinished);
+  const cellar = fin.some(st => st.kind === 'root_cellar');
+  const freezer = fin.some(st => st.kind === 'root_cellar' && s.utilities.lit.includes(st.id));
+  const fromStores = s.disaster.tracks.stores > 0.5;
+  // spoilage (fractional units carry as a remainder on the stock count)
+  let spoiled = 0;
+  const spoil = (f: FoodId, rate: number) => { const lost = s.stock[f] * rate; s.stock[f] -= lost; spoiled += lost * KCAL[f]; };
+  spoil('fresh', cellar ? SPOIL_CELLAR : SPOIL_FRESH);
+  if (!freezer) spoil('frozen', fromStores ? 0 : THAW);
+  // what grows
+  const grown = produce(s);
+  s.stock.fresh += grown / KCAL.fresh;
+  // hunting (after the stores close; a hunter in season: elk / deer, ≈ 40,000 kcal of meat)
+  const doy = calendarOf(s.clock).doy;
+  const hunter = Math.max(...s.people.filter((p, i) => !p.kid && alive(s, i)).map(p => p.skills.hunter), 0);
+  if (!fromStores && hunter >= 2 && doy > 245 && doy < 335 && rnd < 0.04 * hunter / 5) {
+    if (freezer) s.stock.frozen += 4; else s.stock.fresh += 20;
+    log(s, 'A deer down in the timber: meat for weeks.');
+  }
+  // eating
+  const need = s.people.reduce((a, p, i) => a + (alive(s, i) ? (p.kid ? NEED_KID : NEED_ADULT) : 0), 0);
+  let ate = 0;
+  const kinds: FoodId[] = [];
+  if (fromStores) ate = need;
+  else {
+    for (const f of FOODS) {
+      if (ate >= need) break;
+      const take = Math.min(s.stock[f], (need - ate) / KCAL[f]);
+      if (take > 1e-6) { s.stock[f] -= take; ate += take * KCAL[f]; kinds.push(f); }
+    }
+  }
+  const short = Math.max(0, need - ate);
+  if (short > need * 0.25 && !fromStores) log(s, `Short of food: ${Math.round(short)} kcal less than the family needs today.`);
+  // needs, person by person
+  const cozy = s.disaster.difficulty === 'cozy';
+  const variety = fromStores ? 3 : kinds.length + (grown > 500 ? 1 : 0);
+  const home = fin.some(st => ['timber_cabin', 'log_house'].includes(st.kind));
+  const dark = s.utilities.fittings.some(f => f.kind === 'wire' && f.finishedAt !== null) && !s.utilities.lit.some(id => ['timber_cabin', 'log_house'].includes(s.structures.find(x => x.id === id)?.kind ?? ''));
+  const medic = Math.max(...s.people.filter((p, i) => !p.kid && alive(s, i)).map(p => p.skills.medic), 0);
+  const bay = fin.some(st => st.kind === 'bunker_medical');
+  s.people.forEach((p, i) => {
+    const n = s.personState[i]?.needs;
+    if (!n || n.died != null) return;
+    const mine = (p.kid ? NEED_KID : NEED_ADULT) / Math.max(1, need);
+    n.hunger = Math.max(0, n.hunger + short * mine - (short === 0 ? 600 : 0));
+    // health: hunger, wounds and radiation take it; rest and food bring it back
+    let dh = n.hunger > 15000 ? -1.5 : n.hunger > 5000 ? -0.5 : 0.6;
+    for (const h of n.hurt) {
+      dh -= h.sev / 60;
+      const meds = s.stock.meds >= 0.1;
+      if (meds) s.stock.meds -= 0.1;            // a kit lasts about ten wound-days
+      h.sev = Math.max(0, h.sev - (1 + 0.5 * medic + (bay ? 2.5 : 0) + (meds ? 1.5 : 0)));
+    }
+    n.hurt = n.hurt.filter(h => h.sev > 0);
+    if (n.dose > 1) dh -= (n.dose - 1) * 2;           // radiation sickness above ~1 Sv
+    n.health = Math.max(cozy ? 5 : 0, Math.min(100, n.health + dh));
+    // morale: drifts to a baseline that variety, a home, light and safety raise; hunger and loss lower
+    const target = 45 + 6 * Math.min(variety, 4) + (home ? 8 : -6) + (dark ? -8 : 0) - Math.min(25, n.hunger / 1000) - (s.personState.some(x => x.needs?.died != null) ? 15 : 0);
+    n.morale += (Math.max(0, Math.min(100, target)) - n.morale) * 0.08;
+    if (n.health <= 0) {
+      n.died = Math.floor(s.clock.t);
+      log(s, `${p.first} ${p.last} has died.`);
+    }
+  });
+  return { needKcal: need, ateKcal: ate, producedKcal: grown, spoiledKcal: spoiled, fromStores, kinds, daysLeft: daysOfFood(s) };
+}
+
+/** Work rate multiplier from health and morale (the hungry, hurt or hopeless get less done). */
+export function workFactor(n: Needs | undefined): number {
+  if (!n || n.died != null) return 0;
+  const h = n.health >= 60 ? 1 : 0.35 + 0.65 * n.health / 60;
+  const m = n.morale >= 35 ? 1 : 0.6 + 0.4 * n.morale / 35;
+  return h * m;
+}

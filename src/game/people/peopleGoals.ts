@@ -94,6 +94,7 @@ export function goalFor(i: number, kid: boolean, task: TaskKind, target: string 
       const [tx, tz] = toYard ? [y.x - 0.3 + 0.1 * i, y.z - 0.9] : [t.x + dx * t.len * 0.3, t.z + dz * t.len * 0.3];
       return { x: tx + dz * 0.08 * side, z: tz - dx * 0.08 * side, pose: FIG_POSE.CARRY, face: null, hidden: false, work: false };
     }
+    case 'gone':
     case 'job': {
       // in town at the day job: off the land
       return { x: ctx.camp.x, z: ctx.camp.z, pose: FIG_POSE.STAND, face: null, hidden: true, work: false };

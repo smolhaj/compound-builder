@@ -1,0 +1,82 @@
+import { describe, expect, it } from 'vitest';
+import { newGame, type GameState, type Structure } from './state';
+import { daysOfFood, KCAL, liveDay, produce, workFactor } from './needs';
+
+const built = (g: GameState, id: string, kind: string): Structure => {
+  const st: Structure = { id, kind, x: 10, z: 10, rot: 0, stage: 5, done: 0, supplied: true, finishedAt: 0 };
+  g.structures.push(st);
+  return st;
+};
+const noStores = (g: GameState) => { g.disaster.tracks = { ...g.disaster.tracks, stores: 0, banks: 0 }; };
+
+describe('food and needs', () => {
+  it('while the stores are open the family eats from them; after, from the pantry: fresh first, staples last', () => {
+    const g = newGame(1);
+    g.stock.canned = 4; g.stock.staples = 1; g.stock.fresh = 3;
+    liveDay(g, 0.5);
+    expect(g.stock.canned).toBe(4);
+    noStores(g);
+    const r = liveDay(g, 0.5);
+    expect(r.kinds[0]).toBe('fresh');
+    expect(g.stock.staples).toBe(1);          // canned covered the rest
+    expect(r.ateKcal).toBeCloseTo(r.needKcal);
+  });
+
+  it('fresh food spoils, slower in a root cellar; the freezer thaws without power', () => {
+    const a = newGame(1), b = newGame(1);
+    noStores(a); noStores(b);
+    a.stock.fresh = 100; b.stock.fresh = 100;
+    built(b, 'c', 'root_cellar');
+    a.stock.frozen = 10;
+    a.people.length = 0; b.people.length = 0;  // nobody eating: just the spoiling
+    liveDay(a, 0.5); liveDay(b, 0.5);
+    expect(a.stock.fresh).toBeLessThan(b.stock.fresh);
+    expect(a.stock.frozen).toBeLessThan(8);
+  });
+
+  it('the coop lays all year; the garden only in season', () => {
+    const g = newGame(1, 20);
+    built(g, 'k', 'chicken_coop'); built(g, 'g', 'garden');
+    const winter = produce(g);
+    const s = newGame(1, 230);
+    built(s, 'k', 'chicken_coop'); built(s, 'g', 'garden');
+    expect(winter).toBeGreaterThan(100);
+    expect(produce(s)).toBeGreaterThan(winter + 1500);
+  });
+
+  it('going hungry costs health and morale, and with them work; Cozy never lets anyone die', () => {
+    const g = newGame(1);
+    noStores(g);
+    for (let d = 0; d < 60; d++) liveDay(g, 0.5);
+    const n = g.personState[0].needs;
+    expect(n.hunger).toBeGreaterThan(15000);
+    expect(n.health).toBeLessThan(80);
+    expect(n.morale).toBeLessThan(50);
+    expect(workFactor(n)).toBeLessThan(1);
+    const c = newGame(2);
+    c.disaster.difficulty = 'cozy';
+    noStores(c);
+    for (let d = 0; d < 400; d++) liveDay(c, 0.5);
+    expect(c.personState.every(ps => ps.needs.died == null)).toBe(true);
+    const h = newGame(3);
+    noStores(h);
+    for (let d = 0; d < 400; d++) liveDay(h, 0.5);
+    expect(h.personState.some(ps => ps.needs.died != null)).toBe(true);
+  });
+
+  it('wounds heal faster with a medic, medical supplies and a medical bay', () => {
+    const slow = newGame(1), fast = newGame(1);
+    for (const g of [slow, fast]) g.personState[0].needs.hurt = [{ what: 'a deep cut', sev: 60 }];
+    fast.stock.meds = 3; built(fast, 'm', 'bunker_medical');
+    for (let d = 0; d < 5; d++) { liveDay(slow, 0.5); liveDay(fast, 0.5); }
+    const sev = (g: GameState) => g.personState[0].needs.hurt[0]?.sev ?? 0;
+    expect(sev(fast)).toBeLessThan(sev(slow) - 15);
+    expect(fast.stock.meds).toBeLessThan(3);
+  });
+
+  it('days of food counts what is put by', () => {
+    const g = newGame(1);
+    g.stock.canned = 0; g.stock.staples = 1;
+    expect(daysOfFood(g)).toBeCloseTo(KCAL.staples / (2 * 2400 + 2 * 1700));
+  });
+});

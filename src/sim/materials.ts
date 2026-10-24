@@ -6,7 +6,8 @@
 export type MaterialId = 'lumber' | 'logs' | 'firewood' | 'fieldstone' | 'concrete' | 'roofing' | 'hardware' | 'wire' | 'seedlings' | 'container'
   | 'pipe' | 'cable' | 'fixtures' | 'pump' | 'drilling' | 'solar_panel' | 'battery' | 'inverter' | 'generator' | 'fuel' | 'tank' | 'septic_tank'
   | 'rebar' | 'membrane' | 'excavator' | 'blast_door' | 'nbc_filter' | 'spoil' | 'culvert' | 'egress_hatch'
-  | 'lead_sheet' | 'faraday_mesh' | 'blast_valve' | 'filter_set';
+  | 'lead_sheet' | 'faraday_mesh' | 'blast_valve' | 'filter_set'
+  | 'fresh' | 'frozen' | 'canned' | 'staples' | 'meds';
 
 export interface MaterialDef {
   id: MaterialId;
@@ -51,6 +52,11 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   lead_sheet: { id: 'lead_sheet', name: 'Lead sheet', unit: '1 × 2 m sheet, 6 mm (≈ 135 kg)', price: 620 },
   faraday_mesh: { id: 'faraday_mesh', name: 'Faraday mesh', unit: 'roll of welded copper-clad mesh + bonding strap', price: 380 },
   blast_valve: { id: 'blast_valve', name: 'Blast valve', unit: 'spring-loaded vent valve', price: 1450 },
+  fresh: { id: 'fresh', name: 'Fresh food', unit: 'basket (≈ 2,000 kcal: eggs, greens, roots)', price: null },
+  frozen: { id: 'frozen', name: 'Freezer meat', unit: '5 kg (≈ 10,000 kcal)', price: 65 },
+  canned: { id: 'canned', name: 'Canned food', unit: 'case of 12 (≈ 6,000 kcal)', price: 36 },
+  staples: { id: 'staples', name: 'Bulk staples', unit: 'rice, beans, flour, oil (≈ 80,000 kcal, 25 kg)', price: 120 },
+  meds: { id: 'meds', name: 'Medical supplies', unit: 'kit: dressings, antibiotics, painkillers', price: 150 },
   filter_set: { id: 'filter_set', name: 'HEPA filter set', unit: 'HEPA cartridges + hand-crank blower', price: 900 },
 };
 
@@ -59,7 +65,7 @@ export const MATERIAL_IDS = Object.keys(MATERIALS) as MaterialId[];
 export type Stock = Record<MaterialId, number>;
 
 export function emptyStock(): Stock {
-  return { lumber: 0, logs: 0, firewood: 0, fieldstone: 0, concrete: 0, roofing: 0, hardware: 0, wire: 0, seedlings: 0, container: 0, pipe: 0, cable: 0, fixtures: 0, pump: 0, drilling: 0, solar_panel: 0, battery: 0, inverter: 0, generator: 0, fuel: 0, tank: 0, septic_tank: 0, rebar: 0, membrane: 0, excavator: 0, blast_door: 0, nbc_filter: 0, spoil: 0, culvert: 0, egress_hatch: 0, lead_sheet: 0, faraday_mesh: 0, blast_valve: 0, filter_set: 0 };
+  return { lumber: 0, logs: 0, firewood: 0, fieldstone: 0, concrete: 0, roofing: 0, hardware: 0, wire: 0, seedlings: 0, container: 0, pipe: 0, cable: 0, fixtures: 0, pump: 0, drilling: 0, solar_panel: 0, battery: 0, inverter: 0, generator: 0, fuel: 0, tank: 0, septic_tank: 0, rebar: 0, membrane: 0, excavator: 0, blast_door: 0, nbc_filter: 0, spoil: 0, culvert: 0, egress_hatch: 0, lead_sheet: 0, faraday_mesh: 0, blast_valve: 0, filter_set: 0, fresh: 0, frozen: 0, canned: 0, staples: 0, meds: 0 };
 }
 
 /** Cost of a bill of materials at retail (unbuyable items count 0). */

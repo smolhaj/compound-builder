@@ -11,6 +11,7 @@ import { addRunWork, nextRun } from './perimeter';
 import { addFitWork, balanceDay, nextFit, plant } from './utilities';
 import { addHardenWork, nextHardenJob } from './hardening';
 import { updateDisaster } from './disaster';
+import { liveDay, workFactor } from './needs';
 import { log } from './economy';
 import { dayIndex } from './state';
 import { buildRate } from './family';
@@ -41,6 +42,8 @@ function subStep(s: GameState): void {
   const weekday = dayIndex(s.clock.t) % 7 < 5;
   s.people.forEach((p, i) => {
     const ps = s.personState.find(x => x.id === p.id)!;
+    if (ps.needs.died != null) { ps.task = 'gone'; ps.target = null; return; }
+    const rate = buildRate(p) * workFactor(ps.needs);
     const slot = routineAt(p, h);
     // the day job: weekdays in town during work hours, paid by the hour
     if (slot === 'work' && weekday && ps.employed && p.job) {
@@ -51,11 +54,11 @@ function subStep(s: GameState): void {
     const task = taskFor(slot, target !== null || run !== null || fit !== null || harden !== null, job !== null, i % 2 === 1);
     ps.task = task;
     ps.target = task === 'build' ? (target?.id ?? run?.id ?? fit?.building ?? harden?.building ?? null) : task === 'forestry' && job ? job.id : null;
-    if (task === 'build' && target) addWork(s, target, SUBSTEP * 24 * buildRate(p));
-    else if (task === 'build' && run) addRunWork(s, run, SUBSTEP * 24 * buildRate(p));
+    if (task === 'build' && target) addWork(s, target, SUBSTEP * 24 * rate);
+    else if (task === 'build' && run) addRunWork(s, run, SUBSTEP * 24 * rate);
     else if (task === 'build' && fit) addFitWork(s, fit, SUBSTEP * 24, p.skills.mechanic);
-    else if (task === 'build' && harden) addHardenWork(s, harden, SUBSTEP * 24 * buildRate(p));
-    else if (task === 'forestry' && job) addFellWork(s, job, SUBSTEP * 24 * buildRate(p));
+    else if (task === 'build' && harden) addHardenWork(s, harden, SUBSTEP * 24 * rate);
+    else if (task === 'forestry' && job) addFellWork(s, job, SUBSTEP * 24 * rate);
   });
   if (s.disaster.tracks.banks > 0.5 && s.disaster.tracks.stores > 0.5) s.money -= LIVING_PER_DAY * SUBSTEP;
   burnFirewood(s, SUBSTEP);
@@ -76,6 +79,8 @@ function subStep(s: GameState): void {
   if (day !== s.utilities.lastDay && h < 0.3) {
     const x = Math.sin(day * 78.233 + s.seed) * 43758.5453;
     balanceDay(s, plant(s), x - Math.floor(x));
+    const y = Math.sin(day * 12.9898 + s.seed * 3.1) * 43758.5453;
+    s.food = liveDay(s, y - Math.floor(y));
   }
 }
 
