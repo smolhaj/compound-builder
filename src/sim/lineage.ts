@@ -142,7 +142,8 @@ export function lineageDay(s: GameState): string[] {
   // deaths (any cause) go in the chronicle
   for (const p of s.people) if (!alive(s, p) && !L.mourned.includes(p.id)) {
     L.mourned.push(p.id);
-    if (p.kin) chronicle(s, 'death', `${fullName(p)} died, aged ${p.age}.`);
+    const taken = s.personState.find(ps => ps.id === p.id)?.needs.taken;
+    if (p.kin) chronicle(s, 'death', taken ? `${fullName(p)} was taken by raiders, aged ${p.age}.` : `${fullName(p)} died, aged ${p.age}.`);
   }
   // birthdays
   for (const p of living) {

@@ -34,6 +34,8 @@ export interface WeatherState {
   active: WeatherEvent | null;
   /** Day the last storm ended (−999 none yet). */
   last: number;
+  /** The last hail: year and day of year (it takes that season's crop, not the beds). */
+  hail?: { year: number; doy: number };
 }
 
 /** Days of quiet after a storm before another can come. */
@@ -119,11 +121,13 @@ function hit(s: GameState, e: WeatherEvent, r: () => number, out: string[]): voi
       out.push(`${p.first} was hurt by flying debris.`);
     }
   } else if (e.kind === 'hail') {
+    // the crop standing in the beds is shredded; the beds are still there and get replanted from the seed put by
     const beds = fin.filter(st => st.kind === 'garden' || st.kind === 'field');
-    for (const st of beds) { st.stage = blueprintOf(st).stages.length - 1; st.done = 0; st.supplied = false; st.finishedAt = null; }
+    const c = calendarOf(s.clock);
+    weatherOf(s).hail = { year: c.year, doy: c.doy };
     const lost = Math.floor(s.stock.fresh / 2);
     s.stock.fresh -= lost;
-    out.push(beds.length ? `Hail stripped the ${beds.map(b => label(b.kind)).join(' and ')}: it all has to be replanted.` : 'Hail the size of golf balls; nothing planted to lose.');
+    out.push(beds.length ? `Hail stripped the ${[...new Set(beds.map(b => label(b.kind)))].join(' and ')}. Replanting; this year's crop will be short.` : 'Hail the size of golf balls; nothing planted to lose.');
   } else if (e.kind === 'heat_wave') {
     out.push('The heat wave is here.');
   } else if (e.kind === 'flood') {

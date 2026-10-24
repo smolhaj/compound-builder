@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { newGame, type GameState } from './state';
-import { generateNeighbors, gateDay, postureOf, resolve, whoComes, type EncounterKind } from './encounters';
+import { generateNeighbors, gateDay, postureOf, raiderTemper, resolve, whoComes, type EncounterKind } from './encounters';
 import { planRun, canEnter } from './perimeter';
 import { mulberry32 } from './rng';
 
@@ -94,5 +94,16 @@ describe('neighbors and the gate', () => {
     const t = planRun(g, 'escape_tunnel', [[5, 5], [30, 5]]);
     expect(canEnter(t, 'outside')).toBe(false);
     expect(canEnter(t, 'inside')).toBe(true);
+  });
+  it('the longer and more permanent the collapse, the more ruthless the crews', () => {
+    const count = (fate: 'full' | 'never', days: number) => {
+      const g = newGame(3, 105, 2027, { mode: 'scenario', peace: 'short', kind: 'grid_down' });
+      g.disaster.fate = fate; g.clock.t = g.disaster.hitAt + days;
+      const r = mulberry32(9); let savage = 0;
+      for (let i = 0; i < 2000; i++) if (raiderTemper(g, 'gang', r) === 'savage') savage++;
+      return savage / 2000;
+    };
+    expect(count('full', 30)).toBeLessThan(0.12);
+    expect(count('never', 500)).toBeGreaterThan(0.3);
   });
 });

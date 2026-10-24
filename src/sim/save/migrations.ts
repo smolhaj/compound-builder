@@ -43,6 +43,10 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   5: s => ({ ...s, version: 6, stock: { rebar: 0, membrane: 0, excavator: 0, blast_door: 0, nbc_filter: 0, spoil: 0, ...(s.stock as object) } }),
   // 6 → 7: the escape tunnel (culvert, egress hatch)
   6: s => ({ ...s, version: 7, stock: { culvert: 0, egress_hatch: 0, ...(s.stock as object) } }),
+  // 36 → 37: raider temper on an encounter and `taken` on a person (both optional: old saves have desperate raiders and nobody taken)
+  36: s => ({ ...s, version: 37 }),
+  // 35 → 36: hail is remembered by year (weather.hail) instead of unbuilding the beds; old saves: no hail this year
+  35: s => ({ ...s, version: 36 }),
   // 34 → 35: the greenhouse kit and fruit trees (new goods at zero)
   34: s => ({ ...s, version: 35, stock: { greenhouse_kit: 0, fruit_trees: 0, ...(s.stock as object) } }),
   // 33 → 34: peacetime break-ins and the law (the evidence locker,

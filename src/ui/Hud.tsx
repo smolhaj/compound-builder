@@ -373,7 +373,7 @@ export function Hud() {
               return <div key={p.id} style={{ padding: '5px 0', borderBottom: `1px solid ${LINE}` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>
                   <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 4, background: '#' + p.shirt.toString(16).padStart(6, '0'), marginRight: 6 }} />{fullName(p)}, {p.age}{backgroundOf(p) && <span style={{ color: '#c9b27a', fontSize: 11 }}> · {BACKGROUND_NAME[backgroundOf(p)!]}</span>}</span>
-                  <span style={{ color: DIM }}>{n?.died != null ? 'Died' : TASK_TEXT[st?.task ?? 'idle']}</span>
+                  <span style={{ color: DIM }}>{n?.taken ? 'Taken' : n?.died != null ? 'Died' : TASK_TEXT[st?.task ?? 'idle']}</span>
                 </div>
                 {n && n.died == null && <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 4, fontSize: 11 }}>
                   <span style={{ color: DIM, width: 34 }}>health</span>{bar(n.health, n.health > 60 ? '#9cc070' : n.health > 30 ? '#e0b050' : '#e06a50', `Health ${Math.round(n.health)}`)}
