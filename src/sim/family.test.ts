@@ -28,3 +28,42 @@ describe('generateFamily', () => {
     expect(workHoursPerDay(adult)).toBeGreaterThan(workHoursPerDay(kid));
   });
 });
+
+import { variedFamily } from './family';
+import { newGame } from './state';
+import { step } from './engine';
+
+describe('varied households (setup screen, with a reroll)', () => {
+  it('every shape turns up; names unique, ages sensible, only working-age adults have jobs', () => {
+    const kinds = new Set<string>();
+    for (let seed = 1; seed < 80; seed++) for (let roll = 0; roll < 4; roll++) {
+      const { kind, people } = variedFamily(seed, roll);
+      kinds.add(kind);
+      expect(new Set(people.map(p => p.first)).size).toBe(people.length);
+      expect(people.some(p => !p.kid && !p.elder)).toBe(true);
+      for (const p of people) {
+        if (p.kid) { expect(p.age).toBeGreaterThanOrEqual(2); expect(p.age).toBeLessThanOrEqual(17); expect(p.job).toBeUndefined(); }
+        else if (p.elder) { expect(p.age).toBeGreaterThanOrEqual(60); expect(p.job).toBeUndefined(); }
+        else expect(p.job).toBeDefined();
+      }
+      // parents are old enough to be parents, grandparents older than parents
+      const parents = people.filter(p => !p.kid && !p.elder), kids = people.filter(p => p.kid);
+      for (const k of kids) expect(Math.max(...parents.map(p => p.age)) - k.age).toBeGreaterThanOrEqual(18);
+    }
+    expect(kinds.size).toBe(7);
+    expect(variedFamily(5, 2)).toEqual(variedFamily(5, 2));
+    expect(variedFamily(5, 2)).not.toEqual(variedFamily(5, 3));
+  });
+
+  it('a new game takes the household chosen, and a grandparent works slower but the run plays', () => {
+    let fam = variedFamily(1, 0);
+    for (let r = 0; fam.kind !== 'four_gen'; r++) fam = variedFamily(1, r);
+    let g = newGame(1, 105, 2027, { family: fam.people, dayJobs: true });
+    expect(g.people.map(p => p.first)).toEqual(fam.people.map(p => p.first));
+    expect(g.personState.length).toBe(fam.people.length);
+    const elder = g.people.find(p => p.elder)!;
+    expect(buildRate(elder)).toBeLessThan(0.6 + elder.skills.builder * 0.1);
+    g = step(g, 30);
+    expect(g.personState.every(ps => ps.needs.died == null)).toBe(true);
+  });
+});

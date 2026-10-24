@@ -174,10 +174,10 @@ export interface GameState {
 }
 
 /** New-game choices (the setup screen). Defaults (tests, the dev scene): Free build, no day jobs. */
-export interface RunSetup { site?: Site; lifestyle?: Lifestyle; difficulty?: Difficulty; mode?: Mode; peace?: PeaceLength; kind?: DisasterKind | null; variant?: string; dayJobs?: boolean; grid?: boolean }
+export interface RunSetup { site?: Site; lifestyle?: Lifestyle; difficulty?: Difficulty; mode?: Mode; peace?: PeaceLength; kind?: DisasterKind | null; variant?: string; dayJobs?: boolean; grid?: boolean; family?: Person[] }
 
 export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: RunSetup = {}): GameState {
-  const people = generateFamily(seed);
+  const people = setup.family ? structuredClone(setup.family) : generateFamily(seed);
   const site = setup.site ?? CLASSIC;
   const g: GameState = {
     version: SAVE_VERSION,
