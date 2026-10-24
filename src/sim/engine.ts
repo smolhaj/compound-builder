@@ -3,6 +3,7 @@
  * quarter-hour sub-step (deterministic regardless of frame rate or speed).
  * Systems mutate a draft; `step` returns a fresh state object.
  */
+import { LIFESTYLE } from './site';
 import { addWork, blockedReason, isFinished } from './construction';
 import { deliverOrders } from './economy';
 import { addFellWork, nextFellJob } from './forestry';
@@ -69,6 +70,8 @@ function subStep(s: GameState): void {
     else if (task === 'forestry' && job) addFellWork(s, job, SUBSTEP * 24 * rate);
   });
   if (s.disaster.tracks.banks > 0.5 && s.disaster.tracks.stores > 0.5) s.money -= LIVING_PER_DAY * SUBSTEP;
+  // investment income comes in while the banks work
+  if (s.disaster.tracks.banks > 0.5) s.money += LIFESTYLE[s.lifestyle].passive / 365 * SUBSTEP;
   burnFirewood(s, SUBSTEP);
   // the collapse clock, once a day: warning signs, the hit, the outside world's services
   if (dayIndex(s.clock.t) !== s.disaster.day) {

@@ -23,16 +23,18 @@ export default function App() {
       const game = saved ?? newGame(useWorldStore.getState().seed);
       useGameStore.getState().load(game);
       // no game to resume (and not a QA shot): the new-game screen
-      if (!saved && !q.has('seed')) useGameStore.getState().openSetup(true);
+      if (!saved && (!q.has('seed') || q.has('new'))) useGameStore.getState().openSetup(true);
       setReady(true);
     });
   }, []);
   const setup = useGameStore(s => s.setupOpen);
+  // a new place (another seed or listing) is a new world
+  const worldKey = useGameStore(s => `${s.game.seed}:${s.game.site.id}:${s.game.site.creek}`);
   const clean = new URLSearchParams(location.search).has('clean');
   if (!ready) return null;
   return (
     <>
-      <GameCanvas />
+      <GameCanvas key={worldKey} />
       <Hud />
       {!clean && <Ticker />}
       {!clean && <GateCard />}

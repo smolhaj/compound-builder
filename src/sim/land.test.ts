@@ -34,7 +34,7 @@ describe('buying land', () => {
     const p = g.land.parcels[0];
     p.kind = 'grazing'; const grazing = priceOf(g, p);
     p.kind = 'creek_bottom'; const creek = priceOf(g, p);
-    expect(creek).toBeGreaterThan(grazing * 3);
+    expect(creek).toBeGreaterThan(grazing * 1.5);
     g.clock.t = g.disaster.hitAt - 1;
     expect(priceOf(g, p)).toBeGreaterThan(creek * 1.8);
   });

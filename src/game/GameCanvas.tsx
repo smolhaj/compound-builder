@@ -22,6 +22,7 @@ import type { PerimeterKind } from '../sim/perimeter';
 import { useGameStore } from '../store/gameStore';
 import { calendarOf, hourOf, SECONDS_PER_DAY } from '../sim/state';
 import { setWindowGlow } from './buildkit/materials';
+import { homeOutsideForty } from '../sim/site';
 
 /** Background damp of the season (ground darkens a little in the shoulder seasons). */
 const SEASON_WETNESS: Record<VisualSeason, number> = { spring: 0.22, fall: 0.28, winter: 0.14, summer: 0 };
@@ -33,13 +34,13 @@ export function GameCanvas() {
   useEffect(() => {
     const canvas = ref.current!;
     const ws = new WorldScene(canvas);
-    const world = new HomesteadWorld(ws, useGameStore.getState().game.seed);
+    const world = new HomesteadWorld(ws, useGameStore.getState().game.seed, useGameStore.getState().game.site);
     const weather = new WeatherRenderer(ws.scene, useGameStore.getState().game.seed);
     const cam = new DioramaCamera(canvas);
     cam.groundAt = world.groundAt;
     cam.solidAt = world.crownAt;
     const occluders = new CameraOccluders(ws.scene, () => []);   // the diorama camera keeps its own ground clearance
-    cam.target.set(world.center.x, 0, world.center.z);
+    cam.target.set(world.camp.x, 0, world.camp.z);
     const tour = new TourController({
       camera: ws.camera, dom: canvas, scene: ws.scene,
       getBlocked: () => world.tourBlocked,
@@ -117,13 +118,13 @@ export function GameCanvas() {
     applyLook();
     world.syncStructures(useGameStore.getState().game.structures);
     // the neighbor parcels: survey what each is once (timber, creek bottom, hay ground, dry grazing), and plant what's bought
-    const ownedRects = (g: GameState) => g.land.parcels.filter(p => p.owner === 'you').map(p => p.rect);
+    const ownedRects = (g: GameState) => [...homeOutsideForty(g.site), ...g.land.parcels.filter(p => p.owner === 'you').map(p => p.rect)];
     if (!useGameStore.getState().game.land.surveyed) useGameStore.getState().survey(world.surveyLand(useGameStore.getState().game.land.parcels));
     world.setOwnedLand(ownedRects(useGameStore.getState().game));
     const unsub = [
       // wildfire weather: measure the fuel round every building (what cleared ground there is decides what burns)
       useGameStore.subscribe(s => s.game.disaster.phase, ph => { const g = useGameStore.getState().game; if (g.disaster.kind === 'wildfire' && ph === 'warning' && !g.disaster.fuel) useGameStore.getState().setFuel(world.fuelNear(g.structures)); }),
-      useGameStore.subscribe(s => s.game.land, l => world.setOwnedLand(l.parcels.filter(p => p.owner === 'you').map(p => p.rect))),
+      useGameStore.subscribe(s => s.game.land, () => world.setOwnedLand(ownedRects(useGameStore.getState().game))),
       useWorldStore.subscribe(s => s.quality, applyLook),
       useWorldStore.subscribe(s => s.cameraMode, applyCameraMode),
       useGameStore.subscribe(s => s.game.structures, list => { world.syncStructures(list); occluders.invalidate(); }),
@@ -149,7 +150,8 @@ export function GameCanvas() {
       const dt = Math.min(0.1, (now - last) / 1000);
       last = now;
       // the sim advances in real time at its speed; the view clock follows it (outside photo mode)
-      useGameStore.getState().tick(dt);
+      // the clock stands still while the new-game screen is up
+      if (!useGameStore.getState().setupOpen) useGameStore.getState().tick(dt);
       const game = useGameStore.getState().game;
       if (!useWorldStore.getState().photo) {
         const cal = calendarOf(game.clock);

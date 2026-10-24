@@ -7,6 +7,7 @@
 import { log } from './economy';
 import { calendarOf, dayIndex, type GameState } from './state';
 import { climate } from './effects';
+import { REGIONS } from './regions';
 
 /** Heating demand 0–1 by day of year (peaks mid-January, nil June–August). */
 export function heatDemand(doy: number): number {
@@ -19,7 +20,7 @@ export const BURN_PER_DAY = 0.12;
 
 /** Burn `days` worth of firewood (called each sub-step). */
 export function burnFirewood(s: GameState, days: number): void {
-  const d = Math.min(1, heatDemand(calendarOf(s.clock).doy) + climate(s).cold);
+  const d = Math.min(1.6, heatDemand(calendarOf(s.clock).doy) * REGIONS[s.site.region].cold + climate(s).cold);
   if (d <= 0) return;
   s.heat.burned += d * BURN_PER_DAY * days;
   while (s.heat.burned >= 1) {

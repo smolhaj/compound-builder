@@ -1,83 +1,207 @@
-import { useState, type CSSProperties } from 'react';
+import { useState, type CSSProperties, type ReactNode } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { useWorldStore } from '../store/worldStore';
 import { newGame } from '../sim/state';
 import { generateFamily, fullName } from '../sim/family';
 import { DISASTERS, type Difficulty, type DisasterKind, type Mode, type PeaceLength } from '../sim/disaster';
 import { saveGame, AUTOSAVE } from '../sim/save/saveSystem';
+import { affordable, ANY_WISH, LIFESTYLE, listings, siteFacts, type Acres, type LandWish, type Lifestyle, type Site } from '../sim/site';
+import { PLAYABLE, REGION_IDS, REGIONS, type RegionId } from '../sim/regions';
 
 const MODES: Array<[Mode, string, string]> = [
-  ['surprise', 'Surprise', 'Three to six years of peacetime, and you don\'t know what is coming. Watch the news, the prices, the neighbors. A good build hedges.'],
+  ['surprise', 'Surprise', 'Three to six years of peace, and you don\'t know what is coming. Watch the news, the prices, the neighbors.'],
   ['scenario', 'Scenario', 'Pick the disaster and how long you have to get ready.'],
-  ['sandbox', 'Free build', 'Nothing happens until you say so. Build at your own pace, then trigger any disaster from the right-hand panel.'],
+  ['sandbox', 'Free build', 'Nothing happens until you say so. Trigger any disaster from the side panel.'],
 ];
 const DIFFS: Array<[Difficulty, string, string]> = [['cozy', 'Cozy', 'Long warning, gentle raids, nobody dies for good'], ['standard', 'Standard', 'The intended game'], ['hardcore', 'Hardcore', 'Little warning, harsh raids, permadeath']];
 const PEACE: Array<[Exclude<PeaceLength, 'random'>, string]> = [['short', '1 year'], ['medium', '3 years'], ['long', '5 years']];
 
-const card = (on: boolean): CSSProperties => ({ flex: 1, textAlign: 'left', padding: '10px 12px', borderRadius: 8, border: on ? '2px solid #d8c9a0' : '2px solid transparent', background: on ? 'rgba(216,201,160,0.16)' : 'rgba(255,255,255,0.05)', color: '#eee', cursor: 'pointer' });
+const C = { bg: 'rgba(22,24,20,0.98)', card: 'rgba(255,255,255,0.045)', line: 'rgba(255,255,255,0.09)', gold: '#d8c9a0', dim: 'rgba(238,238,238,0.62)', good: '#a8d080', bad: '#f0a080' };
+const usd = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
+const month = (doy: number) => new Date(2027, 0, doy).toLocaleString('en-US', { month: 'short' });
+const tile = (on: boolean, off = false): CSSProperties => ({
+  textAlign: 'left', padding: '12px 14px', borderRadius: 10, border: `1.5px solid ${on ? C.gold : C.line}`,
+  background: on ? 'rgba(216,201,160,0.12)' : C.card, color: '#eee', cursor: off ? 'not-allowed' : 'pointer', opacity: off ? 0.45 : 1,
+});
+const chip = (on: boolean): CSSProperties => ({ padding: '5px 11px', borderRadius: 999, border: `1px solid ${on ? C.gold : C.line}`, background: on ? 'rgba(216,201,160,0.18)' : 'transparent', color: '#eee', cursor: 'pointer', fontSize: 12.5 });
+const H = ({ children }: { children: ReactNode }) => <div style={{ fontSize: 11.5, textTransform: 'uppercase', letterSpacing: 0.8, color: C.dim, margin: '14px 0 8px' }}>{children}</div>;
 
-/** New game: mode, the disaster (Scenario), how long peacetime lasts, day jobs. */
+/** A row of choices (the land filters, difficulty, peacetime). */
+function Chips<T extends string | number>({ label, value, opts, set }: { label: string; value: T; opts: Array<[T, string]>; set: (v: T) => void }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
+      <span style={{ width: 62, color: C.dim, fontSize: 12.5 }}>{label}</span>
+      {opts.map(([v, l]) => <button key={String(v)} style={chip(value === v)} onClick={() => set(v)}>{l}</button>)}
+    </div>
+  );
+}
+
+function ListingCard({ l, on, pick, budget }: { l: Site; on: boolean; pick: () => void; budget: number }) {
+  const ok = affordable(l, budget);
+  return (
+    <button style={{ ...tile(on, !ok), display: 'flex', flexDirection: 'column', gap: 8 }} onClick={() => ok && pick()} title={ok ? undefined : 'Over budget'}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+        <span style={{ fontSize: 16, fontWeight: 700 }}>{l.acres} acres</span>
+        <span style={{ fontSize: 16, fontWeight: 700, color: ok ? C.gold : C.bad }}>{usd(l.price)}</span>
+      </div>
+      <div style={{ fontSize: 12, color: C.dim, marginTop: -6 }}>{l.name} · {usd(Math.round(l.price / l.acres))}/acre</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', columnGap: 10, rowGap: 3, fontSize: 12.5 }}>
+        {siteFacts(l).map(f => [
+          <span key={f.label + 'l'} style={{ color: C.dim }}>{f.label}</span>,
+          <span key={f.label + 'v'} style={{ color: f.tone === 'good' ? C.good : f.tone === 'bad' ? C.bad : '#eee' }}>{f.value}</span>,
+        ])}
+      </div>
+      <div style={{ fontSize: 12, color: ok ? C.dim : C.bad, borderTop: `1px solid ${C.line}`, paddingTop: 6 }}>
+        {ok ? `Leaves ${usd(budget - l.price)} to build with` : 'Over budget'}
+      </div>
+    </button>
+  );
+}
+
+const STEPS = ['Region', 'Land', 'Family & play'] as const;
+
+/** New game, in three steps: the region, the land (what you want, then the listings), the family and how it plays. */
 export function SetupScreen() {
   const g = useGameStore();
   const seed = useWorldStore(s => s.seed);
+  const [step, setStep] = useState(0);
+  const [region, setRegion] = useState<RegionId>('mountain_west');
+  const [wish, setWish] = useState<LandWish>(ANY_WISH);
+  const [batch, setBatch] = useState(0);
+  const [life, setLife] = useState<Lifestyle>('fulltime');
+  const budget = LIFESTYLE[life].budget;
+  const lots = listings(seed + batch * 1013, region, wish, 6, budget);
+  const [lotId, setLotId] = useState<string | null>(null);
+  const lot = lots.find(l => l.id === lotId && affordable(l, budget)) ?? lots.find(l => affordable(l, budget)) ?? null;
   const [mode, setMode] = useState<Mode>('surprise');
   const [kind, setKind] = useState<DisasterKind>('grid_down');
   const [peace, setPeace] = useState<Exclude<PeaceLength, 'random'>>('medium');
-  const [jobs, setJobs] = useState(true);
   const [diff, setDiff] = useState<Difficulty>('standard');
   const family = generateFamily(seed);
   let unlocked = false;
   try { unlocked = localStorage.getItem('cb.unlocked') === '1'; } catch { /* storage blocked */ }
   const start = () => {
-    const game = newGame(seed, 105, 2027, { mode, peace: mode === 'scenario' ? peace : 'random', kind: mode === 'scenario' ? kind : null, dayJobs: jobs, difficulty: diff, grid: true });
+    if (!lot) return;
+    const game = newGame(seed, 105, 2027, { site: lot, lifestyle: life, mode, peace: mode === 'scenario' ? peace : 'random', kind: mode === 'scenario' ? kind : null, dayJobs: LIFESTYLE[life].jobs, difficulty: diff, grid: true });
     g.load(game);
     g.openSetup(false);
     void saveGame(AUTOSAVE, game);
   };
+  const setW = (w: Partial<LandWish>) => { setWish({ ...wish, ...w }); setLotId(null); };
+  const R = REGIONS[region];
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(10,12,9,0.72)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 12, padding: 16 }}>
-      <div style={{ background: 'rgba(24,26,21,0.97)', color: '#eee', borderRadius: 12, padding: '20px 24px', width: 640, maxWidth: '100%', maxHeight: '100%', overflowY: 'auto', fontSize: 13.5 }}>
-        <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: 0.3 }}>Compound Builder</div>
-        <div style={{ opacity: 0.7, marginBottom: 14 }}>Build the place you'd want when everything falls apart. Then find out if you were right.</div>
-
-        <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.6, opacity: 0.6, marginBottom: 6 }}>The family</div>
-        <div style={{ marginBottom: 14 }}>
-          {family.map(p => <div key={p.id}>{fullName(p)}, {p.age}{p.job ? <span style={{ opacity: 0.7 }}> · {p.job.title}, ${p.job.wage}/day</span> : <span style={{ opacity: 0.7 }}> · kid</span>}</div>)}
-        </div>
-
-        <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.6, opacity: 0.6, marginBottom: 6 }}>How it plays</div>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-          {MODES.map(([m, name, blurb]) => (
-            <button key={m} style={card(mode === m)} onClick={() => setMode(m)}>
-              <div style={{ fontWeight: 600, marginBottom: 3 }}>{name}</div>
-              <div style={{ fontSize: 12, opacity: 0.75 }}>{blurb}</div>
-            </button>
-          ))}
-        </div>
-
-        {mode === 'scenario' && <>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
-            <span style={{ opacity: 0.7 }}>Disaster</span>
-            <select value={kind} onChange={e => setKind(e.target.value as DisasterKind)}>
-              {(Object.keys(DISASTERS) as DisasterKind[]).map(k => <option key={k} value={k} disabled={DISASTERS[k]!.pulpy && !unlocked}>{DISASTERS[k]!.name}{DISASTERS[k]!.pulpy && !unlocked ? ' (finish a run to unlock)' : ''}</option>)}
-            </select>
-            <span style={{ opacity: 0.7 }}>Peacetime</span>
-            {PEACE.map(([p, label]) => <button key={p} style={{ ...card(peace === p), flex: 'none', padding: '4px 10px' }} onClick={() => setPeace(p)}>{label}</button>)}
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(10,12,9,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 12, padding: 16 }}>
+      <div style={{ background: C.bg, color: '#eee', borderRadius: 14, width: 860, maxWidth: '100%', maxHeight: '100%', display: 'flex', flexDirection: 'column', fontSize: 13.5, boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}>
+        {/* header: title and the steps */}
+        <div style={{ padding: '18px 24px 12px', borderBottom: `1px solid ${C.line}` }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: 8 }}>
+            <div style={{ fontSize: 22, fontWeight: 700 }}>Compound Builder</div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {STEPS.map((s, i) => (
+                <button key={s} onClick={() => (i < 2 || lot) && setStep(i)} style={{ ...chip(step === i), opacity: i <= step ? 1 : 0.6 }}>{i + 1}. {s}</button>
+              ))}
+            </div>
           </div>
-        </>}
-
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '4px 0 8px', flexWrap: 'wrap' }}>
-          <span style={{ opacity: 0.7 }}>Difficulty</span>
-          {DIFFS.map(([d, label, tip]) => <button key={d} title={tip} style={{ ...card(diff === d), flex: 'none', padding: '4px 10px' }} onClick={() => setDiff(d)}>{label}</button>)}
+          <div style={{ color: C.dim, marginTop: 2 }}>Build the place you'd want when everything falls apart. Then find out if you were right.</div>
         </div>
-        <label style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '8px 0 16px' }}>
-          <input type="checkbox" checked={jobs} onChange={e => setJobs(e.target.checked)} />
-          <span>The adults keep their day jobs (a weekday wage; less time to build). They can quit any time.</span>
-        </label>
 
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          {g.setupCanClose && <button style={{ ...card(false), flex: 'none', padding: '8px 14px', textAlign: 'center' }} onClick={() => g.openSetup(false)}>Back to my game</button>}
-          <button style={{ ...card(true), flex: 'none', padding: '8px 18px', textAlign: 'center', fontWeight: 600 }} onClick={start}>Start</button>
+        {/* body */}
+        <div style={{ padding: '4px 24px 16px', overflowY: 'auto', flex: 1 }}>
+          {step === 0 && <>
+            <H>Where to look for land</H>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 10 }}>
+              {REGION_IDS.map(id => {
+                const r = REGIONS[id], ok = PLAYABLE.has(id);
+                return (
+                  <button key={id} style={tile(region === id, !ok)} onClick={() => ok && (setRegion(id), setLotId(null))} title={ok ? undefined : 'This region\'s world is still being built'}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>
+                      <span style={{ fontWeight: 700, fontSize: 15 }}>{r.name}</span>
+                      {!ok && <span style={{ fontSize: 11, color: C.dim }}>coming</span>}
+                    </div>
+                    <div style={{ fontSize: 12, color: C.dim, margin: '2px 0 6px' }}>{r.where}</div>
+                    <div style={{ fontSize: 12.5, lineHeight: 1.35, marginBottom: 8 }}>{r.blurb}</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', columnGap: 10, rowGap: 2, fontSize: 12 }}>
+                      <span style={{ color: C.dim }}>Land</span><span>~{usd(r.perAcre)}/acre</span>
+                      <span style={{ color: C.dim }}>Season</span><span>{month(r.frost[0])} to {month(r.frost[1])}</span>
+                      <span style={{ color: C.dim }}>Winter</span><span>{r.cold >= 1.3 ? 'Bitter' : r.cold >= 0.9 ? 'Cold' : r.cold >= 0.5 ? 'Mild' : 'Short, mild'}</span>
+                      <span style={{ color: C.dim }}>Rain</span><span>{Math.round(r.rainMm / 25.4)} in a year</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </>}
+
+          {step === 1 && <>
+            <H>How the family will live</H>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 8, marginBottom: 6 }}>
+              {(['fulltime', 'independent', 'weekend'] as Lifestyle[]).map(id => {
+                const L = LIFESTYLE[id];
+                return <button key={id} style={tile(life === id, !L.ready)} onClick={() => L.ready && (setLife(id), setLotId(null))} title={L.ready ? undefined : 'Coming: being away from the place during the week is still being built'}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}><span style={{ fontWeight: 700 }}>{L.name}</span>{!L.ready && <span style={{ fontSize: 11, color: C.dim }}>coming</span>}</div>
+                  <div style={{ fontSize: 12, color: C.dim, margin: '3px 0 6px', lineHeight: 1.35 }}>{L.blurb}</div>
+                  <div style={{ fontSize: 12.5 }}>{usd(L.budget)} to spend{L.passive ? ` · ${usd(L.passive)}/yr income` : L.jobs ? ' · two wages' : ''}</div>
+                </button>;
+              })}
+            </div>
+            <H>What you're looking for in {R.name}</H>
+            <Chips label="Size" value={wish.acres} set={v => setW({ acres: v as Acres | 'any' })} opts={[['any', 'Any'], [5, '5 acres'], [20, '20'], [40, '40'], [80, '80']]} />
+            <Chips label="Water" value={wish.water} set={v => setW({ water: v })} opts={[['any', 'Any'], ['creek', 'Creek'], ['spring', 'Spring'], ['dry', 'Dry (cheaper)']]} />
+            <Chips label="Timber" value={wish.timber} set={v => setW({ timber: v })} opts={[['any', 'Any'], ['open', 'Open'], ['some', 'Some'], ['heavy', 'Heavy']]} />
+            <Chips label="Town" value={wish.town} set={v => setW({ town: v })} opts={[['any', 'Any'], ['near', 'Close in'], ['far', 'Way out']]} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', margin: '14px 0 8px' }}>
+              <span style={{ fontSize: 11.5, textTransform: 'uppercase', letterSpacing: 0.8, color: C.dim }}>Listings · {usd(budget)} to spend</span>
+              <button style={chip(false)} onClick={() => { setBatch(batch + 1); setLotId(null); }}>More listings</button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 10 }}>
+              {lots.map(l => <ListingCard key={l.id} l={l} budget={budget} on={lot?.id === l.id} pick={() => setLotId(l.id)} />)}
+            </div>
+            {!lot && <div style={{ color: C.bad, marginTop: 8 }}>Nothing here fits the budget: widen the search or look at more listings.</div>}
+          </>}
+
+          {step === 2 && <>
+            <H>The family</H>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 8 }}>
+              {family.map(p => (
+                <div key={p.id} style={{ ...tile(false), cursor: 'default', padding: '8px 12px' }}>
+                  <div style={{ fontWeight: 600 }}>{fullName(p)}, {p.age}</div>
+                  <div style={{ fontSize: 12, color: C.dim }}>{p.job ? `${p.job.title} · $${p.job.wage}/day` : 'kid'}</div>
+                </div>
+              ))}
+            </div>
+            <H>How it plays</H>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8 }}>
+              {MODES.map(([m, name, blurb]) => (
+                <button key={m} style={tile(mode === m)} onClick={() => setMode(m)}>
+                  <div style={{ fontWeight: 700, marginBottom: 3 }}>{name}</div>
+                  <div style={{ fontSize: 12, color: C.dim, lineHeight: 1.35 }}>{blurb}</div>
+                </button>
+              ))}
+            </div>
+            <div style={{ marginTop: 12 }}>
+              {mode === 'scenario' && <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                  <span style={{ width: 62, color: C.dim, fontSize: 12.5 }}>Disaster</span>
+                  <select value={kind} onChange={e => setKind(e.target.value as DisasterKind)} style={{ background: '#2a2c26', color: '#eee', border: `1px solid ${C.line}`, borderRadius: 6, padding: '4px 8px' }}>
+                    {(Object.keys(DISASTERS) as DisasterKind[]).map(k => <option key={k} value={k} disabled={DISASTERS[k]!.pulpy && !unlocked}>{DISASTERS[k]!.name}{DISASTERS[k]!.pulpy && !unlocked ? ' (finish a run to unlock)' : ''}</option>)}
+                  </select>
+                </div>
+                <Chips label="Peace" value={peace} set={setPeace} opts={PEACE} />
+              </>}
+              <Chips label="Difficulty" value={diff} set={setDiff} opts={DIFFS.map(([d, l]) => [d, l] as [Difficulty, string])} />
+            </div>
+          </>}
+        </div>
+
+        {/* footer: the choice so far and the way on */}
+        <div style={{ padding: '12px 24px', borderTop: `1px solid ${C.line}`, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, color: C.dim, fontSize: 12.5, minWidth: 200 }}>
+            {R.name} · {LIFESTYLE[life].name}{lot ? ` · ${lot.acres} acres for ${usd(lot.price)} · ${usd(budget - lot.price)} left` : ''}
+          </div>
+          {g.setupCanClose && <button style={chip(false)} onClick={() => g.openSetup(false)}>Back to my game</button>}
+          {step > 0 && <button style={chip(false)} onClick={() => setStep(step - 1)}>Back</button>}
+          {step < 2 && <button style={{ ...chip(true), fontWeight: 600, padding: '7px 16px', ...(step === 1 && !lot ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }} disabled={step === 1 && !lot} onClick={() => setStep(step + 1)}>Next</button>}
+          {step === 2 && <button style={{ ...chip(true), fontWeight: 700, padding: '7px 18px', ...(!lot ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }} disabled={!lot} onClick={start}>Buy it and start</button>}
         </div>
       </div>
     </div>

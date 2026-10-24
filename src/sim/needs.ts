@@ -14,6 +14,8 @@ import { calendarOf, type GameState } from './state';
 import { log } from './economy';
 import { isFinished } from './construction';
 import { climate } from './effects';
+import { SOIL_YIELD } from './site';
+import { REGIONS, seasons } from './regions';
 
 export type FoodId = 'fresh' | 'frozen' | 'canned' | 'staples';
 /** Food is kept in the stockpile in these units; kcal in one unit. */
@@ -45,15 +47,14 @@ export const freshNeeds = (): Needs => ({ health: 100, morale: 70, hunger: 0, do
  * keep dry (staples), the potatoes go to the cellar (fresh).
  */
 export const FIELD_KCAL = 700_000, FIELD_DRY = 0.4;
-const HARVEST = [225, 290] as const;
 
 /** The day's field harvest (kcal), before it is split into dry and fresh. */
 export function fieldHarvest(s: GameState): number {
-  const doy = calendarOf(s.clock).doy;
+  const doy = calendarOf(s.clock).doy, HARVEST = seasons(REGIONS[s.site.region]).harvest;
   if (doy < HARVEST[0] || doy >= HARVEST[1]) return 0;
   const fields = s.structures.filter(st => st.kind === 'field' && isFinished(st)).length;
   const skill = Math.max(...s.people.map(p => p.skills.gardener), 0);
-  return fields * FIELD_KCAL / (HARVEST[1] - HARVEST[0]) * (0.6 + 0.08 * skill) * climate(s).grow;
+  return fields * FIELD_KCAL / (HARVEST[1] - HARVEST[0]) * (0.6 + 0.08 * skill) * SOIL_YIELD[s.site.soil] * climate(s).grow;
 }
 
 /** What the place grows a day (kcal, fresh), by day of year: eggs from the coop, the garden in season, the field harvest. */
@@ -65,9 +66,11 @@ export function produce(s: GameState): number {
   // a dozen hens: ~8 eggs a day in summer, ~3 in midwinter (≈ 70 kcal each)
   const eggs = coops * 70 * (5.5 + 2.5 * Math.cos(2 * Math.PI * (doy - 172) / 365));
   // a kitchen garden: nothing until mid-June, a peak of ≈ 2,500 kcal a day in August–September, done by late October
-  const season = doy < 160 || doy > 295 ? 0 : doy < 205 ? (doy - 160) / 45 : doy < 260 ? 1 : (295 - doy) / 35;
+  // nothing until three weeks past the last frost, full by mid-summer, done a month past the first frost
+  const [g0, g1] = seasons(REGIONS[s.site.region]).garden;
+  const season = doy < g0 || doy > g1 ? 0 : doy < g0 + 45 ? (doy - g0) / 45 : doy < g1 - 35 ? 1 : (g1 - doy) / 35;
   const skill = Math.max(...s.people.map(p => p.skills.gardener), 0);
-  const veg = gardens * 2500 * season * (0.6 + 0.08 * skill);
+  const veg = gardens * 2500 * season * (0.6 + 0.08 * skill) * SOIL_YIELD[s.site.soil];
   return Math.max(0, eggs) * Math.max(0.5, climate(s).grow) + veg * climate(s).grow + fieldHarvest(s);
 }
 
@@ -161,7 +164,7 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
     if (s.utilities.report.shortL > s.utilities.report.useL * 0.5) dh -= 2;   // not enough to drink
     n.health = Math.max(cozy ? 5 : 0, Math.min(100, n.health + dh));
     // morale: drifts to a baseline that variety, a home, light and safety raise; hunger and loss lower
-    const target = 45 + 6 * Math.min(variety, 4) + (home ? 8 : -6) + (dark ? -8 : 0) + (s.utilities.hauling ? -4 : 0) - Math.min(25, n.hunger / 1000) - (s.personState.some(x => x.needs?.died != null) ? 15 : 0);
+    const target = 45 + 6 * Math.min(variety, 4) + (home ? 8 : -6) + (dark ? -8 : 0) + (s.utilities.hauling ? (s.utilities.haulFar ? -10 : -4) : 0) - Math.min(25, n.hunger / 1000) - (s.personState.some(x => x.needs?.died != null) ? 15 : 0);
     n.morale += (Math.max(0, Math.min(100, target)) - n.morale) * 0.08;
     if (n.health <= 0) {
       n.died = Math.floor(s.clock.t);

@@ -304,3 +304,163 @@ Separate repo. Same stack as University Empire: Vite, TypeScript, React, Zustand
 4. Do kids age into skilled adults over a long survival, so a generational arc exists?
 5. Should there be an end state beyond "survive N years"? Candidates: the town becomes a functioning settlement, order is restored, or an endless mode.
 6. Can people you take in betray you or leave with supplies? (Default: yes, telegraphed through morale and traits.)
+
+## 10. v1 additions (decided with the user, after playtest round 1)
+v1 ships with the Mountain West only; more regions come after it. When they come, each region varies the land, forest, water, climate, growing season, prices, neighbors and disaster odds. The build kit stays the same everywhere: all modern materials can be bought anywhere, and you choose the style and cost.
+
+Everything below goes into v1, built one system at a time, each with its own PR, then a second playtest round.
+
+### 10.1 The land you buy (answers open question 1)
+- A new game offers **a few listings**: three or four parcels for sale, each randomized, with different prices and features.
+- **What varies:**
+  - water: a creek or not, a spring, the depth and quality of the groundwater (hard, iron, arsenic), how good a well is;
+  - timber or open ground;
+  - soil, slope and road access;
+  - neighbors close or far.
+- **Prices follow the features.** A dry bench with no creek and deep groundwater is cheap; creek-bottom with a good water table is dear.
+
+### 10.2 Water you buy, store and reuse
+- **Buying water:** three ways, all only while they run, and pricey after the collapse:
+  - a water hauler truck that delivers into your tank or cistern;
+  - bottled water and 5-gallon jugs in the stockpile;
+  - hauling it yourself with a water trailer (an IBC tote) from town or a neighbor's well.
+- **Storage:** tanks of several sizes, the cistern, the water tower, and jugs in the bunker.
+- **Rainwater:** gutters into storage, with a filter (first-flush plus sediment and carbon, or slow sand) so it is safe to drink.
+- **Reuse:** a greywater system for the garden and toilets, plus a wastewater purification system that turns used water back into drinking water.
+- **Contamination:** in some scenarios the landscape is polluted (fallout, chemical spills). Creek water, game and fish carry it for a time, and filters only partly help.
+
+### 10.3 Wild food
+- **What you can hunt or catch depends on the land:**
+  - timber nearby: deer and elk;
+  - a creek, river or lake: fish;
+  - open range: rabbits and birds.
+- **Game thins out** as the collapse goes on and everyone hunts.
+- **In peacetime:** hunting seasons and licenses, with a risk of poaching fines.
+- **Gear and kills:** traps and nets you build; meat is smoked or cured to keep it.
+- **Fallout or contamination** makes game and fish unsafe for a while.
+
+### 10.4 Peacetime systems
+- **Wear, expiry and rotation:**
+  - stored food, meds and fuel expire, so rotate stock; fuel stabilizer helps;
+  - pumps, batteries and generators wear and need service.
+- **Livestock:** goats (milk), pigs, rabbits, a cow and bees (honey), each needing feed, fencing and winter shelter.
+- **Vehicles:** a pickup and trailer, which limit hauling, and a tractor.
+- **Skills and training:**
+  - paid courses: first aid / EMT, ham license, canning, hunter safety, welding;
+  - slow learning by doing.
+- **The county and OPSEC:**
+  - permits and inspections, and property tax;
+  - neighbors notice big deliveries or a bunker dig, which raises later risk.
+
+### 10.5 Survival systems
+- **Heat, cold and sanitation:**
+  - firewood need by season, and freezing without heat;
+  - the outhouse-to-well distance and disease (dysentery).
+- **Barter and mutual aid:**
+  - barter values for ammo, fuel, meds, salt and alcohol, and a market day;
+  - a mutual-aid pact with neighbors: a shared watch and a shared harvest.
+- **Scavenging trips:** to town or abandoned farms for parts and meds, with risk and time away; the finds run out.
+- **Long-term self-reliance:**
+  - seed saving for next year;
+  - a forge, soap and candles, a smokehouse;
+  - spare parts getting scarcer over the years.
+
+### 10.6 People, health and the world
+- **Medical depth:** chronic meds that run out, infections, surgery checks against medic skill, childbirth, dental emergencies.
+- **Radio and rumors:** ham and shortwave news, and rumors that may be false, which scouting can confirm.
+- **Weather threats:** blizzards that cut you off, creek and bunker flooding, hail or tornado damage, a drought on top of the disaster.
+- **Family life and mental health (answers open question 4):**
+  - kids grow up and learn, people age, a pregnancy;
+  - grief, depression and someone breaking down;
+  - schooling the kids.
+
+### 10.7 Peacetime lifestyle (decided with the user)
+You pick the lifestyle on the new-game screen and can change it later, but not cheaply: selling the town house, quitting the jobs.
+- **Weekend getaway:** the family lives in town (a town house, two salaries) and comes up on weekends and vacations to improve the place a little at a time.
+- **Full-time with jobs:** they live on the compound and commute to normal jobs. This is how v1 plays today.
+- **Financially independent:** they live there with no 9-to-5, on savings plus passive income. There's more time to build and less money coming in.
+
+**While the family is away,** things work the way they do in the real world, depending on what's there:
+- **Hired building crews:** optional. They build during the week, faster but at a cost, and they see everything (OPSEC).
+- **A neighbor caretaker:** optional, for a fee or goodwill. They feed the animals and watch the place.
+- **Break-ins:** possible when security is weak.
+- **Upkeep slips:** with nobody tending the garden and animals, or heating the house (frozen pipes in winter).
+
+**When the disaster hits** and the family is in town, a **bug-out trip** event chain follows: the drive out, with roadblocks, traffic and fuel. Go-bags and the state of the vehicle decide it, and heeding the warning signs lets them leave early.
+
+### 10.8 Armory and home defense (decided with the user)
+- **Each firearm is tracked:**
+  - its type (defensive rifle, hunting rifle, shotgun, handgun) and caliber;
+  - its condition, who carries it, and where it's stored (gun safe, armory, on a person);
+  - ammo is counted by caliber;
+  - guns need cleaning, they wear, and parts can break.
+- **Buying is realistic:**
+  - real 2025 prices from a sporting goods store or gun shop;
+  - background-check delays, and a hunting license for hunting;
+  - bulk buying is noticed (OPSEC);
+  - ammo prices spike during the warning signs, and after the collapse it is barter only.
+- **Personal kit:** plate carriers and helmets, night vision, thermal scopes, radios and headsets, an individual first-aid kit (IFAK) on each person.
+- **Watching the place:**
+  - security cameras (day, IR, thermal);
+  - motion sensors and driveway alarms;
+  - floodlights and tripwire alarms;
+  - a guard tower or listening post;
+  - dogs.
+- **Hardening the house:** steel doors and frames, window bars and shutters, sandbag positions, a safe room, ballistic panels.
+- **Storage and upkeep:** gun safes and an armory room (the bunker's comms and armory), cleaning kits, spare parts, a reloading bench.
+- **What it does in play:** all of it feeds the defense and detection numbers at the gate and in raids (how early you see them, how well you hold), and the people carrying it.
+
+### 10.9 Money, the land's improvements, the family (decided with the user)
+- **The budget comes from the lifestyle** (§10.7). Compound builders are roughly the top 10–15 % of households, about $1M or more in net worth.
+  - Weekend getaway: about $450k.
+  - Full-time with jobs: about $800k.
+  - Financially independent: about $1.4M, plus about $45k a year in passive income.
+- **Everything is priced at real 2025 costs** (land, materials, contractors, gear).
+  - Owner-built work saves the labor, which is about half the cost of hiring it out.
+  - Hiring a crew is faster and dearer.
+- **Improvements:** some listings come with an old house or cabin, a barn, a working well, power at the line, or septic, priced in. An improved 40 with a house runs $350–600k. Others are raw land.
+- **Hookups:**
+  - grid power may be at the property line, or cost $15–50 a foot to bring in;
+  - a long driveway costs gravel and grading;
+  - listings way out are cheaper partly for these reasons.
+- **The nest egg depends on the disaster:**
+  - investments crash in a financial collapse, freeze while the banks are closed, and come back with the banks;
+  - cash in hand, gold and silver, and goods are what's left;
+  - buying gold or silver becomes an option.
+- **The family varies, seeded, with a reroll on the setup screen:**
+  - a couple with kids, a couple without kids, or a single parent;
+  - three generations: grandparents with their meds and their skills;
+  - two families pooling their money.
+
+### 10.10 Precious metals, barter and the shop (decided with the user)
+- **Metals:**
+  - **Kinds:**
+    - gold: American Eagles and 1 oz bars, at spot plus a premium; dense wealth, but hard to make change with;
+    - silver: 1 oz Eagles and rounds, and junk silver (pre-1965 dimes and quarters), the practical barter money.
+  - **Where they're kept matters:**
+    - a home safe;
+    - caches buried on the land;
+    - a bank safe-deposit box, frozen when the banks close.
+  - **Prices** start near 2025 spot (gold about $2,600–3,300 an ounce, silver about $30–40), drift in peacetime, and jump during the warning signs and in a financial collapse.
+- **Barter after the collapse:**
+  - every good has a barter value that moves with local scarcity: fuel, ammo, antibiotics, salt, coffee, alcohol, tobacco, batteries, seeds, silver;
+  - traders and neighbors haggle, and your negotiator matters.
+- **The Shop:** a store window with tabs (building supplies, food, water, power, medical, firearms and gear, metals), item cards at real prices, a cart and a delivery time. The stockpile stays in the side panel.
+
+### 10.11 The long game (decided with the user)
+- **The game can go on indefinitely,** for as long as someone of the household is alive.
+- **After a disaster ends and you keep playing** (one more turn, Civilization-style), the next era varies. It can be any of:
+  - recovery into a changed world (rationing, new government, higher prices), then a new peacetime and a worse disaster;
+  - a full recovery, then a random disaster;
+  - a world that stays broken, with new threats arriving over the years (warlords, plague, famine, hard winters).
+
+  Over a long run it trends toward a more permanent collapse.
+- **Generations, with aging and heirs:**
+  - everyone ages a year each year;
+  - kids grow up, learn skills and take over work;
+  - the old die in time, and children can be born;
+  - you play on as the next generation.
+- **Legacy:**
+  - a **chronicle**: newspaper pages from each era's report card, births and deaths, what was built, readable any time;
+  - a **dynasty score**: years survived, people kept alive, people taken in, the size of the place and how self-sufficient it is;
+  - **milestones**: first winter off-grid, ten years self-fed, three generations on the land, and so on.

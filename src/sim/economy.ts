@@ -38,7 +38,7 @@ export function placeOrder(s: GameState, lines: readonly OrderLine[]): string | 
   const cost = orderCost(real, prices(s));
   const id = `o${s.nextId++}`;
   s.money -= cost;
-  s.orders.push({ id, lines: real, cost, placedAt: s.clock.t, dueAt: s.clock.t + LEAD_TIME_DAYS, status: 'ordered' });
+  s.orders.push({ id, lines: real, cost, placedAt: s.clock.t, dueAt: s.clock.t + LEAD_TIME_DAYS + Math.floor(s.site.miles / 15), status: 'ordered' });
   log(s, `Ordered ${real.map(l => `${l.qty} × ${MATERIALS[l.material].name.toLowerCase()}`).join(', ')} — $${cost.toLocaleString('en-US')}.`);
   return id;
 }
