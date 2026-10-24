@@ -279,6 +279,7 @@ export class BattleRenderer {
       case 'breach': this._boom(e.x, this._ground(e.x, e.z), e.z, 0.5, true); break;
       case 'wound': { const u = U_(e.unit); if (u && !e.stopped) { u.wound = Math.min(1, u.wound + Math.max(0.3, e.sev)); this._tint(u); } break; }
       case 'death': { const u = U_(e.unit); if (u) { u.dead = true; u.wound = 1; this._tint(u); u.y = 0; } break; }
+      case 'taken':
       case 'flee': {
         const u = U_(e.unit); if (!u || u.dead) break;
         const dx = u.x - this._center.x, dz = u.z - this._center.z, d = Math.hypot(dx, dz) || 1;

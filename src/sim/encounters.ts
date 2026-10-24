@@ -17,7 +17,7 @@ import { mulberry32, pick } from './rng';
 import { forewarned } from './radio';
 import { gearPosture } from './gear';
 import { armed, firepower } from './armory';
-import { applyBattle, planBattle } from './battle';
+import { applyBattle, planBattle, type RaiderTemper } from './battle';
 import { breakInDay, resolveBreakIn } from './breakins';
 import type { Aftermath, Prisoner } from './aftermath';
 import { isHome } from './blueprints';
@@ -161,7 +161,31 @@ export interface Encounter {
   wants?: Partial<Stock>;
   neighbor?: string;
   stances: Stance[];
+  /** Raiders: what kind of people they are (battle.ts RaiderTemper); the dossier may or may not say. */
+  temper?: RaiderTemper;
 }
+
+/**
+ * How ruthless a crew is. Most are desperate people after food; some will kill
+ * a wounded man to save a bullet; a few are what's left when it never comes
+ * back (The Road, Mad Max): they leave nobody and take the children. The
+ * longer and the more permanent the collapse, the more of those there are.
+ */
+export function raiderTemper(s: GameState, kind: EncounterKind, r: () => number): RaiderTemper {
+  const d = s.disaster;
+  const months = d.kind ? Math.max(0, (s.clock.t - d.hitAt) / 30) : 0;
+  const permanence = d.fate === 'never' ? 1 : d.fate === 'partial' ? 0.5 : 0.2;
+  const grim = permanence * Math.min(1, months / 12);
+  const savage = (kind === 'gang' ? 0.06 : kind === 'militia' ? 0.02 : 0.02) + 0.3 * grim * (kind === 'gang' ? 1.2 : 0.7);
+  const hard = 0.15 + 0.35 * grim;
+  const u = r();
+  return u < savage ? 'savage' : u < savage + hard ? 'hard' : 'desperate';
+}
+const TEMPER_SIGN: Record<RaiderTemper, string[]> = {
+  savage: ['There\'s something tied to the grille of the lead truck. It used to be a person.', 'Smoke from the Hendersons\' place two days ago. Nobody\'s seen the Hendersons since.', 'On the radio: a crew working the valley that leaves nobody standing. Kids missing from two farms.'],
+  hard: ['They shot a man at the feed store who wouldn\'t give up his truck.', 'Hard men. They\'ve done this before.'],
+  desperate: ['Thin, dirty, scared. More hungry than mean.', ''],
+};
 
 export interface Outcome { title: string; text: string; tone: 'good' | 'mixed' | 'bad'; lines: string[] }
 
@@ -282,6 +306,15 @@ export function whoComes(s: GameState, p: Posture, r: () => number): EncounterKi
 }
 
 function makeThreat(kind: EncounterKind, r: () => number, id: string, day: number, s: GameState): Encounter {
+  const e = makeThreat0(kind, r, id, day, s);
+  if (kind === 'looters' || kind === 'gang' || kind === 'militia') {
+    e.temper = raiderTemper(s, kind, r);
+    // the signs aren't always there to read
+    if (r() < (e.temper === 'savage' ? 0.65 : 0.5)) { const sign = pick(r, TEMPER_SIGN[e.temper]); if (sign) e.dossier.push(sign); }
+  }
+  return e;
+}
+function makeThreat0(kind: EncounterKind, r: () => number, id: string, day: number, s: GameState): Encounter {
   switch (kind) {
     case 'looters': {
       const size = 2 + Math.floor(r() * 4);
@@ -430,8 +463,12 @@ export function resolve(s: GameState, stance: Stance): Outcome {
     const help = allies.reduce((a, n) => a + n.members * 6, 0);
     if (stance === 'hide') {
       // everyone underground (or in the timber); they take what's lying about. Nobody gets in by the tunnel: it only opens from inside.
-      const found = r() * 100 < p.visibility * 0.6;
-      if (!found) { title = 'They never knew'; text = p.bunker ? 'Lights out, everyone down the hatch. Boots on the porch, voices, then the truck pulls away.' : 'Everyone into the timber, flat in the deadfall. Boots on the porch, voices, then the truck pulls away.'; tone = 'good'; }
+      const found = r() * 100 < p.visibility * 0.6 + (e.temper === 'savage' ? 25 : 0);
+      // a savage crew doesn't stop at the stores: they hunt for whoever lives here
+      if (found && e.temper === 'savage' && !p.bunker && !p.safeRoom && r() < 0.6) {
+        stance = 'defend';
+        lines.push('They didn\'t stop at the house. They came into the trees after you, with dogs.');
+      } else if (!found) { title = 'They never knew'; text = p.bunker ? 'Lights out, everyone down the hatch. Boots on the porch, voices, then the truck pulls away.' : 'Everyone into the timber, flat in the deadfall. Boots on the porch, voices, then the truck pulls away.'; tone = 'good'; }
       else {
         const lost = take(s, e.wants ?? {}, p.bunker ? 1 : 1.5);
         title = 'They took what they found'; text = p.bunker ? 'From the bunker you hear them go through the house and the shop.' : 'From the trees you watch them load your stores into the truck.'; tone = 'bad';
@@ -440,7 +477,7 @@ export function resolve(s: GameState, stance: Stance): Outcome {
         if (!p.bunker && p.safeRoom) lines.push('Everyone sat it out behind the safe-room door.');
       }
     } else if (stance === 'parley' || stance === 'trade') {
-      const calm = r() * 100 < 35 + negotiator * 7 + (e.kind === 'refugees' ? 30 : 0) + (e.kind === 'requisition' ? 15 : 0) - (e.kind === 'gang' ? 15 : 0);
+      const calm = r() * 100 < 35 + negotiator * 7 + (e.kind === 'refugees' ? 30 : 0) + (e.kind === 'requisition' ? 15 : 0) - (e.kind === 'gang' ? 15 : 0) - (e.temper === 'savage' ? 45 : e.temper === 'hard' ? 10 : 0);
       if (calm) {
         const paid = take(s, e.wants ?? {}, stance === 'trade' ? 0.5 : 0.3);
         title = 'Talked down'; text = `${negotiator >= 5 ? 'A good talker at the gate. ' : ''}They leave with something, and nobody fired a shot.`; tone = 'mixed';
@@ -458,7 +495,7 @@ export function resolve(s: GameState, stance: Stance): Outcome {
     }
     if (stance === 'defend') {
       // the fight itself, second by second (sim/battle.ts); the world can play it back from g.battle
-      const b = planBattle(s, Math.max(1, e.size - Math.floor(help / 12)), s.seed * 131 + e.day * 7 + 1, { armed: e.armed });
+      const b = planBattle(s, Math.max(1, e.size - Math.floor(help / 12)), s.seed * 131 + e.day * 7 + 1, { armed: e.armed, temper: e.temper });
       g.battle = b;
       lines.push(...applyBattle(s, b));
       if (b.result === 'repelled' || b.result === 'fled') {

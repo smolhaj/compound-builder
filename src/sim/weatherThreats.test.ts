@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { newGame } from './state';
+import { calendarOf, newGame, type GameState } from './state';
+import { fieldHarvest, produce } from './needs';
 import { CLASSIC } from './site';
 import { snowedIn, weatherDay, weatherOf } from './weatherThreats';
 
@@ -10,6 +11,8 @@ const place = (region: typeof CLASSIC.region, doy: number, seed = 5) => {
   return g;
 };
 const run = (g: ReturnType<typeof newGame>, days: number) => { const t0 = g.clock.t; const lines: string[] = []; for (let d = 0; d < days; d++) { g.clock.t = t0 + d; lines.push(...weatherDay(g)); } return lines; };
+
+const fieldHarvestAt = (g: GameState, t: number) => { g.clock.t = t; return fieldHarvest(g); };
 
 describe('weather threats', () => {
   it('a few notable storms a year at most', () => {
@@ -69,8 +72,10 @@ describe('weather threats', () => {
     g.stock.fresh = 10;
     g.weather = { active: { kind: 'hail', at: 0, until: 0 }, last: -999 };
     g.clock.t = 0; weatherDay(g);
-    expect(g.structures.find(s => s.id === 'g')!.stage).toBe(4);
+    // the beds stay; this season's crop is what's lost
+    expect(g.structures.find(s => s.id === 'g')!.stage).toBe(5);
     expect(g.stock.fresh).toBe(5);
+    expect(g.weather.hail).toBeTruthy();
     const h = place('desert', 200);
     h.people[0].age = 72;
     h.utilities.lit = [];
@@ -78,5 +83,25 @@ describe('weather threats', () => {
     run(h, 4);
     expect(h.personState.find(p => p.id === h.people[0].id)!.needs.health).toBeLessThan(100);
     expect(h.weather.active).toBeNull();
+  });
+  it('hail takes the season\'s crop, not the beds: the garden comes back after replanting, the fields come in short', () => {
+    const g = place('plains', 200);
+    g.structures.push({ id: 'g', kind: 'garden', x: 5, z: 5, rot: 0, stage: 5, done: 0, supplied: true, finishedAt: 0 });
+    g.structures.push({ id: 'f', kind: 'field', x: 9, z: 9, rot: 0, stage: 99, done: 0, supplied: true, finishedAt: 0 });
+    const year = (t: number) => { g.clock.t = t; return calendarOf(g.clock); };
+    // mid-July, the garden at full summer
+    let t = 0; while (year(t).doy !== 195) t++;
+    const before = produce(g);
+    const c = calendarOf(g.clock);
+    g.weather = { active: null, last: -999, hail: { year: c.year, doy: c.doy - 1 } };
+    expect(produce(g)).toBeLessThan(before * 0.5);
+    g.clock.t = t + 40;
+    expect(produce(g)).toBeGreaterThan(0);
+    // the field harvest that year is short, the next year back to full
+    let h = t; while (fieldHarvestAt(g, h) === 0) h++;
+    const short = fieldHarvestAt(g, h);
+    g.weather.hail = undefined;
+    expect(short).toBeLessThan(fieldHarvestAt(g, h) * 0.8);
+    expect(short).toBeGreaterThan(0);
   });
 });

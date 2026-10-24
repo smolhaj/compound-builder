@@ -25,7 +25,7 @@ import { calendarOf } from '../src/sim/state';
 import { planRun } from '../src/sim/perimeter';
 import { orderFit, fitProblem, plant } from '../src/sim/utilities';
 import { orderHardenAll } from '../src/sim/hardening';
-import { resolve, type Stance } from '../src/sim/encounters';
+import { defenseOf, postureOf, resolve, type Stance } from '../src/sim/encounters';
 import { resolveAftermath, type AftermathChoice } from '../src/sim/aftermath';
 import type { PlannedBattle } from '../src/sim/battle';
 const AFTER: Record<string, AftermathChoice> = { idle: 'leave', homestead: 'treat_release', prepper: 'hold', fortress: 'leave' };
@@ -44,11 +44,14 @@ const PLANS: Record<Strategy, Array<[string, number, number]>> = {
     ['bunker_hatch', 20, 40], ['bunker_corridor', 20.75, 40], ['bunker_dorm', 21.75, 40.25], ['bunker_stores', 21.75, 41.25], ['bunker_plant', 22.75, 40.25], ['bunker_medical', 22.75, 41.25], ['bunker_comms', 20.5, 41]],
   fortress: [['timber_cabin', 30, 30], ['well_hand', 26, 34], ['workshop', 38, 28], ['garden', 22, 28]],
 };
+/** Their strength well over the place's defense (what the gate card shows). */
+const outgunned = (s: GameState) => (s.gate.pending?.strength ?? 0) > defenseOf(postureOf(s)) * 1.2;
 /** Days of food left per head if `size` more join (what the gate card shows). */
 const roomFor = (s: GameState, size: number) => { const here = s.personState.filter(p => p.needs.died == null).length; return daysOfFood(s) * here / (here + size); };
 const STANCE: Record<Strategy, (kinds: Stance[], kind: string, s: GameState, size: number) => Stance> = {
   idle: k => k.includes('turn_away') ? 'turn_away' : k.includes('hide') ? 'hide' : k[0],
-  homestead: (k, kind, s, n) => kind === 'arrival' ? (s.food.fromStores || roomFor(s, n) > 240 ? 'take_in' : 'trade') : k.includes('parley') ? 'parley' : k[0],
+  // a sensible family: talk first, and if they're clearly outgunned, hide rather than fight
+  homestead: (k, kind, s, n) => kind === 'arrival' ? (s.food.fromStores || roomFor(s, n) > 240 ? 'take_in' : 'trade') : outgunned(s) && k.includes('hide') ? 'hide' : k.includes('parley') ? 'parley' : k[0],
   prepper: (k, kind, s, n) => kind === 'arrival' ? (s.food.fromStores || roomFor(s, n) > 365 ? 'trial' : 'turn_away') : k.includes('hide') ? 'hide' : k[0],
   fortress: (k, kind) => kind === 'arrival' ? 'turn_away' : k.includes('defend') ? 'defend' : k[0],
 };

@@ -64,7 +64,15 @@ export interface BattleOptions {
    * them), and someone shouts that the police are coming. No breach of a line.
    */
   peacetime?: boolean;
+  /**
+   * What kind of people they are once they're inside (encounters.ts raiderTemper):
+   * desperate: they want the food and fight whoever fights (the default);
+   * hard: they also finish off a wounded defender now and then;
+   * savage: the Road / Mad Max kind: nobody is left alive, the children are taken.
+   */
+  temper?: RaiderTemper;
 }
+export type RaiderTemper = 'desperate' | 'hard' | 'savage';
 /** A planned battle plus what applyBattle needs (still a Battle for the playback). */
 export interface PlannedBattle extends Battle {
   spent: Partial<Record<Caliber, number>>;
@@ -95,7 +103,7 @@ interface Fighter {
   nvg: boolean;
   /** The gun's condition (a worn gun jams more). */
   wear: number;
-  movedAt?: number; bleedAt?: number; bleedPart?: 'head' | 'torso' | 'arm' | 'leg' | 'frag'; saidAt?: number;
+  movedAt?: number; aided?: boolean; taken?: boolean; bleedAt?: number; bleedPart?: 'head' | 'torso' | 'arm' | 'leg' | 'frag'; saidAt?: number;
 }
 
 const dist = (a: { x: number; z: number }, b: { x: number; z: number }) => Math.hypot(a.x - b.x, a.z - b.z);
@@ -205,6 +213,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
   const late = Math.min(1, daysAfter / 365);
   const armedR = opts.armed !== false;
   const peace = !!opts.peacetime;
+  const temper: RaiderTemper = peace ? 'desperate' : opts.temper ?? 'desperate';
   let gLeft = opts.grenades ?? (armedR && !peace ? Math.round(raiders * late * 0.6 * r()) : 0);
   let rLeft = opts.rockets ?? (armedR && !peace && daysAfter > 120 && r() < late * 0.5 ? 1 : 0);
   for (let i = 0; i < raiders; i++) {
@@ -320,7 +329,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
   };
   // how organized they are: later in the collapse, armored, more of them carry rifles
   const org = peace ? 0 : Math.min(1, late * 0.7 + R.filter(f => f.armor.plate || f.armor.soft).length / Math.max(1, raiders) * 0.4);
-  let shaken = false;
+  let shaken = false, heldUp = false;
   let wallDown = false, breached = false, fled = false, end: PlannedBattle['result'] | null = null, endT = 0;
   let breachT = 0, lineSince = -1;
 
@@ -450,7 +459,8 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
       f.hp -= f.bleed;
       if (f.hp <= 0) { bleedOut(f, t); continue; }
       // still able: put your own tourniquet on (those who served know how and do it fast)
-      if (!f.out && f.side === 'home' && t - (f.bleedAt ?? t) >= (f.vet ? 2 : 6) && ifaks > 0) {
+      if (!f.out && !f.aided && f.side === 'home' && t - (f.bleedAt ?? t) >= (f.vet ? 2 : 6) && ifaks > 0) {
+        f.aided = true;   // one go at it: what's left of the bleeding is for the medic
         stopBleed(f, f, t, !!f.vet);
         sayF(f, t, f.bleedPart === 'leg' || f.bleedPart === 'arm' ? ['Tourniquet — I got it on — oh God, oh God, tighter —', 'I\'m putting the tourniquet on — fuck, it hurts —'] : ['Pressing on it — I\'m pressing on it —', 'There\'s a hole in me — the seal, where\'s the seal —'], ['Tourniquet\'s on. Back in it.', 'Sealed it. I\'m good.'], 0);
       } else if (!f.out && f.side === 'raider' && t - (f.bleedAt ?? t) >= 5 && r() < 0.15) f.bleed *= 0.3;
@@ -504,7 +514,8 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
     if (!shaken && !fled && !breached && org < 0.35 && losses > 0 && t < 40) { shaken = true; firstBlood = r() < 0.4; }
     // a break-in: they run at the first shot from the family, or soon after they find someone awake and facing them
     const peaceBreak = peace && alarmed && (losses > 0 || t >= 10 || ev.some(e => e.kind === 'shot' && e.from.startsWith('h_')));
-    if (!fled && !breached && rUp.length && (losses >= Math.max(1, raiders * (0.25 + 0.3 * org)) || R[0].out || firstBlood || peaceBreak)) {
+    // a savage crew doesn't scare: they take more losses before they quit
+    if (!fled && !breached && rUp.length && (losses >= Math.max(1, raiders * (0.25 + 0.3 * org + (temper === 'savage' ? 0.2 : 0))) || (R[0].out && temper !== 'savage') || (firstBlood && temper === 'desperate') || peaceBreak)) {
       fled = true;
       const l1 = lead();
       t += 1;   // after this second's shots land
@@ -525,10 +536,41 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
       if (f.dry) { f.fled = true; ev.push({ t, kind: 'flee', unit: f.id }); if (r() < 0.5) say(t, pick(['I\'m dry! I\'m out!', 'No ammo — I\'m outta here!']), f); continue; }
       if (t < f.readyAt) continue;
       if (breached) {
-        // inside: go for the house, shoot anyone not in a hard shelter
+        // inside: go for the house and the stores. They fight whoever still fights; someone hiding unarmed is
+        // mostly found and held at gunpoint, not shot (a panicked shot now and then); the wounded on the ground are left
         if (d > 1.2) { const s2 = Math.min(MOVE, d - 1); f.x += (C.x - f.x) / d * s2; f.z += (C.z - f.z) / d * s2; if (t % 3 === 0) ev.push({ t, kind: 'move', unit: f.id, x: r2(f.x), z: r2(f.z) }); }
-        const tg = H.filter(h => !h.dead && !h.escaped && !(h.shelter && hardShelter) && dist(h, f) <= f.arm.range + 3).sort((a, b) => dist(a, f) - dist(b, f))[0];
+        const near = (h: Fighter) => !h.dead && !h.escaped && dist(h, f) <= f.arm.range + 3;
+        const fighting: Fighter | undefined = H.filter(h => near(h) && !h.out && !h.shelter).sort((a, b) => dist(a, f) - dist(b, f))[0];
+        const savage = temper === 'savage';
+        // a ruthless crew finishes the wounded on the ground (a hard one now and then)
+        const downed = fighting ? undefined : H.find(h => near(h) && h.out && !h.dead && !h.shelter && !h.escaped);
+        if (downed && r() < (savage ? 0.35 : temper === 'hard' ? 0.06 : 0)) {
+          downed.dead = true; downed.bleed = 0;
+          ev.push({ t: r2(t + 0.4), kind: 'shot', from: f.id, to: downed.id, hit: true });
+          ev.push({ t: r2(t + 0.45), kind: 'death', unit: downed.id, executed: true });
+          if (r() < 0.5) say(t, pick(savage ? ['Nobody gets up.', 'Leave nobody.'] : ['That one\'s still moving.']), f);
+          continue;
+        }
+        // the children: a savage crew carries them off; the adults hiding with them are shot
+        if (savage && !fighting && d <= 2 && !hardShelter) {
+          const kid = H.find(h => near(h) && h.shelter && h.kid && !h.dead && !h.escaped);
+          if (kid && r() < 0.2) {
+            kid.escaped = true; kid.taken = true;
+            ev.push({ t: r2(t + 0.5), kind: 'taken', unit: kid.id, by: f.id });
+            say(t, pick(['Grab the kid. Put it in the truck.', 'This one comes with us.']), f);
+            say(t + 0.8, pick(['NO — no — let me go — MOM! DAD!', 'Please — please — I want my mom —']), kid);
+            continue;
+          }
+        }
+        const hiding = !fighting && d <= 2 && r() < (savage ? 0.25 : 0.04) ? H.find(h => near(h) && h.shelter && !hardShelter && (!savage || !h.kid)) : undefined;
+        const tg = fighting ?? hiding;
         if (tg && r() < f.arm.rate) { if (tg.shelter) tg.cover = 0.5; shoot(f, tg, t + r() * 0.9); }
+        if (!fighting && !heldUp && !savage && d <= 2 && r() < 0.3 && H.some(h => h.shelter && !h.dead && !h.escaped && !hardShelter)) {
+          heldUp = true;
+          say(t, pick(['Hands where I can see them! Don\'t move!', 'On the floor! Nobody be a hero!', 'Where\'s the food? WHERE\'S THE FOOD?']), f);
+          const kid = H.find(h => h.shelter && h.kid && !h.dead && !h.escaped);
+          if (kid) say(t + 1, pick(['Please don\'t hurt us — please —', 'Mom? Dad? DAD?', 'Take it, take it all, just go —']), kid);
+        }
         continue;
       }
       // rockets at the best post in range
@@ -631,6 +673,13 @@ export function applyBattle(s: GameState, b: Battle): string[] {
       nd.hurt.push({ what: !e.part ? 'hit by shrapnel' : e.part === 'head' ? 'head wound' : e.part === 'torso' ? 'shot in the body' : e.sev < 30 ? 'grazed by a bullet' : `shot in the ${e.part}`, sev, trauma: true });
       nd.health = Math.max(s.disaster.difficulty === 'cozy' ? 5 : 1, nd.health - sev * 0.5);
       out.push(`${s.people[i].first} was wounded.`);
+    } else if (e.kind === 'taken' && byUnit.has(e.unit)) {
+      // carried off: out of the family's life (counted as gone, not dead)
+      const i = idx(e.unit); if (i < 0) continue;
+      const nd = s.personState[i].needs;
+      if (nd.died != null) continue;
+      nd.died = day; nd.taken = true;
+      out.push(`${s.people[i].first} was taken.`);
     } else if (e.kind === 'death' && byUnit.has(e.unit)) {
       const i = idx(e.unit); if (i < 0) continue;
       const nd = s.personState[i].needs;
@@ -650,7 +699,8 @@ export function applyBattle(s: GameState, b: Battle): string[] {
   if (thrown) s.stock.grenades = Math.max(0, (s.stock.grenades ?? 0) - thrown);
   if (result === 'breached' || result === 'overrun') {
     s.gate.raidsLost++;
-    const share = result === 'overrun' ? 0.6 : 0.3;
+    const savage = b.events.some(e => e.kind === 'taken' || (e.kind === 'death' && e.executed));
+    const share = savage ? 0.9 : result === 'overrun' ? 0.6 : 0.3;
     const lost: string[] = [];
     for (const k of ['canned', 'staples', 'frozen', 'fuel', 'meds'] as const) { const t = Math.floor((s.stock[k] ?? 0) * share); if (t > 0) { s.stock[k] -= t; lost.push(`${t} ${k}`); } }
     if (lost.length) out.push(`Lost: ${lost.join(', ')}`);
