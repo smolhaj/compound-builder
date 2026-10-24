@@ -17,6 +17,8 @@
  *               family) or boiling it (firewood). Arsenic in the well needs
  *               reverse osmosis for drinking water; hard water scales the
  *               pump unless there's a softener.
+ *               A filtration shed (sediment, carbon, UV) treats it all for the
+ *               house: no filter cartridges, no boiling.
  *  Greywater    a diverter sends sink and shower water to the garden: the
  *               garden needs half the well water.
  */
@@ -44,6 +46,9 @@ export function orderTanker(s: GameState, capacity: number): string | null {
   return null;
 }
 
+/** A finished filtration shed on the place (sediment + carbon + UV): well, rain and hauled water are safe to drink. */
+export const treated = (s: GameState) => s.structures.some(x => x.kind === 'filtration_shed' && x.stage >= 5);
+
 /** Once a day, after the water balance: jugs cover the shortfall, untreated water makes people sick, arsenic, the filter wears. */
 export function waterDay(s: GameState): string[] {
   const out: string[] = [];
@@ -63,7 +68,8 @@ export function waterDay(s: GameState): string[] {
   if (u.hauling && s.stock.water_trailer >= 1) u.haulFar = false;
   // untreated creek water: a filter, or boil it (firewood), or take the chance
   if (u.hauling) {
-    if (s.stock.water_filter >= 0.01) s.stock.water_filter = Math.max(0, s.stock.water_filter - 0.0008 * living.length);
+    if (treated(s)) { /* the filtration shed's sediment, carbon and UV take care of it */ }
+    else if (s.stock.water_filter >= 0.01) s.stock.water_filter = Math.max(0, s.stock.water_filter - 0.0008 * living.length);
     else if (s.stock.firewood >= 0.05) s.stock.firewood -= 0.05;
     else for (const ps of living) if (r() < 0.006) { ps.needs.hurt.push({ what: 'giardia (bad water)', sev: 25 }); out.push('Someone is sick from the creek water. Filter it or boil it.'); break; }
   }

@@ -26,7 +26,7 @@ export const EXPOSURE_NAME: Record<ExposureSource, string> = {
   lights: 'Lights after the grid', smoke: 'Smoke & cooking', talk: 'Talk in town', news: 'On the local news',
 };
 
-const STRUCTURE_WEIGHT: Record<string, number> = { bunker_hatch: 10, bunker_stairs: 8, water_tower: 8, solar_array: 7 };
+const STRUCTURE_WEIGHT: Record<string, number> = { bunker_hatch: 10, bunker_stairs: 8, water_tower: 8, solar_array: 7, garage_solar: 5 };
 
 /** Each source's points (talk is negative). */
 export function exposureParts(s: GameState): Record<ExposureSource, number> {
