@@ -3,7 +3,7 @@
  *
  * Small iron / timber pieces EnvironmentRenderer._houseOnLot adds to the r16
  * regional houses, as axis-aligned boxes in the house frame (+x along the
- * street, +z away from it; y = box centre above the lot ground). Every piece
+ * street, +z away from it; y = box center above the lot ground). Every piece
  * is an instance in the town's shared pad set — no per-house draw calls.
  *
  *   entryCourt     — the Spanish entry court's low stucco walls, gate piers,
@@ -16,7 +16,7 @@
  *                    cross the walk or pass through a pier.
  */
 
-/** [x, yCentre, z, w, h, d] in the house frame. */
+/** [x, yCenter, z, w, h, d] in the house frame. */
 export type LBox = [number, number, number, number, number, number];
 
 export interface CourtGate {
@@ -31,7 +31,7 @@ export interface CourtGate {
 
 /**
  * The window bays the facade shader draws across a house face of width `w`
- * (≈ 2.5 m bays, at least one): their centres from the face's middle.
+ * (≈ 2.5 m bays, at least one): their centers from the face's middle.
  */
 export function houseBays(w: number): number[] {
   const nb = Math.max(1, Math.floor(w / 0.42 + 0.5 + 1e-3)), bw = w / nb;
@@ -87,7 +87,7 @@ export interface Deck { boards: LBox[]; framing: LBox[]; rail: LBox[]; glass: LB
 
 /**
  * A cantilevered timber deck (NW contemporary), in a face frame: the wall is
- * the plane z = 0, the deck runs along x (centred) and projects toward +z for
+ * the plane z = 0, the deck runs along x (centered) and projects toward +z for
  * `depth`, its walking surface at `yFloor`. No posts to the ground: deep
  * joists bear back into the house, a fascia board hides their ends. The
  * guard (≈ 1 m) runs round the three open sides — frameless glass panels
@@ -209,7 +209,7 @@ export function gateTop(t: number): number {
 export const COURT = { t: 0.045, h: 0.19, pier: 0.06, pierH: 0.212, cap: 0.014, over: 0.006 } as const;
 
 export interface EntryCourt {
-  /** Stucco wall runs and the two gate piers (y centre above the lot ground; footing below it). */
+  /** Stucco wall runs and the two gate piers (y center above the lot ground; footing below it). */
   walls: LBox[];
   /** Terracotta tile coping on the walls, and the pier caps. */
   caps: LBox[];
@@ -222,7 +222,7 @@ export interface EntryCourt {
 /**
  * A Spanish-revival entry court in front of the house face z = faceZ: side
  * walls at x = xe and x = xr running back into the face, a front wall at z = zf
- * open at a gate centred on the walk (x = px, half-width `gap`) between two
+ * open at a gate centered on the walk (x = px, half-width `gap`) between two
  * piers. One height everywhere; the runs overlap at the corners (same top, so
  * they read as one mass); each carries a tile coping cap that never doubles
  * up at a corner; every piece runs `footing` below the lot ground so the wall
@@ -243,7 +243,7 @@ export function entryCourt(px: number, gap: number, xe: number, xr: number, zf: 
     caps.push([x, h + cap / 2, (c0 + faceZ) / 2, t + 2 * over, cap, faceZ - c0]);
     footprints.push([x, (zf - t / 2 + faceZ) / 2, t, faceZ - zf + t / 2]);
   }
-  // front runs from the corners to the pier centres
+  // front runs from the corners to the pier centers
   const pc = [px - gap - pier / 2, px + gap + pier / 2];
   const runs: Array<[number, number, number, number]> = [[lo - t / 2, pc[0], lo - t / 2 - over, pc[0]], [pc[1], hi + t / 2, pc[1], hi + t / 2 + over]];
   for (const [a, b, ca, cb] of runs) {
@@ -266,10 +266,10 @@ export function entryCourt(px: number, gap: number, xe: number, xr: number, zf: 
 export const GATE_OPEN_ANGLE = 110 * Math.PI / 180;
 
 /**
- * The gate in an opening centred on the walk at x = px, half-width `gap`, in
+ * The gate in an opening centered on the walk at x = px, half-width `gap`, in
  * the court's front wall at z = zf (the court lies at z > zf), between piers of
  * COURT.pier whose inner faces are the hinge lines. Each leaf hangs on its
- * pier just inside the wall's centre line; open, it turns on that hinge into
+ * pier just inside the wall's center line; open, it turns on that hinge into
  * the court by GATE_OPEN_ANGLE, so it stands angled back toward the pier and
  * its pickets still read from the street. Never across the walk (`walkHalf`
  * its half width), never through the pier or the wall. Each part is a box in
@@ -352,7 +352,7 @@ export function doorX(edge: number, w: number, s: number): number {
 }
 
 /**
- * The upper-floor bays (centres, x) of a block of width `w` centred at x0 where a
+ * The upper-floor bays (centers, x) of a block of width `w` centered at x0 where a
  * balcony (≤ 0.3 u wide) clears every excluded x span (an entry tower, a loggia's roof).
  */
 export function spanishFreeBays(w: number, x0: number, ...excl: Array<[number, number] | null>): number[] {
@@ -366,7 +366,7 @@ export const ARCH = { r: 0.3, head: 0.33, pier: 0.2 } as const;
 export interface Arcade {
   /** Arch heads (the instanced arch-head mesh: a unit bay scaled uniformly by the pitch): [x, yBase (the springing), z, pitch, pitch, thickness]. */
   heads: LBox[];
-  /** Piers, the band over the arches, the closed end walls, the floor plinth (house colour). */
+  /** Piers, the band over the arches, the closed end walls, the floor plinth (house color). */
   stucco: LBox[];
   /** Impost blocks at the springing and pier bases. */
   trim: LBox[];
@@ -377,8 +377,8 @@ export interface Arcade {
   /** The loggia's footprint [x, z, w, d]. */
   footprint: [number, number, number, number];
   n: number; pitch: number;
-  /** The arch centres (x). */
-  centres: number[];
+  /** The arch centers (x). */
+  centers: number[];
 }
 
 /**
@@ -386,8 +386,8 @@ export interface Arcade {
  * round arches on short piers standing `depth` in front of the face z = faceZ
  * between x = lo and x = hi (closed stucco end walls at both ends), a band
  * over the arches up to `top`, a timber ceiling with beams, a tiled floor at
- * `floorY` on a stucco plinth down to `groundY` (y = box centres in the house
- * frame). `align`: an arch is centred on it (the front door behind it).
+ * `floorY` on a stucco plinth down to `groundY` (y = box centers in the house
+ * frame). `align`: an arch is centered on it (the front door behind it).
  * Null when 3 arches (pitch ≥ 0.24 u ≈ 1.45 m) do not fit.
  */
 export function loggiaArcade(o: { lo: number; hi: number; faceZ: number; depth: number; floorY: number; top: number; groundY: number; align?: number; nMax?: number }): Arcade | null {
@@ -398,7 +398,7 @@ export function loggiaArcade(o: { lo: number; hi: number; faceZ: number; depth: 
   let p = Math.min(pMax, span / n);
   let a0 = o.lo + endMin + (span - n * p) / 2;
   if (o.align !== undefined) {
-    // the most (then the widest) arches with one centred on `align`, inside the end walls
+    // the most (then the widest) arches with one centered on `align`, inside the end walls
     let found = false;
     for (let nn = n; nn >= 3 && !found; nn--) {
       for (let pp = pMax; pp >= pMin - 1e-9 && !found; pp -= 0.005) {
@@ -415,10 +415,10 @@ export function loggiaArcade(o: { lo: number; hi: number; faceZ: number; depth: 
   const spring = o.top - band - ARCH.head * p;
   const pw = ARCH.pier * p;
   const heads: LBox[] = [], stucco: LBox[] = [], trim: LBox[] = [], tile: LBox[] = [], timber: LBox[] = [];
-  const centres: number[] = [];
+  const centers: number[] = [];
   for (let k = 0; k < n; k++) {
     const x = a0 + (k + 0.5) * p;
-    centres.push(x);
+    centers.push(x);
     heads.push([x, spring, zc, p, p, t]);
   }
   const h = spring - o.floorY;
@@ -442,5 +442,5 @@ export function loggiaArcade(o: { lo: number; hi: number; faceZ: number; depth: 
     const x = Math.min(eB - 0.012, Math.max(eA + 0.012, a0 + k * p));
     timber.push([x, o.top - band - 0.019, zm + t / 2, 0.022, 0.022, o.depth - t]);
   }
-  return { heads, stucco, trim, tile, timber, footprint: [(o.lo + o.hi) / 2, zm, o.hi - o.lo, o.depth], n, pitch: p, centres };
+  return { heads, stucco, trim, tile, timber, footprint: [(o.lo + o.hi) / 2, zm, o.hi - o.lo, o.depth], n, pitch: p, centers };
 }

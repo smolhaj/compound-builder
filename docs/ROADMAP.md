@@ -4,7 +4,7 @@ Living list of features beyond the current milestone. The GDS stays the source o
 items here get folded into it (with the user) before they are built.
 Legend: **[user]** asked for by the user · **[gds]** already in the GDS · **[idea]** suggested, needs a yes.
 
-## Perimeter & surroundings (GDS §2.4 defence / visibility)
+## Perimeter & surroundings (GDS §2.4 defense / visibility)
 - **[user]** Barbed-wire fences (cheap, see-through, slows but doesn't stop; snags on approach).
 - **[user]** Thorn / bramble hedge lines (blackberry, hawthorn, Osage-orange "hedge apple" — the pre-barbed-wire
   living fence). Grows in over seasons; free once planted; hides and blocks; burns in a dry summer.
@@ -23,7 +23,7 @@ Legend: **[user]** asked for by the user · **[gds]** already in the GDS · **[i
 - **[idea]** Defensible space for wildfire: firebreaks, cleared zones, a firefighting water tank + pump.
 
 ## Underground (GDS §2.2 underground layer)
-- **[user]** Underground bunkers, fully buried, with a separate build view (floor toggle). **Built (v1):** hatch / stairwell entrances, tunnel, container, bunkroom, galley, storeroom, plant room, medical, comms & armoury; underground view; open pits while digging; spoil → berms.
+- **[user]** Underground bunkers, fully buried, with a separate build view (floor toggle). **Built (v1):** hatch / stairwell entrances, tunnel, container, bunkroom, galley, storeroom, plant room, medical, comms & armory; underground view; open pits while digging; spoil → berms.
 - **[user]** Bunker entrances inside a walled compound (hidden hatch in a shed / under a floor).
 - **[gds]** Root cellar, cistern, tunnels between buildings.
 - **[idea]** Escape tunnel to a hidden exit in the woods; storm cellar; fallout shelter with NBC air filtration,
@@ -37,15 +37,15 @@ Legend: **[user]** asked for by the user · **[gds]** already in the GDS · **[i
 - **[idea]** Power: solar + battery bank, micro-hydro on the creek, wood gasifier, fuel storage with stabiliser
   and rotation, a Faraday cage for spare electronics (EMP scenario).
 - **[idea]** Heat: firewood in cords (felling feeds it), wood stove, passive solar, earth-sheltered walls.
-- **[idea]** Sanitation: outhouse / composting toilets, greywater, laundry — hygiene drives disease and morale.
+- **[idea]** Sanitation: outhouse / composting toilets, graywater, laundry — hygiene drives disease and morale.
 - **[idea]** Medical: infirmary, quarantine room (pandemic scenario), dental, med stockpile with expiry.
-- **[idea]** Comms: ham / GMRS radio, antenna mast (useful *and* visible), field phones to neighbours, codes.
+- **[idea]** Comms: ham / GMRS radio, antenna mast (useful *and* visible), field phones to neighbors, codes.
 - **[idea]** Workshop: forge, sawmill, reloading bench, vehicle repair; tool wear.
 - **[idea]** Bug-out: off-site caches, a bug-out vehicle and bags, a fallback retreat, rally points.
 
 ## Community & people (GDS §3, §5)
 - **[idea]** Barter goods (salt, coffee, alcohol, medicine, fuel) and a trade post; mutual-aid pacts with the
-  neighbour farms; a school, chapel or meeting hall; library and music for morale; skills taught over time.
+  neighbor farms; a school, chapel or meeting hall; library and music for morale; skills taught over time.
 
 ## Visual / tech
 - Construction stages, weathering, damage states (GDS §8.1 step 2); overlays (step 3); photo mode.
@@ -76,26 +76,26 @@ Grouped by what they do. Each has a furnished interior, construction stages, upk
 - Workshop, blacksmith forge, sawmill and lumber kiln, machine shop, vehicle bay with pit, reloading bench, sewing / leather room, pottery kiln, soap and candle making, a print room or radio repair bench.
 
 **Sanitation and utilities** (user: plumbing / electricity possible, but only with the infrastructure, and it must cost something)
-- Outhouse (first, cheap), composting toilet, bathhouse, septic tank + leach field, greywater wetland.
+- Outhouse (first, cheap), composting toilet, bathhouse, septic tank + leach field, graywater wetland.
 - Water: hand pump → pressure tank / gravity water tower → plumbed fixtures (sink, shower, water heater, flush toilet); pipes buried below frost line or they freeze.
 - Power: oil / candle → generator → solar + batteries + inverter → wired buildings (lights, freezer, well pump, radio). Upkeep: battery ageing, panel cleaning, pump repairs, fuel.
 
 **Health and people**
 - Infirmary / clinic with a quarantine room, dental chair, herb garden + drying room, bathhouse / sauna, laundry, composting toilets, school room, chapel or meeting hall, mess hall, children's play yard, cemetery (a quiet, real part of a long game), trading post at the gate.
 
-**Security and defence** (the user's ideas first)
+**Security and defense** (the user's ideas first)
 - Barbed-wire and razor-wire fences, thorn hedgerows (hawthorn, blackthorn, Osage orange: years to grow, nearly impassable), shipping-container walls, log palisade, earth berms, gabion walls, rammed-earth walls, HESCO-style barriers, a moat or dry ditch, a pond as a barrier, vehicle ditches and dragon's teeth, a chicane approach and a double gate (sally port), watchtowers, fighting positions, a safe room in each house.
 - Motion-sensor lights, driveway alarms, tripwires with noise makers, trail cameras, dog runs, geese (loud alarms), listening posts, a radio relay mast.
-- **Sightlines (the user's idea):** hidden in the woods vs out in the open is a real tradeoff. Trees hide you and block your view; open ground lets you see them coming and lets them see you. Overlays for visibility from the road, from the ridge, and at night (lights, smoke, noise). Camouflage nets, earth-covered roofs, light discipline, smokeless stoves, decoy buildings, and a "grey man" mode where the compound looks like an ordinary farm.
+- **Sightlines (the user's idea):** hidden in the woods vs out in the open is a real tradeoff. Trees hide you and block your view; open ground lets you see them coming and lets them see you. Overlays for visibility from the road, from the ridge, and at night (lights, smoke, noise). Camouflage nets, earth-covered roofs, light discipline, smokeless stoves, decoy buildings, and a "gray man" mode where the compound looks like an ordinary farm.
 
 **Underground** (the user's idea)
-- Root-cellar-grade shelters first, then a buried container bunker, a poured-concrete bunker with blast door and NBC filter, a bunker entered from inside the walls (hatch in a shed or under a house), an escape tunnel to a hidden exit in the woods, underground storage galleries, a bunker that can be extended room by room (dormitory, galley, armoury, comms, generator room, water tank, medical bay). Digging moves real dirt: spoil becomes berms.
+- Root-cellar-grade shelters first, then a buried container bunker, a poured-concrete bunker with blast door and NBC filter, a bunker entered from inside the walls (hatch in a shed or under a house), an escape tunnel to a hidden exit in the woods, underground storage galleries, a bunker that can be extended room by room (dormitory, galley, armory, comms, generator room, water tank, medical bay). Digging moves real dirt: spoil becomes berms.
 
 **Vehicles and mobility**
-- Defence truck, farm tractor + implements, ATVs with trailers (log skidding), horses + a barn and tack room (fuel-free transport), bicycles, a boat on the reservoir, a bug-out trailer packed and ready.
+- Defense truck, farm tractor + implements, ATVs with trailers (log skidding), horses + a barn and tack room (fuel-free transport), bicycles, a boat on the reservoir, a bug-out trailer packed and ready.
 
 ## Layouts [idea]
-The game should reward many shapes of compound, each with tradeoffs (the GDS cost / visibility / defence / labour lenses):
+The game should reward many shapes of compound, each with tradeoffs (the GDS cost / visibility / defense / labour lenses):
 - **Hidden homestead:** under the timber, no wall, low profile, earth-sheltered house. Hard to find, hard to defend once found, short sightlines.
 - **Fortified farm:** a classic walled farmstead in the open: long sightlines and fields, but visible for miles.
 - **Hillside dug-in:** buildings cut into a slope, bunker galleries behind, terraces in front.
@@ -109,6 +109,6 @@ Layout choices feed the systems: walking distance between home, water, food and 
 - **Time and seasons matter:** orchards take years, firewood must season a year, hedges take 3–5 years to become a barrier, winter shuts down building, and spring mud slows trucks.
 - **Real people:** a family with skills, moods and relationships. Kids grow up and learn trades. Newcomers ask to join (vet them, house them, feed them). Grandparents bring knowledge.
 - **Peacetime then crisis:** years of preparing with money (GDS), then a crisis that changes the rules: trucks stop coming, money stops mattering, and barter and labour take over.
-- **The neighbours:** the farms around you can become allies, traders or threats. Mutual-aid pacts, a shared radio net, a market day.
+- **The neighbors:** the farms around you can become allies, traders or threats. Mutual-aid pacts, a shared radio net, a market day.
 - **Visible history:** buildings weather, paths wear in, stumps, fresh fill, and patched roofs show what happened.
 - **Walk it:** first-person through a furnished home at night with the stove going and rain on the roof, then climb the watchtower and look out over the dark woods.

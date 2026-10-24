@@ -113,7 +113,7 @@ export const SEASON_WEIGHTS: Record<WeatherSeason, Record<WeatherKind, number>> 
 
 /**
  * Regional multipliers on SEASON_WEIGHTS (NOAA climate normals, in spirit):
- * Seattle / Portland are dry in summer and grey-wet all winter (drizzle, fog
+ * Seattle / Portland are dry in summer and gray-wet all winter (drizzle, fog
  * banks on the sound); coastal Southern California sees rain on a few winter
  * days and June-gloom cloud; the Gulf South and the Midwest get summer
  * thunderstorms (and spring severe weather); the Mountain West has its

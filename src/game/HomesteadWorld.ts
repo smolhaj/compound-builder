@@ -15,7 +15,7 @@ import { seasonState } from '../engine/world/season/seasonState';
 import { RegionalProps } from '../engine/world/houses/regionalProps';
 import { buildFarmstead, type FarmTree } from '../engine/world/houses/regionalFarmsteads';
 import { onFarmstead, type Farmstead } from '../engine/world/houses/farmstead';
-import { planNeighbours } from './region/neighbours';
+import { planNeighbors } from './region/neighbors';
 import { buildCamp, flickerCampfire } from './props/campGeometry';
 import { FamilyRenderer } from './people/FamilyRenderer';
 import type { GoalCtx, Site } from './people/peopleGoals';
@@ -119,7 +119,7 @@ export class HomesteadWorld {
   private _view: BuildingView = 'full';
   /** Atmosphere for the frame (set by the canvas before tick). */
   readonly air = { hour: 12, wind: 0.2, daylight: 1, viewportH: 800 };
-  /** Neighbouring farmsteads (seeded). */
+  /** Neighboring farmsteads (seeded). */
   readonly farms: Farmstead[];
   /** The family's camp (until a home stands; it stays as the work yard). */
   readonly camp: { x: number; z: number; rot: number };
@@ -150,7 +150,7 @@ export class HomesteadWorld {
     this._ws = ws;
     ws.setSite({ x0: 0, z0: 0, x1: PARCEL_SIZE, z1: PARCEL_SIZE });
     this.parcel = new ParcelTerrain(seed);
-    this.farms = planNeighbours(this.parcel);
+    this.farms = planNeighbors(this.parcel);
     this.camp = this._pickCamp();
     this.access = planAccess(this.camp);
     this.terrain = new TerrainRenderer(ws.scene);
@@ -245,7 +245,7 @@ export class HomesteadWorld {
     this._treeById = new Map(all.map(t => [t.id, t]));
     this._plantForest();
     const inside = (x: number, z: number) => x > -margin && x < PARCEL_SIZE + margin && z > -margin && z < PARCEL_SIZE + margin;
-    // Neighbouring farmsteads (houses, hay barns, corrals, poplar windbreaks)
+    // Neighboring farmsteads (houses, hay barns, corrals, poplar windbreaks)
     this._props?.dispose();
     const props = new RegionalProps(this._ws.scene, 'mountain');
     const farmTrees: FarmTree[] = [];
@@ -664,7 +664,7 @@ export class HomesteadWorld {
 
   private readonly _naturalH = (x: number, z: number) => this.parcel.natural(x, z).h;
 
-  /** A bunker room's doorways (its neighbours) and the ground above its surface point. */
+  /** A bunker room's doorways (its neighbors) and the ground above its surface point. */
   /** Hardening fitted per bunker room (from the sim), and its key. */
   private readonly _harden = new Map<string, { key: string; tiers: NonNullable<Structure['hardening']> }>();
 
@@ -681,7 +681,7 @@ export class HomesteadWorld {
     return { doors: { ...doorsOf(p, placed), ...tunnelDoors }, depth: Math.round((ground - datum) * 1000) / 1000, ...(blast.length ? { blast } : {}), ...(harden && Object.keys(harden).length ? { harden } : {}) };
   }
 
-  /** New neighbours open new doorways: rebuild the bunker rooms whose doorways changed. */
+  /** New neighbors open new doorways: rebuild the bunker rooms whose doorways changed. */
   private _syncUnderground(): void {
     const placed = [...this._built.values()].map(b => b.placed);
     for (const b of this._built.values()) {

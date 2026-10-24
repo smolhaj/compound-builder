@@ -2,7 +2,7 @@
  * Clutter — the slice-of-life layer that makes spaces look lived in (user:
  * "make sure there's clutter and slice of life stuff too"). Small props,
  * each built in its own frame on a surface at y = 0 (pass the surface
- * height in the placement), sizes in metres × M:
+ * height in the placement), sizes in meters × M:
  *
  *  table / counter  mugs, plates, bowls, bread, fruit, a cutting board,
  *                   jars, candles, an open book, mail, a puzzle / checkers
@@ -210,7 +210,7 @@ export const Clutter = {
     add(mat, box(0.42 * M, 0.5 * M, 0.06 * M, 0, 0.55 * M, -0.2 * M));
     add(mat, box(0.42 * M, 0.04 * M, 0.12 * M, 0, 1.03 * M, -0.2 * M));
   },
-  /** Rumpled quilt and a thrown-back corner on a bed (place at the bed centre, y = mattress top). */
+  /** Rumpled quilt and a thrown-back corner on a bed (place at the bed center, y = mattress top). */
   rumple(add: Add, mat: KitMaterialId = 'quilt_red'): void {
     add(mat, new THREE.SphereGeometry(0.3 * M, 8, 5).scale(1.4, 0.25, 0.9).translate(0.1 * M, 0.02 * M, -0.1 * M));
     add('linen', new THREE.SphereGeometry(0.18 * M, 7, 5).scale(1.2, 0.5, 0.8).translate(-0.25 * M, 0.04 * M, 0.3 * M));
@@ -276,7 +276,7 @@ export const Clutter = {
   },
 } as const;
 
-/** A flat image plane (its own 0–1 UVs, not world-scaled) facing +z, centred at (x, y, z). */
+/** A flat image plane (its own 0–1 UVs, not world-scaled) facing +z, centered at (x, y, z). */
 function artPlane(w: number, h: number, x: number, y: number, z: number): THREE.BufferGeometry {
   const g = new THREE.PlaneGeometry(w, h).translate(x, y, z);
   g.userData.keepUV = true;

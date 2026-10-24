@@ -88,7 +88,7 @@ describe('regional seasons', () => {
     }
   });
 
-  it('leaf litter peaks after the colour and is buried by snow', () => {
+  it('leaf litter peaks after the color and is buried by snow', () => {
     expect(at('new_england', 11, 5).litter).toBeGreaterThan(at('new_england', 10, 1).litter);
     expect(at('new_england', 1, 20).litter).toBeLessThan(0.05);
   });

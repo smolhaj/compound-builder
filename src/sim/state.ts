@@ -11,7 +11,8 @@ import type { PerimeterRun } from './perimeter';
 import { emptyUtilities, type Utilities } from './utilities';
 
 import type { HardenId, HardenJob, Tier } from './hardening';
-export const SAVE_VERSION = 8;
+import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
+export const SAVE_VERSION = 9;
 
 /** Starting savings (GDS §1 peacetime money constraint). */
 export const STARTING_MONEY = 30000;
@@ -64,13 +65,15 @@ export interface Structure {
   hardening?: Partial<Record<HardenId, Tier>>;
 }
 
-export type TaskKind = 'idle' | 'build' | 'forestry' | 'sleep' | 'chores' | 'school' | 'leisure';
+export type TaskKind = 'idle' | 'build' | 'forestry' | 'sleep' | 'chores' | 'school' | 'leisure' | 'job';
 
 export interface PersonState {
   id: string;
   task: TaskKind;
   /** Structure id when building, felling job id when in the woods. */
   target: string | null;
+  /** Still going to the day job (adults; ends when the disaster hits, or when they quit). */
+  employed?: boolean;
 }
 
 /** A tree marked for felling (GDS §2.1 "fell own timber"; docs/DECISIONS.md). */
@@ -123,13 +126,18 @@ export interface GameState {
   utilities: Utilities;
   /** Bunker hardening retrofits, ordered and in progress. */
   hardenJobs: HardenJob[];
+  /** The collapse clock: mode, the disaster to come, the outside world's services, the news ticker. */
+  disaster: DisasterState;
   /** Recent events for the HUD log (newest last, capped). */
   log: LogEntry[];
   /** Next id counter. */
   nextId: number;
 }
 
-export function newGame(seed: number, startDoy = 105, startYear = 2027): GameState {
+/** New-game choices (the setup screen). Defaults (tests, the dev scene): Free build, no day jobs. */
+export interface RunSetup { difficulty?: Difficulty; mode?: Mode; peace?: PeaceLength; kind?: DisasterKind | null; variant?: string; dayJobs?: boolean }
+
+export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: RunSetup = {}): GameState {
   const people = generateFamily(seed);
   return {
     version: SAVE_VERSION,
@@ -139,13 +147,14 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027): GameSta
     stock: { ...emptyStock(), firewood: STARTING_FIREWOOD },
     orders: [],
     people,
-    personState: people.map(p => ({ id: p.id, task: 'idle', target: null })),
+    personState: people.map(p => ({ id: p.id, task: 'idle', target: null, ...(setup.dayJobs && p.job ? { employed: true } : {}) })),
     structures: [],
     forestry: { jobs: [], cleared: [] },
     heat: { burned: 0, warned: -1 },
     perimeter: [],
     utilities: emptyUtilities(),
     hardenJobs: [],
+    disaster: newDisaster(seed, setup.mode ?? 'sandbox', setup.peace ?? 'random', setup.kind ?? null, setup.variant, setup.difficulty ?? 'standard'),
     log: [{ t: 0, text: `The ${people[0].last} family arrives on the land.` }],
     nextId: 1,
   };

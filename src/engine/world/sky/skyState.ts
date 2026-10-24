@@ -9,7 +9,7 @@
  *  • Sky darkness (Bortle class, in spirit) from the region and how built-up
  *    the surroundings are: a Mountain West or rural New England campus sees the
  *    Milky Way on a moonless night; a city campus sees a handful of stars in an
- *    orange-grey glow.
+ *    orange-gray glow.
  *  • God-ray strength: low sun, sun on screen, broken (not solid) cloud.
  */
 

@@ -6,7 +6,7 @@
  * optional front porch, chimney or stovepipe, ceiling, scaffold) that each
  * building describes with a spec and furnishes with a callback.
  *
- * Local frame: origin at the footprint centre on the pad (y = 0), ridge
+ * Local frame: origin at the footprint center on the pad (y = 0), ridge
  * along z, the main door / porch on the +z gable. One merged mesh per
  * layer × material; faces carry world-scaled UVs (1 UV = 1 unit) so kit
  * textures keep their real size. Scale: 1 unit ≈ 6 m; door ≈ 0.36 (2.15 m).
@@ -74,7 +74,7 @@ export interface BuildOpts {
 /** Collects geometry per layer × material. */
 export class Parts {
   layer: BuildLayer = 'stakes';
-  /** Shift applied to everything added (and to colliders): a shell set off-centre in its footprint. */
+  /** Shift applied to everything added (and to colliders): a shell set off-center in its footprint. */
   ox = 0; oz = 0;
   /** Seeded random for this building (clutter varies house to house). */
   readonly rnd: () => number;
@@ -143,7 +143,7 @@ export function windowAt(parts: Parts, cx: number, cz: number, y: number, nx: nu
   const alongX = nx === 0;
   const bx = (a: number, hh: number, depth: number, oa: number, oy: number, oo: number) =>
     alongX ? box(a, hh, depth, cx + oa, oy, cz + nz * oo) : box(depth, hh, a, cx + nx * oo, oy, cz + oa);
-  // the face point is the wall's outer surface; pull the frame back to the wall centre line
+  // the face point is the wall's outer surface; pull the frame back to the wall center line
   const c = -wallT / 2;
   parts.add('glass', bx(w, h, 0.006, 0, y, c + out - 0.006));
   // lamplight seen from outside: a one-sided glow just outside the glass (from inside you look out into the night)

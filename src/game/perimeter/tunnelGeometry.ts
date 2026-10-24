@@ -56,7 +56,7 @@ export function buildTunnel(samples: readonly PathSample[], ground: (x: number, 
   const lamps: THREE.Vector3[] = [];
   if (samples.length < 2) return new THREE.Group();
   const L = samples[samples.length - 1].s;
-  // the vault stops half a chamber short of the exit; the exit chamber (and the shaft above it) is centred on the exit point
+  // the vault stops half a chamber short of the exit; the exit chamber (and the shaft above it) is centered on the exit point
   const upTo = built >= 0.999 ? L - VAULT_W / 2 : L * Math.max(0, built);
   // the vault's rings: every sample up to upTo, then one exactly at upTo (so it meets the exit chamber's wall)
   const rows: PathSample[] = samples.filter(p => p.s < upTo - 1e-6);

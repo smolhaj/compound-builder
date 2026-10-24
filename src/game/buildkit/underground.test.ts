@@ -60,7 +60,7 @@ describe('underground rules', () => {
     expect(siteProblem(KIT.bunker_dorm, 11, 10.5, 0, { ...flat, water: x => x > 10.8 }, [hatch])).toBe('water');
   });
 
-  it('neighbours agree on where their doorway is', () => {
+  it('neighbors agree on where their doorway is', () => {
     const a = P('s1', 'bunker_hatch', 10.25, 10.25), b = P('s2', 'bunker_dorm', 11, 10.5, 1);
     const list = [a, b];
     const da = doorsOf(a, list), db = doorsOf(b, list);

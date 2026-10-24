@@ -1,6 +1,6 @@
 /**
  * FarTreeRenderer — the regional landscape's trees beyond the site: simple
- * vertex-coloured species silhouettes (fir, cedar, pine, broadleaf, live oak,
+ * vertex-colored species silhouettes (fir, cedar, pine, broadleaf, live oak,
  * cypress, birch / aspen, eucalyptus, shrub, poplar), instanced in two LODs,
  * planted in rings outward from the site where the regional forest density
  * says so, with GPU seasons for the deciduous species.
@@ -49,7 +49,7 @@ export function speciesMix(kind: RegionKind): Array<[TreeSpecies, number]> {
   }
 }
 
-/** [near, far] geometry per species, vertex-coloured (leaves white: the instance colour tints them). */
+/** [near, far] geometry per species, vertex-colored (leaves white: the instance color tints them). */
 function speciesGeos(): Record<TreeSpecies, [THREE.BufferGeometry, THREE.BufferGeometry]> {
   const paint = (g: THREE.BufferGeometry, c: THREE.Color): THREE.BufferGeometry => {
     const n = g.getAttribute('position').count;
@@ -62,7 +62,7 @@ function speciesGeos(): Record<TreeSpecies, [THREE.BufferGeometry, THREE.BufferG
   const bark = new THREE.Color(0x4a3a2c).multiplyScalar(0.6), pale = new THREE.Color(0xc8c2b4), leaf = new THREE.Color(1, 1, 1);
   const trunk = (r: number, h: number, seg: number, c = bark, y = 0) => paint(new THREE.CylinderGeometry(r * 0.7, r, h, seg, 1, true).translate(0, y + h / 2, 0).toNonIndexed(), c);
   const cone = (r: number, h: number, y: number, seg: number) => paint(new THREE.ConeGeometry(r, h, seg, 1).translate(0, y + h / 2, 0).toNonIndexed(), leaf);
-  /** Lumpy crown blob: radii rx / ry / rz centred at (ox, y, oz). */
+  /** Lumpy crown blob: radii rx / ry / rz centered at (ox, y, oz). */
   const blob = (detail: number, rx = 0.42, ry = 0.33, rz = 0.42, y = 0.62, ox = 0, oz = 0) => {
     const g = new THREE.IcosahedronGeometry(1, detail); // polyhedra are already non-indexed
     const p = g.getAttribute('position') as THREE.BufferAttribute;

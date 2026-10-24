@@ -111,7 +111,7 @@ export function slideMove(
 
 /**
  * Ease the eye toward `groundY + eye`: fast when stepping up (never sink into
- * a rise), a little softer when stepping down so kerbs don't jolt.
+ * a rise), a little softer when stepping down so curbs don't jolt.
  */
 export function followGround(y: number, groundY: number, dt: number, eye = TOUR_EYE_HEIGHT): number {
   const target = groundY + eye;
@@ -189,7 +189,7 @@ const boxArea = (b: TourBox) => (b.maxX - b.minX) * (b.maxZ - b.minZ);
 
 /**
  * Choose the notable buildings the cinematic tour visits, in a pleasant
- * visiting order (greedy nearest-neighbour from the first highlight).
+ * visiting order (greedy nearest-neighbor from the first highlight).
  */
 export function pickTourStops(infos: readonly TourBuildingInfo[], max = 8): TourStop[] {
   const pool = infos.filter(i => i.solid && boxHeight(i.box) > 0.2);
@@ -214,7 +214,7 @@ export function pickTourStops(infos: readonly TourBuildingInfo[], max = 8): Tour
     add(i, i.typeName);
   }
 
-  // Visiting order: nearest-neighbour chain from the first highlight
+  // Visiting order: nearest-neighbor chain from the first highlight
   const rest = [...chosen.values()];
   const out: TourStop[] = [rest.shift()!];
   const cx = (b: TourBox) => (b.minX + b.maxX) / 2, cz = (b: TourBox) => (b.minZ + b.maxZ) / 2;
@@ -269,7 +269,7 @@ export function occlusionScore(
  * in front of the building (dwell), and the segment to the next building
  * (transit) is lifted over the rooftops in between. The viewing side of each
  * building is the one (of 16 candidates) with the clearest sight lines,
- * preferring the site-centre side so the site fills the background.
+ * preferring the site-center side so the site fills the background.
  */
 export function buildCinematicPath(
   stops: readonly TourStop[], center: { x: number; z: number }, heightAt: HeightFn,
@@ -297,14 +297,14 @@ export function buildCinematicPath(
       const px = bx + Math.cos(ang) * R, pz = bz + Math.sin(ang) * R;
       return { x: px, y: Math.max(camY, heightAt(px, pz) + 1.4), z: pz };
     };
-    const toCentre = Math.hypot(center.x - bx, center.z - bz) < 1 ? Math.PI * 0.25 : Math.atan2(center.z - bz, center.x - bx);
-    let a = toCentre, best = Infinity;
+    const toCenter = Math.hypot(center.x - bx, center.z - bz) < 1 ? Math.PI * 0.25 : Math.atan2(center.z - bz, center.x - bx);
+    let a = toCenter, best = Infinity;
     for (let c = 0; c < 16; c++) {
-      const ang = toCentre + (c / 16) * Math.PI * 2;
+      const ang = toCenter + (c / 16) * Math.PI * 2;
       let sc = 0;
       for (const k of [-1, 0, 1]) sc += occlusionScore(camAt(ang + SWEEP * k), look, obstacles, b);
-      // Mild preference for the site-centre side
-      const off = Math.abs(Math.atan2(Math.sin(ang - toCentre), Math.cos(ang - toCentre)));
+      // Mild preference for the site-center side
+      const off = Math.abs(Math.atan2(Math.sin(ang - toCenter), Math.cos(ang - toCenter)));
       sc += off * 0.8;
       if (sc < best) { best = sc; a = ang; }
     }
@@ -651,7 +651,7 @@ export class TourController {
   private _updateCinematic(dt: number): void {
     const path = this._path;
     if (!path || this._cineLen <= 0) {
-      // Empty lot: gentle orbit around the centre
+      // Empty lot: gentle orbit around the center
       const { w, h } = this._ctx.siteBounds();
       this._cineS += dt * 0.08;
       const R = Math.max(w, h) * 0.55 + 10;

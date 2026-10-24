@@ -2,7 +2,7 @@
  * ForestRenderer — near trees on the terrain: instanced, three distance LODs
  * per kind (InstancedLodSet: per-instance frustum culling), the shared
  * vegetation material (wind sway, leaf flutter, clump speckle, GPU seasons:
- * per-tree fall colour, leaf drop, spring flush), branch shadows in winter.
+ * per-tree fall color, leaf drop, spring flush), branch shadows in winter.
  *
  * From UE HeightmapTerrainRenderer's forest (planForestTrees → instanced sets);
  * placement is the caller's (any list of ForestTreeSpec on any ground).

@@ -1,5 +1,5 @@
 /**
- * RoadRibbon — a road surface draped on the terrain along a centre line:
+ * RoadRibbon — a road surface draped on the terrain along a center line:
  * a strip subdivided across its width so it follows cross-slope, lifted a
  * hair above the ground with polygon offset, UVs in world units (u across
  * 0…1, v along the length). Gravel / dirt textures come from roadTextures.

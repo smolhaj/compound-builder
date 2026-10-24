@@ -10,7 +10,7 @@
  * (town extent / building heights).
  *
  * Scale (SCALE v2): 1 unit ≈ 6 m. Mountain West's front-range foothills rise
- * ~60–110 units (350–650 m) a few kilometres west of town and the high
+ * ~60–110 units (350–650 m) a few kilometers west of town and the high
  * peaks ~300–420 units (1.8–2.5 km) behind them; New England drumlins are
  * 5–15 units (30–90 m); the Midwest varies by a couple of units.
  *
@@ -94,7 +94,7 @@ export interface RegionLook {
   stoneWalls: boolean;
   /** Evergreen share of the far trees (0..1). */
   evergreen: number;
-  /** Ground colour overriding the location tint (semi-arid regions). */
+  /** Ground color overriding the location tint (semi-arid regions). */
   grass?: number;
   dryGrass?: number;
   /**
@@ -106,7 +106,7 @@ export interface RegionLook {
   fieldMode: 'plss' | 'irregular' | 'orchard';
   /** Kudzu draped over the wood edges (Deep South). */
   kudzu?: boolean;
-  /** Centre-pivot irrigation circles in some quarter sections. */
+  /** Center-pivot irrigation circles in some quarter sections. */
   pivots?: boolean;
   /** French long lots perpendicular to the river near it. */
   longLots?: boolean;
@@ -156,9 +156,9 @@ function sstep(e0: number, e1: number, x: number): number {
   return t * t * (3 - 2 * t);
 }
 
-/** Mountain West canyon positions along the range front (z relative to the campus centre). */
+/** Mountain West canyon positions along the range front (z relative to the campus center). */
 const CANYONS = [-560, -230, 150, 470, 820];
-/** SoCal marine terrace risers: [distance inland from the campus centre, riser height]. */
+/** SoCal marine terrace risers: [distance inland from the campus center, riser height]. */
 const TERRACES: Array<[number, number]> = [[190, 5], [380, 6], [620, 7]];
 /** Midwest oxbow lakes: [x, z offset from the valley axis, open-side angle]. */
 const OXBOWS: Array<[number, number, number]> = [[-520, 30, 1.6], [-160, -34, -1.4], [280, 28, 1.7], [640, -30, -1.5]];
@@ -169,7 +169,7 @@ function hash2(i: number, j: number, seed: number): number {
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 
-/** Nearest scattered kettle (one chance per cell): distance to its centre and its radius, or null. */
+/** Nearest scattered kettle (one chance per cell): distance to its center and its radius, or null. */
 function kettle(x: number, z: number, cell: number, chance: number, seed: number): { d: number; r: number } | null {
   const i0 = Math.floor(x / cell), j0 = Math.floor(z / cell);
   let best: { d: number; r: number } | null = null;
@@ -454,7 +454,7 @@ export class RegionalField {
         return { rel, forest, field: 1 - forest };
       }
       case 'plains': {
-        // Till plain: broad swells of a few metres; to the north a river
+        // Till plain: broad swells of a few meters; to the north a river
         // valley ~35 m deep with a wide floodplain, a strongly meandering
         // channel, oxbow lakes and steep wooded bluffs cut by ravines.
         const upland = 0.8 + 2.4 * (this.fbm(n1, px * 0.0022, pz * 0.0022, 3) + 0.5);
@@ -542,7 +542,7 @@ export class RegionalField {
     return { h, forest: wet ? 0 : r.forest * t, field: wet ? 0 : r.field * sstep(0.45, 1, t) };
   }
 
-  /** World x of the main N–S river's centre line at z (New England, Deep South), else null. */
+  /** World x of the main N–S river's center line at z (New England, Deep South), else null. */
   riverAxisX(z: number): number | null {
     const pz = z - this.cz;
     if (this.kind === 'drumlin') return -150 + 45 * Math.sin(pz / 140 + 0.6) + 18 * Math.sin(pz / 47 + 2.1);

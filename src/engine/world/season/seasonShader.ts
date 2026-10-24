@@ -16,14 +16,14 @@
  *     chunk, run just before the weather patch in lights_physical_fragment):
  *       – lawns (green-dominant, upward-facing, porous): spring flush, dry tan
  *         late-summer grass, browned dormant winter grass;
- *       – leaf litter on lawns, kerbs (SEA_KERB) and road gutters
- *         (SEA_PLOUGHED_UV: v runs across the carriageway);
+ *       – leaf litter on lawns, curbs (SEA_CURB) and road gutters
+ *         (SEA_PLOWED_UV: v runs across the carriageway);
  *       – snow multiplier `seaSnowK` read by the weather snow patch:
- *         ploughed roads / paths (SEA_PLOUGHED) stay dark, banks at the edges,
+ *         plowed roads / paths (SEA_PLOWED) stay dark, banks at the edges,
  *         bare deciduous crowns (SEA_DECID) hold little;
  *       – frozen ponds (SEA_FREEZE materials).
  *   • Vegetation vertex code (treeGeometry.createVegetationMaterial and the
- *     regional far trees): per-tree fall colour / timing from an instance
+ *     regional far trees): per-tree fall color / timing from an instance
  *     position hash, spring flush and blossom, leaf drop to a twig haze.
  *   • Custom water shaders call `seasonIceGlsl()` at their output.
  */
@@ -74,7 +74,7 @@ uniform vec4 uSeaD;
 
 /**
  * Per-tree foliage (vertex stage). `h` = four stable per-tree randoms.
- * Linear-space colours; `base` is the tree's summer canopy colour.
+ * Linear-space colors; `base` is the tree's summer canopy color.
  */
 const SEA_LEAF_FUNCS = /* glsl */`
 vec4 seaTreeHash(vec2 p) {
@@ -94,7 +94,7 @@ vec3 seaLeaf(vec3 base, vec4 h) {
   // Blossom on the flowering trees (cherry / crabapple pink, pear / dogwood white)
   float bl = uSeaA.w * step(h.x, 0.17);
   c = mix(c, h.y < 0.55 ? vec3(0.82, 0.42, 0.52) : vec3(0.80, 0.79, 0.74), bl * 0.92);
-  // Fall: each tree turns on its own schedule, to its own colour; the region
+  // Fall: each tree turns on its own schedule, to its own color; the region
   // caps how far it goes (blaze: New England 1 … SoCal 0.15)
   float ever = seaEverFor(h);
   float t = smoothstep(h.z * 0.72, h.z * 0.72 + 0.45, uSeaA.x) * uSeaC.y * (1.0 - ever);
@@ -158,7 +158,7 @@ float seaNoise(vec2 p) {
 }
 /** Snow multiplier from earlier stages (regional terrain: forest canopy holds less). */
 float seaSnowMul = 1.0;
-/** Fallen-leaf colour at a world xz (fine speckle, averaged out with distance). */
+/** Fallen-leaf color at a world xz (fine speckle, averaged out with distance). */
 vec3 seaLitterColor(vec2 xz, float fw) {
   vec2 cell = floor(xz * 26.0);
   float h = seaHash(cell);
@@ -170,7 +170,7 @@ vec3 seaLitterColor(vec2 xz, float fw) {
   vec3 avg = vec3(0.30, 0.13, 0.025);
   return mix(c * (0.75 + 0.5 * seaHash(cell + 3.3)), avg, smoothstep(0.25, 0.9, fw * 26.0));
 }
-/** Far forest canopy on the regional terrain: deciduous share turns, then goes grey-brown. */
+/** Far forest canopy on the regional terrain: deciduous share turns, then goes gray-brown. */
 vec3 seaFarCanopy(vec3 col, float decid, vec2 xz) {
   decid *= 1.0 - uSeaD.x;   // live oak / magnolia stands stay green
   if (decid < 0.002) return col;
@@ -195,19 +195,19 @@ float seaSnowK = 1.0;
 vec3 seaSnowTint = vec3( 1.0 );
 #ifdef STANDARD
   seaSnowK = seaSnowMul;
-#ifdef SEA_KERB
-  seaSnowTint = vec3( 0.78, 0.76, 0.72 ); // grit + spray along the kerb
+#ifdef SEA_CURB
+  seaSnowTint = vec3( 0.78, 0.76, 0.72 ); // grit + spray along the curb
 #endif
 #ifdef SEA_DECID
   seaSnowK = 0.3;
 #endif
-#ifdef SEA_PLOUGHED
+#ifdef SEA_PLOWED
   seaSnowK = 0.12;
 #endif
-#if defined( SEA_PLOUGHED_UV ) && defined( USE_MAP )
+#if defined( SEA_PLOWED_UV ) && defined( USE_MAP )
   {
-    // Ploughed carriageway: dark tyre tracks in each lane, packed snow
-    // between and along the crown, dirty grey banks at the kerbs
+    // Plowed carriageway: dark tire tracks in each lane, packed snow
+    // between and along the crown, dirty gray banks at the curbs
     float seV = vMapUv.y;
     float seTr = 0.0;
     for ( int i = 0; i < 4; i++ ) {
@@ -229,7 +229,7 @@ if ( uSeaB.x + uSeaB.y + uSeaB.z + uSeaB.w + uSeaA.z + uSeaC.x > 0.003 ) {
   float seLum = dot( seC, vec3( 0.2126, 0.7152, 0.0722 ) );
   float seN1 = seaNoise( seP.xz * 0.17 ) * 0.62 + seaNoise( seP.xz * 1.1 + 5.3 ) * 0.38;
 #ifdef SEA_FREEZE
-  // Frozen pond: matte grey-white ice with darker clear patches + cracks
+  // Frozen pond: matte gray-white ice with darker clear patches + cracks
   if ( uSeaC.x > 0.002 ) {
     float seCr = smoothstep( 0.035, 0.0, abs( seaNoise( seP.xz * 2.3 ) - 0.5 ) );
     vec3 seIce = mix( vec3( 0.36, 0.42, 0.47 ), vec3( 0.58, 0.62, 0.66 ), smoothstep( 0.3, 0.75, seN1 ) ) * ( 1.0 - 0.25 * seCr );
@@ -257,19 +257,19 @@ if ( uSeaB.x + uSeaB.y + uSeaB.z + uSeaB.w + uSeaA.z + uSeaC.x > 0.003 ) {
     seT = mix( seT, vec3( 0.22, 0.19, 0.115 ) * seK * ( 0.93 + 0.14 * seN1 ), seDor );
     diffuseColor.rgb = mix( diffuseColor.rgb, seT, seGreen );
   }
-  // Fallen leaves: drifts on lawns, along kerbs and in road gutters
+  // Fallen leaves: drifts on lawns, along curbs and in road gutters
   if ( uSeaB.w > 0.003 ) {
     float seLm = seGreen;
-#ifdef SEA_KERB
+#ifdef SEA_CURB
     seLm = max( seLm, seUp * 0.9 );
 #endif
-#if defined( SEA_PLOUGHED_UV ) && defined( USE_MAP )
+#if defined( SEA_PLOWED_UV ) && defined( USE_MAP )
     float seEdge = smoothstep( 0.16, 0.02, min( vMapUv.y, 1.0 - vMapUv.y ) );
     seLm = max( seLm, seEdge * seUp );
 #endif
     if ( seLm > 0.001 ) {
       float seDrift = seaNoise( seP.xz * 0.8 + 11.0 ) * 0.6 + seaNoise( seP.xz * 4.0 ) * 0.4;
-      // Lawns: scattered drifts (most of the lawn stays green); kerbs / gutters: dense
+      // Lawns: scattered drifts (most of the lawn stays green); curbs / gutters: dense
       float seCov = mix( 0.55, 1.0, max( seLm - seGreen, 0.0 ) );
       float seL = smoothstep( 0.7, 0.52, seDrift - uSeaB.w * 0.18 ) * uSeaB.w * seLm * seCov;
       // each litter cell holds one leaf: a small jittered ellipse, not a filled
@@ -325,7 +325,7 @@ export function seasonIceGlsl(worldPos: string, openWater = '0.0'): string {
     float icCr = smoothstep( 0.035, 0.0, abs( seaNoise( icXZ * 2.3 ) - 0.5 ) );
     vec3 icAlb = mix( vec3( 0.36, 0.42, 0.47 ), vec3( 0.62, 0.66, 0.70 ), smoothstep( 0.3, 0.75, icN ) ) * ( 1.0 - 0.25 * icCr );
     // Snow lying on the ice (weather cover)
-    // Snow lies in wind-blown drifts on the ice; skating-clear grey ice shows between
+    // Snow lies in wind-blown drifts on the ice; skating-clear gray ice shows between
     float icDr = seaNoise( icXZ * 0.35 + 5.1 ) * 0.7 + seaNoise( icXZ * 2.2 ) * 0.3;
     icAlb = mix( icAlb, vec3( 0.80, 0.83, 0.88 ), clamp( uSeaB.x * smoothstep( 0.5, 0.72, icDr ), 0.0, 0.9 ) );
     vec3 icIrr = ( reflectedLight.directDiffuse + reflectedLight.indirectDiffuse ) / max( diffuseColor.rgb, vec3( 1e-3 ) );
@@ -339,9 +339,9 @@ export function seasonIceGlsl(worldPos: string, openWater = '0.0'): string {
 }
 
 /**
- * Season patch for simple vertex-coloured instanced trees (regional far
- * trees): leaf vertices (white vertex colour) of deciduous sets take the
- * per-tree seasonal colour. Call from the material's onBeforeCompile.
+ * Season patch for simple vertex-colored instanced trees (regional far
+ * trees): leaf vertices (white vertex color) of deciduous sets take the
+ * per-tree seasonal color. Call from the material's onBeforeCompile.
  */
 export function applySeasonToFarTrees(shader: { uniforms: Record<string, THREE.IUniform>; vertexShader: string }, deciduous: boolean): void {
   if (!deciduous) return;

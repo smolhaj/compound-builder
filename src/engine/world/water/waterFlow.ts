@@ -30,7 +30,7 @@ export interface FlowInput {
   texel: number;
   /** Preferred downstream direction in raster axes (x right, y down). */
   downstream: [number, number];
-  /** Rivers are at most this wide from bank to centre line (world units). */
+  /** Rivers are at most this wide from bank to center line (world units). */
   maxRiverHalfWidth: number;
   /** Surface speed (world units / s) mid-channel at the reference half-width. */
   baseSpeed: number;
@@ -232,7 +232,7 @@ export function computeWaterFlow(inp: FlowInput): FlowField {
     }
     tx[k] = vx * w; ty[k] = vy * w; tw[k] = w;
   }
-  // Smooth the weighted tangents (fills the centre line where the gradient
+  // Smooth the weighted tangents (fills the center line where the gradient
   // vanishes), then re-align raw tangents to the smoothed field and repeat
   for (let pass = 0; pass < 2; pass++) {
     const r = 2;
@@ -281,7 +281,7 @@ export function computeWaterFlow(inp: FlowInput): FlowField {
     const hw = Math.max(0.75, localHW[k]);
     const bend = sstep(0.04, 0.16, curv * hw);
     const nar = sstep(1.0, 1.9, inp.refHalfWidth / (hw * texel));
-    // whitest toward the faster centre of the channel
+    // whitest toward the faster center of the channel
     const prof = Math.sqrt(Math.min(1, distT[k] / hw));
     foam[k] = Math.min(1, (bend * 0.75 + nar * 0.55) * (0.35 + 0.65 * prof));
   }

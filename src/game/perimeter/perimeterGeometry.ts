@@ -59,7 +59,7 @@ export function buildRun(run: PerimeterRun, ground: Ground, t: number, under: (x
   const built = run.finishedAt !== null ? wl : wl * runProgress(run);
   const spans = solidSpans(run, built);
   const growth = runGrowth(run, t);
-  /** A box from a to b (centre line) at height y0..y0+h, thickness th. */
+  /** A box from a to b (center line) at height y0..y0+h, thickness th. */
   const beam = (ax: number, az: number, bx: number, bz: number, y0: number, h: number, th: number, m: KitMaterialId, sag = 0) => {
     const l = Math.hypot(bx - ax, bz - az);
     if (l < 1e-4) return;
@@ -176,7 +176,7 @@ export function buildRun(run: PerimeterRun, ground: Ground, t: number, under: (x
       run.pts.forEach((p, i) => {
         if (i > 0) acc += Math.hypot(p[0] - run.pts[i - 1][0], p[1] - run.pts[i - 1][1]);
         if (!under(p[0], p[1])) { mark(acc); return; }
-        // walk out of the footprint toward the neighbouring points
+        // walk out of the footprint toward the neighboring points
         for (const dir of [1, -1]) {
           if ((dir < 0 && i === 0) || (dir > 0 && i === run.pts.length - 1)) continue;
           for (let d = 0.05; d < 2; d += 0.05) {

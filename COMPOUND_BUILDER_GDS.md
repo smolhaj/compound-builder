@@ -26,7 +26,7 @@
   - and more.
 - **Farming:** medium depth. Crops depend on season and soil. You can run an orchard, a greenhouse, chickens, goats, bees and a fishpond. Food has yields and spoils unless you preserve it (canning, smoking, the root cellar). Individual plants are not micro-managed.
 - **Camera:** a diorama builder camera, plus a walk/fly mode, plus a photo mode.
-- **Difficulty:** Cosy, Standard and Hardcore presets (Hardcore has permadeath, fewer warning signs and harsher raids), plus God Mode.
+- **Difficulty:** Cozy, Standard and Hardcore presets (Hardcore has permadeath, fewer warning signs and harsher raids), plus God Mode.
 
 **Modes:** Surprise (default), Scenario (choose the disaster), God Mode (choose and trigger events, unlimited money, sandbox; flagged as sandbox).
 
@@ -36,7 +36,7 @@
 
 | Phase | Length | Feel | Constraint |
 |---|---|---|---|
-| **Peacetime** | ~4–8 in-game years (30–60 min) | Cosy builder | Money, day job, zoning and HOA, neighbours' opinions |
+| **Peacetime** | ~4–8 in-game years (30–60 min) | Cozy builder | Money, day job, zoning and HOA, neighbors' opinions |
 | **Warning signs** | A few weeks to months | Rising tension | Time; prices spike; news ticker gets darker |
 | **Disaster** | Instant to weeks | Shock | Things break: grid, banks, roads, law |
 | **Survival** | 1–3 years | Builder under pressure | Water, calories, power, security, morale |
@@ -76,7 +76,7 @@ Each material has stats: **cost, build time, skill required, durability, protect
 **Materials age and weather visibly:** patina, moss, rust, sun-bleached wood. A 10-year-old compound should look lived-in.
 
 ### 2.4 Layout matters (systems that read the design)
-- **Defence** is computed from design, not stats bolted on:
+- **Defense** is computed from design, not stats bolted on:
   - perimeter continuity;
   - choke points and gates;
   - sightlines from towers or windows (raycast coverage map);
@@ -84,7 +84,7 @@ Each material has stats: **cost, build time, skill required, durability, protect
   - fall-back positions;
   - distance from the road;
   - lighting.
-  - A **Defence overlay** shows covered and blind zones.
+  - A **Defense overlay** shows covered and blind zones.
 - **Visibility (OPSEC):** how noticeable the compound is from the road, from the air and at night (light, smoke, noise, generator hum). Low visibility avoids trouble; high capability attracts it. Overlay included.
 - **Flow:** walking distance between beds, kitchen, water, latrine, garden and posts, which affects daily labour and morale.
 - **Fire:** spacing, firebreaks, roofing material, water access.
@@ -94,7 +94,7 @@ Each material has stats: **cost, build time, skill required, durability, protect
 Water (well, cistern, rain catchment, creek pump, filtration), food (garden beds, orchard, greenhouse, chickens, goats, fishpond, smokehouse, root cellar), power (solar, micro-hydro, wind, wood gasifier, generator plus fuel), heat (wood stove, passive solar, thermal mass), waste (composting, septic), comms (ham radio, antenna mast), medical (infirmary), security (walls, gates, towers, lights, dogs, alarms), workshop (repairs, crafting, the sawmill).
 
 ## 3. People
-- A family of 4–6 to start (procedurally generated, named). Others can join after the disaster: neighbours, refugees, skilled strangers.
+- A family of 4–6 to start (procedurally generated, named). Others can join after the disaster: neighbors, refugees, skilled strangers.
 - **Skills** (medic, builder, mechanic, gardener, hunter, negotiator, teacher, radio) gate what can be built and run. They're learned in peacetime through courses, which cost time and money.
 - Needs, morale, relationships, and kids who grow up.
 - **Jobs** are assigned by schedule (watch rotations, garden, chores), Rimworld-lite.
@@ -125,12 +125,19 @@ Each disaster is a ruleset: what breaks, what is scarce, and what threat cadence
 
 **Disaster rules** (decided with the user after the research in `docs/research_disasters.md`):
 - **Warning** varies by disaster: months for an asteroid, a season for drought, days for wildfire or a solar flare (aurora), minutes to days for nuclear war.
-- **Visibility** is a threat-type matrix: a fortress look (walls, guns, lights) deters opportunists and looters but attracts organised gangs, militia and requisitioners; staying unseen (the "gray man") avoids both but deters no one who finds you.
-- **Neighbours** are named NPC households on the surrounding farms, each with a disposition, skills, a radio net, trades and mutual aid. You can build an alliance or make enemies.
+- **Visibility** is a threat-type matrix: a fortress look (walls, guns, lights) deters opportunists and looters but attracts organized gangs, militia and requisitioners; staying unseen (the "gray man") avoids both but deters no one who finds you.
+- **Neighbors** are named NPC households on the surrounding farms, each with a disposition, skills, a radio net, trades and mutual aid. You can build an alliance or make enemies.
 - **Medical dependency**: some runs draw a family member on insulin, oxygen or heart medication (random). It becomes a story driver: the stockpile, fridge power, finding a medic.
 - **Nuclear war** severity is rolled; a rare large exchange adds 1–3 years of nuclear winter (cold, short seasons, famine).
 - **Government**: a help-or-hindrance roll per run and region. Either FEMA aid and restored order, or martial law, checkpoints and requisition of fuel and food. Hidden stores matter.
 - **Civil war** uses invented, non-partisan factions, never real-world parties.
+- **Modes and peacetime length** (user):
+  - Surprise rolls a random length and a hidden disaster.
+  - Scenario has you pick the disaster and the length (short / medium / long) at setup.
+  - **Free build** is a sandbox where nothing happens until the player triggers a disaster by hand.
+- **Warning signs** run on a news-ticker strip that darkens as tension rises. They also show in rising prices and in world tells.
+- **Money in peacetime:** starting savings plus a salary while an adult keeps a day job. The job costs that adult's daytime build hours and takes them off the compound; quitting means more building and less money.
+- **Money after the disaster:** cash collapses to barter. In grid-down it works for a few weeks, then fades.
 - **Engine:** one **collapse clock** with tracks (power, water, fuel, food, medical, law, comms). Each disaster sets the track speeds and adds its own effects (fallout, ash, a fire front, herds), so disasters chain naturally.
 - **Zombies and hordes:** herds drift across the map as a pressure field that pushes on walls, drawn by noise and light. Individual infected and small groups arrive as encounter events, like raids.
 - **Radiation:** each person carries a dose. Rooms have a protection factor (PF) and fallout follows the 7-10 decay. Open water, garden crops and grazing livestock take up fallout, so covered cisterns, stored food and washing produce all matter.
@@ -139,9 +146,9 @@ Each disaster is a ruleset: what breaks, what is scarce, and what threat cadence
   - **Warning signs, all four:**
     - news-ticker escalation (crisis headlines, DEFCON changes, embassy evacuations, a market crash);
     - local tells (military convoys on the county road, jets overhead, the missile-field towns emptying, gas lines);
-    - the neighbours' gossip (they start talking, buying, leaving or digging);
+    - the neighbors' gossip (they start talking, buying, leaving or digging);
     - a final "BALLISTIC MISSILE THREAT" emergency alert minutes before the strike.
-  - **The strike:** the sky flashes on the horizon, with a mushroom cloud in the distance if the strike is nearby. Then the EMP drops every unshielded light, the sky turns sickly, and fallout arrives hours later as grey dust.
+  - **The strike:** the sky flashes on the horizon, with a mushroom cloud in the distance if the strike is nearby. Then the EMP drops every unshielded light, the sky turns sickly, and fallout arrives hours later as gray dust.
   - **The dash:** each person runs to the bunker from wherever they are when the alert sounds. People in the far field or in town may not make it, so a bunker near the house matters.
   - **Shelter life, about 2 weeks, managed by the player:**
     - ration food and water;
@@ -149,22 +156,28 @@ Each disaster is a ruleset: what breaks, what is scarce, and what threat cadence
     - deal with sanitation and morale;
     - listen to the radio for news;
     - short dashes outside cost dose;
-    - neighbours knock on the hatch, and the player decides whether to let them in.
+    - neighbors knock on the hatch, and the player decides whether to let them in.
 - **Grid-down:**
   - **Cause:** a random cause per run (ice-storm cascade, a substation attack, a cyberattack or an aging-grid failure), each with its own hints and restoration curve, from days to months.
   - **Water depends on what you built:** the electric well pump dies unless it runs on solar plus battery or has a hand pump; the pressure tank gives about a day; a gravity cistern keeps flowing; creek water needs filtering.
   - **Power:** solar output follows weather and season and charges the batteries, and the player sets priority loads (well pump, freezer, radio, lights). The generator burns real fuel and can be heard about 1 km away.
   - **Social order follows the research curve:**
-    - days 1–3: calm and neighbourly;
+    - days 1–3: calm and neighborly;
     - week 2: shelves empty and tempers fray;
     - weeks 3–4: the first thefts;
-    - month 2 on: organised looting unless power is restored.
+    - month 2 on: organized looting unless power is restored.
 
     Rural areas lag cities by weeks.
+- **Grid power (peacetime):** the homestead starts on the county grid, with cheap power billed per kWh that runs the well pump and the fridge. Solar is grid-tied unless the player buys a hybrid inverter and batteries. When the grid dies, only what you built keeps running.
+- **Encounters:** a group shows up with a dossier (size, armed or not, intent). The player picks a stance (hide, parley, warn off, defend or trade). The sim resolves it from detection, deterrence, defense and people, and a short illustrated card shows what happened and what was damaged.
+- **Food:** each person needs about 2,000–2,500 kcal a day, from stores, the garden, the coop and hunting. Preserved food lasts and fresh food spoils. Monotony hurts morale. The pantry and root cellar are built up in peacetime.
+- **Neighbors:** 4–6 named households.
+- **Injuries and death:** wounds, illness and radiation sickness need a medic, meds and the medical bay. People can die on Standard. Cozy prevents death; Hardcore is permadeath with no reloads.
+- **Report card:** a newspaper-style page with a grade, the survivors, and concrete lines from the run ("Your cistern saved 4 lives", "No one knew first aid", "The tunnel was never needed").
 - **End of a run**: the region recovers, the compound reaches a self-sustaining equilibrium, or the family is lost; then the report card. Endless continue is optional.
 
 **Buying land** (decided with the user):
-- **Parcels:** the land round the compound is split into named neighbour parcels (the timber quarter, the creek bottom, the hay field, a neighbour's place), each with an owner and a price.
+- **Parcels:** the land round the compound is split into named neighbor parcels (the timber quarter, the creek bottom, the hay field, a neighbor's place), each with an owner and a price.
 - **Willingness to sell** depends on the owner's disposition. Owners who like you sell sooner and for less; owners you've annoyed hold out. Old farmers sell when they retire, and estates come up when someone dies.
 - **Prices** follow the land's character, at Mountain West per-acre rates:
   - dry grazing is cheap;
@@ -188,9 +201,9 @@ Each disaster is a ruleset: what breaks, what is scarce, and what threat cadence
   - NBC filtration: filter cabinet, hand crank, pressure gauge, blast valves on the vents.
   - Blast hardening: hinged blast doors on every opening, shock-mounted bunks and shelves.
 - **EMP:** a Faraday-shielded room protects everything stored inside it (radios, solar spares, vehicle electronics, medical devices). Anything unshielded fries.
-- **Warning signs** are telegraphed through the news ticker, prices, neighbours' gossip, radio chatter and sky colour. Attentive players hedge.
+- **Warning signs** are telegraphed through the news ticker, prices, neighbors' gossip, radio chatter and sky color. Attentive players hedge.
 - **Abstract encounters:**
-  - A group approaches, and the game evaluates detection (sightlines, dogs, alarms), deterrence (how the place looks), defence (walls and positions versus their strength) and people (skills, morale, numbers).
+  - A group approaches, and the game evaluates detection (sightlines, dogs, alarms), deterrence (how the place looks), defense (walls and positions versus their strength) and people (skills, morale, numbers).
   - The player chooses a stance: hide, parley, warn off, defend, or trade.
   - The result is damage to specific structures, injuries and resources, plus reputation.
   - The outcome is shown as a short illustrated vignette.
@@ -201,10 +214,10 @@ The compound is whatever size you let it become. **Who you take in is the main g
 ### 5.1 Arrivals
 People come to the gate before and after the disaster:
 - **Relatives:** your brother's family, an aging parent, a cousin from the city.
-- **Neighbours:** people you know from peacetime, with history and reputation either way.
+- **Neighbors:** people you know from peacetime, with history and reputation either way.
 - **Other families:** strangers with kids, fleeing something.
 - **Lone survivors:** a nurse, an ex-soldier, a teenager, a con artist.
-- **Groups:** a church group, a work crew, a band of travellers.
+- **Groups:** a church group, a work crew, a band of travelers.
 
 ### 5.2 The intake decision (a core screen)
 Each arrival shows a **dossier**, and what you can see depends on your negotiator skill and how long you've known them:
@@ -213,12 +226,12 @@ Each arrival shows a **dossier**, and what you can see depends on your negotiato
 - **Costs:** mouths to feed, water, beds, medical needs, kids or elders to care for.
 - **Unknowns:** traits that aren't revealed yet (honest, lazy, brave, a thief, sick, being followed). These can be learned by questioning them, a trial period, or references from people you trust.
 
-Options: **take them in**, **trial period** (a camp outside the wall), **trade and send on**, **turn away**, or **point them to a neighbour**. Every choice affects reputation, morale (your people have opinions) and future arrivals.
+Options: **take them in**, **trial period** (a camp outside the wall), **trade and send on**, **turn away**, or **point them to a neighbor**. Every choice affects reputation, morale (your people have opinions) and future arrivals.
 
 ### 5.3 Growth changes the build
 - More people unlock bigger projects: a mason crew can build the stone wall, a mechanic can run the gasifier, a teacher lets kids learn skills.
 - They also need housing (bunkhouse → cabins → a street of houses), a bigger kitchen, latrines, water capacity, a meeting hall and eventually a school, clinic and market.
-- The layout scales from **homestead → compound → hamlet → walled village → small town**, with **districts** (residential, fields, workshops, defence ring) and roads.
+- The layout scales from **homestead → compound → hamlet → walled village → small town**, with **districts** (residential, fields, workshops, defense ring) and roads.
 - Each stage also raises visibility and threat attention: a town is a target, but also a power.
 
 ### 5.4 Governance (light, from the hamlet stage)
@@ -227,8 +240,8 @@ Once you have outsiders, decisions aren't only yours:
 - Factions form along lines like relatives vs. newcomers, or soldiers vs. farmers.
 - Rules come up for decision: rationing, guard duty, who gets the good cabin. Unhappy groups can leave, and take things with them.
 
-### 5.5 Neighbours and reputation
-Neighbours remember peacetime: who you helped, who you snubbed, whether you shared. After the collapse you can form a mutual-aid network with nearby homesteads, trade, run a militia, absorb them, or stay hidden.
+### 5.5 Neighbors and reputation
+Neighbors remember peacetime: who you helped, who you snubbed, whether you shared. After the collapse you can form a mutual-aid network with nearby homesteads, trade, run a militia, absorb them, or stay hidden.
 
 ### 5.6 Play styles this enables
 - **Hermit:** one family, hidden, low visibility, self-sufficient.
@@ -240,11 +253,11 @@ Neighbours remember peacetime: who you helped, who you snubbed, whether you shar
 - Three.js procedural art, with the same approach and toolkit as University Empire: terrain, regions, seasons, weather, day/night, procedural buildings and vegetation.
 - A tilt-shift diorama camera for building, plus a walk mode to inspect your place at eye level.
 - **Photo mode** with time of day and season, because the build is the star.
-- The UI stays out of the way. Overlays (defence, visibility, flow, fire, sun) are toggles.
+- The UI stays out of the way. Overlays (defense, visibility, flow, fire, sun) are toggles.
 
 ## 7. MVP (prototype slice)
 - One region (Mountain West), one parcel, a family of 4.
-- Peacetime: 5 years compressed. Build with 4 materials (timber, log, stone, earthbag) and about 25 structures. Defence and visibility overlays.
+- Peacetime: 5 years compressed. Build with 4 materials (timber, log, stone, earthbag) and about 25 structures. Defense and visibility overlays.
 - One disaster: **grid-down**. It tests water, food, power, heat and security with the least new tech.
 - 3–5 arrivals at the gate with dossiers (take in / trial / trade / turn away); up to about 15 people, homestead → compound scale.
 - One survival year, then the report card.
@@ -260,9 +273,9 @@ Separate repo. Same stack as University Empire: Vite, TypeScript, React, Zustand
 
 | UE module(s) | What it gives Compound Builder | Coupling to UE state |
 |---|---|---|
-| `world/CampusScene.ts`, `world/skyState.ts`, `postprocessing/ProceduralSky.ts`, `GodRayShader.ts`, `ColorGradingShader.ts` | Physically-based light rig, golden hour, gradient-dome sky IBL, camera-following shadows, adaptive bloom, SSAO, colour grading, god rays, stars and moon | Medium: strip campus / era hooks and keep season and time of day |
+| `world/CampusScene.ts`, `world/skyState.ts`, `postprocessing/ProceduralSky.ts`, `GodRayShader.ts`, `ColorGradingShader.ts` | Physically-based light rig, golden hour, gradient-dome sky IBL, camera-following shadows, adaptive bloom, SSAO, color grading, god rays, stars and moon | Medium: strip campus / era hooks and keep season and time of day |
 | `builders/WeatherRenderer.ts`, `weatherState.ts` | Rain, snow, lying snow on surfaces, puddles and ripples, wet roughness, storms | Low |
-| `season/seasonState.ts`, `seasonShader.ts` | Seasonal foliage, snow cover, ploughed paths | Low |
+| `season/seasonState.ts`, `seasonShader.ts` | Seasonal foliage, snow cover, plowed paths | Low |
 | `builders/treeGeometry.ts`, `CampusTreeRenderer.ts`, `instancedLod.ts` | Instanced trees with wind sway, conifer boughs, leaf cards, LODs, regional species | Low |
 | `HeightmapTerrainRenderer.ts`, `RegionalTerrainRenderer.ts`, `terrainElevation.ts`, `utils/terrainGen.ts`, `campusTopography.ts`, `siteGrade.ts` | Regional terrain (hills, benches, bluffs), graded building pads, retaining walls, farmland and survey grid | Medium: becomes the homestead parcel |
 | `WaterEdgeRenderer.ts`, `waterFlow.ts`, `waterShading.ts` | Creeks, ponds and rippled water, which matter for wells, creeks and flood risk | Low |
@@ -280,7 +293,7 @@ Separate repo. Same stack as University Empire: Vite, TypeScript, React, Zustand
 - **Construction stages:** scaffold → frame → clad.
 - **Damage states:** scorch, breach, rubble.
 
-**Step 3: overlays.** Defence (sightline coverage), visibility, sun and shade, fire risk and flow, as ground-projected shader layers.
+**Step 3: overlays.** Defense (sightline coverage), visibility, sun and shade, fire risk and flow, as ground-projected shader layers.
 
 **Performance budget** (same rules as UE): instanced and merged geometry, LOD tiers, and High / Medium / Low quality settings, aiming for 60 fps at homestead scale and 30+ fps at town scale.
 

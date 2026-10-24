@@ -24,7 +24,7 @@
  *            roof, rusty-roofed pole barn, round bales at the field edge, and
  *            either a row of long broiler houses with feed bins (the poultry
  *            belt) or a pecan grove behind the yard; live oak by the house.
- *   sound    Willamette / Skagit valley: tall steep-roofed barn (grey cedar
+ *   sound    Willamette / Skagit valley: tall steep-roofed barn (gray cedar
  *            or red) with lean-to, farmhouse, grass-seed straw stacks under
  *            tarps, Douglas fir windbreak.
  *   coast    Irvine Ranch / Oxnard: low stucco ranch house under red tile,

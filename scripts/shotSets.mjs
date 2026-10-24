@@ -1,4 +1,4 @@
-/** Shot lists for scripts/shots.mjs. Parcel is 0..67 on x/z; centre ≈ 33.5. */
+/** Shot lists for scripts/shots.mjs. Parcel is 0..67 on x/z; center ≈ 33.5. */
 const C = 33.5;
 const aerial = { x: C, z: C, yaw: 0.8, pitch: 0.55, radius: 95 };
 const street = { x: C, z: C, yaw: 0.8, pitch: 0.12, radius: 2.2 };
@@ -49,17 +49,17 @@ SETS.water = [
   { name: 'aerial-reservoir', time: 16, season: 'summer', cam: { x: 250, z: 230, yaw: 2.4, pitch: 0.4, radius: 260 } },
 ];
 
-/** Aerial / eye-level at the nearest neighbour farm. */
+/** Aerial / eye-level at the nearest neighbor farm. */
 const atFarm = (r, pitch, yaw) => `const f = cb.world.farms[0]; cb.cam.target.set(f.x, 0, f.z); cb.cam.radius = ${r}; cb.cam.pitch = ${pitch}; cb.cam.yaw = ${yaw};`;
 SETS.farms = [
   { name: 'farmstead-aerial', time: 10, season: 'summer', setup: atFarm(40, 0.5, 0.8), cam: { x: C, z: C, yaw: 0, pitch: 0.5, radius: 40 } },
   { name: 'farmstead-golden', time: 18.4, season: 'fall', setup: atFarm(30, 0.25, -1.2), cam: { x: C, z: C, yaw: 0, pitch: 0.3, radius: 30 } },
   { name: 'farmstead-winter', time: 12, season: 'winter', setup: atFarm(35, 0.4, 2.2), cam: { x: C, z: C, yaw: 0, pitch: 0.4, radius: 35 } },
   { name: 'eye-level-toward-farm', time: 9, season: 'summer', setup: "const f = cb.world.farms[0]; const dx = f.x - 33.5, dz = f.z - 33.5, d = Math.hypot(dx, dz); const ex = f.x - dx / d * 24, ez = f.z - dz / d * 24; cb.cam.placeEye(ex, ez, f.x, f.z, 0.28);", cam: { x: C, z: C, yaw: 0, pitch: 0.1, radius: 4 } },
-  { name: 'aerial-homestead-and-neighbours', time: 15, season: 'summer', cam: { x: 90, z: 60, yaw: 2.0, pitch: 0.55, radius: 230 } },
+  { name: 'aerial-homestead-and-neighbors', time: 15, season: 'summer', cam: { x: 90, z: 60, yaw: 2.0, pitch: 0.55, radius: 230 } },
 ];
 
-/** Place a cabin on the first valid spot 5–9 units from the creek, near the parcel centre (door toward the creek). */
+/** Place a cabin on the first valid spot 5–9 units from the creek, near the parcel center (door toward the creek). */
 const placeCabin = `
   const w = cb.world, p = w.parcel; let done = cb.game.getState().game.structures.length > 0;
   for (let r = 0; r < 25 && !done; r += 1) for (let a = 0; a < 6.28 && !done; a += 0.5) {
@@ -326,7 +326,7 @@ SETS.bunker = [
   { name: 'storeroom', time: 12, season: 'summer', setup: bunker + inside2('bunker_stores', -0.3, 0.27, 0.3, 0.25, 0.1, -0.3, 74), cam: D, frames: 12 },
   { name: 'hatch-vestibule-ladder', time: 12, season: 'summer', setup: bunker + inside2('bunker_hatch', 0.12, 0.2, 0.15, -0.02, 0.6, -0.05, 80), cam: D, frames: 12 },
   { name: 'stairwell-from-the-landing', time: 12, season: 'summer', setup: bunker + inside2('bunker_stairs', 0.0, 0.27, -0.66, 0.0, 0.6, 0.6, 74), cam: D, frames: 12 },
-  { name: 'comms-and-armoury', time: 12, season: 'summer', setup: bunker + inside2('bunker_comms', 0.1, 0.27, 0.35, -0.1, 0.12, -0.35, 80), cam: D, frames: 12 },
+  { name: 'comms-and-armory', time: 12, season: 'summer', setup: bunker + inside2('bunker_comms', 0.1, 0.27, 0.35, -0.1, 0.12, -0.35, 80), cam: D, frames: 12 },
 ];
 
 /**
@@ -344,7 +344,7 @@ const tunnel = bunker + `{ if (!window.__tun) {
     const a = k * Math.PI * 2 / 36;
     const s = W.tunnelStartAt(from.x + Math.cos(a) * 0.45, from.z + Math.sin(a) * 0.45);
     if (!s.pt) continue;
-    // a long way out (toward half a mile): straight, or with one bend; it may run on under the neighbours' land
+    // a long way out (toward half a mile): straight, or with one bend; it may run on under the neighbors' land
     for (const L1 of [6, 12, 25, 45, 70]) for (const turn of [0, 0.5, -0.5, 0.9, -0.9]) for (const L2 of [6, 12, 20, 40, 65]) {
       const p0 = s.pt, p1 = [p0[0] + Math.cos(a) * 0.6, p0[1] + Math.sin(a) * 0.6], p2 = [p0[0] + Math.cos(a) * L1, p0[1] + Math.sin(a) * L1];
       const p3 = [p2[0] + Math.cos(a + turn) * L2, p2[1] + Math.sin(a + turn) * L2];

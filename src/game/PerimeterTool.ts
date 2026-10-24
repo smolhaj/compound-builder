@@ -101,7 +101,7 @@ export class PerimeterTool {
     this._ray.setFromCamera(this._ndc, this._camera);
     const h = this._ray.intersectObject(mesh, false)[0];
     if (!h) return null;
-    // an escape tunnel may run on under the neighbours' land; everything else stays on yours
+    // an escape tunnel may run on under the neighbors' land; everything else stays on yours
     const m = this._kind === 'escape_tunnel' ? OFF_PARCEL_REACH : 0;
     const x = Math.min(PARCEL_SIZE + m, Math.max(-m, Math.round(h.point.x / SNAP) * SNAP));
     const z = Math.min(PARCEL_SIZE + m, Math.max(-m, Math.round(h.point.z / SNAP) * SNAP));
@@ -178,7 +178,7 @@ export class PerimeterTool {
     (this._line.material as THREE.LineBasicMaterial).color.set(tunnelWhy ? 0xe36a5a : 0xffd27a);
     const txt = tunnelWhy ? tunnelWhy
       : this._pts.length === 0 ? (this._kind === 'escape_tunnel' ? 'Escape tunnel: click a bunker room to start at its wall, then out to the exit' : `${PERIMETER[this._kind].name}: click to start the line`)
-      : `${Math.round(len * 6)} m${this._kind === 'escape_tunnel' && offParcel(pts as Pt[]) > 0 ? ` (${Math.round(offParcel(pts as Pt[]) * 6)} m under neighbours' land)` : ''} · ~$${orderCost(buyable).toLocaleString('en-US')}${own.length ? ' + ' + own.join(', ') : ''} · ${Math.round(runHours(this._kind, len) + (this._kind === 'escape_tunnel' ? OFF_PARCEL_HOURS * offParcel(pts as Pt[]) : 0))} h${this._gates.length ? ` · ${this._gates.length} gate${this._gates.length > 1 ? 's' : ''}` : ''}`;
+      : `${Math.round(len * 6)} m${this._kind === 'escape_tunnel' && offParcel(pts as Pt[]) > 0 ? ` (${Math.round(offParcel(pts as Pt[]) * 6)} m under neighbors' land)` : ''} · ~$${orderCost(buyable).toLocaleString('en-US')}${own.length ? ' + ' + own.join(', ') : ''} · ${Math.round(runHours(this._kind, len) + (this._kind === 'escape_tunnel' ? OFF_PARCEL_HOURS * offParcel(pts as Pt[]) : 0))} h${this._gates.length ? ` · ${this._gates.length} gate${this._gates.length > 1 ? 's' : ''}` : ''}`;
     const e = pts[pts.length - 1] as Pt | undefined;
     const hide = !tunnelWhy && this._kind === 'escape_tunnel' && this._pts.length > 0 && e
       ? (this._world.tunnelExitWoods(e[0], e[1]) >= 0.3 ? ' · exit hidden under leaf litter in the trees' : ' · exit in the open: hidden under turf (the trees hide it better)') : '';

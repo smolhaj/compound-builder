@@ -2,7 +2,7 @@
  * crowdWear.ts
  * What the crowd wears: seasonal clothing (winter coats + beanies in dark
  * tones, light tees and shorts in summer, sweaters and jackets in between),
- * team colours on game day, backpacks, joggers' kit. Pure (colours as sRGB
+ * team colors on game day, backpacks, joggers' kit. Pure (colors as sRGB
  * hex); AgentRenderer uploads them as per-instance attributes.
  */
 
@@ -18,11 +18,11 @@ export interface Wear {
   longHair: boolean;
   /** 0–1 shoe tone (dark → white trainers). */
   shoe: number;
-  /** Coat length: 0 none, 1 hip, 2 mid-thigh, 3 academic gown to the ankle (the coat colour is `shirt`). */
+  /** Coat length: 0 none, 1 hip, 2 mid-thigh, 3 academic gown to the ankle (the coat color is `shirt`). */
   coat: 0 | 1 | 2 | 3;
   /** Bare legs below the knee. */
   shorts: boolean;
-  /** Knit hat colour, or -1 for none. */
+  /** Knit hat color, or -1 for none. */
   hat: number;
 }
 
@@ -46,15 +46,15 @@ const PANTS: Record<WearSeason, number[]> = {
   winter: [0x283247, 0x1e1e20, 0x2d3340, 0x3a3a3e, 0x3b4a66, 0x4a4036],
   spring: [0x3b4a66, 0x6f86a8, 0xa89a78, 0x5d6066, 0x1e1e20, 0xc9bfa8],
 };
-/** Knit hat colours (the figure shader indexes this palette). */
+/** Knit hat colors (the figure shader indexes this palette). */
 export const HATS = [0x2a2c31, 0x9c2a2a, 0x23304a, 0xd9d2c3, 0x4a4a30, 0xb88a2e, 0x6a6e74];
 const JOG_SHIRTS = [0xe8f04a, 0xff6a3a, 0x3ad0ff, 0xf2f0ea, 0xe0407a, 0x2b2b2b, 0x6af07a];
 
 export interface WearOptions {
   season: WearSeason;
-  /** Team colours (game day) or null. */
+  /** Team colors (game day) or null. */
   team: { primary: number; secondary: number } | null;
-  /** 0–1 share of people in team colours on game day. */
+  /** 0–1 share of people in team colors on game day. */
   teamShare?: number;
   jogger?: boolean;
 }
@@ -115,9 +115,9 @@ export const MORTARBOARD = -2;
  * Who a figure is, for what they wear:
  *  - student      the everyday campus crowd (pickWear);
  *  - graduate     black academic gown to the ankle + mortarboard (commencement);
- *  - faculty      a gown in the school colour (the platform party / marshals);
+ *  - faculty      a gown in the school color (the platform party / marshals);
  *  - parent       dressed up for the day (blazers, blouses, chinos), no backpack;
- *  - elder        grandparents: grey / white hair, cardigans and coats;
+ *  - elder        grandparents: gray / white hair, cardigans and coats;
  *  - kid          a younger sibling (the caller draws them at ~0.6 scale);
  *  - resident     townspeople: no backpack, more jackets, a range of ages;
  *  - lecturer     an outdoor-class professor: tweed or navy jacket;
@@ -126,7 +126,7 @@ export const MORTARBOARD = -2;
  */
 export type Persona = 'student' | 'graduate' | 'faculty' | 'parent' | 'elder' | 'kid' | 'resident' | 'lecturer' | 'volunteer' | 'vendor';
 
-const GREY_HAIR = [0x9a9590, 0xc8c4bc, 0xb0aaa2, 0x6e6a66, 0xe2ded8];
+const GRAY_HAIR = [0x9a9590, 0xc8c4bc, 0xb0aaa2, 0x6e6a66, 0xe2ded8];
 const DRESS_SHIRTS = [0xf2f0ea, 0xbcd4ea, 0x2b3a55, 0x6e2433, 0xe6d6c0, 0x9fb8d0, 0xd9a0a8, 0x5b6143, 0x1f2a3a, 0xf0e2b0, 0x7a5a8a];
 const DRESS_PANTS = [0x2a2c31, 0x3b4a66, 0xa89a78, 0x1e1e20, 0x5d6066, 0xc9bfa8];
 const TWEED = [0x6a5440, 0x3a3a3e, 0x23304a, 0x5a4a3a, 0x4a5038];
@@ -134,7 +134,7 @@ const APRONS = [0x2f4a3a, 0x8a4a2a, 0xe8e2d0, 0x23304a, 0x6e2433];
 const KID_SHIRTS = [0xe8f04a, 0xff6a3a, 0x3ad0ff, 0xe0407a, 0x6af07a, 0xf2f0ea, 0x9fc3e0, 0xf3e3a0];
 
 export interface PersonaOptions extends WearOptions {
-  /** Volunteer tee / faculty gown colour. */
+  /** Volunteer tee / faculty gown color. */
   color?: number;
 }
 
@@ -144,7 +144,7 @@ export function pickPersonaWear(rnd: () => number, persona: Persona, opt: Person
   if (persona === 'student') return pickWear(rnd, opt, keep);
   const fanOk = persona === 'kid' || persona === 'resident' || persona === 'parent';
   const base = pickWear(rnd, { ...opt, team: fanOk ? opt.team : null, teamShare: (opt.teamShare ?? 0.5) * 0.8 }, keep);
-  const inColours = !!opt.team && (base.shirt === opt.team.primary || base.shirt === opt.team.secondary);
+  const inColors = !!opt.team && (base.shirt === opt.team.primary || base.shirt === opt.team.secondary);
   base.hasPack = false;
   switch (persona) {
     case 'graduate':
@@ -156,28 +156,28 @@ export function pickPersonaWear(rnd: () => number, persona: Persona, opt: Person
       base.shoe = rnd() * 0.5;
       break;
     case 'parent':
-      if (!inColours) base.shirt = pick(DRESS_SHIRTS);
+      if (!inColors) base.shirt = pick(DRESS_SHIRTS);
       base.pants = pick(DRESS_PANTS);
       base.shorts = opt.season === 'summer' && rnd() < 0.2;
       if (opt.season !== 'summer' && rnd() < 0.35) base.coat = Math.max(base.coat, 1) as 1 | 2 | 3;
       if (base.hat >= 0 && rnd() < 0.6) base.hat = -1;
-      if (!keep && rnd() < 0.3) base.hair = pick(GREY_HAIR);
+      if (!keep && rnd() < 0.3) base.hair = pick(GRAY_HAIR);
       break;
     case 'elder':
       base.shirt = pick([...DRESS_SHIRTS, ...TWEED]);
       base.pants = pick(DRESS_PANTS);
       base.shorts = false;
       base.coat = opt.season === 'summer' ? 0 : rnd() < 0.5 ? 2 : 1;
-      if (!keep) base.hair = pick(GREY_HAIR);
+      if (!keep) base.hair = pick(GRAY_HAIR);
       base.longHair = base.longHair && rnd() < 0.4;
       base.shoe = rnd() * 0.5;
       break;
     case 'kid':
-      if (!inColours) base.shirt = pick(KID_SHIRTS);
+      if (!inColors) base.shirt = pick(KID_SHIRTS);
       base.hasPack = rnd() < 0.15;
       break;
     case 'resident':
-      if (!keep && rnd() < 0.3) base.hair = pick(GREY_HAIR);
+      if (!keep && rnd() < 0.3) base.hair = pick(GRAY_HAIR);
       if (opt.season !== 'summer' && base.coat === 0 && rnd() < 0.4) base.coat = 1;
       base.hasPack = rnd() < 0.1;
       break;
@@ -186,7 +186,7 @@ export function pickPersonaWear(rnd: () => number, persona: Persona, opt: Person
       base.pants = pick(DRESS_PANTS);
       base.coat = 1; base.shorts = false; base.hat = -1;
       base.hasPack = rnd() < 0.3;
-      if (!keep && rnd() < 0.45) base.hair = pick(GREY_HAIR);
+      if (!keep && rnd() < 0.45) base.hair = pick(GRAY_HAIR);
       break;
     case 'volunteer':
       base.shirt = opt.color ?? 0x2c8a7a;
@@ -198,9 +198,9 @@ export function pickPersonaWear(rnd: () => number, persona: Persona, opt: Person
     case 'vendor':
       base.shirt = pick(APRONS);
       base.pants = pick([0x3b4a66, 0x4d5238, 0x5d6066]);
-      base.coat = 1; // the apron reads as a hip-length layer in the shirt colour
+      base.coat = 1; // the apron reads as a hip-length layer in the shirt color
       base.shorts = false;
-      if (!keep && rnd() < 0.3) base.hair = pick(GREY_HAIR);
+      if (!keep && rnd() < 0.3) base.hair = pick(GRAY_HAIR);
       break;
   }
   return base;

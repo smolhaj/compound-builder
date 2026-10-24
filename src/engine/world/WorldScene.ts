@@ -6,7 +6,7 @@
  * game-agnostic world look: the physically-based light rig with golden hour,
  * the procedural sky dome + PMREM IBL, the moon and stars, camera-following
  * shadows, weather on the sky and lights, seasonal particles, and the
- * SSAO → HDR clamp → god rays → bloom → colour grade → output → FXAA chain.
+ * SSAO → HDR clamp → god rays → bloom → color grade → output → FXAA chain.
  *
  * The scene knows nothing about the game: callers hand it a site (the area
  * the camera and particles care about), the time of day, weather, season and
@@ -77,7 +77,7 @@ export class WorldScene {
     NIGHT_SKY: 0.30,
     NIGHT_FILL: 0.08,
   };
-  /** Daytime aerial-perspective haze — pale blue-grey that matches the sky horizon. */
+  /** Daytime aerial-perspective haze — pale blue-gray that matches the sky horizon. */
   static readonly FOG_DAY = 0xb4c4d4;
   static readonly FOG_FULL_RADIUS = 360;
   static readonly FOG_OVERVIEW_DEPTH = 0.22;
@@ -261,7 +261,7 @@ export class WorldScene {
     Object.assign(this._groundGlow, { x, y, z, on: strength });
   }
 
-  /** Season grade (colour grading preset). */
+  /** Season grade (color grading preset). */
   setSeasonGrade(season: string): void {
     if (!this._colorGradingPass) return;
     const preset = COLOR_GRADING_PRESETS[season] ?? COLOR_GRADING_PRESETS['summer'];
@@ -404,7 +404,7 @@ export class WorldScene {
 
   // ── Day / night ───────────────────────────────────────────────────────────
 
-  /** Per-regime light rig: sun / sky (hemi) / fill / rim intensities + colours. */
+  /** Per-regime light rig: sun / sky (hemi) / fill / rim intensities + colors. */
   private static readonly RIG = {
     day: {
       sun: WorldScene.LIGHT.DAY_SUN, hemi: WorldScene.LIGHT.DAY_SKY, fill: WorldScene.LIGHT.DAY_FILL, rim: 0.35,
@@ -597,20 +597,20 @@ export class WorldScene {
     pass.enabled = strength > 0.01;
   }
 
-  /** Overcast greys the gradient and hides the sun; fog washes the dome toward the fog colour. */
+  /** Overcast grays the gradient and hides the sun; fog washes the dome toward the fog color. */
   private _applyWeatherToSky(sky: SkyPalette, overcast: number, fogAmt: number, flash: number): void {
     const tmp = this._c.tmp;
-    const grey = (c: THREE.Color, k: number, amt: number): void => {
+    const gray = (c: THREE.Color, k: number, amt: number): void => {
       const l = (c.r * 0.3 + c.g * 0.55 + c.b * 0.15) * k;
       c.lerp(tmp.setRGB(l, l * 1.01, l * 1.06), amt);
     };
     const a = overcast * 0.85;
-    grey(sky.zenith, 1.9, a);
-    grey(sky.horizonSun, 0.95, a);
-    grey(sky.horizonAnti, 1.0, a);
-    grey(sky.fog, 1.0, overcast * 0.7);
-    grey(sky.cloudLit, 0.72, overcast * 0.8);
-    grey(sky.cloudShade, 0.9, overcast * 0.6);
+    gray(sky.zenith, 1.9, a);
+    gray(sky.horizonSun, 0.95, a);
+    gray(sky.horizonAnti, 1.0, a);
+    gray(sky.fog, 1.0, overcast * 0.7);
+    gray(sky.cloudLit, 0.72, overcast * 0.8);
+    gray(sky.cloudShade, 0.9, overcast * 0.6);
     sky.cloudShade.multiplyScalar(1 - overcast * 0.25);
     sky.cloudCover += (0.97 - sky.cloudCover) * overcast;
     sky.sunDisc *= 1 - overcast;
@@ -708,7 +708,7 @@ export class WorldScene {
   // ── Post-processing ───────────────────────────────────────────────────────
 
   /**
-   * RenderPass → SSAO → HDR clamp → god rays → bloom → colour grade → output → FXAA.
+   * RenderPass → SSAO → HDR clamp → god rays → bloom → color grade → output → FXAA.
    * Grading runs in linear HDR (before OutputPass); FXAA expects sRGB (after it).
    */
   setupPostProcessing(w: number, h: number): void {

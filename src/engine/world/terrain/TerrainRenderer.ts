@@ -26,7 +26,7 @@ export interface TerrainSource {
 export interface TerrainBuildOptions {
   source: TerrainSource;
   kind: RegionKind;
-  /** Centre and half-size of the fine core (the site plus a margin); per axis or both. */
+  /** Center and half-size of the fine core (the site plus a margin); per axis or both. */
   cx: number;
   cz: number;
   core: number | { x: number; z: number };
@@ -35,11 +35,11 @@ export interface TerrainBuildOptions {
   waterY?: number | null;
   /** Survey-grid origin for PLSS fields. */
   fieldOrigin?: [number, number];
-  /** Grass colour override (hex). */
+  /** Grass color override (hex). */
   grass?: number;
 }
 
-/** Half-size of the modelled world around the centre. */
+/** Half-size of the modelled world around the center. */
 export const R_MAX = 2000;
 /** Fine-core cell size per quality (world units; 1 u ≈ 6 m). */
 const CORE_CELL: Record<Quality, number> = { high: 0.35, medium: 0.5, low: 0.8 };
@@ -104,7 +104,7 @@ float rFbm(vec2 p) { return rNoise(p) * 0.55 + rNoise(p * 2.13 + 7.1) * 0.3 + rN
 // Triplanar sampling: no stretched streaks down steep faces
 float rTri(vec3 p, vec3 w, float s) { return rFbm(p.zy * s) * w.x + rFbm(p.xz * s) * w.y + rFbm(p.xy * s) * w.z; }
 float rTriN(vec3 p, vec3 w, float s) { return rNoise(p.zy * s) * w.x + rNoise(p.xz * s) * w.y + rNoise(p.xy * s) * w.z; }
-// The region's crop mix on today's date (cropCalendar.ts): slot colours + cumulative shares
+// The region's crop mix on today's date (cropCalendar.ts): slot colors + cumulative shares
 uniform vec3 uCropC[6];
 uniform float uCropT[6];
 vec3 rCrop(float h) {
@@ -199,7 +199,7 @@ export function makeTerrainMaterial(look: RegionLook, waterY: number | null): { 
         }
         // Farmland. The layout follows the region's real survey / field pattern:
         //   0 PLSS: N–S / E–W square-mile sections on the town grid, quarter
-        //     sections split into 80 / 40-acre fields (centre pivots in the West)
+        //     sections split into 80 / 40-acre fields (center pivots in the West)
         //   1 irregular jittered fields (stone walls / hedgerows), long lots by the river
         //   2 valley orchards and row crops
         // v45: the town apron outside the built town is farmland too
@@ -253,7 +253,7 @@ export function makeTerrainMaterial(look: RegionLook, waterY: number | null): { 
             float e = (sqrt(d2) - sqrt(d1)) * 0.5 * uFieldSize;
             border = 1.0 - smoothstep(0.3, 0.9, e);
             if (uStoneWalls > 0.5) {
-              // A New England stone wall is ~1 m of grey fieldstone in a strip
+              // A New England stone wall is ~1 m of gray fieldstone in a strip
               // of scrub / saplings, not a 10 m pale band (it read as a ghost
               // road across the fields)
               border = 1.0 - smoothstep(0.05, 0.2, e);
@@ -317,7 +317,7 @@ export function makeTerrainMaterial(look: RegionLook, waterY: number | null): { 
         float fo = smoothstep(0.3, 0.65, vForest + (nb - 0.5) * 0.35);
         // Near in, the instanced trees are the canopy and this is the forest
         // floor under them: an even, darker ground with only a subtle seasonal
-        // shift — the speckled far-canopy colours there read as camouflage
+        // shift — the speckled far-canopy colors there read as camouflage
         // blotches across the hillside (QA, Mega Campus by the station)
         float nearFo = 1.0 - smoothstep(110.0, 340.0, length(vRPos - cameraPosition));
         col = mix(col, uForest * mix((0.7 + 0.55 * nc) * (0.85 + 0.3 * na), 0.8 + 0.12 * nb, nearFo), fo);
@@ -469,8 +469,8 @@ export class TerrainRenderer {
     (u['uFieldOrigin'].value as THREE.Vector2).set(fox, foz);
     this._u = u;
     const g = (u['uGrass'].value as THREE.Color).setHex(o.grass ?? look.grass ?? 0x557a3a);
-    const grey = (g.r + g.g + g.b) / 3;
-    g.lerp(new THREE.Color(grey, grey, grey), 0.18).multiplyScalar(0.8);
+    const gray = (g.r + g.g + g.b) / 3;
+    g.lerp(new THREE.Color(gray, gray, gray), 0.18).multiplyScalar(0.8);
     applyEdgeHaze(mat, [o.cx, o.cz], R_MAX * 0.72, R_MAX * 0.995);
     const mesh = new THREE.Mesh(geo, mat);
     mesh.name = 'terrain';

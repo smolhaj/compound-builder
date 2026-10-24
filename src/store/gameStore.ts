@@ -7,6 +7,8 @@ import { planStructure } from '../sim/construction';
 import { markTree, unmarkTree, isMarked, type TreeRef } from '../sim/forestry';
 import { planRun, type Gate, type PerimeterKind, type Pt } from '../sim/perimeter';
 import { fitProblem, orderFit, plant, repairPump } from '../sim/utilities';
+import { triggerDisaster, type DisasterKind } from '../sim/disaster';
+import { log } from '../sim/economy';
 import { hardenProblem, orderHarden, orderHardenAll, tierOf, type HardenId } from '../sim/hardening';
 import { saveGame, AUTOSAVE } from '../sim/save/saveSystem';
 
@@ -39,6 +41,15 @@ export interface GameStore {
   setTool: (kind: string | null) => void;
   setToolProblem: (t: string | null) => void;
   select: (id: string | null) => void;
+  /** Keep or quit an adult's day job (peacetime only). */
+  setEmployed: (personId: string, on: boolean) => void;
+  /** Free build: start a disaster now, after `warnDays` of warning signs. */
+  trigger: (kind: DisasterKind, warnDays: number) => void;
+  /** Whether the new-game screen is up. */
+  setupOpen: boolean;
+  /** The setup screen offers "Back to my game" (opened from the New button, not at boot). */
+  setupCanClose: boolean;
+  openSetup: (open: boolean, canClose?: boolean) => void;
 }
 
 /** Longest real-time step taken in one frame (a background tab does not jump a week). */
@@ -113,4 +124,21 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
   setTool: (tool) => set({ tool, toolProblem: null }),
   setToolProblem: (toolProblem) => set({ toolProblem }),
   select: (selected) => set({ selected }),
+  setEmployed: (personId, on) => {
+    const g = structuredClone(get().game);
+    const ps = g.personState.find(x => x.id === personId), p = g.people.find(x => x.id === personId);
+    if (!ps || !p?.job || g.disaster.phase === 'impact' || g.disaster.phase === 'survival') return;
+    ps.employed = on;
+    log(g, on ? `${p.first} is back at work as a ${p.job.title.toLowerCase()}.` : `${p.first} quit the job to work on the place full time.`);
+    set({ game: g });
+  },
+  trigger: (kind, warnDays) => {
+    const g = structuredClone(get().game);
+    if (g.disaster.mode !== 'sandbox' || (g.disaster.kind && g.disaster.phase !== 'peace')) return;
+    triggerDisaster(g.disaster, g.clock.t, kind, g.seed, warnDays);
+    set({ game: g });
+  },
+  setupOpen: false,
+  setupCanClose: false,
+  openSetup: (setupOpen, setupCanClose = false) => set({ setupOpen, setupCanClose }),
 })));

@@ -18,8 +18,10 @@ export interface Person {
   body: 'f' | 'm';
   /** 0–10. */
   skills: Record<SkillId, number>;
-  /** Shirt / jacket colour (figure tint). */
+  /** Shirt / jacket color (figure tint). */
   shirt: number;
+  /** Adults: the day job in town (peacetime income). */
+  job?: { title: string; wage: number };
 }
 
 const FIRST_F = ['Abigail', 'Ava', 'Beth', 'Carmen', 'Dana', 'Elena', 'Grace', 'Hannah', 'Ivy', 'June', 'Kate', 'Laura', 'Maya', 'Nora', 'Rosa', 'Ruth', 'Sara', 'Tessa', 'Wren'];
@@ -59,8 +61,23 @@ export function generateFamily(seed: number): Person[] {
     const body: 'f' | 'm' = r() < 0.5 ? 'f' : 'm';
     people.push({ id: `p${i}`, first: name(body), last, age, kid: true, body, skills: skills(r, [], true), shirt: shirt() });
   }
+  for (const p of people) if (!p.kid) p.job = dayJob(p, seed);
   return people;
 }
+
+/** An adult's day job, from their strongest skill (its own random stream: the family itself doesn't change). */
+export function dayJob(p: Person, seed: number): { title: string; wage: number } {
+  const r = mulberry32(seed * 131 + Number(p.id.replace(/\D/g, '') || 0) * 17 + 7);
+  const top = SKILL_IDS.reduce((a, b) => (p.skills[b] > p.skills[a] ? b : a));
+  const [title, wage] = JOBS[top];
+  return { title, wage: Math.round(wage * (0.9 + 0.2 * r()) / 5) * 5 };
+}
+
+/** Day jobs by lead skill: title and a day's take-home pay (rural Mountain West, 2020s). */
+const JOBS: Record<SkillId, [string, number]> = {
+  builder: ['Carpenter', 210], gardener: ['Nursery hand', 140], medic: ['Nurse at the county hospital', 280], mechanic: ['Diesel mechanic', 230],
+  hunter: ['Game warden', 200], negotiator: ['Insurance agent', 220], teacher: ['Schoolteacher', 190], radio: ['Dispatcher', 175],
+};
 
 /**
  * Building work rate (1 = a competent builder): skill 5 → 1.0, 0 → 0.5,

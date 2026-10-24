@@ -60,7 +60,7 @@ function makeNoiseTexture(): THREE.DataTexture {
 }
 
 /**
- * Tileable grass-blade detail texture. RGB is a colour modulation centred on
+ * Tileable grass-blade detail texture. RGB is a color modulation centered on
  * 0.5 (the shader multiplies by 2×), A is a pseudo height used for bump.
  * Blades are short, mostly upright strokes of varying tone; later strokes
  * sit "on top" (higher A) like a real sward.

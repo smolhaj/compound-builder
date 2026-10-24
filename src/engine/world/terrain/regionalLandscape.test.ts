@@ -43,7 +43,7 @@ describe('RegionalField', () => {
     let eastMax = 0;
     for (let z = -400; z <= 400; z += 40) for (let x = 250; x <= 900; x += 40) eastMax = Math.max(eastMax, f.height(x, z) - TOWN_Y);
     expect(westMax).toBeGreaterThan(250);   // > 1.5 km of relief
-    expect(eastMax).toBeLessThan(12);       // high plains roll by tens of metres
+    expect(eastMax).toBeLessThan(12);       // high plains roll by tens of meters
   });
 
   it('keeps slopes within reason near the town edge (no wall where the hills start)', () => {

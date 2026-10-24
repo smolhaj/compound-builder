@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CELL, footprint, placementProblem, rotQ, snapCentre, TIMBER_CABIN, type SiteQuery } from './kit';
+import { CELL, footprint, placementProblem, rotQ, snapCenter, TIMBER_CABIN, type SiteQuery } from './kit';
 
 const flat: SiteQuery = { height: () => 0, owned: (x, z) => x >= 0 && z >= 0 && x <= 67 && z <= 67, water: () => false };
 
@@ -25,7 +25,7 @@ describe('build kit', () => {
 
   it('snaps footprints to the 3 m grid', () => {
     for (const rot of [0, 1]) {
-      const [x, z] = snapCentre(TIMBER_CABIN, 10.13, 7.41, rot);
+      const [x, z] = snapCenter(TIMBER_CABIN, 10.13, 7.41, rot);
       const r = footprint(TIMBER_CABIN, x, z, rot, false);
       for (const v of [r.x0, r.x1, r.z0, r.z1]) expect(Math.abs(v / CELL - Math.round(v / CELL))).toBeLessThan(1e-9);
     }

@@ -31,7 +31,7 @@ describe('InstancedLodSet', () => {
     expect(new THREE.Vector3().setFromMatrixPosition(m).z).toBe(-200);
   });
 
-  it('keeps per-instance colours with their instance after compaction', () => {
+  it('keeps per-instance colors with their instance after compaction', () => {
     const { set, camera } = setup();
     set.setColorAt(1, new THREE.Color(1, 0, 0));
     set.update(camera);

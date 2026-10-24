@@ -2,7 +2,7 @@
  * regionalProps — instanced rural structures for the regional landscape:
  * farm buildings (walls + gable roofs), grain bins, bridge piers, wooden
  * utility poles and lattice transmission towers. One InstancedMesh per
- * shape, per-instance colour, the landscape's aerial-perspective fog.
+ * shape, per-instance color, the landscape's aerial-perspective fog.
  */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -19,7 +19,7 @@ export function patchFog(mat: THREE.Material, key: string): void {
   mat.customProgramCacheKey = () => key;
 }
 
-/** Farmhouse / barn colours per region. */
+/** Farmhouse / barn colors per region. */
 export const FARM_PALETTE: Record<RegionKind, { house: number[]; barn: number[] }> = {
   plains: { house: [0xf0ece2, 0xe6dcc6, 0xd8d4cc], barn: [0x8a2c22, 0x9a3a2a, 0xa8a49a] },
   mountain: { house: [0xe8e0cc, 0x8a6a4a, 0xd8cdb4], barn: [0x7a4a30, 0x8a2c22, 0x9a9690] },
@@ -190,7 +190,7 @@ export class RegionalProps {
     this._push('bale', x, y - dia * 0.08, z, rot, len, dia, dia, color);
   }
 
-  /** Plain box (stacks, posts, rails, tarps): centre x/z, base y. */
+  /** Plain box (stacks, posts, rails, tarps): center x/z, base y. */
   box(x: number, y: number, z: number, rot: number, w: number, h: number, d: number, color: number): void {
     this._push('wall', x, y, z, rot, w, h, d, color);
   }

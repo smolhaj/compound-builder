@@ -104,7 +104,7 @@ export const ColorGradingShader: {
     // mix(x, smoothstep(0,1,x), strength):
     //   • At strength=0: identity passthrough
     //   • At strength=1: full smoothstep (compressed shadows/highlights)
-    //   • Symmetric around perceptual mid-grey; HDR values above 1.0 pass through
+    //   • Symmetric around perceptual mid-gray; HDR values above 1.0 pass through
     vec3 sCurve(vec3 color, float strength) {
       // Apply the curve in approximate perceptual (gamma 2.2) space. Running
       // smoothstep directly on linear HDR values crushed every midtone
@@ -119,11 +119,11 @@ export const ColorGradingShader: {
     }
 
     // Luma-preserving saturation adjustment.
-    // Interpolates toward the greyscale value rather than mixing with (0.5,0.5,0.5),
+    // Interpolates toward the grayscale value rather than mixing with (0.5,0.5,0.5),
     // which keeps perceptual brightness constant as saturation changes.
     vec3 adjustSaturation(vec3 color, float saturation) {
-      float grey = luma(color);
-      return mix(vec3(grey), color, saturation);
+      float gray = luma(color);
+      return mix(vec3(gray), color, saturation);
     }
 
     // Warm highlight tint.

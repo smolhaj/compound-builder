@@ -20,7 +20,7 @@ export interface RegionalWaterOptions {
   waterY: number;
   cx: number;
   cz: number;
-  /** Reeds start this far (Chebyshev) from the centre. */
+  /** Reeds start this far (Chebyshev) from the center. */
   reedInner: number;
   quality: Quality;
   season: string;
