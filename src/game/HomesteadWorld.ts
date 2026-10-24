@@ -21,7 +21,7 @@ import { planNeighbors } from './region/neighbors';
 import { buildCamp, flickerCampfire } from './props/campGeometry';
 import { FamilyRenderer } from './people/FamilyRenderer';
 import type { GoalCtx, Site } from './people/peopleGoals';
-import { CELL } from './buildkit/kit';
+import { CELL, type KitPieceDef } from './buildkit/kit';
 import type { GameState } from '../sim/state';
 import type { WearSeason } from '../engine/world/people/crowdWear';
 import type { TourBuildingInfo } from '../engine/world/camera/TourController';
@@ -770,6 +770,8 @@ export class HomesteadWorld {
       light.visible = false;
       group.add(light);
     }
+    // a plan nobody has started is laid out in lime on the ground, so it reads from the air (the stakes alone don't)
+    if (!below) group.add(planMark(def));
     this._built.set(p.id, { placed: p, group, smoke, key: '', finished: false, padY: y, light, services: '000', opts, under });
     if (pad) this.terrain.refresh(this._terrainSource, pad.x0 - pad.skirt - 1, pad.z0 - pad.skirt - 1, pad.x1 + pad.skirt + 1, pad.z1 + pad.skirt + 1);
     if (below) this._syncUnderground();
@@ -938,6 +940,8 @@ export class HomesteadWorld {
       if (key === b.key) continue;
       b.key = key;
       showStage(b.group, done ? 5 : st.stage, f, st.supplied);
+      const mark = b.group.getObjectByName('planMark');
+      if (mark) mark.visible = st.stage === 0;
       if (done !== b.finished) { b.finished = done; if (b.light) b.light.visible = done; this._ws.invalidateShadows(); }
       this._applyView(b);
     }
@@ -1347,3 +1351,21 @@ export function scaleFigure(x: number, z: number, y = 0): THREE.Group {
   g.userData.type = 'scale_figure';
   return g;
 }
+
+const LIME = new THREE.MeshBasicMaterial({ color: 0xece8d8, transparent: true, opacity: 0.85, depthWrite: false });
+/** Lime lines round a footprint (local coordinates), about 25 cm wide, just above the ground. */
+function planMark(def: KitPieceDef): THREE.Group {
+  const g = new THREE.Group();
+  g.name = 'planMark';
+  const hx = def.cellsX * CELL / 2, hz = def.cellsZ * CELL / 2, w = 0.04, y = 0.012;
+  const strip = (sx: number, sz: number, x: number, z: number) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(sx, sz).rotateX(-Math.PI / 2), LIME);
+    m.position.set(x, y, z);
+    m.renderOrder = 1;
+    g.add(m);
+  };
+  strip(2 * hx + w, w, 0, -hz); strip(2 * hx + w, w, 0, hz);
+  strip(w, 2 * hz - w, -hx, 0); strip(w, 2 * hz - w, hx, 0);
+  return g;
+}
+

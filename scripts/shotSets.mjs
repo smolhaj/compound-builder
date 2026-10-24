@@ -415,3 +415,22 @@ SETS.landscape = [
   { name: 'creek-bank', time: 11, season: 'summer', setup: eyeWhere('dz > 2.5 && dz < 3.5 && s.forest > 0.3'), cam: D, frames: 16 },
   { name: 'aerial', time: 11, season: 'summer', setup: `{ cb.cam.target.set(33, 0, 33); cb.cam.radius = 70; cb.cam.pitch = 0.75; cb.cam.yaw = 0.6; }`, cam: D, frames: 20 },
 ];
+
+/** Fresh plans, nothing started: the lime layout lines should read from the air. */
+const planned = `{ if (!window.__p) { window.__p = 1;
+  const G = cb.game, c = cb.world.camp;
+  for (const [kind, dx, dz] of [['timber_cabin', 3, -3.5], ['garden', -2, 4], ['field', -12, 6], ['root_cellar', -6, 1.5]]) {
+    const sp = cb.tool.findSpot(kind, c.x + dx, c.z + dz, 0);
+    if (sp) G.getState().plan(kind, sp[0], sp[1], 0);
+  }
+} }`;
+SETS.plans = [
+  { name: 'plans-aerial', time: 11, season: 'summer', setup: planned + "{ const c = cb.world.camp; cb.cam.target.set(c.x - 3, 0, c.z + 1); cb.cam.radius = 20; cb.cam.pitch = 1.1; cb.cam.yaw = 0; }", cam: D, frames: 16 },
+  { name: 'plans-oblique', time: 16, season: 'summer', setup: planned + "{ const c = cb.world.camp; cb.cam.target.set(c.x - 3, 0, c.z + 1); cb.cam.radius = 12; cb.cam.pitch = 0.5; cb.cam.yaw = 0.5; }", cam: D, frames: 16 },
+];
+
+SETS.darkrect = [
+  { name: 'aerial-camp', time: 6.2, season: 'spring', setup: "{ const c = cb.world.camp; cb.cam.target.set(c.x, 0, c.z); cb.cam.radius = 22; cb.cam.pitch = 1.1; cb.cam.yaw = 0; }", cam: D, frames: 16 },
+  { name: 'aerial-timber', time: 10, season: 'summer', setup: "{ const c = cb.world.camp; cb.cam.target.set(c.x, 0, c.z - 30); cb.cam.radius = 26; cb.cam.pitch = 1.05; cb.cam.yaw = 0; }", cam: D, frames: 16 },
+  { name: 'aerial-camp-noon', time: 12, season: 'spring', setup: "{ const c = cb.world.camp; cb.cam.target.set(c.x, 0, c.z); cb.cam.radius = 22; cb.cam.pitch = 1.1; cb.cam.yaw = 0; }", cam: D, frames: 16 },
+];
