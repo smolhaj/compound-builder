@@ -82,6 +82,9 @@ export class SightOverlay {
   }
 
   /** Spend about `budgetMs` computing more rows. */
+  /** Night mode: how much hidden lamplight is at the cell being painted. */
+  private _hid = 0;
+
   update(budgetMs = 6): void {
     if (this.ready || !this._sight || !this._world || this._mode === 'off') return;
     const t0 = performance.now(), b = this._src.bounds, w = this._world;
@@ -93,9 +96,11 @@ export class SightOverlay {
         const x = b.x0 + i * CELL;
         let v: number;
         if (this._mode === 'night') {
-          v = 0;
-          for (const l of this._lights) v += l.vis * l.k * Math.exp(-Math.hypot(l.x - x, l.z - z) / 2.2);
-          v = Math.min(1, v * 1.4);
+          // warm where a lit window shows from the road, a faint blue pool where it is hidden
+          let seen = 0, hid = 0;
+          for (const l of this._lights) { const f = l.k * Math.exp(-Math.hypot(l.x - x, l.z - z) / 2.2); seen += l.vis * f; hid += (1 - l.vis) * f; }
+          this._hid = Math.min(1, hid * 1.2);
+          v = Math.min(1, seen * 1.4);
         } else v = Math.min(1, exposure(this._sight, w, x, z, 0.25, this._obs) * (this._mode === 'viewshed' ? 1 : 1.6));
         this._paint(i, j, v);
       }
@@ -109,7 +114,7 @@ export class SightOverlay {
     const row = j, k = (row * this._nx + i) * 4;
     const night = this._mode === 'night', view = this._mode === 'viewshed';
     let r: number, g: number, bl: number, a: number;
-    if (night) { r = 1; g = 0.78; bl = 0.35; a = v * 0.75; }
+    if (night) { const h = this._hid * (1 - v); r = 0.25 + 0.75 * v; g = 0.45 + 0.33 * v; bl = 0.35 + 0.6 * h; a = Math.max(v * 0.75, h * 0.35); }
     else if (view) { r = 0.35 + 0.65 * v; g = 0.85 * v + 0.15; bl = 0.25; a = 0.15 + 0.4 * v; }
     else { r = Math.min(1, v * 1.6); g = 0.35 + 0.35 * (1 - Math.abs(v - 0.45) * 2); bl = Math.max(0, 0.75 - v * 1.2); a = 0.28 + 0.3 * v; }
     this._colors[k] = r; this._colors[k + 1] = g; this._colors[k + 2] = bl; this._colors[k + 3] = a;

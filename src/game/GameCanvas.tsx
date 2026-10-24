@@ -39,8 +39,9 @@ export function GameCanvas() {
     cam.target.set(world.center.x, 0, world.center.z);
     const tour = new TourController({
       camera: ws.camera, dom: canvas, scene: ws.scene,
-      getBlocked: () => world.walkBlocked,
-      heightAt: world.walkHeight,
+      getBlocked: () => world.tourBlocked,
+      heightAt: world.tourHeight,
+      portal: world.tourPortal,
       describeBuildings: () => world.describeBuildings(),
       siteBounds: () => ({ w: PARCEL_SIZE, h: PARCEL_SIZE }),
       onCaption: c => useWorldStore.getState().setTourCaption(c),

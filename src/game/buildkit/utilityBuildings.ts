@@ -65,7 +65,10 @@ export const Equipment = {
     for (let k = 0; k < 3; k++) add('paint_green', box(0.12 * M, 0.1 * M, 0.08 * M, (-0.3 + k * 0.15) * M, 1.48 * M, 0));       // fuse boxes
     add('iron', box(0.22 * M, 0.12 * M, 0.15 * M, 0.25 * M, 1.48 * M, 0));
   },
-  inverterWall(add: Add): void {
+  /** Inverter, charge controller and disconnect on a plywood backboard (its back at z = 0, on the wall). */
+  inverterWall(wallAdd: Add): void {
+    const add: Add = (m, g) => wallAdd(m, g.translate(0, 0, 0.12 * M));
+    add('wood_mid', box(1.75 * M, 1.0 * M, 0.02 * M, 0.05 * M, 0.75 * M, -0.11 * M));
     add('iron', box(0.55 * M, 0.75 * M, 0.2 * M, 0, 1.0 * M, 0));
     add('lamp', box(0.15 * M, 0.08 * M, 0.01 * M, 0, 1.55 * M, 0.1 * M));
     add('steel', box(0.4 * M, 0.5 * M, 0.15 * M, 0.7 * M, 1.1 * M, 0));                          // charge controller
@@ -126,7 +129,7 @@ function batteryShed(_def: KitPieceDef, seed = 1): THREE.Group {
   return shed({ W: 0.42, D: 0.42, outer: 'board_batten', front: [{ kind: 'door', at: 0.08, w: 0.14, h: 0.33 }] }, c => {
     c.I({ x: -0.085, z: c.back + 0.05 }, a => Equipment.batteryRack(a, 4, 1.0));
     c.I({ x: 0.085, z: c.back + 0.05 }, a => Equipment.batteryRack(a, 3, 1.0));
-    c.I({ x: c.left + 0.02, z: 0.0, rot: Math.PI / 2 }, a => Equipment.inverterWall(a), false);
+    c.I({ x: c.left + 0.002, z: 0.0, rot: Math.PI / 2 }, a => Equipment.inverterWall(a), false);
     c.I({ x: c.right - 0.03, z: 0.02, rot: -Math.PI / 2 }, a => Equipment.partsShelf(a), false);
     c.I({ x: 0.04, z: 0.06 }, a => Furniture.stool(a));
     c.C({ x: c.right - 0.002, z: 0.13, y: c.y0 + 0.5 * M, rot: -Math.PI / 2 }, a => Equipment.extinguisher(a), 1);
@@ -142,7 +145,7 @@ function generatorShed(_def: KitPieceDef, seed = 1): THREE.Group {
   return shed({ W: 0.42, D: 0.38, outer: 'metal_siding', front: [{ kind: 'bay', at: 0, w: 0.3, h: 0.34 }] }, c => {
     c.I({ x: -0.05, z: -0.04 }, a => Furniture.generator(a));
     c.I({ x: 0.05, z: c.back + 0.06 }, a => Equipment.fuelDrums(a));
-    c.I({ x: c.right - 0.02, z: -0.05, rot: -Math.PI / 2 }, a => Equipment.inverterWall(a), false);
+    c.I({ x: c.right - 0.002, z: -0.05, rot: -Math.PI / 2 }, a => Equipment.inverterWall(a), false);
     c.C({ x: c.left + 0.002, z: 0.1, y: c.y0 + 0.5 * M, rot: Math.PI / 2 }, a => Equipment.extinguisher(a), 1);
     c.C({ x: c.left + 0.002, z: -0.08, y: c.y0 + 1.6 * M, rot: Math.PI / 2 }, a => Equipment.sign(a), 1);
     c.C({ x: c.left + 0.05, z: c.back + 0.04 }, a => { for (let k = 0; k < 3; k++) a('paint_yellow', box(0.14 * M, 0.3 * M, 0.1 * M, k * 0.16 * M, 0, 0)); }, 0.8);   // oil jugs

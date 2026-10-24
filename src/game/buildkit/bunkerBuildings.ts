@@ -19,6 +19,8 @@ import { DEPTH, ROOF_TOP, type Side } from './underground';
 
 /** Clear height inside (2.5 m). */
 export const VAULT_H = 2.5 * M;
+/** The hatch shaft: 0.95 m square inside (half-width). */
+export const SHAFT_HALF = 0.95 * M / 2;
 /** Doorway through a bunker wall (1 m × 2.1 m). */
 const DOOR_W = 1.0 * M, DOOR_H = 2.1 * M;
 
@@ -132,6 +134,18 @@ function vault(def: KitPieceDef, seed: number, opts: BuildOpts, spec: VaultSpec,
     };
     p.collide(...walls('walls'));
     walls('cutwalls', CUT_H);
+    // a darker painted dado band round the room (the classic shelter look; it hides the scuffs)
+    if (spec.inner) {
+      const dado = 1.1 * M, t = 0.004, i = T + t / 2;
+      const run = (layer: BuildLayer, ax: number, az: number, bx: number, bz: number, side: Side, shift: number) =>
+        wallRun(p.sink, layer, 'paint_dado', { ax, az, bx, bz, y0: 0, h: dado, t, cut: layer === 'cutwalls' ? CUT_H : undefined, openings: ops(side).map(o => ({ ...o, at: o.at - shift })) });
+      for (const layer of ['walls', 'cutwalls'] as BuildLayer[]) {
+        run(layer, -hw + T, hd - i, hw - T, hd - i, 'front', T);
+        run(layer, -hw + T, -hd + i, hw - T, -hd + i, 'back', T);
+        run(layer, -hw + i, -hd + T, -hw + i, hd - T, 'left', T);
+        run(layer, hw - i, -hd + T, hw - i, hd - T, 'right', T);
+      }
+    }
     // roof slab (with the shaft hole), painted ceiling
     const slab = (m: KitMaterialId, y: number, h: number, inset: number) => {
       const x0 = -hw + inset, x1 = hw - inset, z0 = -hd + inset, z1 = hd - inset;
@@ -264,7 +278,7 @@ function homey(c: VaultCtx): void {
 }
 
 function hatch(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
-  const sh = 0.95 * M / 2;                 // shaft: 0.95 m square inside
+  const sh = SHAFT_HALF;
   const depth = opts.depth ?? DEPTH;
   const g = vault(def, seed, opts, { ...CONCRETE, blastDoors: true, roofHole: { x0: -sh, x1: sh, z0: -sh, z1: sh }, vents: [[0.15, -0.15]] }, c => {
     const p = c.p, t = 0.15 * M;
@@ -272,11 +286,15 @@ function hatch(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
     for (const [w, d, x, z] of [[2 * sh + 2 * t, t, 0, -sh - t / 2], [2 * sh + 2 * t, t, 0, sh + t / 2], [t, 2 * sh, -sh - t / 2, 0], [t, 2 * sh, sh + t / 2, 0]] as const) {
       p.add('concrete', box(w, depth - VAULT_H + 0.04, d, x, VAULT_H, z), 'roof');
     }
-    p.add('concrete', box(2 * sh + 0.1, 0.05, 2 * sh + 0.1, 0, depth - 0.01, 0).translate(0, 0, 0), 'deck');
-    // the collar's opening (dark) and the steel lid, hinged at the back, propped open
-    p.add('steel', box(2 * sh + 0.02, 0.012, 0.03, 0, depth + 0.04, -sh - 0.01), 'openings');
-    p.add('paint_green', box(2 * sh + 0.01, 2 * sh + 0.01, 0.02, 0, depth + 0.045, -sh - 0.025).translate(0, 0, 0), 'openings');
-    p.add('steel', box(0.04 * M, 0.04 * M, 0.5 * M, sh - 0.02, depth + 0.045 + 2 * sh - 0.01, -sh - 0.04), 'openings');
+    // the collar: a concrete ring round the open shaft, a little proud of the grass
+    const cw = 0.05, co = sh + cw;
+    for (const [w, d, x, z] of [[2 * co, cw, 0, -sh - cw / 2], [2 * co, cw, 0, sh + cw / 2], [cw, 2 * sh, -sh - cw / 2, 0], [cw, 2 * sh, sh + cw / 2, 0]] as const) p.add('concrete', box(w, 0.06, d, x, depth - 0.02, z), 'deck');
+    // the steel lid, shut: hinged at the back, a lifting handle and a padlock hasp at the front
+    const top = depth + 0.04;
+    p.add('paint_green', box(2 * co - 0.01, 0.012, 2 * co - 0.01, 0, top, 0), 'openings');
+    p.add('steel', box(2 * sh, 0.016, 0.02, 0, top + 0.004, -co + 0.012), 'openings');
+    p.add('steel', box(0.25 * M, 0.06 * M, 0.04 * M, 0, top + 0.012, co - 0.03), 'openings');
+    p.add('iron', box(0.06 * M, 0.08 * M, 0.03 * M, 0.15 * M, top + 0.006, co - 0.003), 'openings');
     // a steel ladder up the back of the shaft from the floor to the collar
     const ly = depth + 0.05, lz = -sh + 0.012;
     for (const sx of [-1, 1]) p.add('steel', box(0.04 * M, ly, 0.04 * M, sx * 0.22 * M, 0, lz), 'openings');
@@ -407,8 +425,9 @@ function plant(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
       { len: 1.0 * M, dep: 0.55 * M, fn: a => Equipment.batteryRack(a, 4, 1.0), sides: ['left', 'back', 'right', 'front'] },
       { len: 1.4 * M, dep: 0.6 * M, fn: a => Furniture.generator(a), sides: ['front', 'left', 'right', 'back'] },
       { len: 1.1 * M, dep: 0.65 * M, fn: a => Equipment.fuelDrums(a), sides: ['front', 'right', 'left', 'back'] },
+      // on the wall, its conduits down to the floor: packed so it keeps clear of the rest
+      { len: 1.8 * M, dep: 0.3 * M, fn: a => Equipment.inverterWall((m, g) => a(m, g.translate(0, 0, -0.15 * M))), sides: ['left', 'back', 'right', 'front'], solid: false },
     ]);
-    c.hang(['left', 'back', 'right', 'front'], 1.4 * M, 0, a => Equipment.inverterWall(a), 1);
     c.hang(['right', 'left', 'front'], 0.2 * M, 0.5 * M, a => Equipment.extinguisher(a), 1);
     c.hang(['front', 'back', 'left'], 0.35 * M, 1.7 * M, a => Equipment.sign(a), 1);
     c.C(0, 0.1, 0, a => Furniture.stool(a), 0.6);
@@ -501,16 +520,29 @@ function ammoCans(a: Add): void {
  * Stairwell: a stair from a little board-and-batten headhouse on the surface
  * (+z end) down to a landing at the far end, where the doorways are.
  */
-function stairs(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
-  const hw = def.cellsX * CELL / 2, hd = def.cellsZ * CELL / 2, T = 0.05;
-  const depth = opts.depth ?? DEPTH;
+/**
+ * The stairwell's profile (local z along the piece; floor at 0, the ground
+ * `depth` above): landing, the stair's run, where the headhouse starts, and
+ * the tread height at a z. Shared with walk mode.
+ */
+export function stairProfile(def: KitPieceDef, depth: number): { zLand: number; zTop: number; zHouse: number; yAt: (z: number) => number } {
+  const hd = def.cellsZ * CELL / 2, T = 0.05;
   const zLand = -hd + T + 0.32, zTop = hd - 0.02;            // the stair runs from the landing up to the top end
   const run = zTop - zLand;
   const yAt = (z: number) => Math.max(0, Math.min(depth, (z - zLand) / run * depth));
-  const head = 2.15 * M;                                       // headroom over the treads
-  const ceilAt = (z: number) => Math.max(VAULT_H, yAt(z) + head);
   // the slab over the stair comes up to the ground where the headhouse starts
-  const zHouse = Math.min(zTop - 0.32, zLand + (depth - head + 0.02) / depth * run);
+  const zHouse = Math.min(zTop - 0.32, zLand + (depth - STAIR_HEAD + 0.02) / depth * run);
+  return { zLand, zTop, zHouse, yAt };
+}
+/** Headroom over the treads. */
+const STAIR_HEAD = 2.15 * M;
+
+function stairs(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
+  const hw = def.cellsX * CELL / 2, hd = def.cellsZ * CELL / 2, T = 0.05;
+  const depth = opts.depth ?? DEPTH;
+  const { zLand, zTop, zHouse, yAt } = stairProfile(def, depth);
+  const run = zTop - zLand;
+  const ceilAt = (z: number) => Math.max(VAULT_H, yAt(z) + STAIR_HEAD);
   return vault(def, seed, opts, { ...CONCRETE, custom: true, blastDoors: true }, c => {
     const p = c.p;
     // side walls (concrete) and the landing's end wall, built as profiles that follow the stair's ceiling
@@ -560,7 +592,8 @@ function stairs(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
       for (const sx of [-1, 1]) out.push(...wallRun(p.sink, layer, 'board_batten', { ax: sx * (hw - 0.01), az: hz0 + 0.02, bx: sx * (hw - 0.01), bz: hz1 - 0.02, y0, h: wallH, t: 0.02, cut }));
       return out;
     };
-    p.collide(...house('walls').filter(k => k.z1 - k.z0 < 0.05));
+    // the headhouse's walls block, except its back wall (the stair goes down under it)
+    p.collide(...house('walls').filter(k => !(k.z1 - k.z0 < 0.05 && k.z0 < hz0 + 0.03)));
     house('cutwalls', CUT_H);
     // gable roof (ridge along z) and its gable ends
     const roofRise = 0.14, span = hz1 - hz0 + 0.08, pitch = Math.atan2(roofRise, hw);

@@ -236,14 +236,14 @@ const atCampV = (r, pitch, yaw) => `{ const c = cb.world.camp; cb.cam.target.set
 const eyeAt = (dx, dz, lx, lz, eye = 0.3) => `{ const c = cb.world.camp; cb.cam.placeEye(c.x + ${dx}, c.z + ${dz}, c.x + ${lx}, c.z + ${lz}, ${eye}); }`;
 SETS.perimeter = [
   { name: 'aerial-walled-compound', time: 11, season: 'summer', setup: perimeter + atCampV(26, 0.8, 0.4), cam: D, frames: 20 },
-  { name: 'container-wall-and-gate-eye-level', time: 10, season: 'summer', setup: perimeter + eyeAt(1.5, 13.5, 0, 9.5), cam: D, frames: 14 },
+  { name: 'container-wall-and-gate-eye-level', time: 10, season: 'summer', setup: perimeter + eyeAt(-3.2, 10.6, 0.3, 9.4), cam: D, frames: 14 },
   { name: 'ditch-and-berm', time: 16, season: 'summer', setup: perimeter + atCampV(7, 0.32, 0.5) + "{ const c = cb.world.camp; cb.cam.target.set(c.x + 4, 0, c.z + 11); }", cam: D, frames: 14 },
   { name: 'thorn-hedge-grown', time: 14, season: 'summer', setup: perimeter + eyeAt(2, -12, 0, -9.5), cam: D, frames: 14 },
   { name: 'palisade-from-inside', time: 15, season: 'fall', setup: perimeter + eyeAt(-6, -2, -9.5, 1.5), cam: D, frames: 14 },
   { name: 'barbed-and-game-fence', time: 9, season: 'summer', setup: perimeter + eyeAt(12, -2, 9.5, 2), cam: D, frames: 14 },
   { name: 'sightlines-from-road', time: 12, season: 'summer', setup: perimeter + sight('road') + atCampV(48, 1.0, 0.0), cam: D, frames: 10 },
   { name: 'sightlines-from-ridge', time: 12, season: 'summer', setup: perimeter + sight('ridge') + atCampV(48, 1.0, 0.0), cam: D, frames: 10 },
-  { name: 'sightlines-night-lights', time: 12, season: 'summer', setup: perimeter + sight('night') + atCampV(48, 1.0, 0.0), cam: D, frames: 10 },
+  { name: 'sightlines-night-lights', time: 21.5, season: 'summer', setup: perimeter + sight('night') + atCampV(48, 1.0, 0.0), cam: D, frames: 10 },
   { name: 'viewshed-from-tower', time: 12, season: 'summer', setup: perimeter + sight('viewshed', [9.5, 9.5, 1.7]) + atCampV(48, 1.0, 0.0), cam: D, frames: 10 },
 ];
 
@@ -281,4 +281,50 @@ SETS.utilities = [
   { name: 'log-house-wired-kitchen-night', time: 21, season: 'fall', setup: utilities + inside2('log_house', -0.45, 0.29, -0.25, -0.3, 0.12, 1.0), cam: D, frames: 14 },
   { name: 'log-house-plumbed-bath', time: 11, season: 'summer', setup: utilities + inside2('log_house', 0.2, 0.29, 0.1, 0.6, 0.06, -0.35), cam: D, frames: 14 },
   { name: 'compound-night-electric', time: 21.5, season: 'fall', setup: utilities + atCampV(14, 0.45, 2.6), cam: D, frames: 20 },
+];
+
+/**
+ * A bunker under the compound (hatch → tunnel → rooms → a stairwell out),
+ * every room finished; and a second, smaller one being dug (an open pit,
+ * walls going up). window.__b[kind] = the placed record.
+ */
+const bunker = compound + `{ if (!window.__bk) { window.__bk = true;
+  const G = cb.game, W = cb.world, c = W.camp;
+  const place = (key, kind, dx, dz, rot = 0) => { const sp = cb.tool.findSpot(kind, c.x + dx, c.z + dz, rot, 6); if (!sp) { console.warn('no spot', key); return null; } G.getState().plan(kind, sp[0], sp[1], rot); const st = G.getState().game.structures.at(-1); window.__b[key] = st; return st; };
+  place('bunker_hatch', 'bunker_hatch', 0.25, -6.75);
+  place('bunker_corridor', 'bunker_corridor', 1.0, -6.75, 1);
+  place('bunker_galley', 'bunker_galley', 2.25, -6.5);
+  place('bunker_dorm', 'bunker_dorm', 2.25, -7.75);
+  place('bunker_stores', 'bunker_stores', 3.25, -6.5);
+  place('bunker_plant', 'bunker_plant', 3.25, -7.75);
+  place('bunker_medical', 'bunker_medical', 2.25, -5.5);
+  place('bunker_comms', 'bunker_comms', 1.0, -5.75, 1);
+  place('bunker_stairs', 'bunker_stairs', 4.25, -6.5, 1);
+  // a second bunker being dug, out past the outhouse
+  const h2 = place('hatch2', 'bunker_hatch', -9.25, -6.75);
+  const ct = h2 && place('bunker_container', 'bunker_container', -8.25, -6.75, 1);
+  const d2 = h2 && place('dig2', 'bunker_dorm', -9.0, -5.5);
+  G.setState(s => { const g = structuredClone(s.game);
+    for (const st of g.structures) { st.stage = 5; st.done = 0; st.finishedAt = 0; }
+    const set = (rec, stage, f) => { const st = rec && g.structures.find(x => x.id === rec.id); if (st) { st.stage = stage; st.done = f * [6, 40, 140, 90, 60][stage]; st.supplied = true; st.finishedAt = null; } };
+    if (ct) set(ct, 1, 0.9);
+    if (d2) set(d2, 2, 0.7);
+    if (h2) set(h2, 3, 0.2);
+    return { game: g }; });
+} }`;
+const under = "cb.store.getState().setUnderground(true);";
+const atB = (kind, r, pitch, yaw) => `{ const b = window.__b['${kind}']; if (b) { cb.cam.target.set(b.x, 0, b.z); cb.cam.radius = ${r}; cb.cam.pitch = ${pitch}; cb.cam.yaw = ${yaw}; } }`;
+SETS.bunker = [
+  { name: 'underground-view-aerial', time: 11, season: 'summer', setup: bunker + under + atB('bunker_galley', 7, 0.95, 0.5), cam: D, frames: 20 },
+  { name: 'underground-view-close', time: 11, season: 'summer', setup: bunker + under + atB('bunker_dorm', 3.2, 0.8, 0.9), cam: D, frames: 14 },
+  { name: 'surface-hatch-and-vents', time: 15, season: 'summer', setup: bunker + atB('bunker_hatch', 1.6, 0.3, 0.7), cam: D, frames: 14 },
+  { name: 'surface-stairwell-headhouse', time: 16, season: 'summer', setup: bunker + atB('bunker_stairs', 2.2, 0.25, 1.9), cam: D, frames: 14 },
+  { name: 'dig-open-and-walls-going-up', time: 13, season: 'summer', setup: bunker + atB('hatch2', 3.6, 0.55, 0.6), cam: D, frames: 16 },
+  { name: 'bunkroom', time: 12, season: 'summer', setup: bunker + inside2('bunker_dorm', 0.3, 0.27, 0.3, -0.25, 0.1, -0.3, 74), cam: D, frames: 12 },
+  { name: 'galley', time: 12, season: 'summer', setup: bunker + inside2('bunker_galley', 0.3, 0.27, 0.3, -0.25, 0.1, -0.3, 74), cam: D, frames: 12 },
+  { name: 'plant-room', time: 12, season: 'summer', setup: bunker + inside2('bunker_plant', 0.3, 0.27, 0.3, -0.25, 0.1, -0.3, 74), cam: D, frames: 12 },
+  { name: 'storeroom', time: 12, season: 'summer', setup: bunker + inside2('bunker_stores', -0.3, 0.27, 0.3, 0.25, 0.1, -0.3, 74), cam: D, frames: 12 },
+  { name: 'hatch-vestibule-ladder', time: 12, season: 'summer', setup: bunker + inside2('bunker_hatch', 0.12, 0.2, 0.15, -0.02, 0.6, -0.05, 80), cam: D, frames: 12 },
+  { name: 'stairwell-from-the-landing', time: 12, season: 'summer', setup: bunker + inside2('bunker_stairs', 0.0, 0.27, -0.66, 0.0, 0.6, 0.6, 74), cam: D, frames: 12 },
+  { name: 'comms-and-armoury', time: 12, season: 'summer', setup: bunker + inside2('bunker_comms', 0.1, 0.27, 0.35, -0.1, 0.12, -0.35, 80), cam: D, frames: 12 },
 ];
