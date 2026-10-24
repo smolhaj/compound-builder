@@ -26,6 +26,8 @@ import { liveDay, workFactor } from './needs';
 import { gateDay, neighborGossip } from './encounters';
 import { falloutDay, isNuclear, SHELTER_DAYS, strike } from './nuclear';
 import { tallyDay } from './report';
+import { lineageDay } from './lineage';
+import { erasDay } from './eras';
 import { landMarketDay } from './land';
 import { effectsDay } from './effects';
 import { mulberry32 } from './rng';
@@ -35,8 +37,10 @@ import { buildRate } from './family';
 import { routineAt, taskFor } from './schedule';
 import { hourOf, type GameState, type Structure } from './state';
 
-/** Household running costs a day in peacetime: groceries, the truck, insurance, phone, property tax (rural Mountain West, 2020s). Stops once the stores and banks are gone. */
-export const LIVING_PER_DAY = 160;
+/** Household running costs a day in peacetime (rural Mountain West, 2020s): the truck, insurance, phone and property tax for the household, plus groceries a head ($160 for a family of four). Stops once the stores and banks are gone. */
+export const LIVING_BASE = 100, GROCERIES_PER_HEAD = 15;
+export const LIVING_PER_DAY = LIVING_BASE + 4 * GROCERIES_PER_HEAD;
+export const livingPerDay = (s: GameState) => LIVING_BASE + GROCERIES_PER_HEAD * s.personState.filter(ps => ps.needs.died == null).length;
 
 /** Sub-step in days (15 game minutes). */
 export const SUBSTEP = 0.25 / 24;
@@ -84,7 +88,8 @@ function subStep(s: GameState): void {
     else if (task === 'build' && fix) addFixWork(s, fix.st, fix.f, SUBSTEP * 24 * rate);
     else if (task === 'forestry' && job) addFellWork(s, job, SUBSTEP * 24 * rate);
   });
-  if (s.disaster.tracks.banks > 0.5 && s.disaster.tracks.stores > 0.5) s.money -= LIVING_PER_DAY * SUBSTEP;
+  // (broke: the bills stop at nothing; food stamps and the food bank keep the table going)
+  if (s.disaster.tracks.banks > 0.5 && s.disaster.tracks.stores > 0.5 && s.money > 0) s.money -= livingPerDay(s) * SUBSTEP;
   // investment income comes in while the banks work
   if (s.disaster.tracks.banks > 0.5) s.money += LIFESTYLE[s.lifestyle].passive / 365 * SUBSTEP;
   crewStep(s, SUBSTEP);
@@ -112,7 +117,7 @@ function subStep(s: GameState): void {
     for (const line of effectsDay(s)) log(s, line);
     if (before !== 'impact' && s.disaster.phase === 'impact') {
       for (const ps of s.personState) if (ps.employed) {
-        ps.employed = false;
+        ps.employed = false; ps.laidOff = true;
         const p = s.people.find(x => x.id === ps.id);
         if (p?.job) log(s, `${p.first}'s job is gone: nobody is going to work now.`);
       }
@@ -129,6 +134,8 @@ function subStep(s: GameState): void {
     for (const line of bodyDay(s)) log(s, line);
     const end = tallyDay(s);
     if (end) log(s, end.kind === 'wipe' ? 'The last of the family is gone.' : end.kind === 'recovered' ? 'The outside world is coming back.' : end.kind === 'new_normal' ? 'The outside world has come back as far as it will.' : 'A full year the place has fed itself.');
+    for (const line of lineageDay(s)) log(s, line);
+    for (const line of erasDay(s)) log(s, line);
   }
 }
 

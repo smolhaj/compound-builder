@@ -27,6 +27,17 @@ export interface Person {
   elder?: boolean;
   /** Chronic conditions that need a daily medicine (sim/body.ts). */
   conditions?: Condition[];
+  /** Household family (born or married in), not someone taken in. */
+  kin?: boolean;
+  /** Birthday (day of year); ages tick over on it (sim/lineage.ts). */
+  bday?: number;
+  /** Generation: grandparents 0, the founding adults 1, their kids 2… */
+  gen?: number;
+  /** Partner's id, and parents' ids (no partnering within the family). */
+  partner?: string;
+  parents?: string[];
+  /** Born on the place. */
+  bornHere?: boolean;
 }
 
 const FIRST_F = ['Abigail', 'Ava', 'Beth', 'Carmen', 'Dana', 'Elena', 'Grace', 'Hannah', 'Ivy', 'June', 'Kate', 'Laura', 'Maya', 'Nora', 'Rosa', 'Ruth', 'Sara', 'Tessa', 'Wren'];

@@ -3,6 +3,7 @@
  * adds a step here that upgrades the previous version's JSON (CLAUDE.md
  * rule 5). Pure — tested in migrations.test.ts.
  */
+import { foundLineage, newLineage } from '../lineage';
 import { SAVE_VERSION, type GameState } from '../state';
 import { emptyUtilities } from '../utilities';
 import { newDisaster } from '../disaster';
@@ -42,6 +43,13 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   // 6 → 7: the escape tunnel (culvert, egress hatch)
   6: s => ({ ...s, version: 7, stock: { culvert: 0, egress_hatch: 0, ...(s.stock as object) } }),
   // 7 → 8: bunker hardening (lead, Faraday mesh, blast valves, HEPA sets; the retrofit job list)
+  // 29 → 30: the long game (kinship on the family already here, no eras yet)
+  29: s => {
+    const people = s.people as Person[];
+    for (const p of people) p.kin ??= /^p\d+$/.test(p.id);
+    foundLineage(people.filter(p => p.kin), s.seed as number);
+    return { ...s, version: 30, lineage: newLineage(people[0]?.last ?? 'The family') };
+  },
   // 28 → 29: wild food (game as it was), fishing gear, snares, smoker
   28: s => ({ ...s, version: 29, wild: newWild(), stock: { fishing_gear: 0, snares: 0, smoker: 0, ...(s.stock as object) } }),
   // 27 → 28: water goods (jugs, totes, the trailer, filter, RO, softener, greywater)
@@ -101,7 +109,7 @@ export function migrate(raw: unknown): GameState {
     if (!up) throw new SaveVersionError(`No migration from version ${s.version}`);
     s = up(s);
   }
-  for (const k of ['seed', 'clock', 'money', 'stock', 'orders', 'people', 'personState', 'structures', 'forestry', 'heat', 'perimeter', 'utilities', 'hardenJobs', 'disaster', 'food', 'neighbors', 'gate', 'stats', 'land', 'site', 'lifestyle', 'crews', 'siteJobs', 'roadside', 'paper', 'upkeep', 'shelf', 'body', 'fin', 'armory', 'wild', 'log', 'nextId'] as const) {
+  for (const k of ['seed', 'clock', 'money', 'stock', 'orders', 'people', 'personState', 'structures', 'forestry', 'heat', 'perimeter', 'utilities', 'hardenJobs', 'disaster', 'food', 'neighbors', 'gate', 'stats', 'land', 'site', 'lifestyle', 'crews', 'siteJobs', 'roadside', 'paper', 'upkeep', 'shelf', 'body', 'fin', 'armory', 'wild', 'lineage', 'log', 'nextId'] as const) {
     if (!(k in s)) throw new SaveVersionError(`Save is missing "${k}"`);
   }
   return s as unknown as GameState;

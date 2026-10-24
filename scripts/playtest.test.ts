@@ -7,7 +7,7 @@
  * Report: playtest-report.md (repo root).
  */
 import { describe, expect, it } from 'vitest';
-import { writeFileSync } from 'node:fs';
+import { appendFileSync, writeFileSync } from 'node:fs';
 import { newGame, type GameState } from '../src/sim/state';
 import { step } from '../src/sim/engine';
 import { placeOrder, orderProblem } from '../src/sim/economy';
@@ -65,7 +65,7 @@ function orderNeeds(s: GameState, strat: Strategy): void {
   const lines = MATERIAL_IDS.map(m => ({ material: m, qty: Math.max(0, Math.ceil((need[m] ?? 0) - s.stock[m] - (pending[m] ?? 0))) })).filter(l => l.qty > 0 && MATERIALS[l.material].price !== null);
   // food: a prepper keeps a year put by, a homesteader three months
   const months = strat === 'prepper' ? 12 : strat === 'homestead' ? 3 : 0;
-  const kcalYear = (2 * 2400 + 2 * 1700) * 30 * months;
+  const kcalYear = s.people.reduce((a, p, i) => a + (s.personState[i].needs.died == null ? (p.kid ? 1700 : 2400) : 0), 0) * 30 * months;
   const haveKcal = s.stock.staples * 80000 + s.stock.canned * 6000 + (pending.staples ?? 0) * 80000;
   if (haveKcal < kcalYear) lines.push({ material: 'staples', qty: Math.ceil((kcalYear - haveKcal) / 80000) });
   const jars = strat === 'prepper' ? 400 : strat === 'homestead' ? 200 : 0;
@@ -86,7 +86,7 @@ function orderNeeds(s: GameState, strat: Strategy): void {
 
 interface RunResult { site: string; strat: Strategy; kind: DisasterKind; variant: string; ending: string; grade: string; alive: string; hungry: number; days: number; moneyAtHit: number; builtAtHit: number; bugs: string[]; lines: string[] }
 
-function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' | 'medium', site: Site = CLASSIC): RunResult {
+function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' | 'medium', site: Site = CLASSIC, years = 0): RunResult & { s: GameState } {
   let s = newGame(seed, 105, 2027, { site: site === CLASSIC ? undefined : site, mode: 'scenario', peace, kind, dayJobs: true, grid: true });
   // the plans are drawn on the 40; squeeze them into the place actually bought
   const h = s.site.home, M = (x: number, z: number): [number, number] => [h.x0 + x / 67 * (h.x1 - h.x0), h.z0 + z / 67 * (h.z1 - h.z0)];
@@ -103,7 +103,7 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
   // raw land: the line and the drive first thing
   for (const what of ['drive', 'power'] as const) orderHookup(s, what);
   let planned = 0, moneyAtHit = 0, builtAtHit = 0, hitSeen = false;
-  const maxDays = s.disaster.hitAt + 730;
+  const maxDays = years ? years * 365 : s.disaster.hitAt + 730;
   for (let day = 0; day < maxDays; day++) {
     // build: one new plan when there's money for it (keep a reserve)
     const plans = PLANS[strat];
@@ -119,6 +119,11 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
       if ((strat === 'prepper' || strat === 'fortress') && s.money > 150_000 && hoursLeft(st) > 300) hireCrew(s, st.id);
       if (k === 'solar_array' || k === 'battery_shed' || k === 'generator_shed') { const r = planRun(s, 'power_cable', [[x, z], C]); void r; }
       if (k === 'well_drilled' || k === 'cistern') planRun(s, 'water_pipe', [[x, z], C]);
+    }
+    // the long game: a field more for every few more mouths (on the quiet years' money)
+    if (years && strat !== 'idle' && day % 60 === 0 && s.clock.t < s.disaster.hitAt && s.money > 40_000) {
+      const mouths = s.personState.filter(p => p.needs.died == null).length, fields = s.structures.filter(x => x.kind === 'field').length;
+      if (fields > 0 && fields < Math.ceil(mouths / 1.5) && fields < 16) { const [x, z] = M(10 + (fields % 4) * 7, 19 + Math.floor(fields / 4) * 7); applyForPermit(s, planStructure(s, 'field', x, z, 0)); }
     }
     if (strat === 'fortress' && day === 120) planRun(s, 'log_palisade', [M(15, 15), M(50, 15), M(50, 50), M(15, 50), M(15, 15)]);
     if (strat === 'prepper' && day === 600) for (const id of ['fallout', 'faraday', 'nbc'] as const) orderHardenAll(s, id, 1);
@@ -146,6 +151,10 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
     if (cabin && day % 5 === 0) for (const f of pendingFixes(cabin)) if (fixBlocked(s, f) && !orderProblem(s, Object.entries(fixBill(f)).map(([material, qty]) => ({ material: material as MaterialId, qty: qty as number })))) { placeOrder(s, Object.entries(fixBill(f)).map(([material, qty]) => ({ material: material as MaterialId, qty: qty as number }))); break; }
     if (cabin && day % 10 === 0) { const p = plant(s); for (const k of ['wire', 'plumb'] as const) if (!fitProblem(s, p, cabin, k)) orderFit(s, cabin.id, k); }
     s = step(s, 1);
+    if (process.env.YEARLY && years && day % 91 === 0) {
+      const liv = s.personState.filter(p => p.needs.died == null);
+      appendFileSync(process.env.YEARLY!, `${seed} y${(day / 365).toFixed(2)} era ${s.lineage.era} ${s.disaster.kind} ph ${s.disaster.phase} hit ${Math.round(s.disaster.hitAt)} ppl ${liv.length} hp ${Math.round(Math.min(...liv.map(p => p.needs.health)))} hunger ${Math.round(Math.max(...liv.map(p => p.needs.hunger)))} days food ${Math.round(daysOfFood(s))} grown ${Math.round(s.food.producedKcal)} need ${Math.round(s.food.needKcal)} $${Math.round(s.money)} stores ${s.disaster.tracks.stores.toFixed(2)} deliv ${s.disaster.tracks.deliveries.toFixed(2)} med ${s.disaster.tracks.medical.toFixed(2)} grid ${s.disaster.tracks.grid.toFixed(2)} fields ${s.structures.filter(x => x.kind === 'field' && isFinished(x)).length} end ${s.ending?.kind ?? ''}\n`);
+    }
     if (process.env.TRACE && strat === process.env.TRACE && kind === process.env.KIND && day % 15 === 0 && s.clock.t >= s.disaster.hitAt) {
       const k = (f: string) => Math.round((s.stock as Record<string, number>)[f] * ({ fresh: 2000, frozen: 10000, canned: 6000, staples: 80000 } as Record<string, number>)[f] / 1000);
       console.log(`d${Math.floor(s.clock.t - s.disaster.hitAt)} ppl ${s.personState.filter(p => p.needs.died == null).length} need ${Math.round(s.food.needKcal)} grown ${Math.round(s.food.producedKcal)} fresh ${k('fresh')}k can ${k('canned')}k stap ${k('staples')}k jars ${Math.round(s.stock.lids)} fields ${s.structures.filter(x => x.kind === 'field' && isFinished(x)).length} grow ${s.stats.grownYear | 0}/${s.stats.needYear | 0}`);
@@ -160,14 +169,38 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
     for (const m of MATERIAL_IDS) if (s.stock[m] < -1e-6 || !Number.isFinite(s.stock[m])) bugs.push(`stock ${m} = ${s.stock[m]} on day ${day}`);
     for (const ps of s.personState) if (!Number.isFinite(ps.needs.health) || !Number.isFinite(ps.needs.dose)) bugs.push(`needs NaN on day ${day}`);
     if (bugs.length > 5) break;
-    if (s.ending) break;
+    // the long game: play on through the eras until the line ends
+    if (s.ending && years && s.ending.kind !== 'wipe') s.ending.continued = true;
+    else if (s.ending) break;
   }
   const r = reportCard(s);
   const alive = s.personState.filter(ps => ps.needs.died == null).length;
-  return { site: `${s.site.acres} ac ${s.site.creek ? 'creek' : s.site.spring ? 'spring' : 'dry'} ${s.site.gwDepth} m ${s.site.improvements.house ? s.site.improvements.house.kind + ' ' : 'raw '}$${Math.round(s.site.price / 1000)}k`, strat, kind, variant: s.disaster.variant, ending: s.ending?.kind ?? 'still going (2 yrs)', grade: r.grade, alive: `${alive}/${s.personState.length}`, hungry: s.stats.hungryDays, days: s.stats.days, moneyAtHit, builtAtHit, bugs: [...new Set(bugs)].slice(0, 5), lines: r.lines };
+  return { site: `${s.site.acres} ac ${s.site.creek ? 'creek' : s.site.spring ? 'spring' : 'dry'} ${s.site.gwDepth} m ${s.site.improvements.house ? s.site.improvements.house.kind + ' ' : 'raw '}$${Math.round(s.site.price / 1000)}k`, strat, kind, variant: s.disaster.variant, ending: s.ending?.kind ?? 'still going (2 yrs)', grade: r.grade, alive: `${alive}/${s.personState.length}`, hungry: s.stats.hungryDays, days: s.stats.days, moneyAtHit, builtAtHit, bugs: [...new Set(bugs)].slice(0, 5), lines: r.lines, s };
 }
 
-describe.skipIf(!process.env.PLAYTEST)('playtest', () => {
+describe.skipIf(process.env.PLAYTEST !== 'long')('the long game', () => {
+  it('plays on through the eras for 40 years', () => {
+    const rows: string[] = ['# Long-game playtest (scripted, 40 years)', '', '| Seed | Strategy | Eras | Living | Born here | Generations | Dynasty | Milestones | Bugs |', '|---|---|---|---|---|---|---|---|---|'];
+    const notes: string[] = [];
+    const bugs: string[] = [];
+    let seed = 41;
+    for (const strat of ['homestead', 'prepper', 'homestead', 'prepper', 'homestead', 'prepper', 'idle', 'fortress'] as Strategy[]) {
+      const kind = (['grid_down', 'pandemic', 'financial', 'drought', 'wildfire', 'cyberattack'] as DisasterKind[])[seed % 6];
+      const r = play(strat, kind, seed, 'short', listings(seed)[seed % 4], 40);
+      const s = r.s, L = s.lineage;
+      const living = s.people.filter((_, i) => s.personState[i].needs.died == null);
+      rows.push(`| ${seed} | ${strat} | ${L.eras.map(e => `${e.name} ${e.grade} (${e.fate})`).join(', ') || '-'}${s.ending?.kind === 'wipe' ? ' · wiped' : ''} | ${living.length}/${s.people.length} | ${s.people.filter(p => p.bornHere).length} | ${new Set(living.filter(p => p.kin).map(p => p.gen)).size} | ${Math.round(L.points)} | ${L.milestones.length} | ${r.bugs.join('; ')} |`);
+      notes.push(`## Seed ${seed} (${strat})`, '', ...L.chronicle.map(e => `- ${e.year}: ${e.text}`), '');
+      bugs.push(...r.bugs);
+      if (s.people.length !== s.personState.length) bugs.push('people / personState out of step');
+      seed++;
+    }
+    writeFileSync('playtest-long.md', [...rows, '', ...notes].join('\n'));
+    expect(bugs).toEqual([]);
+  }, 3_600_000);
+});
+
+describe.skipIf(!process.env.PLAYTEST || process.env.PLAYTEST === 'long')('playtest', () => {
   it('plays the strategies against the disasters', () => {
     const kinds: DisasterKind[] = ['grid_down', 'nuclear', 'drought', 'pandemic', 'wildfire', 'ash_winter', 'financial', 'solar_flare', 'zombies'];
     const strats: Strategy[] = ['idle', 'homestead', 'prepper', 'fortress'];
