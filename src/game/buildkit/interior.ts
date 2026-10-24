@@ -245,7 +245,7 @@ export const Furniture = {
   },
 
   /** Open shelves on the wall (back at -z): `levels` boards from `y` up; jars, crocks or books on them. */
-  wallShelf(add: Add, lm = 1.2, y = 1.35, levels = 2, fill: 'lids' | 'books' = 'lids'): void {
+  wallShelf(add: Add, lm = 1.2, y = 1.35, levels = 2, fill: 'jars' | 'books' = 'jars'): void {
     const l = lm * M, d = 0.25 * M;
     for (let k = 0; k < levels; k++) {
       const yy = (y + k * 0.38) * M;
@@ -257,7 +257,7 @@ export const Furniture = {
   },
 
   /** Free-standing shelf unit (bookcase / pantry), back at -z. */
-  shelfUnit(add: Add, lm = 1.0, hm = 1.9, fill: 'lids' | 'books' = 'books'): void {
+  shelfUnit(add: Add, lm = 1.0, hm = 1.9, fill: 'jars' | 'books' = 'books'): void {
     const l = lm * M, h = hm * M, d = 0.35 * M;
     for (const sx of [-1, 1]) add('wood_dark', box(0.03 * M, h, d, sx * (l / 2 - 0.015 * M), 0, 0));
     add('wood_dark', box(l, h, 0.02 * M, 0, 0, -d / 2 + 0.01 * M));
