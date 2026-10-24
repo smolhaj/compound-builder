@@ -12,6 +12,7 @@ import { fitProblem, orderFit, plant, repairPump, replaceFried } from '../sim/ut
 const GRID_RECONNECT = 250;
 import { triggerDisaster, type DisasterKind } from '../sim/disaster';
 import { resolve, type Stance } from '../sim/encounters';
+import { buyLand, type LandKind } from '../sim/land';
 import { log } from '../sim/economy';
 import { hardenProblem, orderHarden, orderHardenAll, tierOf, type HardenId } from '../sim/hardening';
 import { saveGame, AUTOSAVE } from '../sim/save/saveSystem';
@@ -48,6 +49,10 @@ export interface GameStore {
   /** Answer whoever is at the gate. */
   answer: (stance: Stance) => void;
   dismissCard: () => void;
+  /** Buy a neighbor parcel. */
+  buy: (parcelId: string) => string | null;
+  /** The world measured what each parcel is (timber, creek bottom, hay, grazing). */
+  survey: (kinds: Record<string, LandKind>) => void;
   /** After the report card: play on (endless). */
   playOn: () => void;
   /** Put a spare into an EMP-fried building. */
@@ -146,6 +151,18 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     resolve(g, stance);
     set({ game: g });
     void saveGame(AUTOSAVE, g);
+  },
+  buy: (id) => {
+    const g = structuredClone(get().game);
+    const why = buyLand(g, id);
+    if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); }
+    return why;
+  },
+  survey: (kinds) => {
+    const g = structuredClone(get().game);
+    for (const p of g.land.parcels) if (kinds[p.id]) p.kind = kinds[p.id];
+    g.land.surveyed = true;
+    set({ game: g });
   },
   playOn: () => {
     const g = structuredClone(get().game);

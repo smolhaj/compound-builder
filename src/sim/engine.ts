@@ -15,6 +15,7 @@ import { liveDay, workFactor } from './needs';
 import { gateDay, neighborGossip } from './encounters';
 import { falloutDay, isNuclear, SHELTER_DAYS, strike } from './nuclear';
 import { tallyDay } from './report';
+import { landMarketDay } from './land';
 import { mulberry32 } from './rng';
 import { log } from './economy';
 import { dayIndex } from './state';
@@ -76,6 +77,7 @@ function subStep(s: GameState): void {
       const gossip = neighborGossip(s, mulberry32(s.seed * 17 + dayIndex(s.clock.t)));
       if (gossip) { s.disaster.news.push({ t: s.clock.t, text: gossip, tone: 1 }); log(s, gossip); }
     }
+    landMarketDay(s, dayIndex(s.clock.t));
     const e = gateDay(s);
     if (e) log(s, `${e.title}.`);
     if (before !== 'impact' && s.disaster.phase === 'impact' && s.disaster.kind === 'nuclear') for (const line of strike(s)) log(s, line);

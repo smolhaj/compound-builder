@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import type { GameState } from '../sim/state';
 import { MushroomCloud } from './fx/MushroomCloud';
 import { nuclearSky } from '../sim/nuclear';
 import * as THREE from 'three';
@@ -115,7 +116,12 @@ export function GameCanvas() {
     };
     applyLook();
     world.syncStructures(useGameStore.getState().game.structures);
+    // the neighbor parcels: survey what each is once (timber, creek bottom, hay ground, dry grazing), and plant what's bought
+    const ownedRects = (g: GameState) => g.land.parcels.filter(p => p.owner === 'you').map(p => p.rect);
+    if (!useGameStore.getState().game.land.surveyed) useGameStore.getState().survey(world.surveyLand(useGameStore.getState().game.land.parcels));
+    world.setOwnedLand(ownedRects(useGameStore.getState().game));
     const unsub = [
+      useGameStore.subscribe(s => s.game.land, l => world.setOwnedLand(l.parcels.filter(p => p.owner === 'you').map(p => p.rect))),
       useWorldStore.subscribe(s => s.quality, applyLook),
       useWorldStore.subscribe(s => s.cameraMode, applyCameraMode),
       useGameStore.subscribe(s => s.game.structures, list => { world.syncStructures(list); occluders.invalidate(); }),

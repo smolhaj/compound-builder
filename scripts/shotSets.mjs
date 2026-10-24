@@ -396,3 +396,11 @@ SETS.nuclear = [
   { name: 'fallout-dust-falling', time: 13, season: 'summer', setup: compound + nuke('distant', 9) + horizon(13, 0.8), cam: D, frames: 16 },
   { name: 'sickly-sky-day-five', time: 12, season: 'summer', setup: compound + nuke('distant', 24 * 5) + `{ const c = cb.world.camp; cb.cam.target.set(c.x, 0, c.z); cb.cam.radius = 9; cb.cam.pitch = 0.35; cb.cam.yaw = 0.4; }`, cam: D, frames: 16 },
 ];
+
+/** Land: the west forty bought (its trees become near, markable ones; survey pins at the corners). */
+const buyWest = `{ const G = cb.game; G.setState(s => { const g = structuredClone(s.game); for (const p of g.land.parcels) if (p.rect.x0 < 0 && p.rect.z0 === 0) p.owner = 'you'; return { game: g }; }); }`;
+SETS.land = [
+  { name: 'home-place-before', time: 11, season: 'summer', setup: compound + `{ cb.cam.target.set(0, 0, 33); cb.cam.radius = 60; cb.cam.pitch = 0.9; cb.cam.yaw = 0.3; }`, cam: D, frames: 16 },
+  { name: 'west-forty-bought', time: 11, season: 'summer', setup: compound + buyWest + `{ cb.cam.target.set(0, 0, 33); cb.cam.radius = 60; cb.cam.pitch = 0.9; cb.cam.yaw = 0.3; }`, cam: D, frames: 20 },
+  { name: 'corner-pin', time: 15, season: 'summer', setup: compound + buyWest + `{ const W = cb.world; cb.cam.placeEye(-66.6, 2, -67, 0, 0.28); }`, cam: D, frames: 14 },
+];

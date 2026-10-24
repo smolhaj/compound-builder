@@ -30,19 +30,26 @@ export interface PlantOptions {
   density?: number;
   /** Extra exclusions (structures, the cabin site). */
   blocked?: (x: number, z: number) => boolean;
+  /**
+   * Plant a bought neighbor parcel instead of the home square: its own
+   * rect and id range (ids stay stable: the home square's never change).
+   */
+  rect?: { x0: number; z0: number; x1: number; z1: number };
+  idBase?: number;
 }
 
 /** A parcel tree: a forest spec plus a stable id (its grid cell), so marks and stumps survive replanting. */
 export type ParcelTree = ForestTreeSpec & { id: number };
 
 export function planParcelTrees(t: ParcelTerrain, o: PlantOptions): ParcelTree[] {
-  const rnd = mulberry32(t.seed * 7919 + 17);
+  const rnd = mulberry32(t.seed * 7919 + 17 + (o.idBase ?? 0));
   const out: ParcelTree[] = [];
   let cell = -1;
   const lo = -o.margin, hi = PARCEL_SIZE + o.margin;
+  const [x0, x1, z0, z1] = o.rect ? [o.rect.x0, o.rect.x1, o.rect.z0, o.rect.z1] : [lo, hi, lo, hi];
   const density = o.density ?? 1;
-  for (let gz = lo; gz < hi; gz += CELL) {
-    for (let gx = lo; gx < hi; gx += CELL) {
+  for (let gz = z0; gz < z1; gz += CELL) {
+    for (let gx = x0; gx < x1; gx += CELL) {
       cell++;
       const x = gx + rnd() * CELL, z = gz + rnd() * CELL;
       const roll = rnd(), kindRoll = rnd(), sRoll = rnd();
@@ -70,7 +77,7 @@ export function planParcelTrees(t: ParcelTerrain, o: PlantOptions): ParcelTree[]
         scale = 0.75 + sRoll * 0.55;
       }
       out.push({
-        id: cell, x, y: s.h, z, kind, scale,
+        id: (o.idBase ?? 0) + cell, x, y: s.h, z, kind, scale,
         sx: 0.88 + sxR * 0.24, sy: kind === 'oval' ? 1.1 + syR * 0.3 : 0.9 + syR * 0.25,
         rotY, cr,
       });

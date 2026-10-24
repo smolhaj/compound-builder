@@ -11,11 +11,12 @@ import type { PerimeterRun } from './perimeter';
 import { emptyUtilities, type Utilities } from './utilities';
 
 import type { HardenId, HardenJob, Tier } from './hardening';
+import { newLand, type LandState } from './land';
 import { emptyStats, type Ending, type RunStats } from './report';
 import { generateNeighbors, newGate, type GateState, type Neighbor } from './encounters';
 import { freshNeeds, type FoodReport, type Needs } from './needs';
 import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
-export const SAVE_VERSION = 14;
+export const SAVE_VERSION = 15;
 
 /** Starting savings (GDS §1 peacetime money constraint). */
 export const STARTING_MONEY = 30000;
@@ -131,6 +132,8 @@ export interface GameState {
   utilities: Utilities;
   /** Bunker hardening retrofits, ordered and in progress. */
   hardenJobs: HardenJob[];
+  /** The neighbor parcels on the survey grid (who owns them, for sale, what they are). */
+  land: LandState;
   /** The households round the place. */
   neighbors: Neighbor[];
   /** Who comes to the gate: the pending encounter, the last result, humanity and tallies. */
@@ -160,6 +163,7 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     money: STARTING_MONEY,
     stock: { ...emptyStock(), firewood: STARTING_FIREWOOD, canned: 2 },
     neighbors: generateNeighbors(seed),
+    land: newLand(seed, generateNeighbors(seed).map(n => n.id)),
     gate: newGate(seed),
     stats: emptyStats(),
     ending: null,
