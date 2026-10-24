@@ -30,6 +30,8 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   // 6 → 7: the escape tunnel (culvert, egress hatch)
   6: s => ({ ...s, version: 7, stock: { culvert: 0, egress_hatch: 0, ...(s.stock as object) } }),
   // 7 → 8: bunker hardening (lead, Faraday mesh, blast valves, HEPA sets; the retrofit job list)
+  // 9 → 10: the county grid (old saves stay off it), breakers, who had power, the bill in the report
+  9: s => ({ ...s, version: 10, utilities: { ...(s.utilities as object), grid: false, off: [], lit: [], report: { gridKwh: 0, billUsd: 0, shed: [], ...((s.utilities as { report: object }).report) } } }),
   // 8 → 9: the collapse clock (old saves become Free build) and day jobs (off: they've been building full time)
   8: s => ({ ...s, version: 9, disaster: newDisaster(s.seed as number, 'sandbox'), people: (s.people as Person[]).map(p => (p.kid || p.job ? p : { ...p, job: dayJob(p, s.seed as number) })) }),
   7: s => ({ ...s, version: 8, hardenJobs: [], stock: { lead_sheet: 0, faraday_mesh: 0, blast_valve: 0, filter_set: 0, ...(s.stock as object) } }),

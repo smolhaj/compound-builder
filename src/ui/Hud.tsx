@@ -11,7 +11,7 @@ import { onOrder, orderCost, orderProblem } from '../sim/economy';
 import { blockedReason, isFinished, progress } from '../sim/construction';
 import { BLUEPRINTS, totalBill, totalHours } from '../sim/blueprints';
 import { BUNKER_ORDER, KIT, KIT_ORDER, UTILITY_ORDER } from '../game/buildkit/kit';
-import { FIT, fitProblem, plant, serviceOf, FUEL_UNIT_L } from '../sim/utilities';
+import { FIT, fitProblem, plant, serviceOf, FUEL_UNIT_L, UTILITY } from '../sim/utilities';
 import { DISASTERS, TRACKS, TRACK_NAME, type DisasterKind } from '../sim/disaster';
 import { prices } from '../sim/economy';
 import { LIVING_PER_DAY } from '../sim/engine';
@@ -189,6 +189,10 @@ export function Hud() {
               return <>
                 {row('plumb', 'Running water', sv.plumbed)}
                 {row('wire', 'Electric', sv.wired)}
+                {(sv.wired || UTILITY[sel.kind]?.water?.needsPower) && <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 3 }}>
+                  <span>Breaker: {game.utilities.off.includes(sel.id) ? 'off' : game.utilities.lit.includes(sel.id) ? 'on, powered' : 'on, no power'}</span>
+                  <button style={btn()} onClick={() => g.setBreaker(sel.id, game.utilities.off.includes(sel.id))}>{game.utilities.off.includes(sel.id) ? 'Switch on' : 'Switch off'}</button>
+                </div>}
                 {game.utilities.broken.includes(sel.id) && <button style={{ ...btn(true), marginTop: 3 }} onClick={() => g.repairPump(sel.id)}>Repair the pump (1 hardware kit)</button>}
               </>;
             })()}
@@ -260,9 +264,15 @@ export function Hud() {
             </div>;
           })}
         </Section>
-        {(game.utilities.report.solarKwh + game.utilities.report.genKwh + game.utilities.report.waterL > 0) && (() => {
-          const r = game.utilities.report;
+        {(game.utilities.grid || game.utilities.report.solarKwh + game.utilities.report.genKwh + game.utilities.report.waterL > 0) && (() => {
+          const r = game.utilities.report, up = game.disaster.tracks.grid > 0.5;
           return <Section title="Water & power (yesterday)">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
+              <span>County grid: {!game.utilities.grid ? 'off the grid' : up ? `${r.gridKwh.toFixed(1)} kWh, $${r.billUsd.toFixed(2)}` : <span style={{ color: '#f08060' }}>OUT</span>}</span>
+              {(up || game.utilities.grid) && <button style={btn()} title={game.utilities.grid ? 'Have the co-op pull the meter: no more bills, but only what you built runs the place' : 'Reconnect: $250'} onClick={() => g.setGrid(!game.utilities.grid)}>{game.utilities.grid ? 'Leave' : 'Rejoin'}</button>}
+            </div>
+            {r.genKwh > 0.1 && <div style={{ opacity: 0.8 }}>The generator ran {Math.round(r.genKwh / 7 * 10) / 10} h: it carries about 1 km on a still night.</div>}
+            {r.shed.length > 0 && <div style={{ color: '#f0a070' }}>Went without: {r.shed.map(id => KIT[game.structures.find(x => x.id === id)?.kind ?? '']?.name ?? '?').join(', ')}</div>}
             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Power made / used</span><span>{(r.solarKwh + r.genKwh).toFixed(1)} / {r.drawKwh.toFixed(1)} kWh</span></div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Batteries</span><span>{Math.round(r.batteryPct * 100)} %</span></div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Fuel</span><span>{game.stock.fuel * FUEL_UNIT_L} L</span></div>
