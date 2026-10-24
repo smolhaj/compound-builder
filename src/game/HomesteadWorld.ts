@@ -657,20 +657,23 @@ export class HomesteadWorld {
     }
     for (const { pit, spoil, machine } of sites) {
       if (pit.k <= 0) continue;
-      const reach = pitReach(Math.max(0, this.groundAt((pit.x0 + pit.x1) / 2, (pit.z0 + pit.z1) / 2) - pit.floor)) * pit.k + 0.06;
+      const reach = pitReach(Math.max(0, this._naturalH((pit.x0 + pit.x1) / 2, (pit.z0 + pit.z1) / 2) - pit.floor)) * pit.k + 0.06;   // the batter, from the uncut ground
       const soil = new THREE.Mesh(drapeSoil(pit.x0 - reach, pit.z0 - reach, pit.x1 + reach, pit.z1 + reach, this.groundAt), this._soilMat);
       soil.receiveShadow = true; soil.userData.own = true;
       this._dig.add(soil);
       // the heap on the long side, clear of the batter
-      const alongX = pit.x1 - pit.x0 > pit.z1 - pit.z0;
-      const hx = alongX ? (pit.x0 + pit.x1) / 2 : pit.x1 + reach + 0.45, hz = alongX ? pit.z1 + reach + 0.45 : (pit.z0 + pit.z1) / 2;
-      const heap = new THREE.Mesh(spoilHeap(spoil).translate(hx, this.groundAt(hx, hz) - 0.02, hz), kitMaterial('soil'));
+      const alongX = pit.x1 - pit.x0 >= pit.z1 - pit.z0;
+      const len = alongX ? pit.x1 - pit.x0 : pit.z1 - pit.z0;
+      const hx = alongX ? (pit.x0 + pit.x1) / 2 : pit.x1 + reach + 0.3, hz = alongX ? pit.z1 + reach + 0.3 : (pit.z0 + pit.z1) / 2;
+      const rowG = spoilHeap(spoil, len);
+      if (!alongX) rowG.rotateY(Math.PI / 2);
+      const heap = new THREE.Mesh(rowG.translate(hx, this.groundAt(hx, hz) - 0.02, hz), kitMaterial('soil'));
       heap.castShadow = heap.receiveShadow = true; heap.userData.own = true;
       this._dig.add(heap);
       if (machine) {
         // parked at the edge opposite the heap, facing in, bucket down in the hole
         const ex = alongX ? (pit.x0 + pit.x1) / 2 + 0.2 : pit.x0 - reach - 0.28, ez = alongX ? pit.z0 - reach - 0.28 : (pit.z0 + pit.z1) / 2 - 0.1;
-        const g = buildExcavator(Math.max(0.1, this.groundAt(ex, ez) - pit.floor) * 0.8);
+        const g = buildExcavator(Math.max(0.1, this.groundAt(ex, ez) - pit.floor) * 0.6);
         g.position.set(ex, this.groundAt(ex, ez), ez);
         g.rotation.y = alongX ? 0 : Math.PI / 2;
         g.traverse(o => { o.userData.own = true; });
@@ -790,7 +793,7 @@ export class HomesteadWorld {
       if (b.under) {
         // scaled to the room: the same lamps light a small vestibule and a big bunkroom alike
         const def = KIT[b.placed.kind], area = def.cellsX * def.cellsZ / 4;
-        b.light.intensity = (this._under ? 0.3 : 0.9) * Math.min(1, 0.35 + 0.65 * area);
+        b.light.intensity = (this._under ? 0.3 : 0.8) * Math.min(1, 0.2 + 0.8 * area);
         b.light.color.set(0xfff2dc);
         continue;
       }

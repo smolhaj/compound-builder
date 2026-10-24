@@ -319,7 +319,7 @@ SETS.bunker = [
   { name: 'underground-view-close', time: 11, season: 'summer', setup: bunker + under + atB('bunker_dorm', 3.2, 0.8, 0.9), cam: D, frames: 14 },
   { name: 'surface-hatch-and-vents', time: 15, season: 'summer', setup: bunker + atB('bunker_hatch', 1.6, 0.3, 0.7), cam: D, frames: 14 },
   { name: 'surface-stairwell-headhouse', time: 16, season: 'summer', setup: bunker + atB('bunker_stairs', 2.2, 0.25, 1.9), cam: D, frames: 14 },
-  { name: 'dig-open-and-walls-going-up', time: 13, season: 'summer', setup: bunker + atB('hatch2', 3.6, 0.55, 0.6), cam: D, frames: 16 },
+  { name: 'dig-open-and-walls-going-up', time: 13, season: 'summer', setup: bunker + atB('hatch2', 3.4, 0.6, 3.6), cam: D, frames: 16 },
   { name: 'bunkroom', time: 12, season: 'summer', setup: bunker + inside2('bunker_dorm', 0.3, 0.27, 0.3, -0.25, 0.1, -0.3, 74), cam: D, frames: 12 },
   { name: 'galley', time: 12, season: 'summer', setup: bunker + inside2('bunker_galley', 0.3, 0.27, 0.3, -0.25, 0.1, -0.3, 74), cam: D, frames: 12 },
   { name: 'plant-room', time: 12, season: 'summer', setup: bunker + inside2('bunker_plant', 0.3, 0.27, 0.3, -0.25, 0.1, -0.3, 74), cam: D, frames: 12 },

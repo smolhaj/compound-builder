@@ -73,28 +73,31 @@ export function buildExcavator(reachDown = 0.4): THREE.Group {
   return b.finish();
 }
 
-/** A heap of dug earth, `m3` cubic metres (≈ a 2 : 1 cone), centred at the origin on the ground. */
-export function spoilHeap(m3: number): THREE.BufferGeometry {
-  const v = Math.max(1, m3) * M * M * M;
-  // cone volume π r² h / 3 with h = r / 2 → r = (6 v / π)^(1/3)
-  const r = Math.cbrt(6 * v / Math.PI), h = r / 2;
-  const g = new THREE.SphereGeometry(1, 20, 8, 0, Math.PI * 2, 0, Math.PI / 2).scale(r, h * 1.15, r * 0.8);
+/**
+ * Dug earth in a windrow along a dig's side (the way an excavator casts it):
+ * `len` long (world units, along x), up to ≈ 1.8 m high, as wide as the
+ * volume needs (capped: the rest has been carted off), on the ground at the origin.
+ */
+export function spoilHeap(m3: number, len: number): THREE.BufferGeometry {
+  const v = Math.min(Math.max(1, m3), 140) * M * M * M;
+  const h = Math.min(1.8 * M, Math.cbrt(v) * 0.6), w = Math.max(0.15, Math.min(1.4, v / (len * h * 0.55)));
+  const g = new THREE.SphereGeometry(1, 24, 8, 0, Math.PI * 2, 0, Math.PI / 2).scale(len / 2 + w * 0.3, h, w / 2);
   // lumpy: nudge the vertices
   const p = g.getAttribute('position');
   for (let i = 0; i < p.count; i++) {
     const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
     const n = Math.sin(x * 23.1 + z * 11.7) * 0.06 + Math.sin(x * 7.3 - z * 17.9) * 0.05;
-    p.setXYZ(i, x * (1 + n), y * (1 + n * 0.6), z * (1 + n));
+    p.setXYZ(i, x, y * (1 + n * 1.5), z * (1 + n));
   }
   g.computeVertexNormals();
   return g;
 }
 
 /** Bare earth draped over a rect of ground (the cut and its batters). */
-export function drapeSoil(x0: number, z0: number, x1: number, z1: number, ground: (x: number, z: number) => number, n = 24): THREE.BufferGeometry {
+export function drapeSoil(x0: number, z0: number, x1: number, z1: number, ground: (x: number, z: number) => number, n = 48): THREE.BufferGeometry {
   const g = new THREE.PlaneGeometry(x1 - x0, z1 - z0, n, n).rotateX(-Math.PI / 2).translate((x0 + x1) / 2, 0, (z0 + z1) / 2);
   const p = g.getAttribute('position');
-  for (let i = 0; i < p.count; i++) p.setY(i, ground(p.getX(i), p.getZ(i)) + 0.006);
+  for (let i = 0; i < p.count; i++) p.setY(i, ground(p.getX(i), p.getZ(i)) + 0.004);
   g.computeVertexNormals();
   return g;
 }
