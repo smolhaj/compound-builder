@@ -4,6 +4,7 @@ import { Hud } from './ui/Hud';
 import { SetupScreen } from './ui/SetupScreen';
 import { ShopWindow } from './ui/ShopWindow';
 import { Ticker } from './ui/Ticker';
+import { BattleOverlay } from './ui/BattleOverlay';
 import { GateCard } from './ui/GateCard';
 import { ReportCard } from './ui/ReportCard';
 import { useGameStore } from './store/gameStore';
@@ -39,6 +40,7 @@ export default function App() {
       <GameCanvas key={worldKey} />
       <Hud />
       {!clean && <Ticker />}
+      {!clean && <BattleOverlay />}
       {!clean && <GateCard />}
       {!clean && <ReportCard />}
       {shop && !clean && <ShopWindow />}
