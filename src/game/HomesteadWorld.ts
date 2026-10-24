@@ -1,10 +1,12 @@
 import * as THREE from 'three';
+import { mulberry32 } from '../sim/rng';
+import { ShrubField, SAGE, WILLOW, type ShrubSpec } from '../engine/world/trees/ShrubField';
 import type { Quality, WorldScene } from '../engine/world/WorldScene';
 import { TerrainRenderer } from '../engine/world/terrain/TerrainRenderer';
 import { regionLookFor, regionWaterY } from '../engine/world/terrain/regionalLandscape';
 import { ForestRenderer, FOREST_ASPEN } from '../engine/world/trees/ForestRenderer';
 import { FarTreeRenderer } from '../engine/world/trees/FarTreeRenderer';
-import { planParcelTrees, type ParcelTree } from './parcel/parcelTrees';
+import { planParcelTrees, planUnderstory, type ParcelTree } from './parcel/parcelTrees';
 import { buildWoods, fallHeading, trunkRadius } from './forestry/woodsGeometry';
 import type { Forestry } from '../sim/state';
 import { plant, serviceOf } from '../sim/utilities';
@@ -108,6 +110,8 @@ export class HomesteadWorld {
   readonly parcel: ParcelTerrain;
   readonly terrain: TerrainRenderer;
   readonly forest: ForestRenderer;
+  readonly sage: ShrubField;
+  readonly willow: ShrubField;
   readonly farTrees: FarTreeRenderer;
   readonly stream: StreamRenderer;
   readonly lakes: RegionalWaterRenderer;
@@ -155,6 +159,8 @@ export class HomesteadWorld {
     this.access = planAccess(this.camp);
     this.terrain = new TerrainRenderer(ws.scene);
     this.forest = new ForestRenderer(ws.scene);
+    this.sage = new ShrubField(ws.scene, 'sagebrush', SAGE, 1);
+    this.willow = new ShrubField(ws.scene, 'willow', WILLOW, 1);
     this.farTrees = new FarTreeRenderer(ws.scene);
     this.stream = new StreamRenderer(ws.scene);
     this.lakes = new RegionalWaterRenderer(ws.scene);
@@ -242,7 +248,11 @@ export class HomesteadWorld {
     // the home square, then each bought neighbor parcel (its own id range; the home square's ids never change)
     const plantAll = (density: number, block: (x: number, z: number) => boolean) => [
       ...planParcelTrees(this.parcel, { margin, density, blocked: block }),
-      ...this._ownedLand.flatMap((r, k) => planParcelTrees(this.parcel, { margin, density, rect: r, idBase: 1_000_000 * (k + 1), blocked: (x, z) => inHome(x, z) || block(x, z) })),
+      ...planUnderstory(this.parcel, { margin, density, blocked: block }),
+      ...this._ownedLand.flatMap((r, k) => {
+        const o = { margin, density, rect: r, idBase: 1_000_000 * (k + 1), blocked: (x: number, z: number) => inHome(x, z) || block(x, z) };
+        return [...planParcelTrees(this.parcel, o), ...planUnderstory(this.parcel, o)];
+      }),
     ];
     const specs = plantAll(q === 'low' ? 0.5 : 1, blocked);
     for (const t of specs) t.y = this.terrain.surfaceAt(t.x, t.z) - 0.03;
@@ -251,6 +261,7 @@ export class HomesteadWorld {
     const all = q === 'low' ? plantAll(1, (x, z) => this.onBuilding(x, z, 0.6) || this.onCamp(x, z, 0.6) || this.onAccess(x, z, 0.5)) : specs;
     this._treeById = new Map(all.map(t => [t.id, t]));
     this._plantForest();
+    this._plantShrubs(q, inHome, blocked);
     const inside = (x: number, z: number) => inHome(x, z) || this._inOwned(x, z);
     // Neighboring farmsteads (houses, hay barns, corrals, poplar windbreaks)
     this._props?.dispose();
@@ -271,6 +282,40 @@ export class HomesteadWorld {
   }
 
   private _planted: ParcelTree[] = [];
+
+  /**
+   * Sagebrush on the dry, open benches and willow thickets on the creek
+   * banks (landscape audit: the two shrubs that make Mountain West ground
+   * read as itself). Seeded per cell; clear of buildings, the camp, the
+   * drive, fences and the timber.
+   */
+  private _plantShrubs(q: Quality, inHome: (x: number, z: number) => boolean, blocked: (x: number, z: number) => boolean): void {
+    const sage: ShrubSpec[] = [], willow: ShrubSpec[] = [];
+    const rects = [{ x0: -TREE_MARGIN, z0: -TREE_MARGIN, x1: PARCEL_SIZE + TREE_MARGIN, z1: PARCEL_SIZE + TREE_MARGIN }, ...this._ownedLand];
+    const keep = q === 'low' ? 0.35 : q === 'medium' ? 0.7 : 1;
+    const creek = this.parcel.creek;
+    rects.forEach((r, k) => {
+      const rnd = mulberry32(this.parcel.seed * 7703 + k * 97 + 5);
+      const C = 0.75;
+      for (let z = r.z0; z < r.z1; z += C) for (let x = r.x0; x < r.x1; x += C) {
+        const px = x + rnd() * C, pz = z + rnd() * C, roll = rnd(), sR = rnd(), rot = rnd() * 6.283, tone = rnd();
+        if (k > 0 && inHome(px, pz)) continue;
+        if (roll > keep) continue;
+        const s = this.parcel.natural(px, pz), dz = Math.abs(pz - creek.zAt(px)), hw = creek.halfWidth;
+        if (s.h < creek.waterY(px) + 0.05) continue;
+        // willow on the banks: a dense band just above the water
+        if (dz > hw + 0.25 && dz < hw + 2.6) {
+          if (roll / keep < 0.55 * (1 - (dz - hw) / 2.6) + 0.12 && !blocked(px, pz)) willow.push({ x: px, y: this.groundAt(px, pz) - 0.02, z: pz, s: 0.8 + sR * 0.6, rot, tone });
+          continue;
+        }
+        // sage on the open benches, thinning into the timber's edge
+        if (s.forest > 0.25 || dz < hw + 5) continue;
+        if (roll / keep < 0.36 * (1 - s.forest / 0.25) && !blocked(px, pz)) sage.push({ x: px, y: this.groundAt(px, pz) - 0.01, z: pz, s: 0.8 + sR * 0.45, rot, tone });
+      }
+    });
+    this.sage.build(sage, q);
+    this.willow.build(willow, q);
+  }
   /** Neighbor parcels the family has bought (their trees are planted near and detailed, markable). */
   private _ownedLand: Array<{ x0: number; z0: number; x1: number; z1: number }> = [];
   private _inOwned(x: number, z: number): boolean { return this._ownedLand.some(r => x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1); }
@@ -773,6 +818,8 @@ export class HomesteadWorld {
     this._under = on;
     this.terrain.setOpacity(on ? 0.3 : 1);
     this.forest.visible = !on;
+    this.sage.visible = !on;
+    this.willow.visible = !on;
     this.stream.setEdgesVisible(!on);
     for (const [id, g] of this._runGroups) if (this._runs.find(r => r.id === id)?.kind === 'escape_tunnel') this._applyTunnelView(g.group);
     // a bed of dark earth under the bunkers, so the see-through ground reads as a cut-away section, not sky
