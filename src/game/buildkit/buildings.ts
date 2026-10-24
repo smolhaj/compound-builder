@@ -111,8 +111,8 @@ function rootCellar(def: KitPieceDef, seed = 1): THREE.Group {
   }, (c: FurnishCtx) => {
     const { I, left, right, back } = c;
     for (const z of [-0.2, 0.1]) {
-      I({ x: left + 0.03, z, rot: Math.PI / 2 }, a => Furniture.shelfUnit(a, 1.6, 1.7, 'lids'));
-      I({ x: right - 0.03, z, rot: -Math.PI / 2 }, a => Furniture.shelfUnit(a, 1.6, 1.7, 'lids'));
+      I({ x: left + 0.03, z, rot: Math.PI / 2 }, a => Furniture.shelfUnit(a, 1.6, 1.7, 'jars'));
+      I({ x: right - 0.03, z, rot: -Math.PI / 2 }, a => Furniture.shelfUnit(a, 1.6, 1.7, 'jars'));
     }
     I({ x: -0.1, z: back + 0.06 }, a => Furniture.rootBin(a, 'log_end'));
     I({ x: 0.1, z: back + 0.06 }, a => Furniture.rootBin(a, 'paint_red'));
@@ -369,11 +369,11 @@ function logHouse(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group
       for (const [x, z] of [[-0.32, 0.55], [-0.32, 0.72], [0.35, 0.78], [-0.4, -0.65], [0.45, -0.8]]) I({ x, z, y: z < -0.3 ? yE - 0.07 : yE + 0.2 }, a => Furniture.pendant(a, z < -0.3 ? 0.5 : 1.6), false);
     }
     if (o.plumbed) I({ x: LH.px + 0.06, z: LH.bathZ - 0.06, rot: Math.PI }, a => Furniture.waterHeater(a));
-    I({ x: left + 0.02, z: 0.8, rot: Math.PI / 2 }, a => Furniture.wallShelf(a, 1.5, 1.5, 2, 'lids'), false);
+    I({ x: left + 0.02, z: 0.8, rot: Math.PI / 2 }, a => Furniture.wallShelf(a, 1.5, 1.5, 2, 'jars'), false);
     I({ x: left + 0.06, z: 0.22, rot: Math.PI / 2 }, a => Furniture.cookstove(a));
     I({ x: -0.32, z: 0.62, rot: Math.PI / 2 }, a => Furniture.island(a, 1.8));
     I({ x: 0.35, z: 0.78, rot: Math.PI / 2 }, a => Furniture.diningTable(a));
-    I({ x: 0.62, z: front - 0.04, rot: Math.PI }, a => Furniture.shelfUnit(a, 1.0, 1.6, 'lids'));
+    I({ x: 0.62, z: front - 0.04, rot: Math.PI }, a => Furniture.shelfUnit(a, 1.0, 1.6, 'jars'));
     I({ x: -0.15, z: front - 0.01, rot: Math.PI }, a => Furniture.coatPegs(a, 0.9), false);
     // stairs up to the loft, rising toward the back along the partition
     I({ x: 0.06, z: LH.loftZ + 0.3 }, a => Furniture.stairs(a, c.spec.wallH / M, 3.6, 0.85));
