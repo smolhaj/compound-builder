@@ -13,6 +13,7 @@
  * repair. Shortages are logged. Pure (tested).
  */
 import { SPRING_LPD } from './site';
+import { toteStorage, waterPrice } from './water';
 import { sound } from './improvements';
 import { REGIONS } from './regions';
 import { log } from './economy';
@@ -337,6 +338,7 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
     }
     if (def.store) store += def.store;
   }
+  store += toteStorage(s);
   // a spring on the place runs year round (less in a drought), carried in buckets unless pumped
   if (s.site.spring) supply += SPRING_LPD * (s.disaster.kind === 'drought' && s.clock.t >= s.disaster.hitAt ? 0.4 : 1);
   // roofs on the water network with a cistern catch rain (gutters)
@@ -345,7 +347,7 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
   const rainL = roof * rainMm(doy) * REGIONS[s.site.region].rainMm / 400 * 0.8;
   const people = s.people.length;
   const homePlumbed = fin.some(st => fitted(s, st.id, 'plumb') && (DRAW_KWH[st.kind] ?? 0) >= 5);
-  const use = people * (homePlumbed ? WATER_PLUMBED : WATER_CARRIED) + (fin.some(st => st.kind === 'garden') && doy > 120 && doy < 270 ? 400 : 0) + (fin.some(st => st.kind === 'chicken_coop') ? 10 : 0);
+  const use = people * (homePlumbed ? WATER_PLUMBED : WATER_CARRIED) + (fin.some(st => st.kind === 'garden') && doy > 120 && doy < 270 ? (s.stock.greywater >= 1 && homePlumbed ? 200 : 400) : 0) + (fin.some(st => st.kind === 'chicken_coop') ? 10 : 0);
   u.storedL = Math.min(store, u.storedL + rainL);
   let left = supply - use, shortL = 0;
   if (left < 0) { const take = Math.min(-left, u.storedL); u.storedL -= take; left += take; }
@@ -355,13 +357,18 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
   const creekDry = s.disaster.kind === 'drought' && s.clock.t >= s.disaster.hitAt;
   if (left < 0 && (supply + store > 0 || creekDry)) {
     // while the town works, what's short is bought (bottled water, the county water truck) instead of going without
-    if (townOpen) { const cost = Math.round(-left * 0.03); s.money -= cost; if (cost > 30) log(s, `Bought ${Math.round(-left)} L of water in town ($${cost}).`); }
+    if (townOpen) { const cost = Math.round(-left * waterPrice(s)); s.money -= cost; if (cost > 30) log(s, `Bought ${Math.round(-left)} L of water in town ($${cost}).`); }
     // the pump's dead or the tank's dry: back to buckets from the creek (playtest: families died of thirst beside a running creek)
     else if (!creekDry) { u.hauling = true; if (!s.site.creek) u.haulFar = true; }
     else { shortL = -left; log(s, `Water ran short by ${Math.round(shortL)} L.`); }
   }
   u.report = { solarKwh: solar, drawKwh: draw, genKwh: gen, shortKwh: short, batteryPct: capKwh > 0 ? u.batteryKwh / capKwh : 0, gridKwh, billUsd: bill, shed, waterL: supply + rainL, useL: use, shortL, storedL: u.storedL };
   u.lastDay = dayIndex(s.clock.t);
+}
+
+/** Storage on the place (cisterns, the tower, totes), liters. */
+export function storageCapacity(s: GameState): number {
+  return s.structures.filter(isFinished).reduce((a, st) => a + (UTILITY[st.kind]?.store ?? 0), 0) + toteStorage(s);
 }
 
 /** Repair a broken pump (hardware kit; a mechanic does it in an hour or two). */

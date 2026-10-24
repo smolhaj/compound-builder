@@ -20,7 +20,7 @@ const TABS: Array<[Tab, string]> = [['build', 'Building'], ['bunker', 'Bunker'],
 const SHELVES: Record<Exclude<Tab, 'metals' | 'money' | 'guns'>, MaterialId[]> = {
   build: ['lumber', 'fieldstone', 'concrete', 'roofing', 'hardware', 'wire', 'seedlings'],
   bunker: ['rebar', 'membrane', 'container', 'blast_door', 'blast_valve', 'nbc_filter', 'filter_set', 'culvert', 'egress_hatch', 'lead_sheet', 'faraday_mesh'],
-  water: ['pipe', 'cable', 'fixtures', 'pump', 'drilling', 'tank', 'septic_tank', 'solar_panel', 'battery', 'inverter', 'generator'],
+  water: ['water_jugs', 'ibc_tote', 'water_trailer', 'water_filter', 'ro_system', 'softener', 'greywater', 'pipe', 'cable', 'fixtures', 'pump', 'drilling', 'tank', 'septic_tank', 'solar_panel', 'battery', 'inverter', 'generator'],
   food: ['staples', 'canned', 'frozen', 'seed', 'lids'],
   household: ['meds', 'hygiene', 'traps'],
   fuel: ['fuel', 'stabilizer', 'firewood', 'excavator', 'plow', 'gun_safe', 'gun_cleaning'],
@@ -72,6 +72,23 @@ function Icon({ id }: { id: string }) {
     case 'nbc_filter': case 'filter_set': case 'blast_valve': return g(<><circle cx="22" cy="22" r="13" fill="#5a6058" /><circle cx="22" cy="22" r="7" fill="#2a2e28" />{[0, 60, 120].map(a => <path key={a} d="M22 15 v14" stroke="#9aa" transform={`rotate(${a} 22 22)`} />)}</>);
     case 'rebar': return g(<>{[12, 18, 24, 30].map(x => <path key={x} d={`M${x} 6 v32`} stroke="#8a4a2a" strokeWidth="3" />)}</>);
     case 'membrane': case 'faraday_mesh': case 'lead_sheet': case 'culvert': return g(<rect x="8" y="10" width="28" height="24" rx={id === 'culvert' ? 12 : 1} fill={id === 'membrane' ? '#1a1a1a' : id === 'faraday_mesh' ? '#b87333' : id === 'lead_sheet' ? '#707880' : '#9aa0a4'} />);
+    case 'water_jugs': return g(<><rect x="12" y="12" width="20" height="24" rx="5" fill="#5a9ad0" opacity="0.85" /><rect x="18" y="7" width="8" height="6" fill="#3a6a9a" /></>);
+    case 'ibc_tote': return g(<><rect x="8" y="9" width="28" height="26" fill="#e8e8e0" /><path d="M8 18 h28 M8 27 h28 M17 9 v26 M27 9 v26" stroke="#888" /><rect x="8" y="35" width="28" height="3" fill="#8a6a40" /></>);
+    case 'water_trailer': return g(<><rect x="8" y="12" width="26" height="16" rx="8" fill="#e8e8e0" /><circle cx="14" cy="32" r="4" fill="#222" /><circle cx="28" cy="32" r="4" fill="#222" /><path d="M34 26 h6" stroke="#888" strokeWidth="2" /></>);
+    case 'water_filter': return g(<><rect x="14" y="6" width="16" height="30" rx="3" fill="#c8ccd0" /><path d="M22 36 v4" stroke="#5a9ad0" strokeWidth="2" /></>);
+    case 'ro_system': case 'softener': return g(<>{[12, 22, 32].map(x => <rect key={x} x={x - 4} y="10" width="8" height="24" rx="3" fill={id === 'ro_system' ? '#5a8ab0' : '#c8ccd0'} />)}</>);
+    case 'greywater': return g(<><path d="M8 14 h16 v12 h12" fill="none" stroke="#7a8a6a" strokeWidth="4" /><ellipse cx="34" cy="32" rx="7" ry="3" fill="#5a7a3a" /></>);
+    case 'plate_carrier': return g(<path d="M12 8 h20 v6 l4 4 v18 h-28 v-18 l4 -4 z" fill="#4a5a3a" stroke="#2a3020" />);
+    case 'ifak': return g(<><rect x="10" y="12" width="24" height="20" rx="3" fill="#3a3a30" /><path d="M22 16 v12 M16 22 h12" stroke="#c03030" strokeWidth="3" /></>);
+    case 'nvg': case 'thermal': return g(<><rect x="8" y="16" width="24" height="12" rx="4" fill="#333" /><circle cx="34" cy="22" r="5" fill={id === 'nvg' ? '#3a9a4a' : '#d06a2a'} /></>);
+    case 'radios': return g(<>{[14, 28].map(x => <g key={x}><rect x={x - 5} y="14" width="10" height="20" rx="2" fill="#2a2a2a" /><path d={`M${x + 3} 14 v-7`} stroke="#2a2a2a" strokeWidth="2" /></g>)}</>);
+    case 'cameras': case 'thermal_cam': return g(<><rect x="8" y="16" width="22" height="10" rx="2" fill="#e0e0d8" /><circle cx="10" cy="21" r="3" fill={id === 'cameras' ? '#333' : '#d06a2a'} /><path d="M24 26 v10" stroke="#888" strokeWidth="2" /></>);
+    case 'driveway_alarm': case 'tripwire': return g(<><path d="M6 30 h32" stroke="#888" strokeDasharray={id === 'tripwire' ? '2 2' : undefined} /><rect x="16" y="14" width="12" height="12" rx="2" fill="#3a6a9a" /></>);
+    case 'floodlights': return g(<><path d="M14 14 l10 6 v6 l-10 6 z" fill="#555" /><path d="M24 20 l14 -6 v20 l-14 -6" fill="#ffe08a" opacity="0.8" /></>);
+    case 'dog': return g(<path d="M10 30 v-10 l6 -6 h4 l2 -4 l4 4 v6 h10 v10 h-4 v-6 h-14 v6 z" fill="#8a6a40" />);
+    case 'steel_door': case 'safe_room': return g(<><rect x="12" y="6" width="20" height="32" fill="#6a7068" stroke="#3a3e38" strokeWidth="2" /><circle cx="28" cy="22" r="2" fill="#ccc" /></>);
+    case 'window_bars': return g(<><rect x="8" y="8" width="28" height="28" fill="#2a3a4a" />{[14, 20, 26, 32].map(x => <path key={x} d={`M${x} 8 v28`} stroke="#9a9a9a" strokeWidth="2" />)}</>);
+    case 'sandbags': return g(<>{[[12, 30], [24, 30], [18, 22], [30, 22]].map(([x, y]) => <ellipse key={x + '' + y} cx={x} cy={y} rx="7" ry="4" fill="#b8a070" stroke="#7a6a48" />)}</>);
     case 'gun_safe': return g(<><rect x="10" y="6" width="24" height="32" rx="2" fill="#2a2e2a" stroke="#555" /><circle cx="22" cy="20" r="5" fill="none" stroke="#c8a040" strokeWidth="2" /><path d="M28 26 h3" stroke="#c8a040" strokeWidth="2" /></>);
     case 'gun_cleaning': return g(<><path d="M8 34 L36 10" stroke="#8a8a8a" strokeWidth="3" /><rect x="10" y="22" width="8" height="12" rx="1" fill="#3a6a3a" /></>);
     case 'rifle': return g(<path d="M4 24 h26 l6 -3 h4 v4 h-10 l-4 5 h-6 l2 -5 h-18 z" fill="#b08858" stroke="#5a4028" />);

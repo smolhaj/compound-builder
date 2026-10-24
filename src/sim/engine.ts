@@ -17,6 +17,7 @@ import { bodyDay } from './body';
 import { financeDay } from './finance';
 import { armoryDay } from './armory';
 import { gearDay } from './gear';
+import { waterDay } from './water';
 import { addRunWork, nextRun } from './perimeter';
 import { addFitWork, balanceDay, nextFit, plant } from './utilities';
 import { addHardenWork, nextHardenJob } from './hardening';
@@ -123,6 +124,7 @@ function subStep(s: GameState): void {
     const x = Math.sin(day * 78.233 + s.seed) * 43758.5453;
     balanceDay(s, plant(s), x - Math.floor(x));
     const y = Math.sin(day * 12.9898 + s.seed * 3.1) * 43758.5453;
+    for (const line of waterDay(s)) log(s, line);
     s.food = liveDay(s, y - Math.floor(y));
     for (const line of bodyDay(s)) log(s, line);
     const end = tallyDay(s);

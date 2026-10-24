@@ -41,6 +41,8 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   // 6 → 7: the escape tunnel (culvert, egress hatch)
   6: s => ({ ...s, version: 7, stock: { culvert: 0, egress_hatch: 0, ...(s.stock as object) } }),
   // 7 → 8: bunker hardening (lead, Faraday mesh, blast valves, HEPA sets; the retrofit job list)
+  // 27 → 28: water goods (jugs, totes, the trailer, filter, RO, softener, greywater)
+  27: s => ({ ...s, version: 28, stock: { water_jugs: 0, ibc_tote: 0, water_trailer: 0, water_filter: 0, ro_system: 0, softener: 0, greywater: 0, ...(s.stock as object) } }),
   // 26 → 27: personal kit, watching the place, hardening (all goods in the stockpile)
   26: s => ({ ...s, version: 27, stock: { plate_carrier: 0, ifak: 0, nvg: 0, thermal: 0, radios: 0, cameras: 0, thermal_cam: 0, driveway_alarm: 0, floodlights: 0, tripwire: 0, dog: 0, steel_door: 0, window_bars: 0, sandbags: 0, safe_room: 0, ...(s.stock as object) } }),
   // 25 → 26: the armory (old saves: none), the gun safe and cleaning kit
