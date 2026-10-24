@@ -42,7 +42,7 @@ describe('the land you buy', () => {
   it('the price comes out of savings; the old game (no listing) is the 40 with the creek', () => {
     const site = listings(3)[1];
     const g = newGame(3, 105, 2027, { site });
-    expect(g.money).toBe(SAVINGS - site.price);
+    expect(g.money).toBe(SAVINGS - Math.round(site.price * 1.03));   // closing costs
     expect(g.site).toEqual(site);
     expect(newGame(3).site).toEqual(CLASSIC);
   });

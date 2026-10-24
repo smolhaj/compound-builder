@@ -39,6 +39,8 @@ export interface Parcel {
   kind: LandKind;
   /** Up for sale (estate, retirement, or they'd sell to you). */
   forSale: boolean;
+  /** What you paid for it (assessed value). */
+  paid?: number;
 }
 
 export interface LandState {
@@ -127,7 +129,7 @@ export function buyLand(s: GameState, id: string): string | null {
   if (why) return why;
   const price = priceOf(s, p), seller = s.neighbors.find(x => x.id === p.owner);
   s.money -= price;
-  p.owner = 'you'; p.forSale = false;
+  p.owner = 'you'; p.forSale = false; p.paid = price;
   log(s, `Bought ${p.name} (${acresOf(p.rect)} acres of ${LAND_NAME[p.kind]}) from ${seller?.name ?? 'the owner'} for $${price.toLocaleString('en-US')}.`);
   return null;
 }

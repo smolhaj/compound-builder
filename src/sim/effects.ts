@@ -8,6 +8,7 @@
  * gone. Pure.
  */
 import { isFinished } from './construction';
+import { insuranceClaim } from './paperwork';
 import { BLUEPRINTS } from './blueprints';
 import { mulberry32 } from './rng';
 import type { GameState } from './state';
@@ -80,6 +81,8 @@ export function effectsDay(s: GameState): string[] {
       if (roof < 0) continue;
       st.stage = roof; st.done = 0; st.supplied = false; st.finishedAt = null;
       out.push(`The ${st.kind.replace('_', ' ')} roof came down under the wet ash: it has to be rebuilt.`);
+      const paid = insuranceClaim(s, st, 0.4);
+      if (paid) out.push(paid);
     }
   }
   // the fire front: buildings burn by the fuel round them (trees close in, measured by the world); bunkers and stone don't
@@ -92,6 +95,8 @@ export function effectsDay(s: GameState): string[] {
       if (r() > p) continue;
       st.stage = 0; st.done = 0; st.supplied = false; st.finishedAt = null;
       out.push(`The ${st.kind.replace('_', ' ')} burned: embers in the timber${near > 8 ? ' right up against it' : ''}.`);
+      const paid = insuranceClaim(s, st, 1);
+      if (paid) out.push(paid);
     }
     if (!out.length) out.push('The fire went round: every building is standing. The cleared ground saved it.');
   }

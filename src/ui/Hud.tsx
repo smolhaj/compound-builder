@@ -12,6 +12,7 @@ import { blockedReason, isFinished, planProblem, progress } from '../sim/constru
 import { drillExtra } from '../sim/site';
 import { REGIONS } from '../sim/regions';
 import { CREW_RATE, CREW_SIZE, crewProblem, crewQuote } from '../sim/crews';
+import { countyWorks, needsPermit, permitFee, premium, yearlyTax } from '../sim/paperwork';
 import { DRIVE_PER_FT, driveQuote, fixBill, fixBlocked, fixDef, hookupProblem, pendingFixes, POLE_PER_FT, powerQuote } from '../sim/improvements';
 import { BLUEPRINTS, totalBill, totalHours } from '../sim/blueprints';
 import { BUNKER_ORDER, KIT, UTILITY_ORDER } from '../game/buildkit/kit';
@@ -195,7 +196,7 @@ export function Hud() {
               <Group key={gid} id={gid} title={title}>
                 {kinds.map(kind => {
                   const own = ownNeeds(kind), no = planProblem(game, kind), extra = kind === 'well_drilled' ? drillExtra(game.site) : 0;
-                  return <Item key={kind} name={KIT[kind].name} cost={`~${usd(costOf(kind) + extra)}`} sub={`${totalHours(BLUEPRINTS[kind])} h${own ? ` · + ${own}` : ''}${kind === 'well_drilled' ? ` · water at ${game.site.gwDepth} m` : ''}`}
+                  return <Item key={kind} name={KIT[kind].name} cost={`~${usd(costOf(kind) + extra)}`} sub={`${totalHours(BLUEPRINTS[kind])} h${own ? ` · + ${own}` : ''}${kind === 'well_drilled' ? ` · water at ${game.site.gwDepth} m` : ''}${needsPermit(kind) && game.paper.permits && countyWorks(game) ? ` · permit ${usd(permitFee(game, kind))}` : ''}`}
                     on={g.tool === kind} off={no} title={KIT[kind].blurb} click={() => g.setTool(g.tool === kind ? null : kind)} />;
                 })}
               </Group>
@@ -209,7 +210,7 @@ export function Hud() {
             <Group id="under" title="Underground" extra={shelters > 0 ? `shelters ${shelters}` : undefined}>
               {BUNKER_ORDER.map(kind => {
                 const own = ownNeeds(kind);
-                return <Item key={kind} name={KIT[kind].name} cost={`~${usd(costOf(kind))}`} sub={`${totalHours(BLUEPRINTS[kind])} h${own ? ` · + ${own}` : ''}`} on={g.tool === kind} title={KIT[kind].blurb} click={() => g.setTool(g.tool === kind ? null : kind)} />;
+                return <Item key={kind} name={KIT[kind].name} cost={`~${usd(costOf(kind))}`} sub={`${totalHours(BLUEPRINTS[kind])} h${own ? ` · + ${own}` : ''}${needsPermit(kind) && game.paper.permits && countyWorks(game) ? ` · permit ${usd(permitFee(game, kind))}` : ''}`} on={g.tool === kind} title={KIT[kind].blurb} click={() => g.setTool(g.tool === kind ? null : kind)} />;
               })}
               {(() => {
                 const kind = 'escape_tunnel' as const, len = 50 / 6, tool = `fence:${kind}`;
@@ -469,6 +470,21 @@ export function Hud() {
               {(game.roadside ?? []).length > 0 && <Note tone="warn">{game.roadside.length} deliver{game.roadside.length > 1 ? 'ies' : 'y'} at the road: about {Math.round(game.roadside.reduce((a, r) => a + r.hours - r.done, 0))} h of carrying before building goes on.</Note>}
               {!game.site.improvements.power && !game.utilities.grid && <Note>No power at the place: run the line, or go solar or a generator.</Note>}
               {game.land.parcels.some(p => p.owner === 'you') && <Row label="Bought since" value={`${game.land.parcels.filter(p => p.owner === 'you').reduce((a, p) => a + acresOf(p.rect), 0)} acres`} />}
+            </Section>
+            <Section title="Paperwork">
+              {countyWorks(game) ? <>
+                <Row label="Property tax" value={`${usd(yearlyTax(game))}/yr`} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                  <span style={{ color: DIM }}>Insurance: {game.paper.insured ? (premium(game) ? `${usd(premium(game))}/yr` : 'nothing to insure yet') : <span style={{ color: TONE.warn }}>none</span>}</span>
+                  <button style={btn()} title={game.paper.insured ? 'Save the premium; a fire or a collapsed roof comes out of your pocket' : 'Buildings lost to fire or ash are paid out while the banks work'} onClick={() => g.setPaper('insured', !game.paper.insured)}>{game.paper.insured ? 'Drop' : 'Insure'}</button>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                  <span style={{ color: DIM }}>Permits: {game.paper.permits ? 'pulled for new builds' : <span style={{ color: TONE.warn }}>building without</span>}</span>
+                  <button style={btn()} title={game.paper.permits ? 'No fees or waits, but an inspector may notice: a fine, a stop-work order, the permit at double' : 'Fees and the county\'s review before work starts'} onClick={() => g.setPaper('permits', !game.paper.permits)}>{game.paper.permits ? 'Skip them' : 'Pull them'}</button>
+                </div>
+                {game.structures.some(x => x.permit === 'none' && !isFinished(x)) && <Note tone="warn">{game.structures.filter(x => x.permit === 'none' && !isFinished(x)).length} build{game.structures.filter(x => x.permit === 'none' && !isFinished(x)).length > 1 ? 's' : ''} going up without a permit.</Note>}
+                {game.paper.fines > 0 && <Row label="Fines paid" value={usd(game.paper.fines)} />}
+              </> : <Note>Nobody at the county now: no permits, no tax bills{game.paper.backTax > 0 ? ` (back taxes on the books: ${usd(game.paper.backTax)})` : ''}, and no insurer paying out.</Note>}
             </Section>
             <Section title="Land next door">
               {game.land.parcels.map(p => {

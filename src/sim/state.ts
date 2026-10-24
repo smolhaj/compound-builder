@@ -16,11 +16,12 @@ import { CLASSIC, LIFESTYLE, type Lifestyle, type Site } from './site';
 import { REGIONS } from './regions';
 import type { Crew } from './crews';
 import { improvementStructures, type Fix, type SiteJobs } from './improvements';
+import { CLOSING_COSTS, newPaper, type Paper } from './paperwork';
 import { emptyStats, type Ending, type RunStats } from './report';
 import { generateNeighbors, newGate, type GateState, type Neighbor } from './encounters';
 import { freshNeeds, type FoodReport, type Needs } from './needs';
 import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
-export const SAVE_VERSION = 20;
+export const SAVE_VERSION = 21;
 
 /** Starting savings (GDS §1 peacetime money constraint). */
 export const STARTING_MONEY = 30000;
@@ -79,6 +80,9 @@ export interface Structure {
   unplaced?: boolean;
   /** Repairs it needs (old roof, wiring, plumbing, septic field). */
   fixes?: Fix[];
+  /** County permit (sim/paperwork.ts): under review, approved, built without one, or stopped by the inspector; when review / the stop ends. */
+  permit?: 'review' | 'ok' | 'none' | 'stopped';
+  permitAt?: number;
 }
 
 export type TaskKind = 'idle' | 'build' | 'forestry' | 'sleep' | 'chores' | 'school' | 'leisure' | 'job' | 'gone' | 'shelter';
@@ -156,6 +160,8 @@ export interface GameState {
   siteJobs: SiteJobs;
   /** Deliveries left at the road (no drive yet): carried in by hand, oldest first. */
   roadside: Roadside[];
+  /** Permits, property tax, insurance. */
+  paper: Paper;
   /** The households round the place. */
   neighbors: Neighbor[];
   /** Who comes to the gate: the pending encounter, the last result, humanity and tallies. */
@@ -183,11 +189,12 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     version: SAVE_VERSION,
     seed,
     clock: { t: 0, ticks: 0, startDoy, startYear, speed: 1 },
-    money: setup.site ? LIFESTYLE[setup.lifestyle ?? 'fulltime'].budget - setup.site.price : STARTING_MONEY,
+    money: setup.site ? LIFESTYLE[setup.lifestyle ?? 'fulltime'].budget - Math.round(setup.site.price * (1 + CLOSING_COSTS)) : STARTING_MONEY,
     lifestyle: setup.lifestyle ?? 'fulltime',
     crews: [],
     siteJobs: { power: null, drive: null },
     roadside: [],
+    paper: newPaper(),
     site,
     stock: { ...emptyStock(), firewood: STARTING_FIREWOOD, canned: 2 },
     neighbors: generateNeighbors(seed),

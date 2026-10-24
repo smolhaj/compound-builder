@@ -5,6 +5,7 @@
  * hours are done the next one begins.
  */
 import { drillExtra, siteProblem } from './site';
+import { permitHold } from './paperwork';
 import { BLUEPRINTS } from './blueprints';
 import { hasAll, MATERIALS, shortfall, type MaterialId, type Stock } from './materials';
 import { log } from './economy';
@@ -34,6 +35,8 @@ export function planStructure(s: GameState, kind: string, x: number, z: number, 
 /** Why work on this structure can't go on now (null = it can). */
 export function blockedReason(s: GameState, st: Structure): string | null {
   if (isFinished(st)) return 'finished';
+  const hold = permitHold(s, st);
+  if (hold) return hold;
   if (st.supplied) return null;
   const need = blueprintOf(st).stages[st.stage].materials;
   if (hasAll(s.stock, need)) return null;

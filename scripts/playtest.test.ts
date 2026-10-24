@@ -16,6 +16,7 @@ import { CLASSIC, listings, type Site } from '../src/sim/site';
 import { BLUEPRINTS, isHome } from '../src/sim/blueprints';
 import { fixBill, fixBlocked, orderHookup, pendingFixes, placeImprovements } from '../src/sim/improvements';
 import { hireCrew, hoursLeft } from '../src/sim/crews';
+import { applyForPermit } from '../src/sim/paperwork';
 import { planRun } from '../src/sim/perimeter';
 import { orderFit, fitProblem, plant } from '../src/sim/utilities';
 import { orderHardenAll } from '../src/sim/hardening';
@@ -99,6 +100,7 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
       const k = planProblem(s, k0) && k0 === 'well_hand' ? 'well_drilled' : k0;
       const [x, z] = M(x0, z0);
       const st = planStructure(s, k, x, z, 0);
+      applyForPermit(s, st);
       // money to spare: hire it out
       if ((strat === 'prepper' || strat === 'fortress') && s.money > 150_000 && hoursLeft(st) > 300) hireCrew(s, st.id);
       if (k === 'solar_array' || k === 'battery_shed' || k === 'generator_shed') { const r = planRun(s, 'power_cable', [[x, z], C]); void r; }
