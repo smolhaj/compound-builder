@@ -71,6 +71,8 @@ export interface GameStore {
   setPaper: (k: 'permits' | 'insured', on: boolean) => void;
   /** Sweep the chimney. */
   sweep: () => void;
+  /** Eat what you store (rotate the pantry). */
+  setRotate: (on: boolean) => void;
   /** After the report card: play on (endless). */
   playOn: () => void;
   /** Put a spare into an EMP-fried building. */
@@ -200,6 +202,12 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     // anything with no spot (no room for it) is dropped rather than left floating
     const lost = g.structures.filter(x => x.unplaced);
     if (lost.length) { g.structures = g.structures.filter(x => !x.unplaced); }
+    set({ game: g });
+  },
+  setRotate: (on) => {
+    const g = structuredClone(get().game);
+    g.shelf.rotate = on;
+    log(g, on ? 'Eating what we store: the oldest off the shelf first, the grocery run replaces it.' : 'Stopped rotating the pantry.');
     set({ game: g });
   },
   sweep: () => {

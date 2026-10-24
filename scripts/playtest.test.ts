@@ -69,6 +69,9 @@ function orderNeeds(s: GameState, strat: Strategy): void {
   if (s.stock.lids + (pending.lids ?? 0) < jars / 2) lines.push({ material: 'lids', qty: jars });
   // a winter's firewood (about 4 cords) in by fall
   if (strat !== 'idle' && s.stock.firewood + (pending.firewood ?? 0) < 12) lines.push({ material: 'firewood', qty: 12 });
+  // traps in the stores, stabilizer in the gas
+  if (strat !== 'idle' && s.stock.traps + (pending.traps ?? 0) < 1) lines.push({ material: 'traps', qty: 3 });
+  if (strat === 'prepper' && s.stock.stabilizer + (pending.stabilizer ?? 0) < Math.ceil((s.stock.fuel + (pending.fuel ?? 0)) / 10)) lines.push({ material: 'stabilizer', qty: 2 });
   if (strat === 'prepper' && s.stock.meds + (pending.meds ?? 0) < 4) lines.push({ material: 'meds', qty: 2 });
   if (strat === 'prepper' && s.stock.fuel + (pending.fuel ?? 0) < 20) lines.push({ material: 'fuel', qty: 10 });
   if (strat === 'prepper' && s.stock.inverter + (pending.inverter ?? 0) < 1) lines.push({ material: 'inverter', qty: 1 });
@@ -90,6 +93,7 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
   const pre = s.structures.find(x => x.pre && isHome(x.kind));
   if (pre) C = [pre.x, pre.z];
   const has = (k: string) => s.structures.some(x => x.kind === k || (k === 'timber_cabin' && isHome(x.kind)) || (k === 'well_hand' && x.kind === 'well_drilled'));
+  if (strat === 'prepper' || strat === 'homestead') s.shelf.rotate = true;
   // raw land: the line and the drive first thing
   for (const what of ['drive', 'power'] as const) orderHookup(s, what);
   let planned = 0, moneyAtHit = 0, builtAtHit = 0, hitSeen = false;
