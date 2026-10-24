@@ -63,7 +63,7 @@ export function waterDay(s: GameState): string[] {
   if (u.hauling && s.stock.water_trailer >= 1) u.haulFar = false;
   // untreated creek water: a filter, or boil it (firewood), or take the chance
   if (u.hauling) {
-    if (s.stock.water_filter >= 0.01) s.stock.water_filter -= 0.0008 * living.length;
+    if (s.stock.water_filter >= 0.01) s.stock.water_filter = Math.max(0, s.stock.water_filter - 0.0008 * living.length);
     else if (s.stock.firewood >= 0.05) s.stock.firewood -= 0.05;
     else for (const ps of living) if (r() < 0.006) { ps.needs.hurt.push({ what: 'giardia (bad water)', sev: 25 }); out.push('Someone is sick from the creek water. Filter it or boil it.'); break; }
   }

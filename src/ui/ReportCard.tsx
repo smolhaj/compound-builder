@@ -1,5 +1,6 @@
 import { useGameStore } from '../store/gameStore';
 import { reportCard } from '../sim/report';
+import { roman } from '../sim/eras';
 
 const serif = 'Georgia, "Times New Roman", serif';
 
@@ -17,7 +18,7 @@ export function ReportCard() {
       <div style={{ background: '#f2ecdc', color: '#1d1b16', width: 620, maxWidth: '100%', maxHeight: '100%', overflowY: 'auto', borderRadius: 4, padding: '18px 26px 20px', boxShadow: '0 12px 50px rgba(0,0,0,0.6)', fontFamily: serif }}>
         <div style={{ textAlign: 'center', borderBottom: '3px double #1d1b16', paddingBottom: 6 }}>
           <div style={{ fontSize: 34, fontWeight: 700, letterSpacing: 1 }}>{r.masthead}</div>
-          <div style={{ fontSize: 12, letterSpacing: 2, textTransform: 'uppercase', opacity: 0.7 }}>{r.date}</div>
+          <div style={{ fontSize: 12, letterSpacing: 2, textTransform: 'uppercase', opacity: 0.7 }}>{g.game.lineage.era > 1 ? `Era ${roman(g.game.lineage.era)} · ` : ''}{r.date}</div>
         </div>
         <div style={{ display: 'flex', gap: 16, marginTop: 14, alignItems: 'flex-start' }}>
           <div style={{ flex: 1 }}>
@@ -35,8 +36,11 @@ export function ReportCard() {
         <div style={{ display: 'flex', gap: 10, borderTop: '1px solid #1d1b16', marginTop: 8, paddingTop: 8, fontFamily: 'system-ui, sans-serif', fontSize: 12 }}>
           {r.facts.map(([k, v]) => <div key={k} style={{ flex: 1 }}><div style={{ opacity: 0.6, textTransform: 'uppercase', letterSpacing: 0.8, fontSize: 10.5 }}>{k}</div><div style={{ fontSize: 16, fontWeight: 600 }}>{v}</div></div>)}
         </div>
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 14, fontFamily: 'system-ui, sans-serif' }}>
-          {e.kind !== 'wipe' && <button style={{ padding: '7px 14px', borderRadius: 6, border: '1px solid #1d1b16', background: 'transparent', cursor: 'pointer' }} onClick={() => g.playOn()}>Keep playing</button>}
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center', marginTop: 14, fontFamily: 'system-ui, sans-serif' }}>
+          <span style={{ flex: 1, fontSize: 12, opacity: 0.7 }}>{e.kind === 'wipe'
+            ? `The ${g.game.lineage.family} line ran ${Math.max(1, Math.floor(g.game.clock.t / 365))} years. Dynasty score ${Math.round(g.game.lineage.points + r.score).toLocaleString('en-US')}.`
+            : 'The family goes on. The world will turn again.'}</span>
+          {e.kind !== 'wipe' && <button style={{ padding: '7px 14px', borderRadius: 6, border: '1px solid #1d1b16', background: 'transparent', cursor: 'pointer' }} onClick={() => g.playOn()}>Keep playing: the next era</button>}
           <button style={{ padding: '7px 16px', borderRadius: 6, border: 0, background: '#1d1b16', color: '#f2ecdc', cursor: 'pointer', fontWeight: 600 }} onClick={() => g.openSetup(true)}>New game</button>
         </div>
       </div>

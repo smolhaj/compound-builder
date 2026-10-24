@@ -24,7 +24,11 @@ export type FoodId = 'fresh' | 'frozen' | 'canned' | 'staples';
 export const KCAL: Record<FoodId, number> = { fresh: 2000, frozen: 10000, canned: 6000, staples: 80000 };
 export const FOODS: FoodId[] = ['fresh', 'frozen', 'canned', 'staples'];
 /** Daily need (kcal): adults working the land, kids. */
-export const NEED_ADULT = 2400, NEED_KID = 1700;
+export const NEED_ADULT = 2400, NEED_KID = 1700, NEED_BABY = 1000;
+/** What food stamps and the food bank cover a day when the money's gone (about a family of six). */
+export const FOOD_BANK_KCAL = 6 * 2200;
+/** One person's daily need (babies and toddlers eat less). */
+export const needOf = (p: { kid: boolean; age: number }) => (p.kid ? (p.age < 3 ? NEED_BABY : NEED_KID) : NEED_ADULT);
 
 export interface Needs {
   /** 0–100. */
@@ -85,7 +89,7 @@ export interface FoodReport { needKcal: number; ateKcal: number; producedKcal: n
 
 /** Days the family can eat from what's put by (not counting what grows). */
 export function daysOfFood(s: GameState): number {
-  const need = s.people.reduce((a, p, i) => a + (alive(s, i) ? (p.kid ? NEED_KID : NEED_ADULT) : 0), 0);
+  const need = s.people.reduce((a, p, i) => a + (alive(s, i) ? needOf(p) : 0), 0);
   const have = FOODS.reduce((a, f) => a + s.stock[f] * KCAL[f], 0);
   return need > 0 ? have / need : Infinity;
 }
@@ -114,11 +118,12 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
   // hunting, fishing and snares (wildfood.ts: the region's game, seasons and tags, the game thinning out)
   const meat = wildDay(s, freezer);
   // eating
-  const need = s.people.reduce((a, p, i) => a + (alive(s, i) ? (p.kid ? NEED_KID : NEED_ADULT) : 0), 0);
+  const need = s.people.reduce((a, p, i) => a + (alive(s, i) ? needOf(p) : 0), 0);
   let ate = 0;
   const kinds: FoodId[] = [];
-  if (fromStores) ate = need;
-  else {
+  // broke in peacetime: food stamps and the food bank cover a household's worth; anyone past that eats from the pantry
+  if (fromStores) ate = s.money > 0 ? need : Math.min(need, FOOD_BANK_KCAL);
+  if (ate < need) {
     for (const f of FOODS) {
       if (ate >= need) break;
       const take = Math.min(s.stock[f], (need - ate) / KCAL[f]);
@@ -146,7 +151,7 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
   s.people.forEach((p, i) => {
     const n = s.personState[i]?.needs;
     if (!n || n.died != null) return;
-    const mine = (p.kid ? NEED_KID : NEED_ADULT) / Math.max(1, need);
+    const mine = needOf(p) / Math.max(1, need);
     n.hunger = Math.max(0, n.hunger + short * mine - (short === 0 ? 600 : 0));
     // health: hunger, wounds and radiation take it; rest and food bring it back
     let dh = n.hunger > 15000 ? -1.5 : n.hunger > 5000 ? -0.5 : 0.6;
@@ -173,7 +178,7 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
     const family = s.people[0]?.last;
     for (let i = s.people.length - 1; i >= 0; i--) {
       const ps = s.personState[i];
-      if (!ps || ps.needs.died != null || s.people[i].last === family || ps.needs.hunger < 8000 || rnd > 0.08) continue;
+      if (!ps || ps.needs.died != null || s.people[i].last === family || s.people[i].kin || ps.needs.hunger < 8000 || rnd > 0.08) continue;
       log(s, `${s.people[i].first} ${s.people[i].last} left to try their luck elsewhere.`);
       s.people.splice(i, 1); s.personState.splice(i, 1);
     }

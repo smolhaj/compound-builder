@@ -94,7 +94,7 @@ export class FamilyRenderer {
       if (!moving && goal.work && goal.pose === FIG_POSE.REACH) pose = Math.sin(this._time * 6 + i * 1.7) > 0 ? FIG_POSE.REACH : FIG_POSE.STAND;
       const fp: FigurePose = {
         x: a.x, y: ground(a.x, a.z), z: a.z, rot: a.rot,
-        scale: p.kid ? (p.age < 8 ? 0.62 : p.age < 13 ? 0.78 : 0.92) : 1,
+        scale: p.kid ? (p.age < 3 ? 0.42 : p.age < 8 ? 0.62 : p.age < 13 ? 0.78 : 0.92) : 1,
         pose, phase: a.phase, amp: moving ? 0.5 : 0,
       };
       // the wear slot must follow the draw slot

@@ -278,6 +278,8 @@ export interface DisasterState {
   done?: string[];
   /** Wildfire: trees close round each building, measured by the world when the fire weather starts. */
   fuel?: Record<string, number>;
+  /** The long game: where earlier eras left the world (services never get above this; it mends slowly if anything is left). */
+  baseline?: Partial<Record<Track, number>>;
 }
 
 const PEACE_DAYS: Record<Exclude<PeaceLength, 'random'>, number> = { short: 365, medium: 3 * 365, long: 5 * 365 };
@@ -360,7 +362,47 @@ export function tracksAt(d: DisasterState, t: number): Record<Track, number> {
     const lv = levelsOf(c.kind, c.variant, c.back, t - c.hitAt, d.ceiling);
     for (const k of TRACKS) out[k] = Math.min(out[k], lv[k]);
   }
+  if (d.baseline) for (const k of TRACKS) out[k] = Math.min(out[k], d.baseline[k] ?? 1);
   return out;
+}
+
+/**
+ * The next era (task #34: "varied next era, escalating toward permanent
+ * collapse"). Once the world has settled after an era, the next one is
+ * rolled: a different disaster, one that still has something to knock down
+ * (no grid-down where there is no grid), after a quiet that gets shorter
+ * each era, with the odds of the world coming back falling each time. The
+ * world starts from where the last era left it.
+ */
+export function nextEraDisaster(prev: DisasterState, now: number, seed: number, era: number, odds: Partial<Record<DisasterKind, number>> = {}): DisasterState {
+  const r = rng(seed * 8191 + era * 131 + 7);
+  const base: Partial<Record<Track, number>> = {};
+  for (const k of TRACKS) base[k] = Math.round(Math.min(prev.baseline?.[k] ?? 1, prev.tracks[k]) * 100) / 100;
+  const allWell = TRACKS.every(k => (base[k] ?? 1) >= 0.97);
+  const peaceOnly = { ...prev, kind: null, variant: '', phase: 'peace' as Phase, warnAt: NEVER, hitAt: NEVER, back: {}, chained: [], fate: 'full' as Fate, ceiling: {}, done: [], baseline: allWell ? undefined : base };
+  if (prev.mode === 'sandbox') return peaceOnly;
+  const gone = (k: Track) => (base[k] ?? 1) < 0.3;
+  let pool = SURPRISE_POOL.filter(k => k !== prev.kind
+    && !(gone('grid') && (k === 'grid_down' || k === 'cyberattack' || k === 'solar_flare'))
+    && !(gone('banks') && k === 'financial') && !(gone('law') && k === 'lawless'));
+  if (!pool.length) pool = ['drought', 'pandemic', 'wildfire'];
+  const w = pool.map(k => odds[k] ?? 1), tot = w.reduce((a, b) => a + b, 0);
+  let u = r() * tot, kind = pool[pool.length - 1];
+  for (let i = 0; i < pool.length; i++) { u -= w[i]; if (u <= 0) { kind = pool[i]; break; } }
+  const def = DISASTERS[kind]!;
+  const v = pick(def.variants, r()).id;
+  const n = era - 1;
+  const lo = Math.max(0.5, 4 - 0.5 * n), hi = Math.max(1.5, 8 - n);
+  const quiet = Math.round(365 * (lo + (hi - lo) * r()));
+  const warn = Math.max(1, Math.round(roll(r, def.warn) * WARN_SCALE[prev.difficulty]));
+  // each era, a little less chance it all comes back
+  const [f0, p0] = FATE_ODDS[kind] ?? [0, 0, 1];
+  const f = f0 * Math.pow(0.8, n), pp = p0 * Math.pow(0.92, n), uf = r();
+  const fate: Fate = uf < f ? 'full' : uf < f + pp ? 'partial' : 'never';
+  return {
+    ...peaceOnly, kind, variant: v, warnAt: now + quiet - warn, hitAt: now + quiet,
+    back: fateBack(rollBack(def, v, r), fate), fate, ceiling: fate === 'partial' ? rollCeiling(r) : {},
+  };
 }
 
 /** 0 → 1 through the warning signs (0 before, 1 at the hit). */
@@ -388,6 +430,13 @@ const PEACE_NEWS = [
   'County fair this weekend: pie contest, tractor pull.', 'Hay prices steady; good second cutting expected.', 'School board approves the new bus route.',
   'Elk season opens next month; tags on sale at the courthouse.', 'Road crews patching the county road through August.', 'Farmers market moves to the grange hall for winter.',
   'High school football: the Miners win at home, 21–14.', 'Library book sale Saturday.', 'Fire danger "moderate"; burn permits still issued.',
+];
+
+/** The quiet between eras in a world that didn't all come back. */
+const THIN_NEWS = [
+  'Swap meet at the grange Saturday: bring what you can spare.', 'The co-op runs the power 6 to 10 tonight.', 'Word on the radio: the county road is open as far as the river.',
+  'The store has flour this week, one sack a family.', 'School meets in the church basement again this fall.', 'A trader came through with salt and seed potatoes.',
+  'The doctor in town sees people Tuesdays, for eggs or labor.', 'Folks are planting the old Miller fields again.',
 ];
 
 /**
@@ -424,7 +473,12 @@ export function updateDisaster(d: DisasterState, t: number, seed: number): strin
   if (d.phase === 'warning' && def) {
     const w = tension(d, t), stage = w < 0.4 ? 0 : w < 0.8 ? 1 : 2;
     if (r() < 0.35 + 0.5 * w) say(def.hints[stage][Math.floor(r() * def.hints[stage].length)].replace('{cause}', cause), (stage + 1) as 1 | 2 | 3);
-  } else if (d.phase === 'peace' && r() < 0.25) say(PEACE_NEWS[Math.floor(r() * PEACE_NEWS.length)], 0);
+  } else if (d.phase === 'peace' && r() < 0.25) {
+    const broken = d.baseline && Math.min(d.baseline.stores ?? 1, d.baseline.grid ?? 1) < 0.6;
+    say(broken ? THIN_NEWS[Math.floor(r() * THIN_NEWS.length)] : PEACE_NEWS[Math.floor(r() * PEACE_NEWS.length)], 0);
+  }
+  // a thinner world mends a little, if there's anything left to mend
+  if (d.phase === 'peace' && d.baseline) for (const k of TRACKS) { const b = d.baseline[k] ?? 1; if (b >= 0.3 && b < 1) d.baseline[k] = Math.min(1, b + 0.00015); }
   // how it's going out there (the fate shows itself only slowly)
   if (def && d.phase === 'survival') {
     const since = day - Math.floor(d.hitAt + 0.25), first = Math.min(...Object.values(d.back).map(Number), Infinity);
