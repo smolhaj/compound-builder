@@ -75,7 +75,8 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
   const fin = s.structures.filter(isFinished);
   const cellar = fin.some(st => st.kind === 'root_cellar');
   const freezer = fin.some(st => st.kind === 'root_cellar' && s.utilities.lit.includes(st.id));
-  const fromStores = s.disaster.tracks.stores > 0.5;
+  // groceries need open stores with trucks restocking them
+  const fromStores = s.disaster.tracks.stores > 0.5 && s.disaster.tracks.deliveries > 0.25;
   // spoilage (fractional units carry as a remainder on the stock count)
   let spoiled = 0;
   const spoil = (f: FoodId, rate: number) => { const lost = s.stock[f] * rate; s.stock[f] -= lost; spoiled += lost * KCAL[f]; };

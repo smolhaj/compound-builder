@@ -65,6 +65,11 @@ try {
   await frames(3);
   await page.screenshot({ path: `${outDir}/06-what-happened.png` });
   console.log('06');
+  // the report card (a recovery, with some history to tell)
+  await page.evaluate(() => { const G = window.__cb.game; G.getState().dismissCard(); G.setState(st => { const g = structuredClone(st.game); g.stats.days = 214; g.stats.hungryDays = 9; g.stats.wounds = 1; g.gate.tookIn = 3; g.gate.turnedAway = 4; g.gate.raidsHeld = 2; g.gate.raidsLost = 1; g.ending = { kind: 'recovered', day: Math.floor(g.clock.t), continued: false }; return { game: g }; }); });
+  await frames(3);
+  await page.screenshot({ path: `${outDir}/07-report-card.png` });
+  console.log('07');
 } finally {
   await browser.close();
   vite.kill();

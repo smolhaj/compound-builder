@@ -4,6 +4,7 @@ import { Hud } from './ui/Hud';
 import { SetupScreen } from './ui/SetupScreen';
 import { Ticker } from './ui/Ticker';
 import { GateCard } from './ui/GateCard';
+import { ReportCard } from './ui/ReportCard';
 import { useGameStore } from './store/gameStore';
 import { useWorldStore } from './store/worldStore';
 import { loadGame, AUTOSAVE } from './sim/save/saveSystem';
@@ -35,6 +36,7 @@ export default function App() {
       <Hud />
       {!clean && <Ticker />}
       {!clean && <GateCard />}
+      {!clean && <ReportCard />}
       {setup && !clean && <SetupScreen />}
     </>
   );

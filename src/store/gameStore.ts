@@ -48,6 +48,8 @@ export interface GameStore {
   /** Answer whoever is at the gate. */
   answer: (stance: Stance) => void;
   dismissCard: () => void;
+  /** After the report card: play on (endless). */
+  playOn: () => void;
   /** Put a spare into an EMP-fried building. */
   fixFried: (id: string) => string | null;
   /** Leave the county grid, or get back on it (a reconnection fee). */
@@ -75,11 +77,11 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
   selected: null,
   tick: (realDt) => {
     const g = get().game;
-    if (g.clock.speed === 0 || g.gate.pending) return;
+    if (g.clock.speed === 0 || g.gate.pending || (g.ending && !g.ending.continued)) return;
     const days = Math.min(realDt, MAX_DT) / SECONDS_PER_DAY[g.clock.speed];
     const next = step(g, days);
     // someone at the gate: stop the clock until the player decides
-    if (next.gate.pending && !g.gate.pending) next.clock = { ...next.clock, speed: 0 };
+    if ((next.gate.pending && !g.gate.pending) || (next.ending && !g.ending)) next.clock = { ...next.clock, speed: 0 };
     set({ game: next });
     if (dayIndex(next.clock.t) !== dayIndex(g.clock.t)) void saveGame(AUTOSAVE, next);
   },
@@ -144,6 +146,11 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     resolve(g, stance);
     set({ game: g });
     void saveGame(AUTOSAVE, g);
+  },
+  playOn: () => {
+    const g = structuredClone(get().game);
+    if (g.ending) g.ending.continued = true;
+    set({ game: g });
   },
   fixFried: (id) => {
     const g = structuredClone(get().game);

@@ -33,7 +33,7 @@ export function SetupScreen() {
     void saveGame(AUTOSAVE, game);
   };
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(10,12,9,0.72)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10, padding: 16 }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(10,12,9,0.72)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 12, padding: 16 }}>
       <div style={{ background: 'rgba(24,26,21,0.97)', color: '#eee', borderRadius: 12, padding: '20px 24px', width: 640, maxWidth: '100%', maxHeight: '100%', overflowY: 'auto', fontSize: 13.5 }}>
         <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: 0.3 }}>Compound Builder</div>
         <div style={{ opacity: 0.7, marginBottom: 14 }}>Build the place you'd want when everything falls apart. Then find out if you were right.</div>

@@ -14,6 +14,7 @@ import { updateDisaster } from './disaster';
 import { liveDay, workFactor } from './needs';
 import { gateDay, neighborGossip } from './encounters';
 import { falloutDay, isNuclear, SHELTER_DAYS, strike } from './nuclear';
+import { tallyDay } from './report';
 import { mulberry32 } from './rng';
 import { log } from './economy';
 import { dayIndex } from './state';
@@ -94,6 +95,8 @@ function subStep(s: GameState): void {
     balanceDay(s, plant(s), x - Math.floor(x));
     const y = Math.sin(day * 12.9898 + s.seed * 3.1) * 43758.5453;
     s.food = liveDay(s, y - Math.floor(y));
+    const end = tallyDay(s);
+    if (end) log(s, end.kind === 'wipe' ? 'The last of the family is gone.' : end.kind === 'recovered' ? 'The outside world is coming back.' : 'A full year the place has fed itself.');
   }
 }
 
