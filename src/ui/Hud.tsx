@@ -31,6 +31,7 @@ import { roman } from '../sim/eras';
 import { MILESTONE_COUNT, MILESTONE_NAME } from '../sim/lineage';
 import { daysOfFood, KCAL, needOf } from '../sim/needs';
 import { ANIMALS, feedDemand, winterHay } from '../sim/livestock';
+import { barterPrices, moneyWorks, type Good } from '../sim/barter';
 import { NEIGHBOR_BLURB } from '../sim/encounters';
 import { acresOf, buyProblem, LAND_NAME, priceOf } from '../sim/land';
 import { HARDEN, HARDEN_IDS, type TierDef, hardenCost, hardenProblem, isBunkerRoom, protectionOf, tierOf } from '../sim/hardening';
@@ -605,6 +606,14 @@ export function Hud() {
                   tone={n.disposition > 50 ? 'good' : n.disposition < -20 ? 'bad' : undefined} />))}
               {game.clock.t >= game.disaster.hitAt && <Note>Humanity {Math.round(game.gate.humanity)} · took in {game.gate.tookIn} · turned away {game.gate.turnedAway}</Note>}
             </Section>}
+            {game.clock.t >= game.disaster.hitAt && !moneyWorks(game) && (() => {
+              const p = barterPrices(game);
+              const rows: Array<[string, Good]> = [['Canned food (case)', 'canned'], ['Staples (25 kg)', 'staples'], ['Fuel (20 L)', 'fuel'], ['Meds (kit)', 'meds'], ['Firewood (rick)', 'firewood'], ['Seed (season)', 'seed'], ['Hygiene (month)', 'hygiene'], ['Silver coin', 'metal:silver_coin'], ['A day\'s labor', 'labor']];
+              return <Section title="Trade with neighbors">
+                <Note>Money is gone; goods change hands at what they're worth now (2025 dollars-equivalent). Friendly neighbors (allies) trade at par.</Note>
+                {rows.map(([label, k]) => <Row key={k} label={label} value={`$${Math.round(p[k]).toLocaleString('en-US')}`} />)}
+              </Section>;
+            })()}
           </>}
         </div>
       </div>
