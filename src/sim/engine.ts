@@ -13,6 +13,7 @@ import { addHardenWork, nextHardenJob } from './hardening';
 import { updateDisaster } from './disaster';
 import { liveDay, workFactor } from './needs';
 import { gateDay, neighborGossip } from './encounters';
+import { falloutDay, isNuclear, SHELTER_DAYS, strike } from './nuclear';
 import { mulberry32 } from './rng';
 import { log } from './economy';
 import { dayIndex } from './state';
@@ -45,6 +46,8 @@ function subStep(s: GameState): void {
   s.people.forEach((p, i) => {
     const ps = s.personState.find(x => x.id === p.id)!;
     if (ps.needs.died != null) { ps.task = 'gone'; ps.target = null; return; }
+    // the first two weeks after the strikes: everyone in the shelter
+    if (isNuclear(s) && s.clock.t < s.disaster.hitAt + SHELTER_DAYS) { ps.task = routineAt(p, h) === 'sleep' ? 'sleep' : 'shelter'; ps.target = null; return; }
     const rate = buildRate(p) * workFactor(ps.needs);
     const slot = routineAt(p, h);
     // the day job: weekdays in town during work hours, paid by the hour
@@ -74,6 +77,8 @@ function subStep(s: GameState): void {
     }
     const e = gateDay(s);
     if (e) log(s, `${e.title}.`);
+    if (before !== 'impact' && s.disaster.phase === 'impact' && s.disaster.kind === 'nuclear') for (const line of strike(s)) log(s, line);
+    for (const line of falloutDay(s)) log(s, line);
     if (before !== 'impact' && s.disaster.phase === 'impact') {
       for (const ps of s.personState) if (ps.employed) {
         ps.employed = false;

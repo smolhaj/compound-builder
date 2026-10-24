@@ -385,3 +385,14 @@ SETS.hardening = [
   { name: 'stores-tier3', time: 12, season: 'summer', setup: hardened(3) + inside2('bunker_stores', -0.3, 0.27, 0.3, 0.25, 0.1, -0.3, 74), cam: D, frames: 12 },
   { name: 'cutaway-tier3', time: 11, season: 'summer', setup: hardened(3) + under + "cb.store.getState().setBuildingView('cutaway');" + atB('bunker_dorm', 2.6, 0.85, 0.9), cam: D, frames: 14 },
 ];
+
+/** Nuclear war: strike the clock to `h` hours after the detonation (variant: distant / nearby / exchange). */
+const nuke = (variant, h) => `{ const G = cb.game; G.setState(s => { const g = structuredClone(s.game); const d = g.disaster; d.kind = 'nuclear'; d.variant = '${variant}'; d.mode = 'sandbox'; d.phase = 'survival'; d.warnAt = d.hitAt = g.clock.t - ${h} / 24; d.back = {}; return { game: g }; }); }`;
+const horizon = (time, yaw = 0) => `{ const W = cb.world, c = W.camp; cb.cam.placeEye(c.x + 2, c.z + 4, c.x + 2 + Math.sin(${yaw}) * 30, c.z + 4 - Math.cos(${yaw}) * 30, 0.28); }`;
+SETS.nuclear = [
+  { name: 'nearby-strike-minutes-after', time: 14, season: 'summer', setup: compound + nuke('nearby', 0.12) + horizon(14), cam: D, frames: 14 },
+  { name: 'nearby-strike-hour-after', time: 15, season: 'summer', setup: compound + nuke('nearby', 1.2) + horizon(15), cam: D, frames: 14 },
+  { name: 'distant-strikes-on-the-skyline', time: 10, season: 'summer', setup: compound + nuke('distant', 0.3) + horizon(10), cam: D, frames: 14 },
+  { name: 'fallout-dust-falling', time: 13, season: 'summer', setup: compound + nuke('distant', 9) + horizon(13, 0.8), cam: D, frames: 16 },
+  { name: 'sickly-sky-day-five', time: 12, season: 'summer', setup: compound + nuke('distant', 24 * 5) + `{ const c = cb.world.camp; cb.cam.target.set(c.x, 0, c.z); cb.cam.radius = 9; cb.cam.pitch = 0.35; cb.cam.yaw = 0.4; }`, cam: D, frames: 16 },
+];

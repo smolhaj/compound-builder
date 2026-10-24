@@ -95,6 +95,7 @@ export function goalFor(i: number, kid: boolean, task: TaskKind, target: string 
       return { x: tx + dz * 0.08 * side, z: tz - dx * 0.08 * side, pose: FIG_POSE.CARRY, face: null, hidden: false, work: false };
     }
     case 'gone':
+    case 'shelter':
     case 'job': {
       // in town at the day job: off the land
       return { x: ctx.camp.x, z: ctx.camp.z, pose: FIG_POSE.STAND, face: null, hidden: true, work: false };

@@ -16,7 +16,7 @@ import { log } from './economy';
 import { calendarOf, dayIndex, type GameState, type Structure } from './state';
 import { isFinished } from './construction';
 import { runFinished, type PerimeterRun } from './perimeter';
-import { hasAll, type Stock } from './materials';
+import { hasAll, type MaterialId, type Stock } from './materials';
 
 /** What utility buildings provide. */
 export interface UtilityDef {
@@ -79,6 +79,8 @@ export interface Utilities {
   broken: string[];
   /** On the county grid (the account is open; whether it has power is the disaster clock's grid track). */
   grid: boolean;
+  /** Electronics killed by an EMP (solar inverter, battery charger, generator, pump controller) until a spare goes in. */
+  fried: string[];
   /** Buildings switched off at their breaker. */
   off: string[];
   /** Buildings that had power yesterday (lights on, fridge running). */
@@ -96,7 +98,7 @@ export interface UtilityReport {
 }
 
 export function emptyUtilities(): Utilities {
-  return { fittings: [], batteryKwh: 0, batteryFade: 0, storedL: 0, fuelL: 0, broken: [], grid: false, off: [], lit: [], lastDay: -1, report: { solarKwh: 0, drawKwh: 0, genKwh: 0, shortKwh: 0, batteryPct: 0, gridKwh: 0, billUsd: 0, shed: [], waterL: 0, useL: 0, shortL: 0, storedL: 0 } };
+  return { fittings: [], batteryKwh: 0, batteryFade: 0, storedL: 0, fuelL: 0, broken: [], fried: [], grid: false, off: [], lit: [], lastDay: -1, report: { solarKwh: 0, drawKwh: 0, genKwh: 0, shortKwh: 0, batteryPct: 0, gridKwh: 0, billUsd: 0, shed: [], waterL: 0, useL: 0, shortL: 0, storedL: 0 } };
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -251,9 +253,10 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
   let solar = 0, draw = 0, gen = 0, short = 0, capKwh = 0, gridKwh = 0;
   const lit = new Set<string>(), shed: string[] = [];
   const loadOf = (o: Node) => u.off.includes(o.id) ? 0
-    : UTILITY[o.kind]?.water?.needsPower ? (u.broken.includes(o.id) ? 0 : UTILITY[o.kind]!.water!.needsPower!)
+    : UTILITY[o.kind]?.water?.needsPower ? (u.broken.includes(o.id) || u.fried.includes(o.id) ? 0 : UTILITY[o.kind]!.water!.needsPower!)
     : fitted(s, o.id, 'wire') ? DRAW_KWH[o.kind] ?? 0 : 0;
   const isSource = (o: Node) => !!(UTILITY[o.kind]?.solarKw || UTILITY[o.kind]?.genKw || UTILITY[o.kind]?.batteryKwh);
+  const live = (o: Node) => !u.fried.includes(o.id);
   const groups = new Map<number | string, Node[]>();
   for (const o of p.nodes) {
     const n = p.power.get(o.id);
@@ -266,11 +269,11 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
     if (typeof key === 'string' && !gridUp) continue;
     const loads = members.filter(o => loadOf(o) > 0).sort((a, b) => (LOAD_PRIORITY[a.kind] ?? 2) - (LOAD_PRIORITY[b.kind] ?? 2));
     const d = loads.reduce((a, o) => a + loadOf(o), 0);
-    const cap = members.reduce((a, o) => a + (UTILITY[o.kind]?.batteryKwh ?? 0), 0) * (1 - u.batteryFade);
-    const genKw = members.reduce((a, o) => a + (UTILITY[o.kind]?.genKw ?? 0), 0);
+    const cap = members.filter(live).reduce((a, o) => a + (UTILITY[o.kind]?.batteryKwh ?? 0), 0) * (1 - u.batteryFade);
+    const genKw = members.filter(live).reduce((a, o) => a + (UTILITY[o.kind]?.genKw ?? 0), 0);
     // grid-tied solar shuts off in a blackout unless a battery (hybrid inverter) is on the network
     const solarOk = gridUp || cap > 0 || !u.grid;
-    const sol = solarOk ? members.reduce((a, o) => a + (UTILITY[o.kind]?.solarKw ?? 0), 0) * sunHours(doy) * 0.8 : 0;
+    const sol = solarOk ? members.filter(live).reduce((a, o) => a + (UTILITY[o.kind]?.solarKw ?? 0), 0) * sunHours(doy) * 0.8 : 0;
     draw += d; solar += sol; capKwh += cap;
     let have = sol;
     // battery: bank the surplus, cover the shortfall
@@ -342,4 +345,20 @@ export function repairPump(s: GameState, id: string): boolean {
   s.utilities.broken = s.utilities.broken.filter(x => x !== id);
   log(s, 'Pump repaired.');
   return true;
+}
+
+/** The spare an EMP-fried building needs (inverter, generator, pump). */
+export const SPARE_FOR: Record<string, MaterialId> = { solar_array: 'inverter', battery_shed: 'inverter', generator_shed: 'generator', well_drilled: 'pump' };
+
+/** Put a spare into what the EMP fried (the spare and a hardware kit). */
+export function replaceFried(s: GameState, id: string): string | null {
+  const st = s.structures.find(x => x.id === id);
+  if (!st || !s.utilities.fried.includes(id)) return 'nothing to fix';
+  const spare = SPARE_FOR[st.kind];
+  if (!spare || s.stock[spare] < 1) return `needs a spare ${spare ?? 'part'}`;
+  if (s.stock.hardware < 1) return 'needs a hardware kit';
+  s.stock[spare]--; s.stock.hardware--;
+  s.utilities.fried = s.utilities.fried.filter(x => x !== id);
+  log(s, `New ${spare} in: the ${st.kind.replace('_', ' ')} runs again.`);
+  return null;
 }

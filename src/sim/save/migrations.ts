@@ -32,6 +32,8 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   // 6 → 7: the escape tunnel (culvert, egress hatch)
   6: s => ({ ...s, version: 7, stock: { culvert: 0, egress_hatch: 0, ...(s.stock as object) } }),
   // 7 → 8: bunker hardening (lead, Faraday mesh, blast valves, HEPA sets; the retrofit job list)
+  // 12 → 13: electronics fried by an EMP
+  12: s => ({ ...s, version: 13, utilities: { fried: [], ...(s.utilities as object) } }),
   // 11 → 12: neighbors and the gate
   11: s => ({ ...s, version: 12, neighbors: generateNeighbors(s.seed as number), gate: newGate(s.seed as number) }),
   // 10 → 11: food in the stockpile, each person's needs, yesterday's eating
