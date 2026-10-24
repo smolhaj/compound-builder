@@ -93,6 +93,77 @@ Water (well, cistern, rain catchment, creek pump, filtration), food (garden beds
 
 ## 4. Disasters (surprise by default)
 Each disaster is a ruleset: what breaks, what is scarce, and what threat cadence follows. See the brainstorm table. Disasters can **chain**, e.g. financial collapse → end of the rule of law.
+
+**Disaster table** (decided with the user; details are settled per disaster as each one is built). Each run has **one primary disaster plus a chained aftermath** (a likely follow-on, e.g. nuclear war → grid-down + end of the rule of law).
+
+| Disaster | Kind | What breaks / what it tests |
+|---|---|---|
+| Grid-down (MVP, built first) | Grounded | Power, pumps, refrigeration, comms → water, food, heat, security |
+| Financial collapse | Grounded | Banks, cash, supply chains; chains into end of the rule of law |
+| End of the rule of law | Grounded / chained | No police or courts: raids, looters, gate encounters |
+| Drought | Grounded | Wells, the creek, crops → cistern, catchment, well depth |
+| Pandemic | Grounded | People, trade, arrivals → quarantine, infirmary, med stock |
+| Nuclear war | Grounded | Blast (nearby strike) or distant strikes; EMP, fallout plume (~2 weeks sheltering), per-person dose, failed crops, refugees. Severity rolled in Surprise, chosen in Scenario |
+| Solar flare (Carrington event) | Grounded | Continent-wide EMP, transformers out for months to years → Faraday storage |
+| Wildfire / megafire | Grounded | A fire front with days of warning → defensible space, fire overlay, shelter |
+| Supervolcano / ash winter | Grounded | Ash fall, 1–2 years with no summer → greenhouses, stored food |
+| Cyberattack on infrastructure | Grounded | Patchwork outages (grid, banks, water treatment, fuel) with rolling partial recovery |
+| Zombies | Pulpy (unlockable) | Constant attackers; walls and sightlines |
+| Invasion | Pulpy (unlockable) | Occupation, patrols, requisitioning; hiding beats fighting |
+| Civil war | Pulpy (unlockable) | Moving front lines, faction territory, conscription, choosing sides or staying neutral |
+| Engineered bioweapon | Pulpy (unlockable) | High-fatality pandemic; quarantine and NBC air filtering |
+| Asteroid impact | Pulpy (unlockable) | Telegraphed months ahead; impact winter plus tsunami or blast zone |
+| Alien / unknown event | Pulpy (end-game unlockable) | Lights in the sky, the grid stops, people vanish |
+
+**Disaster rules** (decided with the user after the research in `docs/research_disasters.md`):
+- **Warning** varies by disaster: months for an asteroid, a season for drought, days for wildfire or a solar flare (aurora), minutes to days for nuclear war.
+- **Visibility** is a threat-type matrix: a fortress look (walls, guns, lights) deters opportunists and looters but attracts organised gangs, militia and requisitioners; staying unseen (the "gray man") avoids both but deters no one who finds you.
+- **Neighbours** are named NPC households on the surrounding farms, each with a disposition, skills, a radio net, trades and mutual aid. You can build an alliance or make enemies.
+- **Medical dependency**: some runs draw a family member on insulin, oxygen or heart medication (random). It becomes a story driver: the stockpile, fridge power, finding a medic.
+- **Nuclear war** severity is rolled; a rare large exchange adds 1–3 years of nuclear winter (cold, short seasons, famine).
+- **Government**: a help-or-hindrance roll per run and region. Either FEMA aid and restored order, or martial law, checkpoints and requisition of fuel and food. Hidden stores matter.
+- **Civil war** uses invented, non-partisan factions, never real-world parties.
+- **Engine:** one **collapse clock** with tracks (power, water, fuel, food, medical, law, comms). Each disaster sets the track speeds and adds its own effects (fallout, ash, a fire front, herds), so disasters chain naturally.
+- **Zombies and hordes:** herds drift across the map as a pressure field that pushes on walls, drawn by noise and light. Individual infected and small groups arrive as encounter events, like raids.
+- **Radiation:** each person carries a dose. Rooms have a protection factor (PF) and fallout follows the 7-10 decay. Open water, garden crops and grazing livestock take up fallout, so covered cisterns, stored food and washing produce all matter.
+- **Gate choices** move a humanity / morale track that the family feels and the report card grades ("You turned away 14 people"), alongside the practical cost.
+- **Nuclear war:**
+  - **Warning signs, all four:**
+    - news-ticker escalation (crisis headlines, DEFCON changes, embassy evacuations, a market crash);
+    - local tells (military convoys on the county road, jets overhead, the missile-field towns emptying, gas lines);
+    - the neighbours' gossip (they start talking, buying, leaving or digging);
+    - a final "BALLISTIC MISSILE THREAT" emergency alert minutes before the strike.
+  - **The strike:** the sky flashes on the horizon, with a mushroom cloud in the distance if the strike is nearby. Then the EMP drops every unshielded light, the sky turns sickly, and fallout arrives hours later as grey dust.
+  - **The dash:** each person runs to the bunker from wherever they are when the alert sounds. People in the far field or in town may not make it, so a bunker near the house matters.
+  - **Shelter life, about 2 weeks, managed by the player:**
+    - ration food and water;
+    - run the air (by hand crank if there's no power);
+    - deal with sanitation and morale;
+    - listen to the radio for news;
+    - short dashes outside cost dose;
+    - neighbours knock on the hatch, and the player decides whether to let them in.
+- **Grid-down:**
+  - **Cause:** a random cause per run (ice-storm cascade, a substation attack, a cyberattack or an aging-grid failure), each with its own hints and restoration curve, from days to months.
+  - **Water depends on what you built:** the electric well pump dies unless it runs on solar plus battery or has a hand pump; the pressure tank gives about a day; a gravity cistern keeps flowing; creek water needs filtering.
+  - **Power:** solar output follows weather and season and charges the batteries, and the player sets priority loads (well pump, freezer, radio, lights). The generator burns real fuel and can be heard about 1 km away.
+  - **Social order follows the research curve:**
+    - days 1–3: calm and neighbourly;
+    - week 2: shelves empty and tempers fray;
+    - weeks 3–4: the first thefts;
+    - month 2 on: organised looting unless power is restored.
+
+    Rural areas lag cities by weeks.
+- **End of a run**: the region recovers, the compound reaches a self-sustaining equilibrium, or the family is lost; then the report card. Endless continue is optional.
+
+**Bunker hardening** (user): fallout shielding (protection factor ~1000), Faraday cage / EMP shield, NBC air filtration (blast valve, HEPA + carbon, hand crank, overpressure) and blast hardening, each an upgrade that costs more. Radiation is a per-person dose (Sv) set by where each person is and that spot's shielding, with a radiation overlay.
+- Hardening is applied **per room**, with a "Harden whole bunker" shortcut. Each upgrade is a build job with its own stage, and existing rooms can be retrofitted.
+- Each upgrade has **3 tiers**, with price and build time climbing steeply. Fallout shielding: Basic (PF 40, extra earth) → Shelter (PF 1,000, dense concrete) → Military (PF 10,000+, lead and steel).
+- **Visible inside:**
+  - Faraday cage: mesh at the seams, copper bonding strap, gasketed door seals, filtered power entry box.
+  - Fallout shielding: deeper door reveals, a baffled zig-zag entry.
+  - NBC filtration: filter cabinet, hand crank, pressure gauge, blast valves on the vents.
+  - Blast hardening: hinged blast doors on every opening, shock-mounted bunks and shelves.
+- **EMP:** a Faraday-shielded room protects everything stored inside it (radios, solar spares, vehicle electronics, medical devices). Anything unshielded fries.
 - **Warning signs** are telegraphed through the news ticker, prices, neighbours' gossip, radio chatter and sky colour. Attentive players hedge.
 - **Abstract encounters:**
   - A group approaches, and the game evaluates detection (sightlines, dogs, alarms), deterrence (how the place looks), defence (walls and positions versus their strength) and people (skills, morale, numbers).

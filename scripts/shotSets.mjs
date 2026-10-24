@@ -328,3 +328,50 @@ SETS.bunker = [
   { name: 'stairwell-from-the-landing', time: 12, season: 'summer', setup: bunker + inside2('bunker_stairs', 0.0, 0.27, -0.66, 0.0, 0.6, 0.6, 74), cam: D, frames: 12 },
   { name: 'comms-and-armoury', time: 12, season: 'summer', setup: bunker + inside2('bunker_comms', 0.1, 0.27, 0.35, -0.1, 0.12, -0.35, 80), cam: D, frames: 12 },
 ];
+
+/**
+ * The bunker plus an escape tunnel out of its plant room to a hidden exit:
+ * the setup tries headings away from the camp and lays the first route the
+ * rules allow (finished), and a second, shorter one from the dig site still
+ * being trenched. window.__tun = { pts, exit, dir }.
+ */
+const tunnel = bunker + `{ if (!window.__tun) {
+  const G = cb.game, W = cb.world, c = W.camp, b = window.__b;
+  const from = b.bunker_plant ?? b.bunker_stores ?? b.bunker_dorm;
+  // every heading and length the rules allow; keep the one whose exit is deepest in the trees
+  let best = null;
+  for (let k = 0; k < 36; k++) {
+    const a = k * Math.PI * 2 / 36;
+    const s = W.tunnelStartAt(from.x + Math.cos(a) * 0.45, from.z + Math.sin(a) * 0.45);
+    if (!s.pt) continue;
+    // a long way out (toward half a mile): straight, or with one bend; it may run on under the neighbours' land
+    for (const L1 of [6, 12, 25, 45, 70]) for (const turn of [0, 0.5, -0.5, 0.9, -0.9]) for (const L2 of [6, 12, 20, 40, 65]) {
+      const p0 = s.pt, p1 = [p0[0] + Math.cos(a) * 0.6, p0[1] + Math.sin(a) * 0.6], p2 = [p0[0] + Math.cos(a) * L1, p0[1] + Math.sin(a) * L1];
+      const p3 = [p2[0] + Math.cos(a + turn) * L2, p2[1] + Math.sin(a + turn) * L2];
+      const pts = (turn ? [p0, p1, p2, p3] : [p0, p1, [p0[0] + Math.cos(a) * (L1 + L2), p0[1] + Math.sin(a) * (L1 + L2)]]).map(p => [Math.round(p[0] * 4) / 4, Math.round(p[1] * 4) / 4]); pts[0] = p0;
+      if (pts.some(p => p[0] < -60 || p[1] < -60 || p[0] > 127 || p[1] > 127)) continue;
+      if (W.tunnelRouteProblem(pts)) continue;
+      const e = pts[pts.length - 1], score = W.tunnelExitWoods(e[0], e[1]) * 3 + Math.min(L1 + L2, 135) * 0.01;
+      if (!best || score > best.score) best = { pts, dir: Math.atan2(e[1] - pts[pts.length - 2][1], e[0] - pts[pts.length - 2][0]), dir0: a, score };
+    }
+  }
+  if (!best) { console.warn('no tunnel route'); window.__tun = { pts: null }; } else {
+    G.getState().planRun('escape_tunnel', best.pts, []);
+    G.setState(s => { const g = structuredClone(s.game); for (const r of g.perimeter) if (r.kind === 'escape_tunnel') { r.done = r.hours; r.supplied = true; r.finishedAt = g.clock.t - 30; } return { game: g }; });
+    window.__tun = { pts: best.pts, exit: best.pts[best.pts.length - 1], dir: best.dir, dir0: best.dir0 };
+  }
+} }`;
+const atExit = (r, pitch, yaw) => `{ const t = window.__tun; if (t.pts) { cb.cam.target.set(t.exit[0], 0, t.exit[1]); cb.cam.radius = ${r}; cb.cam.pitch = ${pitch}; cb.cam.yaw = -t.dir - Math.PI / 2 + ${yaw}; } }`;
+/** Camera along the tunnel: at distance `s` from the start, looking `ahead` further on (y above the tunnel floor). */
+const inTunnel = (s, ahead, ey = 0.2, ly = 0.15, fov = 74) => `{ const t = window.__tun; if (t.pts) { const W = cb.world; const [a, b] = [t.pts[1], t.pts[2]]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]); const ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L;
+  const y = W.tunnelFloorAt(t.pts);
+  cb.qa.pose = { x: a[0] + ux * ${s}, y: y + ${ey}, z: a[1] + uz * ${s}, lx: a[0] + ux * (${s} + ${ahead}), ly: y + ${ly}, lz: a[1] + uz * (${s} + ${ahead}), fov: ${fov} }; } }`;
+SETS.tunnel = [
+  { name: 'underground-view-tunnel', time: 11, season: 'summer', setup: tunnel + under + `{ const t = window.__tun; const m = t.pts ? [(t.pts[0][0] + t.exit[0]) / 2, (t.pts[0][1] + t.exit[1]) / 2] : [cb.world.camp.x, cb.world.camp.z]; const len = t.pts ? Math.hypot(t.exit[0] - t.pts[0][0], t.exit[1] - t.pts[0][1]) : 10; cb.cam.target.set(m[0], 0, m[1]); cb.cam.radius = Math.max(8, len * 0.62); cb.cam.pitch = 1.05; cb.cam.yaw = 0.4; }`, cam: D, frames: 20 },
+  { name: 'barred-tunnel-door', time: 12, season: 'summer', setup: tunnel + `{ const t = window.__tun; if (t.pts) { const W = cb.world, [sx, sz] = t.pts[0], a = t.dir0, y = W.tunnelFloorAt(t.pts); cb.qa.pose = { x: sx - Math.cos(a) * 0.38, y: y + 0.27, z: sz - Math.sin(a) * 0.38, lx: sx, ly: y + 0.16, lz: sz, fov: 70 }; } }`, cam: D, frames: 12 },
+  { name: 'inside-the-tunnel', time: 12, season: 'summer', setup: tunnel + inTunnel(0.4, 2.0), cam: D, frames: 12 },
+  { name: 'exit-shaft-looking-up', time: 12, season: 'summer', setup: tunnel + `{ const t = window.__tun; if (t.pts) { const y = cb.world.tunnelFloorAt(t.pts, 1e9), [ex, ez] = t.exit, a = t.dir; cb.qa.pose = { x: ex - Math.cos(a) * 0.12, y: y + 0.2, z: ez - Math.sin(a) * 0.12, lx: ex + Math.cos(a) * 0.02, ly: y + 1.2, lz: ez + Math.sin(a) * 0.02, fov: 80 }; } }`, cam: D, frames: 12 },
+  { name: 'hidden-exit-from-outside', time: 15, season: 'summer', setup: tunnel + atExit(1.1, 0.35, 0.5), cam: D, frames: 14 },
+  { name: 'hidden-exit-eye-level', time: 15, season: 'summer', setup: tunnel + `{ const t = window.__tun; if (t.pts) { const [ex, ez] = t.exit, a = t.dir; const [px, pz] = cb.world.openSpotNear(ex + Math.cos(a) * 1.0 + Math.sin(a) * 0.5, ez + Math.sin(a) * 1.0 - Math.cos(a) * 0.5, 0.4); cb.cam.placeEye(px, pz, ex, ez, 0.28); } }`, cam: D, frames: 14 },
+  { name: 'bunkroom-warm-light', time: 12, season: 'summer', setup: tunnel + inside2('bunker_dorm', 0.3, 0.27, 0.3, -0.25, 0.1, -0.3, 74), cam: D, frames: 12 },
+];

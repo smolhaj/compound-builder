@@ -10,11 +10,26 @@ import type { HomesteadWorld } from './HomesteadWorld';
 import { PARCEL_SIZE } from './parcel/parcelTerrain';
 import { closestOnLine } from './parcel/parcelTerrain';
 import { useGameStore } from '../store/gameStore';
-import { PERIMETER, runBill, runHours, wallLength, type Gate, type PerimeterKind, type Pt } from '../sim/perimeter';
+import { OFF_PARCEL_HOURS, PERIMETER, runBill, runHours, wallLength, type Gate, type PerimeterKind, type Pt } from '../sim/perimeter';
 import { orderCost } from '../sim/economy';
 import { MATERIALS, type MaterialId } from '../sim/materials';
 
 const SNAP = 0.25;
+/** How far beyond the parcel a tunnel may run (≈ 360 m). */
+const OFF_PARCEL_REACH = 60;
+
+/** Length of a polyline lying outside the parcel. */
+function offParcel(pts: readonly Pt[]): number {
+  let off = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const [ax, az] = pts[i - 1], [bx, bz] = pts[i], l = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.ceil(l / 0.25));
+    for (let k = 0; k < n; k++) {
+      const x = ax + (bx - ax) * (k + 0.5) / n, z = az + (bz - az) * (k + 0.5) / n;
+      if (x < 0 || z < 0 || x > PARCEL_SIZE || z > PARCEL_SIZE) off += l / n;
+    }
+  }
+  return off;
+}
 /** Gate width: a truck fits (≈ 3.6 m). */
 export const GATE_W = 0.6;
 
@@ -59,7 +74,7 @@ export class PerimeterTool {
       const now = performance.now();
       if (now - this._lastClick < 320 && this._pts.length >= 2) { this.finish(); return; }
       this._lastClick = now;
-      if (e.shiftKey) this.addGateAt(p[0], p[1]);
+      if (e.shiftKey && this._kind !== 'escape_tunnel') this.addGateAt(p[0], p[1]);
       else this.addPoint(p[0], p[1]);
     });
     on(window, 'keydown', e => {
@@ -86,14 +101,22 @@ export class PerimeterTool {
     this._ray.setFromCamera(this._ndc, this._camera);
     const h = this._ray.intersectObject(mesh, false)[0];
     if (!h) return null;
-    const x = Math.min(PARCEL_SIZE, Math.max(0, Math.round(h.point.x / SNAP) * SNAP));
-    const z = Math.min(PARCEL_SIZE, Math.max(0, Math.round(h.point.z / SNAP) * SNAP));
+    // an escape tunnel may run on under the neighbours' land; everything else stays on yours
+    const m = this._kind === 'escape_tunnel' ? OFF_PARCEL_REACH : 0;
+    const x = Math.min(PARCEL_SIZE + m, Math.max(-m, Math.round(h.point.x / SNAP) * SNAP));
+    const z = Math.min(PARCEL_SIZE + m, Math.max(-m, Math.round(h.point.z / SNAP) * SNAP));
     return [x, z];
   }
 
   private _len(): number { return wallLength({ pts: this._pts, gates: [] }); }
 
   addPoint(x: number, z: number): void {
+    // an escape tunnel starts at a free wall of a bunker room
+    if (this._kind === 'escape_tunnel' && this._pts.length === 0) {
+      const s = this._world.tunnelStartAt(x, z);
+      if ('problem' in s) { useGameStore.getState().setToolProblem(s.problem); return; }
+      [x, z] = s.pt;
+    }
     const last = this._pts.at(-1);
     if (last && Math.hypot(last[0] - x, last[1] - z) < SNAP * 0.5) return;
     this._pts.push([x, z]);
@@ -114,7 +137,8 @@ export class PerimeterTool {
 
   finish(): void {
     if (!this._kind || this._pts.length < 2) return;
-    useGameStore.getState().planRun(this._kind, this._pts.map(p => [p[0], p[1]] as Pt), this._gates.map(g => ({ ...g })));
+    if (this._kind === 'escape_tunnel' && this._world.tunnelRouteProblem(this._pts)) return;
+    useGameStore.getState().planRun(this._kind, this._pts.map(p => [p[0], p[1]] as Pt), this._gates.map(g => ({ ...g })), this._kind === 'escape_tunnel' ? offParcel(this._pts) : 0);
     this._pts = []; this._gates = [];
     this._redraw();
   }
@@ -150,9 +174,15 @@ export class PerimeterTool {
     const lines = Object.entries(bill).map(([k, q]) => ({ material: k as MaterialId, qty: q as number }));
     const buyable = lines.filter(l => MATERIALS[l.material].price !== null);
     const own = lines.filter(l => MATERIALS[l.material].price === null).map(l => `${l.qty} ${MATERIALS[l.material].name.toLowerCase()}`);
-    const txt = this._pts.length === 0 ? `${PERIMETER[this._kind].name}: click to start the line`
-      : `${Math.round(len * 6)} m · ~$${orderCost(buyable).toLocaleString('en-US')}${own.length ? ' + ' + own.join(', ') : ''} · ${Math.round(runHours(this._kind, len))} h${this._gates.length ? ` · ${this._gates.length} gate${this._gates.length > 1 ? 's' : ''}` : ''}`;
-    useGameStore.getState().setToolProblem(txt);
+    const tunnelWhy = this._kind === 'escape_tunnel' ? this._world.tunnelRouteProblem(pts as Pt[]) : null;
+    (this._line.material as THREE.LineBasicMaterial).color.set(tunnelWhy ? 0xe36a5a : 0xffd27a);
+    const txt = tunnelWhy ? tunnelWhy
+      : this._pts.length === 0 ? (this._kind === 'escape_tunnel' ? 'Escape tunnel: click a bunker room to start at its wall, then out to the exit' : `${PERIMETER[this._kind].name}: click to start the line`)
+      : `${Math.round(len * 6)} m${this._kind === 'escape_tunnel' && offParcel(pts as Pt[]) > 0 ? ` (${Math.round(offParcel(pts as Pt[]) * 6)} m under neighbours' land)` : ''} · ~$${orderCost(buyable).toLocaleString('en-US')}${own.length ? ' + ' + own.join(', ') : ''} · ${Math.round(runHours(this._kind, len) + (this._kind === 'escape_tunnel' ? OFF_PARCEL_HOURS * offParcel(pts as Pt[]) : 0))} h${this._gates.length ? ` · ${this._gates.length} gate${this._gates.length > 1 ? 's' : ''}` : ''}`;
+    const e = pts[pts.length - 1] as Pt | undefined;
+    const hide = !tunnelWhy && this._kind === 'escape_tunnel' && this._pts.length > 0 && e
+      ? (this._world.tunnelExitWoods(e[0], e[1]) >= 0.3 ? ' · exit hidden under leaf litter in the trees' : ' · exit in the open: hidden under turf (the trees hide it better)') : '';
+    useGameStore.getState().setToolProblem(txt + hide);
   }
 
   dispose(): void {

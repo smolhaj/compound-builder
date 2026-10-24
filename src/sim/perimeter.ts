@@ -14,7 +14,7 @@ import { hasAll, shortfall, MATERIALS, type MaterialId, type Stock } from './mat
 import { log } from './economy';
 import type { GameState } from './state';
 
-export type PerimeterKind = 'split_rail' | 'barbed_wire' | 'woven_wire' | 'thorn_hedge' | 'log_palisade' | 'container_wall' | 'earth_berm' | 'ditch' | 'water_pipe' | 'power_cable';
+export type PerimeterKind = 'split_rail' | 'barbed_wire' | 'woven_wire' | 'thorn_hedge' | 'log_palisade' | 'container_wall' | 'earth_berm' | 'ditch' | 'water_pipe' | 'power_cable' | 'escape_tunnel';
 
 export interface PerimeterDef {
   id: PerimeterKind;
@@ -30,6 +30,11 @@ export interface PerimeterDef {
   sight: number;
   /** Years to full growth (hedges); 0 = full strength when built. */
   growYears: number;
+  /**
+   * A way out that only opens from inside (the escape tunnel): nothing from
+   * outside can enter by it, whatever it brings. See `canEnter`.
+   */
+  egressOnly?: boolean;
 }
 
 export const PERIMETER: Record<PerimeterKind, PerimeterDef> = {
@@ -42,6 +47,7 @@ export const PERIMETER: Record<PerimeterKind, PerimeterDef> = {
   earth_berm: { id: 'earth_berm', name: 'Earth berm', blurb: 'A 2 m bank of earth. Stops vehicles and bullets and hides what\'s behind it. Weeks of shovel work.', hours: 30, materials: {}, height: 0.3, blocks: { people: 0.35, animals: 0.2, vehicles: 0.9 }, sight: 1, growYears: 0 },
   water_pipe: { id: 'water_pipe', name: 'Water line (buried)', blurb: 'PEX pipe in a trench below the frost line (1.2 m) so it never freezes. Joins wells, cisterns and towers to the houses.', hours: 5, materials: { pipe: 0.2 }, height: 0, blocks: { people: 0, animals: 0, vehicles: 0 }, sight: 0, growYears: 0 },
   power_cable: { id: 'power_cable', name: 'Power cable (buried)', blurb: 'Direct-burial cable in conduit, 60 cm down. Joins the solar, batteries and generator to the buildings.', hours: 3, materials: { cable: 0.2 }, height: 0, blocks: { people: 0, animals: 0, vehicles: 0 }, sight: 0, growYears: 0 },
+  escape_tunnel: { id: 'escape_tunnel', name: 'Escape tunnel', blurb: 'A long poured-concrete vault you walk upright in (60 m to half a mile and more, on under the neighbours\' land if need be) from a bunker room to a hidden hatch far out in the woods, away from any fighting. A way out for the family, never a way in: a blast door barred from the bunker side, and an exit lid with no handle outside, its hinges and drop-bolts on the underside, buried under soil, leaves and fallen branches.', hours: 36, materials: { culvert: 1, excavator: 0.3 }, height: 0, blocks: { people: 0, animals: 0, vehicles: 0 }, sight: 0, growYears: 0, egressOnly: true },
   ditch: { id: 'ditch', name: 'Ditch / dry moat', blurb: 'A 2 m deep, 3 m wide ditch. No vehicle crosses; the spoil can build a berm.', hours: 40, materials: {}, height: -0.33, blocks: { people: 0.45, animals: 0.3, vehicles: 1 }, sight: 0, growYears: 0 },
 };
 
@@ -83,7 +89,20 @@ export function wallLength(run: Pick<PerimeterRun, 'pts' | 'gates'>): number {
 export function runBill(kind: PerimeterKind, len: number): Partial<Stock> {
   const out: Partial<Stock> = {};
   for (const [k, v] of Object.entries(PERIMETER[kind].materials) as Array<[MaterialId, number]>) out[k] = Math.max(1, Math.ceil(v * len - 1e-9));
+  // the tunnel's two locks: a blast door at the bunker end, the egress hatch at the far end
+  if (kind === 'escape_tunnel') Object.assign(out, { blast_door: 1, egress_hatch: 1, concrete: 4 });
   return out;
+}
+
+/**
+ * Can someone come in by this run from `side`? Fences and walls are not
+ * ways in at all (they are barriers: see runStops); the escape tunnel is a
+ * way in only from inside the compound, and never from outside: no
+ * breaching, no tools, no numbers change that.
+ */
+export function canEnter(r: Pick<PerimeterRun, 'kind'>, side: 'inside' | 'outside'): boolean {
+  if (!PERIMETER[r.kind].egressOnly) return false;
+  return side === 'inside';
 }
 
 export function runHours(kind: PerimeterKind, len: number): number {
@@ -92,13 +111,19 @@ export function runHours(kind: PerimeterKind, len: number): number {
 
 /** Earth in a berm and dug out of a ditch, per world unit of length (≈ 6 m), m³. */
 export const BERM_M3 = 36, DITCH_M3 = 24;
+/** Net earth a tunnel's cut-and-cover leaves over, per unit length (the culvert's volume), m³. */
+export const TUNNEL_M3 = 12;
 /** Share of a berm's hours saved when its earth comes off the spoil pile (pushed up, not dug). */
 export const SPOIL_SAVES = 0.6;
 
-/** Plan a run (mutates the draft). */
-export function planRun(s: GameState, kind: PerimeterKind, pts: Pt[], gates: Gate[] = []): PerimeterRun {
+/** Extra person-hours per unit length for the stretch of a tunnel under someone else's land (dug by hand, at night, no excavator). */
+export const OFF_PARCEL_HOURS = 40;
+
+/** Plan a run (mutates the draft). `offLen`: how much of it lies beyond the parcel (tunnels only). */
+export function planRun(s: GameState, kind: PerimeterKind, pts: Pt[], gates: Gate[] = [], offLen = 0): PerimeterRun {
   const len = wallLength({ pts, gates });
-  const run: PerimeterRun = { id: `p${s.nextId++}`, kind, pts, gates, done: 0, hours: runHours(kind, len), supplied: false, finishedAt: null };
+  const hours = runHours(kind, len) + (kind === 'escape_tunnel' ? OFF_PARCEL_HOURS * offLen : 0);
+  const run: PerimeterRun = { id: `p${s.nextId++}`, kind, pts, gates, done: 0, hours, supplied: false, finishedAt: null };
   s.perimeter.push(run);
   log(s, `Laid out ${Math.round(len * 6)} m of ${PERIMETER[kind].name.toLowerCase()}.`);
   return run;
@@ -136,6 +161,7 @@ export function addRunWork(s: GameState, r: PerimeterRun, hours: number): void {
   if (r.done >= r.hours - 1e-9) {
     r.finishedAt = s.clock.t;
     if (r.kind === 'ditch') s.stock.spoil += Math.round(DITCH_M3 * wallLength(r));
+    if (r.kind === 'escape_tunnel') s.stock.spoil += Math.round(TUNNEL_M3 * wallLength(r));
     const d = PERIMETER[r.kind];
     log(s, d.growYears ? `${d.name} planted. Give it ${d.growYears} years.` : `${d.name} ${r.kind === 'water_pipe' || r.kind === 'power_cable' ? 'laid' : 'finished'}.`);
   }

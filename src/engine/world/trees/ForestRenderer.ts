@@ -121,6 +121,7 @@ export class ForestRenderer {
         c.setHSL(hsl.h + (jh - 0.5) * 0.03, Math.min(1, hsl.s * (0.85 + js * 0.3)), Math.min(1, Math.max(0.03, hsl.l * (0.8 + jl * 0.32))));
         inst.setColorAt(i, c);
       });
+      if (!this._shown) inst.visible = false;
       this._sets.push(inst);
     }
   }

@@ -25,7 +25,9 @@ import type { WearSeason } from '../engine/world/people/crowdWear';
 import type { TourBuildingInfo } from '../engine/world/camera/TourController';
 import { footprint, KIT, rotQ, type Placed } from './buildkit/kit';
 import { showStage, CUTAWAY_HIDE, XRAY_LAYERS, type BuildLayer as CabinLayer, type BuildOpts } from './buildkit/shell';
-import { datums, doorsOf, DEPTH, isEntry, isUnderground } from './buildkit/underground';
+import { datums, doorsOf, DEPTH, isEntry, isUnderground, tunnelDoorsOf, tunnelStart, type Side } from './buildkit/underground';
+import { floorAt, tunnelPath, tunnelProblem, TUNNEL_PROBLEM_TEXT, VAULT_W, type PathSample } from './buildkit/tunnelPath';
+import { buildTunnel } from './perimeter/tunnelGeometry';
 import { SHAFT_HALF, stairProfile } from './buildkit/bunkerBuildings';
 import { buildExcavator, drapeSoil, spoilHeap } from './props/digSite';
 import { kitMaterial } from './buildkit/materials';
@@ -299,12 +301,101 @@ export class HomesteadWorld {
   private _runs: readonly PerimeterRun[] = [];
   private readonly _runGroups = new Map<string, { key: string; group: THREE.Group }>();
   private _runIds = '';
+  private _tunnelKey = '';
   private _worksKey = '';
 
   /** Is (x, z) within `pad` of a planned perimeter line (trees are cleared off fence lines)? */
   onPerimeterLine(x: number, z: number, pad = 0): boolean {
-    for (const r of this._runs) if (closestOnLine(r.pts, x, z).d < pad) return true;
+    for (const r of this._runs) {
+      // a tunnel goes under the trees; only its exit hatch needs a clear spot
+      if (r.kind === 'escape_tunnel') { const e = r.pts[r.pts.length - 1]; if (Math.hypot(e[0] - x, e[1] - z) < 0.18 + pad) return true; continue; }
+      if (closestOnLine(r.pts, x, z).d < pad) return true;
+    }
     return false;
+  }
+
+  /** The bunker room a tunnel starts from, and so its floor level. */
+  private _tunnelDatum(r: PerimeterRun): number {
+    const [x, z] = r.pts[0];
+    for (const b of this._built.values()) {
+      if (!b.under) continue;
+      const f = footprint(KIT[b.placed.kind], b.placed.x, b.placed.z, b.placed.rot, false);
+      if (x > f.x0 - 0.03 && x < f.x1 + 0.03 && z > f.z0 - 0.03 && z < f.z1 + 0.03) return b.under.datum;
+    }
+    return this._naturalH(x, z) - DEPTH;
+  }
+
+  /** Escape tunnel tool: where a tunnel clicked at (x, z) would leave its room (a free wall), or why it can't. */
+  tunnelStartAt(x: number, z: number): { pt: [number, number] } | { problem: string } {
+    const placed = [...this._built.values()].map(b => b.placed);
+    const starts = this._runs.filter(r => r.kind === 'escape_tunnel').map(r => r.pts[0]);
+    const inRoom = placed.some(p => isUnderground(KIT[p.kind]) && (() => { const f = footprint(KIT[p.kind], p.x, p.z, p.rot, false); return x >= f.x0 && x <= f.x1 && z >= f.z0 && z <= f.z1; })());
+    const s = tunnelStart(x, z, placed, starts);
+    if (!s) return { problem: TUNNEL_PROBLEM_TEXT[inRoom ? 'no_wall' : 'no_room'] };
+    return { pt: s.pt };
+  }
+
+  /** Floor level of a tunnel starting at pts[0] (its bunker's; QA poses). */
+  tunnelFloorAt(pts: ReadonlyArray<[number, number]>, s = 0): number {
+    const datum = this._tunnelDatum({ pts } as unknown as PerimeterRun);
+    return s <= 0 ? datum : floorAt(tunnelPath(pts, datum, this._naturalH).samples, s);
+  }
+
+  /** Water a tunnel can't pass under: the creek channel (its line, with a margin, on and off the parcel) and the stream. */
+  private readonly _underWater = (x: number, z: number): boolean =>
+    Math.abs(z - this.parcel.creek.zAt(x)) < this.parcel.creek.halfWidth + 0.45 || this.parcel.isCreek(x, z) || this.stream.depthAt(x, z) > 0;
+
+  /** Escape tunnel tool: why this route won't do (null = it will). */
+  tunnelRouteProblem(pts: ReadonlyArray<[number, number]>): string | null {
+    if (pts.length < 2) return null;
+    const placed = [...this._built.values()].map(b => b.placed);
+    const p = tunnelProblem(pts, this._tunnelDatum({ pts: pts as [number, number][] } as PerimeterRun), this._naturalH, this._underWater, placed);
+    return p ? TUNNEL_PROBLEM_TEXT[p] : null;
+  }
+
+  /**
+   * A long tunnel has dozens of bulbs; a few real lights follow the eye
+   * through it, sitting in the nearest bulbs (dim, warm), so it reads as
+   * pools of light with dark between at the cost of four lights.
+   */
+  private readonly _tLights: THREE.PointLight[] = [];
+  private _poolTunnelLights(): void {
+    if (!this._tLights.length) for (let i = 0; i < 4; i++) { const l = new THREE.PointLight(0xffdcb0, 0, 1.5, 1.7); l.castShadow = false; this._tLights.push(l); this._ws.scene.add(l); }
+    const cam = this._ws.camera.position;
+    const below = cam.y < this.groundAt(cam.x, cam.z) - 0.12;
+    const near: THREE.Vector3[] = [];
+    if (below) for (const [id, g] of this._runGroups) {
+      if (this._runs.find(r => r.id === id)?.kind !== 'escape_tunnel') continue;
+      for (const p of (g.group.userData.lamps ?? []) as THREE.Vector3[]) if (Math.abs(p.x - cam.x) < 6 && Math.abs(p.z - cam.z) < 6) near.push(p);
+    }
+    near.sort((a, b) => a.distanceToSquared(cam) - b.distanceToSquared(cam));
+    this._tLights.forEach((l, i) => { const p = near[i]; l.intensity = p ? 0.32 : 0; if (p) l.position.copy(p); });
+  }
+
+  /** A tunnel's graded floor along its route (cached; depends on its bunker's floor and the land). */
+  private readonly _paths = new Map<string, { key: string; samples: PathSample[] }>();
+  /** Tree cover at a tunnel's exit (how it is hidden). */
+  private _exitWoods(r: PerimeterRun): number { const e = r.pts[r.pts.length - 1]; return this.tunnelExitWoods(e[0], e[1]); }
+
+  /** How wooded a tunnel exit's spot is (0–1), from the trees actually standing round it. */
+  tunnelExitWoods(x: number, z: number): number {
+    let n = 0;
+    for (const t of this.treeSpecs) if (Math.abs(t.x - x) < 1.6 && Math.abs(t.z - z) < 1.6 && Math.hypot(t.x - x, t.z - z) < 1.6) n++;   // within ≈ 10 m
+    return Math.min(1, n / 5);
+  }
+
+  private _pathOf(r: PerimeterRun): PathSample[] {
+    const datum = this._tunnelDatum(r), key = `${datum.toFixed(3)}|${r.pts.join(';')}`;
+    const c = this._paths.get(r.id);
+    if (c?.key === key) return c.samples;
+    const samples = tunnelPath(r.pts, datum, this._naturalH).samples;
+    this._paths.set(r.id, { key, samples });
+    return samples;
+  }
+
+  /** Underground view: the vault's top comes off so the tunnel shows cut open. */
+  private _applyTunnelView(g: THREE.Group): void {
+    for (const o of g.children) if (o.userData.part === 'upper') o.visible = !this._under;
   }
 
   /** Fences, hedges and walls drawn as built (hedges by growth); berms and ditches shape the terrain. */
@@ -316,13 +407,19 @@ export class HomesteadWorld {
       const cur = this._runGroups.get(r.id);
       if (cur?.key === key) continue;
       if (cur) { this._root.remove(cur.group); cur.group.traverse(o => (o as THREE.Mesh).geometry?.dispose()); }
-      const group = buildRun(r, this.groundAt, t, (x, z) => this.onBuilding(x, z, 0.02, false));
+      const tunnel = r.kind === 'escape_tunnel';
+      const group = tunnel
+        ? buildTunnel(this._pathOf(r), this.groundAt, r.finishedAt !== null ? 1 : runProgress(r), this._exitWoods(r))
+        : buildRun(r, this.groundAt, t, (x, z) => this.onBuilding(x, z, 0.02, false));
+      if (tunnel) this._applyTunnelView(group);
       this._root.add(group);
       this._runGroups.set(r.id, { key, group });
       this._ws.invalidateShadows();
     }
     // earthworks (berms raise, ditches cut) as they are dug
     const works: Earthwork[] = runs.filter(r => r.kind === 'earth_berm' || r.kind === 'ditch').map(r => ({ pts: r.pts, gates: r.gates, height: PERIMETER[r.kind].height, k: r.finishedAt !== null ? 1 : runProgress(r) }));
+    // a tunnel is cut and covered: an open trench along it while the culvert goes in
+    for (const r of runs) if (r.kind === 'escape_tunnel' && r.finishedAt === null && (r.supplied || r.done > 0)) works.push({ pts: r.pts.slice(), gates: [], height: -0.33, k: 1 });
     const wk = works.map(w => `${w.pts.length}:${Math.round(w.k * 20)}`).join('|');
     if (wk !== this._worksKey) {
       this._worksKey = wk;
@@ -335,6 +432,9 @@ export class HomesteadWorld {
       for (const g of this._runGroups.values()) g.key = '';
       this._ws.invalidateShadows();
     }
+    // tunnels open doorways (with blast doors) in the rooms they start from
+    const tk = runs.filter(r => r.kind === 'escape_tunnel').map(r => `${r.pts[0][0]},${r.pts[0][1]}`).join('|');
+    if (tk !== this._tunnelKey) { this._tunnelKey = tk; this._syncUnderground(); }
     // a new line clears the trees off it
     if (ids !== this._runIds) {
       const before = this._runIds;
@@ -347,6 +447,7 @@ export class HomesteadWorld {
   /** Walk / people collision with built perimeter runs (gates and unbuilt stretches are open). */
   private _perimeterBlocked(x: number, z: number, r: number): boolean {
     for (const run of this._runs) {
+      if (run.kind === 'escape_tunnel') continue;
       const th = run.kind === 'container_wall' ? 0.21 : run.kind === 'thorn_hedge' ? 0.15 * runGrowth(run, this._simT) : run.kind === 'log_palisade' ? 0.03 : run.kind === 'earth_berm' || run.kind === 'ditch' ? 0 : 0.01;
       if (th < 0.01) continue;
       const { d, s } = closestOnLine(run.pts, x, z);
@@ -569,7 +670,11 @@ export class HomesteadWorld {
     // the surface point: the stairwell's top end, otherwise the middle
     const [sx, sz] = p.kind === 'bunker_stairs' ? rotQ(0, def.cellsZ * CELL / 2 - 0.25, p.rot) : [0, 0];
     const ground = this.parcel.sample(p.x + sx, p.z + sz).h;
-    return { doors: doorsOf(p, placed), depth: Math.round((ground - datum) * 1000) / 1000 };
+    // escape tunnels leave through a blast door, barred from the room side
+    const starts = this._runs.filter(r => r.kind === 'escape_tunnel').map(r => r.pts[0]);
+    const tunnelDoors = tunnelDoorsOf(p, starts);
+    const blast = Object.keys(tunnelDoors) as Side[];
+    return { doors: { ...doorsOf(p, placed), ...tunnelDoors }, depth: Math.round((ground - datum) * 1000) / 1000, ...(blast.length ? { blast } : {}) };
   }
 
   /** New neighbours open new doorways: rebuild the bunker rooms whose doorways changed. */
@@ -594,6 +699,8 @@ export class HomesteadWorld {
     this._under = on;
     this.terrain.setOpacity(on ? 0.3 : 1);
     this.forest.visible = !on;
+    this.stream.setEdgesVisible(!on);
+    for (const [id, g] of this._runGroups) if (this._runs.find(r => r.id === id)?.kind === 'escape_tunnel') this._applyTunnelView(g.group);
     // a bed of dark earth under the bunkers, so the see-through ground reads as a cut-away section, not sky
     if (on) {
       const floors = [...this._built.values()].filter(b => b.under).map(b => b.under!.datum);
@@ -793,8 +900,9 @@ export class HomesteadWorld {
       if (b.under) {
         // scaled to the room: the same lamps light a small vestibule and a big bunkroom alike
         const def = KIT[b.placed.kind], area = def.cellsX * def.cellsZ / 4;
-        b.light.intensity = (this._under ? 0.3 : 0.8) * Math.min(1, 0.2 + 0.8 * area);
-        b.light.color.set(0xfff2dc);
+        // warm, low lamplight (incandescent-ish), not a bright work light
+        b.light.intensity = (this._under ? 0.25 : 0.48) * Math.min(1, 0.2 + 0.8 * area);
+        b.light.color.set(0xffd49e);
         continue;
       }
       // homes are lit in the evening; sheds and shops keep a dim work light
@@ -890,8 +998,21 @@ export class HomesteadWorld {
     return null;
   }
 
+  /** A finished escape tunnel the walker is in (below ground): its floor, and how near the exit ladder. */
+  private _tunnelAt(x: number, z: number): { floor: number; toExit: number; run: PerimeterRun } | null {
+    for (const r of this._runs) {
+      if (r.kind !== 'escape_tunnel' || r.finishedAt === null) continue;
+      const { d, s } = closestOnLine(r.pts, x, z);
+      if (d >= VAULT_W / 2 - 0.03) continue;
+      const path = this._pathOf(r);
+      return { floor: floorAt(path, s), toExit: path[path.length - 1].s - s, run: r };
+    }
+    return null;
+  }
+
   /** Walk-mode floor: down in the bunker, its floor (the stair's treads in a stairwell); up top, the surface. */
   tourHeight = (x: number, z: number): number => {
+    if (this._below) { const t = this._tunnelAt(x, z); if (t && !this._roomAt(x, z)) return t.floor; }
     const r = this._roomAt(x, z);
     if (r && r.b.placed.kind === 'bunker_stairs') {
       const pr = stairProfile(KIT.bunker_stairs, r.b.opts.depth ?? DEPTH);
@@ -916,7 +1037,7 @@ export class HomesteadWorld {
       return this.walkBlocked(x, z, r);
     }
     const here = this._roomAt(x, z, 0.0);
-    if (!here) return true;
+    if (!here) return !this._tunnelAt(x, z);       // below ground: rooms and escape tunnels are all there is
     for (const b of this._built.values()) {
       if (!b.under || !b.finished) continue;
       const def = KIT[b.placed.kind], reach = Math.max(def.cellsX, def.cellsZ) * CELL + 0.3;
@@ -929,6 +1050,15 @@ export class HomesteadWorld {
 
   /** Level changes: down a stairwell past its headhouse, or down / up a hatch's ladder. */
   tourPortal = (x: number, z: number): { x: number; z: number } | null => {
+    // the escape tunnel's ladder: up and out from below, and only from below (from outside the hatch is just woods floor)
+    if (this._below) {
+      const t = this._tunnelAt(x, z);
+      if (t && t.toExit < 0.05) {
+        const p = t.run.pts, [ex, ez] = p[p.length - 1], [px, pz] = p[p.length - 2], l = Math.hypot(ex - px, ez - pz);
+        this._below = false;
+        return { x: ex + (ex - px) / l * 0.18, z: ez + (ez - pz) / l * 0.18 };
+      }
+    }
     const r = this._roomAt(x, z);
     if (!r || r.b.placed.kind !== 'bunker_stairs') this._house = null;
     if (!r) return null;
@@ -1001,6 +1131,7 @@ export class HomesteadWorld {
 
   /** Per frame: seasons (eased toward the calendar / pinned season) then terrain uniforms. */
   tick(dt: number, doy: number, totalDays: number, mode: SeasonMode): void {
+    this._poolTunnelLights();
     // underground (walking in a bunker, a QA pose inside a room): no daylight, only the lamps
     const cam = this._ws.camera.position;
     const below = cam.y < this.groundAt(cam.x, cam.z) - 0.12;

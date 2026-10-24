@@ -17,7 +17,7 @@ export type KitMaterialId = 'timber_lap' | 'trim' | 'fieldstone' | 'metal_roof' 
   // interior finishes and furnishings
   | 'pine_panel' | 'wood_dark' | 'wood_mid' | 'iron' | 'enamel' | 'quilt_red' | 'quilt_blue' | 'linen' | 'rug' | 'books' | 'lamp' | 'cutcap' | 'crockery'
   // more buildings
-  | 'concrete' | 'metal_siding' | 'log_wall' | 'log_end' | 'board_batten' | 'wire_mesh' | 'straw' | 'soil' | 'crop' | 'earth' | 'pegboard' | 'steel' | 'paint_red' | 'paint_green' | 'paint_yellow' | 'paint_bunker' | 'paint_dado' | 'bulkhead' | 'glow'
+  | 'concrete' | 'metal_siding' | 'log_wall' | 'log_end' | 'board_batten' | 'wire_mesh' | 'straw' | 'soil' | 'crop' | 'earth' | 'pegboard' | 'steel' | 'paint_red' | 'paint_green' | 'paint_yellow' | 'paint_bunker' | 'paint_dado' | 'bulkhead' | 'glow' | 'whitewash' | 'wet_concrete' | 'bulb'
   // perimeter
   | 'hedge' | 'hedge2' | 'hedge_berry' | 'container_red' | 'container_blue' | 'container_green' | 'container_tan'
   // homey decor (procedural art)
@@ -29,7 +29,7 @@ const TEX_WORLD: Partial<Record<KitMaterialId, number>> = {
   timber_lap: 0.5, fieldstone: 0.5, metal_roof: 0.5, deck: 0.5, door: 0.2,
   curtain: 0.15, curtain_red: 0.15, hedge: 0.25, hedge2: 0.25,
   pine_panel: 0.5, quilt_red: 0.12, quilt_blue: 0.12, rug: 0.3, books: 0.1,
-  concrete: 0.6, metal_siding: 0.5, container_red: 0.4, container_blue: 0.4, container_green: 0.4, container_tan: 0.4, log_wall: 0.5, board_batten: 0.5, wire_mesh: 0.15, straw: 0.3, soil: 0.4, earth: 0.8, pegboard: 0.2,
+  concrete: 0.6, whitewash: 0.5, wet_concrete: 0.6, metal_siding: 0.5, container_red: 0.4, container_blue: 0.4, container_green: 0.4, container_tan: 0.4, log_wall: 0.5, board_batten: 0.5, wire_mesh: 0.15, straw: 0.3, soil: 0.4, earth: 0.8, pegboard: 0.2,
 };
 
 function lcg(seed: number): () => number {
@@ -254,6 +254,34 @@ function paintConcrete(): HTMLCanvasElement {
   }
   g.strokeStyle = 'rgba(80,78,74,0.5)';
   for (let k = 0; k < 3; k++) { g.beginPath(); let x = r() * N, y = r() * N; g.moveTo(x, y); for (let i = 0; i < 6; i++) { x += (r() - 0.5) * 40; y += (r() - 0.3) * 30; g.lineTo(x, y); } g.stroke(); }
+  return c;
+}
+
+/**
+ * Whitewashed board-formed concrete (the tunnel vault, after the user's
+ * photo): cream limewash over the imprint of horizontal form boards
+ * (≈ 15 cm), with tie-hole dots, a few hairline cracks and grubby patches.
+ */
+function paintWhitewash(): HTMLCanvasElement {
+  const N = 512, boards = 20, bh = N / boards;
+  const [c, g] = canvas(N);
+  const r = lcg(131);
+  g.fillStyle = rgb(226, 221, 204);
+  g.fillRect(0, 0, N, N);
+  for (let i = 0; i < boards; i++) {
+    const t = r();
+    g.fillStyle = rgb(218 + t * 16, 212 + t * 15, 192 + t * 14);
+    g.fillRect(0, i * bh + 1, N, bh - 2);
+    g.fillStyle = 'rgba(120,108,84,0.45)';
+    g.fillRect(0, i * bh, N, 1.5);                                   // board joint
+    if (i % 4 === 2) for (let x = r() * 60; x < N; x += 90 + r() * 30) { g.fillStyle = 'rgba(90,80,62,0.55)'; g.beginPath(); g.arc(x, i * bh + bh / 2, 2.2, 0, Math.PI * 2); g.fill(); }   // tie holes
+  }
+  for (let k = 0; k < 500; k++) {
+    g.fillStyle = `rgba(${r() < 0.6 ? '150,136,106' : '226,218,196'},${0.04 + r() * 0.1})`;
+    g.fillRect(r() * N, r() * N, 3 + r() * 20, 2 + r() * 8);
+  }
+  g.strokeStyle = 'rgba(96,86,66,0.45)';
+  for (let k = 0; k < 4; k++) { g.beginPath(); let x = r() * N, y = r() * N; g.moveTo(x, y); for (let i = 0; i < 7; i++) { x += (r() - 0.5) * 50; y += (r() - 0.5) * 18; g.lineTo(x, y); } g.stroke(); }
   return c;
 }
 
@@ -571,9 +599,13 @@ export function kitMaterial(id: KitMaterialId): THREE.MeshStandardMaterial {
     case 'crop': m = new THREE.MeshStandardMaterial({ color: 0x4f8a34, roughness: 0.85 }); break;
     case 'steel': m = new THREE.MeshStandardMaterial({ color: 0x7c8186, roughness: 0.4, metalness: 0.75 }); break;
     case 'paint_red': m = new THREE.MeshStandardMaterial({ color: 0x9c2f26, roughness: 0.6 }); break;
-    case 'paint_dado': m = new THREE.MeshStandardMaterial({ color: 0x6f8466, roughness: 0.5 }); break;
-    case 'paint_bunker': m = new THREE.MeshStandardMaterial({ color: 0xc9d3c2, roughness: 0.55 }); break;
-    case 'bulkhead': m = new THREE.MeshStandardMaterial({ color: 0xfff6e0, roughness: 0.3, emissive: new THREE.Color(1.0, 0.93, 0.78), emissiveIntensity: 0.8 }); break;
+    case 'whitewash': m = texMat(id, paintWhitewash, 1.0, 0.9); break;
+    // damp poured floor: darker, a little shine where the light catches the wet
+    case 'wet_concrete': { const mm = texMat(id, paintConcrete, 1.0, 0.32, 0.15); mm.color.setRGB(0.62, 0.6, 0.56); m = mm; break; }
+    case 'bulb': m = new THREE.MeshStandardMaterial({ color: 0xfff0d0, roughness: 0.2, emissive: new THREE.Color(1.0, 0.78, 0.5), emissiveIntensity: 1.6 }); break;
+    case 'paint_dado': m = new THREE.MeshStandardMaterial({ color: 0x6b7a58, roughness: 0.75 }); break;
+    case 'paint_bunker': m = new THREE.MeshStandardMaterial({ color: 0xcfc9b2, roughness: 0.85 }); break;
+    case 'bulkhead': m = new THREE.MeshStandardMaterial({ color: 0xffe2b0, roughness: 0.4, emissive: new THREE.Color(1.0, 0.8, 0.55), emissiveIntensity: 0.45 }); break;
     case 'paint_yellow': m = new THREE.MeshStandardMaterial({ color: 0xd9a92a, roughness: 0.55 }); break;
     case 'paint_green': m = new THREE.MeshStandardMaterial({ color: 0x3f5f3a, roughness: 0.6 }); break;
     case 'art_mountains': m = texMat(id, paintLandscape(3, ['rgb(120,160,200)', 'rgb(200,215,225)'], ['rgb(110,120,140)', 'rgb(70,100,70)', 'rgb(90,120,60)']), 0.4, 0.6); break;

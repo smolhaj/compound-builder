@@ -5,7 +5,7 @@
  */
 export type MaterialId = 'lumber' | 'logs' | 'firewood' | 'fieldstone' | 'concrete' | 'roofing' | 'hardware' | 'wire' | 'seedlings' | 'container'
   | 'pipe' | 'cable' | 'fixtures' | 'pump' | 'drilling' | 'solar_panel' | 'battery' | 'inverter' | 'generator' | 'fuel' | 'tank' | 'septic_tank'
-  | 'rebar' | 'membrane' | 'excavator' | 'blast_door' | 'nbc_filter' | 'spoil';
+  | 'rebar' | 'membrane' | 'excavator' | 'blast_door' | 'nbc_filter' | 'spoil' | 'culvert' | 'egress_hatch';
 
 export interface MaterialDef {
   id: MaterialId;
@@ -45,6 +45,8 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   blast_door: { id: 'blast_door', name: 'Blast door', unit: 'steel blast door and frame', price: 3200 },
   nbc_filter: { id: 'nbc_filter', name: 'NBC air filter', unit: 'filtration unit, hand crank, blast valves', price: 5800 },
   spoil: { id: 'spoil', name: 'Spoil (dug earth)', unit: 'm³', price: null },
+  culvert: { id: 'culvert', name: 'Tunnel vault', unit: '6 m of poured arch: forms, rebar, concrete', price: 1100 },
+  egress_hatch: { id: 'egress_hatch', name: 'Egress hatch', unit: 'steel lid, collar, inside drop-bolts, ladder', price: 2400 },
 };
 
 export const MATERIAL_IDS = Object.keys(MATERIALS) as MaterialId[];
@@ -52,7 +54,7 @@ export const MATERIAL_IDS = Object.keys(MATERIALS) as MaterialId[];
 export type Stock = Record<MaterialId, number>;
 
 export function emptyStock(): Stock {
-  return { lumber: 0, logs: 0, firewood: 0, fieldstone: 0, concrete: 0, roofing: 0, hardware: 0, wire: 0, seedlings: 0, container: 0, pipe: 0, cable: 0, fixtures: 0, pump: 0, drilling: 0, solar_panel: 0, battery: 0, inverter: 0, generator: 0, fuel: 0, tank: 0, septic_tank: 0, rebar: 0, membrane: 0, excavator: 0, blast_door: 0, nbc_filter: 0, spoil: 0 };
+  return { lumber: 0, logs: 0, firewood: 0, fieldstone: 0, concrete: 0, roofing: 0, hardware: 0, wire: 0, seedlings: 0, container: 0, pipe: 0, cable: 0, fixtures: 0, pump: 0, drilling: 0, solar_panel: 0, battery: 0, inverter: 0, generator: 0, fuel: 0, tank: 0, septic_tank: 0, rebar: 0, membrane: 0, excavator: 0, blast_door: 0, nbc_filter: 0, spoil: 0, culvert: 0, egress_hatch: 0 };
 }
 
 /** Cost of a bill of materials at retail (unbuyable items count 0). */
