@@ -2,7 +2,7 @@ import { useState, type CSSProperties, type ReactNode } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { useWorldStore } from '../store/worldStore';
 import { newGame } from '../sim/state';
-import { generateFamily, fullName } from '../sim/family';
+import { fullName, HOUSEHOLD_NAME, variedFamily } from '../sim/family';
 import { DISASTERS, type Difficulty, type DisasterKind, type Mode, type PeaceLength } from '../sim/disaster';
 import { saveGame, AUTOSAVE } from '../sim/save/saveSystem';
 import { affordable, ANY_WISH, builtFacts, LIFESTYLE, listings, siteFacts, type Acres, type LandWish, type Lifestyle, type Site } from '../sim/site';
@@ -83,12 +83,13 @@ export function SetupScreen() {
   const [kind, setKind] = useState<DisasterKind>('grid_down');
   const [peace, setPeace] = useState<Exclude<PeaceLength, 'random'>>('medium');
   const [diff, setDiff] = useState<Difficulty>('standard');
-  const family = generateFamily(seed);
+  const [famRoll, setFamRoll] = useState(0);
+  const { kind: household, people: family } = variedFamily(seed, famRoll);
   let unlocked = false;
   try { unlocked = localStorage.getItem('cb.unlocked') === '1'; } catch { /* storage blocked */ }
   const start = () => {
     if (!lot) return;
-    const game = newGame(seed, 105, 2027, { site: lot, lifestyle: life, mode, peace: mode === 'scenario' ? peace : 'random', kind: mode === 'scenario' ? kind : null, dayJobs: LIFESTYLE[life].jobs, difficulty: diff, grid: true });
+    const game = newGame(seed, 105, 2027, { site: lot, lifestyle: life, mode, peace: mode === 'scenario' ? peace : 'random', kind: mode === 'scenario' ? kind : null, dayJobs: LIFESTYLE[life].jobs, difficulty: diff, grid: true, family });
     g.load(game);
     g.openSetup(false);
     void saveGame(AUTOSAVE, game);
@@ -167,12 +168,16 @@ export function SetupScreen() {
           </>}
 
           {step === 2 && <>
-            <H>The family</H>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '14px 0 8px' }}>
+              <span style={{ fontSize: 11.5, textTransform: 'uppercase', letterSpacing: 0.8, color: C.dim }}>The family · {HOUSEHOLD_NAME[household]}</span>
+              <button style={chip(false)} onClick={() => setFamRoll(famRoll + 1)} title="Another family">Reroll</button>
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 8 }}>
               {family.map(p => (
                 <div key={p.id} style={{ ...tile(false), cursor: 'default', padding: '8px 12px' }}>
                   <div style={{ fontWeight: 600 }}>{fullName(p)}, {p.age}</div>
-                  <div style={{ fontSize: 12, color: C.dim }}>{p.job ? `${p.job.title} · $${p.job.wage}/day` : 'kid'}</div>
+                  <div style={{ fontSize: 12, color: C.dim }}>{p.job && LIFESTYLE[life].jobs ? `${p.job.title} · $${p.job.wage}/day` : p.elder ? 'Grandparent, retired' : p.kid ? (p.age < 6 ? 'little one' : p.age < 13 ? 'kid' : 'teen') : 'at home'}</div>
+                  <div style={{ fontSize: 11.5, color: C.dim, marginTop: 2 }}>{(Object.entries(p.skills) as Array<[string, number]>).filter(([, v]) => v >= 4).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([k, v]) => `${k} ${v}`).join(' · ') || 'learning'}</div>
                 </div>
               ))}
             </div>
