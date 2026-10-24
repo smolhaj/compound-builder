@@ -28,6 +28,7 @@ import { emptyStats, type Ending, type RunStats } from './report';
 import { generateNeighbors, newGate, type GateState, type Neighbor } from './encounters';
 import { freshNeeds, type FoodReport, type Needs } from './needs';
 import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
+import type { BlackMarket } from './blackMarket';
 export const SAVE_VERSION = 30;
 
 /** Starting savings (GDS §1 peacetime money constraint). */
@@ -185,6 +186,8 @@ export interface GameState {
   wild: Wild;
   /** The long game: eras, the chronicle, milestones, the dynasty score. */
   lineage: Lineage;
+  /** The black market contact, deals and heat (lazily created by sim/blackMarket.ts; optional, no save bump). */
+  blackMarket?: BlackMarket;
   /** The households round the place. */
   neighbors: Neighbor[];
   /** Who comes to the gate: the pending encounter, the last result, humanity and tallies. */

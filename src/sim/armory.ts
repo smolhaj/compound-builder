@@ -56,6 +56,8 @@ export interface GunModel {
   assault?: boolean;
   /** A machine gun: NFA, pre-1986 registered, Form 4 and a tax stamp. */
   nfa?: boolean;
+  /** Black market only (sim/blackMarket.ts): illegal to own, never on the shop's shelves; price is street value for reference. */
+  contraband?: boolean;
 }
 export const GUNS: GunModel[] = [
   { id: 'ruger_1022', name: 'Ruger 10/22', type: 'rimfire', cal: '22lr', price: 300, capacity: 10, blurb: 'The classic .22 for rabbits, grouse and teaching the kids.' },
@@ -79,6 +81,8 @@ export const GUNS: GunModel[] = [
   { id: 'ak_nfa', name: 'AK-47 (registered, full auto)', type: 'auto_rifle', cal: '762x39', price: 28000, capacity: 30, look: 'ak', nfa: true, blurb: 'A pre-1986 registered select-fire AK: rock, paper, AK.' },
   { id: 'm16_nfa', name: 'Colt M16A1 (registered, full auto)', type: 'auto_rifle', cal: '556', price: 35000, capacity: 30, look: 'ar', nfa: true, blurb: 'A pre-1986 transferable Colt M16: the real thing, at collector prices.' },
   { id: 'mp5_nfa', name: 'H&K MP5 (registered, full auto)', type: 'smg', cal: '9mm', price: 45000, capacity: 30, look: 'smg', nfa: true, blurb: 'A transferable MP5 on a registered sear: the most wanted sub-gun there is.' },
+  { id: 'm4_contraband', name: 'M4-type carbine (unregistered, select-fire)', type: 'auto_rifle', cal: '556', price: 2500, capacity: 30, look: 'ar', contraband: true, blurb: 'Post-1986 select-fire: illegal for a civilian to own. Black market only.' },
+  { id: 'ak_contraband', name: 'AK-type rifle (unregistered, select-fire)', type: 'auto_rifle', cal: '762x39', price: 2000, capacity: 30, look: 'ak', contraband: true, blurb: 'A select-fire AK with no paperwork: illegal to own. Black market only.' },
   { id: 'mossberg_500', name: 'Mossberg 500', type: 'pump', cal: '12ga', price: 450, capacity: 5, blurb: 'Pump 12-gauge: birds, deer with slugs, the house at night.' },
   { id: 'rem_870', name: 'Remington 870 Fieldmaster', type: 'pump', cal: '12ga', price: 550, capacity: 4, blurb: 'The other classic pump 12-gauge.' },
   { id: 'glock_19', name: 'Glock 19', type: 'pistol', cal: '9mm', price: 550, capacity: 15, blurb: 'Compact 9mm pistol: simple, reliable, common.' },
@@ -135,6 +139,7 @@ export const ammoLimit = (s: GameState) => (gunPrices(s) > 1.3 ? 4 : Infinity);
 export function buyGun(s: GameState, model: string): string | null {
   const m = GUN[model];
   if (!m) return 'no such gun';
+  if (m.contraband) return 'no shop sells that';
   if (!shopOpen(s)) return 'the gun shop is closed';
   const ban = stateBan(s, m);
   if (ban) return ban;

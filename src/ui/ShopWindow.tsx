@@ -12,6 +12,7 @@ import {
   type Account, type MetalKind, type Where,
 } from '../sim/finance';
 import type { OrderLine } from '../sim/state';
+import { buyOffer, canTrade, findContact, heatNow, INTRO_CASH, lawless, offers, peekBm, priceOfOffer, risk } from '../sim/blackMarket';
 import { HARDEN_GOODS, KIT_GOODS, WATCH_GOODS } from '../sim/gear';
 import { ammoLimit, buyAmmo, buyGun, CALIBER, CALIBERS, CLASS_USD, GUN, GUN_GROUP, GUNS, groupOf, gunPrices, issue, NFA_STAMP, practice, shopOpen, skillOf, stateBan, takeClass, type Caliber, type GunGroup, type GunModel } from '../sim/armory';
 
@@ -264,7 +265,7 @@ function Guns({ onMsg }: { onMsg: (m: string | null) => void }) {
       <div style={{ fontWeight: 600, margin: '12px 0 4px' }}>{GUN_GROUP[grp]}</div>
       {grp === 'nfa' && <div style={{ fontSize: 11.5, color: C.dim, marginBottom: 6, lineHeight: 1.4 }}>Full auto. Only machine guns registered before May 1986 can be sold to a civilian, so they go at collector prices. Pay the dealer, send ATF Form 4 with fingerprints and a ${NFA_STAMP} tax stamp, and wait four to nine months. At the gate they hit harder and burn three times the ammo.</div>}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 8 }}>
-      {GUNS.filter(m => groupOf(m) === grp).map(m => { const ban = stateBan(game, m); return <div key={m.id} style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 10, display: 'flex', gap: 10, opacity: ban ? 0.55 : 1 }}>
+      {GUNS.filter(m => !m.contraband && groupOf(m) === grp).map(m => { const ban = stateBan(game, m); return <div key={m.id} style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 10, display: 'flex', gap: 10, opacity: ban ? 0.55 : 1 }}>
         <Icon id={icon(m)} />
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}><b>{m.name}</b><span style={{ color: C.gold }}>{usd(m.price * k)}</span></div>
@@ -311,5 +312,25 @@ function Guns({ onMsg }: { onMsg: (m: string | null) => void }) {
         <button style={btn()} title="100 rounds at the range" onClick={() => run(d => practice(d, p.id))}>Practice</button>
       </div>;
     })}
+    <BlackMarket onMsg={onMsg} />
+  </>;
+}
+
+function BlackMarket({ onMsg }: { onMsg: (m: string | null) => void }) {
+  const g = useGameStore(), game = g.game, b = peekBm(game), after = lawless(game);
+  const run = (op: Parameters<typeof g.money>[0]) => onMsg(g.money(op));
+  const pct = (x: number) => `${Math.round(x * 100)} %`;
+  return <>
+    <div style={{ fontWeight: 600, margin: '16px 0 4px' }}>Black market</div>
+    <div style={{ fontSize: 11.5, color: C.bad, marginBottom: 6, lineHeight: 1.4 }}>{after ? 'No law to speak of now: traders deal in gold and silver, and some of them cheat.' : 'Illegal: owning these is a federal felony. A sting means seizure, a heavy fine, lawyers and an investigation. Cash only, from the safe.'}</div>
+    {!after && !b.contact && <button style={btn(true)} onClick={() => run(d => findContact(d))}>Find a contact (${INTRO_CASH.toLocaleString('en-US')}+ cash on hand)</button>}
+    {!after && heatNow(game) > 0.1 && <div style={{ fontSize: 11.5, color: C.bad, margin: '4px 0' }}>Under investigation: any deal is far riskier.</div>}
+    {canTrade(game) && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 8, marginTop: 6 }}>
+      {offers(game).map(o => { const rk = risk(game, o); return <div key={o.id} style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 10 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}><b>{o.name}</b><span style={{ color: C.gold }}>{usd(priceOfOffer(game, o))}{after ? ' in metal' : ''}</span></div>
+        <div style={{ fontSize: 11.5, color: C.bad, margin: '3px 0 5px' }}>{after ? '' : `sting ${pct(rk.sting)} · `}scam {pct(rk.scam)}{b.cleanDeals ? ` · ${b.cleanDeals} clean deal${b.cleanDeals > 1 ? 's' : ''}` : ''}</div>
+        <button style={btn()} onClick={() => run(d => { const r = buyOffer(d, o.id); return typeof r === 'string' ? r : r.result === 'ok' ? null : r.result === 'scam' ? 'scammed: the money is gone' : `a sting: seized, fined $${(r.fine ?? 0).toLocaleString('en-US')}`; })}>Buy</button>
+      </div>; })}
+    </div>}
   </>;
 }
