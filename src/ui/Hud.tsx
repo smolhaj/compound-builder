@@ -29,6 +29,7 @@ import { DISASTERS, TRACKS, TRACK_NAME, type DisasterKind } from '../sim/disaste
 import { prices } from '../sim/economy';
 import { livingPerDay } from '../sim/engine';
 import { roman } from '../sim/eras';
+import { canRigMines, rigMines } from '../sim/battle';
 import { MILESTONE_COUNT, MILESTONE_NAME } from '../sim/lineage';
 import { daysOfFood, KCAL, needOf } from '../sim/needs';
 import { ANIMALS, feedDemand, winterHay } from '../sim/livestock';
@@ -606,6 +607,11 @@ export function Hud() {
                 ))}
               </Section>
             )}
+            {canRigMines(game) && <Section title="Mines">
+              <Row label="Rigged on the approaches" value={Math.floor(game.stock.mines ?? 0)} title="They go off as raiders cross the band outside the line" />
+              <button style={{ ...btn(), width: '100%' }} title="Four buried charges on pressure switches, from a hardware kit and a can of fuel" onClick={() => { const why = g.money(d => rigMines(d)); if (why) alert(why); }}>Rig 4 mines (1 hardware kit, 1 can of fuel)</button>
+              <Note tone="warn">Anyone can step on them: neighbors, people coming to the gate for help, your own kids.</Note>
+            </Section>}
             {(() => {
               const ex = exposure(game), o = game.opsec ?? { quietDeliveries: false, blackout: false };
               return <Section title="OPSEC">

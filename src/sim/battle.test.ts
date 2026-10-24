@@ -3,7 +3,7 @@ import { newGame, type GameState } from './state';
 import { planRun } from './perimeter';
 import { backgroundOf } from './family';
 import { skillOf } from './armory';
-import { applyBattle, canRigMines, planBattle, type PlannedBattle } from './battle';
+import { applyBattle, canRigMines, minesDay, planBattle, type PlannedBattle } from './battle';
 
 function afterHit(seed = 1): GameState {
   const g = newGame(seed, 105, 2027, { mode: 'scenario', peace: 'short', kind: 'grid_down' });
@@ -174,5 +174,24 @@ describe('the battle at the compound', () => {
     for (let k = 0; k < 500 && backgroundOf(p) !== 'military'; k++) p.id = `vet_${k}`;
     expect(backgroundOf(p)).toBe('military');
     expect(skillOf(g, p.id)).toBeGreaterThanOrEqual(Math.max(6, base > 6 ? base : 6));
+  });
+
+  it('buried mines are a standing risk: deer, strangers, your own', () => {
+    let blasts = 0, own = 0;
+    for (let seed = 1; seed <= 20; seed++) {
+      const g = afterHit(seed);
+      g.stock.mines = 16;
+      for (let d = 0; d < 365; d++) {
+        g.clock.t = d;
+        const lines = minesDay(g);
+        blasts += lines.length;
+        own += lines.filter(l => l.includes('stepped on')).length;
+      }
+    }
+    expect(blasts).toBeGreaterThan(20);           // about 4 a year with 16 down
+    expect(blasts).toBeLessThan(20 * 30);
+    expect(own).toBeGreaterThan(0);
+    const none = afterHit(1);
+    for (let d = 0; d < 365; d++) { none.clock.t = d; expect(minesDay(none)).toEqual([]); }
   });
 });
