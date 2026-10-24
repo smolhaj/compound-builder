@@ -101,6 +101,22 @@ export const FIELD: KitPieceDef = {
   maxSlope: 0.25, floorY: 0.0, porch: 0, sleeps: 0, light: null,
 };
 
+export const GREENHOUSE: KitPieceDef = {
+  id: 'greenhouse', name: 'Greenhouse', category: 'food',
+  blurb: '12 × 24 ft aluminum and polycarbonate greenhouse with benches of seedling trays: the garden six weeks earlier and later, greens all winter.',
+  cellsX: 2, cellsZ: 3, frontCells: 0,
+  parts: { foundation: 'concrete', walls: 'glass', roof: 'glass' },
+  maxSlope: 0.2, floorY: 0.0, porch: 0, sleeps: 0, light: null,
+};
+
+export const ORCHARD: KitPieceDef = {
+  id: 'orchard', name: 'Orchard', category: 'food',
+  blurb: 'Twelve apple, peach and pear trees on a grid. No fruit for three years; from the sixth, about 1,800 lb a year.',
+  cellsX: 5, cellsZ: 5, frontCells: 0,
+  parts: { foundation: 'fieldstone', walls: 'board_batten', roof: 'metal_roof' },
+  maxSlope: 0.35, floorY: 0.0, porch: 0, sleeps: 0, light: null,
+};
+
 export const LOG_HOUSE: KitPieceDef = {
   id: 'log_house', name: 'Log house', category: 'home',
   blurb: '9 × 15 m house of your own logs: great room with a glass gable and stone fireplace, bath, three bedrooms.',
@@ -169,9 +185,9 @@ export const BUNKER_KIT: KitPieceDef[] = [
 /** Underground menu order. */
 export const BUNKER_ORDER: readonly string[] = BUNKER_KIT.map(d => d.id);
 
-export const KIT: Record<string, KitPieceDef> = Object.fromEntries([TIMBER_CABIN, LOG_HOUSE, FARMHOUSE, TRAILER, BARN, OUTHOUSE, WORKSHOP, ROOT_CELLAR, CHICKEN_COOP, GARDEN, FIELD, ...UTILITY_KIT, ...BUNKER_KIT].map(d => [d.id, d]));
+export const KIT: Record<string, KitPieceDef> = Object.fromEntries([TIMBER_CABIN, LOG_HOUSE, FARMHOUSE, TRAILER, BARN, OUTHOUSE, WORKSHOP, ROOT_CELLAR, CHICKEN_COOP, GARDEN, FIELD, GREENHOUSE, ORCHARD, ...UTILITY_KIT, ...BUNKER_KIT].map(d => [d.id, d]));
 /** Build-menu order. */
-export const KIT_ORDER: readonly string[] = ['timber_cabin', 'log_house', 'outhouse', 'garden', 'field', 'chicken_coop', 'root_cellar', 'workshop', 'barn'];
+export const KIT_ORDER: readonly string[] = ['timber_cabin', 'log_house', 'outhouse', 'garden', 'greenhouse', 'orchard', 'field', 'chicken_coop', 'root_cellar', 'workshop', 'barn'];
 /** Water & power menu order. */
 export const UTILITY_ORDER: readonly string[] = ['well_hand', 'well_drilled', 'cistern', 'water_tower', 'septic', 'solar_array', 'battery_shed', 'generator_shed'];
 

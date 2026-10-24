@@ -49,7 +49,7 @@ export const UTILITY: Record<string, UtilityDef> = {
 };
 
 /** Daily power draw (kWh) of a wired building by kind, and water use (L/person/day) carried vs plumbed. */
-export const DRAW_KWH: Record<string, number> = { timber_cabin: 5, log_house: 8, farmhouse: 9, trailer: 6, barn: 1, workshop: 4, root_cellar: 0.2, chicken_coop: 0.3, outhouse: 0, garden: 0, field: 0 };
+export const DRAW_KWH: Record<string, number> = { timber_cabin: 5, log_house: 8, farmhouse: 9, trailer: 6, barn: 1, workshop: 4, root_cellar: 0.2, chicken_coop: 0.3, outhouse: 0, garden: 0, field: 0, greenhouse: 1, orchard: 0 };
 export const WATER_CARRIED = 25, WATER_PLUMBED = 130;
 /** Fitting jobs: hours and materials (per building). */
 export const FIT = {
@@ -67,7 +67,7 @@ export const GRID_USD_PER_KWH = 0.14, GRID_USD_PER_DAY = 0.9;
  * Who gets power first when there isn't enough (lower first): pumps, the
  * root cellar (freezer), homes, then the coop and the workshop.
  */
-export const LOAD_PRIORITY: Record<string, number> = { well_drilled: 0, root_cellar: 1, timber_cabin: 2, log_house: 2, farmhouse: 2, trailer: 2, barn: 4, chicken_coop: 3, workshop: 4 };
+export const LOAD_PRIORITY: Record<string, number> = { well_drilled: 0, root_cellar: 1, timber_cabin: 2, log_house: 2, farmhouse: 2, trailer: 2, barn: 4, chicken_coop: 3, greenhouse: 3, workshop: 4 };
 
 export interface Fitting { building: string; kind: 'plumb' | 'wire'; done: number; hours: number; supplied: boolean; finishedAt: number | null }
 
@@ -247,8 +247,8 @@ export function sunHours(doy: number): number {
 }
 
 /** Half-size (world units) a line must reach to touch a building, and its roof area (m²) for rain catchment, by kind. */
-export const NODE_R: Record<string, number> = { timber_cabin: 0.5, log_house: 0.75, farmhouse: 0.75, trailer: 0.6, barn: 1.0, workshop: 0.75, root_cellar: 0.4, chicken_coop: 0.4, garden: 0.7, field: 2.2, outhouse: 0.2, well_hand: 0.25, well_drilled: 0.3, cistern: 0.3, water_tower: 0.35, solar_array: 0.6, battery_shed: 0.3, generator_shed: 0.3, septic: 0.4 };
-export const ROOF_M2: Record<string, number> = { timber_cabin: 70, log_house: 160, farmhouse: 140, trailer: 90, barn: 220, workshop: 120, chicken_coop: 6, outhouse: 2, battery_shed: 8, generator_shed: 8, well_drilled: 6, well_hand: 3 };
+export const NODE_R: Record<string, number> = { timber_cabin: 0.5, log_house: 0.75, farmhouse: 0.75, trailer: 0.6, barn: 1.0, workshop: 0.75, root_cellar: 0.4, chicken_coop: 0.4, garden: 0.7, field: 2.2, greenhouse: 0.6, orchard: 1.3, outhouse: 0.2, well_hand: 0.25, well_drilled: 0.3, cistern: 0.3, water_tower: 0.35, solar_array: 0.6, battery_shed: 0.3, generator_shed: 0.3, septic: 0.4 };
+export const ROOF_M2: Record<string, number> = { timber_cabin: 70, log_house: 160, farmhouse: 140, trailer: 90, barn: 220, workshop: 120, chicken_coop: 6, greenhouse: 26, outhouse: 2, battery_shed: 8, generator_shed: 8, well_drilled: 6, well_hand: 3 };
 
 /** Rain and snowmelt (mm a day, averaged by month): wet spring, dry late summer. */
 export function rainMm(doy: number): number {

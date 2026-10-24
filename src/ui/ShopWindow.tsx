@@ -19,7 +19,7 @@ import { ammoLimit, buyAmmo, buyGun, CALIBER, CALIBERS, CLASS_USD, GUN, GUN_GROU
 type Tab = 'build' | 'bunker' | 'water' | 'food' | 'household' | 'fuel' | 'guns' | 'defense' | 'metals' | 'money';
 const TABS: Array<[Tab, string]> = [['build', 'Building'], ['bunker', 'Bunker'], ['water', 'Water & power'], ['food', 'Food'], ['household', 'Medical & household'], ['fuel', 'Fuel & tools'], ['guns', 'Guns & ammo'], ['defense', 'Kit & security'], ['metals', 'Gold & silver'], ['money', 'Money']];
 const SHELVES: Record<Exclude<Tab, 'metals' | 'money' | 'guns'>, MaterialId[]> = {
-  build: ['lumber', 'fieldstone', 'concrete', 'roofing', 'hardware', 'wire', 'seedlings'],
+  build: ['lumber', 'fieldstone', 'concrete', 'roofing', 'hardware', 'wire', 'seedlings', 'greenhouse_kit', 'fruit_trees'],
   bunker: ['rebar', 'membrane', 'container', 'blast_door', 'blast_valve', 'nbc_filter', 'filter_set', 'culvert', 'egress_hatch', 'lead_sheet', 'faraday_mesh'],
   water: ['water_jugs', 'ibc_tote', 'water_trailer', 'water_filter', 'ro_system', 'softener', 'greywater', 'pipe', 'cable', 'fixtures', 'pump', 'drilling', 'tank', 'septic_tank', 'solar_panel', 'battery', 'inverter', 'generator'],
   food: ['staples', 'canned', 'frozen', 'seed', 'lids', 'fishing_gear', 'snares', 'smoker', 'goat', 'pig', 'steer', 'rabbit', 'hay', 'feed'],
@@ -49,6 +49,8 @@ function Icon({ id }: { id: string }) {
     case 'roofing': return g(<>{[8, 16, 24, 32].map(x => <rect key={x} x={x} y="10" width="6" height="24" fill="#7a3428" stroke="#4a1a14" />)}</>);
     case 'hardware': return box('#5a6068', 'BOLTS');
     case 'wire': return g(<><circle cx="22" cy="22" r="11" fill="none" stroke="#a0a6aa" strokeWidth="3" /><circle cx="22" cy="22" r="6" fill="none" stroke="#a0a6aa" strokeWidth="2" /></>);
+    case 'greenhouse_kit': return g(<><path d="M8 34 V20 L22 10 L36 20 V34 Z" fill="#cfe4ea" fillOpacity="0.5" stroke="#9aa4aa" strokeWidth="2" /><path d="M22 10 V34 M8 24 H36" stroke="#9aa4aa" strokeWidth="1.5" /></>);
+    case 'fruit_trees': return g(<><rect x="20" y="24" width="4" height="12" fill="#6a4a2a" /><circle cx="22" cy="18" r="10" fill="#4f8a34" /><circle cx="17" cy="20" r="2.2" fill="#c0392b" /><circle cx="26" cy="15" r="2.2" fill="#c0392b" /></>);
     case 'seedlings': return g(<><rect x="12" y="26" width="20" height="10" fill="#6a4a2a" /><path d="M16 26 v-8 M22 26 v-12 M28 26 v-7" stroke="#5a9a3a" strokeWidth="2.5" /></>);
     case 'staples': return bag('#d8c8a0', 'RICE');
     case 'canned': return can('#b04a30');

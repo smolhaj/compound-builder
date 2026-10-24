@@ -119,7 +119,7 @@ function Item({ name, cost, sub, on, off, title, click }: { name: string; cost: 
 /** The build menu's groups (kit pieces by what they are for). */
 const BUILD_GROUPS: Array<[string, string, readonly string[]]> = [
   ['home', 'Home & work', ['timber_cabin', 'log_house', 'outhouse', 'workshop', 'barn']],
-  ['food', 'Food', ['garden', 'field', 'chicken_coop', 'root_cellar']],
+  ['food', 'Food', ['garden', 'greenhouse', 'orchard', 'field', 'chicken_coop', 'root_cellar']],
   ['water', 'Water & power', UTILITY_ORDER],
 ];
 
