@@ -90,6 +90,11 @@ export interface GameStore {
   trigger: (kind: DisasterKind, warnDays: number) => void;
   /** Whether the new-game screen is up. */
   setupOpen: boolean;
+  /** The shop & money window. */
+  shopOpen: boolean;
+  openShop: (open: boolean) => void;
+  /** Run a money operation on a draft (transfer, buy / sell / move metal); returns why not, or null. */
+  money: (op: (g: GameState) => string | null) => string | null;
   /** The setup screen offers "Back to my game" (opened from the New button, not at boot). */
   setupCanClose: boolean;
   openSetup: (open: boolean, canClose?: boolean) => void;
@@ -288,6 +293,14 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     set({ game: g });
   },
   setupOpen: false,
+  shopOpen: false,
+  openShop: (shopOpen) => set({ shopOpen }),
+  money: (op) => {
+    const g = structuredClone(get().game);
+    const why = op(g);
+    if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); }
+    return why;
+  },
   setupCanClose: false,
   openSetup: (setupOpen, setupCanClose = false) => set({ setupOpen, setupCanClose }),
 })));
