@@ -9,6 +9,7 @@
  */
 import { log } from './economy';
 import { addWork, blockedReason, blueprintOf, isFinished } from './construction';
+import { addFixWork, fixBlocked, fixHoursLeft, pendingFixes } from './improvements';
 import { dayIndex, hourOf, type GameState, type Structure } from './state';
 
 export const CREW_SIZE = 4;
@@ -30,7 +31,7 @@ export interface Crew {
 /** Person-hours left on a building. */
 export function hoursLeft(st: Structure): number {
   const stages = blueprintOf(st).stages;
-  let h = 0;
+  let h = fixHoursLeft(st);
   for (let i = st.stage; i < stages.length; i++) h += i === st.stage ? stages[i].hours - st.done : stages[i].hours;
   return Math.max(0, h);
 }
@@ -43,7 +44,7 @@ export function crewQuote(st: Structure): { usd: number; weeks: number } {
 
 /** Why no crew can be hired now (null = one can). */
 export function crewProblem(s: GameState, st: Structure): string | null {
-  if (isFinished(st)) return 'finished';
+  if (isFinished(st) && !pendingFixes(st).length) return 'finished';
   if ((s.crews ?? []).some(c => c.target === st.id)) return 'a crew is already on it';
   const t = s.disaster.tracks;
   if (t.banks < 0.5 || t.law < 0.5 || t.fuel < 0.3) return 'nobody is hiring out crews now';
@@ -74,14 +75,15 @@ export function crewStep(s: GameState, days: number): void {
   for (const c of [...s.crews]) {
     const st = s.structures.find(x => x.id === c.target);
     const gone = (why: string) => { dismissCrew(s, c.id); log(s, why); };
-    if (!st || isFinished(st)) { gone(`The crew finished${st ? ` the ${st.kind.replace('_', ' ')}` : ''} and went home ($${Math.round(c.paid).toLocaleString('en-US')} all told).`); continue; }
+    const fix = st && isFinished(st) ? pendingFixes(st).find(f => !fixBlocked(s, f)) ?? null : null;
+    if (!st || (isFinished(st) && !pendingFixes(st).length)) { gone(`The crew finished${st ? ` the ${st.kind.replace('_', ' ')}` : ''} and went home ($${Math.round(c.paid).toLocaleString('en-US')} all told).`); continue; }
     if (t.banks < 0.5 || t.law < 0.5 || t.fuel < 0.3) { gone('The crew stopped coming: nobody can pay them or get them here now.'); continue; }
     if (!weekday || h < CREW_HOURS[0] || h >= CREW_HOURS[1]) continue;
-    if (blockedReason(s, st)) continue;                    // waiting on materials: they work elsewhere that day
+    if (isFinished(st) ? !fix : blockedReason(s, st)) continue;   // waiting on materials: they work elsewhere that day
     const ph = CREW_SIZE * days * 24;
     const bill = ph * CREW_RATE;
     if (s.money < bill) { gone('The crew went home: there was no money to pay them.'); continue; }
-    const used = addWork(s, st, ph);
+    const used = fix ? addFixWork(s, st, fix, ph) : addWork(s, st, ph);
     s.money -= used * CREW_RATE;
     c.hours += used; c.paid += used * CREW_RATE;
   }

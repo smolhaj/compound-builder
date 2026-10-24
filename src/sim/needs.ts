@@ -11,6 +11,7 @@
  * health, and with it how much work people can do.
  */
 import { calendarOf, type GameState } from './state';
+import { isHome } from './blueprints';
 import { log } from './economy';
 import { isFinished } from './construction';
 import { climate } from './effects';
@@ -130,7 +131,7 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
   }
   const short = Math.max(0, need - ate);
   // putting up the harvest: fresh beyond five days' eating is canned in the home kitchen, two canner loads a day
-  const kitchen = fin.some(st => ['timber_cabin', 'log_house'].includes(st.kind));
+  const kitchen = fin.some(st => isHome(st.kind));
   const surplus = s.stock.fresh * KCAL.fresh - 5 * need;
   if (kitchen && surplus > KCAL.canned && s.stock.lids >= 1) {
     const cases = Math.min(Math.floor(surplus / KCAL.canned), CANNER_CASES, Math.floor(s.stock.lids));
@@ -142,8 +143,8 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
   // needs, person by person
   const cozy = s.disaster.difficulty === 'cozy';
   const variety = fromStores ? 3 : kinds.length + (grown > 500 ? 1 : 0);
-  const home = fin.some(st => ['timber_cabin', 'log_house'].includes(st.kind));
-  const dark = s.utilities.fittings.some(f => f.kind === 'wire' && f.finishedAt !== null) && !s.utilities.lit.some(id => ['timber_cabin', 'log_house'].includes(s.structures.find(x => x.id === id)?.kind ?? ''));
+  const home = fin.some(st => isHome(st.kind));
+  const dark = s.utilities.fittings.some(f => f.kind === 'wire' && f.finishedAt !== null) && !s.utilities.lit.some(id => isHome(s.structures.find(x => x.id === id)?.kind ?? ''));
   const medic = Math.max(...s.people.filter((p, i) => !p.kid && alive(s, i)).map(p => p.skills.medic), 0);
   const bay = fin.some(st => st.kind === 'bunker_medical');
   s.people.forEach((p, i) => {

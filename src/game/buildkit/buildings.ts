@@ -12,6 +12,7 @@ import { box, buildGabled, CUT_H, Parts, showStage, type BuildOpts, type Furnish
 import { Clutter } from './clutter';
 import { UTILITY_BUILDERS } from './utilityBuildings';
 import { BUNKER_BUILDERS } from './bunkerBuildings';
+import { OLD_BUILDERS } from './oldBuildings';
 
 /** Seats for evenings at home: local x, z and the point the sitter faces. */
 export type Seat = [number, number, number, number];
@@ -487,6 +488,7 @@ const BUILDERS: Record<string, (def: KitPieceDef, seed?: number, opts?: BuildOpt
   log_house: logHouse,
   ...UTILITY_BUILDERS,
   ...BUNKER_BUILDERS,
+  ...OLD_BUILDERS,
 };
 
 /** Every layer of a kit piece (construction shows them stage by stage). */

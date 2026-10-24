@@ -25,7 +25,7 @@ import { CELL, type KitPieceDef } from './buildkit/kit';
 import type { GameState } from '../sim/state';
 import type { WearSeason } from '../engine/world/people/crowdWear';
 import type { TourBuildingInfo } from '../engine/world/camera/TourController';
-import { footprint, KIT, rotQ, type Placed } from './buildkit/kit';
+import { footprint, KIT, placementProblem, rotQ, type Placed, type SiteQuery } from './buildkit/kit';
 import { showStage, CUTAWAY_HIDE, XRAY_LAYERS, type BuildLayer as CabinLayer, type BuildOpts } from './buildkit/shell';
 import { datums, doorsOf, DEPTH, isEntry, isUnderground, tunnelDoorsOf, tunnelStart, type Side } from './buildkit/underground';
 import { floorAt, tunnelPath, tunnelProblem, TUNNEL_PROBLEM_TEXT, VAULT_W, type PathSample } from './buildkit/tunnelPath';
@@ -135,7 +135,7 @@ export class HomesteadWorld {
   /** County road, driveway, gate and stockpile yard. */
   readonly access: Access;
   private readonly _roads = new THREE.Group();
-  readonly truck: DeliveryTruck;
+  truck: DeliveryTruck;
   private _stockpile: THREE.Group | null = null;
   private _stockKey = '';
   private readonly _seenOrders = new Set<string>();
@@ -179,7 +179,67 @@ export class HomesteadWorld {
     const zc = this.parcel.creek.zAt(this.center.x + 3);
     this._root.add(scaleFigure(this.center.x + 3, zc + 4, this.parcel.height(this.center.x + 3, zc + 4)));
     ws.scene.add(this._root);
-    this.truck = new DeliveryTruck(ws.scene, this.access.drive, this.groundAt);
+    this._drive = site.improvements?.drive ?? true;
+    this.truck = new DeliveryTruck(ws.scene, this._truckRoute(), this.groundAt);
+  }
+
+  /** A gravel drive in to the yard (else a two-track, and the truck stops at the gate). */
+  private _drive = true;
+  private _roadside: THREE.Group | null = null;
+  private _roadsideKey = '';
+  private _truckRoute(): Array<[number, number]> {
+    if (this._drive) return this.access.drive;
+    const inside = this.access.drive.filter(([x]) => x >= PARCEL_SIZE - 2.5);
+    return inside.length >= 2 ? inside : this.access.drive.slice(0, 3);
+  }
+
+  /** The drive went in (or the place has none yet): redraw it and send the truck the new way. */
+  setDrive(on: boolean): void {
+    if (on === this._drive) return;
+    this._drive = on;
+    this._buildRoads();
+    this.truck.dispose();
+    this.truck = new DeliveryTruck(this._ws.scene, this._truckRoute(), this.groundAt);
+  }
+
+  /**
+   * Spots for what came with the land (house, barn, well, septic): the house
+   * by the camp facing the drive, the rest round it on open, level ground
+   * that's the family's own and clear of the creek, the drive and each other.
+   */
+  siteImprovements(list: ReadonlyArray<{ id: string; kind: string }>, query: SiteQuery): Record<string, { x: number; z: number; rot: number }> {
+    const out: Record<string, { x: number; z: number; rot: number }> = {};
+    const placed: Placed[] = [...this._built.values()].map(b => b.placed);
+    const order = ['farmhouse', 'trailer', 'timber_cabin', 'log_house', 'well_drilled', 'septic', 'barn'];
+    const items = [...list].sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind));
+    let house: { x: number; z: number } | null = null;
+    for (const it of items) {
+      const real = KIT[it.kind];
+      if (!real) continue;
+      // a cell (3 m) of yard all round, so nothing is built hard against anything else
+      const def = { ...real, cellsX: real.cellsX + 2, cellsZ: real.cellsZ + 2 };
+      // the house beside the camp; the well and septic near the house; the barn a little way off
+      const c: { x: number; z: number } = house ?? { x: this.camp.x - 1.5, z: this.camp.z - 2.5 };
+      const [r0, r1]: [number, number] = it.kind === 'barn' ? [6, 16] : house ? [2.5, 8] : [0, 8];
+      let best: { x: number; z: number; rot: number } | null = null, bestD = Infinity;
+      for (let r: number = r0; r <= r1 && !best; r += 0.5) {
+        for (let a = 0; a < 24; a++) {
+          const th = a / 24 * Math.PI * 2;
+          const x: number = c.x + Math.cos(th) * r, z: number = c.z + Math.sin(th) * r;
+          for (const rot of [0, 1]) {
+            if (placementProblem(def, x, z, rot, query, placed)) continue;
+            // septic behind the house, away from the well
+            const d = it.kind === 'septic' && house ? -Math.hypot(x - c.x, z - c.z) * 0.1 + (z > c.z ? 2 : 0) : r;
+            if (d < bestD) { bestD = d; best = { x, z, rot }; }
+          }
+        }
+      }
+      if (!best) continue;
+      out[it.id] = best;
+      placed.push({ id: it.id, kind: it.kind, x: best.x, z: best.z, rot: best.rot });
+      if (!house && ['farmhouse', 'trailer', 'timber_cabin', 'log_house'].includes(it.kind)) house = best;
+    }
+    return out;
   }
 
   /** Is (x, z) on the county road or the driveway (plus `pad`)? */
@@ -196,7 +256,8 @@ export class HomesteadWorld {
     this._roads.clear();
     const mat = gravelMaterial();
     const road = new THREE.Mesh(buildRibbon(roadLine(1), ROAD_W, this.groundAt, 0.02, 6), mat);
-    const drive = new THREE.Mesh(buildRibbon(this.access.drive, DRIVE_W, this.groundAt, 0.024, 4), mat);
+    const track = this._drive ? mat : (() => { const m = mat.clone(); m.color = new THREE.Color(0x8a7a5c); return m; })();
+    const drive = new THREE.Mesh(buildRibbon(this.access.drive, this._drive ? DRIVE_W : DRIVE_W * 0.55, this.groundAt, this._drive ? 0.024 : 0.012, 4), track);
     for (const m of [road, drive]) { m.receiveShadow = true; this._roads.add(m); }
     const gate = buildGate(DRIVE_W);
     const { gate: gp } = this.access;
@@ -217,6 +278,21 @@ export class HomesteadWorld {
       if (this._clock > 0.5) this.truck.enqueue(o.lines);
     }
     this.truck.update(dt, speedK);
+    // deliveries left at the road (no drive yet), by the gate
+    const rs = emptyStock();
+    for (const r of game.roadside ?? []) for (const l of r.lines) rs[l.material] += l.qty * (1 - r.done / r.hours);
+    const rsKey = MATERIAL_IDS.map(m => Math.min(Math.ceil(rs[m]), 40)).join(',');
+    if (rsKey !== this._roadsideKey) {
+      this._roadsideKey = rsKey;
+      if (this._roadside) { this._root.remove(this._roadside); this._roadside.traverse(o => (o as THREE.Mesh).geometry?.dispose()); this._roadside = null; }
+      if (MATERIAL_IDS.some(m => rs[m] > 0)) {
+        for (const m of MATERIAL_IDS) rs[m] = Math.ceil(rs[m]);
+        const g = buildStockpile(rs), gp = this.access.gate;
+        g.position.set(gp.x - 1.2, this.groundAt(gp.x - 1.2, gp.z - 1.4), gp.z - 1.4);
+        this._roadside = g;
+        this._root.add(g);
+      }
+    }
     const pending = this.truck.onTruck(), shown = emptyStock();
     for (const m of MATERIAL_IDS) shown[m] = Math.max(0, game.stock[m] - pending[m]);
     const key = MATERIAL_IDS.map(m => Math.min(shown[m], 40)).join(',');

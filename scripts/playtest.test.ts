@@ -13,7 +13,9 @@ import { step } from '../src/sim/engine';
 import { placeOrder, orderProblem } from '../src/sim/economy';
 import { planStructure, planProblem, isFinished } from '../src/sim/construction';
 import { CLASSIC, listings, type Site } from '../src/sim/site';
-import { BLUEPRINTS } from '../src/sim/blueprints';
+import { BLUEPRINTS, isHome } from '../src/sim/blueprints';
+import { fixBill, fixBlocked, orderHookup, pendingFixes, placeImprovements } from '../src/sim/improvements';
+import { hireCrew, hoursLeft } from '../src/sim/crews';
 import { planRun } from '../src/sim/perimeter';
 import { orderFit, fitProblem, plant } from '../src/sim/utilities';
 import { orderHardenAll } from '../src/sim/hardening';
@@ -74,27 +76,40 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
   let s = newGame(seed, 105, 2027, { site: site === CLASSIC ? undefined : site, mode: 'scenario', peace, kind, dayJobs: true, grid: true });
   // the plans are drawn on the 40; squeeze them into the place actually bought
   const h = s.site.home, M = (x: number, z: number): [number, number] => [h.x0 + x / 67 * (h.x1 - h.x0), h.z0 + z / 67 * (h.z1 - h.z0)];
-  const C = M(30, 30);
+  let C = M(30, 30);
   const bugs: string[] = [];
+  // what came with the land: laid in beside the plans' cabin spot (the world would pick these)
+  const spots: Record<string, { x: number; z: number; rot: number }> = {};
+  s.structures.filter(x => x.unplaced).forEach((st, i) => { const [x, z] = M(44 + (i % 2) * 8, 44 + Math.floor(i / 2) * 8); spots[st.id] = { x, z, rot: 0 }; });
+  placeImprovements(s, spots);
+  const pre = s.structures.find(x => x.pre && isHome(x.kind));
+  if (pre) C = [pre.x, pre.z];
+  const has = (k: string) => s.structures.some(x => x.kind === k || (k === 'timber_cabin' && isHome(x.kind)) || (k === 'well_hand' && x.kind === 'well_drilled'));
+  // raw land: the line and the drive first thing
+  for (const what of ['drive', 'power'] as const) orderHookup(s, what);
   let planned = 0, moneyAtHit = 0, builtAtHit = 0, hitSeen = false;
   const maxDays = s.disaster.hitAt + 730;
   for (let day = 0; day < maxDays; day++) {
     // build: one new plan when there's money for it (keep a reserve)
     const plans = PLANS[strat];
+    while (planned < plans.length && ['timber_cabin', 'well_hand', 'well_drilled', 'septic'].includes(plans[planned][0]) && has(plans[planned][0])) planned++;
     if (planned < plans.length && s.money > 25000 && s.structures.filter(x => !isFinished(x)).length < 2) {
       const [k0, x0, z0] = plans[planned++];
       // too deep to dig by hand: drill it
       const k = planProblem(s, k0) && k0 === 'well_hand' ? 'well_drilled' : k0;
       const [x, z] = M(x0, z0);
-      planStructure(s, k, x, z, 0);
+      const st = planStructure(s, k, x, z, 0);
+      // money to spare: hire it out
+      if ((strat === 'prepper' || strat === 'fortress') && s.money > 150_000 && hoursLeft(st) > 300) hireCrew(s, st.id);
       if (k === 'solar_array' || k === 'battery_shed' || k === 'generator_shed') { const r = planRun(s, 'power_cable', [[x, z], C]); void r; }
       if (k === 'well_drilled' || k === 'cistern') planRun(s, 'water_pipe', [[x, z], C]);
     }
     if (strat === 'fortress' && day === 120) planRun(s, 'log_palisade', [M(15, 15), M(50, 15), M(50, 50), M(15, 50), M(15, 15)]);
     if (strat === 'prepper' && day === 600) for (const id of ['fallout', 'faraday', 'nbc'] as const) orderHardenAll(s, id, 1);
     if (day % 3 === 0 && s.clock.t < s.disaster.hitAt) orderNeeds(s, strat);
-    // wire and plumb the cabin once it can be
-    const cabin = s.structures.find(x => x.kind === 'timber_cabin' && isFinished(x));
+    // wire and plumb the house once it can be; order what its repairs need
+    const cabin = s.structures.find(x => isHome(x.kind) && isFinished(x));
+    if (cabin && day % 5 === 0) for (const f of pendingFixes(cabin)) if (fixBlocked(s, f) && !orderProblem(s, Object.entries(fixBill(f)).map(([material, qty]) => ({ material: material as MaterialId, qty: qty as number })))) { placeOrder(s, Object.entries(fixBill(f)).map(([material, qty]) => ({ material: material as MaterialId, qty: qty as number }))); break; }
     if (cabin && day % 10 === 0) { const p = plant(s); for (const k of ['wire', 'plumb'] as const) if (!fitProblem(s, p, cabin, k)) orderFit(s, cabin.id, k); }
     s = step(s, 1);
     if (process.env.TRACE && strat === process.env.TRACE && kind === process.env.KIND && day % 15 === 0 && s.clock.t >= s.disaster.hitAt) {
@@ -115,7 +130,7 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
   }
   const r = reportCard(s);
   const alive = s.personState.filter(ps => ps.needs.died == null).length;
-  return { site: `${s.site.acres} ac ${s.site.creek ? 'creek' : s.site.spring ? 'spring' : 'dry'} ${s.site.gwDepth} m $${Math.round(s.site.price / 1000)}k`, strat, kind, variant: s.disaster.variant, ending: s.ending?.kind ?? 'still going (2 yrs)', grade: r.grade, alive: `${alive}/${s.personState.length}`, hungry: s.stats.hungryDays, days: s.stats.days, moneyAtHit, builtAtHit, bugs: [...new Set(bugs)].slice(0, 5), lines: r.lines };
+  return { site: `${s.site.acres} ac ${s.site.creek ? 'creek' : s.site.spring ? 'spring' : 'dry'} ${s.site.gwDepth} m ${s.site.improvements.house ? s.site.improvements.house.kind + ' ' : 'raw '}$${Math.round(s.site.price / 1000)}k`, strat, kind, variant: s.disaster.variant, ending: s.ending?.kind ?? 'still going (2 yrs)', grade: r.grade, alive: `${alive}/${s.personState.length}`, hungry: s.stats.hungryDays, days: s.stats.days, moneyAtHit, builtAtHit, bugs: [...new Set(bugs)].slice(0, 5), lines: r.lines };
 }
 
 describe.skipIf(!process.env.PLAYTEST)('playtest', () => {

@@ -8,6 +8,7 @@
  * Pure.
  */
 import { isFinished } from './construction';
+import { isHome } from './blueprints';
 import { DISASTERS, TRACKS } from './disaster';
 import type { GameState } from './state';
 
@@ -53,7 +54,7 @@ export function tallyDay(s: GameState): Ending | null {
   st.kcalNeed += f.needKcal; st.kcalGrown += f.producedKcal;
   if (f.ateKcal < f.needKcal * 0.9) st.hungryDays++;
   if (s.utilities.report.shortL > 0) st.dryDays++;
-  const homes = s.structures.filter(x => isFinished(x) && ['timber_cabin', 'log_house'].includes(x.kind));
+  const homes = s.structures.filter(x => isFinished(x) && isHome(x.kind));
   if (homes.length && !homes.some(h => s.utilities.lit.includes(h.id))) st.darkDays++;
   st.wounds = Math.max(st.wounds, s.personState.reduce((a, ps) => a + ps.needs.hurt.length, 0));
   st.maxDose = Math.max(st.maxDose, ...s.personState.map(ps => ps.needs.dose));

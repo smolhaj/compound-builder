@@ -109,6 +109,29 @@ export const LOG_HOUSE: KitPieceDef = {
   maxSlope: 0.3, floorY: 0.1, porch: 0.45, sleeps: 6, light: [0, 0.34, 0],
 };
 
+/** What comes with improved land (sim/improvements.ts); the barn is also in the build menu. */
+export const FARMHOUSE: KitPieceDef = {
+  id: 'farmhouse', name: 'Old farmhouse', category: 'home',
+  blurb: 'A two-storey 9 × 12 m farmhouse from the last century: front porch, kitchen and parlor, bedrooms up, a basement.',
+  cellsX: 3, cellsZ: 4, frontCells: 1,
+  parts: { foundation: 'concrete', walls: 'timber_lap', roof: 'metal_roof' },
+  maxSlope: 0.3, floorY: 0.12, porch: 0.4, sleeps: 6, light: [0, 0.32, 0],
+};
+export const TRAILER: KitPieceDef = {
+  id: 'trailer', name: 'Manufactured home', category: 'home',
+  blurb: 'A 1990s manufactured home on piers: kitchen, living room, two bedrooms and a bath.',
+  cellsX: 2, cellsZ: 6, frontCells: 0,
+  parts: { foundation: 'concrete', walls: 'metal_siding', roof: 'metal_roof' },
+  maxSlope: 0.3, floorY: 0.13, porch: 0, sleeps: 4, light: [0, 0.3, 0],
+};
+export const BARN: KitPieceDef = {
+  id: 'barn', name: 'Barn', category: 'work',
+  blurb: '12 × 18 m board-and-batten barn: big doors at both ends, stalls for stock, a hay loft under a steep metal roof.',
+  cellsX: 4, cellsZ: 6, frontCells: 0,
+  parts: { foundation: 'fieldstone', walls: 'board_batten', roof: 'metal_roof' },
+  maxSlope: 0.25, floorY: 0.03, porch: 0, sleeps: 0, light: [0, 0.4, 0],
+};
+
 const DEEP = new Set(['well_hand', 'well_drilled', 'septic']);
 const util = (id: string, name: string, category: 'water' | 'power' | 'sanitation', cx: number, cz: number, blurb: string, light: [number, number, number] | null = null): KitPieceDef => ({
   id, name, category, blurb, cellsX: cx, cellsZ: cz, frontCells: 0, parts: { foundation: 'concrete', walls: 'board_batten', roof: 'metal_roof' }, maxSlope: 0.35, floorY: 0.02, porch: 0, sleeps: 0, light,
@@ -146,9 +169,9 @@ export const BUNKER_KIT: KitPieceDef[] = [
 /** Underground menu order. */
 export const BUNKER_ORDER: readonly string[] = BUNKER_KIT.map(d => d.id);
 
-export const KIT: Record<string, KitPieceDef> = Object.fromEntries([TIMBER_CABIN, LOG_HOUSE, OUTHOUSE, WORKSHOP, ROOT_CELLAR, CHICKEN_COOP, GARDEN, FIELD, ...UTILITY_KIT, ...BUNKER_KIT].map(d => [d.id, d]));
+export const KIT: Record<string, KitPieceDef> = Object.fromEntries([TIMBER_CABIN, LOG_HOUSE, FARMHOUSE, TRAILER, BARN, OUTHOUSE, WORKSHOP, ROOT_CELLAR, CHICKEN_COOP, GARDEN, FIELD, ...UTILITY_KIT, ...BUNKER_KIT].map(d => [d.id, d]));
 /** Build-menu order. */
-export const KIT_ORDER: readonly string[] = ['timber_cabin', 'log_house', 'outhouse', 'garden', 'field', 'chicken_coop', 'root_cellar', 'workshop'];
+export const KIT_ORDER: readonly string[] = ['timber_cabin', 'log_house', 'outhouse', 'garden', 'field', 'chicken_coop', 'root_cellar', 'workshop', 'barn'];
 /** Water & power menu order. */
 export const UTILITY_ORDER: readonly string[] = ['well_hand', 'well_drilled', 'cistern', 'water_tower', 'septic', 'solar_array', 'battery_shed', 'generator_shed'];
 

@@ -6,7 +6,8 @@
 import { LIFESTYLE } from './site';
 import { crewStep } from './crews';
 import { addWork, blockedReason, isFinished } from './construction';
-import { deliverOrders } from './economy';
+import { addCarryWork, deliverOrders } from './economy';
+import { addFixWork, nextFix, siteJobsDay } from './improvements';
 import { addFellWork, nextFellJob } from './forestry';
 import { burnFirewood } from './heating';
 import { addRunWork, nextRun } from './perimeter';
@@ -45,6 +46,9 @@ function subStep(s: GameState): void {
   const run = target ? null : nextRun(s);
   const fit = target || run ? null : nextFit(s);
   const harden = target || run || fit ? null : nextHardenJob(s);
+  const fix = target || run || fit || harden ? null : nextFix(s);
+  // deliveries at the road come in before anything else gets built
+  const carry = s.roadside?.length > 0;
   const job = nextFellJob(s);
   // with both building and felling to do, the family splits: every other person to the woods
   const weekday = dayIndex(s.clock.t) % 7 < 5;
@@ -61,13 +65,15 @@ function subStep(s: GameState): void {
       s.money += p.job.wage / 8 * SUBSTEP * 24;
       return;
     }
-    const task = taskFor(slot, target !== null || run !== null || fit !== null || harden !== null, job !== null, i % 2 === 1);
+    const task = taskFor(slot, carry || target !== null || run !== null || fit !== null || harden !== null || fix !== null, job !== null, i % 2 === 1);
     ps.task = task;
-    ps.target = task === 'build' ? (target?.id ?? run?.id ?? fit?.building ?? harden?.building ?? null) : task === 'forestry' && job ? job.id : null;
-    if (task === 'build' && target) addWork(s, target, SUBSTEP * 24 * rate);
+    ps.target = task === 'build' && !carry ? (target?.id ?? run?.id ?? fit?.building ?? harden?.building ?? fix?.st.id ?? null) : task === 'forestry' && job ? job.id : null;
+    if (task === 'build' && carry) addCarryWork(s, SUBSTEP * 24 * rate);
+    else if (task === 'build' && target) addWork(s, target, SUBSTEP * 24 * rate);
     else if (task === 'build' && run) addRunWork(s, run, SUBSTEP * 24 * rate);
     else if (task === 'build' && fit) addFitWork(s, fit, SUBSTEP * 24, p.skills.mechanic);
     else if (task === 'build' && harden) addHardenWork(s, harden, SUBSTEP * 24 * rate);
+    else if (task === 'build' && fix) addFixWork(s, fix.st, fix.f, SUBSTEP * 24 * rate);
     else if (task === 'forestry' && job) addFellWork(s, job, SUBSTEP * 24 * rate);
   });
   if (s.disaster.tracks.banks > 0.5 && s.disaster.tracks.stores > 0.5) s.money -= LIVING_PER_DAY * SUBSTEP;
@@ -84,6 +90,7 @@ function subStep(s: GameState): void {
       if (gossip) { s.disaster.news.push({ t: s.clock.t, text: gossip, tone: 1 }); log(s, gossip); }
     }
     landMarketDay(s, dayIndex(s.clock.t));
+    siteJobsDay(s);
     const e = gateDay(s);
     if (e) log(s, `${e.title}.`);
     if (before !== 'impact' && s.disaster.phase === 'impact' && s.disaster.kind === 'nuclear') for (const line of strike(s)) log(s, line);

@@ -15,17 +15,21 @@ import { newLand, type LandState } from './land';
 import { CLASSIC, LIFESTYLE, type Lifestyle, type Site } from './site';
 import { REGIONS } from './regions';
 import type { Crew } from './crews';
+import { improvementStructures, type Fix, type SiteJobs } from './improvements';
 import { emptyStats, type Ending, type RunStats } from './report';
 import { generateNeighbors, newGate, type GateState, type Neighbor } from './encounters';
 import { freshNeeds, type FoodReport, type Needs } from './needs';
 import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
-export const SAVE_VERSION = 18;
+export const SAVE_VERSION = 19;
 
 /** Starting savings (GDS §1 peacetime money constraint). */
 export const STARTING_MONEY = 30000;
 
 /** Ricks of firewood brought along (a couple of weeks of spring nights). */
 export const STARTING_FIREWOOD = 2;
+
+/** A delivery dropped at the road, and the person-hours to carry it in. */
+export interface Roadside { lines: OrderLine[]; hours: number; done: number }
 
 export type Speed = 0 | 1 | 2 | 3 | 4;
 /** Real seconds per in-game day at each speed (docs/DECISIONS.md: 1× = 60 s … 1.5 s). */
@@ -70,6 +74,11 @@ export interface Structure {
   finishedAt: number | null;
   /** Bunker hardening fitted (tier per upgrade; absent = none). */
   hardening?: Partial<Record<HardenId, Tier>>;
+  /** Came with the land (sim/improvements.ts); `unplaced` until the world finds it a spot. */
+  pre?: boolean;
+  unplaced?: boolean;
+  /** Repairs it needs (old roof, wiring, plumbing, septic field). */
+  fixes?: Fix[];
 }
 
 export type TaskKind = 'idle' | 'build' | 'forestry' | 'sleep' | 'chores' | 'school' | 'leisure' | 'job' | 'gone' | 'shelter';
@@ -143,6 +152,10 @@ export interface GameState {
   lifestyle: Lifestyle;
   /** Hired crews at work on the place. */
   crews: Crew[];
+  /** The co-op's line extension and the drive contractor, when due (null = not ordered). */
+  siteJobs: SiteJobs;
+  /** Deliveries left at the road (no drive yet): carried in by hand, oldest first. */
+  roadside: Roadside[];
   /** The households round the place. */
   neighbors: Neighbor[];
   /** Who comes to the gate: the pending encounter, the last result, humanity and tallies. */
@@ -165,14 +178,17 @@ export interface RunSetup { site?: Site; lifestyle?: Lifestyle; difficulty?: Dif
 
 export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: RunSetup = {}): GameState {
   const people = generateFamily(seed);
-  return {
+  const site = setup.site ?? CLASSIC;
+  const g: GameState = {
     version: SAVE_VERSION,
     seed,
     clock: { t: 0, ticks: 0, startDoy, startYear, speed: 1 },
     money: setup.site ? LIFESTYLE[setup.lifestyle ?? 'fulltime'].budget - setup.site.price : STARTING_MONEY,
     lifestyle: setup.lifestyle ?? 'fulltime',
     crews: [],
-    site: setup.site ?? CLASSIC,
+    siteJobs: { power: null, drive: null },
+    roadside: [],
+    site,
     stock: { ...emptyStock(), firewood: STARTING_FIREWOOD, canned: 2 },
     neighbors: generateNeighbors(seed),
     land: newLand(seed, generateNeighbors(seed).map(n => n.id), (setup.site ?? CLASSIC).home),
@@ -187,12 +203,14 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     forestry: { jobs: [], cleared: [] },
     heat: { burned: 0, warned: -1 },
     perimeter: [],
-    utilities: { ...emptyUtilities(), grid: setup.grid ?? false },
+    utilities: { ...emptyUtilities(), grid: (setup.grid ?? false) && site.improvements.power },
     hardenJobs: [],
     disaster: newDisaster(seed, setup.mode ?? 'sandbox', setup.peace ?? 'random', setup.kind ?? null, setup.variant, setup.difficulty ?? 'standard', REGIONS[(setup.site ?? CLASSIC).region].odds),
     log: [{ t: 0, text: `The ${people[0].last} family arrives on the land.` }],
     nextId: 1,
   };
+  g.structures.push(...improvementStructures(g));
+  return g;
 }
 
 /** Hour of day 0–24 (the clock starts at 06:00). */
