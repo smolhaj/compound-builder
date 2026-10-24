@@ -4,6 +4,7 @@
  * then); builders add person-hours at their work rate; when the stage's
  * hours are done the next one begins.
  */
+import { drillExtra, siteProblem } from './site';
 import { BLUEPRINTS } from './blueprints';
 import { hasAll, MATERIALS, shortfall, type MaterialId, type Stock } from './materials';
 import { log } from './economy';
@@ -18,6 +19,11 @@ export function isFinished(st: Structure): boolean {
 }
 
 /** Plan a structure at a placed spot (mutates the draft). */
+/** Why this piece can't be planned here (null = it can). */
+export function planProblem(s: GameState, kind: string): string | null {
+  return siteProblem(s.site, kind);
+}
+
 export function planStructure(s: GameState, kind: string, x: number, z: number, rot: number): Structure {
   const st: Structure = { id: `s${s.nextId++}`, kind, x, z, rot, stage: 0, done: 0, supplied: false, finishedAt: null };
   s.structures.push(st);
@@ -61,6 +67,11 @@ export function addWork(s: GameState, st: Structure, personHours: number): numbe
     left -= use;
     if (st.done >= stage.hours - 1e-9) {
       for (const [k, n] of Object.entries(stage.yields ?? {}) as Array<[keyof Stock, number]>) s.stock[k] += n;
+      // a deep well: the driller bills the meters past the usual bore
+      if (st.kind === 'well_drilled' && stage.id === 'foundation' && drillExtra(s.site) > 0) {
+        s.money -= drillExtra(s.site);
+        log(s, `The driller went to ${s.site.gwDepth} m for water: $${drillExtra(s.site).toLocaleString('en-US')} more for the extra footage.`);
+      }
       st.stage++;
       st.done = 0;
       st.supplied = false;

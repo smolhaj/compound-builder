@@ -43,6 +43,7 @@ import { hitsColliders, type Collider } from './buildkit/interior';
 import type { BuildingView } from '../store/worldStore';
 import type { Structure } from '../sim/state';
 import { calendarOf } from '../sim/state';
+import { REGIONS, seasons } from '../sim/regions';
 import { BLUEPRINTS } from '../sim/blueprints';
 import { SmokePlume } from '../engine/world/fx/SmokePlume';
 import type { Pad, Pit } from './parcel/parcelTerrain';
@@ -50,6 +51,7 @@ import { pitReach } from './parcel/parcelTerrain';
 import { SeasonController, climateFor, type SeasonMode } from '../engine/world/season/seasonState';
 import { writeSeasonUniforms } from '../engine/world/season/seasonShader';
 import { PARCEL_SIZE, ParcelTerrain } from './parcel/parcelTerrain';
+import { CLASSIC, type Site as LandSite } from '../sim/site';
 import { DRIVE_W, ROAD_W, distToLine, planAccess, roadLine, roadX, type Access } from './region/access';
 import { buildRibbon } from '../engine/world/roads/RoadRibbon';
 import { gravelMaterial } from '../engine/world/roads/roadTextures';
@@ -151,13 +153,17 @@ export class HomesteadWorld {
   private readonly _ws: WorldScene;
   private _quality: Quality | null = null;
 
-  constructor(ws: WorldScene, seed: number) {
+  /** The place the family bought (its rect on the survey grid). */
+  readonly home: { x0: number; z0: number; x1: number; z1: number };
+
+  constructor(ws: WorldScene, seed: number, site: LandSite = CLASSIC) {
     this._ws = ws;
     ws.setSite({ x0: 0, z0: 0, x1: PARCEL_SIZE, z1: PARCEL_SIZE });
-    this.parcel = new ParcelTerrain(seed);
+    this.home = { ...site.home };
+    this.parcel = new ParcelTerrain(seed, { creek: site.creek, timber: site.timber });
     this.farms = planNeighbors(this.parcel);
     this.camp = this._pickCamp();
-    this.access = planAccess(this.camp);
+    this.access = planAccess(this.camp, Math.max(4, this.home.z0 + 3), Math.min(PARCEL_SIZE - 4, this.home.z1 - 3));
     this.terrain = new TerrainRenderer(ws.scene);
     this.forest = new ForestRenderer(ws.scene);
     this.sage = new ShrubField(ws.scene, 'sagebrush', SAGE, 1);
@@ -368,7 +374,7 @@ export class HomesteadWorld {
     if (this._pins) { this._ws.scene.remove(this._pins); this._pins.traverse(o => { if (o instanceof THREE.Mesh) o.geometry.dispose(); }); }
     const g = new THREE.Group();
     const corners = new Set<string>();
-    for (const r of [{ x0: 0, z0: 0, x1: PARCEL_SIZE, z1: PARCEL_SIZE }, ...this._ownedLand]) for (const [x, z] of [[r.x0, r.z0], [r.x1, r.z0], [r.x0, r.z1], [r.x1, r.z1]]) corners.add(`${x},${z}`);
+    for (const r of [this.home, ...this._ownedLand]) for (const [x, z] of [[r.x0, r.z0], [r.x1, r.z0], [r.x0, r.z1], [r.x1, r.z1]]) corners.add(`${x},${z}`);
     const lath = new THREE.MeshStandardMaterial({ color: 0xd8c39a, roughness: 0.9 }), flag = new THREE.MeshStandardMaterial({ color: 0xff6a1a, roughness: 0.7, side: THREE.DoubleSide });
     for (const c of corners) {
       const [x, z] = c.split(',').map(Number);
@@ -686,25 +692,32 @@ export class HomesteadWorld {
    * nearest the middle of the parcel. Deterministic per seed.
    */
   private _pickCamp(): { x: number; z: number; rot: number } {
-    const p = this.parcel;
+    const p = this.parcel, h = this.home;
+    // inside the home forty part of the place (the 80's west forty is the back forty)
+    const x0 = Math.max(h.x0, 0) + 6, x1 = h.x1 - 6, z0 = h.z0 + 6, z1 = h.z1 - 6;
+    const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
     let best: { x: number; z: number; rot: number } | null = null, bestScore = Infinity;
-    for (let x = 8; x <= PARCEL_SIZE - 8; x += 1) {
-      for (let z = 8; z <= PARCEL_SIZE - 8; z += 1) {
-        const dc = Math.abs(z - p.creek.zAt(x));
-        if (dc < 5 || dc > 14) continue;
-        const s = p.natural(x, z);
-        if (s.forest > 0.05) continue;
-        const slope = Math.hypot(p.height(x + 1, z) - p.height(x - 1, z), p.height(x, z + 1) - p.height(x, z - 1)) / 2;
-        if (slope > 0.08) continue;
-        const score = Math.hypot(x - PARCEL_SIZE / 2, z - PARCEL_SIZE / 2) + slope * 40;
-        if (score < bestScore) {
-          bestScore = score;
-          // tent door toward the creek
-          best = { x, z, rot: Math.atan2(0, p.creek.zAt(x) - z) };
+    for (let pass = 0; pass < 2 && !best; pass++) {
+      for (let x = x0; x <= x1; x += 1) {
+        for (let z = z0; z <= z1; z += 1) {
+          const dc = Math.abs(z - p.creek.zAt(x));
+          // by the creek when it runs through (water), else anywhere open; the second pass takes whatever is level
+          if (p.creekHome && pass === 0 && (dc < 5 || dc > 14)) continue;
+          if (dc < 5) continue;
+          const s = p.natural(x, z);
+          if (s.forest > (pass === 0 ? 0.05 : 0.3)) continue;
+          const slope = Math.hypot(p.height(x + 1, z) - p.height(x - 1, z), p.height(x, z + 1) - p.height(x, z - 1)) / 2;
+          if (slope > (pass === 0 ? 0.08 : 0.16)) continue;
+          const score = Math.hypot(x - cx, z - cz) + slope * 40;
+          if (score < bestScore) {
+            bestScore = score;
+            // tent door toward the creek (or the road)
+            best = { x, z, rot: p.creekHome ? Math.atan2(0, p.creek.zAt(x) - z) : Math.PI / 2 };
+          }
         }
       }
     }
-    return best ?? { x: PARCEL_SIZE / 2, z: PARCEL_SIZE / 2, rot: 0 };
+    return best ?? { x: cx, z: cz, rot: 0 };
   }
 
   /** Is (x, z) on the camp (plus `pad`)? */
@@ -1069,7 +1082,7 @@ export class HomesteadWorld {
     const season = (seasonState.visual === 'winter' && !seasonState.climate.freeze ? 'fall' : seasonState.visual) as WearSeason;
     this.family.update(dt, game.people, game.personState, hour, game.clock.t, ctx, this.walkHeight, season, speedK);
     // crops stand in the ground from planting (mid-May) to the last of the harvest (late October); bare soil the rest of the year
-    const doy = calendarOf(game.clock).doy, growing = doy >= 135 && doy < 300;
+    const doy = calendarOf(game.clock).doy, [c0, c1] = seasons(REGIONS[game.site.region]).crops, growing = doy >= c0 && doy < c1;
     for (const b of this._built.values()) {
       if (b.placed.kind !== 'garden' && b.placed.kind !== 'field') continue;
       for (const o of b.group.children) {

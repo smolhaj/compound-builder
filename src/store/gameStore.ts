@@ -1,3 +1,4 @@
+import { planProblem } from '../sim/construction';
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { newGame, SECONDS_PER_DAY, dayIndex, type GameState, type OrderLine, type Speed } from '../sim/state';
@@ -101,6 +102,7 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     return ok;
   },
   plan: (kind, x, z, rot) => {
+    if (planProblem(get().game, kind)) return;
     const g = structuredClone(get().game);
     const st = planStructure(g, kind, x, z, rot);
     set({ game: g, selected: st.id });

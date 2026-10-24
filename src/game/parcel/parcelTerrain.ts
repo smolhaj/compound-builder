@@ -141,8 +141,15 @@ export class ParcelTerrain {
   private readonly _timberSide: number;
   private _pads: Pad[] = [];
 
-  constructor(seed: number) {
+  /** The creek runs through the home forty, or on a neighbor's land (about a quarter mile off). */
+  readonly creekHome: boolean;
+  private readonly _timber: number;
+
+  /** `creek`: through the place (default) or off it; `timber`: how much timber against the usual (1). */
+  constructor(seed: number, opts: { creek?: boolean; timber?: number } = {}) {
     this.seed = seed;
+    this.creekHome = opts.creek ?? true;
+    this._timber = opts.timber ?? 1;
     const rnd = mulberry32(seed ^ 0x9e3779b9);
     this._noise = createNoise2D(rnd);
     this.region = new RegionalField({ kind: 'mountain', cW: PARCEL_SIZE, cH: PARCEL_SIZE, townExt: 14 });
@@ -150,7 +157,9 @@ export class ParcelTerrain {
     this._benchSteps = rnd() < 0.5 ? 2 : 3;
     this._benchPhase = rnd() * 0.6;
     this._timberSide = rnd() < 0.5 ? -1 : 1;      // timber north (−z) or south (+z) of the creek
-    const z0 = PARCEL_SIZE * (0.35 + 0.3 * rnd());
+    const zIn = PARCEL_SIZE * (0.35 + 0.3 * rnd());
+    // off the place: through the north or the south forty
+    const z0 = this.creekHome ? zIn : rnd() < 0.5 ? PARCEL_SIZE * (1.45 + 0.15 * rnd()) : -PARCEL_SIZE * (0.45 + 0.15 * rnd());
     const a1 = 3 + 4 * rnd(), a2 = 1 + 2 * rnd(), p1 = rnd() * 6.28, p2 = rnd() * 6.28;
     const n = this._noise;
     this.creek = {
@@ -202,10 +211,11 @@ export class ParcelTerrain {
       }
     }
     // Cover: timber on the upper bench on one side of the creek; cottonwoods on the banks
-    const side = Math.sign(z - this.creek.zAt(x)) === this._timberSide ? 1 : 0;
+    // with the creek off the place, the timber runs in patches on the upper bench on either side
+    const side = !this.creekHome && Math.abs(z - this.creek.zAt(x)) > 20 ? 1 : Math.sign(z - this.creek.zAt(x)) === this._timberSide ? 1 : 0;
     const upper = sstep(this._benchAmp * 0.35, this._benchAmp * 0.6, this._bench(x, z));
     const patch = sstep(-0.45, 0.4, this._noise(x * 0.04 + 5, z * 0.04 - 2) + 0.35 * this._noise(x * 0.13 - 3, z * 0.13 + 8));
-    const timber = side * upper * patch * w;
+    const timber = Math.min(1, side * upper * patch * w * this._timber);
     const riparian = (1 - sstep(1.5, 6 + 3 * this._noise(x * 0.05, 3.3), dz)) * sstep(CREEK_HALF + 0.2, CREEK_HALF + 0.8, dz) * along
       * (0.55 + 0.45 * sstep(-0.3, 0.3, this._noise(x * 0.09 + 11, z * 0.09)));
     const forest = Math.max(r.forest * (1 - w), 0.92 * timber, 0.75 * riparian);

@@ -12,11 +12,13 @@ import { emptyUtilities, type Utilities } from './utilities';
 
 import type { HardenId, HardenJob, Tier } from './hardening';
 import { newLand, type LandState } from './land';
+import { CLASSIC, LIFESTYLE, type Lifestyle, type Site } from './site';
+import { REGIONS } from './regions';
 import { emptyStats, type Ending, type RunStats } from './report';
 import { generateNeighbors, newGate, type GateState, type Neighbor } from './encounters';
 import { freshNeeds, type FoodReport, type Needs } from './needs';
 import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
-export const SAVE_VERSION = 16;
+export const SAVE_VERSION = 17;
 
 /** Starting savings (GDS §1 peacetime money constraint). */
 export const STARTING_MONEY = 30000;
@@ -134,6 +136,10 @@ export interface GameState {
   hardenJobs: HardenJob[];
   /** The neighbor parcels on the survey grid (who owns them, for sale, what they are). */
   land: LandState;
+  /** The place itself: the listing the family bought (size, creek, groundwater, timber, soil). */
+  site: Site;
+  /** How the family lives in peacetime (budget, jobs, passive income). */
+  lifestyle: Lifestyle;
   /** The households round the place. */
   neighbors: Neighbor[];
   /** Who comes to the gate: the pending encounter, the last result, humanity and tallies. */
@@ -152,7 +158,7 @@ export interface GameState {
 }
 
 /** New-game choices (the setup screen). Defaults (tests, the dev scene): Free build, no day jobs. */
-export interface RunSetup { difficulty?: Difficulty; mode?: Mode; peace?: PeaceLength; kind?: DisasterKind | null; variant?: string; dayJobs?: boolean; grid?: boolean }
+export interface RunSetup { site?: Site; lifestyle?: Lifestyle; difficulty?: Difficulty; mode?: Mode; peace?: PeaceLength; kind?: DisasterKind | null; variant?: string; dayJobs?: boolean; grid?: boolean }
 
 export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: RunSetup = {}): GameState {
   const people = generateFamily(seed);
@@ -160,10 +166,12 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     version: SAVE_VERSION,
     seed,
     clock: { t: 0, ticks: 0, startDoy, startYear, speed: 1 },
-    money: STARTING_MONEY,
+    money: setup.site ? LIFESTYLE[setup.lifestyle ?? 'fulltime'].budget - setup.site.price : STARTING_MONEY,
+    lifestyle: setup.lifestyle ?? 'fulltime',
+    site: setup.site ?? CLASSIC,
     stock: { ...emptyStock(), firewood: STARTING_FIREWOOD, canned: 2 },
     neighbors: generateNeighbors(seed),
-    land: newLand(seed, generateNeighbors(seed).map(n => n.id)),
+    land: newLand(seed, generateNeighbors(seed).map(n => n.id), (setup.site ?? CLASSIC).home),
     gate: newGate(seed),
     stats: emptyStats(),
     ending: null,
@@ -177,7 +185,7 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     perimeter: [],
     utilities: { ...emptyUtilities(), grid: setup.grid ?? false },
     hardenJobs: [],
-    disaster: newDisaster(seed, setup.mode ?? 'sandbox', setup.peace ?? 'random', setup.kind ?? null, setup.variant, setup.difficulty ?? 'standard'),
+    disaster: newDisaster(seed, setup.mode ?? 'sandbox', setup.peace ?? 'random', setup.kind ?? null, setup.variant, setup.difficulty ?? 'standard', REGIONS[(setup.site ?? CLASSIC).region].odds),
     log: [{ t: 0, text: `The ${people[0].last} family arrives on the land.` }],
     nextId: 1,
   };

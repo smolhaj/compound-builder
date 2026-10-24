@@ -11,7 +11,8 @@ import { writeFileSync } from 'node:fs';
 import { newGame, type GameState } from '../src/sim/state';
 import { step } from '../src/sim/engine';
 import { placeOrder, orderProblem } from '../src/sim/economy';
-import { planStructure, isFinished } from '../src/sim/construction';
+import { planStructure, planProblem, isFinished } from '../src/sim/construction';
+import { CLASSIC, listings, type Site } from '../src/sim/site';
 import { BLUEPRINTS } from '../src/sim/blueprints';
 import { planRun } from '../src/sim/perimeter';
 import { orderFit, fitProblem, plant } from '../src/sim/utilities';
@@ -67,10 +68,13 @@ function orderNeeds(s: GameState, strat: Strategy): void {
   if (lines.length && !orderProblem(s, lines)) placeOrder(s, lines);
 }
 
-interface RunResult { strat: Strategy; kind: DisasterKind; variant: string; ending: string; grade: string; alive: string; hungry: number; days: number; moneyAtHit: number; builtAtHit: number; bugs: string[]; lines: string[] }
+interface RunResult { site: string; strat: Strategy; kind: DisasterKind; variant: string; ending: string; grade: string; alive: string; hungry: number; days: number; moneyAtHit: number; builtAtHit: number; bugs: string[]; lines: string[] }
 
-function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' | 'medium'): RunResult {
-  let s = newGame(seed, 105, 2027, { mode: 'scenario', peace, kind, dayJobs: true, grid: true });
+function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' | 'medium', site: Site = CLASSIC): RunResult {
+  let s = newGame(seed, 105, 2027, { site: site === CLASSIC ? undefined : site, mode: 'scenario', peace, kind, dayJobs: true, grid: true });
+  // the plans are drawn on the 40; squeeze them into the place actually bought
+  const h = s.site.home, M = (x: number, z: number): [number, number] => [h.x0 + x / 67 * (h.x1 - h.x0), h.z0 + z / 67 * (h.z1 - h.z0)];
+  const C = M(30, 30);
   const bugs: string[] = [];
   let planned = 0, moneyAtHit = 0, builtAtHit = 0, hitSeen = false;
   const maxDays = s.disaster.hitAt + 730;
@@ -78,12 +82,15 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
     // build: one new plan when there's money for it (keep a reserve)
     const plans = PLANS[strat];
     if (planned < plans.length && s.money > 25000 && s.structures.filter(x => !isFinished(x)).length < 2) {
-      const [k, x, z] = plans[planned++];
+      const [k0, x0, z0] = plans[planned++];
+      // too deep to dig by hand: drill it
+      const k = planProblem(s, k0) && k0 === 'well_hand' ? 'well_drilled' : k0;
+      const [x, z] = M(x0, z0);
       planStructure(s, k, x, z, 0);
-      if (k === 'solar_array' || k === 'battery_shed' || k === 'generator_shed') { const r = planRun(s, 'power_cable', [[x, z], [30, 30]]); void r; }
-      if (k === 'well_drilled' || k === 'cistern') planRun(s, 'water_pipe', [[x, z], [30, 30]]);
+      if (k === 'solar_array' || k === 'battery_shed' || k === 'generator_shed') { const r = planRun(s, 'power_cable', [[x, z], C]); void r; }
+      if (k === 'well_drilled' || k === 'cistern') planRun(s, 'water_pipe', [[x, z], C]);
     }
-    if (strat === 'fortress' && day === 120) planRun(s, 'log_palisade', [[15, 15], [50, 15], [50, 50], [15, 50], [15, 15]]);
+    if (strat === 'fortress' && day === 120) planRun(s, 'log_palisade', [M(15, 15), M(50, 15), M(50, 50), M(15, 50), M(15, 15)]);
     if (strat === 'prepper' && day === 600) for (const id of ['fallout', 'faraday', 'nbc'] as const) orderHardenAll(s, id, 1);
     if (day % 3 === 0 && s.clock.t < s.disaster.hitAt) orderNeeds(s, strat);
     // wire and plumb the cabin once it can be
@@ -108,7 +115,7 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
   }
   const r = reportCard(s);
   const alive = s.personState.filter(ps => ps.needs.died == null).length;
-  return { strat, kind, variant: s.disaster.variant, ending: s.ending?.kind ?? 'still going (2 yrs)', grade: r.grade, alive: `${alive}/${s.personState.length}`, hungry: s.stats.hungryDays, days: s.stats.days, moneyAtHit, builtAtHit, bugs: [...new Set(bugs)].slice(0, 5), lines: r.lines };
+  return { site: `${s.site.acres} ac ${s.site.creek ? 'creek' : s.site.spring ? 'spring' : 'dry'} ${s.site.gwDepth} m $${Math.round(s.site.price / 1000)}k`, strat, kind, variant: s.disaster.variant, ending: s.ending?.kind ?? 'still going (2 yrs)', grade: r.grade, alive: `${alive}/${s.personState.length}`, hungry: s.stats.hungryDays, days: s.stats.days, moneyAtHit, builtAtHit, bugs: [...new Set(bugs)].slice(0, 5), lines: r.lines };
 }
 
 describe.skipIf(!process.env.PLAYTEST)('playtest', () => {
@@ -117,9 +124,9 @@ describe.skipIf(!process.env.PLAYTEST)('playtest', () => {
     const strats: Strategy[] = ['idle', 'homestead', 'prepper', 'fortress'];
     const results: RunResult[] = [];
     let seed = 11;
-    for (const kind of kinds) for (const strat of strats) results.push(play(strat, kind, seed++, 'medium'));
-    const md = ['# Playtest report (scripted)', '', '| Disaster | Strategy | Variant | Ending | Grade | Alive | Hungry days | Days | $ at hit | Built at hit | Bugs |', '|---|---|---|---|---|---|---|---|---|---|---|',
-      ...results.map(r => `| ${r.kind} | ${r.strat} | ${r.variant} | ${r.ending} | ${r.grade} | ${r.alive} | ${r.hungry} | ${r.days} | ${r.moneyAtHit.toLocaleString('en-US')} | ${r.builtAtHit} | ${r.bugs.join('; ')} |`),
+    for (const kind of kinds) for (const strat of strats) { const site = listings(seed)[seed % 4]; results.push(play(strat, kind, seed++, 'medium', site)); }
+    const md = ['# Playtest report (scripted)', '', '| Site | Disaster | Strategy | Variant | Ending | Grade | Alive | Hungry days | Days | $ at hit | Built at hit | Bugs |', '|---|---|---|---|---|---|---|---|---|---|---|---|',
+      ...results.map(r => `| ${r.site} | ${r.kind} | ${r.strat} | ${r.variant} | ${r.ending} | ${r.grade} | ${r.alive} | ${r.hungry} | ${r.days} | ${r.moneyAtHit.toLocaleString('en-US')} | ${r.builtAtHit} | ${r.bugs.join('; ')} |`),
       '', '## Report card lines', '', ...results.map(r => `- **${r.kind} / ${r.strat}:** ${r.lines.join(' ')}`)];
     writeFileSync('playtest-report.md', md.join('\n'));
     expect(results.flatMap(r => r.bugs)).toEqual([]);

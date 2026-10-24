@@ -12,6 +12,8 @@
  * plumbed), rain into the cisterns. Batteries fade, pumps fail and need
  * repair. Shortages are logged. Pure (tested).
  */
+import { SPRING_LPD } from './site';
+import { REGIONS } from './regions';
 import { log } from './economy';
 import { calendarOf, dayIndex, type GameState, type Structure } from './state';
 import { isFinished } from './construction';
@@ -84,6 +86,8 @@ export interface Utilities {
   fried: string[];
   /** Yesterday the water came in buckets from the creek (the pump or the tank failed). */
   hauling?: boolean;
+  /** …and the creek is a quarter mile off, on a neighbor's land (a long haul). */
+  haulFar?: boolean;
   /** Buildings switched off at their breaker. */
   off: string[];
   /** Buildings that had power yesterday (lights on, fridge running). */
@@ -251,6 +255,7 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
   const u = s.utilities, doy = calendarOf(s.clock).doy;
   const townOpen = s.disaster.tracks.deliveries > 0.5 && s.disaster.tracks.banks > 0.5;
   u.hauling = false;
+  u.haulFar = false;
   const fin = s.structures.filter(isFinished);
   const kinds = new Map(fin.map(st => [st.id, st.kind]));
   // ── power: each network's own sources (solar → battery → grid → generator), loads served by priority ──
@@ -328,10 +333,12 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
     }
     if (def.store) store += def.store;
   }
+  // a spring on the place runs year round (less in a drought), carried in buckets unless pumped
+  if (s.site.spring) supply += SPRING_LPD * (s.disaster.kind === 'drought' && s.clock.t >= s.disaster.hitAt ? 0.4 : 1);
   // roofs on the water network with a cistern catch rain (gutters)
   let roof = 0;
   for (const st of fin) if (p.water.has(st.id) && p.nodes.some(o => p.water.get(o.id) === p.water.get(st.id) && UTILITY[o.kind]?.store)) roof += roofM2(kinds.get(st.id)!);
-  const rainL = roof * rainMm(doy) * 0.8;
+  const rainL = roof * rainMm(doy) * REGIONS[s.site.region].rainMm / 400 * 0.8;
   const people = s.people.length;
   const homePlumbed = fin.some(st => fitted(s, st.id, 'plumb') && (DRAW_KWH[st.kind] ?? 0) >= 5);
   const use = people * (homePlumbed ? WATER_PLUMBED : WATER_CARRIED) + (fin.some(st => st.kind === 'garden') && doy > 120 && doy < 270 ? 400 : 0) + (fin.some(st => st.kind === 'chicken_coop') ? 10 : 0);
@@ -346,7 +353,7 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
     // while the town works, what's short is bought (bottled water, the county water truck) instead of going without
     if (townOpen) { const cost = Math.round(-left * 0.03); s.money -= cost; if (cost > 30) log(s, `Bought ${Math.round(-left)} L of water in town ($${cost}).`); }
     // the pump's dead or the tank's dry: back to buckets from the creek (playtest: families died of thirst beside a running creek)
-    else if (!creekDry) { u.hauling = true; }
+    else if (!creekDry) { u.hauling = true; if (!s.site.creek) u.haulFar = true; }
     else { shortL = -left; log(s, `Water ran short by ${Math.round(shortL)} L.`); }
   }
   u.report = { solarKwh: solar, drawKwh: draw, genKwh: gen, shortKwh: short, batteryPct: capKwh > 0 ? u.batteryKwh / capKwh : 0, gridKwh, billUsd: bill, shed, waterL: supply + rainL, useL: use, shortL, storedL: u.storedL };

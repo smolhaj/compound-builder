@@ -206,6 +206,13 @@ export const DISASTERS: Partial<Record<DisasterKind, DisasterDef>> = {
 
 /** Grounded disasters a Surprise run may roll (the pulpy ones are unlockables: Scenario and Free build). */
 export const SURPRISE_POOL: DisasterKind[] = ['grid_down', 'nuclear', 'financial', 'lawless', 'drought', 'pandemic', 'solar_flare', 'wildfire', 'ash_winter', 'cyberattack'];
+/** The Surprise roll, weighted by how likely each disaster is in the region (1 = the usual). */
+export function surpriseKind(u: number, odds: Partial<Record<DisasterKind, number>> = {}): DisasterKind {
+  const w = SURPRISE_POOL.map(k => odds[k] ?? 1), tot = w.reduce((a, b) => a + b, 0);
+  let acc = 0;
+  for (let i = 0; i < w.length; i++) { acc += w[i] / tot; if (u < acc) return SURPRISE_POOL[i]; }
+  return SURPRISE_POOL[SURPRISE_POOL.length - 1];
+}
 
 export interface Chained { kind: DisasterKind; variant: string; hitAt: number; back: Partial<Record<Track, number>> }
 
@@ -255,9 +262,9 @@ function rollBack(def: DisasterDef, variant: string, r: () => number): Partial<R
 }
 
 /** Set up the disaster for a new run. */
-export function newDisaster(seed: number, mode: Mode, peace: PeaceLength = 'random', kind: DisasterKind | null = null, variant?: string, difficulty: Difficulty = 'standard'): DisasterState {
+export function newDisaster(seed: number, mode: Mode, peace: PeaceLength = 'random', kind: DisasterKind | null = null, variant?: string, difficulty: Difficulty = 'standard', odds: Partial<Record<DisasterKind, number>> = {}): DisasterState {
   const r = rng(seed * 7919 + 13);
-  const k: DisasterKind | null = mode === 'sandbox' ? null : kind ?? SURPRISE_POOL[Math.floor(r() * SURPRISE_POOL.length)];
+  const k: DisasterKind | null = mode === 'sandbox' ? null : kind ?? surpriseKind(r(), odds);
   const def = k ? DISASTERS[k] : undefined;
   const v = def ? (variant && def.variants.some(x => x.id === variant) ? variant : pick(def.variants, r()).id) : '';
   const len = mode === 'sandbox' ? NEVER : peace === 'random' || mode === 'surprise' ? Math.round(3 * 365 + r() * 3 * 365) : PEACE_DAYS[peace];

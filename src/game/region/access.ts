@@ -92,8 +92,8 @@ export function distToLine(pts: readonly Pt[], x: number, z: number): number {
  * to a yard beside the camp. `camp` is the camp center; the yard sits on its
  * road side.
  */
-export function planAccess(camp: { x: number; z: number }): Access {
-  const gz = Math.min(PARCEL_SIZE - 4, Math.max(4, camp.z + 1.5));
+export function planAccess(camp: { x: number; z: number }, zMin = 4, zMax = PARCEL_SIZE - 4): Access {
+  const gz = Math.min(zMax, Math.max(zMin, camp.z + 1.5));
   const rx = roadX(gz);
   const yard = { x: camp.x + 2.2, z: camp.z + 1.2 };
   const raw: Pt[] = [[rx - ROAD_W / 2, gz], [PARCEL_SIZE + 0.6, gz], [PARCEL_SIZE - 3, gz], [(PARCEL_SIZE - 3 + yard.x) / 2, (gz + yard.z) / 2], [yard.x + 0.6, yard.z]];
