@@ -29,7 +29,7 @@ interface U {
   wear: Wear; wound: number; dead: boolean; crouch: boolean; gone: boolean;
 }
 interface Tracer { ttl: number; a: THREE.Vector3; b: THREE.Vector3 }
-interface Puff { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; age: number; life: number; r0: number; r1: number; rise: number; o0: number }
+interface Puff { mesh: THREE.Sprite; mat: THREE.SpriteMaterial; age: number; life: number; r0: number; r1: number; rise: number; o0: number }
 interface Proj { mesh: THREE.Mesh; a: THREE.Vector3; b: THREE.Vector3; age: number; dur: number; arc: number; trail: boolean; lastPuff: number }
 interface Pending { at: number; ev: BattleEvent }
 
@@ -305,11 +305,26 @@ export class BattleRenderer {
     this._puff(p, 0.06, 0.16, 0.12, 0, 0xffe0a0, 1, true);
   }
 
+  /** A soft round blob (smoke, dust, fire): a canvas radial gradient, made once. */
+  private static _soft: THREE.CanvasTexture | null = null;
+  private static softTex(): THREE.CanvasTexture {
+    if (BattleRenderer._soft) return BattleRenderer._soft;
+    const c = document.createElement('canvas'); c.width = c.height = 64;
+    const g = c.getContext('2d')!, grd = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grd.addColorStop(0, 'rgba(255,255,255,1)'); grd.addColorStop(0.45, 'rgba(255,255,255,0.7)'); grd.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = grd; g.fillRect(0, 0, 64, 64);
+    // a little lumpiness so smoke isn't a perfect disc
+    for (let i = 0; i < 18; i++) { const a = i * 2.4, rr = 10 + (i * 7) % 12; g.fillStyle = 'rgba(0,0,0,0.06)'; g.beginPath(); g.arc(32 + Math.cos(a) * rr, 32 + Math.sin(a) * rr, 6, 0, Math.PI * 2); g.fill(); }
+    BattleRenderer._soft = new THREE.CanvasTexture(c);
+    BattleRenderer._soft.colorSpace = THREE.SRGBColorSpace;
+    return BattleRenderer._soft;
+  }
+
   private _puff(p: THREE.Vector3, r0: number, r1: number, life: number, rise: number, color: number, o0: number, glow = false): void {
     if (this._puffs.length >= MAX_PUFFS) { const old = this._puffs.shift()!; this._group.remove(old.mesh); old.mat.dispose(); }
-    const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: o0, depthWrite: false, toneMapped: !glow, blending: glow ? THREE.AdditiveBlending : THREE.NormalBlending });
-    const mesh = new THREE.Mesh(this._puffGeo, mat);
-    mesh.position.copy(p); mesh.scale.setScalar(r0);
+    const mat = new THREE.SpriteMaterial({ map: BattleRenderer.softTex(), color, transparent: true, opacity: o0, depthWrite: false, toneMapped: !glow, blending: glow ? THREE.AdditiveBlending : THREE.NormalBlending, rotation: Math.random() * Math.PI * 2 });
+    const mesh = new THREE.Sprite(mat);
+    mesh.position.copy(p); mesh.scale.setScalar(r0 * 2.4);
     mesh.userData = { noSSAO: true };
     this._group.add(mesh);
     this._puffs.push({ mesh, mat, age: 0, life, r0, r1, rise, o0 });
@@ -433,7 +448,7 @@ export class BattleRenderer {
       const f = p.age / p.life;
       if (f >= 1) { this._group.remove(p.mesh); p.mat.dispose(); this._puffs.splice(i, 1); continue; }
       const e = 1 - (1 - f) * (1 - f);
-      p.mesh.scale.setScalar(p.r0 + (p.r1 - p.r0) * e);
+      p.mesh.scale.setScalar((p.r0 + (p.r1 - p.r0) * e) * 2.4);
       p.mesh.position.y += p.rise * dt;
       p.mat.opacity = p.o0 * (1 - f);
     }

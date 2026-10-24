@@ -28,6 +28,7 @@ import { updateDisaster } from './disaster';
 import { liveDay, workFactor } from './needs';
 import { gateDay, neighborGossip } from './encounters';
 import { mutualAidDay } from './barter';
+import { minesDay } from './battle';
 import { falloutDay, isNuclear, SHELTER_DAYS, strike } from './nuclear';
 import { tallyDay } from './report';
 import { lineageDay } from './lineage';
@@ -117,6 +118,7 @@ function subStep(s: GameState): void {
     for (const line of radioDay(s)) log(s, line);
     for (const line of upkeepDay(s, demandNow(s), s.heat.warned !== dayIndex(s.clock.t) - 1 && s.heat.warned !== dayIndex(s.clock.t))) log(s, line);
     for (const line of mutualAidDay(s)) log(s, line);
+    for (const line of minesDay(s)) log(s, line);
     for (const line of weatherDay(s)) log(s, line);
     const e = gateDay(s);
     if (e) log(s, `${e.title}.`);

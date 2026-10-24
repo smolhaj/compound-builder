@@ -90,6 +90,33 @@ export function rigMines(s: GameState): string | null {
   return null;
 }
 
+/**
+ * Mines don't know who's walking: once a day, buried charges can go off under
+ * a deer, a stranger coming up the road for help, or one of your own (the
+ * kids most of all). The more there are, the likelier.
+ */
+export function minesDay(s: GameState): string[] {
+  const m = Math.floor(s.stock.mines ?? 0);
+  if (m <= 0) return [];
+  const day = Math.floor(s.clock.t + 0.25), r = mulberry32(s.seed * 7121 + day * 13 + 1);
+  if (r() >= 0.003 * Math.sqrt(m)) return [];
+  s.stock.mines = m - 1;
+  const u = r();
+  if (u < 0.6) return ['A mine went off in the night: a deer, by the look of it. Venison, at least.'];
+  if (u < 0.85) {
+    s.gate.humanity = Math.max(0, s.gate.humanity - 6);
+    return [r() < 0.5 ? 'A mine went off on the drive. A stranger, walking up for help. They didn\'t make it.' : 'A mine went off on the drive. A stranger, badly hurt, dragged themselves back to the road.'];
+  }
+  const living = s.people.map((p, i) => ({ p, i })).filter(({ i }) => s.personState[i]?.needs.died == null);
+  const kids = living.filter(({ p }) => p.kid);
+  const who = (kids.length && r() < 0.6 ? kids : living)[Math.floor(r() * (kids.length && r() < 0.6 ? kids : living).length)];
+  if (!who) return [];
+  const n = s.personState[who.i].needs;
+  n.hurt.push({ what: 'blast injuries from a mine', sev: 55 + Math.round(r() * 30), trauma: true });
+  n.health = Math.max(s.disaster.difficulty === 'cozy' ? 5 : 1, n.health - 40);
+  return [`${who.p.first} stepped on one of the mines. They're alive, badly hurt.`];
+}
+
 export function planBattle(s: GameState, raiders: number, seed: number, opts: BattleOptions = {}): PlannedBattle {
   const r = mulberry32(seed * 2654435 + 977);
   const hr = hourOf(s.clock.t), night = hr < 6 || hr >= 20;
