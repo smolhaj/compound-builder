@@ -1,7 +1,9 @@
 /**
  * Materials: what the family buys, stockpiles and builds with. Abstract
- * bulk units a pickup / flatbed load is counted in. Prices are 2020s rural
- * Mountain West retail (lumber yard / farm store), rounded.
+ * bulk units a pickup / flatbed load is counted in. Prices are 2025 rural
+ * retail (lumber yard, farm store, contractor quotes), rounded: a bundle of
+ * about 50 boards and sheets ~$650, ready-mix ~$190 a yard, a cased 200 ft
+ * well ~$11,000, a steel blast door ~$14,000.
  */
 export type MaterialId = 'lumber' | 'logs' | 'firewood' | 'fieldstone' | 'concrete' | 'roofing' | 'hardware' | 'wire' | 'seedlings' | 'container'
   | 'pipe' | 'cable' | 'fixtures' | 'pump' | 'drilling' | 'solar_panel' | 'battery' | 'inverter' | 'generator' | 'fuel' | 'tank' | 'septic_tank'
@@ -19,47 +21,47 @@ export interface MaterialDef {
 }
 
 export const MATERIALS: Record<MaterialId, MaterialDef> = {
-  lumber: { id: 'lumber', name: 'Lumber', unit: 'bundle (≈ 50 boards)', price: 250 },
+  lumber: { id: 'lumber', name: 'Lumber', unit: 'bundle (≈ 50 boards)', price: 650 },
   logs: { id: 'logs', name: 'Logs', unit: 'log', price: null },
   firewood: { id: 'firewood', name: 'Firewood', unit: 'rick (⅓ cord)', price: null },
-  fieldstone: { id: 'fieldstone', name: 'Fieldstone', unit: 'pallet', price: 120 },
-  concrete: { id: 'concrete', name: 'Concrete', unit: 'cubic yard (ready-mix)', price: 165 },
-  roofing: { id: 'roofing', name: 'Metal roofing', unit: 'bundle of sheets', price: 180 },
-  hardware: { id: 'hardware', name: 'Doors, windows & hardware', unit: 'kit', price: 400 },
-  wire: { id: 'wire', name: 'Fence wire', unit: 'roll (400 m barbed / 100 m woven)', price: 110 },
-  seedlings: { id: 'seedlings', name: 'Hedge whips', unit: 'bundle of 25 bare-root', price: 55 },
-  container: { id: 'container', name: 'Shipping container', unit: '40 ft used, delivered', price: 3800 },
-  pipe: { id: 'pipe', name: 'PEX pipe & fittings', unit: '30 m coil + fittings', price: 95 },
-  cable: { id: 'cable', name: 'Electrical cable', unit: '30 m direct-burial + conduit', price: 140 },
-  fixtures: { id: 'fixtures', name: 'Plumbing fixtures', unit: 'sink, shower, water heater, toilet set', price: 1650 },
-  pump: { id: 'pump', name: 'Well pump & pressure tank', unit: 'submersible pump kit', price: 1300 },
-  drilling: { id: 'drilling', name: 'Well drilling', unit: 'contractor, ~60 m bore', price: 9500 },
-  solar_panel: { id: 'solar_panel', name: 'Solar panels', unit: '400 W panel', price: 240 },
-  battery: { id: 'battery', name: 'Batteries', unit: '5 kWh LiFePO4 pack', price: 1700 },
-  inverter: { id: 'inverter', name: 'Inverter / charger', unit: '6 kW off-grid', price: 1900 },
-  generator: { id: 'generator', name: 'Generator', unit: '7 kW gas, electric start', price: 2600 },
-  fuel: { id: 'fuel', name: 'Fuel', unit: '20 L jerry can', price: 26 },
-  tank: { id: 'tank', name: 'Water tank', unit: '10,000 L poly tank', price: 2400 },
-  septic_tank: { id: 'septic_tank', name: 'Septic tank', unit: '4,000 L concrete tank + leach pipe', price: 2100 },
-  rebar: { id: 'rebar', name: 'Rebar', unit: 'bundle (20 × 6 m #4 bars, ties)', price: 110 },
-  membrane: { id: 'membrane', name: 'Waterproofing membrane', unit: 'roll (≈ 20 m²)', price: 340 },
-  excavator: { id: 'excavator', name: 'Excavator hire', unit: 'day (mini-excavator, delivered)', price: 520 },
-  blast_door: { id: 'blast_door', name: 'Blast door', unit: 'steel blast door and frame', price: 3200 },
-  nbc_filter: { id: 'nbc_filter', name: 'NBC air filter', unit: 'filtration unit, hand crank, blast valves', price: 5800 },
+  fieldstone: { id: 'fieldstone', name: 'Fieldstone', unit: 'pallet', price: 300 },
+  concrete: { id: 'concrete', name: 'Concrete', unit: 'cubic yard (ready-mix)', price: 190 },
+  roofing: { id: 'roofing', name: 'Metal roofing', unit: 'bundle of sheets', price: 450 },
+  hardware: { id: 'hardware', name: 'Doors, windows & hardware', unit: 'kit: a door or a couple of windows, hinges, locks, fasteners', price: 900 },
+  wire: { id: 'wire', name: 'Fence wire', unit: 'roll (400 m barbed / 100 m woven)', price: 140 },
+  seedlings: { id: 'seedlings', name: 'Hedge whips', unit: 'bundle of 25 bare-root', price: 75 },
+  container: { id: 'container', name: 'Shipping container', unit: '40 ft used, delivered', price: 4800 },
+  pipe: { id: 'pipe', name: 'PEX pipe & fittings', unit: '30 m coil + fittings', price: 150 },
+  cable: { id: 'cable', name: 'Electrical cable', unit: '30 m direct-burial + conduit', price: 380 },
+  fixtures: { id: 'fixtures', name: 'Plumbing fixtures', unit: 'sink, shower, water heater, toilet set', price: 2500 },
+  pump: { id: 'pump', name: 'Well pump & pressure tank', unit: 'submersible pump kit', price: 2000 },
+  drilling: { id: 'drilling', name: 'Well drilling', unit: 'contractor, ~60 m (200 ft) bore, cased', price: 11000 },
+  solar_panel: { id: 'solar_panel', name: 'Solar panels', unit: '400 W panel', price: 260 },
+  battery: { id: 'battery', name: 'Batteries', unit: '5 kWh LiFePO4 pack', price: 1900 },
+  inverter: { id: 'inverter', name: 'Inverter / charger', unit: '6 kW off-grid', price: 2400 },
+  generator: { id: 'generator', name: 'Generator', unit: '7 kW gas, electric start', price: 1300 },
+  fuel: { id: 'fuel', name: 'Fuel', unit: '20 L jerry can', price: 22 },
+  tank: { id: 'tank', name: 'Water tank', unit: '10,000 L poly tank', price: 3000 },
+  septic_tank: { id: 'septic_tank', name: 'Septic tank', unit: '4,000 L concrete tank + leach pipe', price: 2400 },
+  rebar: { id: 'rebar', name: 'Rebar', unit: 'bundle (20 × 6 m #4 bars, ties)', price: 240 },
+  membrane: { id: 'membrane', name: 'Waterproofing membrane', unit: 'roll (≈ 20 m²)', price: 400 },
+  excavator: { id: 'excavator', name: 'Excavator hire', unit: 'day (mini-excavator, delivered)', price: 650 },
+  blast_door: { id: 'blast_door', name: 'Blast door', unit: 'steel blast door and frame', price: 14000 },
+  nbc_filter: { id: 'nbc_filter', name: 'NBC air filter', unit: 'filtration unit, hand crank, blast valves', price: 9500 },
   spoil: { id: 'spoil', name: 'Spoil (dug earth)', unit: 'm³', price: null },
-  culvert: { id: 'culvert', name: 'Tunnel vault', unit: '6 m of poured arch: forms, rebar, concrete', price: 1100 },
-  egress_hatch: { id: 'egress_hatch', name: 'Egress hatch', unit: 'steel lid, collar, inside drop-bolts, ladder', price: 2400 },
-  lead_sheet: { id: 'lead_sheet', name: 'Lead sheet', unit: '1 × 2 m sheet, 6 mm (≈ 135 kg)', price: 620 },
-  faraday_mesh: { id: 'faraday_mesh', name: 'Faraday mesh', unit: 'roll of welded copper-clad mesh + bonding strap', price: 380 },
-  blast_valve: { id: 'blast_valve', name: 'Blast valve', unit: 'spring-loaded vent valve', price: 1450 },
+  culvert: { id: 'culvert', name: 'Tunnel vault', unit: '6 m of poured arch: forms, rebar, concrete', price: 3600 },
+  egress_hatch: { id: 'egress_hatch', name: 'Egress hatch', unit: 'steel lid, collar, inside drop-bolts, ladder', price: 4500 },
+  lead_sheet: { id: 'lead_sheet', name: 'Lead sheet', unit: '1 × 2 m sheet, 6 mm (≈ 135 kg)', price: 650 },
+  faraday_mesh: { id: 'faraday_mesh', name: 'Faraday mesh', unit: 'roll of welded copper-clad mesh + bonding strap', price: 420 },
+  blast_valve: { id: 'blast_valve', name: 'Blast valve', unit: 'spring-loaded vent valve', price: 2200 },
   fresh: { id: 'fresh', name: 'Fresh food', unit: 'basket (≈ 2,000 kcal: eggs, greens, roots)', price: null },
-  frozen: { id: 'frozen', name: 'Freezer meat', unit: '5 kg (≈ 10,000 kcal)', price: 65 },
-  canned: { id: 'canned', name: 'Canned food', unit: 'case of 12 (≈ 6,000 kcal)', price: 36 },
-  staples: { id: 'staples', name: 'Bulk staples', unit: 'rice, beans, flour, oil (≈ 80,000 kcal, 25 kg)', price: 120 },
-  meds: { id: 'meds', name: 'Medical supplies', unit: 'kit: dressings, antibiotics, painkillers', price: 150 },
-  seed: { id: 'seed', name: 'Field seed', unit: 'a season for a quarter acre: seed potatoes, dry beans, seed wheat', price: 180 },
+  frozen: { id: 'frozen', name: 'Freezer meat', unit: '5 kg (≈ 10,000 kcal)', price: 70 },
+  canned: { id: 'canned', name: 'Canned food', unit: 'case of 12 (≈ 6,000 kcal)', price: 38 },
+  staples: { id: 'staples', name: 'Bulk staples', unit: 'rice, beans, flour, oil (≈ 80,000 kcal, 25 kg)', price: 85 },
+  meds: { id: 'meds', name: 'Medical supplies', unit: 'kit: dressings, antibiotics, painkillers', price: 160 },
+  seed: { id: 'seed', name: 'Field seed', unit: 'a season for a quarter acre: seed potatoes, dry beans, seed wheat', price: 200 },
   lids: { id: 'lids', name: 'Canning lids', unit: 'sleeve of 12 lids (one case of quarts put up; the jars come back, the lids don\'t)', price: 6 },
-  filter_set: { id: 'filter_set', name: 'HEPA filter set', unit: 'HEPA cartridges + hand-crank blower', price: 900 },
+  filter_set: { id: 'filter_set', name: 'HEPA filter set', unit: 'HEPA cartridges + hand-crank blower', price: 1100 },
 };
 
 export const MATERIAL_IDS = Object.keys(MATERIALS) as MaterialId[];

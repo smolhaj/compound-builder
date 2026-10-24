@@ -14,11 +14,12 @@ import type { HardenId, HardenJob, Tier } from './hardening';
 import { newLand, type LandState } from './land';
 import { CLASSIC, LIFESTYLE, type Lifestyle, type Site } from './site';
 import { REGIONS } from './regions';
+import type { Crew } from './crews';
 import { emptyStats, type Ending, type RunStats } from './report';
 import { generateNeighbors, newGate, type GateState, type Neighbor } from './encounters';
 import { freshNeeds, type FoodReport, type Needs } from './needs';
 import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
-export const SAVE_VERSION = 17;
+export const SAVE_VERSION = 18;
 
 /** Starting savings (GDS §1 peacetime money constraint). */
 export const STARTING_MONEY = 30000;
@@ -140,6 +141,8 @@ export interface GameState {
   site: Site;
   /** How the family lives in peacetime (budget, jobs, passive income). */
   lifestyle: Lifestyle;
+  /** Hired crews at work on the place. */
+  crews: Crew[];
   /** The households round the place. */
   neighbors: Neighbor[];
   /** Who comes to the gate: the pending encounter, the last result, humanity and tallies. */
@@ -168,6 +171,7 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     clock: { t: 0, ticks: 0, startDoy, startYear, speed: 1 },
     money: setup.site ? LIFESTYLE[setup.lifestyle ?? 'fulltime'].budget - setup.site.price : STARTING_MONEY,
     lifestyle: setup.lifestyle ?? 'fulltime',
+    crews: [],
     site: setup.site ?? CLASSIC,
     stock: { ...emptyStock(), firewood: STARTING_FIREWOOD, canned: 2 },
     neighbors: generateNeighbors(seed),

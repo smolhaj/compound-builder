@@ -4,6 +4,7 @@
  * Systems mutate a draft; `step` returns a fresh state object.
  */
 import { LIFESTYLE } from './site';
+import { crewStep } from './crews';
 import { addWork, blockedReason, isFinished } from './construction';
 import { deliverOrders } from './economy';
 import { addFellWork, nextFellJob } from './forestry';
@@ -72,6 +73,7 @@ function subStep(s: GameState): void {
   if (s.disaster.tracks.banks > 0.5 && s.disaster.tracks.stores > 0.5) s.money -= LIVING_PER_DAY * SUBSTEP;
   // investment income comes in while the banks work
   if (s.disaster.tracks.banks > 0.5) s.money += LIFESTYLE[s.lifestyle].passive / 365 * SUBSTEP;
+  crewStep(s, SUBSTEP);
   burnFirewood(s, SUBSTEP);
   // the collapse clock, once a day: warning signs, the hit, the outside world's services
   if (dayIndex(s.clock.t) !== s.disaster.day) {
