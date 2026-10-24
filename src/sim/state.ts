@@ -4,6 +4,7 @@
  * Bump SAVE_VERSION and add a migration in save/migrations.ts whenever a
  * field changes (CLAUDE.md rule 5).
  */
+import type { RadioState } from './radio';
 import { emptyStock, type Stock, type MaterialId } from './materials';
 import { generateFamily, type Person } from './family';
 import type { StageId } from './blueprints';
@@ -184,6 +185,8 @@ export interface GameState {
   neighbors: Neighbor[];
   /** Who comes to the gate: the pending encounter, the last result, humanity and tallies. */
   gate: GateState;
+  /** Radio and rumors after the collapse (radio.ts); made on first use. */
+  radio?: RadioState;
   /** Tallies since the hit (the report card), and how the run ended (null while it goes on). */
   stats: RunStats;
   ending: Ending | null;
