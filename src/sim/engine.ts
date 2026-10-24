@@ -16,6 +16,7 @@ import { gateDay, neighborGossip } from './encounters';
 import { falloutDay, isNuclear, SHELTER_DAYS, strike } from './nuclear';
 import { tallyDay } from './report';
 import { landMarketDay } from './land';
+import { effectsDay } from './effects';
 import { mulberry32 } from './rng';
 import { log } from './economy';
 import { dayIndex } from './state';
@@ -82,6 +83,7 @@ function subStep(s: GameState): void {
     if (e) log(s, `${e.title}.`);
     if (before !== 'impact' && s.disaster.phase === 'impact' && s.disaster.kind === 'nuclear') for (const line of strike(s)) log(s, line);
     for (const line of falloutDay(s)) log(s, line);
+    for (const line of effectsDay(s)) log(s, line);
     if (before !== 'impact' && s.disaster.phase === 'impact') {
       for (const ps of s.personState) if (ps.employed) {
         ps.employed = false;

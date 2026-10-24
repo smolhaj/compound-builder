@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { GameState } from '../sim/state';
 import { MushroomCloud } from './fx/MushroomCloud';
-import { nuclearSky } from '../sim/nuclear';
+import { disasterSky } from '../sim/nuclear';
 import * as THREE from 'three';
 import { WorldScene } from '../engine/world/WorldScene';
 import { moonPhase, skyDarkness } from '../engine/world/sky/skyState';
@@ -121,6 +121,8 @@ export function GameCanvas() {
     if (!useGameStore.getState().game.land.surveyed) useGameStore.getState().survey(world.surveyLand(useGameStore.getState().game.land.parcels));
     world.setOwnedLand(ownedRects(useGameStore.getState().game));
     const unsub = [
+      // wildfire weather: measure the fuel round every building (what cleared ground there is decides what burns)
+      useGameStore.subscribe(s => s.game.disaster.phase, ph => { const g = useGameStore.getState().game; if (g.disaster.kind === 'wildfire' && ph === 'warning' && !g.disaster.fuel) useGameStore.getState().setFuel(world.fuelNear(g.structures)); }),
       useGameStore.subscribe(s => s.game.land, l => world.setOwnedLand(l.parcels.filter(p => p.owner === 'you').map(p => p.rect))),
       useWorldStore.subscribe(s => s.quality, applyLook),
       useWorldStore.subscribe(s => s.cameraMode, applyCameraMode),
@@ -186,7 +188,7 @@ export function GameCanvas() {
         snowBase: sp.snow, snowAllow: seasonState.weatherSnow, region: seasonState.climate.id,
       });
       // nuclear war: the flash, a mushroom cloud on the northern skyline, a sickly hazed sky, grey dust falling
-      const gs = useGameStore.getState().game, nk = nuclearSky(gs);
+      const gs = useGameStore.getState().game, nk = disasterSky(gs);
       if (gs.disaster.kind === 'nuclear' && gs.clock.t >= gs.disaster.hitAt && gs.disaster.variant !== 'exchange') {
         if (!mushroom) { // within the far plane, sized to the angle it would fill: ≈ 6° for the missile fields 100+ km off, ≈ 20° for the base
           mushroom = new MushroomCloud(PARCEL_SIZE * 0.3, -2250, gs.disaster.variant === 'nearby' ? 220 : 70); ws.scene.add(mushroom.group); }

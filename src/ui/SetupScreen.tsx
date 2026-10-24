@@ -26,6 +26,8 @@ export function SetupScreen() {
   const [jobs, setJobs] = useState(true);
   const [diff, setDiff] = useState<Difficulty>('standard');
   const family = generateFamily(seed);
+  let unlocked = false;
+  try { unlocked = localStorage.getItem('cb.unlocked') === '1'; } catch { /* storage blocked */ }
   const start = () => {
     const game = newGame(seed, 105, 2027, { mode, peace: mode === 'scenario' ? peace : 'random', kind: mode === 'scenario' ? kind : null, dayJobs: jobs, difficulty: diff, grid: true });
     g.load(game);
@@ -57,7 +59,7 @@ export function SetupScreen() {
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
             <span style={{ opacity: 0.7 }}>Disaster</span>
             <select value={kind} onChange={e => setKind(e.target.value as DisasterKind)}>
-              {(Object.keys(DISASTERS) as DisasterKind[]).filter(k => k !== 'lawless').map(k => <option key={k} value={k}>{DISASTERS[k]!.name}</option>)}
+              {(Object.keys(DISASTERS) as DisasterKind[]).map(k => <option key={k} value={k} disabled={DISASTERS[k]!.pulpy && !unlocked}>{DISASTERS[k]!.name}{DISASTERS[k]!.pulpy && !unlocked ? ' (finish a run to unlock)' : ''}</option>)}
             </select>
             <span style={{ opacity: 0.7 }}>Peacetime</span>
             {PEACE.map(([p, label]) => <button key={p} style={{ ...card(peace === p), flex: 'none', padding: '4px 10px' }} onClick={() => setPeace(p)}>{label}</button>)}

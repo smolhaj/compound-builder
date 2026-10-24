@@ -305,6 +305,17 @@ export class HomesteadWorld {
     return out;
   }
 
+  /** Wildfire: trees standing within ≈ 24 m of each building (defensible space is the ground you've cleared). */
+  fuelNear(list: ReadonlyArray<{ id: string; x: number; z: number }>): Record<string, number> {
+    const out: Record<string, number> = {};
+    for (const st of list) {
+      let n = 0;
+      for (const t of this.treeSpecs) if (Math.abs(t.x - st.x) < 4 && Math.abs(t.z - st.z) < 4 && Math.hypot(t.x - st.x, t.z - st.z) < 4) n++;
+      out[st.id] = n;
+    }
+    return out;
+  }
+
   private _pins: THREE.Group | null = null;
   /** Survey pins at the corners of the land you own: an iron pin in a cap, a lath with orange flagging. */
   private _buildCornerPins(): void {

@@ -9,6 +9,8 @@ export function ReportCard() {
   const e = g.game.ending;
   if (!e || e.continued) return null;
   const r = reportCard(g.game);
+  // finishing a run unlocks the pulpy scenarios (GDS: zombies, invasion … as unlockables)
+  try { localStorage.setItem('cb.unlocked', '1'); } catch { /* storage blocked: stays locked */ }
   const gradeColor = r.grade === 'A' ? '#2f6b2a' : r.grade === 'B' ? '#4f6b2a' : r.grade === 'C' ? '#7a6a20' : '#8a2f22';
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(10,12,9,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 11, padding: 16 }}>
