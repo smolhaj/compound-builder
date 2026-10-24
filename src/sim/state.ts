@@ -17,11 +17,12 @@ import { REGIONS } from './regions';
 import type { Crew } from './crews';
 import { improvementStructures, type Fix, type SiteJobs } from './improvements';
 import { CLOSING_COSTS, newPaper, type Paper } from './paperwork';
+import { newUpkeep, type Upkeep } from './upkeep';
 import { emptyStats, type Ending, type RunStats } from './report';
 import { generateNeighbors, newGate, type GateState, type Neighbor } from './encounters';
 import { freshNeeds, type FoodReport, type Needs } from './needs';
 import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
-export const SAVE_VERSION = 21;
+export const SAVE_VERSION = 22;
 
 /** Starting savings (GDS §1 peacetime money constraint). */
 export const STARTING_MONEY = 30000;
@@ -162,6 +163,8 @@ export interface GameState {
   roadside: Roadside[];
   /** Permits, property tax, insurance. */
   paper: Paper;
+  /** Seasoning firewood, creosote in the flue. */
+  upkeep: Upkeep;
   /** The households round the place. */
   neighbors: Neighbor[];
   /** Who comes to the gate: the pending encounter, the last result, humanity and tallies. */
@@ -195,6 +198,7 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     siteJobs: { power: null, drive: null },
     roadside: [],
     paper: newPaper(),
+    upkeep: newUpkeep(),
     site,
     stock: { ...emptyStock(), firewood: STARTING_FIREWOOD, canned: 2 },
     neighbors: generateNeighbors(seed),

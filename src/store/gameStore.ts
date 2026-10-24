@@ -2,6 +2,7 @@ import { planProblem } from '../sim/construction';
 import { dismissCrew, hireCrew } from '../sim/crews';
 import { orderHookup, placeImprovements } from '../sim/improvements';
 import { applyForPermit } from '../sim/paperwork';
+import { sweepChimney } from '../sim/upkeep';
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { newGame, SECONDS_PER_DAY, dayIndex, type GameState, type OrderLine, type Speed } from '../sim/state';
@@ -68,6 +69,8 @@ export interface GameStore {
   hookup: (what: 'power' | 'drive') => string | null;
   /** Paperwork switches: pull permits for new builds; keep the insurance. */
   setPaper: (k: 'permits' | 'insured', on: boolean) => void;
+  /** Sweep the chimney. */
+  sweep: () => void;
   /** After the report card: play on (endless). */
   playOn: () => void;
   /** Put a spare into an EMP-fried building. */
@@ -197,6 +200,11 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     // anything with no spot (no room for it) is dropped rather than left floating
     const lost = g.structures.filter(x => x.unplaced);
     if (lost.length) { g.structures = g.structures.filter(x => !x.unplaced); }
+    set({ game: g });
+  },
+  sweep: () => {
+    const g = structuredClone(get().game);
+    log(g, sweepChimney(g));
     set({ game: g });
   },
   setPaper: (k, on) => {

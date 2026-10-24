@@ -30,7 +30,8 @@ describe('forestry', () => {
     expect(g.forestry.jobs).toHaveLength(0);
     expect(g.forestry.cleared).toEqual([42]);
     expect(g.stock.logs - logs0).toBe(yieldOf('conifer', 1).logs);
-    expect(g.stock.firewood - wood0).toBe(1);
+    expect(g.stock.firewood - wood0).toBe(0);                       // green: it goes on the seasoning pile
+    expect(g.upkeep.green.reduce((a, x) => a + x.ricks, 0)).toBe(1);
     expect(markTree(g, pine, 20)).toBeNull();
   });
 

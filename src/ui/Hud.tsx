@@ -12,6 +12,7 @@ import { blockedReason, isFinished, planProblem, progress } from '../sim/constru
 import { drillExtra } from '../sim/site';
 import { REGIONS } from '../sim/regions';
 import { CREW_RATE, CREW_SIZE, crewProblem, crewQuote } from '../sim/crews';
+import { chimneyState, greenRicks, SEASON_DAYS, SWEEP_USD } from '../sim/upkeep';
 import { countyWorks, needsPermit, permitFee, premium, yearlyTax } from '../sim/paperwork';
 import { DRIVE_PER_FT, driveQuote, fixBill, fixBlocked, fixDef, hookupProblem, pendingFixes, POLE_PER_FT, powerQuote } from '../sim/improvements';
 import { BLUEPRINTS, totalBill, totalHours } from '../sim/blueprints';
@@ -426,7 +427,18 @@ export function Hud() {
 
           {rightTab === 'utilities' && (() => {
             const r = game.utilities.report, up = game.disaster.tracks.grid > 0.5;
+            const gr = greenRicks(game), next = game.upkeep.green.length ? Math.max(0, Math.ceil(SEASON_DAYS - (game.clock.t - Math.min(...game.upkeep.green.map(x => x.at))))) : 0;
+            const ch = chimneyState(game);
             return <>
+              <Section title="Heat">
+                <Row label="Firewood, seasoned" value={`${Math.floor(game.stock.firewood)} rick${Math.floor(game.stock.firewood) === 1 ? '' : 's'}`} />
+                {gr > 0 && <Row label="Green, seasoning" value={`${Math.round(gr * 10) / 10} ricks · next ready in ${next} days`} />}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                  <span style={{ color: DIM }}>Chimney: <span style={{ color: ch === 'dirty' ? TONE.bad : ch === 'building up' ? TONE.warn : TONE.good }}>{ch}</span></span>
+                  {ch !== 'clean' && <button style={btn(ch === 'dirty')} title="Creosote builds up with every rick burned (green wood three times as fast); a dirty flue can catch fire" onClick={() => g.sweep()}>{game.disaster.tracks.stores >= 0.5 && game.disaster.tracks.banks >= 0.5 ? `Sweep it ($${SWEEP_USD})` : 'Sweep it ourselves'}</button>}
+                </div>
+                {game.stock.firewood < 1 && gr >= 1.5 && <Note tone="warn">Burning green wood: half again as much, and the flue fouls fast.</Note>}
+              </Section>
               <Section title="Power (yesterday)">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, padding: '2px 0' }}>
                   <span style={{ color: DIM }}>County grid</span>
