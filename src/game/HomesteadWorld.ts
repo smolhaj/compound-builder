@@ -665,6 +665,9 @@ export class HomesteadWorld {
   private readonly _naturalH = (x: number, z: number) => this.parcel.natural(x, z).h;
 
   /** A bunker room's doorways (its neighbours) and the ground above its surface point. */
+  /** Hardening fitted per bunker room (from the sim), and its key. */
+  private readonly _harden = new Map<string, { key: string; tiers: NonNullable<Structure['hardening']> }>();
+
   private _underOpts(p: Placed, placed: readonly Placed[], datum: number): BuildOpts {
     const def = KIT[p.kind];
     // the surface point: the stairwell's top end, otherwise the middle
@@ -674,7 +677,8 @@ export class HomesteadWorld {
     const starts = this._runs.filter(r => r.kind === 'escape_tunnel').map(r => r.pts[0]);
     const tunnelDoors = tunnelDoorsOf(p, starts);
     const blast = Object.keys(tunnelDoors) as Side[];
-    return { doors: { ...doorsOf(p, placed), ...tunnelDoors }, depth: Math.round((ground - datum) * 1000) / 1000, ...(blast.length ? { blast } : {}) };
+    const harden = this._harden.get(p.id)?.tiers;
+    return { doors: { ...doorsOf(p, placed), ...tunnelDoors }, depth: Math.round((ground - datum) * 1000) / 1000, ...(blast.length ? { blast } : {}), ...(harden && Object.keys(harden).length ? { harden } : {}) };
   }
 
   /** New neighbours open new doorways: rebuild the bunker rooms whose doorways changed. */
@@ -797,6 +801,15 @@ export class HomesteadWorld {
 
   /** Show each structure at its construction stage (scaffold → frame → roof → siding). */
   syncProgress(list: readonly Structure[]): void {
+    // bunker hardening fitted: rebuild those rooms with their fittings
+    let hardened = false;
+    for (const st of list) {
+      const k = st.hardening ? JSON.stringify(st.hardening) : '';
+      if (k === (this._harden.get(st.id)?.key ?? '')) continue;
+      this._harden.set(st.id, { key: k, tiers: st.hardening ?? {} });
+      hardened = true;
+    }
+    if (hardened) this._syncUnderground();
     for (const st of list) {
       const b = this._built.get(st.id);
       if (!b) continue;

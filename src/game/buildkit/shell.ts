@@ -11,6 +11,7 @@
  * layer × material; faces carry world-scaled UVs (1 UV = 1 unit) so kit
  * textures keep their real size. Scale: 1 unit ≈ 6 m; door ≈ 0.36 (2.15 m).
  */
+import type { HardenId } from '../../sim/hardening';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { kitMaterial, type KitMaterialId } from './materials';
@@ -66,6 +67,8 @@ export interface BuildOpts {
   depth?: number;
   /** Doorways that take a blast door, barred from the room side (where an escape tunnel leaves). */
   blast?: Array<'front' | 'back' | 'left' | 'right'>;
+  /** Bunker hardening fitted (sim/hardening): what shows inside the room. */
+  harden?: Partial<Record<HardenId, 1 | 2 | 3>>;
 }
 
 /** Collects geometry per layer × material. */

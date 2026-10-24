@@ -12,6 +12,7 @@ import { blockedReason, isFinished, progress } from '../sim/construction';
 import { BLUEPRINTS, totalBill, totalHours } from '../sim/blueprints';
 import { BUNKER_ORDER, KIT, KIT_ORDER, UTILITY_ORDER } from '../game/buildkit/kit';
 import { FIT, fitProblem, plant, serviceOf, FUEL_UNIT_L } from '../sim/utilities';
+import { HARDEN, HARDEN_IDS, type TierDef, hardenCost, hardenProblem, isBunkerRoom, protectionOf, tierOf } from '../sim/hardening';
 import { PERIMETER, PERIMETER_ORDER, UTILITY_LINES, runBill, runHours, runFinished, runProgress, runBlocked, runGrowth } from '../sim/perimeter';
 
 const QUALITIES: Quality[] = ['high', 'medium', 'low'];
@@ -61,6 +62,11 @@ export function Hud() {
       if (i < st.stage || (i === st.stage && st.supplied)) return;
       for (const [k, n] of Object.entries(sg.materials) as Array<[MaterialId, number]>) need[k] = (need[k] ?? 0) + n;
     });
+  }
+  for (const j of game.hardenJobs) {
+    const st = game.structures.find(x => x.id === j.building);
+    if (j.finishedAt !== null || j.supplied || !st) continue;
+    for (const [k, n] of Object.entries(hardenCost(st.kind, j.upgrade, j.tier).materials) as Array<[MaterialId, number]>) need[k] = (need[k] ?? 0) + n;
   }
   for (const k of MATERIAL_IDS) need[k] = Math.max(0, (need[k] ?? 0) - game.stock[k] - (pending[k] ?? 0));
   const needLines = MATERIAL_IDS.filter(k => (need[k] ?? 0) > 0 && MATERIALS[k].price !== null).map(k => ({ material: k, qty: need[k]! }));
@@ -164,6 +170,30 @@ export function Hud() {
                 {game.utilities.broken.includes(sel.id) && <button style={{ ...btn(true), marginTop: 3 }} onClick={() => g.repairPump(sel.id)}>Repair the pump (1 hardware kit)</button>}
               </>;
             })()}
+          </Section>
+        )}
+        {sel && isBunkerRoom(sel.kind) && isFinished(sel) && (
+          <Section title="Hardening">
+            {(() => {
+              const p = protectionOf(sel);
+              return <div style={{ opacity: 0.8, marginBottom: 4 }}>PF {p.pf.toLocaleString('en-US')} · EMP {Math.round(p.empSurvive * 100)} % survive · air: {p.filter === 'none' ? 'unfiltered' : p.filter === 'dust' ? 'dust filtered' : p.filter === 'gas' ? 'gas-tight' : 'overpressure'} · {p.psi} psi</div>;
+            })()}
+            {HARDEN_IDS.map(id => {
+              const t = tierOf(sel, id), job = game.hardenJobs.find(j => j.building === sel.id && j.upgrade === id && j.finishedAt === null);
+              const next = t < 3 ? (HARDEN[id].tiers as readonly TierDef[])[t] : null, why = hardenProblem(game, sel, id);
+              const cost = next ? hardenCost(sel.kind, id, (t + 1) as 1 | 2 | 3) : null;
+              const buy = cost ? Object.entries(cost.materials).map(([material, qty]) => ({ material: material as MaterialId, qty: qty as number })) : [];
+              return <div key={id} style={{ marginTop: 4 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>
+                  <span>{HARDEN[id].name}</span>
+                  <span style={{ opacity: 0.75 }}>{t ? HARDEN[id].tiers[t - 1].name : 'none'}{job ? ` → ${HARDEN[id].tiers[job.tier - 1].name} ${Math.round((job.done / job.hours) * 100)} %` : ''}</span>
+                </div>
+                {next && !job && <div style={{ display: 'flex', gap: 4, marginTop: 2 }}>
+                  <button style={btn()} disabled={!!why} title={`${next.blurb} · ${cost!.hours} h`} onClick={() => g.harden(sel.id, id)}>{next.name} ~{usd(orderCost(buy))}</button>
+                  <button style={btn()} disabled={!!why} title="Order this tier for every room of the bunker" onClick={() => g.harden(sel.id, id, true)}>Whole bunker</button>
+                </div>}
+              </div>;
+            })}
           </Section>
         )}
         {game.perimeter.some(r => !runFinished(r) || runGrowth(r, game.clock.t) < 1) && (

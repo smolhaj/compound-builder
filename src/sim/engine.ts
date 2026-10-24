@@ -9,6 +9,7 @@ import { addFellWork, nextFellJob } from './forestry';
 import { burnFirewood } from './heating';
 import { addRunWork, nextRun } from './perimeter';
 import { addFitWork, balanceDay, nextFit, plant } from './utilities';
+import { addHardenWork, nextHardenJob } from './hardening';
 import { dayIndex } from './state';
 import { buildRate } from './family';
 import { routineAt, taskFor } from './schedule';
@@ -29,16 +30,18 @@ function subStep(s: GameState): void {
   const target = nextBuildTarget(s);
   const run = target ? null : nextRun(s);
   const fit = target || run ? null : nextFit(s);
+  const harden = target || run || fit ? null : nextHardenJob(s);
   const job = nextFellJob(s);
   // with both building and felling to do, the family splits: every other person to the woods
   s.people.forEach((p, i) => {
     const ps = s.personState.find(x => x.id === p.id)!;
-    const task = taskFor(routineAt(p, h), target !== null || run !== null || fit !== null, job !== null, i % 2 === 1);
+    const task = taskFor(routineAt(p, h), target !== null || run !== null || fit !== null || harden !== null, job !== null, i % 2 === 1);
     ps.task = task;
-    ps.target = task === 'build' ? (target?.id ?? run?.id ?? fit?.building ?? null) : task === 'forestry' && job ? job.id : null;
+    ps.target = task === 'build' ? (target?.id ?? run?.id ?? fit?.building ?? harden?.building ?? null) : task === 'forestry' && job ? job.id : null;
     if (task === 'build' && target) addWork(s, target, SUBSTEP * 24 * buildRate(p));
     else if (task === 'build' && run) addRunWork(s, run, SUBSTEP * 24 * buildRate(p));
     else if (task === 'build' && fit) addFitWork(s, fit, SUBSTEP * 24, p.skills.mechanic);
+    else if (task === 'build' && harden) addHardenWork(s, harden, SUBSTEP * 24 * buildRate(p));
     else if (task === 'forestry' && job) addFellWork(s, job, SUBSTEP * 24 * buildRate(p));
   });
   burnFirewood(s, SUBSTEP);

@@ -16,6 +16,14 @@
 - **Time:** real time with pause, a day/night cycle and seasons.
 - **Platform:** browser first, with a desktop wrapper later.
 - **Setting:** the contemporary USA, using real-feeling regions that reuse UE's regional terrain and house styles.
+- **Regions** (user: "other land types eventually"). Each region brings its own terrain, vegetation, climate, building styles, land prices and disaster odds. The MVP is the Mountain West; the planned regions are:
+  - Appalachia (steep hollows and ridges, hardwoods);
+  - the desert Southwest;
+  - thick virgin forest (Maine / northern Minnesota);
+  - the Great Plains (Kansas, Nebraska);
+  - the Pacific Northwest;
+  - the Upper Midwest;
+  - and more.
 - **Farming:** medium depth. Crops depend on season and soil. You can run an orchard, a greenhouse, chickens, goats, bees and a fishpond. Food has yields and spoils unless you preserve it (canning, smoking, the root cellar). Individual plants are not micro-managed.
 - **Camera:** a diorama builder camera, plus a walk/fly mode, plus a photo mode.
 - **Difficulty:** Cosy, Standard and Hardcore presets (Hardcore has permadeath, fewer warning signs and harsher raids), plus God Mode.
@@ -154,6 +162,22 @@ Each disaster is a ruleset: what breaks, what is scarce, and what threat cadence
 
     Rural areas lag cities by weeks.
 - **End of a run**: the region recovers, the compound reaches a self-sustaining equilibrium, or the family is lost; then the report card. Endless continue is optional.
+
+**Buying land** (decided with the user):
+- **Parcels:** the land round the compound is split into named neighbour parcels (the timber quarter, the creek bottom, the hay field, a neighbour's place), each with an owner and a price.
+- **Willingness to sell** depends on the owner's disposition. Owners who like you sell sooner and for less; owners you've annoyed hold out. Old farmers sell when they retire, and estates come up when someone dies.
+- **Prices** follow the land's character, at Mountain West per-acre rates:
+  - dry grazing is cheap;
+  - timber is in between;
+  - irrigated hay ground is dear;
+  - creek frontage and water rights carry a premium.
+
+  Prices spike during the warning-signs phase.
+- **What more land gives you:**
+  - stand-off distance (earlier warning, less visibility from the road);
+  - resources (timber, water rights, grazing, hay, hunting);
+  - zoning room (more buildings allowed, fewer complaints);
+  - escape-tunnel routes on your own land.
 
 **Bunker hardening** (user): fallout shielding (protection factor ~1000), Faraday cage / EMP shield, NBC air filtration (blast valve, HEPA + carbon, hand crank, overpressure) and blast hardening, each an upgrade that costs more. Radiation is a per-person dose (Sv) set by where each person is and that spot's shielding, with a radiation overlay.
 - Hardening is applied **per room**, with a "Harden whole bunker" shortcut. Each upgrade is a build job with its own stage, and existing rooms can be retrofitted.

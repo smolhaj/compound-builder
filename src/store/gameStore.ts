@@ -7,6 +7,7 @@ import { planStructure } from '../sim/construction';
 import { markTree, unmarkTree, isMarked, type TreeRef } from '../sim/forestry';
 import { planRun, type Gate, type PerimeterKind, type Pt } from '../sim/perimeter';
 import { fitProblem, orderFit, plant, repairPump } from '../sim/utilities';
+import { hardenProblem, orderHarden, orderHardenAll, tierOf, type HardenId } from '../sim/hardening';
 import { saveGame, AUTOSAVE } from '../sim/save/saveSystem';
 
 /** Game state (the simulation) + transient UI state for the build tool. */
@@ -30,6 +31,8 @@ export interface GameStore {
   planRun: (kind: PerimeterKind, pts: Pt[], gates: Gate[], offLen?: number) => void;
   /** Plumb or wire a building (a fitting job for the family). */
   fit: (buildingId: string, kind: 'plumb' | 'wire') => string | null;
+  /** Order the next tier of a hardening upgrade for one bunker room, or (all) for every room of the bunker up to that tier. */
+  harden: (buildingId: string, upgrade: HardenId, all?: boolean) => string | null;
   repairPump: (id: string) => boolean;
   /** Mark a tree to fell, or unmark it if it is marked and not yet cut. */
   toggleMark: (t: TreeRef, haulDist: number) => void;
@@ -82,6 +85,17 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     const why = fitProblem(g, plant(g), st, kind);
     if (why) return why;
     orderFit(g, id, kind);
+    set({ game: g });
+    return null;
+  },
+  harden: (id, upgrade, all = false) => {
+    const g = structuredClone(get().game);
+    const st = g.structures.find(x => x.id === id);
+    if (!st) return 'no such building';
+    const why = hardenProblem(g, st, upgrade);
+    if (why) return why;
+    if (all) orderHardenAll(g, upgrade, (tierOf(st, upgrade) + 1) as 1 | 2 | 3);
+    else orderHarden(g, st, upgrade);
     set({ game: g });
     return null;
   },
