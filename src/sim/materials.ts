@@ -12,7 +12,7 @@ export type MaterialId = 'lumber' | 'logs' | 'firewood' | 'fieldstone' | 'concre
   | 'fresh' | 'frozen' | 'canned' | 'staples' | 'meds' | 'seed' | 'lids' | 'plow' | 'stabilizer' | 'traps' | 'hygiene' | 'gun_safe' | 'gun_cleaning' | 'fishing_gear' | 'snares' | 'smoker' | 'goat' | 'pig' | 'steer' | 'rabbit' | 'hay' | 'feed' | 'water_jugs' | 'ibc_tote' | 'water_trailer' | 'water_filter' | 'ro_system' | 'softener' | 'greywater'
   | 'plate_carrier' | 'ifak' | 'nvg' | 'thermal' | 'radios' | 'cameras' | 'thermal_cam' | 'driveway_alarm' | 'floodlights' | 'tripwire' | 'dog' | 'steel_door' | 'window_bars' | 'sandbags' | 'safe_room' | 'sw_radio' | 'ham_rig' | 'helmet' | 'soft_armor'
   | 'grenades' | 'rpg_launcher' | 'rpg_rounds' | 'suppressor'
-  | 'mines';
+  | 'mines' | 'greenhouse_kit' | 'fruit_trees';
 
 export interface MaterialDef {
   id: MaterialId;
@@ -32,6 +32,8 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   roofing: { id: 'roofing', name: 'Metal roofing', unit: 'bundle of sheets', price: 450 },
   hardware: { id: 'hardware', name: 'Doors, windows & hardware', unit: 'kit: a door or a couple of windows, hinges, locks, fasteners', price: 900 },
   wire: { id: 'wire', name: 'Fence wire', unit: 'roll (400 m barbed / 100 m woven)', price: 140 },
+  greenhouse_kit: { id: 'greenhouse_kit', name: 'Greenhouse kit', unit: '12 × 24 ft aluminum-frame greenhouse, twin-wall polycarbonate, door, vents, benches', price: 4500 },
+  fruit_trees: { id: 'fruit_trees', name: 'Fruit trees', unit: 'a bare-root semi-dwarf apple, peach or pear tree', price: 40 },
   seedlings: { id: 'seedlings', name: 'Hedge whips', unit: 'bundle of 25 bare-root', price: 75 },
   container: { id: 'container', name: 'Shipping container', unit: '40 ft used, delivered', price: 4800 },
   pipe: { id: 'pipe', name: 'PEX pipe & fittings', unit: '30 m coil + fittings', price: 150 },

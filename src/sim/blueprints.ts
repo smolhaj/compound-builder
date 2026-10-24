@@ -93,6 +93,30 @@ export const GARDEN_BLUEPRINT: Blueprint = {
   ],
 };
 
+/** A 12 × 24 ft hobby greenhouse kit on a gravel bed and a concrete curb: ≈ 60 person-hours, ≈ $5,600 of materials. */
+export const GREENHOUSE_BLUEPRINT: Blueprint = {
+  kind: 'greenhouse',
+  stages: [
+    { id: 'site', name: 'Square and level the bed (long side to the south)', hours: 4, materials: {} },
+    { id: 'foundation', name: 'Gravel bed and a concrete curb, anchors set', hours: 16, materials: { concrete: 2, fieldstone: 1 } },
+    { id: 'frame', name: 'Bolt up the aluminum frame', hours: 18, materials: { greenhouse_kit: 1 } },
+    { id: 'roof', name: 'Ridge, rafters and roof panels', hours: 10, materials: {} },
+    { id: 'finish', name: 'Wall panels, door, vents and the benches', hours: 12, materials: { lumber: 1 } },
+  ],
+};
+
+/** Twelve bare-root fruit trees on a grid, staked and guarded: ≈ 30 person-hours, ≈ $620. */
+export const ORCHARD_BLUEPRINT: Blueprint = {
+  kind: 'orchard',
+  stages: [
+    { id: 'site', name: 'Stake the rows (4 m apart)', hours: 3, materials: {} },
+    { id: 'foundation', name: 'Strip the sod, dig the planting holes', hours: 12, materials: {} },
+    { id: 'frame', name: 'Plant the trees', hours: 8, materials: { fruit_trees: 12 } },
+    { id: 'roof', name: 'Stakes and trunk guards', hours: 4, materials: { wire: 1 } },
+    { id: 'finish', name: 'Mulch rings and the first watering', hours: 3, materials: {} },
+  ],
+};
+
 /** A quarter-acre field plot: potatoes, dry beans and wheat, plowed by a neighbor's tractor or by hand. */
 export const FIELD_BLUEPRINT: Blueprint = {
   kind: 'field',
@@ -232,7 +256,7 @@ export const BUNKER_BLUEPRINTS: Blueprint[] = [
 ];
 
 export const BLUEPRINTS: Record<string, Blueprint> = Object.fromEntries(
-  [CABIN_BLUEPRINT, OUTHOUSE_BLUEPRINT, WORKSHOP_BLUEPRINT, ROOT_CELLAR_BLUEPRINT, COOP_BLUEPRINT, GARDEN_BLUEPRINT, FIELD_BLUEPRINT, LOG_HOUSE_BLUEPRINT, FARMHOUSE_BLUEPRINT, TRAILER_BLUEPRINT, BARN_BLUEPRINT, COTTAGE_BLUEPRINT, METAL_GARAGE_BLUEPRINT, GARAGE_SOLAR_BLUEPRINT, ...UTILITY_BLUEPRINTS, ...BUNKER_BLUEPRINTS].map(b => [b.kind, b]));
+  [CABIN_BLUEPRINT, OUTHOUSE_BLUEPRINT, WORKSHOP_BLUEPRINT, ROOT_CELLAR_BLUEPRINT, COOP_BLUEPRINT, GARDEN_BLUEPRINT, FIELD_BLUEPRINT, GREENHOUSE_BLUEPRINT, ORCHARD_BLUEPRINT, LOG_HOUSE_BLUEPRINT, FARMHOUSE_BLUEPRINT, TRAILER_BLUEPRINT, BARN_BLUEPRINT, COTTAGE_BLUEPRINT, METAL_GARAGE_BLUEPRINT, GARAGE_SOLAR_BLUEPRINT, ...UTILITY_BLUEPRINTS, ...BUNKER_BLUEPRINTS].map(b => [b.kind, b]));
 
 /** Total bill of materials for a blueprint. */
 export function totalBill(bp: Blueprint): Partial<Stock> {

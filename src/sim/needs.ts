@@ -20,6 +20,7 @@ import { climate } from './effects';
 import { tractorBoost } from './vehicles';
 import { SOIL_YIELD } from './site';
 import { REGIONS, seasons } from './regions';
+import { gardenSeason, GREENHOUSE_PEAK, greenhouseGreens, hasGreenhouse, orchardHarvest } from './greenhouse';
 
 export type FoodId = 'fresh' | 'frozen' | 'canned' | 'staples';
 /** Food is kept in the stockpile in these units; kcal in one unit. */
@@ -76,11 +77,14 @@ export function produce(s: GameState): number {
   const eggs = coops * 70 * (5.5 + 2.5 * Math.cos(2 * Math.PI * (doy - 172) / 365));
   // a kitchen garden: nothing until mid-June, a peak of ≈ 2,500 kcal a day in August–September, done by late October
   // nothing until three weeks past the last frost, full by mid-summer, done a month past the first frost
-  const [g0, g1] = seasons(REGIONS[s.site.region]).garden;
+  // a finished greenhouse starts the garden six weeks earlier, runs it six weeks later and raises the peak (greenhouse.ts)
+  const [g0, g1] = gardenSeason(s);
   const season = doy < g0 || doy > g1 ? 0 : doy < g0 + 45 ? (doy - g0) / 45 : doy < g1 - 35 ? 1 : (g1 - doy) / 35;
   const skill = Math.max(...s.people.map(p => p.skills.gardener), 0);
-  const veg = gardens * 2500 * season * (0.6 + 0.08 * skill) * SOIL_YIELD[s.site.soil];
-  return Math.max(0, eggs) * Math.max(0.5, climate(s).grow) + veg * climate(s).grow + fieldHarvest(s);
+  const veg = gardens * 2500 * season * (0.6 + 0.08 * skill) * SOIL_YIELD[s.site.soil] * (hasGreenhouse(s) ? GREENHOUSE_PEAK : 1);
+  // winter greens on the greenhouse benches; the orchard's fruit, August to October
+  const grow = climate(s).grow;
+  return Math.max(0, eggs) * Math.max(0.5, grow) + (veg + greenhouseGreens(s) + orchardHarvest(s)) * grow + fieldHarvest(s);
 }
 
 /** Fraction of fresh food that spoils a day: in the open vs a root cellar. */

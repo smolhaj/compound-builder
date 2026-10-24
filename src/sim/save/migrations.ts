@@ -43,6 +43,8 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   5: s => ({ ...s, version: 6, stock: { rebar: 0, membrane: 0, excavator: 0, blast_door: 0, nbc_filter: 0, spoil: 0, ...(s.stock as object) } }),
   // 6 → 7: the escape tunnel (culvert, egress hatch)
   6: s => ({ ...s, version: 7, stock: { culvert: 0, egress_hatch: 0, ...(s.stock as object) } }),
+  // 34 → 35: the greenhouse kit and fruit trees (new goods at zero)
+  34: s => ({ ...s, version: 35, stock: { greenhouse_kit: 0, fruit_trees: 0, ...(s.stock as object) } }),
   // 33 → 34: peacetime break-ins and the law (the evidence locker,
   // a felony record (no guns), legal costs, the last local-news story: sim/breakins.ts); a raid reputation starting at nothing.
   33: s => ({ ...s, version: 34, breakins: (s.breakins as object | undefined) ?? newBreakins(), gate: { respect: 0, ...(s.gate as object) } }),
