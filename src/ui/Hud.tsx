@@ -12,6 +12,7 @@ import { blockedReason, isFinished, planProblem, progress } from '../sim/constru
 import { drillExtra } from '../sim/site';
 import { REGIONS } from '../sim/regions';
 import { CREW_RATE, CREW_SIZE, crewProblem, crewQuote } from '../sim/crews';
+import { keeping, KEPT } from '../sim/shelf';
 import { chimneyState, greenRicks, SEASON_DAYS, SWEEP_USD } from '../sim/upkeep';
 import { countyWorks, needsPermit, permitFee, premium, yearlyTax } from '../sim/paperwork';
 import { DRIVE_PER_FT, driveQuote, fixBill, fixBlocked, fixDef, hookupProblem, pendingFixes, POLE_PER_FT, powerQuote } from '../sim/improvements';
@@ -379,6 +380,18 @@ export function Hud() {
           </>}
 
           {rightTab === 'supplies' && <>
+            <Section title="Keeping">
+              {KEPT.filter(k => game.stock[k] > 0.05).map(k => {
+                const kp = keeping(game, k), yrs = (d: number) => d >= 365 ? `${(d / 365).toFixed(1)} yr` : `${Math.round(d / 30)} mo`;
+                return <Row key={k} label={MATERIALS[k].name} value={<span style={{ color: TONE[kp.tone === 'good' ? 'good' : kp.tone] }}>{yrs(kp.age)} old / keeps {yrs(kp.life)}</span>} />;
+              })}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                <span style={{ color: DIM }}>Rotate the pantry: {game.shelf.rotate ? 'yes' : 'no'}</span>
+                <button style={btn()} title="Eat what you store: the oldest comes off the shelf, the grocery run replaces it (keeps the stores young while town is open)" onClick={() => g.setRotate(!game.shelf.rotate)}>{game.shelf.rotate ? 'Stop' : 'Rotate'}</button>
+              </div>
+              <Row label="Mouse traps" value={game.shelf.traps > 0 ? `set (${game.shelf.traps} days)` : game.stock.traps >= 1 ? 'a box in the shed' : <span style={{ color: TONE.warn }}>none: mice in the stores</span>} />
+              {game.stock.fuel > 0 && game.stock.stabilizer < Math.ceil(game.stock.fuel / 10) && <Note tone="warn">The gas has no stabilizer: it goes stale in about six months.</Note>}
+            </Section>
             <Section title="Food">
               {(() => {
                 const f = game.food, d = daysOfFood(game);

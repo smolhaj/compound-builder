@@ -12,6 +12,7 @@ import { paperworkDay } from './paperwork';
 import { addFellWork, nextFellJob } from './forestry';
 import { burnFirewood, demandNow } from './heating';
 import { upkeepDay } from './upkeep';
+import { shelfDay } from './shelf';
 import { addRunWork, nextRun } from './perimeter';
 import { addFitWork, balanceDay, nextFit, plant } from './utilities';
 import { addHardenWork, nextHardenJob } from './hardening';
@@ -94,6 +95,7 @@ function subStep(s: GameState): void {
     landMarketDay(s, dayIndex(s.clock.t));
     siteJobsDay(s);
     for (const line of paperworkDay(s)) log(s, line);
+    for (const line of shelfDay(s)) log(s, line);
     for (const line of upkeepDay(s, demandNow(s), s.heat.warned !== dayIndex(s.clock.t) - 1 && s.heat.warned !== dayIndex(s.clock.t))) log(s, line);
     const e = gateDay(s);
     if (e) log(s, `${e.title}.`);
