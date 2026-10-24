@@ -33,6 +33,7 @@ import { freshNeeds, type FoodReport, type Needs } from './needs';
 import type { WeatherState } from './weatherThreats';
 import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
 export const SAVE_VERSION = 31;
+import type { BlackMarket } from './blackMarket';
 
 /** Starting savings (GDS §1 peacetime money constraint). */
 export const STARTING_MONEY = 30000;
@@ -197,6 +198,8 @@ export interface GameState {
   lineage: Lineage;
   /** Goats, pigs, the steer, rabbits (lazily made: `s.livestock ??= newLivestock()`). */
   livestock?: Livestock;
+  /** The black market contact, deals and heat (lazily created by sim/blackMarket.ts; optional, no save bump). */
+  blackMarket?: BlackMarket;
   /** The households round the place. */
   neighbors: Neighbor[];
   /** Who comes to the gate: the pending encounter, the last result, humanity and tallies. */

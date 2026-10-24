@@ -10,7 +10,8 @@ export type MaterialId = 'lumber' | 'logs' | 'firewood' | 'fieldstone' | 'concre
   | 'rebar' | 'membrane' | 'excavator' | 'blast_door' | 'nbc_filter' | 'spoil' | 'culvert' | 'egress_hatch'
   | 'lead_sheet' | 'faraday_mesh' | 'blast_valve' | 'filter_set'
   | 'fresh' | 'frozen' | 'canned' | 'staples' | 'meds' | 'seed' | 'lids' | 'plow' | 'stabilizer' | 'traps' | 'hygiene' | 'gun_safe' | 'gun_cleaning' | 'fishing_gear' | 'snares' | 'smoker' | 'goat' | 'pig' | 'steer' | 'rabbit' | 'hay' | 'feed' | 'water_jugs' | 'ibc_tote' | 'water_trailer' | 'water_filter' | 'ro_system' | 'softener' | 'greywater'
-  | 'plate_carrier' | 'ifak' | 'nvg' | 'thermal' | 'radios' | 'cameras' | 'thermal_cam' | 'driveway_alarm' | 'floodlights' | 'tripwire' | 'dog' | 'steel_door' | 'window_bars' | 'sandbags' | 'safe_room' | 'sw_radio' | 'ham_rig';
+  | 'plate_carrier' | 'ifak' | 'nvg' | 'thermal' | 'radios' | 'cameras' | 'thermal_cam' | 'driveway_alarm' | 'floodlights' | 'tripwire' | 'dog' | 'steel_door' | 'window_bars' | 'sandbags' | 'safe_room' | 'sw_radio' | 'ham_rig'
+  | 'grenades' | 'rpg_launcher' | 'rpg_rounds' | 'suppressor';
 
 export interface MaterialDef {
   id: MaterialId;
@@ -80,6 +81,11 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   window_bars: { id: 'window_bars', name: 'Window bars', unit: 'security bars for the house windows', price: 900 },
   sandbags: { id: 'sandbags', name: 'Sandbags', unit: '100 bags (fill them with your own dirt) for a fighting position', price: 300 },
   safe_room: { id: 'safe_room', name: 'Safe room', unit: 'a reinforced interior room: steel door, lined walls, supplies shelf', price: 8500 },
+  // Black market only (sim/blackMarket.ts): price null, so the catalog never sells them.
+  grenades: { id: 'grenades', name: 'Hand grenades', unit: 'grenade', price: null },
+  rpg_launcher: { id: 'rpg_launcher', name: 'RPG-type launcher', unit: 'launcher tube', price: null },
+  rpg_rounds: { id: 'rpg_rounds', name: 'Launcher rounds', unit: 'round', price: null },
+  suppressor: { id: 'suppressor', name: 'Suppressor (unregistered)', unit: 'can', price: null },
   water_jugs: { id: 'water_jugs', name: 'Drinking water', unit: 'a 5-gallon jug (19 L), sealed', price: 9 },
   ibc_tote: { id: 'ibc_tote', name: 'IBC tote', unit: '1,000 L food-grade tote on a pallet: more storage', price: 180 },
   water_trailer: { id: 'water_trailer', name: 'Water trailer', unit: 'a 1,000 L tank on a utility trailer: haul from the standpipe or the creek', price: 2800 },
