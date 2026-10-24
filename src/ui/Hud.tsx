@@ -28,6 +28,7 @@ import { DISASTERS, TRACKS, TRACK_NAME, type DisasterKind } from '../sim/disaste
 import { prices } from '../sim/economy';
 import { LIVING_PER_DAY } from '../sim/engine';
 import { daysOfFood, KCAL, NEED_ADULT, NEED_KID } from '../sim/needs';
+import { ANIMALS, feedDemand, winterHay } from '../sim/livestock';
 import { NEIGHBOR_BLURB } from '../sim/encounters';
 import { acresOf, buyProblem, LAND_NAME, priceOf } from '../sim/land';
 import { HARDEN, HARDEN_IDS, type TierDef, hardenCost, hardenProblem, isBunkerRoom, protectionOf, tierOf } from '../sim/hardening';
@@ -419,6 +420,14 @@ export function Hud() {
               {game.wild.hotUntil >= Math.floor(game.clock.t) && <Note tone="bad">Fallout: game and fish read hot for months.</Note>}
               {game.stock.fishing_gear < 1 && game.site.creek && <Note>A creek full of {REGIONS[game.site.region].game.find(x => ['trout', 'bass', 'catfish', 'salmon', 'panfish'].includes(x)) ?? 'fish'}, and no fishing gear.</Note>}
             </Section>
+            {ANIMALS.some(a => (game.stock[a] ?? 0) >= 1) && <Section title="Livestock">
+              {ANIMALS.filter(a => (game.stock[a] ?? 0) >= 1).map(a => { const c = game.livestock?.condition[a] ?? 1; return <Row key={a} label={MATERIALS[a].name} value={<span style={{ color: c < 0.5 ? TONE.bad : c < 0.9 ? TONE.warn : undefined }}>{Math.floor(game.stock[a])} head, {Math.round(c * 100)} % condition</span>} />; })}
+              {(() => { const d = feedDemand(game), hd = d.hay > 0 ? (game.stock.hay ?? 0) / d.hay : Infinity, fd = d.feed > 0 ? (game.stock.feed ?? 0) / d.feed : Infinity; return <>
+                {d.hay > 0 && <Row label="Hay" value={<span style={{ color: hd < 14 ? TONE.warn : undefined }}>{Math.floor(game.stock.hay ?? 0)} bales ({hd > 999 ? 'plenty' : `${Math.floor(hd)} days`})</span>} />}
+                {d.feed > 0 && <Row label="Feed" value={<span style={{ color: fd < 14 ? TONE.warn : undefined }}>{Math.floor(game.stock.feed ?? 0)} bags ({fd > 999 ? 'plenty' : `${Math.floor(fd)} days`})</span>} />}
+                {winterHay(game) > (game.stock.hay ?? 0) && <Note>Put up about {winterHay(game)} bales of hay for the winter.</Note>}
+              </>; })()}
+            </Section>}
             <Section title="Food">
               {(() => {
                 const f = game.food, d = daysOfFood(game);
