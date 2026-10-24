@@ -42,6 +42,7 @@ describe('sim engine', () => {
 
   it('waits for materials, then the family builds a cabin in a few months (≈ 1,400 person-hours)', () => {
     let g = newGame(7);
+    g.weather = { active: null, last: 1e9 }; // no storms: this checks build timing
     const st = planStructure(g, 'timber_cabin', 20, 20, 0);
     g = step(g, 1);
     // site prep needs no materials: work starts at once; the foundation then waits for stone

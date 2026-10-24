@@ -30,6 +30,7 @@ import type { Vehicle } from './vehicles';
 import { emptyStats, type Ending, type RunStats } from './report';
 import { generateNeighbors, newGate, type GateState, type Neighbor } from './encounters';
 import { freshNeeds, type FoodReport, type Needs } from './needs';
+import type { WeatherState } from './weatherThreats';
 import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
 export const SAVE_VERSION = 30;
 
@@ -178,6 +179,8 @@ export interface GameState {
   paper: Paper;
   /** Seasoning firewood, creosote in the flue. */
   upkeep: Upkeep;
+  /** Severe weather: the storm on or warned of (sim/weatherThreats.ts; lazily set, absent in old saves). */
+  weather?: WeatherState;
   /** How old the stores are, rotation, traps. */
   shelf: Shelf;
   /** Medicine on hand per person. */
