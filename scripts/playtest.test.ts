@@ -19,6 +19,7 @@ import { hireCrew, hoursLeft } from '../src/sim/crews';
 import { applyForPermit } from '../src/sim/paperwork';
 import { sweepChimney } from '../src/sim/upkeep';
 import { stockUpRx } from '../src/sim/body';
+import { buyAmmo, buyGun, takeClass, type Caliber } from '../src/sim/armory';
 import { calendarOf } from '../src/sim/state';
 import { planRun } from '../src/sim/perimeter';
 import { orderFit, fitProblem, plant } from '../src/sim/utilities';
@@ -123,6 +124,15 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
     if (day % 3 === 0 && s.clock.t < s.disaster.hitAt) orderNeeds(s, strat);
     // the prescriptions, three months ahead, once the news turns
     if (strat !== 'idle' && s.disaster.phase === 'warning' && day % 30 === 0) stockUpRx(s);
+    // the armory, bought early (a deer rifle and a .22; more for the preppers and the fortress)
+    if (day === 10 && strat !== 'idle') {
+      const kit: Record<string, string[]> = { homestead: ['marlin_336', 'ruger_1022'], prepper: ['rem_700', 'sw_mp15', 'sw_mp15', 'mossberg_500', 'glock_19', 'ruger_1022'], fortress: ['sw_mp15', 'sw_mp15', 'ruger_mini14', 'mossberg_500', 'rem_700'] };
+      for (const m of kit[strat] ?? []) buyGun(s, m);
+      const ammo: Partial<Record<Caliber, number>> = strat === 'homestead' ? { '3030': 6, '22lr': 2 } : strat === 'prepper' ? { '308': 15, '556': 50, '12ga': 12, '9mm': 20, '22lr': 4 } : { '556': 75, '12ga': 12, '308': 10 };
+      for (const [c, n] of Object.entries(ammo) as Array<[Caliber, number]>) buyAmmo(s, c, n);
+      if (strat !== 'homestead') for (const p of s.people.filter(x => !x.kid)) takeClass(s, p.id);
+      placeOrder(s, [{ material: 'gun_safe', qty: 1 }, { material: 'gun_cleaning', qty: 2 }]);
+    }
     // sweep the chimney each fall
     if (strat !== 'idle' && calendarOf(s.clock).doy === 260) sweepChimney(s);
     // wire and plumb the house once it can be; order what its repairs need

@@ -11,6 +11,7 @@
  * health, and with it how much work people can do.
  */
 import { calendarOf, type GameState } from './state';
+import { huntingRifle, smallGameGun } from './armory';
 import { isHome } from './blueprints';
 import { log } from './economy';
 import { isFinished } from './construction';
@@ -113,9 +114,13 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
   // hunting (after the stores close; a hunter in season: elk / deer, ≈ 40,000 kcal of meat)
   const doy = calendarOf(s.clock).doy;
   const hunter = Math.max(...s.people.filter((p, i) => !p.kid && alive(s, i)).map(p => p.skills.hunter), 0);
-  if (!fromStores && hunter >= 2 && doy > 245 && doy < 335 && rnd < 0.04 * hunter / 5) {
+  // (a rifle and rounds for it; or snares and a .22 / shotgun for rabbits and grouse)
+  if (!fromStores && hunter >= 2 && doy > 245 && doy < 335 && rnd < 0.04 * hunter / 5 && huntingRifle(s, true)) {
     if (freezer) s.stock.frozen += 4; else s.stock.fresh += 20;
     log(s, 'A deer down in the timber: meat for weeks.');
+  } else if (!fromStores && hunter >= 1 && rnd > 0.96 && smallGameGun(s)) {
+    s.stock.fresh += 1.5;
+    s.armory.ammo['22lr'] = Math.max(0, (s.armory.ammo['22lr'] ?? 0) - 3);
   }
   // eating
   const need = s.people.reduce((a, p, i) => a + (alive(s, i) ? (p.kid ? NEED_KID : NEED_ADULT) : 0), 0);

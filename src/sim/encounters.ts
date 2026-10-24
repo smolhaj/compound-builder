@@ -14,6 +14,7 @@
  * ever reaches the family through it. Pure and seeded.
  */
 import { mulberry32, pick } from './rng';
+import { armed, firepower, spendInFight } from './armory';
 import { isHome } from './blueprints';
 import { log } from './economy';
 import { isFinished } from './construction';
@@ -92,9 +93,10 @@ export interface Posture {
   barrier: number;
   /** 0–100: how early they're seen (walls you can see over, dogs/alarms later, a watch). */
   detection: number;
-  /** Fighting adults, and how well armed (an armory). */
+  /** Fighting adults, and how well armed (guns with ammo, skill, condition: 0.6 bare hands … ~1.6 well armed and trained). */
   fighters: number;
   armed: boolean;
+  firepower: number;
   /** A bunker to hide in. */
   bunker: boolean;
 }
@@ -120,7 +122,7 @@ export function postureOf(s: GameState): Posture {
   const watch = Math.max(0, ...adults.map(p => p.skills.hunter));
   const radioNet = s.neighbors.some(n => n.radio && n.status === 'home' && n.disposition > 30);
   const detection = Math.min(100, 25 + watch * 5 + (radioNet ? 20 : 0) + (barrier > 50 ? 10 : 0));
-  return { visibility, fortress, barrier, detection, fighters, armed: fin.some(st => st.kind === 'bunker_comms'), bunker: fin.some(st => st.kind === 'bunker_hatch' || st.kind === 'bunker_stairs') };
+  return { visibility, fortress, barrier, detection, fighters, armed: armed(s), firepower: firepower(s), bunker: fin.some(st => st.kind === 'bunker_hatch' || st.kind === 'bunker_stairs') };
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -345,7 +347,7 @@ function wound(s: GameState, r: () => number, sev: number, what: string): string
 
 /** The family's fighting strength against a group (0–100+). */
 export function defenseOf(p: Posture): number {
-  return p.barrier * 0.45 + p.fighters * 9 * (p.armed ? 1.4 : 1) + p.detection * 0.15;
+  return p.barrier * 0.45 + p.fighters * 9 * (p.firepower ?? (p.armed ? 1.4 : 1)) + p.detection * 0.15;
 }
 
 /** Apply the player's stance. Returns the vignette card. */
@@ -416,11 +418,13 @@ export function resolve(s: GameState, stance: Stance): Outcome {
       }
     }
     if (stance === 'warn') {
-      const deterred = r() * 100 < p.fortress * 0.6 + (e.armed ? 0 : 25) + (e.kind === 'looters' ? 20 : 0) - (e.kind === 'gang' ? 25 : 0);
+      const deterred = r() * 100 < p.fortress * 0.6 + (p.armed ? 15 : -10) + (e.armed ? 0 : 25) + (e.kind === 'looters' ? 20 : 0) - (e.kind === 'gang' ? 25 : 0);
       if (deterred) { title = 'They thought better of it'; text = 'A shot over the truck and the walls behind it. They turn around in the road.'; tone = 'good'; if (e.kind === 'refugees') g.humanity = Math.max(0, g.humanity - 5); }
       else stance = 'defend';
     }
     if (stance === 'defend') {
+      const shots = spendInFight(s, r);
+      if (shots) lines.push(shots);
       const odds = (def + help + (seen ? 15 : 0)) / Math.max(1, e.strength + def + help);
       if (r() < odds) {
         g.raidsHeld++;
