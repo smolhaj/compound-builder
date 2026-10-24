@@ -16,6 +16,10 @@ const RUN = 1.1;          // world units / s (≈ 6.5 m/s)
 const FLEE = 1.6;
 const MAX_TRACERS = 64;
 const MAX_PUFFS = 48;
+/** How long a tracer streak takes muzzle to target (s). */
+const TRACER_LIFE = 0.3;
+/** A tracer streak's length (world units, ≈ 7 m). */
+const STREAK = 1.2;
 const END_HOLD = 3.5;
 
 interface U {
@@ -41,7 +45,7 @@ export class BattleRenderer {
   /** Playback clock (s). */
   time = 0;
   /** Latest 'say' lines. */
-  lines: string[] = [];
+  lines: Array<{ who?: string; text: string }> = [];
   /** Called once the battle (and its hold) is over. */
   onEnd: (() => void) | null = null;
   battle: Battle | null = null;
@@ -57,6 +61,10 @@ export class BattleRenderer {
   private _endAt = -1;
   // tracers
   private readonly _tracers: Tracer[] = [];
+  /** Tracer streaks as glowing rods (a 1-px line vanishes at game distance). */
+  private readonly _rods: THREE.InstancedMesh;
+  /** A ring at each fighter's feet: red raiders, blue residents (readable from the diorama camera). */
+  private readonly _rings: THREE.InstancedMesh;
   private readonly _trGeo = new THREE.BufferGeometry();
   private readonly _trPos = new Float32Array(MAX_TRACERS * 6);
   private readonly _trLines: THREE.LineSegments;
@@ -76,6 +84,7 @@ export class BattleRenderer {
   private readonly _e = new THREE.Euler();
   private readonly _v = new THREE.Vector3();
   private readonly _s = new THREE.Vector3();
+  private readonly _c = new THREE.Color();
 
   constructor(scene: THREE.Scene, ground: (x: number, z: number) => number,
     people: () => ReadonlyArray<{ id: string; shirt: number; body: 'f' | 'm' }>) {
@@ -88,6 +97,12 @@ export class BattleRenderer {
     this._trLines = new THREE.LineSegments(this._trGeo, new THREE.LineBasicMaterial({ color: 0xffd27a, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
     this._trLines.frustumCulled = false;
     this._group.add(this._trLines);
+    this._rods = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0xffe08a, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }), MAX_TRACERS);
+    this._rods.count = 0; this._rods.frustumCulled = false; this._rods.userData = { noSSAO: true };
+    this._group.add(this._rods);
+    this._rings = new THREE.InstancedMesh(new THREE.RingGeometry(0.16, 0.22, 20).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.85, depthWrite: false, toneMapped: false }), 64);
+    this._rings.count = 0; this._rings.frustumCulled = false; this._rings.userData = { noSSAO: true };
+    this._group.add(this._rings);
     for (let i = 0; i < 4; i++) {
       const l = new THREE.PointLight(0xffc070, 0, 4, 2);
       l.castShadow = false;
@@ -96,6 +111,19 @@ export class BattleRenderer {
   }
 
   get playing(): boolean { return this.battle !== null; }
+
+  /** Where the fight is: between the defenders and the nearest raiders still in it (for the camera), and how far apart they are. */
+  focus(): { x: number; z: number; spread: number } | null {
+    const live = [...this._units.values()].filter(u => !u.gone && !u.dead);
+    const home = live.filter(u => u.def.side === 'home'), raiders = live.filter(u => u.def.side === 'raider');
+    if (!home.length && !raiders.length) return null;
+    const pick = home.length ? home : raiders;
+    const hx = pick.reduce((a, u) => a + u.x, 0) / pick.length, hz = pick.reduce((a, u) => a + u.z, 0) / pick.length;
+    if (!home.length || !raiders.length) return { x: hx, z: hz, spread: 4 };
+    const near = raiders.reduce((a, u) => (Math.hypot(u.x - hx, u.z - hz) < Math.hypot(a.x - hx, a.z - hz) ? u : a));
+    const d = Math.hypot(near.x - hx, near.z - hz);
+    return { x: (hx + near.x) / 2, z: (hz + near.z) / 2, spread: d / 2 };
+  }
 
   play(b: Battle): void {
     this.stop();
@@ -128,6 +156,12 @@ export class BattleRenderer {
     this._group.add(this._alarm);
   }
 
+  /** Run the playback forward to time t (screenshots, scrubbing): small steps, so everything in flight at t is drawn. */
+  seek(t: number): void {
+    let guard = 0;
+    while (this.battle && this.time < t && guard++ < 10000) this.update(Math.min(1 / 30, t - this.time));
+  }
+
   /** Jump to the end (Skip). */
   skip(): void {
     if (!this.battle) return;
@@ -141,6 +175,7 @@ export class BattleRenderer {
     this._pending = [];
     this._tracers.length = 0;
     this._trGeo.setDrawRange(0, 0);
+    this._rods.count = 0; this._rings.count = 0;
     for (const p of this._puffs) { this._group.remove(p.mesh); p.mat.dispose(); }
     this._puffs.length = 0;
     for (const p of this._projs) { this._group.remove(p.mesh); (p.mesh.material as THREE.Material).dispose(); }
@@ -224,7 +259,7 @@ export class BattleRenderer {
         break;
       }
       case 'breach': this._boom(e.x, this._ground(e.x, e.z), e.z, 0.5, true); break;
-      case 'wound': { const u = U_(e.unit); if (u) { u.wound = Math.min(1, u.wound + Math.max(0.3, e.sev)); this._tint(u); } break; }
+      case 'wound': { const u = U_(e.unit); if (u && !e.stopped) { u.wound = Math.min(1, u.wound + Math.max(0.3, e.sev)); this._tint(u); } break; }
       case 'death': { const u = U_(e.unit); if (u) { u.dead = true; u.wound = 1; this._tint(u); u.y = 0; } break; }
       case 'flee': {
         const u = U_(e.unit); if (!u || u.dead) break;
@@ -232,7 +267,7 @@ export class BattleRenderer {
         u.tx = u.x + dx / d * 60; u.tz = u.z + dz / d * 60; u.ty = 0; u.speed = FLEE; u.crouch = false;
         break;
       }
-      case 'say': this.lines = [...this.lines, e.text].slice(-3); break;
+      case 'say': this.lines = [...this.lines, { who: e.who, text: e.text }].slice(-4); break;
       case 'end': this._endAt = this.time; this._alarmOn = false; break;
     }
   }
@@ -261,13 +296,13 @@ export class BattleRenderer {
   private _tracer(a: THREE.Vector3, b: THREE.Vector3): void {
     if (this._tracers.length >= MAX_TRACERS) this._tracers.shift();
     // a short streak along the line (not the whole line): starts near the muzzle
-    this._tracers.push({ ttl: 0.12, a: a.clone(), b: b.clone() });
+    this._tracers.push({ ttl: TRACER_LIFE, a: a.clone(), b: b.clone() });
   }
 
   private _flash(p: THREE.Vector3, k: number, color: number): void {
     const l = this._flashes[this._flashI++ % this._flashes.length];
     l.position.copy(p); l.color.setHex(color); l.intensity = k; l.distance = 2 + k * 0.6;
-    this._puff(p, 0.02, 0.05, 0.08, 0, 0xffe0a0, 1, true);
+    this._puff(p, 0.06, 0.16, 0.12, 0, 0xffe0a0, 1, true);
   }
 
   private _puff(p: THREE.Vector3, r0: number, r1: number, life: number, rise: number, color: number, o0: number, glow = false): void {
@@ -285,7 +320,8 @@ export class BattleRenderer {
     const p = new THREE.Vector3(x, y + radius * 0.25, z);
     const l = this._flashes[this._flashI++ % this._flashes.length];
     l.position.copy(p).y += radius * 0.5; l.color.setHex(0xffa040); l.intensity = 30 * radius; l.distance = 6 + radius * 6;
-    this._puff(p, radius * 0.1, radius * 0.8, 0.35, 0.1, 0xffc060, 1, true);
+    this._puff(p, radius * 0.15, radius * 0.9, 0.45, 0.1, 0xffd070, 1, true);
+    this._puff(p, radius * 0.05, radius * 0.45, 0.25, 0.05, 0xfff4c0, 1, true);
     this._puff(p, radius * 0.08, radius * 0.6, 0.5, 0.2, 0xff6a20, 0.9, true);
     for (let i = 0; i < 4; i++) {
       const q = p.clone().add(new THREE.Vector3((Math.random() - 0.5) * radius * 0.6, radius * 0.2, (Math.random() - 0.5) * radius * 0.6));
@@ -296,8 +332,8 @@ export class BattleRenderer {
   }
 
   private _decal(x: number, z: number, r: number): void {
-    const g = new THREE.CircleGeometry(Math.max(0.15, r), 18).rotateX(-Math.PI / 2);
-    const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: 0x1b1714, roughness: 1, transparent: true, opacity: 0.85, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
+    const g = new THREE.CircleGeometry(Math.max(0.15, r * 0.6), 18).rotateX(-Math.PI / 2);
+    const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: 0x1b1714, roughness: 1, transparent: true, opacity: 0.6, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
     m.position.set(x, this._ground(x, z) + 0.01, z);
     this._group.add(m);
     this._decals.push(m);
@@ -343,6 +379,17 @@ export class BattleRenderer {
       n++;
     }
     this._layer.commit(n, true);
+    let ri = 0;
+    for (const u of this._units.values()) {
+      if (u.gone || u.dead || ri >= 64) continue;
+      this._m.makeTranslation(u.x, this._ground(u.x, u.z) + u.y + 0.02, u.z);
+      this._rings.setMatrixAt(ri, this._m);
+      this._rings.setColorAt(ri, this._c.setHex(u.def.side === 'raider' ? 0xff3b30 : 0x4aa8ff));
+      ri++;
+    }
+    this._rings.count = ri;
+    this._rings.instanceMatrix.needsUpdate = true;
+    if (this._rings.instanceColor) this._rings.instanceColor.needsUpdate = true;
   }
 
   private _tickFx(dt: number): void {
@@ -354,8 +401,8 @@ export class BattleRenderer {
       if (tr.ttl <= 0) { this._tracers.splice(i, 1); continue; }
     }
     for (const tr of this._tracers) {
-      const f = 1 - tr.ttl / 0.12;
-      const h = Math.min(1, f + 0.35);
+      const len = Math.max(1e-3, tr.a.distanceTo(tr.b));
+      const h = Math.min(1, (1 - tr.ttl / TRACER_LIFE) * (1 + STREAK / len)), f = Math.max(0, h - STREAK / len);
       this._v.lerpVectors(tr.a, tr.b, f);
       this._trPos.set([this._v.x, this._v.y, this._v.z], k * 6);
       this._v.lerpVectors(tr.a, tr.b, h);
@@ -363,6 +410,21 @@ export class BattleRenderer {
       k++;
     }
     this._trGeo.setDrawRange(0, k * 2);
+    // the rods: from the streak's tail to its head, a few cm thick
+    let r = 0;
+    for (const tr of this._tracers) {
+      const full = Math.max(1e-3, tr.a.distanceTo(tr.b));
+      const h = Math.min(1, (1 - tr.ttl / TRACER_LIFE) * (1 + STREAK / full)), f = Math.max(0, h - STREAK / full);
+      const a = this._v.lerpVectors(tr.a, tr.b, f).clone(), b = this._s.lerpVectors(tr.a, tr.b, h).clone();
+      const len = a.distanceTo(b);
+      if (len < 1e-3) continue;
+      this._m.lookAt(a, b, THREE.Object3D.DEFAULT_UP);
+      this._q.setFromRotationMatrix(this._m);
+      this._m.compose(a.add(b).multiplyScalar(0.5), this._q, new THREE.Vector3(0.035, 0.035, len));
+      this._rods.setMatrixAt(r++, this._m);
+    }
+    this._rods.count = r;
+    this._rods.instanceMatrix.needsUpdate = true;
     (this._trGeo.attributes.position as THREE.BufferAttribute).needsUpdate = true;
     for (const f of this._flashes) f.intensity *= Math.max(0, 1 - dt * 14);
     for (let i = this._puffs.length - 1; i >= 0; i--) {
@@ -390,6 +452,8 @@ export class BattleRenderer {
     this.stop();
     this._layer.dispose();
     this._trGeo.dispose(); (this._trLines.material as THREE.Material).dispose();
+    this._rods.geometry.dispose(); (this._rods.material as THREE.Material).dispose();
+    this._rings.geometry.dispose(); (this._rings.material as THREE.Material).dispose();
     this._puffGeo.dispose();
     this._scene.remove(this._group);
   }

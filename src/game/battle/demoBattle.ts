@@ -38,32 +38,33 @@ export function demoBattle(structures: readonly DemoStructure[], people: readonl
     ev.push({ t: 7 + (i % 2) * 1.4, kind: 'cover', unit: id, x: c.x + (i - 2.5) * 1.3, z: c.z + 8 });
   }
   ev.push({ t: 0, kind: 'alarm', what: 'dog' });
-  ev.push({ t: 0.3, kind: 'say', text: 'The dog is going off — movement at the gate.' });
+  ev.push({ t: 0.3, kind: 'say', text: 'The dog\'s going off — movement at the gate!', who: 'h0' });
   ev.push({ t: 1.0, kind: 'lights' });
-  ev.push({ t: 1.2, kind: 'say', text: 'Raid! 6 at the gate.' });
-  let t = 5;
-  for (let k = 0; k < 14; k++) {
-    const from = `h${k % 4}`, to = `r${(k * 5) % 6}`;
-    ev.push({ t, kind: 'shot', from, to, hit: k % 5 === 4, auto: k % 3 === 0 });
-    ev.push({ t: t + 0.4, kind: 'shot', from: `r${k % 6}`, to: `h${(k + 1) % 4}`, hit: false });
-    t += 0.7;
+  ev.push({ t: 2.6, kind: 'say', text: 'Spread out! Hit the house!', who: 'r0' });
+  ev.push({ t: 10.0, kind: 'say', text: 'Grenade!', who: 'h1' });
+  ev.push({ t: 15.4, kind: 'say', text: 'Fall back! Not worth it!', who: 'r0' });
+  ev.push({ t: 1.2, kind: 'say', text: 'Six of them on the drive. To your posts!', who: 'h0' });
+  // the firefight: every defender fires about twice a second, the raiders answer (the suppressing pair fires while the other pair moves)
+  for (let t = 4, k = 0; t < 15; t += 0.25, k++) {
+    ev.push({ t, kind: 'shot', from: `h${k % 4}`, to: `r${(k * 5) % 6}`, hit: k % 11 === 10, auto: k % 9 === 0 });
+    if (k % 2 === 0) ev.push({ t: t + 0.12, kind: 'shot', from: `r${(k >> 1) % 6}`, to: `h${(k + 1) % 4}`, hit: false, auto: k % 10 === 0 });
   }
   ev.push({ t: 9.5, kind: 'mine', x: c.x - 1.6, z: c.z + 9, hits: ['r1'] });
   ev.push({ t: 9.6, kind: 'wound', unit: 'r1', sev: 0.8 });
-  ev.push({ t: 9.8, kind: 'say', text: 'Mine at the drive! One down.' });
+  ev.push({ t: 9.8, kind: 'say', text: 'Mine at the drive! One down.', who: 'h2' });
   // a grenade at the wall post, a rocket at the tower (it is wrecked), the tower man falls back
   ev.push({ t: 10.2, kind: 'throw', from: 'r0', x: posts[1].x + 0.4, z: posts[1].z + 0.6, what: 'grenade' });
   ev.push({ t: 11.2, kind: 'explosion', x: posts[1].x + 0.4, z: posts[1].z + 0.6, radius: 0.5, hits: [] });
   ev.push({ t: 12.0, kind: 'rocket', from: 'r5', x: posts[0].x, z: posts[0].z, y: 0.9 });
-  ev.push({ t: 12.1, kind: 'say', text: 'RPG! Get off the tower!' });
+  ev.push({ t: 12.1, kind: 'say', text: 'RPG! Get off the tower!', who: 'h1' });
   ev.push({ t: 11.6, kind: 'move', unit: 'h0', x: posts[0].x - 1.5, z: posts[0].z - 1.5, y: 0 });
   ev.push({ t: 12.9, kind: 'explosion', x: posts[0].x, z: posts[0].z, y: 0.9, radius: 0.8, hits: [], wrecks: 'post' });
   ev.push({ t: 13.3, kind: 'cover', unit: 'h1', x: c.x - 2, z: c.z + 1.5 });
-  ev.push({ t: 13.4, kind: 'say', text: 'Fall back to the house!' });
+  ev.push({ t: 13.4, kind: 'say', text: 'Fall back to the house!', who: 'h0' });
   ev.push({ t: 11, kind: 'wound', unit: 'h2', sev: 0.3 });
-  ev.push({ t: 11.2, kind: 'say', text: 'I\'m hit — just a graze, keep firing!' });
+  ev.push({ t: 11.2, kind: 'say', text: 'I\'m hit — just a graze, keep firing!', who: 'h2' });
   ev.push({ t: 12.5, kind: 'death', unit: 'r4' });
-  ev.push({ t: 15, kind: 'say', text: 'They\'re pulling back!' });
+  ev.push({ t: 15, kind: 'say', text: 'They\'re pulling back!', who: 'h3' });
   for (let i = 0; i < 6; i++) if (i !== 4) ev.push({ t: 15 + i * 0.2, kind: 'flee', unit: `r${i}` });
   ev.push({ t: 19, kind: 'end', result: 'repelled' });
   ev.push({ t: 19, kind: 'say', text: 'Raid repelled.' });

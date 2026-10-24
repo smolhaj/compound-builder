@@ -107,4 +107,26 @@ describe('food and needs', () => {
     expect(g.stock.canned).toBeCloseTo(CANNER_CASES * CANNED_YIELD);
     expect(g.stock.lids).toBe(24 - CANNER_CASES);
   });
+
+  it('a fight wound heals with treatment, barely without, and can go bad', () => {
+    const run = (treated: boolean) => {
+      const g = newGame(5);
+      g.stock.staples = 50; g.stock.meds = treated ? 10 : 0;
+      g.people.forEach(p => { p.skills.medic = 0; });
+      g.personState[0].needs.hurt.push({ what: 'shot in the leg', sev: 40, trauma: true });
+      for (let d = 0; d < 30; d++) { g.clock.t = d; liveDay(g, (d * 0.6180339) % 1); }
+      return g.personState[0].needs;
+    };
+    const t = run(true), u = run(false);
+    expect(t.hurt.filter(h => h.trauma).reduce((a, h) => a + h.sev, 0)).toBeLessThan(5);
+    expect(u.hurt.filter(h => h.trauma).reduce((a, h) => a + h.sev, 0)).toBeGreaterThan(25);
+    expect(u.health).toBeLessThan(t.health);
+  });
+
+  it('a bad fight wound puts you on your back', () => {
+    const g = newGame(5);
+    const n = g.personState[0].needs;
+    n.hurt.push({ what: 'shot in the body', sev: 70, trauma: true });
+    expect(workFactor(n)).toBeLessThanOrEqual(0.1);
+  });
 });

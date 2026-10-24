@@ -24,6 +24,7 @@
  * Prices are 2025 US street prices.
  */
 import { log } from './economy';
+import { backgroundOf } from './family';
 import { mulberry32 } from './rng';
 import { calendarOf, type GameState } from './state';
 import type { MaterialId } from './materials';
@@ -123,7 +124,12 @@ export interface Armory {
 export const newArmory = (): Armory => ({ guns: [], ammo: {}, skill: {}, onBooks: 0, pending: [] });
 
 /** Starting shooting skill: hunters already shoot. */
-export const skillOf = (s: GameState, pid: string) => s.armory.skill[pid] ?? Math.round((s.people.find(p => p.id === pid)?.skills.hunter ?? 0) * 0.6);
+/** Shooting skill: what they've trained, or hunting experience; a veteran or an ex-officer starts well ahead of a civilian. */
+export const skillOf = (s: GameState, pid: string) => {
+  const p = s.people.find(x => x.id === pid);
+  const base = Math.round((p?.skills.hunter ?? 0) * 0.6), bg = p ? backgroundOf(p) : null;
+  return s.armory.skill[pid] ?? (bg === 'military' ? Math.max(base, 6) : bg === 'police' ? Math.max(base, 5) : base);
+};
 
 export const shopOpen = (s: GameState) => s.disaster.tracks.law >= 0.5 && s.disaster.tracks.banks >= 0.5 && s.disaster.tracks.stores >= 0.4;
 /** Panic in the warning signs runs guns and ammo up faster than anything (1 = normal). */

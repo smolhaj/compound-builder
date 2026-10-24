@@ -20,7 +20,8 @@
  */
 import type { Battle, BattleEvent, BattleUnit } from './battleTypes';
 import { GUN, skillOf, type Caliber } from './armory';
-import { gearPosture, softenWound } from './gear';
+import { gearPosture } from './gear';
+import { backgroundOf } from './family';
 import { isHome } from './blueprints';
 import { isFinished } from './construction';
 import { PERIMETER, runFinished } from './perimeter';
@@ -69,6 +70,10 @@ interface Fighter {
   hp: number; out: boolean; dead: boolean; arm: Arm; skill: number; readyAt: number;
   post: PostSpot | null; cover: number; moving: boolean; nextMove: number; shelter: boolean;
   grenades: number; rockets: number; leader?: boolean; medic?: boolean; fled?: boolean; rescued?: boolean;
+  /** Body armor: rifle plates, a soft (pistol-rated) vest, a ballistic helmet. */
+  armor: { plate: boolean; soft: boolean; helmet: boolean };
+  /** Served (military or police): no freezing at the alarm, steadier under fire. */
+  vet?: boolean;
 }
 
 const dist = (a: { x: number; z: number }, b: { x: number; z: number }) => Math.hypot(a.x - b.x, a.z - b.z);
@@ -140,7 +145,9 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
       const gun = free.find(x => x.carrier === p.id) ?? free.find(x => !x.carrier);
       if (gun) { free.splice(free.indexOf(gun), 1); const m = GUN[gun.model]; arm = { ...(ARMS[m.type] ?? ARMS.pistol), cal: m.cal }; if (gun.condition < 0.5) arm.acc *= 0.7; }
     }
-    const f: Fighter = { id: `h_${p.id}`, side: 'home', pid: p.id, x, z, y: 0, hp: 100, out: false, dead: false, arm, skill: skillOf(s, p.id), readyAt: Infinity, post: null, cover: 0.8, moving: false, nextMove: 0, shelter: !fights, grenades: n('grenades') && fights ? 1 : 0, rockets: 0, medic: p.id === medicId };
+    const vet = backgroundOf(p) !== null;
+    const hp0 = Math.max(20, s.personState.find(q => q.id === p.id)?.needs.health ?? 100);   // already hurt or sick: weaker from the start
+    const f: Fighter = { id: `h_${p.id}`, side: 'home', pid: p.id, x, z, y: 0, hp: hp0, out: false, dead: false, arm, skill: skillOf(s, p.id), readyAt: Infinity, post: null, cover: 0.8, moving: false, nextMove: 0, shelter: !fights, grenades: n('grenades') && fights ? 1 : 0, rockets: 0, medic: p.id === medicId, armor: { plate: false, soft: false, helmet: false }, vet };
     F.push(f); units.push({ id: f.id, side: 'home', personId: p.id, x: r2(x), z: r2(z), post: 'open' });
   }
   const daysAfter = s.disaster.kind ? Math.max(0, s.clock.t - s.disaster.hitAt) : 0;
@@ -154,10 +161,24 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
     const arm: Arm = !armedR ? FISTS : { ...(autoR ? ARMS.auto_rifle : r() < 0.7 ? ARMS.semi_rifle : ARMS.pump), cal: null };
     const gr = gLeft > 0 ? 1 : 0; gLeft -= gr;
     const rk = rLeft > 0 && i > 0 ? 1 : 0; rLeft -= rk;
-    const f: Fighter = { id: `r${i}`, side: 'raider', ...p, y: 0, hp: 100, out: false, dead: false, arm, skill: 3 + Math.floor(r() * 4), readyAt: 0, post: null, cover: 1, moving: true, nextMove: 0, shelter: false, grenades: gr, rockets: rk, leader: i === 0 };
+    const f: Fighter = { id: `r${i}`, side: 'raider', ...p, y: 0, hp: 100, out: false, dead: false, arm, skill: 3 + Math.floor(r() * 4), readyAt: 0, post: null, cover: 1, moving: true, nextMove: 0, shelter: false, grenades: gr, rockets: rk, leader: i === 0, armor: { plate: armedR && r() < late * 0.35, soft: armedR && r() < 0.15 + late * 0.2, helmet: armedR && r() < late * 0.3 } };
     F.push(f); units.push({ id: f.id, side: 'raider', x: r2(p.x), z: r2(p.z), post: 'open' });
   }
   const H = F.filter(f => f.side === 'home'), R = F.filter(f => f.side === 'raider');
+  // the family's armor goes to the fighters, those who served first
+  {
+    let plates = n('plate_carrier'), soft = n('soft_armor'), helmets = n('helmet');
+    for (const f of [...H].filter(h => !h.shelter).sort((a, b) => Number(!!b.vet) - Number(!!a.vet))) {
+      if (plates > 0) { f.armor.plate = true; plates--; } else if (soft > 0) { f.armor.soft = true; soft--; }
+      if (helmets > 0) { f.armor.helmet = true; helmets--; }
+    }
+  }
+  // who's talking (the ticker shows the speaker), and how much a wound takes out of a fighter
+  const pick = <T,>(xs: T[]): T => xs[Math.floor(r() * xs.length)];
+  const nameOf = (f: Fighter) => (f.pid ? s.people.find(p => p.id === f.pid)?.first ?? 'They' : 'Raider');
+  const say = (t: number, text: string, who?: Fighter) => { ev.push({ t: r2(t), kind: 'say', text, ...(who ? { who: who.id } : {}) }); };
+  const eff = (f: Fighter) => Math.max(0.15, Math.min(1, f.hp / 100));
+  const lead = () => H.find(h => !h.out && !h.shelter);
 
   // ── detection, alarm, lights ──
   const detection = Math.min(100, 25 + g.detection + Math.max(0, ...fightersP.map(({ p }) => p.skills.hunter)) * 4);
@@ -172,7 +193,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
     const used = (p: PostSpot) => H.filter(h => h.post === p && !h.out).length;
     const p = posts.find(p => p !== exclude && !p.wrecked && used(p) < p.cap) ?? posts[posts.length - 1];
     f.post = p;
-    const tr = Math.max(1, dist(f, p) / MOVE);
+    const tr = Math.max(1, dist(f, p) / MOVE) / (0.4 + 0.6 * eff(f));
     f.x = p.x; f.z = p.z; f.y = p.y; f.cover = p.cover; f.readyAt = t + tr;
     ev.push({ t: r2(t + 0.2), kind: 'move', unit: f.id, x: r2(p.x), z: r2(p.z), ...(p.y ? { y: p.y } : {}) });
   };
@@ -181,11 +202,23 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
     ev.push({ t: r2(t + 0.3), kind: 'move', unit: f.id, x: r2(shelterAt.x), z: r2(shelterAt.z) });
   };
 
-  const hurt = (f: Fighter, sev: number, t: number) => {
+  const hurt = (f: Fighter, sev: number, t: number, by?: Fighter, part?: 'head' | 'torso' | 'arm' | 'leg') => {
     if (f.dead) return;
     f.hp -= sev;
-    if (f.hp <= 0) { f.dead = true; f.out = true; ev.push({ t: r2(t + 0.05), kind: 'death', unit: f.id }); return; }
-    ev.push({ t: r2(t + 0.05), kind: 'wound', unit: f.id, sev: Math.round(sev) });
+    const mate = () => H.find(h => h !== f && !h.out && !h.shelter);
+    if (f.hp <= 0) {
+      f.dead = true; f.out = true; ev.push({ t: r2(t + 0.05), kind: 'death', unit: f.id });
+      const m = mate();
+      if (f.side === 'home' && m) say(t + 0.4, `${nameOf(f)}'s down! ${pick(['No, no, no —', 'Somebody get to them —', 'Keep firing!'])}`, m);
+      else if (f.side === 'raider' && by?.side === 'home' && r() < 0.5) say(t + 0.3, pick(['Got him!', 'One down!', 'He\'s down — next!']), by);
+      return;
+    }
+    ev.push({ t: r2(t + 0.05), kind: 'wound', unit: f.id, sev: Math.round(sev), ...(part ? { part } : {}) });
+    if (f.side === 'home' && part === 'leg') say(t + 0.3, sev > 60 ? 'My leg — it\'s bleeding bad! Tourniquet!' : 'Ahh — my leg! I can still shoot!', f);
+    else if (f.side === 'home' && part === 'head') say(t + 0.3, 'Something hit my head — can\'t see right —', f);
+    else if (f.side === 'home' && !part) say(t + 0.3, pick(['Shrapnel — I\'m hit!', 'Aagh — the blast got me!']), f);
+    else if (f.side === 'home') say(t + 0.3, sev < 30 ? pick(['I\'m hit — just a graze, keep firing!', 'Grazed me. I\'m fine!']) : sev < 55 ? pick(['I\'m hit! My arm —', 'Ahh — my leg! I can still shoot!']) : pick(['I\'m hit bad —', 'Can\'t… can\'t breathe —']), f);
+    else if (by?.side === 'home' && r() < 0.3) say(t + 0.3, pick(['Hit one!', 'He\'s hit!']), by);
     if (f.hp < (f.side === 'raider' ? 55 : 45)) f.out = true;
   };
   const explode = (x: number, z: number, t: number, radius: number, wreck?: PostSpot) => {
@@ -195,7 +228,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
       const d = Math.hypot(u.x - x, u.z - z);
       if (d > radius) continue;
       hits.push(u.id);
-      hurt(u, (60 + r() * 50) * (1 - d / radius * 0.6) * (u.post === wreck ? 1 : Math.max(0.4, u.cover)), t);
+      hurt(u, (60 + r() * 50) * (1 - d / radius * 0.6) * (u.post === wreck ? 1 : Math.max(0.4, u.cover)) * (u.armor.plate || u.armor.soft ? 0.7 : 1) * (u.armor.helmet ? 0.85 : 1), t);   // armor takes some of the fragments
     }
     let wrecks: 'post' | 'wall' | undefined;
     if (wreck && wreck.kind !== 'open') { wreck.wrecked = true; wrecks = wreck.kind === 'wall' ? 'wall' : 'post'; if (wreck.kind === 'wall') wallDown = true; }
@@ -203,6 +236,42 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
   };
   let wallDown = false, breached = false, fled = false, end: PlannedBattle['result'] | null = null, endT = 0;
   let breachT = 0, lineSince = -1;
+
+  /**
+   * A round that hits: where (cover hides the torso, so more heads and arms
+   * get hit from behind a wall), what the armor does, and whether it kills.
+   * Plates stop rifle rounds most of the time; a soft vest stops pistol
+   * rounds and buckshot, not a rifle; a helmet turns some head shots into
+   * a concussion. An unprotected chest or head can kill outright.
+   */
+  const strike = (b: Fighter, a: Fighter, t: number) => {
+    const covered = b.cover < 0.9 || (b.post && b.post.kind !== 'open');
+    const u = r();
+    const part: 'head' | 'torso' | 'arm' | 'leg' = covered ? (u < 0.25 ? 'head' : u < 0.5 ? 'torso' : u < 0.8 ? 'arm' : 'leg') : (u < 0.1 ? 'head' : u < 0.55 ? 'torso' : u < 0.78 ? 'arm' : 'leg');
+    const rifle = a.arm.range >= 30;
+    const stop = (text: string) => {
+      ev.push({ t: r2(t + 0.05), kind: 'wound', unit: b.id, sev: 5, part, stopped: true });
+      b.hp -= 4;
+      if (b.side === 'home') say(t + 0.3, text, b);
+    };
+    if (part === 'torso') {
+      if (b.armor.plate && r() < 0.85) return stop(pick(['Plate caught it! I\'m okay!', 'Took one in the plate — I\'m good!']));
+      if (b.armor.soft && !rifle && r() < 0.8) return stop('Vest stopped it!');
+      if (r() < (rifle ? 0.3 : 0.18)) return hurt(b, b.hp + 1, t, a, part);
+      return hurt(b, 45 + r() * 35, t, a, part);
+    }
+    if (part === 'head') {
+      if (b.armor.helmet && r() < (rifle ? 0.35 : 0.8)) {   // the helmet holds: a concussion, not a hole
+        b.hp -= 15; ev.push({ t: r2(t + 0.05), kind: 'wound', unit: b.id, sev: 15, part });
+        if (b.side === 'home') say(t + 0.4, 'Helmet took it — my ears are ringing…', b);
+        return;
+      }
+      if (r() < 0.75) return hurt(b, b.hp + 1, t, a, part);
+      return hurt(b, 55 + r() * 25, t, a, part);
+    }
+    if (part === 'leg' && r() < 0.05) return hurt(b, 70, t, a, part);   // the femoral artery
+    return hurt(b, (part === 'arm' ? 20 : 25) + r() * 28, t, a, part);
+  };
 
   const shoot = (a: Fighter, b: Fighter, t: number) => {
     const cal = a.arm.cal;
@@ -214,10 +283,11 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
     let p = (0.06 + 0.025 * a.skill) * a.arm.acc * rangeF * tgtCover * seeMul * (a.side === 'home' && a.post?.kind === 'tower' ? 1.15 : 1);
     if (a.side === 'home' && a.moving) p *= 0.5;
     if (a.arm.auto) p *= 1.6;
+    p *= eff(a);                                   // a wounded shooter shoots worse
     const hit = r() < Math.min(0.9, p);
     ev.push({ t: r2(t), kind: 'shot', from: a.id, to: b.id, hit, ...(a.arm.auto ? { auto: true } : {}) });
     if (b.post) b.post.fire++;
-    if (hit) hurt(b, 25 + r() * 45, t);
+    if (hit) strike(b, a, t);
   };
 
   for (let t = 0; t < 300 && !end; t++) {
@@ -228,20 +298,21 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
       alarmed = true;
       ev.push({ t, kind: 'alarm', what });
       if (lightsOn) ev.push({ t: t + 1, kind: 'lights' });
-      ev.push({ t, kind: 'say', text: what === 'dog' ? 'The dog goes off — everyone up!' : 'Movement on the drive — to your posts!' });
-      for (const f of H) if (f.shelter) toShelter(f, t); else assignPost(f, t);
+      say(t, what === 'dog' ? 'The dog\'s going off — everyone up!' : what === 'camera' ? 'Movement on the camera — to your posts!' : what === 'tripwire' ? 'Tripwire! They\'re in the trees!' : 'Movement on the drive — to your posts!', lead());
+      say(t + 2, pick(['Spread out! Hit the house!', 'Go, go — flank \'em!', 'Nobody has to get hurt — just leave the food!']), R[0]);
+      for (const f of H) if (f.shelter) toShelter(f, t); else { assignPost(f, t); if (!f.vet) f.readyAt += 1 + r() * 3; }   // civilians freeze a moment; those who served go straight to it
     }
     for (const p of posts) p.fire *= 0.7;
 
     // home side: fire, fall back, medic
     if (alarmed) for (const f of hUp) {
       if (t < f.readyAt) continue;
-      if (f.post && (f.post.wrecked || f.post.fire > 5) && f.post.kind !== 'open') { const old = f.post; old.fire = 0; assignPost(f, t, old); continue; }
+      if (f.post && (f.post.wrecked || f.post.fire > (f.vet ? 9 : 5)) && f.post.kind !== 'open') { const old = f.post; old.fire = 0; say(t, old.wrecked ? 'Post\'s gone — falling back!' : 'Too hot here — moving!', f); assignPost(f, t, old); continue; }
       if (f.grenades > 0) {
         const tg = rUp.find(x => dist(x, f) <= GRENADE_RANGE);
-        if (tg) { f.grenades--; ev.push({ t, kind: 'throw', from: f.id, x: r2(tg.x), z: r2(tg.z), what: 'grenade' }); explode(tg.x + (r() - 0.5), tg.z + (r() - 0.5), t + 2, 1.5); continue; }
+        if (tg) { f.grenades--; say(t, 'Frag out!', f); ev.push({ t, kind: 'throw', from: f.id, x: r2(tg.x), z: r2(tg.z), what: 'grenade' }); explode(tg.x + (r() - 0.5), tg.z + (r() - 0.5), t + 2, 1.5); continue; }
       }
-      if (r() > f.arm.rate) continue;
+      if (r() > f.arm.rate * (0.5 + 0.5 * eff(f))) continue;     // and slower
       // threat: close, carrying explosives, caught in the open; only those in front of the post and in range
       const seen = rUp.filter(x => dist(x, f) <= f.arm.range && (f.post?.kind !== 'building' || (x.x - f.x) * ax + (x.z - f.z) * az > -1));
       if (!seen.length) continue;
@@ -254,7 +325,8 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
     if (alarmed && med && down && !breached) {
       down.rescued = true;
       ev.push({ t: r2(t + 0.4), kind: 'move', unit: med.id, x: r2(down.x), z: r2(down.z) });
-      ev.push({ t: r2(t + 2), kind: 'say', text: 'Man down — dragging them inside!' });
+      say(t + 0.5, `Cover me — I'm getting ${nameOf(down)}!`, med);
+      say(t + 3.2, `Got you, ${nameOf(down)}. Pressure on it — hold still.`, med);
       toShelter(down, t + 3);
       med.readyAt = t + 6;
       ev.push({ t: r2(t + 3.3), kind: 'move', unit: med.id, x: r2(med.post?.x ?? med.x), z: r2(med.post?.z ?? med.z) });
@@ -264,13 +336,14 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
     const losses = R.filter(f => f.out).length;
     if (!fled && !breached && rUp.length && (losses >= raiders * 0.4 || R[0].out)) {
       fled = true;
-      ev.push({ t, kind: 'say', text: R[0].out ? 'Their leader is down — they\'re pulling back!' : 'They\'re breaking off!' });
+      say(t, R[0].out ? 'Their leader\'s down — they\'re pulling back!' : 'They\'re breaking off!', lead());
+      if (!R[0].out) say(t + 0.5, pick(['Fall back! Fall back!', 'Not worth it — go!']), R[0]);
       for (const f of rUp) { f.fled = true; const p = at(36, (r() - 0.5) * 10); ev.push({ t: r2(t + r()), kind: 'flee', unit: f.id }); ev.push({ t: r2(t + 1), kind: 'move', unit: f.id, x: r2(p.x), z: r2(p.z) }); }
       end = 'fled'; endT = t + 8; break;
     }
     if (!rUp.length) { end = 'repelled'; endT = t + 3; break; }
     // they can't get over the wall and give up
-    if (!breached && wallR && !wallDown && lineSince >= 0 && t - lineSince > 40) { ev.push({ t, kind: 'say', text: 'They can\'t get over the wall — they\'re giving up.' }); for (const f of rUp) { f.fled = true; ev.push({ t: r2(t + r()), kind: 'flee', unit: f.id }); } end = 'fled'; endT = t + 6; break; }
+    if (!breached && wallR && !wallDown && lineSince >= 0 && t - lineSince > 40) { say(t, 'They can\'t get over the wall — they\'re giving up.', lead()); for (const f of rUp) { f.fled = true; ev.push({ t: r2(t + r()), kind: 'flee', unit: f.id }); } end = 'fled'; endT = t + 6; break; }
     // the weak side: which flank has fewer defenders
     const leftDef = hUp.filter(h => (h.x - C.x) * lx + (h.z - C.z) * lz > 0).length;
     const flank = leftDef > hUp.length / 2 ? -1 : 1;
@@ -287,7 +360,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
       if (f.rockets > 0 && alarmed) {
         const pt = posts.find(p => !p.wrecked && p.kind !== 'open' && H.some(h => h.post === p && !h.out) && dist(p, f) <= ROCKET_RANGE);
         if (pt) {
-          f.rockets--; ev.push({ t, kind: 'rocket', from: f.id, x: r2(pt.x), z: r2(pt.z), ...(pt.y ? { y: pt.y } : {}) });
+          f.rockets--; say(t - 0.3, 'RPG! Get down!', lead()); ev.push({ t, kind: 'rocket', from: f.id, x: r2(pt.x), z: r2(pt.z), ...(pt.y ? { y: pt.y } : {}) });
           const onTarget = r() < 0.6;
           explode(pt.x + (onTarget ? 0 : (r() - 0.5) * 3), pt.z + (onTarget ? 0 : (r() - 0.5) * 3), t + 1, 1.2, onTarget ? pt : undefined);
           continue;
@@ -296,7 +369,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
       // grenades within ~30 m
       if (f.grenades > 0) {
         const tg = hUp.find(h => dist(h, f) <= GRENADE_RANGE);
-        if (tg) { f.grenades--; ev.push({ t, kind: 'throw', from: f.id, x: r2(tg.x), z: r2(tg.z), what: 'grenade' }); explode(tg.x + (r() - 0.5), tg.z + (r() - 0.5), t + 2, 1.5, tg.post && r() < 0.4 ? tg.post : undefined); continue; }
+        if (tg) { f.grenades--; say(t + 0.3, 'Grenade!', tg); ev.push({ t, kind: 'throw', from: f.id, x: r2(tg.x), z: r2(tg.z), what: 'grenade' }); explode(tg.x + (r() - 0.5), tg.z + (r() - 0.5), t + 2, 1.5, tg.post && r() < 0.4 ? tg.post : undefined); continue; }
       }
       // bounding: half move while half suppress; swap each bound
       const movers = Math.floor(t / 4) % 2 === k % 2;
@@ -331,7 +404,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
       breached = true; breachT = t;
       const p = at(lineR, 0);
       ev.push({ t, kind: 'breach', x: r2(p.x), z: r2(p.z) });
-      ev.push({ t, kind: 'say', text: 'They\'re through the line!' });
+      say(t, 'They\'re through the line! Get inside!', lead());
     }
     if (breached && t - breachT >= 20) {
       end = H.some(f => !f.out && !f.shelter) ? 'breached' : 'overrun'; endT = t + 2;
@@ -360,15 +433,19 @@ export function applyBattle(s: GameState, b: Battle): string[] {
   for (const e of b.events) {
     if (e.kind === 'wound' && byUnit.has(e.unit)) {
       const i = idx(e.unit); if (i < 0) continue;
-      const sev = softenWound(s, e.sev, true), nd = s.personState[i].needs;
+      const nd = s.personState[i].needs;
+      if (e.stopped) { if (nd.died == null) { nd.hurt.push({ what: 'bruised ribs (the armor stopped a round)', sev: 8 }); out.push(`${s.people[i].first}'s armor stopped a round.`); } continue; }
+      // a tourniquet or chest seal from an IFAK on the spot
+      let sev = e.sev;
+      if (s.stock.ifak >= 1) { s.stock.ifak -= 1; sev = Math.round(sev * 0.7); }
       if (nd.died != null) continue;
-      nd.hurt.push({ what: 'wounded in the fight', sev });
+      nd.hurt.push({ what: !e.part ? 'hit by shrapnel' : e.part === 'head' ? 'head wound' : e.part === 'torso' ? 'shot in the body' : e.sev < 30 ? 'grazed by a bullet' : `shot in the ${e.part}`, sev, trauma: true });
       nd.health = Math.max(s.disaster.difficulty === 'cozy' ? 5 : 1, nd.health - sev * 0.5);
       out.push(`${s.people[i].first} was wounded.`);
     } else if (e.kind === 'death' && byUnit.has(e.unit)) {
       const i = idx(e.unit); if (i < 0) continue;
       const nd = s.personState[i].needs;
-      if (s.disaster.difficulty === 'cozy') { nd.hurt.push({ what: 'badly wounded in the fight', sev: 80 }); nd.health = 5; out.push(`${s.people[i].first} was badly wounded.`); continue; }
+      if (s.disaster.difficulty === 'cozy') { nd.hurt.push({ what: 'badly wounded in the fight', sev: 80, trauma: true }); nd.health = 5; out.push(`${s.people[i].first} was badly wounded.`); continue; }
       nd.health = 0; nd.died = day;
       out.push(`${s.people[i].first} was killed.`);
     }

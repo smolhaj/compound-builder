@@ -27,11 +27,13 @@ export type BattleEvent =
   | { t: number; kind: 'move'; unit: string; x: number; z: number; y?: number }
   | { t: number; kind: 'shot'; from: string; to: string; hit: boolean; auto?: boolean }
   | { t: number; kind: 'mine'; x: number; z: number; hits: string[] }
-  | { t: number; kind: 'wound'; unit: string; sev: number }
+  /** `part`: where the round struck (shrapnel has none); `stopped`: armor caught it (a bruise, not a wound). */
+  | { t: number; kind: 'wound'; unit: string; sev: number; part?: 'head' | 'torso' | 'arm' | 'leg'; stopped?: boolean }
   | { t: number; kind: 'death'; unit: string }
   | { t: number; kind: 'breach'; x: number; z: number }
   | { t: number; kind: 'flee'; unit: string }
-  | { t: number; kind: 'say'; text: string }
+  /** A line spoken in the fight: `who` is the unit speaking (a resident or a raider), absent for narration. */
+  | { t: number; kind: 'say'; text: string; who?: string }
   | { t: number; kind: 'throw'; from: string; x: number; z: number; what: 'grenade' }
   | { t: number; kind: 'rocket'; from: string; x: number; z: number; y?: number }
   | { t: number; kind: 'explosion'; x: number; z: number; y?: number; radius: number; hits: string[]; wrecks?: 'post' | 'wall' }
