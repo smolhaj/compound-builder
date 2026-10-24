@@ -186,6 +186,8 @@ export interface GameState {
   fin: Fin;
   /** Guns, ammo by caliber, who can shoot. */
   armory: Armory;
+  /** OPSEC choices (sim/opsec.ts); made lazily. */
+  opsec?: { quietDeliveries: boolean; blackout: boolean };
   /** The game in the woods and the creek, licenses. */
   wild: Wild;
   /** The long game: eras, the chronicle, milestones, the dynasty score. */

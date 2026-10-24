@@ -34,6 +34,7 @@ import { daysOfFood, KCAL, needOf } from '../sim/needs';
 import { ANIMALS, feedDemand, winterHay } from '../sim/livestock';
 import { barterPrices, moneyWorks, type Good } from '../sim/barter';
 import { NEIGHBOR_BLURB } from '../sim/encounters';
+import { EXPOSURE_NAME, exposure, raidPressure, topExposure } from '../sim/opsec';
 import { acresOf, buyProblem, LAND_NAME, priceOf } from '../sim/land';
 import { HARDEN, HARDEN_IDS, type TierDef, hardenCost, hardenProblem, isBunkerRoom, protectionOf, tierOf } from '../sim/hardening';
 import { PERIMETER, PERIMETER_ORDER, UTILITY_LINES, runBill, runHours, runFinished, runProgress, runBlocked, runGrowth } from '../sim/perimeter';
@@ -603,6 +604,17 @@ export function Hud() {
                 ))}
               </Section>
             )}
+            {(() => {
+              const ex = exposure(game), o = game.opsec ?? { quietDeliveries: false, blackout: false };
+              return <Section title="OPSEC">
+                <Row label="Exposure" value={`${ex} / 100 · raids ×${raidPressure(game).toFixed(2)}`} tone={ex > 60 ? 'bad' : ex > 30 ? 'warn' : 'good'} title="How much the county knows you're prepared" />
+                {topExposure(game).map(([k, v]) => <Row key={k} label={EXPOSURE_NAME[k]} value={`+${Math.round(v)}`} />)}
+                <div style={{ display: 'flex', gap: 4, padding: '2px 0', flexWrap: 'wrap' }}>
+                  <button style={btn(o.quietDeliveries)} title="Pick deliveries up in town: fewer people see the truck" onClick={() => g.setOpsec('quietDeliveries', !o.quietDeliveries)}>Pick up in town</button>
+                  <button style={btn(o.blackout)} title="Blackout curtains: lights at night show half as much" onClick={() => g.setOpsec('blackout', !o.blackout)}>Blackout curtains</button>
+                </div>
+              </Section>;
+            })()}
             {game.disaster.kind && game.clock.t >= game.disaster.warnAt && <Section title="Neighbors">
               {game.neighbors.map(n => (
                 <Row key={n.id} title={NEIGHBOR_BLURB[n.kind]} label={<>{n.name[0].toUpperCase() + n.name.slice(1)}{n.radio ? ' · radio' : ''}</>}
