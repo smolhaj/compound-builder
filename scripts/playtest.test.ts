@@ -132,6 +132,9 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
       for (const [c, n] of Object.entries(ammo) as Array<[Caliber, number]>) buyAmmo(s, c, n);
       if (strat !== 'homestead') for (const p of s.people.filter(x => !x.kid)) takeClass(s, p.id);
       placeOrder(s, [{ material: 'gun_safe', qty: 1 }, { material: 'gun_cleaning', qty: 2 }]);
+      const gear: Partial<Record<MaterialId, number>> = strat === 'prepper' ? { driveway_alarm: 1, cameras: 1, dog: 1, ifak: 6, radios: 2, plate_carrier: 2, nvg: 1 }
+        : strat === 'fortress' ? { sandbags: 3, steel_door: 2, window_bars: 1, driveway_alarm: 1, dog: 2, plate_carrier: 4, ifak: 6, radios: 2 } : { driveway_alarm: 1, ifak: 2 };
+      placeOrder(s, (Object.entries(gear) as Array<[MaterialId, number]>).map(([material, qty]) => ({ material, qty })));
     }
     // sweep the chimney each fall
     if (strat !== 'idle' && calendarOf(s.clock).doy === 260) sweepChimney(s);

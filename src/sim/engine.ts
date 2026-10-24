@@ -16,6 +16,7 @@ import { shelfDay } from './shelf';
 import { bodyDay } from './body';
 import { financeDay } from './finance';
 import { armoryDay } from './armory';
+import { gearDay } from './gear';
 import { addRunWork, nextRun } from './perimeter';
 import { addFitWork, balanceDay, nextFit, plant } from './utilities';
 import { addHardenWork, nextHardenJob } from './hardening';
@@ -101,6 +102,7 @@ function subStep(s: GameState): void {
     for (const line of shelfDay(s)) log(s, line);
     for (const line of financeDay(s)) log(s, line);
     for (const line of armoryDay(s)) log(s, line);
+    for (const line of gearDay(s)) log(s, line);
     for (const line of upkeepDay(s, demandNow(s), s.heat.warned !== dayIndex(s.clock.t) - 1 && s.heat.warned !== dayIndex(s.clock.t))) log(s, line);
     const e = gateDay(s);
     if (e) log(s, `${e.title}.`);

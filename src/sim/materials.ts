@@ -9,7 +9,8 @@ export type MaterialId = 'lumber' | 'logs' | 'firewood' | 'fieldstone' | 'concre
   | 'pipe' | 'cable' | 'fixtures' | 'pump' | 'drilling' | 'solar_panel' | 'battery' | 'inverter' | 'generator' | 'fuel' | 'tank' | 'septic_tank'
   | 'rebar' | 'membrane' | 'excavator' | 'blast_door' | 'nbc_filter' | 'spoil' | 'culvert' | 'egress_hatch'
   | 'lead_sheet' | 'faraday_mesh' | 'blast_valve' | 'filter_set'
-  | 'fresh' | 'frozen' | 'canned' | 'staples' | 'meds' | 'seed' | 'lids' | 'plow' | 'stabilizer' | 'traps' | 'hygiene' | 'gun_safe' | 'gun_cleaning';
+  | 'fresh' | 'frozen' | 'canned' | 'staples' | 'meds' | 'seed' | 'lids' | 'plow' | 'stabilizer' | 'traps' | 'hygiene' | 'gun_safe' | 'gun_cleaning'
+  | 'plate_carrier' | 'ifak' | 'nvg' | 'thermal' | 'radios' | 'cameras' | 'thermal_cam' | 'driveway_alarm' | 'floodlights' | 'tripwire' | 'dog' | 'steel_door' | 'window_bars' | 'sandbags' | 'safe_room';
 
 export interface MaterialDef {
   id: MaterialId;
@@ -62,6 +63,21 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   seed: { id: 'seed', name: 'Field seed', unit: 'a season for a quarter acre: seed potatoes, dry beans, seed wheat', price: 200 },
   stabilizer: { id: 'stabilizer', name: 'Fuel stabilizer', unit: 'a bottle: keeps ten cans of gas good for two years', price: 15 },
   hygiene: { id: 'hygiene', name: 'Hygiene supplies', unit: 'a person-month: soap, toilet paper, toothpaste, shampoo, pads', price: 25 },
+  plate_carrier: { id: 'plate_carrier', name: 'Plate carrier', unit: 'a carrier with a pair of level III plates', price: 600 },
+  ifak: { id: 'ifak', name: 'IFAK', unit: 'individual first-aid kit: tourniquet, chest seal, pressure dressing', price: 90 },
+  nvg: { id: 'nvg', name: 'Night vision', unit: 'gen 3 monocular and a head mount', price: 3500 },
+  thermal: { id: 'thermal', name: 'Thermal monocular', unit: 'handheld thermal: people and deer in the dark', price: 2200 },
+  radios: { id: 'radios', name: 'GMRS radios', unit: 'a pair of handheld radios with chargers', price: 150 },
+  cameras: { id: 'cameras', name: 'Security cameras', unit: '4 IR night-vision cameras and a recorder (needs power)', price: 450 },
+  thermal_cam: { id: 'thermal_cam', name: 'Thermal camera', unit: 'a fixed thermal security camera on the drive (needs power)', price: 2800 },
+  driveway_alarm: { id: 'driveway_alarm', name: 'Driveway alarm', unit: 'wireless motion sensors along the drive, a base unit in the house', price: 150 },
+  floodlights: { id: 'floodlights', name: 'Motion floodlights', unit: 'a set of motion floodlights for the yard (needs power)', price: 220 },
+  tripwire: { id: 'tripwire', name: 'Tripwire alarms', unit: 'tripwire noisemakers for the trails into the place', price: 60 },
+  dog: { id: 'dog', name: 'Guard dog', unit: 'a trained dog: barks at strangers (eats ~1,000 kcal a day)', price: 600 },
+  steel_door: { id: 'steel_door', name: 'Steel entry door', unit: 'a steel door in a steel frame, installed', price: 1200 },
+  window_bars: { id: 'window_bars', name: 'Window bars', unit: 'security bars for the house windows', price: 900 },
+  sandbags: { id: 'sandbags', name: 'Sandbags', unit: '100 bags (fill them with your own dirt) for a fighting position', price: 300 },
+  safe_room: { id: 'safe_room', name: 'Safe room', unit: 'a reinforced interior room: steel door, lined walls, supplies shelf', price: 8500 },
   gun_safe: { id: 'gun_safe', name: 'Gun safe', unit: '24-gun fire-rated safe, bolted down', price: 1800 },
   gun_cleaning: { id: 'gun_cleaning', name: 'Gun cleaning kit', unit: 'rods, brushes, solvent, oil, patches: about a year', price: 60 },
   traps: { id: 'traps', name: 'Traps & bait stations', unit: 'snap traps, bait stations and bait: about two months', price: 35 },
@@ -75,7 +91,7 @@ export const MATERIAL_IDS = Object.keys(MATERIALS) as MaterialId[];
 export type Stock = Record<MaterialId, number>;
 
 export function emptyStock(): Stock {
-  return { lumber: 0, logs: 0, firewood: 0, fieldstone: 0, concrete: 0, roofing: 0, hardware: 0, wire: 0, seedlings: 0, container: 0, pipe: 0, cable: 0, fixtures: 0, pump: 0, drilling: 0, solar_panel: 0, battery: 0, inverter: 0, generator: 0, fuel: 0, tank: 0, septic_tank: 0, rebar: 0, membrane: 0, excavator: 0, blast_door: 0, nbc_filter: 0, spoil: 0, culvert: 0, egress_hatch: 0, lead_sheet: 0, faraday_mesh: 0, blast_valve: 0, filter_set: 0, fresh: 0, frozen: 0, canned: 0, staples: 0, meds: 0, seed: 0, lids: 0, plow: 0, stabilizer: 0, traps: 0, hygiene: 0, gun_safe: 0, gun_cleaning: 0 };
+  return { lumber: 0, logs: 0, firewood: 0, fieldstone: 0, concrete: 0, roofing: 0, hardware: 0, wire: 0, seedlings: 0, container: 0, pipe: 0, cable: 0, fixtures: 0, pump: 0, drilling: 0, solar_panel: 0, battery: 0, inverter: 0, generator: 0, fuel: 0, tank: 0, septic_tank: 0, rebar: 0, membrane: 0, excavator: 0, blast_door: 0, nbc_filter: 0, spoil: 0, culvert: 0, egress_hatch: 0, lead_sheet: 0, faraday_mesh: 0, blast_valve: 0, filter_set: 0, fresh: 0, frozen: 0, canned: 0, staples: 0, meds: 0, seed: 0, lids: 0, plow: 0, stabilizer: 0, traps: 0, hygiene: 0, gun_safe: 0, gun_cleaning: 0, plate_carrier: 0, ifak: 0, nvg: 0, thermal: 0, radios: 0, cameras: 0, thermal_cam: 0, driveway_alarm: 0, floodlights: 0, tripwire: 0, dog: 0, steel_door: 0, window_bars: 0, sandbags: 0, safe_room: 0 };
 }
 
 /** Cost of a bill of materials at retail (unbuyable items count 0). */
