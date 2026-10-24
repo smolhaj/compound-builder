@@ -166,3 +166,119 @@ SETS.interiors = [
   { name: 'cutaway-night-lamplight', time: 21, season: 'fall', setup: buildTo(5, 0) + view('cutaway') + viewCabin(2.6, 0.8, 0.9), cam: { x: C, z: C, yaw: 0, pitch: 0.8, radius: 3 }, frames: 12 },
   { name: 'cabin-night-windows', time: 21.5, season: 'fall', setup: buildTo(5, 0) + viewCabin(3.2, 0.2, 0.6), cam: { x: C, z: C, yaw: 0, pitch: 0.2, radius: 3 }, frames: 12 },
 ];
+
+/**
+ * A small compound round the camp, every building finished (placed once per
+ * page; each shot then frames one). window.__b[kind] = the placed record.
+ */
+const compound = `{ if (!window.__b) { window.__b = {};
+  const G = cb.game, W = cb.world, c = W.camp;
+  const plan = [['log_house', -4, -3, 0], ['timber_cabin', 3, -3.5, 0], ['workshop', 6, 2, 3], ['garden', -2, 4, 0], ['chicken_coop', 1.5, 4.5, 0], ['root_cellar', -6, 1.5, 1], ['outhouse', 4.5, -7, 0]];
+  for (const [kind, dx, dz, rot] of plan) {
+    const sp = cb.tool.findSpot(kind, c.x + dx, c.z + dz, rot);
+    if (!sp) continue;
+    G.getState().plan(kind, sp[0], sp[1], rot);
+    const st = G.getState().game.structures.at(-1);
+    window.__b[kind] = st;
+  }
+  G.setState(s => { const g = structuredClone(s.game); for (const st of g.structures) { st.stage = 5; st.done = 0; st.finishedAt = 0; } return { game: g }; });
+} }`;
+const at = (kind, r, pitch, yaw) => `{ const b = window.__b['${kind}']; if (b) { cb.cam.target.set(b.x, 0, b.z); cb.cam.radius = ${r}; cb.cam.pitch = ${pitch}; cb.cam.yaw = b.rot * Math.PI / 2 + ${yaw}; } }`;
+const inside2 = (kind, ex, ey, ez, lx, ly, lz, fov = 68) => `{ const b = window.__b['${kind}']; const W = cb.world;
+  const e = W.localToWorld(b.id, ${ex}, ${ey}, ${ez}), l = W.localToWorld(b.id, ${lx}, ${ly}, ${lz});
+  cb.qa.pose = { x: e.x, y: e.y, z: e.z, lx: l.x, ly: l.y, lz: l.z, fov: ${fov} }; }`;
+const cut = "cb.store.getState().setBuildingView('cutaway');";
+const D = { x: C, z: C, yaw: 0, pitch: 0.4, radius: 4 };
+SETS.buildings = [
+  { name: 'compound-aerial', time: 10.5, season: 'summer', setup: compound + "{ const c = cb.world.camp; cb.cam.target.set(c.x, 0, c.z); cb.cam.radius = 16; cb.cam.pitch = 0.75; cb.cam.yaw = 0.6; }", cam: D, frames: 20 },
+  { name: 'log-house-glass-gable', time: 17.5, season: 'summer', setup: compound + at('log_house', 4.2, 0.2, 0.45), cam: D, frames: 12 },
+  { name: 'log-house-cutaway', time: 12, season: 'summer', setup: compound + cut + at('log_house', 4, 0.9, 0.3), cam: D, frames: 12 },
+  { name: 'log-house-great-room', time: 16, season: 'summer', setup: compound + inside2('log_house', 0.3, 0.29, 1.0, -0.45, 0.15, -1.0), cam: D, frames: 12 },
+  { name: 'log-house-kitchen', time: 9, season: 'summer', setup: compound + inside2('log_house', -0.45, 0.29, -0.25, -0.3, 0.12, 1.0), cam: D, frames: 12 },
+  { name: 'log-house-loft', time: 14, season: 'summer', setup: compound + inside2('log_house', 0.0, 0.85, -0.38, -0.1, 0.62, -1.1), cam: D, frames: 12 },
+  { name: 'log-house-bath', time: 11, season: 'summer', setup: compound + inside2('log_house', 0.2, 0.29, 0.1, 0.6, 0.06, -0.35), cam: D, frames: 12 },
+  { name: 'workshop-exterior', time: 11, season: 'summer', setup: compound + at('workshop', 3.2, 0.22, 0.4), cam: D, frames: 12 },
+  { name: 'workshop-cutaway', time: 13, season: 'summer', setup: compound + cut + at('workshop', 3.2, 0.95, 0.2), cam: D, frames: 12 },
+  { name: 'workshop-inside', time: 15, season: 'summer', setup: compound + inside2('workshop', 0.3, 0.27, 0.75, -0.1, 0.12, -0.95), cam: D, frames: 12 },
+  { name: 'root-cellar', time: 10, season: 'summer', setup: compound + at('root_cellar', 2.2, 0.25, 0.5), cam: D, frames: 12 },
+  { name: 'root-cellar-cutaway', time: 11, season: 'summer', setup: compound + cut + at('root_cellar', 1.6, 0.85, 0.3), cam: D, frames: 12 },
+  { name: 'coop-and-run', time: 9.5, season: 'summer', setup: compound + at('chicken_coop', 2.0, 0.4, 0.6), cam: D, frames: 12 },
+  { name: 'garden', time: 15.5, season: 'summer', setup: compound + at('garden', 2.6, 0.55, -0.5), cam: D, frames: 12 },
+  { name: 'outhouse', time: 10, season: 'summer', setup: compound + at('outhouse', 1.4, 0.22, 0.5), cam: D, frames: 12 },
+  { name: 'compound-night', time: 21.5, season: 'fall', setup: compound + "{ const c = cb.world.camp; cb.cam.target.set(c.x, 0, c.z); cb.cam.radius = 12; cb.cam.pitch = 0.45; cb.cam.yaw = 2.6; }", cam: D, frames: 20 },
+];
+
+/**
+ * A perimeter round the sample compound: container wall (front), log
+ * palisade (west), a grown thorn hedge (back), barbed + game fence (east),
+ * a ditch and berm outside the front; gates wherever a line crosses the
+ * driveway, plus a front gate. Everything finished; the hedge planted 6
+ * years ago.
+ */
+const perimeter = compound + `{ if (!window.__perim) { window.__perim = true;
+  const G = cb.game, W = cb.world, c = W.camp, R = 9.5, drive = W.access.drive;
+  const near = (pts) => { const gates = []; let acc = 0; for (let i = 1; i < pts.length; i++) { const [ax, az] = pts[i - 1], [bx, bz] = pts[i], l = Math.hypot(bx - ax, bz - az); for (let s = 0; s < l; s += 0.1) { const x = ax + (bx - ax) * s / l, z = az + (bz - az) * s / l; if (drive.some(p => Math.hypot(p[0] - x, p[1] - z) < 0.35) && !gates.some(g => Math.abs(g.at - (acc + s)) < 1.2)) gates.push({ at: acc + s, w: 0.6 }); } acc += l; } return gates; };
+  const x0 = c.x - R, x1 = c.x + R, z0 = c.z - R, z1 = c.z + R;
+  const runs = [
+    ['container_wall', [[x0, z1], [x1, z1]], [{ at: R, w: 0.6 }]],
+    ['log_palisade', [[x0, z0], [x0, z1]], []],
+    ['thorn_hedge', [[x0, z0], [x1, z0]], []],
+    ['barbed_wire', [[x1, z0], [x1, c.z]], []],
+    ['woven_wire', [[x1, c.z], [x1, z1]], []],
+    ['ditch', [[x0 - 1.5, z1 + 1.6], [x1 + 1.5, z1 + 1.6]], [{ at: R + 1.5, w: 0.6 }]],
+    ['earth_berm', [[x0 - 1.5, z1 + 2.6], [x1 + 1.5, z1 + 2.6]], [{ at: R + 1.5, w: 0.6 }]],
+  ];
+  for (const [kind, pts, gates] of runs) G.getState().planRun(kind, pts, [...gates, ...near(pts)]);
+  G.setState(s => { const g = structuredClone(s.game); for (const r of g.perimeter) { r.done = r.hours; r.supplied = true; r.finishedAt = g.clock.t - 6 * 365; } return { game: g }; });
+} }`;
+const sight = (m, eye) => `cb.store.getState().setSightMode('${m}');` + (eye ? `{ const c = cb.world.camp; cb.sight.set('viewshed', { x: c.x + ${eye[0]}, z: c.z + ${eye[1]}, eye: ${eye[2]} }); }` : '') + 'cb.sight.update(600000);';
+const atCampV = (r, pitch, yaw) => `{ const c = cb.world.camp; cb.cam.target.set(c.x, 0, c.z); cb.cam.radius = ${r}; cb.cam.pitch = ${pitch}; cb.cam.yaw = ${yaw}; }`;
+const eyeAt = (dx, dz, lx, lz, eye = 0.3) => `{ const c = cb.world.camp; cb.cam.placeEye(c.x + ${dx}, c.z + ${dz}, c.x + ${lx}, c.z + ${lz}, ${eye}); }`;
+SETS.perimeter = [
+  { name: 'aerial-walled-compound', time: 11, season: 'summer', setup: perimeter + atCampV(26, 0.8, 0.4), cam: D, frames: 20 },
+  { name: 'container-wall-and-gate-eye-level', time: 10, season: 'summer', setup: perimeter + eyeAt(1.5, 13.5, 0, 9.5), cam: D, frames: 14 },
+  { name: 'ditch-and-berm', time: 16, season: 'summer', setup: perimeter + atCampV(7, 0.32, 0.5) + "{ const c = cb.world.camp; cb.cam.target.set(c.x + 4, 0, c.z + 11); }", cam: D, frames: 14 },
+  { name: 'thorn-hedge-grown', time: 14, season: 'summer', setup: perimeter + eyeAt(2, -12, 0, -9.5), cam: D, frames: 14 },
+  { name: 'palisade-from-inside', time: 15, season: 'fall', setup: perimeter + eyeAt(-6, -2, -9.5, 1.5), cam: D, frames: 14 },
+  { name: 'barbed-and-game-fence', time: 9, season: 'summer', setup: perimeter + eyeAt(12, -2, 9.5, 2), cam: D, frames: 14 },
+  { name: 'sightlines-from-road', time: 12, season: 'summer', setup: perimeter + sight('road') + atCampV(48, 1.0, 0.0), cam: D, frames: 10 },
+  { name: 'sightlines-from-ridge', time: 12, season: 'summer', setup: perimeter + sight('ridge') + atCampV(48, 1.0, 0.0), cam: D, frames: 10 },
+  { name: 'sightlines-night-lights', time: 12, season: 'summer', setup: perimeter + sight('night') + atCampV(48, 1.0, 0.0), cam: D, frames: 10 },
+  { name: 'viewshed-from-tower', time: 12, season: 'summer', setup: perimeter + sight('viewshed', [9.5, 9.5, 1.7]) + atCampV(48, 1.0, 0.0), cam: D, frames: 10 },
+];
+
+/**
+ * Water and power round the sample compound: drilled well + pump house,
+ * cistern, water tower, septic; solar array, battery shed, generator shed;
+ * buried lines joining them to the log house and cabin; both houses plumbed
+ * and wired; a day of balance run.
+ */
+const utilities = compound + `{ if (!window.__util) { window.__util = true;
+  const G = cb.game, W = cb.world, c = W.camp, lh = window.__b.log_house, cab = window.__b.timber_cabin;
+  const place = (kind, dx, dz, rot = 0) => { const sp = cb.tool.findSpot(kind, c.x + dx, c.z + dz, rot); if (!sp) return null; G.getState().plan(kind, sp[0], sp[1], rot); const st = G.getState().game.structures.at(-1); window.__b[kind] = st; return st; };
+  const well = place('well_drilled', -8, -1), cis = place('cistern', -7, -5), tower = place('water_tower', -9, 3), sep = place('septic', -2, -8);
+  const sol = place('solar_array', 1, 8), bat = place('battery_shed', 4, 7), gen = place('generator_shed', 5, 9), hw = place('well_hand', 7, -2);
+  G.setState(s => { const g = structuredClone(s.game); for (const st of g.structures) { st.stage = 5; st.done = 0; st.finishedAt = 0; } g.stock.fuel = 10; return { game: g }; });
+  const pts = (...a) => a.filter(Boolean).map(st => [st.x, st.z]);
+  G.getState().planRun('water_pipe', pts(well, tower, lh, cab), []);
+  G.getState().planRun('water_pipe', pts(cis, lh), []);
+  G.getState().planRun('water_pipe', pts(lh, sep), []);
+  G.getState().planRun('power_cable', pts(sol, bat, gen), []);
+  G.getState().planRun('power_cable', pts(bat, cab, lh, well), []);
+  G.setState(s => { const g = structuredClone(s.game); for (const r of g.perimeter) { r.done = r.hours; r.supplied = true; r.finishedAt = g.clock.t - 400; }
+    for (const id of [lh.id, cab.id]) for (const kind of ['plumb', 'wire']) g.utilities.fittings.push({ building: id, kind, done: 40, hours: 40, supplied: true, finishedAt: 0 });
+    return { game: g }; });
+  G.getState().advance(1);
+} }`;
+SETS.utilities = [
+  { name: 'aerial-water-and-power', time: 11, season: 'summer', setup: utilities + atCampV(22, 0.85, 0.3), cam: D, frames: 24 },
+  { name: 'solar-array-and-battery-shed', time: 12.5, season: 'summer', setup: utilities + at('solar_array', 2.6, 0.35, 0.5), cam: D, frames: 14 },
+  { name: 'battery-shed-cutaway', time: 13, season: 'summer', setup: utilities + cut + at('battery_shed', 1.2, 0.9, 0.3), cam: D, frames: 14 },
+  { name: 'generator-shed', time: 15, season: 'summer', setup: utilities + at('generator_shed', 1.5, 0.3, 0.2), cam: D, frames: 14 },
+  { name: 'water-tower-and-well-house', time: 10, season: 'summer', setup: utilities + at('water_tower', 3.2, 0.25, 0.6), cam: D, frames: 14 },
+  { name: 'cistern', time: 16, season: 'summer', setup: utilities + at('cistern', 1.8, 0.3, 0.4), cam: D, frames: 14 },
+  { name: 'pump-house-inside', time: 11, season: 'summer', setup: utilities + inside2('well_drilled', 0.04, 0.27, 0.28, -0.06, 0.12, -0.15), cam: D, frames: 14 },
+  { name: 'log-house-wired-kitchen-night', time: 21, season: 'fall', setup: utilities + inside2('log_house', -0.45, 0.29, -0.25, -0.3, 0.12, 1.0), cam: D, frames: 14 },
+  { name: 'log-house-plumbed-bath', time: 11, season: 'summer', setup: utilities + inside2('log_house', 0.2, 0.29, 0.1, 0.6, 0.06, -0.35), cam: D, frames: 14 },
+  { name: 'compound-night-electric', time: 21.5, season: 'fall', setup: utilities + atCampV(14, 0.45, 2.6), cam: D, frames: 20 },
+];

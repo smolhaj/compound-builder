@@ -10,9 +10,14 @@ import { MATERIALS, MATERIAL_IDS, emptyStock, type MaterialId } from '../sim/mat
 import { onOrder, orderCost, orderProblem } from '../sim/economy';
 import { blockedReason, isFinished, progress } from '../sim/construction';
 import { BLUEPRINTS, totalBill, totalHours } from '../sim/blueprints';
-import { KIT } from '../game/buildkit/kit';
+import { KIT, KIT_ORDER, UTILITY_ORDER } from '../game/buildkit/kit';
+import { FIT, fitProblem, plant, serviceOf, FUEL_UNIT_L } from '../sim/utilities';
+import { PERIMETER, PERIMETER_ORDER, UTILITY_LINES, runBill, runHours, runFinished, runProgress, runBlocked, runGrowth } from '../sim/perimeter';
 
 const QUALITIES: Quality[] = ['high', 'medium', 'low'];
+const SIGHTS: Array<['off' | 'road' | 'ridge' | 'night' | 'viewshed', string, string]> = [
+  ['off', 'Off', 'No sightline overlay'], ['road', 'Road', 'How exposed each spot is to people on the county road'], ['ridge', 'Ridge', 'Seen from the high ground to the west'],
+  ['night', 'Night', 'Where your lit windows give you away after dark'], ['viewshed', 'View from…', 'Click a spot to see what can be seen from there (Shift-click: from a 10 m tower)']];
 const CAMERAS: Array<[CameraMode, string]> = [['diorama', 'Diorama'], ['walk', 'Walk'], ['fly', 'Fly'], ['cinematic', 'Tour']];
 const VIEWS: Array<[BuildingView, string, string]> = [['full', 'Walls', 'Whole buildings'], ['cutaway', 'Cutaway', 'Walls cut at waist height, roof and loft off (V)'], ['xray', 'X-ray', 'See-through walls and roof (V)']];
 const SPEEDS: Array<[Speed, string]> = [[0, '❚❚'], [1, '▶'], [2, '▶▶'], [3, '▶▶▶'], [4, '⏩']];
@@ -60,8 +65,8 @@ export function Hud() {
   for (const k of MATERIAL_IDS) need[k] = Math.max(0, (need[k] ?? 0) - game.stock[k] - (pending[k] ?? 0));
   const needLines = MATERIAL_IDS.filter(k => (need[k] ?? 0) > 0 && MATERIALS[k].price !== null).map(k => ({ material: k, qty: need[k]! }));
   const sel = game.structures.find(s => s.id === g.selected) ?? game.structures.find(s => !isFinished(s)) ?? null;
-  const cabin = BLUEPRINTS.timber_cabin;
-  const cabinCost = orderCost(Object.entries(totalBill(cabin)).map(([material, qty]) => ({ material: material as MaterialId, qty: qty as number })));
+  const costOf = (kind: string) => orderCost(Object.entries(totalBill(BLUEPRINTS[kind])).filter(([m]) => MATERIALS[m as MaterialId].price !== null).map(([material, qty]) => ({ material: material as MaterialId, qty: qty as number })));
+  const ownNeeds = (kind: string) => Object.entries(totalBill(BLUEPRINTS[kind])).filter(([m]) => MATERIALS[m as MaterialId].price === null).map(([m, q]) => `${q} ${MATERIALS[m as MaterialId].name.toLowerCase()}`).join(', ');
 
   return (
     <>
@@ -78,13 +83,46 @@ export function Hud() {
       {/* Left: build menu + construction */}
       <div style={{ ...panel, position: 'fixed', left: 10, top: 10, width: 230 }}>
         <Section title="Build">
-          <button style={{ ...btn(g.tool === 'timber_cabin'), width: '100%', textAlign: 'left' }} onClick={() => g.setTool(g.tool ? null : 'timber_cabin')}>
-            {KIT.timber_cabin.name} · ~{usd(cabinCost)} · {totalHours(cabin)} h
-          </button>
+          {KIT_ORDER.map(kind => {
+            const own = ownNeeds(kind);
+            return <button key={kind} title={KIT[kind].blurb} style={{ ...btn(g.tool === kind), width: '100%', textAlign: 'left', marginBottom: 3, display: 'block' }} onClick={() => g.setTool(g.tool === kind ? null : kind)}>
+              <div>{KIT[kind].name}</div>
+              <div style={{ fontSize: 11, opacity: 0.75 }}>~{usd(costOf(kind))}{own ? ` + ${own}` : ''} · {totalHours(BLUEPRINTS[kind])} h</div>
+            </button>;
+          })}
+          <div style={{ ...h3, marginTop: 6 }}>Water & power</div>
+          {UTILITY_ORDER.map(kind => {
+            const own = ownNeeds(kind);
+            return <button key={kind} title={KIT[kind].blurb} style={{ ...btn(g.tool === kind), width: '100%', textAlign: 'left', marginBottom: 3, display: 'block' }} onClick={() => g.setTool(g.tool === kind ? null : kind)}>
+              <div>{KIT[kind].name}</div>
+              <div style={{ fontSize: 11, opacity: 0.75 }}>~{usd(costOf(kind))}{own ? ` + ${own}` : ''} · {totalHours(BLUEPRINTS[kind])} h</div>
+            </button>;
+          })}
+          {UTILITY_LINES.map(kind => {
+            const len = 100 / 6, bill = runBill(kind, len);
+            const buy = Object.entries(bill).map(([material, qty]) => ({ material: material as MaterialId, qty: qty as number }));
+            const tool = `fence:${kind}`;
+            return <button key={kind} title={PERIMETER[kind].blurb} style={{ ...btn(g.tool === tool), width: '100%', textAlign: 'left', marginBottom: 3, display: 'block' }} onClick={() => g.setTool(g.tool === tool ? null : tool)}>
+              <div>{PERIMETER[kind].name}</div>
+              <div style={{ fontSize: 11, opacity: 0.75 }}>~{usd(orderCost(buy))} per 100 m · {Math.round(runHours(kind, len))} h</div>
+            </button>;
+          })}
+          <div style={{ ...h3, marginTop: 6 }}>Perimeter (per 100 m)</div>
+          {PERIMETER_ORDER.map(kind => {
+            const len = 100 / 6, bill = runBill(kind, len);
+            const buy = Object.entries(bill).filter(([m]) => MATERIALS[m as MaterialId].price !== null).map(([material, qty]) => ({ material: material as MaterialId, qty: qty as number }));
+            const own = Object.entries(bill).filter(([m]) => MATERIALS[m as MaterialId].price === null).map(([m, q]) => `${q} ${MATERIALS[m as MaterialId].name.toLowerCase()}`).join(', ');
+            const tool = `fence:${kind}`;
+            return <button key={kind} title={PERIMETER[kind].blurb} style={{ ...btn(g.tool === tool), width: '100%', textAlign: 'left', marginBottom: 3, display: 'block' }} onClick={() => g.setTool(g.tool === tool ? null : tool)}>
+              <div>{PERIMETER[kind].name}</div>
+              <div style={{ fontSize: 11, opacity: 0.75 }}>{buy.length ? `~${usd(orderCost(buy))}` : 'no materials'}{own ? ` + ${own}` : ''} · {Math.round(runHours(kind, len))} h</div>
+            </button>;
+          })}
           <button style={{ ...btn(g.tool === 'fell'), width: '100%', textAlign: 'left', marginTop: 4 }} onClick={() => g.setTool(g.tool === 'fell' ? null : 'fell')}>
             Mark trees to fell
           </button>
           {g.tool && <div style={{ marginTop: 4, opacity: 0.85 }}>{g.toolProblem ?? (g.tool === 'fell' ? 'Point at a tree · click marks / unmarks · Esc stops' : 'Click to stake it out · R rotates · Esc cancels')}</div>}
+          {g.tool?.startsWith('fence:') && <div style={{ marginTop: 2, opacity: 0.65, fontSize: 11 }}>Click corners · Shift-click the line for a gate · Enter / double-click lays it out · Backspace undoes · Esc cancels</div>}
         </Section>
         {sel && (
           <Section title="Construction">
@@ -93,6 +131,31 @@ export function Hud() {
               <div style={{ width: `${progress(sel) * 100}%`, height: '100%', background: '#c9b27a', borderRadius: 3 }} />
             </div>
             {!isFinished(sel) && <div style={{ opacity: 0.8 }}>{blockedReason(game, sel) ?? `${Math.round(progress(sel) * 100)} % done`}</div>}
+            {isFinished(sel) && (() => {
+              const p = plant(game), sv = serviceOf(game, p, sel.id);
+              const job = (k: 'plumb' | 'wire') => game.utilities.fittings.find(f => f.building === sel.id && f.kind === k);
+              const row = (k: 'plumb' | 'wire', label: string, on: boolean) => {
+                const j = job(k), why = fitProblem(game, p, sel, k);
+                return <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                  <span>{label}: {on ? 'yes' : j ? (j.finishedAt ? 'yes' : `${Math.round((j.done / j.hours) * 100)} %`) : 'no'}</span>
+                  {!j && <button style={btn()} disabled={!!why} title={why ?? `${FIT[k].hours} h · ${Object.entries(FIT[k].materials).map(([m, q]) => `${q} ${MATERIALS[m as MaterialId].name.toLowerCase()}`).join(', ')}`} onClick={() => g.fit(sel.id, k)}>{k === 'plumb' ? 'Plumb it' : 'Wire it'}</button>}
+                </div>;
+              };
+              return <>
+                {row('plumb', 'Running water', sv.plumbed)}
+                {row('wire', 'Electric', sv.wired)}
+                {game.utilities.broken.includes(sel.id) && <button style={{ ...btn(true), marginTop: 3 }} onClick={() => g.repairPump(sel.id)}>Repair the pump (1 hardware kit)</button>}
+              </>;
+            })()}
+          </Section>
+        )}
+        {game.perimeter.some(r => !runFinished(r) || runGrowth(r, game.clock.t) < 1) && (
+          <Section title="Perimeter">
+            {game.perimeter.filter(r => !runFinished(r) || runGrowth(r, game.clock.t) < 1).slice(0, 4).map(r => (
+              <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>
+                <span>{PERIMETER[r.kind].name}</span>
+                <span style={{ opacity: 0.75 }}>{runFinished(r) ? `growing ${Math.round(runGrowth(r, game.clock.t) * 100)} %` : runBlocked(game, r) ?? `${Math.round(runProgress(r) * 100)} %`}</span>
+              </div>))}
           </Section>
         )}
         {game.forestry.jobs.length > 0 && (
@@ -119,8 +182,20 @@ export function Hud() {
             </div>;
           })}
         </Section>
+        {(game.utilities.report.solarKwh + game.utilities.report.genKwh + game.utilities.report.waterL > 0) && (() => {
+          const r = game.utilities.report;
+          return <Section title="Water & power (yesterday)">
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Power made / used</span><span>{(r.solarKwh + r.genKwh).toFixed(1)} / {r.drawKwh.toFixed(1)} kWh</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Batteries</span><span>{Math.round(r.batteryPct * 100)} %</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Fuel</span><span>{game.stock.fuel * FUEL_UNIT_L} L</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Water in / used</span><span>{Math.round(r.waterL)} / {Math.round(r.useL)} L</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Stored</span><span>{Math.round(r.storedL)} L</span></div>
+            {(r.shortKwh > 0.5 || r.shortL > 0) && <div style={{ color: '#f0a070' }}>{r.shortKwh > 0.5 ? 'Power ran short. ' : ''}{r.shortL > 0 ? 'Water ran short.' : ''}</div>}
+          </Section>;
+        })()}
         <Section title="Stockpile">
-          {MATERIAL_IDS.map(m => (
+          {MATERIAL_IDS.filter(m => game.stock[m] > 0 || (pending[m] ?? 0) > 0 || qty[m] > 0).length === 0 && <div style={{ opacity: 0.6 }}>Empty. Order below or fell timber.</div>}
+          {MATERIAL_IDS.filter(m => game.stock[m] > 0 || (pending[m] ?? 0) > 0 || qty[m] > 0).map(m => (
             <div key={m} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 4 }}>
               <span>{MATERIALS[m].name}</span>
               <span style={{ marginLeft: 'auto', fontVariantNumeric: 'tabular-nums' }}>{game.stock[m]}{pending[m] ? <span style={{ opacity: 0.6 }}> +{pending[m]}</span> : null}</span>
@@ -131,6 +206,10 @@ export function Hud() {
               </>}
             </div>
           ))}
+          <select value="" style={{ marginTop: 4, width: '100%' }} onChange={e => { const m = e.target.value as MaterialId; if (m) setQty({ ...qty, [m]: qty[m] + 1 }); }}>
+            <option value="">Order…</option>
+            {MATERIAL_IDS.filter(m => MATERIALS[m].price !== null).map(m => <option key={m} value={m}>{MATERIALS[m].name} ({usd(MATERIALS[m].price!)} / {MATERIALS[m].unit})</option>)}
+          </select>
           <div style={{ display: 'flex', gap: 4, marginTop: 6, flexWrap: 'wrap' }}>
             {lines.length > 0 && <button style={btn(true)} disabled={!!problem}
               onClick={() => { if (g.order(lines)) setQty(emptyStock()); }}>
@@ -174,6 +253,8 @@ export function Hud() {
         <select value={w.quality} onChange={e => w.setQuality(e.target.value as Quality)} title="Graphics quality">
           {QUALITIES.map(x => <option key={x}>{x}</option>)}
         </select>
+        <span style={{ opacity: 0.7 }}>Sightlines</span>
+        {SIGHTS.map(([m, label, tip]) => <button key={m} title={tip} style={btn(w.sightMode === m)} onClick={() => w.setSightMode(m)}>{label}</button>)}
         <button style={btn(w.photo)} onClick={() => w.setPhoto(!w.photo)}>Photo</button>
         {w.photo && <>
           <span>{clock(w.timeOfDay)}</span>

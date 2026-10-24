@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { KIT, PROBLEM_TEXT, placementProblem, snapCentre, footprint, type SiteQuery } from './buildkit/kit';
-import { buildCabinGroup } from './buildkit/cabinGeometry';
+import { buildGhost } from './buildkit/buildings';
 import type { HomesteadWorld } from './HomesteadWorld';
 import { PARCEL_SIZE } from './parcel/parcelTerrain';
 import { useGameStore } from '../store/gameStore';
@@ -36,7 +36,7 @@ export class PlacementTool {
       height: (x, z) => _world.parcel.natural(x, z).h,
       owned: (x, z) => x >= 0 && z >= 0 && x <= PARCEL_SIZE && z <= PARCEL_SIZE,
       water: (x, z) => _world.parcel.isCreek(x, z) || _world.stream.depthAt(x, z) > 0,
-      blocked: (x, z) => _world.onCamp(x, z),
+      blocked: (x, z) => _world.onCamp(x, z) || _world.onAccess(x, z, 0.1),
     };
     const on = <K extends keyof HTMLElementEventMap>(el: HTMLElement | Window, t: K, f: (e: HTMLElementEventMap[K]) => void) => {
       el.addEventListener(t, f as EventListener);
@@ -66,7 +66,7 @@ export class PlacementTool {
     this._kind = kind;
     if (this._ghost) { this._scene.remove(this._ghost); this._ghost.traverse(o => (o as THREE.Mesh).geometry?.dispose()); this._ghost = null; }
     if (kind) {
-      this._ghost = buildCabinGroup(KIT[kind]);
+      this._ghost = buildGhost(KIT[kind]);
       this._ghost.traverse(o => { if ((o as THREE.Mesh).isMesh) { (o as THREE.Mesh).castShadow = false; (o as THREE.Mesh).renderOrder = 5; } });
       this._ghost.visible = false;
       this._scene.add(this._ghost);
@@ -91,6 +91,21 @@ export class PlacementTool {
   }
 
   placeHere(): void { this._place(); }
+
+  /** QA: the nearest valid spot for a piece to (x, z) (searched in a growing ring on the build grid), or null. */
+  findSpot(kind: string, x: number, z: number, rot = 0, maxR = 30): [number, number] | null {
+    const def = KIT[kind];
+    const placed = useGameStore.getState().game.structures;
+    for (let r = 0; r <= maxR; r += 0.5) {
+      const n = Math.max(1, Math.ceil(2 * Math.PI * r / 0.5));
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2;
+        const [sx, sz] = snapCentre(def, x + Math.cos(a) * r, z + Math.sin(a) * r, rot);
+        if (placementProblem(def, sx, sz, rot, this._site, placed) === null) return [sx, sz];
+      }
+    }
+    return null;
+  }
 
   private _move(cx: number, cy: number): void {
     if (!this._kind || !this._world.terrain.mesh) return;

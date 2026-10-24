@@ -7,6 +7,9 @@ import { addWork, blockedReason, isFinished } from './construction';
 import { deliverOrders } from './economy';
 import { addFellWork, nextFellJob } from './forestry';
 import { burnFirewood } from './heating';
+import { addRunWork, nextRun } from './perimeter';
+import { addFitWork, balanceDay, nextFit, plant } from './utilities';
+import { dayIndex } from './state';
 import { buildRate } from './family';
 import { routineAt, taskFor } from './schedule';
 import { hourOf, type GameState, type Structure } from './state';
@@ -24,17 +27,27 @@ function subStep(s: GameState): void {
   deliverOrders(s);
   const h = hourOf(s.clock.t);
   const target = nextBuildTarget(s);
+  const run = target ? null : nextRun(s);
+  const fit = target || run ? null : nextFit(s);
   const job = nextFellJob(s);
   // with both building and felling to do, the family splits: every other person to the woods
   s.people.forEach((p, i) => {
     const ps = s.personState.find(x => x.id === p.id)!;
-    const task = taskFor(routineAt(p, h), target !== null, job !== null, i % 2 === 1);
+    const task = taskFor(routineAt(p, h), target !== null || run !== null || fit !== null, job !== null, i % 2 === 1);
     ps.task = task;
-    ps.target = task === 'build' && target ? target.id : task === 'forestry' && job ? job.id : null;
+    ps.target = task === 'build' ? (target?.id ?? run?.id ?? fit?.building ?? null) : task === 'forestry' && job ? job.id : null;
     if (task === 'build' && target) addWork(s, target, SUBSTEP * 24 * buildRate(p));
+    else if (task === 'build' && run) addRunWork(s, run, SUBSTEP * 24 * buildRate(p));
+    else if (task === 'build' && fit) addFitWork(s, fit, SUBSTEP * 24, p.skills.mechanic);
     else if (task === 'forestry' && job) addFellWork(s, job, SUBSTEP * 24 * buildRate(p));
   });
   burnFirewood(s, SUBSTEP);
+  // once a day (at midnight): balance water and power
+  const day = dayIndex(s.clock.t);
+  if (day !== s.utilities.lastDay && h < 0.3) {
+    const x = Math.sin(day * 78.233 + s.seed) * 43758.5453;
+    balanceDay(s, plant(s), x - Math.floor(x));
+  }
 }
 
 /** Advance `days` of game time. Returns a new state (the input is not mutated). */

@@ -33,6 +33,9 @@ export interface WorldState {
   quality: Quality;
   cameraMode: CameraMode;
   buildingView: BuildingView;
+  /** Sightline overlay: off / exposure from the road / from the ridge / night lights / viewshed from a point. */
+  sightMode: 'off' | 'road' | 'ridge' | 'night' | 'viewshed';
+  setSightMode: (m: WorldState['sightMode']) => void;
   setBuildingView: (v: BuildingView) => void;
   /** Cinematic tour caption card (null = none). */
   tourCaption: TourCaption | null;
@@ -63,6 +66,8 @@ export const useWorldStore = create<WorldState>()(subscribeWithSelector((set) =>
   quality: 'high',
   cameraMode: 'diorama',
   buildingView: 'full',
+  sightMode: 'off',
+  setSightMode: (sightMode) => set({ sightMode }),
   setBuildingView: (buildingView) => set({ buildingView }),
   tourCaption: null,
   setCameraMode: (cameraMode) => set({ cameraMode }),

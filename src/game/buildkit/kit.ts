@@ -23,19 +23,95 @@ export interface KitPieceDef {
   parts: { foundation: KitMaterialId; walls: KitMaterialId; roof: KitMaterialId };
   /** Steepest ground (rise / run) under the footprint before it needs a bigger pad. */
   maxSlope: number;
+  /** Build-menu group and one-line description. */
+  category: 'home' | 'work' | 'food' | 'sanitation' | 'water' | 'power';
+  blurb: string;
+  /** Floor height above the pad (walking height inside) and porch depth in front of the +z wall (world units). */
+  floorY: number;
+  porch: number;
+  /** People it sleeps (0 = not a home). */
+  sleeps: number;
+  /** Interior lamp position (local, above the floor), or null for no lamplight. */
+  light: [number, number, number] | null;
 }
 
 export const TIMBER_CABIN: KitPieceDef = {
-  id: 'timber_cabin',
-  name: 'Timber cabin',
+  id: 'timber_cabin', name: 'Timber cabin', category: 'home',
+  blurb: '6 × 9 m one-room cabin with a bedroom and a kids\' loft, wood stove, porch.',
   cellsX: 2,   // 6 m
   cellsZ: 3,   // 9 m
   frontCells: 1,
   parts: { foundation: 'fieldstone', walls: 'timber_lap', roof: 'metal_roof' },
-  maxSlope: 0.35,
+  maxSlope: 0.35, floorY: 0.09, porch: 0.42, sleeps: 4, light: [-0.2, 0.32, -0.05],
 };
 
-export const KIT: Record<string, KitPieceDef> = { [TIMBER_CABIN.id]: TIMBER_CABIN };
+export const OUTHOUSE: KitPieceDef = {
+  id: 'outhouse', name: 'Outhouse', category: 'sanitation',
+  blurb: 'Pit privy with a crescent-moon door. Keep it downhill and well away from the water.',
+  cellsX: 1, cellsZ: 1, frontCells: 0,
+  parts: { foundation: 'fieldstone', walls: 'board_batten', roof: 'metal_roof' },
+  maxSlope: 0.45, floorY: 0.03, porch: 0, sleeps: 0, light: null,
+};
+
+export const WORKSHOP: KitPieceDef = {
+  id: 'workshop', name: 'Workshop & garage', category: 'work',
+  blurb: '9 × 12 m steel-sided shop on a slab: a vehicle bay, workbench, tool wall, forge corner.',
+  cellsX: 3, cellsZ: 4, frontCells: 1,
+  parts: { foundation: 'concrete', walls: 'metal_siding', roof: 'metal_roof' },
+  maxSlope: 0.25, floorY: 0.03, porch: 0, sleeps: 0, light: [0, 0.4, 0],
+};
+
+export const ROOT_CELLAR: KitPieceDef = {
+  id: 'root_cellar', name: 'Root cellar', category: 'food',
+  blurb: 'Earth-bermed stone vault: cool, dark and steady for potatoes, roots, crocks and canning jars.',
+  cellsX: 2, cellsZ: 2, frontCells: 1,
+  parts: { foundation: 'fieldstone', walls: 'fieldstone', roof: 'earth' },
+  maxSlope: 0.5, floorY: 0.02, porch: 0, sleeps: 0, light: [0, 0.25, -0.1],
+};
+
+export const CHICKEN_COOP: KitPieceDef = {
+  id: 'chicken_coop', name: 'Chicken coop & run', category: 'food',
+  blurb: 'Raised coop with roosts and nest boxes, a covered wire run for a dozen hens.',
+  cellsX: 2, cellsZ: 2, frontCells: 0,
+  parts: { foundation: 'fieldstone', walls: 'board_batten', roof: 'metal_roof' },
+  maxSlope: 0.4, floorY: 0.0, porch: 0, sleeps: 0, light: null,
+};
+
+export const GARDEN: KitPieceDef = {
+  id: 'garden', name: 'Kitchen garden', category: 'food',
+  blurb: 'Six raised beds inside a deer fence, compost bins and a rain barrel.',
+  cellsX: 3, cellsZ: 3, frontCells: 0,
+  parts: { foundation: 'fieldstone', walls: 'board_batten', roof: 'metal_roof' },
+  maxSlope: 0.3, floorY: 0.0, porch: 0, sleeps: 0, light: null,
+};
+
+export const LOG_HOUSE: KitPieceDef = {
+  id: 'log_house', name: 'Log house', category: 'home',
+  blurb: '9 × 15 m house of your own logs: great room with a glass gable and stone fireplace, bath, three bedrooms.',
+  cellsX: 3, cellsZ: 5, frontCells: 1,
+  parts: { foundation: 'fieldstone', walls: 'log_wall', roof: 'metal_roof' },
+  maxSlope: 0.3, floorY: 0.1, porch: 0.45, sleeps: 6, light: [0, 0.34, 0],
+};
+
+const util = (id: string, name: string, category: 'water' | 'power' | 'sanitation', cx: number, cz: number, blurb: string, light: [number, number, number] | null = null): KitPieceDef => ({
+  id, name, category, blurb, cellsX: cx, cellsZ: cz, frontCells: 0, parts: { foundation: 'concrete', walls: 'board_batten', roof: 'metal_roof' }, maxSlope: 0.35, floorY: 0.02, porch: 0, sleeps: 0, light,
+});
+export const UTILITY_KIT: KitPieceDef[] = [
+  util('well_hand', 'Hand-dug well', 'water', 1, 1, 'A stone-lined well with a hand pump. ≈ 900 L a day, carried by bucket: no pressure, no plumbing.'),
+  util('well_drilled', 'Drilled well & pump house', 'water', 1, 1, 'A 60 m bore (contractor) with a submersible pump and pressure tank: running water, but the pump needs power.', [0, 0.25, 0]),
+  util('cistern', 'Rain cistern', 'water', 1, 1, '10,000 L tank fed by the gutters of every roof on its water line. Storage for dry spells.'),
+  util('water_tower', 'Water tower', 'water', 1, 1, 'A 4,000 L tank on a timber stand: gravity pressure with no pump, and a lookout deck.'),
+  util('solar_array', 'Solar array', 'power', 3, 2, '12 × 400 W panels on ground racks: ≈ 12 kWh a summer day, 6 in December.'),
+  util('battery_shed', 'Battery & inverter shed', 'power', 1, 1, '20 kWh of batteries, an inverter and charge controller: power through the night.', [0, 0.28, 0]),
+  util('generator_shed', 'Generator shed', 'power', 1, 1, 'A 7 kW generator and fuel rack. Backup for dark weeks; burns ≈ 0.45 L a kWh.', [0, 0.28, 0]),
+  util('septic', 'Septic system', 'sanitation', 2, 2, 'Septic tank and leach field. Lets plumbed houses have flush toilets.'),
+];
+
+export const KIT: Record<string, KitPieceDef> = Object.fromEntries([TIMBER_CABIN, LOG_HOUSE, OUTHOUSE, WORKSHOP, ROOT_CELLAR, CHICKEN_COOP, GARDEN, ...UTILITY_KIT].map(d => [d.id, d]));
+/** Build-menu order. */
+export const KIT_ORDER: readonly string[] = ['timber_cabin', 'log_house', 'outhouse', 'garden', 'chicken_coop', 'root_cellar', 'workshop'];
+/** Water & power menu order. */
+export const UTILITY_ORDER: readonly string[] = ['well_hand', 'well_drilled', 'cistern', 'water_tower', 'septic', 'solar_array', 'battery_shed', 'generator_shed'];
 
 /** A placed structure (the game state record). */
 export interface Placed {

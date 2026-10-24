@@ -7,6 +7,7 @@ import { FarTreeRenderer } from '../engine/world/trees/FarTreeRenderer';
 import { planParcelTrees, type ParcelTree } from './parcel/parcelTrees';
 import { buildWoods, fallHeading, trunkRadius } from './forestry/woodsGeometry';
 import type { Forestry } from '../sim/state';
+import { plant, serviceOf } from '../sim/utilities';
 import { StreamRenderer } from '../engine/world/water/StreamRenderer';
 import { RegionalWaterRenderer } from '../engine/world/water/RegionalWaterRenderer';
 import { updateWaterGlobals } from '../engine/world/water/waterShading';
@@ -23,7 +24,13 @@ import type { GameState } from '../sim/state';
 import type { WearSeason } from '../engine/world/people/crowdWear';
 import type { TourBuildingInfo } from '../engine/world/camera/TourController';
 import { footprint, KIT, type Placed } from './buildkit/kit';
-import { buildCabinLayers, cabinChimneyTop, showCabinStage, CABIN, CUTAWAY_HIDE, XRAY_LAYERS, type CabinLayer } from './buildkit/cabinGeometry';
+import { showStage, CUTAWAY_HIDE, XRAY_LAYERS, type BuildLayer as CabinLayer } from './buildkit/shell';
+import { buildLayers, type Seat } from './buildkit/buildings';
+import { hashStr } from './buildkit/clutter';
+import { buildRun, solidSpans } from './perimeter/perimeterGeometry';
+import { PERIMETER, runGrowth, runProgress, wallLength, type PerimeterRun } from '../sim/perimeter';
+import { closestOnLine, earthworkReach, type Earthwork } from './parcel/parcelTerrain';
+import { exposure, Sight, type Observer, type SightWorld } from './sightlines/visibility';
 import { hitsColliders, type Collider } from './buildkit/interior';
 import type { BuildingView } from '../store/worldStore';
 import type { Structure } from '../sim/state';
@@ -52,13 +59,16 @@ const TREE_MARGIN = 26;
 interface Built {
   placed: Placed;
   group: THREE.Group;
-  smoke: SmokePlume;
+  /** Wood smoke from the chimney / stovepipe (null: no stove). */
+  smoke: SmokePlume | null;
   key: string;
   finished: boolean;
   /** Floor level of the pad the building stands on. */
   padY: number;
   /** Lamplight inside (warm point light, brighter at night). */
-  light: THREE.PointLight;
+  light: THREE.PointLight | null;
+  /** Services the interior was built with ('pws' bits). */
+  services: string;
 }
 
 /** See-through variants of the kit materials (x-ray view), shared. */
@@ -216,7 +226,7 @@ export class HomesteadWorld {
   /** Parcel trees (near, detailed) inside the margin; regional far trees beyond it. */
   private _plant(q: Quality): void {
     const margin = TREE_MARGIN;
-    const specs = planParcelTrees(this.parcel, { margin, density: q === 'low' ? 0.5 : 1, blocked: (x, z) => this.onBuilding(x, z, 0.6) || this.onCamp(x, z, 0.6) || this.onAccess(x, z, 0.5) });
+    const specs = planParcelTrees(this.parcel, { margin, density: q === 'low' ? 0.5 : 1, blocked: (x, z) => this.onBuilding(x, z, 0.6) || this.onCamp(x, z, 0.6) || this.onAccess(x, z, 0.5) || this.onPerimeterLine(x, z, 0.25) });
     for (const t of specs) t.y = this.terrain.surfaceAt(t.x, t.z) - 0.03;
     this._planted = specs;
     // lookups cover every tree a full-density plan has (marks made on High survive a switch to Low)
@@ -274,6 +284,117 @@ export class HomesteadWorld {
       if (along < bestD) { bestD = along; best = t; }
     }
     return best;
+  }
+
+  // ── Perimeter ─────────────────────────────────────────────────────────
+  private _runs: readonly PerimeterRun[] = [];
+  private readonly _runGroups = new Map<string, { key: string; group: THREE.Group }>();
+  private _runIds = '';
+  private _worksKey = '';
+
+  /** Is (x, z) within `pad` of a planned perimeter line (trees are cleared off fence lines)? */
+  onPerimeterLine(x: number, z: number, pad = 0): boolean {
+    for (const r of this._runs) if (closestOnLine(r.pts, x, z).d < pad) return true;
+    return false;
+  }
+
+  /** Fences, hedges and walls drawn as built (hedges by growth); berms and ditches shape the terrain. */
+  syncPerimeter(runs: readonly PerimeterRun[], t: number): void {
+    this._runs = runs;
+    const ids = runs.map(r => r.id).join(',');
+    for (const r of runs) {
+      const key = `${Math.round(runProgress(r) * 60)}:${Math.round(runGrowth(r, t) * 40)}:${r.finishedAt === null ? 0 : 1}:${r.gates.length}`;
+      const cur = this._runGroups.get(r.id);
+      if (cur?.key === key) continue;
+      if (cur) { this._root.remove(cur.group); cur.group.traverse(o => (o as THREE.Mesh).geometry?.dispose()); }
+      const group = buildRun(r, this.groundAt, t, (x, z) => this.onBuilding(x, z, 0.02, false));
+      this._root.add(group);
+      this._runGroups.set(r.id, { key, group });
+      this._ws.invalidateShadows();
+    }
+    // earthworks (berms raise, ditches cut) as they are dug
+    const works: Earthwork[] = runs.filter(r => r.kind === 'earth_berm' || r.kind === 'ditch').map(r => ({ pts: r.pts, gates: r.gates, height: PERIMETER[r.kind].height, k: r.finishedAt !== null ? 1 : runProgress(r) }));
+    const wk = works.map(w => `${w.pts.length}:${Math.round(w.k * 20)}`).join('|');
+    if (wk !== this._worksKey) {
+      this._worksKey = wk;
+      this.parcel.setEarthworks(works);
+      for (const w of works) {
+        const pad = earthworkReach(w) + 0.5;
+        const xs = w.pts.map(p => p[0]), zs = w.pts.map(p => p[1]);
+        this.terrain.refresh(this._terrainSource, Math.min(...xs) - pad, Math.min(...zs) - pad, Math.max(...xs) + pad, Math.max(...zs) + pad);
+      }
+      for (const g of this._runGroups.values()) g.key = '';
+      this._ws.invalidateShadows();
+    }
+    // a new line clears the trees off it
+    if (ids !== this._runIds) {
+      const before = this._runIds;
+      this._runIds = ids;
+      for (const [id, g] of this._runGroups) if (!runs.some(r => r.id === id)) { this._root.remove(g.group); this._runGroups.delete(id); }
+      if (before !== '' || ids !== '') { if (this._quality) this._plant(this._quality); }
+    }
+  }
+
+  /** Walk / people collision with built perimeter runs (gates and unbuilt stretches are open). */
+  private _perimeterBlocked(x: number, z: number, r: number): boolean {
+    for (const run of this._runs) {
+      const th = run.kind === 'container_wall' ? 0.21 : run.kind === 'thorn_hedge' ? 0.15 * runGrowth(run, this._simT) : run.kind === 'log_palisade' ? 0.03 : run.kind === 'earth_berm' || run.kind === 'ditch' ? 0 : 0.01;
+      if (th < 0.01) continue;
+      const { d, s } = closestOnLine(run.pts, x, z);
+      if (d > th + r) continue;
+      const built = run.finishedAt !== null ? wallLength(run) : wallLength(run) * runProgress(run);
+      if (solidSpans(run, built).some(([a, b]) => s >= a - 0.01 && s <= b + 0.01)) return true;
+    }
+    return false;
+  }
+  private _simT = 0;
+  /** Sim time for growth-dependent checks (set by the canvas). */
+  set simTime(t: number) { this._simT = t; }
+
+  // ── Sightlines ────────────────────────────────────────────────────────
+  /** What blocks sight now: terrain, standing trees, the regional forest, grown hedges / walls, buildings. */
+  sightWorld(): SightWorld {
+    const boxes = [...this._built.values()].map(b => {
+      const box = new THREE.Box3().setFromObject(b.group);
+      return { x0: box.min.x, z0: box.min.z, x1: box.max.x, z1: box.max.z, top: box.max.y };
+    });
+    const walls = this._runs.filter(r => r.kind !== 'earth_berm' && r.kind !== 'ditch' && PERIMETER[r.kind].sight > 0).map(r => {
+      const g = runGrowth(r, this._simT);
+      return { pts: r.pts, top: PERIMETER[r.kind].height * (r.kind === 'thorn_hedge' ? g : 1), cut: PERIMETER[r.kind].sight * (r.kind === 'thorn_hedge' ? g : r.finishedAt !== null ? 1 : runProgress(r)), gates: r.gates };
+    });
+    const inside = (x: number, z: number) => x > -TREE_MARGIN && z > -TREE_MARGIN && x < PARCEL_SIZE + TREE_MARGIN && z < PARCEL_SIZE + TREE_MARGIN;
+    return { ground: this.groundAt, trees: this.treeSpecs, forestAt: (x, z) => this.parcel.region.sample(x, z).forest, inside, walls, boxes };
+  }
+
+  /** Who looks: people driving / walking the county road, or someone up on the ridge to the west. */
+  observers(kind: 'road' | 'ridge'): Observer[] {
+    if (kind === 'road') {
+      const out: Observer[] = [];
+      for (let z = -12; z <= PARCEL_SIZE + 12; z += 5) out.push({ x: roadX(z), z, eye: 0.3 });
+      return out;
+    }
+    // the highest ground in a band 40–90 units west of the parcel
+    const cand: Array<Observer & { h: number }> = [];
+    // open high points only (a spotter picks bare rock or a clearing, not the middle of the timber)
+    for (let x = -90; x <= -30; x += 4) for (let z = -30; z <= PARCEL_SIZE + 30; z += 6) if (this.parcel.region.sample(x, z).forest < 0.3) cand.push({ x, z, eye: 0.3, h: this.groundAt(x, z) });
+    cand.sort((a, b) => b.h - a.h);
+    const picked: Observer[] = [];
+    for (const c of cand) { if (picked.every(p => Math.hypot(p.x - c.x, p.z - c.z) > 18)) picked.push({ x: c.x, z: c.z, eye: 0.3 }); if (picked.length >= 6) break; }
+    return picked;
+  }
+
+  /** Lit windows at night (finished buildings with a lamp, and the campfire until a home stands). */
+  nightLights(): Array<{ x: number; z: number; h: number; k: number }> {
+    const out = [...this._built.values()].filter(b => b.finished && KIT[b.placed.kind].light).map(b => ({ x: b.placed.x, z: b.placed.z, h: KIT[b.placed.kind].floorY + 0.25, k: KIT[b.placed.kind].sleeps > 0 ? 1 : 0.6 }));
+    if (!out.some(l => l.k === 1)) out.push({ x: this.camp.x, z: this.camp.z, h: 0.15, k: 0.8 });
+    return out;
+  }
+
+  /** Share of the county road that can see each building (its windows, ≈ 1.5 m up). */
+  buildingExposure(): Record<string, number> {
+    const s = new Sight(this.sightWorld()), obs = this.observers('road'), out: Record<string, number> = {};
+    for (const b of this._built.values()) out[b.placed.id] = exposure(s, { ground: this.groundAt }, b.placed.x, b.placed.z, KIT[b.placed.kind].floorY + 0.25, obs);
+    return out;
   }
 
   /** Show the woods at work: paint marks, felled and bucked trees, stumps; cut trees leave the forest. */
@@ -385,19 +506,25 @@ export class HomesteadWorld {
     const y = this.parcel.padHeight(r.x0, r.z0, r.x1, r.z1);
     const pad: Pad = { x0: r.x0 - 0.05, z0: r.z0 - 0.05, x1: r.x1 + 0.05, z1: r.z1 + 0.05, y, skirt: 0.9 };
     this.parcel.setPads([...this.parcel.pads, pad]);
-    const group = buildCabinLayers(def);
-    showCabinStage(group, 0, 0);
+    const group = buildLayers(def, hashStr(p.id + ':' + this.parcel.seed));
+    showStage(group, 0, 0);
     group.position.set(p.x, y, p.z);
     group.rotation.y = p.rot * Math.PI / 2;
-    group.userData = { type: 'building', buildingId: p.id };
+    // keep the builder's userData (colliders, seats, chimney) and tag it for the tour camera
+    Object.assign(group.userData, { type: 'building', buildingId: p.id });
     this._ws.scene.add(group);
-    const smoke = new SmokePlume(group.localToWorld(cabinChimneyTop(def)));
-    this._ws.scene.add(smoke.points);
-    const light = new THREE.PointLight(0xffc27a, 0, 1.4, 2);
-    light.position.set(-0.2, CABIN.floor + 0.32, -0.05);
-    light.visible = false;
-    group.add(light);
-    this._built.set(p.id, { placed: p, group, smoke, key: '', finished: false, padY: y, light });
+    group.updateMatrixWorld(true);
+    const top = group.userData.chimneyTop as THREE.Vector3 | null;
+    const smoke = top ? new SmokePlume(group.localToWorld(top.clone())) : null;
+    if (smoke) this._ws.scene.add(smoke.points);
+    let light: THREE.PointLight | null = null;
+    if (def.light) {
+      light = new THREE.PointLight(0xffc27a, 0, def.cellsX * CELL * 1.4 + 0.6, 2);
+      light.position.set(def.light[0], def.floorY + def.light[1], def.light[2]);
+      light.visible = false;
+      group.add(light);
+    }
+    this._built.set(p.id, { placed: p, group, smoke, key: '', finished: false, padY: y, light, services: '000' });
     this.terrain.refresh(this._terrainSource, pad.x0 - pad.skirt - 1, pad.z0 - pad.skirt - 1, pad.x1 + pad.skirt + 1, pad.z1 + pad.skirt + 1);
     if (this._quality) this._plant(this._quality);
     this._ws.invalidateShadows();
@@ -419,10 +546,58 @@ export class HomesteadWorld {
       const key = `${st.stage}:${Math.round(f * 200)}:${st.supplied ? 1 : 0}`;
       if (key === b.key) continue;
       b.key = key;
-      showCabinStage(b.group, done ? 5 : st.stage, f, st.supplied);
-      if (done !== b.finished) { b.finished = done; b.light.visible = done; this._ws.invalidateShadows(); }
+      showStage(b.group, done ? 5 : st.stage, f, st.supplied);
+      if (done !== b.finished) { b.finished = done; if (b.light) b.light.visible = done; this._ws.invalidateShadows(); }
       this._applyView(b);
     }
+  }
+
+  /**
+   * Services changed (plumbed / wired / septic): rebuild those buildings so
+   * their interiors match (faucets, lights, fridge, flush toilet), and
+   * warm lamplight turns to electric light.
+   */
+  syncServices(game: GameState): void {
+    const p = plant(game);
+    for (const b of this._built.values()) {
+      if (!b.finished) continue;
+      const sv = serviceOf(game, p, b.placed.id);
+      const opts = { plumbed: sv.plumbed, wired: sv.wired, septic: sv.septic };
+      const key = `${+opts.plumbed}${+opts.wired}${+opts.septic}`;
+      if (key === b.services) continue;
+      b.services = key;
+      if (key === '000' && !b.group.userData.opts?.plumbed && !b.group.userData.opts?.wired) continue;
+      this._rebuild(b, opts);
+      if (b.light) b.light.color.set(opts.wired ? 0xfff0d8 : 0xffc27a);
+    }
+  }
+
+  private _rebuild(b: Built, opts: { plumbed: boolean; wired: boolean; septic: boolean }): void {
+    const def = KIT[b.placed.kind];
+    const g = buildLayers(def, hashStr(b.placed.id + ':' + this.parcel.seed), opts);
+    Object.assign(g.userData, { type: 'building', buildingId: b.placed.id });
+    g.position.copy(b.group.position);
+    g.rotation.copy(b.group.rotation);
+    if (b.light) { b.group.remove(b.light); g.add(b.light); }
+    this._ws.scene.remove(b.group);
+    b.group.traverse(o => (o as THREE.Mesh).geometry?.dispose());
+    b.group = g;
+    this._ws.scene.add(g);
+    b.key = '';
+    showStage(g, 5, 0);
+    this._applyView(b);
+    this._ws.invalidateShadows();
+  }
+
+  /** The building a screen ray hits (click to select), or null. */
+  pickBuilding(ray: THREE.Ray): string | null {
+    const rc = new THREE.Raycaster(ray.origin, ray.direction);
+    let best: { id: string; d: number } | null = null;
+    for (const b of this._built.values()) {
+      const hit = rc.intersectObject(b.group, true)[0];
+      if (hit && (!best || hit.distance < best.d)) best = { id: b.placed.id, d: hit.distance };
+    }
+    return best?.id ?? null;
   }
 
   /** Cutaway (walls cut at waist height, roof and loft off) / x-ray (see-through shell) / full. */
@@ -454,7 +629,7 @@ export class HomesteadWorld {
     const night = 1 - this.air.daylight;
     const lit = this.air.hour > 5.5 && this.air.hour < 23;
     for (const b of this._built.values()) {
-      if (!b.finished) continue;
+      if (!b.finished || !b.light) continue;
       b.light.intensity = (this._view === 'full' ? 0.25 : 0.12) + (lit ? night * 1.6 : night * 0.25);
     }
   }
@@ -465,9 +640,10 @@ export class HomesteadWorld {
       const b = this._built.get(id);
       if (!b) return null;
       const def = KIT[b.placed.kind];
-      return { x: b.placed.x, z: b.placed.z, rot: b.placed.rot * Math.PI / 2, w: def.cellsX * CELL, d: def.cellsZ * CELL };
+      return { x: b.placed.x, z: b.placed.z, rot: b.placed.rot * Math.PI / 2, w: def.cellsX * CELL, d: def.cellsZ * CELL, seats: b.group.userData.seats as Seat[] };
     };
-    const homeB = [...this._built.values()].find(b => b.finished);
+    // home: the finished house that sleeps the most
+    const homeB = [...this._built.values()].filter(b => b.finished && KIT[b.placed.kind].sleeps > 0).sort((a, b) => KIT[b.placed.kind].sleeps - KIT[a.placed.kind].sleeps)[0];
     const tree = (jobId: string) => {
       const j = game.forestry.jobs.find(x => x.id === jobId);
       const t = j && this._treeById.get(j.treeId);
@@ -485,7 +661,7 @@ export class HomesteadWorld {
   localToWorld(id: string, lx: number, ly: number, lz: number): { x: number; y: number; z: number } | null {
     const b = this._built.get(id);
     if (!b) return null;
-    const v = new THREE.Vector3(lx, ly + CABIN.floor, lz).applyEuler(new THREE.Euler(0, b.placed.rot * Math.PI / 2, 0));
+    const v = new THREE.Vector3(lx, ly + KIT[b.placed.kind].floorY, lz).applyEuler(new THREE.Euler(0, b.placed.rot * Math.PI / 2, 0));
     return { x: b.placed.x + v.x, y: b.padY + v.y, z: b.placed.z + v.z };
   }
 
@@ -521,7 +697,7 @@ export class HomesteadWorld {
       const def = KIT[b.placed.kind];
       const [lx, lz] = this._local(b, x, z);
       const hw = def.cellsX * CELL / 2, hd = def.cellsZ * CELL / 2;
-      if (Math.abs(lx) < hw && lz > -hd && lz < hd + CABIN.porch) return b.padY + CABIN.floor;
+      if (Math.abs(lx) < hw && lz > -hd && lz < hd + def.porch && def.floorY > 0.02) return b.padY + def.floorY;
     }
     return this.groundAt(x, z);
   };
@@ -530,6 +706,7 @@ export class HomesteadWorld {
   walkBlocked = (x: number, z: number, r: number): boolean => {
     if (this.stream.depthAt(x, z) > 0.04) return true;
     if (this._buildingBlocked(x, z, r)) return true;
+    if (this._perimeterBlocked(x, z, Math.min(r, INDOOR_R))) return true;
     if (Math.hypot(x - this.camp.x, z - this.camp.z) < 0.4 + r) return true;
     for (const t of this.treeSpecs) {
       const dx = t.x - x, dz = t.z - z;
@@ -588,7 +765,7 @@ export class HomesteadWorld {
     const fire = Math.max(cooking, heating * (h > 23 || h < 5 ? 0.5 : 1));
     const wx = 0.08 + a.wind * 0.45, wz = 0.03 + a.wind * 0.12;   // prevailing westerlies off the range
     this._updateLights();
-    for (const { smoke, finished } of this._built.values()) smoke.update(this._clock, finished ? fire : 0, wx, wz, a.daylight, a.viewportH);
+    for (const { smoke, finished } of this._built.values()) smoke?.update(this._clock, finished ? fire : 0, wx, wz, a.daylight, a.viewportH);
     if (seasonState.plants !== this._plantSeason) {
       this._plantSeason = seasonState.plants;
       this.stream.setSeason(this._plantSeason);
@@ -599,8 +776,8 @@ export class HomesteadWorld {
   dispose(): void {
     this.terrain.dispose();
     for (const { group, smoke } of this._built.values()) {
-      this._ws.scene.remove(group, smoke.points);
-      smoke.dispose();
+      this._ws.scene.remove(group);
+      if (smoke) { this._ws.scene.remove(smoke.points); smoke.dispose(); }
       group.traverse(o => (o as THREE.Mesh).geometry?.dispose());
     }
     this._built.clear();

@@ -12,7 +12,7 @@ import { FIG_POSE } from '../../engine/world/people/figureKit';
 import { CAMP } from '../props/campGeometry';
 import type { TaskKind } from '../../sim/state';
 
-export interface Site { x: number; z: number; rot: number; w: number; d: number }
+export interface Site { x: number; z: number; rot: number; w: number; d: number; /** Evening seats (local x, z, face x, z). */ seats?: ReadonlyArray<readonly [number, number, number, number]> }
 
 export interface GoalCtx {
   /** Camp centre (world) and its rotation. */
@@ -105,9 +105,9 @@ export function goalFor(i: number, kid: boolean, task: TaskKind, target: string 
       return { x, z, pose: FIG_POSE.STAND, face: null, hidden: true, work: false };
     }
     case 'leisure': {
-      if (ctx.home && (hour >= 18 || hour < 6)) {
-        // evenings at home: round the table, or in the armchairs by the stove (cabin seats, local frame)
-        const seats: Array<[number, number, number, number]> = [[-0.295, -0.08, -0.25, 0.02], [-0.205, 0.12, -0.25, 0.02], [0.11, -0.34, 0.26, -0.62], [0.38, -0.33, 0.26, -0.62]];
+      if (ctx.home?.seats?.length && (hour >= 18 || hour < 6)) {
+        // evenings at home: round the table, or in the chairs by the stove / fire (the home's seats, local frame)
+        const seats = ctx.home.seats;
         const [sx, sz, fx, fz] = seats[i % seats.length];
         const h = ctx.home, c = Math.cos(h.rot), sn = Math.sin(h.rot);
         const w = (lx: number, lz: number): [number, number] => [h.x + lx * c + lz * sn, h.z - lx * sn + lz * c];
