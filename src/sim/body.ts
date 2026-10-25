@@ -23,6 +23,7 @@
 import type { GameState } from './state';
 import type { Person } from './family';
 import { mulberry32 } from './rng';
+import { dentalEmergency } from './medical';
 
 export type Condition = 'blood_pressure' | 'thyroid' | 'asthma' | 'insulin';
 export const CONDITION: Record<Condition, { name: string; rx: string; monthly: number }> = {
@@ -111,7 +112,7 @@ export function bodyDay(s: GameState): string[] {
     // a toothache, now and then
     if (r() < 1 / 1100) {
       if (stores) { s.money -= DENTIST_USD; out.push(`${p.first} had a toothache: the dentist in town fixed it ($${DENTIST_USD}).`); }
-      else { n.hurt.push({ what: 'toothache', sev: 25 }); n.morale -= 6; out.push(`${p.first} has a bad toothache and there's no dentist.`); }
+      else { n.morale -= 6; out.push(dentalEmergency(s, p.id)); }   // an abscess with no dentist (sim/medical.ts)
     }
     // no soap, no paper: morale sinks and stomach bugs go round
     if (!hygiene) {

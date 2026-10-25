@@ -33,10 +33,13 @@ import { generateNeighbors, newGate, type GateState, type Neighbor } from './enc
 import { freshNeeds, type FoodReport, type Needs } from './needs';
 import type { WeatherState } from './weatherThreats';
 import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
-export const SAVE_VERSION = 39;
+export const SAVE_VERSION = 46;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
+import { newMind, type MindState } from './mind';
+import { newMedical, type Medical } from './medical';
+import { newLearning, type Learning } from './skills';
 
 /** Starting savings (GDS §1 peacetime money constraint). */
 export const STARTING_MONEY = 30000;
@@ -219,6 +222,12 @@ export interface GameState {
   gate: GateState;
   /** The children taken by raiders, the leads, the rescue raid out (sim/rescue.ts). Save v38; `??=` for safety. */
   rescue?: RescueState;
+  /** Each person's stress, trauma, grief and low mood; a quarrel; the gatherings (sim/mind.ts; save v46, `??=` via mindOf). */
+  mind?: MindState;
+  /** Open medical cases, tetanus shots, lasting effects (sim/medical.ts; save v46, `??=` via medicalOf). */
+  medical?: Medical;
+  /** Practice hours, last practiced, best levels, courses, today's work hours (sim/skills.ts; save v46, `??=` via learningOf). */
+  learning?: Learning;
   /** Radio and rumors after the collapse (radio.ts); made on first use. */
   radio?: RadioState;
   /** Tallies since the hit (the report card), and how the run ended (null while it goes on). */
@@ -267,6 +276,9 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     gate: newGate(seed),
     breakins: newBreakins(),
     rescue: newRescue(),
+    mind: newMind(),
+    medical: newMedical(),
+    learning: newLearning(),
     stats: emptyStats(),
     ending: null,
     food: { needKcal: 0, ateKcal: 0, producedKcal: 0, spoiledKcal: 0, fromStores: true, kinds: [], daysLeft: 0 },

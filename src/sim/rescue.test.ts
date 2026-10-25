@@ -1,3 +1,4 @@
+import { psyOf } from './mind';
 import { describe, expect, it } from 'vitest';
 import { newGame, dayIndex, calendarOf, type GameState } from './state';
 import { step } from './engine';
@@ -187,7 +188,9 @@ describe('the taken', () => {
     expect(ps.needs.taken).toBe(false);
     expect(h.lineage.mourned).not.toContain(kid.id);
     expect(h.lineage.chronicle.some(e => e.kind === 'home')).toBe(true);
-    expect(ps.needs.hurt.some(x => /captivity/.test(x.what))).toBe(true);
+    // what they went through stays with them (sim/mind.ts), not as a wound
+    expect(psyOf(h, kid.id).what).toBe('captivity');
+    expect(psyOf(h, kid.id).trauma).toBeGreaterThan(25);
     const b = step(h, 2);
     expect(b.food.needKcal).toBeGreaterThan(need0);
     const bk = b.people.find(p => p.id === kid.id)!, bps = b.personState.find(x => x.id === kid.id)!;

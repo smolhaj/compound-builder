@@ -23,6 +23,7 @@ import { REGIONS, seasons } from './regions';
 import { gardenSeason, GREENHOUSE_PEAK, greenhouseGreens, hasGreenhouse, orchardHarvest } from './greenhouse';
 import { addFood, addFoodKcal, dietDay, dietEffects, eatFrom, inDateKcal, syncPantry } from './pantry';
 import { mulberry32 } from './rng';
+import { mindMorale } from './mind';
 
 export type FoodId = 'fresh' | 'frozen' | 'canned' | 'staples';
 /** Food is kept in the stockpile in these units; kcal in one unit. */
@@ -45,7 +46,8 @@ export interface Needs {
   dose: number;
   /** Wounds / illness being treated: severity 0–100, what it is. */
   /** `trauma`: a wound from a fight (gunshot, shrapnel) that needs treating: meds, a medic or a medical bay. Untreated it barely heals and can go septic. */
-  hurt: Array<{ what: string; sev: number; trauma?: boolean }>;
+  /** `med`: a case medical.ts runs (its own course and treatment; the line here is its status for the Family tab). */
+  hurt: Array<{ what: string; sev: number; trauma?: boolean; med?: string }>;
   /** Dead (day), or null. Also set when someone was taken by raiders (`taken`): gone from the place either way. */
   died: number | null;
   taken?: boolean;
@@ -232,6 +234,7 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
     let dh = n.hunger > 15000 ? -1.5 : n.hunger > 5000 ? -0.5 : 0.6;
     n.hurt.forEach((h, k) => {
       dh -= h.sev / 60;
+      if (h.med) return;                          // medical.ts treats it (sim/medical.ts)
       const meds = s.stock.meds >= 0.1;
       if (meds) s.stock.meds -= 0.1;            // a kit lasts about ten wound-days
       // food poisoning: a few days, longer without enough to drink; meds (rehydration salts, antiemetics) help
@@ -254,7 +257,8 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
     if (n.health + dh > diet.healthCap) dh = Math.min(dh, n.health > diet.healthCap ? -0.2 : diet.healthCap - n.health);
     n.health = Math.max(cozy ? 5 : 0, Math.min(100, n.health + dh));
     // morale: drifts to a baseline that variety, a home, light and safety raise; hunger and loss lower
-    const target = 45 + 6 * Math.min(variety, 4) + diet.morale + (home ? 8 : -6) + (dark ? -8 : 0) + (s.utilities.hauling ? (s.utilities.haulFar ? -10 : -4) : 0) - Math.min(25, n.hunger / 1000) - (s.personState.some(x => x.needs?.died != null) ? 15 : 0);
+    // (grief, trauma, strain and low mood: sim/mind.ts; the empty chair stays)
+    const target = 45 + 6 * Math.min(variety, 4) + diet.morale + (home ? 8 : -6) + (dark ? -8 : 0) + (s.utilities.hauling ? (s.utilities.haulFar ? -10 : -4) : 0) - Math.min(25, n.hunger / 1000) - (s.personState.some(x => x.needs?.died != null) ? 4 : 0) - mindMorale(s, p.id);
     n.morale += (Math.max(0, Math.min(100, target)) - n.morale) * 0.08;
     if (n.health <= 0) {
       n.died = Math.floor(s.clock.t);

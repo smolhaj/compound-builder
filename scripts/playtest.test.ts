@@ -19,6 +19,8 @@ import { hireCrew, hoursLeft } from '../src/sim/crews';
 import { applyForPermit } from '../src/sim/paperwork';
 import { sweepChimney } from '../src/sim/upkeep';
 import { stockUpRx } from '../src/sim/body';
+import { vaccinate } from '../src/sim/medical';
+import { takeCourse } from '../src/sim/skills';
 import { buyAmmo, buyGun, takeClass, type Caliber } from '../src/sim/armory';
 import { buyLicense } from '../src/sim/wildfood';
 import { markTree } from '../src/sim/forestry';
@@ -194,7 +196,8 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
     const n = ps.needs, p = s.people[i];
     if (n.died == null || mourned.has(ps.id)) return;
     mourned.add(ps.id);
-    const why = n.taken ? 'taken' : fought ? 'killed in a fight' : n.hunger > 5000 ? 'hunger' : n.hurt.some(h => h.trauma) ? 'wounds' : n.dose > 1 ? 'radiation' : s.utilities.report.shortL > s.utilities.report.useL * 0.5 ? 'thirst' : n.hurt.some(h => h.what === 'fever') ? 'sickness' : (p?.age ?? 0) >= 65 ? 'old age' : 'other';
+    const med = n.hurt.find(h => h.med && h.sev >= 100)?.what;
+    const why = n.taken ? 'taken' : fought ? 'killed in a fight' : n.hunger > 5000 ? 'hunger' : med ? med : n.hurt.some(h => h.trauma) ? 'wounds' : n.dose > 1 ? 'radiation' : s.utilities.report.shortL > s.utilities.report.useL * 0.5 ? 'thirst' : n.hurt.some(h => h.what === 'fever') ? 'sickness' : (p?.age ?? 0) >= 65 ? 'old age' : 'other';
     causes.set(why, (causes.get(why) ?? 0) + 1);
   });
   const maxDays = years ? years * 365 : s.disaster.hitAt + 730;
@@ -238,6 +241,8 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
     }
     // the prescriptions, three months ahead, once the news turns
     if (strat !== 'idle' && s.disaster.phase === 'warning' && day % 30 === 0) stockUpRx(s);
+    // (people layer) tetanus boosters; the prepper's medic takes a first-responder course
+    if (strat === 'prepper' && day === 20) { vaccinate(s); const m = [...s.people].filter(p => !p.kid).sort((a, b) => b.skills.medic - a.skills.medic)[0]; if (m) takeCourse(s, m.id, 'wfr'); }
     // the armory, bought early (a deer rifle and a .22; more for the preppers and the fortress)
     if (day === 10 && strat !== 'idle') {
       const kit: Record<string, string[]> = { homestead: ['marlin_336', 'ruger_1022'], prepper: ['rem_700', 'sw_mp15', 'sw_mp15', 'mossberg_500', 'glock_19', 'ruger_1022'], fortress: ['sw_mp15', 'sw_mp15', 'ruger_mini14', 'mossberg_500', 'rem_700'] };
@@ -248,6 +253,9 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
       placeOrder(s, [{ material: 'gun_safe', qty: 1 }, { material: 'gun_cleaning', qty: 2 }]);
       const gear: Partial<Record<MaterialId, number>> = strat === 'prepper' ? { driveway_alarm: 1, cameras: 1, dog: 1, ifak: 6, radios: 2, plate_carrier: 2, nvg: 1, water_filter: 2, water_jugs: 30, ibc_tote: 4, fishing_gear: 1, snares: 2, smoker: 1 }
         : strat === 'fortress' ? { water_filter: 1, water_jugs: 20, sandbags: 3, steel_door: 2, window_bars: 1, driveway_alarm: 1, dog: 2, plate_carrier: 4, ifak: 6, radios: 2 } : { driveway_alarm: 1, ifak: 2, water_filter: 1, water_jugs: 10, fishing_gear: 1, snares: 1 };
+      // (people layer) the medicine cabinet past the pharmacy, the books, something for the evenings
+      if (strat === 'prepper') Object.assign(gear, { fish_antibiotics: 3, suture_kit: 1, dental_kit: 1, surgical_kit: 1, midwifery_kit: 1, medical_books: 1, how_to_books: 1, pastimes: 1 });
+      if (strat === 'homestead') Object.assign(gear, { fish_antibiotics: 1, medical_books: 1, pastimes: 1 });
       placeOrder(s, (Object.entries(gear) as Array<[MaterialId, number]>).map(([material, qty]) => ({ material, qty })));
     }
     // the year's tags and licenses

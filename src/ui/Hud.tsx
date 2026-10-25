@@ -6,6 +6,7 @@ import { SEASON_MODES, type SeasonMode } from '../engine/world/season/seasonStat
 import { WEATHER_MODES, type WeatherMode } from '../engine/world/weather/weatherState';
 import { calendarOf, dayIndex, hourOf, type Speed } from '../sim/state';
 import { BACKGROUND_NAME, backgroundOf, fullName } from '../sim/family';
+import { MedicineCabinet, PersonExtra } from './PeoplePanel';
 import { MATERIALS, MATERIAL_IDS, emptyStock, type MaterialId } from '../sim/materials';
 import { onOrder, orderCost, orderProblem } from '../sim/economy';
 import { blockedReason, isFinished, planProblem, progress } from '../sim/construction';
@@ -382,6 +383,7 @@ export function Hud() {
                   <span style={{ color: DIM, width: 36 }}>morale</span>{bar(n.morale, '#7aa0d0', `Morale ${Math.round(n.morale)}`)}
                 </div>}
                 {notes && <Note tone="warn">{notes}</Note>}
+                {n && n.died == null && <PersonExtra game={game} p={p} />}
                 {n && n.died == null && (p.conditions?.length ?? 0) > 0 && (() => {
                   const days = Math.floor(game.body.rx[p.id] ?? 30);
                   return <div style={{ fontSize: 11, color: days < 14 ? TONE.bad : days < 45 ? TONE.warn : DIM, marginTop: 2 }}>{p.conditions!.map(c => CONDITION[c].name).join(', ')}: {days > 0 ? `${days} days of ${p.conditions!.map(c => CONDITION[c].rx).join(' and ')}` : 'out of medicine'}</div>;
@@ -393,6 +395,7 @@ export function Hud() {
                 : <Note tone="warn">The pharmacy is shut: what's on hand is all there is.</Note>}
               <Row label="Hygiene supplies" value={game.disaster.tracks.stores >= 0.5 ? `bought with groceries · ${Math.floor(game.stock.hygiene)} put by` : `${Math.floor(game.stock.hygiene)} person-months left`} />
             </Section>}
+            <MedicineCabinet game={game} />
             <Section title="Work and money">
               {game.disaster.tracks.banks > 0.5 && game.disaster.tracks.stores > 0.5 && <Row label="Household costs" value={`$${livingPerDay(game)}/day`} />}
               {game.people.filter(p => p.job).map(p => {

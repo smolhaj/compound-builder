@@ -36,6 +36,8 @@ import type { Battle, BattleEvent, BattleUnit } from './battleTypes';
 import { GUN, skillOf, type Caliber } from './armory';
 import { backgroundOf, fullName, type Person } from './family';
 import { chronicle } from './lineage';
+import { homeFromCaptivity } from './mind';
+import { peopleAfterFight } from './people';
 import { log } from './economy';
 import { radioSet, reception } from './radio';
 import { VEHICLES, startingVehicles, type Vehicle } from './vehicles';
@@ -452,7 +454,8 @@ export function bringHome(s: GameState, c: Captive, how: 'ransom' | 'rescue' | '
   n.health = Math.min(n.health, Math.max(35, 85 - gone * 0.8));
   n.hunger = Math.max(n.hunger, Math.min(12000, gone * 300));
   n.morale = Math.min(n.morale, 20);
-  n.hurt.push({ what: 'home from captivity: nightmares, won\'t sleep alone', sev: Math.min(60, 20 + gone) });
+  // what they went through stays with them (sim/mind.ts: trauma, and the family's relief)
+  homeFromCaptivity(s, p.id, gone);
   // the birthdays missed while gone
   for (let d = c.day + 1; d <= day; d++) if (calendarOf(s.clock, d).doy === (p.bday ?? -1)) p.age++;
   if (p.kid && p.age >= 18) p.kid = false;
@@ -830,6 +833,7 @@ function hitCamp(s: GameState, raid: RescueRaid): Outcome {
   const lines: string[] = [];
   lines.push(f.surprise ? 'They got to the edge of the firelight without a sound. Most of the camp was asleep.' : 'The dogs started up before they were halfway there. The camp came awake shooting.');
   lines.push(...applyCasualties(s, f.battle));
+  peopleAfterFight(s, f.battle);
   let rounds = 0;
   for (const [cal, nn] of Object.entries(f.spent) as Array<[Caliber, number]>) { s.armory.ammo[cal] = Math.max(0, (s.armory.ammo[cal] ?? 0) - nn); rounds += nn; }
   if (rounds) { lines.push(`${rounds} rounds fired.`); for (const g of s.armory.guns) if (raid.team.includes(g.carrier ?? '')) { g.fired += Math.round(rounds / raid.team.length); g.condition = Math.max(0, g.condition - 0.01); } }

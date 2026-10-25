@@ -42,6 +42,8 @@ import { mulberry32 } from './rng';
 import { log } from './economy';
 import { dayIndex } from './state';
 import { buildRate } from './family';
+import { peopleDay, personWork } from './people';
+import { logWork } from './skills';
 import { routineAt, taskFor } from './schedule';
 import { hourOf, type GameState, type Structure } from './state';
 
@@ -79,7 +81,7 @@ function subStep(s: GameState): void {
     if (isAway(s, p.id)) { ps.task = 'away'; ps.target = null; return; }
     // the first two weeks after the strikes: everyone in the shelter
     if (isNuclear(s) && s.clock.t < s.disaster.hitAt + SHELTER_DAYS) { ps.task = routineAt(p, h) === 'sleep' ? 'sleep' : 'shelter'; ps.target = null; return; }
-    const rate = buildRate(p) * workFactor(ps.needs);
+    const rate = buildRate(p) * workFactor(ps.needs) * personWork(s, p.id);
     const slot = routineAt(p, h);
     // the day job: weekdays in town during work hours, paid by the hour
     if (slot === 'work' && weekday && ps.employed && p.job && !snowedIn(s)) {
@@ -97,6 +99,8 @@ function subStep(s: GameState): void {
     else if (task === 'build' && harden) addHardenWork(s, harden, SUBSTEP * 24 * rate);
     else if (task === 'build' && fix) addFixWork(s, fix.st, fix.f, SUBSTEP * 24 * rate);
     else if (task === 'forestry' && job) addFellWork(s, job, SUBSTEP * 24 * rate);
+    // practice at it, and the day's exposure to accidents (sim/skills.ts, sim/medical.ts)
+    if (task === 'build' || (task === 'forestry' && job)) logWork(s, p.id, task === 'forestry' ? 'fell' : carry ? 'carry' : !target && !run && fit ? 'fit' : 'build', SUBSTEP * 24);
   });
   // (broke: the bills stop at nothing; food stamps and the food bank keep the table going)
   if (s.disaster.tracks.banks > 0.5 && s.disaster.tracks.stores > 0.5 && s.money > 0) s.money -= livingPerDay(s) * SUBSTEP;
@@ -150,6 +154,7 @@ function subStep(s: GameState): void {
     for (const line of waterDay(s)) log(s, line);
     s.food = liveDay(s, y - Math.floor(y));
     for (const line of bodyDay(s)) log(s, line);
+    for (const line of peopleDay(s)) log(s, line);   // illness and injury, the mind, practice (sim/people.ts)
     const end = tallyDay(s);
     if (end) log(s, end.kind === 'wipe' ? 'The last of the family is gone.' : end.kind === 'recovered' ? 'The outside world is coming back.' : end.kind === 'new_normal' ? 'The outside world has come back as far as it will.' : 'A full year the place has fed itself.');
     for (const line of lineageDay(s)) log(s, line);

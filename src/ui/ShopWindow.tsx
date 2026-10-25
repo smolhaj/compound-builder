@@ -25,7 +25,7 @@ const SHELVES: Record<Exclude<Tab, 'metals' | 'money' | 'guns'>, MaterialId[]> =
   bunker: ['rebar', 'membrane', 'container', 'blast_door', 'blast_valve', 'nbc_filter', 'filter_set', 'culvert', 'egress_hatch', 'lead_sheet', 'faraday_mesh'],
   water: ['water_jugs', 'ibc_tote', 'water_trailer', 'water_filter', 'ro_system', 'softener', 'greywater', 'pipe', 'cable', 'fixtures', 'pump', 'drilling', 'tank', 'septic_tank', 'solar_panel', 'battery', 'inverter', 'generator'],
   food: ['seed', 'lids', 'fishing_gear', 'snares', 'smoker', 'goat', 'pig', 'steer', 'rabbit', 'hay', 'feed'],
-  household: ['meds', 'hygiene', 'traps'],
+  household: ['meds', 'fish_antibiotics', 'suture_kit', 'dental_kit', 'surgical_kit', 'midwifery_kit', 'medical_books', 'how_to_books', 'pastimes', 'hygiene', 'traps'],
   fuel: ['fuel', 'stabilizer', 'firewood', 'excavator', 'plow', 'gun_safe', 'gun_cleaning'],
   defense: [...KIT_GOODS, ...WATCH_GOODS, ...HARDEN_GOODS],
 };
@@ -71,6 +71,14 @@ function Icon({ id, tint }: { id: string; tint?: number }) {
     case 'seed': return bag('#c8b070', 'SEED');
     case 'lids': return g(<>{[0, 1, 2].map(i => <ellipse key={i} cx="22" cy={18 + i * 6} rx="11" ry="3" fill="#c8a040" stroke="#7a5a10" />)}</>);
     case 'meds': return g(<><rect x="8" y="12" width="28" height="22" rx="3" fill="#e8e4dc" /><path d="M22 16 v14 M15 23 h14" stroke="#c03030" strokeWidth="4" /></>);
+    case 'fish_antibiotics': return g(<><rect x="14" y="12" width="16" height="24" rx="3" fill="#e8e4dc" /><rect x="15" y="8" width="14" height="5" rx="1" fill="#3a7ab0" /><path d="M17 24 q5 -6 10 0 q-5 6 -10 0 z M27 24 l3 -3 v6 z" fill="#3a7ab0" /></>);
+    case 'suture_kit': return g(<><rect x="8" y="14" width="28" height="18" rx="2" fill="#5a6a78" /><path d="M14 28 q4 -12 10 -8 q4 3 8 -2" stroke="#e8e4dc" strokeWidth="1.5" fill="none" /><path d="M12 20 l8 8" stroke="#c8ccd0" strokeWidth="2" /></>);
+    case 'dental_kit': return g(<><path d="M14 12 q8 -4 16 0 q2 10 -2 22 q-2 3 -4 -6 q-2 -4 -4 0 q-2 9 -4 6 q-4 -12 -2 -22 z" fill="#f2f0ea" stroke="#b8b4a8" /></>);
+    case 'surgical_kit': return g(<><rect x="7" y="13" width="30" height="20" rx="2" fill="#2f6f6f" /><path d="M11 23 h14 l4 -2" stroke="#d0d4d8" strokeWidth="2" fill="none" /><path d="M13 29 h18" stroke="#d0d4d8" strokeWidth="1.5" /></>);
+    case 'midwifery_kit': return g(<><rect x="8" y="14" width="28" height="20" rx="3" fill="#c88a9a" /><circle cx="22" cy="22" r="4" fill="#f2e8e0" /><path d="M16 32 q6 -6 12 0" stroke="#f2e8e0" strokeWidth="2" fill="none" /></>);
+    case 'medical_books': return g(<>{[8, 17, 26].map((x, i) => <rect key={x} x={x} y={10 + i} width="8" height={26 - i} fill={['#b03a30', '#3a5b8c', '#5a6e3a'][i]} stroke="rgba(0,0,0,0.3)" />)}<path d="M12 18 v6 M9 21 h6" stroke="#fff" strokeWidth="1.5" /></>);
+    case 'how_to_books': return g(<>{[7, 14, 21, 28].map((x, i) => <rect key={x} x={x} y={10 + (i % 2) * 2} width="6" height={26 - (i % 2) * 2} fill={['#7a5a2a', '#4a4a52', '#a86a2a', '#2f6f6f'][i]} stroke="rgba(0,0,0,0.3)" />)}</>);
+    case 'pastimes': return g(<><ellipse cx="18" cy="28" rx="8" ry="7" fill="#a86a2a" /><ellipse cx="18" cy="20" rx="6" ry="5" fill="#a86a2a" /><rect x="22" y="6" width="3" height="16" fill="#5a3a1a" transform="rotate(25 23 14)" /><circle cx="18" cy="25" r="2" fill="#3a2410" /><rect x="28" y="26" width="9" height="9" rx="1" fill="#f2f0ea" /><circle cx="30.5" cy="28.5" r="0.9" fill="#222" /><circle cx="34.5" cy="32.5" r="0.9" fill="#222" /></>);
     case 'hygiene': return g(<><rect x="9" y="14" width="12" height="20" rx="3" fill="#7ab0d8" /><circle cx="29" cy="24" r="8" fill="#f2f0ea" /><circle cx="29" cy="24" r="3" fill="#c8c4bc" /></>);
     case 'traps': return g(<><rect x="10" y="20" width="24" height="10" fill="#c8a070" /><path d="M12 20 q10 -10 20 0" fill="none" stroke="#9aa0a4" strokeWidth="2" /></>);
     case 'fuel': case 'stabilizer': return g(<><path d="M12 12 h16 l6 6 v18 h-22 z" fill={id === 'fuel' ? '#b83a2a' : '#3a7ab8'} /><rect x="26" y="8" width="5" height="6" fill="#333" /></>);

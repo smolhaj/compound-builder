@@ -17,7 +17,9 @@ import { dayIndex, type GameState } from './state';
 /** A day's labor in peacetime (2025 dollars, farm hand). */
 export const LABOR_DAY = 120;
 /** Stock goods a neighbor will barter for. */
-export const STOCK_GOODS = ['fresh', 'frozen', 'canned', 'staples', 'fuel', 'firewood', 'meds', 'seed', 'hygiene'] as const;
+export const STOCK_GOODS = ['fresh', 'frozen', 'canned', 'staples', 'fuel', 'firewood', 'meds', 'seed', 'hygiene', 'fish_antibiotics', 'suture_kit', 'dental_kit', 'surgical_kit', 'midwifery_kit', 'medical_books'] as const;
+/** Medicine past the pharmacy (sim/medical.ts): worth far more once the hospital is gone. */
+const MEDICAL_GOODS: readonly string[] = ['meds', 'fish_antibiotics', 'suture_kit', 'dental_kit', 'surgical_kit', 'midwifery_kit'];
 export type StockGood = typeof STOCK_GOODS[number];
 /** A tradable good: a stock item, rounds of a caliber, a unit of a metal, or a day's labor. */
 export type Good = StockGood | `ammo:${Caliber}` | `metal:${MetalKind}` | 'labor';
@@ -62,7 +64,8 @@ export function barterPrices(s: GameState): Record<Good, number> {
   for (const g of STOCK_GOODS) {
     const base = g === 'fresh' ? FRESH_PRICE : MATERIALS[g].price ?? 0;
     const m = g === 'fuel' ? (1 + 2.5 * (1 - t.fuel)) * age
-      : g === 'meds' ? (1 + 3 * (1 - t.medical)) * age
+      : MEDICAL_GOODS.includes(g) ? (1 + 3 * (1 - t.medical)) * age
+      : g === 'medical_books' ? 1 + 2 * (1 - t.medical)
       : g === 'firewood' ? 1 + 0.8 * (1 - t.grid)
       : g === 'seed' ? (1 + 1.2 * (1 - t.deliveries)) * age
       : g === 'hygiene' ? (1 + 1 * (1 - t.stores)) * age

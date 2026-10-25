@@ -24,6 +24,7 @@ import type { GameState } from './state';
 import { SKILL_IDS, type Person, type SkillId } from './family';
 import { freshNeeds } from './needs';
 import { prisonerLead } from './rescue';
+import { afterExecution, afterLeaving } from './mind';
 
 export type AftermathChoice = 'treat_release' | 'hold' | 'leave' | 'finish';
 export interface Aftermath { day: number; wounded: number; dead: number }
@@ -78,12 +79,14 @@ export function resolveAftermath(s: GameState, choice: AftermathChoice): string[
       g.humanity = Math.max(0, g.humanity - 2 - n);
       out.push(r() < 0.5 ? 'By morning the drive was empty. A blood trail went into the trees.' : 'By morning they had stopped calling for help.');
       lowerMorale(s, 4);
+      afterLeaving(s);
     } else {
       g.humanity = Math.max(0, g.humanity - 12 - 4 * n);
       lowerMorale(s, 15);
       const kids = s.people.some((p, i) => p.kid && s.personState[i]?.needs.died == null);
       out.push(`It was done. Nobody talked at supper.${kids ? ' The kids heard the shots.' : ''}`);
       g.executed = (g.executed ?? 0) + n;
+      afterExecution(s, n);   // it stays with people (sim/mind.ts)
     }
   }
   if (a.dead > 0) {

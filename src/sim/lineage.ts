@@ -28,6 +28,7 @@ import { isFinished } from './construction';
 import { isHome } from './blueprints';
 import { mulberry32 } from './rng';
 import { log } from './economy';
+import { afterBirth, birthRisk } from './medical';
 
 export type ChronicleKind = 'era' | 'birth' | 'death' | 'partner' | 'coming' | 'milestone' | 'retire' | 'home';
 export interface ChronicleEntry { t: number; year: number; kind: ChronicleKind; text: string }
@@ -212,13 +213,15 @@ export function lineageDay(s: GameState): string[] {
     if (mother) {
       if (mother.age < 18 || mother.age > 43 || r() >= (town ? 0.1 : 0.07) * (kidsNow >= 4 ? 0.3 : 1) / 365) continue;
       const body: 'f' | 'm' = r() < 0.5 ? 'f' : 'm';
-      const risky = !doctor && !medic;
+      // the risk: the hospital, or who's here to help and with what (sim/medical.ts)
+      const risk = doctor ? { baby: 0, mother: 0 } : birthRisk(s, mother);
       L.lastBirth[p.id] = L.lastBirth[mate.id] = day;
-      if (risky && r() < 0.04) { say('birth', `${mother.first}'s baby didn't live. There was no one to help.`); continue; }
+      if (risk.baby > 0 && r() < risk.baby) { say('birth', `${mother.first}'s baby didn't live.${medic ? '' : ' There was no one to help.'}`); out.push(...afterBirth(s, mother, false)); continue; }
       const kid = newPerson(s, { first: pickName(s, body, r), last: L.family, age: 0, kid: true, body, kin: true, bornHere: true, bday: doy, gen: Math.max(p.gen ?? 1, mate.gen ?? 1) + 1, parents: [p.id, mate.id] }, r);
       L.points += 25;
       say('birth', `${kid.first} ${kid.last} was born to ${p.first} and ${mate.first}.`);
-      if (risky && r() < 0.015) { const ps = s.personState.find(x => x.id === mother.id)!; ps.needs.died = Math.floor(s.clock.t); L.mourned.push(mother.id); say('death', `${fullName(mother)} died in childbirth, aged ${mother.age}.`); }
+      if (risk.mother > 0 && r() < risk.mother) { const ps = s.personState.find(x => x.id === mother.id)!; ps.needs.died = Math.floor(s.clock.t); L.mourned.push(mother.id); say('death', `${fullName(mother)} died in childbirth, aged ${mother.age}.`); }
+      else out.push(...afterBirth(s, mother, true));
     } else if (p.age <= 50 && kidsNow < 3 && r() < 0.04 / 365) {
       L.lastBirth[p.id] = L.lastBirth[mate.id] = day;
       const body: 'f' | 'm' = r() < 0.5 ? 'f' : 'm';

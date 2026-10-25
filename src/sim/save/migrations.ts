@@ -23,11 +23,23 @@ import { newBreakins } from '../breakins';
 import { newRescue } from '../rescue';
 import { newWild } from '../wildfood';
 import { dayJob, type Person } from '../family';
+import { newMind } from '../mind';
+import { newMedical } from '../medical';
+import { newLearning } from '../skills';
 
 type Raw = Record<string, unknown> & { version?: number };
 
 /** version n → n + 1 upgraders. */
 const STEPS: Record<number, (s: Raw) => Raw> = {
+  // 39 → 46 (40–45 held for other branches): the people layer — mind (stress, trauma, grief, low mood), medical cases, skills practice.
+  // Losses before the save are already grieved over (they don't start fresh); hurt lines and skills stay as they were.
+  39: s => {
+    const ps = (s.personState as Array<{ id: string; needs: { died: number | null; taken?: boolean } }>) ?? [];
+    const mind = newMind();
+    mind.seenDead = ps.filter(p => p.needs?.died != null && !p.needs.taken).map(p => p.id);
+    mind.seenTaken = ps.filter(p => p.needs?.died != null && p.needs.taken).map(p => p.id);
+    return { ...s, version: 46, mind, medical: newMedical(), learning: newLearning(), stock: { fish_antibiotics: 0, suture_kit: 0, dental_kit: 0, surgical_kit: 0, midwifery_kit: 0, medical_books: 0, how_to_books: 0, pastimes: 0, ...(s.stock as object) } };
+  },
   // 38 → 39: the pantry, item by item (the aggregate staples / canned / frozen split into a default breakdown at their shelf ages)
   38: s => {
     const st = s.stock as Record<string, number>, sh = s.shelf as { age?: Record<string, number> } | undefined;

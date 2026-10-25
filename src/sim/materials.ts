@@ -12,7 +12,8 @@ export type MaterialId = 'lumber' | 'logs' | 'firewood' | 'fieldstone' | 'concre
   | 'fresh' | 'frozen' | 'canned' | 'staples' | 'meds' | 'seed' | 'lids' | 'plow' | 'stabilizer' | 'traps' | 'hygiene' | 'gun_safe' | 'gun_cleaning' | 'fishing_gear' | 'snares' | 'smoker' | 'goat' | 'pig' | 'steer' | 'rabbit' | 'hay' | 'feed' | 'water_jugs' | 'ibc_tote' | 'water_trailer' | 'water_filter' | 'ro_system' | 'softener' | 'greywater'
   | 'plate_carrier' | 'ifak' | 'nvg' | 'thermal' | 'radios' | 'cameras' | 'thermal_cam' | 'driveway_alarm' | 'floodlights' | 'tripwire' | 'dog' | 'steel_door' | 'window_bars' | 'sandbags' | 'safe_room' | 'sw_radio' | 'ham_rig' | 'helmet' | 'soft_armor'
   | 'grenades' | 'rpg_launcher' | 'rpg_rounds' | 'suppressor'
-  | 'mines' | 'greenhouse_kit' | 'fruit_trees';
+  | 'mines' | 'greenhouse_kit' | 'fruit_trees'
+  | 'fish_antibiotics' | 'suture_kit' | 'dental_kit' | 'surgical_kit' | 'midwifery_kit' | 'medical_books' | 'how_to_books' | 'pastimes';
 
 export interface MaterialDef {
   id: MaterialId;
@@ -64,6 +65,15 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   canned: { id: 'canned', name: 'Canned food', unit: 'case of 12 (≈ 6,000 kcal)', price: 38 },
   staples: { id: 'staples', name: 'Bulk staples', unit: 'rice, beans, flour, oil (≈ 80,000 kcal, 25 kg)', price: 85 },
   meds: { id: 'meds', name: 'Medical supplies', unit: 'kit: dressings, antibiotics, painkillers', price: 160 },
+  // the medicine cabinet past the ambulance (sim/medical.ts); the books and pastimes (sim/skills.ts, sim/mind.ts)
+  fish_antibiotics: { id: 'fish_antibiotics', name: 'Fish antibiotics', unit: 'a bottle of 100 aquarium amoxicillin 500 mg capsules: the same pills, sold for fish (no prescription, no FDA say-so); about four courses', price: 35 },
+  suture_kit: { id: 'suture_kit', name: 'Suture kit', unit: 'needle driver, forceps, scissors, 24 sutures, skin stapler: about twenty closures', price: 60 },
+  dental_kit: { id: 'dental_kit', name: 'Dental kit', unit: 'extraction forceps, elevators, temporary filling, clove oil (eugenol), gauze: about ten teeth', price: 140 },
+  surgical_kit: { id: 'surgical_kit', name: 'Surgical kit', unit: 'scalpels, hemostats, retractors, sterile drapes, gowns, sutures: about four operations', price: 380 },
+  midwifery_kit: { id: 'midwifery_kit', name: 'Midwifery kit', unit: 'cord clamps, scissors, bulb syringe, gloves, underpads, a fetoscope: two births', price: 95 },
+  medical_books: { id: 'medical_books', name: 'Medical books', unit: 'Where There Is No Doctor, Where There Is No Dentist, a wilderness and austere medicine manual', price: 85 },
+  how_to_books: { id: 'how_to_books', name: 'How-to library', unit: 'homesteading, carpentry, small engines, seed saving, hunting and ham radio manuals', price: 160 },
+  pastimes: { id: 'pastimes', name: 'Music & games', unit: 'a used guitar, a harmonica, cards, board games, a shelf of novels for the long evenings', price: 180 },
   seed: { id: 'seed', name: 'Field seed', unit: 'a season for a quarter acre: seed potatoes, dry beans, seed wheat', price: 200 },
   stabilizer: { id: 'stabilizer', name: 'Fuel stabilizer', unit: 'a bottle: keeps ten cans of gas good for two years', price: 15 },
   hygiene: { id: 'hygiene', name: 'Hygiene supplies', unit: 'a person-month: soap, toilet paper, toothpaste, shampoo, pads', price: 25 },

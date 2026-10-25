@@ -27,6 +27,8 @@ import { isFinished } from './construction';
 import { PERIMETER, runFinished } from './perimeter';
 import { mulberry32 } from './rng';
 import { leaveAftermath } from './aftermath';
+import { fightNerves } from './mind';
+import { peopleAfterFight } from './people';
 import { hourOf, type GameState } from './state';
 
 type Post = NonNullable<BattleUnit['post']>;
@@ -93,6 +95,9 @@ interface Fighter {
   armor: { plate: boolean; soft: boolean; helmet: boolean };
   /** Served (military or police): no freezing at the alarm, steadier under fire. */
   vet?: boolean;
+  /** Shaken by what came before (sim/mind.ts): extra seconds frozen at the alarm, and how long they hold a post under fire (1 = as anyone). */
+  shaken?: number;
+  nerve?: number;
   /** Rounds in the gun; spare magazines (or handfuls of loose rounds) on them; out of both. */
   inGun: number; spare: number; dry?: boolean;
   /** Blood lost a second from an open wound (a tourniquet or pressure stops it). */
@@ -240,8 +245,9 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
       if (gun) { free.splice(free.indexOf(gun), 1); const m = GUN[gun.model]; arm = { ...(ARMS[m.type] ?? ARMS.pistol), cal: m.cal }; if (m.capacity) arm.mag = m.capacity; if (gun.condition < 0.5) arm.acc *= 0.7; wear = gun.condition; }
     }
     const vet = backgroundOf(p) !== null;
+    const nerves = fightNerves(s, p);
     const hp0 = Math.max(20, s.personState.find(q => q.id === p.id)?.needs.health ?? 100);   // already hurt or sick: weaker from the start
-    const f: Fighter = { id: `h_${p.id}`, side: 'home', pid: p.id, x, z, y: 0, hp: hp0, out: false, dead: false, arm, skill: skillOf(s, p.id), readyAt: Infinity, post: null, cover: 0.8, moving: false, nextMove: 0, shelter: !fights, grenades: n('grenades') && fights ? 1 : 0, rockets: 0, medic: p.id === medicId, kid: p.kid, armor: { plate: false, soft: false, helmet: false }, vet, inGun: arm.mag, spare: arm.feed === 'tube' ? 4 : 2, bleed: 0, supp: 0, nvg: false, wear };
+    const f: Fighter = { id: `h_${p.id}`, side: 'home', pid: p.id, x, z, y: 0, hp: hp0, out: false, dead: false, arm, skill: skillOf(s, p.id), readyAt: Infinity, post: null, cover: 0.8, moving: false, nextMove: 0, shelter: !fights, grenades: n('grenades') && fights ? 1 : 0, rockets: 0, medic: p.id === medicId, kid: p.kid, armor: { plate: false, soft: false, helmet: false }, vet, shaken: nerves.freeze, nerve: nerves.hold, inGun: arm.mag, spare: arm.feed === 'tube' ? 4 : 2, bleed: 0, supp: 0, nvg: false, wear };
     F.push(f); units.push({ id: f.id, side: 'home', personId: p.id, x: r2(x), z: r2(z), post: 'open' });
   }
   const daysAfter = s.disaster.kind ? Math.max(0, s.clock.t - s.disaster.hitAt) : 0;
@@ -471,7 +477,10 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
       }
       if (peace) say(t + 1.5, v(l0, ['I called 911! The police are on their way! GET OUT OF MY HOUSE!', 'The sheriff\'s coming — get out, GET OUT!'], ['Sheriff\'s on the way. Leave. Now.']), l0);
       if (peace) say(t + 2, pick(['Shit — somebody\'s home!', 'Go, go — he\'s got a gun!']), R[0]); else say(t + 2, pick(['Spread out! Hit the house!', 'Go, go — flank \'em!', 'Come out and nobody gets hurt! We just want the food!', 'Light \'em up!']), R[0]);
-      for (const f of H) if (f.shelter) toShelter(f, t); else { assignPost(f, t); if (!f.vet) f.readyAt += 1 + r() * 3; }   // civilians freeze a moment; those who served go straight to it
+      for (const f of H) if (f.shelter) toShelter(f, t); else { assignPost(f, t); if (!f.vet) f.readyAt += 1 + r() * 3; f.readyAt += f.shaken ?? 0; }   // civilians freeze a moment; those who served go straight to it; the shaken freeze longer (sim/mind.ts)
+      // someone who froze last time, and knows it
+      const frozen = H.filter(f => !f.shelter && (f.shaken ?? 0) >= 1.5).sort((a, b) => (b.shaken ?? 0) - (a.shaken ?? 0))[0];
+      if (frozen) say(t + 0.8, v(frozen, ['I can\'t — not again — I can\'t —', 'Oh God, not again. Not again.', 'My hands won\'t — come on, come ON —'], ['…Okay. Okay. Breathe. Moving.']), frozen);
     }
     for (const p of posts) p.fire *= 0.7;
     for (const f of F) {
@@ -493,7 +502,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
     if (alarmed) for (const f of hUp) {
       if (t < f.readyAt) continue;
       // a wrecked post is left at once; one under heavy fire only now and then (moving under fire is worse than staying behind cover)
-      if (f.post && f.post.kind !== 'open' && (f.post.wrecked || (f.post.fire > (f.vet ? 14 : 9) && t - (f.movedAt ?? -99) > 20 && r() < 0.15))) { const old = f.post; old.fire = 0; say(t, old.wrecked ? v(f, ['It\'s gone — the whole thing\'s gone — I\'m getting out of here!', 'Shit — it\'s on fire — moving back!'], ['Position\'s gone. Falling back.']) : v(f, ['They\'re all shooting at me — fuck — I\'m moving!', 'I can\'t stay here — I can\'t — moving back!'], ['Too hot. Moving. Cover me.']), f); assignPost(f, t, old); continue; }
+      if (f.post && f.post.kind !== 'open' && (f.post.wrecked || (f.post.fire > (f.vet ? 14 : 9) * (f.nerve ?? 1) && t - (f.movedAt ?? -99) > 20 && r() < 0.15))) { const old = f.post; old.fire = 0; say(t, old.wrecked ? v(f, ['It\'s gone — the whole thing\'s gone — I\'m getting out of here!', 'Shit — it\'s on fire — moving back!'], ['Position\'s gone. Falling back.']) : v(f, ['They\'re all shooting at me — fuck — I\'m moving!', 'I can\'t stay here — I can\'t — moving back!'], ['Too hot. Moving. Cover me.']), f); assignPost(f, t, old); continue; }
       if (f.grenades > 0) {
         const tg = rUp.find(x => dist(x, f) <= GRENADE_RANGE);
         if (tg) { f.grenades--; say(t, v(f, ['Throwing it — get down, get DOWN!', 'Here goes — everybody down!'], ['Frag out!']), f); ev.push({ t, kind: 'throw', from: f.id, x: r2(tg.x), z: r2(tg.z), what: 'grenade' }); explode(tg.x + (r() - 0.5), tg.z + (r() - 0.5), t + 2, 1.5); continue; }
@@ -693,6 +702,7 @@ export function applyBattle(s: GameState, b: Battle): string[] {
   const endEv = b.events.find(e => e.kind === 'end');
   const result = endEv && endEv.kind === 'end' ? endEv.result : 'repelled';
   out.push(...applyCasualties(s, b));
+  peopleAfterFight(s, b);   // what it leaves in people, and the shooting practice it was (sim/people.ts)
   let rounds = 0;
   for (const [cal, nn] of Object.entries(pb.spent ?? {}) as Array<[Caliber, number]>) { s.armory.ammo[cal] = Math.max(0, (s.armory.ammo[cal] ?? 0) - nn); rounds += nn; }
   if (rounds) {
