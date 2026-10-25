@@ -103,6 +103,32 @@ export function knockBack(s: GameState, st: Structure, stage: number): void {
   st.stage = stage; st.done = 0; st.supplied = false; st.finishedAt = null;
 }
 
+/**
+ * A structure burned (a wildfire front, raiders' torch). Most go back to
+ * nothing. A well doesn't: the bore and its steel casing (or the stoned shaft)
+ * are in the ground and come through, and so does a submersible pump down the
+ * hole or a cast-iron hand pump; the pump house, the roof and the pressure tank
+ * and controls burn. Round 4: a wildfire burned a drilled well back to stage 0,
+ * which meant drilling it again, which nobody can buy after the collapse.
+ * A septic system is underground and isn't touched. Returns false if nothing burned.
+ */
+export function burnStructure(s: GameState, st: Structure): boolean {
+  const stages = blueprintOf(st).stages;
+  if (st.kind === 'septic') return false;
+  if (st.kind === 'well_drilled' || st.kind === 'well_hand') {
+    const keep = stages.findIndex(x => x.id === (st.kind === 'well_drilled' ? 'frame' : 'roof'));
+    if (st.stage <= keep) return false;
+    const hw = s.stock.hardware;
+    knockBack(s, st, keep);
+    // the pump comes out of the hole (or off the cast-iron stand) fine; what was in the pump house didn't make it
+    // (a hand well keeps its roof stage to redo, and gets the hand pump back from knockBack)
+    if (st.kind === 'well_drilled') { s.stock.hardware = hw; s.stock.roofing = Math.max(0, s.stock.roofing - (stages[3]?.materials.roofing ?? 0)); }
+    return true;
+  }
+  st.stage = 0; st.done = 0; st.supplied = false; st.finishedAt = null;
+  return true;
+}
+
 /** 0–1 overall progress by person-hours. */
 export function progress(st: Structure): number {
   const bp = blueprintOf(st);

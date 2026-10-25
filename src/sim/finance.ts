@@ -13,6 +13,15 @@
  *             a dealer at spot plus a premium and shipped in about a week;
  *             sold back a little under spot. Kept in the safe, buried, or in a
  *             safe-deposit box at the bank (out of reach when the bank shuts).
+ *  Debt       (round 4, decided with the user) checking never goes below zero:
+ *             a bill it can't cover goes on the credit card (24 % APR,
+ *             compounded daily). Each month's statement is paid from checking,
+ *             as much as there is. Short of the minimum, it's late (a fee);
+ *             six missed months and the card is charged off to collections;
+ *             a year in collections and the collector takes a judgment: a lien
+ *             on the land (no selling it or buying more until it's paid) and a
+ *             quarter of any paycheck garnished. Once the banks fail nobody is
+ *             collecting: no interest, no letters, no garnishment.
  *  Bank holiday  checking and savings freeze with the banks. In a financial
  *             collapse that doesn't fully come back, balances over the
  *             $250,000 insured limit take a 30 % bail-in haircut.
@@ -54,8 +63,32 @@ export interface Fin {
   /** The crash at the hit and the bail-in, once. */
   crashed: boolean;
   bailedIn: boolean;
+  /** What's owed: the card, then collections, then a judgment and a lien (round 4). */
+  debt: Debt;
 }
-export const newFin = (): Fin => ({ savings: 0, brokerage: 0, cash: 0, spot: { gold: 3400, silver: 38 }, base: { gold: 3400, silver: 38 }, holdings: [], orders: [], onBooks: 0, crashed: false, bailedIn: false });
+export type DebtStage = 'none' | 'card' | 'late' | 'collections' | 'judgment';
+export interface Debt {
+  /** Balance owed ($). */
+  owed: number;
+  stage: DebtStage;
+  /** Statements in a row with less than the minimum paid. */
+  missed: number;
+  /** Day of the next statement (−1: none open). */
+  statementDay: number;
+  /** Interest and fees charged in all. */
+  interest: number;
+  /** The judgment lien recorded on the land ($, 0 = none). */
+  lien: number;
+}
+export const newDebt = (): Debt => ({ owed: 0, stage: 'none', missed: 0, statementDay: -1, interest: 0, lien: 0 });
+export const newFin = (): Fin => ({ savings: 0, brokerage: 0, cash: 0, spot: { gold: 3400, silver: 38 }, base: { gold: 3400, silver: 38 }, holdings: [], orders: [], onBooks: 0, crashed: false, bailedIn: false, debt: newDebt() });
+export const CARD_APR = 0.24;
+export const LATE_FEE = 40;
+/** Statements missed before the card is charged off to collections, and before the collector gets a judgment. */
+export const CHARGE_OFF = 6, JUDGMENT = 18;
+/** The minimum payment on a statement: 1 % of the balance plus the month's interest, at least $35. */
+export const minimumDue = (owed: number) => Math.min(owed, Math.max(35, owed * (0.01 + CARD_APR / 12)));
+export const debtOf = (s: GameState): Debt => (s.fin.debt ??= newDebt());
 
 export const FDIC_LIMIT = 250_000;
 export const BOX_FEE = 150;
@@ -71,7 +104,7 @@ export const priceOf = (s: GameState, k: MetalKind) => s.fin.spot[METALS[k].meta
 export const buyPrice = (s: GameState, k: MetalKind) => Math.round(priceOf(s, k) * (1 + METALS[k].premium) * 100) / 100;
 export const sellPrice = (s: GameState, k: MetalKind) => Math.round(priceOf(s, k) * (1 + METALS[k].buyback) * 100) / 100;
 export const metalsValue = (s: GameState, where?: Where) => s.fin.holdings.filter(h => !where || h.where === where).reduce((a, h) => a + priceOf(s, h.kind) * h.units, 0);
-export const netWorth = (s: GameState) => s.money + s.fin.savings + s.fin.brokerage + s.fin.cash + metalsValue(s);
+export const netWorth = (s: GameState) => s.money + s.fin.savings + s.fin.brokerage + s.fin.cash + metalsValue(s) - (s.fin.debt?.owed ?? 0);
 
 export type Account = 'checking' | 'savings' | 'brokerage' | 'cash';
 const get = (s: GameState, a: Account) => (a === 'checking' ? s.money : s.fin[a]);
@@ -178,7 +211,72 @@ export function financeDay(s: GameState): string[] {
   }
   // the safe-deposit box, yearly
   if (day % 365 === 0 && f.holdings.some(h => h.where === 'bank') && banksOpen(s)) s.money -= BOX_FEE;
+  out.push(...debtDay(s, day));
   return out;
+}
+
+/**
+ * Once a day: an overdraft goes on the card; interest; the monthly statement
+ * (paid from checking as far as it goes), late fees, collections, the
+ * judgment and its lien. Nothing moves while the banks are shut.
+ */
+export function debtDay(s: GameState, day: number): string[] {
+  const out: string[] = [];
+  const d = debtOf(s);
+  // checking doesn't go below zero: whatever was charged past it went on the card
+  if (s.money < 0) {
+    if (d.owed <= 0 && d.stage === 'none') out.push(`Checking ran dry: $${Math.round(-s.money).toLocaleString('en-US')} in bills went on the credit card (24 % APR).`);
+    d.owed += -s.money; s.money = 0;
+    if (d.stage === 'none') d.stage = 'card';
+  }
+  if (d.owed <= 0.005) { if (d.stage !== 'none' || d.lien) { if (d.lien) out.push('The debt is paid off and the lien on the land is released.'); Object.assign(d, newDebt()); } return out; }
+  // the banks are gone: nobody is collecting (the balance just sits there)
+  if (!banksOpen(s)) return out;
+  if (d.statementDay < 0) d.statementDay = day + 30;
+  const i = d.owed * CARD_APR / 365;
+  d.owed += i; d.interest += i;
+  // garnishment: a quarter of the day jobs' pay goes to the collector (a working day's wage, five days in seven)
+  if (d.stage === 'judgment') {
+    const wages = s.people.reduce((a, p, k) => a + (s.personState[k]?.employed && s.personState[k]?.needs.died == null ? p.job?.wage ?? 0 : 0), 0) * 5 / 7;
+    const g = Math.min(d.owed, wages * 0.25, Math.max(0, s.money));
+    d.owed -= g; s.money -= g;
+  }
+  if (day < d.statementDay) return out;
+  d.statementDay = day + 30;
+  const due = minimumDue(d.owed);
+  const pay = Math.min(d.owed, Math.max(0, s.money));
+  s.money -= pay; d.owed -= pay;
+  if (d.owed <= 0.005) { out.push(`Paid off the card ($${Math.round(pay).toLocaleString('en-US')}).${d.lien ? ' The lien on the land is released.' : ''}`); Object.assign(d, newDebt()); return out; }
+  if (pay + 0.005 >= due) { d.missed = 0; if (d.stage === 'late') d.stage = 'card'; return out; }
+  d.missed++;
+  if (d.stage === 'card' || d.stage === 'late') { d.owed += LATE_FEE; d.interest += LATE_FEE; }
+  if (d.missed >= JUDGMENT && d.stage !== 'judgment') {
+    d.stage = 'judgment'; d.lien = Math.round(d.owed);
+    out.push(`The collector went to court and got a judgment: a $${d.lien.toLocaleString('en-US')} lien on the land, and a quarter of any paycheck garnished until it's paid.`);
+  } else if (d.missed >= CHARGE_OFF && d.stage !== 'collections' && d.stage !== 'judgment') {
+    d.stage = 'collections';
+    out.push(`Six months behind: the card company charged off the $${Math.round(d.owed).toLocaleString('en-US')} and sold it to a collection agency. The calls start the next morning.`);
+  } else if (d.stage === 'card') {
+    d.stage = 'late';
+    out.push(`Missed the minimum on the card ($${Math.round(due).toLocaleString('en-US')}): a $${LATE_FEE} late fee. $${Math.round(d.owed).toLocaleString('en-US')} owed at 24 %.`);
+  } else if (d.stage === 'collections' && d.missed % 3 === 0) {
+    out.push(`Another letter from the collection agency: $${Math.round(d.owed).toLocaleString('en-US')}, "final notice before legal action".`);
+  }
+  return out;
+}
+
+/** Pay down what's owed from checking (the Finance panel's button). */
+export function payDebt(s: GameState, amount: number): string | null {
+  const d = debtOf(s);
+  if (d.owed <= 0) return 'nothing owed';
+  if (!banksOpen(s)) return 'the banks are shut';
+  const pay = Math.min(amount, d.owed, s.money);
+  if (pay <= 0) return 'nothing in checking';
+  s.money -= pay; d.owed -= pay;
+  log(s, `Paid $${Math.round(pay).toLocaleString('en-US')} toward the debt.`);
+  if (d.owed <= 0.005) { log(s, `The debt is paid off${d.lien ? ' and the lien on the land is released' : ''}.`); Object.assign(d, newDebt()); }
+  else if (d.missed && pay >= minimumDue(d.owed)) d.missed = 0;
+  return null;
 }
 
 /** What a trader at the gate gives for metal once the money's gone: spot, bid up by scarcity. */

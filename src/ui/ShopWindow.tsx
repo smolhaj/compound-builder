@@ -8,7 +8,7 @@ import { useGameStore } from '../store/gameStore';
 import { MATERIALS, type MaterialId } from '../sim/materials';
 import { orderCost, orderProblem, payWith, prices } from '../sim/economy';
 import {
-  banksOpen, buyMetal, buyPrice, dealerOpen, METAL_KINDS, METALS, metalsValue, moveMetal, netWorth, sellMetal, sellPrice, transfer, WHERE_NAME,
+  banksOpen, buyMetal, CARD_APR, CHARGE_OFF, JUDGMENT, minimumDue, payDebt, buyPrice, dealerOpen, METAL_KINDS, METALS, metalsValue, moveMetal, netWorth, sellMetal, sellPrice, transfer, WHERE_NAME,
   type Account, type MetalKind, type Where,
 } from '../sim/finance';
 import type { OrderLine } from '../sim/state';
@@ -250,6 +250,19 @@ function Money({ onMsg }: { onMsg: (m: string | null) => void }) {
       <button style={btn(open, !open)} disabled={!open} onClick={() => onMsg(g.money(d => transfer(d, from, to, amt)))}>Move it</button>
     </div>
     {!open && <div style={{ color: C.bad, marginTop: 8 }}>The banks are shut: checking, savings and the brokerage account are frozen.</div>}
+    {(f.debt?.owed ?? 0) > 0.5 && (() => {
+      const d = f.debt!;
+      const stage = { none: '', card: 'on the card, current', late: `late: ${d.missed} statement${d.missed > 1 ? 's' : ''} missed (charged off at ${CHARGE_OFF})`, collections: `in collections (a judgment after ${JUDGMENT} missed)`, judgment: `judgment: a $${d.lien.toLocaleString('en-US')} lien on the land, wages garnished 25 %` }[d.stage];
+      return <div style={{ marginTop: 16, maxWidth: 520 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', rowGap: 4, columnGap: 16 }}>
+          <span>Owed <span style={{ color: C.dim, fontSize: 11.5 }}>· {Math.round(CARD_APR * 100)} % APR, {stage}</span></span><b style={{ textAlign: 'right', color: C.bad }}>{usd(d.owed)}</b>
+          <span style={{ color: C.dim }}>Minimum due each month</span><span style={{ textAlign: 'right' }}>{usd(minimumDue(d.owed))}</span>
+          <span style={{ color: C.dim }}>Interest and fees so far</span><span style={{ textAlign: 'right' }}>{usd(d.interest)}</span>
+        </div>
+        <button style={{ ...btn(open && game.money > 0, !open || game.money <= 0), marginTop: 6 }} disabled={!open || game.money <= 0} onClick={() => onMsg(g.money(x => payDebt(x, x.money)))}>Pay it down from checking</button>
+        <div style={{ fontSize: 11.5, color: C.dim, marginTop: 6, lineHeight: 1.4 }}>{open ? 'A bill checking can\'t cover goes on the card. Each statement is paid from checking as far as it goes; short of the minimum it\'s late, six months behind it goes to collections, a year after that the collector gets a lien on the land.' : 'The banks are gone, and nobody is collecting.'}</div>
+      </div>;
+    })()}
     <div style={{ fontSize: 11.5, color: C.dim, marginTop: 12, lineHeight: 1.4 }}>Cash withdrawals over $10,000 are reported. Savings and checking are insured to $250,000; past that, a bank that fails for good can take a cut. Markets fall when the disaster hits. Metals climb as trust in money goes.</div>
   </>;
 }

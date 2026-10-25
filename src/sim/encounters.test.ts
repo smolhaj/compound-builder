@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { newGame, type GameState } from './state';
-import { generateNeighbors, gateDay, postureOf, raiderTemper, resolve, whoComes, type EncounterKind } from './encounters';
+import { fightOdds, generateNeighbors, gateDay, hideFoundChance, postureOf, raiderTemper, resolve, whoComes, type Encounter, type EncounterKind } from './encounters';
 import { planRun, canEnter } from './perimeter';
 import { mulberry32 } from './rng';
 
@@ -105,5 +105,78 @@ describe('neighbors and the gate', () => {
     };
     expect(count('full', 30)).toBeLessThan(0.12);
     expect(count('never', 500)).toBeGreaterThan(0.3);
+  });
+});
+
+describe('round 4: honest odds, hiding has a cost, no double take', () => {
+  const looters = (g: GameState, size = 4, extra: Partial<Encounter> = {}): Encounter => {
+    const e: Encounter = { id: `x${size}`, kind: 'looters', day: Math.floor(g.clock.t), title: 'Looters', dossier: ['d0', 'd1'], size, armed: true, strength: size * 9, wants: { canned: 3, fuel: 2 }, stances: ['hide', 'warn', 'defend', 'parley'], temper: 'desperate', ...extra };
+    g.gate.pending = e;
+    return e;
+  };
+  const rifles = (g: GameState) => { for (const [i, p] of g.people.entries()) if (!p.kid || p.age >= 15) { g.armory.guns.push({ id: `g${i}`, model: 'sw_mp15', condition: 1, fired: 0, where: 'house', carrier: p.id }); g.armory.skill[p.id] = 4; } g.armory.ammo['556'] = 2000; return g; };
+  const house = (g: GameState) => { g.structures.push({ id: 'house', kind: 'timber_cabin', x: 10, z: 10, rot: 0, stage: 99, done: 0, supplied: true, finishedAt: 0 }); return g; };
+
+  it('the fight odds come from the battle itself: deterministic, cached, and they rank the places', () => {
+    const open = house(afterHit(3)), held = rifles(house(afterHit(3)));
+    wall(held);
+    const a = fightOdds(open, looters(open)), b = fightOdds(held, looters(held));
+    expect(fightOdds(open, open.gate.pending!)).toBe(a);   // cached
+    expect(b.win).toBeGreaterThan(a.win);
+    expect(b.loseSomeone).toBeLessThanOrEqual(a.loseSomeone);
+    const again = house(afterHit(3)); looters(again);
+    again.gate.pending!.id = 'other';
+    expect(fightOdds(again, again.gate.pending!)).toEqual(a);
+  });
+
+  it('a lost fight takes applyBattle\'s share of the stores, not the raiders\' wants on top', () => {
+    let checked = 0;
+    for (let seed = 1; seed <= 20 && checked < 3; seed++) {
+      const g = house(afterHit(seed));
+      g.stock.canned = 20;
+      looters(g, 8);
+      const card = resolve(g, 'defend');
+      if (card.tone !== 'bad') continue;
+      checked++;
+      const b = g.gate.battle!;
+      const savage = b.events.some(e => e.kind === 'taken' || (e.kind === 'death' && e.executed));
+      const share = savage ? 0.9 : b.events.find(e => e.kind === 'end' && e.result === 'overrun') ? 0.6 : 0.3;
+      expect(g.stock.canned).toBe(20 - Math.floor(20 * share));
+    }
+    expect(checked).toBeGreaterThan(0);
+  });
+
+  it('hiding when they find the place costs more than what they came for, and they come back', () => {
+    let found = 0, backs = 0;
+    for (let seed = 1; seed <= 30; seed++) {
+      const g = house(afterHit(seed));
+      // a place that shows: sheds and a shop round the house
+      for (let k = 0; k < 8; k++) g.structures.push({ id: `sh${k}`, kind: 'workshop', x: 14 + k, z: 4, rot: 0, stage: 99, done: 0, supplied: true, finishedAt: 0 });
+      g.stock.canned = 40; g.stock.staples = 10;
+      looters(g, 5, { temper: 'hard' });
+      const card = resolve(g, 'hide');
+      if (card.tone !== 'bad') continue;
+      found++;
+      expect(g.stock.canned).toBeLessThan(40 - 3 * 1.5);   // more than 1.5 × the wants
+      expect(g.stock.staples).toBeLessThan(10);
+      if (g.gate.comeBack) {
+        expect(g.gate.next).toBeLessThanOrEqual(Math.floor(g.clock.t) + 25);
+        // the crew that comes back knows somebody lives here
+        let back: Encounter | null = null;
+        for (let d = 0; d < 60 && !back; d++) { g.clock.t += 1; const e = gateDay(g); if (e?.back) back = e; else if (e) g.gate.pending = null; }
+        if (back) {
+          backs++;
+          expect(back.kind).toBe('looters');
+          expect(hideFoundChance(g, back)).toBeGreaterThan(hideFoundChance(g, { ...back, back: false }));
+          // and a crew back for the second time doesn't promise a third visit
+          g.gate.comeBack = null;
+          g.gate.pending = back;
+          resolve(g, 'hide');
+          expect(g.gate.comeBack).toBeNull();
+        }
+      }
+    }
+    expect(found).toBeGreaterThan(5);
+    expect(backs).toBeGreaterThan(0);
   });
 });

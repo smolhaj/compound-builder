@@ -15,6 +15,7 @@ import { CREW_RATE, CREW_SIZE, crewProblem, crewQuote } from '../sim/crews';
 import { keeping, KEPT } from '../sim/shelf';
 import { CONDITION, pharmacyOpen } from '../sim/body';
 import { netWorth } from '../sim/finance';
+import { campNeed, trialCamps } from '../sim/trial';
 import { JUG_L, orderTanker } from '../sim/water';
 import { buyVehicle, startingVehicles, VEHICLES, type VehicleKind } from '../sim/vehicles';
 import { buyLicense, hasLicense, inSeason, lawful, TAG_USD, type License } from '../sim/wildfood';
@@ -199,6 +200,7 @@ export function Hud() {
         <span style={{ fontVariantNumeric: 'tabular-nums' }}>{clock(hourOf(game.clock.t))}</span>
         {game.lineage.era > 1 && <span style={{ color: '#d8c08a' }} title={`The ${game.lineage.family} family: era ${game.lineage.era}`}>Era {roman(game.lineage.era)}</span>}
         <span style={{ fontWeight: 600, color: '#cfe0a8' }} title={`Checking. Net worth ${usd(netWorth(game))}`}>{usd(game.money)}</span>
+        {(game.fin.debt?.owed ?? 0) > 0.5 && <span style={{ fontWeight: 600, color: game.fin.debt!.stage === 'card' ? TONE.warn : TONE.bad }} title={game.disaster.tracks.banks < 0.5 ? 'The banks are gone: nobody is collecting' : `Owed on the card at 24 %${game.fin.debt!.lien ? ', with a judgment lien on the land' : ''} (Shop & money → Accounts)`}>owe {usd(game.fin.debt!.owed)}</span>}
         <button style={btn()} title="Town, the catalog, your accounts, gold and silver" onClick={() => g.openShop(true)}>Shop & money</button>
         <button style={btn()} title="New game" onClick={() => g.openSetup(true, true)}>New</button>
         <span style={{ display: 'flex', gap: 3 }}>
@@ -387,6 +389,14 @@ export function Hud() {
                 })()}
               </div>;
             })}
+            {trialCamps(game).map(c => <Section key={c.id} title={`Camp outside the wall: ${c.title}`}>
+              <Row label="On trial" value={`day ${Math.max(0, dayIndex(game.clock.t) - c.from)} of ${c.until - c.from}`} />
+              <Row label="People" value={c.people.map(p => `${p.first}${p.kid ? ` (${p.age})` : ''}`).join(', ')} />
+              <Row label="Their ration" value={`${campNeed(c).toLocaleString('en-US')} kcal/day from your stores${c.hungry ? ` · short ${c.hungry} days` : ''}`} />
+              <Row label="Work put in" value={`${Math.round(c.worked)} h`} />
+              {c.learned.map((l, k) => <Note key={k} tone="warn">{l}</Note>)}
+              {!c.learned.length && <div style={{ fontSize: 11, color: DIM }}>Not family yet. You'll know them better by the end of the month.</div>}
+            </Section>)}
             {game.people.some(p => p.conditions?.length) && <Section title="Medicine & household">
               {pharmacyOpen(game) ? <button style={{ ...btn(), width: '100%' }} title="Fill everyone's prescriptions three months past the month in hand (as far ahead as insurance covers)" onClick={() => g.stockUpRx()}>Fill prescriptions 90 days ahead</button>
                 : <Note tone="warn">The pharmacy is shut: what's on hand is all there is.</Note>}
