@@ -17,7 +17,7 @@ import { newUpkeep } from '../upkeep';
 import { newShelf } from '../shelf';
 import { pantryFromAggregates } from '../pantry';
 import { conditionsFor, newBody } from '../body';
-import { newFin } from '../finance';
+import { newDebt, newFin } from '../finance';
 import { newArmory } from '../armory';
 import { newBreakins } from '../breakins';
 import { newRescue } from '../rescue';
@@ -50,6 +50,9 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   5: s => ({ ...s, version: 6, stock: { rebar: 0, membrane: 0, excavator: 0, blast_door: 0, nbc_filter: 0, spoil: 0, ...(s.stock as object) } }),
   // 6 → 7: the escape tunnel (culvert, egress hatch)
   6: s => ({ ...s, version: 7, stock: { culvert: 0, egress_hatch: 0, ...(s.stock as object) } }),
+  // 39 → 40 (encounter realism): what's owed on the
+  // card (fin.debt: a negative checking balance moves onto it the first day it runs), trial camps outside the wall, a crew coming back
+  39: s => ({ ...s, version: 40, fin: { debt: newDebt(), ...(s.fin as object) }, gate: { camps: [], comeBack: null, ...(s.gate as object) } }),
   // 37 → 38: the taken and getting them back (sim/rescue.ts): no records yet (anyone already taken gets one on the first day it runs)
   37: s => ({ ...s, version: 38, rescue: (s.rescue as object | undefined) ?? newRescue() }),
   // 36 → 37: raider temper on an encounter and `taken` on a person (both optional: old saves have desperate raiders and nobody taken)

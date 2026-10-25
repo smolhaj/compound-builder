@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
 import { useGameStore } from '../store/gameStore';
-import { defenseOf, postureOf, type Stance } from '../sim/encounters';
+import { fightOdds, hideFoundChance, postureOf, type Stance } from '../sim/encounters';
 import { daysOfFood } from '../sim/needs';
 import { AFTERMATH_TEXT } from '../sim/aftermath';
 import { canPay, DOUBLE_CROSS } from '../sim/rescue';
@@ -13,7 +13,7 @@ const STANCE: Record<Stance, [string, string]> = {
   defend: ['Defend', 'Hold the line. Walls, fighters, the armory and allies on the radio decide it.'],
   trade: ['Trade', 'Offer something for peace, or for what they carry.'],
   take_in: ['Take them in', 'They join the family: more hands, more mouths.'],
-  trial: ['A month\'s trial', 'They stay and work for their keep. You\'ll see what they\'re made of.'],
+  trial: ['A month\'s trial', 'They camp outside the wall for a month and work for their keep, fed from your stores. You\'ll see what they\'re made of.'],
   turn_away: ['Turn them away', 'The gate stays shut.'],
   call_911: ['Lock in and call 911', 'Everyone behind the safe-room or a locked bedroom door, on the phone with dispatch. They\'ll likely take something and be gone before the deputies come.'],
   shout: ['Lights on and shout', 'Every light on, and a shout down the stairs that the police are coming. Most burglars run.'],
@@ -21,6 +21,15 @@ const STANCE: Record<Stance, [string, string]> = {
   refuse: ['Refuse', 'Send them off with nothing.'],
   confront: ['Confront them', 'Gun in hand. They\'ll probably run, but a shooting means the sheriff\'s investigation, lawyers, and the guns held as evidence.'],
 };
+
+/** The end of a month's trial. */
+const TRIAL_END: Partial<Record<Stance, [string, string]>> = {
+  take_in: ['Take them in', 'They move inside the wall and join the family.'],
+  turn_away: ['Send them on', 'Thank them for the month\'s work and point them down the road.'],
+};
+
+/** "about 7 in 10", from a share. */
+const inTen = (x: number) => (x < 0.05 ? 'almost never' : x > 0.95 ? 'almost always' : `about ${Math.round(x * 10)} in 10`);
 
 /** At the gate with a ransom: the same stances, in their words. */
 const RANSOM: Partial<Record<Stance, [string, string]>> = {
@@ -38,10 +47,13 @@ export function GateCard() {
   const gate = g.game.gate;
   const e = gate.pending;
   if (e) {
-    const p = postureOf(g.game), def = defenseOf(p);
+    const p = postureOf(g.game);
+    // honest odds: the battle sim itself, a couple of dozen times (cached per encounter)
+    const odds = e.strength > 0 && e.kind !== 'break_in' && e.stances.includes('defend') ? fightOdds(g.game, e) : null;
+    const label = (st: Stance) => (e.ransom && RANSOM[st]) || (e.kind === 'trial_end' && TRIAL_END[st]) || STANCE[st];
     return (
       <div style={box}>
-        <div style={{ fontSize: 11, letterSpacing: 1, opacity: 0.6, textTransform: 'uppercase' }}>{e.kind === 'break_in' ? 'In the night' : e.kind === 'ransom' ? 'Word about your child' : 'At the gate'}</div>
+        <div style={{ fontSize: 11, letterSpacing: 1, opacity: 0.6, textTransform: 'uppercase' }}>{e.kind === 'break_in' ? 'In the night' : e.kind === 'ransom' ? 'Word about your child' : e.kind === 'trial_end' ? 'The camp outside the wall' : 'At the gate'}</div>
         <div style={{ fontSize: 19, fontWeight: 700, margin: '2px 0 8px' }}>{e.title}</div>
         {e.dossier.filter(Boolean).map((l, i) => <div key={i} style={{ marginBottom: 4, opacity: 0.9 }}>{l}</div>)}
         {e.kind === 'arrival' && !g.game.food.fromStores && (() => {
@@ -54,13 +66,15 @@ export function GateCard() {
           return <div style={{ margin: '8px 0', fontSize: 12, opacity: 0.75 }}>You have: {have}{canPay(gm, t) ? '' : ' (not enough for all of it)'} · a double-cross is {e.temper === 'savage' ? 'a real risk with this crew' : e.temper === 'hard' ? 'possible' : 'unlikely'} (about {Math.round(DOUBLE_CROSS[e.temper ?? 'savage'] * 100)} %)</div>;
         })()}
         {e.strength > 0 && e.kind !== 'break_in' && <div style={{ margin: '8px 0', fontSize: 12, opacity: 0.75 }}>
-          {e.size} {e.armed ? 'armed' : 'unarmed'} · their strength {e.strength} vs your defense {Math.round(def)} · walls {Math.round(p.barrier)} % · seen early {Math.round(p.detection)} %{p.bunker ? ' · bunker to hide in' : ''}
+          <div>{e.size} {e.armed ? 'armed' : 'unarmed'} · walls {Math.round(p.barrier)} % · seen early {Math.round(p.detection)} %{p.bunker ? ' · bunker to hide in' : p.safeRoom ? ' · safe room' : ''}</div>
+          {odds && <div>If you fight: you hold {inTen(odds.win)} · someone of yours killed or taken {inTen(odds.loseSomeone)}</div>}
+          {e.stances.includes('hide') && <div>If you hide: they find the place lived in {inTen(hideFoundChance(g.game, e, p))}, and strip it</div>}
         </div>}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
           {e.stances.map((st, i) => (
-            <button key={st} style={button(i === 0)} title={(e.ransom && RANSOM[st] || STANCE[st])[1]} onClick={() => g.answer(st)}>
-              <div style={{ fontWeight: 600 }}>{(e.ransom && RANSOM[st] || STANCE[st])[0]}</div>
-              <div style={{ fontSize: 11.5, opacity: 0.75 }}>{(e.ransom && RANSOM[st] || STANCE[st])[1]}</div>
+            <button key={st} style={button(i === 0)} title={label(st)[1]} onClick={() => g.answer(st)}>
+              <div style={{ fontWeight: 600 }}>{label(st)[0]}</div>
+              <div style={{ fontSize: 11.5, opacity: 0.75 }}>{label(st)[1]}</div>
             </button>
           ))}
         </div>

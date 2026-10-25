@@ -3,7 +3,8 @@ import { newGame } from './state';
 import type { DisasterKind } from './disaster';
 import { step } from './engine';
 import { placeOrder, orderProblem } from './economy';
-import { buyMetal, buyPrice, financeDay, metalsValue, moveMetal, netWorth, priceOf, sellMetal, sellPrice, transfer } from './finance';
+import { buyProblem } from './land';
+import { buyMetal, buyPrice, debtDay, payDebt, financeDay, metalsValue, moveMetal, netWorth, priceOf, sellMetal, sellPrice, transfer } from './finance';
 
 const rich = (kind: DisasterKind = 'grid_down') => { const g = newGame(5, 105, 2027, { mode: 'scenario', peace: 'short', kind }); g.money = 600_000; return g; };
 
@@ -70,5 +71,71 @@ describe('money: accounts and metals', () => {
       return;
     }
     throw new Error('no partial fate found');
+  });
+});
+
+describe('round 4: debt', () => {
+  const broke = () => { const g = newGame(5, 105, 2027, { mode: 'scenario', peace: 'long', kind: 'grid_down' }); g.money = 0; for (const ps of g.personState) ps.employed = false; return g; };
+  const days = (g: ReturnType<typeof broke>, n: number) => { const d0 = Math.floor(g.clock.t); const lines: string[] = []; for (let d = 1; d <= n; d++) { g.clock.t = d0 + d + 0.5; lines.push(...debtDay(g, d0 + d)); } return lines; };
+
+  it('checking never goes below zero: an overdraft goes on the card at about 24 % a year', () => {
+    const g = broke();
+    g.money = -5000;
+    const lines = days(g, 1);
+    expect(g.money).toBe(0);
+    expect(g.fin.debt.owed).toBeGreaterThan(5000);
+    expect(lines.join(' ')).toMatch(/credit card/);
+    // a year of interest compounding daily (nothing paid): ≈ 27 % with the late fees
+    days(g, 364);
+    expect(g.fin.debt.owed).toBeGreaterThan(5000 * 1.25);
+    expect(g.fin.debt.owed).toBeLessThan(5000 * 1.4);
+  });
+
+  it('late, then collections after six missed statements, then a judgment and a lien on the land', () => {
+    const g = broke();
+    g.money = -2000;
+    const lines = days(g, 31);
+    expect(g.fin.debt.stage).toBe('late');
+    expect(lines.join(' ')).toMatch(/late fee/);
+    days(g, 30 * 5);
+    expect(g.fin.debt.stage).toBe('collections');
+    days(g, 30 * 12);
+    expect(g.fin.debt.stage).toBe('judgment');
+    expect(g.fin.debt.lien).toBeGreaterThan(2000);
+    // a parcel they could otherwise buy: the lien stops the sale
+    g.money = 10_000_000;
+    const lien = g.fin.debt.lien;
+    g.fin.debt.lien = 0;
+    for (const x of g.land.parcels) x.forSale = true;
+    const p = g.land.parcels.find(x => buyProblem(g, x) === null)!;
+    expect(p).toBeDefined();
+    g.fin.debt.lien = lien;
+    expect(buyProblem(g, p)).toMatch(/lien/);
+  });
+
+  it('money coming in pays the statement; paying it all off clears it and the lien', () => {
+    const g = broke();
+    g.money = -1000;
+    days(g, 1);
+    g.money = 400;
+    days(g, 30);
+    expect(g.fin.debt.missed).toBe(0);
+    expect(g.money).toBe(0);
+    g.money = 5000;
+    expect(payDebt(g, 5000)).toBeNull();
+    expect(g.fin.debt.owed).toBe(0);
+    expect(g.fin.debt.stage).toBe('none');
+  });
+
+  it('once the banks fail nobody is collecting: no interest, no letters', () => {
+    const g = broke();
+    g.money = -3000;
+    days(g, 1);
+    const owed = g.fin.debt.owed;
+    g.disaster.tracks = { ...g.disaster.tracks, banks: 0 };
+    const lines = days(g, 400);
+    expect(g.fin.debt.owed).toBeCloseTo(owed, 6);
+    expect(g.fin.debt.stage).toBe('card');
+    expect(lines).toEqual([]);
   });
 });
