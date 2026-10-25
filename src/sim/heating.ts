@@ -10,6 +10,8 @@ import { calendarOf, dayIndex, type GameState } from './state';
 import { climate } from './effects';
 import { REGIONS } from './regions';
 import { roofLoss } from './improvements';
+import { isHome } from './blueprints';
+import { isFinished } from './construction';
 
 /** Heating demand 0–1 by day of year (peaks mid-January, nil June–August). */
 export function heatDemand(doy: number): number {
@@ -34,7 +36,9 @@ export function burnFirewood(s: GameState, days: number): void {
     if (!burnRick(s)) {
       s.heat.burned = 1;
       const day = dayIndex(s.clock.t);
-      if (s.heat.warned !== day) { s.heat.warned = day; log(s, 'Out of firewood: a cold night at camp. Mark some trees to fell.'); }
+      // (in the house once there is one: the line used to say "at camp" for years after the cabin went up)
+      const home = s.structures.find(x => isHome(x.kind) && isFinished(x));
+      if (s.heat.warned !== day) { s.heat.warned = day; log(s, `Out of firewood: a cold night ${home ? `in the ${home.kind.replace(/_/g, ' ')}` : 'at camp'}. Mark some trees to fell.`); }
       return;
     }
     s.heat.burned -= 1;

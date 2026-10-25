@@ -7,7 +7,7 @@
  * timber, a sickness that comes in with strangers, neighbors who are simply
  * gone. Pure.
  */
-import { isFinished } from './construction';
+import { isFinished, knockBack } from './construction';
 import { insuranceClaim } from './paperwork';
 import { BLUEPRINTS } from './blueprints';
 import { mulberry32 } from './rng';
@@ -79,7 +79,7 @@ export function effectsDay(s: GameState): string[] {
       if (!['workshop', 'chicken_coop', 'garden'].includes(st.kind) || r() > 0.55) continue;
       const roof = BLUEPRINTS[st.kind].stages.findIndex(x => x.id === 'roof');
       if (roof < 0) continue;
-      st.stage = roof; st.done = 0; st.supplied = false; st.finishedAt = null;
+      knockBack(s, st, roof);
       out.push(`The ${st.kind.replace('_', ' ')} roof came down under the wet ash: it has to be rebuilt.`);
       const paid = insuranceClaim(s, st, 0.4);
       if (paid) out.push(paid);

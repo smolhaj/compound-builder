@@ -21,7 +21,7 @@
  */
 import { calendarOf, dayIndex, type GameState, type Structure } from './state';
 import { REGIONS, type RegionId } from './regions';
-import { blueprintOf, isFinished } from './construction';
+import { blueprintOf, isFinished, knockBack } from './construction';
 import { insuranceClaim } from './paperwork';
 import { mulberry32, pick } from './rng';
 
@@ -89,8 +89,7 @@ function sheltered(s: GameState): boolean {
 function damage(s: GameState, st: Structure, share: number, what: string, out: string[]): void {
   const stages = blueprintOf(st).stages;
   const roof = stages.findIndex(x => x.id === 'roof');
-  st.stage = roof >= 0 ? roof : stages.length - 1;
-  st.done = 0; st.supplied = false; st.finishedAt = null;
+  knockBack(s, st, roof >= 0 ? roof : stages.length - 1);
   out.push(`${what} The ${label(st.kind)} has to be ${roof >= 0 ? 're-roofed' : 'redone'}.`);
   const paid = insuranceClaim(s, st, share);
   if (paid) out.push(paid);
@@ -156,7 +155,7 @@ export function weatherDay(s: GameState): string[] {
         if (s.stock.firewood >= 1) s.stock.firewood--;
         for (const o of s.orders) if (o.status === 'ordered' && o.dueAt < s.clock.t + 1) o.dueAt += 1;
       } else if (a.kind === 'heat_wave') {
-        s.utilities.storedL = Math.max(0, s.utilities.storedL - 40 * s.people.length);
+        s.utilities.storedL = Math.max(0, s.utilities.storedL - 40 * s.personState.filter(ps => ps.needs?.died == null).length);
         const powered = s.structures.some(st => s.utilities.lit.includes(st.id));
         if (!powered) for (const p of s.people) {
           const n = s.personState.find(x => x.id === p.id)?.needs;

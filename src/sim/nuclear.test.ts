@@ -45,6 +45,20 @@ describe('nuclear war', () => {
     expect(run(false)).toBeGreaterThan(0.6);
   });
 
+  it('fallout in the produce goes by how much of the diet it is, not how big the harvest is', () => {
+    const run = (produced: number) => {
+      const g = war();
+      built(g, 'd', 'bunker_dorm', { hardening: { fallout: 2 } }); built(g, 'w', 'cistern');
+      g.clock.t = g.disaster.hitAt + 20;
+      g.food = { ...g.food, needKcal: 10_000, producedKcal: produced };
+      falloutDay(g);
+      return g.personState[0].needs.dose;
+    };
+    expect(run(150_000)).toBeCloseTo(run(10_000), 6);    // a sixteen-field harvest feeds the same mouths as a garden that covers them
+    expect(run(150_000)).toBeLessThan(0.01);
+    expect(run(5_000)).toBeLessThan(run(10_000));
+  });
+
   it('the EMP fries electronics; spares in a Faraday room come through', () => {
     const bare = war(), caged = war();
     for (const g of [bare, caged]) { built(g, 's', 'solar_array'); g.stock.inverter = 4; g.stock.hardware = 2; g.clock.t = g.disaster.hitAt; }

@@ -31,6 +31,21 @@ describe('endings and the report card', () => {
     expect(reportCard(g).grade).toBe('F');
   });
 
+  it('everyone gone is a wipe in the quiet years before the next hit too, and after a card that was played on', () => {
+    const g = newGame(1, 105, 2027, { mode: 'scenario', peace: 'short', kind: 'nuclear' });
+    g.clock.t = g.disaster.hitAt - 30;
+    for (const ps of g.personState) ps.needs.died = 1;
+    expect(tallyDay(g)?.kind).toBe('wipe');
+    const h = newGame(1, 105, 2027, { mode: 'scenario', peace: 'short', kind: 'nuclear' });
+    h.clock.t = h.disaster.hitAt + 400;
+    h.ending = { kind: 'recovered', day: 300, continued: true };
+    for (const ps of h.personState) ps.needs.died = 1;
+    expect(tallyDay(h)?.kind).toBe('wipe');
+    expect(h.ending?.continued).toBe(false);
+    // and it is said once: a wipe on file isn't ended again
+    expect(tallyDay(h)).toBeNull();
+  });
+
   it('a year feeding yourselves is the equilibrium ending, counted over the year (the harvest carries the winter)', () => {
     const g = newGame(2, 105, 2027, { mode: 'scenario', peace: 'short', kind: 'grid_down', variant: 'cascade' });
     g.disaster.tracks = { ...g.disaster.tracks, grid: 0 };

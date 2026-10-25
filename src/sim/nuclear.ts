@@ -130,7 +130,8 @@ export function falloutDay(s: GameState): string[] {
     if (day < CONTAMINATED_DAYS) {
       const k = (1 - day / CONTAMINATED_DAYS) * (R1[v] ?? 1);
       if (!cleanWater) dose += 0.004 * k;
-      if (s.food.producedKcal > 0) dose += 0.002 * k * (s.food.producedKcal / 2000);
+      // (by the share of the diet that's fresh from the place, not the size of the farm: playtest round 3, a fallout over a 16-field harvest gave everyone 0.3 Sv a day)
+      if (s.food.producedKcal > 0) dose += 0.002 * k * Math.min(1, s.food.producedKcal / Math.max(1, s.food.needKcal));
     }
     n.dose += dose;
     if (n.dose > 1 && n.dose - dose <= 1) out.push(`${p.first} is sick: nausea, weakness. Radiation sickness.`);

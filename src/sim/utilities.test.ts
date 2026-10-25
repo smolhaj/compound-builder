@@ -147,6 +147,17 @@ describe('the county grid and grid-down', () => {
     expect(g.utilities.report.shed).toContain('k');
   });
 
+  it('only the living use water: the dead and the taken are not counted', () => {
+    const g = newGame(1, 172);
+    day(g);
+    const all = g.utilities.report.useL;
+    expect(all).toBeGreaterThan(0);
+    g.personState[0].needs.died = 1;
+    g.personState[1].needs.died = 1; g.personState[1].needs.taken = true;
+    day(g);
+    expect(g.utilities.report.useL).toBeCloseTo(all * (g.personState.length - 2) / g.personState.length, 5);
+  });
+
   it('a breaker switched off takes a building off the load', () => {
     const g = grid();
     built(g, 'h', 'timber_cabin', 10, 10);
