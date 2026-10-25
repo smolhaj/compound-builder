@@ -29,7 +29,7 @@ import { isHome } from './blueprints';
 import { mulberry32 } from './rng';
 import { log } from './economy';
 
-export type ChronicleKind = 'era' | 'birth' | 'death' | 'partner' | 'coming' | 'milestone' | 'retire';
+export type ChronicleKind = 'era' | 'birth' | 'death' | 'partner' | 'coming' | 'milestone' | 'retire' | 'home';
 export interface ChronicleEntry { t: number; year: number; kind: ChronicleKind; text: string }
 
 /** One era: a disaster lived through (eras.ts fills these in). */

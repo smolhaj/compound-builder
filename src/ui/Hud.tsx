@@ -4,7 +4,7 @@ import { useGameStore } from '../store/gameStore';
 import type { Quality } from '../engine/world/WorldScene';
 import { SEASON_MODES, type SeasonMode } from '../engine/world/season/seasonState';
 import { WEATHER_MODES, type WeatherMode } from '../engine/world/weather/weatherState';
-import { calendarOf, hourOf, type Speed } from '../sim/state';
+import { calendarOf, dayIndex, hourOf, type Speed } from '../sim/state';
 import { BACKGROUND_NAME, backgroundOf, fullName } from '../sim/family';
 import { MATERIALS, MATERIAL_IDS, emptyStock, type MaterialId } from '../sim/materials';
 import { onOrder, orderCost, orderProblem } from '../sim/economy';
@@ -36,6 +36,7 @@ import { daysOfFood, KCAL, needOf } from '../sim/needs';
 import { ANIMALS, feedDemand, winterHay } from '../sim/livestock';
 import { barterPrices, moneyWorks, type Good } from '../sim/barter';
 import { NEIGHBOR_BLURB } from '../sim/encounters';
+import { alliesFor, canGo, FAR_COLD, isAway, latestFarLead, latestLead, LEAD_COLD, LEAD_WARM, leadAge, openCaptives, raidProblem, rescueOdds, tripFuel, tripProblem } from '../sim/rescue';
 import { EXPOSURE_NAME, exposure, raidPressure, topExposure } from '../sim/opsec';
 import { acresOf, buyProblem, LAND_NAME, priceOf } from '../sim/land';
 import { HARDEN, HARDEN_IDS, type TierDef, hardenCost, hardenProblem, isBunkerRoom, protectionOf, tierOf } from '../sim/hardening';
@@ -50,7 +51,7 @@ const VIEWS: Array<[BuildingView, string, string]> = [['full', 'Walls', 'Whole b
 const SPEEDS: Array<[Speed, string]> = [[0, '❚❚'], [1, '▶'], [2, '▶▶'], [3, '▶▶▶'], [4, '⏩']];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const MONTH_START = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
-const TASK_TEXT: Record<string, string> = { build: 'Building', forestry: 'In the woods', chores: 'Chores', sleep: 'Asleep', school: 'School', leisure: 'Free time', idle: 'Idle', job: 'At work in town', gone: 'Died', shelter: 'Sheltering' };
+const TASK_TEXT: Record<string, string> = { build: 'Building', forestry: 'In the woods', chores: 'Chores', sleep: 'Asleep', school: 'School', leisure: 'Free time', idle: 'Idle', job: 'At work in town', gone: 'Died', shelter: 'Sheltering', away: 'Away on the rescue' };
 
 function dateLabel(doy: number): string {
   let m = 11;
@@ -584,6 +585,7 @@ export function Hud() {
           {rightTab === 'chronicle' && <Chronicle />}
 
           {rightTab === 'outside' && <>
+            <TakenSection />
             {game.disaster.mode === 'sandbox' && !game.disaster.kind && <FreeBuild />}
             {!(game.disaster.phase === 'warning' || (game.disaster.kind && game.clock.t >= game.disaster.warnAt)) && !(game.disaster.mode === 'sandbox' && !game.disaster.kind) && <Note>All quiet. Watch the news ticker, the prices and the neighbors.</Note>}
             {(game.disaster.phase === 'warning' || (game.disaster.kind && game.clock.t >= game.disaster.warnAt)) && (
@@ -701,8 +703,91 @@ export function Hud() {
   );
 }
 
+const SOURCE_NAME = { radio: 'Radio', neighbor: 'Neighbor', trader: 'Trader', prisoner: 'Prisoner' } as const;
+const KNOWN_TEXT = { nothing: 'no word yet', alive: 'seen alive', traded: 'traded on, down the road', dead: 'word is they\'re dead' } as const;
+
+/** The taken: what the family has heard, and what they can do (sim/rescue.ts). */
+function TakenSection() {
+  const g = useGameStore();
+  const game = g.game;
+  const [team, setTeam] = useState<Record<string, string[]>>({});
+  const [odds, setOdds] = useState<Record<string, number>>({});
+  const [askAllies, setAskAllies] = useState(false);
+  const allies = alliesFor(game);
+  const allyN = allies.reduce((a, x) => a + x.n, 0);
+  const open = openCaptives(game);
+  const raid = game.rescue?.raid;
+  const recent = (game.rescue?.captives ?? []).filter(c => c.closed && dayIndex(game.clock.t) - (c.closedDay ?? 0) < 14);
+  if (!open.length && !recent.length && !raid) return null;
+  const day = dayIndex(game.clock.t);
+  const name = (id: string) => game.people.find(p => p.id === id)?.first ?? '?';
+  return <Section title="Taken">
+    {raid && <div style={{ marginBottom: 6 }}>
+      <Note tone="warn">{raid.team.map(name).join(', ')} {raid.resolved ? 'on the way home' : raid.kind === 'trip' ? `on the road after ${name(raid.captive)}` : `gone after ${name(raid.captive)}`}{raid.allies?.length ? ', with the neighbors\' men' : ''}: back about day {raid.backDay - day <= 0 ? 'today' : `+${raid.backDay - day}`}. The place is held by {game.people.filter((p, i) => game.personState[i]?.needs.died == null && !raid.team.includes(p.id) && (!p.kid || p.age >= 15)).length} who can shoot.</Note>
+    </div>}
+    {open.map(c => {
+      const child = game.people.find(p => p.id === c.pid);
+      if (!child) return null;
+      const lead = latestLead(c), age = lead ? leadAge(game, lead) : 0;
+      const pickd = team[c.pid] ?? [];
+      const can = game.people.filter(p => canGo(game, p));
+      const why = raidProblem(game, c.pid, pickd);
+      const staying = game.people.filter((p, i) => game.personState[i]?.needs.died == null && !pickd.includes(p.id) && !isAway(game, p.id));
+      const out = raid?.captive === c.pid;
+      return <div key={c.pid} style={{ marginBottom: 10, paddingBottom: 6, borderBottom: `1px solid ${LINE}` }}>
+        <Row label={<b style={{ color: '#eee' }}>{fullName(child)}, {child.age}</b>} value={`${day - c.day} days`} tone="bad" />
+        <Note>Taken by {c.crew} · {KNOWN_TEXT[c.known]}</Note>
+        {c.leads.slice(-3).reverse().map((l, i) => {
+          const a = leadAge(game, l);
+          return <div key={i} style={{ fontSize: 11.5, margin: '3px 0', opacity: i ? 0.6 : 1 }}>
+            {l.far ? <><span style={{ color: a <= FAR_COLD ? TONE.warn : DIM }}>Far rumor, {a === 0 ? 'today' : `${a} days ago`}{a > FAR_COLD ? ' · cold' : ''}:</span> {l.where}, {l.km} km</>
+              : <><span style={{ color: a <= LEAD_WARM ? TONE.good : a <= LEAD_COLD ? TONE.warn : DIM }}>{SOURCE_NAME[l.source]}, {a === 0 ? 'today' : `${a} days ago`}{a > LEAD_COLD ? ' · cold' : a > LEAD_WARM ? ' · cooling' : ''}:</span> {l.where}, {l.km} km · {l.count} of them{l.seenAlive ? ' · seen alive' : ''}</>}
+          </div>;
+        })}
+        {!c.leads.length && <Note>No lead yet. A radio, the neighbors, a prisoner who talks: someone may hear something.</Note>}
+        {!out && c.known !== 'traded' && <>
+          {lead && age <= LEAD_COLD && <div style={{ marginTop: 4 }}>
+            <div style={{ fontSize: 11.5, color: DIM, marginBottom: 2 }}>Who goes to {lead.where}:</div>
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+              {can.map(p => <button key={p.id} style={btn(pickd.includes(p.id))} title={`Health ${Math.round(game.personState.find(x => x.id === p.id)?.needs.health ?? 0)}`} onClick={() => { setTeam({ ...team, [c.pid]: pickd.includes(p.id) ? pickd.filter(x => x !== p.id) : [...pickd, p.id] }); setOdds({ ...odds, [c.pid]: -1 }); }}>{p.first}</button>)}
+              {!can.length && <Note tone="warn">Nobody is fit to go.</Note>}
+            </div>
+            {allyN > 0 && <button style={{ ...btn(askAllies), width: '100%', marginTop: 4 }} title="Neighbors on the radio net who like you. Their men can be hurt or killed, and they'll hold it against you if it goes badly." onClick={() => { setAskAllies(!askAllies); setOdds({ ...odds, [c.pid]: -1 }); }}>{askAllies ? '✓ ' : ''}Ask the neighbors: {allies.map(a => `${a.name} (${a.n})`).join(', ')}</button>}
+            {pickd.length > 0 && <Note tone="warn">Staying: {staying.map(p => p.first).join(', ') || 'nobody'} ({staying.filter(p => !p.kid || p.age >= 15).length} who can shoot). The place is lightly held for {lead.km > 25 ? 'four' : 'two'} days.</Note>}
+            {pickd.length > 0 && <div style={{ display: 'flex', gap: 4, marginTop: 3 }}>
+              <button style={{ ...btn(), flex: 1 }} title="A guess from what the lead says: how many, and who you send" onClick={() => setOdds({ ...odds, [c.pid]: rescueOdds(game, c.pid, pickd, 40, askAllies) })}>{(odds[c.pid] ?? -1) >= 0 ? `Odds: about ${Math.round(odds[c.pid] * 10)} in 10` : 'Weigh the odds'}</button>
+              <button style={{ ...btn(true), flex: 1, opacity: why ? 0.4 : 1 }} disabled={!!why} title={why ?? `They go tonight and hit the camp before dawn`} onClick={() => { const w = g.rescue(c.pid, pickd, askAllies); if (w) alert(w); else setTeam({ ...team, [c.pid]: [] }); }}>Go get {child.body === 'f' ? 'her' : 'him'}</button>
+            </div>}
+          </div>}
+          <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+            <button style={{ ...btn(), flex: 1, opacity: lead && age <= LEAD_COLD && c.offerDue == null ? 1 : 0.4 }} title={c.offerDue != null ? 'Word has gone out: waiting for an answer' : 'Send word through whoever gave the lead that you will pay. Some crews answer.'} onClick={() => { const w = g.askRansom(c.pid); if (w) alert(w); }}>{c.offerDue != null ? 'Waiting for an answer' : 'Offer to pay'}</button>
+            <button style={{ ...btn(), flex: 1 }} title="Stop looking. The family has to keep the others alive." onClick={() => { if (confirm(`Stop looking for ${child.first}?`)) { const w = g.giveUp(c.pid); if (w) alert(w); } }}>Give up</button>
+          </div>
+        </>}
+        {!out && c.known === 'traded' && (() => {
+          const fl = latestFarLead(c), warm = fl && leadAge(game, fl) <= FAR_COLD;
+          const fuel = fl ? tripFuel(game, fl.km) : null, tw = tripProblem(game, c.pid, pickd);
+          return <div style={{ marginTop: 4 }}>
+            {!warm && <Note>Traded on, far off. Now and then a rumor comes over the radio, months apart.</Note>}
+            {warm && fl && fuel && <>
+              <div style={{ fontSize: 11.5, color: DIM, marginBottom: 2 }}>Drive to {fl.where} ({fl.km} km, {fuel.liters} L of fuel there and back, {2 * Math.ceil(fl.km / 150)} days{fuel.truck ? '' : ', no running truck'}). Who goes (up to 3):</div>
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                {can.map(p => <button key={p.id} style={btn(pickd.includes(p.id))} onClick={() => setTeam({ ...team, [c.pid]: pickd.includes(p.id) ? pickd.filter(x => x !== p.id) : [...pickd, p.id] })}>{p.first}</button>)}
+              </div>
+              {pickd.length > 0 && <Note tone="warn">Staying: {staying.map(p => p.first).join(', ') || 'nobody'}. A long shot: the rumor may be wrong, or they may be moved on.</Note>}
+              <button style={{ ...btn(true), width: '100%', marginTop: 3, opacity: tw ? 0.4 : 1 }} disabled={!!tw} title={tw ?? 'Take the truck and the trade goods'} onClick={() => { const w = g.trip(c.pid, pickd); if (w) alert(w); else setTeam({ ...team, [c.pid]: [] }); }}>Take the truck</button>
+            </>}
+            <button style={{ ...btn(), width: '100%', marginTop: 4 }} onClick={() => { if (confirm(`Stop looking for ${child.first}?`)) g.giveUp(c.pid); }}>Give up</button>
+          </div>;
+        })()}
+      </div>;
+    })}
+    {recent.map(c => <Note key={c.pid} tone={c.closed === 'home' ? 'good' : undefined}>{name(c.pid)}: {c.closed === 'home' ? 'home again' : c.closed === 'dead' ? 'gone' : 'no longer looking'}</Note>)}
+  </Section>;
+}
+
 const cap = (x: string) => x[0].toUpperCase() + x.slice(1);
-const KIND_MARK: Record<string, string> = { era: '◆', birth: '✦', death: '✝', partner: '♥', coming: '▲', milestone: '★', retire: '·' };
+const KIND_MARK: Record<string, string> = { era: '◆', birth: '✦', death: '✝', partner: '♥', coming: '▲', milestone: '★', retire: '·', home: '⌂' };
 
 /** The long game: the family over the years, the eras, milestones and the dynasty score. */
 function Chronicle() {
