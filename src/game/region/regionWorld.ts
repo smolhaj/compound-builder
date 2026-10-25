@@ -115,7 +115,7 @@ export const REGION_WORLD: Record<RegionId, RegionWorld> = {
     road: 'asphalt', fence: 'rail',
   },
   desert: {
-    kind: 'desert', climate: 'desert_southwest', relief: 'bajada', cover: 1.6,
+    kind: 'desert', climate: 'desert_southwest', relief: 'bajada', cover: 3.5,
     trees: {
       timber: [{ kind: 'conifer', w: 1, scale: [0.28, 0.45], sx: [1.25, 1.6], sy: [0.7, 0.9] }],   // one-seed juniper, pinyon
       riparian: { kind: 'broad', scale: [0.9, 1.2] },                                 // Fremont cottonwood

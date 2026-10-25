@@ -137,7 +137,7 @@ export function regionLookFor(kind: RegionKind): RegionLook {
     // oak–hickory / tulip-poplar cove forest, hay in the bottoms, sandstone ledges on the steep faces
     case 'appalachia': return { ...base, snowLineWinter: 30, forest: 0x2d4a26, evergreen: 0.2, rock: 0x8a8070, grass: 0x557a36, farm: 0.4, fieldSize: 18, rockSlope: 0.55 };
     // Colorado Plateau: tan grama grass and bare red-brown soil, pinyon–juniper on the mesas, red sandstone cliffs
-    case 'desert': return { ...base, dry: 0.92, rock: 0x9c5f45, forest: 0x46553a, evergreen: 0.97, grass: 0x8c8458, dryGrass: 0xb39a72, farm: 0, fieldSize: 60, rockSlope: 0.28 };
+    case 'desert': return { ...base, dry: 0.92, rock: 0x9c5f45, forest: 0x46553a, evergreen: 0.97, grass: 0x8c8458, dryGrass: 0xb39a72, farm: 0, fieldSize: 60, rockSlope: 0.18 };
     // spruce–fir and pine on the flats, birch and aspen in the burns, lakes and open bog
     case 'north_woods': return { ...base, snowLineWinter: -15, forest: 0x1d3424, evergreen: 0.75, rock: 0x6e6c66, grass: 0x5c6e40, farm: 0.05, fieldSize: 24, rockSlope: 0.45 };
     // dairy country: 40-acre fields on the survey grid, hardwood woodlots, kettle lakes
