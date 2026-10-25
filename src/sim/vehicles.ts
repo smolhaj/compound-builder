@@ -104,7 +104,8 @@ export function vehiclesDay(s: GameState): string[] {
   const out: string[] = [];
   const peace = stationsUp(s) && s.disaster.tracks.stores >= 0.5;
   const commuting = peace && s.personState.some(ps => ps.employed);
-  const mechanic = Math.max(0, ...s.people.map(p => p.skills.mechanic ?? 0));
+  // (the living: a dead mechanic used to keep the trucks running)
+  const mechanic = Math.max(0, ...s.people.filter((_, i) => s.personState[i]?.needs.died == null).map(p => p.skills.mechanic ?? 0));
   // the commute: one running truck makes the town trip on workdays (≈ 5/7 of days)
   const truck = vs.find(v => (v.kind === 'pickup' || v.kind === 'old_pickup') && runs(v));
   for (const v of vs) {

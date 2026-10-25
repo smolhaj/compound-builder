@@ -156,7 +156,7 @@ export function weatherDay(s: GameState): string[] {
         if (s.stock.firewood >= 1) s.stock.firewood--;
         for (const o of s.orders) if (o.status === 'ordered' && o.dueAt < s.clock.t + 1) o.dueAt += 1;
       } else if (a.kind === 'heat_wave') {
-        s.utilities.storedL = Math.max(0, s.utilities.storedL - 40 * s.people.length);
+        s.utilities.storedL = Math.max(0, s.utilities.storedL - 40 * s.personState.filter(ps => ps.needs?.died == null).length);
         const powered = s.structures.some(st => s.utilities.lit.includes(st.id));
         if (!powered) for (const p of s.people) {
           const n = s.personState.find(x => x.id === p.id)?.needs;
