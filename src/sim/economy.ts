@@ -8,6 +8,26 @@ import { weatherDelay } from './upkeep';
 import type { GameState, OrderLine } from './state';
 import { canOrder, priceFactor } from './disaster';
 import { CARRY_H } from './improvements';
+import { addFood, CAT_KCAL, FOOD, type FoodItemId } from './pantry';
+
+/** A line's price at list (a named food at its own price). */
+const linePrice = (l: OrderLine) => l.food ? (FOOD[l.food].price ?? 0) * (l.n ?? 0) : (MATERIALS[l.material].price ?? 0) * l.qty;
+const isReal = (l: OrderLine) => l.qty > 0 || (l.food !== undefined && (l.n ?? 0) > 0);
+/** A line's name in the log. */
+const lineName = (l: OrderLine) => l.food ? `${l.n} × ${FOOD[l.food].name.toLowerCase()}` : `${l.qty} × ${MATERIALS[l.material].name.toLowerCase()}`;
+
+/** An order line for `n` units of a named food. */
+export function foodLine(id: FoodItemId, n: number): OrderLine {
+  const it = FOOD[id];
+  return { material: it.cat, qty: n * it.kcal / CAT_KCAL[it.cat], food: id, n };
+}
+
+/** Put a delivered line in the stockpile (a named food goes into the pantry by name). */
+export function receive(s: GameState, l: OrderLine): void {
+  if (l.food && (l.n ?? 0) > 0) addFood(s, l.food, l.n ?? 0);
+  else s.stock[l.material] += l.qty;
+}
+
 
 /** Days from order to delivery. */
 export const LEAD_TIME_DAYS = 2;
@@ -18,16 +38,16 @@ export type OrderProblem = 'empty' | 'not_for_sale' | 'cannot_afford' | 'no_deli
 
 /** Cost of an order; `factor` is the price level (panic buying in the warning signs, scarcity after; disaster.priceFactor). */
 export function orderCost(lines: readonly OrderLine[], factor = 1): number {
-  return Math.round(lines.reduce((a, l) => a + (MATERIALS[l.material].price ?? 0) * l.qty, 0) * factor) + (lines.length ? DELIVERY_FEE : 0);
+  return Math.round(lines.reduce((a, l) => a + linePrice(l), 0) * factor) + (lines.length ? DELIVERY_FEE : 0);
 }
 
 /** Today's price level. */
 export const prices = (s: GameState) => priceFactor(s.disaster, s.clock.t);
 
 export function orderProblem(s: GameState, lines: readonly OrderLine[]): OrderProblem | null {
-  const real = lines.filter(l => l.qty > 0);
+  const real = lines.filter(isReal);
   if (real.length === 0) return 'empty';
-  if (real.some(l => MATERIALS[l.material].price === null)) return 'not_for_sale';
+  if (real.some(l => (l.food ? FOOD[l.food].price : MATERIALS[l.material].price) === null)) return 'not_for_sale';
   const how = payWith(s);
   if (!how) return 'no_deliveries';
   if (orderCost(real, prices(s)) > (how === 'bank' ? s.money : s.fin.cash)) return 'cannot_afford';
@@ -44,13 +64,13 @@ export function payWith(s: GameState): 'bank' | 'cash' | null {
 /** Place an order (mutates the draft). Returns the order id or null. */
 export function placeOrder(s: GameState, lines: readonly OrderLine[]): string | null {
   if (orderProblem(s, lines)) return null;
-  const real = lines.filter(l => l.qty > 0).map(l => ({ ...l }));
+  const real = lines.filter(isReal).map(l => ({ ...l }));
   const cost = orderCost(real, prices(s));
   const id = `o${s.nextId++}`;
   if (payWith(s) === 'cash') s.fin.cash -= cost; else s.money -= cost;
   const wx = weatherDelay(s, real.map(l => l.material));
   s.orders.push({ id, lines: real, cost, placedAt: s.clock.t, dueAt: s.clock.t + LEAD_TIME_DAYS + Math.floor(s.site.miles / 15) + wx.days, status: 'ordered' });
-  log(s, `Ordered ${real.map(l => `${l.qty} × ${MATERIALS[l.material].name.toLowerCase()}`).join(', ')} — $${cost.toLocaleString('en-US')}.${wx.why ? ` It'll be ${wx.days} days late (${wx.why}).` : ''}`);
+  log(s, `Ordered ${real.map(lineName).join(', ')} — $${cost.toLocaleString('en-US')}.${wx.why ? ` It'll be ${wx.days} days late (${wx.why}).` : ''}`);
   return id;
 }
 
@@ -59,7 +79,7 @@ export function deliverOrders(s: GameState): void {
   for (const o of s.orders) {
     if (o.status !== 'ordered' || s.clock.t < o.dueAt) continue;
     o.status = 'delivered';
-    const what = o.lines.map(l => `${l.qty} ${MATERIALS[l.material].name.toLowerCase()}`).join(', ');
+    const what = o.lines.map(l => l.food ? `${l.n} ${FOOD[l.food].name.toLowerCase()}` : `${l.qty} ${MATERIALS[l.material].name.toLowerCase()}`).join(', ');
     // no drive yet: the truck leaves it at the road and the family carries it in
     if (!s.site.improvements.drive) {
       const hours = o.lines.reduce((a, l) => a + (CARRY_H[l.material] ?? 0.2) * l.qty, 0);
@@ -69,7 +89,7 @@ export function deliverOrders(s: GameState): void {
         continue;
       }
     }
-    for (const l of o.lines) s.stock[l.material] += l.qty;
+    for (const l of o.lines) receive(s, l);
     log(s, `The delivery truck dropped off ${what}.`);
   }
 }
@@ -94,7 +114,7 @@ export function addCarryWork(s: GameState, hours: number): number {
     const use = Math.min(left, r.hours - r.done);
     r.done += use; left -= use;
     if (r.done >= r.hours - 1e-9) {
-      for (const l of r.lines) s.stock[l.material] += l.qty;
+      for (const l of r.lines) receive(s, l);
       s.roadside.shift();
       log(s, 'Carried the last of the delivery in from the road.');
     }
