@@ -1,0 +1,28 @@
+# Compound Builder — where things stand (paused 2026-10-25)
+
+## Merged to main (this stretch)
+#44 civilian voices · #45 combat realism + aftermath · #46 peacetime break-ins · #47 compound buildings ·
+#48 playtest fixes + ruthless crews · #49 interiors · #50 rescue the taken · #51 itemized food ·
+#53 playtest round 3. Main SAVE_VERSION = 40 (after #54).
+
+## Open PRs
+- #52 regions (claude/regions @c4a9a2d) — DONE: 11 regions (+New England, Ozarks, Hill Country, Rust Belt), storms by difficulty, desert wash fix; no save bump; full vitest passed locally. NEXT: merge main, check CI, squash-merge. Leftovers: desert mesa striping, Hill Country juniper reads as fir. Shots: scratchpad/shots/regions/. Farm-kitchen maple can now include new_england.
+- (#54 encounter realism MERGED — main is now save 40.)
+
+## Branches pushed, no PR yet (renumber saves at merge, in this order after #54 = 40)
+- claude/survival-realism @88f94f6 — save 45 (keyed 39→45; renumber after 40): radiation, hand pump, thirst, cold. HOLD the PR until the follow-ups land (without them a desert family on a >100 m well dies in drought): (1) DC solar well pump ~$3.5–4.5k, to ~250 m, L/h ≈ 120000/(depth+40) × sun hrs × 0.8, EMP-vulnerable; hauling from neighbor's well / nearest river (truck+trailer 1000 L/day w/ fuel, on foot 20 L/trip) in utilities.balanceDay drought branch; (2) 'brush' heat in cold.ts up to +8 °C, chore hours, more creosote; (3) dry garden cuts veg harvest (needs.ts); (4) DECISIONS note: cancer model is a placeholder for people/medical.
+- claude/farm-kitchen @f14b1d1 — save 44 (one 39→44 step; renumber): WIP, NO PR. Sim done + tested (preserving.ts cellar/canning/drying/meat, farmWork.ts labor ledger, seeds.ts, livestock/poultry/dairy/livestockHealth, pond.ts, maple.ts, farm.ts). TODO: UI (Farm tab, seeds in Supplies, shop, build menu), pond + sugar shack geometry, canning-day visual, playtest bot buys jars/canner/feed, after-playtest (before at scratchpad/farm/pt-before.md), migration test, DECISIONS row, merge main. Open Qs: Appalachia maple? canner power not charged; freezer unlimited; rennet infinite; coop free hens; seed potato clonal; water-glassing; pond ≈5k kcal/yr unfed OK?
+- claude/people-depth @b1f7978 — save 46 (one 39→46 step; renumber): WIP, NO PR. Built mind.ts, medical.ts (9 conditions), skills.ts (practice/teach/courses/rust), PeoplePanel.tsx, 8 shop items; hooks in src/sim/people.ts (practice, teach, gathering, shock, startCase) — daily-life should call practice()/gathering() and switch off PASSIVE_PRACTICE. 32 new tests pass; playtest 36 runs: alive 80→94, wipes 14→13, fight deaths 32→18 (reports scratchpad/people-pt/). NOTE both daily-life and people-depth replace the flat −15 death morale with fading grief → reconcile on merge. TODO: merge main, DECISIONS row, screenshots (scratchpad/peopleShots.mjs port 5371; family-tab.png unchecked), quiet full test run. Open Qs: 2.5 % birth risk with a skill-5 medic; isolation low mood −10 % work in winter; courses were the agent's own call.
+- claude/world-life @3158d40 (merged main at v39; renumber vs main 40) — save 42: DONE + 36 tests pass, NO PR yet. scavenge.ts, market.ts/tradeGoods.ts, neighborLife.ts/pact.ts, WorldPanels.tsx, burned farms visual. Shot: scratchpad/shots/world/scavenging.png; TODO market.png/neighbors.png (scratchpad/worldShots.mjs, port 5341) + burned-farm eye level. Open Qs: merge salt/coffee with pantry + sell trade goods pre-collapse? tools speed building? pact callout as gate card? militia/co-op costs OK? tetanus odds? map drawn farmsteads to sim neighbors + refugee camps?
+- claude/daily-life @ef00a32 — save 43 (one 38→43 step; renumber): WIP, NO PR. Built: daily.ts roster + auto planner (threat 0/1/2, night watch shifts), 10 chore backlogs, fatigue, gatherings.ts (11 kinds), SchedulePanel, 6 poses + tools, yard props, watchNow(s) for atmosphere flashlights. Hooks in engine/needs/encounters/battle/opsec. Grief now fades (replaces flat −15). TODO before PR: tests (planner, chores, gatherings, task kinds); PERF — engine ~1.5–2× slower per sub-step (paperwork/armory tests 8→49 s, 11→79 s locally) → must fix or CI times out; run scripts/dailyShot.mjs (port 5350) for screenshots; merge main. Open questions for user: should kitchen hours gate auto canning, feeding hours affect milk, hunt hours wild food, teach hours kids' skills? Guitar flag invented; no alcohol item; OK that grief fades?
+- claude/atmosphere @0041022 — no save: WIP, NO PR. Built (src/game/atmosphere/): nightLife.ts window states (oil/electric/curtain/off), props/firePit.ts (world.atmos.fire), fx/Flashlights.ts (task 'watch' → hook to daily-life watchNow), generator smoke+light, aging.ts + weathering.ts shader (wood/paint/rust/moss/grime, sagging fences, weeds), seasonCover.ts (drifts, mud, frost, iced tank). TODO: screenshots (only a poor night-overview.png; script scratchpad/atmosShot.mjs, ~23 min to first frame on Medium), clean full test run, perf/draw-call measurement, visual check of fence sag/drifts/weathering.
+Worktrees: scratchpad/wt-* (wt-regions, wt-encounter, wt-survival, wt-farm, wt-people, wt-world, wt-daily, wt-atmos).
+
+## Queued (user approved)
+- Bug-out option + fortification upgrades (after #54 merges).
+- Savage crews can attack bunkers/safe rooms "with real limits" (blast door / hidden hatch stop most; smoke, burn, pry, wait out).
+- From #54: raiders hit trial camps; long bank failure writes off debt; slabs/foundations survive fire.
+
+## Notes
+- CI uses vitest's 5 s per-test timeout; local runs under heavy agent load time out the long sim tests (armory, paperwork, breakins) — not real failures; check CI.
+- Old merged branches still need deleting by the user (403 for us): see prs.txt.
