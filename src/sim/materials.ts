@@ -9,7 +9,7 @@ export type MaterialId = 'lumber' | 'logs' | 'firewood' | 'fieldstone' | 'concre
   | 'pipe' | 'cable' | 'fixtures' | 'pump' | 'drilling' | 'solar_panel' | 'battery' | 'inverter' | 'generator' | 'fuel' | 'tank' | 'septic_tank'
   | 'rebar' | 'membrane' | 'excavator' | 'blast_door' | 'nbc_filter' | 'spoil' | 'culvert' | 'egress_hatch'
   | 'lead_sheet' | 'faraday_mesh' | 'blast_valve' | 'filter_set'
-  | 'fresh' | 'frozen' | 'canned' | 'staples' | 'meds' | 'seed' | 'lids' | 'plow' | 'stabilizer' | 'traps' | 'hygiene' | 'gun_safe' | 'gun_cleaning' | 'fishing_gear' | 'snares' | 'smoker' | 'goat' | 'pig' | 'steer' | 'rabbit' | 'hay' | 'feed' | 'water_jugs' | 'ibc_tote' | 'water_trailer' | 'water_filter' | 'ro_system' | 'softener' | 'greywater'
+  | 'fresh' | 'frozen' | 'canned' | 'staples' | 'meds' | 'seed' | 'lids' | 'plow' | 'stabilizer' | 'traps' | 'hygiene' | 'gun_safe' | 'gun_cleaning' | 'fishing_gear' | 'snares' | 'smoker' | 'goat' | 'pig' | 'steer' | 'rabbit' | 'hay' | 'feed' | 'water_jugs' | 'ibc_tote' | 'water_trailer' | 'water_filter' | 'ro_system' | 'softener' | 'greywater' | 'hand_pump' | 'potassium_iodide' | 'sleeping_bags'
   | 'plate_carrier' | 'ifak' | 'nvg' | 'thermal' | 'radios' | 'cameras' | 'thermal_cam' | 'driveway_alarm' | 'floodlights' | 'tripwire' | 'dog' | 'steel_door' | 'window_bars' | 'sandbags' | 'safe_room' | 'sw_radio' | 'ham_rig' | 'helmet' | 'soft_armor'
   | 'grenades' | 'rpg_launcher' | 'rpg_rounds' | 'suppressor'
   | 'mines' | 'greenhouse_kit' | 'fruit_trees';
@@ -98,6 +98,9 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   water_filter: { id: 'water_filter', name: 'Gravity water filter', unit: 'ceramic gravity filter, about a year of cartridges for a family', price: 350 },
   ro_system: { id: 'ro_system', name: 'Reverse osmosis', unit: 'under-sink reverse osmosis for drinking water (takes out arsenic)', price: 1200 },
   softener: { id: 'softener', name: 'Water softener', unit: 'for hard water: saves the pump and the pipes', price: 900 },
+  hand_pump: { id: 'hand_pump', name: 'Deep-well hand pump', unit: 'a Simple Pump-style hand pump fitted down the drilled well\'s casing beside the electric pump: water with no power, by hand, to about 100 m static level', price: 2200 },
+  potassium_iodide: { id: 'potassium_iodide', name: 'Potassium iodide', unit: 'a 14-tablet pack (130 mg): guards one person\'s thyroid against radioactive iodine for two weeks, and nothing else', price: 12 },
+  sleeping_bags: { id: 'sleeping_bags', name: 'Cold-weather sleeping bag', unit: 'a 0 °F (−18 °C) mummy bag for one person', price: 150 },
   greywater: { id: 'greywater', name: 'Greywater system', unit: 'diverter, surge tank and mulch basins: sink and shower water to the garden', price: 900 },
   fishing_gear: { id: 'fishing_gear', name: 'Fishing gear', unit: 'rods, reels, tackle box, waders', price: 120 },
   snares: { id: 'snares', name: 'Snares', unit: 'a dozen wire snares for rabbits and grouse', price: 40 },

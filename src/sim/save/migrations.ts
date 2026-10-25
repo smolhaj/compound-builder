@@ -28,6 +28,24 @@ type Raw = Record<string, unknown> & { version?: number };
 
 /** version n → n + 1 upgraders. */
 const STEPS: Record<number, (s: Raw) => Raw> = {
+  // 39 → 45 (40–44 are other branches' until they merge): survival realism. Radiation with repair (the old dose counted as
+  // mostly repaired by now, unless the strikes were recent), dehydration and cold strain, the cold-spell day, the hand pump,
+  // potassium iodide and sleeping bags, the hand-pumped water in the day's report.
+  39: s => {
+    const d = s.disaster as { kind?: string; hitAt?: number } | undefined, t = (s.clock as { t: number }).t;
+    const since = d?.kind === 'nuclear' && typeof d.hitAt === 'number' && t >= d.hitAt ? t - d.hitAt : Infinity;
+    const u = s.utilities as { report: object };
+    return {
+      ...s, version: 45,
+      personState: (s.personState as Array<{ needs: Record<string, unknown> }>).map(ps => {
+        const dose = (ps.needs.dose as number) ?? 0;
+        return { ...ps, needs: { rad: { seen: dose, rep: 0.9 * dose * Math.pow(0.5, since / 30), risk: Math.min(0.9, 0.05 * dose), ...(dose > 0.01 && Number.isFinite(since) ? { first: Math.floor(d!.hitAt!) } : {}) }, dry: 0, chill: 0, ...ps.needs } };
+      }),
+      heat: { cold: -1, ...(s.heat as object) },
+      stock: { hand_pump: 0, potassium_iodide: 0, sleeping_bags: 0, ...(s.stock as object) },
+      utilities: { ...u, report: { handL: 0, handH: 0, ...u.report } },
+    };
+  },
   // 38 → 39: the pantry, item by item (the aggregate staples / canned / frozen split into a default breakdown at their shelf ages)
   38: s => {
     const st = s.stock as Record<string, number>, sh = s.shelf as { age?: Record<string, number> } | undefined;

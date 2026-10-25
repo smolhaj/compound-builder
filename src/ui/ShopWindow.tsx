@@ -23,9 +23,9 @@ const TABS: Array<[Tab, string]> = [['build', 'Building'], ['bunker', 'Bunker'],
 const SHELVES: Record<Exclude<Tab, 'metals' | 'money' | 'guns'>, MaterialId[]> = {
   build: ['lumber', 'fieldstone', 'concrete', 'roofing', 'hardware', 'wire', 'seedlings', 'greenhouse_kit', 'fruit_trees'],
   bunker: ['rebar', 'membrane', 'container', 'blast_door', 'blast_valve', 'nbc_filter', 'filter_set', 'culvert', 'egress_hatch', 'lead_sheet', 'faraday_mesh'],
-  water: ['water_jugs', 'ibc_tote', 'water_trailer', 'water_filter', 'ro_system', 'softener', 'greywater', 'pipe', 'cable', 'fixtures', 'pump', 'drilling', 'tank', 'septic_tank', 'solar_panel', 'battery', 'inverter', 'generator'],
+  water: ['water_jugs', 'ibc_tote', 'water_trailer', 'water_filter', 'ro_system', 'softener', 'greywater', 'hand_pump', 'pipe', 'cable', 'fixtures', 'pump', 'drilling', 'tank', 'septic_tank', 'solar_panel', 'battery', 'inverter', 'generator'],
   food: ['seed', 'lids', 'fishing_gear', 'snares', 'smoker', 'goat', 'pig', 'steer', 'rabbit', 'hay', 'feed'],
-  household: ['meds', 'hygiene', 'traps'],
+  household: ['meds', 'potassium_iodide', 'hygiene', 'sleeping_bags', 'traps'],
   fuel: ['fuel', 'stabilizer', 'firewood', 'excavator', 'plow', 'gun_safe', 'gun_cleaning'],
   defense: [...KIT_GOODS, ...WATCH_GOODS, ...HARDEN_GOODS],
 };
@@ -91,6 +91,9 @@ function Icon({ id, tint }: { id: string; tint?: number }) {
     case 'water_jugs': return g(<><rect x="12" y="12" width="20" height="24" rx="5" fill="#5a9ad0" opacity="0.85" /><rect x="18" y="7" width="8" height="6" fill="#3a6a9a" /></>);
     case 'ibc_tote': return g(<><rect x="8" y="9" width="28" height="26" fill="#e8e8e0" /><path d="M8 18 h28 M8 27 h28 M17 9 v26 M27 9 v26" stroke="#888" /><rect x="8" y="35" width="28" height="3" fill="#8a6a40" /></>);
     case 'water_trailer': return g(<><rect x="8" y="12" width="26" height="16" rx="8" fill="#e8e8e0" /><circle cx="14" cy="32" r="4" fill="#222" /><circle cx="28" cy="32" r="4" fill="#222" /><path d="M34 26 h6" stroke="#888" strokeWidth="2" /></>);
+    case 'hand_pump': return g(<><rect x="19" y="10" width="6" height="28" fill="#7a8088" /><path d="M22 14 L36 8" stroke="#3a3e44" strokeWidth="3" strokeLinecap="round" /><path d="M19 18 h-8 v4" stroke="#7a8088" strokeWidth="3" fill="none" /><path d="M11 25 v4" stroke="#5a9ad0" strokeWidth="2" /></>);
+    case 'potassium_iodide': return g(<><rect x="8" y="12" width="28" height="20" rx="2" fill="#e8e4dc" />{[14, 22, 30].map(x => [18, 26].map(y => <circle key={`${x}${y}`} cx={x} cy={y} r="2.6" fill="#c8c4bc" />))}</>);
+    case 'sleeping_bags': return g(<><rect x="10" y="8" width="24" height="30" rx="10" fill="#3f6a4a" /><ellipse cx="22" cy="14" rx="6" ry="4" fill="#2a4532" /></>);
     case 'water_filter': return g(<><rect x="14" y="6" width="16" height="30" rx="3" fill="#c8ccd0" /><path d="M22 36 v4" stroke="#5a9ad0" strokeWidth="2" /></>);
     case 'ro_system': case 'softener': return g(<>{[12, 22, 32].map(x => <rect key={x} x={x - 4} y="10" width="8" height="24" rx="3" fill={id === 'ro_system' ? '#5a8ab0' : '#c8ccd0'} />)}</>);
     case 'greywater': return g(<><path d="M8 14 h16 v12 h12" fill="none" stroke="#7a8a6a" strokeWidth="4" /><ellipse cx="34" cy="32" rx="7" ry="3" fill="#5a7a3a" /></>);

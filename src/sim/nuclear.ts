@@ -20,6 +20,7 @@ export { winterFactor };
 import { mulberry32 } from './rng';
 import { empVehicles } from './vehicles';
 import type { Stock } from './materials';
+import { takeIodide } from './radiation';
 
 /** Dose rate at H+1 (Sv/h) at the compound, by variant, and hours until the fallout arrives. */
 const R1: Record<string, number> = { distant: 2.0, nearby: 4.0, exchange: 3.0 };
@@ -103,6 +104,8 @@ export function strike(s: GameState): string[] {
   });
   const [pf, where] = bestShelter(s);
   out.push(`Everyone into ${where} (protection factor ${Math.round(pf)}).`);
+  const ki = takeIodide(s);
+  if (ki) out.push(ki);
   return out;
 }
 
@@ -133,8 +136,8 @@ export function falloutDay(s: GameState): string[] {
       // (by the share of the diet that's fresh from the place, not the size of the farm: playtest round 3, a fallout over a 16-field harvest gave everyone 0.3 Sv a day)
       if (s.food.producedKcal > 0) dose += 0.002 * k * Math.min(1, s.food.producedKcal / Math.max(1, s.food.needKcal));
     }
+    // (the sickness itself, with the body's repair, is sim/radiation.ts)
     n.dose += dose;
-    if (n.dose > 1 && n.dose - dose <= 1) out.push(`${p.first} is sick: nausea, weakness. Radiation sickness.`);
   });
   return out;
 }

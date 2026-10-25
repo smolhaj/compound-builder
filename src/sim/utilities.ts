@@ -13,7 +13,7 @@
  * repair. Shortages are logged. Pure (tested).
  */
 import { SPRING_LPD } from './site';
-import { toteStorage, waterPrice } from './water';
+import { handPumpHours, handPumpLph, handPumpReady, toteStorage, waterPrice } from './water';
 import { sound } from './improvements';
 import { REGIONS } from './regions';
 import { log } from './economy';
@@ -105,10 +105,12 @@ export interface UtilityReport {
   /** From the grid, and what it cost; loads cut for want of power (building ids). */
   gridKwh: number; billUsd: number; shed: string[];
   waterL: number; useL: number; shortL: number; storedL: number;
+  /** Pumped by hand from the drilled well today (L), and the hours it took (sim/water.ts). */
+  handL?: number; handH?: number;
 }
 
 export function emptyUtilities(): Utilities {
-  return { fittings: [], batteryKwh: 0, batteryFade: 0, storedL: 0, fuelL: 0, broken: [], fried: [], grid: false, off: [], lit: [], lastDay: -1, report: { solarKwh: 0, drawKwh: 0, genKwh: 0, shortKwh: 0, batteryPct: 0, gridKwh: 0, billUsd: 0, shed: [], waterL: 0, useL: 0, shortL: 0, storedL: 0 } };
+  return { fittings: [], batteryKwh: 0, batteryFade: 0, storedL: 0, fuelL: 0, broken: [], fried: [], grid: false, off: [], lit: [], lastDay: -1, report: { solarKwh: 0, drawKwh: 0, genKwh: 0, shortKwh: 0, batteryPct: 0, gridKwh: 0, billUsd: 0, shed: [], waterL: 0, useL: 0, shortL: 0, storedL: 0, handL: 0, handH: 0 } };
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -350,6 +352,14 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
   const people = s.personState.filter(ps => ps.needs?.died == null).length;
   const homePlumbed = fin.some(st => fitted(s, st.id, 'plumb') && (DRAW_KWH[st.kind] ?? 0) >= 5);
   const use = people * (homePlumbed ? WATER_PLUMBED : WATER_CARRIED) + (fin.some(st => st.kind === 'garden') && doy > 120 && doy < 270 ? (s.stock.greywater >= 1 && homePlumbed ? 200 : 400) : 0) + (fin.some(st => st.kind === 'chicken_coop') ? 10 : 0);
+  // no power for the well pump (or it's dead): the hand pump down the same casing, as much as the day needs and arms allow
+  let handL = 0, handH = 0;
+  if (supply < use && handPumpReady(s)) {
+    const lph = handPumpLph(s.site.gwDepth) * wellYield(s, 'well_drilled');
+    handL = Math.min(use - supply, lph * handPumpHours(s));
+    handH = lph > 0 ? handL / lph : 0;
+    supply += handL;
+  }
   u.storedL = Math.min(store, u.storedL + rainL);
   let left = supply - use, shortL = 0;
   if (left < 0) { const take = Math.min(-left, u.storedL); u.storedL -= take; left += take; }
@@ -364,7 +374,7 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
     else if (!creekDry) { u.hauling = true; if (!s.site.creek) u.haulFar = true; }
     else { shortL = -left; log(s, `Water ran short by ${Math.round(shortL)} L.`); }
   }
-  u.report = { solarKwh: solar, drawKwh: draw, genKwh: gen, shortKwh: short, batteryPct: capKwh > 0 ? u.batteryKwh / capKwh : 0, gridKwh, billUsd: bill, shed, waterL: supply + rainL, useL: use, shortL, storedL: u.storedL };
+  u.report = { solarKwh: solar, drawKwh: draw, genKwh: gen, shortKwh: short, batteryPct: capKwh > 0 ? u.batteryKwh / capKwh : 0, gridKwh, billUsd: bill, shed, waterL: supply + rainL, useL: use, shortL, storedL: u.storedL, handL, handH };
   u.lastDay = dayIndex(s.clock.t);
 }
 

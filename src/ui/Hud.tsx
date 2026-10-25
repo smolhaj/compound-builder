@@ -15,7 +15,7 @@ import { CREW_RATE, CREW_SIZE, crewProblem, crewQuote } from '../sim/crews';
 import { keeping, KEPT } from '../sim/shelf';
 import { CONDITION, pharmacyOpen } from '../sim/body';
 import { netWorth } from '../sim/finance';
-import { JUG_L, orderTanker } from '../sim/water';
+import { HAND_PUMP_MAX_M, JUG_L, orderTanker } from '../sim/water';
 import { buyVehicle, startingVehicles, VEHICLES, type VehicleKind } from '../sim/vehicles';
 import { buyLicense, hasLicense, inSeason, lawful, TAG_USD, type License } from '../sim/wildfood';
 import { chimneyState, greenRicks, SEASON_DAYS, SWEEP_USD } from '../sim/upkeep';
@@ -33,6 +33,8 @@ import { canRigMines, rigMines } from '../sim/battle';
 import { canJoin } from '../sim/aftermath';
 import { MILESTONE_COUNT, MILESTONE_NAME } from '../sim/lineage';
 import { daysOfFood, KCAL, needOf } from '../sim/needs';
+import { effectiveDose } from '../sim/radiation';
+import { drinkShare } from '../sim/thirst';
 import { ANIMALS, feedDemand, winterHay } from '../sim/livestock';
 import { barterPrices, moneyWorks, type Good } from '../sim/barter';
 import { NEIGHBOR_BLURB } from '../sim/encounters';
@@ -371,7 +373,7 @@ export function Hud() {
             {game.people.map((p, i) => {
               const st = game.personState[i], n = st?.needs;
               const bar = (v: number, c: string, t: string) => <div title={t} style={{ flex: 1, height: 4, background: '#333', borderRadius: 2 }}><div style={{ width: `${Math.max(0, v)}%`, height: '100%', background: c, borderRadius: 2 }} /></div>;
-              const notes = n && n.died == null ? [n.hunger > 5000 ? 'hungry' : '', ...n.hurt.map(h => h.trauma ? `${h.what}: ${treating ? 'being treated' : 'needs dressings and antibiotics'}` : h.what), n.dose > 0.05 ? `${n.dose.toFixed(2)} Sv` : ''].filter(Boolean).join(', ') : '';
+              const notes = n && n.died == null ? [n.hunger > 5000 ? 'hungry' : '', ...n.hurt.map(h => h.trauma ? `${h.what}: ${treating ? 'being treated' : 'needs dressings and antibiotics'}` : h.what), n.dose > 0.05 ? `${n.dose.toFixed(2)} Sv (${effectiveDose(n).toFixed(2)} unrepaired)` : ''].filter(Boolean).join(', ') : '';
               return <div key={p.id} style={{ padding: '5px 0', borderBottom: `1px solid ${LINE}` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>
                   <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 4, background: '#' + p.shirt.toString(16).padStart(6, '0'), marginRight: 6 }} />{fullName(p)}, {p.age}{backgroundOf(p) && <span style={{ color: '#c9b27a', fontSize: 11 }}> · {BACKGROUND_NAME[backgroundOf(p)!]}</span>}</span>
@@ -526,7 +528,9 @@ export function Hud() {
                 {(['tractor', 'atv', 'old_pickup', 'trailer'] as VehicleKind[]).filter(k => !(game.vehicles ?? []).some(v => v.kind === k)).map(k => <button key={k} style={{ ...btn(), width: '100%', marginTop: 3 }} onClick={() => g.money(d => buyVehicle(d, k))}>Buy {VEHICLES[k].name.toLowerCase()} (${VEHICLES[k].price.toLocaleString('en-US')})</button>)}
                 <Row label="Well depth here" value={`${game.site.gwDepth} m`} />
                 {game.utilities.hauling && <Note tone="warn">{game.utilities.haulFar ? 'Hauling water a quarter mile from the creek on the neighbor\'s land: a well or cistern would end it.' : 'Hauling water from the creek by the bucket: a well or cistern would end it.'}</Note>}
-                {r.shortL > 0 && <Note tone="bad">Water ran short.</Note>}
+                {(r.handL ?? 0) > 0 && <Row label="Pumped by hand" value={`${Math.round(r.handL ?? 0)} L in ${(r.handH ?? 0).toFixed(1)} h`} />}
+                {r.shortL > 0 && <Note tone="bad">{drinkShare(game) < 1 ? 'Water ran short: drinking water is rationed. People dehydrate within days.' : 'Water ran short: no washing, the garden goes dry. Drinking water comes first.'}</Note>}
+                {game.structures.some(x => x.kind === 'well_drilled') && game.stock.hand_pump < 1 && game.site.gwDepth <= HAND_PUMP_MAX_M && <Note>A deep-well hand pump in the drilled well would give water with the power out.</Note>}
                 {game.utilities.hauling && game.stock.water_filter < 0.01 && <Note tone="warn">{game.stock.firewood >= 0.05 ? 'Boiling the creek water (firewood): a filter would save the wood.' : 'Drinking the creek water untreated: giardia. Get a filter or boil it.'}</Note>}
                 {game.site.gwQuality === 'arsenic' && game.stock.ro_system < 1 && <Note tone="warn">Arsenic in the well water: get reverse osmosis for drinking water.</Note>}
                 {game.site.gwQuality === 'hard' && game.stock.softener < 1 && <Note>Hard water: scale wears the pump faster without a softener.</Note>}

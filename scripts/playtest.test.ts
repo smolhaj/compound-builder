@@ -21,6 +21,9 @@ import { sweepChimney } from '../src/sim/upkeep';
 import { stockUpRx } from '../src/sim/body';
 import { buyAmmo, buyGun, takeClass, type Caliber } from '../src/sim/armory';
 import { buyLicense } from '../src/sim/wildfood';
+import { isRadiationHurt } from '../src/sim/radiation';
+import { isColdHurt } from '../src/sim/cold';
+import { HAND_PUMP_MAX_M } from '../src/sim/water';
 import { markTree } from '../src/sim/forestry';
 import { askRansom, canPay, openCaptives } from '../src/sim/rescue';
 import { calendarOf } from '../src/sim/state';
@@ -127,6 +130,10 @@ function orderNeeds(s: GameState, strat: Strategy): void {
   if (strat === 'prepper' && s.stock.inverter + (pending.inverter ?? 0) < 1) lines.push({ material: 'inverter', qty: 1 });
   // (v2) a spare well pump on the shelf, and hardware kits to fix pumps and fit spares with, once nobody comes out to do it
   if ((strat === 'prepper' || strat === 'homestead') && s.structures.some(x => x.kind === 'well_drilled') && s.stock.pump + (pending.pump ?? 0) < 1) lines.push({ material: 'pump', qty: 1 });
+  // (survival realism) a hand pump down the drilled well for when the power's out; iodide and cold-weather bags for the prepper, bags for the homestead
+  if ((strat === 'prepper' || strat === 'homestead') && s.structures.some(x => x.kind === 'well_drilled') && s.site.gwDepth <= HAND_PUMP_MAX_M && s.stock.hand_pump + (pending.hand_pump ?? 0) < 1) lines.push({ material: 'hand_pump', qty: 1 });
+  if (strat === 'prepper' && s.stock.potassium_iodide + (pending.potassium_iodide ?? 0) < heads) lines.push({ material: 'potassium_iodide', qty: heads });
+  if ((strat === 'prepper' || strat === 'homestead') && s.stock.sleeping_bags + (pending.sleeping_bags ?? 0) < heads) lines.push({ material: 'sleeping_bags', qty: heads - Math.floor(s.stock.sleeping_bags + (pending.sleeping_bags ?? 0)) });
   // seed and fence for the fields still to come, after the shops close (v2): enough for a field per head and a few to spare
   if (PLANS[strat].some(p => p[0] === 'field')) {
     const extra = FIELD_SPARE[strat] + Math.max(0, fieldsWanted(s) - s.structures.filter(x => x.kind === 'field').length);
@@ -194,7 +201,7 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
     const n = ps.needs, p = s.people[i];
     if (n.died == null || mourned.has(ps.id)) return;
     mourned.add(ps.id);
-    const why = n.taken ? 'taken' : fought ? 'killed in a fight' : n.hunger > 5000 ? 'hunger' : n.hurt.some(h => h.trauma) ? 'wounds' : n.dose > 1 ? 'radiation' : s.utilities.report.shortL > s.utilities.report.useL * 0.5 ? 'thirst' : n.hurt.some(h => h.what === 'fever') ? 'sickness' : (p?.age ?? 0) >= 65 ? 'old age' : 'other';
+    const why = n.taken ? 'taken' : fought ? 'killed in a fight' : n.hunger > 5000 ? 'hunger' : n.hurt.some(h => h.trauma) ? 'wounds' : (n.dry ?? 0) >= 5 ? 'thirst' : n.hurt.some(h => isRadiationHurt(h.what)) ? 'radiation' : n.hurt.some(h => isColdHurt(h.what)) || (n.chill ?? 0) >= 10 ? 'cold' : n.hurt.some(h => h.what === 'fever') ? 'sickness' : (p?.age ?? 0) >= 65 ? 'old age' : 'other';
     causes.set(why, (causes.get(why) ?? 0) + 1);
   });
   const maxDays = years ? years * 365 : s.disaster.hitAt + 730;

@@ -2,7 +2,7 @@
  * The wood stove (GDS §2.4 heat): the tent's (later the cabin's) stove burns
  * firewood on cold days. Mountain West heating season ≈ October–April; a
  * small cabin burns ~4–5 cords a winter (≈ 0.12 rick a day in January).
- * Running out is logged (comfort / health effects come with needs). Pure.
+ * Running out is logged once when it happens; the cold's harm is in cold.ts. Pure.
  */
 import { log } from './economy';
 import { burnRick } from './upkeep';
@@ -38,7 +38,13 @@ export function burnFirewood(s: GameState, days: number): void {
       const day = dayIndex(s.clock.t);
       // (in the house once there is one: the line used to say "at camp" for years after the cabin went up)
       const home = s.structures.find(x => isHome(x.kind) && isFinished(x));
-      if (s.heat.warned !== day) { s.heat.warned = day; log(s, `Out of firewood: a cold night ${home ? `in the ${home.kind.replace(/_/g, ' ')}` : 'at camp'}. Mark some trees to fell.`); }
+      // said once when the woodpile runs out, not every night after (playtest round 3: 1,070 times in an idle run)
+      if (s.heat.warned !== day) {
+        const fresh = s.heat.warned < day - 1;
+        s.heat.warned = day;
+        const town = s.disaster.tracks.stores > 0.5 && s.disaster.tracks.deliveries > 0.25;
+        if (fresh) log(s, `Out of firewood: a cold night ${home ? `in the ${home.kind.replace(/_/g, ' ')}` : 'at camp'}.${town ? ' Propane heaters until the woodpile is stocked again.' : ''} Mark some trees to fell.`);
+      }
       return;
     }
     s.heat.burned -= 1;
