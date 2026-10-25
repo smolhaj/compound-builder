@@ -28,6 +28,9 @@ import { updateDisaster } from './disaster';
 import { liveDay, workFactor } from './needs';
 import { gateDay, neighborGossip } from './encounters';
 import { mutualAidDay } from './barter';
+import { scavengeDay } from './scavenge';
+import { marketDay } from './market';
+import { neighborLifeDay } from './neighborLife';
 import { minesDay } from './battle';
 import { legalDay } from './breakins';
 import { prisonersDay } from './aftermath';
@@ -123,6 +126,10 @@ function subStep(s: GameState): void {
     for (const line of radioDay(s)) log(s, line);
     for (const line of upkeepDay(s, demandNow(s), s.heat.warned !== dayIndex(s.clock.t) - 1 && s.heat.warned !== dayIndex(s.clock.t))) log(s, line);
     for (const line of mutualAidDay(s)) log(s, line);
+    // the world round the place: the neighbors' lives, the market, scavenging runs coming home
+    for (const line of neighborLifeDay(s)) log(s, line);
+    for (const line of marketDay(s)) log(s, line);
+    for (const line of scavengeDay(s)) log(s, line);
     for (const line of minesDay(s)) log(s, line);
     for (const line of legalDay(s)) log(s, line);
     prisonersDay(s);   // (it logs its own lines)

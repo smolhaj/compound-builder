@@ -34,6 +34,9 @@ import type { Farmstead } from './farmstead';
 import type { RegionKind } from '../terrain/regionalLandscape';
 import { FARM_PALETTE, type RegionalProps } from './regionalProps';
 
+/** A burned-out farm's walls: char and soot. */
+const CHARRED = { house: [0x2b2622, 0x342c26], barn: [0x241f1b, 0x2e2722] };
+
 export type FarmTreeSpecies = 'fir' | 'broad' | 'liveoak' | 'poplar' | 'eucalyptus';
 
 export interface FarmTree { x: number; z: number; h: number; sp: FarmTreeSpecies }
@@ -57,7 +60,7 @@ export function buildFarmstead(
   ground: (x: number, z: number) => number, slope: (x: number, z: number) => number,
   tree: (t: FarmTree) => void,
 ): void {
-  const pal = FARM_PALETTE[kind];
+  const pal = f.burned ? CHARRED : FARM_PALETTE[kind];
   const c = Math.cos(f.rot), sn = Math.sin(f.rot);
   const W = (lx: number, lz: number): [number, number] => [f.x + lx * c + lz * sn, f.z - lx * sn + lz * c];
   const g = (lx: number, lz: number): number => { const [x, z] = W(lx, lz); return ground(x, z); };

@@ -31,7 +31,8 @@ import { dayJob, type Person, type SkillId, SKILL_IDS } from './family';
 import { dayIndex, type GameState } from './state';
 import type { Stock } from './materials';
 import type { Battle } from './battleTypes';
-import { gateLead, recordBattle, resolveRansom, type RansomTerms } from './rescue';
+import { gateLead, isAway, recordBattle, resolveRansom, type RansomTerms } from './rescue';
+import { defenders } from './pact';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Neighbors
@@ -128,8 +129,8 @@ export function postureOf(s: GameState): Posture {
     look += len * (d.height > 0.35 ? 1 : 0.3) * g;
   }
   const barrier = Math.min(100, held / 40 * 100), fortress = Math.min(100, look / 40 * 100);
-  // anyone away on a rescue isn't on the line
-  const here = (i: number) => s.personState[i]?.needs.died == null && !s.rescue?.raid?.team.includes(s.people[i].id);
+  // anyone away (a rescue, a run, the market) isn't on the line
+  const here = (i: number) => s.personState[i]?.needs.died == null && !isAway(s, s.people[i].id);
   const adults = s.people.filter((p, i) => !p.kid && here(i));
   const fighters = adults.length + s.people.filter((p, i) => p.kid && p.age >= 15 && here(i)).length * 0.5;
   const watch = Math.max(0, ...adults.map(p => p.skills.hunter));
@@ -468,8 +469,8 @@ export function resolve(s: GameState, stance: Stance): Outcome {
     }
   } else {
     // a threat: looters, a gang, refugees, a requisition team
-    // allies on the radio net ride over to help when there's shooting
-    const allies = s.neighbors.filter(n => n.status === 'home' && n.radio && n.disposition > 50);
+    // allies on the radio net, pact members and the militia ride over to help when there's shooting (sim/pact.ts)
+    const allies = defenders(s);
     const help = allies.reduce((a, n) => a + n.members * 6, 0);
     if (stance === 'hide') {
       // everyone underground (or in the timber); they take what's lying about. Nobody gets in by the tunnel: it only opens from inside.

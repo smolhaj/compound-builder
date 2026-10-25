@@ -84,7 +84,7 @@ export function have(s: GameState, good: Good): number {
   return s.stock[good as StockGood];
 }
 
-function move(s: GameState, good: Good, qty: number): void {
+export function move(s: GameState, good: Good, qty: number): void {
   const b = barterOf(s);
   if (good === 'labor') { b.laborOwed = Math.max(0, b.laborOwed - qty); return; }
   if (good.startsWith('ammo:')) { const c = good.slice(5) as Caliber; s.armory.ammo[c] = (s.armory.ammo[c] ?? 0) + qty; return; }

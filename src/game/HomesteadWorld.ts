@@ -348,13 +348,8 @@ export class HomesteadWorld {
     this._plantShrubs(q, inHome, blocked);
     const inside = (x: number, z: number) => inHome(x, z) || this._inOwned(x, z);
     // Neighboring farmsteads (houses, hay barns, corrals, poplar windbreaks)
-    this._props?.dispose();
-    const props = new RegionalProps(this._ws.scene, 'mountain');
     const farmTrees: FarmTree[] = [];
-    const slope = (x: number, z: number) => this.parcel.region.slope(x, z);
-    for (const f of this.farms) buildFarmstead(f, 'mountain', props, this.groundAt, slope, t => farmTrees.push(t));
-    props.finish();
-    this._props = props;
+    this._buildFarms(t => farmTrees.push(t));
     this.farTrees.build({
       extra: farmTrees.map(t => ({ x: t.x, y: this.groundAt(t.x, t.z) - 0.05, z: t.z, h: t.h, sp: t.sp })),
       kind: 'mountain', look: regionLookFor('mountain'),
@@ -363,6 +358,24 @@ export class HomesteadWorld {
       waterY: regionWaterY('mountain'), quality: q,
       blocked: (x, z) => inside(x, z) || onFarmstead(this.farms, x, z, 2.5) || this.onAccess(x, z, 1.2),
     });
+  }
+
+  private _buildFarms(tree: (t: FarmTree) => void = () => {}): void {
+    this._props?.dispose();
+    const props = new RegionalProps(this._ws.scene, 'mountain');
+    const slope = (x: number, z: number) => this.parcel.region.slope(x, z);
+    for (const f of this.farms) buildFarmstead(f, 'mountain', props, this.groundAt, slope, tree);
+    props.finish();
+    this._props = props;
+  }
+
+  /** Neighbor farms that have burned (sim/neighborLife.burnedFarms, in farm order): rebuild their props charred. */
+  setBurnedFarms(flags: readonly boolean[]): void {
+    let changed = false;
+    this.farms.forEach((f, i) => { const b = !!flags[i]; if (!!f.burned !== b) { f.burned = b; changed = true; } });
+    if (!changed) return;
+    this._buildFarms();
+    this._ws.invalidateShadows();
   }
 
   private _planted: ParcelTree[] = [];

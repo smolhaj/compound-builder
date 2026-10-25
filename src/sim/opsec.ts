@@ -20,10 +20,10 @@ export interface Opsec { quietDeliveries: boolean; blackout: boolean }
 
 export const opsecOf = (s: GameState): Opsec => (s.opsec ??= { quietDeliveries: false, blackout: false });
 
-export type ExposureSource = 'deliveries' | 'structures' | 'guns' | 'metals' | 'lights' | 'smoke' | 'talk' | 'news';
+export type ExposureSource = 'deliveries' | 'structures' | 'guns' | 'metals' | 'lights' | 'smoke' | 'talk' | 'news' | 'market';
 export const EXPOSURE_NAME: Record<ExposureSource, string> = {
   deliveries: 'Deliveries seen', structures: 'Visible structures', guns: 'Gun sales on record', metals: 'Metal & cash on the books',
-  lights: 'Lights after the grid', smoke: 'Smoke & cooking', talk: 'Talk in town', news: 'On the local news',
+  lights: 'Lights after the grid', smoke: 'Smoke & cooking', talk: 'Talk in town', news: 'On the local news', market: 'Followed from the market',
 };
 
 const STRUCTURE_WEIGHT: Record<string, number> = { bunker_hatch: 10, bunker_stairs: 8, water_tower: 8, solar_array: 7, garage_solar: 5 };
@@ -49,7 +49,9 @@ export function exposureParts(s: GameState): Record<ExposureSource, number> {
   // a shooting on the local news (sim/breakins.ts), fading over about a year
   const at = s.breakins?.newsAt ?? -1;
   const news = at >= 0 ? 15 * Math.exp(-Math.max(0, s.clock.t - at) / 365) : 0;
-  return { deliveries, structures, guns, metals, lights, smoke, talk, news };
+  // followed home from the crossroads market (sim/market.ts), fading over weeks
+  const market = s.market?.heat ?? 0;
+  return { deliveries, structures, guns, metals, lights, smoke, talk, news, market };
 }
 
 /** 0–100: how much the county knows. */
