@@ -22,6 +22,7 @@ import { stockUpRx } from '../src/sim/body';
 import { buyAmmo, buyGun, takeClass, type Caliber } from '../src/sim/armory';
 import { buyLicense } from '../src/sim/wildfood';
 import { markTree } from '../src/sim/forestry';
+import { askRansom, canPay, openCaptives } from '../src/sim/rescue';
 import { calendarOf } from '../src/sim/state';
 import { planRun } from '../src/sim/perimeter';
 import { orderFit, fitProblem, plant, repairPump, replaceFried } from '../src/sim/utilities';
@@ -31,7 +32,8 @@ import { resolveAftermath, type AftermathChoice } from '../src/sim/aftermath';
 import type { PlannedBattle } from '../src/sim/battle';
 const AFTER: Record<string, AftermathChoice> = { idle: 'leave', homestead: 'treat_release', prepper: 'hold', fortress: 'leave' };
 import { reportCard } from '../src/sim/report';
-import { daysOfFood, FIELD_KCAL, KCAL, needOf } from '../src/sim/needs';
+import { bestShelter } from '../src/sim/nuclear';
+import { daysOfFood, FIELD_KCAL, fieldHarvest, KCAL, needOf } from '../src/sim/needs';
 import { SOIL_YIELD } from '../src/sim/site';
 import { REGION_IDS, REGIONS, seasons, type RegionId } from '../src/sim/regions';
 import { MATERIAL_IDS, MATERIALS, type MaterialId } from '../src/sim/materials';
@@ -55,7 +57,15 @@ const livingCount = (s: GameState) => s.personState.filter(p => p.needs.died == 
 /** Days of food left per head if `size` more join (what the gate card shows). */
 const roomFor = (s: GameState, size: number) => { const here = livingCount(s); return daysOfFood(s) * here / (here + size); };
 /** A quarter-acre field in an ordinary year, on this soil, with the family's best gardener (needs.ts fieldHarvest, without the weather). */
-const perField = (s: GameState) => FIELD_KCAL * (0.6 + 0.08 * Math.max(0, ...s.people.filter((_, i) => s.personState[i].needs.died == null).map(p => p.skills.gardener))) * SOIL_YIELD[s.site.soil];
+const perFieldBook = (s: GameState) => FIELD_KCAL * (0.6 + 0.08 * Math.max(0, ...s.people.filter((_, i) => s.personState[i].needs.died == null).map(p => p.skills.gardener))) * SOIL_YIELD[s.site.soil];
+/** What a field actually made the last few harvests (the bot learns from its own fields: the short northern seasons, hail, drought). */
+let observed: number[] = [], season = 0;
+const perField = (s: GameState) => observed.length ? observed.reduce((a, x) => a + x, 0) / observed.length : perFieldBook(s);
+function watchHarvest(s: GameState): void {
+  const today = fieldHarvest(s), fields = s.structures.filter(x => x.kind === 'field' && isFinished(x)).length;
+  if (today > 0) season += today;
+  else if (season > 0) { if (fields) observed = [...observed, season / fields].slice(-3); season = 0; }
+}
 /** A year of what the place grows in an ordinary year (fields, garden, hens; rough). */
 const yearGrown = (s: GameState) => { const fin = s.structures.filter(isFinished); return fin.filter(x => x.kind === 'field').length * perField(s) + fin.filter(x => x.kind === 'garden').length * 250_000 + fin.filter(x => x.kind === 'chicken_coop').length * 180_000; };
 /** A year of eating for everyone here plus `size` adults. */
@@ -64,13 +74,14 @@ const yearNeed = (s: GameState, size: number) => (s.people.reduce((a, p, i) => a
 const toHarvest = (s: GameState) => { const doy = calendarOf(s.clock).doy, [, h1] = seasons(REGIONS[s.site.region]).harvest; return (h1 - doy + 365) % 365; };
 /**
  * Would the food cover `size` more (`margin` 1.2 = 20 % over): what's put by
- * has to last everyone to the next harvest, and an ordinary year's harvest
- * has to feed them after that (or the stores carry a whole year more).
+ * has to last everyone to the next harvest, and the harvest the fields have
+ * been making has to feed them after that.
  */
 const foodCovers = (s: GameState, size: number, margin: number) => {
   const stored = (['fresh', 'frozen', 'canned', 'staples'] as const).reduce((a, f) => a + s.stock[f] * KCAL[f], 0);
   const year = yearNeed(s, size), day = year / 365;
-  return stored >= day * toHarvest(s) * margin && (yearGrown(s) >= year * margin || stored >= day * (toHarvest(s) + 365) * margin);
+  // (an earlier try let a big pantry stand in for the harvest: the long game's families then ate the pantry down with the people taken in and starved)
+  return stored >= day * toHarvest(s) * margin && yearGrown(s) >= year * margin;
 };
 const STANCE: Record<Strategy, (kinds: Stance[], kind: string, s: GameState, size: number) => Stance> = {
   idle: k => k.includes('turn_away') ? 'turn_away' : k.includes('hide') ? 'hide' : k[0],
@@ -176,13 +187,14 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
   const fights: string[] = [];
   let planned = 0, moneyAtHit = 0, builtAtHit = 0, hitSeen = false, lastLog = -Infinity, minMoney = s.money, lastMoney = s.money;
   const seen = new Map<string, number>();
+  observed = []; season = 0;
   // how each one was lost (read off their state the day it happened)
   const causes = new Map<string, number>(), mourned = new Set<string>();
   const tallyDeaths = (fought: boolean) => s.personState.forEach((ps, i) => {
     const n = ps.needs, p = s.people[i];
     if (n.died == null || mourned.has(ps.id)) return;
     mourned.add(ps.id);
-    const why = n.taken ? 'taken' : fought ? 'killed in a fight' : n.hunger > 5000 ? 'hunger' : n.hurt.some(h => h.trauma) ? 'wounds' : n.dose > 1 ? 'radiation' : n.hurt.some(h => h.what === 'fever') ? 'sickness' : (p?.age ?? 0) >= 65 ? 'old age' : 'other';
+    const why = n.taken ? 'taken' : fought ? 'killed in a fight' : n.hunger > 5000 ? 'hunger' : n.hurt.some(h => h.trauma) ? 'wounds' : n.dose > 1 ? 'radiation' : s.utilities.report.shortL > s.utilities.report.useL * 0.5 ? 'thirst' : n.hurt.some(h => h.what === 'fever') ? 'sickness' : (p?.age ?? 0) >= 65 ? 'old age' : 'other';
     causes.set(why, (causes.get(why) ?? 0) + 1);
   });
   const maxDays = years ? years * 365 : s.disaster.hitAt + 730;
@@ -217,6 +229,8 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
     if (strat === 'prepper' && day === 600) for (const id of ['fallout', 'faraday', 'nbc'] as const) orderHardenAll(s, id, 1);
     // (v2: and after the hit too, for as long as the trucks still deliver)
     if (day % 3 === 0 && (s.clock.t < s.disaster.hitAt || payWith(s))) orderNeeds(s, strat);
+    // (v2) someone taken: send word that the family will pay, whenever there's a lead to carry it
+    if (strat !== 'idle' && day % 10 === 0) for (const c of openCaptives(s)) askRansom(s, c.pid);
     // (v2) a dead pump gets a hardware kit, an EMP-fried one its spare, as the HUD's buttons would
     if (strat !== 'idle') {
       for (const id of [...s.utilities.broken]) repairPump(s, id);
@@ -249,6 +263,7 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
     for (const l of s.log) if (l.t > lastLog) { const k = l.text.replace(/[\d,.$]+/g, '#'); seen.set(k, (seen.get(k) ?? 0) + 1); }
     lastLog = s.log.length ? s.log[s.log.length - 1].t : lastLog;
     minMoney = Math.min(minMoney, s.money);
+    watchHarvest(s);
     tallyDeaths(false);
     // (checked after the day's tally; a death at the gate is tallied the next midnight)
     if (livingCount(s) === 0 && !s.ending) bugs.push(`everyone is gone but the run goes on (day ${day}, ${s.disaster.phase})`);
@@ -256,7 +271,7 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
     lastMoney = s.money;
     if (process.env.YEARLY && years && day % Number(process.env.YEARLY_EVERY ?? 91) === 0 && (!process.env.SEED || seed === Number(process.env.SEED))) {
       const liv = s.personState.filter(p => p.needs.died == null);
-      appendFileSync(process.env.YEARLY!, `${seed} y${(day / 365).toFixed(2)} era ${s.lineage.era} ${s.disaster.kind} ph ${s.disaster.phase} hit ${Math.round(s.disaster.hitAt)} ppl ${liv.length} hp ${Math.round(Math.min(...liv.map(p => p.needs.health)))} hunger ${Math.round(Math.max(...liv.map(p => p.needs.hunger)))} days food ${Math.round(daysOfFood(s))} grown ${Math.round(s.food.producedKcal)} need ${Math.round(s.food.needKcal)} $${Math.round(s.money)} stores ${s.disaster.tracks.stores.toFixed(2)} deliv ${s.disaster.tracks.deliveries.toFixed(2)} med ${s.disaster.tracks.medical.toFixed(2)} grid ${s.disaster.tracks.grid.toFixed(2)} fields ${s.structures.filter(x => x.kind === 'field' && isFinished(x)).length} water ${Math.round(s.utilities.report.waterL)}/${Math.round(s.utilities.report.useL)} short ${Math.round(s.utilities.report.shortL)} stored ${Math.round(s.utilities.storedL)} banks ${s.disaster.tracks.banks.toFixed(2)} end ${s.ending?.kind ?? ''}\n`);
+      appendFileSync(process.env.YEARLY!, `${seed} y${(day / 365).toFixed(2)} era ${s.lineage.era} ${s.disaster.kind} ph ${s.disaster.phase} hit ${Math.round(s.disaster.hitAt)} ppl ${liv.length} hp ${Math.round(Math.min(...liv.map(p => p.needs.health)))} hunger ${Math.round(Math.max(...liv.map(p => p.needs.hunger)))} days food ${Math.round(daysOfFood(s))} grown ${Math.round(s.food.producedKcal)} need ${Math.round(s.food.needKcal)} $${Math.round(s.money)} stores ${s.disaster.tracks.stores.toFixed(2)} deliv ${s.disaster.tracks.deliveries.toFixed(2)} med ${s.disaster.tracks.medical.toFixed(2)} grid ${s.disaster.tracks.grid.toFixed(2)} fields ${s.structures.filter(x => x.kind === 'field' && isFinished(x)).length} water ${Math.round(s.utilities.report.waterL)}/${Math.round(s.utilities.report.useL)} short ${Math.round(s.utilities.report.shortL)} stored ${Math.round(s.utilities.storedL)} banks ${s.disaster.tracks.banks.toFixed(2)} wells ${s.structures.filter(x => x.kind.startsWith('well')).map(x => `${x.kind}:${x.stage}${s.utilities.broken.includes(x.id) ? 'B' : ''}${s.utilities.fried.includes(x.id) ? 'F' : ''}${s.utilities.lit.includes(x.id) ? 'L' : ''}`).join(',')} hw ${Math.round(s.stock.hardware)} dose ${Math.max(0, ...liv.map(p => p.needs.dose)).toFixed(2)} haul ${s.utilities.hauling ? 1 : 0} shelter ${Math.round(bestShelter(s)[0])} creek ${s.site.creek ? 1 : 0} spring ${s.site.spring ? 1 : 0} end ${s.ending?.kind ?? ''}\n`);
     }
     if (process.env.TRACE && strat === process.env.TRACE && kind === process.env.KIND && day % 15 === 0 && s.clock.t >= s.disaster.hitAt) {
       const k = (f: string) => Math.round((s.stock as Record<string, number>)[f] * ({ fresh: 2000, frozen: 10000, canned: 6000, staples: 80000 } as Record<string, number>)[f] / 1000);
@@ -267,7 +282,10 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
     let guard = 0;
     while (s.gate.pending && guard++ < 5) {
       // (v2: compare with the battle on file before this answer: the day's step clones the state, so the last fight used to be counted again at every later gate)
-      const e = s.gate.pending, before = s.gate.battle, def = Math.round(defenseOf(postureOf(s))); resolve(s, STANCE[strat](e.stances, e.kind, s, e.size)); s.gate.card = null;
+      const e = s.gate.pending, before = s.gate.battle, def = Math.round(defenseOf(postureOf(s)));
+      // word from a crew holding one of ours: pay it if it can be paid, talk it down if six in ten can, else no deal (the idle family never pays)
+      const ransom = e.kind === 'ransom' && e.ransom ? (strat === 'idle' ? 'refuse' : canPay(s, e.ransom) ? 'pay' : canPay(s, e.ransom, 0.6) ? 'parley' : 'refuse') : null;
+      resolve(s, ransom ?? STANCE[strat](e.stances, e.kind, s, e.size)); s.gate.card = null;
       const b = s.gate.battle as (PlannedBattle | undefined);
       if (b && b !== before) { if (process.env.GATES) console.log(`gate ${strat} ${kind} d${Math.floor(s.clock.t - s.disaster.hitAt)} ${e.kind} ${e.temper ?? ''} n${e.size} str ${e.strength} vs def ${def}: ${b.result} people ${livingCount(s)}`); fights.push(`${b.result}${b.events.some(x => x.kind === 'death' && x.unit.startsWith('h_')) ? ' (lost people)' : ''}`); }
       // after the shooting: what each kind of family does with the wounded raiders

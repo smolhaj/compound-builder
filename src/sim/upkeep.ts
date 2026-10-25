@@ -19,7 +19,7 @@
  */
 import { calendarOf, type GameState } from './state';
 import { REGIONS } from './regions';
-import { isFinished } from './construction';
+import { isFinished, knockBack } from './construction';
 import { isHome } from './blueprints';
 import type { MaterialId } from './materials';
 import type { Fix } from './improvements';
@@ -93,7 +93,7 @@ export function upkeepDay(s: GameState, demand: number, warm: boolean): string[]
     s.upkeep.creosote = 0;
     if (r() < 0.3) {
       const h = homes[0];
-      h.stage = 3; h.done = 0; h.supplied = false; h.finishedAt = null;
+      knockBack(s, h, 3);
       out.push(`Chimney fire! It got into the roof of the ${h.kind.replace(/_/g, ' ')}: the roof has to be rebuilt.`);
       const paid = insuranceClaim(s, h, 0.35);
       if (paid) out.push(paid);

@@ -21,7 +21,7 @@
  */
 import { calendarOf, dayIndex, type GameState, type Structure } from './state';
 import { REGIONS, type RegionId } from './regions';
-import { blueprintOf, isFinished } from './construction';
+import { blueprintOf, isFinished, knockBack } from './construction';
 import { insuranceClaim } from './paperwork';
 import { mulberry32, pick } from './rng';
 
@@ -89,8 +89,7 @@ function sheltered(s: GameState): boolean {
 function damage(s: GameState, st: Structure, share: number, what: string, out: string[]): void {
   const stages = blueprintOf(st).stages;
   const roof = stages.findIndex(x => x.id === 'roof');
-  st.stage = roof >= 0 ? roof : stages.length - 1;
-  st.done = 0; st.supplied = false; st.finishedAt = null;
+  knockBack(s, st, roof >= 0 ? roof : stages.length - 1);
   out.push(`${what} The ${label(st.kind)} has to be ${roof >= 0 ? 're-roofed' : 'redone'}.`);
   const paid = insuranceClaim(s, st, share);
   if (paid) out.push(paid);

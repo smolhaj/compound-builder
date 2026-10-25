@@ -87,6 +87,22 @@ export function addWork(s: GameState, st: Structure, personHours: number): numbe
   return personHours - left;
 }
 
+/**
+ * Knock a finished (or part-built) structure back to `stage`: that stage and
+ * the ones after it are worked again, but what the later stages put in (the
+ * pump, the doors and windows, the fittings) is salvaged into the stockpile,
+ * so the rebuild uses it again instead of needing it bought new. Playtest
+ * round 3: a storm took a well's pump-house roof, and the rebuilt well then
+ * waited for a new pump nobody could buy after the collapse.
+ */
+export function knockBack(s: GameState, st: Structure, stage: number): void {
+  const stages = blueprintOf(st).stages, from = Math.min(st.stage, stages.length);
+  for (let i = stage + 1; i < from; i++) for (const [k, n] of Object.entries(stages[i].materials) as Array<[keyof Stock, number]>) s.stock[k] += n;
+  // the current stage's own materials, if they were already taken in
+  if (st.stage > stage && st.stage < stages.length && st.supplied) for (const [k, n] of Object.entries(stages[st.stage].materials) as Array<[keyof Stock, number]>) s.stock[k] += n;
+  st.stage = stage; st.done = 0; st.supplied = false; st.finishedAt = null;
+}
+
 /** 0–1 overall progress by person-hours. */
 export function progress(st: Structure): number {
   const bp = blueprintOf(st);
