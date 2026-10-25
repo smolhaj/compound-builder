@@ -22,6 +22,7 @@ import { isFinished } from './construction';
 import { runFinished, type PerimeterRun } from './perimeter';
 import { hasAll, type MaterialId, type Stock } from './materials';
 import { wellYield } from './effects';
+import { stormOutage } from './weatherThreats';
 
 /** What utility buildings provide. */
 export interface UtilityDef {
@@ -265,7 +266,8 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
   const fin = s.structures.filter(isFinished);
   const kinds = new Map(fin.map(st => [st.id, st.kind]));
   // ── power: each network's own sources (solar → battery → grid → generator), loads served by priority ──
-  const gridUp = u.grid && s.disaster.tracks.grid > 0.5;
+  // the county grid, unless it's gone (the disaster) or a storm has the lines down
+  const gridUp = u.grid && s.disaster.tracks.grid > 0.5 && !stormOutage(s);
   let solar = 0, draw = 0, gen = 0, short = 0, capKwh = 0, gridKwh = 0;
   const lit = new Set<string>(), shed: string[] = [];
   const loadOf = (o: Node) => u.off.includes(o.id) ? 0

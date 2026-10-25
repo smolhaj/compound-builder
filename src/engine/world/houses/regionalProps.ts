@@ -28,6 +28,14 @@ export const FARM_PALETTE: Record<RegionKind, { house: number[]; barn: number[] 
   sound: { house: [0xe8e4da, 0x8a9aa2, 0x6e7e78], barn: [0x6e3a2c, 0x5a5048, 0x8a2c22] },
   coast: { house: [0xf2eee4, 0xeae2cf], barn: [0x8a7a66, 0xb8a888] },
   city: { house: [0xf0ece2, 0xd8d4cc], barn: [0x8a2c22, 0xa8a49a] },
+  // white frame and painted farmhouses; black-stained tobacco barns, weathered gray hay barns
+  appalachia: { house: [0xf0ece2, 0xe2dccc, 0xb8c4c0, 0xc8b89a], barn: [0x2e2a28, 0x6e655a, 0x7a2f26] },
+  // stucco / adobe, tan manufactured homes
+  desert: { house: [0xd8c4a0, 0xc8a882, 0xe4d8c0, 0xb89a78], barn: [0xa9adb0, 0x8a7a66] },
+  // log, brown-stained and white clapboard; gray barns
+  north_woods: { house: [0x7a5a3e, 0xf0ece2, 0x5e6e5a, 0x8a6a4a], barn: [0x7a756c, 0x8a2c22, 0x5e5850] },
+  // white farmhouses and red dairy barns
+  upper_midwest: { house: [0xf4f2ea, 0xece6d4, 0xe0d8c4], barn: [0x8a2c22, 0x9a3226, 0x7e2a22] },
 };
 
 /** Resample a polyline at ~`step` spacing (keeps the end points). */

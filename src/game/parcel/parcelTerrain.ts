@@ -12,11 +12,19 @@
  * over: the irrigated plain, the reservoir and the Front Range ~2 km west.
  * The creek runs on through it so the channel never ends at the fence.
  *
+ * Other regions (game/region/regionWorld.ts) lie differently: an
+ * Appalachian hollow (a hay bottom along the creek, wooded sides rising
+ * 40–60 m), a desert bajada with a dry wash, North Woods swells with a bog,
+ * flat Plains with the creek in a draw, Northwest foothills, Upper Midwest
+ * moraine hummocks; each set into its own regional field.
+ *
  * Pure (no three.js): one height/cover function the renderer, the camera
  * floor, placement and (later) water flow all share. 1 unit ≈ 6 m.
  */
 import { createNoise2D } from 'simplex-noise';
 import { RegionalField, TOWN_Y } from '../../engine/world/terrain/regionalLandscape';
+import { regionWorld, type Relief, type RegionWorld } from '../region/regionWorld';
+import { REGIONS, type RegionId } from '../../sim/regions';
 
 /** Parcel side in world units (40 acres ≈ 402 m). */
 export const PARCEL_SIZE = 67;
@@ -128,6 +136,8 @@ function terrace(u: number, r: number): number {
 const CREEK_DEPTH = 0.42;
 const CREEK_HALF = 0.7;
 const FLOODPLAIN_HALF = 4.5;
+/** The creek valley-floor table (non-bench reliefs): x from FP_X0, one entry a unit. */
+const FP_X0 = -70, FP_N = 210;
 
 export class ParcelTerrain {
   readonly seed: number;
@@ -145,14 +155,28 @@ export class ParcelTerrain {
   readonly creekHome: boolean;
   private readonly _timber: number;
 
-  /** `creek`: through the place (default) or off it; `timber`: how much timber against the usual (1). */
-  constructor(seed: number, opts: { creek?: boolean; timber?: number } = {}) {
+  /** The region's world (relief, trees, rocks, road and fences). */
+  readonly world: RegionWorld;
+  readonly relief: Relief;
+  readonly regionId: RegionId;
+  /** Per-parcel shape of the non-bench reliefs (amplitude, bottom width, phase). */
+  private _relA = 0;
+  private _relB = 0;
+  private _relP = 0;
+  /** A dry wash across the desert place (center z at x), or null. */
+  readonly wash: ((x: number) => number) | null = null;
+
+  /** `creek`: through the place (default) or off it; `timber`: how much timber against the usual (1); `region`: whose land. */
+  constructor(seed: number, opts: { creek?: boolean; timber?: number; region?: RegionId } = {}) {
     this.seed = seed;
     this.creekHome = opts.creek ?? true;
     this._timber = opts.timber ?? 1;
+    this.regionId = opts.region ?? 'mountain_west';
+    this.world = regionWorld(this.regionId);
+    this.relief = this.world.relief;
     const rnd = mulberry32(seed ^ 0x9e3779b9);
     this._noise = createNoise2D(rnd);
-    this.region = new RegionalField({ kind: 'mountain', cW: PARCEL_SIZE, cH: PARCEL_SIZE, townExt: 14 });
+    this.region = new RegionalField({ kind: this.world.kind, cW: PARCEL_SIZE, cH: PARCEL_SIZE, townExt: 14 });
     this._benchAmp = 3.2 + 1.6 * rnd();          // 19–29 m of relief across the parcel
     this._benchSteps = rnd() < 0.5 ? 2 : 3;
     this._benchPhase = rnd() * 0.6;
@@ -167,6 +191,107 @@ export class ParcelTerrain {
       waterY: (x: number) => this._floodplainY(x) - CREEK_DEPTH + 0.12,
       halfWidth: CREEK_HALF,
     };
+    // the other reliefs draw their own shape after the bench rolls (Mountain West parcels stay as they were)
+    if (this.relief !== 'benches') {
+      const r2 = mulberry32(seed * 6151 + 29);
+      this._relA = r2(); this._relB = r2(); this._relP = r2() * 6.28;
+      if (this.relief === 'bajada' && !this.creekHome) {
+        const wz = PARCEL_SIZE * (0.3 + 0.4 * r2()), wa = 3 + 4 * r2(), wp = r2() * 6.28;
+        this.wash = (x: number) => wz + wa * Math.sin(x / 15 + wp) + 1.5 * Math.sin(x / 5.1 + 2 * wp);
+      }
+      // the creek's valley floor follows the land down: the lowest ground across its line, never rising downstream (east)
+      const fp: number[] = [];
+      let lo = Infinity;
+      for (let i = 0; i <= FP_N; i++) {
+        const x = FP_X0 + i, zc = this.creek.zAt(x);
+        let m = Infinity;
+        for (const dz of [-7, -3.5, 0, 3.5, 7]) m = Math.min(m, this._open(x, zc + dz));
+        lo = Math.min(lo, m - 0.05);
+        fp.push(lo);
+      }
+      // a little smoothing (still never above the ground it was taken from)
+      this._fp = fp.map((v, i) => Math.min(v, (fp[Math.max(0, i - 2)] + fp[Math.max(0, i - 1)] + v + fp[Math.min(FP_N, i + 1)] + fp[Math.min(FP_N, i + 2)]) / 5));
+    }
+  }
+
+  private _fp: number[] | null = null;
+  /** The region's middle timber (the neighbors' woods). */
+  private get _regionTimber(): number { const [a, b] = REGIONS[this.regionId].timber; return (a + b) / 2; }
+
+  /** Natural ground before the creek and the wash are cut (the regional field plus the local relief). */
+  private _open(x: number, z: number): number {
+    return this.region.sample(x, z).h + this._local(x, z) * (1 - sstep(80, 300, this._outside(x, z)));
+  }
+
+  /**
+   * Local relief above the regional ground, by region: the Mountain West
+   * benches, or the hollow / bajada / swell / flat / foothill / moraine shapes.
+   */
+  private _local(x: number, z: number): number {
+    const S = PARCEL_SIZE, n = this._noise;
+    switch (this.relief) {
+      case 'benches': return this._bench(x, z);
+      case 'hollow': {
+        // the sides rise 40–60 m from a hay bottom 70–100 m wide; spurs and side hollows in the slopes
+        const A = 7 + 3 * this._relA, B = 6 + 3 * this._relB;
+        const dz = Math.abs(z - this.creek.zAt(x));
+        const up = sstep(B, B + 32, dz + 2.5 * n(x * 0.04, z * 0.04));
+        return A * up + 1.2 * up * n(x * 0.04 + 3, z * 0.04 - 7) + 0.9 * (S - x) / S + 0.12 * n(x * 0.11, z * 0.11);
+      }
+      // a long alluvial slope off the mesa (≈ 2 %), low swells
+      case 'bajada': return 1.6 * (S - x) / S + 0.45 * (0.5 + 0.5 * n(x * 0.03, z * 0.03)) + 0.12 * n(x * 0.12, z * 0.12);
+      // low glacial swells; a bog in a hollow
+      case 'swell': return 1.2 * (0.5 + 0.5 * n(x * 0.028 + this._relP, z * 0.028)) + 0.35 * n(x * 0.09, z * 0.09) - 0.6 * this._bog(x, z);
+      case 'flat': return 0.5 * (0.5 + 0.5 * n(x * 0.018, z * 0.018)) + 0.25 * (S - x) / S;
+      case 'foothill': {
+        // rolling foothill benches, 20–35 m of relief, rising away from the road
+        const A = 3.5 + 2 * this._relA;
+        return A * (0.5 + 0.5 * (0.8 * n(x * 0.016 + this._relP, z * 0.016) + 0.2 * n(x * 0.05, z * 0.05))) + 2 * (S - x) / S;
+      }
+      case 'moraine': {
+        // swells and kettle hollows of 10–15 m; slopes mostly 2–12 %
+        const A = 1.6 + 0.9 * this._relA;
+        return A * (0.5 + 0.5 * (0.75 * n(x * 0.024 + this._relP, z * 0.024) + 0.25 * n(x * 0.06 - 4, z * 0.06)));
+      }
+    }
+  }
+
+  /** North Woods: an open sphagnum bog in a low spot (0–1). */
+  private _bog(x: number, z: number): number {
+    if (this.relief !== 'swell') return 0;
+    const bx = PARCEL_SIZE * (0.2 + 0.3 * this._relB), bz = PARCEL_SIZE * (0.15 + 0.7 * this._relA);
+    return 1 - sstep(6, 13, Math.hypot(x - bx, (z - bz) * 0.8) + 3 * this._noise(x * 0.06, z * 0.06));
+  }
+
+  /** Timber cover the region's land carries at (x, z), before the listing's timber (0–1). */
+  private _cover(x: number, z: number): number {
+    const n = this._noise, S = PARCEL_SIZE;
+    switch (this.relief) {
+      case 'benches': case 'flat': return 0;
+      case 'hollow': {
+        // woods everywhere off the bottom; the bottom in hay
+        // (an old hayfield cleared on the road side of a ridge-top place)
+        const off = sstep(0.8, 2.4, this._local(x, z) - 0.9 * (S - x) / S);
+        const field = this.creekHome ? 0 : 0.9 * sstep(S * 0.58, S * 0.72, x + 4 * n(x * 0.05, z * 0.05 - 4));
+        return 0.95 * off * (0.8 + 0.2 * n(x * 0.03 + 5, z * 0.03 - 2)) * (1 - field);
+      }
+      // pinyon–juniper in open stands
+      case 'bajada': return 0.62 * sstep(-0.25, 0.45, n(x * 0.05 + 2, z * 0.05 - 9) + 0.4 * n(x * 0.15, z * 0.15));
+      case 'swell': {
+        // an old clearing on the road side; spruce and birch to its edge; the bog open
+        const clear = sstep(S * 0.55, S * 0.7, x + 5 * n(x * 0.05, z * 0.05 + 3));
+        return 0.97 * (1 - clear) * (1 - this._bog(x, z));
+      }
+      case 'foothill': {
+        // a pasture cleared on the lower, road side
+        const clear = sstep(S * 0.5, S * 0.68, x + 6 * n(x * 0.04, z * 0.04 + 1));
+        return 0.97 * (1 - clear * (0.85 + 0.15 * n(x * 0.2, z * 0.2)));
+      }
+      case 'moraine': {
+        // the woodlot on the back (west) of the forty, a fence-line edge; fields in front
+        return 0.92 * (1 - sstep(S * 0.3, S * 0.36, x + 2.5 * n(x * 0.04, z * 0.04)));
+      }
+    }
   }
 
   /** Bench relief above the town datum before the creek (≥ 0, rising west). */
@@ -186,6 +311,10 @@ export class ParcelTerrain {
 
   /** Floodplain level at x: the creek valley floor falls eastward with the benches. */
   private _floodplainY(x: number): number {
+    if (this._fp) {
+      const u = Math.max(0, Math.min(FP_N - 1e-6, x - FP_X0)), i = Math.floor(u), f = u - i;
+      return this._fp[i] * (1 - f) + this._fp[i + 1] * f;
+    }
     const S = PARCEL_SIZE;
     const t = Math.max(0, Math.min(1, (S - x) / S));
     return TOWN_Y + this._benchAmp * 0.18 * t + 0.6 * Math.max(0, -x) / 60;
@@ -197,7 +326,9 @@ export class ParcelTerrain {
     // the benches run on along the range front; the regional field takes over far out
     const out = this._outside(x, z);
     const w = 1 - sstep(4, 34, out);
-    let h = r.h + this._bench(x, z) * (1 - sstep(80, 300, out));
+    let h = r.h + this._local(x, z) * (1 - sstep(80, 300, out));
+    // the desert's dry wash: a flat sandy bed a couple of meters down, cut banks
+    if (this.wash) h -= 0.32 * (1 - sstep(1.2, 2.4, Math.abs(z - this.wash(x))));
     // Creek valley: floodplain flat, incised channel. Runs on past the parcel.
     const dz = Math.abs(z - this.creek.zAt(x));
     const fp = this._floodplainY(x);
@@ -212,13 +343,27 @@ export class ParcelTerrain {
     }
     // Cover: timber on the upper bench on one side of the creek; cottonwoods on the banks
     // with the creek off the place, the timber runs in patches on the upper bench on either side
-    const side = !this.creekHome && Math.abs(z - this.creek.zAt(x)) > 20 ? 1 : Math.sign(z - this.creek.zAt(x)) === this._timberSide ? 1 : 0;
-    const upper = sstep(this._benchAmp * 0.35, this._benchAmp * 0.6, this._bench(x, z));
-    const patch = sstep(-0.45, 0.4, this._noise(x * 0.04 + 5, z * 0.04 - 2) + 0.35 * this._noise(x * 0.13 - 3, z * 0.13 + 8));
-    const timber = Math.min(1, side * upper * patch * w * this._timber);
+    let timber: number;
+    if (this.relief === 'benches') {
+      const side = !this.creekHome && Math.abs(z - this.creek.zAt(x)) > 20 ? 1 : Math.sign(z - this.creek.zAt(x)) === this._timberSide ? 1 : 0;
+      const upper = sstep(this._benchAmp * 0.35, this._benchAmp * 0.6, this._bench(x, z));
+      const patch = sstep(-0.45, 0.4, this._noise(x * 0.04 + 5, z * 0.04 - 2) + 0.35 * this._noise(x * 0.13 - 3, z * 0.13 + 8));
+      timber = Math.min(1, side * upper * patch * w * this._timber);
+    } else {
+      // the region's cover, thinned or thickened by the listing's timber
+      // the region's cover, thinned or thickened by the listing's timber; the land round the place
+      // carries the same woods (at the region's usual timber), out to where the regional field takes over
+      const near = 1 - sstep(60, 240, out), k = w * this._timber + (1 - w) * near * this._regionTimber;
+      timber = Math.min(1, this._cover(x, z) * k * this.world.cover);
+    }
     const riparian = (1 - sstep(1.5, 6 + 3 * this._noise(x * 0.05, 3.3), dz)) * sstep(CREEK_HALF + 0.2, CREEK_HALF + 0.8, dz) * along
       * (0.55 + 0.45 * sstep(-0.3, 0.3, this._noise(x * 0.09 + 11, z * 0.09)));
-    const forest = Math.max(r.forest * (1 - w), 0.92 * timber, 0.75 * riparian);
+    let forest = Math.max(r.forest * (this.relief === 'benches' ? 1 - w : sstep(60, 240, out)), 0.92 * timber, 0.75 * riparian);
+    // desert washes: a few cottonwoods / desert willow on the banks, where the water sits after a storm
+    if (this.wash) {
+      const dw = Math.abs(z - this.wash(x));
+      forest = Math.max(forest, 0.5 * (1 - sstep(2.4, 5, dw)) * sstep(1.6, 2.4, dw) * (0.5 + 0.5 * this._noise(x * 0.1 + 7, 1.3)) * w);
+    }
     return { h, forest, field: r.field * (1 - w) };
   }
 

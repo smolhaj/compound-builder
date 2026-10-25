@@ -131,13 +131,21 @@ export const CROPS: Record<CropId, CropKey[]> = {
 
 /** Crop mix per region: [crop, share]. Shares need not sum to 1 (normalised). */
 export const REGION_CROPS: Record<RegionKind, Array<[CropId, number]>> = {
-  plains: [['corn', 0.5], ['soy', 0.38], ['hay', 0.07], ['wheat', 0.05]],
+  // Great Plains (Kansas / Nebraska): winter wheat and summer fallow, irrigated corn under the pivots, native range
+  plains: [['wheat', 0.42], ['corn', 0.2], ['rangePasture', 0.18], ['fallow', 0.12], ['soy', 0.08]],
   city: [['corn', 0.48], ['soy', 0.36], ['hay', 0.1], ['wheat', 0.06]],
   mountain: [['alfalfa', 0.38], ['wheat', 0.27], ['rangePasture', 0.2], ['fallow', 0.08], ['silage', 0.07]],
   drumlin: [['hay', 0.48], ['pasture', 0.22], ['silage', 0.22], ['rowVeg', 0.08]],
   bayou: [['warmPasture', 0.36], ['cotton', 0.24], ['soy', 0.24], ['corn', 0.1], ['fallow', 0.06]],
   sound: [['grassSeed', 0.46], ['hay', 0.22], ['wheat', 0.16], ['pasture', 0.1], ['rowVeg', 0.06]],
   coast: [['rowVeg', 0.55], ['rangePasture', 0.28], ['fallow', 0.17]],
+  // hay and pasture in the creek bottoms (beef cow-calf country), a little corn
+  appalachia: [['hay', 0.5], ['pasture', 0.38], ['corn', 0.12]],
+  // (no farmland drawn: ranch range only)
+  desert: [['rangePasture', 0.8], ['fallow', 0.2]],
+  north_woods: [['hay', 0.6], ['pasture', 0.4]],
+  // Wisconsin dairy rotation: hay, silage corn, corn, soybeans, pasture
+  upper_midwest: [['hay', 0.32], ['silage', 0.24], ['corn', 0.22], ['soy', 0.12], ['pasture', 0.1]],
 };
 
 /** Number of crop slots the shader takes. */

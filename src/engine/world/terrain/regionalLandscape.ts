@@ -2,8 +2,11 @@
  * regionalLandscape — the land beyond the town: one continuous heightfield
  * per region (Mountain West ranges, SoCal chaparral ridges, Pacific
  * Northwest forested hills + sound + volcano, New England drumlins, Midwest
- * farmland + river, Deep South bayou), plus the town footprint each region
- * gets (a big-city downtown only for Urban scenarios).
+ * farmland + river, Deep South bayou; Compound Builder adds Appalachian
+ * ridges and hollows, the high-desert mesas and washes, the North Woods'
+ * lakes and spruce flats, the Upper Midwest's moraine farmland with kettle
+ * lakes, and the Great Plains), plus the town footprint each region gets (a
+ * big-city downtown only for Urban scenarios).
  *
  * Pure (no Three.js): exercised by regionalLandscape.test.ts and shared by
  * RegionalTerrainRenderer (mesh, trees, water) and EnvironmentRenderer
@@ -22,7 +25,8 @@
 import { createNoise2D } from 'simplex-noise';
 import { ARROYO_MOUTH_Y, ARROYO_W0, ARROYO_WALL, arroyoJitter, arroyoZ, ARROYO_OFFSETS } from './coastline';
 
-export type RegionKind = 'mountain' | 'coast' | 'sound' | 'drumlin' | 'plains' | 'bayou' | 'city';
+export type RegionKind = 'mountain' | 'coast' | 'sound' | 'drumlin' | 'plains' | 'bayou' | 'city'
+  | 'appalachia' | 'desert' | 'north_woods' | 'upper_midwest';
 
 /** Town ground height (the EnvironmentRenderer ground plane). */
 export const TOWN_Y = -0.10;
@@ -71,6 +75,10 @@ export function townSpecFor(kind: RegionKind): TownSpec {
     case 'drumlin': return { ext: 26, maxD: 26, towers: false, maxStoreys: 3, suburbFrom: 32, reach: 96 };
     case 'plains': return { ext: 96, maxD: 88, towers: false, maxStoreys: 3, suburbFrom: 30 };
     case 'bayou': return { ext: 50, maxD: 50, towers: false, maxStoreys: 3, suburbFrom: 28, reach: 90 };
+    case 'appalachia': return { ext: 26, maxD: 26, towers: false, maxStoreys: 2, suburbFrom: 20, reach: 70 };
+    case 'desert': return { ext: 60, maxD: 60, towers: false, maxStoreys: 2, suburbFrom: 24 };
+    case 'north_woods': return { ext: 30, maxD: 30, towers: false, maxStoreys: 2, suburbFrom: 20, reach: 70 };
+    case 'upper_midwest': return { ext: 70, maxD: 64, towers: false, maxStoreys: 3, suburbFrom: 28 };
   }
 }
 
@@ -122,9 +130,18 @@ export function regionLookFor(kind: RegionKind): RegionLook {
     case 'coast': return { ...base, dry: 0.75, rock: 0x8a7a62, forest: 0x343c22, evergreen: 0.15, grass: 0x7d7a48, dryGrass: 0xa58c5c, farm: 0.75, fieldSize: 36, fieldMode: 'orchard', rockSlope: 0.6 };
     case 'sound': return { ...base, treeLine: 260, snowLine: 210, snowLineWinter: 120, rock: 0x6a665f, forest: 0x203a26, evergreen: 0.9, farm: 0.15, fieldSize: 22 };
     case 'drumlin': return { ...base, snowLine: 1e9, snowLineWinter: -8, forest: 0x34492a, farm: 0.6, fieldSize: 26, stoneWalls: true, evergreen: 0.35, rockSlope: 0.62 };
-    case 'plains': return { ...base, snowLineWinter: -15, forest: 0x34502c, farm: 1, fieldSize: 52, evergreen: 0.05, fieldMode: 'plss' };
+    // Great Plains: wheat, sorghum and native grass on the section grid, cottonwoods only on the creeks; center pivots
+    case 'plains': return { ...base, snowLineWinter: -15, forest: 0x34502c, farm: 1, fieldSize: 52, evergreen: 0.05, fieldMode: 'plss', pivots: true, dry: 0.3, grass: 0x6f7a44, dryGrass: 0xa39a68 };
     case 'bayou': return { ...base, forest: 0x2f4426, farm: 0.45, fieldSize: 40, evergreen: 0.35, longLots: true, kudzu: true };
     case 'city': return { ...base, farm: 0.2, fieldSize: 40, fieldMode: 'plss' };
+    // oak–hickory / tulip-poplar cove forest, hay in the bottoms, sandstone ledges on the steep faces
+    case 'appalachia': return { ...base, snowLineWinter: 30, forest: 0x2d4a26, evergreen: 0.2, rock: 0x8a8070, grass: 0x557a36, farm: 0.4, fieldSize: 18, rockSlope: 0.55 };
+    // Colorado Plateau: tan grama grass and bare red-brown soil, pinyon–juniper on the mesas, red sandstone cliffs
+    case 'desert': return { ...base, dry: 0.92, rock: 0x9c5f45, forest: 0x46553a, evergreen: 0.97, grass: 0x8c8458, dryGrass: 0xb39a72, farm: 0, fieldSize: 60, rockSlope: 0.28 };
+    // spruce–fir and pine on the flats, birch and aspen in the burns, lakes and open bog
+    case 'north_woods': return { ...base, snowLineWinter: -15, forest: 0x1d3424, evergreen: 0.75, rock: 0x6e6c66, grass: 0x5c6e40, farm: 0.05, fieldSize: 24, rockSlope: 0.45 };
+    // dairy country: 40-acre fields on the survey grid, hardwood woodlots, kettle lakes
+    case 'upper_midwest': return { ...base, snowLineWinter: -15, forest: 0x2f4a28, evergreen: 0.2, grass: 0x5f7a3c, farm: 0.9, fieldSize: 34, fieldMode: 'plss', rockSlope: 0.6 };
   }
 }
 
@@ -136,6 +153,9 @@ export function regionWaterY(kind: RegionKind): number | null {
     case 'drumlin': return TOWN_Y - 4.6;
     case 'plains': return TOWN_Y - 9.5;
     case 'bayou': return TOWN_Y - 0.25;
+    case 'appalachia': return TOWN_Y - 3.2;
+    case 'north_woods': return TOWN_Y - 1.1;
+    case 'upper_midwest': return TOWN_Y - 2.2;
     default: return null;
   }
 }
@@ -229,7 +249,7 @@ export class RegionalField {
     this.cz = o.cH / 2;
     this.waterY = regionWaterY(o.kind);
     this.edge = o.townExt + 6;
-    const seed = { mountain: 11, coast: 23, sound: 37, drumlin: 41, plains: 53, bayou: 67, city: 71 }[o.kind];
+    const seed = { mountain: 11, coast: 23, sound: 37, drumlin: 41, plains: 53, bayou: 67, city: 71, appalachia: 79, desert: 83, north_woods: 89, upper_midwest: 97 }[o.kind];
     this.n1 = createNoise2D(makeRng(seed));
     this.n2 = createNoise2D(makeRng(seed + 100));
     this.n3 = createNoise2D(makeRng(seed + 200));
@@ -477,8 +497,9 @@ export class RegionalField {
         }
         const riparian = 1 - sstep(8, 24, dc);
         const bluffs = sstep(60, 72, dv) * (1 - sstep(100, 118, dv));
-        const wood = sstep(0.45, 0.6, n3(px * 0.006, pz * 0.006));
-        const forest = Math.max(riparian * 0.9, bluffs * 0.92, wood * 0.8);
+        // Great Plains: no upland woods, a farmstead shelterbelt here and there (regionalFarmsteads)
+        const wood = sstep(0.62, 0.72, n3(px * 0.006, pz * 0.006));
+        const forest = Math.max(riparian * 0.9, bluffs * 0.7, wood * 0.55);
         return { rel, forest, field: 1 - forest };
       }
       case 'bayou': {
@@ -500,6 +521,80 @@ export class RegionalField {
         const back = sstep(70, 120, ad) * wr;
         const forest = Math.max(0.85 * swamp, 0.9 * back, 0.55 * sstep(34, 60, ad) * (1 - sstep(60, 90, ad)), 0.5 * sstep(0.0, 0.3, n3(px * 0.008, pz * 0.008)));
         return { rel, forest, field: (1 - forest) * 0.7 };
+      }
+      case 'appalachia': {
+        // Dissected plateau / Blue Ridge: rounded ridges 150–450 m above
+        // V-shaped hollows (billowed noise: creases are the hollows), a
+        // higher range on the east skyline, the home creek running west →
+        // east down its hollow, and a river (TVA lake) in the big valley to
+        // the south.
+        const wx = px + 40 * n3(pz * 0.004, 2.1), wz = pz + 40 * n3(px * 0.004, 7.3);
+        let bill = 0, a = 1, f = 0.0042, nrm = 0;
+        for (let i = 0; i < 4; i++) { bill += a * Math.abs(n1(wx * f, wz * f)); nrm += a; a *= 0.5; f *= 2.05; }
+        bill /= nrm;                                               // 0 in the creases … ~0.7 on the knobs
+        let rel = 4 + 70 * Math.pow(bill, 1.05) + 55 * sstep(500, 1100, px + 0.3 * pz) * (0.6 + 0.4 * this.fbm(n3, px * 0.0015, pz * 0.0015, 2));
+        // the home hollow continues off the parcel both ways
+        const hz = Math.abs(pz - 8 * Math.sin(px / 60) - 4 * n3(px * 0.02, 1));
+        rel = Math.min(rel, 1.2 + 0.32 * Math.max(0, hz - 8) + 0.002 * Math.max(0, hz - 8) ** 2);
+        // the river valley: flat bottom, steep wooded sides
+        const rz = pz - 330 - 40 * Math.sin(px / 210) - 20 * n3(px * 0.003, 4);
+        const ad = Math.abs(rz);
+        if (ad < 120) rel = Math.min(rel, ad < 30 ? -4.5 : -4.5 + 0.12 * (ad - 30) ** 1.25);
+        const bottom = 1 - sstep(2, 9, rel);
+        const field = 0.85 * bottom * sstep(-0.2, 0.25, n3(px * 0.01 + 4, pz * 0.01));
+        const forest = Math.max(0.92 * (1 - field), 0) * (rel < -3 ? 0 : 1);
+        return { rel, forest, field };
+      }
+      case 'desert': {
+        // Colorado Plateau high desert: a broad basin of grama grass and
+        // bare soil cut by sandy washes, flat-topped mesas and buttes with
+        // a sandstone caprock (cliff over a talus slope, 60–200 m high),
+        // a far volcanic range on the south skyline.
+        let rel = 0.6 + 0.0035 * Math.max(0, -px) + 1.2 * (this.fbm(n1, px * 0.004, pz * 0.004, 3) + 0.4);
+        const m = this.fbm(n1, px * 0.0021 + 3.3, pz * 0.0021 - 1.7, 3) + 0.25 * n3(px * 0.009, pz * 0.009);
+        // two caprock tiers: risers are short and steep, treads flat
+        // (the nearest mesa stands a kilometer or so off: the place is on the open bajada)
+        const far = sstep(150, 280, d);
+        const tier1 = sstep(0.16, 0.2, m) * far, tier2 = sstep(0.36, 0.39, m) * far;
+        const talus = sstep(0.04, 0.16, m) * far;
+        rel += 6 * talus + 24 * tier1 + 16 * tier2;
+        const range = sstep(900, 1500, pz - 0.2 * px) * (40 + 120 * this.ridged(px * 0.002, pz * 0.002, 3));
+        rel = Math.max(rel, range);
+        // washes: dendritic sandy channels on the flats
+        const w = Math.abs(this.fbm(n3, px * 0.003 + 9, pz * 0.003, 3));
+        if (talus < 0.5) rel -= 0.9 * (1 - sstep(0.012, 0.03, w));
+        // pinyon–juniper on the talus and mesa tops, scattered juniper on the flats
+        const pj = sstep(-0.2, 0.3, n3(px * 0.02, pz * 0.02));
+        const forest = Math.max(0.62 * talus * (0.5 + 0.5 * pj), 0.5 * tier1 * pj, 0.48 * pj * sstep(0.1, 0.5, n1(px * 0.006 + 1, pz * 0.006)));
+        return { rel, forest, field: 0 };
+      }
+      case 'north_woods': {
+        // Laurentian shield / Maine lowland: low glacial swells and eskers,
+        // lakes everywhere (kettles and scoured basins), open sphagnum bogs
+        // in the low spots, spruce–fir forest on the rest.
+        let rel = 1.2 + 4.5 * (this.fbm(n1, px * 0.0035, pz * 0.0035, 4) + 0.45) + 2.5 * Math.pow(this.ridged(px * 0.006, pz * 0.006, 2), 2);
+        const kp = kettle(px, pz, 150, 0.55, 89);
+        if (kp && d > 120) rel = Math.min(rel, -2.2 + 0.25 * Math.max(0, kp.d - kp.r * 1.6));
+        // a big lake to the north-west
+        const lk = Math.hypot((px + 420) / 1.8, pz + 380) + 40 * n3(px * 0.006, pz * 0.006);
+        if (lk < 260) rel = Math.min(rel, -3 + 4 * sstep(200, 260, lk));
+        const bog = sstep(0.2, 0.32, this.fbm(n3, px * 0.004 + 5, pz * 0.004, 2)) * (1 - sstep(1, 3, rel));
+        const forest = 0.94 * (1 - bog) * (rel < -1 ? 0 : 1);
+        return { rel: rel - 0.6 * bog, forest, field: 0.05 * (1 - forest) };
+      }
+      case 'upper_midwest': {
+        // End moraine and outwash: rolling hills of 10–40 m, kettle lakes,
+        // a hardwood woodlot on most quarter sections, the rest in hay,
+        // corn and pasture on the survey grid.
+        let rel = 1 + 5.5 * (this.fbm(n1, px * 0.0045, pz * 0.0045, 3) + 0.45) + 3 * this.fbm(n3, px * 0.012, pz * 0.012, 2);
+        const kp = kettle(px, pz, 190, 0.45, 97);
+        if (kp && d > 110) rel = Math.min(rel, -3.6 + 0.35 * Math.max(0, kp.d - kp.r));
+        const cell = 67, ci = Math.floor(px / cell), cj = Math.floor(pz / cell);
+        const lot = hash2(ci, cj, 97) < 0.3 ? 1 : 0;
+        // (and wooded draws and kettle rims the plow never took)
+        const draws = sstep(0.5, 0.7, n3(px * 0.008 + 3, pz * 0.008 - 5));
+        const forest = Math.max(0.88 * lot, 0.8 * draws) * (rel < -2 ? 0 : 1);
+        return { rel, forest, field: 1 - forest };
       }
       case 'city':
       default: {

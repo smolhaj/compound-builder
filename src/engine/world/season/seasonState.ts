@@ -143,6 +143,45 @@ export const CLIMATES: Record<string, SeasonClimate> = {
     snow: 0, weatherSnow: 0, dormant: 0.9, dormantOn: 330, greenUp: 88,
     freeze: false,
   },
+  // Compound Builder regions (NOAA normals; fall-color peaks from the state forestry reports)
+  appalachia: {
+    // oak–hickory and maple: reds and oranges peaking late October on the ridges; snow comes and goes
+    ...BASE, id: 'appalachia', blaze: 1, palette: [0.28, 0.34, 0.26, 0.12],
+    turnStart: 275, peak: 298, dropEnd: 322, leafOut: 100, bloomDay: 95,
+    snow: 0.4, snowOn: 352, snowFull: 362, snowMelt: 40, snowGone: 62, weatherSnow: 0.6,
+    dormant: 0.8, dormantOn: 312, greenUp: 88,
+  },
+  desert_southwest: {
+    // high desert: dry fore-summer (May–June), the monsoon greens it July–September; cottonwoods go gold in November
+    ...BASE, id: 'desert_southwest', blaze: 0.3, palette: [0.0, 0.1, 0.85, 0.05],
+    turnStart: 290, peak: 310, dropEnd: 333, leafOut: 95, bloomDay: 85,
+    snow: 0.15, snowOn: 348, snowFull: 356, snowMelt: 28, snowGone: 45, weatherSnow: 0.45,
+    // (the brown "dormant" spell runs from November through the dry fore-summer to the first monsoon rains)
+    dormant: 0.9, dormantOn: 305, greenUp: 196,
+    dry: 0.5, dryStart: 255, dryFull: 285, dryEnd: 335,
+    freeze: false,
+  },
+  north_woods: {
+    // maple red and birch / aspen gold against black spruce, peaking late September; snow from November into April
+    ...BASE, id: 'north_woods', blaze: 0.95, palette: [0.3, 0.18, 0.47, 0.05],
+    turnStart: 250, peak: 272, dropEnd: 293, leafOut: 135, bloomDay: 140,
+    snow: 0.95, snowOn: 318, snowFull: 330, snowMelt: 92, snowGone: 112,
+    dormantOn: 288, greenUp: 125,
+  },
+  great_plains: {
+    // native grass cures tan by late July; cottonwood yellow on the creeks; snow blows off the open ground
+    ...BASE, id: 'great_plains', blaze: 0.6, palette: [0.05, 0.2, 0.65, 0.1],
+    turnStart: 275, peak: 292, dropEnd: 312, leafOut: 112, bloomDay: 105,
+    snow: 0.6, snowOn: 342, snowFull: 352, snowMelt: 50, snowGone: 72,
+    dry: 0.6, dryStart: 195, dryFull: 225, dryEnd: 300,
+  },
+  upper_midwest: {
+    // sugar maple and red oak, peak in early October; deep snow December to March
+    ...BASE, id: 'upper_midwest', blaze: 0.95, palette: [0.36, 0.3, 0.27, 0.07],
+    turnStart: 258, peak: 282, dropEnd: 305, leafOut: 125, bloomDay: 128,
+    snow: 0.92, snowOn: 328, snowFull: 342, snowMelt: 75, snowGone: 96,
+    greenUp: 115,
+  },
   southern_california: {
     ...BASE, id: 'southern_california', blaze: 0.15, palette: [0.08, 0.25, 0.37, 0.3],
     turnStart: 310, peak: 335, dropEnd: 356, bareMax: 0.2, broadEvergreen: 0.5, leafOut: 62, bloomDay: 70,

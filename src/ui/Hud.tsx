@@ -1,4 +1,5 @@
 import { useState, type CSSProperties, type ReactNode } from 'react';
+import { stormOutage } from '../sim/weatherThreats';
 import { useWorldStore, type BuildingView, type CameraMode } from '../store/worldStore';
 import { useGameStore } from '../store/gameStore';
 import type { Quality } from '../engine/world/WorldScene';
@@ -485,7 +486,7 @@ export function Hud() {
           </>}
 
           {rightTab === 'utilities' && (() => {
-            const r = game.utilities.report, up = game.disaster.tracks.grid > 0.5;
+            const r = game.utilities.report, up = game.disaster.tracks.grid > 0.5 && !stormOutage(game);
             const gr = greenRicks(game), next = game.upkeep.green.length ? Math.max(0, Math.ceil(SEASON_DAYS - (game.clock.t - Math.min(...game.upkeep.green.map(x => x.at))))) : 0;
             const ch = chimneyState(game);
             return <>

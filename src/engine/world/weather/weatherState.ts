@@ -153,6 +153,36 @@ export const REGION_WEATHER: Record<string, Partial<Record<WeatherSeason, Partia
   new_england: {
     fall:   { clear: 1.4, partly: 1.2, overcast: 0.8 },
   },
+  // Compound Builder regions
+  appalachia: {
+    spring: { rain: 1.4, storm: 1.3, fog: 1.6 },
+    summer: { storm: 1.8, rain: 1.3, fog: 1.4, clear: 0.7 },
+    fall:   { fog: 1.8, clear: 1.1 },
+    winter: { rain: 1.6, snow: 0.6, overcast: 1.5, fog: 1.4 },
+  },
+  desert_southwest: {
+    spring: { rain: 0.3, storm: 0.1, clear: 2, overcast: 0.5, fog: 0.1 },
+    summer: { storm: 1.8, rain: 0.5, clear: 1.2, fog: 0 },
+    fall:   { rain: 0.4, clear: 1.8, fog: 0.1 },
+    winter: { rain: 0.4, snow: 0.35, clear: 1.6, fog: 0.2 },
+  },
+  north_woods: {
+    summer: { storm: 1.2 },
+    fall:   { overcast: 1.3, rain: 1.1 },
+    winter: { snow: 1.5, overcast: 1.3, clear: 0.8 },
+  },
+  great_plains: {
+    spring: { storm: 2, rain: 1, partly: 1.3, fog: 0.4 },
+    summer: { storm: 2.2, rain: 0.9, partly: 1.5, clear: 1.2, fog: 0.2 },
+    fall:   { clear: 1.4, partly: 1.2 },
+    winter: { snow: 0.8, clear: 1.3, fog: 0.6 },
+  },
+  upper_midwest: {
+    spring: { storm: 1.3, rain: 1.1 },
+    summer: { storm: 1.6, rain: 1.1 },
+    fall:   { overcast: 1.3, rain: 1.1 },
+    winter: { snow: 1.4, overcast: 1.5, clear: 0.7 },
+  },
 };
 
 /**
@@ -180,6 +210,12 @@ export const REGION_SKY: Record<string, RegionSky> = {
   deep_south:          { cumulus: 1.15, rain: 1.15, haze: { spring: 0.55, summer: 0.8, fall: 0.5, winter: 0.45 }, supercell: { spring: 0.3, summer: 0.5 } },
   midwest_plains:      { cumulus: 1.3,  rain: 1.05, haze: { spring: 0.35, summer: 0.45, fall: 0.25, winter: 0.3 }, supercell: { spring: 0.4, summer: 0.5, fall: 0.1 } },
   mountain_west:       { cumulus: 1.1,  rain: 0.8,  haze: { spring: 0.15, summer: 0.2, fall: 0.1, winter: 0.12 }, supercell: { summer: 0.4 } },
+  // the Smokies' blue summer haze; monsoon towers over the desert; Plains supercells
+  appalachia:          { cumulus: 1.1,  rain: 1.05, haze: { spring: 0.5, summer: 0.75, fall: 0.35, winter: 0.4 }, supercell: { spring: 0.15, summer: 0.25 } },
+  desert_southwest:    { cumulus: 1.2,  rain: 0.9,  haze: { spring: 0.15, summer: 0.25, fall: 0.1, winter: 0.1 }, supercell: { summer: 0.55 } },
+  north_woods:         { cumulus: 0.9,  rain: 1.0,  haze: { spring: 0.25, summer: 0.35, fall: 0.15, winter: 0.2 }, supercell: { summer: 0.15 } },
+  great_plains:        { cumulus: 1.35, rain: 1.05, haze: { spring: 0.3, summer: 0.4, fall: 0.2, winter: 0.25 }, supercell: { spring: 0.5, summer: 0.55, fall: 0.1 } },
+  upper_midwest:       { cumulus: 1.2,  rain: 1.0,  haze: { spring: 0.35, summer: 0.45, fall: 0.25, winter: 0.3 }, supercell: { spring: 0.25, summer: 0.35 } },
 };
 
 /** Region sky character (unknown region → New England-like baseline with the base haze). */

@@ -23,11 +23,12 @@ const TREES: Record<Quality, number> = { high: 7500, medium: 4800, low: 1400 };
 
 /** Far-tree geometries: [near, far] for conifers and broadleaves (unit height, base at y=0). */
 /** Far-landscape tree species (region-appropriate silhouettes). */
-export type TreeSpecies = 'fir' | 'cedar' | 'pine' | 'broad' | 'liveoak' | 'cypress' | 'birch' | 'eucalyptus' | 'shrub' | 'poplar';
+export type TreeSpecies = 'fir' | 'cedar' | 'pine' | 'broad' | 'liveoak' | 'cypress' | 'birch' | 'eucalyptus' | 'shrub' | 'poplar' | 'spruce' | 'juniper';
 
 /** Season behaviour per species: deciduous crowns turn and go bare (bald cypress included). */
 export const SPECIES_DECIDUOUS: Record<TreeSpecies, boolean> = {
   fir: false, cedar: false, pine: false, broad: true, liveoak: false, cypress: true, birch: true, eucalyptus: false, shrub: false, poplar: true,
+  spruce: false, juniper: false,
 };
 
 /**
@@ -46,6 +47,14 @@ export function speciesMix(kind: RegionKind): Array<[TreeSpecies, number]> {
     case 'plains': return [['broad', 0.88], ['fir', 0.04], ['birch', 0.08]];
     case 'mountain': return [['pine', 0.55], ['fir', 0.25], ['birch', 0.2]];
     case 'city': return [['broad', 0.7], ['fir', 0.3]];
+    // oak–hickory, tulip poplar and maple; hemlock in the coves, Virginia / white pine on the dry ridges
+    case 'appalachia': return [['broad', 0.72], ['fir', 0.1], ['pine', 0.1], ['birch', 0.08]];
+    // one-seed juniper and pinyon
+    case 'desert': return [['juniper', 0.75], ['shrub', 0.25]];
+    // black / white spruce, balsam fir, jack / red pine; paper birch and aspen
+    case 'north_woods': return [['spruce', 0.55], ['fir', 0.15], ['pine', 0.1], ['birch', 0.2]];
+    // sugar maple, red oak, basswood woodlots; a few white pine
+    case 'upper_midwest': return [['broad', 0.82], ['birch', 0.08], ['pine', 0.1]];
   }
 }
 
@@ -99,6 +108,10 @@ function speciesGeos(): Record<TreeSpecies, [THREE.BufferGeometry, THREE.BufferG
     shrub: [m([blob(0, 0.45, 0.3, 0.45, 0.28)]), m([blob(0, 0.45, 0.3, 0.45, 0.28)])],
     // Lombardy poplar (farm windbreak rows in the intermountain West): a tall narrow column
     poplar: [m([trunk(0.03, 0.2, 4), blob(1, 0.12, 0.42, 0.12, 0.56)]), m([blob(0, 0.12, 0.44, 0.12, 0.54)])],
+    // black spruce / balsam fir: a narrow spire, short branches to the ground
+    spruce: [m([trunk(0.03, 0.12, 4), cone(0.15, 0.62, 0.06, 6), cone(0.11, 0.46, 0.42, 6)]), m([cone(0.15, 0.95, 0.05, 4)])],
+    // one-seed juniper / pinyon: a low, ragged, rounded crown on a short twisted trunk
+    juniper: [m([trunk(0.05, 0.22, 4), blob(1, 0.42, 0.34, 0.4, 0.5), blob(0, 0.26, 0.22, 0.24, 0.42, 0.2, 0.12)]), m([blob(0, 0.44, 0.38, 0.42, 0.48)])],
   };
 }
 
@@ -114,6 +127,8 @@ const SPECIES_SHAPE: Record<TreeSpecies, { h: number; w: number; col: number }> 
   eucalyptus: { h: 1.55, w: 1.0, col: 0x66765a },
   shrub: { h: 0.35, w: 0.9, col: 0x4a5430 },
   poplar: { h: 1.3, w: 1.0, col: 0x4c6a32 },
+  spruce: { h: 1.25, w: 0.75, col: 0x26402c },
+  juniper: { h: 0.45, w: 1.05, col: 0x4c5a40 },
 };
 
 
@@ -161,12 +176,15 @@ export class FarTreeRenderer {
     };
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
     const v = new THREE.Vector3(), s = new THREE.Vector3();
-    const broadTint = new THREE.Color(o.kind === 'coast' ? 0x55602f : o.kind === 'bayou' ? 0x46553a : o.kind === 'mountain' ? 0x5a7a34 : 0x3f6430);
+    const broadTint = new THREE.Color(o.kind === 'coast' ? 0x55602f : o.kind === 'bayou' ? 0x46553a : o.kind === 'mountain' || o.kind === 'desert' ? 0x5a7a34 : 0x3f6430);
     const pickSp = (x: number, z: number, h: number, wetK: number): TreeSpecies => {
       if (o.kind === 'bayou' && wetK > 0.5 && hash(z, x * 0.7) < 0.75) return 'cypress';
       if (o.kind === 'mountain' && h > 120 && hash(z * 1.3, x) < 0.7) return 'fir';
       if (o.kind === 'mountain' && h < 20 && wetK > 0.2) return 'broad';
       if (o.kind === 'coast' && wetK > 0.2) return hash(x, z) < 0.7 ? 'broad' : 'liveoak';
+      // cottonwoods on the desert washes and the plains creeks; tamarack / cedar round the north-woods lakes
+      if ((o.kind === 'desert' || o.kind === 'plains') && wetK > 0.2) return 'broad';
+      if (o.kind === 'appalachia' && h > 60 && hash(z, x * 1.7) < 0.35) return 'pine';
       const r = hash(x * 1.3, z);
       let acc = 0;
       for (const [sp, w] of mix) { acc += w; if (r < acc) return sp; }
