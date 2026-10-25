@@ -5,7 +5,7 @@ import { orderHookup, placeImprovements } from '../sim/improvements';
 import { applyForPermit } from '../sim/paperwork';
 import { sweepChimney } from '../sim/upkeep';
 import { stockUpRx } from '../sim/body';
-import { askRansom, giveUp, startRescue } from '../sim/rescue';
+import { askRansom, giveUp, startRescue, startTrip } from '../sim/rescue';
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { newGame, SECONDS_PER_DAY, dayIndex, type GameState, type OrderLine, type Speed } from '../sim/state';
@@ -65,7 +65,9 @@ export interface GameStore {
   releasePrisoner: (id: string) => void;
   joinPrisoner: (id: string) => void;
   /** The taken (sim/rescue.ts): send armed adults to the camp, send word you'll pay, stop looking. Return why not, or null. */
-  rescue: (pid: string, team: string[]) => string | null;
+  rescue: (pid: string, team: string[], allies?: boolean) => string | null;
+  /** A long trip by truck after a child traded on (a far rumor). */
+  trip: (pid: string, team: string[]) => string | null;
   askRansom: (pid: string) => string | null;
   giveUp: (pid: string) => string | null;
   /** Wildfire: the world's count of trees round each building. */
@@ -293,9 +295,15 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     const g = structuredClone(get().game);
     if (!releasePrisoner(g, id)) set({ game: g });
   },
-  rescue: (pid, team) => {
+  trip: (pid, team) => {
     const g = structuredClone(get().game);
-    const why = startRescue(g, pid, team);
+    const why = startTrip(g, pid, team);
+    if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); }
+    return why;
+  },
+  rescue: (pid, team, allies) => {
+    const g = structuredClone(get().game);
+    const why = startRescue(g, pid, team, allies);
     if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); }
     return why;
   },

@@ -38,6 +38,7 @@ import { backgroundOf, fullName, type Person } from './family';
 import { chronicle } from './lineage';
 import { log } from './economy';
 import { radioSet, reception } from './radio';
+import { VEHICLES, startingVehicles, type Vehicle } from './vehicles';
 import { mulberry32 } from './rng';
 import { calendarOf, dayIndex, type GameState } from './state';
 import type { Stock } from './materials';
@@ -60,6 +61,8 @@ export interface Lead {
   /** The child was seen alive (true), not seen (null), or the lead says they're not there any more. */
   seenAlive: boolean | null;
   news?: 'traded' | 'dead';
+  /** A long-shot rumor of a child traded on: a trading post or work camp far off (a trip by truck, not a raid). */
+  far?: boolean;
   /** The line the family heard. */
   text: string;
   /** Whether it was true when it was said (hidden). */
@@ -85,6 +88,10 @@ export interface Captive {
   statusDay: number;
   /** What the family has heard. */
   known: 'nothing' | 'alive' | 'traded' | 'dead';
+  /** Traded on: where to now (hidden), a trading post or camp 80–400 km off; it moves every couple of months. */
+  farWhere?: string;
+  farKm?: number;
+  farDir?: string;
   /** This crew deals: they'll trade a child back for goods. */
   deals: boolean;
   leads: Lead[];
@@ -98,8 +105,11 @@ export interface Captive {
 
 export interface RescueRaid {
   captive: string;
-  /** Who went. */
+  /** A raid on the camp, or a long trip by truck after a child traded on. */
+  kind?: 'raid' | 'trip';
+  /** Who went, and the neighbors who sent men (household id, how many). */
   team: string[];
+  allies?: Array<{ id: string; n: number }>;
   left: number;
   /** The day they hit the camp, the day they're back. */
   hitDay: number;
@@ -116,8 +126,12 @@ const rescueOf = (s: GameState): RescueState => (s.rescue ??= newRescue());
 
 /** A lead is warm for ten days, cooling to three weeks, then cold (the crew has likely moved on). */
 export const LEAD_WARM = 10, LEAD_COLD = 21;
+/** A far rumor stays worth the drive for six weeks. */
+export const FAR_COLD = 45;
 export const leadAge = (s: GameState, l: Lead) => dayIndex(s.clock.t) - l.day;
-export const latestLead = (c: Captive): Lead | undefined => c.leads[c.leads.length - 1];
+/** The latest lead on the crew's camp (not a far rumor of a child traded on). */
+export const latestLead = (c: Captive): Lead | undefined => c.leads.filter(l => !l.far).pop();
+export const latestFarLead = (c: Captive): Lead | undefined => c.leads.filter(l => l.far).pop();
 export const openCaptives = (s: GameState) => (s.rescue?.captives ?? []).filter(c => !c.closed);
 
 /** Away on a rescue: off the line, off the work. */
@@ -142,19 +156,31 @@ const free = (s: GameState, p: Person) => stateOf(s, p.id)?.needs.died == null;
 
 /** The child's mom and dad (or whoever's raising them) who are still here, by voice. */
 function parents(s: GameState, child: Person): { mom?: Person; dad?: Person; any?: Person } {
+  if (!child.kid) {
+    // an adult taken: their partner speaks, or whoever's closest to them
+    const mate = child.partner ? person(s, child.partner) : undefined;
+    const kin = s.people.filter(p => p !== child && !p.kid && free(s, p) && (p.kin || p.last === child.last));
+    return { any: mate && free(s, mate) ? mate : kin[0] ?? s.people.find(p => p !== child && !p.kid && free(s, p)) };
+  }
   const ps = (child.parents ?? []).map(id => person(s, id)).filter((p): p is Person => !!p && free(s, p));
   const adults = ps.length ? ps : s.people.filter(p => !p.kid && free(s, p) && (p.kin || p.last === child.last));
   const mom = adults.find(p => p.body === 'f'), dad = adults.find(p => p.body === 'm');
   return { mom, dad, any: mom ?? dad ?? s.people.find(p => !p.kid && free(s, p)) };
 }
 /** A line spoken by the child's mother or father. */
-function voice(s: GameState, child: Person, r: () => number, mom: string[], dad: string[]): string {
+function voice(s: GameState, child: Person, r: () => number, mom: string[], dad: string[], adult?: string[]): string {
   const { mom: m, dad: d, any } = parents(s, child);
+  if (!child.kid) {
+    const f = child.first;
+    return any ? `${any.first}: "${pick(r, adult ?? [`We get ${f} back. Whatever it takes.`, `I keep thinking about ${f} out there, working for those animals.`, `${f}'s strong. ${f} will hold on. ${f} has to.`])}"` : '';
+  }
   const who = m && d ? (r() < 0.5 ? m : d) : m ?? d ?? any;
   if (!who) return '';
   return `${who.first}: "${pick(r, who === m || (!d && who.body === 'f') ? mom : dad)}"`;
 }
 const they = (p: Person) => (p.body === 'f' ? ['she', 'her'] : ['he', 'him']);
+/** How the family speaks of them: the child, the kid, or by name (an adult). */
+const callIt = (p: Person) => (!p.kid ? p.first : p.age < 13 ? 'the child' : 'the kid');
 const news = (s: GameState, text: string, tone: 0 | 1 | 2 | 3) => {
   s.disaster.news.push({ t: s.clock.t, text, tone });
   if (s.disaster.news.length > 40) s.disaster.news.splice(0, s.disaster.news.length - 40);
@@ -179,7 +205,7 @@ export function recordTaken(s: GameState, pid: string, raiders: number, temper: 
     camp: Math.max(3, raiders - lost + Math.floor(r() * 5)),
     where: pick(r, PLACES), km: 4 + Math.round(r() * 30), dir: pick(r, DIRS),
     day, status: 'held', statusDay: day, known: 'nothing',
-    deals: r() < (temper === 'savage' ? 0.45 : temper === 'hard' ? 0.65 : 0.8),
+    deals: r() < (temper === 'savage' ? 0.45 : temper === 'hard' ? 0.8 : 0.8),
     leads: [],
   };
   R.captives.push(c);
@@ -204,16 +230,26 @@ export function fateHazard(c: Pick<Captive, 'temper'>, days: number): number {
   return (0.015 + 0.0004 * days) * (c.temper === 'savage' ? 1 : c.temper === 'hard' ? 0.6 : 0.4);
 }
 /** One day of what becomes of them. */
+const FAR_PLACES = ['the trading post at Hadley Junction', 'the market in the old Walmart lot at Ridgeway', 'a work camp at the dam on the river', 'the convoy yard at Fort Madison', 'the salt flats market', 'the barge landing at Crow Point', 'the feedlot camp outside Garden City'];
+const setFar = (c: Captive, r: () => number) => { c.farWhere = pick(r, FAR_PLACES.filter(p => p !== c.farWhere)); c.farKm = 80 + Math.round(r() * 320); c.farDir = pick(r, ['south', 'east', 'west', 'north']); };
 function fateDay(s: GameState, c: Captive, day: number): void {
-  if (c.status !== 'held') return;
   const r = mulberry32(s.seed * 7717 + day * 101 + hashId(c.pid) % 7919);
+  // traded on: a hard life somewhere far off; they get moved on every couple of months
+  if (c.status === 'traded') {
+    if (!c.farWhere) setFar(c, r);
+    if (r() < 0.003) { c.status = 'dead'; c.statusDay = day; } else if (r() < 1 / 60) setFar(c, r);
+    return;
+  }
+  if (c.status !== 'held') return;
   if (r() >= fateHazard(c, day - c.day)) {
     // the crew moves camp every few weeks: the leads point at an empty place
     if (r() < 1 / 25) { c.where = pick(r, PLACES.filter(p => p !== c.where)); c.km = 4 + Math.round(r() * 30); c.dir = pick(r, DIRS); }
     return;
   }
-  c.status = r() < 0.55 ? 'traded' : 'dead';
+  // a hard crew keeps a worker alive and sells him on; a savage one is likelier to kill
+  c.status = r() < (c.temper === 'savage' ? 0.45 : c.temper === 'hard' ? 0.2 : 0.3) ? 'dead' : 'traded';
   c.statusDay = day;
+  if (c.status === 'traded') setFar(c, r);
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -237,9 +273,9 @@ export function addLead(s: GameState, c: Captive, source: LeadSource, r: () => n
   } else seenAlive = r() < 0.5 ? true : null;
   const [sh] = they(child);
   const first = child.first;
-  const about = said === 'traded' ? `They don't have the ${child.age < 13 ? 'child' : 'kid'} any more: traded ${child.body === 'f' ? 'her' : 'him'} to a convoy going south.`
-    : said === 'dead' ? `There's a fresh grave behind the place. Small.`
-    : seenAlive ? `There's a ${child.age < 13 ? 'child' : 'kid'} with them, ${child.age} or so. Alive.` : 'Nobody saw a child.';
+  const about = said === 'traded' ? `They don't have ${child.kid ? callIt(child) : child.first} any more: traded ${child.body === 'f' ? 'her' : 'him'} to a convoy going south.`
+    : said === 'dead' ? `There's a fresh grave behind the place.${child.kid ? ' Small.' : ''}`
+    : seenAlive ? (child.kid ? `There's a ${child.age < 13 ? 'child' : 'kid'} with them, ${child.age} or so. Alive.` : `Somebody matching ${child.first} is working their camp under guard. Alive.`) : child.kid ? 'Nobody saw a child.' : `Nobody saw ${child.first}.`;
   const camp = `${c.crew[0].toUpperCase() + c.crew.slice(1)} camp at ${where}, about ${km} km ${dir}. ${count} of them.`;
   const lead0 = source === 'radio' ? `${pick(r, RADIO_SRC)}: ${camp} ${about}`
     : source === 'prisoner' ? `The prisoner knows them. ${camp} ${about}`
@@ -323,9 +359,9 @@ function ransomEncounter(s: GameState, c: Captive, r: () => number): Encounter {
   const how = pick(r, [
     `A boy on a bicycle leaves a note in the gate and pedals off fast. It's in pencil: they have ${child.first}.`,
     `A man stands at the end of the drive under a white rag on a stick. He says they have ${child.first}, and holds up ${child.first}'s shoe.`,
-    `A voice on the CB, on your channel: "We got your kid. ${child.first}. You want ${him} back?"`,
+    `A voice on the CB, on your channel: "We got ${child.kid ? 'your kid' : 'your man'}. ${child.first}. You want ${him} back?"`.replace('your man', child.body === 'f' ? 'your woman' : 'your man'),
   ]);
-  const alive = c.status === 'held' ? pick(r, [`They put ${child.first} on the radio for a second. "Mom? Dad? I'm okay, I'm —" Then nothing.`, `${child.first}'s name is written at the bottom, in ${child.first}'s own hand.`]) : 'They won\'t say how the child is. "You\'ll see when you pay."';
+  const alive = c.status === 'held' ? pick(r, [child.kid ? `They put ${child.first} on the radio for a second. "Mom? Dad? I'm okay, I'm —" Then nothing.` : `They put ${child.first} on the radio for a second. "I'm okay. Don't do anything stupid —" Then nothing.`, `${child.first}'s name is written at the bottom, in ${child.first}'s own hand.`]) : `They won't say how ${child.first} is. "You'll see when you pay."`;
   return {
     id: `e${s.nextId++}`, kind: 'ransom', day, title: `Word from ${c.crew}`,
     dossier: [how, alive, `They want: ${termsText(t)}.`, `They'll bring ${him} to the gate at first light. One of you, unarmed, at the gate.`],
@@ -337,7 +373,7 @@ function ransomEncounter(s: GameState, c: Captive, r: () => number): Encounter {
 export function askRansom(s: GameState, pid: string): string | null {
   const c = openCaptives(s).find(x => x.pid === pid);
   if (!c) return 'no one to ask about';
-  const l = latestLead(c);
+  const l = c.leads.filter(x => !x.far).pop();
   if (!l || leadAge(s, l) > LEAD_COLD) return 'nobody to carry word: you need a lead on where they are';
   if (c.offerDue != null) return 'word has gone; waiting for an answer';
   const day = dayIndex(s.clock.t);
@@ -375,7 +411,7 @@ export function resolveRansom(s: GameState, e: Encounter, stance: Stance): Outco
   lines.push(`Paid: ${share < 1 ? 'six parts in ten of ' : ''}${termsText(t)}.`);
   const crossed = c.status !== 'held' || r() < DOUBLE_CROSS[c.temper];
   if (!crossed) {
-    lines.push(voice(s, child, r, [`${child.first}! Oh, baby — I've got you, I've got you, I'm never letting go —`, `Look at me. Look at me. You're home. You're home now.`], [`Come here. Come here, kiddo. It's over. It's over.`, `I've got ${him}. I've got ${him}. Get the door —`]));
+    lines.push(voice(s, child, r, [`${child.first}! Oh, baby — I've got you, I've got you, I'm never letting go —`, `Look at me. Look at me. You're home. You're home now.`], [`Come here. Come here, kiddo. It's over. It's over.`, `I've got ${him}. I've got ${him}. Get the door —`], [`${child.first}. Oh God, ${child.first}. You're home.`, `Look at your hands. What did they — never mind. You're home.`]));
     lines.push(...bringHome(s, c, 'ransom'));
     return { title: `${child.first} is home`, text: `At first light a truck stops at the end of the drive. They push ${child.first} out and are gone before ${sh} reaches the gate.`, tone: 'good', lines: lines.filter(Boolean) };
   }
@@ -396,7 +432,7 @@ export function resolveRansom(s: GameState, e: Encounter, stance: Stance): Outco
     lines.push(...bringHome(s, c, 'ransom'));
     return { title: 'An ambush at the gate', text: `It was a trap. You held, and ${child.first} came home in the middle of it.`, tone: 'mixed', lines: lines.filter(Boolean) };
   }
-  return { title: 'An ambush at the gate', text: b.result === 'repelled' || b.result === 'fled' ? 'It was a trap. You held the gate, but they drove off with the goods, and with your child.' : 'It was a trap. They got in.', tone: 'bad', lines: lines.filter(Boolean) };
+  return { title: 'An ambush at the gate', text: b.result === 'repelled' || b.result === 'fled' ? `It was a trap. You held the gate, but they drove off with the goods, and with ${child.first}.` : 'It was a trap. They got in.', tone: 'bad', lines: lines.filter(Boolean) };
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -404,7 +440,7 @@ export function resolveRansom(s: GameState, e: Encounter, stance: Stance): Outco
 // ─────────────────────────────────────────────────────────────────────────
 
 /** Back with the family: back in the day's work, the meals, the birthdays; shaken. */
-export function bringHome(s: GameState, c: Captive, how: 'ransom' | 'rescue'): string[] {
+export function bringHome(s: GameState, c: Captive, how: 'ransom' | 'rescue' | 'trip'): string[] {
   const i = s.people.findIndex(p => p.id === c.pid);
   if (i < 0) return [];
   const p = s.people[i], ps = s.personState[i], n = ps.needs;
@@ -425,7 +461,7 @@ export function bringHome(s: GameState, c: Captive, how: 'ransom' | 'rescue'): s
   // the chronicle wrote them off as taken: write them back in
   s.lineage.mourned = s.lineage.mourned.filter(id => id !== p.id);
   c.closed = 'home'; c.closedDay = day; c.known = 'alive'; c.offerDue = undefined;
-  const line = `${fullName(p)} came home after ${gone} day${gone === 1 ? '' : 's'} with ${c.crew}${how === 'ransom' ? ', ransomed' : ', brought back by force'}.`;
+  const line = `${fullName(p)} came home after ${gone} day${gone === 1 ? '' : 's'} with ${c.crew}${how === 'ransom' ? ', ransomed' : how === 'trip' ? `, brought back from ${c.farWhere ?? 'far away'}` : ', brought back by force'}.`;
   if (p.kin) chronicle(s, 'home', line);
   log(s, line);
   news(s, line, 0);
@@ -467,7 +503,7 @@ export function raidProblem(s: GameState, pid: string, team: string[]): string |
   if (!c) return 'no one to go after';
   if (s.rescue?.raid && !s.rescue.raid.resolved) return 'a rescue is already out';
   if (s.rescue?.raid) return 'wait for the last ones to get home';
-  const l = latestLead(c);
+  const l = c.leads.filter(x => !x.far).pop();
   if (!l) return 'nobody knows where they are yet';
   if (leadAge(s, l) > LEAD_COLD) return 'the trail is cold: you need a fresh lead';
   if (!team.length) return 'pick who goes';
@@ -475,21 +511,138 @@ export function raidProblem(s: GameState, pid: string, team: string[]): string |
   return null;
 }
 
-/** Send them. They go tonight, hit the camp before dawn and are back the day after. */
-export function startRescue(s: GameState, pid: string, team: string[]): string | null {
+/**
+ * Neighbors who'd send a man or two: home, on the radio net, and who like you
+ * (the same households that ride over when there's shooting at the gate).
+ */
+export function alliesFor(s: GameState): Array<{ id: string; name: string; n: number }> {
+  return s.neighbors.filter(n => n.status === 'home' && n.radio && n.disposition > 50 && n.members > 0).map(n => ({ id: n.id, name: n.name, n: n.members >= 3 ? 2 : 1 }));
+}
+const ALLY_FIRST = ['Walt', 'Dale', 'Marty', 'Ruth', 'Gene', 'Tom', 'Luis', 'Jo', 'Earl', 'Kate'];
+
+/** Send them (with the neighbors' men if asked). They go tonight, hit the camp before dawn and are back the day after. */
+export function startRescue(s: GameState, pid: string, team: string[], withAllies = false): string | null {
   const why = raidProblem(s, pid, team);
   if (why) return why;
   const c = openCaptives(s).find(x => x.pid === pid)!;
-  const l = latestLead(c)!;
+  const l = c.leads.filter(x => !x.far).pop()!;
   const day = dayIndex(s.clock.t);
   const far = l.km > 25 ? 1 : 0;
-  rescueOf(s).raid = { captive: pid, team: [...team], left: day, hitDay: day + 1 + far, backDay: day + 2 + 2 * far, resolved: false };
+  const allies = withAllies ? alliesFor(s).map(a => ({ id: a.id, n: a.n })) : [];
+  rescueOf(s).raid = { kind: 'raid', captive: pid, team: [...team], allies, left: day, hitDay: day + 1 + far, backDay: day + 2 + 2 * far, resolved: false };
+  if (allies.length) log(s, `${alliesFor(s).map(a => `${a.name[0].toUpperCase() + a.name.slice(1)} sent ${a.n === 1 ? 'a man' : 'two men'}`).join('; ')}, on the radio net.`);
   for (const id of team) { const ps = stateOf(s, id); if (ps) { ps.task = 'away'; ps.target = null; } }
   const child = person(s, pid)!;
   const names = team.map(id => person(s, id)?.first).filter(Boolean) as string[];
   log(s, `${names.join(', ')} went after ${child.first}, to ${l.where}. The place is left with ${s.people.filter(p => free(s, p) && !team.includes(p.id) && (!p.kid || p.age >= 15)).length} who can hold a gun.`);
   log(s, voice(s, child, mulberry32(s.seed + day), ['Bring them home. All of you. Promise me.', 'I\'m going. Don\'t try to stop me.'], ['Lock the gate behind us. Don\'t open it for anyone.', 'If we\'re not back by Thursday — don\'t come looking.']));
   return null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Traded on: the long-shot trip
+// ─────────────────────────────────────────────────────────────────────────
+
+const CAN_L = 20, L_PER_GAL = 3.785;
+/** The truck for a long trip (running, not fried) and the liters there and back. */
+export function tripFuel(s: GameState, km: number): { truck: Vehicle | undefined; liters: number; have: number } {
+  const truck = (s.vehicles ?? startingVehicles()).filter(v => (v.kind === 'pickup' || v.kind === 'old_pickup') && !v.fried && v.condition > 0.1).sort((a, b) => b.condition - a.condition)[0];
+  const liters = truck ? Math.ceil(2 * km / 1.609 / VEHICLES[truck.kind].mpg * L_PER_GAL) : 0;
+  return { truck, liters, have: (truck?.fuel ?? 0) + s.stock.fuel * CAN_L };
+}
+const farLead = (c: Captive) => c.leads.filter(l => l.far).pop();
+
+/** Why a trip after a traded-on child can't go now, or null. */
+export function tripProblem(s: GameState, pid: string, team: string[]): string | null {
+  const c = openCaptives(s).find(x => x.pid === pid);
+  if (!c) return 'no one to go after';
+  if (s.rescue?.raid) return s.rescue.raid.resolved ? 'wait for the last ones to get home' : 'someone is already out';
+  const l = farLead(c);
+  if (!l) return 'no word of where they were taken';
+  if (leadAge(s, l) > FAR_COLD) return 'that rumor is months old: wait for another';
+  const { truck, liters, have } = tripFuel(s, l.km);
+  if (!truck) return 'no running truck';
+  if (have < liters) return `not enough fuel: ${liters} L there and back, ${Math.floor(have)} L on hand`;
+  if (!team.length) return 'pick who goes';
+  if (team.length > 3) return 'the truck takes three';
+  if (team.some(id => { const p = person(s, id); return !p || !canGo(s, p); })) return 'someone picked can\'t go';
+  return null;
+}
+
+/** Drive to the trading post or camp the rumor named: days on the road each way, the fuel, wear on the truck. */
+export function startTrip(s: GameState, pid: string, team: string[]): string | null {
+  const why = tripProblem(s, pid, team);
+  if (why) return why;
+  const c = openCaptives(s).find(x => x.pid === pid)!;
+  const l = farLead(c)!;
+  const { truck, liters } = tripFuel(s, l.km);
+  const fromTank = Math.min(truck!.fuel, liters);
+  truck!.fuel -= fromTank;
+  s.stock.fuel = Math.max(0, s.stock.fuel - (liters - fromTank) / CAN_L);
+  truck!.mileage += 2 * l.km / 1.609; truck!.condition = Math.max(0, truck!.condition - 0.03);
+  const day = dayIndex(s.clock.t), leg = Math.ceil(l.km / 150);
+  rescueOf(s).raid = { kind: 'trip', captive: pid, team: [...team], left: day, hitDay: day + leg, backDay: day + 2 * leg, resolved: false };
+  for (const id of team) { const ps = stateOf(s, id); if (ps) { ps.task = 'away'; ps.target = null; } }
+  const child = person(s, pid)!;
+  log(s, `${team.map(id => person(s, id)?.first).join(', ')} took the truck to ${l.where}, ${l.km} km off: ${liters} L of fuel and ${2 * leg} days, for a rumor.`);
+  log(s, voice(s, child, mulberry32(s.seed + day + 1), ['Even if it\'s nothing. Even if it\'s nothing, go.', 'Bring a picture. Show everyone the picture.'], ['If there\'s any chance at all.', 'Take the good rifle. And the trade goods. All of them.']));
+  return null;
+}
+
+/** At the trading post: ask, show the picture, and buy them back if they're there. */
+function tripArrive(s: GameState, raid: RescueRaid): Outcome {
+  const R = rescueOf(s);
+  const c = R.captives.find(x => x.pid === raid.captive)!;
+  const child = person(s, c.pid)!;
+  const day = dayIndex(s.clock.t);
+  const l = farLead(c)!;
+  const r = mulberry32(s.seed * 8111 + day * 5 + 9);
+  raid.resolved = true;
+  const names = raid.team.map(id => person(s, id)?.first).filter(Boolean).join(', ');
+  const [, him] = they(child);
+  const lines: string[] = [];
+  // the road: roadblocks, a crew working the highway
+  if (r() < 0.2) {
+    const id = pick(r, raid.team), p = person(s, id), ps = stateOf(s, id);
+    if (p && ps) { const sev = 30 + Math.round(r() * 25); ps.needs.hurt.push({ what: 'shot at a roadblock on the highway', sev, trauma: true }); ps.needs.health = Math.max(1, ps.needs.health - sev * 0.5); lines.push(`They were shot at at a roadblock on the way. ${p.first} was hit.`); }
+  }
+  if (!l.true || c.status !== 'traded' || l.where !== c.farWhere) {
+    l.day = Math.min(l.day, day - FAR_COLD - 1);
+    const grave = l.true && c.status === 'dead' && l.where === c.farWhere;
+    if (grave) { c.known = 'dead'; c.closed = 'dead'; c.closedDay = day; const ps = stateOf(s, c.pid); if (ps) ps.needs.taken = false; if (child.kin) chronicle(s, 'death', `${fullName(child)} died far from home, at ${l.where}, aged ${child.age}.`); }
+    return { title: grave ? 'Too late' : 'Nobody had heard of them', text: grave ? `At ${l.where} a woman remembered ${child.first}. She showed them the grave. ${names} are on the long road home.` : `${names} showed ${child.first}'s picture to everyone at ${l.where}. Nobody knew the face. They're on the long road home.`, tone: 'bad', lines };
+  }
+  // there: buy them back from whoever has them now
+  const t = ransomTerms(s, { ...c, temper: 'desperate' }, r);
+  const paid = canPay(s, t);
+  if (r() < (paid ? 0.65 : 0.25)) {
+    if (paid) { pay(s, t, 1); lines.push(`Paid: ${termsText(t)}.`); } else lines.push('They had nothing like the price; they talked, and then they ran with ' + him + '.');
+    raid.freed = true;
+    lines.push(voice(s, child, r, ['Is it — is it really — oh God. Oh God, it is.', 'You found ' + him + '. You actually found ' + him + '.'], ['All that way. All that way, and there ' + they(child)[0] + ' was.', 'I never stopped. I never stopped looking.'], ['I never stopped looking. Not one day.', 'You\'re thin. You\'re so thin. Come on. Home.']));
+    return { title: `Found at ${l.where}`, text: `${child.first} was there, ${c.farKm} km from home, working for a man who'd bought ${him} off a convoy. They're bringing ${him} home.`, tone: 'good', lines: lines.filter(Boolean) };
+  }
+  setFar(c, r);
+  return { title: 'So close', text: `${child.first} was there. The man who has ${him} wouldn't sell, and moved ${him} on that night. ${names} are on the long road home.`, tone: 'bad', lines };
+}
+
+/** Now and then, months on, a rumor of a child traded on: a trading post or work camp far off (radio only; a ham hears the most). */
+function farRumorDay(s: GameState, c: Captive, day: number, r: () => number): void {
+  if (c.status !== 'traded' && c.known !== 'traded') return;
+  const set = radioSet(s);
+  const p = (set === 'ham' ? 0.008 : set === 'shortwave' ? 0.004 : 0.0015) * Math.exp(-(day - c.statusDay) / 240);
+  if (r() >= p) return;
+  const child = person(s, c.pid);
+  if (!child) return;
+  if (!c.farWhere) setFar(c, r);
+  const tru = c.status === 'traded' && r() < reception(s).truth;
+  const where = tru ? c.farWhere! : pick(r, FAR_PLACES), km = tru ? c.farKm! : 80 + Math.round(r() * 320);
+  const text = `${pick(r, RADIO_SRC)}: someone at ${where}, ${km} km off, has a ${child.kid ? (child.age < 13 ? 'child' : 'kid') : 'worker'} who says ${child.body === 'f' ? 'her' : 'his'} name is ${child.first}.`;
+  c.leads.push({ day, source: 'radio', where, km, count: 0, seenAlive: true, far: true, text, true: tru });
+  if (c.leads.length > 8) c.leads.splice(0, c.leads.length - 8);
+  c.known = 'traded';
+  log(s, text);
+  log(s, voice(s, child, r, [`${km} kilometers. I'd walk it. I'd walk it barefoot.`, 'It\'s a rumor. It\'s a rumor. But it\'s ' + child.first + '\'s name.'], ['The truck would make it. If we had the fuel. We have the fuel.', 'People say things on the radio. But ' + child.first + '.']));
+  news(s, text, 2);
 }
 
 export interface CampFight {
@@ -502,6 +655,8 @@ export interface CampFight {
   battle: Battle;
   spent: Partial<Record<Caliber, number>>;
   campDown: number;
+  /** The neighbors' men: hurt, killed. */
+  allies: { wounded: number; dead: number };
   lines: string[];
 }
 
@@ -517,7 +672,7 @@ interface Side { id: string; pid?: string; home: boolean; hp: number; out: boole
  * savage one at ~65 %); the team pulls back at half down. Every shot fired
  * in the camp can find the child.
  */
-export function fightAtCamp(s: GameState, team: string[], c: Pick<Captive, 'camp' | 'temper' | 'status'>, seed: number): CampFight {
+export function fightAtCamp(s: GameState, team: string[], c: Pick<Captive, 'camp' | 'temper' | 'status'>, seed: number, allyN = 0): CampFight {
   const r = mulberry32(seed * 2654435 + 4441);
   const late = s.disaster.kind ? Math.min(1, Math.max(0, s.clock.t - s.disaster.hitAt) / 365) : 0;
   const n = (k: string) => Math.floor((s.stock as Record<string, number>)[k] ?? 0);
@@ -545,6 +700,8 @@ export function fightAtCamp(s: GameState, team: string[], c: Pick<Captive, 'camp
       if (cal) { const want = f.arm.mag * (f.armor.plate ? 7 : 4); f.rounds = Math.min(want, ammo[cal] ?? 0); ammo[cal] = (ammo[cal] ?? 0) - f.rounds; }
     }
   }
+  // the neighbors' men: their own rifles and a box of shells, steady country shots, no armor
+  for (let i = 0; i < allyN; i++) H.push({ id: `a${i}`, home: true, hp: 100, out: false, dead: false, arm: { ...ARMS.semi_rifle, cal: null }, skill: 3 + Math.floor(r() * 3), armor: { plate: false, soft: false, helmet: false }, vet: false, nvg: false, ready: 0, rounds: 90, supp: 0 });
   for (const f of H) units.push({ id: f.id, side: 'home', personId: f.pid, x: 0, z: 0, ...(f.armor.plate || f.armor.soft || f.armor.helmet ? { armor: { ...f.armor } } : {}) });
   // the camp: like the crews at the gate (rifles, later armor and the odd night sight); a savage crew keeps dogs more often than not
   const dogs = r() < (c.temper === 'savage' ? 0.6 : 0.35);
@@ -572,7 +729,7 @@ export function fightAtCamp(s: GameState, team: string[], c: Pick<Captive, 'camp
   const shoot = (a: Side, b: Side, t: number, d: number, cover: number, sleeping = false) => {
     const cost = a.arm.auto ? 3 : 1;
     if (a.home && a.arm.cal) { if (a.rounds < cost) return; a.rounds -= cost; spent[a.arm.cal] = (spent[a.arm.cal] ?? 0) + cost; }
-    else if (!a.home) { if (a.rounds < cost) return; a.rounds -= cost; }
+    else if (a.arm !== FISTS) { if (a.rounds < cost) return; a.rounds -= cost; }
     const rangeF = Math.max(0.15, 1 - d / (a.arm.range * 1.2));
     // the dark: the camp's fires light them up, the team is in the trees
     const see = a.home ? (a.nvg || sleeping ? 0.9 : 0.6) : (a.nvg ? 0.8 : 0.35);
@@ -636,17 +793,18 @@ export function fightAtCamp(s: GameState, team: string[], c: Pick<Captive, 'camp
   ev.push({ t: 245, kind: 'end', result: end === 'failed' ? 'repelled' : 'overrun' });
   const child: CampFight['child'] = !childThere ? 'not_there' : childHit === 'killed' ? 'killed' : end === 'failed' ? 'still_held' : childHit === 'wounded' ? 'wounded' : 'freed';
   if (!end) end = 'failed';
-  return { result: end, child, surprise, battle: { night: true, units, events: ev, duration: 246 }, spent, campDown: R.filter(f => f.out).length, lines };
+  return { result: end, child, surprise, battle: { night: true, units, events: ev, duration: 246 }, spent, campDown: R.filter(f => f.out).length, allies: { wounded: H.filter(f => !f.pid && f.hp < 100 && !f.dead).length, dead: H.filter(f => !f.pid && f.dead).length }, lines };
 }
 
 /** Rough odds of bringing the child home, from what the lead says (the family's guess, not the truth). */
-export function rescueOdds(s: GameState, pid: string, team: string[], tries = 40): number {
+export function rescueOdds(s: GameState, pid: string, team: string[], tries = 40, withAllies = false): number {
   const c = openCaptives(s).find(x => x.pid === pid);
-  const l = c && latestLead(c);
+  const l = c && c.leads.filter(x => !x.far).pop();
+  const allyN = withAllies ? alliesFor(s).reduce((a, x) => a + x.n, 0) : 0;
   if (!c || !l || !team.length) return 0;
   let ok = 0;
   for (let i = 0; i < tries; i++) {
-    const f = fightAtCamp(s, team, { camp: l.count, temper: c.temper, status: 'held' }, 9001 + i);
+    const f = fightAtCamp(s, team, { camp: l.count, temper: c.temper, status: 'held' }, 9001 + i, allyN);
     if (f.child === 'freed' || f.child === 'wounded') ok++;
   }
   return ok / tries;
@@ -658,22 +816,24 @@ function hitCamp(s: GameState, raid: RescueRaid): Outcome {
   const c = R.captives.find(x => x.pid === raid.captive)!;
   const child = person(s, c.pid)!;
   const day = dayIndex(s.clock.t);
-  const l = latestLead(c)!;
+  const l = c.leads.filter(x => !x.far).pop()!;
   const r = mulberry32(s.seed * 6151 + day * 7 + 3);
   raid.resolved = true;
   const names = raid.team.map(id => person(s, id)?.first).filter(Boolean).join(', ');
   // a wrong lead, or they've moved on: nobody there
   if (!l.true || l.where !== c.where) {
     l.true = false; l.day = Math.min(l.day, day - LEAD_COLD - 1);   // that lead is dead now
-    return { title: 'The camp was empty', text: `${names} crept up on ${l.where} before dawn. Cold ashes, tire tracks, a child's sock in the mud. They're on their way home.`, tone: 'bad', lines: [voice(s, child, r, ['We were so close. We were so close.', `${child.first} was here. ${child.first} was HERE.`], ['They moved. We start again.', 'Next time we go the same day. The same hour.'])].filter(Boolean) };
+    return { title: 'The camp was empty', text: `${names} crept up on ${l.where} before dawn. Cold ashes, tire tracks, ${child.kid ? 'a child\'s sock' : `${child.first}'s jacket`} in the mud. They're on their way home.`, tone: 'bad', lines: [voice(s, child, r, ['We were so close. We were so close.', `${child.first} was here. ${child.first} was HERE.`], ['They moved. We start again.', 'Next time we go the same day. The same hour.'])].filter(Boolean) };
   }
-  const f = fightAtCamp(s, raid.team, c, s.seed * 389 + day * 11 + 5);
+  const allyN = (raid.allies ?? []).reduce((a, x) => a + x.n, 0);
+  const f = fightAtCamp(s, raid.team, c, s.seed * 389 + day * 11 + 5, allyN);
   const lines: string[] = [];
   lines.push(f.surprise ? 'They got to the edge of the firelight without a sound. Most of the camp was asleep.' : 'The dogs started up before they were halfway there. The camp came awake shooting.');
   lines.push(...applyCasualties(s, f.battle));
   let rounds = 0;
   for (const [cal, nn] of Object.entries(f.spent) as Array<[Caliber, number]>) { s.armory.ammo[cal] = Math.max(0, (s.armory.ammo[cal] ?? 0) - nn); rounds += nn; }
   if (rounds) { lines.push(`${rounds} rounds fired.`); for (const g of s.armory.guns) if (raid.team.includes(g.carrier ?? '')) { g.fired += Math.round(rounds / raid.team.length); g.condition = Math.max(0, g.condition - 0.01); } }
+  lines.push(...alliesAfter(s, raid, f, r));
   const [sh, him] = they(child);
   let title = '', text = '', tone: Outcome['tone'] = 'mixed';
   if (f.result === 'wiped' || f.result === 'routed') {
@@ -696,8 +856,8 @@ function hitCamp(s: GameState, raid: RescueRaid): Outcome {
     if (f.child === 'wounded') { const ps = stateOf(s, c.pid); if (ps) ps.needs.hurt.push({ what: 'grazed by a round in the camp', sev: 35, trauma: true }); }
     text = f.result === 'snatched' ? `${names} cut through the back of a stock trailer while the camp slept and carried ${child.first} out into the dark. Nobody woke. They're bringing ${him} home.`
       : `${names} went in for ${child.first} and found ${him} tied in the back of a stock trailer${f.child === 'wounded' ? ', bleeding from a graze' : ''}. They're bringing ${him} home.`;
-    lines.push(`${child.first}: "${pick(r, ['I knew you\'d come. I knew it. I knew it.', 'Is it really you? Is it really — ', 'Don\'t let go. Please don\'t let go.'])}"`);
-    lines.push(voice(s, child, r, ['I\'ve got you, baby. Don\'t look. Just hold on to me.', 'You\'re safe. You\'re safe now. We\'re going home.'], ['I\'ve got you, kiddo. Eyes on me. Don\'t look back there.', 'Hold on to my neck. We\'re going home.']));
+    lines.push(`${child.first}: "${pick(r, child.kid ? ['I knew you\'d come. I knew it. I knew it.', 'Is it really you? Is it really — ', 'Don\'t let go. Please don\'t let go.'] : ['You came. You actually came.', 'Get the others — there are others in the shed —', 'Go, go, before they wake up.'])}"`);
+    lines.push(voice(s, child, r, ['I\'ve got you, baby. Don\'t look. Just hold on to me.', 'You\'re safe. You\'re safe now. We\'re going home.'], ['I\'ve got you, kiddo. Eyes on me. Don\'t look back there.', 'Hold on to my neck. We\'re going home.'], [`Lean on me. Can you walk? We're going home.`, `I'm here. I came. We're going home.`]));
     tone = 'good';
   } else if (f.child === 'killed') {
     text = `${child.first} was hit in the crossfire. ${sh[0].toUpperCase() + sh.slice(1)} died before they could get ${him} out.`;
@@ -705,11 +865,11 @@ function hitCamp(s: GameState, raid: RescueRaid): Outcome {
     const ps = stateOf(s, c.pid); if (ps) ps.needs.taken = false;
     for (const q of s.personState) if (q.needs.died == null) q.needs.morale = Math.max(0, q.needs.morale - 20);
     if (child.kin) chronicle(s, 'death', `${fullName(child)} was killed in the rescue at ${l.where}, aged ${child.age}.`);
-    lines.push(voice(s, child, r, ['No. No no no. Give ' + him + ' to me. GIVE ME MY BABY.', 'We did this. We came and we did this.'], ['I carried ' + him + ' the whole way back. I couldn\'t leave ' + him + ' there.', 'It was us. It was our shooting. It was us.']));
+    lines.push(voice(s, child, r, ['No. No no no. Give ' + him + ' to me. GIVE ME MY BABY.', 'We did this. We came and we did this.'], ['I carried ' + him + ' the whole way back. I couldn\'t leave ' + him + ' there.', 'It was us. It was our shooting. It was us.'], ['We came all that way. All that way.', 'I should have gone alone. Quieter. I should have —']));
     tone = 'bad';
   } else if (f.child === 'not_there') {
     // somebody in the camp knew: traded on, or the grave
-    text = c.status === 'traded' ? `${child.first} wasn't there. One of them, bleeding out by the trucks, said they'd traded ${him} to a convoy going south two weeks back.` : `${child.first} wasn't there. Behind the camp there was a grave, small, with a name scratched on a board.`;
+    text = c.status === 'traded' ? `${child.first} wasn't there. One of them, bleeding out by the trucks, said they'd traded ${him} to a convoy going south two weeks back.` : `${child.first} wasn't there. Behind the camp there was a grave${child.kid ? ', small,' : ''} with a name scratched on a board.`;
     c.known = c.status === 'traded' ? 'traded' : 'dead';
     if (c.status === 'dead') {
       c.closed = 'dead'; c.closedDay = day;
@@ -724,6 +884,29 @@ function hitCamp(s: GameState, raid: RescueRaid): Outcome {
   return { title, text, tone, lines: lines.filter(Boolean) };
 }
 
+/** What it cost the neighbors who sent men: their dead and wounded, and how they feel about you now. */
+function alliesAfter(s: GameState, raid: RescueRaid, f: CampFight, r: () => number): string[] {
+  const out: string[] = [];
+  const went = (raid.allies ?? []).map(a => ({ a, n: s.neighbors.find(x => x.id === a.id) })).filter(x => x.n);
+  if (!went.length) return out;
+  const good = f.child === 'freed' || f.child === 'wounded' || f.result === 'wiped' || f.result === 'routed';
+  let dead = f.allies.dead, hurt = f.allies.wounded;
+  for (const { a, n } of went) {
+    const N = n!.name[0].toUpperCase() + n!.name.slice(1);
+    let loss = good ? 0 : 10;
+    for (let k = 0; k < a.n; k++) {
+      if (dead > 0) {
+        dead--; loss += 25; n!.members = Math.max(0, n!.members - 1);
+        out.push(`${pick(r, ALLY_FIRST)} from ${n!.name} was killed. ${N} will bury their own.`);
+      } else if (hurt > 0) { hurt--; loss += 3; out.push(`${pick(r, ALLY_FIRST)} from ${n!.name} was hit; they carried him home.`); }
+    }
+    if (n!.members === 0) { n!.status = 'gone'; out.push(`There's nobody left at ${n!.name}' place.`); }
+    n!.disposition = Math.max(-100, Math.min(100, n!.disposition + (good && loss === 0 ? 8 : -loss)));
+  }
+  if (!good) out.push('The neighbors\' men rode home without a word.');
+  return out;
+}
+
 /** The ones who went come home (the freed child with them). */
 function raidHome(s: GameState, raid: RescueRaid): void {
   const R = rescueOf(s);
@@ -732,7 +915,7 @@ function raidHome(s: GameState, raid: RescueRaid): void {
   const back = raid.team.filter(id => stateOf(s, id)?.needs.died == null);
   for (const id of back) { const ps = stateOf(s, id); if (ps) { ps.task = 'idle'; ps.target = null; } }
   const names = back.map(id => person(s, id)?.first).filter(Boolean).join(', ');
-  if (c && raid.freed && !c.closed) bringHome(s, c, 'rescue');
+  if (c && raid.freed && !c.closed) bringHome(s, c, raid.kind === 'trip' ? 'trip' : 'rescue');
   else if (names) log(s, `${names} ${back.length === 1 ? 'is' : 'are'} home from ${c?.crew ?? 'the raid'}.`);
 }
 
@@ -756,13 +939,14 @@ export function rescueDay(s: GameState): Outcome | null {
   let card: Outcome | null = null;
   // the raid: the fight on its day, home the day after
   const raid = R.raid;
-  if (raid && !raid.resolved && day >= raid.hitDay) card = hitCamp(s, raid);
+  if (raid && !raid.resolved && day >= raid.hitDay) card = raid.kind === 'trip' ? tripArrive(s, raid) : hitCamp(s, raid);
   else if (raid && raid.resolved && day >= raid.backDay) raidHome(s, raid);
   const someone = s.people.some(p => !p.kid && free(s, p) && !isAway(s, p.id));
   for (const c of R.captives) {
     if (c.closed) continue;
     fateDay(s, c, day);
     const r = mulberry32(s.seed * 4447 + day * 53 + hashId(c.pid) % 6007);
+    farRumorDay(s, c, day, mulberry32(s.seed * 1931 + day * 61 + hashId(c.pid) % 5003));
     const since = day - c.day, trail = Math.exp(-since / 60);
     // leads: the radio (a ham rig and someone who can work it hear the most), the neighbors riding over
     const set = radioSet(s);
@@ -776,7 +960,7 @@ export function rescueDay(s: GameState): Outcome | null {
     // word from the crew: an answer to the family's word, or an offer of their own
     if (!someone || s.gate.pending || (raid && raid.captive === c.pid)) continue;
     const answer = c.offerDue != null && day >= c.offerDue;
-    const offer = c.deals && c.status === 'held' && since >= 4 && (c.lastOffer == null || day - c.lastOffer >= 10) && r() < 0.035 * Math.exp(-since / 50);
+    const offer = c.deals && c.status === 'held' && since >= 4 && (c.lastOffer == null || day - c.lastOffer >= 10) && r() < 0.035 * (c.temper === 'hard' ? 1.5 : 1) * Math.exp(-since / 50);
     if (answer && !c.deals) { c.offerDue = undefined; c.lastOffer = day; log(s, `No answer came from ${c.crew}.`); continue; }
     if (answer || offer) { s.gate.pending = ransomEncounter(s, c, r); log(s, `${s.gate.pending.title}.`); }
   }

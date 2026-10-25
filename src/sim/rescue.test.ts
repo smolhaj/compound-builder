@@ -5,7 +5,8 @@ import { postureOf, resolve } from './encounters';
 import { tallyDay } from './report';
 import { migrate } from './save/migrations';
 import { mulberry32 } from './rng';
-import { addLead, bringHome, fateHazard, fightAtCamp, isAway, LEAD_COLD, leadAge, openCaptives, raidProblem, recordTaken, rescueDay, startRescue, type Captive } from './rescue';
+import { planBattle } from './battle';
+import { addLead, alliesFor, bringHome, fateHazard, fightAtCamp, isAway, LEAD_COLD, leadAge, openCaptives, raidProblem, recordBattle, recordTaken, rescueDay, startRescue, startTrip, tripFuel, tripProblem, type Captive } from './rescue';
 
 function afterHit(seed = 1): GameState {
   const g = newGame(seed, 105, 2027, { mode: 'scenario', peace: 'short', kind: 'grid_down' });
@@ -224,4 +225,124 @@ describe('the taken', () => {
     const m = migrate(JSON.parse(JSON.stringify(g)));
     expect(m.rescue).toEqual({ captives: [], raid: null });
   });
+
+  it('neighbors on the radio net can send men: better odds, and they can be hurt or killed', () => {
+    const g = afterHit(1);
+    arm(g, false);
+    const team = adults(g).map(p => p.id);
+    let alone = 0, helped = 0;
+    for (let seed = 1; seed <= 80; seed++) {
+      if (['freed', 'wounded'].includes(fightAtCamp(g, team, { camp: 7, temper: 'savage', status: 'held' }, seed).child)) alone++;
+      if (['freed', 'wounded'].includes(fightAtCamp(g, team, { camp: 7, temper: 'savage', status: 'held' }, seed, 3).child)) helped++;
+    }
+    expect(helped).toBeGreaterThan(alone);
+    // a real raid with them: goodwill rides on how it goes; they bury their dead
+    let lostMen = 0, soured = 0, warmed = 0;
+    for (let seed = 1; seed <= 40; seed++) {
+      const h = afterHit(seed), c = takeKid(h);
+      arm(h, false);
+      h.neighbors.forEach((n, i) => { n.status = 'home'; n.radio = i === 0; n.disposition = i === 0 ? 80 : 0; n.members = 4; });
+      expect(alliesFor(h)).toEqual([{ id: h.neighbors[0].id, name: h.neighbors[0].name, n: 2 }]);
+      addLead(h, c, 'prisoner', mulberry32(1));
+      Object.assign(c.leads[0], { true: true, where: c.where, km: 10 });
+      c.camp = 9;
+      expect(startRescue(h, c.pid, adults(h).map(p => p.id), true)).toBeNull();
+      expect(h.rescue!.raid!.allies).toHaveLength(1);
+      nextDay(h); rescueDay(h);
+      const n = h.neighbors[0];
+      if (n.members < 4) lostMen++;
+      if (n.disposition < 80) soured++;
+      if (n.disposition > 80) warmed++;
+    }
+    expect(lostMen).toBeGreaterThan(0);
+    expect(soured).toBeGreaterThan(0);
+    expect(warmed).toBeGreaterThan(0);
+  });
+
+  it('a child traded on: rare far rumors over months, then a long, costly trip with small odds', () => {
+    let rumors = 0;
+    for (let seed = 1; seed <= 12; seed++) {
+      const g = afterHit(seed), c = takeKid(g);
+      g.stock.sw_radio = 1;
+      c.status = 'traded'; c.known = 'traded';
+      for (let d = 0; d < 240; d++) { nextDay(g); rescueDay(g); g.gate.pending = null; }
+      if (c.leads.some(l => l.far)) rumors++;
+    }
+    expect(rumors).toBeGreaterThan(2);
+    expect(rumors).toBeLessThan(12);
+    // the trip: a truck, fuel there and back, days on the road
+    let found = 0, trips = 0;
+    for (let seed = 1; seed <= 40; seed++) {
+      const g = afterHit(seed), c = takeKid(g);
+      arm(g, false);
+      g.vehicles = [{ id: 'v1', kind: 'pickup', mileage: 130000, condition: 0.8, fuel: 90, oilAt: 0 }];
+      g.stock.fuel = 30; g.stock.canned = 100; g.stock.meds = 10;
+      c.status = 'traded'; c.known = 'traded'; c.farWhere = 'the salt flats market'; c.farKm = 240;
+      c.leads.push({ day: dayIndex(g.clock.t), source: 'radio', where: c.farWhere, km: 240, count: 0, seenAlive: true, far: true, text: '', true: true });
+      const team = [adults(g)[0].id];
+      expect(tripProblem(g, c.pid, team)).toBeNull();
+      const before = g.vehicles[0].fuel + g.stock.fuel * 20, need = tripFuel(g, 240).liters;
+      expect(startTrip(g, c.pid, team)).toBeNull();
+      expect(g.vehicles[0].fuel + g.stock.fuel * 20).toBeCloseTo(before - need, 3);
+      expect(isAway(g, team[0])).toBe(true);
+      for (let d = 0; d < 6; d++) { nextDay(g); rescueDay(g); }
+      trips++;
+      if (g.personState.find(ps => ps.id === c.pid)!.needs.died == null) found++;
+      expect(g.rescue!.raid).toBeNull();
+    }
+    // even on a true lead, it's a long shot
+    expect(found).toBeGreaterThan(0);
+    expect(found).toBeLessThan(trips);
+    // no truck, no trip
+    const g = afterHit(2), c = takeKid(g);
+    c.known = 'traded'; c.leads.push({ day: dayIndex(g.clock.t), source: 'radio', where: 'x', km: 200, count: 0, seenAlive: true, far: true, text: '', true: false });
+    g.vehicles = [{ id: 'v1', kind: 'pickup', mileage: 0, condition: 0.8, fuel: 0, oilAt: 0, fried: true }];
+    expect(tripProblem(g, c.pid, [adults(g)[0].id])).toMatch(/truck/);
+  });
+
+  it('a hard crew that gets in takes a working-age adult; they deal more and kill less', () => {
+    let workers = 0, kids = 0;
+    for (let seed = 1; seed <= 40; seed++) {
+      const g = afterHit(seed);
+      const b = planBattle(g, 8, seed, { temper: 'hard' });
+      for (const e of b.events) if (e.kind === 'taken') {
+        const p = g.people.find(x => x.id === b.units.find(u => u.id === e.unit)?.personId)!;
+        if (p.kid) kids++; else { workers++; expect(p.age).toBeGreaterThanOrEqual(16); }
+      }
+      if (seed === 1 || workers === 1) {
+        const h = structuredClone(g);
+        // (written into the game: a captive held by a hard crew)
+        const taken = b.events.find(e => e.kind === 'taken');
+        if (taken) {
+          const hb = structuredClone(b);
+          const pid = hb.units.find(u => u.id === (taken as { unit: string }).unit)!.personId!;
+          const ps = h.personState.find(x => x.id === pid)!; ps.needs.died = dayIndex(h.clock.t); ps.needs.taken = true;
+          recordBattle(h, hb, 8, 'hard');
+          expect(openCaptives(h)[0].temper).toBe('hard');
+        }
+      }
+    }
+    expect(workers).toBeGreaterThan(0);
+    expect(kids).toBe(0);
+    // over two months, fewer of a hard crew's captives are dead
+    const deadShare = (temper: 'hard' | 'savage') => {
+      const g = afterHit(5), R = g.rescue!, d0 = dayIndex(g.clock.t);
+      for (let k = 0; k < 300; k++) R.captives.push({ pid: `y${k}`, crew: 'c', temper, raiders: 6, camp: 6, where: 'w', km: 10, dir: 'n', day: d0, status: 'held', statusDay: d0, known: 'nothing', deals: false, leads: [] });
+      for (let d = 0; d < 90; d++) { nextDay(g); rescueDay(g); }
+      const gone = R.captives.filter(c => c.status !== 'held');
+      return gone.filter(c => c.status === 'dead').length / Math.max(1, gone.length);
+    };
+    expect(deadShare('hard')).toBeLessThan(deadShare('savage'));
+    // and they're likelier to trade
+    let hardDeals = 0, savageDeals = 0;
+    for (let k = 0; k < 200; k++) {
+      const g = afterHit(1); g.clock.t += k;
+      const pid = g.people.find(p => !p.kid)!.id;
+      if (recordTaken(g, pid, 6, 'hard').deals) hardDeals++;
+      const h = afterHit(1); h.clock.t += k;
+      if (recordTaken(h, pid, 6, 'savage').deals) savageDeals++;
+    }
+    expect(hardDeals).toBeGreaterThan(savageDeals);
+  });
 });
+

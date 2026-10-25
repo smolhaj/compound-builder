@@ -364,7 +364,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
   };
   // how organized they are: later in the collapse, armored, more of them carry rifles
   const org = peace ? 0 : Math.min(1, late * 0.7 + R.filter(f => f.armor.plate || f.armor.soft).length / Math.max(1, raiders) * 0.4);
-  let shaken = false, heldUp = false;
+  let shaken = false, heldUp = false, tookWorker = false;
   let wallDown = false, breached = false, fled = false, end: PlannedBattle['result'] | null = null, endT = 0;
   let breachT = 0, lineSince = -1;
 
@@ -585,6 +585,17 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
             continue;
           }
         }
+        // a hard crew takes a working-age adult to work their camp: one hiding in the house, or one down on the ground
+        if (temper === 'hard' && !tookWorker && !fighting && d <= 2 && !hardShelter) {
+          const worker = H.find(h => near(h) && !h.dead && !h.escaped && !h.kid && (h.shelter || h.out) && (() => { const a = s.people.find(p => p.id === h.pid)?.age ?? 0; return a >= 16 && a <= 55; })());
+          if (worker && r() < 0.06) {
+            tookWorker = true; worker.escaped = true; worker.taken = true;
+            ev.push({ t: r2(t + 0.5), kind: 'taken', unit: worker.id, by: f.id });
+            say(t, pick(['This one can work. Tie his hands.', 'Up. You\'re coming with us. You can dig.']), f);
+            say(t + 0.8, pick(['No — my family — please —', 'Take the food, take it, just leave me —']), worker);
+            continue;
+          }
+        }
         const hiding = !fighting && d <= 2 && r() < (savage ? 0.25 : 0.04) ? H.find(h => near(h) && h.shelter && !hardShelter && (!savage || !h.kid)) : undefined;
         const tg = fighting ?? hiding;
         if (tg && r() < f.arm.rate) { if (tg.shelter) tg.cover = 0.5; shoot(f, tg, t + r() * 0.9); }
@@ -693,7 +704,8 @@ export function applyBattle(s: GameState, b: Battle): string[] {
   if (thrown) s.stock.grenades = Math.max(0, (s.stock.grenades ?? 0) - thrown);
   if (result === 'breached' || result === 'overrun') {
     s.gate.raidsLost++;
-    const savage = b.events.some(e => e.kind === 'taken' || (e.kind === 'death' && e.executed));
+    const kidOf = (unit: string) => s.people.find(p => p.id === b.units.find(u => u.id === unit)?.personId)?.kid;
+    const savage = b.events.some(e => (e.kind === 'taken' && kidOf(e.unit)) || (e.kind === 'death' && e.executed));
     const share = savage ? 0.9 : result === 'overrun' ? 0.6 : 0.3;
     const lost: string[] = [];
     for (const k of ['canned', 'staples', 'frozen', 'fuel', 'meds'] as const) { const t = Math.floor((s.stock[k] ?? 0) * share); if (t > 0) { s.stock[k] -= t; lost.push(`${t} ${k}`); } }
