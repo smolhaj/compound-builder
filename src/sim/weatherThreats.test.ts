@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { markSown } from './seeds';
 import { calendarOf, newGame, type GameState } from './state';
 import { fieldHarvest, produce } from './needs';
 import { CLASSIC } from './site';
@@ -109,6 +110,8 @@ describe('weather threats', () => {
     const year = (t: number) => { g.clock.t = t; return calendarOf(g.clock); };
     // mid-July, the garden at full summer
     let t = 0; while (year(t).doy !== 195) t++;
+    markSown(g);         // sown this spring (sim/seeds.ts); replanting after the hail takes seed
+    g.stock.seed_saved = 4;
     const before = produce(g);
     const c = calendarOf(g.clock);
     g.weather = { active: null, last: -999, hail: { year: c.year, doy: c.doy - 1 } };

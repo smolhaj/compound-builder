@@ -13,8 +13,11 @@ const TONE = { good: '#a8d080', warn: '#f0c070', bad: '#f08060' } as const;
 const h3 = { margin: '0 0 4px', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.6, opacity: 0.65, fontWeight: 600 } as const;
 
 /** The unit a row is counted in. */
+/** Units of the food put up on the place. */
+const HOME_WORD: Partial<Record<FoodItemId, string>> = { home_canned_meat: 'case', dried_produce: 'jar', cured_pork: 'ham', cellar_roots: 'bushel', cheese: 'wheel', butter: 'lb', lard: 'crock', maple_syrup: 'gal' };
 function unitWord(id: FoodItemId, n: number): string {
   const it = FOOD[id], one = Math.abs(n - 1) < 0.05;
+  if (HOME_WORD[id]) return one || HOME_WORD[id] === 'lb' || HOME_WORD[id] === 'gal' ? HOME_WORD[id]! : HOME_WORD[id] + 's';
   const w = id === 'home_canned' ? 'case' : id === 'honey' || id === 'oil' ? 'jug' : it.prop === 'bucket' ? 'bucket' : it.prop === 'can10' ? (id === 'coffee' ? 'can' : '#10 can') : it.prop === 'sack' || it.prop === 'bag' ? (id === 'smoked_meat' ? 'bundle' : 'bag') : it.prop === 'pack' ? 'box' : 'case';
   return one ? w : w + (w.endsWith('s') ? 'es' : 's');
 }

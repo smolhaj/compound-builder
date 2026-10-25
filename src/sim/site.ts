@@ -11,6 +11,7 @@
 import { mulberry32 } from './rng';
 import { REGION_IDS, REGIONS, SIZE_FACTOR, type RegionId } from './regions';
 import { driveQuote, HOUSE_NAME, improvementValue, powerQuote, type Condition, type HouseKind, type Improvements } from './improvements';
+import { MAPLE_REGIONS } from './maple';
 
 /** The home square on the survey grid (world units; 67 = a quarter-quarter section, 40 acres). */
 export const FORTY = 67;
@@ -225,8 +226,13 @@ export function homeOutsideForty(s: Site): Rect[] {
 /** Why a piece can't go on this land (null = it can): a hand-dug well needs water within about 9 m. */
 export function siteProblem(s: Site, kind: string): string | null {
   if (kind === 'well_hand' && s.gwDepth > 9) return `Water is ${s.gwDepth} m down here: too deep to dig by hand (drill a well)`;
+  if (kind === 'pond' && !pondHolds(s)) return 'A pond won\'t hold water here: it needs a creek, a spring, a water table within 4 m or a wet climate';
+  if (kind === 'sugar_shack' && !MAPLE_REGIONS.has(s.region)) return 'No sugar maples here: they grow in New England, the Upper Midwest and the North Woods';
   return null;
 }
+
+/** Does a dug pond hold water on this land: a creek or spring, a high water table (≤ 4 m), or 600 mm+ of rain (sim/pond.ts). */
+export const pondHolds = (s: Site) => s.creek || s.spring || s.gwDepth <= 4 || REGIONS[s.region].rainMm >= 600;
 
 /** What the driller charges past the usual 60 m bore ($/m, about $45 a foot). */
 export const DRILL_PER_M = 150;

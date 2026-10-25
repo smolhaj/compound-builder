@@ -12,7 +12,11 @@ export type MaterialId = 'lumber' | 'logs' | 'firewood' | 'fieldstone' | 'concre
   | 'fresh' | 'frozen' | 'canned' | 'staples' | 'meds' | 'seed' | 'lids' | 'plow' | 'stabilizer' | 'traps' | 'hygiene' | 'gun_safe' | 'gun_cleaning' | 'fishing_gear' | 'snares' | 'smoker' | 'goat' | 'pig' | 'steer' | 'rabbit' | 'hay' | 'feed' | 'water_jugs' | 'ibc_tote' | 'water_trailer' | 'water_filter' | 'ro_system' | 'softener' | 'greywater'
   | 'plate_carrier' | 'ifak' | 'nvg' | 'thermal' | 'radios' | 'cameras' | 'thermal_cam' | 'driveway_alarm' | 'floodlights' | 'tripwire' | 'dog' | 'steel_door' | 'window_bars' | 'sandbags' | 'safe_room' | 'sw_radio' | 'ham_rig' | 'helmet' | 'soft_armor'
   | 'grenades' | 'rpg_launcher' | 'rpg_rounds' | 'suppressor'
-  | 'mines' | 'greenhouse_kit' | 'fruit_trees';
+  | 'mines' | 'greenhouse_kit' | 'fruit_trees'
+  // the farm kitchen and the barnyard (sim/preserving.ts, seeds.ts, livestock.ts, pond.ts, maple.ts; save v44)
+  | 'jars' | 'tattler_lids' | 'pressure_canner' | 'dehydrator' | 'drying_screens' | 'seed_heirloom' | 'seed_saved'
+  | 'cow' | 'sow' | 'goat_buck' | 'boar' | 'chicks' | 'vet_kit' | 'hardware_cloth' | 'cheese_kit'
+  | 'fingerlings' | 'maple_taps' | 'evaporator';
 
 export interface MaterialDef {
   id: MaterialId;
@@ -64,7 +68,9 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   canned: { id: 'canned', name: 'Canned food', unit: 'case of 12 (≈ 6,000 kcal)', price: 38 },
   staples: { id: 'staples', name: 'Bulk staples', unit: 'rice, beans, flour, oil (≈ 80,000 kcal, 25 kg)', price: 85 },
   meds: { id: 'meds', name: 'Medical supplies', unit: 'kit: dressings, antibiotics, painkillers', price: 160 },
-  seed: { id: 'seed', name: 'Field seed', unit: 'a season for a quarter acre: seed potatoes, dry beans, seed wheat', price: 200 },
+  seed: { id: 'seed', name: 'Field seed (hybrid)', unit: 'a season for a quarter acre: certified seed potatoes, hybrid beans and wheat. Yields a little more; seed saved from it doesn\'t come true', price: 200 },
+  seed_heirloom: { id: 'seed_heirloom', name: 'Field seed (heirloom)', unit: 'a season for a quarter acre, open-pollinated: seed saved from it comes true year after year', price: 240 },
+  seed_saved: { id: 'seed_saved', name: 'Saved seed', unit: 'a quarter acre\'s seed kept back from the harvest', price: null },
   stabilizer: { id: 'stabilizer', name: 'Fuel stabilizer', unit: 'a bottle: keeps ten cans of gas good for two years', price: 15 },
   hygiene: { id: 'hygiene', name: 'Hygiene supplies', unit: 'a person-month: soap, toilet paper, toothpaste, shampoo, pads', price: 25 },
   plate_carrier: { id: 'plate_carrier', name: 'Plate carrier', unit: 'a carrier with a pair of level III plates', price: 600 },
@@ -112,6 +118,22 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   gun_cleaning: { id: 'gun_cleaning', name: 'Gun cleaning kit', unit: 'rods, brushes, solvent, oil, patches: about a year', price: 60 },
   traps: { id: 'traps', name: 'Traps & bait stations', unit: 'snap traps, bait stations and bait: about two months', price: 35 },
   plow: { id: 'plow', name: 'Plow blade', unit: 'a snowplow blade for the truck (keep the drive open)', price: 3500 },
+  jars: { id: 'jars', name: 'Canning jars', unit: 'case of 12 quart Mason jars with bands (they come back when the food is eaten)', price: 20 },
+  tattler_lids: { id: 'tattler_lids', name: 'Reusable canning lids', unit: 'a dozen Tattler-style plastic lids and rubber rings: used again and again (seal a little less often)', price: 14 },
+  pressure_canner: { id: 'pressure_canner', name: 'Pressure canner', unit: 'a 23-quart pressure canner (7 quarts a load): the only safe way to can vegetables, meat and fish', price: 180 },
+  dehydrator: { id: 'dehydrator', name: 'Food dehydrator', unit: 'a 9-tray electric dehydrator: a basket of fruit or vegetables a day (≈ 6 kWh)', price: 300 },
+  drying_screens: { id: 'drying_screens', name: 'Drying screens', unit: 'six framed food-safe screens and a cover: sun drying in a dry, sunny summer', price: 80 },
+  cow: { id: 'cow', name: 'Family milk cow', unit: 'a bred Jersey cow in milk: about 3 gallons a day (hay, pasture, a little grain)', price: 2200 },
+  sow: { id: 'sow', name: 'Bred sow', unit: 'a bred gilt: two litters a year of eight to ten piglets (bagged feed)', price: 450 },
+  goat_buck: { id: 'goat_buck', name: 'Breeding buck (goat)', unit: 'a dairy buck: breeds the does each fall (no stud fees, and kids after the collapse)', price: 300 },
+  boar: { id: 'boar', name: 'Breeding boar', unit: 'a boar for the sows (no AI or a neighbor\'s boar needed)', price: 400 },
+  chicks: { id: 'chicks', name: 'Chicks', unit: 'ten day-old straight-run chicks: about half pullets (laying at five months), half cockerels for the pot', price: 45 },
+  vet_kit: { id: 'vet_kit', name: 'Livestock vet kit', unit: 'dewormer, penicillin, oxytetracycline, electrolytes, wound spray, a drench gun, teat dip: a year for a small herd', price: 150 },
+  hardware_cloth: { id: 'hardware_cloth', name: 'Predator-proofing', unit: 'for one coop or hutch: ½-inch hardware cloth, a buried apron, a covered run, two-step latches', price: 180 },
+  cheese_kit: { id: 'cheese_kit', name: 'Cheese-making kit', unit: 'a cheese press, molds, cloth, a thermometer, cultures and rennet for a year', price: 150 },
+  fingerlings: { id: 'fingerlings', name: 'Pond fish', unit: 'stocking for a quarter-acre pond: 125 bluegill, 25 largemouth bass and 25 channel catfish fingerlings', price: 180 },
+  maple_taps: { id: 'maple_taps', name: 'Maple tapping kit', unit: 'spouts, 25 sap buckets with lids and a tapping bit: 25 trees', price: 220 },
+  evaporator: { id: 'evaporator', name: 'Maple evaporator', unit: 'a 2 × 4 ft wood-fired evaporator, arch and stack: about 12 gallons of sap an hour', price: 1800 },
   lids: { id: 'lids', name: 'Canning lids', unit: 'sleeve of 12 lids (one case of quarts put up; the jars come back, the lids don\'t)', price: 6 },
   filter_set: { id: 'filter_set', name: 'HEPA filter set', unit: 'HEPA cartridges + hand-crank blower', price: 1100 },
 };

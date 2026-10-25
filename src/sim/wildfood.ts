@@ -21,7 +21,7 @@ import { calendarOf, type GameState } from './state';
 import { REGIONS, type Game } from './regions';
 import { huntingRifle, smallGameGun } from './armory';
 import { mulberry32 } from './rng';
-import { addFoodKcal } from './pantry';
+import { putUpMeat, SMOKE_KEEP } from './preserving';
 
 export type GameClass = 'big' | 'small' | 'fish';
 const BIG: Game[] = ['elk', 'deer', 'moose', 'antelope', 'javelina', 'turkey'];
@@ -95,10 +95,9 @@ export function wildDay(s: GameState, freezer: boolean): number {
   let meat = 0;
   const bring = (baskets: number, what: string, cls: GameClass) => {
     meat += baskets * 2000;
-    // a freezer, a smoker (jerky keeps like staples), or eat it fresh
-    if (freezer) addFoodKcal(s, 'game_meat', baskets * 2000);
-    else if (s.stock.smoker >= 1 && baskets > 4) { addFoodKcal(s, 'smoked_meat', baskets * 2000 * 0.8); meat -= baskets * 2000 * 0.2; }
-    else s.stock.fresh += baskets;
+    // a freezer, a smoker (jerky keeps like staples), the canner, or eat it fresh (sim/preserving.ts)
+    const put = putUpMeat(s, baskets * 2000, cls === 'fish' ? 'fish' : 'red', freezer);
+    meat -= put.smoked > 0 ? put.smoked * (1 / SMOKE_KEEP - 1) : 0;
     w.abundance[cls] = Math.max(0.05, w.abundance[cls] - (cls === 'big' ? 0.02 : 0.004));
     if (day <= w.hotUntil) for (const ps of s.personState) if (ps.needs.died == null) ps.needs.dose += 0.004 * baskets / 4;
     if (baskets >= 8) log(s, `${what} down: meat for weeks${s.stock.smoker >= 1 && !freezer ? ' (smoked into jerky)' : ''}.${day <= w.hotUntil ? ' It reads hot on the counter.' : ''}`);

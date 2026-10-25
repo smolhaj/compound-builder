@@ -27,13 +27,15 @@ import { newFin, type Fin } from './finance';
 import { newArmory, type Armory } from './armory';
 import { newWild, type Wild } from './wildfood';
 import type { Livestock } from './livestock';
+import type { Sown } from './seeds';
+import { newFarm, type Farm } from './farmState';
 import type { Vehicle } from './vehicles';
 import { emptyStats, type Ending, type RunStats } from './report';
 import { generateNeighbors, newGate, type GateState, type Neighbor } from './encounters';
 import { freshNeeds, type FoodReport, type Needs } from './needs';
 import type { WeatherState } from './weatherThreats';
 import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
-export const SAVE_VERSION = 39;
+export const SAVE_VERSION = 44;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -104,6 +106,8 @@ export interface Structure {
   /** County permit (sim/paperwork.ts): under review, approved, built without one, or stopped by the inspector; when review / the stop ends. */
   permit?: 'review' | 'ok' | 'none' | 'stopped';
   permitAt?: number;
+  /** Fields and gardens: what they were sown with this year (sim/seeds.ts; save v44). */
+  sown?: Sown;
 }
 
 export type TaskKind = 'idle' | 'build' | 'forestry' | 'sleep' | 'chores' | 'school' | 'leisure' | 'job' | 'gone' | 'shelter' | 'away';
@@ -207,8 +211,10 @@ export interface GameState {
   wild: Wild;
   /** The long game: eras, the chronicle, milestones, the dynasty score. */
   lineage: Lineage;
-  /** Goats, pigs, the steer, rabbits (lazily made: `s.livestock ??= newLivestock()`). */
+  /** The barnyard: goats, the cow, pigs, rabbits, the hens; their young, sickness, predators (lazily made: `ensureLivestock(s)`; save v44 adds the herd's breeding and health). */
   livestock?: Livestock;
+  /** The farm kitchen and the land's other food: preserving, seed saving, the pond, maple sugaring, the day's farm labor (sim/farmState.ts; save v44). */
+  farm: Farm;
   /** The black market contact, deals and heat (lazily created by sim/blackMarket.ts; optional, no save bump). */
   blackMarket?: BlackMarket;
   /** Peacetime break-ins and their legal aftermath (sim/breakins.ts): the evidence locker, a felony record, the news. Save v34; `??=` for safety. */
@@ -259,6 +265,7 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     fin: newFin(),
     armory: newArmory(),
     wild: newWild(),
+    farm: newFarm(),
     lineage: newLineage(people[0].last),
     site,
     stock: { ...emptyStock(), firewood: STARTING_FIREWOOD, canned: 2 },

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { markSown } from './seeds';
 import { affordable, CLASSIC, drillExtra, HOME_RECT, listings, SAVINGS, siteProblem, type Acres, type LandWish } from './site';
 import { REGION_IDS, SIZE_FACTOR } from './regions';
 import { newGame } from './state';
@@ -82,6 +83,7 @@ describe('the land you buy', () => {
     const grow = (soil: 'thin' | 'deep') => {
       const g = newGame(1, 250, 2027, { site: { ...CLASSIC, soil } });
       g.structures.push({ id: 'f', kind: 'field', x: 10, z: 10, rot: 0, stage: 5, done: 0, supplied: true, finishedAt: 0 });
+      markSown(g);
       return fieldHarvest(g);
     };
     expect(grow('deep')).toBeGreaterThan(grow('thin') * 1.4);

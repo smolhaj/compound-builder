@@ -8,10 +8,12 @@ import { billCost } from './materials';
 import { needsPermit } from './paperwork';
 import { migrate } from './save/migrations';
 import { SAVE_VERSION } from './state';
+import { markSown } from './seeds';
 
 const built = (g: GameState, id: string, kind: string, finishedAt = 0): Structure => {
   const st: Structure = { id, kind, x: 10, z: 10, rot: 0, stage: 5, done: 0, supplied: true, finishedAt };
   g.structures.push(st);
+  markSown(g);         // sown this spring (sim/seeds.ts)
   return st;
 };
 /** A game on day-of-year `doy` of its `years`-th year. */

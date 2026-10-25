@@ -123,9 +123,34 @@ export const FIELD_BLUEPRINT: Blueprint = {
   stages: [
     { id: 'site', name: 'Stake the corners', hours: 3, materials: {} },
     { id: 'foundation', name: 'Plow, pick rock and harrow (rented tiller)', hours: 60, materials: {} },
-    { id: 'frame', name: 'Plant potatoes, beans and wheat', hours: 50, materials: { seed: 1 } },
+    // (the seed is sown each spring from the seed store: sim/seeds.ts)
+    { id: 'frame', name: 'Lay out the rows and furrow (sown from the seed store each spring)', hours: 50, materials: {} },
     { id: 'roof', name: 'Deer fence and gate', hours: 60, materials: { lumber: 3, wire: 2, hardware: 1 } },
     { id: 'finish', name: 'Hill the potatoes, set the drying racks', hours: 30, materials: { lumber: 1 } },
+  ],
+};
+
+/** A quarter-acre farm pond (sim/pond.ts): dug with a hired excavator, a packed clay core and an overflow; ≈ 140 person-hours, ≈ $6,500. */
+export const POND_BLUEPRINT: Blueprint = {
+  kind: 'pond',
+  stages: [
+    { id: 'site', name: 'Stake it and test the clay (a pond needs a clay bottom)', hours: 6, materials: {} },
+    { id: 'foundation', name: 'Dig the basin, 8–10 ft at the deep end (hired excavator)', hours: 60, materials: { excavator: 8 }, yields: { spoil: 300 } },
+    { id: 'frame', name: 'Pack the clay core of the dam, set the overflow pipe and spillway', hours: 40, materials: { pipe: 2, concrete: 2 } },
+    { id: 'roof', name: 'Let it fill (rain, runoff, the creek or spring)', hours: 8, materials: {} },
+    { id: 'finish', name: 'Seed the banks, a little dock, brush piles for the fish', hours: 24, materials: { lumber: 2 } },
+  ],
+};
+
+/** A 6 × 6 m sugar shack with a woodshed lean-to and an evaporator (sim/maple.ts): ≈ 90 person-hours, ≈ $5,000. */
+export const SUGAR_SHACK_BLUEPRINT: Blueprint = {
+  kind: 'sugar_shack',
+  stages: [
+    { id: 'site', name: 'Stake it out at the foot of the sugarbush', hours: 3, materials: {} },
+    { id: 'foundation', name: 'Post footings and a gravel floor', hours: 14, materials: { concrete: 2 } },
+    { id: 'frame', name: 'Frame the shack and the woodshed lean-to', hours: 40, materials: { lumber: 5 } },
+    { id: 'roof', name: 'Metal roof and the steam cupola', hours: 16, materials: { roofing: 3, hardware: 1 } },
+    { id: 'finish', name: 'Set the evaporator, its stack and the sap tank', hours: 16, materials: { evaporator: 1, hardware: 1 } },
   ],
 };
 
@@ -256,7 +281,7 @@ export const BUNKER_BLUEPRINTS: Blueprint[] = [
 ];
 
 export const BLUEPRINTS: Record<string, Blueprint> = Object.fromEntries(
-  [CABIN_BLUEPRINT, OUTHOUSE_BLUEPRINT, WORKSHOP_BLUEPRINT, ROOT_CELLAR_BLUEPRINT, COOP_BLUEPRINT, GARDEN_BLUEPRINT, FIELD_BLUEPRINT, GREENHOUSE_BLUEPRINT, ORCHARD_BLUEPRINT, LOG_HOUSE_BLUEPRINT, FARMHOUSE_BLUEPRINT, TRAILER_BLUEPRINT, BARN_BLUEPRINT, COTTAGE_BLUEPRINT, METAL_GARAGE_BLUEPRINT, GARAGE_SOLAR_BLUEPRINT, ...UTILITY_BLUEPRINTS, ...BUNKER_BLUEPRINTS].map(b => [b.kind, b]));
+  [CABIN_BLUEPRINT, OUTHOUSE_BLUEPRINT, WORKSHOP_BLUEPRINT, ROOT_CELLAR_BLUEPRINT, COOP_BLUEPRINT, GARDEN_BLUEPRINT, FIELD_BLUEPRINT, GREENHOUSE_BLUEPRINT, ORCHARD_BLUEPRINT, POND_BLUEPRINT, SUGAR_SHACK_BLUEPRINT, LOG_HOUSE_BLUEPRINT, FARMHOUSE_BLUEPRINT, TRAILER_BLUEPRINT, BARN_BLUEPRINT, COTTAGE_BLUEPRINT, METAL_GARAGE_BLUEPRINT, GARAGE_SOLAR_BLUEPRINT, ...UTILITY_BLUEPRINTS, ...BUNKER_BLUEPRINTS].map(b => [b.kind, b]));
 
 /** Total bill of materials for a blueprint. */
 export function totalBill(bp: Blueprint): Partial<Stock> {

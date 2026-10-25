@@ -12,7 +12,10 @@
  */
 import { calendarOf, type GameState } from './state';
 import { wildDay } from './wildfood';
-import { livestockDay } from './livestock';
+import { farmDay } from './farm';
+import { eggsToday } from './poultry';
+import { keepSeed, sownFields, sownGardens } from './seeds';
+import { preserveDay, storeHarvest } from './preserving';
 import { isHome } from './blueprints';
 import { log } from './economy';
 import { isFinished } from './construction';
@@ -21,7 +24,7 @@ import { tractorBoost } from './vehicles';
 import { SOIL_YIELD } from './site';
 import { REGIONS, seasons } from './regions';
 import { gardenSeason, GREENHOUSE_PEAK, greenhouseGreens, hasGreenhouse, orchardHarvest } from './greenhouse';
-import { addFood, addFoodKcal, dietDay, dietEffects, eatFrom, inDateKcal, syncPantry } from './pantry';
+import { dietDay, dietEffects, eatFrom, inDateKcal, syncPantry } from './pantry';
 import { mulberry32 } from './rng';
 
 export type FoodId = 'fresh' | 'frozen' | 'canned' | 'staples';
@@ -78,38 +81,45 @@ function hailThisYear(s: GameState): number | null {
 export function fieldHarvest(s: GameState): number {
   const doy = calendarOf(s.clock).doy, HARVEST = seasons(REGIONS[s.site.region]).harvest;
   if (doy < HARVEST[0] || doy >= HARVEST[1]) return 0;
-  const fields = s.structures.filter(st => st.kind === 'field' && isFinished(st)).length;
+  // only fields sown this spring bear, each by its seed's vigor and how late it went in (sim/seeds.ts)
+  const fields = sownFields(s);
   const skill = bestGardener(s);
   // hail on the standing crop: replanted early in the summer it still makes 70 %; in late summer a quick catch crop, 30 %
   const hd = hailThisYear(s), hail = hd == null || hd >= HARVEST[1] ? 1 : hd < HARVEST[0] - 60 ? 0.7 : 0.3;
   return fields * FIELD_KCAL / (HARVEST[1] - HARVEST[0]) * (0.6 + 0.08 * skill) * SOIL_YIELD[s.site.soil] * climate(s).grow * tractorBoost(s) * hail;
 }
 
-/** What the place grows a day (kcal, fresh), by day of year: eggs from the coop, the garden in season, the field harvest. */
-export function produce(s: GameState): number {
+/** What the place grows a day by source (kcal): the hens, the garden in season (and its late keepers), the greenhouse, the orchard, the field harvest. */
+export interface ProduceParts { eggs: number; garden: number; gardenKeep: number; greens: number; orchard: number; field: number }
+export function produceParts(s: GameState): ProduceParts {
   const doy = calendarOf(s.clock).doy;
-  const fin = s.structures.filter(isFinished);
-  const coops = fin.filter(st => st.kind === 'chicken_coop').length;
-  const gardens = fin.filter(st => st.kind === 'garden').length;
-  // a dozen hens: ~8 eggs a day in summer, ~3 in midwinter (≈ 70 kcal each)
-  const eggs = coops * 70 * (5.5 + 2.5 * Math.cos(2 * Math.PI * (doy - 172) / 365));
+  // the flock's eggs by day length, the molt, the hens' age and feed (sim/poultry.ts)
+  const eggs = eggsToday(s);
   // a kitchen garden: nothing until mid-June, a peak of ≈ 2,500 kcal a day in August–September, done by late October
   // nothing until three weeks past the last frost, full by mid-summer, done a month past the first frost
   // a finished greenhouse starts the garden six weeks earlier, runs it six weeks later and raises the peak (greenhouse.ts)
+  // only gardens sown this spring grow (sim/seeds.ts)
   const [g0, g1] = gardenSeason(s);
   const season = doy < g0 || doy > g1 ? 0 : doy < g0 + 45 ? (doy - g0) / 45 : doy < g1 - 35 ? 1 : (g1 - doy) / 35;
   const skill = bestGardener(s);
   // a month to come back after hail (replanted from saved seed), then a shorter season
   const hd = hailThisYear(s), hail = hd == null || doy < hd ? 1 : doy - hd < 30 ? 0 : 0.7;
-  const veg = gardens * 2500 * season * (0.6 + 0.08 * skill) * SOIL_YIELD[s.site.soil] * (hasGreenhouse(s) ? GREENHOUSE_PEAK : 1) * hail;
+  const veg = sownGardens(s) * 2500 * season * (0.6 + 0.08 * skill) * SOIL_YIELD[s.site.soil] * (hasGreenhouse(s) ? GREENHOUSE_PEAK : 1) * hail;
   // winter greens on the greenhouse benches; the orchard's fruit, August to October
   const grow = climate(s).grow;
-  return Math.max(0, eggs) * Math.max(0.5, grow) + (veg + greenhouseGreens(s) + orchardHarvest(s)) * grow + fieldHarvest(s);
+  // the garden's last six weeks: squash, roots and cabbage that keep in a cellar (about 40 %)
+  const late = doy > g1 - 40 ? 0.4 : 0;
+  return { eggs: Math.max(0, eggs) * Math.max(0.5, grow), garden: veg * grow * (1 - late), gardenKeep: veg * grow * late, greens: greenhouseGreens(s) * grow, orchard: orchardHarvest(s) * grow, field: fieldHarvest(s) };
+}
+/** What the place grows a day (kcal), by day of year: eggs from the coop, the garden in season, the field harvest. */
+export function produce(s: GameState): number {
+  const p = produceParts(s);
+  return p.eggs + p.garden + p.gardenKeep + p.greens + p.orchard + p.field;
 }
 
 /** Fraction of fresh food that spoils a day: in the open vs a root cellar. */
 const SPOIL_FRESH = 0.08, SPOIL_CELLAR = 0.015, THAW = 0.3;
-/** Canning: cases a day (two pressure-canner loads), and the kcal kept (trimming, the odd jar that doesn't seal). */
+/** Canning (sim/preserving.ts has the detail): a pressure canner's cases a day (four loads of 7 quarts), and the cases put up per 6,000 kcal of fresh food (trimming, the odd jar that doesn't seal). */
 export const CANNER_CASES = 2, CANNED_YIELD = 0.85;
 
 export interface FoodReport { needKcal: number; ateKcal: number; producedKcal: number; spoiledKcal: number; fromStores: boolean; kinds: FoodId[]; daysLeft: number }
@@ -138,15 +148,16 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
   const spoil = (f: FoodId, rate: number) => { const lost = s.stock[f] * rate; s.stock[f] -= lost; spoiled += lost * KCAL[f]; };
   spoil('fresh', cellar ? SPOIL_CELLAR : SPOIL_FRESH);
   if (!freezer) spoil('frozen', fromStores ? 0 : THAW);
-  // what grows
-  const grown = produce(s), dry = fieldHarvest(s) * FIELD_DRY;
+  // what grows: seed kept back off the field for next spring (sim/seeds.ts), the field's beans and wheat to the sacks,
+  // its potatoes, the orchard's apples and the garden's late keepers to the root cellar, the rest fresh (sim/preserving.ts)
+  const parts = produceParts(s);
+  const grown = parts.eggs + parts.garden + parts.gardenKeep + parts.greens + parts.orchard + parts.field;
   syncPantry(s);
-  if (dry > 0) addFoodKcal(s, 'home_dry', dry);
-  s.stock.fresh += (grown - dry) / KCAL.fresh;
+  storeHarvest(s, { fresh: parts.eggs + parts.garden + parts.greens, field: parts.field, fieldDry: FIELD_DRY, orchard: parts.orchard, gardenKeep: parts.gardenKeep }, keepSeed(s, parts.field));
   // hunting, fishing and snares (wildfood.ts: the region's game, seasons and tags, the game thinning out)
   const meat = wildDay(s, freezer);
-  // goats, pigs, the steer, rabbits (livestock.ts: feed, hunger, milk, November butchering, litters)
-  const stock = livestockDay(s, freezer);
+  // the farm: sowing, the barnyard (feed, breeding, milk and cheese, butchering, predators, sickness), the pond, the sap (sim/farm.ts)
+  const stock = farmDay(s, freezer);
   // eating
   const need = s.people.reduce((a, p, i) => a + (alive(s, i) ? needOf(p) : 0), 0);
   let ate = 0;
@@ -187,15 +198,8 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
     }
   }
   const short = Math.max(0, need - ate);
-  // putting up the harvest: fresh beyond five days' eating is canned in the home kitchen, two canner loads a day
-  const kitchen = fin.some(st => isHome(st.kind));
-  const surplus = s.stock.fresh * KCAL.fresh - 5 * need;
-  if (kitchen && surplus > KCAL.canned && s.stock.lids >= 1) {
-    const cases = Math.min(Math.floor(surplus / KCAL.canned), CANNER_CASES, Math.floor(s.stock.lids));
-    s.stock.lids -= cases;
-    s.stock.fresh -= cases * KCAL.canned / KCAL.fresh;
-    addFood(s, 'home_canned', cases * CANNED_YIELD);
-  }
+  // putting up the harvest: fresh beyond five days' eating is canned and dried in the home kitchen, as far as the gear, jars, lids, heat and hours go (sim/preserving.ts)
+  for (const line of preserveDay(s, need)) log(s, line);
   if (short > need * 0.25 && !fromStores) log(s, `Short of food: ${Math.round(short)} kcal less than the family needs today.`);
   // needs, person by person
   const cozy = s.disaster.difficulty === 'cozy';

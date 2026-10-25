@@ -27,8 +27,8 @@ import { catKeeping, pantryDay, syncPantry, type FoodCat } from './pantry';
 
 const isFood = (k: Kept): k is FoodCat => k === 'canned' || k === 'staples' || k === 'frozen';
 
-export type Kept = 'canned' | 'staples' | 'frozen' | 'meds' | 'seed' | 'fuel';
-export const KEPT: readonly Kept[] = ['canned', 'staples', 'frozen', 'meds', 'seed', 'fuel'];
+export type Kept = 'canned' | 'staples' | 'frozen' | 'meds' | 'seed' | 'seed_heirloom' | 'seed_saved' | 'fuel';
+export const KEPT: readonly Kept[] = ['canned', 'staples', 'frozen', 'meds', 'seed', 'seed_heirloom', 'seed_saved', 'fuel'];
 /** Shelf life (days) and the share lost a day past it. */
 export const LIFE: Record<Kept, { days: number; loss: number; what: string }> = {
   canned: { days: 1460, loss: 0.0003, what: 'rusting cans, going soft' },
@@ -36,6 +36,8 @@ export const LIFE: Record<Kept, { days: number; loss: number; what: string }> = 
   frozen: { days: 365, loss: 0.001, what: 'freezer burn' },
   meds: { days: 1095, loss: 0.0005, what: 'past its date, losing potency' },
   seed: { days: 1095, loss: 0.0006, what: 'old seed, poor germination' },
+  seed_heirloom: { days: 1095, loss: 0.0006, what: 'old seed, poor germination' },
+  seed_saved: { days: 1095, loss: 0.0006, what: 'old seed, poor germination' },
   fuel: { days: 180, loss: 0.0025, what: 'stale gas, gumming up the generator' },
 };
 export const STABILIZED_FUEL_DAYS = 730;
@@ -63,7 +65,7 @@ export function shelfDay(s: GameState): string[] {
   // food, item by item (mice get into the sacks when no traps are set and there's no concrete storeroom)
   const vault = s.structures.some(x => x.kind === 'bunker_stores' && x.stage >= 5);
   syncPantry(s);
-  const before = s.stock.staples + s.stock.seed;
+  const before = s.stock.staples + s.stock.seed + s.stock.seed_heirloom + s.stock.seed_saved;
   out.push(...pantryDay(s, { rotate: sh.rotate && townOpen, mice: sh.traps <= 0 && !vault && s.stock.traps < 1, townOpen: townOpen && s.disaster.tracks.deliveries > 0.25 }));
   for (const k of KEPT) {
     if (isFood(k)) { const c = catKeeping(s, k); sh.age[k] = c.age; sh.qty[k] = s.stock[k]; continue; }
@@ -74,7 +76,7 @@ export function shelfDay(s: GameState): string[] {
     if (q <= 1e-9) age = 0;
     age += 1;
     // rotation: eat the oldest and buy it back (food and fuel), about every three months
-    if (sh.rotate && townOpen && k !== 'seed') age *= 1 - 1 / 90;
+    if (sh.rotate && townOpen && !k.startsWith('seed')) age *= 1 - 1 / 90;
     const life = lifeOf(s, k);
     if (age > life && q > 0) {
       s.stock[k as MaterialId] = q * (1 - LIFE[k].loss);
@@ -89,7 +91,7 @@ export function shelfDay(s: GameState): string[] {
   if (sh.traps > 0) sh.traps--;
   else {
     // mice in the stores (the sacks of staples above; buckets keep them out, and a concrete storeroom underground)
-    s.stock.seed *= 0.999; s.stock.fresh *= 0.995;
+    s.stock.seed *= 0.999; s.stock.seed_heirloom *= 0.999; s.stock.seed_saved *= 0.999; s.stock.fresh *= 0.995;
     if (before > 1 && r() < 1 / 30) out.push('Mice in the stores: chewed sacks and droppings in the staples. Set some traps.');
     // pack rats chew the wiring in a wired building, now and then
     if (r() < 1 / 120) {

@@ -276,7 +276,7 @@ describe('the pantry, item by item', () => {
   it('the field harvest, the canner and the smoker put up named food', () => {
     const g = fresh();
     noStores(g);
-    g.stock.fresh = 200; g.stock.lids = 10;
+    g.stock.fresh = 200; g.stock.lids = 10; g.stock.jars = 10; g.stock.firewood = 2;
     g.structures.push({ id: 'h', kind: 'timber_cabin', x: 5, z: 5, rot: 0, stage: 5, done: 0, supplied: true, finishedAt: 0 });
     liveDay(g, 0.4);
     expect(g.pantry.items.home_canned?.q).toBeGreaterThan(0);

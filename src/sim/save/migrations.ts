@@ -23,11 +23,37 @@ import { newBreakins } from '../breakins';
 import { newRescue } from '../rescue';
 import { newWild } from '../wildfood';
 import { dayJob, type Person } from '../family';
+import { emptyStock } from '../materials';
+import { newFarm } from '../farmState';
+import { newLivestock } from '../livestock';
+import { calendarOf, type Clock, type Structure } from '../state';
+import { REGIONS, type RegionId } from '../regions';
 
 type Raw = Record<string, unknown> & { version?: number };
 
 /** version n → n + 1 upgraders. */
 const STEPS: Record<number, (s: Raw) => Raw> = {
+  // 39 → 44 (40–43 are other branches'; renumbered at merge): the farm kitchen and the barnyard (sim/farmState.ts):
+  // preserving, seed saving, the pond, maple; the new goods at zero; the herd's breeding and health. A family that was
+  // canning keeps canning (a pressure canner and a jar case per sleeve of lids); its fields and gardens count as sown
+  // this year if spring is past, with a season's seed saved for each (they had been planting for years without any).
+  39: s => {
+    const st = { ...emptyStock(), ...(s.stock as Record<string, number>) };
+    const items = (s.pantry as { items?: Record<string, { q: number }> } | undefined)?.items ?? {};
+    const canning = (st.lids ?? 0) >= 1 || (items.home_canned?.q ?? 0) > 0;
+    if (canning) { st.pressure_canner = Math.max(st.pressure_canner, 1); st.jars = Math.max(st.jars, Math.ceil(st.lids ?? 0)); }
+    const structures = (s.structures as Structure[]).map(x => ({ ...x }));
+    const done = (x: Structure) => x.finishedAt !== null && x.finishedAt !== undefined;
+    const plots = structures.filter(x => (x.kind === 'field' || x.kind === 'garden') && done(x));
+    const { doy, year } = calendarOf(s.clock as Clock);
+    const site = s.site as { region?: RegionId } | undefined, last = REGIONS[site?.region ?? 'mountain_west']?.frost[0] ?? 140;
+    if (doy >= last - 21) for (const x of plots) x.sown = { y: year, l: 'heirloom', v: 1 };
+    st.seed_saved += plots.reduce((a, x) => a + (x.kind === 'field' ? 1 : 0.1), 0);
+    const farm = newFarm();
+    farm.preserve.full = items.home_canned?.q ?? 0;
+    const livestock = s.livestock ? { ...newLivestock(), ...(s.livestock as object), condition: { ...newLivestock().condition, ...((s.livestock as { condition?: object }).condition ?? {}) } } : undefined;
+    return { ...s, version: 44, stock: st, structures, farm, ...(livestock ? { livestock } : {}) };
+  },
   // 38 → 39: the pantry, item by item (the aggregate staples / canned / frozen split into a default breakdown at their shelf ages)
   38: s => {
     const st = s.stock as Record<string, number>, sh = s.shelf as { age?: Record<string, number> } | undefined;
@@ -134,7 +160,7 @@ export function migrate(raw: unknown): GameState {
     if (!up) throw new SaveVersionError(`No migration from version ${s.version}`);
     s = up(s);
   }
-  for (const k of ['seed', 'clock', 'money', 'stock', 'orders', 'people', 'personState', 'structures', 'forestry', 'heat', 'perimeter', 'utilities', 'hardenJobs', 'disaster', 'food', 'neighbors', 'gate', 'stats', 'land', 'site', 'lifestyle', 'crews', 'siteJobs', 'roadside', 'paper', 'upkeep', 'shelf', 'pantry', 'body', 'fin', 'armory', 'wild', 'lineage', 'log', 'nextId'] as const) {
+  for (const k of ['seed', 'clock', 'money', 'stock', 'orders', 'people', 'personState', 'structures', 'forestry', 'heat', 'perimeter', 'utilities', 'hardenJobs', 'disaster', 'food', 'neighbors', 'gate', 'stats', 'land', 'site', 'lifestyle', 'crews', 'siteJobs', 'roadside', 'paper', 'upkeep', 'shelf', 'pantry', 'body', 'fin', 'armory', 'wild', 'farm', 'lineage', 'log', 'nextId'] as const) {
     if (!(k in s)) throw new SaveVersionError(`Save is missing "${k}"`);
   }
   return s as unknown as GameState;

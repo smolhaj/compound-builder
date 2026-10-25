@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { newGame, type GameState, type Structure } from './state';
+import { markSown } from './seeds';
 import { CANNER_CASES, CANNED_YIELD, daysOfFood, FIELD_KCAL, fieldHarvest, KCAL, liveDay, produce, workFactor } from './needs';
 
 const built = (g: GameState, id: string, kind: string): Structure => {
   const st: Structure = { id, kind, x: 10, z: 10, rot: 0, stage: 5, done: 0, supplied: true, finishedAt: 0 };
   g.structures.push(st);
+  markSown(g);         // sown this spring (sim/seeds.ts)
   return st;
 };
 const noStores = (g: GameState) => { g.disaster.tracks = { ...g.disaster.tracks, stores: 0, banks: 0 }; };
@@ -98,17 +100,25 @@ describe('food and needs', () => {
     expect(fieldHarvest(newGame(1, 120))).toBe(0);
   });
 
-  it('surplus fresh food is canned in the home kitchen, two canner loads a day, if there are lids', () => {
+  it('surplus fresh food is canned in the home kitchen, if there are jars, lids and a canner (sim/preserving.ts)', () => {
     const g = newGame(1, 250);
     noStores(g);
     built(g, 'h', 'timber_cabin');
-    g.stock.fresh = 200; g.stock.canned = 0; g.stock.lids = 0;
+    g.stock.fresh = 200; g.stock.canned = 0; g.stock.lids = 0; g.stock.jars = 24; g.stock.firewood = 5;
     liveDay(g, 0.5);
     expect(g.stock.canned).toBe(0);                        // no lids
     g.stock.lids = 24;
     liveDay(g, 0.5);
-    expect(g.stock.canned).toBeCloseTo(CANNER_CASES * CANNED_YIELD);
-    expect(g.stock.lids).toBe(24 - CANNER_CASES);
+    // no pressure canner: only the high-acid part in the water bath, one big pot's four loads (≈ 2 cases)
+    const bath = g.stock.canned;
+    expect(bath).toBeGreaterThan(1);
+    expect(bath).toBeLessThanOrEqual(CANNER_CASES * 1.2);
+    expect(g.stock.lids).toBeCloseTo(24 - Math.round(bath / 0.98));
+    g.stock.pressure_canner = 1;
+    g.clock.t += 1;
+    liveDay(g, 0.5);
+    expect(g.stock.canned - bath).toBeGreaterThan(bath);  // the pressure canner adds its own loads
+    expect(g.stock.canned * 6000 / 200 / 2000).toBeLessThan(CANNED_YIELD);
   });
 
   it('a fight wound heals with treatment, barely without, and can go bad', () => {
