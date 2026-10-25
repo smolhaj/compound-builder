@@ -18,7 +18,10 @@ import { RegionalProps } from '../engine/world/houses/regionalProps';
 import { buildFarmstead, type FarmTree } from '../engine/world/houses/regionalFarmsteads';
 import { onFarmstead, type Farmstead } from '../engine/world/houses/farmstead';
 import { planNeighbors } from './region/neighbors';
-import { buildCamp, flickerCampfire } from './props/campGeometry';
+import { buildCamp } from './props/campGeometry';
+import { Atmosphere, type AtmosBuilding, type AtmosFrame } from './atmosphere/Atmosphere';
+import { fenceLean } from './atmosphere/aging';
+import { LEANS, leanRun } from './atmosphere/fenceAging';
 import { FamilyRenderer } from './people/FamilyRenderer';
 import type { GoalCtx, Site } from './people/peopleGoals';
 import { CELL, type KitPieceDef } from './buildkit/kit';
@@ -133,6 +136,8 @@ export class HomesteadWorld {
   readonly camp: { x: number; z: number; rot: number };
   private readonly _campGroup: THREE.Group;
   readonly family: FamilyRenderer;
+  /** Night life, weathering and the deeper seasons (atmosphere/). */
+  readonly atmos: Atmosphere;
   /** County road, driveway, gate and stockpile yard. */
   readonly access: Access;
   private readonly _roads = new THREE.Group();
@@ -173,15 +178,30 @@ export class HomesteadWorld {
     this.stream = new StreamRenderer(ws.scene);
     this.lakes = new RegionalWaterRenderer(ws.scene);
     this.family = new FamilyRenderer(ws.scene);
-    this._campGroup = buildCamp();
+    this._campGroup = buildCamp({ fire: false });
     this._campGroup.position.set(this.camp.x, this.parcel.height(this.camp.x, this.camp.z), this.camp.z);
     this._campGroup.rotation.y = this.camp.rot;
     this._root.add(this._campGroup);
     const zc = this.parcel.creek.zAt(this.center.x + 3);
     this._root.add(scaleFigure(this.center.x + 3, zc + 4, this.parcel.height(this.center.x + 3, zc + 4)));
     ws.scene.add(this._root);
+    this.atmos = new Atmosphere({
+      scene: ws.scene, groundAt: this.groundAt, camp: this.camp, family: this.family,
+      buildings: () => this._atmosBuildings(),
+      runs: () => this._runs.flatMap(run => { const g = this._runGroups.get(run.id); return g ? [{ run, group: g.group }] : []; }),
+      blocked: (x, z) => this.onBuilding(x, z, 0.02, false) || this.onAccess(x, z, 0.1) || this.onCamp(x, z, 0.2),
+    });
     this._drive = site.improvements?.drive ?? true;
     this.truck = new DeliveryTruck(ws.scene, this._truckRoute(), this.groundAt);
+  }
+
+  private *_atmosBuildings(): Iterable<AtmosBuilding> {
+    for (const b of this._built.values()) yield { id: b.placed.id, kind: b.placed.kind, x: b.placed.x, z: b.placed.z, rot: b.placed.rot, group: b.group, finished: b.finished, under: !!b.under };
+  }
+
+  /** Night life, weathering, mud, frost, drifts (after tick, once the season is eased). */
+  updateAtmosphere(f: AtmosFrame, game: GameState, doy: number): void {
+    this.atmos.update(f, game, doy);
   }
 
   /** A gravel drive in to the yard (else a two-track, and the truck stops at the gate). */
@@ -256,8 +276,10 @@ export class HomesteadWorld {
     this._roads.traverse(o => { if (o !== this._roads) (o as THREE.Mesh).geometry?.dispose(); });
     this._roads.clear();
     const mat = gravelMaterial();
+    // mud season: the gravel goes soft and the tire tracks hold water (season patch)
+    mat.defines = { ...mat.defines, SEA_MUD: '', SEA_MUD_UV: '' };
     const road = new THREE.Mesh(buildRibbon(roadLine(1), ROAD_W, this.groundAt, 0.02, 6), mat);
-    const track = this._drive ? mat : (() => { const m = mat.clone(); m.color = new THREE.Color(0x8a7a5c); return m; })();
+    const track = this._drive ? mat : (() => { const m = mat.clone(); m.color = new THREE.Color(0x8a7a5c); m.defines = { ...m.defines, SEA_MUD: '', SEA_MUD_UV: '' }; return m; })();
     const drive = new THREE.Mesh(buildRibbon(this.access.drive, this._drive ? DRIVE_W : DRIVE_W * 0.55, this.groundAt, this._drive ? 0.024 : 0.012, 4), track);
     for (const m of [road, drive]) { m.receiveShadow = true; this._roads.add(m); }
     const gate = buildGate(DRIVE_W);
@@ -321,6 +343,7 @@ export class HomesteadWorld {
     this._plant(q);
     this._water(q);
     this._buildRoads();
+    this.atmos.setQuality(q);
     this._ws.invalidateShadows();
   }
 
@@ -602,7 +625,9 @@ export class HomesteadWorld {
     this._runs = runs;
     const ids = runs.map(r => r.id).join(',');
     for (const r of runs) {
-      const key = `${Math.round(runProgress(r) * 60)}:${Math.round(runGrowth(r, t) * 40)}:${r.finishedAt === null ? 0 : 1}:${r.gates.length}`;
+      // old posts lean and rails sag (atmosphere/aging): rebuilt as the lean steps
+      const lean = LEANS.has(r.kind) && r.finishedAt !== null ? Math.round(fenceLean((t - r.finishedAt) / 365) * 10) / 10 : 0;
+      const key = `${Math.round(runProgress(r) * 60)}:${Math.round(runGrowth(r, t) * 40)}:${r.finishedAt === null ? 0 : 1}:${r.gates.length}:${lean}`;
       const cur = this._runGroups.get(r.id);
       if (cur?.key === key) continue;
       if (cur) { this._root.remove(cur.group); cur.group.traverse(o => (o as THREE.Mesh).geometry?.dispose()); }
@@ -611,6 +636,7 @@ export class HomesteadWorld {
         ? buildTunnel(this._pathOf(r), this.groundAt, r.finishedAt !== null ? 1 : runProgress(r), this._exitWoods(r))
         : buildRun(r, this.groundAt, t, (x, z) => this.onBuilding(x, z, 0.02, false));
       if (tunnel) this._applyTunnelView(group);
+      if (lean > 0) leanRun(group, lean, hashStr(r.id) % 997, this.groundAt);
       this._root.add(group);
       this._runGroups.set(r.id, { key, group });
       this._ws.invalidateShadows();
@@ -1113,7 +1139,7 @@ export class HomesteadWorld {
       // x-ray: the shell goes see-through, the furniture stays solid
       const see = v === 'ghost' || (v === 'xray' && XRAY_LAYERS.includes(layer));
       m.material = see ? xrayOf(ud.baseMat) : ud.baseMat;
-      m.castShadow = !see && !['kit_glass', 'kit_glow', 'kit_string'].includes(ud.baseMat.name);
+      m.castShadow = !see && !['kit_glass', 'kit_string'].includes(ud.baseMat.name) && !ud.baseMat.name.startsWith('kit_glow');
       if (layer === 'cutwalls') m.visible = v === 'cutaway' && b.finished;
       else if (v === 'cutaway' && CUTAWAY_HIDE.includes(layer) && (b.finished || layer !== 'walls')) m.visible = false;
     }
@@ -1134,9 +1160,11 @@ export class HomesteadWorld {
         b.light.color.set(0xffd49e);
         continue;
       }
-      // homes are lit in the evening; sheds and shops keep a dim work light
+      // the room as the household keeps it tonight (atmosphere/nightLife: up, asleep, on watch, away)
+      const room = this.atmos.room(b.placed.id);
       const home = KIT[b.placed.kind].sleeps > 0;
-      b.light.intensity = (this._view === 'full' ? 0.25 : 0.12) + (home ? (lit ? night * 1.25 : night * 0.25) : night * 0.1);
+      const fill = this._view === 'full' ? 0.25 : 0.12;
+      b.light.intensity = room !== undefined ? fill * (0.3 + 0.7 * this.air.daylight) + room * 1.4 * night : fill + (home ? (lit ? night * 1.25 : night * 0.25) : night * 0.1);
     }
   }
 
@@ -1180,9 +1208,7 @@ export class HomesteadWorld {
         if (name === 'kit_crop' || name === 'kit_grain' || (b.placed.kind === 'field' && name === 'kit_straw')) o.visible = growing && (o.userData.layer !== 'interior' || b.finished);
       }
     }
-    // fire lit at mealtimes and evenings, and on cold days, while the camp is home
-    const meals = (hour > 5.5 && hour < 8.5) || (hour > 11.8 && hour < 13) || (hour > 17 && hour < 22.5);
-    flickerCampfire(this._clock, !homeB && (meals || seasonState.params.cold > 0.4) ? 1 : 0);
+    // the fire pit (camp cookfire, evenings sat out) is lit by the atmosphere (atmosphere/nightLife.firePitLit)
   }
 
   /** A point in a building's local frame (y above its floor) in world coordinates (QA camera poses). */
@@ -1426,6 +1452,7 @@ export class HomesteadWorld {
     this._props?.dispose();
     this.stream.dispose();
     this.family.dispose();
+    this.atmos.dispose();
     this.lakes.dispose();
     this._ws.scene.remove(this._root);
     this._root.traverse(o => {

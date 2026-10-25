@@ -12,12 +12,13 @@
  */
 import * as THREE from 'three';
 import { generateNormalMap } from '../../engine/world/materials/normalMapGen';
+import { patchWear, WEAR_CLASS } from '../atmosphere/weathering';
 
 export type KitMaterialId = 'timber_lap' | 'trim' | 'fieldstone' | 'metal_roof' | 'deck' | 'door' | 'glass' | 'chimney_cap' | 'frame' | 'scaffold' | 'string'
   // interior finishes and furnishings
   | 'pine_panel' | 'wood_dark' | 'wood_mid' | 'iron' | 'enamel' | 'quilt_red' | 'quilt_blue' | 'linen' | 'rug' | 'books' | 'lamp' | 'cutcap' | 'crockery'
   // more buildings
-  | 'concrete' | 'metal_siding' | 'log_wall' | 'log_end' | 'board_batten' | 'wire_mesh' | 'straw' | 'soil' | 'crop' | 'grain' | 'earth' | 'pegboard' | 'steel' | 'paint_red' | 'paint_green' | 'paint_yellow' | 'paint_bunker' | 'paint_dado' | 'bulkhead' | 'glow' | 'whitewash' | 'wet_concrete' | 'bulb' | 'copper' | 'lead' | 'rubber' | 'gauge'
+  | 'concrete' | 'metal_siding' | 'log_wall' | 'log_end' | 'board_batten' | 'wire_mesh' | 'straw' | 'soil' | 'crop' | 'grain' | 'earth' | 'pegboard' | 'steel' | 'paint_red' | 'paint_green' | 'paint_yellow' | 'paint_bunker' | 'paint_dado' | 'bulkhead' | 'glow' | 'glow_oil' | 'glow_electric' | 'glow_curtain' | 'glow_off' | 'whitewash' | 'wet_concrete' | 'bulb' | 'copper' | 'lead' | 'rubber' | 'gauge'
   // perimeter
   | 'hedge' | 'hedge2' | 'hedge_berry' | 'container_red' | 'container_blue' | 'container_green' | 'container_tan'
   // homey decor (procedural art)
@@ -682,6 +683,12 @@ export function kitMaterial(id: KitMaterialId): THREE.MeshStandardMaterial {
     case 'glass': m = new THREE.MeshStandardMaterial({ color: 0x9fb4c0, roughness: 0.05, metalness: 0.2, transparent: true, opacity: 0.28, depthWrite: false }); break;
     // lit windows from outside: one-sided (faces out), invisible by day
     case 'glow': m = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 1, transparent: true, opacity: 0, depthWrite: false, emissive: new THREE.Color(1.0, 0.72, 0.42), emissiveIntensity: 0, side: THREE.FrontSide }); m.visible = false; break;
+    // per-building window light (atmosphere/nightLife): oil lamp, electric light, blackout curtain, dark
+    case 'glow_oil': case 'glow_electric': case 'glow_curtain': case 'glow_off': {
+      const e = id === 'glow_oil' ? new THREE.Color(1.0, 0.6, 0.27) : id === 'glow_electric' ? new THREE.Color(1.0, 0.86, 0.66) : new THREE.Color(0.32, 0.12, 0.05);
+      m = new THREE.MeshStandardMaterial({ color: id === 'glow_curtain' ? 0x1a1512 : 0x000000, roughness: 1, transparent: true, opacity: 0, depthWrite: false, emissive: e, emissiveIntensity: 0, side: THREE.FrontSide });
+      m.visible = false; break;
+    }
     case 'pine_panel': m = texMat(id, paintPinePanel, 1.2, 0.7); break;
     case 'wood_dark': m = new THREE.MeshStandardMaterial({ color: 0x5a3b24, roughness: 0.6 }); break;
     case 'wood_mid': m = new THREE.MeshStandardMaterial({ color: 0x9a6a3e, roughness: 0.65 }); break;
@@ -763,14 +770,24 @@ export function kitMaterial(id: KitMaterialId): THREE.MeshStandardMaterial {
     }
   }
   m.name = `kit_${id}`;
+  const wc = WEAR_CLASS[id];
+  if (wc) patchWear(m, wc);
   _cache.set(id, m);
   return m;
 }
 
 /** Interior lights behind the glass (0 = off … 1 = a warm lit room at night). */
-export function setWindowGlow(k: number): void {
+export function setWindowGlow(k: number, time = 0): void {
   const g = _cache.get('glow');
   if (g) { g.emissiveIntensity = 1.1 * k; g.opacity = Math.min(0.9, k * 1.2); g.visible = k > 0.02; }
   const l = _cache.get('lamp');
   if (l) l.emissiveIntensity = 0.4 + 2.6 * k;
+  // an oil lamp's flame breathes; electric light holds steady; a blackout curtain lets a glimmer round its edges
+  const flick = 0.9 + 0.06 * Math.sin(time * 7.1) + 0.04 * Math.sin(time * 17.3 + 1.3);
+  const o = _cache.get('glow_oil');
+  if (o) { o.emissiveIntensity = 0.95 * k * flick; o.opacity = Math.min(0.88, k * 1.2); o.visible = k > 0.02; }
+  const e = _cache.get('glow_electric');
+  if (e) { e.emissiveIntensity = 1.5 * k; e.opacity = Math.min(0.92, k * 1.3); e.visible = k > 0.02; }
+  const c = _cache.get('glow_curtain');
+  if (c) { c.emissiveIntensity = 0.05 * k; c.opacity = Math.min(0.97, k * 2); c.visible = k > 0.02; }
 }

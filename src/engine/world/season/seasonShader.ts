@@ -9,7 +9,8 @@
  *   uSeaB = (snow, dormant, dry, litter)    ground
  *   uSeaC = (ice, blaze, wet, cold)         water / region intensity
  *   uSeaP = cumulative fall palette shares (scarlet, +orange, +gold, 1)
- *   uSeaD = (broadleaf evergreen share, 0, 0, 0)   region (live oak / magnolia)
+ *   uSeaD = (broadleaf evergreen share, frost, mud, 0)   region (live oak / magnolia);
+ *           morning frost and mud season (writeSeasonExtras; the game's own calendar)
  *
  * Hooks (no geometry is rebuilt for a season):
  *   • Global surface patch for EVERY MeshStandardMaterial (`season_surface`
@@ -55,6 +56,17 @@ export function writeSeasonUniforms(p: SeasonParams, c: SeasonClimate): void {
   const s = r + o + y + b || 1;
   P.x = r / s; P.y = (r + o) / s; P.z = (r + o + y) / s; P.w = 1;
   D.x = c.broadEvergreen;
+}
+
+/**
+ * Morning frost (white rime on grass and roofs, 0–1) and mud season (thawed
+ * ground gone to mud on SEA_MUD materials, with water standing in the ruts of
+ * SEA_MUD_UV drives, 0–1). Set by the game from its own calendar / clock;
+ * writeSeasonUniforms leaves them alone.
+ */
+export function writeSeasonExtras(frost: number, mud: number): void {
+  D.y = Math.max(0, Math.min(1, frost));
+  D.z = Math.max(0, Math.min(1, mud));
 }
 
 /** Current uniform values (tests / QA). */
@@ -220,7 +232,7 @@ vec3 seaSnowTint = vec3( 1.0 );
   }
 #endif
 #ifndef SEA_VEG
-if ( uSeaB.x + uSeaB.y + uSeaB.z + uSeaB.w + uSeaA.z + uSeaC.x > 0.003 ) {
+if ( uSeaB.x + uSeaB.y + uSeaB.z + uSeaB.w + uSeaA.z + uSeaC.x + uSeaD.y + uSeaD.z > 0.003 ) {
   vec3 seN = normalize( ( vec4( normal, 0.0 ) * viewMatrix ).xyz );
   vec3 seP = cameraPosition + ( vec4( - vViewPosition, 0.0 ) * viewMatrix ).xyz;
   float seUp = smoothstep( 0.6, 0.9, seN.y );
@@ -283,6 +295,33 @@ if ( uSeaB.x + uSeaB.y + uSeaB.z + uSeaB.w + uSeaA.z + uSeaC.x > 0.003 ) {
       diffuseColor.rgb = mix( diffuseColor.rgb, seaLitterColor( seP.xz, seFw ), seL );
       roughnessFactor = max( roughnessFactor, mix( roughnessFactor, 0.8, seL ) );
     }
+  }
+#ifdef SEA_MUD
+  // Mud season: the thawed ground goes to dark wet mud in patches (bare ground
+  // more than sod), glossy where water stands; drives hold water in their ruts
+  if ( uSeaD.z > 0.003 ) {
+    float seMn = seaNoise( seP.xz * 0.9 + 3.1 ) * 0.6 + seaNoise( seP.xz * 3.7 ) * 0.4;
+    float seMud = uSeaD.z * seUp * smoothstep( 0.66 - uSeaD.z * 0.32, 0.8 - uSeaD.z * 0.32, seMn + ( 1.0 - seGreen ) * 0.16 );
+#if defined( SEA_MUD_UV ) && defined( USE_MAP )
+    float seRut = max( smoothstep( 0.075, 0.03, abs( vMapUv.x - 0.27 ) ), smoothstep( 0.075, 0.03, abs( vMapUv.x - 0.73 ) ) );
+    seMud = max( seMud, uSeaD.z * ( 0.55 + 0.45 * seRut ) );
+#else
+    float seRut = 0.0;
+#endif
+    vec3 seMudC = vec3( 0.075, 0.056, 0.038 ) * ( 0.8 + 0.4 * seaNoise( seP.xz * 11.0 ) );
+    diffuseColor.rgb = mix( diffuseColor.rgb, seMudC, clamp( seMud * 0.92, 0.0, 1.0 ) );
+    float sePool = max( seMud * smoothstep( 0.78, 0.92, seMn ), seRut * uSeaD.z );
+    diffuseColor.rgb *= 1.0 - 0.35 * sePool;
+    roughnessFactor = mix( mix( roughnessFactor, 0.62, seMud ), 0.12, sePool );
+  }
+#endif
+  // Morning frost: a fine white rime on up-facing porous surfaces, thickest on grass
+  if ( uSeaD.y > 0.003 ) {
+    float seFr = uSeaD.y * seUp * smoothstep( 0.3, 0.6, roughnessFactor ) * ( 0.6 + 0.4 * seGreen );
+    float seSp = seaHash( floor( seP.xz * 140.0 ) );
+    float seFm = seFr * ( 0.5 + 0.3 * seN1 + 0.2 * seSp );
+    diffuseColor.rgb = mix( diffuseColor.rgb, vec3( 0.6, 0.64, 0.7 ), clamp( seFm, 0.0, 0.85 ) );
+    roughnessFactor = max( roughnessFactor, mix( roughnessFactor, 0.9, seFr ) );
   }
 #endif
 }

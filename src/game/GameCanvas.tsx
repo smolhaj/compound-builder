@@ -201,7 +201,7 @@ export function GameCanvas() {
       const pKey = vis === 'fall' && sp.fall > 0.45 && sp.bare < 0.9 && seasonState.climate.blaze >= 0.5 ? 'fall'
         : vis === 'spring' && sp.bloom > 0.3 ? 'spring' : '';
       if (pKey !== lastParticles) { lastParticles = pKey; ws.setSeasonalParticles(pKey); }
-      const wetKey = Math.round((SEASON_WETNESS[vis] * (1 - sp.snow) + sp.wet * 0.45) * 50);
+      const wetKey = Math.round((Math.max(SEASON_WETNESS[vis], world.atmos.mud * 0.55) * (1 - sp.snow) + sp.wet * 0.45) * 50);
       if (wetKey !== lastWetKey) { lastWetKey = wetKey; ws.setWetness(wetKey / 50); }
       // Weather → sky / light / fog (next frame), wet + snowy surfaces.
       const wxSeason = vis === 'winter' && seasonState.weatherSnow <= 0 ? 'fall' : vis;
@@ -225,8 +225,12 @@ export function GameCanvas() {
         wx.snow = Math.max(wx.snow, 0.6 * nk.dust);
       }
       ws.setWeather(wx, Math.max(weather.flash, nk.flash), weather.skyLightning);
-      // lamps on inside from dusk (a little after sunset, off by late night)
-      setWindowGlow(Math.max(0, Math.min(1, (ws.nightFactor - 0.25) / 0.4)) * (t > 23.5 || t < 5 ? 0.25 : 1));
+      // lamps on inside from dusk (which windows, and how, is the atmosphere's: who's up, power, blackout curtains)
+      setWindowGlow(Math.max(0, Math.min(1, (ws.nightFactor - 0.25) / 0.4)), now / 1000);
+      world.updateAtmosphere({
+        dt, time: now / 1000, hour: t, night: ws.nightFactor, daylight: 1 - ws.nightFactor * 0.85, wind: wx.wind, rain: wx.rain, cloud: wx.cloud,
+        snow: Math.max(sp.snow, wx.snowCover * seasonState.weatherSnow) * (wx.rain > 0.3 ? 0.4 : 1), viewportH: canvas.clientHeight || 800, battle: battle.playing,
+      }, gs, seasonState.doy);
       if (tour.active) {
         const f = tour.update(dt);
         // walking indoors: a near plane short enough that walls and furniture never clip
