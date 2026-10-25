@@ -13,13 +13,19 @@
  *  Mice       get into staples, seed and fresh food; pack rats chew wiring.
  *             Traps and bait stations keep them down (a box lasts a couple of months).
  *
- * Shelf lives: canned food ~4 years, bulk staples in buckets ~10, frozen
- * meat ~1, medicine ~3, field seed ~3, gasoline ~6 months (2 years stabilized).
+ * Shelf lives: medicine ~3 years, field seed ~3, gasoline ~6 months (2
+ * years stabilized). Food keeps item by item (sim/pantry.ts: rice and beans
+ * sealed in buckets 30 years, in bags a few; flour a year; oil one to two;
+ * cans two to five; honey, sugar and salt forever); the canned / staples /
+ * frozen rows here are their kcal-weighted averages.
  */
 import type { GameState } from './state';
 import type { MaterialId } from './materials';
 import { mulberry32 } from './rng';
 import type { Fix } from './improvements';
+import { catKeeping, pantryDay, syncPantry, type FoodCat } from './pantry';
+
+const isFood = (k: Kept): k is FoodCat => k === 'canned' || k === 'staples' || k === 'frozen';
 
 export type Kept = 'canned' | 'staples' | 'frozen' | 'meds' | 'seed' | 'fuel';
 export const KEPT: readonly Kept[] = ['canned', 'staples', 'frozen', 'meds', 'seed', 'fuel'];
@@ -54,7 +60,13 @@ export function shelfDay(s: GameState): string[] {
   const day = Math.floor(s.clock.t + 0.25);
   const r = mulberry32(s.seed * 2903 + day * 5 + 9);
   const townOpen = s.disaster.tracks.stores >= 0.5;
+  // food, item by item (mice get into the sacks when no traps are set and there's no concrete storeroom)
+  const vault = s.structures.some(x => x.kind === 'bunker_stores' && x.stage >= 5);
+  syncPantry(s);
+  const before = s.stock.staples + s.stock.seed;
+  out.push(...pantryDay(s, { rotate: sh.rotate && townOpen, mice: sh.traps <= 0 && !vault && s.stock.traps < 1, townOpen: townOpen && s.disaster.tracks.deliveries > 0.25 }));
   for (const k of KEPT) {
+    if (isFood(k)) { const c = catKeeping(s, k); sh.age[k] = c.age; sh.qty[k] = s.stock[k]; continue; }
     const q = s.stock[k as MaterialId], q0 = sh.qty[k] ?? q;
     let age = sh.age[k] ?? 0;
     // new stock in: blend it in at age 0
@@ -76,11 +88,7 @@ export function shelfDay(s: GameState): string[] {
   if (sh.traps <= 0 && s.stock.traps >= 1) { s.stock.traps--; sh.traps = 60; }
   if (sh.traps > 0) sh.traps--;
   else {
-    // mice in the stores
-    // (buckets slow them down; a concrete storeroom underground keeps them out of the staples)
-    const vault = s.structures.some(x => x.kind === 'bunker_stores' && x.stage >= 5);
-    const before = s.stock.staples + s.stock.seed;
-    if (!vault) s.stock.staples *= 0.9995;
+    // mice in the stores (the sacks of staples above; buckets keep them out, and a concrete storeroom underground)
     s.stock.seed *= 0.999; s.stock.fresh *= 0.995;
     if (before > 1 && r() < 1 / 30) out.push('Mice in the stores: chewed sacks and droppings in the staples. Set some traps.');
     // pack rats chew the wiring in a wired building, now and then
@@ -101,6 +109,6 @@ export function shelfDay(s: GameState): string[] {
 
 /** How a good is keeping, for the HUD. */
 export function keeping(s: GameState, k: Kept): { age: number; life: number; tone: 'good' | 'warn' | 'bad' } {
-  const age = s.shelf.age[k] ?? 0, life = lifeOf(s, k);
+  const age = s.shelf.age[k] ?? 0, life = isFood(k) ? catKeeping(s, k).life : lifeOf(s, k);
   return { age, life, tone: age > life ? 'bad' : age > life * 0.75 ? 'warn' : 'good' };
 }

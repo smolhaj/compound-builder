@@ -54,6 +54,18 @@ export function tube(pts: readonly V3[], r: number, segs = 6): THREE.BufferGeome
 }
 
 /**
+ * Mark a shelf board (or a pallet / floor patch, `floor`) where stored food
+ * is drawn: `len` along x, `dep` toward +z, `clear` free height above, its
+ * top middle at (x, y, z). Not geometry: Parts keeps it as a food slot
+ * (shell.ts `FoodSlot`) wherever the piece ends up.
+ */
+export function foodSlot(add: (m: KitMaterialId, g: THREE.BufferGeometry) => void, len: number, dep: number, clear: number, floor: boolean | 'freezer', x = 0, y = 0, z = 0): void {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute([x, y, z, x + len / 2, y, z, x, y, z + dep / 2, x, y + clear, z, x, y - (floor === 'freezer' ? 0.003 : floor ? 0.001 : 0.002), z], 3));
+  add('food_slot', g);
+}
+
+/**
  * Build a piece in its own frame with `fn(add)`, move it to `p`, send it to
  * the sink, and return its footprint (null if `solid` is false).
  */
@@ -273,8 +285,8 @@ export const Furniture = {
     for (const sx of [-1, 1]) add('iron', box(0.02 * M, 0.12 * M, d * 0.8, sx * (l / 2 - 0.08 * M), y * M - 0.12 * M, 0));
   },
 
-  /** Free-standing shelf unit (bookcase / pantry), back at -z. */
-  shelfUnit(add: Add, lm = 1.0, hm = 1.9, fill: 'jars' | 'books' = 'books'): void {
+  /** Free-standing shelf unit (bookcase / pantry), back at -z. `food`: bare boards, each marked as a food slot (the stores drawn on them, game/props/FoodShelfRenderer). */
+  shelfUnit(add: Add, lm = 1.0, hm = 1.9, fill: 'jars' | 'books' | 'food' = 'books'): void {
     const l = lm * M, h = hm * M, d = 0.35 * M;
     for (const sx of [-1, 1]) add('wood_dark', box(0.03 * M, h, d, sx * (l / 2 - 0.015 * M), 0, 0));
     add('wood_dark', box(l, h, 0.02 * M, 0, 0, -d / 2 + 0.01 * M));
@@ -284,8 +296,29 @@ export const Furniture = {
       add('wood_dark', box(l - 0.04 * M, 0.025 * M, d, 0, yy, 0));
       if (k === n) break;
       if (fill === 'books') add('books', box(l - 0.1 * M, (h / n) * 0.7, d * 0.8, 0, yy + 0.025 * M, 0.01 * M));
+      else if (fill === 'food') foodSlot(add, l - 0.08 * M, d - 0.02 * M, (h - 0.08 * M) / n - 0.035 * M, false, 0, yy + 0.025 * M, 0.005 * M);
       else for (let i = 0; i < 5; i++) add(i % 2 ? 'crockery' : 'enamel', cyl(0.055 * M, (h / n) * 0.55, -l / 2 + 0.14 * M + i * (l - 0.28 * M) / 4, yy + 0.025 * M, 0, 8));
     }
+  },
+
+  /** A wooden pallet (1.2 × 1.0 m GMA) with a food slot on top: the stored buckets and sacks go there. */
+  foodPallet(add: Add, clear = 0.85): void {
+    const l = 1.2 * M, d = 1.0 * M, top = 0.14 * M;
+    for (const z of [-0.45, 0, 0.45]) add('wood_mid', box(l, 0.1 * M, 0.1 * M, 0, 0, z * M));          // stringers
+    for (let i = 0; i < 7; i++) add('wood_mid', box(0.14 * M, 0.02 * M, d, -l / 2 + 0.07 * M + i * (l - 0.14 * M) / 6, 0.1 * M, 0));   // deck boards
+    foodSlot(add, l - 0.02 * M, d - 0.02 * M, clear * M, true, 0, top, 0);
+  },
+
+  /** A chest freezer (1.1 × 0.65 m, 0.85 m tall), lid up so the cutaway shows what's in it: a food slot inside for the frozen packages. */
+  chestFreezer(add: Add): void {
+    const l = 1.1 * M, d = 0.65 * M, h = 0.85 * M, t = 0.05 * M;
+    add('enamel', box(l, 0.12 * M, d, 0, 0, 0));                                        // base and plinth
+    for (const sz of [-1, 1]) add('enamel', box(l, h - 0.12 * M, t, 0, 0.12 * M, sz * (d / 2 - t / 2)));
+    for (const sx of [-1, 1]) add('enamel', box(t, h - 0.12 * M, d - 2 * t, sx * (l / 2 - t / 2), 0.12 * M, 0));
+    add('iron', box(l - 2 * t, 0.01 * M, d - 2 * t, 0, 0.12 * M, 0));                     // dark liner floor
+    add('enamel', box(l, d * 0.95, 0.06 * M, 0, h, -d / 2 - 0.03 * M));                    // the lid, standing open at the back
+    add('iron', box(0.12 * M, 0.04 * M, 0.04 * M, l / 2 - 0.15 * M, 0.55 * M, d / 2 + 0.02 * M));   // thermostat knob
+    foodSlot(add, l - 2 * t - 0.02 * M, d - 2 * t - 0.02 * M, h - 0.15 * M, 'freezer', 0, 0.13 * M, 0);
   },
 
   /** Chest of drawers. */
