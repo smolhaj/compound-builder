@@ -10,7 +10,7 @@ const built = (g: GameState, id: string, kind: string): Structure => {
 const noStores = (g: GameState) => { g.disaster.tracks = { ...g.disaster.tracks, stores: 0, banks: 0 }; };
 
 describe('food and needs', () => {
-  it('while the stores are open the family eats from them; after, from the pantry: fresh first, staples last', () => {
+  it('while the stores are open the family eats from them; after, from the pantry: fresh first, then canned and staples side by side', () => {
     const g = newGame(1);
     g.stock.canned = 4; g.stock.staples = 1; g.stock.fresh = 3;
     liveDay(g, 0.5);
@@ -18,7 +18,10 @@ describe('food and needs', () => {
     noStores(g);
     const r = liveDay(g, 0.5);
     expect(r.kinds[0]).toBe('fresh');
-    expect(g.stock.staples).toBe(1);          // canned covered the rest
+    // the rest from canned and staples in proportion to the calories of each on hand (24,000 vs 80,000)
+    const fromCanned = (4 - g.stock.canned) * KCAL.canned, fromStaples = (1 - g.stock.staples) * KCAL.staples;
+    expect(fromCanned / fromStaples).toBeCloseTo(24000 / 80000, 5);
+    expect(r.kinds).toEqual(['fresh', 'canned', 'staples']);
     expect(r.ateKcal).toBeCloseTo(r.needKcal);
   });
 
@@ -128,5 +131,18 @@ describe('food and needs', () => {
     const n = g.personState[0].needs;
     n.hurt.push({ what: 'shot in the body', sev: 70, trauma: true });
     expect(workFactor(n)).toBeLessThanOrEqual(0.1);
+  });
+});
+
+describe('who tends the garden', () => {
+  it('only the living on the place count: a dead or taken gardener grows nothing', async () => {
+    const { bestGardener } = await import('./needs');
+    const g = newGame(3);
+    g.people.forEach((p, i) => { p.skills.gardener = i === 0 ? 9 : 1; });
+    expect(bestGardener(g)).toBe(9);
+    g.personState[0].needs.died = 5;
+    expect(bestGardener(g)).toBe(1);
+    g.personState[0].needs.died = null; g.personState[0].needs.taken = true;
+    expect(bestGardener(g)).toBe(1);
   });
 });
