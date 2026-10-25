@@ -31,6 +31,7 @@ import { dayJob, type Person, type SkillId, SKILL_IDS } from './family';
 import { dayIndex, type GameState } from './state';
 import type { Stock } from './materials';
 import type { Battle } from './battleTypes';
+import { gateLead, recordBattle, resolveRansom, type RansomTerms } from './rescue';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Neighbors
@@ -127,8 +128,10 @@ export function postureOf(s: GameState): Posture {
     look += len * (d.height > 0.35 ? 1 : 0.3) * g;
   }
   const barrier = Math.min(100, held / 40 * 100), fortress = Math.min(100, look / 40 * 100);
-  const adults = s.people.filter((p, i) => !p.kid && s.personState[i]?.needs.died == null);
-  const fighters = adults.length + s.people.filter((p, i) => p.kid && p.age >= 15 && s.personState[i]?.needs.died == null).length * 0.5;
+  // anyone away on a rescue isn't on the line
+  const here = (i: number) => s.personState[i]?.needs.died == null && !s.rescue?.raid?.team.includes(s.people[i].id);
+  const adults = s.people.filter((p, i) => !p.kid && here(i));
+  const fighters = adults.length + s.people.filter((p, i) => p.kid && p.age >= 15 && here(i)).length * 0.5;
   const watch = Math.max(0, ...adults.map(p => p.skills.hunter));
   const radioNet = s.neighbors.some(n => n.radio && n.status === 'home' && n.disposition > 30);
   const gear = gearPosture(s, fighters);
@@ -140,8 +143,8 @@ export function postureOf(s: GameState): Posture {
 // Encounters
 // ─────────────────────────────────────────────────────────────────────────
 
-export type EncounterKind = 'arrival' | 'looters' | 'gang' | 'refugees' | 'requisition' | 'neighbor_help' | 'trader' | 'horde' | 'patrol' | 'militia' | 'break_in';
-export type Stance = 'hide' | 'parley' | 'warn' | 'defend' | 'trade' | 'take_in' | 'trial' | 'turn_away' | 'call_911' | 'shout' | 'confront';
+export type EncounterKind = 'arrival' | 'looters' | 'gang' | 'refugees' | 'requisition' | 'neighbor_help' | 'trader' | 'horde' | 'patrol' | 'militia' | 'break_in' | 'ransom';
+export type Stance = 'hide' | 'parley' | 'warn' | 'defend' | 'trade' | 'take_in' | 'trial' | 'turn_away' | 'call_911' | 'shout' | 'confront' | 'pay' | 'refuse';
 
 export interface Encounter {
   id: string;
@@ -163,6 +166,8 @@ export interface Encounter {
   stances: Stance[];
   /** Raiders: what kind of people they are (battle.ts RaiderTemper); the dossier may or may not say. */
   temper?: RaiderTemper;
+  /** A crew's terms for a taken child (sim/rescue.ts). */
+  ransom?: RansomTerms;
 }
 
 /**
@@ -425,7 +430,10 @@ export function resolve(s: GameState, stance: Stance): Outcome {
   const negotiator = Math.max(0, ...s.people.filter((x, i) => !x.kid && s.personState[i]?.needs.died == null).map(x => x.skills.negotiator));
   const lines: string[] = [];
   let title = '', text = '', tone: Outcome['tone'] = 'mixed';
-  if (e.kind === 'break_in') {
+  if (e.kind === 'ransom') {
+    const o = resolveRansom(s, e, stance);
+    title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines);
+  } else if (e.kind === 'break_in') {
     const o = resolveBreakIn(s, e, stance);
     title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines);
   } else if (e.kind === 'arrival') {
@@ -448,9 +456,11 @@ export function resolve(s: GameState, stance: Stance): Outcome {
     if (stance === 'trade' && e.wants && hasAllOf(s, e.wants)) {
       lines.push(`Gave: ${take(s, e.wants).join(', ')}`); give(s, e.brings ?? {}); lines.push(`Got: ${Object.entries(e.brings ?? {}).map(([k, n]) => `${n} ${k}`).join(', ')}`);
       title = 'A fair trade'; text = 'Handshakes at the gate.'; tone = 'good';
+      { const l = gateLead(s, e.kind === 'trader' ? 'trader' : 'neighbor', e.kind === 'trader' ? 'The trader' : e.title.replace(/ come by$/, ''), r); if (l) lines.push(l); }
       if (e.neighbor) { const n = s.neighbors.find(x => x.id === e.neighbor); if (n) n.disposition = Math.min(100, n.disposition + 10); }
     } else if (stance === 'parley') {
       title = 'News over the fence'; text = 'An hour of talk: who\'s left, who\'s gone, where the trouble is.'; tone = 'good';
+      { const l = gateLead(s, e.kind === 'trader' ? 'trader' : 'neighbor', e.kind === 'trader' ? 'The trader' : e.title.replace(/ come by$/, ''), r); if (l) lines.push(l); }
       if (e.neighbor) { const n = s.neighbors.find(x => x.id === e.neighbor); if (n) n.disposition = Math.min(100, n.disposition + 6); }
     } else {
       title = 'Not today'; text = stance === 'trade' ? 'You don\'t have what they want.' : 'You wave them off.'; tone = 'mixed';
@@ -498,6 +508,7 @@ export function resolve(s: GameState, stance: Stance): Outcome {
       const b = planBattle(s, Math.max(1, e.size - Math.floor(help / 12)), s.seed * 131 + e.day * 7 + 1, { armed: e.armed, temper: e.temper });
       g.battle = b;
       lines.push(...applyBattle(s, b));
+      recordBattle(s, b, e.size, e.temper);
       if (b.result === 'repelled' || b.result === 'fled') {
         title = 'The line held'; text = `${help ? `${allies.map(a => a.name).join(' and ')} came over the ridge when they heard the shooting. ` : ''}${b.result === 'fled' ? 'They broke off and ran.' : 'None of them got past the line.'}`; tone = 'good';
         for (const n of allies) n.disposition = Math.min(100, n.disposition + 5);

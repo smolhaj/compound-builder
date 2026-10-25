@@ -31,6 +31,7 @@ import { mutualAidDay } from './barter';
 import { minesDay } from './battle';
 import { legalDay } from './breakins';
 import { prisonersDay } from './aftermath';
+import { isAway, rescueDay } from './rescue';
 import { falloutDay, isNuclear, SHELTER_DAYS, strike } from './nuclear';
 import { tallyDay } from './report';
 import { lineageDay } from './lineage';
@@ -74,6 +75,8 @@ function subStep(s: GameState): void {
   s.people.forEach((p, i) => {
     const ps = s.personState.find(x => x.id === p.id)!;
     if (ps.needs.died != null) { ps.task = 'gone'; ps.target = null; return; }
+    // gone after a taken child: off the place until they're back
+    if (isAway(s, p.id)) { ps.task = 'away'; ps.target = null; return; }
     // the first two weeks after the strikes: everyone in the shelter
     if (isNuclear(s) && s.clock.t < s.disaster.hitAt + SHELTER_DAYS) { ps.task = routineAt(p, h) === 'sleep' ? 'sleep' : 'shelter'; ps.target = null; return; }
     const rate = buildRate(p) * workFactor(ps.needs);
@@ -126,6 +129,7 @@ function subStep(s: GameState): void {
     for (const line of weatherDay(s)) log(s, line);
     const e = gateDay(s);
     if (e) log(s, `${e.title}.`);
+    rescueDay(s);   // the taken: their fate, leads, word from the crew, a rescue out (logs its own lines)
     if (before !== 'impact' && s.disaster.phase === 'impact' && s.disaster.kind === 'nuclear') for (const line of strike(s)) log(s, line);
     for (const line of falloutDay(s)) log(s, line);
     for (const line of effectsDay(s)) log(s, line);

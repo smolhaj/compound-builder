@@ -32,8 +32,9 @@ import { generateNeighbors, newGate, type GateState, type Neighbor } from './enc
 import { freshNeeds, type FoodReport, type Needs } from './needs';
 import type { WeatherState } from './weatherThreats';
 import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
-export const SAVE_VERSION = 37;
+export const SAVE_VERSION = 38;
 import type { BlackMarket } from './blackMarket';
+import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
 
 /** Starting savings (GDS §1 peacetime money constraint). */
@@ -98,7 +99,7 @@ export interface Structure {
   permitAt?: number;
 }
 
-export type TaskKind = 'idle' | 'build' | 'forestry' | 'sleep' | 'chores' | 'school' | 'leisure' | 'job' | 'gone' | 'shelter';
+export type TaskKind = 'idle' | 'build' | 'forestry' | 'sleep' | 'chores' | 'school' | 'leisure' | 'job' | 'gone' | 'shelter' | 'away';
 
 export interface PersonState {
   id: string;
@@ -207,6 +208,8 @@ export interface GameState {
   neighbors: Neighbor[];
   /** Who comes to the gate: the pending encounter, the last result, humanity and tallies. */
   gate: GateState;
+  /** The children taken by raiders, the leads, the rescue raid out (sim/rescue.ts). Save v38; `??=` for safety. */
+  rescue?: RescueState;
   /** Radio and rumors after the collapse (radio.ts); made on first use. */
   radio?: RadioState;
   /** Tallies since the hit (the report card), and how the run ended (null while it goes on). */
@@ -253,6 +256,7 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     land: newLand(seed, generateNeighbors(seed).map(n => n.id), (setup.site ?? CLASSIC).home),
     gate: newGate(seed),
     breakins: newBreakins(),
+    rescue: newRescue(),
     stats: emptyStats(),
     ending: null,
     food: { needKcal: 0, ateKcal: 0, producedKcal: 0, spoiledKcal: 0, fromStores: true, kinds: [], daysLeft: 0 },

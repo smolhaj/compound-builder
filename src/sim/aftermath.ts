@@ -23,6 +23,7 @@ import { mulberry32 } from './rng';
 import type { GameState } from './state';
 import { SKILL_IDS, type Person, type SkillId } from './family';
 import { freshNeeds } from './needs';
+import { prisonerLead } from './rescue';
 
 export type AftermathChoice = 'treat_release' | 'hold' | 'leave' | 'finish';
 export interface Aftermath { day: number; wounded: number; dead: number }
@@ -113,7 +114,10 @@ export function prisonersDay(s: GameState): string[] {
     // talking: once he trusts you a little, he gives up his crew or their cache
     if (!p.talked && p.trust >= 35 && r() < 0.1) {
       p.talked = true;
-      if (r() < 0.5) {
+      // the taken: a prisoner may know the crew that has them
+      const lead = r() < 0.5 ? prisonerLead(s, r) : null;
+      if (lead) out.push('The prisoner talked about the crew that took the child.');
+      else if (r() < 0.5) {
         s.stock.canned += 6 + Math.floor(r() * 10);
         s.armory.ammo['556'] = (s.armory.ammo['556'] ?? 0) + 40;
         out.push('The prisoner told you where his crew cached what they took. You brought back canned food and a can of 5.56.');
