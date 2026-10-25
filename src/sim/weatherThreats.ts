@@ -78,7 +78,17 @@ const REGION_SEASON: Partial<Record<RegionId, Partial<Record<WeatherKind, [numbe
   plains: { lightning_fire: [60, 120] },
   // Northwest floods are winter atmospheric rivers; fires in a dry September east wind
   pnw: { flood: [305, 45], lightning_fire: [225, 270] },
+  // Hill Country floods come with the spring and fall storms and the odd stalled tropical system (May–Oct)
+  hill_country: { flash_flood: [120, 300], heat_wave: [165, 250], lightning_fire: [190, 250] },
+  // Ozark woods burn in the spring before green-up
+  ozarks: { lightning_fire: [60, 105] },
 };
+
+/**
+ * Difficulty (user): Cozy about half the severe storms and shorter outages,
+ * Standard realistic, Hardcore a bit more.
+ */
+export const STORM_SCALE = { cozy: 0.5, standard: 1, hardcore: 1.25 } as const;
 const inSeason = (doy: number, [a, b]: [number, number]) => a <= b ? doy >= a && doy <= b : doy >= a || doy <= b;
 
 export const weatherOf = (s: GameState): WeatherState => (s.weather ??= { active: null, last: -999 });
@@ -103,7 +113,7 @@ export function odds(s: GameState, doy: number): Partial<Record<WeatherKind, num
     const p = R.storms[k];
     if (!p || !inSeason(doy, seasons[k] ?? SEASON[k])) continue;
     if (k === 'flood' && !s.site.creek) continue;        // a creek through the place (the desert's washes are flash floods)
-    o[k] = p;
+    o[k] = p * STORM_SCALE[s.disaster.difficulty ?? 'standard'];
   }
   return o;
 }
@@ -236,7 +246,10 @@ export function weatherDay(s: GameState): string[] {
     if (r() >= p) continue;
     const at = day + AHEAD[kind];
     const [lo, hi] = LASTS[kind];
-    w.active = { kind, at, until: at + lo + Math.floor(r() * (hi - lo + 1)) };
+    let until = at + lo + Math.floor(r() * (hi - lo + 1));
+    // Cozy: the crews get the lines back up sooner (outages and storm days are halved)
+    if (s.disaster.difficulty === 'cozy') until = at + Math.floor((until - at) / 2);
+    w.active = { kind, at, until };
     news(s, WARN[kind], kind === 'heat_wave' || kind === 'hail' ? 1 : 2);
     out.push(WARN[kind]);
     if (at === day) hit(s, w.active, r, out);

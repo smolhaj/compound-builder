@@ -55,6 +55,12 @@ export function speciesMix(kind: RegionKind): Array<[TreeSpecies, number]> {
     case 'north_woods': return [['spruce', 0.55], ['fir', 0.15], ['pine', 0.1], ['birch', 0.2]];
     // sugar maple, red oak, basswood woodlots; a few white pine
     case 'upper_midwest': return [['broad', 0.82], ['birch', 0.08], ['pine', 0.1]];
+    // white / post / black oak and hickory, shortleaf pine, eastern red cedar in the glades
+    case 'ozarks': return [['broad', 0.68], ['pine', 0.2], ['spruce', 0.12]];
+    // plateau live oak and Ashe juniper ("cedar"), cedar elm and Spanish oak
+    case 'hill_country': return [['liveoak', 0.42], ['juniper', 0.45], ['broad', 0.13]];
+    // red maple, black cherry, oak, ash
+    case 'rust_belt': return [['broad', 0.85], ['birch', 0.08], ['pine', 0.07]];
   }
 }
 
@@ -176,7 +182,7 @@ export class FarTreeRenderer {
     };
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
     const v = new THREE.Vector3(), s = new THREE.Vector3();
-    const broadTint = new THREE.Color(o.kind === 'coast' ? 0x55602f : o.kind === 'bayou' ? 0x46553a : o.kind === 'mountain' || o.kind === 'desert' ? 0x5a7a34 : 0x3f6430);
+    const broadTint = new THREE.Color(o.kind === 'hill_country' ? 0x4f5e34 : o.kind === 'coast' ? 0x55602f : o.kind === 'bayou' ? 0x46553a : o.kind === 'mountain' || o.kind === 'desert' ? 0x5a7a34 : 0x3f6430);
     const pickSp = (x: number, z: number, h: number, wetK: number): TreeSpecies => {
       if (o.kind === 'bayou' && wetK > 0.5 && hash(z, x * 0.7) < 0.75) return 'cypress';
       if (o.kind === 'mountain' && h > 120 && hash(z * 1.3, x) < 0.7) return 'fir';
@@ -184,6 +190,8 @@ export class FarTreeRenderer {
       if (o.kind === 'coast' && wetK > 0.2) return hash(x, z) < 0.7 ? 'broad' : 'liveoak';
       // cottonwoods on the desert washes and the plains creeks; tamarack / cedar round the north-woods lakes
       if ((o.kind === 'desert' || o.kind === 'plains') && wetK > 0.2) return 'broad';
+      // bald cypress along the Hill Country rivers
+      if (o.kind === 'hill_country' && wetK > 0.3) return hash(x, z) < 0.6 ? 'cypress' : 'broad';
       if (o.kind === 'appalachia' && h > 60 && hash(z, x * 1.7) < 0.35) return 'pine';
       const r = hash(x * 1.3, z);
       let acc = 0;

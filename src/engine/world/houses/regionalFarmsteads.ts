@@ -46,6 +46,17 @@
  *            big red gambrel dairy barn with a milk house, two concrete
  *            stave silos (and often a blue Harvestore), a steel machine
  *            shed, sugar maples by the house.
+ *   ozarks   a Missouri / Arkansas hill farm: a small frame house under a
+ *            metal roof with a porch, a single-wide beside it, a pole barn
+ *            and hay shed, round bales, and on a third of farms two long
+ *            broiler houses (the Arkansas poultry belt).
+ *   hill_country  a Llano / Gillespie County ranch: a limestone ranch house
+ *            under a standing-seam roof (the German stone houses round
+ *            Fredericksburg), a windmill and stock tank, a galvanized pole
+ *            barn, pipe pens, live oak shade.
+ *   rust_belt  an eastern-Ohio / western-PA farm on a town's edge: a
+ *            two-storey vinyl-sided farmhouse, a faded red bank barn, a
+ *            metal pole building, a detached garage, an old car or two.
  */
 import type { Farmstead } from './farmstead';
 import type { RegionKind } from '../terrain/regionalLandscape';
@@ -241,6 +252,50 @@ export function buildFarmstead(
       for (let t = -8; t <= 8; t += 2.8) if (Math.abs(t) > 1.6) T(t, -7.6, 2.5, 'broad');
       T(-5.8, -1.8, 2.6, 'broad');
       windbreak('fir', 2.4, 2.6, 'back');
+      break;
+    }
+    case 'ozarks': {
+      // small frame house, metal roof, porch; a single-wide; pole barn and hay shed; round bales; maybe broiler houses
+      const tin = pick([0x9aa0a2, 0x8a3a2a, 0x3e5a4a, 0x9aa0a2], h3);
+      B(-3.4, -3.4, 0, 1.5, 0.6, 1.2, pick(pal.house, h), tin, 0.45);
+      B(-3.4, -4.2, 0, 1.5, 0.36, 0.4, 0xe8e4da, tin, 0.08);
+      if (h2 < 0.6) BX(-5.8, 1.6, Math.PI / 2, 2.4, 0.45, 0.6, pick([0xe8e4da, 0xc8c0aa, 0xb8c0b8], h3), 0.08);
+      B(2.6, 1.6, 0, 2.6, 0.9, 2.2, pick(pal.barn, h2), 0x9aa0a2, 0.3);                 // metal pole barn
+      { const [x, z] = W(2.6, -2.2); props.roof([x, z], ground(x, z) + 0.6, f.rot, 2.2, 1.4, 0x8a8e92, 0.2); }
+      for (let k = 0; k < 6; k++) { const [x, z] = W(-1.4 + k * 0.45, 6.4 + (hash(k, f.x) - 0.5) * 0.2); props.bale(x, ground(x, z), z, f.rot + Math.PI / 2, 0.27, 0.25); }
+      if (h3 < 0.35) {
+        for (const lx of [-2.2, 2.2]) longBarn(lx, 9, 22, 2.0, 0.38, 0xe8e6e0, 0xb8bcbe, 0.22);
+      }
+      T(-5.8, -5.6, 2.3, 'broad'); T(0.2, -6.2, 2.0, 'broad');
+      break;
+    }
+    case 'hill_country': {
+      // limestone ranch house, standing-seam roof, porch; windmill + stock tank; pole barn; pipe pens; live oaks
+      B(-3.2, -3.4, 0, 2.2, 0.6, 1.3, pick(pal.house, h), pick([0x9aa0a2, 0x5a6a5e, 0x8a3a2a], h2), 0.4);
+      B(-3.2, -4.3, 0, 2.2, 0.38, 0.45, 0xd8ccb0, 0x9aa0a2, 0.08);
+      BX(-2.3, -3.4, 0, 0.16, 1.1, 0.16, 0xcfc2a2);                                 // stone chimney
+      windmill(4.6, -3.8);
+      B(2.6, 2.0, 0, 2.6, 0.85, 2.0, pick(pal.barn, h2), 0x9aa0a2, 0.28);
+      const [cx, cz, r] = [-3.6, 3.8, 1.8];
+      for (const [ax, az, bx2, bz2] of [[-r, -r, r, -r], [r, -r, r, r], [r, r, -r, r], [-r, r, -r, -r]]) {
+        const mx = cx + (ax + bx2) / 2, mz = cz + (az + bz2) / 2;
+        const along = Math.abs(bz2 - az) > 0.1 ? Math.PI / 2 : 0;
+        for (const y of [0.1, 0.2]) BX(mx, mz, along, Math.hypot(bx2 - ax, bz2 - az), 0.025, 0.025, 0x8a8e90, y);
+        BX(cx + ax, cz + az, 0, 0.05, 0.26, 0.05, 0x6e7274);
+      }
+      T(-5.8, -5.8, 2.0, 'liveoak'); T(-0.6, -6.4, 1.8, 'liveoak'); T(6.4, 4.6, 1.9, 'liveoak');
+      break;
+    }
+    case 'rust_belt': {
+      // two-storey vinyl farmhouse, faded red bank barn, pole building, garage, an old car or two
+      B(-3.4, -3.4, 0, 1.3, 1.2, 1.3, pick(pal.house, h), 0x3e3f42, 0.55);
+      B(-3.4, -4.25, 0, 1.3, 0.4, 0.4, 0xe8e4da, 0x3e3f42, 0.08);
+      B(-1.3, -3.6, 0, 0.9, 0.5, 0.9, pick(pal.house, h2), 0x3e3f42, 0.3);           // garage
+      G(2.6, 1.8, 0, 2.3, 1.0, 3.6, pick(pal.barn, h2), 0x55585c, 1.2);                // bank barn
+      if (h3 < 0.55) S(4.5, 0.4, 0.38, 2.6, CONCRETE, null);                            // old silo, its roof gone
+      B(-3.6, 3.6, Math.PI / 2, 2.8, 0.85, 1.8, STEEL, 0x8c9094, 0.28);
+      for (let k = 0; k < 1 + Math.floor(h * 2); k++) BX(-6.4 + k * 0.9, 0.6, 0.3 * k, 0.75, 0.22, 0.32, pick([0x7a2a22, 0x2e3a4a, 0x8a8478, 0x5a4a3a], hash(k, f.x)));
+      for (let t = -8; t <= 8; t += 3) if (Math.abs(t) > 2) T(t, -7.6, 2.4, 'broad');
       break;
     }
     case 'mountain': {

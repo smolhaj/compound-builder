@@ -5,7 +5,8 @@
  * farmland + river, Deep South bayou; Compound Builder adds Appalachian
  * ridges and hollows, the high-desert mesas and washes, the North Woods'
  * lakes and spruce flats, the Upper Midwest's moraine farmland with kettle
- * lakes, and the Great Plains), plus the town footprint each region gets (a
+ * lakes, the Great Plains, the Ozark plateau, the Texas Hill Country's
+ * limestone stair-steps and the Rust Belt's dissected Allegheny plateau), plus the town footprint each region gets (a
  * big-city downtown only for Urban scenarios).
  *
  * Pure (no Three.js): exercised by regionalLandscape.test.ts and shared by
@@ -26,7 +27,7 @@ import { createNoise2D } from 'simplex-noise';
 import { ARROYO_MOUTH_Y, ARROYO_W0, ARROYO_WALL, arroyoJitter, arroyoZ, ARROYO_OFFSETS } from './coastline';
 
 export type RegionKind = 'mountain' | 'coast' | 'sound' | 'drumlin' | 'plains' | 'bayou' | 'city'
-  | 'appalachia' | 'desert' | 'north_woods' | 'upper_midwest';
+  | 'appalachia' | 'desert' | 'north_woods' | 'upper_midwest' | 'ozarks' | 'hill_country' | 'rust_belt';
 
 /** Town ground height (the EnvironmentRenderer ground plane). */
 export const TOWN_Y = -0.10;
@@ -79,6 +80,9 @@ export function townSpecFor(kind: RegionKind): TownSpec {
     case 'desert': return { ext: 60, maxD: 60, towers: false, maxStoreys: 2, suburbFrom: 24 };
     case 'north_woods': return { ext: 30, maxD: 30, towers: false, maxStoreys: 2, suburbFrom: 20, reach: 70 };
     case 'upper_midwest': return { ext: 70, maxD: 64, towers: false, maxStoreys: 3, suburbFrom: 28 };
+    case 'ozarks': return { ext: 30, maxD: 30, towers: false, maxStoreys: 2, suburbFrom: 20, reach: 70 };
+    case 'hill_country': return { ext: 40, maxD: 40, towers: false, maxStoreys: 2, suburbFrom: 22, reach: 80 };
+    case 'rust_belt': return { ext: 60, maxD: 60, towers: false, maxStoreys: 4, suburbFrom: 24 };
   }
 }
 
@@ -142,6 +146,12 @@ export function regionLookFor(kind: RegionKind): RegionLook {
     case 'north_woods': return { ...base, snowLineWinter: -15, forest: 0x1d3424, evergreen: 0.75, rock: 0x6e6c66, grass: 0x5c6e40, farm: 0.05, fieldSize: 24, rockSlope: 0.45 };
     // dairy country: 40-acre fields on the survey grid, hardwood woodlots, kettle lakes
     case 'upper_midwest': return { ...base, snowLineWinter: -15, forest: 0x2f4a28, evergreen: 0.2, grass: 0x5f7a3c, farm: 0.9, fieldSize: 34, fieldMode: 'plss', rockSlope: 0.6 };
+    // oak–hickory and shortleaf pine, fescue pasture on the ridgetops, gray chert and limestone bluffs
+    case 'ozarks': return { ...base, snowLineWinter: 40, forest: 0x34502a, evergreen: 0.25, rock: 0x9c968a, grass: 0x5e7a38, farm: 0.45, fieldSize: 22, rockSlope: 0.45 };
+    // live oak and Ashe juniper savanna on caliche-pale grass; white limestone on the risers
+    case 'hill_country': return { ...base, dry: 0.55, forest: 0x3c4a2c, evergreen: 0.75, rock: 0xc4bba4, grass: 0x7c8048, dryGrass: 0xab9a68, farm: 0.25, fieldSize: 28, rockSlope: 0.3 };
+    // second-growth hardwoods on the valley sides, old dairy fields on the uplands
+    case 'rust_belt': return { ...base, snowLineWinter: -10, forest: 0x31492a, evergreen: 0.12, grass: 0x5c7a3a, farm: 0.6, fieldSize: 26, rockSlope: 0.5 };
   }
 }
 
@@ -156,6 +166,9 @@ export function regionWaterY(kind: RegionKind): number | null {
     case 'appalachia': return TOWN_Y - 3.2;
     case 'north_woods': return TOWN_Y - 1.1;
     case 'upper_midwest': return TOWN_Y - 2.2;
+    case 'ozarks': return TOWN_Y - 3.5;
+    case 'hill_country': return TOWN_Y - 2.6;
+    case 'rust_belt': return TOWN_Y - 3.2;
     default: return null;
   }
 }
@@ -249,7 +262,7 @@ export class RegionalField {
     this.cz = o.cH / 2;
     this.waterY = regionWaterY(o.kind);
     this.edge = o.townExt + 6;
-    const seed = { mountain: 11, coast: 23, sound: 37, drumlin: 41, plains: 53, bayou: 67, city: 71, appalachia: 79, desert: 83, north_woods: 89, upper_midwest: 97 }[o.kind];
+    const seed = { mountain: 11, coast: 23, sound: 37, drumlin: 41, plains: 53, bayou: 67, city: 71, appalachia: 79, desert: 83, north_woods: 89, upper_midwest: 97, ozarks: 101, hill_country: 103, rust_belt: 107 }[o.kind];
     this.n1 = createNoise2D(makeRng(seed));
     this.n2 = createNoise2D(makeRng(seed + 100));
     this.n3 = createNoise2D(makeRng(seed + 200));
@@ -594,6 +607,64 @@ export class RegionalField {
         // (and wooded draws and kettle rims the plow never took)
         const draws = sstep(0.5, 0.7, n3(px * 0.008 + 3, pz * 0.008 - 5));
         const forest = Math.max(0.88 * lot, 0.8 * draws) * (rel < -2 ? 0 : 1);
+        return { rel, forest, field: 1 - forest };
+      }
+      case 'ozarks': {
+        // Salem / Springfield plateau: broad ridgetops in pasture, hollows
+        // cut 60–150 m into them (karst: dry hollows, springs, sinkholes),
+        // a big reservoir (Table Rock / Bull Shoals) in the river valley.
+        const wx = px + 50 * n3(pz * 0.003, 2.4), wz = pz + 50 * n3(px * 0.003, 5.1);
+        let bill = 0, a = 1, f = 0.0035, nrm = 0;
+        for (let i = 0; i < 3; i++) { bill += a * Math.abs(n1(wx * f, wz * f)); nrm += a; a *= 0.5; f *= 2.1; }
+        bill /= nrm;
+        // flat-topped ridges: the plateau surface caps the dissection
+        let rel = 3 + 26 * Math.min(1, Math.pow(bill / 0.42, 1.2)) + 2 * this.fbm(n3, px * 0.01, pz * 0.01, 2);
+        const hz = Math.abs(pz - 6 * Math.sin(px / 70) - 4 * n3(px * 0.02, 1));
+        rel = Math.min(rel, 1 + 0.2 * Math.max(0, hz - 8) + 0.0012 * Math.max(0, hz - 8) ** 2);
+        // sinkholes on the uplands
+        const sk = kettle(px, pz, 110, 0.3, 101);
+        if (sk && d > 100 && rel > 15) rel -= 3 * (1 - sstep(sk.r * 0.3, sk.r * 0.8, sk.d));
+        const rz = pz - 300 - 50 * Math.sin(px / 180) - 30 * n3(px * 0.003, 4);
+        const arms = 18 * Math.abs(n3(px * 0.008, pz * 0.008));
+        const ad = Math.abs(rz) - arms;
+        if (ad < 140) rel = Math.min(rel, ad < 50 ? -6 : -6 + 0.1 * (ad - 50) ** 1.3);
+        const top = sstep(18, 24, rel);
+        const field = 0.85 * Math.max(top * sstep(-0.3, 0.2, n3(px * 0.006 + 4, pz * 0.006)), (1 - sstep(2, 6, rel)) * 0.6) * (rel < -3 ? 0 : 1);
+        const forest = 0.9 * (1 - field) * (rel < -3 ? 0 : 1);
+        return { rel, forest, field };
+      }
+      case 'hill_country': {
+        // Edwards Plateau margin: limestone hills built of flat benches and
+        // short steep risers (the stair-step "Hill Country" profile), 60–200 m
+        // of relief, a spring-fed river (Guadalupe / Pedernales) with a cypress
+        // fringe, live oak motts and cedar brakes on caliche-pale grass.
+        const base = 2 + 34 * Math.pow(Math.max(0, this.fbm(n1, px * 0.0024, pz * 0.0024, 3) + 0.5), 1.4) + 1.5 * n3(px * 0.01, pz * 0.01);
+        const step = 5.5, q = base / step, fq = Math.floor(q);
+        let rel = (fq + sstep(0.72, 1, q - fq)) * step;
+        const rz = pz + 280 + 40 * Math.sin(px / 150) + 20 * n3(px * 0.004, 3);
+        const ad = Math.abs(rz);
+        if (ad < 110) rel = Math.min(rel, ad < 18 ? -3.6 : -3.6 + 0.09 * (ad - 18) ** 1.25);
+        const riser = sstep(0.55, 0.9, q - fq);
+        const mott = sstep(-0.1, 0.45, n3(px * 0.025, pz * 0.025) + 0.4 * n1(px * 0.07, pz * 0.07));
+        const river = (1 - sstep(18, 30, ad)) * sstep(14, 18, ad);
+        const forest = Math.max(0.6 * mott, 0.75 * riser * mott, 0.9 * river) * (rel < -2.5 ? 0 : 1);
+        return { rel, forest, field: 0.5 * (1 - sstep(30, 70, ad)) * (1 - forest) };
+      }
+      case 'rust_belt': {
+        // Glaciated Allegheny plateau edge: rolling uplands of old dairy
+        // fields, steep wooded valley sides 30–80 m deep, a river with a
+        // mill town in its valley, second-growth woodlots on a third of the land.
+        let rel = 6 + 4 * (this.fbm(n1, px * 0.004, pz * 0.004, 3) + 0.4);
+        const v = Math.abs(this.fbm(n3, px * 0.0035 + 2, pz * 0.0035, 3));
+        rel -= 9 * (1 - sstep(0.02, 0.12, v));
+        const rz = pz - 260 - 30 * Math.sin(px / 200) - 15 * n3(px * 0.004, 6);
+        const ad = Math.abs(rz);
+        if (ad < 150) rel = Math.min(rel, ad < 28 ? -4.5 : -4.5 + 0.15 * (ad - 28) ** 1.1);
+        const cell = 67, ci = Math.floor(px / cell), cj = Math.floor(pz / cell);
+        const lot = hash2(ci, cj, 107) < 0.32 ? 1 : 0;
+        const sides = (1 - sstep(0.04, 0.14, v)) * sstep(0.0, 0.02, v);
+        const valley = sstep(28, 40, ad) * (1 - sstep(80, 150, ad));
+        const forest = Math.max(0.88 * lot, 0.9 * sides, 0.85 * valley) * (rel < -3 ? 0 : 1);
         return { rel, forest, field: 1 - forest };
       }
       case 'city':

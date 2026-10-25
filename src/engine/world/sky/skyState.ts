@@ -62,6 +62,9 @@ export const REGION_DARK_SKY: Record<string, number> = {
   north_woods: 0.97,
   great_plains: 0.92,
   upper_midwest: 0.82,
+  ozarks: 0.88,
+  hill_country: 0.85,
+  rust_belt: 0.55,
 };
 
 /**

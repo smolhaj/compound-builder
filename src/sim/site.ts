@@ -171,7 +171,8 @@ export function listings(seed: number, region: RegionId = 'mountain_west', wish:
     const s = r();
     const soil: Soil = s < R.soil.thin ? 'thin' : s > 1 - R.soil.deep ? 'deep' : 'fair';
     const m = r();
-    const miles = Math.round(wish.town === 'near' ? 2 + m * 8 : wish.town === 'far' ? 15 + m * 20 : acres === 5 ? 3 + m * 8 : 6 + m * 22);
+    const ts = R.townScale ?? 1;
+    const miles = Math.max(1, Math.round((wish.town === 'near' ? 2 + m * 8 : wish.town === 'far' ? 15 + m * 20 : acres === 5 ? 3 + m * 8 : 6 + m * 22) * ts));
     const improvements = rollImprovements(ri, acres, miles, gwDepth, wish.built ?? 'any', region);
     const base = { region, acres, home: HOME_RECT[acres], creek, spring, gwDepth, gwQuality, timber, soil, miles, improvements };
     out.push({ id: `${region}-${k}`, name: `${ROADS[Math.floor(r() * ROADS.length)]} Road ${KIND[acres][Math.floor(r() * 2)]}`, ...base, price: sitePrice(base) });
@@ -189,7 +190,7 @@ export interface Fact { label: string; value: string; tone?: 'good' | 'bad' }
 /** The listing card's rows. */
 export function siteFacts(s: Site): Fact[] {
   return [
-    { label: 'Water', value: s.creek ? 'Creek runs through' : s.spring ? 'Spring, no creek' : 'Dry (creek on the neighbor\'s)', tone: s.creek || s.spring ? 'good' : 'bad' },
+    { label: 'Water', value: s.creek ? 'Creek runs through' : s.spring ? 'Spring, no creek' : s.region === 'desert' ? 'Dry: a wash runs only after storms' : 'Dry (creek on the neighbor\'s)', tone: s.creek || s.spring ? 'good' : 'bad' },
     { label: 'Well', value: `${s.gwDepth} m${s.gwDepth <= 9 ? ' (hand-dug OK)' : ''}`, tone: s.gwDepth <= 20 ? 'good' : s.gwDepth > 90 ? 'bad' : undefined },
     { label: 'Groundwater', value: GW_SHORT[s.gwQuality], tone: s.gwQuality === 'good' ? 'good' : s.gwQuality === 'arsenic' ? 'bad' : undefined },
     { label: 'Timber', value: s.timber > 1.1 ? 'Heavy' : s.timber < 0.5 ? 'Open ground' : 'Some' },

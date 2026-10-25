@@ -77,7 +77,7 @@ export class RegionalWaterRenderer {
     ntex.needsUpdate = true;
     const down: Record<RegionKind, [number, number]> = {
       drumlin: [0, 1], bayou: [0, 1], plains: [1, 0], mountain: [1, 0.3], sound: [0, 1], coast: [-1, 0], city: [1, 0],
-      appalachia: [1, 0], desert: [1, 0], north_woods: [1, 0], upper_midwest: [1, 0],
+      appalachia: [1, 0], desert: [1, 0], north_woods: [1, 0], upper_midwest: [1, 0], ozarks: [1, 0], hill_country: [1, 0], rust_belt: [1, 0],
     };
     const flow = computeWaterFlow({
       W: NN, H: NN, wet, texel: tex1, downstream: down[field.kind],
@@ -100,6 +100,7 @@ export class RegionalWaterRenderer {
       drumlin: WATER_LOOKS.river, plains: WATER_LOOKS.river, bayou: WATER_LOOKS.bayou, sound: WATER_LOOKS.sound,
       mountain: WATER_LOOKS.campus, coast: WATER_LOOKS.campus, city: WATER_LOOKS.campus,
       appalachia: WATER_LOOKS.river, desert: WATER_LOOKS.campus, north_woods: WATER_LOOKS.pond, upper_midwest: WATER_LOOKS.pond,
+      ozarks: WATER_LOOKS.pond, hill_country: WATER_LOOKS.pond, rust_belt: WATER_LOOKS.river,
     };
     const mat = new THREE.MeshStandardMaterial({ color: 0xffffff });
     patchWaterMaterial(mat, {

@@ -157,4 +157,29 @@ describe('weather threats', () => {
     d.clock.t = 0;
     expect(weatherDay(d).some(l => /wash/.test(l))).toBe(true);
   });
+
+  it('storms scale with difficulty: Cozy about half and shorter outages, Hardcore a quarter more', () => {
+    const at = (d: 'cozy' | 'standard' | 'hardcore') => { const g = place('appalachia', 1); g.disaster.difficulty = d; return odds(g, 10).ice_storm!; };
+    expect(at('cozy')).toBeCloseTo(at('standard') * 0.5, 9);
+    expect(at('hardcore')).toBeCloseTo(at('standard') * 1.25, 9);
+    // count the storm days over many years: Cozy well under Standard
+    const days = (d: 'cozy' | 'standard') => {
+      let n = 0;
+      for (let seed = 1; seed <= 12; seed++) {
+        const g = place('north_woods', 1, seed); g.disaster.difficulty = d;
+        for (let t = 0; t < 365 * 2; t++) { g.clock.t = t; weatherDay(g); if (g.weather?.active && t >= g.weather.active.at) n++; }
+      }
+      return n;
+    };
+    expect(days('cozy')).toBeLessThan(days('standard') * 0.7);
+  });
+
+  it('the new regions: Hill Country flash floods, New England hurricane remnants, the Ozarks ice and tornadoes', () => {
+    const year = (region: typeof CLASSIC.region) => { const seen = new Set<string>(); const g = place(region, 1); for (let d = 1; d <= 365; d++) for (const k of Object.keys(odds(g, d))) seen.add(k); return seen; };
+    expect(year('hill_country').has('flash_flood')).toBe(true);
+    expect(year('hill_country').has('blizzard')).toBe(false);
+    expect(year('new_england').has('hurricane_remnants')).toBe(true);
+    expect(year('ozarks').has('ice_storm') && year('ozarks').has('tornado')).toBe(true);
+    expect(year('rust_belt').has('blizzard')).toBe(true);
+  });
 });

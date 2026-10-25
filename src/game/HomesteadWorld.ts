@@ -57,7 +57,7 @@ import { DRIVE_W, ROAD_W, distToLine, planAccess, roadLine, roadX, type Access }
 import { buildRibbon } from '../engine/world/roads/RoadRibbon';
 import { gravelMaterial, roadMaterial } from '../engine/world/roads/roadTextures';
 import { RockField, type RockSpec } from '../engine/world/terrain/RockField';
-import { buildLineFences, planLineFences } from './region/lineFences';
+import { buildLineFences, buildPowerline, planLineFences } from './region/lineFences';
 import type { RegionWorld } from './region/regionWorld';
 import { buildGate } from './props/gateGeometry';
 import { buildStockpile } from './props/stockpileGeometry';
@@ -267,7 +267,7 @@ export class HomesteadWorld {
     this._roads.traverse(o => { if (o !== this._roads) (o as THREE.Mesh).geometry?.dispose(); });
     this._roads.clear();
     // the county road the region's way (gravel, blacktop, caliche); the drive is gravel (caliche in the desert)
-    const mat = this.regionWorld.road === 'caliche' ? roadMaterial('caliche') : gravelMaterial();
+    const mat = (this.regionWorld.drive ?? (this.regionWorld.road === 'caliche' ? 'caliche' : 'gravel')) === 'caliche' ? roadMaterial('caliche') : gravelMaterial();
     const road = new THREE.Mesh(buildRibbon(roadLine(1), ROAD_W, this.groundAt, 0.02, 6), roadMaterial(this.regionWorld.road));
     const track = this._drive ? mat : (() => { const m = mat.clone(); m.color = new THREE.Color(0x8a7a5c); return m; })();
     const drive = new THREE.Mesh(buildRibbon(this.access.drive, this._drive ? DRIVE_W : DRIVE_W * 0.55, this.groundAt, this._drive ? 0.024 : 0.012, 4), track);
@@ -371,6 +371,7 @@ export class HomesteadWorld {
     buildLineFences(planLineFences(roadX, ROAD_W / 2, -330, PARCEL_SIZE + 330), this.regionWorld.fence, props, this.groundAt,
       (x, z) => onFarmstead(this.farms, x, z, 1.5) || Math.abs(z - creek.zAt(x)) < 2.2 || (wy !== null && this.parcel.region.height(x, z) < wy + 0.15) || inside(x, z),
       (a, b) => { const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return s - Math.floor(s); });
+    if (this.regionWorld.powerline) buildPowerline(props, this.groundAt, (x, z) => onFarmstead(this.farms, x, z, 4) || (wy !== null && this.parcel.region.height(x, z) < wy + 0.3) || inside(x, z));
     props.finish();
     this._props = props;
     this.farTrees.build({
@@ -754,7 +755,9 @@ export class HomesteadWorld {
   /** The creek (sloped stream) and the regional reservoir. */
   private _water(q: Quality): void {
     const c = this.parcel.creek;
-    this.stream.build({
+    // a dry desert place: the channel off the place is a dry wash too (no running water drawn)
+    if (this.parcel.relief === 'bajada' && !this.parcel.creekHome) this.stream.clear();
+    else this.stream.build({
       x0: this.center.x - 62, x1: this.center.x + 62, zAt: c.zAt, waterY: c.waterY, band: 3,
       site: {
         ground: this.groundAt,

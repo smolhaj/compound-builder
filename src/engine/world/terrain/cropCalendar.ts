@@ -145,6 +145,12 @@ export const REGION_CROPS: Record<RegionKind, Array<[CropId, number]>> = {
   desert: [['rangePasture', 0.8], ['fallow', 0.2]],
   north_woods: [['hay', 0.6], ['pasture', 0.4]],
   // Wisconsin dairy rotation: hay, silage corn, corn, soybeans, pasture
+  // fescue pasture and hay (cow-calf), a few broiler-house farms
+  ozarks: [['pasture', 0.5], ['hay', 0.4], ['fallow', 0.1]],
+  // coastal Bermuda hay, oats, peach orchards around Fredericksburg (rowVeg stands in), native range
+  hill_country: [['rangePasture', 0.5], ['hay', 0.25], ['wheat', 0.15], ['rowVeg', 0.1]],
+  // old dairy ground: hay, corn, soybeans, some gone to brush
+  rust_belt: [['hay', 0.35], ['corn', 0.25], ['soy', 0.25], ['fallow', 0.15]],
   upper_midwest: [['hay', 0.32], ['silage', 0.24], ['corn', 0.22], ['soy', 0.12], ['pasture', 0.1]],
 };
 

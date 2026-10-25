@@ -182,6 +182,28 @@ export const CLIMATES: Record<string, SeasonClimate> = {
     snow: 0.92, snowOn: 328, snowFull: 342, snowMelt: 75, snowGone: 96,
     greenUp: 115,
   },
+  ozarks: {
+    // oaks and hickories redden late October; dogwood and redbud in early April; snow rarely lies
+    ...BASE, id: 'ozarks', blaze: 0.9, palette: [0.3, 0.3, 0.25, 0.15],
+    turnStart: 280, peak: 300, dropEnd: 322, leafOut: 98, bloomDay: 90,
+    snow: 0.3, snowOn: 355, snowFull: 362, snowMelt: 35, snowGone: 55, weatherSnow: 0.55,
+    dormant: 0.85, dormantOn: 315, greenUp: 85,
+  },
+  hill_country: {
+    // live oaks keep their leaves; cedar elm and Spanish oak turn in November; bluebonnets in March; grass cures in the summer heat
+    ...BASE, id: 'hill_country', blaze: 0.35, palette: [0.25, 0.2, 0.4, 0.15],
+    turnStart: 300, peak: 320, dropEnd: 345, bareMax: 0.5, broadEvergreen: 0.55, leafOut: 70, bloomDay: 75,
+    snow: 0, weatherSnow: 0.1, dormant: 0.8, dormantOn: 330, greenUp: 75,
+    dry: 0.7, dryStart: 190, dryFull: 220, dryEnd: 290,
+    freeze: false,
+  },
+  rust_belt: {
+    // maple and oak peak mid-October; gray lake-effect winters
+    ...BASE, id: 'rust_belt', blaze: 0.9, palette: [0.3, 0.3, 0.3, 0.1],
+    turnStart: 265, peak: 290, dropEnd: 312, leafOut: 115, bloomDay: 112,
+    snow: 0.75, snowOn: 335, snowFull: 350, snowMelt: 60, snowGone: 80,
+    greenUp: 105,
+  },
   southern_california: {
     ...BASE, id: 'southern_california', blaze: 0.15, palette: [0.08, 0.25, 0.37, 0.3],
     turnStart: 310, peak: 335, dropEnd: 356, bareMax: 0.2, broadEvergreen: 0.5, leafOut: 62, bloomDay: 70,

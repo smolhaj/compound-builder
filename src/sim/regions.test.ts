@@ -63,3 +63,22 @@ describe('region data', () => {
     expect(new Set(REGION_IDS.map(id => regionWorld(id).relief)).size).toBe(REGION_IDS.length);
   });
 });
+
+describe('the new regions', () => {
+  it('New England is stony with arsenic in the bedrock wells; the Hill Country hot, hard-watered and dear; the Rust Belt close to town', async () => {
+    const { listings, siteFacts } = await import('./site');
+    expect(REGIONS.new_england.gwBad.arsenic).toBeGreaterThan(REGIONS.plains.gwBad.arsenic);
+    expect(REGIONS.new_england.soil.thin).toBeGreaterThan(0.5);
+    expect(REGIONS.hill_country.julyHighF).toBeGreaterThan(REGIONS.new_england.julyHighF + 10);
+    expect(REGIONS.hill_country.gwBad.hard).toBeGreaterThan(0.6);
+    expect(REGIONS.ozarks.springOdds).toBeGreaterThan(REGIONS.plains.springOdds);
+    const miles = (r: 'rust_belt' | 'north_woods') => listings(5, r).reduce((a, l) => a + l.miles, 0);
+    expect(miles('rust_belt')).toBeLessThan(miles('north_woods') / 2);
+    // the North Woods are Minnesota / the UP now: no stone walls (New England has them)
+    expect(regionWorld('north_woods').fence).not.toBe('stone');
+    expect(regionWorld('new_england').fence).toBe('stone');
+    // a dry desert listing has a wash, not a creek on the neighbor's
+    const dry = listings(5, 'desert').find(l => !l.creek && !l.spring)!;
+    expect(siteFacts(dry)[0].value).toMatch(/wash/);
+  });
+});

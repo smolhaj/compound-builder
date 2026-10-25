@@ -16,7 +16,9 @@
  * Appalachian hollow (a hay bottom along the creek, wooded sides rising
  * 40–60 m), a desert bajada with a dry wash, North Woods swells with a bog,
  * flat Plains with the creek in a draw, Northwest foothills, Upper Midwest
- * moraine hummocks; each set into its own regional field.
+ * moraine hummocks, a New England drumlin flank, an Ozark ridgetop falling
+ * into its hollow, Hill Country limestone stair-steps, a Rust Belt ravine;
+ * each set into its own regional field.
  *
  * Pure (no three.js): one height/cover function the renderer, the camera
  * floor, placement and (later) water flow all share. 1 unit ≈ 6 m.
@@ -248,6 +250,33 @@ export class ParcelTerrain {
         const A = 3.5 + 2 * this._relA;
         return A * (0.5 + 0.5 * (0.8 * n(x * 0.016 + this._relP, z * 0.016) + 0.2 * n(x * 0.05, z * 0.05))) + 2 * (S - x) / S;
       }
+      case 'drumlin': {
+        // the flank of a drumlin (NNW long axis) rising 20–35 m to the west, stony
+        const A = 3.5 + 2.5 * this._relA, cz = S * (0.3 + 0.4 * this._relB);
+        const u = (x + 12) * 0.92 + (z - cz) * 0.38, v = -(x + 12) * 0.38 + (z - cz) * 0.92;
+        return A * Math.exp(-((u / 60) ** 2 + (v / 34) ** 2)) + 0.25 * n(x * 0.05, z * 0.05) + 0.1 * n(x * 0.16, z * 0.16);
+      }
+      case 'ridge': {
+        // an Ozark ridgetop: the flat top in pasture, falling 25–35 m into the creek's hollow; a sinkhole
+        const A = 4 + 2 * this._relA, B = 8 + 3 * this._relB;
+        const dz = Math.abs(z - this.creek.zAt(x));
+        const up = sstep(B, B + 30, dz + 2.5 * n(x * 0.04, z * 0.04));
+        const sx = S * (0.25 + 0.5 * this._relB), sz = this.creek.zAt(sx) + (this._relA < 0.5 ? -1 : 1) * (B + 22);
+        const sink = 0.6 * (1 - sstep(1.5, 4, Math.hypot(x - sx, z - sz)));
+        return A * up + 0.6 * up * n(x * 0.05 + 3, z * 0.05 - 7) + 0.5 * (S - x) / S - sink;
+      }
+      case 'stairstep': {
+        // limestone benches with short steep risers, rising 20–30 m to the west
+        const A = 3.2 + 1.8 * this._relA, steps = 3;
+        const t = Math.max(0, Math.min(1.2, (S - x) / S + 0.1 * n(x * 0.03, z * 0.03) + 0.15 * this._relB));
+        return A * terrace(t * steps, 0.25) / steps + 0.12 * n(x * 0.08, z * 0.08);
+      }
+      case 'ravine': {
+        // gently rolling fields; the creek in a wooded ravine 10–18 m deep
+        const A = 1.8 + 1.2 * this._relA, B = 2.2;
+        const dz = Math.abs(z - this.creek.zAt(x));
+        return A * sstep(B, B + 13, dz + 1.5 * n(x * 0.05, z * 0.05)) + 0.6 * (0.5 + 0.5 * n(x * 0.025 + this._relP, z * 0.025)) + 0.3 * (S - x) / S;
+      }
       case 'moraine': {
         // swells and kettle hollows of 10–15 m; slopes mostly 2–12 %
         const A = 1.6 + 0.9 * this._relA;
@@ -286,6 +315,28 @@ export class ParcelTerrain {
         // a pasture cleared on the lower, road side
         const clear = sstep(S * 0.5, S * 0.68, x + 6 * n(x * 0.04, z * 0.04 + 1));
         return 0.97 * (1 - clear * (0.85 + 0.15 * n(x * 0.2, z * 0.2)));
+      }
+      case 'drumlin': {
+        // the upper (west) part gone back to sugarbush and pine behind a stone wall; hay below
+        const wall = S * (0.45 + 0.1 * this._relB);
+        return 0.95 * (1 - sstep(wall - 3, wall + 1, x + 3 * n(x * 0.03, z * 0.03 + 4)));
+      }
+      case 'ridge': {
+        // woods down the hollow sides; the ridgetop in fescue with a few oaks left for shade
+        const B = 8 + 3 * this._relB;
+        const dz = Math.abs(z - this.creek.zAt(x));
+        const side = sstep(B - 2, B + 4, dz) * (1 - sstep(B + 22, B + 32, dz));
+        return Math.max(0.95 * side, 0.55 * sstep(0.35, 0.6, n(x * 0.05 + 5, z * 0.05 - 2)));
+      }
+      case 'stairstep': {
+        // live oak motts and cedar brakes on the grass, thicker on the risers
+        return 0.7 * sstep(-0.15, 0.45, n(x * 0.045 + 5, z * 0.045 - 2) + 0.35 * n(x * 0.12 - 3, z * 0.12 + 8));
+      }
+      case 'ravine': {
+        // the ravine sides wooded; a second-growth woodlot at the back of the place
+        const dz = Math.abs(z - this.creek.zAt(x));
+        const rav = this.creekHome ? (1 - sstep(10, 15, dz)) * sstep(1.5, 2.5, dz) : 0;
+        return Math.max(0.92 * rav, 0.9 * (1 - sstep(S * 0.26, S * 0.32, x + 2.5 * n(x * 0.04, z * 0.04))));
       }
       case 'moraine': {
         // the woodlot on the back (west) of the forty, a fence-line edge; fields in front

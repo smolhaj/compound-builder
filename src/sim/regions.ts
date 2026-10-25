@@ -13,7 +13,8 @@
  */
 import type { DisasterKind } from './disaster';
 
-export type RegionId = 'mountain_west' | 'appalachia' | 'desert' | 'north_woods' | 'plains' | 'pnw' | 'upper_midwest';
+export type RegionId = 'mountain_west' | 'appalachia' | 'desert' | 'north_woods' | 'plains' | 'pnw' | 'upper_midwest'
+  | 'new_england' | 'ozarks' | 'hill_country' | 'rust_belt';
 export type Game = 'deer' | 'elk' | 'moose' | 'turkey' | 'javelina' | 'antelope' | 'rabbit' | 'grouse' | 'waterfowl' | 'trout' | 'bass' | 'catfish' | 'salmon' | 'panfish';
 
 /**
@@ -67,7 +68,9 @@ export interface RegionDef {
   /** Houses that come with improved listings. */
   houses: HouseMix;
   /** World terrain and look (engine region kind). */
-  terrain: 'mountain' | 'appalachia' | 'desert' | 'north_woods' | 'plains' | 'pnw' | 'upper_midwest';
+  terrain: 'mountain' | 'appalachia' | 'desert' | 'north_woods' | 'plains' | 'pnw' | 'upper_midwest' | 'new_england' | 'ozarks' | 'hill_country' | 'rust_belt';
+  /** Miles to town against the usual (1): the Rust Belt edge is close in, the north woods far out. */
+  townScale?: number;
 }
 
 /*
@@ -80,7 +83,9 @@ export interface RegionDef {
  *    Salmon ID / Sheridan WY; Boone NC / Morehead KY; Snowflake AZ /
  *    Deming NM (high desert, ~5,000 ft); Ely MN / Presque Isle ME;
  *    Hays KS / Broken Bow NE; Chehalis WA / Sweet Home OR; Wausau WI /
- *    Cadillac MI.
+ *    Cadillac MI; Montpelier VT / Farmington ME; West Plains MO /
+ *    Harrison AR; Fredericksburg TX / Llano TX; Youngstown OH / New
+ *    Castle PA. (Ely MN / Marquette MI for the North Woods.)
  *  - storms: NOAA Storm Events per county per year, spread over the season:
  *    a 0.003 daily chance over a 100-day season is about one in three years.
  */
@@ -133,20 +138,20 @@ export const REGIONS: Record<RegionId, RegionDef> = {
     terrain: 'desert',
   },
   north_woods: {
-    id: 'north_woods', name: 'North Woods', where: 'Maine, northern Minnesota',
-    blurb: 'Thick spruce and fir, lakes and bogs, moose. Cheap land and bitter winters; a short season and a lot of firewood.',
-    // northern MN / Maine woodland $1,200–3,000 an acre
-    perAcre: 2200, creekOdds: 0.55, springOdds: 0.25, gwDepth: [5, 60], gwBad: { hard: 0.1, iron: 0.3, arsenic: 0.1 },
-    // Ely MN / Presque Isle ME: ~9,500 heating degree days
+    id: 'north_woods', name: 'North Woods', where: 'northern Minnesota, the Upper Peninsula',
+    blurb: 'Thick spruce and fir, birch, lakes and bogs, moose. Cheap land and bitter winters; a short season and a lot of firewood.',
+    // northern MN / UP woodland $1,200–3,000 an acre
+    perAcre: 2000, creekOdds: 0.55, springOdds: 0.25, gwDepth: [5, 60], gwBad: { hard: 0.1, iron: 0.3, arsenic: 0.1 },
+    // Ely MN / Marquette MI: ~9,500 heating degree days
     timber: [1.2, 1.6], soil: { thin: 0.5, deep: 0.1 }, frost: [152, 253], zone: '3b–4a', cold: 1.3, rainMm: 850,
     snowCm: 220, julyHighF: 77, janLowF: -6,
     game: ['moose', 'deer', 'grouse', 'rabbit', 'waterfowl', 'trout', 'panfish'],
     odds: { grid_down: 1.3, pandemic: 1, wildfire: 0.7, drought: 0.5 },
-    // nor'easters and Alberta clippers; the 1998 ice storm; the 1999 Boundary Waters derecho
-    storms: { blizzard: 0.014, ice_storm: 0.002, derecho: 0.0008, hail: 0.001, heat_wave: 0.002, flood: 0.0021, lightning_fire: 0.001 },
+    // Alberta clippers and lake-effect snow; the 1999 Boundary Waters derecho; a rare ice storm
+    storms: { blizzard: 0.014, ice_storm: 0.001, derecho: 0.0008, hail: 0.001, heat_wave: 0.002, flood: 0.0021, lightning_fire: 0.001 },
     // hunting camps and log homes in the woods
     houses: { farmhouse: 0.3, trailer: 0.25, timber_cabin: 0.25, log_house: 0.2 },
-    terrain: 'north_woods',
+    terrain: 'north_woods', townScale: 1.3,
   },
   plains: {
     id: 'plains', name: 'Great Plains', where: 'Kansas, Nebraska, the Dakotas',
@@ -190,6 +195,74 @@ export const REGIONS: Record<RegionId, RegionDef> = {
     storms: { blizzard: 0.0125, tornado: 0.0012, derecho: 0.0008, hail: 0.004, heat_wave: 0.003, flood: 0.0018, ice_storm: 0.002 },
     houses: { farmhouse: 0.6, trailer: 0.25, timber_cabin: 0.08, log_house: 0.07 },
     terrain: 'upper_midwest',
+  },
+  new_england: {
+    id: 'new_england', name: 'New England', where: 'Vermont, New Hampshire, western Maine',
+    blurb: 'Stony hill farms gone back to woods, stone walls through the sugarbush, brooks and old capes. Snowy winters, mud season, and dear land.',
+    // VT / NH woodland and old hill farms $3,500–8,000 an acre (Act 250 country)
+    perAcre: 5500, creekOdds: 0.55, springOdds: 0.35,
+    // drilled wells in granite / schist bedrock average 75–150 m; 10–20 % of NH / ME bedrock wells run over the arsenic limit
+    gwDepth: [20, 150], gwBad: { hard: 0.1, iron: 0.2, arsenic: 0.18 },
+    // glacial till: stones in every field ("the second crop is rocks")
+    timber: [0.9, 1.5], soil: { thin: 0.55, deep: 0.05 }, frost: [140, 265], zone: '4b–5a', cold: 1.1, rainMm: 1100,
+    snowCm: 220, julyHighF: 80, janLowF: 6,
+    game: ['deer', 'moose', 'turkey', 'grouse', 'rabbit', 'trout', 'bass'],
+    odds: { grid_down: 1.3, financial: 1, wildfire: 0.4, drought: 0.6 },
+    // nor'easters; the 1998 ice storm; Irene (2011) flooding every valley in Vermont; spring floods
+    storms: { blizzard: 0.012, ice_storm: 0.002, hurricane_remnants: 0.002, flood: 0.0025, hail: 0.001, heat_wave: 0.002 },
+    // old capes and connected farmhouses; camps in the woods
+    houses: { farmhouse: 0.55, trailer: 0.2, timber_cabin: 0.15, log_house: 0.1 },
+    terrain: 'new_england',
+  },
+  ozarks: {
+    id: 'ozarks', name: 'Ozarks', where: 'southern Missouri, northern Arkansas',
+    blurb: 'Oak-and-pine ridges, clear spring-fed rivers, chert in the fields and caves under them. Cheap land, few codes, ice storms and tornadoes.',
+    // MO / AR timber and pasture $2,000–4,000 an acre
+    perAcre: 3000, creekOdds: 0.5, springOdds: 0.45,
+    // karst: deep wells (100–200 m) into the Ozark aquifer, hard water, surface pollution reaches it fast
+    gwDepth: [25, 180], gwBad: { hard: 0.5, iron: 0.05, arsenic: 0.01 },
+    timber: [0.7, 1.4], soil: { thin: 0.6, deep: 0.05 }, frost: [102, 298], zone: '6b–7a', cold: 0.6, rainMm: 1150,
+    snowCm: 30, julyHighF: 90, janLowF: 24,
+    game: ['deer', 'turkey', 'rabbit', 'trout', 'bass', 'catfish'],
+    odds: { financial: 1.2, grid_down: 1.2, drought: 0.9, wildfire: 0.8 },
+    // the 2009 ice storm; Joplin (2011) and spring tornadoes; flash floods down the hollows; hail and summer heat
+    storms: { ice_storm: 0.003, tornado: 0.0012, derecho: 0.0006, flood: 0.003, hail: 0.003, heat_wave: 0.005, lightning_fire: 0.0008 },
+    houses: { farmhouse: 0.35, trailer: 0.45, timber_cabin: 0.1, log_house: 0.1 },
+    terrain: 'ozarks', townScale: 1.1,
+  },
+  hill_country: {
+    id: 'hill_country', name: 'Texas Hill Country', where: 'the Edwards Plateau west of Austin',
+    blurb: 'Limestone hills, live oak and cedar, spring-fed rivers lined with cypress. Long hot summers, a short mild winter, drought and flash floods.',
+    // Llano / Mason / Kerr ranch land $5,000–9,000 an acre; dearer toward Austin
+    perAcre: 7000, creekOdds: 0.3, springOdds: 0.25,
+    // Trinity / Edwards aquifer wells 100–250 m, very hard limestone water
+    gwDepth: [60, 250], gwBad: { hard: 0.7, iron: 0.03, arsenic: 0.03 },
+    timber: [0.4, 1.1], soil: { thin: 0.7, deep: 0.05 }, frost: [84, 322], zone: '8a', cold: 0.3, rainMm: 800,
+    snowCm: 3, julyHighF: 94, janLowF: 35,
+    game: ['deer', 'turkey', 'javelina', 'rabbit', 'bass', 'catfish'],
+    odds: { drought: 2, grid_down: 1.4, wildfire: 1.3, financial: 1 },
+    // "Flash Flood Alley" (the Guadalupe, July 2025); hail; 100 °F summers; cedar fires; Winter Storm Uri (Feb 2021)
+    storms: { flash_flood: 0.004, hail: 0.003, heat_wave: 0.009, lightning_fire: 0.002, ice_storm: 0.0008, tornado: 0.0005 },
+    // limestone ranch houses, manufactured homes on the smaller tracts
+    houses: { farmhouse: 0.35, trailer: 0.4, timber_cabin: 0.15, log_house: 0.1 },
+    terrain: 'hill_country',
+  },
+  rust_belt: {
+    id: 'rust_belt', name: 'Rust Belt edge', where: 'eastern Ohio, western Pennsylvania',
+    blurb: 'Rolling woodlots and old dairy farms on the edge of a mill town: close to stores and jobs, cheap old houses, and a lot of neighbors.',
+    // OH / PA farm and woodland on a town's edge $4,500–7,000 an acre
+    perAcre: 5500, creekOdds: 0.4, springOdds: 0.2,
+    // shale and sandstone wells 20–60 m; iron and sulfur common
+    gwDepth: [10, 60], gwBad: { hard: 0.45, iron: 0.3, arsenic: 0.03 },
+    timber: [0.4, 1.1], soil: { thin: 0.25, deep: 0.2 }, frost: [125, 283], zone: '6a', cold: 0.85, rainMm: 950,
+    snowCm: 140, julyHighF: 82, janLowF: 18,
+    game: ['deer', 'turkey', 'rabbit', 'grouse', 'waterfowl', 'bass', 'panfish'],
+    odds: { financial: 1.4, grid_down: 1.2, lawless: 1.2, pandemic: 1.1, drought: 0.7, wildfire: 0.3 },
+    // lake-effect snow; the 2012 derecho; Ivan's remnants (2004); ice storms; spring floods
+    storms: { blizzard: 0.008, ice_storm: 0.002, derecho: 0.0008, tornado: 0.0006, hail: 0.002, heat_wave: 0.003, flood: 0.002, hurricane_remnants: 0.001 },
+    // old farmhouses and modular homes
+    houses: { farmhouse: 0.6, trailer: 0.25, timber_cabin: 0.08, log_house: 0.07 },
+    terrain: 'rust_belt', townScale: 0.45,
   },
 };
 export const REGION_IDS = Object.keys(REGIONS) as RegionId[];
