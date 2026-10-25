@@ -107,6 +107,11 @@ export interface GameStore {
   /** The shop & money window. */
   shopOpen: boolean;
   openShop: (open: boolean) => void;
+  /** The daily schedule window (sim/daily.ts). */
+  scheduleOpen: boolean;
+  openSchedule: (open: boolean) => void;
+  /** Run a daily-life change (roster, templates, gatherings) on a draft; returns why not, or null. */
+  daily: (op: (g: GameState) => string | null) => string | null;
   /** Run a money operation on a draft (transfer, buy / sell / move metal); returns why not, or null. */
   money: (op: (g: GameState) => string | null) => string | null;
   /** The setup screen offers "Back to my game" (opened from the New button, not at boot). */
@@ -356,6 +361,14 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
   setupOpen: false,
   shopOpen: false,
   openShop: (shopOpen) => set({ shopOpen }),
+  scheduleOpen: false,
+  openSchedule: (scheduleOpen) => set({ scheduleOpen }),
+  daily: (op) => {
+    const g = structuredClone(get().game);
+    const why = op(g);
+    if (!why) set({ game: g });
+    return why;
+  },
   money: (op) => {
     const g = structuredClone(get().game);
     const why = op(g);

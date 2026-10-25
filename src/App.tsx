@@ -3,6 +3,7 @@ import { GameCanvas } from './game/GameCanvas';
 import { Hud } from './ui/Hud';
 import { SetupScreen } from './ui/SetupScreen';
 import { ShopWindow } from './ui/ShopWindow';
+import { SchedulePanel } from './ui/SchedulePanel';
 import { Ticker } from './ui/Ticker';
 import { BattleOverlay } from './ui/BattleOverlay';
 import { GateCard } from './ui/GateCard';
@@ -31,6 +32,7 @@ export default function App() {
   }, []);
   const setup = useGameStore(s => s.setupOpen);
   const shop = useGameStore(s => s.shopOpen);
+  const schedule = useGameStore(s => s.scheduleOpen);
   // a new place (another seed or listing) is a new world
   const worldKey = useGameStore(s => `${s.game.seed}:${s.game.site.id}:${s.game.site.creek}`);
   const clean = new URLSearchParams(location.search).has('clean');
@@ -44,6 +46,7 @@ export default function App() {
       {!clean && <GateCard />}
       {!clean && <ReportCard />}
       {shop && !clean && <ShopWindow />}
+      {schedule && !clean && <SchedulePanel />}
       {setup && !clean && <SetupScreen />}
     </>
   );

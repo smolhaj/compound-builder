@@ -20,6 +20,8 @@ import { onFarmstead, type Farmstead } from '../engine/world/houses/farmstead';
 import { planNeighbors } from './region/neighbors';
 import { buildCamp, flickerCampfire } from './props/campGeometry';
 import { FamilyRenderer } from './people/FamilyRenderer';
+import { buildYard, type Yard } from './props/yardGeometry';
+import { dailyCtx, yardFx } from './people/dailyScene';
 import type { GoalCtx, Site } from './people/peopleGoals';
 import { CELL, type KitPieceDef } from './buildkit/kit';
 import type { GameState } from '../sim/state';
@@ -132,6 +134,8 @@ export class HomesteadWorld {
   /** The family's camp (until a home stands; it stays as the work yard). */
   readonly camp: { x: number; z: number; rot: number };
   private readonly _campGroup: THREE.Group;
+  /** The chore yard round the camp (sim/daily.ts). */
+  private readonly _yard: Yard;
   readonly family: FamilyRenderer;
   /** County road, driveway, gate and stockpile yard. */
   readonly access: Access;
@@ -177,6 +181,10 @@ export class HomesteadWorld {
     this._campGroup.position.set(this.camp.x, this.parcel.height(this.camp.x, this.camp.z), this.camp.z);
     this._campGroup.rotation.y = this.camp.rot;
     this._root.add(this._campGroup);
+    this._yard = buildYard();
+    this._yard.group.position.copy(this._campGroup.position);
+    this._yard.group.rotation.y = this.camp.rot;
+    this._root.add(this._yard.group);
     const zc = this.parcel.creek.zAt(this.center.x + 3);
     this._root.add(scaleFigure(this.center.x + 3, zc + 4, this.parcel.height(this.center.x + 3, zc + 4)));
     ws.scene.add(this._root);
@@ -1155,7 +1163,10 @@ export class HomesteadWorld {
       const t = j && this._treeById.get(j.treeId);
       return j && t ? { x: t.x, z: t.z, scale: t.scale, stage: j.stage, fall: fallHeading(t.id), len: 2.6 * t.scale * t.sy } : null;
     };
-    const ctx: GoalCtx = { camp: this.camp, site, home: homeB ? site(homeB.placed.id) : null, tree, yard: this.access.yard };
+    const refs = [...this._built.values()].filter(b => b.finished).map(b => ({ kind: b.placed.kind, site: site(b.placed.id)! }));
+    const ctx: GoalCtx = { camp: this.camp, site, home: homeB ? site(homeB.placed.id) : null, tree, yard: this.access.yard, ...dailyCtx(refs, game, this.access.yard, seasonState.params.cold < 0.35) };
+    const fx = yardFx(game, hour);
+    this._yard.update(this._clock, fx.lights, fx.smoke);
     const season = (seasonState.visual === 'winter' && !seasonState.climate.freeze ? 'fall' : seasonState.visual) as WearSeason;
     this.family.update(dt, game.people, game.personState, hour, game.clock.t, ctx, this.walkHeight, season, speedK);
     // crops stand in the ground from planting (mid-May) to the last of the harvest (late October); bare soil the rest of the year
@@ -1426,6 +1437,7 @@ export class HomesteadWorld {
     this._props?.dispose();
     this.stream.dispose();
     this.family.dispose();
+    this._yard.dispose();
     this.lakes.dispose();
     this._ws.scene.remove(this._root);
     this._root.traverse(o => {

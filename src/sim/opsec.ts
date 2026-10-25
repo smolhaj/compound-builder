@@ -15,15 +15,16 @@
  */
 import type { GameState } from './state';
 import { isFinished } from './construction';
+import { noiseNow } from './gatherings';
 
 export interface Opsec { quietDeliveries: boolean; blackout: boolean }
 
 export const opsecOf = (s: GameState): Opsec => (s.opsec ??= { quietDeliveries: false, blackout: false });
 
-export type ExposureSource = 'deliveries' | 'structures' | 'guns' | 'metals' | 'lights' | 'smoke' | 'talk' | 'news';
+export type ExposureSource = 'deliveries' | 'structures' | 'guns' | 'metals' | 'lights' | 'smoke' | 'talk' | 'news' | 'gatherings';
 export const EXPOSURE_NAME: Record<ExposureSource, string> = {
   deliveries: 'Deliveries seen', structures: 'Visible structures', guns: 'Gun sales on record', metals: 'Metal & cash on the books',
-  lights: 'Lights after the grid', smoke: 'Smoke & cooking', talk: 'Talk in town', news: 'On the local news',
+  lights: 'Lights after the grid', smoke: 'Smoke & cooking', talk: 'Talk in town', news: 'On the local news', gatherings: 'Parties & cookouts',
 };
 
 const STRUCTURE_WEIGHT: Record<string, number> = { bunker_hatch: 10, bunker_stairs: 8, water_tower: 8, solar_array: 7, garage_solar: 5 };
@@ -49,7 +50,9 @@ export function exposureParts(s: GameState): Record<ExposureSource, number> {
   // a shooting on the local news (sim/breakins.ts), fading over about a year
   const at = s.breakins?.newsAt ?? -1;
   const news = at >= 0 ? 15 * Math.exp(-Math.max(0, s.clock.t - at) / 365) : 0;
-  return { deliveries, structures, guns, metals, lights, smoke, talk, news };
+  // noise, light and smoke from a cookout or a party (sim/gatherings.ts), fading over a few days
+  const gatherings = Math.min(15, noiseNow(s));
+  return { deliveries, structures, guns, metals, lights, smoke, talk, news, gatherings };
 }
 
 /** 0–100: how much the county knows. */

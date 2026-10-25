@@ -7,9 +7,15 @@
  *  school   kids at the camp table (seated)
  *  leisure  evenings sat round the fire; daytime kids roam near camp
  *  sleep    inside the tent / cabin (hidden once there)
+ *  daily life (sim/daily.ts): hoeing / weeding the garden and fields, feed
+ *  pails at the coop, the axe at the chopping block and stacking, buckets
+ *  between the well and the house, stirring at the fire pit, laundry at the
+ *  line and the tub, a hammer at the fence, the watch (tower, a rifle along
+ *  the wall, the gate), meals at the picnic table, a gathering round the fire
  */
-import { FIG_POSE } from '../../engine/world/people/figureKit';
+import { FIG_POSE, FIG_TOOL } from '../../engine/world/people/figureKit';
 import { CAMP } from '../props/campGeometry';
+import { YARD } from '../props/yardGeometry';
 import type { TaskKind } from '../../sim/state';
 
 export interface Site { x: number; z: number; rot: number; w: number; d: number; /** Evening seats (local x, z, face x, z). */ seats?: ReadonlyArray<readonly [number, number, number, number]> }
@@ -25,6 +31,28 @@ export interface GoalCtx {
   tree?: (jobId: string) => WorkTree | null;
   /** Stockpile yard (logs are skidded here). */
   yard?: { x: number; z: number };
+  /** Where the daily work happens (finished structures, the wall). */
+  spots?: WorkSpots;
+  /** The watch post of a person (sim/daily.ts watchNow), by id order of the people. */
+  post?: (i: number) => 'tower' | 'wall' | 'gate';
+  /** Fine weather for eating outdoors. */
+  outdoors?: boolean;
+  /** Anyone carries a long gun on watch. */
+  armed?: boolean;
+}
+
+export interface WorkSpots {
+  gardens: Site[];
+  fields: Site[];
+  coops: Site[];
+  barns: Site[];
+  /** Well, cistern or filter shed (where the water comes from). */
+  water: { x: number; z: number } | null;
+  towers: Array<{ x: number; z: number }>;
+  /** Points along the finished wall / fence, in order (patrol). */
+  wall: Array<[number, number]>;
+  /** The drive's gate (or where the drive meets the yard). */
+  gate: { x: number; z: number } | null;
 }
 
 export interface WorkTree { x: number; z: number; scale: number; stage: 'marked' | 'felled' | 'bucked'; fall: number; len: number }
@@ -39,6 +67,12 @@ export interface Goal {
   hidden: boolean;
   /** Working motion (hammering / kneeling) once there. */
   work: boolean;
+  /** Tool in hand (FIG_TOOL). */
+  tool?: number;
+  /** Height above the ground (a tower deck). */
+  y?: number;
+  /** Pose while walking there (a rifle carried, buckets). */
+  walkPose?: number;
 }
 
 /** Rotate a camp-local point into the world. */
@@ -68,7 +102,7 @@ export function goalFor(i: number, kid: boolean, task: TaskKind, target: string 
         const lx = u * (st.w / 2 + 0.12), lz = v * (st.d / 2 + 0.12);
         const c = Math.cos(st.rot), s = Math.sin(st.rot);
         const x = st.x + lx * c + lz * s, z = st.z - lx * s + lz * c;
-        return { x, z, pose: FIG_POSE.REACH, face: faceTo(x, z, st.x, st.z), hidden: false, work: true };
+        return { x, z, pose: FIG_POSE.REACH, face: faceTo(x, z, st.x, st.z), hidden: false, work: true, tool: FIG_TOOL.HAMMER };
       }
       break;
     }
@@ -86,7 +120,7 @@ export function goalFor(i: number, kid: boolean, task: TaskKind, target: string 
         const f = 0.2 + 0.25 * (i % 3);
         const lx = t.x + dx * t.len * f, lz = t.z + dz * t.len * f;
         const x = lx + dz * 0.09 * side, z = lz - dx * 0.09 * side;
-        return { x, z, pose: FIG_POSE.REACH, face: faceTo(x, z, lx, lz), hidden: false, work: true };
+        return { x, z, pose: FIG_POSE.CHOP, face: faceTo(x, z, lx, lz), hidden: false, work: true, tool: FIG_TOOL.AXE };
       }
       // skidding: back and forth between the log sections and the yard
       const y = ctx.yard ?? ctx.camp;
@@ -132,7 +166,11 @@ export function goalFor(i: number, kid: boolean, task: TaskKind, target: string 
       const [x, z] = campPt(ctx, Math.cos(a) * r, Math.sin(a) * r);
       return { x, z, pose: FIG_POSE.STAND, face: null, hidden: false, work: false };
     }
-    default: break;
+    default: {
+      const g = dailyGoal(i, kid, task, hour, ctx, clock);
+      if (g) return g;
+      break;
+    }
   }
   // chores (and building with nothing to build): fire, barrel, woodpile by turns
   const spots: Array<[number, number, number]> = [
@@ -144,4 +182,149 @@ export function goalFor(i: number, kid: boolean, task: TaskKind, target: string 
   const [lx, lz, pose] = spots[(i + Math.floor(wobble(i, clock, 0.05) * 4)) % spots.length];
   const [x, z] = campPt(ctx, lx, lz);
   return { x, z, pose, face: faceTo(x, z, fire[0], fire[1]), hidden: false, work: pose !== FIG_POSE.STAND };
+}
+
+/** A spot inside a structure's footprint (local u, v in −1…1), in the world. */
+function inSite(st: Site, u: number, v: number): [number, number] {
+  const lx = u * st.w / 2, lz = v * st.d / 2, c = Math.cos(st.rot), sn = Math.sin(st.rot);
+  return [st.x + lx * c + lz * sn, st.z - lx * sn + lz * c];
+}
+
+const pickOf = <T,>(xs: readonly T[], i: number): T | null => (xs.length ? xs[i % xs.length] : null);
+
+/** The daily-life tasks (sim/daily.ts). Null: fall back to camp chores. */
+export function dailyGoal(i: number, kid: boolean, task: TaskKind, hour: number, ctx: GoalCtx, clock: number): Goal | null {
+  const sp = ctx.spots;
+  const at = (lx: number, lz: number) => campPt(ctx, lx, lz);
+  const goal = (x: number, z: number, pose: number, face: number | null, extra: Partial<Goal> = {}): Goal => ({ x, z, pose, face, hidden: false, work: false, ...extra });
+  const fire = at(CAMP.fire.x, CAMP.fire.z);
+  switch (task) {
+    case 'garden':
+    case 'fields': {
+      const st = pickOf(task === 'garden' ? sp?.gardens ?? [] : sp?.fields ?? [], i);
+      if (!st) return null;
+      // a new row every half hour or so; hoeing, or down on the knees weeding / digging
+      const u = (wobble(i, clock, 0.02) - 0.5) * 1.4, v = (wobble(i + 31, clock, 0.02) - 0.5) * 1.4;
+      const [x, z] = inSite(st, u, v);
+      const kneel = kid || wobble(i + 7, clock, 0.04) < (task === 'fields' ? 0.5 : 0.35);
+      return goal(x, z, kneel ? FIG_POSE.KNEEL : FIG_POSE.HOE, st.rot + (i % 2 ? Math.PI : 0), { work: true, tool: kneel ? FIG_TOOL.NONE : FIG_TOOL.HOE });
+    }
+    case 'livestock': {
+      const st = pickOf(sp?.coops ?? [], i) ?? pickOf(sp?.barns ?? [], i);
+      if (!st) return null;
+      // out in the run in front of the coop, scattering feed from a pail
+      const [x, z] = inSite(st, (wobble(i, clock, 0.015) - 0.5) * 1.2, 1.25);
+      return goal(x, z, FIG_POSE.PAIL, faceTo(x, z, st.x, st.z), { tool: FIG_TOOL.PAIL, walkPose: FIG_POSE.PAIL });
+    }
+    case 'wood': {
+      // one splits at the block, the next stacks (carrying splits to the pile)
+      if (i % 2 === 0 || kid) {
+        const [x, z] = at(YARD.block.x + 0.14, YARD.block.z + 0.02);
+        const [bx, bz] = at(YARD.block.x, YARD.block.z);
+        return goal(x, z, FIG_POSE.CHOP, faceTo(x, z, bx, bz), { work: true, tool: FIG_TOOL.AXE });
+      }
+      const toPile = wobble(i, clock, 0.006) < 0.5;
+      const [x, z] = toPile ? at(YARD.woodpile.x + 0.08, YARD.woodpile.z + (wobble(i + 3, clock, 0.006) - 0.5) * 0.4) : at(YARD.block.x - 0.05, YARD.block.z + 0.16);
+      return goal(x, z, FIG_POSE.KNEEL, toPile ? Math.PI / 2 * -1 + ctx.camp.rot : null, { walkPose: FIG_POSE.CARRY, work: true });
+    }
+    case 'water': {
+      // buckets between the well (or the creek side of camp) and the barrel at the house
+      const src = sp?.water ?? { x: at(-0.9, -1.6)[0], z: at(-0.9, -1.6)[1] };
+      const [bx, bz] = at(CAMP.barrel.x + 0.1, CAMP.barrel.z + 0.08);
+      const there = wobble(i, clock, 0.012) < 0.5;
+      const x = there ? src.x + 0.15 : bx, z = there ? src.z + 0.15 : bz;
+      return goal(x, z, FIG_POSE.STAND, null, { tool: FIG_TOOL.BUCKETS, walkPose: FIG_POSE.STAND });
+    }
+    case 'kitchen': {
+      // the summer kitchen at the fire pit: stirring the pot, putting up the harvest
+      const a = 0.6 + (i % 3) * 0.9;
+      const x = fire[0] + Math.cos(a) * 0.13, z = fire[1] + Math.sin(a) * 0.13;
+      return goal(x, z, FIG_POSE.STIR, faceTo(x, z, fire[0], fire[1]), { tool: FIG_TOOL.SPOON, work: true });
+    }
+    case 'laundry': {
+      const L = YARD.line;
+      if (wobble(i, clock, 0.025) < 0.45) {
+        // scrubbing at the tub
+        const [x, z] = at(YARD.tub.x - 0.1, YARD.tub.z - 0.08);
+        const [tx, tz] = at(YARD.tub.x, YARD.tub.z);
+        return goal(x, z, FIG_POSE.KNEEL, faceTo(x, z, tx, tz), { work: true });
+      }
+      const lx = L.x0 + 0.1 + wobble(i + 5, clock, 0.01) * (L.x1 - L.x0 - 0.2);
+      const [x, z] = at(lx, L.z + 0.07), [tx, tz] = at(lx, L.z);
+      return goal(x, z, FIG_POSE.HANG, faceTo(x, z, tx, tz), { work: true });
+    }
+    case 'repairs': {
+      const w = sp?.wall ?? [];
+      if (w.length >= 2) {
+        const k = Math.floor(wobble(i, clock, 0.04) * (w.length - 1));
+        const [ax, az] = w[k], [bx, bz] = w[k + 1];
+        const u = wobble(i + 11, clock, 0.04);
+        const px = ax + (bx - ax) * u, pz = az + (bz - az) * u;
+        // inside the line, facing it
+        const nx = -(bz - az), nz = bx - ax, nl = Math.hypot(nx, nz) || 1;
+        const side = (ctx.camp.x - px) * nx + (ctx.camp.z - pz) * nz > 0 ? 1 : -1;
+        const x = px + nx / nl * 0.09 * side, z = pz + nz / nl * 0.09 * side;
+        return goal(x, z, FIG_POSE.REACH, faceTo(x, z, px, pz), { work: true, tool: FIG_TOOL.HAMMER });
+      }
+      const st = ctx.home ?? pickOf(sp?.barns ?? [], i);
+      if (!st) return null;
+      const [x, z] = inSite(st, 1.15, (i % 2) - 0.5);
+      return goal(x, z, FIG_POSE.REACH, faceTo(x, z, st.x, st.z), { work: true, tool: FIG_TOOL.HAMMER });
+    }
+    case 'hunt':
+    case 'medic':
+    case 'radio': {
+      // out in the woods / indoors with the sick / at the set
+      const h = ctx.home;
+      if (task !== 'hunt' && !h) return null;
+      return { x: h?.x ?? ctx.camp.x, z: h?.z ?? ctx.camp.z, pose: FIG_POSE.STAND, face: null, hidden: true, work: false };
+    }
+    case 'teach': {
+      const [x, z] = at(CAMP.table.x + 0.2, CAMP.table.z);
+      const [tx, tz] = at(CAMP.table.x, CAMP.table.z);
+      return goal(x, z, FIG_POSE.REACH, faceTo(x, z, tx, tz), { work: true });
+    }
+    case 'watch': {
+      const post = ctx.post?.(i) ?? 'gate';
+      const rifle = ctx.armed ? FIG_TOOL.RIFLE : FIG_TOOL.NONE, pose = ctx.armed ? FIG_POSE.RIFLE : FIG_POSE.STAND;
+      const tower = pickOf(sp?.towers ?? [], 0);
+      if (post === 'tower' && tower) return goal(tower.x + 0.05, tower.z + 0.05, pose, faceTo(tower.x, tower.z, ctx.camp.x, ctx.camp.z) + Math.PI, { y: 0.9, tool: rifle, walkPose: pose });
+      const w = sp?.wall ?? [];
+      if (post === 'wall' && w.length >= 2) {
+        // walk the line, a new stretch every quarter hour, pausing to look out
+        const k = Math.floor(wobble(i, clock, 0.012) * w.length);
+        const [px, pz] = w[k];
+        const x = px + (ctx.camp.x - px) * 0.04, z = pz + (ctx.camp.z - pz) * 0.04;
+        return goal(x, z, pose, faceTo(ctx.camp.x, ctx.camp.z, px, pz), { tool: rifle, walkPose: pose });
+      }
+      const g = sp?.gate ?? { x: at(0, 2)[0], z: at(0, 2)[1] };
+      const x = g.x + (ctx.camp.x - g.x) * 0.05 + (i % 2 ? 0.1 : -0.1), z = g.z + (ctx.camp.z - g.z) * 0.05;
+      return goal(x, z, pose, faceTo(ctx.camp.x, ctx.camp.z, g.x, g.z), { tool: rifle, walkPose: pose });
+    }
+    case 'meal': {
+      if (!ctx.outdoors && ctx.home?.seats?.length) return goalFor(i, kid, 'leisure', null, 19, ctx, clock);
+      const P = YARD.picnic, side = i % 2 ? 1 : -1, k = Math.floor(i / 2) % 3;
+      const [x, z] = at(P.x - 0.1 + k * 0.1, P.z + side * 0.12);
+      const [tx, tz] = at(P.x - 0.1 + k * 0.1, P.z);
+      return goal(x, z, FIG_POSE.BENCH, faceTo(x, z, tx, tz));
+    }
+    case 'party': {
+      // the grill, round the fire on the stools, at the picnic table, standing about
+      if (i === 0 && hour < 20) {
+        const [x, z] = at(YARD.grill.x - 0.11, YARD.grill.z);
+        const [gx, gz] = at(YARD.grill.x, YARD.grill.z);
+        return goal(x, z, FIG_POSE.STIR, faceTo(x, z, gx, gz), { tool: FIG_TOOL.SPOON });
+      }
+      const n = YARD.stools.length;
+      if (i - 1 < n) {
+        const st = YARD.stools[(i - 1 + n) % n];
+        const [x, z] = at(st.x, st.z);
+        return goal(x, z, FIG_POSE.BENCH, faceTo(x, z, fire[0], fire[1]));
+      }
+      const P = YARD.picnic, side = i % 2 ? 1 : -1;
+      const [x, z] = at(P.x - 0.12 + ((i >> 1) % 3) * 0.12, P.z + side * 0.12);
+      return goal(x, z, FIG_POSE.BENCH, faceTo(x, z, fire[0], fire[1]));
+    }
+    default: return null;
+  }
 }

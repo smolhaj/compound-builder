@@ -21,6 +21,8 @@ import { tractorBoost } from './vehicles';
 import { SOIL_YIELD } from './site';
 import { REGIONS, seasons } from './regions';
 import { gardenSeason, GREENHOUSE_PEAK, greenhouseGreens, hasGreenhouse, orchardHarvest } from './greenhouse';
+import { careYield, lifeMorale } from './daily';
+import { socialMorale } from './gatherings';
 
 export type FoodId = 'fresh' | 'frozen' | 'canned' | 'staples';
 /** Food is kept in the stockpile in these units; kcal in one unit. */
@@ -73,7 +75,7 @@ export function fieldHarvest(s: GameState): number {
   const skill = Math.max(...s.people.map(p => p.skills.gardener), 0);
   // hail on the standing crop: replanted early in the summer it still makes 70 %; in late summer a quick catch crop, 30 %
   const hd = hailThisYear(s), hail = hd == null || hd >= HARVEST[1] ? 1 : hd < HARVEST[0] - 60 ? 0.7 : 0.3;
-  return fields * FIELD_KCAL / (HARVEST[1] - HARVEST[0]) * (0.6 + 0.08 * skill) * SOIL_YIELD[s.site.soil] * climate(s).grow * tractorBoost(s) * hail;
+  return fields * FIELD_KCAL / (HARVEST[1] - HARVEST[0]) * (0.6 + 0.08 * skill) * SOIL_YIELD[s.site.soil] * climate(s).grow * tractorBoost(s) * hail * careYield(s, 'harvest');
 }
 
 /** What the place grows a day (kcal, fresh), by day of year: eggs from the coop, the garden in season, the field harvest. */
@@ -83,7 +85,7 @@ export function produce(s: GameState): number {
   const coops = fin.filter(st => st.kind === 'chicken_coop').length;
   const gardens = fin.filter(st => st.kind === 'garden').length;
   // a dozen hens: ~8 eggs a day in summer, ~3 in midwinter (≈ 70 kcal each)
-  const eggs = coops * 70 * (5.5 + 2.5 * Math.cos(2 * Math.PI * (doy - 172) / 365));
+  const eggs = coops * 70 * (5.5 + 2.5 * Math.cos(2 * Math.PI * (doy - 172) / 365)) * careYield(s, 'animals');
   // a kitchen garden: nothing until mid-June, a peak of ≈ 2,500 kcal a day in August–September, done by late October
   // nothing until three weeks past the last frost, full by mid-summer, done a month past the first frost
   // a finished greenhouse starts the garden six weeks earlier, runs it six weeks later and raises the peak (greenhouse.ts)
@@ -92,7 +94,7 @@ export function produce(s: GameState): number {
   const skill = Math.max(...s.people.map(p => p.skills.gardener), 0);
   // a month to come back after hail (replanted from saved seed), then a shorter season
   const hd = hailThisYear(s), hail = hd == null || doy < hd ? 1 : doy - hd < 30 ? 0 : 0.7;
-  const veg = gardens * 2500 * season * (0.6 + 0.08 * skill) * SOIL_YIELD[s.site.soil] * (hasGreenhouse(s) ? GREENHOUSE_PEAK : 1) * hail;
+  const veg = gardens * 2500 * season * (0.6 + 0.08 * skill) * SOIL_YIELD[s.site.soil] * (hasGreenhouse(s) ? GREENHOUSE_PEAK : 1) * hail * careYield(s, 'weeds');
   // winter greens on the greenhouse benches; the orchard's fruit, August to October
   const grow = climate(s).grow;
   return Math.max(0, eggs) * Math.max(0.5, grow) + (veg + greenhouseGreens(s) + orchardHarvest(s)) * grow + fieldHarvest(s);
@@ -168,6 +170,8 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
   const dark = s.utilities.fittings.some(f => f.kind === 'wire' && f.finishedAt !== null) && !s.utilities.lit.some(id => isHome(s.structures.find(x => x.id === id)?.kind ?? ''));
   const medic = Math.max(...s.people.filter((p, i) => !p.kid && alive(s, i)).map(p => p.skills.medic), 0);
   const bay = fin.some(st => st.kind === 'bunker_medical');
+  // gatherings' afterglow and grief (sim/gatherings.ts: a funeral eases it)
+  const social = socialMorale(s);
   s.people.forEach((p, i) => {
     const n = s.personState[i]?.needs;
     if (!n || n.died != null) return;
@@ -193,7 +197,7 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
     if (s.utilities.report.shortL > s.utilities.report.useL * 0.5) dh -= 2;   // not enough to drink
     n.health = Math.max(cozy ? 5 : 0, Math.min(100, n.health + dh));
     // morale: drifts to a baseline that variety, a home, light and safety raise; hunger and loss lower
-    const target = 45 + 6 * Math.min(variety, 4) + (home ? 8 : -6) + (dark ? -8 : 0) + (s.utilities.hauling ? (s.utilities.haulFar ? -10 : -4) : 0) - Math.min(25, n.hunger / 1000) - (s.personState.some(x => x.needs?.died != null) ? 15 : 0);
+    const target = 45 + 6 * Math.min(variety, 4) + (home ? 8 : -6) + (dark ? -8 : 0) + (s.utilities.hauling ? (s.utilities.haulFar ? -10 : -4) : 0) - Math.min(25, n.hunger / 1000) + social + lifeMorale(s, i);
     n.morale += (Math.max(0, Math.min(100, target)) - n.morale) * 0.08;
     if (n.health <= 0) {
       n.died = Math.floor(s.clock.t);

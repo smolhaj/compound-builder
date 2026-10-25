@@ -1,4 +1,6 @@
 import { useState, type CSSProperties, type ReactNode } from 'react';
+import { DailySection } from './SchedulePanel';
+import { DAILY_TASK_TEXT } from './dailyText';
 import { useWorldStore, type BuildingView, type CameraMode } from '../store/worldStore';
 import { useGameStore } from '../store/gameStore';
 import type { Quality } from '../engine/world/WorldScene';
@@ -51,7 +53,7 @@ const VIEWS: Array<[BuildingView, string, string]> = [['full', 'Walls', 'Whole b
 const SPEEDS: Array<[Speed, string]> = [[0, '❚❚'], [1, '▶'], [2, '▶▶'], [3, '▶▶▶'], [4, '⏩']];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const MONTH_START = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
-const TASK_TEXT: Record<string, string> = { build: 'Building', forestry: 'In the woods', chores: 'Chores', sleep: 'Asleep', school: 'School', leisure: 'Free time', idle: 'Idle', job: 'At work in town', gone: 'Died', shelter: 'Sheltering', away: 'Away on the rescue' };
+const TASK_TEXT: Record<string, string> = { build: 'Building', forestry: 'In the woods', chores: 'Chores', sleep: 'Asleep', school: 'School', leisure: 'Free time', idle: 'Idle', job: 'At work in town', gone: 'Died', shelter: 'Sheltering', away: 'Away on the rescue', ...DAILY_TASK_TEXT };
 
 function dateLabel(doy: number): string {
   let m = 11;
@@ -387,6 +389,7 @@ export function Hud() {
                 })()}
               </div>;
             })}
+            <DailySection />
             {game.people.some(p => p.conditions?.length) && <Section title="Medicine & household">
               {pharmacyOpen(game) ? <button style={{ ...btn(), width: '100%' }} title="Fill everyone's prescriptions three months past the month in hand (as far ahead as insurance covers)" onClick={() => g.stockUpRx()}>Fill prescriptions 90 days ahead</button>
                 : <Note tone="warn">The pharmacy is shut: what's on hand is all there is.</Note>}

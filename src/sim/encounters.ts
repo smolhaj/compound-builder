@@ -16,6 +16,7 @@
 import { mulberry32, pick } from './rng';
 import { forewarned } from './radio';
 import { gearPosture } from './gear';
+import { fenceHold, watchDetection } from './daily';
 import { armed, firepower } from './armory';
 import { applyBattle, planBattle, type RaiderTemper } from './battle';
 import { breakInDay, resolveBreakIn } from './breakins';
@@ -127,7 +128,7 @@ export function postureOf(s: GameState): Posture {
     held += len * d.blocks.people * g;
     look += len * (d.height > 0.35 ? 1 : 0.3) * g;
   }
-  const barrier = Math.min(100, held / 40 * 100), fortress = Math.min(100, look / 40 * 100);
+  const barrier = Math.min(100, held / 40 * 100) * fenceHold(s), fortress = Math.min(100, look / 40 * 100);
   // anyone away on a rescue isn't on the line
   const here = (i: number) => s.personState[i]?.needs.died == null && !s.rescue?.raid?.team.includes(s.people[i].id);
   const adults = s.people.filter((p, i) => !p.kid && here(i));
@@ -135,7 +136,7 @@ export function postureOf(s: GameState): Posture {
   const watch = Math.max(0, ...adults.map(p => p.skills.hunter));
   const radioNet = s.neighbors.some(n => n.radio && n.status === 'home' && n.disposition > 30);
   const gear = gearPosture(s, fighters);
-  const detection = Math.min(100, 25 + watch * 5 + (radioNet ? 20 : 0) + (barrier > 50 ? 10 : 0) + gear.detection + forewarned(s));
+  const detection = Math.min(100, 25 + watch * 5 + (radioNet ? 20 : 0) + (barrier > 50 ? 10 : 0) + gear.detection + forewarned(s) + watchDetection(s));
   return { visibility: Math.min(100, visibility + gear.visibility), fortress, barrier: Math.min(100, barrier + gear.barrier), detection, fighters, deter: gear.deter, safeRoom: gear.safeRoom, armed: armed(s), firepower: firepower(s) * gear.fight, bunker: fin.some(st => st.kind === 'bunker_hatch' || st.kind === 'bunker_stairs') };
 }
 
