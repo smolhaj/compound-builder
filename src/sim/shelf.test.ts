@@ -42,7 +42,9 @@ describe('shelf life and pests', () => {
     const h = newGame(1);
     h.stock.staples = 100; h.stock.traps = 7;
     days(h, 365);
-    expect(h.stock.staples).toBeGreaterThan(97);
+    // (the flour in the mix goes rancid in a warm house inside the year: that's not the mice)
+    expect(h.stock.staples).toBeGreaterThan(95);
+    expect(h.stock.staples).toBeGreaterThan(g.stock.staples + 5);
     const v = newGame(1);
     v.stock.staples = 100;
     v.structures.push({ id: 'v', kind: 'bunker_stores', x: 1, z: 1, rot: 0, stage: 5, done: 0, supplied: true, finishedAt: 0 });
