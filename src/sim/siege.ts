@@ -36,7 +36,12 @@ import { dayIndex, hourOf, type GameState } from './state';
 /** Kinds that arrive as an attack and get the cutscene (not traders, neighbors, refugees, a trial's end or a break-in). */
 const RAID_KINDS: ReadonlySet<EncounterKind> = new Set(['looters', 'gang', 'militia', 'patrol', 'requisition', 'horde']);
 
-/** An encounter that plays as a cutscene: an armed (or dead) crew at the gate that can be fought. */
+/** Anything that plays as a cutscene: a raid, or a night break-in (a short single scene in the house). */
+export function hasCutscene(e: Pick<Encounter, 'kind' | 'strength' | 'stances'> | null | undefined): boolean {
+  return !!e && (e.kind === 'break_in' || isRaid(e));
+}
+
+/** An encounter that plays as a raid: an armed (or dead) crew at the gate that can be fought. */
 export function isRaid(e: Pick<Encounter, 'kind' | 'strength' | 'stances'> | null | undefined): boolean {
   return !!e && RAID_KINDS.has(e.kind) && e.strength > 0 && e.stances.includes('defend');
 }
@@ -49,6 +54,7 @@ const WINDOWS: Record<string, Array<[number, number, number]>> = {
   patrol: [[8, 17, 8], [5, 8, 1.5], [20, 24, 0.5]],
   requisition: [[8, 17, 9], [17, 19, 1]],
   horde: [[0, 24, 1]],
+  break_in: [[1.5, 3.5, 1]],
 };
 
 /** The hour of day (0-24, quarter hours) a raid of this kind arrives. Deterministic in the seed. */
@@ -125,6 +131,8 @@ export interface Scene {
 
 export interface SiegePlan {
   scenes: Scene[];
+  /** What kind of encounter this is (captions differ for a break-in). */
+  crew: EncounterKind;
   /** The hour of day the raid arrived. */
   startHour: number;
   night: boolean;
@@ -188,11 +196,12 @@ export function planSiege(inp: SiegeInput): SiegePlan {
   const tailOf = () => 35 + r() * 85;
   const scenes: Scene[] = [];
   const mk = (kind: SceneKind, fight: number, gap: number): Scene => {
-    let lead = leadOf(), tail = tailOf();
-    // a scene is never under two minutes whole, and (the fight aside) never over eight
-    const total0 = lead + fight + tail;
+    const house = inp.kind === 'break_in';
+    let lead = house ? 40 + r() * 50 : leadOf(), tail = house ? 40 + r() * 50 : tailOf();
+    // a scene is never under two minutes whole, and (the fight aside) never over eight (a break-in: four)
+    const total0 = lead + fight + tail, cap = house ? 240 : 480;
     if (total0 < 120) lead += 120 - total0;
-    else if (total0 > 480) { const cut = Math.min(total0 - 480, lead + tail - 40); const k = (lead + tail - cut) / (lead + tail); lead *= k; tail *= k; }
+    else if (total0 > cap) { const cut = Math.min(total0 - cap, lead + tail - 40); const k = (lead + tail - cut) / (lead + tail); lead *= k; tail *= k; }
     return { index: scenes.length, kind, label: SCENE_LABEL[kind], gap: Math.round(gap), lead: Math.round(lead), fight: Math.round(fight), tail: Math.round(tail) };
   };
   const finalFight = Math.max(20, Math.round(inp.fightSeconds ?? 45 + r() * 60));
@@ -220,9 +229,25 @@ export function planSiege(inp: SiegeInput): SiegePlan {
       for (const sc of scenes) if (sc.gap > 0) sc.gap = Math.max(600, Math.round(sc.gap * k));
     }
   }
+  return finishPlan(inp.kind, inp.hour, scenes);
+}
+
+/** Totals for a list of scenes (also used to splice a plan after a mid-siege change of stance). */
+export function finishPlan(crew: EncounterKind, startHour: number, list: Scene[]): SiegePlan {
+  const scenes = list.map((sc, i) => ({ ...sc, index: i, gap: i === 0 ? 0 : sc.gap }));
   const totalGame = scenes.reduce((a, sc) => a + sc.gap + sceneGame(sc), 0);
   const totalReal = scenes.reduce((a, sc) => { const p = playbackLengths(sc); return a + (sc.gap > 0 ? GAP_CARD_SECONDS : 0) + p.lead + p.fight + p.tail; }, 0);
-  return { scenes, startHour: inp.hour, night, totalGame, totalReal };
+  return { scenes, crew, startHour, night: isNight(startHour), totalGame, totalReal };
+}
+
+/**
+ * What a night under siege does to the family: lost sleep (hours owed, wears off 3 a day) and
+ * morale. Scales with the scenes and how long it ran; a single short scene costs a little.
+ */
+export function siegeStrain(plan: SiegePlan): { sleep: number; morale: number } {
+  const hours = plan.totalGame / 3600, extra = plan.scenes.length - 1;
+  const asleep = plan.night ? 1 : 0.35;
+  return { sleep: Math.round(Math.min(8, (0.6 + hours * 0.9 + extra * 0.4) * asleep) * 10) / 10, morale: Math.round(Math.min(16, 1 + extra * 2.5 + hours * 1.6)) };
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -308,6 +333,10 @@ export function promptNarration(s: GameState, e: Pick<Encounter, 'kind' | 'size'
   if (e.kind === 'horde') return night
     ? pickOf(r, ['A low moaning from the road, and the dog will not stop. Something is dragging itself up the drive.', 'Shapes on the county road in the dark, too many, too slow. The sound carries.'])
     : pickOf(r, ['A shuffling crowd on the county road, drawn up the drive by the noise.', 'Dozens of them, in the heat shimmer, coming up the road.']);
+  if (e.kind === 'break_in') return pickOf(r, [
+    dog ? 'The dog is going crazy downstairs, and then a crash of glass.' : 'A floorboard, downstairs. Somebody is in the kitchen, trying not to be heard.',
+    'Footsteps in the hall, a drawer pulled out. The lights are off and the bedroom door is shut.',
+  ]);
   if (night) {
     const lines = [
       dog ? 'The dog is at the window, hackles up. Headlights, off the county road and slowing at the mailbox.' : 'Headlights sweep the ceiling. An engine idling at the end of the drive.',
@@ -329,6 +358,7 @@ export function sceneCaption(plan: SiegePlan, scene: Scene, part: 'lead' | 'tail
   const r = mulberry32(seed * 53 + scene.index * 7 + (part === 'lead' ? 1 : part === 'tail' ? 2 : 3));
   const night = isNight(hourAfter(plan, 0));
   if (part === 'gap') return gapLabel(scene.gap);
+  if (plan.crew === 'break_in') return part === 'lead' ? pickOf(r, ['A step on the stairs. A beam of light under the door.', 'Glass crunches in the kitchen. Then silence. Then a drawer.']) : pickOf(r, ['The back door bangs. A car starts on the county road.', 'Quiet. Then the first thing you hear is your own heart.']);
   if (part === 'lead') {
     switch (scene.kind) {
       case 'gate': return pickOf(r, ['They stand at the gate and look at the house.', 'Boots on the gravel. Someone walks the fence line and tries the latch.']);
@@ -453,4 +483,37 @@ export function gateScene(s: GameState, e: Pick<Encounter, 'size' | 'kind' | 'id
   ev.push({ t: duration, kind: 'end', result: tone === 'bad' ? 'breached' : 'fled' });
   ev.sort((a, c) => a.t - c.t);
   return { night, units, events: ev, duration };
+}
+
+/**
+ * A break-in that isn't a fight (shouting, or hiding on the phone with dispatch): the intruders are
+ * in the house, go through it, and go out to the road. `tone` good = they run, bad = they take things.
+ */
+export function breakInScene(s: GameState, e: Pick<Encounter, 'size'>, stance: Stance, tone: 'good' | 'mixed' | 'bad', seed: number): Battle {
+  const r = mulberry32(seed * 6113 + 5);
+  const { C, at } = stage(s, seed);
+  const n = Math.max(1, Math.min(3, e.size));
+  const units: BattleUnit[] = [];
+  const ev: BattleEvent[] = [];
+  const say = (t: number, text: string, who?: string) => ev.push({ t: r2(t), kind: 'say', text, ...(who ? { who } : {}) });
+  for (let i = 0; i < n; i++) { const p = at(2.2 + r(), (i - (n - 1) / 2) * 1.2); units.push({ id: `r${i}`, side: 'raider', x: r2(p.x), z: r2(p.z), post: 'open' }); }
+  ev.push({ t: 0, kind: 'alarm', what: (s.stock.dog ?? 0) >= 1 ? 'dog' : 'watch' });
+  if (stance === 'shout') {
+    ev.push({ t: 2, kind: 'lights' });
+    say(3, 'Every light on! The sheriff is on the way!');
+    say(6, 'Shit — go, go, GO!', 'r0');
+  } else {
+    say(5, 'Quiet. Check the kitchen. Look for the guns.', 'r0');
+    say(18, 'Take the laptop. Tools in the shop. Come on.', 'r0');
+  }
+  for (let i = 0; i < n; i++) {
+    const door = at(0.5 + i * 0.4, (i - 1) * 0.7), out = at(36, (i - 1) * 2);
+    ev.push({ t: r2(stance === 'shout' ? 3 + r() : 8 + r() * 4), kind: 'move', unit: `r${i}`, x: r2(door.x), z: r2(door.z) });
+    ev.push({ t: r2(stance === 'shout' ? 8 + r() * 2 : tone === 'bad' ? 24 + r() * 6 : 16 + r() * 4), kind: 'move', unit: `r${i}`, x: r2(out.x), z: r2(out.z) });
+  }
+  void C;
+  const duration = stance === 'shout' ? 30 : 46;
+  ev.push({ t: duration, kind: 'end', result: tone === 'bad' ? 'breached' : 'fled' });
+  ev.sort((a, c) => a.t - c.t);
+  return { night: true, units, events: ev, duration };
 }

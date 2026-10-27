@@ -5,6 +5,7 @@
  * the sim: when the timeline is done it asks the store to commit (the clock
  * advances once, by the plan's length).
  */
+import { useGameStore } from '../../store/gameStore';
 import { useBattleStore } from '../../store/battleStore';
 import { useCutsceneView } from '../../store/cutsceneStore';
 import type { CutsceneState } from '../../store/gameStore';
@@ -26,6 +27,8 @@ export class CutscenePlayer {
   private _c: CutsceneState | null = null;
   private _real = 0;
   private _seen = false;
+  /** Scenes whose between-scenes card has been shown. */
+  private _offered = new Set<number>();
   private _wasPlaying = false;
   private _startedScene = -1;
   private _dir: Director;
@@ -43,7 +46,7 @@ export class CutscenePlayer {
 
   start(c: CutsceneState): void {
     this._c = c;
-    this.clockGame = 0;
+    this.clockGame = 0; this._offered.clear();
     this._real = 0; this._startedScene = -1; this._done = false; this._time = 0; this._lastKind = '';
     this._dir = new Director(this.d.seed);
     this.active = true;
@@ -57,7 +60,7 @@ export class CutscenePlayer {
   }
 
   skipScene(): void {
-    const c = this._c; if (!c?.plan || this._done) return;
+    const c = this._c; if (!c?.plan || this._done || c.offer != null) return;
     const loc = locate(c.plan, this._real);
     this._endBattle();
     this._real = sceneWindow(c.plan, loc.segment.scene).end + 1e-6;
@@ -66,7 +69,8 @@ export class CutscenePlayer {
   skipAll(): void {
     const c = this._c; if (!c?.plan || this._done) return;
     this._endBattle();
-    this._real = c.plan.totalReal + 1;
+    if (c.offer != null) useGameStore.getState().midStance(null);
+    this._real = (useGameStore.getState().cutscene?.plan ?? c.plan).totalReal + 1;
   }
 
   private _endBattle(): void {
@@ -75,9 +79,20 @@ export class CutscenePlayer {
 
   /** Advance by dt; returns the camera pose to use this frame. */
   update(dt: number): { eye: V3; look: V3; fov: number } | null {
+    // a change of stance between scenes swaps the plan (the part already played is identical)
+    const live = useGameStore.getState().cutscene;
+    if (live?.phase === 'playing') this._c = live;
     const c = this._c;
     if (!c?.plan || !c.battles) return null;
     const plan = c.plan;
+    // the card between scenes holds everything still until it is answered
+    if (c.offer != null) {
+      this._time += dt;
+      this._endBattle();
+      const shot0 = this._dir.shot ?? this._dir.establish(this._time, this.d.house(), this._road, this.d.ground);
+      this._publish(true);
+      return poseAt(shot0, this._time);
+    }
     this._time += dt;
     const { battle, ground } = this.d;
     let loc = locate(plan, this._real);
@@ -97,6 +112,15 @@ export class CutscenePlayer {
     }
     loc = locate(plan, this._real);
     this.clockGame = loc.game;
+    // reaching the gap before a later scene: offer one change of stance (until it has been used)
+    if (!loc.done && loc.segment.kind === 'gap' && !c.changed && !this._offered.has(loc.segment.scene)) {
+      this._offered.add(loc.segment.scene);
+      this._real = loc.segment.real0; this.clockGame = loc.segment.game0;
+      this._endBattle();
+      useGameStore.getState().offerChange(loc.segment.scene - 1);
+      this._publish(true);
+      return poseAt(this._dir.shot ?? this._dir.establish(this._time, this.d.house(), this._road, this.d.ground), this._time);
+    }
     // a fight ends with its tail (bodies stay down, the alarm dies); the next scene starts clean
     if (loc.segment.scene !== seg.scene || loc.done) this._endBattle();
     if (loc.done) {
@@ -133,7 +157,7 @@ export class CutscenePlayer {
     const caption = kind === 'fight' ? '' : sceneCaption(plan, sc, part, this.d.seed);
     useCutsceneView.getState().set({
       scene: sc.index, scenes: plan.scenes.length, sceneLabel: sc.label, seg: kind,
-      hour: hourAfter(plan, loc.game), game: loc.game, caption,
+      hour: hourAfter(plan, kind === 'gap' && c.offer == null ? loc.segment.game0 + loc.segment.gameLen : loc.game), game: loc.game, caption,
       gap: kind === 'gap' ? sceneCaption(plan, sc, 'gap', this.d.seed) : null,
       progress: Math.min(1, this._real / Math.max(1, plan.totalReal)),
     });

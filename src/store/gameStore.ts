@@ -6,8 +6,8 @@ import { applyForPermit } from '../sim/paperwork';
 import { sweepChimney } from '../sim/upkeep';
 import { stockUpRx } from '../sim/body';
 import { askRansom, giveUp, startRescue, startTrip } from '../sim/rescue';
-import { isRaid, promptNarration } from '../sim/siege';
-import { commitRaid, stageRaid, type RaidReport } from '../sim/raidCutscene';
+import { hasCutscene, promptNarration } from '../sim/siege';
+import { commitRaid, restageRaid, stageRaid, type RaidReport, type StagedRaid } from '../sim/raidCutscene';
 import type { SiegePlan } from '../sim/siege';
 import type { Battle } from '../sim/battleTypes';
 import { create } from 'zustand';
@@ -51,7 +51,16 @@ export interface CutsceneState {
   report?: RaidReport;
   /** Game time (days) of the arrival. */
   t0?: number;
+  /** The staged raid the fields above mirror (kept whole so a mid-siege change of stance can restage it). */
+  raid?: StagedRaid;
+  /** Between scenes: the index of the scene just played while the "change your stance?" card is up (null: no card). */
+  offer?: number | null;
+  /** The one change of stance has been used. */
+  changed?: boolean;
 }
+
+/** The mirrored fields of a staged raid. */
+const fromRaid = (st: StagedRaid) => ({ plan: st.plan, battles: st.battles, staged: st.staged, report: st.report, t0: st.t0, raid: st });
 
 const LOCKED_WHY = 'not while the raid is on';
 /** Whether a cutscene is holding the controls. */
@@ -60,7 +69,7 @@ const locked = (): boolean => useGameStore.getState().cutscene !== null;
 /** The prompt for a raid that has just reached the gate (null for anything else). */
 function promptFor(g: GameState): CutsceneState | null {
   const e = g.gate.pending;
-  if (!isRaid(e)) return null;
+  if (!hasCutscene(e)) return null;
   const hour = hourOf(g.clock.t);
   return { phase: 'prompt', hour, narration: promptNarration(g, e!, hour), stance: null };
 }
@@ -79,6 +88,10 @@ export interface GameStore {
   /** Pick the stance on the gate card (the cutscene's prompt); Watch then plays it. */
   chooseStance: (s: Stance | null) => void;
   watchRaid: () => void;
+  /** The player (or the siege timeline) reached the gap after scene `scene`: put the stance card up. */
+  offerChange: (scene: number) => void;
+  /** Answer the card between scenes: a new stance (once), or null to carry on as you are. */
+  midStance: (s: Stance | null) => void;
   /** The scenes are over (or skipped): commit the result to the clock and show the report. */
   commitCutscene: () => void;
   /** Done with the report: control returns (the aftermath choices, if any, are next). */
@@ -179,13 +192,21 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     if (c?.phase !== 'prompt' || !g.gate.pending) return;
     const stance = c.stance ?? g.gate.pending.stances[0];
     const st = stageRaid(g, stance);
-    set({ tool: null, toolProblem: null, shopOpen: false, selected: null, cutscene: { ...c, phase: 'playing', stance, plan: st.plan, battles: st.battles, staged: st.staged, report: st.report, t0: st.t0 } });
+    set({ tool: null, toolProblem: null, shopOpen: false, selected: null, cutscene: { ...c, phase: 'playing', stance, ...fromRaid(st), offer: null, changed: false } });
+  },
+  offerChange: (scene) => { const c = get().cutscene; if (c?.phase === 'playing' && !c.changed) set({ cutscene: { ...c, offer: scene } }); },
+  midStance: (stance) => {
+    const c = get().cutscene, g = get().game;
+    if (c?.phase !== 'playing' || c.offer == null || !c.raid) return;
+    if (!stance || stance === c.stance || c.changed) { set({ cutscene: { ...c, offer: null } }); return; }
+    const next = restageRaid(g, c.raid, c.offer + 1, stance);
+    set({ cutscene: { ...c, ...fromRaid(next), stance, changed: true, offer: null } });
   },
   commitCutscene: () => {
     const c = get().cutscene;
     if (c?.phase !== 'playing' || !c.staged || !c.plan) return;
     const g = commitRaid({ staged: c.staged, plan: c.plan });
-    set({ game: g, cutscene: { ...c, phase: 'aftermath', staged: undefined } });
+    set({ game: g, cutscene: { ...c, phase: 'aftermath', staged: undefined, raid: undefined, offer: null } });
     void saveGame(AUTOSAVE, g);
   },
   endCutscene: () => {

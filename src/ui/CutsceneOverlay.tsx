@@ -4,6 +4,7 @@ import { useBattleStore } from '../store/battleStore';
 import { useCutsceneView } from '../store/cutsceneStore';
 import { clockLabel, gapLabel } from '../sim/siege';
 import type { Battle } from '../sim/battleTypes';
+import { STANCE } from './stanceText';
 
 const BAR = 'clamp(54px, 12vh, 120px)';
 const FONT = '"Iowan Old Style", "Palatino Linotype", Georgia, serif';
@@ -52,7 +53,7 @@ export function CutsceneOverlay() {
         )}
         {playing && (
           <div style={{ display: 'flex', gap: 8 }}>
-            {multi && <button style={btn} onClick={skipScene}>Skip scene</button>}
+            {multi && c.offer == null && <button style={btn} onClick={skipScene}>Skip scene</button>}
             <button style={btn} onClick={skipAll}>{multi ? 'Skip all' : 'Skip'}</button>
           </div>
         )}
@@ -69,19 +70,49 @@ export function CutsceneOverlay() {
           </div>
         )}
       </div>
-      {playing && view.seg === 'gap' && view.gap && (
+      {playing && view.seg === 'gap' && view.gap && c.offer == null && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 37, background: 'rgba(3,3,2,0.86)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', color: '#efe6d4', fontFamily: FONT, pointerEvents: 'none' }}>
           <div style={label}>{view.sceneLabel}</div>
           <div style={{ fontSize: 'clamp(28px, 6vh, 56px)', margin: '8px 0', letterSpacing: 0.5 }}>{view.gap}</div>
           <div style={{ fontSize: 'clamp(18px, 3.4vh, 30px)', fontVariantNumeric: 'tabular-nums', opacity: 0.85 }}>{clockLabel(view.hour)}</div>
         </div>
       )}
+      {c.phase === 'playing' && c.offer != null && <Offer />}
       {c.phase === 'aftermath' && c.report && <Report />}
     </>
   );
 }
 
 const card: CSSProperties = { position: 'fixed', right: 'clamp(12px, 3vw, 40px)', top: `calc(${BAR} + 14px)`, width: 'min(400px, calc(100vw - 24px))', maxHeight: `calc(100vh - 2 * ${BAR} - 28px)`, overflow: 'auto', background: 'rgba(16,14,11,0.94)', color: '#efe6d4', borderRadius: 4, padding: '16px 18px', zIndex: 40, fontFamily: FONT, boxShadow: '0 6px 28px rgba(0,0,0,0.6)', border: '1px solid rgba(239,230,212,0.2)' };
+
+/** Between scenes of a siege: one chance to change what the family does. */
+function Offer() {
+  const c = useGameStore(s => s.cutscene)!;
+  const pending = useGameStore(s => s.game.gate.pending);
+  const mid = useGameStore(s => s.midStance);
+  const view = useCutsceneView(s => s.view);
+  const next = c.plan?.scenes[(c.offer ?? 0) + 1];
+  const others = (pending?.stances ?? []).filter(st => st !== c.stance && st !== 'warn');
+  return (
+    <div style={card}>
+      <div style={label}>Between scenes{view ? ` · ${clockLabel(view.hour)}` : ''}</div>
+      <div style={{ fontSize: 20, fontWeight: 600, margin: '2px 0 6px' }}>They have pulled back</div>
+      <div style={{ opacity: 0.85, fontSize: 14, lineHeight: 1.4, marginBottom: 10 }}>
+        {next ? `${gapLabel(next.gap).replace(/ later$/, '')} of quiet, and then it will start again. ` : ''}You can change what the family does, once. Building and the shop stay locked.
+      </div>
+      <button style={{ ...btn, width: '100%', textAlign: 'left', background: '#d8c9a0', color: '#1c1d18', border: 0, padding: '9px 12px', marginBottom: 6 }} onClick={() => mid(null)}>
+        <div style={{ fontWeight: 700 }}>Carry on as you are</div>
+        <div style={{ fontSize: 11.5, opacity: 0.75 }}>{STANCE[c.stance ?? 'defend'][0]}: {STANCE[c.stance ?? 'defend'][1]}</div>
+      </button>
+      {others.map(st => (
+        <button key={st} style={{ ...btn, width: '100%', textAlign: 'left', padding: '8px 12px', marginBottom: 6 }} onClick={() => mid(st)}>
+          <div style={{ fontWeight: 600 }}>Change to: {STANCE[st][0]}</div>
+          <div style={{ fontSize: 11.5, opacity: 0.75 }}>{STANCE[st][1]}</div>
+        </button>
+      ))}
+    </div>
+  );
+}
 
 /** The short report after the scenes: who was hurt, what was lost, who is left on the drive. */
 function Report() {

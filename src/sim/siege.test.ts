@@ -4,10 +4,10 @@ import { step } from './engine';
 import { planRun } from './perimeter';
 import type { Encounter, EncounterKind } from './encounters';
 import {
-  arrivalHour, clockLabel, commitDays, gapLabel, gateScene, hourAfter, isRaid, locate, planSiege, probeBattle, promptNarration,
+  arrivalHour, hasCutscene, siegeStrain, clockLabel, commitDays, gapLabel, gateScene, hourAfter, isRaid, locate, planSiege, probeBattle, promptNarration,
   scheduleArrival, arrivalCheck, sceneWindow, segments, type SiegeInput,
 } from './siege';
-import { commitRaid, stageRaid } from './raidCutscene';
+import { commitRaid, restageRaid, stageRaid } from './raidCutscene';
 import { useGameStore } from '../store/gameStore';
 
 function afterHit(seed = 1): GameState {
@@ -288,4 +288,137 @@ describe('the lock: you decide, then you watch', () => {
     expect(useGameStore.getState().cutscene).toBeNull();
     expect(useGameStore.getState().game.gate.card).toBeNull();
   }, 30_000);
+});
+
+/** A night game with a gang at the gate whose plan is a siege of 3+ scenes. */
+function siegeGame(): GameState {
+  for (let seed = 1; seed < 40; seed++) for (let day = 1; day < 60; day++) {
+    const g = afterHit(seed);
+    g.gate.next = 99999;
+    const SUB = 0.25 / 24;
+    g.clock.t = Math.round((Math.floor(g.clock.t) - 0.25 + 1 / 24) / SUB) * SUB; g.clock.ticks = Math.round(g.clock.t / SUB);
+    const e = { ...raid('gang', 12), day, temper: 'hard' as const };
+    g.gate.pending = e;
+    const p = planSiege({ kind: 'gang', size: 12, temper: 'hard', hour: hourOf(g.clock.t), seed: g.seed * 131 + day * 7 + 1, fought: true, fightSeconds: 90 });
+    if (p.scenes.length >= 3) return g;
+  }
+  throw new Error('no siege game');
+}
+
+describe('a night under siege costs sleep and morale', () => {
+  it('strain grows with the scenes and the hours; the staged family is shaken, never hurt before the assault', () => {
+    const g = siegeGame();
+    const st = stageRaid(g, 'defend');
+    const a = siegeStrain(st.plan), one = siegeStrain({ ...st.plan, scenes: st.plan.scenes.slice(0, 1), totalGame: 400 });
+    expect(a.morale).toBeGreaterThan(one.morale);
+    expect(a.sleep).toBeGreaterThan(one.sleep);
+    const i = g.personState.findIndex((p, k) => p.needs.died == null && st.staged.personState[k].needs.died == null && !st.staged.personState[k].needs.taken);
+    const before = g.personState[i].needs.morale;
+    expect(st.staged.personState[i].needs.morale).toBeLessThan(before);
+    expect(st.staged.personState[i].needs.tired ?? 0).toBeGreaterThan(0);
+    expect(st.outcome.lines.some(l => /slept|sleep/.test(l))).toBe(true);
+    // the cosmetic scenes never wound anyone
+    for (const b of st.battles.slice(0, -1)) expect(b.events.some(e => e.kind === 'wound' || e.kind === 'death' || e.kind === 'taken')).toBe(false);
+  });
+});
+
+describe('one change of stance between scenes', () => {
+  it('keeps the scenes already played, swaps the rest, and the clock accounting stays exact', () => {
+    const g = siegeGame();
+    const first = stageRaid(g, 'defend');
+    const played = 1;
+    const next = restageRaid(g, first, played, 'hide');
+    // the part already shown is identical, so the virtual clock does not jump at the change
+    expect(JSON.stringify(next.plan.scenes.slice(0, played))).toBe(JSON.stringify(first.plan.scenes.slice(0, played)));
+    expect(next.battles[0]).toBe(first.battles[0]);
+    const endOfPlayed = sceneWindow(first.plan, played - 1).end;
+    expect(locate(next.plan, endOfPlayed).game).toBeCloseTo(locate(first.plan, endOfPlayed).game, 9);
+    expect(next.plan.scenes.length).toBe(played + 1);
+    expect(next.plan.scenes[played].kind).toBe('gate');
+    expect(next.plan.scenes[played].gap).toBe(first.plan.scenes[played].gap);
+    // committed once, by the NEW plan's length; the visible game was never touched
+    const done = commitRaid(next);
+    expect(done.clock.t).toBeCloseTo(g.clock.t + next.plan.totalGame / 86_400, 9);
+    expect(next.staged.clock.t).toBe(g.clock.t);
+    expect(next.plan.totalGame).not.toBe(first.plan.totalGame);
+    // the rounds of the scene already played are still spent; the outcome is the new stance's
+    expect(next.outcome.title).not.toBe(first.outcome.title);
+    // staying a fight keeps the cosmetic scenes still to come and the same length
+    const again = restageRaid(g, first, played, 'defend');
+    expect(again.plan.scenes.length).toBe(first.plan.scenes.length);
+    expect(again.plan.totalGame).toBe(first.plan.totalGame);
+  });
+
+  it('through the store: the card is offered after a scene, answered once, then the siege runs to its commit', () => {
+    const g = siegeGame();
+    useGameStore.setState({ game: g, cutscene: { phase: 'prompt', hour: hourOf(g.clock.t), narration: 'x', stance: null }, tool: null });
+    useGameStore.getState().chooseStance('defend');
+    useGameStore.getState().watchRaid();
+    const t0 = useGameStore.getState().game.clock.t;
+    const n0 = useGameStore.getState().cutscene!.plan!.scenes.length;
+    useGameStore.getState().offerChange(0);
+    expect(useGameStore.getState().cutscene!.offer).toBe(0);
+    // carrying on leaves the plan alone and lets the card come again
+    useGameStore.getState().midStance(null);
+    expect(useGameStore.getState().cutscene!.offer).toBeNull();
+    expect(useGameStore.getState().cutscene!.changed).toBe(false);
+    useGameStore.getState().offerChange(1);
+    useGameStore.getState().midStance('hide');
+    const c = useGameStore.getState().cutscene!;
+    expect(c.changed).toBe(true);
+    expect(c.stance).toBe('hide');
+    expect(c.plan!.scenes.length).toBe(3);
+    expect(n0).toBeGreaterThanOrEqual(3);
+    // once only: no more cards, a second change is ignored, and the lock still holds
+    useGameStore.getState().offerChange(1);
+    expect(useGameStore.getState().cutscene!.offer ?? null).toBeNull();
+    useGameStore.getState().midStance('trade');
+    expect(useGameStore.getState().cutscene!.stance).toBe('hide');
+    const s0 = useGameStore.getState().game.structures.length;
+    useGameStore.getState().plan('shed', 9, 9, 0);
+    expect(useGameStore.getState().game.structures.length).toBe(s0);
+    useGameStore.getState().commitCutscene();
+    expect(useGameStore.getState().game.clock.t).toBeCloseTo(t0 + c.plan!.totalGame / 86_400, 9);
+    useGameStore.getState().endCutscene();
+    expect(useGameStore.getState().cutscene).toBeNull();
+  }, 30_000);
+});
+
+describe('a night break-in plays as a short single scene', () => {
+  const breakIn = (): Encounter => ({ id: 'b1', kind: 'break_in', day: 5, title: 'Someone is in the house', dossier: ['Two in the morning. Glass breaking downstairs.'], size: 2, armed: false, strength: 10, wants: {}, stances: ['call_911', 'shout', 'confront'] });
+
+  it('arrives between 1:30 and 3:30 and has a cutscene; a raid-only test still excludes it', () => {
+    for (let s = 1; s < 50; s++) { const h = arrivalHour('break_in', s); expect(h).toBeGreaterThanOrEqual(1.5); expect(h).toBeLessThanOrEqual(3.5); }
+    expect(hasCutscene(breakIn())).toBe(true);
+    expect(isRaid(breakIn())).toBe(false);
+  });
+
+  it('every stance stages one scene of 2-4 minutes, with a scene that always ends', () => {
+    for (const stance of ['call_911', 'shout', 'confront'] as const) for (let seed = 1; seed <= 6; seed++) {
+      const g = newGame(seed);   // the law still works
+      g.clock.t = 3 - 0.25 + 2 / 24; g.clock.ticks = Math.round(g.clock.t / (0.25 / 24));
+      g.structures.push({ id: 'house', kind: 'farmhouse', x: 0, z: 0, rot: 0, stage: 99, done: 0, supplied: true, finishedAt: 0 });
+      g.gate.pending = breakIn();
+      const st = stageRaid(g, stance);
+      expect(st.plan.scenes.length).toBe(1);
+      const total = st.plan.totalGame;
+      expect(total).toBeGreaterThanOrEqual(120);
+      expect(total).toBeLessThanOrEqual(Math.max(240, st.plan.scenes[0].fight + 40));
+      const b = st.battles[0];
+      expect(b.events[b.events.length - 1].kind).toBe('end');
+      expect(st.staged.gate.pending).toBeNull();
+    }
+  });
+
+  it('the store raises the Watch prompt for a break-in and locks like any raid', () => {
+    const g = newGame(2);
+    g.clock.speed = 1;
+    g.structures.push({ id: 'house', kind: 'farmhouse', x: 0, z: 0, rot: 0, stage: 99, done: 0, supplied: true, finishedAt: 0 });
+    g.gate.incoming = { e: breakIn(), at: g.clock.t + 0.05 };
+    useGameStore.setState({ game: g, cutscene: null });
+    for (let i = 0; i < 400 && !useGameStore.getState().cutscene; i++) useGameStore.getState().tick(0.25);
+    expect(useGameStore.getState().cutscene?.phase).toBe('prompt');
+    expect(useGameStore.getState().cutscene!.narration.length).toBeGreaterThan(15);
+    expect(useGameStore.getState().buy('p1')).toBe('not while the raid is on');
+  });
 });
