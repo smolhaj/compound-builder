@@ -497,7 +497,7 @@ SETS.linked = [
   { name: 'linked-walkway-close', time: 11, season: 'summer', setup: linkedSetup + "cb.cam.target.set(34, 0, 44); cb.cam.yaw = 0.6; cb.cam.pitch = 0.2; cb.cam.radius = 7;", cam: { x: 34, z: 44, yaw: 0.6, pitch: 0.2, radius: 7 }, frames: 14 },
   { name: 'linked-eye-inside-walkway', time: 21.5, season: 'summer', setup: linkedSetup + eye(31, 44, 38, 44, 0.22, 0.22, 70), cam: { x: 34, z: 44, yaw: 0, pitch: 0.2, radius: 7 }, frames: 14 },
   { name: 'linked-night-aerial', time: 22, season: 'summer', setup: linkedSetup + "cb.cam.target.set(34, 0, 42); cb.cam.yaw = 0.3; cb.cam.pitch = 0.45; cb.cam.radius = 28;", cam: { x: 34, z: 42, yaw: 0.3, pitch: 0.45, radius: 28 }, frames: 14 },
-  { name: 'linked-underground-passage', time: 11, season: 'summer', setup: linkedSetup + under + "cb.cam.target.set(34, 0, 37); cb.cam.yaw = 0.4; cb.cam.pitch = 0.9; cb.cam.radius = 30;", cam: { x: 34, z: 37, yaw: 0.4, pitch: 0.9, radius: 30 }, frames: 20 },
+  { name: 'linked-underground-passage', time: 11, season: 'summer', setup: linkedSetup + under + "const gy = cb.world.groundAt(34, 37); cb.cam.target.set(34, gy - 0.6, 37); cb.cam.yaw = 0.4; cb.cam.pitch = 0.45; cb.cam.radius = 12;", cam: { x: 34, z: 37, yaw: 0.4, pitch: 0.9, radius: 30 }, frames: 20 },
   { name: 'linked-underground-hatch-close', time: 11, season: 'summer', setup: linkedSetup + under + "cb.cam.target.set(24, 0, 37); cb.cam.yaw = 0.5; cb.cam.pitch = 0.8; cb.cam.radius = 4;", cam: { x: 24, z: 37, yaw: 0.5, pitch: 0.8, radius: 4 }, frames: 20 },
   { name: 'linked-skirt-and-sensor-close', time: 10, season: 'summer', setup: linkedSetup + eye(10, 36, 14, 40, 0.22, 0.1, 58), cam: { x: 14, z: 40, yaw: 0, pitch: 0.2, radius: 5 }, frames: 14 },
 ];
