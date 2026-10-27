@@ -27,6 +27,7 @@ import { addHardenWork, nextHardenJob } from './hardening';
 import { updateDisaster } from './disaster';
 import { liveDay, workFactor } from './needs';
 import { gateDay, neighborGossip } from './encounters';
+import { digDay } from './tunnelers';
 import { mutualAidDay } from './barter';
 import { scavengeDay } from './scavenge';
 import { marketDay } from './market';
@@ -134,6 +135,7 @@ function subStep(s: GameState): void {
     for (const line of legalDay(s)) log(s, line);
     prisonersDay(s);   // (it logs its own lines)
     for (const line of weatherDay(s)) log(s, line);
+    for (const line of digDay(s)) log(s, line);
     const e = gateDay(s);
     if (e) log(s, `${e.title}.`);
     rescueDay(s);   // the taken: their fate, leads, word from the crew, a rescue out (logs its own lines)

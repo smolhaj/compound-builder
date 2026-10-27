@@ -1,0 +1,99 @@
+import { describe, expect, it } from 'vitest';
+import { newGame, type GameState } from './state';
+import { planRun, PERIMETER, type PerimeterKind, type PerimeterRun, type Pt } from './perimeter';
+import { enclosure } from './enclosure';
+import { coveredRoute, hatches, linkedGroups, links, passageEntry, setPassageLocked, tripExposed, yardRings } from './compounds';
+import { defenseReport } from './defenseReport';
+
+const done = (g: GameState, kind: PerimeterKind, pts: Pt[]): PerimeterRun => { const r = planRun(g, kind, pts); r.done = r.hours; r.supplied = true; r.finishedAt = 0; return r; };
+const yard = (g: GameState, cx: number, cz: number, h = 3) => done(g, 'container_wall', [[cx - h, cz - h], [cx + h, cz - h], [cx + h, cz + h], [cx - h, cz + h], [cx - h, cz - h]]);
+const house = (g: GameState, id: string, x: number, z: number) => g.structures.push({ id, kind: 'farmhouse', x, z, rot: 0, stage: 99, done: 0, supplied: true, finishedAt: 0 });
+
+function twoYards() {
+  const g = newGame(3);
+  const cx = (g.site.home.x0 + g.site.home.x1) / 2, cz = (g.site.home.z0 + g.site.home.z1) / 2;
+  const a = yard(g, cx - 8, cz), b = yard(g, cx + 8, cz);
+  house(g, 'h1', cx - 8, cz); house(g, 'h2', cx + 8, cz);
+  return { g, a, b, cx, cz };
+}
+
+describe('linked compounds: covered walkways', () => {
+  it('each walled yard stays its own ring; a walkway between them joins the two for the covered check', () => {
+    const { g, a, b, cx, cz } = twoYards();
+    const rings = yardRings(g);
+    expect(rings.map(r => r.id).sort()).toEqual([a.id, b.id].sort());
+    expect(linkedGroups(rings, links(g, rings))).toHaveLength(2);
+    expect(coveredRoute(g, a.id, b.id)).toBe(false);
+    expect(tripExposed(g, [cx - 8, cz], [cx + 8, cz])).toBe(true);
+    const w = done(g, 'covered_walkway', [[cx - 5, cz], [cx + 5, cz]]);
+    const ls = links(g);
+    expect(ls).toHaveLength(1);
+    expect(new Set([ls[0].a, ls[0].b])).toEqual(new Set([a.id, b.id]));
+    expect(coveredRoute(g, a.id, b.id)).toBe(true);
+    expect(tripExposed(g, [cx - 8, cz], [cx + 8, cz])).toBe(false);
+    expect(tripExposed(g, [cx - 8, cz], [cx - 8, cz + 1])).toBe(false);
+    // the walkway is not itself a yard
+    expect(yardRings(g).some(r => r.id === w.id)).toBe(false);
+    const rep = defenseReport(g);
+    expect(rep.homes.every(h => h.covered)).toBe(true);
+    expect(rep.homes[0].how).toMatch(/joined to 1 other yard/);
+    expect(rep.linked.some(c => c.id === 'yards' && c.ok)).toBe(true);
+  });
+
+  it('counts as wall for the ring checks and is dark without power', () => {
+    expect(PERIMETER.covered_walkway.blocks.people).toBeGreaterThanOrEqual(0.5);
+    const { g, cx, cz } = twoYards();
+    done(g, 'covered_walkway', [[cx - 5, cz], [cx + 5, cz]]);
+    expect(links(g)[0].lit).toBe(false);
+    g.utilities.lit = ['h1'];
+    expect(links(g)[0].lit).toBe(true);
+    // a walkway laid along an unwalled home counts toward the barrier like any wall
+    const open = newGame(3); const c = (open.site.home.x0 + open.site.home.x1) / 2, z = open.site.home.z0;
+    const before = enclosure(open).barrier;
+    done(open, 'covered_walkway', [[c - 3, z], [c + 3, z]]);
+    expect(enclosure(open).barrier).toBeGreaterThan(before);
+  });
+
+  it('a walkway with an end in open ground does not join anything', () => {
+    const { g, cx, cz } = twoYards();
+    done(g, 'covered_walkway', [[cx - 5, cz], [cx, cz + 12]]);
+    expect(linkedGroups(yardRings(g), links(g))).toHaveLength(2);
+    expect(defenseReport(g).linked.some(c => c.id.startsWith('walk_') && !c.ok)).toBe(true);
+  });
+});
+
+describe('linked compounds: the underground passage', () => {
+  it('between two yards both hatches are inside a wall: hidden, joined, and no way in', () => {
+    const { g, a, b, cx, cz } = twoYards();
+    done(g, 'underground_passage', [[cx - 8, cz], [cx + 8, cz]]);
+    const hs = hatches(g);
+    expect(hs).toHaveLength(2);
+    expect(hs.every(h => !h.exposed)).toBe(true);
+    expect(coveredRoute(g, a.id, b.id)).toBe(true);
+    let got = 0;
+    for (let i = 0; i < 100; i++) if (passageEntry(g, () => 0, true)) got++;
+    expect(got).toBe(0);
+  });
+
+  it('a hatch out in the woods is the guarded weak point: the blast door holds unless forced', () => {
+    const { g, cx, cz } = twoYards();
+    const p = done(g, 'underground_passage', [[cx - 8, cz], [cx - 8, cz - 25]]);
+    const out = hatches(g).filter(h => h.exposed);
+    expect(out).toHaveLength(1);
+    expect(out[0].locked).toBe(true);
+    // found (r < 0.08), door holds (second draw low)
+    const seq = (...xs: number[]) => { let i = 0; return () => xs[Math.min(i++, xs.length - 1)]; };
+    expect(passageEntry(g, seq(0, 0), false)).toBeNull();
+    // found, and a crew with explosives blows it
+    expect(passageEntry(g, seq(0, 0.9), true)).toMatchObject({ runId: p.id, forced: true });
+    // not found
+    expect(passageEntry(g, seq(0.5), true)).toBeNull();
+    // unbolted: found is enough
+    setPassageLocked(g, p.id, false);
+    expect(passageEntry(g, seq(0), false)).toMatchObject({ forced: false });
+    // revealed: far easier to find
+    setPassageLocked(g, p.id, true); p.revealed = true;
+    expect(passageEntry(g, seq(0.3, 0.99), false)).not.toBeNull();
+    expect(defenseReport(g).linked.some(c => c.id === `pass_${p.id}`)).toBe(true);
+  });
+});

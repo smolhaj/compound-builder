@@ -34,6 +34,8 @@ import type { Stock } from './materials';
 import type { Battle } from './battleTypes';
 import { gateLead, isAway, recordBattle, resolveRansom, type RansomTerms } from './rescue';
 import { defenders } from './pact';
+import { passageEntry } from './compounds';
+import { resolveDigWarning } from './tunnelers';
 import { resolveTrialEnd, startTrial, trialDay, type TrialCamp } from './trial';
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -149,8 +151,8 @@ export function postureOf(s: GameState): Posture {
 // Encounters
 // ─────────────────────────────────────────────────────────────────────────
 
-export type EncounterKind = 'arrival' | 'looters' | 'gang' | 'refugees' | 'requisition' | 'neighbor_help' | 'trader' | 'horde' | 'patrol' | 'militia' | 'break_in' | 'ransom' | 'trial_end';
-export type Stance = 'hide' | 'parley' | 'warn' | 'defend' | 'trade' | 'take_in' | 'trial' | 'turn_away' | 'call_911' | 'shout' | 'confront' | 'pay' | 'refuse';
+export type EncounterKind = 'arrival' | 'looters' | 'gang' | 'refugees' | 'requisition' | 'neighbor_help' | 'trader' | 'horde' | 'patrol' | 'militia' | 'break_in' | 'ransom' | 'trial_end' | 'tunnelers';
+export type Stance = 'hide' | 'parley' | 'warn' | 'defend' | 'trade' | 'take_in' | 'trial' | 'turn_away' | 'call_911' | 'shout' | 'confront' | 'pay' | 'refuse' | 'ambush' | 'flood' | 'collapse' | 'ignore';
 
 export interface Encounter {
   id: string;
@@ -178,10 +180,12 @@ export interface Encounter {
   trial?: string;
   /** A crew coming back to a place they found empty and stripped. */
   back?: boolean;
+  /** Tunnelers (sim/tunnelers.ts): found digging under the wall (`warning`, the window to act), or up inside it (`inside`). */
+  dig?: { phase: 'warning' | 'inside'; id: string; /** Days left in the dig when it was found. */ lead: number; by?: string };
 }
 
 /** Crews that plan, carry more and might bring explosives (battle.ts `organized`). */
-export const ORGANIZED: ReadonlySet<EncounterKind> = new Set(['gang', 'militia', 'patrol', 'requisition']);
+export const ORGANIZED: ReadonlySet<EncounterKind> = new Set(['gang', 'militia', 'patrol', 'requisition', 'tunnelers']);
 /** A crew that found the place empty and stripped it: they know it's lived in and come back sooner. */
 export interface ComeBack { kind: EncounterKind; size: number; armed: boolean; temper?: RaiderTemper; until: number }
 
@@ -458,7 +462,7 @@ const raidersAfterHelp = (e: Encounter, help: number) => Math.max(1, e.size - Ma
 /** The chance a crew finds the place lived in if the family hides (it shows; a savage crew looks hard; a crew come back knows). */
 export function hideFoundChance(s: GameState, e: Encounter, p: Posture = postureOf(s)): number {
   if (e.kind === 'horde') return Math.min(0.95, p.visibility * 0.6 / 100);
-  return Math.min(0.95, (p.visibility * 0.6 + (e.temper === 'savage' ? 25 : 0) + (e.back ? 20 : 0)) / 100);
+  return Math.min(0.95, (p.visibility * 0.6 + (e.temper === 'savage' ? 25 : 0) + (e.back ? 20 : 0) + (e.dig ? 40 : 0)) / 100);
 }
 
 /**
@@ -526,7 +530,7 @@ export function fightOdds(s: GameState, e: Encounter, tries = Math.max(10, Math.
   const help = alliesOf(s).reduce((a, n) => a + n.members * 6, 0);
   let win = 0, loseSomeone = 0, lost = 0;
   for (let i = 0; i < tries; i++) {
-    const b = planBattle(s, raidersAfterHelp(e, help), 7_919 + i * 104_729 + e.day, { armed: e.armed, temper: e.temper, organized: ORGANIZED.has(e.kind) });
+    const b = planBattle(s, raidersAfterHelp(e, help), 7_919 + i * 104_729 + e.day, { armed: e.armed, temper: e.temper, organized: ORGANIZED.has(e.kind), ...(e.dig ? { insideBreach: true } : {}) });
     if (b.result === 'repelled' || b.result === 'fled') win++;
     const n = b.events.filter(x => (x.kind === 'death' || x.kind === 'taken') && x.unit.startsWith('h_')).length;
     if (n) loseSomeone++;
@@ -553,6 +557,9 @@ export function resolve(s: GameState, stance: Stance): Outcome {
     title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines);
   } else if (e.kind === 'break_in') {
     const o = resolveBreakIn(s, e, stance);
+    title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines);
+  } else if (e.kind === 'tunnelers' && e.dig?.phase === 'warning') {
+    const o = resolveDigWarning(s, e, stance, r);
     title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines);
   } else if (e.kind === 'trial_end') {
     const o = resolveTrialEnd(s, e, stance);
@@ -633,7 +640,12 @@ export function resolve(s: GameState, stance: Stance): Outcome {
     }
     if (stance === 'defend') {
       // the fight itself, second by second (sim/battle.ts); the world can play it back from g.battle
-      const b = planBattle(s, raidersAfterHelp(e, help), s.seed * 131 + e.day * 7 + 1, { armed: e.armed, temper: e.temper, organized: ORGANIZED.has(e.kind) });
+      // a crew up inside the wall (tunnelers), or one that finds a hatch outside it (an underground passage's way in): no wall to get over
+      const via = e.dig ? null : passageEntry(s, r, ORGANIZED.has(e.kind));
+      if (via) lines.push(via.forced ? 'They found a steel hatch in the leaf litter out in the trees and blew the blast door. They are in the passage.' : 'They found a steel hatch out in the trees, left unbolted. They are in the passage.');
+      const raiders = via ? Math.min(raidersAfterHelp(e, help), 4 + Math.floor(e.size / 4)) : raidersAfterHelp(e, help);
+      const b = planBattle(s, raiders, s.seed * 131 + e.day * 7 + 1, { armed: e.armed, temper: e.temper, organized: ORGANIZED.has(e.kind), ...(e.dig || via ? { insideBreach: true } : {}) });
+      if (via) { const run = s.perimeter.find(x => x.id === via.runId); if (run) run.revealed = true; }
       g.battle = b;
       lines.push(...applyBattle(s, b));
       recordBattle(s, b, e.size, e.temper);

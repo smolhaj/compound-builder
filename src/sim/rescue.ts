@@ -139,6 +139,7 @@ export const isAway = (s: GameState, pid: string) => {
   const r = s.rescue?.raid;
   if (r && r.team.includes(pid)) return true;
   const day = dayIndex(s.clock.t);
+  if (s.digs?.party && s.digs.party.day === day && s.digs.party.ids.includes(pid)) return true;   // out at a dig site (sim/tunnelers.ts)
   return !!s.scavenge?.run?.team.includes(pid) || (s.market?.trip?.pid === pid && s.market.trip.day === day) || (s.locals?.duty?.pid === pid && s.locals.duty.day === day);
 };
 

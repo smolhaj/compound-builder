@@ -10,6 +10,7 @@ import { newDisaster } from '../disaster';
 import { freshNeeds } from '../needs';
 import { generateNeighbors, newGate } from '../encounters';
 import { emptyStats } from '../report';
+import { newDigs } from '../tunnelers';
 import { newLand } from '../land';
 import { CLASSIC, CLASSIC_IMPROVEMENTS } from '../site';
 import { newPaper } from '../paperwork';
@@ -53,6 +54,8 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   5: s => ({ ...s, version: 6, stock: { rebar: 0, membrane: 0, excavator: 0, blast_door: 0, nbc_filter: 0, spoil: 0, ...(s.stock as object) } }),
   // 6 → 7: the escape tunnel (culvert, egress hatch)
   6: s => ({ ...s, version: 7, stock: { culvert: 0, egress_hatch: 0, ...(s.stock as object) } }),
+  // 42 → 43: tunnelers (the dig in progress, the party sent out, tallies), ground sensors and passage hatches in the stock; runs may carry a buried skirt / unlocked / revealed (none yet)
+  42: s => ({ ...s, version: 43, digs: (s.digs as object | undefined) ?? newDigs(), stock: { ground_sensor: 0, passage_hatch: 0, ...(s.stock as object) } }),
   // 41 → 42: perimeter runs may carry `replaces` (an upgrade of a finished run in place); none yet
   41: s => ({ ...s, version: 42 }),
   // 40 → 41: scavenging places and runs, the crossroads market and its trade-goods bag, the neighbors' lives (none yet: made on the first day after the hit)

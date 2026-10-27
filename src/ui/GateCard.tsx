@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import { useGameStore } from '../store/gameStore';
+import { ambushOdds } from '../sim/tunnelers';
 import { fightOdds, hideFoundChance, postureOf, type Stance } from '../sim/encounters';
 import { daysOfFood } from '../sim/needs';
 import { AFTERMATH_TEXT } from '../sim/aftermath';
@@ -19,6 +20,10 @@ const STANCE: Record<Stance, [string, string]> = {
   shout: ['Lights on and shout', 'Every light on, and a shout down the stairs that the police are coming. Most burglars run.'],
   pay: ['Pay them', 'Hand it over at the gate and pray they keep their word.'],
   refuse: ['Refuse', 'Send them off with nothing.'],
+  ambush: ['Send the party to the dig site', 'The armed family wait at the breakout point with rifles. Early warning and good guns win it; the house is thin while they are out, and someone may get hurt.'],
+  flood: ['Flood the tunnel', 'Let the ditch drain into the tunnel. The water table does the rest.'],
+  collapse: ['Collapse the tunnel', 'Hire the excavator and bring the roof of the dig down on them. It works. It also weighs on the family.'],
+  ignore: ['Ignore it', 'Leave them to it. They will be through in a few days, and inside the wall.'],
   confront: ['Confront them', 'Gun in hand. They\'ll probably run, but a shooting means the sheriff\'s investigation, lawyers, and the guns held as evidence.'],
 };
 
@@ -64,6 +69,10 @@ export function GateCard() {
           const t = e.ransom, gm = g.game;
           const have = [...(Object.keys(t.goods) as Array<keyof typeof gm.stock>).map(k => `${Math.floor(gm.stock[k])} ${k}`), ...(Object.keys(t.ammo) as Caliber[]).map(k => `${gm.armory.ammo[k] ?? 0} rounds of ${k}`)].join(', ');
           return <div style={{ margin: '8px 0', fontSize: 12, opacity: 0.75 }}>You have: {have}{canPay(gm, t) ? '' : ' (not enough for all of it)'} · a double-cross is {e.temper === 'savage' ? 'a real risk with this crew' : e.temper === 'hard' ? 'possible' : 'unlikely'} (about {Math.round(DOUBLE_CROSS[e.temper ?? 'savage'] * 100)} %)</div>;
+        })()}
+        {e.dig?.phase === 'warning' && e.stances.includes('ambush') && (() => {
+          const o = ambushOdds(g.game, { size: e.size, lead: e.dig!.lead, temper: e.temper });
+          return <div style={{ margin: '8px 0', fontSize: 12, opacity: 0.75 }}>If you ambush them: you hold {inTen(o.win)} · someone of yours killed or taken {o.lost < 0.05 ? 'almost never' : `about ${Math.round(o.lost * 10) / 10} on average`}</div>;
         })()}
         {e.strength > 0 && e.kind !== 'break_in' && <div style={{ margin: '8px 0', fontSize: 12, opacity: 0.75 }}>
           <div>{e.size} {e.armed ? 'armed' : 'unarmed'} · walls {Math.round(p.barrier)} % · seen early {Math.round(p.detection)} %{p.bunker ? ' · bunker to hide in' : p.safeRoom ? ' · safe room' : ''}</div>
