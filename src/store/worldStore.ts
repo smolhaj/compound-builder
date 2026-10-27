@@ -35,6 +35,9 @@ export interface WorldState {
   buildingView: BuildingView;
   /** Sightline overlay: off / exposure from the road / from the ridge / night lights / viewshed from a point. */
   sightMode: 'off' | 'road' | 'ridge' | 'night' | 'viewshed';
+  /** The property line drawn on the ground (also shown while a fence or wall is being drawn). */
+  showBoundary: boolean;
+  setShowBoundary: (on: boolean) => void;
   /** Underground view (bunker rooms; the ground goes see-through). */
   underground: boolean;
   setUnderground: (on: boolean) => void;
@@ -77,9 +80,11 @@ export const useWorldStore = create<WorldState>()(subscribeWithSelector((set) =>
   cameraMode: 'diorama',
   buildingView: 'full',
   sightMode: 'off',
+  showBoundary: false,
   underground: false,
   setUnderground: (underground) => set({ underground }),
   setSightMode: (sightMode) => set({ sightMode }),
+  setShowBoundary: (showBoundary) => set({ showBoundary }),
   setBuildingView: (buildingView) => set({ buildingView }),
   tourCaption: null,
   setCameraMode: (cameraMode) => set({ cameraMode }),

@@ -4,6 +4,9 @@ const aerial = { x: C, z: C, yaw: 0.8, pitch: 0.55, radius: 95 };
 const street = { x: C, z: C, yaw: 0.8, pitch: 0.12, radius: 2.2 };
 
 export const SETS = {
+  boundary: [
+    { name: 'aerial-boundary-on', time: 12, cam: { ...aerial, yaw: 0.4, pitch: 0.9, radius: 130 }, setup: 'cb.store.getState().setShowBoundary(true)' },
+  ],
   basic: [
     { name: 'aerial-noon', time: 12, cam: aerial },
     { name: 'aerial-golden', time: 18.5, cam: { ...aerial, yaw: -1.3, pitch: 0.35 } },
