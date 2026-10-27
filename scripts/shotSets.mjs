@@ -534,8 +534,8 @@ const fight = `{ const units = [{ id: 'h_a', side: 'home', x: 32, z: 54, y: 1.32
   events.sort((a, b) => a.t - b.t);
   import('/src/store/battleStore.ts').then(m => m.useBattleStore.getState().playBattle({ night: false, duration: 99999, units, events })); }`;
 SETS.mounts = [
-  { name: 'mount-from-above', time: 11, ...base, setup: towersSetup() + noman + `{ cb.qa.pose = null; cb.cam.target.set(32, 1.2, 54); cb.cam.radius = 2.6; cb.cam.pitch = 1.0; cb.cam.yaw = 0.3; }`, frames: 12 },
-  { name: 'turret-from-above', time: 11, ...base, setup: towersSetup() + noman + `{ cb.qa.pose = null; cb.cam.target.set(38, 1.25, 54); cb.cam.radius = 2.6; cb.cam.pitch = 1.0; cb.cam.yaw = 0.3; }`, frames: 12 },
+  { name: 'mount-from-above', time: 11, ...base, setup: towersSetup() + noman + eye(32.5, 55.9, 32, 54, 2.7, 1.35, 55), frames: 12 },
+  { name: 'turret-from-above', time: 11, ...base, setup: towersSetup() + noman + eye(38.5, 55.9, 38, 54, 2.7, 1.4, 55), frames: 12 },
   { name: 'mount-turret-from-ground', time: 11, ...base, setup: towersSetup() + noman + eye(35, 58.5, 35, 54, 0.28, 1.1, 66), frames: 12 },
   { name: 'mount-turret-fight', time: 11, ...base, setup: towersSetup() + fight + `{ cb.qa.pose = null; cb.cam.target.set(35, 0.6, 58); cb.cam.radius = 9; cb.cam.pitch = 0.3; cb.cam.yaw = 0.2; }`, frames: 20 },
 ];
