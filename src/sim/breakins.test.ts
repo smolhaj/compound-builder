@@ -1,3 +1,4 @@
+import { adoptDog } from './pets';
 import { describe, expect, it } from 'vitest';
 import { newGame, type GameState } from './state';
 import { gateDay, resolve } from './encounters';
@@ -49,7 +50,7 @@ describe('peacetime break-ins', () => {
     const quiet = g0(), loud = g0(), dog = g0();
     for (const g of [loud]) { for (let i = 0; i < 20; i++) g.orders.push({ id: `o${i}`, lines: [], cost: 3000, placedAt: 0, dueAt: 0, status: 'delivered' }); g.armory.onBooks = 8; }
     expect(breakInRate(loud)).toBeGreaterThan(breakInRate(quiet) * 1.5);
-    dog.stock.dog = 1; dog.stock.driveway_alarm = 1;
+    adoptDog(dog); dog.stock.driveway_alarm = 1;
     expect(breakInRate(dog)).toBeLessThan(breakInRate(quiet) * 0.3);
   });
 

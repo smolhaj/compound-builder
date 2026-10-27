@@ -33,13 +33,14 @@ import { generateNeighbors, newGate, type GateState, type Neighbor } from './enc
 import { freshNeeds, type FoodReport, type Needs } from './needs';
 import type { WeatherState } from './weatherThreats';
 import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
-export const SAVE_VERSION = 42;
+export const SAVE_VERSION = 43;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
 import { newScavenge, type ScavengeState } from './scavenge';
 import { newMarketState, type MarketState } from './tradeGoods';
 import { newLocals, type LocalsState } from './neighborLife';
+import type { Dog, PetLife } from './pets';
 
 /** Starting savings (GDS §1 peacetime money constraint). */
 export const STARTING_MONEY = 30000;
@@ -228,6 +229,10 @@ export interface GameState {
   market?: MarketState;
   /** The neighbors' lives: ages, history, news on its way, the co-op or militia, the pact (sim/neighborLife.ts). Save v42. */
   locals?: LocalsState;
+  /** The family's dogs, each a named pet with its own health, bonds and moods (sim/pets.ts; save v43). Replaces the old `stock.dog` count. */
+  dogs: Dog[];
+  /** Pet care settings, the family's grief for lost pets, yesterday's care (sim/pets.ts; save v43; `??=` for safety). */
+  petLife?: PetLife;
   /** Radio and rumors after the collapse (radio.ts); made on first use. */
   radio?: RadioState;
   /** Tallies since the hit (the report card), and how the run ended (null while it goes on). */
@@ -276,6 +281,7 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     gate: newGate(seed),
     breakins: newBreakins(),
     rescue: newRescue(),
+    dogs: [],
     scavenge: newScavenge(),
     market: newMarketState(),
     locals: newLocals(),

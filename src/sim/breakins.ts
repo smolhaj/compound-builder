@@ -33,6 +33,7 @@ import { mulberry32 } from './rng';
 import { log } from './economy';
 import { raidPressure } from './opsec';
 import { powered } from './gear';
+import { dogCount } from './pets';
 import { backgroundOf } from './family';
 import { GUN, type Gun } from './armory';
 import { seize, LAWYERS } from './blackMarket';
@@ -87,7 +88,7 @@ export function breakInRate(s: GameState): number {
   if (!lawWorks(s)) return 0;
   const seen = (raidPressure(s) / 0.835) ** 2;   // 0.7 (nobody knows) · 1 (an ordinary place, exposure ≈ 15) · 3.7 (everybody does)
   let deter = 1;
-  if (n(s, 'dog')) deter *= 0.35;
+  if (dogCount(s)) deter *= 0.35;
   if (n(s, 'driveway_alarm')) deter *= 0.6;
   if (powered(s) && (n(s, 'cameras') || n(s, 'thermal_cam'))) deter *= 0.75;
   if (powered(s) && n(s, 'floodlights')) deter *= 0.9;
@@ -140,7 +141,7 @@ export function breakInDay(s: GameState, day: number): Encounter | null {
   const size = u < 0.6 ? 1 : u < 0.88 ? 2 : 3;
   const armed = r() < 0.35;
   const d = SHERIFF[s.site.region];
-  const sound = n(s, 'dog') ? 'The dog is going crazy downstairs.' : n(s, 'driveway_alarm') ? 'The driveway alarm chimed, then glass broke downstairs.' : 'Glass breaking downstairs. Then footsteps.';
+  const sound = dogCount(s) ? 'The dog is going crazy downstairs.' : n(s, 'driveway_alarm') ? 'The driveway alarm chimed, then glass broke downstairs.' : 'Glass breaking downstairs. Then footsteps.';
   return {
     id: `e${s.nextId++}`, kind: 'break_in', day, title: 'Someone is in the house',
     dossier: [
@@ -338,7 +339,7 @@ export function resolveBreakIn(s: GameState, e: Encounter, stance: Stance): Omit
   const safeRoom = n(s, 'safe_room') > 0;
   if (stance === 'shout') {
     const homeArmed = s.armory.guns.length > 0;
-    const p = 0.7 + (n(s, 'dog') ? 0.1 : 0) + (powered(s) && n(s, 'floodlights') ? 0.05 : 0) + (homeArmed ? 0.05 : 0) - (e.armed ? 0.15 : 0) - (e.size - 1) * 0.05;
+    const p = 0.7 + (dogCount(s) ? 0.1 : 0) + (powered(s) && n(s, 'floodlights') ? 0.05 : 0) + (homeArmed ? 0.05 : 0) - (e.armed ? 0.15 : 0) - (e.size - 1) * 0.05;
     if (r() < p) {
       lines.push(`The deputy got there in ${mins} minutes and took a report.`);
       lines.push(...plainView(s, r, 0.3));
