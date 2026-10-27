@@ -25,7 +25,7 @@ import { backgroundOf } from './family';
 import { isHome } from './blueprints';
 import { isFinished } from './construction';
 import { PERIMETER, fenceLive, runFinished } from './perimeter';
-import { TURRET_JAM, floodReady, isTower, mountReady, towerPosture, towerPosts, towerReach, turretsReady } from './towers';
+import { TURRET_JAM, floodReady, highBonus, isTower, mountReady, towerPosture, towerPosts, towerReach, turretsReady } from './towers';
 import { enclosure } from './enclosure';
 import { mulberry32 } from './rng';
 import { leaveAftermath } from './aftermath';
@@ -243,7 +243,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
   // cover (the share of hits that still land): a prepared position beats what a raider finds in a ditch or behind a tree (0.4).
   // (round 4: a wall post was 0.55 and a log house 0.5–0.6, worse than the raiders' 0.3, so they out-shot a fortified family)
   const posts: PostSpot[] = [];
-  for (const tp of towerPosts(s)) posts.push({ kind: 'tower', x: tp.st.x, z: tp.st.z, y: tp.post.y, cover: tp.post.cover, value: tp.post.value, cap: 1, wrecked: false, fire: 0, reach: tp.post.reach, acc: tp.post.acc, mount: !!(tp.def?.mount && mount) });
+  for (const tp of towerPosts(s)) posts.push({ kind: 'tower', x: tp.st.x, z: tp.st.z, y: tp.post.y, cover: tp.post.cover, value: tp.post.value, cap: 1, wrecked: false, fire: 0, reach: tp.post.reach + (tp.def ? highBonus(tp.st, tp.def.kind).reach : 0), acc: tp.post.acc, mount: !!(tp.def?.mount && mount) });
   const isPostKind = (k: string) => k.includes('tower') || isTower(k);
   for (let i = 0; i < Math.min(3, n('sandbags')); i++) { const p = at(3, (i - 1) * 2.5); posts.push({ kind: 'sandbags', ...p, y: 0, cover: 0.22, value: 3, cap: 1, wrecked: false, fire: 0 }); }
   // a wall only delays a crew that has to come over it: a gap, an open gate or an unbarred creek in the property line is the way round

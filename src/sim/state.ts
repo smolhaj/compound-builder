@@ -109,6 +109,8 @@ export interface Structure {
   permitAt?: number;
   /** An upgrade of this finished structure (sim/towers.ts): the old tier keeps working until this one is done, then goes (half its materials back). */
   replaces?: string;
+  /** Towers: how far the ground at the site stands above the land round it (world units, ≥ 0; sim/towers.ts `stampHighGround`). */
+  high?: number;
 }
 
 export type TaskKind = 'idle' | 'build' | 'forestry' | 'sleep' | 'chores' | 'school' | 'leisure' | 'job' | 'gone' | 'shelter' | 'away';

@@ -257,3 +257,46 @@ describe('saves', () => {
     expect(up.stock.turret_head).toBe(0);
   });
 });
+
+import { highBonus, highGroundAt, setGroundProbe, stampHighGround, HIGH_FULL } from './towers';
+describe('high ground', () => {
+  const hill = (cx: number, cz: number, h: number) => (x: number, z: number) => h * Math.max(0, 1 - Math.hypot(x - cx, z - cz) / 9);
+  it('is how far the site stands above the land round it, never negative, and flat ground gives none', () => {
+    setGroundProbe(() => 3);
+    expect(highGroundAt(10, 10)).toBe(0);
+    setGroundProbe(hill(10, 10, 0.8));
+    expect(highGroundAt(10, 10)).toBeGreaterThan(0.3);
+    setGroundProbe((x) => -x * 0.2);                       // a hole relative to a slope
+    expect(highGroundAt(0, 0)).toBeGreaterThanOrEqual(0);
+    setGroundProbe(null);
+    expect(highGroundAt(10, 10)).toBe(0);
+  });
+
+  it('adds modest, capped sight and warning, most to the low rise and least to a tall tower', () => {
+    setGroundProbe(hill(6, 6, 2));
+    const mk = (kind: string): Structure => { const st = { id: kind, kind, x: 6, z: 6, rot: 0, stage: 99, done: 0, supplied: true, finishedAt: 0 } as Structure; stampHighGround(st); return st; };
+    const rise = mk('rise_lookout'), wood = mk('watchtower_wood'), top = mk('watchtower_turret');
+    expect(rise.high).toBeGreaterThanOrEqual(HIGH_FULL);
+    const br = highBonus(rise, 'rise_lookout'), bw = highBonus(wood, 'watchtower_wood'), bt = highBonus(top, 'watchtower_turret');
+    expect(br.view).toBeGreaterThan(bw.view); expect(bw.view).toBeGreaterThan(bt.view); expect(bt.view).toBeGreaterThan(0);
+    expect(br.view).toBeLessThanOrEqual(10); expect(br.viewR).toBeLessThanOrEqual(5); expect(br.reach).toBeLessThanOrEqual(0.2);
+    // a huge hill adds nothing more
+    setGroundProbe(hill(6, 6, 50));
+    const big = mk('rise_lookout');
+    expect(highBonus(big, 'rise_lookout')).toEqual(br);
+    // none stamped: no bonus
+    expect(highBonus({ ...rise, high: undefined } as Structure, 'rise_lookout').view).toBe(0);
+    setGroundProbe(null);
+  });
+
+  it('a tower on a hill gives more warning than the same tower on the flat', () => {
+    const run = (probe: ((x: number, z: number) => number) | null) => {
+      setGroundProbe(probe);
+      const g = afterHit(2); const st = tower(g, 'rise_lookout', 'r', 6, 6); stampHighGround(st);
+      const d = towerPosture(g).detection;
+      setGroundProbe(null);
+      return d;
+    };
+    expect(run(hill(6, 6, 1.5))).toBeGreaterThan(run(null));
+  });
+});

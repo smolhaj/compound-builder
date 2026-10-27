@@ -45,7 +45,7 @@ import { EXPOSURE_NAME, exposure, raidPressure, topExposure } from '../sim/opsec
 import { acresOf, buyProblem, LAND_NAME, priceOf } from '../sim/land';
 import { HARDEN, HARDEN_IDS, type TierDef, hardenCost, hardenProblem, isBunkerRoom, protectionOf, tierOf } from '../sim/hardening';
 import { defenseReport, type Check } from '../sim/defenseReport';
-import { TOWERS, TOWER_NEXT, isTower, towerBill, towerUpgradeProblem } from '../sim/towers';
+import { TOWERS, TOWER_NEXT, highBonus, highShare, isTower, towerBill, towerUpgradeProblem } from '../sim/towers';
 import { STRUCTURE_SALVAGE, isFinished as structFinished } from '../sim/construction';
 import { PERIMETER, PERIMETER_ORDER, SALVAGE, UPGRADE_NEXT, UTILITY_LINES, upgradeProblem, wallLength, runBill, runHours, runFinished, runProgress, runBlocked, runGrowth } from '../sim/perimeter';
 import { PantryPanel } from './PantryPanel';
@@ -780,12 +780,14 @@ function DefenseTab() {
       {game.structures.every(st => !isTower(st.kind)) && <Note>No tower yet. Build a rise &amp; lookout from the Build menu (Watch towers).</Note>}
       {game.structures.filter(st => isTower(st.kind) && structFinished(st)).map(st => {
         const def = TOWERS[st.kind as keyof typeof TOWERS], nk = TOWER_NEXT[st.kind];
-        if (!nk) return <div key={st.id} style={{ padding: '3px 0' }}>{def.name} <span style={{ color: DIM }}>(tier {def.tier} of 6, the last)</span></div>;
+        const hb = highBonus(st, st.kind as keyof typeof TOWERS);
+        const hg = highShare(st) > 0.05 ? <span style={{ color: TONE.good }} title="The ground under it stands above the land round it: the watch sees farther and earlier (capped)."> · high ground +{Math.round((st.high ?? 0) * 6)} m: sees {Math.round(hb.viewR * 6)} m farther, +{Math.round(hb.view)} warning</span> : null;
+        if (!nk) return <div key={st.id} style={{ padding: '3px 0' }}>{def.name} <span style={{ color: DIM }}>(tier {def.tier} of 6, the last)</span>{hg}</div>;
         const price = (bill: ReturnType<typeof towerBill>, f: number) => orderCost(Object.entries(bill).filter(([m]) => MATERIALS[m as MaterialId].price !== null).map(([material, qty]) => ({ material: material as MaterialId, qty: Math.ceil((qty as number) * f) })));
         const net = Math.max(0, price(towerBill(nk), 1) - price(towerBill(st.kind as keyof typeof TOWERS), STRUCTURE_SALVAGE));
         const why = towerUpgradeProblem(game, st);
         return <div key={st.id} style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '3px 0' }}>
-          <span style={{ flex: 1 }}>{def.name} <span style={{ color: DIM }}>(tier {def.tier})</span> <span style={{ color: DIM }}>→</span> {TOWERS[nk].name}</span>
+          <span style={{ flex: 1 }}>{def.name} <span style={{ color: DIM }}>(tier {def.tier})</span>{hg} <span style={{ color: DIM }}>→</span> {TOWERS[nk].name}</span>
           <button style={btn(false)} disabled={!!why} title={why ?? `${TOWERS[nk].blurb} About ${usd(net)} after the salvage of the old one (${Math.round(STRUCTURE_SALVAGE * 100)}% of its materials back).`} onClick={() => { const w = useGameStore.getState().upgradeTower(st.id); if (w) alert(w); }}>{why ? 'Under way' : `Upgrade ~${usd(net)}`}</button>
         </div>;
       })}

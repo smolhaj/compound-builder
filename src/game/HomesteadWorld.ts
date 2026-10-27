@@ -1,3 +1,4 @@
+import { setGroundProbe } from '../sim/towers';
 import * as THREE from 'three';
 import { mulberry32 } from '../sim/rng';
 import { ShrubField, SAGE, WILLOW, type ShrubSpec } from '../engine/world/trees/ShrubField';
@@ -185,6 +186,7 @@ export class HomesteadWorld {
     ws.setSite({ x0: 0, z0: 0, x1: PARCEL_SIZE, z1: PARCEL_SIZE });
     this.home = { ...site.home };
     this.parcel = new ParcelTerrain(seed, { creek: site.creek, timber: site.timber, region: site.region });
+    setGroundProbe((x, z) => this.parcel.natural(x, z).h);
     this.regionWorld = this.parcel.world;
     this.climate = this.regionWorld.climate;
     this.farms = planNeighbors(this.parcel);

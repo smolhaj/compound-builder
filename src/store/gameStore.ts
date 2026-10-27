@@ -13,7 +13,7 @@ import { step } from '../sim/engine';
 import { placeOrder } from '../sim/economy';
 import { planStructure } from '../sim/construction';
 import { markTree, unmarkTree, isMarked, type TreeRef } from '../sim/forestry';
-import { upgradeTower } from '../sim/towers';
+import { stampHighGround, upgradeTower } from '../sim/towers';
 import { planRun, upgradeRun, type Gate, type PerimeterKind, type Pt } from '../sim/perimeter';
 import { fitProblem, orderFit, plant, repairPump, replaceFried } from '../sim/utilities';
 
@@ -150,6 +150,7 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     if (planProblem(get().game, kind)) return;
     const g = structuredClone(get().game);
     const st = planStructure(g, kind, x, z, rot);
+    stampHighGround(st);
     applyForPermit(g, st);
     set({ game: g, selected: st.id });
     void saveGame(AUTOSAVE, g);

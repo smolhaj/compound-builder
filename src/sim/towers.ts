@@ -78,6 +78,34 @@ export const MOUNT_ROUNDS = 60, TURRET_ROUNDS = 200;
 /** A turret's chance of jamming on any burst. */
 export const TURRET_JAM = 0.012;
 
+// ── high ground ──
+/** The ground height at (x, z), set by the world when it has a terrain (tests set their own). */
+let groundProbe: ((x: number, z: number) => number) | null = null;
+export const setGroundProbe = (f: ((x: number, z: number) => number) | null): void => { groundProbe = f; };
+/** A rise this high above the land round it (≈ 3 m) gives the whole bonus; more adds nothing. */
+export const HIGH_FULL = 0.5;
+/** How much each tier leans on the ground: the low rise gains most from a natural hill, a tall tower least. */
+const HIGH_WEIGHT: Record<TowerKind, number> = { rise_lookout: 2, watchtower_wood: 1, watchtower_concrete: 0.6, watchtower_flood: 0.6, watchtower_mount: 0.6, watchtower_turret: 0.6 };
+
+/** How far (x, z) stands above the mean of a ring of ground 24 m out (world units, never negative). */
+export function highGroundAt(x: number, z: number): number {
+  if (!groundProbe) return 0;
+  let ring = 0;
+  for (let i = 0; i < 8; i++) ring += groundProbe(x + Math.cos(i * Math.PI / 4) * 4, z + Math.sin(i * Math.PI / 4) * 4);
+  return Math.max(0, groundProbe(x, z) - ring / 8);
+}
+/** Record the high ground under a freshly staked tower. */
+export function stampHighGround(st: Structure): void {
+  if (isTower(st.kind)) st.high = Math.round(highGroundAt(st.x, st.z) * 100) / 100;
+}
+/** 0–1: how much of the full bonus a tower's ground gives. */
+export const highShare = (st: Structure): number => Math.min(1, (st.high ?? 0) / HIGH_FULL);
+/** What the ground adds to a tower: warning points, how far out the watch sees (units), and a reach factor. Modest and capped. */
+export function highBonus(st: Structure, kind: TowerKind): { view: number; viewR: number; reach: number } {
+  const k = highShare(st) * HIGH_WEIGHT[kind];
+  return { view: Math.min(10, 5 * k), viewR: Math.min(5, 2.5 * k), reach: Math.min(0.2, 0.08 * k) };
+}
+
 /** A finished tower of the chain. */
 export function towersBuilt(s: GameState): Array<{ st: Structure; def: TowerDef }> {
   return s.structures.filter(st => isTower(st.kind) && isFinished(st)).map(st => ({ st, def: TOWERS[st.kind as TowerKind] }));
@@ -133,7 +161,7 @@ export function towerPosture(s: GameState): { detection: number; visibility: num
   const t = towersBuilt(s);
   const posts = towerPosts(s);
   if (!posts.length) return { detection: 0, visibility: 0, fire: 1 };
-  const views = posts.map(p => p.def?.view ?? TOWERS.watchtower_wood.view).sort((a, b) => b - a);
+  const views = posts.map(p => (p.def?.view ?? TOWERS.watchtower_wood.view) + (p.def ? highBonus(p.st, p.def.kind).view : 0)).sort((a, b) => b - a);
   let detection = views[0] + 2 * Math.min(3, views.length - 1);
   if (floodReady(s)) detection += 6;
   if (turretsReady(s).length) detection += 4;
@@ -146,7 +174,7 @@ export function towerPosture(s: GameState): { detection: number; visibility: num
 export function towerReach(s: GameState, night: boolean, lit: boolean): number {
   let r = 0;
   for (const p of towerPosts(s)) {
-    const base = p.def?.viewR ?? TOWERS.watchtower_wood.viewR;
+    const base = (p.def?.viewR ?? TOWERS.watchtower_wood.viewR) + (p.def ? highBonus(p.st, p.def.kind).viewR : 0);
     // in the dark an unlit tower sees about half as far
     r = Math.max(r, night && !(lit && p.def?.flood) ? base * 0.5 : base);
   }
@@ -189,6 +217,7 @@ export function upgradeTower(s: GameState, id: string): string | null {
   const [x, z] = spots.find(([sx, sz]) => clear(sx, sz)) ?? spots[0];
   const st = planStructure(s, next, x, z, old.rot);
   st.replaces = old.id;
+  stampHighGround(st);
   applyForPermit(s, st);
   log(s, `Upgrading the ${TOWERS[old.kind as TowerKind].name.toLowerCase()} to a ${TOWERS[next].name.toLowerCase()}, rising beside it. The old one stands until the new one is up.`);
   return null;

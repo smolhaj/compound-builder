@@ -185,35 +185,38 @@ function concreteTower(opts: ConcreteOpts): (def: KitPieceDef, seed?: number) =>
       const py = fy + cabH;                                                         // the platform deck: where the gun crew stands
       p.add('concrete', box(cabW + 0.06, 0.035, cabW + 0.06, 0, py, 0), 'roof');
       const e = hc + 0.02;
-      for (const [w, d, x, z] of [[cabW + 0.06, 0.03, 0, -e], [0.03, cabW + 0.06, -e, 0], [0.03, cabW + 0.06, e, 0], [cabW + 0.06, 0.03, 0, e]] as const) p.add('concrete', box(w, 0.1, d, x, py + 0.035, z), 'roof');
-      sandbags(p, -e, -e, e, -e, py + 0.135, 1);
-      sandbags(p, -e, -e, -e, e, py + 0.135, 1);
-      sandbags(p, e, -e, e, e, py + 0.135, 1);
+      for (const [w, d, x, z] of [[cabW + 0.06, 0.03, 0, -e], [0.03, cabW + 0.06, -e, 0], [0.03, cabW + 0.06, e, 0], [cabW + 0.06, 0.03, 0, e]] as const) p.add('concrete', box(w, 0.06, d, x, py + 0.035, z), 'roof');
+      sandbags(p, -e, -e, e, -e, py + 0.095, 1);
+      sandbags(p, -e, -e, -e, e, py + 0.095, 1);
+      sandbags(p, e, -e, e, e, py + 0.095, 1);
       // the hatch the crew come up through, and an ammunition crate stack
       p.add('iron', box(0.12, 0.012, 0.12, hc - 0.14, py + 0.035, hc - 0.12), 'openings');
       p.add('paint_green', box(0.07, 0.04, 0.05, -hc + 0.08, py + 0.035, -hc + 0.08), 'openings');
       p.add('paint_green', box(0.07, 0.04, 0.05, -hc + 0.08, py + 0.075, -hc + 0.08), 'openings');
-      // the ring mount: a pedestal, a ring, the gun with its shield, feed tray and can
+      // the ring mount: a tall pedestal, a ring, the gun in a big armored shield: it must read from the ground, over the parapet
       const gx = opts.turret ? -0.1 : 0, gz = 0.0, gy = py + 0.035;
-      p.add('iron', cyl(0.012, 0.1, gx, gy, gz, 8), 'openings');
-      p.add('steel', new THREE.TorusGeometry(0.075, 0.006, 5, 18).rotateX(Math.PI / 2).translate(gx, gy + 0.1, gz), 'openings');
-      p.add('iron', box(0.03, 0.03, 0.16, gx, gy + 0.1, gz + 0.04), 'openings');                                  // receiver
-      p.add('steel', cyl(0.006, 0.22, gx, gy + 0.115, gz, 6).rotateX(Math.PI / 2).translate(0, 0, 0.14), 'openings'); // barrel
-      p.add('steel', cyl(0.011, 0.04, gx, gy + 0.115, gz + 0.25, 6).rotateX(Math.PI / 2), 'openings');             // flash hider
-      p.add('steel', box(0.11, 0.1, 0.01, gx, gy + 0.1, gz + 0.1), 'openings');                                  // gun shield
-      p.add('paint_green', box(0.04, 0.035, 0.05, gx + 0.045, gy + 0.09, gz + 0.02), 'openings');                 // ammunition can
-      p.add('steel', box(0.008, 0.03, 0.03, gx + 0.026, gy + 0.115, gz + 0.03), 'openings');                      // belt
+      p.add('iron', cyl(0.02, 0.17, gx, gy, gz, 8), 'openings');                                                   // pedestal
+      p.add('steel', new THREE.TorusGeometry(0.09, 0.008, 5, 18).rotateX(Math.PI / 2).translate(gx, gy + 0.17, gz), 'openings');
+      p.add('iron', box(0.05, 0.05, 0.2, gx, gy + 0.17, gz + 0.03), 'openings');                                  // receiver
+      p.add('steel', cyl(0.011, 0.34, gx, gy + 0.195, gz, 8).rotateX(Math.PI / 2).translate(0, 0, 0.2), 'openings'); // barrel
+      p.add('iron', cyl(0.018, 0.07, gx, gy + 0.195, gz, 8).rotateX(Math.PI / 2).translate(0, 0, 0.38), 'openings'); // muzzle brake
+      p.add('steel', box(0.2, 0.17, 0.014, gx, gy + 0.15, gz + 0.1), 'openings');                                 // gun shield
+      p.add('steel', box(0.014, 0.15, 0.1, gx - 0.1, gy + 0.15, gz + 0.05), 'openings');                          // shield wings
+      p.add('steel', box(0.014, 0.15, 0.1, gx + 0.1, gy + 0.15, gz + 0.05), 'openings');
+      p.add('paint_green', box(0.07, 0.06, 0.08, gx + 0.075, gy + 0.14, gz - 0.02), 'openings');                  // ammunition can
+      p.add('paint_yellow', box(0.07, 0.012, 0.08, gx + 0.075, gy + 0.2, gz - 0.02), 'openings');                 // its lid (a bright mark)
+      p.add('steel', box(0.012, 0.05, 0.05, gx + 0.04, gy + 0.19, gz + 0.02), 'openings');                        // belt
       if (opts.turret) {
-        // the remote turret on its own plinth: a gyro housing, a twin-barrel cradle, optics; a camera mast with two domes
-        const tx = 0.12, ty = py + 0.035;
-        p.add('concrete', box(0.12, 0.03, 0.12, tx, ty, 0), 'openings');
-        p.add('steel', new THREE.SphereGeometry(0.052, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2).translate(tx, ty + 0.03, 0), 'openings');
-        p.add('iron', box(0.07, 0.04, 0.07, tx, ty + 0.06, 0), 'openings');
-        p.add('steel', cyl(0.005, 0.18, tx - 0.014, ty + 0.085, 0, 6).rotateX(Math.PI / 2).translate(0, 0, 0.12), 'openings');
-        p.add('steel', cyl(0.005, 0.18, tx + 0.014, ty + 0.085, 0, 6).rotateX(Math.PI / 2).translate(0, 0, 0.12), 'openings');
-        p.add('glass', new THREE.SphereGeometry(0.014, 8, 6).translate(tx, ty + 0.11, 0.035), 'openings');
-        p.add('iron', cyl(0.007, 0.17, tx + 0.04, py + 0.035, -hc + 0.05, 6), 'openings');
-        for (const dx of [-0.018, 0.018]) { p.add('iron', new THREE.SphereGeometry(0.015, 8, 6).translate(tx + 0.04 + dx, py + 0.215, -hc + 0.05), 'openings'); p.add('glass', new THREE.SphereGeometry(0.008, 6, 5).translate(tx + 0.04 + dx, py + 0.215, -hc + 0.064), 'openings'); }
+        // the remote turret on its own plinth: a big gyro dome, twin barrels, optics; a tall camera mast with two domes
+        const tx = 0.13, ty = py + 0.035;
+        p.add('concrete', box(0.16, 0.05, 0.16, tx, ty, 0), 'openings');
+        p.add('steel', new THREE.SphereGeometry(0.085, 14, 9, 0, Math.PI * 2, 0, Math.PI / 2).translate(tx, ty + 0.05, 0), 'openings');
+        p.add('iron', box(0.12, 0.07, 0.12, tx, ty + 0.1, 0), 'openings');
+        for (const dx of [-0.026, 0.026]) p.add('steel', cyl(0.009, 0.3, tx + dx, ty + 0.14, 0, 8).rotateX(Math.PI / 2).translate(0, 0, 0.19), 'openings');
+        p.add('paint_red', box(0.1, 0.012, 0.1, tx, ty + 0.2, 0), 'openings');                                  // a red top plate, to read from afar
+        p.add('glass', new THREE.SphereGeometry(0.022, 8, 6).translate(tx, ty + 0.17, 0.07), 'openings');
+        p.add('iron', cyl(0.009, 0.3, tx + 0.02, py + 0.035, -hc + 0.06, 6), 'openings');
+        for (const dx of [-0.03, 0.03]) { p.add('iron', new THREE.SphereGeometry(0.024, 8, 6).translate(tx + 0.02 + dx, py + 0.35, -hc + 0.06), 'openings'); p.add('glass', new THREE.SphereGeometry(0.012, 6, 5).translate(tx + 0.02 + dx, py + 0.35, -hc + 0.082), 'openings'); }
       }
     }
     // the light mast (tier 4 up): a pole at the back corner with two flood heads, and a pair of heads at the front corners of the cab
