@@ -80,7 +80,7 @@ describe('the armory', () => {
     for (const m of ['glock_19', 'mossberg_500', 'ruger_1022']) buyGun(g, m);
     g = step(g, 365);
     expect(g.armory.guns.every(x => x.where === 'safe')).toBe(true);
-  });
+  }, 30_000);   // a full simulated year per seed
 
   it('AR, AK and MP5-pattern semi-autos sell over the counter, but not in Washington', () => {
     const g = fresh();

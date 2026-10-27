@@ -37,7 +37,7 @@ import { MILESTONE_COUNT, MILESTONE_NAME } from '../sim/lineage';
 import { daysOfFood, KCAL, needOf } from '../sim/needs';
 import { ANIMALS, feedDemand, winterHay } from '../sim/livestock';
 import { barterPrices, moneyWorks, type Good } from '../sim/barter';
-import { NEIGHBOR_BLURB } from '../sim/encounters';
+import { MarketSection, NeighborsSection, ScavengeSection } from './WorldPanels';
 import { alliesFor, canGo, FAR_COLD, isAway, latestFarLead, latestLead, LEAD_COLD, LEAD_WARM, leadAge, openCaptives, raidProblem, rescueOdds, tripFuel, tripProblem } from '../sim/rescue';
 import { EXPOSURE_NAME, exposure, raidPressure, topExposure } from '../sim/opsec';
 import { acresOf, buyProblem, LAND_NAME, priceOf } from '../sim/land';
@@ -54,7 +54,7 @@ const VIEWS: Array<[BuildingView, string, string]> = [['full', 'Walls', 'Whole b
 const SPEEDS: Array<[Speed, string]> = [[0, '❚❚'], [1, '▶'], [2, '▶▶'], [3, '▶▶▶'], [4, '⏩']];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const MONTH_START = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
-const TASK_TEXT: Record<string, string> = { build: 'Building', forestry: 'In the woods', chores: 'Chores', sleep: 'Asleep', school: 'School', leisure: 'Free time', idle: 'Idle', job: 'At work in town', gone: 'Died', shelter: 'Sheltering', away: 'Away on the rescue' };
+const TASK_TEXT: Record<string, string> = { build: 'Building', forestry: 'In the woods', chores: 'Chores', sleep: 'Asleep', school: 'School', leisure: 'Free time', idle: 'Idle', job: 'At work in town', gone: 'Died', shelter: 'Sheltering', away: 'Away from the place' };
 
 function dateLabel(doy: number): string {
   let m = 11;
@@ -599,6 +599,7 @@ export function Hud() {
 
           {rightTab === 'outside' && <>
             <TakenSection />
+            <ScavengeSection />
             {game.disaster.mode === 'sandbox' && !game.disaster.kind && <FreeBuild />}
             {!(game.disaster.phase === 'warning' || (game.disaster.kind && game.clock.t >= game.disaster.warnAt)) && !(game.disaster.mode === 'sandbox' && !game.disaster.kind) && <Note>All quiet. Watch the news ticker, the prices and the neighbors.</Note>}
             {(game.disaster.phase === 'warning' || (game.disaster.kind && game.clock.t >= game.disaster.warnAt)) && (
@@ -651,13 +652,8 @@ export function Hud() {
                 </div>
               </Section>;
             })()}
-            {game.disaster.kind && game.clock.t >= game.disaster.warnAt && <Section title="Neighbors">
-              {game.neighbors.map(n => (
-                <Row key={n.id} title={NEIGHBOR_BLURB[n.kind]} label={<>{n.name[0].toUpperCase() + n.name.slice(1)}{n.radio ? ' · radio' : ''}</>}
-                  value={n.status !== 'home' ? n.status : n.disposition > 50 ? 'allies' : n.disposition > 15 ? 'friendly' : n.disposition < -20 ? 'hostile' : 'wary'}
-                  tone={n.disposition > 50 ? 'good' : n.disposition < -20 ? 'bad' : undefined} />))}
-              {game.clock.t >= game.disaster.hitAt && <Note>Humanity {Math.round(game.gate.humanity)} · took in {game.gate.tookIn} · turned away {game.gate.turnedAway}</Note>}
-            </Section>}
+            {game.disaster.kind && game.clock.t >= game.disaster.warnAt && <NeighborsSection />}
+            <MarketSection />
             {game.clock.t >= game.disaster.hitAt && !moneyWorks(game) && (() => {
               const p = barterPrices(game);
               const rows: Array<[string, Good]> = [['Canned food (case)', 'canned'], ['Staples (25 kg)', 'staples'], ['Fuel (20 L)', 'fuel'], ['Meds (kit)', 'meds'], ['Firewood (rick)', 'firewood'], ['Seed (season)', 'seed'], ['Hygiene (month)', 'hygiene'], ['Silver coin', 'metal:silver_coin'], ['A day\'s labor', 'labor']];

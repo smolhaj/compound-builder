@@ -1,3 +1,4 @@
+import { burnedFarms } from '../sim/neighborLife';
 import { useEffect, useRef } from 'react';
 import type { GameState } from '../sim/state';
 import { MushroomCloud } from './fx/MushroomCloud';
@@ -142,6 +143,7 @@ export function GameCanvas() {
     const ownedRects = (g: GameState) => [...homeOutsideForty(g.site), ...g.land.parcels.filter(p => p.owner === 'you').map(p => p.rect)];
     if (!useGameStore.getState().game.land.surveyed) useGameStore.getState().survey(world.surveyLand(useGameStore.getState().game.land.parcels));
     world.setOwnedLand(ownedRects(useGameStore.getState().game));
+    world.setBurnedFarms(burnedFarms(useGameStore.getState().game));
     const unsub = [
       // wildfire weather: measure the fuel round every building (what cleared ground there is decides what burns)
       useGameStore.subscribe(s => s.game.disaster.phase, ph => { const g = useGameStore.getState().game; if (g.disaster.kind === 'wildfire' && ph === 'warning' && !g.disaster.fuel) useGameStore.getState().setFuel(world.fuelNear(g.structures)); }),
@@ -150,6 +152,8 @@ export function GameCanvas() {
       useWorldStore.subscribe(s => s.cameraMode, applyCameraMode),
       useGameStore.subscribe(s => s.game.structures, list => { world.syncStructures(placedOnly(list)); occluders.invalidate(); }),
       useGameStore.subscribe(s => s.game.site.improvements.drive, on => world.setDrive(on)),
+      // a neighbor's farm burned (sim/neighborLife.ts): drawn charred once the family knows
+      useGameStore.subscribe(s => burnedFarms(s.game).join(), () => world.setBurnedFarms(burnedFarms(useGameStore.getState().game))),
       useGameStore.subscribe(s => s.tool, k => { tool.setKind(k); marker.setOn(k === 'fell'); fence.setKind(k?.startsWith('fence:') ? k.slice(6) as PerimeterKind : null); if (k === 'fence:escape_tunnel') useWorldStore.getState().setUnderground(true); }),
       useWorldStore.subscribe(s => s.buildingView, v => world.setBuildingView(v)),
       useWorldStore.subscribe(s => s.underground, on => world.setUnderground(on)),

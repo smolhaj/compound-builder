@@ -137,6 +137,8 @@ export class HomesteadWorld {
   readonly lakes: RegionalWaterRenderer;
   private _plantSeason = '';
   private _props: RegionalProps | null = null;
+  /** The home + owned-land test the last build used (a rebuild of the farms after a fire reuses it). */
+  private _insideHome: (x: number, z: number) => boolean = () => false;
   /** Built structures by id (scene groups tagged userData.type = 'building'). */
   private readonly _built = new Map<string, Built>();
   /** Current building view (cutaway / x-ray toggle). */
@@ -368,20 +370,10 @@ export class HomesteadWorld {
     this._plantShrubs(q, inHome, blocked);
     const inside = (x: number, z: number) => inHome(x, z) || this._inOwned(x, z);
     // Neighboring farmsteads (houses, hay barns, corrals, poplar windbreaks)
-    this._props?.dispose();
     const kind = this.regionWorld.kind, wy = regionWaterY(kind);
-    const props = new RegionalProps(this._ws.scene, kind);
     const farmTrees: FarmTree[] = [];
-    const slope = (x: number, z: number) => this.parcel.region.slope(x, z);
-    for (const f of this.farms) buildFarmstead(f, kind, props, this.groundAt, slope, t => farmTrees.push(t));
-    // the neighbors' line fences, the region's way (wire on T-posts, split rail, stone walls, woven wire)
-    const creek = this.parcel.creek;
-    buildLineFences(planLineFences(roadX, ROAD_W / 2, -330, PARCEL_SIZE + 330), this.regionWorld.fence, props, this.groundAt,
-      (x, z) => onFarmstead(this.farms, x, z, 1.5) || Math.abs(z - creek.zAt(x)) < 2.2 || (wy !== null && this.parcel.region.height(x, z) < wy + 0.15) || inside(x, z),
-      (a, b) => { const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return s - Math.floor(s); });
-    if (this.regionWorld.powerline) buildPowerline(props, this.groundAt, (x, z) => onFarmstead(this.farms, x, z, 4) || (wy !== null && this.parcel.region.height(x, z) < wy + 0.3) || inside(x, z));
-    props.finish();
-    this._props = props;
+    this._insideHome = inside;
+    this._buildFarms(t => farmTrees.push(t), inside);
     this.farTrees.build({
       extra: farmTrees.map(t => ({ x: t.x, y: this.groundAt(t.x, t.z) - 0.05, z: t.z, h: t.h, sp: t.sp })),
       // (the regions other than the Mountain West carry their own lie and woods out past the place: the far trees stand on it)
@@ -392,6 +384,32 @@ export class HomesteadWorld {
       waterY: wy, quality: q,
       blocked: (x, z) => inside(x, z) || onFarmstead(this.farms, x, z, 2.5) || this.onAccess(x, z, 1.2),
     });
+  }
+
+  /** The neighbors' farmsteads, their line fences and the power line: rebuilt whole when a farm burns. */
+  private _buildFarms(tree: (t: FarmTree) => void = () => {}, insideHome: (x: number, z: number) => boolean = this._insideHome): void {
+    this._props?.dispose();
+    const kind = this.regionWorld.kind, wy = regionWaterY(kind);
+    const props = new RegionalProps(this._ws.scene, kind);
+    const slope = (x: number, z: number) => this.parcel.region.slope(x, z);
+    for (const f of this.farms) buildFarmstead(f, kind, props, this.groundAt, slope, tree);
+    // the neighbors' line fences, the region's way (wire on T-posts, split rail, stone walls, woven wire)
+    const creek = this.parcel.creek;
+    buildLineFences(planLineFences(roadX, ROAD_W / 2, -330, PARCEL_SIZE + 330), this.regionWorld.fence, props, this.groundAt,
+      (x, z) => onFarmstead(this.farms, x, z, 1.5) || Math.abs(z - creek.zAt(x)) < 2.2 || (wy !== null && this.parcel.region.height(x, z) < wy + 0.15) || insideHome(x, z),
+      (a, b) => { const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return s - Math.floor(s); });
+    if (this.regionWorld.powerline) buildPowerline(props, this.groundAt, (x, z) => onFarmstead(this.farms, x, z, 4) || (wy !== null && this.parcel.region.height(x, z) < wy + 0.3) || insideHome(x, z));
+    props.finish();
+    this._props = props;
+  }
+
+  /** Neighbor farms that have burned (sim/neighborLife.burnedFarms, in farm order): rebuild their props charred. */
+  setBurnedFarms(flags: readonly boolean[]): void {
+    let changed = false;
+    this.farms.forEach((f, i) => { const b = !!flags[i]; if (!!f.burned !== b) { f.burned = b; changed = true; } });
+    if (!changed) return;
+    this._buildFarms();
+    this._ws.invalidateShadows();
   }
 
   private _planted: ParcelTree[] = [];

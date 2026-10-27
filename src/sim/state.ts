@@ -33,10 +33,13 @@ import { generateNeighbors, newGate, type GateState, type Neighbor } from './enc
 import { freshNeeds, type FoodReport, type Needs } from './needs';
 import type { WeatherState } from './weatherThreats';
 import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
-export const SAVE_VERSION = 40;
+export const SAVE_VERSION = 41;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
+import { newScavenge, type ScavengeState } from './scavenge';
+import { newMarketState, type MarketState } from './tradeGoods';
+import { newLocals, type LocalsState } from './neighborLife';
 
 /** Starting savings (GDS §1 peacetime money constraint). */
 export const STARTING_MONEY = 30000;
@@ -219,6 +222,12 @@ export interface GameState {
   gate: GateState;
   /** The children taken by raiders, the leads, the rescue raid out (sim/rescue.ts). Save v38; `??=` for safety. */
   rescue?: RescueState;
+  /** Scavenging runs: the places, what's left in each, the run out (sim/scavenge.ts). Save v42; `??=` for safety. */
+  scavenge?: ScavengeState;
+  /** The crossroads market: the trade-goods bag, the family's name, today's stalls (sim/market.ts). Save v42. */
+  market?: MarketState;
+  /** The neighbors' lives: ages, history, news on its way, the co-op or militia, the pact (sim/neighborLife.ts). Save v42. */
+  locals?: LocalsState;
   /** Radio and rumors after the collapse (radio.ts); made on first use. */
   radio?: RadioState;
   /** Tallies since the hit (the report card), and how the run ended (null while it goes on). */
@@ -267,6 +276,9 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     gate: newGate(seed),
     breakins: newBreakins(),
     rescue: newRescue(),
+    scavenge: newScavenge(),
+    market: newMarketState(),
+    locals: newLocals(),
     stats: emptyStats(),
     ending: null,
     food: { needKcal: 0, ateKcal: 0, producedKcal: 0, spoiledKcal: 0, fromStores: true, kinds: [], daysLeft: 0 },
