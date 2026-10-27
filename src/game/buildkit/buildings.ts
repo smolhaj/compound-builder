@@ -6,7 +6,7 @@
  */
 import * as THREE from 'three';
 import { CELL, KIT, type KitPieceDef } from './kit';
-import { Furniture, M, wallRun } from './interior';
+import { foodSlot, Furniture, M, wallRun } from './interior';
 import { buildCabinLayers } from './cabinGeometry';
 import { box, buildGabled, CUT_H, Parts, showStage, type BuildOpts, type FurnishCtx } from './shell';
 import { Clutter } from './clutter';
@@ -114,16 +114,18 @@ function rootCellar(def: KitPieceDef, seed = 1): THREE.Group {
   }, (c: FurnishCtx) => {
     const { I, left, right, back } = c;
     for (const z of [-0.2, 0.1]) {
-      I({ x: left + 0.03, z, rot: Math.PI / 2 }, a => Furniture.shelfUnit(a, 1.6, 1.7, 'jars'));
-      I({ x: right - 0.03, z, rot: -Math.PI / 2 }, a => Furniture.shelfUnit(a, 1.6, 1.7, 'jars'));
+      // food slots: the jars, cans and sacks the pantry holds are drawn on them (game/props/FoodShelfRenderer)
+      I({ x: left + 0.03, z, rot: Math.PI / 2 }, a => Furniture.shelfUnit(a, 1.6, 1.7, 'food'));
+      I({ x: right - 0.03, z, rot: -Math.PI / 2 }, a => Furniture.shelfUnit(a, 1.6, 1.7, 'food'));
     }
     I({ x: -0.1, z: back + 0.06 }, a => Furniture.rootBin(a, 'log_end'));
     I({ x: 0.1, z: back + 0.06 }, a => Furniture.rootBin(a, 'paint_red'));
     I({ x: 0, z: 0.0 }, a => Furniture.crocks(a));
     I({ x: 0, z: -0.1, rot: 0 }, a => Furniture.hangingStrings(a, 2.0, 1.85), false);
-    I({ x: 0.12, z: 0.2 }, a => Furniture.barrel(a));
     c.C({ x: 0, z: 0.0, y: c.y0 + 0.43 * M }, a => Clutter.candle(a), 0.8);
-    c.C({ x: -0.12, z: 0.22 }, a => Clutter.laundryBasket(a), 0.5);
+    // the chest freezer (the sim's freezer is the cellar's, while it has power) and a patch of floor for buckets and sacks
+    I({ x: -0.05, z: 0.16, rot: Math.PI / 2 }, a => Furniture.chestFreezer(a));
+    I({ x: 0.058, z: 0.2 }, a => foodSlot(a, 0.64 * M, 0.64 * M, 0.85 * M, true, 0, 0.004, 0), false);
     c.C({ x: 0.1, z: 0.3 }, a => Clutter.bucket(a), 0.6);
   }, parts, p => {
     // the earth berm over the vault (with a sod cap), stone wing walls flanking the door, a vent pipe
@@ -376,7 +378,7 @@ function logHouse(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group
     I({ x: left + 0.06, z: 0.22, rot: Math.PI / 2 }, a => Furniture.cookstove(a));
     I({ x: -0.32, z: 0.62, rot: Math.PI / 2 }, a => Furniture.island(a, 1.8));
     I({ x: 0.35, z: 0.78, rot: Math.PI / 2 }, a => Furniture.diningTable(a));
-    I({ x: 0.62, z: front - 0.04, rot: Math.PI }, a => Furniture.shelfUnit(a, 1.0, 1.6, 'jars'));
+    I({ x: 0.62, z: front - 0.04, rot: Math.PI }, a => Furniture.shelfUnit(a, 1.0, 1.6, 'food'));
     I({ x: -0.15, z: front - 0.01, rot: Math.PI }, a => Furniture.coatPegs(a, 0.9), false);
     // stairs up to the loft, rising toward the back along the partition
     I({ x: 0.06, z: LH.loftZ + 0.3 }, a => Furniture.stairs(a, c.spec.wallH / M, 3.6, 0.85));

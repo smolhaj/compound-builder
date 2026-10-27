@@ -72,6 +72,23 @@ export interface BuildOpts {
 }
 
 /** Collects geometry per layer × material. */
+/**
+ * A food slot as the building holds it: `o` the middle of the board's top
+ * (or the pallet's), `u` / `f` unit vectors along it and toward its front,
+ * its length, depth and clear height (world units), floor or shelf.
+ */
+export interface FoodSlot { o: [number, number, number]; u: [number, number, number]; f: [number, number, number]; len: number; dep: number; clear: number; floor: boolean; freezer: boolean }
+
+/** Decode the marker geometry interior.ts `foodSlot` makes (middle, end, front, top, and a point just below the middle whose drop says floor or shelf), after it was moved into place. */
+function readFoodSlot(g: THREE.BufferGeometry, ox: number, oz: number): FoodSlot {
+  const p = g.getAttribute('position');
+  const v = (i: number) => new THREE.Vector3(p.getX(i) + ox, p.getY(i), p.getZ(i) + oz);
+  const o = v(0), a = v(1).sub(o), f = v(2).sub(o), h = v(3).y - o.y;
+  const len = a.length() * 2, dep = f.length() * 2;
+  a.normalize(); f.normalize();
+  return { o: [o.x, o.y, o.z], u: [a.x, a.y, a.z], f: [f.x, f.y, f.z], len, dep, clear: h, floor: o.y - v(4).y < 0.0015, freezer: o.y - v(4).y > 0.0025 };
+}
+
 export class Parts {
   layer: BuildLayer = 'stakes';
   /** Shift applied to everything added (and to colliders): a shell set off-center in its footprint. */
@@ -83,7 +100,10 @@ export class Parts {
   constructor(seed = 1, opts: BuildOpts = {}) { this.rnd = rng(seed); this.opts = opts; }
   readonly map = new Map<string, THREE.BufferGeometry[]>();
   readonly colliders: Collider[] = [];
+  /** Shelf boards and pallets where stored food goes (game/props/FoodShelfRenderer), in the building's frame. */
+  readonly foodSlots: FoodSlot[] = [];
   add(m: KitMaterialId, g: THREE.BufferGeometry, layer: BuildLayer = this.layer): void {
+    if (m === 'food_slot') { this.foodSlots.push(readFoodSlot(g, this.ox, this.oz)); g.dispose(); return; }
     const k = `${layer}|${m}`;
     let l = this.map.get(k);
     if (!l) this.map.set(k, l = []);
@@ -114,6 +134,7 @@ export class Parts {
       group.add(mesh);
     }
     group.userData.colliders = this.colliders;
+    group.userData.foodSlots = this.foodSlots;
     return group;
   }
 }

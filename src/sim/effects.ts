@@ -7,7 +7,7 @@
  * timber, a sickness that comes in with strangers, neighbors who are simply
  * gone. Pure.
  */
-import { isFinished } from './construction';
+import { burnStructure, isFinished, knockBack } from './construction';
 import { insuranceClaim } from './paperwork';
 import { BLUEPRINTS } from './blueprints';
 import { mulberry32 } from './rng';
@@ -79,7 +79,7 @@ export function effectsDay(s: GameState): string[] {
       if (!['workshop', 'chicken_coop', 'garden'].includes(st.kind) || r() > 0.55) continue;
       const roof = BLUEPRINTS[st.kind].stages.findIndex(x => x.id === 'roof');
       if (roof < 0) continue;
-      st.stage = roof; st.done = 0; st.supplied = false; st.finishedAt = null;
+      knockBack(s, st, roof);
       out.push(`The ${st.kind.replace('_', ' ')} roof came down under the wet ash: it has to be rebuilt.`);
       const paid = insuranceClaim(s, st, 0.4);
       if (paid) out.push(paid);
@@ -93,9 +93,10 @@ export function effectsDay(s: GameState): string[] {
       const near = fuel[st.id] ?? 6;
       const p = Math.min(0.85, 0.05 + near * 0.06);
       if (r() > p) continue;
-      st.stage = 0; st.done = 0; st.supplied = false; st.finishedAt = null;
-      out.push(`The ${st.kind.replace('_', ' ')} burned: embers in the timber${near > 8 ? ' right up against it' : ''}.`);
-      const paid = insuranceClaim(s, st, 1);
+      if (!burnStructure(s, st)) continue;
+      out.push(st.kind === 'well_drilled' ? 'The pump house over the drilled well burned. The bore and the pump down it came through; the pump house, pressure tank and controls have to be redone.'
+        : st.kind === 'well_hand' ? 'The well house burned. The stoned shaft and the hand pump came through; it needs a new roof.' : `The ${st.kind.replace('_', ' ')} burned: embers in the timber${near > 8 ? ' right up against it' : ''}.`);
+      const paid = insuranceClaim(s, st, st.kind.startsWith('well_') ? 0.2 : 1);
       if (paid) out.push(paid);
     }
     if (!out.length) out.push('The fire went round: every building is standing. The cleared ground saved it.');

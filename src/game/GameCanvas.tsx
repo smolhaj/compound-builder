@@ -180,6 +180,7 @@ export function GameCanvas() {
         useWorldStore.getState().syncClock(hourOf(game.clock.t), cal.doy, game.clock.t);
       }
       world.syncProgress(game.structures);
+      world.syncFood(game);
       world.syncForestry(game.forestry);
       world.simTime = game.clock.t;
       world.syncPerimeter(game.perimeter, game.clock.t);

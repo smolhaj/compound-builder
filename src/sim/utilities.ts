@@ -348,7 +348,8 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
   let roof = 0;
   for (const st of fin) if (p.water.has(st.id) && p.nodes.some(o => p.water.get(o.id) === p.water.get(st.id) && UTILITY[o.kind]?.store)) roof += roofM2(kinds.get(st.id)!);
   const rainL = roof * rainMm(doy) * REGIONS[s.site.region].rainMm / 400 * 0.8;
-  const people = s.people.length;
+  // the living drink and wash (playtest round 3: the dead and the taken were still counted, doubling a long game's water use)
+  const people = s.personState.filter(ps => ps.needs?.died == null).length;
   const homePlumbed = fin.some(st => fitted(s, st.id, 'plumb') && (DRAW_KWH[st.kind] ?? 0) >= 5);
   const use = people * (homePlumbed ? WATER_PLUMBED : WATER_CARRIED) + (fin.some(st => st.kind === 'garden') && doy > 120 && doy < 270 ? (s.stock.greywater >= 1 && homePlumbed ? 200 : 400) : 0) + (fin.some(st => st.kind === 'chicken_coop') ? 10 : 0);
   u.storedL = Math.min(store, u.storedL + rainL);

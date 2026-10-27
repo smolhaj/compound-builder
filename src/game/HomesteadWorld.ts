@@ -40,7 +40,7 @@ import { buildRun, solidSpans } from './perimeter/perimeterGeometry';
 import { PERIMETER, runGrowth, runProgress, wallLength, type PerimeterRun } from '../sim/perimeter';
 import { closestOnLine, earthworkReach, type Earthwork } from './parcel/parcelTerrain';
 import { exposure, Sight, type Observer, type SightWorld } from './sightlines/visibility';
-import { hitsColliders, type Collider } from './buildkit/interior';
+import { hitsColliders, M, type Collider } from './buildkit/interior';
 import type { BuildingView } from '../store/worldStore';
 import type { Structure } from '../sim/state';
 import { calendarOf } from '../sim/state';
@@ -63,6 +63,14 @@ import { buildGate } from './props/gateGeometry';
 import { buildStockpile } from './props/stockpileGeometry';
 import { DeliveryTruck } from './DeliveryTruck';
 import { MATERIAL_IDS, emptyStock } from '../sim/materials';
+import { pantryRows } from '../sim/pantry';
+import { needOf } from '../sim/needs';
+import { FoodShelfRenderer, type ShownPlace } from './props/FoodShelfRenderer';
+import { planShelves, propsWanted, splitInUse } from './props/foodShelfPlan';
+import type { FoodSlot } from './buildkit/shell';
+
+/** The order the stores take their turns: the buried storeroom, the root cellar, the bunker's galley and container, then the house pantries. */
+const FOOD_ORDER: Record<string, number> = { bunker_stores: 0, root_cellar: 1, bunker_galley: 2, bunker_container: 3 };
 
 export { PARCEL_SIZE };
 /** Person height in world units (≈ 1.7 m). */
@@ -931,6 +939,51 @@ export class HomesteadWorld {
       this._rebuild(b, { ...b.opts, ...u });
     }
   }
+
+  // ── Food on the shelves ───────────────────────────────────────────────
+  readonly food = new FoodShelfRenderer();
+  private _foodKey = '';
+  /**
+   * Draw the pantry on the shelves and pallets of every finished storeroom,
+   * cellar and pantry, filled by quantity (props/foodShelfPlan). Cheap when
+   * nothing changed; the shelves of a ghosted building (underground view)
+   * stay reserved but aren't drawn.
+   */
+  syncFood(game: GameState): void {
+    // nothing that matters changed since the last frame: skip (the game object is only replaced when the sim steps or the player acts)
+    const finished = this._finishedCount();
+    if (game.pantry === this._foodPantry && game.stock === this._foodStock && this._foodCheap === `${this._under}|${this._built.size}|${finished}`) return;
+    this._foodPantry = game.pantry; this._foodStock = game.stock; this._foodCheap = `${this._under}|${this._built.size}|${finished}`;
+    const all = [...this._built.values()].filter(b => b.finished && (b.group.userData.foodSlots as FoodSlot[] | undefined)?.length)
+      .sort((a, b) => (FOOD_ORDER[a.placed.kind] ?? 9) - (FOOD_ORDER[b.placed.kind] ?? 9) || a.placed.id.localeCompare(b.placed.id));
+    // the house pantries hold what's in use (two to three weeks); the storeroom, cellar and bunker the rest (props/foodShelfPlan splitInUse)
+    const isStore = (b: Built) => b.placed.kind in FOOD_ORDER;
+    const stores = all.filter(isStore), homes = all.filter(b => !isStore(b));
+    const need = game.people.reduce((a, p, i) => a + (game.personState[i]?.needs?.died == null ? needOf(p) : 0), 0);
+    const split = splitInUse(pantryRows(game, 1).map(r => ({ id: r.id, units: r.units })), need, stores.length > 0 && homes.length > 0);
+    const wHome = propsWanted(homes.length ? split.house : []), wStore = propsWanted(homes.length ? split.store : split.house);
+    const key = `${wHome.map(w => w.id + w.n).join()}|${wStore.map(w => w.id + w.n).join()}|${all.map(b => b.group.uuid).join()}|${this._under}`;
+    if (key === this._foodKey) return;
+    this._foodKey = key;
+    if (!this.food.group.parent) this._ws.scene.add(this.food.group);
+    const shown: ShownPlace[] = [];
+    for (const [group, wants] of [[homes, wHome], [stores, wStore]] as const) {
+      // board by board in turn round the buildings, so each has its share (and empties with the rest);
+      // within one: the pallets and the freezer, then the boards nearest eye height (≈ 1.2 m) on every unit before the high and low ones
+      const lists = group.map(b => (b.group.userData.foodSlots as FoodSlot[]).map(slot => ({ b, slot }))
+        .sort((x, y) => +(y.slot.floor || y.slot.freezer) - +(x.slot.floor || x.slot.freezer) || Math.round(Math.abs(x.slot.o[1] - 1.2 * M) / (0.2 * M)) - Math.round(Math.abs(y.slot.o[1] - 1.2 * M) / (0.2 * M))));
+      const slots: Array<{ b: Built; slot: FoodSlot }> = [];
+      for (let i = 0; lists.some(l => i < l.length); i++) for (const l of lists) if (i < l.length) slots.push(l[i]);
+      const places = planShelves(wants, slots.map(({ slot }) => ({ len: slot.len / M, dep: slot.dep / M, clear: slot.clear / M, floor: slot.floor, freezer: slot.freezer })));
+      for (const b of group) b.group.updateMatrixWorld(true);
+      for (const p of places) if (!(this._under && !slots[p.slot].b.under)) shown.push({ place: p, slot: slots[p.slot].slot, world: slots[p.slot].b.group.matrixWorld });
+    }
+    this.food.update(shown);
+  }
+  private _foodPantry: unknown = null;
+  private _foodStock: unknown = null;
+  private _foodCheap = '';
+  private _finishedCount(): number { let n = 0; for (const b of this._built.values()) if (b.finished) n++; return n; }
 
   // ── Underground ───────────────────────────────────────────────────────
   private _under = false;

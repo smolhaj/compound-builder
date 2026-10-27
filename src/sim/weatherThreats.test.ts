@@ -4,6 +4,7 @@ import { fieldHarvest, produce } from './needs';
 import { CLASSIC } from './site';
 import { odds, snowedIn, stormOutage, weatherDay, weatherOf } from './weatherThreats';
 import { REGION_IDS } from './regions';
+import { addWork, isFinished } from './construction';
 
 const place = (region: typeof CLASSIC.region, doy: number, seed = 5) => {
   const g = newGame(seed, doy, 2027);
@@ -49,6 +50,23 @@ describe('weather threats', () => {
     g.clock.t = 1; weatherDay(g);
     expect(g.structures[0].stage).toBe(3);
     expect(g.structures[0].finishedAt).toBeNull();
+  });
+
+  it('a storm-wrecked pump house is re-roofed with the pump it already had (no new pump needed)', () => {
+    const g = place('plains', 100, 3);
+    g.structures.push({ id: 'w', kind: 'well_drilled', x: 34, z: 30, rot: 0, stage: 5, done: 0, supplied: true, finishedAt: 0 });
+    g.structures = g.structures.filter(x => x.id !== 'h');
+    g.stock.pump = 0; g.stock.hardware = 0;
+    g.weather = { active: { kind: 'tornado', at: 1, until: 1 }, last: -999 };
+    g.clock.t = 1; weatherDay(g);
+    const w = g.structures.find(x => x.id === 'w')!;
+    expect(w.stage).toBe(3);                     // back to the roof
+    expect(g.stock.pump).toBe(1);                // the pump and its kit came out of the wreck
+    expect(g.stock.hardware).toBe(1);
+    g.stock.roofing = 1;
+    addWork(g, w, 100);
+    expect(isFinished(w)).toBe(true);
+    expect(g.stock.pump).toBe(0);
   });
 
   it('a root cellar keeps people from being hurt in a tornado', () => {

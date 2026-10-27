@@ -46,6 +46,11 @@ const living = (s: GameState) => s.personState.filter(ps => ps.needs.died == nul
 /** Once a day after the hit: tally, then see whether the run is over. */
 export function tallyDay(s: GameState): Ending | null {
   const d = s.disaster;
+  // the last of them gone ends the line whenever it happens: in the quiet years between eras, or after a card that was played on (playtest round 3: the run used to go on with nobody left)
+  if (s.personState.length && living(s) === 0 && s.ending?.kind !== 'wipe') {
+    s.ending = { kind: 'wipe', day: Math.floor(s.clock.t), continued: false };
+    return s.ending;
+  }
   if (!d.kind || s.clock.t < d.hitAt || (s.ending && !s.ending.continued)) return null;
   const st = s.stats, day = Math.floor(s.clock.t - d.hitAt);
   if (day <= st.days - 1) return null;

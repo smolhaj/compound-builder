@@ -27,7 +27,9 @@ export type KitMaterialId = 'timber_lap' | 'trim' | 'fieldstone' | 'metal_roof' 
   // greenhouse and orchard
   | 'polycarb' | 'aluminum' | 'fruit'
   // interior floors (greenhouse gravel + paver aisle, cottage boards, the garage's oil drips)
-  | 'gravel' | 'pavers' | 'floorboards' | 'oil_stain';
+  | 'gravel' | 'pavers' | 'floorboards' | 'oil_stain'
+  // not drawn: marks a shelf board / pallet where the stored food goes (interior.ts foodSlot; Parts keeps it as a slot)
+  | 'food_slot';
 
 /** World units covered by one texture repeat. */
 const TEX_WORLD: Partial<Record<KitMaterialId, number>> = {
@@ -755,6 +757,7 @@ export function kitMaterial(id: KitMaterialId): THREE.MeshStandardMaterial {
     // an oil drip on the slab: dark, a little sheen, laid just above the floor
     case 'oil_stain': m = new THREE.MeshStandardMaterial({ color: 0x1d1a16, roughness: 0.3, metalness: 0.1, transparent: true, opacity: 0.55, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }); break;
     case 'hedge_berry': m = new THREE.MeshStandardMaterial({ color: 0xa3261e, roughness: 0.5 }); break;
+    case 'food_slot': m = new THREE.MeshStandardMaterial({ visible: false }); break;
     case 'container_red': case 'container_blue': case 'container_green': case 'container_tan': {
       const tint = { container_red: 0xb0473a, container_blue: 0x4a6f9a, container_green: 0x6f8f62, container_tan: 0xc7aa7c }[id];
       const mm = texMat(id, paintMetalSiding, 2.5, 0.6, 0.4);

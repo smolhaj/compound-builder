@@ -44,4 +44,19 @@ describe('vehicles', () => {
     expect(g.stock.fuel).toBeLessThan(5);
     expect(g.vehicles[0].condition).toBeLessThan(c0);
   });
+
+  it('a mechanic who has died no longer keeps the trucks up', () => {
+    const run = (dead: boolean) => {
+      const g = newGame(1);
+      g.vehicles = startingVehicles();
+      g.disaster.tracks.fuel = 0; g.disaster.tracks.stores = 0;
+      g.stock.fuel = 5;
+      g.people.forEach((p, i) => { p.skills.mechanic = i === 0 ? 9 : 0; });
+      if (dead) g.personState[0].needs.died = 1;
+      const c0 = g.vehicles[0].condition;
+      vehiclesDay(g);
+      return c0 - g.vehicles[0].condition;
+    };
+    expect(run(true)).toBeGreaterThan(run(false));
+  });
 });

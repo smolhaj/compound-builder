@@ -21,6 +21,7 @@ import { improvementStructures, type Fix, type SiteJobs } from './improvements';
 import { CLOSING_COSTS, newPaper, type Paper } from './paperwork';
 import { newUpkeep, type Upkeep } from './upkeep';
 import { newShelf, type Shelf } from './shelf';
+import { pantryFromAggregates, type FoodItemId, type Pantry } from './pantry';
 import { conditionsFor, newBody, type Body } from './body';
 import { newFin, type Fin } from './finance';
 import { newArmory, type Armory } from './armory';
@@ -32,7 +33,7 @@ import { generateNeighbors, newGate, type GateState, type Neighbor } from './enc
 import { freshNeeds, type FoodReport, type Needs } from './needs';
 import type { WeatherState } from './weatherThreats';
 import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
-export const SAVE_VERSION = 38;
+export const SAVE_VERSION = 40;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -61,7 +62,13 @@ export interface Clock {
   speed: Speed;
 }
 
-export interface OrderLine { material: MaterialId; qty: number }
+/**
+ * One line of an order. A named food (`food`, sim/pantry.ts) is `n` real
+ * units (bags, buckets, cases); its `material` is the food category and
+ * `qty` the same food in that category's units, so everything that counts
+ * stock by material keeps working.
+ */
+export interface OrderLine { material: MaterialId; qty: number; food?: FoodItemId; n?: number }
 
 export interface Order {
   id: string;
@@ -186,6 +193,8 @@ export interface GameState {
   weather?: WeatherState;
   /** How old the stores are, rotation, traps. */
   shelf: Shelf;
+  /** What the food stores are made of, item by item, and the diet's running averages (sim/pantry.ts; save v39). */
+  pantry: Pantry;
   /** Medicine on hand per person. */
   body: Body;
   /** Savings, the brokerage account, cash in the safe, gold and silver. */
@@ -245,6 +254,7 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     paper: newPaper(),
     upkeep: newUpkeep(),
     shelf: newShelf(),
+    pantry: pantryFromAggregates({ canned: 2 }),
     body: newBody(),
     fin: newFin(),
     armory: newArmory(),
