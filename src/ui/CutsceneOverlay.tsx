@@ -59,7 +59,7 @@ export function CutsceneOverlay() {
       </div>
       <div style={{ ...bar, bottom: 0, height: BAR, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 clamp(16px, 8vw, 120px)', color: '#efe6d4', fontFamily: FONT, textAlign: 'center' }}>
         {c.phase === 'prompt' && <div style={{ fontSize: 'clamp(14px, 2.5vh, 21px)', fontStyle: 'italic', lineHeight: 1.35 }}>{c.narration}</div>}
-        {playing && view.seg !== 'fight' && view.caption && <div style={{ fontSize: 'clamp(14px, 2.5vh, 21px)', fontStyle: 'italic', lineHeight: 1.35 }}>{view.caption}</div>}
+        {playing && view.seg !== 'fight' && view.seg !== 'gap' && view.caption && <div style={{ fontSize: 'clamp(14px, 2.5vh, 21px)', fontStyle: 'italic', lineHeight: 1.35 }}>{view.caption}</div>}
         {playing && view.seg === 'fight' && (
           <div style={{ fontSize: 'clamp(13px, 2.2vh, 19px)', lineHeight: 1.3 }}>
             {lines.slice(-2).map((l, i, a) => {
