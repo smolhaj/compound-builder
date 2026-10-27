@@ -454,3 +454,15 @@ SETS.baths = [
   { name: 'farmhouse-plan', time: 12, season: 'summer', setup: homes + cut + top('farmhouse'), cam: D, frames: 14 },
   { name: 'trailer-plan', time: 12, season: 'summer', setup: homes + cut + top('trailer'), cam: D, frames: 14 },
 ];
+
+// the fence and wall upgrade chain, side by side: split-rail > barbed > woven > chain-link > wrought iron > iron + barbed > steel > electrified
+const tiersSetup = `{ if (!window.__tiers) { window.__tiers = true;
+  const G = cb.game, kinds = ['split_rail', 'barbed_wire', 'woven_wire', 'chain_link', 'wrought_iron', 'iron_barbed', 'steel_wall', 'electric_steel'];
+  kinds.forEach((k, i) => G.getState().planRun(k, [[6 + i * 7, 40], [6 + i * 7 + 6, 40]], [], 0));
+  G.setState(s => { const g = structuredClone(s.game); for (const r of g.perimeter) { r.done = r.hours; r.supplied = true; r.finishedAt = 0; } return { game: g }; });
+} }`;
+SETS.tiers = [
+  { name: 'tiers-overview', time: 11, season: 'summer', setup: tiersSetup, cam: { x: 33, z: 40, yaw: 0.0, pitch: 0.32, radius: 40 }, frames: 16 },
+  { name: 'tiers-low-1', time: 11, season: 'summer', setup: tiersSetup, cam: { x: 17, z: 40, yaw: 0.35, pitch: 0.16, radius: 7.5 }, frames: 12 },
+  { name: 'tiers-low-2', time: 11, season: 'summer', setup: tiersSetup, cam: { x: 47, z: 40, yaw: 0.35, pitch: 0.16, radius: 7.5 }, frames: 12 },
+];

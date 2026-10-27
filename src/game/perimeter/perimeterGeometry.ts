@@ -119,6 +119,65 @@ export function buildRun(run: PerimeterRun, ground: Ground, t: number, under: (x
       for (const e of spanEnds()) post(e.x, e.z, H + 0.03, 0.06 * M, 'iron');
       break;
     }
+    case 'chain_link':
+      // 1.8 m galvanized mesh on round steel posts, top rail and a tension wire at the foot
+      bays(3 * M, (a, b) => {
+        post(a.x, a.z, 1.9 * M, 0.04 * M, 'steel', true);
+        beam(a.x, a.z, b.x, b.z, 0.08 * M, 1.75 * M, 0.008 * M, 'wire_mesh');
+        beam(a.x, a.z, b.x, b.z, 1.82 * M, 0.04 * M, 0.04 * M, 'steel');
+        beam(a.x, a.z, b.x, b.z, 0.06 * M, 0.02 * M, 0.02 * M, 'steel');
+      });
+      for (const e of spanEnds()) post(e.x, e.z, 1.95 * M, 0.06 * M, 'steel', true);
+      break;
+    case 'wrought_iron':
+    case 'iron_barbed': {
+      // forged pickets with spear points between stone-capped posts, on a low stone footing; the barbed version adds outward-leaning arms and three strands
+      const H = 2.0 * M;
+      bays(2.4 * M, (a, b) => {
+        post(a.x, a.z, H + 0.15 * M, 0.07 * M, 'iron');
+        add('fieldstone', new THREE.BoxGeometry(0.2 * M, 0.2 * M, 0.2 * M).translate(a.x, ground(a.x, a.z) + 0.07 * M, a.z));
+        beam(a.x, a.z, b.x, b.z, 0.15 * M, 0.2 * M, 0.1 * M, 'fieldstone');
+        beam(a.x, a.z, b.x, b.z, 0.3 * M, 0.04 * M, 0.04 * M, 'iron');
+        beam(a.x, a.z, b.x, b.z, H - 0.12 * M, 0.04 * M, 0.04 * M, 'iron');
+        const l = Math.hypot(b.x - a.x, b.z - a.z), n = Math.max(2, Math.round(l / (0.12 * M)));
+        for (let k = 1; k < n; k++) {
+          const f = k / n, x = a.x + (b.x - a.x) * f, z = a.z + (b.z - a.z) * f, y = ground(x, z);
+          add('iron', new THREE.CylinderGeometry(0.012 * M, 0.012 * M, H - 0.25 * M, 4).translate(x, y + 0.3 * M + (H - 0.25 * M) / 2, z));
+          add('iron', new THREE.ConeGeometry(0.025 * M, 0.12 * M, 4).translate(x, y + H - 0.01 * M, z));
+        }
+        if (run.kind === 'iron_barbed') {
+          const ox = a.dz * 0.18 * M, oz = -a.dx * 0.18 * M;    // outward (right of the run)
+          for (const y of [0.18, 0.33, 0.48]) beam(a.x + ox, a.z + oz, b.x + ox, b.z + oz, H + y * M, 0.012 * M, 0.012 * M, 'iron', 0.02 * M);
+          add('iron', new THREE.BoxGeometry(0.2 * M, 0.04 * M, 0.04 * M).rotateY(-Math.atan2(a.dz, a.dx) + Math.PI / 2).translate(a.x + ox * 0.5, ground(a.x, a.z) + H + 0.1 * M, a.z + oz * 0.5));
+        }
+      });
+      for (const e of spanEnds()) post(e.x, e.z, H + 0.2 * M, 0.09 * M, 'iron');
+      break;
+    }
+    case 'steel_wall':
+    case 'electric_steel': {
+      // 2.8 m steel plate panels bolted to concrete posts on a poured footing; razor wire (and, electrified, an energized wire on stand-offs with warning signs)
+      const H = 2.8 * M;
+      bays(3 * M, (a, b, i) => {
+        post(a.x, a.z, H + 0.1 * M, 0.09 * M, 'concrete');
+        beam(a.x, a.z, b.x, b.z, -0.05 * M, 0.35 * M, 0.2 * M, 'concrete');
+        beam(a.x, a.z, b.x, b.z, 0.25 * M, H - 0.25 * M, 0.04 * M, 'steel');
+        beam(a.x, a.z, b.x, b.z, H - 0.02 * M, 0.04 * M, 0.06 * M, 'iron');
+        const l = Math.hypot(b.x - a.x, b.z - a.z), n = Math.max(2, Math.round(l / (0.2 * M)));
+        for (let k = 0; k < n; k++) {   // razor-wire coils along the top
+          const f = (k + 0.5) / n, x = a.x + (b.x - a.x) * f, z = a.z + (b.z - a.z) * f;
+          add('steel', new THREE.TorusGeometry(0.12 * M, 0.012 * M, 4, 10).rotateY(-Math.atan2(b.z - a.z, b.x - a.x)).translate(x, ground(x, z) + H + 0.14 * M, z));
+        }
+        if (run.kind === 'electric_steel') {
+          for (const y of [0.3, 0.6]) beam(a.x, a.z, b.x, b.z, H + y * M, 0.012 * M, 0.012 * M, 'copper');
+          add('paint_yellow', new THREE.BoxGeometry(0.02 * M, 0.3 * M, 0.3 * M).translate(a.x, ground(a.x, a.z) + 1.5 * M, a.z));   // a warning sign on every post
+          post(a.x, a.z, H + 0.7 * M, 0.02 * M, 'iron');
+        }
+        void i;
+      });
+      for (const e of spanEnds()) post(e.x, e.z, H + 0.15 * M, 0.11 * M, 'concrete');
+      break;
+    }
     case 'thorn_hedge': {
       const g = Math.max(0.04, growth), h = def.height * g, w = (0.4 + 1.6 * g) * M;
       let k = 0;

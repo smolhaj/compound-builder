@@ -45,7 +45,7 @@ import { EXPOSURE_NAME, exposure, raidPressure, topExposure } from '../sim/opsec
 import { acresOf, buyProblem, LAND_NAME, priceOf } from '../sim/land';
 import { HARDEN, HARDEN_IDS, type TierDef, hardenCost, hardenProblem, isBunkerRoom, protectionOf, tierOf } from '../sim/hardening';
 import { defenseReport, type Check } from '../sim/defenseReport';
-import { PERIMETER, PERIMETER_ORDER, UTILITY_LINES, runBill, runHours, runFinished, runProgress, runBlocked, runGrowth } from '../sim/perimeter';
+import { PERIMETER, PERIMETER_ORDER, SALVAGE, UPGRADE_NEXT, UTILITY_LINES, upgradeProblem, wallLength, runBill, runHours, runFinished, runProgress, runBlocked, runGrowth } from '../sim/perimeter';
 import { PantryPanel } from './PantryPanel';
 
 const QUALITIES: Quality[] = ['high', 'medium', 'low'];
@@ -758,6 +758,19 @@ function DefenseTab() {
     <Section title="The property line">
       {d.walls.map(c => <CheckRow key={c.id} c={c} />)}
       {d.gaps.length > 0 && <Note tone="warn">Open ground on the line, e.g. near ({d.gaps.slice(0, 3).map(([x, z]) => `${Math.round(x * 6)}, ${Math.round(z * 6)} m`).join('; ')}). Turn on the property line to see it.</Note>}
+    </Section>
+    <Section title="Upgrade the walls">
+      {game.perimeter.filter(r => runFinished(r) && UPGRADE_NEXT[r.kind]).length === 0 && <Note>Nothing to upgrade. A finished fence or wall can be upgraded in place to the next tier: the old one stands until the new one is up, and half its materials come back.</Note>}
+      {game.perimeter.filter(r => runFinished(r) && UPGRADE_NEXT[r.kind]).slice(0, 8).map(r => {
+        const next = UPGRADE_NEXT[r.kind]!, len = wallLength(r);
+        const price = (k: typeof next, f: number) => orderCost(Object.entries(runBill(k, len)).filter(([m]) => MATERIALS[m as MaterialId].price !== null).map(([material, qty]) => ({ material: material as MaterialId, qty: Math.ceil((qty as number) * f) })));
+        const net = Math.max(0, price(next, 1) - price(r.kind, SALVAGE));
+        const why = upgradeProblem(game, r);
+        return <div key={r.id} style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '3px 0' }}>
+          <span style={{ flex: 1 }}>{PERIMETER[r.kind].name} <span style={{ color: DIM }}>({Math.round(len * 6)} m)</span> <span style={{ color: DIM }}>→</span> {PERIMETER[next].name}</span>
+          <button style={btn(false)} disabled={!!why} title={why ?? `${Math.round(runHours(next, len))} h of work; about ${usd(net)} after the salvage of the old one (${Math.round(SALVAGE * 100)}% of its materials back)`} onClick={() => { const w = useGameStore.getState().upgradeRun(r.id); if (w) alert(w); }}>{why ? 'Under way' : `Upgrade ~${usd(net)}`}</button>
+        </div>;
+      })}
     </Section>
     <Section title="The houses">
       {d.homes.length === 0 && <Note>No house finished yet.</Note>}
