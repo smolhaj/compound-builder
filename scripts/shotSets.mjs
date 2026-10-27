@@ -437,3 +437,20 @@ SETS.darkrect = [
   { name: 'aerial-timber', time: 10, season: 'summer', setup: "{ const c = cb.world.camp; cb.cam.target.set(c.x, 0, c.z - 30); cb.cam.radius = 26; cb.cam.pitch = 1.05; cb.cam.yaw = 0; }", cam: D, frames: 16 },
   { name: 'aerial-camp-noon', time: 12, season: 'spring', setup: "{ const c = cb.world.camp; cb.cam.target.set(c.x, 0, c.z); cb.cam.radius = 22; cb.cam.pitch = 1.1; cb.cam.yaw = 0; }", cam: D, frames: 16 },
 ];
+
+// bathrooms in the houses that have plumbing (farmhouse, manufactured home), seen from above in cutaway
+const homes = `{ if (!window.__h) { window.__h = {};
+  const G = cb.game, W = cb.world, c = W.camp;
+  for (const [kind, dx, dz, rot] of [['farmhouse', -5, -2, 0], ['trailer', 5, -2, 0]]) {
+    const sp = cb.tool.findSpot(kind, c.x + dx, c.z + dz, rot);
+    if (!sp) continue;
+    G.getState().plan(kind, sp[0], sp[1], rot);
+    window.__h[kind] = G.getState().game.structures.at(-1);
+  }
+  G.setState(s => { const g = structuredClone(s.game); for (const st of g.structures) { st.stage = 5; st.done = 0; st.finishedAt = 0; } return { game: g }; });
+} }`;
+const top = kind => `{ const b = window.__h['${kind}']; if (b) { cb.cam.target.set(b.x, 0, b.z); cb.cam.radius = 3.4; cb.cam.pitch = 1.25; cb.cam.yaw = b.rot * Math.PI / 2; } }`;
+SETS.baths = [
+  { name: 'farmhouse-plan', time: 12, season: 'summer', setup: homes + cut + top('farmhouse'), cam: D, frames: 14 },
+  { name: 'trailer-plan', time: 12, season: 'summer', setup: homes + cut + top('trailer'), cam: D, frames: 14 },
+];
