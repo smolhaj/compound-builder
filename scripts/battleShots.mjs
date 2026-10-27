@@ -70,9 +70,13 @@ try {
   let n = 0;
   for (const t of info.times) {
     // run the battle clock forward without drawing every frame, then let a couple of frames render the moment
-    await page.evaluate(t => { const b = window.__cb.battle; b.update(0.05); while (b.time < t) b.update(0.1); const cam = window.__cb.cam; cam.radius = 5; cam.pitch = 0.2; }, t);
+    await page.evaluate(t => { const b = window.__cb.battle; b.update(0.05); while (b.time < t) b.update(0.1); const cam = window.__cb.cam, us = [...b._units.values()].filter(u => u.def?.side === 'raider' && !u.dead && !u.gone);
+      // frame the raiders from the house side, low: the wall between them and us
+      const house = window.__cb.world.camp;
+      if (us.length) { const cx = us.reduce((a, u) => a + u.x, 0) / us.length, cz = us.reduce((a, u) => a + u.z, 0) / us.length; cam.target.set(cx, 0, cz); cam.yaw = Math.atan2(house.x - cx, house.z - cz); }
+      cam.radius = 3.2; cam.pitch = 0.22; }, t);
     const f0 = await page.evaluate(() => window.__cb.qa.frames);
-    await page.waitForFunction(x => window.__cb.qa.frames >= x, f0 + 4, { polling: 200 });
+    await page.waitForFunction(x => window.__cb.qa.frames >= x, f0 + 8, { polling: 200 });
     const png = await page.evaluate(() => document.querySelector('canvas').toDataURL('image/png'));
     const f = `${outDir}/${String(++n).padStart(2, '0')}-t${Math.round(t)}s.png`;
     writeFileSync(f, Buffer.from(png.split(',')[1], 'base64'));
