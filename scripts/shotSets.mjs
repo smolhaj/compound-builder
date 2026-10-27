@@ -496,19 +496,22 @@ const towersSetup = (lit = false) => `{ if (!window.__tw) { window.__tw = true;
   G.getState().planRun('wrought_iron', [[40, 49], [52, 49]], [], 0);
   G.setState(s => { const g = structuredClone(s.game); const [a, b] = g.perimeter.slice(-2); a.done = a.hours; a.supplied = true; a.finishedAt = 0; b.replaces = a.id; b.supplied = true; b.done = b.hours * 0.5; return { game: g }; });
 } }`;
-// someone standing at (x, z), via a one-man playback (no events): the scale reference
-const stander = (x, z) => `{ if (!window.__man) { window.__man = true; cb.battle.play({ night: false, duration: 9999, events: [], units: [{ id: 'h_a', side: 'home', x: ${x}, z: ${z}, post: 'open' }] }); } }`;
+// someone standing at (x, z): a one-man playback through the battle store (no events), the scale reference
+const stander = (x, z) => `{ import('/src/store/battleStore.ts').then(m => m.useBattleStore.getState().playBattle({ night: false, duration: 99999, events: [], units: [{ id: 'h_a', side: 'home', x: ${x}, z: ${z}, post: 'open' }] })); }`;
+const noman = `{ import('/src/store/battleStore.ts').then(m => m.useBattleStore.getState().endBattle()); }`;
 const cam0 = { x: 33, z: 54, yaw: 0, pitch: 0.3, radius: 20 };
+const base = { season: 'summer', cam: cam0 };
 SETS.towers = [
-  { name: 'towers-aerial-chain', time: 11, season: 'summer', setup: towersSetup() + `{ cb.qa.pose = null; cb.cam.target.set(26, 0, 54); cb.cam.radius = 34; cb.cam.pitch = 0.5; cb.cam.yaw = 0.15; }`, cam: cam0, frames: 16 },
-  { name: 'towers-aerial-low-tiers', time: 11, season: 'summer', setup: towersSetup() + `{ cb.qa.pose = null; cb.cam.target.set(14, 0, 54); cb.cam.radius = 12; cb.cam.pitch = 0.45; cb.cam.yaw = 0.5; }`, cam: cam0, frames: 14 },
-  { name: 'towers-aerial-high-tiers', time: 11, season: 'summer', setup: towersSetup() + `{ cb.qa.pose = null; cb.cam.target.set(32, 0, 54); cb.cam.radius = 12; cb.cam.pitch = 0.45; cb.cam.yaw = -0.5; }`, cam: cam0, frames: 14 },
-  { name: 'towers-eye-rise-wood-concrete', time: 11, season: 'summer', setup: towersSetup() + stander(11, 55.2) + eye(9, 58, 14, 54, 0.28, 0.6, 60), cam: cam0, frames: 14 },
-  { name: 'towers-eye-flood-mount-turret', time: 11, season: 'summer', setup: towersSetup() + stander(31, 55.2) + eye(29, 58.5, 32, 54, 0.28, 0.9, 62), cam: cam0, frames: 14 },
-  { name: 'towers-eye-mount-closeup', time: 11, season: 'summer', setup: towersSetup() + stander(32.2, 55) + eye(31, 57, 32, 54, 0.3, 1.1, 60), cam: cam0, frames: 14 },
-  { name: 'towers-eye-turret-closeup', time: 11, season: 'summer', setup: towersSetup() + stander(38.2, 55) + eye(37, 57.5, 38, 54, 0.3, 1.2, 60), cam: cam0, frames: 14 },
-  { name: 'towers-night-floodlights', time: 22.5, season: 'summer', setup: towersSetup(true) + `{ cb.qa.pose = null; cb.cam.target.set(24, 0, 54); cb.cam.radius = 20; cb.cam.pitch = 0.22; cb.cam.yaw = 0.3; }`, cam: cam0, frames: 18 },
-  { name: 'towers-night-unpowered', time: 22.5, season: 'summer', setup: towersSetup(false) + `{ cb.qa.pose = null; cb.cam.target.set(24, 0, 54); cb.cam.radius = 20; cb.cam.pitch = 0.22; cb.cam.yaw = 0.3; }`, cam: cam0, frames: 18 },
-  { name: 'upgrade-beside-old', time: 11, season: 'summer', setup: towersSetup() + `{ cb.qa.pose = null; cb.cam.target.set(46, 0, 52); cb.cam.radius = 14; cb.cam.pitch = 0.5; cb.cam.yaw = 0.2; }`, cam: cam0, frames: 14 },
-  { name: 'upgrade-beside-old-eye', time: 11, season: 'summer', setup: towersSetup() + eye(44, 57, 46.4, 53, 0.28, 0.7, 62), cam: cam0, frames: 14 },
+  { name: 'towers-aerial-chain', time: 11, ...base, setup: towersSetup() + `{ cb.qa.pose = null; cb.cam.target.set(26, 0, 54); cb.cam.radius = 34; cb.cam.pitch = 0.5; cb.cam.yaw = 0.15; }`, frames: 16 },
+  { name: 'towers-aerial-low-tiers', time: 11, ...base, setup: towersSetup() + `{ cb.qa.pose = null; cb.cam.target.set(14, 0, 54); cb.cam.radius = 12; cb.cam.pitch = 0.45; cb.cam.yaw = 0.5; }`, frames: 14 },
+  { name: 'towers-aerial-high-tiers', time: 11, ...base, setup: towersSetup() + `{ cb.qa.pose = null; cb.cam.target.set(32, 0, 54); cb.cam.radius = 12; cb.cam.pitch = 0.45; cb.cam.yaw = -0.5; }`, frames: 14 },
+  { name: 'towers-eye-row', time: 11, ...base, setup: towersSetup() + stander(6.3, 54.9) + eye(4.2, 55.6, 30, 54, 0.28, 0.5, 70), frames: 14 },
+  { name: 'towers-eye-rise-and-wood', time: 11, ...base, setup: towersSetup() + stander(9.3, 55.6) + eye(8.0, 58.2, 11.5, 54, 0.28, 0.45, 64), frames: 14 },
+  { name: 'towers-eye-concrete-and-flood', time: 11, ...base, setup: towersSetup() + stander(22.6, 55.6) + eye(21, 58.4, 24, 54, 0.28, 0.7, 64), frames: 14 },
+  { name: 'towers-eye-mount', time: 11, ...base, setup: towersSetup() + stander(33.1, 55.4) + eye(31.4, 57.4, 32, 54, 0.28, 1.0, 64), frames: 14 },
+  { name: 'towers-eye-turret', time: 11, ...base, setup: towersSetup() + stander(39.1, 55.4) + eye(37.4, 57.4, 38, 54, 0.28, 1.05, 64), frames: 14 },
+  { name: 'towers-night-floodlights', time: 22.5, ...base, setup: towersSetup(true) + noman + `{ cb.qa.pose = null; cb.cam.target.set(24, 0, 54); cb.cam.radius = 20; cb.cam.pitch = 0.22; cb.cam.yaw = 0.3; }`, frames: 18 },
+  { name: 'towers-night-unpowered', time: 22.5, ...base, setup: towersSetup(false) + noman + `{ cb.qa.pose = null; cb.cam.target.set(24, 0, 54); cb.cam.radius = 20; cb.cam.pitch = 0.22; cb.cam.yaw = 0.3; }`, frames: 18 },
+  { name: 'upgrade-beside-old', time: 11, ...base, setup: towersSetup() + noman + `{ cb.qa.pose = null; cb.cam.target.set(46, 0, 52); cb.cam.radius = 14; cb.cam.pitch = 0.5; cb.cam.yaw = 0.2; }`, frames: 14 },
+  { name: 'upgrade-beside-old-eye', time: 11, ...base, setup: towersSetup() + stander(45.0, 55.6) + eye(43.6, 58.2, 46.4, 53, 0.28, 0.7, 62), frames: 14 },
 ];
