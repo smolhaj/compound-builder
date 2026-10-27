@@ -26,6 +26,7 @@ export class CutscenePlayer {
   private _c: CutsceneState | null = null;
   private _real = 0;
   private _seen = false;
+  private _wasPlaying = false;
   private _startedScene = -1;
   private _dir: Director;
   private _road = { x: 0, z: 1 };
@@ -111,6 +112,7 @@ export class CutscenePlayer {
       this._road = { x: rx / l, z: rz / l };
     }
     let shot;
+    if (battle.playing !== this._wasPlaying) { this._wasPlaying = battle.playing; this._dir.shot = null; this._lastKind = ''; }
     if (battle.playing) {
       shot = this._dir.update(this._time, battle.actors(), battle.drainEvents(), house, ground);
     } else {
