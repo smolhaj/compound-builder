@@ -40,7 +40,7 @@ import { orchardBearing, orchardFrost, ORCHARD_PICK } from '../sim/greenhouse';
 import { buildLayers, type Seat } from './buildkit/buildings';
 import { hashStr } from './buildkit/clutter';
 import { buildRun, solidSpans } from './perimeter/perimeterGeometry';
-import { PERIMETER, runGrowth, runProgress, wallLength, type PerimeterRun } from '../sim/perimeter';
+import { PERIMETER, hasSkirt, runGrowth, runProgress, wallLength, type PerimeterRun } from '../sim/perimeter';
 import { closestOnLine, earthworkReach, type Earthwork } from './parcel/parcelTerrain';
 import { exposure, Sight, type Observer, type SightWorld } from './sightlines/visibility';
 import { hitsColliders, M, type Collider } from './buildkit/interior';
@@ -583,7 +583,7 @@ export class HomesteadWorld {
   onPerimeterLine(x: number, z: number, pad = 0): boolean {
     for (const r of this._runs) {
       // a tunnel goes under the trees; only its exit hatch needs a clear spot
-      if (r.kind === 'escape_tunnel') { const e = r.pts[r.pts.length - 1]; if (Math.hypot(e[0] - x, e[1] - z) < 0.18 + pad) return true; continue; }
+      if (r.kind === 'escape_tunnel' || r.kind === 'underground_passage') { for (const e of r.kind === 'escape_tunnel' ? [r.pts[r.pts.length - 1]] : [r.pts[0], r.pts[r.pts.length - 1]]) if (Math.hypot(e[0] - x, e[1] - z) < 0.18 + pad) return true; continue; }
       if (closestOnLine(r.pts, x, z).d < pad) return true;
     }
     return false;
@@ -640,7 +640,7 @@ export class HomesteadWorld {
     const below = cam.y < this.groundAt(cam.x, cam.z) - 0.12;
     const near: THREE.Vector3[] = [];
     if (below) for (const [id, g] of this._runGroups) {
-      if (this._runs.find(r => r.id === id)?.kind !== 'escape_tunnel') continue;
+      if (!['escape_tunnel', 'underground_passage'].includes(this._runs.find(r => r.id === id)?.kind ?? '')) continue;
       for (const p of (g.group.userData.lamps ?? []) as THREE.Vector3[]) if (Math.abs(p.x - cam.x) < 6 && Math.abs(p.z - cam.z) < 6) near.push(p);
     }
     near.sort((a, b) => a.distanceToSquared(cam) - b.distanceToSquared(cam));
@@ -670,24 +670,26 @@ export class HomesteadWorld {
 
   /** Underground view: the vault's top comes off so the tunnel shows cut open. */
   private _applyTunnelView(g: THREE.Group): void {
-    for (const o of g.children) if (o.userData.part === 'upper') o.visible = !this._under;
+    // a passage is hidden: from above only the covers of its hatches show; the vault is drawn in the underground view
+    for (const o of g.children) { if (g.userData.passage && o.userData.part !== 'surface') o.visible = this._under; else if (o.userData.part === 'upper') o.visible = !this._under; }
   }
 
   /** Fences, hedges and walls drawn as built (hedges by growth); berms and ditches shape the terrain. */
-  syncPerimeter(runs: readonly PerimeterRun[], t: number): void {
+  syncPerimeter(runs: readonly PerimeterRun[], t: number, opts: { lit?: boolean; sensors?: boolean } = {}): void {
     this._runs = runs;
+    const lit = opts.lit ?? true, sensors = opts.sensors ?? false;
     const ids = runs.map(r => r.id).join(',');
     for (const r of runs) {
       // old posts lean and rails sag (atmosphere/aging): rebuilt as the lean steps
       const lean = LEANS.has(r.kind) && r.finishedAt !== null ? Math.round(fenceLean((t - r.finishedAt) / 365) * 10) / 10 : 0;
-      const key = `${Math.round(runProgress(r) * 60)}:${Math.round(runGrowth(r, t) * 40)}:${r.finishedAt === null ? 0 : 1}:${r.gates.length}:${lean}`;
+      const key = `${Math.round(runProgress(r) * 60)}:${Math.round(runGrowth(r, t) * 40)}:${r.finishedAt === null ? 0 : 1}:${r.gates.length}:${lean}:${hasSkirt(r, t) ? 1 : 0}:${lit ? 1 : 0}:${sensors ? 1 : 0}`;
       const cur = this._runGroups.get(r.id);
       if (cur?.key === key) continue;
       if (cur) { this._root.remove(cur.group); cur.group.traverse(o => (o as THREE.Mesh).geometry?.dispose()); }
-      const tunnel = r.kind === 'escape_tunnel';
+      const tunnel = r.kind === 'escape_tunnel' || r.kind === 'underground_passage';
       const group = tunnel
-        ? buildTunnel(this._pathOf(r), this.groundAt, r.finishedAt !== null ? 1 : runProgress(r), this._exitWoods(r))
-        : buildRun(r, this.groundAt, t, (x, z) => this.onBuilding(x, z, 0.02, false));
+        ? buildTunnel(this._pathOf(r), this.groundAt, r.finishedAt !== null ? 1 : runProgress(r), this._exitWoods(r), r.kind === 'underground_passage' ? { woodsStart: this.tunnelExitWoods(r.pts[0][0], r.pts[0][1]) } : undefined)
+        : buildRun(r, this.groundAt, t, (x, z) => this.onBuilding(x, z, 0.02, false), { lit, sensors });
       if (tunnel) this._applyTunnelView(group);
       if (lean > 0) leanRun(group, lean, hashStr(r.id) % 997, this.groundAt);
       this._root.add(group);
@@ -697,7 +699,7 @@ export class HomesteadWorld {
     // earthworks (berms raise, ditches cut) as they are dug
     const works: Earthwork[] = runs.filter(r => r.kind === 'earth_berm' || r.kind === 'ditch').map(r => ({ pts: r.pts, gates: r.gates, height: PERIMETER[r.kind].height, k: r.finishedAt !== null ? 1 : runProgress(r) }));
     // a tunnel is cut and covered: an open trench along it while the culvert goes in
-    for (const r of runs) if (r.kind === 'escape_tunnel' && r.finishedAt === null && (r.supplied || r.done > 0)) works.push({ pts: r.pts.slice(), gates: [], height: -0.33, k: 1 });
+    for (const r of runs) if ((r.kind === 'escape_tunnel' || r.kind === 'underground_passage') && r.finishedAt === null && (r.supplied || r.done > 0)) works.push({ pts: r.pts.slice(), gates: [], height: -0.33, k: 1 });
     const wk = works.map(w => `${w.pts.length}:${Math.round(w.k * 20)}`).join('|');
     if (wk !== this._worksKey) {
       this._worksKey = wk;
@@ -725,7 +727,7 @@ export class HomesteadWorld {
   /** Walk / people collision with built perimeter runs (gates and unbuilt stretches are open). */
   private _perimeterBlocked(x: number, z: number, r: number): boolean {
     for (const run of this._runs) {
-      if (run.kind === 'escape_tunnel') continue;
+      if (run.kind === 'escape_tunnel' || run.kind === 'underground_passage') continue;
       const th = run.kind === 'container_wall' ? 0.21 : run.kind === 'thorn_hedge' ? 0.15 * runGrowth(run, this._simT) : run.kind === 'log_palisade' ? 0.03 : run.kind === 'earth_berm' || run.kind === 'ditch' ? 0 : 0.01;
       if (th < 0.01) continue;
       const { d, s } = closestOnLine(run.pts, x, z);
@@ -1041,7 +1043,7 @@ export class HomesteadWorld {
     this.willow.visible = !on;
     this.rocks.visible = !on;
     this.stream.setEdgesVisible(!on);
-    for (const [id, g] of this._runGroups) if (this._runs.find(r => r.id === id)?.kind === 'escape_tunnel') this._applyTunnelView(g.group);
+    for (const [id, g] of this._runGroups) if (['escape_tunnel', 'underground_passage'].includes(this._runs.find(r => r.id === id)?.kind ?? '')) this._applyTunnelView(g.group);
     // a bed of dark earth under the bunkers, so the see-through ground reads as a cut-away section, not sky
     if (on) {
       const floors = [...this._built.values()].filter(b => b.under).map(b => b.under!.datum);
@@ -1381,7 +1383,7 @@ export class HomesteadWorld {
   /** A finished escape tunnel the walker is in (below ground): its floor, and how near the exit ladder. */
   private _tunnelAt(x: number, z: number): { floor: number; toExit: number; run: PerimeterRun } | null {
     for (const r of this._runs) {
-      if (r.kind !== 'escape_tunnel' || r.finishedAt === null) continue;
+      if ((r.kind !== 'escape_tunnel' && r.kind !== 'underground_passage') || r.finishedAt === null) continue;
       const { d, s } = closestOnLine(r.pts, x, z);
       if (d >= VAULT_W / 2 - 0.03) continue;
       const path = this._pathOf(r);

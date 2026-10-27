@@ -49,7 +49,7 @@ function profile(): Array<[number, number]> {
 }
 
 /** `woods` at the exit (0–1): in the trees it hides under leaf litter and deadfall; in open ground under turf, flush with the grass. */
-export function buildTunnel(samples: readonly PathSample[], ground: (x: number, z: number) => number, built = 1, woods = 1): THREE.Group {
+export function buildTunnel(samples: readonly PathSample[], ground: (x: number, z: number) => number, built = 1, woods = 1, twoWay?: { woodsStart: number }): THREE.Group {
   const bits = new Map<string, THREE.BufferGeometry[]>();
   const add = (part: Part, m: KitMaterialId, g: THREE.BufferGeometry) => { const k = `${part}|${m}`; let l = bits.get(k); if (!l) bits.set(k, l = []); l.push(g.index ? g.toNonIndexed() : g); };
   const addW = (part: Part, m: KitMaterialId, g: THREE.BufferGeometry) => add(part, m, worldUV(g));
@@ -59,7 +59,12 @@ export function buildTunnel(samples: readonly PathSample[], ground: (x: number, 
   // the vault stops half a chamber short of the exit; the exit chamber (and the shaft above it) is centered on the exit point
   const upTo = built >= 0.999 ? L - VAULT_W / 2 : L * Math.max(0, built);
   // the vault's rings: every sample up to upTo, then one exactly at upTo (so it meets the exit chamber's wall)
-  const rows: PathSample[] = samples.filter(p => p.s < upTo - 1e-6);
+  const fromS = twoWay ? VAULT_W / 2 : 0;
+  const rows: PathSample[] = samples.filter(p => p.s < upTo - 1e-6 && p.s > fromS + 1e-6);
+  if (twoWay) {   // the vault starts half a chamber in from the first hatch
+    const b = samples.find(p => p.s > fromS + 1e-6), a = [...samples].reverse().find(p => p.s <= fromS + 1e-6);
+    if (a && b) { const k = (fromS - a.s) / Math.max(1e-6, b.s - a.s); rows.unshift({ x: a.x + (b.x - a.x) * k, z: a.z + (b.z - a.z) * k, s: fromS, floor: a.floor + (b.floor - a.floor) * k }); }
+  }
   const nx = samples.find(p => p.s >= upTo - 1e-6);
   if (nx && rows.length) { const a = rows[rows.length - 1], t = (upTo - a.s) / Math.max(1e-6, nx.s - a.s); rows.push({ x: a.x + (nx.x - a.x) * t, z: a.z + (nx.z - a.z) * t, s: upTo, floor: a.floor + (nx.floor - a.floor) * t }); }
   const prof = profile();
@@ -101,6 +106,7 @@ export function buildTunnel(samples: readonly PathSample[], ground: (x: number, 
   for (let i = 1; i < samples.length; i++) {
     const a = samples[i - 1], b = samples[i];
     if (a.s >= upTo) break;
+    if (b.s <= fromS) continue;
     const l = Math.hypot(b.x - a.x, b.z - a.z), yaw = -Math.atan2(b.z - a.z, b.x - a.x);
     const mx = (a.x + b.x) / 2, mz = (a.z + b.z) / 2, my = (a.floor + b.floor) / 2, pitch = Math.atan2(b.floor - a.floor, l);
     const seg = (g: THREE.BufferGeometry) => g.rotateZ(pitch).rotateY(yaw).translate(mx, my, mz);
@@ -122,8 +128,7 @@ export function buildTunnel(samples: readonly PathSample[], ground: (x: number, 
     }
   }
   // the exit chamber: end wall, a shaft up to the hatch, the ladder, the lid's underside; the disguise on top
-  if (built >= 0.999) {
-    const e = samples[samples.length - 1], o = samples[samples.length - 2];
+  const chamber = (e: PathSample, o: PathSample, woods: number, hatchDoor: boolean) => {
     const ul = Math.hypot(e.x - o.x, e.z - o.z) || 1, ux = (e.x - o.x) / ul, uz = (e.z - o.z) / ul, yaw = -Math.atan2(uz, ux);
     const ex = e.x, ez = e.z, gy = ground(ex, ez);
     const at = (g: THREE.BufferGeometry) => g.rotateY(yaw).translate(ex, 0, ez);
@@ -148,6 +153,12 @@ export function buildTunnel(samples: readonly PathSample[], ground: (x: number, 
     const sr = sh, lx = sh - 0.012, ly0 = e.floor, ly1 = gy - 0.02;
     for (const sz of [-1, 1]) addW('lower', 'steel', at(new THREE.BoxGeometry(0.04 * M, ly1 - ly0, 0.04 * M).translate(lx, (ly0 + ly1) / 2, sz * 0.2 * M)));
     for (let y = ly0 + 0.3 * M; y < ly1 - 0.05; y += 0.3 * M) addW('lower', 'steel', at(new THREE.BoxGeometry(0.03 * M, 0.025 * M, 0.42 * M).translate(lx, y, 0)));
+    if (hatchDoor) {   // a blast door in the vault opening, swung back against the wall, its frame and a bolt bar; a red lock lamp
+      addW('lower', 'steel', at(new THREE.BoxGeometry(0.08 * M, VAULT_WALL + 0.1 * M, 2 * hw + 0.1 * M).translate(-hw - 0.02, e.floor + (VAULT_WALL + 0.1 * M) / 2 - 0.05 * M, 0)));
+      addW('lower', 'steel', at(new THREE.BoxGeometry(0.1 * M, VAULT_WALL, 0.7 * M).translate(-hw + 0.1 * M, e.floor + VAULT_WALL / 2, hw - 0.4 * M).rotateY(0)));
+      addW('lower', 'iron', at(new THREE.BoxGeometry(0.14 * M, 0.06 * M, 0.9 * M).translate(-hw + 0.17 * M, e.floor + 1.0 * M, hw - 0.4 * M)));
+      add('lower', 'paint_red', at(new THREE.SphereGeometry(0.035 * M, 6, 5).translate(-hw + 0.2 * M, e.floor + 1.6 * M, hw - 0.1 * M)));
+    }
     lamps.push(new THREE.Vector3(ex - ux * 0.08, e.floor + H - 0.15 * M, ez - uz * 0.08));
     add('lower', 'bulb', new THREE.SphereGeometry(0.07 * M, 8, 6).translate(ex - ux * 0.08, e.floor + H - 0.15 * M, ez - uz * 0.08));
     // the lid's underside (only ever seen from below): hinges, two drop-bolts in their keepers, the locking wheel
@@ -195,7 +206,12 @@ export function buildTunnel(samples: readonly PathSample[], ground: (x: number, 
         for (let f = 0; f < 7; f++) addW('surface', 'hedge', at(new THREE.PlaneGeometry(0.012, 0.07).translate(0, 0.035, 0).rotateX(-0.9).rotateY(f / 7 * Math.PI * 2 + rnd()).translate(fx, gy, fz)));
       }
     }
+    };
+  if (built >= 0.999) {
+    chamber(samples[samples.length - 1], samples[samples.length - 2], woods, !!twoWay);
+    if (twoWay) chamber(samples[0], samples[1], twoWay.woodsStart, true);
   }
+
   const group = new THREE.Group();
   for (const [k, list] of bits) {
     const [part, m] = k.split('|') as [Part, KitMaterialId];
@@ -209,6 +225,7 @@ export function buildTunnel(samples: readonly PathSample[], ground: (x: number, 
     group.add(mesh);
   }
   group.userData.type = 'tunnel';
+  group.userData.passage = !!twoWay;
   group.userData.lamps = lamps;
   return group;
 }
