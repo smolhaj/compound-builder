@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { newGame, type GameState, type Structure } from './state';
 import { DISASTERS, newDisaster, SURPRISE_POOL, type DisasterKind } from './disaster';
 import { climate, effectsDay, wellYield } from './effects';
+import { burnStructure } from './construction';
 import { resolve } from './encounters';
 import { postureOf, whoComes } from './encounters';
 import { mulberry32 } from './rng';
@@ -78,5 +79,37 @@ describe('all sixteen disasters', () => {
     const u = at(run('unknown'), 0.2);
     effectsDay(u);
     expect(u.neighbors.some(n => n.status === 'gone')).toBe(true);
+  });
+});
+
+describe('round 4: a wildfire doesn\'t take the bore', () => {
+  it('a drilled well that burns keeps its bore and pump; only the pump house is redone', () => {
+    let burned = 0;
+    for (let seed = 1; seed <= 20; seed++) {
+      const g = at(run('wildfire', undefined, seed), 0.1);
+      const w = built(g, 'w', 'well_drilled');
+      g.disaster.fuel = { w: 14 };
+      const pumps = g.stock.pump, hw = g.stock.hardware;
+      const lines = effectsDay(g);
+      if (w.finishedAt !== null) continue;
+      burned++;
+      expect(w.stage).toBe(2);   // the pump-house frame: the drilling (stage 1) stands
+      expect(g.stock.pump).toBe(pumps + 1);   // the submersible comes up out of the hole fine
+      expect(g.stock.hardware).toBe(hw);   // the controls burned
+      expect(lines.join(' ')).toMatch(/bore/);
+    }
+    expect(burned).toBeGreaterThan(5);
+  });
+
+  it('a hand-dug well keeps its stoned shaft and hand pump', () => {
+    const g = at(run('wildfire'), 0.1);
+    const w = built(g, 'w', 'well_hand');
+    w.stage = 5;
+    const hw = g.stock.hardware;
+    expect(burnStructure(g, w)).toBe(true);
+    expect(w.stage).toBe(3);
+    expect(g.stock.hardware).toBe(hw + 1);
+    // a septic system is underground
+    expect(burnStructure(g, built(g, 'sp', 'septic'))).toBe(false);
   });
 });

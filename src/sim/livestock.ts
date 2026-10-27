@@ -24,6 +24,7 @@
 import { log } from './economy';
 import { calendarOf, type GameState } from './state';
 import { REGIONS } from './regions';
+import { addFoodKcal } from './pantry';
 
 export type Animal = 'goat' | 'pig' | 'steer' | 'rabbit';
 export const ANIMALS: Animal[] = ['goat', 'pig', 'steer', 'rabbit'];
@@ -97,8 +98,8 @@ export function livestockDay(s: GameState, freezer: boolean): number {
   let kcal = 0;
   const meat = (k: number, what: string) => {
     kcal += k;
-    if (freezer) s.stock.frozen += k / 10000;
-    else if ((s.stock.smoker ?? 0) >= 1 && k > 8000) { s.stock.staples += k * 0.8 / 80000; kcal -= k * 0.2; }
+    if (freezer) addFoodKcal(s, 'game_meat', k);
+    else if ((s.stock.smoker ?? 0) >= 1 && k > 8000) { addFoodKcal(s, 'smoked_meat', k * 0.8); kcal -= k * 0.2; }
     else s.stock.fresh += k / 2000;
     if (k >= 20000) log(s, `${what}: ${Math.round(k / 1000).toLocaleString('en-US')},000 kcal of meat${freezer ? ' in the freezer' : (s.stock.smoker ?? 0) >= 1 ? ' smoked and cured' : ' to eat before it turns'}.`);
   };

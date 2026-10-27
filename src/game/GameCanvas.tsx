@@ -1,3 +1,4 @@
+import { burnedFarms } from '../sim/neighborLife';
 import { useEffect, useRef } from 'react';
 import type { GameState } from '../sim/state';
 import { MushroomCloud } from './fx/MushroomCloud';
@@ -105,6 +106,10 @@ export function GameCanvas() {
       if (e.code === 'KeyU' && !(e.target instanceof HTMLInputElement)) useWorldStore.getState().setUnderground(!useWorldStore.getState().underground);
     };
     window.addEventListener('keydown', onKey);
+    let shiftDown = false;
+    const onShift = (e: KeyboardEvent) => { shiftDown = e.shiftKey; };
+    window.addEventListener('keydown', onShift);
+    window.addEventListener('keyup', onShift);
 
     const resize = () => {
       const w = canvas.clientWidth, h = canvas.clientHeight;
@@ -138,6 +143,7 @@ export function GameCanvas() {
     const ownedRects = (g: GameState) => [...homeOutsideForty(g.site), ...g.land.parcels.filter(p => p.owner === 'you').map(p => p.rect)];
     if (!useGameStore.getState().game.land.surveyed) useGameStore.getState().survey(world.surveyLand(useGameStore.getState().game.land.parcels));
     world.setOwnedLand(ownedRects(useGameStore.getState().game));
+    world.setBurnedFarms(burnedFarms(useGameStore.getState().game));
     const unsub = [
       // wildfire weather: measure the fuel round every building (what cleared ground there is decides what burns)
       useGameStore.subscribe(s => s.game.disaster.phase, ph => { const g = useGameStore.getState().game; if (g.disaster.kind === 'wildfire' && ph === 'warning' && !g.disaster.fuel) useGameStore.getState().setFuel(world.fuelNear(g.structures)); }),
@@ -146,6 +152,8 @@ export function GameCanvas() {
       useWorldStore.subscribe(s => s.cameraMode, applyCameraMode),
       useGameStore.subscribe(s => s.game.structures, list => { world.syncStructures(placedOnly(list)); occluders.invalidate(); }),
       useGameStore.subscribe(s => s.game.site.improvements.drive, on => world.setDrive(on)),
+      // a neighbor's farm burned (sim/neighborLife.ts): drawn charred once the family knows
+      useGameStore.subscribe(s => burnedFarms(s.game).join(), () => world.setBurnedFarms(burnedFarms(useGameStore.getState().game))),
       useGameStore.subscribe(s => s.tool, k => { tool.setKind(k); marker.setOn(k === 'fell'); fence.setKind(k?.startsWith('fence:') ? k.slice(6) as PerimeterKind : null); if (k === 'fence:escape_tunnel') useWorldStore.getState().setUnderground(true); }),
       useWorldStore.subscribe(s => s.buildingView, v => world.setBuildingView(v)),
       useWorldStore.subscribe(s => s.underground, on => world.setUnderground(on)),
@@ -166,10 +174,14 @@ export function GameCanvas() {
     let battleSkip = useBattleStore.getState().skipReq, battleSync = 0;
     let battleView: { x: number; z: number; radius: number; pitch: number } | null = null;
     const qa: { frames: number; frameMs: number; pose: null | { x: number; y: number; z: number; lx: number; ly: number; lz: number; fov?: number } } = { frames: 0, frameMs: 0, pose: null };
+    let slow = 0;
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
       const t0 = performance.now();
       const dt = Math.min(0.1, (now - last) / 1000);
+      // a slow machine on High (SSAO, 2× pixels) steps down to Medium by itself after ~5 s under 40 fps
+      slow = dt > 0.025 ? slow + dt : Math.max(0, slow - dt * 2);
+      if (slow > 5 && useWorldStore.getState().quality === 'high') { useWorldStore.getState().setQuality('medium'); slow = 0; }
       last = now;
       // the sim advances in real time at its speed; the view clock follows it (outside photo mode)
       // the clock stands still while the new-game screen is up
@@ -180,6 +192,7 @@ export function GameCanvas() {
         useWorldStore.getState().syncClock(hourOf(game.clock.t), cal.doy, game.clock.t);
       }
       world.syncProgress(game.structures);
+      world.syncFood(game);
       world.syncForestry(game.forestry);
       world.simTime = game.clock.t;
       world.syncPerimeter(game.perimeter, game.clock.t);
@@ -191,7 +204,7 @@ export function GameCanvas() {
       world.updateDeliveries(dt, game, speedK);
       const speed = game.clock.speed;
       const { timeOfDay: t, dayOfYear, totalDays, seasonMode, weatherMode } = useWorldStore.getState();
-      ws.setNightSky(moonPhase(dayOfYear + t / 24), skyDarkness('mountain_west', false));
+      ws.setNightSky(moonPhase(dayOfYear + t / 24), skyDarkness(world.climate, false));
       Object.assign(world.air, { hour: t, wind: weather.outputs.wind, daylight: 1 - ws.nightFactor * 0.85, viewportH: canvas.clientHeight || 800 });
       world.tick(dt, dayOfYear, totalDays, seasonMode);
       const sp = world.seasons.params;
@@ -246,6 +259,7 @@ export function GameCanvas() {
         ws.camera.updateProjectionMatrix();
         ws.setShadowFocus(p.x, p.z, 6);
       } else {
+        cam.step(dt, shiftDown);
         cam.apply(ws.camera);
         occluders.keepOut(ws.camera, cam.target.x, cam.target.z, cam.target.y);
         // looking down, fit the shadows to the ground actually on screen (the far edge of the view
@@ -298,6 +312,8 @@ export function GameCanvas() {
       window.removeEventListener('resize', resize);
       unsub.forEach(u => u());
       window.removeEventListener('keydown', onKey);
+      window.removeEventListener('keydown', onShift);
+      window.removeEventListener('keyup', onShift);
       battle.dispose();
       tour.dispose();
       tool.dispose();

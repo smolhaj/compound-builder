@@ -134,10 +134,12 @@ export const latestLead = (c: Captive): Lead | undefined => c.leads.filter(l => 
 export const latestFarLead = (c: Captive): Lead | undefined => c.leads.filter(l => l.far).pop();
 export const openCaptives = (s: GameState) => (s.rescue?.captives ?? []).filter(c => !c.closed);
 
-/** Away on a rescue: off the line, off the work. */
+/** Away on a rescue (or a scavenging run, at the market, on the militia watch or a work day: sim/scavenge, market, neighborLife): off the line, off the work. */
 export const isAway = (s: GameState, pid: string) => {
   const r = s.rescue?.raid;
-  return !!r && r.team.includes(pid);
+  if (r && r.team.includes(pid)) return true;
+  const day = dayIndex(s.clock.t);
+  return !!s.scavenge?.run?.team.includes(pid) || (s.market?.trip?.pid === pid && s.market.trip.day === day) || (s.locals?.duty?.pid === pid && s.locals.duty.day === day);
 };
 
 // ─────────────────────────────────────────────────────────────────────────

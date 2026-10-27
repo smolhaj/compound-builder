@@ -114,6 +114,8 @@ export function buyProblem(s: GameState, p: Parcel): string | null {
   if (s.disaster.kind && s.clock.t >= s.disaster.hitAt && s.disaster.tracks.banks < 0.5) return 'nobody sells land for cash now';
   if (!p.forSale && (!n || n.disposition < 30)) return `${n ? n.name[0].toUpperCase() + n.name.slice(1) : 'The owner'} won't sell`;
   if (s.money < priceOf(s, p)) return 'not enough money';
+  // (round 4) a judgment lien on the place: no title company will close until it's paid
+  if (s.fin.debt?.lien && s.disaster.tracks.banks >= 0.5) return 'there\'s a judgment lien on your land';
   return null;
 }
 

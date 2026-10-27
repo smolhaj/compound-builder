@@ -4,7 +4,7 @@ import { ShrubField, SAGE, WILLOW, type ShrubSpec } from '../engine/world/trees/
 import type { Quality, WorldScene } from '../engine/world/WorldScene';
 import { TerrainRenderer } from '../engine/world/terrain/TerrainRenderer';
 import { regionLookFor, regionWaterY } from '../engine/world/terrain/regionalLandscape';
-import { ForestRenderer, FOREST_ASPEN } from '../engine/world/trees/ForestRenderer';
+import { ForestRenderer } from '../engine/world/trees/ForestRenderer';
 import { FarTreeRenderer } from '../engine/world/trees/FarTreeRenderer';
 import { planParcelTrees, planUnderstory, type ParcelTree } from './parcel/parcelTrees';
 import { buildWoods, fallHeading, trunkRadius } from './forestry/woodsGeometry';
@@ -43,7 +43,7 @@ import { buildRun, solidSpans } from './perimeter/perimeterGeometry';
 import { PERIMETER, runGrowth, runProgress, wallLength, type PerimeterRun } from '../sim/perimeter';
 import { closestOnLine, earthworkReach, type Earthwork } from './parcel/parcelTerrain';
 import { exposure, Sight, type Observer, type SightWorld } from './sightlines/visibility';
-import { hitsColliders, type Collider } from './buildkit/interior';
+import { hitsColliders, M, type Collider } from './buildkit/interior';
 import type { BuildingView } from '../store/worldStore';
 import type { Structure } from '../sim/state';
 import { calendarOf } from '../sim/state';
@@ -58,16 +58,27 @@ import { PARCEL_SIZE, ParcelTerrain } from './parcel/parcelTerrain';
 import { CLASSIC, type Site as LandSite } from '../sim/site';
 import { DRIVE_W, ROAD_W, distToLine, planAccess, roadLine, roadX, type Access } from './region/access';
 import { buildRibbon } from '../engine/world/roads/RoadRibbon';
-import { gravelMaterial } from '../engine/world/roads/roadTextures';
+import { gravelMaterial, roadMaterial } from '../engine/world/roads/roadTextures';
+import { RockField, type RockSpec } from '../engine/world/terrain/RockField';
+import { buildLineFences, buildPowerline, planLineFences } from './region/lineFences';
+import type { RegionWorld } from './region/regionWorld';
 import { buildGate } from './props/gateGeometry';
 import { buildStockpile } from './props/stockpileGeometry';
 import { DeliveryTruck } from './DeliveryTruck';
 import { MATERIAL_IDS, emptyStock } from '../sim/materials';
+import { pantryRows } from '../sim/pantry';
+import { needOf } from '../sim/needs';
+import { FoodShelfRenderer, type ShownPlace } from './props/FoodShelfRenderer';
+import { planShelves, propsWanted, splitInUse } from './props/foodShelfPlan';
+import type { FoodSlot } from './buildkit/shell';
+
+/** The order the stores take their turns: the buried storeroom, the root cellar, the bunker's galley and container, then the house pantries. */
+const FOOD_ORDER: Record<string, number> = { bunker_stores: 0, root_cellar: 1, bunker_galley: 2, bunker_container: 3 };
 
 export { PARCEL_SIZE };
 /** Person height in world units (≈ 1.7 m). */
 export const PERSON_H = 0.28;
-/** Climate / region of the M1 parcel. */
+/** Climate of the original (Mountain West) parcel; each world has its region's (`HomesteadWorld.climate`). */
 export const CLIMATE_ID = 'mountain_west';
 /** Parcel trees are planted this far beyond the parcel; regional far trees beyond. */
 const TREE_MARGIN = 26;
@@ -119,11 +130,18 @@ export class HomesteadWorld {
   readonly forest: ForestRenderer;
   readonly sage: ShrubField;
   readonly willow: ShrubField;
+  readonly rocks: RockField;
   readonly farTrees: FarTreeRenderer;
+  /** The region's look and lie (game/region/regionWorld.ts). */
+  readonly regionWorld: RegionWorld;
+  /** Season / weather / night-sky climate id of the region. */
+  readonly climate: string;
   readonly stream: StreamRenderer;
   readonly lakes: RegionalWaterRenderer;
   private _plantSeason = '';
   private _props: RegionalProps | null = null;
+  /** The home + owned-land test the last build used (a rebuild of the farms after a fire reuses it). */
+  private _insideHome: (x: number, z: number) => boolean = () => false;
   /** Built structures by id (scene groups tagged userData.type = 'building'). */
   private readonly _built = new Map<string, Built>();
   /** Current building view (cutaway / x-ray toggle). */
@@ -166,13 +184,16 @@ export class HomesteadWorld {
     this._ws = ws;
     ws.setSite({ x0: 0, z0: 0, x1: PARCEL_SIZE, z1: PARCEL_SIZE });
     this.home = { ...site.home };
-    this.parcel = new ParcelTerrain(seed, { creek: site.creek, timber: site.timber });
+    this.parcel = new ParcelTerrain(seed, { creek: site.creek, timber: site.timber, region: site.region });
+    this.regionWorld = this.parcel.world;
+    this.climate = this.regionWorld.climate;
     this.farms = planNeighbors(this.parcel);
     this.camp = this._pickCamp();
     this.access = planAccess(this.camp, Math.max(4, this.home.z0 + 3), Math.min(PARCEL_SIZE - 4, this.home.z1 - 3));
     this.terrain = new TerrainRenderer(ws.scene);
     this.forest = new ForestRenderer(ws.scene);
-    this.sage = new ShrubField(ws.scene, 'sagebrush', SAGE, 1);
+    this.sage = new ShrubField(ws.scene, 'sagebrush', this.regionWorld.sagePalette ?? SAGE, 1);
+    this.rocks = new RockField(ws.scene);
     this.willow = new ShrubField(ws.scene, 'willow', WILLOW, 1);
     this.farTrees = new FarTreeRenderer(ws.scene);
     this.stream = new StreamRenderer(ws.scene);
@@ -275,11 +296,11 @@ export class HomesteadWorld {
   private _buildRoads(): void {
     this._roads.traverse(o => { if (o !== this._roads) (o as THREE.Mesh).geometry?.dispose(); });
     this._roads.clear();
-    const mat = gravelMaterial();
-    // mud season: the gravel goes soft and the tire tracks hold water (season patch)
-    mat.defines = { ...mat.defines, SEA_MUD: '', SEA_MUD_UV: '' };
-    const road = new THREE.Mesh(buildRibbon(roadLine(1), ROAD_W, this.groundAt, 0.02, 6), mat);
-    const track = this._drive ? mat : (() => { const m = mat.clone(); m.color = new THREE.Color(0x8a7a5c); m.defines = { ...m.defines, SEA_MUD: '', SEA_MUD_UV: '' }; return m; })();
+    // the county road the region's way (gravel, blacktop, caliche); the drive is gravel (caliche in the desert)
+    const mud = <M extends THREE.Material>(m: M): M => { m.defines = { ...m.defines, SEA_MUD: '', SEA_MUD_UV: '' }; return m; };   // mud season: the surface goes soft and the tire tracks hold water (season patch)
+    const mat = mud((this.regionWorld.drive ?? (this.regionWorld.road === 'caliche' ? 'caliche' : 'gravel')) === 'caliche' ? roadMaterial('caliche') : gravelMaterial());
+    const road = new THREE.Mesh(buildRibbon(roadLine(1), ROAD_W, this.groundAt, 0.02, 6), mud(roadMaterial(this.regionWorld.road)));
+    const track = this._drive ? mat : (() => { const m = mat.clone(); m.color = new THREE.Color(0x8a7a5c); return mud(m); })();
     const drive = new THREE.Mesh(buildRibbon(this.access.drive, this._drive ? DRIVE_W : DRIVE_W * 0.55, this.groundAt, this._drive ? 0.024 : 0.012, 4), track);
     for (const m of [road, drive]) { m.receiveShadow = true; this._roads.add(m); }
     const gate = buildGate(DRIVE_W);
@@ -337,8 +358,8 @@ export class HomesteadWorld {
     this._quality = q;
     this.terrain.build({
       source: this._terrainSource,
-      kind: 'mountain', cx: this.center.x, cz: this.center.z,
-      core: { x: PARCEL_SIZE / 2 + 70, z: PARCEL_SIZE / 2 + 22 }, quality: q, waterY: regionWaterY('mountain'),
+      kind: this.regionWorld.kind, cx: this.center.x, cz: this.center.z,
+      core: { x: PARCEL_SIZE / 2 + 70, z: PARCEL_SIZE / 2 + 22 }, quality: q, waterY: regionWaterY(this.regionWorld.kind),
     });
     this._plant(q);
     this._water(q);
@@ -371,21 +392,46 @@ export class HomesteadWorld {
     this._plantShrubs(q, inHome, blocked);
     const inside = (x: number, z: number) => inHome(x, z) || this._inOwned(x, z);
     // Neighboring farmsteads (houses, hay barns, corrals, poplar windbreaks)
-    this._props?.dispose();
-    const props = new RegionalProps(this._ws.scene, 'mountain');
+    const kind = this.regionWorld.kind, wy = regionWaterY(kind);
     const farmTrees: FarmTree[] = [];
-    const slope = (x: number, z: number) => this.parcel.region.slope(x, z);
-    for (const f of this.farms) buildFarmstead(f, 'mountain', props, this.groundAt, slope, t => farmTrees.push(t));
-    props.finish();
-    this._props = props;
+    this._insideHome = inside;
+    this._buildFarms(t => farmTrees.push(t), inside);
     this.farTrees.build({
       extra: farmTrees.map(t => ({ x: t.x, y: this.groundAt(t.x, t.z) - 0.05, z: t.z, h: t.h, sp: t.sp })),
-      kind: 'mountain', look: regionLookFor('mountain'),
-      sample: (x, z) => this.parcel.region.sample(x, z), height: (x, z) => this.parcel.region.height(x, z),
+      // (the regions other than the Mountain West carry their own lie and woods out past the place: the far trees stand on it)
+      kind, look: regionLookFor(kind),
+      sample: (x, z) => this.parcel.relief === 'benches' ? this.parcel.region.sample(x, z) : this.parcel.natural(x, z),
+      height: (x, z) => this.parcel.relief === 'benches' ? this.parcel.region.height(x, z) : this.parcel.natural(x, z).h,
       cx: this.center.x, cz: this.center.z, siteW: PARCEL_SIZE, siteH: PARCEL_SIZE, r0: margin + 2,
-      waterY: regionWaterY('mountain'), quality: q,
+      waterY: wy, quality: q,
       blocked: (x, z) => inside(x, z) || onFarmstead(this.farms, x, z, 2.5) || this.onAccess(x, z, 1.2),
     });
+  }
+
+  /** The neighbors' farmsteads, their line fences and the power line: rebuilt whole when a farm burns. */
+  private _buildFarms(tree: (t: FarmTree) => void = () => {}, insideHome: (x: number, z: number) => boolean = this._insideHome): void {
+    this._props?.dispose();
+    const kind = this.regionWorld.kind, wy = regionWaterY(kind);
+    const props = new RegionalProps(this._ws.scene, kind);
+    const slope = (x: number, z: number) => this.parcel.region.slope(x, z);
+    for (const f of this.farms) buildFarmstead(f, kind, props, this.groundAt, slope, tree);
+    // the neighbors' line fences, the region's way (wire on T-posts, split rail, stone walls, woven wire)
+    const creek = this.parcel.creek;
+    buildLineFences(planLineFences(roadX, ROAD_W / 2, -330, PARCEL_SIZE + 330), this.regionWorld.fence, props, this.groundAt,
+      (x, z) => onFarmstead(this.farms, x, z, 1.5) || Math.abs(z - creek.zAt(x)) < 2.2 || (wy !== null && this.parcel.region.height(x, z) < wy + 0.15) || insideHome(x, z),
+      (a, b) => { const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return s - Math.floor(s); });
+    if (this.regionWorld.powerline) buildPowerline(props, this.groundAt, (x, z) => onFarmstead(this.farms, x, z, 4) || (wy !== null && this.parcel.region.height(x, z) < wy + 0.3) || insideHome(x, z));
+    props.finish();
+    this._props = props;
+  }
+
+  /** Neighbor farms that have burned (sim/neighborLife.burnedFarms, in farm order): rebuild their props charred. */
+  setBurnedFarms(flags: readonly boolean[]): void {
+    let changed = false;
+    this.farms.forEach((f, i) => { const b = !!flags[i]; if (!!f.burned !== b) { f.burned = b; changed = true; } });
+    if (!changed) return;
+    this._buildFarms();
+    this._ws.invalidateShadows();
   }
 
   private _planted: ParcelTree[] = [];
@@ -400,7 +446,8 @@ export class HomesteadWorld {
     const sage: ShrubSpec[] = [], willow: ShrubSpec[] = [];
     const rects = [{ x0: -TREE_MARGIN, z0: -TREE_MARGIN, x1: PARCEL_SIZE + TREE_MARGIN, z1: PARCEL_SIZE + TREE_MARGIN }, ...this._ownedLand];
     const keep = q === 'low' ? 0.35 : q === 'medium' ? 0.7 : 1;
-    const creek = this.parcel.creek;
+    const creek = this.parcel.creek, rw = this.regionWorld;
+    const rocks: RockSpec[] = [];
     rects.forEach((r, k) => {
       const rnd = mulberry32(this.parcel.seed * 7703 + k * 97 + 5);
       const C = 0.75;
@@ -412,16 +459,22 @@ export class HomesteadWorld {
         if (s.h < creek.waterY(px) + 0.05) continue;
         // willow on the banks: a dense band just above the water
         if (dz > hw + 0.25 && dz < hw + 2.6) {
-          if (roll / keep < 0.55 * (1 - (dz - hw) / 2.6) + 0.12 && !blocked(px, pz)) willow.push({ x: px, y: this.groundAt(px, pz) - 0.02, z: pz, s: 0.8 + sR * 0.6, rot, tone });
+          if (roll / keep < (0.55 * (1 - (dz - hw) / 2.6) + 0.12) * rw.willow && !blocked(px, pz)) willow.push({ x: px, y: this.groundAt(px, pz) - 0.02, z: pz, s: 0.8 + sR * 0.6, rot, tone });
           continue;
+        }
+        // rocks: ledges and loose stone, more on the steep and wooded ground (one chance in a few hundred cells)
+        if (rw.rocks.count > 0 && (tone * 997) % 1 < rw.rocks.count / 4000 * (1 + 3 * Math.min(1, this.parcel.region.slope(px, pz) * 4 + s.forest * 0.5)) && dz > hw + 1.5 && !blocked(px, pz)) {
+          const [r0, r1] = rw.rocks.size;
+          rocks.push({ x: px, y: this.groundAt(px, pz), z: pz, s: r0 + (r1 - r0) * sR * sR, flat: (tone * 31.7) % 1 < rw.rocks.flat ? 1 : 0, rot, tone: (tone * 13.3) % 1 });
         }
         // sage on the open benches, thinning into the timber's edge
         if (s.forest > 0.25 || dz < hw + 5) continue;
-        if (roll / keep < 0.36 * (1 - s.forest / 0.25) && !blocked(px, pz)) sage.push({ x: px, y: this.groundAt(px, pz) - 0.01, z: pz, s: 0.8 + sR * 0.45, rot, tone });
+        if (roll / keep < 0.36 * rw.sage * (1 - s.forest / 0.25) && !blocked(px, pz)) sage.push({ x: px, y: this.groundAt(px, pz) - 0.01, z: pz, s: 0.8 + sR * 0.45, rot, tone });
       }
     });
     this.sage.build(sage, q);
     this.willow.build(willow, q);
+    this.rocks.build(rocks, rw.rocks.color, q);
   }
   /** Neighbor parcels the family has bought (their trees are planted near and detailed, markable). */
   private _ownedLand: Array<{ x0: number; z0: number; x1: number; z1: number }> = [];
@@ -491,7 +544,7 @@ export class HomesteadWorld {
   private _plantForest(): void {
     if (!this._quality) return;
     this.treeSpecs = this._planted.filter(t => !this._down.has(t.id));
-    this.forest.build(this.treeSpecs, this._quality, { oval: FOREST_ASPEN, broad: FOREST_ASPEN });
+    this.forest.build(this.treeSpecs, this._quality, this.regionWorld.trees.palettes);
   }
 
   /** A parcel tree by id (standing or not). */
@@ -753,7 +806,9 @@ export class HomesteadWorld {
   /** The creek (sloped stream) and the regional reservoir. */
   private _water(q: Quality): void {
     const c = this.parcel.creek;
-    this.stream.build({
+    // a dry desert place: the channel off the place is a dry wash too (no running water drawn)
+    if (this.parcel.relief === 'bajada' && !this.parcel.creekHome) this.stream.clear();
+    else this.stream.build({
       x0: this.center.x - 62, x1: this.center.x + 62, zAt: c.zAt, waterY: c.waterY, band: 3,
       site: {
         ground: this.groundAt,
@@ -761,10 +816,10 @@ export class HomesteadWorld {
       },
       quality: q, season: seasonState.plants, seed: this.parcel.seed,
     });
-    const wy = regionWaterY('mountain');
+    const kind = this.regionWorld.kind, wy = regionWaterY(kind);
     if (wy !== null) {
       this.lakes.build({
-        kind: 'mountain', height: (x, z) => this.parcel.region.height(x, z), waterY: wy,
+        kind, height: (x, z) => this.parcel.region.height(x, z), waterY: wy,
         cx: this.center.x, cz: this.center.z, reedInner: PARCEL_SIZE, quality: q, season: seasonState.plants,
       });
     }
@@ -928,6 +983,51 @@ export class HomesteadWorld {
     }
   }
 
+  // ── Food on the shelves ───────────────────────────────────────────────
+  readonly food = new FoodShelfRenderer();
+  private _foodKey = '';
+  /**
+   * Draw the pantry on the shelves and pallets of every finished storeroom,
+   * cellar and pantry, filled by quantity (props/foodShelfPlan). Cheap when
+   * nothing changed; the shelves of a ghosted building (underground view)
+   * stay reserved but aren't drawn.
+   */
+  syncFood(game: GameState): void {
+    // nothing that matters changed since the last frame: skip (the game object is only replaced when the sim steps or the player acts)
+    const finished = this._finishedCount();
+    if (game.pantry === this._foodPantry && game.stock === this._foodStock && this._foodCheap === `${this._under}|${this._built.size}|${finished}`) return;
+    this._foodPantry = game.pantry; this._foodStock = game.stock; this._foodCheap = `${this._under}|${this._built.size}|${finished}`;
+    const all = [...this._built.values()].filter(b => b.finished && (b.group.userData.foodSlots as FoodSlot[] | undefined)?.length)
+      .sort((a, b) => (FOOD_ORDER[a.placed.kind] ?? 9) - (FOOD_ORDER[b.placed.kind] ?? 9) || a.placed.id.localeCompare(b.placed.id));
+    // the house pantries hold what's in use (two to three weeks); the storeroom, cellar and bunker the rest (props/foodShelfPlan splitInUse)
+    const isStore = (b: Built) => b.placed.kind in FOOD_ORDER;
+    const stores = all.filter(isStore), homes = all.filter(b => !isStore(b));
+    const need = game.people.reduce((a, p, i) => a + (game.personState[i]?.needs?.died == null ? needOf(p) : 0), 0);
+    const split = splitInUse(pantryRows(game, 1).map(r => ({ id: r.id, units: r.units })), need, stores.length > 0 && homes.length > 0);
+    const wHome = propsWanted(homes.length ? split.house : []), wStore = propsWanted(homes.length ? split.store : split.house);
+    const key = `${wHome.map(w => w.id + w.n).join()}|${wStore.map(w => w.id + w.n).join()}|${all.map(b => b.group.uuid).join()}|${this._under}`;
+    if (key === this._foodKey) return;
+    this._foodKey = key;
+    if (!this.food.group.parent) this._ws.scene.add(this.food.group);
+    const shown: ShownPlace[] = [];
+    for (const [group, wants] of [[homes, wHome], [stores, wStore]] as const) {
+      // board by board in turn round the buildings, so each has its share (and empties with the rest);
+      // within one: the pallets and the freezer, then the boards nearest eye height (≈ 1.2 m) on every unit before the high and low ones
+      const lists = group.map(b => (b.group.userData.foodSlots as FoodSlot[]).map(slot => ({ b, slot }))
+        .sort((x, y) => +(y.slot.floor || y.slot.freezer) - +(x.slot.floor || x.slot.freezer) || Math.round(Math.abs(x.slot.o[1] - 1.2 * M) / (0.2 * M)) - Math.round(Math.abs(y.slot.o[1] - 1.2 * M) / (0.2 * M))));
+      const slots: Array<{ b: Built; slot: FoodSlot }> = [];
+      for (let i = 0; lists.some(l => i < l.length); i++) for (const l of lists) if (i < l.length) slots.push(l[i]);
+      const places = planShelves(wants, slots.map(({ slot }) => ({ len: slot.len / M, dep: slot.dep / M, clear: slot.clear / M, floor: slot.floor, freezer: slot.freezer })));
+      for (const b of group) b.group.updateMatrixWorld(true);
+      for (const p of places) if (!(this._under && !slots[p.slot].b.under)) shown.push({ place: p, slot: slots[p.slot].slot, world: slots[p.slot].b.group.matrixWorld });
+    }
+    this.food.update(shown);
+  }
+  private _foodPantry: unknown = null;
+  private _foodStock: unknown = null;
+  private _foodCheap = '';
+  private _finishedCount(): number { let n = 0; for (const b of this._built.values()) if (b.finished) n++; return n; }
+
   // ── Underground ───────────────────────────────────────────────────────
   private _under = false;
   private _earth: THREE.Mesh | null = null;
@@ -939,6 +1039,7 @@ export class HomesteadWorld {
     this.forest.visible = !on;
     this.sage.visible = !on;
     this.willow.visible = !on;
+    this.rocks.visible = !on;
     this.stream.setEdgesVisible(!on);
     for (const [id, g] of this._runGroups) if (this._runs.find(r => r.id === id)?.kind === 'escape_tunnel') this._applyTunnelView(g.group);
     // a bed of dark earth under the bunkers, so the see-through ground reads as a cut-away section, not sky
@@ -1415,8 +1516,8 @@ export class HomesteadWorld {
     const cam = this._ws.camera.position;
     const below = cam.y < this.groundAt(cam.x, cam.z) - 0.12;
     this._ws.outdoorLight += ((below ? 0.04 : 1) - this._ws.outdoorLight) * Math.min(1, dt * 6);
-    const p = this.seasons.update({ locationId: CLIMATE_ID, doy, totalDays, mode, dt });
-    writeSeasonUniforms(p, climateFor(CLIMATE_ID));
+    const p = this.seasons.update({ locationId: this.climate, doy, totalDays, mode, dt });
+    writeSeasonUniforms(p, climateFor(this.climate));
     this.terrain.update();
     this._clock += dt;
     ForestRenderer.setWindTime(this._clock);
@@ -1448,6 +1549,7 @@ export class HomesteadWorld {
     this._ws.scene.remove(this._roads);
     this._roads.traverse(o => (o as THREE.Mesh).geometry?.dispose());
     this.forest.dispose();
+    this.rocks.dispose();
     this.farTrees.dispose();
     this._props?.dispose();
     this.stream.dispose();

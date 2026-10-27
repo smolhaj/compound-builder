@@ -8,6 +8,8 @@ export interface Farmstead {
   annex?: { kind: 'poultry' | 'hog' | 'pecan' | 'plots'; x0: number; x1: number; z0: number; z1: number };
   /** A land-grant university research farm (UE only; never set here). */
   uni?: boolean;
+  /** Burned out (Compound Builder: a neighbor's farm after a raid or a fire): charred walls. */
+  burned?: boolean;
 }
 
 /** Is (x, z) on a farmstead's yard or annex (plus `pad`)? */

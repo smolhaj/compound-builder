@@ -323,3 +323,38 @@ describe('the battle at the compound', () => {
     expect(out).toBeGreaterThan(0);
   });
 });
+
+describe('round 4: the fight answers to walls, guns, armor and numbers', () => {
+  const cabin = (seed: number) => { const g = afterHit(seed); g.structures = g.structures.filter(s => s.id !== 'house'); g.structures.push({ id: 'house', kind: 'timber_cabin', x: 0, z: 0, rot: 0, stage: 99, done: 0, supplied: true, finishedAt: 0 }); g.clock.t = Math.floor(g.disaster.hitAt + 200) + 0.5; return g; };
+  const palisade = (g: GameState) => { const r = planRun(g, 'log_palisade', [[-15, -15], [15, -15], [15, 15], [-15, 15], [-15, -15]]); r.done = r.hours; r.supplied = true; r.finishedAt = 0; return g; };
+  const rifles = (g: GameState) => { for (const [i, p] of g.people.entries()) if (!p.kid || p.age >= 15) { g.armory.guns.push({ id: `g${i}`, model: 'sw_mp15', condition: 1, fired: 0, where: 'house', carrier: p.id }); g.armory.skill[p.id] = 3; } g.armory.ammo['556'] = 2000; return g; };
+  const held = (make: (seed: number) => GameState, n: number, N = 24) => { let w = 0; for (let i = 0; i < N; i++) { const b = planBattle(make(i % 6 + 1), n, 300 + i, { armed: true, temper: 'desperate' }); if (b.result === 'repelled' || b.result === 'fled') w++; } return w / N; };
+
+  it('two armed looters rarely overrun a walled place with rifles (round 3: four times running)', () => {
+    expect(held(s => rifles(palisade(cabin(s))), 2)).toBeGreaterThanOrEqual(0.8);
+  });
+
+  it('walls, guns and plates each help; more of them hurts', () => {
+    const bare = held(cabin, 2), guns = held(s => rifles(cabin(s)), 2), walled = held(s => rifles(palisade(cabin(s))), 4), armored = held(s => { const g = rifles(palisade(cabin(s))); g.stock.plate_carrier = 4; g.stock.sandbags = 3; return g; }, 4);
+    expect(guns).toBeGreaterThan(bare);
+    expect(walled).toBeGreaterThan(held(s => rifles(cabin(s)), 4));
+    expect(armored).toBeGreaterThanOrEqual(walled);
+    expect(held(s => rifles(palisade(cabin(s))), 8)).toBeLessThan(walled);
+  });
+
+  it('a pickup of looters brings no rocket; they start out of sight beyond a wide wall', () => {
+    for (let i = 0; i < 20; i++) {
+      const g = rifles(palisade(cabin(i % 5 + 1)));
+      const b = planBattle(g, 3, 500 + i, { armed: true, organized: false });
+      expect(b.events.some(e => e.kind === 'rocket')).toBe(false);
+      const start = b.units.filter(u => u.side === 'raider').map(u => Math.hypot(u.x, u.z));
+      expect(Math.min(...start)).toBeGreaterThan(21 + 15);
+    }
+  });
+
+  it('clubs against rifles behind a wall: they don\'t get over', () => {
+    let over = 0;
+    for (let i = 0; i < 20; i++) if (planBattle(rifles(palisade(cabin(i % 5 + 1))), 8, 700 + i, { armed: false }).result.match(/breached|overrun/)) over++;
+    expect(over).toBeLessThanOrEqual(2);
+  });
+});

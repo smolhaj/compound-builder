@@ -112,11 +112,12 @@ export const ANY_WISH: LandWish = { acres: 'any', water: 'any', timber: 'any', t
 
 /**
  * What's on a listing (`r` its own random stream): about two in five come
- * improved (more of the small lots near town). Old farmhouses (1920–1975)
+ * improved (more of the small lots near town); which kind of house follows
+ * the region's housing stock. Old farmhouses (1920–1975)
  * and manufactured homes (1985–2005) need work; a newer cabin or log house
  * (2005–2020) is sound.
  */
-export function rollImprovements(r: () => number, acres: Acres, miles: number, gwDepth: number, want: 'raw' | 'house' | 'any' = 'any'): Improvements {
+export function rollImprovements(r: () => number, acres: Acres, miles: number, gwDepth: number, want: 'raw' | 'house' | 'any' = 'any', region: RegionId = 'mountain_west'): Improvements {
   const improved = want === 'house' ? true : want === 'raw' ? false : r() < (acres === 5 ? 0.55 : 0.4);
   const driveFt = Math.round((acres === 5 ? 150 + r() * 250 : 300 + r() * 1000) / 10) * 10;
   if (!improved) {
@@ -124,8 +125,9 @@ export function rollImprovements(r: () => number, acres: Acres, miles: number, g
     return { ...RAW, poleFt, driveFt };
   }
   const cond = (pGood: number, pFair: number): Condition => { const x = r(); return x < pGood ? 'good' : x < pGood + pFair ? 'fair' : 'poor'; };
-  const h = r();
-  const kind: HouseKind = h < 0.45 ? 'farmhouse' : h < 0.8 ? 'trailer' : h < 0.93 ? 'timber_cabin' : 'log_house';
+  // the region's housing stock (regions.ts houses): Mountain West 45 / 35 / 13 / 7
+  const h = r(), m = REGIONS[region].houses;
+  const kind: HouseKind = h < m.farmhouse ? 'farmhouse' : h < m.farmhouse + m.trailer ? 'trailer' : h < m.farmhouse + m.trailer + m.timber_cabin ? 'timber_cabin' : 'log_house';
   const old = kind === 'farmhouse' || kind === 'trailer';
   const built = kind === 'farmhouse' ? 1920 + Math.round(r() * 55) : kind === 'trailer' ? 1985 + Math.round(r() * 20) : 2005 + Math.round(r() * 15);
   const house = old
@@ -169,8 +171,9 @@ export function listings(seed: number, region: RegionId = 'mountain_west', wish:
     const s = r();
     const soil: Soil = s < R.soil.thin ? 'thin' : s > 1 - R.soil.deep ? 'deep' : 'fair';
     const m = r();
-    const miles = Math.round(wish.town === 'near' ? 2 + m * 8 : wish.town === 'far' ? 15 + m * 20 : acres === 5 ? 3 + m * 8 : 6 + m * 22);
-    const improvements = rollImprovements(ri, acres, miles, gwDepth, wish.built ?? 'any');
+    const ts = R.townScale ?? 1;
+    const miles = Math.max(1, Math.round((wish.town === 'near' ? 2 + m * 8 : wish.town === 'far' ? 15 + m * 20 : acres === 5 ? 3 + m * 8 : 6 + m * 22) * ts));
+    const improvements = rollImprovements(ri, acres, miles, gwDepth, wish.built ?? 'any', region);
     const base = { region, acres, home: HOME_RECT[acres], creek, spring, gwDepth, gwQuality, timber, soil, miles, improvements };
     out.push({ id: `${region}-${k}`, name: `${ROADS[Math.floor(r() * ROADS.length)]} Road ${KIND[acres][Math.floor(r() * 2)]}`, ...base, price: sitePrice(base) });
   }
@@ -187,7 +190,7 @@ export interface Fact { label: string; value: string; tone?: 'good' | 'bad' }
 /** The listing card's rows. */
 export function siteFacts(s: Site): Fact[] {
   return [
-    { label: 'Water', value: s.creek ? 'Creek runs through' : s.spring ? 'Spring, no creek' : 'Dry (creek on the neighbor\'s)', tone: s.creek || s.spring ? 'good' : 'bad' },
+    { label: 'Water', value: s.creek ? 'Creek runs through' : s.spring ? 'Spring, no creek' : s.region === 'desert' ? 'Dry: a wash runs only after storms' : 'Dry (creek on the neighbor\'s)', tone: s.creek || s.spring ? 'good' : 'bad' },
     { label: 'Well', value: `${s.gwDepth} m${s.gwDepth <= 9 ? ' (hand-dug OK)' : ''}`, tone: s.gwDepth <= 20 ? 'good' : s.gwDepth > 90 ? 'bad' : undefined },
     { label: 'Groundwater', value: GW_SHORT[s.gwQuality], tone: s.gwQuality === 'good' ? 'good' : s.gwQuality === 'arsenic' ? 'bad' : undefined },
     { label: 'Timber', value: s.timber > 1.1 ? 'Heavy' : s.timber < 0.5 ? 'Open ground' : 'Some' },
