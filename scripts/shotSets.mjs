@@ -479,3 +479,36 @@ SETS.defenses = [
       cb.qa.pose = { x: 15.5, y: g(15.5, z - 3.2) + 0.3, z: z - 3.2, lx: 20, ly: g(20, z) + 0.15, lz: z + 0.4, fov: 62 }; }`, cam: { x: 33, z: 54, yaw: 0, pitch: 0.3, radius: 20 }, frames: 14 },
   { name: 'aerial-creek-bars', time: 11, season: 'summer', setup: `{ const c = cb.world.parcel.creek; cb.qa.pose = null; cb.cam.target.set(20, 0, c.zAt(20)); cb.cam.radius = 9; cb.cam.pitch = 0.7; cb.cam.yaw = 0.5; }`, cam: { x: 20, z: 40, yaw: 0.5, pitch: 0.7, radius: 9 }, frames: 12 },
 ];
+
+// the watch tower upgrade chain, side by side along z = 54: rise + lookout > wooden > concrete & steel > floodlights > manned mount > turret.
+// A resident stands at the foot of each pair for scale (a person is ~0.28 tall); the upgrade in progress rises beside the old tier.
+const TW = ['rise_lookout', 'watchtower_wood', 'watchtower_concrete', 'watchtower_flood', 'watchtower_mount', 'watchtower_turret'];
+const towersSetup = (lit = false) => `{ if (!window.__tw) { window.__tw = true;
+  const G = cb.game, kinds = ${JSON.stringify(TW)};
+  G.setState(s => { const g = structuredClone(s.game);
+    kinds.forEach((k, i) => g.structures.push({ id: 'tw' + i, kind: k, x: 8 + i * 6, z: 54, rot: 0, stage: 5, done: 0, supplied: false, finishedAt: 0 }));
+    // the upgrade in progress: a wooden tower with the concrete one rising beside it, and a chain-link fence being upgraded
+    g.structures.push({ id: 'up0', kind: 'watchtower_wood', x: 46, z: 54, rot: 0, stage: 5, done: 0, supplied: false, finishedAt: 0 });
+    g.structures.push({ id: 'up1', kind: 'watchtower_concrete', x: 46.7, z: 54, rot: 0, stage: 3, done: 30, supplied: true, finishedAt: null, replaces: 'up0' });
+    ${lit ? "g.utilities.lit = ['tw0'];" : ''}
+    return { game: g }; });
+  G.getState().planRun('chain_link', [[40, 49], [52, 49]], [], 0);
+  G.getState().planRun('wrought_iron', [[40, 49], [52, 49]], [], 0);
+  G.setState(s => { const g = structuredClone(s.game); const [a, b] = g.perimeter.slice(-2); a.done = a.hours; a.supplied = true; a.finishedAt = 0; b.replaces = a.id; b.supplied = true; b.done = b.hours * 0.5; return { game: g }; });
+} }`;
+// someone standing at (x, z), via a one-man playback (no events): the scale reference
+const stander = (x, z) => `{ if (!window.__man) { window.__man = true; cb.battle.play({ night: false, duration: 9999, events: [], units: [{ id: 'h_a', side: 'home', x: ${x}, z: ${z}, post: 'open' }] }); } }`;
+const cam0 = { x: 33, z: 54, yaw: 0, pitch: 0.3, radius: 20 };
+SETS.towers = [
+  { name: 'towers-aerial-chain', time: 11, season: 'summer', setup: towersSetup() + `{ cb.qa.pose = null; cb.cam.target.set(26, 0, 54); cb.cam.radius = 34; cb.cam.pitch = 0.5; cb.cam.yaw = 0.15; }`, cam: cam0, frames: 16 },
+  { name: 'towers-aerial-low-tiers', time: 11, season: 'summer', setup: towersSetup() + `{ cb.qa.pose = null; cb.cam.target.set(14, 0, 54); cb.cam.radius = 12; cb.cam.pitch = 0.45; cb.cam.yaw = 0.5; }`, cam: cam0, frames: 14 },
+  { name: 'towers-aerial-high-tiers', time: 11, season: 'summer', setup: towersSetup() + `{ cb.qa.pose = null; cb.cam.target.set(32, 0, 54); cb.cam.radius = 12; cb.cam.pitch = 0.45; cb.cam.yaw = -0.5; }`, cam: cam0, frames: 14 },
+  { name: 'towers-eye-rise-wood-concrete', time: 11, season: 'summer', setup: towersSetup() + stander(11, 55.2) + eye(9, 58, 14, 54, 0.28, 0.6, 60), cam: cam0, frames: 14 },
+  { name: 'towers-eye-flood-mount-turret', time: 11, season: 'summer', setup: towersSetup() + stander(31, 55.2) + eye(29, 58.5, 32, 54, 0.28, 0.9, 62), cam: cam0, frames: 14 },
+  { name: 'towers-eye-mount-closeup', time: 11, season: 'summer', setup: towersSetup() + stander(32.2, 55) + eye(31, 57, 32, 54, 0.3, 1.1, 60), cam: cam0, frames: 14 },
+  { name: 'towers-eye-turret-closeup', time: 11, season: 'summer', setup: towersSetup() + stander(38.2, 55) + eye(37, 57.5, 38, 54, 0.3, 1.2, 60), cam: cam0, frames: 14 },
+  { name: 'towers-night-floodlights', time: 22.5, season: 'summer', setup: towersSetup(true) + `{ cb.qa.pose = null; cb.cam.target.set(24, 0, 54); cb.cam.radius = 20; cb.cam.pitch = 0.22; cb.cam.yaw = 0.3; }`, cam: cam0, frames: 18 },
+  { name: 'towers-night-unpowered', time: 22.5, season: 'summer', setup: towersSetup(false) + `{ cb.qa.pose = null; cb.cam.target.set(24, 0, 54); cb.cam.radius = 20; cb.cam.pitch = 0.22; cb.cam.yaw = 0.3; }`, cam: cam0, frames: 18 },
+  { name: 'upgrade-beside-old', time: 11, season: 'summer', setup: towersSetup() + `{ cb.qa.pose = null; cb.cam.target.set(46, 0, 52); cb.cam.radius = 14; cb.cam.pitch = 0.5; cb.cam.yaw = 0.2; }`, cam: cam0, frames: 14 },
+  { name: 'upgrade-beside-old-eye', time: 11, season: 'summer', setup: towersSetup() + eye(44, 57, 46.4, 53, 0.28, 0.7, 62), cam: cam0, frames: 14 },
+];
