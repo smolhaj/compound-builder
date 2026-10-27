@@ -45,7 +45,8 @@ import { EXPOSURE_NAME, exposure, raidPressure, topExposure } from '../sim/opsec
 import { acresOf, buyProblem, LAND_NAME, priceOf } from '../sim/land';
 import { HARDEN, HARDEN_IDS, type TierDef, hardenCost, hardenProblem, isBunkerRoom, protectionOf, tierOf } from '../sim/hardening';
 import { defenseReport, type Check } from '../sim/defenseReport';
-import { TOWERS, TOWER_NEXT, highBonus, highShare, isTower, towerBill, towerUpgradeProblem } from '../sim/towers';
+import { ARMORY_LIGHTS, LIGHT_MODES, LIGHT_MODE_NAME, lightList, lightMode, lightsOf } from '../sim/lights';
+import { floodTowerIds, TOWERS, TOWER_NEXT, highBonus, highShare, isTower, towerBill, towerUpgradeProblem } from '../sim/towers';
 import { STRUCTURE_SALVAGE, isFinished as structFinished } from '../sim/construction';
 import { PERIMETER, PERIMETER_ORDER, SALVAGE, UPGRADE_NEXT, UTILITY_LINES, upgradeProblem, wallLength, runBill, runHours, runFinished, runProgress, runBlocked, runGrowth } from '../sim/perimeter';
 import { PantryPanel } from './PantryPanel';
@@ -774,6 +775,22 @@ function DefenseTab() {
           <button style={btn(false)} disabled={!!why} title={why ?? `${Math.round(runHours(next, len))} h of work; about ${usd(net)} after the salvage of the old one (${Math.round(SALVAGE * 100)}% of its materials back)`} onClick={() => { const w = useGameStore.getState().upgradeRun(r.id); if (w) alert(w); }}>{why ? 'Under way' : `Upgrade ~${usd(net)}`}</button>
         </div>;
       })}
+    </Section>
+    <Section title="Floodlights">
+      <Note>Part of the night-time suite: lights that stay on draw the road's eyes to the camp. Always on costs power and is seen from the road; a motion sensor lights up when a threat is detected near and for a little after; off keeps the place dark. A blackout (curtains) turns every light off.</Note>
+      <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', padding: '3px 0' }}>
+        <span style={{ flex: 1 }}>Default for all</span>
+        {LIGHT_MODES.map(m => <button key={m} style={btn(lightsOf(game).mode === m)} onClick={() => useGameStore.getState().setLightDefault(m)}>{LIGHT_MODE_NAME[m]}</button>)}
+      </div>
+      <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', padding: '3px 0' }}>
+        <span style={{ flex: 1, color: DIM }}>Set all lights (clears overrides)</span>
+        {LIGHT_MODES.map(m => <button key={m} style={btn(false)} onClick={() => useGameStore.getState().setAllLights(m)}>{LIGHT_MODE_NAME[m]}</button>)}
+      </div>
+      {lightList(game, floodTowerIds(game)).length === 0 && <Note>No floodlights yet: buy a set (Shop, Defense) or build a tower with a light mast.</Note>}
+      {lightList(game, floodTowerIds(game)).map(l => <div key={l.id} style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', padding: '3px 0' }}>
+        <span style={{ flex: 1 }}>{l.name}{l.id !== ARMORY_LIGHTS ? '' : ''}</span>
+        {LIGHT_MODES.map(m => <button key={m} style={btn(lightMode(game, l.id) === m)} onClick={() => useGameStore.getState().setLightMode(l.id, lightsOf(game).per[l.id] === m ? null : m)}>{LIGHT_MODE_NAME[m]}</button>)}
+      </div>)}
     </Section>
     <Section title="Upgrade the towers">
       <Note>A watch tower goes: rise &amp; lookout, wooden tower, concrete &amp; steel, floodlights, a manned mounted gun, an automated turret. The next tier rises beside the old one, which keeps watch until it is up.</Note>

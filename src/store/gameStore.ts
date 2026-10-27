@@ -13,6 +13,7 @@ import { step } from '../sim/engine';
 import { placeOrder } from '../sim/economy';
 import { planStructure } from '../sim/construction';
 import { markTree, unmarkTree, isMarked, type TreeRef } from '../sim/forestry';
+import { lightsOf, type LightMode } from '../sim/lights';
 import { stampHighGround, upgradeTower } from '../sim/towers';
 import { planRun, upgradeRun, type Gate, type PerimeterKind, type Pt } from '../sim/perimeter';
 import { fitProblem, orderFit, plant, repairPump, replaceFried } from '../sim/utilities';
@@ -50,6 +51,10 @@ export interface GameStore {
   upgradeRun: (id: string) => string | null;
   /** Upgrade a finished watch tower in place: the next tier rises beside it. */
   upgradeTower: (id: string) => string | null;
+  /** Floodlight discipline (sim/lights.ts): the default for every light, one light's override (null clears it), or set all (clears the overrides). */
+  setLightDefault: (mode: LightMode) => void;
+  setLightMode: (id: string, mode: LightMode | null) => void;
+  setAllLights: (mode: LightMode) => void;
   /** Plumb or wire a building (a fitting job for the family). */
   fit: (buildingId: string, kind: 'plumb' | 'wire') => string | null;
   /** Order the next tier of a hardening upgrade for one bunker room, or (all) for every room of the bunker up to that tier. */
@@ -168,6 +173,9 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); }
     return why;
   },
+  setLightDefault: (mode) => { const g = structuredClone(get().game); lightsOf(g).mode = mode; set({ game: g }); },
+  setLightMode: (id, mode) => { const g = structuredClone(get().game); const l = lightsOf(g); if (mode) l.per[id] = mode; else delete l.per[id]; set({ game: g }); },
+  setAllLights: (mode) => { const g = structuredClone(get().game); const l = lightsOf(g); l.mode = mode; l.per = {}; set({ game: g }); },
   upgradeTower: (id) => {
     const g = structuredClone(get().game);
     const why = upgradeTower(g, id);

@@ -25,7 +25,8 @@ import { backgroundOf } from './family';
 import { isHome } from './blueprints';
 import { isFinished } from './construction';
 import { PERIMETER, fenceLive, runFinished } from './perimeter';
-import { TURRET_JAM, floodReady, highBonus, isTower, mountReady, towerPosture, towerPosts, towerReach, turretsReady } from './towers';
+import { ARMORY_LIGHTS, floodlightLit } from './lights';
+import { TURRET_JAM, highBonus, litTowerIds, isTower, mountReady, towerPosture, towerPosts, towerReach, turretsReady } from './towers';
 import { enclosure } from './enclosure';
 import { mulberry32 } from './rng';
 import { leaveAftermath } from './aftermath';
@@ -234,8 +235,10 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
   const g = gearPosture(s, fightersP.length);
   const n = (k: string) => Math.floor((s.stock as Record<string, number>)[k] ?? 0);
   const powered = s.utilities.lit.length > 0 || (s.utilities.grid && s.disaster.tracks.grid > 0.5);
-  const mast = floodReady(s);
-  const lightsOn = night && powered && (n('floodlights') > 0 || mast);
+  // lights in a raid: the armory's yard lights and each tower's mast, by their mode (a raid trips the motion sensors)
+  const mastIds = litTowerIds(s, true);
+  const mast = mastIds.length > 0;
+  const lightsOn = night && ((n('floodlights') > 0 && floodlightLit(s, ARMORY_LIGHTS, true)) || mast);
   const mount = mountReady(s);
   const tw = towerPosture(s);
 
@@ -531,7 +534,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
       alarmed = true;
       ev.push({ t, kind: 'alarm', what });
       if (lightsOn) {
-        const masts = mast ? towerPosts(s).filter(x => x.def?.flood).slice(0, 3).map(x => ({ x: r2(x.st.x), z: r2(x.st.z), y: x.post.y + 0.1 })) : [];
+        const masts = mast ? towerPosts(s).filter(x => x.def?.flood && mastIds.includes(x.st.id)).slice(0, 3).map(x => ({ x: r2(x.st.x), z: r2(x.st.z), y: x.post.y + 0.1 })) : [];
         const aimAt = at(lineR + 8, 0);
         ev.push({ t: t + 1, kind: 'lights', ...(masts.length ? { masts, aim: { x: r2(aimAt.x), z: r2(aimAt.z) } } : {}) });
       }

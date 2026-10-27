@@ -25,6 +25,7 @@ import { applyForPermit } from './paperwork';
 import { BLUEPRINTS, totalBill } from './blueprints';
 import { log } from './economy';
 import { powered } from './gear';
+import { floodlightArmed, floodlightLit, threatNearby } from './lights';
 import type { Caliber } from './armory';
 import type { Stock } from './materials';
 import type { GameState, Structure } from './state';
@@ -148,8 +149,13 @@ export function turretsReady(s: GameState): Array<{ st: Structure; cal: Caliber 
 
 /** Floodlights on a tower, with power to run them (by night; by day they are only lamps). */
 export function floodReady(s: GameState): boolean {
-  return powered(s) && towersBuilt(s).some(x => x.def.flood);
+  return towersBuilt(s).some(x => x.def.flood && floodlightArmed(s, x.st.id));
 }
+
+/** Towers with a light mast (the lights' ids are their structure ids). */
+export const floodTowerIds = (s: GameState): string[] => towersBuilt(s).filter(x => x.def.flood).map(x => x.st.id);
+/** Towers whose floodlights are lit now (power, blackout, mode; `threat`: a raid is on). */
+export const litTowerIds = (s: GameState, threat: boolean = threatNearby(s)): string[] => floodTowerIds(s).filter(id => floodlightLit(s, id, threat));
 
 /**
  * What the towers add to the gate's posture: warning (the best tower's view
@@ -167,7 +173,7 @@ export function towerPosture(s: GameState): { detection: number; visibility: num
   if (turretsReady(s).length) detection += 4;
   const best = t.reduce((a, x) => Math.max(a, x.def.tier), 0);
   const fire = 1 + 0.02 * best + (mountReady(s) ? 0.22 : 0) + (turretsReady(s).length ? 0.18 : 0);
-  return { detection: Math.min(30, detection), visibility: t.length ? 4 + (floodReady(s) ? 6 : 0) : 0, fire };
+  return { detection: Math.min(30, detection), visibility: t.length ? 4 + (litTowerIds(s, false).length ? 6 : 0) : 0, fire };
 }
 
 /** How much farther out the watch sees a crew coming (world units), from the best tower. */

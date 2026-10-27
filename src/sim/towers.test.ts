@@ -223,7 +223,7 @@ describe('what the top tiers need', () => {
     expect(floodReady(g)).toBe(false);
     expect(defenseReport(g).watch.find(c => c.id === 'towerlights')?.ok).toBe(false);
     const darkP = towerPosture(g);
-    power(g);
+    power(g); lightsOf(g).mode = 'on';
     expect(floodReady(g)).toBe(true);
     expect(towerPosture(g).detection).toBeGreaterThan(darkP.detection);
     expect(towerPosture(g).visibility).toBeGreaterThan(darkP.visibility);
@@ -258,6 +258,8 @@ describe('saves', () => {
   });
 });
 
+import { lightsOf, floodlightLit, lightMode, newLights, ARMORY_LIGHTS, SENSOR_HOLD, raiseAlert, threatNearby } from './lights';
+import { exposureParts } from './opsec';
 import { highBonus, highGroundAt, setGroundProbe, stampHighGround, HIGH_FULL } from './towers';
 describe('high ground', () => {
   const hill = (cx: number, cz: number, h: number) => (x: number, z: number) => h * Math.max(0, 1 - Math.hypot(x - cx, z - cz) / 9);
@@ -298,5 +300,64 @@ describe('high ground', () => {
       return d;
     };
     expect(run(hill(6, 6, 1.5))).toBeGreaterThan(run(null));
+  });
+});
+
+describe('floodlight discipline', () => {
+  it('defaults to the motion sensor, with a global default and per-light overrides', () => {
+    const g = afterHit(1);
+    expect(lightsOf(g).mode).toBe('sensor');
+    expect(lightMode(g, 'tw')).toBe('sensor');
+    lightsOf(g).mode = 'off'; lightsOf(g).per.tw = 'on';
+    expect(lightMode(g, 'tw')).toBe('on');
+    expect(lightMode(g, 'other')).toBe('off');
+    expect(newLights().mode).toBe('sensor');
+  });
+
+  it('always on is lit with power and nothing else; the sensor needs a threat (and holds a while after); off is never lit; no power, no light', () => {
+    const g = afterHit(1); power(g);
+    lightsOf(g).per.a = 'on'; lightsOf(g).per.b = 'sensor'; lightsOf(g).per.c = 'off';
+    expect([floodlightLit(g, 'a', false), floodlightLit(g, 'b', false), floodlightLit(g, 'c', false)]).toEqual([true, false, false]);
+    expect([floodlightLit(g, 'a', true), floodlightLit(g, 'b', true), floodlightLit(g, 'c', true)]).toEqual([true, true, false]);
+    // the sensors trip on an alarm and hold for a short time
+    expect(threatNearby(g)).toBe(false);
+    raiseAlert(g);
+    expect(floodlightLit(g, 'b')).toBe(true);
+    g.clock.t += SENSOR_HOLD + 0.001;
+    expect(floodlightLit(g, 'b')).toBe(false);
+    dark(g);
+    expect([floodlightLit(g, 'a', true), floodlightLit(g, 'b', true)]).toEqual([false, false]);
+  });
+
+  it('a blackout (curtains) turns every light off whatever its mode', () => {
+    const g = afterHit(1); power(g);
+    lightsOf(g).per.a = 'on';
+    expect(floodlightLit(g, 'a', true)).toBe(true);
+    g.opsec = { quietDeliveries: false, blackout: true };
+    expect(floodlightLit(g, 'a', true)).toBe(false);
+  });
+
+  it('the armory\'s yard lights and the towers\' masts share it; always-on lights raise the OPSEC exposure and the gate visibility, the sensor does not', () => {
+    const mk = (mode: 'on' | 'sensor' | 'off') => { const g = afterHit(3); power(g); g.stock.floodlights = 1; tower(g, 'watchtower_flood', 'f1', 4, 4); lightsOf(g).mode = mode; return g; };
+    const on = mk('on'), sensor = mk('sensor'), off = mk('off');
+    expect(exposureParts(on).lights).toBeGreaterThan(exposureParts(sensor).lights);
+    expect(exposureParts(sensor).lights).toBe(exposureParts(off).lights);
+    expect(postureOf(on).visibility).toBeGreaterThan(postureOf(sensor).visibility);
+    // warning: off gives none of the lights' share, the sensor and always-on do
+    expect(postureOf(sensor).detection).toBeGreaterThan(postureOf(off).detection);
+    expect(floodlightLit(on, ARMORY_LIGHTS, false)).toBe(true);
+    // at night in a raid: the sensor lights come on (the raid trips them), off stays dark, per light
+    const nightRaid = (g: GameState) => planBattle(night(g), 5, 3).events.find(e => e.kind === 'lights');
+    expect(nightRaid(mk('sensor'))).toBeTruthy();
+    expect(nightRaid(mk('off'))).toBeUndefined();
+    const mixed = mk('off'); lightsOf(mixed).per.f1 = 'sensor';
+    const ev = nightRaid(mixed);
+    expect(ev && ev.kind === 'lights' && ev.masts?.length).toBe(1);
+  });
+
+  it('a v42 save gets the default floodlight mode', () => {
+    const g = newGame(1) as unknown as Record<string, unknown>;
+    const up = migrate({ ...g, version: 42, lights: undefined });
+    expect(up.lights?.mode).toBe('sensor');
   });
 });

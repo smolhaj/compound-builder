@@ -81,7 +81,7 @@ export function defenseReport(s: GameState): DefenseReport {
   const rounds = Math.max(0, ...HEAVY_CALIBERS.map(c => s.armory.ammo[c] ?? 0));
   const watch: Check[] = [
     chk('tower', 'Watch tower', tower, topTower ? `${topTower.def.name.toLowerCase()}: a view over the wall` : tower ? 'a view over the wall' : 'nobody sees them coming over a wall', true),
-    ...(built.some(x => x.def.flood) ? [chk('towerlights', 'Tower floodlights', floodReady(s), floodReady(s) ? 'the approach is lit at night' : 'no power: the mast stays dark', true)] : []),
+    ...(built.some(x => x.def.flood) ? [chk('towerlights', 'Tower floodlights', floodReady(s), floodReady(s) ? 'ready: lit by their mode at night' : !powered ? 'no power: the mast stays dark' : 'switched off (or lights out)', true)] : []),
     ...(built.some(x => x.def.mount) ? [chk('mount', 'Gun on the tower ring', !!mountReady(s), mountReady(s) ? 'a person up there and belts in the armory' : rounds < MOUNT_ROUNDS ? `needs ${MOUNT_ROUNDS}+ rounds of 7.62 / 5.56 in the armory (${rounds})` : 'nobody to put on it', false)] : []),
     ...(built.some(x => x.def.turret) ? [chk('turret', 'Automated turret', turretsReady(s).length > 0, turretsReady(s).length ? 'armed and live' : !powered ? 'no power: it does not fire' : `needs ${TURRET_ROUNDS}+ rounds in the armory (${rounds})`, false)] : []),
     chk('dog', 'Guard dog', n(s, 'dog') > 0, n(s, 'dog') > 0 ? `${Math.min(2, n(s, 'dog'))} on watch` : 'no bark to warn you', true),

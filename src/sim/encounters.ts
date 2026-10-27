@@ -18,6 +18,7 @@ import { forewarned } from './radio';
 import { gearPosture } from './gear';
 import { armed, firepower } from './armory';
 import { towerPosture } from './towers';
+import { raiseAlert } from './lights';
 import { applyBattle, planBattle, type RaiderTemper } from './battle';
 import { breakInDay, resolveBreakIn } from './breakins';
 import type { Aftermath, Prisoner } from './aftermath';
@@ -417,6 +418,7 @@ export function gateDay(s: GameState): Encounter | null {
   if (s.disaster.difficulty === 'hardcore' && e.strength) e.strength = Math.round(e.strength * 1.35);
   if (s.disaster.difficulty === 'cozy' && e.strength) e.strength = Math.round(e.strength * 0.6);
   g.pending = e;
+  raiseAlert(s);
   return e;
 }
 

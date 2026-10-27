@@ -12,6 +12,7 @@ import { generateNeighbors, newGate } from '../encounters';
 import { emptyStats } from '../report';
 import { newLand } from '../land';
 import { CLASSIC, CLASSIC_IMPROVEMENTS } from '../site';
+import { newLights } from '../lights';
 import { newPaper } from '../paperwork';
 import { newUpkeep } from '../upkeep';
 import { newShelf } from '../shelf';
@@ -54,7 +55,7 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   // 6 → 7: the escape tunnel (culvert, egress hatch)
   6: s => ({ ...s, version: 7, stock: { culvert: 0, egress_hatch: 0, ...(s.stock as object) } }),
   // 42 → 43: structures may carry `replaces` (a watch-tower upgrade in place, sim/towers.ts; none yet) and the top towers' mount and turret goods join the stockpile at zero
-  42: s => ({ ...s, version: 43, stock: { gun_mount: 0, turret_head: 0, ...(s.stock as object) } }),
+  42: s => ({ ...s, version: 43, stock: { gun_mount: 0, turret_head: 0, ...(s.stock as object) }, lights: (s.lights as object | undefined) ?? newLights() }),
   // 41 → 42: perimeter runs may carry `replaces` (an upgrade of a finished run in place); none yet
   41: s => ({ ...s, version: 42 }),
   // 40 → 41: scavenging places and runs, the crossroads market and its trade-goods bag, the neighbors' lives (none yet: made on the first day after the hit)

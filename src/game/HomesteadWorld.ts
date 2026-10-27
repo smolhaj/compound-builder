@@ -1145,6 +1145,8 @@ export class HomesteadWorld {
 
   /** Mains power is on (a lit building or the grid): floodlights on the towers shine at night. Set each frame from the game. */
   powered = false;
+  /** Towers whose floodlights are lit now (sim/lights.ts: power, mode, blackout, threat). Set each frame from the game. */
+  litTowers: ReadonlySet<string> = new Set();
 
   /** Take a structure down: its scene group, smoke and light. */
   removeStructure(id: string): void {
@@ -1286,7 +1288,7 @@ export class HomesteadWorld {
       }
       // a tower's floodlights: hard white over the approach at night, only with power (the lenses glow with them)
       if (KIT[b.placed.kind].floodlit) {
-        const on = this.powered && night > 0.35;
+        const on = this.litTowers.has(b.placed.id) && night > 0.35;
         b.light.intensity = on ? 8 * night : 0;
         const bulb = b.group.getObjectByName('bldg_interior_bulb');
         if (bulb) bulb.visible = on;
