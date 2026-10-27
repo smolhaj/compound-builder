@@ -48,6 +48,15 @@ export const ARMS: Record<string, Omit<Arm, 'cal'>> = {
   revolver: { range: 5, rate: 0.3, acc: 0.8, auto: false, mag: 6, feed: 'tube' },
 };
 export const FISTS: Arm = { range: 0.6, rate: 0.5, acc: 0.8, auto: false, cal: null, mag: 0, feed: 'mag' };
+/** What a wall does to the crew getting over it, a chance per raider at the line each second, and how badly (hp). */
+const WALL_HAZARD: Record<string, { p: number; min: number; max: number; what: string; lines: string[] }> = {
+  barbed_wire: { p: 0.07, min: 10, max: 35, what: 'barbed wire', lines: ['AGH — the wire — it\'s in my — FUCK!', 'Cut — I\'m cut — get me off this —', 'The barbs — oh Jesus, my hands —'] },
+  woven_wire: { p: 0.04, min: 8, max: 25, what: 'wire', lines: ['Shit — it\'s got me — hold it, hold it —', 'The wire — I\'m caught!'] },
+  thorn_hedge: { p: 0.09, min: 8, max: 30, what: 'thorns', lines: ['The thorns — Jesus, they\'re like knives —', 'I can\'t get through this — AGH — my face!', 'It\'s all thorns — back, BACK —'] },
+  ditch: { p: 0.06, min: 15, max: 50, what: 'ditch', lines: ['I fell — my leg — I think it\'s broken —', 'The ditch — I can\'t climb out —'] },
+  log_palisade: { p: 0.02, min: 10, max: 30, what: 'sharpened logs', lines: ['Splinters — shit — the points —', 'Slipped — I slipped — my arm —'] },
+  creek_bars: { p: 0.05, min: 8, max: 28, what: 'bars', lines: ['The bars — I can\'t get through — my hand —'] },
+};
 const MOVE = 0.6;          // ≈ 3.6 m/s running
 const GRENADE_RANGE = 5;   // ≈ 30 m
 const ROCKET_RANGE = 50;
@@ -218,11 +227,13 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
   // a wall only delays a crew that has to come over it: a gap, an open gate or an unbarred creek in the property line is the way round
   const propLine = enclosure(s);
   const lineClosed = propLine.openShare === 0 && propLine.creekOpen === 0;
-  let wallR = 0;
+  let wallR = 0, wallKind = '';
   for (const run of s.perimeter) {
     if (!runFinished(run) || PERIMETER[run.kind].blocks.people <= 0 || !run.pts.length) continue;
     const pts = run.pts.map(([x, z]) => ({ x, z })).sort((a, b) => ((b.x - C.x) * ax + (b.z - C.z) * az) - ((a.x - C.x) * ax + (a.z - C.z) * az));
-    wallR = Math.max(wallR, Math.max(4, Math.min(30, dist(pts[0], C))));
+    const rr = Math.max(4, Math.min(30, dist(pts[0], C)));
+    if (rr >= wallR) wallKind = run.kind;   // the outermost wall is the one they meet first
+    wallR = Math.max(wallR, rr);
   }
   if (wallR) for (let i = 0; i < 3; i++) { const p = at(wallR, (i - 1) * 4); posts.push({ kind: 'wall', ...p, y: 0, cover: 0.22, value: 2, cap: 1, wrecked: false, fire: 0 }); }
   const bars = n('window_bars') > 0 ? 0.28 : 0.35;
@@ -675,6 +686,22 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
     const hNow = H.filter(f => !f.out && !f.shelter && f.arm !== FISTS).length;
     // a wall takes time to get over (a ladder, bolt cutters, a truck): ~10 s at it, exposed, before the first are across
     const climbing = wallR > 0 && !wallDown && (lineClosed || !propLine.onLine.size);
+    // the wall bites: a crew at the wire, the hedge or the ditch is hurt getting over it (the ones who go down are left behind),
+    // and a crew that isn't set on killing loses heart a man at a time
+    if (climbing && atLine.length && !breached) {
+      const hz = WALL_HAZARD[wallKind];
+      let bitten = 0;
+      if (hz) for (const f of atLine) if (r() < hz.p) {
+        bitten++;
+        ev.push({ t: r2(t + 0.1), kind: 'snag', unit: f.id, x: r2(f.x), z: r2(f.z), what: hz.what });
+        hurt(f, hz.min + r() * (hz.max - hz.min), t + 0.1, undefined, 'leg');
+        if (!f.dead && r() < 0.7) say(t + 0.3, pick(hz.lines), f);
+      }
+      if (temper !== 'savage' && !peace && t - lineSince >= 6) for (const f of atLine) if (!f.fled && !f.out && r() < 0.03 + 0.05 * Math.min(1, losses / Math.max(1, raiders)) + 0.03 * bitten) {
+        f.fled = true; ev.push({ t, kind: 'flee', unit: f.id });
+        if (r() < 0.5) say(t + 0.2, pick(['Fuck this — I\'m not going over that.', 'It\'s not worth it — back, get BACK!', 'No way — I\'m out — I\'m out of here!']), f);
+      }
+    }
     // (round 4) clubs against rifles need far more of them to rush the line; going over a wall, every rifle at a post on it slows them
     const outnumber = armedR ? 2 : 4;
     const onWall = H.filter(f => !f.out && !f.shelter && f.arm !== FISTS && t >= f.readyAt && f.post?.kind !== 'open' && f.post?.kind !== 'building').length;
