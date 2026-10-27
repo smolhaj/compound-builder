@@ -13,6 +13,7 @@ import { step } from '../sim/engine';
 import { placeOrder } from '../sim/economy';
 import { planStructure } from '../sim/construction';
 import { markTree, unmarkTree, isMarked, type TreeRef } from '../sim/forestry';
+import { newDigs } from '../sim/tunnelers';
 import { setPassageLocked } from '../sim/compounds';
 import { addSkirt, planRun, upgradeRun, type Gate, type PerimeterKind, type Pt } from '../sim/perimeter';
 import { fitProblem, orderFit, plant, repairPump, replaceFried } from '../sim/utilities';
@@ -67,6 +68,8 @@ export interface GameStore {
   select: (id: string | null) => void;
   /** Answer whoever is at the gate. */
   answer: (stance: Stance) => void;
+  /** Pick who goes to a dig site (gate card). */
+  setAmbushParty: (ids: string[]) => void;
   dismissCard: () => void;
   decideAftermath: (choice: AftermathChoice) => void;
   releasePrisoner: (id: string) => void;
@@ -225,6 +228,12 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
   dismiss: (crewId) => {
     const g = structuredClone(get().game);
     dismissCrew(g, crewId);
+    set({ game: g });
+  },
+  setAmbushParty: ids => {
+    const g = structuredClone(get().game);
+    g.digs ??= newDigs();
+    g.digs.partyPick = ids;
     set({ game: g });
   },
   answer: (stance) => {

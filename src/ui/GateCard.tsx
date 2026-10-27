@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
 import { useGameStore } from '../store/gameStore';
-import { ambushOdds } from '../sim/tunnelers';
+import { ambushOdds, ambushParty, chosenParty } from '../sim/tunnelers';
 import { fightOdds, hideFoundChance, postureOf, type Stance } from '../sim/encounters';
 import { daysOfFood } from '../sim/needs';
 import { AFTERMATH_TEXT } from '../sim/aftermath';
@@ -22,7 +22,7 @@ const STANCE: Record<Stance, [string, string]> = {
   refuse: ['Refuse', 'Send them off with nothing.'],
   ambush: ['Send the party to the dig site', 'The armed family wait at the breakout point with rifles. Early warning and good guns win it; the house is thin while they are out, and someone may get hurt.'],
   flood: ['Flood the tunnel', 'Let the ditch drain into the tunnel. The water table does the rest.'],
-  collapse: ['Collapse the tunnel', 'Hire the excavator and bring the roof of the dig down on them. It works. It also weighs on the family.'],
+  collapse: ['Collapse the tunnel', 'Hire the excavator and bring the roof of the dig down on them.'],
   ignore: ['Ignore it', 'Leave them to it. They will be through in a few days, and inside the wall.'],
   confront: ['Confront them', 'Gun in hand. They\'ll probably run, but a shooting means the sheriff\'s investigation, lawyers, and the guns held as evidence.'],
 };
@@ -69,6 +69,12 @@ export function GateCard() {
           const t = e.ransom, gm = g.game;
           const have = [...(Object.keys(t.goods) as Array<keyof typeof gm.stock>).map(k => `${Math.floor(gm.stock[k])} ${k}`), ...(Object.keys(t.ammo) as Caliber[]).map(k => `${gm.armory.ammo[k] ?? 0} rounds of ${k}`)].join(', ');
           return <div style={{ margin: '8px 0', fontSize: 12, opacity: 0.75 }}>You have: {have}{canPay(gm, t) ? '' : ' (not enough for all of it)'} · a double-cross is {e.temper === 'savage' ? 'a real risk with this crew' : e.temper === 'hard' ? 'possible' : 'unlikely'} (about {Math.round(DOUBLE_CROSS[e.temper ?? 'savage'] * 100)} %)</div>;
+        })()}
+        {e.dig?.phase === 'warning' && e.stances.includes('ambush') && (() => {
+          const gm = g.game, able = ambushParty(gm, true), going = chosenParty(gm);
+          return <div style={{ margin: '8px 0', fontSize: 12, opacity: 0.85 }}>Who goes to the dig site:{' '}
+            {able.map(id => { const p = gm.people.find(x => x.id === id)!; return <label key={id} style={{ marginRight: 10 }}><input type="checkbox" checked={going.includes(id)} onChange={ev => g.setAmbushParty(ev.target.checked ? [...going, id] : going.filter(x => x !== id))} /> {p.first}</label>; })}
+            <div style={{ opacity: 0.7 }}>The rest hold the house.</div></div>;
         })()}
         {e.dig?.phase === 'warning' && e.stances.includes('ambush') && (() => {
           const o = ambushOdds(g.game, { size: e.size, lead: e.dig!.lead, temper: e.temper });

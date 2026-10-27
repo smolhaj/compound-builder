@@ -58,6 +58,8 @@ export interface DigState {
   active: Dig | null;
   /** The party sent to a breakout point: away (the line thin) on this day. */
   party: { ids: string[]; day: number } | null;
+  /** The player's pick of who goes to a dig site (gate card); empty = automatic. */
+  partyPick?: string[];
   /** Tallies. */
   started: number;
   turnedBySkirt: number;
@@ -227,11 +229,18 @@ export function warningEncounter(s: GameState, d: Dig, day: number, r: () => num
 }
 
 /** Who goes to the dig site: the armed fighters (one adult stays home if there are three or more). */
-export function ambushParty(s: GameState): string[] {
+export function ambushParty(s: GameState, everyone = false): string[] {
   if (!armed(s)) return [];
   const here = s.people.filter((p, i) => !p.kid && s.personState[i]?.needs.died == null && s.personState[i]?.task !== 'gone' && !isAwayNow(s, p.id));
-  const go = here.length >= 3 ? here.slice(0, here.length - 1) : here;
+  const go = here.length >= 3 && !everyone ? here.slice(0, here.length - 1) : here;
   return go.map(p => p.id);
+}
+
+/** Who goes: the player's pick (from the gate card) among those able, else the automatic party. */
+export function chosenParty(s: GameState): string[] {
+  const able = ambushParty(s, true), pick = s.digs?.partyPick;
+  const chosen = pick ? able.filter(id => pick.includes(id)) : [];
+  return chosen.length ? chosen : ambushParty(s);
 }
 
 /** The crew that comes up inside the wall: a few of them. */
@@ -342,14 +351,14 @@ export function resolveDigWarning(s: GameState, e: Encounter, stance: Stance, r:
   const d = ds.active && ds.active.id === e.dig?.id ? ds.active : null;
   if (!d) return { title: 'They gave up', text: 'By the time you look, the hole is empty and the dig is abandoned.', tone: 'good', lines: [] };
   if (stance === 'ambush') {
-    const party = ambushParty(s);
+    const party = chosenParty(s);
     const { surprise, crew } = ambushShape(d.size, e.dig?.lead ?? 0);
     const b = planBattle(s, crew, s.seed * 131 + day * 7 + 5, { armed: true, organized: true, temper: d.temper, ambush: surprise });
     g.battle = b;
     const lines = applyBattle(s, b);
     recordBattle(s, b, crew, d.temper);
     ds.ambushed++; ds.active = null;
-    ds.party = { ids: party, day: day + 1 };
+    ds.party = { ids: party, day: day + 1 }; ds.partyPick = undefined;
     // the line is thin while the party is out: a second crew may be watching
     if (r() < 0.25 && g.next > day + 1) { g.next = day + 1; lines.push('The party is still out at the breakout, and someone is watching the road.'); }
     const won = b.result === 'repelled' || b.result === 'fled';
@@ -365,7 +374,7 @@ export function resolveDigWarning(s: GameState, e: Encounter, stance: Stance, r:
   }
   if (stance === 'collapse') {
     take(s, 'excavator', 1);
-    ds.active = null; g.humanity = Math.max(0, g.humanity - 4); g.respect = Math.min(1, (g.respect ?? 0) + 0.15);
+    ds.active = null; g.respect = Math.min(1, (g.respect ?? 0) + 0.15);
     return { title: 'The tunnel comes down', text: 'The excavator crowds the spoil pile and drops the roof of the dig onto itself. A few of them get out the far end.', tone: 'mixed', lines: [`Some of the ${d.size} will not be coming back. It sits badly with the family.`] };
   }
   d.ignored = true;

@@ -151,3 +151,8 @@ export function passageEntry(s: GameState, r: () => number, organized: boolean):
   }
   return null;
 }
+
+/** An alarm or a raid starts: every passage's blast doors bolt themselves (the player can unbolt them again from the Defense tab). */
+export function boltPassages(s: GameState): void {
+  for (const r of s.perimeter) if (PERIMETER[r.kind].twoWay) r.unlocked = false;
+}

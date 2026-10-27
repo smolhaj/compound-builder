@@ -3,7 +3,9 @@ import { newGame, dayIndex, type GameState } from './state';
 import { addSkirt, canEnter, hasSkirt, planRun, runBill, skirtProblem, type PerimeterKind, type PerimeterRun, type Pt } from './perimeter';
 import { resolve } from './encounters';
 import { applyBattle, planBattle } from './battle';
-import { ambushOdds, ambushParty, ambushShape, combine, detectChances, digChancePerDay, digDay, digDefense, floodChance, newDigs, type Dig } from './tunnelers';
+import { boltPassages } from './compounds';
+import { gateDay } from './encounters';
+import { ambushOdds, ambushParty, chosenParty, ambushShape, combine, detectChances, digChancePerDay, digDay, digDefense, floodChance, newDigs, type Dig } from './tunnelers';
 import { defenseReport } from './defenseReport';
 
 function afterHit(seed = 1): GameState {
@@ -219,5 +221,43 @@ describe('tunnelers: sim integration', () => {
     const b = planBattle(g, 4, 3, { armed: true, organized: true, insideBreach: true });
     expect(b.events.find(e => e.kind === 'breach')!.t).toBeLessThanOrEqual(2);
     applyBattle(g, b);
+  });
+
+  it('collapsing the tunnel costs no humanity (only the excavator)', () => {
+    const g = afterHit(12); const r = square(g, 'container_wall'); g.stock.excavator = 2;
+    dig(g, r, { detectedDay: dayIndex(g.clock.t), by: 'watch' });
+    digDay(g);
+    const before = g.gate.humanity;
+    resolve(g, 'collapse');
+    expect(g.gate.humanity).toBe(before);
+    expect(g.stock.excavator).toBe(1);
+  });
+
+  it('the player picks who goes to the dig site; the default is every armed adult but one', () => {
+    const g = afterHit(13); const r = square(g, 'container_wall'); armedFamily(g);
+    const all = ambushParty(g, true);
+    expect(chosenParty(g)).toEqual(ambushParty(g));
+    if (all.length >= 3) expect(chosenParty(g).length).toBe(all.length - 1);
+    g.digs = { ...newDigs() };
+    g.digs.partyPick = [all[0]];
+    expect(chosenParty(g)).toEqual([all[0]]);
+    dig(g, r, { detectedDay: dayIndex(g.clock.t), by: 'watch' });
+    g.digs.partyPick = [all[0]];
+    digDay(g);
+    resolve(g, 'ambush');
+    expect(g.digs!.party!.ids).toEqual([all[0]]);
+  });
+
+  it('passage hatches bolt themselves when a raid starts', () => {
+    const g = afterHit(14);
+    const p = done(g, 'underground_passage', [[0, -3], [0, -30]]);
+    p.unlocked = true;
+    boltPassages(g);
+    expect(p.unlocked).toBe(false);
+    p.unlocked = true;
+    g.gate.next = 0; g.gate.day = -1; g.gate.pending = null;
+    for (let i = 0; i < 80 && !g.gate.pending; i++) { g.clock.t += 1; gateDay(g); }
+    const pend = g.gate.pending as { kind: string } | null;
+    if (pend && !['arrival', 'trader', 'neighbor_help'].includes(pend.kind)) expect(p.unlocked).toBe(false);
   });
 });

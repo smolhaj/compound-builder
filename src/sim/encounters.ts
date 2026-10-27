@@ -34,7 +34,7 @@ import type { Stock } from './materials';
 import type { Battle } from './battleTypes';
 import { gateLead, isAway, recordBattle, resolveRansom, type RansomTerms } from './rescue';
 import { defenders } from './pact';
-import { passageEntry } from './compounds';
+import { boltPassages, passageEntry } from './compounds';
 import { resolveDigWarning } from './tunnelers';
 import { resolveTrialEnd, startTrial, trialDay, type TrialCamp } from './trial';
 
@@ -418,6 +418,8 @@ export function gateDay(s: GameState): Encounter | null {
   }
   if (s.disaster.difficulty === 'hardcore' && e.strength) e.strength = Math.round(e.strength * 1.35);
   if (s.disaster.difficulty === 'cozy' && e.strength) e.strength = Math.round(e.strength * 0.6);
+  // an alarm: the passage hatches bolt themselves
+  if (!['arrival', 'trader', 'neighbor_help'].includes(e.kind)) boltPassages(s);
   g.pending = e;
   return e;
 }
@@ -641,6 +643,7 @@ export function resolve(s: GameState, stance: Stance): Outcome {
     if (stance === 'defend') {
       // the fight itself, second by second (sim/battle.ts); the world can play it back from g.battle
       // a crew up inside the wall (tunnelers), or one that finds a hatch outside it (an underground passage's way in): no wall to get over
+      boltPassages(s);
       const via = e.dig ? null : passageEntry(s, r, ORGANIZED.has(e.kind));
       if (via) lines.push(via.forced ? 'They found a steel hatch in the leaf litter out in the trees and blew the blast door. They are in the passage.' : 'They found a steel hatch out in the trees, left unbolted. They are in the passage.');
       const raiders = via ? Math.min(raidersAfterHelp(e, help), 4 + Math.floor(e.size / 4)) : raidersAfterHelp(e, help);
