@@ -24,7 +24,7 @@ import { isHome } from './blueprints';
 import { log } from './economy';
 import { burnStructure, isFinished } from './construction';
 import { raidPressure } from './opsec';
-import { PERIMETER, runFinished, runGrowth, wallLength } from './perimeter';
+import { PERIMETER, peopleBlock, runFinished, runGrowth, wallLength } from './perimeter';
 import { enclosure } from './enclosure';
 import { freshNeeds } from './needs';
 import { contagion, infect } from './effects';
@@ -129,7 +129,7 @@ export function postureOf(s: GameState): Posture {
     if (!runFinished(r) || d.blocks.people <= 0) continue;
     if (line.onLine.has(r.id)) { look += wallLength(r) * (d.height > 0.35 ? 1 : 0.3) * runGrowth(r, s.clock.t); continue; }   // the property line holds by whether it is closed (sim/enclosure.ts)
     const g = runGrowth(r, s.clock.t), len = wallLength(r);
-    held += len * d.blocks.people * g;
+    held += len * peopleBlock(s, r) * g;
     look += len * (d.height > 0.35 ? 1 : 0.3) * g;
   }
   // a ring round the compound, or a closed line round the whole property (gaps, open gates and an unbarred creek let them in)

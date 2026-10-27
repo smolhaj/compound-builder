@@ -14,7 +14,7 @@ import { hasAll, shortfall, MATERIALS, type MaterialId, type Stock } from './mat
 import { log } from './economy';
 import type { GameState } from './state';
 
-export type PerimeterKind = 'split_rail' | 'barbed_wire' | 'woven_wire' | 'thorn_hedge' | 'log_palisade' | 'container_wall' | 'earth_berm' | 'ditch' | 'creek_bars' | 'water_pipe' | 'power_cable' | 'escape_tunnel';
+export type PerimeterKind = 'split_rail' | 'barbed_wire' | 'woven_wire' | 'thorn_hedge' | 'log_palisade' | 'container_wall' | 'earth_berm' | 'ditch' | 'creek_bars' | 'chain_link' | 'wrought_iron' | 'iron_barbed' | 'steel_wall' | 'electric_steel' | 'water_pipe' | 'power_cable' | 'escape_tunnel';
 
 export interface PerimeterDef {
   id: PerimeterKind;
@@ -49,10 +49,15 @@ export const PERIMETER: Record<PerimeterKind, PerimeterDef> = {
   power_cable: { id: 'power_cable', name: 'Power cable (buried)', blurb: 'Direct-burial cable in conduit, 60 cm down. Joins the solar, batteries and generator to the buildings.', hours: 3, materials: { cable: 0.2 }, height: 0, blocks: { people: 0, animals: 0, vehicles: 0 }, sight: 0, growYears: 0 },
   escape_tunnel: { id: 'escape_tunnel', name: 'Escape tunnel', blurb: 'A long poured-concrete vault you walk upright in (60 m to half a mile and more, on under the neighbors\' land if need be) from a bunker room to a hidden hatch far out in the woods, away from any fighting. A way out for the family, never a way in: a blast door barred from the bunker side, and an exit lid with no handle outside, its hinges and drop-bolts on the underside, buried under soil, leaves and fallen branches.', hours: 36, materials: { culvert: 1, excavator: 0.3 }, height: 0, blocks: { people: 0, animals: 0, vehicles: 0 }, sight: 0, growYears: 0, egressOnly: true },
   creek_bars: { id: 'creek_bars', name: 'Creek bars (steel)', blurb: 'Vertical steel bars set in the bed and banks right across the creek, 15 cm apart: water, ice-free flow, fish and driftwood pass; a person can\'t swim, wade or climb through. Without one at each place the creek crosses your line, the creek is the way in round any wall or gate.', hours: 14, materials: { rebar: 0.7, hardware: 0.1 }, height: 0.3, blocks: { people: 0.92, animals: 0.6, vehicles: 1 }, sight: 0, growYears: 0 },
+  chain_link: { id: 'chain_link', name: 'Chain-link fence', blurb: '1.8 m galvanized chain-link on steel posts. A real fence: climbable and cuttable, but it turns most people round. First step up from woven wire.', hours: 5, materials: { wire: 0.25, hardware: 0.1 }, height: 0.3, blocks: { people: 0.55, animals: 0.97, vehicles: 0.35 }, sight: 0.05, growYears: 0 },
+  wrought_iron: { id: 'wrought_iron', name: 'Wrought-iron fence', blurb: 'Forged pickets with spear points set in a low stone footing, 2 m tall. Hard to climb, impossible to cut with hand tools, and it lets you see out.', hours: 14, materials: { rebar: 0.8, hardware: 0.3, concrete: 0.4 }, height: 0.34, blocks: { people: 0.68, animals: 0.98, vehicles: 0.5 }, sight: 0.1, growYears: 0 },
+  iron_barbed: { id: 'iron_barbed', name: 'Wrought iron with barbed wire', blurb: 'The iron fence with three strands of barbed wire on outward-leaning arms. Going over it costs skin.', hours: 17, materials: { rebar: 0.8, hardware: 0.3, concrete: 0.4, wire: 0.12 }, height: 0.38, blocks: { people: 0.78, animals: 0.98, vehicles: 0.55 }, sight: 0.1, growYears: 0 },
+  steel_wall: { id: 'steel_wall', name: 'Reinforced steel wall', blurb: '2.8 m steel plate panels bolted to concrete-filled posts on a poured footing, razor wire along the top. Stops vehicles and most tools; they need explosives or a lot of time.', hours: 26, materials: { rebar: 1.1, concrete: 0.8, hardware: 0.3, wire: 0.1 }, height: 0.47, blocks: { people: 0.93, animals: 1, vehicles: 0.9 }, sight: 0.6, growYears: 0 },
+  electric_steel: { id: 'electric_steel', name: 'Electrified steel wall', blurb: 'The steel wall with an energized wire on stand-offs along the top and warning signs. Needs power (a battery bank is enough): without it, it is only a steel wall. A shock drops a man; it rarely kills, but a gate left open or a child who climbs is at risk.', hours: 32, materials: { rebar: 1.1, concrete: 0.8, hardware: 0.3, wire: 0.1, cable: 0.2 }, height: 0.5, blocks: { people: 0.97, animals: 1, vehicles: 0.9 }, sight: 0.6, growYears: 0 },
   ditch: { id: 'ditch', name: 'Ditch / dry moat', blurb: 'A 2 m deep, 3 m wide ditch. No vehicle crosses; the spoil can build a berm.', hours: 40, materials: {}, height: -0.33, blocks: { people: 0.45, animals: 0.3, vehicles: 1 }, sight: 0, growYears: 0 },
 };
 
-export const PERIMETER_ORDER: readonly PerimeterKind[] = ['split_rail', 'barbed_wire', 'woven_wire', 'thorn_hedge', 'log_palisade', 'container_wall', 'earth_berm', 'ditch', 'creek_bars'];
+export const PERIMETER_ORDER: readonly PerimeterKind[] = ['split_rail', 'barbed_wire', 'woven_wire', 'thorn_hedge', 'log_palisade', 'container_wall', 'earth_berm', 'ditch', 'creek_bars', 'chain_link', 'wrought_iron', 'iron_barbed', 'steel_wall', 'electric_steel'];
 /** Lines that carry utilities (drawn with the same tool, under Water & power). */
 export const UTILITY_LINES: readonly PerimeterKind[] = ['water_pipe', 'power_cable'];
 
@@ -73,6 +78,25 @@ export interface PerimeterRun {
   supplied: boolean;
   /** Game time it was finished (planted, for hedges), or null. */
   finishedAt: number | null;
+  /** An upgrade of this finished run: the old tier keeps working until this one is done, then goes (its materials half back). */
+  replaces?: string;
+}
+
+/** The next tier up, where there is one (upgraded in place: sim `upgradeRun`). */
+export const UPGRADE_NEXT: Partial<Record<PerimeterKind, PerimeterKind>> = {
+  split_rail: 'barbed_wire', barbed_wire: 'woven_wire', woven_wire: 'chain_link', chain_link: 'wrought_iron',
+  wrought_iron: 'iron_barbed', iron_barbed: 'steel_wall', steel_wall: 'electric_steel',
+};
+/** Share of the old tier's materials that comes back when its upgrade is finished. */
+export const SALVAGE = 0.5;
+
+/** Is there power for an energized wire? (a lit building, or the grid while it works) */
+export const fenceLive = (s: GameState): boolean => s.utilities.lit.length > 0 || (s.utilities.grid && s.disaster.tracks.grid > 0.5);
+
+/** How well a run stops people right now: an electrified wall with no power is just a steel wall. */
+export function peopleBlock(s: GameState, r: Pick<PerimeterRun, 'kind'>): number {
+  if (r.kind === 'electric_steel' && !fenceLive(s)) return PERIMETER.steel_wall.blocks.people;
+  return PERIMETER[r.kind].blocks.people;
 }
 
 export function runLength(pts: readonly Pt[]): number {
@@ -132,6 +156,28 @@ export function planRun(s: GameState, kind: PerimeterKind, pts: Pt[], gates: Gat
 
 export const runFinished = (r: PerimeterRun): boolean => r.finishedAt !== null;
 
+/** Why a run can't be upgraded (null = it can). */
+export function upgradeProblem(s: GameState, r: PerimeterRun): string | null {
+  if (!runFinished(r)) return 'not finished yet';
+  const next = UPGRADE_NEXT[r.kind];
+  if (!next) return 'nothing better to upgrade to';
+  if (s.perimeter.some(x => x.replaces === r.id && !runFinished(x))) return 'an upgrade is already under way';
+  return null;
+}
+
+/** Upgrade a finished run in place: lay out the next tier over the same line (it works the old one until it's done). */
+export function upgradeRun(s: GameState, id: string): string | null {
+  const r = s.perimeter.find(x => x.id === id);
+  if (!r) return 'no such run';
+  const why = upgradeProblem(s, r);
+  if (why) return why;
+  const next = UPGRADE_NEXT[r.kind]!;
+  const run = planRun(s, next, r.pts.map(p => [p[0], p[1]] as Pt), r.gates.map(g => ({ ...g })));
+  run.replaces = r.id;
+  log(s, `Upgrading the ${PERIMETER[r.kind].name.toLowerCase()} to ${PERIMETER[next].name.toLowerCase()}. The old one stands until the new one is up.`);
+  return null;
+}
+
 /** Why work on a run can't go on (null = it can). */
 export function runBlocked(s: GameState, r: PerimeterRun): string | null {
   if (runFinished(r)) return 'finished';
@@ -164,6 +210,15 @@ export function addRunWork(s: GameState, r: PerimeterRun, hours: number): void {
     if (r.kind === 'ditch') s.stock.spoil += Math.round(DITCH_M3 * wallLength(r));
     if (r.kind === 'escape_tunnel') s.stock.spoil += Math.round(TUNNEL_M3 * wallLength(r));
     const d = PERIMETER[r.kind];
+    // an upgrade replaces the old tier, and some of its materials come back
+    if (r.replaces) {
+      const old = s.perimeter.find(x => x.id === r.replaces);
+      if (old) {
+        for (const [k, q] of Object.entries(runBill(old.kind, wallLength(old))) as Array<[MaterialId, number]>) s.stock[k] += Math.floor(q * SALVAGE);
+        s.perimeter = s.perimeter.filter(x => x.id !== old.id);
+      }
+      r.replaces = undefined;
+    }
     log(s, d.growYears ? `${d.name} planted. Give it ${d.growYears} years.` : `${d.name} ${r.kind === 'water_pipe' || r.kind === 'power_cable' ? 'laid' : 'finished'}.`);
   }
 }

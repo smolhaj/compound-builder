@@ -24,7 +24,7 @@ import { gearPosture } from './gear';
 import { backgroundOf } from './family';
 import { isHome } from './blueprints';
 import { isFinished } from './construction';
-import { PERIMETER, runFinished } from './perimeter';
+import { PERIMETER, fenceLive, runFinished } from './perimeter';
 import { enclosure } from './enclosure';
 import { mulberry32 } from './rng';
 import { leaveAftermath } from './aftermath';
