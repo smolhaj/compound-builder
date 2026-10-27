@@ -108,8 +108,8 @@ export class Director {
     if (kind === 'raiders' && raiders.length) {
       // from the side of the approach, low: the crew coming on with the compound beyond
       const front = raiders.reduce((a, b) => (Math.hypot(b.x - house.x, b.z - house.z) < Math.hypot(a.x - house.x, a.z - house.z) ? b : a));
-      eye = at(front.x + road.x * 1.6 + px * 1.5, front.z + road.z * 1.6 + pz * 1.5, 0.26);
-      look = at(front.x - road.x * 1.2, front.z - road.z * 1.2, 0.18);
+      eye = at(front.x + road.x * 1.6 + px * 1.5, front.z + road.z * 1.6 + pz * 1.5, 0.5);
+      look = at(front.x - road.x * 1.2, front.z - road.z * 1.2, 0.12);
       return this._set({ kind, subject: front.id, eye, look, fov: 56, since: time, hold, drift: { x: -px * 0.03, y: 0, z: -pz * 0.03 } });
     }
     if (kind === 'house') {
