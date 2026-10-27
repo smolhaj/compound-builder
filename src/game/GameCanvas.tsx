@@ -16,6 +16,7 @@ import { CameraOccluders } from '../engine/world/camera/cameraOcclusion';
 import { PARCEL_SIZE } from './HomesteadWorld';
 import { PlacementTool } from './PlacementTool';
 import { MarkTool } from './MarkTool';
+import { BoundaryOutline } from './BoundaryOutline';
 import { PerimeterTool } from './PerimeterTool';
 import { SightOverlay } from './sightlines/SightOverlay';
 import { PARCEL_SIZE as PS } from './parcel/parcelTerrain';
@@ -143,11 +144,18 @@ export function GameCanvas() {
     const ownedRects = (g: GameState) => [...homeOutsideForty(g.site), ...g.land.parcels.filter(p => p.owner === 'you').map(p => p.rect)];
     if (!useGameStore.getState().game.land.surveyed) useGameStore.getState().survey(world.surveyLand(useGameStore.getState().game.land.parcels));
     world.setOwnedLand(ownedRects(useGameStore.getState().game));
+    // the property line: on by the Boundary button, and while a fence or wall is being drawn
+    const boundary = new BoundaryOutline(ws.scene, world.groundAt);
+    const rebuildBoundary = () => boundary.build([world.home, ...ownedRects(useGameStore.getState().game)]);
+    const showBoundary = () => { boundary.visible = useWorldStore.getState().showBoundary || !!useGameStore.getState().tool?.startsWith('fence:'); };
+    rebuildBoundary(); showBoundary();
     world.setBurnedFarms(burnedFarms(useGameStore.getState().game));
     const unsub = [
       // wildfire weather: measure the fuel round every building (what cleared ground there is decides what burns)
       useGameStore.subscribe(s => s.game.disaster.phase, ph => { const g = useGameStore.getState().game; if (g.disaster.kind === 'wildfire' && ph === 'warning' && !g.disaster.fuel) useGameStore.getState().setFuel(world.fuelNear(g.structures)); }),
-      useGameStore.subscribe(s => s.game.land, () => world.setOwnedLand(ownedRects(useGameStore.getState().game))),
+      useGameStore.subscribe(s => s.game.land, () => { world.setOwnedLand(ownedRects(useGameStore.getState().game)); rebuildBoundary(); }),
+      useWorldStore.subscribe(s => s.showBoundary, showBoundary),
+      useGameStore.subscribe(s => s.tool, showBoundary),
       useWorldStore.subscribe(s => s.quality, applyLook),
       useWorldStore.subscribe(s => s.cameraMode, applyCameraMode),
       useGameStore.subscribe(s => s.game.structures, list => { world.syncStructures(placedOnly(list)); occluders.invalidate(); }),
@@ -320,6 +328,7 @@ export function GameCanvas() {
       marker.dispose();
       fence.dispose();
       sight.dispose();
+      boundary.dispose();
       canvas.removeEventListener('pointerdown', onVsDown);
       canvas.removeEventListener('pointerup', onVsUp);
       cam.dispose();
