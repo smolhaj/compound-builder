@@ -162,7 +162,7 @@ export function GameCanvas() {
       useGameStore.subscribe(s => s.game.site.improvements.drive, on => world.setDrive(on)),
       // a neighbor's farm burned (sim/neighborLife.ts): drawn charred once the family knows
       useGameStore.subscribe(s => burnedFarms(s.game).join(), () => world.setBurnedFarms(burnedFarms(useGameStore.getState().game))),
-      useGameStore.subscribe(s => s.tool, k => { tool.setKind(k); marker.setOn(k === 'fell'); fence.setKind(k?.startsWith('fence:') ? k.slice(6) as PerimeterKind : null); if (k === 'fence:escape_tunnel') useWorldStore.getState().setUnderground(true); }),
+      useGameStore.subscribe(s => s.tool, k => { tool.setKind(k); marker.setOn(k === 'fell'); fence.setKind(k?.startsWith('fence:') ? k.slice(6) as PerimeterKind : null); if (k === 'fence:escape_tunnel' || k === 'fence:underground_passage') useWorldStore.getState().setUnderground(true); }),
       useWorldStore.subscribe(s => s.buildingView, v => world.setBuildingView(v)),
       useWorldStore.subscribe(s => s.underground, on => world.setUnderground(on)),
       useWorldStore.subscribe(s => s.sightMode, m => sight.set(m)),

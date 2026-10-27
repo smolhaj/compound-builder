@@ -13,7 +13,8 @@ import { step } from '../sim/engine';
 import { placeOrder } from '../sim/economy';
 import { planStructure } from '../sim/construction';
 import { markTree, unmarkTree, isMarked, type TreeRef } from '../sim/forestry';
-import { planRun, upgradeRun, type Gate, type PerimeterKind, type Pt } from '../sim/perimeter';
+import { setPassageLocked } from '../sim/compounds';
+import { addSkirt, planRun, upgradeRun, type Gate, type PerimeterKind, type Pt } from '../sim/perimeter';
 import { fitProblem, orderFit, plant, repairPump, replaceFried } from '../sim/utilities';
 
 /** Reconnection fee to get back on the grid after leaving it. */
@@ -47,6 +48,10 @@ export interface GameStore {
   planRun: (kind: PerimeterKind, pts: Pt[], gates: Gate[], offLen?: number) => void;
   /** Upgrade a finished fence or wall to the next tier, in place (null = laid out; else why not). */
   upgradeRun: (id: string) => string | null;
+  /** Bury a steel-and-concrete skirt under a finished wall (null = done, else why not). */
+  addSkirt: (id: string) => string | null;
+  /** Bolt or unbolt the blast hatches of an underground passage. */
+  lockPassage: (id: string, locked: boolean) => void;
   /** Plumb or wire a building (a fitting job for the family). */
   fit: (buildingId: string, kind: 'plumb' | 'wire') => string | null;
   /** Order the next tier of a hardening upgrade for one bunker room, or (all) for every room of the bunker up to that tier. */
@@ -163,6 +168,18 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     const why = upgradeRun(g, id);
     if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); }
     return why;
+  },
+  addSkirt: (id) => {
+    const g = structuredClone(get().game);
+    const why = addSkirt(g, id);
+    if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); }
+    return why;
+  },
+  lockPassage: (id, locked) => {
+    const g = structuredClone(get().game);
+    setPassageLocked(g, id, locked);
+    set({ game: g });
+    void saveGame(AUTOSAVE, g);
   },
   fit: (id, kind) => {
     const g = structuredClone(get().game);
