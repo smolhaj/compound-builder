@@ -39,6 +39,8 @@ const RANSOM: Partial<Record<Stance, [string, string]>> = {
 };
 
 const box: CSSProperties = { position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', width: 460, maxWidth: 'calc(100vw - 32px)', background: 'rgba(24,22,18,0.97)', color: '#eee', borderRadius: 12, padding: '18px 20px', zIndex: 9, boxShadow: '0 10px 40px rgba(0,0,0,0.5)', fontSize: 13.5 };
+/** The raid prompt: to the right, so the view down the drive stays open between the bars. */
+const raidBox: CSSProperties = { ...box, left: 'auto', right: 'clamp(12px, 3vw, 40px)', top: 'calc(clamp(54px, 12vh, 120px) + 12px)', transform: 'none', width: 'min(400px, calc(100vw - 24px))', maxHeight: 'calc(100vh - 2 * clamp(54px, 12vh, 120px) - 24px)', overflowY: 'auto', zIndex: 40, padding: '14px 16px' };
 const button = (primary: boolean): CSSProperties => ({ padding: '7px 12px', borderRadius: 7, border: 0, cursor: 'pointer', background: primary ? '#d8c9a0' : '#3a3d34', color: primary ? '#1c1d18' : '#eee', fontSize: 13, textAlign: 'left' });
 
 /** Someone at the gate: the dossier and the stances (the game is paused); then what happened. */
@@ -46,13 +48,17 @@ export function GateCard() {
   const g = useGameStore();
   const gate = g.game.gate;
   const e = gate.pending;
+  const cut = g.cutscene;
+  // a raid plays as a cutscene (ui/CutsceneOverlay): the card takes the stance, then Watch; nothing else shows till the report
+  if (cut && cut.phase !== 'prompt') return null;
   if (e) {
     const p = postureOf(g.game);
     // honest odds: the battle sim itself, a couple of dozen times (cached per encounter)
     const odds = e.strength > 0 && e.kind !== 'break_in' && e.stances.includes('defend') ? fightOdds(g.game, e) : null;
     const label = (st: Stance) => (e.ransom && RANSOM[st]) || (e.kind === 'trial_end' && TRIAL_END[st]) || STANCE[st];
+    const picked = cut ? cut.stance ?? e.stances[0] : null;
     return (
-      <div style={box}>
+      <div style={cut ? raidBox : box}>
         <div style={{ fontSize: 11, letterSpacing: 1, opacity: 0.6, textTransform: 'uppercase' }}>{e.kind === 'break_in' ? 'In the night' : e.kind === 'ransom' ? 'Word about your child' : e.kind === 'trial_end' ? 'The camp outside the wall' : 'At the gate'}</div>
         <div style={{ fontSize: 19, fontWeight: 700, margin: '2px 0 8px' }}>{e.title}</div>
         {e.dossier.filter(Boolean).map((l, i) => <div key={i} style={{ marginBottom: 4, opacity: 0.9 }}>{l}</div>)}
@@ -72,12 +78,13 @@ export function GateCard() {
         </div>}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
           {e.stances.map((st, i) => (
-            <button key={st} style={button(i === 0)} title={label(st)[1]} onClick={() => g.answer(st)}>
+            <button key={st} style={cut ? { ...button(st === picked), outline: st === picked ? '2px solid #d8c9a0' : undefined, background: st === picked ? '#4a4a3c' : '#2e302a', color: '#eee' } : button(i === 0)} title={label(st)[1]} onClick={() => (cut ? g.chooseStance(st) : g.answer(st))}>
               <div style={{ fontWeight: 600 }}>{label(st)[0]}</div>
               <div style={{ fontSize: 11.5, opacity: 0.75 }}>{label(st)[1]}</div>
             </button>
           ))}
         </div>
+        {cut && <button style={{ ...button(true), marginTop: 12, width: '100%', textAlign: 'center', fontSize: 15, padding: '10px 12px', fontWeight: 700, letterSpacing: 0.5 }} onClick={g.watchRaid}>Watch</button>}
       </div>
     );
   }
