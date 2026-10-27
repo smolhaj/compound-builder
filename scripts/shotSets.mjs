@@ -479,3 +479,25 @@ SETS.defenses = [
       cb.qa.pose = { x: 15.5, y: g(15.5, z - 3.2) + 0.3, z: z - 3.2, lx: 20, ly: g(20, z) + 0.15, lz: z + 0.4, fov: 62 }; }`, cam: { x: 33, z: 54, yaw: 0, pitch: 0.3, radius: 20 }, frames: 14 },
   { name: 'aerial-creek-bars', time: 11, season: 'summer', setup: `{ const c = cb.world.parcel.creek; cb.qa.pose = null; cb.cam.target.set(20, 0, c.zAt(20)); cb.cam.radius = 9; cb.cam.pitch = 0.7; cb.cam.yaw = 0.5; }`, cam: { x: 20, z: 40, yaw: 0.5, pitch: 0.7, radius: 9 }, frames: 12 },
 ];
+
+// linked compounds: two walled yards joined by a covered steel walkway, an underground passage between them, a buried skirt and ground sensors
+const linkedSetup = `{ if (!window.__linked) { window.__linked = true;
+  const sq = (cx, cz, h) => [[cx - h, cz - h], [cx + h, cz - h], [cx + h, cz + h], [cx - h, cz + h], [cx - h, cz - h]];
+  cb.game.setState(s => { const g = structuredClone(s.game);
+    const done = (kind, pts) => { cb.__id = (cb.__id || 0) + 1; g.perimeter.push({ id: 'L' + cb.__id, kind, pts, gates: [], done: 1, hours: 1, supplied: true, finishedAt: 0 }); };
+    for (const [id, x, z] of [['h1', 22, 40], ['h2', 46, 40]]) g.structures.push({ id, kind: 'farmhouse', x, z, rot: 0, stage: 99, done: 0, supplied: true, finishedAt: 0 });
+    done('container_wall', sq(22, 40, 8)); done('container_wall', sq(46, 40, 8)); 
+    done('covered_walkway', [[30, 44], [38, 44]]);
+    done('underground_passage', [[24, 37], [44, 37]]);
+    g.perimeter.find(r => r.pts[0][0] === 22 - 8 && r.kind === 'container_wall').skirtAt = 0;
+    g.stock.ground_sensor = 2; g.utilities.lit = ['h1', 'h2'];
+    return { game: g }; }); } cb.qa.pose = null; }`;
+SETS.linked = [
+  { name: 'linked-aerial-day', time: 12, season: 'summer', setup: linkedSetup + "cb.cam.target.set(34, 0, 41); cb.cam.yaw = 0.5; cb.cam.pitch = 0.6; cb.cam.radius = 34;", cam: { x: 34, z: 41, yaw: 0.5, pitch: 0.6, radius: 34 }, frames: 14 },
+  { name: 'linked-walkway-close', time: 11, season: 'summer', setup: linkedSetup + "cb.cam.target.set(34, 0, 44); cb.cam.yaw = 0.6; cb.cam.pitch = 0.2; cb.cam.radius = 7;", cam: { x: 34, z: 44, yaw: 0.6, pitch: 0.2, radius: 7 }, frames: 14 },
+  { name: 'linked-eye-inside-walkway', time: 21.5, season: 'summer', setup: linkedSetup + eye(31, 44, 38, 44, 0.22, 0.22, 70), cam: { x: 34, z: 44, yaw: 0, pitch: 0.2, radius: 7 }, frames: 14 },
+  { name: 'linked-night-aerial', time: 22, season: 'summer', setup: linkedSetup + "cb.cam.target.set(34, 0, 42); cb.cam.yaw = 0.3; cb.cam.pitch = 0.45; cb.cam.radius = 28;", cam: { x: 34, z: 42, yaw: 0.3, pitch: 0.45, radius: 28 }, frames: 14 },
+  { name: 'linked-underground-passage', time: 11, season: 'summer', setup: linkedSetup + under + "cb.cam.target.set(34, 0, 37); cb.cam.yaw = 0.4; cb.cam.pitch = 0.9; cb.cam.radius = 30;", cam: { x: 34, z: 37, yaw: 0.4, pitch: 0.9, radius: 30 }, frames: 20 },
+  { name: 'linked-underground-hatch-close', time: 11, season: 'summer', setup: linkedSetup + under + "cb.cam.target.set(24, 0, 37); cb.cam.yaw = 0.5; cb.cam.pitch = 0.8; cb.cam.radius = 4;", cam: { x: 24, z: 37, yaw: 0.5, pitch: 0.8, radius: 4 }, frames: 20 },
+  { name: 'linked-skirt-and-sensor-close', time: 10, season: 'summer', setup: linkedSetup + eye(10, 36, 14, 40, 0.22, 0.1, 58), cam: { x: 14, z: 40, yaw: 0, pitch: 0.2, radius: 5 }, frames: 14 },
+];
