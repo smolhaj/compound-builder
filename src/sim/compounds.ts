@@ -156,3 +156,31 @@ export function passageEntry(s: GameState, r: () => number, organized: boolean):
 export function boltPassages(s: GameState): void {
   for (const r of s.perimeter) if (PERIMETER[r.kind].twoWay) r.unlocked = false;
 }
+
+/** A doorway in a yard wall where a walkway meets it: wide enough for the walk's frame (≈ 2.3 m). */
+export const DOORWAY_W = 0.38;
+
+/**
+ * Where a covered walkway's end meets a yard's ring of wall, cut a doorway
+ * (a gate) in that wall so people can walk through from yard to yard. The
+ * walkway is enclosed, so the doorway is part of the closed ring (a gate in a
+ * ring still counts as wall for the ring check), not a gap in the defense
+ * score. Adds the gate to the ring run; returns the rings opened.
+ */
+export function openDoorways(s: GameState, walk: PerimeterRun): string[] {
+  const opened: string[] = [];
+  const rings = s.perimeter.filter(r => r.id !== walk.id && PERIMETER[r.kind].blocks.people >= 0.5 && r.pts.length > 3 && !PERIMETER[r.kind].walkway
+    && Math.hypot(r.pts[0][0] - r.pts.at(-1)![0], r.pts[0][1] - r.pts.at(-1)![1]) < 0.6);
+  for (const end of [walk.pts[0], walk.pts[walk.pts.length - 1]]) {
+    let best: { r: PerimeterRun; s: number; d: number } | null = null;
+    for (const r of rings) { const n = nearest(r.pts, end[0], end[1]); if (n.d <= JOIN_REACH && (!best || n.d < best.d)) best = { r, s: n.s, d: n.d }; }
+    if (!best) continue;
+    const L = best.r.pts.reduce((a, p, i) => a + (i ? Math.hypot(p[0] - best!.r.pts[i - 1][0], p[1] - best!.r.pts[i - 1][1]) : 0), 0);
+    const at = Math.min(L - DOORWAY_W / 2, Math.max(DOORWAY_W / 2, best.s));
+    if (best.r.gates.some(g => Math.abs(g.at - at) < (g.w + DOORWAY_W) / 2)) continue;
+    best.r.gates.push({ at, w: DOORWAY_W });
+    // a wall already finished is cut through: its hours and bill are unchanged (a few panels fewer); the opening is framed by the walkway
+    opened.push(best.r.id);
+  }
+  return opened;
+}

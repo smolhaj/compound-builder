@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { newGame, type GameState } from './state';
-import { planRun, PERIMETER, type PerimeterKind, type PerimeterRun, type Pt } from './perimeter';
+import { planRun, PERIMETER, footingOf, type PerimeterKind, type PerimeterRun, type Pt } from './perimeter';
 import { enclosure } from './enclosure';
 import { coveredRoute, hatches, linkedGroups, links, passageEntry, setPassageLocked, tripExposed, yardRings } from './compounds';
 import { defenseReport } from './defenseReport';
@@ -95,5 +95,34 @@ describe('linked compounds: the underground passage', () => {
     setPassageLocked(g, p.id, true); p.revealed = true;
     expect(passageEntry(g, seq(0.3, 0.99), false)).not.toBeNull();
     expect(defenseReport(g).linked.some(c => c.id === `pass_${p.id}`)).toBe(true);
+  });
+});
+
+describe('doorways and footings', () => {
+  it('planning a walkway cuts a doorway in each yard wall where it meets, and the rings stay closed and covered', () => {
+    const { g, a, b, cx, cz } = twoYards();
+    const w = planRun(g, 'covered_walkway', [[cx - 5, cz], [cx + 5, cz]]);
+    w.done = w.hours; w.supplied = true; w.finishedAt = 0;
+    expect(a.gates).toHaveLength(1);
+    expect(b.gates).toHaveLength(1);
+    expect(a.gates[0].w).toBeGreaterThan(0.3);
+    // each doorway sits where the walkway's end meets the wall (the east side of yard a, the west side of yard b)
+    expect(a.gates[0].at).toBeGreaterThan(0);
+    expect(yardRings(g).map(r => r.id).sort()).toEqual([a.id, b.id].sort());
+    expect(coveredRoute(g, a.id, b.id)).toBe(true);
+    expect(defenseReport(g).homes.every(h => h.covered)).toBe(true);
+    // planning another from the same spot does not cut a second door
+    planRun(g, 'covered_walkway', [[cx - 5, cz + 0.05], [cx + 5, cz + 0.05]]);
+    expect(a.gates).toHaveLength(1);
+  });
+
+  it('every people-stopping wall tier stands on a footing that closes it to the ground', () => {
+    for (const k of Object.keys(PERIMETER) as PerimeterKind[]) {
+      const d = PERIMETER[k];
+      const needs = d.blocks.people > 0 && d.height > 0 && !d.walkway && !d.twoWay && !d.egressOnly && !['thorn_hedge', 'earth_berm', 'creek_bars'].includes(k);
+      expect(footingOf(k) !== null, k).toBe(needs);
+    }
+    expect(footingOf('container_wall')).toBe('plinth');
+    expect(footingOf('steel_wall')).toBe('curb');
   });
 });

@@ -486,11 +486,15 @@ const linkedSetup = `{ if (!window.__linked) { window.__linked = true;
   cb.game.setState(s => { const g = structuredClone(s.game);
     const done = (kind, pts) => { cb.__id = (cb.__id || 0) + 1; g.perimeter.push({ id: 'L' + cb.__id, kind, pts, gates: [], done: 1, hours: 1, supplied: true, finishedAt: 0 }); };
     for (const [id, x, z] of [['h1', 22, 40], ['h2', 46, 40]]) g.structures.push({ id, kind: 'farmhouse', x, z, rot: 0, stage: 99, done: 0, supplied: true, finishedAt: 0 });
-    done('container_wall', sq(22, 40, 8)); done('container_wall', sq(46, 40, 8)); 
-    done('covered_walkway', [[30, 44], [38, 44]]);
-    done('underground_passage', [[24, 37], [44, 37]]);
-    g.perimeter.find(r => r.pts[0][0] === 22 - 8 && r.kind === 'container_wall').skirtAt = 0;
+    done('container_wall', sq(22, 40, 8)); done('container_wall', sq(46, 40, 8));
     g.stock.ground_sensor = 2; g.utilities.lit = ['h1', 'h2'];
+    return { game: g }; });
+  // the walkway is planned through the sim, which cuts a doorway in each yard wall
+  cb.game.getState().planRun('covered_walkway', [[30, 44], [38, 44]], [], 0);
+  cb.game.getState().planRun('underground_passage', [[24, 37], [44, 37]], [], 0);
+  cb.game.setState(s => { const g = structuredClone(s.game);
+    for (const r of g.perimeter) { r.done = r.hours; r.supplied = true; r.finishedAt = 0; }
+    g.perimeter.find(r => r.kind === 'container_wall').skirtAt = 0;
     return { game: g }; }); } cb.qa.pose = null; }`;
 SETS.linked = [
   { name: 'linked-aerial-day', time: 12, season: 'summer', setup: linkedSetup + "cb.cam.target.set(34, 0, 41); cb.cam.yaw = 0.5; cb.cam.pitch = 0.6; cb.cam.radius = 34;", cam: { x: 34, z: 41, yaw: 0.5, pitch: 0.6, radius: 34 }, frames: 14 },
@@ -500,4 +504,18 @@ SETS.linked = [
   { name: 'linked-underground-passage', time: 11, season: 'summer', setup: linkedSetup + under + "const gy = cb.world.groundAt(34, 37); cb.cam.target.set(34, gy - 0.6, 37); cb.cam.yaw = 0.4; cb.cam.pitch = 0.45; cb.cam.radius = 12;", cam: { x: 34, z: 37, yaw: 0.4, pitch: 0.9, radius: 30 }, frames: 20 },
   { name: 'linked-underground-hatch-close', time: 11, season: 'summer', setup: linkedSetup + under + "cb.cam.target.set(24, 0, 37); cb.cam.yaw = 0.5; cb.cam.pitch = 0.8; cb.cam.radius = 4;", cam: { x: 24, z: 37, yaw: 0.5, pitch: 0.8, radius: 4 }, frames: 20 },
   { name: 'linked-skirt-and-sensor-close', time: 10, season: 'summer', setup: linkedSetup + eye(10, 36, 14, 40, 0.22, 0.1, 58), cam: { x: 14, z: 40, yaw: 0, pitch: 0.2, radius: 5 }, frames: 14 },
+  { name: 'linked-doorway-outside', time: 11, season: 'summer', setup: linkedSetup + eye(34, 52, 30, 44, 0.24, 0.22, 64), cam: { x: 34, z: 44, yaw: 0, pitch: 0.2, radius: 7 }, frames: 14 },
+  { name: 'linked-doorway-inside', time: 11, season: 'summer', setup: linkedSetup + eye(25, 44, 30, 44, 0.24, 0.22, 64), cam: { x: 30, z: 44, yaw: 0, pitch: 0.2, radius: 7 }, frames: 14 },
+];
+
+// a container wall on a slope near the camp, at eye level with the family in view: the plinth closes the gap under it
+const wallSlope = `{ if (!window.__wslope) { window.__wslope = true; const c = cb.world.camp, g = cb.world.groundAt; let best = null, bd = -1;
+      for (let a = 0; a < 6.28; a += 0.4) for (let r = 5; r <= 9; r += 2) { const x0 = c.x + Math.cos(a) * r, z0 = c.z + Math.sin(a) * r, x1 = x0 + 14, z1 = z0; let lo = 1e9, hi = -1e9; for (let k = 0; k <= 14; k++) { const h = g(x0 + k, z0); lo = Math.min(lo, h); hi = Math.max(hi, h); } if (hi - lo > bd) { bd = hi - lo; best = [x0, z0, x1, z1]; } }
+      window.__ws = best;
+      cb.game.setState(s => { const gm = structuredClone(s.game); gm.perimeter.push({ id: 'W1', kind: 'container_wall', pts: [[best[0], best[1]], [best[2], best[3]]], gates: [], done: 1, hours: 1, supplied: true, finishedAt: 0 }); return { game: gm }; }); }
+     }`;
+SETS.walls = [
+  { name: 'wall-slope-eye-person', time: 10, season: 'summer', setup: wallSlope + `{ const w = window.__ws, c = cb.world.camp, g = cb.world.groundAt; const mx = (w[0] + w[2]) / 2, mz = w[1]; const ex = mx - 1, ez = mz - 5;
+    cb.qa.pose = { x: ex, y: g(ex, ez) + 0.24, z: ez, lx: mx + 1, ly: g(mx + 1, mz) + 0.1, lz: mz, fov: 62 }; }`, cam: { x: C, z: C, yaw: 0, pitch: 0.2, radius: 7 }, frames: 40 },
+  { name: 'wall-slope-eye-along', time: 10, season: 'summer', setup: wallSlope + `{ const w = window.__ws, g = cb.world.groundAt; const ex = w[0] - 3, ez = w[1] - 1.6; cb.qa.pose = { x: ex, y: g(ex, ez) + 0.2, z: ez, lx: w[0] + 8, ly: g(w[0] + 8, w[1]) + 0.1, lz: w[1], fov: 70 }; }`, cam: { x: C, z: C, yaw: 0, pitch: 0.2, radius: 7 }, frames: 14 },
 ];

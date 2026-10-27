@@ -13,6 +13,7 @@
 import { hasAll, shortfall, MATERIALS, type MaterialId, type Stock } from './materials';
 import { log } from './economy';
 import type { GameState } from './state';
+import { openDoorways } from './compounds';
 
 export type PerimeterKind = 'split_rail' | 'barbed_wire' | 'woven_wire' | 'thorn_hedge' | 'log_palisade' | 'container_wall' | 'earth_berm' | 'ditch' | 'creek_bars' | 'chain_link' | 'wrought_iron' | 'iron_barbed' | 'steel_wall' | 'electric_steel' | 'water_pipe' | 'power_cable' | 'escape_tunnel' | 'covered_walkway' | 'underground_passage';
 
@@ -108,6 +109,25 @@ export const UPGRADE_NEXT: Partial<Record<PerimeterKind, PerimeterKind>> = {
   split_rail: 'barbed_wire', barbed_wire: 'woven_wire', woven_wire: 'chain_link', chain_link: 'wrought_iron',
   wrought_iron: 'iron_barbed', iron_barbed: 'steel_wall', steel_wall: 'electric_steel',
 };
+/**
+ * What a wall stands on so it is closed to the ground (no gap to crawl or
+ * walk under, on a slope or in a dip): every people-stopping fence and wall
+ * tier has one, drawn following the terrain (perimeterGeometry). Palisade
+ * logs are set in a trench, a hedge is rooted, a berm and a ditch are the
+ * ground itself, and creek bars are set in the bed.
+ */
+export type Footing = 'plinth' | 'curb' | 'mound' | 'trench';
+export function footingOf(kind: PerimeterKind): Footing | null {
+  const d = PERIMETER[kind];
+  if (d.walkway || d.twoWay || d.egressOnly || d.height <= 0 || d.blocks.people <= 0) return null;
+  switch (kind) {
+    case 'container_wall': return 'plinth';
+    case 'log_palisade': return 'trench';
+    case 'thorn_hedge': case 'earth_berm': case 'creek_bars': return null;
+    case 'split_rail': case 'barbed_wire': return 'mound';
+    default: return 'curb';
+  }
+}
 /** Share of the old tier's materials that comes back when its upgrade is finished. */
 export const SALVAGE = 0.5;
 
@@ -213,6 +233,7 @@ export function planRun(s: GameState, kind: PerimeterKind, pts: Pt[], gates: Gat
   const run: PerimeterRun = { id: `p${s.nextId++}`, kind, pts, gates, done: 0, hours, supplied: false, finishedAt: null };
   s.perimeter.push(run);
   log(s, `Laid out ${Math.round(len * 6)} m of ${PERIMETER[kind].name.toLowerCase()}.`);
+  if (PERIMETER[kind].walkway) openDoorways(s, run);
   return run;
 }
 

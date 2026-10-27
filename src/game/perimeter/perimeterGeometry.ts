@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { kitMaterial, type KitMaterialId } from '../buildkit/materials';
 import { worldUV } from '../buildkit/shell';
-import { PERIMETER, hasSkirt, runGrowth, runProgress, wallLength, type PerimeterRun, type Pt } from '../../sim/perimeter';
+import { PERIMETER, footingOf, hasSkirt, runGrowth, runProgress, wallLength, type PerimeterRun, type Pt } from '../../sim/perimeter';
 
 const M = 1 / 6;
 type Ground = (x: number, z: number) => number;
@@ -276,9 +276,13 @@ export function buildRun(run: PerimeterRun, ground: Ground, t: number, under: (x
         const len = Math.hypot(b.x - a.x, b.z - a.z);
         const samples = [0, 0.25, 0.5, 0.75, 1].map(f => ground(a.x + (b.x - a.x) * f, a.z + (b.z - a.z) * f));
         const y = Math.max(...samples) + 0.015;
-        for (const f of [0.03, 0.5, 0.97]) for (const side of [-1, 1]) {
-          const px = a.x + (b.x - a.x) * f - a.dz * side * W * 0.42, pz = a.z + (b.z - a.z) * f + a.dx * side * W * 0.42, gy = ground(px, pz) - 0.02;
-          if (y - gy > 0.005) add('concrete', new THREE.BoxGeometry(0.06, y - gy, 0.06).translate(px, gy + (y - gy) / 2, pz));
+        // a poured plinth under the whole container, following the terrain and filling the gap on slopes and dips: nothing to walk or crawl under
+        const nSub = Math.max(2, Math.ceil(len / 0.3));
+        for (let q = 0; q < nSub; q++) {
+          const f0 = q / nSub, f1 = (q + 1) / nSub;
+          const x0 = a.x + (b.x - a.x) * f0, z0 = a.z + (b.z - a.z) * f0, x1 = a.x + (b.x - a.x) * f1, z1 = a.z + (b.z - a.z) * f1;
+          const gy = Math.min(ground(x0, z0), ground(x1, z1), ground((x0 + x1) / 2, (z0 + z1) / 2)) - 0.05;
+          if (y - gy > 0.004) add('concrete', new THREE.BoxGeometry(Math.hypot(x1 - x0, z1 - z0) + 0.004, y - gy, W * 1.02).translate(0, (y - gy) / 2, 0).rotateY(-Math.atan2(z1 - z0, x1 - x0)).translate((x0 + x1) / 2, gy, (z0 + z1) / 2));
         }
         const g = new THREE.BoxGeometry(len - 0.02 * M, H, W).translate(0, H / 2, 0).rotateY(-Math.atan2(b.z - a.z, b.x - a.x)).translate((a.x + b.x) / 2, y, (a.z + b.z) / 2);
         add(m, g);
@@ -319,6 +323,21 @@ export function buildRun(run: PerimeterRun, ground: Ground, t: number, under: (x
     }
     default: break;  // berm, ditch: earthworks in the terrain
   }
+  // every wall tier is closed to the ground: a footing that follows the terrain (sim/perimeter footingOf)
+  const footing = run.finishedAt !== null || built > 0 ? footingOf(run.kind) : null;
+  if (footing && footing !== 'plinth' && footing !== 'trench') {
+    const mat: KitMaterialId = footing === 'curb' ? 'concrete' : 'earth';
+    const w = (footing === 'curb' ? 0.3 : 0.5) * M, h = (footing === 'curb' ? 0.2 : 0.25) * M;
+    for (const [s0, s1] of spans) {
+      const n = Math.max(1, Math.ceil((s1 - s0) / 0.3));
+      for (let i = 0; i < n; i++) {
+        const a = along(run.pts, s0 + (s1 - s0) * i / n), b = along(run.pts, s0 + (s1 - s0) * (i + 1) / n);
+        const lo = Math.min(ground(a.x, a.z), ground(b.x, b.z), ground((a.x + b.x) / 2, (a.z + b.z) / 2));
+        const hi = Math.max(ground(a.x, a.z), ground(b.x, b.z));
+        add(mat, new THREE.BoxGeometry(Math.hypot(b.x - a.x, b.z - a.z) + 0.004, hi - lo + h + 0.05, w).translate(0, (hi - lo + h + 0.05) / 2, 0).rotateY(-Math.atan2(b.z - a.z, b.x - a.x)).translate((a.x + b.x) / 2, lo - 0.05, (a.z + b.z) / 2));
+      }
+    }
+  }
   // a buried skirt shows as a darker poured collar at the foot of the wall, with a flush steel inspection plate every 12 m; the steel and concrete tiers already have their footing in the drawing
   if (run.finishedAt !== null && hasSkirt(run, t) && !def.deepFooting && def.height > 0 && !def.walkway) {
     for (const [s0, s1] of spans) {
@@ -345,6 +364,11 @@ export function buildRun(run: PerimeterRun, ground: Ground, t: number, under: (x
       const p0 = along(run.pts, g.at - g.w / 2), p1 = along(run.pts, g.at + g.w / 2);
       const tall = Math.max(1.4 * M, Math.abs(def.height) + 0.05 * M);
       for (const p of [p0, p1]) post(p.x, p.z, tall, 0.1 * M, 'wood_dark', true);
+      // a framed doorway: a steel lintel across the posts (the opening where a walkway meets a yard wall reads as a real door, from both sides)
+      if (g.w <= 0.45 && def.height >= 0.4) {
+        for (const p of [p0, p1]) post(p.x, p.z, def.height + 0.08 * M, 0.1 * M, 'steel');
+        beam(p0.x, p0.z, p1.x, p1.z, def.height, 0.14 * M, 0.3 * M, 'steel');
+      }
       const wall = run.kind === 'log_palisade' || run.kind === 'container_wall';
       const leafH = wall ? Math.abs(def.height) * 0.95 : 1.3 * M;
       const ang = -Math.atan2(p0.dz, p0.dx);
