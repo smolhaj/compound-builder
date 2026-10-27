@@ -466,3 +466,16 @@ SETS.tiers = [
   { name: 'tiers-low-1', time: 11, season: 'summer', setup: tiersSetup, cam: { x: 17, z: 54, yaw: 0.35, pitch: 0.14, radius: 7.5 }, frames: 12 },
   { name: 'tiers-low-2', time: 11, season: 'summer', setup: tiersSetup, cam: { x: 47, z: 54, yaw: 0.35, pitch: 0.14, radius: 7.5 }, frames: 12 },
 ];
+
+// eye level (a person is ~0.28 tall): the fence tiers from the ground, and the creek barred
+const eye = (x, z, lx, lz, dy = 0.26, ly = 0.2, fov = 62) => `{ const g = cb.world.groundAt; cb.qa.pose = { x: ${x}, y: g(${x}, ${z}) + ${dy}, z: ${z}, lx: ${lx}, ly: g(${lx}, ${lz}) + ${ly}, lz: ${lz}, fov: ${fov} }; }`;
+SETS.defenses = [
+  { name: 'eye-tiers-1-split-to-chainlink', time: 11, season: 'summer', setup: tiersSetup + eye(4, 52.2, 30, 54.4), cam: { x: 33, z: 54, yaw: 0, pitch: 0.3, radius: 20 }, frames: 12 },
+  { name: 'eye-tiers-2-wrought-to-electric', time: 11, season: 'summer', setup: tiersSetup + eye(26, 52.2, 56, 54.4), cam: { x: 33, z: 54, yaw: 0, pitch: 0.3, radius: 20 }, frames: 12 },
+  { name: 'eye-steel-and-electric-close', time: 11, season: 'summer', setup: tiersSetup + eye(42, 52.6, 52, 54.2, 0.22, 0.25, 58), cam: { x: 33, z: 54, yaw: 0, pitch: 0.3, radius: 20 }, frames: 12 },
+  { name: 'eye-creek-bars', time: 11, season: 'summer', setup: `{ if (!window.__bars) { window.__bars = true; const G = cb.game, c = cb.world.parcel.creek, x = 20, z = c.zAt(x);
+      G.getState().planRun('creek_bars', [[x, z - 2.6], [x, z + 2.6]], [], 0);
+      G.setState(s => { const g = structuredClone(s.game); for (const r of g.perimeter) { r.done = r.hours; r.supplied = true; r.finishedAt = 0; } return { game: g }; }); } const g = cb.world.groundAt, c = cb.world.parcel.creek, z = c.zAt(20);
+      cb.qa.pose = { x: 15.5, y: g(15.5, z - 3.2) + 0.3, z: z - 3.2, lx: 20, ly: g(20, z) + 0.15, lz: z + 0.4, fov: 62 }; }`, cam: { x: 33, z: 54, yaw: 0, pitch: 0.3, radius: 20 }, frames: 14 },
+  { name: 'aerial-creek-bars', time: 11, season: 'summer', setup: `{ const c = cb.world.parcel.creek; cb.qa.pose = null; cb.cam.target.set(20, 0, c.zAt(20)); cb.cam.radius = 9; cb.cam.pitch = 0.7; cb.cam.yaw = 0.5; }`, cam: { x: 20, z: 40, yaw: 0.5, pitch: 0.7, radius: 9 }, frames: 12 },
+];
