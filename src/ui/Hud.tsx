@@ -706,6 +706,7 @@ export function Hud() {
         </select>
         <span style={{ opacity: 0.7 }}>Sightlines</span>
         {SIGHTS.map(([m, label, tip]) => <button key={m} title={tip} style={btn(w.sightMode === m)} onClick={() => w.setSightMode(m)}>{label}</button>)}
+        <button style={btn(w.showBoundary)} title="Draw the property line on the ground (it also shows while you draw a fence or wall)" onClick={() => w.setShowBoundary(!w.showBoundary)}>Boundary</button>
         <button style={btn(w.photo)} onClick={() => w.setPhoto(!w.photo)}>Photo</button>
         {w.photo && <>
           <span>{clock(w.timeOfDay)}</span>

@@ -45,6 +45,12 @@ function farmhouse(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Grou
     I({ x: 0.0, z: -0.55 }, a => Furniture.diningTable(a));
     // the stair up along the right wall
     I({ x: right - 0.1, z: 0.05 }, a => Furniture.stairs(a, up / M, 3.6, 0.85));
+    // the bathroom, a 1950s addition off the kitchen (back right): a tub along the right wall, a toilet and a washstand
+    c.partition(0.46, back, 0.46, -0.5, [], 'whitewash');
+    c.partition(0.46, -0.5, right, -0.5, [{ at: 0.0, w: 0.13, sill: 0, h: 0.36 }], 'whitewash');
+    if (o.plumbed) I({ x: right - 0.07, z: back + 0.3, rot: Math.PI / 2 }, a => Furniture.tub(a));
+    I({ x: 0.6, z: back + 0.04 }, a => (o.plumbed && o.septic ? Furniture.flushToilet(a) : Furniture.toilet(a)));
+    I({ x: 0.5, z: -0.62, rot: Math.PI / 2 }, a => Furniture.washstand(a));
     // upstairs: two bedrooms
     L({ x: -0.35, z: back + 0.2, y: yU }, a => Furniture.bed(a, true, 'quilt_red'));
     L({ x: 0.25, z: back + 0.2, y: yU }, a => Furniture.bed(a, false, 'quilt_blue'));
@@ -82,6 +88,11 @@ function trailer(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group 
     I({ x: 0.15, z: -0.75 }, a => Furniture.single(a, 'quilt_blue'));
     c.partition(left, -0.5, right, -0.5, [{ at: 0.25, w: 0.14, sill: 0, h: 0.36 }], 'pine_panel');
     c.partition(left, -1.05, right, -1.05, [{ at: -0.25, w: 0.14, sill: 0, h: 0.36 }], 'pine_panel');
+    // the bath: the left half of the middle room, a toilet and a washstand against the back wall, a shower by the front one
+    c.partition(-0.1, -1.05, -0.1, -0.5, [{ at: 0.15, w: 0.14, sill: 0, h: 0.36 }], 'pine_panel');
+    I({ x: -0.38, z: -1.03 }, a => (o.plumbed && o.septic ? Furniture.flushToilet(a) : Furniture.toilet(a)));
+    I({ x: -0.22, z: -1.03 }, a => Furniture.washstand(a));
+    if (o.plumbed) I({ x: -0.4, z: -0.58, rot: Math.PI }, a => Furniture.shower(a));
     c.C({ x: right + 0.18, z: -1.0, y: 0.004 }, a => Clutter.bike(a), 0.5);
     c.C({ x: left - 0.15, z: 0.6, y: 0.004 }, a => Clutter.choppingBlock(a), 0.5);
     void y0;
