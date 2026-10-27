@@ -2,8 +2,10 @@ import * as THREE from 'three';
 
 /**
  * Diorama orbit camera: drag to rotate (left) or pan (right / shift), wheel to
- * zoom. State is plain numbers so QA can set it directly.
+ * zoom; the arrow keys pan (Shift = faster). State is plain numbers so QA can set it directly.
  */
+const ARROWS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+
 export class DioramaCamera {
   target = new THREE.Vector3();
   yaw = Math.PI / 4;
@@ -21,6 +23,8 @@ export class DioramaCamera {
   enabled = true;
   private _drag: { x: number; y: number; pan: boolean } | null = null;
   private readonly _off: Array<() => void> = [];
+  /** Arrow keys held (pan the view; Shift = faster). */
+  private readonly _keys = new Set<string>();
 
   constructor(el: HTMLElement) {
     const on = <K extends keyof HTMLElementEventMap>(t: K, f: (e: HTMLElementEventMap[K]) => void, o?: AddEventListenerOptions) => {
@@ -49,11 +53,36 @@ export class DioramaCamera {
         this.pitch = Math.min(1.45, Math.max(0.05, this.pitch + dy * 0.004));
       }
     });
+    const typing = (e: KeyboardEvent) => e.target instanceof HTMLElement && (e.target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName));
+    const onDown = (e: KeyboardEvent) => {
+      if (!ARROWS.includes(e.code) || typing(e) || e.ctrlKey || e.metaKey || e.altKey) return;
+      this._keys.add(e.code);
+      if (this.enabled) e.preventDefault();
+    };
+    const onUp = (e: KeyboardEvent) => { this._keys.delete(e.code); };
+    const onBlur = () => this._keys.clear();
+    window.addEventListener('keydown', onDown);
+    window.addEventListener('keyup', onUp);
+    window.addEventListener('blur', onBlur);
+    this._off.push(() => { window.removeEventListener('keydown', onDown); window.removeEventListener('keyup', onUp); window.removeEventListener('blur', onBlur); });
     on('wheel', e => {
       if (!this.enabled) return;
       e.preventDefault();
       this.radius = Math.min(this.maxRadius, Math.max(this.minRadius, this.radius * Math.exp(e.deltaY * 0.0012)));
     }, { passive: false });
+  }
+
+  /** Pan with the arrow keys, relative to where the camera looks (call once a frame). Shift is faster. */
+  step(dt: number, fast = false): void {
+    if (!this.enabled || !this._keys.size) return;
+    const k = this._keys;
+    const fwd = (k.has('ArrowUp') ? 1 : 0) - (k.has('ArrowDown') ? 1 : 0);
+    const right = (k.has('ArrowRight') ? 1 : 0) - (k.has('ArrowLeft') ? 1 : 0);
+    if (!fwd && !right) return;
+    const sp = this.radius * (fast ? 1.6 : 0.6) * Math.min(dt, 0.1);
+    const s = Math.sin(this.yaw), c = Math.cos(this.yaw);
+    this.target.x += (-s * fwd + c * right) * sp;
+    this.target.z += (-c * fwd - s * right) * sp;
   }
 
   /**

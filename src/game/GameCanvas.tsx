@@ -105,6 +105,10 @@ export function GameCanvas() {
       if (e.code === 'KeyU' && !(e.target instanceof HTMLInputElement)) useWorldStore.getState().setUnderground(!useWorldStore.getState().underground);
     };
     window.addEventListener('keydown', onKey);
+    let shiftDown = false;
+    const onShift = (e: KeyboardEvent) => { shiftDown = e.shiftKey; };
+    window.addEventListener('keydown', onShift);
+    window.addEventListener('keyup', onShift);
 
     const resize = () => {
       const w = canvas.clientWidth, h = canvas.clientHeight;
@@ -166,10 +170,14 @@ export function GameCanvas() {
     let battleSkip = useBattleStore.getState().skipReq, battleSync = 0;
     let battleView: { x: number; z: number; radius: number; pitch: number } | null = null;
     const qa: { frames: number; frameMs: number; pose: null | { x: number; y: number; z: number; lx: number; ly: number; lz: number; fov?: number } } = { frames: 0, frameMs: 0, pose: null };
+    let slow = 0;
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
       const t0 = performance.now();
       const dt = Math.min(0.1, (now - last) / 1000);
+      // a slow machine on High (SSAO, 2× pixels) steps down to Medium by itself after ~5 s under 40 fps
+      slow = dt > 0.025 ? slow + dt : Math.max(0, slow - dt * 2);
+      if (slow > 5 && useWorldStore.getState().quality === 'high') { useWorldStore.getState().setQuality('medium'); slow = 0; }
       last = now;
       // the sim advances in real time at its speed; the view clock follows it (outside photo mode)
       // the clock stands still while the new-game screen is up
@@ -243,6 +251,7 @@ export function GameCanvas() {
         ws.camera.updateProjectionMatrix();
         ws.setShadowFocus(p.x, p.z, 6);
       } else {
+        cam.step(dt, shiftDown);
         cam.apply(ws.camera);
         occluders.keepOut(ws.camera, cam.target.x, cam.target.z, cam.target.y);
         // looking down, fit the shadows to the ground actually on screen (the far edge of the view
@@ -295,6 +304,8 @@ export function GameCanvas() {
       window.removeEventListener('resize', resize);
       unsub.forEach(u => u());
       window.removeEventListener('keydown', onKey);
+      window.removeEventListener('keydown', onShift);
+      window.removeEventListener('keyup', onShift);
       battle.dispose();
       tour.dispose();
       tool.dispose();
