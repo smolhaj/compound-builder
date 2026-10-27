@@ -66,9 +66,13 @@ try {
     return { seed: best.seed, snags: best.snags, fled: best.fled, result: b.result, duration: b.duration, times, left: b.leftBehind };
   }, [kind, raiders]);
   console.log(JSON.stringify(info));
+  await page.waitForFunction(() => window.__cb.battle.playing, null, { polling: 200 });
   let n = 0;
   for (const t of info.times) {
-    await page.waitForFunction(t => window.__cb.battle.time >= t, t, { polling: 150 });
+    // run the battle clock forward without drawing every frame, then let a couple of frames render the moment
+    await page.evaluate(t => { const b = window.__cb.battle; b.update(0.05); while (b.time < t) b.update(0.1); const cam = window.__cb.cam; cam.radius = 5; cam.pitch = 0.2; }, t);
+    const f0 = await page.evaluate(() => window.__cb.qa.frames);
+    await page.waitForFunction(x => window.__cb.qa.frames >= x, f0 + 4, { polling: 200 });
     const png = await page.evaluate(() => document.querySelector('canvas').toDataURL('image/png'));
     const f = `${outDir}/${String(++n).padStart(2, '0')}-t${Math.round(t)}s.png`;
     writeFileSync(f, Buffer.from(png.split(',')[1], 'base64'));
