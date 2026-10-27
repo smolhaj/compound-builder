@@ -8,7 +8,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { dayIndex, type GameState } from '../sim/state';
 import {
-  ageText, allDogs, bondOf, careHours, careNow, COATS, coatName, dogWatch, giveTreat, livingDogs, neuterDog, rehomeDog, setAutoCare, setCaretaker, setGuard, stageOf, temperOf,
+  ageText, allDogs, bondOf, careHours, careNow, COATS, coatName, dogWatch, findHomes, giveTreat, livingDogs, neuterDog, rehomeDog, setAutoCare, setCaretaker, setGuard, stageOf, temperOf,
   TRAIT_TEXT, vetNeed, type Dog, type PetDuty, type Temper,
 } from '../sim/pets';
 
@@ -66,6 +66,7 @@ function DogCard({ game, d }: { game: GameState; d: Dog }) {
     <div style={{ display: 'flex', gap: 4, marginTop: 4, alignItems: 'center' }}>
       <button style={btn(d.guard)} title={d.guard ? 'Guards a post at the line: warns, deters, and can be hurt in a fight. Click to keep it inside.' : 'Kept inside with the family: warns but is safe. Click to put it on guard.'} onClick={() => money(g => setGuard(g, d.id, !d.guard))}>{d.guard ? 'On guard' : 'Stays inside'}</button>
       {!d.fixed && <button style={{ ...btn(), opacity: 0.7 }} title="Spay / neuter at the vet (no puppies)" onClick={() => money(g => neuterDog(g, d.id))}>Fix</button>}
+      {st === 'puppy' && <button style={{ ...btn(), opacity: 0.7 }} title="Find the puppy a good home with the neighbors (a little goodwill; the children will miss it)" onClick={() => money(g => findHomes(g, d.id))}>Find a home</button>}
       <button style={{ ...btn(), opacity: 0.7 }} title="Find it another home. Everyone will miss it." onClick={() => { if (window.confirm(`Give ${d.name} away? The family will grieve.`)) money(g => rehomeDog(g, d.id)); }}>Rehome</button>
     </div>
   </div>;

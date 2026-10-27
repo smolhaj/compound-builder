@@ -214,7 +214,7 @@ export function makeDog(s: GameState, o: NewDogOpts = {}): Dog {
     id: `d${n}`, name, breed, tone: Math.floor(r() * 3), sex, trait: pick(r, TRAITS), born: Math.round(day - age * 365),
     health: 100, hunger: 5, thirst: 0, mood: 65, play: 50, exercise: 50, training: o.training ?? (o.puppy ? 0 : 20 + Math.round(r() * 20)),
     vax: o.puppy ? -9999 : day - Math.floor(r() * 300), worms: Math.round(r() * 15), sick: null, injury: null, bonds: {}, caretaker: null,
-    guard: o.guard ?? !o.puppy, fixed: false, due: null, heat: day + 30 + Math.floor(r() * 150), mourning: 0, done: {}, starved: 0, died: null,
+    guard: o.guard ?? false, fixed: false, due: null, heat: day + 30 + Math.floor(r() * 150), mourning: 0, done: {}, starved: 0, died: null,
   };
 }
 
@@ -230,7 +230,7 @@ export function adoptDog(s: GameState, o: NewDogOpts = {}): Dog {
 export function migrateDogs(raw: { seed: number; clock: { t: number }; stock: Record<string, number>; people: Array<{ id: string; kid: boolean }> }): { dogs: Dog[]; petLife: PetLife } {
   const n = Math.max(0, Math.floor(raw.stock.dog ?? 0));
   const s = { seed: raw.seed, clock: raw.clock, people: raw.people, dogs: [] as Dog[], petLife: newPetLife() } as unknown as GameState;
-  for (let i = 0; i < n; i++) adoptDog(s, { ageYears: 2 + (i % 4), training: 50, guard: true });
+  for (let i = 0; i < n; i++) adoptDog(s, { ageYears: 2 + (i % 4), training: 50, guard: false });
   return { dogs: s.dogs ?? [], petLife: s.petLife ?? newPetLife() };
 }
 
@@ -474,6 +474,27 @@ export function rehomeDog(s: GameState, id: string): string | null {
   return null;
 }
 
+/**
+ * Find a puppy a home with the neighbors: it goes to a good family nearby (a
+ * little goodwill with them), and it is still a loss: grief by bond, like any
+ * rehome, but lighter than losing it for good.
+ */
+export function findHomes(s: GameState, id: string): string | null {
+  const d = dogById(s, id); if (!d || d.died != null) return 'No such dog.';
+  if (stageOf(d, today(s)) !== 'puppy') return `${d.name} is too old to be a puppy to give away.`;
+  const hosts = s.neighbors.filter(n => n.status === 'home');
+  d.died = today(s); d.cause = 'went to a neighbor';
+  grieve(s, d, 0.5, 1);
+  const L = life(s); L.lost.unshift({ name: d.name, day: d.died, cause: 'went to a neighbor' }); L.lost.length = Math.min(L.lost.length, 10);
+  const h = hosts.length ? hosts[(d.born % hosts.length + hosts.length) % hosts.length] : null;
+  if (h) { h.disposition = Math.min(100, h.disposition + 4); log(s, `${d.name} went to live with the ${h.name}s. They were delighted; the children said goodbye.`); }
+  else log(s, `${d.name} went to a new home. The children said goodbye.`);
+  return null;
+}
+
+/** Dogs that have a bed (a blanket counts; a doghouse is a bed too): the first N dogs. */
+export const hasBed = (s: GameState, d: Dog): boolean => livingDogs(s).indexOf(d) < Math.floor((s.stock.dogbed ?? 0) + (s.stock.doghouse ?? 0));
+
 // ─────────────────────────────────────────────────────────────────────────
 // Grief, and the dogs' lift to morale
 // ─────────────────────────────────────────────────────────────────────────
@@ -655,7 +676,7 @@ export function petsDay(s: GameState): string[] {
     // the mood it settles to
     const b = bondOf(d).v;
     let target = 50 + b * 0.15 + (d.play >= 40 ? 8 : d.play < 20 ? -10 : 0) * (d.trait === 'playful' ? 1.4 : 1) + (d.exercise >= 40 ? 6 : d.exercise < 20 ? -8 : 0)
-      + (d.hunger < 25 ? 4 : d.hunger > 50 ? -15 : 0) + (d.thirst > 50 ? -10 : 0) + (d.health < 50 ? -10 : 0) + (cold ? -10 : 0) + (d.training >= 50 ? 3 : 0) - d.mourning * 0.35
+      + (d.hunger < 25 ? 4 : d.hunger > 50 ? -15 : 0) + (d.thirst > 50 ? -10 : 0) + (d.health < 50 ? -10 : 0) + (cold ? -10 : 0) + (d.training >= 50 ? 3 : 0) - (hasBed(s, d) ? 0 : 6) - d.mourning * 0.35
       + (d.trait === 'timid' && post ? -4 : 0);
     target = Math.max(0, Math.min(100, target));
     d.mood = Math.max(0, Math.min(100, d.mood + (target - d.mood) * 0.3));

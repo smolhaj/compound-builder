@@ -57,7 +57,7 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   // 42 → 43: dogs are named family pets (each old guard dog in the stockpile becomes a named adult dog), and the new dog goods start at zero
   42: s => {
     const { dogs, petLife } = migrateDogs(s as unknown as Parameters<typeof migrateDogs>[0]);
-    return { ...s, version: 43, dogs, petLife, stock: { puppy: 0, kibble: 0, doghouse: 0, ...(s.stock as object), dog: 0 } };
+    return { ...s, version: 43, dogs, petLife, stock: { puppy: 0, kibble: 0, dogbed: 0, doghouse: 0, ...(s.stock as object), dog: 0 } };
   },
   // 41 → 42: perimeter runs may carry `replaces` (an upgrade of a finished run in place); none yet
   41: s => ({ ...s, version: 42 }),

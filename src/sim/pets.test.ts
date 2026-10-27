@@ -5,7 +5,7 @@ import { addFood } from './pantry';
 import { gearPosture } from './gear';
 import { dogEffects } from './../sim/pets';
 import {
-  adoptDog, assignCare, bondOf, careHours, careNow, dogCount, dogsInBattle, dogWatch, killDog, makeDog, petsDay, rehomeDog, setCaretaker, setGuard, stageOf, ageYears,
+  adoptDog, findHomes, hasBed, assignCare, bondOf, careHours, careNow, dogCount, dogsInBattle, dogWatch, killDog, makeDog, petsDay, rehomeDog, setCaretaker, setGuard, stageOf, ageYears,
 } from './pets';
 
 /** A game with the stores shut (so the dogs eat from the family's own food), after `days` days. */
@@ -27,7 +27,7 @@ describe('dogs as named pets', () => {
     const up = migrate(raw);
     expect(up.version).toBe(SAVE_VERSION);
     expect(up.dogs).toHaveLength(2);
-    expect(up.dogs.every(d => d.name.length > 1 && d.died == null && d.guard)).toBe(true);
+    expect(up.dogs.every(d => d.name.length > 1 && d.died == null && !d.guard)).toBe(true);
     expect(new Set(up.dogs.map(d => d.name)).size).toBe(2);
     expect(up.stock.dog).toBe(0);
     expect(up.stock.kibble).toBe(0);
@@ -223,5 +223,30 @@ describe('dogs as named pets', () => {
     expect(e.play).toBeGreaterThan(50);
     expect(careNow(h, e.id, 'feed')).toBeNull();
     expect(careNow(h, e.id, 'feed')).toMatch(/already/);
+  });
+
+  it('every adopted dog starts inside: the player posts it', () => {
+    const g = newGame(2); const d = adoptDog(g); const p = adoptDog(g, { puppy: true });
+    expect(d.guard).toBe(false); expect(p.guard).toBe(false);
+    expect(dogWatch(g)).toMatchObject({ onPost: 0, deter: 0 });
+  });
+
+  it('a puppy can be given to the neighbors: goodwill, and still some grief; older dogs cannot', () => {
+    const g = newGame(4); g.clock.t = 400;
+    const pup = adoptDog(g, { puppy: true }), old = adoptDog(g, { ageYears: 3 });
+    pup.bonds[g.people[2].id] = 80;
+    const before = g.neighbors.reduce((a, n) => a + n.disposition, 0);
+    expect(findHomes(g, old.id)).toMatch(/too old/);
+    expect(findHomes(g, pup.id)).toBeNull();
+    expect(pup.died).not.toBeNull();
+    expect(g.neighbors.reduce((a, n) => a + n.disposition, 0)).toBeGreaterThan(before);
+    expect(g.petLife!.grief[g.people[2].id]).toBeGreaterThan(g.petLife!.grief[g.people[0].id]);
+  });
+
+  it('a dog without a bed is a little less happy; a blanket counts', () => {
+    const run2 = (beds: number) => { const g = shut(6); g.stock.kibble = 50; g.stock.dogbed = beds; const d = adoptDog(g, { ageYears: 3 }); run(g, 20); return { g, d }; };
+    const a = run2(0), b = run2(1);
+    expect(hasBed(a.g, a.d)).toBe(false); expect(hasBed(b.g, b.d)).toBe(true);
+    expect(b.d.mood).toBeGreaterThan(a.d.mood + 2);
   });
 });

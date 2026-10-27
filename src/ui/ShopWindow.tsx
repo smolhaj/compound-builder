@@ -25,7 +25,7 @@ const SHELVES: Record<Exclude<Tab, 'metals' | 'money' | 'guns'>, MaterialId[]> =
   bunker: ['rebar', 'membrane', 'container', 'blast_door', 'blast_valve', 'nbc_filter', 'filter_set', 'culvert', 'egress_hatch', 'lead_sheet', 'faraday_mesh'],
   water: ['water_jugs', 'ibc_tote', 'water_trailer', 'water_filter', 'ro_system', 'softener', 'greywater', 'pipe', 'cable', 'fixtures', 'pump', 'drilling', 'tank', 'septic_tank', 'solar_panel', 'battery', 'inverter', 'generator'],
   food: ['seed', 'lids', 'fishing_gear', 'snares', 'smoker', 'goat', 'pig', 'steer', 'rabbit', 'hay', 'feed'],
-  household: ['meds', 'hygiene', 'traps', 'kibble', 'doghouse'],
+  household: ['meds', 'hygiene', 'traps', 'kibble', 'dogbed', 'doghouse'],
   fuel: ['fuel', 'stabilizer', 'firewood', 'excavator', 'plow', 'gun_safe', 'gun_cleaning'],
   defense: [...KIT_GOODS, ...WATCH_GOODS, ...HARDEN_GOODS],
 };
@@ -102,6 +102,7 @@ function Icon({ id, tint }: { id: string; tint?: number }) {
     case 'driveway_alarm': case 'tripwire': return g(<><path d="M6 30 h32" stroke="#888" strokeDasharray={id === 'tripwire' ? '2 2' : undefined} /><rect x="16" y="14" width="12" height="12" rx="2" fill="#3a6a9a" /></>);
     case 'floodlights': return g(<><path d="M14 14 l10 6 v6 l-10 6 z" fill="#555" /><path d="M24 20 l14 -6 v20 l-14 -6" fill="#ffe08a" opacity="0.8" /></>);
     case 'puppy': return g(<><ellipse cx="22" cy="28" rx="10" ry="6" fill="#d8b878" /><circle cx="14" cy="22" r="6" fill="#d8b878" /><ellipse cx="9" cy="18" rx="2.5" ry="4" fill="#9a7a48" /><circle cx="12" cy="21" r="1" fill="#222" /><circle cx="11" cy="25" r="1.4" fill="#222" /></>);
+    case 'dogbed': return g(<><ellipse cx="22" cy="28" rx="14" ry="7" fill="#7a6a9a" /><ellipse cx="22" cy="26" rx="10" ry="4" fill="#a898c8" /></>);
     case 'kibble': return bag('#a86a3a', 'DOG');
     case 'doghouse': return g(<><path d="M8 34 V22 L22 10 L36 22 V34 Z" fill="#a8774a" stroke="#4a3018" /><path d="M17 34 v-9 a5 5 0 0 1 10 0 v9 z" fill="#2a1e10" /></>);
     case 'dog': return g(<path d="M10 30 v-10 l6 -6 h4 l2 -4 l4 4 v6 h10 v10 h-4 v-6 h-14 v6 z" fill="#8a6a40" />);
