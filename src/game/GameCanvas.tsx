@@ -199,6 +199,7 @@ export function GameCanvas() {
         const cal = calendarOf(game.clock);
         useWorldStore.getState().syncClock(hourOf(game.clock.t), cal.doy, game.clock.t);
       }
+      world.powered = game.utilities.lit.length > 0 || (game.utilities.grid && game.disaster.tracks.grid > 0.5);
       world.syncProgress(game.structures);
       world.syncFood(game);
       world.syncForestry(game.forestry);

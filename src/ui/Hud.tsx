@@ -26,7 +26,7 @@ import { chimneyState, greenRicks, SEASON_DAYS, SWEEP_USD } from '../sim/upkeep'
 import { countyWorks, needsPermit, permitFee, premium, yearlyTax } from '../sim/paperwork';
 import { DRIVE_PER_FT, driveQuote, fixBill, fixBlocked, fixDef, hookupProblem, pendingFixes, POLE_PER_FT, powerQuote } from '../sim/improvements';
 import { BLUEPRINTS, homeBeds, totalBill, totalHours } from '../sim/blueprints';
-import { BUNKER_ORDER, KIT, UTILITY_ORDER } from '../game/buildkit/kit';
+import { BUNKER_ORDER, KIT, TOWER_ORDER, UTILITY_ORDER } from '../game/buildkit/kit';
 import { FIT, fitProblem, plant, serviceOf, FUEL_UNIT_L, UTILITY, SPARE_FOR, storageCapacity } from '../sim/utilities';
 import { bestShelter, doseRate, isNuclear, SHELTER_DAYS } from '../sim/nuclear';
 import { DISASTERS, TRACKS, TRACK_NAME, type DisasterKind } from '../sim/disaster';
@@ -45,6 +45,8 @@ import { EXPOSURE_NAME, exposure, raidPressure, topExposure } from '../sim/opsec
 import { acresOf, buyProblem, LAND_NAME, priceOf } from '../sim/land';
 import { HARDEN, HARDEN_IDS, type TierDef, hardenCost, hardenProblem, isBunkerRoom, protectionOf, tierOf } from '../sim/hardening';
 import { defenseReport, type Check } from '../sim/defenseReport';
+import { TOWERS, TOWER_NEXT, isTower, towerBill, towerUpgradeProblem } from '../sim/towers';
+import { STRUCTURE_SALVAGE, isFinished as structFinished } from '../sim/construction';
 import { PERIMETER, PERIMETER_ORDER, SALVAGE, UPGRADE_NEXT, UTILITY_LINES, upgradeProblem, wallLength, runBill, runHours, runFinished, runProgress, runBlocked, runGrowth } from '../sim/perimeter';
 import { PantryPanel } from './PantryPanel';
 
@@ -129,6 +131,7 @@ const BUILD_GROUPS: Array<[string, string, readonly string[]]> = [
   ['home', 'Home & work', ['timber_cabin', 'log_house', 'cottage', 'outhouse', 'workshop', 'metal_garage', 'barn']],
   ['food', 'Food', ['garden', 'greenhouse', 'orchard', 'field', 'chicken_coop', 'root_cellar']],
   ['water', 'Water & power', UTILITY_ORDER],
+  ['defense', 'Watch towers', TOWER_ORDER],
 ];
 
 /** Free build: start any disaster when you are ready. */
@@ -769,6 +772,21 @@ function DefenseTab() {
         return <div key={r.id} style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '3px 0' }}>
           <span style={{ flex: 1 }}>{PERIMETER[r.kind].name} <span style={{ color: DIM }}>({Math.round(len * 6)} m)</span> <span style={{ color: DIM }}>→</span> {PERIMETER[next].name}</span>
           <button style={btn(false)} disabled={!!why} title={why ?? `${Math.round(runHours(next, len))} h of work; about ${usd(net)} after the salvage of the old one (${Math.round(SALVAGE * 100)}% of its materials back)`} onClick={() => { const w = useGameStore.getState().upgradeRun(r.id); if (w) alert(w); }}>{why ? 'Under way' : `Upgrade ~${usd(net)}`}</button>
+        </div>;
+      })}
+    </Section>
+    <Section title="Upgrade the towers">
+      <Note>A watch tower goes: rise &amp; lookout, wooden tower, concrete &amp; steel, floodlights, a manned mounted gun, an automated turret. The next tier rises beside the old one, which keeps watch until it is up.</Note>
+      {game.structures.every(st => !isTower(st.kind)) && <Note>No tower yet. Build a rise &amp; lookout from the Build menu (Watch towers).</Note>}
+      {game.structures.filter(st => isTower(st.kind) && structFinished(st)).map(st => {
+        const def = TOWERS[st.kind as keyof typeof TOWERS], nk = TOWER_NEXT[st.kind];
+        if (!nk) return <div key={st.id} style={{ padding: '3px 0' }}>{def.name} <span style={{ color: DIM }}>(tier {def.tier} of 6, the last)</span></div>;
+        const price = (bill: ReturnType<typeof towerBill>, f: number) => orderCost(Object.entries(bill).filter(([m]) => MATERIALS[m as MaterialId].price !== null).map(([material, qty]) => ({ material: material as MaterialId, qty: Math.ceil((qty as number) * f) })));
+        const net = Math.max(0, price(towerBill(nk), 1) - price(towerBill(st.kind as keyof typeof TOWERS), STRUCTURE_SALVAGE));
+        const why = towerUpgradeProblem(game, st);
+        return <div key={st.id} style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '3px 0' }}>
+          <span style={{ flex: 1 }}>{def.name} <span style={{ color: DIM }}>(tier {def.tier})</span> <span style={{ color: DIM }}>→</span> {TOWERS[nk].name}</span>
+          <button style={btn(false)} disabled={!!why} title={why ?? `${TOWERS[nk].blurb} About ${usd(net)} after the salvage of the old one (${Math.round(STRUCTURE_SALVAGE * 100)}% of its materials back).`} onClick={() => { const w = useGameStore.getState().upgradeTower(st.id); if (w) alert(w); }}>{why ? 'Under way' : `Upgrade ~${usd(net)}`}</button>
         </div>;
       })}
     </Section>

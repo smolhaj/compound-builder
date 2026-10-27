@@ -13,6 +13,7 @@ import { step } from '../sim/engine';
 import { placeOrder } from '../sim/economy';
 import { planStructure } from '../sim/construction';
 import { markTree, unmarkTree, isMarked, type TreeRef } from '../sim/forestry';
+import { upgradeTower } from '../sim/towers';
 import { planRun, upgradeRun, type Gate, type PerimeterKind, type Pt } from '../sim/perimeter';
 import { fitProblem, orderFit, plant, repairPump, replaceFried } from '../sim/utilities';
 
@@ -47,6 +48,8 @@ export interface GameStore {
   planRun: (kind: PerimeterKind, pts: Pt[], gates: Gate[], offLen?: number) => void;
   /** Upgrade a finished fence or wall to the next tier, in place (null = laid out; else why not). */
   upgradeRun: (id: string) => string | null;
+  /** Upgrade a finished watch tower in place: the next tier rises beside it. */
+  upgradeTower: (id: string) => string | null;
   /** Plumb or wire a building (a fitting job for the family). */
   fit: (buildingId: string, kind: 'plumb' | 'wire') => string | null;
   /** Order the next tier of a hardening upgrade for one bunker room, or (all) for every room of the bunker up to that tier. */
@@ -161,6 +164,12 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
   upgradeRun: (id) => {
     const g = structuredClone(get().game);
     const why = upgradeRun(g, id);
+    if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); }
+    return why;
+  },
+  upgradeTower: (id) => {
+    const g = structuredClone(get().game);
+    const why = upgradeTower(g, id);
     if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); }
     return why;
   },

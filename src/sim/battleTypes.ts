@@ -21,11 +21,14 @@ export interface BattleUnit {
   y?: number;
   /** What they're wearing (drawn: a plate carrier, a soft vest, a helmet). */
   armor?: { plate: boolean; soft: boolean; helmet: boolean };
+  /** Not a person: a remote turret on a tower (drawn as part of the tower, not as a figure). */
+  machine?: 'turret';
 }
 
 export type BattleEvent =
   | { t: number; kind: 'alarm'; what: 'dog' | 'sensor' | 'tripwire' | 'camera' | 'watch' }
-  | { t: number; kind: 'lights' }
+  /** `masts`: floodlights on towers (sim/towers.ts), aimed at `aim`; absent, the yard lights come on round the house. */
+  | { t: number; kind: 'lights'; masts?: Array<{ x: number; z: number; y: number }>; aim?: { x: number; z: number } }
   | { t: number; kind: 'move'; unit: string; x: number; z: number; y?: number }
   | { t: number; kind: 'shot'; from: string; to: string; hit: boolean; auto?: boolean }
   | { t: number; kind: 'mine'; x: number; z: number; hits: string[] }

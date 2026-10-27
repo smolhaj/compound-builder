@@ -18,7 +18,7 @@ import type { MaterialId } from './materials';
 
 export const KIT_GOODS: MaterialId[] = ['plate_carrier', 'soft_armor', 'helmet', 'ifak', 'nvg', 'thermal', 'radios', 'sw_radio', 'ham_rig'];
 export const WATCH_GOODS: MaterialId[] = ['cameras', 'thermal_cam', 'driveway_alarm', 'floodlights', 'tripwire', 'dog'];
-export const HARDEN_GOODS: MaterialId[] = ['steel_door', 'window_bars', 'sandbags', 'safe_room'];
+export const HARDEN_GOODS: MaterialId[] = ['steel_door', 'window_bars', 'sandbags', 'safe_room', 'gun_mount', 'turret_head'];
 
 const n = (s: GameState, m: MaterialId) => Math.floor(s.stock[m] ?? 0);
 export const powered = (s: GameState) => s.utilities.lit.length > 0 || (s.utilities.grid && s.disaster.tracks.grid > 0.5);
