@@ -36,4 +36,21 @@ describe('save migrations', () => {
     expect(g.heat.burned).toBe(0);
     expect(() => step(g, 2)).not.toThrow();
   });
+
+  it('upgrades a v38 save: nothing owed (a negative balance goes on the card), no camps, nobody coming back', () => {
+    const v38 = structuredClone(newGame(4)) as unknown as Record<string, unknown>;
+    v38.version = 38;
+    delete (v38.fin as Record<string, unknown>).debt;
+    delete (v38.gate as Record<string, unknown>).camps;
+    delete (v38.gate as Record<string, unknown>).comeBack;
+    v38.money = -7668;
+    let g = migrate(v38);
+    expect(g.version).toBe(SAVE_VERSION);
+    expect(g.fin.debt).toEqual({ owed: 0, stage: 'none', missed: 0, statementDay: -1, interest: 0, lien: 0 });
+    expect(g.gate.camps).toEqual([]);
+    expect(g.gate.comeBack).toBeNull();
+    g = step(g, 1.2);
+    expect(g.money).toBeGreaterThanOrEqual(0);
+    expect(g.fin.debt.owed).toBeGreaterThan(7000);
+  });
 });

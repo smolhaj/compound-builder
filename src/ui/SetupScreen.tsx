@@ -6,7 +6,7 @@ import { fullName, HOUSEHOLD_NAME, variedFamily } from '../sim/family';
 import { DISASTERS, type Difficulty, type DisasterKind, type Mode, type PeaceLength } from '../sim/disaster';
 import { saveGame, AUTOSAVE } from '../sim/save/saveSystem';
 import { affordable, ANY_WISH, builtFacts, LIFESTYLE, listings, siteFacts, type Acres, type LandWish, type Lifestyle, type Site } from '../sim/site';
-import { PLAYABLE, REGION_IDS, REGIONS, type RegionId } from '../sim/regions';
+import { PLAYABLE, REGION_IDS, REGIONS, type RegionDef, type RegionId, type StormKind } from '../sim/regions';
 
 const MODES: Array<[Mode, string, string]> = [
   ['surprise', 'Surprise', 'Three to six years of peace, and you don\'t know what is coming. Watch the news, the prices, the neighbors.'],
@@ -65,6 +65,16 @@ function ListingCard({ l, on, pick, budget }: { l: Site; on: boolean; pick: () =
 }
 
 const STEPS = ['Region', 'Land', 'Family & play'] as const;
+
+const STORM_NAME: Record<StormKind, string> = {
+  blizzard: 'blizzards', tornado: 'tornadoes', derecho: 'derechos', hail: 'hail', heat_wave: 'heat', flood: 'floods', lightning_fire: 'wildfire',
+  ice_storm: 'ice storms', hurricane_remnants: 'hurricane remnants', flash_flood: 'flash floods', windstorm: 'windstorms',
+};
+/** The region's three likeliest storms over a year (chance a day × the length of its season). */
+function stormList(r: RegionDef): string {
+  const len: Partial<Record<StormKind, number>> = { blizzard: 105, ice_storm: 90, windstorm: 125, tornado: 110, derecho: 110, hail: 100, heat_wave: 60, flood: 110, lightning_fire: 80, hurricane_remnants: 70, flash_flood: 75 };
+  return (Object.entries(r.storms) as Array<[StormKind, number]>).sort((a, b) => b[1] * (len[b[0]] ?? 90) - a[1] * (len[a[0]] ?? 90)).slice(0, 3).map(([k]) => STORM_NAME[k]).join(', ');
+}
 
 /** New game, in three steps: the region, the land (what you want, then the listings), the family and how it plays. */
 export function SetupScreen() {
@@ -129,9 +139,11 @@ export function SetupScreen() {
                     <div style={{ fontSize: 12.5, lineHeight: 1.35, marginBottom: 8 }}>{r.blurb}</div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', columnGap: 10, rowGap: 2, fontSize: 12 }}>
                       <span style={{ color: C.dim }}>Land</span><span>~{usd(r.perAcre)}/acre</span>
-                      <span style={{ color: C.dim }}>Season</span><span>{month(r.frost[0])} to {month(r.frost[1])}</span>
-                      <span style={{ color: C.dim }}>Winter</span><span>{r.cold >= 1.3 ? 'Bitter' : r.cold >= 0.9 ? 'Cold' : r.cold >= 0.5 ? 'Mild' : 'Short, mild'}</span>
-                      <span style={{ color: C.dim }}>Rain</span><span>{Math.round(r.rainMm / 25.4)} in a year</span>
+                      <span style={{ color: C.dim }}>Frost-free</span><span>{month(r.frost[0])} to {month(r.frost[1])}</span>
+                      <span style={{ color: C.dim }}>Zone</span><span>{r.zone} · {r.frost[1] - r.frost[0]} days</span>
+                      <span style={{ color: C.dim }}>Winter</span><span>{r.cold >= 1.25 ? 'Bitter' : r.cold >= 0.9 ? 'Cold' : r.cold >= 0.5 ? 'Mild' : 'Short, mild'} · lows {r.janLowF}°F · {Math.round(r.snowCm / 2.54)} in of snow</span>
+                      <span style={{ color: C.dim }}>Summer</span><span>highs {r.julyHighF}°F · {Math.round(r.rainMm / 25.4)} in of rain a year</span>
+                      <span style={{ color: C.dim }}>Storms</span><span>{stormList(r)}</span>
                     </div>
                   </button>
                 );
