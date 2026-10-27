@@ -15,7 +15,8 @@ try { ({ chromium } = require('playwright')); }
 catch { ({ chromium } = await import('/opt/node22/lib/node_modules/playwright/index.mjs')); }
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
-const single = args.includes('--single');
+const mode = opt('--mode', 'siege');   // siege | hide | breakin
+const single = mode !== 'siege';
 const port = Number(opt('--port', 5961)), quality = opt('--quality', 'medium');
 const outDir = resolve(opt('--out', 'shots/cutscene'));
 mkdirSync(outDir, { recursive: true });
@@ -36,7 +37,7 @@ try {
   const frames = async (k) => { const f0 = await page.evaluate(() => window.__cb.qa.frames); await page.waitForFunction(x => window.__cb.qa.frames >= x, f0 + k, { polling: 200 }); };
   const shot = async (name, k = 4) => { await frames(k); const f = `${outDir}/${String(++n).padStart(2, '0')}-${name}.png`; await page.screenshot({ path: f }); console.log(f); };
 
-  const info = await page.evaluate(async (single) => {
+  const info = await page.evaluate(async ([single, mode]) => {
     const cb = window.__cb, G = cb.game, c = cb.world.camp;
     const { planSiege } = await import('/src/sim/siege.ts');
     const sp = cb.tool.findSpot('timber_cabin', c.x, c.z, 0);
@@ -53,7 +54,7 @@ try {
     const SUB = 0.25 / 24;
     const day = Math.floor(g.disaster.hitAt + 20);
     g.clock.t = Math.round((day - 0.25 + 2.25 / 24) / SUB) * SUB; g.clock.ticks = Math.round(g.clock.t / SUB); g.clock.speed = 0;
-    g.disaster.tracks = { ...g.disaster.tracks, law: 0, stores: 0, deliveries: 0, banks: 0 };
+    if (mode !== 'breakin') g.disaster.tracks = { ...g.disaster.tracks, law: 0, stores: 0, deliveries: 0, banks: 0 };
     g.stock.canned = 20; g.stock.meds = 3; g.stock.sandbags = 3; g.stock.dog = 1; g.armory.ammo['556'] = 2000;
     for (const [i, p] of g.people.entries()) if (!p.kid || p.age >= 15) { g.armory.guns.push({ id: `g${i}`, model: 'sw_mp15', condition: 1, fired: 0, where: 'house', carrier: p.id }); g.armory.skill[p.id] = 5; }
     // an encounter day whose plan is a siege (or a single scene)
@@ -62,7 +63,7 @@ try {
       const p = planSiege({ kind: 'gang', size: 10, temper: 'hard', hour: 2.25, seed: g.seed * 131 + d * 7 + 1, fought: true, fightSeconds: 90 });
       if (single ? p.scenes.length === 1 : p.scenes.length >= 3) { ed = d; break; }
     }
-    g.gate.pending = { id: 'e9', kind: 'gang', day: ed, title: 'An armed crew', dossier: ['10 of them, organized, rifles. They\'ve been working the farms east of town.', 'They know what they want, and they think you have it.'], size: 10, armed: true, strength: 120, wants: { canned: 8, fuel: 4 }, stances: ['hide', 'parley', 'defend', 'trade'], temper: 'hard' };
+    g.gate.pending = mode === 'breakin' ? { id: 'e9', kind: 'break_in', day: 5, title: 'Someone is in the house', dossier: ['Two in the morning. The dog is going crazy downstairs.', '2 people, by the voices; no gun that you can see.'], size: 2, armed: false, strength: 10, wants: {}, stances: ['call_911', 'shout', 'confront'] } : { id: 'e9', kind: 'gang', day: ed, title: 'An armed crew', dossier: ['10 of them, organized, rifles. They\'ve been working the farms east of town.', 'They know what they want, and they think you have it.'], size: 10, armed: true, strength: 120, wants: { canned: 8, fuel: 4 }, stances: ['hide', 'parley', 'defend', 'trade'], temper: 'hard' };
     // stepping the player and the renderer by hand (a software GL frame takes seconds)
     const { useBattleStore } = await import('/src/store/battleStore.ts');
     const { useCutsceneView } = await import('/src/store/cutsceneStore.ts');
@@ -81,13 +82,13 @@ try {
     };
     G.getState().load(g);
     return { day: ed, scenes: planSiege({ kind: 'gang', size: 10, temper: 'hard', hour: 2.25, seed: g.seed * 131 + ed * 7 + 1, fought: true, fightSeconds: 90 }).scenes.length };
-  }, single);
+  }, [single, mode]);
   console.log(JSON.stringify(info));
   await frames(10);
   await page.waitForTimeout(3500);
   await shot('prompt', 6);
   // pick Defend on the gate card, Watch
-  await page.getByRole('button', { name: /^Defend/ }).click();
+  await page.getByRole('button', { name: mode === 'hide' ? /^Parley/ : mode === 'breakin' ? /^Confront/ : /^Defend/ }).click();
   await shot('prompt-defend-picked', 2);
   await page.getByRole('button', { name: 'Watch', exact: true }).click();
   await frames(2);
@@ -95,19 +96,19 @@ try {
     const ok = await page.evaluate(m => window.__adv(new Function('v', 't', `return ${m}`)), match);
     if (ok) await shot(name, extra); else console.log('no match for', name);
   };
-  await step('scene1-leadin', 'v.scene === 0 && v.seg === "lead" && v.progress > 0.01');
-  await step('scene1-fight-a', 'v.scene === 0 && v.seg === "fight" && t > 14');
-  await step('scene1-fight-b', 'v.scene === 0 && v.seg === "fight" && t > 24');
-  await step('scene1-fight-c', 'v.scene === 0 && v.seg === "fight" && t > 36');
-  if (!single) {
-    await step('gap-card', 'v.seg === "gap"');
-    await step('scene2-lead', 'v.scene === 1 && v.seg === "lead"');
-    await step('scene2-fight', 'v.scene === 1 && v.seg === "fight" && t > 12');
-    await step('last-scene-fight-a', 'v.scene === v.scenes - 1 && v.seg === "fight" && t > 16');
+  if (mode === 'siege') {
+    await step('fight-first-frame', 'v.scene === 0 && v.seg === "fight" && t > 8');
+    await step('fight-b', 'v.scene === 0 && v.seg === "fight" && t > 24');
+    await step('between-scenes-card', 'window.__cb.game.getState().cutscene.offer != null', 3);
+    await page.evaluate(() => window.__cb.game.getState().midStance(null));
+    await step('gap-card-new-time', 'v.seg === "gap"');
+    await step('assault-b', 'v.scene === v.scenes - 1 && v.seg === "fight" && t > 34');
+    await step('tail', 'v.scene === v.scenes - 1 && v.seg === "tail"');
+  } else {
+    await step('scene-lead', 'v.seg === "lead" && v.progress > 0.02');
+    await step('scene-fight', 'v.seg === "fight" && t > 14');
+    await step('scene-late', 'v.seg === "fight" && t > 30');
   }
-  await step('assault-b', 'v.scene === v.scenes - 1 && v.seg === "fight" && t > 34');
-  await step('assault-c', 'v.scene === v.scenes - 1 && v.seg === "fight" && t > 55');
-  await step('tail', 'v.scene === v.scenes - 1 && v.seg === "tail"');
   await page.evaluate(() => window.__cb.player.skipAll());
   await page.evaluate(() => window.__adv(() => false, 4));
   await frames(6);
