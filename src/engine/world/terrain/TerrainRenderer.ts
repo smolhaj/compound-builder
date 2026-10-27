@@ -160,6 +160,8 @@ export function makeTerrainMaterial(look: RegionLook, waterY: number | null): { 
   };
   ensureGroundTextures(); // r15: the shared grass-blade texture (sampled near the camera)
   const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.96, metalness: 0 });
+  // the thawed ground goes to mud in mud season (season patch, uSeaD.z)
+  mat.defines = { ...mat.defines, SEA_MUD: '' };
   mat.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, u);
     sh.uniforms.uGDetail = groundUniforms.uGDetail;

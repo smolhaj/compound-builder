@@ -37,6 +37,15 @@ export class FamilyRenderer {
     this._layer = new FigureLayer(scene, 16, 'family');
   }
 
+  /** Ids of the people drawn outdoors this frame (not hidden indoors / asleep). */
+  readonly shown = new Set<string>();
+
+  /** Where someone stands and which way they face (null: never placed). */
+  poseOf(id: string): { x: number; z: number; rot: number } | null {
+    const a = this._agents.get(id);
+    return a ? { x: a.x, z: a.z, rot: a.rot } : null;
+  }
+
   /** World positions of the visible people (QA / camera). */
   positions(): Array<{ id: string; x: number; z: number }> {
     return [...this._agents.entries()].map(([id, a]) => ({ id, x: a.x, z: a.z }));
@@ -51,6 +60,7 @@ export class FamilyRenderer {
     const redress = season !== this._season;
     this._season = season;
     let n = 0;
+    this.shown.clear();
     people.forEach((p, i) => {
       const st = states.find(s => s.id === p.id);
       if (!st) return;
@@ -88,6 +98,7 @@ export class FamilyRenderer {
         a.rot += dr * Math.min(1, dt * 6);
       }
       if (!moving && goal.hidden) return;     // indoors
+      this.shown.add(p.id);
       a.phase += dt * (moving ? 9 * Math.min(2.5, Math.max(1, speedK)) : 0);
       // at work: hammer (reach / stand) on a beat, or kneel
       let pose = moving ? FIG_POSE.STAND : goal.pose;

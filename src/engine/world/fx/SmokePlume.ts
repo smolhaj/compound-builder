@@ -33,9 +33,16 @@ export class SmokePlume {
     uColor: { value: new THREE.Color(0.78, 0.78, 0.8) },
     uMap: { value: sprite() },
     uScale: { value: 400 },
+    uRise: { value: 2.2 },
+    uSize: { value: 0.55 },
   };
+  private readonly _tint: THREE.Color;
 
-  constructor(at: THREE.Vector3) {
+  /** `opts`: rise (world units, ≈ 13 m chimney smoke), puff size, base color (a generator's exhaust is small and gray-brown). */
+  constructor(at: THREE.Vector3, opts: { rise?: number; size?: number; color?: number } = {}) {
+    this._u.uRise.value = opts.rise ?? 2.2;
+    this._u.uSize.value = opts.size ?? 0.55;
+    this._tint = opts.color !== undefined ? new THREE.Color(opts.color) : new THREE.Color().setRGB(0.78, 0.78, 0.8);
     const geo = new THREE.BufferGeometry();
     const phase = new Float32Array(N), seed = new Float32Array(N);
     for (let i = 0; i < N; i++) { phase[i] = i / N; seed[i] = Math.random(); }
@@ -49,19 +56,19 @@ export class SmokePlume {
       depthWrite: false,
       fog: false,
       vertexShader: /* glsl */`
-        uniform float uTime; uniform vec2 uWind; uniform float uAmount; uniform float uScale;
+        uniform float uTime; uniform vec2 uWind; uniform float uAmount; uniform float uScale; uniform float uRise; uniform float uSize;
         attribute float aPhase; attribute float aSeed;
         varying float vA;
         void main() {
           float life = fract(aPhase + uTime * 0.07);           // ~14 s from the stack to gone
-          float rise = life * 2.2 * (0.8 + 0.4 * aSeed);
-          vec3 p = position + vec3(uWind.x, 0.0, uWind.y) * life * 6.0;
+          float rise = life * uRise * (0.8 + 0.4 * aSeed);
+          vec3 p = position + vec3(uWind.x, 0.0, uWind.y) * life * 6.0 * (uRise / 2.2);
           p.y += rise;
           p.x += sin(life * 9.0 + aSeed * 6.0) * 0.08 * life;
           p.z += cos(life * 7.0 + aSeed * 4.0) * 0.08 * life;
           vec4 mv = modelViewMatrix * vec4(p, 1.0);
           gl_Position = projectionMatrix * mv;
-          float size = 0.05 + life * 0.55;
+          float size = 0.05 * uSize / 0.55 + life * uSize;
           gl_PointSize = min(uScale * size / -mv.z, 220.0);
           vA = uAmount * smoothstep(0.0, 0.06, life) * (1.0 - smoothstep(0.35, 1.0, life)) * 0.55;
         }`,
@@ -91,7 +98,7 @@ export class SmokePlume {
     u.uTime.value = time;
     u.uAmount.value = amount;
     u.uWind.value.set(windX, windZ);
-    u.uColor.value.setRGB(0.78, 0.78, 0.8).multiplyScalar(0.25 + 0.75 * light);
+    u.uColor.value.copy(this._tint).multiplyScalar(0.25 + 0.75 * light);
     u.uScale.value = viewportH * 1.2;   // ≈ H / (2 tan(fov / 2)) at the 45° view
     this.points.visible = amount > 0.01;
   }

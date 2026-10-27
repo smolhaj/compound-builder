@@ -28,7 +28,8 @@ function flameMat(): THREE.MeshBasicMaterial {
   return _flame ??= new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 1.0, 0.3), transparent: true, opacity: 0.9, depthWrite: false });
 }
 
-export function buildCamp(): THREE.Group {
+/** `fire: false` leaves out the fire ring (a FirePit prop stands there instead). */
+export function buildCamp(opts: { fire?: boolean } = {}): THREE.Group {
   const T = CAMP.tent;
   const canvas: THREE.BufferGeometry[] = [], wood: THREE.BufferGeometry[] = [], stone: THREE.BufferGeometry[] = [], flame: THREE.BufferGeometry[] = [], metal: THREE.BufferGeometry[] = [];
   // Tent: four short walls + a gable roof (open-ended prism) + door flap
@@ -57,12 +58,12 @@ export function buildCamp(): THREE.Group {
   metal.push(new THREE.CylinderGeometry(0.012, 0.012, 0.16, 8).translate(T.x + 0.12, T.ridge + 0.02, T.z - 0.15));
   // Fire ring + logs + flames
   const F = CAMP.fire;
-  for (let i = 0; i < 10; i++) {
+  if (opts.fire !== false) for (let i = 0; i < 10; i++) {
     const a = (i / 10) * Math.PI * 2;
     stone.push(new THREE.DodecahedronGeometry(0.028, 0).scale(1, 0.7, 1).translate(F.x + Math.cos(a) * 0.09, 0.012, F.z + Math.sin(a) * 0.09));
   }
-  for (let i = 0; i < 3; i++) wood.push(new THREE.CylinderGeometry(0.01, 0.012, 0.13, 5).rotateZ(Math.PI / 2).rotateY(i * 2.1).translate(F.x, 0.015, F.z));
-  flame.push(new THREE.ConeGeometry(0.035, 0.11, 6).translate(F.x, 0.07, F.z), new THREE.ConeGeometry(0.02, 0.07, 5).translate(F.x + 0.02, 0.05, F.z + 0.01));
+  if (opts.fire !== false) for (let i = 0; i < 3; i++) wood.push(new THREE.CylinderGeometry(0.01, 0.012, 0.13, 5).rotateZ(Math.PI / 2).rotateY(i * 2.1).translate(F.x, 0.015, F.z));
+  if (opts.fire !== false) flame.push(new THREE.ConeGeometry(0.035, 0.11, 6).translate(F.x, 0.07, F.z), new THREE.ConeGeometry(0.02, 0.07, 5).translate(F.x + 0.02, 0.05, F.z + 0.01));
   // Camp table + two benches (seat top ≈ 0.075 = UE bench height)
   const Tb = CAMP.table;
   wood.push(new THREE.BoxGeometry(0.3, 0.012, 0.14).translate(Tb.x, 0.125, Tb.z));
@@ -77,6 +78,7 @@ export function buildCamp(): THREE.Group {
   metal.push(new THREE.CylinderGeometry(0.05, 0.05, 0.15, 12).translate(CAMP.barrel.x, 0.075, CAMP.barrel.z));
   const g = new THREE.Group();
   const add = (list: THREE.BufferGeometry[], mat: THREE.Material, shadow = true, name = '') => {
+    if (!list.length) return;
     const geo = mergeGeometries(list.map(x => (x.index ? x.toNonIndexed() : x)).map(x => { x.deleteAttribute('uv'); return x; }));
     if (!geo) return;
     geo.computeVertexNormals();
