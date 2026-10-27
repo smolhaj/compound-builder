@@ -7,6 +7,8 @@ import { useGameStore } from '../store/gameStore';
 import type { Quality } from '../engine/world/WorldScene';
 import { SEASON_MODES, type SeasonMode } from '../engine/world/season/seasonState';
 import { WEATHER_MODES, type WeatherMode } from '../engine/world/weather/weatherState';
+import { DogsPanel } from './DogsPanel';
+import { setGuard } from '../sim/pets';
 import { calendarOf, dayIndex, hourOf, type Speed } from '../sim/state';
 import { BACKGROUND_NAME, backgroundOf, fullName } from '../sim/family';
 import { MATERIALS, MATERIAL_IDS, emptyStock, type MaterialId } from '../sim/materials';
@@ -395,6 +397,7 @@ export function Hud() {
                 })()}
               </div>;
             })}
+            <DogsPanel game={game} />
             {trialCamps(game).map(c => <Section key={c.id} title={`Camp outside the wall: ${c.title}`}>
               <Row label="On trial" value={`day ${Math.max(0, dayIndex(game.clock.t) - c.from)} of ${c.until - c.from}`} />
               <Row label="People" value={c.people.map(p => `${p.first}${p.kid ? ` (${p.age})` : ''}`).join(', ')} />
@@ -731,10 +734,13 @@ function defenseTabAlert(game: GameState): Tone | undefined {
 
 /** One checklist line: a tick or a cross, what it is, and why. */
 function CheckRow({ c }: { c: Check }) {
+  const money = useGameStore(s => s.money);
+  const dog = c.id.startsWith('dog:') ? c.id.slice(4) : null;
   return <div title={c.detail} style={{ display: 'flex', gap: 6, padding: '2px 0', alignItems: 'baseline' }}>
     <span style={{ color: TONE[c.tone], width: 14, textAlign: 'center' }}>{c.ok ? '✓' : '✕'}</span>
     <span style={{ flex: 1 }}>{c.label}</span>
     <span style={{ color: DIM, fontSize: 11.5, textAlign: 'right', maxWidth: '55%' }}>{c.detail}</span>
+    {dog && <button style={{ ...btn(), padding: '1px 6px', fontSize: 11 }} title="Put this dog on a post at the line, or keep it inside with the family" onClick={() => money(g => { const d = g.dogs.find(x => x.id === dog); return d ? setGuard(g, dog, !d.guard) : null; })}>{c.detail.startsWith('on the post') ? 'bring in' : 'post'}</button>}
   </div>;
 }
 

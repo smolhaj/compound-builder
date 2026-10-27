@@ -23,6 +23,8 @@ import { Atmosphere, type AtmosBuilding, type AtmosFrame } from './atmosphere/At
 import { fenceLean } from './atmosphere/aging';
 import { LEANS, leanRun } from './atmosphere/fenceAging';
 import { FamilyRenderer } from './people/FamilyRenderer';
+import { DogRenderer } from './people/DogRenderer';
+import type { DogCtx } from './people/dogGoals';
 import type { GoalCtx, Site } from './people/peopleGoals';
 import { CELL, type KitPieceDef } from './buildkit/kit';
 import type { GameState } from '../sim/state';
@@ -154,6 +156,7 @@ export class HomesteadWorld {
   readonly camp: { x: number; z: number; rot: number };
   private readonly _campGroup: THREE.Group;
   readonly family: FamilyRenderer;
+  readonly dogs: DogRenderer;
   /** Night life, weathering and the deeper seasons (atmosphere/). */
   readonly atmos: Atmosphere;
   /** County road, driveway, gate and stockpile yard. */
@@ -199,6 +202,7 @@ export class HomesteadWorld {
     this.stream = new StreamRenderer(ws.scene);
     this.lakes = new RegionalWaterRenderer(ws.scene);
     this.family = new FamilyRenderer(ws.scene);
+    this.dogs = new DogRenderer(ws.scene);
     this._campGroup = buildCamp({ fire: false });
     this._campGroup.position.set(this.camp.x, this.parcel.height(this.camp.x, this.camp.z), this.camp.z);
     this._campGroup.rotation.y = this.camp.rot;
@@ -1287,6 +1291,11 @@ export class HomesteadWorld {
     const ctx: GoalCtx = { camp: this.camp, site, home: homeB ? site(homeB.placed.id) : null, tree, yard: this.access.yard };
     const season = (seasonState.visual === 'winter' && !seasonState.climate.freeze ? 'fall' : seasonState.visual) as WearSeason;
     this.family.update(dt, game.people, game.personState, hour, game.clock.t, ctx, this.walkHeight, season, speedK);
+    const dctx: DogCtx = {
+      home: ctx.home, camp: this.camp, gate: this.access.gate, yard: this.access.yard, atGate: !!game.gate.pending,
+      person: id => (this.family.shown.has(id) ? this.family.poseOf(id) : null),
+    };
+    this.dogs.update(dt, game, hour, game.clock.t, dctx, this.walkHeight, speedK);
     // crops stand in the ground from planting (mid-May) to the last of the harvest (late October); bare soil the rest of the year
     const doy = calendarOf(game.clock).doy, [c0, c1] = seasons(REGIONS[game.site.region]).crops, growing = doy >= c0 && doy < c1;
     // the orchard: leaves from blossom to a month past the first frost, fruit in late summer once the trees bear (and no late frost took it)
@@ -1554,6 +1563,7 @@ export class HomesteadWorld {
     this._props?.dispose();
     this.stream.dispose();
     this.family.dispose();
+    this.dogs.dispose();
     this.atmos.dispose();
     this.lakes.dispose();
     this._ws.scene.remove(this._root);

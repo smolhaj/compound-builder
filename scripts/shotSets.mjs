@@ -479,3 +479,33 @@ SETS.defenses = [
       cb.qa.pose = { x: 15.5, y: g(15.5, z - 3.2) + 0.3, z: z - 3.2, lx: 20, ly: g(20, z) + 0.15, lz: z + 0.4, fov: 62 }; }`, cam: { x: 33, z: 54, yaw: 0, pitch: 0.3, radius: 20 }, frames: 14 },
   { name: 'aerial-creek-bars', time: 11, season: 'summer', setup: `{ const c = cb.world.parcel.creek; cb.qa.pose = null; cb.cam.target.set(20, 0, c.zAt(20)); cb.cam.radius = 9; cb.cam.pitch = 0.7; cb.cam.yaw = 0.5; }`, cam: { x: 20, z: 40, yaw: 0.5, pitch: 0.7, radius: 9 }, frames: 12 },
 ];
+
+/**
+ * Dogs: named family pets. A compound with a log house, a cabin and a garden; three dogs
+ * come in on the truck (two trained adults, one puppy), their bonds are set, and the sim is
+ * run to the hour shown so the family and the dogs are where the day puts them.
+ * (A person is ~0.28 tall; a dog ~0.1 at the shoulder.)
+ */
+const dogsSetup = `{ if (!window.__dogs) { window.__dogs = true;
+  ${compound.slice(2, -2)}
+  const G2 = cb.game;
+  for (let i = 0; i < 3; i++) G2.getState().order([{ material: i === 2 ? 'puppy' : 'dog', qty: 1 }]);
+  G2.getState().advance(2.4);
+  G2.setState(s => { const g = structuredClone(s.game); const ps = g.people;
+    g.dogs.forEach((d, i) => { d.bonds = {}; d.bonds[ps[(i + 2) % ps.length].id] = 70 + i * 6; d.bonds[ps[i % 2].id] = 25; d.guard = i === 0; d.tone = i; d.training = 40 + i * 15; d.breed = ['shepherd', 'lab', 'collie'][i]; });
+    g.dogs[2].born = Math.floor(g.clock.t) - 100;
+    return { game: g }; });
+} }`;
+const dogHome = "const hb = window.__b['log_house']; ";
+const dogEye = (x, z, lx, lz, dy = 0.2, ly = 0.1, fov = 58) => `{ const g = cb.world.groundAt; cb.qa.pose = { x: ${x}, y: g(${x}, ${z}) + ${dy}, z: ${z}, lx: ${lx}, ly: g(${lx}, ${lz}) + ${ly}, lz: ${lz}, fov: ${fov} }; }`;
+const nearHome = (dist, ang, dy, ly) => `{ const b = window.__b['log_house'], th = b.rot * Math.PI / 2 + ${ang}; const [px, pz] = cb.world.openSpotNear(b.x + Math.sin(th) * ${dist}, b.z + Math.cos(th) * ${dist}, 0.4); const g = cb.world.groundAt; cb.qa.pose = { x: px, y: g(px, pz) + ${dy}, z: pz, lx: b.x, ly: g(b.x, b.z) + ${ly}, lz: b.z, fov: 58 }; }`;
+SETS.dogs = [
+  { name: 'dogs-aerial-day', time: 16, season: 'summer', setup: dogsSetup + toHour(16) + "{ cb.qa.pose = null; const c = cb.world.camp; cb.cam.target.set(c.x, 0, c.z); cb.cam.radius = 9; cb.cam.pitch = 0.6; cb.cam.yaw = 0.7; }", cam: { x: C, z: C, yaw: 0, pitch: 0.5, radius: 9 }, frames: 24 },
+  { name: 'dogs-eye-level-yard', time: 17.5, season: 'summer', setup: dogsSetup + toHour(17.5) + nearHome(2.6, 0.7, 0.2, 0.2), cam: { x: C, z: C, yaw: 0, pitch: 0.3, radius: 3 }, frames: 24 },
+  { name: 'dogs-close-with-person', time: 17.5, season: 'summer', setup: dogsSetup + toHour(17.5) + "{ cb.qa.pose = null; const f = cb.world.family; const dg = cb.world.dogs.positions()[0]; const p = f.positions().find(q => Math.hypot(q.x - dg.x, q.z - dg.z) < 2) ?? f.positions()[0]; cb.cam.target.set((p.x + dg.x) / 2, 0.05, (p.z + dg.z) / 2); cb.cam.radius = 0.9; cb.cam.pitch = 0.18; cb.cam.yaw = 0.8; }", cam: { x: C, z: C, yaw: 0, pitch: 0.2, radius: 1 }, frames: 24 },
+  { name: 'dog-on-guard-at-gate', time: 11, season: 'summer', setup: dogsSetup + toHour(11) + "{ const a = cb.world.access, g = a.gate, d = cb.world.dogs.positions()[0]; cb.qa.pose = null; cb.cam.target.set(d.x, 0.06, d.z); cb.cam.radius = 1.4; cb.cam.pitch = 0.16; cb.cam.yaw = Math.atan2(g.x - d.x, g.z - d.z) + 2.4; }", cam: { x: C, z: C, yaw: 0, pitch: 0.2, radius: 1.4 }, frames: 24 },
+  { name: 'dog-at-gate-aerial', time: 11, season: 'summer', setup: dogsSetup + toHour(11) + "{ cb.qa.pose = null; const a = cb.world.access, g = a.gate; cb.cam.target.set(g.x - 1, 0, g.z); cb.cam.radius = 6; cb.cam.pitch = 0.5; cb.cam.yaw = 1.3; }", cam: { x: C, z: C, yaw: 0, pitch: 0.4, radius: 6 }, frames: 24 },
+  { name: 'dogs-night-at-the-gate', time: 23, season: 'summer', setup: dogsSetup + toHour(23) + "{ cb.qa.pose = null; const a = cb.world.access, g = a.gate, d = cb.world.dogs.positions()[0]; cb.cam.target.set(d.x, 0.06, d.z); cb.cam.radius = 2.2; cb.cam.pitch = 0.2; cb.cam.yaw = Math.atan2(g.x - d.x, g.z - d.z) + 2.0; }", cam: { x: C, z: C, yaw: 0, pitch: 0.2, radius: 2 }, frames: 28 },
+  { name: 'dogs-night-by-the-house', time: 22.5, season: 'summer', setup: dogsSetup + toHour(22.5) + nearHome(3.2, 0.8, 0.22, 0.15), cam: { x: C, z: C, yaw: 0, pitch: 0.3, radius: 3 }, frames: 28 },
+  { name: 'dogs-winter', time: 12, season: 'winter', setup: dogsSetup + toHour(12) + "{ cb.qa.pose = null; const c = cb.world.camp; cb.cam.target.set(c.x, 0, c.z); cb.cam.radius = 6; cb.cam.pitch = 0.45; cb.cam.yaw = 0.4; }", cam: { x: C, z: C, yaw: 0, pitch: 0.4, radius: 6 }, frames: 24 },
+];
