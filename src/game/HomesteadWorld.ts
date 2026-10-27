@@ -1047,6 +1047,7 @@ export class HomesteadWorld {
     // a bed of dark earth under the bunkers, so the see-through ground reads as a cut-away section, not sky
     if (on) {
       const floors = [...this._built.values()].filter(b => b.under).map(b => b.under!.datum);
+      for (const r of this._runs) if (r.kind === 'underground_passage' && r.pts.length > 1) floors.push(Math.min(...this._pathOf(r).map(p => p.floor)));   // a passage runs at its own depth
       const y = (floors.length ? Math.min(...floors) : this.groundAt(this.camp.x, this.camp.z) - DEPTH) - 0.08;
       this._earth ??= new THREE.Mesh(new THREE.PlaneGeometry(PARCEL_SIZE + 60, PARCEL_SIZE + 60).rotateX(-Math.PI / 2),
         new THREE.MeshStandardMaterial({ color: 0x2e241a, roughness: 1 }));
