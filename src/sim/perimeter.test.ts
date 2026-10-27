@@ -43,3 +43,60 @@ describe('perimeter', () => {
     expect(g.structures[0].done + g.structures[0].stage).toBeGreaterThan(0);
   });
 });
+
+import { UPGRADE_NEXT, SALVAGE, planRun as plan, peopleBlock, upgradeProblem, upgradeRun, PERIMETER, type PerimeterRun } from './perimeter';
+
+describe('upgrading in place', () => {
+  const finished = (kind: Parameters<typeof plan>[1]) => {
+    const g = newGame(5);
+    const r = plan(g, kind, [[0, 0], [6, 0]]);
+    r.done = r.hours; r.supplied = true; r.finishedAt = 0;
+    return { g, r };
+  };
+
+  it('the chain runs from a split-rail fence to the electrified steel wall, each tier stronger than the last', () => {
+    let k: keyof typeof PERIMETER | undefined = 'split_rail', last = -1, steps = 0;
+    while (k) {
+      const b = PERIMETER[k].blocks.people;
+      expect(b).toBeGreaterThanOrEqual(last);
+      last = b; k = UPGRADE_NEXT[k]; steps++;
+    }
+    expect(steps).toBe(8);
+    expect(last).toBeGreaterThan(0.95);
+  });
+
+  it('an upgrade is a new run over the same line; the old tier stands until it is done, then goes and half its materials come back', () => {
+    const { g, r } = finished('chain_link');
+    expect(upgradeProblem(g, r)).toBeNull();
+    expect(upgradeRun(g, r.id)).toBeNull();
+    const up = g.perimeter.find(x => x.replaces === r.id) as PerimeterRun;
+    expect(up.kind).toBe('wrought_iron');
+    expect(up.pts).toEqual(r.pts);
+    expect(upgradeProblem(g, r)).toMatch(/under way/);
+    // the old one is still the wall while the new one is built
+    expect(g.perimeter.some(x => x.id === r.id && runFinished(x))).toBe(true);
+    const bill = runBill('wrought_iron', wallLength(up)), before = { ...g.stock };
+    for (const [m, n] of Object.entries(bill)) (g.stock as unknown as Record<string, number>)[m] += n as number;
+    addRunWork(g, up, up.hours);
+    expect(runFinished(up)).toBe(true);
+    expect(g.perimeter.some(x => x.id === r.id)).toBe(false);
+    expect(up.replaces).toBeUndefined();
+    const back = runBill('chain_link', wallLength(r));
+    for (const [m, n] of Object.entries(back)) expect((g.stock as unknown as Record<string, number>)[m] - (before as unknown as Record<string, number>)[m]).toBeGreaterThanOrEqual(Math.floor((n as number) * SALVAGE));
+  });
+
+  it('the top tier has nothing to upgrade to, and an unfinished run cannot be upgraded', () => {
+    const { g, r } = finished('electric_steel');
+    expect(upgradeProblem(g, r)).toMatch(/nothing better/);
+    const u = plan(g, 'chain_link', [[0, 0], [3, 0]]);
+    expect(upgradeProblem(g, u)).toMatch(/not finished/);
+  });
+
+  it('an electrified wall without power is only a steel wall', () => {
+    const { g, r } = finished('electric_steel');
+    g.utilities.lit = []; g.utilities.grid = false;
+    expect(peopleBlock(g, r)).toBe(PERIMETER.steel_wall.blocks.people);
+    g.utilities.lit = ['h'];
+    expect(peopleBlock(g, r)).toBe(PERIMETER.electric_steel.blocks.people);
+  });
+});

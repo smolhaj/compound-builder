@@ -12,7 +12,7 @@
  *    the east). Each crossing needs creek bars; with either open the creek is
  *    the way round every wall and gate, and the barrier can't pass 35.
  */
-import { PERIMETER, runFinished, runGrowth, type Pt } from './perimeter';
+import { PERIMETER, peopleBlock, runFinished, runGrowth, type Pt } from './perimeter';
 import type { Rect } from './land';
 import type { GameState } from './state';
 
@@ -84,7 +84,7 @@ export function enclosure(s: GameState, t = s.clock.t): Enclosure {
       const { d, s: along } = nearest(r.pts, x, z);
       if (d > REACH) continue;
       const inGate = r.gates.some(g => Math.abs(along - g.at) <= g.w / 2);
-      hold = Math.max(hold, PERIMETER[r.kind].blocks.people * runGrowth(r, t) * (inGate ? GATE_HOLD : 1));
+      hold = Math.max(hold, peopleBlock(s, r) * runGrowth(r, t) * (inGate ? GATE_HOLD : 1));
     }
     sum += hold;
     if (hold < 0.2) { open++; if (gaps.length < 8 && (open - 1) % 6 === 0) gaps.push([x, z]); }

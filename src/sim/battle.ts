@@ -24,7 +24,7 @@ import { gearPosture } from './gear';
 import { backgroundOf } from './family';
 import { isHome } from './blueprints';
 import { isFinished } from './construction';
-import { PERIMETER, runFinished } from './perimeter';
+import { PERIMETER, fenceLive, runFinished } from './perimeter';
 import { enclosure } from './enclosure';
 import { mulberry32 } from './rng';
 import { leaveAftermath } from './aftermath';
@@ -55,6 +55,11 @@ const WALL_HAZARD: Record<string, { p: number; min: number; max: number; what: s
   thorn_hedge: { p: 0.09, min: 8, max: 30, what: 'thorns', lines: ['The thorns — Jesus, they\'re like knives —', 'I can\'t get through this — AGH — my face!', 'It\'s all thorns — back, BACK —'] },
   ditch: { p: 0.06, min: 15, max: 50, what: 'ditch', lines: ['I fell — my leg — I think it\'s broken —', 'The ditch — I can\'t climb out —'] },
   log_palisade: { p: 0.02, min: 10, max: 30, what: 'sharpened logs', lines: ['Splinters — shit — the points —', 'Slipped — I slipped — my arm —'] },
+  chain_link: { p: 0.025, min: 6, max: 20, what: 'chain-link', lines: ['The fence — it\'s cutting my hands —', 'Shit — it\'s sharp at the top — AGH!'] },
+  wrought_iron: { p: 0.03, min: 10, max: 30, what: 'iron spikes', lines: ['The points — it\'s got me — oh God —', 'Slipped — the spikes — my leg!'] },
+  iron_barbed: { p: 0.08, min: 12, max: 38, what: 'barbed wire on iron', lines: ['The wire — and the spikes — I can\'t —', 'AGH — it\'s everywhere — get me off —'] },
+  steel_wall: { p: 0.015, min: 10, max: 35, what: 'razor wire', lines: ['Razor wire — Jesus — it\'s razor wire —', 'Can\'t climb it — it\'s smooth — my hands —'] },
+  electric_steel: { p: 0.22, min: 25, max: 75, what: 'live wire', lines: ['AAAGH — it\'s LIVE — it\'s electrified —', 'I can\'t let go — oh God — it\'s —', 'Don\'t touch it — don\'t TOUCH it!'] },
   creek_bars: { p: 0.05, min: 8, max: 28, what: 'bars', lines: ['The bars — I can\'t get through — my hand —'] },
 };
 const MOVE = 0.6;          // ≈ 3.6 m/s running
@@ -689,7 +694,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
     // the wall bites: a crew at the wire, the hedge or the ditch is hurt getting over it (the ones who go down are left behind),
     // and a crew that isn't set on killing loses heart a man at a time
     if (climbing && atLine.length && !breached) {
-      const hz = WALL_HAZARD[wallKind];
+      const hz = wallKind === 'electric_steel' && !fenceLive(s) ? WALL_HAZARD.steel_wall : WALL_HAZARD[wallKind];
       let bitten = 0;
       if (hz) for (const f of atLine) if (r() < hz.p) {
         bitten++;
