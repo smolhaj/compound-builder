@@ -1,4 +1,6 @@
 import { useState, type CSSProperties, type ReactNode } from 'react';
+import type { GameState } from '../sim/state';
+import { isHome } from '../sim/blueprints';
 import { stormOutage } from '../sim/weatherThreats';
 import { useWorldStore, type BuildingView, type CameraMode } from '../store/worldStore';
 import { useGameStore } from '../store/gameStore';
@@ -42,6 +44,7 @@ import { alliesFor, canGo, FAR_COLD, isAway, latestFarLead, latestLead, LEAD_COL
 import { EXPOSURE_NAME, exposure, raidPressure, topExposure } from '../sim/opsec';
 import { acresOf, buyProblem, LAND_NAME, priceOf } from '../sim/land';
 import { HARDEN, HARDEN_IDS, type TierDef, hardenCost, hardenProblem, isBunkerRoom, protectionOf, tierOf } from '../sim/hardening';
+import { defenseReport, type Check } from '../sim/defenseReport';
 import { PERIMETER, PERIMETER_ORDER, UTILITY_LINES, runBill, runHours, runFinished, runProgress, runBlocked, runGrowth } from '../sim/perimeter';
 import { PantryPanel } from './PantryPanel';
 
@@ -152,7 +155,7 @@ export function Hud() {
   const g = useGameStore();
   const [qty, setQty] = useState<Record<MaterialId, number>>(emptyStock());
   const [leftTab, setLeftTab] = useState<'build' | 'projects' | 'log'>('build');
-  const [rightTab, setRightTab] = useState<'family' | 'supplies' | 'utilities' | 'land' | 'outside' | 'chronicle'>('family');
+  const [rightTab, setRightTab] = useState<'family' | 'supplies' | 'utilities' | 'land' | 'defense' | 'outside' | 'chronicle'>('family');
   // picking a building on the map opens its project card
   const [lastSel, setLastSel] = useState<string | null>(null);
   if (g.selected !== lastSel) { setLastSel(g.selected); if (g.selected) setLeftTab('projects'); }
@@ -187,6 +190,7 @@ export function Hud() {
   const daysFood = daysOfFood(game);
   const foodAlert: Tone | undefined = !game.food.fromStores && game.food.ateKcal < game.food.needKcal * 0.95 ? 'bad' : warned && (game.food.fromStores ? daysFood < 180 : daysFood < 30) ? 'warn' : undefined;
   const utilAlert: Tone | undefined = game.utilities.report.shortL > 0 ? 'bad' : game.utilities.hauling || game.utilities.report.shortKwh > 0.5 ? 'warn' : undefined;
+  const defenseAlert: Tone | undefined = defenseTabAlert(game);
   const outsideAlert: Tone | undefined = game.clock.t >= game.disaster.hitAt && game.disaster.kind ? 'bad' : warned ? 'warn' : undefined;
   // fight wounds heal only with meds, a medic (skill 3+) or the bunker's medical bay
   const treating = game.stock.meds >= 0.1 || game.people.some((q, j) => !q.kid && game.personState[j]?.needs.died == null && q.skills.medic >= 3) || game.structures.some(st => st.kind === 'bunker_medical' && isFinished(st));
@@ -368,7 +372,7 @@ export function Hud() {
 
       {/* Right: the family, supplies, water & power, land, the outside world */}
       <div style={{ ...panel, position: 'fixed', right: 10, top: 10, width: 268, maxHeight: 'calc(100vh - 90px)', display: 'flex', flexDirection: 'column' }}>
-        <Tabs tabs={[['family', 'Family', familyAlert], ['supplies', 'Supplies', foodAlert], ['utilities', 'Utilities', utilAlert], ['land', 'Land'], ['outside', 'Outside', outsideAlert], ['chronicle', 'Years']]} value={rightTab} set={setRightTab} />
+        <Tabs tabs={[['family', 'Family', familyAlert], ['supplies', 'Supplies', foodAlert], ['utilities', 'Utilities', utilAlert], ['land', 'Land'], ['defense', 'Defense', defenseAlert], ['outside', 'Outside', outsideAlert], ['chronicle', 'Years']]} value={rightTab} set={setRightTab} />
         <div style={{ overflowY: 'auto', flex: 1, paddingRight: 2 }}>
           {rightTab === 'family' && <>
             {game.people.map((p, i) => {
@@ -597,6 +601,8 @@ export function Hud() {
 
           {rightTab === 'chronicle' && <Chronicle />}
 
+          {rightTab === 'defense' && <DefenseTab />}
+
           {rightTab === 'outside' && <>
             <TakenSection />
             <ScavengeSection />
@@ -711,6 +717,61 @@ export function Hud() {
       </div>
     </>
   );
+}
+
+/** The Defense tab's dot: red if a home is exposed after the hit, amber if the line is open before it. */
+function defenseTabAlert(game: GameState): Tone | undefined {
+  if (!game.structures.some(st => st.finishedAt !== null && isHome(st.kind))) return undefined;
+  const hit = !!game.disaster.kind && game.clock.t >= game.disaster.hitAt;
+  if (!hit && game.disaster.phase !== 'warning') return undefined;   // the report is only worked out when it matters
+  const d = defenseReport(game);
+  if (hit && d.homes.some(h => !h.covered)) return 'bad';
+  return d.score < 25 ? 'warn' : undefined;
+}
+
+/** One checklist line: a tick or a cross, what it is, and why. */
+function CheckRow({ c }: { c: Check }) {
+  return <div title={c.detail} style={{ display: 'flex', gap: 6, padding: '2px 0', alignItems: 'baseline' }}>
+    <span style={{ color: TONE[c.tone], width: 14, textAlign: 'center' }}>{c.ok ? '✓' : '✕'}</span>
+    <span style={{ flex: 1 }}>{c.label}</span>
+    <span style={{ color: DIM, fontSize: 11.5, textAlign: 'right', maxWidth: '55%' }}>{c.detail}</span>
+  </div>;
+}
+
+/** Defense and preparedness: a score, whether the place is walled in, what's built, and how ready it is for other trouble. */
+function DefenseTab() {
+  const game = useGameStore(s => s.game);
+  const w = useWorldStore();
+  const d = defenseReport(game);
+  const exposed = d.homes.filter(h => !h.covered);
+  return <>
+    <Section title="Defense">
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+        <span style={{ fontSize: 30, fontWeight: 700, color: TONE[d.tone] }}>{d.score}</span>
+        <span style={{ fontSize: 15, color: TONE[d.tone] }}>{d.label}</span>
+        <span style={{ color: DIM, fontSize: 11.5 }}>of 100</span>
+      </div>
+      <Row label="Line holds people out" value={`${Math.round(d.barrier)}%`} tone={d.barrier >= 65 ? 'good' : d.barrier >= 35 ? 'warn' : 'bad'} title="How hard the walls, gates and bars stop a crew, as the gate card and the battle read it" />
+      <Row label="Seen coming" value={`${Math.round(d.detection)}%`} tone={d.detection >= 60 ? 'good' : d.detection >= 35 ? 'warn' : 'bad'} />
+      <button style={{ ...btn(w.showBoundary), marginTop: 4 }} onClick={() => w.setShowBoundary(!w.showBoundary)} title="Draw the property line on the ground">{w.showBoundary ? 'Hide' : 'Show'} property line</button>
+    </Section>
+    <Section title="The property line">
+      {d.walls.map(c => <CheckRow key={c.id} c={c} />)}
+      {d.gaps.length > 0 && <Note tone="warn">Open ground on the line, e.g. near ({d.gaps.slice(0, 3).map(([x, z]) => `${Math.round(x * 6)}, ${Math.round(z * 6)} m`).join('; ')}). Turn on the property line to see it.</Note>}
+    </Section>
+    <Section title="The houses">
+      {d.homes.length === 0 && <Note>No house finished yet.</Note>}
+      {d.homes.map(h => <CheckRow key={h.id} c={{ id: h.id, label: h.name, ok: h.covered, tone: h.covered ? 'good' : 'bad', detail: h.how }} />)}
+      {exposed.length > 0 && <Note tone="bad">{exposed.length} home{exposed.length > 1 ? 's are' : ' is'} exposed: close the property line (and bar the creek) or wall a ring round {exposed.length > 1 ? 'them' : 'it'}.</Note>}
+    </Section>
+    <Section title="Watching">{d.watch.map(c => <CheckRow key={c.id} c={c} />)}</Section>
+    <Section title="Fighting">{d.fight.map(c => <CheckRow key={c.id} c={c} />)}</Section>
+    <Section title="Shelter">{d.shelter.map(c => <CheckRow key={c.id} c={c} />)}</Section>
+    <Section title="Other catastrophes">{d.catastrophes.map(c => <CheckRow key={c.id} c={c} />)}</Section>
+    <Section title="Built for defense">
+      {d.improvements.length ? <div style={{ color: DIM, lineHeight: 1.5 }}>{d.improvements.join(' · ')}</div> : <Note>Nothing yet. Fences, walls, a tower, a dog and cameras all count.</Note>}
+    </Section>
+  </>;
 }
 
 const SOURCE_NAME = { radio: 'Radio', neighbor: 'Neighbor', trader: 'Trader', prisoner: 'Prisoner' } as const;

@@ -25,6 +25,7 @@ import { backgroundOf } from './family';
 import { isHome } from './blueprints';
 import { isFinished } from './construction';
 import { PERIMETER, runFinished } from './perimeter';
+import { enclosure } from './enclosure';
 import { mulberry32 } from './rng';
 import { leaveAftermath } from './aftermath';
 import { hourOf, type GameState } from './state';
@@ -214,6 +215,9 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
   const posts: PostSpot[] = [];
   for (const st of fin) if (st.kind.includes('tower')) posts.push({ kind: 'tower', x: st.x, z: st.z, y: 0.9, cover: 0.28, value: 4, cap: 1, wrecked: false, fire: 0 });
   for (let i = 0; i < Math.min(3, n('sandbags')); i++) { const p = at(3, (i - 1) * 2.5); posts.push({ kind: 'sandbags', ...p, y: 0, cover: 0.22, value: 3, cap: 1, wrecked: false, fire: 0 }); }
+  // a wall only delays a crew that has to come over it: a gap, an open gate or an unbarred creek in the property line is the way round
+  const propLine = enclosure(s);
+  const lineClosed = propLine.openShare === 0 && propLine.creekOpen === 0;
   let wallR = 0;
   for (const run of s.perimeter) {
     if (!runFinished(run) || PERIMETER[run.kind].blocks.people <= 0 || !run.pts.length) continue;
@@ -564,8 +568,8 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
     }
     if (!rUp.length) { end = 'repelled'; endT = t + 3; break; }
     // they can't get over the wall and give up
-    if (!breached && wallR && !wallDown && lineSince >= 0 && t - lineSince > 40) { say(t, v(lead(), ['They can\'t get over the wall — they\'re giving up — oh my God —'], ['They can\'t breach. They\'re pulling out.']), lead()); for (const f of rUp) { f.fled = true; ev.push({ t: r2(t + r()), kind: 'flee', unit: f.id }); } end = 'fled'; endT = t + 6; break; }
-    const climbing0 = wallR > 0 && !wallDown;
+    if (!breached && wallR && !wallDown && lineSince >= 0 && t - lineSince > 40 && (lineClosed || !propLine.onLine.size)) { say(t, v(lead(), ['They can\'t get over the wall — they\'re giving up — oh my God —'], ['They can\'t breach. They\'re pulling out.']), lead()); for (const f of rUp) { f.fled = true; ev.push({ t: r2(t + r()), kind: 'flee', unit: f.id }); } end = 'fled'; endT = t + 6; break; }
+    const climbing0 = wallR > 0 && !wallDown && (lineClosed || !propLine.onLine.size);
     // the weak side: which flank has fewer defenders
     const leftDef = hUp.filter(h => (h.x - C.x) * lx + (h.z - C.z) * lz > 0).length;
     const flank = leftDef > hUp.length / 2 ? -1 : 1;
@@ -670,7 +674,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
     if (atLine.length && lineSince < 0) lineSince = t;
     const hNow = H.filter(f => !f.out && !f.shelter && f.arm !== FISTS).length;
     // a wall takes time to get over (a ladder, bolt cutters, a truck): ~10 s at it, exposed, before the first are across
-    const climbing = wallR > 0 && !wallDown;
+    const climbing = wallR > 0 && !wallDown && (lineClosed || !propLine.onLine.size);
     // (round 4) clubs against rifles need far more of them to rush the line; going over a wall, every rifle at a post on it slows them
     const outnumber = armedR ? 2 : 4;
     const onWall = H.filter(f => !f.out && !f.shelter && f.arm !== FISTS && t >= f.readyAt && f.post?.kind !== 'open' && f.post?.kind !== 'building').length;
