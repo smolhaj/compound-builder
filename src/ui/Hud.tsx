@@ -699,7 +699,7 @@ export function Hud() {
         <select value={w.weatherMode} onChange={e => w.setWeatherMode(e.target.value as WeatherMode)} title="Weather">
           {WEATHER_MODES.map(x => <option key={x}>{x}</option>)}
         </select>
-        <select value={w.quality} onChange={e => w.setQuality(e.target.value as Quality)} title="Graphics quality">
+        <select value={w.quality} onChange={e => w.setQuality(e.target.value as Quality, true)} title="Graphics quality">
           {QUALITIES.map(x => <option key={x}>{x}</option>)}
         </select>
         <span style={{ opacity: 0.7 }}>Sightlines</span>
