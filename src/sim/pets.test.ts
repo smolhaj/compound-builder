@@ -243,10 +243,17 @@ describe('dogs as named pets', () => {
     expect(g.petLife!.grief[g.people[2].id]).toBeGreaterThan(g.petLife!.grief[g.people[0].id]);
   });
 
-  it('a dog without a bed is a little less happy; a blanket counts', () => {
-    const run2 = (beds: number) => { const g = shut(6); g.stock.kibble = 50; g.stock.dogbed = beds; const d = adoptDog(g, { ageYears: 3 }); run(g, 20); return { g, d }; };
-    const a = run2(0), b = run2(1);
-    expect(hasBed(a.g, a.d)).toBe(false); expect(hasBed(b.g, b.d)).toBe(true);
-    expect(b.d.mood).toBeGreaterThan(a.d.mood + 2);
+  it('a dog inside a furnished home never needs a dog bed; outside or homeless it wants one (a blanket counts)', () => {
+    const mk = (home: boolean, guard: boolean, beds: number) => {
+      const g = shut(6); g.stock.kibble = 50; g.stock.dogbed = beds;
+      if (home) g.structures.push({ id: 'h1', kind: 'timber_cabin', x: 30, z: 30, rot: 0, stage: 5, done: 0, supplied: true, finishedAt: 0 });
+      const d = adoptDog(g, { ageYears: 3, guard }); run(g, 20); return { g, d };
+    };
+    const inside = mk(true, false, 0), camp = mk(false, false, 0), campBed = mk(false, false, 1), post = mk(true, true, 0), postBed = mk(true, true, 1);
+    expect(hasBed(inside.g, inside.d)).toBe(true);
+    expect(hasBed(camp.g, camp.d)).toBe(false); expect(hasBed(campBed.g, campBed.d)).toBe(true);
+    expect(hasBed(post.g, post.d)).toBe(false); expect(hasBed(postBed.g, postBed.d)).toBe(true);
+    expect(inside.d.mood).toBeGreaterThan(camp.d.mood + 2);
+    expect(campBed.d.mood).toBeGreaterThan(camp.d.mood + 2);
   });
 });

@@ -24,7 +24,7 @@ export interface DogGoal {
 
 export interface DogCtx {
   /** The house the family lives in (center, rot, size), or null (camp). */
-  home: { x: number; z: number; rot: number; w: number; d: number } | null;
+  home: { x: number; z: number; rot: number; w: number; d: number; /** Seats, sofas and rugs inside (local x, z, face x, z). */ seats?: ReadonlyArray<readonly [number, number, number, number]> } | null;
   camp: { x: number; z: number };
   /** The gate on the property line, and the yard the drive runs to. */
   gate: { x: number; z: number };
@@ -74,6 +74,12 @@ export function dogGoal(d: Dog, index: number, hour: number, day: number, ctx: D
     // trot along behind-and-to-the-side of its person
     const a = who.rot + Math.PI + (hash(d.id, 3) < 0.5 ? 0.7 : -0.7), r = 0.11 + 0.04 * index;
     return { x: who.x + Math.sin(a) * r, z: who.z + Math.cos(a) * r, stance: lazy ? 'lie' : 'sit', face: faceTo(who.x, who.z, who.x + Math.sin(who.rot), who.z + Math.cos(who.rot)), frisky: pup || d.play < 15, follow: !lazy };
+  }
+  if (night && ctx.home?.seats?.length && !d.guard) {
+    // inside: curled up on a sofa, a rug or a bed where the interior has one
+    const h = ctx.home, seat = h.seats![Math.floor(hash(d.id, 7) * h.seats!.length)];
+    const c = Math.cos(h.rot), sn = Math.sin(h.rot);
+    return { x: h.x + seat[0] * c + seat[1] * sn, z: h.z - seat[0] * sn + seat[1] * c, stance: 'lie', face: null, frisky: false, follow: false };
   }
   if (night) {
     const s = doorSpot(ctx, d, 0.1);

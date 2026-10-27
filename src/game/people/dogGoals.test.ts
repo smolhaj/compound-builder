@@ -31,4 +31,11 @@ describe('where the dogs are', () => {
     const g = newGame(1); const d = adoptDog(g, { puppy: true }); d.guard = true;
     expect(dogGoal(d, 0, 23, 0, ctx(), 0).stance).toBe('lie');
   });
+  it('an inside dog sleeps on the sofa or rug where the interior has one', () => {
+    const g = newGame(1); const d = adoptDog(g, { ageYears: 3 });
+    const c = ctx({ home: { x: 30, z: 30, rot: 0, w: 4, d: 3, seats: [[0.5, 0.2, 0, 0]] } });
+    const night = dogGoal(d, 0, 23, 0, c, 0.5);
+    expect(night.stance).toBe('lie');
+    expect(night.x).toBeCloseTo(30.5); expect(night.z).toBeCloseTo(30.2);
+  });
 });

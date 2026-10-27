@@ -84,7 +84,7 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   dog: { id: 'dog', name: 'Dog (trained adult)', unit: 'a named, trained adult dog: a family pet who also barks at strangers. It must be fed, watered, walked and doctored, and it will grieve and be grieved', price: 600 },
   puppy: { id: 'puppy', name: 'Puppy', unit: 'a named puppy: needs vaccines, training and a lot of time, and grows into a better guard and a closer friend', price: 250 },
   kibble: { id: 'kibble', name: 'Dog food', unit: '18 kg bag of kibble (≈ 63,000 kcal: two months for one dog)', price: 45 },
-  dogbed: { id: 'dogbed', name: 'Dog bed', unit: 'a cheap bed or a folded blanket for a dog: every dog wants somewhere of its own', price: 20 },
+  dogbed: { id: 'dogbed', name: 'Dog bed', unit: 'a cheap bed or a folded blanket for a dog kept outside or with no home yet (inside a furnished home dogs use the beds, sofa and rugs)', price: 20 },
   doghouse: { id: 'doghouse', name: 'Doghouse', unit: 'an insulated doghouse for a dog kept outside in the cold', price: 140 },
   steel_door: { id: 'steel_door', name: 'Steel entry door', unit: 'a steel door in a steel frame, installed', price: 1200 },
   window_bars: { id: 'window_bars', name: 'Window bars', unit: 'security bars for the house windows', price: 900 },

@@ -34,6 +34,7 @@
 import { mulberry32, pick } from './rng';
 import { calendarOf, dayIndex, type GameState } from './state';
 import { eatFrom } from './pantry';
+import { isHome } from './blueprints';
 import { REGIONS } from './regions';
 import type { SkillId } from './family';
 
@@ -492,8 +493,17 @@ export function findHomes(s: GameState, id: string): string | null {
   return null;
 }
 
-/** Dogs that have a bed (a blanket counts; a doghouse is a bed too): the first N dogs. */
-export const hasBed = (s: GameState, d: Dog): boolean => livingDogs(s).indexOf(d) < Math.floor((s.stock.dogbed ?? 0) + (s.stock.doghouse ?? 0));
+/**
+ * Somewhere of its own to sleep. A dog kept inside a furnished home uses the
+ * family's beds, the sofa or a rug, so it never needs a dog bed. Otherwise
+ * (posted outside, or no home yet) a dog bed, a blanket or a doghouse: one
+ * for each of the first N such dogs.
+ */
+export function hasBed(s: GameState, d: Dog): boolean {
+  if (!d.guard && s.structures.some(st => st.finishedAt !== null && isHome(st.kind))) return true;
+  const needy = livingDogs(s).filter(x => x.guard || !s.structures.some(st => st.finishedAt !== null && isHome(st.kind)));
+  return needy.indexOf(d) < Math.floor((s.stock.dogbed ?? 0) + (s.stock.doghouse ?? 0));
+}
 
 // ─────────────────────────────────────────────────────────────────────────
 // Grief, and the dogs' lift to morale
