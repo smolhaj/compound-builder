@@ -29,6 +29,8 @@ export type BattleEvent =
   | { t: number; kind: 'move'; unit: string; x: number; z: number; y?: number }
   | { t: number; kind: 'shot'; from: string; to: string; hit: boolean; auto?: boolean }
   | { t: number; kind: 'mine'; x: number; z: number; hits: string[] }
+  /** A raider hurt getting over the wall (the wire, the thorns, the ditch, the sharpened logs): `what` is what caught him. */
+  | { t: number; kind: 'snag'; unit: string; x: number; z: number; what: string }
   /** `part`: where the round struck (shrapnel has none); `stopped`: armor caught it (a bruise, not a wound). */
   | { t: number; kind: 'wound'; unit: string; sev: number; part?: 'head' | 'torso' | 'arm' | 'leg'; stopped?: boolean }
   /** `executed`: killed on the ground after the fight was lost (a ruthless crew). */

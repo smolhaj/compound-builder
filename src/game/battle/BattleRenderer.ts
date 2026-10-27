@@ -246,6 +246,13 @@ export class BattleRenderer {
         if (e.auto) for (let k = 1; k <= 3; k++) this._pending.push({ at: this.time + k * 0.09, ev: { ...e, t: e.t, auto: false, hit: false } });
         break;
       }
+      case 'snag': {
+        // caught on the wire / the thorns / in the ditch: he stops where he is and crouches, a small cloud of dust
+        const u = U_(e.unit); if (!u || u.dead) break;
+        u.tx = u.x; u.tz = u.z; u.crouch = true;
+        this._puff(new THREE.Vector3(u.x, this._ground(u.x, u.z) + 0.05, u.z), 0.04, 0.3, 0.6, 0.03, 0x8a7a5c, 0.5);
+        break;
+      }
       case 'mine': {
         this._boom(e.x, this._ground(e.x, e.z), e.z, 0.7, true);
         break;
