@@ -25,7 +25,7 @@ describe('regionKindFor / townSpecFor', () => {
 
 describe('RegionalField', () => {
   it('is the flat town ground inside the town (streets are never buried)', () => {
-    for (const k of ['mountain', 'coast', 'sound', 'drumlin', 'plains', 'bayou', 'city'] as RegionKind[]) {
+    for (const k of ['mountain', 'coast', 'sound', 'drumlin', 'plains', 'bayou', 'city', 'appalachia', 'desert', 'north_woods', 'upper_midwest'] as RegionKind[]) {
       const f = field(k);
       const ext = townSpecFor(k).ext;
       for (let i = 0; i < 200; i++) {
@@ -47,7 +47,7 @@ describe('RegionalField', () => {
   });
 
   it('keeps slopes within reason near the town edge (no wall where the hills start)', () => {
-    for (const k of ['mountain', 'drumlin', 'sound', 'coast'] as RegionKind[]) {
+    for (const k of ['mountain', 'drumlin', 'sound', 'coast', 'appalachia', 'desert', 'north_woods', 'upper_midwest'] as RegionKind[]) {
       const f = field(k);
       const edge = f.edge;
       for (let i = 0; i < 120; i++) {
@@ -62,7 +62,7 @@ describe('RegionalField', () => {
   });
 
   it('carves water only in low ground, well clear of the town', () => {
-    for (const k of ['mountain', 'sound', 'drumlin', 'plains', 'bayou'] as RegionKind[]) {
+    for (const k of ['mountain', 'sound', 'drumlin', 'plains', 'bayou', 'appalachia', 'north_woods', 'upper_midwest'] as RegionKind[]) {
       const f = field(k);
       let wet = 0;
       for (let x = -900; x <= 900; x += 15) for (let z = -900; z <= 900; z += 15) {
@@ -73,6 +73,33 @@ describe('RegionalField', () => {
       }
       expect(wet).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('Compound Builder regions', () => {
+  const relief = (k: RegionKind) => {
+    const f = field(k);
+    let lo = Infinity, hi = -Infinity, wood = 0, n = 0;
+    for (let x = -700; x <= 700; x += 20) for (let z = -700; z <= 700; z += 20) {
+      if (f.rectDist(x, z) < 250) continue;
+      const s = f.sample(x, z); lo = Math.min(lo, s.h); hi = Math.max(hi, s.h); n++; if (s.forest > 0.5) wood++;
+    }
+    return { range: hi - lo, wood: wood / n };
+  };
+  it('Appalachia is steep and wooded, the Plains flat and open, the desert bare with mesas, the North Woods low and wooded', () => {
+    const ap = relief('appalachia'), pl = relief('plains'), de = relief('desert'), nw = relief('north_woods'), um = relief('upper_midwest');
+    expect(ap.range).toBeGreaterThan(40);          // ridges 250 m+ over the hollows
+    expect(ap.wood).toBeGreaterThan(0.6);
+    expect(pl.wood).toBeLessThan(0.25);
+    expect(de.range).toBeGreaterThan(20);          // mesas 120 m+
+    expect(de.wood).toBeLessThan(0.3);
+    expect(nw.range).toBeLessThan(ap.range);
+    expect(nw.wood).toBeGreaterThan(0.55);
+    expect(um.wood).toBeGreaterThan(0.1);
+    expect(um.wood).toBeLessThan(0.6);
+  });
+  it('the desert has no open water', () => {
+    expect(field('desert').waterY).toBeNull();
   });
 });
 

@@ -31,7 +31,10 @@ export const CLOSING_COSTS = 0.03;
 /** Property tax rate (of assessed value, a year) and how strict the county is about permits, by region. */
 export const COUNTY: Record<RegionId, { tax: number; strict: number }> = {
   mountain_west: { tax: 0.0055, strict: 1 }, appalachia: { tax: 0.005, strict: 0.6 }, desert: { tax: 0.006, strict: 0.6 },
-  north_woods: { tax: 0.012, strict: 0.8 }, plains: { tax: 0.013, strict: 0.5 }, pnw: { tax: 0.009, strict: 1.6 }, upper_midwest: { tax: 0.015, strict: 1.3 },
+  north_woods: { tax: 0.012, strict: 0.8 },
+  // Vermont's Act 250 and NH's high property tax; most Missouri / Arkansas counties have no building code; unincorporated Texas almost none
+  new_england: { tax: 0.019, strict: 1.4 }, ozarks: { tax: 0.009, strict: 0.35 }, hill_country: { tax: 0.018, strict: 0.3 }, rust_belt: { tax: 0.016, strict: 1.1 },
+  plains: { tax: 0.013, strict: 0.5 }, pnw: { tax: 0.009, strict: 1.6 }, upper_midwest: { tax: 0.015, strict: 1.3 },
 };
 
 /** Permit fee by kind (none = no permit needed); review days for homes are longer. */

@@ -192,7 +192,7 @@ export function GameCanvas() {
       world.updateDeliveries(dt, game, speedK);
       const speed = game.clock.speed;
       const { timeOfDay: t, dayOfYear, totalDays, seasonMode, weatherMode } = useWorldStore.getState();
-      ws.setNightSky(moonPhase(dayOfYear + t / 24), skyDarkness('mountain_west', false));
+      ws.setNightSky(moonPhase(dayOfYear + t / 24), skyDarkness(world.climate, false));
       Object.assign(world.air, { hour: t, wind: weather.outputs.wind, daylight: 1 - ws.nightFactor * 0.85, viewportH: canvas.clientHeight || 800 });
       world.tick(dt, dayOfYear, totalDays, seasonMode);
       const sp = world.seasons.params;

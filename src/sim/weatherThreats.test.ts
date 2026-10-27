@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { calendarOf, newGame, type GameState } from './state';
 import { fieldHarvest, produce } from './needs';
 import { CLASSIC } from './site';
-import { snowedIn, weatherDay, weatherOf } from './weatherThreats';
+import { odds, snowedIn, stormOutage, weatherDay, weatherOf } from './weatherThreats';
+import { REGION_IDS } from './regions';
 import { addWork, isFinished } from './construction';
 
 const place = (region: typeof CLASSIC.region, doy: number, seed = 5) => {
@@ -121,5 +122,82 @@ describe('weather threats', () => {
     g.weather.hail = undefined;
     expect(short).toBeLessThan(fieldHarvestAt(g, h) * 0.8);
     expect(short).toBeGreaterThan(0);
+  });
+
+  it('each region gets its own storms: hurricane remnants in the mountains, monsoon flash floods in the desert, Northwest windstorms', () => {
+    const year = (region: typeof CLASSIC.region) => { const seen = new Set<string>(); const g = place(region, 1); for (let d = 1; d <= 365; d++) for (const k of Object.keys(odds(g, d))) seen.add(k); return seen; };
+    expect(year('appalachia').has('hurricane_remnants')).toBe(true);
+    expect(year('appalachia').has('ice_storm')).toBe(true);
+    expect(year('desert').has('flash_flood')).toBe(true);
+    expect(year('desert').has('blizzard')).toBe(false);
+    expect(year('pnw').has('windstorm')).toBe(true);
+    expect(year('pnw').has('tornado')).toBe(false);
+    expect(year('plains').has('tornado')).toBe(true);
+    expect(year('mountain_west').has('hurricane_remnants')).toBe(false);
+    // the Northwest floods in winter (atmospheric rivers), not with the spring melt
+    const pnw = place('pnw', 1);
+    expect(odds(pnw, 10).flood).toBeGreaterThan(0);
+    expect(odds(pnw, 120).flood).toBeUndefined();
+    // and no region gets more than a few storms a year
+    for (const region of REGION_IDS) {
+      let storms = 0;
+      for (let seed = 1; seed <= 8; seed++) storms += run(place(region, 1, seed), 365).filter(l => /warning|watch/i.test(l)).length;
+      expect(storms / 8).toBeLessThan(5);
+    }
+  });
+
+  it('an ice storm takes the power out and shuts the roads; then it clears', () => {
+    const g = place('appalachia', 10);
+    g.weather = { active: { kind: 'ice_storm', at: 0, until: 2 }, last: -999 };
+    g.clock.t = 0;
+    const lines = weatherDay(g);
+    expect(lines.some(l => /Ice storm/.test(l))).toBe(true);
+    expect(stormOutage(g, 1)).toBe(true);
+    expect(snowedIn(g, 1)).toBe(true);
+    expect(stormOutage(g, 3)).toBe(false);
+    run(g, 3);
+    expect(g.weather.active).toBeNull();
+  });
+
+  it('the hurricane\'s remnants flood the creek bottom; a flash flood takes the wash', () => {
+    let hit = 0;
+    for (let seed = 1; seed <= 40; seed++) {
+      const g = place('appalachia', 260, seed);
+      g.structures.push({ id: 'g', kind: 'garden', x: 5, z: 5, rot: 0, stage: 5, done: 0, supplied: true, finishedAt: 0 });
+      g.weather = { active: { kind: 'hurricane_remnants', at: 0, until: 1 }, last: -999 };
+      g.clock.t = 0; weatherDay(g);
+      if (g.structures.some(s => s.finishedAt === null)) hit++;
+    }
+    expect(hit).toBeGreaterThan(5);
+    const d = place('desert', 210);
+    d.site = { ...d.site, creek: false };
+    d.weather = { active: { kind: 'flash_flood', at: 0, until: 0 }, last: -999 };
+    d.clock.t = 0;
+    expect(weatherDay(d).some(l => /wash/.test(l))).toBe(true);
+  });
+
+  it('storms scale with difficulty: Cozy about half and shorter outages, Hardcore a quarter more', () => {
+    const at = (d: 'cozy' | 'standard' | 'hardcore') => { const g = place('appalachia', 1); g.disaster.difficulty = d; return odds(g, 10).ice_storm!; };
+    expect(at('cozy')).toBeCloseTo(at('standard') * 0.5, 9);
+    expect(at('hardcore')).toBeCloseTo(at('standard') * 1.25, 9);
+    // count the storm days over many years: Cozy well under Standard
+    const days = (d: 'cozy' | 'standard') => {
+      let n = 0;
+      for (let seed = 1; seed <= 12; seed++) {
+        const g = place('north_woods', 1, seed); g.disaster.difficulty = d;
+        for (let t = 0; t < 365 * 2; t++) { g.clock.t = t; weatherDay(g); if (g.weather?.active && t >= g.weather.active.at) n++; }
+      }
+      return n;
+    };
+    expect(days('cozy')).toBeLessThan(days('standard') * 0.7);
+  });
+
+  it('the new regions: Hill Country flash floods, New England hurricane remnants, the Ozarks ice and tornadoes', () => {
+    const year = (region: typeof CLASSIC.region) => { const seen = new Set<string>(); const g = place(region, 1); for (let d = 1; d <= 365; d++) for (const k of Object.keys(odds(g, d))) seen.add(k); return seen; };
+    expect(year('hill_country').has('flash_flood')).toBe(true);
+    expect(year('hill_country').has('blizzard')).toBe(false);
+    expect(year('new_england').has('hurricane_remnants')).toBe(true);
+    expect(year('ozarks').has('ice_storm') && year('ozarks').has('tornado')).toBe(true);
+    expect(year('rust_belt').has('blizzard')).toBe(true);
   });
 });
