@@ -33,7 +33,7 @@ export function CutsceneOverlay() {
   if (!c) return null;
   const night = c.hour < 6 || c.hour >= 20;
   const playing = c.phase === 'playing' && view;
-  const hour = playing ? view.hour : c.hour;
+  const hour = playing ? view.hour : c.phase === 'aftermath' && c.plan ? (c.hour + c.plan.totalGame / 3600) % 24 : c.hour;
   const plan = c.plan;
   const multi = !!plan && plan.scenes.length > 1;
   return (
@@ -103,7 +103,7 @@ function Report() {
       {row('Lost from the stores', r.lost.length ? r.lost.map(([k, n]) => `${n} ${k}`).join(', ') : 'nothing')}
       {row('Rounds fired', String(r.rounds))}
       {row('Raiders on the drive', r.raidersWounded + r.raidersDead ? `${r.raidersWounded} wounded, ${r.raidersDead} dead` : 'none left')}
-      {r.lines.map((l, i) => <div key={i} style={{ fontSize: 12.5, opacity: 0.8, marginTop: 5 }}>{l}</div>)}
+      {r.lines.filter(l => !/^Lost:|rounds fired\.$|more rounds went out/.test(l)).map((l, i) => <div key={i} style={{ fontSize: 12.5, opacity: 0.8, marginTop: 5 }}>{l}</div>)}
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
         <button style={{ ...btn, background: '#d8c9a0', color: '#1c1d18', border: 0, padding: '8px 16px', fontSize: 14 }} onClick={end}>{r.aftermath ? 'See to the drive' : 'Pick up the pieces'}</button>
       </div>
