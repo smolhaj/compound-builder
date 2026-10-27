@@ -100,3 +100,22 @@ describe('enclosure', () => {
     expect(ownedRects(game(false))[0]).toEqual(game(false).site.home);
   });
 });
+
+import { defenseReport } from './defenseReport';
+describe('defense report', () => {
+  it('scores an empty place as exposed and a walled, barred, watched one as hardened', () => {
+    const g = game(true);
+    g.structures.push({ id: 'h1', kind: 'log_house', x: 30, z: 30, rot: 0, stage: 5, done: 0, supplied: true, finishedAt: 0 });
+    const bare = defenseReport(g);
+    expect(bare.label).toBe('Exposed');
+    expect(bare.homes[0].covered).toBe(false);
+    expect(bare.walls.find(c => c.id === 'line')?.ok).toBe(false);
+    const h = g.site.home, midZ = (h.z0 + h.z1) / 2;
+    g.perimeter.push(loop(g, 'log_palisade'), run('creek_bars', [[h.x0 + 1, midZ - 3], [h.x0 + 1, midZ + 3]]), run('creek_bars', [[h.x1 - 1, midZ - 3], [h.x1 - 1, midZ + 3]]));
+    const walled = defenseReport(g);
+    expect(walled.homes[0].covered).toBe(true);
+    expect(walled.walls.every(c => c.ok || c.id === 'strong')).toBe(true);
+    expect(walled.score).toBeGreaterThan(bare.score + 20);
+    expect(walled.improvements.join()).toMatch(/palisade/i);
+  });
+});

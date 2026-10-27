@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
+import { useState, type CSSProperties, type ReactNode } from 'react';
 import type { GameState } from '../sim/state';
 import { isHome } from '../sim/blueprints';
 import { stormOutage } from '../sim/weatherThreats';
@@ -722,9 +722,11 @@ export function Hud() {
 /** The Defense tab's dot: red if a home is exposed after the hit, amber if the line is open before it. */
 function defenseTabAlert(game: GameState): Tone | undefined {
   if (!game.structures.some(st => st.finishedAt !== null && isHome(st.kind))) return undefined;
+  const hit = !!game.disaster.kind && game.clock.t >= game.disaster.hitAt;
+  if (!hit && game.disaster.phase !== 'warning') return undefined;   // the report is only worked out when it matters
   const d = defenseReport(game);
-  if (d.homes.some(h => !h.covered) && game.clock.t >= game.disaster.hitAt && game.disaster.kind) return 'bad';
-  return d.score < 25 && game.disaster.phase === 'warning' ? 'warn' : undefined;
+  if (hit && d.homes.some(h => !h.covered)) return 'bad';
+  return d.score < 25 ? 'warn' : undefined;
 }
 
 /** One checklist line: a tick or a cross, what it is, and why. */
@@ -740,7 +742,7 @@ function CheckRow({ c }: { c: Check }) {
 function DefenseTab() {
   const game = useGameStore(s => s.game);
   const w = useWorldStore();
-  const d = useMemo(() => defenseReport(game), [game.perimeter, game.structures, game.stock, game.armory, game.land, game.utilities, game.people, game.clock.ticks]);
+  const d = defenseReport(game);
   const exposed = d.homes.filter(h => !h.covered);
   return <>
     <Section title="Defense">
