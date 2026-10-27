@@ -104,6 +104,21 @@ export function buildRun(run: PerimeterRun, ground: Ground, t: number, under: (x
       });
       for (const e of spanEnds()) post(e.x, e.z, 2.45 * M, 0.09 * M, 'wood_dark', true);
       break;
+    case 'creek_bars': {
+      // vertical steel bars in the bed, 15 cm clear apart (water, fish and drift pass), tied by a top rail and a low rail, a post every 2.4 m
+      const H = def.height, sp = 0.18 * M;
+      for (const [s0, s1] of spans) for (let s = s0; s <= s1 + 1e-6; s += sp) {
+        const p = along(run.pts, s), y = ground(p.x, p.z) - 0.08;
+        add('iron', new THREE.CylinderGeometry(0.025 * M, 0.025 * M, H + 0.08, 5).translate(p.x, y + (H + 0.08) / 2, p.z));
+      }
+      bays(2.4 * M, (a, b) => {
+        post(a.x, a.z, H + 0.03, 0.05 * M, 'iron');
+        beam(a.x, a.z, b.x, b.z, H - 0.02, 0.05 * M, 0.05 * M, 'iron');
+        beam(a.x, a.z, b.x, b.z, 0.35 * M, 0.04 * M, 0.04 * M, 'iron');
+      });
+      for (const e of spanEnds()) post(e.x, e.z, H + 0.03, 0.06 * M, 'iron');
+      break;
+    }
     case 'thorn_hedge': {
       const g = Math.max(0.04, growth), h = def.height * g, w = (0.4 + 1.6 * g) * M;
       let k = 0;

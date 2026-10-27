@@ -25,6 +25,7 @@ import { log } from './economy';
 import { burnStructure, isFinished } from './construction';
 import { raidPressure } from './opsec';
 import { PERIMETER, runFinished, runGrowth, wallLength } from './perimeter';
+import { enclosure } from './enclosure';
 import { freshNeeds } from './needs';
 import { contagion, infect } from './effects';
 import { dayJob, type Person, type SkillId, SKILL_IDS } from './family';
@@ -121,15 +122,18 @@ export function postureOf(s: GameState): Posture {
   const surface = fin.filter(st => !st.kind.startsWith('bunker_')).length;
   const visibility = Math.min(100, 12 + surface * 5 + (lit ? 18 : 0) + (s.utilities.report.genKwh > 0.1 ? 15 : 0) + (homes.length ? 8 : 0));
   // the line: barrier runs weighted by how much they stop people, against a ring of ≈ 240 m
+  const line = enclosure(s);
   let held = 0, look = 0;
   for (const r of s.perimeter) {
     const d = PERIMETER[r.kind];
     if (!runFinished(r) || d.blocks.people <= 0) continue;
+    if (line.onLine.has(r.id)) { look += wallLength(r) * (d.height > 0.35 ? 1 : 0.3) * runGrowth(r, s.clock.t); continue; }   // the property line holds by whether it is closed (sim/enclosure.ts)
     const g = runGrowth(r, s.clock.t), len = wallLength(r);
     held += len * d.blocks.people * g;
     look += len * (d.height > 0.35 ? 1 : 0.3) * g;
   }
-  const barrier = Math.min(100, held / 40 * 100), fortress = Math.min(100, look / 40 * 100);
+  // a ring round the compound, or a closed line round the whole property (gaps, open gates and an unbarred creek let them in)
+  const barrier = Math.max(Math.min(100, held / 40 * 100), line.barrier), fortress = Math.min(100, look / 40 * 100);
   // anyone away (a rescue, a run, the market) isn't on the line
   const here = (i: number) => s.personState[i]?.needs.died == null && !isAway(s, s.people[i].id);
   const adults = s.people.filter((p, i) => !p.kid && here(i));
