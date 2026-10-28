@@ -17,6 +17,7 @@ import { mulberry32, pick } from './rng';
 import { diffOf } from './difficulty';
 import { forewarned } from './radio';
 import { gearPosture } from './gear';
+import { fenceHold, watchDetection } from './daily';
 import { armed, firepower } from './armory';
 import { towerPosture } from './towers';
 import { raiseAlert } from './lights';
@@ -141,7 +142,7 @@ export function postureOf(s: GameState): Posture {
   // (balance pass) the ring needs ≈ 40 units of wall to close, and how good it is decides the rest: a ring of woven wire holds 50, a steel one 93,
   // so every tier up the chain raises the number (it used to be held / 40, which any 80 units of woven wire already maxed out)
   const ringQuality = wall > 0 ? held / wall : 0;
-  const barrier = Math.max(Math.min(1, wall / 40) * ringQuality * 100, line.barrier), fortress = Math.min(100, look / 40 * 100);
+  const barrier = Math.max(Math.min(1, wall / 40) * ringQuality * 100, line.barrier) * fenceHold(s), fortress = Math.min(100, look / 40 * 100);
   // anyone away (a rescue, a run, the market) isn't on the line
   const here = (i: number) => s.personState[i]?.needs.died == null && !isAway(s, s.people[i].id);
   const adults = s.people.filter((p, i) => !p.kid && here(i));
@@ -150,7 +151,7 @@ export function postureOf(s: GameState): Posture {
   const radioNet = s.neighbors.some(n => n.radio && n.status === 'home' && n.disposition > 30);
   const gear = gearPosture(s, fighters);
   const tw = towerPosture(s);
-  const detection = Math.min(100, 25 + watch * 5 + (radioNet ? 20 : 0) + (barrier > 50 ? 10 : 0) + gear.detection + tw.detection + forewarned(s));
+  const detection = Math.min(100, 25 + watch * 5 + (radioNet ? 20 : 0) + (barrier > 50 ? 10 : 0) + gear.detection + tw.detection + forewarned(s) + watchDetection(s));
   return { visibility: Math.min(100, visibility + gear.visibility + tw.visibility), fortress, barrier: Math.min(100, barrier + gear.barrier), detection, fighters, deter: gear.deter, safeRoom: gear.safeRoom, armed: armed(s), firepower: firepower(s) * gear.fight * tw.fire, bunker: fin.some(st => st.kind === 'bunker_hatch' || st.kind === 'bunker_stairs') };
 }
 

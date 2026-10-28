@@ -466,18 +466,18 @@ describe('after the collapse', () => {
 });
 
 describe('save', () => {
-  it('a v45 save gets a starter kit from its family and trades', () => {
+  it('a v46 save gets a starter kit from its family and trades', () => {
     const g = newGame(7) as unknown as Record<string, unknown>;
-    const old: Record<string, unknown> = { ...g, version: 45 }; delete old.tools;
+    const old: Record<string, unknown> = { ...g, version: 46 }; delete old.tools;
     const up = migrate(old);
-    expect(up.version).toBe(46);
+    expect(up.version).toBe(47);
     expect(up.tools!.items.length).toBeGreaterThanOrEqual(9);
     expect(up.tools).toEqual(starterKit(up.people, up.seed));
   });
   it('a save that already has a kit keeps it', () => {
     const g = newGame(7);
     g.tools!.items[0].cond = 0.123;
-    const up = migrate({ ...(structuredClone(g) as unknown as Record<string, unknown>), version: 45 });
+    const up = migrate({ ...(structuredClone(g) as unknown as Record<string, unknown>), version: 46 });
     expect(up.tools!.items[0].cond).toBe(0.123);
   });
 });

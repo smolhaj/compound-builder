@@ -5,8 +5,7 @@
  */
 import { LIFESTYLE } from './site';
 import { crewStep } from './crews';
-import { addWork, holdReason, isFinished } from './construction';
-import { toolsDay } from './tools';
+import { addWork, canGoOn } from './construction';
 import { addCarryWork, deliverOrders } from './economy';
 import { addFixWork, nextFix, siteJobsDay } from './improvements';
 import { paperworkDay } from './paperwork';
@@ -19,6 +18,7 @@ import { bodyDay } from './body';
 import { financeDay } from './finance';
 import { armoryDay } from './armory';
 import { gearDay } from './gear';
+import { toolsDay } from './tools';
 import { vehiclesDay } from './vehicles';
 import { radioDay } from './radio';
 import { waterDay } from './water';
@@ -47,8 +47,10 @@ import { mulberry32 } from './rng';
 import { log } from './economy';
 import { dayIndex } from './state';
 import { buildRate } from './family';
-import { routineAt, taskFor } from './schedule';
-import { hourOf, type GameState, type Structure } from './state';
+import { taskFor } from './schedule';
+import { choresDay, choresStep, dailyTick, DUTY, DUTY_TASK, restFactor, tire, dutyWork, choreRate } from './daily';
+import { gatheringStep, gatheringsDay } from './gatherings';
+import type { GameState, Structure } from './state';
 
 /** Household running costs a day in peacetime (rural Mountain West, 2020s): the truck, insurance, phone and property tax for the household, plus groceries a head ($160 for a family of four). Stops once the stores and banks are gone. */
 export const LIVING_BASE = 100, GROCERIES_PER_HEAD = 15;
@@ -60,7 +62,7 @@ export const SUBSTEP = 0.25 / 24;
 
 /** Structure the family works on next: the oldest one that can go on. */
 export function nextBuildTarget(s: GameState): Structure | null {
-  for (const st of s.structures) if (!isFinished(st) && holdReason(s, st) === null) return st;
+  for (const st of s.structures) if (canGoOn(s, st)) return st;
   return null;
 }
 
@@ -68,7 +70,7 @@ function subStep(s: GameState): void {
   deliverOrders(s);
   // a raid rolled this morning reaches the gate at its hour of the night or day
   { const arrived = arrivalCheck(s); if (arrived) log(s, `${arrived.title}.`); }
-  const h = hourOf(s.clock.t);
+  const h = (s.clock.ticks * 0.25 + 6) % 24;   // exact: the tick count is an integer (hourOf(t) can land a hair under the hour)
   const target = nextBuildTarget(s);
   const run = target ? null : nextRun(s);
   const fit = target || run ? null : nextFit(s);
@@ -79,32 +81,49 @@ function subStep(s: GameState): void {
   const job = nextFellJob(s);
   // with both building and felling to do, the family splits: every other person to the woods
   const weekday = dayIndex(s.clock.t) % 7 < 5;
+  const canBuild = carry || target !== null || run !== null || fit !== null || harden !== null || fix !== null;
+  // daily life (sim/daily.ts): the roster, refilled each day on Auto (and when the threat changes, checked hourly)
+  // (fatigue and chores are counted once a game hour; building work every sub-step)
+  const tk = dailyTick(s, { build: canBuild, fell: job !== null }), rates = tk.rates, hrs = SUBSTEP * 24, hourly = s.clock.ticks % 4 === 0;
+  const party = gatheringStep(s);
   s.people.forEach((p, i) => {
     const ps = s.personState.find(x => x.id === p.id)!;
     if (ps.needs.died != null) { ps.task = 'gone'; ps.target = null; return; }
     // gone after a taken child: off the place until they're back
     if (isAway(s, p.id)) { ps.task = 'away'; ps.target = null; return; }
+    const duty = tk.duties[i];
+    // between the hour marks nothing changes for someone already on a plain duty (building and felling are worked every sub-step)
+    if (!hourly && !party && duty !== 'build' && duty !== 'wood' && ps.task === DUTY_TASK[duty]) return;
     // the first two weeks after the strikes: everyone in the shelter
-    if (isNuclear(s) && s.clock.t < s.disaster.hitAt + SHELTER_DAYS) { ps.task = routineAt(p, h) === 'sleep' ? 'sleep' : 'shelter'; ps.target = null; return; }
-    const rate = buildRate(p) * workFactor(ps.needs);
-    const slot = routineAt(p, h);
+    if (isNuclear(s) && s.clock.t < s.disaster.hitAt + SHELTER_DAYS) { ps.task = duty === 'sleep' ? 'sleep' : 'shelter'; ps.target = null; if (hourly) tire(ps, duty === 'sleep' ? 'sleep' : 'leisure', h, 1); return; }
+    // a gathering: everyone not on watch comes (the little ones until nine)
+    if (party && duty !== 'watch' && (duty !== 'sleep' || (h >= 17 && h < (p.kid && p.age < 12 ? 21 : 23)))) { ps.task = 'party'; ps.target = null; if (hourly) tire(ps, 'leisure', h, 1); return; }
     // the day job: weekdays in town during work hours, paid by the hour
-    if (slot === 'work' && weekday && ps.employed && p.job && !snowedIn(s)) {
-      ps.task = 'job'; ps.target = null;
+    if (DUTY[duty].work && duty !== 'watch' && h >= 7 && h < 16 && weekday && ps.employed && p.job && !snowedIn(s)) {
+      ps.task = 'job'; ps.target = null; if (hourly) tire(ps, 'kitchen', h, 1);
       s.money += p.job.wage / 8 * SUBSTEP * 24;
       return;
     }
-    const task = taskFor(slot, carry || target !== null || run !== null || fit !== null || harden !== null || fix !== null, job !== null, i % 2 === 1);
-    ps.task = task;
-    ps.target = task === 'build' && !carry ? (target?.id ?? run?.id ?? fit?.building ?? harden?.building ?? fix?.st.id ?? null) : task === 'forestry' && job ? job.id : null;
-    if (task === 'build' && carry) addCarryWork(s, SUBSTEP * 24 * rate);
-    else if (task === 'build' && target) addWork(s, target, SUBSTEP * 24 * rate, true);
-    else if (task === 'build' && run) addRunWork(s, run, SUBSTEP * 24 * rate);
-    else if (task === 'build' && fit) addFitWork(s, fit, SUBSTEP * 24, p.skills.mechanic);
-    else if (task === 'build' && harden) addHardenWork(s, harden, SUBSTEP * 24 * rate);
-    else if (task === 'build' && fix) addFixWork(s, fix.st, fix.f, SUBSTEP * 24 * rate);
-    else if (task === 'forestry' && job) addFellWork(s, job, SUBSTEP * 24 * rate);
+    if (hourly) tire(ps, duty, h, 1);
+    if (duty === 'build' || (duty === 'wood' && job !== null && (rates.woodpile <= 0 || i % 2 === 0))) {
+      const rate = buildRate(p) * workFactor(ps.needs) * restFactor(ps);
+      const task = duty === 'wood' ? 'forestry' : taskFor('work', canBuild, job !== null, i % 2 === 1);
+      ps.task = task;
+      ps.target = task === 'build' && !carry ? (target?.id ?? run?.id ?? fit?.building ?? harden?.building ?? fix?.st.id ?? null) : task === 'forestry' && job ? job.id : null;
+      if (task === 'build' && carry) addCarryWork(s, hrs * rate);
+      else if (task === 'build' && target) addWork(s, target, hrs * rate, true);
+      else if (task === 'build' && run) addRunWork(s, run, hrs * rate);
+      else if (task === 'build' && fit) addFitWork(s, fit, hrs, p.skills.mechanic);
+      else if (task === 'build' && harden) addHardenWork(s, harden, hrs * rate);
+      else if (task === 'build' && fix) addFixWork(s, fix.st, fix.f, hrs * rate);
+      else if (task === 'forestry' && job) addFellWork(s, job, hrs * rate);
+      return;
+    }
+    ps.task = DUTY_TASK[duty];
+    ps.target = null;
+    if (hourly) dutyWork(s, p, ps, duty, choreRate(p) * workFactor(ps.needs) * restFactor(ps), h);
   });
+  if (hourly) choresStep(s, 1 / 24, rates);
   // (broke: the bills stop at nothing; food stamps and the food bank keep the table going)
   if (s.disaster.tracks.banks > 0.5 && s.disaster.tracks.stores > 0.5 && s.money > 0) s.money -= livingPerDay(s) * SUBSTEP;
   // investment income comes in while the banks work
@@ -146,6 +165,8 @@ function subStep(s: GameState): void {
     if (before !== 'impact' && s.disaster.phase === 'impact' && s.disaster.kind === 'nuclear') for (const line of strike(s)) log(s, line);
     for (const line of falloutDay(s)) log(s, line);
     for (const line of effectsDay(s)) log(s, line);
+    for (const line of choresDay(s, mulberry32(s.seed * 6151 + dayIndex(s.clock.t) * 3))) log(s, line);
+    for (const line of gatheringsDay(s)) log(s, line);
     if (before !== 'impact' && s.disaster.phase === 'impact') {
       for (const ps of s.personState) if (ps.employed) {
         ps.employed = false; ps.laidOff = true;

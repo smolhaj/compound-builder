@@ -21,6 +21,7 @@
  * Prices (2025 US): a dairy doe $350, a feeder pig $150, a weaned steer calf
  * $1,800, a meat rabbit $35; hay $12 a small square bale, feed $20 a bag.
  */
+import { careYield } from './daily';
 import { log } from './economy';
 import { calendarOf, type GameState } from './state';
 import { REGIONS } from './regions';
@@ -105,7 +106,7 @@ export function livestockDay(s: GameState, freezer: boolean): number {
   };
   // milk: dry from Dec to mid-February
   const goats = head(s, 'goat');
-  if (goats > 0 && !(doy > 335 || doy < 45)) { const m = goats * MILK_KCAL * l.condition.goat; s.stock.fresh += m / 2000; kcal += m; }
+  if (goats > 0 && !(doy > 335 || doy < 45)) { const m = goats * MILK_KCAL * l.condition.goat * careYield(s, 'animals'); s.stock.fresh += m / 2000; kcal += m; }
   // November: pigs to the butcher, and the steer once it has had a summer here
   if (doy >= 305 && doy <= 334 && l.butchered !== year) {
     l.butchered = year;

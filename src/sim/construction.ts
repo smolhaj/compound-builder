@@ -7,7 +7,7 @@
 import { drillExtra, siteProblem } from './site';
 import { permitHold } from './paperwork';
 import { BLUEPRINTS, totalBill } from './blueprints';
-import { hasAll, MATERIALS, shortfall, type MaterialId, type Stock } from './materials';
+import { hasAll, shortfall, waitingFor, type Stock } from './materials';
 import { log } from './economy';
 import { payUpkeep, toolHold, wearTools, workSpeed } from './tools';
 import type { GameState, Structure } from './state';
@@ -55,7 +55,14 @@ export function blockedReason(s: GameState, st: Structure): string | null {
   const need = blueprintOf(st).stages[st.stage].materials;
   if (hasAll(s.stock, need)) return null;
   const miss = shortfall(s.stock, need);
-  return 'Waiting for ' + (Object.entries(miss) as Array<[MaterialId, number]>).map(([k, n]) => `${n} ${MATERIALS[k].name.toLowerCase()}`).join(', ');
+  return waitingFor(miss);
+}
+
+/** `blockedReason(s, st) === null` without building the message (the engine asks this every quarter-hour). */
+export function canGoOn(s: GameState, st: Structure): boolean {
+  if (isFinished(st) || permitHold(s, st)) return false;
+  if (!(st.supplied || hasAll(s.stock, blueprintOf(st).stages[st.stage].materials))) return false;
+  return toolHold(s, { kind: 'build', stage: blueprintOf(st).stages[st.stage].id }) === null;   // (a tool it can't do without: sim/tools.ts)
 }
 
 /** Why the family can't go on with this structure now: the materials, or a tool it can't do without ("Needs a saw"). Null = it can. */

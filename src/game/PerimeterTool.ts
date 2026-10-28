@@ -13,7 +13,7 @@ import { closestOnLine } from './parcel/parcelTerrain';
 import { useGameStore } from '../store/gameStore';
 import { OFF_PARCEL_HOURS, PERIMETER, runBill, runHours, wallLength, type Gate, type PerimeterKind, type Pt } from '../sim/perimeter';
 import { orderCost } from '../sim/economy';
-import { MATERIALS, type MaterialId } from '../sim/materials';
+import { MATERIALS, billText, type MaterialId } from '../sim/materials';
 
 const SNAP = 0.25;
 /** How far beyond the parcel a tunnel may run (≈ 360 m). */
@@ -179,7 +179,7 @@ export class PerimeterTool {
     const bill = len > 0 ? runBill(this._kind, len) : {};
     const lines = Object.entries(bill).map(([k, q]) => ({ material: k as MaterialId, qty: q as number }));
     const buyable = lines.filter(l => MATERIALS[l.material].price !== null);
-    const own = lines.filter(l => MATERIALS[l.material].price === null).map(l => `${l.qty} ${MATERIALS[l.material].name.toLowerCase()}`);
+    const own = [billText(Object.fromEntries(lines.filter(l => MATERIALS[l.material].price === null).map(l => [l.material, l.qty])))].filter(Boolean);
     const tunnelWhy = this._kind === 'escape_tunnel' ? this._world.tunnelRouteProblem(pts as Pt[]) : null;
     (this._line.material as THREE.LineBasicMaterial).color.set(tunnelWhy ? 0xe36a5a : 0xffd27a);
     const txt = tunnelWhy ? tunnelWhy
