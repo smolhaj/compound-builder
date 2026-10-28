@@ -204,13 +204,13 @@ export class WildlifeRenderer {
       const bounce = b.v > 0.4 && (b.sp === 'rabbit' || b.sp === 'squirrel') ? Math.abs(Math.sin(b.phase * 0.7)) * H * 0.6 : b.v > 0.4 ? Math.abs(Math.sin(b.phase)) * H * 0.04 : 0;
       const tone = b.k;
       if (!bird) {
-        const legLen = H * (b.sp === 'rabbit' || b.sp === 'squirrel' ? 0.35 : b.sp === 'javelina' || b.sp === 'bear' ? 0.42 : 0.52);
-        const by = legLen + H * 0.2 + bounce, bw = H * (b.sp === 'bear' ? 0.27 : b.sp === 'javelina' ? 0.24 : 0.2), bh = H * (b.sp === 'bear' ? 0.31 : 0.26), bl = L * 0.37;
+        const legLen = H * (b.sp === 'rabbit' || b.sp === 'squirrel' ? 0.35 : b.sp === 'javelina' || b.sp === 'bear' ? 0.38 : 0.44);
+        const by = legLen + H * 0.24 + bounce, bw = H * (b.sp === 'bear' ? 0.3 : b.sp === 'javelina' ? 0.27 : 0.24), bh = H * (b.sp === 'bear' ? 0.36 : 0.32), bl = L * 0.4;
         this._put(this._parts.body, this._loc(0, by, 0, 0, 0, 0, bw, bh, bl), pal.body, tone);
         // legs: front pair and hind pair swing in opposition
         for (let i = 0; i < 4; i++) {
           const fz = i < 2 ? bl * 0.62 : -bl * 0.62, fx = (i % 2 ? 1 : -1) * bw * 0.6, sw = swing * ((i < 2) === (i % 2 === 0) ? 1 : -1);
-          const lr = H * (b.sp === 'bear' ? 0.085 : b.sp === 'rabbit' || b.sp === 'squirrel' ? 0.09 : 0.05);
+          const lr = H * (b.sp === 'bear' ? 0.1 : b.sp === 'rabbit' || b.sp === 'squirrel' ? 0.09 : 0.07);
           this._put(this._parts.leg, this._loc(fx, by - bh * 0.2, fz, sw, 0, 0, lr, legLen + bh * 0.2, lr), pal.leg, tone);
         }
         // neck and head: down to graze, up to look
