@@ -29,19 +29,24 @@ function Bar({ v, color }: { v: number; color: string }) {
   return <div style={{ width: 38, height: 4, background: '#333', borderRadius: 2, flex: 'none' }}><div style={{ width: `${Math.max(0, Math.min(1, v)) * 100}%`, height: '100%', background: color, borderRadius: 2 }} /></div>;
 }
 
-function ToolRow({ t, msg }: { t: Tool; msg: (m: string | null) => void }) {
-  const g = useGameStore(), game = g.game, d = TOOLS[t.kind];
-  const plan = repairPlan(game, t.id);
-  const canSharpen = d.dull > 0 && t.cond > 0 && t.sharp < 0.95;
-  const needsMend = t.cond < t.max - 0.14 || t.cond <= 0;
+/** All the tools of one kind (a family has several hammers): one row, with the actions aimed at the ones that need them. */
+function KindRow({ kind, tools, msg }: { kind: ToolKind; tools: Tool[]; msg: (m: string | null) => void }) {
+  const g = useGameStore(), game = g.game, d = TOOLS[kind];
+  const working = tools.filter(t => t.cond > 0), broken = tools.length - working.length;
+  const avg = working.length ? working.reduce((a, t) => a + t.cond, 0) / working.length : 0;
+  const worst = [...tools].sort((a, b) => a.cond - b.cond)[0];
+  const dull = working.filter(t => d.dull > 0 && t.sharp < 0.95), keen = working.filter(isDull).length;
+  const mendable = [...tools].filter(t => t.cond < t.max - 0.14 || t.cond <= 0).sort((a, b) => a.cond - b.cond)[0];
+  const plan = mendable ? repairPlan(game, mendable.id) : null;
+  const pro = tools.filter(t => gradeOf(t) === 'pro').length;
+  const color = broken > 0 && !working.length ? TONE.bad : toneOf(worst);
   return <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 0', fontSize: 11.5 }}>
-    <ToolIcon kind={t.kind} size={22} />
-    <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={d.blurb}>{d.name}{gradeOf(t) === 'pro' && <span style={{ color: '#d8c9a0' }}> · pro</span>}</span>
-    <Bar v={t.cond} color={toneOf(t)} />
-    <span style={{ color: toneOf(t), width: 62, textAlign: 'right' }}>{condWord(t)}</span>
-    {d.dull > 0 ? <span title={`edge ${Math.round(t.sharp * 100)} %`} style={{ color: isDull(t) ? TONE.warn : DIM, width: 28, textAlign: 'right' }}>{isDull(t) ? 'dull' : ''}</span> : <span style={{ width: 28 }} />}
-    {canSharpen && <button style={btn()} title="Sharpen it (a whetstone or file does best; a river rock will do)" onClick={() => msg(g.money(x => sharpen(x, t.id)))}>Sharpen</button>}
-    {needsMend && <button style={btn(!plan.ok ? false : t.cond <= 0)} disabled={!plan.ok} title={plan.ok ? `Mend it with ${plan.uses}: a bit weaker each time` : plan.why ?? ''} onClick={() => msg(g.money(x => repair(x, t.id)))}>{t.cond <= 0 ? 'Mend' : 'Fix'}</button>}
+    <ToolIcon kind={kind} size={22} />
+    <span style={{ flex: 1, minWidth: 0, lineHeight: 1.2 }} title={d.blurb}>{d.name}{tools.length > 1 ? ` ×${tools.length}` : ''}{pro > 0 && <span style={{ color: '#d8c9a0' }}> · {pro === tools.length ? 'pro' : `${pro} pro`}</span>}</span>
+    <Bar v={avg} color={color} />
+    <span style={{ color, width: 58, textAlign: 'right', lineHeight: 1.2 }}>{broken > 0 ? `${broken} broken` : condWord(worst)}{keen > 0 && <span style={{ color: TONE.warn }}> dull</span>}</span>
+    {dull.length > 0 && <button style={btn()} title="Sharpen them (a whetstone or file does best; a river rock will do)" onClick={() => msg(g.money(x => { let done = false; for (const k of dull) if (sharpen(x, k.id) === null) done = true; return done ? null : 'Already as sharp as it gets.'; }))}>Sharpen</button>}
+    {mendable && <button style={btn(mendable.cond <= 0)} disabled={!plan?.ok} title={plan?.ok ? `Mend one with ${plan.uses}: a bit weaker each time` : plan?.why ?? ''} onClick={() => msg(g.money(x => repair(x, mendable.id)))}>{mendable.cond <= 0 ? 'Mend' : 'Fix'}</button>}
   </div>;
 }
 
@@ -54,7 +59,7 @@ export function ToolsPanel({ game }: { game: GameState }): ReactNode {
   const day = Math.floor(game.clock.t);
   const bare = cov.filter(c => !c.tool);
   const hard = ['cut', 'nail', 'dig', 'fell', 'wrench', 'wire'] as ToolRole[];
-  const items = [...kit.items].sort((a, b) => Number(TOOLS[a.kind].crude ?? false) - Number(TOOLS[b.kind].crude ?? false) || a.kind.localeCompare(b.kind));
+  const kinds = [...new Set(kit.items.map(t => t.kind))].sort((a, b) => Number(TOOLS[a].crude ?? false) - Number(TOOLS[b].crude ?? false) || TOOLS[a].name.localeCompare(TOOLS[b].name));
   const market = marketOpen(game), shop = toolShopOpen(game);
   return <div style={{ marginBottom: 10 }}>
     <div style={h3}>Tools</div>
@@ -77,7 +82,7 @@ export function ToolsPanel({ game }: { game: GameState }): ReactNode {
         ];
       })}
     </div>
-    <div style={{ marginTop: 6 }}>{items.map(t => <ToolRow key={t.id} t={t} msg={setM} />)}</div>
+    <div style={{ marginTop: 6 }}>{kinds.map(k => <KindRow key={k} kind={k} tools={kit.items.filter(t => t.kind === k)} msg={setM} />)}</div>
     <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginTop: 4 }}>
       <button style={btn()} disabled={counts.dull === 0} title="Put an edge on every dull blade" onClick={() => { setM(null); g.money(x => (sharpenAll(x, 0.75), null)); }}>Sharpen all</button>
       <label style={{ fontSize: 11.5, color: DIM, display: 'flex', alignItems: 'center', gap: 4 }}>
