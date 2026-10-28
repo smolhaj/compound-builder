@@ -124,6 +124,18 @@ export class BattleRenderer {
 
   get playing(): boolean { return this.battle !== null; }
 
+  /** Everyone in the fight where they stand now (for the cutscene camera). */
+  actors(): Array<{ id: string; side: 'home' | 'raider'; post?: string; x: number; y: number; z: number; dead: boolean; gone: boolean }> {
+    return [...this._units.values()].map(u => ({ id: u.def.id, side: u.def.side, post: u.def.post, x: u.x, y: u.y, z: u.z, dead: u.dead, gone: u.gone }));
+  }
+
+  /** Events applied since the last call (the cutscene camera reacts to them). */
+  drainEvents(): BattleEvent[] {
+    const e = this._fed; this._fed = [];
+    return e;
+  }
+  private _fed: BattleEvent[] = [];
+
   /** Where the fight is: between the defenders and the nearest raiders still in it (for the camera), and how far apart they are. */
   focus(): { x: number; z: number; spread: number } | null {
     const live = [...this._units.values()].filter(u => !u.gone && !u.dead);
@@ -189,6 +201,7 @@ export class BattleRenderer {
     for (const m of this._marks) { this._group.remove(m.sprite); m.sprite.material.dispose(); }
     this._marks.length = 0;
     this.battle = null;
+    this._fed = [];
     this._units.clear();
     this._pending = [];
     this._tracers.length = 0;
@@ -229,6 +242,7 @@ export class BattleRenderer {
   }
 
   private _apply(e: BattleEvent): void {
+    if (this._fed.length < 64) this._fed.push(e);
     const U_ = (id: string) => this._units.get(id);
     switch (e.kind) {
       case 'alarm': this._alarmOn = true; break;

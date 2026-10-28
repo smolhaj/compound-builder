@@ -243,11 +243,13 @@ export interface GateState {
   camps?: TrialCamp[];
   /** A crew that found nobody home and means to come back (they know someone lives here). */
   comeBack?: ComeBack | null;
+  /** A raid rolled for today that has not arrived yet: it reaches the gate at `at` (game days), at its hour of the night or day (sim/siege.ts). */
+  incoming?: { e: Encounter; at: number } | null;
 }
 
 export function newGate(seed: number): GateState {
   const r = mulberry32(seed * 811 + 5);
-  return { pending: null, card: null, humanity: 70, tookIn: 0, turnedAway: 0, raidsHeld: 0, raidsLost: 0, government: r() < 0.5 ? 'help' : 'hindrance', day: -1, next: -1, history: [], aftermath: null, prisoners: [], camps: [], comeBack: null };
+  return { pending: null, card: null, humanity: 70, tookIn: 0, turnedAway: 0, raidsHeld: 0, raidsLost: 0, government: r() < 0.5 ? 'help' : 'hindrance', day: -1, next: -1, history: [], aftermath: null, prisoners: [], camps: [], comeBack: null, incoming: null };
 }
 
 const FIRST = ['Alex', 'Jordan', 'Casey', 'Morgan', 'Riley', 'Jamie', 'Drew', 'Quinn', 'Avery', 'Rowan', 'Elena', 'Marcus', 'Dolores', 'Hector', 'Lena', 'Walt', 'Tomas', 'Bea'];
