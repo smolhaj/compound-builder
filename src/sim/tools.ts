@@ -650,7 +650,7 @@ export function toolSecurity(s: GameState): number {
   const done = (k: string) => s.structures.some(st => st.kind === k && st.finishedAt !== null);
   let open = 1;
   if (done('workshop')) open *= 0.5;
-  if (done('metal_garage') || done('garage_solar')) open *= 0.65;
+  if (done('metal_garage') || done('garage_solar') || done('gate_garage')) open *= 0.65;
   if (done('bunker_stores')) open *= 0.5;
   if ((s.stock.gun_safe ?? 0) > 0) open *= 0.75;
   return open;

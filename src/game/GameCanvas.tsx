@@ -1,4 +1,5 @@
 import { litTowerIds } from '../sim/towers';
+import { blackoutNow } from '../sim/lights';
 import { burnedFarms } from '../sim/neighborLife';
 import { useEffect, useRef } from 'react';
 import type { GameState } from '../sim/state';
@@ -175,7 +176,7 @@ export function GameCanvas() {
     const rebuildBoundary = () => boundary.build([world.home, ...ownedRects(useGameStore.getState().game)]);
     const showBoundary = () => { boundary.visible = useWorldStore.getState().showBoundary || !!useGameStore.getState().tool?.startsWith('fence:'); };
     rebuildBoundary(); showBoundary();
-    useWorldStore.getState().setSiteGeo({ creekZ: x => world.parcel.creek.zAt(x), creekHalf: world.parcel.creek.halfWidth, roadGate: [world.access.gate.x, world.access.gate.z] });
+    useWorldStore.getState().setSiteGeo({ creekZ: x => world.parcel.creek.zAt(x), creekHalf: world.parcel.creek.halfWidth, roadGate: [world.access.gate.x, world.access.gate.z], center: [world.camp.x, world.camp.z] });
     world.setBurnedFarms(burnedFarms(useGameStore.getState().game));
     const unsub = [
       // wildfire weather: measure the fuel round every building (what cleared ground there is decides what burns)
@@ -278,7 +279,7 @@ export function GameCanvas() {
       world.syncTents(game);
       world.syncForestry(game.forestry);
       world.simTime = game.clock.t;
-      world.syncPerimeter(game.perimeter, game.clock.t, { lit: fenceLive(game), sensors: (game.stock.ground_sensor ?? 0) > 0 });
+      world.syncPerimeter(game.perimeter, game.clock.t, { lit: fenceLive(game) && !blackoutNow(game), sensors: (game.stock.ground_sensor ?? 0) > 0 });
       const svKey = `${game.structures.filter(x => x.stage >= 5).length}|${game.perimeter.filter(r => r.finishedAt !== null).length}|${game.utilities.fittings.filter(f => f.finishedAt !== null).length}`;
       if (svKey !== servicesKey) { servicesKey = svKey; world.syncServices(game); }
       sight.update(6);

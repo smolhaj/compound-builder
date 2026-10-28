@@ -66,7 +66,9 @@ describe('the Build list', () => {
   it('reports the two endgame goals with progress', () => {
     const g = fresh();
     const [enclose, bunker] = longTerm(g);
-    expect(enclose.steps.map(x => x.done)).toEqual([false, false, false]);
+    expect(enclose.steps.map(x => x.done)).toEqual([false, false, false, false, false]);   // line, walls, towers, wall-top walkway, gate garage
+    expect(enclose.steps.map(x => x.label)).toContain('Wall-top walkway');
+    expect(enclose.steps.map(x => x.label)).toContain('Gate garage');
     expect(bunker.steps.every(x => !x.done)).toBe(true);
     built(g, 'bunker_hatch');
     expect(longTerm(g)[1].steps[0].done).toBe(true);

@@ -43,6 +43,11 @@ export class FleetRenderer {
     for (const p of plan.parked) {
       const v = vs.find(x => x.id === p.vehicle);
       if (!v) continue;
+      if (p.slot) {
+        // a real slot in the gatehouse garage (sim/garage.ts): nose out through the roll-up door
+        out.set(v.id, { x: p.slot.x, z: p.slot.z, rot: Math.atan2(p.slot.fx, p.slot.fz) });
+        continue;
+      }
       if (p.bay && p.bays.length) {
         const host = ctx.host(p.bay.structure);
         if (host) {

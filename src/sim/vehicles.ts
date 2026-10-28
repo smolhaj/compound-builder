@@ -30,7 +30,7 @@ import type { GameState } from './state';
 import { dayIndex } from './state';
 import { log } from './economy';
 import { mulberry32 } from './rng';
-import { parkingPlan } from './parking';
+import { parkingPlan, syncParking } from './parking';
 import { addTool, kitOf } from './tools';
 
 export type VehicleKind = 'pickup' | 'suv' | 'motorhome' | 'tractor' | 'atv' | 'old_pickup' | 'trailer';
@@ -122,6 +122,7 @@ export function buyVehicle(s: GameState, kind: VehicleKind): string | null {
   const mileage = MILEAGE_NEW[kind];
   vs.push({ id, kind, mileage, condition: 0.85, fuel: def.tankL, oilAt: mileage, serviceAt: mileage });
   // the tractor comes with its implements (plow, disc, loader bucket): the tools system works them
+  syncParking(s);   // into the gatehouse garage if there is a free slot
   if (kind === 'tractor' && !kitOf(s).items.some(t => t.kind === 'tractor_implements')) addTool(s, 'tractor_implements', 0.85, 1);
   return null;
 }
@@ -191,6 +192,7 @@ export function stripForParts(s: GameState, id: string): string | null {
   if (alive(v)) return 'it still runs';
   s.stock.vehicle_parts += v.kind === 'motorhome' ? 3 : v.kind === 'trailer' ? 1 : 2;
   vs.splice(vs.indexOf(v), 1);
+  syncParking(s);
   log(s, `Stripped the dead ${VEHICLES[v.kind].name.toLowerCase()} for parts.`);
   return null;
 }
@@ -300,6 +302,7 @@ export function vehiclesDay(s: GameState): string[] {
   const commuting = peace && s.personState.some(ps => ps.employed);
   // (the living: a dead mechanic used to keep the trucks running)
   const mechanic = mechanicOf(s);
+  syncParking(s);
   const plan = parkingPlan(s);
   const day = dayIndex(s.clock.t);
   // the commute: one running truck makes the town trip on workdays (≈ 5/7 of days)

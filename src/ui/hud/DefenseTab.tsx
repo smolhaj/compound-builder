@@ -11,9 +11,11 @@ import { PERIMETER, SALVAGE, UPGRADE_NEXT, runBill, runFinished, runHours, upgra
 import { STRUCTURE_SALVAGE, isFinished as structFinished } from '../../sim/construction';
 import { AI_MODULE, ARMORY_LIGHTS, LIGHT_MODES, LIGHT_MODE_NAME, aiModulesUsed, hasAiSensor, lightList, lightMode, lightsOf } from '../../sim/lights';
 import { floodTowerIds, TOWERS, TOWER_NEXT, highBonus, highShare, isTower, towerBill, towerUpgradeProblem } from '../../sim/towers';
+import { canHostWalkway, walkOn, walkwayBill, walkwayProblem } from '../../sim/walkway';
 import { Note, Row, Section } from './common';
 import { TONE, DIM, btn, usd } from './style';
 import { WallProperty } from './WallProperty';
+import { FortifyRing } from './FortifyRing';
 
 /** One checklist line: a tick or a cross, what it is, and why. */
 function CheckRow({ c }: { c: Check }) {
@@ -47,6 +49,7 @@ export function DefenseTab() {
     <Section title="The property line">
       {d.walls.map(c => <CheckRow key={c.id} c={c} />)}
       <WallProperty />
+      <FortifyRing />
       {d.gaps.length > 0 && <Note tone="warn">Open ground on the line, e.g. on the {spotsText(d.gaps, game.site.home)}. Turn on the property line to see it.</Note>}
     </Section>
     <Section title="Upgrade the walls">
@@ -59,6 +62,18 @@ export function DefenseTab() {
         return <div key={r.id} style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '3px 0' }}>
           <span style={{ flex: 1 }}>{PERIMETER[r.kind].name} <span style={{ color: DIM }}>({Math.round(len * 6)} m)</span> <span style={{ color: DIM }}>→</span> {PERIMETER[next].name}</span>
           <button style={btn(false)} disabled={!!why} title={why ?? `${Math.round(runHours(next, len))} h of work; about ${usd(net)} after the salvage of the old one (${Math.round(SALVAGE * 100)}% of its materials back)`} onClick={() => { const w = useGameStore.getState().upgradeRun(r.id); if (w) alert(w); }}>{why ? 'Under way' : `Upgrade ~${usd(net)}`}</button>
+        </div>;
+      })}
+    </Section>
+    <Section title="Wall-top walkway">
+      <Note>A steel patrol deck along the top of a container, steel or concrete wall (1.2 m wide, a handrail, stairs at the gates and about every 80 m). Guards on watch walk it and see farther; a post on it fights from above and fewer crews get over. It stays on through a wall upgrade.</Note>
+      {game.perimeter.filter(r => canHostWalkway(r.kind) && !r.replaces).length === 0 && <Note>No wall that can take one yet: container, steel or concrete.</Note>}
+      {game.perimeter.filter(r => canHostWalkway(r.kind) && !r.replaces).slice(0, 8).map(r => {
+        const len = wallLength(r), deck = walkOn(game, r.id), why = walkwayProblem(game, r.id);
+        const price = orderCost(Object.entries(walkwayBill(len)).filter(([m]) => MATERIALS[m as MaterialId].price !== null).map(([material, qty]) => ({ material: material as MaterialId, qty: qty as number })));
+        return <div key={r.id} style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '3px 0' }}>
+          <span style={{ flex: 1 }}>{PERIMETER[r.kind].name} <span style={{ color: DIM }}>({Math.round(len * 6)} m)</span></span>
+          <button style={btn(!!deck && runFinished(deck))} disabled={!!why} title={why ?? `${Math.round(runHours('wall_walk', len))} h of work; about ${usd(price)} of materials (rebar, roofing sheet, hardware: Shop, Fencing)`} onClick={() => { const w = useGameStore.getState().addWalkway(r.id); if (w) alert(w); }}>{deck ? (runFinished(deck) ? 'Walkway built' : 'Walkway under way') : why ? 'Not yet' : `Add walkway ~${usd(price)}`}</button>
         </div>;
       })}
     </Section>

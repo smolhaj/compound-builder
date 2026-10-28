@@ -62,6 +62,15 @@ describe('the fleet renderer', () => {
     expect(xs[1] - xs[0]).toBeCloseTo(0.48, 2); expect(xs[2] - xs[1]).toBeCloseTo(0.48, 2);
     for (const s of spots.values()) { expect(Math.abs(s.z - 10)).toBeLessThan(0.1); }
   });
+  it('a vehicle in a gatehouse-garage slot stands on the slot, nose out through the door', () => {
+    const g = newGame(1);
+    g.structures.push({ id: 'gg', kind: 'gate_garage', x: 10, z: 5, rot: 0, stage: 99, done: 0, supplied: true, finishedAt: 0, parked: ['v1', null, null, null] });
+    const f = new FleetRenderer(new THREE.Scene());
+    const spot = f.spots(g, ctx({})).get('v1')!;
+    expect(Math.abs(spot.z - 5)).toBeLessThan(0.01);
+    expect(Math.abs(spot.x - 10)).toBeGreaterThan(0.5);        // one of the four slots, not the middle (that is the gate)
+    expect(spot.rot).toBeCloseTo(0, 5);
+  });
   it('vehicles with no garage stand in a row in the yard, apart from each other', () => {
     const g = newGame(1);
     fleetOf(g).push({ id: 'v2', kind: 'suv', mileage: 1, condition: 1, fuel: 50, oilAt: 0 });

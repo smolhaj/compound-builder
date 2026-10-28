@@ -6,7 +6,9 @@ import {
   breakdownChance, buyVehicle, cargoKg, empVehicles, fleetCapacity, fleetOf, overdue, repairDays, roadTrouble, runs, serviceVehicle, SERVICE_MILES, startingVehicles, stripForParts,
   tractorBoost, tractorRuns, tripPlan, tripVehicle, vehiclesDay, VEHICLES, type Vehicle, type VehicleKind,
 } from './vehicles';
-import { bays, GARAGES, garageConnected, garageLinks, isUnderRoof, parkingPlan } from './parking';
+import { slotOf, parkingSlots, freeSlots } from './garage';
+import { bays, GARAGES, syncParking, garageConnected, garageLinks, isUnderRoof, parkingPlan } from './parking';
+import { parkedText as parkedTextOf } from './parking';
 import { bugOut, bugOutPlan } from './bugout';
 import { reportCard } from './report';
 import { goToMarket, MARKET_KM } from './market';
@@ -154,6 +156,42 @@ describe('the garage', () => {
     // a passage that stops short of the garage does not connect
     run.pts = [[0.3, 0], [2.5, 0]];
     expect(garageConnected(g)).toBe(false);
+  });
+});
+
+describe('the gatehouse garage (the fortress wall)', () => {
+  it('the fleet parks in its real slots, first, and keeps the slot while out on a run', () => {
+    const g = rich(newGame(1));
+    finish(g, 'gate_garage', 20, 0); finish(g, 'metal_garage', 0, 0);
+    buyVehicle(g, 'suv'); buyVehicle(g, 'motorhome'); buyVehicle(g, 'tractor');
+    syncParking(g);
+    expect(slotOf(g, 'v1')).toBeTruthy();                           // the pickup too, on the first sync
+    expect(parkingSlots(g)).toHaveLength(4);
+    expect(freeSlots(g)).toHaveLength(0);
+    const plan = parkingPlan(g);
+    expect(plan.parked.filter(p => p.slot)).toHaveLength(4);
+    expect(plan.outside).toHaveLength(0);
+    expect(parkedTextOf(g, 'v1')).toBe('in the gatehouse garage');
+    fleetOf(g)[0].away = true;
+    expect(slotOf(g, 'v1')).toBeTruthy();
+    // a fifth goes to the metal garage's own bays
+    buyVehicle(g, 'atv');
+    const atv = fleetOf(g).find(v => v.kind === 'atv')!;
+    expect(slotOf(g, atv.id)).toBeNull();
+    expect(parkingPlan(g).parked.find(p => p.vehicle === atv.id)!.bay).toBeTruthy();
+  });
+  it('a stripped vehicle gives its slot back', () => {
+    const g = rich(newGame(1)); finish(g, 'gate_garage', 20, 0);
+    const v = add(g, 'old_pickup', { condition: 0 }); syncParking(g);
+    expect(slotOf(g, v.id)).toBeTruthy();
+    stripForParts(g, v.id);
+    expect(slotOf(g, v.id)).toBeNull();
+  });
+  it('a passage from the gatehouse garage to the house is a covered way to the vehicles', () => {
+    const g = newGame(1);
+    finish(g, 'timber_cabin', 0, 0); const gg = finish(g, 'gate_garage', 14, 0);
+    g.perimeter.push({ id: 'r1', kind: 'underground_passage', pts: [[0.3, 0], [14, 0.4]], gates: [], done: 1, hours: 1, supplied: true, finishedAt: 0 } as unknown as PerimeterRun);
+    expect(garageLinks(g).map(l => l.garage)).toEqual([gg.id]);
   });
 });
 
@@ -363,9 +401,9 @@ describe('bug out', () => {
 });
 
 describe('save', () => {
-  it('migrates v54 to the fleet: parts in the stock, a service reading on each vehicle', () => {
+  it('migrates v55 to the fleet: parts in the stock, a service reading on each vehicle', () => {
     const old = structuredClone(newGame(2)) as unknown as Record<string, unknown>;
-    old.version = 54; delete (old.stock as Record<string, unknown>).vehicle_parts;
+    old.version = 55; delete (old.stock as Record<string, unknown>).vehicle_parts;
     old.vehicles = [{ id: 'v1', kind: 'pickup', mileage: 100_000, condition: 0.7, fuel: 40, oilAt: 99_000 }];
     const back = migrate(old);
     expect(back.version).toBe(SAVE_VERSION);
@@ -374,7 +412,7 @@ describe('save', () => {
   });
   it('an old save with no vehicles gets the family pickup the way it always did', () => {
     const old = structuredClone(newGame(2)) as unknown as Record<string, unknown>;
-    old.version = 54; delete old.vehicles;
+    old.version = 55; delete old.vehicles;
     const back = migrate(old);
     vehiclesDay(back);
     expect(back.vehicles).toHaveLength(1);

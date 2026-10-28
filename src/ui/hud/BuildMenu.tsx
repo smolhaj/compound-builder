@@ -14,19 +14,20 @@ import { MATERIALS, billText, type MaterialId } from '../../sim/materials';
 import { orderCost } from '../../sim/economy';
 import { drillExtra } from '../../sim/site';
 import { countyWorks, needsPermit, permitFee } from '../../sim/paperwork';
-import { BUNKER_ORDER, KIT, TOWER_ORDER, UTILITY_ORDER } from '../../game/buildkit/kit';
+import { BUNKER_ORDER, GATEHOUSE_ORDER, KIT, TOWER_ORDER, UTILITY_ORDER } from '../../game/buildkit/kit';
 import { PERIMETER, UTILITY_LINES, runBill, runHours, type PerimeterKind } from '../../sim/perimeter';
 import { bunkerChecklist, buildAdvice, longTerm, suggestions, type SuggestionAct, perimeterNote, perimeterOff, perimeterTiers, upgradeChain } from '../../sim/guidance';
 import { Group, Item, Note } from './common';
 import { btn, DIM, usd } from './style';
 import { WallProperty } from './WallProperty';
+import { FortifyRing } from './FortifyRing';
 
 /** The build menu's groups (kit pieces by what they are for). */
 const BUILD_GROUPS: Array<[string, string, readonly string[]]> = [
   ['home', 'Home & work', ['timber_cabin', 'log_house', 'cottage', 'guest_house', 'moms_house', 'outhouse', 'workshop', 'metal_garage', 'barn']],
   ['food', 'Food', ['garden', 'greenhouse', 'orchard', 'field', 'chicken_coop', 'root_cellar']],
   ['water', 'Water & power', UTILITY_ORDER],
-  ['defense', 'Watch towers', TOWER_ORDER],
+  ['defense', 'Watch towers & gatehouse', [...TOWER_ORDER, ...GATEHOUSE_ORDER]],
 ];
 
 const toBuy = (bill: Partial<Record<MaterialId, number>>) => Object.entries(bill).filter(([m]) => MATERIALS[m as MaterialId].price !== null).map(([material, qty]) => ({ material: material as MaterialId, qty: qty as number }));
@@ -99,7 +100,7 @@ export function BuildMenu({ showProjects = () => undefined }: { showProjects?: (
           {goal.steps.map(x => <div key={x.label} style={{ display: 'flex', gap: 6, fontSize: 11.5, opacity: x.done ? 0.6 : 1 }} title={x.detail}>
             <span style={{ width: 12, color: x.done ? '#a8d080' : DIM }}>{x.done ? '✓' : '·'}</span><span>{x.label}</span>
           </div>)}
-          {goal.id === 'enclose' && <WallProperty />}
+          {goal.id === 'enclose' && <><WallProperty /><FortifyRing /></>}
         </div>;
       })}
     </div>
@@ -130,6 +131,7 @@ export function BuildMenu({ showProjects = () => undefined }: { showProjects?: (
     </Group>
     <Group id="perimeter" title="Perimeter">
       <WallProperty />
+      <FortifyRing />
       <Note>Fences upgrade in place, tier to tier (Defense tab, Upgrade the walls): {chain}.</Note>
       {perimeterTiers().map(t => <div key={t.id}>
         <div style={{ fontSize: 11, color: DIM, margin: '4px 2px 2px' }} title={t.hint}>{t.title} <span style={{ opacity: 0.7 }}>· {t.hint}</span></div>

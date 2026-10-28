@@ -376,9 +376,9 @@ describe('guidance', () => {
 });
 
 describe('save', () => {
-  it('migrates v53 to the current version with nobody in town and no requests', () => {
+  it('migrates v54 to the current version with nobody in town and no requests', () => {
     const old = structuredClone(newGame(2)) as unknown as Record<string, unknown>;
-    old.version = 53; delete old.kin;
+    old.version = 54; delete old.kin;
     const back = migrate(old);
     expect(back.version).toBe(SAVE_VERSION);
     expect(back.kin).toEqual(newKin([], false));
