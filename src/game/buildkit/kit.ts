@@ -174,7 +174,6 @@ export const MOMS_HOUSE: KitPieceDef = {
   parts: { foundation: 'concrete', walls: 'timber_lap', roof: 'metal_roof' },
   maxSlope: 0.25, floorY: 0.08, porch: 0.28, sleeps: 4, light: [0, 0.3, -0.1],
 };
-/** A 9 × 12 m steel pole building with two roll-up doors (the trucks); `garage_solar` carries 8 kW on the roof. */
 export const METAL_GARAGE: KitPieceDef = {
   id: 'metal_garage', name: 'Metal garage', category: 'work',
   blurb: '9 × 12 m steel pole building on a slab: corrugated walls and roof, two roll-up doors for the trucks.',

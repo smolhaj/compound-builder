@@ -180,6 +180,26 @@ describe('a lost fight and the yard', () => {
     expect(raidTakesVehicles(safe, true)).toEqual([]);                // everything under a roof
     expect(fleetOf(safe)).toHaveLength(2);
   });
+  it('a vehicle parked in the gatehouse garage survives a lost fight, in the open or not', () => {
+    for (let seed = 1; seed <= 25; seed++) {
+      const g = rich(newGame(seed)); finish(g, 'gate_garage', 20, 0);
+      buyVehicle(g, 'suv'); buyVehicle(g, 'tractor');                  // with the pickup: three of the four slots
+      syncParking(g);
+      expect(yardOpen(g)).toBe(true);                                   // no wall: the yard is open
+      expect(slotOf(g, 'v1')).toBeTruthy();
+      expect(raidTakesVehicles(g, true)).toEqual([]);
+      expect(fleetOf(g)).toHaveLength(3);
+      expect(fleetOf(g).every(v => slotOf(g, v.id))).toBe(true);
+    }
+    // a fifth, standing outside, is the only one at risk
+    const g = rich(newGame(2)); finish(g, 'gate_garage', 20, 0);
+    buyVehicle(g, 'suv'); buyVehicle(g, 'tractor'); buyVehicle(g, 'atv'); buyVehicle(g, 'motorhome');
+    syncParking(g);
+    const out = parkingPlan(g).outside.slice();
+    expect(out.length).toBeGreaterThan(0);
+    raidTakesVehicles(g, true);
+    for (const v of fleetOf(g)) if (!out.includes(v.id)) expect(slotOf(g, v.id)).toBeTruthy();
+  });
   it('a closed property line keeps the yard safe', () => {
     const g = rich(newGame(3)); buyVehicle(g, 'suv');
     const ring: PerimeterRun = { id: 'w', kind: 'steel_wall', pts: [[-50, -50], [50, -50], [50, 50], [-50, 50], [-50, -50]], gates: [], done: 1, hours: 1, supplied: true, finishedAt: 0 } as unknown as PerimeterRun;
