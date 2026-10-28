@@ -20,8 +20,8 @@ import { WallProperty } from './WallProperty';
 
 /** The build menu's groups (kit pieces by what they are for). */
 const BUILD_GROUPS: Array<[string, string, readonly string[]]> = [
-  ['home', 'Home & work', ['timber_cabin', 'log_house', 'cottage', 'outhouse', 'workshop', 'metal_garage', 'barn']],
-  ['food', 'Food', ['garden', 'greenhouse', 'orchard', 'field', 'chicken_coop', 'root_cellar']],
+  ['home', 'Home & work', ['timber_cabin', 'log_house', 'cottage', 'outhouse', 'workshop', 'metal_garage', 'barn', 'equipment_yard']],
+  ['food', 'Food', ['garden', 'greenhouse', 'greenhouse_heated', 'orchard', 'orchard_grove', 'field', 'chicken_coop', 'sheep_barn', 'pond', 'root_cellar']],
   ['water', 'Water & power', UTILITY_ORDER],
   ['defense', 'Watch towers', TOWER_ORDER],
 ];

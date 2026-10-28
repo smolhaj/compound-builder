@@ -220,6 +220,85 @@ export const UTILITY_BLUEPRINTS: Blueprint[] = [
   bp('septic', [['site', 'Perc test and stake the field', 6, {}], ['foundation', 'Dig the tank hole and leach trenches (hired excavator)', 40, { excavator: 2 }], ['frame', 'Set the tank', 8, { septic_tank: 1 }], ['roof', 'Leach pipe in gravel', 30, { pipe: 3, concrete: 4 }], ['finish', 'Backfill, vent and lids', 16, { excavator: 1 }]]),
 ];
 
+// ── Self-sufficiency: bigger food and power tiers, the pond and the yard (docs/DECISIONS.md "Self-sufficient interior") ──
+/** A 9 × 24 m production greenhouse (gutter-connected hoops, twin-wall polycarbonate, a heater): ≈ 280 person-hours, ≈ $30,000 of materials. */
+export const GREENHOUSE_HEATED_BLUEPRINT: Blueprint = bp('greenhouse_heated', [
+  ['site', 'Square and level the bed (ridges run north-south)', 12, {}],
+  ['foundation', 'Gravel bed, a concrete curb and the heat-loop trench', 60, { concrete: 10, fieldstone: 2 }],
+  ['frame', 'Bolt up the hoops and purlins', 90, { greenhouse_pro_kit: 1 }],
+  ['roof', 'Glaze the roof, ridge vents and thermal curtain', 50, {}],
+  ['finish', 'Heater, benches, drip lines and the end walls', 70, { hardware: 2, pipe: 2, cable: 1 }],
+]);
+
+/** Forty-eight trees on a grid (apple, pear, peach, plum), staked and guarded: ≈ 110 person-hours, ≈ $2,300. */
+export const ORCHARD_GROVE_BLUEPRINT: Blueprint = bp('orchard_grove', [
+  ['site', 'Stake the rows (4 m apart)', 8, {}],
+  ['foundation', 'Strip the sod, dig the planting holes', 40, {}],
+  ['frame', 'Plant the trees', 30, { fruit_trees: 48 }],
+  ['roof', 'Stakes, trunk guards and the deer fence', 24, { wire: 4, lumber: 1 }],
+  ['finish', 'Mulch rings and the first watering', 12, {}],
+]);
+
+/** The 20 kW solar farm: 50 × 400 W panels in five rows on ground racks, with three 6 kW inverters. */
+export const SOLAR_FARM_BLUEPRINT: Blueprint = bp('solar_farm', [
+  ['site', 'Stake the rows (facing south, 4 m apart)', 8, {}],
+  ['foundation', 'Post footings for five rows', 50, { concrete: 8 }],
+  ['frame', 'Steel racking', 90, { rebar: 2, hardware: 4 }],
+  ['roof', 'Mount 50 panels', 80, { solar_panel: 50 }],
+  ['finish', 'Combiner boxes, three inverters and the trench', 50, { inverter: 3, cable: 4, hardware: 1 }],
+]);
+
+/** The battery container: 60 kWh of lithium racks, an inverter and a fan, in a 20 ft shipping container. */
+export const BATTERY_BANK_BLUEPRINT: Blueprint = bp('battery_bank', [
+  ['site', 'Stake it out beside the array', 4, {}],
+  ['foundation', 'Gravel and a slab', 20, { concrete: 3 }],
+  ['frame', 'Set and insulate the container, cut the door', 30, { container: 1, lumber: 2 }],
+  ['roof', 'Vents and a sun roof', 10, { roofing: 1 }],
+  ['finish', 'Twelve battery racks, the inverter and the breaker panel', 40, { battery: 12, inverter: 1, cable: 2 }],
+]);
+
+/** A private trout and crayfish pond: dug with a hired excavator, lined, with a spillway and a standpipe. */
+export const POND_BLUEPRINT: Blueprint = {
+  kind: 'pond',
+  stages: [
+    { id: 'site', name: 'Stake the shore and the spillway', hours: 8, materials: {} },
+    { id: 'foundation', name: 'Dig the basin (hired excavator, 2 m deep at the standpipe)', hours: 60, materials: { excavator: 6 }, yields: { spoil: 320 } },
+    { id: 'frame', name: 'Line the basin and set the standpipe', hours: 40, materials: { membrane: 8, pipe: 2 } },
+    { id: 'roof', name: 'Dress the spillway in stone and shape the bank', hours: 30, materials: { fieldstone: 2 } },
+    { id: 'finish', name: 'Fill it, plant the margin, set the fish fence', hours: 30, materials: { wire: 2 } },
+  ],
+};
+
+/** A lined freshwater reservoir: 400,000 L of stored water for the fields and the fire hydrants, no fish. */
+export const RESERVOIR_BLUEPRINT: Blueprint = {
+  kind: 'reservoir',
+  stages: [
+    { id: 'site', name: 'Stake the basin and the intake', hours: 6, materials: {} },
+    { id: 'foundation', name: 'Dig the basin (hired excavator)', hours: 50, materials: { excavator: 5 }, yields: { spoil: 260 } },
+    { id: 'frame', name: 'Line it, pour the concrete edge and the intake', hours: 70, materials: { membrane: 10, concrete: 6 } },
+    { id: 'roof', name: 'Overflow, the pump pad and the fence', hours: 30, materials: { pipe: 3, wire: 2, hardware: 1 } },
+    { id: 'finish', name: 'Fill it and test the intake screen', hours: 20, materials: { cable: 1 } },
+  ],
+};
+
+/** A 9 × 12 m sheep barn: open-front stalls, a lambing pen and a hay mow. */
+export const SHEEP_BARN_BLUEPRINT: Blueprint = bp('sheep_barn', [
+  ['site', 'Stake out and level the pad', 12, {}],
+  ['foundation', 'Posts and a gravel floor', 40, { concrete: 3, fieldstone: 2 }],
+  ['frame', 'Pole frame and the stall rails', 100, { lumber: 14 }],
+  ['roof', 'Trusses and metal roof', 60, { lumber: 4, roofing: 8 }],
+  ['finish', 'Gates, lambing pen, hay racks and a water trough', 50, { hardware: 3, wire: 2, lumber: 2 }],
+]);
+
+/** The equipment yard: a graded gravel pad with a fence, a fuel tank and parking bays for the tractor and its implements. */
+export const EQUIPMENT_YARD_BLUEPRINT: Blueprint = bp('equipment_yard', [
+  ['site', 'Stake out and grade the yard', 8, {}],
+  ['foundation', 'Crushed rock, compacted', 40, { fieldstone: 8 }],
+  ['frame', 'Posts and a pipe-rail fence', 40, { lumber: 2, wire: 2 }],
+  ['roof', 'Paint the bays and set the fuel tank', 10, { hardware: 1 }],
+  ['finish', 'Hitch rails, a wash pad and a light pole', 16, { cable: 1, hardware: 1 }],
+]);
+
 // ── Underground: dug with a hired excavator; the net earth dug out becomes spoil for berms ──
 type Fit = Partial<Stock>;
 /** A poured room: dig + slab, walls, roof slab + waterproofing + backfill, fit-out. `spoil` m³ net. */
@@ -274,7 +353,7 @@ export const TOWER_BLUEPRINTS: Blueprint[] = [
 ];
 
 export const BLUEPRINTS: Record<string, Blueprint> = Object.fromEntries(
-  [CABIN_BLUEPRINT, OUTHOUSE_BLUEPRINT, WORKSHOP_BLUEPRINT, ROOT_CELLAR_BLUEPRINT, COOP_BLUEPRINT, GARDEN_BLUEPRINT, FIELD_BLUEPRINT, GREENHOUSE_BLUEPRINT, ORCHARD_BLUEPRINT, LOG_HOUSE_BLUEPRINT, FARMHOUSE_BLUEPRINT, TRAILER_BLUEPRINT, BARN_BLUEPRINT, COTTAGE_BLUEPRINT, METAL_GARAGE_BLUEPRINT, GARAGE_SOLAR_BLUEPRINT, ...UTILITY_BLUEPRINTS, ...BUNKER_BLUEPRINTS, ...TOWER_BLUEPRINTS].map(b => [b.kind, b]));
+  [CABIN_BLUEPRINT, OUTHOUSE_BLUEPRINT, WORKSHOP_BLUEPRINT, ROOT_CELLAR_BLUEPRINT, COOP_BLUEPRINT, GARDEN_BLUEPRINT, FIELD_BLUEPRINT, GREENHOUSE_BLUEPRINT, ORCHARD_BLUEPRINT, LOG_HOUSE_BLUEPRINT, FARMHOUSE_BLUEPRINT, TRAILER_BLUEPRINT, BARN_BLUEPRINT, COTTAGE_BLUEPRINT, METAL_GARAGE_BLUEPRINT, GARAGE_SOLAR_BLUEPRINT, ...UTILITY_BLUEPRINTS, GREENHOUSE_HEATED_BLUEPRINT, ORCHARD_GROVE_BLUEPRINT, SOLAR_FARM_BLUEPRINT, BATTERY_BANK_BLUEPRINT, POND_BLUEPRINT, RESERVOIR_BLUEPRINT, SHEEP_BARN_BLUEPRINT, EQUIPMENT_YARD_BLUEPRINT, ...BUNKER_BLUEPRINTS, ...TOWER_BLUEPRINTS].map(b => [b.kind, b]));
 
 /** Total bill of materials for a blueprint. */
 export function totalBill(bp: Blueprint): Partial<Stock> {

@@ -29,6 +29,7 @@ import { newArmory, type Armory } from './armory';
 import { newWild, type Wild } from './wildfood';
 import { newWildlife, type Wildlife } from './wildlife';
 import type { Livestock } from './livestock';
+import type { Farm } from './farm';
 import type { Vehicle } from './vehicles';
 import { emptyStats, type Ending, type RunStats } from './report';
 import { generateNeighbors, newGate, type GateState, type Neighbor } from './encounters';
@@ -38,7 +39,7 @@ import { DIFFICULTY } from './difficulty';
 import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
 import type { LightsState } from './lights';
 import { starterKit, type ToolKit } from './tools';
-export const SAVE_VERSION = 52;
+export const SAVE_VERSION = 53;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -240,6 +241,8 @@ export interface GameState {
   lineage: Lineage;
   /** Goats, pigs, the steer, rabbits (lazily made: `s.livestock ??= newLivestock()`). */
   livestock?: Livestock;
+  /** Heated greenhouses, orchards, ponds and equipment yards (sim/farm.ts; lazily made: `farmOf(s)`). */
+  farm?: Farm;
   /** The black market contact, deals and heat (lazily created by sim/blackMarket.ts; optional, no save bump). */
   blackMarket?: BlackMarket;
   /** Peacetime break-ins and their legal aftermath (sim/breakins.ts): the evidence locker, a felony record, the news. Save v34; `??=` for safety. */

@@ -14,7 +14,8 @@ export type MaterialId = 'lumber' | 'logs' | 'firewood' | 'fieldstone' | 'concre
   | 'grenades' | 'rpg_launcher' | 'rpg_rounds' | 'suppressor'
   | 'mines' | 'greenhouse_kit' | 'fruit_trees' | 'ground_sensor' | 'passage_hatch'
   | 'gun_mount' | 'turret_head' | 'ai_sensor_module'
-  | 'tent' | 'sleeping_bag';
+  | 'tent' | 'sleeping_bag'
+  | 'greenhouse_pro_kit' | 'trout_fry' | 'crayfish_stock' | 'fish_feed' | 'sheep';
 
 export interface MaterialDef {
   id: MaterialId;
@@ -35,6 +36,7 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   hardware: { id: 'hardware', name: 'Doors, windows & hardware', unit: 'kit: a door or a couple of windows, hinges, locks, fasteners', price: 900 },
   wire: { id: 'wire', name: 'Fence wire', unit: 'roll (400 m barbed / 100 m woven)', price: 140 },
   greenhouse_kit: { id: 'greenhouse_kit', name: 'Greenhouse kit', unit: '12 × 24 ft aluminum-frame greenhouse, twin-wall polycarbonate, door, vents, benches', price: 4500 },
+  greenhouse_pro_kit: { id: 'greenhouse_pro_kit', name: 'Production greenhouse kit', unit: '9 × 24 m gutter-connected steel-hoop house, twin-wall polycarbonate, roof vents, a heater and thermal curtain', price: 24000 },
   fruit_trees: { id: 'fruit_trees', name: 'Fruit trees', unit: 'a bare-root semi-dwarf apple, peach or pear tree', price: 40 },
   seedlings: { id: 'seedlings', name: 'Hedge whips', unit: 'bundle of 25 bare-root', price: 75 },
   container: { id: 'container', name: 'Shipping container', unit: '40 ft used, delivered', price: 4800 },
@@ -123,6 +125,10 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   pig: { id: 'pig', name: 'Feeder pig', unit: 'a weaned feeder pig: to the butcher in November (bagged feed)', price: 150 },
   steer: { id: 'steer', name: 'Beef steer', unit: 'a weaned steer calf: beef after a summer on grass (hay in winter)', price: 1800 },
   rabbit: { id: 'rabbit', name: 'Meat rabbit', unit: 'a meat rabbit for the hutch: a buck and two does make a colony', price: 35 },
+  sheep: { id: 'sheep', name: 'Sheep', unit: 'a ewe in lamb: wool each spring, a lamb or two, mutton in the fall (needs a sheep barn in winter)', price: 300 },
+  trout_fry: { id: 'trout_fry', name: 'Trout fingerlings', unit: 'a bag of 100 rainbow trout fingerlings, delivered live (cold water only)', price: 90 },
+  crayfish_stock: { id: 'crayfish_stock', name: 'Crayfish breeders', unit: '50 red-swamp or signal crayfish breeders, delivered live', price: 120 },
+  fish_feed: { id: 'fish_feed', name: 'Fish feed', unit: 'a 50 lb bag of floating trout pellets', price: 45 },
   hay: { id: 'hay', name: 'Hay', unit: 'a 50 lb small square bale (cheapest bought at the fall cutting)', price: 12 },
   feed: { id: 'feed', name: 'Livestock feed', unit: 'a 50 lb bag of pellets and grain for pigs, goats, rabbits', price: 20 },
   smoker: { id: 'smoker', name: 'Smoker', unit: 'a smokehouse kit and curing salt: jerky that keeps without a freezer', price: 300 },

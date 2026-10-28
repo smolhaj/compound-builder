@@ -20,6 +20,8 @@ import { financeDay } from './finance';
 import { armoryDay } from './armory';
 import { petsDay } from './pets';
 import { toolsDay } from './tools';
+import { greenhouseDay, orchardDay } from './greenhouse';
+import { pondDay } from './pond';
 import { vehiclesDay } from './vehicles';
 import { radioDay } from './radio';
 import { waterDay } from './water';
@@ -165,6 +167,10 @@ function subStep(s: GameState): void {
     for (const line of weatherDay(s)) log(s, line);
     for (const line of digDay(s)) log(s, line);
     for (const line of wildlifeDay(s, s.structures.some(st => st.kind === 'root_cellar' && isFinished(st) && s.utilities.lit.includes(st.id)))) log(s, line);
+    // the self-sufficient interior: greenhouse heat, orchard pruning and pests, the pond's fish (sim/greenhouse.ts, sim/pond.ts)
+    for (const line of greenhouseDay(s)) log(s, line);
+    for (const line of orchardDay(s, s.daily?.chores.levels.orchard ?? 0)) log(s, line);
+    for (const line of pondDay(s)) log(s, line);
     const e = gateDay(s);
     // a raid has an hour of arrival (a gang at 2:15 AM); it waits for it and the game runs on until then
     if (e && !(hasCutscene(e) && scheduleArrival(s, e))) log(s, `${e.title}.`);

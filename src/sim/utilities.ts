@@ -23,6 +23,7 @@ import { runFinished, type PerimeterRun } from './perimeter';
 import { hasAll, type MaterialId, type Stock } from './materials';
 import { wellYield } from './effects';
 import { stormOutage } from './weatherThreats';
+import { greenhouseKwh } from './greenhouse';
 
 /** What utility buildings provide. */
 export interface UtilityDef {
@@ -44,14 +45,21 @@ export const UTILITY: Record<string, UtilityDef> = {
   cistern: { store: 10000 },
   water_tower: { store: 4000, gravity: true },
   solar_array: { solarKw: 4.8 },
+  /** 50 × 400 W panels in five rows: the 20 kW benchmark array. */
+  solar_farm: { solarKw: 20 },
   garage_solar: { solarKw: 8 },
   battery_shed: { batteryKwh: 20 },
+  /** A battery container: twelve 5 kWh racks. */
+  battery_bank: { batteryKwh: 60 },
+  /** A dug pond and a lined reservoir store water (a reservoir has no fish, so its water is clean). */
+  pond: { store: 300_000 },
+  reservoir: { store: 400_000 },
   generator_shed: { genKw: 7 },
   septic: { septic: true },
 };
 
 /** Daily power draw (kWh) of a wired building by kind, and water use (L/person/day) carried vs plumbed. */
-export const DRAW_KWH: Record<string, number> = { timber_cabin: 5, log_house: 8, farmhouse: 9, trailer: 6, cottage: 4, barn: 1, workshop: 4, metal_garage: 1, garage_solar: 1, filtration_shed: 0.3, root_cellar: 0.2, chicken_coop: 0.3, outhouse: 0, garden: 0, field: 0, greenhouse: 1, orchard: 0 };
+export const DRAW_KWH: Record<string, number> = { timber_cabin: 5, log_house: 8, farmhouse: 9, trailer: 6, cottage: 4, barn: 1, workshop: 4, metal_garage: 1, garage_solar: 1, filtration_shed: 0.3, root_cellar: 0.2, chicken_coop: 0.3, outhouse: 0, garden: 0, field: 0, greenhouse: 1, greenhouse_heated: 4, orchard: 0, orchard_grove: 0, pond: 1.5, reservoir: 1, sheep_barn: 0.3, equipment_yard: 0.2, solar_farm: 0, battery_bank: 0 };
 export const WATER_CARRIED = 25, WATER_PLUMBED = 130;
 /** Fitting jobs: hours and materials (per building). */
 export const FIT = {
@@ -69,7 +77,7 @@ export const GRID_USD_PER_KWH = 0.14, GRID_USD_PER_DAY = 0.9;
  * Who gets power first when there isn't enough (lower first): pumps, the
  * root cellar (freezer), homes, then the coop and the workshop.
  */
-export const LOAD_PRIORITY: Record<string, number> = { well_drilled: 0, root_cellar: 1, timber_cabin: 2, log_house: 2, farmhouse: 2, trailer: 2, cottage: 2, filtration_shed: 0, barn: 4, chicken_coop: 3, workshop: 4, metal_garage: 4, garage_solar: 4, greenhouse: 3 };
+export const LOAD_PRIORITY: Record<string, number> = { well_drilled: 0, root_cellar: 1, timber_cabin: 2, log_house: 2, farmhouse: 2, trailer: 2, cottage: 2, filtration_shed: 0, barn: 4, chicken_coop: 3, workshop: 4, metal_garage: 4, garage_solar: 4, greenhouse: 3, greenhouse_heated: 3, pond: 1, reservoir: 3, sheep_barn: 4, equipment_yard: 5 };
 
 export interface Fitting { building: string; kind: 'plumb' | 'wire'; done: number; hours: number; supplied: boolean; finishedAt: number | null }
 
@@ -102,6 +110,8 @@ export interface Utilities {
 }
 
 export interface UtilityReport {
+  /** Solar made yesterday that nobody used and no battery took (no cable to a load or battery, or the bank was full); the nameplate kW on the place; battery energy and capacity (kWh). */
+  wastedKwh?: number; solarKw?: number; storedKwh?: number; capKwh?: number;
   solarKwh: number; drawKwh: number; genKwh: number; shortKwh: number; batteryPct: number;
   /** From the grid, and what it cost; loads cut for want of power (building ids). */
   gridKwh: number; billUsd: number; shed: string[];
@@ -179,8 +189,36 @@ export function plant(s: GameState, halfSize: (kind: string) => number = k => NO
   return {
     nodes,
     water: networks(nodes, s.perimeter.filter(r => r.kind === 'water_pipe')),
-    power: networks(nodes, s.perimeter.filter(r => r.kind === 'power_cable')),
+    power: joinBank(nodes, networks(nodes, s.perimeter.filter(r => r.kind === 'power_cable'))),
   };
+}
+
+/** What a power bank is made of: panels, batteries, a generator. Equipment standing together is one bank (the bus bars and conduit are part of the kit). */
+export const BANK_KINDS = ['solar_array', 'solar_farm', 'garage_solar', 'battery_shed', 'battery_bank', 'generator_shed'];
+/** How close (world units, edge to edge) bank equipment must stand to share a bus: about 4 m. */
+export const BANK_GAP = 0.7;
+
+/**
+ * A solar array and the battery shed beside it are one bank without a drawn cable: the playtest's
+ * "batteries at 0 % for 1,900 days with solar made" was an array and a shed standing apart, each its
+ * own island (the array's sun went nowhere; the shed had nothing to charge it). Equipment within
+ * `BANK_GAP` of each other joins one network; a cable still joins a bank to the houses.
+ */
+export function joinBank(nodes: readonly Node[], power: Map<string, number>): Map<string, number> {
+  const bank = nodes.filter(n => BANK_KINDS.includes(n.kind));
+  const parent = new Map<number, number>();
+  const find = (a: number): number => { let p = parent.get(a) ?? a; while (p !== (parent.get(p) ?? p)) p = parent.get(p) ?? p; parent.set(a, p); return p; };
+  let any = false;
+  for (let i = 0; i < bank.length; i++) for (let j = i + 1; j < bank.length; j++) {
+    const a = bank[i], b = bank[j];
+    if (Math.hypot(a.x - b.x, a.z - b.z) - a.r - b.r > BANK_GAP) continue;
+    const ra = find(power.get(a.id)!), rb = find(power.get(b.id)!);
+    if (ra !== rb) { parent.set(ra, rb); any = true; }
+  }
+  if (!any) return power;
+  const out = new Map<string, number>();
+  for (const [id, n] of power) out.set(id, find(n));
+  return out;
 }
 
 function fitted(s: GameState, id: string, kind: Fitting['kind']): boolean {
@@ -249,8 +287,8 @@ export function sunHours(doy: number): number {
 }
 
 /** Half-size (world units) a line must reach to touch a building, and its roof area (m²) for rain catchment, by kind. */
-export const NODE_R: Record<string, number> = { timber_cabin: 0.5, log_house: 0.75, farmhouse: 0.75, trailer: 0.6, cottage: 0.55, barn: 1.0, workshop: 0.75, metal_garage: 0.8, garage_solar: 0.8, filtration_shed: 0.2, root_cellar: 0.4, chicken_coop: 0.4, garden: 0.7, field: 2.2, outhouse: 0.2, well_hand: 0.25, well_drilled: 0.3, cistern: 0.3, water_tower: 0.35, solar_array: 0.6, battery_shed: 0.3, generator_shed: 0.3, septic: 0.4, greenhouse: 0.6, orchard: 1.3 };
-export const ROOF_M2: Record<string, number> = { timber_cabin: 70, log_house: 160, farmhouse: 140, trailer: 90, cottage: 60, barn: 220, workshop: 120, metal_garage: 120, garage_solar: 120, filtration_shed: 5, chicken_coop: 6, outhouse: 2, battery_shed: 8, generator_shed: 8, well_drilled: 6, well_hand: 3, greenhouse: 26 };
+export const NODE_R: Record<string, number> = { solar_farm: 1.5, battery_bank: 0.5, greenhouse_heated: 1.5, orchard_grove: 2, pond: 1.5, reservoir: 1.2, sheep_barn: 1, equipment_yard: 1, timber_cabin: 0.5, log_house: 0.75, farmhouse: 0.75, trailer: 0.6, cottage: 0.55, barn: 1.0, workshop: 0.75, metal_garage: 0.8, garage_solar: 0.8, filtration_shed: 0.2, root_cellar: 0.4, chicken_coop: 0.4, garden: 0.7, field: 2.2, outhouse: 0.2, well_hand: 0.25, well_drilled: 0.3, cistern: 0.3, water_tower: 0.35, solar_array: 0.6, battery_shed: 0.3, generator_shed: 0.3, septic: 0.4, greenhouse: 0.6, orchard: 1.3 };
+export const ROOF_M2: Record<string, number> = { timber_cabin: 70, log_house: 160, farmhouse: 140, trailer: 90, cottage: 60, barn: 220, workshop: 120, metal_garage: 120, garage_solar: 120, filtration_shed: 5, chicken_coop: 6, outhouse: 2, battery_shed: 8, generator_shed: 8, well_drilled: 6, well_hand: 3, greenhouse: 26, greenhouse_heated: 216, sheep_barn: 110, battery_bank: 18 };
 
 /** Rain and snowmelt (mm a day, averaged by month): wet spring, dry late summer. */
 export function rainMm(doy: number): number {
@@ -265,14 +303,16 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
   u.haulFar = false;
   const fin = s.structures.filter(isFinished);
   const kinds = new Map(fin.map(st => [st.id, st.kind]));
+  const built = new Map(fin.map(st => [st.id, st]));
   // ── power: each network's own sources (solar → battery → grid → generator), loads served by priority ──
   // the county grid, unless it's gone (the disaster) or a storm has the lines down
   const gridUp = u.grid && s.disaster.tracks.grid > 0.5 && !stormOutage(s);
-  let solar = 0, draw = 0, gen = 0, short = 0, capKwh = 0, gridKwh = 0;
+  let solar = 0, draw = 0, gen = 0, short = 0, capKwh = 0, gridKwh = 0, wasted = 0, newBat = 0;
+
   const lit = new Set<string>(), shed: string[] = [];
   const loadOf = (o: Node) => u.off.includes(o.id) ? 0
     : UTILITY[o.kind]?.water?.needsPower ? (u.broken.includes(o.id) || u.fried.includes(o.id) ? 0 : UTILITY[o.kind]!.water!.needsPower!)
-    : fitted(s, o.id, 'wire') ? DRAW_KWH[o.kind] ?? 0 : 0;
+    : fitted(s, o.id, 'wire') ? (o.kind === 'greenhouse_heated' ? greenhouseKwh(s, built.get(o.id)!) : DRAW_KWH[o.kind] ?? 0) : 0;
   const isSource = (o: Node) => !!(UTILITY[o.kind]?.solarKw || UTILITY[o.kind]?.genKw || UTILITY[o.kind]?.batteryKwh);
   const live = (o: Node) => !u.fried.includes(o.id);
   const groups = new Map<number | string, Node[]>();
@@ -282,6 +322,11 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
     const key = sourced ? n! : `solo:${o.id}`;
     let l = groups.get(key); if (!l) groups.set(key, l = []); l.push(o);
   }
+  // the battery's energy is one number for the place; split it among the banks by capacity so two banks never draw on the same charge
+  const capOf = (members: Node[]) => members.filter(o => !u.fried.includes(o.id)).reduce((a, o) => a + (UTILITY[o.kind]?.batteryKwh ?? 0), 0) * (1 - u.batteryFade);
+  let capAll = 0;
+  for (const members of groups.values()) capAll += capOf(members);
+  const bat0 = u.batteryKwh;
   for (const [key, members] of groups) {
     // a building on no network of its own: the grid or nothing (dark, no shortage to report)
     if (typeof key === 'string' && !gridUp) continue;
@@ -295,10 +340,12 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
     draw += d; solar += sol; capKwh += cap;
     let have = sol;
     // battery: bank the surplus, cover the shortfall
+    let bat = capAll > 0 ? bat0 * cap / capAll : 0;
     if (cap > 0) {
-      if (have > d) { u.batteryKwh = Math.min(cap, u.batteryKwh + (have - d) * 0.92); have = d; }
-      else { const take = Math.min(d - have, u.batteryKwh); u.batteryKwh -= take; have += take; }
-    }
+      if (have > d) { const room = Math.max(0, cap - bat), put = Math.min(have - d, room / 0.92); bat += put * 0.92; wasted += have - d - put; have = d; }
+      else { const take = Math.min(d - have, bat); bat -= take; have += take; }
+    } else if (have > d && sol > 0) wasted += have - d;
+    newBat += bat;
     // the county grid, while it's up
     if (have < d && gridUp) { gridKwh += d - have; have = d; }
     // the generator for the rest, while there's fuel
@@ -320,6 +367,7 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
     short += loads.filter(o => shed.includes(o.id)).reduce((a, o) => a + loadOf(o), 0);
   }
   if (short > 0.5) log(s, `Power ran short by ${short.toFixed(1)} kWh: lamps tonight.`);
+  u.batteryKwh = Math.min(newBat, capKwh);
   u.lit = [...lit];
   const bill = u.grid && gridUp ? gridKwh * GRID_USD_PER_KWH + GRID_USD_PER_DAY : 0;
   s.money -= bill;
@@ -347,12 +395,16 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
   // roofs on the water network with a cistern catch rain (gutters)
   let roof = 0;
   for (const st of fin) if (p.water.has(st.id) && p.nodes.some(o => p.water.get(o.id) === p.water.get(st.id) && UTILITY[o.kind]?.store)) roof += roofM2(kinds.get(st.id)!);
-  const rainL = roof * rainMm(doy) * REGIONS[s.site.region].rainMm / 400 * 0.8;
+  // a dug pond or reservoir takes the rain on its own surface and a seep (or the creek) all year, and loses water in the summer heat
+  const basins = fin.filter(st => st.kind === 'pond' || st.kind === 'reservoir').length;
+  const basinIn = basins * (rainMm(doy) * 330 * REGIONS[s.site.region].rainMm / 400 * 0.8 + (s.site.creek ? 2200 : 600)) * (s.disaster.kind === 'drought' && s.clock.t >= s.disaster.hitAt ? 0.3 : 1);
+  const basinOut = basins * (doy > 150 && doy < 250 ? 800 : 150);
+  const rainL = roof * rainMm(doy) * REGIONS[s.site.region].rainMm / 400 * 0.8 + basinIn - basinOut;
   // the living drink and wash (playtest round 3: the dead and the taken were still counted, doubling a long game's water use)
   const people = s.personState.filter(ps => ps.needs?.died == null).length;
   const homePlumbed = fin.some(st => fitted(s, st.id, 'plumb') && (DRAW_KWH[st.kind] ?? 0) >= 5);
   const use = people * (homePlumbed ? WATER_PLUMBED : WATER_CARRIED) + (fin.some(st => st.kind === 'garden') && doy > 120 && doy < 270 ? (s.stock.greywater >= 1 && homePlumbed ? 200 : 400) : 0) + (fin.some(st => st.kind === 'chicken_coop') ? 10 : 0);
-  u.storedL = Math.min(store, u.storedL + rainL);
+  u.storedL = Math.max(0, Math.min(store, u.storedL + rainL));
   let left = supply - use, shortL = 0;
   if (left < 0) { const take = Math.min(-left, u.storedL); u.storedL -= take; left += take; }
   else u.storedL = Math.min(store, u.storedL + left);
@@ -366,7 +418,8 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
     else if (!creekDry) { u.hauling = true; if (!s.site.creek) u.haulFar = true; }
     else { shortL = -left; log(s, `Water ran short by ${Math.round(shortL)} L.`); }
   }
-  u.report = { solarKwh: solar, drawKwh: draw, genKwh: gen, shortKwh: short, batteryPct: capKwh > 0 ? u.batteryKwh / capKwh : 0, gridKwh, billUsd: bill, shed, waterL: supply + rainL, useL: use, shortL, storedL: u.storedL };
+  const nameplate = fin.reduce((a, st) => a + (u.fried.includes(st.id) ? 0 : UTILITY[st.kind]?.solarKw ?? 0), 0);
+  u.report = { wastedKwh: wasted, solarKw: nameplate, storedKwh: u.batteryKwh, capKwh, solarKwh: solar, drawKwh: draw, genKwh: gen, shortKwh: short, batteryPct: capKwh > 0 ? u.batteryKwh / capKwh : 0, gridKwh, billUsd: bill, shed, waterL: supply + Math.max(0, rainL), useL: use, shortL, storedL: u.storedL };
   u.lastDay = dayIndex(s.clock.t);
 }
 
