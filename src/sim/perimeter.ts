@@ -144,13 +144,13 @@ export const SPOIL_SAVES = 0.6;
 /** Extra person-hours per unit length for the stretch of a tunnel under someone else's land (dug by hand, at night, no excavator). */
 export const OFF_PARCEL_HOURS = 40;
 
-/** Plan a run (mutates the draft). `offLen`: how much of it lies beyond the parcel (tunnels only). */
-export function planRun(s: GameState, kind: PerimeterKind, pts: Pt[], gates: Gate[] = [], offLen = 0): PerimeterRun {
+/** Plan a run (mutates the draft). `offLen`: how much of it lies beyond the parcel (tunnels only). `quiet`: no log line (a batch logs once). */
+export function planRun(s: GameState, kind: PerimeterKind, pts: Pt[], gates: Gate[] = [], offLen = 0, quiet = false): PerimeterRun {
   const len = wallLength({ pts, gates });
   const hours = runHours(kind, len) + (kind === 'escape_tunnel' ? OFF_PARCEL_HOURS * offLen : 0);
   const run: PerimeterRun = { id: `p${s.nextId++}`, kind, pts, gates, done: 0, hours, supplied: false, finishedAt: null };
   s.perimeter.push(run);
-  log(s, `Laid out ${Math.round(len * 6)} m of ${PERIMETER[kind].name.toLowerCase()}.`);
+  if (!quiet) log(s, `Laid out ${Math.round(len * 6)} m of ${PERIMETER[kind].name.toLowerCase()}.`);
   return run;
 }
 

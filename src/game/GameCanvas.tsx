@@ -154,6 +154,7 @@ export function GameCanvas() {
     const rebuildBoundary = () => boundary.build([world.home, ...ownedRects(useGameStore.getState().game)]);
     const showBoundary = () => { boundary.visible = useWorldStore.getState().showBoundary || !!useGameStore.getState().tool?.startsWith('fence:'); };
     rebuildBoundary(); showBoundary();
+    useWorldStore.getState().setSiteGeo({ creekZ: x => world.parcel.creek.zAt(x), creekHalf: world.parcel.creek.halfWidth, roadGate: [world.access.gate.x, world.access.gate.z] });
     world.setBurnedFarms(burnedFarms(useGameStore.getState().game));
     const unsub = [
       // wildfire weather: measure the fuel round every building (what cleared ground there is decides what burns)
@@ -379,6 +380,7 @@ export function GameCanvas() {
       fence.dispose();
       sight.dispose();
       boundary.dispose();
+      useWorldStore.getState().setSiteGeo(null);
       canvas.removeEventListener('pointerdown', onVsDown);
       canvas.removeEventListener('pointerup', onVsUp);
       cam.dispose();
