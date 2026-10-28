@@ -698,18 +698,19 @@ export class HomesteadWorld {
   syncPerimeter(runs: readonly PerimeterRun[], t: number, opts: { lit?: boolean; sensors?: boolean } = {}): void {
     this._runs = runs;
     const lit = opts.lit ?? true, sensors = opts.sensors ?? false;
+    const hostOf = (r: PerimeterRun) => (PERIMETER[r.kind].wallTop ? runs.find(x => x.id === r.hostId)?.kind ?? '' : '');
     const ids = runs.map(r => r.id).join(',');
     for (const r of runs) {
       // old posts lean and rails sag (atmosphere/aging): rebuilt as the lean steps
       const lean = LEANS.has(r.kind) && r.finishedAt !== null ? Math.round(fenceLean((t - r.finishedAt) / 365) * 10) / 10 : 0;
-      const key = `${Math.round(runProgress(r) * 60)}:${Math.round(runGrowth(r, t) * 40)}:${r.finishedAt === null ? 0 : 1}:${r.gates.length}:${lean}:${hasSkirt(r, t) ? 1 : 0}:${lit ? 1 : 0}:${sensors ? 1 : 0}`;
+      const key = `${Math.round(runProgress(r) * 60)}:${Math.round(runGrowth(r, t) * 40)}:${r.finishedAt === null ? 0 : 1}:${r.gates.length}:${lean}:${hasSkirt(r, t) ? 1 : 0}:${lit ? 1 : 0}:${sensors ? 1 : 0}:${hostOf(r)}`;
       const cur = this._runGroups.get(r.id);
       if (cur?.key === key) continue;
       if (cur) { this._root.remove(cur.group); cur.group.traverse(o => (o as THREE.Mesh).geometry?.dispose()); }
       const tunnel = r.kind === 'escape_tunnel' || r.kind === 'underground_passage';
       const group = tunnel
         ? buildTunnel(this._pathOf(r), this.groundAt, r.finishedAt !== null ? 1 : runProgress(r), this._exitWoods(r), r.kind === 'underground_passage' ? { woodsStart: this.tunnelExitWoods(r.pts[0][0], r.pts[0][1]) } : undefined)
-        : buildRun(r, this.groundAt, t, (x, z) => this.onBuilding(x, z, 0.02, false), { lit, sensors });
+        : buildRun(r, this.groundAt, t, (x, z) => this.onBuilding(x, z, 0.02, false), { lit, sensors, hostKind: PERIMETER[r.kind].wallTop ? runs.find(x => x.id === r.hostId)?.kind : undefined });
       if (tunnel) this._applyTunnelView(group);
       if (lean > 0) leanRun(group, lean, hashStr(r.id) % 997, this.groundAt);
       this._root.add(group);

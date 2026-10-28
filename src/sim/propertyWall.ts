@@ -32,6 +32,8 @@ export interface PropertyGeometry {
   creekHalf?: number;
   /** The farm gate on the county road. */
   roadGate?: Pt;
+  /** Where the family lives (the camp): a compound ring is centered here. */
+  center?: Pt;
 }
 
 /** The kinds that make sense as the one wall round a property. */
@@ -142,6 +144,18 @@ function distToPolyline(pts: readonly Pt[], x: number, z: number): number {
 
 export interface PlannedRun { kind: PerimeterKind; pts: Pt[]; gates: Gate[] }
 
+/** Where the road gate is: its middle on the line, the direction of the wall there, and the unit vector from the wall into the compound. */
+export interface GateSpot { x: number; z: number; dx: number; dz: number; inx: number; inz: number }
+
+export interface PlanOptions {
+  /** The road gate's width, world units (default `ROAD_GATE_W`; a gatehouse garage is as wide as its footprint). */
+  gateW?: number;
+  /** Wall this land instead of the whole property (a compound ring on part of it): the rectangles whose outline is traced. */
+  rects?: Rect[];
+  /** The gate gap is for a gatehouse garage (sim/garage.ts): the gate is marked so no leaves are drawn and the garage holds the line. */
+  garage?: boolean;
+}
+
 export interface WallPlan {
   kind: PerimeterKind;
   runs: PlannedRun[];
@@ -155,6 +169,8 @@ export interface WallPlan {
   gates: number;
   /** Why there is no gate (null = one is planned or none was wanted). */
   gateNote: string | null;
+  /** Where the gate is (null = none planned). */
+  gateSpot: GateSpot | null;
   bill: Partial<Stock>;
   /** What the buyable part of the bill costs, and the own-labor materials (logs). */
   cost: number;
@@ -167,8 +183,11 @@ const M = 6;
 /** Can this existing run stand for the property wall along the line? */
 const holdsLine = (r: Pick<PerimeterRun, 'kind' | 'pts'>) => r.kind !== 'creek_bars' && PERIMETER[r.kind].blocks.people > 0 && r.pts.length > 1;
 
-export function planPropertyWall(s: GameState, kind: PerimeterKind, geo: PropertyGeometry = {}): WallPlan {
-  const loops = traceLoops(ownedRects(s)).map(p => new Loop(p));
+export function planPropertyWall(s: GameState, kind: PerimeterKind, geo: PropertyGeometry = {}, opts: PlanOptions = {}): WallPlan {
+  const gw = opts.gateW ?? ROAD_GATE_W;
+  let gateSpot: GateSpot | null = null;
+  const landRects = opts.rects ?? ownedRects(s);
+  const loops = traceLoops(landRects).map(p => new Loop(p));
   const walls = s.perimeter.filter(holdsLine), bars = s.perimeter.filter(r => r.kind === 'creek_bars' && r.pts.length > 1);
   const creek = s.site.creek && geo.creekZ ? geo : null;
   const gh = (geo.creekHalf ?? 0.7) + BANK;
@@ -191,6 +210,15 @@ export function planPropertyWall(s: GameState, kind: PerimeterKind, geo: Propert
       }
       gateAt = { loop: l, s: mid };
     }
+  }
+
+  // a gatehouse garage needs a straight stretch: keep the gate clear of corners
+  if (opts.garage && gateAt) {
+    const l = gateAt.loop;
+    let i = 0;
+    while (i < l.pts.length - 1 && l.cum[i + 1] <= gateAt.s) i++;
+    const lo = l.cum[i] + gw / 2 + 0.2, hi = l.cum[i + 1] - gw / 2 - 0.2;
+    if (hi > lo) gateAt = { loop: l, s: Math.min(hi, Math.max(lo, gateAt.s)) };
   }
 
   for (const loop of loops) {
@@ -244,7 +272,16 @@ export function planPropertyWall(s: GameState, kind: PerimeterKind, geo: Propert
       const pts = loop.slice(s0, s1);
       if (gateAt && gateAt.loop === loop) {
         const rel = (((gateAt.s - s0) % L) + L) % L, len = s1 - s0;
-        if (rel <= len && len >= ROAD_GATE_W + 0.4) gates.push({ at: Math.min(len - ROAD_GATE_W / 2 - 0.05, Math.max(ROAD_GATE_W / 2 + 0.05, rel)), w: ROAD_GATE_W });
+        if (rel <= len && len >= gw + 0.4) {
+          const at = Math.min(len - gw / 2 - 0.05, Math.max(gw / 2 + 0.05, rel));
+          gates.push({ at, w: gw, ...(opts.garage ? { garage: true } : {}) });
+          const c = loop.at(s0 + at), a = loop.at(s0 + at - 0.05), b = loop.at(s0 + at + 0.05), dl = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+          const dx = (b[0] - a[0]) / dl, dz = (b[1] - a[1]) / dl;
+          // inward: the normal that stays on the owned land
+          const owned = (x: number, z: number) => landRects.some(r => x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1);
+          const n: Pt = owned(c[0] - dz * 0.1, c[1] + dx * 0.1) ? [-dz, dx] : [dz, -dx];
+          gateSpot = { x: c[0], z: c[1], dx, dz, inx: n[0], inz: n[1] };
+        }
       }
       out.push({ kind, pts, gates });
       gateCount += gates.length;
@@ -268,7 +305,7 @@ export function planPropertyWall(s: GameState, kind: PerimeterKind, geo: Propert
   const own = (Object.entries(bill) as Array<[MaterialId, number]>).filter(([m]) => MATERIALS[m].price === null).map(([material, qty]) => ({ material, qty }));
   const hours = out.reduce((a, r) => a + runHours(r.kind, wallLength(r)), 0);
   const wallM = out.filter(r => r.kind !== 'creek_bars').reduce((a, r) => a + wallLength(r), 0) * M;
-  return { kind, runs: out, wallM: Math.round(wallM), barsM: Math.round(barsLen * M), heldM: Math.round(held * M), lineM: Math.round(lineLen * M), creekCrossings: crossings, gates: gateCount, gateNote, bill, cost: orderCost(buy), own, hours: Math.round(hours) };
+  return { kind, runs: out, wallM: Math.round(wallM), barsM: Math.round(barsLen * M), heldM: Math.round(held * M), lineM: Math.round(lineLen * M), creekCrossings: crossings, gates: gateCount, gateNote, gateSpot, bill, cost: orderCost(buy), own, hours: Math.round(hours) };
 }
 
 /** Lay the plan out: every run goes on the list for the family to build. Returns how many runs. */

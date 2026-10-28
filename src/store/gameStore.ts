@@ -25,6 +25,8 @@ import { AUTO_NAME, type AutoLightsOut } from '../sim/blackout';
 import { stampHighGround, upgradeTower } from '../sim/towers';
 import { addSkirt, planRun, upgradeRun, type Gate, type PerimeterKind, type Pt } from '../sim/perimeter';
 import { layPropertyWall, planPropertyWall, type PropertyGeometry } from '../sim/propertyWall';
+import { addWalkway } from '../sim/walkway';
+import { layFortress, planFortress, type FortressOptions } from '../sim/fortress';
 import { fitProblem, orderFit, plant, repairPump, replaceFried } from '../sim/utilities';
 
 /** Reconnection fee to get back on the grid after leaving it. */
@@ -119,6 +121,10 @@ export interface GameStore {
   upgradeRun: (id: string) => string | null;
   /** Bury a steel-and-concrete skirt under a finished wall (null = done, else why not). */
   addSkirt: (id: string) => string | null;
+  /** A patrol walkway on top of a finished wall (sim/walkway.ts). */
+  addWalkway: (id: string) => string | null;
+  /** "Fortify my ring": lay out the plan (container wall, decks, gate garage, towers, passage). Returns how many runs and structures. */
+  fortifyRing: (geo: PropertyGeometry, opts: Partial<FortressOptions>) => { runs: number; structures: number };
   /** Bolt or unbolt the blast hatches of an underground passage. */
   lockPassage: (id: string, locked: boolean) => void;
   /** Upgrade a finished watch tower in place: the next tier rises beside it. */
@@ -310,6 +316,20 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     const why = addSkirt(g, id);
     if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); }
     return why;
+  },
+  addWalkway: (id) => {
+    if (locked()) return LOCKED_WHY;
+    const g = structuredClone(get().game);
+    const why = addWalkway(g, id);
+    if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); }
+    return why;
+  },
+  fortifyRing: (geo, opts) => {
+    if (locked()) return { runs: 0, structures: 0 };
+    const g = structuredClone(get().game);
+    const n = layFortress(g, planFortress(g, geo, opts));
+    if (n.runs + n.structures) { set({ game: g }); void saveGame(AUTOSAVE, g); }
+    return n;
   },
   lockPassage: (id, locked) => {
     const g = structuredClone(get().game);
