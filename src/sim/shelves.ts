@@ -11,7 +11,7 @@ import { HARDEN_GOODS, KIT_GOODS, WATCH_GOODS } from './gear';
 export type ShelfTab = 'build' | 'fencing' | 'bunker' | 'water' | 'power' | 'food' | 'household' | 'fuel' | 'defense';
 
 export const SHELF_TABS: ReadonlyArray<[ShelfTab, string]> = [
-  ['build', 'Building'], ['fencing', 'Fencing'], ['bunker', 'Bunker'], ['water', 'Water'], ['power', 'Power'], ['food', 'Food & farm'], ['household', 'Medical & household'], ['fuel', 'Fuel & tools'], ['defense', 'Kit & security'],
+  ['build', 'Building'], ['fencing', 'Fencing'], ['bunker', 'Bunker'], ['water', 'Water'], ['power', 'Power'], ['food', 'Food & farm'], ['household', 'Medical & household'], ['fuel', 'Fuel & hire'], ['defense', 'Kit & security'],
 ];
 
 export const SHELVES: Record<ShelfTab, MaterialId[]> = {
