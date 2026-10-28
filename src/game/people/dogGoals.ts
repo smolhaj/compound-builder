@@ -73,7 +73,7 @@ export function dogGoal(d: Dog, index: number, hour: number, day: number, ctx: D
   if (!night && who) {
     // trot along behind-and-to-the-side of its person
     const a = who.rot + Math.PI + (hash(d.id, 3) < 0.5 ? 0.7 : -0.7), r = 0.11 + 0.04 * index;
-    return { x: who.x + Math.sin(a) * r, z: who.z + Math.cos(a) * r, stance: lazy ? 'lie' : 'sit', face: faceTo(who.x, who.z, who.x + Math.sin(who.rot), who.z + Math.cos(who.rot)), frisky: pup || d.play < 15, follow: !lazy };
+    return { x: who.x + Math.sin(a) * r, z: who.z + Math.cos(a) * r, stance: lazy ? 'lie' : 'stand', face: faceTo(who.x, who.z, who.x + Math.sin(who.rot), who.z + Math.cos(who.rot)), frisky: pup || d.play < 15, follow: !lazy };
   }
   if (night && ctx.home?.seats?.length && !d.guard) {
     // inside: curled up on a sofa, a rug or a bed where the interior has one

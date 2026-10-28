@@ -21,7 +21,7 @@ describe('where the dogs are', () => {
   it('a dog kept inside follows its person by day and sleeps by the house at night', () => {
     const g = newGame(1); const d = adoptDog(g, { ageYears: 3 }); setGuard(g, d.id, false); d.bonds.p1 = 90;
     const day = dogGoal(d, 0, 11, 0, ctx(), 0.5);
-    expect(day.follow || day.stance === 'sit').toBe(true);
+    expect(day.follow || day.stance === 'stand').toBe(true);
     expect(Math.hypot(day.x - 35, day.z - 33)).toBeLessThan(0.3);
     const night = dogGoal(d, 0, 23, 0, ctx(), 0.5);
     expect(night.stance).toBe('lie');
