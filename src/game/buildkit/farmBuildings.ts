@@ -98,13 +98,17 @@ function greenhouseHeated(_def: KitPieceDef, seed = 1): THREE.Group {
     const n = 11;
     for (let k = 0; k < n; k++) for (const c of [-0.3, 0.3]) {
       const h = (0.12 + 0.22 * hash(r * 13 + k, c)) * M, z = benchZ0 + 0.3 * M + k * (benchLen - 0.6 * M) / (n - 1), px = x + c * M;
-      p.add('crop', ball(0.17 * M + h * 0.3, px, benchY + 0.12 * M + h * 0.5, z, 1, 0.7, 1));
+      p.add('crop', ball(0.13 * M + h * 0.3, px, benchY + 0.12 * M + h * 0.5, z, 1, 0.7, 1));
       if (hash(k, r + c) > 0.55) p.add('crop', ball(0.1 * M, px + 0.12 * M, benchY + 0.2 * M + h, z + 0.06 * M, 1, 0.8, 1));
     }
     if (r === 0 || r === 3) for (let k = 0; k < 6; k++) {
       const z = benchZ0 + 0.8 * M + k * (benchLen - 1.6 * M) / 5, px = x + (r === 0 ? -1 : 1) * 0.35 * M;
-      p.add('crop', cylY(0.22 * M, 1.7 * M, px, benchY + 0.1 * M, z, 6));
-      for (let f = 0; f < 4; f++) p.add('fruit', ball(0.07 * M, px + (f % 2 ? 0.14 : -0.14) * M, benchY + (0.7 + f * 0.3) * M, z + (f < 2 ? 0.08 : -0.08) * M, 1, 1, 1, 5));
+      p.add('wood_mid', cylY(0.025 * M, 1.9 * M, px, benchY + 0.1 * M, z, 5));
+      for (let f = 0; f < 5; f++) {
+        const y = benchY + (0.35 + f * 0.33) * M;
+        p.add('crop', ball(0.17 * M, px + (f % 2 ? 0.08 : -0.08) * M, y, z, 1, 0.8, 1, 5));
+        p.add('fruit', ball(0.06 * M, px + (f % 2 ? 0.2 : -0.2) * M, y - 0.1 * M, z + (f < 3 ? 0.1 : -0.1) * M, 1, 1, 1, 5));
+      }
       p.add('string', box(0.006, 2.1 * M, 0.006, px, benchY, z));
     }
   });
@@ -330,7 +334,7 @@ function pond(def: KitPieceDef, seed = 1): THREE.Group {
   p.layer = 'roof';
   const sp = sh[Math.floor(sh.length * 0.25)];
   for (let k = 0; k < 8; k++) p.add('fieldstone', ball(0.04 + 0.02 * hash(k, 9), sp[0] * 1.25 + (hash(k, 1) - 0.5) * 0.2, 0.012, sp[1] * 1.25 + k * 0.025, 1.3, 0.5, 1, 5));
-  p.add('hedge2', flat(scaleOutline(sh, 1.3), 0.047), 'roof');
+  p.add('hedge2', ring(scaleOutline(sh, 1.04), scaleOutline(sh, 1.3), 0.047, 0.047), 'roof');
   // walls: the fish fence (wire mesh on posts) round the whole bank
   p.layer = 'walls';
   const fence = scaleOutline(sh, 1.38);
@@ -371,7 +375,7 @@ function pond(def: KitPieceDef, seed = 1): THREE.Group {
   // decor: the fish and crayfish, shown by the world in proportion to the stock (the first meshes show first)
   for (let k = 0; k < 18; k++) {
     const a = hash(k, 11) * Math.PI * 2, r = 0.15 + 0.6 * hash(k, 12), ang = hash(k, 13) * Math.PI * 2;
-    p.add('fish', troutGeo(Math.cos(a) * rx * 0.8 * r, Math.sin(a) * rz * 0.8 * r, ang, 0.02));
+    p.add('fish', troutGeo(Math.cos(a) * rx * 0.8 * r, Math.sin(a) * rz * 0.8 * r, ang, 0.024));
   }
   for (let k = 0; k < 14; k++) {
     const i = Math.floor(hash(k, 14) * sh.length), [x, z] = sh[i], d = 0.88 - 0.1 * hash(k, 15);

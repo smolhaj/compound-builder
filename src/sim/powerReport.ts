@@ -7,12 +7,14 @@
  *             of every working battery.
  *  Yesterday  made / used / stored; the sun that was made and wasted (no cable to a load, a full
  *             bank, no battery on the grid-tied place).
- *  Islands    a source with nowhere to put its energy: an array not joined to a battery or a wired
- *             building, a battery bank with no panels or generator, wired buildings with no source.
+ *  Islands    a source or bank not on a cable (sim/hookups.ts says which and what to do); equipment
+ *             standing together shares a bus (utilities.ts `joinBank`), so an array and the battery
+ *             container beside it count as one bank.
  */
 import { isFinished } from './construction';
 import type { GameState } from './state';
 import { BANK_KINDS, plant, UTILITY } from './utilities';
+import { needsHookup } from './hookups';
 import { KIT } from '../game/buildkit/kit';
 
 /** One decimal, no trailing noise: 4.8, 20, 0.4 (never 4.800000000000001). */
@@ -45,25 +47,8 @@ export function powerSummary(s: GameState): PowerSummary {
   const batteryKwh = working.reduce((a, st) => a + (UTILITY[st.kind]?.batteryKwh ?? 0), 0) * (1 - u.batteryFade);
   const genKw = working.reduce((a, st) => a + (UTILITY[st.kind]?.genKw ?? 0), 0);
   const p = plant(s);
-  const problems: PowerProblem[] = [];
-  const name = (kind: string) => KIT[kind]?.name ?? kind;
-  const net = (id: string) => p.power.get(id);
-  const sameNet = (a: string, b: string) => net(a) !== undefined && net(a) === net(b);
-  const wired = new Set(u.fittings.filter(f => f.kind === 'wire' && f.finishedAt !== null).map(f => f.building));
-  for (const st of fin) {
-    const def = UTILITY[st.kind];
-    if (!def) continue;
-    const peers = fin.filter(o => o.id !== st.id && sameNet(o.id, st.id));
-    if (def.solarKw && !u.fried.includes(st.id)) {
-      const sinks = peers.some(o => (UTILITY[o.kind]?.batteryKwh ?? 0) > 0 || wired.has(o.id));
-      if (!sinks && !(u.grid && s.disaster.tracks.grid > 0.5)) problems.push({ id: st.id, building: st.kind, text: `${name(st.kind)} (${fmtKw(def.solarKw)} kW) is not connected to a battery or a wired building: its power goes nowhere. Set a battery shed beside it, or run a power cable to the house.` });
-      else if (!sinks) problems.push({ id: st.id, building: st.kind, text: `${name(st.kind)} has no battery or wired building on its cable: on the grid-tied line it only offsets the meter, and shuts off in an outage.` });
-    }
-    if (def.batteryKwh) {
-      const charger = peers.some(o => (UTILITY[o.kind]?.solarKw ?? 0) > 0 || (UTILITY[o.kind]?.genKw ?? 0) > 0);
-      if (!charger) problems.push({ id: st.id, building: st.kind, text: `${name(st.kind)} has nothing to charge it: put it beside the solar array or run a cable from it.` });
-    }
-  }
+  // which sources and banks are not on a cable is sim/hookups.ts's job; this reads its answer
+  const problems: PowerProblem[] = needsHookup(s).filter(h => h.kind === 'power_link').map(h => ({ id: h.id, building: h.name, text: `${KIT[h.name]?.name ?? h.name}: ${h.todo}` }));
   const made = r.solarKwh + r.genKwh, wasted = r.wastedKwh ?? 0;
   let headline: string | null = null;
   if (problems.length) headline = problems[0].text;

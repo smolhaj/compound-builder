@@ -13,6 +13,9 @@ import { isFinished, planProblem } from './construction';
 import { countyWorks, needsPermit, permitFee, reviewDays } from './paperwork';
 import { onOrder, orderCost, prices } from './economy';
 import { firewoodOutlook } from './heating';
+import { UTILITY } from './utilities';
+import { fmtKw } from './powerReport';
+import { ORCHARD_KINDS, orchardBearing } from './greenhouse';
 import { needsHookup, storageTip } from './hookups';
 import { MATERIAL_IDS, MATERIALS, type MaterialId } from './materials';
 import { PERIMETER, PERIMETER_ORDER, UPGRADE_NEXT, fenceLive, runBill, runFinished, wallLength, type PerimeterKind } from './perimeter';
@@ -180,7 +183,25 @@ export function longTerm(s: GameState): Goal[] {
     { label: 'Watch towers', done: towers > 0, detail: towers ? `${towers} standing` : 'a place to see them coming from' },
   ] };
   const bunker: Goal = { id: 'bunker', title: 'A bunker underneath', steps: bunkerChecklist(s).map(c => ({ label: c.label, done: c.done, detail: c.detail })) };
-  return [enclose, bunker];
+  return [enclose, bunker, selfSufficient(s)];
+}
+
+/** The third goal, always shown, never required: feed and power the compound from its own land (the self-sufficient interior). */
+export function selfSufficient(s: GameState): Goal {
+  const fin = s.structures.filter(isFinished);
+  const kw = fin.reduce((a, st) => a + (UTILITY[st.kind]?.solarKw ?? 0), 0), kwh = fin.reduce((a, st) => a + (UTILITY[st.kind]?.batteryKwh ?? 0), 0);
+  const has = (...k: string[]) => fin.some(st => k.includes(st.kind));
+  const bearing = fin.some(st => ORCHARD_KINDS.includes(st.kind) && orchardBearing((s.clock.t - (st.finishedAt ?? s.clock.t)) / 365) > 0);
+  const stocked = Object.values(s.farm?.ponds ?? {}).some(p => p.trout + p.crayfish > 0);
+  return { id: 'self', title: 'Feed and power the compound', steps: [
+    { label: '20 kW of solar', done: kw >= 20, detail: kw > 0 ? `${fmtKw(kw)} of 20 kW built` : 'a solar farm of 50 panels' },
+    { label: 'Battery storage', done: kwh >= 40, detail: kwh > 0 ? `${Math.round(kwh)} kWh of 40 built` : 'a battery container beside the array' },
+    { label: 'A heated greenhouse', done: has('greenhouse_heated'), detail: 'fresh greens all winter' },
+    { label: 'An orchard bearing fruit', done: bearing, detail: has('orchard', 'orchard_grove') ? 'planted: fruit from the fourth year' : 'fruit trees take years' },
+    { label: 'A stocked pond', done: stocked, detail: has('pond') ? 'dug: add trout or crayfish' : 'trout and crayfish' },
+    { label: 'Barn and sheep barn', done: has('barn') && has('sheep_barn'), detail: 'a roof for the stock in winter' },
+    { label: 'Workshop and equipment yard', done: has('workshop') && has('equipment_yard'), detail: 'tools last longer; a yard for the tractor' },
+  ] };
 }
 
 /** Why a kit piece cannot be staked now (null = it can): the site, the bunker's entrance, the permit fee. */

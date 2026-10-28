@@ -45,6 +45,11 @@ function Icon({ id, tint }: { id: string; tint?: number }) {
     case 'roofing': return g(<>{[8, 16, 24, 32].map(x => <rect key={x} x={x} y="10" width="6" height="24" fill="#7a3428" stroke="#4a1a14" />)}</>);
     case 'hardware': return box('#5a6068', 'BOLTS');
     case 'wire': return g(<><circle cx="22" cy="22" r="11" fill="none" stroke="#a0a6aa" strokeWidth="3" /><circle cx="22" cy="22" r="6" fill="none" stroke="#a0a6aa" strokeWidth="2" /></>);
+    case 'greenhouse_pro_kit': return g(<><path d="M5 34 V22 L13.5 14 L22 22 L30.5 14 L39 22 V34 Z" fill="#cfe4ea" fillOpacity="0.5" stroke="#9aa4aa" strokeWidth="1.8" /><path d="M22 22 V34 M5 28 H39" stroke="#9aa4aa" strokeWidth="1.2" /><path d="M12 31 q2 -5 4 0 M26 31 q2 -5 4 0" stroke="#5a9a3a" strokeWidth="2" fill="none" /></>);
+    case 'trout_fry': return g(<><path d="M8 24 q8 -9 18 0 q-10 9 -18 0 z" fill="#a8b4ac" stroke="#5a6a62" /><path d="M26 24 l9 -6 v12 z" fill="#8a988e" /><circle cx="13" cy="22" r="1.3" fill="#222" /><path d="M10 31 q8 5 16 0" stroke="#4a8aa0" fill="none" /></>);
+    case 'crayfish_stock': return g(<><ellipse cx="22" cy="26" rx="6" ry="9" fill="#8a3a24" /><path d="M16 17 q-6 -6 -8 -1 q3 6 8 6 M28 17 q6 -6 8 -1 q-3 6 -8 6" fill="#a8452b" stroke="#5a2214" /><path d="M18 35 l-3 4 M26 35 l3 4" stroke="#5a2214" strokeWidth="2" /></>);
+    case 'fish_feed': return bag('#8a6a3a', 'FISH');
+    case 'sheep': return g(<><ellipse cx="21" cy="25" rx="11" ry="8" fill="#ece8da" stroke="#9a9684" /><circle cx="33" cy="22" r="4.5" fill="#3a3028" /><path d="M14 32 v5 M28 32 v5" stroke="#3a3028" strokeWidth="2.5" /></>);
     case 'greenhouse_kit': return g(<><path d="M8 34 V20 L22 10 L36 20 V34 Z" fill="#cfe4ea" fillOpacity="0.5" stroke="#9aa4aa" strokeWidth="2" /><path d="M22 10 V34 M8 24 H36" stroke="#9aa4aa" strokeWidth="1.5" /></>);
     case 'fruit_trees': return g(<><rect x="20" y="24" width="4" height="12" fill="#6a4a2a" /><circle cx="22" cy="18" r="10" fill="#4f8a34" /><circle cx="17" cy="20" r="2.2" fill="#c0392b" /><circle cx="26" cy="15" r="2.2" fill="#c0392b" /></>);
     case 'seedlings': return g(<><rect x="12" y="26" width="20" height="10" fill="#6a4a2a" /><path d="M16 26 v-8 M22 26 v-12 M28 26 v-7" stroke="#5a9a3a" strokeWidth="2.5" /></>);

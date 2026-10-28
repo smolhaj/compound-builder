@@ -195,8 +195,8 @@ export function plant(s: GameState, halfSize: (kind: string) => number = k => NO
 
 /** What a power bank is made of: panels, batteries, a generator. Equipment standing together is one bank (the bus bars and conduit are part of the kit). */
 export const BANK_KINDS = ['solar_array', 'solar_farm', 'garage_solar', 'battery_shed', 'battery_bank', 'generator_shed'];
-/** How close (world units, edge to edge) bank equipment must stand to share a bus: about 4 m. */
-export const BANK_GAP = 0.7;
+/** How close (world units, edge to edge, by reach) bank equipment must stand to share a bus: about 6 m of conduit. */
+export const BANK_GAP = 1.0;
 
 /**
  * A solar array and the battery shed beside it are one bank without a drawn cable: the playtest's

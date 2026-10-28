@@ -6,13 +6,13 @@
  *              water without a filter. (`reservoir` is the same hole without fish: 400,000 L.)
  *  Stock       a bag of 100 trout fingerlings (8 g) or 50 crayfish breeders, bought in the Shop (Food
  *              & farm). Trout need cool water: the pond is stocked when it is under 19 C (spring and
- *              fall) and not at all where July runs past 94 F. A pond carries 450 trout (800 when an
+ *              fall) and not at all where July runs past 90 F. A pond carries 450 trout (800 when an
  *              aerator runs on the compound's power) and 2,400 crayfish.
  *  Feed        trout eat 1.2 % of their weight a day in pellets (a 50 lb bag feeds about 12 fish
  *              hundred for a week). Unfed they hold their weight at best and grow at a third of the
  *              rate. Crayfish forage; they breed from April to July.
- *  Growth      trout gain by water temperature (about 1.8 g a day at 14 C, none above 21 or under
- *              4): a fingerling reaches the 350 g table size in about seven months. The Livestock duty
+ *  Growth      trout gain by water temperature (about 3.2 g a day from 12 to 17 C, none above 22 or under
+ *              3): a fingerling reaches the 350 g table size in about eight months of growing weather. The Livestock duty
  *              does the feeding and clears the screens (the pond chore); behind, they grow slower.
  *  Seasons     crayfish are trapped May to October (traps and nets: fishing gear). In a hot July,
  *              or under ice with no aerator, the oxygen drops and a die-off takes a share of them.
@@ -46,16 +46,15 @@ export function waterTempC(s: GameState, doy = calendarOf(s.clock).doy): number 
   return Math.max(1, (airF - 32) / 1.8 * 0.6 + 3);
 }
 
-/** Trout live where July stays under 94 F. */
-export const troutSuited = (s: GameState): boolean => REGIONS[s.site.region].julyHighF < 94;
+/** Trout live where July stays under 90 F (the water under 22 C). */
+export const troutSuited = (s: GameState): boolean => REGIONS[s.site.region].julyHighF < 90;
 
-/** Grams a trout gains a day at a water temperature (C). */
+/** Grams a trout gains a day at a water temperature (C): about 2.4 g between 12 and 17 C, none under 3 or over 22. */
 export function troutGrowth(temp: number): number {
-  if (temp <= 4 || temp >= 21) return 0;
-  if (temp <= 10) return 1.2 * (temp - 4) / 6;
-  if (temp <= 14) return 1.2 + 0.6 * (temp - 10) / 4;
-  if (temp <= 18) return 1.8;
-  return 1.8 * (21 - temp) / 3;
+  if (temp <= 3 || temp >= 22) return 0;
+  if (temp <= 12) return 3.2 * (temp - 3) / 9;
+  if (temp <= 17) return 3.2;
+  return 3.2 * (22 - temp) / 5;
 }
 
 /** Is an aerator running (the pond is wired and had power yesterday)? */
@@ -109,7 +108,7 @@ export function pondDay(s: GameState): string[] {
     // crayfish: a spring hatch up to what the pond holds
     if (p.crayfish > 0 && doy >= 100 && doy <= 215 && temp > 12) p.crayfish = Math.min(CRAY_CAP, p.crayfish + p.crayfish * 0.012 * Math.max(0, 1 - p.crayfish / CRAY_CAP) * (0.5 + 0.5 * ox));
     // a hot spell and a stratified pond: the trout stress
-    if (temp > 21 && p.trout > 0) { const lose = Math.ceil(p.trout * (aerated(s, st) ? 0.004 : 0.02)); p.trout -= lose; p.lost += lose; }
+    if (temp > 22 && p.trout > 0) { const lose = Math.ceil(p.trout * (aerated(s, st) ? 0.004 : 0.02)); p.trout -= lose; p.lost += lose; }
     // a die-off: gasping fish, a share lost
     if (ox < 0.35 && p.trout + p.crayfish > 0 && r() < 0.3) {
       const t = Math.floor(p.trout * (0.2 + 0.3 * r())), c = Math.floor(p.crayfish * (0.1 + 0.2 * r()));
@@ -170,7 +169,7 @@ export function stockPond(s: GameState, id: string, species: 'trout' | 'crayfish
     s.stock.trout_fry--;
     p.troutG = (p.troutG * p.trout + TROUT_FRY_G * TROUT_FRY) / (p.trout + TROUT_FRY);
     p.trout += TROUT_FRY;
-    log(s, `Stocked ${TROUT_FRY} trout fingerlings. They reach table size in about seven months with feed and cool water.`);
+    log(s, `Stocked ${TROUT_FRY} trout fingerlings. They reach table size in about eight months of growing weather with feed and cool water.`);
   } else {
     s.stock.crayfish_stock--;
     p.crayfish += CRAY_BAG;

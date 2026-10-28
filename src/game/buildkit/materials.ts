@@ -761,7 +761,7 @@ export function kitMaterial(id: KitMaterialId): THREE.MeshStandardMaterial {
     case 'aluminum': m = new THREE.MeshStandardMaterial({ color: 0xc4c8cc, roughness: 0.35, metalness: 0.7 }); break;
     case 'fruit': m = new THREE.MeshStandardMaterial({ color: 0xc23a22, roughness: 0.45 }); break;
     // a dark green-brown pond: glossy, a little clear so the fish show through, doubled-sided for the reservoir edge
-    case 'pond_water': m = new THREE.MeshStandardMaterial({ color: 0x2f5a52, roughness: 0.06, metalness: 0.25, transparent: true, opacity: 0.84, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }); break;
+    case 'pond_water': m = new THREE.MeshStandardMaterial({ color: 0x2f5a52, roughness: 0.06, metalness: 0.25, transparent: true, opacity: 0.72, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }); break;
     case 'fish': m = new THREE.MeshStandardMaterial({ color: 0x9aa8a0, roughness: 0.4, metalness: 0.3, side: THREE.DoubleSide }); break;
     case 'crayfish': m = new THREE.MeshStandardMaterial({ color: 0x8a3a24, roughness: 0.6 }); break;
     case 'sheepwool': m = new THREE.MeshStandardMaterial({ color: 0xe9e4d4, roughness: 0.95 }); break;

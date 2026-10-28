@@ -47,6 +47,9 @@ import { runFinished } from '../sim/perimeter';
 import { plansNeed, plansNeedLines } from '../sim/guidance';
 import { populations, predatorLine } from '../sim/wildlife';
 import { PantryPanel } from './PantryPanel';
+import { FarmPanel } from './FarmPanel';
+import { fmtKw, powerSummary } from '../sim/powerReport';
+import { sheepRoom, sheepSheltered } from '../sim/livestock';
 import { ToolsPanel } from './ToolsPanel';
 import { Note, Row, Section, Tabs } from './hud/common';
 import { DIM, LINE, TONE, btn, panel, usd, type Tone } from './hud/style';
@@ -246,9 +249,11 @@ export function Hud() {
               {(() => { const d = feedDemand(game), hd = d.hay > 0 ? (game.stock.hay ?? 0) / d.hay : Infinity, fd = d.feed > 0 ? (game.stock.feed ?? 0) / d.feed : Infinity; return <>
                 {d.hay > 0 && <Row label="Hay" value={<span style={{ color: hd < 14 ? TONE.warn : undefined }}>{Math.floor(game.stock.hay ?? 0)} bales ({hd > 999 ? 'plenty' : `${Math.floor(hd)} days`})</span>} />}
                 {d.feed > 0 && <Row label="Feed" value={<span style={{ color: fd < 14 ? TONE.warn : undefined }}>{Math.floor(game.stock.feed ?? 0)} bags ({fd > 999 ? 'plenty' : `${Math.floor(fd)} days`})</span>} />}
+                {(game.stock.sheep ?? 0) >= 1 && <Note tone={sheepSheltered(game) < 1 ? 'warn' : 'good'}>{sheepSheltered(game) < 1 ? `Roof for ${sheepRoom(game)} of ${Math.floor(game.stock.sheep)} sheep: build a sheep barn (30) before winter.` : 'All the sheep have a roof for the winter.'}</Note>}
                 {winterHay(game) > (game.stock.hay ?? 0) && <Note>Put up about {winterHay(game)} bales of hay for the winter.</Note>}
               </>; })()}
             </Section>}
+            <FarmPanel game={game} />
             <Section title="Food">
               {(() => {
                 const f = game.food, d = daysOfFood(game);
@@ -309,8 +314,13 @@ export function Hud() {
                     {(up || game.utilities.grid) && (game.site.improvements.power || game.utilities.grid) && <button style={btn()} title={game.utilities.grid ? 'Have the co-op pull the meter: no more bills, but only what you built runs the place' : 'Reconnect: $250'} onClick={() => g.setGrid(!game.utilities.grid)}>{game.utilities.grid ? 'Leave' : 'Rejoin'}</button>}
                   </span>
                 </div>
-                <Row label="Made / used" value={`${(r.solarKwh + r.genKwh).toFixed(1)} / ${r.drawKwh.toFixed(1)} kWh`} />
-                <Row label="Batteries" value={`${Math.round(r.batteryPct * 100)} %`} />
+                {(() => { const pw = powerSummary(game); return <>
+                  {(pw.solarKw > 0 || pw.batteryKwh > 0) && <Row label="Installed" value={`${pw.solarKw > 0 ? `${fmtKw(pw.solarKw)} kW solar` : 'no solar'}${pw.batteryKwh > 0 ? ` · ${Math.round(pw.batteryKwh)} kWh batteries` : ''}`} title="Nameplate: panels in kW (a 20 kW farm is 50 panels), batteries in kWh" />}
+                  <Row label="Made / used" value={`${fmtKw(pw.madeKwh)} / ${fmtKw(pw.usedKwh)} kWh`} />
+                  <Row label="Batteries" value={pw.batteryKwh > 0 ? `${Math.round(pw.storedKwh)} of ${Math.round(pw.batteryKwh)} kWh (${pw.batteryPct} %)` : 'none'} tone={pw.batteryKwh > 0 && pw.madeKwh > 0 && pw.storedKwh < 0.5 ? 'warn' : undefined} />
+                  {pw.wastedKwh >= 1 && <Row label="Made, not stored" value={`${fmtKw(pw.wastedKwh)} kWh`} tone="warn" title="Power the sun made yesterday that nobody used and no battery took" />}
+                  {pw.headline && <Note tone="warn">{pw.headline}</Note>}
+                </>; })()}
                 <Row label="Generator fuel" value={litersText(game.stock.fuel * FUEL_UNIT_L)} />
                 {r.genKwh > 0.1 && <Note>The generator ran {Math.round(r.genKwh / 7 * 10) / 10} h: it carries about 1 km on a still night.</Note>}
                 {r.shed.length > 0 && <Note tone="warn">Went without: {r.shed.map(id => KIT[game.structures.find(x => x.id === id)?.kind ?? '']?.name ?? '?').join(', ')}</Note>}

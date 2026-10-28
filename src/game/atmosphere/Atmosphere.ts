@@ -82,7 +82,7 @@ const LAMP_MAT: Record<LampKind, KitMaterialId> = { off: 'glow_off', oil: 'glow_
 /** Layers that are the building's inside (never weathered). */
 const INSIDE = new Set(['interior', 'decor', 'loft']);
 /** No drifts against these (open, flat or tiny). */
-const NO_DRIFT = new Set(['garden', 'field', 'orchard', 'septic', 'solar_array', 'well_drilled', 'well_hand']);
+const NO_DRIFT = new Set(['garden', 'field', 'orchard', 'orchard_grove', 'septic', 'solar_array', 'solar_farm', 'pond', 'reservoir', 'equipment_yard', 'well_drilled', 'well_hand']);
 const WILD_KINDS = new Set(['garden', 'field']);
 
 export class Atmosphere {
