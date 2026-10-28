@@ -33,6 +33,7 @@ import { emptyStats, type Ending, type RunStats } from './report';
 import { generateNeighbors, newGate, type GateState, type Neighbor } from './encounters';
 import { freshNeeds, type FoodReport, type Needs } from './needs';
 import type { WeatherState } from './weatherThreats';
+import { DIFFICULTY } from './difficulty';
 import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
 import type { LightsState } from './lights';
 export const SAVE_VERSION = 45;
@@ -266,7 +267,7 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     version: SAVE_VERSION,
     seed,
     clock: { t: 0, ticks: 0, startDoy, startYear, speed: 1 },
-    money: funds ? funds.budget - Math.round(setup.site!.price * (1 + CLOSING_COSTS)) : STARTING_MONEY,
+    money: Math.round((funds ? funds.budget - Math.round(setup.site!.price * (1 + CLOSING_COSTS)) : STARTING_MONEY) * DIFFICULTY[setup.difficulty ?? 'standard'].money),
     lifestyle: setup.lifestyle ?? 'fulltime',
     startFunds: funds,
     crews: [],
