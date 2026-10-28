@@ -778,7 +778,11 @@ export class WorldScene {
     this._composer = composer;
     this._fxaaPass = fxaaPass;
     this._lastEnvUpdateHour = -999;
+    if (this.qaPixelRatio != null) this.renderer.setPixelRatio(this.qaPixelRatio);
   }
+
+  /** QA only (`?lowrender`): a fixed pixel ratio that overrides the tier's, or null for the tier's own. */
+  qaPixelRatio: number | null = null;
 
   /** Render one frame (EffectComposer when available and enabled). */
   renderFrame(): void {
