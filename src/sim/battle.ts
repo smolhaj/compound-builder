@@ -30,6 +30,7 @@ import { ARMORY_LIGHTS, floodlightLit } from './lights';
 import { TURRET_JAM, highBonus, litTowerIds, isTower, mountReady, towerPosture, towerPosts, towerReach, turretsReady } from './towers';
 import { enclosure } from './enclosure';
 import { mulberry32 } from './rng';
+import { diffOf } from './difficulty';
 import { leaveAftermath } from './aftermath';
 import { hourOf, type GameState } from './state';
 
@@ -387,6 +388,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
 
   const hurt = (f: Fighter, sev: number, t: number, by?: Fighter, part?: 'head' | 'torso' | 'arm' | 'leg') => {
     if (f.dead) return;
+    if (f.side === 'home') sev *= diffOf(s.disaster).wound;   // the difficulty: Hardcore's bullets hurt more, Cozy's less
     f.hp -= sev;
     const mate = () => H.find(h => h !== f && !h.out && !h.shelter);
     if (f.hp <= 0) {

@@ -55,11 +55,13 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   5: s => ({ ...s, version: 6, stock: { rebar: 0, membrane: 0, excavator: 0, blast_door: 0, nbc_filter: 0, spoil: 0, ...(s.stock as object) } }),
   // 6 → 7: the escape tunnel (culvert, egress hatch)
   6: s => ({ ...s, version: 7, stock: { culvert: 0, egress_hatch: 0, ...(s.stock as object) } }),
-  // 44 → 45: dogs are named family pets (each old guard dog in the stockpile becomes a named adult dog), and the new dog goods start at zero
-  44: s => {
+  // 45 → 46: dogs are named family pets (each old guard dog in the stockpile becomes a named adult dog), and the new dog goods start at zero
+  45: s => {
     const { dogs, petLife } = migrateDogs(s as unknown as Parameters<typeof migrateDogs>[0]);
-    return { ...s, version: 45, dogs, petLife, stock: { puppy: 0, kibble: 0, dogbed: 0, doghouse: 0, ...(s.stock as object), dog: 0 } };
+    return { ...s, version: 46, dogs, petLife, stock: { puppy: 0, kibble: 0, dogbed: 0, doghouse: 0, ...(s.stock as object), dog: 0 } };
   },
+  // 44 → 45: where the starting money came from (old saves: not recorded; they keep their jobs and the old flat passive income)
+  44: s => ({ ...s, version: 45, startFunds: null }),
   // 43 → 44: structures may carry `replaces` (a watch-tower upgrade in place, sim/towers.ts; none yet) and the top towers' mount and turret goods join the stockpile at zero
   43: s => ({ ...s, version: 44, stock: { gun_mount: 0, turret_head: 0, ...(s.stock as object) }, lights: (s.lights as object | undefined) ?? newLights() }),
   // 42 → 43: a raid rolled for the day waits for its hour of arrival (`gate.incoming`, sim/siege.ts); none yet

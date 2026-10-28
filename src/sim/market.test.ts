@@ -77,7 +77,9 @@ describe('market: haggling and reputation', () => {
     const r = haggle(g, st.id, 0, 1, [{ good: 'ammo:22lr', qty }], 'honest');
     expect(r.ok).toBe(true);
     expect(marketOf(g).rep).toBeGreaterThan(0);
-    expect(g.armory.ammo['22lr']).toBe(10);
+    // (it takes the rounds the deal needs: a round of change either way, depending on the day's prices)
+    expect(g.armory.ammo['22lr']).toBeGreaterThanOrEqual(10);
+    expect(g.armory.ammo['22lr']).toBeLessThanOrEqual(11);
   });
   it('a lowball is refused', () => {
     const { g, st } = atStall();
@@ -135,6 +137,7 @@ describe('market: the road home', () => {
       g.disaster.tracks.law = 0.25;
       const pid = adult(g);
       g.people.find(p => p.id === pid)!.skills.hunter = 0;
+      for (const q of g.people) q.skills.negotiator = 0;   // (the family is drawn by seed: don't depend on a smooth talker; the household's best one lowers exposure)
       goToMarket(g, pid, false);
       const m = marketOf(g);
       m.trip!.carried = 500;
