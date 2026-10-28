@@ -510,14 +510,19 @@ SETS.linked = [
 
 // a container wall on a slope near the camp, at eye level with the family in view: the plinth closes the gap under it
 const wallSlope = `{ if (!window.__wslope) { window.__wslope = true; const c = cb.world.camp, g = cb.world.groundAt; let best = null, bd = -1;
-      for (let a = 0; a < 6.28; a += 0.4) for (let r = 5; r <= 9; r += 2) { const x0 = c.x + Math.cos(a) * r, z0 = c.z + Math.sin(a) * r, x1 = x0 + 14, z1 = z0; let lo = 1e9, hi = -1e9; for (let k = 0; k <= 14; k++) { const h = g(x0 + k, z0); lo = Math.min(lo, h); hi = Math.max(hi, h); } if (hi - lo > bd) { bd = hi - lo; best = [x0, z0, x1, z1]; } }
-      window.__ws = best;
-      cb.game.setState(s => { const gm = structuredClone(s.game); gm.perimeter.push({ id: 'W1', kind: 'container_wall', pts: [[best[0], best[1]], [best[2], best[3]]], gates: [], done: 1, hours: 1, supplied: true, finishedAt: 0 }); return { game: gm }; }); }
-     }`;
+    for (let k = 0; k < 8; k++) for (const sd of [-1, 1]) { const a = k * 0.39, cx = c.x + sd * 4 * Math.cos(a + 1.57), cz = c.z + sd * 4 * Math.sin(a + 1.57); const p0 = [cx - Math.cos(a) * 7, cz - Math.sin(a) * 7], p1 = [cx + Math.cos(a) * 7, cz + Math.sin(a) * 7]; let lo = 1e9, hi = -1e9; for (let i = 0; i <= 14; i++) { const h = g(p0[0] + (p1[0] - p0[0]) * i / 14, p0[1] + (p1[1] - p0[1]) * i / 14); lo = Math.min(lo, h); hi = Math.max(hi, h); } if (hi - lo > bd) { bd = hi - lo; best = [p0[0], p0[1], p1[0], p1[1], cx, cz]; } }
+    window.__ws = best;
+    cb.game.setState(s => { const gm = structuredClone(s.game); gm.perimeter.push({ id: 'W1', kind: window.__wallKind || 'container_wall', pts: [[best[0], best[1]], [best[2], best[3]]], gates: [], done: 1, hours: 1, supplied: true, finishedAt: 0 }); return { game: gm }; }); } }`;
+// eye level on the camp side of the wall, looking across the camp (the family is between) at the wall
+const wallEye = (kind) => `window.__wallKind = '${kind}'; ` + wallSlope + `{ const w = window.__ws, c = cb.world.camp, g = cb.world.groundAt; const dx = c.x - w[4], dz = c.z - w[5], d = Math.hypot(dx, dz) || 1; const ex = c.x + dx / d * 3.2, ez = c.z + dz / d * 3.2; cb.qa.pose = { x: ex, y: g(ex, ez) + 0.24, z: ez, lx: w[4], ly: g(w[4], w[5]) + 0.12, lz: w[5], fov: 66 }; }`;
 SETS.walls = [
-  { name: 'wall-slope-eye-person', time: 10, season: 'summer', setup: wallSlope + `{ const w = window.__ws, c = cb.world.camp, g = cb.world.groundAt; const mx = (w[0] + w[2]) / 2, mz = w[1]; const ex = mx - 1, ez = mz - 5;
-    cb.qa.pose = { x: ex, y: g(ex, ez) + 0.24, z: ez, lx: mx + 1, ly: g(mx + 1, mz) + 0.1, lz: mz, fov: 62 }; }`, cam: { x: C, z: C, yaw: 0, pitch: 0.2, radius: 7 }, frames: 40 },
-  { name: 'wall-slope-eye-along', time: 10, season: 'summer', setup: wallSlope + `{ const w = window.__ws, g = cb.world.groundAt; const ex = w[0] - 3, ez = w[1] - 1.6; cb.qa.pose = { x: ex, y: g(ex, ez) + 0.2, z: ez, lx: w[0] + 8, ly: g(w[0] + 8, w[1]) + 0.1, lz: w[1], fov: 70 }; }`, cam: { x: C, z: C, yaw: 0, pitch: 0.2, radius: 7 }, frames: 14 },
+  { name: 'wall-slope-container-eye-person', time: 10, season: 'summer', setup: toHour(10) + wallEye('container_wall'), cam: { x: C, z: C, yaw: 0, pitch: 0.2, radius: 7 }, frames: 40 },
+  { name: 'wall-slope-concrete-eye-person', time: 10, season: 'summer', setup: toHour(10) + wallEye('concrete_wall'), cam: { x: C, z: C, yaw: 0, pitch: 0.2, radius: 7 }, frames: 40 },
+  { name: 'wall-slope-steel-eye-person', time: 10, season: 'summer', setup: toHour(10) + wallEye('steel_wall'), cam: { x: C, z: C, yaw: 0, pitch: 0.2, radius: 7 }, frames: 40 },
+];
+// a container wall being upgraded to steel: the steel rises beside the containers
+SETS.upgrade = [
+  { name: 'container-to-steel-upgrade', time: 11, season: 'summer', setup: `{ if (!window.__up) { window.__up = true; cb.game.setState(s => { const g = structuredClone(s.game); g.stock.rebar = 99; g.stock.concrete = 99; g.stock.hardware = 30; g.stock.wire = 30; g.perimeter.push({ id: 'C1', kind: 'container_wall', pts: [[20, 36], [48, 36]], gates: [], done: 1, hours: 1, supplied: true, finishedAt: 0 }); return { game: g }; }); cb.game.getState().upgradeRun('C1'); cb.game.setState(s => { const g = structuredClone(s.game); const u = g.perimeter.find(r => r.replaces); u.supplied = true; u.done = u.hours * 0.55; return { game: g }; }); } cb.qa.pose = null; cb.cam.target.set(30, 0, 36); cb.cam.yaw = 0.5; cb.cam.pitch = 0.22; cb.cam.radius = 9; }`, cam: { x: 30, z: 36, yaw: 0.5, pitch: 0.22, radius: 9 }, frames: 14 },
 ];
 
 // the watch tower upgrade chain, side by side along z = 54: rise + lookout > wooden > concrete & steel > floodlights > manned mount > turret.
