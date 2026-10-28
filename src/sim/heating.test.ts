@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { newGame } from './state';
 import { step } from './engine';
-import { BURN_PER_DAY, heatDemand } from './heating';
+import { BURN_PER_DAY, firewoodOutlook, heatDemand } from './heating';
 import { isHome } from './blueprints';
 
 describe('wood stove', () => {
@@ -28,6 +28,26 @@ describe('wood stove', () => {
     const warnings = g.log.filter(e => e.text.startsWith('Out of firewood'));
     expect(warnings.length).toBeGreaterThan(0);
     expect(g.stock.firewood).toBe(0);
+  });
+
+  it('does not log the empty woodpile every day: once, then a reminder every two weeks', () => {
+    let g = newGame(1, 1);
+    g.stock.firewood = 0;
+    g = step(g, 40);
+    const n = g.log.filter(e => e.text.startsWith('Out of firewood')).length;
+    expect(n).toBeGreaterThanOrEqual(2);
+    expect(n).toBeLessThanOrEqual(4);
+  });
+
+  it('reads the woodpile against the next two months of cold', () => {
+    const g = newGame(1, 300);
+    g.stock.firewood = 0;
+    const o = firewoodOutlook(g);
+    expect(o.need).toBeGreaterThan(2);
+    expect(o.short).toBeCloseTo(o.need, 5);
+    g.stock.firewood = 50;
+    expect(firewoodOutlook(g).short).toBe(0);
+    expect(firewoodOutlook(newGame(1, 190)).need).toBeLessThan(1);
   });
 
   it('says where the cold night was: at camp, or in the house once it is built', () => {
