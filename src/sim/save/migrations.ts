@@ -56,7 +56,7 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   // 6 → 7: the escape tunnel (culvert, egress hatch)
   6: s => ({ ...s, version: 7, stock: { culvert: 0, egress_hatch: 0, ...(s.stock as object) } }),
   // 46 → 47: daily life (sim/daily.ts): an Auto roster (the planner fills it on the first sub-step), no chores behind, nobody tired
-  46: s => ({ ...s, version: 47, daily: (s.daily as object | undefined) ?? newDaily(), personState: (s.personState as Array<Record<string, unknown>>).map(ps => ({ fatigue: 0, ...ps })) }),
+  46: s => ({ ...s, version: 47, losses: (s.losses as unknown[] | undefined) ?? [], daily: (s.daily as object | undefined) ?? newDaily(), personState: (s.personState as Array<Record<string, unknown>>).map(ps => ({ fatigue: 0, ...ps })) }),
   // 45 → 46 and 44 → 45: BRIDGE (dogs #66 and linked compounds #68 own these versions; delete these two lines when they merge)
   45: s => ({ ...s, version: 46 }),
   44: s => ({ ...s, version: 45 }),

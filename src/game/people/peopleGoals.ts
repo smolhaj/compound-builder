@@ -142,8 +142,9 @@ export function goalFor(i: number, kid: boolean, task: TaskKind, target: string 
     }
     case 'sleep': {
       if (ctx.home) return { x: ctx.home.x, z: ctx.home.z, pose: FIG_POSE.STAND, face: null, hidden: true, work: false };
-      const [x, z] = campPt(ctx, CAMP.tent.x + (i - 1.5) * 0.08, CAMP.tent.z);
-      return { x, z, pose: FIG_POSE.STAND, face: null, hidden: true, work: false };
+      // no house yet: asleep on a bedroll in front of the tent, in plain sight
+      const [x, z] = campPt(ctx, CAMP.tent.x + (i - 1.5) * 0.1, CAMP.tent.z + 0.1);
+      return { x, z, pose: FIG_POSE.LAWN, face: ctx.camp.rot + Math.PI / 2, hidden: false, work: false };
     }
     case 'leisure': {
       if (ctx.home?.seats?.length && (hour >= 18 || hour < 6)) {
@@ -240,6 +241,23 @@ export function dailyGoal(i: number, kid: boolean, task: TaskKind, hour: number,
       const a = 0.6 + (i % 3) * 0.9;
       const x = fire[0] + Math.cos(a) * 0.13, z = fire[1] + Math.sin(a) * 0.13;
       return goal(x, z, FIG_POSE.STIR, faceTo(x, z, fire[0], fire[1]), { tool: FIG_TOOL.SPOON, work: true });
+    }
+    case 'cleaning': {
+      // scrubbing the step and the porch; inside the house when there is one
+      const st = ctx.home;
+      if (st) {
+        const [x, z] = inSite(st, 1.15, ((i % 3) - 1) * 0.5);
+        return goal(x, z, FIG_POSE.KNEEL, faceTo(x, z, st.x, st.z), { work: true });
+      }
+      const [x, z] = at(CAMP.table.x - 0.25 + (i % 2) * 0.1, CAMP.table.z + 0.2);
+      return goal(x, z, FIG_POSE.KNEEL, null, { work: true });
+    }
+    case 'pets': {
+      // the dogs' bowls by the door: a pail of water, then a walk round the yard
+      const walk = wobble(i, clock, 0.02) < 0.4;
+      const a = wobble(i + 9, clock, 0.01) * Math.PI * 2;
+      const [x, z] = walk ? at(Math.cos(a) * 0.9, Math.sin(a) * 0.9 + 0.4) : at(CAMP.barrel.x - 0.25, CAMP.barrel.z + 0.2);
+      return goal(x, z, FIG_POSE.PAIL, null, { tool: FIG_TOOL.PAIL, walkPose: FIG_POSE.PAIL, work: !walk });
     }
     case 'laundry': {
       const L = YARD.line;

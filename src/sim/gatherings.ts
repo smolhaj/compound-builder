@@ -22,6 +22,7 @@ import { seasons, REGIONS } from './regions';
 import { log } from './economy';
 import { mulberry32 } from './rng';
 import { dailyOf } from './daily';
+import { griefMorale, mourn, noteLosses, unmourned } from './grief';
 
 export type GatheringKind = 'cookout' | 'birthday' | 'thanksgiving' | 'christmas' | 'july4' | 'harvest' | 'movie' | 'campfire' | 'wedding' | 'funeral' | 'neighbors';
 
@@ -68,8 +69,6 @@ export interface Social {
   /** OPSEC noise points and when (fades over a few days). */
   noise: number;
   noiseAt: number;
-  /** Deaths and whether they had a funeral. */
-  grief: Array<{ id: string; at: number; mourned: boolean }>;
   /** Gatherings held (the report card). */
   held: number;
   /** Holidays, birthdays, weddings, funerals and the odd campfire happen on their own (off: only what the player calls). */
@@ -89,7 +88,7 @@ export function gatheringProblem(s: GameState, kind: GatheringKind): string | nu
   const so = socialOf(s);
   if (so.active && s.clock.t < so.active.until) return `the ${GATHERING[so.active.kind].name.toLowerCase()} is on`;
   if (kind === 'movie' && !powerOn(s)) return 'no power for a movie';
-  if (kind === 'funeral' && !so.grief.some(g => !g.mourned)) return 'nobody to bury';
+  if (kind === 'funeral' && !unmourned(s).length) return 'nobody to bury';
   if (kind === 'neighbors' && !friendlyNeighbor(s)) return 'no neighbors on good terms nearby';
   const last = so.last[kind];
   if (last != null && s.clock.t - last < 2) return 'you just had one';
@@ -107,7 +106,7 @@ export function callGathering(s: GameState, kind: GatheringKind, who?: string): 
   const at = s.clock.t + ((startH - h + 24) % 24) / 24;
   const g: Gathering = { kind, at, until: at + GATHERING[kind].hours / 24 };
   if (who) g.who = who;
-  if (kind === 'funeral') g.who = who ?? so.grief.find(x => !x.mourned)?.id;
+  if (kind === 'funeral') g.who = who ?? unmourned(s)[0]?.id;
   if (kind === 'neighbors') g.guests = friendlyNeighbor(s)?.id;
   so.active = g;
   log(s, CALL_LINE[kind](s, g));
@@ -172,7 +171,7 @@ export function holdGathering(s: GameState, g: Gathering): string[] {
   const hungry = s.disaster.tracks.stores < 0.5;
   so.noise = noiseNow(s) + def.noise * (hungry ? 1 : 0.25) * (music ? 1.2 : 1); so.noiseAt = s.clock.t;
   so.last[g.kind] = s.clock.t; so.held++;
-  if (g.kind === 'funeral') for (const x of so.grief) if (x.id === g.who || !g.who) x.mourned = true;
+  if (g.kind === 'funeral') mourn(s, g.who);
   if (g.kind === 'neighbors') { const n = s.neighbors.find(x => x.id === g.guests); if (n) n.disposition = Math.min(100, n.disposition + 8); }
   if (covered < 0.5) out.push('There wasn\'t much to go round, but we were together.');
   else if (quality >= 1.1) out.push(RICH_LINE[g.kind]);
@@ -207,37 +206,20 @@ export function noiseNow(s: GameState): number {
   return so ? so.noise * Math.exp(-Math.max(0, s.clock.t - so.noiseAt) / 3) : 0;
 }
 
-/**
- * Grief (morale target points, negative): a death weighs on everyone. With a
- * funeral it eases over a couple of months to almost nothing; without one it
- * lingers (two thirds of it after a year).
- */
-export function griefNow(s: GameState): number {
-  let sum = 0;
-  const so = s.daily?.social;
-  for (const ps of s.personState) {
-    if (ps.needs.died == null) continue;
-    const g = so?.grief.find(x => x.id === ps.id);
-    const days = Math.max(0, s.clock.t - (g?.at ?? ps.needs.died));
-    sum += g?.mourned ? 3 + 12 * Math.exp(-days / 30) : 9 + 6 * Math.exp(-days / 120);
-  }
-  return -Math.min(25, sum);
-}
-
 /** Morale target terms from gatherings and grief (needs.ts). */
-export const socialMorale = (s: GameState) => glowNow(s) + griefNow(s);
+export const socialMorale = (s: GameState) => glowNow(s) + griefMorale(s);
 
 /** Once a day: deaths noted, and the gatherings that happen on their own. Returns log lines. */
 export function gatheringsDay(s: GameState): string[] {
   const so = socialOf(s), out: string[] = [];
   const { doy } = calendarOf(s.clock), day = dayIndex(s.clock.t);
-  for (const ps of s.personState) if (ps.needs.died != null && !ps.needs.taken && !so.grief.some(g => g.id === ps.id)) so.grief.push({ id: ps.id, at: s.clock.t, mourned: false });
+  noteLosses(s);
   if (so.active || so.auto === false) return out;
   const since = (k: GatheringKind) => s.clock.t - (so.last[k] ?? -1e9);
   const auto = (k: GatheringKind, who?: string) => { callGathering(s, k, who); };
   // a funeral the day after (one at a time)
-  const unmourned = so.grief.find(g => !g.mourned && s.clock.t - g.at >= 0.5);
-  if (unmourned) { auto('funeral', unmourned.id); return out; }
+  const toBury = unmourned(s).find(g => s.clock.t - g.at >= 0.5);
+  if (toBury) { auto('funeral', toBury.id); return out; }
   // holidays (Thanksgiving: the fourth Thursday of November ≈ day 327)
   if (doy === 327 && since('thanksgiving') > 300) { auto('thanksgiving'); return out; }
   if (doy === 359 && since('christmas') > 300) { auto('christmas'); return out; }

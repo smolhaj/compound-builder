@@ -10,7 +10,7 @@ import { nextBuildTarget } from '../sim/engine';
 import { nextFellJob } from '../sim/forestry';
 import { hourOf, type GameState } from '../sim/state';
 import {
-  applyTemplate, behind, canDo, choreRates, CHORE_NAME, CHORE_WHY, CHORES, dailyOf, DUTIES, DUTY, setDuty, TEMPLATE_NAME, threatLevel, unlockPerson, watchNow, workHours,
+  applyTemplate, behind, canDo, chronotypes, CHRONO_NAME, setFocus, choreRates, CHORE_NAME, CHORE_WHY, CHORES, dailyOf, DUTIES, DUTY, setDuty, TEMPLATE_NAME, threatLevel, unlockPerson, watchNow, workHours,
   type Duty, type TemplateId,
 } from '../sim/daily';
 import { GATHERING, gatheringProblem, callGathering, type GatheringKind } from '../sim/gatherings';
@@ -67,6 +67,7 @@ export function SchedulePanel() {
   const paint = (id: string, h: number) => { const why = g.daily(s => setDuty(s, id, [h], brush)); setMsg(why); };
   const close = () => g.openSchedule(false);
   const threat = threatLevel(game);
+  const chrono = chronotypes(game);
   const cell = 22;
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(10,12,9,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 11, padding: 16 }} onClick={close} onMouseUp={() => setPainting(false)}>
@@ -93,13 +94,15 @@ export function SchedulePanel() {
               <th style={{ textAlign: 'left', fontWeight: 500, color: C.dim, paddingRight: 8 }}>Person</th>
               {Array.from({ length: 24 }, (_, h) => <th key={h} style={{ width: cell, fontWeight: h === hourNow ? 700 : 400, color: h === hourNow ? C.gold : C.dim }}>{h}</th>)}
               <th style={{ color: C.dim, fontWeight: 400, paddingLeft: 8, textAlign: 'left' }}>Work · fatigue</th>
+              <th style={{ color: C.dim, fontWeight: 400, paddingLeft: 8, textAlign: 'left' }} title="Always put this person on a duty first; the planner fills in the rest">Always on</th>
             </tr></thead>
             <tbody>{people.map(({ p, ps }) => {
               const row = plan.hours[p.id] ?? [];
               const locked = plan.locked.includes(p.id);
               const fat = Math.round(ps.fatigue ?? 0);
               return <tr key={p.id}>
-                <td style={{ paddingRight: 8, whiteSpace: 'nowrap' }}>{p.first}{p.kid ? <span style={{ color: C.dim }}> ({p.age})</span> : ''}</td>
+                <td style={{ paddingRight: 8, whiteSpace: 'nowrap' }} title={plan.notes?.[p.id] ?? ''}>{p.first}{p.kid ? <span style={{ color: C.dim }}> ({p.age})</span> : ''}
+                  <div style={{ fontSize: 10, color: chrono[p.id] === 'owl' ? C.warn : C.dim }}>{CHRONO_NAME[chrono[p.id]]}{plan.notes?.[p.id] ? ` · ${plan.notes[p.id]}` : ''}</div></td>
                 {Array.from({ length: 24 }, (_, h) => {
                   const duty = row[h] ?? 'sleep';
                   return <td key={h} title={`${p.first} ${h}:00 · ${DUTY[duty].name}`}
@@ -110,6 +113,13 @@ export function SchedulePanel() {
                   <span style={{ color: workHours(row) > 12 ? C.warn : C.dim }}>{workHours(row)} h</span>
                   <span style={{ display: 'inline-block', width: 40, height: 5, background: '#333', borderRadius: 3, margin: '0 6px', verticalAlign: 'middle' }}><span style={{ display: 'block', width: `${fat}%`, height: '100%', background: fat > 70 ? C.bad : fat > 45 ? C.warn : '#7aa0d0', borderRadius: 3 }} /></span>
                   {locked ? <button style={{ ...btn(), padding: '1px 6px' }} title="Give this row back to the planner" onClick={() => g.daily(s => { unlockPerson(s, p.id); return null; })}>hand-set ✕</button> : <span style={{ color: C.dim }}>{plan.auto ? 'auto' : ''}</span>}
+                </td>
+                <td style={{ paddingLeft: 8 }}>
+                  <select value={plan.focus?.[p.id] ?? ''} style={{ fontSize: 11, background: '#222', color: '#eee', border: `1px solid ${C.line}`, borderRadius: 4 }}
+                    onChange={e => setMsg(g.daily(s => setFocus(s, p.id, (e.target.value || null) as Duty | null)))}>
+                    <option value="">Planner decides</option>
+                    {DUTIES.filter(k => DUTY[k].work && canDo(p, k)).map(k => <option key={k} value={k}>{DUTY[k].name}</option>)}
+                  </select>
                 </td>
               </tr>;
             })}</tbody>

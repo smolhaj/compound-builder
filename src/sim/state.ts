@@ -42,6 +42,7 @@ import { newScavenge, type ScavengeState } from './scavenge';
 import { newMarketState, type MarketState } from './tradeGoods';
 import { newLocals, type LocalsState } from './neighborLife';
 import { newDaily, type Daily } from './daily';
+import type { Loss } from './grief';
 
 /** Starting savings (GDS §1 peacetime money constraint). */
 export const STARTING_MONEY = 30000;
@@ -117,7 +118,7 @@ export interface Structure {
 
 export type TaskKind = 'idle' | 'build' | 'forestry' | 'sleep' | 'chores' | 'school' | 'leisure' | 'job' | 'gone' | 'shelter' | 'away'
   // daily life (sim/daily.ts): the duty on the roster, and a gathering
-  | 'garden' | 'fields' | 'livestock' | 'wood' | 'water' | 'kitchen' | 'laundry' | 'repairs' | 'hunt' | 'medic' | 'teach' | 'radio' | 'watch' | 'meal' | 'party';
+  | 'garden' | 'fields' | 'livestock' | 'pets' | 'cleaning' | 'wood' | 'water' | 'kitchen' | 'laundry' | 'repairs' | 'hunt' | 'medic' | 'teach' | 'radio' | 'watch' | 'meal' | 'party';
 
 export interface PersonState {
   id: string;
@@ -240,8 +241,10 @@ export interface GameState {
   market?: MarketState;
   /** The neighbors' lives: ages, history, news on its way, the co-op or militia, the pact (sim/neighborLife.ts). Save v42. */
   locals?: LocalsState;
-  /** Daily life (sim/daily.ts): the roster, chores, gatherings. Save v43; `dailyOf` makes it lazily. */
+  /** Daily life (sim/daily.ts): the roster, chores, gatherings. Save v47; `dailyOf` makes it lazily. */
   daily?: Daily;
+  /** Deaths in the household and whether they were mourned (sim/grief.ts). Save v47; `lossesOf` makes it lazily. */
+  losses?: Loss[];
   /** Radio and rumors after the collapse (radio.ts); made on first use. */
   radio?: RadioState;
   /** Tallies since the hit (the report card), and how the run ended (null while it goes on). */
