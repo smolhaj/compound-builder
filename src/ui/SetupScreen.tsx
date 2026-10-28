@@ -2,6 +2,8 @@ import { useState, type CSSProperties, type ReactNode } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { useWorldStore } from '../store/worldStore';
 import { newGame } from '../sim/state';
+import { kinPool, kinTitle, ROLE_NAME, retirementIncome } from '../sim/kin';
+import { CONDITION } from '../sim/body';
 import { fullName, HOUSEHOLD_NAME, JOB_POOL, jobDef, randomJobId, variedFamily } from '../sim/family';
 import { FUNDS_RANGE, startFunds } from '../sim/startFunds';
 import { difficultySummary } from '../sim/difficulty';
@@ -92,7 +94,13 @@ export function SetupScreen() {
   // each adult's occupation: undefined = whatever the roll gave; a pool id = chosen or shuffled
   const [picks, setPicks] = useState<Array<string | undefined>>([]);
   const [shuffles, setShuffles] = useState(0);
-  const { kind: household, people: family } = variedFamily(seed, famRoll, picks);
+  const { kind: household, people: baseFamily } = variedFamily(seed, famRoll, picks);
+  // extended family (sim/kin.ts): a seeded pool of relatives; the ones brought along join the household and its money
+  const pool = kinPool(seed, famRoll, baseFamily);
+  const [kinWith, setKinWith] = useState<string[]>([]);
+  const [kinOpen, setKinOpen] = useState(true);
+  const brought = pool.filter(p => kinWith.includes(p.id));
+  const family = [...baseFamily, ...brought];
   const funds = startFunds(family, life, seed, famRoll);
   const budget = funds.budget;
   const lots = listings(seed + batch * 1013, region, wish, 6, budget);
@@ -104,12 +112,12 @@ export function SetupScreen() {
   const [kind, setKind] = useState<DisasterKind>('grid_down');
   const [peace, setPeace] = useState<Exclude<PeaceLength, 'random'>>('medium');
   const [diff, setDiff] = useState<Difficulty>('standard');
-  const workers = family.filter(p => !p.kid && !p.elder);
+  const workers = baseFamily.filter(p => !p.kid && !p.elder);
   let unlocked = false;
   try { unlocked = localStorage.getItem('cb.unlocked') === '1'; } catch { /* storage blocked */ }
   const start = () => {
     if (!lot) return;
-    const game = newGame(seed, 105, 2027, { site: lot, lifestyle: life, mode, peace: mode === 'scenario' ? peace : 'random', kind: mode === 'scenario' ? kind : null, dayJobs: LIFESTYLE[life].jobs, difficulty: diff, grid: true, family, funds });
+    const game = newGame(seed, 105, 2027, { site: lot, lifestyle: life, mode, peace: mode === 'scenario' ? peace : 'random', kind: mode === 'scenario' ? kind : null, dayJobs: LIFESTYLE[life].jobs, difficulty: diff, grid: true, family, funds, kinAway: pool.filter(p => !kinWith.includes(p.id)), kinOpen });
     g.load(game);
     g.openSetup(false);
     void saveGame(AUTOSAVE, game);
@@ -195,11 +203,11 @@ export function SetupScreen() {
               <span style={{ fontSize: 11.5, textTransform: 'uppercase', letterSpacing: 0.8, color: C.dim }}>The family · {HOUSEHOLD_NAME[household]}</span>
               <span style={{ display: 'flex', gap: 6 }}>
                 <button style={chip(false)} onClick={() => { setShuffles(shuffles + 1); setPicks(workers.reduce<string[]>((a, _, i) => [...a, randomJobId(seed, famRoll, i, shuffles + 1, i ? a[0] : undefined)], [])); }} title="Draw new occupations for the adults; the rest of the family stays">Shuffle jobs</button>
-                <button style={chip(false)} onClick={() => { setFamRoll(famRoll + 1); setPicks([]); }} title="Another family">Reroll family</button>
+                <button style={chip(false)} onClick={() => { setFamRoll(famRoll + 1); setPicks([]); setKinWith([]); }} title="Another family">Reroll family</button>
               </span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: 8 }}>
-              {family.map(p => {
+              {baseFamily.map(p => {
                 const slot = workers.indexOf(p);
                 const def = jobDef(p.job?.id);
                 return (
@@ -221,6 +229,25 @@ export function SetupScreen() {
                 );
               })}
             </div>
+            {pool.length > 0 && <>
+              <H>Extended family <span style={{ textTransform: 'none', letterSpacing: 0 }}>(optional)</span></H>
+              <div style={{ fontSize: 12, color: C.dim, marginBottom: 6 }}>Parents, in-laws and grown kids can come with you or stay in town. Each who comes brings savings, medicine to refill, and a bed to find; the old bring Social Security and a pension while the banks work, and do best in a guest house or a cottage of their own.</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: 8 }}>
+                {pool.map(p => {
+                  const on = kinWith.includes(p.id), inc = p.income ?? (p.elder ? retirementIncome(p, seed) : null);
+                  return (
+                    <button key={p.id} style={{ ...tile(on), padding: '8px 12px' }} onClick={() => setKinWith(on ? kinWith.filter(x => x !== p.id) : [...kinWith, p.id])} title={on ? 'Brings them along' : 'Stays in town'}>
+                      <div style={{ fontWeight: 600 }}>{fullName(p)}, {p.age}</div>
+                      <div style={{ fontSize: 12, color: C.gold }}>{kinTitle(p, baseFamily) || ROLE_NAME[p.rel!.role]}</div>
+                      <div style={{ fontSize: 12, color: C.dim }}>{p.elder ? `Retired${inc ? `: ${usd(inc.perDay * 30)} a month (${inc.label})` : ''}` : p.job ? `${p.job.title}, $${p.job.wage}/day` : 'at home'}</div>
+                      {(p.conditions?.length ?? 0) > 0 && <div style={{ fontSize: 11.5, color: C.dim }}>Needs: {p.conditions!.map(c => CONDITION[c].rx).join(', ')}</div>}
+                      <div style={{ fontSize: 12, marginTop: 3, color: on ? C.good : C.dim }}>{on ? 'Comes with you' : 'Stays in town'}</div>
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{ marginTop: 8 }}><Chips label="Later" value={kinOpen ? 'yes' : 'no'} set={v => setKinOpen(v === 'yes')} opts={[['yes', 'Those in town may ask to join'], ['no', 'None will ask']]} /></div>
+            </>}
             <H>Where the money came from</H>
             <div style={{ ...tile(false), cursor: 'default', padding: '10px 14px' }}>
               {funds.lines.map(l => (
