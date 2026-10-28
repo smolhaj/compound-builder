@@ -552,8 +552,8 @@ const stage = ({ near = [9, -3], ang = 0, animals = [], camBack = 1.2, camSide =
   const flat = (x, z) => { let m = 0; for (const [f, s] of [[-2, 0], [-2, 0.8], [2, 0], [4, 0], [6, 0], [4, 1.6], [4, -1.6], [7, 2]]) m = Math.max(m, Math.abs(g(x + ca * f - sa * s, z + sa * f + ca * s) - g(x, z))); return m; };
   let best = null;
   for (let ix = -24; ix <= 24; ix += 2) for (let iz = -24; iz <= 24; iz += 2) {
-    const x = ${fence ? `h.x0 + 3.2 + ix * 0.05` : `c.x + ${near[0]} + ix`}, z = ${fence ? `c.z + iz * 1.2` : `c.z + ${near[1]} + iz`};
-    if (x < h.x0 + 3 || x > h.x1 - 3 || z < h.z0 + 3 || z > h.z1 - 3) continue;
+    const x = ${fence ? `h.x1 - 3.2 + ix * 0.05` : `c.x + ${near[0]} + ix`}, z = ${fence ? `c.z + iz * 1.2` : `c.z + ${near[1]} + iz`};
+    if (x < h.x0 + 3 || x > h.x1 - ${fence ? 1 : 3} || z < h.z0 + 3 || z > h.z1 - 3) continue;
     if (cb.world.onBuilding(x, z, 3) || cb.world.onBuilding(x + ca * 5, z + sa * 5, 2)) continue;
     const cz = cb.world.parcel.creek.zAt(x); if (Math.abs(z - cz) < 6) continue;
     const m = flat(x, z) + 0.002 * Math.hypot(ix, iz);
@@ -561,7 +561,7 @@ const stage = ({ near = [9, -3], ang = 0, animals = [], camBack = 1.2, camSide =
   }
   const px = best.x, pz = best.z;
   const at = (f, s) => [px + ca * f - sa * s, pz + sa * f + ca * s];
-  const fd = px - h.x0;
+  const fd = h.x1 - px;
   ${animals.map(a => `{ const [x, z] = at(${typeof a[1] === 'number' ? a[1] * K : a[1]}, ${typeof a[2] === 'number' ? a[2] * K : a[2]}); w.spawnDebug('${a[0]}', x, z, ${a[3] ?? 0}, ${a[4] ?? true}, '${a[5] ?? 'free'}'); }`).join('\n  ')}
   ${person ? `import('/src/store/battleStore.ts').then(m => m.useBattleStore.getState().playBattle({ night: false, duration: 99999, events: [], units: [{ id: 'h_a', side: 'home', x: px, z: pz, post: 'open' }] }));` : `import('/src/store/battleStore.ts').then(m => m.useBattleStore.getState().endBattle());`}
   const [ex, ez] = at(-${camBack}, ${camSide}), [lx, lz] = at(${look}, 0);
@@ -575,9 +575,9 @@ const ringSetup = (kind) => `{ const G = cb.game; const h = G.getState().game.si
 const aerialAt = (r, pitch, yaw) => `{ const c = cb.world.camp; cb.qa.pose = null; cb.cam.target.set(c.x + 6, 0, c.z - 2); cb.cam.radius = ${r}; cb.cam.pitch = ${pitch}; cb.cam.yaw = ${yaw}; }`;
 /** Aerial of the west fence line: animals placed relative to the line (x forward into the place from the fence, z along it), person inside. */
 const fenceAerial = (animals) => `{ const w = cb.world.wildlife; w.clearDebug(); const c = cb.world.camp, h = cb.game.getState().game.site.home, z0 = c.z;
-  ${animals.map(a => `w.spawnDebug('${a[0]}', h.x0 + ${a[1]}, z0 + ${a[2]}, ${a[3]}, ${a[4]}, '${a[5]}');`).join(' ')}
-  import('/src/store/battleStore.ts').then(m => m.useBattleStore.getState().playBattle({ night: false, duration: 99999, events: [], units: [{ id: 'h_a', side: 'home', x: h.x0 + 5, z: z0 + 3, post: 'open' }] }));
-  cb.qa.pose = null; cb.cam.target.set(h.x0 + 4, 0, z0); cb.cam.radius = 17; cb.cam.pitch = 0.5; cb.cam.yaw = 1.2; }`;
+  ${animals.map(a => `w.spawnDebug('${a[0]}', h.x1 - ${a[1]}, z0 + ${a[2]}, ${a[3]}, ${a[4]}, '${a[5]}');`).join(' ')}
+  import('/src/store/battleStore.ts').then(m => m.useBattleStore.getState().playBattle({ night: false, duration: 99999, events: [], units: [{ id: 'h_a', side: 'home', x: h.x1 - 5, z: z0 + 3, post: 'open' }] }));
+  cb.qa.pose = null; cb.cam.target.set(h.x1 - 4, 0, z0); cb.cam.radius = 17; cb.cam.pitch = 0.5; cb.cam.yaw = 0.6; }`;
 const wlBase = { season: 'summer', cam: cam0 };
 SETS.wildlife = [
   { name: 'eye-deer-and-rabbits-in-the-field', time: 7.4, ...wlBase,
@@ -585,9 +585,9 @@ SETS.wildlife = [
   { name: 'eye-turkeys-at-the-edge', time: 9, ...wlBase,
     setup: stage({ ang: 0.3, animals: [['turkey', 4.2, 0.2, 0.8, true], ['turkey', 5, 1.0, 1.2, false], ['turkey', 4.4, -0.9, 0.4, false], ['turkey', 5.6, -0.2, 1.0, false]] }), frames: 10 },
   { name: 'eye-bear-at-the-fence-barbed-wire-open', time: 18.9, ...wlBase,
-    setup: ringSetup('barbed_wire') + stage({ fence: true, ang: Math.PI, animals: [['bear', 'fd - 1.2', 0.7, 1.5 * Math.PI + 0.3, true, 'free']], look: 'fd - 0.5', camBack: 1.6, camSide: 0.5 }), frames: 12 },
+    setup: ringSetup('barbed_wire') + stage({ fence: true, ang: 0, animals: [['bear', 'fd - 1.2', 0.7, 1.5 * Math.PI + 0.3, true, 'free']], look: 'fd - 0.5', camBack: 1.6, camSide: 0.5 }), frames: 12 },
   { name: 'eye-bear-at-the-fence-chainlink-closed', time: 18.9, ...wlBase,
-    setup: ringSetup('chain_link') + stage({ fence: true, ang: Math.PI, animals: [['bear', 'fd + 1.6', 0.7, 0.5 * Math.PI, true, 'out'], ['coyote', 'fd + 2.6', -1.6, 0.5 * Math.PI, true, 'out']], look: 'fd + 0.5', camBack: 1.6, camSide: 0.5 }), frames: 12 },
+    setup: ringSetup('chain_link') + stage({ fence: true, ang: 0, animals: [['bear', 'fd + 1.6', 0.7, 0.5 * Math.PI, true, 'out'], ['coyote', 'fd + 2.6', -1.6, 0.5 * Math.PI, true, 'out']], look: 'fd + 0.5', camBack: 1.6, camSide: 0.5 }), frames: 12 },
   { name: 'aerial-herd-no-wall', time: 7.4, ...wlBase,
     setup: ringSetup('barbed_wire') + fenceAerial([['elk', 9, 0, 2, true, 'free'], ['elk', 10, 1.2, 1.8, false, 'free'], ['elk', 8.4, -1.2, 2.2, false, 'free'], ['deer', 6, 5, 1, false, 'free'], ['bear', -1.5, -3, 1.5, true, 'free'], ['coyote', 3, -6, 1, true, 'free']]), frames: 10 },
   { name: 'aerial-same-parcel-closed-wall', time: 7.4, ...wlBase,
