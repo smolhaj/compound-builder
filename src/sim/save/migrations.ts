@@ -10,6 +10,7 @@ import { newDisaster } from '../disaster';
 import { freshNeeds } from '../needs';
 import { generateNeighbors, newGate } from '../encounters';
 import { emptyStats } from '../report';
+import { newDigs } from '../tunnelers';
 import { newLand } from '../land';
 import { CLASSIC, CLASSIC_IMPROVEMENTS } from '../site';
 import { newLights } from '../lights';
@@ -36,6 +37,8 @@ type Raw = Record<string, unknown> & { version?: number };
 
 /** version n → n + 1 upgraders. */
 const STEPS: Record<number, (s: Raw) => Raw> = {
+  // 50 → 51: tunnelers (the dig in progress, the party sent out, tallies), ground sensors and passage hatches in the stock; runs may carry a buried skirt / unlocked / revealed / permitAt (none yet)
+  50: s => ({ ...s, version: 51, digs: (s.digs as object | undefined) ?? newDigs(), stock: { ground_sensor: 0, passage_hatch: 0, ...(s.stock as object) } }),
   // 46 → 47: the family's tools (sim/tools.ts): a starter kit from the trades, as if they had brought it
   46: s => ({ ...s, version: 47, tools: (s.tools as object | undefined) ?? starterKit(s.people as Person[], s.seed as number) }),
   // 38 → 39: the pantry, item by item (the aggregate staples / canned / frozen split into a default breakdown at their shelf ages)
@@ -60,8 +63,8 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   5: s => ({ ...s, version: 6, stock: { rebar: 0, membrane: 0, excavator: 0, blast_door: 0, nbc_filter: 0, spoil: 0, ...(s.stock as object) } }),
   // 6 → 7: the escape tunnel (culvert, egress hatch)
   6: s => ({ ...s, version: 7, stock: { culvert: 0, egress_hatch: 0, ...(s.stock as object) } }),
-  // 50 → 51: light discipline: the family's lights-out routine (`opsec.auto`) and blackout curtains join the stockpile at zero (sim/blackout.ts)
-  50: s => ({ ...s, version: 51, stock: { blackout_curtains: 0, gen_baffles: 0, gen_vault: 0, ...(s.stock as object) }, opsec: s.opsec ? { auto: 'off', ...(s.opsec as object) } : s.opsec }),
+  // 51 → 52: light discipline: the family's lights-out routine (`opsec.auto`) and blackout curtains join the stockpile at zero (sim/blackout.ts)
+  51: s => ({ ...s, version: 52, stock: { blackout_curtains: 0, gen_baffles: 0, gen_vault: 0, ...(s.stock as object) }, opsec: s.opsec ? { auto: 'off', ...(s.opsec as object) } : s.opsec }),
   // 45 → 46: daily life (sim/daily.ts): an Auto roster (the planner fills it on the first sub-step), no chores behind, nobody tired; the losses ledger (sim/grief.ts)
   45: s => ({ ...s, version: 46, losses: (s.losses as unknown[] | undefined) ?? [], daily: (s.daily as object | undefined) ?? newDaily(), personState: (s.personState as Array<Record<string, unknown>>).map(ps => ({ fatigue: 0, ...ps })) }),
   // 44 → 45: where the starting money came from (old saves: not recorded; they keep their jobs and the old flat passive income)

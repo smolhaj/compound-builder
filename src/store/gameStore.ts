@@ -17,10 +17,12 @@ import { step } from '../sim/engine';
 import { placeOrder } from '../sim/economy';
 import { planStructure } from '../sim/construction';
 import { markTree, unmarkTree, isMarked, type TreeRef } from '../sim/forestry';
+import { newDigs } from '../sim/tunnelers';
+import { setPassageLocked } from '../sim/compounds';
 import { lightsOf, setAiSensor, setAllAi, type LightMode } from '../sim/lights';
 import { AUTO_NAME, type AutoLightsOut } from '../sim/blackout';
 import { stampHighGround, upgradeTower } from '../sim/towers';
-import { planRun, upgradeRun, type Gate, type PerimeterKind, type Pt } from '../sim/perimeter';
+import { addSkirt, planRun, upgradeRun, type Gate, type PerimeterKind, type Pt } from '../sim/perimeter';
 import { layPropertyWall, planPropertyWall, type PropertyGeometry } from '../sim/propertyWall';
 import { fitProblem, orderFit, plant, repairPump, replaceFried } from '../sim/utilities';
 
@@ -114,6 +116,10 @@ export interface GameStore {
   wallProperty: (kind: PerimeterKind, geo: PropertyGeometry) => number;
   /** Upgrade a finished fence or wall to the next tier, in place (null = laid out; else why not). */
   upgradeRun: (id: string) => string | null;
+  /** Bury a steel-and-concrete skirt under a finished wall (null = done, else why not). */
+  addSkirt: (id: string) => string | null;
+  /** Bolt or unbolt the blast hatches of an underground passage. */
+  lockPassage: (id: string, locked: boolean) => void;
   /** Upgrade a finished watch tower in place: the next tier rises beside it. */
   upgradeTower: (id: string) => string | null;
   /** Floodlight discipline (sim/lights.ts): the default for every light, one light's override (null clears it), or set all (clears the overrides). */
@@ -138,6 +144,8 @@ export interface GameStore {
   select: (id: string | null) => void;
   /** Answer whoever is at the gate. */
   answer: (stance: Stance) => void;
+  /** Pick who goes to a dig site (gate card). */
+  setAmbushParty: (ids: string[]) => void;
   dismissCard: () => void;
   decideAftermath: (choice: AftermathChoice) => void;
   releasePrisoner: (id: string) => void;
@@ -290,6 +298,18 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); }
     return why;
   },
+  addSkirt: (id) => {
+    const g = structuredClone(get().game);
+    const why = addSkirt(g, id);
+    if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); }
+    return why;
+  },
+  lockPassage: (id, locked) => {
+    const g = structuredClone(get().game);
+    setPassageLocked(g, id, locked);
+    set({ game: g });
+    void saveGame(AUTOSAVE, g);
+  },
   setLightDefault: (mode) => { const g = structuredClone(get().game); lightsOf(g).mode = mode; set({ game: g }); },
   setLightMode: (id, mode) => { const g = structuredClone(get().game); const l = lightsOf(g); if (mode) l.per[id] = mode; else delete l.per[id]; set({ game: g }); },
   setLightAi: (id, on) => { const g = structuredClone(get().game); const why = setAiSensor(g, id, on); if (!why) set({ game: g }); return why; },
@@ -351,6 +371,12 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     if (locked()) return;
     const g = structuredClone(get().game);
     dismissCrew(g, crewId);
+    set({ game: g });
+  },
+  setAmbushParty: ids => {
+    const g = structuredClone(get().game);
+    g.digs ??= newDigs();
+    g.digs.partyPick = ids;
     set({ game: g });
   },
   answer: (stance) => {

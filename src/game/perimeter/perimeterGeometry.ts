@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { kitMaterial, type KitMaterialId } from '../buildkit/materials';
 import { worldUV } from '../buildkit/shell';
-import { PERIMETER, runGrowth, runProgress, wallLength, type PerimeterRun, type Pt } from '../../sim/perimeter';
+import { PERIMETER, footingOf, hasSkirt, runGrowth, runProgress, wallLength, type PerimeterRun, type Pt } from '../../sim/perimeter';
 
 const M = 1 / 6;
 type Ground = (x: number, z: number) => number;
@@ -75,9 +75,10 @@ export function offsetPts(pts: readonly Pt[], d: number): Pt[] {
  * `under` says whether a point is under a building: pipe and cable trenches
  * stop at its wall and their marker posts stand outside it.
  */
-export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (x: number, z: number) => boolean = () => false): THREE.Group {
+export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (x: number, z: number) => boolean = () => false, opts: { lit?: boolean; sensors?: boolean } = {}): THREE.Group {
+  const lit = opts.lit ?? true;
   // an upgrade of a finished run is drawn beside the old tier (not on top of it) until it is done and the old one comes down
-  const run = run0.replaces ? { ...run0, pts: offsetPts(run0.pts, UPGRADE_OFFSET) } : run0;
+  const run = run0.replaces ? { ...run0, pts: offsetPts(run0.pts, run0.replacesKind === 'container_wall' ? 0.36 : UPGRADE_OFFSET) } : run0;
   const bits = new Map<KitMaterialId, THREE.BufferGeometry[]>();
   const add = (m: KitMaterialId, g: THREE.BufferGeometry) => { let l = bits.get(m); if (!l) bits.set(m, l = []); l.push(worldUV(g)); };
   const def = PERIMETER[run.kind];
@@ -204,6 +205,81 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
       for (const e of spanEnds()) post(e.x, e.z, H + 0.15 * M, 0.11 * M, 'concrete');
       break;
     }
+    case 'covered_walkway': {
+      // an enclosed steel walkway on trusses between two yards (SCALE v2: 2 m inside width, 2.6 m to the roof): portal frames every 3 m, X-bracing,
+      // mesh below and glass above, a handrail inside, a roof with a ridge cap, pendant lights (lit only with power)
+      const W = 2.0 * M, H = 2.6 * M, FL = 0.5 * M, hw = W / 2 + 0.06 * M;
+      const floorY = FL;
+      bays(3 * M, (a, b, i) => {
+        const nx = -a.dz, nz = a.dx;                                     // lateral (left of the run)
+        const side = (u: number, p: typeof a) => ({ x: p.x + nx * u, z: p.z + nz * u });
+        for (const u of [-hw, hw]) {
+          const A = side(u, a), B = side(u, b);
+          post(A.x, A.z, H + FL, 0.05 * M, 'steel');                                 // square steel column on its pier
+          add('concrete', new THREE.BoxGeometry(0.28 * M, FL * 0.6, 0.28 * M).translate(A.x, ground(A.x, A.z) + FL * 0.3 - 0.01, A.z));
+          beam(A.x, A.z, B.x, B.z, floorY - 0.1 * M, 0.1 * M, 0.09 * M, 'steel');    // floor chord
+          beam(A.x, A.z, B.x, B.z, floorY + H - 0.09 * M, 0.09 * M, 0.09 * M, 'steel');   // top chord
+          // X-bracing in the side panel
+          const l = Math.hypot(B.x - A.x, B.z - A.z), ang = Math.atan2(H - 0.35 * M, l);
+          for (const sgn of [1, -1]) {
+            const g = new THREE.BoxGeometry(Math.hypot(l, H - 0.35 * M), 0.04 * M, 0.04 * M).rotateZ(sgn * ang).translate(0, 0, 0);
+            g.rotateY(-Math.atan2(B.z - A.z, B.x - A.x)).translate((A.x + B.x) / 2, ground((A.x + B.x) / 2, (A.z + B.z) / 2) + floorY + H / 2 - 0.05 * M, (A.z + B.z) / 2);
+            add('steel', g);
+          }
+          // mesh below the handrail, glass above
+          beam(A.x, A.z, B.x, B.z, floorY + 0.05 * M, 1.0 * M, 0.012 * M, 'wire_mesh');
+          beam(A.x, A.z, B.x, B.z, floorY + 1.05 * M, H - 1.2 * M, 0.012 * M, 'glass');
+          // handrail inside at hip height
+          const inn = u > 0 ? -0.1 * M : 0.1 * M, RA = side(u + inn, a), RB = side(u + inn, b);
+          beam(RA.x, RA.z, RB.x, RB.z, floorY + 0.95 * M, 0.04 * M, 0.04 * M, 'iron');
+        }
+        // roof: portal beam across at each frame, then a shallow gabled roof of two sheets and a ridge cap
+        const L = side(-hw - 0.15 * M, a), R = side(hw + 0.15 * M, a);
+        beam(L.x, L.z, R.x, R.z, floorY + H - 0.05 * M, 0.1 * M, 0.08 * M, 'steel');
+        const mid = { x: (a.x + b.x) / 2, z: (a.z + b.z) / 2 };
+        for (const sgn of [-1, 1]) {
+          const half = hw + 0.15 * M, rise = 0.18 * M, slope = Math.atan2(rise, half);
+          const g = new THREE.BoxGeometry(Math.hypot(b.x - a.x, b.z - a.z) + 0.02 * M, 0.03 * M, Math.hypot(half, rise)).rotateX(sgn * slope).translate(0, rise / 2 + 0.03 * M, sgn * half / 2);
+          g.rotateY(-Math.atan2(b.z - a.z, b.x - a.x)).translate(mid.x, ground(mid.x, mid.z) + floorY + H, mid.z);
+          add('metal_roof', g);
+        }
+        beam(a.x, a.z, b.x, b.z, floorY + H + 0.17 * M, 0.04 * M, 0.06 * M, 'steel');
+        // floor: steel grating on the chords, a plank of deck down the middle
+        beam(a.x, a.z, b.x, b.z, floorY - 0.12 * M, 0.06 * M, W, 'steel');
+        beam(a.x, a.z, b.x, b.z, floorY - 0.06 * M, 0.025 * M, W * 0.8, 'deck');
+        // pendant light on a cord at the middle of the bay
+        add('iron', new THREE.CylinderGeometry(0.004, 0.004, 0.35 * M, 4).translate(mid.x, ground(mid.x, mid.z) + floorY + H - 0.2 * M, mid.z));
+        add(lit ? 'bulb' : 'enamel', new THREE.SphereGeometry(0.075 * M, 10, 7).scale(1, 0.8, 1).translate(mid.x, ground(mid.x, mid.z) + floorY + H - 0.42 * M, mid.z));
+        void i;
+      });
+      for (const e of spanEnds()) {   // the door frame at each end where it meets a wall: a steel portal and a threshold step
+        const nx = -e.dz, nz = e.dx;
+        for (const u of [-hw, hw]) post(e.x + nx * u, e.z + nz * u, H + FL + 0.05 * M, 0.07 * M, 'steel');
+        beam(e.x + nx * -hw, e.z + nz * -hw, e.x + nx * hw, e.z + nz * hw, floorY + H, 0.1 * M, 0.12 * M, 'steel');
+        add('concrete', new THREE.BoxGeometry(W, 0.3 * M, 0.5 * M).rotateY(-Math.atan2(e.dz, e.dx) + Math.PI / 2).translate(e.x - e.dx * 0.1 * M, ground(e.x, e.z) + 0.15 * M, e.z - e.dz * 0.1 * M));
+      }
+      break;
+    }
+    case 'concrete_wall': {
+      // a 3.5 m poured wall in LEVEL panels (3 m bays, each set at the high point of its bay) on a stepped poured plinth that fills down to the ground on slopes and dips;
+      // form-tie shadow lines, a pilaster at each joint, a capped top
+      const H = 3.5 * M;
+      bays(3 * M, (a, b) => {
+        const len = Math.hypot(b.x - a.x, b.z - a.z), yaw = -Math.atan2(b.z - a.z, b.x - a.x), mx = (a.x + b.x) / 2, mz = (a.z + b.z) / 2;
+        const samples = [0, 0.25, 0.5, 0.75, 1].map(f => ground(a.x + (b.x - a.x) * f, a.z + (b.z - a.z) * f));
+        const hi = Math.max(...samples), lo = Math.min(...samples) - 0.06;
+        const box = (l: number, h: number, w: number, y0: number, m: KitMaterialId) => add(m, new THREE.BoxGeometry(l, h, w).translate(0, h / 2, 0).rotateY(yaw).translate(mx, y0, mz));
+        box(len + 0.004, hi - lo + 0.03, 0.34 * M, lo, 'concrete');                 // the plinth step, from the lowest ground to the panel's base
+        box(len, H, 0.3 * M, hi + 0.02, 'concrete');                                   // the level panel
+        box(len + 0.01, 0.12 * M, 0.42 * M, hi + 0.02 + H - 0.02 * M, 'concrete');    // the cap
+        box(len + 0.002, 0.03 * M, 0.32 * M, hi + 0.02 + H * 0.5, 'wet_concrete');    // form-tie lines
+        box(len + 0.002, 0.03 * M, 0.32 * M, hi + 0.02 + H * 0.82, 'wet_concrete');
+        const off = 0.17 * M;
+        for (const sd of [-1, 1]) add('concrete', new THREE.BoxGeometry(0.24 * M, H, 0.12 * M).translate(0, H / 2, 0).rotateY(-Math.atan2(a.dz, a.dx)).translate(a.x - a.dz * off * sd, hi + 0.02, a.z + a.dx * off * sd));   // pilasters at the joint
+      });
+      for (const e of spanEnds()) post(e.x, e.z, H + 0.1 * M, 0.2 * M, 'concrete');
+      break;
+    }
     case 'thorn_hedge': {
       const g = Math.max(0.04, growth), h = def.height * g, w = (0.4 + 1.6 * g) * M;
       let k = 0;
@@ -246,9 +322,13 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
         const len = Math.hypot(b.x - a.x, b.z - a.z);
         const samples = [0, 0.25, 0.5, 0.75, 1].map(f => ground(a.x + (b.x - a.x) * f, a.z + (b.z - a.z) * f));
         const y = Math.max(...samples) + 0.015;
-        for (const f of [0.03, 0.5, 0.97]) for (const side of [-1, 1]) {
-          const px = a.x + (b.x - a.x) * f - a.dz * side * W * 0.42, pz = a.z + (b.z - a.z) * f + a.dx * side * W * 0.42, gy = ground(px, pz) - 0.02;
-          if (y - gy > 0.005) add('concrete', new THREE.BoxGeometry(0.06, y - gy, 0.06).translate(px, gy + (y - gy) / 2, pz));
+        // a poured plinth under the whole container, following the terrain and filling the gap on slopes and dips: nothing to walk or crawl under
+        const nSub = Math.max(2, Math.ceil(len / 0.3));
+        for (let q = 0; q < nSub; q++) {
+          const f0 = q / nSub, f1 = (q + 1) / nSub;
+          const x0 = a.x + (b.x - a.x) * f0, z0 = a.z + (b.z - a.z) * f0, x1 = a.x + (b.x - a.x) * f1, z1 = a.z + (b.z - a.z) * f1;
+          const gy = Math.min(ground(x0, z0), ground(x1, z1), ground((x0 + x1) / 2, (z0 + z1) / 2)) - 0.05;
+          if (y - gy > 0.004) add('concrete', new THREE.BoxGeometry(Math.hypot(x1 - x0, z1 - z0) + 0.004, y - gy, W * 1.02).translate(0, (y - gy) / 2, 0).rotateY(-Math.atan2(z1 - z0, x1 - x0)).translate((x0 + x1) / 2, gy, (z0 + z1) / 2));
         }
         const g = new THREE.BoxGeometry(len - 0.02 * M, H, W).translate(0, H / 2, 0).rotateY(-Math.atan2(b.z - a.z, b.x - a.x)).translate((a.x + b.x) / 2, y, (a.z + b.z) / 2);
         add(m, g);
@@ -289,13 +369,53 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
     }
     default: break;  // berm, ditch: earthworks in the terrain
   }
+  // every wall tier is closed to the ground: a footing that follows the terrain (sim/perimeter footingOf)
+  const footing = run.finishedAt !== null || built > 0 ? footingOf(run.kind) : null;
+  if (footing && footing !== 'plinth' && footing !== 'trench') {
+    const mat: KitMaterialId = footing === 'curb' ? 'concrete' : 'earth';
+    const w = (footing === 'curb' ? 0.3 : 0.5) * M, h = (footing === 'curb' ? 0.2 : 0.25) * M;
+    for (const [s0, s1] of spans) {
+      const n = Math.max(1, Math.ceil((s1 - s0) / 0.3));
+      for (let i = 0; i < n; i++) {
+        const a = along(run.pts, s0 + (s1 - s0) * i / n), b = along(run.pts, s0 + (s1 - s0) * (i + 1) / n);
+        const lo = Math.min(ground(a.x, a.z), ground(b.x, b.z), ground((a.x + b.x) / 2, (a.z + b.z) / 2));
+        const hi = Math.max(ground(a.x, a.z), ground(b.x, b.z));
+        add(mat, new THREE.BoxGeometry(Math.hypot(b.x - a.x, b.z - a.z) + 0.004, hi - lo + h + 0.05, w).translate(0, (hi - lo + h + 0.05) / 2, 0).rotateY(-Math.atan2(b.z - a.z, b.x - a.x)).translate((a.x + b.x) / 2, lo - 0.05, (a.z + b.z) / 2));
+      }
+    }
+  }
+  // a buried skirt shows as a darker poured collar at the foot of the wall, with a flush steel inspection plate every 12 m; the steel and concrete tiers already have their footing in the drawing
+  if (run.finishedAt !== null && hasSkirt(run, t) && !def.deepFooting && def.height > 0 && !def.walkway) {
+    for (const [s0, s1] of spans) {
+      const n = Math.max(1, Math.ceil((s1 - s0) / 0.5));
+      for (let i = 0; i < n; i++) {
+        const a = along(run.pts, s0 + (s1 - s0) * i / n), b = along(run.pts, s0 + (s1 - s0) * (i + 1) / n);
+        beam(a.x, a.z, b.x, b.z, -0.012, 0.045, 0.34 * M, 'wet_concrete');
+      }
+      for (let s = s0 + 1 * M; s < s1; s += 12 * M) { const q = along(run.pts, s); add('steel', new THREE.BoxGeometry(0.32 * M, 0.012, 0.18 * M).rotateY(-Math.atan2(q.dz, q.dx)).translate(q.x - q.dz * 0.4 * M, ground(q.x, q.z) + 0.004, q.z + q.dx * 0.4 * M)); }
+    }
+  }
+  // ground sensors: a short steel stake with a green status cap on the outside of the wall every ~18 m
+  if (opts.sensors && run.finishedAt !== null && def.blocks.people >= 0.6 && def.height > 0 && !def.walkway) {
+    for (const [s0, s1] of spans) for (let s = s0 + 2 * M; s < s1; s += 18 * M) {
+      const q = along(run.pts, s), x = q.x + q.dz * 0.9 * M, z = q.z - q.dx * 0.9 * M, y = ground(x, z);
+      add('steel', new THREE.CylinderGeometry(0.014, 0.014, 0.3 * M, 5).translate(x, y + 0.15 * M, z));
+      add('paint_green', new THREE.CylinderGeometry(0.03 * M, 0.03 * M, 0.06 * M, 7).translate(x, y + 0.33 * M, z));
+      add(lit ? 'bulb' : 'enamel', new THREE.SphereGeometry(0.014, 6, 4).translate(x, y + 0.37 * M, z));
+    }
+  }
   // gates: posts each side and a leaf swung open (wire / rail fences: tube gate; walls: plank or steel gates)
   if (run.finishedAt !== null && run.kind !== 'ditch') {
     for (const g of run.gates) {
       const p0 = along(run.pts, g.at - g.w / 2), p1 = along(run.pts, g.at + g.w / 2);
       const tall = Math.max(1.4 * M, Math.abs(def.height) + 0.05 * M);
       for (const p of [p0, p1]) post(p.x, p.z, tall, 0.1 * M, 'wood_dark', true);
-      const wall = run.kind === 'log_palisade' || run.kind === 'container_wall';
+      // a framed doorway: a steel lintel across the posts (the opening where a walkway meets a yard wall reads as a real door, from both sides)
+      if (g.w <= 0.45 && def.height >= 0.4) {
+        for (const p of [p0, p1]) post(p.x, p.z, def.height + 0.08 * M, 0.1 * M, 'steel');
+        beam(p0.x, p0.z, p1.x, p1.z, def.height, 0.14 * M, 0.3 * M, 'steel');
+      }
+      const wall = run.kind === 'log_palisade' || run.kind === 'container_wall' || run.kind === 'concrete_wall';
       const leafH = wall ? Math.abs(def.height) * 0.95 : 1.3 * M;
       const ang = -Math.atan2(p0.dz, p0.dx);
       /** A gate leaf, hinged at (hx, hz), `w` wide, swung open by `open` radians. */

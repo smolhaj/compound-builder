@@ -136,7 +136,7 @@ describe('the Perimeter list', () => {
   it('knows the upgrade chain from any link', () => {
     const chain = upgradeChain('chain_link');
     expect(chain[0]).toBe('split_rail');
-    expect(chain.at(-1)).toBe('electric_steel');
+    expect(chain.at(-1)).toBe('concrete_wall');
     for (let i = 1; i < chain.length; i++) expect(UPGRADE_NEXT[chain[i - 1]]).toBe(chain[i]);
   });
 });

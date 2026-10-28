@@ -38,13 +38,14 @@ import { DIFFICULTY } from './difficulty';
 import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
 import type { LightsState } from './lights';
 import { starterKit, type ToolKit } from './tools';
-export const SAVE_VERSION = 51;
+export const SAVE_VERSION = 52;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
 import { newScavenge, type ScavengeState } from './scavenge';
 import { newMarketState, type MarketState } from './tradeGoods';
 import { newLocals, type LocalsState } from './neighborLife';
+import { newDigs, type DigState } from './tunnelers';
 import type { Dog, PetLife } from './pets';
 import { newDaily, type Daily } from './daily';
 import type { Loss } from './grief';
@@ -255,6 +256,8 @@ export interface GameState {
   market?: MarketState;
   /** The neighbors' lives: ages, history, news on its way, the co-op or militia, the pact (sim/neighborLife.ts). Save v42. */
   locals?: LocalsState;
+  /** Tunnelers: the dig in progress, the party sent to a breakout, tallies (sim/tunnelers.ts). Save v47; `??=` for safety. */
+  digs?: DigState;
   /** The family's dogs, each a named pet with its own health, bonds and moods (sim/pets.ts; save v43). Replaces the old `stock.dog` count. */
   dogs: Dog[];
   /** Pet care settings, the family's grief for lost pets, yesterday's care (sim/pets.ts; save v43; `??=` for safety). */
@@ -319,6 +322,7 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     scavenge: newScavenge(),
     market: newMarketState(),
     locals: newLocals(),
+    digs: newDigs(),
     daily: newDaily(),
     stats: emptyStats(),
     ending: null,

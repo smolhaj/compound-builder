@@ -107,6 +107,26 @@ export function DefenseTab() {
       {d.homes.map(h => <CheckRow key={h.id} c={{ id: h.id, label: h.name, ok: h.covered, tone: h.covered ? 'good' : 'bad', detail: h.how }} />)}
       {exposed.length > 0 && <Note tone="bad">{exposed.length} home{exposed.length > 1 ? 's are' : ' is'} exposed: close the property line (and bar the creek) or wall a ring round {exposed.length > 1 ? 'them' : 'it'}.</Note>}
     </Section>
+    {d.linked.length > 0 && <Section title="Linked yards">
+      {d.linked.map(c => <CheckRow key={c.id} c={c} />)}
+      {d.linkList.filter(l => l.kind === 'passage').map(l => {
+        const run = game.perimeter.find(r => r.id === l.runId);
+        const exposed = d.hatches.some(h => h.runId === l.runId && h.exposed);
+        return <div key={l.runId} style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '3px 0' }}>
+          <span style={{ flex: 1 }}>Passage blast doors <span style={{ color: DIM }}>{exposed ? '(one end comes up outside a wall)' : '(both ends inside walls)'}</span></span>
+          <button style={btn(!run?.unlocked)} onClick={() => useGameStore.getState().lockPassage(l.runId, !!run?.unlocked)}>{run?.unlocked ? 'Unbolted: bolt them' : 'Bolted: unbolt'}</button>
+        </div>;
+      })}
+      <Note>A covered walkway is steel and glass above ground, lit if there is power, with a doorway cut in each yard wall. A passage is hidden below it; only a hatch outside every wall could ever be found. The doors bolt themselves when a raid starts.</Note>
+    </Section>}
+    {d.digging.length > 0 && <Section title="Digging">
+      {d.digging.map(c => <CheckRow key={c.id} c={c} />)}
+      {d.skirtable.map(r => <div key={r.id} style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '3px 0' }}>
+        <span style={{ flex: 1 }}>{r.label}</span>
+        <button style={btn(false)} disabled={!!r.problem} title={r.problem ?? 'Sink a steel-and-concrete skirt 4 m down under the wall; the crew has it in the ground in a few days'} onClick={() => { const w = useGameStore.getState().addSkirt(r.id); if (w) alert(w); }}>{r.has ? 'Skirt buried' : r.problem && !/Waiting/.test(r.problem) ? r.problem : 'Add a buried skirt'}</button>
+      </div>)}
+      <Note>Organized crews dig under walls over a week or more, late in the collapse. A skirt stops them; a ditch floods the tunnel; sensors, dogs and a watch give you days of warning. Then you can wait for them at the breakout with the party.</Note>
+    </Section>}
     <Section title="Watching">{d.watch.map(c => <CheckRow key={c.id} c={c} />)}</Section>
     <Section title="Fighting">{d.fight.map(c => <CheckRow key={c.id} c={c} />)}</Section>
     <Section title="Shelter">{d.shelter.map(c => <CheckRow key={c.id} c={c} />)}</Section>

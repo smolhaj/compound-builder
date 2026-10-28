@@ -136,10 +136,10 @@ describe('light discipline', () => {
     expect(g.personState.reduce((a, p) => a + p.needs.morale, 0)).toBeCloseTo(base.personState.reduce((a, p) => a + p.needs.morale, 0));
   });
 
-  it('migrates a v50 save: routine off, curtains at zero', () => {
+  it('migrates a v51 save: routine off, curtains at zero', () => {
     const g = fresh(); g.opsec = { quietDeliveries: true, blackout: true };
-    const old = { ...JSON.parse(JSON.stringify(g)), version: 50 };
-    delete old.stock.blackout_curtains; old.version = 50;
+    const old = { ...JSON.parse(JSON.stringify(g)), version: 51 };
+    delete old.stock.blackout_curtains; old.version = 51;
     const m = migrate(old);
     expect(m.opsec).toMatchObject({ quietDeliveries: true, blackout: true, auto: 'off' });
     expect(m.stock.blackout_curtains).toBe(0);

@@ -480,6 +480,51 @@ SETS.defenses = [
   { name: 'aerial-creek-bars', time: 11, season: 'summer', setup: `{ const c = cb.world.parcel.creek; cb.qa.pose = null; cb.cam.target.set(20, 0, c.zAt(20)); cb.cam.radius = 9; cb.cam.pitch = 0.7; cb.cam.yaw = 0.5; }`, cam: { x: 20, z: 40, yaw: 0.5, pitch: 0.7, radius: 9 }, frames: 12 },
 ];
 
+// linked compounds: two walled yards joined by a covered steel walkway, an underground passage between them, a buried skirt and ground sensors
+const linkedSetup = `{ if (!window.__linked) { window.__linked = true;
+  const sq = (cx, cz, h) => [[cx - h, cz - h], [cx + h, cz - h], [cx + h, cz + h], [cx - h, cz + h], [cx - h, cz - h]];
+  cb.game.setState(s => { const g = structuredClone(s.game);
+    const done = (kind, pts) => { cb.__id = (cb.__id || 0) + 1; g.perimeter.push({ id: 'L' + cb.__id, kind, pts, gates: [], done: 1, hours: 1, supplied: true, finishedAt: 0 }); };
+    for (const [id, x, z] of [['h1', 22, 40], ['h2', 46, 40]]) g.structures.push({ id, kind: 'farmhouse', x, z, rot: 0, stage: 99, done: 0, supplied: true, finishedAt: 0 });
+    done('container_wall', sq(22, 40, 8)); done('container_wall', sq(46, 40, 8));
+    g.stock.ground_sensor = 2; g.utilities.lit = ['h1', 'h2'];
+    return { game: g }; });
+  // the walkway is planned through the sim, which cuts a doorway in each yard wall
+  cb.game.getState().planRun('covered_walkway', [[30, 44], [38, 44]], [], 0);
+  cb.game.getState().planRun('underground_passage', [[24, 37], [44, 37]], [], 0);
+  cb.game.setState(s => { const g = structuredClone(s.game);
+    for (const r of g.perimeter) { r.done = r.hours; r.supplied = true; r.finishedAt = 0; }
+    g.perimeter.find(r => r.kind === 'container_wall').skirtAt = 0;
+    return { game: g }; }); } cb.qa.pose = null; }`;
+SETS.linked = [
+  { name: 'linked-aerial-day', time: 12, season: 'summer', setup: linkedSetup + "cb.cam.target.set(34, 0, 41); cb.cam.yaw = 0.5; cb.cam.pitch = 0.6; cb.cam.radius = 34;", cam: { x: 34, z: 41, yaw: 0.5, pitch: 0.6, radius: 34 }, frames: 14 },
+  { name: 'linked-walkway-close', time: 11, season: 'summer', setup: linkedSetup + "cb.cam.target.set(34, 0, 44); cb.cam.yaw = 0.6; cb.cam.pitch = 0.2; cb.cam.radius = 7;", cam: { x: 34, z: 44, yaw: 0.6, pitch: 0.2, radius: 7 }, frames: 14 },
+  { name: 'linked-eye-inside-walkway', time: 21.5, season: 'summer', setup: linkedSetup + eye(31, 44, 38, 44, 0.22, 0.22, 70), cam: { x: 34, z: 44, yaw: 0, pitch: 0.2, radius: 7 }, frames: 14 },
+  { name: 'linked-night-aerial', time: 21, season: 'summer', setup: linkedSetup + "cb.cam.target.set(34, 0, 44); cb.cam.yaw = 0.5; cb.cam.pitch = 0.3; cb.cam.radius = 11;", cam: { x: 34, z: 42, yaw: 0.3, pitch: 0.45, radius: 28 }, frames: 14 },
+  { name: 'linked-underground-passage', time: 11, season: 'summer', setup: linkedSetup + under + "const gy = cb.world.groundAt(34, 37); cb.cam.target.set(30, 0, 37); cb.cam.yaw = 0.4; cb.cam.pitch = 0.85; cb.cam.radius = 8;", cam: { x: 34, z: 37, yaw: 0.4, pitch: 0.9, radius: 30 }, frames: 20 },
+  { name: 'linked-underground-hatch-close', time: 11, season: 'summer', setup: linkedSetup + under + "cb.cam.target.set(24, 0, 37); cb.cam.yaw = 0.5; cb.cam.pitch = 0.8; cb.cam.radius = 4;", cam: { x: 24, z: 37, yaw: 0.5, pitch: 0.8, radius: 4 }, frames: 20 },
+  { name: 'linked-skirt-and-sensor-close', time: 10, season: 'summer', setup: linkedSetup + eye(10, 36, 14, 40, 0.22, 0.1, 58), cam: { x: 14, z: 40, yaw: 0, pitch: 0.2, radius: 5 }, frames: 14 },
+  { name: 'linked-doorway-outside', time: 11, season: 'summer', setup: linkedSetup + eye(34, 52, 30, 44, 0.24, 0.22, 64), cam: { x: 34, z: 44, yaw: 0, pitch: 0.2, radius: 7 }, frames: 14 },
+  { name: 'linked-doorway-inside', time: 11, season: 'summer', setup: linkedSetup + eye(25, 44, 30, 44, 0.24, 0.22, 64), cam: { x: 30, z: 44, yaw: 0, pitch: 0.2, radius: 7 }, frames: 14 },
+];
+
+// a container wall on a slope near the camp, at eye level with the family in view: the plinth closes the gap under it
+const wallSlope = `{ if (window.__wslope !== window.__wallKind) { window.__wslope = window.__wallKind; const c = cb.world.camp, g = cb.world.groundAt; let best = null, bd = -1;
+    for (let k = 0; k < 8; k++) for (const sd of [-1, 1]) { const a = k * 0.39, cx = c.x + sd * 4 * Math.cos(a + 1.57), cz = c.z + sd * 4 * Math.sin(a + 1.57); const p0 = [cx - Math.cos(a) * 7, cz - Math.sin(a) * 7], p1 = [cx + Math.cos(a) * 7, cz + Math.sin(a) * 7]; let lo = 1e9, hi = -1e9; for (let i = 0; i <= 14; i++) { const h = g(p0[0] + (p1[0] - p0[0]) * i / 14, p0[1] + (p1[1] - p0[1]) * i / 14); lo = Math.min(lo, h); hi = Math.max(hi, h); } if (hi - lo > bd) { bd = hi - lo; best = [p0[0], p0[1], p1[0], p1[1], cx, cz]; } }
+    window.__ws = best;
+    cb.game.setState(s => { const gm = structuredClone(s.game); gm.perimeter = gm.perimeter.filter(r => !r.id.startsWith('W_')); gm.perimeter.push({ id: 'W_' + window.__wallKind, kind: window.__wallKind || 'container_wall', pts: [[best[0], best[1]], [best[2], best[3]]], gates: [], done: 1, hours: 1, supplied: true, finishedAt: 0 }); return { game: gm }; }); } }`;
+// eye level on the camp side of the wall, looking across the camp (the family is between) at the wall
+const wallEye = (kind) => `window.__wallKind = '${kind}'; ` + wallSlope + `{ const w = window.__ws, c = cb.world.camp, g = cb.world.groundAt; const dx = c.x - w[4], dz = c.z - w[5], d = Math.hypot(dx, dz) || 1; const ex = c.x + dx / d * 1.8, ez = c.z + dz / d * 1.8; cb.qa.pose = { x: ex, y: g(ex, ez) + 0.24, z: ez, lx: w[4], ly: g(w[4], w[5]) + 0.12, lz: w[5], fov: 66 }; }`;
+SETS.walls = [
+  { name: 'wall-slope-container-eye-person', time: 10, season: 'summer', setup: toHour(10) + wallEye('container_wall'), cam: { x: C, z: C, yaw: 0, pitch: 0.2, radius: 7 }, frames: 40 },
+  { name: 'wall-slope-concrete-eye-person', time: 10, season: 'summer', setup: toHour(10) + wallEye('concrete_wall'), cam: { x: C, z: C, yaw: 0, pitch: 0.2, radius: 7 }, frames: 40 },
+  { name: 'wall-slope-steel-eye-person', time: 10, season: 'summer', setup: toHour(10) + wallEye('steel_wall'), cam: { x: C, z: C, yaw: 0, pitch: 0.2, radius: 7 }, frames: 40 },
+];
+// a container wall being upgraded to steel: the steel rises beside the containers
+SETS.upgrade = [
+  { name: 'container-to-steel-upgrade', time: 11, season: 'summer', setup: `{ if (!window.__up) { window.__up = true; cb.game.setState(s => { const g = structuredClone(s.game); g.stock.rebar = 99; g.stock.concrete = 99; g.stock.hardware = 30; g.stock.wire = 30; g.perimeter.push({ id: 'C1', kind: 'container_wall', pts: [[20, 36], [48, 36]], gates: [], done: 1, hours: 1, supplied: true, finishedAt: 0 }); return { game: g }; }); cb.game.getState().upgradeRun('C1'); cb.game.setState(s => { const g = structuredClone(s.game); const u = g.perimeter.find(r => r.replaces); u.supplied = true; u.done = u.hours * 0.55; return { game: g }; }); } cb.qa.pose = null; cb.cam.target.set(34, cb.world.groundAt(34, 36), 36); cb.cam.yaw = 0.35; cb.cam.pitch = 0.4; cb.cam.radius = 9; }`, cam: { x: 30, z: 36, yaw: 0.5, pitch: 0.22, radius: 9 }, frames: 14 },
+];
+
 /**
  * Dogs: named family pets. A compound with a log house, a cabin and a garden; three dogs
  * come in on the truck (two trained adults, one puppy), their bonds are set, and the sim is

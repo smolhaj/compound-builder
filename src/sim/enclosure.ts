@@ -17,7 +17,7 @@ import type { Rect } from './land';
 import type { GameState } from './state';
 
 /** Closest approach of a point to a polyline, and how far along it that is. */
-function nearest(pts: readonly Pt[], x: number, z: number): { d: number; s: number } {
+export function nearest(pts: readonly Pt[], x: number, z: number): { d: number; s: number } {
   let best = { d: Infinity, s: 0 }, acc = 0;
   for (let i = 1; i < pts.length; i++) {
     const [ax, az] = pts[i - 1], [bx, bz] = pts[i];
