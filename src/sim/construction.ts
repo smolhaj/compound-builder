@@ -6,7 +6,7 @@
  */
 import { drillExtra, siteProblem } from './site';
 import { permitHold } from './paperwork';
-import { BLUEPRINTS } from './blueprints';
+import { BLUEPRINTS, totalBill } from './blueprints';
 import { hasAll, MATERIALS, shortfall, type MaterialId, type Stock } from './materials';
 import { log } from './economy';
 import type { GameState, Structure } from './state';
@@ -17,6 +17,19 @@ export function blueprintOf(st: Structure) {
 
 export function isFinished(st: Structure): boolean {
   return st.stage >= blueprintOf(st).stages.length;
+}
+
+/** Share of the old tier's materials that comes back when its upgrade is finished (same as the walls: sim/perimeter.ts SALVAGE). */
+export const STRUCTURE_SALVAGE = 0.5;
+
+/** An upgrade is done: the old tier goes, and half its materials come back to the stockpile. */
+function completeUpgrade(s: GameState, st: Structure): void {
+  const old = s.structures.find(x => x.id === st.replaces);
+  st.replaces = undefined;
+  if (!old) return;
+  for (const [k, n] of Object.entries(totalBill(blueprintOf(old))) as Array<[keyof Stock, number]>) s.stock[k] += Math.floor(n * STRUCTURE_SALVAGE);
+  s.structures = s.structures.filter(x => x.id !== old.id);
+  log(s, `The old ${old.kind.replace(/_/g, ' ')} comes down; half its materials are back in the stockpile.`);
 }
 
 /** Plan a structure at a placed spot (mutates the draft). */
@@ -81,6 +94,7 @@ export function addWork(s: GameState, st: Structure, personHours: number): numbe
       if (isFinished(st)) {
         st.finishedAt = s.clock.t;
         log(s, `The ${st.kind.replace('_', ' ')} is finished!`);
+        if (st.replaces) completeUpgrade(s, st);
       } else log(s, `${stage.name} done — on to: ${bp.stages[st.stage].name.toLowerCase()}.`);
     }
   }

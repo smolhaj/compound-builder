@@ -24,7 +24,7 @@ export interface KitPieceDef {
   /** Steepest ground (rise / run) under the footprint before it needs a bigger pad. */
   maxSlope: number;
   /** Build-menu group and one-line description. */
-  category: 'home' | 'work' | 'food' | 'sanitation' | 'water' | 'power' | 'bunker';
+  category: 'home' | 'work' | 'food' | 'sanitation' | 'water' | 'power' | 'bunker' | 'defense';
   blurb: string;
   /** Floor height above the pad (walking height inside) and porch depth in front of the +z wall (world units). */
   floorY: number;
@@ -41,6 +41,8 @@ export interface KitPieceDef {
   level?: 'surface' | 'underground' | 'both';
   /** People it shelters in an emergency (bunker rooms). */
   shelters?: number;
+  /** Floodlights on a mast: a hard white lamp over the approach at night, with power (towers.ts tier 4+). */
+  floodlit?: boolean;
 }
 
 export const TIMBER_CABIN: KitPieceDef = {
@@ -186,6 +188,22 @@ export const UTILITY_KIT: KitPieceDef[] = [
   util('septic', 'Septic system', 'sanitation', 2, 2, 'Septic tank and leach field. Lets plumbed houses have flush toilets.'),
 ];
 
+// ── Watch towers: the upgrade chain (sim/towers.ts; sizes match its `cells`) ──
+const tower = (id: string, name: string, cx: number, blurb: string, over: Partial<KitPieceDef> = {}): KitPieceDef => ({
+  id, name, category: 'defense', blurb, cellsX: cx, cellsZ: cx, frontCells: 0,
+  parts: { foundation: 'concrete', walls: 'concrete', roof: 'metal_roof' }, maxSlope: 0.6, floorY: 0.02, porch: 0, sleeps: 0, light: null, ...over,
+});
+export const TOWER_KIT: KitPieceDef[] = [
+  tower('rise_lookout', 'Rise & lookout', 2, 'A mound of earth with a sandbagged nest and a plank roof on top: one rifle and a pair of eyes above the grass. Cheap; a small view bonus. Build it on a natural rise if you have one.', { parts: { foundation: 'fieldstone', walls: 'timber_lap', roof: 'metal_roof' } }),
+  tower('watchtower_wood', 'Wooden watchtower', 1, 'A 6 m timber tower with a roofed cab.', { parts: { foundation: 'concrete', walls: 'board_batten', roof: 'metal_roof' } }),
+  tower('watchtower_concrete', 'Concrete & steel tower', 1, 'A poured shaft with a steel cab and firing slits.'),
+  tower('watchtower_flood', 'Tower with floodlights', 1, 'The concrete tower with a light mast (needs power at night).', { floodlit: true, light: [0, 1.4, 0] }),
+  tower('watchtower_mount', 'Tower with a mounted gun', 1, 'An armored cab with a ring-mounted machine gun.', { floodlit: true, light: [0, 1.5, 0] }),
+  tower('watchtower_turret', 'Tower with an automated turret', 1, 'The armored tower with a remote turret on the roof.', { floodlit: true, light: [0, 1.6, 0] }),
+];
+/** Defense menu: only the first tier is built from scratch; the rest are upgrades from the Defense tab. */
+export const TOWER_ORDER: readonly string[] = ['rise_lookout'];
+
 // ── Underground (GDS §2.2; underground.ts) ──
 const room = (id: string, name: string, cx: number, cz: number, blurb: string, shelters = 0, level: 'underground' | 'both' = 'underground'): KitPieceDef => ({
   id, name, category: 'bunker', blurb, cellsX: cx, cellsZ: cz, frontCells: 0,
@@ -207,7 +225,7 @@ export const BUNKER_KIT: KitPieceDef[] = [
 /** Underground menu order. */
 export const BUNKER_ORDER: readonly string[] = BUNKER_KIT.map(d => d.id);
 
-export const KIT: Record<string, KitPieceDef> = Object.fromEntries([TIMBER_CABIN, LOG_HOUSE, FARMHOUSE, TRAILER, BARN, COTTAGE, METAL_GARAGE, GARAGE_SOLAR, OUTHOUSE, WORKSHOP, ROOT_CELLAR, CHICKEN_COOP, GARDEN, FIELD, GREENHOUSE, ORCHARD, ...UTILITY_KIT, ...BUNKER_KIT].map(d => [d.id, d]));
+export const KIT: Record<string, KitPieceDef> = Object.fromEntries([TIMBER_CABIN, LOG_HOUSE, FARMHOUSE, TRAILER, BARN, COTTAGE, METAL_GARAGE, GARAGE_SOLAR, OUTHOUSE, WORKSHOP, ROOT_CELLAR, CHICKEN_COOP, GARDEN, FIELD, GREENHOUSE, ORCHARD, ...UTILITY_KIT, ...BUNKER_KIT, ...TOWER_KIT].map(d => [d.id, d]));
 /** Build-menu order. */
 export const KIT_ORDER: readonly string[] = ['timber_cabin', 'log_house', 'cottage', 'outhouse', 'garden', 'greenhouse', 'orchard', 'field', 'chicken_coop', 'root_cellar', 'workshop', 'metal_garage', 'barn'];
 /** Water & power menu order. */

@@ -1,3 +1,4 @@
+import { litTowerIds } from '../sim/towers';
 import { burnedFarms } from '../sim/neighborLife';
 import { useEffect, useRef } from 'react';
 import type { GameState } from '../sim/state';
@@ -219,6 +220,8 @@ export function GameCanvas() {
         cam.enabled = useWorldStore.getState().cameraMode === 'diorama';
         if (cineSaved) { ws.camera.fov = cineSaved.fov; ws.camera.near = cineSaved.near; ws.camera.updateProjectionMatrix(); }
       }
+      world.powered = game.utilities.lit.length > 0 || (game.utilities.grid && game.disaster.tracks.grid > 0.5);
+      world.litTowers = new Set(litTowerIds(game));
       const cv = useCutsceneView.getState();
       if (cv.skipScene !== skipScene) { skipScene = cv.skipScene; player.skipScene(); }
       if (cv.skipAll !== skipAll) { skipAll = cv.skipAll; player.skipAll(); }

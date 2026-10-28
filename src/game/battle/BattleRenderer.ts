@@ -139,7 +139,7 @@ export class BattleRenderer {
   /** Where the fight is: between the defenders and the nearest raiders still in it (for the camera), and how far apart they are. */
   focus(): { x: number; z: number; spread: number } | null {
     const live = [...this._units.values()].filter(u => !u.gone && !u.dead);
-    const home = live.filter(u => u.def.side === 'home'), raiders = live.filter(u => u.def.side === 'raider');
+    const home = live.filter(u => u.def.side === 'home' && !u.def.machine), raiders = live.filter(u => u.def.side === 'raider');
     if (!home.length && !raiders.length) return null;
     const pick = home.length ? home : raiders;
     const hx = pick.reduce((a, u) => a + u.x, 0) / pick.length, hz = pick.reduce((a, u) => a + u.z, 0) / pick.length;
@@ -246,7 +246,7 @@ export class BattleRenderer {
     const U_ = (id: string) => this._units.get(id);
     switch (e.kind) {
       case 'alarm': this._alarmOn = true; break;
-      case 'lights': this._lightsOn(); break;
+      case 'lights': this._lightsOn(e.masts, e.aim); break;
       case 'move': { const u = U_(e.unit); if (u && !u.dead) { u.tx = e.x; u.tz = e.z; u.ty = e.y ?? 0; u.crouch = false; } break; }
       case 'cover': { const u = U_(e.unit); if (u && !u.dead) { u.tx = e.x; u.tz = e.z; u.ty = 0; u.crouch = true; } break; }
       case 'shot': {
@@ -330,9 +330,23 @@ export class BattleRenderer {
     u.wear = { ...u.wear, shirt: c.getHex() };
   }
 
-  private _lightsOn(): void {
+  private _lightsOn(masts?: Array<{ x: number; z: number; y: number }>, aim?: { x: number; z: number }): void {
     if (this._floods.length) return;
     const c = this._center;
+    // floodlights on the towers' masts (sim/towers.ts): hard white lamps up high, aimed down the approach
+    if (masts?.length) {
+      masts.forEach((m, i) => {
+        const a = aim ?? c;
+        const s = new THREE.SpotLight(0xfff6ea, this.battle?.night ? 90 : 12, 40, 0.75, 0.45, 1.2);
+        s.position.set(m.x, this._ground(m.x, m.z) + m.y, m.z);
+        s.target.position.set(a.x, this._ground(a.x, a.z), a.z);
+        s.castShadow = i === 0;
+        if (s.castShadow) s.shadow.mapSize.set(512, 512);
+        this._group.add(s); this._group.add(s.target);
+        this._floods.push(s);
+      });
+      return;
+    }
     for (let i = 0; i < 3; i++) {
       const a = i * (Math.PI * 2 / 3) + 0.4;
       const x = c.x + Math.cos(a) * 2.5, z = c.z + Math.sin(a) * 2.5;
@@ -418,7 +432,7 @@ export class BattleRenderer {
   private _moveUnits(dt: number): void {
     let n = 0;
     for (const u of this._units.values()) {
-      if (u.gone) continue;
+      if (u.gone || u.def.machine) continue;
       let moving = false;
       if (!u.dead) {
         const dx = u.tx - u.x, dz = u.tz - u.z, d = Math.hypot(dx, dz);
@@ -449,7 +463,7 @@ export class BattleRenderer {
     this._layer.commit(n, true);
     let ri = 0;
     for (const u of this._units.values()) {
-      if (u.gone || u.dead || ri >= 64) continue;
+      if (u.gone || u.dead || u.def.machine || ri >= 64) continue;
       this._m.makeTranslation(u.x, this._ground(u.x, u.z) + u.y + 0.02, u.z);
       this._rings.setMatrixAt(ri, this._m);
       this._rings.setColorAt(ri, this._c.setHex(u.def.side === 'raider' ? 0xff3b30 : 0x4aa8ff));

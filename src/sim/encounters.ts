@@ -17,6 +17,8 @@ import { mulberry32, pick } from './rng';
 import { forewarned } from './radio';
 import { gearPosture } from './gear';
 import { armed, firepower } from './armory';
+import { towerPosture } from './towers';
+import { raiseAlert } from './lights';
 import { applyBattle, planBattle, type RaiderTemper } from './battle';
 import { breakInDay, resolveBreakIn } from './breakins';
 import type { Aftermath, Prisoner } from './aftermath';
@@ -141,8 +143,9 @@ export function postureOf(s: GameState): Posture {
   const watch = Math.max(0, ...adults.map(p => p.skills.hunter));
   const radioNet = s.neighbors.some(n => n.radio && n.status === 'home' && n.disposition > 30);
   const gear = gearPosture(s, fighters);
-  const detection = Math.min(100, 25 + watch * 5 + (radioNet ? 20 : 0) + (barrier > 50 ? 10 : 0) + gear.detection + forewarned(s));
-  return { visibility: Math.min(100, visibility + gear.visibility), fortress, barrier: Math.min(100, barrier + gear.barrier), detection, fighters, deter: gear.deter, safeRoom: gear.safeRoom, armed: armed(s), firepower: firepower(s) * gear.fight, bunker: fin.some(st => st.kind === 'bunker_hatch' || st.kind === 'bunker_stairs') };
+  const tw = towerPosture(s);
+  const detection = Math.min(100, 25 + watch * 5 + (radioNet ? 20 : 0) + (barrier > 50 ? 10 : 0) + gear.detection + tw.detection + forewarned(s));
+  return { visibility: Math.min(100, visibility + gear.visibility + tw.visibility), fortress, barrier: Math.min(100, barrier + gear.barrier), detection, fighters, deter: gear.deter, safeRoom: gear.safeRoom, armed: armed(s), firepower: firepower(s) * gear.fight * tw.fire, bunker: fin.some(st => st.kind === 'bunker_hatch' || st.kind === 'bunker_stairs') };
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -417,6 +420,7 @@ export function gateDay(s: GameState): Encounter | null {
   if (s.disaster.difficulty === 'hardcore' && e.strength) e.strength = Math.round(e.strength * 1.35);
   if (s.disaster.difficulty === 'cozy' && e.strength) e.strength = Math.round(e.strength * 0.6);
   g.pending = e;
+  raiseAlert(s);
   return e;
 }
 
