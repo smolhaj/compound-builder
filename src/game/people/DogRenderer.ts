@@ -131,9 +131,9 @@ export class DogRenderer {
   }
 
   /** Local transform: translate, then rotate about x (pitch) / z (roll) / y (yaw). */
-  private _loc(x: number, y: number, z: number, rx = 0, ry = 0, rz = 0, s = 1): THREE.Matrix4 {
+  private _loc(x: number, y: number, z: number, rx = 0, ry = 0, rz = 0, s = 1, sy = s): THREE.Matrix4 {
     tmpQ.setFromEuler(tmpE.set(rx, ry, rz));
-    return tmpP.compose(tmpV.set(x, y, z), tmpQ, tmpS.set(s, s, s));
+    return tmpP.compose(tmpV.set(x, y, z), tmpQ, tmpS.set(s, sy, s));
   }
 
   private _draw(n: number, d: Dog, a: Agent, moving: boolean, ground: (x: number, z: number) => number, day: number): void {
@@ -147,7 +147,7 @@ export class DogRenderer {
     // body posture: sitting tips the rump down, lying drops the whole dog
     const lie = a.lie, sit = a.sit * (1 - lie), up = a.up;
     const bodyY = 0.068 - 0.032 * lie - 0.012 * sit + bob;
-    const pitch = -0.55 * sit;               // nose up
+    const pitch = -0.4 * sit;               // nose up
     const gy = ground(a.x, a.z);
     const base = new THREE.Matrix4().compose(tmpV.set(a.x, gy, a.z), tmpQ.setFromEuler(tmpE.set(0, a.rot, 0)), tmpS.set(sc, sc, sc));
     const bodyL = this._loc(0, bodyY, 0, pitch, 0, 0);
@@ -190,7 +190,10 @@ export class DogRenderer {
       let lz = hz;
       if (lie > 0.01) { rx = (rear ? 1.45 : -1.35) * lie + swing * (1 - lie); ly = 0.034 - 0.016 * lie; lz = hz + (rear ? -0.012 : 0.02) * lie; }
       if (sit > 0.01 && rear) { rx = 1.2 * sit; ly = 0.034 - 0.006 * sit; lz = hz - 0.02 * sit; }
-      const lm = tmpP.copy(this._loc(hx, ly, lz, rx));
+      // sitting: the chest is raised, so the straight front legs are stretched to reach the ground
+      const stretch = !rear && sit > 0.01 ? 1 + 0.55 * sit : 1;
+      if (!rear && sit > 0.01) ly = 0.044 + 0.034 * sit;
+      const lm = tmpP.copy(this._loc(hx, ly, lz, rx, 0, 0, 1, stretch));
       tmpM.multiplyMatrices(base, lm);
       leg.mesh.setMatrixAt(n * 4 + k, tmpM); leg.mesh.setColorAt(n * 4 + k, tmpC.setHex(legC));
     }
