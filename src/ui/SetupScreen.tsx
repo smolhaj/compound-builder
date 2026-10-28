@@ -2,7 +2,8 @@ import { useState, type CSSProperties, type ReactNode } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { useWorldStore } from '../store/worldStore';
 import { newGame } from '../sim/state';
-import { fullName, HOUSEHOLD_NAME, variedFamily } from '../sim/family';
+import { fullName, HOUSEHOLD_NAME, JOB_POOL, jobDef, randomJobId, variedFamily } from '../sim/family';
+import { FUNDS_RANGE, startFunds } from '../sim/startFunds';
 import { difficultySummary } from '../sim/difficulty';
 import { DISASTERS, type Difficulty, type DisasterKind, type Mode, type PeaceLength } from '../sim/disaster';
 import { saveGame, AUTOSAVE } from '../sim/save/saveSystem';
@@ -19,6 +20,7 @@ const PEACE: Array<[Exclude<PeaceLength, 'random'>, string]> = [['short', '18 mo
 
 const C = { bg: 'rgba(22,24,20,0.98)', card: 'rgba(255,255,255,0.045)', line: 'rgba(255,255,255,0.09)', gold: '#d8c9a0', dim: 'rgba(238,238,238,0.62)', good: '#a8d080', bad: '#f0a080' };
 const usd = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
+const usdK = (n: number) => (n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(2).replace(/0$/, '')}M` : `$${Math.round(n / 1000)}k`);
 const month = (doy: number) => new Date(2027, 0, doy).toLocaleString('en-US', { month: 'short' });
 const tile = (on: boolean, off = false): CSSProperties => ({
   textAlign: 'left', padding: '12px 14px', borderRadius: 10, border: `1.5px solid ${on ? C.gold : C.line}`,
@@ -86,21 +88,28 @@ export function SetupScreen() {
   const [wish, setWish] = useState<LandWish>(ANY_WISH);
   const [batch, setBatch] = useState(0);
   const [life, setLife] = useState<Lifestyle>('fulltime');
-  const budget = LIFESTYLE[life].budget;
+  const [famRoll, setFamRoll] = useState(0);
+  // each adult's occupation: undefined = whatever the roll gave; a pool id = chosen or shuffled
+  const [picks, setPicks] = useState<Array<string | undefined>>([]);
+  const [shuffles, setShuffles] = useState(0);
+  const { kind: household, people: family } = variedFamily(seed, famRoll, picks);
+  const funds = startFunds(family, life, seed, famRoll);
+  const budget = funds.budget;
   const lots = listings(seed + batch * 1013, region, wish, 6, budget);
   const [lotId, setLotId] = useState<string | null>(null);
-  const lot = lots.find(l => l.id === lotId && affordable(l, budget)) ?? lots.find(l => affordable(l, budget)) ?? null;
+  // the family's money moves with their jobs: a land pick that no longer fits is dropped, not swapped behind your back
+  const picked = lotId ? lots.find(l => l.id === lotId) : undefined;
+  const lot = picked ? (affordable(picked, budget) ? picked : null) : lots.find(l => affordable(l, budget)) ?? null;
   const [mode, setMode] = useState<Mode>('surprise');
   const [kind, setKind] = useState<DisasterKind>('grid_down');
   const [peace, setPeace] = useState<Exclude<PeaceLength, 'random'>>('medium');
   const [diff, setDiff] = useState<Difficulty>('standard');
-  const [famRoll, setFamRoll] = useState(0);
-  const { kind: household, people: family } = variedFamily(seed, famRoll);
+  const workers = family.filter(p => !p.kid && !p.elder);
   let unlocked = false;
   try { unlocked = localStorage.getItem('cb.unlocked') === '1'; } catch { /* storage blocked */ }
   const start = () => {
     if (!lot) return;
-    const game = newGame(seed, 105, 2027, { site: lot, lifestyle: life, mode, peace: mode === 'scenario' ? peace : 'random', kind: mode === 'scenario' ? kind : null, dayJobs: LIFESTYLE[life].jobs, difficulty: diff, grid: true, family });
+    const game = newGame(seed, 105, 2027, { site: lot, lifestyle: life, mode, peace: mode === 'scenario' ? peace : 'random', kind: mode === 'scenario' ? kind : null, dayJobs: LIFESTYLE[life].jobs, difficulty: diff, grid: true, family, funds });
     g.load(game);
     g.openSetup(false);
     void saveGame(AUTOSAVE, game);
@@ -160,7 +169,8 @@ export function SetupScreen() {
                 return <button key={id} style={tile(life === id, !L.ready)} onClick={() => L.ready && (setLife(id), setLotId(null))} title={L.ready ? undefined : 'Coming: being away from the place during the week is still being built'}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}><span style={{ fontWeight: 700 }}>{L.name}</span>{!L.ready && <span style={{ fontSize: 11, color: C.dim }}>coming</span>}</div>
                   <div style={{ fontSize: 12, color: C.dim, margin: '3px 0 6px', lineHeight: 1.35 }}>{L.blurb}</div>
-                  <div style={{ fontSize: 12.5 }}>{usd(L.budget)} to spend{L.passive ? ` · ${usd(L.passive)}/yr income` : L.jobs ? ' · two wages' : ''}</div>
+                  <div style={{ fontSize: 12.5 }}>{usdK(FUNDS_RANGE[id][0])} to {usdK(FUNDS_RANGE[id][1])} to spend{L.passive ? ' · investment income' : L.jobs ? ' · two wages' : ''}</div>
+                  {life === id && <div style={{ fontSize: 12, color: C.gold, marginTop: 2 }}>This family: {usd(budget)}</div>}
                 </button>;
               })}
             </div>
@@ -171,28 +181,59 @@ export function SetupScreen() {
             <Chips label="Town" value={wish.town} set={v => setW({ town: v })} opts={[['any', 'Any'], ['near', 'Close in'], ['far', 'Way out']]} />
             <Chips label="Built" value={wish.built ?? 'any'} set={v => setW({ built: v })} opts={[['any', 'Any'], ['raw', 'Raw land'], ['house', 'With a house']]} />
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', margin: '14px 0 8px' }}>
-              <span style={{ fontSize: 11.5, textTransform: 'uppercase', letterSpacing: 0.8, color: C.dim }}>Listings · {usd(budget)} to spend</span>
+              <span style={{ fontSize: 11.5, textTransform: 'uppercase', letterSpacing: 0.8, color: C.dim }}>Listings · {usd(budget)} to spend <span style={{ textTransform: 'none', letterSpacing: 0 }}>(from this family\u2019s savings; see step 3)</span></span>
               <button style={chip(false)} onClick={() => { setBatch(batch + 1); setLotId(null); }}>More listings</button>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 10 }}>
               {lots.map(l => <ListingCard key={l.id} l={l} budget={budget} on={lot?.id === l.id} pick={() => setLotId(l.id)} />)}
             </div>
-            {!lot && <div style={{ color: C.bad, marginTop: 8 }}>Nothing here fits the budget: widen the search or look at more listings.</div>}
+            {!lot && <div style={{ color: C.bad, marginTop: 8 }}>{picked ? 'That place is over this family\u2019s budget now: pick another.' : 'Nothing here fits the budget: widen the search or look at more listings.'}</div>}
           </>}
 
           {step === 2 && <>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '14px 0 8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '14px 0 8px', gap: 8, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 11.5, textTransform: 'uppercase', letterSpacing: 0.8, color: C.dim }}>The family · {HOUSEHOLD_NAME[household]}</span>
-              <button style={chip(false)} onClick={() => setFamRoll(famRoll + 1)} title="Another family">Reroll</button>
+              <span style={{ display: 'flex', gap: 6 }}>
+                <button style={chip(false)} onClick={() => { setShuffles(shuffles + 1); setPicks(workers.reduce<string[]>((a, _, i) => [...a, randomJobId(seed, famRoll, i, shuffles + 1, i ? a[0] : undefined)], [])); }} title="Draw new occupations for the adults; the rest of the family stays">Shuffle jobs</button>
+                <button style={chip(false)} onClick={() => { setFamRoll(famRoll + 1); setPicks([]); }} title="Another family">Reroll family</button>
+              </span>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 8 }}>
-              {family.map(p => (
-                <div key={p.id} style={{ ...tile(false), cursor: 'default', padding: '8px 12px' }}>
-                  <div style={{ fontWeight: 600 }}>{fullName(p)}, {p.age}</div>
-                  <div style={{ fontSize: 12, color: C.dim }}>{p.job && LIFESTYLE[life].jobs ? `${p.job.title} · $${p.job.wage}/day` : p.elder ? 'Grandparent, retired' : p.kid ? (p.age < 6 ? 'little one' : p.age < 13 ? 'kid' : 'teen') : 'at home'}</div>
-                  <div style={{ fontSize: 11.5, color: C.dim, marginTop: 2 }}>{(Object.entries(p.skills) as Array<[string, number]>).filter(([, v]) => v >= 4).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([k, v]) => `${k} ${v}`).join(' · ') || 'learning'}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: 8 }}>
+              {family.map(p => {
+                const slot = workers.indexOf(p);
+                const def = jobDef(p.job?.id);
+                return (
+                  <div key={p.id} style={{ ...tile(false), cursor: 'default', padding: '8px 12px' }}>
+                    <div style={{ fontWeight: 600 }}>{fullName(p)}, {p.age}</div>
+                    {slot >= 0 && p.job ? <>
+                      <div style={{ display: 'flex', gap: 4, margin: '4px 0 3px' }}>
+                        <select aria-label={`Occupation of ${p.first}`} value={p.job.id ?? ''} onChange={e => setPicks(workers.map((_, i) => (i === slot ? e.target.value : picks[i])))}
+                          style={{ flex: 1, minWidth: 0, background: '#2a2c26', color: '#eee', border: `1px solid ${C.line}`, borderRadius: 6, padding: '3px 6px', fontSize: 12.5, textOverflow: 'ellipsis' }}>
+                          {JOB_POOL.map(j => <option key={j.id} value={j.id} title={`${j.title}, $${j.wage}/day`}>{j.short ?? j.title}</option>)}
+                        </select>
+                        <button style={{ ...chip(false), padding: '3px 8px' }} title="Random occupation for this one" aria-label={`Random occupation for ${p.first}`}
+                          onClick={() => { setShuffles(shuffles + 1); setPicks(workers.map((_, i) => (i === slot ? randomJobId(seed, famRoll, i, shuffles + 1, i ? workers[0].job?.id : undefined) : picks[i]))); }}>{'\u21BB'}</button>
+                      </div>
+                      <div style={{ fontSize: 12, color: C.dim }}>{def ? `${def.title}. ` : ''}{LIFESTYLE[life].jobs ? `Paid $${p.job.wage}/day` : 'Former career'}{def ? `: ${def.good}` : ''}</div>
+                    </> : <div style={{ fontSize: 12, color: C.dim }}>{p.elder ? 'Grandparent, retired' : p.kid ? (p.age < 6 ? 'little one' : p.age < 13 ? 'kid' : 'teen') : 'at home'}</div>}
+                    <div style={{ fontSize: 11.5, color: C.dim, marginTop: 2 }}>{(Object.entries(p.skills) as Array<[string, number]>).filter(([, v]) => v >= 4).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => `${k} ${v}`).join(' \u00B7 ') || 'learning'}</div>
+                  </div>
+                );
+              })}
+            </div>
+            <H>Where the money came from</H>
+            <div style={{ ...tile(false), cursor: 'default', padding: '10px 14px' }}>
+              {funds.lines.map(l => (
+                <div key={l.label} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 12.5, padding: '1px 0' }}>
+                  <span style={{ color: C.dim }}>{l.label}</span><span style={{ color: l.usd < 0 ? C.bad : '#eee' }}>{l.usd < 0 ? '\u2212' : ''}{usd(Math.abs(l.usd))}</span>
                 </div>
               ))}
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontWeight: 700, borderTop: `1px solid ${C.line}`, marginTop: 5, paddingTop: 5 }}>
+                <span>To spend on land and building</span><span style={{ color: C.gold }}>{usd(budget)}</span>
+              </div>
+              {funds.passive > 0 && <div style={{ fontSize: 12, color: C.dim, marginTop: 3 }}>Plus about {usd(funds.passive)} a year in investment income.</div>}
+              <div style={{ fontSize: 11.5, color: C.dim, marginTop: 3 }}>{LIFESTYLE[life].name} families start with {usdK(FUNDS_RANGE[life][0])} to {usdK(FUNDS_RANGE[life][1])}; better jobs, age and a bit of luck raise it, debts take it down.</div>
+              {!lot && <div style={{ color: C.bad, fontSize: 12.5, marginTop: 6 }}>The place you picked is over this budget: go back to Land and pick another.</div>}
             </div>
             <H>How it plays</H>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8 }}>
