@@ -25,6 +25,7 @@ import { canningCases, careYield, lifeMorale, spoilFactor } from './daily';
 import { socialMorale } from './gatherings';
 import { addFood, addFoodKcal, dietDay, dietEffects, eatFrom, inDateKcal, syncPantry } from './pantry';
 import { mulberry32 } from './rng';
+import { sleepEffects } from './housing';
 
 export type FoodId = 'fresh' | 'frozen' | 'canned' | 'staples';
 /** Food is kept in the stockpile in these units; kcal in one unit. */
@@ -227,11 +228,14 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
   const dark = s.utilities.fittings.some(f => f.kind === 'wire' && f.finishedAt !== null) && !s.utilities.lit.some(id => isHome(s.structures.find(x => x.id === id)?.kind ?? ''));
   const medic = Math.max(...s.people.filter((p, i) => !p.kid && alive(s, i)).map(p => p.skills.medic), 0);
   const bay = fin.some(st => st.kind === 'bunker_medical');
+  // where everybody slept and how well (sim/housing.ts): bed, couch, floor, tent, nowhere
+  const slept = sleepEffects(s);
   // gatherings' afterglow and grief (sim/gatherings.ts: a funeral eases it)
   const social = socialMorale(s);
   s.people.forEach((p, i) => {
     const n = s.personState[i]?.needs;
     if (!n || n.died != null) return;
+    const sl = slept.get(i);
     const mine = needOf(p) / Math.max(1, need);
     n.hunger = Math.max(0, n.hunger + short * mine - (short === 0 ? 600 : 0));
     // health: hunger, wounds and radiation take it; rest and food bring it back
@@ -258,11 +262,13 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
     if (s.utilities.report.shortL > s.utilities.report.useL * 0.5) dh -= 2;   // not enough to drink
     // a diet short of fat or protein (or salt, working hard) keeps health from coming all the way back
     if (n.health + dh > diet.healthCap) dh = Math.min(dh, n.health > diet.healthCap ? -0.2 : diet.healthCap - n.health);
+    if (sl) dh -= sl.harm;
     n.health = Math.max(cozy ? 5 : 0, Math.min(100, n.health + dh));
     // morale: drifts to a baseline that variety, a home, light and safety raise; hunger and loss lower
-    const target = 45 + 6 * Math.min(variety, 4) + diet.morale + (home ? 8 : -6) + (dark ? -8 : 0) + (s.utilities.hauling ? (s.utilities.haulFar ? -10 : -4) : 0) - Math.min(25, n.hunger / 1000) + social + lifeMorale(s, i);
+    const target = 45 + 6 * Math.min(variety, 4) + diet.morale + (home ? 8 : -6) + (dark ? -8 : 0) + (s.utilities.hauling ? (s.utilities.haulFar ? -10 : -4) : 0) - Math.min(25, n.hunger / 1000) + social + lifeMorale(s, i) + (sl?.morale ?? 0);
     n.morale += (Math.max(0, Math.min(100, target)) - n.morale) * 0.08;
     if (n.tired) n.tired = Math.max(0, n.tired - 3);
+    if (sl?.tired) n.tired = Math.min(Math.max(n.tired ?? 0, 5), (n.tired ?? 0) + sl.tired);
     if (n.health <= 0) {
       n.died = Math.floor(s.clock.t);
       log(s, `${p.first} ${p.last} has died.`);

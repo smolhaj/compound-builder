@@ -39,6 +39,10 @@ export interface GoalCtx {
   outdoors?: boolean;
   /** Anyone carries a long gun on watch. */
   armed?: boolean;
+  /** Where person `i` sleeps tonight (sim/housing.ts sleepSpotFor): the kind of place, the structure or tent it is in, and which seat. */
+  sleepAt?: (i: number) => { kind: string; where: string | null; slot: number } | null;
+  /** The yard position of dome tent `n` (props/TentsRenderer). */
+  tentAt?: (n: number) => { x: number; z: number } | undefined;
 }
 
 export interface WorkSpots {
@@ -141,10 +145,27 @@ export function goalFor(i: number, kid: boolean, task: TaskKind, target: string 
       return { x, z, pose: FIG_POSE.BENCH, face: faceTo(x, z, tx, tz), hidden: false, work: false };
     }
     case 'sleep': {
-      // TODO(housing): WHERE a sleeper lies (bed, sofa, rug, floor) and how well belongs to the housing branch: when `sleepSpotFor(person)` (sim/housing.ts)
-      // lands, show them there when the camera is indoors / the roof is cut away. The schedule (sim/daily.ts) only decides WHEN they sleep.
+      // sim/housing.ts decides WHERE (bed, couch, floor bag, tent, nowhere); the schedule (sim/daily.ts) decides WHEN
+      const sp = ctx.sleepAt?.(i);
+      const b = sp?.where && !sp.where.startsWith('tent:') ? ctx.site(sp.where) : null;
+      if (sp && sp.where?.startsWith('tent:') && sp.where !== 'tent:wall') {
+        const t = ctx.tentAt?.(Number(sp.where.slice(5)));
+        if (t) return { x: t.x, z: t.z, pose: FIG_POSE.STAND, face: null, hidden: true, work: false };
+      }
+      if (sp && b && sp.kind !== 'bed') {
+        // lying where they sleep, inside the building (seen when the roof is cut away): the sofa, a bag on the floor, a bunk, or on the porch
+        const c = Math.cos(b.rot), s = Math.sin(b.rot);
+        const w = (lx: number, lz: number): [number, number] => [b.x + lx * c + lz * s, b.z - lx * s + lz * c];
+        const row = sp.slot % 6, line = Math.floor(sp.slot / 6);
+        const [lx, lz] = sp.kind === 'couch' ? [-0.2 * b.w, -0.2 * b.d + 0.1 * sp.slot]
+          : sp.kind === 'nowhere' ? [(row - 2.5) * 0.1, 0.5 * b.d + 0.12]
+          : [(row - 2.5) * 0.1 * Math.min(1.5, b.w), 0.15 * b.d - line * 0.14];
+        const [x, z] = w(lx, lz);
+        return { x, z, pose: FIG_POSE.LAWN, face: b.rot + (sp.kind === 'couch' ? Math.PI : Math.PI / 2), hidden: false, work: false, y: sp.kind === 'nowhere' ? undefined : 0.1 };
+      }
+      if (sp?.where === 'tent:wall') { const [x, z] = campPt(ctx, CAMP.tent.x + (i - 1.5) * 0.05, CAMP.tent.z); return { x, z, pose: FIG_POSE.STAND, face: null, hidden: true, work: false }; }
       if (ctx.home) return { x: ctx.home.x, z: ctx.home.z, pose: FIG_POSE.STAND, face: null, hidden: true, work: false };
-      // no house yet: asleep on a bedroll in front of the tent, in plain sight
+      // no house yet: asleep in the camp's wall tent (hidden)
       const [x, z] = campPt(ctx, CAMP.tent.x + (i - 1.5) * 0.1, CAMP.tent.z + 0.1);
       return { x, z, pose: FIG_POSE.LAWN, face: ctx.camp.rot + Math.PI / 2, hidden: false, work: false };
     }

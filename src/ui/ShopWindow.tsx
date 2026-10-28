@@ -65,6 +65,8 @@ function Icon({ id, tint }: { id: string; tint?: number }) {
     case 'lids': return g(<>{[0, 1, 2].map(i => <ellipse key={i} cx="22" cy={18 + i * 6} rx="11" ry="3" fill="#c8a040" stroke="#7a5a10" />)}</>);
     case 'meds': return g(<><rect x="8" y="12" width="28" height="22" rx="3" fill="#e8e4dc" /><path d="M22 16 v14 M15 23 h14" stroke="#c03030" strokeWidth="4" /></>);
     case 'hygiene': return g(<><rect x="9" y="14" width="12" height="20" rx="3" fill="#7ab0d8" /><circle cx="29" cy="24" r="8" fill="#f2f0ea" /><circle cx="29" cy="24" r="3" fill="#c8c4bc" /></>);
+    case 'tent': return g(<><path d="M6 34 L22 10 L38 34 Z" fill="#c9a24a" stroke="#6a5220" strokeWidth="1.5" /><path d="M22 10 L17 34 H27 Z" fill="#2a2418" /></>);
+    case 'sleeping_bag': return g(<><rect x="6" y="15" width="32" height="14" rx="7" fill="#3a6a5a" stroke="#1f3a30" /><path d="M12 15 v14 M20 15 v14 M28 15 v14" stroke="#1f3a30" /></>);
     case 'traps': return g(<><rect x="10" y="20" width="24" height="10" fill="#c8a070" /><path d="M12 20 q10 -10 20 0" fill="none" stroke="#9aa0a4" strokeWidth="2" /></>);
     case 'fuel': case 'stabilizer': return g(<><path d="M12 12 h16 l6 6 v18 h-22 z" fill={id === 'fuel' ? '#b83a2a' : '#3a7ab8'} /><rect x="26" y="8" width="5" height="6" fill="#333" /></>);
     case 'plow': return g(<path d="M6 30 q16 -16 32 0 v4 h-32 z" fill="#d8a020" stroke="#7a5a10" />);

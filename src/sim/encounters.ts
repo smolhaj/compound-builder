@@ -591,6 +591,7 @@ export function resolve(s: GameState, stance: Stance): Outcome {
     } else if (stance === 'take_in') {
       for (const person of e.people ?? []) { s.people.push(person); s.personState.push({ id: person.id, task: 'idle', target: null, needs: freshNeeds() }); }
       give(s, e.brings ?? {});
+      s.stock.sleeping_bag += (e.people ?? []).length;     // they come with a bedroll each (sim/housing.ts)
       g.tookIn += e.size; g.humanity = Math.min(100, g.humanity + 6);
       title = 'They\'re family now';
       text = `You open the gate. ${e.size} more at the table tonight.`;

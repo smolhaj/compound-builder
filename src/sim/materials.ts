@@ -13,7 +13,8 @@ export type MaterialId = 'lumber' | 'logs' | 'firewood' | 'fieldstone' | 'concre
   | 'plate_carrier' | 'ifak' | 'nvg' | 'thermal' | 'radios' | 'cameras' | 'thermal_cam' | 'driveway_alarm' | 'floodlights' | 'tripwire' | 'dog' | 'steel_door' | 'window_bars' | 'sandbags' | 'safe_room' | 'sw_radio' | 'ham_rig' | 'helmet' | 'soft_armor'
   | 'grenades' | 'rpg_launcher' | 'rpg_rounds' | 'suppressor'
   | 'mines' | 'greenhouse_kit' | 'fruit_trees'
-  | 'gun_mount' | 'turret_head';
+  | 'gun_mount' | 'turret_head'
+  | 'tent' | 'sleeping_bag';
 
 export interface MaterialDef {
   id: MaterialId;
@@ -90,6 +91,9 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   // for the watch towers' top tiers (sim/towers.ts)
   gun_mount: { id: 'gun_mount', name: 'Ring mount & machine gun', unit: 'a pintle ring on a pedestal with a registered belt-fed 7.62 machine gun and a feed tray', price: 9500 },
   turret_head: { id: 'turret_head', name: 'Remote turret head', unit: 'a gyro-stabilised remote weapon station: gun cradle, servos, optics and a controller (needs power and cameras)', price: 26000 },
+  // somewhere to sleep when there are more people than beds (sim/housing.ts)
+  tent: { id: 'tent', name: 'Dome tent', unit: '4-person dome tent with a rain fly and a footprint: sleeps 3 (fine in mild weather, miserable in a storm or a freeze)', price: 180 },
+  sleeping_bag: { id: 'sleeping_bag', name: 'Sleeping bag', unit: '20°F bag and a foam pad: for the floor, a couch or a tent', price: 70 },
   // Black market only (sim/blackMarket.ts): price null, so the catalog never sells them.
   grenades: { id: 'grenades', name: 'Hand grenades', unit: 'grenade', price: null },
   rpg_launcher: { id: 'rpg_launcher', name: 'RPG-type launcher', unit: 'launcher tube', price: null },

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { newGame, type GameState } from './state';
+import { SAVE_VERSION } from './state';
 import { addWork, holdReason } from './construction';
 import { planStructure } from './construction';
 import { generateFamily, type Person } from './family';
@@ -470,7 +471,7 @@ describe('save', () => {
     const g = newGame(7) as unknown as Record<string, unknown>;
     const old: Record<string, unknown> = { ...g, version: 46 }; delete old.tools;
     const up = migrate(old);
-    expect(up.version).toBe(47);
+    expect(up.version).toBe(SAVE_VERSION);
     expect(up.tools!.items.length).toBeGreaterThanOrEqual(9);
     expect(up.tools).toEqual(starterKit(up.people, up.seed));
   });

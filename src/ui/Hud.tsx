@@ -25,6 +25,7 @@ import { countyWorks, premium, yearlyTax } from '../sim/paperwork';
 import { DRIVE_PER_FT, driveQuote, hookupProblem, POLE_PER_FT, powerQuote } from '../sim/improvements';
 import { KIT } from '../game/buildkit/kit';
 import { FUEL_UNIT_L, storageCapacity } from '../sim/utilities';
+import { HousingPanel } from './HousingPanel';
 import { bestShelter, doseRate, isNuclear, SHELTER_DAYS } from '../sim/nuclear';
 import { DISASTERS, TRACKS, TRACK_NAME, type DisasterKind } from '../sim/disaster';
 import { livingPerDay } from '../sim/engine';
@@ -169,6 +170,7 @@ export function Hud() {
                 })()}
               </div>;
             })}
+            <HousingPanel />
             <DailySection />
             {trialCamps(game).map(c => <Section key={c.id} title={`Camp outside the wall: ${c.title}`}>
               <Row label="On trial" value={`day ${Math.max(0, dayIndex(game.clock.t) - c.from)} of ${c.until - c.from}`} />
