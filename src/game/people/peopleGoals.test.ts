@@ -19,11 +19,14 @@ describe('peopleGoals', () => {
     expect(Math.hypot(a.x - b.x, a.z - b.z)).toBeGreaterThan(0.3);
   });
 
-  it('kids sit at the camp table for school; everyone sleeps hidden', () => {
+  it('kids sit at the camp table for school; sleepers lie on a bedroll at the tent, or are inside the house', () => {
     const s = goalFor(2, true, 'school', null, 10, ctx);
     expect(s.pose).toBe(FIG_POSE.BENCH);
     expect(Math.hypot(s.x - 10, s.z - 10)).toBeLessThan(1);
-    expect(goalFor(0, false, 'sleep', null, 2, ctx).hidden).toBe(true);
+    const camp = goalFor(0, false, 'sleep', null, 2, ctx);
+    expect(camp.hidden).toBe(false);
+    expect(camp.pose).toBe(FIG_POSE.LAWN);
+    expect(goalFor(0, false, 'sleep', null, 2, { ...ctx, home: { x: 20, z: 20, rot: 0, w: 1, d: 1.5 } }).hidden).toBe(true);
     expect(goalFor(0, false, 'sleep', null, 2, { ...ctx, home: { x: 20, z: 20, rot: 0, w: 1, d: 1.5 } }).x).toBe(20);
   });
 
@@ -47,5 +50,18 @@ describe('peopleGoals', () => {
     expect(spots.some(g => Math.hypot(g.x - 12, g.z - 12) < 1.5)).toBe(true);
     expect(spots.some(g => Math.hypot(g.x - 30, g.z - 30) < 1.5)).toBe(true);
     expect(goalFor(0, false, 'forestry', 'gone', 10, c).work).toBeDefined();   // no tree → chores
+  });
+});
+
+describe('sleeping places (sim/housing.ts)', () => {
+  const base = { camp: { x: 10, z: 10, rot: 0 }, site: (id: string) => (id === 'h' ? { x: 20, z: 20, rot: 0, w: 1, d: 1.5 } : null), home: { x: 20, z: 20, rot: 0, w: 1, d: 1.5 } };
+  it('a couch or floor sleeper lies visibly inside the building; a bed sleeper is hidden; a dome-tent sleeper goes to the tent', () => {
+    const at = (kind: string, where: string | null, slot = 0) => goalFor(0, false, 'sleep', null, 2, { ...base, sleepAt: () => ({ kind, where, slot }), tentAt: () => ({ x: 3, z: 4 }) });
+    expect(at('bed', 'h').hidden).toBe(true);
+    const couch = at('couch', 'h'); expect(couch.hidden).toBe(false);
+    expect(Math.hypot(couch.x - 20, couch.z - 20)).toBeLessThan(1.5);
+    expect(at('floor', 'h', 2).hidden).toBe(false);
+    const tent = at('tent', 'tent:0'); expect(tent.hidden).toBe(true); expect([tent.x, tent.z]).toEqual([3, 4]);
+    expect(at('tent', 'tent:wall').hidden).toBe(true);
   });
 });

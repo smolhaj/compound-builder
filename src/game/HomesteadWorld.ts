@@ -24,6 +24,8 @@ import { Atmosphere, type AtmosBuilding, type AtmosFrame } from './atmosphere/At
 import { fenceLean } from './atmosphere/aging';
 import { LEANS, leanRun } from './atmosphere/fenceAging';
 import { FamilyRenderer } from './people/FamilyRenderer';
+import { buildYard, type Yard } from './props/yardGeometry';
+import { dailyCtx, yardFx } from './people/dailyScene';
 import type { GoalCtx, Site } from './people/peopleGoals';
 import { CELL, type KitPieceDef } from './buildkit/kit';
 import type { GameState } from '../sim/state';
@@ -71,7 +73,7 @@ import { pantryRows } from '../sim/pantry';
 import { needOf } from '../sim/needs';
 import { FoodShelfRenderer, type ShownPlace } from './props/FoodShelfRenderer';
 import { TentsRenderer, tentSpots } from './props/TentsRenderer';
-import { tentsPitched } from '../sim/housing';
+import { sleepSpotFor, tentsPitched } from '../sim/housing';
 import { planShelves, propsWanted, splitInUse } from './props/foodShelfPlan';
 import type { FoodSlot } from './buildkit/shell';
 
@@ -156,6 +158,8 @@ export class HomesteadWorld {
   /** The family's camp (until a home stands; it stays as the work yard). */
   readonly camp: { x: number; z: number; rot: number };
   private readonly _campGroup: THREE.Group;
+  /** The chore yard round the camp (sim/daily.ts). */
+  private readonly _yard: Yard;
   readonly family: FamilyRenderer;
   /** Night life, weathering and the deeper seasons (atmosphere/). */
   readonly atmos: Atmosphere;
@@ -207,6 +211,10 @@ export class HomesteadWorld {
     this._campGroup.position.set(this.camp.x, this.parcel.height(this.camp.x, this.camp.z), this.camp.z);
     this._campGroup.rotation.y = this.camp.rot;
     this._root.add(this._campGroup);
+    this._yard = buildYard();
+    this._yard.group.position.copy(this._campGroup.position);
+    this._yard.group.rotation.y = this.camp.rot;
+    this._root.add(this._yard.group);
     const zc = this.parcel.creek.zAt(this.center.x + 3);
     this._root.add(scaleFigure(this.center.x + 3, zc + 4, this.parcel.height(this.center.x + 3, zc + 4)));
     ws.scene.add(this._root);
@@ -989,12 +997,14 @@ export class HomesteadWorld {
 
   // ── Dome tents in the yard (sim/housing.ts) ───────────────────────────
   readonly tents = new TentsRenderer();
+  private _tentPos: Array<{ x: number; z: number; rot: number }> = [];
   /** Pitch a dome tent round the camp for each one somebody sleeps in tonight. */
   syncTents(game: GameState): void {
     const n = tentsPitched(game);
-    if (n === 0 && this.tents.group.children.length === 0) return;
+    if (n === 0 && this.tents.group.children.length === 0) { this._tentPos = []; return; }
     if (!this.tents.group.parent) this._ws.scene.add(this.tents.group);
-    this.tents.sync(tentSpots(this.camp, n, (x, z) => this.onBuilding(x, z, 0.4, false) || this.onAccess(x, z, 0.3) || this.onPerimeterLine(x, z, 0.2)), this.groundAt);
+    this._tentPos = tentSpots(this.camp, n, (x, z) => this.onBuilding(x, z, 0.4, false) || this.onAccess(x, z, 0.3) || this.onPerimeterLine(x, z, 0.2));
+    this.tents.sync(this._tentPos, this.groundAt);
   }
 
   // ── Food on the shelves ───────────────────────────────────────────────
@@ -1329,7 +1339,10 @@ export class HomesteadWorld {
       const t = j && this._treeById.get(j.treeId);
       return j && t ? { x: t.x, z: t.z, scale: t.scale, stage: j.stage, fall: fallHeading(t.id), len: 2.6 * t.scale * t.sy } : null;
     };
-    const ctx: GoalCtx = { camp: this.camp, site, home: homeB ? site(homeB.placed.id) : null, tree, yard: this.access.yard };
+    const refs = [...this._built.values()].filter(b => b.finished).map(b => ({ kind: b.placed.kind, site: site(b.placed.id)! }));
+    const ctx: GoalCtx = { camp: this.camp, site, home: homeB ? site(homeB.placed.id) : null, tree, yard: this.access.yard, sleepAt: i => sleepSpotFor(game, i), tentAt: n => this._tentPos[n], ...dailyCtx(refs, game, this.access.yard, seasonState.params.cold < 0.35) };
+    const fx = yardFx(game, hour);
+    this._yard.update(this._clock, fx.lights, fx.smoke);
     const season = (seasonState.visual === 'winter' && !seasonState.climate.freeze ? 'fall' : seasonState.visual) as WearSeason;
     this.family.update(dt, game.people, game.personState, hour, game.clock.t, ctx, this.walkHeight, season, speedK);
     // crops stand in the ground from planting (mid-May) to the last of the harvest (late October); bare soil the rest of the year
@@ -1599,6 +1612,7 @@ export class HomesteadWorld {
     this._props?.dispose();
     this.stream.dispose();
     this.family.dispose();
+    this._yard.dispose();
     this.atmos.dispose();
     this.lakes.dispose();
     this._ws.scene.remove(this._root);
