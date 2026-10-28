@@ -34,7 +34,7 @@ import { freshNeeds, type FoodReport, type Needs } from './needs';
 import type { WeatherState } from './weatherThreats';
 import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
 import type { LightsState } from './lights';
-export const SAVE_VERSION = 43;
+export const SAVE_VERSION = 44;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -211,7 +211,7 @@ export interface GameState {
   armory: Armory;
   /** OPSEC choices (sim/opsec.ts); made lazily. */
   opsec?: { quietDeliveries: boolean; blackout: boolean };
-  /** Floodlight modes: the default and per-light overrides (sim/lights.ts). Save v43; made lazily. */
+  /** Floodlight modes: the default and per-light overrides (sim/lights.ts). Save v44; made lazily. */
   lights?: LightsState;
   /** The game in the woods and the creek, licenses. */
   wild: Wild;
