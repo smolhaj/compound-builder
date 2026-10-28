@@ -99,6 +99,7 @@ export function kinPool(seed: number, roll: number, family: readonly Person[]): 
   const hasElders = family.some(p => p.elder);
   const used = new Set(family.map(p => p.first));
   const out: Person[] = [];
+  let idN = 0;
   const nameOf = (body: 'f' | 'm', old: boolean) => {
     const list = old ? (body === 'f' ? FIRST_F : FIRST_M) : body === 'f' ? FIRST_Y_F : FIRST_Y_M;
     let n: string, guard = 0;
@@ -108,7 +109,7 @@ export function kinPool(seed: number, roll: number, family: readonly Person[]): 
   };
   const make = (role: KinRole, anchor: Person, body: 'f' | 'm', age: number, last: string): Person => {
     const old = age >= 58;
-    const id = `pk${out.length + 1}`;
+    const id = `pk${++idN}`;
     const lead = old ? [weightedJob(r).lead[0], weightedJob(r).lead[0]] : [];
     const sk = rollSkills(r, lead, false);
     if (old) for (const s of SKILL_IDS) sk[s] = Math.min(10, sk[s] + 1);
@@ -324,6 +325,7 @@ export function admitKin(s: GameState, people: readonly Person[], savings: numbe
   const ids = new Set(people.map(p => p.id));
   k.away = k.away.filter(x => !ids.has(x.id));
   k.waiting = k.waiting.filter(w => !w.ids.some(i => ids.has(i)));
+  k.refused = k.refused.filter(r => !r.people.some(p => ids.has(p.id)));   // (turned away once, let in now)
   k.joined += people.length;
   s.stock.sleeping_bag += people.length;
   if (banksOpen(s)) s.money += savings;
@@ -364,6 +366,7 @@ export function resolveKin(s: GameState, e: Encounter, stance: Stance): Outcome 
   const strain = old ? -9 : -6;
   k.strain.push({ at: s.clock.t, points: strain, why: `${names} turned away`, of: anchors });
   k.away = k.away.filter(x => !people.some(p => p.id === x.id));
+  k.refused = k.refused.filter(r => !r.people.some(p => people.some(q => q.id === p.id)));   // a second no replaces the first
   const hit = s.disaster.kind ? Math.floor(s.disaster.hitAt + 0.25) : Infinity;
   k.refused.push({ people: structuredClone(people), day, fate: null, due: Math.max(hit, day) + 12 + (people.length * 7 + day % 23) });
   lines.push(`Humanity ${old ? '-8' : '-5'}. The family takes it hard: ${anchors.length ? s.people.find(p => p.id === anchors[0])?.first ?? 'someone' : 'someone'} especially.`);
