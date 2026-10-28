@@ -40,11 +40,11 @@ export interface LightsState {
   per: Record<string, LightMode>;
   /** Game time until which the sensors still count a threat as nearby. */
   alertUntil: number;
-  /** Lights with an AI sensor module installed (light id → true). Save v46. */
+  /** Lights with an AI sensor module installed (light id → true). Save v47. */
   ai: Record<string, boolean>;
-  /** Game time until which an animal near the house keeps basic sensors lit. Save v46. */
+  /** Game time until which an animal near the house keeps basic sensors lit. Save v47. */
   animalUntil: number;
-  /** Day indices of recent nights an animal tripped the lights (the last week; the road sees the glow). Save v46. */
+  /** Day indices of recent nights an animal tripped the lights (the last week; the road sees the glow). Save v47. */
   animalNights: number[];
 }
 export const newLights = (): LightsState => ({ mode: 'sensor', per: {}, alertUntil: -1, ai: {}, animalUntil: -1, animalNights: [] });

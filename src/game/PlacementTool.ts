@@ -6,6 +6,7 @@ import { useWorldStore } from '../store/worldStore';
 import { buildGhost } from './buildkit/buildings';
 import type { HomesteadWorld } from './HomesteadWorld';
 import { useGameStore } from '../store/gameStore';
+import { onJustPlaced, type Spot } from './buildkit/justPlaced';
 
 /**
  * Build tool: a translucent ghost of the kit piece follows the cursor over
@@ -21,6 +22,8 @@ export class PlacementTool {
   private _rot = 0;
   private _at: [number, number] | null = null;
   private _ok = false;
+  /** The spot just staked: the cursor is still over it, so say nothing about it. */
+  private _just: Spot | null = null;
   private _down: { x: number; y: number } | null = null;
   private readonly _okMat = new THREE.MeshBasicMaterial({ color: 0x9be38a, transparent: true, opacity: 0.45, depthWrite: false });
   private readonly _badMat = new THREE.MeshBasicMaterial({ color: 0xe36a5a, transparent: true, opacity: 0.45, depthWrite: false });
@@ -45,6 +48,8 @@ export class PlacementTool {
       this._off.push(() => el.removeEventListener(t, f as EventListener));
     };
     on(_dom, 'pointermove', e => this._move(e.clientX, e.clientY));
+    // off the map (onto a panel): no ghost, no message about a spot the cursor is not over
+    on(_dom, 'pointerleave', () => { if (!this._kind) return; this._at = null; this._ok = false; if (this._ghost) this._ghost.visible = false; useGameStore.getState().setToolProblem(null); });
     on(_dom, 'pointerdown', e => { if (e.button === 0) this._down = { x: e.clientX, y: e.clientY }; if (e.button === 2) this.setKind(null); });
     on(_dom, 'pointerup', e => {
       const d = this._down;
@@ -66,6 +71,7 @@ export class PlacementTool {
     if (kind === this._kind) return;
     const wasPlacing = this._kind !== null;
     this._kind = kind;
+    this._just = null;
     if (this._ghost) { this._scene.remove(this._ghost); this._ghost.traverse(o => (o as THREE.Mesh).geometry?.dispose()); this._ghost = null; }
     if (kind) {
       if (isUnderground(KIT[kind])) useWorldStore.getState().setUnderground(true);
@@ -90,6 +96,7 @@ export class PlacementTool {
     if (!this._kind || !this._at || !this._ok) return;
     const [x, z] = this._at;
     useGameStore.getState().plan(this._kind, x, z, this._rot);
+    this._just = { x, z, rot: this._rot };
     this._update();
   }
 
@@ -127,6 +134,8 @@ export class PlacementTool {
     const def = KIT[kind];
     const [x, z] = snapCenter(def, this._at[0], this._at[1], this._rot);
     this._at = [x, z];
+    if (onJustPlaced(this._just, x, z, this._rot)) { this._ok = false; g.visible = false; useGameStore.getState().setToolProblem(null); return; }
+    this._just = null;
     const placed = useGameStore.getState().game.structures;
     const problem = siteProblem(def, x, z, this._rot, this._site, placed);
     this._ok = problem === null;

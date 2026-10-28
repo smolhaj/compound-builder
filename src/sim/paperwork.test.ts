@@ -44,7 +44,7 @@ describe('the paperwork', () => {
     }
     expect(caught).toBeGreaterThan(5);
     expect(caught).toBeLessThan(30);
-  });
+  }, 30_000);   // 30 two-hundred-day runs: about 3 s alone, more under a loaded CI box
 
   it('property tax on land and buildings, billed in halves; the ag rate with two fields; insurance once there\'s a home', () => {
     const g = fresh();

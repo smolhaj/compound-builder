@@ -1,7 +1,7 @@
-import { useState, type CSSProperties, type ReactNode } from 'react';
-import type { GameState } from '../sim/state';
-import { isHome } from '../sim/blueprints';
+import { useState } from 'react';
 import { stormOutage } from '../sim/weatherThreats';
+import { DailySection } from './SchedulePanel';
+import { DAILY_TASK_TEXT } from './dailyText';
 import { useWorldStore, type BuildingView, type CameraMode } from '../store/worldStore';
 import { useGameStore } from '../store/gameStore';
 import type { Quality } from '../engine/world/WorldScene';
@@ -9,12 +9,10 @@ import { SEASON_MODES, type SeasonMode } from '../engine/world/season/seasonStat
 import { WEATHER_MODES, type WeatherMode } from '../engine/world/weather/weatherState';
 import { calendarOf, dayIndex, hourOf, type Speed } from '../sim/state';
 import { BACKGROUND_NAME, backgroundOf, fullName } from '../sim/family';
-import { MATERIALS, MATERIAL_IDS, emptyStock, type MaterialId } from '../sim/materials';
-import { onOrder, orderCost, orderProblem } from '../sim/economy';
-import { blockedReason, isFinished, planProblem, progress } from '../sim/construction';
-import { drillExtra } from '../sim/site';
+import { MATERIALS, MATERIAL_IDS, qtyText, type MaterialId } from '../sim/materials';
+import { onOrder, orderCost, orderProblem, prices } from '../sim/economy';
+import { blockedReason, isFinished } from '../sim/construction';
 import { REGIONS } from '../sim/regions';
-import { CREW_RATE, CREW_SIZE, crewProblem, crewQuote } from '../sim/crews';
 import { keeping, KEPT } from '../sim/shelf';
 import { CONDITION, pharmacyOpen } from '../sim/body';
 import { netWorth } from '../sim/finance';
@@ -23,14 +21,12 @@ import { JUG_L, orderTanker } from '../sim/water';
 import { buyVehicle, startingVehicles, VEHICLES, type VehicleKind } from '../sim/vehicles';
 import { buyLicense, hasLicense, inSeason, lawful, TAG_USD, type License } from '../sim/wildfood';
 import { chimneyState, greenRicks, SEASON_DAYS, SWEEP_USD } from '../sim/upkeep';
-import { countyWorks, needsPermit, permitFee, premium, yearlyTax } from '../sim/paperwork';
-import { DRIVE_PER_FT, driveQuote, fixBill, fixBlocked, fixDef, hookupProblem, pendingFixes, POLE_PER_FT, powerQuote } from '../sim/improvements';
-import { BLUEPRINTS, homeBeds, totalBill, totalHours } from '../sim/blueprints';
-import { BUNKER_ORDER, KIT, TOWER_ORDER, UTILITY_ORDER } from '../game/buildkit/kit';
-import { FIT, fitProblem, plant, serviceOf, FUEL_UNIT_L, UTILITY, SPARE_FOR, storageCapacity } from '../sim/utilities';
+import { countyWorks, premium, yearlyTax } from '../sim/paperwork';
+import { DRIVE_PER_FT, driveQuote, hookupProblem, POLE_PER_FT, powerQuote } from '../sim/improvements';
+import { KIT } from '../game/buildkit/kit';
+import { FUEL_UNIT_L, storageCapacity } from '../sim/utilities';
 import { bestShelter, doseRate, isNuclear, SHELTER_DAYS } from '../sim/nuclear';
 import { DISASTERS, TRACKS, TRACK_NAME, type DisasterKind } from '../sim/disaster';
-import { prices } from '../sim/economy';
 import { livingPerDay } from '../sim/engine';
 import { roman } from '../sim/eras';
 import { canRigMines, rigMines } from '../sim/battle';
@@ -43,14 +39,16 @@ import { MarketSection, NeighborsSection, ScavengeSection } from './WorldPanels'
 import { alliesFor, canGo, FAR_COLD, isAway, latestFarLead, latestLead, LEAD_COLD, LEAD_WARM, leadAge, openCaptives, raidProblem, rescueOdds, tripFuel, tripProblem } from '../sim/rescue';
 import { EXPOSURE_NAME, exposure, raidPressure, topExposure } from '../sim/opsec';
 import { acresOf, buyProblem, LAND_NAME, priceOf } from '../sim/land';
-import { HARDEN, HARDEN_IDS, type TierDef, hardenCost, hardenProblem, isBunkerRoom, protectionOf, tierOf } from '../sim/hardening';
-import { defenseReport, type Check } from '../sim/defenseReport';
-import { AI_MODULE, ARMORY_LIGHTS, LIGHT_MODES, LIGHT_MODE_NAME, aiModulesUsed, hasAiSensor, lightList, lightMode, lightsOf } from '../sim/lights';
+import { runFinished } from '../sim/perimeter';
+import { plansNeed, plansNeedLines } from '../sim/guidance';
 import { populations, predatorLine } from '../sim/wildlife';
-import { floodTowerIds, TOWERS, TOWER_NEXT, highBonus, highShare, isTower, towerBill, towerUpgradeProblem } from '../sim/towers';
-import { STRUCTURE_SALVAGE, isFinished as structFinished } from '../sim/construction';
-import { PERIMETER, PERIMETER_ORDER, SALVAGE, UPGRADE_NEXT, UTILITY_LINES, upgradeProblem, wallLength, runBill, runHours, runFinished, runProgress, runBlocked, runGrowth } from '../sim/perimeter';
 import { PantryPanel } from './PantryPanel';
+import { Note, Row, Section, Tabs } from './hud/common';
+import { DIM, LINE, TONE, btn, panel, usd, type Tone } from './hud/style';
+import { BuildMenu } from './hud/BuildMenu';
+import { ProjectsTab } from './hud/ProjectsTab';
+import { DefenseTab } from './hud/DefenseTab';
+import { defenseTabAlert } from './hud/defenseAlert';
 
 const QUALITIES: Quality[] = ['high', 'medium', 'low'];
 const SIGHTS: Array<['off' | 'road' | 'ridge' | 'night' | 'viewshed', string, string]> = [
@@ -61,7 +59,7 @@ const VIEWS: Array<[BuildingView, string, string]> = [['full', 'Walls', 'Whole b
 const SPEEDS: Array<[Speed, string]> = [[0, '❚❚'], [1, '▶'], [2, '▶▶'], [3, '▶▶▶'], [4, '⏩']];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const MONTH_START = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
-const TASK_TEXT: Record<string, string> = { build: 'Building', forestry: 'In the woods', chores: 'Chores', sleep: 'Asleep', school: 'School', leisure: 'Free time', idle: 'Idle', job: 'At work in town', gone: 'Died', shelter: 'Sheltering', away: 'Away from the place' };
+const TASK_TEXT: Record<string, string> = { build: 'Building', forestry: 'In the woods', chores: 'Chores', sleep: 'Asleep', school: 'School', leisure: 'Free time', idle: 'Idle', job: 'At work in town', gone: 'Died', shelter: 'Sheltering', away: 'Away from the place', ...DAILY_TASK_TEXT };
 
 function dateLabel(doy: number): string {
   let m = 11;
@@ -69,73 +67,6 @@ function dateLabel(doy: number): string {
   return `${MONTHS[m]} ${doy - MONTH_START[m]}`;
 }
 const clock = (h: number) => `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.floor((h % 1) * 60)).padStart(2, '0')}`;
-const usd = (n: number) => '$' + Math.round(n).toLocaleString('en-US');
-
-const panel: CSSProperties = { background: 'rgba(20,22,18,0.78)', borderRadius: 8, padding: '8px 10px', fontSize: 12.5, color: '#eee' };
-const btn = (on = false): CSSProperties => ({ padding: '4px 9px', borderRadius: 6, border: 0, cursor: 'pointer', background: on ? '#d8c9a0' : '#3a3d34', color: on ? '#1c1d18' : '#eee', fontSize: 12.5 });
-const h3: CSSProperties = { margin: '0 0 4px', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.6, opacity: 0.65, fontWeight: 600 };
-
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return <div style={{ marginBottom: 10 }}><div style={h3}>{title}</div>{children}</div>;
-}
-
-const DIM = 'rgba(238,238,238,0.6)', LINE = 'rgba(255,255,255,0.08)';
-const TONE = { good: '#a8d080', warn: '#f0c070', bad: '#f08060' } as const;
-type Tone = keyof typeof TONE;
-
-/** A label on the left, its value on the right. */
-function Row({ label, value, tone, title }: { label: ReactNode; value: ReactNode; tone?: Tone; title?: string }) {
-  return <div title={title} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, padding: '2px 0' }}>
-    <span style={{ color: DIM }}>{label}</span>
-    <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: tone ? TONE[tone] : undefined }}>{value}</span>
-  </div>;
-}
-
-/** A note line (a warning or a hint), colored by tone. */
-function Note({ tone, children }: { tone?: Tone; children: ReactNode }) {
-  return <div style={{ fontSize: 11.5, lineHeight: 1.35, margin: '3px 0', color: tone ? TONE[tone] : DIM }}>{children}</div>;
-}
-
-/** Tabs across the top of a panel; a dot marks a tab that wants attention. */
-function Tabs<T extends string>({ tabs, value, set }: { tabs: Array<[T, string, Tone?]>; value: T; set: (t: T) => void }) {
-  return <div style={{ display: 'flex', gap: 2, borderBottom: `1px solid ${LINE}`, margin: '-2px -2px 8px', flexWrap: 'wrap' }}>
-    {tabs.map(([id, label, alert]) => (
-      <button key={id} onClick={() => set(id)} style={{ flex: '1 0 auto', padding: '5px 6px', border: 0, borderBottom: `2px solid ${value === id ? '#d8c9a0' : 'transparent'}`, background: 'transparent', color: value === id ? '#fff' : DIM, cursor: 'pointer', fontSize: 12, fontWeight: value === id ? 600 : 400 }}>
-        {label}{alert && <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: 3, background: TONE[alert], marginLeft: 4, verticalAlign: 'middle' }} />}
-      </button>
-    ))}
-  </div>;
-}
-
-/** A group of build items that folds away (remembered per browser). */
-function Group({ id, title, extra, children }: { id: string; title: string; extra?: string; children: ReactNode }) {
-  const key = `cb.fold.${id}`;
-  const [open, setOpen] = useState(() => { try { return localStorage.getItem(key) !== '0'; } catch { return true; } });
-  const toggle = () => { setOpen(!open); try { localStorage.setItem(key, open ? '0' : '1'); } catch { /* storage blocked */ } };
-  return <div style={{ marginBottom: 4 }}>
-    <button onClick={toggle} style={{ ...h3, display: 'flex', width: '100%', justifyContent: 'space-between', background: 'transparent', border: 0, color: '#eee', cursor: 'pointer', padding: '5px 2px', margin: 0 }}>
-      <span>{open ? '▾' : '▸'} {title}</span>{extra && <span style={{ textTransform: 'none', letterSpacing: 0 }}>{extra}</span>}
-    </button>
-    {open && <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>{children}</div>}
-  </div>;
-}
-
-/** One thing to build: the name and cost on a line, the time and notes under it. */
-function Item({ name, cost, sub, on, off, title, click }: { name: string; cost: string; sub?: string; on: boolean; off?: string | null; title?: string; click: () => void }) {
-  return <button disabled={!!off} title={off ?? title} onClick={click} style={{ textAlign: 'left', padding: '5px 8px', borderRadius: 6, border: 0, cursor: off ? 'not-allowed' : 'pointer', opacity: off ? 0.45 : 1, background: on ? '#d8c9a0' : 'rgba(255,255,255,0.05)', color: on ? '#1c1d18' : '#eee' }}>
-    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}><span>{name}</span><span style={{ fontVariantNumeric: 'tabular-nums' }}>{cost}</span></div>
-    {sub && <div style={{ fontSize: 11, opacity: 0.65 }}>{off ? off : sub}</div>}
-  </button>;
-}
-
-/** The build menu's groups (kit pieces by what they are for). */
-const BUILD_GROUPS: Array<[string, string, readonly string[]]> = [
-  ['home', 'Home & work', ['timber_cabin', 'log_house', 'cottage', 'outhouse', 'workshop', 'metal_garage', 'barn']],
-  ['food', 'Food', ['garden', 'greenhouse', 'orchard', 'field', 'chicken_coop', 'root_cellar']],
-  ['water', 'Water & power', UTILITY_ORDER],
-  ['defense', 'Watch towers', TOWER_ORDER],
-];
-
 /** Free build: start any disaster when you are ready. */
 function FreeBuild() {
   const g = useGameStore();
@@ -158,7 +89,6 @@ function FreeBuild() {
 export function Hud() {
   const w = useWorldStore();
   const g = useGameStore();
-  const [qty, setQty] = useState<Record<MaterialId, number>>(emptyStock());
   const [leftTab, setLeftTab] = useState<'build' | 'projects' | 'log'>('build');
   const [rightTab, setRightTab] = useState<'family' | 'supplies' | 'utilities' | 'land' | 'defense' | 'outside' | 'chronicle'>('family');
   // picking a building on the map opens its project card (not while a build tool is armed: placing a row of things keeps the Build list up)
@@ -168,28 +98,9 @@ export function Hud() {
   const game = g.game;
   const cal = calendarOf(game.clock);
   const pending = onOrder(game);
-  const lines = MATERIAL_IDS.filter(m => qty[m] > 0).map(m => ({ material: m, qty: qty[m] }));
-  const problem = lines.length ? orderProblem(game, lines) : null;
-  // what the plans still need beyond stock + orders
-  const need: Partial<Record<MaterialId, number>> = {};
-  for (const st of game.structures) {
-    if (isFinished(st)) continue;
-    const bp = BLUEPRINTS[st.kind];
-    bp.stages.forEach((sg, i) => {
-      if (i < st.stage || (i === st.stage && st.supplied)) return;
-      for (const [k, n] of Object.entries(sg.materials) as Array<[MaterialId, number]>) need[k] = (need[k] ?? 0) + n;
-    });
-  }
-  for (const j of game.hardenJobs) {
-    const st = game.structures.find(x => x.id === j.building);
-    if (j.finishedAt !== null || j.supplied || !st) continue;
-    for (const [k, n] of Object.entries(hardenCost(st.kind, j.upgrade, j.tier).materials) as Array<[MaterialId, number]>) need[k] = (need[k] ?? 0) + n;
-  }
-  for (const k of MATERIAL_IDS) need[k] = Math.max(0, (need[k] ?? 0) - game.stock[k] - (pending[k] ?? 0));
-  const needLines = MATERIAL_IDS.filter(k => (need[k] ?? 0) > 0 && MATERIALS[k].price !== null).map(k => ({ material: k, qty: need[k]! }));
-  const sel = game.structures.find(s => s.id === g.selected) ?? game.structures.find(s => !isFinished(s)) ?? null;
-  const costOf = (kind: string) => orderCost(Object.entries(totalBill(BLUEPRINTS[kind])).filter(([m]) => MATERIALS[m as MaterialId].price !== null).map(([material, qty]) => ({ material: material as MaterialId, qty: qty as number })));
-  const shelters = game.structures.filter(isFinished).reduce((a, s) => a + (KIT[s.kind].shelters ?? 0), 0);
+  // what the plans still lack beyond stock + orders (bought in the Shop, grouped by use)
+  const need = plansNeed(game);
+  const needLines = plansNeedLines(game);
   // a dot on a tab that wants attention
   const warned = !!game.disaster.kind && game.clock.t >= game.disaster.warnAt;
   const daysFood = daysOfFood(game);
@@ -201,7 +112,6 @@ export function Hud() {
   const treating = game.stock.meds >= 0.1 || game.people.some((q, j) => !q.kid && game.personState[j]?.needs.died == null && q.skills.medic >= 3) || game.structures.some(st => st.kind === 'bunker_medical' && isFinished(st));
   const familyAlert: Tone | undefined = game.personState.some(ps => ps.needs.died == null && (ps.needs.health < 40 || ps.needs.hurt.length > 0)) ? 'bad' : game.personState.some(ps => ps.needs.died == null && ps.needs.hunger > 5000) ? 'warn' : undefined;
   const projectsAlert: Tone | undefined = game.structures.some(st => !isFinished(st) && blockedReason(game, st)) ? 'warn' : undefined;
-  const ownNeeds = (kind: string) => Object.entries(totalBill(BLUEPRINTS[kind])).filter(([m]) => MATERIALS[m as MaterialId].price === null).map(([m, q]) => `${q} ${MATERIALS[m as MaterialId].name.toLowerCase()}`).join(', ');
 
   return (
     <>
@@ -223,150 +133,9 @@ export function Hud() {
       <div style={{ ...panel, position: 'fixed', left: 10, top: 10, width: 244, maxHeight: 'calc(100vh - 140px)', display: 'flex', flexDirection: 'column' }}>
         <Tabs tabs={[['build', 'Build'], ['projects', 'Projects', projectsAlert], ['log', 'Log']]} value={leftTab} set={setLeftTab} />
         <div style={{ overflowY: 'auto', flex: 1, paddingRight: 2 }}>
-          {leftTab === 'build' && <>
-            {BUILD_GROUPS.map(([gid, title, kinds]) => (
-              <Group key={gid} id={gid} title={title} extra={gid === 'home' ? `beds ${homeBeds(game)} · ${game.people.length} people` : undefined}>
-                {kinds.map(kind => {
-                  const own = ownNeeds(kind), no = planProblem(game, kind), extra = kind === 'well_drilled' ? drillExtra(game.site) : 0;
-                  return <Item key={kind} name={KIT[kind].name} cost={`~${usd(costOf(kind) + extra)}`} sub={`${totalHours(BLUEPRINTS[kind])} h${own ? ` · + ${own}` : ''}${kind === 'well_drilled' ? ` · water at ${game.site.gwDepth} m` : ''}${needsPermit(kind) && game.paper.permits && countyWorks(game) ? ` · permit ${usd(permitFee(game, kind))}` : ''}`}
-                    on={g.tool === kind} off={no} title={KIT[kind].blurb} click={() => g.setTool(g.tool === kind ? null : kind)} />;
-                })}
-              </Group>
-            ))}
-            <Group id="lines" title="Pipes & cables">
-              {UTILITY_LINES.map(kind => {
-                const len = 100 / 6, buy = Object.entries(runBill(kind, len)).map(([material, qty]) => ({ material: material as MaterialId, qty: qty as number })), tool = `fence:${kind}`;
-                return <Item key={kind} name={PERIMETER[kind].name} cost={`~${usd(orderCost(buy))}`} sub={`per 100 m · ${Math.round(runHours(kind, len))} h`} on={g.tool === tool} title={PERIMETER[kind].blurb} click={() => g.setTool(g.tool === tool ? null : tool)} />;
-              })}
-            </Group>
-            <Group id="under" title="Underground" extra={shelters > 0 ? `shelters ${shelters}` : undefined}>
-              {BUNKER_ORDER.map(kind => {
-                const own = ownNeeds(kind);
-                return <Item key={kind} name={KIT[kind].name} cost={`~${usd(costOf(kind))}`} sub={`${totalHours(BLUEPRINTS[kind])} h${own ? ` · + ${own}` : ''}${needsPermit(kind) && game.paper.permits && countyWorks(game) ? ` · permit ${usd(permitFee(game, kind))}` : ''}`} on={g.tool === kind} title={KIT[kind].blurb} click={() => g.setTool(g.tool === kind ? null : kind)} />;
-              })}
-              {(() => {
-                const kind = 'escape_tunnel' as const, len = 50 / 6, tool = `fence:${kind}`;
-                const buy = Object.entries(runBill(kind, len)).map(([material, qty]) => ({ material: material as MaterialId, qty: qty as number }));
-                return <Item name={PERIMETER[kind].name} cost={`~${usd(orderCost(buy))}`} sub={`per 50 m · ${Math.round(runHours(kind, len))} h · opens only from inside`} on={g.tool === tool} title={PERIMETER[kind].blurb} click={() => g.setTool(g.tool === tool ? null : tool)} />;
-              })()}
-            </Group>
-            <Group id="perimeter" title="Perimeter">
-              {PERIMETER_ORDER.map(kind => {
-                const len = 100 / 6, bill = runBill(kind, len);
-                const buy = Object.entries(bill).filter(([m]) => MATERIALS[m as MaterialId].price !== null).map(([material, qty]) => ({ material: material as MaterialId, qty: qty as number }));
-                const own = Object.entries(bill).filter(([m]) => MATERIALS[m as MaterialId].price === null).map(([m, q]) => `${q} ${MATERIALS[m as MaterialId].name.toLowerCase()}`).join(', ');
-                const tool = `fence:${kind}`;
-                return <Item key={kind} name={PERIMETER[kind].name} cost={buy.length ? `~${usd(orderCost(buy))}` : '—'} sub={`per 100 m · ${Math.round(runHours(kind, len))} h${own ? ` · + ${own}` : ''}`} on={g.tool === tool} title={PERIMETER[kind].blurb} click={() => g.setTool(g.tool === tool ? null : tool)} />;
-              })}
-            </Group>
-            <Group id="woods" title="Woods">
-              <Item name="Mark trees to fell" cost="" sub="logs for building, firewood for the stove" on={g.tool === 'fell'} click={() => g.setTool(g.tool === 'fell' ? null : 'fell')} />
-            </Group>
-          </>}
+          {leftTab === 'build' && <BuildMenu />}
 
-          {leftTab === 'projects' && <>
-            {!sel && !game.perimeter.some(r => !runFinished(r)) && !game.forestry.jobs.length && <Note>Nothing under way. Stake something out from the Build tab.</Note>}
-            {sel && (
-              <Section title={KIT[sel.kind].name}>
-                <Row label="Stage" value={sel.pre ? 'Came with the land' : isFinished(sel) ? 'Finished' : BLUEPRINTS[sel.kind].stages[sel.stage].name} />
-                {(sel.fixes ?? []).length > 0 && <>
-                  {(sel.fixes ?? []).map(f => <div key={f.part} style={{ display: 'flex', justifyContent: 'space-between', gap: 6, marginTop: 3 }}>
-                    <span style={{ color: DIM }} title={Object.entries(fixBill(f)).map(([m, q]) => `${q} ${MATERIALS[m as MaterialId].name.toLowerCase()}`).join(', ')}>{fixDef(f).name} <span style={{ fontSize: 11 }}>({f.cond}, {f.hours} h)</span></span>
-                    <span style={{ color: f.done >= f.hours ? TONE.good : f.done > 0 ? '#eee' : f.cond === 'poor' ? TONE.bad : TONE.warn }}>{f.done >= f.hours ? 'done' : f.done > 0 ? `${Math.round(f.done / f.hours * 100)} %` : fixBlocked(game, f) ? 'needs materials' : 'next up'}</span>
-                  </div>)}
-                  {pendingFixes(sel).some(f => fixBlocked(game, f)) && (() => {
-                    const need: Partial<Record<MaterialId, number>> = {};
-                    for (const f of pendingFixes(sel)) if (!f.supplied) for (const [m, q] of Object.entries(fixBill(f)) as Array<[MaterialId, number]>) need[m] = (need[m] ?? 0) + q;
-                    const lines = (Object.entries(need) as Array<[MaterialId, number]>).map(([material, q]) => ({ material, qty: Math.max(0, q - game.stock[material]) })).filter(l => l.qty > 0);
-                    return lines.length > 0 && <button style={{ ...btn(), width: '100%', marginTop: 4 }} disabled={!!orderProblem(game, lines)} onClick={() => g.order(lines)}>Order the repair materials: {usd(orderCost(lines, prices(game)))}</button>;
-                  })()}
-                  {pendingFixes(sel).some(f => f.part === 'roof') && <Note tone="warn">The roof leaks: the stove burns more to keep the house warm.</Note>}
-                  {pendingFixes(sel).some(f => f.cond === 'poor' && (f.part === 'wiring' || f.part === 'plumbing')) && <Note tone="warn">Unsafe {pendingFixes(sel).filter(f => f.cond === 'poor' && f.part !== 'roof' && f.part !== 'septic').map(f => f.part).join(' and ')}: shut off until it's redone.</Note>}
-                </>}
-                <div style={{ height: 6, background: '#333', borderRadius: 3, margin: '4px 0' }}>
-                  <div style={{ width: `${progress(sel) * 100}%`, height: '100%', background: '#c9b27a', borderRadius: 3 }} />
-                </div>
-                {!isFinished(sel) && <Note tone={blockedReason(game, sel) ? 'warn' : undefined}>{blockedReason(game, sel) ?? `${Math.round(progress(sel) * 100)} % done`}</Note>}
-                {(!isFinished(sel) || pendingFixes(sel).length > 0) && (() => {
-                  const crew = game.crews.find(c => c.target === sel.id), q = crewQuote(sel), why = crewProblem(game, sel);
-                  return crew
-                    ? <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                        <span style={{ color: DIM }}>Crew of {CREW_SIZE} on it · ${Math.round(crew.paid).toLocaleString('en-US')} so far</span>
-                        <button style={btn()} onClick={() => g.dismiss(crew.id)}>Send home</button>
-                      </div>
-                    : <button style={{ ...btn(), width: '100%', marginTop: 4 }} disabled={!!why} title={why ?? `${CREW_SIZE} workers at $${CREW_RATE}/h, weekdays 8 to 5; you still buy the materials`} onClick={() => g.hire(sel.id)}>
-                        Hire a crew: ~{usd(q.usd)}, about {q.weeks} week{q.weeks > 1 ? 's' : ''}
-                      </button>;
-                })()}
-                {(!isFinished(sel) || pendingFixes(sel).length > 0) && !game.crews.some(c => c.target === sel.id) && game.money < crewQuote(sel).usd && !crewProblem(game, sel) && (() => {
-                  const wk = Math.floor(game.money / (CREW_RATE * CREW_SIZE * 45));
-                  return <Note tone="warn">Money for about {wk} week{wk === 1 ? '' : 's'} of a crew; they go home when it runs out.</Note>;
-                })()}
-                {isFinished(sel) && (() => {
-                  const p = plant(game), sv = serviceOf(game, p, sel.id);
-                  const job = (k: 'plumb' | 'wire') => game.utilities.fittings.find(f => f.building === sel.id && f.kind === k);
-                  const row = (k: 'plumb' | 'wire', label: string, on: boolean) => {
-                    const j = job(k), why = fitProblem(game, p, sel, k);
-                    return <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginTop: 3 }}>
-                      <span style={{ color: DIM }}>{label}</span>
-                      {j || on ? <span>{on ? 'yes' : j!.finishedAt ? 'yes' : `${Math.round((j!.done / j!.hours) * 100)} %`}</span>
-                        : <button style={btn()} disabled={!!why} title={why ?? `${FIT[k].hours} h · ${Object.entries(FIT[k].materials).map(([m, q]) => `${q} ${MATERIALS[m as MaterialId].name.toLowerCase()}`).join(', ')}`} onClick={() => g.fit(sel.id, k)}>{k === 'plumb' ? 'Plumb it' : 'Wire it'}</button>}
-                    </div>;
-                  };
-                  return <>
-                    {row('plumb', 'Running water', sv.plumbed)}
-                    {row('wire', 'Electric', sv.wired)}
-                    {(sv.wired || UTILITY[sel.kind]?.water?.needsPower) && <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 3 }}>
-                      <span style={{ color: DIM }}>Breaker: {game.utilities.off.includes(sel.id) ? 'off' : game.utilities.lit.includes(sel.id) ? 'on' : 'on, no power'}</span>
-                      <button style={btn()} onClick={() => g.setBreaker(sel.id, game.utilities.off.includes(sel.id))}>{game.utilities.off.includes(sel.id) ? 'Switch on' : 'Switch off'}</button>
-                    </div>}
-                    {game.utilities.fried.includes(sel.id) && <button style={{ ...btn(true), marginTop: 3 }} title={`Fried by the EMP: needs a spare ${SPARE_FOR[sel.kind]} and a hardware kit`} onClick={() => g.fixFried(sel.id)}>Replace the fried {SPARE_FOR[sel.kind]} ({game.stock[SPARE_FOR[sel.kind]] >= 1 ? 'spare on hand' : 'no spare'})</button>}
-                    {game.utilities.broken.includes(sel.id) && <button style={{ ...btn(true), marginTop: 3 }} onClick={() => g.repairPump(sel.id)}>Repair the pump (1 hardware kit)</button>}
-                  </>;
-                })()}
-              </Section>
-            )}
-            {sel && isBunkerRoom(sel.kind) && isFinished(sel) && (
-              <Section title="Hardening">
-                {(() => {
-                  const p = protectionOf(sel);
-                  return <>
-                    <Row label="Fallout (PF)" value={p.pf.toLocaleString('en-US')} />
-                    <Row label="EMP survival" value={`${Math.round(p.empSurvive * 100)} %`} />
-                    <Row label="Air" value={p.filter === 'none' ? 'unfiltered' : p.filter === 'dust' ? 'dust filtered' : p.filter === 'gas' ? 'gas-tight' : 'overpressure'} />
-                    <Row label="Blast" value={`${p.psi} psi`} />
-                  </>;
-                })()}
-                {HARDEN_IDS.map(id => {
-                  const t = tierOf(sel, id), job = game.hardenJobs.find(j => j.building === sel.id && j.upgrade === id && j.finishedAt === null);
-                  const next = t < 3 ? (HARDEN[id].tiers as readonly TierDef[])[t] : null, why = hardenProblem(game, sel, id);
-                  const cost = next ? hardenCost(sel.kind, id, (t + 1) as 1 | 2 | 3) : null;
-                  const buy = cost ? Object.entries(cost.materials).map(([material, qty]) => ({ material: material as MaterialId, qty: qty as number })) : [];
-                  return <div key={id} style={{ marginTop: 6, paddingTop: 4, borderTop: `1px solid ${LINE}` }}>
-                    <Row label={HARDEN[id].name} value={`${t ? HARDEN[id].tiers[t - 1].name : 'none'}${job ? ` → ${Math.round((job.done / job.hours) * 100)} %` : ''}`} />
-                    {next && !job && <div style={{ display: 'flex', gap: 4, marginTop: 2 }}>
-                      <button style={btn()} disabled={!!why} title={`${next.blurb} · ${cost!.hours} h`} onClick={() => g.harden(sel.id, id)}>{next.name} ~{usd(orderCost(buy))}</button>
-                      <button style={btn()} disabled={!!why} title="Order this tier for every room of the bunker" onClick={() => g.harden(sel.id, id, true)}>Whole bunker</button>
-                    </div>}
-                  </div>;
-                })}
-              </Section>
-            )}
-            {game.perimeter.some(r => !runFinished(r) || runGrowth(r, game.clock.t) < 1) && (
-              <Section title="Lines going in">
-                {game.perimeter.filter(r => !runFinished(r) || runGrowth(r, game.clock.t) < 1).slice(0, 6).map(r => (
-                  <Row key={r.id} label={PERIMETER[r.kind].name} value={runFinished(r) ? `growing ${Math.round(runGrowth(r, game.clock.t) * 100)} %` : runBlocked(game, r) ?? `${Math.round(runProgress(r) * 100)} %`} />))}
-              </Section>
-            )}
-            {game.forestry.jobs.length > 0 && (
-              <Section title="Woods">
-                {(['marked', 'felled', 'bucked'] as const).map(st => {
-                  const n = game.forestry.jobs.filter(j => j.stage === st).length;
-                  return n ? <Row key={st} label={st === 'marked' ? 'Marked to fell' : st === 'felled' ? 'Down, to buck' : 'Bucked, to skid'} value={n} /> : null;
-                })}
-              </Section>
-            )}
-          </>}
+          {leftTab === 'projects' && <ProjectsTab />}
 
           {leftTab === 'log' && game.log.slice(-14).reverse().map((e, i) => <div key={i} style={{ padding: '3px 0', borderBottom: `1px solid ${LINE}`, opacity: 1 - i * 0.04 }}>{e.text}</div>)}
         </div>
@@ -376,7 +145,7 @@ export function Hud() {
       </div>
 
       {/* Right: the family, supplies, water & power, land, the outside world */}
-      <div style={{ ...panel, position: 'fixed', right: 10, top: 10, width: 268, maxHeight: 'calc(100vh - 90px)', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ ...panel, position: 'fixed', right: 10, top: 10, width: 320, maxHeight: 'calc(100vh - 90px)', display: 'flex', flexDirection: 'column' }}>
         <Tabs tabs={[['family', 'Family', familyAlert], ['supplies', 'Supplies', foodAlert], ['utilities', 'Utilities', utilAlert], ['land', 'Land'], ['defense', 'Defense', defenseAlert], ['outside', 'Outside', outsideAlert], ['chronicle', 'Years']]} value={rightTab} set={setRightTab} />
         <div style={{ overflowY: 'auto', flex: 1, paddingRight: 2 }}>
           {rightTab === 'family' && <>
@@ -400,6 +169,7 @@ export function Hud() {
                 })()}
               </div>;
             })}
+            <DailySection />
             {trialCamps(game).map(c => <Section key={c.id} title={`Camp outside the wall: ${c.title}`}>
               <Row label="On trial" value={`day ${Math.max(0, dayIndex(game.clock.t) - c.from)} of ${c.until - c.from}`} />
               <Row label="People" value={c.people.map(p => `${p.first}${p.kid ? ` (${p.age})` : ''}`).join(', ')} />
@@ -486,27 +256,19 @@ export function Hud() {
               })()}
             </Section>
             <Section title="Stockpile">
-              {MATERIAL_IDS.filter(m => game.stock[m] > 0 || (pending[m] ?? 0) > 0 || qty[m] > 0).length === 0 && <Note>Empty. Order below, or fell timber.</Note>}
-              {MATERIAL_IDS.filter(m => game.stock[m] > 0 || (pending[m] ?? 0) > 0 || qty[m] > 0).map(m => (
+              {MATERIAL_IDS.filter(m => game.stock[m] > 0 || (pending[m] ?? 0) > 0 || (need[m] ?? 0) > 0).length === 0 && <Note>Empty. Buy materials in the Shop, or fell timber.</Note>}
+              {MATERIAL_IDS.filter(m => game.stock[m] > 0 || (pending[m] ?? 0) > 0 || (need[m] ?? 0) > 0).map(m => (
                 <div key={m} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 4, padding: '1px 0' }}>
                   <span style={{ color: DIM, flex: 1 }}>{MATERIALS[m].name}</span>
+                  {(need[m] ?? 0) > 0 && <span style={{ fontSize: 10.5, color: TONE.warn, border: `1px solid ${TONE.warn}`, borderRadius: 8, padding: '0 5px' }} title="The plans need more of this than you have or have on order">needs {qtyText(need[m]!)} more</span>}
                   <span style={{ fontVariantNumeric: 'tabular-nums', minWidth: 30, textAlign: 'right' }}>{Math.floor(game.stock[m] + 1e-6)}{pending[m] ? <span style={{ color: DIM }}> +{pending[m]}</span> : null}</span>
-                  {MATERIALS[m].price !== null && <span style={{ display: 'flex', alignItems: 'center', gap: 2, marginLeft: 4 }}>
-                    <button style={{ ...btn(), padding: '1px 6px' }} onClick={() => setQty({ ...qty, [m]: Math.max(0, qty[m] - 1) })}>−</button>
-                    <span style={{ width: 18, textAlign: 'center', color: qty[m] ? '#fff' : DIM }}>{qty[m]}</span>
-                    <button style={{ ...btn(), padding: '1px 6px' }} onClick={() => setQty({ ...qty, [m]: qty[m] + 1 })}>+</button>
-                  </span>}
                 </div>
               ))}
-              <select value="" style={{ marginTop: 6, width: '100%' }} onChange={e => { const m = e.target.value as MaterialId; if (m) setQty({ ...qty, [m]: qty[m] + 1 }); }}>
-                <option value="">Add to the order…</option>
-                {MATERIAL_IDS.filter(m => MATERIALS[m].price !== null).map(m => <option key={m} value={m}>{MATERIALS[m].name} ({usd(MATERIALS[m].price!)} / {MATERIALS[m].unit})</option>)}
-              </select>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 6 }}>
-                {lines.length > 0 && <button style={btn(true)} disabled={!!problem} onClick={() => { if (g.order(lines)) setQty(emptyStock()); }}>
-                  Order {usd(orderCost(lines, prices(game)))}{problem === 'cannot_afford' ? ' (too much)' : problem === 'no_deliveries' ? ' (no deliveries)' : ''}
-                </button>}
-                {needLines.length > 0 && <button style={btn()} disabled={!!orderProblem(game, needLines)} onClick={() => g.order(needLines)}>Order what the plans need ({usd(orderCost(needLines, prices(game)))})</button>}
+                {needLines.length > 0
+                  ? <button style={btn(true)} disabled={!!orderProblem(game, needLines)} title="Everything the plans still lack, in one order" onClick={() => g.order(needLines)}>Order what the plans need ({usd(orderCost(needLines, prices(game)))})</button>
+                  : <Note>{game.structures.some(s => !isFinished(s)) || game.perimeter.some(r => !runFinished(r)) ? 'The plans have all they need.' : 'Nothing planned that needs materials.'}</Note>}
+                <button style={btn()} title="Everything else is bought here, grouped by use: building, fencing, water, power, food, and so on" onClick={() => g.openShop(true)}>Buy materials in the Shop…</button>
               </div>
             </Section>
           </>}
@@ -726,114 +488,6 @@ export function Hud() {
       </div>
     </>
   );
-}
-
-/** The Defense tab's dot: red if a home is exposed after the hit, amber if the line is open before it. */
-function defenseTabAlert(game: GameState): Tone | undefined {
-  if (!game.structures.some(st => st.finishedAt !== null && isHome(st.kind))) return undefined;
-  const hit = !!game.disaster.kind && game.clock.t >= game.disaster.hitAt;
-  if (!hit && game.disaster.phase !== 'warning') return undefined;   // the report is only worked out when it matters
-  const d = defenseReport(game);
-  if (hit && d.homes.some(h => !h.covered)) return 'bad';
-  return d.score < 25 ? 'warn' : undefined;
-}
-
-/** One checklist line: a tick or a cross, what it is, and why. */
-function CheckRow({ c }: { c: Check }) {
-  return <div title={c.detail} style={{ display: 'flex', gap: 6, padding: '2px 0', alignItems: 'baseline' }}>
-    <span style={{ color: TONE[c.tone], width: 14, textAlign: 'center' }}>{c.ok ? '✓' : '✕'}</span>
-    <span style={{ flex: 1 }}>{c.label}</span>
-    <span style={{ color: DIM, fontSize: 11.5, textAlign: 'right', maxWidth: '55%' }}>{c.detail}</span>
-  </div>;
-}
-
-/** Defense and preparedness: a score, whether the place is walled in, what's built, and how ready it is for other trouble. */
-function DefenseTab() {
-  const game = useGameStore(s => s.game);
-  const w = useWorldStore();
-  const d = defenseReport(game);
-  const exposed = d.homes.filter(h => !h.covered);
-  return <>
-    <Section title="Defense">
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-        <span style={{ fontSize: 30, fontWeight: 700, color: TONE[d.tone] }}>{d.score}</span>
-        <span style={{ fontSize: 15, color: TONE[d.tone] }}>{d.label}</span>
-        <span style={{ color: DIM, fontSize: 11.5 }}>of 100</span>
-      </div>
-      <Row label="Line holds people out" value={`${Math.round(d.barrier)}%`} tone={d.barrier >= 65 ? 'good' : d.barrier >= 35 ? 'warn' : 'bad'} title="How hard the walls, gates and bars stop a crew, as the gate card and the battle read it" />
-      <Row label="Seen coming" value={`${Math.round(d.detection)}%`} tone={d.detection >= 60 ? 'good' : d.detection >= 35 ? 'warn' : 'bad'} />
-      <button style={{ ...btn(w.showBoundary), marginTop: 4 }} onClick={() => w.setShowBoundary(!w.showBoundary)} title="Draw the property line on the ground">{w.showBoundary ? 'Hide' : 'Show'} property line</button>
-    </Section>
-    <Section title="The property line">
-      {d.walls.map(c => <CheckRow key={c.id} c={c} />)}
-      {d.gaps.length > 0 && <Note tone="warn">Open ground on the line, e.g. near ({d.gaps.slice(0, 3).map(([x, z]) => `${Math.round(x * 6)}, ${Math.round(z * 6)} m`).join('; ')}). Turn on the property line to see it.</Note>}
-    </Section>
-    <Section title="Upgrade the walls">
-      {game.perimeter.filter(r => runFinished(r) && UPGRADE_NEXT[r.kind]).length === 0 && <Note>Nothing to upgrade. A finished fence or wall can be upgraded in place to the next tier: the old one stands until the new one is up, and half its materials come back.</Note>}
-      {game.perimeter.filter(r => runFinished(r) && UPGRADE_NEXT[r.kind]).slice(0, 8).map(r => {
-        const next = UPGRADE_NEXT[r.kind]!, len = wallLength(r);
-        const price = (k: typeof next, f: number) => orderCost(Object.entries(runBill(k, len)).filter(([m]) => MATERIALS[m as MaterialId].price !== null).map(([material, qty]) => ({ material: material as MaterialId, qty: Math.ceil((qty as number) * f) })));
-        const net = Math.max(0, price(next, 1) - price(r.kind, SALVAGE));
-        const why = upgradeProblem(game, r);
-        return <div key={r.id} style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '3px 0' }}>
-          <span style={{ flex: 1 }}>{PERIMETER[r.kind].name} <span style={{ color: DIM }}>({Math.round(len * 6)} m)</span> <span style={{ color: DIM }}>→</span> {PERIMETER[next].name}</span>
-          <button style={btn(false)} disabled={!!why} title={why ?? `${Math.round(runHours(next, len))} h of work; about ${usd(net)} after the salvage of the old one (${Math.round(SALVAGE * 100)}% of its materials back)`} onClick={() => { const w = useGameStore.getState().upgradeRun(r.id); if (w) alert(w); }}>{why ? 'Under way' : `Upgrade ~${usd(net)}`}</button>
-        </div>;
-      })}
-    </Section>
-    <Section title="Floodlights">
-      <Note>Part of the night-time suite: lights that stay on draw the road's eyes to the camp. Always on costs power and is seen from the road; a motion sensor lights up when a threat is detected near and for a little after; off keeps the place dark. A blackout (curtains) turns every light off.</Note>
-      <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', padding: '3px 0' }}>
-        <span style={{ flex: 1 }}>Default for all</span>
-        {LIGHT_MODES.map(m => <button key={m} style={btn(lightsOf(game).mode === m)} onClick={() => useGameStore.getState().setLightDefault(m)}>{LIGHT_MODE_NAME[m]}</button>)}
-      </div>
-      <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', padding: '3px 0' }}>
-        <span style={{ flex: 1, color: DIM }}>Set all lights (clears overrides)</span>
-        {LIGHT_MODES.map(m => <button key={m} style={btn(false)} onClick={() => useGameStore.getState().setAllLights(m)}>{LIGHT_MODE_NAME[m]}</button>)}
-      </div>
-      <Note>A basic motion sensor trips on anything that moves at night: deer, coyotes, a bear. That burns power and the glow is seen from the road. An AI sensor module ({game.stock[AI_MODULE]} owned, {aiModulesUsed(game)} fitted; Shop, Defense) tells people from animals: the light comes on for people only.</Note>
-      <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', padding: '3px 0' }}>
-        <span style={{ flex: 1, color: DIM }}>AI sensor, all lights</span>
-        <button style={btn(false)} onClick={() => { const n = useGameStore.getState().setAllLightsAi(lightList(game, floodTowerIds(game)).map(l => l.id), true); if (!n) alert(game.stock[AI_MODULE] - aiModulesUsed(game) < 1 ? 'No spare AI sensor module: buy one in the Shop (Defense).' : 'Nothing to fit (the lights need power).'); }}>Fit all</button>
-        <button style={btn(false)} onClick={() => useGameStore.getState().setAllLightsAi(lightList(game, floodTowerIds(game)).map(l => l.id), false)}>Strip all</button>
-      </div>
-      {lightList(game, floodTowerIds(game)).length === 0 && <Note>No floodlights yet: buy a set (Shop, Defense) or build a tower with a light mast.</Note>}
-      {lightList(game, floodTowerIds(game)).map(l => <div key={l.id} style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', padding: '3px 0' }}>
-        <span style={{ flex: 1 }}>{l.name}{l.id !== ARMORY_LIGHTS ? '' : ''}</span>
-        {LIGHT_MODES.map(m => <button key={m} style={btn(lightMode(game, l.id) === m)} onClick={() => useGameStore.getState().setLightMode(l.id, lightsOf(game).per[l.id] === m ? null : m)}>{LIGHT_MODE_NAME[m]}</button>)}
-        <button style={btn(hasAiSensor(game, l.id))} title="AI sensor module: this light ignores animals and comes on for people only (needs a spare module and power)" onClick={() => { const why = useGameStore.getState().setLightAi(l.id, !hasAiSensor(game, l.id)); if (why) alert(why); }}>AI {hasAiSensor(game, l.id) ? 'on' : 'off'}</button>
-      </div>)}
-    </Section>
-    <Section title="Upgrade the towers">
-      <Note>A watch tower goes: rise &amp; lookout, wooden tower, concrete &amp; steel, floodlights, a manned mounted gun, an automated turret. The next tier rises beside the old one, which keeps watch until it is up.</Note>
-      {game.structures.every(st => !isTower(st.kind)) && <Note>No tower yet. Build a rise &amp; lookout from the Build menu (Watch towers).</Note>}
-      {game.structures.filter(st => isTower(st.kind) && structFinished(st)).map(st => {
-        const def = TOWERS[st.kind as keyof typeof TOWERS], nk = TOWER_NEXT[st.kind];
-        const hb = highBonus(st, st.kind as keyof typeof TOWERS);
-        const hg = highShare(st) > 0.05 ? <span style={{ color: TONE.good }} title="The ground under it stands above the land round it: the watch sees farther and earlier (capped)."> · high ground +{Math.round((st.high ?? 0) * 6)} m: sees {Math.round(hb.viewR * 6)} m farther, +{Math.round(hb.view)} warning</span> : null;
-        if (!nk) return <div key={st.id} style={{ padding: '3px 0' }}>{def.name} <span style={{ color: DIM }}>(tier {def.tier} of 6, the last)</span>{hg}</div>;
-        const price = (bill: ReturnType<typeof towerBill>, f: number) => orderCost(Object.entries(bill).filter(([m]) => MATERIALS[m as MaterialId].price !== null).map(([material, qty]) => ({ material: material as MaterialId, qty: Math.ceil((qty as number) * f) })));
-        const net = Math.max(0, price(towerBill(nk), 1) - price(towerBill(st.kind as keyof typeof TOWERS), STRUCTURE_SALVAGE));
-        const why = towerUpgradeProblem(game, st);
-        return <div key={st.id} style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '3px 0' }}>
-          <span style={{ flex: 1 }}>{def.name} <span style={{ color: DIM }}>(tier {def.tier})</span>{hg} <span style={{ color: DIM }}>→</span> {TOWERS[nk].name}</span>
-          <button style={btn(false)} disabled={!!why} title={why ?? `${TOWERS[nk].blurb} About ${usd(net)} after the salvage of the old one (${Math.round(STRUCTURE_SALVAGE * 100)}% of its materials back).`} onClick={() => { const w = useGameStore.getState().upgradeTower(st.id); if (w) alert(w); }}>{why ? 'Under way' : `Upgrade ~${usd(net)}`}</button>
-        </div>;
-      })}
-    </Section>
-    <Section title="The houses">
-      {d.homes.length === 0 && <Note>No house finished yet.</Note>}
-      {d.homes.map(h => <CheckRow key={h.id} c={{ id: h.id, label: h.name, ok: h.covered, tone: h.covered ? 'good' : 'bad', detail: h.how }} />)}
-      {exposed.length > 0 && <Note tone="bad">{exposed.length} home{exposed.length > 1 ? 's are' : ' is'} exposed: close the property line (and bar the creek) or wall a ring round {exposed.length > 1 ? 'them' : 'it'}.</Note>}
-    </Section>
-    <Section title="Watching">{d.watch.map(c => <CheckRow key={c.id} c={c} />)}</Section>
-    <Section title="Fighting">{d.fight.map(c => <CheckRow key={c.id} c={c} />)}</Section>
-    <Section title="Shelter">{d.shelter.map(c => <CheckRow key={c.id} c={c} />)}</Section>
-    <Section title="Other catastrophes">{d.catastrophes.map(c => <CheckRow key={c.id} c={c} />)}</Section>
-    <Section title="Built for defense">
-      {d.improvements.length ? <div style={{ color: DIM, lineHeight: 1.5 }}>{d.improvements.join(' · ')}</div> : <Note>Nothing yet. Fences, walls, a tower, a dog and cameras all count.</Note>}
-    </Section>
-  </>;
 }
 
 const SOURCE_NAME = { radio: 'Radio', neighbor: 'Neighbor', trader: 'Trader', prisoner: 'Prisoner' } as const;

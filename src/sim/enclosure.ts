@@ -90,11 +90,13 @@ export function enclosure(s: GameState, t = s.clock.t, who: Against = 'people'):
   // a gate is shut unless somebody is at it (a crew at the gate, a raid): then it is a hole in the line for animals too
   const gateHold = who === 'people' ? GATE_HOLD : s.gate.pending ? 0 : 0.95;
   const runs = s.perimeter.filter(r => runFinished(r) && r.kind !== 'creek_bars' && holdOf(s, r, who) > 0 && r.pts.length > 1);
+  // creek bars that stand on the line close the gap the wall leaves at the creek (bars out in the middle of the place touch no ring point)
+  const holders = [...runs, ...s.perimeter.filter(r => runFinished(r) && r.kind === 'creek_bars' && r.pts.length > 1)];
   let sum = 0, open = 0;
   const gaps: Pt[] = [];
   for (const [x, z] of ring) {
     let hold = 0;
-    for (const r of runs) {
+    for (const r of holders) {
       const { d, s: along } = nearest(r.pts, x, z);
       if (d > REACH) continue;
       const inGate = r.gates.some(g => Math.abs(along - g.at) <= g.w / 2);
