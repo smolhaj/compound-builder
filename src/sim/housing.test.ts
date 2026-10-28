@@ -296,11 +296,11 @@ describe('arrivals', () => {
 });
 
 describe('save', () => {
-  it(`a v44 save gets bedding (v${SAVE_VERSION})`, () => {
+  it(`a v45 save gets bedding (v${SAVE_VERSION})`, () => {
     const g = newGame(5) as unknown as Record<string, unknown>;
     const stock = { ...(g.stock as Record<string, number>) };
     delete stock.tent; delete stock.sleeping_bag;
-    const up = migrate({ ...g, version: 44, stock });
+    const up = migrate({ ...g, version: 45, stock });
     expect(up.version).toBe(SAVE_VERSION);
     expect(up.stock.sleeping_bag).toBe(up.people.length);
     expect(up.stock.tent).toBe(Math.max(0, Math.ceil((up.people.length - 4) / 3)));

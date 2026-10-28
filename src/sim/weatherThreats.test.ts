@@ -176,10 +176,10 @@ describe('weather threats', () => {
     expect(weatherDay(d).some(l => /wash/.test(l))).toBe(true);
   });
 
-  it('storms scale with difficulty: Cozy about half and shorter outages, Hardcore a quarter more', () => {
+  it('storms scale with difficulty: Cozy about half and shorter outages, Hardcore half as many again', () => {
     const at = (d: 'cozy' | 'standard' | 'hardcore') => { const g = place('appalachia', 1); g.disaster.difficulty = d; return odds(g, 10).ice_storm!; };
     expect(at('cozy')).toBeCloseTo(at('standard') * 0.5, 9);
-    expect(at('hardcore')).toBeCloseTo(at('standard') * 1.25, 9);
+    expect(at('hardcore')).toBeCloseTo(at('standard') * 1.5, 9);
     // count the storm days over many years: Cozy well under Standard
     const days = (d: 'cozy' | 'standard') => {
       let n = 0;
