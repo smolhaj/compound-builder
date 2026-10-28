@@ -78,7 +78,7 @@ export function offsetPts(pts: readonly Pt[], d: number): Pt[] {
 export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (x: number, z: number) => boolean = () => false, opts: { lit?: boolean; sensors?: boolean } = {}): THREE.Group {
   const lit = opts.lit ?? true;
   // an upgrade of a finished run is drawn beside the old tier (not on top of it) until it is done and the old one comes down
-  const run = run0.replaces ? { ...run0, pts: offsetPts(run0.pts, UPGRADE_OFFSET) } : run0;
+  const run = run0.replaces ? { ...run0, pts: offsetPts(run0.pts, run0.replacesKind === 'container_wall' ? 0.36 : UPGRADE_OFFSET) } : run0;
   const bits = new Map<KitMaterialId, THREE.BufferGeometry[]>();
   const add = (m: KitMaterialId, g: THREE.BufferGeometry) => { let l = bits.get(m); if (!l) bits.set(m, l = []); l.push(worldUV(g)); };
   const def = PERIMETER[run.kind];

@@ -107,6 +107,8 @@ export interface PerimeterRun {
   revealed?: boolean;
   /** An upgrade of this finished run: the old tier keeps working until this one is done, then goes (its materials half back). */
   replaces?: string;
+  /** The kind being replaced (an upgrade is drawn beside it: a container wall is wide, so the new wall stands further off). */
+  replacesKind?: PerimeterKind;
 }
 
 /** The next tier up, where there is one (upgraded in place: sim `upgradeRun`). */
@@ -270,6 +272,7 @@ export function upgradeRun(s: GameState, id: string): string | null {
   const next = UPGRADE_NEXT[r.kind]!;
   const run = planRun(s, next, r.pts.map(p => [p[0], p[1]] as Pt), r.gates.map(g => ({ ...g })));
   run.replaces = r.id;
+  run.replacesKind = r.kind;
   log(s, `Upgrading the ${PERIMETER[r.kind].name.toLowerCase()} to ${PERIMETER[next].name.toLowerCase()}. The old one stands until the new one is up.`);
   return null;
 }
