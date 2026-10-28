@@ -3,7 +3,8 @@ import { useGameStore } from '../../store/gameStore';
 import { BLUEPRINTS } from '../../sim/blueprints';
 import { billText, type MaterialId } from '../../sim/materials';
 import { orderCost, orderProblem, prices } from '../../sim/economy';
-import { blockedReason, isFinished, progress } from '../../sim/construction';
+import { ToolNeedsNote } from '../ToolsPanel';
+import { holdReason, isFinished, progress } from '../../sim/construction';
 import { CREW_RATE, CREW_SIZE, crewProblem, crewQuote } from '../../sim/crews';
 import { fixBill, fixBlocked, fixDef, pendingFixes } from '../../sim/improvements';
 import { KIT } from '../../game/buildkit/kit';
@@ -49,7 +50,8 @@ export function ProjectsTab() {
           <div style={{ height: 6, background: '#333', borderRadius: 3, margin: '4px 0' }}>
             <div style={{ width: `${progress(sel) * 100}%`, height: '100%', background: '#c9b27a', borderRadius: 3 }} />
           </div>
-          {!isFinished(sel) && <Note tone={blockedReason(game, sel) ? 'warn' : undefined}>{blockedReason(game, sel) ?? `${Math.round(progress(sel) * 100)} % done`}</Note>}
+          {!isFinished(sel) && <Note tone={holdReason(game, sel) ? 'warn' : undefined}>{holdReason(game, sel) ?? `${Math.round(progress(sel) * 100)} % done`}</Note>}
+          <ToolNeedsNote game={game} st={sel} />
           {(!isFinished(sel) || pendingFixes(sel).length > 0) && (() => {
             const crew = game.crews.find(c => c.target === sel.id), q = crewQuote(sel), why = crewProblem(game, sel);
             return crew

@@ -7,11 +7,12 @@ import { useGameStore } from '../store/gameStore';
 import type { Quality } from '../engine/world/WorldScene';
 import { SEASON_MODES, type SeasonMode } from '../engine/world/season/seasonState';
 import { WEATHER_MODES, type WeatherMode } from '../engine/world/weather/weatherState';
+import { DogsPanel } from './DogsPanel';
 import { calendarOf, dayIndex, hourOf, type Speed } from '../sim/state';
 import { BACKGROUND_NAME, backgroundOf, fullName } from '../sim/family';
 import { MATERIALS, MATERIAL_IDS, qtyText, type MaterialId } from '../sim/materials';
 import { onOrder, orderCost, orderProblem, prices } from '../sim/economy';
-import { blockedReason, isFinished } from '../sim/construction';
+import { holdReason, isFinished } from '../sim/construction';
 import { REGIONS } from '../sim/regions';
 import { keeping, KEPT } from '../sim/shelf';
 import { CONDITION, pharmacyOpen } from '../sim/body';
@@ -25,6 +26,7 @@ import { countyWorks, premium, yearlyTax } from '../sim/paperwork';
 import { DRIVE_PER_FT, driveQuote, hookupProblem, POLE_PER_FT, powerQuote } from '../sim/improvements';
 import { KIT } from '../game/buildkit/kit';
 import { FUEL_UNIT_L, storageCapacity } from '../sim/utilities';
+import { HousingPanel } from './HousingPanel';
 import { bestShelter, doseRate, isNuclear, SHELTER_DAYS } from '../sim/nuclear';
 import { DISASTERS, TRACKS, TRACK_NAME, type DisasterKind } from '../sim/disaster';
 import { livingPerDay } from '../sim/engine';
@@ -41,7 +43,9 @@ import { EXPOSURE_NAME, exposure, raidPressure, topExposure } from '../sim/opsec
 import { acresOf, buyProblem, LAND_NAME, priceOf } from '../sim/land';
 import { runFinished } from '../sim/perimeter';
 import { plansNeed, plansNeedLines } from '../sim/guidance';
+import { populations, predatorLine } from '../sim/wildlife';
 import { PantryPanel } from './PantryPanel';
+import { ToolsPanel } from './ToolsPanel';
 import { Note, Row, Section, Tabs } from './hud/common';
 import { DIM, LINE, TONE, btn, panel, usd, type Tone } from './hud/style';
 import { BuildMenu } from './hud/BuildMenu';
@@ -110,7 +114,7 @@ export function Hud() {
   // fight wounds heal only with meds, a medic (skill 3+) or the bunker's medical bay
   const treating = game.stock.meds >= 0.1 || game.people.some((q, j) => !q.kid && game.personState[j]?.needs.died == null && q.skills.medic >= 3) || game.structures.some(st => st.kind === 'bunker_medical' && isFinished(st));
   const familyAlert: Tone | undefined = game.personState.some(ps => ps.needs.died == null && (ps.needs.health < 40 || ps.needs.hurt.length > 0)) ? 'bad' : game.personState.some(ps => ps.needs.died == null && ps.needs.hunger > 5000) ? 'warn' : undefined;
-  const projectsAlert: Tone | undefined = game.structures.some(st => !isFinished(st) && blockedReason(game, st)) ? 'warn' : undefined;
+  const projectsAlert: Tone | undefined = game.structures.some(st => !isFinished(st) && holdReason(game, st)) ? 'warn' : undefined;
 
   return (
     <>
@@ -168,6 +172,8 @@ export function Hud() {
                 })()}
               </div>;
             })}
+            <DogsPanel game={game} />
+            <HousingPanel />
             <DailySection />
             {trialCamps(game).map(c => <Section key={c.id} title={`Camp outside the wall: ${c.title}`}>
               <Row label="On trial" value={`day ${Math.max(0, dayIndex(game.clock.t) - c.from)} of ${c.until - c.from}`} />
@@ -197,6 +203,7 @@ export function Hud() {
 
           {rightTab === 'supplies' && <>
             <PantryPanel game={game} />
+            <ToolsPanel game={game} />
             <Section title="Keeping">
               {KEPT.filter(k => game.stock[k] > 0.05).map(k => {
                 const kp = keeping(game, k), yrs = (d: number) => d >= 365 ? `${(d / 365).toFixed(1)} yr` : `${Math.round(d / 30)} mo`;
@@ -221,6 +228,10 @@ export function Hud() {
               </div> : <Note>No seasons, no wardens now. Everyone is hunting: the game is thinning out.</Note>}
               {game.wild.hotUntil >= Math.floor(game.clock.t) && <Note tone="bad">Fallout: game and fish read hot for months.</Note>}
               {game.stock.fishing_gear < 1 && game.site.creek && <Note>A creek full of {REGIONS[game.site.region].game.find(x => ['trout', 'bass', 'catfish', 'salmon', 'panfish'].includes(x)) ?? 'fish'}, and no fishing gear.</Note>}
+            </Section>
+            <Section title="Wildlife on the land">
+              {populations(game).map(p => <Row key={p.sp} label={p.name} value={<span style={{ color: p.predator ? (p.count ? TONE.warn : DIM) : p.count < p.cap * 0.5 ? TONE.warn : undefined }}>{p.count} <span style={{ color: DIM }}>of ~{p.cap < 1 ? '<1' : Math.round(p.cap)}</span></span>} title={p.predator ? 'A predator: a danger to stock, dogs and kids if the place is careless; kept out by a wall that holds it; a good shot fills the freezer' : 'Counts follow the acres you own, the timber, open ground and water, and what has been hunted'} />)}
+              <Note tone={predatorLine(game).ok ? 'good' : 'warn'}>Predators: {predatorLine(game).detail}</Note>
             </Section>
             {ANIMALS.some(a => (game.stock[a] ?? 0) >= 1) && <Section title="Livestock">
               {ANIMALS.filter(a => (game.stock[a] ?? 0) >= 1).map(a => { const c = game.livestock?.condition[a] ?? 1; return <Row key={a} label={MATERIALS[a].name} value={<span style={{ color: c < 0.5 ? TONE.bad : c < 0.9 ? TONE.warn : undefined }}>{Math.floor(game.stock[a])} head, {Math.round(c * 100)} % condition</span>} />; })}

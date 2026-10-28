@@ -3,6 +3,7 @@ import { newGame, dayIndex, type GameState } from './state';
 import { addSkirt, canEnter, hasSkirt, planRun, runBill, skirtProblem, type PerimeterKind, type PerimeterRun, type Pt } from './perimeter';
 import { resolve } from './encounters';
 import { applyBattle, planBattle } from './battle';
+import { adoptDog } from './pets';
 import { boltPassages } from './compounds';
 import { gateDay } from './encounters';
 import { ambushOdds, ambushParty, chosenParty, ambushShape, combine, detectChances, digChancePerDay, digDay, digDefense, floodChance, newDigs, type Dig } from './tunnelers';
@@ -69,13 +70,13 @@ describe('tunnelers: how each counter changes the odds', () => {
     g.utilities.lit = ['house'];
     const wired = detectChances(digDefense(g, run, [0, -5]));
     expect(wired.sensors).toBeGreaterThan(0.05);
-    g.stock.dog = 2;
+    adoptDog(g); adoptDog(g);
     const withDogs = combine(detectChances(digDefense(g, run, [0, -5])));
     expect(withDogs).toBeGreaterThan(combine(wired));
     // over eight days nearly every dig is noticed
     let found = 0;
     for (let seed = 1; seed <= 30; seed++) {
-      const h = afterHit(seed); const r = square(h, 'container_wall'); h.stock.ground_sensor = 3; h.stock.dog = 2; h.utilities.lit = ['house'];
+      const h = afterHit(seed); const r = square(h, 'container_wall'); h.stock.ground_sensor = 3; adoptDog(h); adoptDog(h); h.utilities.lit = ['house'];
       dig(h, r); if (play(h) === 'warned') found++;
     }
     expect(found).toBeGreaterThanOrEqual(27);
@@ -144,7 +145,7 @@ describe('tunnelers: how each counter changes the odds', () => {
 describe('tunnelers: what you do when you hear them', () => {
   it('offers the ambush only to an armed party, the flood only with a ditch, the collapse only with the means', () => {
     const g = afterHit(5); const r = square(g, 'container_wall');
-    dig(g, r, { detectedDay: dayIndex(g.clock.t), by: 'dogs' }); g.stock.dog = 1;
+    dig(g, r, { detectedDay: dayIndex(g.clock.t), by: 'dogs' }); adoptDog(g);
     expect(ambushParty(g)).toEqual([]);
     digDay(g);
     expect(g.gate.pending!.stances).toEqual(['ignore']);

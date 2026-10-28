@@ -194,6 +194,7 @@ export function resolveTrialEnd(s: GameState, e: Encounter, stance: Stance): Out
       s.people.push(p); s.personState.push({ id: p.id, task: 'idle', target: null, needs });
     }
     for (const [k, v] of Object.entries(c?.brings ?? e.brings ?? {}) as Array<[keyof Stock, number]>) s.stock[k] += v;
+    s.stock.sleeping_bag += people.length;     // a bedroll each (sim/housing.ts)
     s.gate.tookIn += people.length; s.gate.humanity = Math.min(100, s.gate.humanity + 4);
     return { title: 'Inside the wall', text: `They move their things in from the camp. ${people.length} more at the table tonight.`, tone: 'good', lines: [] };
   }

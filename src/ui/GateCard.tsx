@@ -7,6 +7,7 @@ import { AFTERMATH_TEXT } from '../sim/aftermath';
 import { canPay, DOUBLE_CROSS } from '../sim/rescue';
 import type { Caliber } from '../sim/armory';
 import { STANCE } from './stanceText';
+import { ArrivalHousing } from './HousingPanel';
 
 
 /** The end of a month's trial. */
@@ -49,6 +50,7 @@ export function GateCard() {
         <div style={{ fontSize: 11, letterSpacing: 1, opacity: 0.6, textTransform: 'uppercase' }}>{e.kind === 'break_in' ? 'In the night' : e.kind === 'ransom' ? 'Word about your child' : e.kind === 'trial_end' ? 'The camp outside the wall' : 'At the gate'}</div>
         <div style={{ fontSize: 19, fontWeight: 700, margin: '2px 0 8px' }}>{e.title}</div>
         {e.dossier.filter(Boolean).map((l, i) => <div key={i} style={{ marginBottom: 4, opacity: 0.9 }}>{l}</div>)}
+        {(e.kind === 'arrival' || e.kind === 'trial_end') && !!e.people?.length && <ArrivalHousing people={e.people} />}
         {e.kind === 'arrival' && !g.game.food.fromStores && (() => {
           const here = g.game.personState.filter(ps => ps.needs.died == null).length, days = daysOfFood(g.game);
           return <div style={{ margin: '8px 0', fontSize: 12, opacity: 0.75 }}>Put by: {Math.round(days)} days of food for {here}; with them, {Math.round(days * here / (here + e.size))} days.</div>;

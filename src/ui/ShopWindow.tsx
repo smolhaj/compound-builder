@@ -15,12 +15,13 @@ import {
 } from '../sim/finance';
 import type { GameState, OrderLine } from '../sim/state';
 import { buyOffer, canTrade, findContact, heatNow, INTRO_CASH, lawless, offers, peekBm, priceOfOffer, risk } from '../sim/blackMarket';
+import { ToolShop } from './ToolShop';
 import { SHELF_TABS, SHELVES, shelvesNeeding, type ShelfTab } from '../sim/shelves';
 import { plansNeed, plansNeedLines } from '../sim/guidance';
 import { ammoLimit, buyAmmo, buyGun, CALIBER, CALIBERS, CLASS_USD, GUN, GUN_GROUP, GUNS, groupOf, gunPrices, issue, NFA_STAMP, practice, shopOpen, skillOf, stateBan, takeClass, type Caliber, type GunGroup, type GunModel } from '../sim/armory';
 
-type Tab = ShelfTab | 'guns' | 'metals' | 'money';
-const TABS: Array<[Tab, string]> = [...SHELF_TABS.filter(([id]) => id !== 'defense'), ['guns', 'Guns & ammo'], ['defense', 'Kit & security'], ['metals', 'Gold & silver'], ['money', 'Money']];
+type Tab = ShelfTab | 'tools' | 'guns' | 'metals' | 'money';
+const TABS: Array<[Tab, string]> = [...SHELF_TABS.filter(([id]) => id !== 'defense'), ['tools', 'Tools'], ['guns', 'Guns & ammo'], ['defense', 'Kit & security'], ['metals', 'Gold & silver'], ['money', 'Money']];
 
 const C = { bg: 'rgba(22,24,20,0.98)', card: 'rgba(255,255,255,0.045)', line: 'rgba(255,255,255,0.09)', gold: '#d8c9a0', dim: 'rgba(238,238,238,0.62)', good: '#a8d080', bad: '#f0a080' };
 const usd = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
@@ -64,6 +65,8 @@ function Icon({ id, tint }: { id: string; tint?: number }) {
     case 'lids': return g(<>{[0, 1, 2].map(i => <ellipse key={i} cx="22" cy={18 + i * 6} rx="11" ry="3" fill="#c8a040" stroke="#7a5a10" />)}</>);
     case 'meds': return g(<><rect x="8" y="12" width="28" height="22" rx="3" fill="#e8e4dc" /><path d="M22 16 v14 M15 23 h14" stroke="#c03030" strokeWidth="4" /></>);
     case 'hygiene': return g(<><rect x="9" y="14" width="12" height="20" rx="3" fill="#7ab0d8" /><circle cx="29" cy="24" r="8" fill="#f2f0ea" /><circle cx="29" cy="24" r="3" fill="#c8c4bc" /></>);
+    case 'tent': return g(<><path d="M6 34 L22 10 L38 34 Z" fill="#c9a24a" stroke="#6a5220" strokeWidth="1.5" /><path d="M22 10 L17 34 H27 Z" fill="#2a2418" /></>);
+    case 'sleeping_bag': return g(<><rect x="6" y="15" width="32" height="14" rx="7" fill="#3a6a5a" stroke="#1f3a30" /><path d="M12 15 v14 M20 15 v14 M28 15 v14" stroke="#1f3a30" /></>);
     case 'traps': return g(<><rect x="10" y="20" width="24" height="10" fill="#c8a070" /><path d="M12 20 q10 -10 20 0" fill="none" stroke="#9aa0a4" strokeWidth="2" /></>);
     case 'fuel': case 'stabilizer': return g(<><path d="M12 12 h16 l6 6 v18 h-22 z" fill={id === 'fuel' ? '#b83a2a' : '#3a7ab8'} /><rect x="26" y="8" width="5" height="6" fill="#333" /></>);
     case 'plow': return g(<path d="M6 30 q16 -16 32 0 v4 h-32 z" fill="#d8a020" stroke="#7a5a10" />);
@@ -92,8 +95,13 @@ function Icon({ id, tint }: { id: string; tint?: number }) {
     case 'radios': return g(<>{[14, 28].map(x => <g key={x}><rect x={x - 5} y="14" width="10" height="20" rx="2" fill="#2a2a2a" /><path d={`M${x + 3} 14 v-7`} stroke="#2a2a2a" strokeWidth="2" /></g>)}</>);
     case 'cameras': case 'thermal_cam': return g(<><rect x="8" y="16" width="22" height="10" rx="2" fill="#e0e0d8" /><circle cx="10" cy="21" r="3" fill={id === 'cameras' ? '#333' : '#d06a2a'} /><path d="M24 26 v10" stroke="#888" strokeWidth="2" /></>);
     case 'driveway_alarm': case 'tripwire': return g(<><path d="M6 30 h32" stroke="#888" strokeDasharray={id === 'tripwire' ? '2 2' : undefined} /><rect x="16" y="14" width="12" height="12" rx="2" fill="#3a6a9a" /></>);
+    case 'ai_sensor_module': return g(<><rect x="12" y="14" width="24" height="20" rx="3" fill="#2c3a4a" /><circle cx="24" cy="24" r="6" fill="#7fd0ff" /><circle cx="24" cy="24" r="2.5" fill="#102030" /><path d="M16 12 h4 M28 12 h4" stroke="#9cc070" strokeWidth="2" /></>);
     case 'floodlights': return g(<><path d="M14 14 l10 6 v6 l-10 6 z" fill="#555" /><path d="M24 20 l14 -6 v20 l-14 -6" fill="#ffe08a" opacity="0.8" /></>);
     case 'ground_sensor': return g(<><path d="M6 30 h32" stroke="#6a5a3a" strokeWidth="3" /><path d="M14 30 v-10 M22 30 v-14 M30 30 v-8" stroke="#9aa098" strokeWidth="3" /><circle cx="14" cy="18" r="2.5" fill="#6fbf6f" /><circle cx="22" cy="14" r="2.5" fill="#6fbf6f" /><circle cx="30" cy="20" r="2.5" fill="#6fbf6f" /></>);
+    case 'puppy': return g(<><ellipse cx="22" cy="28" rx="10" ry="6" fill="#d8b878" /><circle cx="14" cy="22" r="6" fill="#d8b878" /><ellipse cx="9" cy="18" rx="2.5" ry="4" fill="#9a7a48" /><circle cx="12" cy="21" r="1" fill="#222" /><circle cx="11" cy="25" r="1.4" fill="#222" /></>);
+    case 'dogbed': return g(<><ellipse cx="22" cy="28" rx="14" ry="7" fill="#7a6a9a" /><ellipse cx="22" cy="26" rx="10" ry="4" fill="#a898c8" /></>);
+    case 'kibble': return bag('#a86a3a', 'DOG');
+    case 'doghouse': return g(<><path d="M8 34 V22 L22 10 L36 22 V34 Z" fill="#a8774a" stroke="#4a3018" /><path d="M17 34 v-9 a5 5 0 0 1 10 0 v9 z" fill="#2a1e10" /></>);
     case 'dog': return g(<path d="M10 30 v-10 l6 -6 h4 l2 -4 l4 4 v6 h10 v10 h-4 v-6 h-14 v6 z" fill="#8a6a40" />);
     case 'steel_door': case 'safe_room': return g(<><rect x="12" y="6" width="20" height="32" fill="#6a7068" stroke="#3a3e38" strokeWidth="2" /><circle cx="28" cy="22" r="2" fill="#ccc" /></>);
     case 'window_bars': return g(<><rect x="8" y="8" width="28" height="28" fill="#2a3a4a" />{[14, 20, 26, 32].map(x => <path key={x} d={`M${x} 8 v28`} stroke="#9a9a9a" strokeWidth="2" />)}</>);
@@ -159,7 +167,7 @@ export function ShopWindow() {
         </div>}
         <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
           <div style={{ flex: 1, overflowY: 'auto', padding: 14 }}>
-            {tab !== 'metals' && tab !== 'money' && tab !== 'guns' && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 8 }}>
+            {tab !== 'metals' && tab !== 'money' && tab !== 'guns' && tab !== 'tools' && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 8 }}>
               {tab === 'food' && <FoodShelves game={game} k={k} cart={foodCart} add={addFood} />}
               {(SHELVES as Record<string, MaterialId[]>)[tab].filter(m => MATERIALS[m].price !== null).slice().sort((a, b) => Number((need[b] ?? 0) > 0) - Number((need[a] ?? 0) > 0)).map(m => (
                 <div key={m} style={{ background: C.card, border: `1px solid ${cart[m] || (need[m] ?? 0) > 0 ? C.gold : C.line}`, borderRadius: 10, padding: 10, display: 'flex', gap: 10 }}>
@@ -178,12 +186,13 @@ export function ShopWindow() {
                 </div>
               ))}
             </div>}
+            {tab === 'tools' && <ToolShop onMsg={setMsg} />}
             {tab === 'guns' && <Guns onMsg={setMsg} />}
             {tab === 'metals' && <Metals onMsg={setMsg} />}
             {tab === 'money' && <Money onMsg={setMsg} />}
             {msg && <div style={{ color: C.bad, marginTop: 10 }}>{msg}</div>}
           </div>
-          {tab !== 'metals' && tab !== 'money' && tab !== 'guns' && <div style={{ width: 250, borderLeft: `1px solid ${C.line}`, padding: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {tab !== 'metals' && tab !== 'money' && tab !== 'guns' && tab !== 'tools' && <div style={{ width: 250, borderLeft: `1px solid ${C.line}`, padding: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
             <b>The order</b>
             {!lines.length && <div style={{ color: C.dim }}>Nothing yet.</div>}
             <div style={{ flex: 1, overflowY: 'auto' }}>

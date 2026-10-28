@@ -23,6 +23,7 @@ import { REGIONS, type Game } from './regions';
 import { huntingRifle, smallGameGun } from './armory';
 import { mulberry32 } from './rng';
 import { addFoodKcal } from './pantry';
+import { gameCount, killShare, recoveryPerDay } from './wildlife';
 
 export type GameClass = 'big' | 'small' | 'fish';
 const BIG: Game[] = ['elk', 'deer', 'moose', 'antelope', 'javelina', 'turkey'];
@@ -91,7 +92,9 @@ export function wildDay(s: GameState, freezer: boolean): number {
   // everyone's out hunting once the stores are gone: the game thins, then slowly comes back
   for (const c of ['big', 'small', 'fish'] as GameClass[]) {
     if (after && d.tracks.stores < 0.5) w.abundance[c] = Math.max(0.05, w.abundance[c] - (c === 'big' ? 0.0012 : 0.0006));
-    w.abundance[c] = Math.min(1, w.abundance[c] + (c === 'small' ? 0.0008 : 0.0003));
+    // (a small place refills faster: its long edge lets neighbors' animals wander in; sim/wildlife.ts)
+    if (c !== 'fish') w.abundance[c] = Math.min(1, w.abundance[c] + recoveryPerDay(s, c));
+    else w.abundance[c] = Math.min(1, w.abundance[c] + 0.0003);
   }
   let meat = 0;
   const bring = (baskets: number, what: string, cls: GameClass) => {
@@ -100,7 +103,8 @@ export function wildDay(s: GameState, freezer: boolean): number {
     if (freezer) addFoodKcal(s, 'game_meat', baskets * 2000);
     else if (s.stock.smoker >= 1 && baskets > 4) { addFoodKcal(s, 'smoked_meat', baskets * 2000 * 0.8); meat -= baskets * 2000 * 0.2; }
     else s.stock.fresh += baskets;
-    w.abundance[cls] = Math.max(0.05, w.abundance[cls] - (cls === 'big' ? 0.02 : 0.004));
+    // one animal's share of what the land holds: on 5 acres a deer is half the deer; on 80 a sixteenth
+    w.abundance[cls] = Math.max(0.05, w.abundance[cls] - (cls === 'fish' ? 0.004 : killShare(s, cls)));
     if (day <= w.hotUntil) for (const ps of s.personState) if (ps.needs.died == null) ps.needs.dose += 0.004 * baskets / 4;
     if (baskets >= 8) log(s, `${what} down: meat for weeks${s.stock.smoker >= 1 && !freezer ? ' (smoked into jerky)' : ''}.${day <= w.hotUntil ? ' It reads hot on the counter.' : ''}`);
   };
@@ -113,7 +117,9 @@ export function wildDay(s: GameState, freezer: boolean): number {
     const elk = bigs.includes('elk') && (after || (inSeason(s, 'elk') && hasLicense(s, 'elk')));
     const deerOk = after || (inSeason(s, 'deer') && (hasLicense(s, 'deer') || w.poach)) || (inSeason(s, 'elk') && bigs.includes('elk') && w.poach);
     const winter = calendarOf(s.clock).doy < 60 || calendarOf(s.clock).doy > 340;
-    if ((elk || deerOk) && r() < 0.03 * hunter / 5 * hf * w.abundance.big * timber * (winter ? 0.5 : 1) && huntingRifle(s, true)) {
+    // (few animals on a small place: the hunt finds fewer; the hunt's odds follow the animals that are there)
+    const herd = Math.max(0.25, Math.min(1.3, gameCount(s, 'big') / 6));
+    if ((elk || deerOk) && r() < 0.03 * hunter / 5 * hf * w.abundance.big * timber * herd * (winter ? 0.5 : 1) && huntingRifle(s, true)) {
       const kind: Game = elk && r() < 0.4 ? 'elk' : bigs.find(x => x !== 'elk') ?? bigs[0];
       const poached = !after && !(kind === 'elk' ? hasLicense(s, 'elk') : hasLicense(s, 'deer'));
       if (!(poached && warden())) bring(MEAT[kind] ?? 15, kind[0].toUpperCase() + kind.slice(1), 'big');
@@ -121,7 +127,7 @@ export function wildDay(s: GameState, freezer: boolean): number {
   }
   // small game: snares, or a .22 / shotgun
   const smallOk = after || (inSeason(s, 'small') && hasLicense(s, 'small'));
-  if (smallOk && (s.stock.snares >= 1 || (hunter >= 1 && smallGameGun(s))) && r() < 0.06 * hf * w.abundance.small) {
+  if (smallOk && (s.stock.snares >= 1 || (hunter >= 1 && smallGameGun(s))) && r() < 0.06 * hf * w.abundance.small * Math.max(0.3, Math.min(1.2, gameCount(s, 'small') / 8))) {
     if (s.stock.snares < 1) s.armory.ammo['22lr'] = Math.max(0, (s.armory.ammo['22lr'] ?? 0) - 3);
     bring(1, 'A rabbit', 'small');
   }

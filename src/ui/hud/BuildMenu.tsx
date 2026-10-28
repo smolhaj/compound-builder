@@ -5,7 +5,8 @@
  * now. Nothing is hidden (sim/guidance.ts decides; this draws).
  */
 import { useGameStore } from '../../store/gameStore';
-import { BLUEPRINTS, homeBeds, totalBill, totalHours } from '../../sim/blueprints';
+import { housingSummary } from '../../sim/housing';
+import { BLUEPRINTS, totalBill, totalHours } from '../../sim/blueprints';
 import { MATERIALS, billText, type MaterialId } from '../../sim/materials';
 import { orderCost } from '../../sim/economy';
 import { drillExtra } from '../../sim/site';
@@ -82,7 +83,7 @@ export function BuildMenu() {
       })}
     </div>
     {BUILD_GROUPS.map(([gid, title, kinds]) => (
-      <Group key={gid} id={gid} title={title} extra={gid === 'home' ? `beds ${homeBeds(game)} · ${game.people.length} people` : undefined}>
+      <Group key={gid} id={gid} title={title} extra={gid === 'home' ? housingSummary(game) : undefined}>
         {kinds.map(kit)}
       </Group>
     ))}

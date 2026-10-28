@@ -11,7 +11,7 @@
  *             steel wall tiers, an add-on for cheaper fences (perimeter.addSkirt)
  *   sensors   buried ground sensors (need power), or a trained watcher listening
  *   ditch     a ditch or moat outside the wall: the water table floods tunnels
- *   dogs      dogs and the watch rotation (gear.dogCount)
+ *   dogs      dogs and the watch rotation (pets.dogCount)
  *
  * When diggers are found the player picks: send the party to the dig site
  * (an ambush at the breakout, the battle sim with the crew caught flat-footed;
@@ -19,7 +19,8 @@
  * tunnel, or ignore it.
  */
 import { mulberry32 } from './rng';
-import { dogCount, powered } from './gear';
+import { powered } from './gear';
+import { dogCount } from './pets';
 import { armed } from './armory';
 import { enclosure, nearest } from './enclosure';
 import { PERIMETER, hasSkirt, runFinished, wallLength, type PerimeterRun, type Pt } from './perimeter';
