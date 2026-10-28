@@ -92,7 +92,7 @@ export function BuildMenu() {
     </Group>
     <Group id="perimeter" title="Perimeter">
       <WallProperty />
-      <Note>Fences upgrade in place, tier to tier (Defense tab, Upgrade the walls): {chain}, then steel.</Note>
+      <Note>Fences upgrade in place, tier to tier (Defense tab, Upgrade the walls): {chain}.</Note>
       {perimeterTiers().map(t => <div key={t.id}>
         <div style={{ fontSize: 11, color: DIM, margin: '4px 2px 2px' }} title={t.hint}>{t.title} <span style={{ opacity: 0.7 }}>· {t.hint}</span></div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>{t.kinds.map(k => lineItem(k, 100, '100 m'))}</div>
