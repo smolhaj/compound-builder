@@ -509,12 +509,12 @@ SETS.linked = [
 ];
 
 // a container wall on a slope near the camp, at eye level with the family in view: the plinth closes the gap under it
-const wallSlope = `{ if (!window.__wslope) { window.__wslope = true; const c = cb.world.camp, g = cb.world.groundAt; let best = null, bd = -1;
+const wallSlope = `{ if (window.__wslope !== window.__wallKind) { window.__wslope = window.__wallKind; const c = cb.world.camp, g = cb.world.groundAt; let best = null, bd = -1;
     for (let k = 0; k < 8; k++) for (const sd of [-1, 1]) { const a = k * 0.39, cx = c.x + sd * 4 * Math.cos(a + 1.57), cz = c.z + sd * 4 * Math.sin(a + 1.57); const p0 = [cx - Math.cos(a) * 7, cz - Math.sin(a) * 7], p1 = [cx + Math.cos(a) * 7, cz + Math.sin(a) * 7]; let lo = 1e9, hi = -1e9; for (let i = 0; i <= 14; i++) { const h = g(p0[0] + (p1[0] - p0[0]) * i / 14, p0[1] + (p1[1] - p0[1]) * i / 14); lo = Math.min(lo, h); hi = Math.max(hi, h); } if (hi - lo > bd) { bd = hi - lo; best = [p0[0], p0[1], p1[0], p1[1], cx, cz]; } }
     window.__ws = best;
-    cb.game.setState(s => { const gm = structuredClone(s.game); gm.perimeter.push({ id: 'W1', kind: window.__wallKind || 'container_wall', pts: [[best[0], best[1]], [best[2], best[3]]], gates: [], done: 1, hours: 1, supplied: true, finishedAt: 0 }); return { game: gm }; }); } }`;
+    cb.game.setState(s => { const gm = structuredClone(s.game); gm.perimeter = gm.perimeter.filter(r => r.id !== 'W1'); gm.perimeter.push({ id: 'W1', kind: window.__wallKind || 'container_wall', pts: [[best[0], best[1]], [best[2], best[3]]], gates: [], done: 1, hours: 1, supplied: true, finishedAt: 0 }); return { game: gm }; }); } }`;
 // eye level on the camp side of the wall, looking across the camp (the family is between) at the wall
-const wallEye = (kind) => `window.__wallKind = '${kind}'; ` + wallSlope + `{ const w = window.__ws, c = cb.world.camp, g = cb.world.groundAt; const dx = c.x - w[4], dz = c.z - w[5], d = Math.hypot(dx, dz) || 1; const ex = c.x + dx / d * 3.2, ez = c.z + dz / d * 3.2; cb.qa.pose = { x: ex, y: g(ex, ez) + 0.24, z: ez, lx: w[4], ly: g(w[4], w[5]) + 0.12, lz: w[5], fov: 66 }; }`;
+const wallEye = (kind) => `window.__wallKind = '${kind}'; ` + wallSlope + `{ const w = window.__ws, c = cb.world.camp, g = cb.world.groundAt; const dx = c.x - w[4], dz = c.z - w[5], d = Math.hypot(dx, dz) || 1; const ex = c.x + dx / d * 1.8, ez = c.z + dz / d * 1.8; cb.qa.pose = { x: ex, y: g(ex, ez) + 0.24, z: ez, lx: w[4], ly: g(w[4], w[5]) + 0.12, lz: w[5], fov: 66 }; }`;
 SETS.walls = [
   { name: 'wall-slope-container-eye-person', time: 10, season: 'summer', setup: toHour(10) + wallEye('container_wall'), cam: { x: C, z: C, yaw: 0, pitch: 0.2, radius: 7 }, frames: 40 },
   { name: 'wall-slope-concrete-eye-person', time: 10, season: 'summer', setup: toHour(10) + wallEye('concrete_wall'), cam: { x: C, z: C, yaw: 0, pitch: 0.2, radius: 7 }, frames: 40 },
