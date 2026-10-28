@@ -126,7 +126,7 @@ function subStep(s: GameState): void {
   // (broke: the bills stop at nothing; food stamps and the food bank keep the table going)
   if (s.disaster.tracks.banks > 0.5 && s.disaster.tracks.stores > 0.5 && s.money > 0) s.money -= livingPerDay(s) * SUBSTEP;
   // investment income comes in while the banks work
-  if (s.disaster.tracks.banks > 0.5) s.money += LIFESTYLE[s.lifestyle].passive / 365 * SUBSTEP;
+  if (s.disaster.tracks.banks > 0.5) s.money += (s.startFunds ? s.startFunds.passive : LIFESTYLE[s.lifestyle].passive) / 365 * SUBSTEP;
   crewStep(s, SUBSTEP);
   burnFirewood(s, SUBSTEP);
   // the collapse clock, once a day: warning signs, the hit, the outside world's services

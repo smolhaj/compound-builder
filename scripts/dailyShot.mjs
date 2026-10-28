@@ -12,10 +12,10 @@ try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   page.setDefaultTimeout(900000);
   page.on('pageerror', e => console.error('pageerror:', e.message));
-  await page.goto(`http://localhost:${port}/?seed=7`);
-  await page.waitForFunction(() => window.__cb, null, { timeout: 300000 });
+  await page.goto(`http://localhost:${port}/?seed=7&lowrender=0.9`);
+  await page.waitForFunction(() => window.__cb?.qa?.lowrender, null, { timeout: 300000 });
   await page.evaluate(() => window.__cb.store.getState().setQuality('low'));
-  const frames = async n => { const f0 = await page.evaluate(() => window.__cb.qa.frames); await page.waitForFunction(k => window.__cb.qa.frames >= k, f0 + n, { polling: 200 }); };
+  const frames = async () => { await page.evaluate(() => window.__cb.qa.renderNow()); };   // ?lowrender: the canvas draws on request
   await frames(3); lap('loaded');
   // the compound: home, garden, coop, field, well, a wall; a family of six (two taken in)
   await page.evaluate(async () => {

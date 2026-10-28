@@ -12,7 +12,9 @@ import { newGame, type GameState } from '../src/sim/state';
 import { step } from '../src/sim/engine';
 import { placeOrder, orderProblem, payWith } from '../src/sim/economy';
 import { planStructure, planProblem, isFinished } from '../src/sim/construction';
-import { CLASSIC, listings, type Site } from '../src/sim/site';
+import { affordable, CLASSIC, listings, type Site } from '../src/sim/site';
+import { generateFamily } from '../src/sim/family';
+import { startFunds } from '../src/sim/startFunds';
 import { BLUEPRINTS, isHome } from '../src/sim/blueprints';
 import { fixBill, fixBlocked, orderHookup, pendingFixes, placeImprovements } from '../src/sim/improvements';
 import { hireCrew, hoursLeft } from '../src/sim/crews';
@@ -185,6 +187,14 @@ function fieldSpot(s: GameState, M: (x: number, z: number) => [number, number]):
     if (!s.structures.some(st => Math.hypot(st.x - x, st.z - z) < r)) return [x, z];
   }
   return null;
+}
+
+/** The listing the old bots bought (the seed's pick of the first four); if this family can't afford it, the priciest one it can. */
+function siteFor(seed: number, region?: RegionId): Site {
+  const budget = startFunds(generateFamily(seed), 'fulltime', seed).budget;
+  const ls = listings(seed, region, undefined, 6, budget), want = ls[seed % 4];
+  if (affordable(want, budget)) return want;
+  return ls.filter(l => affordable(l, budget)).sort((a, b) => b.price - a.price)[0];
 }
 
 interface RunResult { causes: string; often: Array<[string, number]>; minMoney: number; site: string; strat: Strategy; kind: DisasterKind; variant: string; ending: string; grade: string; alive: string; hungry: number; days: number; moneyAtHit: number; builtAtHit: number; bugs: string[]; lines: string[]; fights: string[]; prisoners: number; hides: number; hidFound: number; owed: number; debtStage: string; trials: string; stripped: number; burned: number }
@@ -367,7 +377,7 @@ describe.skipIf(process.env.PLAYTEST !== 'long')('the long game', () => {
     const runs: Array<[Strategy, RegionId]> = [...REGION_IDS.flatMap(g => [['homestead', g], ['prepper', g]] as Array<[Strategy, RegionId]>), ['idle', 'mountain_west'], ['fortress', 'mountain_west']];
     for (const [strat, region] of runs) {
       const kind = (['grid_down', 'pandemic', 'financial', 'drought', 'wildfire', 'cyberattack'] as DisasterKind[])[seed % 6];
-      const r = play(strat, kind, seed, 'short', listings(seed, region)[seed % 4], 40);
+      const r = play(strat, kind, seed, 'short', siteFor(seed, region), 40);
       const s = r.s, L = s.lineage;
       const living = s.people.filter((_, i) => s.personState[i].needs.died == null);
       rows.push(`| ${seed} | ${region} | ${strat} | ${L.eras.map(e => `${e.name} ${e.grade} (${e.fate})`).join(', ') || '-'}${s.ending?.kind === 'wipe' ? ' · wiped' : ''} | ${living.length}/${s.people.length} | ${r.causes || '-'} | ${s.ending?.kind === 'wipe' ? `${calendarOf(s.clock).year} (${s.disaster.phase})` : '-'} | ${s.people.filter(p => p.bornHere).length} | ${new Set(living.filter(p => p.kin).map(p => p.gen)).size} | ${Math.round(L.points)} | ${L.milestones.length} | ${r.bugs.join('; ')} |`);
@@ -388,7 +398,7 @@ describe.skipIf(!process.env.PLAYTEST || process.env.PLAYTEST === 'long')('playt
     const results: RunResult[] = [];
     // (the seed is fixed by the disaster's and the strategy's place in the full table, so a filtered run replays the same game)
     const ALL_KINDS = ['grid_down', 'nuclear', 'drought', 'pandemic', 'wildfire', 'ash_winter', 'financial', 'solar_flare', 'zombies'], ALL_STRATS: Strategy[] = ['idle', 'homestead', 'prepper', 'fortress'];
-    for (const kind of kinds) for (const strat of strats) { const seed = 11 + ALL_KINDS.indexOf(kind) * 4 + ALL_STRATS.indexOf(strat) + Number(process.env.SEEDOFF ?? 0), site = listings(seed)[seed % 4]; results.push(play(strat, kind, seed, 'medium', site)); }
+    for (const kind of kinds) for (const strat of strats) { const seed = 11 + ALL_KINDS.indexOf(kind) * 4 + ALL_STRATS.indexOf(strat) + Number(process.env.SEEDOFF ?? 0), site = siteFor(seed); results.push(play(strat, kind, seed, 'medium', site)); }
     const md = ['# Playtest report (scripted)', '', '| Site | Disaster | Strategy | Variant | Ending | Grade | Alive | Lost to | Hungry days | Days | $ at hit | Built at hit | Fights | Hid (found) | Trials | Bugs |', '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|',
       ...results.map(r => `| ${r.site} | ${r.kind} | ${r.strat} | ${r.variant} | ${r.ending} | ${r.grade} | ${r.alive} | ${r.causes || '-'} | ${r.hungry} | ${r.days} | ${r.moneyAtHit.toLocaleString('en-US')} | ${r.builtAtHit} | ${r.fights.join(', ') || '-'}${r.prisoners ? ` · ${r.prisoners} held` : ''} | ${r.hides ? `${r.hides} (${r.hidFound})${r.burned ? `, ${r.burned} burned` : ''}` : '-'} | ${r.trials} | ${r.bugs.join('; ')} |`),
       '', '## Report card lines', '', ...results.map(r => `- **${r.kind} / ${r.strat}:** ${r.lines.join(' ')}`),

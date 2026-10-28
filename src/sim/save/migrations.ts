@@ -55,13 +55,10 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   5: s => ({ ...s, version: 6, stock: { rebar: 0, membrane: 0, excavator: 0, blast_door: 0, nbc_filter: 0, spoil: 0, ...(s.stock as object) } }),
   // 6 → 7: the escape tunnel (culvert, egress hatch)
   6: s => ({ ...s, version: 7, stock: { culvert: 0, egress_hatch: 0, ...(s.stock as object) } }),
-  // 47 → 48: BRIDGE steps 44-46 below belong to the dogs (#66), linked compounds (#68) and blackout (#71) PRs; drop them as those merge.
-  // daily life (sim/daily.ts): an Auto roster (the planner fills it on the first sub-step), no chores behind, nobody tired
-  47: s => ({ ...s, version: 48, losses: (s.losses as unknown[] | undefined) ?? [], daily: (s.daily as object | undefined) ?? newDaily(), personState: (s.personState as Array<Record<string, unknown>>).map(ps => ({ fatigue: 0, ...ps })) }),
-  // 45 → 46 and 44 → 45: BRIDGE (dogs #66 and linked compounds #68 own these versions; delete these two lines when they merge)
-  46: s => ({ ...s, version: 47 }),
-  45: s => ({ ...s, version: 46 }),
-  44: s => ({ ...s, version: 45 }),
+  // 45 → 46: daily life (sim/daily.ts): an Auto roster (the planner fills it on the first sub-step), no chores behind, nobody tired; the losses ledger (sim/grief.ts)
+  45: s => ({ ...s, version: 46, losses: (s.losses as unknown[] | undefined) ?? [], daily: (s.daily as object | undefined) ?? newDaily(), personState: (s.personState as Array<Record<string, unknown>>).map(ps => ({ fatigue: 0, ...ps })) }),
+  // 44 → 45: where the starting money came from (old saves: not recorded; they keep their jobs and the old flat passive income)
+  44: s => ({ ...s, version: 45, startFunds: null }),
   // 43 → 44: structures may carry `replaces` (a watch-tower upgrade in place, sim/towers.ts; none yet) and the top towers' mount and turret goods join the stockpile at zero
   43: s => ({ ...s, version: 44, stock: { gun_mount: 0, turret_head: 0, ...(s.stock as object) }, lights: (s.lights as object | undefined) ?? newLights() }),
   // 42 → 43: a raid rolled for the day waits for its hour of arrival (`gate.incoming`, sim/siege.ts); none yet
