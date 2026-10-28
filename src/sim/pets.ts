@@ -34,6 +34,7 @@
 import { mulberry32, pick } from './rng';
 import { calendarOf, dayIndex, type GameState } from './state';
 import { eatFrom } from './pantry';
+import { logGate } from './nag';
 import { isHome } from './blueprints';
 import { REGIONS } from './regions';
 import type { SkillId } from './family';
@@ -394,6 +395,9 @@ export function applyDuty(s: GameState, d: Dog, duty: PetDuty, who: string | nul
   }
 }
 
+/** The same dog's "needs the vet" line shows at most this often (days). */
+export const VET_NAG_DAYS = 14;
+
 /** The vet: a clinic while the town is open (a bill), else the family's own medical supplies. */
 function vetVisit(s: GameState, d: Dog, who: string | null): string | null {
   const day = today(s), clinic = clinicOpen(s);
@@ -409,7 +413,7 @@ function vetVisit(s: GameState, d: Dog, who: string | null): string | null {
   if (ageYears(d, day) >= 0.2 && day - d.vax > 365 && pay(0.1, 85)) { d.vax = day; did.push('vaccinated'); }
   if (d.worms > 40 && pay(0.05, 40)) { d.worms = 0; did.push('wormed'); }
   if (did.length) { bump(d, who, 0.8); return `${d.name}: ${did.join(', ')}.`; }
-  return vetNeed(d, day) ? `${d.name} needs the vet and there are no medical supplies.` : null;
+  return vetNeed(d, day) && logGate(s, `vet:${d.id}`, VET_NAG_DAYS) ? `${d.name} needs the vet and there are no medical supplies.` : null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────
