@@ -115,8 +115,8 @@ try {
       if (!c.pending && !c.cutscene && !c.aftermath && !c.card) break;
       if (c.cutscene === 'prompt' || (c.pending && !c.cutscene)) {
         if (stage < 1) { await shot(tag + '-prompt'); stage = 1; }
-        await clickIf(/^Defend/) || await clickIf(/^Warn off/) || await clickIf(/^Hide/);   // chooseStance, by the stance's button
-        if (!(await clickIf(/^Watch$/))) { if (!c.cutscene) { await page.evaluate(() => window.__cb.game.getState().answer?.('defend')); } }
+        await clickIf(/^Defend/) || await clickIf(/^Warn off/) || await clickIf(/^Hide/) || await clickIf(/^Take them in/) || await clickIf(/^Pay/);   // the stance's own button (arrivals and raids differ)
+        await clickIf(/^Watch$/);   // raids only; an arrival is answered by its stance button
         await page.waitForTimeout(300); continue;
       }
       if (c.cutscene === 'playing') {
