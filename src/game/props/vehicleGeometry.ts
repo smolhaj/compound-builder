@@ -29,13 +29,13 @@ interface Parts { body: G[]; trim: G[]; glass: G[]; chrome: G[]; accent: G[]; li
 const parts = (): Parts => ({ body: [], trim: [], glass: [], chrome: [], accent: [], light: [] });
 
 const PAINT: Record<VehicleKind, number[]> = {
-  pickup: [0xa23a2f, 0x3d6a9a, 0xc4c3bb, 0x6a6d72, 0x6f8a4a],
-  suv: [0x4a6a47, 0x2f4a7a, 0xd2d0c8, 0x70747a, 0x8a3a33],
-  old_pickup: [0xc9b377, 0x6d8a73, 0xa4492a, 0xd9d2b8],
-  motorhome: [0xe4e0d4, 0xd8cfae],
-  tractor: [0x3a7a30, 0xb8321f, 0x2d5fa0],
-  atv: [0x2d4a2a, 0xa5322b, 0x2a2a2d],
-  trailer: [0x45484c],
+  pickup: [0xc84a3a, 0x5b8fc4, 0xdedbd0, 0x9a9ea4, 0x86a85c],
+  suv: [0x6f9a68, 0x5278b8, 0xe6e3da, 0x9ba0a6, 0xb85a4c],
+  old_pickup: [0xdcc58a, 0x8fb39a, 0xc9603e, 0xece6cf],
+  motorhome: [0xece8dc, 0xe0d7b6],
+  tractor: [0x4fa040, 0xd44a32, 0x4a86c8],
+  atv: [0x5a8a4a, 0xc84a3a, 0x8a8a94],
+  trailer: [0x7a7e84],
 };
 
 function pickup(p: Parts, old: boolean): void {
@@ -149,9 +149,9 @@ function trailer(p: Parts): void {
 }
 
 const matCache = new Map<number, THREE.MeshStandardMaterial>();
-const paint = (c: number) => { let m = matCache.get(c); if (!m) { m = new THREE.MeshStandardMaterial({ color: c, roughness: 0.5, metalness: 0.06 }); matCache.set(c, m); } return m; };
+const paint = (c: number) => { let m = matCache.get(c); if (!m) { m = new THREE.MeshStandardMaterial({ color: c, roughness: 0.5, metalness: 0.06, emissive: new THREE.Color(c).multiplyScalar(0.14) }); matCache.set(c, m); } return m; };
 let _trim: THREE.MeshStandardMaterial | null = null, _chrome: THREE.MeshStandardMaterial | null = null, _light: THREE.MeshStandardMaterial | null = null;
-const trimMat = () => (_trim ??= new THREE.MeshStandardMaterial({ color: 0x1d1e20, roughness: 0.85 }));
+const trimMat = () => (_trim ??= new THREE.MeshStandardMaterial({ color: 0x34363a, roughness: 0.85 }));
 const chromeMat = () => (_chrome ??= new THREE.MeshStandardMaterial({ color: 0xb8bcc0, roughness: 0.28, metalness: 0.9 }));
 const lightMat = () => (_light ??= new THREE.MeshStandardMaterial({ color: 0xf2ecc8, emissive: 0x222010, roughness: 0.3 }));
 

@@ -4,11 +4,12 @@ import { BLUEPRINTS } from './blueprints';
 import { migrate } from './save/migrations';
 import {
   breakdownChance, buyVehicle, cargoKg, empVehicles, fleetCapacity, fleetOf, overdue, repairDays, roadTrouble, runs, serviceVehicle, SERVICE_MILES, startingVehicles, stripForParts,
-  tractorBoost, tractorRuns, tripPlan, tripVehicle, vehiclesDay, VEHICLES, type Vehicle, type VehicleKind,
+  raidTakesVehicles, yardOpen, tractorBoost, tractorRuns, tripPlan, tripVehicle, vehiclesDay, VEHICLES, type Vehicle, type VehicleKind,
 } from './vehicles';
 import { slotOf, parkingSlots, freeSlots } from './garage';
 import { bays, GARAGES, syncParking, garageConnected, garageLinks, isUnderRoof, parkingPlan } from './parking';
 import { parkedText as parkedTextOf } from './parking';
+import { resolve } from './encounters';
 import { bugOut, bugOutPlan } from './bugout';
 import { reportCard } from './report';
 import { goToMarket, MARKET_KM } from './market';
@@ -156,6 +157,48 @@ describe('the garage', () => {
     // a passage that stops short of the garage does not connect
     run.pts = [[0.3, 0], [2.5, 0]];
     expect(garageConnected(g)).toBe(false);
+  });
+});
+
+describe('a lost fight and the yard', () => {
+  const lost = (g: GameState) => { g.vehicles = fleetOf(g); };
+  it('vehicles in the open yard can be driven off; garaged ones and ones away are safe; a closed wall protects the yard', () => {
+    let taken = 0, kept = 0;
+    for (let seed = 1; seed <= 40; seed++) {
+      const g = rich(newGame(seed)); lost(g);
+      buyVehicle(g, 'suv'); buyVehicle(g, 'tractor'); buyVehicle(g, 'atv');
+      fleetOf(g)[2].away = true;                                      // the tractor is out on a run
+      const n0 = fleetOf(g).length;
+      const lines = raidTakesVehicles(g, true);
+      taken += lines.length; kept += fleetOf(g).length;
+      expect(fleetOf(g).length).toBe(n0 - lines.length);
+      expect(fleetOf(g).some(v => v.kind === 'tractor')).toBe(true);
+      lines.forEach(l => expect(l).toMatch(/drove off the .* standing in the open yard/));
+    }
+    expect(taken).toBeGreaterThan(20); expect(kept).toBeGreaterThan(20);
+    const safe = rich(newGame(3)); finish(safe, 'metal_garage'); buyVehicle(safe, 'suv');
+    expect(raidTakesVehicles(safe, true)).toEqual([]);                // everything under a roof
+    expect(fleetOf(safe)).toHaveLength(2);
+  });
+  it('a closed property line keeps the yard safe', () => {
+    const g = rich(newGame(3)); buyVehicle(g, 'suv');
+    const ring: PerimeterRun = { id: 'w', kind: 'steel_wall', pts: [[-50, -50], [50, -50], [50, 50], [-50, 50], [-50, -50]], gates: [], done: 1, hours: 1, supplied: true, finishedAt: 0 } as unknown as PerimeterRun;
+    g.perimeter.push(ring);
+    // the sim's own enclosure check decides: either way a closed line must never lose vehicles
+    if (!yardOpen(g)) expect(raidTakesVehicles(g, true)).toEqual([]);
+    expect(yardOpen(newGame(3))).toBe(true);
+  });
+  it('a lost fight at the gate reports the vehicles it took', () => {
+    let seen = false;
+    for (let seed = 1; seed <= 30 && !seen; seed++) {
+      const g = rich(newGame(seed, 105, 2027, { mode: 'scenario', peace: 'short', kind: 'grid_down' }));
+      buyVehicle(g, 'suv');
+      g.clock.t = g.disaster.hitAt + 20; g.disaster.phase = 'survival';
+      g.gate.pending = { id: 'e1', kind: 'gang', day: 1, title: 'A gang', dossier: [], size: 40, armed: true, strength: 500, stances: ['defend'], temper: 'hard' } as never;
+      const o = resolve(g, 'defend');
+      if (o.title === 'They got in' && o.lines.some(l => /drove off/.test(l))) seen = true;
+    }
+    expect(seen).toBe(true);
   });
 });
 

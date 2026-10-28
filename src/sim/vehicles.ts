@@ -32,6 +32,8 @@ import { log } from './economy';
 import { mulberry32 } from './rng';
 import { parkingPlan, syncParking } from './parking';
 import { addTool, kitOf } from './tools';
+import { enclosure } from './enclosure';
+import { runFinished } from './perimeter';
 
 export type VehicleKind = 'pickup' | 'suv' | 'motorhome' | 'tractor' | 'atv' | 'old_pickup' | 'trailer';
 
@@ -290,6 +292,35 @@ export function driveTrip(s: GameState, v: Vehicle, km: number, liters: number, 
   s.stock.fuel = Math.max(0, s.stock.fuel - (liters - fromTank) / CAN_L);
   v.mileage += 2 * km / 1.609;
   v.condition = Math.max(0, v.condition - wear);
+}
+
+// ── Raids: what a lost fight takes ─────────────────────────────────────────
+
+/** Is the yard open to a crew? A closed property line (sim/enclosure.ts) keeps what stands inside it safe. */
+export function yardOpen(s: GameState): boolean {
+  const e = enclosure(s, s.clock.t);
+  return !(e.openShare === 0 && e.creekOpen === 0 && s.perimeter.some(r => runFinished(r) && e.onLine.has(r.id)));
+}
+
+/**
+ * A lost fight: a crew that gets in drives off what is standing in the open yard (docs/DECISIONS.md, user answer):
+ * each vehicle outside takes its chance (looters 40 %, an organized crew 60 %). A vehicle under a roof (the garages, the
+ * gatehouse garage) or inside a closed wall is safe, and one away on a run is not here. Returns the report lines.
+ */
+export function raidTakesVehicles(s: GameState, organized: boolean): string[] {
+  if (!yardOpen(s)) return [];
+  const vs = fleetOf(s);
+  const outside = parkingPlan(s).outside.map(id => vs.find(v => v.id === id)).filter((v): v is Vehicle => !!v && !v.away);
+  const lines: string[] = [];
+  const p = organized ? 0.6 : 0.4;
+  for (const v of outside) {
+    const u = mulberry32(s.seed * 5413 + dayIndex(s.clock.t) * 41 + (Number(v.id.slice(1)) || 0) * 7)();
+    if (u >= p) continue;
+    vs.splice(vs.indexOf(v), 1);
+    lines.push(`They drove off the ${VEHICLES[v.kind].name.toLowerCase()} that was standing in the open yard.`);
+  }
+  if (lines.length) syncParking(s);
+  return lines;
 }
 
 // ── Once a day ─────────────────────────────────────────────────────────────
