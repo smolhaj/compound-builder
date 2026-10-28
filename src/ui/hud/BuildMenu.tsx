@@ -75,7 +75,7 @@ export function BuildMenu() {
           <div style={{ display: 'flex', justifyContent: 'space-between' }}><b>{goal.title}</b><span style={{ color: done === goal.steps.length ? '#a8d080' : DIM }}>{done} of {goal.steps.length}</span></div>
           <div style={{ height: 3, background: '#333', borderRadius: 2, margin: '2px 0 3px' }}><div style={{ width: `${done / goal.steps.length * 100}%`, height: '100%', background: '#c9b27a', borderRadius: 2 }} /></div>
           {goal.steps.map(x => <div key={x.label} style={{ display: 'flex', gap: 6, fontSize: 11.5, opacity: x.done ? 0.6 : 1 }} title={x.detail}>
-            <span style={{ width: 12, color: x.done ? '#a8d080' : DIM }}>{x.done ? '✓' : '·'}</span><span>{x.label}</span><span style={{ color: DIM, marginLeft: 'auto', textAlign: 'right', maxWidth: '60%' }}>{x.detail}</span>
+            <span style={{ width: 12, color: x.done ? '#a8d080' : DIM }}>{x.done ? '✓' : '·'}</span><span>{x.label}</span>
           </div>)}
           {goal.id === 'enclose' && <WallProperty />}
         </div>;
