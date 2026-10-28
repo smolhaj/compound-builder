@@ -12,7 +12,7 @@ import { drillExtra } from '../../sim/site';
 import { countyWorks, needsPermit, permitFee } from '../../sim/paperwork';
 import { BUNKER_ORDER, KIT, TOWER_ORDER, UTILITY_ORDER } from '../../game/buildkit/kit';
 import { PERIMETER, UTILITY_LINES, runBill, runHours, type PerimeterKind } from '../../sim/perimeter';
-import { bunkerChecklist, buildAdvice, nextStep, perimeterNote, perimeterOff, perimeterTiers, upgradeChain } from '../../sim/guidance';
+import { bunkerChecklist, buildAdvice, longTerm, suggestions, perimeterNote, perimeterOff, perimeterTiers, upgradeChain } from '../../sim/guidance';
 import { Group, Item, Note } from './common';
 import { btn, DIM, usd } from './style';
 import { WallProperty } from './WallProperty';
@@ -34,7 +34,8 @@ export function BuildMenu() {
   const game = g.game;
   const shelters = game.structures.filter(s => s.finishedAt !== null).reduce((a, s) => a + (KIT[s.kind]?.shelters ?? 0), 0);
   const arm = (tool: string) => g.setTool(g.tool === tool ? null : tool);
-  const step = nextStep(game);
+  const sug = suggestions(game);
+  const goals = longTerm(game);
   const bunker = bunkerChecklist(game);
   const bunkerStarted = bunker.some(c => c.done);
 
@@ -59,13 +60,27 @@ export function BuildMenu() {
   const chain = upgradeChain('split_rail').map(k => PERIMETER[k].name.replace(/ \(.*\)/, '').toLowerCase()).join(' → ');
 
   return <>
-    {step && !g.tool && <div style={{ border: '1px solid #d8c9a0', borderRadius: 8, padding: '6px 8px', marginBottom: 8, background: 'rgba(216,201,160,0.08)' }}>
-      <div style={{ fontSize: 11, color: DIM, textTransform: 'uppercase', letterSpacing: 0.6 }}>Next step</div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
-        <span><b>{KIT[step.kind].name}</b><span style={{ color: DIM }}>: {step.why}</span></span>
-        <button style={btn(true)} onClick={() => arm(step.kind)}>Stake it</button>
-      </div>
+    {sug.length > 0 && !g.tool && <div style={{ border: '1px solid #d8c9a0', borderRadius: 8, padding: '6px 8px', marginBottom: 8, background: 'rgba(216,201,160,0.08)' }}>
+      <div style={{ fontSize: 11, color: DIM, textTransform: 'uppercase', letterSpacing: 0.6 }}>Most pressing now <span style={{ textTransform: 'none', letterSpacing: 0 }}>· suggestions, nothing is locked</span></div>
+      {sug.map(x => <div key={x.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, padding: '2px 0' }}>
+        <span><b>{KIT[x.kind].name}</b><span style={{ color: DIM }}>: {x.why}</span></span>
+        <button style={btn(true)} onClick={() => arm(x.kind)}>Stake it</button>
+      </div>)}
     </div>}
+    <div style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '5px 8px', marginBottom: 8 }}>
+      <div style={{ fontSize: 11, color: DIM, textTransform: 'uppercase', letterSpacing: 0.6 }}>Long-term <span style={{ textTransform: 'none', letterSpacing: 0 }}>· where a prepper place ends up</span></div>
+      {goals.map(goal => {
+        const done = goal.steps.filter(x => x.done).length;
+        return <div key={goal.id} style={{ marginTop: 4 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}><b>{goal.title}</b><span style={{ color: done === goal.steps.length ? '#a8d080' : DIM }}>{done} of {goal.steps.length}</span></div>
+          <div style={{ height: 3, background: '#333', borderRadius: 2, margin: '2px 0 3px' }}><div style={{ width: `${done / goal.steps.length * 100}%`, height: '100%', background: '#c9b27a', borderRadius: 2 }} /></div>
+          {goal.steps.map(x => <div key={x.label} style={{ display: 'flex', gap: 6, fontSize: 11.5, opacity: x.done ? 0.6 : 1 }} title={x.detail}>
+            <span style={{ width: 12, color: x.done ? '#a8d080' : DIM }}>{x.done ? '✓' : '·'}</span><span>{x.label}</span><span style={{ color: DIM, marginLeft: 'auto', textAlign: 'right', maxWidth: '60%' }}>{x.detail}</span>
+          </div>)}
+          {goal.id === 'enclose' && <WallProperty />}
+        </div>;
+      })}
+    </div>
     {BUILD_GROUPS.map(([gid, title, kinds]) => (
       <Group key={gid} id={gid} title={title} extra={gid === 'home' ? `beds ${homeBeds(game)} · ${game.people.length} people` : undefined}>
         {kinds.map(kit)}

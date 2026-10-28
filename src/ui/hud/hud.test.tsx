@@ -22,7 +22,10 @@ describe('the guided HUD (server-rendered)', () => {
     const t = text(renderToStaticMarkup(<BuildMenu />));
     expect(t).toContain('needs a hatch or stairwell first');
     expect(t).toContain('The bunker needs, in order');
-    expect(t).toContain('Next step');
+    expect(t).toContain('Most pressing now');
+    expect(t).toContain('Long-term');
+    expect(t).toContain('Enclose the compound');
+    expect(t).toContain('A bunker underneath');
     expect(t).toMatch(/water is 65 m down/i);
     expect(t).toContain('Wall my property');
     expect(t).toContain('Cheap in cash');

@@ -5,7 +5,9 @@
  * list groups by price. Pure (tested); the HUD only draws it.
  */
 import { KIT } from '../game/buildkit/kit';
-import { BLUEPRINTS, isHome } from './blueprints';
+import { BLUEPRINTS, homeBeds, isHome } from './blueprints';
+import { daysOfFood } from './needs';
+import { enclosure } from './enclosure';
 import { hardenCost } from './hardening';
 import { isFinished, planProblem } from './construction';
 import { countyWorks, needsPermit, permitFee, reviewDays } from './paperwork';
@@ -91,26 +93,50 @@ export interface BuildAdvice {
 const hasKind = (s: GameState, ...kinds: string[]) => s.structures.some(st => kinds.includes(st.kind));
 const hasPower = (s: GameState) => !!s.site.improvements?.power || hasKind(s, 'solar_array', 'garage_solar', 'generator_shed', 'battery_shed');
 
-/** The family's route through the Build list, first undone first: roof, water, a toilet, food, power, then the watch. */
-export interface Step { id: string; kind: (s: GameState) => string; done: (s: GameState) => boolean; why: string }
-export const STEPS: readonly Step[] = [
-  { id: 'home', kind: () => 'timber_cabin', done: s => s.structures.some(st => isHome(st.kind)), why: 'a roof first' },
-  { id: 'water', kind: s => (s.site.gwDepth > 9 ? 'well_drilled' : 'well_hand'), done: s => hasKind(s, 'well_hand', 'well_drilled', 'cistern', 'water_tower'), why: 'water is next: nothing lasts without it' },
-  { id: 'toilet', kind: () => 'outhouse', done: s => hasKind(s, 'outhouse', 'septic'), why: 'somewhere to go' },
-  { id: 'food', kind: () => 'garden', done: s => hasKind(s, 'garden', 'field', 'greenhouse', 'orchard'), why: 'grow food' },
-  { id: 'power', kind: () => 'solar_array', done: hasPower, why: 'power for the pump, lights and the freezer' },
-  { id: 'cellar', kind: () => 'root_cellar', done: s => hasKind(s, 'root_cellar'), why: 'somewhere cool to keep what you grow' },
-  { id: 'watch', kind: () => 'rise_lookout', done: s => s.structures.some(st => st.kind === 'rise_lookout' || st.kind.startsWith('watchtower')), why: 'a place to watch the road from' },
-];
+/** One thing worth doing now, from what the place lacks. A suggestion, never a requirement: nothing is locked behind it. */
+export interface Suggestion { id: string; kind: string; why: string; urgency: number }
 
-/** The next kit piece to stake, with the reason; null when the list is done. */
-export function nextStep(s: GameState): { kind: string; why: string } | null {
-  for (const st of STEPS) {
-    if (st.done(s)) continue;
-    const kind = st.kind(s);
-    if (!planProblem(s, kind) && !buildOff(s, kind)) return { kind, why: st.why };
-  }
-  return null;
+/**
+ * What is most pressing right now (at most three), read from the state of the
+ * place: no roof, someone without a bed, no water, no food in the pantry or
+ * growing, no toilet, no power. There is no fixed route; once something is
+ * staked or built it stops being suggested.
+ */
+export function suggestions(s: GameState): Suggestion[] {
+  const people = s.people.length;
+  const homes = s.structures.filter(st => isHome(st.kind));
+  const beds = homeBeds(s);
+  const out: Suggestion[] = [];
+  const add = (id: string, kind: string, why: string, urgency: number) => { if (!buildOff(s, kind)) out.push({ id, kind, why, urgency }); };
+  if (homes.length === 0) add('roof', 'timber_cabin', 'no roof over the family yet', 100);
+  else if (beds < people && homes.every(h => structDone(h))) add('beds', 'cottage', `${people - beds} of ${people} have no bed`, 80);
+  if (!hasKind(s, 'well_hand', 'well_drilled', 'cistern', 'water_tower')) add('water', s.site.gwDepth > 9 ? 'well_drilled' : 'well_hand', s.site.gwDepth > 9 ? `no water on the place (it is ${s.site.gwDepth} m down: drill)` : 'no water on the place', 90);
+  const growing = hasKind(s, 'garden', 'field', 'greenhouse', 'orchard');
+  if (!growing) add('food', 'garden', daysOfFood(s) < 90 ? 'little food put by and nothing growing' : 'nothing growing yet', daysOfFood(s) < 90 ? 70 : 45);
+  if (!hasKind(s, 'outhouse', 'septic')) add('toilet', 'outhouse', 'nowhere to go', 50);
+  if (!hasPower(s)) add('power', 'solar_array', 'no power for the pump, lights and the freezer', 40);
+  if (growing && !hasKind(s, 'root_cellar')) add('cellar', 'root_cellar', 'nowhere cool to keep what you grow', 30);
+  return out.sort((x, y) => y.urgency - x.urgency).slice(0, 3);
+}
+
+const structDone = (st: GameState['structures'][number]): boolean => isFinished(st);
+
+export interface Goal { id: string; title: string; steps: Array<{ label: string; done: boolean; detail: string }> }
+
+/** The two endgame goals, always shown, never required: a closed and hardened compound, and a bunker underneath. */
+export function longTerm(s: GameState): Goal[] {
+  const line = enclosure(s, s.clock.t);
+  const lineRuns = s.perimeter.filter(r => runFinished(r) && line.onLine.has(r.id));
+  const best = lineRuns.reduce<PerimeterKind | null>((a, r) => (!a || PERIMETER[r.kind].blocks.people > PERIMETER[a].blocks.people ? r.kind : a), null);
+  const closed = line.openShare === 0 && line.creekOpen === 0;
+  const towers = s.structures.filter(st => (st.kind === 'rise_lookout' || st.kind.startsWith('watchtower')) && isFinished(st)).length;
+  const enclose: Goal = { id: 'enclose', title: 'Enclose the compound', steps: [
+    { label: 'Wall the property line', done: closed, detail: closed ? 'the line is closed all round' : line.openShare >= 1 ? 'nothing on the line yet' : `${Math.round(line.openShare * 100)}% of the line is open${line.creekOpen ? ' and the creek is unbarred' : ''}` },
+    { label: 'Upgrade the walls', done: !!best && PERIMETER[best].blocks.people >= 0.7, detail: best ? `${PERIMETER[best].name.toLowerCase()} now${UPGRADE_NEXT[best] ? `, next: ${PERIMETER[UPGRADE_NEXT[best]!].name.toLowerCase()}` : ', the top of the chain'}` : 'a hard wall stops people far better than wire' },
+    { label: 'Watch towers', done: towers > 0, detail: towers ? `${towers} standing` : 'a place to see them coming from' },
+  ] };
+  const bunker: Goal = { id: 'bunker', title: 'A bunker underneath', steps: bunkerChecklist(s).map(c => ({ label: c.label, done: c.done, detail: c.detail })) };
+  return [enclose, bunker];
 }
 
 /** Why a kit piece cannot be staked now (null = it can): the site, the bunker's entrance, the permit fee. */
@@ -124,11 +150,10 @@ export function buildOff(s: GameState, kind: string): string | null {
 
 export function buildAdvice(s: GameState, kind: string): BuildAdvice {
   const off = buildOff(s, kind);
-  const step = nextStep(s);
-  const bn = kind.startsWith('bunker_') ? bunkerNext(s) : null;
-  const next = !off && (step?.kind === kind || (!!bn && bn.kind === kind));
+  const sug = suggestions(s).find(x => x.kind === kind);
+  const next = !off && !!sug;
   let note: string | null = null;
-  if (next) note = bn && bn.kind === kind ? `next for the bunker: ${bn.detail}` : `next step: ${step!.why}`;
+  if (next) note = `suggested: ${sug!.why}`;
   else if (!off && needsPermit(kind) && s.paper.permits && countyWorks(s)) note = `county permit ${usd(permitFee(s, kind))}, about ${reviewDays(s, kind)} days`;
   return { off, next, note };
 }

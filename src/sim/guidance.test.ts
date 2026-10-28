@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { newGame } from './state';
 import { planStructure } from './construction';
 import { MATERIAL_IDS, MATERIALS } from './materials';
-import { bunkerChecklist, bunkerNext, buildAdvice, nextStep, perimeterOff, perimeterTiers, plansNeed, plansNeedLines, upgradeChain } from './guidance';
+import { bunkerChecklist, bunkerNext, buildAdvice, longTerm, suggestions, perimeterOff, perimeterTiers, plansNeed, plansNeedLines, upgradeChain } from './guidance';
 import { PERIMETER_ORDER, UPGRADE_NEXT, planRun } from './perimeter';
 import { SHELVES, shelvesNeeding } from './shelves';
 import { BUNKER_ORDER } from '../game/buildkit/kit';
@@ -35,33 +35,40 @@ describe('the bunker', () => {
     expect(bunkerChecklist(g).every(c => c.done)).toBe(true);
   });
 
-  it('highlights the next bunker piece as the next step', () => {
-    const g = fresh();
-    planStructure(g, 'bunker_hatch', 0, 0, 0);
-    expect(buildAdvice(g, 'bunker_dorm').next || buildAdvice(g, 'bunker_container').next).toBe(true);
-  });
 });
 
 describe('the Build list', () => {
-  it('greys the hand-dug well where the water is too deep, and points at a drilled one', () => {
+  it('greys the hand-dug well where the water is too deep, and suggests a drilled one', () => {
     const g = fresh();
     g.site = { ...g.site, gwDepth: 65 };
     expect(buildAdvice(g, 'well_hand').off).toMatch(/65 m down/);
     expect(buildAdvice(g, 'well_drilled').off).toBeNull();
-    g.structures.push({ id: 'h', kind: 'timber_cabin', x: 0, z: 0, rot: 0, stage: 99, done: 0, supplied: true, finishedAt: 0 } as never);
-    expect(nextStep(g)!.kind).toBe('well_drilled');
+    expect(suggestions(g).map(x => x.kind)).toContain('well_drilled');
   });
 
-  it('walks the family through roof, water, toilet, food in order', () => {
+  it('suggests what is pressing, at most three, and drops what is staked: no fixed route', () => {
     const g = fresh();
     g.site = { ...g.site, gwDepth: 5 };
-    expect(nextStep(g)!.kind).toBe('timber_cabin');
+    const first = suggestions(g);
+    expect(first.length).toBeLessThanOrEqual(3);
+    expect(first[0].id).toBe('roof');
+    expect(first.map(x => x.id)).toContain('water');
     planStructure(g, 'timber_cabin', 0, 0, 0);
-    expect(nextStep(g)!.kind).toBe('well_hand');
     planStructure(g, 'well_hand', 3, 0, 0);
-    expect(nextStep(g)!.kind).toBe('outhouse');
-    planStructure(g, 'outhouse', 6, 0, 0);
-    expect(nextStep(g)!.kind).toBe('garden');
+    const next = suggestions(g).map(x => x.id);
+    expect(next).not.toContain('roof');
+    expect(next).not.toContain('water');
+    // nothing is locked: every kit piece is still stakeable regardless of suggestions
+    expect(buildAdvice(g, 'barn').off).toBeNull();
+  });
+
+  it('reports the two endgame goals with progress', () => {
+    const g = fresh();
+    const [enclose, bunker] = longTerm(g);
+    expect(enclose.steps.map(x => x.done)).toEqual([false, false, false]);
+    expect(bunker.steps.every(x => !x.done)).toBe(true);
+    planStructure(g, 'bunker_hatch', 0, 0, 0);
+    expect(longTerm(g)[1].steps[0].done).toBe(true);
   });
 
   it('greys the creek bars on land with no creek, and the tunnel until there is a bunker', () => {
