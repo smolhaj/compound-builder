@@ -40,19 +40,27 @@ function KindRow({ kind, tools, msg }: { kind: ToolKind; tools: Tool[]; msg: (m:
   const plan = mendable ? repairPlan(game, mendable.id) : null;
   const pro = tools.filter(t => gradeOf(t) === 'pro').length;
   const color = broken > 0 && !working.length ? TONE.bad : toneOf(worst);
+  const wornN = working.filter(x => x.cond < 0.35).length;
+  const bits = [broken > 0 ? `${broken} broken` : '', wornN > 0 ? `${wornN} nearly worn out` : '', keen > 0 ? `${keen} dull` : '', !broken && !wornN && !keen ? condWord(worst) : ''].filter(Boolean).join(', ');
   return <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 0', fontSize: 11.5 }}>
     <ToolIcon kind={kind} size={22} />
-    <span style={{ flex: 1, minWidth: 0, lineHeight: 1.2 }} title={d.blurb}>{d.name}{tools.length > 1 ? ` ×${tools.length}` : ''}{pro > 0 && <span style={{ color: '#d8c9a0' }}> · {pro === tools.length ? 'pro' : `${pro} pro`}</span>}</span>
+    <span style={{ flex: 1, minWidth: 0, lineHeight: 1.25 }} title={d.blurb}>
+      {d.name}{tools.length > 1 ? ` ×${tools.length}` : ''}{pro > 0 && <span style={{ color: '#d8c9a0' }}> · {pro === tools.length ? 'pro' : `${pro} pro`}</span>}
+      <div style={{ color, fontSize: 11 }}>{bits}</div>
+    </span>
     <Bar v={avg} color={color} />
-    <span style={{ color, width: 58, textAlign: 'right', lineHeight: 1.2 }}>{broken > 0 ? `${broken} broken` : condWord(worst)}{keen > 0 && <span style={{ color: TONE.warn }}> dull</span>}</span>
     {dull.length > 0 && <button style={btn()} title="Sharpen them (a whetstone or file does best; a river rock will do)" onClick={() => msg(g.money(x => { let done = false; for (const k of dull) if (sharpen(x, k.id) === null) done = true; return done ? null : 'Already as sharp as it gets.'; }))}>Sharpen</button>}
     {mendable && <button style={btn(mendable.cond <= 0)} disabled={!plan?.ok} title={plan?.ok ? `Mend one with ${plan.uses}: a bit weaker each time` : plan?.why ?? ''} onClick={() => msg(g.money(x => repair(x, mendable.id)))}>{mendable.cond <= 0 ? 'Mend' : 'Fix'}</button>}
   </div>;
 }
 
+/** Needs attention: broken, nearly worn out or dull. */
+const needsCare = (tools: Tool[]) => tools.some(t => t.cond < 0.35 || isDull(t));
+
 export function ToolsPanel({ game }: { game: GameState }): ReactNode {
   const g = useGameStore();
   const [m, setM] = useState<string | null>(null);
+  const [all, setAll] = useState(false);
   const [swapKind, setSwapKind] = useState<ToolKind>('hand_saw');
   const [swapGood, setSwapGood] = useState<BagGood>('salt');
   const kit = readKit(game), counts = kitCounts(kit), cov = coverage(game), ctx = ctxOf(game);
@@ -82,7 +90,16 @@ export function ToolsPanel({ game }: { game: GameState }): ReactNode {
         ];
       })}
     </div>
-    <div style={{ marginTop: 6 }}>{kinds.map(k => <KindRow key={k} kind={k} tools={kit.items.filter(t => t.kind === k)} msg={setM} />)}</div>
+    <div style={{ marginTop: 6 }}>{(() => {
+      const groups = kinds.map(k => ({ k, tools: kit.items.filter(t => t.kind === k) }));
+      const care = groups.filter(x => needsCare(x.tools)), rest = groups.filter(x => !needsCare(x.tools));
+      return <>
+        {care.map(x => <KindRow key={x.k} kind={x.k} tools={x.tools} msg={setM} />)}
+        {care.length === 0 && <div style={{ fontSize: 11.5, color: TONE.good }}>Everything is in working order.</div>}
+        <button style={{ ...btn(), margin: '3px 0' }} onClick={() => setAll(a => !a)}>{all ? 'Hide the rest' : `Show all ${counts.total} tools`}</button>
+        {all && rest.map(x => <KindRow key={x.k} kind={x.k} tools={x.tools} msg={setM} />)}
+      </>;
+    })()}</div>
     <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginTop: 4 }}>
       <button style={btn()} disabled={counts.dull === 0} title="Put an edge on every dull blade" onClick={() => { setM(null); g.money(x => (sharpenAll(x, 0.75), null)); }}>Sharpen all</button>
       <label style={{ fontSize: 11.5, color: DIM, display: 'flex', alignItems: 'center', gap: 4 }}>
