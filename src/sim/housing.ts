@@ -319,7 +319,7 @@ let memo: { key: string; plan: HousingPlan } | null = null;
 /** The plan, reused while nothing it depends on has changed (the world asks every frame). */
 export function cachedPlan(s: GameState): HousingPlan {
   const fin = finished(s).length;
-  const key = `${s.seed}|${dayIndex(s.clock.t)}|${s.people.length}|${s.personState.map(p => (p.needs.died != null || p.needs.taken ? 1 : 0)).join('')}|${s.structures.length}|${fin}|${s.stock.tent}|${s.stock.sleeping_bag}|${heatOn(s) ? 1 : 0}|${s.weather?.active?.kind ?? ''}`;
+  const key = `${s.seed}|${s.clock.startDoy}|${dayIndex(s.clock.t)}|${s.site.region}|${s.people.length}|${s.personState.map(p => (p.needs.died != null || p.needs.taken ? 1 : 0)).join('')}|${s.structures.length}|${fin}|${s.stock.tent}|${s.stock.sleeping_bag}|${heatOn(s) ? 1 : 0}|${s.weather?.active?.kind ?? ''}`;
   if (memo?.key === key) return memo.plan;
   const plan = housingPlan(s);
   memo = { key, plan };
