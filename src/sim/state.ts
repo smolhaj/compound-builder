@@ -207,6 +207,8 @@ export interface GameState {
   startFunds: StartFunds | null;
   /** Hired crews at work on the place. */
   crews: Crew[];
+  /** "Work on this first": the id of the building or wall the family does before the rest of the queue (sim/priority.ts). */
+  focus: string | null;
   /** The co-op's line extension and the drive contractor, when due (null = not ordered). */
   siteJobs: SiteJobs;
   /** Deliveries left at the road (no drive yet): carried in by hand, oldest first. */
@@ -301,6 +303,7 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     lifestyle: setup.lifestyle ?? 'fulltime',
     startFunds: funds,
     crews: [],
+    focus: null,
     siteJobs: { power: null, drive: null },
     roadside: [],
     paper: newPaper(),

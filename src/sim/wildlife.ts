@@ -31,6 +31,7 @@ import { basicSensors, lightList, raiseAnimalAlert } from './lights';
 import { PERIMETER, runFinished } from './perimeter';
 import { ANIMALS } from './livestock';
 import { isFinished } from './construction';
+import { openLineText } from './format';
 
 export type SpeciesId = 'deer' | 'elk' | 'moose' | 'antelope' | 'javelina' | 'turkey' | 'rabbit' | 'squirrel' | 'grouse' | 'waterfowl'
   | 'bear' | 'cougar' | 'wolf' | 'coyote';
@@ -201,7 +202,7 @@ export function proof(s: GameState, who: Against = 'predators'): Proof {
   const e = enclosure(s, s.clock.t, who);
   const closed = e.openShare === 0 && e.creekOpen === 0;
   const bits: string[] = [];
-  if (e.openShare > 0) bits.push(`${Math.round(e.openShare * 100)}% of the line stops nothing${who === 'predators' ? ' that has teeth' : ''}`);
+  if (e.openShare > 0) bits.push(who === 'predators' ? openLineText(e.openShare) : `${Math.round(e.openShare * 100)}% of the line is open`);
   if (e.creekOpen > 0) bits.push(`the creek is open at ${e.creekOpen} crossing${e.creekOpen > 1 ? 's' : ''}`);
   if (s.gate.pending && s.perimeter.some(r => runFinished(r) && r.gates.length)) bits.push('a gate is standing open');
   const kinds = new Set(s.perimeter.filter(r => runFinished(r) && e.onLine.has(r.id)).map(r => r.kind));

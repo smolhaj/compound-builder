@@ -4,7 +4,10 @@
  * sensible piece is highlighted, and the bunker says what it needs right
  * now. Nothing is hidden (sim/guidance.ts decides; this draws).
  */
+import { useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
+import { useWorldStore } from '../../store/worldStore';
+import { orderProblem } from '../../sim/economy';
 import { housingSummary } from '../../sim/housing';
 import { BLUEPRINTS, totalBill, totalHours } from '../../sim/blueprints';
 import { MATERIALS, billText, type MaterialId } from '../../sim/materials';
@@ -13,7 +16,7 @@ import { drillExtra } from '../../sim/site';
 import { countyWorks, needsPermit, permitFee } from '../../sim/paperwork';
 import { BUNKER_ORDER, KIT, TOWER_ORDER, UTILITY_ORDER } from '../../game/buildkit/kit';
 import { PERIMETER, UTILITY_LINES, runBill, runHours, type PerimeterKind } from '../../sim/perimeter';
-import { bunkerChecklist, buildAdvice, longTerm, suggestions, perimeterNote, perimeterOff, perimeterTiers, upgradeChain } from '../../sim/guidance';
+import { bunkerChecklist, buildAdvice, longTerm, suggestions, type SuggestionAct, perimeterNote, perimeterOff, perimeterTiers, upgradeChain } from '../../sim/guidance';
 import { Group, Item, Note } from './common';
 import { btn, DIM, usd } from './style';
 import { WallProperty } from './WallProperty';
@@ -30,15 +33,27 @@ const toBuy = (bill: Partial<Record<MaterialId, number>>) => Object.entries(bill
 const ownNeeds = (kind: string) => billText(Object.fromEntries(Object.entries(totalBill(BLUEPRINTS[kind])).filter(([m]) => MATERIALS[m as MaterialId].price === null)));
 const costOf = (kind: string) => orderCost(toBuy(totalBill(BLUEPRINTS[kind])));
 
-export function BuildMenu() {
+export function BuildMenu({ showProjects = () => undefined }: { showProjects?: () => void }) {
   const g = useGameStore();
+  const markTrees = useWorldStore(w => w.markNearestTrees);
+  const [note, setNote] = useState<string | null>(null);
   const game = g.game;
   const shelters = game.structures.filter(s => s.finishedAt !== null).reduce((a, s) => a + (KIT[s.kind]?.shelters ?? 0), 0);
   const arm = (tool: string) => g.setTool(g.tool === tool ? null : tool);
   const sug = suggestions(game);
   const goals = longTerm(game);
   const bunker = bunkerChecklist(game);
-  const bunkerStarted = bunker.some(c => c.done);
+  const bunkerStarted = bunker.some(c => c.done || c.building);
+
+  /** A suggestion's one-click action. */
+  const run = (a: SuggestionAct) => {
+    setNote(null);
+    if (a.type === 'stake') arm(a.kind);
+    else if (a.type === 'tool') g.setTool(a.tool);
+    else if (a.type === 'order') { if (!g.order(a.lines)) setNote('Could not place that order.'); }
+    else if (a.type === 'markTrees') { const n = markTrees?.(a.n) ?? 0; setNote(n ? `Marked ${n} trees: the family fells them in work hours.` : 'No more trees to mark near the yard.'); }
+    else { g.select(a.id); showProjects(); }
+  };
 
   /** One kit piece as a menu item. */
   const kit = (kind: string) => {
@@ -63,10 +78,16 @@ export function BuildMenu() {
   return <>
     {sug.length > 0 && !g.tool && <div style={{ border: '1px solid #d8c9a0', borderRadius: 8, padding: '6px 8px', marginBottom: 8, background: 'rgba(216,201,160,0.08)' }}>
       <div style={{ fontSize: 11, color: DIM, textTransform: 'uppercase', letterSpacing: 0.6 }}>Most pressing now <span style={{ textTransform: 'none', letterSpacing: 0 }}>· suggestions, nothing is locked</span></div>
-      {sug.map(x => <div key={x.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, padding: '2px 0' }}>
-        <span><b>{KIT[x.kind].name}</b><span style={{ color: DIM }}>: {x.why}</span></span>
-        <button style={btn(true)} onClick={() => arm(x.kind)}>Stake it</button>
+      {sug.map(x => <div key={x.id} style={{ padding: '3px 0' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
+          <span><b>{x.title ?? KIT[x.kind].name}</b><span style={{ color: DIM }}>: {x.why}</span></span>
+          {!x.acts && <button style={btn(true)} onClick={() => run({ type: 'stake', kind: x.kind })}>Stake it</button>}
+        </div>
+        {x.acts && <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 3 }}>
+          {x.acts.map(a => { const why = a.act.type === 'order' ? orderProblem(g.game, a.act.lines) : null; return <button key={a.label} style={btn(true)} disabled={!!why} title={why ? 'Cannot order that now (money, or nobody delivering)' : undefined} onClick={() => run(a.act)}>{a.label}</button>; })}
+        </div>}
       </div>)}
+      {note && <Note>{note}</Note>}
     </div>}
     <div style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '5px 8px', marginBottom: 8 }}>
       <div style={{ fontSize: 11, color: DIM, textTransform: 'uppercase', letterSpacing: 0.6 }}>Long-term <span style={{ textTransform: 'none', letterSpacing: 0 }}>· where a prepper place ends up</span></div>
@@ -97,7 +118,7 @@ export function BuildMenu() {
           const first = !c.done && bunker.findIndex(x => !x.done) === i;
           return <div key={c.id} style={{ display: 'flex', gap: 6, alignItems: 'baseline', padding: '1px 0', opacity: c.done ? 0.6 : 1 }} title={c.detail}>
             <span style={{ width: 12, color: c.done ? '#a8d080' : first ? '#d8c9a0' : DIM }}>{c.done ? '✓' : first ? '▸' : '·'}</span>
-            <span style={{ flex: 1, fontWeight: first ? 600 : 400 }}>{c.label}</span>
+            <span style={{ flex: 1, fontWeight: first ? 600 : 400 }}>{c.label}{c.building && <span style={{ color: '#e0b050', fontWeight: 400, fontSize: 11 }}> · being built</span>}</span>
             {first && <button style={{ ...btn(true), padding: '1px 6px', fontSize: 11 }} onClick={() => arm(c.kind)}>{KIT[c.kind].name}</button>}
           </div>;
         })}
@@ -116,7 +137,8 @@ export function BuildMenu() {
       </div>)}
     </Group>
     <Group id="woods" title="Woods">
-      <Item name="Mark trees to fell" cost="" sub="logs for building, firewood for the stove" on={g.tool === 'fell'} click={() => g.setTool(g.tool === 'fell' ? null : 'fell')} />
+      <Item name="Mark trees to fell" cost="" sub="logs for building, firewood for the stove (green wood seasons for about nine months)" on={g.tool === 'fell'} click={() => g.setTool(g.tool === 'fell' ? null : 'fell')} />
+      <button style={{ ...btn(), width: '100%', marginTop: 2 }} disabled={!markTrees} title="Marks the ten standing trees nearest the yard on your land" onClick={() => run({ type: 'markTrees', n: 10 })}>Mark the 10 nearest trees</button>
     </Group>
   </>;
 }

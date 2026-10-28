@@ -7,6 +7,7 @@ import { PERIMETER_ORDER, UPGRADE_NEXT, planRun } from './perimeter';
 import { SHELVES, shelvesNeeding } from './shelves';
 import { BUNKER_ORDER } from '../game/buildkit/kit';
 
+const built = (g: ReturnType<typeof newGame>, kind: string, x = 0, z = 0) => { const st = planStructure(g, kind, x, z, 0); st.stage = 99; st.finishedAt = 0; return st; };
 const fresh = () => { const g = newGame(11); g.structures = []; g.perimeter = []; g.stock = { ...g.stock }; return g; };
 
 describe('the bunker', () => {
@@ -23,14 +24,14 @@ describe('the bunker', () => {
   it('lists what the bunker needs, in order, and points at the first thing missing', () => {
     const g = fresh();
     expect(bunkerNext(g)!.id).toBe('entrance');
-    planStructure(g, 'bunker_hatch', 0, 0, 0);
+    built(g, 'bunker_hatch');
     expect(bunkerNext(g)!.id).toBe('beds');
-    planStructure(g, 'bunker_dorm', 1, 0, 0);
+    built(g, 'bunker_dorm', 1, 0);
     const people = g.people.length;
     // a bunkroom sleeps eight: enough for any family the game starts with
     expect(people).toBeLessThanOrEqual(8);
     expect(bunkerNext(g)!.id).toBe('air');
-    for (const k of ['bunker_plant', 'bunker_stores', 'bunker_medical']) planStructure(g, k, 5, 5, 0);
+    for (const k of ['bunker_plant', 'bunker_stores', 'bunker_medical']) built(g, k, 5, 5);
     expect(bunkerNext(g)).toBeNull();
     expect(bunkerChecklist(g).every(c => c.done)).toBe(true);
   });
@@ -67,8 +68,42 @@ describe('the Build list', () => {
     const [enclose, bunker] = longTerm(g);
     expect(enclose.steps.map(x => x.done)).toEqual([false, false, false]);
     expect(bunker.steps.every(x => !x.done)).toBe(true);
-    planStructure(g, 'bunker_hatch', 0, 0, 0);
+    built(g, 'bunker_hatch');
     expect(longTerm(g)[1].steps[0].done).toBe(true);
+  });
+
+  it('counts a bunker step only when the room is built, not when it is only staked out', () => {
+    const g = fresh();
+    for (const k of ['bunker_hatch', 'bunker_dorm', 'bunker_plant', 'bunker_stores', 'bunker_medical']) planStructure(g, k, 0, 0, 0);
+    expect(bunkerChecklist(g).every(c => !c.done)).toBe(true);
+    expect(bunkerChecklist(g).every(c => c.building)).toBe(true);
+    expect(longTerm(g)[1].steps.some(x => x.done)).toBe(false);
+    expect(bunkerChecklist(g)[0].detail).toMatch(/still being built/);
+    for (const st of g.structures) { st.stage = 99; st.finishedAt = 0; }
+    expect(bunkerChecklist(g).every(c => c.done && !c.building)).toBe(true);
+  });
+
+  it('suggests firewood (with an order and a mark-trees action) when the woodpile is bare or thin for the cold', () => {
+    const g = newGame(11, 330);
+    g.stock.firewood = 0;
+    const f = suggestions(g).find(x => x.id === 'firewood');
+    expect(f).toBeDefined();
+    expect(f!.acts!.map(a => a.act.type)).toEqual(['order', 'markTrees']);
+    expect(f!.acts![0].label).toMatch(/Order \d+ ricks? \(\$[\d,]+\)/);
+    g.stock.firewood = 40;
+    expect(suggestions(g).find(x => x.id === 'firewood')).toBeUndefined();
+    const summer = newGame(11, 190); summer.stock.firewood = 0;
+    expect(suggestions(summer).find(x => x.id === 'firewood')).toBeUndefined();
+  });
+
+  it('suggests finishing a house that is built but not wired', () => {
+    const g = fresh();
+    g.utilities.grid = false;
+    built(g, 'cottage', 10, 10);
+    const h = suggestions(g).find(x => x.id === 'hookup');
+    expect(h).toBeDefined();
+    expect(h!.title).toMatch(/cottage/);
+    expect(h!.acts!.some(a => a.act.type === 'select')).toBe(true);
   });
 
   it('greys the creek bars on land with no creek, and the tunnel until there is a bunker', () => {
