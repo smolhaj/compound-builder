@@ -14,6 +14,9 @@ import { PERIMETER, hasSkirt, runFinished, skirtProblem, wallLength, type Perime
 import { hatches, insideRing, linkedGroups, links, yardRings, type Hatch, type Link } from './compounds';
 import { digDefense, detectChances, combine, floodChance, noticeOverDig } from './tunnelers';
 import { dogCount } from './pets';
+import { canHostWalkway, walkLength, walkOn, walkwayWatch } from './walkway';
+import { GATE_GARAGE, garages, occupiedSlots, parkingSlots } from './garage';
+import { MAX_TOWERS } from './fortress';
 import { HEAVY_CALIBERS, MOUNT_ROUNDS, TURRET_ROUNDS, TOWERS, floodReady, mountReady, towerPosts, towersBuilt, turretsReady } from './towers';
 import { dayIndex, type GameState } from './state';
 import { bondOf, dogWatch, livingDogs, temperOf } from './pets';
@@ -82,6 +85,18 @@ export function defenseReport(s: GameState): DefenseReport {
   // bears, cougars, wolves and coyotes: kept out only by a line that holds them (solid fence, chain link, wrought iron, steel, container, palisade), gates shut, creek barred
   { const pl = predatorLine(s); walls.push(chk('predators', 'Keeps predators out', pl.ok, pl.detail, predatorSpecies(s).length > 0 && line.openShare < 0.15)); }
   if (gates > 0) walls.push(chk('gates', `${gates} gate${gates > 1 ? 's' : ''} in the line`, true, 'a closed gate holds about as well as 60 % of its fence'));
+  // the fortress ring: a patrol deck on the wall, the gatehouse garage (sim/walkway.ts, sim/garage.ts)
+  const hosts = s.perimeter.filter(r => canHostWalkway(r.kind) && !r.replaces);
+  if (hosts.length) {
+    const decked = hosts.filter(r => { const w = walkOn(s, r.id); return !!w && runFinished(w); });
+    const len = walkLength(s), ww = walkwayWatch(s);
+    walls.push(chk('walkway', 'Wall-top walkway', decked.length === hosts.length, decked.length ? `${Math.round(len * 6)} m of patrol deck on ${decked.length} of ${hosts.length} wall run${hosts.length > 1 ? 's' : ''}: ${ww.manned ? 'a guard is up there' : 'nobody on watch up there now'}` : 'guards stand inside the wall; a deck on top sees farther and fights from above', true));
+  }
+  const garagesStaked = s.structures.filter(st => st.kind === GATE_GARAGE);
+  if (garagesStaked.length) {
+    const done = garages(s), used = occupiedSlots(s).length, all = parkingSlots(s).length;
+    walls.push(chk('gategarage', 'Gate garage', done.length > 0, done.length ? `part of the closed line; ${used} of ${all} bays in use` : 'staked: the gap in the wall is an ordinary gate until it is built', true));
+  }
   const strong = lineRuns.filter(r => PERIMETER[r.kind].blocks.people >= 0.7).length;
   if (lineRuns.length && !strong) walls.push(chk('strong', 'A wall that stops people', false, 'what is built stops walkers poorly; palisade, container or a grown hedge stop them', true));
 
@@ -136,7 +151,9 @@ export function defenseReport(s: GameState): DefenseReport {
   const tower = posts.length > 0;
   const topTower = built.reduce<(typeof built)[number] | null>((a, x) => (!a || x.def.tier > a.def.tier ? x : a), null);
   const rounds = Math.max(0, ...HEAVY_CALIBERS.map(c => s.armory.ammo[c] ?? 0));
+  const ringTowers = built.length;
   const watch: Check[] = [
+    ...(ringTowers >= 2 || garagesStaked.length > 0 || hosts.some(r => walkOn(s, r.id)) ? [chk('ringtowers', 'Towers on the ring', ringTowers >= MAX_TOWERS, `${ringTowers} of ${MAX_TOWERS}: corners and mid-spans, each upgrades in place`, ringTowers >= 2)] : []),
     chk('tower', 'Watch tower', tower, topTower ? `${topTower.def.name.toLowerCase()}: a view over the wall` : tower ? 'a view over the wall' : 'nobody sees them coming over a wall', true),
     ...(built.some(x => x.def.flood) ? [chk('towerlights', 'Tower floodlights', floodReady(s), floodReady(s) ? 'ready: lit by their mode at night' : !powered ? 'no power: the mast stays dark' : 'switched off (or lights out)', true)] : []),
     ...(built.some(x => x.def.mount) ? [chk('mount', 'Gun on the tower ring', !!mountReady(s), mountReady(s) ? 'a person up there and belts in the armory' : rounds < MOUNT_ROUNDS ? `needs ${MOUNT_ROUNDS}+ rounds of 7.62 / 5.56 in the armory (${rounds})` : 'nobody to put on it', false)] : []),

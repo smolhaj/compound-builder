@@ -22,6 +22,7 @@
 import { dogCount } from './pets';
 import { calendarOf, dayIndex, hourOf, type GameState, type PersonState, type TaskKind } from './state';
 import { isFinished } from './construction';
+import { hasWalkway } from './walkway';
 import { isHome } from './blueprints';
 import { gardenSeason } from './greenhouse';
 import { REGIONS, seasons } from './regions';
@@ -73,7 +74,7 @@ export const DUTY: Record<Duty, DutyDef> = {
   medic: { name: 'Medic', short: '+', color: '#c04a5a', work: true, tire: 3, kid: false, hint: 'Tending the sick and the wounded.' },
   teach: { name: 'Teaching', short: 'T', color: '#6a8ac8', work: true, tire: 2.5, kid: false, hint: 'Teaching the kids.' },
   radio: { name: 'Radio', short: 'Ra', color: '#7a6aa8', work: true, tire: 1.5, kid: false, hint: 'Listening on the radio for news and the net.' },
-  watch: { name: 'Watch', short: '!', color: '#c8a030', work: true, tire: 4, kid: false, hint: 'On watch: the wall, the tower, the gate. Helps see trouble coming.' },
+  watch: { name: 'Watch', short: '!', color: '#c8a030', work: true, tire: 4, kid: false, hint: 'On watch: the tower, the wall (or its walkway, if there is one), the gate. Helps see trouble coming.' },
 };
 export const DUTIES = Object.keys(DUTY) as Duty[];
 
@@ -740,24 +741,26 @@ export function dutyWork(s: GameState, p: Person, ps: PersonState, duty: Duty, p
 // ─────────────────────────────────────────────────────────────────────────
 
 export type WatchPost = 'tower' | 'wall' | 'gate';
-export interface Watcher { id: string; post: WatchPost; night: boolean; alert: number }
+export interface Watcher { id: string; post: WatchPost; night: boolean; alert: number; /** On the patrol deck of the wall (sim/walkway.ts): the people renderer puts them on top of it. */ walk?: boolean }
 
 /**
  * Who is on watch right now (reads the tasks the last sub-step set). For the
  * gate (detection) and the atmosphere layer (flashlights at night). Posts:
  * the first watcher takes the tower if there is one, the next walks the wall
- * (if there's a perimeter), the rest the gate.
+ * (if there's a perimeter; with a wall-top walkway, up to two walk the deck),
+ * the rest the gate.
  */
 export function watchNow(s: GameState): Watcher[] {
   const h = hourOf(s.clock.t), night = h >= 20 || h < 6;
   const tower = s.structures.some(st => isFinished(st) && st.kind.includes('tower'));
   const wall = s.perimeter.some(r => r.finishedAt !== null);
+  const deck = hasWalkway(s);
   const out: Watcher[] = [];
   for (const ps of s.personState) {
     if (ps.task !== 'watch' || ps.needs.died != null) continue;
     const k = out.length;
-    const post: WatchPost = k === 0 && tower ? 'tower' : wall && k <= 1 ? 'wall' : 'gate';
-    out.push({ id: ps.id, post, night, alert: Math.max(0.3, 1 - (ps.fatigue ?? 0) / 140) });
+    const post: WatchPost = k === 0 && tower ? 'tower' : wall && k <= (deck ? 2 : 1) ? 'wall' : 'gate';
+    out.push({ id: ps.id, post, night, alert: Math.max(0.3, 1 - (ps.fatigue ?? 0) / 140), ...(post === 'wall' && deck ? { walk: true } : {}) });
   }
   return out;
 }
@@ -767,7 +770,7 @@ export function watchDetection(s: GameState): number {
   const w = watchNow(s).sort((a, b) => b.alert - a.alert);
   let sum = 0;
   const owl = w.length ? chronotypes(s) : {};
-  w.forEach((x, k) => { sum += ((k === 0 ? 10 : k === 1 ? 6 : 2) + (owl[x.id] === 'owl' ? 1.5 : 0)) * x.alert * (x.post === 'tower' ? 1.2 : 1); });
+  w.forEach((x, k) => { sum += ((k === 0 ? 10 : k === 1 ? 6 : 2) + (owl[x.id] === 'owl' ? 1.5 : 0)) * x.alert * (x.post === 'tower' ? 1.2 : x.walk ? 1.1 : 1); });
   return Math.min(20, sum);
 }
 

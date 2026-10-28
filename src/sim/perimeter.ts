@@ -17,7 +17,7 @@ import type { GameState } from './state';
 import { openDoorways } from './compounds';
 import { COUNTY, PERMIT_FEE, countyWorks } from './paperwork';
 
-export type PerimeterKind = 'split_rail' | 'barbed_wire' | 'woven_wire' | 'thorn_hedge' | 'log_palisade' | 'container_wall' | 'earth_berm' | 'ditch' | 'creek_bars' | 'chain_link' | 'wrought_iron' | 'iron_barbed' | 'steel_wall' | 'electric_steel' | 'water_pipe' | 'power_cable' | 'escape_tunnel' | 'covered_walkway' | 'underground_passage' | 'concrete_wall';
+export type PerimeterKind = 'split_rail' | 'barbed_wire' | 'woven_wire' | 'thorn_hedge' | 'log_palisade' | 'container_wall' | 'earth_berm' | 'ditch' | 'creek_bars' | 'chain_link' | 'wrought_iron' | 'iron_barbed' | 'steel_wall' | 'electric_steel' | 'water_pipe' | 'power_cable' | 'escape_tunnel' | 'covered_walkway' | 'underground_passage' | 'concrete_wall' | 'wall_walk';
 
 export interface PerimeterDef {
   id: PerimeterKind;
@@ -50,6 +50,8 @@ export interface PerimeterDef {
   hidden?: boolean;
   /** An enclosed steel walkway above ground between two walled yards (lights need power). */
   walkway?: boolean;
+  /** A patrol walkway on top of a finished wall (sim/walkway.ts): not a wall itself, it rides on the run named by `hostId`. */
+  wallTop?: boolean;
   /** Footing poured deep enough that a tunnel can't go under it (concrete and steel tiers); cheaper fences need a buried skirt. */
   deepFooting?: boolean;
 }
@@ -74,6 +76,7 @@ export const PERIMETER: Record<PerimeterKind, PerimeterDef> = {
   concrete_wall: { id: 'concrete_wall', name: 'Poured-concrete wall', blurb: 'A 3.5 m reinforced concrete wall on a deep poured footing, smooth-faced with a capped top: no handholds, no tunnel under it, and it stops a truck. The top of the chain. The county wants a permit for a wall this tall.', hours: 44, materials: { rebar: 1.6, concrete: 2.4, hardware: 0.1 }, height: 0.58, blocks: { people: 0.97, animals: 1, vehicles: 1 }, sight: 0.95, growYears: 0, deepFooting: true },
   covered_walkway: { id: 'covered_walkway', name: 'Covered walkway (steel)', blurb: 'An enclosed steel walkway on trusses between two walled yards: 2 m wide, 2.6 m high, glass and mesh sides, a roof, handrails and pendant lights. The family goes house to house under cover. It is a wall in its own right (steel and mesh); the lights need power, and without it the walk is dark at night.', hours: 18, materials: { rebar: 0.7, hardware: 0.25, roofing: 0.3, cable: 0.1 }, height: 0.43, blocks: { people: 0.8, animals: 1, vehicles: 0.4 }, sight: 0.15, growYears: 0, walkway: true },
   underground_passage: { id: 'underground_passage', name: 'Underground passage', blurb: 'A buried concrete passage between two yards (or from a yard to a hatch out in the woods). Nothing shows from outside. Both ways: so each end has a lockable blast hatch, and a hatch that comes up outside a wall is a way in if raiders ever find it. Can be dug under, and it floods.', hours: 28, materials: { culvert: 0.8, excavator: 0.25 }, height: 0, blocks: { people: 0, animals: 0, vehicles: 0 }, sight: 0, growYears: 0, twoWay: true, hidden: true },
+  wall_walk: { id: 'wall_walk', name: 'Wall-top walkway', blurb: 'A steel patrol deck along the top of a container, steel or concrete wall: 1.2 m wide with a handrail and a kick plate, steps up at each corner and gate. Guards walk it and see over the whole line; a post on it fights like a tower post. Added in place on a finished wall; it stays on through a wall upgrade.', hours: 8, materials: { rebar: 0.5, roofing: 0.4, hardware: 0.2 }, height: 0, blocks: { people: 0, animals: 0, vehicles: 0 }, sight: 0, growYears: 0, wallTop: true },
   ditch: { id: 'ditch', name: 'Ditch / dry moat', blurb: 'A 2 m deep, 3 m wide ditch. No vehicle crosses; the spoil can build a berm.', hours: 40, materials: {}, height: -0.33, blocks: { people: 0.45, animals: 0.3, vehicles: 1 }, sight: 0, growYears: 0 },
 };
 
@@ -84,7 +87,12 @@ export const UTILITY_LINES: readonly PerimeterKind[] = ['water_pipe', 'power_cab
 export type Pt = [number, number];
 
 /** A gap left in a run for a gate (distance along the run, width). */
-export interface Gate { at: number; w: number }
+export interface Gate {
+  at: number;
+  w: number;
+  /** The gap is filled by a gatehouse garage (sim/garage.ts): no gate leaves are drawn, and the garage holds the line here. */
+  garage?: boolean;
+}
 
 export interface PerimeterRun {
   id: string;
@@ -110,6 +118,8 @@ export interface PerimeterRun {
   replaces?: string;
   /** The kind being replaced (an upgrade is drawn beside it: a container wall is wide, so the new wall stands further off). */
   replacesKind?: PerimeterKind;
+  /** A wall-top walkway: the wall run it stands on (follows the wall through an upgrade; sim/walkway.ts). */
+  hostId?: string;
 }
 
 /**
@@ -120,7 +130,7 @@ export interface PerimeterRun {
  */
 export const PREDATOR_BLOCK: Record<PerimeterKind, number> = {
   split_rail: 0.02, barbed_wire: 0.1, woven_wire: 0.35, thorn_hedge: 0.75, log_palisade: 0.97, container_wall: 1, earth_berm: 0.2, ditch: 0.2,
-  creek_bars: 0.95, chain_link: 0.9, wrought_iron: 0.97, iron_barbed: 0.98, steel_wall: 1, electric_steel: 1, water_pipe: 0, power_cable: 0, escape_tunnel: 0, covered_walkway: 1, underground_passage: 0, concrete_wall: 1,
+  creek_bars: 0.95, chain_link: 0.9, wrought_iron: 0.97, iron_barbed: 0.98, steel_wall: 1, electric_steel: 1, water_pipe: 0, power_cable: 0, escape_tunnel: 0, covered_walkway: 1, underground_passage: 0, concrete_wall: 1, wall_walk: 0,
 };
 
 /** The next tier up, where there is one (upgraded in place: sim `upgradeRun`). */
@@ -292,6 +302,11 @@ export function upgradeRun(s: GameState, id: string): string | null {
 /** Why work on a run can't go on (null = it can). */
 export function runBlocked(s: GameState, r: PerimeterRun): string | null {
   if (runFinished(r)) return 'finished';
+  if (PERIMETER[r.kind].wallTop) {
+    const host = s.perimeter.find(x => x.id === r.hostId);
+    if (!host) return 'The wall it stands on is gone';
+    if (!runFinished(host)) return 'Waiting for the wall to be finished';
+  }
   if (r.permitAt !== undefined && s.clock.t < r.permitAt) return `Waiting on the county permit (${Math.ceil(r.permitAt - s.clock.t)} days)`;
   if (r.supplied) return null;
   const bill = runBill(r.kind, wallLength(r));
@@ -333,6 +348,8 @@ export function addRunWork(s: GameState, r: PerimeterRun, hours: number): void {
       if (old) {
         for (const [k, q] of Object.entries(runBill(old.kind, wallLength(old))) as Array<[MaterialId, number]>) s.stock[k] += Math.floor(q * SALVAGE);
         s.perimeter = s.perimeter.filter(x => x.id !== old.id);
+        // a wall-top walkway rides on the new wall (the deck is lifted and set back on the new tier)
+        for (const w of s.perimeter) if (w.hostId === old.id) w.hostId = r.id;
       }
       r.replaces = undefined;
     }

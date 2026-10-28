@@ -15,6 +15,7 @@
 import { PERIMETER, PREDATOR_BLOCK, peopleBlock, runFinished, runGrowth, type PerimeterRun, type Pt } from './perimeter';
 import type { Rect } from './land';
 import type { GameState } from './state';
+import { GARAGE_HOLD, garageHolds } from './garage';
 
 /** Closest approach of a point to a polyline, and how far along it that is. */
 export function nearest(pts: readonly Pt[], x: number, z: number): { d: number; s: number } {
@@ -99,8 +100,11 @@ export function enclosure(s: GameState, t = s.clock.t, who: Against = 'people'):
     for (const r of holders) {
       const { d, s: along } = nearest(r.pts, x, z);
       if (d > REACH) continue;
-      const inGate = r.gates.some(g => Math.abs(along - g.at) <= g.w / 2);
-      hold = Math.max(hold, holdOf(s, r, who) * runGrowth(r, t) * (inGate ? gateHold : 1));
+      const gate = r.gates.find(g => Math.abs(along - g.at) <= g.w / 2);
+      // a finished gatehouse garage fills its gap: nearly as good as the wall (steel gates, roll-up doors); for animals it is shut unless somebody is at the gate
+      const garaged = !!gate?.garage && garageHolds(s, x, z);
+      const gateF = garaged ? (who === 'people' ? GARAGE_HOLD : s.gate.pending ? 0.5 : 1) : gate ? gateHold : 1;
+      hold = Math.max(hold, holdOf(s, r, who) * runGrowth(r, t) * gateF);
     }
     sum += hold;
     if (hold < openBelow) { open++; if (gaps.length < 8 && (open - 1) % 6 === 0) gaps.push([x, z]); }

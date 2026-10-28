@@ -14,6 +14,8 @@ import { countyWorks, needsPermit, permitFee, reviewDays } from './paperwork';
 import { onOrder, orderCost } from './economy';
 import { MATERIAL_IDS, MATERIALS, type MaterialId } from './materials';
 import { PERIMETER, PERIMETER_ORDER, UPGRADE_NEXT, fenceLive, runBill, runFinished, wallLength, type PerimeterKind } from './perimeter';
+import { MAX_TOWERS, ringStatus } from './fortress';
+import { canHostWalkway } from './walkway';
 import type { GameState, OrderLine } from './state';
 
 const usd = (n: number) => '$' + Math.round(n).toLocaleString('en-US');
@@ -129,11 +131,14 @@ export function longTerm(s: GameState): Goal[] {
   const lineRuns = s.perimeter.filter(r => runFinished(r) && line.onLine.has(r.id));
   const best = lineRuns.reduce<PerimeterKind | null>((a, r) => (!a || PERIMETER[r.kind].blocks.people > PERIMETER[a].blocks.people ? r.kind : a), null);
   const closed = line.openShare === 0 && line.creekOpen === 0;
+  const ring = ringStatus(s), solid = s.perimeter.some(r => canHostWalkway(r.kind));
   const towers = s.structures.filter(st => (st.kind === 'rise_lookout' || st.kind.startsWith('watchtower')) && isFinished(st)).length;
   const enclose: Goal = { id: 'enclose', title: 'Enclose the compound', steps: [
     { label: 'Wall the property line', done: closed, detail: closed ? 'the line is closed all round' : line.openShare >= 1 ? 'nothing on the line yet' : `${Math.round(line.openShare * 100)}% of the line is open${line.creekOpen ? ' and the creek is unbarred' : ''}` },
     { label: 'Upgrade the walls', done: !!best && PERIMETER[best].blocks.people >= 0.7, detail: best ? `${PERIMETER[best].name.toLowerCase()} now${UPGRADE_NEXT[best] ? `, next: ${PERIMETER[UPGRADE_NEXT[best]!].name.toLowerCase()}` : ', the top of the chain'}` : 'a hard wall stops people far better than wire' },
-    { label: 'Watch towers', done: towers > 0, detail: towers ? `${towers} standing` : 'a place to see them coming from' },
+    { label: 'Watch towers', done: towers > 0, detail: towers ? `${towers} standing${towers < MAX_TOWERS ? `, up to ${MAX_TOWERS} on the corners and mid-spans` : ''}` : `a place to see them coming from: up to ${MAX_TOWERS} on the ring (Fortify my ring)` },
+    { label: 'Wall-top walkway', done: ring.walkway, detail: ring.walkway ? 'guards walk the top of the wall' : solid ? 'a deck on the wall: guards see farther and fight from above (Defense tab)' : 'needs a container, steel or concrete wall under it' },
+    { label: 'Gate garage', done: ring.garage, detail: ring.garage ? 'part of the closed line; the vehicles park inside it' : 'a garage built into the wall at the gate (Fortify my ring, or the Build menu)' },
   ] };
   const bunker: Goal = { id: 'bunker', title: 'A bunker underneath', steps: bunkerChecklist(s).map(c => ({ label: c.label, done: c.done, detail: c.detail })) };
   return [enclose, bunker];
@@ -170,7 +175,8 @@ export function perimeterNote(s: GameState, kind: PerimeterKind): string | null 
   if (kind === 'electric_steel' && !fenceLive(s)) return 'needs power running, or it is only a steel wall';
   if (PERIMETER[kind].growYears) return `takes ${PERIMETER[kind].growYears} years to grow into a wall`;
   const up = UPGRADE_NEXT[kind];
-  return up ? `upgrades to ${PERIMETER[up].name.toLowerCase()}` : null;
+  const deck = canHostWalkway(kind) ? ' · takes a patrol walkway on top' : '';
+  return up ? `upgrades to ${PERIMETER[up].name.toLowerCase()}${deck}` : deck ? deck.slice(3) : null;
 }
 
 // ── the Perimeter list by price ──
