@@ -32,6 +32,9 @@ try {
     // setup (adopts the dogs, runs the sim to the hour), then a couple of frames so the dogs settle
     await page.evaluate(s => { if (s.setup) new Function('cb', s.setup)(window.__cb); }, s);
     await page.evaluate(async () => { await window.__cb.qa.renderNow(); await window.__cb.qa.renderNow(); });
+    // the family and dogs exist only once a frame is drawn: apply the setup (camera) again
+    await page.evaluate(s => { if (s.setup) new Function('cb', s.setup)(window.__cb); }, s);
+    await page.evaluate(async () => { await window.__cb.qa.renderNow(); });
     await page.evaluate(f => (f ? window.__cb.qa.renderFull('high') : window.__cb.qa.renderNow()), full);
     const file = `${out}/${String(++n).padStart(2, '0')}-${s.name}${full ? '-full' : ''}.png`;
     await page.screenshot({ path: file });

@@ -502,6 +502,7 @@ const nearHome = (dist, ang, dy, ly) => `{ const b = window.__b['log_house'], th
 
 /** Eye level beside a following dog and its nearest person, both in frame (a person is ~0.28 tall, a dog ~0.14 at the shoulder). */
 const dogAndPerson = (back, dy, fov = 55) => `{ const W = cb.world, g = W.groundAt, ds = W.dogs.positions(), ps = W.family.positions();
+  if (!ds.length || !ps.length) return;   // (nothing drawn yet: lowrender draws on request; run the setup again after a frame)
   const d = ds[Math.min(1, ds.length - 1)]; let p = ps[0]; for (const q of ps) if (Math.hypot(q.x - d.x, q.z - d.z) < Math.hypot(p.x - d.x, p.z - d.z)) p = q;
   const mx = (d.x + p.x) / 2, mz = (d.z + p.z) / 2, ax = Math.atan2(p.x - d.x, p.z - d.z) + Math.PI / 2;
   const [cx, cz] = W.openSpotNear(mx + Math.sin(ax) * ${back}, mz + Math.cos(ax) * ${back}, 0.2);
