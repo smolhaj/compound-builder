@@ -106,12 +106,36 @@ describe('wall-top walkway', () => {
     expect(postureOf(g).detection).toBeGreaterThan(postureOf(bare).detection);
   });
 
-  it('the battle gets guard posts on the deck, higher than the wall', () => {
-    const g = game(); g.clock.t = 400.25;
-    const w = wall(g); addWalkway(g, w.id); walkOn(g, w.id)!.finishedAt = 0;
-    const b = planBattle(g, 3, { raiders: 6, armed: true } as never);
-    void b;   // planBattle returns events; the post list is internal, so the check is that it plans with a deck on the line
-    expect(b).toBeTruthy();
+  const raidGame = (deck: boolean): GameState => {
+    const g = newGame(1, 105, 2027, { mode: 'scenario', peace: 'short', kind: 'grid_down' });
+    g.clock.t = Math.floor(g.disaster.hitAt + 20) + 0.25;
+    g.disaster.tracks = { ...g.disaster.tracks, law: 0, stores: 0, deliveries: 0, banks: 0 };
+    g.structures.push({ id: 'house', kind: 'farmhouse', x: 0, z: 0, rot: 0, stage: 99, done: 0, supplied: true, finishedAt: 0 });
+    for (const [i, p] of g.people.entries()) if (!p.kid || p.age >= 15) { g.armory.guns.push({ id: `g${i}`, model: 'sw_mp15', condition: 1, fired: 0, where: 'house', carrier: p.id }); g.armory.skill[p.id] = 6; }
+    g.armory.ammo['556'] = 600;
+    const w = planRun(g, 'container_wall', [[-12, -12], [12, -12], [12, 12], [-12, 12], [-12, -12]]); w.finishedAt = 0;
+    if (deck) { addWalkway(g, w.id); walkOn(g, w.id)!.finishedAt = 0; }
+    return g;
+  };
+
+  it('the battle puts guards on the real deck where the raid meets the wall, up at the deck height', () => {
+    const g = raidGame(true);
+    const b = planBattle(g, 6, 3);
+    const up = b.events.filter(e => e.kind === 'move' && Math.abs((e.y ?? 0) - (PERIMETER.container_wall.height + 0.02)) < 1e-6);
+    expect(up.length).toBeGreaterThan(0);
+    // standing on the wall line (the ring is 12 units out), not floating over the yard
+    for (const e of up) expect(Math.max(Math.abs((e as { x: number }).x), Math.abs((e as { z: number }).z))).toBeGreaterThan(10.5);
+    const plain = planBattle(raidGame(false), 6, 3);
+    expect(plain.events.some(e => e.kind === 'move' && (e.y ?? 0) > 0.4)).toBe(false);
+  });
+
+  it('with a guard deck fewer crews get over the wall than without', () => {
+    let withDeck = 0, without = 0;
+    for (let seed = 1; seed <= 40; seed++) {
+      if (planBattle(raidGame(true), 6, seed).result === 'breached') withDeck++;
+      if (planBattle(raidGame(false), 6, seed).result === 'breached') without++;
+    }
+    expect(withDeck).toBeLessThanOrEqual(without);
   });
 });
 

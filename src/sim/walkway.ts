@@ -167,3 +167,26 @@ export function walkwayWatch(s: GameState): { view: number; viewR: number; posts
   const k = manned ? 1 : 0.4;
   return { view: Math.min(7, 3 + len / 25) * k, viewR: Math.min(3, 1.2 + len / 80) * k, posts: wallPosts(s).length, manned };
 }
+
+/**
+ * The deck spots nearest a point (where a raid meets the wall), at least `gap` apart, nearest first, none farther than `maxD`:
+ * the battle stands its guards on the real deck there (x, z, and the deck's height).
+ */
+export function deckSpots(s: GameState, target: Pt, n: number, maxD = 8, gap = 3): Array<{ x: number; z: number; y: number }> {
+  const all: Array<{ x: number; z: number; y: number; d: number }> = [];
+  for (const { walk, host } of walkRuns(s)) {
+    const L = wallLength({ pts: walk.pts, gates: [] });
+    for (let at = 0; at <= L; at += 1.5) {
+      const p = pointAt(walk.pts, at);
+      if (walk.gates.some(g => Math.abs(at - g.at) < g.w / 2)) continue;
+      all.push({ x: p.x, z: p.z, y: deckHeight(host) + 0.02, d: Math.hypot(p.x - target[0], p.z - target[1]) });
+    }
+  }
+  all.sort((a, b) => a.d - b.d);
+  const out: Array<{ x: number; z: number; y: number }> = [];
+  for (const c of all) {
+    if (c.d > maxD || out.length >= n) break;
+    if (out.every(o => Math.hypot(o.x - c.x, o.z - c.z) >= gap)) out.push({ x: c.x, z: c.z, y: c.y });
+  }
+  return out;
+}

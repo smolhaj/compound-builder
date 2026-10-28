@@ -28,7 +28,7 @@ import { isHome } from './blueprints';
 import { isFinished } from './construction';
 import { PERIMETER, fenceLive, runFinished } from './perimeter';
 import { ARMORY_LIGHTS, floodlightLit } from './lights';
-import { WALK_CLIMB_FACTOR, WALK_POST, deckHeight, walkLength, walkRuns } from './walkway';
+import { WALK_CLIMB_FACTOR, WALK_POST, deckSpots, walkLength, walkRuns } from './walkway';
 import { TURRET_JAM, highBonus, litTowerIds, isTower, mountReady, towerPosture, towerPosts, towerReach, turretsReady } from './towers';
 import { enclosure } from './enclosure';
 import { mulberry32 } from './rng';
@@ -277,14 +277,12 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
     if (rr >= wallR) wallKind = run.kind;   // the outermost wall is the one they meet first
     wallR = Math.max(wallR, rr);
   }
-  // a patrol deck on the wall (sim/walkway.ts): the posts on it are a parapet over the line, higher and better covered than a spot behind the wall
-  const decks = walkRuns(s), deck = decks.find(x => x.host.kind === wallKind) ?? decks[0];
-  const deckPosts = deck ? 3 + Math.min(2, Math.floor(walkLength(s) / 20)) : 3;
-  if (wallR) for (let i = 0; i < deckPosts; i++) {
-    const p = at(wallR, (i - (deckPosts - 1) / 2) * 4);
-    posts.push(deck
-      ? { kind: 'wall', ...p, y: deckHeight(deck.host) + 0.02, cover: WALK_POST.cover, value: WALK_POST.value, cap: 1, wrecked: false, fire: 0, reach: WALK_POST.reach, acc: WALK_POST.acc }
-      : { kind: 'wall', ...p, y: 0, cover: 0.22, value: 2, cap: 1, wrecked: false, fire: 0 });
+  // a patrol deck on the wall (sim/walkway.ts): the posts on it are on the real deck where the raid meets the wall, higher and better covered than a spot behind it
+  const decks = walkRuns(s), deckPosts = decks.length ? deckSpots(s, wallR ? [at(wallR, 0).x, at(wallR, 0).z] : [C.x, C.z], 3 + Math.min(2, Math.floor(walkLength(s) / 20))) : [];
+  const deck = deckPosts.length > 0;
+  if (wallR) {
+    if (deck) for (const p of deckPosts) posts.push({ kind: 'wall', x: p.x, z: p.z, y: p.y, cover: WALK_POST.cover, value: WALK_POST.value, cap: 1, wrecked: false, fire: 0, reach: WALK_POST.reach, acc: WALK_POST.acc });
+    else for (let i = 0; i < 3; i++) { const p = at(wallR, (i - 1) * 4); posts.push({ kind: 'wall', ...p, y: 0, cover: 0.22, value: 2, cap: 1, wrecked: false, fire: 0 }); }
   }
   const bars = n('window_bars') > 0 ? 0.28 : 0.35;
   for (const st of fin) if (!st.kind.startsWith('bunker_') && !isPostKind(st.kind) && dist(st, C) < 25) posts.push({ kind: 'building', x: st.x + ax * 0.5, z: st.z + az * 0.5, y: 0.3, cover: bars, value: 1, cap: isHome(st.kind) ? 2 : 1, wrecked: false, fire: 0 });
