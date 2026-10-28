@@ -95,7 +95,7 @@ export const localsOf = (s: GameState): LocalsState => (s.locals ??= newLocals()
 
 const HEAD_AGE: Record<NeighborKind, [number, number]> = { old_farmer: [72, 84], widow: [68, 80], young_family: [30, 38], prepper: [45, 60], ranch: [50, 65], loner: [40, 60] };
 const hashId = (id: string) => { let h = 2166136261; for (const c of id) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0; return h; };
-const cap = (x: string) => x[0].toUpperCase() + x.slice(1);
+const cap = (x: string) => (x ? x[0].toUpperCase() + x.slice(1) : x);
 /** "the Hendersons" → "Henderson". */
 export const surname = (n: Neighbor) => n.name.replace(/^the /, '').replace(/s$/, '');
 /** "Ortiz" → "the Ortizes", "Bauer" → "the Bauers". */
@@ -205,9 +205,9 @@ const REFUGEE: Array<[string, string]> = [
   ['Moreau', 'Two nurses and an old man in a horse trailer by the reservoir.'],
 ];
 
-function dies(n: Neighbor, l: NeighborLife, r: () => number, why: string): string {
+export function dies(n: Neighbor, l: NeighborLife, r: () => number, why: string): string {
   const old = l.head >= 65;
-  const who = n.members <= 1 ? (n.kind === 'widow' ? `Old Mrs. ${surname(n)}` : `${cap(n.kind === 'old_farmer' ? 'old ' : '')}${surname(n)}`) : old && r() < 0.5 ? `Old ${surname(n)}` : `One of the ${plural(surname(n))}`;
+  const who = n.members <= 1 ? (n.kind === 'widow' ? `Old Mrs. ${surname(n)}` : `${n.kind === 'old_farmer' ? 'Old ' : ''}${surname(n)}`) : old && r() < 0.5 ? `Old ${surname(n)}` : `One of the ${plural(surname(n))}`;
   n.members = Math.max(0, n.members - 1);
   if (who.startsWith('Old')) l.head = Math.max(25, l.head - 4 - Math.floor(r() * 30));
   return `${who.replace(/^Old Old/, 'Old')} ${why}`;
