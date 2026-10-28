@@ -42,8 +42,8 @@ import type { SkillId } from './family';
 // The dog
 // ─────────────────────────────────────────────────────────────────────────
 
-export type Breed = 'lab' | 'shepherd' | 'hound' | 'collie' | 'mutt';
-export const BREEDS: readonly Breed[] = ['lab', 'shepherd', 'hound', 'collie', 'mutt'];
+export type Breed = 'lab' | 'shepherd' | 'hound' | 'collie' | 'terrier' | 'mutt';
+export const BREEDS: readonly Breed[] = ['lab', 'shepherd', 'hound', 'collie', 'terrier', 'mutt'];
 export type Trait = 'loyal' | 'bold' | 'timid' | 'playful' | 'stubborn' | 'gentle';
 export const TRAITS: readonly Trait[] = ['loyal', 'bold', 'timid', 'playful', 'stubborn', 'gentle'];
 export const TRAIT_TEXT: Record<Trait, string> = {
@@ -56,12 +56,13 @@ export const COATS: Record<Breed, Array<{ body: number; trim: number; name: stri
   shepherd: [{ body: 0x8a6a40, trim: 0x1e1a14, name: 'tan and black' }, { body: 0x1e1c1a, trim: 0x6a4a2a, name: 'black and tan' }, { body: 0xb89a68, trim: 0x3a2e20, name: 'sable' }],
   hound: [{ body: 0xa8683a, trim: 0xf0e8d8, name: 'red and white' }, { body: 0xd8b078, trim: 0xf4ecdc, name: 'fawn' }, { body: 0x8a5a3a, trim: 0xe8dcc4, name: 'tricolor' }],
   collie: [{ body: 0x2a2624, trim: 0xf2eee6, name: 'black and white' }, { body: 0xb8742e, trim: 0xf4efe4, name: 'sable and white' }, { body: 0x6a6a72, trim: 0xf0ece4, name: 'blue merle' }],
+  terrier: [{ body: 0xc9a36a, trim: 0xf0e8d8, name: 'wheaten' }, { body: 0x3a3430, trim: 0xb08850, name: 'black and tan' }, { body: 0xe8e0d0, trim: 0xb07840, name: 'white and tan' }],
   mutt: [{ body: 0x9a7a52, trim: 0x6a5238, name: 'brindle' }, { body: 0xc8b08a, trim: 0xa8906a, name: 'tan' }, { body: 0x5a5048, trim: 0xe0d8c8, name: 'patched' }],
 };
 /** Years a breed lives, about. */
-const LIFE: Record<Breed, number> = { lab: 12, shepherd: 11, hound: 12, collie: 13, mutt: 13 };
+const LIFE: Record<Breed, number> = { lab: 12, shepherd: 11, hound: 12, collie: 13, terrier: 14, mutt: 13 };
 /** Kcal a day, grown. */
-const KCAL_BASE: Record<Breed, number> = { lab: 1100, shepherd: 1150, hound: 950, collie: 900, mutt: 900 };
+const KCAL_BASE: Record<Breed, number> = { lab: 1100, shepherd: 1150, hound: 950, collie: 900, terrier: 600, mutt: 900 };
 
 export interface Injury { what: string; sev: number }
 
