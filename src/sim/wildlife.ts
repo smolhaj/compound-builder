@@ -293,7 +293,7 @@ export function wildlifeNight(s: GameState): string[] {
     if (!s.utilities.grid && s.utilities.batteryKwh > 0) s.utilities.batteryKwh = Math.max(0, s.utilities.batteryKwh - 0.2 * fooled);
     if (w.lastLightLog !== day) {
       w.lastLightLog = day;
-      return [`The motion light came on in the night: just ${SPECIES[loudest].kind === 'predator' ? 'a ' + SPECIES[loudest].name.toLowerCase().replace(/s$/, '') : SPECIES[loudest].name.toLowerCase()} walking by. An AI sensor module would ignore animals.`];
+      return [`The motion light came on in the night: just ${one(loudest)} walking by. An AI sensor module would ignore animals.`];
     }
   }
   return [];
@@ -349,7 +349,8 @@ function hurtKid(s: GameState, sev: number, what: string): string | null {
 }
 
 const a_an = (w: string) => /^[aeiou]/i.test(w) ? 'an' : 'a';
-const one = (sp: SpeciesId) => sp === 'wolf' ? 'a wolf' : `${a_an(sp)} ${sp}`;
+/** "a deer", "an elk", "a pronghorn": one animal of the species, with its article. */
+function one(sp: SpeciesId): string { const n = sp === 'antelope' ? 'pronghorn' : sp === 'waterfowl' ? 'duck' : sp; return `${a_an(n)} ${n}`; }
 
 /**
  * Once a day: sightings, and predators that come to a careless place. Returns the ticker lines.

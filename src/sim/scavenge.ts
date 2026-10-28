@@ -34,6 +34,7 @@ import { CALIBER, type Caliber } from './armory';
 import { dayIndex, type GameState } from './state';
 import type { SkillId } from './family';
 import { bagOf, BAG_BASE, type BagGood } from './tradeGoods';
+import { diffOf } from './difficulty';
 
 // ─────────────────────────────────────────────────────────────────────────
 // State
@@ -294,6 +295,7 @@ export function chooseHaul(found: Partial<Record<LootKey, number>>, kg: number):
 function hurtOne(s: GameState, pid: string, what: string, sev: number, trauma = false): void {
   const ps = s.personState.find(x => x.id === pid);
   if (!ps || ps.needs.died != null) return;
+  sev = Math.round(sev * diffOf(s.disaster).wound);
   ps.needs.hurt.push({ what, sev, ...(trauma ? { trauma: true } : {}) });
   ps.needs.health = Math.max(s.disaster.difficulty === 'cozy' ? 5 : 1, ps.needs.health - sev * 0.4);
 }

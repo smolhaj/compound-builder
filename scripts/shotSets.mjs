@@ -540,28 +540,52 @@ SETS.mounts = [
   { name: 'mount-turret-fight', time: 11, ...base, setup: towersSetup() + fight + `{ cb.qa.pose = null; cb.cam.target.set(35, 0.6, 58); cb.cam.radius = 9; cb.cam.pitch = 0.3; cb.cam.yaw = 0.2; }`, frames: 20 },
 ];
 
-// native wildlife (sim/wildlife.ts): animals staged by hand with the debug spawn (W), a person (stander) in frame for scale.
-// W(sp, x, z, rot, male, side)... clears the staged animals and places these; the natural ones keep living their lives.
-const W = (...list) => `{ const w = cb.world.wildlife; w.clearDebug(); ${list.map(a => `w.spawnDebug('${a[0]}', ${a[1]}, ${a[2]}, ${a[3] ?? 0}, ${a[4] ?? true}, '${a[5] ?? 'free'}');`).join(' ')} }`;
+// native wildlife (sim/wildlife.ts): animals staged by hand with the debug spawn, a person (stander) in frame for scale.
+// stage({ near, ang, animals: [[species, forward, sideways, heading, male, side]], camBack, camSide, look, fov, fence, person }):
+// finds an open spot near the camp (or a fence spot), stands the person there and the animals `forward` / `sideways` of them
+// toward heading `ang`, and puts the eye camera behind the person. `forward` / `sideways` may be JS expressions.
+const stage = ({ near = [9, -3], ang = 0, animals = [], camBack = 1.7, camSide = 0.5, look = 4, fov = 60, fence = false, person = true, eyeH = 0.27, dy = 0.12 }) => `{ const w = cb.world.wildlife; w.clearDebug();
+  const c = cb.world.camp, h = cb.game.getState().game.site.home, g = cb.world.groundAt;
+  const ca = Math.cos(${ang}), sa = Math.sin(${ang});
+  // the flattest open ground near the spot (the animals must not hide behind a rise): the ground a few units about and ahead stays within a hand of the person's feet
+  const flat = (x, z) => { let m = 0; for (const [f, s] of [[-2, 0], [-2, 0.8], [2, 0], [4, 0], [6, 0], [4, 1.6], [4, -1.6], [7, 2]]) m = Math.max(m, Math.abs(g(x + ca * f - sa * s, z + sa * f + ca * s) - g(x, z))); return m; };
+  let best = null;
+  for (let ix = -24; ix <= 24; ix += 2) for (let iz = -24; iz <= 24; iz += 2) {
+    const x = ${fence ? `h.x0 + 7 + ix * 0.2` : `c.x + ${near[0]} + ix`}, z = ${fence ? `c.z + iz * 1.2` : `c.z + ${near[1]} + iz`};
+    if (x < h.x0 + 3 || x > h.x1 - 3 || z < h.z0 + 3 || z > h.z1 - 3) continue;
+    if (cb.world.onBuilding(x, z, 3) || cb.world.onBuilding(x + ca * 5, z + sa * 5, 2)) continue;
+    const cz = cb.world.parcel.creek.zAt(x); if (Math.abs(z - cz) < 6) continue;
+    const m = flat(x, z) + 0.002 * Math.hypot(ix, iz);
+    if (!best || m < best.m) best = { x, z, m };
+  }
+  const px = best.x, pz = best.z;
+  const at = (f, s) => [px + ca * f - sa * s, pz + sa * f + ca * s];
+  const fd = px - h.x0;
+  ${animals.map(a => `{ const [x, z] = at(${a[1]}, ${a[2]}); w.spawnDebug('${a[0]}', x, z, ${a[3] ?? 0}, ${a[4] ?? true}, '${a[5] ?? 'free'}'); }`).join('\n  ')}
+  ${person ? `import('/src/store/battleStore.ts').then(m => m.useBattleStore.getState().playBattle({ night: false, duration: 99999, events: [], units: [{ id: 'h_a', side: 'home', x: px, z: pz, post: 'open' }] }));` : `import('/src/store/battleStore.ts').then(m => m.useBattleStore.getState().endBattle());`}
+  const [ex, ez] = at(-${camBack}, ${camSide}), [lx, lz] = at(${look}, 0);
+  cb.qa.pose = { x: ex, y: g(ex, ez) + ${eyeH}, z: ez, lx, ly: g(lx, lz) + ${dy}, lz, fov: ${fov} };
+  console.error('wildlife stage', JSON.stringify({ person: [px, pz], flat: best.m, beasts: w.animals().filter(a => a.id.startsWith('qa:')).map(a => [a.sp, +a.x.toFixed(1), +a.z.toFixed(1), +g(a.x, a.z).toFixed(2)]), total: w.animals().length })); }`;
 /** A wall round the home square, finished 6 years ago (kind), or none. */
 const ringSetup = (kind) => `{ const G = cb.game; const h = G.getState().game.site.home;
   G.setState(s => { const g = structuredClone(s.game); g.perimeter = [];
     ${kind ? `g.perimeter.push({ id: 'wl_ring', kind: '${kind}', pts: [[h.x0, h.z0], [h.x1, h.z0], [h.x1, h.z1], [h.x0, h.z1], [h.x0, h.z0]], gates: [], done: 1, hours: 1, supplied: true, finishedAt: -2000 });` : ''}
     return { game: g }; }); }`;
+const aerialAt = (r, pitch, yaw) => `{ const c = cb.world.camp; cb.qa.pose = null; cb.cam.target.set(c.x + 6, 0, c.z - 2); cb.cam.radius = ${r}; cb.cam.pitch = ${pitch}; cb.cam.yaw = ${yaw}; }`;
 const wlBase = { season: 'summer', cam: cam0 };
 SETS.wildlife = [
   { name: 'eye-deer-and-rabbits-in-the-field', time: 7.4, ...wlBase,
-    setup: W(['deer', 24, 40, 1.2, false], ['deer', 25.2, 41.4, 0.9, false], ['deer', 23.4, 41.6, 1.4, true], ['rabbit', 20.4, 36.5, 0.5]) + stander(18.5, 36.2) + eye(16.8, 34.6, 23, 40, 0.27, 0.12, 60), frames: 10 },
+    setup: stage({ ang: 0.3, animals: [['deer', 4.6, 0.4, 1.2, false], ['deer', 5.4, 1.5, 0.9, false], ['deer', 4.3, -0.9, 1.4, true], ['rabbit', 2.6, -1.2, 0.5], ['rabbit', 3.1, 1.6, 2]] }), frames: 10 },
   { name: 'eye-turkeys-at-the-edge', time: 9, ...wlBase,
-    setup: W(['turkey', 25, 40, 0.8, true], ['turkey', 25.9, 40.6, 1.2, false], ['turkey', 24.4, 41.2, 0.4, false], ['turkey', 26.4, 39.4, 1.0, false]) + stander(19, 37) + eye(17.4, 35.4, 24, 40, 0.27, 0.1, 60), frames: 10 },
-  { name: 'eye-bear-at-the-fence-open', time: 20.5, ...wlBase,
-    setup: ringSetup('barbed_wire') + W(['bear', 56, 30.5, 1.6, true, 'free']) + stander(52.5, 29.5) + eye(50.5, 27.8, 56, 30.5, 0.27, 0.14, 62), frames: 12 },
-  { name: 'eye-bear-at-the-fence-chainlink-closed', time: 20.5, ...wlBase,
-    setup: ringSetup('chain_link') + W(['bear', 69.2, 30.5, 3.14, true, 'out']) + stander(63.5, 29.5) + eye(61.5, 27.8, 68, 30.5, 0.27, 0.14, 62), frames: 12 },
+    setup: stage({ ang: 0.3, animals: [['turkey', 4.2, 0.2, 0.8, true], ['turkey', 5, 1.0, 1.2, false], ['turkey', 4.4, -0.9, 0.4, false], ['turkey', 5.6, -0.2, 1.0, false]] }), frames: 10 },
+  { name: 'eye-bear-at-the-fence-barbed-wire-open', time: 18.9, ...wlBase,
+    setup: ringSetup('barbed_wire') + stage({ fence: true, ang: Math.PI, animals: [['bear', 'fd - 0.7', 0.6, 1.5 * Math.PI + 0.3, true, 'free']], look: 'fd * 0.8' }), frames: 12 },
+  { name: 'eye-bear-at-the-fence-chainlink-closed', time: 18.9, ...wlBase,
+    setup: ringSetup('chain_link') + stage({ fence: true, ang: Math.PI, animals: [['bear', 'fd + 1.8', 0.6, 0.5 * Math.PI, true, 'out']], look: 'fd * 0.8' }), frames: 12 },
   { name: 'aerial-herd-no-wall', time: 7.4, ...wlBase,
-    setup: ringSetup(null) + W(['elk', 30, 24, 2, true], ['elk', 31, 25.5, 1.8, false], ['elk', 29, 25.2, 2.2, false], ['deer', 40, 30, 1, false], ['deer', 41, 31, 0.5, false], ['coyote', 12, 14, 1, true]) + noman + `{ cb.qa.pose = null; cb.cam.target.set(32, 0, 28); cb.cam.radius = 22; cb.cam.pitch = 0.6; cb.cam.yaw = 0.5; }`, frames: 10 },
+    setup: ringSetup(null) + stage({ ang: 0.3, person: true, animals: [['elk', 6, 0, 2, true], ['elk', 7, 1.4, 1.8, false], ['elk', 5.4, -1.2, 2.2, false], ['deer', 3, 6, 1, false], ['deer', 3.8, 7, 0.5, false], ['coyote', -4, 6, 1, true]] }) + aerialAt(18, 0.62, 0.5), frames: 10 },
   { name: 'aerial-same-parcel-closed-wall', time: 7.4, ...wlBase,
-    setup: ringSetup('chain_link') + W(['elk', 30, 24, 2, true, 'in'], ['elk', 31, 25.5, 1.8, false, 'in'], ['deer', 40, 30, 1, false, 'in'], ['bear', 70, 14, 3.14, true, 'out'], ['coyote', -3, 20, 1.5, true, 'out']) + noman + `{ cb.qa.pose = null; cb.cam.target.set(32, 0, 28); cb.cam.radius = 30; cb.cam.pitch = 0.6; cb.cam.yaw = 0.5; }`, frames: 10 },
+    setup: ringSetup('chain_link') + stage({ ang: 0.3, person: true, animals: [['elk', 6, 0, 2, true, 'in'], ['elk', 7, 1.4, 1.8, false, 'in'], ['deer', 3, 6, 1, false, 'in']] }) + `{ const w = cb.world.wildlife, h = cb.game.getState().game.site.home; w.spawnDebug('bear', h.x0 - 1.5, (h.z0 + h.z1) / 2, 1.5, true, 'out'); w.spawnDebug('coyote', h.x1 + 1.5, h.z0 + 10, 3, true, 'out'); }` + aerialAt(60, 0.7, 0.5), frames: 10 },
   { name: 'eye-moose-wolf-cougar-javelina', time: 19, ...wlBase,
-    setup: W(['moose', 23, 38, 1, true], ['wolf', 28, 33, 3, true], ['cougar', 27, 44, 0, true], ['javelina', 21, 43, 0.5], ['javelina', 21.6, 43.7, 0.9], ['squirrel', 19.2, 39.4, 0.3], ['waterfowl', 24, 30, 1]) + stander(16, 36) + eye(14.4, 34.4, 24, 39, 0.27, 0.12, 66), frames: 10 },
+    setup: stage({ ang: 0.3, animals: [['moose', 6, 1.6, 1, true], ['wolf', 5, -1.8, 3, true], ['cougar', 7, 0, 0.2, true], ['javelina', 3.2, 1.2, 0.5], ['javelina', 3.6, 1.7, 0.9], ['squirrel', 1.8, -0.7, 0.3], ['waterfowl', 4, 3, 1]] }), frames: 10 },
 ];

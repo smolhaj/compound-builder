@@ -381,10 +381,10 @@ describe('motion lights and animals', () => {
   });
 });
 
-describe('save v45', () => {
-  it('upgrades a v44 save: wildlife state, the module in stock, the light fields', () => {
+describe('save v46', () => {
+  it('upgrades a v45 save: wildlife state, the module in stock, the light fields', () => {
     const g = newGame(1) as unknown as Record<string, unknown>;
-    const old = { ...g, version: 44, lights: { mode: 'sensor', per: {}, alertUntil: -1 }, stock: { ...(g.stock as object) } } as Record<string, unknown>;
+    const old = { ...g, version: 45, lights: { mode: 'sensor', per: {}, alertUntil: -1 }, stock: { ...(g.stock as object) } } as Record<string, unknown>;
     delete old.wildlife; delete (old.stock as Record<string, unknown>).ai_sensor_module;
     const up = migrate(old);
     expect(up.version).toBe(SAVE_VERSION);

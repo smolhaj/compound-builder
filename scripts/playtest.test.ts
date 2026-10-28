@@ -12,7 +12,9 @@ import { newGame, type GameState } from '../src/sim/state';
 import { step } from '../src/sim/engine';
 import { placeOrder, orderProblem, payWith } from '../src/sim/economy';
 import { planStructure, planProblem, isFinished } from '../src/sim/construction';
-import { CLASSIC, listings, type Site } from '../src/sim/site';
+import { affordable, CLASSIC, listings, type Site } from '../src/sim/site';
+import { generateFamily } from '../src/sim/family';
+import { startFunds } from '../src/sim/startFunds';
 import { BLUEPRINTS, isHome } from '../src/sim/blueprints';
 import { fixBill, fixBlocked, orderHookup, pendingFixes, placeImprovements } from '../src/sim/improvements';
 import { hireCrew, hoursLeft } from '../src/sim/crews';
@@ -24,7 +26,8 @@ import { buyLicense } from '../src/sim/wildfood';
 import { markTree } from '../src/sim/forestry';
 import { askRansom, canPay, openCaptives } from '../src/sim/rescue';
 import { calendarOf } from '../src/sim/state';
-import { planRun } from '../src/sim/perimeter';
+import { planRun, upgradeRun, runBill, runFinished, wallLength, UPGRADE_NEXT, type PerimeterKind } from '../src/sim/perimeter';
+import { TOWER_NEXT, upgradeTower } from '../src/sim/towers';
 import { orderFit, fitProblem, plant, repairPump, replaceFried } from '../src/sim/utilities';
 import { orderHardenAll } from '../src/sim/hardening';
 import { defenseOf, fightOdds, hideFoundChance, postureOf, resolve, type Stance } from '../src/sim/encounters';
@@ -38,6 +41,10 @@ import { SOIL_YIELD } from '../src/sim/site';
 import { REGION_IDS, REGIONS, seasons, type RegionId } from '../src/sim/regions';
 import { MATERIAL_IDS, MATERIALS, type MaterialId } from '../src/sim/materials';
 import type { DisasterKind } from '../src/sim/disaster';
+import type { Difficulty } from '../src/sim/difficulty';
+
+/** (GATES=<file>) append a debug line to a file (vitest swallows console output). */
+const dbg = (m: string) => appendFileSync(process.env.GATES!, m + '\n');
 
 type Strategy = 'idle' | 'homestead' | 'prepper' | 'fortress';
 
@@ -47,8 +54,14 @@ const PLANS: Record<Strategy, Array<[string, number, number]>> = {
   homestead: [['timber_cabin', 30, 30], ['outhouse', 36, 26], ['well_hand', 26, 34], ['garden', 22, 28], ['field', 10, 12], ['field', 17, 12], ['field', 24, 12], ['chicken_coop', 24, 22], ['root_cellar', 34, 36], ['cistern', 28, 38]],
   prepper: [['timber_cabin', 30, 30], ['outhouse', 36, 26], ['well_drilled', 26, 34], ['garden', 22, 28], ['field', 10, 12], ['field', 17, 12], ['field', 24, 12], ['field', 10, 19], ['chicken_coop', 24, 22], ['root_cellar', 34, 36], ['cistern', 28, 38], ['solar_array', 40, 30], ['battery_shed', 40, 34], ['generator_shed', 42, 36],
     ['bunker_hatch', 20, 40], ['bunker_corridor', 20.75, 40], ['bunker_dorm', 21.75, 40.25], ['bunker_stores', 21.75, 41.25], ['bunker_plant', 22.75, 40.25], ['bunker_medical', 22.75, 41.25], ['bunker_comms', 20.5, 41]],
-  fortress: [['timber_cabin', 30, 30], ['well_hand', 26, 34], ['workshop', 38, 28], ['garden', 22, 28]],
+  // (balance pass) a real fortress: a house, water and a food base first (a siege is a hunger problem as much as a gunfight), then the watch and the shop;
+  // the wall round the compound (FORTRESS_RING) is laid out on day 20, a tower on each corner, and both are upgraded in place as the money and the hours allow
+  fortress: [['timber_cabin', 30, 30], ['well_hand', 26, 34], ['outhouse', 36, 26], ['garden', 22, 28], ['field', 10, 12], ['field', 17, 12], ['chicken_coop', 24, 22], ['watchtower_wood', 19, 21], ['watchtower_wood', 43, 39], ['root_cellar', 34, 36], ['cistern', 28, 38], ['workshop', 38, 28]],
 };
+/** The fortress's wall: a closed ring round the compound (plan coordinates), about 100 world units. */
+const FORTRESS_RING: Array<[number, number]> = [[17, 19], [45, 19], [45, 41], [17, 41], [17, 19]];
+/** The wall's tiers, up the chain, as far as the fortress takes it (steel and electrified need more than a family builds in three years). */
+const RING_TOP: PerimeterKind = 'iron_barbed';
 /** (round 4) The odds the gate card shows: the battle sim run a couple of dozen times (encounters.fightOdds). */
 const odds = (s: GameState) => fightOdds(s, s.gate.pending!);
 /** Likely to lose the fight, or someone in it (what the gate card shows). Round 3 compared their strength with defenseOf, which didn't predict the fight. */
@@ -86,7 +99,7 @@ const foodCovers = (s: GameState, size: number, margin: number) => {
   return stored >= day * toHarvest(s) * margin && yearGrown(s) >= year * margin;
 };
 /** (round 4) The end of a month's trial: take them in if the food covers them, as for an arrival (the idle family and the fortress send them on). */
-const MARGIN: Record<Strategy, number> = { idle: 0, homestead: 1.1, prepper: 1.25, fortress: 0 };
+const MARGIN: Record<Strategy, number> = { idle: 0, homestead: 1.1, prepper: 1.25, fortress: 1.25 };
 const trialEnd = (strat: Strategy, s: GameState, n: number): Stance => MARGIN[strat] && foodCovers(s, n, MARGIN[strat]) ? 'take_in' : 'turn_away';
 const STANCE: Record<Strategy, (kinds: Stance[], kind: string, s: GameState, size: number) => Stance> = {
   idle: k => k.includes('turn_away') ? 'turn_away' : k.includes('hide') ? 'hide' : k[0],
@@ -97,7 +110,9 @@ const STANCE: Record<Strategy, (kinds: Stance[], kind: string, s: GameState, siz
   // (round 4: on the honest odds, by default; PREPPER_HIDES=1 for the old always-hide bot)
   prepper: (k, kind, s, n) => kind === 'arrival' ? (foodCovers(s, n, 1.25) && roomFor(s, n) > 240 ? 'trial' : 'turn_away')
     : !process.env.PREPPER_HIDES && k.includes('defend') && outclassed(s) ? 'defend' : k.includes('hide') ? 'hide' : k[0],
-  fortress: (k, kind) => kind === 'arrival' ? 'turn_away' : k.includes('defend') ? 'defend' : k[0],
+  // (balance pass) a fortress stands at its wall when the odds are good, and does not throw the family at a crew it cannot beat: it parleys, or hides
+  fortress: (k, kind, s, n) => kind === 'arrival' ? (foodCovers(s, n, 1.25) && roomFor(s, n) > 240 ? 'trial' : 'turn_away')
+    : kind === 'refugees' && k.includes('parley') ? 'parley' : k.includes('defend') && !outgunned(s) ? 'defend' : k.includes('hide') ? 'hide' : k.includes('parley') ? 'parley' : k.includes('defend') ? 'defend' : k[0],
 };
 
 /** Order what the plans still need (like the HUD's button), and a pantry for when the stores close. */
@@ -110,6 +125,8 @@ function orderNeeds(s: GameState, strat: Strategy): void {
       for (const [k, n] of Object.entries(sg.materials) as Array<[MaterialId, number]>) need[k] = (need[k] ?? 0) + n;
     });
   }
+  // (balance pass) the walls too: the bill of every run not yet supplied
+  for (const r of s.perimeter) if (!runFinished(r) && !r.supplied) for (const [k, n] of Object.entries(runBill(r.kind, wallLength(r))) as Array<[MaterialId, number]>) need[k] = (need[k] ?? 0) + n;
   const pending: Partial<Record<MaterialId, number>> = {};
   for (const o of s.orders) if (o.status === 'ordered') for (const l of o.lines) pending[l.material] = (pending[l.material] ?? 0) + l.qty;
   const lines = MATERIAL_IDS.map(m => ({ material: m, qty: Math.max(0, Math.ceil((need[m] ?? 0) - s.stock[m] - (pending[m] ?? 0))) })).filter(l => l.qty > 0 && MATERIALS[l.material].price !== null);
@@ -146,7 +163,7 @@ function orderNeeds(s: GameState, strat: Strategy): void {
 }
 
 /** Fields put by for after the collapse, beyond what today's mouths need (arrivals, lost crops). */
-const FIELD_SPARE: Record<Strategy, number> = { idle: 0, homestead: 3, prepper: 6, fortress: 0 };
+const FIELD_SPARE: Record<Strategy, number> = { idle: 0, homestead: 3, prepper: 6, fortress: 3 };
 /** Fields to keep for the mouths here: a year of eating over an ordinary year's field (less the garden and the hens), at least one per 1.5 mouths, 16 at most. */
 function fieldsWanted(s: GameState): number {
   const fin = s.structures.filter(isFinished);
@@ -172,10 +189,18 @@ function fieldSpot(s: GameState, M: (x: number, z: number) => [number, number]):
   return null;
 }
 
+/** The listing the old bots bought (the seed's pick of the first four); if this family can't afford it, the priciest one it can. */
+function siteFor(seed: number, region?: RegionId): Site {
+  const budget = startFunds(generateFamily(seed), 'fulltime', seed).budget;
+  const ls = listings(seed, region, undefined, 6, budget), want = ls[seed % 4];
+  if (affordable(want, budget)) return want;
+  return ls.filter(l => affordable(l, budget)).sort((a, b) => b.price - a.price)[0];
+}
+
 interface RunResult { causes: string; often: Array<[string, number]>; minMoney: number; site: string; strat: Strategy; kind: DisasterKind; variant: string; ending: string; grade: string; alive: string; hungry: number; days: number; moneyAtHit: number; builtAtHit: number; bugs: string[]; lines: string[]; fights: string[]; prisoners: number; hides: number; hidFound: number; owed: number; debtStage: string; trials: string; stripped: number; burned: number }
 
 function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' | 'medium', site: Site = CLASSIC, years = 0): RunResult & { s: GameState } {
-  let s = newGame(seed, 105, 2027, { site: site === CLASSIC ? undefined : site, mode: 'scenario', peace, kind, dayJobs: true, grid: true });
+  let s = newGame(seed, 105, 2027, { site: site === CLASSIC ? undefined : site, mode: 'scenario', peace, kind, dayJobs: true, grid: true, difficulty: process.env.DIFF as Difficulty | undefined });
   // the plans are drawn on the 40; squeeze them into the place actually bought
   const h = s.site.home, M = (x: number, z: number): [number, number] => [h.x0 + x / 67 * (h.x1 - h.x0), h.z0 + z / 67 * (h.z1 - h.z0)];
   let C = M(30, 30);
@@ -234,7 +259,16 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
     if (strat !== 'idle' && day % 10 === 0 && s.disaster.tracks.stores < 0.5 && s.stock.firewood + s.upkeep.green.reduce((a, g) => a + g.ricks, 0) < 15 && s.forestry.jobs.length < 3) {
       for (let k = 0; k < 3; k++) { const id = 1_000_000 + s.nextId; const [x, z] = M(4 + (id % 9) * 7, 64); markTree(s, { id, x, z, kind: 'broad', scale: 1 }, 20); }
     }
-    if (strat === 'fortress' && day === 120) planRun(s, 'log_palisade', [M(15, 15), M(50, 15), M(50, 50), M(15, 50), M(15, 15)]);
+    if (strat === 'fortress') {
+      if (day === 20) planRun(s, 'woven_wire', FORTRESS_RING.map(([x, z]) => M(x, z)));
+      // up the chain: one upgrade at a time, once the last is done and there is money for the next
+      if (day > 20 && day % 5 === 0 && s.money > 80_000) {
+        const ring = s.perimeter.find(r => runFinished(r) && FORTRESS_RING.length === r.pts.length && UPGRADE_NEXT[r.kind] && r.kind !== RING_TOP);
+        if (ring && !s.perimeter.some(r => r.replaces)) upgradeRun(s, ring.id);
+        const tower = s.structures.find(x => isFinished(x) && TOWER_NEXT[x.kind] && x.kind !== 'watchtower_concrete');
+        if (tower && !s.structures.some(x => x.replaces)) upgradeTower(s, tower.id);
+      }
+    }
     if (strat === 'prepper' && day === 600) for (const id of ['fallout', 'faraday', 'nbc'] as const) orderHardenAll(s, id, 1);
     // (v2: and after the hit too, for as long as the trucks still deliver)
     if (day % 3 === 0 && (s.clock.t < s.disaster.hitAt || payWith(s))) orderNeeds(s, strat);
@@ -300,6 +334,7 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
       const e = s.gate.pending, before = s.gate.battle, def = Math.round(defenseOf(postureOf(s)));
       // word from a crew holding one of ours: pay it if it can be paid, talk it down if six in ten can, else no deal (the idle family never pays)
       const ransom = e.kind === 'ransom' && e.ransom ? (strat === 'idle' ? 'refuse' : canPay(s, e.ransom) ? 'pay' : canPay(s, e.ransom, 0.6) ? 'parley' : 'refuse') : null;
+      if (process.env.GATES) { const q = postureOf(s); dbg(`  posture d${Math.floor(s.clock.t - s.disaster.hitAt)}: barrier ${Math.round(q.barrier)} fighters ${q.fighters} fire ${(q.firepower ?? 0).toFixed(2)} det ${Math.round(q.detection)} towers ${s.structures.filter(x => x.kind.startsWith('watchtower') && isFinished(x)).length} built ${s.structures.filter(isFinished).length} runs ${s.perimeter.filter(runFinished).map(r => r.kind).join('+')} fields ${s.structures.filter(x => x.kind === 'field' && isFinished(x)).length} food ${Math.round(daysOfFood(s))}d people ${livingCount(s)}`); }
       const oddsNow = process.env.GATES && e.stances.includes('defend') ? odds(s) : null, foundNow = e.stances.includes('hide') ? hideFoundChance(s, e) : 0;
       const stance = ransom ?? (e.kind === 'trial_end' ? trialEnd(strat, s, e.size) : STANCE[strat](e.stances, e.kind, s, e.size));
       const hidBefore = s.gate.history.length;
@@ -309,9 +344,9 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
       if (stance === 'hide') { hides++; const h = s.gate.history[hidBefore]; if (h && h.stance === 'hide' && h.tone === 'bad') hidFound++; }
       if (stance === 'trial') trial.started++;
       if (e.kind === 'trial_end') trial[stance === 'take_in' ? 'in' : 'on']++;
-      if (process.env.GATES && stance === 'hide') console.log(`hide ${strat} ${kind} d${Math.floor(s.clock.t - s.disaster.hitAt)} ${e.kind} ${e.temper ?? ''} n${e.size}${e.back ? ' back' : ''} found ${Math.round(foundNow * 100)}%: ${s.gate.history[hidBefore]?.tone} ${s.gate.history[hidBefore]?.stance}`);
+      if (process.env.GATES && stance === 'hide') dbg(`hide ${strat} ${kind} d${Math.floor(s.clock.t - s.disaster.hitAt)} ${e.kind} ${e.temper ?? ''} n${e.size}${e.back ? ' back' : ''} found ${Math.round(foundNow * 100)}%: ${s.gate.history[hidBefore]?.tone} ${s.gate.history[hidBefore]?.stance}`);
       const b = s.gate.battle as (PlannedBattle | undefined);
-      if (b && b !== before) { if (process.env.GATES) console.log(`gate ${strat} ${kind} d${Math.floor(s.clock.t - s.disaster.hitAt)} ${e.kind} ${e.temper ?? ''} n${e.size} str ${e.strength} vs def ${def} odds ${oddsNow ? `${Math.round(oddsNow.win * 100)}%/${Math.round(oddsNow.loseSomeone * 100)}%` : '-'}: ${b.result} people ${livingCount(s)}`); fights.push(`${b.result}${b.events.some(x => x.kind === 'death' && x.unit.startsWith('h_')) ? ' (lost people)' : ''}`); }
+      if (b && b !== before) { if (process.env.GATES) dbg(`gate ${strat} ${kind} d${Math.floor(s.clock.t - s.disaster.hitAt)} ${e.kind} ${e.temper ?? ''} n${e.size} str ${e.strength} vs def ${def} odds ${oddsNow ? `${Math.round(oddsNow.win * 100)}%/${Math.round(oddsNow.loseSomeone * 100)}%` : '-'}: ${b.result} people ${livingCount(s)}`); fights.push(`${b.result}${b.events.some(x => x.kind === 'death' && x.unit.startsWith('h_')) ? ' (lost people)' : ''}`); }
       // after the shooting: what each kind of family does with the wounded raiders
       if (s.gate.aftermath) resolveAftermath(s, AFTER[strat]);
     }
@@ -342,7 +377,7 @@ describe.skipIf(process.env.PLAYTEST !== 'long')('the long game', () => {
     const runs: Array<[Strategy, RegionId]> = [...REGION_IDS.flatMap(g => [['homestead', g], ['prepper', g]] as Array<[Strategy, RegionId]>), ['idle', 'mountain_west'], ['fortress', 'mountain_west']];
     for (const [strat, region] of runs) {
       const kind = (['grid_down', 'pandemic', 'financial', 'drought', 'wildfire', 'cyberattack'] as DisasterKind[])[seed % 6];
-      const r = play(strat, kind, seed, 'short', listings(seed, region)[seed % 4], 40);
+      const r = play(strat, kind, seed, 'short', siteFor(seed, region), 40);
       const s = r.s, L = s.lineage;
       const living = s.people.filter((_, i) => s.personState[i].needs.died == null);
       rows.push(`| ${seed} | ${region} | ${strat} | ${L.eras.map(e => `${e.name} ${e.grade} (${e.fate})`).join(', ') || '-'}${s.ending?.kind === 'wipe' ? ' · wiped' : ''} | ${living.length}/${s.people.length} | ${r.causes || '-'} | ${s.ending?.kind === 'wipe' ? `${calendarOf(s.clock).year} (${s.disaster.phase})` : '-'} | ${s.people.filter(p => p.bornHere).length} | ${new Set(living.filter(p => p.kin).map(p => p.gen)).size} | ${Math.round(L.points)} | ${L.milestones.length} | ${r.bugs.join('; ')} |`);
@@ -358,11 +393,12 @@ describe.skipIf(process.env.PLAYTEST !== 'long')('the long game', () => {
 
 describe.skipIf(!process.env.PLAYTEST || process.env.PLAYTEST === 'long')('playtest', () => {
   it('plays the strategies against the disasters', () => {
-    const kinds: DisasterKind[] = ['grid_down', 'nuclear', 'drought', 'pandemic', 'wildfire', 'ash_winter', 'financial', 'solar_flare', 'zombies'];
-    const strats: Strategy[] = ['idle', 'homestead', 'prepper', 'fortress'];
+    const kinds: DisasterKind[] = (process.env.KINDS ? process.env.KINDS.split(',') : ['grid_down', 'nuclear', 'drought', 'pandemic', 'wildfire', 'ash_winter', 'financial', 'solar_flare', 'zombies']) as DisasterKind[];
+    const strats: Strategy[] = (process.env.STRATS ? process.env.STRATS.split(',') : ['idle', 'homestead', 'prepper', 'fortress']) as Strategy[];
     const results: RunResult[] = [];
-    let seed = 11;
-    for (const kind of kinds) for (const strat of strats) { const site = listings(seed)[seed % 4]; results.push(play(strat, kind, seed++, 'medium', site)); }
+    // (the seed is fixed by the disaster's and the strategy's place in the full table, so a filtered run replays the same game)
+    const ALL_KINDS = ['grid_down', 'nuclear', 'drought', 'pandemic', 'wildfire', 'ash_winter', 'financial', 'solar_flare', 'zombies'], ALL_STRATS: Strategy[] = ['idle', 'homestead', 'prepper', 'fortress'];
+    for (const kind of kinds) for (const strat of strats) { const seed = 11 + ALL_KINDS.indexOf(kind) * 4 + ALL_STRATS.indexOf(strat) + Number(process.env.SEEDOFF ?? 0), site = siteFor(seed); results.push(play(strat, kind, seed, 'medium', site)); }
     const md = ['# Playtest report (scripted)', '', '| Site | Disaster | Strategy | Variant | Ending | Grade | Alive | Lost to | Hungry days | Days | $ at hit | Built at hit | Fights | Hid (found) | Trials | Bugs |', '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|',
       ...results.map(r => `| ${r.site} | ${r.kind} | ${r.strat} | ${r.variant} | ${r.ending} | ${r.grade} | ${r.alive} | ${r.causes || '-'} | ${r.hungry} | ${r.days} | ${r.moneyAtHit.toLocaleString('en-US')} | ${r.builtAtHit} | ${r.fights.join(', ') || '-'}${r.prisoners ? ` · ${r.prisoners} held` : ''} | ${r.hides ? `${r.hides} (${r.hidFound})${r.burned ? `, ${r.burned} burned` : ''}` : '-'} | ${r.trials} | ${r.bugs.join('; ')} |`),
       '', '## Report card lines', '', ...results.map(r => `- **${r.kind} / ${r.strat}:** ${r.lines.join(' ')}`),
@@ -370,7 +406,7 @@ describe.skipIf(!process.env.PLAYTEST || process.env.PLAYTEST === 'long')('playt
       // (round 4: checking can dip a few dollars under zero within a day, until the next morning moves it onto the card)
       '', '## Money', '', ...results.filter(r => r.minMoney < -100).map(r => `- **${r.kind} / ${r.strat}:** went as low as $${r.minMoney.toLocaleString('en-US')}`),
       ...results.filter(r => r.owed > 0).map(r => `- **${r.kind} / ${r.strat}:** owed as much as $${r.owed.toLocaleString('en-US')} (worst: ${r.debtStage})`)];
-    writeFileSync('playtest-report.md', md.join('\n'));
+    writeFileSync(process.env.REPORT ?? 'playtest-report.md', md.join('\n'));
     expect(results.flatMap(r => r.bugs)).toEqual([]);
   }, 1_800_000);
 });
