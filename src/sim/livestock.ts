@@ -29,6 +29,7 @@
  */
 import { careYield } from './daily';
 import { log } from './economy';
+import { logGate } from './nag';
 import { calendarOf, type GameState } from './state';
 import { REGIONS } from './regions';
 import { addFoodKcal } from './pantry';
@@ -114,7 +115,7 @@ export function livestockDay(s: GameState, freezer: boolean): number {
     // sheep with no roof in the cold months waste: the wool is not enough in a Mountain West January
     const exposed = a === 'sheep' && !grazing(s) ? 0.03 * (1 - sheepSheltered(s)) * Math.max(0.3, REGIONS[s.site.region].cold) : 0;
     l.condition[a] = Math.min(1, Math.max(0, before + (fed >= 0.95 ? 0.02 : -0.06 * (1 - fed)) - exposed));
-    if (exposed > 0.008 && s.clock.t - Math.floor(s.clock.t) < 1 && Math.floor(s.clock.t) % 20 === 0) log(s, 'The sheep are standing in the snow with no barn: they are losing condition.');
+    if (exposed > 0.008 && logGate(s, 'sheep-cold', 20)) log(s, 'The sheep are standing in the snow with no barn: they are losing condition.');
     if (before >= 0.5 && l.condition[a] < 0.5) log(s, `The ${a === 'steer' ? 'steer is' : a + 's are'} short of feed and losing condition.`);
     if (l.condition[a] <= 0) { s.stock[a] = head(s, a) - 1; l.condition[a] = 0.4; log(s, `A ${a} died: starved for want of ${EAT[a].hay > 0 ? 'hay' : 'feed'}.`); }
   }

@@ -28,6 +28,7 @@ import { powered } from './gear';
 import { currentThreat, floodlightArmed, floodlightLit, type ThreatKind } from './lights';
 import type { Caliber } from './armory';
 import type { Stock } from './materials';
+import { walkwayWatch } from './walkway';
 import type { GameState, Structure } from './state';
 
 export type TowerKind = 'rise_lookout' | 'watchtower_wood' | 'watchtower_concrete' | 'watchtower_flood' | 'watchtower_mount' | 'watchtower_turret';
@@ -166,8 +167,10 @@ export const litTowerIds = (s: GameState, threat: ThreatKind | boolean | null = 
 export function towerPosture(s: GameState): { detection: number; visibility: number; fire: number } {
   const t = towersBuilt(s);
   const posts = towerPosts(s);
-  if (!posts.length) return { detection: 0, visibility: 0, fire: 1 };
-  const views = posts.map(p => (p.def?.view ?? TOWERS.watchtower_wood.view) + (p.def ? highBonus(p.st, p.def.kind).view : 0)).sort((a, b) => b - a);
+  // the patrol deck on the wall (sim/walkway.ts): a long, low post; a guard on it adds all of its view
+  const deck = walkwayWatch(s);
+  if (!posts.length && deck.view <= 0) return { detection: 0, visibility: 0, fire: 1 };
+  const views = [...posts.map(p => (p.def?.view ?? TOWERS.watchtower_wood.view) + (p.def ? highBonus(p.st, p.def.kind).view : 0)), ...(deck.view > 0 ? [deck.view] : [])].sort((a, b) => b - a);
   let detection = views[0] + 2 * Math.min(3, views.length - 1);
   if (floodReady(s)) detection += 6;
   if (turretsReady(s).length) detection += 4;
@@ -179,6 +182,8 @@ export function towerPosture(s: GameState): { detection: number; visibility: num
 /** How much farther out the watch sees a crew coming (world units), from the best tower. */
 export function towerReach(s: GameState, night: boolean, lit: boolean): number {
   let r = 0;
+  const deck = walkwayWatch(s);
+  if (deck.viewR > 0) r = night ? deck.viewR * 0.5 : deck.viewR;
   for (const p of towerPosts(s)) {
     const base = (p.def?.viewR ?? TOWERS.watchtower_wood.viewR) + (p.def ? highBonus(p.st, p.def.kind).viewR : 0);
     // in the dark an unlit tower sees about half as far

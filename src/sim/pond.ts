@@ -30,6 +30,7 @@ import { addFoodKcal } from './pantry';
 import { finishedOf, pondOf, type PondState } from './farm';
 import { attractants, predatorSpecies, proof } from './wildlife';
 import { careYield } from './daily';
+import { logGate } from './nag';
 
 export const TROUT_FRY = 100, TROUT_FRY_G = 8, TABLE_G = 350, CRAY_BAG = 50;
 export const TROUT_CAP = 450, TROUT_CAP_AERATED = 800, CRAY_CAP = 2400;
@@ -93,7 +94,7 @@ export function pondDay(s: GameState): string[] {
       const give = Math.min(want, Math.max(0, s.stock.fish_feed ?? 0));
       s.stock.fish_feed = Math.max(0, (s.stock.fish_feed ?? 0) - give);
       p.fed = give / want;
-      if (p.fed < 0.5 && p.trout > 50 && day % 15 === 0) out.push('The trout are hungry: the pellets have run out.');
+      if (p.fed < 0.5 && p.trout > 50 && logGate(s, `pond-feed:${st.id}`, 15)) out.push('The trout are hungry: the pellets have run out.');
     } else p.fed = 1;
     // water
     const ox = oxygenOf(s, st, p, temp);

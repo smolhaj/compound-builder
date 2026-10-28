@@ -17,7 +17,8 @@
  *    (perimeter.canEnter); the passage is, which is why its hatches are
  *    modelled as the guarded weak points.
  */
-import { enclosure, nearest } from './enclosure';
+import { enclosure, nearest, ownedRects } from './enclosure';
+import { inGarage } from './garage';
 import { PERIMETER, fenceLive, runFinished, type PerimeterRun, type Pt } from './perimeter';
 import type { GameState } from './state';
 
@@ -112,6 +113,17 @@ export interface Hatch {
   locked: boolean;
 }
 
+/**
+ * Does a point lie inside the closed property line, or in a gatehouse garage
+ * (which is part of the line)? A passage that comes up in the garage, or
+ * anywhere inside a closed property wall, is not a way in.
+ */
+export function insideClosedLine(s: GameState, p: Pt): boolean {
+  if (inGarage(s, p[0], p[1], 0.05)) return true;
+  const e = enclosure(s);
+  return e.openShare === 0 && e.creekOpen === 0 && ownedRects(s).some(r => p[0] > r.x0 && p[0] < r.x1 && p[1] > r.z0 && p[1] < r.z1);
+}
+
 export function hatches(s: GameState, rings: readonly PerimeterRun[] = yardRings(s)): Hatch[] {
   const out: Hatch[] = [];
   for (const r of s.perimeter) {
@@ -119,7 +131,7 @@ export function hatches(s: GameState, rings: readonly PerimeterRun[] = yardRings
     ([0, 1] as const).forEach(end => {
       const at = end === 0 ? r.pts[0] : r.pts[r.pts.length - 1];
       const yard = yardAt(rings, at);
-      out.push({ runId: r.id, end, at, yard, exposed: yard === null, locked: !r.unlocked });
+      out.push({ runId: r.id, end, at, yard, exposed: yard === null && !insideClosedLine(s, at), locked: !r.unlocked });
     });
   }
   return out;

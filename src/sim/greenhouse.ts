@@ -36,6 +36,7 @@ import { REGIONS, seasons } from './regions';
 import { mulberry32 } from './rng';
 import { climate } from './effects';
 import { burnRick } from './upkeep';
+import { logGate } from './nag';
 import { heatDemand } from './heating';
 import { farmOf, greenhouseCareOf, orchardCareOf } from './farm';
 
@@ -126,7 +127,7 @@ export function greenhouseDay(s: GameState): string[] {
       let ok = true;
       while (c.burned >= 1) { if (!burnRick(s)) { ok = false; c.burned = 1; break; } c.burned -= 1; }
       c.heated = ok; c.by = ok ? 'wood' : 'none';
-      if (!ok && day - c.warned > 6) { c.warned = day; out.push('The greenhouse boiler is out of wood: the benches will freeze back.'); }
+      if (!ok && logGate(s, `gh-wood:${st.id}`, 7)) { c.warned = day; out.push('The greenhouse boiler is out of wood: the benches will freeze back.'); }
     }
     if (c.by !== was && c.by === 'wood' && c.heat === 'electric') out.push('The greenhouse heater has no power: the boiler is burning wood instead.');
   }

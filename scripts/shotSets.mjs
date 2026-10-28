@@ -733,3 +733,31 @@ SETS.farm = [
   { name: 'reservoir', time: 14, season: 'summer', setup: farmSet + farmDoy(190) + farmAt('reservoir', 9, 0.6, 0.4), cam: D, frames: 14 },
   { name: 'dusk-greenhouse-and-solar', time: 19.4, season: 'summer', setup: farmSet + farmDoy(300, true) + farmAt('greenhouse_heated', 14, 0.35, 0.9, -4, 5), cam: D, frames: 20 },
 ];
+
+// the fortress ring (sim/fortress.ts): container wall, patrol walkway, gatehouse garage, five towers. The whole 40-acre line is built in the setup; the cameras find the
+// garage, a corner tower and a guard on the deck (the family's watchers are posted by hand, then the clock jumps so they stand where the patrol puts them).
+const fortressSetup = `{ if (!window.__fort) { window.__fort = 1;
+  import('/src/store/worldStore.ts').then(m => {
+    const G = cb.game, geo = m.useWorldStore.getState().siteGeo ?? {};
+    G.getState().fortifyRing(geo, { towers: 5, towerKind: 'watchtower_wood', passage: false });
+    G.setState(s => { const g = structuredClone(s.game);
+      for (const r of g.perimeter) { r.done = r.hours; r.supplied = true; r.finishedAt = 0; }
+      for (const st of g.structures) if (st.kind === 'gate_garage' || st.kind.startsWith('watchtower')) { st.stage = 5; st.supplied = false; st.finishedAt = 0; st.permit = 'ok'; }
+      g.utilities.lit = ['x'];
+      g.personState.slice(0, 3).forEach(ps => { ps.task = 'watch'; ps.target = null; });
+      g.clock.t += 0.07;
+      return { game: g }; });
+    window.__fort = 2; }); } }`;
+const fortFind = `const g0 = cb.game.getState().game, gar = g0.structures.find(s => s.kind === 'gate_garage'); if (!gar) return;
+  const inw = [[0, 1], [1, 0], [0, -1], [-1, 0]][gar.rot], gr = cb.world.groundAt;`;
+const fortGuard = `const ps = cb.world.family.positions().filter(p => g0.personState.slice(1, 3).some(q => q.id === p.id)); const gd = ps[0];`;
+SETS.fortress = [
+  { name: 'fortress-aerial-gate', time: 11, season: 'summer', setup: fortressSetup + `{ ${fortFind} cb.qa.pose = null; cb.cam.target.set(gar.x, 0, gar.z); cb.cam.radius = 22; cb.cam.pitch = 0.55; cb.cam.yaw = 1.1; }`, cam: { x: C, z: C, yaw: 0, pitch: 0.5, radius: 20 }, frames: 14 },
+  { name: 'fortress-eye-garage-front', time: 11, season: 'summer', setup: fortressSetup + `{ ${fortFind} const x = gar.x + inw[0] * 4.5, z = gar.z + inw[1] * 4.5, lx = gar.x, lz = gar.z; cb.qa.pose = { x, y: gr(x, z) + 0.28, z, lx, ly: gr(lx, lz) + 0.28, lz, fov: 62 }; }`, cam: { x: C, z: C, yaw: 0, pitch: 0.3, radius: 5 }, frames: 14 },
+  { name: 'fortress-eye-road-gate', time: 11, season: 'summer', setup: fortressSetup + `{ ${fortFind} const x = gar.x - inw[0] * 6.5, z = gar.z - inw[1] * 6.5; cb.qa.pose = { x, y: gr(x, z) + 0.28, z, lx: gar.x, ly: gr(gar.x, gar.z) + 0.3, lz: gar.z, fov: 62 }; }`, cam: { x: C, z: C, yaw: 0, pitch: 0.3, radius: 5 }, frames: 14 },
+  { name: 'fortress-eye-guard-on-deck', time: 11, season: 'summer', setup: fortressSetup + `{ ${fortFind} ${fortGuard} if (!gd) return; const c = cb.world.camp, d = Math.hypot(c.x - gd.x, c.z - gd.z) || 1; const x = gd.x + (c.x - gd.x) / d * 5, z = gd.z + (c.z - gd.z) / d * 5; cb.qa.pose = { x, y: gr(x, z) + 0.3, z, lx: gd.x, ly: gr(gd.x, gd.z) + 0.55, lz: gd.z, fov: 60 }; }`, cam: { x: C, z: C, yaw: 0, pitch: 0.3, radius: 5 }, frames: 14 },
+  { name: 'fortress-eye-stairs', time: 11, season: 'summer', setup: fortressSetup + `{ ${fortFind} import('/src/sim/walkway.ts').then(m => { const run = g0.perimeter.find(r => r.kind === 'wall_walk'); if (!run) return; const q = m.walkwayAccess(run).find(a => Math.hypot(a.x - gar.x, a.z - gar.z) > 20); if (!q) return; const c = cb.world.camp, nx = -q.dz, nz = q.dx, sgn = ((c.x - q.x) * nx + (c.z - q.z) * nz) > 0 ? 1 : -1; const x = q.x + nx * sgn * 6, z = q.z + nz * sgn * 6; cb.qa.pose = { x, y: gr(x, z) + 0.3, z, lx: q.x, ly: gr(q.x, q.z) + 0.3, lz: q.z, fov: 60 }; }); }`, cam: { x: C, z: C, yaw: 0, pitch: 0.3, radius: 5 }, frames: 14 },
+  { name: 'fortress-aerial-deck-stairs', time: 11, season: 'summer', setup: fortressSetup + `{ ${fortFind} ${fortGuard} cb.qa.pose = null; const c = gd ?? gar; cb.cam.target.set(c.x, 0.4, c.z); cb.cam.radius = 6; cb.cam.pitch = 0.55; cb.cam.yaw = 0.9; }`, cam: { x: C, z: C, yaw: 0, pitch: 0.5, radius: 6 }, frames: 14 },
+  { name: 'fortress-aerial-corner-tower', time: 11, season: 'summer', setup: fortressSetup + `{ ${fortFind} const tw = g0.structures.filter(s => s.kind === 'watchtower_wood'); const t = tw[0]; if (!t) return; cb.qa.pose = null; cb.cam.target.set(t.x, 0.3, t.z); cb.cam.radius = 9; cb.cam.pitch = 0.5; cb.cam.yaw = 0.6; }`, cam: { x: C, z: C, yaw: 0, pitch: 0.5, radius: 9 }, frames: 14 },
+  { name: 'fortress-night-gate', time: 22, season: 'summer', setup: fortressSetup + `{ ${fortFind} cb.qa.pose = null; cb.cam.target.set(gar.x, 0, gar.z); cb.cam.radius = 9; cb.cam.pitch = 0.3; cb.cam.yaw = 1.1; }`, cam: { x: C, z: C, yaw: 0, pitch: 0.4, radius: 18 }, frames: 14 },
+];
