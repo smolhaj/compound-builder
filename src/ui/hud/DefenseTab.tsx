@@ -3,11 +3,12 @@ import { LightDiscipline } from '../LightDiscipline';
 import { useGameStore } from '../../store/gameStore';
 import { useWorldStore } from '../../store/worldStore';
 import { defenseReport, type Check } from '../../sim/defenseReport';
+import { setGuard } from '../../sim/pets';
 import { MATERIALS, type MaterialId } from '../../sim/materials';
 import { orderCost } from '../../sim/economy';
 import { PERIMETER, SALVAGE, UPGRADE_NEXT, runBill, runFinished, runHours, upgradeProblem, wallLength } from '../../sim/perimeter';
 import { STRUCTURE_SALVAGE, isFinished as structFinished } from '../../sim/construction';
-import { ARMORY_LIGHTS, LIGHT_MODES, LIGHT_MODE_NAME, lightList, lightMode, lightsOf } from '../../sim/lights';
+import { AI_MODULE, ARMORY_LIGHTS, LIGHT_MODES, LIGHT_MODE_NAME, aiModulesUsed, hasAiSensor, lightList, lightMode, lightsOf } from '../../sim/lights';
 import { floodTowerIds, TOWERS, TOWER_NEXT, highBonus, highShare, isTower, towerBill, towerUpgradeProblem } from '../../sim/towers';
 import { Note, Row, Section } from './common';
 import { TONE, DIM, btn, usd } from './style';
@@ -15,10 +16,13 @@ import { WallProperty } from './WallProperty';
 
 /** One checklist line: a tick or a cross, what it is, and why. */
 function CheckRow({ c }: { c: Check }) {
+  const money = useGameStore(s => s.money);
+  const dog = c.id.startsWith('dog:') ? c.id.slice(4) : null;
   return <div title={c.detail} style={{ display: 'flex', gap: 6, padding: '2px 0', alignItems: 'baseline' }}>
     <span style={{ color: TONE[c.tone], width: 14, textAlign: 'center' }}>{c.ok ? '✓' : '✕'}</span>
     <span style={{ flex: 1 }}>{c.label}</span>
     <span style={{ color: DIM, fontSize: 11.5, textAlign: 'right', maxWidth: '55%' }}>{c.detail}</span>
+    {dog && <button style={{ ...btn(), padding: '1px 6px', fontSize: 11 }} title="Put this dog on a post at the line, or keep it inside with the family" onClick={() => money(g => { const d = g.dogs.find(x => x.id === dog); return d ? setGuard(g, dog, !d.guard) : null; })}>{c.detail.startsWith('on the post') ? 'bring in' : 'post'}</button>}
   </div>;
 }
 
@@ -68,10 +72,17 @@ export function DefenseTab() {
         <span style={{ flex: 1, color: DIM }}>Set all lights (clears overrides)</span>
         {LIGHT_MODES.map(m => <button key={m} style={btn(false)} onClick={() => useGameStore.getState().setAllLights(m)}>{LIGHT_MODE_NAME[m]}</button>)}
       </div>
+      <Note>A basic motion sensor trips on anything that moves at night: deer, coyotes, a bear. That burns power and the glow is seen from the road. An AI sensor module ({game.stock[AI_MODULE]} owned, {aiModulesUsed(game)} fitted; Shop, Defense) tells people from animals: the light comes on for people only.</Note>
+      <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', padding: '3px 0' }}>
+        <span style={{ flex: 1, color: DIM }}>AI sensor, all lights</span>
+        <button style={btn(false)} onClick={() => { const n = useGameStore.getState().setAllLightsAi(lightList(game, floodTowerIds(game)).map(l => l.id), true); if (!n) alert(game.stock[AI_MODULE] - aiModulesUsed(game) < 1 ? 'No spare AI sensor module: buy one in the Shop (Defense).' : 'Nothing to fit (the lights need power).'); }}>Fit all</button>
+        <button style={btn(false)} onClick={() => useGameStore.getState().setAllLightsAi(lightList(game, floodTowerIds(game)).map(l => l.id), false)}>Strip all</button>
+      </div>
       {lightList(game, floodTowerIds(game)).length === 0 && <Note>No floodlights yet: buy a set (Shop, Defense) or build a tower with a light mast.</Note>}
       {lightList(game, floodTowerIds(game)).map(l => <div key={l.id} style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', padding: '3px 0' }}>
         <span style={{ flex: 1 }}>{l.name}{l.id !== ARMORY_LIGHTS ? '' : ''}</span>
         {LIGHT_MODES.map(m => <button key={m} style={btn(lightMode(game, l.id) === m)} onClick={() => useGameStore.getState().setLightMode(l.id, lightsOf(game).per[l.id] === m ? null : m)}>{LIGHT_MODE_NAME[m]}</button>)}
+        <button style={btn(hasAiSensor(game, l.id))} title="AI sensor module: this light ignores animals and comes on for people only (needs a spare module and power)" onClick={() => { const why = useGameStore.getState().setLightAi(l.id, !hasAiSensor(game, l.id)); if (why) alert(why); }}>AI {hasAiSensor(game, l.id) ? 'on' : 'off'}</button>
       </div>)}
     </Section>
     <Section title="Upgrade the towers">

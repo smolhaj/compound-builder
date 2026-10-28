@@ -4,10 +4,8 @@
  */
 import type { CSSProperties } from 'react';
 import { useGameStore } from '../store/gameStore';
-import { alwaysLit } from '../sim/lights';
-import { floodTowerIds } from '../sim/towers';
-import { AUTO_HELP, AUTO_MODES, AUTO_NAME, autoMode, curtainCover, curtainSets, darkness, lightLines, lightsOutReason, nightNow, visibilityOf, VISIBILITY_NAME, windowSets } from '../sim/blackout';
-import { raidPressure } from '../sim/opsec';
+import { AUTO_HELP, AUTO_MODES, AUTO_NAME, autoMode, curtainCover, curtainSets, darkness, genRunning, genTier, GEN_TIER_NAME, lightsOutReason, nightNow, visibilityOf, VISIBILITY_NAME, windowSets } from '../sim/blackout';
+import { lightLinesOf, raidPressure } from '../sim/opsec';
 
 const DIM = 'rgba(238,238,238,0.6)';
 const btn = (on = false): CSSProperties => ({ padding: '4px 9px', borderRadius: 6, border: 0, cursor: 'pointer', background: on ? '#d8c9a0' : '#3a3d34', color: on ? '#1c1d18' : '#eee', fontSize: 12.5 });
@@ -17,7 +15,7 @@ const REASON = { manual: 'switched on by you', dusk: 'every-dusk routine', warne
 export function LightDiscipline() {
   const game = useGameStore(s => s.game);
   const st = useGameStore.getState();
-  const lines = lightLines(game, alwaysLit(game, floodTowerIds(game)));
+  const lines = lightLinesOf(game);
   const total = lines.reduce((a, l) => a + l.points, 0);
   const vis = visibilityOf(total);
   const why = lightsOutReason(game);
@@ -35,6 +33,8 @@ export function LightDiscipline() {
       {AUTO_MODES.map(m => <button key={m} style={btn(autoMode(game) === m)} title={AUTO_HELP[m]} onClick={() => st.setLightsOutAuto(m)}>{AUTO_NAME[m]}</button>)}
     </div>
     <div style={{ color: DIM, fontSize: 12 }}>{AUTO_HELP[autoMode(game)]} A warning keeps your motion-sensor floodlights; the other two modes switch them off.</div>
+    <div style={row}><span>Generator soundproofing</span><span>{genRunning(game) ? GEN_TIER_NAME[genTier(game)] : `${GEN_TIER_NAME[genTier(game)]} (generator idle)`}</span></div>
+    <div style={{ color: DIM, fontSize: 12 }}>A generator is loud and bright, more so the more it runs. Buy baffles (about half) or a vault (silent) in the Shop, Defense.</div>
     <div style={{ ...row, paddingTop: 4 }}><span>Blackout curtains</span><span>{Math.min(sets, need)} of {need} houses</span></div>
     <div style={{ color: DIM, fontSize: 12 }}>{curtainCover(game) >= 1 ? 'Every house is curtained: the rooms stay lit behind them.' : `Buy a set per house (Shop, Defense). Without them lights out means dark rooms: night work ${Math.round(20 * dark)}% slower, falls in the dark, a worse mood (children most).`}</div>
   </div>;

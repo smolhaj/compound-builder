@@ -10,6 +10,7 @@
 import { CALIBER, type Caliber } from './armory';
 import { barterValue, METALS, type MetalKind } from './finance';
 import { MATERIALS } from './materials';
+import { addTool, kitOf, readKit, TOOL_KINDS, TOOLS, usedValue, type ToolKind } from './tools';
 import { blockedReason, isFinished, addWork } from './construction';
 import { mulberry32 } from './rng';
 import { dayIndex, type GameState } from './state';
@@ -20,7 +21,7 @@ export const LABOR_DAY = 120;
 export const STOCK_GOODS = ['fresh', 'frozen', 'canned', 'staples', 'fuel', 'firewood', 'meds', 'seed', 'hygiene'] as const;
 export type StockGood = typeof STOCK_GOODS[number];
 /** A tradable good: a stock item, rounds of a caliber, a unit of a metal, or a day's labor. */
-export type Good = StockGood | `ammo:${Caliber}` | `metal:${MetalKind}` | 'labor';
+export type Good = StockGood | `ammo:${Caliber}` | `metal:${MetalKind}` | `tool:${ToolKind}` | 'labor';
 export interface Lot { good: Good; qty: number }
 
 /** Persistent barter state (optional on old saves; lazily initialized). */
@@ -71,6 +72,8 @@ export function barterPrices(s: GameState): Record<Good, number> {
   }
   for (const c of Object.keys(CALIBER) as Caliber[]) out[`ammo:${c}`] = CALIBER[c].price / CALIBER[c].box * (1 + 3 * (1 - t.law)) * age;
   for (const k of Object.keys(METALS) as MetalKind[]) out[`metal:${k}`] = barterValue(s, k);
+  // a used tool: its old shelf price less the wear, dearer the longer the stores stay shut
+  for (const k of TOOL_KINDS) out[`tool:${k}`] = usedValue(k, 0.65) * (TOOLS[k].crude ? 0.5 : 1) * (1 + 1.5 * scarce * Math.min(1, sinceHit(s) / 365));
   // a day's work is worth less in goods when everyone has time and nobody has things
   out.labor = LABOR_DAY * (1 - 0.4 * scarce);
   return out;
@@ -80,6 +83,7 @@ export function barterPrices(s: GameState): Record<Good, number> {
 export function have(s: GameState, good: Good): number {
   if (good === 'labor') return Infinity;
   if (good.startsWith('ammo:')) return s.armory.ammo[good.slice(5) as Caliber] ?? 0;
+  if (good.startsWith('tool:')) return readKit(s).items.filter(t => t.kind === good.slice(5) && t.cond > 0).length;
   if (good.startsWith('metal:')) return s.fin.holdings.filter(h => h.kind === good.slice(6) && h.where !== 'bank').reduce((a, h) => a + h.units, 0);
   return s.stock[good as StockGood];
 }
@@ -88,6 +92,15 @@ export function move(s: GameState, good: Good, qty: number): void {
   const b = barterOf(s);
   if (good === 'labor') { b.laborOwed = Math.max(0, b.laborOwed - qty); return; }
   if (good.startsWith('ammo:')) { const c = good.slice(5) as Caliber; s.armory.ammo[c] = (s.armory.ammo[c] ?? 0) + qty; return; }
+  if (good.startsWith('tool:')) {
+    const kind = good.slice(5) as ToolKind;
+    if (qty > 0) { for (let i = 0; i < qty; i++) addTool(s, kind, 0.5, 0.5); return; }
+    // the family gives up its most worn working ones first
+    const kit = kitOf(s);
+    const out = kit.items.filter(t => t.kind === kind && t.cond > 0).sort((a, b) => a.cond - b.cond).slice(0, -qty);
+    kit.items = kit.items.filter(t => !out.includes(t));
+    return;
+  }
   if (good.startsWith('metal:')) {
     const kind = good.slice(6) as MetalKind;
     if (qty > 0) { const h = s.fin.holdings.find(x => x.kind === kind && x.where === 'safe'); if (h) h.units += qty; else s.fin.holdings.push({ kind, units: qty, where: 'safe' }); return; }

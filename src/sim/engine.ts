@@ -3,9 +3,10 @@
  * quarter-hour sub-step (deterministic regardless of frame rate or speed).
  * Systems mutate a draft; `step` returns a fresh state object.
  */
+import { wildlifeDay, wildlifeNight } from './wildlife';
 import { LIFESTYLE } from './site';
 import { crewStep } from './crews';
-import { addWork, canGoOn } from './construction';
+import { addWork, canGoOn, isFinished } from './construction';
 import { addCarryWork, deliverOrders } from './economy';
 import { addFixWork, nextFix, siteJobsDay } from './improvements';
 import { paperworkDay } from './paperwork';
@@ -17,7 +18,8 @@ import { shelfDay } from './shelf';
 import { bodyDay } from './body';
 import { financeDay } from './finance';
 import { armoryDay } from './armory';
-import { gearDay } from './gear';
+import { petsDay } from './pets';
+import { toolsDay } from './tools';
 import { vehiclesDay } from './vehicles';
 import { radioDay } from './radio';
 import { waterDay } from './water';
@@ -68,6 +70,8 @@ export function nextBuildTarget(s: GameState): Structure | null {
 
 function subStep(s: GameState): void {
   deliverOrders(s);
+  // animals walking past the motion lights at night (sim/wildlife.ts)
+  for (const line of wildlifeNight(s)) log(s, line);
   // a raid rolled this morning reaches the gate at its hour of the night or day
   { const arrived = arrivalCheck(s); if (arrived) log(s, `${arrived.title}.`); }
   const h = (s.clock.ticks * 0.25 + 6) % 24;   // exact: the tick count is an integer (hourOf(t) can land a hair under the hour)
@@ -111,7 +115,7 @@ function subStep(s: GameState): void {
       ps.task = task;
       ps.target = task === 'build' && !carry ? (target?.id ?? run?.id ?? fit?.building ?? harden?.building ?? fix?.st.id ?? null) : task === 'forestry' && job ? job.id : null;
       if (task === 'build' && carry) addCarryWork(s, hrs * rate);
-      else if (task === 'build' && target) addWork(s, target, hrs * rate);
+      else if (task === 'build' && target) addWork(s, target, hrs * rate, true);
       else if (task === 'build' && run) addRunWork(s, run, hrs * rate);
       else if (task === 'build' && fit) addFitWork(s, fit, hrs, p.skills.mechanic);
       else if (task === 'build' && harden) addHardenWork(s, harden, hrs * rate);
@@ -144,7 +148,8 @@ function subStep(s: GameState): void {
     for (const line of shelfDay(s)) log(s, line);
     for (const line of financeDay(s)) log(s, line);
     for (const line of armoryDay(s)) log(s, line);
-    for (const line of gearDay(s)) log(s, line);
+    for (const line of petsDay(s)) log(s, line);
+    for (const line of toolsDay(s)) log(s, line);
     for (const line of vehiclesDay(s)) log(s, line);
     for (const line of radioDay(s)) log(s, line);
     for (const line of upkeepDay(s, demandNow(s), s.heat.warned !== dayIndex(s.clock.t) - 1 && s.heat.warned !== dayIndex(s.clock.t))) log(s, line);
@@ -157,6 +162,7 @@ function subStep(s: GameState): void {
     for (const line of legalDay(s)) log(s, line);
     prisonersDay(s);   // (it logs its own lines)
     for (const line of weatherDay(s)) log(s, line);
+    for (const line of wildlifeDay(s, s.structures.some(st => st.kind === 'root_cellar' && isFinished(st) && s.utilities.lit.includes(st.id)))) log(s, line);
     const e = gateDay(s);
     // a raid has an hour of arrival (a gang at 2:15 AM); it waits for it and the game runs on until then
     if (e && !(hasCutscene(e) && scheduleArrival(s, e))) log(s, `${e.title}.`);

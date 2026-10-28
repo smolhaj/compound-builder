@@ -24,6 +24,9 @@ import { Atmosphere, type AtmosBuilding, type AtmosFrame } from './atmosphere/At
 import { fenceLean } from './atmosphere/aging';
 import { LEANS, leanRun } from './atmosphere/fenceAging';
 import { FamilyRenderer } from './people/FamilyRenderer';
+import { DogRenderer } from './people/DogRenderer';
+import type { DogCtx } from './people/dogGoals';
+import { WildlifeRenderer } from './wildlife/WildlifeRenderer';
 import { buildYard, type Yard } from './props/yardGeometry';
 import { dailyCtx, yardFx } from './people/dailyScene';
 import type { GoalCtx, Site } from './people/peopleGoals';
@@ -72,6 +75,8 @@ import { MATERIAL_IDS, emptyStock } from '../sim/materials';
 import { pantryRows } from '../sim/pantry';
 import { needOf } from '../sim/needs';
 import { FoodShelfRenderer, type ShownPlace } from './props/FoodShelfRenderer';
+import { TentsRenderer, tentSpots } from './props/TentsRenderer';
+import { sleepSpotFor, tentsPitched } from '../sim/housing';
 import { planShelves, propsWanted, splitInUse } from './props/foodShelfPlan';
 import type { FoodSlot } from './buildkit/shell';
 
@@ -159,6 +164,9 @@ export class HomesteadWorld {
   /** The chore yard round the camp (sim/daily.ts). */
   private readonly _yard: Yard;
   readonly family: FamilyRenderer;
+  readonly dogs: DogRenderer;
+  /** Native wildlife (sim/wildlife.ts): deer, turkeys, bears and the rest, drawn as instanced animals. */
+  readonly wildlife: WildlifeRenderer;
   /** Night life, weathering and the deeper seasons (atmosphere/). */
   readonly atmos: Atmosphere;
   /** County road, driveway, gate and stockpile yard. */
@@ -205,6 +213,8 @@ export class HomesteadWorld {
     this.stream = new StreamRenderer(ws.scene);
     this.lakes = new RegionalWaterRenderer(ws.scene);
     this.family = new FamilyRenderer(ws.scene);
+    this.dogs = new DogRenderer(ws.scene);
+    this.wildlife = new WildlifeRenderer(ws.scene);
     this._campGroup = buildCamp({ fire: false });
     this._campGroup.position.set(this.camp.x, this.parcel.height(this.camp.x, this.camp.z), this.camp.z);
     this._campGroup.rotation.y = this.camp.rot;
@@ -993,6 +1003,18 @@ export class HomesteadWorld {
     }
   }
 
+  // ── Dome tents in the yard (sim/housing.ts) ───────────────────────────
+  readonly tents = new TentsRenderer();
+  private _tentPos: Array<{ x: number; z: number; rot: number }> = [];
+  /** Pitch a dome tent round the camp for each one somebody sleeps in tonight. */
+  syncTents(game: GameState): void {
+    const n = tentsPitched(game);
+    if (n === 0 && this.tents.group.children.length === 0) { this._tentPos = []; return; }
+    if (!this.tents.group.parent) this._ws.scene.add(this.tents.group);
+    this._tentPos = tentSpots(this.camp, n, (x, z) => this.onBuilding(x, z, 0.4, false) || this.onAccess(x, z, 0.3) || this.onPerimeterLine(x, z, 0.2));
+    this.tents.sync(this._tentPos, this.groundAt);
+  }
+
   // ── Food on the shelves ───────────────────────────────────────────────
   readonly food = new FoodShelfRenderer();
   private _foodKey = '';
@@ -1310,6 +1332,21 @@ export class HomesteadWorld {
     }
   }
 
+  /** Wildlife: the animals the sim says live here, grazing, wandering and bolting from people (and dogs). */
+  updateWildlife(dt: number, game: GameState, speedK: number): void {
+    const threats: Array<[number, number]> = this.family.positions().filter(p => this.family.shown.has(p.id)).map(p => [p.x, p.z] as [number, number]);
+    for (const d of this.dogPositions()) threats.push(d);
+    const creek = this.parcel.creekHome ? this.parcel.creek : null;
+    this.wildlife.update(dt, game, game.clock.t, {
+      ground: this.groundAt,
+      blocked: (x, z) => this.onBuilding(x, z, 0.25) || this.onCamp(x, z, 0.5) || this.onAccess(x, z, 0.3),
+      creek,
+      threats,
+    }, speedK);
+  }
+  /** Where dogs are (animals bolt from them too); none until the dogs renderer exists. */
+  dogPositions(): Array<[number, number]> { return this.dogs.positions().map(d => [d.x, d.z] as [number, number]); }
+
   /** People: walk the family to their tasks; tend the campfire. */
   updatePeople(dt: number, game: GameState, hour: number, speedK: number): void {
     const site = (id: string): Site | null => {
@@ -1326,11 +1363,16 @@ export class HomesteadWorld {
       return j && t ? { x: t.x, z: t.z, scale: t.scale, stage: j.stage, fall: fallHeading(t.id), len: 2.6 * t.scale * t.sy } : null;
     };
     const refs = [...this._built.values()].filter(b => b.finished).map(b => ({ kind: b.placed.kind, site: site(b.placed.id)! }));
-    const ctx: GoalCtx = { camp: this.camp, site, home: homeB ? site(homeB.placed.id) : null, tree, yard: this.access.yard, ...dailyCtx(refs, game, this.access.yard, seasonState.params.cold < 0.35) };
+    const ctx: GoalCtx = { camp: this.camp, site, home: homeB ? site(homeB.placed.id) : null, tree, yard: this.access.yard, sleepAt: i => sleepSpotFor(game, i), tentAt: n => this._tentPos[n], ...dailyCtx(refs, game, this.access.yard, seasonState.params.cold < 0.35) };
     const fx = yardFx(game, hour);
     this._yard.update(this._clock, fx.lights, fx.smoke);
     const season = (seasonState.visual === 'winter' && !seasonState.climate.freeze ? 'fall' : seasonState.visual) as WearSeason;
     this.family.update(dt, game.people, game.personState, hour, game.clock.t, ctx, this.walkHeight, season, speedK);
+    const dctx: DogCtx = {
+      home: ctx.home, camp: this.camp, gate: this.access.gate, yard: this.access.yard, atGate: !!game.gate.pending,
+      person: id => (this.family.shown.has(id) ? this.family.poseOf(id) : null),
+    };
+    this.dogs.update(dt, game, hour, game.clock.t, dctx, this.walkHeight, speedK);
     // crops stand in the ground from planting (mid-May) to the last of the harvest (late October); bare soil the rest of the year
     const doy = calendarOf(game.clock).doy, [c0, c1] = seasons(REGIONS[game.site.region]).crops, growing = doy >= c0 && doy < c1;
     // the orchard: leaves from blossom to a month past the first frost, fruit in late summer once the trees bear (and no late frost took it)
@@ -1598,6 +1640,8 @@ export class HomesteadWorld {
     this._props?.dispose();
     this.stream.dispose();
     this.family.dispose();
+    this.dogs.dispose();
+    this.wildlife.dispose();
     this._yard.dispose();
     this.atmos.dispose();
     this.lakes.dispose();

@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { newGame, type GameState } from './state';
+import { postureOf } from './encounters';
 import { exposureParts, opsecOf, raidPressure } from './opsec';
 import { floodlightLit, lightsOf } from './lights';
-import { autoMode, curtainCover, darkness, glowFactor, lightLines, lightsOutNow, lightsOutReason, mishapChance, nightWork, visibilityOf } from './blackout';
+import { autoMode, curtainCover, darkness, glowFactor, lightLines, lightsOutNow, lightsOutReason, mishapChance, genPoints, genSound, genTier, nightWork, visibilityOf } from './blackout';
 import { windowLight } from '../game/atmosphere/nightLife';
 import { liveDay } from './needs';
 import { migrate } from './save/migrations';
@@ -71,6 +72,27 @@ describe('light discipline', () => {
     expect(mishapChance(g)).toBe(0);
   });
 
+  it('a generator is louder the more it runs, and soundproofing buys it down to nothing', () => {
+    const g = fresh(); g.disaster.tracks.grid = 0;
+    g.utilities.report.genKwh = 2; const light = genPoints(g);
+    g.utilities.report.genKwh = 12; const heavy = genPoints(g);
+    expect(heavy).toBeGreaterThan(light);
+    expect(genTier(g)).toBe(0);
+    g.stock.gen_baffles = 1;
+    expect(genTier(g)).toBe(1); expect(genSound(g)).toBeCloseTo(0.45);
+    expect(genPoints(g)).toBeCloseTo(heavy * 0.45);
+    g.stock.gen_vault = 1;
+    expect(genTier(g)).toBe(2); expect(genPoints(g)).toBe(0);
+    expect(lightLines(g, 0).find(l => l.id === 'generator')!.points).toBe(0);
+  });
+
+  it('the generator feeds the road visibility in encounters and the vault silences it', () => {
+    const g = fresh(); g.utilities.report.genKwh = 6;
+    const loud = postureOf(g).visibility;
+    g.stock.gen_vault = 1;
+    expect(postureOf(g).visibility).toBeLessThan(loud);
+  });
+
   it('a generator is seen whatever the discipline', () => {
     const g = fresh(); g.disaster.tracks.grid = 0; g.utilities.report.genKwh = 4;
     opsecOf(g).blackout = true; g.stock.blackout_curtains = 9;
@@ -98,22 +120,29 @@ describe('light discipline', () => {
     expect(g.personState.every(p => p.needs.hurt.length === 0)).toBe(true);
   });
 
-  it('children feel the dark more and a day without curtains wears the mood down', () => {
+  it('people up at night feel the dark in their mood; sleepers do not', () => {
     const run = (curtains: number) => {
       const g = fresh(); house(g); opsecOf(g).blackout = true; g.stock.blackout_curtains = curtains;
-      for (const ps of g.personState) ps.needs.morale = 70;
+      for (const ps of g.personState) { ps.needs.morale = 70; ps.task = 'watch' as never; }
       for (let d = 0; d < 40; d++) liveDay(g, 0.9);
       return g.personState.reduce((a, p) => a + p.needs.morale, 0);
     };
     expect(run(0)).toBeLessThan(run(1));
+    const g = fresh(); house(g); opsecOf(g).blackout = true;
+    for (const ps of g.personState) { ps.needs.morale = 70; ps.task = 'sleep'; }
+    const base = fresh(); house(base);
+    for (const ps of base.personState) { ps.needs.morale = 70; ps.task = 'sleep'; }
+    for (let d = 0; d < 40; d++) { liveDay(g, 0.9); liveDay(base, 0.9); }
+    expect(g.personState.reduce((a, p) => a + p.needs.morale, 0)).toBeCloseTo(base.personState.reduce((a, p) => a + p.needs.morale, 0));
   });
 
-  it('migrates a v46 save: routine off, curtains at zero', () => {
+  it('migrates a v50 save: routine off, curtains at zero', () => {
     const g = fresh(); g.opsec = { quietDeliveries: true, blackout: true };
-    const old = { ...JSON.parse(JSON.stringify(g)), version: 46 };
-    delete old.stock.blackout_curtains;
+    const old = { ...JSON.parse(JSON.stringify(g)), version: 50 };
+    delete old.stock.blackout_curtains; old.version = 50;
     const m = migrate(old);
     expect(m.opsec).toMatchObject({ quietDeliveries: true, blackout: true, auto: 'off' });
     expect(m.stock.blackout_curtains).toBe(0);
+    expect(m.stock.gen_vault).toBe(0);
   });
 });

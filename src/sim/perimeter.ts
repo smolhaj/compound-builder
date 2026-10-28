@@ -12,6 +12,7 @@
  */
 import { hasAll, shortfall, waitingFor, type MaterialId, type Stock } from './materials';
 import { log } from './economy';
+import { payUpkeep, wearTools, workSpeed } from './tools';
 import type { GameState } from './state';
 
 export type PerimeterKind = 'split_rail' | 'barbed_wire' | 'woven_wire' | 'thorn_hedge' | 'log_palisade' | 'container_wall' | 'earth_berm' | 'ditch' | 'creek_bars' | 'chain_link' | 'wrought_iron' | 'iron_barbed' | 'steel_wall' | 'electric_steel' | 'water_pipe' | 'power_cable' | 'escape_tunnel';
@@ -81,6 +82,17 @@ export interface PerimeterRun {
   /** An upgrade of this finished run: the old tier keeps working until this one is done, then goes (its materials half back). */
   replaces?: string;
 }
+
+/**
+ * How well a run keeps bears, cougars, wolves and coyotes out (0–1; sim/wildlife.ts reads it through
+ * `enclosure(s, t, 'predators')`). Solid stuff stops them: palisade, container, chain link, wrought iron,
+ * steel; wire that stops a deer (game fence) does not stop a bear, and split rail and barbed wire are only a
+ * line to step through. `animals` above is what a run does to hooved game (≥ 0.9 keeps deer out).
+ */
+export const PREDATOR_BLOCK: Record<PerimeterKind, number> = {
+  split_rail: 0.02, barbed_wire: 0.1, woven_wire: 0.35, thorn_hedge: 0.75, log_palisade: 0.97, container_wall: 1, earth_berm: 0.2, ditch: 0.2,
+  creek_bars: 0.95, chain_link: 0.9, wrought_iron: 0.97, iron_barbed: 0.98, steel_wall: 1, electric_steel: 1, water_pipe: 0, power_cable: 0, escape_tunnel: 0,
+};
 
 /** The next tier up, where there is one (upgraded in place: sim `upgradeRun`). */
 export const UPGRADE_NEXT: Partial<Record<PerimeterKind, PerimeterKind>> = {
@@ -204,7 +216,12 @@ export function addRunWork(s: GameState, r: PerimeterRun, hours: number): void {
       log(s, `The berm takes ${Math.round(use)} m³ off the spoil pile.`);
     }
   }
-  r.done = Math.min(r.hours, r.done + hours);
+  // the family's shovel, pliers and so on (sim/tools.ts)
+  hours = payUpkeep(s, hours);
+  const task = { kind: 'fence', run: r.kind } as const, m = workSpeed(s, task);
+  if (m <= 0) return;
+  wearTools(s, task, hours);
+  r.done = Math.min(r.hours, r.done + hours * m);
   if (r.done >= r.hours - 1e-9) {
     r.finishedAt = s.clock.t;
     if (r.kind === 'ditch') s.stock.spoil += Math.round(DITCH_M3 * wallLength(r));

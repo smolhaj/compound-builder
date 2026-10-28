@@ -10,10 +10,11 @@ export type MaterialId = 'lumber' | 'logs' | 'firewood' | 'fieldstone' | 'concre
   | 'rebar' | 'membrane' | 'excavator' | 'blast_door' | 'nbc_filter' | 'spoil' | 'culvert' | 'egress_hatch'
   | 'lead_sheet' | 'faraday_mesh' | 'blast_valve' | 'filter_set'
   | 'fresh' | 'frozen' | 'canned' | 'staples' | 'meds' | 'seed' | 'lids' | 'plow' | 'stabilizer' | 'traps' | 'hygiene' | 'gun_safe' | 'gun_cleaning' | 'fishing_gear' | 'snares' | 'smoker' | 'goat' | 'pig' | 'steer' | 'rabbit' | 'hay' | 'feed' | 'water_jugs' | 'ibc_tote' | 'water_trailer' | 'water_filter' | 'ro_system' | 'softener' | 'greywater'
-  | 'plate_carrier' | 'ifak' | 'nvg' | 'thermal' | 'radios' | 'cameras' | 'thermal_cam' | 'driveway_alarm' | 'floodlights' | 'blackout_curtains' | 'tripwire' | 'dog' | 'steel_door' | 'window_bars' | 'sandbags' | 'safe_room' | 'sw_radio' | 'ham_rig' | 'helmet' | 'soft_armor'
+  | 'plate_carrier' | 'ifak' | 'nvg' | 'thermal' | 'radios' | 'cameras' | 'thermal_cam' | 'driveway_alarm' | 'floodlights' | 'blackout_curtains' | 'gen_baffles' | 'gen_vault' | 'tripwire' | 'dog' | 'puppy' | 'kibble' | 'dogbed' | 'doghouse' | 'steel_door' | 'window_bars' | 'sandbags' | 'safe_room' | 'sw_radio' | 'ham_rig' | 'helmet' | 'soft_armor'
   | 'grenades' | 'rpg_launcher' | 'rpg_rounds' | 'suppressor'
   | 'mines' | 'greenhouse_kit' | 'fruit_trees'
-  | 'gun_mount' | 'turret_head';
+  | 'gun_mount' | 'turret_head' | 'ai_sensor_module'
+  | 'tent' | 'sleeping_bag';
 
 export interface MaterialDef {
   id: MaterialId;
@@ -81,9 +82,16 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   thermal_cam: { id: 'thermal_cam', name: 'Thermal camera', unit: 'a fixed thermal security camera on the drive (needs power)', price: 2800 },
   driveway_alarm: { id: 'driveway_alarm', name: 'Driveway alarm', unit: 'wireless motion sensors along the drive, a base unit in the house', price: 150 },
   floodlights: { id: 'floodlights', name: 'Motion floodlights', unit: 'a set of motion floodlights for the yard (needs power)', price: 220 },
+  gen_baffles: { id: 'gen_baffles', name: 'Generator baffles', unit: 'an insulated, vented enclosure and exhaust muffler for the generator shed: about half the noise and light', price: 900 },
+  gen_vault: { id: 'gen_vault', name: 'Generator vault', unit: 'a buried, lined generator room with an exhaust silencer and a baffled intake: the generator is not heard or seen from the road', price: 6500 },
   blackout_curtains: { id: 'blackout_curtains', name: 'Blackout curtains', unit: 'heavy light-blocking curtains and tracks for one house: the room stays lit, the window stays dark', price: 140 },
+  ai_sensor_module: { id: 'ai_sensor_module', name: 'AI sensor module', unit: 'a chip and lens for one floodlight: tells people from animals, so the light comes on for people only (needs the light powered; fit it in Defense)', price: 180 },
   tripwire: { id: 'tripwire', name: 'Tripwire alarms', unit: 'tripwire noisemakers for the trails into the place', price: 60 },
-  dog: { id: 'dog', name: 'Guard dog', unit: 'a trained dog: barks at strangers (eats ~1,000 kcal a day)', price: 600 },
+  dog: { id: 'dog', name: 'Dog (trained adult)', unit: 'a named, trained adult dog: a family pet who also barks at strangers. It must be fed, watered, walked and doctored, and it will grieve and be grieved', price: 600 },
+  puppy: { id: 'puppy', name: 'Puppy', unit: 'a named puppy: needs vaccines, training and a lot of time, and grows into a better guard and a closer friend', price: 250 },
+  kibble: { id: 'kibble', name: 'Dog food', unit: '18 kg bag of kibble (≈ 63,000 kcal: two months for one dog)', price: 45 },
+  dogbed: { id: 'dogbed', name: 'Dog bed', unit: 'a cheap bed or a folded blanket for a dog kept outside or with no home yet (inside a furnished home dogs use the beds, sofa and rugs)', price: 20 },
+  doghouse: { id: 'doghouse', name: 'Doghouse', unit: 'an insulated doghouse for a dog kept outside in the cold', price: 140 },
   steel_door: { id: 'steel_door', name: 'Steel entry door', unit: 'a steel door in a steel frame, installed', price: 1200 },
   window_bars: { id: 'window_bars', name: 'Window bars', unit: 'security bars for the house windows', price: 900 },
   sandbags: { id: 'sandbags', name: 'Sandbags', unit: '100 bags (fill them with your own dirt) for a fighting position', price: 300 },
@@ -91,6 +99,9 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   // for the watch towers' top tiers (sim/towers.ts)
   gun_mount: { id: 'gun_mount', name: 'Ring mount & machine gun', unit: 'a pintle ring on a pedestal with a registered belt-fed 7.62 machine gun and a feed tray', price: 9500 },
   turret_head: { id: 'turret_head', name: 'Remote turret head', unit: 'a gyro-stabilised remote weapon station: gun cradle, servos, optics and a controller (needs power and cameras)', price: 26000 },
+  // somewhere to sleep when there are more people than beds (sim/housing.ts)
+  tent: { id: 'tent', name: 'Dome tent', unit: '4-person dome tent with a rain fly and a footprint: sleeps 3 (fine in mild weather, miserable in a storm or a freeze)', price: 180 },
+  sleeping_bag: { id: 'sleeping_bag', name: 'Sleeping bag', unit: '20°F bag and a foam pad: for the floor, a couch or a tent', price: 70 },
   // Black market only (sim/blackMarket.ts): price null, so the catalog never sells them.
   grenades: { id: 'grenades', name: 'Hand grenades', unit: 'grenade', price: null },
   rpg_launcher: { id: 'rpg_launcher', name: 'RPG-type launcher', unit: 'launcher tube', price: null },

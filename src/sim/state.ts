@@ -27,6 +27,7 @@ import { conditionsFor, newBody, type Body } from './body';
 import { newFin, type Fin } from './finance';
 import { newArmory, type Armory } from './armory';
 import { newWild, type Wild } from './wildfood';
+import { newWildlife, type Wildlife } from './wildlife';
 import type { Livestock } from './livestock';
 import type { Vehicle } from './vehicles';
 import { emptyStats, type Ending, type RunStats } from './report';
@@ -36,15 +37,20 @@ import type { WeatherState } from './weatherThreats';
 import { DIFFICULTY } from './difficulty';
 import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
 import type { LightsState } from './lights';
-export const SAVE_VERSION = 47;
+import { starterKit, type ToolKit } from './tools';
+export const SAVE_VERSION = 51;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
 import { newScavenge, type ScavengeState } from './scavenge';
 import { newMarketState, type MarketState } from './tradeGoods';
 import { newLocals, type LocalsState } from './neighborLife';
+import type { Dog, PetLife } from './pets';
 import { newDaily, type Daily } from './daily';
 import type { Loss } from './grief';
+
+/** What the family packs to sleep in: a bag each and, past the wall tent's four, a dome tent for the rest (sim/housing.ts). */
+export const startingBedding = (n: number): { sleeping_bag: number; tent: number } => ({ sleeping_bag: n, tent: Math.max(0, Math.ceil((n - 4) / 3)) });
 
 /** Starting savings (GDS §1 peacetime money constraint). */
 export const STARTING_MONEY = 30000;
@@ -221,10 +227,14 @@ export interface GameState {
   armory: Armory;
   /** OPSEC choices (sim/opsec.ts); made lazily. */
   opsec?: { quietDeliveries: boolean; blackout: boolean; auto?: 'off' | 'warned' | 'dusk' };
+  /** Hammers, saws, shovels and drills: condition, sharpness, what is missing (sim/tools.ts). Save v45; made lazily from the family's trades. */
+  tools?: ToolKit;
   /** Floodlight modes: the default and per-light overrides (sim/lights.ts). Save v44; made lazily. */
   lights?: LightsState;
   /** The game in the woods and the creek, licenses. */
   wild: Wild;
+  /** Native wildlife on the land: predators taken, sightings, raids (sim/wildlife.ts). Save v49; made lazily. */
+  wildlife?: Wildlife;
   /** The long game: eras, the chronicle, milestones, the dynasty score. */
   lineage: Lineage;
   /** Goats, pigs, the steer, rabbits (lazily made: `s.livestock ??= newLivestock()`). */
@@ -245,9 +255,13 @@ export interface GameState {
   market?: MarketState;
   /** The neighbors' lives: ages, history, news on its way, the co-op or militia, the pact (sim/neighborLife.ts). Save v42. */
   locals?: LocalsState;
-  /** Daily life (sim/daily.ts): the roster, chores, gatherings. Save v46; `dailyOf` makes it lazily. */
+  /** The family's dogs, each a named pet with its own health, bonds and moods (sim/pets.ts; save v43). Replaces the old `stock.dog` count. */
+  dogs: Dog[];
+  /** Pet care settings, the family's grief for lost pets, yesterday's care (sim/pets.ts; save v43; `??=` for safety). */
+  petLife?: PetLife;
+  /** Daily life (sim/daily.ts): the roster, chores, gatherings. Save v49; `dailyOf` makes it lazily. */
   daily?: Daily;
-  /** Deaths in the household and whether they were mourned (sim/grief.ts). Save v46; `lossesOf` makes it lazily. */
+  /** Deaths in the household and whether they were mourned (sim/grief.ts). Save v49; `lossesOf` makes it lazily. */
   losses?: Loss[];
   /** Radio and rumors after the collapse (radio.ts); made on first use. */
   radio?: RadioState;
@@ -291,14 +305,17 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     fin: newFin(),
     armory: newArmory(),
     wild: newWild(),
+    wildlife: newWildlife(),
     lineage: newLineage(people[0].last),
     site,
-    stock: { ...emptyStock(), firewood: STARTING_FIREWOOD, canned: 2 },
+    stock: { ...emptyStock(), firewood: STARTING_FIREWOOD, canned: 2, ...startingBedding(people.length) },
     neighbors: generateNeighbors(seed),
     land: newLand(seed, generateNeighbors(seed).map(n => n.id), (setup.site ?? CLASSIC).home),
     gate: newGate(seed),
     breakins: newBreakins(),
+    tools: starterKit(people, seed),
     rescue: newRescue(),
+    dogs: [],
     scavenge: newScavenge(),
     market: newMarketState(),
     locals: newLocals(),
