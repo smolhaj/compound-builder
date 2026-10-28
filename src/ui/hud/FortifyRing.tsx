@@ -32,6 +32,9 @@ export function FortifyRing() {
     return () => useWorldStore.getState().setShowBoundary(was);
   }, [open]);
   const plan = useMemo(() => (open ? planFortress(game, w.siteGeo ?? {}, opts) : null), [open, game, opts, w.siteGeo]);
+  // both scopes are priced so the player sees what expanding to the whole property line would cost
+  const other = useMemo(() => (open ? planFortress(game, w.siteGeo ?? {}, { ...opts, scope: opts.scope === 'core' ? 'full' : 'core' }) : null), [open, game, opts, w.siteGeo]);
+  const priced = plan && other ? (opts.scope === 'core' ? { core: plan, full: other } : { core: other, full: plan }) : null;
 
   if (!open) {
     return <button style={{ ...btn(false), width: '100%', margin: '2px 0 6px' }} title="The signature compound: a container-wall ring with a patrol walkway on top, a vehicle garage built into the gate, up to five towers and a tunnel to the house. Cost, hours and the finish date are shown first."
@@ -51,7 +54,15 @@ export function FortifyRing() {
       <Note tone="good">Laid out. The family builds the wall first, then the deck on top, the garage and the towers, as the materials come in. The Defense tab shows each piece as it goes up.</Note>
       {need.length > 0 && <button style={{ ...btn(true), width: '100%' }} disabled={!!orderProblem(game, need)} onClick={() => g.order(need)}>Order what the plans need ({usd(orderCost(need, prices(game)))})</button>}
     </> : <>
-      <Note>Container walls all round the property with a walkway along the top, a gatehouse garage at the road gate and towers on the corners. Walls you already have are kept; a container, steel or concrete wall gets a deck.</Note>
+      <Note>A container-wall ring with a walkway along the top, a gatehouse garage at the gate and towers on the corners. It starts as a compound round the family's buildings (about 5 acres); expand it to the whole property line when you can pay for it. Walls you already have are kept; a container, steel or concrete wall gets a deck.</Note>
+      {priced && (priced.core.coreIsFull
+        ? <Note>Your lot is small: the core compound is the whole lot.</Note>
+        : <div style={{ display: 'flex', gap: 4, alignItems: 'stretch', flexWrap: 'wrap', padding: '3px 0' }}>
+          {([['core', 'Core compound', 'about 5 acres round the family', priced.core], ['full', 'Expand to the full property line', `${priced.full.wall.lineM.toLocaleString('en-US')} m of line`, priced.full]] as const).map(([k, label, sub, p]) =>
+            <button key={k} style={{ ...btn(opts.scope === k), flex: 1, textAlign: 'left', padding: '4px 7px' }} title={sub} onClick={() => setOpts({ ...opts, scope: k })}>
+              <div>{label}</div><div style={{ fontSize: 11, opacity: 0.75 }}>{usd(p.cost)} · {p.hours.toLocaleString('en-US')} h</div>
+            </button>)}
+        </div>)}
       <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', padding: '3px 0' }}>
         <span style={{ flex: 1, color: DIM }}>Towers</span>
         {Array.from({ length: MAX_TOWERS + 1 }, (_, n) => <button key={n} style={{ ...btn(opts.towers === n), padding: '2px 7px' }} onClick={() => setOpts({ ...opts, towers: n })}>{n}</button>)}
@@ -66,7 +77,7 @@ export function FortifyRing() {
       </div>
       {plan && <div style={{ borderTop: `1px solid ${LINE}`, borderBottom: `1px solid ${LINE}`, margin: '6px 0', padding: '6px 0' }}>
         {nothing ? <Note tone="good">Nothing to add: the line is already held and has what this plan would give it.</Note> : <>
-          <div>Container wall <b>{plan.wall.wallM.toLocaleString('en-US')} m</b>{plan.wall.heldM > 0 && <span style={{ color: DIM }}> · {plan.wall.heldM.toLocaleString('en-US')} m already held</span>}</div>
+          <div>Container wall <b>{plan.wall.wallM.toLocaleString('en-US')} m</b>{opts.scope === 'core' && !plan.coreIsFull && <span style={{ color: DIM }}> round the compound</span>}{plan.wall.heldM > 0 && <span style={{ color: DIM }}> · {plan.wall.heldM.toLocaleString('en-US')} m already held</span>}</div>
           {plan.wall.creekCrossings > 0 && <div>Creek bars at <b>{plan.wall.creekCrossings}</b> crossing{plan.wall.creekCrossings > 1 ? 's' : ''}</div>}
           <div>Patrol walkway on top <b>{Math.round(plan.walkwayLen * 6).toLocaleString('en-US')} m</b>{plan.walkwayRuns > 0 && <span style={{ color: DIM }}> · stairs at the gate and every ~80 m</span>}</div>
           <div>{plan.garage ? <>Gatehouse garage at the road gate <span style={{ color: DIM }}>· 4 bays, a steel drive-through gate</span></> : <span style={{ color: DIM }}>No gate garage</span>}</div>

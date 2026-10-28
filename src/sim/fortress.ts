@@ -28,6 +28,7 @@ import { TOWERS, stampHighGround, type TowerKind } from './towers';
 import { ownedRects } from './enclosure';
 import { planPropertyWall, traceLoops, type GateSpot, type PropertyGeometry, type WallPlan } from './propertyWall';
 import { CELL } from '../game/buildkit/kit';
+import type { Rect } from './land';
 import type { GameState } from './state';
 
 /** How many towers a ring carries: up to five (the user's description: "five observation towers"). */
@@ -35,18 +36,29 @@ export const MAX_TOWERS = 5;
 /** The first tiers a ring can start with (the rest are upgrades in place from the Defense tab). */
 export const RING_TOWER_KINDS: readonly TowerKind[] = ['rise_lookout', 'watchtower_wood', 'watchtower_concrete'];
 
+/** The core compound's side: ≈ 144 m, about five acres (a 12 × 12 block of 12 m tiles). */
+export const CORE_SIDE = 24;
+
+/** Where the ring goes: a core compound round the family's buildings (the default), or the whole property line. */
+export type FortressScope = 'core' | 'full';
+
 export interface FortressOptions {
+  scope: FortressScope;
   towers: number;
   towerKind: TowerKind;
   /** Plan an underground passage from the garage to the nearest house. */
   passage: boolean;
 }
-export const DEFAULT_FORTRESS: FortressOptions = { towers: MAX_TOWERS, towerKind: 'watchtower_wood', passage: true };
+export const DEFAULT_FORTRESS: FortressOptions = { scope: 'core', towers: MAX_TOWERS, towerKind: 'watchtower_wood', passage: true };
 
 export interface PlannedStructure { kind: string; x: number; z: number; rot: number }
 
 export interface FortressPlan {
   options: FortressOptions;
+  /** The land the ring encloses (the core square, or the owned rectangles). */
+  rects: Rect[];
+  /** The core compound is the whole home block already (a small lot): the two scopes are the same ring. */
+  coreIsFull: boolean;
   wall: WallPlan;
   garage: PlannedStructure | null;
   towers: PlannedStructure[];
@@ -66,6 +78,19 @@ export interface FortressPlan {
 
 const GARAGE_D = GARAGE_CELLS_Z * CELL;
 
+/**
+ * The core compound: a square of `CORE_SIDE` centered on the family's buildings (the camp, else the middle of the staked buildings, else the middle of the
+ * home block), slid to stay inside the home block. A small lot is all core.
+ */
+export function coreRect(s: GameState, geo: PropertyGeometry = {}): Rect {
+  const h = s.site.home;
+  const live = s.structures.filter(st => !st.unplaced && !st.kind.startsWith('bunker_') && st.x >= h.x0 && st.x <= h.x1 && st.z >= h.z0 && st.z <= h.z1);
+  const c: Pt = geo.center ?? (live.length ? [live.reduce((a, st) => a + st.x, 0) / live.length, live.reduce((a, st) => a + st.z, 0) / live.length] : [(h.x0 + h.x1) / 2, (h.z0 + h.z1) / 2]);
+  const w = Math.min(CORE_SIDE, h.x1 - h.x0), d = Math.min(CORE_SIDE, h.z1 - h.z0);
+  const x0 = Math.min(h.x1 - w, Math.max(h.x0, c[0] - w / 2)), z0 = Math.min(h.z1 - d, Math.max(h.z0, c[1] - d / 2));
+  return { x0, z0, x1: x0 + w, z1: z0 + d };
+}
+
 /** The tier-1 and up tower's half footprint, plus half a container wall and a gap: how far inside the wall its center stands. */
 const towerInset = (kind: TowerKind) => TOWERS[kind].cells * CELL / 2 + 0.2 + 0.06;
 
@@ -75,11 +100,11 @@ function clearOf(s: GameState, x: number, z: number, half: number): boolean {
 }
 
 /** Sites for `n` towers just inside the wall: corners first, then the middle of the longest sides, spread out and clear of the gate. */
-export function towerSites(s: GameState, kind: TowerKind, n: number, gate: GateSpot | null, taken: ReadonlyArray<{ x: number; z: number }> = []): Pt[] {
-  const loops = traceLoops(ownedRects(s));
+export function towerSites(s: GameState, kind: TowerKind, n: number, gate: GateSpot | null, taken: ReadonlyArray<{ x: number; z: number }> = [], rects: readonly Rect[] = ownedRects(s)): Pt[] {
+  const loops = traceLoops(rects);
   if (!loops.length || n <= 0) return [];
   const loop = loops[0], inset = towerInset(kind);
-  const owned = (x: number, z: number) => ownedRects(s).some(r => x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1);
+  const owned = (x: number, z: number) => rects.some(r => x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1);
   const cand: Array<{ line: Pt; site: Pt }> = [];
   const m = loop.length;
   for (let i = 0; i < m; i++) {
@@ -126,7 +151,10 @@ const addBill = (into: Partial<Stock>, bill: Partial<Stock>): void => { for (con
 export function planFortress(s: GameState, geo: PropertyGeometry = {}, opts: Partial<FortressOptions> = {}): FortressPlan {
   const options: FortressOptions = { ...DEFAULT_FORTRESS, ...opts, towers: Math.max(0, Math.min(MAX_TOWERS, opts.towers ?? DEFAULT_FORTRESS.towers)) };
   const notes: string[] = [];
-  const wall = planPropertyWall(s, 'container_wall', geo, { gateW: GARAGE_W, garage: true });
+  const home = s.site.home, core = coreRect(s, geo);
+  const coreIsFull = ownedRects(s).length === 1 && (core.x1 - core.x0) * (core.z1 - core.z0) >= 0.9 * (home.x1 - home.x0) * (home.z1 - home.z0);
+  const rects: Rect[] = options.scope === 'core' && !coreIsFull ? [core] : ownedRects(s);
+  const wall = planPropertyWall(s, 'container_wall', geo, { gateW: GARAGE_W, garage: true, rects });
 
   // the garage: in the gate gap, door side facing in; it must have the ground to itself
   let garage: PlannedStructure | null = null;
@@ -139,7 +167,7 @@ export function planFortress(s: GameState, geo: PropertyGeometry = {}, opts: Par
   } else notes.push(wall.gateNote ? `No gate garage: ${wall.gateNote}. Add a gate to the wall or stake the garage from the Build menu.` : 'No gate garage planned (no road side on the line).');
   if (!garage && gs) { wall.runs.forEach(r => r.gates.forEach(g => { delete g.garage; })); }
 
-  const towers = towerSites(s, options.towerKind, options.towers, gs, garage ? [garage] : []).map((p): PlannedStructure => ({ kind: options.towerKind, x: p[0], z: p[1], rot: 0 }));
+  const towers = towerSites(s, options.towerKind, options.towers, gs, garage ? [garage] : [], rects).map((p): PlannedStructure => ({ kind: options.towerKind, x: p[0], z: p[1], rot: 0 }));
   if (towers.length < options.towers) notes.push(`${towers.length} of ${options.towers} tower sites found clear of buildings.`);
 
   // the underground passage from the garage to the nearest house (staked or built)
@@ -176,7 +204,7 @@ export function planFortress(s: GameState, geo: PropertyGeometry = {}, opts: Par
   const buy = (Object.entries(bill) as Array<[MaterialId, number]>).filter(([m]) => MATERIALS[m].price !== null).map(([material, qty]) => ({ material, qty }));
   const own = (Object.entries(bill) as Array<[MaterialId, number]>).filter(([m]) => MATERIALS[m].price === null).map(([material, qty]) => ({ material, qty }));
   return {
-    options, wall, garage, towers, passage, walkwayLen: walkLen, walkwayRuns: planned.length + existing.length, notes,
+    options, rects, coreIsFull, wall, garage, towers, passage, walkwayLen: walkLen, walkwayRuns: planned.length + existing.length, notes,
     bill, cost: orderCost(buy) + permits, own, permits, hours: Math.round(hours),
   };
 }

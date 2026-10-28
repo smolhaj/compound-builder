@@ -4,7 +4,8 @@ import { PERIMETER, planRun, runBlocked, runFinished, upgradeRun, wallLength, ty
 import { enclosure } from './enclosure';
 import { GATE_GARAGE, GARAGE_SLOTS, GARAGE_W, freeSlots, garageRotFor, leave, occupiedSlots, park, parkingSlots, slotOf, slotsOf } from './garage';
 import { addWalkway, deckHeight, hasWalkway, walkOn, walkRuns, walkwayAccess, walkwayProblem, walkwayWatch, wallPosts, WALKWAY_HOSTS } from './walkway';
-import { DEFAULT_FORTRESS, MAX_TOWERS, layFortress, planFortress, ringStatus } from './fortress';
+import { CORE_SIDE, DEFAULT_FORTRESS, MAX_TOWERS, coreRect, layFortress, planFortress, ringStatus } from './fortress';
+import { HOME_RECT } from './site';
 import { planBattle } from './battle';
 import { postureOf } from './encounters';
 import { watchNow } from './daily';
@@ -195,13 +196,13 @@ describe('gatehouse garage', () => {
 
   it('fills the gate gap: a finished garage holds the line where an ordinary gate does not', () => {
     const g = game();
-    const plan = planFortress(g, geo(g), { towers: 0, passage: false });
+    const plan = planFortress(g, geo(g), { scope: 'full', towers: 0, passage: false });
     layFortress(g, plan);
     finishAll(g);
     const withGarage = enclosure(g).barrier;
     // the same ring with the garage not yet built is a gate gap
     const g2 = game();
-    layFortress(g2, planFortress(g2, geo(g2), { towers: 0, passage: false }));
+    layFortress(g2, planFortress(g2, geo(g2), { scope: 'full', towers: 0, passage: false }));
     for (const r of g2.perimeter) r.finishedAt = 0;
     const without = enclosure(g2).barrier;
     expect(withGarage).toBeGreaterThan(without);
@@ -210,7 +211,7 @@ describe('gatehouse garage', () => {
 
   it('a passage that comes up inside the garage (or a closed line) is not a way in', () => {
     const g = game();
-    layFortress(g, planFortress(g, geo(g), { towers: 0, passage: false }));
+    layFortress(g, planFortress(g, geo(g), { scope: 'full', towers: 0, passage: false }));
     finishAll(g);
     const gar = g.structures.find(st => st.kind === GATE_GARAGE)!;
     const home = { id: 'h', kind: 'farmhouse', x: gar.x - 8, z: gar.z - 2, rot: 0, stage: 99, done: 0, supplied: true, finishedAt: 0 };
@@ -223,7 +224,7 @@ describe('gatehouse garage', () => {
 describe('Fortify my ring', () => {
   it('plans the container ring with a gate garage, a deck and five towers, costed, before anything is laid', () => {
     const g = game();
-    const plan = planFortress(g, geo(g), { passage: false });
+    const plan = planFortress(g, geo(g), { scope: 'full', passage: false });
     expect(g.perimeter).toHaveLength(0);
     expect(g.structures.filter(s => s.kind === GATE_GARAGE)).toHaveLength(0);
     expect(plan.wall.kind).toBe('container_wall');
@@ -237,7 +238,7 @@ describe('Fortify my ring', () => {
 
   it('puts the garage on the road side, door toward the inside, across the gate gap', () => {
     const g = game();
-    const plan = planFortress(g, geo(g), { passage: false });
+    const plan = planFortress(g, geo(g), { scope: 'full', passage: false });
     const gs = plan.wall.gateSpot!, h = g.site.home;
     expect(gs.x).toBeCloseTo(h.x1);
     expect(gs.inx).toBeLessThan(0);   // inward is west from the east side
@@ -248,7 +249,7 @@ describe('Fortify my ring', () => {
 
   it('puts the towers just inside the wall, spread out, none beside the gate', () => {
     const g = game();
-    const plan = planFortress(g, geo(g), { passage: false });
+    const plan = planFortress(g, geo(g), { scope: 'full', passage: false });
     const h = g.site.home, gs = plan.wall.gateSpot!;
     expect(new Set(plan.towers.map(t => `${Math.round(t.x)},${Math.round(t.z)}`)).size).toBe(MAX_TOWERS);
     for (const t of plan.towers) {
@@ -259,16 +260,16 @@ describe('Fortify my ring', () => {
     // four corners and one mid-span
     const corners = plan.towers.filter(t => (Math.abs(t.x - h.x0) < 1 || Math.abs(t.x - h.x1) < 1) && (Math.abs(t.z - h.z0) < 1 || Math.abs(t.z - h.z1) < 1));
     expect(corners.length).toBeGreaterThanOrEqual(3);
-    expect(planFortress(g, geo(g), { towers: 2 }).towers).toHaveLength(2);
-    expect(planFortress(g, geo(g), { towers: 0 }).towers).toHaveLength(0);
-    expect(planFortress(g, geo(g), { towers: 99 }).towers).toHaveLength(MAX_TOWERS);
+    expect(planFortress(g, geo(g), { scope: 'full', towers: 2 }).towers).toHaveLength(2);
+    expect(planFortress(g, geo(g), { scope: 'full', towers: 0 }).towers).toHaveLength(0);
+    expect(planFortress(g, geo(g), { scope: 'full', towers: 99 }).towers).toHaveLength(MAX_TOWERS);
   });
 
   it('lays out walls, a deck on each, the garage, the towers and (with a house) the passage', () => {
     const g = game();
     g.structures.push({ id: 'house', kind: 'farmhouse', x: 0, z: 0, rot: 0, stage: 99, done: 0, supplied: true, finishedAt: 0 });
     const before = g.money;
-    const plan = planFortress(g, geo(g), DEFAULT_FORTRESS);
+    const plan = planFortress(g, geo(g), { ...DEFAULT_FORTRESS, scope: 'full' });
     expect(plan.passage).not.toBeNull();
     const n = layFortress(g, plan);
     expect(n.structures).toBe(1 + MAX_TOWERS);
@@ -283,7 +284,7 @@ describe('Fortify my ring', () => {
     const deck = g.perimeter.find(r => r.kind === 'wall_walk')!;
     expect(deck.gates.some(x => x.garage)).toBe(true);
     // nothing to lay twice: a second plan sees the line held
-    const again = planFortress(g, geo(g), { towers: 0, passage: false });
+    const again = planFortress(g, geo(g), { scope: 'full', towers: 0, passage: false });
     expect(again.wall.runs).toHaveLength(0);
     expect(again.walkwayLen).toBe(0);
   });
@@ -293,7 +294,7 @@ describe('Fortify my ring', () => {
     const h = g.site.home;
     const w = planRun(g, 'container_wall', [[h.x0, h.z0], [h.x1, h.z0], [h.x1, h.z1], [h.x0, h.z1], [h.x0, h.z0]]);
     w.finishedAt = 0;
-    const plan = planFortress(g, geo(g), { passage: false });
+    const plan = planFortress(g, geo(g), { scope: 'full', passage: false });
     expect(plan.garage).toBeNull();
     expect(plan.notes.join(' ')).toMatch(/No gate garage/);
     expect(plan.walkwayLen).toBeGreaterThan(0);
@@ -303,7 +304,7 @@ describe('Fortify my ring', () => {
 
   it('shows up in the Defense report and the ring status once built', () => {
     const g = game();
-    layFortress(g, planFortress(g, geo(g), { passage: false }));
+    layFortress(g, planFortress(g, geo(g), { scope: 'full', passage: false }));
     finishAll(g);
     const st = ringStatus(g);
     expect(st).toMatchObject({ walkway: true, garage: true, towers: MAX_TOWERS });
@@ -317,10 +318,116 @@ describe('Fortify my ring', () => {
 
   it('wall lengths of the ring leave out the garage span', () => {
     const g = game();
-    const plan = planFortress(g, geo(g), { passage: false });
+    const plan = planFortress(g, geo(g), { scope: 'full', passage: false });
     const run = plan.wall.runs[0];
     expect(wallLength(run)).toBeCloseTo(run.pts.reduce((a, p, i) => a + (i ? Math.hypot(p[0] - run.pts[i - 1][0], p[1] - run.pts[i - 1][1]) : 0), 0) - GARAGE_W);
     expect(runFinished(g.perimeter[0] ?? ({ finishedAt: null } as never))).toBe(false);
+  });
+});
+
+describe('Fortify my ring: the core compound is the default', () => {
+  const centered = (g: GameState) => ({ ...geo(g), center: [g.site.home.x0 + 30, g.site.home.z0 + 30] as Pt });
+
+  it('defaults to a scaled ring on the core of the home forty, much cheaper than the full line', () => {
+    expect(DEFAULT_FORTRESS.scope).toBe('core');
+    const g = game();
+    const core = planFortress(g, centered(g), {});
+    const full = planFortress(g, centered(g), { scope: 'full' });
+    expect(core.options.scope).toBe('core');
+    expect(core.coreIsFull).toBe(false);
+    expect(core.wall.wallM).toBeLessThan(full.wall.wallM / 2);
+    expect(core.cost).toBeLessThan(full.cost / 2);
+    expect(core.hours).toBeLessThan(full.hours);
+    // both are shown to the player: the full line is the "Expand" option
+    expect(full.wall.lineM).toBeGreaterThan(core.wall.lineM);
+  });
+
+  it('puts the ring, the garage and every tower inside a square of the core size round the family', () => {
+    const g = game();
+    const geoC = centered(g), c = coreRect(g, geoC);
+    expect(c.x1 - c.x0).toBe(CORE_SIDE);
+    expect(c.z1 - c.z0).toBe(CORE_SIDE);
+    const plan = planFortress(g, geoC, { passage: false });
+    const inside = (x: number, z: number, m = 0.01) => x >= c.x0 - m && x <= c.x1 + m && z >= c.z0 - m && z <= c.z1 + m;
+    for (const r of plan.wall.runs) for (const q of r.pts) expect(inside(q[0], q[1])).toBe(true);
+    expect(plan.garage).not.toBeNull();
+    expect(inside(plan.garage!.x, plan.garage!.z)).toBe(true);
+    expect(plan.towers).toHaveLength(MAX_TOWERS);
+    for (const tw of plan.towers) expect(inside(tw.x, tw.z)).toBe(true);
+    expect(plan.walkwayLen).toBeGreaterThan(10);
+  });
+
+  it('slides the core to stay on the home block when the family lives near an edge', () => {
+    const g = game(), h = g.site.home;
+    const c = coreRect(g, { center: [h.x1 - 1, h.z0 + 1] });
+    expect(c.x1).toBeLessThanOrEqual(h.x1);
+    expect(c.z0).toBeGreaterThanOrEqual(h.z0);
+    expect(c.x1 - c.x0).toBe(CORE_SIDE);
+  });
+
+  it('centers on the staked buildings when the camp is not known', () => {
+    const g = game(), h = g.site.home;
+    g.structures.push({ id: 'a', kind: 'farmhouse', x: h.x0 + 20, z: h.z0 + 40, rot: 0, stage: 99, done: 0, supplied: true, finishedAt: 0 });
+    const c = coreRect(g);
+    expect((c.x0 + c.x1) / 2).toBeCloseTo(h.x0 + 20);
+    expect((c.z0 + c.z1) / 2).toBeCloseTo(h.z0 + 40);
+  });
+
+  it('on a small lot the core is the whole lot: both scopes are the same ring', () => {
+    const g = newGame(7); g.site = { ...g.site, acres: 5, home: HOME_RECT[5], creek: false };
+    const a = planFortress(g, {}, { scope: 'core' }), b = planFortress(g, {}, { scope: 'full' });
+    expect(a.coreIsFull).toBe(true);
+    expect(a.wall.wallM).toBe(b.wall.wallM);
+    expect(a.cost).toBe(b.cost);
+  });
+
+  it('lays the core ring out and it makes a closed yard the Defense report counts as a ring', () => {
+    const g = game();
+    layFortress(g, planFortress(g, centered(g), { passage: false }));
+    finishAll(g);
+    const home = { id: 'h', kind: 'farmhouse', x: coreRect(g, centered(g)).x0 + 12, z: coreRect(g, centered(g)).z0 + 12, rot: 0, stage: 99, done: 0, supplied: true, finishedAt: 0 };
+    g.structures.push(home);
+    const d = defenseReport(g);
+    expect(d.homes.find(x => x.id === 'h')!.covered).toBe(true);
+    // the property line is still open: only the compound is closed
+    expect(d.walls.find(c => c.id === 'line')!.ok).toBe(false);
+  });
+});
+
+describe('an irregular property line', () => {
+  /** The home block plus a parcel stuck on its east side, upper half: an L. */
+  const ell = (): GameState => {
+    const g = game(), h = g.site.home;
+    g.land.parcels.push({ id: 'pz', name: 'the east piece', rect: { x0: h.x1, z0: h.z0, x1: h.x1 + 30, z1: h.z0 + 25 }, owner: 'you', kind: 'grazing' as never, forSale: false });
+    return g;
+  };
+
+  it('walls the whole L with a garage on a straight stretch and towers inside the land', () => {
+    const g = ell(), h = g.site.home;
+    const plan = planFortress(g, { roadGate: [h.x1 + 30, h.z0 + 12] }, { scope: 'full', passage: false });
+    expect(plan.garage).not.toBeNull();
+    expect(plan.wall.runs.length).toBeGreaterThan(0);
+    const gs = plan.wall.gateSpot!;
+    // the gate is on the east piece's east edge and the garage sits inside it, door toward the west
+    expect(gs.x).toBeCloseTo(h.x1 + 30);
+    expect(plan.garage!.rot).toBe(3);
+    const owned = (x: number, z: number) => [h, { x0: h.x1, z0: h.z0, x1: h.x1 + 30, z1: h.z0 + 25 }].some(r => x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1);
+    for (const tw of plan.towers) expect(owned(tw.x, tw.z)).toBe(true);
+    expect(plan.towers.length).toBeGreaterThan(2);
+    // the gap is on one straight edge: its two ends are on the same side of the line
+    const run = plan.wall.runs.find(r => r.gates.some(x => x.garage))!;
+    expect(run.gates[0].w).toBe(GARAGE_W);
+    layFortress(g, plan);
+    finishAll(g);
+    expect(enclosure(g).openShare).toBe(0);
+    expect(g.perimeter.filter(r => r.kind === 'wall_walk').length).toBeGreaterThan(0);
+  });
+
+  it('keeps the garage off a corner even when the road gate is at one', () => {
+    const g = ell(), h = g.site.home;
+    const plan = planFortress(g, { roadGate: [h.x1 + 30, h.z0] }, { scope: 'full', passage: false });
+    const gs = plan.wall.gateSpot!;
+    expect(Math.abs(gs.z - h.z0)).toBeGreaterThanOrEqual(GARAGE_W / 2 + 0.19);
   });
 });
 

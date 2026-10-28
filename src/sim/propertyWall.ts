@@ -32,6 +32,8 @@ export interface PropertyGeometry {
   creekHalf?: number;
   /** The farm gate on the county road. */
   roadGate?: Pt;
+  /** Where the family lives (the camp): a compound ring is centered here. */
+  center?: Pt;
 }
 
 /** The kinds that make sense as the one wall round a property. */
@@ -148,6 +150,8 @@ export interface GateSpot { x: number; z: number; dx: number; dz: number; inx: n
 export interface PlanOptions {
   /** The road gate's width, world units (default `ROAD_GATE_W`; a gatehouse garage is as wide as its footprint). */
   gateW?: number;
+  /** Wall this land instead of the whole property (a compound ring on part of it): the rectangles whose outline is traced. */
+  rects?: Rect[];
   /** The gate gap is for a gatehouse garage (sim/garage.ts): the gate is marked so no leaves are drawn and the garage holds the line. */
   garage?: boolean;
 }
@@ -182,7 +186,8 @@ const holdsLine = (r: Pick<PerimeterRun, 'kind' | 'pts'>) => r.kind !== 'creek_b
 export function planPropertyWall(s: GameState, kind: PerimeterKind, geo: PropertyGeometry = {}, opts: PlanOptions = {}): WallPlan {
   const gw = opts.gateW ?? ROAD_GATE_W;
   let gateSpot: GateSpot | null = null;
-  const loops = traceLoops(ownedRects(s)).map(p => new Loop(p));
+  const landRects = opts.rects ?? ownedRects(s);
+  const loops = traceLoops(landRects).map(p => new Loop(p));
   const walls = s.perimeter.filter(holdsLine), bars = s.perimeter.filter(r => r.kind === 'creek_bars' && r.pts.length > 1);
   const creek = s.site.creek && geo.creekZ ? geo : null;
   const gh = (geo.creekHalf ?? 0.7) + BANK;
@@ -273,7 +278,7 @@ export function planPropertyWall(s: GameState, kind: PerimeterKind, geo: Propert
           const c = loop.at(s0 + at), a = loop.at(s0 + at - 0.05), b = loop.at(s0 + at + 0.05), dl = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
           const dx = (b[0] - a[0]) / dl, dz = (b[1] - a[1]) / dl;
           // inward: the normal that stays on the owned land
-          const owned = (x: number, z: number) => ownedRects(s).some(r => x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1);
+          const owned = (x: number, z: number) => landRects.some(r => x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1);
           const n: Pt = owned(c[0] - dz * 0.1, c[1] + dx * 0.1) ? [-dz, dx] : [dz, -dx];
           gateSpot = { x: c[0], z: c[1], dx, dz, inx: n[0], inz: n[1] };
         }
