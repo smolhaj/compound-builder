@@ -499,10 +499,17 @@ const dogsSetup = `{ if (!window.__dogs) { window.__dogs = true;
 const dogHome = "const hb = window.__b['log_house']; ";
 const dogEye = (x, z, lx, lz, dy = 0.2, ly = 0.1, fov = 58) => `{ const g = cb.world.groundAt; cb.qa.pose = { x: ${x}, y: g(${x}, ${z}) + ${dy}, z: ${z}, lx: ${lx}, ly: g(${lx}, ${lz}) + ${ly}, lz: ${lz}, fov: ${fov} }; }`;
 const nearHome = (dist, ang, dy, ly) => `{ const b = window.__b['log_house'], th = b.rot * Math.PI / 2 + ${ang}; const [px, pz] = cb.world.openSpotNear(b.x + Math.sin(th) * ${dist}, b.z + Math.cos(th) * ${dist}, 0.4); const g = cb.world.groundAt; cb.qa.pose = { x: px, y: g(px, pz) + ${dy}, z: pz, lx: b.x, ly: g(b.x, b.z) + ${ly}, lz: b.z, fov: 58 }; }`;
+
+/** Eye level beside a following dog and its nearest person, both in frame (a person is ~0.28 tall, a dog ~0.14 at the shoulder). */
+const dogAndPerson = (back, dy, fov = 55) => `{ const W = cb.world, g = W.groundAt, ds = W.dogs.positions(), ps = W.family.positions();
+  const d = ds[Math.min(1, ds.length - 1)]; let p = ps[0]; for (const q of ps) if (Math.hypot(q.x - d.x, q.z - d.z) < Math.hypot(p.x - d.x, p.z - d.z)) p = q;
+  const mx = (d.x + p.x) / 2, mz = (d.z + p.z) / 2, ax = Math.atan2(p.x - d.x, p.z - d.z) + Math.PI / 2;
+  const [cx, cz] = W.openSpotNear(mx + Math.sin(ax) * ${back}, mz + Math.cos(ax) * ${back}, 0.2);
+  cb.qa.pose = { x: cx, y: g(cx, cz) + ${dy}, z: cz, lx: mx, ly: g(mx, mz) + 0.12, lz: mz, fov: ${fov} }; }`;
 SETS.dogs = [
   { name: 'dogs-aerial-day', time: 16, season: 'summer', setup: dogsSetup + toHour(16) + "{ cb.qa.pose = null; const c = cb.world.camp; cb.cam.target.set(c.x, 0, c.z); cb.cam.radius = 9; cb.cam.pitch = 0.6; cb.cam.yaw = 0.7; }", cam: { x: C, z: C, yaw: 0, pitch: 0.5, radius: 9 }, frames: 24 },
-  { name: 'dogs-eye-level-yard', time: 17.5, season: 'summer', setup: dogsSetup + toHour(17.5) + nearHome(2.6, 0.7, 0.2, 0.2), cam: { x: C, z: C, yaw: 0, pitch: 0.3, radius: 3 }, frames: 24 },
-  { name: 'dogs-close-with-person', time: 17.5, season: 'summer', setup: dogsSetup + toHour(17.5) + "{ cb.qa.pose = null; const f = cb.world.family; const dg = cb.world.dogs.positions()[0]; const p = f.positions().find(q => Math.hypot(q.x - dg.x, q.z - dg.z) < 2) ?? f.positions()[0]; cb.cam.target.set((p.x + dg.x) / 2, 0.05, (p.z + dg.z) / 2); cb.cam.radius = 0.9; cb.cam.pitch = 0.18; cb.cam.yaw = 0.8; }", cam: { x: C, z: C, yaw: 0, pitch: 0.2, radius: 1 }, frames: 24 },
+  { name: 'dogs-eye-level-yard', time: 17.5, season: 'summer', setup: dogsSetup + toHour(17.5) + dogAndPerson(1.5, 0.22, 58), cam: { x: C, z: C, yaw: 0, pitch: 0.3, radius: 3 }, frames: 24 },
+  { name: 'dogs-close-with-person', time: 17.5, season: 'summer', setup: dogsSetup + toHour(17.5) + dogAndPerson(0.8, 0.16, 50), cam: { x: C, z: C, yaw: 0, pitch: 0.2, radius: 1 }, frames: 24 },
   { name: 'dog-on-guard-at-gate', time: 11, season: 'summer', setup: dogsSetup + toHour(11) + "{ const a = cb.world.access, g = a.gate, d = cb.world.dogs.positions()[0]; cb.qa.pose = null; cb.cam.target.set(d.x, 0.06, d.z); cb.cam.radius = 1.4; cb.cam.pitch = 0.16; cb.cam.yaw = Math.atan2(g.x - d.x, g.z - d.z) + 2.4; }", cam: { x: C, z: C, yaw: 0, pitch: 0.2, radius: 1.4 }, frames: 24 },
   { name: 'dog-at-gate-aerial', time: 11, season: 'summer', setup: dogsSetup + toHour(11) + "{ cb.qa.pose = null; const a = cb.world.access, g = a.gate; cb.cam.target.set(g.x - 1, 0, g.z); cb.cam.radius = 6; cb.cam.pitch = 0.5; cb.cam.yaw = 1.3; }", cam: { x: C, z: C, yaw: 0, pitch: 0.4, radius: 6 }, frames: 24 },
   { name: 'dogs-night-at-the-gate', time: 23, season: 'summer', setup: dogsSetup + toHour(23) + "{ cb.qa.pose = null; const a = cb.world.access, g = a.gate, d = cb.world.dogs.positions()[0]; cb.cam.target.set(d.x, 0.06, d.z); cb.cam.radius = 2.2; cb.cam.pitch = 0.2; cb.cam.yaw = Math.atan2(g.x - d.x, g.z - d.z) + 2.0; }", cam: { x: C, z: C, yaw: 0, pitch: 0.2, radius: 2 }, frames: 28 },

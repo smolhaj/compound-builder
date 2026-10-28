@@ -13,6 +13,8 @@ import { dayIndex, type GameState } from '../../sim/state';
 import { dogGoal, type DogCtx, type Stance } from './dogGoals';
 
 const CAP = 16;
+/** Dogs read small beside a 0.28 person at the base size (0.1 at the shoulder): 1.3x gives 0.12 to 0.17. */
+const SCALE_UP = 1.3;
 /** Dog speeds (world units per real second at 1×). A dog trots faster than a person walks. */
 const TROT = 0.8, RUN = 1.6;
 
@@ -68,6 +70,8 @@ export class DogRenderer {
     const a = this._agents.get(id);
     return a ? { x: a.x, z: a.z, rot: a.rot, stance: a.stance } : null;
   }
+  /** World y of a dog's body part instance 0 (test hook). */
+  bodyY(slot = 0): number { const m = new THREE.Matrix4(); this._parts.body.mesh.getMatrixAt(slot, m); return new THREE.Vector3().setFromMatrixPosition(m).y; }
   positions(): Array<{ id: string; x: number; z: number }> { return [...this._agents.entries()].map(([id, a]) => ({ id, x: a.x, z: a.z })); }
 
   update(dt: number, game: GameState, hour: number, clock: number, ctx: DogCtx, ground: (x: number, z: number) => number, speedK: number): void {
@@ -136,7 +140,7 @@ export class DogRenderer {
     const pup = ageYears(d, day) < 0.5;
     const grow = pup ? 0.55 + 0.45 * Math.max(0, ageYears(d, day)) / 0.5 : 1;
     const big = d.breed === 'shepherd' || d.breed === 'lab' ? 1.06 : d.breed === 'hound' ? 1.0 : d.breed === 'collie' ? 0.98 : 0.94;
-    const sc = grow * big;
+    const sc = grow * big * SCALE_UP;
     const coat = COATS[d.breed][d.tone % 3];
     const ph = a.phase, trot = moving ? 1 : 0;
     const bob = trot * Math.abs(Math.sin(ph)) * 0.004;

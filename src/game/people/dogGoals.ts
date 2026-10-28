@@ -52,7 +52,7 @@ function doorSpot(ctx: DogCtx, d: Dog, r: number): { x: number; z: number } {
   const h = ctx.home;
   if (!h) return { x: ctx.camp.x + 0.5, z: ctx.camp.z + 0.4 };
   const c = Math.cos(h.rot), s = Math.sin(h.rot);
-  const lx = (h.w / 2 + r) * (hash(d.id, 1) < 0.5 ? 1 : -1), lz = (hash(d.id, 2) - 0.5) * h.d * 0.8;
+  const lx = (h.w / 2 + r + 0.3) * (hash(d.id, 1) < 0.5 ? 1 : -1), lz = (hash(d.id, 2) - 0.5) * h.d * 0.8;
   return { x: h.x + lx * c + lz * s, z: h.z - lx * s + lz * c };
 }
 
