@@ -19,6 +19,9 @@ export function heatDemand(doy: number): number {
   return Math.max(0, (c - 0.3) / 0.7);
 }
 
+/** Days between reminders while the woodpile stays empty. */
+export const OUT_REMINDER_DAYS = 14;
+
 /** Ricks burned per day at full demand. */
 export const BURN_PER_DAY = 0.12;
 
@@ -38,9 +41,29 @@ export function burnFirewood(s: GameState, days: number): void {
       const day = dayIndex(s.clock.t);
       // (in the house once there is one: the line used to say "at camp" for years after the cabin went up)
       const home = s.structures.find(x => isHome(x.kind) && isFinished(x));
-      if (s.heat.warned !== day) { s.heat.warned = day; log(s, `Out of firewood: a cold night ${home ? `in the ${home.kind.replace(/_/g, ' ')}` : 'at camp'}. Mark some trees to fell.`); }
+      // once, then a reminder every two weeks (the daily line used to fill the log for whole winters); a change of place says it again
+      const place = home ? `in the ${home.kind.replace(/_/g, ' ')}` : 'at camp';
+      const prev = [...s.log].reverse().find(e => e.text.startsWith('Out of firewood'));
+      if (s.heat.warned !== day && (s.heat.warned < 0 || day - s.heat.warned >= OUT_REMINDER_DAYS || !prev || !prev.text.includes(place))) {
+        const again = s.heat.warned >= 0 && !!prev && prev.text.includes(place);
+        s.heat.warned = day;
+        log(s, `${again ? 'Out of firewood still' : 'Out of firewood'}: a cold night ${place}. Order a few ricks in the Shop (Heat), or mark trees to fell: green wood needs about nine months to season.`);
+      }
       return;
     }
     s.heat.burned -= 1;
   }
+}
+
+/**
+ * Where the woodpile stands against the next two months of cold: ricks in
+ * hand (seasoned only: green wood is not ready for months), ricks the stove
+ * will burn, and what is short. Pure; drives the "Most pressing" firewood prompt.
+ */
+export function firewoodOutlook(s: GameState, horizon = 60): { have: number; need: number; short: number; coldNow: boolean } {
+  const doy = calendarOf(s.clock).doy, cold = REGIONS[s.site.region].cold;
+  let need = 0;
+  for (let k = 0; k < horizon; k++) need += heatDemand(((doy - 1 + k) % 365) + 1) * cold * BURN_PER_DAY;
+  const have = s.stock.firewood;
+  return { have, need, short: Math.max(0, need - have), coldNow: demandNow(s) > 0 };
 }

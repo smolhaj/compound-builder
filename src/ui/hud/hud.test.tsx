@@ -4,6 +4,10 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { useGameStore } from '../../store/gameStore';
 import { newGame } from '../../sim/state';
 import { planStructure } from '../../sim/construction';
+import { planRun } from '../../sim/perimeter';
+import { setFocus } from '../../sim/priority';
+import { DogsPanel } from '../DogsPanel';
+import { adoptDog } from '../../sim/pets';
 import { BuildMenu } from './BuildMenu';
 import { ProjectsTab } from './ProjectsTab';
 import { ShopWindow } from '../ShopWindow';
@@ -54,5 +58,46 @@ describe('the guided HUD (server-rendered)', () => {
     expect(t).toContain('needed now');
     expect(t).toContain('Order what the plans need');
     expect(t).toContain('Fencing');
+  });
+
+  it('prompts for firewood with an order button and a mark-trees button when the woodpile is bare', () => {
+    withGame(g => { g.clock.startDoy = 330; g.stock.firewood = 0; planStructure(g, 'cottage', 5, 5, 0).stage = 99; });
+    const t = text(renderToStaticMarkup(<BuildMenu />));
+    expect(t).toContain('Firewood');
+    expect(t).toMatch(/Order \d+ ricks? \(\$[\d,]+\)/);
+    expect(t).toContain('Mark 10 trees');
+    expect(t).toContain('Mark the 10 nearest trees');
+  });
+
+  it('lists a finished house that is not wired under "Finished, but not working yet", with what to do', () => {
+    withGame(g => { g.utilities.grid = false; const st = planStructure(g, 'cottage', 5, 5, 0); st.stage = 99; st.finishedAt = 0; });
+    const t = text(renderToStaticMarkup(<ProjectsTab />));
+    expect(t).toContain('Finished, but not working yet');
+    expect(t).toContain('No power reaches it');
+    expect(t).toContain('Draw the line');
+  });
+
+  it('shows the work queue with "Work on this first" and the focused project marked', () => {
+    withGame(g => { planStructure(g, 'cottage', 5, 5, 0); const r = planRun(g, 'split_rail', [[0, 0], [30, 0]], []); setFocus(g, r.id); });
+    const t = text(renderToStaticMarkup(<ProjectsTab />));
+    expect(t).toContain('Under way, in the order the family works');
+    expect(t).toContain('Clear');
+    expect(t).toContain('Work on this first');
+  });
+
+  it('warns a crew would stand idle when the materials are not on site', () => {
+    withGame(g => { g.money = 200000; planStructure(g, 'cottage', 5, 5, 0).stage = 1; g.stock.lumber = 0; g.stock.hardware = 0; g.stock.concrete = 0; g.stock.roofing = 0; });
+    const t = text(renderToStaticMarkup(<ProjectsTab />));
+    expect(t).toContain('materials are not on site yet');
+    expect(t).toContain('Hire a crew anyway');
+  });
+
+  it('warns when the dogs need more care hours than the household has, and offers the puppies switch', () => {
+    withGame(g => { for (let i = 0; i < 9; i++) adoptDog(g, { ageYears: 2, sex: i % 2 ? 'f' : 'm' }); });
+    const html = renderToStaticMarkup(<DogsPanel game={useGameStore.getInitialState().game} />);
+    const t = text(html);
+    expect(t).toMatch(/Care takes about [\d.]+ h a day and the household can spare about/);
+    expect(t).toContain('Allow puppies');
+    expect(t).toContain('Fix ($220)');
   });
 });

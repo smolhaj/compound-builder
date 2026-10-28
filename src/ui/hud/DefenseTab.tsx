@@ -1,4 +1,5 @@
 /** The Defense tab: score, the property line (with "Wall my property"), upgrades, lights, towers, readiness checks. */
+import { spotsText } from '../../sim/format';
 import { LightDiscipline } from '../LightDiscipline';
 import { useGameStore } from '../../store/gameStore';
 import { useWorldStore } from '../../store/worldStore';
@@ -46,7 +47,7 @@ export function DefenseTab() {
     <Section title="The property line">
       {d.walls.map(c => <CheckRow key={c.id} c={c} />)}
       <WallProperty />
-      {d.gaps.length > 0 && <Note tone="warn">Open ground on the line, e.g. near ({d.gaps.slice(0, 3).map(([x, z]) => `${Math.round(x * 6)}, ${Math.round(z * 6)} m`).join('; ')}). Turn on the property line to see it.</Note>}
+      {d.gaps.length > 0 && <Note tone="warn">Open ground on the line, e.g. on the {spotsText(d.gaps, game.site.home)}. Turn on the property line to see it.</Note>}
     </Section>
     <Section title="Upgrade the walls">
       {game.perimeter.filter(r => runFinished(r) && UPGRADE_NEXT[r.kind]).length === 0 && <Note>Nothing to upgrade. A finished fence or wall can be upgraded in place to the next tier: the old one stands until the new one is up, and half its materials come back.</Note>}

@@ -46,9 +46,13 @@ export interface QueueItem { id: string; name: string; hours: number }
 
 export function workQueue(s: GameState): QueueItem[] {
   const out: QueueItem[] = [];
+  const first = s.focus;
   for (const st of s.structures) if (!isFinished(st)) out.push({ id: st.id, name: st.kind, hours: hoursLeft(st) });
   for (const r of s.perimeter) if (!runFinished(r)) out.push({ id: r.id, name: r.kind, hours: runLeft(r) });
   for (const j of s.hardenJobs) if (j.finishedAt === null) out.push({ id: j.id, name: 'hardening', hours: Math.max(0, j.hours - j.done) });
+  // "work on this first" (sim/priority.ts) jumps the queue
+  const i = first ? out.findIndex(q => q.id === first) : -1;
+  if (i > 0) out.unshift(...out.splice(i, 1));
   return out;
 }
 
