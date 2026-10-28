@@ -15,7 +15,7 @@ describe('collapse clock', () => {
       expect(d.warnAt).toBeLessThan(d.hitAt);
     }
     const sc = newDisaster(1, 'scenario', 'short', 'nuclear', 'nearby');
-    expect([sc.kind, sc.variant, sc.hitAt]).toEqual(['nuclear', 'nearby', 365]);
+    expect([sc.kind, sc.variant, sc.hitAt]).toEqual(['nuclear', 'nearby', 548]);
     const fb = newDisaster(1, 'sandbox');
     expect(fb.kind).toBeNull();
     expect(fb.hitAt).toBe(NEVER);

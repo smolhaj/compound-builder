@@ -3,6 +3,7 @@ import { useGameStore } from '../store/gameStore';
 import { useWorldStore } from '../store/worldStore';
 import { newGame } from '../sim/state';
 import { fullName, HOUSEHOLD_NAME, variedFamily } from '../sim/family';
+import { difficultySummary } from '../sim/difficulty';
 import { DISASTERS, type Difficulty, type DisasterKind, type Mode, type PeaceLength } from '../sim/disaster';
 import { saveGame, AUTOSAVE } from '../sim/save/saveSystem';
 import { affordable, ANY_WISH, builtFacts, LIFESTYLE, listings, siteFacts, type Acres, type LandWish, type Lifestyle, type Site } from '../sim/site';
@@ -13,8 +14,8 @@ const MODES: Array<[Mode, string, string]> = [
   ['scenario', 'Scenario', 'Pick the disaster and how long you have to get ready.'],
   ['sandbox', 'Free build', 'Nothing happens until you say so. Trigger any disaster from the side panel.'],
 ];
-const DIFFS: Array<[Difficulty, string, string]> = [['cozy', 'Cozy', 'Long warning, gentle raids, nobody dies for good'], ['standard', 'Standard', 'The intended game'], ['hardcore', 'Hardcore', 'Little warning, harsh raids, permadeath']];
-const PEACE: Array<[Exclude<PeaceLength, 'random'>, string]> = [['short', '1 year'], ['medium', '3 years'], ['long', '5 years']];
+const DIFFS: Array<[Difficulty, string, string]> = [['cozy', 'Cozy', 'Long warning, gentle raids, nobody dies for good'], ['standard', 'Standard', 'The intended game'], ['hardcore', 'Hardcore', 'Little warning, more and bigger raids, worse wounds, a slow recovery, permadeath']];
+const PEACE: Array<[Exclude<PeaceLength, 'random'>, string]> = [['short', '18 months'], ['medium', '3 years'], ['long', '5 years']];
 
 const C = { bg: 'rgba(22,24,20,0.98)', card: 'rgba(255,255,255,0.045)', line: 'rgba(255,255,255,0.09)', gold: '#d8c9a0', dim: 'rgba(238,238,238,0.62)', good: '#a8d080', bad: '#f0a080' };
 const usd = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
@@ -213,6 +214,7 @@ export function SetupScreen() {
                 <Chips label="Peace" value={peace} set={setPeace} opts={PEACE} />
               </>}
               <Chips label="Difficulty" value={diff} set={setDiff} opts={DIFFS.map(([d, l]) => [d, l] as [Difficulty, string])} />
+              <div style={{ marginLeft: 68, marginBottom: 6, fontSize: 12, color: C.dim }}>{DIFFS.find(x => x[0] === diff)![2]}. Against Standard: {difficultySummary(diff).join(', ')}.</div>
             </div>
           </>}
         </div>

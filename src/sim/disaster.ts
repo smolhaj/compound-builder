@@ -21,8 +21,8 @@ export type DisasterKind = 'grid_down' | 'financial' | 'lawless' | 'drought' | '
   | 'zombies' | 'invasion' | 'civil_war' | 'bioweapon' | 'asteroid' | 'unknown';
 export type Mode = 'surprise' | 'scenario' | 'sandbox';
 /** GDS difficulty presets: Cozy (long warning, gentle raids), Standard, Hardcore (little warning, harsh raids, permadeath). */
-export type Difficulty = 'cozy' | 'standard' | 'hardcore';
-const WARN_SCALE: Record<Difficulty, number> = { cozy: 1.6, standard: 1, hardcore: 0.4 };
+export type { Difficulty } from './difficulty';
+import { DIFFICULTY, type Difficulty } from './difficulty';
 export type PeaceLength = 'random' | 'short' | 'medium' | 'long';
 export type Phase = 'peace' | 'warning' | 'impact' | 'survival' | 'over';
 
@@ -242,10 +242,11 @@ function rollCeiling(r: () => number): Partial<Record<Track, number>> {
   return out;
 }
 /** Apply the fate to rolled return days: late for a partial recovery, none for never. */
-function fateBack(back: Partial<Record<Track, number>>, fate: Fate): Partial<Record<Track, number>> {
+function fateBack(back: Partial<Record<Track, number>>, fate: Fate, difficulty: Difficulty = 'standard'): Partial<Record<Track, number>> {
   if (fate === 'never') return {};
-  if (fate === 'partial') return Object.fromEntries(Object.entries(back).map(([k, v]) => [k, Math.round((v as number) * 1.5)]));
-  return back;
+  // the difficulty's recovery factor: Hardcore waits longer for the world to come back, Cozy less
+  const k = DIFFICULTY[difficulty].recovery * (fate === 'partial' ? 1.5 : 1);
+  return k === 1 ? back : Object.fromEntries(Object.entries(back).map(([t, v]) => [t, Math.round((v as number) * k)]));
 }
 
 export interface Chained { kind: DisasterKind; variant: string; hitAt: number; back: Partial<Record<Track, number>> }
@@ -282,7 +283,7 @@ export interface DisasterState {
   baseline?: Partial<Record<Track, number>>;
 }
 
-const PEACE_DAYS: Record<Exclude<PeaceLength, 'random'>, number> = { short: 365, medium: 3 * 365, long: 5 * 365 };
+const PEACE_DAYS: Record<Exclude<PeaceLength, 'random'>, number> = { short: 548, medium: 3 * 365, long: 5 * 365 };
 export const FULL: Record<Track, number> = { grid: 1, fuel: 1, stores: 1, deliveries: 1, medical: 1, law: 1, phone: 1, banks: 1 };
 
 function pick<T extends { weight: number }>(list: T[], r: number): T {
@@ -307,14 +308,14 @@ export function newDisaster(seed: number, mode: Mode, peace: PeaceLength = 'rand
   const def = k ? DISASTERS[k] : undefined;
   const v = def ? (variant && def.variants.some(x => x.id === variant) ? variant : pick(def.variants, r()).id) : '';
   const len = mode === 'sandbox' ? NEVER : peace === 'random' || mode === 'surprise' ? Math.round(3 * 365 + r() * 3 * 365) : PEACE_DAYS[peace];
-  const warn = def ? Math.max(1, Math.round(roll(r, def.warn) * WARN_SCALE[difficulty])) : 0;
+  const warn = def ? Math.max(1, Math.round(roll(r, def.warn) * DIFFICULTY[difficulty].warn)) : 0;
   // the fate on its own stream (the rest of the run's rolls don't move)
   const rf = rng(seed * 6007 + 29);
   const fate = k ? rollFate(k, rf()) : 'full';
   return {
     mode, difficulty, peace, kind: k, variant: v, phase: 'peace',
     warnAt: len - warn, hitAt: len,
-    back: def ? fateBack(rollBack(def, v, r), fate) : {},
+    back: def ? fateBack(rollBack(def, v, r), fate, difficulty) : {},
     chained: [], fate, ceiling: fate === 'partial' ? rollCeiling(rf) : {}, tracks: { ...FULL }, news: [], day: -1,
   };
 }
@@ -330,7 +331,7 @@ export function triggerDisaster(d: DisasterState, now: number, kind: DisasterKin
   const rf = rng(seed * 6007 + 29 + Math.floor(now));
   d.fate = rollFate(kind, rf());
   d.ceiling = d.fate === 'partial' ? rollCeiling(rf) : {};
-  d.back = fateBack(rollBack(def, d.variant, r), d.fate);
+  d.back = fateBack(rollBack(def, d.variant, r), d.fate, d.difficulty);
   d.chained = [];
   d.phase = warnDays > 0 ? 'warning' : 'peace';
 }
@@ -394,14 +395,14 @@ export function nextEraDisaster(prev: DisasterState, now: number, seed: number, 
   const n = era - 1;
   const lo = Math.max(0.5, 4 - 0.5 * n), hi = Math.max(1.5, 8 - n);
   const quiet = Math.round(365 * (lo + (hi - lo) * r()));
-  const warn = Math.max(1, Math.round(roll(r, def.warn) * WARN_SCALE[prev.difficulty]));
+  const warn = Math.max(1, Math.round(roll(r, def.warn) * DIFFICULTY[prev.difficulty].warn));
   // each era, a little less chance it all comes back
   const [f0, p0] = FATE_ODDS[kind] ?? [0, 0, 1];
   const f = f0 * Math.pow(0.8, n), pp = p0 * Math.pow(0.92, n), uf = r();
   const fate: Fate = uf < f ? 'full' : uf < f + pp ? 'partial' : 'never';
   return {
     ...peaceOnly, kind, variant: v, warnAt: now + quiet - warn, hitAt: now + quiet,
-    back: fateBack(rollBack(def, v, r), fate), fate, ceiling: fate === 'partial' ? rollCeiling(r) : {},
+    back: fateBack(rollBack(def, v, r), fate, prev.difficulty), fate, ceiling: fate === 'partial' ? rollCeiling(r) : {},
   };
 }
 
@@ -413,10 +414,11 @@ export function tension(d: DisasterState, t: number): number {
 
 /** Prices climb through the warning signs (panic buying), then whatever is left is dear. */
 export function priceFactor(d: DisasterState, t: number): number {
-  const w = tension(d, t);
-  if (t < d.hitAt) return 1 + 0.6 * w * w;
+  const w = tension(d, t), k = DIFFICULTY[d.difficulty ?? 'standard'].price;
+  // (the difficulty stretches how far prices climb above list)
+  if (t < d.hitAt) return 1 + 0.6 * w * w * k;
   const tr = tracksAt(d, t);
-  return 1.6 + 2.4 * (1 - Math.min(tr.stores, tr.deliveries));
+  return 1 + (0.6 + 2.4 * (1 - Math.min(tr.stores, tr.deliveries))) * k;
 }
 
 /** Can the yard still deliver, and will anyone take your money? (Orders fail once deliveries or the banks are mostly gone.) */
@@ -464,7 +466,7 @@ export function updateDisaster(d: DisasterState, t: number, seed: number): strin
       const cd = DISASTERS[c.kind];
       if (!cd) continue;
       const v = pick(cd.variants, r());
-      d.chained.push({ kind: c.kind, variant: v.id, hitAt: d.hitAt + roll(r, c.after), back: fateBack(rollBack(cd, v.id, r), d.fate ?? 'full') });
+      d.chained.push({ kind: c.kind, variant: v.id, hitAt: d.hitAt + roll(r, c.after), back: fateBack(rollBack(cd, v.id, r), d.fate ?? 'full', d.difficulty) });
     }
   } else if (d.phase === 'impact' && t >= d.hitAt + 3) d.phase = 'survival';
   // chained follow-ons announce themselves when they hit
