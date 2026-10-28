@@ -544,7 +544,8 @@ SETS.mounts = [
 // stage({ near, ang, animals: [[species, forward, sideways, heading, male, side]], camBack, camSide, look, fov, fence, person }):
 // finds an open spot near the camp (or a fence spot), stands the person there and the animals `forward` / `sideways` of them
 // toward heading `ang`, and puts the eye camera behind the person. `forward` / `sideways` may be JS expressions.
-const stage = ({ near = [9, -3], ang = 0, animals = [], camBack = 1.7, camSide = 0.5, look = 4, fov = 60, fence = false, person = true, eyeH = 0.27, dy = 0.12 }) => `{ const w = cb.world.wildlife; w.clearDebug();
+const K = 0.55;   // numeric offsets are compressed: SCALE v2 animals are small, so they must be near the lens to read
+const stage = ({ near = [9, -3], ang = 0, animals = [], camBack = 1.2, camSide = 0.35, look = 3, fov = 52, fence = false, person = true, eyeH = 0.27, dy = 0.12 }) => `{ const w = cb.world.wildlife; w.clearDebug();
   const c = cb.world.camp, h = cb.game.getState().game.site.home, g = cb.world.groundAt;
   const ca = Math.cos(${ang}), sa = Math.sin(${ang});
   // the flattest open ground near the spot (the animals must not hide behind a rise): the ground a few units about and ahead stays within a hand of the person's feet
@@ -561,7 +562,7 @@ const stage = ({ near = [9, -3], ang = 0, animals = [], camBack = 1.7, camSide =
   const px = best.x, pz = best.z;
   const at = (f, s) => [px + ca * f - sa * s, pz + sa * f + ca * s];
   const fd = px - h.x0;
-  ${animals.map(a => `{ const [x, z] = at(${a[1]}, ${a[2]}); w.spawnDebug('${a[0]}', x, z, ${a[3] ?? 0}, ${a[4] ?? true}, '${a[5] ?? 'free'}'); }`).join('\n  ')}
+  ${animals.map(a => `{ const [x, z] = at(${typeof a[1] === 'number' ? a[1] * K : a[1]}, ${typeof a[2] === 'number' ? a[2] * K : a[2]}); w.spawnDebug('${a[0]}', x, z, ${a[3] ?? 0}, ${a[4] ?? true}, '${a[5] ?? 'free'}'); }`).join('\n  ')}
   ${person ? `import('/src/store/battleStore.ts').then(m => m.useBattleStore.getState().playBattle({ night: false, duration: 99999, events: [], units: [{ id: 'h_a', side: 'home', x: px, z: pz, post: 'open' }] }));` : `import('/src/store/battleStore.ts').then(m => m.useBattleStore.getState().endBattle());`}
   const [ex, ez] = at(-${camBack}, ${camSide}), [lx, lz] = at(${look}, 0);
   cb.qa.pose = { x: ex, y: g(ex, ez) + ${eyeH}, z: ez, lx, ly: g(lx, lz) + ${dy}, lz, fov: ${fov} };
