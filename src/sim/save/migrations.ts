@@ -28,11 +28,14 @@ import { newLocals } from '../neighborLife';
 import { newWild } from '../wildfood';
 import { newDaily } from '../daily';
 import { dayJob, type Person } from '../family';
+import { starterKit } from '../tools';
 
 type Raw = Record<string, unknown> & { version?: number };
 
 /** version n → n + 1 upgraders. */
 const STEPS: Record<number, (s: Raw) => Raw> = {
+  // 46 → 47: the family's tools (sim/tools.ts): a starter kit from the trades, as if they had brought it
+  46: s => ({ ...s, version: 47, tools: (s.tools as object | undefined) ?? starterKit(s.people as Person[], s.seed as number) }),
   // 38 → 39: the pantry, item by item (the aggregate staples / canned / frozen split into a default breakdown at their shelf ages)
   38: s => {
     const st = s.stock as Record<string, number>, sh = s.shelf as { age?: Record<string, number> } | undefined;

@@ -36,7 +36,8 @@ import type { WeatherState } from './weatherThreats';
 import { DIFFICULTY } from './difficulty';
 import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
 import type { LightsState } from './lights';
-export const SAVE_VERSION = 46;
+import { starterKit, type ToolKit } from './tools';
+export const SAVE_VERSION = 47;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -221,6 +222,8 @@ export interface GameState {
   armory: Armory;
   /** OPSEC choices (sim/opsec.ts); made lazily. */
   opsec?: { quietDeliveries: boolean; blackout: boolean };
+  /** Hammers, saws, shovels and drills: condition, sharpness, what is missing (sim/tools.ts). Save v45; made lazily from the family's trades. */
+  tools?: ToolKit;
   /** Floodlight modes: the default and per-light overrides (sim/lights.ts). Save v44; made lazily. */
   lights?: LightsState;
   /** The game in the woods and the creek, licenses. */
@@ -298,6 +301,7 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     land: newLand(seed, generateNeighbors(seed).map(n => n.id), (setup.site ?? CLASSIC).home),
     gate: newGate(seed),
     breakins: newBreakins(),
+    tools: starterKit(people, seed),
     rescue: newRescue(),
     scavenge: newScavenge(),
     market: newMarketState(),
