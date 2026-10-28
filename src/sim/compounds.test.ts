@@ -126,3 +126,46 @@ describe('doorways and footings', () => {
     expect(footingOf('steel_wall')).toBe('curb');
   });
 });
+
+import { UPGRADE_NEXT, upgradeRun, runBlocked, addRunWork, runBill, SALVAGE } from './perimeter';
+
+describe('the wall chain: containers and the poured-concrete top tier', () => {
+  it('containers upgrade to a steel wall, and the chain ends at poured concrete', () => {
+    expect(UPGRADE_NEXT.container_wall).toBe('steel_wall');
+    expect(UPGRADE_NEXT.electric_steel).toBe('concrete_wall');
+    expect(UPGRADE_NEXT.concrete_wall).toBeUndefined();
+    let k: PerimeterKind | undefined = 'split_rail'; const seen: string[] = [];
+    while (k) { seen.push(k); k = UPGRADE_NEXT[k]; }
+    expect(seen.at(-1)).toBe('concrete_wall');
+    // stronger at each step from a container up
+    expect(PERIMETER.steel_wall.blocks.people).toBeGreaterThan(PERIMETER.container_wall.blocks.people);
+    expect(PERIMETER.concrete_wall.blocks.people).toBeGreaterThan(PERIMETER.electric_steel.blocks.people - 1e-9);
+    expect(PERIMETER.concrete_wall.deepFooting).toBe(true);
+    expect(PERIMETER.concrete_wall.height).toBeGreaterThan(PERIMETER.steel_wall.height);
+  });
+
+  it('upgrading a finished container wall lays out steel beside it, and the containers go (half their cost back) once it is done', () => {
+    const g = newGame(5); g.stock.rebar = 60; g.stock.concrete = 60; g.stock.hardware = 20; g.stock.wire = 20; g.stock.container = 0;
+    const c = done(g, 'container_wall', [[0, 0], [6, 0], [6, 6], [0, 6], [0, 0]]);
+    expect(upgradeRun(g, c.id)).toBeNull();
+    const steel = g.perimeter.find(r => r.replaces === c.id)!;
+    expect(steel.kind).toBe('steel_wall');
+    addRunWork(g, steel, steel.hours);
+    expect(g.perimeter.some(r => r.id === c.id)).toBe(false);
+    expect(g.stock.container).toBe(Math.floor((runBill('container_wall', 24)).container! * SALVAGE));
+  });
+
+  it('a poured-concrete wall needs a county permit (fee and a review) before work starts; no county, no wait', () => {
+    const g = newGame(5); g.disaster.tracks = { ...g.disaster.tracks, banks: 1, law: 1 };
+    g.stock.rebar = 99; g.stock.concrete = 99; g.stock.hardware = 9;
+    const money = g.money;
+    const r = planRun(g, 'concrete_wall', [[0, 0], [5, 0]]);
+    expect(g.money).toBeLessThan(money);
+    expect(runBlocked(g, r)).toMatch(/county permit/);
+    g.clock.t += 40;
+    expect(runBlocked(g, r)).toBeNull();
+    const h = newGame(5); h.disaster.tracks = { ...h.disaster.tracks, banks: 0, law: 0 };
+    const r2 = planRun(h, 'concrete_wall', [[0, 0], [5, 0]]);
+    expect(r2.permitAt).toBeUndefined();
+  });
+});

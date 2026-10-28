@@ -54,14 +54,14 @@ describe('upgrading in place', () => {
     return { g, r };
   };
 
-  it('the chain runs from a split-rail fence to the electrified steel wall, each tier stronger than the last', () => {
+  it('the chain runs from a split-rail fence to the poured-concrete wall, each tier stronger than the last', () => {
     let k: keyof typeof PERIMETER | undefined = 'split_rail', last = -1, steps = 0;
     while (k) {
       const b = PERIMETER[k].blocks.people;
       expect(b).toBeGreaterThanOrEqual(last);
       last = b; k = UPGRADE_NEXT[k]; steps++;
     }
-    expect(steps).toBe(8);
+    expect(steps).toBe(9);
     expect(last).toBeGreaterThan(0.95);
   });
 
@@ -86,7 +86,7 @@ describe('upgrading in place', () => {
   });
 
   it('the top tier has nothing to upgrade to, and an unfinished run cannot be upgraded', () => {
-    const { g, r } = finished('electric_steel');
+    const { g, r } = finished('concrete_wall');
     expect(upgradeProblem(g, r)).toMatch(/nothing better/);
     const u = plan(g, 'chain_link', [[0, 0], [3, 0]]);
     expect(upgradeProblem(g, u)).toMatch(/not finished/);

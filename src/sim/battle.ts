@@ -68,6 +68,7 @@ const WALL_HAZARD: Record<string, { p: number; min: number; max: number; what: s
   chain_link: { p: 0.025, min: 6, max: 20, what: 'chain-link', lines: ['The fence — it\'s cutting my hands —', 'Shit — it\'s sharp at the top — AGH!'] },
   wrought_iron: { p: 0.03, min: 10, max: 30, what: 'iron spikes', lines: ['The points — it\'s got me — oh God —', 'Slipped — the spikes — my leg!'] },
   iron_barbed: { p: 0.08, min: 12, max: 38, what: 'barbed wire on iron', lines: ['The wire — and the spikes — I can\'t —', 'AGH — it\'s everywhere — get me off —'] },
+  concrete_wall: { p: 0.02, min: 8, max: 25, what: 'smooth concrete', lines: ['There\'s nothing to hold — it\'s smooth — I can\'t —', 'It\'s too high — it\'s just a wall —'] },
   steel_wall: { p: 0.015, min: 10, max: 35, what: 'razor wire', lines: ['Razor wire — Jesus — it\'s razor wire —', 'Can\'t climb it — it\'s smooth — my hands —'] },
   electric_steel: { p: 0.22, min: 25, max: 75, what: 'live wire', lines: ['AAAGH — it\'s LIVE — it\'s electrified —', 'I can\'t let go — oh God — it\'s —', 'Don\'t touch it — don\'t TOUCH it!'] },
   creek_bars: { p: 0.05, min: 8, max: 28, what: 'bars', lines: ['The bars — I can\'t get through — my hand —'] },

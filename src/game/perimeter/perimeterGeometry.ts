@@ -260,6 +260,20 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
       }
       break;
     }
+    case 'concrete_wall': {
+      // a 3.5 m poured wall: continuous panels with form-tie shadow lines every 3 m, a pilaster at each joint, a capped top and a sloped drip edge; the footing curb below is added for every wall tier
+      const H = 3.5 * M;
+      bays(3 * M, (a, b) => {
+        beam(a.x, a.z, b.x, b.z, -0.05 * M, H + 0.05 * M, 0.3 * M, 'concrete');
+        beam(a.x, a.z, b.x, b.z, H - 0.02 * M, 0.12 * M, 0.42 * M, 'concrete');          // the cap
+        beam(a.x, a.z, b.x, b.z, H * 0.5, 0.03 * M, 0.32 * M, 'wet_concrete');           // a form-tie line
+        beam(a.x, a.z, b.x, b.z, H * 0.82, 0.03 * M, 0.32 * M, 'wet_concrete');
+        const off = 0.17 * M;                                                              // pilasters on both faces at each joint
+        for (const sd of [-1, 1]) post(a.x - a.dz * off * sd, a.z + a.dx * off * sd, H, 0.12 * M, 'concrete');
+      });
+      for (const e of spanEnds()) post(e.x, e.z, H + 0.1 * M, 0.2 * M, 'concrete');
+      break;
+    }
     case 'thorn_hedge': {
       const g = Math.max(0.04, growth), h = def.height * g, w = (0.4 + 1.6 * g) * M;
       let k = 0;
@@ -395,7 +409,7 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
         for (const p of [p0, p1]) post(p.x, p.z, def.height + 0.08 * M, 0.1 * M, 'steel');
         beam(p0.x, p0.z, p1.x, p1.z, def.height, 0.14 * M, 0.3 * M, 'steel');
       }
-      const wall = run.kind === 'log_palisade' || run.kind === 'container_wall';
+      const wall = run.kind === 'log_palisade' || run.kind === 'container_wall' || run.kind === 'concrete_wall';
       const leafH = wall ? Math.abs(def.height) * 0.95 : 1.3 * M;
       const ang = -Math.atan2(p0.dz, p0.dx);
       /** A gate leaf, hinged at (hx, hz), `w` wide, swung open by `open` radians. */
