@@ -239,7 +239,7 @@ export function SetupScreen() {
                     <button key={p.id} style={{ ...tile(on), padding: '8px 12px' }} onClick={() => setKinWith(on ? kinWith.filter(x => x !== p.id) : [...kinWith, p.id])} title={on ? 'Brings them along' : 'Stays in town'}>
                       <div style={{ fontWeight: 600 }}>{fullName(p)}, {p.age}</div>
                       <div style={{ fontSize: 12, color: C.gold }}>{kinTitle(p, baseFamily) || ROLE_NAME[p.rel!.role]}</div>
-                      <div style={{ fontSize: 12, color: C.dim }}>{p.elder ? `Retired${inc ? `: ${usd(inc.perDay * 30)} a month, ${inc.label.toLowerCase()}` : ''}` : p.job ? `${p.job.title}, $${p.job.wage}/day` : 'at home'}</div>
+                      <div style={{ fontSize: 12, color: C.dim }}>{p.elder ? `Retired${inc ? `: ${usd(inc.perDay * 30)} a month (${inc.label})` : ''}` : p.job ? `${p.job.title}, $${p.job.wage}/day` : 'at home'}</div>
                       {(p.conditions?.length ?? 0) > 0 && <div style={{ fontSize: 11.5, color: C.dim }}>Needs: {p.conditions!.map(c => CONDITION[c].rx).join(', ')}</div>}
                       <div style={{ fontSize: 12, marginTop: 3, color: on ? C.good : C.dim }}>{on ? 'Comes with you' : 'Stays in town'}</div>
                     </button>
