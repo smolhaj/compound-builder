@@ -18,6 +18,7 @@ import type { Quality } from '../../engine/world/WorldScene';
 import type { GameState, Structure } from '../../sim/state';
 import { calendarOf, dayIndex } from '../../sim/state';
 import { REGIONS } from '../../sim/regions';
+import { dogCount } from '../../sim/pets';
 import { isHome } from '../../sim/blueprints';
 import type { PerimeterRun } from '../../sim/perimeter';
 import { KIT, footprint } from '../buildkit/kit';
@@ -179,7 +180,7 @@ export class Atmosphere {
     // ── flashlights ──
     const threat = {
       radioWarned: !!game.radio && dayIndex(game.clock.t) <= game.radio.warnedUntil,
-      atGate: !!game.gate.pending, battle: f.battle, dogs: (game.stock.dog ?? 0) >= 1 && !!game.gate.pending,
+      atGate: !!game.gate.pending, battle: f.battle, dogs: dogCount(game) >= 1 && !!game.gate.pending,
     };
     const ids = flashlightCarriers(people, this._h.family.shown, f.night, threat);
     const carriers: Carrier[] = [];

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { newGame, type GameState } from './state';
 import { step } from './engine';
+import { adoptDog } from './pets';
 import { CLASSIC } from './site';
 import {
   addChoreWork, applyTemplate, canningCases, choresDay, cookRatio, dutyWork, huntFactor, lifeMorale, spoilFactor, tallyOf, autoPlan, CHORES, chronotypes, choreRates, choresStep, CLEAR_HOURS, dailyOf, dailyTick, DUTIES, DUTY, DUTY_CHORES, DUTY_TASK, dutyAt,
@@ -199,7 +200,7 @@ describe('who suits what', () => {
 
   it('a standing assignment ("always on") is honoured, and cleared again', () => {
     const g = game(3, 1);
-    g.stock.dog = 2;
+    for (let k = 0; k < 2; k++) adoptDog(g);
     const i = g.people.findIndex(p => !p.kid);
     expect(setFocus(g, g.people[i].id, 'pets')).toBeNull();
     plan(g, true);
@@ -228,7 +229,7 @@ describe('chores and task kinds', () => {
     const worked = new Set(Object.values(DUTY_CHORES).flat());
     for (const c of CHORES) expect(worked.has(c), c).toBe(true);
     const g = game();
-    g.stock.dog = 2;
+    for (let k = 0; k < 2; k++) adoptDog(g);
     const rates = choreRates(g);
     expect(rates.pets).toBeGreaterThan(0);
     expect(rates.house).toBeGreaterThan(0);
@@ -246,7 +247,7 @@ describe('chores and task kinds', () => {
   it('no dogs, no pet chore; neglected dogs lose their bark', () => {
     const g = game();
     expect(choreRates(g).pets).toBe(0);
-    g.stock.dog = 2;
+    for (let k = 0; k < 2; k++) adoptDog(g);
     expect(petCare(g)).toBe(1);
     dailyOf(g).chores.levels.pets = 100;
     expect(petCare(g)).toBeCloseTo(0.5);
@@ -254,7 +255,7 @@ describe('chores and task kinds', () => {
 
   it('the planner gives the dogs, the house, the kitchen and the garden people when they are behind', () => {
     const g = withPeople(game(3, 1), 5);
-    g.stock.dog = 2;
+    for (let k = 0; k < 2; k++) adoptDog(g);
     const lv = dailyOf(g).chores.levels;
     lv.pets = 80; lv.house = 80; lv.kitchen = 60;
     plan(g, true);
@@ -264,7 +265,7 @@ describe('chores and task kinds', () => {
 
   it('duty wants are person-hours: what keeps up plus a share of the backlog', () => {
     const g = game();
-    g.stock.dog = 3;
+    for (let k = 0; k < 3; k++) adoptDog(g);
     const w = new Map(dutyWants(g, choreRates(g)));
     expect(w.get('pets')).toBeGreaterThan(0.5);
     dailyOf(g).chores.levels.pets = 90;

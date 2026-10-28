@@ -18,7 +18,7 @@ import { shelfDay } from './shelf';
 import { bodyDay } from './body';
 import { financeDay } from './finance';
 import { armoryDay } from './armory';
-import { gearDay } from './gear';
+import { petsDay } from './pets';
 import { toolsDay } from './tools';
 import { vehiclesDay } from './vehicles';
 import { radioDay } from './radio';
@@ -147,7 +147,7 @@ function subStep(s: GameState): void {
     for (const line of shelfDay(s)) log(s, line);
     for (const line of financeDay(s)) log(s, line);
     for (const line of armoryDay(s)) log(s, line);
-    for (const line of gearDay(s)) log(s, line);
+    for (const line of petsDay(s)) log(s, line);
     for (const line of toolsDay(s)) log(s, line);
     for (const line of vehiclesDay(s)) log(s, line);
     for (const line of radioDay(s)) log(s, line);

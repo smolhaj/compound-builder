@@ -8,6 +8,7 @@ import { weatherDelay } from './upkeep';
 import type { GameState, OrderLine } from './state';
 import { canOrder, priceFactor } from './disaster';
 import { CARRY_H } from './improvements';
+import { adoptDog, coatName } from './pets';
 import { addFood, CAT_KCAL, FOOD, type FoodItemId } from './pantry';
 
 /** A line's price at list (a named food at its own price). */
@@ -24,6 +25,8 @@ export function foodLine(id: FoodItemId, n: number): OrderLine {
 
 /** Put a delivered line in the stockpile (a named food goes into the pantry by name). */
 export function receive(s: GameState, l: OrderLine): void {
+  // dogs are not goods: each one that arrives is a named pet (sim/pets.ts)
+  if (l.material === 'dog' || l.material === 'puppy') { for (let k = 0; k < Math.floor(l.qty); k++) { const d = adoptDog(s, l.material === 'puppy' ? { puppy: true } : { training: 50, ageYears: 2 }); log(s, `${d.name}, a ${coatName(d)} ${d.breed}, has come home. Everyone wants to meet ${d.sex === 'f' ? 'her' : 'him'}.`); } return; }
   if (l.food && (l.n ?? 0) > 0) addFood(s, l.food, l.n ?? 0);
   else s.stock[l.material] += l.qty;
 }

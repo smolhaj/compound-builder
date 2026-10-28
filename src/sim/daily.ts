@@ -19,6 +19,7 @@
  *             gate (`watchDetection`, read by encounters.ts / battle.ts) and
  *             the atmosphere layer's flashlights.
  */
+import { dogCount } from './pets';
 import { calendarOf, dayIndex, hourOf, type GameState, type PersonState, type TaskKind } from './state';
 import { isFinished } from './construction';
 import { isHome } from './blueprints';
@@ -152,13 +153,11 @@ export function choreRates(s: GameState): Record<ChoreId, number> {
 /**
  * How many dogs need looking after.
  *
- * TODO(dogs, PR #66 / branch claude/dogs): the named dogs live in
- * `pets.ts` there (`dogCount`, `careHours`, `assignCare(s, { capacity })`).
- * When that merges, return `dogCount(s)` here, scale the pets chore by
- * `careHours(s)` (see CLEAR_HOURS.pets) and pass the roster's availability to
- * `assignCare`. Until then the guard dogs bought in the shop (`stock.dog`).
+ * The named dogs (sim/pets.ts). The pets chore backlog here is the roster's
+ * view of their care; pets.ts does the feeding, bonding and grief, and hands
+ * out its own care hours (`careHours`, `assignCare(s, { capacity })`).
  */
-export const petDogs = (s: GameState): number => Math.floor((s.stock as unknown as Record<string, number>).dog ?? 0);
+export const petDogs = (s: GameState): number => dogCount(s);
 
 // ─────────────────────────────────────────────────────────────────────────
 // State

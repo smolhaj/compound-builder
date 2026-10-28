@@ -29,6 +29,7 @@ import { newWild } from '../wildfood';
 import { newWildlife } from '../wildlife';
 import { newDaily } from '../daily';
 import { dayJob, type Person } from '../family';
+import { migrateDogs } from '../pets';
 import { starterKit } from '../tools';
 
 type Raw = Record<string, unknown> & { version?: number };
@@ -63,6 +64,11 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   45: s => ({ ...s, version: 46, losses: (s.losses as unknown[] | undefined) ?? [], daily: (s.daily as object | undefined) ?? newDaily(), personState: (s.personState as Array<Record<string, unknown>>).map(ps => ({ fatigue: 0, ...ps })) }),
   // 44 → 45: where the starting money came from (old saves: not recorded; they keep their jobs and the old flat passive income)
   44: s => ({ ...s, version: 45, startFunds: null }),
+  // 49 → 50: dogs are named family pets (each old guard dog in the stockpile becomes a named adult dog), and the new dog goods start at zero
+  49: s => {
+    const { dogs, petLife } = migrateDogs(s as unknown as Parameters<typeof migrateDogs>[0]);
+    return { ...s, version: 50, dogs, petLife, stock: { puppy: 0, kibble: 0, dogbed: 0, doghouse: 0, ...(s.stock as object), dog: 0 } };
+  },
   // 47 → 48: bedding for the housing model (sim/housing.ts): a bag each and a dome tent for anyone past the wall tent's four
   47: s => ({ ...s, version: 48, stock: { ...startingBedding((s.people as unknown[]).length), ...(s.stock as object) } }),
   // 43 → 44: structures may carry `replaces` (a watch-tower upgrade in place, sim/towers.ts; none yet) and the top towers' mount and turret goods join the stockpile at zero

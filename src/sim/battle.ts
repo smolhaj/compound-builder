@@ -21,6 +21,7 @@
 import type { Battle, BattleEvent, BattleUnit } from './battleTypes';
 import { GUN, skillOf, type Caliber } from './armory';
 import { gearPosture } from './gear';
+import { dogCount, dogsInBattle } from './pets';
 import { watchDetection } from './daily';
 import { backgroundOf } from './family';
 import { isHome } from './blueprints';
@@ -355,7 +356,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
   const darkBlind = night && !lightsOn && !n('nvg') && !n('thermal') && !n('thermal_cam');
   // (round 4: measured from the line, where the watch stands and the sensors are, not from the house)
   const detectAt = lineR + towerReach(s, night, lightsOn) + Math.max(2, (6 + detection * 0.24) * (darkBlind ? 0.7 : 1), night ? 0 : 16 + detection * 0.06);
-  const what: 'dog' | 'sensor' | 'tripwire' | 'camera' | 'watch' = n('dog') ? 'dog' : n('driveway_alarm') ? 'sensor' : n('tripwire') ? 'tripwire' : powered && (n('cameras') || n('thermal_cam')) ? 'camera' : 'watch';
+  const what: 'dog' | 'sensor' | 'tripwire' | 'camera' | 'watch' = dogCount(s) ? 'dog' : n('driveway_alarm') ? 'sensor' : n('tripwire') ? 'tripwire' : powered && (n('cameras') || n('thermal_cam')) ? 'camera' : 'watch';
   let alarmed = false;
   const mines = Math.min(n('mines'), 12);
   let minesLeft = mines;
@@ -813,6 +814,15 @@ export function applyBattle(s: GameState, b: Battle): string[] {
   const endEv = b.events.find(e => e.kind === 'end');
   const result = endEv && endEv.kind === 'end' ? endEv.result : 'repelled';
   out.push(...applyCasualties(s, b));
+  {
+    // the dogs on the post: hurt or killed by the fight, never automatically
+    const home = new Set(b.units.filter(u => u.personId).map(u => u.id));
+    const kidOf = (unit: string) => s.people.find(p => p.id === b.units.find(u => u.id === unit)?.personId)?.kid;
+    out.push(...dogsInBattle(s, {
+      homeWounds: b.events.filter(e => e.kind === 'wound' && home.has(e.unit)).length, homeDeaths: b.events.filter(e => e.kind === 'death' && home.has(e.unit)).length, result,
+      savage: b.events.some(e => (e.kind === 'taken' && kidOf(e.unit)) || (e.kind === 'death' && e.executed)),
+    }));
+  }
   let rounds = 0;
   for (const [cal, nn] of Object.entries(pb.spent ?? {}) as Array<[Caliber, number]>) { s.armory.ammo[cal] = Math.max(0, (s.armory.ammo[cal] ?? 0) - nn); rounds += nn; }
   if (rounds) {

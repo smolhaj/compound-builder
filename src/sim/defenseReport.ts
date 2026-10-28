@@ -12,7 +12,8 @@ import { daysOfFood } from './needs';
 import { predatorLine, predatorSpecies } from './wildlife';
 import { PERIMETER, runFinished, type Pt } from './perimeter';
 import { HEAVY_CALIBERS, MOUNT_ROUNDS, TURRET_ROUNDS, TOWERS, floodReady, mountReady, towerPosts, towersBuilt, turretsReady } from './towers';
-import type { GameState } from './state';
+import { dayIndex, type GameState } from './state';
+import { bondOf, dogWatch, livingDogs, temperOf } from './pets';
 
 export type Tone = 'good' | 'warn' | 'bad';
 export interface Check { id: string; label: string; ok: boolean; tone: Tone; detail: string }
@@ -48,6 +49,21 @@ function inside(pts: readonly Pt[], x: number, z: number): boolean {
     if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) c = !c;
   }
   return c;
+}
+
+/** The dogs, one row each: who is on a post and who is kept inside, and how they are. */
+function dogRows(s: GameState): Check[] {
+  const ds = livingDogs(s), day = dayIndex(s.clock.t);
+  if (!ds.length) return [chk('dog', 'Dog', false, 'no bark to warn you', true)];
+  const w = dogWatch(s);
+  return ds.map(d => {
+    const b = bondOf(d), who = b.id ? s.people.find(p => p.id === b.id)?.first : null;
+    const t = temperOf(d);
+    const bad = d.hunger > 60 || d.health < 40 || t === 'aggressive' || t === 'withdrawn';
+    const place = d.guard ? 'on the post' : 'kept inside';
+    const note = d.hunger > 60 ? 'hungry' : d.health < 40 ? 'unwell' : t === 'withdrawn' || t === 'aggressive' ? t : who ? `bonded to ${who}` : '';
+    return chk(`dog:${d.id}`, d.name, !bad && (d.guard || w.detection > 0), `${place}${note ? ` · ${note}` : ''}${day - d.born < 180 ? ' · a puppy' : ''}`, true);
+  });
 }
 
 export function defenseReport(s: GameState): DefenseReport {
@@ -87,7 +103,7 @@ export function defenseReport(s: GameState): DefenseReport {
     ...(built.some(x => x.def.flood) ? [chk('towerlights', 'Tower floodlights', floodReady(s), floodReady(s) ? 'ready: lit by their mode at night' : !powered ? 'no power: the mast stays dark' : 'switched off (or lights out)', true)] : []),
     ...(built.some(x => x.def.mount) ? [chk('mount', 'Gun on the tower ring', !!mountReady(s), mountReady(s) ? 'a person up there and belts in the armory' : rounds < MOUNT_ROUNDS ? `needs ${MOUNT_ROUNDS}+ rounds of 7.62 / 5.56 in the armory (${rounds})` : 'nobody to put on it', false)] : []),
     ...(built.some(x => x.def.turret) ? [chk('turret', 'Automated turret', turretsReady(s).length > 0, turretsReady(s).length ? 'armed and live' : !powered ? 'no power: it does not fire' : `needs ${TURRET_ROUNDS}+ rounds in the armory (${rounds})`, false)] : []),
-    chk('dog', 'Guard dog', n(s, 'dog') > 0, n(s, 'dog') > 0 ? `${Math.min(2, n(s, 'dog'))} on watch` : 'no bark to warn you', true),
+    ...dogRows(s),
     chk('cameras', 'Cameras / motion sensors', n(s, 'cameras') + n(s, 'thermal_cam') + n(s, 'driveway_alarm') > 0, powered ? 'working' : 'need power to run', true),
     chk('lights', 'Floodlights', n(s, 'floodlights') > 0 && !!powered, n(s, 'floodlights') > 0 ? (powered ? 'on at night' : 'no power') : 'dark at night', true),
     chk('radio', 'Radio', n(s, 'radios') + n(s, 'sw_radio') + n(s, 'ham_rig') > 0, 'warning from neighbors and the net', true),
@@ -125,7 +141,8 @@ export function defenseReport(s: GameState): DefenseReport {
   for (const r of s.perimeter) if (runFinished(r) && PERIMETER[r.kind].blocks.people > 0) byKind.set(r.kind, (byKind.get(r.kind) ?? 0) + 1);
   for (const [k, c] of byKind) improvements.push(`${PERIMETER[k as keyof typeof PERIMETER].name}${c > 1 ? ` ×${c}` : ''}`);
   for (const st of fin) if (st.kind in TOWERS) improvements.push(TOWERS[st.kind as keyof typeof TOWERS].name); else if (st.kind.includes('tower') || st.kind.startsWith('bunker_')) improvements.push(st.kind.replace(/_/g, ' '));
-  for (const [k, lbl] of [['dog', 'guard dog'], ['cameras', 'cameras'], ['floodlights', 'floodlights'], ['steel_door', 'steel door'], ['window_bars', 'window bars'], ['sandbags', 'sandbags'], ['safe_room', 'safe room'], ['tripwire', 'tripwires'], ['driveway_alarm', 'driveway alarm']] as const) if (n(s, k) > 0) improvements.push(lbl);
+  for (const d of livingDogs(s)) improvements.push(d.guard ? `${d.name} (dog on guard)` : `${d.name} (dog)`);
+  for (const [k, lbl] of [['cameras', 'cameras'], ['floodlights', 'floodlights'], ['steel_door', 'steel door'], ['window_bars', 'window bars'], ['sandbags', 'sandbags'], ['safe_room', 'safe room'], ['tripwire', 'tripwires'], ['driveway_alarm', 'driveway alarm']] as const) if (n(s, k) > 0) improvements.push(lbl);
 
   // ── the score ──
   const score = Math.round(Math.min(100, 0.38 * p.barrier + 0.2 * p.detection + 0.14 * Math.min(100, p.fighters * 18) + 0.14 * Math.min(100, Math.max(0, ((p.firepower ?? 1) - 0.6) * 100)) + 0.08 * p.fortress + (bunker ? 4 : 0) + (p.safeRoom ? 2 : 0)));

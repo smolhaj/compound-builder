@@ -21,7 +21,7 @@ export const SHELVES: Record<ShelfTab, MaterialId[]> = {
   water: ['water_jugs', 'ibc_tote', 'water_trailer', 'water_filter', 'ro_system', 'softener', 'greywater', 'pipe', 'fixtures', 'pump', 'drilling', 'tank', 'septic_tank'],
   power: ['solar_panel', 'battery', 'inverter', 'generator', 'cable'],
   food: ['seed', 'lids', 'fishing_gear', 'snares', 'smoker', 'goat', 'pig', 'steer', 'rabbit', 'hay', 'feed'],
-  household: ['meds', 'hygiene', 'traps', 'tent', 'sleeping_bag'],
+  household: ['meds', 'hygiene', 'traps', 'tent', 'sleeping_bag', 'kibble', 'dogbed', 'doghouse'],
   fuel: ['fuel', 'stabilizer', 'firewood', 'excavator', 'plow', 'gun_safe', 'gun_cleaning'],
   defense: [...KIT_GOODS, ...WATCH_GOODS, ...HARDEN_GOODS],
 };

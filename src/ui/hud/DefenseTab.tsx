@@ -2,6 +2,7 @@
 import { useGameStore } from '../../store/gameStore';
 import { useWorldStore } from '../../store/worldStore';
 import { defenseReport, type Check } from '../../sim/defenseReport';
+import { setGuard } from '../../sim/pets';
 import { MATERIALS, type MaterialId } from '../../sim/materials';
 import { orderCost } from '../../sim/economy';
 import { PERIMETER, SALVAGE, UPGRADE_NEXT, runBill, runFinished, runHours, upgradeProblem, wallLength } from '../../sim/perimeter';
@@ -14,10 +15,13 @@ import { WallProperty } from './WallProperty';
 
 /** One checklist line: a tick or a cross, what it is, and why. */
 function CheckRow({ c }: { c: Check }) {
+  const money = useGameStore(s => s.money);
+  const dog = c.id.startsWith('dog:') ? c.id.slice(4) : null;
   return <div title={c.detail} style={{ display: 'flex', gap: 6, padding: '2px 0', alignItems: 'baseline' }}>
     <span style={{ color: TONE[c.tone], width: 14, textAlign: 'center' }}>{c.ok ? '✓' : '✕'}</span>
     <span style={{ flex: 1 }}>{c.label}</span>
     <span style={{ color: DIM, fontSize: 11.5, textAlign: 'right', maxWidth: '55%' }}>{c.detail}</span>
+    {dog && <button style={{ ...btn(), padding: '1px 6px', fontSize: 11 }} title="Put this dog on a post at the line, or keep it inside with the family" onClick={() => money(g => { const d = g.dogs.find(x => x.id === dog); return d ? setGuard(g, dog, !d.guard) : null; })}>{c.detail.startsWith('on the post') ? 'bring in' : 'post'}</button>}
   </div>;
 }
 

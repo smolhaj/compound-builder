@@ -7,6 +7,7 @@ import { useGameStore } from '../store/gameStore';
 import type { Quality } from '../engine/world/WorldScene';
 import { SEASON_MODES, type SeasonMode } from '../engine/world/season/seasonState';
 import { WEATHER_MODES, type WeatherMode } from '../engine/world/weather/weatherState';
+import { DogsPanel } from './DogsPanel';
 import { calendarOf, dayIndex, hourOf, type Speed } from '../sim/state';
 import { BACKGROUND_NAME, backgroundOf, fullName } from '../sim/family';
 import { MATERIALS, MATERIAL_IDS, qtyText, type MaterialId } from '../sim/materials';
@@ -171,6 +172,7 @@ export function Hud() {
                 })()}
               </div>;
             })}
+            <DogsPanel game={game} />
             <HousingPanel />
             <DailySection />
             {trialCamps(game).map(c => <Section key={c.id} title={`Camp outside the wall: ${c.title}`}>
