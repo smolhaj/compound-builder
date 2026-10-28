@@ -38,6 +38,7 @@ import { REGIONS, type RegionId, type StormKind } from './regions';
 import { blueprintOf, isFinished, knockBack } from './construction';
 import { insuranceClaim } from './paperwork';
 import { mulberry32, pick } from './rng';
+import { DIFFICULTY } from './difficulty';
 
 export type WeatherKind = StormKind;
 
@@ -88,7 +89,7 @@ const REGION_SEASON: Partial<Record<RegionId, Partial<Record<WeatherKind, [numbe
  * Difficulty (user): Cozy about half the severe storms and shorter outages,
  * Standard realistic, Hardcore a bit more.
  */
-export const STORM_SCALE = { cozy: 0.5, standard: 1, hardcore: 1.25 } as const;
+export const STORM_SCALE = { cozy: DIFFICULTY.cozy.storms, standard: DIFFICULTY.standard.storms, hardcore: DIFFICULTY.hardcore.storms } as const;
 const inSeason = (doy: number, [a, b]: [number, number]) => a <= b ? doy >= a && doy <= b : doy >= a || doy <= b;
 
 export const weatherOf = (s: GameState): WeatherState => (s.weather ??= { active: null, last: -999 });

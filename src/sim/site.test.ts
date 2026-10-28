@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { affordable, CLASSIC, drillExtra, HOME_RECT, listings, SAVINGS, siteProblem, type Acres, type LandWish } from './site';
+import { affordable, CLASSIC, drillExtra, HOME_RECT, listings, siteProblem, type Acres, type LandWish } from './site';
 import { REGION_IDS, SIZE_FACTOR } from './regions';
 import { newGame } from './state';
 import { acresOf, buyProblem, ownsAt } from './land';
@@ -42,7 +42,7 @@ describe('the land you buy', () => {
   it('the price comes out of savings; the old game (no listing) is the 40 with the creek', () => {
     const site = listings(3)[1];
     const g = newGame(3, 105, 2027, { site });
-    expect(g.money).toBe(SAVINGS - Math.round(site.price * 1.03));   // closing costs
+    expect(g.money).toBe(g.startFunds!.budget - Math.round(site.price * 1.03));   // closing costs
     expect(g.site).toEqual(site);
     expect(newGame(3).site).toEqual(CLASSIC);
   });
