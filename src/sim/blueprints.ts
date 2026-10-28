@@ -255,8 +255,26 @@ export const BUNKER_BLUEPRINTS: Blueprint[] = [
   },
 ];
 
+// ── Watch towers: the upgrade chain (sim/towers.ts). Each tier is built whole; an upgrade pays the new tier's bill and gets half the old one's back. ──
+const concreteTower = (kind: string, mast: boolean, ring: boolean, turret: boolean): Blueprint => bp(kind, [
+  ['site', 'Stake out beside the old one', 8, {}],
+  ['foundation', 'Dig and pour the footing', ring ? 70 : 60, { concrete: ring ? 10 : 8, rebar: ring ? 4 : 3 }],
+  ['frame', 'Form and pour the shaft', ring ? 240 : 200, { concrete: ring ? 18 : 14, rebar: ring ? 10 : 8, lumber: 4 }],
+  ['roof', ring ? 'Armored cab, firing slits and roof' : 'Steel cab, firing slits and roof', ring ? 120 : 90, { rebar: ring ? 6 : 4, roofing: 4, hardware: ring ? 4 : 3, ...(mast ? { floodlights: 2 } : {}) }],
+  ['finish', turret ? 'Gun ring, ammunition locker, remote turret, cameras and the data line' : ring ? 'Gun ring, ammunition locker, armor plate and the stair' : mast ? 'Light mast, wiring, switch and the stair' : 'Steel stair, hatch door and parapet', turret ? 140 : ring ? 110 : mast ? 90 : 70,
+    turret ? { gun_mount: 1, turret_head: 1, cameras: 1, hardware: 4, rebar: 3, cable: 6 } : ring ? { gun_mount: 1, hardware: 4, rebar: 3, cable: 3 } : mast ? { hardware: 4, rebar: 3, cable: 3 } : { hardware: 4, rebar: 3 }],
+]);
+export const TOWER_BLUEPRINTS: Blueprint[] = [
+  bp('rise_lookout', [['site', 'Stake out the rise', 4, {}], ['foundation', 'Pile, tamp and face the earth rise', 30, {}], ['frame', 'Timber nest platform and ladder', 14, { lumber: 2 }], ['roof', 'Sandbag parapet and a plank roof', 10, { sandbags: 1, roofing: 1 }], ['finish', 'Firing slots, a bench, a rope rail', 6, { hardware: 1 }]]),
+  bp('watchtower_wood', [['site', 'Stake out beside the old one', 6, {}], ['foundation', 'Footings', 40, { concrete: 3 }], ['frame', 'Timber legs, bracing and the deck', 150, { lumber: 10 }], ['roof', 'Cab walls and a metal roof', 60, { lumber: 3, roofing: 3 }], ['finish', 'Ladder, trapdoor, rail and firing slots', 40, { lumber: 2, hardware: 2 }]]),
+  concreteTower('watchtower_concrete', false, false, false),
+  concreteTower('watchtower_flood', true, false, false),
+  concreteTower('watchtower_mount', true, true, false),
+  concreteTower('watchtower_turret', true, true, true),
+];
+
 export const BLUEPRINTS: Record<string, Blueprint> = Object.fromEntries(
-  [CABIN_BLUEPRINT, OUTHOUSE_BLUEPRINT, WORKSHOP_BLUEPRINT, ROOT_CELLAR_BLUEPRINT, COOP_BLUEPRINT, GARDEN_BLUEPRINT, FIELD_BLUEPRINT, GREENHOUSE_BLUEPRINT, ORCHARD_BLUEPRINT, LOG_HOUSE_BLUEPRINT, FARMHOUSE_BLUEPRINT, TRAILER_BLUEPRINT, BARN_BLUEPRINT, COTTAGE_BLUEPRINT, METAL_GARAGE_BLUEPRINT, GARAGE_SOLAR_BLUEPRINT, ...UTILITY_BLUEPRINTS, ...BUNKER_BLUEPRINTS].map(b => [b.kind, b]));
+  [CABIN_BLUEPRINT, OUTHOUSE_BLUEPRINT, WORKSHOP_BLUEPRINT, ROOT_CELLAR_BLUEPRINT, COOP_BLUEPRINT, GARDEN_BLUEPRINT, FIELD_BLUEPRINT, GREENHOUSE_BLUEPRINT, ORCHARD_BLUEPRINT, LOG_HOUSE_BLUEPRINT, FARMHOUSE_BLUEPRINT, TRAILER_BLUEPRINT, BARN_BLUEPRINT, COTTAGE_BLUEPRINT, METAL_GARAGE_BLUEPRINT, GARAGE_SOLAR_BLUEPRINT, ...UTILITY_BLUEPRINTS, ...BUNKER_BLUEPRINTS, ...TOWER_BLUEPRINTS].map(b => [b.kind, b]));
 
 /** Total bill of materials for a blueprint. */
 export function totalBill(bp: Blueprint): Partial<Stock> {

@@ -13,6 +13,7 @@ import { PERIMETER, hasSkirt, runFinished, skirtProblem, wallLength, type Perime
 import { hatches, insideRing, linkedGroups, links, yardRings, type Hatch, type Link } from './compounds';
 import { digDefense, detectChances, combine, floodChance, noticeOverDig } from './tunnelers';
 import { dogCount } from './gear';
+import { HEAVY_CALIBERS, MOUNT_ROUNDS, TURRET_ROUNDS, TOWERS, floodReady, mountReady, towerPosts, towersBuilt, turretsReady } from './towers';
 import type { GameState } from './state';
 
 export type Tone = 'good' | 'warn' | 'bad';
@@ -112,9 +113,15 @@ export function defenseReport(s: GameState): DefenseReport {
   const skirtable = wallRuns.filter(r => !PERIMETER[r.kind].deepFooting).map(r => ({ id: r.id, label: `${PERIMETER[r.kind].name}, ${Math.round(wallLength(r) * 6)} m`, has: hasSkirt(r, s.clock.t), problem: hasSkirt(r, s.clock.t) ? 'already has one' : skirtProblem(s, r) }));
 
   // ── watching, fighting, sheltering ──
-  const tower = fin.some(st => st.kind.includes('tower'));
+  const posts = towerPosts(s), built = towersBuilt(s);
+  const tower = posts.length > 0;
+  const topTower = built.reduce<(typeof built)[number] | null>((a, x) => (!a || x.def.tier > a.def.tier ? x : a), null);
+  const rounds = Math.max(0, ...HEAVY_CALIBERS.map(c => s.armory.ammo[c] ?? 0));
   const watch: Check[] = [
-    chk('tower', 'Watch tower', tower, tower ? 'a view over the wall' : 'nobody sees them coming over a wall', true),
+    chk('tower', 'Watch tower', tower, topTower ? `${topTower.def.name.toLowerCase()}: a view over the wall` : tower ? 'a view over the wall' : 'nobody sees them coming over a wall', true),
+    ...(built.some(x => x.def.flood) ? [chk('towerlights', 'Tower floodlights', floodReady(s), floodReady(s) ? 'ready: lit by their mode at night' : !powered ? 'no power: the mast stays dark' : 'switched off (or lights out)', true)] : []),
+    ...(built.some(x => x.def.mount) ? [chk('mount', 'Gun on the tower ring', !!mountReady(s), mountReady(s) ? 'a person up there and belts in the armory' : rounds < MOUNT_ROUNDS ? `needs ${MOUNT_ROUNDS}+ rounds of 7.62 / 5.56 in the armory (${rounds})` : 'nobody to put on it', false)] : []),
+    ...(built.some(x => x.def.turret) ? [chk('turret', 'Automated turret', turretsReady(s).length > 0, turretsReady(s).length ? 'armed and live' : !powered ? 'no power: it does not fire' : `needs ${TURRET_ROUNDS}+ rounds in the armory (${rounds})`, false)] : []),
     chk('dog', 'Guard dog', n(s, 'dog') > 0, n(s, 'dog') > 0 ? `${Math.min(2, n(s, 'dog'))} on watch` : 'no bark to warn you', true),
     chk('cameras', 'Cameras / motion sensors', n(s, 'cameras') + n(s, 'thermal_cam') + n(s, 'driveway_alarm') > 0, powered ? 'working' : 'need power to run', true),
     chk('lights', 'Floodlights', n(s, 'floodlights') > 0 && !!powered, n(s, 'floodlights') > 0 ? (powered ? 'on at night' : 'no power') : 'dark at night', true),
@@ -152,7 +159,7 @@ export function defenseReport(s: GameState): DefenseReport {
   const byKind = new Map<string, number>();
   for (const r of s.perimeter) if (runFinished(r) && (PERIMETER[r.kind].blocks.people > 0 || PERIMETER[r.kind].twoWay)) byKind.set(r.kind, (byKind.get(r.kind) ?? 0) + 1);
   for (const [k, c] of byKind) improvements.push(`${PERIMETER[k as keyof typeof PERIMETER].name}${c > 1 ? ` ×${c}` : ''}`);
-  for (const st of fin) if (st.kind.includes('tower') || st.kind.startsWith('bunker_')) improvements.push(st.kind.replace(/_/g, ' '));
+  for (const st of fin) if (st.kind in TOWERS) improvements.push(TOWERS[st.kind as keyof typeof TOWERS].name); else if (st.kind.includes('tower') || st.kind.startsWith('bunker_')) improvements.push(st.kind.replace(/_/g, ' '));
   for (const [k, lbl] of [['dog', 'guard dog'], ['cameras', 'cameras'], ['floodlights', 'floodlights'], ['steel_door', 'steel door'], ['window_bars', 'window bars'], ['sandbags', 'sandbags'], ['safe_room', 'safe room'], ['tripwire', 'tripwires'], ['driveway_alarm', 'driveway alarm']] as const) if (n(s, k) > 0) improvements.push(lbl);
 
   // ── the score ──

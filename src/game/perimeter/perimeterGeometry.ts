@@ -46,13 +46,39 @@ export function solidSpans(run: Pick<PerimeterRun, 'pts' | 'gates'>, built: numb
   return out;
 }
 
+/** How far an upgrade run is drawn to the right of the run it replaces, so the old tier stays visible while the new one rises (world units). */
+export const UPGRADE_OFFSET = 0.12;
+
+/**
+ * The run's line moved `d` to its right (right of the direction of travel, x east / z south):
+ * each vertex shifts along the mean of its neighbouring segments' normals. Pure (tested).
+ */
+export function offsetPts(pts: readonly Pt[], d: number): Pt[] {
+  const seg = (i: number): [number, number] => {
+    const dx = pts[i + 1][0] - pts[i][0], dz = pts[i + 1][1] - pts[i][1], l = Math.hypot(dx, dz) || 1;
+    return [-dz / l, dx / l];
+  };
+  return pts.map((p, i): Pt => {
+    const a = i > 0 ? seg(i - 1) : null, b = i < pts.length - 1 ? seg(i) : null;
+    let nx = (a?.[0] ?? 0) + (b?.[0] ?? 0), nz = (a?.[1] ?? 0) + (b?.[1] ?? 0);
+    const l = Math.hypot(nx, nz) || 1;
+    nx /= l; nz /= l;
+    // at a corner the mean normal is shorter than 1: stretch it so the offset line stays d from both segments
+    const cos = a && b ? a[0] * b[0] + a[1] * b[1] : 1;
+    const k = d / Math.max(0.5, Math.sqrt((1 + cos) / 2));
+    return [p[0] + nx * k, p[1] + nz * k];
+  });
+}
+
 /** Geometry of one run (merged per material), in world coordinates. */
 /**
  * `under` says whether a point is under a building: pipe and cable trenches
  * stop at its wall and their marker posts stand outside it.
  */
-export function buildRun(run: PerimeterRun, ground: Ground, t: number, under: (x: number, z: number) => boolean = () => false, opts: { lit?: boolean; sensors?: boolean } = {}): THREE.Group {
+export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (x: number, z: number) => boolean = () => false, opts: { lit?: boolean; sensors?: boolean } = {}): THREE.Group {
   const lit = opts.lit ?? true;
+  // an upgrade of a finished run is drawn beside the old tier (not on top of it) until it is done and the old one comes down
+  const run = run0.replaces ? { ...run0, pts: offsetPts(run0.pts, UPGRADE_OFFSET) } : run0;
   const bits = new Map<KitMaterialId, THREE.BufferGeometry[]>();
   const add = (m: KitMaterialId, g: THREE.BufferGeometry) => { let l = bits.get(m); if (!l) bits.set(m, l = []); l.push(worldUV(g)); };
   const def = PERIMETER[run.kind];

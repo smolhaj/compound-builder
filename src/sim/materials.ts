@@ -12,7 +12,8 @@ export type MaterialId = 'lumber' | 'logs' | 'firewood' | 'fieldstone' | 'concre
   | 'fresh' | 'frozen' | 'canned' | 'staples' | 'meds' | 'seed' | 'lids' | 'plow' | 'stabilizer' | 'traps' | 'hygiene' | 'gun_safe' | 'gun_cleaning' | 'fishing_gear' | 'snares' | 'smoker' | 'goat' | 'pig' | 'steer' | 'rabbit' | 'hay' | 'feed' | 'water_jugs' | 'ibc_tote' | 'water_trailer' | 'water_filter' | 'ro_system' | 'softener' | 'greywater'
   | 'plate_carrier' | 'ifak' | 'nvg' | 'thermal' | 'radios' | 'cameras' | 'thermal_cam' | 'driveway_alarm' | 'floodlights' | 'tripwire' | 'dog' | 'steel_door' | 'window_bars' | 'sandbags' | 'safe_room' | 'sw_radio' | 'ham_rig' | 'helmet' | 'soft_armor'
   | 'grenades' | 'rpg_launcher' | 'rpg_rounds' | 'suppressor'
-  | 'mines' | 'greenhouse_kit' | 'fruit_trees' | 'ground_sensor' | 'passage_hatch';
+  | 'mines' | 'greenhouse_kit' | 'fruit_trees' | 'ground_sensor' | 'passage_hatch'
+  | 'gun_mount' | 'turret_head';
 
 export interface MaterialDef {
   id: MaterialId;
@@ -88,6 +89,9 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   window_bars: { id: 'window_bars', name: 'Window bars', unit: 'security bars for the house windows', price: 900 },
   sandbags: { id: 'sandbags', name: 'Sandbags', unit: '100 bags (fill them with your own dirt) for a fighting position', price: 300 },
   safe_room: { id: 'safe_room', name: 'Safe room', unit: 'a reinforced interior room: steel door, lined walls, supplies shelf', price: 8500 },
+  // for the watch towers' top tiers (sim/towers.ts)
+  gun_mount: { id: 'gun_mount', name: 'Ring mount & machine gun', unit: 'a pintle ring on a pedestal with a registered belt-fed 7.62 machine gun and a feed tray', price: 9500 },
+  turret_head: { id: 'turret_head', name: 'Remote turret head', unit: 'a gyro-stabilised remote weapon station: gun cradle, servos, optics and a controller (needs power and cameras)', price: 26000 },
   // Black market only (sim/blackMarket.ts): price null, so the catalog never sells them.
   grenades: { id: 'grenades', name: 'Hand grenades', unit: 'grenade', price: null },
   rpg_launcher: { id: 'rpg_launcher', name: 'RPG-type launcher', unit: 'launcher tube', price: null },

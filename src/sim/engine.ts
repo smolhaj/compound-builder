@@ -29,6 +29,7 @@ import { liveDay, workFactor } from './needs';
 import { gateDay, neighborGossip } from './encounters';
 import { digDay } from './tunnelers';
 import { mutualAidDay } from './barter';
+import { arrivalCheck, hasCutscene, scheduleArrival } from './siege';
 import { scavengeDay } from './scavenge';
 import { marketDay } from './market';
 import { neighborLifeDay } from './neighborLife';
@@ -65,6 +66,8 @@ export function nextBuildTarget(s: GameState): Structure | null {
 
 function subStep(s: GameState): void {
   deliverOrders(s);
+  // a raid rolled this morning reaches the gate at its hour of the night or day
+  { const arrived = arrivalCheck(s); if (arrived) log(s, `${arrived.title}.`); }
   const h = hourOf(s.clock.t);
   const target = nextBuildTarget(s);
   const run = target ? null : nextRun(s);
@@ -137,7 +140,8 @@ function subStep(s: GameState): void {
     for (const line of weatherDay(s)) log(s, line);
     for (const line of digDay(s)) log(s, line);
     const e = gateDay(s);
-    if (e) log(s, `${e.title}.`);
+    // a raid has an hour of arrival (a gang at 2:15 AM); it waits for it and the game runs on until then
+    if (e && !(hasCutscene(e) && scheduleArrival(s, e))) log(s, `${e.title}.`);
     rescueDay(s);   // the taken: their fate, leads, word from the crew, a rescue out (logs its own lines)
     if (before !== 'impact' && s.disaster.phase === 'impact' && s.disaster.kind === 'nuclear') for (const line of strike(s)) log(s, line);
     for (const line of falloutDay(s)) log(s, line);
@@ -177,6 +181,8 @@ export function step(state: GameState, days: number): GameState {
     s.clock.ticks++;
     s.clock.t = s.clock.ticks * SUBSTEP;
     subStep(s);
+    // a raid has reached the gate: stop on the very quarter-hour (the cutscene reads the hour off the clock)
+    if (hasCutscene(s.gate.pending) && !hasCutscene(state.gate.pending)) return s;
   }
   s.clock.t = end;
   return s;

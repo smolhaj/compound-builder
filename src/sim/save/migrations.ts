@@ -13,6 +13,7 @@ import { emptyStats } from '../report';
 import { newDigs } from '../tunnelers';
 import { newLand } from '../land';
 import { CLASSIC, CLASSIC_IMPROVEMENTS } from '../site';
+import { newLights } from '../lights';
 import { newPaper } from '../paperwork';
 import { newUpkeep } from '../upkeep';
 import { newShelf } from '../shelf';
@@ -54,8 +55,12 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   5: s => ({ ...s, version: 6, stock: { rebar: 0, membrane: 0, excavator: 0, blast_door: 0, nbc_filter: 0, spoil: 0, ...(s.stock as object) } }),
   // 6 → 7: the escape tunnel (culvert, egress hatch)
   6: s => ({ ...s, version: 7, stock: { culvert: 0, egress_hatch: 0, ...(s.stock as object) } }),
-  // 42 → 43: tunnelers (the dig in progress, the party sent out, tallies), ground sensors and passage hatches in the stock; runs may carry a buried skirt / unlocked / revealed (none yet)
-  42: s => ({ ...s, version: 43, digs: (s.digs as object | undefined) ?? newDigs(), stock: { ground_sensor: 0, passage_hatch: 0, ...(s.stock as object) } }),
+  // 44 → 45: tunnelers (the dig in progress, the party sent out, tallies), ground sensors and passage hatches in the stock; runs may carry a buried skirt / unlocked / revealed (none yet)
+  44: s => ({ ...s, version: 45, digs: (s.digs as object | undefined) ?? newDigs(), stock: { ground_sensor: 0, passage_hatch: 0, ...(s.stock as object) } }),
+  // 43 → 44: structures may carry `replaces` (a watch-tower upgrade in place, sim/towers.ts; none yet) and the top towers' mount and turret goods join the stockpile at zero
+  43: s => ({ ...s, version: 44, stock: { gun_mount: 0, turret_head: 0, ...(s.stock as object) }, lights: (s.lights as object | undefined) ?? newLights() }),
+  // 42 → 43: a raid rolled for the day waits for its hour of arrival (`gate.incoming`, sim/siege.ts); none yet
+  42: s => ({ ...s, version: 43, gate: { incoming: null, ...(s.gate as object) } }),
   // 41 → 42: perimeter runs may carry `replaces` (an upgrade of a finished run in place); none yet
   41: s => ({ ...s, version: 42 }),
   // 40 → 41: scavenging places and runs, the crossroads market and its trade-goods bag, the neighbors' lives (none yet: made on the first day after the hit)

@@ -15,6 +15,8 @@
  */
 import type { GameState } from './state';
 import { isFinished } from './construction';
+import { alwaysLit } from './lights';
+import { floodTowerIds } from './towers';
 
 export interface Opsec { quietDeliveries: boolean; blackout: boolean }
 
@@ -41,7 +43,9 @@ export function exposureParts(s: GameState): Record<ExposureSource, number> {
   const guns = Math.min(15, s.armory.onBooks * 2);
   const metals = Math.min(10, s.fin.onBooks / 5000);
   const gridDown = s.disaster.tracks.grid < 0.5;
-  const lights = gridDown && s.utilities.lit.length > 0 ? Math.min(20, 8 + s.utilities.lit.length * 2) * (o.blackout ? 0.5 : 1) : 0;
+  // lamps in the windows once the grid is down; floodlights left on all night are seen from the road (+3 each, up to 9; sim/lights.ts)
+  const floodSeen = Math.min(9, 3 * alwaysLit(s, floodTowerIds(s)));
+  const lights = (gridDown && s.utilities.lit.length > 0 ? Math.min(20, 8 + s.utilities.lit.length * 2) * (o.blackout ? 0.5 : 1) : 0) + floodSeen;
   const hungry = s.disaster.tracks.stores < 0.5;
   const smoke = hungry ? 6 + (s.stock.smoker ? 4 : 0) : 0;
   const adults = s.people.filter((p, i) => !p.kid && s.personState[i]?.needs.died == null);
