@@ -261,15 +261,21 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
       break;
     }
     case 'concrete_wall': {
-      // a 3.5 m poured wall: continuous panels with form-tie shadow lines every 3 m, a pilaster at each joint, a capped top and a sloped drip edge; the footing curb below is added for every wall tier
+      // a 3.5 m poured wall in LEVEL panels (3 m bays, each set at the high point of its bay) on a stepped poured plinth that fills down to the ground on slopes and dips;
+      // form-tie shadow lines, a pilaster at each joint, a capped top
       const H = 3.5 * M;
       bays(3 * M, (a, b) => {
-        beam(a.x, a.z, b.x, b.z, -0.05 * M, H + 0.05 * M, 0.3 * M, 'concrete');
-        beam(a.x, a.z, b.x, b.z, H - 0.02 * M, 0.12 * M, 0.42 * M, 'concrete');          // the cap
-        beam(a.x, a.z, b.x, b.z, H * 0.5, 0.03 * M, 0.32 * M, 'wet_concrete');           // a form-tie line
-        beam(a.x, a.z, b.x, b.z, H * 0.82, 0.03 * M, 0.32 * M, 'wet_concrete');
-        const off = 0.17 * M;                                                              // pilasters on both faces at each joint
-        for (const sd of [-1, 1]) post(a.x - a.dz * off * sd, a.z + a.dx * off * sd, H, 0.12 * M, 'concrete');
+        const len = Math.hypot(b.x - a.x, b.z - a.z), yaw = -Math.atan2(b.z - a.z, b.x - a.x), mx = (a.x + b.x) / 2, mz = (a.z + b.z) / 2;
+        const samples = [0, 0.25, 0.5, 0.75, 1].map(f => ground(a.x + (b.x - a.x) * f, a.z + (b.z - a.z) * f));
+        const hi = Math.max(...samples), lo = Math.min(...samples) - 0.06;
+        const box = (l: number, h: number, w: number, y0: number, m: KitMaterialId) => add(m, new THREE.BoxGeometry(l, h, w).translate(0, h / 2, 0).rotateY(yaw).translate(mx, y0, mz));
+        box(len + 0.004, hi - lo + 0.03, 0.34 * M, lo, 'concrete');                 // the plinth step, from the lowest ground to the panel's base
+        box(len, H, 0.3 * M, hi + 0.02, 'concrete');                                   // the level panel
+        box(len + 0.01, 0.12 * M, 0.42 * M, hi + 0.02 + H - 0.02 * M, 'concrete');    // the cap
+        box(len + 0.002, 0.03 * M, 0.32 * M, hi + 0.02 + H * 0.5, 'wet_concrete');    // form-tie lines
+        box(len + 0.002, 0.03 * M, 0.32 * M, hi + 0.02 + H * 0.82, 'wet_concrete');
+        const off = 0.17 * M;
+        for (const sd of [-1, 1]) add('concrete', new THREE.BoxGeometry(0.24 * M, H, 0.12 * M).translate(0, H / 2, 0).rotateY(-Math.atan2(a.dz, a.dx)).translate(a.x - a.dz * off * sd, hi + 0.02, a.z + a.dx * off * sd));   // pilasters at the joint
       });
       for (const e of spanEnds()) post(e.x, e.z, H + 0.1 * M, 0.2 * M, 'concrete');
       break;

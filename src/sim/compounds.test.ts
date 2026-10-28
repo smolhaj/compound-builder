@@ -124,6 +124,7 @@ describe('doorways and footings', () => {
     }
     expect(footingOf('container_wall')).toBe('plinth');
     expect(footingOf('steel_wall')).toBe('curb');
+    expect(footingOf('concrete_wall')).toBe('plinth');
   });
 });
 

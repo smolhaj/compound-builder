@@ -130,7 +130,7 @@ export function footingOf(kind: PerimeterKind): Footing | null {
   const d = PERIMETER[kind];
   if (d.walkway || d.twoWay || d.egressOnly || d.height <= 0 || d.blocks.people <= 0) return null;
   switch (kind) {
-    case 'container_wall': return 'plinth';
+    case 'container_wall': case 'concrete_wall': return 'plinth';
     case 'log_palisade': return 'trench';
     case 'thorn_hedge': case 'earth_berm': case 'creek_bars': return null;
     case 'split_rail': case 'barbed_wire': return 'mound';
