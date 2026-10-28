@@ -22,6 +22,7 @@ import { setPassageLocked } from '../sim/compounds';
 import { lightsOf, type LightMode } from '../sim/lights';
 import { stampHighGround, upgradeTower } from '../sim/towers';
 import { addSkirt, planRun, upgradeRun, type Gate, type PerimeterKind, type Pt } from '../sim/perimeter';
+import { layPropertyWall, planPropertyWall, type PropertyGeometry } from '../sim/propertyWall';
 import { fitProblem, orderFit, plant, repairPump, replaceFried } from '../sim/utilities';
 
 /** Reconnection fee to get back on the grid after leaving it. */
@@ -110,6 +111,8 @@ export interface GameStore {
   load: (g: GameState) => void;
   /** Lay out a fence / hedge / wall run for the family to build. */
   planRun: (kind: PerimeterKind, pts: Pt[], gates: Gate[], offLen?: number) => void;
+  /** "Wall my property": lay out the whole closed property line in one wall type (creek bars, a road gate, existing runs kept). Returns how many runs. */
+  wallProperty: (kind: PerimeterKind, geo: PropertyGeometry) => number;
   /** Upgrade a finished fence or wall to the next tier, in place (null = laid out; else why not). */
   upgradeRun: (id: string) => string | null;
   /** Bury a steel-and-concrete skirt under a finished wall (null = done, else why not). */
@@ -186,6 +189,11 @@ export interface GameStore {
   /** The shop & money window. */
   shopOpen: boolean;
   openShop: (open: boolean) => void;
+  /** The daily schedule window (sim/daily.ts). */
+  scheduleOpen: boolean;
+  openSchedule: (open: boolean) => void;
+  /** Run a daily-life change (roster, templates, gatherings) on a draft; returns why not, or null. */
+  daily: (op: (g: GameState) => string | null) => string | null;
   /** Run a money operation on a draft (transfer, buy / sell / move metal); returns why not, or null. */
   money: (op: (g: GameState) => string | null) => string | null;
   /** The setup screen offers "Back to my game" (opened from the New button, not at boot). */
@@ -269,6 +277,13 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     planRun(g, kind, pts, gates, offLen);
     set({ game: g });
     void saveGame(AUTOSAVE, g);
+  },
+  wallProperty: (kind, geo) => {
+    if (locked()) return 0;
+    const g = structuredClone(get().game);
+    const n = layPropertyWall(g, planPropertyWall(g, kind, geo));
+    if (n) { set({ game: g }); void saveGame(AUTOSAVE, g); }
+    return n;
   },
   upgradeRun: (id) => {
     if (locked()) return LOCKED_WHY;
@@ -531,6 +546,14 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
   setupOpen: false,
   shopOpen: false,
   openShop: (shopOpen) => { if (!locked() || !shopOpen) set({ shopOpen }); },
+  scheduleOpen: false,
+  openSchedule: (scheduleOpen) => set({ scheduleOpen }),
+  daily: (op) => {
+    const g = structuredClone(get().game);
+    const why = op(g);
+    if (!why) set({ game: g });
+    return why;
+  },
   money: (op) => {
     if (locked()) return LOCKED_WHY;
     const g = structuredClone(get().game);

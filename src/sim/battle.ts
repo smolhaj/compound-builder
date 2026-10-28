@@ -21,6 +21,7 @@
 import type { Battle, BattleEvent, BattleUnit } from './battleTypes';
 import { GUN, skillOf, type Caliber } from './armory';
 import { gearPosture } from './gear';
+import { watchDetection } from './daily';
 import { backgroundOf } from './family';
 import { isHome } from './blueprints';
 import { isFinished } from './construction';
@@ -29,6 +30,7 @@ import { ARMORY_LIGHTS, floodlightLit } from './lights';
 import { TURRET_JAM, highBonus, litTowerIds, isTower, mountReady, towerPosture, towerPosts, towerReach, turretsReady } from './towers';
 import { enclosure } from './enclosure';
 import { mulberry32 } from './rng';
+import { diffOf } from './difficulty';
 import { leaveAftermath } from './aftermath';
 import { hourOf, type GameState } from './state';
 
@@ -364,7 +366,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
   let ifaks = n('ifak');
 
   // ── detection, alarm, lights ──
-  const detection = Math.min(100, 25 + (s.gate.forewarned ? 20 : 0) + g.detection + tw.detection + Math.max(0, ...fightersP.map(({ p }) => p.skills.hunter)) * 4);
+  const detection = Math.min(100, 25 + (s.gate.forewarned ? 20 : 0) + g.detection + tw.detection + watchDetection(s) + Math.max(0, ...fightersP.map(({ p }) => p.skills.hunter)) * 4);
   // by day, people on watch see a group coming up the drive a couple of hundred meters out; at night it's what the gear hears and sees
   const darkBlind = night && !lightsOn && !n('nvg') && !n('thermal') && !n('thermal_cam');
   // (round 4: measured from the line, where the watch stands and the sensors are, not from the house)
@@ -402,6 +404,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
 
   const hurt = (f: Fighter, sev: number, t: number, by?: Fighter, part?: 'head' | 'torso' | 'arm' | 'leg') => {
     if (f.dead) return;
+    if (f.side === 'home') sev *= diffOf(s.disaster).wound;   // the difficulty: Hardcore's bullets hurt more, Cozy's less
     f.hp -= sev;
     const mate = () => H.find(h => h !== f && !h.out && !h.shelter);
     if (f.hp <= 0) {

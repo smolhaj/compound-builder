@@ -14,8 +14,10 @@
  * ever reaches the family through it. Pure and seeded.
  */
 import { mulberry32, pick } from './rng';
+import { diffOf } from './difficulty';
 import { forewarned } from './radio';
 import { gearPosture } from './gear';
+import { fenceHold, watchDetection } from './daily';
 import { armed, firepower } from './armory';
 import { towerPosture } from './towers';
 import { raiseAlert } from './lights';
@@ -127,17 +129,21 @@ export function postureOf(s: GameState): Posture {
   const visibility = Math.min(100, 12 + surface * 5 + (lit ? 18 : 0) + (s.utilities.report.genKwh > 0.1 ? 15 : 0) + (homes.length ? 8 : 0));
   // the line: barrier runs weighted by how much they stop people, against a ring of ≈ 240 m
   const line = enclosure(s);
-  let held = 0, look = 0;
+  let held = 0, look = 0, wall = 0;
   for (const r of s.perimeter) {
     const d = PERIMETER[r.kind];
     if (!runFinished(r) || d.blocks.people <= 0) continue;
     if (line.onLine.has(r.id)) { look += wallLength(r) * (d.height > 0.35 ? 1 : 0.3) * runGrowth(r, s.clock.t); continue; }   // the property line holds by whether it is closed (sim/enclosure.ts)
     const g = runGrowth(r, s.clock.t), len = wallLength(r);
     held += len * peopleBlock(s, r) * g;
+    wall += len * g;
     look += len * (d.height > 0.35 ? 1 : 0.3) * g;
   }
   // a ring round the compound, or a closed line round the whole property (gaps, open gates and an unbarred creek let them in)
-  const barrier = Math.max(Math.min(100, held / 40 * 100), line.barrier), fortress = Math.min(100, look / 40 * 100);
+  // (balance pass) the ring needs ≈ 40 units of wall to close, and how good it is decides the rest: a ring of woven wire holds 50, a steel one 93,
+  // so every tier up the chain raises the number (it used to be held / 40, which any 80 units of woven wire already maxed out)
+  const ringQuality = wall > 0 ? held / wall : 0;
+  const barrier = Math.max(Math.min(1, wall / 40) * ringQuality * 100, line.barrier) * fenceHold(s), fortress = Math.min(100, look / 40 * 100);
   // anyone away (a rescue, a run, the market) isn't on the line
   const here = (i: number) => s.personState[i]?.needs.died == null && !isAway(s, s.people[i].id);
   const adults = s.people.filter((p, i) => !p.kid && here(i));
@@ -146,7 +152,7 @@ export function postureOf(s: GameState): Posture {
   const radioNet = s.neighbors.some(n => n.radio && n.status === 'home' && n.disposition > 30);
   const gear = gearPosture(s, fighters);
   const tw = towerPosture(s);
-  const detection = Math.min(100, 25 + watch * 5 + (radioNet ? 20 : 0) + (barrier > 50 ? 10 : 0) + gear.detection + tw.detection + forewarned(s));
+  const detection = Math.min(100, 25 + watch * 5 + (radioNet ? 20 : 0) + (barrier > 50 ? 10 : 0) + gear.detection + tw.detection + forewarned(s) + watchDetection(s));
   return { visibility: Math.min(100, visibility + gear.visibility + tw.visibility), fortress, barrier: Math.min(100, barrier + gear.barrier), detection, fighters, deter: gear.deter, safeRoom: gear.safeRoom, armed: armed(s), firepower: firepower(s) * gear.fight * tw.fire, bunker: fin.some(st => st.kind === 'bunker_hatch' || st.kind === 'bunker_stairs') };
 }
 
@@ -296,13 +302,13 @@ function makeArrival(r: () => number, id: string, day: number, seed: number): En
 }
 
 /** How often someone comes (days between), from law and order outside and how much the place shows. */
-function cadence(s: GameState, p: Posture): number {
+export function cadence(s: GameState, p: Posture): number {
   const law = s.disaster.tracks.law;
   // playtest: every 3–6 days was relentless; real accounts are weeks between visits, more as order fails
   // after the first year the desperate have died, moved on or settled somewhere: the visits thin out (up to half as often by year three)
   const since = s.disaster.kind ? s.clock.t - s.disaster.hitAt : 0;
   const base = (45 - 30 * (1 - law)) * (1 + Math.max(0, Math.min(1, (since - 365) / 730)));
-  return Math.max(10, base * (1.3 - p.visibility / 200) / raidPressure(s));
+  return Math.max(10, base * (1.3 - p.visibility / 200) / raidPressure(s) * diffOf(s.disaster).cadence);
 }
 
 /**
@@ -421,8 +427,12 @@ export function gateDay(s: GameState): Encounter | null {
     e.dossier = [`${cb.size} of them: the same ones who went through the place. They know somebody lives here now, and they mean to find them.`, ...e.dossier.slice(1, 2)];
     g.comeBack = null;
   }
-  if (s.disaster.difficulty === 'hardcore' && e.strength) e.strength = Math.round(e.strength * 1.35);
-  if (s.disaster.difficulty === 'cozy' && e.strength) e.strength = Math.round(e.strength * 0.6);
+  // the difficulty's crew size (the battle counts heads: `strength` is only the dossier's figure for them)
+  if (e.strength) {
+    const k = diffOf(s.disaster).raid, was = e.size, size = Math.max(1, Math.round(was * k));
+    e.strength = Math.round(e.strength * size / Math.max(1, was));
+    if (size !== was) { e.size = size; e.dossier = e.dossier.map((l, i) => i === 0 ? l.replace(String(was), String(size)) : l); }
+  }
   // an alarm: the passage hatches bolt themselves
   if (!['arrival', 'trader', 'neighbor_help'].includes(e.kind)) boltPassages(s);
   g.pending = e;
@@ -451,6 +461,7 @@ function wound(s: GameState, r: () => number, sev: number, what: string): string
   if (!idx.length) return '';
   const i = idx[Math.floor(r() * idx.length)];
   const n = s.personState[i].needs;
+  sev = Math.round(sev * diffOf(s.disaster).wound);
   n.hurt.push({ what, sev });
   n.health = Math.max(s.disaster.difficulty === 'cozy' ? 5 : 0, n.health - sev * 0.5);
   if (n.health <= 0) { n.died = Math.floor(s.clock.t); return `${s.people[i].first} was killed.`; }
@@ -469,8 +480,9 @@ const raidersAfterHelp = (e: Encounter, help: number) => Math.max(1, e.size - Ma
 
 /** The chance a crew finds the place lived in if the family hides (it shows; a savage crew looks hard; a crew come back knows). */
 export function hideFoundChance(s: GameState, e: Encounter, p: Posture = postureOf(s)): number {
+  const hunt = diffOf(s.disaster).hunt;
   if (e.kind === 'horde') return Math.min(0.95, p.visibility * 0.6 / 100);
-  return Math.min(0.95, (p.visibility * 0.6 + (e.temper === 'savage' ? 25 : 0) + (e.back ? 20 : 0) + (e.dig ? 40 : 0)) / 100);
+  return Math.max(0, Math.min(0.95, (p.visibility * 0.6 + (e.temper === 'savage' ? 25 : 0) + (e.back ? 20 : 0) + (e.dig ? 40 : 0) + hunt) / 100));
 }
 
 /**

@@ -10,7 +10,7 @@
  * animals and vehicles, 0–1) and `sight` (how much view it cuts, 0–1) at
  * `height` — the threat and sightline systems read these.
  */
-import { hasAll, shortfall, MATERIALS, type MaterialId, type Stock } from './materials';
+import { hasAll, shortfall, waitingFor, type MaterialId, type Stock } from './materials';
 import { log } from './economy';
 import type { GameState } from './state';
 import { openDoorways } from './compounds';
@@ -204,7 +204,7 @@ export function skirtProblem(s: GameState, r: PerimeterRun): string | null {
   if (d.blocks.people <= 0 || d.height <= 0 || d.walkway) return 'a skirt goes under a fence or wall';
   if (d.deepFooting) return 'its footing already goes deep';
   if (r.skirtAt !== undefined) return 'already has one';
-  if (!hasAll(s.stock, skirtBill(wallLength(r)))) return 'Waiting for ' + (Object.entries(shortfall(s.stock, skirtBill(wallLength(r)))) as Array<[MaterialId, number]>).map(([k, n]) => `${n} ${MATERIALS[k].name.toLowerCase()}`).join(', ');
+  if (!hasAll(s.stock, skirtBill(wallLength(r)))) return waitingFor(shortfall(s.stock, skirtBill(wallLength(r))));
   return null;
 }
 /** Add a buried skirt to a finished run: the materials go now, the crew has it in the ground in a few days. */
@@ -233,13 +233,13 @@ export const SPOIL_SAVES = 0.6;
 /** Extra person-hours per unit length for the stretch of a tunnel under someone else's land (dug by hand, at night, no excavator). */
 export const OFF_PARCEL_HOURS = 40;
 
-/** Plan a run (mutates the draft). `offLen`: how much of it lies beyond the parcel (tunnels only). */
-export function planRun(s: GameState, kind: PerimeterKind, pts: Pt[], gates: Gate[] = [], offLen = 0): PerimeterRun {
+/** Plan a run (mutates the draft). `offLen`: how much of it lies beyond the parcel (tunnels only). `quiet`: no log line (a batch logs once). */
+export function planRun(s: GameState, kind: PerimeterKind, pts: Pt[], gates: Gate[] = [], offLen = 0, quiet = false): PerimeterRun {
   const len = wallLength({ pts, gates });
   const hours = runHours(kind, len) + (kind === 'escape_tunnel' ? OFF_PARCEL_HOURS * offLen : 0);
   const run: PerimeterRun = { id: `p${s.nextId++}`, kind, pts, gates, done: 0, hours, supplied: false, finishedAt: null };
   s.perimeter.push(run);
-  log(s, `Laid out ${Math.round(len * 6)} m of ${PERIMETER[kind].name.toLowerCase()}.`);
+  if (!quiet) log(s, `Laid out ${Math.round(len * 6)} m of ${PERIMETER[kind].name.toLowerCase()}.`);
   if (PERIMETER[kind].walkway) openDoorways(s, run);
   // a wall this tall needs a county permit: the fee now, a review before work starts
   if ((PERMIT_FEE[kind] ?? 0) > 0 && countyWorks(s) && s.paper.permits) {
@@ -282,7 +282,7 @@ export function runBlocked(s: GameState, r: PerimeterRun): string | null {
   const bill = runBill(r.kind, wallLength(r));
   if (hasAll(s.stock, bill)) return null;
   const miss = shortfall(s.stock, bill);
-  return 'Waiting for ' + (Object.entries(miss) as Array<[MaterialId, number]>).map(([k, n]) => `${n} ${MATERIALS[k].name.toLowerCase()}`).join(', ');
+  return waitingFor(miss);
 }
 
 /** Add person-hours to a run (takes its materials first). */

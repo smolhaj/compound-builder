@@ -14,7 +14,8 @@ import { emptyUtilities, type Utilities } from './utilities';
 
 import type { HardenId, HardenJob, Tier } from './hardening';
 import { newLand, type LandState } from './land';
-import { CLASSIC, LIFESTYLE, type Lifestyle, type Site } from './site';
+import { CLASSIC, type Lifestyle, type Site } from './site';
+import { startFunds, type StartFunds } from './startFunds';
 import { REGIONS } from './regions';
 import type { Crew } from './crews';
 import { improvementStructures, type Fix, type SiteJobs } from './improvements';
@@ -32,9 +33,10 @@ import { emptyStats, type Ending, type RunStats } from './report';
 import { generateNeighbors, newGate, type GateState, type Neighbor } from './encounters';
 import { freshNeeds, type FoodReport, type Needs } from './needs';
 import type { WeatherState } from './weatherThreats';
+import { DIFFICULTY } from './difficulty';
 import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
 import type { LightsState } from './lights';
-export const SAVE_VERSION = 45;
+export const SAVE_VERSION = 47;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -42,6 +44,8 @@ import { newScavenge, type ScavengeState } from './scavenge';
 import { newMarketState, type MarketState } from './tradeGoods';
 import { newLocals, type LocalsState } from './neighborLife';
 import { newDigs, type DigState } from './tunnelers';
+import { newDaily, type Daily } from './daily';
+import type { Loss } from './grief';
 
 /** Starting savings (GDS §1 peacetime money constraint). */
 export const STARTING_MONEY = 30000;
@@ -115,7 +119,9 @@ export interface Structure {
   high?: number;
 }
 
-export type TaskKind = 'idle' | 'build' | 'forestry' | 'sleep' | 'chores' | 'school' | 'leisure' | 'job' | 'gone' | 'shelter' | 'away';
+export type TaskKind = 'idle' | 'build' | 'forestry' | 'sleep' | 'chores' | 'school' | 'leisure' | 'job' | 'gone' | 'shelter' | 'away'
+  // daily life (sim/daily.ts): the duty on the roster, and a gathering
+  | 'garden' | 'fields' | 'livestock' | 'pets' | 'cleaning' | 'wood' | 'water' | 'kitchen' | 'laundry' | 'repairs' | 'hunt' | 'medic' | 'teach' | 'radio' | 'watch' | 'meal' | 'party';
 
 export interface PersonState {
   id: string;
@@ -128,6 +134,8 @@ export interface PersonState {
   laidOff?: boolean;
   /** Health, morale, hunger, dose, wounds. */
   needs: Needs;
+  /** 0–100: long days and night watch (sim/daily.ts). Save v43. */
+  fatigue?: number;
 }
 
 /** A tree marked for felling (GDS §2.1 "fell own timber"; docs/DECISIONS.md). */
@@ -188,6 +196,8 @@ export interface GameState {
   site: Site;
   /** How the family lives in peacetime (budget, jobs, passive income). */
   lifestyle: Lifestyle;
+  /** Where the starting money came from (null: old saves and the dev scene). */
+  startFunds: StartFunds | null;
   /** Hired crews at work on the place. */
   crews: Crew[];
   /** The co-op's line extension and the drive contractor, when due (null = not ordered). */
@@ -236,8 +246,12 @@ export interface GameState {
   market?: MarketState;
   /** The neighbors' lives: ages, history, news on its way, the co-op or militia, the pact (sim/neighborLife.ts). Save v42. */
   locals?: LocalsState;
-  /** Tunnelers: the dig in progress, the party sent to a breakout, tallies (sim/tunnelers.ts). Save v43; `??=` for safety. */
+  /** Tunnelers: the dig in progress, the party sent to a breakout, tallies (sim/tunnelers.ts). Save v47; `??=` for safety. */
   digs?: DigState;
+  /** Daily life (sim/daily.ts): the roster, chores, gatherings. Save v46; `dailyOf` makes it lazily. */
+  daily?: Daily;
+  /** Deaths in the household and whether they were mourned (sim/grief.ts). Save v46; `lossesOf` makes it lazily. */
+  losses?: Loss[];
   /** Radio and rumors after the collapse (radio.ts); made on first use. */
   radio?: RadioState;
   /** Tallies since the hit (the report card), and how the run ended (null while it goes on). */
@@ -254,19 +268,21 @@ export interface GameState {
 }
 
 /** New-game choices (the setup screen). Defaults (tests, the dev scene): Free build, no day jobs. */
-export interface RunSetup { site?: Site; lifestyle?: Lifestyle; difficulty?: Difficulty; mode?: Mode; peace?: PeaceLength; kind?: DisasterKind | null; variant?: string; dayJobs?: boolean; grid?: boolean; family?: Person[] }
+export interface RunSetup { site?: Site; lifestyle?: Lifestyle; difficulty?: Difficulty; mode?: Mode; peace?: PeaceLength; kind?: DisasterKind | null; variant?: string; dayJobs?: boolean; grid?: boolean; family?: Person[]; funds?: StartFunds }
 
 export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: RunSetup = {}): GameState {
   const people = setup.family ? structuredClone(setup.family) : generateFamily(seed);
   for (const p of people) p.conditions ??= conditionsFor(p, seed);
   foundLineage(people, seed);
   const site = setup.site ?? CLASSIC;
+  const funds: StartFunds | null = setup.site ? setup.funds ?? startFunds(people, setup.lifestyle ?? 'fulltime', seed) : null;
   const g: GameState = {
     version: SAVE_VERSION,
     seed,
     clock: { t: 0, ticks: 0, startDoy, startYear, speed: 1 },
-    money: setup.site ? LIFESTYLE[setup.lifestyle ?? 'fulltime'].budget - Math.round(setup.site.price * (1 + CLOSING_COSTS)) : STARTING_MONEY,
+    money: Math.round((funds ? funds.budget - Math.round(setup.site!.price * (1 + CLOSING_COSTS)) : STARTING_MONEY) * DIFFICULTY[setup.difficulty ?? 'standard'].money),
     lifestyle: setup.lifestyle ?? 'fulltime',
+    startFunds: funds,
     crews: [],
     siteJobs: { power: null, drive: null },
     roadside: [],
@@ -290,12 +306,13 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     market: newMarketState(),
     locals: newLocals(),
     digs: newDigs(),
+    daily: newDaily(),
     stats: emptyStats(),
     ending: null,
     food: { needKcal: 0, ateKcal: 0, producedKcal: 0, spoiledKcal: 0, fromStores: true, kinds: [], daysLeft: 0 },
     orders: [],
     people,
-    personState: people.map(p => ({ id: p.id, task: 'idle', target: null, needs: freshNeeds(), ...(setup.dayJobs && p.job ? { employed: true } : {}) })),
+    personState: people.map(p => ({ id: p.id, task: 'idle', target: null, needs: freshNeeds(), fatigue: 0, ...(setup.dayJobs && p.job ? { employed: true } : {}) })),
     structures: [],
     forestry: { jobs: [], cleared: [] },
     heat: { burned: 0, warned: -1 },

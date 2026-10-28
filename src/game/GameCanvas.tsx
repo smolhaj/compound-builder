@@ -35,6 +35,7 @@ import { setWindowGlow } from './buildkit/materials';
 import { homeOutsideForty } from '../sim/site';
 import { ownsAt } from '../sim/land';
 import type { SiteQuery } from './buildkit/kit';
+import { parseLowRender, RenderRequests, type QaQuality } from './qaRender';
 
 /** Background damp of the season (ground darkens a little in the shoulder seasons). */
 const SEASON_WETNESS: Record<VisualSeason, number> = { spring: 0.22, fall: 0.28, winter: 0.14, summer: 0 };
@@ -125,12 +126,16 @@ export function GameCanvas() {
     resize();
     window.addEventListener('resize', resize);
 
-    const applyLook = () => {
-      const s = useWorldStore.getState();
-      ws.setGraphicsQuality(s.quality);
-      weather.setQuality(s.quality);
-      world.setQuality(s.quality);
+    // QA-only on-demand rendering (?lowrender): Low quality, reduced pixel ratio, drawn only when asked
+    const lowRender = parseLowRender(window.location.search);
+    const renderReq = new RenderRequests();
+    const setLook = (q: QaQuality) => {
+      ws.qaPixelRatio = lowRender.on ? (q === 'low' ? lowRender.scale : 1) : null;
+      ws.setGraphicsQuality(q);
+      weather.setQuality(q);
+      world.setQuality(q);
     };
+    const applyLook = () => setLook(lowRender.on ? 'low' : useWorldStore.getState().quality);
     applyLook();
     // what came with the land: the world picks its spots once, then it's laid in like anything built
     const unplaced = useGameStore.getState().game.structures.filter(x => x.unplaced);
@@ -154,6 +159,7 @@ export function GameCanvas() {
     const rebuildBoundary = () => boundary.build([world.home, ...ownedRects(useGameStore.getState().game)]);
     const showBoundary = () => { boundary.visible = useWorldStore.getState().showBoundary || !!useGameStore.getState().tool?.startsWith('fence:'); };
     rebuildBoundary(); showBoundary();
+    useWorldStore.getState().setSiteGeo({ creekZ: x => world.parcel.creek.zAt(x), creekHalf: world.parcel.creek.halfWidth, roadGate: [world.access.gate.x, world.access.gate.z] });
     world.setBurnedFarms(burnedFarms(useGameStore.getState().game));
     const unsub = [
       // wildfire weather: measure the fuel round every building (what cleared ground there is decides what burns)
@@ -195,7 +201,9 @@ export function GameCanvas() {
     let cineSaved: { fov: number; near: number } | null = null;
     let promptAt = -1, skipScene = useCutsceneView.getState().skipScene, skipAll = useCutsceneView.getState().skipAll;
     let battleView: { x: number; z: number; radius: number; pitch: number } | null = null;
-    const qa: { frames: number; frameMs: number; pose: null | { x: number; y: number; z: number; lx: number; ly: number; lz: number; fov?: number } } = { frames: 0, frameMs: 0, pose: null };
+    const qa: { frames: number; frameMs: number; lowrender?: boolean; renderNow?: () => Promise<void>; renderFull?: (q?: QaQuality) => Promise<void>; pose: null | { x: number; y: number; z: number; lx: number; ly: number; lz: number; fov?: number } } = { frames: 0, frameMs: 0, pose: null };
+    // window.__cb.qa.renderNow(): draw one frame (a promise); renderFull('high'|'medium'): one slow full-quality, full-resolution shot
+    if (lowRender.on) Object.assign(qa, { lowrender: true, renderNow: () => renderReq.request(), renderFull: (q: QaQuality = 'high') => renderReq.request(q) });
     let slow = 0;
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
@@ -203,7 +211,7 @@ export function GameCanvas() {
       const dt = Math.min(0.1, (now - last) / 1000);
       // a slow machine on High (SSAO, 2× pixels) steps down to Medium by itself after ~5 s under 40 fps
       slow = dt > 0.025 ? slow + dt : Math.max(0, slow - dt * 2);
-      if (slow > 5 && useWorldStore.getState().quality === 'high') { useWorldStore.getState().setQuality('medium'); slow = 0; }
+      if (!lowRender.on && slow > 5 && useWorldStore.getState().quality === 'high') { useWorldStore.getState().setQuality('medium'); slow = 0; }
       last = now;
       // the sim advances in real time at its speed; the view clock follows it (outside photo mode)
       // the clock stands still while the new-game screen is up
@@ -349,7 +357,15 @@ export function GameCanvas() {
       }
       ws.tick(dt);
       ws.updateDayNight(t);
-      ws.renderFrame();
+      if (!lowRender.on) ws.renderFrame();
+      else if (renderReq.pending) {
+        // one on-demand draw; a full-quality shot lifts the look for this frame only
+        const q = renderReq.quality;
+        if (q) { setLook(q); ws.updateDayNight(t); }
+        ws.renderFrame();
+        if (q) { setLook('low'); }
+        renderReq.drawn();
+      }
       qa.frames++;
       qa.frameMs = performance.now() - t0;
     };
@@ -379,6 +395,7 @@ export function GameCanvas() {
       fence.dispose();
       sight.dispose();
       boundary.dispose();
+      useWorldStore.getState().setSiteGeo(null);
       canvas.removeEventListener('pointerdown', onVsDown);
       canvas.removeEventListener('pointerup', onVsUp);
       cam.dispose();
