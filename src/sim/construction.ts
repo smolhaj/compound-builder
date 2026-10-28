@@ -9,6 +9,7 @@ import { permitHold } from './paperwork';
 import { BLUEPRINTS, totalBill } from './blueprints';
 import { hasAll, shortfall, waitingFor, type Stock } from './materials';
 import { log } from './economy';
+import { payUpkeep, toolHold, wearTools, workSpeed } from './tools';
 import type { GameState, Structure } from './state';
 
 export function blueprintOf(st: Structure) {
@@ -60,7 +61,15 @@ export function blockedReason(s: GameState, st: Structure): string | null {
 /** `blockedReason(s, st) === null` without building the message (the engine asks this every quarter-hour). */
 export function canGoOn(s: GameState, st: Structure): boolean {
   if (isFinished(st) || permitHold(s, st)) return false;
-  return st.supplied || hasAll(s.stock, blueprintOf(st).stages[st.stage].materials);
+  if (!(st.supplied || hasAll(s.stock, blueprintOf(st).stages[st.stage].materials))) return false;
+  return toolHold(s, { kind: 'build', stage: blueprintOf(st).stages[st.stage].id }) === null;   // (a tool it can't do without: sim/tools.ts)
+}
+
+/** Why the family can't go on with this structure now: the materials, or a tool it can't do without ("Needs a saw"). Null = it can. */
+export function holdReason(s: GameState, st: Structure): string | null {
+  const why = blockedReason(s, st);
+  if (why || isFinished(st)) return why;
+  return toolHold(s, { kind: 'build', stage: blueprintOf(st).stages[st.stage].id });
 }
 
 /** Take the current stage's materials from the stockpile if they are there. */
@@ -76,17 +85,23 @@ function supply(s: GameState, st: Structure): boolean {
 /**
  * Add `hours` of work at `rate` (person-hours × rate). Carries over into the
  * next stage while materials allow. Returns the person-hours actually used.
+ * `own`: the family's own hands, so its tools speed the work up (or are required) and wear;
+ * hired crews, neighbors and the like bring their own.
  */
-export function addWork(s: GameState, st: Structure, personHours: number): number {
-  let left = personHours;
+export function addWork(s: GameState, st: Structure, personHours: number, own = false): number {
+  let left = own ? payUpkeep(s, personHours) : personHours;
   const bp = blueprintOf(st);
   while (left > 1e-9 && !isFinished(st)) {
     if (!supply(s, st)) break;
     const stage = bp.stages[st.stage];
     const need = stage.hours - st.done;
-    const use = Math.min(need, left);
-    st.done += use;
+    const task = { kind: 'build', stage: stage.id } as const;
+    const m = own ? workSpeed(s, task) : 1;
+    if (m <= 0) break;   // no tool for it (holdReason says which): the family makes do in a day or two
+    const use = Math.min(need / m, left);
+    st.done += use * m;
     left -= use;
+    if (own) wearTools(s, task, use);
     if (st.done >= stage.hours - 1e-9) {
       for (const [k, n] of Object.entries(stage.yields ?? {}) as Array<[keyof Stock, number]>) s.stock[k] += n;
       // a deep well: the driller bills the meters past the usual bore

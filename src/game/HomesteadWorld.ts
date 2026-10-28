@@ -73,6 +73,8 @@ import { MATERIAL_IDS, emptyStock } from '../sim/materials';
 import { pantryRows } from '../sim/pantry';
 import { needOf } from '../sim/needs';
 import { FoodShelfRenderer, type ShownPlace } from './props/FoodShelfRenderer';
+import { TentsRenderer, tentSpots } from './props/TentsRenderer';
+import { sleepSpotFor, tentsPitched } from '../sim/housing';
 import { planShelves, propsWanted, splitInUse } from './props/foodShelfPlan';
 import type { FoodSlot } from './buildkit/shell';
 
@@ -997,6 +999,18 @@ export class HomesteadWorld {
     }
   }
 
+  // ── Dome tents in the yard (sim/housing.ts) ───────────────────────────
+  readonly tents = new TentsRenderer();
+  private _tentPos: Array<{ x: number; z: number; rot: number }> = [];
+  /** Pitch a dome tent round the camp for each one somebody sleeps in tonight. */
+  syncTents(game: GameState): void {
+    const n = tentsPitched(game);
+    if (n === 0 && this.tents.group.children.length === 0) { this._tentPos = []; return; }
+    if (!this.tents.group.parent) this._ws.scene.add(this.tents.group);
+    this._tentPos = tentSpots(this.camp, n, (x, z) => this.onBuilding(x, z, 0.4, false) || this.onAccess(x, z, 0.3) || this.onPerimeterLine(x, z, 0.2));
+    this.tents.sync(this._tentPos, this.groundAt);
+  }
+
   // ── Food on the shelves ───────────────────────────────────────────────
   readonly food = new FoodShelfRenderer();
   private _foodKey = '';
@@ -1345,7 +1359,7 @@ export class HomesteadWorld {
       return j && t ? { x: t.x, z: t.z, scale: t.scale, stage: j.stage, fall: fallHeading(t.id), len: 2.6 * t.scale * t.sy } : null;
     };
     const refs = [...this._built.values()].filter(b => b.finished).map(b => ({ kind: b.placed.kind, site: site(b.placed.id)! }));
-    const ctx: GoalCtx = { camp: this.camp, site, home: homeB ? site(homeB.placed.id) : null, tree, yard: this.access.yard, ...dailyCtx(refs, game, this.access.yard, seasonState.params.cold < 0.35) };
+    const ctx: GoalCtx = { camp: this.camp, site, home: homeB ? site(homeB.placed.id) : null, tree, yard: this.access.yard, sleepAt: i => sleepSpotFor(game, i), tentAt: n => this._tentPos[n], ...dailyCtx(refs, game, this.access.yard, seasonState.params.cold < 0.35) };
     const fx = yardFx(game, hour);
     this._yard.update(this._clock, fx.lights, fx.smoke);
     const season = (seasonState.visual === 'winter' && !seasonState.climate.freeze ? 'fall' : seasonState.visual) as WearSeason;

@@ -4,7 +4,7 @@
  * rule 5). Pure — tested in migrations.test.ts.
  */
 import { foundLineage, newLineage } from '../lineage';
-import { SAVE_VERSION, type GameState } from '../state';
+import { SAVE_VERSION, startingBedding, type GameState } from '../state';
 import { emptyUtilities } from '../utilities';
 import { newDisaster } from '../disaster';
 import { freshNeeds } from '../needs';
@@ -29,11 +29,14 @@ import { newWild } from '../wildfood';
 import { newWildlife } from '../wildlife';
 import { newDaily } from '../daily';
 import { dayJob, type Person } from '../family';
+import { starterKit } from '../tools';
 
 type Raw = Record<string, unknown> & { version?: number };
 
 /** version n → n + 1 upgraders. */
 const STEPS: Record<number, (s: Raw) => Raw> = {
+  // 46 → 47: the family's tools (sim/tools.ts): a starter kit from the trades, as if they had brought it
+  46: s => ({ ...s, version: 47, tools: (s.tools as object | undefined) ?? starterKit(s.people as Person[], s.seed as number) }),
   // 38 → 39: the pantry, item by item (the aggregate staples / canned / frozen split into a default breakdown at their shelf ages)
   38: s => {
     const st = s.stock as Record<string, number>, sh = s.shelf as { age?: Record<string, number> } | undefined;
@@ -60,8 +63,10 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   45: s => ({ ...s, version: 46, losses: (s.losses as unknown[] | undefined) ?? [], daily: (s.daily as object | undefined) ?? newDaily(), personState: (s.personState as Array<Record<string, unknown>>).map(ps => ({ fatigue: 0, ...ps })) }),
   // 44 → 45: where the starting money came from (old saves: not recorded; they keep their jobs and the old flat passive income)
   44: s => ({ ...s, version: 45, startFunds: null }),
+  // 47 → 48: bedding for the housing model (sim/housing.ts): a bag each and a dome tent for anyone past the wall tent's four
+  47: s => ({ ...s, version: 48, stock: { ...startingBedding((s.people as unknown[]).length), ...(s.stock as object) } }),
   // 43 → 44: structures may carry `replaces` (a watch-tower upgrade in place, sim/towers.ts; none yet) and the top towers' mount and turret goods join the stockpile at zero
-  46: s => ({ ...s, version: 47, wildlife: (s.wildlife as object | undefined) ?? newWildlife(), stock: { ai_sensor_module: 0, ...(s.stock as object) }, lights: s.lights ? { ai: {}, animalUntil: -1, animalNights: [], ...(s.lights as object) } : s.lights }),
+  48: s => ({ ...s, version: 49, wildlife: (s.wildlife as object | undefined) ?? newWildlife(), stock: { ai_sensor_module: 0, ...(s.stock as object) }, lights: s.lights ? { ai: {}, animalUntil: -1, animalNights: [], ...(s.lights as object) } : s.lights }),
   43: s => ({ ...s, version: 44, stock: { gun_mount: 0, turret_head: 0, ...(s.stock as object) }, lights: (s.lights as object | undefined) ?? newLights() }),
   // 42 → 43: a raid rolled for the day waits for its hour of arrival (`gate.incoming`, sim/siege.ts); none yet
   42: s => ({ ...s, version: 43, gate: { incoming: null, ...(s.gate as object) } }),
