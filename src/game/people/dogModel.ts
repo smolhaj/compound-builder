@@ -65,10 +65,10 @@ export function lookOf(breed: Breed, tone: number): Look {
 }
 
 // ── pose key frames (side view [y, z]) ──
-interface Key { S: V2; R: V2; head: V2; hp: number; ff: V2; hf: V2; fx: number; hx: number }
-const STAND: Key = { S: [0.104, 0.05], R: [0.104, -0.07], head: [0.14, 0.118], hp: 0.1, ff: [0.0055, 0.038], hf: [0.0055, -0.072], fx: 0.02, hx: 0.022 };
-const SIT: Key = { S: [0.118, 0.022], R: [0.036, -0.08], head: [0.178, 0.056], hp: 0.04, ff: [0.0055, 0.038], hf: [0.0055, -0.01], fx: 0.02, hx: 0.036 };
-const LIE: Key = { S: [0.07, 0.06], R: [0.04, -0.066], head: [0.106, 0.13], hp: 0.2, ff: [0.0055, 0.15], hf: [0.0055, -0.03], fx: 0.022, hx: 0.046 };
+interface Key { S: V2; R: V2; head: V2; hp: number; ff: V2; hf: V2; fx: number; hx: number; ho: V2 }
+const STAND: Key = { S: [0.104, 0.05], R: [0.104, -0.07], head: [0.14, 0.118], hp: 0.1, ff: [0.0055, 0.034], hf: [0.0055, -0.078], fx: 0.02, hx: 0.023, ho: [0.024, -0.008] };
+const SIT: Key = { S: [0.108, 0.03], R: [0.04, -0.082], head: [0.164, 0.074], hp: 0.05, ff: [0.0055, 0.024], hf: [0.0055, -0.03], fx: 0.02, hx: 0.036, ho: [0.006, -0.034] };
+const LIE: Key = { S: [0.07, 0.06], R: [0.04, -0.066], head: [0.1, 0.122], hp: 0.24, ff: [0.0055, 0.15], hf: [0.0055, -0.05], fx: 0.022, hx: 0.03, ho: [0.006, -0.026] };
 
 export interface PoseState {
   /** 0..1 weights (lie wins over sit). */
@@ -99,7 +99,7 @@ function ik(p0: V2, t: V2, l1: number, l2: number, fwd: boolean): V2 {
   return fwd ? (c1[1] > c2[1] ? c1 : c2) : (c1[1] < c2[1] ? c1 : c2);
 }
 
-const L = { arm: 0.04, fore: 0.044, thigh: 0.042, shin: 0.043, meta: 0.036 };
+const L = { arm: 0.04, fore: 0.044, thigh: 0.04, shin: 0.042, meta: 0.036 };
 
 /** The dog, posed. */
 export function dogShape(look: Look, s: PoseState): DogShape {
@@ -177,15 +177,15 @@ export function dogShape(look: Look, s: PoseState): DogShape {
     pos = nxt; elev += ta.curl; yaw *= 0.7;
   }
   // legs: shoulder / hip, elbow / knee, wrist / hock, paw
-  const fx = k(x => x.fx), hx = k(x => x.hx);
+  const fx = k(x => x.fx), hx = k(x => x.hx), ho = k2(x => x.ho);
   const ff = k2(x => x.ff), hf = k2(x => x.hf);
   const LEGS: Array<{ side: number; front: boolean; par: number }> = [
     { side: -1, front: true, par: 0 }, { side: 1, front: true, par: 1 }, { side: -1, front: false, par: 1 }, { side: 1, front: false, par: 0 },
   ];
-  const A = 0.034;
+  const A = 0.046;
   for (const lg of LEGS) {
     const ph = s.phase + lg.par * Math.PI;
-    const stride = s.moving ? A * Math.cos(ph) : 0, lift = s.moving ? Math.max(0, Math.sin(ph)) * 0.02 : 0;
+    const stride = s.moving ? A * Math.cos(ph) : 0, lift = s.moving ? Math.max(0, Math.sin(ph)) * 0.028 : 0;
     const x = lg.side * (lg.front ? fx : hx);
     const foot: V2 = lg.front ? [ff[0] + lift, ff[1] + stride] : [hf[0] + lift, hf[1] + stride];
     // lying hind legs fold to the side: pull them out in x
@@ -201,12 +201,12 @@ export function dogShape(look: Look, s: PoseState): DogShape {
       blob([x, foot[0] + 0.0005, foot[1] + 0.007], [0.0105, 0.0068, 0.0145], col);                                  // paw
     } else {
       const hp0 = P(0.004, -0.006), root2: V2 = [hp0[0], hp0[1]];
-      const hock: V2 = [foot[0] + 0.033, foot[1] - 0.006];
+      const hock: V2 = [foot[0] + ho[0], foot[1] + ho[1]];
       const kn = ik(root2, hock, L.thigh, L.shin, true);
-      blob([lg.side * 0.0225 * W, root2[0], root2[1] + 0.002], [0.022, 0.032, 0.036], look.main, torsoRot);         // thigh
-      bone([lg.side * 0.0225 * W, root2[0], root2[1]], [x, kn[0], kn[1]], 0.0195, look.main);
+      blob([lg.side * 0.0225 * W, root2[0], root2[1] + 0.002], [0.026, 0.037, 0.041], look.main, torsoRot);         // thigh
+      bone([lg.side * 0.0225 * W, root2[0], root2[1]], [x, kn[0], kn[1]], 0.0225, look.main);
       blob([x, kn[0], kn[1]], [0.0145, 0.0145, 0.0145], look.main);
-      bone([x, kn[0], kn[1]], [x, hock[0], hock[1]], 0.0125, look.main);
+      bone([x, kn[0], kn[1]], [x, hock[0], hock[1]], 0.0138, look.main);
       blob([x, hock[0], hock[1]], [0.0105, 0.0115, 0.0105], look.main);
       bone([x, hock[0], hock[1]], [x, foot[0] + 0.004, foot[1] + 0.001], 0.0088, col);
       blob([x, foot[0] + 0.0005, foot[1] + 0.007], [0.0105, 0.0068, 0.0145], col);                                  // paw
