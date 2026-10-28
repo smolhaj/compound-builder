@@ -23,7 +23,7 @@
  */
 import { log, prices } from './economy';
 import { mulberry32, pick } from './rng';
-import type { Person, SkillId } from './family';
+import { jobTools, type Person, type SkillId } from './family';
 import type { StageId } from './blueprints';
 import type { GameState } from './state';
 
@@ -325,9 +325,35 @@ export function starterKit(people: readonly Person[], seed: number): ToolKit {
   if (top('mechanic') >= 5 || job(/mechanic/i)) { give('file', undefined, 0.5); give('bolt_cutters', undefined, 0.5); if (!kit.items.some(t => t.kind === 'cordless_drill')) give('cordless_drill'); give('wrench_set', undefined, 0.5); }
   if (top('gardener') >= 5 || job(/nursery/i)) { give('garden_fork', undefined, 0.4); give('hoe', undefined, 0.4); }
   if (top('hunter') >= 5 || job(/warden/i)) give('axe', undefined, 0.4);
+  // the trades' own gear (a welder's file and bolt cutters, an electrician's drill), pro grade about half the time
+  { const have = new Set(kit.items.map(t => t.kind));
+    for (const p of adults) for (const k of JOB_KITS[(p.job as { id?: string } | undefined)?.id ?? ''] ?? []) {
+      const base = jobTools((p.job as { id?: string } | undefined)?.id).length > 0;
+      if (base && !have.has(k)) { give(k, undefined, 0.5); have.add(k); }
+    } }
   if (people.some(p => p.elder)) { give('pick_mattock', 0.5, 0.3); give('hand_saw', 0.5, 0.3); give('file', 0.5, 0.3); }
   return kit;
 }
+
+/**
+ * What each trade brings (family.ts `jobTools` names the trade's own gear; these are the items of the toolbox
+ * it maps to). Only the tools that do work: a stethoscope or a laptop is not in the toolbox.
+ */
+export const JOB_KITS: Record<string, ToolKind[]> = {
+  carpenter: ['circular_saw', 'cordless_drill', 'nail_gun', 'hammer'],
+  electrician: ['cordless_drill', 'pliers', 'screwdriver_set'],
+  plumber: ['wrench_set', 'pliers'],
+  farmer: ['hoe', 'garden_fork', 'chainsaw', 'bolt_cutters'],
+  diesel: ['wrench_set', 'file', 'bolt_cutters', 'cordless_drill'],
+  welder: ['file', 'bolt_cutters', 'wrench_set'],
+  forester: ['chainsaw', 'axe', 'pick_mattock'],
+  hvac: ['cordless_drill', 'pliers', 'wrench_set'],
+  nursery: ['garden_fork', 'hoe'],
+  warden: ['axe'],
+  soldier: ['shovel'],
+  trucker: ['wrench_set'],
+  butcher: ['file'],
+};
 
 /** A word for a condition. */
 export function condWord(t: Tool): string {

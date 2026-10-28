@@ -286,6 +286,16 @@ describe('the starter kit', () => {
     expect(roles(gran).has('pick_mattock')).toBe(true);
     expect(gran.items.find(t => t.kind === 'pick_mattock')!.cond).toBeLessThan(0.82);
   });
+  it('a trade brings its own gear: a welder bolt cutters and a file, a forester a chainsaw', () => {
+    const w = starterKit([person('a', {}, { job: { title: 'Welder', wage: 200, id: 'welder' } as Person['job'] })], 1);
+    expect(roles(w).has('bolt_cutters')).toBe(true);
+    expect(roles(w).has('file')).toBe(true);
+    const f = starterKit([person('a', {}, { job: { title: 'Forester', wage: 200, id: 'forester' } as Person['job'] })], 1);
+    expect(roles(f).has('chainsaw')).toBe(true);
+    const e = starterKit([person('a', {}, { job: { title: 'Electrician', wage: 200, id: 'electrician' } as Person['job'] })], 1);
+    expect(roles(e).has('cordless_drill')).toBe(true);
+    expect(roles(starterKit([person('a', {}, { job: { title: 'Accountant', wage: 200, id: 'accountant' } as Person['job'] })], 1)).has('cordless_drill')).toBe(false);
+  });
   it('is seeded: the same family and seed give the same kit', () => {
     const f = generateFamily(9);
     expect(starterKit(f, 9)).toEqual(starterKit(f, 9));
@@ -456,18 +466,18 @@ describe('after the collapse', () => {
 });
 
 describe('save', () => {
-  it('a v44 save gets a starter kit from its family and trades', () => {
+  it('a v45 save gets a starter kit from its family and trades', () => {
     const g = newGame(7) as unknown as Record<string, unknown>;
-    const old: Record<string, unknown> = { ...g, version: 44 }; delete old.tools;
+    const old: Record<string, unknown> = { ...g, version: 45 }; delete old.tools;
     const up = migrate(old);
-    expect(up.version).toBe(45);
+    expect(up.version).toBe(46);
     expect(up.tools!.items.length).toBeGreaterThanOrEqual(9);
     expect(up.tools).toEqual(starterKit(up.people, up.seed));
   });
   it('a save that already has a kit keeps it', () => {
     const g = newGame(7);
     g.tools!.items[0].cond = 0.123;
-    const up = migrate({ ...(structuredClone(g) as unknown as Record<string, unknown>), version: 44 });
+    const up = migrate({ ...(structuredClone(g) as unknown as Record<string, unknown>), version: 45 });
     expect(up.tools!.items[0].cond).toBe(0.123);
   });
 });

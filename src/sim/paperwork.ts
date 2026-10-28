@@ -25,6 +25,7 @@ import { MATERIALS, type MaterialId } from './materials';
 import { calendarOf, dayIndex, type GameState, type Structure } from './state';
 import type { RegionId } from './regions';
 import { mulberry32 } from './rng';
+import { diffOf } from './difficulty';
 
 export const CLOSING_COSTS = 0.03;
 
@@ -45,7 +46,7 @@ export const PERMIT_FEE: Record<string, number> = {
 };
 export const needsPermit = (kind: string) => (PERMIT_FEE[kind] ?? 0) > 0;
 export const permitFee = (s: GameState, kind: string) => Math.round((PERMIT_FEE[kind] ?? 0) * (0.6 + 0.4 * COUNTY[s.site.region].strict) / 10) * 10;
-export const reviewDays = (s: GameState, kind: string) => Math.round((isHome(kind) || kind === 'log_house' ? 21 : 7) * COUNTY[s.site.region].strict);
+export const reviewDays = (s: GameState, kind: string) => Math.max(1, Math.round((isHome(kind) || kind === 'log_house' ? 21 : 7) * COUNTY[s.site.region].strict * diffOf(s.disaster).permits));
 
 export interface Paper {
   /** Pull permits for new builds (fees and the wait), or build without and take the chance. */
