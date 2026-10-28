@@ -76,6 +76,8 @@ export interface JobDef {
   w: number;
   /** Needs a degree (student loans). */
   degree?: boolean;
+  /** A shorter name for narrow dropdowns. */
+  short?: string;
   /** The setup screen's one-line note: what it is good for. */
   good: string;
   /** Tools the trade owns (names; the tools branch maps them to items via jobTools). */
@@ -87,15 +89,15 @@ export const JOB_POOL: readonly JobDef[] = [
   { id: 'plumber', title: 'Plumber', wage: 250, lead: ['builder', 'mechanic'], w: 4, good: 'Wells, pipe runs, water treatment and septic.', tools: ['pipe_wrench', 'pipe_cutter', 'torch_kit', 'drain_snake'] },
   { id: 'farmer', title: 'Farmer / rancher', wage: 150, lead: ['gardener', 'mechanic', 'hunter'], w: 6, good: 'Fields, livestock and old machinery; thin pay, strong food skills.', tools: ['garden_tools', 'chainsaw', 'fencing_pliers', 'livestock_kit'] },
   { id: 'emt', title: 'EMT / paramedic', wage: 200, lead: ['medic', 'negotiator'], w: 4, good: 'Trauma care and a steady head when people are hurt.', tools: ['trauma_kit', 'stethoscope', 'splint_set'] },
-  { id: 'nurse', title: 'Nurse at the county hospital', wage: 280, lead: ['medic', 'teacher'], w: 5, degree: true, good: 'Sickness, medicines and long-term care; good pay.', tools: ['stethoscope', 'bp_cuff', 'suture_kit'] },
-  { id: 'police', title: 'Police officer', wage: 250, lead: ['hunter', 'negotiator'], w: 3, good: 'Guns, the gate and de-escalation; knows the county.', tools: ['duty_pistol', 'handcuffs', 'flashlight', 'body_armor'] },
-  { id: 'vet', title: 'Large-animal veterinarian', wage: 330, lead: ['medic', 'gardener'], w: 2, degree: true, good: 'Medicine for people and livestock; stock-keeping.', tools: ['vet_bag', 'suture_kit', 'stethoscope'] },
+  { id: 'nurse', title: 'Nurse at the county hospital', short: 'Nurse', wage: 280, lead: ['medic', 'teacher'], w: 5, degree: true, good: 'Sickness, medicines and long-term care; good pay.', tools: ['stethoscope', 'bp_cuff', 'suture_kit'] },
+  { id: 'police', title: 'Police officer', wage: 250, lead: ['negotiator', 'hunter', 'medic'], w: 3, good: 'De-escalation, the gate and a steady hand with a gun; knows the county.', tools: ['duty_pistol', 'handcuffs', 'flashlight', 'body_armor'] },
+  { id: 'vet', title: 'Large-animal veterinarian', short: 'Large-animal vet', wage: 330, lead: ['medic', 'gardener'], w: 2, degree: true, good: 'Medicine for people and livestock; stock-keeping.', tools: ['vet_bag', 'suture_kit', 'stethoscope'] },
   { id: 'diesel', title: 'Diesel mechanic', wage: 230, lead: ['mechanic', 'builder'], w: 5, good: 'Keeps trucks, tractors and generators running.', tools: ['socket_set', 'impact_wrench', 'jack_stands', 'welder_stick'] },
   { id: 'welder', title: 'Welder / fabricator', wage: 235, lead: ['mechanic', 'builder'], w: 4, good: 'Steel gates, frames and repairs; hardens the perimeter.', tools: ['welder_mig', 'angle_grinder', 'cutting_torch', 'welding_helmet'] },
   { id: 'teacher', title: 'Schoolteacher', wage: 190, lead: ['teacher', 'negotiator'], w: 5, degree: true, good: 'Teaches the kids and the neighbors; steady with people.', tools: ['books', 'whiteboard'] },
-  { id: 'soldier', title: 'National Guard soldier', wage: 200, lead: ['hunter', 'medic', 'radio'], w: 3, good: 'Weapons, first aid and radio; a veteran of drills and the field.', tools: ['rifle_trained', 'field_radio', 'ifak', 'entrenching_tool'] },
-  { id: 'software', title: 'Remote software developer', wage: 400, lead: ['radio', 'teacher'], w: 3, degree: true, good: 'Best pay and works from home; electronics and radio, weak with tools.', tools: ['laptop', 'soldering_iron', 'multimeter'] },
-  { id: 'trucker', title: 'Long-haul truck driver', wage: 220, lead: ['mechanic', 'radio'], w: 4, good: 'Roads, routes, CB radio and enough mechanics to keep a rig going.', tools: ['cb_radio', 'tire_iron', 'tow_chain', 'jumper_cables'] },
+  { id: 'soldier', title: 'National Guard soldier', short: 'Guard soldier', wage: 200, lead: ['hunter', 'negotiator', 'medic'], w: 3, good: 'Weapons, discipline and first aid; a veteran of drills and the field.', tools: ['rifle_trained', 'field_radio', 'ifak', 'entrenching_tool'] },
+  { id: 'software', title: 'Remote software developer', short: 'Remote developer', wage: 400, lead: ['radio', 'teacher'], w: 3, degree: true, good: 'Best pay and works from home; electronics and radio, weak with tools.', tools: ['laptop', 'soldering_iron', 'multimeter'] },
+  { id: 'trucker', title: 'Long-haul truck driver', short: 'Truck driver', wage: 220, lead: ['mechanic', 'radio'], w: 4, good: 'Roads, routes, CB radio and enough mechanics to keep a rig going.', tools: ['cb_radio', 'tire_iron', 'tow_chain', 'jumper_cables'] },
   { id: 'hvac', title: 'HVAC technician', wage: 235, lead: ['mechanic', 'builder'], w: 3, good: 'Stoves, heat, ventilation and filtered air.', tools: ['manifold_gauges', 'tin_snips', 'cordless_drill'] },
   { id: 'butcher', title: 'Butcher / meat cutter', wage: 175, lead: ['hunter', 'gardener'], w: 2, good: 'Dresses game and livestock; smoking and curing.', tools: ['boning_knives', 'meat_saw', 'grinder', 'smoker_rig'] },
   { id: 'forester', title: 'Forester / logger', wage: 215, lead: ['builder', 'hunter'], w: 3, good: 'Fells, bucks and skids timber; reads woods and game.', tools: ['chainsaw', 'axe', 'peavey', 'wedges'] },
@@ -106,7 +108,7 @@ export const JOB_POOL: readonly JobDef[] = [
   { id: 'insurance', title: 'Insurance agent', wage: 220, lead: ['negotiator'], w: 3, good: 'Talks to anyone; knows the county and what things cost.', tools: ['laptop', 'ledger_books'] },
   { id: 'dispatcher', title: 'Dispatcher', wage: 175, lead: ['radio', 'negotiator'], w: 2, good: 'Radio, emergencies and keeping a head count.', tools: ['base_radio', 'headset', 'maps'] },
   { id: 'lineman', title: 'Utility lineman', wage: 300, lead: ['mechanic', 'radio', 'builder'], w: 2, good: 'Poles, lines and climbing; understands the grid and why it fails.', tools: ['climbing_gear', 'lineman_pliers', 'hot_stick', 'bucket_truck_trained'] },
-  { id: 'operator', title: 'Heavy equipment operator', wage: 240, lead: ['builder', 'mechanic'], w: 3, good: 'Digs trenches, ponds and foundations in a day.', tools: ['excavator_trained', 'grease_gun', 'surveying_level'] },
+  { id: 'operator', title: 'Heavy equipment operator', short: 'Equipment operator', wage: 240, lead: ['builder', 'mechanic'], w: 3, good: 'Digs trenches, ponds and foundations in a day.', tools: ['excavator_trained', 'grease_gun', 'surveying_level'] },
 ];
 const JOB_BY_ID = new Map(JOB_POOL.map(j => [j.id, j]));
 export const jobDef = (id: string | undefined): JobDef | undefined => (id ? JOB_BY_ID.get(id) : undefined);

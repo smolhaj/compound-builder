@@ -111,3 +111,17 @@ describe('occupations', () => {
     }
   });
 });
+
+describe('uniformed trades', () => {
+  it('a soldier gets hunter with negotiator and medic; police lead with negotiator, and both keep their background', async () => {
+    const { backgroundOf } = await import('./family');
+    for (const [id, lead] of [['soldier', 'hunter'], ['police', 'negotiator']] as const) {
+      const p = variedFamily(4, 0, [id]).people[0];
+      expect(p.skills[lead]).toBeGreaterThanOrEqual(6);
+      expect(p.skills.negotiator).toBeGreaterThanOrEqual(3);
+      expect(p.skills.medic).toBeGreaterThanOrEqual(3);
+      expect(p.skills.hunter).toBeGreaterThanOrEqual(3);
+      expect(backgroundOf(p)).toBe(id === 'soldier' ? 'military' : 'police');
+    }
+  });
+});

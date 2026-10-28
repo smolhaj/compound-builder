@@ -207,13 +207,13 @@ export function SetupScreen() {
                     {slot >= 0 && p.job ? <>
                       <div style={{ display: 'flex', gap: 4, margin: '4px 0 3px' }}>
                         <select aria-label={`Occupation of ${p.first}`} value={p.job.id ?? ''} onChange={e => setPicks(workers.map((_, i) => (i === slot ? e.target.value : picks[i])))}
-                          style={{ flex: 1, minWidth: 0, background: '#2a2c26', color: '#eee', border: `1px solid ${C.line}`, borderRadius: 6, padding: '3px 6px', fontSize: 12.5 }}>
-                          {JOB_POOL.map(j => <option key={j.id} value={j.id}>{j.title} · ${j.wage}/day</option>)}
+                          style={{ flex: 1, minWidth: 0, background: '#2a2c26', color: '#eee', border: `1px solid ${C.line}`, borderRadius: 6, padding: '3px 6px', fontSize: 12.5, textOverflow: 'ellipsis' }}>
+                          {JOB_POOL.map(j => <option key={j.id} value={j.id} title={`${j.title}, $${j.wage}/day`}>{j.short ?? j.title}</option>)}
                         </select>
                         <button style={{ ...chip(false), padding: '3px 8px' }} title="Random occupation for this one" aria-label={`Random occupation for ${p.first}`}
                           onClick={() => { setShuffles(shuffles + 1); setPicks(workers.map((_, i) => (i === slot ? randomJobId(seed, famRoll, i, shuffles + 1, i ? workers[0].job?.id : undefined) : picks[i]))); }}>{'\u21BB'}</button>
                       </div>
-                      <div style={{ fontSize: 12, color: C.dim }}>{LIFESTYLE[life].jobs ? `Paid $${p.job.wage}/day` : 'Former career'}{def ? `: ${def.good}` : ''}</div>
+                      <div style={{ fontSize: 12, color: C.dim }}>{def ? `${def.title}. ` : ''}{LIFESTYLE[life].jobs ? `Paid $${p.job.wage}/day` : 'Former career'}{def ? `: ${def.good}` : ''}</div>
                     </> : <div style={{ fontSize: 12, color: C.dim }}>{p.elder ? 'Grandparent, retired' : p.kid ? (p.age < 6 ? 'little one' : p.age < 13 ? 'kid' : 'teen') : 'at home'}</div>}
                     <div style={{ fontSize: 11.5, color: C.dim, marginTop: 2 }}>{(Object.entries(p.skills) as Array<[string, number]>).filter(([, v]) => v >= 4).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => `${k} ${v}`).join(' \u00B7 ') || 'learning'}</div>
                   </div>
