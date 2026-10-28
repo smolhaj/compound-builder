@@ -135,6 +135,7 @@ describe('market: the road home', () => {
       g.disaster.tracks.law = 0.25;
       const pid = adult(g);
       g.people.find(p => p.id === pid)!.skills.hunter = 0;
+      for (const q of g.people) q.skills.negotiator = 0;   // (the family is drawn by seed: don't depend on a smooth talker; the household's best one lowers exposure)
       goToMarket(g, pid, false);
       const m = marketOf(g);
       m.trip!.carried = 500;
