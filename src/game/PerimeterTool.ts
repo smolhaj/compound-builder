@@ -77,7 +77,7 @@ export class PerimeterTool {
       const now = performance.now();
       if (now - this._lastClick < 320 && this._pts.length >= 2) { this.finish(); return; }
       this._lastClick = now;
-      if (e.shiftKey && this._kind !== 'escape_tunnel') this.addGateAt(p[0], p[1], e.altKey || e.ctrlKey ? PED_GATE_W : GATE_W);
+      if (e.shiftKey && this._kind !== 'escape_tunnel' && this._kind !== 'underground_passage' && this._kind !== 'covered_walkway') this.addGateAt(p[0], p[1], e.altKey || e.ctrlKey ? PED_GATE_W : GATE_W);
       else this.addPoint(p[0], p[1]);
     });
     on(window, 'keydown', e => {
@@ -183,7 +183,10 @@ export class PerimeterTool {
     const tunnelWhy = this._kind === 'escape_tunnel' ? this._world.tunnelRouteProblem(pts as Pt[]) : null;
     (this._line.material as THREE.LineBasicMaterial).color.set(tunnelWhy ? 0xe36a5a : 0xffd27a);
     const txt = tunnelWhy ? tunnelWhy
-      : this._pts.length === 0 ? (this._kind === 'escape_tunnel' ? 'Escape tunnel: click a bunker room to start at its wall, then out to the exit' : `${PERIMETER[this._kind].name}: click to start the line`)
+      : this._pts.length === 0 ? (this._kind === 'escape_tunnel' ? 'Escape tunnel: click a bunker room to start at its wall, then out to the exit'
+        : this._kind === 'covered_walkway' ? 'Covered walkway: click against the wall of one walled yard, then against the wall of the next'
+        : this._kind === 'underground_passage' ? 'Underground passage: click inside one yard (the hatch goes there), then inside the next, or out to a hatch in the woods'
+        : `${PERIMETER[this._kind].name}: click to start the line`)
       : `${Math.round(len * 6)} m${this._kind === 'escape_tunnel' && offParcel(pts as Pt[]) > 0 ? ` (${Math.round(offParcel(pts as Pt[]) * 6)} m under neighbors' land)` : ''} · ~$${orderCost(buyable).toLocaleString('en-US')}${own.length ? ' + ' + own.join(', ') : ''} · ${Math.round(runHours(this._kind, len) + (this._kind === 'escape_tunnel' ? OFF_PARCEL_HOURS * offParcel(pts as Pt[]) : 0))} h${this._gates.length ? ` · ${this._gates.length} gate${this._gates.length > 1 ? 's' : ''}` : ''}`;
     const e = pts[pts.length - 1] as Pt | undefined;
     const hide = !tunnelWhy && this._kind === 'escape_tunnel' && this._pts.length > 0 && e

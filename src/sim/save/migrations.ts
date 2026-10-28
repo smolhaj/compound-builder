@@ -10,6 +10,7 @@ import { newDisaster } from '../disaster';
 import { freshNeeds } from '../needs';
 import { generateNeighbors, newGate } from '../encounters';
 import { emptyStats } from '../report';
+import { newDigs } from '../tunnelers';
 import { newLand } from '../land';
 import { CLASSIC, CLASSIC_IMPROVEMENTS } from '../site';
 import { newLights } from '../lights';
@@ -36,6 +37,8 @@ type Raw = Record<string, unknown> & { version?: number };
 
 /** version n → n + 1 upgraders. */
 const STEPS: Record<number, (s: Raw) => Raw> = {
+  // 50 → 51: tunnelers (the dig in progress, the party sent out, tallies), ground sensors and passage hatches in the stock; runs may carry a buried skirt / unlocked / revealed / permitAt (none yet)
+  50: s => ({ ...s, version: 51, digs: (s.digs as object | undefined) ?? newDigs(), stock: { ground_sensor: 0, passage_hatch: 0, ...(s.stock as object) } }),
   // 46 → 47: the family's tools (sim/tools.ts): a starter kit from the trades, as if they had brought it
   46: s => ({ ...s, version: 47, tools: (s.tools as object | undefined) ?? starterKit(s.people as Person[], s.seed as number) }),
   // 38 → 39: the pantry, item by item (the aggregate staples / canned / frozen split into a default breakdown at their shelf ages)

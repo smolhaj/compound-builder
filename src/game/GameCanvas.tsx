@@ -21,7 +21,7 @@ import { BoundaryOutline } from './BoundaryOutline';
 import { PerimeterTool } from './PerimeterTool';
 import { SightOverlay } from './sightlines/SightOverlay';
 import { PARCEL_SIZE as PS } from './parcel/parcelTerrain';
-import type { PerimeterKind } from '../sim/perimeter';
+import { fenceLive, type PerimeterKind } from '../sim/perimeter';
 import { useGameStore } from '../store/gameStore';
 import { useBattleStore } from '../store/battleStore';
 import { BattleRenderer } from './battle/BattleRenderer';
@@ -173,7 +173,7 @@ export function GameCanvas() {
       useGameStore.subscribe(s => s.game.site.improvements.drive, on => world.setDrive(on)),
       // a neighbor's farm burned (sim/neighborLife.ts): drawn charred once the family knows
       useGameStore.subscribe(s => burnedFarms(s.game).join(), () => world.setBurnedFarms(burnedFarms(useGameStore.getState().game))),
-      useGameStore.subscribe(s => s.tool, k => { tool.setKind(k); marker.setOn(k === 'fell'); fence.setKind(k?.startsWith('fence:') ? k.slice(6) as PerimeterKind : null); if (k === 'fence:escape_tunnel') useWorldStore.getState().setUnderground(true); }),
+      useGameStore.subscribe(s => s.tool, k => { tool.setKind(k); marker.setOn(k === 'fell'); fence.setKind(k?.startsWith('fence:') ? k.slice(6) as PerimeterKind : null); if (k === 'fence:escape_tunnel' || k === 'fence:underground_passage') useWorldStore.getState().setUnderground(true); }),
       useWorldStore.subscribe(s => s.buildingView, v => world.setBuildingView(v)),
       useWorldStore.subscribe(s => s.underground, on => world.setUnderground(on)),
       useWorldStore.subscribe(s => s.sightMode, m => sight.set(m)),
@@ -255,7 +255,7 @@ export function GameCanvas() {
       world.syncTents(game);
       world.syncForestry(game.forestry);
       world.simTime = game.clock.t;
-      world.syncPerimeter(game.perimeter, game.clock.t);
+      world.syncPerimeter(game.perimeter, game.clock.t, { lit: fenceLive(game), sensors: (game.stock.ground_sensor ?? 0) > 0 });
       const svKey = `${game.structures.filter(x => x.stage >= 5).length}|${game.perimeter.filter(r => r.finishedAt !== null).length}|${game.utilities.fittings.filter(f => f.finishedAt !== null).length}`;
       if (svKey !== servicesKey) { servicesKey = svKey; world.syncServices(game); }
       sight.update(6);

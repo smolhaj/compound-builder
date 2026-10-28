@@ -29,6 +29,7 @@ import { addHardenWork, nextHardenJob } from './hardening';
 import { updateDisaster } from './disaster';
 import { liveDay, workFactor } from './needs';
 import { gateDay, neighborGossip } from './encounters';
+import { digDay } from './tunnelers';
 import { mutualAidDay } from './barter';
 import { arrivalCheck, hasCutscene, scheduleArrival } from './siege';
 import { scavengeDay } from './scavenge';
@@ -161,6 +162,7 @@ function subStep(s: GameState): void {
     for (const line of legalDay(s)) log(s, line);
     prisonersDay(s);   // (it logs its own lines)
     for (const line of weatherDay(s)) log(s, line);
+    for (const line of digDay(s)) log(s, line);
     for (const line of wildlifeDay(s, s.structures.some(st => st.kind === 'root_cellar' && isFinished(st) && s.utilities.lit.includes(st.id)))) log(s, line);
     const e = gateDay(s);
     // a raid has an hour of arrival (a gang at 2:15 AM); it waits for it and the game runs on until then

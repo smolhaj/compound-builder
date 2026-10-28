@@ -22,7 +22,7 @@ describe('escape tunnel: a way out, never a way in', () => {
     expect(canEnter({ kind: 'escape_tunnel' }, 'inside')).toBe(true);
     expect(canEnter({ kind: 'escape_tunnel' }, 'outside')).toBe(false);
     // no other run is a way in from either side
-    for (const k of Object.keys(PERIMETER) as PerimeterKind[]) if (k !== 'escape_tunnel') expect(canEnter({ kind: k }, 'outside')).toBe(false);
+    for (const k of Object.keys(PERIMETER) as PerimeterKind[]) if (k !== 'escape_tunnel' && k !== 'underground_passage') expect(canEnter({ kind: k }, 'outside')).toBe(false);   // (the passage is two-way: its hatches are the guarded weak points, sim/compounds.ts)
   });
 
   it('is built with its two locks: a blast door at the bunker, an egress hatch at the exit', () => {

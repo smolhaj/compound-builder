@@ -105,6 +105,7 @@ export function BuildMenu() {
       </div>
       {BUNKER_ORDER.map(kit)}
       {lineItem('escape_tunnel', 50, '50 m')}
+      {lineItem('underground_passage', 50, '50 m')}
     </Group>
     <Group id="perimeter" title="Perimeter">
       <WallProperty />

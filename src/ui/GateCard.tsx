@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import { useGameStore } from '../store/gameStore';
+import { ambushOdds, ambushParty, chosenParty } from '../sim/tunnelers';
 import { fightOdds, hideFoundChance, postureOf, type Stance } from '../sim/encounters';
 import { daysOfFood } from '../sim/needs';
 import { AFTERMATH_TEXT } from '../sim/aftermath';
@@ -58,6 +59,16 @@ export function GateCard() {
           const t = e.ransom, gm = g.game;
           const have = [...(Object.keys(t.goods) as Array<keyof typeof gm.stock>).map(k => `${Math.floor(gm.stock[k])} ${k}`), ...(Object.keys(t.ammo) as Caliber[]).map(k => `${gm.armory.ammo[k] ?? 0} rounds of ${k}`)].join(', ');
           return <div style={{ margin: '8px 0', fontSize: 12, opacity: 0.75 }}>You have: {have}{canPay(gm, t) ? '' : ' (not enough for all of it)'} · a double-cross is {e.temper === 'savage' ? 'a real risk with this crew' : e.temper === 'hard' ? 'possible' : 'unlikely'} (about {Math.round(DOUBLE_CROSS[e.temper ?? 'savage'] * 100)} %)</div>;
+        })()}
+        {e.dig?.phase === 'warning' && e.stances.includes('ambush') && (() => {
+          const gm = g.game, able = ambushParty(gm, true), going = chosenParty(gm);
+          return <div style={{ margin: '8px 0', fontSize: 12, opacity: 0.85 }}>Who goes to the dig site:{' '}
+            {able.map(id => { const p = gm.people.find(x => x.id === id)!; return <label key={id} style={{ marginRight: 10 }}><input type="checkbox" checked={going.includes(id)} onChange={ev => g.setAmbushParty(ev.target.checked ? [...going, id] : going.filter(x => x !== id))} /> {p.first}</label>; })}
+            <div style={{ opacity: 0.7 }}>The rest hold the house.</div></div>;
+        })()}
+        {e.dig?.phase === 'warning' && e.stances.includes('ambush') && (() => {
+          const o = ambushOdds(g.game, { size: e.size, lead: e.dig!.lead, temper: e.temper });
+          return <div style={{ margin: '8px 0', fontSize: 12, opacity: 0.75 }}>If you ambush them: you hold {inTen(o.win)} · someone of yours killed or taken {o.lost < 0.05 ? 'almost never' : `about ${Math.round(o.lost * 10) / 10} on average`}</div>;
         })()}
         {e.strength > 0 && e.kind !== 'break_in' && <div style={{ margin: '8px 0', fontSize: 12, opacity: 0.75 }}>
           <div>{e.size} {e.armed ? 'armed' : 'unarmed'} · walls {Math.round(p.barrier)} % · seen early {Math.round(p.detection)} %{p.bunker ? ' · bunker to hide in' : p.safeRoom ? ' · safe room' : ''}</div>
