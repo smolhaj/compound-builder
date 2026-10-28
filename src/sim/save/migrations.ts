@@ -32,11 +32,14 @@ import { newDaily } from '../daily';
 import { dayJob, type Person } from '../family';
 import { migrateDogs } from '../pets';
 import { starterKit } from '../tools';
+import { newKin } from '../kin';
 
 type Raw = Record<string, unknown> & { version?: number };
 
 /** version n → n + 1 upgraders. */
 const STEPS: Record<number, (s: Raw) => Raw> = {
+  // 52 → 53: extended family (sim/kin.ts): nobody in town, no requests in a game already under way
+  52: s => ({ ...s, version: 53, kin: (s.kin as object | undefined) ?? newKin([], false) }),
   // 50 → 51: tunnelers (the dig in progress, the party sent out, tallies), ground sensors and passage hatches in the stock; runs may carry a buried skirt / unlocked / revealed / permitAt (none yet)
   50: s => ({ ...s, version: 51, digs: (s.digs as object | undefined) ?? newDigs(), stock: { ground_sensor: 0, passage_hatch: 0, ...(s.stock as object) } }),
   // 46 → 47: the family's tools (sim/tools.ts): a starter kit from the trades, as if they had brought it

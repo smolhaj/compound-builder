@@ -8,6 +8,8 @@ import type { Quality } from '../engine/world/WorldScene';
 import { SEASON_MODES, type SeasonMode } from '../engine/world/season/seasonState';
 import { WEATHER_MODES, type WeatherMode } from '../engine/world/weather/weatherState';
 import { DogsPanel } from './DogsPanel';
+import { KinPanel } from './KinPanel';
+import { kinTitle } from '../sim/kin';
 import { calendarOf, dayIndex, hourOf, type Speed } from '../sim/state';
 import { BACKGROUND_NAME, backgroundOf, fullName } from '../sim/family';
 import { MATERIALS, MATERIAL_IDS, qtyText, type MaterialId } from '../sim/materials';
@@ -158,7 +160,7 @@ export function Hud() {
               const notes = n && n.died == null ? [n.hunger > 5000 ? 'hungry' : '', ...n.hurt.map(h => h.trauma ? `${h.what}: ${treating ? 'being treated' : 'needs dressings and antibiotics'}` : h.what), n.dose > 0.05 ? `${n.dose.toFixed(2)} Sv` : ''].filter(Boolean).join(', ') : '';
               return <div key={p.id} style={{ padding: '5px 0', borderBottom: `1px solid ${LINE}` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>
-                  <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 4, background: '#' + p.shirt.toString(16).padStart(6, '0'), marginRight: 6 }} />{fullName(p)}, {p.age}{backgroundOf(p) && <span style={{ color: '#c9b27a', fontSize: 11 }}> · {BACKGROUND_NAME[backgroundOf(p)!]}</span>}</span>
+                  <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 4, background: '#' + p.shirt.toString(16).padStart(6, '0'), marginRight: 6 }} />{fullName(p)}, {p.age}{p.rel && <span style={{ color: DIM, fontSize: 11 }}> · {kinTitle(p, game.people).toLowerCase()}</span>}{backgroundOf(p) && <span style={{ color: '#c9b27a', fontSize: 11 }}> · {BACKGROUND_NAME[backgroundOf(p)!]}</span>}</span>
                   <span style={{ color: DIM }}>{n?.taken ? 'Taken' : n?.died != null ? 'Died' : TASK_TEXT[st?.task ?? 'idle']}</span>
                 </div>
                 {n && n.died == null && <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 4, fontSize: 11 }}>
@@ -173,6 +175,7 @@ export function Hud() {
               </div>;
             })}
             <DogsPanel game={game} />
+            <KinPanel />
             <HousingPanel />
             <DailySection />
             {trialCamps(game).map(c => <Section key={c.id} title={`Camp outside the wall: ${c.title}`}>
