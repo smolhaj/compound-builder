@@ -31,6 +31,10 @@ export interface UtilityDef {
   water?: { lpd: number; pressure: boolean; needsPower?: number };
   /** Water storage (liters) and roof catchment it collects (m² of the connected roofs count). */
   store?: number;
+  /** Water for the garden, the fields and the fire only (a pond's: it is not drinking water, fish or no fish). */
+  irrigation?: number;
+  /** Stored water that is drinkable only with filtering (a fish-free reservoir needs the filtration shed or a filter). */
+  filtered?: boolean;
   /** Power: solar kW (peak), generator kW, battery kWh. */
   solarKw?: number; genKw?: number; batteryKwh?: number;
   /** Makes pressure for the network from storage (gravity tower). */
@@ -52,8 +56,8 @@ export const UTILITY: Record<string, UtilityDef> = {
   /** A battery container: twelve 5 kWh racks. */
   battery_bank: { batteryKwh: 60 },
   /** A dug pond and a lined reservoir store water (a reservoir has no fish, so its water is clean). */
-  pond: { store: 300_000 },
-  reservoir: { store: 400_000 },
+  pond: { irrigation: 300_000 },
+  reservoir: { store: 400_000, filtered: true },
   generator_shed: { genKw: 7 },
   septic: { septic: true },
 };
@@ -73,6 +77,8 @@ export const FUEL_UNIT_L = 20;
 
 /** County grid: price per kWh and the daily service charge (rural co-op, 2020s). */
 export const GRID_USD_PER_KWH = 0.14, GRID_USD_PER_DAY = 0.9;
+/** What the co-op pays a member for surplus solar sent back to the grid (net metering at the avoided-cost rate), per kWh, while the grid is up. */
+export const NET_METER_USD_PER_KWH = 0.05;
 /**
  * Who gets power first when there isn't enough (lower first): pumps, the
  * root cellar (freezer), homes, then the coop and the workshop.
@@ -88,6 +94,8 @@ export interface Utilities {
   batteryFade: number;
   /** Water in storage (liters). */
   storedL: number;
+  /** Water in the ponds (and an unfiltered reservoir): irrigation and fire only, not drinking (made lazily). */
+  pondL?: number;
   /** Fuel burned toward the next can. */
   fuelL: number;
   /** Broken pumps (well ids) awaiting repair. */
@@ -111,7 +119,7 @@ export interface Utilities {
 
 export interface UtilityReport {
   /** Solar made yesterday that nobody used and no battery took (no cable to a load or battery, or the bank was full); the nameplate kW on the place; battery energy and capacity (kWh). */
-  wastedKwh?: number; solarKw?: number; storedKwh?: number; capKwh?: number;
+  wastedKwh?: number; exportKwh?: number; creditUsd?: number; solarKw?: number; storedKwh?: number; capKwh?: number;
   solarKwh: number; drawKwh: number; genKwh: number; shortKwh: number; batteryPct: number;
   /** From the grid, and what it cost; loads cut for want of power (building ids). */
   gridKwh: number; billUsd: number; shed: string[];
@@ -307,7 +315,9 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
   // ── power: each network's own sources (solar → battery → grid → generator), loads served by priority ──
   // the county grid, unless it's gone (the disaster) or a storm has the lines down
   const gridUp = u.grid && s.disaster.tracks.grid > 0.5 && !stormOutage(s);
-  let solar = 0, draw = 0, gen = 0, short = 0, capKwh = 0, gridKwh = 0, wasted = 0, newBat = 0;
+  let solar = 0, draw = 0, gen = 0, short = 0, capKwh = 0, gridKwh = 0, wasted = 0, exported = 0, newBat = 0;
+  // surplus the batteries cannot take: sold to the co-op while the grid is up, otherwise wasted
+  const spill = (kwh: number) => { if (kwh <= 0) return; if (gridUp) exported += kwh; else wasted += kwh; };
 
   const lit = new Set<string>(), shed: string[] = [];
   const loadOf = (o: Node) => u.off.includes(o.id) ? 0
@@ -342,9 +352,9 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
     // battery: bank the surplus, cover the shortfall
     let bat = capAll > 0 ? bat0 * cap / capAll : 0;
     if (cap > 0) {
-      if (have > d) { const room = Math.max(0, cap - bat), put = Math.min(have - d, room / 0.92); bat += put * 0.92; wasted += have - d - put; have = d; }
+      if (have > d) { const room = Math.max(0, cap - bat), put = Math.min(have - d, room / 0.92); bat += put * 0.92; spill(have - d - put); have = d; }
       else { const take = Math.min(d - have, bat); bat -= take; have += take; }
-    } else if (have > d && sol > 0) wasted += have - d;
+    } else if (have > d && sol > 0) spill(have - d);
     newBat += bat;
     // the county grid, while it's up
     if (have < d && gridUp) { gridKwh += d - have; have = d; }
@@ -370,12 +380,15 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
   u.batteryKwh = Math.min(newBat, capKwh);
   u.lit = [...lit];
   const bill = u.grid && gridUp ? gridKwh * GRID_USD_PER_KWH + GRID_USD_PER_DAY : 0;
-  s.money -= bill;
+  const credit = exported * NET_METER_USD_PER_KWH;
+  s.money += credit - bill;
   // batteries fade ~2.5 % a year with use
   if (capKwh > 0) u.batteryFade = Math.min(0.4, u.batteryFade + 0.025 / 365);
 
   // ── water: well delivery (powered pumps need power), rain into storage, use ──
-  let supply = 0, store = 0;
+  let supply = 0, store = 0, irrigCap = 0;
+  // a reservoir is drinkable once the water is filtered (the filtration shed, or a filter in the stockpile)
+  const drinkOk = fin.some(st => st.kind === 'filtration_shed') || s.stock.water_filter >= 1 || s.stock.ro_system >= 1;
   for (const st of fin) {
     const def = UTILITY[st.kind];
     if (!def) continue;
@@ -387,7 +400,9 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
       // while the town works, the well company comes out and fixes it (playtest: an unrepaired pump in peacetime killed families)
       else if (u.broken.includes(st.id) && townOpen && rnd < 0.5) { u.broken = u.broken.filter(x => x !== st.id); s.money -= 850; log(s, 'The well company replaced the pump: $850.'); }
     }
-    if (def.store) store += def.store;
+    if (def.store && !(def.filtered && !drinkOk)) store += def.store;
+    if (def.irrigation) irrigCap += def.irrigation;
+    if (def.filtered && !drinkOk && def.store) irrigCap += def.store;
   }
   store += toteStorage(s);
   // a spring on the place runs year round (less in a drought), carried in buckets unless pumped
@@ -396,14 +411,20 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
   let roof = 0;
   for (const st of fin) if (p.water.has(st.id) && p.nodes.some(o => p.water.get(o.id) === p.water.get(st.id) && UTILITY[o.kind]?.store)) roof += roofM2(kinds.get(st.id)!);
   // a dug pond or reservoir takes the rain on its own surface and a seep (or the creek) all year, and loses water in the summer heat
-  const basins = fin.filter(st => st.kind === 'pond' || st.kind === 'reservoir').length;
-  const basinIn = basins * (rainMm(doy) * 330 * REGIONS[s.site.region].rainMm / 400 * 0.8 + (s.site.creek ? 2200 : 600)) * (s.disaster.kind === 'drought' && s.clock.t >= s.disaster.hitAt ? 0.3 : 1);
-  const basinOut = basins * (doy > 150 && doy < 250 ? 800 : 150);
-  const rainL = roof * rainMm(doy) * REGIONS[s.site.region].rainMm / 400 * 0.8 + basinIn - basinOut;
+  const ponds = fin.filter(st => st.kind === 'pond').length, reservoirs = fin.filter(st => st.kind === 'reservoir').length;
+  const perBasin = (rainMm(doy) * 330 * REGIONS[s.site.region].rainMm / 400 * 0.8 + (s.site.creek ? 2200 : 600)) * (s.disaster.kind === 'drought' && s.clock.t >= s.disaster.hitAt ? 0.3 : 1) - (doy > 150 && doy < 250 ? 800 : 150);
+  // the ponds (and a reservoir nobody filters) fill their own pool; a filtered reservoir fills the drinking store
+  const toPool = (ponds + (drinkOk ? 0 : reservoirs)) * perBasin, toStore = (drinkOk ? reservoirs : 0) * perBasin;
+  u.pondL = Math.max(0, Math.min(irrigCap, (u.pondL ?? 0) + toPool));
+  const rainL = roof * rainMm(doy) * REGIONS[s.site.region].rainMm / 400 * 0.8 + toStore;
   // the living drink and wash (playtest round 3: the dead and the taken were still counted, doubling a long game's water use)
   const people = s.personState.filter(ps => ps.needs?.died == null).length;
   const homePlumbed = fin.some(st => fitted(s, st.id, 'plumb') && (DRAW_KWH[st.kind] ?? 0) >= 5);
-  const use = people * (homePlumbed ? WATER_PLUMBED : WATER_CARRIED) + (fin.some(st => st.kind === 'garden') && doy > 120 && doy < 270 ? (s.stock.greywater >= 1 && homePlumbed ? 200 : 400) : 0) + (fin.some(st => st.kind === 'chicken_coop') ? 10 : 0);
+  const gardenUse = fin.some(st => st.kind === 'garden') && doy > 120 && doy < 270 ? (s.stock.greywater >= 1 && homePlumbed ? 200 : 400) : 0;
+  // the garden drinks from the pond first: irrigation is what it is for
+  const fromPond = Math.min(u.pondL ?? 0, gardenUse);
+  u.pondL = (u.pondL ?? 0) - fromPond;
+  const use = people * (homePlumbed ? WATER_PLUMBED : WATER_CARRIED) + (gardenUse - fromPond) + (fin.some(st => st.kind === 'chicken_coop') ? 10 : 0);
   u.storedL = Math.max(0, Math.min(store, u.storedL + rainL));
   let left = supply - use, shortL = 0;
   if (left < 0) { const take = Math.min(-left, u.storedL); u.storedL -= take; left += take; }
@@ -419,13 +440,23 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
     else { shortL = -left; log(s, `Water ran short by ${Math.round(shortL)} L.`); }
   }
   const nameplate = fin.reduce((a, st) => a + (u.fried.includes(st.id) ? 0 : UTILITY[st.kind]?.solarKw ?? 0), 0);
-  u.report = { wastedKwh: wasted, solarKw: nameplate, storedKwh: u.batteryKwh, capKwh, solarKwh: solar, drawKwh: draw, genKwh: gen, shortKwh: short, batteryPct: capKwh > 0 ? u.batteryKwh / capKwh : 0, gridKwh, billUsd: bill, shed, waterL: supply + Math.max(0, rainL), useL: use, shortL, storedL: u.storedL };
+  u.report = { exportKwh: exported, creditUsd: credit, wastedKwh: wasted, solarKw: nameplate, storedKwh: u.batteryKwh, capKwh, solarKwh: solar, drawKwh: draw, genKwh: gen, shortKwh: short, batteryPct: capKwh > 0 ? u.batteryKwh / capKwh : 0, gridKwh, billUsd: bill, shed, waterL: supply + Math.max(0, rainL), useL: use, shortL, storedL: u.storedL };
   u.lastDay = dayIndex(s.clock.t);
 }
 
-/** Storage on the place (cisterns, the tower, totes), liters. */
+/** Drinking-water storage on the place (cisterns, the tower, totes, a filtered reservoir), liters. */
 export function storageCapacity(s: GameState): number {
-  return s.structures.filter(isFinished).reduce((a, st) => a + (UTILITY[st.kind]?.store ?? 0), 0) + toteStorage(s);
+  const fin = s.structures.filter(isFinished);
+  const drinkOk = fin.some(st => st.kind === 'filtration_shed') || s.stock.water_filter >= 1 || s.stock.ro_system >= 1;
+  return fin.reduce((a, st) => { const d = UTILITY[st.kind]; return a + (d?.store && !(d.filtered && !drinkOk) ? d.store : 0); }, 0) + toteStorage(s);
+}
+
+/** Water in the ponds and an unfiltered reservoir (irrigation and fire only) and what they hold, liters. */
+export function irrigationStore(s: GameState): { have: number; cap: number } {
+  const fin = s.structures.filter(isFinished);
+  const drinkOk = fin.some(st => st.kind === 'filtration_shed') || s.stock.water_filter >= 1 || s.stock.ro_system >= 1;
+  const cap = fin.reduce((a, st) => { const d = UTILITY[st.kind]; return a + (d?.irrigation ?? 0) + (d?.filtered && !drinkOk && d.store ? d.store : 0); }, 0);
+  return { have: Math.min(cap, s.utilities.pondL ?? 0), cap };
 }
 
 /** Repair a broken pump (hardware kit; a mechanic does it in an hour or two). */

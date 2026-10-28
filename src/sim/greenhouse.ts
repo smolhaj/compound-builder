@@ -39,6 +39,7 @@ import { burnRick } from './upkeep';
 import { logGate } from './nag';
 import { heatDemand } from './heating';
 import { farmOf, greenhouseCareOf, orchardCareOf } from './farm';
+import { glassSound } from './improvements';
 
 /** Days the greenhouse moves the garden's start earlier and its end later. */
 export const GREENHOUSE_EXTEND = 42;
@@ -94,7 +95,9 @@ export function heatNeed(s: GameState): number {
 /** A greenhouse's power draw today (kWh): the hobby house's fans, or the production house's fans plus electric heat. */
 export function greenhouseKwh(s: GameState, st: Structure): number {
   if (st.kind !== 'greenhouse_heated') return 1;
-  return greenhouseCareOf(s, st.id).heat === 'wood' ? GH_BASE_KWH * 0.6 : GH_BASE_KWH + GH_HEAT_KWH * heatNeed(s);
+  // cracked panes leak the heat: up to a third more to keep it warm
+  const leak = 1 + 0.5 * (1 - glassSound(st));
+  return (greenhouseCareOf(s, st.id).heat === 'wood' ? GH_BASE_KWH * 0.6 : GH_BASE_KWH + GH_HEAT_KWH * heatNeed(s) * leak);
 }
 
 /** Is this greenhouse warm for the winter benches? (the hobby house: powered; the production house: its boiler or heater worked yesterday) */
@@ -107,7 +110,7 @@ export function greenhouseGreens(s: GameState): number {
   const doy = calendarOf(s.clock).doy;
   if (!inGreensSeason(doy)) return 0;
   const cold = REGIONS[s.site.region].cold;
-  return greenhouses(s).reduce((a, st) => a + GH_TIER[st.kind].kcal * greensFactor(cold, isHeated(s, st)), 0);
+  return greenhouses(s).reduce((a, st) => a + GH_TIER[st.kind].kcal * greensFactor(cold, isHeated(s, st)) * glassSound(st), 0);
 }
 
 /**

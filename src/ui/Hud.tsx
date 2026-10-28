@@ -25,7 +25,7 @@ import { chimneyState, greenRicks, SEASON_DAYS, SWEEP_USD } from '../sim/upkeep'
 import { countyWorks, premium, yearlyTax } from '../sim/paperwork';
 import { DRIVE_PER_FT, driveQuote, hookupProblem, POLE_PER_FT, powerQuote } from '../sim/improvements';
 import { KIT } from '../game/buildkit/kit';
-import { FUEL_UNIT_L, storageCapacity } from '../sim/utilities';
+import { FUEL_UNIT_L, irrigationStore, storageCapacity } from '../sim/utilities';
 import { litersText } from '../sim/format';
 import { needsHookup } from '../sim/hookups';
 import { HousingPanel } from './HousingPanel';
@@ -318,6 +318,7 @@ export function Hud() {
                   {(pw.solarKw > 0 || pw.batteryKwh > 0) && <Row label="Installed" value={`${pw.solarKw > 0 ? `${fmtKw(pw.solarKw)} kW solar` : 'no solar'}${pw.batteryKwh > 0 ? ` · ${Math.round(pw.batteryKwh)} kWh batteries` : ''}`} title="Nameplate: panels in kW (a 20 kW farm is 50 panels), batteries in kWh" />}
                   <Row label="Made / used" value={`${fmtKw(pw.madeKwh)} / ${fmtKw(pw.usedKwh)} kWh`} />
                   <Row label="Batteries" value={pw.batteryKwh > 0 ? `${Math.round(pw.storedKwh)} of ${Math.round(pw.batteryKwh)} kWh (${pw.batteryPct} %)` : 'none'} tone={pw.batteryKwh > 0 && pw.madeKwh > 0 && pw.storedKwh < 0.5 ? 'warn' : undefined} />
+                  {pw.exportKwh >= 0.5 && <Row label="Sold to the grid" value={`${fmtKw(pw.exportKwh)} kWh · $${pw.creditUsd.toFixed(2)}`} title="Surplus solar sent back to the co-op while the grid is up (net metering, 5 cents a kWh)" />}
                   {pw.wastedKwh >= 1 && <Row label="Made, not stored" value={`${fmtKw(pw.wastedKwh)} kWh`} tone="warn" title="Power the sun made yesterday that nobody used and no battery took" />}
                   {pw.headline && <Note tone="warn">{pw.headline}</Note>}
                 </>; })()}
@@ -329,6 +330,7 @@ export function Hud() {
               <Section title="Water (yesterday)">
                 <Row label="In / used" value={`${Math.round(r.waterL)} / ${Math.round(r.useL)} L`} />
                 <Row label="Stored" value={`${Math.round(r.storedL)} of ${storageCapacity(game).toLocaleString('en-US')} L`} />
+                {irrigationStore(game).cap > 0 && <Row label="Pond (garden, fire)" value={`${Math.round(irrigationStore(game).have).toLocaleString('en-US')} of ${irrigationStore(game).cap.toLocaleString('en-US')} L`} title="Pond water waters the garden and fills the fire line; it is not drinking water. A reservoir counts as drinking water once the filtration shed or a filter is on the place." />}
                 {game.stock.water_jugs >= 1 && <Row label="Drinking water put by" value={`${Math.floor(game.stock.water_jugs)} jugs (${Math.round(game.stock.water_jugs * JUG_L)} L)`} />}
                 {storageCapacity(game) - r.storedL > 1000 && game.disaster.tracks.deliveries >= 0.5 && game.disaster.tracks.banks >= 0.5 && <button style={{ ...btn(), width: '100%', marginTop: 3 }} title="A tanker load from town: 15,000 L" onClick={() => g.money(d => orderTanker(d, storageCapacity(d)))}>Order a tanker load ($450)</button>}
                 <div style={{ marginTop: 6, fontWeight: 600 }}>Vehicles</div>

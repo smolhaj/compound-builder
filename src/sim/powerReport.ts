@@ -30,6 +30,8 @@ export interface PowerSummary {
   solarKw: number; batteryKwh: number; genKw: number;
   /** Yesterday, kWh: made (solar + generator), used by the loads, wasted, and the battery's charge now. */
   madeKwh: number; usedKwh: number; wastedKwh: number; storedKwh: number;
+  /** Sold back to the co-op yesterday (kWh) and what it paid (dollars): net metering while the grid is up. */
+  exportKwh: number; creditUsd: number;
   /** Battery charge 0–100 (whole percent). */
   batteryPct: number;
   /** A bank of panels, batteries or a generator joined to a cable or to each other counts as a bank. */
@@ -56,7 +58,7 @@ export function powerSummary(s: GameState): PowerSummary {
   else if (batteryKwh > 0 && u.batteryKwh < 0.5 && made < 0.1 && solarKw > 0) headline = 'The batteries are flat and the sun was thin yesterday.';
   return {
     solarKw, batteryKwh, genKw,
-    madeKwh: made, usedKwh: r.drawKwh, wastedKwh: wasted, storedKwh: u.batteryKwh,
+    madeKwh: made, usedKwh: r.drawKwh, wastedKwh: wasted, exportKwh: r.exportKwh ?? 0, creditUsd: r.creditUsd ?? 0, storedKwh: u.batteryKwh,
     batteryPct: batteryKwh > 0 ? Math.round(Math.min(1, u.batteryKwh / batteryKwh) * 100) : 0,
     banks: new Set(p.nodes.filter(n => BANK_KINDS.includes(n.kind)).map(n => p.power.get(n.id))).size,
     problems, headline,

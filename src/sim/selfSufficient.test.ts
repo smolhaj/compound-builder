@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { calendarOf, newGame, SAVE_VERSION, type GameState, type Structure } from './state';
 import { planRun } from './perimeter';
-import { balanceDay, plant } from './utilities';
+import { balanceDay, irrigationStore, plant, storageCapacity } from './utilities';
+import { crackGlass } from './improvements';
+import { weatherDay } from './weatherThreats';
 import { powerSummary, fmtKw } from './powerReport';
 import { greenhouseDay, greenhouseGreens, greenhouseKwh, GH_TIER, orchardDay, orchardHarvest, orchardYield, orchardPest, gardenSeason, greensFactor } from './greenhouse';
 import { farmOf, pondOf, greenhouseCareOf, hasWorkshop, orchardCareOf, parkInYard, leaveYard, yardCapacity, yardFree, yardOf, shelterFor, YARD_BAYS } from './farm';
@@ -15,6 +17,7 @@ import { migrate } from './save/migrations';
 import { suggestions, selfSufficient } from './guidance';
 import { REGIONS } from './regions';
 import { dailyOf, choreRates } from './daily';
+import { addFixWork, nextFix } from './improvements';
 import { produce } from './needs';
 import { step } from './engine';
 
@@ -80,6 +83,52 @@ describe('the solar farm and the batteries that stayed at 0 %', () => {
     expect(fmtKw(4.800000000000001)).toBe('4.8');
     expect(fmtKw(20)).toBe('20');
     expect(s.headline).not.toMatch(/\d\.\d{3}/);
+  });
+});
+
+describe('net metering and glass damage', () => {
+  it('surplus solar is sold at 5 cents a kWh while the grid is up; with it down it is wasted', () => {
+    const g = at(172); built(g, 'f', 'solar_farm', 20, 20); g.utilities.grid = true;
+    const m0 = g.money;
+    balanceDay(g, plant(g), 0.5);
+    const r = g.utilities.report;
+    expect(r.exportKwh).toBeGreaterThan(60);
+    expect(r.creditUsd).toBeCloseTo(r.exportKwh! * 0.05);
+    expect(g.money - m0).toBeCloseTo(r.creditUsd! - r.billUsd);
+    expect(r.wastedKwh).toBe(0);
+    expect(powerSummary(g).exportKwh).toBeGreaterThan(60);
+    const h = at(172); built(h, 'f', 'solar_farm', 20, 20); h.utilities.grid = true; h.disaster.tracks.grid = 0;
+    balanceDay(h, plant(h), 0.5);
+    expect(h.utilities.report.exportKwh).toBe(0);
+  });
+  it('cracked glass cuts the winter greens and costs more heat until the repair job is done (hardware)', () => {
+    const g = at(20); const st = built(g, 'h', 'greenhouse_heated', 10, 10); greenhouseCareOf(g, st.id).heated = true;
+    const whole = greenhouseGreens(g), kwh0 = greenhouseKwh(g, st);
+    expect(crackGlass(st, 'fair')).toBe(true);
+    expect(crackGlass(st, 'poor')).toBe(false);
+    expect(greenhouseGreens(g)).toBeCloseTo(whole * 0.7);
+    expect(greenhouseKwh(g, st)).toBeGreaterThan(kwh0);
+    st.fixes = []; crackGlass(st, 'poor');
+    expect(greenhouseGreens(g)).toBeCloseTo(whole * 0.4);
+    // the family mends it from the stockpile: needs hardware
+    expect(nextFix(g)).toBeNull();
+    g.stock.hardware = 5; g.stock.lumber = 5;
+    const job = nextFix(g)!;
+    expect(job.f.part).toBe('glass');
+    addFixWork(g, job.st, job.f, 100);
+    expect(greenhouseGreens(g)).toBeCloseTo(whole);
+    expect(g.stock.hardware).toBeLessThan(5);
+  });
+  it('hail and ice storms crack glasshouses (not always), and say so', () => {
+    let hits = 0;
+    for (let seed = 1; seed <= 20; seed++) {
+      const g = at(200, 0, seed); built(g, 'a', 'greenhouse', 5, 5); built(g, 'b', 'greenhouse_heated', 20, 5);
+      g.weather = { active: { kind: seed % 2 ? 'hail' : 'ice_storm', at: 0, until: 0 }, last: -999 };
+      const lines = weatherDay(g);
+      if (g.structures.some(st => (st.fixes ?? []).some(f => f.part === 'glass'))) { hits++; expect(lines.join(' ')).toMatch(/cracked/); }
+    }
+    expect(hits).toBeGreaterThan(2);
+    expect(hits).toBeLessThan(20);
   });
 });
 
@@ -170,14 +219,29 @@ describe('orchards: pruning, pests and the grove', () => {
 
 describe('the pond', () => {
   const pond = (doy: number, seed = 1) => { const g = at(doy, 0, seed); const st = built(g, 'p', 'pond', 20, 20); g.stock.fishing_gear = 1; return { g, st }; };
-  it('stores 300,000 L, fills from the seep and the rain, and a reservoir holds 400,000', () => {
+  it('pond water is for the garden and the fire, never drinking; a reservoir is drinkable only with filtering', () => {
     const { g } = pond(120);
     balanceDay(g, plant(g), 0.5);
-    expect(g.utilities.storedL).toBeGreaterThan(500);
+    expect(g.utilities.storedL).toBe(0);                       // the pond is not the drinking store
+    expect(g.utilities.pondL).toBeGreaterThan(500);
+    expect(irrigationStore(g).cap).toBe(300_000);
+    expect(storageCapacity(g)).toBe(0);
     built(g, 'r', 'reservoir', 30, 30);
+    expect(storageCapacity(g)).toBe(0);                        // unfiltered: irrigation too
+    expect(irrigationStore(g).cap).toBe(700_000);
+    g.stock.water_filter = 1;
+    expect(storageCapacity(g)).toBe(400_000);
+    expect(irrigationStore(g).cap).toBe(300_000);
     for (let i = 0; i < 30; i++) { g.clock.t += 1; balanceDay(g, plant(g), 0.5); }
     expect(g.utilities.storedL).toBeGreaterThan(20000);
-    expect(g.utilities.storedL).toBeLessThanOrEqual(700_000);
+    expect(g.utilities.storedL).toBeLessThanOrEqual(400_000);
+  });
+  it('the garden drinks from the pond first, so a drought-dry creek does not empty the cistern', () => {
+    const g = at(180); built(g, 'p', 'pond', 20, 20); built(g, 'g', 'garden', 10, 10);
+    g.utilities.pondL = 50_000;
+    balanceDay(g, plant(g), 0.5);
+    expect(g.utilities.pondL).toBeLessThan(50_000 + 5000);
+    expect(g.utilities.report.useL).toBeLessThan(25 * g.people.length + 20);
   });
   it('trout need cool water and a bag of fingerlings; crayfish need breeders', () => {
     const { g } = pond(200);

@@ -140,7 +140,7 @@ export const ORCHARD_GROVE: KitPieceDef = {
 /** The private pond: the dug basin, the berm and the fish fence. */
 export const POND: KitPieceDef = {
   id: 'pond', name: 'Pond', category: 'food',
-  blurb: 'A dug, lined pond for trout and crayfish, 18 × 18 m with a spillway, a dock and a fish fence. Stores 300,000 L for the fields and the fire. Wire it for an aerator.',
+  blurb: 'A dug, lined pond for trout and crayfish, 18 × 18 m with a spillway, a dock and a fish fence. Holds 300,000 L for the garden and the fire (not drinking water). Wire it for an aerator.',
   cellsX: 6, cellsZ: 6, frontCells: 0,
   parts: { foundation: 'fieldstone', walls: 'board_batten', roof: 'metal_roof' },
   maxSlope: 0.1, floorY: 0.0, porch: 0, sleeps: 0, light: null,
@@ -149,7 +149,7 @@ export const POND: KitPieceDef = {
 /** A lined freshwater reservoir. */
 export const RESERVOIR: KitPieceDef = {
   id: 'reservoir', name: 'Reservoir', category: 'water',
-  blurb: 'A lined 15 × 12 m reservoir with a concrete edge, an intake and a pump pad: 400,000 L of clean stored water. No fish.',
+  blurb: 'A lined 15 × 12 m reservoir with a concrete edge, an intake and a pump pad: 400,000 L of stored water, drinkable once you filter it (filtration shed or a filter). No fish.',
   cellsX: 5, cellsZ: 4, frontCells: 0,
   parts: { foundation: 'concrete', walls: 'concrete', roof: 'metal_roof' },
   maxSlope: 0.1, floorY: 0.0, porch: 0, sleeps: 0, light: null,
