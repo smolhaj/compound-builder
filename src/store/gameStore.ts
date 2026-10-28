@@ -18,6 +18,7 @@ import { placeOrder } from '../sim/economy';
 import { planStructure } from '../sim/construction';
 import { markTree, unmarkTree, isMarked, type TreeRef } from '../sim/forestry';
 import { lightsOf, type LightMode } from '../sim/lights';
+import { AUTO_NAME, type AutoLightsOut } from '../sim/blackout';
 import { stampHighGround, upgradeTower } from '../sim/towers';
 import { planRun, upgradeRun, type Gate, type PerimeterKind, type Pt } from '../sim/perimeter';
 import { fitProblem, orderFit, plant, repairPump, replaceFried } from '../sim/utilities';
@@ -159,6 +160,8 @@ export interface GameStore {
   setRotate: (on: boolean) => void;
   /** OPSEC choices: pick deliveries up in town; blackout curtains. */
   setOpsec: (k: 'quietDeliveries' | 'blackout', on: boolean) => void;
+  /** The family's lights-out routine (sim/blackout.ts). */
+  setLightsOutAuto: (m: AutoLightsOut) => void;
   /** Fill everyone's prescriptions 90 days ahead. */
   stockUpRx: () => void;
   /** After the report card: play on (endless). */
@@ -367,9 +370,10 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     if (locked()) return;
     const g = structuredClone(get().game);
     opsecOf(g)[k] = on;
-    log(g, k === 'quietDeliveries' ? (on ? 'Picking deliveries up in town from now on: fewer people see the truck.' : 'Deliveries come to the place again.') : (on ? 'Blackout curtains up: the lights don\'t show from the road.' : 'Blackout curtains down.'));
+    log(g, k === 'quietDeliveries' ? (on ? 'Picking deliveries up in town from now on: fewer people see the truck.' : 'Deliveries come to the place again.') : (on ? 'Lights out: windows, fire pit and lamps go dark, nothing shows from the road.' : 'Lights back on.'));
     set({ game: g });
   },
+  setLightsOutAuto: (m) => { if (locked()) return; const g = structuredClone(get().game); opsecOf(g).auto = m; log(g, `Lights-out routine: ${AUTO_NAME[m].toLowerCase()}.`); set({ game: g }); },
   setRotate: (on) => {
     if (locked()) return;
     const g = structuredClone(get().game);

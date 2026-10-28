@@ -36,6 +36,7 @@ import type { Stock } from './materials';
 import type { Battle } from './battleTypes';
 import { gateLead, isAway, recordBattle, resolveRansom, type RansomTerms } from './rescue';
 import { defenders } from './pact';
+import { glowFactor } from './blackout';
 import { resolveTrialEnd, startTrial, trialDay, type TrialCamp } from './trial';
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -122,7 +123,7 @@ export function postureOf(s: GameState): Posture {
   const homes = fin.filter(st => isHome(st.kind));
   const lit = s.utilities.lit.some(id => homes.some(h => h.id === id));
   const surface = fin.filter(st => !st.kind.startsWith('bunker_')).length;
-  const visibility = Math.min(100, 12 + surface * 5 + (lit ? 18 : 0) + (s.utilities.report.genKwh > 0.1 ? 15 : 0) + (homes.length ? 8 : 0));
+  const visibility = Math.min(100, 12 + surface * 5 + (lit ? 18 * glowFactor(s) : 0) + (s.utilities.report.genKwh > 0.1 ? 15 : 0) + (homes.length ? 8 : 0));
   // the line: barrier runs weighted by how much they stop people, against a ring of ≈ 240 m
   const line = enclosure(s);
   let held = 0, look = 0;

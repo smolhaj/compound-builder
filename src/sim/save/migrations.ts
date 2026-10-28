@@ -54,6 +54,8 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   5: s => ({ ...s, version: 6, stock: { rebar: 0, membrane: 0, excavator: 0, blast_door: 0, nbc_filter: 0, spoil: 0, ...(s.stock as object) } }),
   // 6 → 7: the escape tunnel (culvert, egress hatch)
   6: s => ({ ...s, version: 7, stock: { culvert: 0, egress_hatch: 0, ...(s.stock as object) } }),
+  // 44 → 45: light discipline: the family's lights-out routine (`opsec.auto`) and blackout curtains join the stockpile at zero (sim/blackout.ts)
+  44: s => ({ ...s, version: 45, stock: { blackout_curtains: 0, ...(s.stock as object) }, opsec: s.opsec ? { auto: 'off', ...(s.opsec as object) } : s.opsec }),
   // 43 → 44: structures may carry `replaces` (a watch-tower upgrade in place, sim/towers.ts; none yet) and the top towers' mount and turret goods join the stockpile at zero
   43: s => ({ ...s, version: 44, stock: { gun_mount: 0, turret_head: 0, ...(s.stock as object) }, lights: (s.lights as object | undefined) ?? newLights() }),
   // 42 → 43: a raid rolled for the day waits for its hour of arrival (`gate.incoming`, sim/siege.ts); none yet

@@ -32,7 +32,7 @@ describe('OPSEC', () => {
     expect(exposureParts(g).deliveries).toBeCloseTo(loud * 0.4);
   });
 
-  it('lights after the grid fails show; blackout curtains halve it', () => {
+  it('lights after the grid fails show; lights out cut it', () => {
     const g = fresh();
     g.utilities.lit = ['a', 'b'];
     g.disaster.tracks.grid = 1;
@@ -41,7 +41,7 @@ describe('OPSEC', () => {
     const on = exposureParts(g).lights;
     expect(on).toBeGreaterThan(0);
     opsecOf(g).blackout = true;
-    expect(exposureParts(g).lights).toBeCloseTo(on / 2);
+    expect(exposureParts(g).lights).toBeLessThan(on / 2);
   });
 
   it('a negotiator keeps the talk down', () => {

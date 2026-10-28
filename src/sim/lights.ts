@@ -13,7 +13,7 @@
  * through `blackoutNow` without touching a call site. Pure (tested).
  */
 import { powered } from './gear';
-import { opsecOf } from './opsec';
+import { floodsOut } from './blackout';
 import { isFinished } from './construction';
 import type { GameState } from './state';
 
@@ -39,7 +39,7 @@ export const lightsOf = (s: GameState): LightsState => (s.lights ??= newLights()
 export const lightMode = (s: GameState, id: string): LightMode => lightsOf(s).per[id] ?? lightsOf(s).mode;
 
 /** Lights-out discipline: a blackout turns every floodlight off whatever its mode (opsec curtains today; a fuller blackout can set this later). */
-export const blackoutNow = (s: GameState): boolean => opsecOf(s).blackout;
+export const blackoutNow = (s: GameState): boolean => floodsOut(s);
 
 /** A threat is near: someone at the gate, or a raid (battle.ts passes true), or the sensors tripped in the last SENSOR_HOLD. */
 export const threatNearby = (s: GameState): boolean => !!s.gate.pending || s.clock.t < lightsOf(s).alertUntil;

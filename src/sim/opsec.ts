@@ -11,16 +11,19 @@
  *  Talk            a good negotiator in the household keeps the stories quiet
  *
  * Player choices (`s.opsec`, lazily made): pick deliveries up in town (fewer
- * people see the truck) and blackout curtains (halve the light exposure).
+ * people see the truck) and light discipline (sim/blackout.ts: lights out,
+ * blackout curtains).
  */
 import type { GameState } from './state';
 import { isFinished } from './construction';
 import { alwaysLit } from './lights';
+import { lightLines, type AutoLightsOut } from './blackout';
 import { floodTowerIds } from './towers';
 
-export interface Opsec { quietDeliveries: boolean; blackout: boolean }
+/** `blackout` is the manual lights-out switch; `auto` the family's routine (sim/blackout.ts). */
+export interface Opsec { quietDeliveries: boolean; blackout: boolean; auto?: AutoLightsOut }
 
-export const opsecOf = (s: GameState): Opsec => (s.opsec ??= { quietDeliveries: false, blackout: false });
+export const opsecOf = (s: GameState): Opsec => (s.opsec ??= { quietDeliveries: false, blackout: false, auto: 'off' });
 
 export type ExposureSource = 'deliveries' | 'structures' | 'guns' | 'metals' | 'lights' | 'smoke' | 'talk' | 'news' | 'market';
 export const EXPOSURE_NAME: Record<ExposureSource, string> = {
@@ -42,10 +45,9 @@ export function exposureParts(s: GameState): Record<ExposureSource, number> {
   structures = Math.min(25, structures);
   const guns = Math.min(15, s.armory.onBooks * 2);
   const metals = Math.min(10, s.fin.onBooks / 5000);
-  const gridDown = s.disaster.tracks.grid < 0.5;
   // lamps in the windows once the grid is down; floodlights left on all night are seen from the road (+3 each, up to 9; sim/lights.ts)
-  const floodSeen = Math.min(9, 3 * alwaysLit(s, floodTowerIds(s)));
-  const lights = (gridDown && s.utilities.lit.length > 0 ? Math.min(20, 8 + s.utilities.lit.length * 2) * (o.blackout ? 0.5 : 1) : 0) + floodSeen;
+  // windows (dimmed by lights-out and curtains), floodlights left on, the fire pit, the generator: sim/blackout.ts
+  const lights = lightLines(s, alwaysLit(s, floodTowerIds(s))).reduce((a, l) => a + l.points, 0);
   const hungry = s.disaster.tracks.stores < 0.5;
   const smoke = hungry ? 6 + (s.stock.smoker ? 4 : 0) : 0;
   const adults = s.people.filter((p, i) => !p.kid && s.personState[i]?.needs.died == null);

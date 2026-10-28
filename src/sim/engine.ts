@@ -47,6 +47,7 @@ import { log } from './economy';
 import { dayIndex } from './state';
 import { buildRate } from './family';
 import { routineAt, taskFor } from './schedule';
+import { nightWork } from './blackout';
 import { hourOf, type GameState, type Structure } from './state';
 
 /** Household running costs a day in peacetime (rural Mountain West, 2020s): the truck, insurance, phone and property tax for the household, plus groceries a head ($160 for a family of four). Stops once the stores and banks are gone. */
@@ -85,7 +86,7 @@ function subStep(s: GameState): void {
     if (isAway(s, p.id)) { ps.task = 'away'; ps.target = null; return; }
     // the first two weeks after the strikes: everyone in the shelter
     if (isNuclear(s) && s.clock.t < s.disaster.hitAt + SHELTER_DAYS) { ps.task = routineAt(p, h) === 'sleep' ? 'sleep' : 'shelter'; ps.target = null; return; }
-    const rate = buildRate(p) * workFactor(ps.needs);
+    const rate = buildRate(p) * workFactor(ps.needs) * nightWork(s, h);
     const slot = routineAt(p, h);
     // the day job: weekdays in town during work hours, paid by the hour
     if (slot === 'work' && weekday && ps.employed && p.job && !snowedIn(s)) {

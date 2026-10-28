@@ -11,6 +11,7 @@
  * health, and with it how much work people can do.
  */
 import { calendarOf, type GameState } from './state';
+import { darkMood, mishapChance } from './blackout';
 import { wildDay } from './wildfood';
 import { livestockDay } from './livestock';
 import { isHome } from './blueprints';
@@ -256,8 +257,11 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
     if (n.health + dh > diet.healthCap) dh = Math.min(dh, n.health > diet.healthCap ? -0.2 : diet.healthCap - n.health);
     n.health = Math.max(cozy ? 5 : 0, Math.min(100, n.health + dh));
     // morale: drifts to a baseline that variety, a home, light and safety raise; hunger and loss lower
-    const target = 45 + 6 * Math.min(variety, 4) + diet.morale + (home ? 8 : -6) + (dark ? -8 : 0) + (s.utilities.hauling ? (s.utilities.haulFar ? -10 : -4) : 0) - Math.min(25, n.hunger / 1000) - (s.personState.some(x => x.needs?.died != null) ? 15 : 0);
+    const target = 45 + 6 * Math.min(variety, 4) + diet.morale + (home ? 8 : -6) + (dark ? -8 : 0) + darkMood(s, !!p.kid) + (s.utilities.hauling ? (s.utilities.haulFar ? -10 : -4) : 0) - Math.min(25, n.hunger / 1000) - (s.personState.some(x => x.needs?.died != null) ? 15 : 0);
     n.morale += (Math.max(0, Math.min(100, target)) - n.morale) * 0.08;
+    // stumbling about in dark rooms under lights-out without curtains (sim/blackout.ts)
+    const stumble = ((rnd * 7919 + i * 211 + 5) % 1 + 1) % 1;
+    if (stumble < mishapChance(s) && n.hurt.length < 3) { n.hurt.push({ what: 'a sprain from a fall in the dark', sev: 10 }); log(s, `${p.first} took a fall in the dark house: lights out without curtains is costing the family.`); }
     if (n.tired) n.tired = Math.max(0, n.tired - 3);
     if (n.health <= 0) {
       n.died = Math.floor(s.clock.t);

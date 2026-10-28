@@ -38,8 +38,10 @@ export interface WindowCtx {
   awake: number;
   /** Wired and had power yesterday (sim utilities.lit). */
   powered: boolean;
-  /** OPSEC blackout curtains drawn at night. */
+  /** Lights out with blackout curtains drawn at night: the room is lit, the window is not. */
   blackout: boolean;
+  /** Lights out and no curtains on this building: the room is dark too (sim/blackout.ts). */
+  dark?: boolean;
   /** Someone on watch through the night (a lamp turned low for them). */
   watch: boolean;
 }
@@ -52,7 +54,7 @@ export interface WindowCtx {
  * curtains keep the light in: the room is lit, the window is not.
  */
 export function windowLight(c: WindowCtx): { kind: LampKind; room: number } {
-  if (!isDark(c.night)) return { kind: 'off', room: 0 };
+  if (!isDark(c.night) || c.dark) return { kind: 'off', room: 0 };
   const late = c.hour >= 23 || c.hour < 4.5;
   let room = 0;
   if (c.home) {

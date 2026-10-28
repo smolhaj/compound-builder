@@ -31,6 +31,7 @@ import { SmokePlume } from '../../engine/world/fx/SmokePlume';
 import { seasonState } from '../../engine/world/season/seasonState';
 import { writeSeasonExtras } from '../../engine/world/season/seasonShader';
 import { containerWear, overgrowth, packWear, structureAge, wearFor, wetnessOf, type Wear } from './aging';
+import { curtainSets, lightsOutNow } from '../../sim/blackout';
 import { awakeAtHome, firePitLit, flashlightCarriers, generatorRunning, windowLight, type LampKind, type NightPerson } from './nightLife';
 import { frostAt, mudSeason, troughIce } from './seasonCover';
 import { kitIdOf, setMeshWear, WEAR_CLASS } from './weathering';
@@ -139,7 +140,7 @@ export class Atmosphere {
       const st = game.personState[i];
       return { id: p.id, task: st?.task ?? 'idle', kid: !!p.kid, gone: st?.needs.died != null };
     });
-    const blackout = !!game.opsec?.blackout;
+    const lightsOut = lightsOutNow(game), curtains = curtainSets(game);
     const built = [...this._h.buildings()];
     // ── seasons: mud, frost, drifts, the stock tank ──
     const R = REGIONS[game.site.region];
@@ -163,7 +164,9 @@ export class Atmosphere {
       // the main house holds the household; another house is lit when there are more people than the first sleeps
       const here = !home ? 0 : rank === 0 ? awake : Math.max(0, awake - KIT[homes[0].kind].sleeps * rank);
       const powered = game.utilities.lit.includes(b.id);
-      const w = windowLight({ hour: f.hour, night: f.night, home, awake: here, powered, blackout, watch: watch && rank === 0 });
+      // lights out: a house with a set of curtains keeps its room lit behind them; every other building goes dark
+      const covered = lightsOut && home && rank < curtains;
+      const w = windowLight({ hour: f.hour, night: f.night, home, awake: here, powered, blackout: covered, dark: lightsOut && !covered, watch: watch && rank === 0 });
       const kind = this.qa.lamp ?? w.kind;
       this._room.set(b.id, this.qa.lamp ? (kind === 'off' ? 0 : 0.8) : w.room);
       this._setLamp(b.group, kind);
@@ -173,7 +176,7 @@ export class Atmosphere {
     let sitting = 0;
     for (const id of this._h.family.shown) { const p = this._h.family.poseOf(id); if (p && Math.hypot(p.x - this.fire.x, p.z - this.fire.z) < 0.5) sitting++; }
     const collapsed = !!game.disaster.kind && game.clock.t >= game.disaster.hitAt;
-    const lit = this.qa.fire ?? firePitLit({ hour: f.hour, sittingOut: sitting, rain: f.rain, cold: sp.cold, hasHome, blackout, collapsed, night: f.night });
+    const lit = this.qa.fire ?? firePitLit({ hour: f.hour, sittingOut: sitting, rain: f.rain, cold: sp.cold, hasHome, blackout: lightsOut, collapsed: collapsed || lightsOut, night: f.night });
     const wx = 0.08 + f.wind * 0.45, wz = 0.03 + f.wind * 0.12;
     this.firePit.update(f.time, lit, wx, wz, f.daylight, f.viewportH);
     // ── flashlights ──
@@ -181,7 +184,8 @@ export class Atmosphere {
       radioWarned: !!game.radio && dayIndex(game.clock.t) <= game.radio.warnedUntil,
       atGate: !!game.gate.pending, battle: f.battle, dogs: (game.stock.dog ?? 0) >= 1 && !!game.gate.pending,
     };
-    const ids = flashlightCarriers(people, this._h.family.shown, f.night, threat);
+    // lights out: the watch goes without a torch unless it has come to a fight or someone is at the gate
+    const ids = lightsOut && !f.battle && !threat.atGate ? [] : flashlightCarriers(people, this._h.family.shown, f.night, threat);
     const carriers: Carrier[] = [];
     for (const id of ids) { const p = this._h.family.poseOf(id); if (p) carriers.push({ x: p.x, y: this._h.groundAt(p.x, p.z), z: p.z, rot: p.rot }); }
     this._flash.update(carriers, f.night, f.time);

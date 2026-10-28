@@ -1,4 +1,5 @@
 import { useState, type CSSProperties, type ReactNode } from 'react';
+import { LightDiscipline } from './LightDiscipline';
 import type { GameState } from '../sim/state';
 import { isHome } from '../sim/blueprints';
 import { stormOutage } from '../sim/weatherThreats';
@@ -658,7 +659,6 @@ export function Hud() {
                 {topExposure(game).map(([k, v]) => <Row key={k} label={EXPOSURE_NAME[k]} value={`+${Math.round(v)}`} />)}
                 <div style={{ display: 'flex', gap: 4, padding: '2px 0', flexWrap: 'wrap' }}>
                   <button style={btn(o.quietDeliveries)} title="Pick deliveries up in town: fewer people see the truck" onClick={() => g.setOpsec('quietDeliveries', !o.quietDeliveries)}>Pick up in town</button>
-                  <button style={btn(o.blackout)} title="Blackout curtains: lights at night show half as much" onClick={() => g.setOpsec('blackout', !o.blackout)}>Blackout curtains</button>
                 </div>
               </Section>;
             })()}
@@ -776,8 +776,9 @@ function DefenseTab() {
         </div>;
       })}
     </Section>
+    <LightDiscipline />
     <Section title="Floodlights">
-      <Note>Part of the night-time suite: lights that stay on draw the road's eyes to the camp. Always on costs power and is seen from the road; a motion sensor lights up when a threat is detected near and for a little after; off keeps the place dark. A blackout (curtains) turns every light off.</Note>
+      <Note>Part of the night-time suite: lights that stay on draw the road's eyes to the camp. Always on costs power and is seen from the road; a motion sensor lights up when a threat is detected near and for a little after; off keeps the place dark. Light discipline (above) can turn every light off.</Note>
       <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', padding: '3px 0' }}>
         <span style={{ flex: 1 }}>Default for all</span>
         {LIGHT_MODES.map(m => <button key={m} style={btn(lightsOf(game).mode === m)} onClick={() => useGameStore.getState().setLightDefault(m)}>{LIGHT_MODE_NAME[m]}</button>)}

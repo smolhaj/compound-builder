@@ -101,6 +101,7 @@ function Icon({ id, tint }: { id: string; tint?: number }) {
     case 'cameras': case 'thermal_cam': return g(<><rect x="8" y="16" width="22" height="10" rx="2" fill="#e0e0d8" /><circle cx="10" cy="21" r="3" fill={id === 'cameras' ? '#333' : '#d06a2a'} /><path d="M24 26 v10" stroke="#888" strokeWidth="2" /></>);
     case 'driveway_alarm': case 'tripwire': return g(<><path d="M6 30 h32" stroke="#888" strokeDasharray={id === 'tripwire' ? '2 2' : undefined} /><rect x="16" y="14" width="12" height="12" rx="2" fill="#3a6a9a" /></>);
     case 'floodlights': return g(<><path d="M14 14 l10 6 v6 l-10 6 z" fill="#555" /><path d="M24 20 l14 -6 v20 l-14 -6" fill="#ffe08a" opacity="0.8" /></>);
+    case 'blackout_curtains': return g(<><rect x="8" y="8" width="28" height="3" fill="#777" />{[10, 18, 26].map(x => <path key={x} d={`M${x} 11 q4 12 0 24 h8 q-4 -12 0 -24 z`} fill="#2a2a34" />)}</>);
     case 'dog': return g(<path d="M10 30 v-10 l6 -6 h4 l2 -4 l4 4 v6 h10 v10 h-4 v-6 h-14 v6 z" fill="#8a6a40" />);
     case 'steel_door': case 'safe_room': return g(<><rect x="12" y="6" width="20" height="32" fill="#6a7068" stroke="#3a3e38" strokeWidth="2" /><circle cx="28" cy="22" r="2" fill="#ccc" /></>);
     case 'window_bars': return g(<><rect x="8" y="8" width="28" height="28" fill="#2a3a4a" />{[14, 20, 26, 32].map(x => <path key={x} d={`M${x} 8 v28`} stroke="#9a9a9a" strokeWidth="2" />)}</>);
