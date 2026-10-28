@@ -70,6 +70,44 @@ try {
     // the garden and the coop
     await cam(c.x - 4.5, c.z - 5.5, 4.2, 0.18, 2.9, 0.12); await shot('morning-garden-eye');
   }
+  // ── cleaning and pet care at work, mid-morning ──
+  if (!only || only === 'cleaning') {
+    await page.evaluate(async () => {
+      const D = await import('/src/sim/daily.ts');
+      const G = window.__cb.game;
+      const g = structuredClone(window.__compound.g);
+      const day = Math.floor(g.clock.t) + 70; g.clock.t = day + 3 / 24; g.clock.ticks = Math.round(g.clock.t / (0.25 / 24));
+      g.stock.dog = 2;
+      const duties = ['cleaning', 'pets', 'cleaning', 'pets', 'kitchen', 'repairs'];
+      g.people.forEach((p, i) => { D.setDuty(g, p.id, [6, 7, 8, 9, 10, 11], duties[i] ?? 'cleaning'); });
+      G.setState({ game: g });
+      G.getState().advance(0.08);
+      return G.getState().game.personState.map(ps => ps.task);
+    }).then(t => console.log('cleaning tasks', JSON.stringify(t)));
+    await frames(4);
+    await cam(c.x - 1, c.z - 2.5, 13, 0.62, 2.6); await shot('cleaning-overview');
+    await cam(c.x + 0.9, c.z - 0.3, 2.6, 0.1, -2.2, 0.12); await shot('cleaning-eye');
+    await cam(c.x - 0.4, c.z + 0.1, 2.6, 0.1, 2.4, 0.12); await shot('pets-eye');
+  }
+  // ── no house yet: everyone asleep on bedrolls at the tent at 02:15, one on watch ──
+  if (!only || only === 'tent') {
+    await page.evaluate(async () => {
+      const D = await import('/src/sim/daily.ts');
+      const G = window.__cb.game;
+      const g = structuredClone(window.__compound.g);
+      g.structures = g.structures.filter(x => !['farmhouse', 'cottage'].includes(x.kind));
+      g.disaster.kind = 'grid_down'; g.disaster.hitAt = -30; g.disaster.warnAt = -40; g.disaster.phase = 'survival';
+      g.disaster.tracks = { ...g.disaster.tracks, law: 0, stores: 0, deliveries: 0, banks: 0, grid: 0 };
+      const day = Math.floor(g.clock.t) + 120; g.clock.t = day + (2.25 - 6 + 24) / 24; g.clock.ticks = Math.round(g.clock.t / (0.25 / 24));
+      D.dailyOf(g).plan.day = -1;
+      G.setState({ game: g });
+      G.getState().advance(0.02);
+      return G.getState().game.personState.map(ps => ps.task);
+    }).then(t => console.log('tent tasks', JSON.stringify(t)));
+    await frames(4);
+    await cam(c.x, c.z, 7, 0.5, 2.4, 0.1); await shot('tent-night-above');
+    await cam(c.x + 0.2, c.z - 0.2, 2.2, 0.1, 2.0, 0.1); await shot('tent-night-eye');
+  }
   // ── the schedule panel ──
   if (!only || only === 'panel') {
     await page.evaluate(async () => {
