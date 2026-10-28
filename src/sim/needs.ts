@@ -261,7 +261,8 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
     n.morale += (Math.max(0, Math.min(100, target)) - n.morale) * 0.08;
     // stumbling about in dark rooms under lights-out without curtains (sim/blackout.ts)
     const stumble = ((rnd * 7919 + i * 211 + 5) % 1 + 1) % 1;
-    if (stumble < mishapChance(s) && n.hurt.length < 3) { n.hurt.push({ what: 'a sprain from a fall in the dark', sev: 10 }); log(s, `${p.first} took a fall in the dark house: lights out without curtains is costing the family.`); }
+    // only people up at night (on watch) are out in it; sleepers are not
+    if ((s.personState[i]?.task as string) === 'watch' && stumble < mishapChance(s) && n.hurt.length < 3) { n.hurt.push({ what: 'a sprain from a fall in the dark', sev: 10 }); log(s, `${p.first} took a fall in the dark house: lights out without curtains is costing the family.`); }
     if (n.tired) n.tired = Math.max(0, n.tired - 3);
     if (n.health <= 0) {
       n.died = Math.floor(s.clock.t);

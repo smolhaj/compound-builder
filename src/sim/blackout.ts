@@ -69,9 +69,9 @@ export function glowFactor(s: GameState): number {
 export const darkness = (s: GameState): number => (lightsOutNow(s) ? 1 - curtainCover(s) : 0);
 /** Mood drift target shift (kids feel it more). */
 export const darkMood = (s: GameState, kid: boolean): number => -(kid ? 9 : 6) * darkness(s);
-/** Night work rate (1 = unaffected): slower in unlit rooms after dark. */
+/** Night work rate for people who are awake and working after dark (1 = unaffected): slower in unlit rooms. Not a reason to work at night: sleepers sleep. */
 export const nightWork = (s: GameState, hour: number): number => (isNightHour(hour) ? 1 - 0.2 * darkness(s) : 1);
-/** Chance in a day that someone stumbles in the dark (a sprain). */
+/** Chance in a day that someone who is up at night (on watch, an emergency) stumbles in the dark (a sprain). Sleepers are not affected. */
 export const mishapChance = (s: GameState): number => 0.012 * darkness(s);
 
 export interface LightLine { id: 'windows' | 'floods' | 'fire' | 'generator'; label: string; points: number; note: string }

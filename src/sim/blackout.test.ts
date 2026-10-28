@@ -91,6 +91,13 @@ describe('light discipline', () => {
     expect(windowLight({ ...base, dark: true })).toEqual({ kind: 'off', room: 0 });
   });
 
+  it('only people up at night (on watch) stumble; sleepers do not', () => {
+    const g = fresh(); house(g); opsecOf(g).blackout = true;
+    g.personState.forEach(p => { p.task = 'sleep'; p.needs.hurt = []; });
+    for (let d = 0; d < 200; d++) liveDay(g, (d * 0.137) % 1);
+    expect(g.personState.every(p => p.needs.hurt.length === 0)).toBe(true);
+  });
+
   it('children feel the dark more and a day without curtains wears the mood down', () => {
     const run = (curtains: number) => {
       const g = fresh(); house(g); opsecOf(g).blackout = true; g.stock.blackout_curtains = curtains;

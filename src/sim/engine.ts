@@ -86,8 +86,8 @@ function subStep(s: GameState): void {
     if (isAway(s, p.id)) { ps.task = 'away'; ps.target = null; return; }
     // the first two weeks after the strikes: everyone in the shelter
     if (isNuclear(s) && s.clock.t < s.disaster.hitAt + SHELTER_DAYS) { ps.task = routineAt(p, h) === 'sleep' ? 'sleep' : 'shelter'; ps.target = null; return; }
-    const rate = buildRate(p) * workFactor(ps.needs) * nightWork(s, h);
     const slot = routineAt(p, h);
+    const rate = buildRate(p) * workFactor(ps.needs) * (slot === 'sleep' ? 1 : nightWork(s, h));
     // the day job: weekdays in town during work hours, paid by the hour
     if (slot === 'work' && weekday && ps.employed && p.job && !snowedIn(s)) {
       ps.task = 'job'; ps.target = null;
