@@ -9,7 +9,7 @@ import { enclosure } from './enclosure';
 import { ANIMALS } from './livestock';
 import {
   WILD_BY_REGION, SPECIES, activity, attractants, capacity, count, gameCount, killShare, layFactor, ownedAcres, populations, predatorLine,
-  predatorRisk, predatorSpecies, proof, recoveryPerDay, wildlifeDay, wildlifeNight, wildlifeView, type SpeciesId,
+  hurtKid, predatorRisk, predatorSpecies, proof, recoveryPerDay, wildlifeDay, wildlifeNight, wildlifeView, type SpeciesId,
 } from './wildlife';
 import { floodlightLit, lightsOf, setAiSensor, setAllAi, aiModulesUsed, ARMORY_LIGHTS, animalNearby, raiseAnimalAlert, SENSOR_HOLD, threatNearby } from './lights';
 import { exposureParts } from './opsec';
@@ -291,6 +291,19 @@ describe('predator risk', () => {
       hurt += g.personState.filter(p => p.needs.hurt.some(w => /attack/.test(w.what))).length;
     }
     expect(hurt).toBeGreaterThan(0);
+  });
+  it('a kid caught by a predator is hurt but lives on Cozy and Standard and dies on Hardcore only', () => {
+    for (const d of ['cozy', 'standard'] as const) {
+      const g = place(40); g.disaster.difficulty = d;
+      const r = hurtKid(g, 40, 'bear attack')!;
+      expect(r.died).toBe(false);
+      const kid = g.personState[g.people.findIndex(p => p.kid)];
+      expect(kid.needs.died).toBeNull(); expect(kid.needs.hurt.length).toBe(1);
+    }
+    const h = place(40); h.disaster.difficulty = 'hardcore';
+    const r = hurtKid(h, 40, 'bear attack')!;
+    expect(r.died).toBe(true);
+    expect(h.personState[h.people.findIndex(p => p.id === h.people.find(x => x.kid)!.id)].needs.died).not.toBeNull();
   });
   it('sightings and encounters go to the ticker, and not every day', () => {
     const g = place(80, 'appalachia', { timber: 1 }, 4);

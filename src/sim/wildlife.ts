@@ -339,13 +339,22 @@ export function predatorRisk(s: GameState, sp: SpeciesId, closed = proof(s, 'pre
 }
 
 type Target = 'stock' | 'hens' | 'dog' | 'kid' | 'scraps';
-function hurtKid(s: GameState, sev: number, what: string): string | null {
+/**
+ * A kid caught outside by a bear or cougar. Cozy and Standard: badly hurt but pulled away. Hardcore (permadeath,
+ * the user's choice): the child is killed. Returns the child's first name and whether they died.
+ */
+export function hurtKid(s: GameState, sev: number, what: string): { name: string; died: boolean } | null {
   const kids = s.people.filter((p, i) => p.kid && s.personState[i]?.needs.died == null);
   if (!kids.length) return null;
   const kid = kids[0], ps = s.personState.find(x => x.id === kid.id)!;
+  if (s.disaster.difficulty === 'hardcore') {
+    ps.needs.died = Math.floor(s.clock.t);
+    ps.needs.health = 0;
+    return { name: kid.first, died: true };
+  }
   ps.needs.hurt.push({ what, sev, trauma: true });
   ps.needs.health = Math.max(s.disaster.difficulty === 'cozy' ? 5 : 1, ps.needs.health - sev * 0.4);
-  return kid.first;
+  return { name: kid.first, died: false };
 }
 
 const a_an = (w: string) => /^[aeiou]/i.test(w) ? 'an' : 'a';
@@ -412,7 +421,7 @@ export function wildlifeDay(s: GameState, freezer = false): string[] {
       case 'dog': s.stock.dog = Math.max(0, s.stock.dog - 1); lines.push(`${cap1(one(sp))} took the dog from the yard at night.`); break;
       case 'kid': {
         const who = hurtKid(s, sp === 'bear' ? 38 : 45, `${sp} attack`);
-        lines.push(who ? `${cap1(one(sp))} caught ${who} outside at dusk: badly hurt, but pulled away. Keep the kids in at dusk, or close the land.` : `${cap1(one(sp))} stalked the yard at dusk.`);
+        lines.push(!who ? `${cap1(one(sp))} stalked the yard at dusk.` : who.died ? `${cap1(one(sp))} caught ${who.name} outside at dusk. ${who.name} is dead.` : `${cap1(one(sp))} caught ${who.name} outside at dusk: badly hurt, but pulled away. Keep the kids in at dusk, or close the land.`);
         break;
       }
       case 'scraps': lines.push(`A bear tore into the ${s.stock.fresh >= 1 ? 'food' : 'windfall fruit'} and the scraps. ${a.fruit && !a.smell ? 'Pick up the fruit.' : 'Food smells and open scraps bring it back.'}`); if (s.stock.fresh >= 1) s.stock.fresh = Math.max(0, s.stock.fresh - Math.min(2, s.stock.fresh)); break;
