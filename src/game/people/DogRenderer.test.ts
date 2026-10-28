@@ -13,12 +13,12 @@ describe('dogs on the ground', () => {
     const r = new DogRenderer(new THREE.Scene());
     r.update(0.016, g, 12, 0.5, ctx, ground, 1);
     const pos = r.positions().find(p => p.id === d.id)!;
-    // the body sits a body-height above the ground at its own x, z (lying: 0.036 x scale; standing: 0.068 x scale)
+    // the body sits a body-height above the ground at its own x, z (lying 0.042; standing 0.1, times breed size)
     const y = r.bodyY(0), gy = ground(pos.x, pos.z);
     expect(y).toBeGreaterThan(gy);
-    expect(y - gy).toBeLessThan(0.068 * 1.3 * 1.1);
+    expect(y - gy).toBeLessThan(0.1 * 1.1 * 1.06);
     // the shoulder of a standing dog reaches 0.12 to 0.18 against a 0.28 person
-    const shoulder = (0.068 + 0.03) * 1.3 * 1.06;
+    const shoulder = (0.1 + 0.028) * 1.06;
     expect(shoulder).toBeGreaterThan(0.12); expect(shoulder).toBeLessThan(0.18);
     r.dispose();
   });

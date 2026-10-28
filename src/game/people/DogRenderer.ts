@@ -13,8 +13,8 @@ import { dayIndex, type GameState } from '../../sim/state';
 import { dogGoal, type DogCtx, type Stance } from './dogGoals';
 
 const CAP = 16;
-/** Dogs read small beside a 0.28 person at the base size (0.1 at the shoulder): 1.3x gives 0.12 to 0.17. */
-const SCALE_UP = 1.3;
+/** The base dog is already sized for SCALE v2: back about 0.13 high (a medium dog, hip height about half a 0.28 person's). */
+const SCALE_UP = 1;
 /** Dog speeds (world units per real second at 1×). A dog trots faster than a person walks. */
 const TROT = 0.8, RUN = 1.6;
 
@@ -56,12 +56,12 @@ export class DogRenderer {
       return { mesh, per };
     };
     // (the leg hangs from its hip: the geometry runs from y = 0 down to y = -len)
-    const leg = new THREE.CylinderGeometry(0.0085, 0.0065, 0.05, 6).translate(0, -0.025, 0);
-    const ear = ellipsoid(0.007, 0.017, 0.005, 6).translate(0, -0.009, 0);
-    const tail = ellipsoid(0.0055, 0.0055, 0.034, 6).translate(0, 0, -0.03);
+    const leg = new THREE.CylinderGeometry(0.0058, 0.0042, 0.075, 6).translate(0, -0.0375, 0);
+    const ear = ellipsoid(0.0065, 0.016, 0.0045, 6).translate(0, 0.004, 0);
+    const tail = ellipsoid(0.0045, 0.0045, 0.036, 6).translate(0, 0, -0.034);
     this._parts = {
-      body: mk('body', ellipsoid(0.031, 0.03, 0.066), 1), head: mk('head', ellipsoid(0.024, 0.022, 0.03), 1), snout: mk('snout', ellipsoid(0.0125, 0.011, 0.02, 8), 1),
-      nose: mk('nose', ellipsoid(0.006, 0.005, 0.005, 6), 1), ear: mk('ear', ear, 2), tail: mk('tail', tail, 1), leg: mk('leg', leg, 4),
+      body: mk('body', ellipsoid(0.025, 0.028, 0.075), 1), head: mk('head', ellipsoid(0.02, 0.019, 0.026), 1), snout: mk('snout', ellipsoid(0.0085, 0.0075, 0.021, 8), 1),
+      nose: mk('nose', ellipsoid(0.0045, 0.0038, 0.004, 6), 1), ear: mk('ear', ear, 2), tail: mk('tail', tail, 1), leg: mk('leg', leg, 4),
     };
   }
 
@@ -144,56 +144,53 @@ export class DogRenderer {
     const coat = COATS[d.breed][d.tone % 3];
     const ph = a.phase, trot = moving ? 1 : 0;
     const bob = trot * Math.abs(Math.sin(ph)) * 0.004;
-    // body posture: sitting tips the rump down, lying drops the whole dog
     const lie = a.lie, sit = a.sit * (1 - lie), up = a.up;
-    const bodyY = 0.068 - 0.032 * lie - 0.012 * sit + bob;
-    const pitch = -0.4 * sit;               // nose up
+    // body: standing 0.10 up (back 0.128); lying drops it; sitting tips the chest up about the rump
+    const bodyY = 0.1 - 0.058 * lie - 0.036 * sit + bob;
+    const pitch = -0.5 * sit;
     const gy = ground(a.x, a.z);
     const base = new THREE.Matrix4().compose(tmpV.set(a.x, gy, a.z), tmpQ.setFromEuler(tmpE.set(0, a.rot, 0)), tmpS.set(sc, sc, sc));
-    const bodyL = this._loc(0, bodyY, 0, pitch, 0, 0);
-    const bodyM = new THREE.Matrix4().multiplyMatrices(base, bodyL);
+    const bodyM = new THREE.Matrix4().multiplyMatrices(base, this._loc(0, bodyY, -0.012 * sit, pitch, 0, 0));
     const body = this._parts.body, head = this._parts.head, snout = this._parts.snout, nose = this._parts.nose, ear = this._parts.ear, tail = this._parts.tail, leg = this._parts.leg;
     const dark = 0x14110e;
-    const earC = d.breed === 'hound' || d.breed === 'lab' ? coat.trim : d.breed === 'collie' || d.breed === 'shepherd' ? (d.breed === 'shepherd' ? 0x1c1814 : coat.body) : coat.trim;
+    const prick = d.breed === 'shepherd' || d.breed === 'collie';          // upright ears; the others hang
+    const earC = prick ? (d.breed === 'shepherd' ? 0x1c1814 : coat.body) : coat.trim;
     const legC = d.breed === 'collie' || d.breed === 'hound' || d.breed === 'mutt' ? coat.trim : coat.body;
     const snoutC = d.breed === 'shepherd' ? 0x2a2018 : d.breed === 'collie' ? coat.trim : coat.body;
-    // body
     body.mesh.setMatrixAt(n, bodyM); body.mesh.setColorAt(n, tmpC.setHex(coat.body));
-    // head on the neck: up when alert, down when lying, bobbing when barking
+    // head: level on a short neck (it is lifted when alert, rests low when lying, bobs when barking); counter-pitched so it stays level when the chest tips
     const bark = a.stance === 'bark' ? Math.sin(a.bark * 3) * 0.28 : 0;
-    const headY = 0.028 + 0.012 * up - 0.01 * lie + 0.014 * sit;
-    const headZ = 0.075 + 0.006 * lie;
-    const headPitch = 0.12 * lie - 0.1 * up + bark - 0.05 * sit;
-    const hm = this._loc(0, headY, headZ, headPitch);
+    const headY = 0.034 + 0.016 * up - 0.014 * lie + 0.012 * sit;
+    const hm = this._loc(0, headY, 0.088 + 0.004 * lie, -pitch * 0.9 + 0.1 * lie - 0.08 * up + bark);
     this._put(head, n, bodyM, hm, coat.body);
-    const headBase = new THREE.Matrix4().multiplyMatrices(bodyM, new THREE.Matrix4().copy(hm));
-    this._put(snout, n, headBase, this._loc(0, -0.006, 0.026, bark * 0.3), snoutC);
-    this._put(nose, n, headBase, this._loc(0, -0.002, 0.045), dark);
-    // ears: perked when alert, flat when lying
-    const earTilt = 0.35 + 0.5 * (1 - up) + (d.breed === 'hound' || d.breed === 'lab' ? 0.5 : 0) - (d.breed === 'shepherd' || d.breed === 'collie' ? 0.35 : 0);
-    const earLen = d.breed === 'hound' ? 1.45 : 1;
-    this._put(ear, n * 2, headBase, this._loc(0.016, 0.018, -0.006, 0, 0, -earTilt, earLen), earC);
-    this._put(ear, n * 2 + 1, headBase, this._loc(-0.016, 0.018, -0.006, 0, 0, earTilt, earLen), earC);
-    // tail: wags when the dog is happy, hangs when it is low, straight when alert
+    const headBase = new THREE.Matrix4().multiplyMatrices(bodyM, hm);
+    this._put(snout, n, headBase, this._loc(0, -0.005, 0.03, 0.05 + bark * 0.3), snoutC);
+    this._put(nose, n, headBase, this._loc(0, -0.002, 0.05), dark);
+    // ears: upright cones for shepherds and collies, hanging flaps for the rest
+    const earRoll = prick ? 0.12 : 0.9 + 0.2 * (1 - up);
+    const earLen = d.breed === 'hound' ? 1.3 : prick ? 1.15 : 0.9;
+    this._put(ear, n * 2, headBase, this._loc(0.012, 0.014, -0.008, prick ? -0.1 : 0.1, 0, -earRoll, earLen), earC);
+    this._put(ear, n * 2 + 1, headBase, this._loc(-0.012, 0.014, -0.008, prick ? -0.1 : 0.1, 0, earRoll, earLen), earC);
+    // tail: wags when the dog is happy, hangs when it is low, held out when alert
     const happy = d.mood > 60 ? 1 : d.mood > 35 ? 0.4 : 0;
-    const wag = Math.sin(this._time * (happy ? 12 : 3) + ph) * 0.45 * (happy + 0.1);
-    const tailUp = 0.5 + 0.35 * up + 0.3 * happy - 0.5 * (d.mood < 35 ? 1 : 0) - 0.3 * lie;
-    this._put(tail, n, bodyM, this._loc(0, 0.01, -0.058, -tailUp, wag, 0), d.breed === 'collie' || d.breed === 'mutt' ? coat.trim : coat.body);
-    // legs: swing in a trot (diagonal pairs), folded when lying, rear folded when sitting
-    const hips: Array<[number, number, number]> = [[-0.02, 0.046, 1], [0.02, 0.046, 0], [-0.02, -0.044, 0], [0.02, -0.044, 1]];   // x, z, trot parity (FL, FR, RL, RR)
+    const wag = Math.sin(this._time * (happy ? 12 : 3) + ph) * 0.4 * (happy + 0.1);
+    const tailUp = 0.45 + 0.25 * up + 0.3 * happy - 0.5 * (d.mood < 35 ? 1 : 0) - 0.25 * lie;
+    this._put(tail, n, bodyM, this._loc(0, 0.012, -0.07, -tailUp, wag, 0), d.breed === 'collie' || d.breed === 'mutt' ? coat.trim : coat.body);
+    // legs hang from the hips (y = hip height): a diagonal trot, tucked when lying, haunches down when sitting, front legs straight when sitting
+    const hips: Array<[number, number, number]> = [[-0.017, 0.05, 1], [0.017, 0.05, 0], [-0.017, -0.05, 0], [0.017, -0.05, 1]];
     for (let k = 0; k < 4; k++) {
       const [hx, hz, par] = hips[k];
       const swing = trot * Math.sin(ph + par * Math.PI) * 0.7;
       const rear = hz < 0;
-      let rx = swing;
-      let ly = 0.044 - 0.024 * lie;
-      let lz = hz;
-      if (lie > 0.01) { rx = (rear ? 1.45 : -1.35) * lie + swing * (1 - lie); ly = 0.034 - 0.016 * lie; lz = hz + (rear ? -0.012 : 0.02) * lie; }
-      if (sit > 0.01 && rear) { rx = 1.2 * sit; ly = 0.034 - 0.006 * sit; lz = hz - 0.02 * sit; }
-      // sitting: the chest is raised, so the straight front legs are stretched to reach the ground
-      const stretch = !rear && sit > 0.01 ? 1 + 0.55 * sit : 1;
-      if (!rear && sit > 0.01) ly = 0.044 + 0.034 * sit;
-      const lm = tmpP.copy(this._loc(hx, ly, lz, rx, 0, 0, 1, stretch));
+      let rx = swing, ly = 0.075, lz = hz, sy = 1;
+      if (lie > 0.01) {          // tucked: the forelegs reach out ahead, the hind legs fold under
+        rx = (rear ? 1.5 : -1.45) * lie + swing * (1 - lie); ly = 0.075 - (0.075 - 0.032) * lie; lz = hz + (rear ? -0.006 : 0.025) * lie; sy = 1 - 0.3 * lie;
+      }
+      if (sit > 0.01) {
+        if (rear) { rx = 1.45 * sit; ly = 0.075 - 0.047 * sit; lz = hz - 0.016 * sit; sy = 1 - 0.35 * sit; }
+        else { ly = 0.075 + 0.006 * sit; lz = hz - 0.012 * sit; }
+      }
+      const lm = tmpP.copy(this._loc(hx, ly, lz, rx, 0, 0, 1, sy));
       tmpM.multiplyMatrices(base, lm);
       leg.mesh.setMatrixAt(n * 4 + k, tmpM); leg.mesh.setColorAt(n * 4 + k, tmpC.setHex(legC));
     }
