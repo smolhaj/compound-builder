@@ -20,6 +20,7 @@ import { markTree, unmarkTree, isMarked, type TreeRef } from '../sim/forestry';
 import { lightsOf, type LightMode } from '../sim/lights';
 import { stampHighGround, upgradeTower } from '../sim/towers';
 import { planRun, upgradeRun, type Gate, type PerimeterKind, type Pt } from '../sim/perimeter';
+import { layPropertyWall, planPropertyWall, type PropertyGeometry } from '../sim/propertyWall';
 import { fitProblem, orderFit, plant, repairPump, replaceFried } from '../sim/utilities';
 
 /** Reconnection fee to get back on the grid after leaving it. */
@@ -108,6 +109,8 @@ export interface GameStore {
   load: (g: GameState) => void;
   /** Lay out a fence / hedge / wall run for the family to build. */
   planRun: (kind: PerimeterKind, pts: Pt[], gates: Gate[], offLen?: number) => void;
+  /** "Wall my property": lay out the whole closed property line in one wall type (creek bars, a road gate, existing runs kept). Returns how many runs. */
+  wallProperty: (kind: PerimeterKind, geo: PropertyGeometry) => number;
   /** Upgrade a finished fence or wall to the next tier, in place (null = laid out; else why not). */
   upgradeRun: (id: string) => string | null;
   /** Upgrade a finished watch tower in place: the next tier rises beside it. */
@@ -266,6 +269,13 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     planRun(g, kind, pts, gates, offLen);
     set({ game: g });
     void saveGame(AUTOSAVE, g);
+  },
+  wallProperty: (kind, geo) => {
+    if (locked()) return 0;
+    const g = structuredClone(get().game);
+    const n = layPropertyWall(g, planPropertyWall(g, kind, geo));
+    if (n) { set({ game: g }); void saveGame(AUTOSAVE, g); }
+    return n;
   },
   upgradeRun: (id) => {
     if (locked()) return LOCKED_WHY;
