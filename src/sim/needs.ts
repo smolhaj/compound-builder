@@ -10,6 +10,7 @@
  * bulk staples. A diet of one thing wears on morale; going hungry wears on
  * health, and with it how much work people can do.
  */
+import { layFactor } from './wildlife';
 import { calendarOf, type GameState } from './state';
 import { wildDay } from './wildfood';
 import { livestockDay } from './livestock';
@@ -94,7 +95,7 @@ export function produce(s: GameState): number {
   const coops = fin.filter(st => st.kind === 'chicken_coop').length;
   const gardens = fin.filter(st => st.kind === 'garden').length;
   // a dozen hens: ~8 eggs a day in summer, ~3 in midwinter (≈ 70 kcal each)
-  const eggs = coops * 70 * (5.5 + 2.5 * Math.cos(2 * Math.PI * (doy - 172) / 365));
+  const eggs = coops * 70 * (5.5 + 2.5 * Math.cos(2 * Math.PI * (doy - 172) / 365)) * layFactor(s);
   // a kitchen garden: nothing until mid-June, a peak of ≈ 2,500 kcal a day in August–September, done by late October
   // nothing until three weeks past the last frost, full by mid-summer, done a month past the first frost
   // a finished greenhouse starts the garden six weeks earlier, runs it six weeks later and raises the peak (greenhouse.ts)

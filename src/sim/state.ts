@@ -26,6 +26,7 @@ import { conditionsFor, newBody, type Body } from './body';
 import { newFin, type Fin } from './finance';
 import { newArmory, type Armory } from './armory';
 import { newWild, type Wild } from './wildfood';
+import { newWildlife, type Wildlife } from './wildlife';
 import type { Livestock } from './livestock';
 import type { Vehicle } from './vehicles';
 import { emptyStats, type Ending, type RunStats } from './report';
@@ -34,7 +35,7 @@ import { freshNeeds, type FoodReport, type Needs } from './needs';
 import type { WeatherState } from './weatherThreats';
 import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
 import type { LightsState } from './lights';
-export const SAVE_VERSION = 44;
+export const SAVE_VERSION = 45;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -215,6 +216,8 @@ export interface GameState {
   lights?: LightsState;
   /** The game in the woods and the creek, licenses. */
   wild: Wild;
+  /** Native wildlife on the land: predators taken, sightings, raids (sim/wildlife.ts). Save v45; made lazily. */
+  wildlife?: Wildlife;
   /** The long game: eras, the chronicle, milestones, the dynasty score. */
   lineage: Lineage;
   /** Goats, pigs, the steer, rabbits (lazily made: `s.livestock ??= newLivestock()`). */
@@ -275,6 +278,7 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     fin: newFin(),
     armory: newArmory(),
     wild: newWild(),
+    wildlife: newWildlife(),
     lineage: newLineage(people[0].last),
     site,
     stock: { ...emptyStock(), firewood: STARTING_FIREWOOD, canned: 2 },

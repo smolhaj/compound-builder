@@ -45,7 +45,8 @@ import { EXPOSURE_NAME, exposure, raidPressure, topExposure } from '../sim/opsec
 import { acresOf, buyProblem, LAND_NAME, priceOf } from '../sim/land';
 import { HARDEN, HARDEN_IDS, type TierDef, hardenCost, hardenProblem, isBunkerRoom, protectionOf, tierOf } from '../sim/hardening';
 import { defenseReport, type Check } from '../sim/defenseReport';
-import { ARMORY_LIGHTS, LIGHT_MODES, LIGHT_MODE_NAME, lightList, lightMode, lightsOf } from '../sim/lights';
+import { AI_MODULE, ARMORY_LIGHTS, LIGHT_MODES, LIGHT_MODE_NAME, aiModulesUsed, hasAiSensor, lightList, lightMode, lightsOf } from '../sim/lights';
+import { populations, predatorLine } from '../sim/wildlife';
 import { floodTowerIds, TOWERS, TOWER_NEXT, highBonus, highShare, isTower, towerBill, towerUpgradeProblem } from '../sim/towers';
 import { STRUCTURE_SALVAGE, isFinished as structFinished } from '../sim/construction';
 import { PERIMETER, PERIMETER_ORDER, SALVAGE, UPGRADE_NEXT, UTILITY_LINES, upgradeProblem, wallLength, runBill, runHours, runFinished, runProgress, runBlocked, runGrowth } from '../sim/perimeter';
@@ -452,6 +453,10 @@ export function Hud() {
               {game.wild.hotUntil >= Math.floor(game.clock.t) && <Note tone="bad">Fallout: game and fish read hot for months.</Note>}
               {game.stock.fishing_gear < 1 && game.site.creek && <Note>A creek full of {REGIONS[game.site.region].game.find(x => ['trout', 'bass', 'catfish', 'salmon', 'panfish'].includes(x)) ?? 'fish'}, and no fishing gear.</Note>}
             </Section>
+            <Section title="Wildlife on the land">
+              {populations(game).map(p => <Row key={p.sp} label={p.name} value={<span style={{ color: p.predator ? (p.count ? TONE.warn : DIM) : p.count < p.cap * 0.5 ? TONE.warn : undefined }}>{p.count} <span style={{ color: DIM }}>of ~{p.cap < 1 ? '<1' : Math.round(p.cap)}</span></span>} title={p.predator ? 'A predator: a danger to stock, dogs and kids if the place is careless; kept out by a wall that holds it; a good shot fills the freezer' : 'Counts follow the acres you own, the timber, open ground and water, and what has been hunted'} />)}
+              <Note tone={predatorLine(game).ok ? 'good' : 'warn'}>Predators: {predatorLine(game).detail}</Note>
+            </Section>
             {ANIMALS.some(a => (game.stock[a] ?? 0) >= 1) && <Section title="Livestock">
               {ANIMALS.filter(a => (game.stock[a] ?? 0) >= 1).map(a => { const c = game.livestock?.condition[a] ?? 1; return <Row key={a} label={MATERIALS[a].name} value={<span style={{ color: c < 0.5 ? TONE.bad : c < 0.9 ? TONE.warn : undefined }}>{Math.floor(game.stock[a])} head, {Math.round(c * 100)} % condition</span>} />; })}
               {(() => { const d = feedDemand(game), hd = d.hay > 0 ? (game.stock.hay ?? 0) / d.hay : Infinity, fd = d.feed > 0 ? (game.stock.feed ?? 0) / d.feed : Infinity; return <>
@@ -786,10 +791,17 @@ function DefenseTab() {
         <span style={{ flex: 1, color: DIM }}>Set all lights (clears overrides)</span>
         {LIGHT_MODES.map(m => <button key={m} style={btn(false)} onClick={() => useGameStore.getState().setAllLights(m)}>{LIGHT_MODE_NAME[m]}</button>)}
       </div>
+      <Note>A basic motion sensor trips on anything that moves at night: deer, coyotes, a bear. That burns power and the glow is seen from the road. An AI sensor module ({game.stock[AI_MODULE]} owned, {aiModulesUsed(game)} fitted; Shop, Defense) tells people from animals: the light comes on for people only.</Note>
+      <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', padding: '3px 0' }}>
+        <span style={{ flex: 1, color: DIM }}>AI sensor, all lights</span>
+        <button style={btn(false)} onClick={() => { const n = useGameStore.getState().setAllLightsAi(lightList(game, floodTowerIds(game)).map(l => l.id), true); if (!n) alert(game.stock[AI_MODULE] - aiModulesUsed(game) < 1 ? 'No spare AI sensor module: buy one in the Shop (Defense).' : 'Nothing to fit (the lights need power).'); }}>Fit all</button>
+        <button style={btn(false)} onClick={() => useGameStore.getState().setAllLightsAi(lightList(game, floodTowerIds(game)).map(l => l.id), false)}>Strip all</button>
+      </div>
       {lightList(game, floodTowerIds(game)).length === 0 && <Note>No floodlights yet: buy a set (Shop, Defense) or build a tower with a light mast.</Note>}
       {lightList(game, floodTowerIds(game)).map(l => <div key={l.id} style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', padding: '3px 0' }}>
         <span style={{ flex: 1 }}>{l.name}{l.id !== ARMORY_LIGHTS ? '' : ''}</span>
         {LIGHT_MODES.map(m => <button key={m} style={btn(lightMode(game, l.id) === m)} onClick={() => useGameStore.getState().setLightMode(l.id, lightsOf(game).per[l.id] === m ? null : m)}>{LIGHT_MODE_NAME[m]}</button>)}
+        <button style={btn(hasAiSensor(game, l.id))} title="AI sensor module: this light ignores animals and comes on for people only (needs a spare module and power)" onClick={() => { const why = useGameStore.getState().setLightAi(l.id, !hasAiSensor(game, l.id)); if (why) alert(why); }}>AI {hasAiSensor(game, l.id) ? 'on' : 'off'}</button>
       </div>)}
     </Section>
     <Section title="Upgrade the towers">

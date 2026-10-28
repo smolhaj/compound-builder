@@ -12,7 +12,7 @@
  *    the east). Each crossing needs creek bars; with either open the creek is
  *    the way round every wall and gate, and the barrier can't pass 35.
  */
-import { PERIMETER, peopleBlock, runFinished, runGrowth, type Pt } from './perimeter';
+import { PERIMETER, PREDATOR_BLOCK, peopleBlock, runFinished, runGrowth, type PerimeterRun, type Pt } from './perimeter';
 import type { Rect } from './land';
 import type { GameState } from './state';
 
@@ -72,10 +72,24 @@ export interface Enclosure {
   onLine: Set<string>;
 }
 
-export function enclosure(s: GameState, t = s.clock.t): Enclosure {
+/** Who the line is held against: raiders (the default), predators (bears, cougars, wolves, coyotes) or hooved game. */
+export type Against = 'people' | 'predators' | 'hoofed';
+/** A stretch of line below this hold is open, per `Against` (people keep the old 0.2; a bear walks through anything under a solid fence). */
+const OPEN_BELOW: Record<Against, number> = { people: 0.2, predators: 0.5, hoofed: 0.5 };
+/** What a run holds against `who` right now (before growth and gates). */
+function holdOf(s: GameState, r: PerimeterRun, who: Against): number {
+  if (who === 'predators') return PREDATOR_BLOCK[r.kind];
+  if (who === 'hoofed') return r.kind === 'creek_bars' ? 1 : PERIMETER[r.kind].blocks.animals;
+  return peopleBlock(s, r);
+}
+
+export function enclosure(s: GameState, t = s.clock.t, who: Against = 'people'): Enclosure {
   const rects = ownedRects(s);
   const ring = ringPoints(rects);
-  const runs = s.perimeter.filter(r => runFinished(r) && r.kind !== 'creek_bars' && PERIMETER[r.kind].blocks.people > 0 && r.pts.length > 1);
+  const openBelow = OPEN_BELOW[who];
+  // a gate is shut unless somebody is at it (a crew at the gate, a raid): then it is a hole in the line for animals too
+  const gateHold = who === 'people' ? GATE_HOLD : s.gate.pending ? 0 : 0.95;
+  const runs = s.perimeter.filter(r => runFinished(r) && r.kind !== 'creek_bars' && holdOf(s, r, who) > 0 && r.pts.length > 1);
   let sum = 0, open = 0;
   const gaps: Pt[] = [];
   for (const [x, z] of ring) {
@@ -84,10 +98,10 @@ export function enclosure(s: GameState, t = s.clock.t): Enclosure {
       const { d, s: along } = nearest(r.pts, x, z);
       if (d > REACH) continue;
       const inGate = r.gates.some(g => Math.abs(along - g.at) <= g.w / 2);
-      hold = Math.max(hold, peopleBlock(s, r) * runGrowth(r, t) * (inGate ? GATE_HOLD : 1));
+      hold = Math.max(hold, holdOf(s, r, who) * runGrowth(r, t) * (inGate ? gateHold : 1));
     }
     sum += hold;
-    if (hold < 0.2) { open++; if (gaps.length < 8 && (open - 1) % 6 === 0) gaps.push([x, z]); }
+    if (hold < openBelow) { open++; if (gaps.length < 8 && (open - 1) % 6 === 0) gaps.push([x, z]); }
   }
   const n = Math.max(1, ring.length), avg = sum / n, openShare = open / n;
   let barrier = 100 * avg * (open === 0 ? 1 : 0.6 * (1 - openShare));

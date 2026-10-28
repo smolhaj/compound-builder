@@ -26,6 +26,7 @@ import { newScavenge } from '../scavenge';
 import { newMarketState } from '../tradeGoods';
 import { newLocals } from '../neighborLife';
 import { newWild } from '../wildfood';
+import { newWildlife } from '../wildlife';
 import { dayJob, type Person } from '../family';
 
 type Raw = Record<string, unknown> & { version?: number };
@@ -55,6 +56,7 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   // 6 → 7: the escape tunnel (culvert, egress hatch)
   6: s => ({ ...s, version: 7, stock: { culvert: 0, egress_hatch: 0, ...(s.stock as object) } }),
   // 43 → 44: structures may carry `replaces` (a watch-tower upgrade in place, sim/towers.ts; none yet) and the top towers' mount and turret goods join the stockpile at zero
+  44: s => ({ ...s, version: 45, wildlife: (s.wildlife as object | undefined) ?? newWildlife(), stock: { ai_sensor_module: 0, ...(s.stock as object) }, lights: s.lights ? { ai: {}, animalUntil: -1, animalNights: [], ...(s.lights as object) } : s.lights }),
   43: s => ({ ...s, version: 44, stock: { gun_mount: 0, turret_head: 0, ...(s.stock as object) }, lights: (s.lights as object | undefined) ?? newLights() }),
   // 42 → 43: a raid rolled for the day waits for its hour of arrival (`gate.incoming`, sim/siege.ts); none yet
   42: s => ({ ...s, version: 43, gate: { incoming: null, ...(s.gate as object) } }),

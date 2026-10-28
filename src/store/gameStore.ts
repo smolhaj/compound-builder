@@ -17,7 +17,7 @@ import { step } from '../sim/engine';
 import { placeOrder } from '../sim/economy';
 import { planStructure } from '../sim/construction';
 import { markTree, unmarkTree, isMarked, type TreeRef } from '../sim/forestry';
-import { lightsOf, type LightMode } from '../sim/lights';
+import { lightsOf, setAiSensor, setAllAi, type LightMode } from '../sim/lights';
 import { stampHighGround, upgradeTower } from '../sim/towers';
 import { planRun, upgradeRun, type Gate, type PerimeterKind, type Pt } from '../sim/perimeter';
 import { fitProblem, orderFit, plant, repairPump, replaceFried } from '../sim/utilities';
@@ -116,6 +116,9 @@ export interface GameStore {
   setLightDefault: (mode: LightMode) => void;
   setLightMode: (id: string, mode: LightMode | null) => void;
   setAllLights: (mode: LightMode) => void;
+  /** Fit / strip an AI sensor module on one light (returns why not). */
+  setLightAi: (id: string, on: boolean) => string | null;
+  setAllLightsAi: (ids: string[], on: boolean) => number;
   /** Plumb or wire a building (a fitting job for the family). */
   fit: (buildingId: string, kind: 'plumb' | 'wire') => string | null;
   /** Order the next tier of a hardening upgrade for one bunker room, or (all) for every room of the bunker up to that tier. */
@@ -271,6 +274,8 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
   },
   setLightDefault: (mode) => { const g = structuredClone(get().game); lightsOf(g).mode = mode; set({ game: g }); },
   setLightMode: (id, mode) => { const g = structuredClone(get().game); const l = lightsOf(g); if (mode) l.per[id] = mode; else delete l.per[id]; set({ game: g }); },
+  setLightAi: (id, on) => { const g = structuredClone(get().game); const why = setAiSensor(g, id, on); if (!why) set({ game: g }); return why; },
+  setAllLightsAi: (ids, on) => { const g = structuredClone(get().game); const n = setAllAi(g, ids, on); if (n) set({ game: g }); return n; },
   setAllLights: (mode) => { const g = structuredClone(get().game); const l = lightsOf(g); l.mode = mode; l.per = {}; set({ game: g }); },
   upgradeTower: (id) => {
     const g = structuredClone(get().game);

@@ -24,6 +24,7 @@ import { Atmosphere, type AtmosBuilding, type AtmosFrame } from './atmosphere/At
 import { fenceLean } from './atmosphere/aging';
 import { LEANS, leanRun } from './atmosphere/fenceAging';
 import { FamilyRenderer } from './people/FamilyRenderer';
+import { WildlifeRenderer } from './wildlife/WildlifeRenderer';
 import type { GoalCtx, Site } from './people/peopleGoals';
 import { CELL, type KitPieceDef } from './buildkit/kit';
 import type { GameState } from '../sim/state';
@@ -155,6 +156,8 @@ export class HomesteadWorld {
   readonly camp: { x: number; z: number; rot: number };
   private readonly _campGroup: THREE.Group;
   readonly family: FamilyRenderer;
+  /** Native wildlife (sim/wildlife.ts): deer, turkeys, bears and the rest, drawn as instanced animals. */
+  readonly wildlife: WildlifeRenderer;
   /** Night life, weathering and the deeper seasons (atmosphere/). */
   readonly atmos: Atmosphere;
   /** County road, driveway, gate and stockpile yard. */
@@ -201,6 +204,7 @@ export class HomesteadWorld {
     this.stream = new StreamRenderer(ws.scene);
     this.lakes = new RegionalWaterRenderer(ws.scene);
     this.family = new FamilyRenderer(ws.scene);
+    this.wildlife = new WildlifeRenderer(ws.scene);
     this._campGroup = buildCamp({ fire: false });
     this._campGroup.position.set(this.camp.x, this.parcel.height(this.camp.x, this.camp.z), this.camp.z);
     this._campGroup.rotation.y = this.camp.rot;
@@ -1302,6 +1306,21 @@ export class HomesteadWorld {
     }
   }
 
+  /** Wildlife: the animals the sim says live here, grazing, wandering and bolting from people (and dogs). */
+  updateWildlife(dt: number, game: GameState, speedK: number): void {
+    const threats: Array<[number, number]> = this.family.positions().filter(p => this.family.shown.has(p.id)).map(p => [p.x, p.z] as [number, number]);
+    for (const d of this.dogPositions()) threats.push(d);
+    const creek = this.parcel.creekHome ? this.parcel.creek : null;
+    this.wildlife.update(dt, game, game.clock.t, {
+      ground: this.groundAt,
+      blocked: (x, z) => this.onBuilding(x, z, 0.25) || this.onCamp(x, z, 0.5) || this.onAccess(x, z, 0.3),
+      creek,
+      threats,
+    }, speedK);
+  }
+  /** Where dogs are (animals bolt from them too); none until the dogs renderer exists. */
+  dogPositions(): Array<[number, number]> { return []; }
+
   /** People: walk the family to their tasks; tend the campfire. */
   updatePeople(dt: number, game: GameState, hour: number, speedK: number): void {
     const site = (id: string): Site | null => {
@@ -1587,6 +1606,7 @@ export class HomesteadWorld {
     this._props?.dispose();
     this.stream.dispose();
     this.family.dispose();
+    this.wildlife.dispose();
     this.atmos.dispose();
     this.lakes.dispose();
     this._ws.scene.remove(this._root);

@@ -539,3 +539,29 @@ SETS.mounts = [
   { name: 'mount-turret-from-ground', time: 11, ...base, setup: towersSetup() + noman + eye(35, 58.5, 35, 54, 0.28, 1.1, 66), frames: 12 },
   { name: 'mount-turret-fight', time: 11, ...base, setup: towersSetup() + fight + `{ cb.qa.pose = null; cb.cam.target.set(35, 0.6, 58); cb.cam.radius = 9; cb.cam.pitch = 0.3; cb.cam.yaw = 0.2; }`, frames: 20 },
 ];
+
+// native wildlife (sim/wildlife.ts): animals staged by hand with the debug spawn (W), a person (stander) in frame for scale.
+// W(sp, x, z, rot, male, side)... clears the staged animals and places these; the natural ones keep living their lives.
+const W = (...list) => `{ const w = cb.world.wildlife; w.clearDebug(); ${list.map(a => `w.spawnDebug('${a[0]}', ${a[1]}, ${a[2]}, ${a[3] ?? 0}, ${a[4] ?? true}, '${a[5] ?? 'free'}');`).join(' ')} }`;
+/** A wall round the home square, finished 6 years ago (kind), or none. */
+const ringSetup = (kind) => `{ const G = cb.game; const h = G.getState().game.site.home;
+  G.setState(s => { const g = structuredClone(s.game); g.perimeter = [];
+    ${kind ? `g.perimeter.push({ id: 'wl_ring', kind: '${kind}', pts: [[h.x0, h.z0], [h.x1, h.z0], [h.x1, h.z1], [h.x0, h.z1], [h.x0, h.z0]], gates: [], done: 1, hours: 1, supplied: true, finishedAt: -2000 });` : ''}
+    return { game: g }; }); }`;
+const wlBase = { season: 'summer', cam: cam0 };
+SETS.wildlife = [
+  { name: 'eye-deer-and-rabbits-in-the-field', time: 7.4, ...wlBase,
+    setup: W(['deer', 24, 40, 1.2, false], ['deer', 25.2, 41.4, 0.9, false], ['deer', 23.4, 41.6, 1.4, true], ['rabbit', 20.4, 36.5, 0.5]) + stander(18.5, 36.2) + eye(16.8, 34.6, 23, 40, 0.27, 0.12, 60), frames: 10 },
+  { name: 'eye-turkeys-at-the-edge', time: 9, ...wlBase,
+    setup: W(['turkey', 25, 40, 0.8, true], ['turkey', 25.9, 40.6, 1.2, false], ['turkey', 24.4, 41.2, 0.4, false], ['turkey', 26.4, 39.4, 1.0, false]) + stander(19, 37) + eye(17.4, 35.4, 24, 40, 0.27, 0.1, 60), frames: 10 },
+  { name: 'eye-bear-at-the-fence-open', time: 20.5, ...wlBase,
+    setup: ringSetup('barbed_wire') + W(['bear', 56, 30.5, 1.6, true, 'free']) + stander(52.5, 29.5) + eye(50.5, 27.8, 56, 30.5, 0.27, 0.14, 62), frames: 12 },
+  { name: 'eye-bear-at-the-fence-chainlink-closed', time: 20.5, ...wlBase,
+    setup: ringSetup('chain_link') + W(['bear', 69.2, 30.5, 3.14, true, 'out']) + stander(63.5, 29.5) + eye(61.5, 27.8, 68, 30.5, 0.27, 0.14, 62), frames: 12 },
+  { name: 'aerial-herd-no-wall', time: 7.4, ...wlBase,
+    setup: ringSetup(null) + W(['elk', 30, 24, 2, true], ['elk', 31, 25.5, 1.8, false], ['elk', 29, 25.2, 2.2, false], ['deer', 40, 30, 1, false], ['deer', 41, 31, 0.5, false], ['coyote', 12, 14, 1, true]) + noman + `{ cb.qa.pose = null; cb.cam.target.set(32, 0, 28); cb.cam.radius = 22; cb.cam.pitch = 0.6; cb.cam.yaw = 0.5; }`, frames: 10 },
+  { name: 'aerial-same-parcel-closed-wall', time: 7.4, ...wlBase,
+    setup: ringSetup('chain_link') + W(['elk', 30, 24, 2, true, 'in'], ['elk', 31, 25.5, 1.8, false, 'in'], ['deer', 40, 30, 1, false, 'in'], ['bear', 70, 14, 3.14, true, 'out'], ['coyote', -3, 20, 1.5, true, 'out']) + noman + `{ cb.qa.pose = null; cb.cam.target.set(32, 0, 28); cb.cam.radius = 30; cb.cam.pitch = 0.6; cb.cam.yaw = 0.5; }`, frames: 10 },
+  { name: 'eye-moose-wolf-cougar-javelina', time: 19, ...wlBase,
+    setup: W(['moose', 23, 38, 1, true], ['wolf', 28, 33, 3, true], ['cougar', 27, 44, 0, true], ['javelina', 21, 43, 0.5], ['javelina', 21.6, 43.7, 0.9], ['squirrel', 19.2, 39.4, 0.3], ['waterfowl', 24, 30, 1]) + stander(16, 36) + eye(14.4, 34.4, 24, 39, 0.27, 0.12, 66), frames: 10 },
+];
