@@ -6,7 +6,7 @@
  */
 import { useGameStore } from '../../store/gameStore';
 import { BLUEPRINTS, homeBeds, totalBill, totalHours } from '../../sim/blueprints';
-import { MATERIALS, type MaterialId } from '../../sim/materials';
+import { MATERIALS, billText, type MaterialId } from '../../sim/materials';
 import { orderCost } from '../../sim/economy';
 import { drillExtra } from '../../sim/site';
 import { countyWorks, needsPermit, permitFee } from '../../sim/paperwork';
@@ -26,7 +26,7 @@ const BUILD_GROUPS: Array<[string, string, readonly string[]]> = [
 ];
 
 const toBuy = (bill: Partial<Record<MaterialId, number>>) => Object.entries(bill).filter(([m]) => MATERIALS[m as MaterialId].price !== null).map(([material, qty]) => ({ material: material as MaterialId, qty: qty as number }));
-const ownNeeds = (kind: string) => Object.entries(totalBill(BLUEPRINTS[kind])).filter(([m]) => MATERIALS[m as MaterialId].price === null).map(([m, q]) => `${q} ${MATERIALS[m as MaterialId].name.toLowerCase()}`).join(', ');
+const ownNeeds = (kind: string) => billText(Object.fromEntries(Object.entries(totalBill(BLUEPRINTS[kind])).filter(([m]) => MATERIALS[m as MaterialId].price === null)));
 const costOf = (kind: string) => orderCost(toBuy(totalBill(BLUEPRINTS[kind])));
 
 export function BuildMenu() {
@@ -50,7 +50,7 @@ export function BuildMenu() {
   const lineItem = (kind: PerimeterKind, per: number, unit: string) => {
     const len = per / 6, tool = `fence:${kind}`, off = perimeterOff(game, kind), note = perimeterNote(game, kind);
     const buy = toBuy(runBill(kind, len));
-    const own = Object.entries(runBill(kind, len)).filter(([m]) => MATERIALS[m as MaterialId].price === null).map(([m, q]) => `${q} ${MATERIALS[m as MaterialId].name.toLowerCase()}`).join(', ');
+    const own = billText(Object.fromEntries(Object.entries(runBill(kind, len)).filter(([m]) => MATERIALS[m as MaterialId].price === null)));
     return <Item key={kind} name={PERIMETER[kind].name} cost={buy.length ? `~${usd(orderCost(buy))}` : '—'}
       sub={`per ${unit} · ${Math.round(runHours(kind, len))} h${own ? ` · + ${own}` : ''}${note ? ` · ${note}` : ''}`}
       on={g.tool === tool} off={off} title={PERIMETER[kind].blurb} click={() => arm(tool)} />;

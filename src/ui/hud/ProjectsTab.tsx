@@ -1,7 +1,7 @@
 /** The Projects tab: what is under way, how long it will take and why it is slow, crews, fittings, hardening, lines, woods. */
 import { useGameStore } from '../../store/gameStore';
 import { BLUEPRINTS } from '../../sim/blueprints';
-import { MATERIALS, type MaterialId } from '../../sim/materials';
+import { billText, type MaterialId } from '../../sim/materials';
 import { orderCost, orderProblem, prices } from '../../sim/economy';
 import { blockedReason, isFinished, progress } from '../../sim/construction';
 import { CREW_RATE, CREW_SIZE, crewProblem, crewQuote } from '../../sim/crews';
@@ -34,7 +34,7 @@ export function ProjectsTab() {
           <Row label="Stage" value={sel.pre ? 'Came with the land' : isFinished(sel) ? 'Finished' : BLUEPRINTS[sel.kind].stages[sel.stage].name} />
           {(sel.fixes ?? []).length > 0 && <>
             {(sel.fixes ?? []).map(f => <div key={f.part} style={{ display: 'flex', justifyContent: 'space-between', gap: 6, marginTop: 3 }}>
-              <span style={{ color: DIM }} title={Object.entries(fixBill(f)).map(([m, q]) => `${q} ${MATERIALS[m as MaterialId].name.toLowerCase()}`).join(', ')}>{fixDef(f).name} <span style={{ fontSize: 11 }}>({f.cond}, {f.hours} h)</span></span>
+              <span style={{ color: DIM }} title={billText(fixBill(f))}>{fixDef(f).name} <span style={{ fontSize: 11 }}>({f.cond}, {f.hours} h)</span></span>
               <span style={{ color: f.done >= f.hours ? TONE.good : f.done > 0 ? '#eee' : f.cond === 'poor' ? TONE.bad : TONE.warn }}>{f.done >= f.hours ? 'done' : f.done > 0 ? `${Math.round(f.done / f.hours * 100)} %` : fixBlocked(game, f) ? 'needs materials' : 'next up'}</span>
             </div>)}
             {pendingFixes(sel).some(f => fixBlocked(game, f)) && (() => {
@@ -73,7 +73,7 @@ export function ProjectsTab() {
               return <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginTop: 3 }}>
                 <span style={{ color: DIM }}>{label}</span>
                 {j || on ? <span>{on ? 'yes' : j!.finishedAt ? 'yes' : `${Math.round((j!.done / j!.hours) * 100)} %`}</span>
-                  : <button style={btn()} disabled={!!why} title={why ?? `${FIT[k].hours} h · ${Object.entries(FIT[k].materials).map(([m, q]) => `${q} ${MATERIALS[m as MaterialId].name.toLowerCase()}`).join(', ')}`} onClick={() => g.fit(sel.id, k)}>{k === 'plumb' ? 'Plumb it' : 'Wire it'}</button>}
+                  : <button style={btn()} disabled={!!why} title={why ?? `${FIT[k].hours} h · ${billText(FIT[k].materials)}`} onClick={() => g.fit(sel.id, k)}>{k === 'plumb' ? 'Plumb it' : 'Wire it'}</button>}
               </div>;
             };
             return <>

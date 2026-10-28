@@ -5,7 +5,7 @@
  */
 import { Fragment, useState, type CSSProperties, type ReactNode } from 'react';
 import { useGameStore } from '../store/gameStore';
-import { MATERIALS, type MaterialId } from '../sim/materials';
+import { MATERIALS, billText, type MaterialId } from '../sim/materials';
 import { foodLine, orderCost, orderProblem, payWith, prices } from '../sim/economy';
 import { FOOD, KITS, kitUnits, lifeDays, pantryRows, SHOP_FOOD, type FoodItemId } from '../sim/pantry';
 import { needOf } from '../sim/needs';
@@ -152,7 +152,7 @@ export function ShopWindow() {
           {TABS.map(([t, name]) => <button key={t} style={btn(tab === t)} onClick={() => { setTab(t); setMsg(null); }}>{name}{(needTabs as Record<string, number>)[t] ? <span style={{ marginLeft: 5, fontSize: 10.5, color: '#1c1d18', background: C.gold, borderRadius: 8, padding: '0 5px' }} title="Things the plans still lack are on this shelf">{(needTabs as Record<string, number>)[t]} needed</span> : null}</button>)}
         </div>
         {needLines.length > 0 && <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '7px 16px', borderBottom: `1px solid ${C.line}`, background: 'rgba(216,201,160,0.08)', flexWrap: 'wrap' }}>
-          <span style={{ flex: 1, minWidth: 240 }}>The plans still lack <b>{needLines.length}</b> material{needLines.length > 1 ? 's' : ''}: {needLines.slice(0, 4).map(l => `${l.qty} ${MATERIALS[l.material].name.toLowerCase()}`).join(', ')}{needLines.length > 4 ? '…' : ''}. Marked <i>needed</i> below.</span>
+          <span style={{ flex: 1, minWidth: 240 }}>The plans still lack <b>{needLines.length}</b> material{needLines.length > 1 ? 's' : ''}: {billText(Object.fromEntries(needLines.slice(0, 4).map(l => [l.material, l.qty])))}{needLines.length > 4 ? '…' : ''}. Marked <i>needed</i> below.</span>
           <button style={btn()} onClick={() => setCart(c => { const n = { ...c }; for (const l of needLines) n[l.material] = Math.max(n[l.material] ?? 0, l.qty); return n; })}>Add them to the order</button>
           <button style={btn(true, !!orderProblem(game, needLines))} disabled={!!orderProblem(game, needLines)} onClick={() => { if (g.order(needLines)) setMsg(null); }}>Order what the plans need ({usd(orderCost(needLines, k))})</button>
         </div>}

@@ -7,7 +7,7 @@ import { SEASON_MODES, type SeasonMode } from '../engine/world/season/seasonStat
 import { WEATHER_MODES, type WeatherMode } from '../engine/world/weather/weatherState';
 import { calendarOf, dayIndex, hourOf, type Speed } from '../sim/state';
 import { BACKGROUND_NAME, backgroundOf, fullName } from '../sim/family';
-import { MATERIALS, MATERIAL_IDS, type MaterialId } from '../sim/materials';
+import { MATERIALS, MATERIAL_IDS, qtyText, type MaterialId } from '../sim/materials';
 import { onOrder, orderCost, orderProblem, prices } from '../sim/economy';
 import { blockedReason, isFinished } from '../sim/construction';
 import { REGIONS } from '../sim/regions';
@@ -252,7 +252,7 @@ export function Hud() {
               {MATERIAL_IDS.filter(m => game.stock[m] > 0 || (pending[m] ?? 0) > 0 || (need[m] ?? 0) > 0).map(m => (
                 <div key={m} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 4, padding: '1px 0' }}>
                   <span style={{ color: DIM, flex: 1 }}>{MATERIALS[m].name}</span>
-                  {(need[m] ?? 0) > 0 && <span style={{ fontSize: 10.5, color: TONE.warn, border: `1px solid ${TONE.warn}`, borderRadius: 8, padding: '0 5px' }} title="The plans need more of this than you have or have on order">needs {need[m]} more</span>}
+                  {(need[m] ?? 0) > 0 && <span style={{ fontSize: 10.5, color: TONE.warn, border: `1px solid ${TONE.warn}`, borderRadius: 8, padding: '0 5px' }} title="The plans need more of this than you have or have on order">needs {qtyText(need[m]!)} more</span>}
                   <span style={{ fontVariantNumeric: 'tabular-nums', minWidth: 30, textAlign: 'right' }}>{Math.floor(game.stock[m] + 1e-6)}{pending[m] ? <span style={{ color: DIM }}> +{pending[m]}</span> : null}</span>
                 </div>
               ))}

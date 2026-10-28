@@ -38,7 +38,7 @@ export function plansNeed(s: GameState): Partial<Record<MaterialId, number>> {
   const pending = onOrder(s);
   const out: Partial<Record<MaterialId, number>> = {};
   for (const k of MATERIAL_IDS) {
-    const n = Math.max(0, (need[k] ?? 0) - s.stock[k] - (pending[k] ?? 0));
+    const n = Math.ceil((need[k] ?? 0) - s.stock[k] - (pending[k] ?? 0) - 1e-6);
     if (n > 0) out[k] = n;
   }
   return out;

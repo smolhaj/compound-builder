@@ -10,7 +10,7 @@
  * animals and vehicles, 0–1) and `sight` (how much view it cuts, 0–1) at
  * `height` — the threat and sightline systems read these.
  */
-import { hasAll, shortfall, MATERIALS, type MaterialId, type Stock } from './materials';
+import { hasAll, shortfall, waitingFor, type MaterialId, type Stock } from './materials';
 import { log } from './economy';
 import type { GameState } from './state';
 
@@ -185,7 +185,7 @@ export function runBlocked(s: GameState, r: PerimeterRun): string | null {
   const bill = runBill(r.kind, wallLength(r));
   if (hasAll(s.stock, bill)) return null;
   const miss = shortfall(s.stock, bill);
-  return 'Waiting for ' + (Object.entries(miss) as Array<[MaterialId, number]>).map(([k, n]) => `${n} ${MATERIALS[k].name.toLowerCase()}`).join(', ');
+  return waitingFor(miss);
 }
 
 /** Add person-hours to a run (takes its materials first). */

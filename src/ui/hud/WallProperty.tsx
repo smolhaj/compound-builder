@@ -10,7 +10,7 @@ import { PERIMETER, type PerimeterKind } from '../../sim/perimeter';
 import { WALL_CHOICES, planPropertyWall } from '../../sim/propertyWall';
 import { costPer100m, perimeterNote, perimeterTiers, plansNeedLines } from '../../sim/guidance';
 import { eta, paceOf, slowHint, totalHoursLeft, weeksFor } from '../../sim/pace';
-import { MATERIALS } from '../../sim/materials';
+import { billText } from '../../sim/materials';
 import { orderCost, orderProblem, prices } from '../../sim/economy';
 import { Note } from './common';
 import { btn, DIM, LINE, usd } from './style';
@@ -36,7 +36,7 @@ export function WallProperty() {
     return <button style={{ ...btn(true), width: '100%', margin: '2px 0 6px' }} title="Trace the whole property line in one wall type: creek bars where the creek crosses, a gate on the road, cost and time shown first" onClick={() => { setLaid(false); setOpen(true); }}>Wall my property…</button>;
   }
   const pace = paceOf(game);
-  const own = plan?.own.map(o => `${o.qty} ${MATERIALS[o.material].name.toLowerCase()}`).join(', ');
+  const own = plan ? billText(Object.fromEntries(plan.own.map(o => [o.material, o.qty]))) : '';
   const weeks = plan ? weeksFor(totalHoursLeft(game) + (laid ? 0 : plan.hours), pace) : null;
   const note = perimeterNote(game, kind);
   const need = plansNeedLines(game);
