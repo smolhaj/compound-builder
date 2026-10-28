@@ -34,6 +34,9 @@ import { calendarOf, hourOf, SECONDS_PER_DAY } from '../sim/state';
 import { setWindowGlow } from './buildkit/materials';
 import { homeOutsideForty } from '../sim/site';
 import { ownsAt } from '../sim/land';
+import { isMarked } from '../sim/forestry';
+import { KIT } from './buildkit/kit';
+import { isUnderground } from './buildkit/underground';
 import type { SiteQuery } from './buildkit/kit';
 import { parseLowRender, RenderRequests, type QaQuality } from './qaRender';
 
@@ -66,6 +69,15 @@ export function GameCanvas() {
     const tool = new PlacementTool(ws.scene, ws.camera, canvas, world);
     const marker = new MarkTool(ws.scene, ws.camera, canvas, world);
     const fence = new PerimeterTool(ws.scene, ws.camera, canvas, world);
+    // the HUD's "Mark 10 trees": the nearest standing trees on our land, nearest the yard first
+    useWorldStore.getState().setMarkNearestTrees(n => {
+      const st = useGameStore.getState(), g = st.game, y = world.access.yard;
+      const near = world.treeSpecs
+        .filter(t => t.x > -0.5 && t.z > -0.5 && t.x < PARCEL_SIZE + 0.5 && t.z < PARCEL_SIZE + 0.5 && t.scale >= 0.6 && ownsAt(g, t.x, t.z) && !isMarked(g, t.id) && !g.forestry.cleared.includes(t.id))
+        .map(t => ({ t, d: Math.hypot(t.x - y.x, t.z - y.z) }))
+        .sort((a, b) => a.d - b.d).slice(0, n);
+      return st.markTrees(near.map(({ t, d }) => ({ tree: { id: t.id, x: t.x, z: t.z, kind: t.kind as 'conifer' | 'oval' | 'broad', scale: t.scale }, haulDist: d })));
+    });
     const sight = new SightOverlay(ws.scene, {
       sightWorld: () => world.sightWorld(), bounds: { x0: -6, z0: -6, x1: PS + 6, z1: PS + 6 },
       observers: k => world.observers(k), lights: () => world.nightLights(),
@@ -102,6 +114,8 @@ export function GameCanvas() {
       if (tour.active) tour.setMode(m);
       else tour.enter(m, { x: cam.target.x, z: cam.target.z, theta: cam.yaw, phi: cam.pitch });
     };
+    // the underground view comes on by itself while a bunker room or tunnel is being staked; it goes off again when that tool is put down
+    let autoUnder = false;
     const onKey = (e: KeyboardEvent) => {
       if (e.code === 'Escape' && useWorldStore.getState().cameraMode !== 'diorama') useWorldStore.getState().setCameraMode('diorama');
       // V cycles the building view: full → cutaway → x-ray
@@ -110,7 +124,9 @@ export function GameCanvas() {
         w.setBuildingView(BUILDING_VIEWS[(BUILDING_VIEWS.indexOf(w.buildingView) + 1) % BUILDING_VIEWS.length]);
       }
       // U: the underground view (bunker rooms under see-through ground)
-      if (e.code === 'KeyU' && !(e.target instanceof HTMLInputElement)) useWorldStore.getState().setUnderground(!useWorldStore.getState().underground);
+      if (e.code === 'KeyU' && !(e.target instanceof HTMLInputElement)) { autoUnder = false; useWorldStore.getState().setUnderground(!useWorldStore.getState().underground); }
+      // H: hide / show the side panels so the map has the whole screen
+      if (e.code === 'KeyH' && !e.ctrlKey && !e.metaKey && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLSelectElement) && !(e.target instanceof HTMLTextAreaElement)) useWorldStore.getState().setHudHidden(!useWorldStore.getState().hudHidden);
     };
     window.addEventListener('keydown', onKey);
     let shiftDown = false;
@@ -173,7 +189,14 @@ export function GameCanvas() {
       useGameStore.subscribe(s => s.game.site.improvements.drive, on => world.setDrive(on)),
       // a neighbor's farm burned (sim/neighborLife.ts): drawn charred once the family knows
       useGameStore.subscribe(s => burnedFarms(s.game).join(), () => world.setBurnedFarms(burnedFarms(useGameStore.getState().game))),
-      useGameStore.subscribe(s => s.tool, k => { tool.setKind(k); marker.setOn(k === 'fell'); fence.setKind(k?.startsWith('fence:') ? k.slice(6) as PerimeterKind : null); if (k === 'fence:escape_tunnel' || k === 'fence:underground_passage') useWorldStore.getState().setUnderground(true); }),
+      useGameStore.subscribe(s => s.tool, k => {
+        const w = useWorldStore.getState();
+        const below = !!k && (k === 'fence:escape_tunnel' || k === 'fence:underground_passage' || (!k.startsWith('fence:') && !!KIT[k] && isUnderground(KIT[k])));
+        if (below && !w.underground) autoUnder = true;
+        tool.setKind(k); marker.setOn(k === 'fell'); fence.setKind(k?.startsWith('fence:') ? k.slice(6) as PerimeterKind : null);
+        if (k === 'fence:escape_tunnel' || k === 'fence:underground_passage') w.setUnderground(true);
+        if (!below && autoUnder) { autoUnder = false; w.setUnderground(false); }
+      }),
       useWorldStore.subscribe(s => s.buildingView, v => world.setBuildingView(v)),
       useWorldStore.subscribe(s => s.underground, on => world.setUnderground(on)),
       useWorldStore.subscribe(s => s.sightMode, m => sight.set(m)),
@@ -398,6 +421,8 @@ export function GameCanvas() {
       sight.dispose();
       boundary.dispose();
       useWorldStore.getState().setSiteGeo(null);
+      useWorldStore.getState().setMarkNearestTrees(null);
+      useWorldStore.getState().setUnderground(false);
       canvas.removeEventListener('pointerdown', onVsDown);
       canvas.removeEventListener('pointerup', onVsUp);
       cam.dispose();

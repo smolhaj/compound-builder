@@ -1,6 +1,7 @@
 import { planProblem } from '../sim/construction';
 import { AFTERMATH_TEXT, joinPrisoner, releasePrisoner, resolveAftermath, type AftermathChoice } from '../sim/aftermath';
 import { dismissCrew, hireCrew } from '../sim/crews';
+import { setFocus } from '../sim/priority';
 import { orderHookup, placeImprovements } from '../sim/improvements';
 import { applyForPermit } from '../sim/paperwork';
 import { sweepChimney } from '../sim/upkeep';
@@ -143,6 +144,10 @@ export interface GameStore {
   /** Hire a crew for a building, or send one home. */
   hire: (buildingId: string) => string | null;
   dismiss: (crewId: string) => void;
+  /** "Work on this first" for a building or wall (null clears it). */
+  setFocus: (id: string | null) => string | null;
+  /** Mark a batch of trees to fell in one click (the nearest to the yard). */
+  markTrees: (trees: Array<{ tree: TreeRef; haulDist: number }>) => number;
   /** Mark a tree to fell, or unmark it if it is marked and not yet cut. */
   toggleMark: (t: TreeRef, haulDist: number) => void;
   setTool: (kind: string | null) => void;
@@ -200,7 +205,9 @@ export interface GameStore {
   setupOpen: boolean;
   /** The shop & money window. */
   shopOpen: boolean;
-  openShop: (open: boolean) => void;
+  /** The shelf the window opens on (a prompt that sends you to the right shelf), or null for the default. */
+  shopTab: string | null;
+  openShop: (open: boolean, tab?: string) => void;
   /** The daily schedule window (sim/daily.ts). */
   scheduleOpen: boolean;
   openSchedule: (open: boolean) => void;
@@ -386,6 +393,21 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     const why = hireCrew(g, id);
     if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); }
     return why;
+  },
+  setFocus: (id) => {
+    if (locked()) return LOCKED_WHY;
+    const g = structuredClone(get().game);
+    const why = setFocus(g, id);
+    if (!why) set({ game: g });
+    return why;
+  },
+  markTrees: (trees) => {
+    if (locked()) return 0;
+    const g = structuredClone(get().game);
+    let n = 0;
+    for (const { tree, haulDist } of trees) if (!isMarked(g, tree.id) && markTree(g, tree, haulDist)) n++;
+    if (n) set({ game: g });
+    return n;
   },
   dismiss: (crewId) => {
     if (locked()) return;
@@ -574,7 +596,8 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
   },
   setupOpen: false,
   shopOpen: false,
-  openShop: (shopOpen) => { if (!locked() || !shopOpen) set({ shopOpen }); },
+  shopTab: null,
+  openShop: (shopOpen, tab) => { if (!locked() || !shopOpen) set({ shopOpen, shopTab: shopOpen ? tab ?? null : null }); },
   scheduleOpen: false,
   openSchedule: (scheduleOpen) => set({ scheduleOpen }),
   daily: (op) => {

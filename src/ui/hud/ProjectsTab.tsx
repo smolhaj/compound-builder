@@ -4,14 +4,17 @@ import { BLUEPRINTS } from '../../sim/blueprints';
 import { billText, type MaterialId } from '../../sim/materials';
 import { orderCost, orderProblem, prices } from '../../sim/economy';
 import { ToolNeedsNote } from '../ToolsPanel';
-import { holdReason, isFinished, progress } from '../../sim/construction';
+import { blockedReason, holdReason, isFinished, progress } from '../../sim/construction';
 import { CREW_RATE, CREW_SIZE, crewProblem, crewQuote } from '../../sim/crews';
 import { fixBill, fixBlocked, fixDef, pendingFixes } from '../../sim/improvements';
 import { KIT } from '../../game/buildkit/kit';
-import { FIT, fitProblem, plant, serviceOf, UTILITY, SPARE_FOR } from '../../sim/utilities';
+import { FIT, FUEL_UNIT_L, fitProblem, plant, serviceOf, UTILITY, SPARE_FOR } from '../../sim/utilities';
 import { HARDEN, HARDEN_IDS, type TierDef, hardenCost, hardenProblem, isBunkerRoom, protectionOf, tierOf } from '../../sim/hardening';
 import { PERIMETER, runBlocked, runFinished, runGrowth, runProgress } from '../../sim/perimeter';
 import { eta, paceOf, slowHint, totalHoursLeft, weeksFor, weeksUntil } from '../../sim/pace';
+import { hookupsFor, fitRows, needsHookup } from '../../sim/hookups';
+import { projectRows } from '../../sim/priority';
+import { litersText } from '../../sim/format';
 import { Note, Row, Section } from './common';
 import { TONE, DIM, LINE, btn, usd } from './style';
 
@@ -22,6 +25,7 @@ export function ProjectsTab() {
   const pace = paceOf(game), left = totalHoursLeft(game), weeks = weeksFor(left, pace);
   const selWeeks = sel && !isFinished(sel) ? weeksUntil(game, sel.id, pace) : null;
   const hint = left > 0 ? slowHint(game, weeks, pace) : null;
+  const rows = projectRows(game), todo = needsHookup(game);
   return <>
     {left > 0 && <Section title="Pace">
       <Row label="Work left" value={`${Math.round(left).toLocaleString('en-US')} h`} />
@@ -29,7 +33,29 @@ export function ProjectsTab() {
       {selWeeks !== null && sel && <Row label={`${KIT[sel.kind].name} done in`} value={eta(selWeeks)} title="Counting what the family finishes first, in the order of the list" />}
       {hint && <Note tone="warn">{hint}</Note>}
     </Section>}
-      {!sel && !game.perimeter.some(r => !runFinished(r)) && !game.forestry.jobs.length && <Note>Nothing under way. Stake something out from the Build tab.</Note>}
+      {rows.length > 1 && <Section title="Under way, in the order the family works">
+        {rows.slice(0, 8).map((r, i) => <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 0', borderBottom: `1px solid ${LINE}` }}>
+          <span style={{ flex: 1, cursor: r.kind === 'building' ? 'pointer' : 'default' }} title={r.blocked ?? undefined} onClick={() => r.kind === 'building' && g.select(r.id)}>
+            {i === 0 && r.first ? '★ ' : ''}{r.kind === 'building' ? (KIT[r.name]?.name ?? r.name) : r.name} <span style={{ color: DIM, fontSize: 11 }}>{Math.round(r.pct * 100)} % · {Math.round(r.hours).toLocaleString('en-US')} h</span>
+            {r.blocked && <div style={{ fontSize: 10.5, color: TONE.warn }}>{r.blocked}</div>}
+          </span>
+          {!(i === 0) && <button style={btn()} title="Put this ahead of everything else (the family still works on something else while it waits for materials)" onClick={() => g.setFocus(r.id)}>Work on this first</button>}
+          {i === 0 && r.first && <button style={btn()} onClick={() => g.setFocus(null)}>Clear</button>}
+        </div>)}
+        {rows.length > 8 && <Note>…and {rows.length - 8} more.</Note>}
+      </Section>}
+      {todo.length > 0 && <Section title="Finished, but not working yet">
+        {todo.slice(0, 6).map((t, i) => <div key={t.id + t.kind + i} style={{ padding: '3px 0', borderBottom: `1px solid ${LINE}` }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>
+            <span><b>{KIT[t.name]?.name ?? t.name}</b>: <span style={{ color: TONE.warn }}>{t.text}</span></span>
+            <button style={btn()} onClick={() => g.select(t.id)}>Open</button>
+          </div>
+          <div style={{ fontSize: 11, color: DIM }}>{t.todo}</div>
+          {t.tool && <button style={{ ...btn(), marginTop: 2 }} onClick={() => g.setTool(t.tool)}>Draw the line</button>}
+        </div>)}
+        {todo.length > 6 && <Note>…and {todo.length - 6} more.</Note>}
+      </Section>}
+      {!sel && !rows.length && !game.forestry.jobs.length && !todo.length && <Note>Nothing under way. Stake something out from the Build tab.</Note>}
       {sel && (
         <Section title={KIT[sel.kind].name}>
           <Row label="Stage" value={sel.pre ? 'Came with the land' : isFinished(sel) ? 'Finished' : BLUEPRINTS[sel.kind].stages[sel.stage].name} />
@@ -59,9 +85,12 @@ export function ProjectsTab() {
                   <span style={{ color: DIM }}>Crew of {CREW_SIZE} on it · ${Math.round(crew.paid).toLocaleString('en-US')} so far</span>
                   <button style={btn()} onClick={() => g.dismiss(crew.id)}>Send home</button>
                 </div>
-              : <button style={{ ...btn(), width: '100%', marginTop: 4 }} disabled={!!why} title={why ?? `${CREW_SIZE} workers at $${CREW_RATE}/h, weekdays 8 to 5; you still buy the materials`} onClick={() => g.hire(sel.id)}>
-                  Hire a crew: ~{usd(q.usd)}, about {q.weeks} week{q.weeks > 1 ? 's' : ''}
-                </button>;
+              : <>
+                {!why && !isFinished(sel) && blockedReason(game, sel) && <Note tone="warn">The materials are not on site yet ({blockedReason(game, sel)!.replace(/^Waiting for /, 'still need ')}). A crew hired now stands idle (and bills nothing) until they arrive: order them first.</Note>}
+                <button style={{ ...btn(), width: '100%', marginTop: 4 }} disabled={!!why} title={why ?? `${CREW_SIZE} workers at $${CREW_RATE}/h, weekdays 8 to 5; you still buy the materials`} onClick={() => g.hire(sel.id)}>
+                  Hire a crew{!why && !isFinished(sel) && blockedReason(game, sel) ? ' anyway' : ''}: ~{usd(q.usd)}, about {q.weeks} week{q.weeks > 1 ? 's' : ''}
+                </button>
+              </>;
           })()}
           {(!isFinished(sel) || pendingFixes(sel).length > 0) && !game.crews.some(c => c.target === sel.id) && game.money < crewQuote(sel).usd && !crewProblem(game, sel) && (() => {
             const wk = Math.floor(game.money / (CREW_RATE * CREW_SIZE * 45));
@@ -70,17 +99,33 @@ export function ProjectsTab() {
           {isFinished(sel) && (() => {
             const p = plant(game), sv = serviceOf(game, p, sel.id);
             const job = (k: 'plumb' | 'wire') => game.utilities.fittings.find(f => f.building === sel.id && f.kind === k);
+            const show = fitRows(sel.kind, sv.wired || !!job('wire'), sv.plumbed || !!job('plumb'));
+            const hooks = hookupsFor(game, sel, p).filter(h => h.state !== 'done');
             const row = (k: 'plumb' | 'wire', label: string, on: boolean) => {
               const j = job(k), why = fitProblem(game, p, sel, k);
-              return <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginTop: 3 }}>
-                <span style={{ color: DIM }}>{label}</span>
-                {j || on ? <span>{on ? 'yes' : j!.finishedAt ? 'yes' : `${Math.round((j!.done / j!.hours) * 100)} %`}</span>
-                  : <button style={btn()} disabled={!!why} title={why ?? `${FIT[k].hours} h · ${billText(FIT[k].materials)}`} onClick={() => g.fit(sel.id, k)}>{k === 'plumb' ? 'Plumb it' : 'Wire it'}</button>}
+              const h = hooks.find(x => x.kind === k);
+              return <div style={{ marginTop: 3 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
+                  <span style={{ color: DIM }}>{label}</span>
+                  {j || on ? <span style={{ color: on || j!.finishedAt ? TONE.good : undefined }}>{on ? 'working' : j!.finishedAt ? 'fitted, but not connected' : `${Math.round((j!.done / j!.hours) * 100)} %`}</span>
+                    : <button style={btn(!why)} disabled={!!why} title={why ?? `${FIT[k].hours} h · ${billText(FIT[k].materials)}`} onClick={() => g.fit(sel.id, k)}>{k === 'plumb' ? 'Plumb it' : 'Wire it'}</button>}
+                </div>
+                {/* a greyed button always says why, in text: a tooltip is not enough */}
+                {!j && !on && h && <div style={{ fontSize: 11, color: h.state === 'ready' ? TONE.warn : TONE.bad, marginTop: 1 }}>{h.text}. {h.todo}</div>}
+                {!j && !on && !h && why && <div style={{ fontSize: 11, color: DIM, marginTop: 1 }}>{why}</div>}
               </div>;
             };
             return <>
-              {row('plumb', 'Running water', sv.plumbed)}
-              {row('wire', 'Electric', sv.wired)}
+              {show.plumb && row('plumb', 'Running water', sv.plumbed)}
+              {show.wire && row('wire', 'Electric', sv.wired)}
+              {hooks.filter(h => h.kind !== 'wire' && h.kind !== 'plumb').map(h => <div key={h.kind} style={{ marginTop: 3 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}><span style={{ color: DIM }}>{h.label}</span><span style={{ color: TONE.bad }}>{h.text}</span></div>
+                <div style={{ fontSize: 11, color: DIM }}>{h.todo}</div>
+                {h.tool && <button style={{ ...btn(), marginTop: 2 }} onClick={() => g.setTool(h.tool)}>Draw the line</button>}
+              </div>)}
+              {sel.kind === 'battery_shed' && <Row label="Charge" value={`${Math.round(game.utilities.report.batteryPct * 100)} %`} title="Yesterday's battery state of charge" />}
+              {sel.kind === 'generator_shed' && <Row label="Fuel on hand" value={litersText(game.stock.fuel * FUEL_UNIT_L)} />}
+              {sel.kind.startsWith('bunker_') && <Note>{game.structures.some(x => x.kind === 'bunker_plant' && isFinished(x)) ? 'The plant room supplies air, power and water to the bunker: no cable or pipe to run.' : 'The bunker\'s air, power and water come from the plant room: build it (Build, Underground).'}</Note>}
               {(sv.wired || UTILITY[sel.kind]?.water?.needsPower) && <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 3 }}>
                 <span style={{ color: DIM }}>Breaker: {game.utilities.off.includes(sel.id) ? 'off' : game.utilities.lit.includes(sel.id) ? 'on' : 'on, no power'}</span>
                 <button style={btn()} onClick={() => g.setBreaker(sel.id, game.utilities.off.includes(sel.id))}>{game.utilities.off.includes(sel.id) ? 'Switch on' : 'Switch off'}</button>

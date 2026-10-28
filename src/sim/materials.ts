@@ -5,6 +5,7 @@
  * about 50 boards and sheets ~$650, ready-mix ~$190 a yard, a cased 200 ft
  * well ~$11,000, a steel blast door ~$14,000.
  */
+import { litersText } from './format';
 export type MaterialId = 'lumber' | 'logs' | 'firewood' | 'fieldstone' | 'concrete' | 'roofing' | 'hardware' | 'wire' | 'seedlings' | 'container'
   | 'pipe' | 'cable' | 'fixtures' | 'pump' | 'drilling' | 'solar_panel' | 'battery' | 'inverter' | 'generator' | 'fuel' | 'tank' | 'septic_tank'
   | 'rebar' | 'membrane' | 'excavator' | 'blast_door' | 'nbc_filter' | 'spoil' | 'culvert' | 'egress_hatch'
@@ -174,7 +175,13 @@ export function qtyText(n: number): string | null {
 /** "3 lumber, 0.5 field seed": a bill or shortfall as text, skipping what rounds to zero. */
 export function billText(bill: Partial<Stock>): string {
   return (Object.entries(bill) as Array<[MaterialId, number]>)
-    .map(([k, n]) => { const q = qtyText(n); return q === null ? null : `${q} ${MATERIALS[k].name.toLowerCase()}`; })
+    .map(([k, n]) => {
+      const q = qtyText(n);
+      if (q === null) return null;
+      // fuel is stocked in 20 L cans: say liters, not "1.1 fuel"
+      if (k === 'fuel') return `${litersText(n * 20)} of fuel`;
+      return `${q} ${MATERIALS[k].name.toLowerCase()}`;
+    })
     .filter(Boolean).join(', ');
 }
 

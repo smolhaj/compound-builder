@@ -4,6 +4,7 @@
  * can go wrong. Pure (tested); reads the same posture and enclosure the gate
  * and the battle read, so what it says is what will happen.
  */
+import { backupPower } from './hookups';
 import { isFinished } from './construction';
 import { isHome } from './blueprints';
 import { postureOf } from './encounters';
@@ -60,6 +61,12 @@ function dogRows(s: GameState): Check[] {
   const ds = livingDogs(s), day = dayIndex(s.clock.t);
   if (!ds.length) return [chk('dog', 'Dog', false, 'no bark to warn you', true)];
   const w = dogWatch(s);
+  // a big pack is one line (plus the dogs in trouble), not a row each
+  if (ds.length > 4) {
+    const trouble = ds.filter(d => d.hunger > 60 || d.health < 40 || temperOf(d) === 'aggressive' || temperOf(d) === 'withdrawn');
+    const rows = [chk('dogs', `${ds.length} dogs`, trouble.length === 0 && w.detection > 0, `${w.onPost} on guard, ${ds.length - w.onPost} kept inside${trouble.length ? ` · ${trouble.length} need attention` : ''}`, true)];
+    return [...rows, ...trouble.slice(0, 3).map(d => chk(`dog:${d.id}`, d.name, false, d.hunger > 60 ? 'hungry' : d.health < 40 ? 'unwell' : temperOf(d), true))];
+  }
   return ds.map(d => {
     const b = bondOf(d), who = b.id ? s.people.find(p => p.id === b.id)?.first : null;
     const t = temperOf(d);
@@ -184,7 +191,7 @@ export function defenseReport(s: GameState): DefenseReport {
   const catastrophes: Check[] = [
     chk('food', 'Food put by', days >= 90, `${Number.isFinite(days) ? Math.floor(days) : '∞'} days`, days >= 30),
     chk('water', 'Water', well || waterDays >= 14, well ? 'a well' : `${Math.floor(waterDays)} days stored`, waterDays >= 3),
-    chk('power', 'Power if the grid goes', s.utilities.fittings.some(f => /solar|generator|battery/i.test(String(f))) || s.utilities.batteryKwh > 0, s.utilities.batteryKwh > 0 ? 'battery bank' : 'no backup', true),
+    (() => { const bp = backupPower(s); return chk('power', 'Power if the grid goes', bp.ok, bp.detail, true); })(),
     chk('heat', 'Winter heat', n(s, 'firewood') >= 8, `${n(s, 'firewood')} cords of firewood`, n(s, 'firewood') >= 3),
     chk('meds', 'Medical supplies', n(s, 'meds') + n(s, 'ifak') >= 3, `${n(s, 'meds')} meds, ${n(s, 'ifak')} first-aid kits`, n(s, 'meds') + n(s, 'ifak') >= 1),
     chk('fallout', 'Shelter from fallout', bunker, bunker ? 'the bunker' : 'no shielded room', true),

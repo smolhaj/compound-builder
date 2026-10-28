@@ -125,10 +125,12 @@ export interface PetLife {
   lost: Array<{ name: string; day: number; cause: string }>;
   /** Automatic care on: the planner hands out dog chores. Off: only named caretakers act. */
   auto: boolean;
+  /** Puppies wanted: unfixed dogs breed only while this is on (off by default; a litter of six is a year of work). */
+  allowPups?: boolean;
   /** Yesterday's care. */
   report: { day: number; hours: number; hoursBy: Record<string, number>; tasks: PetTaskReport[] } | null;
 }
-export const newPetLife = (): PetLife => ({ nextDog: 1, grief: {}, lost: [], auto: true, report: null });
+export const newPetLife = (): PetLife => ({ nextDog: 1, grief: {}, lost: [], auto: true, allowPups: false, report: null });
 
 export const MAX_DOGS = 12;
 const life = (s: GameState): PetLife => (s.petLife ??= newPetLife());
@@ -269,6 +271,21 @@ export function dutyHours(d: Dog, duty: PetDuty, day: number): number {
 export function careHours(s: GameState): number {
   const day = today(s);
   return livingDogs(s).reduce((a, d) => a + PET_DUTIES.reduce((b, k) => b + dutyHours(d, k, day), 0), 0);
+}
+
+/** Person-hours a day the household could spare for the dogs (the planner's capacity, summed). */
+export function careCapacity(s: GameState): number {
+  return s.people.reduce((a, _p, i) => a + defaultCapacity(s, i), 0);
+}
+/** Is the care outrunning the hours? Returns the warning to show, or null. */
+export function careWarning(s: GameState): string | null {
+  const dogs = livingDogs(s);
+  if (dogs.length < 2) return null;
+  const need = careHours(s), have = careCapacity(s);
+  if (need <= have * 0.8) return null;
+  const pups = dogs.filter(d => stageOf(d, today(s)) === 'puppy').length;
+  const fixable = dogs.filter(d => !d.fixed && stageOf(d, today(s)) !== 'puppy').length;
+  return `Care takes about ${Math.round(need * 10) / 10} h a day and the household can spare about ${Math.round(have * 10) / 10} h: chores will be missed.${pups ? ` ${pups} are puppies (find them homes).` : ''}${fixable && !(s.petLife?.allowPups) ? '' : fixable ? ' Fix the ones you do not want to breed.' : ''}`;
 }
 
 export interface PetTask { dog: string; duty: PetDuty; hours: number; who: string | null; by: 'caretaker' | 'auto' | null; why?: string }
@@ -454,6 +471,8 @@ export function setCaretaker(s: GameState, id: string, who: string | null): stri
   d.caretaker = who; return null;
 }
 export function setAutoCare(s: GameState, on: boolean): void { life(s).auto = on; }
+/** Allow (or stop) puppies from the dogs that are not fixed. */
+export function setAllowPups(s: GameState, on: boolean): void { life(s).allowPups = on; }
 
 /** Spay / neuter (a vet's job). */
 export function neuterDog(s: GameState, id: string): string | null {
@@ -700,7 +719,7 @@ export function petsDay(s: GameState): string[] {
     if (temperOf(d) === 'withdrawn' && d.mood < 20 && r() < 0.15) out.push(`${d.name} lies in the corner and will not come out.`);
 
     // pups
-    if (d.sex === 'f' && !d.fixed && d.due == null && age >= 1 && age <= 8 && day >= d.heat) {
+    if (d.sex === 'f' && !d.fixed && d.due == null && age >= 1 && age <= 8 && day >= d.heat && life(s).allowPups) {
       const sire = dogs.some(x => x.sex === 'm' && !x.fixed && x.id !== d.id && ageYears(x, day) >= 0.9 && x.health > 40);
       if (sire || r() < 0.3) { d.due = day + 63; out.push(`${d.name} is expecting.`); }
       d.heat = day + 190 + Math.floor(r() * 30);

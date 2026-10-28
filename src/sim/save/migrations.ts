@@ -37,9 +37,11 @@ type Raw = Record<string, unknown> & { version?: number };
 
 /** version n → n + 1 upgraders. */
 const STEPS: Record<number, (s: Raw) => Raw> = {
-  // 52 → 53: the fortress ring (sim/walkway.ts, sim/garage.ts, sim/fortress.ts): runs may be a wall-top walkway (`kind: 'wall_walk'`, `hostId`), gates may be a garage's (`garage`),
+  // 53 → 54: the fortress ring (sim/walkway.ts, sim/garage.ts, sim/fortress.ts): runs may be a wall-top walkway (`kind: 'wall_walk'`, `hostId`), gates may be a garage's (`garage`),
   // and a gatehouse garage carries its parked vehicles (`Structure.parked`). All optional: an old save has none, and no field needs a default.
-  52: s => ({ ...s, version: 53 }),
+  53: s => ({ ...s, version: 54 }),
+  // 52 → 53: "work on this first" (`focus`, sim/priority.ts); dogs: no puppies unless the player allows them (`petLife.allowPups`)
+  52: s => ({ ...s, version: 53, focus: (s.focus as string | null | undefined) ?? null, petLife: s.petLife ? { allowPups: false, ...(s.petLife as object) } : s.petLife }),
   // 50 → 51: tunnelers (the dig in progress, the party sent out, tallies), ground sensors and passage hatches in the stock; runs may carry a buried skirt / unlocked / revealed / permitAt (none yet)
   50: s => ({ ...s, version: 51, digs: (s.digs as object | undefined) ?? newDigs(), stock: { ground_sensor: 0, passage_hatch: 0, ...(s.stock as object) } }),
   // 46 → 47: the family's tools (sim/tools.ts): a starter kit from the trades, as if they had brought it

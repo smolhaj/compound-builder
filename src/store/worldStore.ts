@@ -45,6 +45,12 @@ export interface WorldState {
   /** Underground view (bunker rooms; the ground goes see-through). */
   underground: boolean;
   setUnderground: (on: boolean) => void;
+  /** The side panels hidden (H) so the map shows. */
+  hudHidden: boolean;
+  setHudHidden: (on: boolean) => void;
+  /** Marks the n nearest trees to the yard for felling (set by the canvas; returns how many were marked). */
+  markNearestTrees: ((n: number) => number) | null;
+  setMarkNearestTrees: (f: ((n: number) => number) | null) => void;
   setSightMode: (m: WorldState['sightMode']) => void;
   setBuildingView: (v: BuildingView) => void;
   /** Cinematic tour caption card (null = none). */
@@ -89,6 +95,10 @@ export const useWorldStore = create<WorldState>()(subscribeWithSelector((set) =>
   setSiteGeo: (siteGeo) => set({ siteGeo }),
   underground: false,
   setUnderground: (underground) => set({ underground }),
+  hudHidden: false,
+  setHudHidden: (hudHidden) => set({ hudHidden }),
+  markNearestTrees: null,
+  setMarkNearestTrees: (markNearestTrees) => set({ markNearestTrees }),
   setSightMode: (sightMode) => set({ sightMode }),
   setShowBoundary: (showBoundary) => set({ showBoundary }),
   setBuildingView: (buildingView) => set({ buildingView }),
