@@ -19,8 +19,8 @@ const LEG_PER = 4, HORN_PER = 2;
 
 interface Pal { body: number; head: number; leg: number; horn: number }
 const PAL: Record<SpeciesId, Pal> = {
-  deer: { body: 0x8a6a45, head: 0x7a5c3c, leg: 0x6a4e32, horn: 0xd9cdb0 },
-  elk: { body: 0x8b6a47, head: 0x4a3524, leg: 0x4f3b28, horn: 0xdacfb2 },
+  deer: { body: 0xa4825a, head: 0x947050, leg: 0x7e6044, horn: 0xd9cdb0 },
+  elk: { body: 0xa07c55, head: 0x4a3524, leg: 0x4f3b28, horn: 0xdacfb2 },
   moose: { body: 0x45352a, head: 0x3b2d24, leg: 0x6b5d50, horn: 0xb8aa88 },
   antelope: { body: 0xb98a55, head: 0xc89c68, leg: 0xe8dcc4, horn: 0x2a2a28 },
   javelina: { body: 0x4a4642, head: 0x413d3a, leg: 0x34312e, horn: 0x34312e },
