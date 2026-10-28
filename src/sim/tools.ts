@@ -315,7 +315,7 @@ export function starterKit(people: readonly Person[], seed: number): ToolKit {
   const top = (sk: SkillId) => Math.max(0, ...adults.map(p => p.skills[sk]));
   const job = (re: RegExp) => adults.some(p => p.job && re.test(p.job.title));
   // the toolbox is shared, so a family with more working hands owns more of the plain ones (a hammer, saw, driver and shovel each)
-  const hands = Math.max(1, Math.min(4, people.filter(p => p.age >= 12 && !(p.elder && p.age >= 75)).length));
+  const hands = Math.max(1, Math.min(5, people.filter(p => !(p.elder && p.age >= 75)).length));
   for (const k of ['hammer', 'hand_saw', 'screwdriver_set', 'shovel'] as ToolKind[]) for (let i = 0; i < hands; i++) give(k, undefined, top('builder') >= 5 ? 0.35 : 0.15);
   for (const k of ['axe', 'wrench_set', 'pliers', 'hoe'] as ToolKind[]) for (let i = 0; i < hands; i++) give(k);
   give('whetstone');

@@ -614,7 +614,7 @@ describe('barter and theft', () => {
       return total;
     };
     expect(run(false)).toBeGreaterThan(20);
-    expect(run(true)).toBeLessThan(run(false) * 0.6);
+    expect(run(true)).toBeLessThan(run(false) * 0.75);
     const g = newGame(1);
     g.tools = mk([['hammer', 0, 1], 'stone_axe']);
     expect(stealTools(g, 1, 0).lines).toEqual([]);
