@@ -50,6 +50,8 @@ export interface Needs {
   /** Dead (day), or null. Also set when someone was taken by raiders (`taken`): gone from the place either way. */
   died: number | null;
   taken?: boolean;
+  /** Hours of sleep owed after a night under siege (sim/siege.ts siegeStrain): slows work, wears off 3 a day. */
+  tired?: number;
 }
 
 export const freshNeeds = (): Needs => ({ health: 100, morale: 70, hunger: 0, dose: 0, hurt: [], died: null });
@@ -257,6 +259,7 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
     // morale: drifts to a baseline that variety, a home, light and safety raise; hunger and loss lower
     const target = 45 + 6 * Math.min(variety, 4) + diet.morale + (home ? 8 : -6) + (dark ? -8 : 0) + (s.utilities.hauling ? (s.utilities.haulFar ? -10 : -4) : 0) - Math.min(25, n.hunger / 1000) - (s.personState.some(x => x.needs?.died != null) ? 15 : 0) + dogEffects(s, p.id).morale;
     n.morale += (Math.max(0, Math.min(100, target)) - n.morale) * 0.08;
+    if (n.tired) n.tired = Math.max(0, n.tired - 3);
     if (n.health <= 0) {
       n.died = Math.floor(s.clock.t);
       log(s, `${p.first} ${p.last} has died.`);
@@ -282,5 +285,5 @@ export function workFactor(n: Needs | undefined): number {
   if (n.hurt.some(h => h.trauma && h.sev >= 50)) return 0.1;
   const h = n.health >= 60 ? 1 : 0.35 + 0.65 * n.health / 60;
   const m = n.morale >= 35 ? 1 : 0.6 + 0.4 * n.morale / 35;
-  return h * m;
+  return h * m * (1 - Math.min(0.35, (n.tired ?? 0) * 0.05));
 }

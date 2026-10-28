@@ -6,6 +6,7 @@ import { ShopWindow } from './ui/ShopWindow';
 import { Ticker } from './ui/Ticker';
 import { BattleOverlay } from './ui/BattleOverlay';
 import { GateCard } from './ui/GateCard';
+import { CutsceneOverlay } from './ui/CutsceneOverlay';
 import { ReportCard } from './ui/ReportCard';
 import { useGameStore } from './store/gameStore';
 import { useWorldStore } from './store/worldStore';
@@ -31,6 +32,7 @@ export default function App() {
   }, []);
   const setup = useGameStore(s => s.setupOpen);
   const shop = useGameStore(s => s.shopOpen);
+  const raid = useGameStore(s => s.cutscene !== null);
   // a new place (another seed or listing) is a new world
   const worldKey = useGameStore(s => `${s.game.seed}:${s.game.site.id}:${s.game.site.creek}`);
   const clean = new URLSearchParams(location.search).has('clean');
@@ -38,12 +40,13 @@ export default function App() {
   return (
     <>
       <GameCanvas key={worldKey} />
-      <Hud />
-      {!clean && <Ticker />}
-      {!clean && <BattleOverlay />}
+      {!raid && <Hud />}
+      {!clean && !raid && <Ticker />}
+      {!clean && !raid && <BattleOverlay />}
+      {!clean && <CutsceneOverlay />}
       {!clean && <GateCard />}
       {!clean && <ReportCard />}
-      {shop && !clean && <ShopWindow />}
+      {shop && !clean && !raid && <ShopWindow />}
       {setup && !clean && <SetupScreen />}
     </>
   );

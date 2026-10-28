@@ -509,3 +509,63 @@ SETS.dogs = [
   { name: 'dogs-night-by-the-house', time: 22.5, season: 'summer', setup: dogsSetup + toHour(22.5) + nearHome(3.2, 0.8, 0.22, 0.15), cam: { x: C, z: C, yaw: 0, pitch: 0.3, radius: 3 }, frames: 28 },
   { name: 'dogs-winter', time: 12, season: 'winter', setup: dogsSetup + toHour(12) + "{ cb.qa.pose = null; const c = cb.world.camp; cb.cam.target.set(c.x, 0, c.z); cb.cam.radius = 6; cb.cam.pitch = 0.45; cb.cam.yaw = 0.4; }", cam: { x: C, z: C, yaw: 0, pitch: 0.4, radius: 6 }, frames: 24 },
 ];
+
+// the watch tower upgrade chain, side by side along z = 54: rise + lookout > wooden > concrete & steel > floodlights > manned mount > turret.
+// A resident stands at the foot of each pair for scale (a person is ~0.28 tall); the upgrade in progress rises beside the old tier.
+const TW = ['rise_lookout', 'watchtower_wood', 'watchtower_concrete', 'watchtower_flood', 'watchtower_mount', 'watchtower_turret'];
+const towersSetup = (lit = false, mode = null, alert = false) => `{ if (!window.__tw) { window.__tw = true;
+  const G = cb.game, kinds = ${JSON.stringify(TW)};
+  G.setState(s => { const g = structuredClone(s.game);
+    kinds.forEach((k, i) => g.structures.push({ id: 'tw' + i, kind: k, x: 8 + i * 6, z: 54, rot: 0, stage: 5, done: 0, supplied: false, finishedAt: 0 }));
+    // the upgrade in progress: a wooden tower with the concrete one rising beside it, and a chain-link fence being upgraded
+    g.structures.push({ id: 'up0', kind: 'watchtower_wood', x: 46, z: 54, rot: 0, stage: 5, done: 0, supplied: false, finishedAt: 0 });
+    g.structures.push({ id: 'up1', kind: 'watchtower_concrete', x: 46.7, z: 54, rot: 0, stage: 3, done: 30, supplied: true, finishedAt: null, replaces: 'up0' });
+    ${lit ? "g.utilities.lit = ['tw0'];" : ''}
+    ${mode ? `g.lights = { mode: '${mode}', per: {}, alertUntil: ${alert ? 99999 : -1} };` : ''}
+    return { game: g }; });
+  G.getState().planRun('chain_link', [[40, 49], [52, 49]], [], 0);
+  G.getState().planRun('wrought_iron', [[40, 49], [52, 49]], [], 0);
+  G.setState(s => { const g = structuredClone(s.game); const [a, b] = g.perimeter.slice(-2); a.done = a.hours; a.supplied = true; a.finishedAt = 0; b.replaces = a.id; b.supplied = true; b.done = b.hours * 0.5; return { game: g }; });
+} }`;
+// someone standing at (x, z): a one-man playback through the battle store (no events), the scale reference
+const stander = (x, z) => `{ import('/src/store/battleStore.ts').then(m => m.useBattleStore.getState().playBattle({ night: false, duration: 99999, events: [], units: [{ id: 'h_a', side: 'home', x: ${x}, z: ${z}, post: 'open' }] })); }`;
+const noman = `{ import('/src/store/battleStore.ts').then(m => m.useBattleStore.getState().endBattle()); }`;
+const cam0 = { x: 33, z: 54, yaw: 0, pitch: 0.3, radius: 20 };
+const base = { season: 'summer', cam: cam0 };
+SETS.towers = [
+  { name: 'towers-aerial-chain', time: 11, ...base, setup: towersSetup() + `{ cb.qa.pose = null; cb.cam.target.set(26, 0, 54); cb.cam.radius = 34; cb.cam.pitch = 0.5; cb.cam.yaw = 0.15; }`, frames: 16 },
+  { name: 'towers-aerial-low-tiers', time: 11, ...base, setup: towersSetup() + `{ cb.qa.pose = null; cb.cam.target.set(14, 0, 54); cb.cam.radius = 12; cb.cam.pitch = 0.45; cb.cam.yaw = 0.5; }`, frames: 14 },
+  { name: 'towers-aerial-high-tiers', time: 11, ...base, setup: towersSetup() + `{ cb.qa.pose = null; cb.cam.target.set(32, 0, 54); cb.cam.radius = 12; cb.cam.pitch = 0.45; cb.cam.yaw = -0.5; }`, frames: 14 },
+  { name: 'towers-eye-row', time: 11, ...base, setup: towersSetup() + stander(6.3, 54.9) + eye(4.2, 55.6, 30, 54, 0.28, 0.5, 70), frames: 14 },
+  { name: 'towers-eye-rise-and-wood', time: 11, ...base, setup: towersSetup() + stander(9.3, 55.6) + eye(8.0, 58.2, 11.5, 54, 0.28, 0.45, 64), frames: 14 },
+  { name: 'towers-eye-concrete-and-flood', time: 11, ...base, setup: towersSetup() + stander(22.6, 55.6) + eye(21, 58.4, 24, 54, 0.28, 0.7, 64), frames: 14 },
+  { name: 'towers-eye-mount', time: 11, ...base, setup: towersSetup() + stander(33.1, 55.4) + eye(31.4, 57.4, 32, 54, 0.28, 1.0, 64), frames: 14 },
+  { name: 'towers-eye-turret', time: 11, ...base, setup: towersSetup() + stander(39.1, 55.4) + eye(37.4, 57.4, 38, 54, 0.28, 1.05, 64), frames: 14 },
+  { name: 'towers-night-floodlights', time: 22.5, ...base, setup: towersSetup(true) + noman + `{ cb.qa.pose = null; cb.cam.target.set(24, 0, 54); cb.cam.radius = 20; cb.cam.pitch = 0.22; cb.cam.yaw = 0.3; }`, frames: 18 },
+  { name: 'towers-night-unpowered', time: 22.5, ...base, setup: towersSetup(false) + noman + `{ cb.qa.pose = null; cb.cam.target.set(24, 0, 54); cb.cam.radius = 20; cb.cam.pitch = 0.22; cb.cam.yaw = 0.3; }`, frames: 18 },
+  { name: 'upgrade-beside-old', time: 11, ...base, setup: towersSetup() + noman + `{ cb.qa.pose = null; cb.cam.target.set(46, 0, 52); cb.cam.radius = 14; cb.cam.pitch = 0.5; cb.cam.yaw = 0.2; }`, frames: 14 },
+  { name: 'upgrade-beside-old-eye', time: 11, ...base, setup: towersSetup() + stander(45.0, 55.6) + eye(43.6, 58.2, 46.4, 53, 0.28, 0.7, 62), frames: 14 },
+];
+
+// floodlight discipline: the same row at night in each mode (the motion sensor dark until a threat trips it, then lit)
+const nightCam = `{ cb.qa.pose = null; cb.cam.target.set(34, 0, 54); cb.cam.radius = 14; cb.cam.pitch = 0.2; cb.cam.yaw = 0.3; }`;
+SETS.lights = [
+  { name: 'lights-day-sensor', time: 11, ...base, setup: towersSetup(true, 'sensor') + noman + nightCam, frames: 12 },
+  { name: 'lights-night-always-on', time: 22.5, ...base, setup: towersSetup(true, 'on') + noman + nightCam, frames: 16 },
+  { name: 'lights-night-sensor-idle', time: 22.5, ...base, setup: towersSetup(true, 'sensor', false) + noman + nightCam, frames: 16 },
+  { name: 'lights-night-sensor-alert', time: 22.5, ...base, setup: towersSetup(true, 'sensor', true) + noman + nightCam, frames: 16 },
+  { name: 'lights-night-off', time: 22.5, ...base, setup: towersSetup(true, 'off') + noman + nightCam, frames: 16 },
+];
+
+// the mounted gun and the turret: from above, and a staged fight (a gunner on the ring, the turret firing, raiders coming up from +z)
+const fight = `{ const units = [{ id: 'h_a', side: 'home', x: 32, z: 54, y: 1.32, post: 'tower' }, { id: 't_x', side: 'home', x: 38, z: 54, y: 1.37, post: 'tower', machine: 'turret' },
+  ...[0, 1, 2, 3, 4].map(i => ({ id: 'r' + i, side: 'raider', x: 29 + i * 3, z: 64 + (i % 2) * 2, post: 'open' }))];
+  const events = []; for (let t = 0.3; t < 90; t += 0.12) { const r = 'r' + (Math.floor(t * 7) % 5); events.push({ t, kind: 'shot', from: 'h_a', to: r, hit: false, auto: true }); events.push({ t: t + 0.05, kind: 'shot', from: 't_x', to: 'r' + (Math.floor(t * 5) % 5), hit: false, auto: true }); }
+  events.sort((a, b) => a.t - b.t);
+  import('/src/store/battleStore.ts').then(m => m.useBattleStore.getState().playBattle({ night: false, duration: 99999, units, events })); }`;
+SETS.mounts = [
+  { name: 'mount-from-above', time: 11, ...base, setup: towersSetup() + noman + eye(32.5, 55.9, 32, 54, 2.7, 1.35, 55), frames: 12 },
+  { name: 'turret-from-above', time: 11, ...base, setup: towersSetup() + noman + eye(38.5, 55.9, 38, 54, 2.7, 1.4, 55), frames: 12 },
+  { name: 'mount-turret-from-ground', time: 11, ...base, setup: towersSetup() + noman + eye(35, 58.5, 35, 54, 0.28, 1.1, 66), frames: 12 },
+  { name: 'mount-turret-fight', time: 11, ...base, setup: towersSetup() + fight + `{ cb.qa.pose = null; cb.cam.target.set(35, 0.6, 58); cb.cam.radius = 9; cb.cam.pitch = 0.3; cb.cam.yaw = 0.2; }`, frames: 20 },
+];

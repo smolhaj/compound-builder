@@ -11,6 +11,7 @@ import { buildCabinLayers } from './cabinGeometry';
 import { box, buildGabled, CUT_H, Parts, showStage, type BuildOpts, type FurnishCtx } from './shell';
 import { Clutter } from './clutter';
 import { UTILITY_BUILDERS } from './utilityBuildings';
+import { TOWER_BUILDERS } from './towerBuildings';
 import { BUNKER_BUILDERS } from './bunkerBuildings';
 import { OLD_BUILDERS } from './oldBuildings';
 import { COMPOUND_BUILDERS } from './compoundBuildings';
@@ -491,6 +492,7 @@ const BUILDERS: Record<string, (def: KitPieceDef, seed?: number, opts?: BuildOpt
   field,
   log_house: logHouse,
   ...UTILITY_BUILDERS,
+  ...TOWER_BUILDERS,
   ...BUNKER_BUILDERS,
   ...OLD_BUILDERS,
   ...COMPOUND_BUILDERS,

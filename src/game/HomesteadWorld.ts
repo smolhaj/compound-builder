@@ -1,3 +1,4 @@
+import { setGroundProbe } from '../sim/towers';
 import * as THREE from 'three';
 import { mulberry32 } from '../sim/rng';
 import { ShrubField, SAGE, WILLOW, type ShrubSpec } from '../engine/world/trees/ShrubField';
@@ -188,6 +189,7 @@ export class HomesteadWorld {
     ws.setSite({ x0: 0, z0: 0, x1: PARCEL_SIZE, z1: PARCEL_SIZE });
     this.home = { ...site.home };
     this.parcel = new ParcelTerrain(seed, { creek: site.creek, timber: site.timber, region: site.region });
+    setGroundProbe((x, z) => this.parcel.natural(x, z).h);
     this.regionWorld = this.parcel.world;
     this.climate = this.regionWorld.climate;
     this.farms = planNeighbors(this.parcel);
@@ -940,7 +942,7 @@ export class HomesteadWorld {
     let light: THREE.PointLight | null = null;
     if (def.light) {
       // reach about the room (point lights cast no shadows here, so a long reach would light the yard through the walls)
-      light = new THREE.PointLight(0xffc27a, 0, Math.hypot(def.cellsX, def.cellsZ) * CELL * 0.6 + 0.1, 2);
+      light = new THREE.PointLight(def.floodlit ? 0xfff4e4 : 0xffc27a, 0, def.floodlit ? 5 : Math.hypot(def.cellsX, def.cellsZ) * CELL * 0.6 + 0.1, def.floodlit ? 1.6 : 2);
       light.position.set(def.light[0], def.floorY + def.light[1], def.light[2]);
       light.visible = false;
       group.add(light);
@@ -1138,6 +1140,29 @@ export class HomesteadWorld {
   /** Sync with the game's structures (adds new ones). */
   syncStructures(list: readonly Placed[]): void {
     for (const p of list) this.addStructure(p);
+    // one that is gone (an upgraded tower comes down when the new tier is up)
+    if (this._built.size > list.length) {
+      const keep = new Set(list.map(p => p.id));
+      for (const id of [...this._built.keys()]) if (!keep.has(id)) this.removeStructure(id);
+    }
+  }
+
+  /** Mains power is on (a lit building or the grid): floodlights on the towers shine at night. Set each frame from the game. */
+  powered = false;
+  /** Towers whose floodlights are lit now (sim/lights.ts: power, mode, blackout, threat). Set each frame from the game. */
+  litTowers: ReadonlySet<string> = new Set();
+
+  /** Take a structure down: its scene group, smoke and light. */
+  removeStructure(id: string): void {
+    const b = this._built.get(id);
+    if (!b) return;
+    this._ws.scene.remove(b.group);
+    b.group.traverse(o => (o as THREE.Mesh).geometry?.dispose());
+    if (b.smoke) this._ws.scene.remove(b.smoke.points);
+    this._built.delete(id);
+    this._harden.delete(id);
+    if (b.under) this._syncUnderground();
+    this._ws.invalidateShadows();
   }
 
   /** Show each structure at its construction stage (scaffold → frame → roof → siding). */
@@ -1263,6 +1288,14 @@ export class HomesteadWorld {
         // warm, low lamplight (incandescent-ish), not a bright work light
         b.light.intensity = (this._under ? 0.25 : 0.48) * Math.min(1, 0.2 + 0.8 * area);
         b.light.color.set(0xffd49e);
+        continue;
+      }
+      // a tower's floodlights: hard white over the approach at night, only with power (the lenses glow with them)
+      if (KIT[b.placed.kind].floodlit) {
+        const on = this.litTowers.has(b.placed.id) && night > 0.35;
+        b.light.intensity = on ? 8 * night : 0;
+        const bulb = b.group.getObjectByName('bldg_interior_bulb');
+        if (bulb) bulb.visible = on;
         continue;
       }
       // the room as the household keeps it tonight (atmosphere/nightLife: up, asleep, on watch, away)
