@@ -70,6 +70,8 @@ import { MATERIAL_IDS, emptyStock } from '../sim/materials';
 import { pantryRows } from '../sim/pantry';
 import { needOf } from '../sim/needs';
 import { FoodShelfRenderer, type ShownPlace } from './props/FoodShelfRenderer';
+import { TentsRenderer, tentSpots } from './props/TentsRenderer';
+import { tentsPitched } from '../sim/housing';
 import { planShelves, propsWanted, splitInUse } from './props/foodShelfPlan';
 import type { FoodSlot } from './buildkit/shell';
 
@@ -983,6 +985,16 @@ export class HomesteadWorld {
       b.under.key = key;
       this._rebuild(b, { ...b.opts, ...u });
     }
+  }
+
+  // ── Dome tents in the yard (sim/housing.ts) ───────────────────────────
+  readonly tents = new TentsRenderer();
+  /** Pitch a dome tent round the camp for each one somebody sleeps in tonight. */
+  syncTents(game: GameState): void {
+    const n = tentsPitched(game);
+    if (n === 0 && this.tents.group.children.length === 0) return;
+    if (!this.tents.group.parent) this._ws.scene.add(this.tents.group);
+    this.tents.sync(tentSpots(this.camp, n, (x, z) => this.onBuilding(x, z, 0.4, false) || this.onAccess(x, z, 0.3) || this.onPerimeterLine(x, z, 0.2)), this.groundAt);
   }
 
   // ── Food on the shelves ───────────────────────────────────────────────

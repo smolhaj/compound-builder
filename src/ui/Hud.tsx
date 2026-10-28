@@ -25,7 +25,9 @@ import { buyLicense, hasLicense, inSeason, lawful, TAG_USD, type License } from 
 import { chimneyState, greenRicks, SEASON_DAYS, SWEEP_USD } from '../sim/upkeep';
 import { countyWorks, needsPermit, permitFee, premium, yearlyTax } from '../sim/paperwork';
 import { DRIVE_PER_FT, driveQuote, fixBill, fixBlocked, fixDef, hookupProblem, pendingFixes, POLE_PER_FT, powerQuote } from '../sim/improvements';
-import { BLUEPRINTS, homeBeds, totalBill, totalHours } from '../sim/blueprints';
+import { BLUEPRINTS, totalBill, totalHours } from '../sim/blueprints';
+import { HousingPanel } from './HousingPanel';
+import { housingSummary } from '../sim/housing';
 import { BUNKER_ORDER, KIT, TOWER_ORDER, UTILITY_ORDER } from '../game/buildkit/kit';
 import { FIT, fitProblem, plant, serviceOf, FUEL_UNIT_L, UTILITY, SPARE_FOR, storageCapacity } from '../sim/utilities';
 import { bestShelter, doseRate, isNuclear, SHELTER_DAYS } from '../sim/nuclear';
@@ -224,7 +226,7 @@ export function Hud() {
         <div style={{ overflowY: 'auto', flex: 1, paddingRight: 2 }}>
           {leftTab === 'build' && <>
             {BUILD_GROUPS.map(([gid, title, kinds]) => (
-              <Group key={gid} id={gid} title={title} extra={gid === 'home' ? `beds ${homeBeds(game)} · ${game.people.length} people` : undefined}>
+              <Group key={gid} id={gid} title={title} extra={gid === 'home' ? housingSummary(game) : undefined}>
                 {kinds.map(kind => {
                   const own = ownNeeds(kind), no = planProblem(game, kind), extra = kind === 'well_drilled' ? drillExtra(game.site) : 0;
                   return <Item key={kind} name={KIT[kind].name} cost={`~${usd(costOf(kind) + extra)}`} sub={`${totalHours(BLUEPRINTS[kind])} h${own ? ` · + ${own}` : ''}${kind === 'well_drilled' ? ` · water at ${game.site.gwDepth} m` : ''}${needsPermit(kind) && game.paper.permits && countyWorks(game) ? ` · permit ${usd(permitFee(game, kind))}` : ''}`}
@@ -399,6 +401,7 @@ export function Hud() {
                 })()}
               </div>;
             })}
+            <HousingPanel />
             {trialCamps(game).map(c => <Section key={c.id} title={`Camp outside the wall: ${c.title}`}>
               <Row label="On trial" value={`day ${Math.max(0, dayIndex(game.clock.t) - c.from)} of ${c.until - c.from}`} />
               <Row label="People" value={c.people.map(p => `${p.first}${p.kid ? ` (${p.age})` : ''}`).join(', ')} />
