@@ -160,9 +160,9 @@ export function Hud() {
   const [qty, setQty] = useState<Record<MaterialId, number>>(emptyStock());
   const [leftTab, setLeftTab] = useState<'build' | 'projects' | 'log'>('build');
   const [rightTab, setRightTab] = useState<'family' | 'supplies' | 'utilities' | 'land' | 'defense' | 'outside' | 'chronicle'>('family');
-  // picking a building on the map opens its project card
+  // picking a building on the map opens its project card (not while a build tool is armed: placing a row of things keeps the Build list up)
   const [lastSel, setLastSel] = useState<string | null>(null);
-  if (g.selected !== lastSel) { setLastSel(g.selected); if (g.selected) setLeftTab('projects'); }
+  if (g.selected !== lastSel) { setLastSel(g.selected); if (g.selected && !g.tool) setLeftTab('projects'); }
   if (new URLSearchParams(location.search).has('clean')) return null;
   const game = g.game;
   const cal = calendarOf(game.clock);
