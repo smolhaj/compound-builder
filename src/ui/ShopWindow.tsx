@@ -134,7 +134,7 @@ export function ShopWindow() {
   const game = g.game;
   const need = plansNeed(game), needTabs = shelvesNeeding(need);
   const needLines = plansNeedLines(game);
-  const [tab, setTab] = useState<Tab>(() => (TABS.map(([id]) => id).find(id => id in needTabs) ?? 'build'));
+  const [tab, setTab] = useState<Tab>(() => (TABS.find(([id]) => id === g.shopTab)?.[0] ?? TABS.map(([id]) => id).find(id => id in needTabs) ?? 'build'));
   const [cart, setCart] = useState<Partial<Record<MaterialId, number>>>({});
   const [foodCart, setFoodCart] = useState<Partial<Record<FoodItemId, number>>>({});
   const [msg, setMsg] = useState<string | null>(null);

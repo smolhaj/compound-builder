@@ -8,7 +8,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { dayIndex, type GameState } from '../sim/state';
 import {
-  ageText, allDogs, bondOf, careHours, careNow, COATS, coatName, dogWatch, findHomes, giveTreat, livingDogs, neuterDog, rehomeDog, setAutoCare, setCaretaker, setGuard, stageOf, temperOf,
+  ageText, ageYears, allDogs, bondOf, careHours, careNow, careWarning, setAllowPups, COATS, coatName, dogWatch, findHomes, giveTreat, livingDogs, neuterDog, rehomeDog, setAutoCare, setCaretaker, setGuard, stageOf, temperOf,
   TRAIT_TEXT, vetNeed, type Dog, type PetDuty, type Temper,
 } from '../sim/pets';
 
@@ -65,7 +65,7 @@ function DogCard({ game, d }: { game: GameState; d: Dog }) {
     </div>
     <div style={{ display: 'flex', gap: 4, marginTop: 4, alignItems: 'center' }}>
       <button style={btn(d.guard)} title={d.guard ? 'Guards a post at the line: warns, deters, and can be hurt in a fight. Click to keep it inside.' : 'Kept inside with the family: warns but is safe. Click to put it on guard.'} onClick={() => money(g => setGuard(g, d.id, !d.guard))}>{d.guard ? 'On guard' : 'Stays inside'}</button>
-      {!d.fixed && <button style={{ ...btn(), opacity: 0.7 }} title="Spay / neuter at the vet (no puppies)" onClick={() => money(g => neuterDog(g, d.id))}>Fix</button>}
+      {!d.fixed && <button style={btn()} title="Spay / neuter at the vet ($220): no puppies, ever. Unfixed dogs only breed while 'Allow puppies' is on." onClick={() => money(g => neuterDog(g, d.id))}>Fix ($220)</button>}
       {st === 'puppy' && <button style={{ ...btn(), opacity: 0.7 }} title="Find the puppy a good home with the neighbors (a little goodwill; the children will miss it)" onClick={() => money(g => findHomes(g, d.id))}>Find a home</button>}
       <button style={{ ...btn(), opacity: 0.7 }} title="Find it another home. Everyone will miss it." onClick={() => { if (window.confirm(`Give ${d.name} away? The family will grieve.`)) money(g => rehomeDog(g, d.id)); }}>Rehome</button>
     </div>
@@ -85,13 +85,18 @@ export function DogsPanel({ game }: { game: GameState }): ReactNode {
   if (!allDogs(game).length) return <div style={{ marginBottom: 10 }}>
     <div style={h3}>Dogs</div>
     <div style={{ color: DIM, fontSize: 11.5, lineHeight: 1.5 }}>No dogs. A dog is family: it needs feeding, walking, vet care and love, and it warns you of trouble at the gate.</div>
-    <button style={{ ...btn(), marginTop: 4 }} onClick={() => openShop(true)}>Find a dog in the shop</button>
+    <button style={{ ...btn(), marginTop: 4 }} onClick={() => openShop(true, 'defense')}>Find a dog in the shop (Kit & security)</button>
   </div>;
   return <div style={{ marginBottom: 10 }}>
     <div style={h3}>Dogs ({dogs.length})</div>
     {dogs.length > 0 && <div style={{ fontSize: 11, color: DIM, display: 'flex', justifyContent: 'space-between', gap: 6, alignItems: 'center' }}>
       <span title="Person-hours a day to feed, water, walk, play with, train and doctor the dogs">Care: {hours} h/day · {w.onPost} on guard</span>
       <button style={btn(L?.auto ?? true)} title="On: the house shares out the dog chores by itself. Off: only dogs with a named caretaker are looked after; use the buttons." onClick={() => money(g => { setAutoCare(g, !(g.petLife?.auto ?? true)); return null; })}>{(L?.auto ?? true) ? 'Auto-care on' : 'Auto-care off'}</button>
+    </div>}
+    {careWarning(game) && <div style={{ fontSize: 11, color: TONE.warn, margin: '3px 0' }}>{careWarning(game)}</div>}
+    {dogs.some(d => !d.fixed && ageYears(d, dayIndex(game.clock.t)) >= 0.8) && <div style={{ fontSize: 11, color: DIM, display: 'flex', justifyContent: 'space-between', gap: 6, alignItems: 'center', margin: '3px 0' }}>
+      <span title="Dogs that are not fixed only have puppies while this is on. A litter is four to six mouths and months of care; fixing a dog (the Fix button on its card) ends it for good.">Puppies: {L?.allowPups ? <span style={{ color: TONE.warn }}>allowed (unfixed dogs will breed)</span> : 'not wanted'}</span>
+      <button style={btn(!!L?.allowPups)} onClick={() => money(g => { setAllowPups(g, !(g.petLife?.allowPups)); return null; })}>{L?.allowPups ? 'Stop puppies' : 'Allow puppies'}</button>
     </div>}
     {dogs.length > 0 && <div style={{ fontSize: 11, color: kibbleDays < 10 && game.disaster.tracks.stores < 0.5 ? TONE.warn : DIM }}>Dog food: {game.disaster.tracks.stores >= 0.5 ? 'comes with the groceries' : `${game.stock.kibble > 0.01 ? `${kibbleDays} days of kibble, then ` : ''}the family's own food`}</div>}
     {L?.report && L.report.tasks.some(t => !t.who) && <div style={{ fontSize: 11, color: TONE.warn }}>Left undone yesterday: {[...new Set(L.report.tasks.filter(t => !t.who).map(t => `${game.dogs.find(d => d.id === t.dog)?.name ?? '?'} (${t.duty})`))].slice(0, 4).join(', ')}. Not enough hours in the day.</div>}

@@ -6,6 +6,8 @@
  * an aftermath, whose tracks combine with its own (the worse one wins).
  * Pure and deterministic from the seed.
  */
+import { pickPeaceNews, seasonOf } from './newsPool';
+import type { RegionId } from './regions';
 import { mulberry32 as rng } from './rng';
 
 /** "Never" (Free build until triggered); JSON-safe, unlike Infinity. */
@@ -427,13 +429,6 @@ export function canOrder(d: DisasterState, t: number): boolean {
   return tr.deliveries > 0.25 && tr.banks > 0.25;
 }
 
-/** Ordinary local news in peacetime (the ticker is never empty). */
-const PEACE_NEWS = [
-  'County fair this weekend: pie contest, tractor pull.', 'Hay prices steady; good second cutting expected.', 'School board approves the new bus route.',
-  'Elk season opens next month; tags on sale at the courthouse.', 'Road crews patching the county road through August.', 'Farmers market moves to the grange hall for winter.',
-  'High school football: the Miners win at home, 21–14.', 'Library book sale Saturday.', 'Fire danger "moderate"; burn permits still issued.',
-];
-
 /** The quiet between eras in a world that didn't all come back. */
 const THIN_NEWS = [
   'Swap meet at the grange Saturday: bring what you can spare.', 'The co-op runs the power 6 to 10 tonight.', 'Word on the radio: the county road is open as far as the river.',
@@ -445,7 +440,7 @@ const THIN_NEWS = [
  * Advance the clock once a day: phase changes, track levels, chained
  * follow-ons rolled at the hit, and headlines for the ticker. Returns lines for the log.
  */
-export function updateDisaster(d: DisasterState, t: number, seed: number): string[] {
+export function updateDisaster(d: DisasterState, t: number, seed: number, ctx?: { region: RegionId; doy: number }): string[] {
   // days turn at midnight (game time 0 is 6 a.m.; same as state.dayIndex)
   const day = Math.floor(t + 0.25);
   if (day === d.day) return [];
@@ -477,7 +472,9 @@ export function updateDisaster(d: DisasterState, t: number, seed: number): strin
     if (r() < 0.35 + 0.5 * w) say(def.hints[stage][Math.floor(r() * def.hints[stage].length)].replace('{cause}', cause), (stage + 1) as 1 | 2 | 3);
   } else if (d.phase === 'peace' && r() < 0.25) {
     const broken = d.baseline && Math.min(d.baseline.stores ?? 1, d.baseline.grid ?? 1) < 0.6;
-    say(broken ? THIN_NEWS[Math.floor(r() * THIN_NEWS.length)] : PEACE_NEWS[Math.floor(r() * PEACE_NEWS.length)], 0);
+    const recent = d.news.slice(-30).map(n => n.text);
+    const fresh = THIN_NEWS.filter(x => !recent.includes(x));
+    say(broken ? (fresh.length ? fresh : THIN_NEWS)[Math.floor(r() * (fresh.length || THIN_NEWS.length))] : pickPeaceNews(r, seasonOf(ctx?.doy ?? 120), ctx?.region ?? 'mountain_west', recent), 0);
   }
   // a thinner world mends a little, if there's anything left to mend
   if (d.phase === 'peace' && d.baseline) for (const k of TRACKS) { const b = d.baseline[k] ?? 1; if (b >= 0.3 && b < 1) d.baseline[k] = Math.min(1, b + 0.00015); }

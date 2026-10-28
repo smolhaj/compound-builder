@@ -21,12 +21,12 @@ describe('utilities', () => {
     expect(n.get('c')).not.toBe(n.get('a'));
   });
 
-  it('a house can only be plumbed once pressurised water reaches it, and wired once power does', () => {
+  it('a house can only be plumbed once pressurized water reaches it, and wired once power does', () => {
     const g = newGame(1);
     const home = built(g, 'h', 'timber_cabin', 10, 10);
     built(g, 'w', 'well_hand', 14, 10);
     let p = plant(g);
-    expect(fitProblem(g, p, home, 'plumb')).toMatch(/no pressurised/);
+    expect(fitProblem(g, p, home, 'plumb')).toMatch(/no pressurized/);
     built(g, 'd', 'well_drilled', 14, 12);
     line(g, 'water_pipe', [[14, 12], [10, 10]]);
     p = plant(g);

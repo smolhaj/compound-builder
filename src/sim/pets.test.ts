@@ -193,7 +193,7 @@ describe('dogs as named pets', () => {
       const g = shut(11);
       g.stock.kibble = 400;
       const f = adoptDog(g, { ageYears: 2, sex: 'f', name: 'Mama' }), m = adoptDog(g, { ageYears: 2, sex: 'm', name: 'Papa' });
-      f.heat = 5; return { g, f, m };
+      f.heat = 5; g.petLife!.allowPups = true; return { g, f, m };
     };
     const a = make(), b = make();
     run(a.g, 160); run(b.g, 160);
@@ -202,6 +202,9 @@ describe('dogs as named pets', () => {
     expect(pups.length).toBeGreaterThanOrEqual(1);
     expect(pups.every(p => p.guard === false)).toBe(true);
     expect(stageOf(pups[0], Math.floor(a.g.clock.t))).toBe('puppy');
+    // no puppies unless the player allows them (the default), even for an unfixed pair
+    const nb = make(); nb.g.petLife!.allowPups = false; run(nb.g, 200);
+    expect(nb.g.dogs.filter(d => ageYears(d, Math.floor(nb.g.clock.t)) < 0.5)).toHaveLength(0);
     // fixed dogs do not
     const c = shut(11); c.stock.kibble = 400;
     const f = adoptDog(c, { ageYears: 2, sex: 'f' }); adoptDog(c, { ageYears: 2, sex: 'm' }); f.heat = 5; f.fixed = true;
