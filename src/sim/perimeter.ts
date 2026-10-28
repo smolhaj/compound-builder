@@ -12,7 +12,7 @@
  */
 import { hasAll, shortfall, MATERIALS, type MaterialId, type Stock } from './materials';
 import { log } from './economy';
-import { wearTools, workSpeed } from './tools';
+import { payUpkeep, wearTools, workSpeed } from './tools';
 import type { GameState } from './state';
 
 export type PerimeterKind = 'split_rail' | 'barbed_wire' | 'woven_wire' | 'thorn_hedge' | 'log_palisade' | 'container_wall' | 'earth_berm' | 'ditch' | 'creek_bars' | 'chain_link' | 'wrought_iron' | 'iron_barbed' | 'steel_wall' | 'electric_steel' | 'water_pipe' | 'power_cable' | 'escape_tunnel';
@@ -206,6 +206,7 @@ export function addRunWork(s: GameState, r: PerimeterRun, hours: number): void {
     }
   }
   // the family's shovel, pliers and so on (sim/tools.ts)
+  hours = payUpkeep(s, hours);
   const task = { kind: 'fence', run: r.kind } as const, m = workSpeed(s, task);
   if (m <= 0) return;
   wearTools(s, task, hours);

@@ -40,6 +40,7 @@ import { applyBattle, planBattle } from './battle';
 import type { RegionId } from './regions';
 import type { GameState } from './state';
 import type { Encounter, Outcome, Stance } from './encounters';
+import { stealTools } from './tools';
 import type { Battle } from './battleTypes';
 
 export interface Breakins {
@@ -157,7 +158,7 @@ export function breakInDay(s: GameState, day: number): Encounter | null {
 // ─────────────────────────────────────────────────────────────────────────
 
 /** What they take from a house they have to themselves for a while (share 0–1 of the time they'd like). */
-function burgle(s: GameState, r: () => number, share: number): string[] {
+export function burgle(s: GameState, r: () => number, share: number): string[] {
   const lost: string[] = [];
   let claim = 0;
   const safe = n(s, 'gun_safe') > 0;
@@ -175,7 +176,8 @@ function burgle(s: GameState, r: () => number, share: number): string[] {
     lost.push(`the ${m?.name ?? 'gun'}`);
     claim += m?.price ?? 0;
   }
-  if (r() < 0.6 * share) { const t = Math.round(300 + 1200 * r()); s.money -= t; lost.push(`tools from the shop (${money(t)} to replace)`); claim += t; }
+  // the tools in the shed (sim/tools.ts): a locked workshop, a metal garage or a safe keeps most of them
+  { const th = stealTools(s, r, 0.45 * share); if (th.lines.length) { lost.push(th.lines[0].replace(/^Tools taken: /, 'tools from the shed: ').replace(/\.$/, '')); claim += th.value; } }
   if (s.stock.meds >= 1 && r() < 0.4 * share) { s.stock.meds -= 1; lost.push('the pills in the medicine cabinet'); }
   const out = lost.length ? [`Stolen: ${lost.join(', ')}.`] : ['They left with nothing worth much.'];
   if (taken) out.push('Stolen guns are reported to the sheriff and the ATF by serial number.');

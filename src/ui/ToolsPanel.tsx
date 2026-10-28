@@ -11,7 +11,7 @@ import { marketOpen } from '../sim/market';
 import { BAG_BASE, BAG_GOODS, bagOf, type BagGood } from '../sim/tradeGoods';
 import { swapPrice, swapQty, SWAP_KINDS, tradeForTool } from '../sim/toolTrade';
 import {
-  condWord, coverage, CRUDE_FOR, ctxOf, improvise, IMPROVISE_HOURS, isDull, kitCounts, kitOf, MAKE_DO_DAYS, projectNeeds, readKit, repair, repairPlan, ROLE_INFO, sharpen, sharpenAll,
+  condWord, coverage, gradeOf, CRUDE_FOR, ctxOf, improvise, IMPROVISE_HOURS, isDull, kitCounts, kitOf, MAKE_DO_DAYS, projectNeeds, readKit, repair, repairPlan, ROLE_INFO, sharpen, sharpenAll,
   TOOLS, toolShopOpen, bestTool, type Tool, type ToolKind, type ToolRole,
 } from '../sim/tools';
 import { ToolIcon } from './ToolIcon';
@@ -36,7 +36,7 @@ function ToolRow({ t, msg }: { t: Tool; msg: (m: string | null) => void }) {
   const needsMend = t.cond < t.max - 0.14 || t.cond <= 0;
   return <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 0', fontSize: 11.5 }}>
     <ToolIcon kind={t.kind} size={22} />
-    <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={d.blurb}>{d.name}</span>
+    <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={d.blurb}>{d.name}{gradeOf(t) === 'pro' && <span style={{ color: '#d8c9a0' }}> · pro</span>}</span>
     <Bar v={t.cond} color={toneOf(t)} />
     <span style={{ color: toneOf(t), width: 62, textAlign: 'right' }}>{condWord(t)}</span>
     {d.dull > 0 ? <span title={`edge ${Math.round(t.sharp * 100)} %`} style={{ color: isDull(t) ? TONE.warn : DIM, width: 28, textAlign: 'right' }}>{isDull(t) ? 'dull' : ''}</span> : <span style={{ width: 28 }} />}

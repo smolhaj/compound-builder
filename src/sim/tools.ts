@@ -107,6 +107,14 @@ export const CRUDE_FOR: Record<ToolRole, ToolKind> = {
   cut: 'scrap_saw', nail: 'rock_hammer', fasten: 'scrap_driver', dig: 'digging_stick', fell: 'stone_axe', till: 'digging_stick', wrench: 'scrap_wrench', wire: 'bent_pliers',
 };
 
+/** Quality grades: a cheap tool is what the farm store sells; a pro tool costs 2.5x and lasts twice as long. */
+export type Grade = 'cheap' | 'pro';
+export const GRADES: Record<Grade, { name: string; price: number; wear: number }> = {
+  cheap: { name: 'cheap', price: 1, wear: 1 },
+  pro: { name: 'pro', price: 2.5, wear: 0.5 },
+};
+export const gradeOf = (t: Tool): Grade => t.grade ?? 'cheap';
+
 /** One tool the family owns. */
 export interface Tool {
   id: string;
@@ -118,6 +126,8 @@ export interface Tool {
   /** The best condition it can be brought back to (each repair and each sharpening takes a little). */
   max: number;
   repairs: number;
+  /** Absent = cheap. */
+  grade?: Grade;
 }
 
 export interface ToolKit {
@@ -132,6 +142,8 @@ export interface ToolKit {
   broke: number;
   /** Person-hours of tool work so far. */
   hours: number;
+  /** Hours of the family's work already spent on tool upkeep (sharpening) that the next work pays out of. */
+  owed?: number;
 }
 
 export const newKit = (): ToolKit => ({ items: [], next: 1, missing: {}, care: true, made: 0, broke: 0, hours: 0 });
@@ -223,6 +235,23 @@ export function bestTool(kit: ToolKit, role: ToolRole, ctx: WorkCtx): { tool: To
   return best;
 }
 
+/** The lowest a crowded tool role runs, relative to the best tool (extra hands with too few tools still do something). */
+export const CROWD_FLOOR = 0.3;
+
+/**
+ * The toolbox is shared: when more people work a role than there are tools of that role, the tools are handed
+ * round and each worker runs slower (3 people framing with 1 saw: a third each). The best tools go first, so
+ * a power saw and a hand saw serve two framers at the average of the two.
+ */
+export function crowdRate(kit: ToolKit, role: ToolRole, ctx: WorkCtx, workers: number, best: number): number {
+  if (workers <= 1) return best;
+  const rates: number[] = [];
+  for (const t of kit.items) { const r = efficiency(t, role, ctx); if (r > 0) rates.push(r); }
+  rates.sort((a, b) => b - a);
+  const sum = rates.slice(0, workers).reduce((a, x) => a + x, 0);
+  return Math.max(CROWD_FLOOR * best, sum / workers);
+}
+
 export interface Pick { need: Need; tool: Tool | null; rate: number }
 export interface Speed {
   /** Work done per hour worked, relative to one person with a hand tool in good shape (0 = blocked). */
@@ -233,12 +262,12 @@ export interface Speed {
 }
 
 /** How fast work goes with this kit: harmonic over the roles, weighted by their share of the time. */
-export function taskSpeed(kit: ToolKit, needs: readonly Need[], ctx: WorkCtx): Speed {
+export function taskSpeed(kit: ToolKit, needs: readonly Need[], ctx: WorkCtx, workers = 1): Speed {
   const picks: Pick[] = [];
   let inv = 0, blocked: ToolRole | null = null;
   for (const need of needs) {
     const b = bestTool(kit, need.role, ctx);
-    const rate = b ? b.rate : need.req ? 0 : BARE_HANDS;
+    const rate = b ? crowdRate(kit, need.role, ctx, workers, b.rate) : need.req ? 0 : BARE_HANDS;
     picks.push({ need, tool: b?.tool ?? null, rate });
     if (rate <= 0) blocked ??= need.role; else inv += need.share / rate;
   }
@@ -260,12 +289,12 @@ export function kitOf(s: GameState): ToolKit {
 }
 
 /** Put a used tool in the kit (barter, gifts). */
-export function addTool(s: GameState, kind: ToolKind, cond: number, sharp: number): Tool {
-  return add(kitOf(s), kind, cond, sharp);
+export function addTool(s: GameState, kind: ToolKind, cond: number, sharp: number, grade: Grade = 'cheap'): Tool {
+  return add(kitOf(s), kind, cond, sharp, grade);
 }
 
-function add(kit: ToolKit, kind: ToolKind, cond = 1, sharp = 1): Tool {
-  const t: Tool = { id: `t${kit.next++}`, kind, cond, sharp: TOOLS[kind].dull > 0 ? sharp : 1, max: 1, repairs: 0 };
+function add(kit: ToolKit, kind: ToolKind, cond = 1, sharp = 1, grade: Grade = 'cheap'): Tool {
+  const t: Tool = { id: `t${kit.next++}`, kind, cond, sharp: TOOLS[kind].dull > 0 ? sharp : 1, max: 1, repairs: 0, ...(grade === 'pro' && !TOOLS[kind].crude ? { grade } : {}) };
   kit.items.push(t);
   return t;
 }
@@ -280,18 +309,23 @@ export function starterKit(people: readonly Person[], seed: number): ToolKit {
   const kit = newKit();
   const worn = (lo = 0.72) => lo + (1 - lo) * r();
   const keen = () => 0.6 + 0.4 * r();
-  const give = (k: ToolKind, lo?: number) => add(kit, k, worn(lo), keen());
+  // some of it is good gear (pro grade): more of a trade's own tools
+  const give = (k: ToolKind, lo?: number, pro = 0.2) => add(kit, k, worn(lo), keen(), r() < pro ? 'pro' : 'cheap');
   const adults = people.filter(p => !p.kid);
   const top = (sk: SkillId) => Math.max(0, ...adults.map(p => p.skills[sk]));
   const job = (re: RegExp) => adults.some(p => p.job && re.test(p.job.title));
-  for (const k of ['hammer', 'hand_saw', 'screwdriver_set', 'shovel', 'axe', 'wrench_set', 'pliers', 'hoe', 'whetstone'] as ToolKind[]) give(k);
-  if (top('builder') >= 5 || job(/carpenter/i)) { give('circular_saw'); give('cordless_drill'); give('hammer'); }
-  if (top('builder') >= 8 || (job(/carpenter/i) && top('builder') >= 6)) give('nail_gun');
-  if (top('builder') >= 6 || top('hunter') >= 6) give('chainsaw');
-  if (top('mechanic') >= 5 || job(/mechanic/i)) { give('file'); give('bolt_cutters'); if (!kit.items.some(t => t.kind === 'cordless_drill')) give('cordless_drill'); give('wrench_set'); }
-  if (top('gardener') >= 5 || job(/nursery/i)) { give('garden_fork'); give('hoe'); }
-  if (top('hunter') >= 5 || job(/warden/i)) give('axe');
-  if (people.some(p => p.elder)) { give('pick_mattock', 0.5); give('hand_saw', 0.5); give('file', 0.5); }
+  // the toolbox is shared, so a family with more working hands owns more of the plain ones (a hammer, saw, driver and shovel each)
+  const hands = Math.max(1, Math.min(4, people.filter(p => p.age >= 12 && !(p.elder && p.age >= 75)).length));
+  for (const k of ['hammer', 'hand_saw', 'screwdriver_set', 'shovel'] as ToolKind[]) for (let i = 0; i < hands; i++) give(k, undefined, top('builder') >= 5 ? 0.35 : 0.15);
+  for (const k of ['axe', 'wrench_set', 'pliers', 'hoe'] as ToolKind[]) for (let i = 0; i < Math.ceil(hands / 2); i++) give(k);
+  give('whetstone');
+  if (top('builder') >= 5 || job(/carpenter/i)) { give('circular_saw', undefined, 0.5); give('cordless_drill', undefined, 0.5); give('hammer', undefined, 0.5); }
+  if (top('builder') >= 8 || (job(/carpenter/i) && top('builder') >= 6)) give('nail_gun', undefined, 0.5);
+  if (top('builder') >= 6 || top('hunter') >= 6) give('chainsaw', undefined, 0.4);
+  if (top('mechanic') >= 5 || job(/mechanic/i)) { give('file', undefined, 0.5); give('bolt_cutters', undefined, 0.5); if (!kit.items.some(t => t.kind === 'cordless_drill')) give('cordless_drill'); give('wrench_set', undefined, 0.5); }
+  if (top('gardener') >= 5 || job(/nursery/i)) { give('garden_fork', undefined, 0.4); give('hoe', undefined, 0.4); }
+  if (top('hunter') >= 5 || job(/warden/i)) give('axe', undefined, 0.4);
+  if (people.some(p => p.elder)) { give('pick_mattock', 0.5, 0.3); give('hand_saw', 0.5, 0.3); give('file', 0.5, 0.3); }
   return kit;
 }
 
@@ -311,7 +345,25 @@ export const isDull = (t: Tool) => TOOLS[t.kind].dull > 0 && t.sharp < 0.45 && t
 
 /** How fast a task goes right now for the family (0 = blocked). */
 export function workSpeed(s: GameState, task: ToolTask): number {
-  return taskSpeed(readKit(s), toolFor(task), ctxOf(s)).mult;
+  return taskSpeed(readKit(s), toolFor(task), ctxOf(s), workersOn(s, task)).mult;
+}
+
+/** How many people are at work on this kind of task right now (they share the toolbox). */
+export function workersOn(s: GameState, task: ToolTask): number {
+  const doing = task.kind === 'fell' ? 'forestry' : task.kind === 'build' || task.kind === 'fence' ? 'build' : null;
+  if (!doing) return 1;
+  let n = 0;
+  for (const ps of s.personState) if (ps.task === doing && ps.needs.died == null) n++;
+  return Math.max(1, n);
+}
+
+/** Pay the day's tool upkeep (sharpening) out of the hours about to be worked. Returns the hours left for the work. */
+export function payUpkeep(s: GameState, hours: number): number {
+  const kit = s.tools;
+  if (!kit || !(kit.owed && kit.owed > 0)) return hours;
+  const t = Math.min(kit.owed, hours);
+  kit.owed -= t;
+  return hours - t;
 }
 
 /** Why a task can't be done now ("Needs a saw"), or null. */
@@ -357,7 +409,7 @@ export function wearTools(s: GameState, task: ToolTask, hours: number): string[]
     const t = p.tool;
     if (!t) continue;
     const d = TOOLS[t.kind], h = hours * p.need.share;
-    t.cond = Math.max(0, t.cond - d.wear * h * (1 + 0.5 * (1 - t.sharp)));
+    t.cond = Math.max(0, t.cond - d.wear * GRADES[gradeOf(t)].wear * h * (1 + 0.5 * (1 - t.sharp)));
     if (d.dull > 0) t.sharp = Math.max(0, t.sharp - d.dull * h);
     if (d.power === 'fuel') s.stock.fuel = Math.max(0, s.stock.fuel - FUEL_PER_HOUR * h);
     if (t.cond <= 0) { kit.broke++; broke.push(d.name); log(s, `The ${d.name.toLowerCase()} gives out${d.crude ? '' : ' (the handle splits, the teeth are gone)'}. It might be mended.`); }
@@ -456,7 +508,11 @@ const HARD_ROLES: ToolRole[] = ['cut', 'nail', 'dig', 'fell', 'wrench', 'wire'];
 /** Once a day: the chore of sharpening, and making do when a required tool is gone. Returns log lines. */
 export function toolsDay(s: GameState): string[] {
   const kit = kitOf(s), out: string[] = [], day = Math.floor(s.clock.t);
-  if (kit.care) sharpenAll(s, 0.5);
+  if (kit.care) {
+    // the chore of sharpening takes a little of the family's work time (a stone is quicker than a river rock)
+    const n = sharpenAll(s, 0.5);
+    if (n > 0) kit.owed = (kit.owed ?? 0) + n * (honer(kit) ? 0.2 : 0.4);
+  }
   const ctx = ctxOf(s);
   for (const role of HARD_ROLES) {
     // judged without the power/fuel check: a saw that needs a plug is still a saw (the work waits for the power)
@@ -479,21 +535,21 @@ export function toolsDay(s: GameState): string[] {
 export const toolShopOpen = (s: GameState) => s.disaster.tracks.stores > 0.5;
 
 /** Price of a new tool today (null: not for sale). */
-export const toolPrice = (s: GameState, kind: ToolKind): number | null => {
+export const toolPrice = (s: GameState, kind: ToolKind, grade: Grade = 'cheap'): number | null => {
   const p = TOOLS[kind].price;
-  return p === null ? null : Math.round(p * prices(s));
+  return p === null ? null : Math.round(p * GRADES[grade].price * prices(s));
 };
 
 /** Buy a new tool at the hardware store (cash from the safe once the banks are shut). Returns why not, or null. */
-export function buyTool(s: GameState, kind: ToolKind): string | null {
-  const price = toolPrice(s, kind);
+export function buyTool(s: GameState, kind: ToolKind, grade: Grade = 'cheap'): string | null {
+  const price = toolPrice(s, kind, grade);
   if (price === null) return 'That is not sold.';
   if (!toolShopOpen(s)) return 'The stores are closed.';
   const bank = s.disaster.tracks.banks > 0.25;
   if ((bank ? s.money : s.fin.cash) < price) return 'Not enough money.';
   if (bank) s.money -= price; else s.fin.cash -= price;
-  add(kitOf(s), kind);
-  log(s, `Bought a ${TOOLS[kind].name.toLowerCase()} — $${price.toLocaleString('en-US')}.`);
+  add(kitOf(s), kind, 1, 1, grade);
+  log(s, `Bought a ${grade === 'pro' ? 'pro-grade ' : ''}${TOOLS[kind].name.toLowerCase()} — $${price.toLocaleString('en-US')}.`);
   return null;
 }
 
@@ -508,7 +564,7 @@ export function findTool(s: GameState, r: () => number): Tool {
   const total = FINDS.reduce((a, [, w]) => a + w, 0);
   let x = r() * total, kind = FINDS[0][0];
   for (const [k, w] of FINDS) { x -= w; if (x <= 0) { kind = k; break; } }
-  const t = add(kitOf(s), kind, 0.4 + 0.5 * r(), 0.3 + 0.5 * r());
+  const t = add(kitOf(s), kind, 0.4 + 0.5 * r(), 0.3 + 0.5 * r(), r() < 0.3 ? 'pro' : 'cheap');
   return t;
 }
 
@@ -548,3 +604,42 @@ export function toolUse(k: ToolKind): string {
   return [roles || 'sharpens blades', d.power === 'electric' ? 'needs power' : d.power === 'fuel' ? 'burns fuel' : ''].filter(Boolean).join(' · ');
 }
 
+
+/** Plain tools a stall, a trader or a neighbor will have. */
+export const SWAP_KINDS: ToolKind[] = ['hammer', 'hand_saw', 'shovel', 'axe', 'hoe', 'pliers', 'screwdriver_set', 'wrench_set', 'whetstone', 'file', 'garden_fork', 'pick_mattock', 'bolt_cutters'];
+
+// ─────────────────────────────────────────────────────────────────────────
+// Theft
+// ─────────────────────────────────────────────────────────────────────────
+
+/**
+ * How much of a theft gets through to the tools (1 = all of it open): a locked workshop or metal garage keeps
+ * them behind a door, a gun-safe-like locker holds the small ones, and the bunker's stores room has its own hatch.
+ */
+export function toolSecurity(s: GameState): number {
+  const done = (k: string) => s.structures.some(st => st.kind === k && st.finishedAt !== null);
+  let open = 1;
+  if (done('workshop')) open *= 0.5;
+  if (done('metal_garage') || done('garage_solar')) open *= 0.65;
+  if (done('bunker_stores')) open *= 0.5;
+  if ((s.stock.gun_safe ?? 0) > 0) open *= 0.75;
+  return open;
+}
+
+/**
+ * Thieves take tools (a burglary, a crew that goes through the place). `p` is the chance each good tool is
+ * grabbed before security; dearer tools go first. Returns a log line and the replacement value (2025 dollars).
+ */
+export function stealTools(s: GameState, r: () => number, p: number): { lines: string[]; value: number } {
+  const kit = s.tools;
+  if (!kit) return { lines: [], value: 0 };
+  const open = toolSecurity(s), taken: Tool[] = [];
+  for (const t of [...kit.items]) {
+    const d = TOOLS[t.kind];
+    if (d.crude || t.cond <= 0 || taken.length >= 5) continue;
+    if (r() < Math.min(0.9, p * open * (0.5 + (d.price ?? 0) / 150))) taken.push(t);
+  }
+  kit.items = kit.items.filter(t => !taken.includes(t));
+  const value = taken.reduce((a, t) => a + (TOOLS[t.kind].price ?? 0) * GRADES[gradeOf(t)].price, 0);
+  return { lines: taken.length ? [`Tools taken: ${taken.map(t => `the ${TOOLS[t.kind].name.toLowerCase()}`).join(', ')}.`] : [], value };
+}

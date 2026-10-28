@@ -36,6 +36,7 @@ import type { Stock } from './materials';
 import type { Battle } from './battleTypes';
 import { gateLead, isAway, recordBattle, resolveRansom, type RansomTerms } from './rescue';
 import { defenders } from './pact';
+import { addTool, stealTools, SWAP_KINDS, TOOLS, type ToolKind } from './tools';
 import { resolveTrialEnd, startTrial, trialDay, type TrialCamp } from './trial';
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -170,6 +171,8 @@ export interface Encounter {
   people?: Person[];
   /** What they bring (arrivals, traders) or want. */
   brings?: Partial<Stock>;
+  /** A trader with a used tool for sale (instead of stores). */
+  toolBrings?: ToolKind;
   wants?: Partial<Stock>;
   neighbor?: string;
   stances: Stance[];
@@ -363,7 +366,10 @@ function makeThreat0(kind: EncounterKind, r: () => number, id: string, day: numb
     case 'trader': {
       const brings: Partial<Stock> = pick(r, [{ meds: 2 }, { fuel: 4 }, { staples: 1 }, { hardware: 2 }]);
       const wants: Partial<Stock> = pick(r, [{ canned: 4 }, { firewood: 3 }, { fresh: 10 }, { lumber: 3 }]);
-      return { id, kind, day, title: 'A trader with a loaded truck', dossier: ['An old man with a stock trailer full of odds and ends.', `Offers ${Object.entries(brings).map(([k, n]) => `${n} ${k}`).join(', ')} for ${Object.entries(wants).map(([k, n]) => `${n} ${k}`).join(', ')}.`], size: 1, armed: true, strength: 10, brings, wants, stances: ['trade', 'turn_away'] };
+      // now and then he has a used tool in the trailer instead (its own random stream: the rest is unchanged)
+      const rt = mulberry32(s.seed * 5051 + day * 13 + 3), tool = rt() < 0.3 && s.disaster.hitAt <= day ? pick(rt, SWAP_KINDS) : undefined;
+      const offer = tool ? `a used ${TOOLS[tool].name.toLowerCase()}` : Object.entries(brings).map(([k, n]) => `${n} ${k}`).join(', ');
+      return { id, kind, day, title: 'A trader with a loaded truck', dossier: ['An old man with a stock trailer full of odds and ends.', `Offers ${offer} for ${Object.entries(wants).map(([k, n]) => `${n} ${k}`).join(', ')}.`], size: 1, armed: true, strength: 10, brings: tool ? {} : brings, ...(tool ? { toolBrings: tool } : {}), wants, stances: ['trade', 'turn_away'] };
     }
     case 'neighbor_help': {
       const n = s.neighbors.filter(x => x.status === 'home').sort((a, b) => b.disposition - a.disposition)[0];
@@ -489,6 +495,8 @@ function stripEmpty(s: GameState, e: Encounter, p: Posture, r: () => number, los
   const merged = new Map<string, number>();
   for (const l of lost) { const [n, ...k] = l.split(' '); merged.set(k.join(' '), (merged.get(k.join(' ')) ?? 0) + Number(n)); }
   if (merged.size) out.push(`Lost: ${[...merged].map(([k, n]) => `${n} ${k}`).join(', ')}`);
+  // a crew that goes through the place takes the tools out of the shed (a locked workshop or a safe keeps most of them)
+  if (crew) out.push(...stealTools(s, r, e.temper === 'savage' || e.temper === 'hard' ? 0.35 : 0.2).lines);
   if (!crew) return out;
   // a torch to the shed or the coop: spite, or to smoke out whoever's hiding
   const burnable = s.structures.filter(st => isFinished(st) && !isHome(st.kind) && !st.kind.startsWith('bunker_') && !st.kind.startsWith('well_') && !['root_cellar', 'field', 'garden', 'septic', 'cistern', 'solar_array'].includes(st.kind));
@@ -585,7 +593,7 @@ export function resolve(s: GameState, stance: Stance): Outcome {
     }
   } else if (e.kind === 'trader' || e.kind === 'neighbor_help') {
     if (stance === 'trade' && e.wants && hasAllOf(s, e.wants)) {
-      lines.push(`Gave: ${take(s, e.wants).join(', ')}`); give(s, e.brings ?? {}); lines.push(`Got: ${Object.entries(e.brings ?? {}).map(([k, n]) => `${n} ${k}`).join(', ')}`);
+      lines.push(`Gave: ${take(s, e.wants).join(', ')}`); give(s, e.brings ?? {}); lines.push(`Got: ${e.toolBrings ? `a used ${TOOLS[addTool(s, e.toolBrings, 0.45 + 0.4 * r(), 0.4 + 0.4 * r(), r() < 0.3 ? 'pro' : 'cheap').kind].name.toLowerCase()}` : Object.entries(e.brings ?? {}).map(([k, n]) => `${n} ${k}`).join(', ')}`);
       title = 'A fair trade'; text = 'Handshakes at the gate.'; tone = 'good';
       { const l = gateLead(s, e.kind === 'trader' ? 'trader' : 'neighbor', e.kind === 'trader' ? 'The trader' : e.title.replace(/ come by$/, ''), r); if (l) lines.push(l); }
       if (e.neighbor) { const n = s.neighbors.find(x => x.id === e.neighbor); if (n) n.disposition = Math.min(100, n.disposition + 10); }
@@ -652,6 +660,7 @@ export function resolve(s: GameState, stance: Stance): Outcome {
         g.next = Math.max(g.next, e.day + Math.round(15 + 35 * g.respect));
       } else {
         // (round 4: no second take of their wants here: applyBattle has already taken its 30–90 % share of the stores)
+        if (e.kind === 'looters' || e.kind === 'gang' || e.kind === 'militia') lines.push(...stealTools(s, r, 0.3).lines);
         title = 'They got in'; text = b.result === 'overrun' ? 'They overran the place and took what they came for.' : 'They broke through the line and took what they came for.'; tone = 'bad';
         // picked over: for a while there's not much left worth coming for; but the place is known to be soft
         g.respect = Math.max(0, (g.respect ?? 0) - 0.3);

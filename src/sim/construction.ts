@@ -9,7 +9,7 @@ import { permitHold } from './paperwork';
 import { BLUEPRINTS, totalBill } from './blueprints';
 import { hasAll, MATERIALS, shortfall, type MaterialId, type Stock } from './materials';
 import { log } from './economy';
-import { toolHold, wearTools, workSpeed } from './tools';
+import { payUpkeep, toolHold, wearTools, workSpeed } from './tools';
 import type { GameState, Structure } from './state';
 
 export function blueprintOf(st: Structure) {
@@ -82,7 +82,7 @@ function supply(s: GameState, st: Structure): boolean {
  * hired crews, neighbors and the like bring their own.
  */
 export function addWork(s: GameState, st: Structure, personHours: number, own = false): number {
-  let left = personHours;
+  let left = own ? payUpkeep(s, personHours) : personHours;
   const bp = blueprintOf(st);
   while (left > 1e-9 && !isFinished(st)) {
     if (!supply(s, st)) break;

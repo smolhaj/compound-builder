@@ -5,12 +5,11 @@
  */
 import { BAG_BASE, BAG_GOODS, bagOf, type BagGood } from './tradeGoods';
 import { marketOpen, ramp, BAG_SCARCITY } from './market';
-import { addTool, TOOLS, usedValue, type ToolKind } from './tools';
+import { addTool, SWAP_KINDS, TOOLS, usedValue, type ToolKind } from './tools';
 import { log } from './economy';
 import type { GameState } from './state';
 
-/** Tools a stall will have, by the market's day (a seeded few, always the plain ones). */
-export const SWAP_KINDS: ToolKind[] = ['hammer', 'hand_saw', 'shovel', 'axe', 'hoe', 'pliers', 'screwdriver_set', 'wrench_set', 'whetstone', 'file', 'garden_fork', 'pick_mattock', 'bolt_cutters'];
+export { SWAP_KINDS };
 
 /** Dollars (2025) a used tool costs at the market: scarcer as time passes since the hit. */
 export function swapPrice(s: GameState, kind: ToolKind): number {

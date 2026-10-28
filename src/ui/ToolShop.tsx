@@ -24,14 +24,15 @@ export function ToolShop({ onMsg }: { onMsg: (m: string | null) => void }) {
   return <>
     <div style={{ color: open ? C.dim : C.bad, marginBottom: 8, lineHeight: 1.4 }}>
       {open
-        ? 'The hardware store: pick it up and pay at the counter. Hand tools are the baseline; power tools are 2 to 3.5 times faster but need electricity or gas. Tools wear with use: sharpen and mend them (Supplies → Tools).'
+        ? 'The hardware store: pick it up and pay at the counter. Hand tools are the baseline (cheap grade, or pro grade at 2.5 times the price for twice the life); power tools are 2 to 3.5 times faster but need electricity or gas. Tools wear with use: sharpen and mend them (Supplies → Tools).'
         : 'The stores are closed. Look for tools in the hardware stores and farm sheds (scavenging), at the crossroads market, or make do with stone and scrap (Supplies → Tools).'}
     </div>
     {GROUPS.map(([title, kinds]) => <div key={title}>
       <div style={{ fontWeight: 600, margin: '12px 0 4px' }}>{title}</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 8 }}>
         {kinds.map(k => {
-          const price = toolPrice(game, k) ?? 0, can = open && (game.disaster.tracks.banks > 0.25 ? game.money : game.fin.cash) >= price;
+          const price = toolPrice(game, k) ?? 0, pro = toolPrice(game, k, 'pro') ?? 0, funds = game.disaster.tracks.banks > 0.25 ? game.money : game.fin.cash;
+          const can = open && funds >= price, canPro = open && funds >= pro;
           return <div key={k} style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 10, display: 'flex', gap: 10 }}>
             <ToolIcon kind={k} />
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -39,7 +40,8 @@ export function ToolShop({ onMsg }: { onMsg: (m: string | null) => void }) {
               <div style={{ fontSize: 11.5, color: C.dim, lineHeight: 1.3, margin: '2px 0 2px' }}>{TOOLS[k].blurb}</div>
               <div style={{ fontSize: 11, color: C.dim, marginBottom: 6 }}>{toolUse(k)}</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <button style={btn(can, !can)} disabled={!can} onClick={() => onMsg(g.money(d => buyTool(d, k)))}>Buy</button>
+                <button style={btn(can, !can)} disabled={!can} title="The farm-store grade" onClick={() => onMsg(g.money(d => buyTool(d, k)))}>Buy {usd(price)}</button>
+                {!TOOLS[k].honing && <button style={btn(false, !canPro)} disabled={!canPro} title="Pro grade: forged and hardened, lasts about twice as long" onClick={() => onMsg(g.money(d => buyTool(d, k, 'pro')))}>Pro {usd(pro)}</button>}
                 <span style={{ fontSize: 11, color: C.dim, marginLeft: 'auto' }}>have {have(k)}</span>
               </div>
             </div>

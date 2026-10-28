@@ -8,11 +8,13 @@ import { step } from './engine';
 import { dayIndex } from './state';
 import { mulberry32 } from './rng';
 import { ensurePlaces, resolveRun, scavengeOf } from './scavenge';
+import { barterPrices, have, trade } from './barter';
+import { burgle } from './breakins';
 import { bagOf } from './tradeGoods';
 import { swapQty, tradeForTool } from './toolTrade';
 import {
   bestTool, buyTool, condWord, coverage, efficiency, findTool, improvise, kitOf, MAKE_DO_DAYS, projectNeeds, readKit, repair, repairPlan, sharpen, sharpenAll,
-  starterKit, taskSpeed, toolFor, toolHold, toolNote, toolsDay, toolShopOpen, TOOLS, wearTools, workSpeed, BARE_HANDS, newKit, type Tool, type ToolKind, type ToolKit,
+  starterKit, taskSpeed, crowdRate, CROWD_FLOOR, GRADES, gradeOf, payUpkeep, stealTools, toolSecurity, workersOn, toolPrice, toolFor, toolHold, toolNote, toolsDay, toolShopOpen, TOOLS, wearTools, workSpeed, BARE_HANDS, newKit, type ToolKind, type ToolKit,
 } from './tools';
 
 const ctx = { power: true, fuel: 5 };
@@ -470,4 +472,162 @@ describe('save', () => {
   });
 });
 
-export type { Tool };
+
+
+describe('a shared toolbox', () => {
+  const frame = toolFor({ kind: 'build', stage: 'frame' });
+  it('three people framing with one saw each run at about a third', () => {
+    const kit = mk(['hand_saw', 'hammer', 'hammer', 'hammer', 'screwdriver_set']);
+    const one = taskSpeed(kit, frame, ctx, 1).mult, three = taskSpeed(kit, frame, ctx, 3);
+    expect(three.mult).toBeLessThan(0.6 * one);
+    expect(three.mult).toBeGreaterThan(0.3 * 0.9 * one * 0.5);
+    expect(crowdRate(kit, 'cut', ctx, 3, 1)).toBeCloseTo(Math.max(CROWD_FLOOR, 1 / 3), 5);
+  });
+  it('extra tools of the role lift it back up', () => {
+    const few = mk(['hand_saw', 'hammer', 'screwdriver_set']), more = mk(['hand_saw', 'hand_saw', 'hand_saw', 'hammer', 'hammer', 'hammer', 'screwdriver_set', 'screwdriver_set', 'screwdriver_set']);
+    expect(taskSpeed(more, frame, ctx, 3).mult).toBeCloseTo(taskSpeed(few, frame, ctx, 1).mult, 5);
+    expect(taskSpeed(more, frame, ctx, 3).mult).toBeGreaterThan(2 * taskSpeed(few, frame, ctx, 3).mult);
+  });
+  it('a power saw and a hand saw serve two framers at the average', () => {
+    expect(crowdRate(mk(['circular_saw', 'hand_saw']), 'cut', ctx, 2, 2.5)).toBeCloseTo((2.5 + 1) / 2, 5);
+  });
+  it('never below the floor, and one worker is unchanged', () => {
+    const kit = mk(['hand_saw']);
+    expect(crowdRate(kit, 'cut', ctx, 20, 1)).toBe(CROWD_FLOOR);
+    expect(crowdRate(kit, 'cut', ctx, 1, 1)).toBe(1);
+  });
+  it('counts the people at work from the state', () => {
+    const g = newGame(2);
+    for (const ps of g.personState) ps.task = 'build';
+    expect(workersOn(g, { kind: 'build', stage: 'frame' })).toBe(g.people.length);
+    expect(workersOn(g, { kind: 'fell', stage: 'marked' })).toBe(1);
+    g.personState[0].task = 'idle';
+    expect(workersOn(g, { kind: 'fence', run: 'ditch' })).toBe(g.people.length - 1);
+  });
+  it('a starter kit has enough plain tools for the working hands, so the family builds at pace', () => {
+    for (let seed = 1; seed <= 12; seed++) {
+      const g = newGame(seed);
+      for (const ps of g.personState) ps.task = 'build';
+      const w = workersOn(g, { kind: 'build', stage: 'frame' });
+      if (w > 4) continue;
+      expect(workSpeed(g, { kind: 'build', stage: 'frame' })).toBeGreaterThan(0.6);
+    }
+  });
+});
+
+describe('upkeep takes work time', () => {
+  it('sharpening costs some of the next hours of work, and can be turned off', () => {
+    const g = newGame(2);
+    g.tools = mk([['hand_saw', 1, 0.1], ['axe', 1, 0.1], 'hammer', 'shovel', 'wrench_set', 'pliers', 'whetstone']);
+    toolsDay(g);
+    expect(g.tools.owed).toBeCloseTo(0.4, 5);
+    expect(payUpkeep(g, 0.1)).toBe(0);
+    expect(payUpkeep(g, 1)).toBeCloseTo(0.7, 5);
+    expect(g.tools.owed).toBeCloseTo(0, 5);
+    const h = newGame(2);
+    h.tools = mk([['hand_saw', 1, 0.1], 'hammer', 'shovel', 'axe', 'wrench_set', 'pliers']);
+    h.tools.care = false;
+    toolsDay(h);
+    expect(h.tools.owed ?? 0).toBe(0);
+  });
+  it('the owed hours come out of the family\'s own work', () => {
+    const g = newGame(4);
+    g.stock.lumber = 50; g.stock.hardware = 5; g.stock.concrete = 50;
+    const st = planStructure(g, 'timber_cabin', 0, 0, 0);
+    st.stage = 2;
+    g.tools!.owed = 0.5;
+    addWork(g, st, 1, true);
+    const a = st.done;
+    const h = newGame(4); h.stock.lumber = 50; h.stock.hardware = 5; h.stock.concrete = 50;
+    const s2 = planStructure(h, 'timber_cabin', 0, 0, 0); s2.stage = 2;
+    addWork(h, s2, 1, true);
+    expect(a).toBeCloseTo(s2.done * 0.5, 4);
+  });
+});
+
+describe('grades', () => {
+  it('pro costs 2.5x and lasts twice as long', () => {
+    const g = newGame(2);
+    expect(toolPrice(g, 'hand_saw', 'pro')).toBe(Math.round(25 * 2.5));
+    const a = newGame(2), b = newGame(2);
+    a.tools = mk(['hand_saw', 'hammer', 'screwdriver_set']); b.tools = mk(['hand_saw', 'hammer', 'screwdriver_set']);
+    b.tools.items[0].grade = 'pro';
+    wearTools(a, { kind: 'build', stage: 'frame' }, 100); wearTools(b, { kind: 'build', stage: 'frame' }, 100);
+    expect(1 - b.tools.items[0].cond).toBeCloseTo((1 - a.tools.items[0].cond) * GRADES.pro.wear, 3);
+  });
+  it('the shop sells both grades', () => {
+    const g = newGame(2);
+    const n = g.tools!.items.length, m = g.money;
+    expect(buyTool(g, 'chainsaw', 'pro')).toBeNull();
+    expect(gradeOf(g.tools!.items[n])).toBe('pro');
+    expect(m - g.money).toBe(toolPrice(g, 'chainsaw', 'pro'));
+    expect(buyTool(g, 'hammer')).toBeNull();
+    expect(gradeOf(g.tools!.items[n + 1])).toBe('cheap');
+  });
+  it('starter and found kits are a mix', () => {
+    let pro = 0, cheap = 0;
+    for (let seed = 1; seed <= 20; seed++) for (const t of newGame(seed).tools!.items) { if (gradeOf(t) === 'pro') pro++; else cheap++; }
+    expect(pro).toBeGreaterThan(20);
+    expect(cheap).toBeGreaterThan(pro);
+    const g = newGame(1), r = mulberry32(5);
+    const found = Array.from({ length: 60 }, () => gradeOf(findTool(g, r)));
+    expect(found).toContain('pro'); expect(found).toContain('cheap');
+  });
+});
+
+describe('barter and theft', () => {
+  it('a used tool is a good in a neighbor trade, both ways', () => {
+    const g = after(60);
+    g.neighbors[0].status = 'home'; g.neighbors[0].disposition = 80; g.neighbors[0].members = 4;
+    const price = barterPrices(g)['tool:hand_saw'];
+    expect(price).toBeGreaterThan(20);
+    g.stock.canned = 50;
+    const before = have(g, 'tool:hand_saw');
+    const r1 = trade(g, [{ good: 'canned', qty: Math.ceil(price / barterPrices(g).canned) + 1 }], [{ good: 'tool:hand_saw', qty: 1 }], g.neighbors[0].id);
+    expect(r1.problem).toBeUndefined();
+    expect(r1.ok).toBe(true);
+    expect(have(g, 'tool:hand_saw')).toBe(before + 1);
+    const r2 = trade(g, [{ good: 'tool:hand_saw', qty: 2 }], [{ good: 'fresh', qty: 1 }], g.neighbors[0].id);
+    expect(r2.problem).toBeUndefined();
+    expect(r2.ok).toBe(true);
+    expect(have(g, 'tool:hand_saw')).toBe(before - 1);
+    expect(trade(g, [{ good: 'tool:chainsaw', qty: 99 }], [{ good: 'canned', qty: 1 }], g.neighbors[0].id).problem).toBe('short');
+  });
+  it('security: a workshop, a garage and a safe each keep thieves from the tools', () => {
+    const g = newGame(2);
+    expect(toolSecurity(g)).toBe(1);
+    g.structures.push({ id: 'w', kind: 'workshop', x: 0, z: 0, rot: 0, stage: 9, done: 0, supplied: false, finishedAt: 5 });
+    expect(toolSecurity(g)).toBe(0.5);
+    g.stock.gun_safe = 1;
+    expect(toolSecurity(g)).toBeCloseTo(0.375, 5);
+  });
+  it('thieves take tools, fewer from a locked workshop, and never crude ones or broken ones', () => {
+    const run = (secure: boolean) => {
+      let total = 0;
+      for (let seed = 1; seed <= 40; seed++) {
+        const g = newGame(seed);
+        if (secure) { g.structures.push({ id: 'w', kind: 'workshop', x: 0, z: 0, rot: 0, stage: 9, done: 0, supplied: false, finishedAt: 5 }); g.stock.gun_safe = 1; }
+        const n = g.tools!.items.length;
+        stealTools(g, mulberry32(seed), 0.3);
+        total += n - g.tools!.items.length;
+      }
+      return total;
+    };
+    expect(run(false)).toBeGreaterThan(20);
+    expect(run(true)).toBeLessThan(run(false) * 0.6);
+    const g = newGame(1);
+    g.tools = mk([['hammer', 0, 1], 'stone_axe']);
+    expect(stealTools(g, () => 0, 1).lines).toEqual([]);
+    expect(g.tools.items).toHaveLength(2);
+  });
+  it('a burglary can take tools from the shed (the claim covers them)', () => {
+    let got = 0;
+    for (let seed = 1; seed <= 30; seed++) {
+      const g = newGame(seed);
+      const n = g.tools!.items.length;
+      const lines = burgle(g, mulberry32(seed), 1);
+      if (g.tools!.items.length < n) { got++; expect(lines.join(' ')).toMatch(/tools from the shed/); }
+    }
+    expect(got).toBeGreaterThan(5);
+  });
+});
