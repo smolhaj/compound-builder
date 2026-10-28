@@ -50,6 +50,7 @@ import { log } from './economy';
 import { dayIndex } from './state';
 import { buildRate } from './family';
 import { taskFor } from './schedule';
+import { nightWork } from './blackout';
 import { choresDay, choresStep, dailyTick, DUTY, DUTY_TASK, restFactor, tire, dutyWork, choreRate } from './daily';
 import { gatheringStep, gatheringsDay } from './gatherings';
 import type { GameState, Structure } from './state';
@@ -110,7 +111,7 @@ function subStep(s: GameState): void {
     }
     if (hourly) tire(ps, duty, h, 1);
     if (duty === 'build' || (duty === 'wood' && job !== null && (rates.woodpile <= 0 || i % 2 === 0))) {
-      const rate = buildRate(p) * workFactor(ps.needs) * restFactor(ps);
+      const rate = buildRate(p) * workFactor(ps.needs) * restFactor(ps) * nightWork(s, h);
       const task = duty === 'wood' ? 'forestry' : taskFor('work', canBuild, job !== null, i % 2 === 1);
       ps.task = task;
       ps.target = task === 'build' && !carry ? (target?.id ?? run?.id ?? fit?.building ?? harden?.building ?? fix?.st.id ?? null) : task === 'forestry' && job ? job.id : null;
@@ -125,7 +126,7 @@ function subStep(s: GameState): void {
     }
     ps.task = DUTY_TASK[duty];
     ps.target = null;
-    if (hourly) dutyWork(s, p, ps, duty, choreRate(p) * workFactor(ps.needs) * restFactor(ps), h);
+    if (hourly) dutyWork(s, p, ps, duty, choreRate(p) * workFactor(ps.needs) * restFactor(ps) * nightWork(s, h), h);
   });
   if (hourly) choresStep(s, 1 / 24, rates);
   // (broke: the bills stop at nothing; food stamps and the food bank keep the table going)

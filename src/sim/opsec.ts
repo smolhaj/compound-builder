@@ -11,17 +11,20 @@
  *  Talk            a good negotiator in the household keeps the stories quiet
  *
  * Player choices (`s.opsec`, lazily made): pick deliveries up in town (fewer
- * people see the truck) and blackout curtains (halve the light exposure).
+ * people see the truck) and light discipline (sim/blackout.ts: lights out,
+ * blackout curtains).
  */
 import type { GameState } from './state';
 import { isFinished } from './construction';
 import { noiseNow } from './gatherings';
+import { lightLines, type AutoLightsOut, type LightLine } from './blackout';
 import { alwaysLit, animalGlow, lightList } from './lights';
 import { floodTowerIds } from './towers';
 
-export interface Opsec { quietDeliveries: boolean; blackout: boolean }
+/** `blackout` is the manual lights-out switch; `auto` the family's routine (sim/blackout.ts). */
+export interface Opsec { quietDeliveries: boolean; blackout: boolean; auto?: AutoLightsOut }
 
-export const opsecOf = (s: GameState): Opsec => (s.opsec ??= { quietDeliveries: false, blackout: false });
+export const opsecOf = (s: GameState): Opsec => (s.opsec ??= { quietDeliveries: false, blackout: false, auto: 'off' });
 
 export type ExposureSource = 'deliveries' | 'structures' | 'guns' | 'metals' | 'lights' | 'smoke' | 'talk' | 'news' | 'market' | 'gatherings';
 export const EXPOSURE_NAME: Record<ExposureSource, string> = {
@@ -30,6 +33,12 @@ export const EXPOSURE_NAME: Record<ExposureSource, string> = {
 };
 
 const STRUCTURE_WEIGHT: Record<string, number> = { bunker_hatch: 10, bunker_stairs: 8, water_tower: 8, solar_array: 7, garage_solar: 5 };
+
+/** What shows from the road after dark, source by source (sim/blackout.ts): windows, floodlights (left on, and sensors an animal trips), fire pit, generator. */
+export function lightLinesOf(s: GameState): LightLine[] {
+  const ids = lightList(s, floodTowerIds(s)).map(l => l.id);
+  return lightLines(s, Math.min(9, 3 * alwaysLit(s, floodTowerIds(s)) + animalGlow(s, ids)));
+}
 
 /** Each source's points (talk is negative). */
 export function exposureParts(s: GameState): Record<ExposureSource, number> {
@@ -43,10 +52,8 @@ export function exposureParts(s: GameState): Record<ExposureSource, number> {
   structures = Math.min(25, structures);
   const guns = Math.min(15, s.armory.onBooks * 2);
   const metals = Math.min(10, s.fin.onBooks / 5000);
-  const gridDown = s.disaster.tracks.grid < 0.5;
   // lamps in the windows once the grid is down; floodlights left on all night are seen from the road (+3 each, up to 9; sim/lights.ts)
-  const floodSeen = Math.min(9, 3 * alwaysLit(s, floodTowerIds(s)) + animalGlow(s, lightList(s, floodTowerIds(s)).map(l => l.id)));
-  const lights = (gridDown && s.utilities.lit.length > 0 ? Math.min(20, 8 + s.utilities.lit.length * 2) * (o.blackout ? 0.5 : 1) : 0) + floodSeen;
+  const lights = lightLinesOf(s).reduce((a, l) => a + l.points, 0);
   const hungry = s.disaster.tracks.stores < 0.5;
   const smoke = hungry ? 6 + (s.stock.smoker ? 4 : 0) : 0;
   const adults = s.people.filter((p, i) => !p.kid && s.personState[i]?.needs.died == null);

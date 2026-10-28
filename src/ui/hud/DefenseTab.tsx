@@ -1,4 +1,5 @@
 /** The Defense tab: score, the property line (with "Wall my property"), upgrades, lights, towers, readiness checks. */
+import { LightDiscipline } from '../LightDiscipline';
 import { useGameStore } from '../../store/gameStore';
 import { useWorldStore } from '../../store/worldStore';
 import { defenseReport, type Check } from '../../sim/defenseReport';
@@ -60,8 +61,9 @@ export function DefenseTab() {
         </div>;
       })}
     </Section>
+    <LightDiscipline />
     <Section title="Floodlights">
-      <Note>Part of the night-time suite: lights that stay on draw the road's eyes to the camp. Always on costs power and is seen from the road; a motion sensor lights up when a threat is detected near and for a little after; off keeps the place dark. A blackout (curtains) turns every light off.</Note>
+      <Note>Part of the night-time suite: lights that stay on draw the road's eyes to the camp. Always on costs power and is seen from the road; a motion sensor lights up when a threat is detected near and for a little after; off keeps the place dark. Light discipline (above) can turn every light off.</Note>
       <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', padding: '3px 0' }}>
         <span style={{ flex: 1 }}>Default for all</span>
         {LIGHT_MODES.map(m => <button key={m} style={btn(lightsOf(game).mode === m)} onClick={() => useGameStore.getState().setLightDefault(m)}>{LIGHT_MODE_NAME[m]}</button>)}

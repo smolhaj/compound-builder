@@ -21,7 +21,7 @@ import { dogWatch } from './pets';
 import { ARMORY_LIGHTS, floodlightArmed, floodlightLit } from './lights';
 
 export const KIT_GOODS: MaterialId[] = ['plate_carrier', 'soft_armor', 'helmet', 'ifak', 'nvg', 'thermal', 'radios', 'sw_radio', 'ham_rig'];
-export const WATCH_GOODS: MaterialId[] = ['cameras', 'thermal_cam', 'driveway_alarm', 'floodlights', 'ai_sensor_module', 'tripwire', 'dog', 'puppy', 'ground_sensor'];
+export const WATCH_GOODS: MaterialId[] = ['cameras', 'thermal_cam', 'driveway_alarm', 'floodlights', 'blackout_curtains', 'gen_baffles', 'gen_vault', 'ai_sensor_module', 'tripwire', 'dog', 'puppy', 'ground_sensor'];
 export const HARDEN_GOODS: MaterialId[] = ['steel_door', 'window_bars', 'sandbags', 'safe_room', 'gun_mount', 'turret_head'];
 
 const n = (s: GameState, m: MaterialId) => Math.floor(s.stock[m] ?? 0);

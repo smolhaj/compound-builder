@@ -431,7 +431,6 @@ export function Hud() {
                 {topExposure(game).map(([k, v]) => <Row key={k} label={EXPOSURE_NAME[k]} value={`+${Math.round(v)}`} />)}
                 <div style={{ display: 'flex', gap: 4, padding: '2px 0', flexWrap: 'wrap' }}>
                   <button style={btn(o.quietDeliveries)} title="Pick deliveries up in town: fewer people see the truck" onClick={() => g.setOpsec('quietDeliveries', !o.quietDeliveries)}>Pick up in town</button>
-                  <button style={btn(o.blackout)} title="Blackout curtains: lights at night show half as much" onClick={() => g.setOpsec('blackout', !o.blackout)}>Blackout curtains</button>
                 </div>
               </Section>;
             })()}

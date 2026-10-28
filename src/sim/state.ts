@@ -38,7 +38,7 @@ import { DIFFICULTY } from './difficulty';
 import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
 import type { LightsState } from './lights';
 import { starterKit, type ToolKit } from './tools';
-export const SAVE_VERSION = 51;
+export const SAVE_VERSION = 52;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -227,7 +227,7 @@ export interface GameState {
   /** Guns, ammo by caliber, who can shoot. */
   armory: Armory;
   /** OPSEC choices (sim/opsec.ts); made lazily. */
-  opsec?: { quietDeliveries: boolean; blackout: boolean };
+  opsec?: { quietDeliveries: boolean; blackout: boolean; auto?: 'off' | 'warned' | 'dusk' };
   /** Hammers, saws, shovels and drills: condition, sharpness, what is missing (sim/tools.ts). Save v45; made lazily from the family's trades. */
   tools?: ToolKit;
   /** Floodlight modes: the default and per-light overrides (sim/lights.ts). Save v44; made lazily. */
