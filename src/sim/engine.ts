@@ -5,7 +5,8 @@
  */
 import { LIFESTYLE } from './site';
 import { crewStep } from './crews';
-import { addWork, blockedReason, isFinished } from './construction';
+import { addWork, holdReason, isFinished } from './construction';
+import { toolsDay } from './tools';
 import { addCarryWork, deliverOrders } from './economy';
 import { addFixWork, nextFix, siteJobsDay } from './improvements';
 import { paperworkDay } from './paperwork';
@@ -59,7 +60,7 @@ export const SUBSTEP = 0.25 / 24;
 
 /** Structure the family works on next: the oldest one that can go on. */
 export function nextBuildTarget(s: GameState): Structure | null {
-  for (const st of s.structures) if (!isFinished(st) && blockedReason(s, st) === null) return st;
+  for (const st of s.structures) if (!isFinished(st) && holdReason(s, st) === null) return st;
   return null;
 }
 
@@ -97,7 +98,7 @@ function subStep(s: GameState): void {
     ps.task = task;
     ps.target = task === 'build' && !carry ? (target?.id ?? run?.id ?? fit?.building ?? harden?.building ?? fix?.st.id ?? null) : task === 'forestry' && job ? job.id : null;
     if (task === 'build' && carry) addCarryWork(s, SUBSTEP * 24 * rate);
-    else if (task === 'build' && target) addWork(s, target, SUBSTEP * 24 * rate);
+    else if (task === 'build' && target) addWork(s, target, SUBSTEP * 24 * rate, true);
     else if (task === 'build' && run) addRunWork(s, run, SUBSTEP * 24 * rate);
     else if (task === 'build' && fit) addFitWork(s, fit, SUBSTEP * 24, p.skills.mechanic);
     else if (task === 'build' && harden) addHardenWork(s, harden, SUBSTEP * 24 * rate);
@@ -125,6 +126,7 @@ function subStep(s: GameState): void {
     for (const line of financeDay(s)) log(s, line);
     for (const line of armoryDay(s)) log(s, line);
     for (const line of gearDay(s)) log(s, line);
+    for (const line of toolsDay(s)) log(s, line);
     for (const line of vehiclesDay(s)) log(s, line);
     for (const line of radioDay(s)) log(s, line);
     for (const line of upkeepDay(s, demandNow(s), s.heat.warned !== dayIndex(s.clock.t) - 1 && s.heat.warned !== dayIndex(s.clock.t))) log(s, line);

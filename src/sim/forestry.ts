@@ -6,6 +6,7 @@
  * firewood. Pure (tested).
  */
 import { log } from './economy';
+import { wearTools, workSpeed } from './tools';
 import { stackGreen } from './upkeep';
 import type { FellJob, GameState } from './state';
 
@@ -61,7 +62,11 @@ export function nextFellJob(s: GameState): FellJob | null {
 
 /** Add person-hours to a job; advances stages, and on hauling credits the yield. */
 export function addFellWork(s: GameState, j: FellJob, hours: number): void {
-  j.done += hours;
+  // the family's axe or chainsaw (sim/tools.ts): required for the felling, faster with a saw, wears with the hours
+  const task = { kind: 'fell', stage: j.stage } as const, m = workSpeed(s, task);
+  if (m <= 0) return;
+  wearTools(s, task, hours);
+  j.done += hours * m;
   while (s.forestry.jobs.includes(j) && j.done >= stageHours(j)) {
     j.done -= stageHours(j);
     if (j.stage === 'marked') j.stage = 'felled';

@@ -34,6 +34,7 @@ import { CALIBER, type Caliber } from './armory';
 import { dayIndex, type GameState } from './state';
 import type { SkillId } from './family';
 import { bagOf, BAG_BASE, type BagGood } from './tradeGoods';
+import { findTool, TOOLS } from './tools';
 
 // ─────────────────────────────────────────────────────────────────────────
 // State
@@ -41,7 +42,7 @@ import { bagOf, BAG_BASE, type BagGood } from './tradeGoods';
 
 export type PlaceKind = 'hardware' | 'pharmacy' | 'gas' | 'school' | 'interstate' | 'farm';
 /** What can be found: stock goods, ammo by caliber, trade goods (salt, coffee…) and books. */
-export type LootKey = 'hardware' | 'pipe' | 'cable' | 'meds' | 'fuel' | 'seed' | 'canned' | 'staples' | 'hygiene' | `ammo:${Caliber}` | `bag:${BagGood}` | 'books';
+export type LootKey = 'hardware' | 'pipe' | 'cable' | 'meds' | 'fuel' | 'seed' | 'canned' | 'staples' | 'hygiene' | `ammo:${Caliber}` | `bag:${BagGood}` | 'books' | 'tool';
 
 export interface Place {
   id: string;
@@ -98,19 +99,19 @@ export const onRun = (s: GameState, pid: string) => !!s.scavenge?.run?.team.incl
  * school, two jackknifed semis on the interstate, a farm).
  */
 const STOCKED: Record<PlaceKind, Partial<Record<LootKey, number>>> = {
-  hardware: { hardware: 30, pipe: 12, cable: 10, seed: 6, fuel: 2, 'bag:batteries': 40, 'bag:salt': 25, 'ammo:22lr': 1500, 'ammo:12ga': 200, 'ammo:3030': 60, books: 1 },
+  hardware: { hardware: 30, pipe: 12, cable: 10, seed: 6, fuel: 2, 'bag:batteries': 40, 'bag:salt': 25, 'ammo:22lr': 1500, 'ammo:12ga': 200, 'ammo:3030': 60, books: 1, tool: 10 },
   pharmacy: { meds: 25, hygiene: 40, 'bag:batteries': 30, 'bag:coffee': 8, 'bag:tobacco': 30, books: 1 },
   gas: { fuel: 120, canned: 6, hygiene: 10, 'bag:coffee': 25, 'bag:tobacco': 60, 'bag:liquor': 30, 'bag:batteries': 20, 'bag:salt': 8 },
   school: { canned: 15, staples: 4, meds: 4, hygiene: 15, cable: 4, pipe: 3, 'bag:salt': 15, 'bag:coffee': 6, books: 6 },
   interstate: { fuel: 40, hardware: 15, canned: 20, staples: 6, hygiene: 20, meds: 3, 'bag:batteries': 15, 'bag:liquor': 10, 'ammo:9mm': 100, 'ammo:556': 120 },
-  farm: { seed: 4, canned: 6, staples: 2, fuel: 6, hardware: 6, meds: 1, 'bag:salt': 5, 'bag:liquor': 3, 'ammo:12ga': 50, 'ammo:3030': 40, books: 1 },
+  farm: { seed: 4, canned: 6, staples: 2, fuel: 6, hardware: 6, meds: 1, 'bag:salt': 5, 'bag:liquor': 3, 'ammo:12ga': 50, 'ammo:3030': 40, books: 1, tool: 3 },
 };
 /** Days for others to pick half of what's left, at the worst of it (the first months). */
 export const HALF_LIFE: Record<PlaceKind, number> = { pharmacy: 30, gas: 45, hardware: 75, interstate: 90, school: 150, farm: 200 };
 /** How often other people are there (chance of running into someone, the first months, lawless). */
 export const TRAFFIC: Record<PlaceKind, number> = { pharmacy: 0.4, gas: 0.4, hardware: 0.3, interstate: 0.25, school: 0.2, farm: 0.12 };
 /** Rough weights (kg per unit) for what a pack or a truck bed holds. */
-const WEIGHT: Record<string, number> = { hardware: 8, pipe: 6, cable: 9, meds: 1, fuel: 17, seed: 10, canned: 9, staples: 25, hygiene: 3, books: 1, 'bag:salt': 1, 'bag:coffee': 0.5, 'bag:batteries': 0.1, 'bag:tobacco': 0.05, 'bag:liquor': 1.2 };
+const WEIGHT: Record<string, number> = { hardware: 8, pipe: 6, cable: 9, meds: 1, fuel: 17, seed: 10, canned: 9, staples: 25, hygiene: 3, books: 1, tool: 3, 'bag:salt': 1, 'bag:coffee': 0.5, 'bag:batteries': 0.1, 'bag:tobacco': 0.05, 'bag:liquor': 1.2 };
 const weightOf = (k: LootKey) => WEIGHT[k] ?? (k === 'ammo:12ga' ? 0.04 : 0.02);
 /** A pack each on foot; a pickup bed. */
 export const PACK_KG = 25, TRUCK_KG = 600;
@@ -120,6 +121,7 @@ export const FOOT_KM_DAY = 30;
 /** Dollar value (2025) of a unit of loot, for choosing what to carry and the tallies. */
 export function lootValue(k: LootKey): number {
   if (k === 'books') return 30;
+  if (k === 'tool') return 45;
   if (k.startsWith('ammo:')) { const c = CALIBER[k.slice(5) as Caliber]; return c.price / c.box; }
   if (k.startsWith('bag:')) return BAG_BASE[k.slice(4) as BagGood].price;
   return MATERIALS[k as keyof typeof MATERIALS].price ?? 10;
@@ -304,6 +306,11 @@ function unload(s: GameState, haul: Partial<Record<LootKey, number>>, r: () => n
     if (!n) continue;
     if (k.startsWith('ammo:')) { const c = k.slice(5) as Caliber; s.armory.ammo[c] = (s.armory.ammo[c] ?? 0) + n; continue; }
     if (k.startsWith('bag:')) { const b = bagOf(s); const g = k.slice(4) as BagGood; b[g] = (b[g] ?? 0) + n; continue; }
+    if (k === 'tool') {
+      // a used tool off the shelf or out of the shed (sim/tools.ts)
+      for (let i = 0; i < n; i++) lines.push(`A used ${TOOLS[findTool(s, r).kind].name.toLowerCase()} for the toolbox.`);
+      continue;
+    }
     if (k === 'books') {
       for (let i = 0; i < n; i++) {
         const [title, skill] = pick(r, BOOKS);
@@ -318,7 +325,7 @@ function unload(s: GameState, haul: Partial<Record<LootKey, number>>, r: () => n
   }
 }
 
-const label = (k: LootKey, n: number) => k.startsWith('ammo:') ? `${n} rounds of ${CALIBER[k.slice(5) as Caliber].name}` : k.startsWith('bag:') ? `${n} ${BAG_BASE[k.slice(4) as BagGood].unit}` : k === 'books' ? `${n} book${n > 1 ? 's' : ''}` : `${n} ${MATERIALS[k as keyof typeof MATERIALS].name.toLowerCase()}`;
+const label = (k: LootKey, n: number) => k.startsWith('ammo:') ? `${n} rounds of ${CALIBER[k.slice(5) as Caliber].name}` : k.startsWith('bag:') ? `${n} ${BAG_BASE[k.slice(4) as BagGood].unit}` : k === 'books' ? `${n} book${n > 1 ? 's' : ''}` : k === 'tool' ? `${n} used tool${n > 1 ? 's' : ''}` : `${n} ${MATERIALS[k as keyof typeof MATERIALS].name.toLowerCase()}`;
 export const haulText = (h: Partial<Record<LootKey, number>>) => (Object.entries(h) as Array<[LootKey, number]>).filter(([, n]) => n > 0).map(([k, n]) => label(k, n)).join(', ');
 
 /** Run the trip: who they meet, what happens, what they bring back. Mutates the state; returns the card. */

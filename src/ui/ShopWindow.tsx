@@ -16,11 +16,12 @@ import {
 import type { GameState, OrderLine } from '../sim/state';
 import { buyOffer, canTrade, findContact, heatNow, INTRO_CASH, lawless, offers, peekBm, priceOfOffer, risk } from '../sim/blackMarket';
 import { HARDEN_GOODS, KIT_GOODS, WATCH_GOODS } from '../sim/gear';
+import { ToolShop } from './ToolShop';
 import { ammoLimit, buyAmmo, buyGun, CALIBER, CALIBERS, CLASS_USD, GUN, GUN_GROUP, GUNS, groupOf, gunPrices, issue, NFA_STAMP, practice, shopOpen, skillOf, stateBan, takeClass, type Caliber, type GunGroup, type GunModel } from '../sim/armory';
 
-type Tab = 'build' | 'bunker' | 'water' | 'food' | 'household' | 'fuel' | 'guns' | 'defense' | 'metals' | 'money';
-const TABS: Array<[Tab, string]> = [['build', 'Building'], ['bunker', 'Bunker'], ['water', 'Water & power'], ['food', 'Food'], ['household', 'Medical & household'], ['fuel', 'Fuel & tools'], ['guns', 'Guns & ammo'], ['defense', 'Kit & security'], ['metals', 'Gold & silver'], ['money', 'Money']];
-const SHELVES: Record<Exclude<Tab, 'metals' | 'money' | 'guns'>, MaterialId[]> = {
+type Tab = 'build' | 'bunker' | 'water' | 'food' | 'household' | 'fuel' | 'tools' | 'guns' | 'defense' | 'metals' | 'money';
+const TABS: Array<[Tab, string]> = [['build', 'Building'], ['bunker', 'Bunker'], ['water', 'Water & power'], ['food', 'Food'], ['household', 'Medical & household'], ['fuel', 'Fuel & hire'], ['tools', 'Tools'], ['guns', 'Guns & ammo'], ['defense', 'Kit & security'], ['metals', 'Gold & silver'], ['money', 'Money']];
+const SHELVES: Record<Exclude<Tab, 'metals' | 'money' | 'guns' | 'tools'>, MaterialId[]> = {
   build: ['lumber', 'fieldstone', 'concrete', 'roofing', 'hardware', 'wire', 'seedlings', 'greenhouse_kit', 'fruit_trees'],
   bunker: ['rebar', 'membrane', 'container', 'blast_door', 'blast_valve', 'nbc_filter', 'filter_set', 'culvert', 'egress_hatch', 'lead_sheet', 'faraday_mesh'],
   water: ['water_jugs', 'ibc_tote', 'water_trailer', 'water_filter', 'ro_system', 'softener', 'greywater', 'pipe', 'cable', 'fixtures', 'pump', 'drilling', 'tank', 'septic_tank', 'solar_panel', 'battery', 'inverter', 'generator'],
@@ -159,7 +160,7 @@ export function ShopWindow() {
         </div>
         <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
           <div style={{ flex: 1, overflowY: 'auto', padding: 14 }}>
-            {tab !== 'metals' && tab !== 'money' && tab !== 'guns' && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 8 }}>
+            {tab !== 'metals' && tab !== 'money' && tab !== 'guns' && tab !== 'tools' && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 8 }}>
               {tab === 'food' && <FoodShelves game={game} k={k} cart={foodCart} add={addFood} />}
               {SHELVES[tab].filter(m => MATERIALS[m].price !== null).map(m => (
                 <div key={m} style={{ background: C.card, border: `1px solid ${cart[m] ? C.gold : C.line}`, borderRadius: 10, padding: 10, display: 'flex', gap: 10 }}>
@@ -177,12 +178,13 @@ export function ShopWindow() {
                 </div>
               ))}
             </div>}
+            {tab === 'tools' && <ToolShop onMsg={setMsg} />}
             {tab === 'guns' && <Guns onMsg={setMsg} />}
             {tab === 'metals' && <Metals onMsg={setMsg} />}
             {tab === 'money' && <Money onMsg={setMsg} />}
             {msg && <div style={{ color: C.bad, marginTop: 10 }}>{msg}</div>}
           </div>
-          {tab !== 'metals' && tab !== 'money' && tab !== 'guns' && <div style={{ width: 250, borderLeft: `1px solid ${C.line}`, padding: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {tab !== 'metals' && tab !== 'money' && tab !== 'guns' && tab !== 'tools' && <div style={{ width: 250, borderLeft: `1px solid ${C.line}`, padding: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
             <b>The order</b>
             {!lines.length && <div style={{ color: C.dim }}>Nothing yet.</div>}
             <div style={{ flex: 1, overflowY: 'auto' }}>

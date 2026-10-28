@@ -11,7 +11,7 @@ import { calendarOf, dayIndex, hourOf, type Speed } from '../sim/state';
 import { BACKGROUND_NAME, backgroundOf, fullName } from '../sim/family';
 import { MATERIALS, MATERIAL_IDS, emptyStock, type MaterialId } from '../sim/materials';
 import { onOrder, orderCost, orderProblem } from '../sim/economy';
-import { blockedReason, isFinished, planProblem, progress } from '../sim/construction';
+import { holdReason, isFinished, planProblem, progress } from '../sim/construction';
 import { drillExtra } from '../sim/site';
 import { REGIONS } from '../sim/regions';
 import { CREW_RATE, CREW_SIZE, crewProblem, crewQuote } from '../sim/crews';
@@ -49,6 +49,7 @@ import { ARMORY_LIGHTS, LIGHT_MODES, LIGHT_MODE_NAME, lightList, lightMode, ligh
 import { floodTowerIds, TOWERS, TOWER_NEXT, highBonus, highShare, isTower, towerBill, towerUpgradeProblem } from '../sim/towers';
 import { STRUCTURE_SALVAGE, isFinished as structFinished } from '../sim/construction';
 import { PERIMETER, PERIMETER_ORDER, SALVAGE, UPGRADE_NEXT, UTILITY_LINES, upgradeProblem, wallLength, runBill, runHours, runFinished, runProgress, runBlocked, runGrowth } from '../sim/perimeter';
+import { ToolsPanel, ToolNeedsNote } from './ToolsPanel';
 import { PantryPanel } from './PantryPanel';
 
 const QUALITIES: Quality[] = ['high', 'medium', 'low'];
@@ -199,7 +200,7 @@ export function Hud() {
   // fight wounds heal only with meds, a medic (skill 3+) or the bunker's medical bay
   const treating = game.stock.meds >= 0.1 || game.people.some((q, j) => !q.kid && game.personState[j]?.needs.died == null && q.skills.medic >= 3) || game.structures.some(st => st.kind === 'bunker_medical' && isFinished(st));
   const familyAlert: Tone | undefined = game.personState.some(ps => ps.needs.died == null && (ps.needs.health < 40 || ps.needs.hurt.length > 0)) ? 'bad' : game.personState.some(ps => ps.needs.died == null && ps.needs.hunger > 5000) ? 'warn' : undefined;
-  const projectsAlert: Tone | undefined = game.structures.some(st => !isFinished(st) && blockedReason(game, st)) ? 'warn' : undefined;
+  const projectsAlert: Tone | undefined = game.structures.some(st => !isFinished(st) && holdReason(game, st)) ? 'warn' : undefined;
   const ownNeeds = (kind: string) => Object.entries(totalBill(BLUEPRINTS[kind])).filter(([m]) => MATERIALS[m as MaterialId].price === null).map(([m, q]) => `${q} ${MATERIALS[m as MaterialId].name.toLowerCase()}`).join(', ');
 
   return (
@@ -285,7 +286,8 @@ export function Hud() {
                 <div style={{ height: 6, background: '#333', borderRadius: 3, margin: '4px 0' }}>
                   <div style={{ width: `${progress(sel) * 100}%`, height: '100%', background: '#c9b27a', borderRadius: 3 }} />
                 </div>
-                {!isFinished(sel) && <Note tone={blockedReason(game, sel) ? 'warn' : undefined}>{blockedReason(game, sel) ?? `${Math.round(progress(sel) * 100)} % done`}</Note>}
+                {!isFinished(sel) && <Note tone={holdReason(game, sel) ? 'warn' : undefined}>{holdReason(game, sel) ?? `${Math.round(progress(sel) * 100)} % done`}</Note>}
+                <ToolNeedsNote game={game} st={sel} />
                 {(!isFinished(sel) || pendingFixes(sel).length > 0) && (() => {
                   const crew = game.crews.find(c => c.target === sel.id), q = crewQuote(sel), why = crewProblem(game, sel);
                   return crew
@@ -427,6 +429,7 @@ export function Hud() {
 
           {rightTab === 'supplies' && <>
             <PantryPanel game={game} />
+            <ToolsPanel game={game} />
             <Section title="Keeping">
               {KEPT.filter(k => game.stock[k] > 0.05).map(k => {
                 const kp = keeping(game, k), yrs = (d: number) => d >= 365 ? `${(d / 365).toFixed(1)} yr` : `${Math.round(d / 30)} mo`;

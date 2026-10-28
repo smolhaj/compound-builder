@@ -12,6 +12,7 @@
  */
 import { hasAll, shortfall, MATERIALS, type MaterialId, type Stock } from './materials';
 import { log } from './economy';
+import { wearTools, workSpeed } from './tools';
 import type { GameState } from './state';
 
 export type PerimeterKind = 'split_rail' | 'barbed_wire' | 'woven_wire' | 'thorn_hedge' | 'log_palisade' | 'container_wall' | 'earth_berm' | 'ditch' | 'creek_bars' | 'chain_link' | 'wrought_iron' | 'iron_barbed' | 'steel_wall' | 'electric_steel' | 'water_pipe' | 'power_cable' | 'escape_tunnel';
@@ -204,7 +205,11 @@ export function addRunWork(s: GameState, r: PerimeterRun, hours: number): void {
       log(s, `The berm takes ${Math.round(use)} m³ off the spoil pile.`);
     }
   }
-  r.done = Math.min(r.hours, r.done + hours);
+  // the family's shovel, pliers and so on (sim/tools.ts)
+  const task = { kind: 'fence', run: r.kind } as const, m = workSpeed(s, task);
+  if (m <= 0) return;
+  wearTools(s, task, hours);
+  r.done = Math.min(r.hours, r.done + hours * m);
   if (r.done >= r.hours - 1e-9) {
     r.finishedAt = s.clock.t;
     if (r.kind === 'ditch') s.stock.spoil += Math.round(DITCH_M3 * wallLength(r));
