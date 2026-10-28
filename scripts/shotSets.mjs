@@ -544,15 +544,15 @@ SETS.mounts = [
 // stage({ near, ang, animals: [[species, forward, sideways, heading, male, side]], camBack, camSide, look, fov, fence, person }):
 // finds an open spot near the camp (or a fence spot), stands the person there and the animals `forward` / `sideways` of them
 // toward heading `ang`, and puts the eye camera behind the person. `forward` / `sideways` may be JS expressions.
-const K = 0.55;   // numeric offsets are compressed: SCALE v2 animals are small, so they must be near the lens to read
-const stage = ({ near = [9, -3], ang = 0, animals = [], camBack = 1.2, camSide = 0.35, look = 3, fov = 52, fence = false, person = true, eyeH = 0.27, dy = 0.12 }) => `{ const w = cb.world.wildlife; w.clearDebug();
+const K = 1;
+const stage = ({ near = [9, -3], ang = 0, animals = [], camBack = 0.9, camSide = 0.3, look = 2, fov = 46, fence = false, person = true, eyeH = 0.27, dy = 0.12 }) => `{ const w = cb.world.wildlife; w.clearDebug();
   const c = cb.world.camp, h = cb.game.getState().game.site.home, g = cb.world.groundAt;
   const ca = Math.cos(${ang}), sa = Math.sin(${ang});
   // the flattest open ground near the spot (the animals must not hide behind a rise): the ground a few units about and ahead stays within a hand of the person's feet
   const flat = (x, z) => { let m = 0; for (const [f, s] of [[-2, 0], [-2, 0.8], [2, 0], [4, 0], [6, 0], [4, 1.6], [4, -1.6], [7, 2]]) m = Math.max(m, Math.abs(g(x + ca * f - sa * s, z + sa * f + ca * s) - g(x, z))); return m; };
   let best = null;
   for (let ix = -24; ix <= 24; ix += 2) for (let iz = -24; iz <= 24; iz += 2) {
-    const x = ${fence ? `h.x1 - 3.2 + ix * 0.05` : `c.x + ${near[0]} + ix`}, z = ${fence ? `c.z + iz * 1.2` : `c.z + ${near[1]} + iz`};
+    const x = ${fence ? `h.x1 - 1.7 + ix * 0.04` : `c.x + ${near[0]} + ix`}, z = ${fence ? `c.z + iz * 1.2` : `c.z + ${near[1]} + iz`};
     if (x < h.x0 + 3 || x > h.x1 - ${fence ? 1 : 3} || z < h.z0 + 3 || z > h.z1 - 3) continue;
     if (cb.world.onBuilding(x, z, 3) || cb.world.onBuilding(x + ca * 5, z + sa * 5, 2)) continue;
     const cz = cb.world.parcel.creek.zAt(x); if (Math.abs(z - cz) < 6) continue;
@@ -576,22 +576,28 @@ const aerialAt = (r, pitch, yaw) => `{ const c = cb.world.camp; cb.qa.pose = nul
 /** Aerial of the west fence line: animals placed relative to the line (x forward into the place from the fence, z along it), person inside. */
 const fenceAerial = (animals) => `{ const w = cb.world.wildlife; w.clearDebug(); const c = cb.world.camp, h = cb.game.getState().game.site.home, z0 = c.z;
   ${animals.map(a => `w.spawnDebug('${a[0]}', h.x1 - ${a[1]}, z0 + ${a[2]}, ${a[3]}, ${a[4]}, '${a[5]}');`).join(' ')}
-  import('/src/store/battleStore.ts').then(m => m.useBattleStore.getState().playBattle({ night: false, duration: 99999, events: [], units: [{ id: 'h_a', side: 'home', x: h.x1 - 5, z: z0 + 3, post: 'open' }] }));
-  cb.qa.pose = null; cb.cam.target.set(h.x1 - 4, 0, z0); cb.cam.radius = 17; cb.cam.pitch = 0.5; cb.cam.yaw = 0.6; }`;
+  import('/src/store/battleStore.ts').then(m => m.useBattleStore.getState().playBattle({ night: false, duration: 99999, events: [], units: [{ id: 'h_a', side: 'home', x: h.x1 - 3, z: z0 + 1.6, post: 'open' }] }));
+  cb.qa.pose = null; cb.cam.target.set(h.x1 - 1.5, 0.1, z0); cb.cam.radius = 5; cb.cam.pitch = 0.6; cb.cam.yaw = 0.0; }`;
 const wlBase = { season: 'summer', cam: cam0 };
 SETS.wildlife = [
-  { name: 'eye-deer-and-rabbits-in-the-field', time: 7.4, ...wlBase,
-    setup: stage({ ang: 0.3, animals: [['deer', 4.6, 0.4, 1.2, false], ['deer', 5.4, 1.5, 0.9, false], ['deer', 4.3, -0.9, 1.4, true], ['rabbit', 2.6, -1.2, 0.5], ['rabbit', 3.1, 1.6, 2]] }), frames: 10 },
-  { name: 'eye-turkeys-at-the-edge', time: 9, ...wlBase,
-    setup: stage({ ang: 0.3, animals: [['turkey', 4.2, 0.2, 0.8, true], ['turkey', 5, 1.0, 1.2, false], ['turkey', 4.4, -0.9, 0.4, false], ['turkey', 5.6, -0.2, 1.0, false]] }), frames: 10 },
-  { name: 'eye-bear-at-the-fence-barbed-wire-open', time: 18.9, ...wlBase,
-    setup: ringSetup('barbed_wire') + stage({ fence: true, ang: 0, animals: [['bear', 'fd - 1.2', 0.7, 1.5 * Math.PI + 0.3, true, 'free']], look: 'fd - 0.5', camBack: 1.6, camSide: 0.5 }), frames: 12 },
-  { name: 'eye-bear-at-the-fence-chainlink-closed', time: 18.9, ...wlBase,
-    setup: ringSetup('chain_link') + stage({ fence: true, ang: 0, animals: [['bear', 'fd + 1.6', 0.7, 0.5 * Math.PI, true, 'out'], ['coyote', 'fd + 2.6', -1.6, 0.5 * Math.PI, true, 'out']], look: 'fd + 0.5', camBack: 1.6, camSide: 0.5 }), frames: 12 },
-  { name: 'aerial-herd-no-wall', time: 7.4, ...wlBase,
-    setup: ringSetup('barbed_wire') + fenceAerial([['elk', 9, 0, 2, true, 'free'], ['elk', 10, 1.2, 1.8, false, 'free'], ['elk', 8.4, -1.2, 2.2, false, 'free'], ['deer', 6, 5, 1, false, 'free'], ['bear', -1.5, -3, 1.5, true, 'free'], ['coyote', 3, -6, 1, true, 'free']]), frames: 10 },
-  { name: 'aerial-same-parcel-closed-wall', time: 7.4, ...wlBase,
-    setup: ringSetup('chain_link') + fenceAerial([['elk', 9, 0, 2, true, 'in'], ['elk', 10, 1.2, 1.8, false, 'in'], ['elk', 8.4, -1.2, 2.2, false, 'in'], ['deer', 6, 5, 1, false, 'in'], ['bear', -1.5, -3, 1.5, true, 'out'], ['coyote', -2, -6, 1, true, 'out']]), frames: 10 },
-  { name: 'eye-moose-wolf-cougar-javelina', time: 19, ...wlBase,
-    setup: stage({ ang: 0.3, animals: [['moose', 6, 1.6, 1, true], ['wolf', 5, -1.8, 3, true], ['cougar', 7, 0, 0.2, true], ['javelina', 3.2, 1.2, 0.5], ['javelina', 3.6, 1.7, 0.9], ['squirrel', 1.8, -0.7, 0.3], ['waterfowl', 4, 3, 1]] }), frames: 10 },
+  // animals 6-10 m (1-1.7 units) from a person: a whitetail's shoulder is ~0.6 of a person
+  { name: 'eye-deer-grazing-8m', time: 9.5, ...wlBase,
+    setup: stage({ ang: 0.3, animals: [['deer', 1.5, 0.3, 1.2, false], ['deer', 1.9, 1.0, 0.9, false], ['deer', 1.3, -0.7, 1.4, true], ['rabbit', 0.8, -0.5, 0.5]] }), frames: 8 },
+  { name: 'eye-elk-herd', time: 9.5, ...wlBase,
+    setup: stage({ ang: 0.3, camBack: 1.4, animals: [['elk', 2.2, 0, 2, true], ['elk', 2.6, 0.9, 1.8, false], ['elk', 1.9, -0.9, 2.2, false], ['elk', 2.9, -0.2, 1.6, false]], look: 2.4 }), frames: 8 },
+  { name: 'eye-turkeys', time: 9.5, ...wlBase,
+    setup: stage({ ang: 0.3, animals: [['turkey', 1.2, 0.2, 0.8, true], ['turkey', 1.6, 0.8, 1.2, false], ['turkey', 1.3, -0.6, 0.4, false], ['turkey', 1.9, 0, 1.0, false]] }), frames: 8 },
+  { name: 'eye-bear-8m-from-person-no-wall', time: 9.5, ...wlBase,
+    setup: ringSetup('barbed_wire') + stage({ ang: 0.3, animals: [['bear', 1.5, 0.4, 1.0, true, 'free']], look: 1.6 }), frames: 8 },
+  // the fence line seen along its length: person inside, bear outside / inside
+  { name: 'eye-bear-outside-closed-chainlink', time: 9.5, ...wlBase,
+    setup: ringSetup('chain_link') + stage({ fence: true, ang: Math.PI / 2, camBack: 1.5, camSide: 0.5, look: 3, animals: [['bear', '2.4', '-(fd + 1.3)', Math.PI, true, 'out'], ['coyote', '3.6', '-(fd + 1.8)', Math.PI, true, 'out']] }), frames: 8 },
+  { name: 'eye-bear-inside-open-wire', time: 9.5, ...wlBase,
+    setup: ringSetup('barbed_wire') + stage({ fence: true, ang: Math.PI / 2, camBack: 1.5, camSide: 0.5, look: 3, animals: [['bear', '2.4', '-(fd - 0.9)', Math.PI, true, 'free']] }), frames: 8 },
+  { name: 'aerial-closed-wall-close', time: 9.5, ...wlBase,
+    setup: ringSetup('chain_link') + fenceAerial([['elk', 3.0, 0, 2, true, 'in'], ['elk', 3.5, 0.7, 1.8, false, 'in'], ['deer', 2.4, -0.8, 1, false, 'in'], ['bear', -1.4, 0.4, 1.5, true, 'out'], ['coyote', -1.8, -0.9, 1, true, 'out']]), frames: 8 },
+  { name: 'aerial-open-wire-close', time: 9.5, ...wlBase,
+    setup: ringSetup('barbed_wire') + fenceAerial([['elk', 3.0, 0, 2, true, 'free'], ['elk', 3.5, 0.7, 1.8, false, 'free'], ['deer', 2.4, -0.8, 1, false, 'free'], ['bear', 1.2, 0.4, 1.5, true, 'free'], ['coyote', 0.4, -0.9, 1, true, 'free']]), frames: 8 },
+  { name: 'eye-moose-wolf-cougar-javelina', time: 9.5, ...wlBase,
+    setup: stage({ ang: 0.3, camBack: 1.4, animals: [['moose', 2.4, 1.1, 1, true], ['wolf', 1.6, -1.0, 3, true], ['cougar', 2.2, 0, 0.2, true], ['javelina', 1.1, 0.8, 0.5], ['javelina', 1.4, 1.1, 0.9], ['squirrel', 0.7, -0.4, 0.3]], look: 1.8 }), frames: 8 },
 ];

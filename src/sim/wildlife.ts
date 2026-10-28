@@ -68,10 +68,10 @@ export const SPECIES: Record<SpeciesId, Species> = {
   squirrel:  { id: 'squirrel', name: 'Squirrels', kind: 'small', per40: 10, hab: { timber: 0.9, open: 0.05, water: 0.05 }, group: [1, 1], len: 0.06, h: 0.035, meat: 0.5, active: 'day', fear: 0.8 },
   grouse:    { id: 'grouse', name: 'Grouse', kind: 'bird', per40: 5, hab: { timber: 0.7, open: 0.2, water: 0.1 }, group: [1, 3], len: 0.06, h: 0.07, meat: 1, active: 'crepuscular', fear: 0.9 },
   waterfowl: { id: 'waterfowl', name: 'Ducks & geese', kind: 'bird', per40: 6, hab: { timber: 0, open: 0.1, water: 0.9 }, group: [2, 6], len: 0.09, h: 0.06, meat: 2, active: 'day', fear: 1.4 },
-  bear:      { id: 'bear', name: 'Black bears', kind: 'predator', per40: 0.35, hab: { timber: 0.8, open: 0.1, water: 0.1 }, group: [1, 1], len: 0.3, h: 0.17, meat: 40, active: 'night', fear: 0.9 },
+  bear:      { id: 'bear', name: 'Black bears', kind: 'predator', per40: 0.35, hab: { timber: 0.8, open: 0.1, water: 0.1 }, group: [1, 1], len: 0.3, h: 0.15, meat: 40, active: 'night', fear: 0.9 },
   cougar:    { id: 'cougar', name: 'Cougars', kind: 'predator', per40: 0.22, hab: { timber: 0.6, open: 0.3, water: 0.1 }, group: [1, 1], len: 0.26, h: 0.12, meat: 14, active: 'night', fear: 1.5 },
-  wolf:      { id: 'wolf', name: 'Wolves', kind: 'predator', per40: 0.3, hab: { timber: 0.5, open: 0.4, water: 0.1 }, group: [1, 3], len: 0.2, h: 0.14, meat: 8, active: 'night', fear: 1.6 },
-  coyote:    { id: 'coyote', name: 'Coyotes', kind: 'predator', per40: 0.9, hab: { timber: 0.2, open: 0.7, water: 0.1 }, group: [1, 2], len: 0.16, h: 0.1, meat: 2, active: 'night', fear: 1.8 },
+  wolf:      { id: 'wolf', name: 'Wolves', kind: 'predator', per40: 0.3, hab: { timber: 0.5, open: 0.4, water: 0.1 }, group: [1, 3], len: 0.2, h: 0.115, meat: 8, active: 'night', fear: 1.6 },
+  coyote:    { id: 'coyote', name: 'Coyotes', kind: 'predator', per40: 0.9, hab: { timber: 0.2, open: 0.7, water: 0.1 }, group: [1, 2], len: 0.17, h: 0.105, meat: 2, active: 'night', fear: 1.8 },
 };
 
 /** The region's wildlife (alongside regions.ts `game`, which is what is worth hunting and fishing). */
