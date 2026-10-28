@@ -343,7 +343,7 @@ export function vehiclesDay(s: GameState): string[] {
       if (v.condition <= 0) { v.condition = 0; out.push(`The ${def.name.toLowerCase()} broke down for good.`); continue; }
     }
     // the odd breakdown (the miles they drive every day are not many, but the old ones go)
-    if (rollDown(s, v, breakdownChance(v, mechanic) * (miles > 8 ? 1 : 0.3), 11)) out.push(breakDown(s, v, 5));
+    if (rollDown(s, v, breakdownChance(v, mechanic) * (miles > 8 ? 1 : 0.3), 29)) out.push(breakDown(s, v, 5));
   }
   return out;
 }

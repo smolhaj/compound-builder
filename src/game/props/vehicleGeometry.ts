@@ -149,7 +149,7 @@ function trailer(p: Parts): void {
 }
 
 const matCache = new Map<number, THREE.MeshStandardMaterial>();
-const paint = (c: number) => { let m = matCache.get(c); if (!m) { m = new THREE.MeshStandardMaterial({ color: c, roughness: 0.42, metalness: 0.35 }); matCache.set(c, m); } return m; };
+const paint = (c: number) => { let m = matCache.get(c); if (!m) { m = new THREE.MeshStandardMaterial({ color: c, roughness: 0.5, metalness: 0.06 }); matCache.set(c, m); } return m; };
 let _trim: THREE.MeshStandardMaterial | null = null, _chrome: THREE.MeshStandardMaterial | null = null, _light: THREE.MeshStandardMaterial | null = null;
 const trimMat = () => (_trim ??= new THREE.MeshStandardMaterial({ color: 0x1d1e20, roughness: 0.85 }));
 const chromeMat = () => (_chrome ??= new THREE.MeshStandardMaterial({ color: 0xb8bcc0, roughness: 0.28, metalness: 0.9 }));
