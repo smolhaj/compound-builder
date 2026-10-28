@@ -21,7 +21,7 @@ import { tractorBoost } from './vehicles';
 import { SOIL_YIELD } from './site';
 import { REGIONS, seasons } from './regions';
 import { gardenSeason, GREENHOUSE_PEAK, greenhouseGreens, hasGreenhouse, orchardHarvest } from './greenhouse';
-import { careYield, lifeMorale } from './daily';
+import { canningCases, careYield, lifeMorale, spoilFactor } from './daily';
 import { socialMorale } from './gatherings';
 import { addFood, addFoodKcal, dietDay, dietEffects, eatFrom, inDateKcal, syncPantry } from './pantry';
 import { mulberry32 } from './rng';
@@ -140,7 +140,7 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
   // spoilage (fractional units carry as a remainder on the stock count)
   let spoiled = 0;
   const spoil = (f: FoodId, rate: number) => { const lost = s.stock[f] * rate; s.stock[f] -= lost; spoiled += lost * KCAL[f]; };
-  spoil('fresh', cellar ? SPOIL_CELLAR : SPOIL_FRESH);
+  spoil('fresh', (cellar ? SPOIL_CELLAR : SPOIL_FRESH) * spoilFactor(s));
   if (!freezer) spoil('frozen', fromStores ? 0 : THAW);
   // what grows
   const grown = produce(s), dry = fieldHarvest(s) * FIELD_DRY;
@@ -195,7 +195,7 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
   const kitchen = fin.some(st => isHome(st.kind));
   const surplus = s.stock.fresh * KCAL.fresh - 5 * need;
   if (kitchen && surplus > KCAL.canned && s.stock.lids >= 1) {
-    const cases = Math.min(Math.floor(surplus / KCAL.canned), CANNER_CASES, Math.floor(s.stock.lids));
+    const cases = Math.min(Math.floor(surplus / KCAL.canned), canningCases(s, CANNER_CASES), Math.floor(s.stock.lids));
     s.stock.lids -= cases;
     s.stock.fresh -= cases * KCAL.canned / KCAL.fresh;
     addFood(s, 'home_canned', cases * CANNED_YIELD);

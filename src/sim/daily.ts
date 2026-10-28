@@ -187,7 +187,19 @@ export interface DayPlan {
   notes?: Record<string, string>;
 }
 
-export interface Daily { plan: DayPlan; chores: ChoreState; /** Gatherings (sim/gatherings.ts). */ social: import('./gatherings').Social }
+/** Person-hours put into the duties that have an effect of their own, today and yesterday (rolled over each dawn), and who was out hunting at dusk. */
+export interface Tally { today: Partial<Record<Duty, number>>; yesterday: Partial<Record<Duty, number>>; dusk: string[] }
+
+export interface Daily {
+  plan: DayPlan; chores: ChoreState;
+  /** Gatherings (sim/gatherings.ts). */ social: import('./gatherings').Social;
+  /** Cooking, hunting and teaching hours (`tallyOf` makes it lazily). */ tally?: Tally;
+  /** Days in a row the animals have gone unfed (livestock chore at its worst): sickness, then deaths. */ neglect?: number;
+}
+
+/** Yesterday is assumed to have had its cooking (so a new game doesn't start with cold suppers). */
+export const newTally = (): Tally => ({ today: {}, yesterday: { kitchen: 99 }, dusk: [] });
+export const tallyOf = (s: GameState): Tally => (dailyOf(s).tally ??= newTally());
 
 export function newDaily(): Daily {
   return {
@@ -321,8 +333,11 @@ export function dutyWants(s: GameState, rates: Record<ChoreId, number>): Array<[
   for (const duty of Object.keys(DUTY_CHORES) as Duty[]) {
     let h = 0;
     for (const c of DUTY_CHORES[duty]!) if (rates[c] > 0 || lv[c] > 5) h += (rates[c] + lv[c] / 3) / 100 * CLEAR_HOURS[c];
+    if (duty === 'kitchen') h += cookNeed(s);                     // somebody has to cook the meals and put the harvest by
     if (h > 0.3) out.push([duty, h]);
   }
+  // after the hit the wild is part of the larder: somebody hunts
+  if (s.disaster.phase === 'impact' || s.disaster.phase === 'survival') out.push(['hunt', 2]);
   return out;
 }
 
@@ -704,7 +719,13 @@ export function resolveDuty(s: GameState, p: Person, h: number, rates: Record<Ch
 }
 
 /** An hour slice of a duty's work: chores come down; the medic tends the hurt. */
-export function dutyWork(s: GameState, p: Person, ps: PersonState, duty: Duty, personHours: number): void {
+export function dutyWork(s: GameState, p: Person, ps: PersonState, duty: Duty, personHours: number, hour = 12): void {
+  if (duty === 'kitchen' || duty === 'hunt' || duty === 'teach') {
+    const t = tallyOf(s).today;
+    // skilled hunters and teachers count for more
+    t[duty] = (t[duty] ?? 0) + personHours * (duty === 'hunt' ? 0.5 + p.skills.hunter / 10 : duty === 'teach' ? 0.5 + p.skills.teacher / 10 : 1);
+    if (duty === 'hunt' && hour >= 17 && !tallyOf(s).dusk.includes(p.id)) tallyOf(s).dusk.push(p.id);
+  }
   if (DUTY_CHORES[duty]) { addChoreWork(s, duty, personHours); return; }
   if (duty === 'medic') {
     // the worst wound gets the care (on top of the daily healing in needs.ts)
@@ -746,7 +767,8 @@ export function watchNow(s: GameState): Watcher[] {
 export function watchDetection(s: GameState): number {
   const w = watchNow(s).sort((a, b) => b.alert - a.alert);
   let sum = 0;
-  w.forEach((x, k) => { sum += (k === 0 ? 10 : k === 1 ? 6 : 2) * x.alert * (x.post === 'tower' ? 1.2 : 1); });
+  const owl = w.length ? chronotypes(s) : {};
+  w.forEach((x, k) => { sum += ((k === 0 ? 10 : k === 1 ? 6 : 2) + (owl[x.id] === 'owl' ? 1.5 : 0)) * x.alert * (x.post === 'tower' ? 1.2 : 1); });
   return Math.min(20, sum);
 }
 
@@ -760,6 +782,17 @@ export function careYield(s: GameState, c: 'weeds' | 'harvest' | 'animals'): num
   return 1 - (c === 'weeds' ? 0.5 : 0.6) * Math.max(0, v - 20) / 80;
 }
 
+/** Person-hours of cooking the household needs a day (about one an hour-and-a-bit per three mouths). */
+export const cookNeed = (s: GameState): number => Math.max(1, s.personState.filter(ps => ps.needs.died == null).length / 3);
+/** 0 (nobody cooked yesterday) to 1 (the stove was kept): canning and hot meals depend on it. */
+export const cookRatio = (s: GameState): number => { const t = s.daily?.tally; return t ? Math.min(1, (t.yesterday.kitchen ?? 0) / cookNeed(s)) : 1; };
+/** Canner loads a day: two when the kitchen is kept, fewer as the cooking falls short, none when nobody cooks. */
+export const canningCases = (s: GameState, max: number): number => Math.floor(max * cookRatio(s) + 1e-9);
+/** Fresh food spoils half again as fast when nobody is cooking or putting it by. */
+export const spoilFactor = (s: GameState): number => (cookRatio(s) < 0.3 ? 1.5 : 1);
+/** Hunting effort yesterday scales what the wild gives: a casual 0.6 with nobody on Hunt, to 1.6 with a skilled hunter out four hours. */
+export const huntFactor = (s: GameState): number => 0.6 + Math.min(1, (s.daily?.tally?.yesterday.hunt ?? 0) / 4);
+
 /** How well the dogs are kept (1 = fed, watered and walked; down to a half when the care is badly behind): scales their alarm and deterrence (gear.ts). */
 export const petCare = (s: GameState): number => 1 - 0.5 * Math.max(0, Math.min(1, ((s.daily?.chores.levels.pets ?? 0) - 40) / 60));
 
@@ -770,6 +803,33 @@ export const fenceHold = (s: GameState) => 1 - 0.3 * Math.max(0, (s.daily?.chore
 export function choresDay(s: GameState, r: () => number): string[] {
   const out: string[] = [];
   const d = dailyOf(s), lv = d.chores.levels;
+  // yesterday's hours become the record the effects read (cooking, hunting, teaching), and the day's dusk hunters meet what's out there
+  const tl = tallyOf(s);
+  const taught = tl.today.teach ?? 0;
+  for (const id of tl.dusk) {
+    const i = s.people.findIndex(x => x.id === id), ps = s.personState[i];
+    if (!ps || ps.needs.died != null) continue;
+    // a hunter out at dusk: a fall, a bad shot, something in the dark (worse with no law and no one to send after them)
+    if (r() < (s.disaster.tracks.law < 0.5 ? 0.07 : 0.03) && !ps.needs.hurt.some(h => h.what === 'hunting accident')) {
+      ps.needs.hurt.push({ what: 'hunting accident', sev: 20 + Math.floor(r() * 25) });
+      out.push(`${s.people[i].first} came back from the woods after dark limping, with a gash. "Should've been in before the light went."`);
+    }
+  }
+  tl.yesterday = tl.today; tl.today = {}; tl.dusk = [];
+  // teaching: school kids pick up a little of one skill a day, more with a good teacher and long lessons
+  if (taught > 0) s.people.forEach((p, i) => {
+    if (!p.kid || p.age < 5 || p.age > 17 || s.personState[i]?.needs.died != null) return;
+    const keys = Object.keys(p.skills) as Array<keyof Person['skills']>;
+    const k = keys[Math.floor(r() * keys.length)];
+    p.skills[k] = Math.min(6, p.skills[k] + 0.006 * taught);
+  });
+  // animals unfed for days: first off their feed, then they die one by one
+  d.neglect = lv.animals >= 90 ? (d.neglect ?? 0) + 1 : Math.max(0, (d.neglect ?? 0) - 2);
+  if (d.neglect === 4) out.push('The animals are standing about, off their feed. Something is wrong if nobody has seen to them in days.');
+  if (d.neglect >= 7 && r() < 0.12) {
+    const sp = (['rabbit', 'goat', 'pig', 'steer'] as const).find(a => Math.floor((s.stock as unknown as Record<string, number>)[a] ?? 0) > 0);
+    if (sp) { (s.stock as unknown as Record<string, number>)[sp] -= 1; out.push(`A ${sp} sickened and died. A week of neglect will do that.`); }
+  }
   // unsplit rounds season slowly: the pile ages half a day less
   if (lv.woodpile > 60) for (const g of s.upkeep.green) g.at += 0.5;
   // sickness: a fouled filter, a dirty kitchen, dirty laundry
@@ -828,6 +888,8 @@ export function lifeMorale(s: GameState, i: number): number {
   if (lv.hauling > 70) m -= 4;
   if (lv.animals > 80) m -= 3;
   if (lv.house > 60) m -= 3;
+  const cr = cookRatio(s);
+  if (cr < 0.6) m -= 4 * (1 - cr / 0.6);   // cold, scrappy meals when nobody cooks
   if (lv.pets > 70 && petDogs(s) > 0) m -= 2;
   // a night owl on the late watch is doing what suits them
   if (ps?.task === 'watch' && s.people[i] && chronotypes(s)[s.people[i].id] === 'owl') m += 1.5;

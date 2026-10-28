@@ -3,7 +3,7 @@ import { newGame, type GameState } from './state';
 import { step } from './engine';
 import { CLASSIC } from './site';
 import {
-  addChoreWork, applyTemplate, autoPlan, CHORES, chronotypes, choreRates, choresStep, CLEAR_HOURS, dailyOf, dailyTick, DUTIES, DUTY, DUTY_CHORES, DUTY_TASK, dutyAt,
+  addChoreWork, applyTemplate, canningCases, choresDay, cookRatio, dutyWork, huntFactor, lifeMorale, spoilFactor, tallyOf, autoPlan, CHORES, chronotypes, choreRates, choresStep, CLEAR_HOURS, dailyOf, dailyTick, DUTIES, DUTY, DUTY_CHORES, DUTY_TASK, dutyAt,
   dutyWants, emergencyOf, fitness, isNightHour, nightDuty, owlCount, petCare, setDuty, setFocus, threatLevel, tire, watchDetection, watchNow, workHours,
   type Duty,
 } from './daily';
@@ -411,5 +411,107 @@ describe('gatherings and grief (one fading-grief implementation)', () => {
     dailyOf(h).social.auto = false;
     gatheringsDay(h);
     expect(dailyOf(h).social.active).toBeNull();
+  });
+});
+
+describe('hours that do something: cooking, livestock, hunting, teaching', () => {
+  const rnd = (v: number) => () => v;
+
+  it('canning and hot meals need a cook: nobody on Cooking means no canning, faster spoilage and cold-meal gloom', () => {
+    const g = game();
+    expect(cookRatio(g)).toBe(1);                       // a new game starts with its suppers cooked
+    expect(canningCases(g, 2)).toBe(2);
+    expect(spoilFactor(g)).toBe(1);
+    const m0 = lifeMorale(g, 0);
+    tallyOf(g).yesterday = {};
+    expect(cookRatio(g)).toBe(0);
+    expect(canningCases(g, 2)).toBe(0);
+    expect(spoilFactor(g)).toBe(1.5);
+    expect(lifeMorale(g, 0)).toBeLessThan(m0 - 3);
+    // a cook's hours bring it back
+    dutyWork(g, g.people[0], g.personState[0], 'kitchen', 3);
+    choresDay(g, rnd(0.99));
+    expect(cookRatio(g)).toBe(1);
+  });
+
+  it('the planner always finds the household a cook', () => {
+    const g = game(3, 1);
+    plan(g, true);
+    expect(g.people.some((_, i) => row(g, i).filter(d => d === 'kitchen').length >= 2)).toBe(true);
+  });
+
+  it('animals unfed for a week sicken, then die; fed animals do not', () => {
+    const g = game();
+    g.stock.goat = 2;
+    const d = dailyOf(g);
+    d.chores.levels.animals = 100;
+    const msgs: string[] = [];
+    for (let i = 0; i < 20; i++) msgs.push(...choresDay(g, rnd(0.01)));
+    expect(msgs.some(m => /off their feed/.test(m))).toBe(true);
+    expect(g.stock.goat).toBeLessThan(2);
+    const h = game(); h.stock.goat = 2; dailyOf(h).chores.levels.animals = 10;
+    for (let i = 0; i < 20; i++) choresDay(h, rnd(0.01));
+    expect(h.stock.goat).toBe(2);
+  });
+
+  it('hunting hours raise the take (skilled hunters count more); none leaves a casual 0.6', () => {
+    const g = game();
+    tallyOf(g).yesterday = {};
+    expect(huntFactor(g)).toBeCloseTo(0.6);
+    g.people[0].skills.hunter = 8;
+    dutyWork(g, g.people[0], g.personState[0], 'hunt', 3);
+    choresDay(g, rnd(0.99));
+    const skilled = huntFactor(g);
+    expect(skilled).toBeGreaterThan(1.2);
+    const h = game(); tallyOf(h).yesterday = {};
+    h.people[0].skills.hunter = 1;
+    dutyWork(h, h.people[0], h.personState[0], 'hunt', 3);
+    choresDay(h, rnd(0.99));
+    expect(huntFactor(h)).toBeLessThan(skilled);
+  });
+
+  it('a hunter still out at dusk risks a bad fall, more with no law', () => {
+    let hurt = 0, hurtNoLaw = 0;
+    for (let k = 0; k < 40; k++) {
+      for (const law of [1, 0]) {
+        const g = game(3, law);
+        dutyWork(g, g.people[0], g.personState[0], 'hunt', 1, 18);
+        choresDay(g, ((i = 0) => () => ((k * 7 + (i++) * 13) % 100) / 100)());
+        if (g.personState[0].needs.hurt.some(h => h.what === 'hunting accident')) { if (law) hurt++; else hurtNoLaw++; }
+      }
+    }
+    expect(hurtNoLaw).toBeGreaterThanOrEqual(hurt);
+    const g = game();
+    dutyWork(g, g.people[0], g.personState[0], 'hunt', 1, 9);     // back by lunch: no risk
+    choresDay(g, rnd(0));
+    expect(g.personState[0].needs.hurt.length).toBe(0);
+  });
+
+  it('teaching hours raise a school kid\'s skills, slowly, more with long lessons; no lessons, no gain', () => {
+    const sum = (g: GameState, i: number) => Object.values(g.people[i].skills).reduce((a, b) => a + b, 0);
+    const g = game();
+    const kid = g.people.findIndex(p => p.kid && p.age >= 5);
+    const s0 = sum(g, kid);
+    choresDay(g, rnd(0.5));
+    expect(sum(g, kid)).toBe(s0);
+    dutyWork(g, g.people[0], g.personState[0], 'teach', 3);
+    choresDay(g, rnd(0.5));
+    const one = sum(g, kid) - s0;
+    expect(one).toBeGreaterThan(0);
+    expect(one).toBeLessThan(0.1);
+    const h = game();
+    dutyWork(h, h.people[0], h.personState[0], 'teach', 6);
+    choresDay(h, rnd(0.5));
+    expect(sum(h, kid) - s0).toBeGreaterThan(one);
+  });
+
+  it('a night owl on watch adds a little detection', () => {
+    const g = withPeople(game(7, 0), 12);
+    const c = chronotypes(g);
+    const owl = g.people.findIndex(p => c[p.id] === 'owl'), other = g.people.findIndex((p, i) => !p.kid && c[p.id] !== 'owl' && i !== owl);
+    g.personState[owl].task = 'watch';
+    const a = watchDetection(g);
+    g.personState[owl].task = 'idle'; g.personState[other].task = 'watch';
+    expect(a).toBeGreaterThan(watchDetection(g));
   });
 });

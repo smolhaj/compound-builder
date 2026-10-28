@@ -34,7 +34,7 @@ import { freshNeeds, type FoodReport, type Needs } from './needs';
 import type { WeatherState } from './weatherThreats';
 import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
 import type { LightsState } from './lights';
-export const SAVE_VERSION = 47;
+export const SAVE_VERSION = 48;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -241,9 +241,9 @@ export interface GameState {
   market?: MarketState;
   /** The neighbors' lives: ages, history, news on its way, the co-op or militia, the pact (sim/neighborLife.ts). Save v42. */
   locals?: LocalsState;
-  /** Daily life (sim/daily.ts): the roster, chores, gatherings. Save v47; `dailyOf` makes it lazily. */
+  /** Daily life (sim/daily.ts): the roster, chores, gatherings. Save v48; `dailyOf` makes it lazily. */
   daily?: Daily;
-  /** Deaths in the household and whether they were mourned (sim/grief.ts). Save v47; `lossesOf` makes it lazily. */
+  /** Deaths in the household and whether they were mourned (sim/grief.ts). Save v48; `lossesOf` makes it lazily. */
   losses?: Loss[];
   /** Radio and rumors after the collapse (radio.ts); made on first use. */
   radio?: RadioState;

@@ -141,6 +141,8 @@ export function goalFor(i: number, kid: boolean, task: TaskKind, target: string 
       return { x, z, pose: FIG_POSE.BENCH, face: faceTo(x, z, tx, tz), hidden: false, work: false };
     }
     case 'sleep': {
+      // TODO(housing): WHERE a sleeper lies (bed, sofa, rug, floor) and how well belongs to the housing branch: when `sleepSpotFor(person)` (sim/housing.ts)
+      // lands, show them there when the camera is indoors / the roof is cut away. The schedule (sim/daily.ts) only decides WHEN they sleep.
       if (ctx.home) return { x: ctx.home.x, z: ctx.home.z, pose: FIG_POSE.STAND, face: null, hidden: true, work: false };
       // no house yet: asleep on a bedroll in front of the tent, in plain sight
       const [x, z] = campPt(ctx, CAMP.tent.x + (i - 1.5) * 0.1, CAMP.tent.z + 0.1);

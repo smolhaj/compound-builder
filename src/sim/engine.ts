@@ -120,7 +120,7 @@ function subStep(s: GameState): void {
     }
     ps.task = DUTY_TASK[duty];
     ps.target = null;
-    if (hourly) dutyWork(s, p, ps, duty, choreRate(p) * workFactor(ps.needs) * restFactor(ps));
+    if (hourly) dutyWork(s, p, ps, duty, choreRate(p) * workFactor(ps.needs) * restFactor(ps), h);
   });
   if (hourly) choresStep(s, 1 / 24, rates);
   // (broke: the bills stop at nothing; food stamps and the food bank keep the table going)
