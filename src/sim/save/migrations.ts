@@ -26,6 +26,7 @@ import { newScavenge } from '../scavenge';
 import { newMarketState } from '../tradeGoods';
 import { newLocals } from '../neighborLife';
 import { newWild } from '../wildfood';
+import { newDaily } from '../daily';
 import { dayJob, type Person } from '../family';
 
 type Raw = Record<string, unknown> & { version?: number };
@@ -54,8 +55,10 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   5: s => ({ ...s, version: 6, stock: { rebar: 0, membrane: 0, excavator: 0, blast_door: 0, nbc_filter: 0, spoil: 0, ...(s.stock as object) } }),
   // 6 → 7: the escape tunnel (culvert, egress hatch)
   6: s => ({ ...s, version: 7, stock: { culvert: 0, egress_hatch: 0, ...(s.stock as object) } }),
-  // 45 → 46: light discipline: the family's lights-out routine (`opsec.auto`) and blackout curtains join the stockpile at zero (sim/blackout.ts)
-  45: s => ({ ...s, version: 46, stock: { blackout_curtains: 0, ...(s.stock as object) }, opsec: s.opsec ? { auto: 'off', ...(s.opsec as object) } : s.opsec }),
+  // 46 → 47: light discipline: the family's lights-out routine (`opsec.auto`) and blackout curtains join the stockpile at zero (sim/blackout.ts)
+  46: s => ({ ...s, version: 47, stock: { blackout_curtains: 0, ...(s.stock as object) }, opsec: s.opsec ? { auto: 'off', ...(s.opsec as object) } : s.opsec }),
+  // 45 → 46: daily life (sim/daily.ts): an Auto roster (the planner fills it on the first sub-step), no chores behind, nobody tired; the losses ledger (sim/grief.ts)
+  45: s => ({ ...s, version: 46, losses: (s.losses as unknown[] | undefined) ?? [], daily: (s.daily as object | undefined) ?? newDaily(), personState: (s.personState as Array<Record<string, unknown>>).map(ps => ({ fatigue: 0, ...ps })) }),
   // 44 → 45: where the starting money came from (old saves: not recorded; they keep their jobs and the old flat passive income)
   44: s => ({ ...s, version: 45, startFunds: null }),
   // 43 → 44: structures may carry `replaces` (a watch-tower upgrade in place, sim/towers.ts; none yet) and the top towers' mount and turret goods join the stockpile at zero

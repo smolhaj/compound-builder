@@ -19,11 +19,14 @@ describe('peopleGoals', () => {
     expect(Math.hypot(a.x - b.x, a.z - b.z)).toBeGreaterThan(0.3);
   });
 
-  it('kids sit at the camp table for school; everyone sleeps hidden', () => {
+  it('kids sit at the camp table for school; sleepers lie on a bedroll at the tent, or are inside the house', () => {
     const s = goalFor(2, true, 'school', null, 10, ctx);
     expect(s.pose).toBe(FIG_POSE.BENCH);
     expect(Math.hypot(s.x - 10, s.z - 10)).toBeLessThan(1);
-    expect(goalFor(0, false, 'sleep', null, 2, ctx).hidden).toBe(true);
+    const camp = goalFor(0, false, 'sleep', null, 2, ctx);
+    expect(camp.hidden).toBe(false);
+    expect(camp.pose).toBe(FIG_POSE.LAWN);
+    expect(goalFor(0, false, 'sleep', null, 2, { ...ctx, home: { x: 20, z: 20, rot: 0, w: 1, d: 1.5 } }).hidden).toBe(true);
     expect(goalFor(0, false, 'sleep', null, 2, { ...ctx, home: { x: 20, z: 20, rot: 0, w: 1, d: 1.5 } }).x).toBe(20);
   });
 

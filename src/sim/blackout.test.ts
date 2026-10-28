@@ -108,9 +108,9 @@ describe('light discipline', () => {
     expect(run(0)).toBeLessThan(run(1));
   });
 
-  it('migrates a v45 save: routine off, curtains at zero', () => {
+  it('migrates a v46 save: routine off, curtains at zero', () => {
     const g = fresh(); g.opsec = { quietDeliveries: true, blackout: true };
-    const old = { ...JSON.parse(JSON.stringify(g)), version: 45 };
+    const old = { ...JSON.parse(JSON.stringify(g)), version: 46 };
     delete old.stock.blackout_curtains;
     const m = migrate(old);
     expect(m.opsec).toMatchObject({ quietDeliveries: true, blackout: true, auto: 'off' });
