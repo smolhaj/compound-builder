@@ -25,7 +25,7 @@ import { applyForPermit } from './paperwork';
 import { BLUEPRINTS, totalBill } from './blueprints';
 import { log } from './economy';
 import { powered } from './gear';
-import { floodlightArmed, floodlightLit, threatNearby } from './lights';
+import { currentThreat, floodlightArmed, floodlightLit, type ThreatKind } from './lights';
 import type { Caliber } from './armory';
 import type { Stock } from './materials';
 import type { GameState, Structure } from './state';
@@ -155,7 +155,7 @@ export function floodReady(s: GameState): boolean {
 /** Towers with a light mast (the lights' ids are their structure ids). */
 export const floodTowerIds = (s: GameState): string[] => towersBuilt(s).filter(x => x.def.flood).map(x => x.st.id);
 /** Towers whose floodlights are lit now (power, blackout, mode; `threat`: a raid is on). */
-export const litTowerIds = (s: GameState, threat: boolean = threatNearby(s)): string[] => floodTowerIds(s).filter(id => floodlightLit(s, id, threat));
+export const litTowerIds = (s: GameState, threat: ThreatKind | boolean | null = currentThreat(s)): string[] => floodTowerIds(s).filter(id => floodlightLit(s, id, threat));
 
 /**
  * What the towers add to the gate's posture: warning (the best tower's view

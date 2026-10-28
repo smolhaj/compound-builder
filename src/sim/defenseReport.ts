@@ -9,6 +9,7 @@ import { isHome } from './blueprints';
 import { postureOf } from './encounters';
 import { enclosure } from './enclosure';
 import { daysOfFood } from './needs';
+import { predatorLine, predatorSpecies } from './wildlife';
 import { PERIMETER, runFinished, type Pt } from './perimeter';
 import { HEAVY_CALIBERS, MOUNT_ROUNDS, TURRET_ROUNDS, TOWERS, floodReady, mountReady, towerPosts, towersBuilt, turretsReady } from './towers';
 import { dayIndex, type GameState } from './state';
@@ -77,6 +78,8 @@ export function defenseReport(s: GameState): DefenseReport {
     chk('line', 'Property line closed', line.openShare === 0, line.openShare === 0 ? `held all round (${Math.round(line.barrier)}% strength)` : `${Math.round(line.openShare * 100)}% of the line is open: they walk in there`, line.openShare < 0.15),
   ];
   if (s.site.creek) walls.push(chk('creek', 'Creek barred where it crosses the line', line.creekOpen === 0, line.creekOpen === 0 ? 'steel bars at both crossings' : `${line.creekOpen} crossing${line.creekOpen > 1 ? 's' : ''} open: the creek is the way round every wall and gate`));
+  // bears, cougars, wolves and coyotes: kept out only by a line that holds them (solid fence, chain link, wrought iron, steel, container, palisade), gates shut, creek barred
+  { const pl = predatorLine(s); walls.push(chk('predators', 'Keeps predators out', pl.ok, pl.detail, predatorSpecies(s).length > 0 && line.openShare < 0.15)); }
   if (gates > 0) walls.push(chk('gates', `${gates} gate${gates > 1 ? 's' : ''} in the line`, true, 'a closed gate holds about as well as 60 % of its fence'));
   const strong = lineRuns.filter(r => PERIMETER[r.kind].blocks.people >= 0.7).length;
   if (lineRuns.length && !strong) walls.push(chk('strong', 'A wall that stops people', false, 'what is built stops walkers poorly; palisade, container or a grown hedge stop them', true));

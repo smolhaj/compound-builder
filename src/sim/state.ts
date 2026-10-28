@@ -27,6 +27,7 @@ import { conditionsFor, newBody, type Body } from './body';
 import { newFin, type Fin } from './finance';
 import { newArmory, type Armory } from './armory';
 import { newWild, type Wild } from './wildfood';
+import { newWildlife, type Wildlife } from './wildlife';
 import type { Livestock } from './livestock';
 import type { Vehicle } from './vehicles';
 import { emptyStats, type Ending, type RunStats } from './report';
@@ -37,7 +38,7 @@ import { DIFFICULTY } from './difficulty';
 import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
 import type { LightsState } from './lights';
 import { starterKit, type ToolKit } from './tools';
-export const SAVE_VERSION = 49;
+export const SAVE_VERSION = 50;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -232,6 +233,8 @@ export interface GameState {
   lights?: LightsState;
   /** The game in the woods and the creek, licenses. */
   wild: Wild;
+  /** Native wildlife on the land: predators taken, sightings, raids (sim/wildlife.ts). Save v49; made lazily. */
+  wildlife?: Wildlife;
   /** The long game: eras, the chronicle, milestones, the dynasty score. */
   lineage: Lineage;
   /** Goats, pigs, the steer, rabbits (lazily made: `s.livestock ??= newLivestock()`). */
@@ -256,9 +259,9 @@ export interface GameState {
   dogs: Dog[];
   /** Pet care settings, the family's grief for lost pets, yesterday's care (sim/pets.ts; save v43; `??=` for safety). */
   petLife?: PetLife;
-  /** Daily life (sim/daily.ts): the roster, chores, gatherings. Save v46; `dailyOf` makes it lazily. */
+  /** Daily life (sim/daily.ts): the roster, chores, gatherings. Save v49; `dailyOf` makes it lazily. */
   daily?: Daily;
-  /** Deaths in the household and whether they were mourned (sim/grief.ts). Save v46; `lossesOf` makes it lazily. */
+  /** Deaths in the household and whether they were mourned (sim/grief.ts). Save v49; `lossesOf` makes it lazily. */
   losses?: Loss[];
   /** Radio and rumors after the collapse (radio.ts); made on first use. */
   radio?: RadioState;
@@ -302,6 +305,7 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     fin: newFin(),
     armory: newArmory(),
     wild: newWild(),
+    wildlife: newWildlife(),
     lineage: newLineage(people[0].last),
     site,
     stock: { ...emptyStock(), firewood: STARTING_FIREWOOD, canned: 2, ...startingBedding(people.length) },
