@@ -52,7 +52,7 @@ export function lookOf(breed: Breed, tone: number): Look {
     saddle: false, mask: false, socks: false, blaze: false, ruff: false, tip: false, patch: false,
   };
   switch (breed) {
-    case 'lab': return { ...base, light: lighten(c.body, 0.18), dark: darken(c.body, 0.22), ear: 'drop', earLen: 0.95, size: 1.05, chest: 1.05, width: 1.14, muzzle: 0.9, head: 1.08, tail: 'otter' };
+    case 'lab': return { ...base, socks: lum(c.body) < 120, blaze: false, light: lighten(c.body, lum(c.body) < 120 ? 0.42 : 0.18), dark: darken(c.body, 0.22), ear: 'drop', earLen: 0.95, size: 1.05, chest: 1.05, width: 1.14, muzzle: 0.9, head: 1.08, tail: 'otter' };
     case 'shepherd': {
       const tanFirst = lum(c.body) > lum(c.trim);
       return { ...base, main: tanFirst ? c.body : c.trim, dark: tanFirst ? c.trim : c.body, light: lighten(tanFirst ? c.body : c.trim, 0.3), ear: 'prick', earLen: 1.25, size: 1.07, chest: 1.1, muzzle: 1.05, tail: 'sabre', saddle: true, mask: true };

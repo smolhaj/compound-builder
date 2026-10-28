@@ -15,12 +15,13 @@ import {
 } from '../sim/finance';
 import type { GameState, OrderLine } from '../sim/state';
 import { buyOffer, canTrade, findContact, heatNow, INTRO_CASH, lawless, offers, peekBm, priceOfOffer, risk } from '../sim/blackMarket';
+import { ToolShop } from './ToolShop';
 import { SHELF_TABS, SHELVES, shelvesNeeding, type ShelfTab } from '../sim/shelves';
 import { plansNeed, plansNeedLines } from '../sim/guidance';
 import { ammoLimit, buyAmmo, buyGun, CALIBER, CALIBERS, CLASS_USD, GUN, GUN_GROUP, GUNS, groupOf, gunPrices, issue, NFA_STAMP, practice, shopOpen, skillOf, stateBan, takeClass, type Caliber, type GunGroup, type GunModel } from '../sim/armory';
 
-type Tab = ShelfTab | 'guns' | 'metals' | 'money';
-const TABS: Array<[Tab, string]> = [...SHELF_TABS.filter(([id]) => id !== 'defense'), ['guns', 'Guns & ammo'], ['defense', 'Kit & security'], ['metals', 'Gold & silver'], ['money', 'Money']];
+type Tab = ShelfTab | 'tools' | 'guns' | 'metals' | 'money';
+const TABS: Array<[Tab, string]> = [...SHELF_TABS.filter(([id]) => id !== 'defense'), ['tools', 'Tools'], ['guns', 'Guns & ammo'], ['defense', 'Kit & security'], ['metals', 'Gold & silver'], ['money', 'Money']];
 
 const C = { bg: 'rgba(22,24,20,0.98)', card: 'rgba(255,255,255,0.045)', line: 'rgba(255,255,255,0.09)', gold: '#d8c9a0', dim: 'rgba(238,238,238,0.62)', good: '#a8d080', bad: '#f0a080' };
 const usd = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
@@ -64,6 +65,8 @@ function Icon({ id, tint }: { id: string; tint?: number }) {
     case 'lids': return g(<>{[0, 1, 2].map(i => <ellipse key={i} cx="22" cy={18 + i * 6} rx="11" ry="3" fill="#c8a040" stroke="#7a5a10" />)}</>);
     case 'meds': return g(<><rect x="8" y="12" width="28" height="22" rx="3" fill="#e8e4dc" /><path d="M22 16 v14 M15 23 h14" stroke="#c03030" strokeWidth="4" /></>);
     case 'hygiene': return g(<><rect x="9" y="14" width="12" height="20" rx="3" fill="#7ab0d8" /><circle cx="29" cy="24" r="8" fill="#f2f0ea" /><circle cx="29" cy="24" r="3" fill="#c8c4bc" /></>);
+    case 'tent': return g(<><path d="M6 34 L22 10 L38 34 Z" fill="#c9a24a" stroke="#6a5220" strokeWidth="1.5" /><path d="M22 10 L17 34 H27 Z" fill="#2a2418" /></>);
+    case 'sleeping_bag': return g(<><rect x="6" y="15" width="32" height="14" rx="7" fill="#3a6a5a" stroke="#1f3a30" /><path d="M12 15 v14 M20 15 v14 M28 15 v14" stroke="#1f3a30" /></>);
     case 'traps': return g(<><rect x="10" y="20" width="24" height="10" fill="#c8a070" /><path d="M12 20 q10 -10 20 0" fill="none" stroke="#9aa0a4" strokeWidth="2" /></>);
     case 'fuel': case 'stabilizer': return g(<><path d="M12 12 h16 l6 6 v18 h-22 z" fill={id === 'fuel' ? '#b83a2a' : '#3a7ab8'} /><rect x="26" y="8" width="5" height="6" fill="#333" /></>);
     case 'plow': return g(<path d="M6 30 q16 -16 32 0 v4 h-32 z" fill="#d8a020" stroke="#7a5a10" />);
@@ -162,7 +165,7 @@ export function ShopWindow() {
         </div>}
         <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
           <div style={{ flex: 1, overflowY: 'auto', padding: 14 }}>
-            {tab !== 'metals' && tab !== 'money' && tab !== 'guns' && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 8 }}>
+            {tab !== 'metals' && tab !== 'money' && tab !== 'guns' && tab !== 'tools' && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 8 }}>
               {tab === 'food' && <FoodShelves game={game} k={k} cart={foodCart} add={addFood} />}
               {(SHELVES as Record<string, MaterialId[]>)[tab].filter(m => MATERIALS[m].price !== null).slice().sort((a, b) => Number((need[b] ?? 0) > 0) - Number((need[a] ?? 0) > 0)).map(m => (
                 <div key={m} style={{ background: C.card, border: `1px solid ${cart[m] || (need[m] ?? 0) > 0 ? C.gold : C.line}`, borderRadius: 10, padding: 10, display: 'flex', gap: 10 }}>
@@ -181,12 +184,13 @@ export function ShopWindow() {
                 </div>
               ))}
             </div>}
+            {tab === 'tools' && <ToolShop onMsg={setMsg} />}
             {tab === 'guns' && <Guns onMsg={setMsg} />}
             {tab === 'metals' && <Metals onMsg={setMsg} />}
             {tab === 'money' && <Money onMsg={setMsg} />}
             {msg && <div style={{ color: C.bad, marginTop: 10 }}>{msg}</div>}
           </div>
-          {tab !== 'metals' && tab !== 'money' && tab !== 'guns' && <div style={{ width: 250, borderLeft: `1px solid ${C.line}`, padding: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {tab !== 'metals' && tab !== 'money' && tab !== 'guns' && tab !== 'tools' && <div style={{ width: 250, borderLeft: `1px solid ${C.line}`, padding: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
             <b>The order</b>
             {!lines.length && <div style={{ color: C.dim }}>Nothing yet.</div>}
             <div style={{ flex: 1, overflowY: 'auto' }}>
