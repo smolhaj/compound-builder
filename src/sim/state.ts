@@ -279,6 +279,8 @@ export interface GameState {
   disaster: DisasterState;
   /** Recent events for the HUD log (newest last, capped). */
   log: LogEntry[];
+  /** When a repeating warning last went to the log, by subject (`logGate` in nag.ts; made lazily, so no save bump). */
+  nagged?: Record<string, number>;
   /** Next id counter. */
   nextId: number;
 }

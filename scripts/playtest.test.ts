@@ -303,7 +303,10 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
     if (cabin && day % 10 === 0) { const p = plant(s); for (const k of ['wire', 'plumb'] as const) if (!fitProblem(s, p, cabin, k)) orderFit(s, cabin.id, k); }
     s = step(s, 1);
     // the day's log, with the numbers taken out, tallied: what keeps happening
+    let insured = 0;   // (an insurance payout for burned buildings is real money, not a bug)
     for (const l of s.log) if (l.t > lastLog) {
+      const m = /The insurance paid \$([\d,]+)/.exec(l.text);
+      if (m) insured += Number(m[1].replace(/,/g, ''));
       const k = l.text.replace(/[\d,.$]+/g, '#'); seen.set(k, (seen.get(k) ?? 0) + 1);
       if (l.text.includes('gone in the night')) trial.stole++;
       if (l.text.includes('they moved on. There wasn')) trial.left++;
@@ -316,7 +319,7 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
     tallyDeaths(false);
     // (checked after the day's tally; a death at the gate is tallied the next midnight)
     if (livingCount(s) === 0 && !s.ending) bugs.push(`everyone is gone but the run goes on (day ${day}, ${s.disaster.phase})`);
-    if (s.money - lastMoney > 100_000) bugs.push(`money jumped $${Math.round(s.money - lastMoney).toLocaleString('en-US')} on day ${day}`);
+    if (s.money - lastMoney - insured > 100_000) bugs.push(`money jumped $${Math.round(s.money - lastMoney).toLocaleString('en-US')} on day ${day}`);
     lastMoney = s.money;
     if (process.env.YEARLY && years && day % Number(process.env.YEARLY_EVERY ?? 91) === 0 && (!process.env.SEED || seed === Number(process.env.SEED))) {
       const liv = s.personState.filter(p => p.needs.died == null);

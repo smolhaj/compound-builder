@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { newGame, type GameState } from './state';
 import { step } from './engine';
-import { adoptDog } from './pets';
+import { adoptDog, VET_NAG_DAYS } from './pets';
+import { seasons, REGIONS } from './regions';
 import { CLASSIC } from './site';
 import {
-  addChoreWork, applyTemplate, canningCases, choresDay, cookRatio, dutyWork, huntFactor, lifeMorale, spoilFactor, tallyOf, autoPlan, CHORES, chronotypes, choreRates, choresStep, CLEAR_HOURS, dailyOf, dailyTick, DUTIES, DUTY, DUTY_CHORES, DUTY_TASK, dutyAt,
+  addChoreWork, applyTemplate, careYield, HARVEST_RATE, HARVEST_FLOOR_LOSS, canningCases, choresDay, cookRatio, dutyWork, huntFactor, lifeMorale, spoilFactor, tallyOf, autoPlan, CHORES, BEHIND_NAG_DAYS, chronotypes, choreRates, choresStep, CLEAR_HOURS, dailyOf, dailyTick, DUTIES, DUTY, DUTY_CHORES, DUTY_TASK, dutyAt,
   dutyWants, emergencyOf, fitness, isNightHour, nightDuty, owlCount, petCare, setDuty, setFocus, threatLevel, tire, watchDetection, watchNow, workHours,
   type Duty,
 } from './daily';
@@ -514,5 +515,88 @@ describe('hours that do something: cooking, livestock, hunting, teaching', () =>
     const a = watchDetection(g);
     g.personState[owl].task = 'idle'; g.personState[other].task = 'watch';
     expect(a).toBeGreaterThan(watchDetection(g));
+  });
+});
+
+describe('the harvest backlog is a harvest-time job, not a bookkeeping trap', () => {
+  const fields = (g: GameState, n: number) => { for (let k = 0; k < n; k++) g.structures.push({ id: `f${k}`, kind: 'field', x: 10 + k, z: 40, rot: 0, stage: 5, done: 0, supplied: true, finishedAt: 0 }); };
+  const harvestDay = (g: GameState) => seasons(REGIONS[g.site.region]).harvest[0] + 10;
+  const atDoy = (g: GameState, doy: number) => { g.clock.t = (((doy - g.clock.startDoy) % 365) + 365) % 365 + 0.3; };
+
+  it('sixteen fields can be kept up by two adults, and a pinned backlog still brings in most of the crop', () => {
+    expect(16 * HARVEST_RATE / 100 * CLEAR_HOURS.harvest).toBeLessThanOrEqual(12);
+    const g = game(3, 1);
+    dailyOf(g).chores.levels.harvest = 100;
+    expect(careYield(g, 'harvest')).toBeCloseTo(1 - HARVEST_FLOOR_LOSS, 6);
+    expect(careYield(g, 'harvest')).toBeGreaterThanOrEqual(0.7);
+    dailyOf(g).chores.levels.harvest = 20;
+    expect(careYield(g, 'harvest')).toBe(1);
+  });
+
+  it('the rate is zero outside the harvest window and per field inside it', () => {
+    const g = game(3, 1);
+    fields(g, 4);
+    atDoy(g, harvestDay(g) - 60);
+    expect(choreRates(g).harvest).toBe(0);
+    atDoy(g, harvestDay(g));
+    expect(choreRates(g).harvest).toBe(4 * HARVEST_RATE);
+  });
+
+  it('on Auto, a family with sixteen fields keeps the backlog well under the cap through the harvest', () => {
+    let g = game(3, 1);
+    g.money = 500_000;
+    fields(g, 16);
+    atDoy(g, harvestDay(g));
+    const peaks: number[] = [];
+    for (let d = 0; d < 20; d++) { g = step(g, 1); peaks.push(dailyOf(g).chores.levels.harvest); }
+    const avg = peaks.reduce((a, b) => a + b, 0) / peaks.length;
+    expect(avg).toBeLessThan(60);
+  });
+});
+
+describe('the planner staffs the small daily duties before the big jobs', () => {
+  it('animals, dogs and the stove get hours even when the harvest wants every hour there are', () => {
+    const g = game(3, 1);
+    for (let k = 0; k < 24; k++) g.structures.push({ id: `f${k}`, kind: 'field', x: 10 + k, z: 40, rot: 0, stage: 5, done: 0, supplied: true, finishedAt: 0 });
+    g.structures.push({ id: 'k', kind: 'chicken_coop', x: 20, z: 20, rot: 0, stage: 5, done: 0, supplied: true, finishedAt: 0 });
+    adoptDog(g);
+    g.clock.t = (((seasons(REGIONS[g.site.region]).harvest[0] + 10 - g.clock.startDoy) % 365) + 365) % 365 + 0.3;
+    dailyOf(g).chores.levels.harvest = 100;
+    plan(g, false);
+    const all = g.people.flatMap((_, i) => row(g, i));
+    expect(all).toContain('livestock');
+    expect(all).toContain('pets');
+    expect(all.filter(d => d === 'kitchen').length).toBeGreaterThanOrEqual(2);
+    expect(all.filter(d => d === 'fields').length).toBeGreaterThan(0);
+  });
+
+  it('employed adults are not given chores during their weekday job hours', () => {
+    const g = game(3, 1);
+    g.structures.push({ id: 'k', kind: 'chicken_coop', x: 20, z: 20, rot: 0, stage: 5, done: 0, supplied: true, finishedAt: 0 });
+    g.clock.t = Math.floor(g.clock.t / 7) * 7 + 1;   // a weekday
+    const i = g.people.findIndex(p => !p.kid);
+    g.personState[i].employed = true;
+    g.people[i].job = { title: 'clerk', wage: 20 } as never;
+    plan(g, false);
+    for (let h = 7; h < 16; h++) expect(['livestock', 'pets', 'kitchen', 'cleaning', 'laundry', 'water']).not.toContain(row(g, i)[h]);
+    expect(row(g, i).filter(d => d === 'livestock').length).toBe(0);
+    // ...while the rest of the household still gets the chores
+    expect(g.people.flatMap((_, k) => (k === i ? [] : row(g, k))).includes('livestock')).toBe(true);
+  });
+});
+
+describe('repeating warnings are throttled', () => {
+  const rnd = (v: number) => () => v;
+  it('a chore falling behind is announced at most once per window', () => {
+    const g = game(3, 1);
+    let lines = 0;
+    for (let d = 0; d < 40; d++) {
+      g.clock.t += 1;
+      dailyOf(g).chores.levels.animals = d % 2 ? 10 : 95;   // flaps across the thresholds every day
+      lines += choresDay(g, rnd(0.5)).filter(l => /bawling/.test(l)).length;
+    }
+    expect(lines).toBeLessThanOrEqual(Math.ceil(40 / BEHIND_NAG_DAYS) + 1);
+    expect(lines).toBeGreaterThan(0);
+    void VET_NAG_DAYS;
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { newGame, dayIndex, type GameState } from './state';
-import { answerCallout, askPact, deathYear, happen, holdChance, joinGroup, lifeOf, localsOf, neighborLifeDay, perDay, raidChance, raidHousehold, burnedFarms, stateWord } from './neighborLife';
+import { answerCallout, askPact, deathYear, dies, happen, holdChance, joinGroup, lifeOf, localsOf, neighborLifeDay, perDay, raidChance, raidHousehold, burnedFarms, stateWord } from './neighborLife';
 import { defenders, MILITIA_MEN } from './pact';
 import { resolve, type Encounter } from './encounters';
 import { mulberry32 } from './rng';
@@ -218,5 +218,22 @@ describe('the mutual-defense pact', () => {
     expect(out.some(l => /Work day/.test(l))).toBe(true);
     expect(out.some(l => /went to the work day/.test(l))).toBe(true);
     expect(L.workDay).toBeGreaterThan(dayIndex(g.clock.t) - 14);
+  });
+});
+
+describe('neighbors: the last member of a household dies', () => {
+  it('names the dead without throwing, for every household type', () => {
+    const kinds = ['old_farmer', 'widow', 'young_family', 'prepper', 'ranch', 'loner'] as const;
+    for (const kind of kinds) {
+      const g = afterHit();
+      const n = { ...g.neighbors[0], kind, members: 1 };
+      const l = lifeOf(g, n);
+      const text = dies(n, l, mulberry32(7), 'died in the night.');
+      expect(n.members).toBe(0);
+      expect(text).toMatch(/died in the night\.$/);
+      expect(text).not.toMatch(/undefined|NaN/);
+      expect(text[0]).toBe(text[0].toUpperCase());
+      if (kind === 'old_farmer') expect(text.startsWith('Old ')).toBe(true);
+    }
   });
 });
