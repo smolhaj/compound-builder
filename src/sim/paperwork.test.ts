@@ -10,7 +10,8 @@ const fresh = (doy = 105) => { const g = newGame(2, doy, 2027, { site: listings(
 describe('the paperwork', () => {
   it('closing costs come off at purchase', () => {
     const site = listings(4)[1];
-    expect(newGame(4, 105, 2027, { site }).money).toBe(800_000 - Math.round(site.price * 1.03));
+    const g = newGame(4, 105, 2027, { site });
+    expect(g.money).toBe(g.startFunds!.budget - Math.round(site.price * 1.03));
   });
 
   it('a permit costs a fee and holds work until the county has reviewed it; small things need none', () => {
