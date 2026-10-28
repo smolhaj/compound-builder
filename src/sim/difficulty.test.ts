@@ -9,20 +9,22 @@ const LEVELS: Difficulty[] = ['cozy', 'standard', 'hardcore'];
 
 describe('difficulty table', () => {
   it('Standard is 1 everywhere, so a Standard run is exactly the intended game', () => {
-    for (const v of Object.values(DIFFICULTY.standard)) expect(v).toBe(1);
+    for (const [k, v] of Object.entries(DIFFICULTY.standard)) expect(v).toBe(k === 'hunt' ? 0 : 1);
   });
 
   it('each knob is ordered Cozy < Standard < Hardcore (hardness) or the reverse (warning, money)', () => {
     const [c, s, h] = LEVELS.map(l => DIFFICULTY[l]);
-    for (const k of ['raid', 'wound', 'storms', 'price', 'recovery', 'permits'] as const) { expect(c[k]).toBeLessThan(s[k]); expect(s[k]).toBeLessThan(h[k]); }
+    for (const k of ['raid', 'wound', 'storms', 'recovery'] as const) { expect(c[k]).toBeLessThan(s[k]); expect(s[k]).toBeLessThan(h[k]); }
+    // Hardcore is harder once it hits, never with money: price, permits and savings are Standard's; Cozy is only kinder
+    for (const k of ['price', 'permits', 'money'] as const) expect(h[k]).toBe(1);
     // visits are further apart on Cozy, closer on Hardcore
     expect(c.cadence).toBeGreaterThan(s.cadence); expect(s.cadence).toBeGreaterThan(h.cadence);
     expect(c.warn).toBeGreaterThan(s.warn); expect(s.warn).toBeGreaterThan(h.warn);
-    expect(c.money).toBeGreaterThan(s.money); expect(s.money).toBeGreaterThan(h.money);
+    expect(c.money).toBeGreaterThan(s.money);
   });
 
-  it('Standard and Hardcore now differ in every knob, not just warning and raids', () => {
-    for (const k of Object.keys(DIFFICULTY.standard) as Array<keyof typeof DIFFICULTY.standard>) expect(DIFFICULTY.hardcore[k]).not.toBe(DIFFICULTY.standard[k]);
+  it('Hardcore differs from Standard in every once-it-hits knob', () => {
+    for (const k of ['hunt', 'warn', 'raid', 'cadence', 'wound', 'storms', 'recovery'] as const) expect(DIFFICULTY.hardcore[k]).not.toBe(DIFFICULTY.standard[k]);
   });
 
   it('a save without a difficulty plays as Standard', () => {
@@ -34,13 +36,13 @@ describe('difficulty table', () => {
 describe('what the knobs do', () => {
   const run = (difficulty: Difficulty) => newGame(11, 105, 2027, { mode: 'scenario', peace: 'short', kind: 'financial', difficulty });
 
-  it('prices climb higher in the panic and the scarcity after on Hardcore, less on Cozy; Standard is the old curve', () => {
+  it('prices climb less in the panic and the scarcity after on Cozy; Standard and Hardcore are the old curve', () => {
     const at = (l: Difficulty, t: number) => { const d = run(l).disaster; return priceFactor(d, d.hitAt + t); };
     const std = run('standard').disaster;
     // the old curve, written out
     const old = (t: number) => { const w = tension(std, t); if (t < std.hitAt) return 1 + 0.6 * w * w; const tr = tracksAt(std, t); return 1.6 + 2.4 * (1 - Math.min(tr.stores, tr.deliveries)); };
     for (const dt of [-30, -5, 0, 20, 120, 400]) expect(priceFactor(std, std.hitAt + dt)).toBeCloseTo(old(std.hitAt + dt), 10);
-    for (const dt of [-3, 10, 60]) { expect(at('hardcore', dt)).toBeGreaterThan(at('standard', dt)); expect(at('cozy', dt)).toBeLessThan(at('standard', dt)); expect(at('cozy', dt)).toBeGreaterThanOrEqual(1); }
+    for (const dt of [10, 60]) { expect(at('hardcore', dt)).toBeCloseTo(at('standard', dt), 10); expect(at('cozy', dt)).toBeLessThan(at('standard', dt)); expect(at('cozy', dt)).toBeGreaterThanOrEqual(1); }
   });
 
   it('the outside world comes back later on Hardcore and sooner on Cozy (same dice, scaled)', () => {
@@ -57,16 +59,16 @@ describe('what the knobs do', () => {
     expect(gap('hardcore')).toBeLessThan(gap('standard'));
   });
 
-  it('the county takes longer over a permit on Hardcore, half as long on Cozy', () => {
+  it('the county takes half as long over a permit on Cozy; Hardcore is Standard', () => {
     const days = (l: Difficulty) => reviewDays(run(l), 'timber_cabin');
     expect(days('cozy')).toBeLessThan(days('standard'));
-    expect(days('hardcore')).toBeGreaterThan(days('standard'));
+    expect(days('hardcore')).toBe(days('standard'));
   });
 
-  it('the savings left after the land are bigger on Cozy, smaller on Hardcore', () => {
+  it('the savings left after the land are bigger on Cozy; Hardcore is Standard', () => {
     const money = (l: Difficulty) => run(l).money;
     expect(money('cozy')).toBeGreaterThan(money('standard'));
-    expect(money('hardcore')).toBeLessThan(money('standard'));
+    expect(money('hardcore')).toBe(money('standard'));
     expect(money('cozy') / money('standard')).toBeCloseTo(DIFFICULTY.cozy.money, 2);
   });
 });
@@ -75,13 +77,33 @@ describe('the menu text', () => {
   it('Standard is the intended game; the others list what changes against it', () => {
     expect(difficultySummary('standard')).toEqual(['the intended game']);
     const hc = difficultySummary('hardcore').join('; ');
-    expect(hc).toContain('raider crews +35%');
-    expect(hc).toContain('price spikes +40%');
-    expect(hc).toContain('raids at the gate +25%');
+    expect(hc).toContain('size of raiding crews +30%');
+    expect(hc).toContain('raids at the gate +54%');
+    expect(hc).toContain('wound severity +50%');
+    expect(hc).toContain('a crew finds a hiding family 12 points more often');
+    expect(hc).not.toMatch(/price|permit|savings/);
     expect(hc).toContain('permadeath');
     const cz = difficultySummary('cozy').join('; ');
     expect(cz).toContain('warning before the hit +60%');
-    expect(cz).toContain('raider crews -40%');
+    expect(cz).toContain('size of raiding crews -30%');
     expect(cz).toContain('nobody dies for good');
+  });
+});
+
+describe('raiding crew size', () => {
+  it('a crew has more heads on Hardcore and fewer on Cozy (the battle counts heads), and the dossier agrees', async () => {
+    const { gateDay } = await import('./encounters');
+    const first = (l: Difficulty) => {
+      let total = 0, n = 0;
+      for (let seed = 1; seed <= 40; seed++) {
+        const g = newGame(seed, 105, 2027, { mode: 'scenario', peace: 'short', kind: 'financial', difficulty: l });
+        g.clock.t = g.disaster.hitAt + 60; g.disaster.tracks.law = 0.1; g.gate.day = -5; g.gate.next = 0;
+        const e = gateDay(g);
+        if (e && e.strength) { total += e.size; n++; if (e.kind === 'looters' || e.kind === 'gang') expect(e.dossier[0]).toContain(String(e.size)); }
+      }
+      return total / Math.max(1, n);
+    };
+    expect(first('hardcore')).toBeGreaterThan(first('standard'));
+    expect(first('cozy')).toBeLessThan(first('standard'));
   });
 });

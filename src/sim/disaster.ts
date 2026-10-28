@@ -283,7 +283,7 @@ export interface DisasterState {
   baseline?: Partial<Record<Track, number>>;
 }
 
-const PEACE_DAYS: Record<Exclude<PeaceLength, 'random'>, number> = { short: 365, medium: 3 * 365, long: 5 * 365 };
+const PEACE_DAYS: Record<Exclude<PeaceLength, 'random'>, number> = { short: 548, medium: 3 * 365, long: 5 * 365 };
 export const FULL: Record<Track, number> = { grid: 1, fuel: 1, stores: 1, deliveries: 1, medical: 1, law: 1, phone: 1, banks: 1 };
 
 function pick<T extends { weight: number }>(list: T[], r: number): T {
