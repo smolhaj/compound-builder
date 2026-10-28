@@ -11,7 +11,9 @@ import { enclosure } from './enclosure';
 import { hardenCost } from './hardening';
 import { isFinished, planProblem } from './construction';
 import { countyWorks, needsPermit, permitFee, reviewDays } from './paperwork';
-import { onOrder, orderCost } from './economy';
+import { onOrder, orderCost, prices } from './economy';
+import { firewoodOutlook } from './heating';
+import { needsHookup, storageTip } from './hookups';
 import { MATERIAL_IDS, MATERIALS, type MaterialId } from './materials';
 import { PERIMETER, PERIMETER_ORDER, UPGRADE_NEXT, fenceLive, runBill, runFinished, wallLength, type PerimeterKind } from './perimeter';
 import type { GameState, OrderLine } from './state';
@@ -61,20 +63,24 @@ export const plansNeedCost = (s: GameState, factor = 1): number => orderCost(pla
 export const BUNKER_ENTRANCES: readonly string[] = ['bunker_hatch', 'bunker_stairs'];
 const bunkerKinds = (s: GameState) => s.structures.filter(st => st.kind.startsWith('bunker_'));
 
-export interface BunkerCheck { id: string; label: string; done: boolean; /** What to build for it. */ kind: string; detail: string }
+export interface BunkerCheck { id: string; label: string; done: boolean; /** Staked out and being built, but not finished (so not done yet). */ building: boolean; /** What to build for it. */ kind: string; detail: string }
 
 /** What the bunker needs right now, in the order to do it: the way down, beds for everyone, air, food, a medic's corner. */
 export function bunkerChecklist(s: GameState): BunkerCheck[] {
-  const rooms = bunkerKinds(s);
+  // a step counts only when the room is built (finished), not when it is only staked out
+  const staked = bunkerKinds(s), rooms = staked.filter(isFinished);
   const has = (...kinds: string[]) => rooms.some(r => kinds.includes(r.kind));
+  const going = (...kinds: string[]) => !has(...kinds) && staked.some(r => kinds.includes(r.kind));
   const beds = rooms.reduce((a, r) => a + (KIT[r.kind]?.shelters ?? 0), 0);
+  const bedsStaked = staked.reduce((a, r) => a + (KIT[r.kind]?.shelters ?? 0), 0);
   const people = Math.max(1, s.people.length);
+  const note = (b: boolean, d: string) => (b ? `staked out, still being built: ${d}` : d);
   return [
-    { id: 'entrance', label: 'A way down', done: has(...BUNKER_ENTRANCES), kind: 'bunker_hatch', detail: 'a hatch or a stairwell; every room grows from it' },
-    { id: 'beds', label: `Beds for ${people}`, done: beds >= people, kind: people <= 4 ? 'bunker_container' : 'bunker_dorm', detail: `${beds} of ${people} places so far` },
-    { id: 'air', label: 'Clean air and power', done: has('bunker_plant'), kind: 'bunker_plant', detail: 'the plant room: NBC filter, batteries, a 2,000 L water tank' },
-    { id: 'food', label: 'Food and water put by', done: has('bunker_stores', 'bunker_galley'), kind: 'bunker_stores', detail: 'a storeroom (or a galley)' },
-    { id: 'medical', label: 'A medic\'s corner', done: has('bunker_medical'), kind: 'bunker_medical', detail: 'a medical bay, for wounds in a long stay' },
+    { id: 'entrance', label: 'A way down', done: has(...BUNKER_ENTRANCES), building: going(...BUNKER_ENTRANCES), kind: 'bunker_hatch', detail: note(going(...BUNKER_ENTRANCES), 'a hatch or a stairwell; every room grows from it') },
+    { id: 'beds', label: `Beds for ${people}`, done: beds >= people, building: beds < people && bedsStaked > beds, kind: people <= 4 ? 'bunker_container' : 'bunker_dorm', detail: `${beds} of ${people} places built${bedsStaked > beds ? `, ${bedsStaked - beds} more staked out` : ''}` },
+    { id: 'air', label: 'Clean air and power', done: has('bunker_plant'), building: going('bunker_plant'), kind: 'bunker_plant', detail: note(going('bunker_plant'), 'the plant room: NBC filter, batteries, a 2,000 L water tank') },
+    { id: 'food', label: 'Food and water put by', done: has('bunker_stores', 'bunker_galley'), building: going('bunker_stores', 'bunker_galley'), kind: 'bunker_stores', detail: note(going('bunker_stores', 'bunker_galley'), 'a storeroom (or a galley)') },
+    { id: 'medical', label: 'A medic\'s corner', done: has('bunker_medical'), building: going('bunker_medical'), kind: 'bunker_medical', detail: note(going('bunker_medical'), 'a medical bay, for wounds in a long stay') },
   ];
 }
 
@@ -96,7 +102,23 @@ const hasKind = (s: GameState, ...kinds: string[]) => s.structures.some(st => ki
 const hasPower = (s: GameState) => !!s.site.improvements?.power || hasKind(s, 'solar_array', 'garage_solar', 'generator_shed', 'battery_shed');
 
 /** One thing worth doing now, from what the place lacks. A suggestion, never a requirement: nothing is locked behind it. */
-export interface Suggestion { id: string; kind: string; why: string; urgency: number }
+export type SuggestionAct =
+  | { type: 'stake'; kind: string }
+  | { type: 'order'; lines: OrderLine[] }
+  | { type: 'markTrees'; n: number }
+  | { type: 'select'; id: string }
+  | { type: 'tool'; tool: string };
+export interface Suggestion {
+  id: string;
+  /** The kit piece to stake ('' when the suggestion is something else). */
+  kind: string;
+  why: string;
+  urgency: number;
+  /** Headline when it is not a kit piece. */
+  title?: string;
+  /** One-click buttons. When absent, a kit suggestion has "Stake it". */
+  acts?: Array<{ label: string; act: SuggestionAct }>;
+}
 
 /**
  * What is most pressing right now (at most three), read from the state of the
@@ -124,6 +146,28 @@ export function suggestions(s: GameState): Suggestion[] {
   if (!hasKind(s, 'outhouse', 'septic')) add('toilet', 'outhouse', 'nowhere to go', 50);
   if (!hasPower(s)) add('power', 'solar_array', 'no power for the pump, lights and the freezer', 40);
   if (growing && !hasKind(s, 'root_cellar')) add('cellar', 'root_cellar', 'nowhere cool to keep what you grow', 30);
+
+  // the woodpile: out in the cold, or too thin for the next two months
+  { const w = firewoodOutlook(s);
+    if (w.short >= 1 && (w.coldNow || w.have < 2 || w.short >= 4)) {
+      const n = Math.max(2, Math.min(10, Math.ceil(w.short)));
+      const cost = orderCost([{ material: 'firewood', qty: n }], prices(s));
+      const lines: OrderLine[] = [{ material: 'firewood', qty: n }];
+      out.push({ id: 'firewood', kind: '', title: 'Firewood', urgency: w.coldNow && w.have < 1 ? 85 : 55,
+        why: w.have < 1 ? (w.coldNow ? 'out of firewood on a cold night' : 'no firewood put by for the cold months') : `${Math.floor(w.have)} rick${Math.floor(w.have) === 1 ? '' : 's'} put by, about ${Math.ceil(w.need)} needed for the next two months`,
+        acts: [{ label: `Order ${n} rick${n > 1 ? 's' : ''} ($${Math.round(cost).toLocaleString('en-US')})`, act: { type: 'order', lines } }, { label: 'Mark 10 trees', act: { type: 'markTrees', n: 10 } }] });
+    } }
+
+  // finished is not working: wire it, plumb it, join it to the line
+  { const todo = needsHookup(s);
+    if (todo.length) {
+      const first = todo[0], name = first.name.replace(/_/g, ' ');
+      out.push({ id: 'hookup', kind: '', title: `Finish the ${name}`, urgency: first.kind === 'wire' || first.kind === 'plumb' ? 75 : 62,
+        why: `${first.text.toLowerCase()}${todo.length > 1 ? `; ${todo.length - 1} more building${todo.length > 2 ? 's' : ''} are not working yet either` : ''}`,
+        acts: [{ label: 'Show me', act: { type: 'select', id: first.id } }, ...(first.tool ? [{ label: 'Draw the line', act: { type: 'tool' as const, tool: first.tool } }] : [])] });
+    } }
+  { const tip = storageTip(s);
+    if (tip && !buildOff(s, tip.kind)) add('storage', tip.kind, tip.why, 58); }
   return out.sort((x, y) => y.urgency - x.urgency).slice(0, 3);
 }
 

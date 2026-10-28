@@ -25,9 +25,12 @@ import { kinDay } from './kin';
 import { radioDay } from './radio';
 import { waterDay } from './water';
 import { addRunWork, nextRun } from './perimeter';
+import { pickWork } from './priority';
 import { addFitWork, balanceDay, nextFit, plant } from './utilities';
 import { addHardenWork, nextHardenJob } from './hardening';
 import { updateDisaster } from './disaster';
+import { isSeasonStart, seasonReviewLine } from './newsPool';
+import { reviewFacts } from './yearReview';
 import { liveDay, workFactor } from './needs';
 import { gateDay, neighborGossip } from './encounters';
 import { digDay } from './tunnelers';
@@ -48,7 +51,7 @@ import { landMarketDay } from './land';
 import { effectsDay } from './effects';
 import { mulberry32 } from './rng';
 import { log } from './economy';
-import { dayIndex } from './state';
+import { calendarOf, dayIndex } from './state';
 import { buildRate } from './family';
 import { taskFor } from './schedule';
 import { nightWork } from './blackout';
@@ -77,8 +80,7 @@ function subStep(s: GameState): void {
   // a raid rolled this morning reaches the gate at its hour of the night or day
   { const arrived = arrivalCheck(s); if (arrived) log(s, `${arrived.title}.`); }
   const h = (s.clock.ticks * 0.25 + 6) % 24;   // exact: the tick count is an integer (hourOf(t) can land a hair under the hour)
-  const target = nextBuildTarget(s);
-  const run = target ? null : nextRun(s);
+  const { target, run } = pickWork(s, { building: () => nextBuildTarget(s), line: () => nextRun(s) });
   const fit = target || run ? null : nextFit(s);
   const harden = target || run || fit ? null : nextHardenJob(s);
   const fix = target || run || fit || harden ? null : nextFix(s);
@@ -139,7 +141,9 @@ function subStep(s: GameState): void {
   // the collapse clock, once a day: warning signs, the hit, the outside world's services
   if (dayIndex(s.clock.t) !== s.disaster.day) {
     const before = s.disaster.phase;
-    for (const line of updateDisaster(s.disaster, s.clock.t, s.seed)) log(s, line);
+    for (const line of updateDisaster(s.disaster, s.clock.t, s.seed, { region: s.site.region, doy: calendarOf(s.clock).doy })) log(s, line);
+    // the start of a season: a line of "years in review" in the log
+    { const sea = isSeasonStart(calendarOf(s.clock).doy); if (sea) log(s, seasonReviewLine(reviewFacts(s, sea))); }
     if (s.disaster.phase === 'warning') {
       const gossip = neighborGossip(s, mulberry32(s.seed * 17 + dayIndex(s.clock.t)));
       if (gossip) { s.disaster.news.push({ t: s.clock.t, text: gossip, tone: 1 }); log(s, gossip); }
@@ -154,7 +158,8 @@ function subStep(s: GameState): void {
     for (const line of toolsDay(s)) log(s, line);
     for (const line of vehiclesDay(s)) log(s, line);
     for (const line of radioDay(s)) log(s, line);
-    for (const line of upkeepDay(s, demandNow(s), s.heat.warned !== dayIndex(s.clock.t) - 1 && s.heat.warned !== dayIndex(s.clock.t))) log(s, line);
+    // (the stove is going unless the woodpile is bare: burnFirewood leaves `burned` at 1 then)
+    for (const line of upkeepDay(s, demandNow(s), s.heat.burned < 1)) log(s, line);
     for (const line of mutualAidDay(s)) log(s, line);
     // the world round the place: the neighbors' lives, the market, scavenging runs coming home
     for (const line of neighborLifeDay(s)) log(s, line);

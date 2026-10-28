@@ -189,7 +189,7 @@ export function SetupScreen() {
             <Chips label="Town" value={wish.town} set={v => setW({ town: v })} opts={[['any', 'Any'], ['near', 'Close in'], ['far', 'Way out']]} />
             <Chips label="Built" value={wish.built ?? 'any'} set={v => setW({ built: v })} opts={[['any', 'Any'], ['raw', 'Raw land'], ['house', 'With a house']]} />
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', margin: '14px 0 8px' }}>
-              <span style={{ fontSize: 11.5, textTransform: 'uppercase', letterSpacing: 0.8, color: C.dim }}>Listings · {usd(budget)} to spend <span style={{ textTransform: 'none', letterSpacing: 0 }}>(from this family\u2019s savings; see step 3)</span></span>
+              <span style={{ fontSize: 11.5, textTransform: 'uppercase', letterSpacing: 0.8, color: C.dim }}>Listings · {usd(budget)} to spend <span style={{ textTransform: 'none', letterSpacing: 0 }}>(from this family’s savings; see step 3)</span></span>
               <button style={chip(false)} onClick={() => { setBatch(batch + 1); setLotId(null); }}>More listings</button>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 10 }}>

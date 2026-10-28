@@ -26,7 +26,7 @@ import { stormOutage } from './weatherThreats';
 
 /** What utility buildings provide. */
 export interface UtilityDef {
-  /** Water: liters a day it can deliver; pressurised (piped) or carried. */
+  /** Water: liters a day it can deliver; pressurized (piped) or carried. */
   water?: { lpd: number; pressure: boolean; needsPower?: number };
   /** Water storage (liters) and roof catchment it collects (m² of the connected roofs count). */
   store?: number;
@@ -156,7 +156,7 @@ function linesTouch(a: PerimeterRun, b: PerimeterRun): boolean {
 
 /** What a building has: its water and power networks' capabilities. */
 export interface Service {
-  /** Water: a pressurised source (or gravity tower) on its network. */
+  /** Water: a pressurized source (or gravity tower) on its network. */
   water: boolean;
   /** Power: the county grid account, or a source (solar / generator / battery) on its network. */
   power: boolean;
@@ -207,7 +207,7 @@ export function fitProblem(s: GameState, p: Plant, st: Structure, kind: Fitting[
   // old, unsafe wiring or plumbing that came with the land: redo it first (Projects: the repair)
   if (!sound(st, kind === 'wire' ? 'wiring' : 'plumbing')) return kind === 'wire' ? 'the old wiring is unsafe: rewire the house first' : 'the old plumbing is shot: replumb it first';
   const sv = serviceOf(s, p, st.id);
-  if (kind === 'plumb' && !sv.water) return 'no pressurised water reaches it (run a pipe from a drilled well or water tower)';
+  if (kind === 'plumb' && !sv.water) return 'no pressurized water reaches it (run a pipe from a drilled well or water tower)';
   if (kind === 'wire' && !sv.power) return 'no power reaches it (get on the county grid, or run a cable from the solar / battery / generator)';
   return null;
 }

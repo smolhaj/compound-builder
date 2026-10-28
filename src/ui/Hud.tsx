@@ -28,6 +28,8 @@ import { countyWorks, premium, yearlyTax } from '../sim/paperwork';
 import { DRIVE_PER_FT, driveQuote, hookupProblem, POLE_PER_FT, powerQuote } from '../sim/improvements';
 import { KIT } from '../game/buildkit/kit';
 import { FUEL_UNIT_L, storageCapacity } from '../sim/utilities';
+import { litersText } from '../sim/format';
+import { needsHookup } from '../sim/hookups';
 import { HousingPanel } from './HousingPanel';
 import { bestShelter, doseRate, isNuclear, SHELTER_DAYS } from '../sim/nuclear';
 import { DISASTERS, TRACKS, TRACK_NAME, type DisasterKind } from '../sim/disaster';
@@ -97,6 +99,7 @@ export function Hud() {
   const [leftTab, setLeftTab] = useState<'build' | 'projects' | 'log'>('build');
   const [rightTab, setRightTab] = useState<'family' | 'supplies' | 'utilities' | 'land' | 'defense' | 'outside' | 'chronicle'>('family');
   // picking a building on the map opens its project card (not while a build tool is armed: placing a row of things keeps the Build list up)
+  const [quitAsk, setQuitAsk] = useState<string | null>(null);
   const [lastSel, setLastSel] = useState<string | null>(null);
   if (g.selected !== lastSel) { setLastSel(g.selected); if (g.selected && !g.tool) setLeftTab('projects'); }
   if (new URLSearchParams(location.search).has('clean')) return null;
@@ -116,7 +119,7 @@ export function Hud() {
   // fight wounds heal only with meds, a medic (skill 3+) or the bunker's medical bay
   const treating = game.stock.meds >= 0.1 || game.people.some((q, j) => !q.kid && game.personState[j]?.needs.died == null && q.skills.medic >= 3) || game.structures.some(st => st.kind === 'bunker_medical' && isFinished(st));
   const familyAlert: Tone | undefined = game.personState.some(ps => ps.needs.died == null && (ps.needs.health < 40 || ps.needs.hurt.length > 0)) ? 'bad' : game.personState.some(ps => ps.needs.died == null && ps.needs.hunger > 5000) ? 'warn' : undefined;
-  const projectsAlert: Tone | undefined = game.structures.some(st => !isFinished(st) && holdReason(game, st)) ? 'warn' : undefined;
+  const projectsAlert: Tone | undefined = game.structures.some(st => !isFinished(st) && holdReason(game, st)) || needsHookup(game).length > 0 ? 'warn' : undefined;
 
   return (
     <>
@@ -135,10 +138,10 @@ export function Hud() {
       </div>
 
       {/* Left: build menu (groups) · projects under way · the log */}
-      <div style={{ ...panel, position: 'fixed', left: 10, top: 10, width: 244, maxHeight: 'calc(100vh - 140px)', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ ...panel, position: 'fixed', left: 10, top: 10, width: 244, maxHeight: 'calc(100vh - 140px)', display: w.hudHidden ? 'none' : 'flex', flexDirection: 'column' }}>
         <Tabs tabs={[['build', 'Build'], ['projects', 'Projects', projectsAlert], ['log', 'Log']]} value={leftTab} set={setLeftTab} />
         <div style={{ overflowY: 'auto', flex: 1, paddingRight: 2 }}>
-          {leftTab === 'build' && <BuildMenu />}
+          {leftTab === 'build' && <BuildMenu showProjects={() => setLeftTab('projects')} />}
 
           {leftTab === 'projects' && <ProjectsTab />}
 
@@ -150,7 +153,7 @@ export function Hud() {
       </div>
 
       {/* Right: the family, supplies, water & power, land, the outside world */}
-      <div style={{ ...panel, position: 'fixed', right: 10, top: 10, width: 320, maxHeight: 'calc(100vh - 90px)', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ ...panel, position: 'fixed', right: 10, top: 10, width: 320, maxHeight: 'calc(100vh - 90px)', display: w.hudHidden ? 'none' : 'flex', flexDirection: 'column' }}>
         <Tabs tabs={[['family', 'Family', familyAlert], ['supplies', 'Supplies', foodAlert], ['utilities', 'Utilities', utilAlert], ['land', 'Land'], ['defense', 'Defense', defenseAlert], ['outside', 'Outside', outsideAlert], ['chronicle', 'Years']]} value={rightTab} set={setRightTab} />
         <div style={{ overflowY: 'auto', flex: 1, paddingRight: 2 }}>
           {rightTab === 'family' && <>
@@ -198,7 +201,12 @@ export function Hud() {
                 const over = game.disaster.phase === 'impact' || game.disaster.phase === 'survival' || game.disaster.phase === 'over';
                 return <div key={'job' + p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, padding: '2px 0' }}>
                   <span><span style={{ color: DIM }}>{p.first}:</span> {over ? <s>{p.job!.title}</s> : st?.employed ? `${p.job!.title}, $${p.job!.wage}/day` : 'quit the job'}</span>
-                  {!over && <button style={btn()} onClick={() => g.setEmployed(p.id, !st?.employed)}>{st?.employed ? 'Quit' : 'Go back'}</button>}
+                  {!over && (st?.employed && quitAsk === p.id
+                    ? <span style={{ display: 'flex', gap: 4 }}>
+                        <button style={btn(true)} title={`Gives up $${p.job!.wage}/day; ${p.first} builds five more days a week`} onClick={() => { g.setEmployed(p.id, false); setQuitAsk(null); }}>Yes, quit</button>
+                        <button style={btn()} onClick={() => setQuitAsk(null)}>Keep it</button>
+                      </span>
+                    : <button style={btn()} title={st?.employed ? `Quitting gives up $${p.job!.wage}/day but puts ${p.first} on the site five more days a week` : undefined} onClick={() => st?.employed ? setQuitAsk(p.id) : g.setEmployed(p.id, true)}>{st?.employed ? 'Quit' : 'Go back'}</button>)}
                 </div>;
               })}
             </Section>
@@ -306,7 +314,7 @@ export function Hud() {
                 </div>
                 <Row label="Made / used" value={`${(r.solarKwh + r.genKwh).toFixed(1)} / ${r.drawKwh.toFixed(1)} kWh`} />
                 <Row label="Batteries" value={`${Math.round(r.batteryPct * 100)} %`} />
-                <Row label="Generator fuel" value={`${game.stock.fuel * FUEL_UNIT_L} L`} />
+                <Row label="Generator fuel" value={litersText(game.stock.fuel * FUEL_UNIT_L)} />
                 {r.genKwh > 0.1 && <Note>The generator ran {Math.round(r.genKwh / 7 * 10) / 10} h: it carries about 1 km on a still night.</Note>}
                 {r.shed.length > 0 && <Note tone="warn">Went without: {r.shed.map(id => KIT[game.structures.find(x => x.id === id)?.kind ?? '']?.name ?? '?').join(', ')}</Note>}
                 {r.shortKwh > 0.5 && <Note tone="warn">Power ran short.</Note>}
@@ -451,10 +459,14 @@ export function Hud() {
         </div>
       </div>
 
+      {/* the tool hint stays up while the panels are hidden */}
+      {w.hudHidden && g.tool && <div style={{ ...panel, position: 'fixed', left: 10, top: 10, maxWidth: 300, fontSize: 12 }}>{g.toolProblem ?? (g.tool === 'fell' ? 'Point at a tree · click marks or unmarks · Esc stops' : 'Click to place · R rotates · Esc cancels')}</div>}
+
       {/* Bottom right: cameras, building view */}
       <div style={{ ...panel, position: 'fixed', right: 10, bottom: 34, padding: 4, display: 'flex', gap: 4, alignItems: 'center' }}>
         {VIEWS.map(([v, label, tip]) => <button key={v} title={tip} style={btn(w.buildingView === v)} onClick={() => w.setBuildingView(v)}>{label}</button>)}
-        <button title="Underground: see-through ground, bunker rooms cut open (U)" style={btn(w.underground)} onClick={() => w.setUnderground(!w.underground)}>Underground</button>
+        <button title="Underground: see-through ground, bunker rooms cut open (U). It switches itself off when you put the bunker tool down." style={btn(w.underground)} onClick={() => w.setUnderground(!w.underground)}>Underground</button>
+        <button title="Hide or show the side panels to see the whole map (H)" style={btn(w.hudHidden)} onClick={() => w.setHudHidden(!w.hudHidden)}>{w.hudHidden ? 'Show panels' : 'Hide panels'} (H)</button>
         <span style={{ width: 1, height: 18, background: '#555', margin: '0 3px' }} />
         {CAMERAS.map(([m, label]) => <button key={m} style={btn(w.cameraMode === m)} onClick={() => w.setCameraMode(m)}>{label}</button>)}
       </div>
