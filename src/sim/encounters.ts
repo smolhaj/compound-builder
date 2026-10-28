@@ -14,6 +14,7 @@
  * ever reaches the family through it. Pure and seeded.
  */
 import { mulberry32, pick } from './rng';
+import { diffOf } from './difficulty';
 import { forewarned } from './radio';
 import { gearPosture } from './gear';
 import { armed, firepower } from './armory';
@@ -292,13 +293,13 @@ function makeArrival(r: () => number, id: string, day: number, seed: number): En
 }
 
 /** How often someone comes (days between), from law and order outside and how much the place shows. */
-function cadence(s: GameState, p: Posture): number {
+export function cadence(s: GameState, p: Posture): number {
   const law = s.disaster.tracks.law;
   // playtest: every 3–6 days was relentless; real accounts are weeks between visits, more as order fails
   // after the first year the desperate have died, moved on or settled somewhere: the visits thin out (up to half as often by year three)
   const since = s.disaster.kind ? s.clock.t - s.disaster.hitAt : 0;
   const base = (45 - 30 * (1 - law)) * (1 + Math.max(0, Math.min(1, (since - 365) / 730)));
-  return Math.max(10, base * (1.3 - p.visibility / 200) / raidPressure(s));
+  return Math.max(10, base * (1.3 - p.visibility / 200) / raidPressure(s) * diffOf(s.disaster).cadence);
 }
 
 /**
@@ -417,8 +418,7 @@ export function gateDay(s: GameState): Encounter | null {
     e.dossier = [`${cb.size} of them: the same ones who went through the place. They know somebody lives here now, and they mean to find them.`, ...e.dossier.slice(1, 2)];
     g.comeBack = null;
   }
-  if (s.disaster.difficulty === 'hardcore' && e.strength) e.strength = Math.round(e.strength * 1.35);
-  if (s.disaster.difficulty === 'cozy' && e.strength) e.strength = Math.round(e.strength * 0.6);
+  if (e.strength) e.strength = Math.round(e.strength * diffOf(s.disaster).raid);
   g.pending = e;
   raiseAlert(s);
   return e;
@@ -445,6 +445,7 @@ function wound(s: GameState, r: () => number, sev: number, what: string): string
   if (!idx.length) return '';
   const i = idx[Math.floor(r() * idx.length)];
   const n = s.personState[i].needs;
+  sev = Math.round(sev * diffOf(s.disaster).wound);
   n.hurt.push({ what, sev });
   n.health = Math.max(s.disaster.difficulty === 'cozy' ? 5 : 0, n.health - sev * 0.5);
   if (n.health <= 0) { n.died = Math.floor(s.clock.t); return `${s.people[i].first} was killed.`; }
