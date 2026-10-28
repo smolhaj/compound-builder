@@ -190,10 +190,15 @@ export interface Kin {
   next: number;
   /** Morale the family carries for what was said to them (decays). */
   strain: Strain[];
+  /** Requests made before the hit (at most PRE_CAP) and after it (at most POST_CAP): random but rare. */
+  pre: number;
+  post: number;
   /** Last day `kinDay` ran. */
   day: number;
 }
-export const newKin = (away: Person[] = [], open = true): Kin => ({ open, away, waiting: [], refused: [], joined: 0, asked: 0, next: -1, strain: [], day: -1 });
+/** Most requests in the quiet years and the warning, and in the weeks after the hit. */
+export const PRE_CAP = 2, POST_CAP = 3;
+export const newKin = (away: Person[] = [], open = true): Kin => ({ open, away, waiting: [], refused: [], joined: 0, asked: 0, next: -1, strain: [], pre: 0, post: 0, day: -1 });
 export const kinOf = (s: GameState): Kin => (s.kin ??= newKin());
 
 const alive = (s: GameState, i: number) => !!s.personState[i] && s.personState[i].needs.died == null && !s.personState[i].needs.taken;
@@ -304,9 +309,9 @@ export function requestChance(s: GameState): number {
   if (!d.kind) return 0;
   if (d.phase === 'peace' || d.phase === 'warning') {
     if (t < 30) return 0;
-    return 0.004 + 0.13 * tension(d, t) ** 1.3;
+    return 0.0012 + 0.02 * tension(d, t) ** 1.5;
   }
-  if ((d.phase === 'impact' || d.phase === 'survival') && t < d.hitAt + 45) return 0.07;
+  if ((d.phase === 'impact' || d.phase === 'survival') && t < d.hitAt + 45) return 0.03;
   return 0;
 }
 
@@ -460,14 +465,15 @@ export function kinDay(s: GameState): string[] {
   }
 
   // a new request
-  if (k.open && k.away.length && !gate.pending && !gate.card && day >= k.next && !(hit && day >= hitDay + 45)) {
+  if (k.open && k.away.length && !gate.pending && !gate.card && day >= k.next && !(hit && day >= hitDay + 45) && (hit ? (k.post ?? 0) < POST_CAP : (k.pre ?? 0) < PRE_CAP)) {
     const r = mulberry32(s.seed * 6131 + day * 17 + 3);
     if (r() < requestChance(s)) {
       const first = k.away[Math.floor(r() * k.away.length)];
       const late = hit;
       const e = makeKinRequest(s, groupFor(k.away, first), late, r, `e${s.nextId++}`);
       gate.pending = e;
-      k.next = day + (hit ? 6 : 14 + Math.floor(r() * 10));
+      if (hit) k.post = (k.post ?? 0) + 1; else k.pre = (k.pre ?? 0) + 1;
+      k.next = day + (hit ? 6 : 30 + Math.floor(r() * 40));
       out.push(`${e.title}.`);
     }
   }

@@ -120,17 +120,17 @@ describe('when they ask', () => {
     g.clock.t = 100; const calm = requestChance(g);
     g.clock.t = g.disaster.warnAt + (g.disaster.hitAt - g.disaster.warnAt) * 0.9; g.disaster.phase = 'warning';
     const late = requestChance(g);
-    expect(calm).toBeGreaterThan(0); expect(calm).toBeLessThan(0.01);
-    expect(late).toBeGreaterThan(calm * 8);
+    expect(calm).toBeGreaterThan(0); expect(calm).toBeLessThan(0.002);
+    expect(late).toBeGreaterThan(calm * 8); expect(late).toBeLessThan(0.03);
     g.clock.t = g.disaster.hitAt + 5; g.disaster.phase = 'impact';
-    expect(requestChance(g)).toBeGreaterThan(0.05);
+    expect(requestChance(g)).toBeGreaterThan(0.02); expect(requestChance(g)).toBeLessThan(0.05);
     g.clock.t = g.disaster.hitAt + 60;
     expect(requestChance(g)).toBe(0);
   });
   it('a decision card arrives on the gate, with the three answers', () => {
     const g = game(3);
     let found = false;
-    for (let i = 0; i < 300 && !found; i++) { g.clock.t = 30 + i; if (g.clock.t > g.disaster.warnAt) g.disaster.phase = 'warning'; kinDay(g); found = g.gate.pending?.kind === 'kin'; }
+    for (let i = 0; i < 3000 && !found; i++) { g.clock.t = g.disaster.warnAt + (i % 60) * 0.5; g.disaster.phase = 'warning'; g.kin!.next = -1; kinDay(g); g.kin!.day = -1; found = g.gate.pending?.kind === 'kin'; }
     expect(found).toBe(true);
     const e = g.gate.pending!;
     expect(e.stances).toEqual(['take_in', 'build_first', 'turn_away']);
@@ -313,6 +313,36 @@ describe('refuse', () => {
   });
 });
 
+describe('pacing: random but rare', () => {
+  it('at most two requests before the hit and three after, however long the wait', () => {
+    for (const seed of [1, 4, 8]) {
+      const g = game(seed, { peace: 'medium' });
+      let pre = 0, post = 0;
+      for (let d = 31; d < g.disaster.hitAt + 60; d++) {
+        g.clock.t = d + 0.5;
+        const hit = g.clock.t >= g.disaster.hitAt;
+        g.disaster.phase = hit ? 'survival' : g.clock.t >= g.disaster.warnAt ? 'warning' : 'peace';
+        kinDay(g);
+        const e = g.gate.pending;
+        if (e?.kind === 'kin') { if (hit) post++; else pre++; g.gate.pending = null; g.kin!.away.push(...(e.people ?? [])); }
+      }
+      expect(pre).toBeLessThanOrEqual(2); expect(post).toBeLessThanOrEqual(3);
+    }
+  });
+  it('the timing differs from game to game', () => {
+    const firsts = new Set<number>();
+    for (const seed of [1, 2, 3, 4, 5, 6]) {
+      const g = game(seed, { peace: 'medium' });
+      for (let d = 31; d < g.disaster.hitAt; d++) {
+        g.clock.t = d + 0.5; g.disaster.phase = g.clock.t >= g.disaster.warnAt ? 'warning' : 'peace';
+        kinDay(g);
+        if (g.gate.pending) { firsts.add(d); break; }
+      }
+    }
+    expect(firsts.size).toBeGreaterThan(2);
+  });
+});
+
 describe('retirees, falls and the grandparents', () => {
   it('Social Security and pensions come in a day while the banks work, and stop at the collapse', () => {
     const g = game(3);
@@ -392,7 +422,8 @@ describe('save', () => {
     expect(dayIndex(g.clock.t)).toBeGreaterThanOrEqual(19);
   });
   it('a four-year game with relatives asking, answered every way, stays sane and ends with the right people', () => {
-    for (const seed of [2, 9]) {
+    let askedAll = 0;
+    for (const seed of [2, 9, 5, 11]) {
       let g = game(seed, { peace: 'medium' });
       let n = 0;
       for (let d = 0; d < 4 * 365; d += 5) {
@@ -405,7 +436,7 @@ describe('save', () => {
         g.gate.card = null;
       }
       const k = g.kin!;
-      expect(k.asked).toBeGreaterThan(0);
+      askedAll += k.asked;
       // nobody exists in two places
       const ids = [...g.people.map(p => p.id), ...k.away.map(p => p.id), ...k.waiting.flatMap(w => w.ids), ...k.refused.flatMap(r => r.people.map(p => p.id))];
       const dup = ids.filter((x, i) => ids.indexOf(x) !== i);
@@ -414,5 +445,6 @@ describe('save', () => {
       for (const ps of g.personState) { expect(Number.isFinite(ps.needs.morale)).toBe(true); expect(Number.isFinite(ps.needs.health)).toBe(true); }
       expect(Number.isFinite(g.money)).toBe(true);
     }
+    expect(askedAll).toBeGreaterThan(0);
   }, 120_000);
 });
