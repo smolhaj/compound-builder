@@ -142,7 +142,7 @@ export function Hud() {
       </div>
 
       {/* Right: the family, supplies, water & power, land, the outside world */}
-      <div style={{ ...panel, position: 'fixed', right: 10, top: 10, width: 284, maxHeight: 'calc(100vh - 90px)', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ ...panel, position: 'fixed', right: 10, top: 10, width: 320, maxHeight: 'calc(100vh - 90px)', display: 'flex', flexDirection: 'column' }}>
         <Tabs tabs={[['family', 'Family', familyAlert], ['supplies', 'Supplies', foodAlert], ['utilities', 'Utilities', utilAlert], ['land', 'Land'], ['defense', 'Defense', defenseAlert], ['outside', 'Outside', outsideAlert], ['chronicle', 'Years']]} value={rightTab} set={setRightTab} />
         <div style={{ overflowY: 'auto', flex: 1, paddingRight: 2 }}>
           {rightTab === 'family' && <>

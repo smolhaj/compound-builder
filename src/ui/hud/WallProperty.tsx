@@ -50,14 +50,8 @@ export function WallProperty() {
       {need.length > 0 && <button style={{ ...btn(true), width: '100%' }} disabled={!!orderProblem(game, need)} onClick={() => g.order(need)}>Order what the plans need ({usd(orderCost(need, prices(game)))})</button>}
     </> : <>
       <Note>One wall type for the whole line. Pick it; the plan below updates.</Note>
-      {tiers.map(t => <div key={t.id} style={{ marginBottom: 4 }}>
-        <div style={{ fontSize: 11, color: DIM }} title={t.hint}>{t.title} <span style={{ opacity: 0.7 }}>· {t.hint}</span></div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 2 }}>
-          {t.kinds.map(k => <button key={k} style={{ ...btn(k === kind), padding: '2px 6px', fontSize: 11.5 }} title={PERIMETER[k].blurb} onClick={() => setKind(k)}>{PERIMETER[k].name.replace(/ \(.*\)/, '')} <span style={{ opacity: 0.7 }}>{costPer100m(k) > 0 ? `$${(costPer100m(k) / 1000).toFixed(1)}k` : 'labor'}</span></button>)}
-        </div>
-      </div>)}
-      {plan && <div style={{ borderTop: `1px solid ${LINE}`, marginTop: 6, paddingTop: 6 }}>
-        <div style={{ color: DIM, fontSize: 11.5, marginBottom: 2 }}>per 100 m prices; the plan for {PERIMETER[kind].name.toLowerCase()}:</div>
+      {plan && <div style={{ borderTop: `1px solid ${LINE}`, borderBottom: `1px solid ${LINE}`, margin: '6px 0', padding: '6px 0' }}>
+        <div style={{ color: DIM, fontSize: 11.5, marginBottom: 2 }}>The plan for {PERIMETER[kind].name.toLowerCase()} (chips below show $ per 100 m):</div>
         {plan.runs.length === 0
           ? <Note tone="good">{plan.heldM > 0 ? 'The whole line is already held by what you have laid out.' : 'Nothing to lay out.'}</Note>
           : <>
@@ -73,6 +67,12 @@ export function WallProperty() {
             <button style={{ ...btn(true), width: '100%', marginTop: 4 }} onClick={() => { if (g.wallProperty(kind, w.siteGeo ?? {}) > 0) setLaid(true); }}>Lay it out: {usd(plan.cost)}, {plan.hours} h</button>
           </>}
       </div>}
+      {tiers.map(t => <div key={t.id} style={{ marginBottom: 4 }}>
+        <div style={{ fontSize: 11, color: DIM }} title={t.hint}>{t.title} <span style={{ opacity: 0.7 }}>· {t.hint}</span></div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 2 }}>
+          {t.kinds.map(k => <button key={k} style={{ ...btn(k === kind), padding: '2px 6px', fontSize: 11.5 }} title={PERIMETER[k].blurb} onClick={() => setKind(k)}>{PERIMETER[k].name.replace(/ \(.*\)/, '')} <span style={{ opacity: 0.7 }}>{costPer100m(k) > 0 ? `$${(costPer100m(k) / 1000).toFixed(1)}k` : 'labor'}</span></button>)}
+        </div>
+      </div>)}
     </>}
   </div>;
 }

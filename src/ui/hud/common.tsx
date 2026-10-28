@@ -26,7 +26,7 @@ export function Note({ tone, children }: { tone?: Tone; children: ReactNode }) {
 export function Tabs<T extends string>({ tabs, value, set }: { tabs: Array<[T, string, Tone?]>; value: T; set: (t: T) => void }) {
   return <div style={{ display: 'flex', gap: 0, borderBottom: `1px solid ${LINE}`, margin: '-2px -4px 8px' }}>
     {tabs.map(([id, label, alert]) => (
-      <button key={id} onClick={() => set(id)} style={{ flex: '1 1 0', minWidth: 0, padding: '5px 1px', border: 0, borderBottom: `2px solid ${value === id ? '#d8c9a0' : 'transparent'}`, background: 'transparent', color: value === id ? '#fff' : DIM, cursor: 'pointer', fontSize: 11.5, fontWeight: value === id ? 600 : 400, whiteSpace: 'nowrap' }}>
+      <button key={id} onClick={() => set(id)} style={{ flex: '1 1 auto', padding: '5px 3px', border: 0, borderBottom: `2px solid ${value === id ? '#d8c9a0' : 'transparent'}`, background: 'transparent', color: value === id ? '#fff' : DIM, cursor: 'pointer', fontSize: 11, fontWeight: value === id ? 600 : 400, whiteSpace: 'nowrap' }}>
         {label}{alert && <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: 3, background: TONE[alert], marginLeft: 3, verticalAlign: 'middle' }} />}
       </button>
     ))}
