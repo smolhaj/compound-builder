@@ -15,6 +15,7 @@ import { TOWER_BUILDERS } from './towerBuildings';
 import { BUNKER_BUILDERS } from './bunkerBuildings';
 import { OLD_BUILDERS } from './oldBuildings';
 import { COMPOUND_BUILDERS } from './compoundBuildings';
+import { GATEHOUSE_BUILDERS } from './gatehouseBuildings';
 import { FOOD_BUILDERS } from './foodBuildings';
 
 /** Seats for evenings at home: local x, z and the point the sitter faces. */
@@ -496,6 +497,7 @@ const BUILDERS: Record<string, (def: KitPieceDef, seed?: number, opts?: BuildOpt
   ...BUNKER_BUILDERS,
   ...OLD_BUILDERS,
   ...COMPOUND_BUILDERS,
+  ...GATEHOUSE_BUILDERS,
   ...FOOD_BUILDERS,
 };
 

@@ -6,6 +6,9 @@
  */
 import { watchNow } from '../../sim/daily';
 import { dailyOf } from '../../sim/daily';
+import { PERIMETER } from '../../sim/perimeter';
+import { deckHeight, walkRuns } from '../../sim/walkway';
+import { inGarage } from '../../sim/garage';
 import type { GameState } from '../../sim/state';
 import type { Site, WorkSpots, GoalCtx } from './peopleGoals';
 
@@ -25,9 +28,11 @@ function along(pts: ReadonlyArray<readonly [number, number]>, d: number): [numbe
 export function workSpots(built: readonly BuiltRef[], game: GameState, yard: { x: number; z: number }): WorkSpots {
   const of = (...kinds: string[]) => built.filter(b => kinds.includes(b.kind)).map(b => b.site);
   const water = of('well_hand', 'well_drilled', 'cistern', 'filtration_shed')[0] ?? null;
-  const runs = game.perimeter.filter(r => r.finishedAt !== null && r.pts.length >= 2);
-  // the patrol: the longest finished run's corners, with points between long sides
-  const main = runs.sort((a, b) => b.pts.length - a.pts.length)[0];
+  const runs = game.perimeter.filter(r => r.finishedAt !== null && r.pts.length >= 2 && !PERIMETER[r.kind].wallTop);
+  // the patrol: the longest finished run's corners, with points between long sides (a wall with a walkway on it first: the guards walk the deck)
+  const decks = walkRuns(game);
+  const main = decks.length ? decks.sort((a, b) => b.host.pts.length - a.host.pts.length)[0].host : runs.sort((a, b) => b.pts.length - a.pts.length)[0];
+  const wallY = decks.length && main ? deckHeight(main) : 0;
   const wall: Array<[number, number]> = [];
   if (main) for (let i = 0; i < main.pts.length; i++) {
     const [x, z] = main.pts[i];
@@ -38,12 +43,14 @@ export function workSpots(built: readonly BuiltRef[], game: GameState, yard: { x
     wall.push([x, z]);
   }
   const g = main?.gates[0];
+  // the deck stops at a gatehouse garage: nobody patrols through it
+  if (wallY) for (let i = wall.length - 1; i >= 0; i--) if (inGarage(game, wall[i][0], wall[i][1], 0.12)) wall.splice(i, 1);
   const gate = g && main ? (([x, z]) => ({ x, z }))(along(main.pts, g.at + g.w / 2)) : yard;
   return {
     gardens: of('garden'), fields: of('field'), coops: of('chicken_coop'), barns: of('barn'),
     water: water ? { x: water.x, z: water.z } : null,
     towers: built.filter(b => b.kind.includes('tower')).map(b => ({ x: b.site.x, z: b.site.z })),
-    wall, gate,
+    wall, gate, wallY,
   };
 }
 

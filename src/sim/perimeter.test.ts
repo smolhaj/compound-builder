@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { newGame } from './state';
 import { step } from './engine';
 import { addRunWork, nextRun, planRun, runBill, runBlocked, runFinished, runGrowth, runStops, wallLength } from './perimeter';
+import { MATERIALS, type MaterialId } from './materials';
 
 describe('perimeter', () => {
   it('bills per length, rounded up, and leaves gates out', () => {
@@ -44,7 +45,7 @@ describe('perimeter', () => {
   });
 });
 
-import { UPGRADE_NEXT, SALVAGE, planRun as plan, peopleBlock, upgradeProblem, upgradeRun, PERIMETER, type PerimeterRun } from './perimeter';
+import { UPGRADE_NEXT, SALVAGE, planRun as plan, peopleBlock, upgradeProblem, upgradeRun, PERIMETER, type PerimeterKind, type PerimeterRun } from './perimeter';
 
 describe('upgrading in place', () => {
   const finished = (kind: Parameters<typeof plan>[1]) => {
@@ -98,5 +99,28 @@ describe('upgrading in place', () => {
     expect(peopleBlock(g, r)).toBe(PERIMETER.steel_wall.blocks.people);
     g.utilities.lit = ['h'];
     expect(peopleBlock(g, r)).toBe(PERIMETER.electric_steel.blocks.people);
+  });
+});
+
+describe('wall tier prices (one table: PERIMETER)', () => {
+  /** What a unit (≈ 6 m) of a kind costs in materials at base prices. */
+  const unit = (k: PerimeterKind) => (Object.entries(PERIMETER[k].materials) as Array<[MaterialId, number]>).reduce((a, [m, q]) => a + (MATERIALS[m].price ?? 0) * q, 0);
+  const edges = (Object.entries(UPGRADE_NEXT) as Array<[PerimeterKind, PerimeterKind]>);
+
+  it('a higher tier never costs less than the one it upgrades from', () => {
+    for (const [from, to] of edges) expect(unit(to), `${from} -> ${to}`).toBeGreaterThanOrEqual(unit(from));
+  });
+
+  it('every upgrade costs real money: the new tier minus the half salvaged from the old one is above zero, and at least half of the new tier', () => {
+    for (const [from, to] of edges) {
+      const net = unit(to) - SALVAGE * unit(from);
+      expect(net, `${from} -> ${to}`).toBeGreaterThan(0);
+      expect(net, `${from} -> ${to}`).toBeGreaterThanOrEqual(unit(to) * 0.5 - 1e-9);
+    }
+  });
+
+  it('containers (reused boxes on a plinth) do not out-cost the reinforced steel they upgrade to', () => {
+    expect(unit('steel_wall')).toBeGreaterThan(unit('container_wall'));
+    expect(unit('concrete_wall')).toBeGreaterThan(unit('electric_steel'));
   });
 });

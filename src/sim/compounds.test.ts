@@ -146,7 +146,7 @@ describe('the wall chain: containers and the poured-concrete top tier', () => {
   });
 
   it('upgrading a finished container wall lays out steel beside it, and the containers go (half their cost back) once it is done', () => {
-    const g = newGame(5); g.stock.rebar = 60; g.stock.concrete = 60; g.stock.hardware = 20; g.stock.wire = 20; g.stock.container = 0;
+    const g = newGame(5); g.stock.rebar = 60; g.stock.concrete = 60; g.stock.hardware = 20; g.stock.wire = 20; g.stock.roofing = 99; g.stock.container = 0;
     const c = done(g, 'container_wall', [[0, 0], [6, 0], [6, 6], [0, 6], [0, 0]]);
     expect(upgradeRun(g, c.id)).toBeNull();
     const steel = g.perimeter.find(r => r.replaces === c.id)!;

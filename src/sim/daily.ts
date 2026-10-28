@@ -22,12 +22,14 @@
 import { dogCount } from './pets';
 import { calendarOf, dayIndex, hourOf, type GameState, type PersonState, type TaskKind } from './state';
 import { isFinished } from './construction';
+import { hasWalkway } from './walkway';
 import { isHome } from './blueprints';
 import { gardenSeason } from './greenhouse';
 import { REGIONS, seasons } from './regions';
 import { greenRicks } from './upkeep';
 import { routineAt } from './schedule';
 import { raidPressure } from './opsec';
+import { logGate } from './nag';
 import type { Person } from './family';
 import { kinPersonal } from './kin';
 
@@ -74,7 +76,7 @@ export const DUTY: Record<Duty, DutyDef> = {
   medic: { name: 'Medic', short: '+', color: '#c04a5a', work: true, tire: 3, kid: false, hint: 'Tending the sick and the wounded.' },
   teach: { name: 'Teaching', short: 'T', color: '#6a8ac8', work: true, tire: 2.5, kid: false, hint: 'Teaching the kids.' },
   radio: { name: 'Radio', short: 'Ra', color: '#7a6aa8', work: true, tire: 1.5, kid: false, hint: 'Listening on the radio for news and the net.' },
-  watch: { name: 'Watch', short: '!', color: '#c8a030', work: true, tire: 4, kid: false, hint: 'On watch: the wall, the tower, the gate. Helps see trouble coming.' },
+  watch: { name: 'Watch', short: '!', color: '#c8a030', work: true, tire: 4, kid: false, hint: 'On watch: the tower, the wall (or its walkway, if there is one), the gate. Helps see trouble coming.' },
 };
 export const DUTIES = Object.keys(DUTY) as Duty[];
 
@@ -122,6 +124,13 @@ export const CLEAR_HOURS: Record<ChoreId, number> = { weeds: 10, harvest: 8, ani
 
 export interface ChoreState { levels: Record<ChoreId, number> }
 
+/**
+ * Harvest backlog growth a day per field, only inside the harvest window. Sixteen fields at this rate need
+ * about ten person-hours a day to hold the line (CLEAR_HOURS.harvest), which two adults on Auto can find;
+ * the old flat 22 needed 28 and pinned the backlog at its cap all season.
+ */
+export const HARVEST_RATE = 7;
+
 /** Backlog growth a day, given the place (0 = the chore doesn't apply). */
 export function choreRates(s: GameState): Record<ChoreId, number> {
   const fin = s.structures.filter(isFinished);
@@ -137,7 +146,7 @@ export function choreRates(s: GameState): Record<ChoreId, number> {
   const powered = s.utilities.lit.length > 0 || (s.utilities.grid && s.disaster.tracks.grid > 0.5);
   return {
     weeds: doy >= g0 && doy <= g1 ? 9 * count('garden') : 0,
-    harvest: doy >= H[0] && doy < H[1] ? 22 * count('field') : 0,
+    harvest: doy >= H[0] && doy < H[1] ? HARVEST_RATE * count('field') : 0,
     animals: animals > 0 ? 50 * Math.min(4, animals) : 0,
     pets: petDogs(s) > 0 ? Math.min(100, 40 * petDogs(s)) : 0,
     hauling: s.utilities.hauling ? (s.utilities.haulFar ? 60 : 35) : 0,
@@ -341,6 +350,13 @@ export function dutyWants(s: GameState, rates: Record<ChoreId, number>): Array<[
   return out;
 }
 
+/** While there is a project staked out, this share of a person's project hours is kept for it; the chores use the morning, midday and late-afternoon chore slots (animals, dogs and cooking are reserved ahead and may take project hours). */
+export const BUILD_KEEP = 1;
+/** The crop duties override the project hours once their backlog passes this (the food comes in before the next building goes up). */
+export const CROP_BACKLOG = 50;
+/** Small, daily, can't-skip duties the planner staffs before the big jobs. */
+const RESERVED: readonly Duty[] = ['livestock', 'pets', 'kitchen'];
+
 interface PlanCtx {
   build: boolean;
   fell: boolean;
@@ -382,6 +398,7 @@ export function autoPlan(s: GameState, ctx: { build: boolean; fell: boolean }, r
   const day = dayIndex(s.clock.t);
   const c: PlanCtx = { ...ctx, doy: calendarOf(s.clock).doy, threat: threatLevel(s, pressure), after: s.disaster.phase === 'impact' || s.disaster.phase === 'survival' };
   const rates = ratesNow ?? choreRates(s);
+  const weekday = day % 7 < 5;
   const chrono = chronotypes(s);
   const free: Array<{ p: Person; i: number }> = [];
   s.people.forEach((p, i) => { if (ableAt(s, i) && !plan.locked.includes(p.id)) free.push({ p, i }); });
@@ -402,12 +419,20 @@ export function autoPlan(s: GameState, ctx: { build: boolean; fell: boolean }, r
   const hoursLeft = new Map<string, number[]>();   // each person's work hours still open to be given a job
   for (const { p, i } of free) {
     const row = rows.get(p.id)!, open: number[] = [];
-    for (let h = 6; h < 22; h++) if (DUTY[row[h]].work && h !== 12 && h !== 18) open.push(h);
+    const atJob = weekday && !!s.personState[i].employed && !!p.job;   // (the engine sends them to town 07:00 to 16:00: those hours can't be given a chore)
+    for (let h = 6; h < 22; h++) if (DUTY[row[h]].work && h !== 12 && h !== 18 && !(atJob && h >= 7 && h < 16)) open.push(h);
     // the mildly unwell can take light jobs in their rest hours
     if (unwell(s.personState[i]) && s.personState[i].needs.health >= 35) for (let h = 8; h < 17; h++) if (row[h] === 'leisure' && open.length < 4) open.push(h);
-    open.sort((a, b) => a - b);
+    // after the day job there are still the evening hours for the animals, the dogs and the stove
+    if (atJob) for (const h of [19, 20]) if (row[h] === 'leisure' && !open.includes(h)) open.push(h);
+    // chores take the chore slots (early morning, midday, late afternoon, the evening) first and the project hours last
+    open.sort((a, b) => (row[a] === 'build' ? 1 : 0) - (row[b] === 'build' ? 1 : 0) || a - b);
     hoursLeft.set(p.id, open);
   }
+  // with a project staked out, each person keeps most of their project hours for it (a weekend is the family's build time)
+  const keep = new Map<string, number>();
+  const cropsBehind = (duty: Duty) => (duty === 'fields' || duty === 'garden') && (DUTY_CHORES[duty] ?? []).some(c => dailyOf(s).chores.levels[c] >= CROP_BACKLOG);
+  for (const { p } of free) keep.set(p.id, ctx.build ? Math.floor(hoursLeft.get(p.id)!.filter(h => rows.get(p.id)![h] === 'build').length * BUILD_KEEP) : 0);
   const want = new Map(dutyWants(s, rates));
   const give = (p: Person, i: number, duty: Duty, n: number): number => {
     const open = hoursLeft.get(p.id)!, row = rows.get(p.id)!;
@@ -424,6 +449,26 @@ export function autoPlan(s: GameState, ctx: { build: boolean; fell: boolean }, r
     const n = give(p, i, f, 99);
     if (n) notes[p.id] = `Assigned: ${DUTY[f].name.toLowerCase()}`;
   }
+  // ── the animals, the dogs and the stove come before the big jobs: they are small, they can't wait, and a harvest that
+  //    is 24 hours of work must not starve them (priority by consequence, not by size) ──
+  for (const duty of RESERVED) {
+    for (let guard = 0; guard < 8; guard++) {
+      const w = want.get(duty) ?? 0;
+      if (w <= 0.35) break;
+      let best: { p: Person; i: number } | null = null, bestScore = 0;
+      for (const x of free) {
+        const open = hoursLeft.get(x.p.id)!;
+        if (!open.length) continue;
+        const f = fitness(s, x.i, duty);
+        if (f <= 0) continue;
+        const score = f * (1 + 0.05 * open.length);
+        if (score > bestScore) { best = x; bestScore = score; }
+      }
+      if (!best) break;
+      const rate = Math.max(0.1, choreRate(best.p) * Math.max(0.3, restFactor(s.personState[best.i])));
+      give(best.p, best.i, duty, Math.min(3, Math.max(1, Math.ceil(w / rate))));
+    }
+  }
   // ── then the biggest need to the best-suited person, a spell at a time ──
   for (let guard = 0; guard < 60; guard++) {
     let top: Duty | null = null, topW = 0.35;
@@ -432,7 +477,7 @@ export function autoPlan(s: GameState, ctx: { build: boolean; fell: boolean }, r
     let best: { p: Person; i: number } | null = null, bestScore = 0;
     for (const x of free) {
       const open = hoursLeft.get(x.p.id)!;
-      if (!open.length) continue;
+      if (open.length <= (cropsBehind(top) ? 0 : keep.get(x.p.id)!)) continue;
       const f = fitness(s, x.i, top);
       if (f <= 0) continue;
       const score = f * (1 + 0.05 * open.length);
@@ -743,24 +788,26 @@ export function dutyWork(s: GameState, p: Person, ps: PersonState, duty: Duty, p
 // ─────────────────────────────────────────────────────────────────────────
 
 export type WatchPost = 'tower' | 'wall' | 'gate';
-export interface Watcher { id: string; post: WatchPost; night: boolean; alert: number }
+export interface Watcher { id: string; post: WatchPost; night: boolean; alert: number; /** On the patrol deck of the wall (sim/walkway.ts): the people renderer puts them on top of it. */ walk?: boolean }
 
 /**
  * Who is on watch right now (reads the tasks the last sub-step set). For the
  * gate (detection) and the atmosphere layer (flashlights at night). Posts:
  * the first watcher takes the tower if there is one, the next walks the wall
- * (if there's a perimeter), the rest the gate.
+ * (if there's a perimeter; with a wall-top walkway, up to two walk the deck),
+ * the rest the gate.
  */
 export function watchNow(s: GameState): Watcher[] {
   const h = hourOf(s.clock.t), night = h >= 20 || h < 6;
   const tower = s.structures.some(st => isFinished(st) && st.kind.includes('tower'));
   const wall = s.perimeter.some(r => r.finishedAt !== null);
+  const deck = hasWalkway(s);
   const out: Watcher[] = [];
   for (const ps of s.personState) {
     if (ps.task !== 'watch' || ps.needs.died != null) continue;
     const k = out.length;
-    const post: WatchPost = k === 0 && tower ? 'tower' : wall && k <= 1 ? 'wall' : 'gate';
-    out.push({ id: ps.id, post, night, alert: Math.max(0.3, 1 - (ps.fatigue ?? 0) / 140) });
+    const post: WatchPost = k === 0 && tower ? 'tower' : wall && k <= (deck ? 2 : 1) ? 'wall' : 'gate';
+    out.push({ id: ps.id, post, night, alert: Math.max(0.3, 1 - (ps.fatigue ?? 0) / 140), ...(post === 'wall' && deck ? { walk: true } : {}) });
   }
   return out;
 }
@@ -770,7 +817,7 @@ export function watchDetection(s: GameState): number {
   const w = watchNow(s).sort((a, b) => b.alert - a.alert);
   let sum = 0;
   const owl = w.length ? chronotypes(s) : {};
-  w.forEach((x, k) => { sum += ((k === 0 ? 10 : k === 1 ? 6 : 2) + (owl[x.id] === 'owl' ? 1.5 : 0)) * x.alert * (x.post === 'tower' ? 1.2 : 1); });
+  w.forEach((x, k) => { sum += ((k === 0 ? 10 : k === 1 ? 6 : 2) + (owl[x.id] === 'owl' ? 1.5 : 0)) * x.alert * (x.post === 'tower' ? 1.2 : x.walk ? 1.1 : 1); });
   return Math.min(20, sum);
 }
 
@@ -778,10 +825,12 @@ export function watchDetection(s: GameState): number {
 // Once a day: what falling behind does
 // ─────────────────────────────────────────────────────────────────────────
 
-/** Yield multiplier on a crop from its chore (needs.ts reads it): weeds take up to half the garden, the field loses up to 60 % standing, hungry hens lay 60 % less. */
+/** The most a standing crop loses to a full backlog (a crop left a few weeks is still mostly there). */
+export const HARVEST_FLOOR_LOSS = 0.3;
+/** Yield multiplier on a crop from its chore (needs.ts reads it): weeds take up to half the garden, the field loses up to 30 % standing, hungry hens lay 60 % less. */
 export function careYield(s: GameState, c: 'weeds' | 'harvest' | 'animals'): number {
   const v = s.daily?.chores.levels[c] ?? 0;
-  return 1 - (c === 'weeds' ? 0.5 : 0.6) * Math.max(0, v - 20) / 80;
+  return 1 - (c === 'weeds' ? 0.5 : c === 'harvest' ? HARVEST_FLOOR_LOSS : 0.6) * Math.max(0, v - 20) / 80;
 }
 
 /** Person-hours of cooking the household needs a day (about one an hour-and-a-bit per three mouths). */
@@ -852,11 +901,14 @@ export function choresDay(s: GameState, r: () => number): string[] {
     const v = lv[c];
     if (v >= 80 && (d.chores as { warned?: Partial<Record<ChoreId, number>> }).warned?.[c] !== 1) {
       ((d.chores as { warned?: Partial<Record<ChoreId, number>> }).warned ??= {})[c] = 1;
-      out.push(BEHIND_LINE[c]);
+      if (logGate(s, `behind:${c}`, BEHIND_NAG_DAYS)) out.push(BEHIND_LINE[c]);
     } else if (v < 40 && (d.chores as { warned?: Partial<Record<ChoreId, number>> }).warned?.[c]) delete (d.chores as { warned?: Partial<Record<ChoreId, number>> }).warned![c];
   }
   return out;
 }
+
+/** A chore's "falling behind" line shows at most this often (days). */
+export const BEHIND_NAG_DAYS = 21;
 
 const BEHIND_LINE: Record<ChoreId, string> = {
   weeds: 'The weeds are winning in the garden. Somebody needs to get out there with a hoe.',

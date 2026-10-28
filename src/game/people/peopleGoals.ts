@@ -55,6 +55,8 @@ export interface WorkSpots {
   towers: Array<{ x: number; z: number }>;
   /** Points along the finished wall / fence, in order (patrol). */
   wall: Array<[number, number]>;
+  /** Height of the wall-top walkway the patrol walks on (world units), or 0 when the wall has none (sim/walkway.ts). */
+  wallY?: number;
   /** The drive's gate (or where the drive meets the yard). */
   gate: { x: number; z: number } | null;
 }
@@ -335,6 +337,8 @@ export function dailyGoal(i: number, kid: boolean, task: TaskKind, hour: number,
         // walk the line, a new stretch every quarter hour, pausing to look out
         const k = Math.floor(wobble(i, clock, 0.012) * w.length);
         const [px, pz] = w[k];
+        // on a wall-top walkway the guard stands ON the deck (up there, looking out over the line); otherwise just inside the wall
+        if (sp?.wallY) return goal(px, pz, pose, faceTo(ctx.camp.x, ctx.camp.z, px, pz) + Math.PI, { y: sp.wallY + 0.02, tool: rifle, walkPose: pose });
         const x = px + (ctx.camp.x - px) * 0.04, z = pz + (ctx.camp.z - pz) * 0.04;
         return goal(x, z, pose, faceTo(ctx.camp.x, ctx.camp.z, px, pz), { tool: rifle, walkPose: pose });
       }

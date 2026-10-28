@@ -32,7 +32,7 @@ export const EXPOSURE_NAME: Record<ExposureSource, string> = {
   lights: 'Lights after the grid', smoke: 'Smoke & cooking', talk: 'Talk in town', news: 'On the local news', market: 'Followed from the market', gatherings: 'Parties & cookouts',
 };
 
-const STRUCTURE_WEIGHT: Record<string, number> = { bunker_hatch: 10, bunker_stairs: 8, water_tower: 8, solar_array: 7, garage_solar: 5 };
+const STRUCTURE_WEIGHT: Record<string, number> = { bunker_hatch: 10, bunker_stairs: 8, water_tower: 8, solar_array: 7, garage_solar: 5, gate_garage: 4 };
 
 /** What shows from the road after dark, source by source (sim/blackout.ts): windows, floodlights (left on, and sensors an animal trips), fire pit, generator. */
 export function lightLinesOf(s: GameState): LightLine[] {

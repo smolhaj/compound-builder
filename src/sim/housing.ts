@@ -68,6 +68,7 @@ const HOMES: Record<string, Spec> = {
   bunker_comms: { floorM2: 4, floorQ: 0.5 },
   workshop: { floorM2: 20, floorQ: 0.5, outbuilding: true },
   metal_garage: { floorM2: 20, floorQ: 0.45, outbuilding: true },
+  gate_garage: { floorM2: 20, floorQ: 0.45, outbuilding: true },
   garage_solar: { floorM2: 20, floorQ: 0.45, outbuilding: true },
   barn: { floorM2: 20, floorQ: 0.4, outbuilding: true },
 };

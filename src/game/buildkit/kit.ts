@@ -217,8 +217,17 @@ export const TOWER_KIT: KitPieceDef[] = [
   tower('watchtower_mount', 'Tower with a mounted gun', 1, 'An armored cab with a ring-mounted machine gun.', { floodlit: true, light: [0, 1.5, 0] }),
   tower('watchtower_turret', 'Tower with an automated turret', 1, 'The armored tower with a remote turret on the roof.', { floodlit: true, light: [0, 1.6, 0] }),
 ];
+/** The gatehouse garage (sim/garage.ts): built into the wall at the gate; a steel gate through the middle, two bays of two parking slots, a roof deck. */
+export const GATE_GARAGE_KIT: KitPieceDef = {
+  id: 'gate_garage', name: 'Gatehouse garage', category: 'defense',
+  blurb: 'A vehicle garage built into the wall at the gate: stacked containers, a steel drive-through gate in the middle, two bays with room for four vehicles, and a roof deck that is a guard post. It fills the gap in the wall, so it holds the line (18 × 9 m). Place it across the gate gap, or use Fortify my ring.',
+  cellsX: 6, cellsZ: 3, frontCells: 1,
+  parts: { foundation: 'concrete', walls: 'container_blue', roof: 'metal_roof' }, maxSlope: 0.35, floorY: 0.03, porch: 0, sleeps: 0, light: [0, 0.4, 0.1],
+};
 /** Defense menu: only the first tier is built from scratch; the rest are upgrades from the Defense tab. */
 export const TOWER_ORDER: readonly string[] = ['rise_lookout'];
+/** The gatehouse garage joins the Defense menu beside the first tower. */
+export const GATEHOUSE_ORDER: readonly string[] = ['gate_garage'];
 
 // ── Underground (GDS §2.2; underground.ts) ──
 const room = (id: string, name: string, cx: number, cz: number, blurb: string, shelters = 0, level: 'underground' | 'both' = 'underground'): KitPieceDef => ({
@@ -241,7 +250,7 @@ export const BUNKER_KIT: KitPieceDef[] = [
 /** Underground menu order. */
 export const BUNKER_ORDER: readonly string[] = BUNKER_KIT.map(d => d.id);
 
-export const KIT: Record<string, KitPieceDef> = Object.fromEntries([TIMBER_CABIN, LOG_HOUSE, FARMHOUSE, TRAILER, BARN, COTTAGE, GUEST_HOUSE, MOMS_HOUSE, METAL_GARAGE, GARAGE_SOLAR, OUTHOUSE, WORKSHOP, ROOT_CELLAR, CHICKEN_COOP, GARDEN, FIELD, GREENHOUSE, ORCHARD, ...UTILITY_KIT, ...BUNKER_KIT, ...TOWER_KIT].map(d => [d.id, d]));
+export const KIT: Record<string, KitPieceDef> = Object.fromEntries([GATE_GARAGE_KIT, TIMBER_CABIN, LOG_HOUSE, FARMHOUSE, TRAILER, BARN, COTTAGE, GUEST_HOUSE, MOMS_HOUSE, METAL_GARAGE, GARAGE_SOLAR, OUTHOUSE, WORKSHOP, ROOT_CELLAR, CHICKEN_COOP, GARDEN, FIELD, GREENHOUSE, ORCHARD, ...UTILITY_KIT, ...BUNKER_KIT, ...TOWER_KIT].map(d => [d.id, d]));
 /** Build-menu order. */
 export const KIT_ORDER: readonly string[] = ['timber_cabin', 'log_house', 'cottage', 'guest_house', 'moms_house', 'outhouse', 'garden', 'greenhouse', 'orchard', 'field', 'chicken_coop', 'root_cellar', 'workshop', 'metal_garage', 'barn'];
 /** Water & power menu order. */
