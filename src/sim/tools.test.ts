@@ -608,7 +608,7 @@ describe('barter and theft', () => {
         const g = newGame(seed);
         if (secure) { g.structures.push({ id: 'w', kind: 'workshop', x: 0, z: 0, rot: 0, stage: 9, done: 0, supplied: false, finishedAt: 5 }); g.stock.gun_safe = 1; }
         const n = g.tools!.items.length;
-        stealTools(g, mulberry32(seed), 0.3);
+        stealTools(g, 0.3, seed);
         total += n - g.tools!.items.length;
       }
       return total;
@@ -617,7 +617,7 @@ describe('barter and theft', () => {
     expect(run(true)).toBeLessThan(run(false) * 0.6);
     const g = newGame(1);
     g.tools = mk([['hammer', 0, 1], 'stone_axe']);
-    expect(stealTools(g, () => 0, 1).lines).toEqual([]);
+    expect(stealTools(g, 1, 0).lines).toEqual([]);
     expect(g.tools.items).toHaveLength(2);
   });
   it('a burglary can take tools from the shed (the claim covers them)', () => {

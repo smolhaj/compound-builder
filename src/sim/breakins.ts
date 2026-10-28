@@ -177,7 +177,8 @@ export function burgle(s: GameState, r: () => number, share: number): string[] {
     claim += m?.price ?? 0;
   }
   // the tools in the shed (sim/tools.ts): a locked workshop, a metal garage or a safe keeps most of them
-  { const th = stealTools(s, r, 0.45 * share); if (th.lines.length) { lost.push(th.lines[0].replace(/^Tools taken: /, 'tools from the shed: ').replace(/\.$/, '')); claim += th.value; } }
+  if (r() < 0.6 * share) r();   // (keeps the dice stream of the old money-for-tools line, so a burglary's other losses roll the same)
+  { const th = stealTools(s, 0.45 * share, Math.round(share * 10)); if (th.lines.length) { lost.push(th.lines[0].replace(/^Tools taken: /, 'tools from the shed: ').replace(/\.$/, '')); claim += th.value; } }
   if (s.stock.meds >= 1 && r() < 0.4 * share) { s.stock.meds -= 1; lost.push('the pills in the medicine cabinet'); }
   const out = lost.length ? [`Stolen: ${lost.join(', ')}.`] : ['They left with nothing worth much.'];
   if (taken) out.push('Stolen guns are reported to the sheriff and the ATF by serial number.');

@@ -496,7 +496,7 @@ function stripEmpty(s: GameState, e: Encounter, p: Posture, r: () => number, los
   for (const l of lost) { const [n, ...k] = l.split(' '); merged.set(k.join(' '), (merged.get(k.join(' ')) ?? 0) + Number(n)); }
   if (merged.size) out.push(`Lost: ${[...merged].map(([k, n]) => `${n} ${k}`).join(', ')}`);
   // a crew that goes through the place takes the tools out of the shed (a locked workshop or a safe keeps most of them)
-  if (crew) out.push(...stealTools(s, r, e.temper === 'savage' || e.temper === 'hard' ? 0.35 : 0.2).lines);
+  if (crew) out.push(...stealTools(s, e.temper === 'savage' || e.temper === 'hard' ? 0.35 : 0.2, 1).lines);
   if (!crew) return out;
   // a torch to the shed or the coop: spite, or to smoke out whoever's hiding
   const burnable = s.structures.filter(st => isFinished(st) && !isHome(st.kind) && !st.kind.startsWith('bunker_') && !st.kind.startsWith('well_') && !['root_cellar', 'field', 'garden', 'septic', 'cistern', 'solar_array'].includes(st.kind));
@@ -660,7 +660,7 @@ export function resolve(s: GameState, stance: Stance): Outcome {
         g.next = Math.max(g.next, e.day + Math.round(15 + 35 * g.respect));
       } else {
         // (round 4: no second take of their wants here: applyBattle has already taken its 30–90 % share of the stores)
-        if (e.kind === 'looters' || e.kind === 'gang' || e.kind === 'militia') lines.push(...stealTools(s, r, 0.3).lines);
+        if (e.kind === 'looters' || e.kind === 'gang' || e.kind === 'militia') lines.push(...stealTools(s, 0.3, 2).lines);
         title = 'They got in'; text = b.result === 'overrun' ? 'They overran the place and took what they came for.' : 'They broke through the line and took what they came for.'; tone = 'bad';
         // picked over: for a while there's not much left worth coming for; but the place is known to be soft
         g.respect = Math.max(0, (g.respect ?? 0) - 0.3);

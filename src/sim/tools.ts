@@ -317,7 +317,7 @@ export function starterKit(people: readonly Person[], seed: number): ToolKit {
   // the toolbox is shared, so a family with more working hands owns more of the plain ones (a hammer, saw, driver and shovel each)
   const hands = Math.max(1, Math.min(4, people.filter(p => p.age >= 12 && !(p.elder && p.age >= 75)).length));
   for (const k of ['hammer', 'hand_saw', 'screwdriver_set', 'shovel'] as ToolKind[]) for (let i = 0; i < hands; i++) give(k, undefined, top('builder') >= 5 ? 0.35 : 0.15);
-  for (const k of ['axe', 'wrench_set', 'pliers', 'hoe'] as ToolKind[]) for (let i = 0; i < Math.ceil(hands / 2); i++) give(k);
+  for (const k of ['axe', 'wrench_set', 'pliers', 'hoe'] as ToolKind[]) for (let i = 0; i < hands; i++) give(k);
   give('whetstone');
   if (top('builder') >= 5 || job(/carpenter/i)) { give('circular_saw', undefined, 0.5); give('cordless_drill', undefined, 0.5); give('hammer', undefined, 0.5); }
   if (top('builder') >= 8 || (job(/carpenter/i) && top('builder') >= 6)) give('nail_gun', undefined, 0.5);
@@ -627,12 +627,14 @@ export function toolSecurity(s: GameState): number {
 }
 
 /**
- * Thieves take tools (a burglary, a crew that goes through the place). `p` is the chance each good tool is
+ * Thieves take tools (a burglary, a crew that goes through the place). `salt` varies the dice. `p` is the chance each good tool is
  * grabbed before security; dearer tools go first. Returns a log line and the replacement value (2025 dollars).
  */
-export function stealTools(s: GameState, r: () => number, p: number): { lines: string[]; value: number } {
+export function stealTools(s: GameState, p: number, salt = 0): { lines: string[]; value: number } {
   const kit = s.tools;
   if (!kit) return { lines: [], value: 0 };
+  // its own random stream, so the raid or burglary that calls it plays out the same as before
+  const r = mulberry32(s.seed * 7919 + Math.floor(s.clock.t * 96) * 31 + salt);
   const open = toolSecurity(s), taken: Tool[] = [];
   for (const t of [...kit.items]) {
     const d = TOOLS[t.kind];
