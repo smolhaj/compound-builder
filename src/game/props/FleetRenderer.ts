@@ -6,7 +6,7 @@
  */
 import * as THREE from 'three';
 import type { GameState } from '../../sim/state';
-import { GARAGES, parkingPlan, type Bay } from '../../sim/garage';
+import { GARAGES, parkingPlan, type Bay } from '../../sim/parking';
 import { startingVehicles, type Vehicle } from '../../sim/vehicles';
 import { buildVehicle, paintFor, VEHICLE_SIZE } from './vehicleGeometry';
 import { lineLength, pointAt, type Pt } from '../region/access';

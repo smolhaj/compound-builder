@@ -19,7 +19,7 @@ import { dayIndex, type GameState } from './state';
 import { daysOfFood } from './needs';
 import { log } from './economy';
 import { roadVehicles, VEHICLES, cargoKg, type Vehicle } from './vehicles';
-import { garageConnected } from './garage';
+import { garageConnected } from './parking';
 import type { Person } from './family';
 
 export interface BugOutPlan {

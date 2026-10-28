@@ -6,7 +6,7 @@ import {
   breakdownChance, buyVehicle, cargoKg, empVehicles, fleetCapacity, fleetOf, overdue, repairDays, roadTrouble, runs, serviceVehicle, SERVICE_MILES, startingVehicles, stripForParts,
   tractorBoost, tractorRuns, tripPlan, tripVehicle, vehiclesDay, VEHICLES, type Vehicle, type VehicleKind,
 } from './vehicles';
-import { bays, GARAGES, garageConnected, garageLinks, isUnderRoof, parkingPlan } from './garage';
+import { bays, GARAGES, garageConnected, garageLinks, isUnderRoof, parkingPlan } from './parking';
 import { bugOut, bugOutPlan } from './bugout';
 import { reportCard } from './report';
 import { goToMarket, MARKET_KM } from './market';

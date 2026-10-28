@@ -30,7 +30,7 @@ import type { GameState } from './state';
 import { dayIndex } from './state';
 import { log } from './economy';
 import { mulberry32 } from './rng';
-import { parkingPlan } from './garage';
+import { parkingPlan } from './parking';
 import { addTool, kitOf } from './tools';
 
 export type VehicleKind = 'pickup' | 'suv' | 'motorhome' | 'tractor' | 'atv' | 'old_pickup' | 'trailer';

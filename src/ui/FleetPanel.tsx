@@ -6,7 +6,7 @@
 import { useState } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { BUYABLE, buyVehicle, fleetOf, overdue, refuel, repairDays, serviceVehicle, SERVICE_MILES, SERVICE_USD, stripForParts, vehicleName, VEHICLES, runs, type Vehicle, type VehicleKind } from '../sim/vehicles';
-import { garageConnected, parkedText, parkingPlan } from '../sim/garage';
+import { garageConnected, parkedText, parkingPlan } from '../sim/parking';
 import { bugOut, bugOutPlan } from '../sim/bugout';
 import { litersText } from '../sim/format';
 import { Note, Row, Section } from './hud/common';
