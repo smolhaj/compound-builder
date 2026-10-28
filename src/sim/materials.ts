@@ -142,7 +142,8 @@ export function billCost(bill: Partial<Stock>): number {
 
 /** Does `stock` cover `bill`? */
 export function hasAll(stock: Stock, bill: Partial<Stock>): boolean {
-  return (Object.entries(bill) as Array<[MaterialId, number]>).every(([id, n]) => stock[id] >= n);
+  for (const id in bill) if (!(stock[id as MaterialId] >= (bill[id as MaterialId] as number))) return false;
+  return true;
 }
 
 /** What is still missing from `stock` to cover `bill`. */
@@ -151,3 +152,21 @@ export function shortfall(stock: Stock, bill: Partial<Stock>): Partial<Stock> {
   for (const [id, n] of Object.entries(bill) as Array<[MaterialId, number]>) if (stock[id] < n) out[id] = n - stock[id];
   return out;
 }
+
+/** A quantity for people to read: whole numbers from 10 up, one decimal to 1, two below; null when it rounds to nothing. */
+export function qtyText(n: number): string | null {
+  if (n < 0.005) return null;
+  if (n >= 10) return String(Math.round(n));
+  if (n >= 1) return String(Math.round(n * 10) / 10);
+  return (Math.round(n * 100) / 100).toString();
+}
+
+/** "3 lumber, 0.5 field seed": a bill or shortfall as text, skipping what rounds to zero. */
+export function billText(bill: Partial<Stock>): string {
+  return (Object.entries(bill) as Array<[MaterialId, number]>)
+    .map(([k, n]) => { const q = qtyText(n); return q === null ? null : `${q} ${MATERIALS[k].name.toLowerCase()}`; })
+    .filter(Boolean).join(', ');
+}
+
+/** "Waiting for ..." for a shortfall; a sliver that rounds to nothing still says so. */
+export const waitingFor = (miss: Partial<Stock>): string => `Waiting for ${billText(miss) || 'a little more material'}`;

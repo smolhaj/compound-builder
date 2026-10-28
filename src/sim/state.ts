@@ -36,7 +36,7 @@ import type { WeatherState } from './weatherThreats';
 import { DIFFICULTY } from './difficulty';
 import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
 import type { LightsState } from './lights';
-export const SAVE_VERSION = 46;
+export const SAVE_VERSION = 47;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -44,6 +44,8 @@ import { newScavenge, type ScavengeState } from './scavenge';
 import { newMarketState, type MarketState } from './tradeGoods';
 import { newLocals, type LocalsState } from './neighborLife';
 import type { Dog, PetLife } from './pets';
+import { newDaily, type Daily } from './daily';
+import type { Loss } from './grief';
 
 /** Starting savings (GDS §1 peacetime money constraint). */
 export const STARTING_MONEY = 30000;
@@ -117,7 +119,9 @@ export interface Structure {
   high?: number;
 }
 
-export type TaskKind = 'idle' | 'build' | 'forestry' | 'sleep' | 'chores' | 'school' | 'leisure' | 'job' | 'gone' | 'shelter' | 'away';
+export type TaskKind = 'idle' | 'build' | 'forestry' | 'sleep' | 'chores' | 'school' | 'leisure' | 'job' | 'gone' | 'shelter' | 'away'
+  // daily life (sim/daily.ts): the duty on the roster, and a gathering
+  | 'garden' | 'fields' | 'livestock' | 'pets' | 'cleaning' | 'wood' | 'water' | 'kitchen' | 'laundry' | 'repairs' | 'hunt' | 'medic' | 'teach' | 'radio' | 'watch' | 'meal' | 'party';
 
 export interface PersonState {
   id: string;
@@ -130,6 +134,8 @@ export interface PersonState {
   laidOff?: boolean;
   /** Health, morale, hunger, dose, wounds. */
   needs: Needs;
+  /** 0–100: long days and night watch (sim/daily.ts). Save v43. */
+  fatigue?: number;
 }
 
 /** A tree marked for felling (GDS §2.1 "fell own timber"; docs/DECISIONS.md). */
@@ -244,6 +250,10 @@ export interface GameState {
   dogs: Dog[];
   /** Pet care settings, the family's grief for lost pets, yesterday's care (sim/pets.ts; save v43; `??=` for safety). */
   petLife?: PetLife;
+  /** Daily life (sim/daily.ts): the roster, chores, gatherings. Save v46; `dailyOf` makes it lazily. */
+  daily?: Daily;
+  /** Deaths in the household and whether they were mourned (sim/grief.ts). Save v46; `lossesOf` makes it lazily. */
+  losses?: Loss[];
   /** Radio and rumors after the collapse (radio.ts); made on first use. */
   radio?: RadioState;
   /** Tallies since the hit (the report card), and how the run ended (null while it goes on). */
@@ -298,12 +308,13 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     scavenge: newScavenge(),
     market: newMarketState(),
     locals: newLocals(),
+    daily: newDaily(),
     stats: emptyStats(),
     ending: null,
     food: { needKcal: 0, ateKcal: 0, producedKcal: 0, spoiledKcal: 0, fromStores: true, kinds: [], daysLeft: 0 },
     orders: [],
     people,
-    personState: people.map(p => ({ id: p.id, task: 'idle', target: null, needs: freshNeeds(), ...(setup.dayJobs && p.job ? { employed: true } : {}) })),
+    personState: people.map(p => ({ id: p.id, task: 'idle', target: null, needs: freshNeeds(), fatigue: 0, ...(setup.dayJobs && p.job ? { employed: true } : {}) })),
     structures: [],
     forestry: { jobs: [], cleared: [] },
     heat: { burned: 0, warned: -1 },

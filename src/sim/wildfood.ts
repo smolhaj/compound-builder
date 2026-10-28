@@ -16,6 +16,7 @@
  *              the creek, snares for rabbits; a smoker turns meat into jerky
  *              that keeps without a freezer.
  */
+import { huntFactor } from './daily';
 import { log } from './economy';
 import { calendarOf, type GameState } from './state';
 import { REGIONS, type Game } from './regions';
@@ -105,13 +106,14 @@ export function wildDay(s: GameState, freezer: boolean): number {
   };
   const warden = () => { if (lawful(s) && r() < 0.15) { s.money -= POACH_FINE; log(s, `The game warden caught it: a $${POACH_FINE.toLocaleString('en-US')} fine and the meat taken.`); return true; } return false; };
   // big game: a hunter, a rifle, and (in peacetime) the season and a tag
+  const hf = huntFactor(s);   // yesterday's Hunt hours (sim/daily.ts)
   const timber = Math.min(1.4, 0.6 + s.site.timber * 0.5);
   const bigs = local(s, 'big');
   if (hunter >= 2 && bigs.length) {
     const elk = bigs.includes('elk') && (after || (inSeason(s, 'elk') && hasLicense(s, 'elk')));
     const deerOk = after || (inSeason(s, 'deer') && (hasLicense(s, 'deer') || w.poach)) || (inSeason(s, 'elk') && bigs.includes('elk') && w.poach);
     const winter = calendarOf(s.clock).doy < 60 || calendarOf(s.clock).doy > 340;
-    if ((elk || deerOk) && r() < 0.03 * hunter / 5 * w.abundance.big * timber * (winter ? 0.5 : 1) && huntingRifle(s, true)) {
+    if ((elk || deerOk) && r() < 0.03 * hunter / 5 * hf * w.abundance.big * timber * (winter ? 0.5 : 1) && huntingRifle(s, true)) {
       const kind: Game = elk && r() < 0.4 ? 'elk' : bigs.find(x => x !== 'elk') ?? bigs[0];
       const poached = !after && !(kind === 'elk' ? hasLicense(s, 'elk') : hasLicense(s, 'deer'));
       if (!(poached && warden())) bring(MEAT[kind] ?? 15, kind[0].toUpperCase() + kind.slice(1), 'big');
@@ -119,12 +121,12 @@ export function wildDay(s: GameState, freezer: boolean): number {
   }
   // small game: snares, or a .22 / shotgun
   const smallOk = after || (inSeason(s, 'small') && hasLicense(s, 'small'));
-  if (smallOk && (s.stock.snares >= 1 || (hunter >= 1 && smallGameGun(s))) && r() < 0.06 * w.abundance.small) {
+  if (smallOk && (s.stock.snares >= 1 || (hunter >= 1 && smallGameGun(s))) && r() < 0.06 * hf * w.abundance.small) {
     if (s.stock.snares < 1) s.armory.ammo['22lr'] = Math.max(0, (s.armory.ammo['22lr'] ?? 0) - 3);
     bring(1, 'A rabbit', 'small');
   }
   // fishing: the creek (yours, or the neighbor's down the road), gear, and a license in peacetime
   const fishOk = after || hasLicense(s, 'fishing') && inSeason(s, 'fishing');
-  if (fishOk && s.stock.fishing_gear >= 1 && local(s, 'fish').length && r() < (s.site.creek ? 0.15 : 0.06) * w.abundance.fish) bring(0.6, 'Fish', 'fish');
+  if (fishOk && s.stock.fishing_gear >= 1 && local(s, 'fish').length && r() < (s.site.creek ? 0.15 : 0.06) * hf * w.abundance.fish) bring(0.6, 'Fish', 'fish');
   return meat;
 }

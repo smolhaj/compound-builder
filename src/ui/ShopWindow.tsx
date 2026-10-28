@@ -5,7 +5,7 @@
  */
 import { Fragment, useState, type CSSProperties, type ReactNode } from 'react';
 import { useGameStore } from '../store/gameStore';
-import { MATERIALS, type MaterialId } from '../sim/materials';
+import { MATERIALS, billText, type MaterialId } from '../sim/materials';
 import { foodLine, orderCost, orderProblem, payWith, prices } from '../sim/economy';
 import { FOOD, KITS, kitUnits, lifeDays, pantryRows, SHOP_FOOD, type FoodItemId } from '../sim/pantry';
 import { needOf } from '../sim/needs';
@@ -15,20 +15,12 @@ import {
 } from '../sim/finance';
 import type { GameState, OrderLine } from '../sim/state';
 import { buyOffer, canTrade, findContact, heatNow, INTRO_CASH, lawless, offers, peekBm, priceOfOffer, risk } from '../sim/blackMarket';
-import { HARDEN_GOODS, KIT_GOODS, WATCH_GOODS } from '../sim/gear';
+import { SHELF_TABS, SHELVES, shelvesNeeding, type ShelfTab } from '../sim/shelves';
+import { plansNeed, plansNeedLines } from '../sim/guidance';
 import { ammoLimit, buyAmmo, buyGun, CALIBER, CALIBERS, CLASS_USD, GUN, GUN_GROUP, GUNS, groupOf, gunPrices, issue, NFA_STAMP, practice, shopOpen, skillOf, stateBan, takeClass, type Caliber, type GunGroup, type GunModel } from '../sim/armory';
 
-type Tab = 'build' | 'bunker' | 'water' | 'food' | 'household' | 'fuel' | 'guns' | 'defense' | 'metals' | 'money';
-const TABS: Array<[Tab, string]> = [['build', 'Building'], ['bunker', 'Bunker'], ['water', 'Water & power'], ['food', 'Food'], ['household', 'Medical & household'], ['fuel', 'Fuel & tools'], ['guns', 'Guns & ammo'], ['defense', 'Kit & security'], ['metals', 'Gold & silver'], ['money', 'Money']];
-const SHELVES: Record<Exclude<Tab, 'metals' | 'money' | 'guns'>, MaterialId[]> = {
-  build: ['lumber', 'fieldstone', 'concrete', 'roofing', 'hardware', 'wire', 'seedlings', 'greenhouse_kit', 'fruit_trees'],
-  bunker: ['rebar', 'membrane', 'container', 'blast_door', 'blast_valve', 'nbc_filter', 'filter_set', 'culvert', 'egress_hatch', 'lead_sheet', 'faraday_mesh'],
-  water: ['water_jugs', 'ibc_tote', 'water_trailer', 'water_filter', 'ro_system', 'softener', 'greywater', 'pipe', 'cable', 'fixtures', 'pump', 'drilling', 'tank', 'septic_tank', 'solar_panel', 'battery', 'inverter', 'generator'],
-  food: ['seed', 'lids', 'fishing_gear', 'snares', 'smoker', 'goat', 'pig', 'steer', 'rabbit', 'hay', 'feed'],
-  household: ['meds', 'hygiene', 'traps', 'kibble', 'dogbed', 'doghouse'],
-  fuel: ['fuel', 'stabilizer', 'firewood', 'excavator', 'plow', 'gun_safe', 'gun_cleaning'],
-  defense: [...KIT_GOODS, ...WATCH_GOODS, ...HARDEN_GOODS],
-};
+type Tab = ShelfTab | 'guns' | 'metals' | 'money';
+const TABS: Array<[Tab, string]> = [...SHELF_TABS.filter(([id]) => id !== 'defense'), ['guns', 'Guns & ammo'], ['defense', 'Kit & security'], ['metals', 'Gold & silver'], ['money', 'Money']];
 
 const C = { bg: 'rgba(22,24,20,0.98)', card: 'rgba(255,255,255,0.045)', line: 'rgba(255,255,255,0.09)', gold: '#d8c9a0', dim: 'rgba(238,238,238,0.62)', good: '#a8d080', bad: '#f0a080' };
 const usd = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
@@ -133,7 +125,9 @@ function Icon({ id, tint }: { id: string; tint?: number }) {
 export function ShopWindow() {
   const g = useGameStore();
   const game = g.game;
-  const [tab, setTab] = useState<Tab>('build');
+  const need = plansNeed(game), needTabs = shelvesNeeding(need);
+  const needLines = plansNeedLines(game);
+  const [tab, setTab] = useState<Tab>(() => (TABS.map(([id]) => id).find(id => id in needTabs) ?? 'build'));
   const [cart, setCart] = useState<Partial<Record<MaterialId, number>>>({});
   const [foodCart, setFoodCart] = useState<Partial<Record<FoodItemId, number>>>({});
   const [msg, setMsg] = useState<string | null>(null);
@@ -159,18 +153,24 @@ export function ShopWindow() {
           <button style={btn()} onClick={close}>Close</button>
         </div>
         <div style={{ display: 'flex', gap: 4, padding: '8px 16px', borderBottom: `1px solid ${C.line}`, flexWrap: 'wrap' }}>
-          {TABS.map(([t, name]) => <button key={t} style={btn(tab === t)} onClick={() => { setTab(t); setMsg(null); }}>{name}</button>)}
+          {TABS.map(([t, name]) => <button key={t} style={btn(tab === t)} onClick={() => { setTab(t); setMsg(null); }}>{name}{(needTabs as Record<string, number>)[t] ? <span style={{ marginLeft: 5, fontSize: 10.5, color: '#1c1d18', background: C.gold, borderRadius: 8, padding: '0 5px' }} title="Things the plans still lack are on this shelf">{(needTabs as Record<string, number>)[t]} needed</span> : null}</button>)}
         </div>
+        {needLines.length > 0 && <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '7px 16px', borderBottom: `1px solid ${C.line}`, background: 'rgba(216,201,160,0.08)', flexWrap: 'wrap' }}>
+          <span style={{ flex: 1, minWidth: 240 }}>The plans still lack <b>{needLines.length}</b> material{needLines.length > 1 ? 's' : ''}: {billText(Object.fromEntries(needLines.slice(0, 4).map(l => [l.material, l.qty])))}{needLines.length > 4 ? '…' : ''}. Marked <i>needed</i> below.</span>
+          <button style={btn()} onClick={() => setCart(c => { const n = { ...c }; for (const l of needLines) n[l.material] = Math.max(n[l.material] ?? 0, l.qty); return n; })}>Add them to the order</button>
+          <button style={btn(true, !!orderProblem(game, needLines))} disabled={!!orderProblem(game, needLines)} onClick={() => { if (g.order(needLines)) setMsg(null); }}>Order what the plans need ({usd(orderCost(needLines, k))})</button>
+        </div>}
         <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
           <div style={{ flex: 1, overflowY: 'auto', padding: 14 }}>
             {tab !== 'metals' && tab !== 'money' && tab !== 'guns' && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 8 }}>
               {tab === 'food' && <FoodShelves game={game} k={k} cart={foodCart} add={addFood} />}
-              {SHELVES[tab].filter(m => MATERIALS[m].price !== null).map(m => (
-                <div key={m} style={{ background: C.card, border: `1px solid ${cart[m] ? C.gold : C.line}`, borderRadius: 10, padding: 10, display: 'flex', gap: 10 }}>
+              {(SHELVES as Record<string, MaterialId[]>)[tab].filter(m => MATERIALS[m].price !== null).slice().sort((a, b) => Number((need[b] ?? 0) > 0) - Number((need[a] ?? 0) > 0)).map(m => (
+                <div key={m} style={{ background: C.card, border: `1px solid ${cart[m] || (need[m] ?? 0) > 0 ? C.gold : C.line}`, borderRadius: 10, padding: 10, display: 'flex', gap: 10 }}>
                   <Icon id={m} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}><b>{MATERIALS[m].name}</b><span style={{ color: C.gold }}>{usd((MATERIALS[m].price ?? 0) * k)}</span></div>
                     <div style={{ fontSize: 11.5, color: C.dim, lineHeight: 1.3, margin: '2px 0 6px' }}>{MATERIALS[m].unit}</div>
+                    {(need[m] ?? 0) > 0 && <div style={{ fontSize: 11.5, margin: '-2px 0 5px' }}><span style={{ color: '#1c1d18', background: C.gold, borderRadius: 8, padding: '0 6px', fontWeight: 600 }}>needed now</span> <span style={{ color: C.gold }}>plans lack {need[m]}</span> <button style={{ ...btn(), padding: '0 6px', fontSize: 11 }} onClick={() => setCart(c => ({ ...c, [m]: Math.max(c[m] ?? 0, need[m]!) }))}>add {need[m]}</button></div>}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <button style={btn()} onClick={() => add(m, -1)}>−</button>
                       <span style={{ minWidth: 22, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{cart[m] ?? 0}</span>

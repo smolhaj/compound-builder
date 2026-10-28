@@ -14,6 +14,7 @@
  *  Hardening      steel entry doors and window bars on the house, sandbag
  *                 positions, a safe room (hide in it like a bunker).
  */
+import { petCare } from './daily';
 import type { GameState } from './state';
 import type { MaterialId } from './materials';
 import { dogWatch } from './pets';
@@ -30,11 +31,11 @@ export const powered = (s: GameState) => s.utilities.lit.length > 0 || (s.utilit
 export function gearPosture(s: GameState, fighters: number): { detection: number; barrier: number; fight: number; visibility: number; deter: number; safeRoom: boolean } {
   const p = powered(s), dogs = dogWatch(s);
   const detection = (p && n(s, 'cameras') ? 15 : 0) + (p && n(s, 'thermal_cam') ? 15 : 0) + (n(s, 'driveway_alarm') ? 10 : 0) + (n(s, 'floodlights') && floodlightArmed(s, ARMORY_LIGHTS) ? 5 : 0)
-    + (n(s, 'tripwire') ? 5 : 0) + dogs.detection + (n(s, 'radios') ? 5 : 0) + Math.min(10, (n(s, 'nvg') + n(s, 'thermal')) * 5);
+    + (n(s, 'tripwire') ? 5 : 0) + dogs.detection * petCare(s) + (n(s, 'radios') ? 5 : 0) + Math.min(10, (n(s, 'nvg') + n(s, 'thermal')) * 5);
   const barrier = Math.min(10, n(s, 'steel_door') * 5) + (n(s, 'window_bars') ? 8 : 0) + Math.min(15, n(s, 'sandbags') * 5);
   const f = Math.max(1, fighters);
   const fight = 1 + 0.08 * Math.min(1, n(s, 'plate_carrier') / f) + 0.04 * Math.min(1, n(s, 'radios') * 2 / f) + 0.05 * Math.min(1, (n(s, 'nvg') + n(s, 'thermal')) / f);
-  return { detection, barrier, fight, visibility: (n(s, 'floodlights') && floodlightLit(s, ARMORY_LIGHTS, false) ? 5 : 0), deter: dogs.deter, safeRoom: n(s, 'safe_room') > 0 };
+  return { detection, barrier, fight, visibility: (n(s, 'floodlights') && floodlightLit(s, ARMORY_LIGHTS, false) ? 5 : 0), deter: dogs.deter * petCare(s), safeRoom: n(s, 'safe_room') > 0 };
 }
 
 /** A wound in a fight: plates take some of it, and an IFAK on the spot takes more (one is used up). */

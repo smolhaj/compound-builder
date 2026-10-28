@@ -19,7 +19,7 @@
 import { log } from './economy';
 import { isFinished } from './construction';
 import type { Stock } from './materials';
-import { MATERIALS, hasAll, shortfall, type MaterialId } from './materials';
+import { hasAll, shortfall, waitingFor, type MaterialId } from './materials';
 import type { GameState, Structure } from './state';
 
 export type HouseKind = 'farmhouse' | 'trailer' | 'timber_cabin' | 'log_house';
@@ -139,7 +139,7 @@ export function fixBlocked(s: GameState, f: Fix): string | null {
   const need = fixBill(f);
   if (hasAll(s.stock, need)) return null;
   const miss = shortfall(s.stock, need);
-  return 'Waiting for ' + (Object.entries(miss) as Array<[MaterialId, number]>).map(([k, n]) => `${n} ${MATERIALS[k].name.toLowerCase()}`).join(', ');
+  return waitingFor(miss);
 }
 
 /** The next repair the family can work on (oldest first). */
