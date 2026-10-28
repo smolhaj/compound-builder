@@ -138,7 +138,8 @@ export function billCost(bill: Partial<Stock>): number {
 
 /** Does `stock` cover `bill`? */
 export function hasAll(stock: Stock, bill: Partial<Stock>): boolean {
-  return (Object.entries(bill) as Array<[MaterialId, number]>).every(([id, n]) => stock[id] >= n);
+  for (const id in bill) if (!(stock[id as MaterialId] >= (bill[id as MaterialId] as number))) return false;
+  return true;
 }
 
 /** What is still missing from `stock` to cover `bill`. */
