@@ -29,8 +29,8 @@ interface Parts { body: G[]; trim: G[]; glass: G[]; chrome: G[]; accent: G[]; li
 const parts = (): Parts => ({ body: [], trim: [], glass: [], chrome: [], accent: [], light: [] });
 
 const PAINT: Record<VehicleKind, number[]> = {
-  pickup: [0x8a2b25, 0x2d4a6b, 0xb9b9b2, 0x3d3f42, 0x556b3e],
-  suv: [0x2e3a2b, 0x1f2f4d, 0xc9c7bf, 0x4a4d52, 0x6e2a27],
+  pickup: [0xa23a2f, 0x3d6a9a, 0xc4c3bb, 0x6a6d72, 0x6f8a4a],
+  suv: [0x4a6a47, 0x2f4a7a, 0xd2d0c8, 0x70747a, 0x8a3a33],
   old_pickup: [0xc9b377, 0x6d8a73, 0xa4492a, 0xd9d2b8],
   motorhome: [0xe4e0d4, 0xd8cfae],
   tractor: [0x3a7a30, 0xb8321f, 0x2d5fa0],

@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import type { GameState } from '../../sim/state';
 import { GARAGES, parkingPlan, type Bay } from '../../sim/garage';
 import { startingVehicles, type Vehicle } from '../../sim/vehicles';
-import { buildVehicle, paintFor } from './vehicleGeometry';
+import { buildVehicle, paintFor, VEHICLE_SIZE } from './vehicleGeometry';
 import { lineLength, pointAt, type Pt } from '../region/access';
 
 /** A placed building the bays are laid out in (world position, rotation about y, structure kind). */
@@ -38,7 +38,7 @@ export class FleetRenderer {
   spots(game: GameState, ctx: FleetCtx): Map<string, { x: number; z: number; rot: number }> {
     const plan = parkingPlan(game);
     const out = new Map<string, { x: number; z: number; rot: number }>();
-    let yardN = 0;
+    let yardX = 0, yardRow = 0;
     const vs = game.vehicles ?? startingVehicles();
     for (const p of plan.parked) {
       const v = vs.find(x => x.id === p.vehicle);
@@ -57,12 +57,14 @@ export class FleetRenderer {
           continue;
         }
       }
-      // in the yard: a row beside the camp
+      // in the yard: side by side in rows beside the camp, noses out, a gap between (rows of four, the next row behind)
       const y = ctx.yard;
-      const i = yardN++;
-      const ang = y.rot + Math.PI / 2;
-      const ox = 2.6 + i * 0.55;
-      out.set(v.id, { x: y.x + Math.cos(y.rot) * ox + Math.sin(y.rot) * 1.6, z: y.z - Math.sin(y.rot) * ox + Math.cos(y.rot) * 1.6, rot: ang });
+      const w = VEHICLE_SIZE[v.kind].w + 0.2;
+      if (yardX + w > 2.4 * 2.6) { yardX = 0; yardRow++; }
+      const lx = 2.6 + yardX + w / 2, lz = 1.7 + yardRow * 1.15;
+      yardX += w;
+      const c = Math.cos(y.rot), s = Math.sin(y.rot);
+      out.set(v.id, { x: y.x + c * lx + s * lz, z: y.z - s * lx + c * lz, rot: y.rot + Math.PI });
     }
     return out;
   }
