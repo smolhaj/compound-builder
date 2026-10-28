@@ -3,9 +3,10 @@
  * quarter-hour sub-step (deterministic regardless of frame rate or speed).
  * Systems mutate a draft; `step` returns a fresh state object.
  */
+import { wildlifeDay, wildlifeNight } from './wildlife';
 import { LIFESTYLE } from './site';
 import { crewStep } from './crews';
-import { addWork, canGoOn } from './construction';
+import { addWork, canGoOn, isFinished } from './construction';
 import { addCarryWork, deliverOrders } from './economy';
 import { addFixWork, nextFix, siteJobsDay } from './improvements';
 import { paperworkDay } from './paperwork';
@@ -68,6 +69,8 @@ export function nextBuildTarget(s: GameState): Structure | null {
 
 function subStep(s: GameState): void {
   deliverOrders(s);
+  // animals walking past the motion lights at night (sim/wildlife.ts)
+  for (const line of wildlifeNight(s)) log(s, line);
   // a raid rolled this morning reaches the gate at its hour of the night or day
   { const arrived = arrivalCheck(s); if (arrived) log(s, `${arrived.title}.`); }
   const h = (s.clock.ticks * 0.25 + 6) % 24;   // exact: the tick count is an integer (hourOf(t) can land a hair under the hour)
@@ -158,6 +161,7 @@ function subStep(s: GameState): void {
     for (const line of legalDay(s)) log(s, line);
     prisonersDay(s);   // (it logs its own lines)
     for (const line of weatherDay(s)) log(s, line);
+    for (const line of wildlifeDay(s, s.structures.some(st => st.kind === 'root_cellar' && isFinished(st) && s.utilities.lit.includes(st.id)))) log(s, line);
     const e = gateDay(s);
     // a raid has an hour of arrival (a gang at 2:15 AM); it waits for it and the game runs on until then
     if (e && !(hasCutscene(e) && scheduleArrival(s, e))) log(s, `${e.title}.`);

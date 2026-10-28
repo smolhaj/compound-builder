@@ -42,6 +42,7 @@ import { EXPOSURE_NAME, exposure, raidPressure, topExposure } from '../sim/opsec
 import { acresOf, buyProblem, LAND_NAME, priceOf } from '../sim/land';
 import { runFinished } from '../sim/perimeter';
 import { plansNeed, plansNeedLines } from '../sim/guidance';
+import { populations, predatorLine } from '../sim/wildlife';
 import { PantryPanel } from './PantryPanel';
 import { ToolsPanel } from './ToolsPanel';
 import { Note, Row, Section, Tabs } from './hud/common';
@@ -225,6 +226,10 @@ export function Hud() {
               </div> : <Note>No seasons, no wardens now. Everyone is hunting: the game is thinning out.</Note>}
               {game.wild.hotUntil >= Math.floor(game.clock.t) && <Note tone="bad">Fallout: game and fish read hot for months.</Note>}
               {game.stock.fishing_gear < 1 && game.site.creek && <Note>A creek full of {REGIONS[game.site.region].game.find(x => ['trout', 'bass', 'catfish', 'salmon', 'panfish'].includes(x)) ?? 'fish'}, and no fishing gear.</Note>}
+            </Section>
+            <Section title="Wildlife on the land">
+              {populations(game).map(p => <Row key={p.sp} label={p.name} value={<span style={{ color: p.predator ? (p.count ? TONE.warn : DIM) : p.count < p.cap * 0.5 ? TONE.warn : undefined }}>{p.count} <span style={{ color: DIM }}>of ~{p.cap < 1 ? '<1' : Math.round(p.cap)}</span></span>} title={p.predator ? 'A predator: a danger to stock, dogs and kids if the place is careless; kept out by a wall that holds it; a good shot fills the freezer' : 'Counts follow the acres you own, the timber, open ground and water, and what has been hunted'} />)}
+              <Note tone={predatorLine(game).ok ? 'good' : 'warn'}>Predators: {predatorLine(game).detail}</Note>
             </Section>
             {ANIMALS.some(a => (game.stock[a] ?? 0) >= 1) && <Section title="Livestock">
               {ANIMALS.filter(a => (game.stock[a] ?? 0) >= 1).map(a => { const c = game.livestock?.condition[a] ?? 1; return <Row key={a} label={MATERIALS[a].name} value={<span style={{ color: c < 0.5 ? TONE.bad : c < 0.9 ? TONE.warn : undefined }}>{Math.floor(game.stock[a])} head, {Math.round(c * 100)} % condition</span>} />; })}
