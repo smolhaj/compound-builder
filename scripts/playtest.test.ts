@@ -27,7 +27,7 @@ import { calendarOf } from '../src/sim/state';
 import { planRun } from '../src/sim/perimeter';
 import { orderFit, fitProblem, plant, repairPump, replaceFried } from '../src/sim/utilities';
 import { orderHardenAll } from '../src/sim/hardening';
-import { defenseOf, postureOf, resolve, type Stance } from '../src/sim/encounters';
+import { defenseOf, fightOdds, hideFoundChance, postureOf, resolve, type Stance } from '../src/sim/encounters';
 import { resolveAftermath, type AftermathChoice } from '../src/sim/aftermath';
 import type { PlannedBattle } from '../src/sim/battle';
 const AFTER: Record<string, AftermathChoice> = { idle: 'leave', homestead: 'treat_release', prepper: 'hold', fortress: 'leave' };
@@ -49,10 +49,12 @@ const PLANS: Record<Strategy, Array<[string, number, number]>> = {
     ['bunker_hatch', 20, 40], ['bunker_corridor', 20.75, 40], ['bunker_dorm', 21.75, 40.25], ['bunker_stores', 21.75, 41.25], ['bunker_plant', 22.75, 40.25], ['bunker_medical', 22.75, 41.25], ['bunker_comms', 20.5, 41]],
   fortress: [['timber_cabin', 30, 30], ['well_hand', 26, 34], ['workshop', 38, 28], ['garden', 22, 28]],
 };
-/** Their strength well over the place's defense (what the gate card shows). */
-const outgunned = (s: GameState) => (s.gate.pending?.strength ?? 0) > defenseOf(postureOf(s)) * 1.2;
-/** A fight the place should win easily: their strength well under its defense. */
-const outclassed = (s: GameState) => (s.gate.pending?.strength ?? Infinity) < defenseOf(postureOf(s)) * 0.6;
+/** (round 4) The odds the gate card shows: the battle sim run a couple of dozen times (encounters.fightOdds). */
+const odds = (s: GameState) => fightOdds(s, s.gate.pending!);
+/** Likely to lose the fight, or someone in it (what the gate card shows). Round 3 compared their strength with defenseOf, which didn't predict the fight. */
+const outgunned = (s: GameState) => { const o = odds(s); return o.win < 0.6 || o.loseSomeone > 0.25; };
+/** A fight the place should win easily, and nobody lost. */
+const outclassed = (s: GameState) => { const o = odds(s); return o.win >= 0.85 && o.loseSomeone <= 0.1; };
 const livingCount = (s: GameState) => s.personState.filter(p => p.needs.died == null).length;
 /** Days of food left per head if `size` more join (what the gate card shows). */
 const roomFor = (s: GameState, size: number) => { const here = livingCount(s); return daysOfFood(s) * here / (here + size); };
@@ -83,14 +85,18 @@ const foodCovers = (s: GameState, size: number, margin: number) => {
   // (an earlier try let a big pantry stand in for the harvest: the long game's families then ate the pantry down with the people taken in and starved)
   return stored >= day * toHarvest(s) * margin && yearGrown(s) >= year * margin;
 };
+/** (round 4) The end of a month's trial: take them in if the food covers them, as for an arrival (the idle family and the fortress send them on). */
+const MARGIN: Record<Strategy, number> = { idle: 0, homestead: 1.1, prepper: 1.25, fortress: 0 };
+const trialEnd = (strat: Strategy, s: GameState, n: number): Stance => MARGIN[strat] && foodCovers(s, n, MARGIN[strat]) ? 'take_in' : 'turn_away';
 const STANCE: Record<Strategy, (kinds: Stance[], kind: string, s: GameState, size: number) => Stance> = {
   idle: k => k.includes('turn_away') ? 'turn_away' : k.includes('hide') ? 'hide' : k[0],
   // a sensible family: talk first, and if they're clearly outgunned, hide rather than fight
   // (v2: only take people in when the stores and the year's harvest cover them too; before, anyone was taken in while the shops were open)
   homestead: (k, kind, s, n) => kind === 'arrival' ? (foodCovers(s, n, 1.1) && roomFor(s, n) > 120 ? 'take_in' : 'trade') : outgunned(s) && k.includes('hide') ? 'hide' : k.includes('parley') ? 'parley' : k[0],
-  // a prepper hides when outgunned (or it's the dead), stands and fights only when the place clearly outclasses them
+  // a prepper hides, and stands and fights only when the place clearly outclasses them
+  // (round 4: on the honest odds, by default; PREPPER_HIDES=1 for the old always-hide bot)
   prepper: (k, kind, s, n) => kind === 'arrival' ? (foodCovers(s, n, 1.25) && roomFor(s, n) > 240 ? 'trial' : 'turn_away')
-    : process.env.PREPPER_FIGHTS && kind !== 'horde' && !outgunned(s) && outclassed(s) && k.includes('defend') ? 'defend' : k.includes('hide') ? 'hide' : k[0],
+    : !process.env.PREPPER_HIDES && k.includes('defend') && outclassed(s) ? 'defend' : k.includes('hide') ? 'hide' : k[0],
   fortress: (k, kind) => kind === 'arrival' ? 'turn_away' : k.includes('defend') ? 'defend' : k[0],
 };
 
@@ -166,7 +172,7 @@ function fieldSpot(s: GameState, M: (x: number, z: number) => [number, number]):
   return null;
 }
 
-interface RunResult { causes: string; often: Array<[string, number]>; minMoney: number; site: string; strat: Strategy; kind: DisasterKind; variant: string; ending: string; grade: string; alive: string; hungry: number; days: number; moneyAtHit: number; builtAtHit: number; bugs: string[]; lines: string[]; fights: string[]; prisoners: number }
+interface RunResult { causes: string; often: Array<[string, number]>; minMoney: number; site: string; strat: Strategy; kind: DisasterKind; variant: string; ending: string; grade: string; alive: string; hungry: number; days: number; moneyAtHit: number; builtAtHit: number; bugs: string[]; lines: string[]; fights: string[]; prisoners: number; hides: number; hidFound: number; owed: number; debtStage: string; trials: string; stripped: number; burned: number }
 
 function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' | 'medium', site: Site = CLASSIC, years = 0): RunResult & { s: GameState } {
   let s = newGame(seed, 105, 2027, { site: site === CLASSIC ? undefined : site, mode: 'scenario', peace, kind, dayJobs: true, grid: true });
@@ -186,6 +192,9 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
   for (const what of ['drive', 'power'] as const) orderHookup(s, what);
   const fights: string[] = [];
   let planned = 0, moneyAtHit = 0, builtAtHit = 0, hitSeen = false, lastLog = -Infinity, minMoney = s.money, lastMoney = s.money;
+  // (round 4) hiding, debt and the trial camps
+  let hides = 0, hidFound = 0, owed = 0, debtStage = 'none', burned = 0, stripped = 0;
+  const trial = { started: 0, in: 0, on: 0, stole: 0, left: 0 };
   const seen = new Map<string, number>();
   observed = []; season = 0;
   // how each one was lost (read off their state the day it happened)
@@ -260,7 +269,13 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
     if (cabin && day % 10 === 0) { const p = plant(s); for (const k of ['wire', 'plumb'] as const) if (!fitProblem(s, p, cabin, k)) orderFit(s, cabin.id, k); }
     s = step(s, 1);
     // the day's log, with the numbers taken out, tallied: what keeps happening
-    for (const l of s.log) if (l.t > lastLog) { const k = l.text.replace(/[\d,.$]+/g, '#'); seen.set(k, (seen.get(k) ?? 0) + 1); }
+    for (const l of s.log) if (l.t > lastLog) {
+      const k = l.text.replace(/[\d,.$]+/g, '#'); seen.set(k, (seen.get(k) ?? 0) + 1);
+      if (l.text.includes('gone in the night')) trial.stole++;
+      if (l.text.includes('they moved on. There wasn')) trial.left++;
+    }
+    if ((s.fin.debt?.owed ?? 0) > owed) { owed = s.fin.debt!.owed; }
+    if (s.fin.debt && ['none', 'card', 'late', 'collections', 'judgment'].indexOf(s.fin.debt.stage) > ['none', 'card', 'late', 'collections', 'judgment'].indexOf(debtStage)) debtStage = s.fin.debt.stage;
     lastLog = s.log.length ? s.log[s.log.length - 1].t : lastLog;
     minMoney = Math.min(minMoney, s.money);
     watchHarvest(s);
@@ -285,9 +300,18 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
       const e = s.gate.pending, before = s.gate.battle, def = Math.round(defenseOf(postureOf(s)));
       // word from a crew holding one of ours: pay it if it can be paid, talk it down if six in ten can, else no deal (the idle family never pays)
       const ransom = e.kind === 'ransom' && e.ransom ? (strat === 'idle' ? 'refuse' : canPay(s, e.ransom) ? 'pay' : canPay(s, e.ransom, 0.6) ? 'parley' : 'refuse') : null;
-      resolve(s, ransom ?? STANCE[strat](e.stances, e.kind, s, e.size)); s.gate.card = null;
+      const oddsNow = process.env.GATES && e.stances.includes('defend') ? odds(s) : null, foundNow = e.stances.includes('hide') ? hideFoundChance(s, e) : 0;
+      const stance = ransom ?? (e.kind === 'trial_end' ? trialEnd(strat, s, e.size) : STANCE[strat](e.stances, e.kind, s, e.size));
+      const hidBefore = s.gate.history.length;
+      const out = resolve(s, stance); s.gate.card = null;
+      if (out.lines.some(l => l.includes('set fire'))) burned++;
+      if (stance === 'hide' && out.lines.some(l => l.startsWith('Lost:'))) stripped++;
+      if (stance === 'hide') { hides++; const h = s.gate.history[hidBefore]; if (h && h.stance === 'hide' && h.tone === 'bad') hidFound++; }
+      if (stance === 'trial') trial.started++;
+      if (e.kind === 'trial_end') trial[stance === 'take_in' ? 'in' : 'on']++;
+      if (process.env.GATES && stance === 'hide') console.log(`hide ${strat} ${kind} d${Math.floor(s.clock.t - s.disaster.hitAt)} ${e.kind} ${e.temper ?? ''} n${e.size}${e.back ? ' back' : ''} found ${Math.round(foundNow * 100)}%: ${s.gate.history[hidBefore]?.tone} ${s.gate.history[hidBefore]?.stance}`);
       const b = s.gate.battle as (PlannedBattle | undefined);
-      if (b && b !== before) { if (process.env.GATES) console.log(`gate ${strat} ${kind} d${Math.floor(s.clock.t - s.disaster.hitAt)} ${e.kind} ${e.temper ?? ''} n${e.size} str ${e.strength} vs def ${def}: ${b.result} people ${livingCount(s)}`); fights.push(`${b.result}${b.events.some(x => x.kind === 'death' && x.unit.startsWith('h_')) ? ' (lost people)' : ''}`); }
+      if (b && b !== before) { if (process.env.GATES) console.log(`gate ${strat} ${kind} d${Math.floor(s.clock.t - s.disaster.hitAt)} ${e.kind} ${e.temper ?? ''} n${e.size} str ${e.strength} vs def ${def} odds ${oddsNow ? `${Math.round(oddsNow.win * 100)}%/${Math.round(oddsNow.loseSomeone * 100)}%` : '-'}: ${b.result} people ${livingCount(s)}`); fights.push(`${b.result}${b.events.some(x => x.kind === 'death' && x.unit.startsWith('h_')) ? ' (lost people)' : ''}`); }
       // after the shooting: what each kind of family does with the wounded raiders
       if (s.gate.aftermath) resolveAftermath(s, AFTER[strat]);
     }
@@ -305,7 +329,7 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
   const r = reportCard(s);
   const alive = s.personState.filter(ps => ps.needs.died == null).length;
   const often = [...seen].filter(([, n]) => n >= 40).sort((a, b) => b[1] - a[1]).slice(0, 6);
-  return { causes: [...causes].sort((a, b) => b[1] - a[1]).map(([k, n]) => `${n} ${k}`).join(', '), often, minMoney: Math.round(minMoney), site: `${s.site.acres} ac ${s.site.creek ? 'creek' : s.site.spring ? 'spring' : 'dry'} ${s.site.gwDepth} m ${s.site.improvements.house ? s.site.improvements.house.kind + ' ' : 'raw '}$${Math.round(s.site.price / 1000)}k`, strat, kind, variant: s.disaster.variant, ending: s.ending?.kind ?? 'still going (2 yrs)', grade: r.grade, alive: `${alive}/${s.personState.length}`, hungry: s.stats.hungryDays, days: s.stats.days, moneyAtHit, builtAtHit, bugs: [...new Set(bugs)].slice(0, 5), lines: r.lines, fights, prisoners: s.gate.prisoners?.length ?? 0, s };
+  return { causes: [...causes].sort((a, b) => b[1] - a[1]).map(([k, n]) => `${n} ${k}`).join(', '), often, minMoney: Math.round(minMoney), site: `${s.site.acres} ac ${s.site.creek ? 'creek' : s.site.spring ? 'spring' : 'dry'} ${s.site.gwDepth} m ${s.site.improvements.house ? s.site.improvements.house.kind + ' ' : 'raw '}$${Math.round(s.site.price / 1000)}k`, strat, kind, variant: s.disaster.variant, ending: s.ending?.kind ?? 'still going (2 yrs)', grade: r.grade, alive: `${alive}/${s.personState.length}`, hungry: s.stats.hungryDays, days: s.stats.days, moneyAtHit, builtAtHit, bugs: [...new Set(bugs)].slice(0, 5), lines: r.lines, fights, prisoners: s.gate.prisoners?.length ?? 0, hides, hidFound, owed: Math.round(owed), debtStage, trials: trial.started ? `${trial.started}: ${trial.in} in, ${trial.on} sent on, ${trial.stole} stole, ${trial.left} left` : '-', stripped, burned, s };
 }
 
 describe.skipIf(process.env.PLAYTEST !== 'long')('the long game', () => {
@@ -339,11 +363,13 @@ describe.skipIf(!process.env.PLAYTEST || process.env.PLAYTEST === 'long')('playt
     const results: RunResult[] = [];
     let seed = 11;
     for (const kind of kinds) for (const strat of strats) { const site = listings(seed)[seed % 4]; results.push(play(strat, kind, seed++, 'medium', site)); }
-    const md = ['# Playtest report (scripted)', '', '| Site | Disaster | Strategy | Variant | Ending | Grade | Alive | Lost to | Hungry days | Days | $ at hit | Built at hit | Fights | Bugs |', '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|',
-      ...results.map(r => `| ${r.site} | ${r.kind} | ${r.strat} | ${r.variant} | ${r.ending} | ${r.grade} | ${r.alive} | ${r.causes || '-'} | ${r.hungry} | ${r.days} | ${r.moneyAtHit.toLocaleString('en-US')} | ${r.builtAtHit} | ${r.fights.join(', ') || '-'}${r.prisoners ? ` · ${r.prisoners} held` : ''} | ${r.bugs.join('; ')} |`),
+    const md = ['# Playtest report (scripted)', '', '| Site | Disaster | Strategy | Variant | Ending | Grade | Alive | Lost to | Hungry days | Days | $ at hit | Built at hit | Fights | Hid (found) | Trials | Bugs |', '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|',
+      ...results.map(r => `| ${r.site} | ${r.kind} | ${r.strat} | ${r.variant} | ${r.ending} | ${r.grade} | ${r.alive} | ${r.causes || '-'} | ${r.hungry} | ${r.days} | ${r.moneyAtHit.toLocaleString('en-US')} | ${r.builtAtHit} | ${r.fights.join(', ') || '-'}${r.prisoners ? ` · ${r.prisoners} held` : ''} | ${r.hides ? `${r.hides} (${r.hidFound})${r.burned ? `, ${r.burned} burned` : ''}` : '-'} | ${r.trials} | ${r.bugs.join('; ')} |`),
       '', '## Report card lines', '', ...results.map(r => `- **${r.kind} / ${r.strat}:** ${r.lines.join(' ')}`),
       '', '## What keeps happening (log lines seen 40+ times in a run, numbers taken out)', '', ...results.filter(r => r.often.length).map(r => `- **${r.kind} / ${r.strat}:** ${r.often.map(([k, n]) => `${n}× "${k}"`).join('; ')}`),
-      '', '## Money', '', ...results.filter(r => r.minMoney < 0).map(r => `- **${r.kind} / ${r.strat}:** went as low as $${r.minMoney.toLocaleString('en-US')}`)];
+      // (round 4: checking can dip a few dollars under zero within a day, until the next morning moves it onto the card)
+      '', '## Money', '', ...results.filter(r => r.minMoney < -100).map(r => `- **${r.kind} / ${r.strat}:** went as low as $${r.minMoney.toLocaleString('en-US')}`),
+      ...results.filter(r => r.owed > 0).map(r => `- **${r.kind} / ${r.strat}:** owed as much as $${r.owed.toLocaleString('en-US')} (worst: ${r.debtStage})`)];
     writeFileSync('playtest-report.md', md.join('\n'));
     expect(results.flatMap(r => r.bugs)).toEqual([]);
   }, 1_800_000);

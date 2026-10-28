@@ -12,14 +12,19 @@ import { generateNeighbors, newGate } from '../encounters';
 import { emptyStats } from '../report';
 import { newLand } from '../land';
 import { CLASSIC, CLASSIC_IMPROVEMENTS } from '../site';
+import { newLights } from '../lights';
 import { newPaper } from '../paperwork';
 import { newUpkeep } from '../upkeep';
 import { newShelf } from '../shelf';
+import { pantryFromAggregates } from '../pantry';
 import { conditionsFor, newBody } from '../body';
-import { newFin } from '../finance';
+import { newDebt, newFin } from '../finance';
 import { newArmory } from '../armory';
 import { newBreakins } from '../breakins';
 import { newRescue } from '../rescue';
+import { newScavenge } from '../scavenge';
+import { newMarketState } from '../tradeGoods';
+import { newLocals } from '../neighborLife';
 import { newWild } from '../wildfood';
 import { newDaily } from '../daily';
 import { dayJob, type Person } from '../family';
@@ -28,6 +33,11 @@ type Raw = Record<string, unknown> & { version?: number };
 
 /** version n → n + 1 upgraders. */
 const STEPS: Record<number, (s: Raw) => Raw> = {
+  // 38 → 39: the pantry, item by item (the aggregate staples / canned / frozen split into a default breakdown at their shelf ages)
+  38: s => {
+    const st = s.stock as Record<string, number>, sh = s.shelf as { age?: Record<string, number> } | undefined;
+    return { ...s, version: 39, pantry: pantryFromAggregates({ staples: st.staples, canned: st.canned, frozen: st.frozen }, { staples: sh?.age?.staples, canned: sh?.age?.canned, frozen: sh?.age?.frozen }) };
+  },
   // 1 → 2: felling jobs, firewood stock and the stove's burn (M2 step 5)
   1: s => ({
     ...s, version: 2,
@@ -45,8 +55,22 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   5: s => ({ ...s, version: 6, stock: { rebar: 0, membrane: 0, excavator: 0, blast_door: 0, nbc_filter: 0, spoil: 0, ...(s.stock as object) } }),
   // 6 → 7: the escape tunnel (culvert, egress hatch)
   6: s => ({ ...s, version: 7, stock: { culvert: 0, egress_hatch: 0, ...(s.stock as object) } }),
-  // 38 → 43 (39–42 are other branches'): daily life (sim/daily.ts): an Auto roster (the planner fills it on the first sub-step), no chores behind, nobody tired
-  38: s => ({ ...s, version: 43, daily: (s.daily as object | undefined) ?? newDaily(), personState: (s.personState as Array<Record<string, unknown>>).map(ps => ({ fatigue: 0, ...ps })) }),
+  // 46 → 47: daily life (sim/daily.ts): an Auto roster (the planner fills it on the first sub-step), no chores behind, nobody tired
+  46: s => ({ ...s, version: 47, daily: (s.daily as object | undefined) ?? newDaily(), personState: (s.personState as Array<Record<string, unknown>>).map(ps => ({ fatigue: 0, ...ps })) }),
+  // 45 → 46 and 44 → 45: BRIDGE (dogs #66 and linked compounds #68 own these versions; delete these two lines when they merge)
+  45: s => ({ ...s, version: 46 }),
+  44: s => ({ ...s, version: 45 }),
+  // 43 → 44: structures may carry `replaces` (a watch-tower upgrade in place, sim/towers.ts; none yet) and the top towers' mount and turret goods join the stockpile at zero
+  43: s => ({ ...s, version: 44, stock: { gun_mount: 0, turret_head: 0, ...(s.stock as object) }, lights: (s.lights as object | undefined) ?? newLights() }),
+  // 42 → 43: a raid rolled for the day waits for its hour of arrival (`gate.incoming`, sim/siege.ts); none yet
+  42: s => ({ ...s, version: 43, gate: { incoming: null, ...(s.gate as object) } }),
+  // 41 → 42: perimeter runs may carry `replaces` (an upgrade of a finished run in place); none yet
+  41: s => ({ ...s, version: 42 }),
+  // 40 → 41: scavenging places and runs, the crossroads market and its trade-goods bag, the neighbors' lives (none yet: made on the first day after the hit)
+  40: s => ({ ...s, version: 41, scavenge: (s.scavenge as object | undefined) ?? newScavenge(), market: (s.market as object | undefined) ?? newMarketState(), locals: (s.locals as object | undefined) ?? newLocals() }),
+  // 39 → 40 (encounter realism): what's owed on the
+  // card (fin.debt: a negative checking balance moves onto it the first day it runs), trial camps outside the wall, a crew coming back
+  39: s => ({ ...s, version: 40, fin: { debt: newDebt(), ...(s.fin as object) }, gate: { camps: [], comeBack: null, ...(s.gate as object) } }),
   // 37 → 38: the taken and getting them back (sim/rescue.ts): no records yet (anyone already taken gets one on the first day it runs)
   37: s => ({ ...s, version: 38, rescue: (s.rescue as object | undefined) ?? newRescue() }),
   // 36 → 37: raider temper on an encounter and `taken` on a person (both optional: old saves have desperate raiders and nobody taken)
@@ -131,7 +155,7 @@ export function migrate(raw: unknown): GameState {
     if (!up) throw new SaveVersionError(`No migration from version ${s.version}`);
     s = up(s);
   }
-  for (const k of ['seed', 'clock', 'money', 'stock', 'orders', 'people', 'personState', 'structures', 'forestry', 'heat', 'perimeter', 'utilities', 'hardenJobs', 'disaster', 'food', 'neighbors', 'gate', 'stats', 'land', 'site', 'lifestyle', 'crews', 'siteJobs', 'roadside', 'paper', 'upkeep', 'shelf', 'body', 'fin', 'armory', 'wild', 'lineage', 'log', 'nextId'] as const) {
+  for (const k of ['seed', 'clock', 'money', 'stock', 'orders', 'people', 'personState', 'structures', 'forestry', 'heat', 'perimeter', 'utilities', 'hardenJobs', 'disaster', 'food', 'neighbors', 'gate', 'stats', 'land', 'site', 'lifestyle', 'crews', 'siteJobs', 'roadside', 'paper', 'upkeep', 'shelf', 'pantry', 'body', 'fin', 'armory', 'wild', 'lineage', 'log', 'nextId'] as const) {
     if (!(k in s)) throw new SaveVersionError(`Save is missing "${k}"`);
   }
   return s as unknown as GameState;

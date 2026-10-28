@@ -21,6 +21,7 @@ import { improvementStructures, type Fix, type SiteJobs } from './improvements';
 import { CLOSING_COSTS, newPaper, type Paper } from './paperwork';
 import { newUpkeep, type Upkeep } from './upkeep';
 import { newShelf, type Shelf } from './shelf';
+import { pantryFromAggregates, type FoodItemId, type Pantry } from './pantry';
 import { conditionsFor, newBody, type Body } from './body';
 import { newFin, type Fin } from './finance';
 import { newArmory, type Armory } from './armory';
@@ -32,10 +33,14 @@ import { generateNeighbors, newGate, type GateState, type Neighbor } from './enc
 import { freshNeeds, type FoodReport, type Needs } from './needs';
 import type { WeatherState } from './weatherThreats';
 import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
-export const SAVE_VERSION = 43;
+import type { LightsState } from './lights';
+export const SAVE_VERSION = 47;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
+import { newScavenge, type ScavengeState } from './scavenge';
+import { newMarketState, type MarketState } from './tradeGoods';
+import { newLocals, type LocalsState } from './neighborLife';
 import { newDaily, type Daily } from './daily';
 
 /** Starting savings (GDS §1 peacetime money constraint). */
@@ -62,7 +67,13 @@ export interface Clock {
   speed: Speed;
 }
 
-export interface OrderLine { material: MaterialId; qty: number }
+/**
+ * One line of an order. A named food (`food`, sim/pantry.ts) is `n` real
+ * units (bags, buckets, cases); its `material` is the food category and
+ * `qty` the same food in that category's units, so everything that counts
+ * stock by material keeps working.
+ */
+export interface OrderLine { material: MaterialId; qty: number; food?: FoodItemId; n?: number }
 
 export interface Order {
   id: string;
@@ -98,6 +109,10 @@ export interface Structure {
   /** County permit (sim/paperwork.ts): under review, approved, built without one, or stopped by the inspector; when review / the stop ends. */
   permit?: 'review' | 'ok' | 'none' | 'stopped';
   permitAt?: number;
+  /** An upgrade of this finished structure (sim/towers.ts): the old tier keeps working until this one is done, then goes (half its materials back). */
+  replaces?: string;
+  /** Towers: how far the ground at the site stands above the land round it (world units, ≥ 0; sim/towers.ts `stampHighGround`). */
+  high?: number;
 }
 
 export type TaskKind = 'idle' | 'build' | 'forestry' | 'sleep' | 'chores' | 'school' | 'leisure' | 'job' | 'gone' | 'shelter' | 'away'
@@ -191,6 +206,8 @@ export interface GameState {
   weather?: WeatherState;
   /** How old the stores are, rotation, traps. */
   shelf: Shelf;
+  /** What the food stores are made of, item by item, and the diet's running averages (sim/pantry.ts; save v39). */
+  pantry: Pantry;
   /** Medicine on hand per person. */
   body: Body;
   /** Savings, the brokerage account, cash in the safe, gold and silver. */
@@ -199,6 +216,8 @@ export interface GameState {
   armory: Armory;
   /** OPSEC choices (sim/opsec.ts); made lazily. */
   opsec?: { quietDeliveries: boolean; blackout: boolean };
+  /** Floodlight modes: the default and per-light overrides (sim/lights.ts). Save v44; made lazily. */
+  lights?: LightsState;
   /** The game in the woods and the creek, licenses. */
   wild: Wild;
   /** The long game: eras, the chronicle, milestones, the dynasty score. */
@@ -215,6 +234,12 @@ export interface GameState {
   gate: GateState;
   /** The children taken by raiders, the leads, the rescue raid out (sim/rescue.ts). Save v38; `??=` for safety. */
   rescue?: RescueState;
+  /** Scavenging runs: the places, what's left in each, the run out (sim/scavenge.ts). Save v42; `??=` for safety. */
+  scavenge?: ScavengeState;
+  /** The crossroads market: the trade-goods bag, the family's name, today's stalls (sim/market.ts). Save v42. */
+  market?: MarketState;
+  /** The neighbors' lives: ages, history, news on its way, the co-op or militia, the pact (sim/neighborLife.ts). Save v42. */
+  locals?: LocalsState;
   /** Daily life (sim/daily.ts): the roster, chores, gatherings. Save v43; `dailyOf` makes it lazily. */
   daily?: Daily;
   /** Radio and rumors after the collapse (radio.ts); made on first use. */
@@ -252,6 +277,7 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     paper: newPaper(),
     upkeep: newUpkeep(),
     shelf: newShelf(),
+    pantry: pantryFromAggregates({ canned: 2 }),
     body: newBody(),
     fin: newFin(),
     armory: newArmory(),
@@ -264,6 +290,9 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     gate: newGate(seed),
     breakins: newBreakins(),
     rescue: newRescue(),
+    scavenge: newScavenge(),
+    market: newMarketState(),
+    locals: newLocals(),
     daily: newDaily(),
     stats: emptyStats(),
     ending: null,

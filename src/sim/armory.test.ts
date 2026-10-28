@@ -73,13 +73,14 @@ describe('the armory', () => {
       for (const m of ['glock_19', 'mossberg_500', 'ruger_1022']) buyGun(g, m);
       g = step(g, 365);
       if (g.personState.some(ps => ps.needs.hurt.some(h => h.what.includes('firearm')))) hurt++;
+      if (hurt) break;   // one is enough to show it happens (each seed is a full year of the sim)
     }
     expect(hurt).toBeGreaterThan(0);
     let g = newGame(1); g.money = 50_000; g.stock.gun_safe = 1;
     for (const m of ['glock_19', 'mossberg_500', 'ruger_1022']) buyGun(g, m);
     g = step(g, 365);
     expect(g.armory.guns.every(x => x.where === 'safe')).toBe(true);
-  });
+  }, 30_000);   // a full simulated year per seed
 
   it('AR, AK and MP5-pattern semi-autos sell over the counter, but not in Washington', () => {
     const g = fresh();

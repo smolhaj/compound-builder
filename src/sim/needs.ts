@@ -23,6 +23,8 @@ import { REGIONS, seasons } from './regions';
 import { gardenSeason, GREENHOUSE_PEAK, greenhouseGreens, hasGreenhouse, orchardHarvest } from './greenhouse';
 import { careYield, lifeMorale } from './daily';
 import { socialMorale } from './gatherings';
+import { addFood, addFoodKcal, dietDay, dietEffects, eatFrom, inDateKcal, syncPantry } from './pantry';
+import { mulberry32 } from './rng';
 
 export type FoodId = 'fresh' | 'frozen' | 'canned' | 'staples';
 /** Food is kept in the stockpile in these units; kcal in one unit. */
@@ -49,6 +51,8 @@ export interface Needs {
   /** Dead (day), or null. Also set when someone was taken by raiders (`taken`): gone from the place either way. */
   died: number | null;
   taken?: boolean;
+  /** Hours of sleep owed after a night under siege (sim/siege.ts siegeStrain): slows work, wears off 3 a day. */
+  tired?: number;
 }
 
 export const freshNeeds = (): Needs => ({ health: 100, morale: 70, hunger: 0, dose: 0, hurt: [], died: null });
@@ -61,6 +65,13 @@ export const freshNeeds = (): Needs => ({ health: 100, morale: 70, hunger: 0, do
  */
 export const FIELD_KCAL = 700_000, FIELD_DRY = 0.4;
 
+/** The best gardener among the living who are still on the place (the dead and the taken don't tend the beds). */
+export function bestGardener(s: GameState): number {
+  let best = 0;
+  s.people.forEach((p, i) => { const n = s.personState[i]?.needs; if (n && n.died == null && !n.taken) best = Math.max(best, p.skills.gardener); });
+  return best;
+}
+
 /** This year's hail (weatherThreats.ts): the crop it shredded comes back short from a late replanting. */
 function hailThisYear(s: GameState): number | null {
   const h = s.weather?.hail;
@@ -72,7 +83,7 @@ export function fieldHarvest(s: GameState): number {
   const doy = calendarOf(s.clock).doy, HARVEST = seasons(REGIONS[s.site.region]).harvest;
   if (doy < HARVEST[0] || doy >= HARVEST[1]) return 0;
   const fields = s.structures.filter(st => st.kind === 'field' && isFinished(st)).length;
-  const skill = Math.max(...s.people.map(p => p.skills.gardener), 0);
+  const skill = bestGardener(s);
   // hail on the standing crop: replanted early in the summer it still makes 70 %; in late summer a quick catch crop, 30 %
   const hd = hailThisYear(s), hail = hd == null || hd >= HARVEST[1] ? 1 : hd < HARVEST[0] - 60 ? 0.7 : 0.3;
   return fields * FIELD_KCAL / (HARVEST[1] - HARVEST[0]) * (0.6 + 0.08 * skill) * SOIL_YIELD[s.site.soil] * climate(s).grow * tractorBoost(s) * hail * careYield(s, 'harvest');
@@ -91,7 +102,7 @@ export function produce(s: GameState): number {
   // a finished greenhouse starts the garden six weeks earlier, runs it six weeks later and raises the peak (greenhouse.ts)
   const [g0, g1] = gardenSeason(s);
   const season = doy < g0 || doy > g1 ? 0 : doy < g0 + 45 ? (doy - g0) / 45 : doy < g1 - 35 ? 1 : (g1 - doy) / 35;
-  const skill = Math.max(...s.people.map(p => p.skills.gardener), 0);
+  const skill = bestGardener(s);
   // a month to come back after hail (replanted from saved seed), then a shorter season
   const hd = hailThisYear(s), hail = hd == null || doy < hd ? 1 : doy - hd < 30 ? 0 : 0.7;
   const veg = gardens * 2500 * season * (0.6 + 0.08 * skill) * SOIL_YIELD[s.site.soil] * (hasGreenhouse(s) ? GREENHOUSE_PEAK : 1) * hail * careYield(s, 'weeds');
@@ -133,7 +144,8 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
   if (!freezer) spoil('frozen', fromStores ? 0 : THAW);
   // what grows
   const grown = produce(s), dry = fieldHarvest(s) * FIELD_DRY;
-  s.stock.staples += dry / KCAL.staples;
+  syncPantry(s);
+  if (dry > 0) addFoodKcal(s, 'home_dry', dry);
   s.stock.fresh += (grown - dry) / KCAL.fresh;
   // hunting, fishing and snares (wildfood.ts: the region's game, seasons and tags, the game thinning out)
   const meat = wildDay(s, freezer);
@@ -143,13 +155,39 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
   const need = s.people.reduce((a, p, i) => a + (alive(s, i) ? needOf(p) : 0), 0);
   let ate = 0;
   const kinds: FoodId[] = [];
+  /** What went on the plate, item by item (sim/pantry.ts: the diet's variety, protein, fat). */
+  const plate: Array<[string, number]> = [];
+  /** Sickness risk carried by what was eaten (kcal-weighted; sim/pantry.ts), and the kcal of it past its date. */
+  let risk = 0, botRisk = 0, old = 0;
   // broke in peacetime: food stamps and the food bank cover a household's worth; anyone past that eats from the pantry
-  if (fromStores) ate = s.money > 0 ? need : Math.min(need, FOOD_BANK_KCAL);
+  if (fromStores) { ate = s.money > 0 ? need : Math.min(need, FOOD_BANK_KCAL); plate.push(['grocery', ate]); }
   if (ate < need) {
-    for (const f of FOODS) {
+    // fresh first (it spoils), then the freezer; then canned and staples side by side, in proportion to what's on hand;
+    // food still in date before anything past it (sim/pantry.ts: expired food gives less and can make people sick)
+    const eat = (f: FoodId, kcal: number, inDate = false) => {
+      if (kcal <= 1e-6 || s.stock[f] <= 1e-9) return;
+      let got = 0;
+      if (f === 'fresh') {
+        const take = Math.min(s.stock.fresh, kcal / KCAL.fresh);
+        s.stock.fresh -= take; got = take * KCAL.fresh; plate.push(['fresh', got]);
+      } else {
+        const e = eatFrom(s, f, kcal, { inDate, thawed: f === 'frozen' && !freezer });
+        plate.push(...e.plate); got = e.eff; risk += e.sick; botRisk += e.bot; old += e.old;
+      }
+      if (got <= 1e-6) return;
+      ate += got;
+      if (!kinds.includes(f)) kinds.push(f);
+    };
+    eat('fresh', need - ate);
+    eat('frozen', need - ate, true);
+    eat('frozen', need - ate);
+    for (const inDate of [true, false]) {
       if (ate >= need) break;
-      const take = Math.min(s.stock[f], (need - ate) / KCAL[f]);
-      if (take > 1e-6) { s.stock[f] -= take; ate += take * KCAL[f]; kinds.push(f); }
+      const c = inDate ? inDateKcal(s, 'canned') : s.stock.canned * KCAL.canned, st = inDate ? inDateKcal(s, 'staples') : s.stock.staples * KCAL.staples;
+      const left = need - ate;
+      if (c + st > 0) { eat('canned', left * c / (c + st), inDate); eat('staples', left * st / (c + st), inDate); }
+      // one ran short of its share: the other makes it up
+      eat('canned', need - ate, inDate); eat('staples', need - ate, inDate);
     }
   }
   const short = Math.max(0, need - ate);
@@ -160,12 +198,31 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
     const cases = Math.min(Math.floor(surplus / KCAL.canned), CANNER_CASES, Math.floor(s.stock.lids));
     s.stock.lids -= cases;
     s.stock.fresh -= cases * KCAL.canned / KCAL.fresh;
-    s.stock.canned += cases * CANNED_YIELD;
+    addFood(s, 'home_canned', cases * CANNED_YIELD);
   }
   if (short > need * 0.25 && !fromStores) log(s, `Short of food: ${Math.round(short)} kcal less than the family needs today.`);
   // needs, person by person
   const cozy = s.disaster.difficulty === 'cozy';
-  const variety = fromStores ? 3 : kinds.length + (grown > 500 ? 1 : 0);
+  // the diet: a month's mix of foods (monotony), protein, fat, salt, sweets, coffee (sim/pantry.ts)
+  dietDay(s, plate, s.people.filter((_, i) => alive(s, i)).length, s.people.filter((p, i) => !p.kid && alive(s, i)).length, fromStores, ate > 0 ? old / ate : 0);
+  // food sickness from old or thawed food: each person's chance is the day's kcal-weighted risk (sim/pantry.ts sickness)
+  if (risk > 0 || botRisk > 0) {
+    const r = mulberry32(s.seed * 7919 + Math.floor(s.clock.t + 0.25) * 31 + 5);
+    s.people.forEach((p, i) => {
+      const n = s.personState[i]?.needs;
+      if (!n || n.died != null || n.taken) return;
+      const u = r(), v = r();
+      if (v < botRisk / Math.max(1, need) && !n.hurt.some(h => h.what === 'botulism')) {
+        n.hurt.push({ what: 'botulism', sev: 80, trauma: true });
+        log(s, `${p.first} has botulism from a bad jar: blurred vision, trouble swallowing. Without care it kills.`);
+      } else if (u < risk / Math.max(1, need) && !n.hurt.some(h => h.what === 'food poisoning')) {
+        n.hurt.push({ what: 'food poisoning', sev: 20 });
+        log(s, `${p.first} has food poisoning from old food: a few days of being sick.`);
+      }
+    });
+  }
+  const diet = dietEffects(s, fromStores);
+  const variety = fromStores ? 3 : diet.variety + (grown > 500 ? 0.5 : 0);
   const home = fin.some(st => isHome(st.kind));
   const dark = s.utilities.fittings.some(f => f.kind === 'wire' && f.finishedAt !== null) && !s.utilities.lit.some(id => isHome(s.structures.find(x => x.id === id)?.kind ?? ''));
   const medic = Math.max(...s.people.filter((p, i) => !p.kid && alive(s, i)).map(p => p.skills.medic), 0);
@@ -183,6 +240,10 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
       dh -= h.sev / 60;
       const meds = s.stock.meds >= 0.1;
       if (meds) s.stock.meds -= 0.1;            // a kit lasts about ten wound-days
+      // food poisoning: a few days, longer without enough to drink; meds (rehydration salts, antiemetics) help
+      if (h.what === 'food poisoning') { h.sev = Math.max(0, h.sev - ((s.utilities.report.shortL > s.utilities.report.useL * 0.5 ? 1.5 : 4) + (meds ? 2 : 0))); return; }
+      // botulism without care (medicine, someone who knows how, the bay): paralysis creeps on, and it kills
+      if (h.what === 'botulism' && !meds && medic < 3 && !bay) { dh -= 2.5; h.sev = Math.max(0, h.sev - 0.3); return; }
       // a fight wound needs treating: dressings and antibiotics, someone who knows how, or the bay
       if (h.trauma && !meds && medic < 3 && !bay) {
         h.sev = Math.max(0, h.sev - 0.3);
@@ -195,10 +256,13 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
     n.hurt = n.hurt.filter(h => h.sev > 0);
     if (n.dose > 1) dh -= (n.dose - 1) * 2;           // radiation sickness above ~1 Sv
     if (s.utilities.report.shortL > s.utilities.report.useL * 0.5) dh -= 2;   // not enough to drink
+    // a diet short of fat or protein (or salt, working hard) keeps health from coming all the way back
+    if (n.health + dh > diet.healthCap) dh = Math.min(dh, n.health > diet.healthCap ? -0.2 : diet.healthCap - n.health);
     n.health = Math.max(cozy ? 5 : 0, Math.min(100, n.health + dh));
     // morale: drifts to a baseline that variety, a home, light and safety raise; hunger and loss lower
-    const target = 45 + 6 * Math.min(variety, 4) + (home ? 8 : -6) + (dark ? -8 : 0) + (s.utilities.hauling ? (s.utilities.haulFar ? -10 : -4) : 0) - Math.min(25, n.hunger / 1000) + social + lifeMorale(s, i);
+    const target = 45 + 6 * Math.min(variety, 4) + diet.morale + (home ? 8 : -6) + (dark ? -8 : 0) + (s.utilities.hauling ? (s.utilities.haulFar ? -10 : -4) : 0) - Math.min(25, n.hunger / 1000) + social + lifeMorale(s, i);
     n.morale += (Math.max(0, Math.min(100, target)) - n.morale) * 0.08;
+    if (n.tired) n.tired = Math.max(0, n.tired - 3);
     if (n.health <= 0) {
       n.died = Math.floor(s.clock.t);
       log(s, `${p.first} ${p.last} has died.`);
@@ -224,5 +288,5 @@ export function workFactor(n: Needs | undefined): number {
   if (n.hurt.some(h => h.trauma && h.sev >= 50)) return 0.1;
   const h = n.health >= 60 ? 1 : 0.35 + 0.65 * n.health / 60;
   const m = n.morale >= 35 ? 1 : 0.6 + 0.4 * n.morale / 35;
-  return h * m;
+  return h * m * (1 - Math.min(0.35, (n.tired ?? 0) * 0.05));
 }

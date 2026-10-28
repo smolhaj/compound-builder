@@ -6,7 +6,7 @@
  */
 import { drillExtra, siteProblem } from './site';
 import { permitHold } from './paperwork';
-import { BLUEPRINTS } from './blueprints';
+import { BLUEPRINTS, totalBill } from './blueprints';
 import { hasAll, MATERIALS, shortfall, type MaterialId, type Stock } from './materials';
 import { log } from './economy';
 import type { GameState, Structure } from './state';
@@ -17,6 +17,19 @@ export function blueprintOf(st: Structure) {
 
 export function isFinished(st: Structure): boolean {
   return st.stage >= blueprintOf(st).stages.length;
+}
+
+/** Share of the old tier's materials that comes back when its upgrade is finished (same as the walls: sim/perimeter.ts SALVAGE). */
+export const STRUCTURE_SALVAGE = 0.5;
+
+/** An upgrade is done: the old tier goes, and half its materials come back to the stockpile. */
+function completeUpgrade(s: GameState, st: Structure): void {
+  const old = s.structures.find(x => x.id === st.replaces);
+  st.replaces = undefined;
+  if (!old) return;
+  for (const [k, n] of Object.entries(totalBill(blueprintOf(old))) as Array<[keyof Stock, number]>) s.stock[k] += Math.floor(n * STRUCTURE_SALVAGE);
+  s.structures = s.structures.filter(x => x.id !== old.id);
+  log(s, `The old ${old.kind.replace(/_/g, ' ')} comes down; half its materials are back in the stockpile.`);
 }
 
 /** Plan a structure at a placed spot (mutates the draft). */
@@ -81,6 +94,7 @@ export function addWork(s: GameState, st: Structure, personHours: number): numbe
       if (isFinished(st)) {
         st.finishedAt = s.clock.t;
         log(s, `The ${st.kind.replace('_', ' ')} is finished!`);
+        if (st.replaces) completeUpgrade(s, st);
       } else log(s, `${stage.name} done — on to: ${bp.stages[st.stage].name.toLowerCase()}.`);
     }
   }
@@ -101,6 +115,32 @@ export function knockBack(s: GameState, st: Structure, stage: number): void {
   // the current stage's own materials, if they were already taken in
   if (st.stage > stage && st.stage < stages.length && st.supplied) for (const [k, n] of Object.entries(stages[st.stage].materials) as Array<[keyof Stock, number]>) s.stock[k] += n;
   st.stage = stage; st.done = 0; st.supplied = false; st.finishedAt = null;
+}
+
+/**
+ * A structure burned (a wildfire front, raiders' torch). Most go back to
+ * nothing. A well doesn't: the bore and its steel casing (or the stoned shaft)
+ * are in the ground and come through, and so does a submersible pump down the
+ * hole or a cast-iron hand pump; the pump house, the roof and the pressure tank
+ * and controls burn. Round 4: a wildfire burned a drilled well back to stage 0,
+ * which meant drilling it again, which nobody can buy after the collapse.
+ * A septic system is underground and isn't touched. Returns false if nothing burned.
+ */
+export function burnStructure(s: GameState, st: Structure): boolean {
+  const stages = blueprintOf(st).stages;
+  if (st.kind === 'septic') return false;
+  if (st.kind === 'well_drilled' || st.kind === 'well_hand') {
+    const keep = stages.findIndex(x => x.id === (st.kind === 'well_drilled' ? 'frame' : 'roof'));
+    if (st.stage <= keep) return false;
+    const hw = s.stock.hardware;
+    knockBack(s, st, keep);
+    // the pump comes out of the hole (or off the cast-iron stand) fine; what was in the pump house didn't make it
+    // (a hand well keeps its roof stage to redo, and gets the hand pump back from knockBack)
+    if (st.kind === 'well_drilled') { s.stock.hardware = hw; s.stock.roofing = Math.max(0, s.stock.roofing - (stages[3]?.materials.roofing ?? 0)); }
+    return true;
+  }
+  st.stage = 0; st.done = 0; st.supplied = false; st.finishedAt = null;
+  return true;
 }
 
 /** 0–1 overall progress by person-hours. */

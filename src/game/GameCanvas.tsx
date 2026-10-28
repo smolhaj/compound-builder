@@ -1,3 +1,5 @@
+import { litTowerIds } from '../sim/towers';
+import { burnedFarms } from '../sim/neighborLife';
 import { useEffect, useRef } from 'react';
 import type { GameState } from '../sim/state';
 import { MushroomCloud } from './fx/MushroomCloud';
@@ -15,6 +17,7 @@ import { CameraOccluders } from '../engine/world/camera/cameraOcclusion';
 import { PARCEL_SIZE } from './HomesteadWorld';
 import { PlacementTool } from './PlacementTool';
 import { MarkTool } from './MarkTool';
+import { BoundaryOutline } from './BoundaryOutline';
 import { PerimeterTool } from './PerimeterTool';
 import { SightOverlay } from './sightlines/SightOverlay';
 import { PARCEL_SIZE as PS } from './parcel/parcelTerrain';
@@ -23,6 +26,10 @@ import { useGameStore } from '../store/gameStore';
 import { useBattleStore } from '../store/battleStore';
 import { BattleRenderer } from './battle/BattleRenderer';
 import { demoBattle } from './battle/demoBattle';
+import { CutscenePlayer } from './battle/CutscenePlayer';
+import { useCutsceneView } from '../store/cutsceneStore';
+import { isFinished } from '../sim/construction';
+import { isHome } from '../sim/blueprints';
 import { calendarOf, hourOf, SECONDS_PER_DAY } from '../sim/state';
 import { setWindowGlow } from './buildkit/materials';
 import { homeOutsideForty } from '../sim/site';
@@ -105,6 +112,10 @@ export function GameCanvas() {
       if (e.code === 'KeyU' && !(e.target instanceof HTMLInputElement)) useWorldStore.getState().setUnderground(!useWorldStore.getState().underground);
     };
     window.addEventListener('keydown', onKey);
+    let shiftDown = false;
+    const onShift = (e: KeyboardEvent) => { shiftDown = e.shiftKey; };
+    window.addEventListener('keydown', onShift);
+    window.addEventListener('keyup', onShift);
 
     const resize = () => {
       const w = canvas.clientWidth, h = canvas.clientHeight;
@@ -138,14 +149,24 @@ export function GameCanvas() {
     const ownedRects = (g: GameState) => [...homeOutsideForty(g.site), ...g.land.parcels.filter(p => p.owner === 'you').map(p => p.rect)];
     if (!useGameStore.getState().game.land.surveyed) useGameStore.getState().survey(world.surveyLand(useGameStore.getState().game.land.parcels));
     world.setOwnedLand(ownedRects(useGameStore.getState().game));
+    // the property line: on by the Boundary button, and while a fence or wall is being drawn
+    const boundary = new BoundaryOutline(ws.scene, world.groundAt);
+    const rebuildBoundary = () => boundary.build([world.home, ...ownedRects(useGameStore.getState().game)]);
+    const showBoundary = () => { boundary.visible = useWorldStore.getState().showBoundary || !!useGameStore.getState().tool?.startsWith('fence:'); };
+    rebuildBoundary(); showBoundary();
+    world.setBurnedFarms(burnedFarms(useGameStore.getState().game));
     const unsub = [
       // wildfire weather: measure the fuel round every building (what cleared ground there is decides what burns)
       useGameStore.subscribe(s => s.game.disaster.phase, ph => { const g = useGameStore.getState().game; if (g.disaster.kind === 'wildfire' && ph === 'warning' && !g.disaster.fuel) useGameStore.getState().setFuel(world.fuelNear(g.structures)); }),
-      useGameStore.subscribe(s => s.game.land, () => world.setOwnedLand(ownedRects(useGameStore.getState().game))),
+      useGameStore.subscribe(s => s.game.land, () => { world.setOwnedLand(ownedRects(useGameStore.getState().game)); rebuildBoundary(); }),
+      useWorldStore.subscribe(s => s.showBoundary, showBoundary),
+      useGameStore.subscribe(s => s.tool, showBoundary),
       useWorldStore.subscribe(s => s.quality, applyLook),
       useWorldStore.subscribe(s => s.cameraMode, applyCameraMode),
       useGameStore.subscribe(s => s.game.structures, list => { world.syncStructures(placedOnly(list)); occluders.invalidate(); }),
       useGameStore.subscribe(s => s.game.site.improvements.drive, on => world.setDrive(on)),
+      // a neighbor's farm burned (sim/neighborLife.ts): drawn charred once the family knows
+      useGameStore.subscribe(s => burnedFarms(s.game).join(), () => world.setBurnedFarms(burnedFarms(useGameStore.getState().game))),
       useGameStore.subscribe(s => s.tool, k => { tool.setKind(k); marker.setOn(k === 'fell'); fence.setKind(k?.startsWith('fence:') ? k.slice(6) as PerimeterKind : null); if (k === 'fence:escape_tunnel') useWorldStore.getState().setUnderground(true); }),
       useWorldStore.subscribe(s => s.buildingView, v => world.setBuildingView(v)),
       useWorldStore.subscribe(s => s.underground, on => world.setUnderground(on)),
@@ -164,22 +185,65 @@ export function GameCanvas() {
     const battle = new BattleRenderer(ws.scene, world.groundAt, () => useGameStore.getState().game.people);
     battle.onEnd = () => useBattleStore.getState().endBattle();
     let battleSkip = useBattleStore.getState().skipReq, battleSync = 0;
+    // the raid cutscene: plays a staged siege (sim/siege.ts), cutting between wall, house and raiders
+    const homeSpot = () => {
+      const g = useGameStore.getState().game;
+      const h = g.structures.find(x => isFinished(x) && isHome(x.kind)) ?? g.structures.find(isFinished);
+      return h ? { x: h.x, y: 0, z: h.z } : { x: world.camp.x, y: 0, z: world.camp.z };
+    };
+    const player = new CutscenePlayer({ battle, ground: world.groundAt, house: homeSpot, commit: () => useGameStore.getState().commitCutscene(), seed: useGameStore.getState().game.seed });
+    let cineSaved: { fov: number; near: number } | null = null;
+    let promptAt = -1, skipScene = useCutsceneView.getState().skipScene, skipAll = useCutsceneView.getState().skipAll;
     let battleView: { x: number; z: number; radius: number; pitch: number } | null = null;
     const qa: { frames: number; frameMs: number; pose: null | { x: number; y: number; z: number; lx: number; ly: number; lz: number; fov?: number } } = { frames: 0, frameMs: 0, pose: null };
+    let slow = 0;
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
       const t0 = performance.now();
       const dt = Math.min(0.1, (now - last) / 1000);
+      // a slow machine on High (SSAO, 2× pixels) steps down to Medium by itself after ~5 s under 40 fps
+      slow = dt > 0.025 ? slow + dt : Math.max(0, slow - dt * 2);
+      if (slow > 5 && useWorldStore.getState().quality === 'high') { useWorldStore.getState().setQuality('medium'); slow = 0; }
       last = now;
       // the sim advances in real time at its speed; the view clock follows it (outside photo mode)
       // the clock stands still while the new-game screen is up
       if (!useGameStore.getState().setupOpen) useGameStore.getState().tick(dt);
       const game = useGameStore.getState().game;
-      if (!useWorldStore.getState().photo) {
-        const cal = calendarOf(game.clock);
-        useWorldStore.getState().syncClock(hourOf(game.clock.t), cal.doy, game.clock.t);
+      // the raid cutscene: start / stop the player, and read the clock off its timeline while it plays
+      const cs = useGameStore.getState().cutscene;
+      if (cs?.phase === 'playing' && !player.active) {
+        cineSaved = { fov: ws.camera.fov, near: ws.camera.near };
+        cam.enabled = false;
+        player.start(cs);
+      } else if (cs?.phase !== 'playing' && player.active) {
+        player.stop();
+        cam.enabled = useWorldStore.getState().cameraMode === 'diorama';
+        if (cineSaved) { ws.camera.fov = cineSaved.fov; ws.camera.near = cineSaved.near; ws.camera.updateProjectionMatrix(); }
       }
+      world.powered = game.utilities.lit.length > 0 || (game.utilities.grid && game.disaster.tracks.grid > 0.5);
+      world.litTowers = new Set(litTowerIds(game));
+      const cv = useCutsceneView.getState();
+      if (cv.skipScene !== skipScene) { skipScene = cv.skipScene; player.skipScene(); }
+      if (cv.skipAll !== skipAll) { skipAll = cv.skipAll; player.skipAll(); }
+      const cine = player.active ? player.update(dt) : null;
+      if (!useWorldStore.getState().photo) {
+        const t = player.active && cs?.t0 != null ? cs.t0 + player.clockGame / 86400 : game.clock.t;
+        const cal = calendarOf(game.clock, t);
+        useWorldStore.getState().syncClock(hourOf(t), cal.doy, t);
+      }
+      // the prompt: the camera settles low in the yard, looking down the drive; you can still orbit
+      if (cs?.phase === 'prompt') {
+        if (promptAt < 0) promptAt = now;
+        if (now - promptAt < 2600) {
+          const h = homeSpot(), k = Math.min(1, dt * 2);
+          cam.target.x += (h.x + 0 - cam.target.x) * k; cam.target.z += (h.z + 7 - cam.target.z) * k;
+          cam.target.y += (world.groundAt(cam.target.x, cam.target.z) + 0.15 - cam.target.y) * k;
+          cam.radius += (6.5 - cam.radius) * k; cam.pitch += (0.16 - cam.pitch) * k;
+          let dy = Math.PI - cam.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); cam.yaw += dy * k;
+        }
+      } else promptAt = -1;
       world.syncProgress(game.structures);
+      world.syncFood(game);
       world.syncForestry(game.forestry);
       world.simTime = game.clock.t;
       world.syncPerimeter(game.perimeter, game.clock.t);
@@ -191,7 +255,7 @@ export function GameCanvas() {
       world.updateDeliveries(dt, game, speedK);
       const speed = game.clock.speed;
       const { timeOfDay: t, dayOfYear, totalDays, seasonMode, weatherMode } = useWorldStore.getState();
-      ws.setNightSky(moonPhase(dayOfYear + t / 24), skyDarkness('mountain_west', false));
+      ws.setNightSky(moonPhase(dayOfYear + t / 24), skyDarkness(world.climate, false));
       Object.assign(world.air, { hour: t, wind: weather.outputs.wind, daylight: 1 - ws.nightFactor * 0.85, viewportH: canvas.clientHeight || 800 });
       world.tick(dt, dayOfYear, totalDays, seasonMode);
       const sp = world.seasons.params;
@@ -201,7 +265,7 @@ export function GameCanvas() {
       const pKey = vis === 'fall' && sp.fall > 0.45 && sp.bare < 0.9 && seasonState.climate.blaze >= 0.5 ? 'fall'
         : vis === 'spring' && sp.bloom > 0.3 ? 'spring' : '';
       if (pKey !== lastParticles) { lastParticles = pKey; ws.setSeasonalParticles(pKey); }
-      const wetKey = Math.round((SEASON_WETNESS[vis] * (1 - sp.snow) + sp.wet * 0.45) * 50);
+      const wetKey = Math.round((Math.max(SEASON_WETNESS[vis], world.atmos.mud * 0.55) * (1 - sp.snow) + sp.wet * 0.45) * 50);
       if (wetKey !== lastWetKey) { lastWetKey = wetKey; ws.setWetness(wetKey / 50); }
       // Weather → sky / light / fog (next frame), wet + snowy surfaces.
       const wxSeason = vis === 'winter' && seasonState.weatherSnow <= 0 ? 'fall' : vis;
@@ -225,14 +289,24 @@ export function GameCanvas() {
         wx.snow = Math.max(wx.snow, 0.6 * nk.dust);
       }
       ws.setWeather(wx, Math.max(weather.flash, nk.flash), weather.skyLightning);
-      // lamps on inside from dusk (a little after sunset, off by late night)
-      setWindowGlow(Math.max(0, Math.min(1, (ws.nightFactor - 0.25) / 0.4)) * (t > 23.5 || t < 5 ? 0.25 : 1));
+      // lamps on inside from dusk (which windows, and how, is the atmosphere's: who's up, power, blackout curtains)
+      setWindowGlow(Math.max(0, Math.min(1, (ws.nightFactor - 0.25) / 0.4)), now / 1000);
+      world.updateAtmosphere({
+        dt, time: now / 1000, hour: t, night: ws.nightFactor, daylight: 1 - ws.nightFactor * 0.85, wind: wx.wind, rain: wx.rain, cloud: wx.cloud,
+        snow: Math.max(sp.snow, wx.snowCover * seasonState.weatherSnow) * (wx.rain > 0.3 ? 0.4 : 1), viewportH: canvas.clientHeight || 800, battle: battle.playing,
+      }, gs, seasonState.doy);
       if (tour.active) {
         const f = tour.update(dt);
         // walking indoors: a near plane short enough that walls and furniture never clip
         const near = useWorldStore.getState().cameraMode === 'walk' ? 0.02 : 0.05;
         if (ws.camera.near !== near) { ws.camera.near = near; ws.camera.updateProjectionMatrix(); }
         ws.setShadowFocus(f.x, f.z, 30);
+      } else if (cine) {
+        ws.camera.position.set(cine.eye.x, cine.eye.y, cine.eye.z);
+        ws.camera.lookAt(cine.look.x, cine.look.y, cine.look.z);
+        ws.camera.near = 0.02; ws.camera.fov = cine.fov;
+        ws.camera.updateProjectionMatrix();
+        ws.setShadowFocus(cine.eye.x, cine.eye.z, 16);
       } else if (qa.pose) {
         const p = qa.pose;
         ws.camera.position.set(p.x, p.y, p.z);
@@ -242,6 +316,7 @@ export function GameCanvas() {
         ws.camera.updateProjectionMatrix();
         ws.setShadowFocus(p.x, p.z, 6);
       } else {
+        cam.step(dt, shiftDown);
         cam.apply(ws.camera);
         occluders.keepOut(ws.camera, cam.target.x, cam.target.z, cam.target.y);
         // looking down, fit the shadows to the ground actually on screen (the far edge of the view
@@ -256,7 +331,7 @@ export function GameCanvas() {
       else if (!bs.battle && battle.playing) battle.stop();
       // the camera follows the fight (eased), and goes back where it was afterwards
       const f = battle.playing ? battle.focus() : null;
-      if (f) {
+      if (f && !player.active) {
         const k = Math.min(1, dt * 1.5);
         cam.target.x += (f.x - cam.target.x) * k; cam.target.z += (f.z - cam.target.z) * k; cam.target.y += (world.groundAt(cam.target.x, cam.target.z) - cam.target.y) * k;
         cam.radius += (Math.min(26, Math.max(8, f.spread * 2.2 + 5)) - cam.radius) * k;
@@ -281,7 +356,7 @@ export function GameCanvas() {
     raf = requestAnimationFrame(frame);
 
     // QA hook (screenshot harness, console poking).
-    (window as unknown as Record<string, unknown>).__cb = { ws, world, weather, cam, tour, tool, marker, fence, sight, game: useGameStore, store: useWorldStore, THREE, qa, battle,
+    (window as unknown as Record<string, unknown>).__cb = { player, ws, world, weather, cam, tour, tool, marker, fence, sight, game: useGameStore, store: useWorldStore, THREE, qa, battle,
       demoBattle: () => {
         const g = useGameStore.getState().game;
         const b = demoBattle(g.structures, g.people, g.structures.length ? undefined : world.camp);
@@ -294,12 +369,16 @@ export function GameCanvas() {
       window.removeEventListener('resize', resize);
       unsub.forEach(u => u());
       window.removeEventListener('keydown', onKey);
+      window.removeEventListener('keydown', onShift);
+      window.removeEventListener('keyup', onShift);
+      player.stop();
       battle.dispose();
       tour.dispose();
       tool.dispose();
       marker.dispose();
       fence.dispose();
       sight.dispose();
+      boundary.dispose();
       canvas.removeEventListener('pointerdown', onVsDown);
       canvas.removeEventListener('pointerup', onVsUp);
       cam.dispose();

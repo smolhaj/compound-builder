@@ -5,7 +5,11 @@
  * chance per cell, so stands thin out naturally toward their edges.
  *
  * Planted within `margin` of the parcel; the regional far trees take over
- * beyond (FarTreeRenderer starts its rings there).
+ * beyond (FarTreeRenderer starts its rings there). Other regions plant their
+ * own mix (regionWorld.trees): hardwoods and hemlock in Appalachia, juniper
+ * in the desert, spruce and birch in the North Woods, Douglas fir in the
+ * Northwest, oak–maple woodlots in the Upper Midwest, cottonwoods on the
+ * Plains creeks.
  */
 import type { ForestTreeSpec } from '../../engine/world/trees/ForestRenderer';
 import { PARCEL_SIZE, type ParcelTerrain } from './parcelTerrain';
@@ -66,6 +70,28 @@ export function planParcelTrees(t: ParcelTerrain, o: PlantOptions): ParcelTree[]
       const riparian = dz < 6.5 && s.forest < 0.85;
       let kind: ForestTreeSpec['kind'];
       let scale: number;
+      if (t.relief !== 'benches') {
+        // the region's mix (the same random draws per cell, so ids and positions hold)
+        const mix = t.world.trees;
+        const wash = t.wash && Math.abs(z - t.wash(x)) < 5;
+        let sx = 0.88 + sxR * 0.24, sy = 0.9 + syR * 0.25;
+        if (riparian || wash) { kind = mix.riparian.kind; scale = mix.riparian.scale[0] + sRoll * (mix.riparian.scale[1] - mix.riparian.scale[0]); }
+        else {
+          const tot = mix.timber.reduce((a, m) => a + m.w, 0);
+          let acc = 0, pickM = mix.timber[mix.timber.length - 1];
+          for (const m of mix.timber) { acc += m.w / tot; if (kindRoll < acc) { pickM = m; break; } }
+          kind = pickM.kind;
+          scale = pickM.scale[0] + sRoll * (pickM.scale[1] - pickM.scale[0]);
+          if (pickM.sx) sx = pickM.sx[0] + sxR * (pickM.sx[1] - pickM.sx[0]);
+          if (pickM.sy) sy = pickM.sy[0] + syR * (pickM.sy[1] - pickM.sy[0]);
+        }
+        if (kind === 'oval' && !(riparian || wash)) sy = Math.max(sy, 1.1 + syR * 0.3);
+        out.push({
+          ...(kind === 'conifer' && s.forest > 0.7 && scale > 0.6 ? { stand: true } : {}),
+          id: (o.idBase ?? 0) + cell, x, y: s.h, z, kind, scale, sx, sy, rotY, cr,
+        });
+        continue;
+      }
       if (riparian) {
         kind = 'broad';                           // narrowleaf cottonwood / box elder
         scale = 0.8 + sRoll * 0.4;
@@ -117,8 +143,10 @@ export function planUnderstory(t: ParcelTerrain, o: PlantOptions): ParcelTree[] 
       if (o.blocked?.(x, z)) continue;
       const dz = Math.abs(z - t.creek.zAt(x));
       if (dz < t.creek.halfWidth + 1.2 || s.h < t.creek.waterY(x) + 0.08) continue;
-      const kind: ForestTreeSpec['kind'] = thick ? 'conifer' : 'oval';
-      const scale = thick ? 0.32 + sRoll * 0.3 : 0.4 + sRoll * 0.25;
+      const under = t.world.trees.under;
+      const kind: ForestTreeSpec['kind'] | null = t.relief === 'benches' ? (thick ? 'conifer' : 'oval') : thick ? under.thick : under.edge;
+      if (!kind) continue;
+      const scale = kind === 'conifer' ? 0.32 + sRoll * 0.3 : 0.4 + sRoll * 0.25;
       out.push({ id: (o.idBase ?? 0) + 500_000 + cell, x, y: s.h, z, kind, scale, sx: 0.85 + sxR * 0.25, sy: kind === 'oval' ? 1.15 + syR * 0.3 : 0.95 + syR * 0.2, rotY, cr });
     }
   }

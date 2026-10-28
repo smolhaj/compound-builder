@@ -16,15 +16,17 @@
 import type { GameState } from './state';
 import { isFinished } from './construction';
 import { noiseNow } from './gatherings';
+import { alwaysLit } from './lights';
+import { floodTowerIds } from './towers';
 
 export interface Opsec { quietDeliveries: boolean; blackout: boolean }
 
 export const opsecOf = (s: GameState): Opsec => (s.opsec ??= { quietDeliveries: false, blackout: false });
 
-export type ExposureSource = 'deliveries' | 'structures' | 'guns' | 'metals' | 'lights' | 'smoke' | 'talk' | 'news' | 'gatherings';
+export type ExposureSource = 'deliveries' | 'structures' | 'guns' | 'metals' | 'lights' | 'smoke' | 'talk' | 'news' | 'market' | 'gatherings';
 export const EXPOSURE_NAME: Record<ExposureSource, string> = {
   deliveries: 'Deliveries seen', structures: 'Visible structures', guns: 'Gun sales on record', metals: 'Metal & cash on the books',
-  lights: 'Lights after the grid', smoke: 'Smoke & cooking', talk: 'Talk in town', news: 'On the local news', gatherings: 'Parties & cookouts',
+  lights: 'Lights after the grid', smoke: 'Smoke & cooking', talk: 'Talk in town', news: 'On the local news', market: 'Followed from the market', gatherings: 'Parties & cookouts',
 };
 
 const STRUCTURE_WEIGHT: Record<string, number> = { bunker_hatch: 10, bunker_stairs: 8, water_tower: 8, solar_array: 7, garage_solar: 5 };
@@ -42,7 +44,9 @@ export function exposureParts(s: GameState): Record<ExposureSource, number> {
   const guns = Math.min(15, s.armory.onBooks * 2);
   const metals = Math.min(10, s.fin.onBooks / 5000);
   const gridDown = s.disaster.tracks.grid < 0.5;
-  const lights = gridDown && s.utilities.lit.length > 0 ? Math.min(20, 8 + s.utilities.lit.length * 2) * (o.blackout ? 0.5 : 1) : 0;
+  // lamps in the windows once the grid is down; floodlights left on all night are seen from the road (+3 each, up to 9; sim/lights.ts)
+  const floodSeen = Math.min(9, 3 * alwaysLit(s, floodTowerIds(s)));
+  const lights = (gridDown && s.utilities.lit.length > 0 ? Math.min(20, 8 + s.utilities.lit.length * 2) * (o.blackout ? 0.5 : 1) : 0) + floodSeen;
   const hungry = s.disaster.tracks.stores < 0.5;
   const smoke = hungry ? 6 + (s.stock.smoker ? 4 : 0) : 0;
   const adults = s.people.filter((p, i) => !p.kid && s.personState[i]?.needs.died == null);
@@ -52,7 +56,9 @@ export function exposureParts(s: GameState): Record<ExposureSource, number> {
   const news = at >= 0 ? 15 * Math.exp(-Math.max(0, s.clock.t - at) / 365) : 0;
   // noise, light and smoke from a cookout or a party (sim/gatherings.ts), fading over a few days
   const gatherings = Math.min(15, noiseNow(s));
-  return { deliveries, structures, guns, metals, lights, smoke, talk, news, gatherings };
+  // followed home from the crossroads market (sim/market.ts), fading over weeks
+  const market = s.market?.heat ?? 0;
+  return { deliveries, structures, guns, metals, lights, smoke, talk, news, market, gatherings };
 }
 
 /** 0–100: how much the county knows. */

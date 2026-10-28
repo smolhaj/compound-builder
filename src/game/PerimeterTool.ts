@@ -106,8 +106,11 @@ export class PerimeterTool {
     if (!h) return null;
     // an escape tunnel may run on under the neighbors' land; everything else stays on yours
     const m = this._kind === 'escape_tunnel' ? OFF_PARCEL_REACH : 0;
-    const x = Math.min(PARCEL_SIZE + m, Math.max(-m, Math.round(h.point.x / SNAP) * SNAP));
-    const z = Math.min(PARCEL_SIZE + m, Math.max(-m, Math.round(h.point.z / SNAP) * SNAP));
+    const rx = Math.round(h.point.x / SNAP) * SNAP, rz = Math.round(h.point.z / SNAP) * SNAP;
+    // bought parcels are yours to fence, wall and bar too (the creek runs through them as through the home forty)
+    if (m === 0 && ownsAt(useGameStore.getState().game, rx, rz)) return [rx, rz];
+    const x = Math.min(PARCEL_SIZE + m, Math.max(-m, rx));
+    const z = Math.min(PARCEL_SIZE + m, Math.max(-m, rz));
     return [x, z];
   }
 

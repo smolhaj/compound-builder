@@ -447,8 +447,8 @@ function container(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Grou
     c.pack([
       { len: 2.0 * M, dep: 0.95 * M, along: true, fn: a => Furniture.bunk(a, 'quilt_red', 'quilt_blue'), sides: ['left'] },
       { len: 2.0 * M, dep: 0.95 * M, along: true, fn: a => Furniture.bunk(a, 'quilt_blue', 'quilt_red'), sides: ['right'] },
-      { len: 1.0 * M, dep: 0.35 * M, fn: a => Furniture.shelfUnit(a, 1.0, 1.9, 'jars'), sides: ['front', 'left', 'right'] },
-      { len: 1.0 * M, dep: 0.35 * M, fn: a => Furniture.shelfUnit(a, 1.0, 1.9, 'jars'), sides: ['left', 'right'] },
+      { len: 1.0 * M, dep: 0.35 * M, fn: a => Furniture.shelfUnit(a, 1.0, 1.9, 'food'), sides: ['front', 'left', 'right'] },
+      { len: 1.0 * M, dep: 0.35 * M, fn: a => Furniture.shelfUnit(a, 1.0, 1.9, 'food'), sides: ['left', 'right'] },
       { len: 0.6 * M, dep: 0.6 * M, fn: a => Furniture.barrel(a), sides: ['right', 'left'] },
     ]);
     c.I(0, 0.05, 0, a => Furniture.table(a, 0.8, 1.4));
@@ -490,8 +490,8 @@ function galley(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
   return vault(def, seed, opts, { ...CONCRETE, vents: [[0.3, -0.3]] }, c => {
     c.pack([
       { len: 2.4 * M, dep: 0.6 * M, fn: a => { Furniture.counter(a, 2.4, 0.3, true); campStove(a); }, sides: ['back', 'left', 'right', 'front'] },
-      { len: 1.0 * M, dep: 0.35 * M, fn: a => Furniture.shelfUnit(a, 1.0, 1.9, 'jars'), sides: ['left', 'right', 'front', 'back'] },
-      { len: 1.0 * M, dep: 0.35 * M, fn: a => Furniture.shelfUnit(a, 1.0, 1.9, 'jars'), sides: ['right', 'left', 'front', 'back'] },
+      { len: 1.0 * M, dep: 0.35 * M, fn: a => Furniture.shelfUnit(a, 1.0, 1.9, 'food'), sides: ['left', 'right', 'front', 'back'] },
+      { len: 1.0 * M, dep: 0.35 * M, fn: a => Furniture.shelfUnit(a, 1.0, 1.9, 'food'), sides: ['right', 'left', 'front', 'back'] },
       { len: 0.6 * M, dep: 0.6 * M, fn: a => Furniture.barrel(a), sides: ['front', 'right', 'left'] },
       { len: 0.6 * M, dep: 0.6 * M, fn: a => Furniture.barrel(a), sides: ['front', 'left', 'right'] },
     ]);
@@ -515,28 +515,20 @@ function campStove(a: Add): void {
 
 function stores(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
   return vault(def, seed, opts, { ...CONCRETE, vents: [[0, 0.3]] }, c => {
-    const shelf = (): WallItem => ({ len: 1.0 * M, dep: 0.45 * M, fn: a => { Furniture.shelfUnit(a, 1.0, 2.0, 'jars'); cans(a); } });
+    // the shelves and two pallets are food slots: the pantry's buckets, sacks, cans and jars are drawn on them by quantity (game/props/FoodShelfRenderer)
+    const shelf = (): WallItem => ({ len: 1.0 * M, dep: 0.45 * M, fn: a => Furniture.shelfUnit(a, 1.0, 2.0, 'food') });
     c.pack([shelf(), shelf(), shelf(), shelf(), shelf(), shelf(), shelf(), shelf()]);
     c.pack([
       { len: 0.6 * M, dep: 0.6 * M, fn: a => Furniture.barrel(a) },
       { len: 0.6 * M, dep: 0.6 * M, fn: a => Furniture.barrel(a) },
       { len: 0.6 * M, dep: 0.6 * M, fn: a => Furniture.barrel(a) },
     ]);
-    // a stack of crates and food-grade buckets in the middle
-    c.I(0, 0, 0.1, a => { for (const [x, y, z] of [[-0.35, 0, 0], [0.35, 0, 0], [0, 0.42, 0]]) a('wood_mid', box(0.6 * M, 0.4 * M, 0.45 * M, x * M, y * M, z * M)); });
-    for (let i = 0; i < 4; i++) c.C(-0.12 + i * 0.07, -0.18, 0, a => bucketLid(a), 0.85);
+    // two pallets in the middle for the buckets and sacks, a couple of crates behind them
+    for (const x of [-0.115, 0.115]) c.I(x, 0.06, 0, a => Furniture.foodPallet(a));
+    c.I(0, -0.2, 0, a => { for (const [x, y] of [[-0.32, 0], [0.32, 0], [0, 0.42]]) a('wood_mid', box(0.6 * M, 0.4 * M, 0.45 * M, x * M, y * M, 0)); });
   });
 }
 
-/** Rows of cans on a shelf unit's shelves. */
-function cans(a: Add): void {
-  for (const y of [0.42, 0.88, 1.34]) for (let i = 0; i < 6; i++) a('steel', cyl(0.05 * M, 0.12 * M, (-0.38 + i * 0.15) * M, y * M, 0.06 * M, 8));
-}
-
-function bucketLid(a: Add): void {
-  a('enamel', cyl(0.15 * M, 0.38 * M, 0, 0, 0, 12));
-  a('paint_red', cyl(0.16 * M, 0.03 * M, 0, 0.38 * M, 0, 12));
-}
 
 function plant(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
   return vault(def, seed, opts, { ...CONCRETE, vents: [[-0.3, -0.3], [0.3, -0.3]] }, c => {

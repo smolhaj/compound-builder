@@ -35,6 +35,9 @@ export interface WorldState {
   buildingView: BuildingView;
   /** Sightline overlay: off / exposure from the road / from the ridge / night lights / viewshed from a point. */
   sightMode: 'off' | 'road' | 'ridge' | 'night' | 'viewshed';
+  /** The property line drawn on the ground (also shown while a fence or wall is being drawn). */
+  showBoundary: boolean;
+  setShowBoundary: (on: boolean) => void;
   /** Underground view (bunker rooms; the ground goes see-through). */
   underground: boolean;
   setUnderground: (on: boolean) => void;
@@ -53,10 +56,17 @@ export interface WorldState {
   /** Follow the sim clock (outside photo mode). */
   syncClock: (hour: number, doy: number, totalDays: number) => void;
   setSeasonMode: (s: SeasonMode) => void;
-  setQuality: (q: Quality) => void;
+  /** `manual` (the HUD selector) is remembered across visits; the automatic step-down is not. */
+  setQuality: (q: Quality, manual?: boolean) => void;
 }
 
 const wrapDoy = (d: number) => ((Math.floor(d) - 1) % 365 + 365) % 365 + 1;
+
+/** Medium unless the player chose otherwise (High adds SSAO and a 2× pixel ratio, which is laggy on retina screens). */
+function savedQuality(): Quality {
+  try { const q = localStorage.getItem('cb.quality'); if (q === 'high' || q === 'medium' || q === 'low') return q; } catch { /* no storage */ }
+  return 'medium';
+}
 
 export const useWorldStore = create<WorldState>()(subscribeWithSelector((set) => ({
   seed: initialSeed(),
@@ -66,13 +76,15 @@ export const useWorldStore = create<WorldState>()(subscribeWithSelector((set) =>
   photo: false,
   seasonMode: 'auto',
   weatherMode: 'auto',
-  quality: 'high',
+  quality: savedQuality(),
   cameraMode: 'diorama',
   buildingView: 'full',
   sightMode: 'off',
+  showBoundary: false,
   underground: false,
   setUnderground: (underground) => set({ underground }),
   setSightMode: (sightMode) => set({ sightMode }),
+  setShowBoundary: (showBoundary) => set({ showBoundary }),
   setBuildingView: (buildingView) => set({ buildingView }),
   tourCaption: null,
   setCameraMode: (cameraMode) => set({ cameraMode }),
@@ -83,5 +95,8 @@ export const useWorldStore = create<WorldState>()(subscribeWithSelector((set) =>
   setPhoto: (photo) => set({ photo }),
   syncClock: (timeOfDay, dayOfYear, totalDays) => set({ timeOfDay, dayOfYear, totalDays }),
   setSeasonMode: (seasonMode) => set({ seasonMode }),
-  setQuality: (quality) => set({ quality }),
+  setQuality: (quality, manual = false) => {
+    if (manual) { try { localStorage.setItem('cb.quality', quality); } catch { /* private mode */ } }
+    set({ quality });
+  },
 })));

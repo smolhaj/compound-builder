@@ -3,15 +3,17 @@
  * item cards with a drawn icon, a cart and one order; "Accounts you
  * manage"; metals at spot plus dealer premiums).
  */
-import { useState, type CSSProperties, type ReactNode } from 'react';
+import { Fragment, useState, type CSSProperties, type ReactNode } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { MATERIALS, type MaterialId } from '../sim/materials';
-import { orderCost, orderProblem, payWith, prices } from '../sim/economy';
+import { foodLine, orderCost, orderProblem, payWith, prices } from '../sim/economy';
+import { FOOD, KITS, kitUnits, lifeDays, pantryRows, SHOP_FOOD, type FoodItemId } from '../sim/pantry';
+import { needOf } from '../sim/needs';
 import {
-  banksOpen, buyMetal, buyPrice, dealerOpen, METAL_KINDS, METALS, metalsValue, moveMetal, netWorth, sellMetal, sellPrice, transfer, WHERE_NAME,
+  banksOpen, buyMetal, CARD_APR, CHARGE_OFF, JUDGMENT, minimumDue, payDebt, buyPrice, dealerOpen, METAL_KINDS, METALS, metalsValue, moveMetal, netWorth, sellMetal, sellPrice, transfer, WHERE_NAME,
   type Account, type MetalKind, type Where,
 } from '../sim/finance';
-import type { OrderLine } from '../sim/state';
+import type { GameState, OrderLine } from '../sim/state';
 import { buyOffer, canTrade, findContact, heatNow, INTRO_CASH, lawless, offers, peekBm, priceOfOffer, risk } from '../sim/blackMarket';
 import { HARDEN_GOODS, KIT_GOODS, WATCH_GOODS } from '../sim/gear';
 import { ammoLimit, buyAmmo, buyGun, CALIBER, CALIBERS, CLASS_USD, GUN, GUN_GROUP, GUNS, groupOf, gunPrices, issue, NFA_STAMP, practice, shopOpen, skillOf, stateBan, takeClass, type Caliber, type GunGroup, type GunModel } from '../sim/armory';
@@ -22,7 +24,7 @@ const SHELVES: Record<Exclude<Tab, 'metals' | 'money' | 'guns'>, MaterialId[]> =
   build: ['lumber', 'fieldstone', 'concrete', 'roofing', 'hardware', 'wire', 'seedlings', 'greenhouse_kit', 'fruit_trees'],
   bunker: ['rebar', 'membrane', 'container', 'blast_door', 'blast_valve', 'nbc_filter', 'filter_set', 'culvert', 'egress_hatch', 'lead_sheet', 'faraday_mesh'],
   water: ['water_jugs', 'ibc_tote', 'water_trailer', 'water_filter', 'ro_system', 'softener', 'greywater', 'pipe', 'cable', 'fixtures', 'pump', 'drilling', 'tank', 'septic_tank', 'solar_panel', 'battery', 'inverter', 'generator'],
-  food: ['staples', 'canned', 'frozen', 'seed', 'lids', 'fishing_gear', 'snares', 'smoker', 'goat', 'pig', 'steer', 'rabbit', 'hay', 'feed'],
+  food: ['seed', 'lids', 'fishing_gear', 'snares', 'smoker', 'goat', 'pig', 'steer', 'rabbit', 'hay', 'feed'],
   household: ['meds', 'hygiene', 'traps'],
   fuel: ['fuel', 'stabilizer', 'firewood', 'excavator', 'plow', 'gun_safe', 'gun_cleaning'],
   defense: [...KIT_GOODS, ...WATCH_GOODS, ...HARDEN_GOODS],
@@ -33,7 +35,8 @@ const usd = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
 const btn = (on = false, off = false): CSSProperties => ({ padding: '4px 10px', borderRadius: 6, border: `1px solid ${on ? C.gold : C.line}`, background: on ? 'rgba(216,201,160,0.18)' : 'rgba(255,255,255,0.06)', color: '#eee', cursor: off ? 'not-allowed' : 'pointer', opacity: off ? 0.45 : 1, fontSize: 12.5 });
 
 /** A small drawn icon per item (procedural: shapes and colors, no image files). */
-function Icon({ id }: { id: string }) {
+function Icon({ id, tint }: { id: string; tint?: number }) {
+  const c2 = tint === undefined ? '#888' : `#${tint.toString(16).padStart(6, '0')}`;
   const s = 44;
   const g = (children: ReactNode, bg = '#2c2f28') => <svg width={s} height={s} viewBox="0 0 44 44" style={{ flex: 'none', borderRadius: 8, background: bg }}>{children}</svg>;
   const planks = (c: string) => g(<>{[10, 18, 26].map(y => <rect key={y} x="6" y={y} width="32" height="6" rx="1" fill={c} stroke="#3a2a18" strokeWidth="0.8" />)}</>);
@@ -53,6 +56,16 @@ function Icon({ id }: { id: string }) {
     case 'fruit_trees': return g(<><rect x="20" y="24" width="4" height="12" fill="#6a4a2a" /><circle cx="22" cy="18" r="10" fill="#4f8a34" /><circle cx="17" cy="20" r="2.2" fill="#c0392b" /><circle cx="26" cy="15" r="2.2" fill="#c0392b" /></>);
     case 'seedlings': return g(<><rect x="12" y="26" width="20" height="10" fill="#6a4a2a" /><path d="M16 26 v-8 M22 26 v-12 M28 26 v-7" stroke="#5a9a3a" strokeWidth="2.5" /></>);
     case 'staples': return bag('#d8c8a0', 'RICE');
+    case 'f:bucket': return g(<><path d="M12 12 h20 l-2 24 h-16 z" fill="#f2f0ea" stroke="#b8b4a8" /><rect x="10" y="9" width="24" height="5" rx="1.5" fill={c2} /></>);
+    case 'f:can10': return g(<><rect x="12" y="9" width="20" height="27" rx="2" fill="#c8ccd0" /><rect x="12" y="15" width="20" height="13" fill={c2} /><ellipse cx="22" cy="9" rx="10" ry="2" fill="#a8acb0" /></>);
+    case 'f:sack': return g(<><path d="M12 12 q10 -5 20 0 l3 22 q-13 4 -26 0 z" fill={c2} stroke="rgba(0,0,0,0.25)" /><path d="M14 13 q8 3 16 0" stroke="rgba(0,0,0,0.3)" fill="none" /></>);
+    case 'f:bag': return g(<><path d="M13 10 h18 l2 26 h-22 z" fill={c2} stroke="rgba(0,0,0,0.2)" /><path d="M13 10 l3 -3 h12 l3 3" fill={c2} stroke="rgba(0,0,0,0.25)" /><rect x="15" y="20" width="14" height="7" fill="rgba(60,90,160,0.5)" /></>);
+    case 'f:jug': return g(<><path d="M13 14 h16 v22 h-16 z" fill={c2} opacity="0.85" /><rect x="16" y="9" width="6" height="5" fill="#2a2a2a" /><path d="M26 14 q6 0 4 8" stroke={c2} strokeWidth="3" fill="none" /></>);
+    case 'f:honey': return g(<><rect x="12" y="13" width="20" height="23" rx="4" fill={c2} opacity="0.9" /><rect x="15" y="9" width="14" height="5" rx="1" fill="#c8a040" /></>);
+    case 'f:jar': return g(<>{[10, 23].map(x => <g key={x}><rect x={x} y="14" width="11" height="20" rx="3" fill={c2} opacity="0.85" /><rect x={x + 1} y="11" width="9" height="4" fill="#c8a040" /></g>)}</>);
+    case 'f:case': return box(c2, '');
+    case 'f:can': return can(c2);
+    case 'f:pack': return box('#8ab0c8', 'MEAT');
     case 'canned': return can('#b04a30');
     case 'frozen': return box('#8ab0c8', 'MEAT');
     case 'seed': return bag('#c8b070', 'SEED');
@@ -118,9 +131,14 @@ export function ShopWindow() {
   const game = g.game;
   const [tab, setTab] = useState<Tab>('build');
   const [cart, setCart] = useState<Partial<Record<MaterialId, number>>>({});
+  const [foodCart, setFoodCart] = useState<Partial<Record<FoodItemId, number>>>({});
   const [msg, setMsg] = useState<string | null>(null);
   const k = prices(game);
-  const lines: OrderLine[] = (Object.entries(cart) as Array<[MaterialId, number]>).filter(([, q]) => q > 0).map(([material, qty]) => ({ material, qty }));
+  const lines: OrderLine[] = [
+    ...(Object.entries(cart) as Array<[MaterialId, number]>).filter(([, q]) => q > 0).map(([material, qty]) => ({ material, qty })),
+    ...(Object.entries(foodCart) as Array<[FoodItemId, number]>).filter(([, n]) => n > 0).map(([id, n]) => foodLine(id, n)),
+  ];
+  const addFood = (id: FoodItemId, d: number) => setFoodCart(c => ({ ...c, [id]: Math.max(0, (c[id] ?? 0) + d) }));
   const total = lines.length ? orderCost(lines, k) : 0;
   const why = lines.length ? orderProblem(game, lines) : 'empty';
   const pay = payWith(game);
@@ -142,6 +160,7 @@ export function ShopWindow() {
         <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
           <div style={{ flex: 1, overflowY: 'auto', padding: 14 }}>
             {tab !== 'metals' && tab !== 'money' && tab !== 'guns' && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 8 }}>
+              {tab === 'food' && <FoodShelves game={game} k={k} cart={foodCart} add={addFood} />}
               {SHELVES[tab].filter(m => MATERIALS[m].price !== null).map(m => (
                 <div key={m} style={{ background: C.card, border: `1px solid ${cart[m] ? C.gold : C.line}`, borderRadius: 10, padding: 10, display: 'flex', gap: 10 }}>
                   <Icon id={m} />
@@ -167,14 +186,14 @@ export function ShopWindow() {
             <b>The order</b>
             {!lines.length && <div style={{ color: C.dim }}>Nothing yet.</div>}
             <div style={{ flex: 1, overflowY: 'auto' }}>
-              {lines.map(l => <div key={l.material} style={{ display: 'flex', justifyContent: 'space-between', gap: 6, padding: '2px 0' }}><span>{l.qty} × {MATERIALS[l.material].name}</span><span style={{ color: C.dim }}>{usd((MATERIALS[l.material].price ?? 0) * l.qty * k)}</span></div>)}
+              {lines.map(l => <div key={l.food ?? l.material} style={{ display: 'flex', justifyContent: 'space-between', gap: 6, padding: '2px 0' }}><span>{l.food ? `${l.n} × ${FOOD[l.food].name}` : `${l.qty} × ${MATERIALS[l.material].name}`}</span><span style={{ color: C.dim }}>{usd((l.food ? (FOOD[l.food].price ?? 0) * (l.n ?? 0) : (MATERIALS[l.material].price ?? 0) * l.qty) * k)}</span></div>)}
             </div>
             {lines.length > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: `1px solid ${C.line}`, paddingTop: 6 }}><span>Total, delivered</span><b>{usd(total)}</b></div>}
             <div style={{ fontSize: 11.5, color: C.dim }}>{pay === 'cash' ? 'The banks are shut: paying cash from the safe.' : pay === 'bank' ? `From checking. The truck comes in about ${2 + Math.floor(game.site.miles / 15)} days.` : 'Nobody is delivering now.'}</div>
-            <button style={{ ...btn(true, !!why), padding: '7px 10px', fontWeight: 600 }} disabled={!!why} onClick={() => { if (g.order(lines)) setCart({}); }}>
+            <button style={{ ...btn(true, !!why), padding: '7px 10px', fontWeight: 600 }} disabled={!!why} onClick={() => { if (g.order(lines)) { setCart({}); setFoodCart({}); } }}>
               {why === 'cannot_afford' ? 'Not enough money' : why === 'no_deliveries' ? 'No deliveries' : 'Place the order'}
             </button>
-            {lines.length > 0 && <button style={btn()} onClick={() => setCart({})}>Clear</button>}
+            {lines.length > 0 && <button style={btn()} onClick={() => { setCart({}); setFoodCart({}); }}>Clear</button>}
           </div>}
         </div>
       </div>
@@ -250,6 +269,19 @@ function Money({ onMsg }: { onMsg: (m: string | null) => void }) {
       <button style={btn(open, !open)} disabled={!open} onClick={() => onMsg(g.money(d => transfer(d, from, to, amt)))}>Move it</button>
     </div>
     {!open && <div style={{ color: C.bad, marginTop: 8 }}>The banks are shut: checking, savings and the brokerage account are frozen.</div>}
+    {(f.debt?.owed ?? 0) > 0.5 && (() => {
+      const d = f.debt!;
+      const stage = { none: '', card: 'on the card, current', late: `late: ${d.missed} statement${d.missed > 1 ? 's' : ''} missed (charged off at ${CHARGE_OFF})`, collections: `in collections (a judgment after ${JUDGMENT} missed)`, judgment: `judgment: a $${d.lien.toLocaleString('en-US')} lien on the land, wages garnished 25 %` }[d.stage];
+      return <div style={{ marginTop: 16, maxWidth: 520 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', rowGap: 4, columnGap: 16 }}>
+          <span>Owed <span style={{ color: C.dim, fontSize: 11.5 }}>· {Math.round(CARD_APR * 100)} % APR, {stage}</span></span><b style={{ textAlign: 'right', color: C.bad }}>{usd(d.owed)}</b>
+          <span style={{ color: C.dim }}>Minimum due each month</span><span style={{ textAlign: 'right' }}>{usd(minimumDue(d.owed))}</span>
+          <span style={{ color: C.dim }}>Interest and fees so far</span><span style={{ textAlign: 'right' }}>{usd(d.interest)}</span>
+        </div>
+        <button style={{ ...btn(open && game.money > 0, !open || game.money <= 0), marginTop: 6 }} disabled={!open || game.money <= 0} onClick={() => onMsg(g.money(x => payDebt(x, x.money)))}>Pay it down from checking</button>
+        <div style={{ fontSize: 11.5, color: C.dim, marginTop: 6, lineHeight: 1.4 }}>{open ? 'A bill checking can\'t cover goes on the card. Each statement is paid from checking as far as it goes; short of the minimum it\'s late, six months behind it goes to collections, a year after that the collector gets a lien on the land.' : 'The banks are gone, and nobody is collecting.'}</div>
+      </div>;
+    })()}
     <div style={{ fontSize: 11.5, color: C.dim, marginTop: 12, lineHeight: 1.4 }}>Cash withdrawals over $10,000 are reported. Savings and checking are insured to $250,000; past that, a bank that fails for good can take a cut. Markets fall when the disaster hits. Metals climb as trust in money goes.</div>
   </>;
 }
@@ -334,5 +366,50 @@ function BlackMarket({ onMsg }: { onMsg: (m: string | null) => void }) {
         <button style={btn()} onClick={() => run(d => { const r = buyOffer(d, o.id); return typeof r === 'string' ? r : r.result === 'ok' ? null : r.result === 'scam' ? 'scammed: the money is gone' : `a sting: seized, fined $${(r.fine ?? 0).toLocaleString('en-US')}`; })}>Buy</button>
       </div>; })}
     </div>}
+  </>;
+}
+
+const SHELF_NAME: Record<keyof typeof SHOP_FOOD, string> = { long: 'Long-term storage (decades)', bulk: 'Bulk & pantry', cans: 'Cans & cases', freezer: 'Freezer' };
+const keepsFor = (d: number) => !isFinite(d) ? 'keeps forever' : d >= 730 ? `keeps ${Math.round(d / 365)} yr` : `keeps ${Math.round(d / 30)} mo`;
+
+/** The food tab: itemized cards on their shelves, and kits sized to the household. */
+function FoodShelves({ game, k, cart, add }: { game: GameState; k: number; cart: Partial<Record<FoodItemId, number>>; add: (id: FoodItemId, d: number) => void }) {
+  const need = game.people.reduce((a, p, i) => a + (game.personState[i]?.needs?.died == null ? needOf(p) : 0), 0);
+  const have = new Map(pantryRows(game, need).map(r => [r.id, r.units]));
+  const card = (id: FoodItemId) => {
+    const it = FOOD[id];
+    return <div key={id} style={{ background: C.card, border: `1px solid ${cart[id] ? C.gold : C.line}`, borderRadius: 10, padding: 10, display: 'flex', gap: 10 }}>
+      <Icon id={`f:${it.prop}`} tint={it.color} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}><b>{it.name}</b><span style={{ color: C.gold }}>{usd((it.price ?? 0) * k)}</span></div>
+        <div style={{ fontSize: 11.5, color: C.dim, lineHeight: 1.3, margin: '2px 0 6px' }}>{it.unit} · {it.kcal > 0 ? `${Math.round(it.kcal / 1000)}k kcal${need > 0 ? `, ${(it.kcal / need).toFixed(it.kcal / need >= 10 ? 0 : 1)} days` : ''}` : 'no calories'} · {keepsFor(lifeDays(game, id))}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <button style={btn()} onClick={() => add(id, -1)}>−</button>
+          <span style={{ minWidth: 22, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{cart[id] ?? 0}</span>
+          <button style={btn()} onClick={() => add(id, 1)}>+</button>
+          <span style={{ fontSize: 11, color: C.dim, marginLeft: 'auto' }}>have {Math.floor((have.get(id) ?? 0) + 1e-6)}</span>
+        </div>
+      </div>
+    </div>;
+  };
+  return <>
+    <div style={{ gridColumn: '1 / -1', fontWeight: 600, marginTop: 2 }}>Kits for the household</div>
+    {KITS.map(kit => {
+      const units = kitUnits(kit, need);
+      const cost = units.reduce((a, [id, n]) => a + (FOOD[id].price ?? 0) * n, 0);
+      return <div key={kit.id} style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 10, display: 'flex', gap: 10 }}>
+        <Icon id="f:bucket" tint={0xb83a2a} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}><b>{kit.name}</b><span style={{ color: C.gold }}>{usd(cost * k)}</span></div>
+          <div style={{ fontSize: 11.5, color: C.dim, lineHeight: 1.3, margin: '2px 0 6px' }}>{kit.text} {kit.days} days for {game.people.length}.</div>
+          <button style={btn()} onClick={() => { for (const [id, n] of units) add(id, n); }}>Add to the order</button>
+        </div>
+      </div>;
+    })}
+    {(Object.keys(SHOP_FOOD) as Array<keyof typeof SHOP_FOOD>).map(sh => <Fragment key={sh}>
+      <div style={{ gridColumn: '1 / -1', fontWeight: 600, marginTop: 6 }}>{SHELF_NAME[sh]}</div>
+      {SHOP_FOOD[sh].map(card)}
+    </Fragment>)}
+    <div style={{ gridColumn: '1 / -1', fontWeight: 600, marginTop: 6 }}>Growing, preserving, hunting, livestock</div>
   </>;
 }
