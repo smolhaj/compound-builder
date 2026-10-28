@@ -60,7 +60,7 @@ export class DogRenderer {
     const ear = ellipsoid(0.0065, 0.016, 0.0045, 6).translate(0, 0.004, 0);
     const tail = ellipsoid(0.0045, 0.0045, 0.036, 6).translate(0, 0, -0.034);
     this._parts = {
-      body: mk('body', ellipsoid(0.025, 0.028, 0.075), 1), head: mk('head', ellipsoid(0.02, 0.019, 0.026), 1), snout: mk('snout', ellipsoid(0.0085, 0.0075, 0.021, 8), 1),
+      body: mk('body', ellipsoid(0.026, 0.032, 0.068), 1), head: mk('head', ellipsoid(0.02, 0.019, 0.026), 1), snout: mk('snout', ellipsoid(0.0085, 0.0075, 0.021, 8), 1),
       nose: mk('nose', ellipsoid(0.0045, 0.0038, 0.004, 6), 1), ear: mk('ear', ear, 2), tail: mk('tail', tail, 1), leg: mk('leg', leg, 4),
     };
   }
@@ -146,8 +146,8 @@ export class DogRenderer {
     const bob = trot * Math.abs(Math.sin(ph)) * 0.004;
     const lie = a.lie, sit = a.sit * (1 - lie), up = a.up;
     // body: standing 0.10 up (back 0.128); lying drops it; sitting tips the chest up about the rump
-    const bodyY = 0.1 - 0.058 * lie - 0.036 * sit + bob;
-    const pitch = -0.5 * sit;
+    const bodyY = 0.1 - 0.058 * lie - 0.03 * sit + bob;
+    const pitch = -0.35 * sit;
     const gy = ground(a.x, a.z);
     const base = new THREE.Matrix4().compose(tmpV.set(a.x, gy, a.z), tmpQ.setFromEuler(tmpE.set(0, a.rot, 0)), tmpS.set(sc, sc, sc));
     const bodyM = new THREE.Matrix4().multiplyMatrices(base, this._loc(0, bodyY, -0.012 * sit, pitch, 0, 0));
@@ -160,8 +160,8 @@ export class DogRenderer {
     body.mesh.setMatrixAt(n, bodyM); body.mesh.setColorAt(n, tmpC.setHex(coat.body));
     // head: level on a short neck (it is lifted when alert, rests low when lying, bobs when barking); counter-pitched so it stays level when the chest tips
     const bark = a.stance === 'bark' ? Math.sin(a.bark * 3) * 0.28 : 0;
-    const headY = 0.034 + 0.016 * up - 0.014 * lie + 0.012 * sit;
-    const hm = this._loc(0, headY, 0.088 + 0.004 * lie, -pitch * 0.9 + 0.1 * lie - 0.08 * up + bark);
+    const headY = 0.03 + 0.016 * up - 0.014 * lie + 0.01 * sit;
+    const hm = this._loc(0, headY, 0.074 + 0.004 * lie, -pitch * 0.9 + 0.1 * lie - 0.08 * up + bark);
     this._put(head, n, bodyM, hm, coat.body);
     const headBase = new THREE.Matrix4().multiplyMatrices(bodyM, hm);
     this._put(snout, n, headBase, this._loc(0, -0.005, 0.03, 0.05 + bark * 0.3), snoutC);
@@ -175,9 +175,9 @@ export class DogRenderer {
     const happy = d.mood > 60 ? 1 : d.mood > 35 ? 0.4 : 0;
     const wag = Math.sin(this._time * (happy ? 12 : 3) + ph) * 0.4 * (happy + 0.1);
     const tailUp = 0.45 + 0.25 * up + 0.3 * happy - 0.5 * (d.mood < 35 ? 1 : 0) - 0.25 * lie;
-    this._put(tail, n, bodyM, this._loc(0, 0.012, -0.07, -tailUp, wag, 0), d.breed === 'collie' || d.breed === 'mutt' ? coat.trim : coat.body);
+    this._put(tail, n, bodyM, this._loc(0, 0.014, -0.064, -tailUp, wag, 0), d.breed === 'collie' || d.breed === 'mutt' ? coat.trim : coat.body);
     // legs hang from the hips (y = hip height): a diagonal trot, tucked when lying, haunches down when sitting, front legs straight when sitting
-    const hips: Array<[number, number, number]> = [[-0.017, 0.05, 1], [0.017, 0.05, 0], [-0.017, -0.05, 0], [0.017, -0.05, 1]];
+    const hips: Array<[number, number, number]> = [[-0.017, 0.045, 1], [0.017, 0.045, 0], [-0.017, -0.045, 0], [0.017, -0.045, 1]];
     for (let k = 0; k < 4; k++) {
       const [hx, hz, par] = hips[k];
       const swing = trot * Math.sin(ph + par * Math.PI) * 0.7;
