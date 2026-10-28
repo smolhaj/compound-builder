@@ -285,6 +285,7 @@ export function GameCanvas() {
       const speedK = game.clock.speed === 0 ? 0 : 60 / SECONDS_PER_DAY[game.clock.speed];
       world.updatePeople(dt, game, hourOf(game.clock.t), speedK);
       world.updateWildlife(dt, game, speedK);
+      world.updateFleet(dt, game, speedK);
       world.updateDeliveries(dt, game, speedK);
       const speed = game.clock.speed;
       const { timeOfDay: t, dayOfYear, totalDays, seasonMode, weatherMode } = useWorldStore.getState();

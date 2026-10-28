@@ -36,7 +36,9 @@ describe('the pool of relatives', () => {
   it('every relative has a real relation to someone in the household and fits the sim', () => {
     for (let seed = 1; seed <= 40; seed++) {
       const fam = variedFamily(seed, 0).people;
-      for (const p of kinPool(seed, 0, fam)) {
+      const pool = kinPool(seed, 0, fam);
+      expect(new Set(pool.map(p => p.id)).size).toBe(pool.length);
+      for (const p of pool) {
         expect(p.rel).toBeTruthy();
         expect(fam.some(f => f.id === p.rel!.of)).toBe(true);
         expect(p.kin).toBe(true);
@@ -389,4 +391,28 @@ describe('save', () => {
     expect(g.people.length).toBeGreaterThan(4);
     expect(dayIndex(g.clock.t)).toBeGreaterThanOrEqual(19);
   });
+  it('a four-year game with relatives asking, answered every way, stays sane and ends with the right people', () => {
+    for (const seed of [2, 9]) {
+      let g = game(seed, { peace: 'medium' });
+      let n = 0;
+      for (let d = 0; d < 4 * 365; d += 5) {
+        g = step(g, 5);
+        if (g.gate.pending?.kind === 'kin') {
+          const e = g.gate.pending;
+          resolve(g, e.stances[n++ % e.stances.length]);
+          g.gate.card = null;
+        } else if (g.gate.pending) { resolve(g, g.gate.pending.stances.includes('turn_away') ? 'turn_away' : g.gate.pending.stances[0]); g.gate.card = null; }
+        g.gate.card = null;
+      }
+      const k = g.kin!;
+      expect(k.asked).toBeGreaterThan(0);
+      // nobody exists in two places
+      const ids = [...g.people.map(p => p.id), ...k.away.map(p => p.id), ...k.waiting.flatMap(w => w.ids), ...k.refused.flatMap(r => r.people.map(p => p.id))];
+      const dup = ids.filter((x, i) => ids.indexOf(x) !== i);
+      expect(dup.map(d => [g.people.some(p => p.id === d) ? 'people' : '', k.away.some(p => p.id === d) ? 'away' : '', k.waiting.some(w => w.ids.includes(d)) ? 'waiting' : '', k.refused.some(r => r.people.some(p => p.id === d)) ? 'refused' : ''].filter(Boolean).join('+'))).toEqual([]);
+      expect(g.personState.length).toBe(g.people.length);
+      for (const ps of g.personState) { expect(Number.isFinite(ps.needs.morale)).toBe(true); expect(Number.isFinite(ps.needs.health)).toBe(true); }
+      expect(Number.isFinite(g.money)).toBe(true);
+    }
+  }, 120_000);
 });

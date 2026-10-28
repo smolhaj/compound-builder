@@ -22,7 +22,7 @@ export const SHELVES: Record<ShelfTab, MaterialId[]> = {
   power: ['solar_panel', 'battery', 'inverter', 'generator', 'cable'],
   food: ['seed', 'lids', 'fishing_gear', 'snares', 'smoker', 'goat', 'pig', 'steer', 'rabbit', 'hay', 'feed'],
   household: ['meds', 'hygiene', 'traps', 'tent', 'sleeping_bag', 'kibble', 'dogbed', 'doghouse'],
-  fuel: ['fuel', 'stabilizer', 'firewood', 'excavator', 'plow', 'gun_safe', 'gun_cleaning'],
+  fuel: ['fuel', 'vehicle_parts', 'stabilizer', 'firewood', 'excavator', 'plow', 'gun_safe', 'gun_cleaning'],
   defense: [...KIT_GOODS, ...WATCH_GOODS, ...HARDEN_GOODS],
 };
 
