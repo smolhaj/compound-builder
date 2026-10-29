@@ -24,6 +24,7 @@ import { links } from './compounds';
 import { PERIMETER, runFinished } from './perimeter';
 import { startingVehicles, VEHICLES, type Vehicle } from './vehicles';
 import { GATE_GARAGE, inGarage, leave, park, slotOf, type ParkingSlot } from './garage';
+import { leaveYard, parkInYard, yardBays } from './farm';
 
 export interface GarageDef { name: string; bays: number }
 /** Buildings that park vehicles. */
@@ -46,12 +47,14 @@ export function bays(s: GameState): Bay[] {
   return out;
 }
 
-export interface Parked { vehicle: string; bay: Bay | null; /** The bays it takes (a motorhome 2). */ bays: Bay[]; /** Its slot in the gatehouse garage (sim/garage.ts), when it is parked there. */ slot?: ParkingSlot }
+export interface Parked { vehicle: string; bay: Bay | null; /** The bays it takes (a motorhome 2). */ bays: Bay[]; /** Its slot in the gatehouse garage (sim/garage.ts), when it is parked there. */ slot?: ParkingSlot; /** Its bay in the equipment yard (sim/farm.ts), when it stands there: fenced gravel, no roof. */ yard?: { yard: string; bay: number } }
 export interface ParkingPlan {
   slots: number;
   parked: Parked[];
-  /** Vehicles standing in the yard. */
+  /** Vehicles standing outside (weather wears them; the ones in an equipment yard's bays are among them). */
   outside: string[];
+  /** The equipment yard's bays (sim/farm.ts): how many, how many are free, and who stands in them. */
+  yardSlots: number; yardFree: number; inYard: string[];
   free: number;
 }
 
@@ -90,7 +93,17 @@ export function parkingPlan(s: GameState): ParkingPlan {
     parked.push({ vehicle: v.id, bay: truck?.bay ?? null, bays: [] });
     if (!truck) outside.push(v.id);
   }
-  return { slots: all.length + gateSlots(s), parked, outside, free: free.length + gateFree(s) };
+  // the equipment yard is the last tier: what has no roof stands in a marked bay behind the fence (still weather, but a fenced, lit pad)
+  const yb = yardBays(s), taken = new Set<string>(), inYard: string[] = [];
+  const key = (b: { yard: string; bay: number }) => `${b.yard}:${b.bay}`;
+  for (const id of outside) {
+    const e = parked.find(p => p.vehicle === id);
+    if (!e || needs(vs.find(v => v.id === id)!) === 0) continue;
+    const own = yb.find(b => b.occupant === id && !taken.has(key(b))) ?? yb.find(b => b.occupant === null && !taken.has(key(b)));
+    if (!own) continue;
+    taken.add(key(own)); e.yard = { yard: own.yard, bay: own.bay }; inYard.push(id);
+  }
+  return { slots: all.length + gateSlots(s), parked, outside, free: free.length + gateFree(s), yardSlots: yb.length, yardFree: yb.length - inYard.length, inYard };
 }
 
 /**
@@ -101,6 +114,10 @@ export function syncParking(s: GameState): void {
   const ids = new Set((s.vehicles ?? []).map(v => v.id));
   for (const st of s.structures) if (st.kind === GATE_GARAGE) for (const o of st.parked ?? []) if (o && !ids.has(o)) leave(s, o);
   for (const v of s.vehicles ?? []) if (needs(v) > 0 && !slotOf(s, v.id)) park(s, v.id);
+  // the equipment yard follows the plan: what has no roof takes a bay, what found one (or left the fleet) gives it up
+  const plan = parkingPlan(s);
+  for (const id of ids) { const e = plan.parked.find(p => p.vehicle === id); if (e?.yard) parkInYard(s, id); else leaveYard(s, id); }
+  for (const row of Object.values(s.farm?.yard ?? {})) row.forEach((o, i) => { if (o && !ids.has(o)) row[i] = null; });
 }
 
 export const isUnderRoof = (s: GameState, vehicleId: string): boolean => !parkingPlan(s).outside.includes(vehicleId);
@@ -109,6 +126,7 @@ export const isUnderRoof = (s: GameState, vehicleId: string): boolean => !parkin
 export function parkedText(s: GameState, vehicleId: string): string {
   const p = parkingPlan(s).parked.find(x => x.vehicle === vehicleId);
   if (p?.slot) return 'in the gatehouse garage';
+  if (p?.yard) return 'in the equipment yard';
   return p?.bay ? `in the ${p.bay.name.toLowerCase().replace(/^metal garage with solar roof$/, 'solar garage')}` : 'in the yard';
 }
 

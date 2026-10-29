@@ -36,6 +36,7 @@ export function FleetPanel() {
     <Section title="Vehicles & garage">
       <Row label="Parking" value={plan.slots ? `${plan.slots - plan.free} of ${plan.slots} bays` : 'no garage: all in the yard'} tone={plan.outside.length ? 'warn' : 'good'} title="A metal garage holds 3, the workshop 1, the barn 2. A motorhome takes two bays." />
       {connected && <Note tone="good">The garage is joined to the house by a covered way: the family reaches the vehicles without going outside.</Note>}
+      {plan.yardSlots > 0 && <Row label="Equipment yard" value={`${plan.yardSlots - plan.yardFree} of ${plan.yardSlots} bays`} title="Vehicles with no roof stand in the yard's marked bays: fenced and lit, but still in the weather" />}
       {plan.outside.length > 0 && plan.slots === 0 && <Note>Weather wears what stands outside. A garage (Build → Home & work) keeps them dry.</Note>}
       {vs.map(v => {
         const st = statusOf(v), def = VEHICLES[v.kind];

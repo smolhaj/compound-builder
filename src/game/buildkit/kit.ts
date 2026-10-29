@@ -119,6 +119,60 @@ export const ORCHARD: KitPieceDef = {
   maxSlope: 0.35, floorY: 0.0, porch: 0, sleeps: 0, light: null,
 };
 
+/** The production greenhouse (sim/greenhouse.ts): eight times the glass of the hobby kit, heated through the winter. */
+export const GREENHOUSE_HEATED: KitPieceDef = {
+  id: 'greenhouse_heated', name: 'Heated greenhouse', category: 'food',
+  blurb: '9 × 24 m glass production house with a heater: fresh greens and tomatoes through the winter (≈ 4,200 kcal a day), the garden ten weeks longer. Heated by the compound\'s power (up to ≈ 34 kWh a day in January) or a wood boiler.',
+  cellsX: 3, cellsZ: 8, frontCells: 1,
+  parts: { foundation: 'concrete', walls: 'glass', roof: 'glass' },
+  maxSlope: 0.12, floorY: 0.0, porch: 0, sleeps: 0, light: null,
+};
+
+/** Forty-eight trees: the orchard at farm scale. */
+export const ORCHARD_GROVE: KitPieceDef = {
+  id: 'orchard_grove', name: 'Orchard grove', category: 'food',
+  blurb: 'Forty-eight apple, pear and peach trees in rows: four plots of the orchard. Prune it in winter, hens help with the pests; from year six about 7,200 lb of fruit.',
+  cellsX: 8, cellsZ: 6, frontCells: 0,
+  parts: { foundation: 'fieldstone', walls: 'board_batten', roof: 'metal_roof' },
+  maxSlope: 0.3, floorY: 0.0, porch: 0, sleeps: 0, light: null,
+};
+
+/** The private pond: the dug basin, the berm and the fish fence. */
+export const POND: KitPieceDef = {
+  id: 'pond', name: 'Pond', category: 'food',
+  blurb: 'A dug, lined pond for trout and crayfish, 18 × 18 m with a spillway, a dock and a fish fence. Holds 300,000 L for the garden and the fire (not drinking water). Wire it for an aerator.',
+  cellsX: 6, cellsZ: 6, frontCells: 0,
+  parts: { foundation: 'fieldstone', walls: 'board_batten', roof: 'metal_roof' },
+  maxSlope: 0.1, floorY: 0.0, porch: 0, sleeps: 0, light: null,
+};
+
+/** A lined freshwater reservoir. */
+export const RESERVOIR: KitPieceDef = {
+  id: 'reservoir', name: 'Reservoir', category: 'water',
+  blurb: 'A lined 15 × 12 m reservoir with a concrete edge, an intake and a pump pad: 400,000 L of stored water, drinkable once you filter it (filtration shed or a filter). No fish.',
+  cellsX: 5, cellsZ: 4, frontCells: 0,
+  parts: { foundation: 'concrete', walls: 'concrete', roof: 'metal_roof' },
+  maxSlope: 0.1, floorY: 0.0, porch: 0, sleeps: 0, light: null,
+};
+
+/** The sheep barn (livestock.ts): a roof for a flock of 30 in winter and a paddock. */
+export const SHEEP_BARN: KitPieceDef = {
+  id: 'sheep_barn', name: 'Sheep barn', category: 'food',
+  blurb: '9 × 12 m open-front sheep barn with pens, hay racks, a lambing pen and a paddock: shelter for 30 sheep in winter. The family barn shelters 12.',
+  cellsX: 3, cellsZ: 4, frontCells: 2,
+  parts: { foundation: 'fieldstone', walls: 'board_batten', roof: 'metal_roof' },
+  maxSlope: 0.25, floorY: 0.03, porch: 0, sleeps: 0, light: [0, 0.3, 0],
+};
+
+/** The equipment yard (sim/farm.ts slot API): bays for the tractor and its implements. */
+export const EQUIPMENT_YARD: KitPieceDef = {
+  id: 'equipment_yard', name: 'Equipment yard', category: 'work',
+  blurb: '12 × 12 m fenced gravel yard with six marked bays, a fuel tank, a hitch rail and a wash pad: the place for the tractor and its implements.',
+  cellsX: 4, cellsZ: 4, frontCells: 0,
+  parts: { foundation: 'fieldstone', walls: 'metal_siding', roof: 'metal_roof' },
+  maxSlope: 0.15, floorY: 0.0, porch: 0, sleeps: 0, light: null,
+};
+
 export const LOG_HOUSE: KitPieceDef = {
   id: 'log_house', name: 'Log house', category: 'home',
   blurb: '9 × 15 m house of your own logs: great room with a glass gable and stone fireplace, bath, three bedrooms.',
@@ -200,6 +254,8 @@ export const UTILITY_KIT: KitPieceDef[] = [
   util('battery_shed', 'Battery & inverter shed', 'power', 1, 1, '20 kWh of batteries, an inverter and charge controller: power through the night.', [0, 0.28, 0]),
   util('generator_shed', 'Generator shed', 'power', 1, 1, 'A 7 kW generator and fuel rack. Backup for dark weeks; burns ≈ 0.45 L a kWh.', [0, 0.28, 0]),
   util('filtration_shed', 'Water filtration shed', 'water', 1, 1, 'A 1.8 × 2.4 m shed by the pressure tank: sediment and carbon filters and a UV lamp. Well, rain and creek water treated for the house.', [0, 0.25, 0]),
+  util('solar_farm', 'Solar farm (20 kW)', 'power', 4, 6, '50 × 400 W panels in five rows on steel racks with three inverters: 20 kW, ≈ 72 kWh on a summer day and 40 in December. Stand a battery container beside it.'),
+  util('battery_bank', 'Battery container (60 kWh)', 'power', 2, 1, 'Twelve 5 kWh racks, an inverter and air conditioning in a 20 ft container. Put it beside the array: equipment standing together shares a bus.', [0, 0.28, 0]),
   util('septic', 'Septic system', 'sanitation', 2, 2, 'Septic tank and leach field. Lets plumbed houses have flush toilets.'),
 ];
 
@@ -249,11 +305,11 @@ export const BUNKER_KIT: KitPieceDef[] = [
 /** Underground menu order. */
 export const BUNKER_ORDER: readonly string[] = BUNKER_KIT.map(d => d.id);
 
-export const KIT: Record<string, KitPieceDef> = Object.fromEntries([GATE_GARAGE_KIT, TIMBER_CABIN, LOG_HOUSE, FARMHOUSE, TRAILER, BARN, COTTAGE, GUEST_HOUSE, MOMS_HOUSE, METAL_GARAGE, GARAGE_SOLAR, OUTHOUSE, WORKSHOP, ROOT_CELLAR, CHICKEN_COOP, GARDEN, FIELD, GREENHOUSE, ORCHARD, ...UTILITY_KIT, ...BUNKER_KIT, ...TOWER_KIT].map(d => [d.id, d]));
+export const KIT: Record<string, KitPieceDef> = Object.fromEntries([GATE_GARAGE_KIT, TIMBER_CABIN, LOG_HOUSE, FARMHOUSE, TRAILER, BARN, COTTAGE, GUEST_HOUSE, MOMS_HOUSE, METAL_GARAGE, GARAGE_SOLAR, OUTHOUSE, WORKSHOP, ROOT_CELLAR, CHICKEN_COOP, GARDEN, FIELD, GREENHOUSE, GREENHOUSE_HEATED, ORCHARD, ORCHARD_GROVE, POND, RESERVOIR, SHEEP_BARN, EQUIPMENT_YARD, ...UTILITY_KIT, ...BUNKER_KIT, ...TOWER_KIT].map(d => [d.id, d]));
 /** Build-menu order. */
-export const KIT_ORDER: readonly string[] = ['timber_cabin', 'log_house', 'cottage', 'guest_house', 'moms_house', 'outhouse', 'garden', 'greenhouse', 'orchard', 'field', 'chicken_coop', 'root_cellar', 'workshop', 'metal_garage', 'barn'];
+export const KIT_ORDER: readonly string[] = ['timber_cabin', 'log_house', 'cottage', 'guest_house', 'moms_house', 'outhouse', 'garden', 'greenhouse', 'greenhouse_heated', 'orchard', 'orchard_grove', 'field', 'chicken_coop', 'sheep_barn', 'pond', 'root_cellar', 'workshop', 'metal_garage', 'barn', 'equipment_yard'];
 /** Water & power menu order. */
-export const UTILITY_ORDER: readonly string[] = ['well_hand', 'well_drilled', 'cistern', 'water_tower', 'filtration_shed', 'septic', 'solar_array', 'garage_solar', 'battery_shed', 'generator_shed'];
+export const UTILITY_ORDER: readonly string[] = ['well_hand', 'well_drilled', 'cistern', 'water_tower', 'filtration_shed', 'septic', 'solar_array', 'solar_farm', 'garage_solar', 'battery_shed', 'battery_bank', 'generator_shed', 'reservoir'];
 
 /** A placed structure (the game state record). */
 export interface Placed {

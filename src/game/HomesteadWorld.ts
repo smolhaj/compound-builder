@@ -1402,7 +1402,7 @@ export class HomesteadWorld {
     const [fr0, fr1] = REGIONS[game.site.region].frost, cal = calendarOf(game.clock);
     const leafy = doy >= fr0 - 15 && doy < fr1 + 25, picking = doy >= ORCHARD_PICK[0] - 25 && doy < ORCHARD_PICK[1] && !orchardFrost(game.seed, cal.year);
     for (const b of this._built.values()) {
-      if (b.placed.kind === 'orchard') {
+      if (b.placed.kind === 'orchard' || b.placed.kind === 'orchard_grove') {
         const st = game.structures.find(x => x.id === b.placed.id);
         const fruit = picking && b.finished && orchardBearing((game.clock.t - (st?.finishedAt ?? game.clock.t)) / 365) > 0;
         for (const o of b.group.children) {
@@ -1412,6 +1412,8 @@ export class HomesteadWorld {
         }
         continue;
       }
+      if (b.placed.kind === 'pond') { this._pondLife(b, game); continue; }
+      if (b.placed.kind === 'sheep_barn') { this._flock(b, game); continue; }
       if (b.placed.kind !== 'garden' && b.placed.kind !== 'field') continue;
       for (const o of b.group.children) {
         const name = ((o as THREE.Mesh).userData.baseMat as THREE.Material | undefined)?.name ?? ((o as THREE.Mesh).material as THREE.Material | undefined)?.name;
@@ -1419,6 +1421,34 @@ export class HomesteadWorld {
       }
     }
     // the fire pit (camp cookfire, evenings sat out) is lit by the atmosphere (atmosphere/nightLife.firePitLit)
+  }
+
+  /** The pond's fish and crayfish: shown in proportion to the stock (the first meshes in each draw order show first). */
+  private _pondLife(b: Built, game: GameState): void {
+    const p = game.farm?.ponds?.[b.placed.id];
+    const trout = b.finished && p ? Math.min(1, p.trout / 400) : 0, cray = b.finished && p ? Math.min(1, p.crayfish / 1200) : 0;
+    for (const o of b.group.children) {
+      const m = o as THREE.Mesh, name = (m.material as THREE.Material | undefined)?.name;
+      if (name !== 'kit_fish' && name !== 'kit_crayfish') continue;
+      const k = name === 'kit_fish' ? trout : cray, n = m.userData.vertexCount as number;
+      m.visible = k > 0.001;
+      // whole fish only: each trout is 4 triangles (12 vertices), each crayfish 2 spheres, so round to a fish
+      const per = name === 'kit_fish' ? 12 : n / 14;
+      m.geometry.setDrawRange(0, Math.max(1, Math.round(n * k / per)) * per);
+    }
+  }
+
+  /** The flock in the sheep barn's paddock: ten sheep drawn, shown by head count (1 per 3 head, a pasture sheep for each). */
+  private _flock(b: Built, game: GameState): void {
+    const head = b.finished ? Math.floor(game.stock.sheep ?? 0) : 0;
+    for (const o of b.group.children) {
+      const m = o as THREE.Mesh, name = (m.material as THREE.Material | undefined)?.name;
+      if (m.userData.layer !== 'decor' || (name !== 'kit_sheepwool' && name !== 'kit_wood_dark')) continue;
+      m.visible = head > 0;
+      const n = m.userData.vertexCount as number, shown = Math.min(10, Math.ceil(head / 3)) / 10;
+      const per = name === 'kit_sheepwool' ? n / 30 : n / 60;
+      m.geometry.setDrawRange(0, Math.max(1, Math.round(n * shown / per)) * per);
+    }
   }
 
   /** A point in a building's local frame (y above its floor) in world coordinates (QA camera poses). */
@@ -1464,7 +1494,7 @@ export class HomesteadWorld {
       const hw = def.cellsX * CELL / 2, hd = def.cellsZ * CELL / 2;
       if (Math.abs(lx) < hw && lz > -hd && lz < hd + def.porch && def.floorY > 0.02) return b.padY + def.floorY;
       // a building whose floor is its graded pad (greenhouse gravel, a garage slab): stand on the pad, not the raw slope under it
-      if (Math.abs(lx) < hw && Math.abs(lz) < hd && def.category !== 'bunker' && (def.category !== 'food' || b.placed.kind === 'greenhouse')) return b.padY + Math.max(0, def.floorY);
+      if (Math.abs(lx) < hw && Math.abs(lz) < hd && def.category !== 'bunker' && (def.category !== 'food' || b.placed.kind === 'greenhouse' || b.placed.kind === 'greenhouse_heated' || b.placed.kind === 'sheep_barn')) return b.padY + Math.max(0, def.floorY);
     }
     return this.groundAt(x, z);
   };

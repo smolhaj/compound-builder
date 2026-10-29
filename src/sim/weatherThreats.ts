@@ -39,6 +39,7 @@ import { blueprintOf, isFinished, knockBack } from './construction';
 import { insuranceClaim } from './paperwork';
 import { mulberry32, pick } from './rng';
 import { DIFFICULTY } from './difficulty';
+import { crackGlass } from './improvements';
 
 export type WeatherKind = StormKind;
 
@@ -144,6 +145,15 @@ function sheltered(s: GameState): boolean {
 }
 
 /** Knock a structure back to its roof stage (or its last stage), with an insurance claim. */
+/** Hail and ice crack greenhouse glass: each glasshouse has a chance of a repair job (a few panes, or whole bays), output and heat follow until it is mended. */
+function cracksGlass(s: GameState, r: () => number, chance: number, by: string, out: string[]): void {
+  for (const st of s.structures) {
+    if (!isFinished(st) || (st.kind !== 'greenhouse' && st.kind !== 'greenhouse_heated') || r() >= chance) continue;
+    const bad = r() < 0.3;
+    if (crackGlass(st, bad ? 'poor' : 'fair')) out.push(`${by} cracked the ${label(st.kind).toLowerCase()} glass: ${bad ? 'whole bays are broken' : 'a few panes'}. A repair job (hardware) is in Projects; it grows less, and loses heat, until it is mended.`);
+  }
+}
+
 function damage(s: GameState, st: Structure, share: number, what: string, out: string[]): void {
   const stages = blueprintOf(st).stages;
   const roof = stages.findIndex(x => x.id === 'roof');
@@ -184,6 +194,7 @@ function hit(s: GameState, e: WeatherEvent, r: () => number, out: string[]): voi
     weatherOf(s).hail = { year: c.year, doy: c.doy };
     const lost = Math.floor(s.stock.fresh / 2);
     s.stock.fresh -= lost;
+    cracksGlass(s, r, 0.45, 'Hail', out);
     out.push(beds.length ? `Hail stripped the ${[...new Set(beds.map(b => label(b.kind)))].join(' and ')}. Replanting; this year's crop will be short.` : 'Hail the size of golf balls; nothing planted to lose.');
   } else if (e.kind === 'heat_wave') {
     out.push('The heat wave is here.');
@@ -204,6 +215,7 @@ function hit(s: GameState, e: WeatherEvent, r: () => number, out: string[]): voi
       const low = fin.filter(st => LOW.includes(st.kind));
       if (low.length && r() < 0.6) damage(s, pick(r, low), 0.5, 'The creek came up over the bottom.', out);
     }
+    if (e.kind === 'ice_storm') cracksGlass(s, r, 0.3, 'The ice', out);
     // trees down: on a building if the timber stands close (the ground cleared round the place spares it)
     const cleared = s.forestry.cleared.length >= 20;
     const struck = fin.filter(st => !st.kind.startsWith('bunker_') && !['garden', 'field', 'root_cellar', 'well_hand'].includes(st.kind));

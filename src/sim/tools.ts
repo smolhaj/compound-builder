@@ -26,6 +26,7 @@ import { mulberry32, pick } from './rng';
 import { jobTools, type Person, type SkillId } from './family';
 import type { StageId } from './blueprints';
 import type { GameState } from './state';
+import { hasWorkshop, WORKSHOP_HONING, WORKSHOP_REPAIR_BONUS, WORKSHOP_REPAIR_TOLL, WORKSHOP_WEAR } from './farm';
 import { burnTractor, tractorRuns } from './vehicles';
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -438,7 +439,7 @@ export function wearTools(s: GameState, task: ToolTask, hours: number): string[]
     const t = p.tool;
     if (!t) continue;
     const d = TOOLS[t.kind], h = hours * p.need.share;
-    t.cond = Math.max(0, t.cond - d.wear * GRADES[gradeOf(t)].wear * h * (1 + 0.5 * (1 - t.sharp)));
+    t.cond = Math.max(0, t.cond - d.wear * GRADES[gradeOf(t)].wear * h * (1 + 0.5 * (1 - t.sharp)) * (hasWorkshop(s) ? WORKSHOP_WEAR : 1));
     if (d.dull > 0) t.sharp = Math.max(0, t.sharp - d.dull * h);
     if (d.power === 'fuel') s.stock.fuel = Math.max(0, s.stock.fuel - FUEL_PER_HOUR * h);
     if (d.power === 'tractor') burnTractor(s, h);
@@ -480,16 +481,17 @@ export function sharpenAll(s: GameState, below = 0.75): number {
 
 /** Hardware (a kit's fraction) a repair uses. */
 export const REPAIR_HARDWARE = 0.15;
-/** What each repair costs the tool's best condition. */
+/** What each repair costs the tool's best condition (half that on the workshop's bench, with its vise and grinder). */
 export const REPAIR_TOLL = 0.12;
+const tollOf = (s: GameState): number => REPAIR_TOLL * (hasWorkshop(s) ? WORKSHOP_REPAIR_TOLL : 1);
 
 /** What a repair would use and give: parts from a broken tool, or hardware. */
 export function repairPlan(s: GameState, id: string): { ok: boolean; why: string | null; uses: string; to: number } {
   const kit = readKit(s), t = toolById(kit, id);
   if (!t) return { ok: false, why: 'No such tool.', uses: '', to: 0 };
   const skill = Math.max(0, ...s.people.filter(p => !p.kid).map(p => p.skills.mechanic));
-  const to = Math.max(0.2, Math.min(t.max - REPAIR_TOLL, 0.5 + 0.04 * skill));
-  if (t.cond >= t.max - REPAIR_TOLL - 0.02 && t.cond > 0) return { ok: false, why: 'It is as good as a repair would make it.', uses: '', to };
+  const toll = tollOf(s), to = Math.max(0.2, Math.min(t.max - toll, 0.5 + 0.04 * skill + (hasWorkshop(s) ? WORKSHOP_REPAIR_BONUS : 0)));
+  if (t.cond >= t.max - toll - 0.02 && t.cond > 0) return { ok: false, why: 'It is as good as a repair would make it.', uses: '', to };
   if (s.stock.hardware >= REPAIR_HARDWARE) return { ok: true, why: null, uses: 'some hardware', to };
   if (kit.items.some(x => x.id !== id && x.cond <= 0)) return { ok: true, why: null, uses: 'parts from a broken tool', to };
   return { ok: false, why: 'Needs a little hardware (nails, rivets, a bolt) or a broken tool to take parts from.', uses: '', to };
@@ -505,7 +507,7 @@ export function repair(s: GameState, id: string): string | null {
     const donor = kit.items.find(x => x.id !== id && x.cond <= 0);
     if (donor) kit.items.splice(kit.items.indexOf(donor), 1);
   }
-  t.max = Math.max(0.35, t.max - REPAIR_TOLL);
+  t.max = Math.max(0.35, t.max - tollOf(s));
   t.cond = Math.min(t.max, Math.max(t.cond, plan.to));
   t.repairs++;
   log(s, `Mended the ${TOOLS[t.kind].name.toLowerCase()} (${condWord(t)}).`);
@@ -541,7 +543,7 @@ export function toolsDay(s: GameState): string[] {
   if (kit.care) {
     // the chore of sharpening takes a little of the family's work time (a stone is quicker than a river rock)
     const n = sharpenAll(s, 0.5);
-    if (n > 0) kit.owed = (kit.owed ?? 0) + n * (honer(kit) ? 0.2 : 0.4);
+    if (n > 0) kit.owed = (kit.owed ?? 0) + n * (honer(kit) ? 0.2 : 0.4) * (hasWorkshop(s) ? WORKSHOP_HONING : 1);
   }
   const ctx = ctxOf(s);
   for (const role of HARD_ROLES) {

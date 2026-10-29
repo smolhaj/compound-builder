@@ -686,6 +686,54 @@ SETS.wildlife = [
     setup: stage({ ang: 0.3, camBack: 1.4, animals: [['moose', 2.4, 1.1, 1, true], ['wolf', 1.6, -1.0, 3, true], ['cougar', 2.2, 0, 0.2, true], ['javelina', 1.1, 0.8, 0.5], ['javelina', 1.4, 1.1, 0.9], ['squirrel', 0.7, -0.4, 0.3]], look: 1.8 }), frames: 8 },
 ];
 
+/**
+ * The self-sufficient interior (docs/DECISIONS.md): the compound plus a 20 kW solar farm and its
+ * battery container, a heated greenhouse, an orchard grove, a stocked pond, a sheep barn with its
+ * flock, the equipment yard and a reservoir; all finished, the orchard eight years old.
+ */
+const farmSet = compound + `{ if (!window.__farm) { window.__farm = true;
+  const G = cb.game, c = cb.world.camp, B = window.__b;
+  const place = (key, kind, dx, dz, rot = 0, rad = 8) => { const sp = cb.tool.findSpot(kind, c.x + dx, c.z + dz, rot, rad); if (!sp) { console.error('no spot', key); return null; } G.getState().plan(kind, sp[0], sp[1], rot); const st = G.getState().game.structures.at(-1); B[key] = st; return st; };
+  // two rows south of the houses: food on the near row, power and stock behind
+  place('greenhouse_heated', 'greenhouse_heated', -15, 15, 0, 5);
+  place('orchard_grove', 'orchard_grove', -5, 15, 0, 5);
+  place('pond', 'pond', 8, 16, 0, 5);
+  const sf = place('solar_farm', 'solar_farm', -17, 25, 0, 5);
+  if (sf) place('battery_bank', 'battery_bank', sf.x - c.x + 1.8, sf.z - c.z, 0, 1);
+  place('sheep_barn', 'sheep_barn', -2, 24, 0, 5);
+  place('equipment_yard', 'equipment_yard', 7, 25, 0, 5);
+  place('reservoir', 'reservoir', 16, 25, 0, 5);
+  G.setState(s => { const g = structuredClone(s.game);
+    for (const st of g.structures) { st.stage = 5; st.done = 0; st.supplied = true; st.finishedAt = g.clock.t - 3000; }
+    const pond = B.pond, gh = B.greenhouse_heated;
+    g.farm = { greenhouses: gh ? { [gh.id]: { heat: 'electric', heated: true, by: 'electric', burned: 0, warned: -999 } } : {}, orchards: {}, yard: {}, ponds: pond ? { [pond.id]: { trout: 320, troutG: 380, crayfish: 900, health: 1, fed: 1, oxygen: 0.8, lost: 0, dieOffAt: -999, harvestAt: -999, poachedAt: -999 } } : {} };
+    g.stock.sheep = 14; g.stock.hay = 80;
+    return { game: g }; });
+} }`;
+const farmAt = (kind, r, pitch, yaw, dx = 0, dz = 0) => `{ const b = window.__b['${kind}']; if (b) { cb.cam.target.set(b.x + ${dx}, 0, b.z + ${dz}); cb.cam.radius = ${r}; cb.cam.pitch = ${pitch}; cb.cam.yaw = ${yaw}; } }`;
+/** The game's calendar day (a visual season: leaves and fruit on the orchard, greens in the greenhouse). */
+const farmDoy = (d, lit = false) => `{ cb.game.setState(s => { const g = structuredClone(s.game); g.clock.startDoy = ${d}; ${lit ? "if (window.__b.greenhouse_heated) g.utilities.lit = [window.__b.greenhouse_heated.id];" : ''} return { game: g }; }); }`;
+/** Stand the QA scale figure (a 1.7 m person) at a point offset from a building's center. */
+const figureAt = (kind, dx, dz) => `{ const b = window.__b['${kind}'], W = cb.world; const f = W._root.children.find(o => o.userData.type === 'scale_figure'); if (b && f) f.position.set(b.x + ${dx}, W.parcel.height(b.x + ${dx}, b.z + ${dz}), b.z + ${dz}); }`;
+/** Eye level a few steps from a building (or a point off it), looking at it: the person stands in frame for scale. */
+const eyeNear = (kind, ex, ez, lx = 0, lz = 0, eye = 0.26) => `{ const b = window.__b['${kind}']; if (b) cb.cam.placeEye(b.x + ${ex}, b.z + ${ez}, b.x + ${lx}, b.z + ${lz}, ${eye}); }`;
+SETS.farm = [
+  { name: 'aerial-whole-farm', time: 11, season: 'summer', setup: farmSet + farmDoy(190) + "{ const c = cb.world.camp; cb.cam.target.set(c.x, 0, c.z + 8); cb.cam.radius = 52; cb.cam.pitch = 0.95; cb.cam.yaw = 0.5; }", cam: D, frames: 20 },
+  { name: 'greenhouse-from-above', time: 12, season: 'summer', setup: farmSet + farmDoy(190) + farmAt('greenhouse_heated', 9, 0.75, 0.5), cam: D, frames: 14 },
+  { name: 'greenhouse-eye-level-person', time: 10, season: 'summer', setup: farmSet + farmDoy(190) + figureAt('greenhouse_heated', 2.6, 3.4) + eyeNear('greenhouse_heated', 3.6, 6.2, 1.2, 1.6, 0.3), cam: D, frames: 14 },
+  { name: 'greenhouse-inside', time: 11, season: 'summer', setup: farmSet + farmDoy(190) + "{ const b = window.__b.greenhouse_heated, W = cb.world; if (b) { const e = W.localToWorld(b.id, 0, 0.3, 1.5), l = W.localToWorld(b.id, 0, 0.2, -1.5); cb.qa.pose = { x: e.x, y: e.y, z: e.z, lx: l.x, ly: l.y, lz: l.z, fov: 70 }; } }", cam: D, frames: 14 },
+  { name: 'solar-farm-and-battery', time: 13, season: 'summer', setup: farmSet + farmDoy(190) + farmAt('solar_farm', 11, 0.5, 0.5, 1.0, 0), cam: D, frames: 14 },
+  { name: 'solar-farm-eye-level-person', time: 14, season: 'summer', setup: farmSet + farmDoy(190) + figureAt('solar_farm', -0.6, 2.4) + eyeNear('solar_farm', 1.5, 4.4, -0.8, 0.5, 0.26), cam: D, frames: 14 },
+  { name: 'pond-aerial-fish', time: 12, season: 'summer', setup: farmSet + farmDoy(190) + farmAt('pond', 8, 0.85, 0.4), cam: D, frames: 14 },
+  { name: 'pond-eye-level-person', time: 16, season: 'summer', setup: farmSet + farmDoy(190) + figureAt('pond', 3.0, -0.4) + eyeNear('pond', 4.6, 0.6, -1.0, -0.2, 0.26), cam: D, frames: 14 },
+  { name: 'orchard-grove-fruit', time: 15, season: 'fall', setup: farmSet + farmDoy(255) + farmAt('orchard_grove', 10, 0.45, 0.6), cam: D, frames: 14 },
+  { name: 'orchard-eye-level-person', time: 15, season: 'fall', setup: farmSet + farmDoy(255) + figureAt('orchard_grove', 0.4, 2.2) + eyeNear('orchard_grove', 0.4, 4.2, 0, -1, 0.26), cam: D, frames: 14 },
+  { name: 'sheep-barn-paddock', time: 15, season: 'summer', setup: farmSet + farmDoy(190) + farmAt('sheep_barn', 6, 0.4, 0.3, 0, 1.0), cam: D, frames: 14 },
+  { name: 'equipment-yard', time: 14, season: 'summer', setup: farmSet + farmDoy(190) + farmAt('equipment_yard', 7, 0.6, 0.4), cam: D, frames: 14 },
+  { name: 'reservoir', time: 14, season: 'summer', setup: farmSet + farmDoy(190) + farmAt('reservoir', 9, 0.6, 0.4), cam: D, frames: 14 },
+  { name: 'dusk-greenhouse-and-solar', time: 19.4, season: 'summer', setup: farmSet + farmDoy(300, true) + farmAt('greenhouse_heated', 14, 0.35, 0.9, -4, 5), cam: D, frames: 20 },
+];
+
 // the fortress ring (sim/fortress.ts): container wall, patrol walkway, gatehouse garage, five towers. The whole 40-acre line is built in the setup; the cameras find the
 // garage, a corner tower and a guard on the deck (the family's watchers are posted by hand, then the clock jumps so they stand where the patrol puts them).
 const fortressSetup = `{ if (!window.__fort) { window.__fort = 1;
@@ -712,4 +760,16 @@ SETS.fortress = [
   { name: 'fortress-aerial-deck-stairs', time: 11, season: 'summer', setup: fortressSetup + `{ ${fortFind} ${fortGuard} cb.qa.pose = null; const c = gd ?? gar; cb.cam.target.set(c.x, 0.4, c.z); cb.cam.radius = 6; cb.cam.pitch = 0.55; cb.cam.yaw = 0.9; }`, cam: { x: C, z: C, yaw: 0, pitch: 0.5, radius: 6 }, frames: 14 },
   { name: 'fortress-aerial-corner-tower', time: 11, season: 'summer', setup: fortressSetup + `{ ${fortFind} const tw = g0.structures.filter(s => s.kind === 'watchtower_wood'); const t = tw[0]; if (!t) return; cb.qa.pose = null; cb.cam.target.set(t.x, 0.3, t.z); cb.cam.radius = 9; cb.cam.pitch = 0.5; cb.cam.yaw = 0.6; }`, cam: { x: C, z: C, yaw: 0, pitch: 0.5, radius: 9 }, frames: 14 },
   { name: 'fortress-night-gate', time: 22, season: 'summer', setup: fortressSetup + `{ ${fortFind} cb.qa.pose = null; cb.cam.target.set(gar.x, 0, gar.z); cb.cam.radius = 9; cb.cam.pitch = 0.3; cb.cam.yaw = 1.1; }`, cam: { x: C, z: C, yaw: 0, pitch: 0.4, radius: 18 }, frames: 14 },
+];
+
+/** The fleet in the equipment yard: a tractor and an ATV bought through the real action with no garage, so they take yard bays. */
+const yardFleet = farmSet + farmDoy(190) + `{ if (!window.__yf) { window.__yf = 1; import('/src/sim/vehicles.ts').then(async m => { const G = cb.game;
+  G.setState(s => { const g = structuredClone(s.game); g.money = 500000; return { game: g }; });
+  for (const k of ['tractor', 'atv']) console.error('buy', k, G.getState().money(d => m.buyVehicle(d, k)));
+  const pk = await import('/src/sim/parking.ts'); const g = G.getState().game;
+  console.error('plan', JSON.stringify(pk.parkingPlan(g).parked.map(p => [p.vehicle, p.yard ?? null, !!p.bay])), 'yardbays', JSON.stringify(g.farm?.yard));
+}); } }`;
+SETS.fleetyard = [
+  { name: 'yard-vehicles-aerial', time: 14, season: 'summer', setup: yardFleet + farmAt('equipment_yard', 7, 0.7, 0.4), cam: D, frames: 14 },
+  { name: 'yard-vehicles-eye-level-person', time: 14, season: 'summer', setup: yardFleet + figureAt('equipment_yard', 0.2, 3.0) + eyeNear('equipment_yard', 1.6, 4.6, -0.3, 0.2, 0.3), cam: D, frames: 14 },
 ];

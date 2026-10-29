@@ -62,6 +62,17 @@ export class FleetRenderer {
           continue;
         }
       }
+      if (p.yard) {
+        // a marked bay in the equipment yard (sim/farm.ts; farmBuildings.ts paints two rows of three): nose toward the gate side
+        const host = ctx.host(p.yard.yard);
+        if (host) {
+          const W = 4 * 0.5, D = 4 * 0.5, bw = (W - 0.3) / 3, r = Math.floor(p.yard.bay / 3), k = p.yard.bay % 3;
+          const lx = -W / 2 + 0.15 + (k + 0.5) * bw, lz = -(D / 2 - 0.03) + 0.45 + r * 0.8;
+          const rot = host.rot * Math.PI / 2;
+          out.set(v.id, { x: host.x + Math.cos(rot) * lx + Math.sin(rot) * lz, z: host.z - Math.sin(rot) * lx + Math.cos(rot) * lz, rot });
+          continue;
+        }
+      }
       // in the yard: side by side in rows beside the camp, noses out, a gap between (rows of four, the next row behind)
       const y = ctx.yard;
       const w = VEHICLE_SIZE[v.kind].w + 0.2;

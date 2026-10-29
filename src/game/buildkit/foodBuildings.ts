@@ -391,11 +391,19 @@ export function orchardTrees(def: KitPieceDef): Array<{ x: number; z: number; ki
   const LW = def.cellsX * CELL, LD = def.cellsZ * CELL;
   const kinds: FruitKind[] = ['apple', 'apple', 'pear', 'peach'];
   const out: Array<{ x: number; z: number; kind: FruitKind }> = [];
-  for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) out.push({ x: (c - 1.5) * LW / 4, z: (r - 1) * LD / 3.3, kind: kinds[(c + r) % 4] });
+  // twelve trees four across and three deep; the grove is forty-eight, eight across and six deep
+  const cols = def.id === 'orchard_grove' ? 8 : 4, rows = def.id === 'orchard_grove' ? 6 : 3;
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) out.push({ x: (c - (cols - 1) / 2) * LW / cols, z: (r - (rows - 1) / 2) * LD / (rows + 0.3), kind: kinds[(c + r) % 4] });
   return out;
 }
 
+/** The orchard and the grove share one builder (the grove is the same trees, four times as many, with lighter canopies and fruit). */
+export function orchardBuilder(def: KitPieceDef, seed = 1): THREE.Group {
+  return orchard(def, seed);
+}
+
 function orchard(def: KitPieceDef, seed = 1): THREE.Group {
+  const grove = def.id === 'orchard_grove';
   const LW = def.cellsX * CELL, LD = def.cellsZ * CELL;
   const p = new Parts(seed);
   const x0 = -LW / 2 + 0.04, x1 = LW / 2 - 0.04, z0 = -LD / 2 + 0.04, z1 = LD / 2 - 0.04;
@@ -425,13 +433,13 @@ function orchard(def: KitPieceDef, seed = 1): THREE.Group {
     const cy = trunkH + cr * sy * 0.85;
     const leaf = t.kind === 'apple' ? 'hedge' : 'hedge2';
     p.add(leaf, new THREE.IcosahedronGeometry(cr, 2).scale(sx, sy, sz).translate(x, cy, z), 'interior');
-    for (let k = 0; k < 5; k++) {
+    for (let k = 0; k < (grove ? 3 : 5); k++) {
       const a = p.rnd() * Math.PI * 2, r = cr * 0.6;
       p.add(k % 2 ? 'hedge2' : leaf, new THREE.IcosahedronGeometry(cr * (0.45 + 0.15 * p.rnd()), 1).scale(sx, sy, sz).translate(x + Math.cos(a) * r * sx, cy + (p.rnd() - 0.6) * cr * 0.5, z + Math.sin(a) * r * sz), 'interior');
     }
     // fruit dots on the outside of the canopy (shown in late summer by the world)
     const fm = t.kind === 'pear' ? 'paint_yellow' : 'fruit';
-    for (let k = 0; k < 22; k++) {
+    for (let k = 0; k < (grove ? 9 : 22); k++) {
       const a = p.rnd() * Math.PI * 2, e = (p.rnd() - 0.35) * 1.1;
       const fx = Math.cos(a) * Math.cos(e) * cr * sx * 1.01, fy = Math.sin(e) * cr * sy * 1.01, fz = Math.sin(a) * Math.cos(e) * cr * sz * 1.01;
       p.add(fm, new THREE.IcosahedronGeometry(0.13 * M, 0).translate(x + fx, cy + fy, z + fz), 'decor');
