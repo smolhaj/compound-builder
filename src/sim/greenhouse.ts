@@ -32,7 +32,7 @@
  */
 import { calendarOf, type GameState, type Structure } from './state';
 import { isFinished } from './construction';
-import { REGIONS, seasons } from './regions';
+import { seasons } from './regions';
 import { mulberry32 } from './rng';
 import { climate } from './effects';
 import { burnRick } from './upkeep';
@@ -40,6 +40,7 @@ import { logGate } from './nag';
 import { heatDemand } from './heating';
 import { farmOf, greenhouseCareOf, orchardCareOf } from './farm';
 import { glassSound } from './improvements';
+import { regionFor } from './climate';
 
 /** Days the greenhouse moves the garden's start earlier and its end later. */
 export const GREENHOUSE_EXTEND = 42;
@@ -70,7 +71,7 @@ export const hasGreenhouse = (s: GameState) => greenhouses(s).length > 0;
 
 /** The garden's season (day of year), stretched by the best finished greenhouse. */
 export function gardenSeason(s: GameState): [number, number] {
-  const [g0, g1] = seasons(REGIONS[s.site.region]).garden;
+  const [g0, g1] = seasons(regionFor(s.site)).garden;
   const x = Math.max(0, ...greenhouses(s).map(st => GH_TIER[st.kind].extend));
   return x > 0 ? [g0 - x, g1 + x] : [g0, g1];
 }
@@ -89,7 +90,7 @@ export function greensFactor(cold: number, heated: boolean): number {
 
 /** Today's cold the heater has to meet: 0 in summer, about 1 in a Mountain West January, up to 2 in a snap. */
 export function heatNeed(s: GameState): number {
-  return Math.max(0, Math.min(2, heatDemand(calendarOf(s.clock).doy) * REGIONS[s.site.region].cold + climate(s).cold));
+  return Math.max(0, Math.min(2, heatDemand(calendarOf(s.clock).doy) * regionFor(s.site).cold + climate(s).cold));
 }
 
 /** A greenhouse's power draw today (kWh): the hobby house's fans, or the production house's fans plus electric heat. */
@@ -109,7 +110,7 @@ export function isHeated(s: GameState, st: Structure): boolean {
 export function greenhouseGreens(s: GameState): number {
   const doy = calendarOf(s.clock).doy;
   if (!inGreensSeason(doy)) return 0;
-  const cold = REGIONS[s.site.region].cold;
+  const cold = regionFor(s.site).cold;
   return greenhouses(s).reduce((a, st) => a + GH_TIER[st.kind].kcal * greensFactor(cold, isHeated(s, st)) * glassSound(st), 0);
 }
 

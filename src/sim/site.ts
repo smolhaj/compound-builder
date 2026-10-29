@@ -240,7 +240,7 @@ export function builtFacts(s: Site): Fact[] {
   if (i.barn) out.push({ label: 'Barn', value: `${i.barn.built}, roof ${word(i.barn.roof)}`, tone: i.barn.roof === 'poor' ? 'bad' : undefined });
   if (i.well) out.push({ label: 'Well', value: i.well.pump === 'poor' ? 'Drilled, pump worn out' : 'Drilled, pump in', tone: i.well.pump === 'poor' ? 'bad' : 'good' });
   if (i.septic) out.push({ label: 'Septic', value: i.septic.field === 'poor' ? 'In, leach field failing' : 'In', tone: i.septic.field === 'poor' ? 'bad' : 'good' });
-  const pq = powerQuote(i), dq = driveQuote(i);
+  const pq = powerQuote(i, s), dq = driveQuote(i, s);
   out.push(i.power ? { label: 'Power', value: 'On the grid', tone: 'good' } : { label: 'Power', value: `${i.poleFt.toLocaleString('en-US')} ft to the pole (~$${Math.round(pq.usd / 1000)}k)`, tone: 'bad' });
   out.push(i.drive ? { label: 'Drive', value: 'Gravel', tone: 'good' } : { label: 'Drive', value: `None: ${i.driveFt.toLocaleString('en-US')} ft (~$${Math.round(dq.usd / 1000)}k)`, tone: 'bad' });
   return out;

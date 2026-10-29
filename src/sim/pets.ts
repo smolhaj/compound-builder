@@ -36,8 +36,9 @@ import { calendarOf, dayIndex, type GameState } from './state';
 import { eatFrom } from './pantry';
 import { logGate } from './nag';
 import { isHome } from './blueprints';
-import { REGIONS } from './regions';
+
 import type { SkillId } from './family';
+import { regionFor } from './climate';
 
 // ─────────────────────────────────────────────────────────────────────────
 // The dog
@@ -189,7 +190,7 @@ const clinicOpen = (s: GameState): boolean => s.disaster.tracks.stores >= 0.5;
 const collapsed = (s: GameState): boolean => !clinicOpen(s);
 /** The cold season (1 = a hard winter), for the dogs kept out. */
 export function chillOf(s: GameState): number {
-  const r = REGIONS[s.site.region], doy = calendarOf(s.clock).doy;
+  const r = regionFor(s.site), doy = calendarOf(s.clock).doy;
   const [f0, f1] = r.frost;
   return doy < f0 - 25 || doy > f1 + 15 ? r.cold : 0;
 }

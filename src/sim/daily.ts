@@ -25,7 +25,7 @@ import { isFinished } from './construction';
 import { hasWalkway } from './walkway';
 import { isHome } from './blueprints';
 import { gardenSeason, selfSufficiencyRates } from './greenhouse';
-import { REGIONS, seasons } from './regions';
+import { seasons } from './regions';
 import { greenRicks } from './upkeep';
 import { routineAt } from './schedule';
 import { raidPressure } from './opsec';
@@ -42,6 +42,7 @@ import { bestLevel, levelFor, mentorSkill, practice, skillFactor, teach, type Pr
 import { ESSENTIAL, mindFit, mindStaysIn, resting } from './mind';
 import { classSlots, COURSES, courseHour, DRILL_HOUR, drillable, drillDay, drillHour, enrollmentOf, teachHour } from './courses';
 import { log } from './economy';
+import { regionFor } from './climate';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Duties
@@ -157,7 +158,7 @@ export function choreRates(s: GameState): Record<ChoreId, number> {
   const fin = s.structures.filter(isFinished);
   const count = (k: string) => fin.filter(st => st.kind === k).length;
   const doy = calendarOf(s.clock).doy;
-  const [g0, g1] = gardenSeason(s), H = seasons(REGIONS[s.site.region]).harvest;
+  const [g0, g1] = gardenSeason(s), H = seasons(regionFor(s.site)).harvest;
   const heads = Math.max(1, s.personState.filter(ps => ps.needs.died == null).length);
   const n = (k: string) => Math.floor((s.stock as Record<string, number>)[k] ?? 0);
   const animals = count('chicken_coop') + (n('goat') + n('pig') + n('steer') + n('rabbit') + n('sheep')) / 4;
@@ -397,7 +398,7 @@ interface PlanCtx {
 function seasonalWork(s: GameState, c: PlanCtx, p: Person): Duty {
   const fin = s.structures.filter(isFinished);
   const has = (k: string) => fin.some(st => st.kind === k);
-  const H = seasons(REGIONS[s.site.region]).harvest, [g0, g1] = gardenSeason(s);
+  const H = seasons(regionFor(s.site)).harvest, [g0, g1] = gardenSeason(s);
   if (has('field') && c.doy >= H[0] && c.doy < H[1]) return 'fields';
   if (c.fell) return 'wood';
   if (has('garden') && c.doy >= g0 && c.doy <= g1 && p.skills.gardener >= 3) return 'garden';

@@ -30,6 +30,9 @@ import { FleetPanel } from './FleetPanel';
 import { buyLicense, hasLicense, inSeason, lawful, TAG_USD, type License } from '../sim/wildfood';
 import { chimneyState, greenRicks, SEASON_DAYS, SWEEP_USD } from '../sim/upkeep';
 import { countyWorks, premium, yearlyTax } from '../sim/paperwork';
+import { altitudeClimate } from '../sim/climate';
+import { LOT_NAME } from '../sim/lots';
+import { roadClosedFor, winterRoadLine } from '../sim/slope';
 import { DRIVE_PER_FT, driveQuote, hookupProblem, POLE_PER_FT, powerQuote } from '../sim/improvements';
 import { KIT } from '../game/buildkit/kit';
 import { FUEL_UNIT_L, irrigationStore, storageCapacity } from '../sim/utilities';
@@ -368,9 +371,18 @@ export function Hud() {
             <Section title="The place">
               <Row label="Home place" value={`${game.site.acres} acres`} />
               <Row label="Region" value={REGIONS[game.site.region].name} />
+              {game.site.lot && (() => {
+                const a = altitudeClimate(game.site), wr = winterRoadLine(game);
+                return <>
+                  <Row label="Ground" value={`${LOT_NAME[game.site.lot.kind]}, ${game.site.lot.elevM.toLocaleString('en-US')} m`} />
+                  {a && <Row label="Frost-free" value={`${a.season} days${a.season !== a.seasonRegion ? ` (the region's usual: ${a.seasonRegion})` : ''}`} />}
+                  {a?.notes.map(t => <Note key={t}>{t}</Note>)}
+                  {wr && <Note tone={roadClosedFor(game) > 0 ? 'warn' : undefined}>{roadClosedFor(game) > 0 ? `The road is closed by snow for ${roadClosedFor(game)} more day${roadClosedFor(game) === 1 ? '' : 's'}. ` : ''}{wr}</Note>}
+                </>;
+              })()}
               {(['power', 'drive'] as const).map(what => {
                 const imp = game.site.improvements, have = what === 'power' ? imp.power : imp.drive, due = game.siteJobs[what];
-                const q = what === 'power' ? powerQuote(imp) : driveQuote(imp), why = hookupProblem(game, what);
+                const q = what === 'power' ? powerQuote(imp, game.site) : driveQuote(imp, game.site), why = hookupProblem(game, what);
                 const label = what === 'power' ? 'Power' : 'Drive';
                 return have ? <Row key={what} label={label} value={what === 'power' ? 'On the grid' : 'Gravel'} />
                   : due !== null ? <Row key={what} label={label} value={`coming in ${Math.max(1, Math.ceil(due - game.clock.t))} days`} />
