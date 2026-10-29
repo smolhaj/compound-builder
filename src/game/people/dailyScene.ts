@@ -25,6 +25,17 @@ function along(pts: ReadonlyArray<readonly [number, number]>, d: number): [numbe
   return [x, z];
 }
 
+/** The vehicle gate of the main wall (the longest finished run), or null when there is no wall with a gate. */
+export function wallGate(game: GameState): { x: number; z: number } | null {
+  const runs = game.perimeter.filter(r => r.finishedAt !== null && r.pts.length >= 2 && !PERIMETER[r.kind].wallTop);
+  const decks = walkRuns(game);
+  const main = decks.length ? decks.sort((a, b) => b.host.pts.length - a.host.pts.length)[0].host : runs.sort((a, b) => b.pts.length - a.pts.length)[0];
+  const g = main?.gates[0];
+  if (!g || !main) return null;
+  const [x, z] = along(main.pts, g.at + g.w / 2);
+  return { x, z };
+}
+
 export function workSpots(built: readonly BuiltRef[], game: GameState, yard: { x: number; z: number }): WorkSpots {
   const of = (...kinds: string[]) => built.filter(b => kinds.includes(b.kind)).map(b => b.site);
   const water = of('well_hand', 'well_drilled', 'cistern', 'filtration_shed')[0] ?? null;

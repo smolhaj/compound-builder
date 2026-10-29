@@ -38,7 +38,7 @@ import { DIFFICULTY } from './difficulty';
 import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
 import type { LightsState } from './lights';
 import { starterKit, type ToolKit } from './tools';
-export const SAVE_VERSION = 54;
+export const SAVE_VERSION = 55;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -49,6 +49,7 @@ import { newDigs, type DigState } from './tunnelers';
 import type { Dog, PetLife } from './pets';
 import { newDaily, type Daily } from './daily';
 import type { Loss } from './grief';
+import { newPaths, type PathsState } from './paths';
 
 /** What the family packs to sleep in: a bag each and, past the wall tent's four, a dome tent for the rest (sim/housing.ts). */
 export const startingBedding = (n: number): { sleeping_bag: number; tent: number } => ({ sleeping_bag: n, tent: Math.max(0, Math.ceil((n - 4) / 3)) });
@@ -270,6 +271,8 @@ export interface GameState {
   daily?: Daily;
   /** Deaths in the household and whether they were mourned (sim/grief.ts). Save v49; `lossesOf` makes it lazily. */
   losses?: Loss[];
+  /** Walks the family has laid (gravel, stepping stones, duckboards, concrete) between the stops on the place (sim/paths.ts). Save v55; `pathsOf` makes it lazily. Worn tracks are not saved: they follow from who lives here and for how long. */
+  paths?: PathsState;
   /** Radio and rumors after the collapse (radio.ts); made on first use. */
   radio?: RadioState;
   /** Tallies since the hit (the report card), and how the run ended (null while it goes on). */
@@ -331,6 +334,7 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     locals: newLocals(),
     digs: newDigs(),
     daily: newDaily(),
+    paths: newPaths(),
     stats: emptyStats(),
     ending: null,
     food: { needKcal: 0, ateKcal: 0, producedKcal: 0, spoiledKcal: 0, fromStores: true, kinds: [], daysLeft: 0 },

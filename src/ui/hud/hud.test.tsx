@@ -100,4 +100,25 @@ describe('the guided HUD (server-rendered)', () => {
     expect(t).toContain('Allow puppies');
     expect(t).toContain('Fix ($220)');
   });
+
+  it('offers the footpaths in the Build menu, and says what the walks need once the world has planned them', async () => {
+    withGame(() => undefined);
+    expect(text(renderToStaticMarkup(<BuildMenu />))).toContain('Footpaths');
+    const { PathsPanel } = await import('./PathsPanel');
+    const { useWorldStore } = await import('../../store/worldStore');
+    // a planned network the world would publish: one busy walk, one to the hidden hatch
+    Object.assign(useWorldStore.getInitialState(), { pathNet: { key: 'k', edges: [
+      { key: 'a~b', a: 'a', b: 'b', aName: 'old farmhouse', bName: 'barn', lenM: 40, uniqueM: 40, trips: 4, wear: 0.6, worn: 'dirt', laid: null, can: { gravel: true, stones: true, boards: true, paved: true }, hidden: false },
+      { key: 'a~h', a: 'a', b: 'h', aName: 'old farmhouse', bName: 'bunker hatch', lenM: 20, uniqueM: 20, trips: 0.1, wear: 0.2, worn: 'desire', laid: null, can: { gravel: false, stones: false, boards: false, paved: false }, hidden: true },
+    ] } });
+    const t = text(renderToStaticMarkup(<PathsPanel startOpen />));
+    expect(t).toContain('Footpaths');
+    expect(t).toContain('Old farmhouse ↔ barn');
+    expect(t).toContain('bare earth');
+    // one walk is worth laying (the busy one); the hatch is never offered
+    expect(t).toMatch(/Lay paths between my buildings: 1 walk, 40 m of new gravel walk/);
+    expect(t).toMatch(/All 1/);
+    expect(t).not.toContain('bunker hatch');
+    expect(t).toMatch(/Short: .*fieldstone/i);
+  });
 });

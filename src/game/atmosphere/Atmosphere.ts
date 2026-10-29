@@ -132,6 +132,8 @@ export class Atmosphere {
 
   /** Room brightness for a building's lamp tonight (undefined: not decided here). */
   room(id: string): number | undefined { return this._room.get(id); }
+  /** Where the stock tank stands (world x, z), or null while there is none: nothing else is set down there. */
+  get tankSpot(): { x: number; z: number } | null { return this._tank ? { x: this._tank.group.position.x, z: this._tank.group.position.z } : null; }
   /** Mud season now (0–1): the canvas darkens the damp ground with it. */
   get mud(): number { return this._mud; }
   get frost(): number { return this._frost; }

@@ -32,11 +32,14 @@ import { newDaily } from '../daily';
 import { dayJob, type Person } from '../family';
 import { migrateDogs } from '../pets';
 import { starterKit } from '../tools';
+import { newPaths } from '../paths';
 
 type Raw = Record<string, unknown> & { version?: number };
 
 /** version n → n + 1 upgraders. */
 const STEPS: Record<number, (s: Raw) => Raw> = {
+  // 54 → 55: laid walks (`paths`, sim/paths.ts); worn tracks are derived, not saved
+  54: s => ({ ...s, version: 55, paths: (s.paths as object | undefined) ?? newPaths() }),
   // 53 → 54: the fortress ring (sim/walkway.ts, sim/garage.ts, sim/fortress.ts): runs may be a wall-top walkway (`kind: 'wall_walk'`, `hostId`), gates may be a garage's (`garage`),
   // and a gatehouse garage carries its parked vehicles (`Structure.parked`). All optional: an old save has none, and no field needs a default.
   53: s => ({ ...s, version: 54 }),
