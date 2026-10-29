@@ -61,3 +61,8 @@ export const BRIDGE_SCENARIOS = [
     spanCam('eye-door', `const x = sp.b[0] + ux * 4, z = sp.b[1] + uz * 4; cb.qa.pose = { x, y: gr(x, z) + 0.3, z, lx: sp.b[0], ly: gr(sp.b[0], sp.b[1]) + 0.35, lz: sp.b[1], fov: 62 };`),
   ] },
 ];
+
+export const RING_SCENARIOS = [
+  { name: 'rings-3-rounded', setup: ring({ shape: 'rounded', rings: 3, ringWall: 'stone_wall', towers: 3 }), shots: [aerial(46, 1.15), aerial(38, 0.5, 2.2), eyeWallPerson] },
+  { name: 'rings-4-octagon', setup: ring({ shape: 'octagon', rings: 4, ringWall: 'container_stack', towers: 2 }), shots: [aerial(46, 1.15), aerial(38, 0.5, 2.2)] },
+];

@@ -77,6 +77,15 @@ export function FortifyRing() {
         <span style={{ flex: 1, color: DIM }}>Paint</span>
         {CONTAINER_LOOKS.map(l => <button key={l.id} style={{ ...btn(opts.look === l.id), padding: '2px 7px' }} onClick={() => setOpts({ ...opts, look: l.id })}>{l.name}</button>)}
       </div>}
+      <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', padding: '3px 0' }} title="Defense in depth: rings inside the outer wall, each with its own wall, gate and towers. On a slope they follow the contour up the hill. Each manned ring makes a crew take another wall under fire; each needs two armed adults.">
+        <span style={{ flex: 1, color: DIM }}>Rings</span>
+        {[1, 2, 3, 4].map(n => <button key={n} style={{ ...btn(opts.rings === n), padding: '2px 7px' }} onClick={() => setOpts({ ...opts, rings: n })}>{n}</button>)}
+      </div>
+      {opts.rings > 1 && <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', padding: '3px 0' }}>
+        <span style={{ flex: 1, color: DIM }}>Inner walls</span>
+        {RING_WALLS.map(k => <button key={k} style={{ ...btn(opts.ringWall === k), padding: '2px 7px', fontSize: 11.5 }} title={PERIMETER[k].blurb} onClick={() => setOpts({ ...opts, ringWall: k })}>{PERIMETER[k].name.replace('Poured-concrete wall', 'Concrete').replace('Stone-and-timber wall', 'Stone').replace('Container wall', 'Containers').replace('Stacked containers', 'Stacked')}</button>)}
+        <button style={{ ...btn(opts.ringGates === 'alternate'), padding: '2px 7px', fontSize: 11.5 }} title="Gates on opposite sides, ring by ring: a crew has to walk round each" onClick={() => setOpts({ ...opts, ringGates: opts.ringGates === 'alternate' ? 'aligned' : 'alternate' })}>{opts.ringGates === 'alternate' ? 'Gates alternate' : 'Gates aligned'}</button>
+      </div>}
       <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', padding: '3px 0' }}>
         <span style={{ flex: 1, color: DIM }}>Towers</span>
         {Array.from({ length: MAX_TOWERS + 1 }, (_, n) => <button key={n} style={{ ...btn(opts.towers === n), padding: '2px 7px' }} onClick={() => setOpts({ ...opts, towers: n })}>{n}</button>)}
@@ -95,6 +104,7 @@ export function FortifyRing() {
           {plan.wall.creekCrossings > 0 && <div>Creek bars at <b>{plan.wall.creekCrossings}</b> crossing{plan.wall.creekCrossings > 1 ? 's' : ''}</div>}
           <div>Patrol walkway on top <b>{Math.round(plan.walkwayLen * 6).toLocaleString('en-US')} m</b>{plan.walkwayRuns > 0 && <span style={{ color: DIM }}> · stairs at the gate and every ~80 m</span>}</div>
           <div>{plan.garage ? <>Gate at the road: a gatehouse garage where the driveway crosses the wall <span style={{ color: DIM }}>· 4 bays, a steel drive-through gate</span></> : <span style={{ color: DIM }}>{plan.wall.gateSpot ? 'Gate at the road: an ordinary gate where the driveway crosses (no gate garage)' : 'No gate garage'}</span>}</div>
+          {plan.ringPlan && plan.ringPlan.rings.length > 0 && <div>Inner rings <b>{plan.ringPlan.rings.length}</b> <span style={{ color: DIM }}>· {plan.ringPlan.contour ? 'along the contour of the hill' : 'stepped in from the outer wall'} · {plan.ringPlan.rings.reduce((a, r) => a + r.towers.length, 0)} towers · two armed adults man each</span></div>}
           <div>Towers <b>{plan.towers.length}</b> <span style={{ color: DIM }}>· {TOWERS[opts.towerKind].name.toLowerCase()}, upgradeable in place</span></div>
           {opts.passage && <div>{plan.passage ? <>Underground passage to the house</> : <span style={{ color: DIM }}>No passage yet</span>}</div>}
           <div style={{ marginTop: 3 }}>Cost <b>{usd(plan.cost)}</b>{plan.permits > 0 && <span style={{ color: DIM }}> (permits {usd(plan.permits)})</span>}{own ? <span style={{ color: DIM }}> + {own}</span> : null} · <b>{plan.hours.toLocaleString('en-US')} h</b> of work</div>
