@@ -16,6 +16,7 @@ import { Clutter } from './clutter';
 import { Equipment } from './utilityBuildings';
 import type { KitMaterialId } from './materials';
 import { DEPTH, ROOF_TOP, type Side } from './underground';
+import { airHandler, archVault, archY, cot, controlWall, ductRun, examGear, gameShelf, gunRack, mapEasel, officeChair, pantryShelf, scrubSink, stretcher, toteStack, tvStand, waterFilter } from './bunkerFurniture';
 
 /** Clear height inside (2.5 m). */
 export const VAULT_H = 2.5 * M;
@@ -29,8 +30,13 @@ const cyl = (r: number, h: number, x: number, y: number, z: number, seg = 12) =>
 type Rect = { x0: number; z0: number; x1: number; z1: number };
 const hits = (a: Rect, b: Rect) => a.x0 < b.x1 && a.x1 > b.x0 && a.z0 < b.z1 && a.z1 > b.z0;
 
+/** Where somebody can be in a room (room-local): the console chair, a seat, a bed. Read by game/people/BunkerFolk. */
+export interface RoomSpot { role: 'console' | 'seat' | 'bed'; x: number; z: number; /** Heading (0 = facing +z). */ face: number; /** Height above the floor for a bed (world units). */ y?: number }
+
 /** An item packed against a wall: length along the wall, depth out from it (world units). */
 interface WallItem {
+  /** Places in the item (item-local, heading relative to the item): carried to the room's spots when it is packed. */
+  spots?: Array<{ role: RoomSpot['role']; x: number; z: number; face?: number; y?: number }>;
   len: number; dep: number;
   fn: (a: Add) => void;
   /** The piece's own z axis runs along the wall (beds, bunks). */
@@ -58,6 +64,8 @@ export interface VaultCtx {
   hang(sides: Side[], w: number, y: number, fn: (a: Add) => void, prob?: number): void;
   /** Reserve floor (kept clear by pack). */
   reserve(r: Rect): void;
+  /** Somebody can be here (room-local). */
+  spot(role: RoomSpot['role'], x: number, z: number, face?: number, y?: number): void;
 }
 
 interface VaultSpec {
@@ -73,6 +81,8 @@ interface VaultSpec {
   vents?: Array<[number, number]>;
   /** Skip the standard box (the stairwell builds its own). */
   custom?: boolean;
+  /** An arched, timber-ribbed vault with the walls lined in boards (the tunnel). */
+  arch?: boolean;
 }
 
 /** Steel door leaf standing open inward against the wall, with a locking wheel (blast door) or a lever. */
@@ -152,7 +162,7 @@ function vault(def: KitPieceDef, seed: number, opts: BuildOpts, spec: VaultSpec,
     p.collide(...walls('walls'));
     walls('cutwalls', CUT_H);
     // a darker painted dado band round the room (the classic shelter look; it hides the scuffs)
-    if (spec.inner) {
+    if (spec.inner && !spec.arch) {
       const dado = 1.1 * M, t = 0.004, i = T + t / 2;
       const run = (layer: BuildLayer, ax: number, az: number, bx: number, bz: number, side: Side, shift: number) =>
         wallRun(p.sink, layer, 'paint_dado', { ax, az, bx, bz, y0: 0, h: dado, t, cut: layer === 'cutwalls' ? CUT_H : undefined, openings: ops(side).map(o => ({ ...o, at: o.at - shift })) });
@@ -174,9 +184,19 @@ function vault(def: KitPieceDef, seed: number, opts: BuildOpts, spec: VaultSpec,
       p.add(m, box(x1 - hole.x1, h, hole.z1 - hole.z0, (hole.x1 + x1) / 2, y, (hole.z0 + hole.z1) / 2), 'roof');
     };
     slab('concrete', H, ROOF_TOP - H, 0);
-    if (spec.inner) slab(spec.inner, H - 0.004, 0.004, T);
+    if (spec.inner && !spec.arch) slab(spec.inner, H - 0.004, 0.004, T);
     // waterproofing membrane over the roof (shows while the dig is open)
     slab('iron', ROOF_TOP, 0.004, -0.01);
+    const spring = 1.72 * M, crown = H - 0.006;
+    if (spec.arch) {
+      const sideDoors = [doors.left, doors.right].filter((v): v is number => v !== undefined);
+      archVault((m, g, layer) => p.add(m, g, layer), L, R, B, F, spring, crown, 0.1, z => sideDoors.some(d => Math.abs(z - d) < DOOR_W / 2 + 0.03));
+    }
+    // ventilation: once the bunker's plant room is built, a galvanized trunk runs the length of every room with grilles in it
+    if (opts.air) {
+      const dx = (L + R) / 2 + 0.1;
+      ductRun((m, g) => p.add(m, g, 'roof'), dx, B + 0.03, F - 0.03, spec.arch ? archY(dx, L, R, spring, crown) : H - 0.004);
+    }
   }
   // door frames (and blast doors) in every doorway
   for (const side of ['front', 'back', 'left', 'right'] as Side[]) {
@@ -299,7 +319,9 @@ function vault(def: KitPieceDef, seed: number, opts: BuildOpts, spec: VaultSpec,
     }
   }
   const facing: Record<Side, number> = { back: 0, front: Math.PI, left: Math.PI / 2, right: -Math.PI / 2 };
+  const spots: RoomSpot[] = [];
   const c: VaultCtx = {
+    spot: (role, x, z, face = 0, y) => { spots.push({ role, x, z, face, ...(y !== undefined ? { y } : {}) }); },
     p, left: L, right: R, front: F, back: B, depth, rnd: p.rnd,
     I: (x, z, rot, fn, solid = true) => { const k = piece(p.sink, 'interior', { x, z, rot, y: 0.004 }, fn, solid); if (k) { p.collide(k); placed.push(k); } },
     C: (x, z, rot, fn, prob = 0.75, y = 0.004) => { if (p.rnd() < prob) piece(p.sink, y > CUT_H ? 'decor' : 'interior', { x, z, rot, y }, fn, false); },
@@ -317,8 +339,11 @@ function vault(def: KitPieceDef, seed: number, opts: BuildOpts, spec: VaultSpec,
             const r = alongX ? { x0: cx - it.len / 2, x1: cx + it.len / 2, z0: cz - it.dep / 2, z1: cz + it.dep / 2 } : { x0: cx - it.dep / 2, x1: cx + it.dep / 2, z0: cz - it.len / 2, z1: cz + it.len / 2 };
             if (placed.some(q => hits(q, r))) continue;
             placed.push(r);
-            const k = piece(p.sink, 'interior', { x: cx, z: cz, rot: facing[side] + (it.along ? Math.PI / 2 : 0), y: 0.004 }, it.fn, it.solid ?? true);
+            const rot = facing[side] + (it.along ? Math.PI / 2 : 0);
+            const k = piece(p.sink, 'interior', { x: cx, z: cz, rot, y: 0.004 }, it.fn, it.solid ?? true);
             if (k) p.collide(k);
+            // rotateY(rot): x' = x cos + z sin, z' = -x sin + z cos
+            for (const s of it.spots ?? []) spots.push({ role: s.role, x: cx + s.x * Math.cos(rot) + s.z * Math.sin(rot), z: cz - s.x * Math.sin(rot) + s.z * Math.cos(rot), face: rot + (s.face ?? 0), ...(s.y !== undefined ? { y: s.y } : {}) });
             done = true;
           }
           if (done) break;
@@ -381,6 +406,7 @@ function vault(def: KitPieceDef, seed: number, opts: BuildOpts, spec: VaultSpec,
   g.userData.stageAs = { walls: 'frame', cutwalls: 'frame' };
   g.userData.chimneyTop = null;
   g.userData.underground = true;
+  g.userData.spots = spots;
   return g;
 }
 
@@ -431,13 +457,17 @@ function hatch(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
 }
 
 function corridor(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
-  return vault(def, seed, opts, { ...CONCRETE, vents: [[0, -0.3]] }, c => {
+  // the old-fashioned way: an arched tunnel lined in boards on timber ribs, shelves of stores down one side and bunks down the other
+  return vault(def, seed, opts, { wall: 'concrete', inner: 'pine_panel', floor: 'deck', T: 0.05, arch: true, vents: [[0, -0.3]] }, c => {
     c.pack([
-      { len: 1.2 * M, dep: 0.35 * M, fn: a => Furniture.shelfUnit(a, 1.2, 1.9, 'jars'), sides: ['left', 'right'] },
+      { len: 1.0 * M, dep: 0.35 * M, fn: a => pantryShelf(a, 1.0, 1.5), sides: ['left'] },
+      { len: 1.0 * M, dep: 0.35 * M, fn: a => pantryShelf(a, 1.0, 1.5), sides: ['left'] },
+      { len: 2.0 * M, dep: 0.95 * M, along: true, fn: a => Furniture.bunk(a, 'quilt_red', 'quilt_blue'), sides: ['right'] },
       { len: 1.2 * M, dep: 0.4 * M, fn: a => Furniture.bench(a, 1.2), sides: ['right', 'left'] },
     ]);
     c.hang(['left', 'right'], 1.0 * M, 0, a => Furniture.coatPegs(a, 1.0), 0.8);
     c.hang(['right', 'left'], 0.2 * M, 0.5 * M, a => Equipment.extinguisher(a), 1);
+    c.hang(['left', 'right'], 0.3 * M, 1.5 * M, a => Equipment.sign(a), 0.7);
   });
 }
 
@@ -462,13 +492,19 @@ function container(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Grou
 function dorm(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
   return vault(def, seed, opts, { ...CONCRETE, vents: [[-0.3, -0.3]] }, c => {
     const quilts: KitMaterialId[] = ['quilt_red', 'quilt_blue'];
-    const bunk = (i: number): WallItem => ({ len: 2.0 * M, dep: 0.95 * M, along: true, fn: a => Furniture.bunk(a, quilts[i % 2], quilts[(i + 1) % 2]), sides: ['left', 'right', 'back', 'front'] });
+    const bunk = (i: number): WallItem => ({ len: 2.0 * M, dep: 0.95 * M, along: true, fn: a => Furniture.bunk(a, quilts[i % 2], quilts[(i + 1) % 2]), spots: [{ role: 'bed', x: 0, z: 0.1 * M, y: 0.4 * M }], sides: ['left', 'right', 'back', 'front'] });
+    const mo = opts.morale ?? { games: true, music: false, books: true };
     c.pack([bunk(0), bunk(1), bunk(2), bunk(3)]);
-    c.pack([{ len: 1.5 * M, dep: 0.5 * M, fn: lockers, sides: ['back', 'front', 'left', 'right'] }]);
-    c.I(0, 0, 0, a => Furniture.rug(a, 2.0, 1.4), false);
-    c.I(0, 0, 0, a => Furniture.table(a, 0.9, 0.7));
-    for (const [x, z] of [[-0.09, 0], [0.09, 0]] as const) c.C(x, z, 0, a => Furniture.stool(a), 0.8);
-    c.C(0, 0, 0, a => Clutter.checkers(a), 0.6, 0.004 + 0.76 * M);
+    // the evenings: a TV and console with a sofa facing it, a shelf of what the family owns (games, paperbacks, a guitar)
+    c.pack([
+      { len: 1.5 * M, dep: 0.5 * M, fn: lockers, sides: ['back', 'front', 'left', 'right'] },
+      { len: 1.5 * M, dep: 0.5 * M, fn: tvStand, sides: ['front', 'back', 'right', 'left'] },
+      { len: 1.0 * M, dep: 0.35 * M, fn: a => gameShelf(a, mo.games, mo.books, mo.music), sides: ['back', 'left', 'right', 'front'] },
+    ]);
+    c.I(0, 0.02, 0, a => Furniture.rug(a, 2.0, 1.4), false);
+    c.I(0, 0.02, 0, a => Furniture.table(a, 0.9, 0.7));
+    for (const [x, z] of [[-0.09, 0.02], [0.09, 0.02]] as const) { c.C(x, z, 0, a => Furniture.stool(a), 1); c.spot('seat', x, z, x < 0 ? Math.PI / 2 : -Math.PI / 2); }
+    if (mo.games) c.C(0, 0.02, 0, a => Clutter.checkers(a), 0.9, 0.004 + 0.76 * M);
     c.C(0.2, 0.18, 0.6, a => Clutter.toys(a), 0.7);
     c.C(-0.2, 0.2, 0.2, a => Clutter.laundryBasket(a), 0.5);
     homey(c);
@@ -490,13 +526,15 @@ function galley(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
   return vault(def, seed, opts, { ...CONCRETE, vents: [[0.3, -0.3]] }, c => {
     c.pack([
       { len: 2.4 * M, dep: 0.6 * M, fn: a => { Furniture.counter(a, 2.4, 0.3, true); campStove(a); }, sides: ['back', 'left', 'right', 'front'] },
-      { len: 1.0 * M, dep: 0.35 * M, fn: a => Furniture.shelfUnit(a, 1.0, 1.9, 'food'), sides: ['left', 'right', 'front', 'back'] },
-      { len: 1.0 * M, dep: 0.35 * M, fn: a => Furniture.shelfUnit(a, 1.0, 1.9, 'food'), sides: ['right', 'left', 'front', 'back'] },
+      { len: 1.0 * M, dep: 0.35 * M, fn: a => pantryShelf(a, 1.0, 1.9), sides: ['left', 'right', 'front', 'back'] },
+      { len: 1.0 * M, dep: 0.35 * M, fn: a => pantryShelf(a, 1.0, 1.9), sides: ['right', 'left', 'front', 'back'] },
+      { len: 1.5 * M, dep: 0.55 * M, fn: waterFilter, sides: ['right', 'left', 'front', 'back'] },
       { len: 0.6 * M, dep: 0.6 * M, fn: a => Furniture.barrel(a), sides: ['front', 'right', 'left'] },
       { len: 0.6 * M, dep: 0.6 * M, fn: a => Furniture.barrel(a), sides: ['front', 'left', 'right'] },
     ]);
     c.I(0, 0.08, 0, a => Furniture.table(a, 1.8, 0.85));
     for (const s of [-1, 1]) c.I(0, 0.08 + s * 0.12, 0, a => Furniture.bench(a, 1.6));
+    c.spot('seat', -0.15, 0.2, Math.PI); c.spot('seat', 0.15, -0.04, 0);
     const top = 0.004 + 0.76 * M;
     c.C(-0.08, 0.06, 0, a => Clutter.plate(a), 0.9, top);
     c.C(0.06, 0.1, 0, a => Clutter.mug(a), 0.9, top);
@@ -515,20 +553,23 @@ function campStove(a: Add): void {
 
 function stores(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
   return vault(def, seed, opts, { ...CONCRETE, vents: [[0, 0.3]] }, c => {
-    // the shelves and two pallets are food slots: the pantry's buckets, sacks, cans and jars are drawn on them by quantity (game/props/FoodShelfRenderer)
-    const shelf = (): WallItem => ({ len: 1.0 * M, dep: 0.45 * M, fn: a => Furniture.shelfUnit(a, 1.0, 2.0, 'food') });
+    // the shelves and two pallets are food slots: the pantry's buckets, sacks, cans and jars are drawn on them by quantity (game/props/FoodShelfRenderer);
+    // each board carries a colored tag (grain, cans, vegetables, water, medicine)
+    const shelf = (): WallItem => ({ len: 1.0 * M, dep: 0.45 * M, fn: a => pantryShelf(a, 1.0, 2.0) });
     c.pack([shelf(), shelf(), shelf(), shelf(), shelf(), shelf(), shelf(), shelf()]);
     c.pack([
-      { len: 0.6 * M, dep: 0.6 * M, fn: a => Furniture.barrel(a) },
+      { len: 1.5 * M, dep: 0.55 * M, fn: waterFilter },
+      { len: 1.1 * M, dep: 0.45 * M, fn: a => toteStack(a, 2, 3) },
       { len: 0.6 * M, dep: 0.6 * M, fn: a => Furniture.barrel(a) },
       { len: 0.6 * M, dep: 0.6 * M, fn: a => Furniture.barrel(a) },
     ]);
     // two pallets in the middle for the buckets and sacks, a couple of crates behind them
     for (const x of [-0.115, 0.115]) c.I(x, 0.06, 0, a => Furniture.foodPallet(a));
     c.I(0, -0.2, 0, a => { for (const [x, y] of [[-0.32, 0], [0.32, 0], [0, 0.42]]) a('wood_mid', box(0.6 * M, 0.4 * M, 0.45 * M, x * M, y * M, 0)); });
+    c.hang(['front', 'right', 'left', 'back'], 0.5 * M, 1.5 * M, a => Clutter.poster(a, 0.5, 0.65, 'poster_seeds'), 0.7);
+    c.hang(['left', 'right', 'front'], 0.35 * M, 1.7 * M, a => Equipment.sign(a), 0.9);
   });
 }
-
 
 function plant(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
   return vault(def, seed, opts, { ...CONCRETE, vents: [[-0.3, -0.3], [0.3, -0.3]] }, c => {
@@ -536,6 +577,7 @@ function plant(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
       { len: 1.2 * M, dep: 0.6 * M, fn: nbcFilter, sides: ['back', 'left', 'right', 'front'] },
       { len: 1.4 * M, dep: 1.4 * M, fn: waterTank, sides: ['right', 'left', 'front', 'back'] },
       { len: 1.0 * M, dep: 0.55 * M, fn: a => Equipment.batteryRack(a, 4, 1.0), sides: ['left', 'back', 'right', 'front'] },
+      { len: 0.8 * M, dep: 0.4 * M, fn: a => airHandler(a, !!opts.air), sides: ['back', 'left', 'right', 'front'], solid: false },
       { len: 1.4 * M, dep: 0.6 * M, fn: a => Furniture.generator(a), sides: ['front', 'left', 'right', 'back'] },
       { len: 1.1 * M, dep: 0.65 * M, fn: a => Equipment.fuelDrums(a), sides: ['front', 'right', 'left', 'back'] },
       // on the wall, its conduits down to the floor: packed so it keeps clear of the rest
@@ -568,11 +610,15 @@ function waterTank(a: Add): void {
 function medical(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
   return vault(def, seed, opts, { ...CONCRETE, vents: [[0.3, 0.3]] }, c => {
     c.pack([
-      { len: 2.0 * M, dep: 0.95 * M, along: true, fn: a => { Furniture.bed(a, false, 'linen'); sickSlot(a); }, sides: ['left', 'right', 'back', 'front'] },
+      { len: 2.0 * M, dep: 0.95 * M, along: true, fn: a => { Furniture.bed(a, false, 'linen'); sickSlot(a); }, spots: [{ role: 'bed', x: 0, z: 0.1 * M, y: 0.5 * M }], sides: ['left', 'right', 'back', 'front'] },
       { len: 2.0 * M, dep: 0.95 * M, along: true, fn: a => { Furniture.single(a, 'quilt_blue'); sickSlot(a); }, sides: ['right', 'left', 'back', 'front'] },
       { len: 1.2 * M, dep: 0.6 * M, fn: a => Furniture.counter(a, 1.2, 0.4, true), sides: ['back', 'front', 'left', 'right'] },
       { len: 1.0 * M, dep: 0.45 * M, fn: a => { Furniture.shelfUnit(a, 1.0, 1.9, 'jars'); }, sides: ['front', 'back', 'left', 'right'] },
+      { len: 0.8 * M, dep: 0.5 * M, fn: scrubSink, sides: ['back', 'right', 'left', 'front'] },
+      { len: 0.7 * M, dep: 0.35 * M, fn: stretcher, sides: ['left', 'right', 'back', 'front'], solid: false },
+      { len: 1.1 * M, dep: 0.45 * M, fn: a => toteStack(a, 2, 2), sides: ['front', 'back', 'left', 'right'] },
     ]);
+    c.I(0.18, 0.1, 0.4, a => examGear(a), false);
     c.C(0.12, -0.05, 0, a => ivPole(a), 0.9);
     c.C(-0.15, 0.15, 0, a => a('paint_green', cyl(0.1 * M, 1.2 * M, 0, 0, 0, 10)), 0.9);   // oxygen bottle
     c.C(0, 0.12, 0, a => Furniture.chair(a), 0.8);
@@ -595,28 +641,23 @@ function firstAid(a: Add): void {
 }
 
 function comms(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
+  // the control room and security center: a desk under a wall of screens (cameras, radar, weather, the radio net), a laptop, a cot, a rifle rack, the compound's site plan on a corkboard
   return vault(def, seed, opts, { ...CONCRETE, vents: [[0, 0.3]] }, c => {
     c.pack([
-      { len: 1.8 * M, dep: 0.75 * M, fn: radioDesk, sides: ['left', 'right', 'back', 'front'] },
+      { len: 2.6 * M, dep: 1.5 * M, fn: a => {
+        const sh: Add = (m, g) => a(m, g.translate(0, 0, -0.37 * M));
+        controlWall(sh, !!opts.power);
+        officeChair((m, g) => a(m, g.rotateY(Math.PI).translate(0.2 * M, 0, 0.3 * M)));
+      }, spots: [{ role: 'console', x: 0.2 * M, z: 0.3 * M, face: Math.PI }], sides: ['left', 'right', 'back', 'front'] },
+      { len: 1.9 * M, dep: 0.75 * M, along: true, fn: cot, spots: [{ role: 'bed', x: 0, z: 0.1 * M, y: 0.42 * M }], sides: ['right', 'left', 'back', 'front'] },
+      { len: 1.1 * M, dep: 0.35 * M, fn: gunRack, sides: ['right', 'left', 'front', 'back'] },
       { len: 0.9 * M, dep: 0.65 * M, fn: gunSafe, sides: ['right', 'left', 'back', 'front'] },
+      { len: 1.0 * M, dep: 0.45 * M, fn: mapEasel, sides: ['back', 'front', 'left', 'right'], solid: false },
       { len: 1.0 * M, dep: 0.4 * M, fn: a => { Furniture.shelfUnit(a, 1.0, 1.9, 'books'); ammoCans(a); }, sides: ['right', 'left', 'front', 'back'] },
     ]);
-    c.hang(['left', 'right', 'back'], 0.9 * M, 1.25 * M, a => Clutter.poster(a, 0.9, 0.7, 'poster_map'), 1);
-    c.hang(['right', 'left', 'front'], 1.0 * M, 1.3 * M, a => Clutter.riflePegs(a), 0.8);
     c.hang(['back', 'front', 'left'], 0.32 * M, 1.9 * M, a => Clutter.clock(a), 0.8);
-    c.C(0, 0, 0, a => Furniture.chair(a), 0.9);
+    c.hang(['left', 'right', 'front'], 0.4 * M, 1.6 * M, a => Equipment.sign(a), 0.8);
   });
-}
-
-/** Desk with two radios, a speaker, a notepad and a lamp. */
-function radioDesk(a: Add): void {
-  a('wood_mid', box(1.8 * M, 0.05 * M, 0.75 * M, 0, 0.72 * M, 0));
-  for (const sx of [-1, 1]) a('steel', box(0.05 * M, 0.72 * M, 0.7 * M, sx * 0.85 * M, 0, 0));
-  a('iron', box(0.45 * M, 0.18 * M, 0.3 * M, -0.45 * M, 0.77 * M, -0.15 * M));
-  a('iron', box(0.35 * M, 0.14 * M, 0.28 * M, 0.05 * M, 0.77 * M, -0.18 * M));
-  a('paint_green', box(0.2 * M, 0.03 * M, 0.01 * M, -0.45 * M, 0.88 * M, 0.006 * M));
-  a('steel', box(0.02 * M, 0.5 * M, 0.02 * M, 0.3 * M, 0.77 * M, -0.3 * M));                // mic stand
-  a('linen', box(0.2 * M, 0.01 * M, 0.28 * M, 0.45 * M, 0.77 * M, 0.1 * M));               // notepad
 }
 
 function gunSafe(a: Add): void {

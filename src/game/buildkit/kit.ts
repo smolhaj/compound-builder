@@ -332,7 +332,7 @@ export const BUNKER_KIT: KitPieceDef[] = [
   room('bunker_stores', 'Storeroom', 2, 2, 'Rows of shelving: cans, rice and beans in buckets, water drums, medicine, seed.', 0),
   room('bunker_plant', 'Plant room', 2, 2, 'Air: an NBC filter and blast valves. Power: a battery bank and a vented generator. Water: a 2,000 L tank.', 0),
   room('bunker_medical', 'Medical bay', 2, 2, 'An exam table, a cot, a sink, cabinets of supplies and an oxygen bottle.', 1),
-  room('bunker_comms', 'Comms & armory', 1, 2, 'Radios and maps on one wall, a gun safe and ammunition on the other.', 1),
+  room('bunker_comms', 'Control room & armory', 1, 2, 'A desk under a wall of screens (camera feeds, radar, weather, the radio net), a laptop, a cot and a rifle rack, the site plan on a corkboard, a gun safe and ammunition. The night watch sits here when there are cameras and power.', 1),
 ];
 /** Underground menu order. */
 export const BUNKER_ORDER: readonly string[] = BUNKER_KIT.map(d => d.id);

@@ -69,6 +69,12 @@ export interface BuildOpts {
   blast?: Array<'front' | 'back' | 'left' | 'right'>;
   /** Bunker hardening fitted (sim/hardening): what shows inside the room. */
   harden?: Partial<Record<HardenId, 1 | 2 | 3>>;
+  /** Bunker rooms: the bunker's plant room is built (ducts run, the air handler's lamp is green). */
+  air?: boolean;
+  /** Bunker rooms: the power is on (the control room's lamps). */
+  power?: boolean;
+  /** Bunkroom: what the family owns for the long evenings (sim stock: games, an instrument, paperbacks); the room shows them. */
+  morale?: { games: boolean; music: boolean; books: boolean };
   /** The evenings' goods on and by the family's table (sim/evenings.ts `houseGoods`): 1 in good shape, 2 worn thin. Only the main home gets them. */
   goods?: Partial<Record<'games' | 'guitar' | 'player' | 'books' | 'toys' | 'kidbooks', 1 | 2>>;
 }
