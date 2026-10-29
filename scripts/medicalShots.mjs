@@ -111,7 +111,7 @@ try {
       console.error(JSON.stringify(info));
       await shot(`04${k}-eye-level-medic`);
     }
-    if (only === 'medic') throw new Error('done');
+    if (only === 'medic') { await browser.close(); vite.kill(); process.exit(0); }
     // 5. the bunker's medical corner, underground view
     await page.evaluate(async () => {
       const cb = window.__cb, G = cb.game, c = cb.world.camp;
