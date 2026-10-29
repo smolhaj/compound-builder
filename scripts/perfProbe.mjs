@@ -28,6 +28,7 @@ const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] :
 const outFile = opt('--out', 'perf.json'), port = Number(opt('--port', 5961));
 const tiers = opt('--tiers', 'low,medium,high').split(','), conds = opt('--conds', 'day,night,snow,rain').split(',');
 const FRAMES = Number(opt('--frames', 24)), WARM = Number(opt('--warm', 4)), W = Number(opt('--w', 640)), H = Number(opt('--h', 400));
+const ringOpts = JSON.parse(opt('--ring', '{}'));   // e.g. '{"rings":3,"ringWall":"stone_wall","ringSally":true}': inner rings in the probe scene
 const scene = opt('--scene', 'full'), shotDir = opt('--shots', null), censusOnly = args.includes('--census-only'), noRender = args.includes('--norender'), noLift = args.includes('--nolift'), profile = args.includes('--profile'), withBunker = args.includes('--bunker');
 mkdirSync(dirname(outFile) || '.', { recursive: true }); if (shotDir) mkdirSync(shotDir, { recursive: true });
 
@@ -48,12 +49,12 @@ try {
   await frames(2); lap('loaded');
 
   // ── the scene ──
-  const built = await page.evaluate(async ([kind, withBunker]) => {
+  const built = await page.evaluate(async ([kind, withBunker, ringOpts]) => {
     const cb = window.__cb, G = cb.game, W = await import('/src/store/worldStore.ts');
     G.getState().setSpeed(0);
     const geo = W.useWorldStore.getState().siteGeo ?? {};
     if (kind === 'full') {
-      G.getState().fortifyRing(geo, { towers: 5, towerKind: 'watchtower_wood', passage: false });
+      G.getState().fortifyRing(geo, { towers: 5, towerKind: 'watchtower_wood', passage: false, ...ringOpts });
     }
     const c = cb.world.camp;
     if (withBunker) {
@@ -88,7 +89,7 @@ try {
     // four dogs
     G.setState(s => { const g = structuredClone(s.game); for (let i = 0; i < 4; i++) P.adoptDog(g); return { game: g }; });
     return { camp: c, people: G.getState().game.people.length, structures: G.getState().game.structures.length, dogs: G.getState().game.dogs?.length, vehicles: G.getState().game.vehicles?.length };
-  }, [scene, withBunker]);
+  }, [scene, withBunker, ringOpts]);
   lap('built ' + JSON.stringify(built));
   await frames(6);
   // footpaths laid on the busiest walks (every kind), like a played-in compound

@@ -101,6 +101,8 @@ export interface Gate {
   w: number;
   /** The gap is filled by a gatehouse garage (sim/garage.ts): no gate leaves are drawn, and the garage holds the line here. */
   garage?: boolean;
+  /** A sally port: a small side door in a ring wall (sim/rings.ts SALLY): a weak spot a crew funnels to, and a way for the defenders to sortie. */
+  sally?: boolean;
 }
 
 /** How a container wall looks (cosmetic: the same wall, price and strength). `mixed` is the old four-color cycle. */

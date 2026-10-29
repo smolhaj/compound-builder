@@ -624,11 +624,57 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
       add(lit ? 'bulb' : 'enamel', new THREE.SphereGeometry(0.014, 6, 4).translate(x, y + 0.37 * M, z));
     }
   }
+  /** Plank leaf hinged at (hx, hz), `w` wide and `h` tall, swung by `open` radians (mirror -1 hinges on the far side): vertical boards, iron straps and a Z brace. */
+  const plankLeaf = (hx: number, hz: number, w: number, h: number, open: number, mirror: number, ang: number) => {
+    const parts: Array<[KitMaterialId, THREE.BufferGeometry]> = [];
+    const bar = (x: number, y: number, bw: number, bh: number, th: number, m: KitMaterialId) => parts.push([m, new THREE.BoxGeometry(bw, bh, th).translate(x, y, 0)]);
+    for (let x = 0.08 * M; x < w - 0.04 * M; x += 0.15 * M) bar(x, h / 2, 0.14 * M, h - 0.04 * M, 0.05 * M, 'wood_mid');
+    for (const f of [0.18, 0.5, 0.82]) bar(w / 2, h * f, w, 0.12 * M, 0.07 * M, 'iron');
+    parts.push(['wood_dark', new THREE.BoxGeometry(Math.hypot(w, h) * 0.8, 0.1 * M, 0.06 * M).rotateZ(Math.atan2(h, w)).translate(w / 2, h / 2, 0.02 * M)]);
+    const gy = ground(hx, hz) + 0.01;
+    for (const [m, g] of parts) add(m, g.scale(mirror, 1, 1).rotateY(ang + mirror * open).translate(hx, gy, hz));
+  };
+  /** The stone gatehouse leaf (a gate gap in a stone wall) and the sally port (g.sally): see docs/DECISIONS.md, "Gatehouse leaf and sally port". */
+  const stoneGate = (r: Pick<PerimeterRun, 'kind'>, g: { at: number; w: number; sally?: boolean }, p0: ReturnType<typeof along>, p1: ReturnType<typeof along>) => {
+    const ang = -Math.atan2(p0.dz, p0.dx), mx = (p0.x + p1.x) / 2, mz = (p0.z + p1.z) / 2, gy = ground(mx, mz);
+    const wallH = Math.abs(def.height), mat: KitMaterialId = r.kind === 'stone_wall' ? 'fieldstone' : r.kind === 'concrete_wall' ? 'concrete' : 'steel';
+    /** Put a box in the gate's frame: x along the run, centered at the gap, z across it; y up from the ground at the gate. */
+    const gb = (w: number, h: number, d: number, x: number, y: number, z: number, m: KitMaterialId) =>
+      add(m, new THREE.BoxGeometry(w, h, d).translate(0, h / 2, 0).translate(x, y, z).rotateY(ang).translate(mx, gy, mz));
+    if (g.sally) {
+      // two stone jambs, a lintel under the wall's top course, a single plank door ajar, a lantern over it
+      const doorH = Math.min(2.2 * M, wallH - 0.4 * M), jx = g.w / 2 + 0.18 * M;
+      for (const sg of [-1, 1]) gb(0.36 * M, wallH, 0.66 * M, sg * jx, 0, 0, mat);
+      gb(g.w + 0.72 * M, wallH - doorH, 0.62 * M, 0, doorH, 0, mat);
+      gb(g.w + 0.84 * M, 0.1 * M, 0.74 * M, 0, wallH, 0, mat === 'steel' ? 'iron' : 'wood_dark');     // a coping over it
+      gb(g.w + 0.1 * M, 0.08 * M, 0.7 * M, 0, 0, 0, 'concrete');                                       // the sill
+      plankLeaf(p0.x, p0.z, g.w - 0.02 * M, doorH - 0.04 * M, 1.05, 1, ang);
+      const lx = mx + Math.cos(ang) * 0 + Math.sin(ang) * 0.4 * M, lz = mz + Math.cos(ang) * 0.4 * M;
+      add('iron', new THREE.BoxGeometry(0.05 * M, 0.2 * M, 0.05 * M).translate(lx, gy + doorH + 0.1 * M, lz));
+      add(lit ? 'bulb' : 'enamel', new THREE.SphereGeometry(0.1 * M, 8, 6).translate(lx, gy + doorH + 0.32 * M, lz));
+      return;
+    }
+    // the gatehouse: two stone piers wider than the wall with timber caps, a timber lintel under a stone upper course, a little gable roof of tin, two plank leaves swung open
+    const pierH = wallH + 1.6 * M, jx = g.w / 2 + 0.45 * M, doorH = Math.min(wallH * 0.9, pierH - 1.3 * M);
+    for (const sg of [-1, 1]) {
+      gb(0.95 * M, pierH, 0.95 * M, sg * jx, 0, 0, "fieldstone");
+      gb(0.9 * M, 0.14 * M, 0.94 * M, sg * jx, pierH, 0, 'wood_dark');
+      gb(0.5 * M, 0.2 * M, 0.5 * M, sg * jx, pierH + 0.14 * M, 0, 'fieldstone');
+    }
+    gb(g.w + 0.8 * M, 0.34 * M, 0.5 * M, 0, doorH + 0.04 * M, 0, 'wood_dark');                         // the timber lintel
+    gb(g.w + 0.8 * M, pierH - doorH - 0.38 * M, 0.66 * M, 0, doorH + 0.38 * M, 0, 'fieldstone');       // stone over it
+    const roofL = g.w + 2.1 * M;
+    for (const sg of [-1, 1]) add('metal_roof', new THREE.BoxGeometry(roofL, 0.08 * M, 0.72 * M).rotateX(sg * 0.42).translate(0, pierH + 0.36 * M, sg * 0.3 * M).rotateY(ang).translate(mx, gy, mz));
+    plankLeaf(p0.x, p0.z, g.w / 2 - 0.01, doorH, 1.25, 1, ang);
+    plankLeaf(p1.x, p1.z, g.w / 2 - 0.01, doorH, 1.25, -1, ang);
+  };
   // gates: posts each side and a leaf swung open (wire / rail fences: tube gate; walls: plank or steel gates)
   if (run.finishedAt !== null && run.kind !== 'ditch') {
     for (const g of run.gates) {
       if (g.garage) continue;   // a gatehouse garage fills this gap
       const p0 = along(run.pts, g.at - g.w / 2), p1 = along(run.pts, g.at + g.w / 2);
+      // a stone gatehouse (wide gate in a stone wall) and the sally port (a small side door in any ring wall) have their own piers, lintel and plank leaves
+      if (g.sally || (run.kind === 'stone_wall' && g.w >= 0.35)) { stoneGate(run, g, p0, p1); continue; }
       const tall = Math.max(1.4 * M, Math.abs(def.height) + 0.05 * M);
       for (const p of [p0, p1]) post(p.x, p.z, tall, 0.1 * M, 'wood_dark', true);
       // a framed doorway: a steel lintel across the posts (the opening where a walkway meets a yard wall reads as a real door, from both sides)
