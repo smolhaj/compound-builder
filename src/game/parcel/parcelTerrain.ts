@@ -27,6 +27,7 @@ import { createNoise2D } from 'simplex-noise';
 import { RegionalField, TOWN_Y } from '../../engine/world/terrain/regionalLandscape';
 import { regionWorld, type Relief, type RegionWorld } from '../region/regionWorld';
 import { REGIONS, type RegionId } from '../../sim/regions';
+import { lotField, treeLineM, type LotField, type LotSpec } from '../../sim/lots';
 
 /** Parcel side in world units (40 acres ≈ 402 m). */
 export const PARCEL_SIZE = 67;
@@ -167,9 +168,13 @@ export class ParcelTerrain {
   private _relP = 0;
   /** A dry wash across the desert place (center z at x), or null. */
   readonly wash: ((x: number) => number) | null = null;
+  /** The listing's lot archetype (sim/lots.ts): ridge, bench, gorge, mesa ... null on the classic ground. */
+  readonly lot: LotField | null = null;
+  /** Running water on the place is drawn (false for a lot with no creek: its stream is not on the map). */
+  readonly hasStream: boolean = true;
 
   /** `creek`: through the place (default) or off it; `timber`: how much timber against the usual (1); `region`: whose land. */
-  constructor(seed: number, opts: { creek?: boolean; timber?: number; region?: RegionId } = {}) {
+  constructor(seed: number, opts: { creek?: boolean; timber?: number; region?: RegionId; lot?: LotSpec | null; home?: { x0: number; z0: number; x1: number; z1: number } } = {}) {
     this.seed = seed;
     this.creekHome = opts.creek ?? true;
     this._timber = opts.timber ?? 1;
@@ -193,6 +198,22 @@ export class ParcelTerrain {
       waterY: (x: number) => this._floodplainY(x) - CREEK_DEPTH + 0.12,
       halfWidth: CREEK_HALF,
     };
+    if (opts.lot) {
+      // a lot archetype owns the ground: its relief, its creek (if any) and its lake
+      const home = opts.home ?? { x0: 0, z0: 0, x1: PARCEL_SIZE, z1: PARCEL_SIZE };
+      const lf = lotField(opts.lot, home);
+      this.lot = lf;
+      this.creekHome = !!lf.creek;
+      this.hasStream = !!lf.creek;
+      if (lf.creek) {
+        const lc = lf.creek;
+        this.creek = { zAt: lc.zAt, waterY: (x: number) => TOWN_Y + lc.bedY(x) + 0.3 - CREEK_DEPTH + 0.12, halfWidth: lc.halfWidth };
+      } else {
+        // no stream on the place: the channel sits far off the map
+        this.creek = { zAt: () => PARCEL_SIZE * 6, waterY: () => -50, halfWidth: CREEK_HALF };
+      }
+      return;
+    }
     // the other reliefs draw their own shape after the bench rolls (Mountain West parcels stay as they were)
     if (this.relief !== 'benches') {
       const r2 = mulberry32(seed * 6151 + 29);
@@ -230,6 +251,7 @@ export class ParcelTerrain {
    * benches, or the hollow / bajada / swell / flat / foothill / moraine shapes.
    */
   private _local(x: number, z: number): number {
+    if (this.lot) return this.lot.h(x, z);
     const S = PARCEL_SIZE, n = this._noise;
     switch (this.relief) {
       case 'benches': return this._bench(x, z);
@@ -285,6 +307,33 @@ export class ParcelTerrain {
     }
   }
 
+
+  /** Slope (rise over run) of the lot's relief at (x, z). */
+  lotSlope(x: number, z: number): number {
+    const f = this.lot;
+    if (!f) return 0;
+    return Math.hypot(f.h(x + 0.5, z) - f.h(x - 0.5, z), f.h(x, z + 0.5) - f.h(x, z - 0.5));
+  }
+
+  /**
+   * Timber on a lot archetype: none on cliffs, scree and outcrops, thinning to
+   * nothing at the region's tree line (by altitude), open meadow on level
+   * benches, denser on the north-facing and sheltered ground.
+   */
+  private _lotCover(x: number, z: number): number {
+    const f = this.lot!, n = this._noise;
+    const g = this.lotSlope(x, z), rock = f.rock(x, z), elev = f.spec.elevM + f.h(x, z) * 6;
+    const line = treeLineM(this.regionId);
+    let c = 0.42 * (1 - sstep(line - 250, line, elev)) * (1 - 0.9 * sstep(0.3, 0.7, rock)) * (1 - sstep(0.55, 0.95, g));
+    // meadow: level ground is more often open, and a few glades everywhere
+    const glade = sstep(0.15, 0.55, n(x * 0.035 + 2, z * 0.035 - 6));
+    c *= 1 - glade * (g < 0.1 ? 0.8 : 0.45);
+    // a south-facing slope is drier and more open
+    const fall = f.fall, south = Math.sin(fall) * Math.min(1, g * 4);
+    c *= 1 - 0.18 * Math.max(0, -south);
+    return c;
+  }
+
   /** North Woods: an open sphagnum bog in a low spot (0–1). */
   private _bog(x: number, z: number): number {
     if (this.relief !== 'swell') return 0;
@@ -294,6 +343,7 @@ export class ParcelTerrain {
 
   /** Timber cover the region's land carries at (x, z), before the listing's timber (0–1). */
   private _cover(x: number, z: number): number {
+    if (this.lot) return this._lotCover(x, z);
     const n = this._noise, S = PARCEL_SIZE;
     switch (this.relief) {
       case 'benches': case 'flat': return 0;
@@ -362,6 +412,7 @@ export class ParcelTerrain {
 
   /** Floodplain level at x: the creek valley floor falls eastward with the benches. */
   private _floodplainY(x: number): number {
+    if (this.lot?.creek) return TOWN_Y + this.lot.creek.bedY(x) + 0.3;
     if (this._fp) {
       const u = Math.max(0, Math.min(FP_N - 1e-6, x - FP_X0)), i = Math.floor(u), f = u - i;
       return this._fp[i] * (1 - f) + this._fp[i + 1] * f;
@@ -386,8 +437,9 @@ export class ParcelTerrain {
     const valley = fp + 0.25 * Math.max(0, dz - FLOODPLAIN_HALF) ** 1.2;
     const along = 1 - sstep(PARCEL_SIZE + 20, PARCEL_SIZE + 65, Math.abs(x - PARCEL_SIZE / 2) + PARCEL_SIZE / 2);
     if (along > 0) {
-      h = h + (Math.min(h, valley) - h) * along;
-      if (dz < CREEK_HALF + 1.1) {
+      // (a lot archetype carves its own valley; only the channel is cut here)
+      if (!this.lot) h = h + (Math.min(h, valley) - h) * along;
+      if (dz < CREEK_HALF + 1.1 && (!this.lot || this.lot.creek)) {
         const bed = fp - CREEK_DEPTH + CREEK_DEPTH * sstep(CREEK_HALF * 0.25, CREEK_HALF + 1.1, dz);
         h = h + (Math.min(h, bed) - h) * along;
       }
@@ -395,7 +447,7 @@ export class ParcelTerrain {
     // Cover: timber on the upper bench on one side of the creek; cottonwoods on the banks
     // with the creek off the place, the timber runs in patches on the upper bench on either side
     let timber: number;
-    if (this.relief === 'benches') {
+    if (this.relief === 'benches' && !this.lot) {
       const side = !this.creekHome && Math.abs(z - this.creek.zAt(x)) > 20 ? 1 : Math.sign(z - this.creek.zAt(x)) === this._timberSide ? 1 : 0;
       const upper = sstep(this._benchAmp * 0.35, this._benchAmp * 0.6, this._bench(x, z));
       const patch = sstep(-0.45, 0.4, this._noise(x * 0.04 + 5, z * 0.04 - 2) + 0.35 * this._noise(x * 0.13 - 3, z * 0.13 + 8));
@@ -409,12 +461,14 @@ export class ParcelTerrain {
     }
     const riparian = (1 - sstep(1.5, 6 + 3 * this._noise(x * 0.05, 3.3), dz)) * sstep(CREEK_HALF + 0.2, CREEK_HALF + 0.8, dz) * along
       * (0.55 + 0.45 * sstep(-0.3, 0.3, this._noise(x * 0.09 + 11, z * 0.09)));
-    let forest = Math.max(r.forest * (this.relief === 'benches' ? 1 - w : sstep(60, 240, out)), 0.92 * timber, 0.75 * riparian);
+    let forest = Math.max(r.forest * (this.relief === 'benches' && !this.lot ? 1 - w : sstep(60, 240, out)), 0.92 * timber, 0.75 * riparian);
     // desert washes: a few cottonwoods / desert willow on the banks, where the water sits after a storm
     if (this.wash) {
       const dw = Math.abs(z - this.wash(x));
       forest = Math.max(forest, 0.5 * (1 - sstep(2.4, 5, dw)) * sstep(1.6, 2.4, dw) * (0.5 + 0.5 * this._noise(x * 0.1 + 7, 1.3)) * w);
     }
+    // under the lake nothing grows, and the shore is bare for a step
+    if (this.lot?.lake && h < TOWN_Y + this.lot.lake.y + 0.12) forest = 0;
     return { h, forest, field: r.field * (1 - w) };
   }
 
@@ -473,6 +527,11 @@ export class ParcelTerrain {
 
   /** Is (x, z) in the creek channel (below its water line)? */
   isCreek(x: number, z: number): boolean {
-    return this.natural(x, z).h < this.creek.waterY(x) - 0.01;
+    const h = this.natural(x, z).h;
+    if (this.lot?.lake && h < TOWN_Y + this.lot.lake.y + 0.02) return true;
+    return h < this.creek.waterY(x) - 0.01;
   }
+
+  /** The lake's water plane (world y), or null. */
+  get lakeY(): number | null { return this.lot?.lake ? TOWN_Y + this.lot.lake.y : null; }
 }

@@ -10,6 +10,7 @@ import { FarTreeRenderer } from '../engine/world/trees/FarTreeRenderer';
 import { planParcelTrees, planUnderstory, type ParcelTree } from './parcel/parcelTrees';
 import { buildWoods, fallHeading, trunkRadius } from './forestry/woodsGeometry';
 import type { Forestry } from '../sim/state';
+import { goodsKey, houseGoods } from '../sim/evenings';
 import { plant, serviceOf } from '../sim/utilities';
 import { StreamRenderer } from '../engine/world/water/StreamRenderer';
 import { RegionalWaterRenderer } from '../engine/world/water/RegionalWaterRenderer';
@@ -73,6 +74,7 @@ import { SeasonController, climateFor, type SeasonMode } from '../engine/world/s
 import { writeSeasonUniforms } from '../engine/world/season/seasonShader';
 import { PARCEL_SIZE, ParcelTerrain } from './parcel/parcelTerrain';
 import { CLASSIC, type Site as LandSite } from '../sim/site';
+import { lotStatsOf } from '../sim/lotListing';
 import { DRIVE_W, ROAD_W, distToLine, planAccess, roadLine, roadX, type Access } from './region/access';
 import { buildRibbon } from '../engine/world/roads/RoadRibbon';
 import { gravelMaterial, roadMaterial } from '../engine/world/roads/roadTextures';
@@ -224,7 +226,7 @@ export class HomesteadWorld {
     this._ws = ws;
     ws.setSite({ x0: 0, z0: 0, x1: PARCEL_SIZE, z1: PARCEL_SIZE });
     this.home = { ...site.home };
-    this.parcel = new ParcelTerrain(seed, { creek: site.creek, timber: site.timber, region: site.region });
+    this.parcel = new ParcelTerrain(seed, { creek: site.creek, timber: site.timber, region: site.region, lot: site.lot ?? null, home: site.home });
     setGroundProbe((x, z) => this.parcel.natural(x, z).h);
     this.regionWorld = this.parcel.world;
     this.climate = this.regionWorld.climate;
@@ -521,14 +523,14 @@ export class HomesteadWorld {
         if (k > 0 && inHome(px, pz)) continue;
         if (roll > keep) continue;
         const s = this.parcel.natural(px, pz), dz = Math.abs(pz - creek.zAt(px)), hw = creek.halfWidth;
-        if (s.h < creek.waterY(px) + 0.05) continue;
+        if (s.h < creek.waterY(px) + 0.05 || (this.parcel.lot?.lake && this.parcel.isCreek(px, pz))) continue;
         // willow on the banks: a dense band just above the water
         if (dz > hw + 0.25 && dz < hw + 2.6) {
           if (roll / keep < (0.55 * (1 - (dz - hw) / 2.6) + 0.12) * rw.willow && !blocked(px, pz)) willow.push({ x: px, y: this.groundAt(px, pz) - 0.02, z: pz, s: 0.8 + sR * 0.6, rot, tone });
           continue;
         }
         // rocks: ledges and loose stone, more on the steep and wooded ground (one chance in a few hundred cells)
-        if (rw.rocks.count > 0 && (tone * 997) % 1 < rw.rocks.count / 4000 * (1 + 3 * Math.min(1, this.parcel.region.slope(px, pz) * 4 + s.forest * 0.5)) && dz > hw + 1.5 && !blocked(px, pz)) {
+        if (rw.rocks.count > 0 && (tone * 997) % 1 < rw.rocks.count / 4000 * (1 + 3 * Math.min(1, (this.parcel.lot ? this.parcel.lotSlope(px, pz) : this.parcel.region.slope(px, pz)) * 4 + s.forest * 0.5) + (this.parcel.lot ? 14 * this.parcel.lot.rock(px, pz) : 0)) && dz > hw + 1.5 && !blocked(px, pz)) {
           const [r0, r1] = rw.rocks.size;
           rocks.push({ x: px, y: this.groundAt(px, pz), z: pz, s: r0 + (r1 - r0) * sR * sR, flat: (tone * 31.7) % 1 < rw.rocks.flat ? 1 : 0, rot, tone: (tone * 13.3) % 1 });
         }
@@ -876,7 +878,7 @@ export class HomesteadWorld {
   private _water(q: Quality): void {
     const c = this.parcel.creek;
     // a dry desert place: the channel off the place is a dry wash too (no running water drawn)
-    if (this.parcel.relief === 'bajada' && !this.parcel.creekHome) this.stream.clear();
+    if ((this.parcel.relief === 'bajada' && !this.parcel.creekHome) || !this.parcel.hasStream) this.stream.clear();
     else this.stream.build({
       x0: this.center.x - 62, x1: this.center.x + 62, zAt: c.zAt, waterY: c.waterY, band: 3,
       site: {
@@ -885,10 +887,11 @@ export class HomesteadWorld {
       },
       quality: q, season: seasonState.plants, seed: this.parcel.seed,
     });
-    const kind = this.regionWorld.kind, wy = regionWaterY(kind);
+    const kind = this.regionWorld.kind, lakeY = this.parcel.lakeY, wy = lakeY ?? regionWaterY(kind);
     if (wy !== null) {
+      // a lot with a lake (the bluff, the island) has its own shore: the water follows the lot's ground, not the region's
       this.lakes.build({
-        kind, height: (x, z) => this.parcel.region.height(x, z), waterY: wy,
+        kind, height: lakeY !== null ? (x, z) => this.parcel.natural(x, z).h : (x, z) => this.parcel.region.height(x, z), waterY: wy,
         cx: this.center.x, cz: this.center.z, reedInner: PARCEL_SIZE, quality: q, season: seasonState.plants,
       });
     }
@@ -921,21 +924,28 @@ export class HomesteadWorld {
   private _pickCamp(): { x: number; z: number; rot: number } {
     const p = this.parcel, h = this.home;
     // inside the home forty part of the place (the 80's west forty is the back forty)
-    const x0 = Math.max(h.x0, 0) + 6, x1 = h.x1 - 6, z0 = h.z0 + 6, z1 = h.z1 - 6;
-    const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+    let x0 = Math.max(h.x0, 0) + 6, x1 = h.x1 - 6, z0 = h.z0 + 6, z1 = h.z1 - 6;
+    let cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+    if (p.lot) {
+      // a lot archetype: the camp goes on its best flat (the knoll's crown, the bench, the island), not the middle of the rect
+      const st = lotStatsOf(p.lot);
+      [cx, cz] = st.pad;
+      x0 = Math.max(h.x0, 0) + 2; x1 = h.x1 - 2; z0 = h.z0 + 2; z1 = h.z1 - 2;
+    }
     let best: { x: number; z: number; rot: number } | null = null, bestScore = Infinity;
     for (let pass = 0; pass < 2 && !best; pass++) {
       for (let x = x0; x <= x1; x += 1) {
         for (let z = z0; z <= z1; z += 1) {
           const dc = Math.abs(z - p.creek.zAt(x));
           // by the creek when it runs through (water), else anywhere open; the second pass takes whatever is level
-          if (p.creekHome && pass === 0 && (dc < 5 || dc > 14)) continue;
-          if (dc < 5) continue;
+          if (p.creekHome && !p.lot && pass === 0 && (dc < 5 || dc > 14)) continue;
+          if (dc < 5 && p.hasStream) continue;
+          if (p.lot && p.isCreek(x, z)) continue;
           const s = p.natural(x, z);
           if (s.forest > (pass === 0 ? 0.05 : 0.3)) continue;
           const slope = Math.hypot(p.height(x + 1, z) - p.height(x - 1, z), p.height(x, z + 1) - p.height(x, z - 1)) / 2;
           if (slope > (pass === 0 ? 0.08 : 0.16)) continue;
-          const score = Math.hypot(x - cx, z - cz) + slope * 40;
+          const score = Math.hypot(x - cx, z - cz) + slope * (p.lot ? 25 : 40);
           if (score < bestScore) {
             bestScore = score;
             // tent door toward the creek (or the road)
@@ -1404,19 +1414,22 @@ export class HomesteadWorld {
    */
   syncServices(game: GameState): void {
     const p = plant(game);
+    // the evenings' goods (cards, music, paperbacks, toys) show on the table of the main home only: the biggest finished home
+    const mainId = [...this._built.values()].filter(b => b.finished && KIT[b.placed.kind].sleeps > 0).sort((a, b) => KIT[b.placed.kind].sleeps - KIT[a.placed.kind].sleeps)[0]?.placed.id, goods = houseGoods(game), gk = goodsKey(goods);
     for (const b of this._built.values()) {
       if (!b.finished) continue;
       const sv = serviceOf(game, p, b.placed.id);
       const opts = { plumbed: sv.plumbed, wired: sv.wired, septic: sv.septic };
       // wired but no power yesterday (a blackout, a flat battery): back to lamplight
       const powered = sv.wired && game.utilities.lit.includes(b.placed.id);
-      const key = `${+opts.plumbed}${+opts.wired}${+opts.septic}${+powered}`;
+      const mine = b.placed.id === mainId && gk !== '000000' ? gk : '';
+      const key = `${+opts.plumbed}${+opts.wired}${+opts.septic}${+powered}${mine}`;
       if (key === b.services) continue;
-      const geo = key.slice(0, 3) !== (b.services ?? '000').slice(0, 3);
+      const geo = key.slice(0, 3) !== (b.services ?? '000').slice(0, 3) || key.slice(4) !== (b.services ?? '').slice(4);
       b.services = key;
       if (b.light && !b.under) b.light.color.set(powered ? 0xfff0d8 : 0xffc27a);
-      if (!geo || (key.startsWith('000') && !b.group.userData.opts?.plumbed && !b.group.userData.opts?.wired)) continue;
-      this._rebuild(b, { ...b.opts, ...opts });
+      if (!geo || (key.startsWith('000') && !mine && !b.group.userData.opts?.plumbed && !b.group.userData.opts?.wired && !b.group.userData.opts?.goods)) continue;
+      this._rebuild(b, { ...b.opts, ...opts, goods: mine ? goods : undefined });
       if (b.light && !b.under) b.light.color.set(powered ? 0xfff0d8 : 0xffc27a);
     }
   }

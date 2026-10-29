@@ -25,8 +25,10 @@ import { dailyOf } from './daily';
 import { kinMorale } from './kin';
 import { griefMorale, mourn, noteLosses, unmourned } from './grief';
 import { bestHand, practice } from './skills';
+import { faithOf } from './mind';
+import { gatheringKitLift, noteShared, wearKits, type KitId } from './evenings';
 
-export type GatheringKind = 'cookout' | 'birthday' | 'thanksgiving' | 'christmas' | 'july4' | 'harvest' | 'movie' | 'campfire' | 'wedding' | 'funeral' | 'neighbors';
+export type GatheringKind = 'cookout' | 'birthday' | 'thanksgiving' | 'christmas' | 'july4' | 'harvest' | 'movie' | 'campfire' | 'wedding' | 'funeral' | 'neighbors' | 'service';
 
 export interface GatheringDef {
   name: string;
@@ -56,6 +58,7 @@ export const GATHERING: Record<GatheringKind, GatheringDef> = {
   wedding: { name: 'Wedding', kcal: 1600, lift: 14, noise: 8, wood: 0.08, hours: 5, callable: false },
   funeral: { name: 'Funeral', kcal: 800, lift: 0, noise: 1, wood: 0.02, hours: 2.5, callable: true },
   neighbors: { name: 'The neighbors over', kcal: 1200, lift: 8, noise: 7, wood: 0.06, hours: 3.5, callable: true },
+  service: { name: 'Service or meeting', kcal: 0, lift: 3, noise: 2, wood: 0.01, hours: 1.5, callable: true },
 };
 
 export interface Gathering { kind: GatheringKind; at: number; until: number; who?: string; guests?: string; applied?: boolean }
@@ -130,6 +133,7 @@ const CALL_LINE: Record<GatheringKind, (s: GameState, g: Gathering) => string> =
   wedding: (_s, g) => `${g.who ?? 'The couple'} are getting married this evening, out by the fire pit.`,
   funeral: (s, g) => `We'll bury ${nameOf(s, g.who)} this evening and say a few words.`,
   neighbors: (s, g) => `The ${s.neighbors.find(n => n.id === g.guests)?.name ?? 'neighbors'} are coming over for supper.`,
+  service: () => 'Everybody in the front room at six: a reading, a hymn or two, and a few words about the week. Whatever each believes, it is an hour of sitting together.',
 };
 
 /** Take a gathering's food: fresh first, then frozen, canned and staples (the bought kind while the stores work). Returns the share eaten and how good it was. */
@@ -167,8 +171,21 @@ export function holdGathering(s: GameState, g: Gathering): string[] {
   s.stock.firewood = Math.max(0, s.stock.firewood - def.wood);
   if (g.kind === 'movie' && s.utilities.report.genKwh > 0.1) s.stock.fuel = Math.max(0, s.stock.fuel - 0.15);
   const music = hasGuitar(s) && g.kind !== 'funeral' && g.kind !== 'movie';
-  const lift = (def.lift + (music ? 2 : 0)) * quality * (0.4 + 0.6 * covered);
-  for (const ps of here) ps.needs.morale = Math.min(100, ps.needs.morale + lift);
+  // the goods on hand (sim/evenings.ts): cards, music, something to read aloud, the little ones' toys; they wear with the evening
+  const kit = gatheringKitLift(s, g.kind);
+  const lift = (def.lift + (music ? 2 : 0) + kit.lift) * quality * (0.4 + 0.6 * covered);
+  for (const ps of here) {
+    const p = s.people.find(x => x.id === ps.id);
+    // a service lifts people of faith a lot and the rest a little
+    const faith = g.kind === 'service' && p ? (faithOf(s, p) ? 4 : -1.5) : 0;
+    ps.needs.morale = Math.min(100, ps.needs.morale + lift + faith);
+  }
+  if (kit.used.length) {
+    const users: Partial<Record<KitId, number>> = {};
+    for (const k of kit.used) users[k] = here.length;
+    out.push(...wearKits(s, users));
+    noteShared(s, kit.lift);
+  }
   // the afterglow (the morale target, fading over about a week)
   so.glow = Math.min(10, glowNow(s) + lift * 0.6); so.glowAt = s.clock.t;
   // the noise, light and smoke: it matters once others are hungry
@@ -179,7 +196,8 @@ export function holdGathering(s: GameState, g: Gathering): string[] {
   if (g.kind === 'neighbors') { const n = s.neighbors.find(x => x.id === g.guests); if (n) n.disposition = Math.min(100, n.disposition + 8); }
   if (covered < 0.5) out.push('There wasn\'t much to go round, but we were together.');
   else if (quality >= 1.1) out.push(RICH_LINE[g.kind]);
-  if (music && g.kind !== 'birthday') out.push('Somebody got the guitar out and we sang until the fire burned down.');
+  if (music && g.kind !== 'birthday' && g.kind !== 'service') out.push('Somebody got the guitar out and we sang until the fire burned down.');
+  else if (kit.used.length >= 2) out.push(kit.used.includes('games') ? 'The cards came out after supper, and somebody put the music on. Nobody went to bed early.' : 'The evening ran long over the music.');
   if (hungry && def.noise >= 6) out.push('"Keep it down. Sound carries a long way out here now, and so does the smell of meat."');
   return out;
 }
@@ -196,6 +214,7 @@ const RICH_LINE: Record<GatheringKind, string> = {
   wedding: 'A wedding under the string lights. There wasn\'t a dry eye.',
   funeral: 'We said what needed saying, and then we ate together.',
   neighbors: 'The neighbors came over. It was good to hear other voices at the table.',
+  service: 'We sang badly and meant it. Nobody wanted to be the first to get up.',
 };
 
 /** The afterglow now (morale target points). */

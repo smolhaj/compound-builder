@@ -10,6 +10,7 @@ import { foodSlot, Furniture, M, wallRun } from './interior';
 import { buildCabinLayers } from './cabinGeometry';
 import { box, buildGabled, CUT_H, Parts, showStage, type BuildOpts, type FurnishCtx } from './shell';
 import { Clutter } from './clutter';
+import { dressEvenings } from './goodsDress';
 import { UTILITY_BUILDERS } from './utilityBuildings';
 import { TOWER_BUILDERS } from './towerBuildings';
 import { BUNKER_BUILDERS } from './bunkerBuildings';
@@ -382,6 +383,7 @@ function logHouse(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group
     I({ x: left + 0.06, z: 0.22, rot: Math.PI / 2 }, a => Furniture.cookstove(a));
     I({ x: -0.32, z: 0.62, rot: Math.PI / 2 }, a => Furniture.island(a, 1.8));
     I({ x: 0.35, z: 0.78, rot: Math.PI / 2 }, a => Furniture.diningTable(a));
+    dressEvenings(c, { x: 0.35, z: 0.78, rot: Math.PI / 2 });
     I({ x: 0.62, z: front - 0.04, rot: Math.PI }, a => Furniture.shelfUnit(a, 1.0, 1.6, 'food'));
     I({ x: -0.15, z: front - 0.01, rot: Math.PI }, a => Furniture.coatPegs(a, 0.9), false);
     // stairs up to the loft, rising toward the back along the partition

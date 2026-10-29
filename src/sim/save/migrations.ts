@@ -43,6 +43,8 @@ type Raw = Record<string, unknown> & { version?: number };
 /** version n → n + 1 upgraders. */
 const STEPS: Record<number, (s: Raw) => Raw> = {
   // 65 → 66: weekender cash pacing (sim/weekender.ts): the belt in town is off; a weekend game keeps its town house as it was (owned, with its mortgage), nobody rents
+  // 67 → 68 (provisional number, renumber at merge): the lot archetype of the land (sim/lots.ts): `site.lot`; old places have none (their ground is the classic benches)
+  67: s => ({ ...s, version: 68, site: { lot: null, ...(s.site as object) } }),
   65: s => ({ ...s, version: 66, ...(s.weekend ? { weekend: { belt: false, ...(s.weekend as object) } } : {}) }),
   // 64 → 65: farm choices (sim/crops.ts): the plain `seed` is now the cheap hybrid and the heirloom has its own good. Seed on the shelf keeps its kind: what was heirloom
   // (`seed`) becomes `seed_heirloom`, what was hybrid (`seed_hybrid`) becomes the plain `seed`. Fields already sown keep the line they were sown with.
@@ -53,6 +55,8 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
     return { ...s, version: 65, stock: { ...st, seed: hybrid, seed_heirloom: (st.seed_heirloom ?? 0) + heirloom } };
   },
   // 61 → 62: the herd, the bees and the sugar bush (sim/herd.ts, sim/bees.ts, sim/maple.ts): new goods at zero, the cow's condition, the bees and sugaring chores at zero
+  // 66 → 67: classes, courses, drills and the evenings' wear goods (sim/courses.ts, sim/evenings.ts): the new goods at zero; the state is made when first needed
+  66: s => ({ ...s, version: 67, stock: { game_pieces: 0, guitar_strings: 0, music_player: 0, batteries: 0, paperbacks_bag: 0, toys: 0, picture_books: 0, course_firstaid: 0, course_ham: 0, course_engines: 0, course_welding: 0, course_carpentry: 0, course_wiring: 0, course_gardening: 0, course_husbandry: 0, course_canning: 0, ...(s.stock as object) } }),
   // 63 → 64: medical depth (sim/medical.ts): the supplies at zero, no cases yet
   63: s => ({ ...s, version: 64, stock: { antibiotics: 0, splints: 0, ors: 0, dental_kit: 0, midwife_kit: 0, medical_books: 0, ...(s.stock as object) } }),
   // 62 → 63: people depth (sim/skills.ts, sim/mind.ts): practice and rust, mental health; the evenings' goods at zero
