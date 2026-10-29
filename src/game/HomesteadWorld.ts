@@ -1041,7 +1041,7 @@ export class HomesteadWorld {
   private _pathLook(): { grass: number; soil: number } {
     const look = regionLookFor(this.regionWorld.kind);
     const lerp = (a: number, b: number, t: number) => new THREE.Color(a).lerp(new THREE.Color(b), t).getHex();
-    return { grass: look.grass !== undefined && look.dryGrass !== undefined ? lerp(look.grass, look.dryGrass, 0.5) : (look.grass ?? 0x6c7550), soil: lerp(0x5f4f3a, 0x9c865e, Math.min(1, look.dry * 0.8 + 0.2)) };
+    return { grass: look.grass !== undefined && look.dryGrass !== undefined ? lerp(look.grass, look.dryGrass, 0.5) : (look.grass ?? 0x6c7550), soil: lerp(0x6b5a43, 0xa38d65, Math.min(1, look.dry * 0.8 + 0.2)) };
   }
 
   /** Is (x, z) on the camp (plus `pad`)? */
