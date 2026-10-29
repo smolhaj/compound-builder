@@ -214,3 +214,14 @@ describe('the shared strength', () => {
     expect(typeof adaptOf(g)).toBe('number');
   });
 });
+
+import { groundOf } from './terrainState';
+import { ParcelTerrain } from '../game/parcel/parcelTerrain';
+describe('the same ground the world draws', () => {
+  it('reads the lot profile and home block like HomesteadWorld, so a varied lot is analysed as drawn', () => {
+    const g = newGame(11);
+    const pt = new ParcelTerrain(g.seed, { creek: g.site.creek, timber: g.site.timber, region: g.site.region, lot: g.site.lot ?? null, home: g.site.home });
+    const src = groundOf(g)!;
+    for (const [x, z] of [[10, 10], [33, 40], [60, 20]]) expect(src.h(x, z)).toBeCloseTo(pt.natural(x, z).h, 6);
+  });
+});

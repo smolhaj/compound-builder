@@ -19,7 +19,7 @@ const sources = new Map<string, GroundSource>();
 const terrains = new Map<string, Terrain>();
 const lanes = new Map<string, Lane[]>();
 
-const keyOf = (s: GameState) => `${s.seed}|${s.site.region}|${s.site.creek ? 1 : 0}|${s.site.timber}`;
+const keyOf = (s: GameState) => `${s.seed}|${s.site.region}|${s.site.creek ? 1 : 0}|${s.site.timber}|${JSON.stringify(s.site.lot ?? null)}|${s.site.home.x0},${s.site.home.z0},${s.site.home.x1},${s.site.home.z1}`;
 
 /** The ground of this game's lot (null: none known). */
 export function groundOf(s: GameState): GroundSource | null {
@@ -27,7 +27,7 @@ export function groundOf(s: GameState): GroundSource | null {
   const k = keyOf(s);
   let g = sources.get(k);
   if (!g) {
-    const pt = new ParcelTerrain(s.seed, { creek: s.site.creek, timber: s.site.timber, region: s.site.region });
+    const pt = new ParcelTerrain(s.seed, { creek: s.site.creek, timber: s.site.timber, region: s.site.region, lot: s.site.lot ?? null, home: s.site.home });
     g = { h: (x, z) => pt.natural(x, z).h, creek: pt.creek };
     sources.set(k, g);
   }
