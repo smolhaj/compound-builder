@@ -432,7 +432,9 @@ export function placementProblem(def: KitPieceDef, x: number, z: number, rot: nu
   let grade = 0;
   for (let j = 0; j <= N; j++) grade = Math.max(grade, Math.abs(hs[N][j] - hs[0][j]) / (r.x1 - r.x0));
   for (let i = 0; i <= N; i++) grade = Math.max(grade, Math.abs(hs[i][N] - hs[i][0]) / (r.z1 - r.z0));
-  if (grade > def.maxSlope) return 'too_steep';
+  // (a floor hatch stands on its house's graded pad, whatever the natural ground does)
+  const isFloorHatch = def.id === 'bunker_floorhatch';
+  if (grade > def.maxSlope && !isFloorHatch) return 'too_steep';
   // a floor hatch is built inside a house: the house it stands in is not in its way
   const host = def.id === 'bunker_floorhatch' ? floorHatchHost(x, z, placed) : null;
   if (def.id === 'bunker_floorhatch' && !host) return 'needs_house';

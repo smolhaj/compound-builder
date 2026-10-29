@@ -54,7 +54,7 @@ try {
     const e = W.localToWorld(b.id, ex, ey, ez), l = W.localToWorld(b.id, lx, ly, lz);
     cb.qa.pose = { x: e.x, y: e.y, z: e.z, lx: l.x, ly: l.y, lz: l.z, fov };
   }, [key, ex, ey, ez, lx, ly, lz, fov]);
-  const set = (js) => page.evaluate(new Function('cb', js));
+  const set = (js) => page.evaluate(js => new Function("cb", js)(window.__cb), js);
 
   // construction stages (daylight, from above)
   await set("cb.store.getState().setTimeOfDay(12);");
