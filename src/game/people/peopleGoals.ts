@@ -348,7 +348,8 @@ export function dailyGoal(i: number, kid: boolean, task: TaskKind, hour: number,
     }
     case 'drill': {
       // the firing line: side by side past the yard, rifles up, facing out from the camp
-      const [x, z] = at(-0.6 + (i % 5) * 0.3, 2.7), [tx, tz] = at(-0.6 + (i % 5) * 0.3, 5);
+      // (offsets in the world frame, well past the picnic table and the line)
+      const x = ctx.camp.x - 0.6 + (i % 5) * 0.3, z = ctx.camp.z + 4.5, tx = x, tz = z + 3;
       return goal(x, z, FIG_POSE.RIFLE, faceTo(x, z, tx, tz), { tool: FIG_TOOL.RIFLE, walkPose: FIG_POSE.RIFLE, work: true });
     }
     case 'watch': {

@@ -9,6 +9,10 @@ import { M } from './interior';
 import type { BuildOpts, FurnishCtx } from './shell';
 
 /** The goods in the main home's table: `table` its middle in the building frame and its turn (radians), `h` the top's height in metres. */
+type AddFn = Parameters<Parameters<FurnishCtx['I']>[1]>[0];
+/** The same piece a little bigger than life, so small things read from the air. */
+const big = (a: AddFn, k: number): AddFn => (m, g) => a(m, g.scale(k, k, k));
+
 export function dressEvenings(c: FurnishCtx, table: { x: number; z: number; rot?: number }, h = 0.76): void {
   const g: NonNullable<BuildOpts['goods']> | undefined = c.parts.opts.goods;
   if (!g) return;
@@ -18,11 +22,11 @@ export function dressEvenings(c: FurnishCtx, table: { x: number; z: number; rot?
   const top = c.y0 + 0.004 + h * M;
   const put = (u: number, v: number, a: number, fn: Parameters<FurnishCtx['I']>[1], y = top) => c.I({ ...at(u, v), rot: rot + a, y }, fn, false);
   if (g.games) {
-    put(-0.17, 0.0, 0.1, a => Clutter.gameBox(a, g.games === 2));
-    put(0.2, 0.17, -0.4, a => Clutter.cards(a, g.games === 2));
+    put(-0.17, 0.0, 0.1, a => Clutter.gameBox(big(a, 1.25), g.games === 2));
+    put(0.2, 0.17, -0.4, a => Clutter.cards(big(a, 1.7), g.games === 2));
   }
-  if (g.books) put(0.3, -0.2, 0.3, a => Clutter.paperbacks(a, g.books === 2));
-  if (g.player) put(-0.3, 0.29, Math.PI + 0.2, a => Clutter.radio(a));
+  if (g.books) put(0.3, -0.2, 0.3, a => Clutter.paperbacks(big(a, 1.4), g.books === 2));
+  if (g.player) put(-0.3, 0.29, Math.PI + 0.2, a => Clutter.radio(big(a, 1.5)));
   if (g.guitar) { const p = at(0.68, 0); c.I({ x: p.x, z: p.z, rot: rot + Math.PI / 2, y: c.y0 + 0.004 }, a => Clutter.guitar(a), false); }
   if (g.toys) { const p = at(-0.3, 0.8); c.I({ x: p.x, z: p.z, rot: rot + 0.4, y: c.y0 + 0.004 }, a => Clutter.toys(a), false); }
   if (g.kidbooks) { const p = at(0.3, 0.8); c.I({ x: p.x, z: p.z, rot: rot - 0.3, y: c.y0 + 0.004 }, a => Clutter.pictureBooks(a, g.kidbooks === 2), false); }
