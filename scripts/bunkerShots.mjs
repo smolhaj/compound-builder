@@ -21,7 +21,7 @@ try {
   await page.waitForFunction(() => window.__cb?.qa?.lowrender, null, { timeout: 300000 });
   await page.evaluate(() => window.__cb.store.getState().setQuality('low'));
   const frames = async (n = 1) => { for (let i = 0; i < n; i++) await page.evaluate(() => window.__cb.qa.renderNow()); };
-  const shot = async (name) => { if (only && !name.includes(only)) return; await frames(1); await page.screenshot({ path: `${out}/${name}.png` }); lap(name); };
+  const shot = async (name) => { if (only && !name.includes(only)) return; await frames(3); await page.screenshot({ path: `${out}/${name}.png` }); lap(name); };
 
   // the compound: a house, a garden, solar; the bunker with every room; the family's gear
   await page.evaluate(() => {
@@ -57,7 +57,7 @@ try {
   await room('bunker_corridor', 0.5, 1.5, 0.9, 0.0, 0.1, 0.0, 60); await shot('04-aerial-tunnel');
   // eye level inside the rooms: no daylight below ground, only the lamps; the person stands in each room (setDebug)
   await set("cb.store.getState().setUnderground(false); cb.store.getState().setBuildingView('full'); cb.ws.outdoorLight = 0.04;");
-  await room('bunker_corridor', 0.0, 0.25, 0.42, 0.0, 0.2, -0.4, 80); await shot('05-eye-tunnel-arch');
+  await room('bunker_corridor', 0.0, 0.25, -0.4, 0.0, 0.2, 0.4, 80); await shot('05-eye-tunnel-arch');
   await room('bunker_dorm', 0.3, 0.27, 0.3, -0.25, 0.1, -0.3); await shot('06-eye-bunkroom');
   await room('bunker_comms', 0.1, 0.27, 0.38, -0.1, 0.16, -0.35, 80); await shot('07-eye-control-room');
   await room('bunker_comms', -0.08, 0.22, 0.4, 0.15, 0.2, -0.3, 75); await shot('08-eye-control-room-screens');
