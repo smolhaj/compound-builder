@@ -119,7 +119,7 @@ describe('raids come by the cheapest way', () => {
   const fort: GroundSource = { h: (x, z) => {
     const d = Math.hypot(x - 33, z - 33);
     if (d < 12) return 6;
-    if (Math.abs(z - 33) < 2 && x < 33) return Math.max(0, 6 - (d - 12) * 0.2);
+    if (Math.abs(z - 33) < 3.5 && x < 33) return Math.max(0, 6 - (d - 12) * 0.2);
     return Math.max(0, 6 - (d - 12) * 2.5);
   } };
   it('a crew comes round to an easy lane when the road side is cliff; the road side stays the road side on open ground', () => {
@@ -146,7 +146,7 @@ describe('the ground\'s share of the defense', () => {
   const neck: GroundSource = { h: (x, z) => {
     const d = Math.hypot(x - 33, z - 33);
     if (d < 12) return 6;
-    if (Math.abs(x - 33) < 2 && z > 33) return Math.max(0, 6 - (d - 12) * 0.25);
+    if (Math.abs(x - 33) < 3.5 && z > 33) return Math.max(0, 6 - (d - 12) * 0.25);
     return Math.max(0, 6 - (d - 12) * 2.5);
   } };
   it('is 0 on open ground, rises with a hard lane, and a wall at the choke counts as holding it', () => {
@@ -203,7 +203,7 @@ import { terrainPoints } from './terrainFx';
 import { adaptOf } from './encounters';
 describe('the shared strength', () => {
   it('the ground adds up to 15 defense points to what the crews learn from', () => {
-    const neck: GroundSource = { h: (x, z) => { const d = Math.hypot(x - 33, z - 33); if (d < 12) return 6; if (Math.abs(x - 33) < 2 && z > 33) return Math.max(0, 6 - (d - 12) * 0.25); return Math.max(0, 6 - (d - 12) * 2.5); } };
+    const neck: GroundSource = { h: (x, z) => { const d = Math.hypot(x - 33, z - 33); if (d < 12) return 6; if (Math.abs(x - 33) < 3.5 && z > 33) return Math.max(0, 6 - (d - 12) * 0.25); return Math.max(0, 6 - (d - 12) * 2.5); } };
     const g = game(); g.site = { ...g.site, home: { x0: 0, z0: 0, x1: 67, z1: 67 } };
     built(g, 'h', 'timber_cabin', 33, 33);
     setGroundOverride({ h: () => 0 });

@@ -13,7 +13,7 @@ import type { Pt } from './perimeter';
 
 let override: GroundSource | null = null;
 /** Tests (and the world, if it ever needs to) can pin the ground. */
-export const setGroundOverride = (g: GroundSource | null): void => { override = g; terrains.clear(); lanes.clear(); sources.clear(); sites.clear(); };
+export const setGroundOverride = (g: GroundSource | null): void => { override = g; terrains.clear(); liteTerrains.clear(); lanes.clear(); sources.clear(); sites.clear(); };
 
 const sources = new Map<string, GroundSource>();
 const terrains = new Map<string, Terrain>();
@@ -51,9 +51,20 @@ export function campOf(s: GameState): Pt {
   return live.length ? [live.reduce((a, st) => a + st.x, 0) / live.length, live.reduce((a, st) => a + st.z, 0) / live.length] : [(h.x0 + h.x1) / 2, (h.z0 + h.z1) / 2];
 }
 
+const liteTerrains = new Map<string, Terrain>();
+/** Just what the raid lanes read, at step 2 (a quarter of the work): the cost grid and the creek. Built once per place. */
+export function laneTerrainOf(s: GameState): Terrain | null {
+  const g = groundOf(s);
+  if (!g) return null;
+  const k = keyOf(s) + (override ? '|o' : '');
+  let t = liteTerrains.get(k);
+  if (!t) { t = analyzeTerrain(g, s.site.home, { step: 2, lite: true }); liteTerrains.set(k, t); }
+  return t;
+}
+
 /** The ways a crew could come at the camp, cached by place and camp (rounded to 4 units). */
 export function lanesOf(s: GameState): Lane[] {
-  const t = terrainOf(s);
+  const t = laneTerrainOf(s);
   if (!t) return [];
   const c = campOf(s), k = `${keyOf(s)}|${override ? 'o' : ''}|${Math.round(c[0] / 4)}|${Math.round(c[1] / 4)}`;
   let l = lanes.get(k);
