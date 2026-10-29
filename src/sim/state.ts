@@ -41,6 +41,8 @@ import type { LightsState } from './lights';
 import type { Learning } from './skills';
 import type { MindState } from './mind';
 import type { Medical } from './medical';
+import type { Evenings } from './evenings';
+import type { Courses } from './courses';
 import { starterKit, type ToolKit } from './tools';
 export const SAVE_VERSION = 67;
 import type { BlackMarket } from './blackMarket';
@@ -141,7 +143,7 @@ export type TaskKind = 'idle' | 'build' | 'forestry' | 'sleep' | 'chores' | 'sch
   // the weekender (sim/weekender.ts): at the town house, or at work in town, while the family is not on the place
   | 'town'
   // daily life (sim/daily.ts): the duty on the roster, and a gathering
-  | 'garden' | 'fields' | 'livestock' | 'pets' | 'cleaning' | 'wood' | 'water' | 'kitchen' | 'laundry' | 'repairs' | 'hunt' | 'medic' | 'teach' | 'radio' | 'watch' | 'meal' | 'party';
+  | 'garden' | 'fields' | 'livestock' | 'pets' | 'cleaning' | 'wood' | 'water' | 'kitchen' | 'laundry' | 'repairs' | 'hunt' | 'medic' | 'teach' | 'radio' | 'watch' | 'meal' | 'party' | 'study' | 'drill';
 
 export interface PersonState {
   id: string;
@@ -292,6 +294,10 @@ export interface GameState {
   mind?: MindState;
   /** Medical depth: lasting effects, pregnancies, the epidemic, the antibiotics policy (sim/medical.ts). Save v64; `medicalOf` makes it lazily. */
   medical?: Medical;
+  /** The evenings' goods and how worn they are: the cards, the guitar, the paperbacks, the kids' toys (sim/evenings.ts). Save v65; `eveningsOf` makes it lazily. */
+  evenings?: Evenings;
+  /** Classes and courses taken, the certificates, the defense drills and how drilled everyone is (sim/courses.ts). Save v65; `coursesOf` makes it lazily. */
+  courses?: Courses;
   /** Deaths in the household and whether they were mourned (sim/grief.ts). Save v49; `lossesOf` makes it lazily. */
   losses?: Loss[];
   /** The weekender (sim/weekender.ts): the town house, the caretaker, the trips, the way home. Present while the family splits its week between town and the place, and after the move (the town house may be kept). Save v59. */

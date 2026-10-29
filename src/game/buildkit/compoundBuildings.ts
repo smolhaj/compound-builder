@@ -9,6 +9,7 @@ import * as THREE from 'three';
 import { CELL, type KitPieceDef } from './kit';
 import { Furniture, M, pipe, type Add } from './interior';
 import { Clutter } from './clutter';
+import { dressEvenings } from './goodsDress';
 import { Equipment } from './utilityBuildings';
 import { box, buildGabled, Parts, type BuildOpts, type FurnishCtx } from './shell';
 
@@ -51,6 +52,7 @@ function cottage(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group 
     I({ x: STOVE.x + 0.165, z: STOVE.z - 0.005 }, a => Furniture.woodbox(a));
     if (o.wired) I({ x: left + 0.065, z: front - 0.1, rot: Math.PI / 2 }, a => Furniture.fridge(a));
     I({ x: 0.22, z: 0.35 }, a => { Furniture.table(a, 1.0, 0.8); Furniture.oilLamp(a, 0.25, 0.76, -0.15); });
+    dressEvenings(c, { x: 0.22, z: 0.35 });
     I({ x: 0.22, z: 0.35 - 0.1 }, a => Furniture.chair(a));
     I({ x: 0.22, z: 0.35 + 0.1, rot: Math.PI }, a => Furniture.chair(a));
     I({ x: 0.3, z: 0.05, rot: Math.PI }, a => Furniture.armchair(a, 'quilt_blue'));

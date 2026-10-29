@@ -10,6 +10,7 @@ import { FarTreeRenderer } from '../engine/world/trees/FarTreeRenderer';
 import { planParcelTrees, planUnderstory, type ParcelTree } from './parcel/parcelTrees';
 import { buildWoods, fallHeading, trunkRadius } from './forestry/woodsGeometry';
 import type { Forestry } from '../sim/state';
+import { goodsKey, houseGoods } from '../sim/evenings';
 import { plant, serviceOf } from '../sim/utilities';
 import { StreamRenderer } from '../engine/world/water/StreamRenderer';
 import { RegionalWaterRenderer } from '../engine/world/water/RegionalWaterRenderer';
@@ -1413,19 +1414,22 @@ export class HomesteadWorld {
    */
   syncServices(game: GameState): void {
     const p = plant(game);
+    // the evenings' goods (cards, music, paperbacks, toys) show on the table of the main home only: the biggest finished home
+    const mainId = [...this._built.values()].filter(b => b.finished && KIT[b.placed.kind].sleeps > 0).sort((a, b) => KIT[b.placed.kind].sleeps - KIT[a.placed.kind].sleeps)[0]?.placed.id, goods = houseGoods(game), gk = goodsKey(goods);
     for (const b of this._built.values()) {
       if (!b.finished) continue;
       const sv = serviceOf(game, p, b.placed.id);
       const opts = { plumbed: sv.plumbed, wired: sv.wired, septic: sv.septic };
       // wired but no power yesterday (a blackout, a flat battery): back to lamplight
       const powered = sv.wired && game.utilities.lit.includes(b.placed.id);
-      const key = `${+opts.plumbed}${+opts.wired}${+opts.septic}${+powered}`;
+      const mine = b.placed.id === mainId && gk !== '000000' ? gk : '';
+      const key = `${+opts.plumbed}${+opts.wired}${+opts.septic}${+powered}${mine}`;
       if (key === b.services) continue;
-      const geo = key.slice(0, 3) !== (b.services ?? '000').slice(0, 3);
+      const geo = key.slice(0, 3) !== (b.services ?? '000').slice(0, 3) || key.slice(4) !== (b.services ?? '').slice(4);
       b.services = key;
       if (b.light && !b.under) b.light.color.set(powered ? 0xfff0d8 : 0xffc27a);
-      if (!geo || (key.startsWith('000') && !b.group.userData.opts?.plumbed && !b.group.userData.opts?.wired)) continue;
-      this._rebuild(b, { ...b.opts, ...opts });
+      if (!geo || (key.startsWith('000') && !mine && !b.group.userData.opts?.plumbed && !b.group.userData.opts?.wired && !b.group.userData.opts?.goods)) continue;
+      this._rebuild(b, { ...b.opts, ...opts, goods: mine ? goods : undefined });
       if (b.light && !b.under) b.light.color.set(powered ? 0xfff0d8 : 0xffc27a);
     }
   }

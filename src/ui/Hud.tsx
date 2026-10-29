@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { stormOutage } from '../sim/weatherThreats';
-import { PersonInsight, PeopleSection, MedicalSection } from './PeoplePanel';
+import { PersonInsight, PeopleSection, MedicalSection, ClassesSection } from './PeoplePanel';
 import { DailySection } from './SchedulePanel';
 import { DAILY_TASK_TEXT } from './dailyText';
 import { useWorldStore, type BuildingView, type CameraMode } from '../store/worldStore';
@@ -205,6 +205,7 @@ export function Hud() {
             <HousingPanel />
             <PeopleSection />
             <MedicalSection />
+            <ClassesSection />
             <DailySection />
             {trialCamps(game).map(c => <Section key={c.id} title={`Camp outside the wall: ${c.title}`}>
               <Row label="On trial" value={`day ${Math.max(0, dayIndex(game.clock.t) - c.from)} of ${c.until - c.from}`} />
