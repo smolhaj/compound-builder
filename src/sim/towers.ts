@@ -31,7 +31,7 @@ import type { Stock } from './materials';
 import { walkwayWatch } from './walkway';
 import type { GameState, Structure } from './state';
 
-export type TowerKind = 'rise_lookout' | 'watchtower_wood' | 'watchtower_concrete' | 'watchtower_flood' | 'watchtower_mount' | 'watchtower_turret';
+export type TowerKind = 'rise_lookout' | 'watchtower_wood' | 'watchtower_concrete' | 'watchtower_flood' | 'watchtower_mount' | 'watchtower_turret' | 'watchtower_octagon' | 'watchtower_hex';
 
 export interface TowerDef {
   kind: TowerKind;
@@ -60,13 +60,16 @@ export const TOWERS: Record<TowerKind, TowerDef> = {
   watchtower_flood: { kind: 'watchtower_flood', tier: 4, name: 'Tower with floodlights', cells: 1, blurb: 'The concrete tower with a light mast: the whole approach lit white at night when there is power. Without power it is only a tower.', post: { y: 1.27, cover: 0.17, value: 4.4, acc: 1.2, reach: 1.2 }, view: 14, viewR: 7, flood: true },
   watchtower_mount: { kind: 'watchtower_mount', tier: 5, name: 'Tower with a mounted gun', cells: 1, blurb: 'A taller armored cab with a ring-mounted machine gun and an ammunition locker. Needs a person up there and belts from the armory; big firepower and range.', post: { y: 1.32, cover: 0.15, value: 4.6, acc: 1.2, reach: 1.25 }, view: 16, viewR: 8, flood: true, mount: true },
   watchtower_turret: { kind: 'watchtower_turret', tier: 6, name: 'Tower with an automated turret', cells: 1, blurb: 'The armored tower with a remote turret on the roof, aimed from cameras: it fires with nobody on it. Needs power, cameras and a great deal of ammunition, and a turret can jam.', post: { y: 1.37, cover: 0.14, value: 4.8, acc: 1.2, reach: 1.25 }, view: 20, viewR: 9, flood: true, mount: true, turret: true },
+  // plan variants: the same tier as the square tower they stand beside, with the corners knocked off (an eight- or six-sided shaft: no dead ground at the corners, a little better cover)
+  watchtower_octagon: { kind: 'watchtower_octagon', tier: 2, name: 'Octagonal timber tower', cells: 1, blurb: 'An eight-sided tower on a stone course: timber walls, a roofed cab all round with no dead corners, a ladder and a trapdoor. A wooden tower with a better field of fire and cover.', post: { y: 1.03, cover: 0.25, value: 4.1, acc: 1.17, reach: 1.1 }, view: 11, viewR: 5.5 },
+  watchtower_hex: { kind: 'watchtower_hex', tier: 3, name: 'Hexagonal concrete tower', cells: 1, blurb: 'A six-sided poured shaft with a steel cab: every face takes a glancing blow, and it sees all round. A concrete tower with a little better cover.', post: { y: 1.22, cover: 0.16, value: 4.3, acc: 1.2, reach: 1.2 }, view: 14, viewR: 7 },
 };
 
 /** The chain, lowest tier first. */
 export const TOWER_CHAIN: readonly TowerKind[] = ['rise_lookout', 'watchtower_wood', 'watchtower_concrete', 'watchtower_flood', 'watchtower_mount', 'watchtower_turret'];
 
 /** The next tier up (upgraded in place: `upgradeTower`). */
-export const TOWER_NEXT: Partial<Record<string, TowerKind>> = Object.fromEntries(TOWER_CHAIN.slice(0, -1).map((k, i) => [k, TOWER_CHAIN[i + 1]]));
+export const TOWER_NEXT: Partial<Record<string, TowerKind>> = { ...Object.fromEntries(TOWER_CHAIN.slice(0, -1).map((k, i) => [k, TOWER_CHAIN[i + 1]])), watchtower_octagon: 'watchtower_concrete', watchtower_hex: 'watchtower_flood' };
 
 export const isTower = (kind: string): kind is TowerKind => kind in TOWERS;
 
@@ -87,7 +90,7 @@ export const setGroundProbe = (f: ((x: number, z: number) => number) | null): vo
 /** A rise this high above the land round it (≈ 3 m) gives the whole bonus; more adds nothing. */
 export const HIGH_FULL = 0.5;
 /** How much each tier leans on the ground: the low rise gains most from a natural hill, a tall tower least. */
-const HIGH_WEIGHT: Record<TowerKind, number> = { rise_lookout: 2, watchtower_wood: 1, watchtower_concrete: 0.6, watchtower_flood: 0.6, watchtower_mount: 0.6, watchtower_turret: 0.6 };
+const HIGH_WEIGHT: Record<TowerKind, number> = { rise_lookout: 2, watchtower_wood: 1, watchtower_concrete: 0.6, watchtower_flood: 0.6, watchtower_mount: 0.6, watchtower_turret: 0.6, watchtower_octagon: 1, watchtower_hex: 0.6 };
 
 /** How far (x, z) stands above the mean of a ring of ground 24 m out (world units, never negative). */
 export function highGroundAt(x: number, z: number): number {

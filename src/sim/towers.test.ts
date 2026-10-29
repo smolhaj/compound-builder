@@ -361,3 +361,20 @@ describe('floodlight discipline', () => {
     expect(up.lights?.mode).toBe('sensor');
   });
 });
+
+describe('plan variants', () => {
+  it('the octagonal timber and hexagonal concrete towers stand at their tier, a little better, cost real money, upgrade into the chain, and are in the price table', () => {
+    expect(TOWERS.watchtower_octagon.tier).toBe(TOWERS.watchtower_wood.tier);
+    expect(TOWERS.watchtower_hex.tier).toBe(TOWERS.watchtower_concrete.tier);
+    expect(TOWERS.watchtower_octagon.post.cover).toBeLessThan(TOWERS.watchtower_wood.post.cover);
+    expect(TOWERS.watchtower_hex.post.cover).toBeLessThan(TOWERS.watchtower_concrete.post.cover);
+    expect(TOWERS.watchtower_octagon.post.cover).toBeGreaterThan(TOWERS.watchtower_concrete.post.cover);
+    expect(TOWER_NEXT.watchtower_octagon).toBe('watchtower_concrete');
+    expect(TOWER_NEXT.watchtower_hex).toBe('watchtower_flood');
+    for (const k of ['watchtower_octagon', 'watchtower_hex'] as const) {
+      const base = k === 'watchtower_octagon' ? 'watchtower_wood' : 'watchtower_concrete';
+      expect(billCost(totalBill(BLUEPRINTS[k]))).toBeGreaterThan(billCost(totalBill(BLUEPRINTS[base])));
+      expect(totalHours(BLUEPRINTS[k])).toBeGreaterThan(0);
+    }
+  });
+});

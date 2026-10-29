@@ -426,7 +426,9 @@ const concreteTower = (kind: string, mast: boolean, ring: boolean, turret: boole
 export const TOWER_BLUEPRINTS: Blueprint[] = [
   bp('rise_lookout', [['site', 'Stake out the rise', 4, {}], ['foundation', 'Pile, tamp and face the earth rise', 30, {}], ['frame', 'Timber nest platform and ladder', 14, { lumber: 2 }], ['roof', 'Sandbag parapet and a plank roof', 10, { sandbags: 1, roofing: 1 }], ['finish', 'Firing slots, a bench, a rope rail', 6, { hardware: 1 }]]),
   bp('watchtower_wood', [['site', 'Stake out beside the old one', 6, {}], ['foundation', 'Footings', 40, { concrete: 3 }], ['frame', 'Timber legs, bracing and the deck', 150, { lumber: 10 }], ['roof', 'Cab walls and a metal roof', 60, { lumber: 3, roofing: 3 }], ['finish', 'Ladder, trapdoor, rail and firing slots', 40, { lumber: 2, hardware: 2 }]]),
+  bp('watchtower_octagon', [['site', 'Stake out the eight corners', 6, {}], ['foundation', 'Footings and a course of fieldstone', 55, { concrete: 4 }], ['frame', 'Eight timber posts, girts and the deck', 190, { lumber: 13 }], ['roof', 'Eight-sided cab walls and a metal roof', 80, { lumber: 4, roofing: 4 }], ['finish', 'Ladder, trapdoor, rail and firing slots', 50, { lumber: 2, hardware: 3 }]]),
   concreteTower('watchtower_concrete', false, false, false),
+  bp('watchtower_hex', [['site', 'Stake out beside the old one', 8, {}], ['foundation', 'Dig and pour the footing', 66, { concrete: 9, rebar: 3 }], ['frame', 'Form and pour the six-sided shaft', 230, { concrete: 16, rebar: 9, lumber: 5 }], ['roof', 'Steel cab, firing slits and roof', 100, { rebar: 4, roofing: 4, hardware: 3 }], ['finish', 'Steel stair, hatch and ladder', 54, { hardware: 4, rebar: 3 }]]),
   concreteTower('watchtower_flood', true, false, false),
   concreteTower('watchtower_mount', true, true, false),
   concreteTower('watchtower_turret', true, true, true),

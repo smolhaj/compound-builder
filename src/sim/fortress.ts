@@ -37,7 +37,7 @@ import type { GameState } from './state';
 /** How many towers a ring carries: up to five (the user's description: "five observation towers"). */
 export const MAX_TOWERS = 5;
 /** The first tiers a ring can start with (the rest are upgrades in place from the Defense tab). */
-export const RING_TOWER_KINDS: readonly TowerKind[] = ['rise_lookout', 'watchtower_wood', 'watchtower_concrete'];
+export const RING_TOWER_KINDS: readonly TowerKind[] = ['rise_lookout', 'watchtower_wood', 'watchtower_octagon', 'watchtower_concrete', 'watchtower_hex'];
 
 /** The core compound's side: ≈ 144 m, about five acres (a 12 × 12 block of 12 m tiles). */
 export const CORE_SIDE = 24;
@@ -60,12 +60,14 @@ export interface FortressOptions {
   rings: number;
   ringWall: PerimeterKind;
   ringGates: RingGates;
+  /** A sally port in each inner ring (sim/rings.ts SALLY). */
+  ringSally: boolean;
   /** A motor court in front of the gate garage (sim/motorCourt.ts). */
   motorCourt: boolean;
 }
 /** The walls a ring can be built in (each takes a patrol walkway). */
 export const RING_WALLS: readonly PerimeterKind[] = ['container_wall', 'container_stack', 'stone_wall', 'concrete_wall'];
-export const DEFAULT_FORTRESS: FortressOptions = { scope: 'core', towers: MAX_TOWERS, towerKind: 'watchtower_wood', passage: true, shape: 'square', wall: 'container_wall', look: 'black', rings: 1, ringWall: 'stone_wall', ringGates: 'alternate', motorCourt: false };
+export const DEFAULT_FORTRESS: FortressOptions = { scope: 'core', towers: MAX_TOWERS, towerKind: 'watchtower_wood', passage: true, shape: 'square', wall: 'container_wall', look: 'black', rings: 1, ringWall: 'stone_wall', ringGates: 'alternate', ringSally: false, motorCourt: false };
 
 export interface PlannedStructure { kind: string; x: number; z: number; rot: number }
 
@@ -267,7 +269,7 @@ export function planFortress(s: GameState, geo: PropertyGeometry = {}, opts: Par
   if (options.rings > 1 && wall.runs.length) {
     const outerRun = wall.runs.filter(r => r.kind !== 'creek_bars').sort((a, b) => b.pts.length - a.pts.length)[0];
     const outerPoly = outerRun ? outerRun.pts.slice(0, -1) : region.loops[0];
-    ringPlan = planRings(s, outerPoly.length >= 3 ? outerPoly : region.loops[0], gs ? [gs.x, gs.z] : null, geo, { count: options.rings, wall: options.ringWall, gates: options.ringGates, towers: Math.min(3, options.towers), towerKind: options.towerKind });
+    ringPlan = planRings(s, outerPoly.length >= 3 ? outerPoly : region.loops[0], gs ? [gs.x, gs.z] : null, geo, { count: options.rings, wall: options.ringWall, gates: options.ringGates, sally: options.ringSally, towers: Math.min(3, options.towers), towerKind: options.towerKind });
     notes.push(...ringPlan.notes);
   }
 
