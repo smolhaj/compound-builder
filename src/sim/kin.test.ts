@@ -401,7 +401,7 @@ describe('guidance', () => {
   });
   it('no family goal for a household with no relatives and no elders', () => {
     const g = newGame(1);
-    expect(longTerm(g).map(x => x.id)).toEqual(['enclose', 'bunker', 'self']);
+    expect(longTerm(g).map(x => x.id)).toEqual(['enclose', 'bunker', 'skills', 'self']);
   });
 });
 

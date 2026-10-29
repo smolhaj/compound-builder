@@ -74,6 +74,8 @@ describe('utilities', () => {
     line(g, 'power_cable', [[12, 10], [10, 10]]);
     g.utilities.fittings.push({ building: 'h', kind: 'wire', done: 30, hours: 30, supplied: true, finishedAt: 0 });
     g.stock.fuel = 1;
+    // (a good hand at wiring and engines tunes the generator: sim/utilities.ts genTune; here nobody is)
+    for (const p of g.people) p.skills.mechanic = 0;
     balanceDay(g, plant(g), 0.5);
     expect(g.utilities.report.genKwh).toBeGreaterThan(0);
     for (let i = 0; i < 5; i++) balanceDay(g, plant(g), 0.5);

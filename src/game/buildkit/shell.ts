@@ -69,6 +69,8 @@ export interface BuildOpts {
   blast?: Array<'front' | 'back' | 'left' | 'right'>;
   /** Bunker hardening fitted (sim/hardening): what shows inside the room. */
   harden?: Partial<Record<HardenId, 1 | 2 | 3>>;
+  /** The evenings' goods on and by the family's table (sim/evenings.ts `houseGoods`): 1 in good shape, 2 worn thin. Only the main home gets them. */
+  goods?: Partial<Record<'games' | 'guitar' | 'player' | 'books' | 'toys' | 'kidbooks', 1 | 2>>;
 }
 
 /** Collects geometry per layer × material. */

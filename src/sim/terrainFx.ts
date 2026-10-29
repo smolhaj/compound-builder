@@ -42,6 +42,8 @@ export const FX = {
   GRAVITY_M: 7, GRAVITY_CUT: 0.6,
   /** Raids: the road lane's cost counts this much (it is the easy way), and how much cheaper a lane must be to draw the crew off it. */
   ROAD_EASE: 0.75, LANE_MARGIN: 0.85,
+  /** The ground's share of the defense (0-1) counts as up to this many defense points in the shared strength (sim/adaptive.ts `terrain`; the scale runs 40 = nothing to 100 = full). */
+  DEFENSE_POINTS: 15,
 } as const;
 
 /** Sun on a structure's ground relative to level: 0.75–1.25, 1 on the level (or with no ground known). */
@@ -197,3 +199,5 @@ export function dropBridge(s: GameState, id: string): string | null {
   log(s, `The ${PERIMETER[r.kind].name.toLowerCase()} is down. Nothing crosses there until it is rebuilt, and a crew has to ford and climb.`);
   return null;
 }
+/** The ground's share of the defense in the shared strength's own unit: defense-equivalent points (0 to `FX.DEFENSE_POINTS`). */
+export const terrainPoints = (s: GameState): number => Math.round(terrainDefense(s).score * FX.DEFENSE_POINTS * 10) / 10;

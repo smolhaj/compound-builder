@@ -31,7 +31,9 @@ import { CARETAKER, CARETAKER_KINDS, caretakerProblem, marketFactor, saleBlock, 
 import { CREW_DAY_USD, crewIdea, nextLongStay, nextStageOrder, weekendBudget, weekendsFor } from './weekendPlan';
 import { dayIndex } from './state';
 import { tension } from './disaster';
-import { moodSummary, resting } from './mind';
+import { faithOf, moodSummary, resting } from './mind';
+import { COURSES, COURSE_MODE_NAME, bestMode, courseIdea, skillsGoalSteps, type CourseId, type CourseMode } from './courses';
+import { eveningGaps, restockNeeds } from './evenings';
 import { medReport } from './medical';
 import { pharmacyOpen } from './body';
 import { gatheringProblem, type GatheringKind } from './gatherings';
@@ -118,6 +120,20 @@ export interface BuildAdvice {
 const hasKind = (s: GameState, ...kinds: string[]) => s.structures.some(st => kinds.includes(st.kind));
 const hasPower = (s: GameState) => !!s.site.improvements?.power || hasKind(s, 'solar_array', 'garage_solar', 'generator_shed', 'battery_shed');
 
+/** What to order for people who are strained: wearing-thin restocks first, then the evenings' missing goods (a strained child wants toys and picture books). At most three lines. */
+export function moodOrderLines(s: GameState, mood: ReturnType<typeof moodSummary>): OrderLine[] {
+  const lines: OrderLine[] = [];
+  const addLine = (material: MaterialId) => { if (!lines.some(l => l.material === material) && lines.length < 3) lines.push({ material, qty: 1 }); };
+  restockNeeds(s).forEach(addLine);
+  const kidStrain = mood.struggling.some(x => x.p.kid);
+  for (const g of eveningGaps(s)) {
+    if (g === 'games') addLine(g);
+    else if ((g === 'instrument' || g === 'novels') && mood.struggling.length >= 2) addLine(g);
+    else if ((g === 'toys' || g === 'picture_books') && kidStrain) addLine(g);
+  }
+  return lines;
+}
+
 /** One thing worth doing now, from what the place lacks. A suggestion, never a requirement: nothing is locked behind it. */
 export type SuggestionAct =
   | { type: 'stake'; kind: string }
@@ -137,7 +153,9 @@ export type SuggestionAct =
   /** Show the terrain overlay in this mode (the land's suggestions: sim/terrainFx.ts). */
   | { type: 'terrain'; mode: 'high' | 'lanes' | 'water' }
   /** Lay a tunnel-bridge across the gorge the land invites (the player confirms). */
-  | { type: 'span'; a: Pt; b: Pt };
+  | { type: 'span'; a: Pt; b: Pt }
+  | { type: 'enroll'; course: CourseId; pid: string; mode: CourseMode; teacher?: string }
+  | { type: 'drills'; perWeek: 1 | 2 | 3 };
 export interface Suggestion {
   id: string;
   /** The kit piece to stake ('' when the suggestion is something else). */
@@ -269,9 +287,8 @@ export function suggestions(s: GameState): Suggestion[] {
       const acts: NonNullable<Suggestion['acts']> = [];
       if (!resting(s)) acts.push({ label: 'Take a rest day', act: { type: 'restDay' } });
       if (!gatheringProblem(s, 'campfire')) acts.push({ label: 'Campfire tonight', act: { type: 'gather', kind: 'campfire' } });
-      const lines: OrderLine[] = [];
-      if (s.stock.games < 1) lines.push({ material: 'games', qty: 1 });
-      if (s.stock.instrument < 1 && mood.struggling.length >= 2) lines.push({ material: 'instrument', qty: 1 });
+      if (!gatheringProblem(s, 'service') && s.people.some((p, i) => s.personState[i]?.needs.died == null && faithOf(s, p))) acts.push({ label: 'Hold a service', act: { type: 'gather', kind: 'service' } });
+      const lines = moodOrderLines(s, mood);
       if (lines.length && s.disaster.tracks.stores >= 0.5) acts.push({ label: `Order ${lines.map(l => MATERIALS[l.material].name.toLowerCase()).join(' and ')} (${usd(orderCost(lines, prices(s)))})`, act: { type: 'order', lines } });
       out.push({ id: 'mood', kind: '', title: mood.breaking ? `${names}: not coping` : `${names}: under strain`, urgency: mood.breaking ? 77 : 48,
         why: `${top.why}${ps?.weighs?.length ? `; mostly ${ps.weighs.slice(0, 2).map(w => w[0]).join(' and ')}` : ''}. Rest, company and an evening off help more than pushing on`,
@@ -279,7 +296,32 @@ export function suggestions(s: GameState): Suggestion[] {
     } }
   // the land: a ridge that suits a keep, a gorge that is a choke, a bench for a reservoir (sim/terrainFx.ts): a card to look at, never a requirement
   for (const c of terrainCards(s)) out.push({ id: c.id, kind: '', title: c.title, urgency: c.urgency, why: c.why, acts: [{ label: 'Show me on the map', act: { type: 'terrain', mode: c.mode } }, ...(c.span ? [{ label: `Plan a tunnel-bridge across it (~${usd(costPer100m('tunnel_bridge') * c.span.lengthM / 100)})`, act: { type: 'span' as const, a: c.span.a, b: c.span.b } }] : [])] });
+  { const c = courseSuggestion(s); if (c) out.push(c); }
+  { const d = drillsSuggestion(s); if (d) out.push(d); }
   return out.sort((x, y) => y.urgency - x.urgency).slice(0, 3);
+}
+
+/** A course worth taking (sim/courses.ts): a skill the place lacks that an evening class would give, with a one-click start when a way is open. Never required. */
+export function courseSuggestion(s: GameState): Suggestion | null {
+  const idea = courseIdea(s);
+  if (!idea) return null;
+  const def = COURSES[idea.course], p = s.people.find(x => x.id === idea.pid)!, mode = bestMode(s, idea.course, idea.pid);
+  const acts: NonNullable<Suggestion['acts']> = [];
+  if (mode) acts.push({ label: `${p.first} takes it ${COURSE_MODE_NAME[mode.mode]}${mode.mode === 'online' ? ` ($${def.online})` : ''}`, act: { type: 'enroll', course: idea.course, pid: p.id, mode: mode.mode, ...(mode.teacher ? { teacher: mode.teacher } : {}) } });
+  else if (s.stock[def.book] < 1 && s.disaster.tracks.deliveries >= 0.25) {
+    const lines: OrderLine[] = [{ material: def.book, qty: 1 }];
+    acts.push({ label: `Order the book set (${usd(orderCost(lines, prices(s)))})`, act: { type: 'order', lines } });
+  }
+  return { id: 'course', kind: '', title: `A course: ${def.name.toLowerCase()}`, urgency: 36, why: `${idea.why}; ${p.first} could take the ${def.hours}-hour course in the evenings (it ends with a certificate)`, ...(acts.length ? { acts } : {}) };
+}
+
+/** Drills for the defense: the household has guns and has never run a drill. */
+export function drillsSuggestion(s: GameState): Suggestion | null {
+  const D = s.courses?.drills;
+  const armed = s.armory.guns.length > 0, danger = s.disaster.phase === 'warning' || s.disaster.phase === 'impact' || s.disaster.phase === 'survival';
+  if (!armed || !danger || (D && (D.perWeek > 0 || D.last != null || Object.keys(D.ready).length > 0))) return null;
+  return { id: 'drills', kind: '', title: 'Run drills', urgency: 38, why: 'the family has guns and has never practiced together; a weekly hour at the range steadies the aim and cuts the seconds frozen at the alarm (it spends about 15 rounds a person)',
+    acts: [{ label: 'Drill weekly', act: { type: 'drills', perWeek: 1 } }, { label: 'Twice a week', act: { type: 'drills', perWeek: 2 } }] };
 }
 
 /**
@@ -365,6 +407,7 @@ export function longTerm(s: GameState, drive?: readonly Pt[]): Goal[] {
       { label: 'A place of their own for the old', done: own > 0, detail: own ? `${own} separate ${own === 1 ? 'dwelling' : 'dwellings'}` : 'a guest house, a cottage or Mom\u2019s house: elders and relatives sleep and live better with a front door of their own' },
     ] });
   }
+  goals.push({ id: 'skills', title: 'Skills the place needs', steps: skillsGoalSteps(s) });
   goals.push(selfSufficient(s));
   return goals;
 }

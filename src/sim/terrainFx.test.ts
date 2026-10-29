@@ -198,3 +198,19 @@ describe('the land\'s cards: suggest, never impose', () => {
     expect(terrainCards(g)[0].urgency).toBeLessThan(40);
   });
 });
+
+import { terrainPoints } from './terrainFx';
+import { adaptOf } from './encounters';
+describe('the shared strength', () => {
+  it('the ground adds up to 15 defense points to what the crews learn from', () => {
+    const neck: GroundSource = { h: (x, z) => { const d = Math.hypot(x - 33, z - 33); if (d < 12) return 6; if (Math.abs(x - 33) < 2 && z > 33) return Math.max(0, 6 - (d - 12) * 0.25); return Math.max(0, 6 - (d - 12) * 2.5); } };
+    const g = game(); g.site = { ...g.site, home: { x0: 0, z0: 0, x1: 67, z1: 67 } };
+    built(g, 'h', 'timber_cabin', 33, 33);
+    setGroundOverride({ h: () => 0 });
+    expect(terrainPoints(g)).toBeLessThan(2);
+    setGroundOverride(neck);
+    expect(terrainPoints(g)).toBeGreaterThan(terrainPoints({ ...g, structures: [] } as GameState) - 1);
+    expect(terrainPoints(g)).toBeLessThanOrEqual(15);
+    expect(typeof adaptOf(g)).toBe('number');
+  });
+});

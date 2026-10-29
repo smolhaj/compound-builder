@@ -11,6 +11,7 @@
 import type { Battle } from './battleTypes';
 import { afterFight, mindDay } from './mind';
 import { practice, skillsDay } from './skills';
+import { coursesDay } from './courses';
 import type { GameState } from './state';
 
 export { practice, teach } from './skills';
@@ -18,7 +19,7 @@ export { shock } from './mind';
 
 /** Once a day, at midnight after eating: the mind (strain, grief, breakdowns), then practice and rust. Returns log lines. */
 export function peopleDay(s: GameState): string[] {
-  return [...mindDay(s), ...skillsDay(s)];
+  return [...mindDay(s), ...skillsDay(s), ...coursesDay(s)];
 }
 
 /** After a fight (battle.ts, rescue.ts): the mind's toll, and shooting practice for those who fired. */
