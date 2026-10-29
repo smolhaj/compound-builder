@@ -287,7 +287,7 @@ export function weekenderPlan(s: GameState): Suggestion[] {
     const weekends = weekendsFor(s, next.hours);
     const first = day < SETTLE_DAYS + 3 ? ' The first week is yours to build in: the whole family is on the place until the second Friday.' : '';
     const can = s.money >= next.cost;
-    const blocking = !!home && !isFinished(home) && !home.supplied;
+    const blocking = !!home && !isFinished(home) && next.id === home.id;   // the house is the one waiting on materials
     out.push({ id: 'wk_order', kind: '', title: `Order the ${next.name}: ${names}`, urgency: blocking || !home ? 88 : 62,
       why: `${next.hours} h of work${weekends ? `, about ${weekends} weekend${weekends === 1 ? '' : 's'} at your pace` : ''}, and it needs ${usd(next.cost)} of materials${can ? '' : ` (you have ${usd(s.money)}: a stage at a time is all the account allows)`}. Ordering a stage ahead of the weekend keeps every hour on the place for building, and keeps the rest of the cash for the next stage.${first}`,
       acts: [{ label: `Order it (${usd(next.cost)})`, act: { type: 'order', lines: next.lines } }, { label: 'Show me', act: { type: 'select', id: next.id } }] });

@@ -19,6 +19,7 @@ try {
   const frames = async n => { for (let i = 0; i < (n ?? 2); i++) await page.evaluate(() => window.__cb.qa.renderNow()); };
 
   // ── the setup screen: the Weekend getaway card and the town-home choice ──
+  if (!process.env.SKIPSETUP) {
   await page.goto(`http://localhost:${port}/?new&lowrender=0.4&seed=7`);
   await page.waitForFunction(() => window.__cb?.qa?.lowrender);
   await frames(2);
@@ -37,6 +38,7 @@ try {
   await page.evaluate(() => { for (const el of document.querySelectorAll('div')) if (el.scrollHeight > el.clientHeight + 50 && getComputedStyle(el).overflowY === 'auto') el.scrollTop = 99999; });
   await page.waitForTimeout(300);
   await page.screenshot({ path: `${out}/03-setup-weekend-money.png` });
+  }
 
   // ── a weekender on day 3 with the cabin staked and nothing ordered ──
   await page.goto(`http://localhost:${port}/?seed=7&lowrender=0.9`);
@@ -62,8 +64,14 @@ try {
     G.getState().advance(0.011);
   });
   await frames(3);
+  console.error('debug', JSON.stringify(await page.evaluate(async () => {
+    const W = await import('/src/sim/weekendPlan.ts'), Gd = await import('/src/sim/guidance.ts');
+    const g = window.__cb.game.getState().game;
+    return { next: W.nextStageOrder(g, 2), sug: Gd.suggestions(g).map(x => x.id), st: g.structures.map(s => [s.kind, s.stage, s.supplied]), stock: { l: g.stock.lumber, f: g.stock.fieldstone }, orders: g.orders.map(o => o.status + ':' + o.lines.map(l => l.material + l.qty).join(',')) };
+  })));
   await page.screenshot({ path: `${out}/04-next-step-first-week.png` });
   lap('first week');
+  if (process.env.STOP04) { console.error('done'); process.exit(0); }
 
   // ── week six: the account barely moves, a long stay is coming, the first stage is in ──
   await page.evaluate(async () => {
