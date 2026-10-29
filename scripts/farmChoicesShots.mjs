@@ -26,6 +26,7 @@ try {
     const g = structuredClone(G.getState().game);
     g.structures = [];
     for (const [k, dx, dz] of [['timber_cabin', -3, -4], ['garden', -3.5, -8], ['field', 5, -10], ['field', 8, -10], ['root_cellar', 4, 3]]) g.structures.push({ id: 'cb' + k + dx, kind: k, x: c.x + dx, z: c.z + dz, rot: 0, stage: 99, done: 0, supplied: true, finishedAt: -300 });
+    for (const st of g.structures.filter(x => x.kind === 'field')) C.plotsOf(g)[st.id] = { kind: 'field', fert: 1, prev: null, prev2: null, crop: null, loads: 0, cover: false, settled: -1, planted: true };
     g.stock.seed = 1; g.stock.seed_heirloom = 0; g.stock.seed_saved = 0;
     g.money = 40000;
     const [w0, w1] = C.sowWindow(g);
@@ -60,6 +61,8 @@ try {
   // the Shop: hybrid and heirloom seed
   await page.evaluate(() => window.__cb.game.getState().openShop(true, 'food'));
   await page.waitForTimeout(400);
+  await page.waitForTimeout(400);
+  await page.evaluate(() => { const e = [...document.querySelectorAll('*')].find(x => x.children.length === 0 && x.textContent === 'Hybrid field seed'); e?.scrollIntoView({ block: 'center' }); });
   await page.waitForTimeout(400);
   await page.screenshot({ path: `${out}/04-shop-seed-cards.png` });
   console.error('done');
