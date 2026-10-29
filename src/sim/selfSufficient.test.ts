@@ -440,7 +440,7 @@ describe('integration', () => {
     delete (dailyOf(old as unknown as GameState).chores.levels as Record<string, number>).orchard;
     const m = migrate(old);
     expect(m.version).toBe(SAVE_VERSION);
-    expect(m.farm).toEqual({ greenhouses: {}, orchards: {}, ponds: {}, yard: {} });
+    expect(m.farm).toEqual({ greenhouses: {}, orchards: {}, ponds: {}, yard: {}, plots: {} });
     expect(m.stock.trout_fry).toBe(0);
     expect(m.stock.sheep).toBe(0);
     expect(dailyOf(m).chores.levels.orchard).toBe(0);

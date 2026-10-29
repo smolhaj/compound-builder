@@ -34,6 +34,7 @@ import type { Person } from './family';
 import { kinPersonal } from './kin';
 import { sowingRate, weedFactor } from './crops';
 import { putByHours } from './kitchen';
+import { wearTools, workSpeed } from './tools';
 import { absentIdx, jobDayOf } from './weekender';
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -781,6 +782,12 @@ export function dutyWork(s: GameState, p: Person, ps: PersonState, duty: Duty, p
     // skilled hunters and teachers count for more
     t[duty] = (t[duty] ?? 0) + personHours * (duty === 'hunt' ? 0.5 + p.skills.hunter / 10 : duty === 'teach' ? 0.5 + p.skills.teacher / 10 : 1);
     if (duty === 'hunt' && hour >= 17 && !tallyOf(s).dusk.includes(p.id)) tallyOf(s).dusk.push(p.id);
+  }
+  // the garden and the fields are worked with a hoe, a fork or a shovel: bare hands are half as fast, and the tools wear (sim/tools.ts)
+  if (duty === 'garden' || duty === 'fields') {
+    const task = { kind: 'garden' } as const;
+    personHours *= workSpeed(s, task);
+    wearTools(s, task, personHours);
   }
   if (DUTY_CHORES[duty]) { addChoreWork(s, duty, personHours); return; }
   if (duty === 'medic') {

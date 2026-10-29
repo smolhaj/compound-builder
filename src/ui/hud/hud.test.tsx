@@ -12,6 +12,7 @@ import { BuildMenu } from './BuildMenu';
 import { ProjectsTab } from './ProjectsTab';
 import { ShopWindow } from '../ShopWindow';
 import { FarmPanel } from '../FarmPanel';
+import { FarmTab } from '../FarmTab';
 import { pondOf } from '../../sim/farm';
 
 const text = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
@@ -136,5 +137,18 @@ describe('the guided HUD (server-rendered)', () => {
     const farm = text(renderToStaticMarkup(<FarmPanel game={useGameStore.getInitialState().game} />));
     for (const s of ['Greenhouses', 'Heated greenhouse', 'Orchards', '48 trees', 'Pond', 'Stock trout', 'Harvest trout', 'Equipment bays', 'workshop bench']) expect(farm).toContain(s);
     expect(farm).not.toMatch(/\d\.\d{3,}/);
+  });
+
+  it('the Farm tab: calendar, fields with a crop each, the kitchen, and a food plan with no raw floats', () => {
+    withGame(g => {
+      for (const [k, x] of [['field', 10], ['field', 20], ['garden', 30], ['timber_cabin', 40], ['root_cellar', 50]] as const) { const st = planStructure(g, k, x, 10, 0); st.stage = 5; st.finishedAt = -300; }
+      g.stock.seed = 2;
+    });
+    const game = useGameStore.getInitialState().game;
+    const html = renderToStaticMarkup(<FarmTab game={game} />);
+    expect(text(html)).toContain('The year');
+    const fields = text(renderToStaticMarkup(<FarmTab game={game} />));
+    expect(fields).toMatch(/Season/);
+    expect(fields).not.toMatch(/\d\.\d{4,}/);
   });
 });

@@ -734,6 +734,35 @@ SETS.farm = [
   { name: 'dusk-greenhouse-and-solar', time: 19.4, season: 'summer', setup: farmSet + farmDoy(300, true) + farmAt('greenhouse_heated', 14, 0.35, 0.9, -4, 5), cam: D, frames: 20 },
 ];
 
+
+/**
+ * Farm & kitchen (docs/DECISIONS.md): the compound plus three fields, the garden, a wood-fired oven and a root cellar
+ * with its bins and shelves stocked (potatoes, jars, ferments, dried fruit, lard, cured meat).
+ */
+const kitchenSet = compound + `{ if (!window.__kit) { window.__kit = true;
+  const G = cb.game, c = cb.world.camp, B = window.__b;
+  const place = (key, kind, dx, dz, rot = 0, rad = 6) => { const sp = cb.tool.findSpot(kind, c.x + dx, c.z + dz, rot, rad); if (!sp) { console.error('no spot', key); return null; } G.getState().plan(kind, sp[0], sp[1], rot); const st = G.getState().game.structures.at(-1); B[key] = st; return st; };
+  place('wood_oven', 'wood_oven', 9, -4, 3, 3);
+  place('field2', 'field', -12, 15, 0, 6);
+  place('field3', 'field', -3, 15, 0, 6);
+  G.setState(s => { const g = structuredClone(s.game);
+    for (const st of g.structures) { st.stage = 5; st.done = 0; st.supplied = true; st.finishedAt = g.clock.t - 3000; }
+    const put = (id, q, age, kcal, agg) => { g.pantry.items[id] = { q, age }; g.stock[agg] += q * kcal / ({ canned: 6000, staples: 80000, frozen: 10000 })[agg]; };
+    put('cellar_roots', 40, 30, 40000, 'canned'); put('home_canned', 14, 60, 6000, 'canned'); put('ferments', 6, 40, 2400, 'canned'); put('dried_produce', 5, 90, 12000, 'canned');
+    put('lard', 3, 30, 32000, 'staples'); put('cured_meat', 6, 20, 18000, 'staples'); put('rice_bucket', 6, 100, 54000, 'staples'); put('beans_bucket', 5, 100, 50400, 'staples'); put('home_dry', 4, 30, 77500, 'staples'); put('flour', 3, 40, 41250, 'staples');
+    g.pantry.items.salt = { q: 3, age: 20 };
+    g.stock.lids = 40; g.stock.canner = 1; g.stock.crocks = 1; g.stock.seed_saved = 3; g.stock.manure = 5; g.stock.compost = 6;
+    g.disaster.tracks = { ...g.disaster.tracks, stores: 0 };
+    return { game: g }; });
+} }`;
+SETS.farmkitchen = [
+  { name: 'fields-and-oven-aerial', time: 11, season: 'summer', setup: kitchenSet + farmDoy(235) + "{ const c = cb.world.camp; cb.cam.target.set(c.x - 2, 0, c.z + 6); cb.cam.radius = 30; cb.cam.pitch = 0.9; cb.cam.yaw = 0.5; }", cam: D, frames: 20 },
+  { name: 'wood-oven-eye-level-person', time: 16, season: 'summer', setup: kitchenSet + farmDoy(235) + figureAt('wood_oven', 0.5, 2.0) + eyeNear('wood_oven', 2.4, 4.2, 0, 0.6, 0.26), cam: D, frames: 14 },
+  { name: 'wood-oven-from-above', time: 12, season: 'summer', setup: kitchenSet + farmDoy(235) + farmAt('wood_oven', 5, 0.8, 0.5), cam: D, frames: 14 },
+  { name: 'root-cellar-inside', time: 11, season: 'summer', setup: kitchenSet + farmDoy(235) + "{ const b = window.__b.root_cellar, W = cb.world; if (b) { const e = W.localToWorld(b.id, 0, 0.3, 0.3), l = W.localToWorld(b.id, 0, 0.2, -1.0); cb.qa.pose = { x: e.x, y: e.y, z: e.z, lx: l.x, ly: l.y, lz: l.z, fov: 80 }; } }", cam: D, frames: 14 },
+  { name: 'fields-eye-level-person', time: 10, season: 'summer', setup: kitchenSet + farmDoy(235) + figureAt('field', -1.5, 4) + eyeNear('field', -1.5, 8, 0, 0, 0.26), cam: D, frames: 14 },
+];
+
 // the fortress ring (sim/fortress.ts): container wall, patrol walkway, gatehouse garage, five towers. The whole 40-acre line is built in the setup; the cameras find the
 // garage, a corner tower and a guard on the deck (the family's watchers are posted by hand, then the clock jumps so they stand where the patrol puts them).
 const fortressSetup = `{ if (!window.__fort) { window.__fort = 1;

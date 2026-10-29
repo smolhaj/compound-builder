@@ -67,6 +67,14 @@ function Icon({ id, tint }: { id: string; tint?: number }) {
     case 'canned': return can('#b04a30');
     case 'frozen': return box('#8ab0c8', 'MEAT');
     case 'seed': return bag('#c8b070', 'SEED');
+    case 'seed_hybrid': return bag('#9a8ac0', 'F1');
+    case 'seed_saved': return bag('#b8a070', 'MINE');
+    case 'seed_cover': return bag('#7aa860', 'CLOVER');
+    case 'canner': return g(<><ellipse cx="22" cy="14" rx="12" ry="4" fill="#b8bcc0" /><path d="M10 14 v18 q12 6 24 0 v-18" fill="#9aa0a6" /><circle cx="22" cy="9" r="3.5" fill="#e8e4dc" stroke="#555" /><path d="M22 9 l2 -2" stroke="#c03030" /></>);
+    case 'dehydrator': return g(<>{[12, 18, 24, 30].map(y => <rect key={y} x="9" y={y - 3} width="26" height="4" rx="1.5" fill={y % 12 ? '#d8b060' : '#c89048'} />)}<rect x="8" y="9" width="28" height="3" fill="#4a4a4a" /></>);
+    case 'crocks': return g(<>{[12, 26].map(x => <g key={x}><path d={`M${x - 6} 16 h12 l1.5 16 q-7.5 3 -15 0 z`} fill="#b09060" stroke="#6a5030" /><ellipse cx={x} cy="16" rx="6" ry="2" fill="#8a7a50" /></g>)}</>);
+    case 'grain_mill': return g(<><rect x="12" y="28" width="20" height="5" fill="#6a5030" /><path d="M16 28 l3 -14 h6 l3 14 z" fill="#8a8e92" /><path d="M31 18 h7 v-4" stroke="#8a8e92" strokeWidth="2.5" fill="none" /><circle cx="38" cy="13" r="2.5" fill="#6a5030" /></>);
+    case 'manure': case 'compost': return g(<><path d="M8 34 q14 -22 28 0 z" fill={id === 'manure' ? '#6a4a2a' : '#4a3a24'} /><path d="M16 28 q6 -4 12 0" stroke="rgba(255,255,255,0.18)" fill="none" /></>);
     case 'lids': return g(<>{[0, 1, 2].map(i => <ellipse key={i} cx="22" cy={18 + i * 6} rx="11" ry="3" fill="#c8a040" stroke="#7a5a10" />)}</>);
     case 'meds': return g(<><rect x="8" y="12" width="28" height="22" rx="3" fill="#e8e4dc" /><path d="M22 16 v14 M15 23 h14" stroke="#c03030" strokeWidth="4" /></>);
     case 'hygiene': return g(<><rect x="9" y="14" width="12" height="20" rx="3" fill="#7ab0d8" /><circle cx="29" cy="24" r="8" fill="#f2f0ea" /><circle cx="29" cy="24" r="3" fill="#c8c4bc" /></>);

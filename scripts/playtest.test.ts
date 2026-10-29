@@ -137,6 +137,9 @@ function orderNeeds(s: GameState, strat: Strategy): void {
   if (haveKcal < kcalYear) lines.push({ material: 'staples', qty: Math.ceil((kcalYear - haveKcal) / 80000) });
   const jars = strat === 'prepper' ? 400 : strat === 'homestead' || strat === 'fortress' ? 200 : 0;
   if (s.stock.lids + (pending.lids ?? 0) < jars / 2) lines.push({ material: 'lids', qty: jars });
+  // (farm & kitchen) a pressure canner for the jars, crocks for ferments
+  if (jars > 0 && s.stock.canner + (pending.canner ?? 0) < 1) lines.push({ material: 'canner', qty: 1 });
+  if (jars > 0 && s.stock.crocks + (pending.crocks ?? 0) < 1) lines.push({ material: 'crocks', qty: 1 });
   // a winter's firewood (about 4 cords) in by fall
   if (strat !== 'idle' && s.stock.firewood + (pending.firewood ?? 0) < 12) lines.push({ material: 'firewood', qty: 12 });
   // soap and paper for when the stores close: a year (prepper) or three months (homestead) a head

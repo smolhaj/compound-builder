@@ -43,7 +43,6 @@ import { canRigMines, rigMines } from '../sim/battle';
 import { canJoin } from '../sim/aftermath';
 import { MILESTONE_COUNT, MILESTONE_NAME } from '../sim/lineage';
 import { daysOfFood, KCAL, needOf } from '../sim/needs';
-import { ANIMALS, feedDemand, winterHay } from '../sim/livestock';
 import { barterPrices, moneyWorks, type Good } from '../sim/barter';
 import { MarketSection, NeighborsSection, ScavengeSection } from './WorldPanels';
 import { alliesFor, canGo, FAR_COLD, isAway, latestFarLead, latestLead, LEAD_COLD, LEAD_WARM, leadAge, openCaptives, raidProblem, rescueOdds, tripFuel, tripProblem } from '../sim/rescue';
@@ -53,9 +52,9 @@ import { runFinished } from '../sim/perimeter';
 import { plansNeed, plansNeedLines } from '../sim/guidance';
 import { populations, predatorLine } from '../sim/wildlife';
 import { PantryPanel } from './PantryPanel';
-import { FarmPanel } from './FarmPanel';
+import { FarmTab } from './FarmTab';
+import { farmAlert } from '../sim/farmPlan';
 import { fmtKw, powerSummary } from '../sim/powerReport';
-import { sheepRoom, sheepSheltered } from '../sim/livestock';
 import { ToolsPanel } from './ToolsPanel';
 import { Note, Row, Section, Tabs } from './hud/common';
 import { DIM, LINE, TONE, btn, panel, usd, type Tone } from './hud/style';
@@ -104,7 +103,7 @@ export function Hud() {
   const w = useWorldStore();
   const g = useGameStore();
   const [leftTab, setLeftTab] = useState<'build' | 'projects' | 'log'>('build');
-  const [rightTab, setRightTab] = useState<'family' | 'supplies' | 'utilities' | 'land' | 'defense' | 'outside' | 'chronicle'>('family');
+  const [rightTab, setRightTab] = useState<'family' | 'supplies' | 'utilities' | 'land' | 'defense' | 'outside' | 'chronicle' | 'farm'>('family');
   // picking a building on the map opens its project card (not while a build tool is armed: placing a row of things keeps the Build list up)
   const [quitAsk, setQuitAsk] = useState<string | null>(null);
   const [lastSel, setLastSel] = useState<string | null>(null);
@@ -161,7 +160,7 @@ export function Hud() {
 
       {/* Right: the family, supplies, water & power, land, the outside world */}
       <div style={{ ...panel, position: 'fixed', right: 10, top: 10, width: 320, maxHeight: 'calc(100vh - 90px)', display: w.hudHidden ? 'none' : 'flex', flexDirection: 'column' }}>
-        <Tabs tabs={[['family', 'Family', familyAlert], ['supplies', 'Supplies', foodAlert], ['utilities', 'Utilities', utilAlert], ['land', 'Land'], ['defense', 'Defense', defenseAlert], ['outside', 'Outside', outsideAlert], ['chronicle', 'Years']]} value={rightTab} set={setRightTab} />
+        <Tabs tabs={[['family', 'Family', familyAlert], ['supplies', 'Supplies', foodAlert], ['farm', 'Farm', farmAlert(game)], ['utilities', 'Utilities', utilAlert], ['land', 'Land'], ['defense', 'Defense', defenseAlert], ['outside', 'Outside', outsideAlert], ['chronicle', 'Years']]} value={rightTab} set={setRightTab} />
         <div style={{ overflowY: 'auto', flex: 1, paddingRight: 2 }}>
           {rightTab === 'family' && <>
             {game.people.map((p, i) => {
@@ -254,16 +253,6 @@ export function Hud() {
               {populations(game).map(p => <Row key={p.sp} label={p.name} value={<span style={{ color: p.predator ? (p.count ? TONE.warn : DIM) : p.count < p.cap * 0.5 ? TONE.warn : undefined }}>{p.count} <span style={{ color: DIM }}>of ~{p.cap < 1 ? '<1' : Math.round(p.cap)}</span></span>} title={p.predator ? 'A predator: a danger to stock, dogs and kids if the place is careless; kept out by a wall that holds it; a good shot fills the freezer' : 'Counts follow the acres you own, the timber, open ground and water, and what has been hunted'} />)}
               <Note tone={predatorLine(game).ok ? 'good' : 'warn'}>Predators: {predatorLine(game).detail}</Note>
             </Section>
-            {ANIMALS.some(a => (game.stock[a] ?? 0) >= 1) && <Section title="Livestock">
-              {ANIMALS.filter(a => (game.stock[a] ?? 0) >= 1).map(a => { const c = game.livestock?.condition[a] ?? 1; return <Row key={a} label={MATERIALS[a].name} value={<span style={{ color: c < 0.5 ? TONE.bad : c < 0.9 ? TONE.warn : undefined }}>{Math.floor(game.stock[a])} head, {Math.round(c * 100)} % condition</span>} />; })}
-              {(() => { const d = feedDemand(game), hd = d.hay > 0 ? (game.stock.hay ?? 0) / d.hay : Infinity, fd = d.feed > 0 ? (game.stock.feed ?? 0) / d.feed : Infinity; return <>
-                {d.hay > 0 && <Row label="Hay" value={<span style={{ color: hd < 14 ? TONE.warn : undefined }}>{Math.floor(game.stock.hay ?? 0)} bales ({hd > 999 ? 'plenty' : `${Math.floor(hd)} days`})</span>} />}
-                {d.feed > 0 && <Row label="Feed" value={<span style={{ color: fd < 14 ? TONE.warn : undefined }}>{Math.floor(game.stock.feed ?? 0)} bags ({fd > 999 ? 'plenty' : `${Math.floor(fd)} days`})</span>} />}
-                {(game.stock.sheep ?? 0) >= 1 && <Note tone={sheepSheltered(game) < 1 ? 'warn' : 'good'}>{sheepSheltered(game) < 1 ? `Roof for ${sheepRoom(game)} of ${Math.floor(game.stock.sheep)} sheep: build a sheep barn (30) before winter.` : 'All the sheep have a roof for the winter.'}</Note>}
-                {winterHay(game) > (game.stock.hay ?? 0) && <Note>Put up about {winterHay(game)} bales of hay for the winter.</Note>}
-              </>; })()}
-            </Section>}
-            <FarmPanel game={game} />
             <Section title="Food">
               {(() => {
                 const f = game.food, d = daysOfFood(game);
@@ -301,6 +290,8 @@ export function Hud() {
               </div>
             </Section>
           </>}
+
+          {rightTab === 'farm' && <FarmTab game={game} />}
 
           {rightTab === 'utilities' && (() => {
             const r = game.utilities.report, up = game.disaster.tracks.grid > 0.5 && !stormOutage(game);

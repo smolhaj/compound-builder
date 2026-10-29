@@ -6,7 +6,7 @@
  *                (`cellar_roots` in the pantry) while there is room; the rest sits in the kitchen with the
  *                fresh food and rots. The bins shrink every day by the cellar's temperature: the ground
  *                keeps the cellar a few degrees warmer than the winter air and well cooler than August, so
- *                roots hold ~6 months from October (0.12 % a day at 3 °C, 0.8 % at 15 °C) and are gone by
+ *                roots hold ~6 months from October (0.04 % a day at 3 °C, 0.25 % at 15 °C: a vented cellar, tended) and are gone by
  *                early summer. A cellar with power (a fan and a small chiller) runs 3 °C cooler. Fresh food
  *                kept in the cellar spoils slower than in the kitchen (0.9 %–2.2 % a day against 8 %).
  *  Pantry room   each building holds so much dry and canned food on its shelves. Past that the family
@@ -43,7 +43,7 @@ export function cellarTempC(s: GameState, doy = calendarOf(s.clock).doy): number
   return Math.max(1, t - (cellarPowered(s) ? 3 : 0));
 }
 /** Share of the bins that shrinks and rots a day at a cellar temperature. */
-export const binShrink = (tC: number): number => 0.0012 + 0.00055 * Math.max(0, tC - 3);
+export const binShrink = (tC: number): number => 0.0004 + 0.00018 * Math.max(0, tC - 3);
 /** Share of the fresh food kept in the cellar that spoils a day. */
 export const cellarFreshSpoil = (tC: number): number => 0.008 + 0.0011 * Math.max(0, tC - 3);
 /** The share of the fresh pile that spoils today: kitchen or cellar. */
