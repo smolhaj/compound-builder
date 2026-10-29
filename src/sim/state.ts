@@ -44,7 +44,7 @@ import type { Medical } from './medical';
 import type { Evenings } from './evenings';
 import type { Courses } from './courses';
 import { starterKit, type ToolKit } from './tools';
-export const SAVE_VERSION = 67;
+export const SAVE_VERSION = 68;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';

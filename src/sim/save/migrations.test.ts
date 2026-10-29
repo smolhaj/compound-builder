@@ -86,15 +86,15 @@ describe('save migrations', () => {
     expect(m.farm?.plots?.f1.sown?.line).toBe('heirloom');
   });
 
-  it('v66 → v67: an old place has no lot (its ground is the classic benches), a lot place keeps its spec, and both run on', () => {
+  it('v67 → v68: an old place has no lot (its ground is the classic benches), a lot place keeps its spec, and both run on', () => {
     const old = JSON.parse(JSON.stringify(newGame(3)));
-    old.version = 66;
+    old.version = 67;
     delete old.site.lot;
     const m = migrate(old);
     expect(m.version).toBe(SAVE_VERSION);
     expect(m.site.lot).toBeNull();
     const withLot = JSON.parse(JSON.stringify(newGame(3, 105, 2027, { site: makeLotSite({ kind: 'gorge', seed: 4 }) })));
-    withLot.version = 66;
+    withLot.version = 67;
     const kept = migrate(withLot);
     expect(kept.site.lot?.kind).toBe('gorge');
     // and a day on a lot place runs (the climate, the road and the grade read the lot)
