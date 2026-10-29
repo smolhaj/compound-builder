@@ -19,6 +19,7 @@
  * Distances are world units (1 ≈ 6 m).
  */
 import { BUNKER_ENTRANCES } from './bunkerEntrances';
+import { ringHoldSeconds } from './rings';
 import type { Battle, BattleEvent, BattleUnit } from './battleTypes';
 import { GUN, skillOf, type Caliber } from './armory';
 import { gearPosture } from './gear';
@@ -29,7 +30,7 @@ import { isHome } from './blueprints';
 import { isFinished } from './construction';
 import { PERIMETER, fenceLive, runFinished } from './perimeter';
 import { ARMORY_LIGHTS, floodlightLit } from './lights';
-import { DOOR_DELAY, raidAngle } from './terrainFx';
+import { DOOR_DELAY, doorDelay, raidAngle } from './terrainFx';
 import { roadStart } from './roadFx';
 import { WALK_CLIMB_FACTOR, WALK_POST, deckSpots, walkLength, walkRuns } from './walkway';
 import { TURRET_JAM, highBonus, litTowerIds, isTower, mountReady, towerPosture, towerPosts, towerReach, turretsReady } from './towers';
@@ -305,6 +306,8 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
   posts.push({ kind: 'open', x: C.x + ax * 1.5, z: C.z + az * 1.5, y: 0, cover: 1, value: 0, cap: 99, wrecked: false, fire: 0 });
   posts.sort((a, b) => b.value - a.value);
   const lineR = wallR || 2;
+  // manned inner rings (sim/rings.ts): each makes the crew take another wall under fire before the line is breached
+  const ringHold = opts.insideBreach ? 0 : ringHoldSeconds(s);
 
   const shelterAt = fin.find(st => BUNKER_ENTRANCES.includes(st.kind)) ?? home;
   const hardShelter = shelterAt !== home || g.safeRoom;
@@ -395,6 +398,8 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
 
   // ── detection, alarm, lights ──
   const detection = Math.min(100, 25 + (s.gate.forewarned ? 20 : 0) + g.detection + tw.detection + watchDetection(s) + Math.max(0, ...fightersP.map(({ p }) => p.skills.hunter)) * 4);
+  // the tunnel-bridge's doors lock at night and on the alarm (a watch good enough to call it before they arrive); by day, unwarned, they stand open
+  if (lane?.via && opts.ambush === undefined) { const d = doorDelay(night, detection); for (const f of F) if (f.side === 'raider') f.readyAt = d; }
   // by day, people on watch see a group coming up the drive a couple of hundred meters out; at night it's what the gear hears and sees
   const darkBlind = night && !lightsOn && !n('nvg') && !n('thermal') && !n('thermal_cam');
   // (round 4: measured from the line, where the watch stands and the sensors are, not from the house)
@@ -820,7 +825,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
     // (round 4) clubs against rifles need far more of them to rush the line; going over a wall, every rifle at a post on it slows them
     const outnumber = armedR ? 2 : 4;
     const onWall = H.filter(f => !f.out && !f.shelter && f.arm !== FISTS && t >= f.readyAt && f.post?.kind !== 'open' && f.post?.kind !== 'building').length;
-    if (!breached && !peace && atLine.length && (wallDown || hNow === 0 || rUp.length > hNow * outnumber) && (opts.ambush === undefined || hNow === 0 || t - lineSince >= 12 + opts.ambush) && (!climbing || (t - lineSince >= 10 && r() < 0.02 * atLine.length * (deck ? WALK_CLIMB_FACTOR : 1) / (1 + onWall)))) {
+    if (!breached && !peace && atLine.length && (wallDown || hNow === 0 || rUp.length > hNow * outnumber) && (opts.ambush === undefined || hNow === 0 || t - lineSince >= 12 + opts.ambush) && (hNow === 0 || t - lineSince >= ringHold) && (!climbing || (t - lineSince >= 10 && r() < 0.02 * atLine.length * (deck ? WALK_CLIMB_FACTOR : 1) / (1 + onWall)))) {
       breached = true; breachT = t;
       const p = at(lineR, 0);
       ev.push({ t, kind: 'breach', x: r2(p.x), z: r2(p.z) });

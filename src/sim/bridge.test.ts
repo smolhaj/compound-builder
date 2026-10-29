@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { newGame, type GameState, type Structure } from './state';
 import { setGroundOverride } from './terrainState';
 import { SPAN, spanProblem, slopeTunnelProblem, type GroundSource } from './terrain';
-import { DOOR_DELAY, dropBridge, gorgeSpan, raidAngle, routeProblem, terrainCards, terrainDefense, terrainOff } from './terrainFx';
+import { DOOR_ALARM_DETECTION, DOOR_DELAY, DOOR_OPEN_DELAY, doorDelay, doorsLocked, dropBridge, gorgeSpan, raidAngle, routeProblem, terrainCards, terrainDefense, terrainOff } from './terrainFx';
 import { lanesOf, corridorsOf } from './terrainState';
 import { PERIMETER, PERIMETER_ORDER, addRunWork, planRun, runBill, runFinished, type Pt } from './perimeter';
 import { MATERIALS } from './materials';
@@ -147,5 +147,25 @@ describe('it joins yards like a covered walkway and is not a hole in the line', 
     const e = enclosure(g);
     expect(e.barrier).toBeGreaterThanOrEqual(0);
     void ([] as Pt[]);
+  });
+});
+
+describe('the doors lock themselves', () => {
+  it('open by day with nobody warned, locked at night and when the watch calls the raid early', () => {
+    expect(doorsLocked(false, 20)).toBe(false);
+    expect(doorsLocked(true, 20)).toBe(true);
+    expect(doorsLocked(false, DOOR_ALARM_DETECTION)).toBe(true);
+    expect(doorDelay(false, 20)).toBe(DOOR_OPEN_DELAY);
+    expect(doorDelay(true, 20)).toBe(DOOR_DELAY);
+    expect(DOOR_OPEN_DELAY).toBeGreaterThan(0);
+    expect(DOOR_OPEN_DELAY).toBeLessThan(DOOR_DELAY);
+  });
+
+  it('a raid at night and one by day both plan with the bridge standing', () => {
+    setGroundOverride(GORGE);
+    const g = game();
+    const b = planRun(g, 'tunnel_bridge', [[33, 28], [33, 52]]);
+    finish(b);
+    for (const t of [0.25, 0.8]) { g.clock.t = t; expect(planBattle(g, 4, 5).units.filter(u => u.side === 'raider').length).toBe(4); }
   });
 });

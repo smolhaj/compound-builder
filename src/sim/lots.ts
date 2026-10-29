@@ -46,6 +46,8 @@ export interface LotSpec {
   flip: 1 | -1;
   /** A creek runs down the hillside (the bench and the gorge always have one; the rest never). */
   creek?: boolean;
+  /** A hillside with a cutbank: a rock face notched across the slope above a level shelf (the camp bench cut into the mountain). Absent = no face, as before. */
+  cutbank?: boolean;
 }
 
 export interface LotField {
@@ -153,6 +155,23 @@ export function lotField(spec: LotSpec, rect: Rect): LotField {
         };
       }
       rock = (x, z) => sst(0.6, 0.9, Math.abs(n(x, z, 0.12, 5))) * 0.5;
+      if (spec.cutbank && !spec.creek) {
+        // a cutbank: a rock face across the slope with a level shelf at its foot (the bench a compound is notched into).
+        // q = distance downhill of the face line (units): the ground uphill of it is lifted by Hc over FW (the face, ragged at its
+        // crest), and the shelf, SW wide, is cut level at the slope's own height at its middle.
+        const FW = 0.45, SW = 0.16 * L + 2, Hc = 1.5 + 0.8 * r4 + 0.04 * R, pc = (-0.1 + 0.08 * (r3 - 0.5)) * L;
+        const pOf = (x: number, z: number) => (x - cx) * cf + (z - cz) * sf, bOf = (x: number, z: number) => -(x - cx) * sf + (z - cz) * cf;
+        const prior = raw;
+        const shelfY = (b: number) => prior(cx + (pc + SW * 0.5) * cf - b * sf, cz + (pc + SW * 0.5) * sf + b * cf);
+        const shelfW = (q: number) => sst(-0.3, 0.1, q) * (1 - sst(SW, SW + 1.8, q));
+        raw = (x, z) => {
+          const p = pOf(x, z), b = bOf(x, z), q = p - pc, rag = 0.12 * n(b, 7, 0.4, 11);
+          const h = prior(x, z) + Hc * (1 - sst(-FW + rag, rag, q));
+          return lerp(h, shelfY(b), shelfW(q));
+        };
+        const prevRock = rock;
+        rock = (x, z) => { const q = pOf(x, z) - pc; return Math.max(prevRock(x, z), q < 0.1 && q > -3.2 ? 0.95 : 0); };
+      }
       break;
     }
     case 'bench': {

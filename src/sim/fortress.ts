@@ -16,6 +16,7 @@
  * Whatever the line already has is kept: a stretch already held is skipped,
  * a wall that can take a deck gets one. Pure (tested).
  */
+import { layRings, planRings, type RingGates, type RingPlan } from './rings';
 import { MATERIALS, type MaterialId, type Stock } from './materials';
 import { BLUEPRINTS, isHome, totalBill, totalHours } from './blueprints';
 import { log, orderCost } from './economy';
@@ -54,10 +55,14 @@ export interface FortressOptions {
   /** What the wall is made of (any solid wall that takes a patrol deck) and, for containers, how they are painted. */
   wall: PerimeterKind;
   look: ContainerLook;
+  /** Rings in all, the outer ring included (sim/rings.ts): 1 is the plain ring; 2-4 add inner rings, each with its own wall, gate and towers. */
+  rings: number;
+  ringWall: PerimeterKind;
+  ringGates: RingGates;
 }
 /** The walls a ring can be built in (each takes a patrol walkway). */
 export const RING_WALLS: readonly PerimeterKind[] = ['container_wall', 'container_stack', 'stone_wall', 'concrete_wall'];
-export const DEFAULT_FORTRESS: FortressOptions = { scope: 'core', towers: MAX_TOWERS, towerKind: 'watchtower_wood', passage: true, shape: 'square', wall: 'container_wall', look: 'black' };
+export const DEFAULT_FORTRESS: FortressOptions = { scope: 'core', towers: MAX_TOWERS, towerKind: 'watchtower_wood', passage: true, shape: 'square', wall: 'container_wall', look: 'black', rings: 1, ringWall: 'stone_wall', ringGates: 'alternate' };
 
 export interface PlannedStructure { kind: string; x: number; z: number; rot: number }
 
@@ -72,6 +77,8 @@ export interface FortressPlan {
   wall: WallPlan;
   garage: PlannedStructure | null;
   towers: PlannedStructure[];
+  /** The inner rings (sim/rings.ts), or null with one ring. */
+  ringPlan: RingPlan | null;
   /** Underground passage points (garage to house), or null. */
   passage: Pt[] | null;
   /** Walkway length planned (world units) and how many wall runs get one. */
@@ -240,11 +247,21 @@ export function planFortress(s: GameState, geo: PropertyGeometry = {}, opts: Par
   const existing = s.perimeter.filter(r => canHostWalkway(r.kind) && !walkOn(s, r.id) && !r.replaces);
   const walkLen = planned.reduce((a, r) => a + wallLength(r), 0) + existing.reduce((a, r) => a + wallLength(r), 0);
 
+  // the inner rings: stepped in from the outer wall, following the contour on a slope, each with its own gate and towers
+  let ringPlan: RingPlan | null = null;
+  if (options.rings > 1 && wall.runs.length) {
+    const outerRun = wall.runs.filter(r => r.kind !== 'creek_bars').sort((a, b) => b.pts.length - a.pts.length)[0];
+    const outerPoly = outerRun ? outerRun.pts.slice(0, -1) : region.loops[0];
+    ringPlan = planRings(s, outerPoly.length >= 3 ? outerPoly : region.loops[0], gs ? [gs.x, gs.z] : null, geo, { count: options.rings, wall: options.ringWall, gates: options.ringGates, towers: Math.min(3, options.towers), towerKind: options.towerKind });
+    notes.push(...ringPlan.notes);
+  }
+
   const bill: Partial<Stock> = {};
   addBill(bill, wall.bill);
+  if (ringPlan) addBill(bill, ringPlan.bill);
   addBill(bill, walkwayBill(walkLen));
-  let hours = wall.hours + runHours('wall_walk', walkLen);
-  let permits = 0;
+  let hours = wall.hours + runHours('wall_walk', walkLen) + (ringPlan?.hours ?? 0);
+  let permits = ringPlan?.permits ?? 0;
   const addStructure = (st: PlannedStructure) => {
     addBill(bill, totalBill(BLUEPRINTS[st.kind]));
     hours += totalHours(BLUEPRINTS[st.kind]);
@@ -260,7 +277,7 @@ export function planFortress(s: GameState, geo: PropertyGeometry = {}, opts: Par
   const buy = (Object.entries(bill) as Array<[MaterialId, number]>).filter(([m]) => MATERIALS[m].price !== null).map(([material, qty]) => ({ material, qty }));
   const own = (Object.entries(bill) as Array<[MaterialId, number]>).filter(([m]) => MATERIALS[m].price === null).map(([material, qty]) => ({ material, qty }));
   return {
-    options, rects, region, coreIsFull, wall, garage, towers, passage, walkwayLen: walkLen, walkwayRuns: planned.length + existing.length, notes,
+    options, rects, region, coreIsFull, wall, ringPlan, garage, towers, passage, walkwayLen: walkLen, walkwayRuns: planned.length + existing.length, notes,
     bill, cost: orderCost(buy) + permits, own, permits, hours: Math.round(hours),
   };
 }
@@ -278,6 +295,7 @@ export function layFortress(s: GameState, plan: FortressPlan): { runs: number; s
     structures++;
   }
   let runs = made.length;
+  if (plan.ringPlan) { const r = layRings(s, plan.ringPlan); runs += r.runs; structures += r.structures; }
   if (plan.passage) { planRun(s, 'underground_passage', plan.passage.map(p => [p[0], p[1]] as Pt), [], 0, true); runs++; }
   log(s, `Laid out the fortress ring: ${plan.wall.wallM} m of ${PERIMETER[plan.wall.kind].name.toLowerCase()}${plan.walkwayLen > 0 ? ' with a patrol walkway on top' : ''}${plan.garage ? ', a gatehouse garage at the gate' : ''}${plan.towers.length ? `, ${plan.towers.length} tower${plan.towers.length > 1 ? 's' : ''}` : ''}${plan.passage ? ' and an underground passage to the house' : ''}.`);
   return { runs, structures };

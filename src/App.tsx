@@ -30,7 +30,7 @@ export default function App() {
     (fresh ? Promise.resolve(null) : loadGame(AUTOSAVE)).then(saved => {
       // QA: ?lot=gorge&relief=9&acres=40&region=mountain_west&seed=3 starts a place on that lot archetype
       const lotKind = q.get('lot') as LotKind | null;
-      const lotSite = lotKind ? makeLotSite({ kind: lotKind, relief: Number(q.get('relief') ?? 8), acres: Number(q.get('acres') ?? 40) as Acres, region: (q.get('region') ?? 'mountain_west') as RegionId, seed: Number(q.get('lotseed') ?? 3), outlier: q.has('outlier'), creek: q.has('lotcreek'), flip: q.get('flip') === '-1' ? -1 : 1, elevM: Number(q.get('elev') ?? 2000) }) : null;
+      const lotSite = lotKind ? makeLotSite({ kind: lotKind, relief: Number(q.get('relief') ?? 8), acres: Number(q.get('acres') ?? 40) as Acres, region: (q.get('region') ?? 'mountain_west') as RegionId, seed: Number(q.get('lotseed') ?? 3), outlier: q.has('outlier'), creek: q.has('lotcreek'), cutbank: q.has('lotcut'), flip: q.get('flip') === '-1' ? -1 : 1, elevM: Number(q.get('elev') ?? 2000) }) : null;
       // QA: ?region=plains (no lot) is the classic forty in that region; &drive puts the gravel drive in (the road works are drawn only once it is built)
       const regionSite = !lotSite && q.has('region') ? { ...CLASSIC, region: q.get('region') as RegionId, creek: !q.has('nocreek') } : null;
       const qaSite = lotSite ?? regionSite;
