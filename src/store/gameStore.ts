@@ -28,6 +28,7 @@ import { cutRoadGates } from '../sim/roadGate';
 import { addSkirt, planRun, upgradeRun, type ContainerLook, type Gate, type PerimeterKind, type Pt } from '../sim/perimeter';
 import { ROAD_GATE_W, layPropertyWall, planPropertyWall, type PropertyGeometry } from '../sim/propertyWall';
 import { addWalkway } from '../sim/walkway';
+import { addRazor } from '../sim/razor';
 import { layPaths, pickUpPath, type LaidKind, type LayEdge } from '../sim/paths';
 import { compoundRegion, layFortress, planFortress, type FortressOptions } from '../sim/fortress';
 import type { RingShape } from '../sim/ringShape';
@@ -138,6 +139,8 @@ export interface GameStore {
   addSkirt: (id: string) => string | null;
   /** A patrol walkway on top of a finished wall (sim/walkway.ts). */
   addWalkway: (id: string) => string | null;
+  /** Hang razor wire along the top of a finished wall or fence (sim/razor.ts). */
+  addRazor: (id: string) => string | null;
   /** Lay a walk (gravel, stepping stones, duckboards, concrete) along these door-to-door walks, from the stock (null = laid; else why not). */
   layPaths: (edges: LayEdge[], kind: LaidKind) => string | null;
   /** Take a laid walk up again (back to a worn track). */
@@ -379,6 +382,13 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     if (locked()) return LOCKED_WHY;
     const g = structuredClone(get().game);
     const why = addWalkway(g, id);
+    if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); }
+    return why;
+  },
+  addRazor: (id) => {
+    if (locked()) return LOCKED_WHY;
+    const g = structuredClone(get().game);
+    const why = addRazor(g, id);
     if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); }
     return why;
   },

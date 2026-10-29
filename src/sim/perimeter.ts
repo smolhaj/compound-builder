@@ -17,7 +17,7 @@ import type { GameState } from './state';
 import { openDoorways } from './compounds';
 import { COUNTY, PERMIT_FEE, countyWorks } from './paperwork';
 
-export type PerimeterKind = 'split_rail' | 'barbed_wire' | 'woven_wire' | 'thorn_hedge' | 'log_palisade' | 'container_wall' | 'earth_berm' | 'ditch' | 'creek_bars' | 'chain_link' | 'wrought_iron' | 'iron_barbed' | 'steel_wall' | 'electric_steel' | 'water_pipe' | 'power_cable' | 'escape_tunnel' | 'covered_walkway' | 'underground_passage' | 'concrete_wall' | 'wall_walk' | 'stone_wall' | 'container_stack' | 'tunnel_bridge' | 'slope_tunnel';
+export type PerimeterKind = 'split_rail' | 'barbed_wire' | 'woven_wire' | 'thorn_hedge' | 'log_palisade' | 'container_wall' | 'earth_berm' | 'ditch' | 'creek_bars' | 'chain_link' | 'wrought_iron' | 'iron_barbed' | 'steel_wall' | 'electric_steel' | 'water_pipe' | 'power_cable' | 'escape_tunnel' | 'covered_walkway' | 'underground_passage' | 'concrete_wall' | 'wall_walk' | 'stone_wall' | 'container_stack' | 'tunnel_bridge' | 'slope_tunnel' | 'bar_fence';
 
 export interface PerimeterDef {
   id: PerimeterKind;
@@ -85,10 +85,11 @@ export const PERIMETER: Record<PerimeterKind, PerimeterDef> = {
   container_stack: { id: 'container_stack', name: 'Stacked containers', blurb: 'Containers two high, end to end: a 5 m wall that no ladder from the yard reaches, and each box is still storage. It takes twice the boxes of a single row and a crane that can lift to the second tier. Take the colors you like; black reads as one dark wall.', hours: 6, materials: { container: 1 }, height: 0.86, blocks: { people: 0.95, animals: 1, vehicles: 1 }, sight: 1, growYears: 0 },
   tunnel_bridge: { id: 'tunnel_bridge', name: 'Tunnel-bridge (enclosed steel)', blurb: 'A rust-red steel tube on trusses across a gorge, ravine or creek bed, joining the outer road or motor court to the compound, with a steel door at each end. Vehicles drive through; on foot or by truck it is the one way over the gap. A crew has to come by it (door by door) or ford and climb the gorge, and you can drop it. Needs real low ground to span: 3 m or more under the deck, no longer than 200 m. The county wants a permit.', hours: 30, materials: { rebar: 2.4, roofing: 4, hardware: 0.6, concrete: 1.2, cable: 0.1 }, height: 0.55, blocks: { people: 0.9, animals: 1, vehicles: 0.9 }, sight: 0.9, growYears: 0, walkway: true, span: true, vehicleWay: true },
   slope_tunnel: { id: 'slope_tunnel', name: 'Slope tunnel (enclosed steel)', blurb: 'The same rust-red tube laid down a hillside, following the ground, with a steel door at each end: the secured way from the compound down to a lower yard or road on a slope of 20 % or more. Vehicles drive through.', hours: 22, materials: { rebar: 1.4, roofing: 2.6, hardware: 0.4, concrete: 0.8 }, height: 0.5, blocks: { people: 0.9, animals: 1, vehicles: 0.85 }, sight: 0.85, growYears: 0, walkway: true, vehicleWay: true },
+  bar_fence: { id: 'bar_fence', name: 'Black bar fence', blurb: 'Plain black steel bars, 2.4 m tall, welded to top and bottom rails and set in a low concrete curb, with no spear points to catch a coat: the fence of an embassy or a good estate. You can see through it, but it is hard to climb and cannot be cut with hand tools. Used for the motor court in front of the gate.', hours: 13, materials: { rebar: 0.95, hardware: 0.22, concrete: 0.3 }, height: 0.4, blocks: { people: 0.7, animals: 0.98, vehicles: 0.5 }, sight: 0.04, growYears: 0, deepFooting: true },
   ditch: { id: 'ditch', name: 'Ditch / dry moat', blurb: 'A 2 m deep, 3 m wide ditch. No vehicle crosses; the spoil can build a berm.', hours: 40, materials: {}, height: -0.33, blocks: { people: 0.45, animals: 0.3, vehicles: 1 }, sight: 0, growYears: 0 },
 };
 
-export const PERIMETER_ORDER: readonly PerimeterKind[] = ['split_rail', 'barbed_wire', 'woven_wire', 'thorn_hedge', 'log_palisade', 'container_wall', 'earth_berm', 'ditch', 'creek_bars', 'chain_link', 'wrought_iron', 'iron_barbed', 'steel_wall', 'electric_steel', 'concrete_wall', 'covered_walkway', 'stone_wall', 'container_stack', 'tunnel_bridge', 'slope_tunnel'];
+export const PERIMETER_ORDER: readonly PerimeterKind[] = ['split_rail', 'barbed_wire', 'woven_wire', 'thorn_hedge', 'log_palisade', 'container_wall', 'earth_berm', 'ditch', 'creek_bars', 'chain_link', 'wrought_iron', 'iron_barbed', 'steel_wall', 'electric_steel', 'concrete_wall', 'covered_walkway', 'stone_wall', 'container_stack', 'tunnel_bridge', 'slope_tunnel', 'bar_fence'];
 /** Lines that carry utilities (drawn with the same tool, under Water & power). */
 export const UTILITY_LINES: readonly PerimeterKind[] = ['water_pipe', 'power_cable'];
 
@@ -140,6 +141,8 @@ export interface PerimeterRun {
   dropped?: boolean;
   /** A wall-top walkway: the wall run it stands on (follows the wall through an upgrade; sim/walkway.ts). */
   hostId?: string;
+  /** Razor wire coiled along the top (`addRazor`, sim/razor.ts): a little harder to get over. */
+  razor?: boolean;
 }
 
 /**
@@ -150,13 +153,13 @@ export interface PerimeterRun {
  */
 export const PREDATOR_BLOCK: Record<PerimeterKind, number> = {
   split_rail: 0.02, barbed_wire: 0.1, woven_wire: 0.35, thorn_hedge: 0.75, log_palisade: 0.97, container_wall: 1, earth_berm: 0.2, ditch: 0.2,
-  creek_bars: 0.95, chain_link: 0.9, wrought_iron: 0.97, iron_barbed: 0.98, steel_wall: 1, electric_steel: 1, water_pipe: 0, power_cable: 0, escape_tunnel: 0, covered_walkway: 1, underground_passage: 0, concrete_wall: 1, wall_walk: 0, stone_wall: 1, container_stack: 1, tunnel_bridge: 1, slope_tunnel: 1,
+  creek_bars: 0.95, chain_link: 0.9, wrought_iron: 0.97, iron_barbed: 0.98, steel_wall: 1, electric_steel: 1, water_pipe: 0, power_cable: 0, escape_tunnel: 0, covered_walkway: 1, underground_passage: 0, concrete_wall: 1, wall_walk: 0, stone_wall: 1, container_stack: 1, tunnel_bridge: 1, slope_tunnel: 1, bar_fence: 0.97,
 };
 
 /** The next tier up, where there is one (upgraded in place: sim `upgradeRun`). */
 export const UPGRADE_NEXT: Partial<Record<PerimeterKind, PerimeterKind>> = {
   split_rail: 'barbed_wire', barbed_wire: 'woven_wire', woven_wire: 'chain_link', chain_link: 'wrought_iron',
-  wrought_iron: 'iron_barbed', iron_barbed: 'steel_wall', steel_wall: 'electric_steel', electric_steel: 'concrete_wall',
+  bar_fence: 'steel_wall', wrought_iron: 'iron_barbed', iron_barbed: 'steel_wall', steel_wall: 'electric_steel', electric_steel: 'concrete_wall',
   // shipping containers join the chain: the containers go (their steel is worth something) and a steel wall takes their place
   container_wall: 'steel_wall',
   // the log palisade's next step is a stone wall (the stockade becomes a castle wall)
@@ -190,8 +193,22 @@ export const fenceLive = (s: GameState): boolean => s.utilities.lit.length > 0 |
 /** How well a run stops people right now: an electrified wall with no power is just a steel wall. */
 export function peopleBlock(s: GameState, r: Pick<PerimeterRun, 'kind'>): number {
   if (r.kind === 'electric_steel' && !fenceLive(s)) return PERIMETER.steel_wall.blocks.people;
-  return PERIMETER[r.kind].blocks.people;
+  const base = PERIMETER[r.kind].blocks.people;
+  return (r as { razor?: boolean }).razor && base >= RAZOR.MIN_BLOCK ? Math.min(RAZOR.CAP, base + RAZOR.PEOPLE) : base;
 }
+
+/**
+ * Razor wire along the top of a wall or fence (docs/DECISIONS.md, "Motor court, bar fence and razor wire"): concertina coils on brackets. Priced per
+ * 6 m in the table (`wire` and `hardware`; the family hangs it in `HOURS` hours a run from the stockpile), it adds `PEOPLE` to what the run stops
+ * (to `CAP`), only on a run that already stops people (`MIN_BLOCK`). Walls that carry their own wire (steel, electrified) take none.
+ */
+export const RAZOR = {
+  PEOPLE: 0.06, CAP: 0.99, MIN_BLOCK: 0.5,
+  /** Per 6 m of run. */
+  MATERIALS: { wire: 0.14, hardware: 0.05 } as Partial<Record<MaterialId, number>>,
+  HOURS: 1.6,
+  HOSTS: ['chain_link', 'wrought_iron', 'bar_fence', 'container_wall', 'container_stack', 'stone_wall', 'concrete_wall', 'log_palisade'] as readonly PerimeterKind[],
+} as const;
 
 export function runLength(pts: readonly Pt[]): number {
   let l = 0;

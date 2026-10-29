@@ -33,6 +33,7 @@ import { mulberry32 } from './rng';
 import { parkingPlan, syncParking } from './parking';
 import { addTool, kitOf } from './tools';
 import { enclosure } from './enclosure';
+import { COURT_THEFT_FACTOR, isCourt } from './motorCourt';
 import { runFinished } from './perimeter';
 
 export type VehicleKind = 'pickup' | 'suv' | 'motorhome' | 'tractor' | 'atv' | 'old_pickup' | 'trailer';
@@ -316,7 +317,9 @@ export function raidTakesVehicles(s: GameState, organized: boolean): string[] {
   const fenced = new Set(parkingPlan(s).inYard);
   for (const v of outside) {
     const u = mulberry32(s.seed * 5413 + dayIndex(s.clock.t) * 41 + (Number(v.id.slice(1)) || 0) * 7)();
-    if (u >= p * (fenced.has(v.id) ? 0.5 : 1)) continue;   // (a fenced, lit equipment yard with the hitches locked: half the chance)
+    const pk = parkingPlan(s).parked.find(x => x.vehicle === v.id);
+    const behind = pk?.yard && isCourt(s, pk.yard.yard) ? COURT_THEFT_FACTOR : fenced.has(v.id) ? 0.5 : 1;   // (a fenced, lit equipment yard with the hitches locked: half the chance; behind the motor court's bars and gate: a quarter)
+    if (u >= p * behind) continue;
     vs.splice(vs.indexOf(v), 1);
     lines.push(`They drove off the ${VEHICLES[v.kind].name.toLowerCase()} that was standing in the open yard.`);
   }

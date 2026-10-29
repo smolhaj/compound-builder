@@ -94,6 +94,10 @@ export function FortifyRing() {
         <span style={{ flex: 1, color: DIM }}>Start them as</span>
         {RING_TOWER_KINDS.map(k => <button key={k} style={{ ...btn(opts.towerKind === k), padding: '2px 7px', fontSize: 11.5 }} title={TOWERS[k].blurb} onClick={() => setOpts({ ...opts, towerKind: k })}>{TOWERS[k].name}</button>)}
       </div>
+      <div style={{ display: 'flex', gap: 4, alignItems: 'center', padding: '3px 0' }} title="A gravel forecourt in front of the gate garage, 18 x 12 m, fenced in black steel bars with a drive gate and six bays: the fleet parks here before the open yard, and a vehicle behind the bars is far harder for a crew to drive off. Needs your land outside the gate.">
+        <span style={{ flex: 1, color: DIM }}>Motor court in front of the gate</span>
+        <button style={{ ...btn(opts.motorCourt), padding: '2px 7px' }} onClick={() => setOpts({ ...opts, motorCourt: !opts.motorCourt })}>{opts.motorCourt ? 'Yes' : 'No'}</button>
+      </div>
       <div style={{ display: 'flex', gap: 4, alignItems: 'center', padding: '3px 0' }}>
         <span style={{ flex: 1, color: DIM }}>Underground passage garage to house</span>
         <button style={{ ...btn(opts.passage), padding: '2px 7px' }} onClick={() => setOpts({ ...opts, passage: !opts.passage })}>{opts.passage ? 'Yes' : 'No'}</button>

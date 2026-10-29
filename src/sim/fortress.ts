@@ -23,6 +23,7 @@ import { log, orderCost } from './economy';
 import { isFinished, planStructure } from './construction';
 import { applyForPermit, countyWorks, needsPermit, permitFee } from './paperwork';
 import { PERIMETER, planRun, runBill, runHours, wallLength, type ContainerLook, type PerimeterKind, type PerimeterRun, type Pt } from './perimeter';
+import { COURT_CELLS_X, MOTOR_COURT, courtSpot } from './motorCourt';
 import { GATE_GARAGE, GARAGE_CELLS_Z, GARAGE_W, garageRotFor } from './garage';
 import { canHostWalkway, layWalkway, walkOn, walkwayBill } from './walkway';
 import { TOWERS, stampHighGround, type TowerKind } from './towers';
@@ -59,10 +60,12 @@ export interface FortressOptions {
   rings: number;
   ringWall: PerimeterKind;
   ringGates: RingGates;
+  /** A motor court in front of the gate garage (sim/motorCourt.ts). */
+  motorCourt: boolean;
 }
 /** The walls a ring can be built in (each takes a patrol walkway). */
 export const RING_WALLS: readonly PerimeterKind[] = ['container_wall', 'container_stack', 'stone_wall', 'concrete_wall'];
-export const DEFAULT_FORTRESS: FortressOptions = { scope: 'core', towers: MAX_TOWERS, towerKind: 'watchtower_wood', passage: true, shape: 'square', wall: 'container_wall', look: 'black', rings: 1, ringWall: 'stone_wall', ringGates: 'alternate' };
+export const DEFAULT_FORTRESS: FortressOptions = { scope: 'core', towers: MAX_TOWERS, towerKind: 'watchtower_wood', passage: true, shape: 'square', wall: 'container_wall', look: 'black', rings: 1, ringWall: 'stone_wall', ringGates: 'alternate', motorCourt: false };
 
 export interface PlannedStructure { kind: string; x: number; z: number; rot: number }
 
@@ -76,6 +79,8 @@ export interface FortressPlan {
   coreIsFull: boolean;
   wall: WallPlan;
   garage: PlannedStructure | null;
+  /** The motor court outside the gate, or null. */
+  court: PlannedStructure | null;
   towers: PlannedStructure[];
   /** The inner rings (sim/rings.ts), or null with one ring. */
   ringPlan: RingPlan | null;
@@ -228,6 +233,16 @@ export function planFortress(s: GameState, geo: PropertyGeometry = {}, opts: Par
     if (clearOf(s, x, z, half - 0.5)) garage = { kind: GATE_GARAGE, x, z, rot: garageRotFor([gs.inx, gs.inz]) };
     else notes.push('Something already stands where the gate garage would go: the gap is left as an ordinary gate.');
   } else if (!gs) notes.push(wall.gateNote ? `No gate garage: ${wall.gateNote}. Add a gate to the wall or stake the garage from the Build menu.` : 'No gate garage planned (no road side on the line).');
+  // the motor court: outside the gate, back to the garage, on land you own and clear of other buildings
+  let court: PlannedStructure | null = null;
+  if (options.motorCourt) {
+    if (garage && gs) {
+      const sp = courtSpot(gs), hx = COURT_CELLS_X * CELL / 2, owned = ownedRects(s);
+      const fits = owned.some(r => [[-1, -1], [1, -1], [1, 1], [-1, 1]].every(([sx, sz]) => sp.x + sx * hx > r.x0 && sp.x + sx * hx < r.x1 && sp.z + sz * hx > r.z0 && sp.z + sz * hx < r.z1));
+      if (fits && clearOf(s, sp.x, sp.z, hx - 0.5)) court = { kind: MOTOR_COURT, ...sp };
+      else notes.push('No room for the motor court outside the gate: it needs 18 m of your land across and 12 m out, clear of other buildings.');
+    } else notes.push('No motor court: it goes in front of a gate garage, and there is none planned.');
+  }
   if (!garage && gs) { wall.runs.forEach(r => r.gates.forEach(g => { delete g.garage; })); }
 
   const towers = towerSites(s, options.towerKind, options.towers, gs, garage ? [garage] : [], region).map((p): PlannedStructure => ({ kind: options.towerKind, x: p[0], z: p[1], rot: 0 }));
@@ -268,6 +283,7 @@ export function planFortress(s: GameState, geo: PropertyGeometry = {}, opts: Par
     if (needsPermit(st.kind) && s.paper.permits && countyWorks(s)) permits += permitFee(s, st.kind);
   };
   if (garage) addStructure(garage);
+  if (court) addStructure(court);
   towers.forEach(addStructure);
   if (passage) {
     const len = Math.hypot(passage[1][0] - passage[0][0], passage[1][1] - passage[0][1]);
@@ -277,7 +293,7 @@ export function planFortress(s: GameState, geo: PropertyGeometry = {}, opts: Par
   const buy = (Object.entries(bill) as Array<[MaterialId, number]>).filter(([m]) => MATERIALS[m].price !== null).map(([material, qty]) => ({ material, qty }));
   const own = (Object.entries(bill) as Array<[MaterialId, number]>).filter(([m]) => MATERIALS[m].price === null).map(([material, qty]) => ({ material, qty }));
   return {
-    options, rects, region, coreIsFull, wall, ringPlan, garage, towers, passage, walkwayLen: walkLen, walkwayRuns: planned.length + existing.length, notes,
+    options, rects, region, coreIsFull, wall, ringPlan, garage, court, towers, passage, walkwayLen: walkLen, walkwayRuns: planned.length + existing.length, notes,
     bill, cost: orderCost(buy) + permits, own, permits, hours: Math.round(hours),
   };
 }
@@ -288,7 +304,7 @@ export function layFortress(s: GameState, plan: FortressPlan): { runs: number; s
   // a deck on every container wall (new and old) that does not have one
   for (const r of s.perimeter) if (canHostWalkway(r.kind) && !walkOn(s, r.id) && !r.replaces && !PERIMETER[r.kind].wallTop) layWalkway(s, r, true);
   let structures = 0;
-  for (const st of [...(plan.garage ? [plan.garage] : []), ...plan.towers]) {
+  for (const st of [...(plan.garage ? [plan.garage] : []), ...(plan.court ? [plan.court] : []), ...plan.towers]) {
     const placed = planStructure(s, st.kind, st.x, st.z, st.rot);
     stampHighGround(placed);
     applyForPermit(s, placed);

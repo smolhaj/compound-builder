@@ -42,7 +42,7 @@ export interface PropertyGeometry {
 }
 
 /** The kinds that make sense as the one wall round a property. */
-export const WALL_CHOICES: readonly PerimeterKind[] = ['split_rail', 'barbed_wire', 'woven_wire', 'thorn_hedge', 'log_palisade', 'container_wall', 'earth_berm', 'ditch', 'chain_link', 'wrought_iron', 'iron_barbed', 'steel_wall', 'electric_steel', 'container_stack', 'stone_wall', 'concrete_wall'];
+export const WALL_CHOICES: readonly PerimeterKind[] = ['split_rail', 'barbed_wire', 'woven_wire', 'thorn_hedge', 'log_palisade', 'container_wall', 'earth_berm', 'ditch', 'chain_link', 'bar_fence', 'wrought_iron', 'iron_barbed', 'steel_wall', 'electric_steel', 'container_stack', 'stone_wall', 'concrete_wall'];
 
 // ── the line as a loop ──
 

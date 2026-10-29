@@ -66,3 +66,19 @@ export const RING_SCENARIOS = [
   { name: 'rings-3-rounded', setup: ring({ shape: 'rounded', rings: 3, ringWall: 'stone_wall', towers: 3 }), shots: [aerial(46, 1.15), aerial(38, 0.5, 2.2), eyeWallPerson] },
   { name: 'rings-4-octagon', setup: ring({ shape: 'octagon', rings: 4, ringWall: 'container_stack', towers: 2 }), shots: [aerial(46, 1.15), aerial(38, 0.5, 2.2)] },
 ];
+
+/** The motor court in front of the gate: a camera outside the gate looking in over the court, a QA person in it. */
+const courtCam = (name, back, side, fov = 64, lift = 0.3) => ({ name, cam: `${pre} const ct = g0.structures.find(s => s.kind === 'motor_court'), ga = g0.structures.find(s => s.kind === 'gate_garage'); if (!ct) return; let dx = ct.x - (ga ? ga.x : c.x), dz = ct.z - (ga ? ga.z : c.z); const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l; const nx = -dz, nz = dx; const x = ct.x + dx * ${back} + nx * ${side}, z = ct.z + dz * ${back} + nz * ${side}; ${figure('(ct.x + nx * 0.7 - dx * 0.1)', '(ct.z + nz * 0.7 - dz * 0.1)')} cb.qa.pose = { x, y: gr(x, z) + ${lift}, z, lx: ct.x, ly: gr(ct.x, ct.z) + 0.3, lz: ct.z, fov: ${fov} };` });
+const courtAerial = (name, r, pitch, yaw) => ({ name, cam: `${pre} const ct = g0.structures.find(s => s.kind === 'motor_court'); if (!ct) return; cb.cam.target.set(ct.x, 0, ct.z); cb.cam.radius = ${r}; cb.cam.pitch = ${pitch}; cb.cam.yaw = ${yaw};` });
+const courtExtra = `import('/src/sim/vehicles.ts').then(v => { cb.game.setState(s => { const g = structuredClone(s.game); g.money = 1e6; for (const k of ['suv', 'suv', 'atv', 'tractor', 'pickup', 'motorhome']) v.buyVehicle(g, k); return { game: g }; }); });
+    import('/src/sim/razor.ts').then(r => { cb.game.setState(s => { const g = structuredClone(s.game); g.stock.wire = 9999; g.stock.hardware = 9999; for (const run of g.perimeter) if (!run.hostId) r.addRazor(g, run.id); return { game: g }; }); });`;
+const razorOnly = `import('/src/sim/razor.ts').then(r => { cb.game.setState(s => { const g = structuredClone(s.game); g.stock.wire = 9999; g.stock.hardware = 9999; for (const run of g.perimeter) r.addRazor(g, run.id); return { game: g }; }); });`;
+export const COURT_SCENARIOS = [
+  { name: 'razor-stone', settle: 3500, setup: around('stone_wall', 'rounded', razorOnly), shots: [aerial(36, 0.6, 2.4), eyeWallPerson] },
+  { name: 'razor-bar', settle: 3500, setup: around('bar_fence', 'rounded', razorOnly), shots: [aerial(36, 0.6, 2.4), eyeWallPerson] },
+  { name: 'court-stone', settle: 5000, setup: ring({ shape: 'rounded', wall: 'stone_wall', motorCourt: true, towers: 3, passage: false }, courtExtra), shots: [
+    courtAerial('aerial-top', 22, 1.2, 0.8), courtAerial('aerial-oblique', 18, 0.5, 2.4),
+    courtCam('eye-court-with-person', 5.4, 1.2), courtCam('eye-court-inside', -0.2, 0.4, 70),
+    eyeWallPerson,
+  ] },
+];

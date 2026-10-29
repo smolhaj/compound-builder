@@ -120,4 +120,71 @@ function gateGarage(def: KitPieceDef, seed = 1): THREE.Group {
   return g;
 }
 
-export const GATEHOUSE_BUILDERS: Record<string, (def: KitPieceDef, seed?: number) => THREE.Group> = { gate_garage: gateGarage };
+/**
+ * The motor court (sim/motorCourt.ts): a gravel forecourt in front of the gatehouse garage, fenced on three sides with black bars (the fourth is the wall and
+ * the garage), a double drive gate in the far fence, two rows of three marked bays for the fleet (sim/farm.ts bay slots: vehicles park here), concrete curbs,
+ * gate piers with lamps. Local frame: origin at the footprint center on the pad; -z is the wall side (open), +z the road side with the gate.
+ */
+function motorCourt(def: KitPieceDef, seed = 1): THREE.Group {
+  const p = new Parts(seed);
+  const W = def.cellsX * CELL, D = def.cellsZ * CELL, hw = W / 2 - 0.03, hd = D / 2 - 0.03, H = 2.4 * M, gate = 0.84;
+  p.layer = 'stakes';
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) p.add('trim', box(0.012, 0.09, 0.012, sx * hw, -0.02, sz * hd));
+  p.layer = 'foundation';
+  p.add('gravel', box(W - 0.04, 0.012, D - 0.04, 0, -0.005, 0));
+  p.add('concrete', box(W - 0.04, 0.02, 0.06, 0, -0.006, -hd + 0.03));                       // the curb along the wall
+  p.layer = 'frame';
+  /** A stretch of black bar fence from (ax, az) to (bx, bz): rails, bars every 0.66 m, round-capped posts every 2.4 m, a low curb. */
+  const fence = (ax: number, az: number, bx: number, bz: number) => {
+    const L = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.round(L / (2.4 * M))), yaw = -Math.atan2(bz - az, bx - ax);
+    const at = (g: THREE.BufferGeometry, f: number, y = 0) => g.rotateY(yaw).translate(ax + (bx - ax) * f, y, az + (bz - az) * f);
+    p.add('concrete', at(box(L, 0.22 * M, 0.2 * M, 0, 0, 0), 0.5));
+    p.add('iron', at(box(L, 0.05 * M, 0.05 * M, 0, 0.3 * M, 0), 0.5));
+    p.add('iron', at(box(L, 0.06 * M, 0.05 * M, 0, H - 0.14 * M, 0), 0.5));
+    const nb = Math.max(2, Math.round(L / (0.11 * M)));
+    for (let k = 1; k < nb; k++) p.add('iron', at(box(0.022 * M, H - 0.22 * M, 0.022 * M, 0, 0.22 * M, 0), k / nb));
+    for (let k = 0; k <= n; k++) {
+      p.add('iron', at(box(0.12 * M, H + 0.05 * M, 0.12 * M, 0, 0, 0), k / n));
+      p.add('iron', at(new THREE.SphereGeometry(0.075 * M, 8, 5).translate(0, H + 0.08 * M, 0), k / n));
+    }
+  };
+  fence(-hw, -hd, -hw, hd);                  // the west side
+  fence(hw, -hd, hw, hd);                    // the east side
+  fence(-hw, hd, -gate / 2, hd);             // the far fence, either side of the drive gate
+  fence(gate / 2, hd, hw, hd);
+  // the gate: two stone-capped concrete piers with lamps, two bar leaves swung open
+  for (const sx of [-1, 1]) {
+    p.add('concrete', box(0.5 * M, 3.0 * M, 0.5 * M, sx * (gate / 2 + 0.03), 0, hd));
+    p.add('fieldstone', box(0.65 * M, 0.2 * M, 0.65 * M, sx * (gate / 2 + 0.03), 3.0 * M, hd));
+    p.add('lamp', box(0.3 * M, 0.3 * M, 0.3 * M, sx * (gate / 2 + 0.03), 3.2 * M, hd));
+    // the leaf, swung open inward against the fence: a frame of two rails and bars every 0.66 m
+    const hx = sx * (gate / 2 - 0.045), len = gate / 2 - 0.05;
+    p.add('iron', box(0.05 * M, 0.05 * M, len, hx, 0.3 * M, hd - len - 0.03));
+    p.add('iron', box(0.05 * M, 0.06 * M, len, hx, 2.0 * M, hd - len - 0.03));
+    for (let k = 0; k <= 8; k++) p.add('iron', box(0.025 * M, 2.0 * M - 0.2 * M, 0.025 * M, hx, 0.2 * M, hd - 0.03 - len * k / 8));
+  }
+  p.layer = 'roof';
+  // the bays: two rows of three, painted stalls with wheel stops, nose toward the gate (the fleet draws vehicles in them: FleetRenderer)
+  const bw = (W - 0.3) / 3;
+  for (let r = 0; r < 2; r++) for (let k = 0; k < 3; k++) {
+    const x = -W / 2 + 0.15 + (k + 0.5) * bw, z = -hd + 0.45 + r * 0.8;
+    for (const sx of [-1, 1]) p.add('enamel', box(0.012, 0.004, 0.6, x + sx * (bw / 2 - 0.02), 0.004, z));
+    p.add('concrete', box(bw * 0.5, 0.025, 0.04, x, 0, z - 0.28));
+  }
+  p.add('paint_yellow', box(gate * 0.9, 0.003, 0.05, 0, 0.004, hd - 0.12));                 // a stop line inside the gate
+  p.layer = 'openings';
+  // two light poles inside the corners and a guard's call box by the gate
+  for (const sx of [-1, 1]) {
+    p.add('steel', new THREE.CylinderGeometry(0.035 * M, 0.05 * M, 5 * M, 6).translate(sx * (hw - 0.12), 2.5 * M, -hd + 0.15));
+    p.add('lamp', box(0.5 * M, 0.08 * M, 0.2 * M, sx * (hw - 0.12), 5.0 * M, -hd + 0.15));
+  }
+  p.add('steel', box(0.4 * M, 1.2 * M, 0.3 * M, gate / 2 + 0.2, 0, hd - 0.1));
+  p.add('paint_red', box(0.3 * M, 0.2 * M, 0.02 * M, gate / 2 + 0.2, 0.9 * M, hd - 0.1 + 0.15 * M));
+  for (const [x0, z0, x1, z1] of [[-hw, -hd, -hw + 0.03, hd], [hw - 0.03, -hd, hw, hd], [-hw, hd - 0.03, -gate / 2, hd], [gate / 2, hd - 0.03, hw, hd]] as const) p.collide({ x0, z0, x1, z1 });
+  const g = p.finish();
+  g.userData.chimneyTop = null;
+  g.userData.keep = ['frame', 'rafters'];
+  return g;
+}
+
+export const GATEHOUSE_BUILDERS: Record<string, (def: KitPieceDef, seed?: number) => THREE.Group> = { gate_garage: gateGarage, motor_court: motorCourt };

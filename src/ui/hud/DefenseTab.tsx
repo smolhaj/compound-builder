@@ -8,11 +8,12 @@ import { defenseReport, type Check } from '../../sim/defenseReport';
 import { setGuard } from '../../sim/pets';
 import { MATERIALS, type MaterialId } from '../../sim/materials';
 import { orderCost } from '../../sim/economy';
-import { PERIMETER, SALVAGE, UPGRADE_NEXT, runBill, runFinished, runHours, upgradeProblem, wallLength } from '../../sim/perimeter';
+import { PERIMETER, RAZOR, SALVAGE, UPGRADE_NEXT, runBill, runFinished, runHours, upgradeProblem, wallLength } from '../../sim/perimeter';
 import { STRUCTURE_SALVAGE, isFinished as structFinished } from '../../sim/construction';
 import { AI_MODULE, ARMORY_LIGHTS, LIGHT_MODES, LIGHT_MODE_NAME, aiModulesUsed, hasAiSensor, lightList, lightMode, lightsOf } from '../../sim/lights';
 import { floodTowerIds, TOWERS, TOWER_NEXT, highBonus, highShare, isTower, towerBill, towerUpgradeProblem } from '../../sim/towers';
 import { ungatedCrossings } from '../../sim/roadGate';
+import { razorBill, razorHours, razorProblem } from '../../sim/razor';
 import { canHostWalkway, walkOn, walkwayBill, walkwayProblem } from '../../sim/walkway';
 import { adaptLevel, firstWinter, sinceHit } from '../../sim/adaptive';
 import { adaptOf } from '../../sim/encounters';
@@ -113,6 +114,18 @@ export function DefenseTab() {
         return <div key={r.id} style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '3px 0' }}>
           <span style={{ flex: 1 }}>{PERIMETER[r.kind].name} <span style={{ color: DIM }}>({Math.round(len * 6)} m)</span></span>
           <button style={btn(!!deck && runFinished(deck))} disabled={!!why} title={why ?? `${Math.round(runHours('wall_walk', len))} h of work; about ${usd(price)} of materials (rebar, roofing sheet, hardware: Shop, Fencing)`} onClick={() => { const w = useGameStore.getState().addWalkway(r.id); if (w) alert(w); }}>{deck ? (runFinished(deck) ? 'Walkway built' : 'Walkway under way') : why ? 'Not yet' : `Add walkway ~${usd(price)}`}</button>
+        </div>;
+      })}
+    </Section>
+    <Section title="Razor wire">
+      <Note>Concertina coils along the top of a finished wall or fence: a crew going over it leaves skin and time (+{Math.round(RAZOR.PEOPLE * 100)} points of what the run stops). The family hangs it from the stockpile (wire and hardware: Shop, Fencing); it is lost when the wall is upgraded. Steel and electrified walls carry their own.</Note>
+      {game.perimeter.filter(r => RAZOR.HOSTS.includes(r.kind) && runFinished(r) && !r.replaces).length === 0 && <Note>No finished wall or fence that can take it yet.</Note>}
+      {game.perimeter.filter(r => RAZOR.HOSTS.includes(r.kind) && runFinished(r) && !r.replaces).slice(0, 8).map(r => {
+        const len = wallLength(r), why = razorProblem(game, r);
+        const price = orderCost(Object.entries(razorBill(len)).filter(([m]) => MATERIALS[m as MaterialId].price !== null).map(([material, qty]) => ({ material: material as MaterialId, qty: qty as number })));
+        return <div key={r.id} style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '3px 0' }}>
+          <span style={{ flex: 1 }}>{PERIMETER[r.kind].name} <span style={{ color: DIM }}>({Math.round(len * 6)} m)</span></span>
+          <button style={btn(!!r.razor)} disabled={!!why} title={why ?? `${Math.round(razorHours(len))} h of work; about ${usd(price)} of wire and hardware`} onClick={() => { const w = useGameStore.getState().addRazor(r.id); if (w) alert(w); }}>{r.razor ? 'Wired' : 'Hang razor wire'}</button>
         </div>;
       })}
     </Section>

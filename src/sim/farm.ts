@@ -98,20 +98,22 @@ export const WORKSHOP_WEAR = 0.75, WORKSHOP_HONING = 0.5, WORKSHOP_REPAIR_TOLL =
 
 /** Parking bays in one yard (a 12 × 12 m gravel pad: a tractor and four implements, a truck). */
 export const YARD_BAYS = 6;
+/** Buildings with the yard's bays: the equipment yard, and the motor court in front of the gate (sim/motorCourt.ts). */
+export const YARD_KINDS: readonly string[] = ['motor_court', 'equipment_yard'];
 
 export interface YardBay { yard: string; bay: number; occupant: string | null }
 
 /** Every bay of every finished yard (the occupant is a fleet vehicle id or null). */
 export function yardBays(s: GameState): YardBay[] {
   const out: YardBay[] = [];
-  for (const st of finishedOf(s, 'equipment_yard')) {
+  for (const st of YARD_KINDS.flatMap(k => finishedOf(s, k))) {   // the court by the gate first
     const row = (farmOf(s).yard[st.id] ??= Array.from({ length: YARD_BAYS }, () => null));
     row.forEach((occupant, bay) => out.push({ yard: st.id, bay, occupant }));
   }
   return out;
 }
 
-export const yardCapacity = (s: GameState): number => finishedOf(s, 'equipment_yard').length * YARD_BAYS;
+export const yardCapacity = (s: GameState): number => finishedOf(s, ...YARD_KINDS).length * YARD_BAYS;
 export const yardFree = (s: GameState): number => yardBays(s).filter(b => b.occupant === null).length;
 
 /**

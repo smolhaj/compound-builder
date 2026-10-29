@@ -10,7 +10,7 @@ import { kitMaterial, type KitMaterialId } from '../buildkit/materials';
 import { worldUV } from '../buildkit/shell';
 import { DECK_W, walkwayAccess } from '../../sim/walkway';
 import { insideRing } from '../../sim/compounds';
-import { PERIMETER, footingOf, hasSkirt, runGrowth, runProgress, wallLength, type PerimeterKind, type PerimeterRun, type Pt } from '../../sim/perimeter';
+import { PERIMETER, RAZOR, footingOf, hasSkirt, runGrowth, runProgress, wallLength, type PerimeterKind, type PerimeterRun, type Pt } from '../../sim/perimeter';
 
 const M = 1 / 6;
 type Ground = (x: number, z: number) => number;
@@ -181,6 +181,24 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
         }
       });
       for (const e of spanEnds()) post(e.x, e.z, H + 0.2 * M, 0.09 * M, 'iron');
+      break;
+    }
+    case 'bar_fence': {
+      // plain black bars between top and bottom rails, round-capped posts every 2.4 m, a low concrete curb: no spear points, nothing to catch a coat
+      const H = 2.4 * M;
+      bays(2.4 * M, (a, b) => {
+        post(a.x, a.z, H + 0.05 * M, 0.06 * M, 'iron');
+        add('iron', new THREE.SphereGeometry(0.075 * M, 8, 5).translate(a.x, ground(a.x, a.z) + H + 0.08 * M, a.z));
+        beam(a.x, a.z, b.x, b.z, 0, 0.22 * M, 0.2 * M, 'concrete');
+        beam(a.x, a.z, b.x, b.z, 0.3 * M, 0.05 * M, 0.05 * M, 'iron');
+        beam(a.x, a.z, b.x, b.z, H - 0.14 * M, 0.06 * M, 0.05 * M, 'iron');
+        const l = Math.hypot(b.x - a.x, b.z - a.z), n = Math.max(2, Math.round(l / (0.11 * M)));
+        for (let k = 1; k < n; k++) {
+          const f = k / n, x = a.x + (b.x - a.x) * f, z = a.z + (b.z - a.z) * f, y = ground(x, z);
+          add('iron', new THREE.CylinderGeometry(0.011 * M, 0.011 * M, H - 0.22 * M, 4).translate(x, y + 0.22 * M + (H - 0.22 * M) / 2, z));
+        }
+      });
+      for (const e of spanEnds()) post(e.x, e.z, H + 0.1 * M, 0.08 * M, 'iron');
       break;
     }
     case 'steel_wall':
@@ -603,6 +621,17 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
       add('paint_green', new THREE.CylinderGeometry(0.03 * M, 0.03 * M, 0.06 * M, 7).translate(x, y + 0.33 * M, z));
       add(lit ? 'bulb' : 'enamel', new THREE.SphereGeometry(0.014, 6, 4).translate(x, y + 0.37 * M, z));
     }
+  }
+  // razor wire: loose concertina coils on the top of the run (a ring every 0.26 m)
+  if (run.razor && built > 0.05 && RAZOR.HOSTS.includes(run.kind)) {
+    const top = Math.abs(def.height) + 0.06 * M;
+    bays(2.4 * M, (a, b) => {
+      const l = Math.hypot(b.x - a.x, b.z - a.z), n = Math.max(2, Math.round(l / (0.26 * M))), th = Math.atan2(b.x - a.x, b.z - a.z);
+      for (let k = 0; k < n; k++) {
+        const f = (k + 0.5) / n, x = a.x + (b.x - a.x) * f, z = a.z + (b.z - a.z) * f;
+        add('steel', new THREE.TorusGeometry(0.17 * M, 0.012 * M, 4, 9).rotateY(th).translate(x, ground(x, z) + top + 0.17 * M, z));
+      }
+    });
   }
   // gates: posts each side and a leaf swung open (wire / rail fences: tube gate; walls: plank or steel gates)
   if (run.finishedAt !== null && run.kind !== 'ditch') {
