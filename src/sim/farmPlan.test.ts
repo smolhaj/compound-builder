@@ -38,7 +38,7 @@ describe('farm plan', () => {
   it('spoilage and the plan name what is wrong', () => {
     const g = newGame(1, 250);
     built(g, 'h', 'timber_cabin'); built(g, 'f', 'field');
-    g.stock.fresh = 100; g.stock.lids = 20;
+    g.stock.fresh = 100; g.stock.lids = 20; g.stock.canner = 0;
     expect(spoilageRisks(g).some(r => /rotting/.test(r.text))).toBe(true);
     const plan = foodPlan(g).map(p => p.text).join(' ');
     expect(plan).toMatch(/pressure canner/);

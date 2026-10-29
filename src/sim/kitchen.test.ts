@@ -9,7 +9,7 @@ const built = (g: GameState, id: string, kind: string): Structure => {
   g.structures.push(st);
   return st;
 };
-const home = () => { const g = newGame(1, 250); built(g, 'h', 'timber_cabin'); g.disaster.tracks = { ...g.disaster.tracks, stores: 0 }; return g; };
+const home = () => { const g = newGame(1, 250); g.stock.canner = 0; built(g, 'h', 'timber_cabin'); g.disaster.tracks = { ...g.disaster.tracks, stores: 0 }; return g; };
 
 describe('kitchen', () => {
   it('without a canner only the high-acid third is water-bath canned, one case a day', () => {
