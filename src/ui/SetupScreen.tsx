@@ -19,7 +19,7 @@ const MODES: Array<[Mode, string, string]> = [
   ['scenario', 'Scenario', 'Pick the disaster and how long you have to get ready.'],
   ['sandbox', 'Free build', 'Nothing happens until you say so. Trigger any disaster from the side panel.'],
 ];
-const DIFFS: Array<[Difficulty, string, string]> = [['cozy', 'Cozy', 'Long warning, gentle raids, nobody dies for good'], ['standard', 'Standard', 'The intended game'], ['hardcore', 'Hardcore', 'Little warning, more and bigger raids, worse wounds, a slow recovery, permadeath']];
+const DIFFS: Array<[Difficulty, string, string]> = [['cozy', 'Cozy', 'Long warning, gentle raids, nobody dies for good'], ['standard', 'Standard', 'The intended game'], ['hardcore', 'Hardcore', 'Little warning, more and bigger raids, worse wounds, a slow recovery, permadeath. The world learns: after the first year, crews bring more against a place that holds, and the first winter is hard']];
 const PEACE: Array<[Exclude<PeaceLength, 'random'>, string]> = [['short', '18 months'], ['medium', '3 years'], ['long', '5 years']];
 
 const C = { bg: 'rgba(22,24,20,0.98)', card: 'rgba(255,255,255,0.045)', line: 'rgba(255,255,255,0.09)', gold: '#d8c9a0', dim: 'rgba(238,238,238,0.62)', good: '#a8d080', bad: '#f0a080' };

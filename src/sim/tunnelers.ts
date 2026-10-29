@@ -26,9 +26,11 @@ import { enclosure, nearest } from './enclosure';
 import { PERIMETER, hasSkirt, runFinished, wallLength, type PerimeterRun, type Pt } from './perimeter';
 import { applyBattle, planBattle, type RaiderTemper } from './battle';
 import { recordBattle } from './rescue';
-import { raiderTemper, type Encounter, type Outcome, type Stance } from './encounters';
+import { defenseOf, postureOf, raiderTemper, type Encounter, type Outcome, type Stance } from './encounters';
 import { isFinished } from './construction';
 import { dayIndex, type GameState } from './state';
+import { daysOfFood } from './needs';
+import { adaptation, adaptedHeads, adaptLevel, digFactor, sinceHit } from './adaptive';
 
 export type Counter = 'sensors' | 'dogs' | 'watch' | 'tower';
 
@@ -158,8 +160,12 @@ export function digChancePerDay(s: GameState): number {
   const late = Math.max(0, Math.min(1, (s.clock.t - d.hitAt - 120) / 360));
   if (late <= 0) return 0;
   const hard = d.difficulty === 'hardcore' ? 1.5 : d.difficulty === 'cozy' ? 0.4 : 1;
-  return 0.0012 * late * (0.4 + strength / 100) * hard * (1 - 0.5 * (s.gate.respect ?? 0));
+  // (Hardcore) crews that have learned a defended place dig more (sim/adaptive.ts)
+  return 0.0012 * late * (0.4 + strength / 100) * hard * digFactor(adaptNow(s)) * (1 - 0.5 * (s.gate.respect ?? 0));
 }
+
+/** How far the crews have learned this place (0 unless the level adapts; sim/adaptive.ts). */
+const adaptNow = (s: GameState): number => { const lvl = adaptLevel(s); return lvl > 0 ? adaptation(lvl, sinceHit(s), { defense: defenseOf(postureOf(s)), foodDays: daysOfFood(s) }) : 0; };
 
 const isTarget = (r: PerimeterRun): boolean => {
   const d = PERIMETER[r.kind];
@@ -189,7 +195,7 @@ export function startDig(s: GameState, r: () => number, day: number): Dig | null
   });
   let x = r() * cand.reduce((a, c) => a + c.w, 0), pickd = cand[0];
   for (const c of cand) { x -= c.w; if (x <= 0) { pickd = c; break; } }
-  const size = 4 + Math.floor(r() * 5);
+  const size = adaptedHeads(4 + Math.floor(r() * 5), adaptNow(s));
   const passage = s.perimeter.find(p => PERIMETER[p.kind].twoWay && runFinished(p) && p.pts.length > 1 && nearest(p.pts, pickd.at[0], pickd.at[1]).d <= 0.8);
   return {
     id: `d${s.nextId++}`, run: pickd.run.id, at: [pickd.at[0], pickd.at[1]], startDay: day, days: 6 + Math.floor(r() * 8), size,
