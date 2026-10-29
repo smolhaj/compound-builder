@@ -21,7 +21,7 @@ const fieldCache = new Map<string, LotField>();
 export function siteLot(site: Pick<Site, 'lot' | 'home'>): { field: LotField; stats: LotStats } | null {
   const spec = site.lot;
   if (!spec) return null;
-  const h = site.home, key = `${spec.kind}:${spec.seed}:${spec.relief}:${spec.flip}:${spec.creek ? 1 : 0}:${spec.outlier ? 1 : 0}:${h.x0},${h.z0},${h.x1},${h.z1}`;
+  const h = site.home, key = `${spec.kind}:${spec.seed}:${spec.relief}:${spec.flip}:${spec.creek ? 1 : 0}:${spec.cutbank ? 1 : 0}:${spec.outlier ? 1 : 0}:${h.x0},${h.z0},${h.x1},${h.z1}`;
   let field = fieldCache.get(key);
   if (!field) { if (fieldCache.size > 64) fieldCache.clear(); field = lotField(spec, h); fieldCache.set(key, field); }
   return { field, stats: lotStatsOf(field) };
@@ -31,12 +31,12 @@ export function siteLot(site: Pick<Site, 'lot' | 'home'>): { field: LotField; st
  * A place on a given lot (QA, tests, and the listings' base): raw land with the lot's water, a middling well, nothing built.
  * `?lot=gorge&relief=9&acres=40&region=mountain_west&seed=3` starts one.
  */
-export function makeLotSite(o: { region?: RegionId; kind: LotKind; acres?: Acres; relief?: number; seed?: number; outlier?: boolean; elevM?: number; flip?: 1 | -1; creek?: boolean }): Site {
+export function makeLotSite(o: { region?: RegionId; kind: LotKind; acres?: Acres; relief?: number; seed?: number; outlier?: boolean; elevM?: number; flip?: 1 | -1; creek?: boolean; cutbank?: boolean }): Site {
   const region = o.region ?? 'mountain_west', acres = o.acres ?? 40;
   const kind = o.kind;
   const lake = kind === 'bluff' || kind === 'island';
   const creek = kind === 'bench' || kind === 'gorge' ? true : kind === 'hillside' ? !!o.creek : false;
-  const spec: LotSpec = { kind, seed: o.seed ?? 1, relief: o.relief ?? 8, outlier: !!o.outlier, elevM: o.elevM ?? 2000, flip: o.flip ?? 1, creek: kind === 'hillside' ? creek : undefined };
+  const spec: LotSpec = { kind, seed: o.seed ?? 1, relief: o.relief ?? 8, outlier: !!o.outlier, elevM: o.elevM ?? 2000, flip: o.flip ?? 1, creek: kind === 'hillside' ? creek : undefined, ...(kind === 'hillside' && o.cutbank && !creek ? { cutbank: true } : {}) };
   const base = { region, acres, home: HOME_RECT[acres], creek: creek || lake, spring: kind === 'saddle', gwDepth: 40, gwQuality: 'good' as const, timber: 1, soil: 'thin' as const, miles: 8, improvements: { ...RAW, poleFt: 600, driveFt: 600 }, lot: spec };
   return { id: `${region}-lot-${kind}-${spec.seed}`, name: `Test ${kind} lot`, ...base, price: sitePrice(base) };
 }
@@ -121,6 +121,8 @@ export function rollLot(r: () => number, region: RegionId, acres: Acres, water: 
     kind, seed: Math.floor(spare * 1e6) + seed % 1000, relief: Math.round(relief * 10) / 10, outlier, elevM, flip: kind === 'hillside' && w === 'creek' ? 1 : kind === 'hillside' || kind === 'bench' || kind === 'ridge' ? flip : 1,
     creek: kind === 'hillside' ? w === 'creek' : undefined,
   };
+  // one in eight dry hillsides is a special listing cut into the slope (a rock face over a level shelf); a hash of the seed, so the rolls above never move
+  if (kind === 'hillside' && w !== 'creek' && (spec.seed * 0.6180339887) % 1 < 0.125) spec.cutbank = true;
   // (a hillside with a creek always falls toward the road: the creek would run uphill from it otherwise)
   return { spec, creek: w === 'creek' || w === 'lake', spring: w === 'spring', lake: w === 'lake' };
 }
@@ -177,6 +179,7 @@ export function terrainFacts(site: Pick<Site, 'lot' | 'home'>): Fact[] {
   const out: Fact[] = [];
   out.push({ label: 'Ground', value: `${LOT_NAME[spec.kind]}${spec.outlier ? ', extreme relief' : ''}, ${n0(spec.elevM)} m (${n0(spec.elevM * M_TO_FT)} ft)` });
   out.push({ label: 'Relief', value: `${n0(s.dropM)} m from low to high · slopes avg ${Math.round(s.meanSlopePct)} %, steepest ${n0(s.maxSlopePct)} %`, tone: s.dropM > 140 ? 'bad' : undefined });
+  if (spec.cutbank) out.push({ label: 'Rock face', value: 'Rock face above the pad: a cutbank over a level shelf: a compound can be notched into it, and a crew on foot needs ladders to cross it', tone: 'good' });
   const flat = Math.round(s.padFrac * 100);
   out.push({ label: 'Flat ground', value: `${flat} % buildable${s.padM2 > 0 ? ` · best pad ${acresOfM2(s.padM2)} acre${acresOfM2(s.padM2) === 1 ? '' : 's'}` : ''}`, tone: flat >= 30 ? 'good' : flat < 12 ? 'bad' : undefined });
   const g = s.accessMaxPct;

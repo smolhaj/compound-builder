@@ -27,6 +27,7 @@ import { LivedLayer } from './lived/LivedLayer';
 import type { Mode } from './lived/livedPlan';
 import { lightsOutNow } from '../sim/blackout';
 import type { NetWorld } from './paths/pathNet';
+import { WALK_CLIFF, walkRoute } from './paths/walkRoute';
 import type { PathExtras } from '../sim/paths';
 import { walkFactor } from '../sim/paths';
 import { useWorldStore } from '../store/worldStore';
@@ -982,21 +983,42 @@ export class HomesteadWorld {
     const boxes = [...this._built.values()].filter(b => !b.under && KIT[b.placed.kind].level !== 'underground').map(b => footprint(KIT[b.placed.kind], b.placed.x, b.placed.z, b.placed.rot, false));
     const cars = this._cars, yard = this.access.yard, hasCreek = this.parcel.creekHome, half = this.parcel.creek.halfWidth;
     const own = (x: number, z: number) => (x > this.home.x0 && x < this.home.x1 && z > this.home.z0 && z < this.home.z1) || this._inOwned(x, z);
-    const blocked = (x: number, z: number): boolean => {
-      if (!own(x, z)) return true;
+    const g = this.groundAt;
+    const slope = (x: number, z: number): number => (Math.abs(g(x + 0.25, z) - g(x - 0.25, z)) + Math.abs(g(x, z + 0.25) - g(x, z - 0.25))) / 0.5;
+    // what a straight walk cannot cross: a building, the built wall, the creek, and cliff ground (a rock face, a cutbank)
+    const hard = (x: number, z: number): boolean => {
       for (const r of boxes) if (x > r.x0 - 0.14 && x < r.x1 + 0.14 && z > r.z0 - 0.14 && z < r.z1 + 0.14) return true;
       if (hasCreek && Math.abs(z - this.parcel.creek.zAt(x)) < half + 0.25) return true;
-      if (Math.hypot(x - this.camp.x, z - this.camp.z) < 1.2 || Math.hypot(x - yard.x, z - yard.z) < 0.95) return true;
       if (this._perimeterBlocked(x, z, 0.08)) return true;
+      return slope(x, z) > WALK_CLIFF;
+    };
+    const blocked = (x: number, z: number): boolean => {
+      if (!own(x, z)) return true;
+      if (hard(x, z)) return true;
+      if (Math.hypot(x - this.camp.x, z - this.camp.z) < 1.2 || Math.hypot(x - yard.x, z - yard.z) < 0.95) return true;
       for (const c of cars) if (inCarBox(c, x, z, 0.12)) return true;
       const cx = Math.floor(x), cz = Math.floor(z);
       for (let i = cx - 1; i <= cx + 1; i++) for (let j = cz - 1; j <= cz + 1; j++) for (const [tx, tz, r] of trees.get(i * 4099 + j) ?? []) if ((tx - x) ** 2 + (tz - z) ** 2 < r * r) return true;
       return false;
     };
-    const g = this.groundAt;
     // steep ground and the unlevel: a path takes the easy way round
-    const cost = (x: number, z: number): number => { const sl = (Math.abs(g(x + 0.25, z) - g(x - 0.25, z)) + Math.abs(g(x, z + 0.25) - g(x, z - 0.25))) / 0.5; return 1 + 6 * Math.max(0, sl - 0.1); };
-    return { blocked, cost };
+    const cost = (x: number, z: number): number => 1 + 6 * Math.max(0, slope(x, z) - 0.1);
+    return { blocked, cost, hard };
+  }
+
+  /** The people's route finding world, rebuilt when the paths are (the layout, the cars, the wear). */
+  private _walkCache: { key: string; w: NetWorld } | null = null;
+  private _walkWorld(): NetWorld {
+    const key = `${this.paths.version}|${this._carKey}|${this.treeSpecs.length}|${this._runs.length}`;
+    if (this._walkCache?.key !== key) this._walkCache = { key, w: this._pathWorld() };
+    return this._walkCache.w;
+  }
+
+  /** The way person `from` walks to `to`: the trails when they lead there, round buildings, the wall and cliffs when the straight line crosses them, else straight ([]). */
+  private _walkVia(fx: number, fz: number, tx: number, tz: number): Array<[number, number]> {
+    const w = this._walkWorld();
+    if (!w.hard) return this.paths.via(fx, fz, tx, tz);
+    return walkRoute([fx, fz], [tx, tz], { blocked: w.blocked, hard: w.hard, cost: w.cost }, detour => this.paths.via(fx, fz, tx, tz, detour));
   }
 
   /** What the world adds to the stops: the camp, the delivery yard, the compound's own gate (when the drive does not go through it), a landing on the creek bank. */
@@ -1815,7 +1837,7 @@ export class HomesteadWorld {
     this.paths.update(game, performance.now());
     const ctx: GoalCtx = {
       camp: this.camp, site, home: homeB ? site(homeB.placed.id) : null, tree, yard: this.access.yard, sleepAt: i => sleepSpotFor(game, i), tentAt: n => this._tentPos[n],
-      footing: (x, z) => walkFactor(this.paths.surfaceAt(x, z), this._underfoot), via: (fx, fz, tx, tz) => this.paths.via(fx, fz, tx, tz),
+      footing: (x, z) => walkFactor(this.paths.surfaceAt(x, z), this._underfoot), via: (fx, fz, tx, tz) => this._walkVia(fx, fz, tx, tz),
       ...dailyCtx(refs, game, this.access.yard, seasonState.params.cold < 0.35),
     };
     const fx = yardFx(game, hour);
@@ -1825,6 +1847,7 @@ export class HomesteadWorld {
     const dctx: DogCtx = {
       home: ctx.home, camp: this.camp, gate: this.access.gate, yard: this.access.yard, atGate: !!game.gate.pending,
       person: id => (this.family.shown.has(id) ? this.family.poseOf(id) : null),
+      via: (fx, fz, tx, tz) => this._walkVia(fx, fz, tx, tz),
     };
     this.dogs.update(dt, game, hour, game.clock.t, dctx, this.walkHeight, speedK);
     // crops stand in the ground from planting (mid-May) to the last of the harvest (late October); bare soil the rest of the year

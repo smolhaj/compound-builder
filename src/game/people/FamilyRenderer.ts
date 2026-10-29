@@ -10,6 +10,7 @@ import { pickPersonaWear, type Wear, type WearSeason } from '../../engine/world/
 import type { Person } from '../../sim/family';
 import type { PersonState } from '../../sim/state';
 import { goalFor, type GoalCtx } from './peopleGoals';
+import { slopePace } from '../paths/walkRoute';
 import { figureScale, type SickPose } from './sickbayPlan';
 
 /** Walking speed (world units per real second at 1×; ≈ brisk walk scaled for the diorama). */
@@ -101,7 +102,9 @@ export class FamilyRenderer {
       while (a.via.length && Math.hypot(a.via[0][0] - a.x, a.via[0][1] - a.z) < 0.1) a.via.shift();
       const leg = a.via[0], tx = leg ? leg[0] : goal.x, tz = leg ? leg[1] : goal.z;
       const dx = tx - a.x, dz = tz - a.z, dl = Math.hypot(dx, dz), d = leg ? Math.hypot(goal.x - a.x, goal.z - a.z) : dl;
-      const v = WALK * Math.max(1, speedK) * (p.kid ? 1.1 : 1) * (ctx.footing ? ctx.footing(a.x, a.z) : 1);
+      // climbing steep ground is slow, picking down it a little slower than the flat (game/paths/walkRoute slopePace)
+      const pace = dl > 1e-6 ? slopePace((ground(a.x + dx / dl * 0.2, a.z + dz / dl * 0.2) - ground(a.x, a.z)) / 0.2) : 1;
+      const v = WALK * Math.max(1, speedK) * (p.kid ? 1.1 : 1) * (ctx.footing ? ctx.footing(a.x, a.z) : 1) * pace;
       let moving = false;
       if (d > 0.02) {
         const stepLen = Math.min(dl, v * dt);

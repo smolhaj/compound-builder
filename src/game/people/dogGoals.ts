@@ -33,6 +33,8 @@ export interface DogCtx {
   atGate: boolean;
   /** People drawn outdoors (id → pose). */
   person: (id: string) => { x: number; z: number; rot: number } | null;
+  /** The points to pass through to get from one spot to another round walls, buildings and cliffs ([] = straight; game/paths/walkRoute). */
+  via?: (fx: number, fz: number, tx: number, tz: number) => ReadonlyArray<readonly [number, number]>;
 }
 
 const hash = (s: string, k: number): number => { let h = 2166136261 ^ k; for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619); return ((h >>> 0) % 10000) / 10000; };
