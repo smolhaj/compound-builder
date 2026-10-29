@@ -12,7 +12,7 @@
  *   dirt     a bare, packed track (dozens of trips a day over a season)
  *
  * and the family lays something down where it matters, which is the one
- * saved piece of state (`GameState.paths`, save v55): gravel, stepping
+ * saved piece of state (`GameState.paths`, save v58): gravel, stepping
  * stones, duckboards across the wet ground, and poured concrete between the
  * main buildings. A laid walk is cleared of snow and does not go to mud; a
  * worn track does. Walking on a path is a little quicker and mud off it a
@@ -61,7 +61,7 @@ export const LAID_BLURB: Record<LaidKind, string> = {
 
 // ── Roles: what each stop is for ──
 
-export type Role = 'home' | 'guest' | 'water' | 'privy' | 'garden' | 'field' | 'orchard' | 'greenhouse' | 'coop' | 'barn' | 'work' | 'power' | 'store' | 'tower' | 'hatch' | 'camp' | 'yard' | 'gate' | 'creek' | 'other';
+export type Role = 'home' | 'guest' | 'water' | 'privy' | 'garden' | 'field' | 'orchard' | 'greenhouse' | 'bank' | 'coop' | 'barn' | 'work' | 'power' | 'store' | 'tower' | 'hatch' | 'camp' | 'yard' | 'gate' | 'creek' | 'other';
 
 const BY_KIND: Record<string, Role> = {
   timber_cabin: 'home', log_house: 'home', farmhouse: 'home', trailer: 'home', cottage: 'guest',
@@ -70,6 +70,10 @@ const BY_KIND: Record<string, Role> = {
   garden: 'garden', field: 'field', orchard: 'orchard', greenhouse: 'greenhouse', chicken_coop: 'coop', barn: 'barn', root_cellar: 'store',
   workshop: 'work', metal_garage: 'work', garage_solar: 'work', gate_garage: 'gate',
   battery_shed: 'power', generator_shed: 'power', solar_array: 'power',
+  // the self-sufficient interior: the production greenhouse, the grove, the farm-scale power, the water bodies (a bench on the bank), the sheep barn, the yard of bays
+  greenhouse_heated: 'greenhouse', orchard_grove: 'orchard', solar_farm: 'power', battery_bank: 'power', pond: 'bank', reservoir: 'bank', sheep_barn: 'barn', equipment_yard: 'work',
+  // the extended family's houses
+  guest_house: 'guest', moms_house: 'guest',
   bunker_hatch: 'hatch', bunker_stairs: 'hatch',
 };
 
@@ -183,7 +187,7 @@ export function householdOf(s: GameState): Household {
   const adults = alive.filter(p => !p.kid).length;
   const doy = calendarOf(s.clock).doy, [c0, c1] = seasons(REGIONS[s.site.region]).crops;
   const homeBuilt = s.structures.some(st => isFinished(st) && ['septic'].includes(st.kind));
-  const heads = (['goat', 'pig', 'steer', 'rabbit'] as const).reduce((a, k) => a + Math.floor(s.stock[k] ?? 0), 0);
+  const heads = (['goat', 'pig', 'steer', 'rabbit', 'sheep'] as const).reduce((a, k) => a + Math.floor(s.stock[k] ?? 0), 0);
   return {
     people: alive.length, adults, kids: alive.length - adults,
     commuters: alive.filter(p => !p.kid && p.job).length,
@@ -204,6 +208,7 @@ export function tripsToHub(role: Role, h: Household): number {
     case 'field': return (0.4 + h.adults * 0.5) * crop;
     case 'orchard': return 0.5 * crop;
     case 'greenhouse': return (1 + h.adults * 0.5) * Math.max(crop, 0.6);
+    case 'bank': return 0.5 + h.kids * 0.25;
     case 'coop': return 2.2;
     case 'barn': return 1.5 + h.animals * 0.35;
     case 'work': return 0.6 + h.adults * 0.6;
@@ -228,6 +233,7 @@ export function tripsBetween(a: Role, b: Role, h: Household): number {
   if (pair('barn', 'coop')) return 1.2;
   if (pair('coop', 'garden')) return 0.8;
   if (pair('garden', 'greenhouse')) return 1.6;
+  if (pair('bank', 'garden')) return 0.6 * (h.growing ? 1 : 0.2);
   if (pair('barn', 'field')) return 0.8 * (h.growing ? 1 : 0.2);
   if (pair('work', 'gate') || pair('work', 'yard')) return 1 + (h.vehicles > 0 ? 1.5 : 0);
   if (pair('work', 'barn')) return 0.9;

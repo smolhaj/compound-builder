@@ -304,7 +304,7 @@ export function wildlifeNight(s: GameState): string[] {
 
 const BASE_P: Record<'bear' | 'cougar' | 'wolf' | 'coyote', number> = { bear: 0.006, cougar: 0.004, wolf: 0.005, coyote: 0.015 };
 
-export interface Attractants { smell: boolean; coop: boolean; stock: boolean; kids: boolean; dog: number; shooter: boolean; fruit: boolean }
+export interface Attractants { smell: boolean; coop: boolean; stock: boolean; kids: boolean; dog: number; shooter: boolean; fruit: boolean; fish: boolean }
 /** What makes the place worth a visit (and what protects it). */
 export function attractants(s: GameState): Attractants {
   const n = (k: string) => Math.floor((s.stock as unknown as Record<string, number>)[k] ?? 0);
@@ -318,7 +318,8 @@ export function attractants(s: GameState): Attractants {
     kids: s.people.some((p, i) => p.kid && alive(i)),
     dog: Math.min(2, n('dog')),
     shooter: huntingRifle(s) && s.people.some((p, i) => !p.kid && alive(i) && p.skills.hunter >= 1),
-    fruit: fin.some(st => st.kind === 'orchard') && doy >= 215 && doy <= 300,
+    fruit: fin.some(st => st.kind === 'orchard' || st.kind === 'orchard_grove') && doy >= 215 && doy <= 300,
+    fish: fin.some(st => st.kind === 'pond') && (s.farm?.ponds ? Object.values(s.farm.ponds).some(p => p.trout > 20) : false),
   };
 }
 
@@ -330,6 +331,7 @@ export function predatorRisk(s: GameState, sp: SpeciesId, closed = proof(s, 'pre
   let m = 1;
   if (a.smell) m *= k === 'bear' ? 2.4 : 1.3;
   if (a.fruit && k === 'bear') m *= 1.8;
+  if (a.fish && (k === 'bear' || k === 'coyote')) m *= k === 'bear' ? 1.5 : 1.15;
   if (a.coop) m *= k === 'coyote' ? 2.2 : 1.2;
   if (a.stock) m *= k === 'bear' ? 1 : 1.8;
   if (a.kids) m *= 1.1;

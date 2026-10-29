@@ -86,7 +86,7 @@ export const genTier = (s: GameState): 0 | 1 | 2 => ((s.stock.gen_vault ?? 0) >=
 export const genRunning = (s: GameState): boolean => s.utilities.report.genKwh > 0.05;
 export const genPoints = (s: GameState): number => (genRunning(s) ? Math.min(9, 2 + 0.5 * s.utilities.report.genKwh) * genSound(s) : 0);
 
-export interface LightLine { id: 'windows' | 'floods' | 'fire' | 'generator'; label: string; points: number; note: string }
+export interface LightLine { id: 'windows' | 'floods' | 'fire' | 'generator' | 'greenhouse'; label: string; points: number; note: string }
 
 /** What shows from the road, source by source (the 'Lights after the grid' exposure; `floodSeen` from lights.ts alwaysLit). */
 export function lightLines(s: GameState, floodPoints: number): LightLine[] {
@@ -97,10 +97,14 @@ export function lightLines(s: GameState, floodPoints: number): LightLine[] {
   const fire = gridDown && s.clock.t >= s.disaster.hitAt && !out ? 2 : 0;
   const gen = gridDown ? genPoints(s) : 0;
   const floods = floodPoints;
+  // a heated production greenhouse with its heater and grow lamps on glows through the glazing; the thermal curtain, drawn at lights out, cuts most of it
+  const glasshouses = gridDown ? s.structures.filter(st => st.kind === 'greenhouse_heated' && isFinished(st) && s.utilities.lit.includes(st.id)).length : 0;
+  const glass = Math.min(8, glasshouses * 3) * (out ? 0.3 : 1);
   return [
     { id: 'windows', label: 'Windows', points: windows, note: out ? (curtainCover(s) >= 1 ? 'curtained: only a glimmer at the edges' : 'dark rooms') : 'lamps in the windows' },
     { id: 'floods', label: 'Floodlights left on', points: floods, note: floods > 0 ? 'always on, or tripped by animals' : 'none burning' },
     { id: 'fire', label: 'Fire pit & yard lamps', points: fire, note: out ? 'out' : 'burn in the evening' },
+    { id: 'greenhouse', label: 'Greenhouse glow', points: glass, note: glasshouses === 0 ? 'none lit' : out ? 'thermal curtain drawn: a faint glow' : 'a lit glasshouse shows for miles' },
     { id: 'generator', label: 'Generator', points: gen, note: !genRunning(s) ? 'not running' : genTier(s) === 2 ? 'silenced by the vault' : genTier(s) === 1 ? 'muffled by baffles' : 'loud and bright; lights out does not hide it' },
   ];
 }

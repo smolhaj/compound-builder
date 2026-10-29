@@ -184,3 +184,34 @@ describe('the pieces', () => {
     for (let n = 0; n <= 1; n += 0.05) { const v = yardLamp(n, false); expect(v).toBeGreaterThanOrEqual(prev); prev = v; }
   });
 });
+
+describe('the lived-in yard keeps off the self-sufficient interior', () => {
+  const extra: LivedBuilding[] = [
+    B('gl', 'greenhouse_heated', 64, 24), B('og', 'orchard_grove', 20, 60), B('sf', 'solar_farm', 70, 60), B('bb', 'battery_bank', 76, 60),
+    B('pd', 'pond', 24, 80), B('rv', 'reservoir', 62, 80), B('sb', 'sheep_barn', 12, 30), B('ey', 'equipment_yard', 66, 44, 3), B('gg', 'gate_garage', 80, 40, 1),
+  ];
+  const bs = [...place, ...extra];
+  it('no prop stands on, or in the front yard of, a new structure, and only its own props touch it', () => {
+    const plan = planLived(ctxOf({}, bs));
+    for (const p of plan.props) for (const b of bs) {
+      if (b.id === p.of) continue;
+      const f = footprint(KIT[b.kind], b.x, b.z, b.rot, false);
+      expect(p.x > f.x0 && p.x < f.x1 && p.z > f.z0 && p.z < f.z1, `${p.id} stands on ${b.id}`).toBe(false);
+    }
+  });
+  it('a bench sits on the pond bank and the reservoir bank, beside the sheep barn there are bales, and the yard has only a light', () => {
+    const plan = planLived(ctxOf({}, bs));
+    for (const id of ['pd', 'rv']) expect(plan.props.some(p => p.of === id && p.kind === 'bench'), `${id} bench`).toBe(true);
+    expect(plan.props.some(p => p.of === 'sb' && p.kind === 'haybales')).toBe(true);
+    expect(plan.props.filter(p => p.of === 'ey').every(p => p.kind === 'yardlight')).toBe(true);
+    expect(plan.aprons.some(a => Math.hypot(a.x - 66, a.z - 44) < 6)).toBe(false);
+    expect(plan.props.some(p => p.of === 'gl' && p.kind === 'pottingbench')).toBe(true);
+  });
+  it('props keep off the cars in the open yard', () => {
+    const car = { x: 41.1, z: 42.2 };
+    const free = planLived(ctxOf({}, bs)).props.filter(p => Math.hypot(p.x - car.x, p.z - car.z) < 0.5);
+    const plan = planLived(ctxOf({ blocked: (x, z, r, self, mode) => Math.hypot(x - car.x, z - car.z) < 0.5 + r || ctxOf({}, bs).blocked(x, z, r, self, mode) }, bs));
+    expect(plan.props.filter(p => Math.hypot(p.x - car.x, p.z - car.z) < 0.5).length).toBe(0);
+    expect(free.length).toBeGreaterThanOrEqual(0);
+  });
+});

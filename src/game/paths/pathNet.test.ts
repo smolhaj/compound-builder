@@ -202,3 +202,55 @@ describe('underfoot and on the way', () => {
     void CELL;
   });
 });
+
+describe('the self-sufficient interior and the family on the paths', () => {
+  const interior = [
+    fin('gh', 'greenhouse_heated', 60, 24), fin('og', 'orchard_grove', 20, 56), fin('sf', 'solar_farm', 70, 56), fin('bb', 'battery_bank', 76, 56),
+    fin('pd', 'pond', 24, 76), fin('rv', 'reservoir', 62, 76), fin('sb', 'sheep_barn', 12, 30), fin('ey', 'equipment_yard', 66, 40, 3),
+    fin('gu', 'guest_house', 54, 56), fin('mh', 'moms_house', 36, 60),
+  ];
+  const full = (): GameState => place(900, interior);
+  const planned = (g: GameState, cars: Array<{ x: number; z: number; rot: number; hw: number; hl: number }> = []) => {
+    const w = world(g);
+    const blocked = w.blocked;
+    return planNetwork(g, { camp: { x: 36, z: 36 }, yard: { x: 62, z: 10 } }, { ...w, blocked: (x, z) => blocked(x, z) || cars.some(c => Math.hypot(c.x - x, c.z - z) < c.hl + 0.12) }, newNetCache());
+  };
+
+  it('knows what each new building is for', () => {
+    const roles = Object.fromEntries(pathNodes(full(), {}).map(n => [n.id, n.role]));
+    expect(roles).toMatchObject({ gh: 'greenhouse', og: 'orchard', sf: 'power', bb: 'power', pd: 'bank', rv: 'bank', sb: 'barn', ey: 'work', gu: 'guest', mh: 'guest' });
+  });
+
+  it('walks to the greenhouse, the sheep barn, both houses and the water banks, to their doors and round every new structure', () => {
+    const g = full(), n = planned(g);
+    for (const id of ['gh', 'sb', 'gu', 'mh', 'pd', 'rv', 'ey']) {
+      const e = n.edges.find(x => x.a === id || x.b === id);
+      expect(e, `a walk to ${id}`).toBeDefined();
+      expect(e!.route.length).toBeGreaterThan(2);
+      const node = n.nodes.find(x => x.id === id)!;
+      const ends = [e!.route[0], e!.route[e!.route.length - 1]];
+      expect(Math.min(...ends.map(p => Math.hypot(p[0] - node.ax, p[1] - node.az))), `${id} door`).toBeLessThan(0.31);
+    }
+    // no walk goes through any structure (the last stride into its own door may touch its front)
+    for (const e of n.edges) {
+      const ends = [e.route[0], e.route[e.route.length - 1]];
+      for (const p of e.route.filter(q => Math.min(...ends.map(d => Math.hypot(q[0] - d[0], q[1] - d[1]))) > 0.45)) {
+        for (const s of g.structures) { const f = footprint(KIT[s.kind], s.x, s.z, s.rot, false); expect(p[0] > f.x0 - 0.05 && p[0] < f.x1 + 0.05 && p[1] > f.z0 - 0.05 && p[1] < f.z1 + 0.05, `${e.key} crosses ${s.id}`).toBe(false); }
+      }
+    }
+  });
+
+  it('a walk goes round the cars standing in the yard', () => {
+    const g = full();
+    const car = { x: 48, z: 38, rot: 0, hw: 0.17, hl: 0.46 };
+    const n = planned(g, [car]);
+    for (const e of n.edges) for (const p of e.route) expect(Math.hypot(p[0] - car.x, p[1] - car.z), `${e.key} clips the car`).toBeGreaterThan(car.hl);
+  });
+
+  it('the pond and the reservoir are ordinary (not hidden) stops that can be laid', () => {
+    const g = full();
+    expect(wantedWalks(pathNodes(g, {}), g).find(w => w.a.id === 'pd' || w.b.id === 'pd')!.trips).toBeGreaterThan(0);
+    const n = planned(g);
+    expect(n.edges.find(e => e.a === 'pd' || e.b === 'pd')!.can.gravel).toBe(true);
+  });
+});

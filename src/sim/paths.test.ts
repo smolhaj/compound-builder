@@ -164,10 +164,10 @@ describe('laying a walk', () => {
 });
 
 describe('saves', () => {
-  it('a version 55 save loads with no laid walks, and a new game has none', () => {
+  it('a version 57 save loads with no laid walks, and a new game has none', () => {
     const g = newGame(1);
     const old = JSON.parse(JSON.stringify(g)) as Record<string, unknown>;
-    old.version = 55; delete old.paths;
+    old.version = 57; delete old.paths;
     const back = migrate(old);
     expect(back.paths).toEqual(newPaths());
     expect(pathsOf(newGame(2)).laid).toEqual([]);

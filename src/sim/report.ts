@@ -7,6 +7,7 @@
  * actually mattered: the cistern, the bunker, first aid, who was turned away.
  * Pure.
  */
+import { VEHICLES } from './vehicles';
 import { isFinished } from './construction';
 import { isHome } from './blueprints';
 import { DISASTERS, TRACKS } from './disaster';
@@ -31,6 +32,8 @@ export interface RunStats {
   /** The last year of food grown and needed (kcal; sums that fade over a year, so a winter of eating the harvest counts). */
   grownYear: number;
   needYear: number;
+  /** The bug-out that ended the run (sim/bugout.ts). */
+  bugOut?: { day: number; going: number; left: number; vehicles: string[]; foodDays: number; rangeKm: number; covered: boolean };
 }
 
 export const emptyStats = (): RunStats => ({ days: 0, hungryDays: 0, dryDays: 0, darkDays: 0, kcalNeed: 0, kcalGrown: 0, wounds: 0, maxDose: 0, peak: 0, okSince: -1, selfFed: 0, grownYear: 0, needYear: 0 });
@@ -38,7 +41,7 @@ export const emptyStats = (): RunStats => ({ days: 0, hungryDays: 0, dryDays: 0,
 /** The place feeds everyone: over the last year (and at least 13 months in) it grew 95 % of what was eaten. */
 export const selfSufficient = (st: RunStats) => st.days >= 400 && st.grownYear >= 0.95 * st.needYear;
 
-export type EndKind = 'recovered' | 'new_normal' | 'equilibrium' | 'wipe';
+export type EndKind = 'recovered' | 'new_normal' | 'equilibrium' | 'wipe' | 'bug_out';
 export interface Ending { kind: EndKind; day: number; continued: boolean }
 
 const living = (s: GameState) => s.personState.filter(ps => ps.needs.died == null).length;
@@ -100,15 +103,23 @@ export function reportCard(s: GameState): ReportCard {
   const score = Math.round(100 * (0.5 * survival + 0.2 * fed + 0.15 * (g.humanity / 100) + 0.15 * (g.raidsHeld + g.raidsLost ? g.raidsHeld / (g.raidsHeld + g.raidsLost) : 1)));
   const grade = end === 'wipe' ? 'F' : score >= 90 ? 'A' : score >= 80 ? 'B' : score >= 65 ? 'C' : score >= 50 ? 'D' : 'F';
   const family = s.people[0]?.last ?? 'The family';
-  const headline = end === 'wipe' ? `No one left at the ${family} place`
+  const bo = st.bugOut;
+  const headline = end === 'bug_out' ? `The ${family} family bugged out`
+    : end === 'wipe' ? `No one left at the ${family} place`
     : end === 'recovered' ? `${family} family came through ${name.toLowerCase()}`
     : end === 'new_normal' ? `A thinner world: ${family} family settles in after ${name.toLowerCase()}`
     : `${family} homestead feeds itself a year on`;
-  const sub = end === 'wipe' ? `${days} days after it hit, the last of them was gone.`
+  const sub = end === 'bug_out' ? `They left on day ${bo?.day ?? 0} with ${bo?.going ?? 0} of ${(bo?.going ?? 0) + (bo?.left ?? 0)}. Where they went is the next chapter, and it is not written yet.`
+    : end === 'wipe' ? `${days} days after it hit, the last of them was gone.`
     : end === 'recovered' ? `${days} days after it hit, the lights are back on in the valley. ${alive} of ${total} made it.`
     : end === 'new_normal' ? `${days} days on, the power runs some hours and the store opens some days. It won't be like before. ${alive} of ${total} made it.`
     : `A year without a store. ${alive} people live off what the place grows.`;
   const lines: string[] = [];
+  if (bo) {
+    lines.push(`${bo.going} aboard ${bo.vehicles.length} vehicle${bo.vehicles.length === 1 ? '' : 's'} (${bo.vehicles.map(k => VEHICLES[k as keyof typeof VEHICLES]?.name.toLowerCase() ?? k).join(', ')}), loaded ${bo.covered ? 'under cover, by the passage from the house to the garage' : 'in the open, in plain view of the road'}.`);
+    lines.push(`${bo.foodDays} days of food and water aboard and fuel for about ${bo.rangeKm} km.`);
+    if (bo.left) lines.push(`${bo.left} had no seat and stayed behind to hold the place.`);
+  }
   // water
   const water = has('well_drilled') || has('well_hand') || has('cistern') || has('water_tower');
   if (st.dryDays === 0 && water) lines.push(has('cistern') ? 'Your cistern kept the water coming every day.' : 'The well never went dry.');

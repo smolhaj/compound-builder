@@ -22,7 +22,7 @@ import { climate } from './effects';
 import { tractorBoost } from './vehicles';
 import { SOIL_YIELD } from './site';
 import { REGIONS, seasons } from './regions';
-import { gardenSeason, GREENHOUSE_PEAK, greenhouseGreens, hasGreenhouse, orchardHarvest } from './greenhouse';
+import { gardenSeason, greenhousePeak, greenhouseGreens, orchardYield } from './greenhouse';
 import { canningCases, careYield, lifeMorale, spoilFactor } from './daily';
 import { socialMorale } from './gatherings';
 import { addFood, addFoodKcal, dietDay, dietEffects, eatFrom, inDateKcal, syncPantry } from './pantry';
@@ -109,10 +109,10 @@ export function produce(s: GameState): number {
   const skill = bestGardener(s);
   // a month to come back after hail (replanted from saved seed), then a shorter season
   const hd = hailThisYear(s), hail = hd == null || doy < hd ? 1 : doy - hd < 30 ? 0 : 0.7;
-  const veg = gardens * 2500 * season * (0.6 + 0.08 * skill) * SOIL_YIELD[s.site.soil] * (hasGreenhouse(s) ? GREENHOUSE_PEAK : 1) * hail * careYield(s, 'weeds');
+  const veg = gardens * 2500 * season * (0.6 + 0.08 * skill) * SOIL_YIELD[s.site.soil] * greenhousePeak(s) * hail * careYield(s, 'weeds');
   // winter greens on the greenhouse benches; the orchard's fruit, August to October
   const grow = climate(s).grow;
-  return Math.max(0, eggs) * Math.max(0.5, grow) + (veg + greenhouseGreens(s) + orchardHarvest(s)) * grow + fieldHarvest(s);
+  return Math.max(0, eggs) * Math.max(0.5, grow) + (veg + greenhouseGreens(s) * careYield(s, 'greenhouse') + orchardYield(s) * careYield(s, 'orchard')) * grow + fieldHarvest(s);
 }
 
 /** Fraction of fresh food that spoils a day: in the open vs a root cellar. */

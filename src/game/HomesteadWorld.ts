@@ -33,6 +33,7 @@ import { fenceLean } from './atmosphere/aging';
 import { LEANS, leanRun } from './atmosphere/fenceAging';
 import { FamilyRenderer } from './people/FamilyRenderer';
 import { DogRenderer } from './people/DogRenderer';
+import { FleetRenderer, inCarBox, type CarBox, type FleetCtx } from './props/FleetRenderer';
 import type { DogCtx } from './people/dogGoals';
 import { WildlifeRenderer } from './wildlife/WildlifeRenderer';
 import { buildYard, type Yard } from './props/yardGeometry';
@@ -173,6 +174,8 @@ export class HomesteadWorld {
   private readonly _yard: Yard;
   readonly family: FamilyRenderer;
   readonly dogs: DogRenderer;
+  /** The fleet (sim/vehicles.ts): parked in the garages and the yard, driving out on runs. */
+  readonly fleet: FleetRenderer;
   /** Native wildlife (sim/wildlife.ts): deer, turkeys, bears and the rest, drawn as instanced animals. */
   readonly wildlife: WildlifeRenderer;
   /** Night life, weathering and the deeper seasons (atmosphere/). */
@@ -228,6 +231,7 @@ export class HomesteadWorld {
     this.lakes = new RegionalWaterRenderer(ws.scene);
     this.family = new FamilyRenderer(ws.scene);
     this.dogs = new DogRenderer(ws.scene);
+    this.fleet = new FleetRenderer(ws.scene);
     this.wildlife = new WildlifeRenderer(ws.scene);
     this._campGroup = buildCamp({ fire: false });
     this._campGroup.position.set(this.camp.x, this.parcel.height(this.camp.x, this.camp.z), this.camp.z);
@@ -942,7 +946,7 @@ export class HomesteadWorld {
       (trees.get(k) ?? trees.set(k, []).get(k)!).push([t.x, t.z, 0.07 * t.scale + 0.07]);
     }
     const boxes = [...this._built.values()].filter(b => !b.under && KIT[b.placed.kind].level !== 'underground').map(b => footprint(KIT[b.placed.kind], b.placed.x, b.placed.z, b.placed.rot, false));
-    const yard = this.access.yard, hasCreek = this.parcel.creekHome, half = this.parcel.creek.halfWidth;
+    const cars = this._cars, yard = this.access.yard, hasCreek = this.parcel.creekHome, half = this.parcel.creek.halfWidth;
     const own = (x: number, z: number) => (x > this.home.x0 && x < this.home.x1 && z > this.home.z0 && z < this.home.z1) || this._inOwned(x, z);
     const blocked = (x: number, z: number): boolean => {
       if (!own(x, z)) return true;
@@ -950,6 +954,7 @@ export class HomesteadWorld {
       if (hasCreek && Math.abs(z - this.parcel.creek.zAt(x)) < half + 0.25) return true;
       if (Math.hypot(x - this.camp.x, z - this.camp.z) < 1.2 || Math.hypot(x - yard.x, z - yard.z) < 0.95) return true;
       if (this._perimeterBlocked(x, z, 0.08)) return true;
+      for (const c of cars) if (inCarBox(c, x, z, 0.12)) return true;
       const cx = Math.floor(x), cz = Math.floor(z);
       for (let i = cx - 1; i <= cx + 1; i++) for (let j = cz - 1; j <= cz + 1; j++) for (const [tx, tz, r] of trees.get(i * 4099 + j) ?? []) if ((tx - x) ** 2 + (tz - z) ** 2 < r * r) return true;
       return false;
@@ -1017,6 +1022,7 @@ export class HomesteadWorld {
     const tank = this.atmos.tankSpot;
     if (tank && Math.hypot(x - tank.x, z - tank.z) < 0.4 + r) return true;
     for (const t of this._tentPos) if (Math.hypot(x - t.x, z - t.z) < 0.35 + r) return true;
+    for (const c of this._cars) if (inCarBox(c, x, z, r + 0.06)) return true;
     return false;
   }
 
@@ -1486,6 +1492,22 @@ export class HomesteadWorld {
     }
   }
 
+  /** Vehicles: in their bays and the yard, and out the gate on a run. */
+  updateFleet(dt: number, game: GameState, speedK: number): void {
+    const ctx: FleetCtx = {
+      host: id => { const b = this._built.get(id); return b ? { x: b.placed.x, z: b.placed.z, rot: b.placed.rot, kind: b.placed.kind } : null; },
+      yard: this.camp,
+      drive: this.access.drive,
+      ground: this.groundAt,
+    };
+    this.fleet.update(dt, game, ctx, speedK);
+    // the cars in the open yard are in the way of walks and yard props (re-found only when the fleet changes)
+    const key = (game.vehicles ?? []).map(v => `${v.id}${v.kind}${v.away ? 'a' : ''}`).join() + `|${[...this._built.keys()].length}`;
+    if (key !== this._carKey) { this._carKey = key; this._cars = this.fleet.openBoxes(game, ctx); this.paths.invalidate(); }
+  }
+  private _cars: CarBox[] = [];
+  private _carKey = '';
+
   /** Wildlife: the animals the sim says live here, grazing, wandering and bolting from people (and dogs). */
   updateWildlife(dt: number, game: GameState, speedK: number): void {
     const threats: Array<[number, number]> = this.family.positions().filter(p => this.family.shown.has(p.id)).map(p => [p.x, p.z] as [number, number]);
@@ -1538,7 +1560,7 @@ export class HomesteadWorld {
     const [fr0, fr1] = REGIONS[game.site.region].frost, cal = calendarOf(game.clock);
     const leafy = doy >= fr0 - 15 && doy < fr1 + 25, picking = doy >= ORCHARD_PICK[0] - 25 && doy < ORCHARD_PICK[1] && !orchardFrost(game.seed, cal.year);
     for (const b of this._built.values()) {
-      if (b.placed.kind === 'orchard') {
+      if (b.placed.kind === 'orchard' || b.placed.kind === 'orchard_grove') {
         const st = game.structures.find(x => x.id === b.placed.id);
         const fruit = picking && b.finished && orchardBearing((game.clock.t - (st?.finishedAt ?? game.clock.t)) / 365) > 0;
         for (const o of b.group.children) {
@@ -1548,6 +1570,8 @@ export class HomesteadWorld {
         }
         continue;
       }
+      if (b.placed.kind === 'pond') { this._pondLife(b, game); continue; }
+      if (b.placed.kind === 'sheep_barn') { this._flock(b, game); continue; }
       if (b.placed.kind !== 'garden' && b.placed.kind !== 'field') continue;
       for (const o of b.group.children) {
         const name = ((o as THREE.Mesh).userData.baseMat as THREE.Material | undefined)?.name ?? ((o as THREE.Mesh).material as THREE.Material | undefined)?.name;
@@ -1555,6 +1579,34 @@ export class HomesteadWorld {
       }
     }
     // the fire pit (camp cookfire, evenings sat out) is lit by the atmosphere (atmosphere/nightLife.firePitLit)
+  }
+
+  /** The pond's fish and crayfish: shown in proportion to the stock (the first meshes in each draw order show first). */
+  private _pondLife(b: Built, game: GameState): void {
+    const p = game.farm?.ponds?.[b.placed.id];
+    const trout = b.finished && p ? Math.min(1, p.trout / 400) : 0, cray = b.finished && p ? Math.min(1, p.crayfish / 1200) : 0;
+    for (const o of b.group.children) {
+      const m = o as THREE.Mesh, name = (m.material as THREE.Material | undefined)?.name;
+      if (name !== 'kit_fish' && name !== 'kit_crayfish') continue;
+      const k = name === 'kit_fish' ? trout : cray, n = m.userData.vertexCount as number;
+      m.visible = k > 0.001;
+      // whole fish only: each trout is 4 triangles (12 vertices), each crayfish 2 spheres, so round to a fish
+      const per = name === 'kit_fish' ? 12 : n / 14;
+      m.geometry.setDrawRange(0, Math.max(1, Math.round(n * k / per)) * per);
+    }
+  }
+
+  /** The flock in the sheep barn's paddock: ten sheep drawn, shown by head count (1 per 3 head, a pasture sheep for each). */
+  private _flock(b: Built, game: GameState): void {
+    const head = b.finished ? Math.floor(game.stock.sheep ?? 0) : 0;
+    for (const o of b.group.children) {
+      const m = o as THREE.Mesh, name = (m.material as THREE.Material | undefined)?.name;
+      if (m.userData.layer !== 'decor' || (name !== 'kit_sheepwool' && name !== 'kit_wood_dark')) continue;
+      m.visible = head > 0;
+      const n = m.userData.vertexCount as number, shown = Math.min(10, Math.ceil(head / 3)) / 10;
+      const per = name === 'kit_sheepwool' ? n / 30 : n / 60;
+      m.geometry.setDrawRange(0, Math.max(1, Math.round(n * shown / per)) * per);
+    }
   }
 
   /** A point in a building's local frame (y above its floor) in world coordinates (QA camera poses). */
@@ -1600,7 +1652,7 @@ export class HomesteadWorld {
       const hw = def.cellsX * CELL / 2, hd = def.cellsZ * CELL / 2;
       if (Math.abs(lx) < hw && lz > -hd && lz < hd + def.porch && def.floorY > 0.02) return b.padY + def.floorY;
       // a building whose floor is its graded pad (greenhouse gravel, a garage slab): stand on the pad, not the raw slope under it
-      if (Math.abs(lx) < hw && Math.abs(lz) < hd && def.category !== 'bunker' && (def.category !== 'food' || b.placed.kind === 'greenhouse')) return b.padY + Math.max(0, def.floorY);
+      if (Math.abs(lx) < hw && Math.abs(lz) < hd && def.category !== 'bunker' && (def.category !== 'food' || b.placed.kind === 'greenhouse' || b.placed.kind === 'greenhouse_heated' || b.placed.kind === 'sheep_barn')) return b.padY + Math.max(0, def.floorY);
     }
     return this.groundAt(x, z);
   };
@@ -1800,6 +1852,7 @@ export class HomesteadWorld {
     this.stream.dispose();
     this.family.dispose();
     this.dogs.dispose();
+    this.fleet.dispose();
     this.wildlife.dispose();
     this._yard.dispose();
     this.atmos.dispose();

@@ -51,6 +51,9 @@ export class PathLayer {
     host.scene.add(this.renderer.group);
   }
 
+  /** The world's obstacles changed (the cars in the yard): plan again on the next update. */
+  invalidate(): void { this._layoutKey = ''; }
+
   get network(): PathNetwork { return this._net; }
 
   setQuality(q: Quality): void { this._quality = q; this._wearKey += '~'; }
@@ -70,7 +73,9 @@ export class PathLayer {
     const st = game.structures.filter(s => !s.unplaced).map(s => `${s.id}${s.kind}${s.x},${s.z},${s.rot}${s.stage}`).join(';');
     const per = game.perimeter.map(r => `${r.id}${r.kind}${r.finishedAt === null ? Math.floor((r.done ?? 0) / 20) : 'f'}`).join(';');
     const laid = pathsOf(game).laid.map(l => `${l.a}~${l.b}${l.kind}`).join(';');
-    return `${st}|${per}|${laid}`;
+    // the fleet: the cars standing in the open yard are in the way of a walk
+    const cars = (game.vehicles ?? []).map(v => `${v.id}${v.kind}${v.away ? 'a' : ''}`).join(',');
+    return `${st}|${per}|${laid}|${cars}`;
   }
 
   /** Per frame: cheap unless the game changed enough to matter. `now` in ms. */
@@ -80,7 +85,7 @@ export class PathLayer {
     if (now - this._last < 250 && this._net !== EMPTY) return;
     this._last = now;
     const layout = PathLayer.layout(game);
-    const hh = `${game.people.length}|${Math.floor(game.clock.t / 4)}|${game.stock.goat ?? 0}${game.stock.pig ?? 0}${game.stock.steer ?? 0}|${this._quality}`;
+    const hh = `${game.people.length}|${Math.floor(game.clock.t / 4)}|${game.stock.goat ?? 0}${game.stock.pig ?? 0}${game.stock.steer ?? 0}${game.stock.sheep ?? 0}|${this._quality}`;
     if (layout === this._layoutKey && `${layout}${hh}` === this._wearKey) return;
     if (layout !== this._layoutKey) { this._layoutKey = layout; this._cache = newNetCache(); }
     this._wearKey = `${layout}${hh}`;

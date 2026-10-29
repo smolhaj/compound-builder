@@ -11,6 +11,8 @@ import { adoptDog } from '../../sim/pets';
 import { BuildMenu } from './BuildMenu';
 import { ProjectsTab } from './ProjectsTab';
 import { ShopWindow } from '../ShopWindow';
+import { FarmPanel } from '../FarmPanel';
+import { pondOf } from '../../sim/farm';
 
 const text = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
 const withGame = (mut: (g: ReturnType<typeof newGame>) => void) => {
@@ -120,5 +122,19 @@ describe('the guided HUD (server-rendered)', () => {
     expect(t).toMatch(/All 1/);
     expect(t).not.toContain('bunker hatch');
     expect(t).toMatch(/Short: .*fieldstone/i);
+  });
+
+  it('the self-sufficient interior: the build menu lists the new pieces and the farm panel shows greenhouse, orchard, pond and yard', () => {
+    withGame(g => {
+      for (const [k, x] of [['greenhouse_heated', 10], ['orchard_grove', 20], ['pond', 30], ['equipment_yard', 40], ['workshop', 50]] as const) { const st = planStructure(g, k, x, 10, 0); st.stage = 5; st.finishedAt = -3000; }
+      pondOf(g, g.structures.find(s => s.kind === 'pond')!.id).trout = 120;
+      g.stock.trout_fry = 1;
+    });
+    const menu = text(renderToStaticMarkup(<BuildMenu />));
+    for (const name of ['Heated greenhouse', 'Orchard grove', 'Pond', 'Sheep barn', 'Equipment yard', 'Solar farm (20 kW)', 'Battery container (60 kWh)', 'Reservoir']) expect(menu).toContain(name);
+    expect(menu).toContain('Feed and power the compound');
+    const farm = text(renderToStaticMarkup(<FarmPanel game={useGameStore.getInitialState().game} />));
+    for (const s of ['Greenhouses', 'Heated greenhouse', 'Orchards', '48 trees', 'Pond', 'Stock trout', 'Harvest trout', 'Equipment bays', 'workshop bench']) expect(farm).toContain(s);
+    expect(farm).not.toMatch(/\d\.\d{3,}/);
   });
 });

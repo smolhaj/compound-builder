@@ -140,6 +140,9 @@ function wantsFor(b: LivedBuilding, ctx: LivedCtx, main: boolean): Want[] {
   } else if (role === 'work' || role === 'gate') {
     if (b.kind === 'gate_garage') {
       W({ kind: 'yardlight', min: 4, tier: 0, slots: [{ lx: hw * 0.5, lz: hd + 0.5 }, { lx: -hw * 0.5, lz: hd + 0.5 }] });
+    } else if (b.kind === 'equipment_yard') {
+      // a fenced gravel yard of marked bays: a light at the gate and nothing else (the implements stand in the bays)
+      W({ kind: 'yardlight', min: 6, tier: 0, slots: [{ lx: hw * 0.55, lz: hd + 0.5 }, { lx: -hw * 0.55, lz: hd + 0.5 }] });
     } else {
       W({ kind: 'yardlight', min: 10, tier: 0, slots: [{ lx: hw * 0.55, lz: hd + 0.6 }, { lx: -hw * 0.55, lz: hd + 0.6 }] });
       W({ kind: 'sawhorses', min: 35, tier: 1, slots: [{ lx: hw + 0.42, lz: hd * 0.25, rot: HALF_PI }, { lx: -hw - 0.42, lz: hd * 0.25, rot: -HALF_PI }] });
@@ -155,9 +158,13 @@ function wantsFor(b: LivedBuilding, ctx: LivedCtx, main: boolean): Want[] {
       W({ kind: 'trellis', min: 100, tier: 1, slots: [{ lx: hw + 0.32, lz: -hd * 0.2, rot: HALF_PI }, { lx: -hw - 0.32, lz: -hd * 0.2, rot: -HALF_PI }], variant: hash(b.id) });
     } else if (b.kind === 'field') {
       W({ kind: 'scarecrow', min: 25, tier: 1, when: f.growing, slots: [{ lx: -hw * 0.45, lz: hd - 0.2, mode: 'inside' }], variant: hash(b.id) });
-    } else if (b.kind === 'greenhouse') {
-      W({ kind: 'pottingbench', min: 25, tier: 1, slots: [{ lx: hw + 0.36, lz: 0.05, rot: HALF_PI }, { lx: -hw - 0.36, lz: 0.05, rot: -HALF_PI }], variant: hash(b.id) });
     }
+  } else if (role === 'greenhouse') {
+    // the hobby house and the production house (a potting bench against the end wall, outside the glass)
+    W({ kind: 'pottingbench', min: 25, tier: 1, slots: [{ lx: hw + 0.36, lz: 0.05, rot: HALF_PI }, { lx: -hw - 0.36, lz: 0.05, rot: -HALF_PI }], variant: hash(b.id) });
+  } else if (role === 'bank') {
+    // a bench on the bank, a little off to one side of where the walk arrives, facing the water
+    W({ kind: 'bench', min: 30, tier: 1, slots: [{ lx: hw * 0.55, lz: hd + 0.32, rot: Math.PI }, { lx: -hw * 0.55, lz: hd + 0.32, rot: Math.PI }, { lx: hw * 0.85, lz: hd + 0.32, rot: Math.PI }], variant: hash(b.id) });
   } else if (role === 'water') {
     if (b.kind === 'well_hand' || b.kind === 'well_drilled') W({ kind: 'wellapron', min: 15, tier: 1, slots: [{ lx: 0, lz: hd + 0.12 }, { lx: 0, lz: -hd - 0.12 }], variant: hash(b.id) });
   } else if (role === 'power') {
@@ -207,7 +214,7 @@ export function planLived(ctx: LivedCtx): LivedPlan {
         }
       }
       // a vehicle apron in front of the shop and the garage: gravel packed hard where the trucks stand
-      if (tier === 1 && roleOf(b.kind) === 'work' && b.kind !== 'gate_garage' && b.ageDays >= 5) {
+      if (tier === 1 && roleOf(b.kind) === 'work' && b.kind !== 'gate_garage' && b.kind !== 'equipment_yard' && b.ageDays >= 5) {
         const [ax, az] = rotQ(0, def.cellsZ * CELL / 2 + 0.36, b.rot);
         aprons.push({ x: b.x + ax, z: b.z + az, w: def.cellsX * CELL + 0.5, d: 0.62, rot: b.rot * HALF_PI });
       }

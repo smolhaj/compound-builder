@@ -13,9 +13,10 @@ export type MaterialId = 'lumber' | 'logs' | 'firewood' | 'fieldstone' | 'concre
   | 'fresh' | 'frozen' | 'canned' | 'staples' | 'meds' | 'seed' | 'lids' | 'plow' | 'stabilizer' | 'traps' | 'hygiene' | 'gun_safe' | 'gun_cleaning' | 'fishing_gear' | 'snares' | 'smoker' | 'goat' | 'pig' | 'steer' | 'rabbit' | 'hay' | 'feed' | 'water_jugs' | 'ibc_tote' | 'water_trailer' | 'water_filter' | 'ro_system' | 'softener' | 'greywater'
   | 'plate_carrier' | 'ifak' | 'nvg' | 'thermal' | 'radios' | 'cameras' | 'thermal_cam' | 'driveway_alarm' | 'floodlights' | 'blackout_curtains' | 'gen_baffles' | 'gen_vault' | 'tripwire' | 'dog' | 'puppy' | 'kibble' | 'dogbed' | 'doghouse' | 'steel_door' | 'window_bars' | 'sandbags' | 'safe_room' | 'sw_radio' | 'ham_rig' | 'helmet' | 'soft_armor'
   | 'grenades' | 'rpg_launcher' | 'rpg_rounds' | 'suppressor'
-  | 'mines' | 'greenhouse_kit' | 'fruit_trees' | 'ground_sensor' | 'passage_hatch'
+  | 'mines' | 'greenhouse_kit' | 'fruit_trees' | 'ground_sensor' | 'passage_hatch' | 'vehicle_parts'
   | 'gun_mount' | 'turret_head' | 'ai_sensor_module'
-  | 'tent' | 'sleeping_bag';
+  | 'tent' | 'sleeping_bag'
+  | 'greenhouse_pro_kit' | 'trout_fry' | 'crayfish_stock' | 'fish_feed' | 'sheep';
 
 export interface MaterialDef {
   id: MaterialId;
@@ -36,6 +37,7 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   hardware: { id: 'hardware', name: 'Doors, windows & hardware', unit: 'kit: a door or a couple of windows, hinges, locks, fasteners', price: 900 },
   wire: { id: 'wire', name: 'Fence wire', unit: 'roll (400 m barbed / 100 m woven)', price: 140 },
   greenhouse_kit: { id: 'greenhouse_kit', name: 'Greenhouse kit', unit: '12 × 24 ft aluminum-frame greenhouse, twin-wall polycarbonate, door, vents, benches', price: 4500 },
+  greenhouse_pro_kit: { id: 'greenhouse_pro_kit', name: 'Production greenhouse kit', unit: '9 × 24 m gutter-connected steel-hoop house, twin-wall polycarbonate, roof vents, a heater and thermal curtain', price: 24000 },
   fruit_trees: { id: 'fruit_trees', name: 'Fruit trees', unit: 'a bare-root semi-dwarf apple, peach or pear tree', price: 40 },
   seedlings: { id: 'seedlings', name: 'Hedge whips', unit: 'bundle of 25 bare-root', price: 75 },
   container: { id: 'container', name: 'Shipping container', unit: '40 ft used, delivered', price: 4800 },
@@ -86,6 +88,7 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   gen_baffles: { id: 'gen_baffles', name: 'Generator baffles', unit: 'an insulated, vented enclosure and exhaust muffler for the generator shed: about half the noise and light', price: 900 },
   gen_vault: { id: 'gen_vault', name: 'Generator vault', unit: 'a buried, lined generator room with an exhaust silencer and a baffled intake: the generator is not heard or seen from the road', price: 6500 },
   blackout_curtains: { id: 'blackout_curtains', name: 'Blackout curtains', unit: 'heavy light-blocking curtains and tracks for one house: the room stays lit, the window stays dark', price: 140 },
+  vehicle_parts: { id: 'vehicle_parts', name: 'Vehicle parts', unit: 'kit: filters, belts, hoses, plugs, a fuel pump and a battery for one truck or tractor', price: 260 },
   ground_sensor: { id: 'ground_sensor', name: 'Ground sensors', unit: 'a string of buried geophones along about 120 m of wall and a base unit: hears digging days out (needs power)', price: 1400 },
   passage_hatch: { id: 'passage_hatch', name: 'Passage hatch', unit: 'steel blast hatch, collar and locks from both sides (one for each end of an underground passage)', price: 3800 },
   ai_sensor_module: { id: 'ai_sensor_module', name: 'AI sensor module', unit: 'a chip and lens for one floodlight: tells people from animals, so the light comes on for people only (needs the light powered; fit it in Defense)', price: 180 },
@@ -124,6 +127,10 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   pig: { id: 'pig', name: 'Feeder pig', unit: 'a weaned feeder pig: to the butcher in November (bagged feed)', price: 150 },
   steer: { id: 'steer', name: 'Beef steer', unit: 'a weaned steer calf: beef after a summer on grass (hay in winter)', price: 1800 },
   rabbit: { id: 'rabbit', name: 'Meat rabbit', unit: 'a meat rabbit for the hutch: a buck and two does make a colony', price: 35 },
+  sheep: { id: 'sheep', name: 'Sheep', unit: 'a ewe in lamb: wool each spring, a lamb or two, mutton in the fall (needs a sheep barn in winter)', price: 300 },
+  trout_fry: { id: 'trout_fry', name: 'Trout fingerlings', unit: 'a bag of 100 rainbow trout fingerlings, delivered live (cold water only)', price: 90 },
+  crayfish_stock: { id: 'crayfish_stock', name: 'Crayfish breeders', unit: '50 red-swamp or signal crayfish breeders, delivered live', price: 120 },
+  fish_feed: { id: 'fish_feed', name: 'Fish feed', unit: 'a 50 lb bag of floating trout pellets', price: 45 },
   hay: { id: 'hay', name: 'Hay', unit: 'a 50 lb small square bale (cheapest bought at the fall cutting)', price: 12 },
   feed: { id: 'feed', name: 'Livestock feed', unit: 'a 50 lb bag of pellets and grain for pigs, goats, rabbits', price: 20 },
   smoker: { id: 'smoker', name: 'Smoker', unit: 'a smokehouse kit and curing salt: jerky that keeps without a freezer', price: 300 },
