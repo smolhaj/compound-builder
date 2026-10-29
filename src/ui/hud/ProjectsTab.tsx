@@ -105,7 +105,9 @@ export function ProjectsTab() {
                   <button style={btn()} onClick={() => g.dismiss(crew.id)}>Send home</button>
                 </div>
               : <>
-                {!why && !isFinished(sel) && blockedReason(game, sel) && <Note tone="warn">The materials are not on site yet ({blockedReason(game, sel)!.replace(/^Waiting for /, 'still need ')}). A crew hired now stands idle (and bills nothing) until they arrive: order them first.</Note>}
+                {!why && !isFinished(sel) && blockedReason(game, sel) && <Note tone="warn">{blockedReason(game, sel) === holdReason(game, sel) && /permit/i.test(blockedReason(game, sel)!)
+                  ? 'A crew hired now stands idle (and bills nothing) until the permit clears.'
+                  : `The materials are not on site yet (${blockedReason(game, sel)!.replace(/^Waiting for /, 'still need ')}). A crew hired now stands idle (and bills nothing) until they arrive: order them first.`}</Note>}
                 <button style={{ ...btn(), width: '100%', marginTop: 4 }} disabled={!!why} title={why ?? `${CREW_SIZE} workers at $${CREW_RATE}/h, weekdays 8 to 5; you still buy the materials`} onClick={() => g.hire(sel.id)}>
                   Hire a crew{!why && !isFinished(sel) && blockedReason(game, sel) ? ' anyway' : ''}: ~{usd(q.usd)}, about {q.weeks} week{q.weeks > 1 ? 's' : ''}
                 </button>

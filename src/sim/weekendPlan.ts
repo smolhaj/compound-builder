@@ -96,7 +96,7 @@ export function nextStageOrder(s: GameState, ahead = 1): StageOrder | null {
     const from = st.supplied ? st.stage + 1 : st.stage;
     const lines: Partial<Record<MaterialId, number>> = {};
     const picked: StageOrder['stages'] = [];
-    for (let i = from; i < Math.min(stages.length, from + ahead); i++) {
+    for (let i = from; i < stages.length && picked.length < ahead; i++) {
       let need = false;
       for (const [m, q] of Object.entries(stages[i].materials) as Array<[MaterialId, number]>) {
         const short = Math.max(0, Math.ceil(q - (avail[m] ?? 0) - 1e-6));
