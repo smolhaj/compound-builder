@@ -33,10 +33,12 @@ import { logGate } from './nag';
 import { calendarOf, type GameState } from './state';
 import { REGIONS } from './regions';
 import { MANURE, PILE_MAX } from './crops';
+import { butcherKids, COW_MILK_KCAL, cowInMilk, dairyDay, GOAT_MILK_KCAL, grazeShare, herdDay, sheltered, sickShare } from './herd';
+import { cookRatio } from './daily';
 import { MEAT_WHERE, putUpMeat, renderLard } from './kitchen';
 
-export type Animal = 'goat' | 'pig' | 'steer' | 'rabbit' | 'sheep';
-export const ANIMALS: Animal[] = ['goat', 'pig', 'steer', 'rabbit', 'sheep'];
+export type Animal = 'goat' | 'pig' | 'steer' | 'rabbit' | 'sheep' | 'cow';
+export const ANIMALS: Animal[] = ['goat', 'cow', 'pig', 'steer', 'rabbit', 'sheep'];
 
 /** Pounds a head eats a day: hay (out of the grazing season) and bagged feed. */
 const EAT: Record<Animal, { hay: number; feed: number }> = {
@@ -45,11 +47,12 @@ const EAT: Record<Animal, { hay: number; feed: number }> = {
   steer: { hay: 24, feed: 2 },
   rabbit: { hay: 0, feed: 0.35 },
   sheep: { hay: 4, feed: 0.4 },
+  cow: { hay: 26, feed: 3 },
 };
 const BALE_LB = 50, BAG_LB = 50;
 /** On pasture in the frost-free season: the share of hay still fed. */
 const GRAZE = 0.15;
-const MILK_KCAL = 1300, PORK_KCAL = 150 * 1100, BEEF_KCAL = 450 * 1000, FRYER_KCAL = 2000;
+const PORK_KCAL = 150 * 1100, BEEF_KCAL = 450 * 1000, FRYER_KCAL = 2000;
 const LITTER = 6, RABBIT_CYCLE = 60, RABBIT_CAP = 12;
 /** The share of a pig's calories in fat that is rendered into lard. */
 const LARD_SHARE = 0.15;
@@ -70,7 +73,7 @@ export interface Livestock {
   breeders?: number;
   sheared?: number;
 }
-export const newLivestock = (): Livestock => ({ condition: { goat: 1, pig: 1, steer: 1, rabbit: 1, sheep: 1 }, butchered: -1, steerSince: null, litterAt: -1 });
+export const newLivestock = (): Livestock => ({ condition: { goat: 1, pig: 1, steer: 1, rabbit: 1, sheep: 1, cow: 1 }, butchered: -1, steerSince: null, litterAt: -1 });
 
 const head = (s: GameState, a: Animal) => Math.floor(s.stock[a] ?? 0);
 const grazing = (s: GameState) => { const doy = calendarOf(s.clock).doy, [f0, f1] = REGIONS[s.site.region].frost; return doy >= f0 && doy <= f1; };
@@ -84,7 +87,7 @@ const winterHayScale = (s: GameState) => 1 + 0.2 * Math.max(0, REGIONS[s.site.re
 
 /** Bales of hay and bags of feed the animals on the place eat a day now. */
 export function feedDemand(s: GameState): { hay: number; feed: number } {
-  const hayShare = grazing(s) ? GRAZE : winterHayScale(s);
+  const hayShare = grazing(s) ? grazeShare(s, GRAZE) : winterHayScale(s);
   let hay = 0, feed = 0;
   for (const a of ANIMALS) { const n = head(s, a) * (a === 'rabbit' ? 2 : 1); hay += n * EAT[a].hay * hayShare / BALE_LB; feed += n * EAT[a].feed / BAG_LB; }
   return { hay, feed };
@@ -101,7 +104,7 @@ export function winterHay(s: GameState): number {
 export function livestockDay(s: GameState, freezer: boolean): number {
   if (!ANIMALS.some(a => head(s, a) > 0)) return 0;
   const l = (s.livestock ??= newLivestock());
-  l.condition.sheep ??= 1;
+  l.condition.sheep ??= 1; l.condition.cow ??= 1;
   const day = Math.floor(s.clock.t + 0.25), { doy, year } = calendarOf(s.clock);
   if (head(s, 'steer') > 0) l.steerSince ??= day; else l.steerSince = null;
   // feeding: hay first come, first served; each animal's share of what there is
@@ -112,11 +115,11 @@ export function livestockDay(s: GameState, freezer: boolean): number {
   s.stock.feed = Math.max(0, (s.stock.feed ?? 0) - need.feed);
   for (const a of ANIMALS) {
     if (head(s, a) === 0) { l.condition[a] = 1; continue; }
-    const hayW = EAT[a].hay * (grazing(s) ? GRAZE : 1), w = hayW + EAT[a].feed;
+    const hayW = EAT[a].hay * (grazing(s) ? grazeShare(s, GRAZE) : 1), w = hayW + EAT[a].feed;
     const fed = w > 0 ? (hayW * hayFed + EAT[a].feed * feedFed) / w : 1;
     const before = l.condition[a];
     // sheep with no roof in the cold months waste: the wool is not enough in a Mountain West January
-    const exposed = a === 'sheep' && !grazing(s) ? 0.03 * (1 - sheepSheltered(s)) * Math.max(0.3, REGIONS[s.site.region].cold) : 0;
+    const exposed = a === 'sheep' && !grazing(s) ? 0.03 * (1 - sheepSheltered(s)) * Math.max(0.3, REGIONS[s.site.region].cold) : (a === 'goat' || a === 'cow') && !grazing(s) ? 0.006 * (1 - sheltered(s)) * Math.max(0.3, REGIONS[s.site.region].cold) : 0;
     l.condition[a] = Math.min(1, Math.max(0, before + (fed >= 0.95 ? 0.02 : -0.06 * (1 - fed)) - exposed));
     if (exposed > 0.008 && logGate(s, 'sheep-cold', 20)) log(s, 'The sheep are standing in the snow with no barn: they are losing condition.');
     if (before >= 0.5 && l.condition[a] < 0.5) log(s, `The ${a === 'steer' ? 'steer is' : a + 's are'} short of feed and losing condition.`);
@@ -131,8 +134,13 @@ export function livestockDay(s: GameState, freezer: boolean): number {
     if (k >= 20000) log(s, `${what}: ${Math.round(k / 1000).toLocaleString('en-US')},000 kcal of meat ${MEAT_WHERE[put.where]}.`);
   };
   // milk: dry from Dec to mid-February
-  const goats = head(s, 'goat');
-  if (goats > 0 && !(doy > 335 || doy < 45)) { const m = goats * MILK_KCAL * l.condition.goat * careYield(s, 'animals'); s.stock.fresh += m / 2000; kcal += m; }
+  const goats = head(s, 'goat'), cows = head(s, 'cow');
+  const goatMilk = goats > 0 && !(doy > 335 || doy < 45) ? goats * GOAT_MILK_KCAL * l.condition.goat * careYield(s, 'animals') * (1 - 0.5 * sickShare(s, 'goat')) : 0;
+  const cowMilk = cows > 0 && cowInMilk(doy) ? cows * COW_MILK_KCAL * l.condition.cow * careYield(s, 'animals') * (1 - 0.5 * sickShare(s, 'cow')) : 0;
+  // the family drinks, the cream is churned, the rest pressed with a kit (sim/herd.ts); goats alone: all on the table
+  kcal += dairyDay(s, goatMilk + cowMilk, cows > 0, cookRatio(s));
+  // sickness, kidding and calving, the pasture
+  for (const line of herdDay(s, l)) log(s, line);
   // November: pigs to the butcher, and the steer once it has had a summer here
   if (doy >= 305 && doy <= 334 && l.butchered !== year) {
     l.butchered = year;
@@ -146,6 +154,7 @@ export function livestockDay(s: GameState, freezer: boolean): number {
       kcal += total * LARD_SHARE * 0.9;
     }
     const steers = head(s, 'steer');
+    { const kids = butcherKids(s); if (kids > 0) meat(kids, 'The kids raised for meat went to the butcher'); }
     const flock = head(s, 'sheep'), keep = Math.min(flock, Math.max(2, l.breeders ?? flock));
     if (flock > keep) { s.stock.sheep = keep; meat((flock - keep) * MUTTON_KCAL * (0.5 + 0.5 * l.condition.sheep), `${flock - keep} lambs went to the butcher`); }
     if (steers > 0 && l.steerSince != null && day - l.steerSince >= 150) { s.stock.steer = 0; l.steerSince = null; meat(steers * BEEF_KCAL * (0.5 + 0.5 * l.condition.steer), 'The steer went to the butcher'); }

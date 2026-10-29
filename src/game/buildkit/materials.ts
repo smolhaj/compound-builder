@@ -29,6 +29,8 @@ export type KitMaterialId = 'timber_lap' | 'trim' | 'fieldstone' | 'metal_roof' 
   | 'polycarb' | 'aluminum' | 'fruit'
   // the pond, its fish and crayfish, the flock
   | 'pond_water' | 'fish' | 'crayfish' | 'sheepwool'
+  // the barnyard's animals and the apiary
+  | 'hide_tan' | 'hide_pink' | 'hide_black' | 'hive_white' | 'bee_gold'
   // interior floors (greenhouse gravel + paver aisle, cottage boards, the garage's oil drips)
   | 'gravel' | 'pavers' | 'floorboards' | 'oil_stain'
   // not drawn: marks a shelf board / pallet where the stored food goes (interior.ts foodSlot; Parts keeps it as a slot)
@@ -765,6 +767,11 @@ export function kitMaterial(id: KitMaterialId): THREE.MeshStandardMaterial {
     case 'fish': m = new THREE.MeshStandardMaterial({ color: 0x9aa8a0, roughness: 0.4, metalness: 0.3, side: THREE.DoubleSide }); break;
     case 'crayfish': m = new THREE.MeshStandardMaterial({ color: 0x8a3a24, roughness: 0.6 }); break;
     case 'sheepwool': m = new THREE.MeshStandardMaterial({ color: 0xe9e4d4, roughness: 0.95 }); break;
+    case 'hide_tan': m = new THREE.MeshStandardMaterial({ color: 0xb98a58, roughness: 0.9 }); break;
+    case 'hide_pink': m = new THREE.MeshStandardMaterial({ color: 0xe3b0a4, roughness: 0.85 }); break;
+    case 'hide_black': m = new THREE.MeshStandardMaterial({ color: 0x2a2624, roughness: 0.9 }); break;
+    case 'hive_white': m = new THREE.MeshStandardMaterial({ color: 0xece8dc, roughness: 0.7 }); break;
+    case 'bee_gold': m = new THREE.MeshStandardMaterial({ color: 0xd9a21c, roughness: 0.6 }); break;
     case 'gravel': m = texMat(id, paintGravel, 3.0, 0.95, 0, 1.3); break;
     case 'pavers': m = texMat(id, paintPavers, 2.0, 0.9); break;
     case 'floorboards': m = texMat(id, paintFloorboards, 1.4, 0.6); break;

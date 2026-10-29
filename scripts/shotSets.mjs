@@ -763,6 +763,28 @@ SETS.farmkitchen = [
   { name: 'fields-eye-level-person', time: 10, season: 'summer', setup: kitchenSet + farmDoy(235) + figureAt('field', -1.5, 4) + eyeNear('field', -1.5, 8, 0, 0, 0.26), cam: D, frames: 14 },
 ];
 
+
+/** Farm & kitchen part 2: the apiary, the sugar shack with its bush, and the barnyard with a cow, goats and pigs. */
+const herdSet = compound + `{ if (!window.__herd) { window.__herd = true;
+  const G = cb.game, c = cb.world.camp, B = window.__b;
+  const place = (key, kind, dx, dz, rot = 0, rad = 6) => { const sp = cb.tool.findSpot(kind, c.x + dx, c.z + dz, rot, rad); if (!sp) { console.error('no spot', key); return null; } G.getState().plan(kind, sp[0], sp[1], rot); const st = G.getState().game.structures.at(-1); B[key] = st; return st; };
+  place('apiary', 'apiary', 10, -3, 3, 4);
+  place('sugar_shack', 'sugar_shack', -12, 14, 0, 6);
+  place('barnyard', 'barnyard', 4, 14, 0, 6);
+  G.setState(s => { const g = structuredClone(s.game);
+    for (const st of g.structures) { st.stage = 5; st.done = 0; st.supplied = true; st.finishedAt = g.clock.t - 3000; }
+    return { game: g }; });
+} }`;
+SETS.farmherd = [
+  { name: 'herd-aerial', time: 11, season: 'summer', setup: herdSet + farmDoy(190) + "{ const c = cb.world.camp; cb.cam.target.set(c.x - 1, 0, c.z + 8); cb.cam.radius = 34; cb.cam.pitch = 0.9; cb.cam.yaw = 0.5; }", cam: D, frames: 20 },
+  { name: 'apiary-from-above', time: 12, season: 'summer', setup: herdSet + farmDoy(190) + farmAt('apiary', 4, 0.85, 0.4), cam: D, frames: 14 },
+  { name: 'apiary-eye-level-person', time: 15, season: 'summer', setup: herdSet + farmDoy(190) + figureAt('apiary', 0.5, 1.6) + eyeNear('apiary', 1.8, 3.4, 0, 0, 0.26), cam: D, frames: 14 },
+  { name: 'sugar-bush-from-above', time: 11, season: 'winter', setup: herdSet + farmDoy(60) + farmAt('sugar_shack', 7, 0.8, 0.5), cam: D, frames: 14 },
+  { name: 'sugar-shack-eye-level-person', time: 14, season: 'winter', setup: herdSet + farmDoy(60) + figureAt('sugar_shack', 0.9, 2.6) + eyeNear('sugar_shack', 1.8, 5.0, 0, -0.5, 0.26), cam: D, frames: 14 },
+  { name: 'barnyard-from-above', time: 12, season: 'summer', setup: herdSet + farmDoy(190) + farmAt('barnyard', 7, 0.8, 0.4), cam: D, frames: 14 },
+  { name: 'barnyard-eye-level-person', time: 16, season: 'summer', setup: herdSet + farmDoy(190) + figureAt('barnyard', 0.8, 2.6) + eyeNear('barnyard', 2.0, 5.2, 0, -0.4, 0.26), cam: D, frames: 14 },
+];
+
 // the fortress ring (sim/fortress.ts): container wall, patrol walkway, gatehouse garage, five towers. The whole 40-acre line is built in the setup; the cameras find the
 // garage, a corner tower and a guard on the deck (the family's watchers are posted by hand, then the clock jumps so they stand where the patrol puts them).
 const fortressSetup = `{ if (!window.__fort) { window.__fort = 1;

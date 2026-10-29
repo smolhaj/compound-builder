@@ -18,7 +18,9 @@ export type MaterialId = 'lumber' | 'logs' | 'firewood' | 'fieldstone' | 'concre
   | 'tent' | 'sleeping_bag'
   | 'greenhouse_pro_kit' | 'trout_fry' | 'crayfish_stock' | 'fish_feed' | 'sheep'
   // farm & kitchen (sim/crops.ts, sim/kitchen.ts)
-  | 'seed_hybrid' | 'seed_saved' | 'seed_cover' | 'canner' | 'dehydrator' | 'crocks' | 'grain_mill' | 'manure' | 'compost';
+  | 'seed_hybrid' | 'seed_saved' | 'seed_cover' | 'canner' | 'dehydrator' | 'crocks' | 'grain_mill' | 'manure' | 'compost'
+  // the herd, the bees and the sugar bush (sim/herd.ts, sim/bees.ts, sim/maple.ts)
+  | 'cow' | 'cheese_kit' | 'vet_kit' | 'bee_nuc' | 'hive_supplies' | 'beeswax' | 'maple_taps';
 
 export interface MaterialDef {
   id: MaterialId;
@@ -79,6 +81,13 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   dehydrator: { id: 'dehydrator', name: 'Food dehydrator', unit: 'nine-tray electric dehydrator (about 600 W): dried fruit, vegetables and herbs that keep a year or two', price: 190 },
   crocks: { id: 'crocks', name: 'Fermenting crocks', unit: 'stoneware crocks with weights and airlocks: sauerkraut, pickles, kimchi. No lids, no canner, no power', price: 90 },
   grain_mill: { id: 'grain_mill', name: 'Grain mill', unit: 'a burr mill with a hand crank: wheat berries to flour, corn to meal', price: 120 },
+  cow: { id: 'cow', name: 'Dairy cow', unit: 'a bred Jersey cow, fresh: about 3 gallons of milk a day for ten months, a calf each spring (hay, grain, a stall in winter)', price: 1800 },
+  cheese_kit: { id: 'cheese_kit', name: 'Cheese-making kit', unit: 'press, molds, cheesecloth, cultures and rennet: hard cheese from the milk the family cannot drink', price: 70 },
+  vet_kit: { id: 'vet_kit', name: 'Vet kit', unit: 'ten doses of dewormer, antibiotics, electrolytes and hoof and udder care for the barnyard', price: 90 },
+  bee_nuc: { id: 'bee_nuc', name: 'Bee colony', unit: 'a five-frame nucleus colony with a laying queen, delivered in spring: honey, wax and pollination (needs an apiary)', price: 220 },
+  hive_supplies: { id: 'hive_supplies', name: 'Hive supplies', unit: 'a year for the apiary: frames and foundation, mite strips, sugar for a lean fall, a smoker and a veil', price: 75 },
+  beeswax: { id: 'beeswax', name: 'Beeswax', unit: 'a pound of cleaned wax: candles, salves, polish, trade', price: null },
+  maple_taps: { id: 'maple_taps', name: 'Maple taps', unit: '25 spiles with buckets and lids for the sugar bush', price: 120 },
   manure: { id: 'manure', name: 'Manure', unit: 'a pickup load of aged manure (your own stock makes it for free)', price: 15 },
   compost: { id: 'compost', name: 'Compost', unit: 'a barrow load of finished compost from kitchen scraps, weeds and straw', price: null },
   stabilizer: { id: 'stabilizer', name: 'Fuel stabilizer', unit: 'a bottle: keeps ten cans of gas good for two years', price: 15 },

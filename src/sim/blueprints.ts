@@ -83,6 +83,42 @@ export const WOOD_OVEN_BLUEPRINT: Blueprint = {
   ],
 };
 
+/** Four hives on stands behind an electric bear fence. */
+export const APIARY_BLUEPRINT: Blueprint = {
+  kind: 'apiary',
+  stages: [
+    { id: 'site', name: 'Pick a sunny, sheltered spot and stake it', hours: 2, materials: {} },
+    { id: 'foundation', name: 'Gravel pad and hive stands', hours: 8, materials: { fieldstone: 1 } },
+    { id: 'frame', name: 'Build the hive bodies and frames', hours: 14, materials: { lumber: 2 } },
+    { id: 'roof', name: 'Bear fence and charger', hours: 10, materials: { wire: 2, hardware: 1 } },
+    { id: 'finish', name: 'Windbreak, water dish, a strip of flowers', hours: 4, materials: { seedlings: 1 } },
+  ],
+};
+
+/** A sugar house with an evaporator arch, a sap tank and a woodshed, at the edge of the maples. */
+export const SUGAR_SHACK_BLUEPRINT: Blueprint = {
+  kind: 'sugar_shack',
+  stages: [
+    { id: 'site', name: 'Stake out beside the maples', hours: 3, materials: {} },
+    { id: 'foundation', name: 'Footing and the firebox pad', hours: 22, materials: { concrete: 2, fieldstone: 2 } },
+    { id: 'frame', name: 'Post-and-beam sugar house', hours: 60, materials: { lumber: 8 } },
+    { id: 'roof', name: 'Roof with a steam cupola', hours: 26, materials: { roofing: 6, lumber: 2 } },
+    { id: 'finish', name: 'Evaporator arch, pans, tank and woodshed', hours: 34, materials: { hardware: 3 } },
+  ],
+};
+
+/** A loafing shed, a fenced yard, troughs and a hay rack for the cow, the goats and the pigs. */
+export const BARNYARD_BLUEPRINT: Blueprint = {
+  kind: 'barnyard',
+  stages: [
+    { id: 'site', name: 'Stake out the yard', hours: 4, materials: {} },
+    { id: 'foundation', name: 'Posts, a concrete slab and the apron', hours: 24, materials: { fieldstone: 2, concrete: 2 } },
+    { id: 'frame', name: 'Loafing shed and stalls', hours: 54, materials: { lumber: 12 } },
+    { id: 'roof', name: 'Roof and hay mow', hours: 32, materials: { roofing: 10, lumber: 3 } },
+    { id: 'finish', name: 'Rail fence, gates, troughs and a hay rack', hours: 42, materials: { wire: 4, hardware: 3, lumber: 4 } },
+  ],
+};
+
 export const COOP_BLUEPRINT: Blueprint = {
   kind: 'chicken_coop',
   stages: [
@@ -396,7 +432,7 @@ export const GATE_GARAGE_BLUEPRINT: Blueprint = bp('gate_garage', [
 ]);
 
 export const BLUEPRINTS: Record<string, Blueprint> = Object.fromEntries(
-  [CABIN_BLUEPRINT, OUTHOUSE_BLUEPRINT, WORKSHOP_BLUEPRINT, ROOT_CELLAR_BLUEPRINT, WOOD_OVEN_BLUEPRINT, COOP_BLUEPRINT, GARDEN_BLUEPRINT, FIELD_BLUEPRINT, GREENHOUSE_BLUEPRINT, ORCHARD_BLUEPRINT, LOG_HOUSE_BLUEPRINT, FARMHOUSE_BLUEPRINT, TRAILER_BLUEPRINT, BARN_BLUEPRINT, COTTAGE_BLUEPRINT, GUEST_HOUSE_BLUEPRINT, MOMS_HOUSE_BLUEPRINT, METAL_GARAGE_BLUEPRINT, GARAGE_SOLAR_BLUEPRINT, ...UTILITY_BLUEPRINTS, GREENHOUSE_HEATED_BLUEPRINT, ORCHARD_GROVE_BLUEPRINT, SOLAR_FARM_BLUEPRINT, BATTERY_BANK_BLUEPRINT, POND_BLUEPRINT, RESERVOIR_BLUEPRINT, SHEEP_BARN_BLUEPRINT, EQUIPMENT_YARD_BLUEPRINT, ...BUNKER_BLUEPRINTS, ...TOWER_BLUEPRINTS, GATE_GARAGE_BLUEPRINT].map(b => [b.kind, b]));
+  [CABIN_BLUEPRINT, OUTHOUSE_BLUEPRINT, WORKSHOP_BLUEPRINT, ROOT_CELLAR_BLUEPRINT, WOOD_OVEN_BLUEPRINT, APIARY_BLUEPRINT, SUGAR_SHACK_BLUEPRINT, BARNYARD_BLUEPRINT, COOP_BLUEPRINT, GARDEN_BLUEPRINT, FIELD_BLUEPRINT, GREENHOUSE_BLUEPRINT, ORCHARD_BLUEPRINT, LOG_HOUSE_BLUEPRINT, FARMHOUSE_BLUEPRINT, TRAILER_BLUEPRINT, BARN_BLUEPRINT, COTTAGE_BLUEPRINT, GUEST_HOUSE_BLUEPRINT, MOMS_HOUSE_BLUEPRINT, METAL_GARAGE_BLUEPRINT, GARAGE_SOLAR_BLUEPRINT, ...UTILITY_BLUEPRINTS, GREENHOUSE_HEATED_BLUEPRINT, ORCHARD_GROVE_BLUEPRINT, SOLAR_FARM_BLUEPRINT, BATTERY_BANK_BLUEPRINT, POND_BLUEPRINT, RESERVOIR_BLUEPRINT, SHEEP_BARN_BLUEPRINT, EQUIPMENT_YARD_BLUEPRINT, ...BUNKER_BLUEPRINTS, ...TOWER_BLUEPRINTS, GATE_GARAGE_BLUEPRINT].map(b => [b.kind, b]));
 
 /** Total bill of materials for a blueprint. */
 export function totalBill(bp: Blueprint): Partial<Stock> {

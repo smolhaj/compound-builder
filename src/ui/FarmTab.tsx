@@ -11,7 +11,10 @@ import { CROPS, fieldRows, gardensOf, plotFor, pinField, seedOnHand, seedsOf, se
 import { dishLines, hasMill, hasOven, kitchenOf, toggleMethod } from '../sim/kitchen';
 import { cellarCapacity, cellarKcal, cellarTempC, overflow, pantryLoad, pantryRoom } from '../sim/storage';
 import { foodUnits } from '../sim/pantry';
-import { ANIMALS, feedDemand, sheepRoom, sheepSheltered, winterHay } from '../sim/livestock';
+import { ANIMALS, feedDemand, sheepRoom, sheepSheltered, winterHay, type Animal } from '../sim/livestock';
+import { apiaries, apiaryReport, harvestHoney, harvestProblem, HIVES, stockApiary, stockProblem as bStockProblem } from '../sim/bees';
+import { expectedSyrup, hasMaples, hasShack, mapleOf, sapSeason, setTaps, tapsOut, woodsTaps } from '../sim/maple';
+import { butcher, butcherProblem, feedBudget, herdOf, sheltered } from '../sim/herd';
 import { MATERIALS } from '../sim/materials';
 import { FarmPanel } from './FarmPanel';
 import { Note, Row, Section, Tabs } from './hud/common';
@@ -178,17 +181,64 @@ function KitchenView({ game }: { game: GameState }) {
 
 // ── Animals & the place ──
 
+const BUTCHERABLE: Animal[] = ['goat', 'pig', 'steer', 'sheep', 'rabbit'];
 function AnimalsView({ game }: { game: GameState }) {
+  const g = useGameStore();
+  const have = ANIMALS.filter(a => (game.stock[a] ?? 0) >= 1), h = herdOf(game);
+  const fb = feedBudget(game, feedDemand(game), winterHay(game));
+  const act = (label: string, why: string | null, run: () => void, tip: string) => <button style={{ ...btn(!why), opacity: why ? 0.55 : 1 }} title={why ?? tip} disabled={!!why} onClick={run}>{label}</button>;
+  const hives = apiaries(game), bush = hasMaples(game);
   return <>
-    {ANIMALS.some(a => (game.stock[a] ?? 0) >= 1) && <Section title="Livestock">
-      {ANIMALS.filter(a => (game.stock[a] ?? 0) >= 1).map(a => { const c = game.livestock?.condition[a] ?? 1; return <Row key={a} label={MATERIALS[a].name} value={<span style={{ color: c < 0.5 ? TONE.bad : c < 0.9 ? TONE.warn : undefined }}>{Math.floor(game.stock[a])} head, {Math.round(c * 100)} % condition</span>} />; })}
-      {(() => { const d = feedDemand(game), hd = d.hay > 0 ? (game.stock.hay ?? 0) / d.hay : Infinity, fd = d.feed > 0 ? (game.stock.feed ?? 0) / d.feed : Infinity; return <>
-        {d.hay > 0 && <Row label="Hay" value={<span style={{ color: hd < 14 ? TONE.warn : undefined }}>{Math.floor(game.stock.hay ?? 0)} bales ({hd > 999 ? 'plenty' : `${Math.floor(hd)} days`})</span>} />}
-        {d.feed > 0 && <Row label="Feed" value={<span style={{ color: fd < 14 ? TONE.warn : undefined }}>{Math.floor(game.stock.feed ?? 0)} bags ({fd > 999 ? 'plenty' : `${Math.floor(fd)} days`})</span>} />}
-        {(game.stock.sheep ?? 0) >= 1 && <Note tone={sheepSheltered(game) < 1 ? 'warn' : 'good'}>{sheepSheltered(game) < 1 ? `Roof for ${sheepRoom(game)} of ${Math.floor(game.stock.sheep)} sheep: build a sheep barn (30) before winter.` : 'All the sheep have a roof for the winter.'}</Note>}
-        {winterHay(game) > (game.stock.hay ?? 0) && <Note>Put up about {winterHay(game)} bales of hay for the winter.</Note>}
-      </>; })()}
+    {have.length > 0 && <Section title="Barnyard">
+      {have.map(a => {
+        const c = game.livestock?.condition[a] ?? 1, sick = h.sick[a] ?? 0;
+        return <div key={a} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, padding: '1px 0' }}>
+          <span style={{ color: DIM }}>{MATERIALS[a].name}</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ color: c < 0.5 ? TONE.bad : c < 0.9 ? TONE.warn : undefined }}>{Math.floor(game.stock[a])} head, {Math.round(c * 100)} %</span>
+            {sick > 0 && <span style={{ color: TONE.bad, fontSize: 11 }}>{sick} sick</span>}
+            {BUTCHERABLE.includes(a) && act('Butcher', butcherProblem(game, a, 1), () => g.money(d => butcher(d, a, 1)), `Butcher one ${a}: the meat is put up (freezer, smoker, salt, canner); a pig gives lard`)}
+          </span>
+        </div>;
+      })}
+      <Row label="Roof for the herd" value={`${Math.round(sheltered(game) * 100)} %`} tone={sheltered(game) < 0.6 ? 'warn' : 'good'} title="Animal units under a barn, barnyard or sheep barn: fewer sick animals, no winter wasting" />
+      <Row label="Pasture" value={fb.pastureAcres < 0.1 ? 'none' : `${fb.units.toFixed(1)} of ${fb.carries.toFixed(1)} animal units`} tone={fb.stocking > 1.3 ? 'bad' : fb.stocking > 1 ? 'warn' : undefined} title={`${fb.pastureAcres.toFixed(1)} acres of open grass; the grass is at ${Math.round(fb.pasture * 100)} %`} />
+      <Row label="Hay" value={<span style={{ color: fb.hayBales < fb.hayNeed ? TONE.warn : undefined }}>{fb.hayBales} bales{isFinite(fb.hayDays) ? ` · ${fb.hayDays > 999 ? 'plenty' : `${Math.floor(fb.hayDays)} days`}` : ''} <span style={{ color: DIM }}>/ {fb.hayNeed} for winter</span></span>} />
+      <Row label="Feed" value={<span style={{ color: fb.feedDays < 14 ? TONE.warn : undefined }}>{fb.feedBags} bags{isFinite(fb.feedDays) ? ` · ${fb.feedDays > 999 ? 'plenty' : `${Math.floor(fb.feedDays)} days`}` : ''}</span>} />
+      {(game.stock.sheep ?? 0) >= 1 && <Note tone={sheepSheltered(game) < 1 ? 'warn' : 'good'}>{sheepSheltered(game) < 1 ? `Roof for ${sheepRoom(game)} of ${Math.floor(game.stock.sheep)} sheep: build a sheep barn (30) before winter.` : 'All the sheep have a roof for the winter.'}</Note>}
       <Row label="Manure pile" value={`${(game.stock.manure ?? 0).toFixed(1)} loads`} title="Goes on the fields at spring sowing" />
+      {(h.butterLb > 0 || h.cheeseLb > 0 || h.milk > 0) && <Row label="Dairy this year" value={`${Math.round(h.milk / 2350)} gal milk${h.butterLb > 0 ? ` · ${Math.round(h.butterLb)} lb butter` : ''}${h.cheeseLb > 0 ? ` · ${Math.round(h.cheeseLb)} lb cheese` : ''}`} />}
+      {h.meatKids > 0 && <Note>{h.meatKids} kid{h.meatKids === 1 ? '' : 's'} being raised for the November butchering.</Note>}
+      {game.livestock && (game.stock.vet_kit ?? 0) < 1 && ANIMALS.some(a => (game.stock[a] ?? 0) >= 1) && <Note>No vet kit: a sick animal depends on the vet (while the phones work) or on luck.</Note>}
+      {winterHay(game) > (game.stock.hay ?? 0) && <Note>Put up about {winterHay(game)} bales of hay for the winter.</Note>}
+    </Section>}
+    {hives.map((st, i) => {
+      const r = apiaryReport(game, st.id);
+      return <Section key={st.id} title={hives.length > 1 ? `Apiary ${i + 1}` : 'Apiary'}>
+        <Row label="Colonies" value={`${r.colonies} of ${HIVES}${r.colonies > 0 ? ` · strength ${Math.round(r.strength * 100)} %` : ''}`} />
+        {r.colonies > 0 && <>
+          <Row label="Winter stores" value={<span style={{ color: r.stores < r.need * 0.7 ? TONE.warn : undefined }}>{Math.round(r.stores)} of {Math.round(r.need)} lb</span>} title="Honey the bees need to see out the winter" />
+          <Row label="Honey to take" value={`${Math.floor(r.surplus)} lb`} title="Above their winter stores; taken in late summer (the family does it on day 245 if you do not)" />
+          <Row label="Mites" value={<span style={{ color: r.mites > 0.5 ? TONE.bad : r.mites > 0.3 ? TONE.warn : undefined }}>{Math.round(r.mites * 100)} %{r.treated ? ' · treated this year' : ''}</span>} />
+          <Row label="Forage" value={`${Math.round(r.forage * 100)} %`} title="What the garden, orchard, fields and woods give the bees" />
+        </>}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '3px 0' }}>
+          {act('Stock a colony', bStockProblem(game, st.id), () => g.money(d => stockApiary(d, st.id)), 'Put a nucleus colony from the Shop in a hive (spring)')}
+          {act('Take honey', harvestProblem(game, st.id), () => g.money(d => harvestHoney(d, st.id)), 'Take the surplus honey; the bees keep their winter stores')}
+        </div>
+        {r.notes.map((n, k) => <Note key={k} tone="warn">{n}</Note>)}
+        {r.lostWinter > 0 && <Note>{r.lostWinter} colon{r.lostWinter === 1 ? 'y' : 'ies'} lost over the winter.</Note>}
+      </Section>;
+    })}
+    {bush && (woodsTaps(game) > 0) && <Section title="Sugar bush">
+      <Row label="Maples on the place" value={`room for about ${woodsTaps(game)} taps`} />
+      <Row label="Taps out" value={tapsOut(game) > 0 ? `${tapsOut(game)} (${Math.floor(game.stock.maple_taps ?? 0)} sets)` : 'none: buy tapping sets in the Shop'} />
+      <Row label="Boiler" value={hasShack(game) ? 'sugar shack (150 taps, 12 gal an hour)' : 'steam pan on blocks (40 taps, 3 gal an hour)'} />
+      <Row label="Sap runs" value={`${dateText(sapSeason(game)[0])} to ${dateText(sapSeason(game)[1])}`} />
+      {tapsOut(game) > 0 && <Row label="A normal season" value={`${expectedSyrup(game).toFixed(1)} gal of syrup`} />}
+      {mapleOf(game).syrup > 0 && <Row label="This season" value={`${mapleOf(game).syrup.toFixed(1)} gal from ${Math.round(mapleOf(game).gathered)} gal of sap`} />}
+      {mapleOf(game).sap > 1 && <Note tone="warn">{Math.round(mapleOf(game).sap)} gallons of sap waiting in the tank.</Note>}
+      <div style={{ display: 'flex', gap: 4, marginTop: 3, alignItems: 'center' }}><span style={{ color: DIM }}>Tap:</span>{[null, 25, 50, 100].map(n => <button key={String(n)} style={btn(mapleOf(game).taps === n)} onClick={() => g.money(d => { setTaps(d, n); return null; })}>{n === null ? 'all I can' : n}</button>)}</div>
     </Section>}
     <FarmPanel game={game} />
   </>;
