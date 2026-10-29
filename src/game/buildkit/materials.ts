@@ -13,6 +13,7 @@
 import * as THREE from 'three';
 import { generateNormalMap } from '../../engine/world/materials/normalMapGen';
 import { patchWear, WEAR_CLASS } from '../atmosphere/weathering';
+import { screenTexture, siteMapTexture } from './screenFeeds';
 
 export type KitMaterialId = 'timber_lap' | 'trim' | 'fieldstone' | 'metal_roof' | 'deck' | 'door' | 'glass' | 'chimney_cap' | 'frame' | 'scaffold' | 'string'
   // interior finishes and furnishings
@@ -34,7 +35,9 @@ export type KitMaterialId = 'timber_lap' | 'trim' | 'fieldstone' | 'metal_roof' 
   // interior floors (greenhouse gravel + paver aisle, cottage boards, the garage's oil drips)
   | 'gravel' | 'pavers' | 'floorboards' | 'oil_stain'
   // not drawn: marks a shelf board / pallet where the stored food goes (interior.ts foodSlot; Parts keeps it as a slot)
-  | 'food_slot';
+  | 'food_slot'
+  // the control room: the live screens (emissive atlas), the corkboard's paper site plan, panel lamps
+  | 'screens' | 'sitemap' | 'led_green' | 'led_red' | 'led_amber';
 
 /** World units covered by one texture repeat. */
 const TEX_WORLD: Partial<Record<KitMaterialId, number>> = {
@@ -779,6 +782,12 @@ export function kitMaterial(id: KitMaterialId): THREE.MeshStandardMaterial {
     case 'oil_stain': m = new THREE.MeshStandardMaterial({ color: 0x1d1a16, roughness: 0.3, metalness: 0.1, transparent: true, opacity: 0.55, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }); break;
     case 'hedge_berry': m = new THREE.MeshStandardMaterial({ color: 0xa3261e, roughness: 0.5 }); break;
     case 'food_slot': m = new THREE.MeshStandardMaterial({ visible: false }); break;
+    // the wall of screens: one shared atlas the painter redraws (buildkit/screenFeeds.ts); it glows in the dark bunker
+    case 'screens': { const tex = screenTexture(); m = new THREE.MeshStandardMaterial({ color: 0x000000, map: tex, emissive: new THREE.Color(1, 1, 1), emissiveMap: tex, emissiveIntensity: 0.95, roughness: 0.3, metalness: 0.1 }); break; }
+    case 'sitemap': m = new THREE.MeshStandardMaterial({ map: siteMapTexture(), roughness: 0.9 }); break;
+    case 'led_green': m = new THREE.MeshStandardMaterial({ color: 0x103a18, roughness: 0.4, emissive: new THREE.Color(0.2, 1, 0.3), emissiveIntensity: 1.6 }); break;
+    case 'led_red': m = new THREE.MeshStandardMaterial({ color: 0x3a1010, roughness: 0.4, emissive: new THREE.Color(1, 0.15, 0.1), emissiveIntensity: 1.6 }); break;
+    case 'led_amber': m = new THREE.MeshStandardMaterial({ color: 0x3a2a08, roughness: 0.4, emissive: new THREE.Color(1, 0.65, 0.1), emissiveIntensity: 1.4 }); break;
     case 'container_red': case 'container_blue': case 'container_green': case 'container_tan': {
       const tint = { container_red: 0xb0473a, container_blue: 0x4a6f9a, container_green: 0x6f8f62, container_tan: 0xc7aa7c }[id];
       const mm = texMat(id, paintMetalSiding, 2.5, 0.6, 0.4);

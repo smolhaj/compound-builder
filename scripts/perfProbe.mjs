@@ -1,7 +1,9 @@
 // Repeatable performance probe: a late-game compound at Low / Medium / High, day / night / snow / rain.
 //
 //   flock <lock> node scripts/perfProbe.mjs [--out perf.json] [--port 5961] [--tiers low,medium,high] [--conds day,night,snow,rain]
-//                                           [--frames 24] [--warm 4] [--w 640] [--h 400] [--scene full|bare] [--shots dir] [--nolift]
+//                                           [--frames 24] [--warm 4] [--w 640] [--h 400] [--scene full|bare] [--shots dir] [--nolift] [--bunker]
+//   --bunker: also dig a full bunker under the compound (hatch, tunnel, galley, bunkroom, stores, plant, medical bay, control room, stairwell), every room finished,
+//             with the gear its screens read (cameras, games), so the numbers include the underground rooms the surface view never sees
 //
 // The scene (built through the real store actions, no saved-state changes): the fortress ring (container wall, wall-top deck, gatehouse
 // garage, five towers), heated greenhouse, orchard grove, 20 kW solar farm + battery, pond, reservoir, sheep barn, equipment yard, guest
@@ -25,7 +27,7 @@ const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] :
 const outFile = opt('--out', 'perf.json'), port = Number(opt('--port', 5961));
 const tiers = opt('--tiers', 'low,medium,high').split(','), conds = opt('--conds', 'day,night,snow,rain').split(',');
 const FRAMES = Number(opt('--frames', 24)), WARM = Number(opt('--warm', 4)), W = Number(opt('--w', 640)), H = Number(opt('--h', 400));
-const scene = opt('--scene', 'full'), shotDir = opt('--shots', null), censusOnly = args.includes('--census-only'), noRender = args.includes('--norender'), noLift = args.includes('--nolift'), profile = args.includes('--profile');
+const scene = opt('--scene', 'full'), shotDir = opt('--shots', null), censusOnly = args.includes('--census-only'), noRender = args.includes('--norender'), noLift = args.includes('--nolift'), profile = args.includes('--profile'), withBunker = args.includes('--bunker');
 mkdirSync(dirname(outFile) || '.', { recursive: true }); if (shotDir) mkdirSync(shotDir, { recursive: true });
 
 const vite = spawn('node', ['node_modules/vite/bin/vite.js', '--config', 'scripts/vite.shots.config.ts', '--port', String(port), '--strictPort'], { stdio: ['ignore', 'pipe', 'inherit'] });
@@ -45,7 +47,7 @@ try {
   await frames(2); lap('loaded');
 
   // ── the scene ──
-  const built = await page.evaluate(async ([kind]) => {
+  const built = await page.evaluate(async ([kind, withBunker]) => {
     const cb = window.__cb, G = cb.game, W = await import('/src/store/worldStore.ts');
     G.getState().setSpeed(0);
     const geo = W.useWorldStore.getState().siteGeo ?? {};
@@ -53,11 +55,18 @@ try {
       G.getState().fortifyRing(geo, { towers: 5, towerKind: 'watchtower_wood', passage: false });
     }
     const c = cb.world.camp;
+    if (withBunker) {
+      const place = (kind, dx, dz, rot = 0) => { const sp = cb.tool.findSpot(kind, c.x + dx, c.z + dz, rot, 6); if (sp) G.getState().plan(kind, sp[0], sp[1], rot); };
+      place('bunker_hatch', 0.25, -6.75); place('bunker_corridor', 1.0, -6.75, 1); place('bunker_galley', 2.25, -6.5); place('bunker_dorm', 2.25, -7.75); place('bunker_stores', 3.25, -6.5);
+      place('bunker_plant', 3.25, -7.75); place('bunker_medical', 2.25, -5.5); place('bunker_comms', 1.0, -5.75, 1); place('bunker_stairs', 4.25, -6.5, 1);
+    }
     const P = await import('/src/sim/pets.ts');
     G.setState(s => {
       const g = structuredClone(s.game);
       for (const r of g.perimeter) { r.done = r.hours; r.supplied = true; r.finishedAt = 0; }
       for (const st of g.structures) if (st.kind === 'gate_garage' || st.kind.startsWith('watchtower')) { st.stage = 5; st.supplied = false; st.finishedAt = 0; st.permit = 'ok'; }
+      for (const st of g.structures) if (st.kind.startsWith('bunker_')) { st.stage = 99; st.supplied = true; st.finishedAt = 0; }
+      if (withBunker) { g.stock.cameras = 1; g.stock.games = 1; g.stock.novels = 1; g.stock.canned = 120; g.stock.staples = 14; }
       if (kind === 'full') {
         const B = [
           ['farmhouse', -3, -4, 0], ['cottage', 4.5, -4.5, 0], ['workshop', 7, 4.5, 3], ['barn', -8.5, -7.5, 0], ['chicken_coop', -8, -1.5, 1], ['garden', -3.5, -9, 0],
@@ -78,7 +87,7 @@ try {
     // four dogs
     G.setState(s => { const g = structuredClone(s.game); for (let i = 0; i < 4; i++) P.adoptDog(g); return { game: g }; });
     return { camp: c, people: G.getState().game.people.length, structures: G.getState().game.structures.length, dogs: G.getState().game.dogs?.length, vehicles: G.getState().game.vehicles?.length };
-  }, [scene]);
+  }, [scene, withBunker]);
   lap('built ' + JSON.stringify(built));
   await frames(6);
   // footpaths laid on the busiest walks (every kind), like a played-in compound
@@ -143,7 +152,7 @@ try {
     };
   });
   const stats = a => { if (!a.length) return null; const s = [...a].sort((x, y) => x - y), q = p => s[Math.min(s.length - 1, Math.floor(p * s.length))]; return { mean: a.reduce((x, y) => x + y, 0) / a.length, p50: q(0.5), p95: q(0.95), max: s[s.length - 1] }; };
-  if (noRender) {
+  if (noRender && !censusOnly) {
     // update loop only (`?lowrender`: nothing is drawn): the JS cost of a frame without the software-GL stalls
     for (const cond of conds) {
       await page.evaluate(([cond]) => {

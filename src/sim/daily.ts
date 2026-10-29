@@ -23,6 +23,7 @@ import { dogCount } from './pets';
 import { calendarOf, dayIndex, hourOf, type GameState, type PersonState, type TaskKind } from './state';
 import { isFinished } from './construction';
 import { hasWalkway } from './walkway';
+import { CONSOLE_EYES, consoleManned } from './bunkerLife';
 import { isHome } from './blueprints';
 import { gardenSeason, selfSufficiencyRates } from './greenhouse';
 import { REGIONS, seasons } from './regions';
@@ -869,7 +870,7 @@ export function dutyWork(s: GameState, p: Person, ps: PersonState, duty: Duty, p
 // Watch
 // ─────────────────────────────────────────────────────────────────────────
 
-export type WatchPost = 'tower' | 'wall' | 'gate';
+export type WatchPost = 'tower' | 'wall' | 'gate' | 'console';
 export interface Watcher { id: string; post: WatchPost; night: boolean; alert: number; /** On the patrol deck of the wall (sim/walkway.ts): the people renderer puts them on top of it. */ walk?: boolean }
 
 /**
@@ -888,7 +889,8 @@ export function watchNow(s: GameState): Watcher[] {
   for (const ps of s.personState) {
     if (ps.task !== 'watch' || ps.needs.died != null) continue;
     const k = out.length;
-    const post: WatchPost = k === 0 && tower ? 'tower' : wall && k <= (deck ? 2 : 1) ? 'wall' : 'gate';
+    // at night the first watcher sits at the control room's screens when there are cameras and power (sim/bunkerLife.ts); the tower keeps the second
+    const post: WatchPost = k === 0 && night && consoleManned(s) ? 'console' : (k === 0 || (k === 1 && night && consoleManned(s))) && tower ? 'tower' : wall && k <= (deck ? 2 : 1) ? 'wall' : 'gate';
     out.push({ id: ps.id, post, night, alert: Math.max(0.3, 1 - (ps.fatigue ?? 0) / 140), ...(post === 'wall' && deck ? { walk: true } : {}) });
   }
   return out;
@@ -899,7 +901,7 @@ export function watchDetection(s: GameState): number {
   const w = watchNow(s).sort((a, b) => b.alert - a.alert);
   let sum = 0;
   const owl = w.length ? chronotypes(s) : {};
-  w.forEach((x, k) => { sum += ((k === 0 ? 10 : k === 1 ? 6 : 2) + (owl[x.id] === 'owl' ? 1.5 : 0)) * x.alert * (x.post === 'tower' ? 1.2 : x.walk ? 1.1 : 1); });
+  w.forEach((x, k) => { sum += ((k === 0 ? 10 : k === 1 ? 6 : 2) + (owl[x.id] === 'owl' ? 1.5 : 0)) * x.alert * (x.post === 'tower' ? 1.2 : x.post === 'console' ? CONSOLE_EYES : x.walk ? 1.1 : 1); });
   return Math.min(20, sum);
 }
 

@@ -32,6 +32,8 @@ import { useWorldStore } from '../store/worldStore';
 import { fenceLean } from './atmosphere/aging';
 import { LEANS, leanRun } from './atmosphere/fenceAging';
 import { FamilyRenderer } from './people/FamilyRenderer';
+import { BunkerFolk, type WorldSpot } from './people/BunkerFolk';
+import { bunkerOccupants } from '../sim/bunkerLife';
 import { DogRenderer } from './people/DogRenderer';
 import { FleetRenderer, inCarBox, type CarBox, type FleetCtx } from './props/FleetRenderer';
 import type { DogCtx } from './people/dogGoals';
@@ -45,10 +47,12 @@ import type { WearSeason } from '../engine/world/people/crowdWear';
 import type { TourBuildingInfo } from '../engine/world/camera/TourController';
 import { footprint, KIT, placementProblem, rotQ, type Placed, type SiteQuery } from './buildkit/kit';
 import { showStage, CUTAWAY_HIDE, XRAY_LAYERS, type BuildLayer as CabinLayer, type BuildOpts } from './buildkit/shell';
-import { datums, doorsOf, DEPTH, isEntry, isUnderground, tunnelDoorsOf, tunnelStart, type Side } from './buildkit/underground';
+import { bunkerRoots, datums, doorsOf, DEPTH, isEntry, isUnderground, tunnelDoorsOf, tunnelStart, type Side } from './buildkit/underground';
+import { updateScreens, updateSiteMap } from './buildkit/screenFeeds';
+import { powered as gearPowered } from '../sim/gear';
 import { floorAt, tunnelPath, tunnelProblem, TUNNEL_PROBLEM_TEXT, VAULT_W, type PathSample } from './buildkit/tunnelPath';
 import { buildTunnel } from './perimeter/tunnelGeometry';
-import { SHAFT_HALF, stairProfile } from './buildkit/bunkerBuildings';
+import { SHAFT_HALF, stairProfile, type RoomSpot } from './buildkit/bunkerBuildings';
 import { buildExcavator, drapeSoil, spoilHeap } from './props/digSite';
 import { kitMaterial } from './buildkit/materials';
 import { orchardBearing, orchardFrost, ORCHARD_PICK } from '../sim/greenhouse';
@@ -92,7 +96,7 @@ import { planShelves, propsWanted, splitInUse } from './props/foodShelfPlan';
 import type { FoodSlot } from './buildkit/shell';
 
 /** The order the stores take their turns: the buried storeroom, the root cellar, the bunker's galley and container, then the house pantries. */
-const FOOD_ORDER: Record<string, number> = { bunker_stores: 0, root_cellar: 1, bunker_galley: 2, bunker_container: 3 };
+const FOOD_ORDER: Record<string, number> = { bunker_stores: 0, root_cellar: 1, bunker_galley: 2, bunker_container: 3, bunker_corridor: 4 };
 
 export { PARCEL_SIZE };
 /** Person height in world units (≈ 1.7 m). */
@@ -183,6 +187,8 @@ export class HomesteadWorld {
   /** The chore yard round the camp (sim/daily.ts). */
   private readonly _yard: Yard;
   readonly family: FamilyRenderer;
+  /** The people down in the bunker (seats, bunks, the console): game/people/BunkerFolk. */
+  readonly bunkerFolk: BunkerFolk;
   readonly dogs: DogRenderer;
   /** The fleet (sim/vehicles.ts): parked in the garages and the yard, driving out on runs. */
   readonly fleet: FleetRenderer;
@@ -240,6 +246,7 @@ export class HomesteadWorld {
     this.stream = new StreamRenderer(ws.scene);
     this.lakes = new RegionalWaterRenderer(ws.scene);
     this.family = new FamilyRenderer(ws.scene);
+    this.bunkerFolk = new BunkerFolk(ws.scene);
     this.dogs = new DogRenderer(ws.scene);
     this.fleet = new FleetRenderer(ws.scene);
     this.wildlife = new WildlifeRenderer(ws.scene);
@@ -1151,7 +1158,54 @@ export class HomesteadWorld {
     const tunnelDoors = tunnelDoorsOf(p, starts);
     const blast = Object.keys(tunnelDoors) as Side[];
     const harden = this._harden.get(p.id)?.tiers;
-    return { doors: { ...doorsOf(p, placed), ...tunnelDoors }, depth: Math.round((ground - datum) * 1000) / 1000, ...(blast.length ? { blast } : {}), ...(harden && Object.keys(harden).length ? { harden } : {}) };
+    const root = bunkerRoots(placed).get(p.id) ?? null;
+    return {
+      doors: { ...doorsOf(p, placed), ...tunnelDoors }, depth: Math.round((ground - datum) * 1000) / 1000, ...(blast.length ? { blast } : {}), ...(harden && Object.keys(harden).length ? { harden } : {}),
+      ...(root && this._air.has(root) ? { air: true } : {}), ...(this._power ? { power: true } : {}), ...(this._morale ? { morale: this._morale } : {}),
+    };
+  }
+
+  // ── Bunker life: air from the plant room, power, the family's evenings, the control room's screens ──
+  /** Bunkers (by root id) whose plant room is built: their rooms get ducts, and the air handler's lamp goes green. */
+  private _air = new Set<string>();
+  private _power = false;
+  private _morale: { games: boolean; music: boolean; books: boolean } | undefined;
+  private _belowSeen = false;
+  private _bunkerKey = '';
+  private _screensKey = '';
+  /** Per frame: refresh what the bunker rooms show (rebuilding the ones whose look changed), and redraw the screens while they can be seen. */
+  syncBunker(game: GameState, t: number, hour: number): void {
+    const key = `${this._built.size}|${this._finishedCount()}|${gearPowered(game) ? 1 : 0}|${(game.stock.games ?? 0) > 0 ? 1 : 0}${(game.stock.instrument ?? 0) > 0 ? 1 : 0}${(game.stock.novels ?? 0) > 0 ? 1 : 0}`;
+    if (key !== this._bunkerKey) {
+      this._bunkerKey = key;
+      const placed = [...this._built.values()].map(b => b.placed), roots = bunkerRoots(placed), air = new Set<string>();
+      for (const b of this._built.values()) if (b.under && b.finished && b.placed.kind === 'bunker_plant') { const r = roots.get(b.placed.id); if (r) air.add(r); }
+      const power = gearPowered(game), morale = { games: (game.stock.games ?? 0) > 0, music: (game.stock.instrument ?? 0) > 0, books: (game.stock.novels ?? 0) > 0 };
+      const mk = JSON.stringify([...air].sort()) + power + JSON.stringify(morale);
+      if (mk !== this._screensKey) {
+        this._screensKey = mk; this._air = air; this._power = power; this._morale = morale;
+        this._syncUnderground();
+      }
+    }
+    // walking down (or back up) changes which rooms can be seen: draw only those
+    if (this._belowSeen !== this._below) { this._belowSeen = this._below; for (const b of this._built.values()) if (b.under) this._applyView(b); }
+    // the screens (the control room's wall, the bunkroom's TV): only while one could be on screen (underground view, walking below, or the cutaway)
+    const screens = [...this._built.values()].some(b => b.finished && (b.placed.kind === 'bunker_comms' || b.placed.kind === 'bunker_dorm'));
+    if (screens && (this._under || this._below || this._view === 'cutaway')) { updateSiteMap(game); updateScreens(game, t, hour); }
+    this.bunkerFolk.update(game.people, bunkerOccupants(game), this._bunkerSpots(), 'summer');
+  }
+
+  /** Every finished room's seats, beds and console chair, in the world. */
+  private _bunkerSpots(): WorldSpot[] {
+    const out: WorldSpot[] = [];
+    for (const b of this._built.values()) {
+      if (!b.under || !b.finished) continue;
+      const spots = b.group.userData.spots as RoomSpot[] | undefined;
+      if (!spots?.length) continue;
+      const th = b.placed.rot * Math.PI / 2, c = Math.cos(th), s = Math.sin(th);
+      for (const sp of spots) out.push({ ...sp, wx: b.placed.x + sp.x * c + sp.z * s, wz: b.placed.z - sp.x * s + sp.z * c, wy: b.under.datum, face: sp.face + th, room: b.placed.kind });
+    }
+    return out;
   }
 
   /** New neighbors open new doorways: rebuild the bunker rooms whose doorways changed. */
@@ -1465,6 +1519,9 @@ export class HomesteadWorld {
   private _applyView(b: Built): void {
     // underground view: bunker rooms are shown cut open, everything on the surface is a ghost
     const v = this._under ? (b.under ? 'cutaway' : 'ghost') : this._view;
+    // a finished bunker room is drawn only where somebody can see it (the underground view, walking below): from the surface the earth hides it, so skip its draw calls
+    // (an entrance stays: its shaft or stairwell is part of the yard)
+    if (b.under) b.group.visible = !b.finished || this._under || this._below || isEntry(KIT[b.placed.kind]);
     for (const o of b.group.children) {
       const m = o as THREE.Mesh;
       if (!m.isMesh) continue;
@@ -1925,6 +1982,7 @@ export class HomesteadWorld {
     this._props?.dispose();
     this.stream.dispose();
     this.family.dispose();
+    this.bunkerFolk.dispose();
     this.dogs.dispose();
     this.fleet.dispose();
     this.wildlife.dispose();
