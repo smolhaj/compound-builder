@@ -155,7 +155,7 @@ export class PathRenderer {
   }
 
   /** Rebuild when the layout, what is laid, the wear tier or the quality changes (cheap key check otherwise). */
-  update(net: PathNetwork, ground: Ground, look: PathLook, quality: Quality, key: string): void {
+  update(net: PathNetwork, ground: Ground, look: PathLook, quality: Quality, key: string, wallStair?: (x: number, z: number) => boolean): void {
     const k = `${key}|${quality}`;
     if (k === this._key) return;
     this._key = k;
@@ -168,7 +168,11 @@ export class PathRenderer {
     net.trails.forEach((t, i) => {
       const seed = 17 + i * 31;
       // a riser between terraces: a dry-stack stair, whatever is laid on the rest of the trail
-      for (const r of stairRuns(t.pts, ground)) stairs.push(...stairGeometry(t.pts.slice(r.a, r.b + 1), ground, seed + r.a));
+      for (const r of stairRuns(t.pts, ground)) {
+        // (a stair already set in a retaining wall is drawn with the wall)
+        if (wallStair && t.pts.slice(r.a, r.b + 1).some(p => wallStair(p[0], p[1]))) continue;
+        stairs.push(...stairGeometry(t.pts.slice(r.a, r.b + 1), ground, seed + r.a));
+      }
       // a worn track shows where nothing is laid
       if (!t.laid) for (const g of wornRibbons(t.pts, t.pts.map(() => t.wear), ground, colors, seed)) push('dirt', g);
       else if (t.laid === 'gravel') push('gravel', laidRibbon(t.pts, ground, PATH_WIDTH.gravel, 0.016, [0.8, 0.78, 0.74]));

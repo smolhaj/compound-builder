@@ -20,6 +20,7 @@
  */
 import { BUNKER_ENTRANCES } from './bunkerEntrances';
 import { ringHoldSeconds, sortieFactor } from './rings';
+import { wallHoldSeconds } from './retaining';
 import type { Battle, BattleEvent, BattleUnit } from './battleTypes';
 import { GUN, skillOf, type Caliber } from './armory';
 import { gearPosture } from './gear';
@@ -307,7 +308,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
   posts.sort((a, b) => b.value - a.value);
   const lineR = wallR || 2;
   // manned inner rings (sim/rings.ts): each makes the crew take another wall under fire before the line is breached
-  const ringHold = opts.insideBreach ? 0 : ringHoldSeconds(s);
+  const ringHold = opts.insideBreach ? 0 : ringHoldSeconds(s) + wallHoldSeconds(s);   // the manned rings, and the tall retaining walls a crew has to climb or go round (sim/retaining.ts)
   // a sally port lets the defenders catch a crew held at the wall from the flank
   const sortie = sortieFactor(s);
 

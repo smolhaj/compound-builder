@@ -9,6 +9,7 @@ import { PERIMETER, runFinished, type PerimeterRun, type Pt } from './perimeter'
 import { gradeAt } from './slope';
 import { siteLot } from './lotListing';
 import type { GameState, Structure } from './state';
+import { wallHoldsAt } from './retaining';
 
 export const DRAIN = {
   /** A pad graded at this rise over run or more sheds water onto itself (the retaining-wall band of sim/slope.ts). */
@@ -46,8 +47,8 @@ export function cutSites(s: GameState): Structure[] {
   return s.structures.filter(st => !st.unplaced && !st.kind.startsWith('bunker_') && !st.kind.startsWith('escape') && (st.grade ?? 0) >= DRAIN.RUNOFF_GRADE);
 }
 
-/** The cut-slope buildings with no channel near them. */
-export const undrained = (s: GameState): Structure[] => cutSites(s).filter(st => !nearDrain(s, st.x, st.z));
+/** The cut-slope buildings with no channel near them and no finished retaining wall holding the slope (sim/retaining.ts). */
+export const undrained = (s: GameState): Structure[] => cutSites(s).filter(st => !nearDrain(s, st.x, st.z) && !wallHoldsAt(s, st.x, st.z));
 
 /** The line of a channel above a building on a slope: along the contour, `ABOVE` up the hill, or null on level ground / with no lot. */
 export function drainLineFor(s: GameState, st: Pick<Structure, 'x' | 'z'>): [Pt, Pt] | null {
