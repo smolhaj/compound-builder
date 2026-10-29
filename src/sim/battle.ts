@@ -19,6 +19,7 @@
  * Distances are world units (1 ≈ 6 m).
  */
 import { BUNKER_ENTRANCES } from './bunkerEntrances';
+import { ringHoldSeconds } from './rings';
 import type { Battle, BattleEvent, BattleUnit } from './battleTypes';
 import { GUN, skillOf, type Caliber } from './armory';
 import { gearPosture } from './gear';
@@ -304,6 +305,8 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
   posts.push({ kind: 'open', x: C.x + ax * 1.5, z: C.z + az * 1.5, y: 0, cover: 1, value: 0, cap: 99, wrecked: false, fire: 0 });
   posts.sort((a, b) => b.value - a.value);
   const lineR = wallR || 2;
+  // manned inner rings (sim/rings.ts): each makes the crew take another wall under fire before the line is breached
+  const ringHold = opts.insideBreach ? 0 : ringHoldSeconds(s);
 
   const shelterAt = fin.find(st => BUNKER_ENTRANCES.includes(st.kind)) ?? home;
   const hardShelter = shelterAt !== home || g.safeRoom;
@@ -819,7 +822,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
     // (round 4) clubs against rifles need far more of them to rush the line; going over a wall, every rifle at a post on it slows them
     const outnumber = armedR ? 2 : 4;
     const onWall = H.filter(f => !f.out && !f.shelter && f.arm !== FISTS && t >= f.readyAt && f.post?.kind !== 'open' && f.post?.kind !== 'building').length;
-    if (!breached && !peace && atLine.length && (wallDown || hNow === 0 || rUp.length > hNow * outnumber) && (opts.ambush === undefined || hNow === 0 || t - lineSince >= 12 + opts.ambush) && (!climbing || (t - lineSince >= 10 && r() < 0.02 * atLine.length * (deck ? WALK_CLIMB_FACTOR : 1) / (1 + onWall)))) {
+    if (!breached && !peace && atLine.length && (wallDown || hNow === 0 || rUp.length > hNow * outnumber) && (opts.ambush === undefined || hNow === 0 || t - lineSince >= 12 + opts.ambush) && (hNow === 0 || t - lineSince >= ringHold) && (!climbing || (t - lineSince >= 10 && r() < 0.02 * atLine.length * (deck ? WALK_CLIMB_FACTOR : 1) / (1 + onWall)))) {
       breached = true; breachT = t;
       const p = at(lineR, 0);
       ev.push({ t, kind: 'breach', x: r2(p.x), z: r2(p.z) });
