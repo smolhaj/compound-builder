@@ -300,7 +300,7 @@ export const GREENHOUSE_HEATED_BLUEPRINT: Blueprint = bp('greenhouse_heated', [
   ['finish', 'Heater, benches, drip lines and the end walls', 70, { hardware: 2, pipe: 2, cable: 1 }],
 ]);
 
-/** Forty-eight trees on a grid (apple, pear, peach, plum), staked and guarded: ≈ 110 person-hours, ≈ $2,300. */
+/** Forty-eight trees on a grid (apple, pear, cherry, plum), staked and guarded: ≈ 110 person-hours, ≈ $2,300. */
 export const ORCHARD_GROVE_BLUEPRINT: Blueprint = bp('orchard_grove', [
   ['site', 'Stake the rows (4 m apart)', 8, {}],
   ['foundation', 'Strip the sod, dig the planting holes', 40, {}],

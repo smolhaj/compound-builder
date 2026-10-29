@@ -22,7 +22,8 @@ import { climate } from './effects';
 import { tractorBoost } from './vehicles';
 import { SOIL_YIELD } from './site';
 import { seasons } from './regions';
-import { gardenSeason, greenhousePeak, greenhouseGreens, orchardYield } from './greenhouse';
+import { gardenSeason, greenhousePeak, greenhouseGreens } from './greenhouse';
+import { orchardPicking } from './orchard';
 import { careYield, cookRatio, lifeMorale, spoilFactor } from './daily';
 import { beltMorale, isAbsent } from './weekender';
 import { socialMorale } from './gatherings';
@@ -83,8 +84,7 @@ export const freshNeeds = (): Needs => ({ health: 100, morale: 70, hunger: 0, do
  * keep dry (staples), the potatoes go to the cellar (fresh).
  */
 export const FIELD_KCAL = 700_000, FIELD_DRY = 0.4;
-/** Share of the orchard's fruit that keeps in the cellar bins (apples, pears); the rest is eaten fresh or put up. */
-export const ORCHARD_BINNED = 0.6;
+/** (The share of the orchard's fruit that keeps in the cellar bins is the fruit's own: apples and pears keep, cherries and plums do not: sim/orchard.ts `FRUIT.keeps`.) */
 
 /** The best gardener among the living who are still on the place (the dead and the taken don't tend the beds). */
 export function bestGardener(s: GameState): number {
@@ -135,7 +135,7 @@ export function henSeason(s: GameState, doy: number): number {
 }
 
 /** What the place grows a day (kcal), by source, after the weather and the tending chores. */
-export interface ProduceParts { eggs: number; veg: number; greens: number; orchard: number; field: { total: number; potato: number; dry: number } }
+export interface ProduceParts { eggs: number; veg: number; greens: number; orchard: number; /** The part of the orchard's fruit that keeps (goes to the cellar bins). */ orchardKeep: number; field: { total: number; potato: number; dry: number } }
 export function produceParts(s: GameState): ProduceParts {
   const doy = calendarOf(s.clock).doy;
   const fin = s.structures.filter(isFinished);
@@ -153,11 +153,13 @@ export function produceParts(s: GameState): ProduceParts {
   const hd = hailThisYear(s), hail = hd == null || doy < hd ? 1 : doy - hd < 30 ? 0 : 0.7;
   const veg = gardens * 2500 * season * (0.6 + 0.08 * skill) * SOIL_YIELD[s.site.soil] * greenhousePeak(s) * hail * careYield(s, 'weeds') * gardenFactor(s);
   const grow = climate(s).grow, pol = pollination(s);
+  const pick = orchardPicking(s, pol.orchard), orchardK = careYield(s, 'orchard') * grow;
   return {
     eggs: Math.max(0, eggs) * Math.max(0.5, grow) * henSeason(s, doy),
     veg: Math.max(0, veg) * grow * pol.garden,
     greens: greenhouseGreens(s) * careYield(s, 'greenhouse') * grow,
-    orchard: orchardYield(s) * careYield(s, 'orchard') * grow * pol.orchard,
+    orchard: pick.kcal * orchardK,
+    orchardKeep: pick.keep * orchardK,
     field: fieldHarvestSplit(s),
   };
 }
@@ -208,8 +210,8 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
   const dry = Math.max(0, parts.field.dry - seedKept), potato = Math.max(0, parts.field.potato - Math.max(0, seedKept - parts.field.dry));
   if (dry > 0) addFoodKcal(s, 'home_dry', dry);
   // potatoes and the orchard's apples go to the cellar bins while there is room; the rest is fresh food
-  const binned = potato + parts.orchard * ORCHARD_BINNED, left = shelveRoots(s, binned);
-  s.stock.fresh += (parts.eggs + parts.veg + parts.greens + parts.orchard * (1 - ORCHARD_BINNED) + left) / KCAL.fresh;
+  const binned = potato + parts.orchardKeep, left = shelveRoots(s, binned);
+  s.stock.fresh += (parts.eggs + parts.veg + parts.greens + (parts.orchard - parts.orchardKeep) + left) / KCAL.fresh;
   // hunting, fishing and snares (wildfood.ts: the region's game, seasons and tags, the game thinning out)
   const meat = wildDay(s, freezer);
   // goats, pigs, the steer, rabbits (livestock.ts: feed, hunger, milk, November butchering, litters)

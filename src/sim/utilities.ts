@@ -13,6 +13,7 @@
  * repair. Shortages are logged. Pure (tested).
  */
 import { pumpDrawFactor, sunFactor } from './terrainFx';
+import { orchardWaterL } from './orchard';
 import { solarFogK } from './fogFx';
 import { SPRING_LPD } from './site';
 import { toteStorage, waterPrice } from './water';
@@ -438,10 +439,12 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
   const people = s.personState.filter(ps => ps.needs?.died == null).length;
   const homePlumbed = fin.some(st => fitted(s, st.id, 'plumb') && (DRAW_KWH[st.kind] ?? 0) >= 5);
   const gardenUse = fin.some(st => st.kind === 'garden') && doy > 120 && doy < 270 ? (s.stock.greywater >= 1 && homePlumbed ? 200 : 400) : 0;
-  // the garden drinks from the pond first: irrigation is what it is for
-  const fromPond = Math.min(u.pondL ?? 0, gardenUse);
+  // the orchard's drip line (sim/orchard.ts: young trees 7 L a day each, the dry months) is irrigation too
+  const orchardUse = orchardWaterL(s);
+  // the garden and the orchard drink from the pond first: irrigation is what it is for
+  const fromPond = Math.min(u.pondL ?? 0, gardenUse + orchardUse);
   u.pondL = (u.pondL ?? 0) - fromPond;
-  const use = people * (homePlumbed ? WATER_PLUMBED : WATER_CARRIED) + (gardenUse - fromPond) + (fin.some(st => st.kind === 'chicken_coop') ? 10 : 0);
+  const use = people * (homePlumbed ? WATER_PLUMBED : WATER_CARRIED) + (gardenUse + orchardUse - fromPond) + (fin.some(st => st.kind === 'chicken_coop') ? 10 : 0);
   u.storedL = Math.max(0, Math.min(store, u.storedL + rainL));
   let left = supply - use, shortL = 0;
   if (left < 0) { const take = Math.min(-left, u.storedL); u.storedL -= take; left += take; }
