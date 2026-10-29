@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { newGame, type GameState, type Structure } from './state';
-import { CANNER_CASES, CANNED_YIELD, daysOfFood, FIELD_KCAL, fieldHarvest, KCAL, liveDay, produce, workFactor } from './needs';
+import { CANNER_CASES, CANNED_YIELD, daysOfFood, FIELD_KCAL, fieldHarvest, fieldHarvestSplit, KCAL, liveDay, produce, workFactor } from './needs';
+import { foodUnits } from './pantry';
+import { SEED_UNIT_KCAL } from './crops';
 
 const built = (g: GameState, id: string, kind: string): Structure => {
   const st: Structure = { id, kind, x: 10, z: 10, rot: 0, stage: 5, done: 0, supplied: true, finishedAt: 0 };
@@ -83,31 +85,36 @@ describe('food and needs', () => {
     expect(daysOfFood(g)).toBeCloseTo(KCAL.staples / (2 * 2400 + 2 * 1700));
   });
 
-  it('a field plot brings in the fall harvest: wheat and beans keep dry, potatoes go in fresh', () => {
+  it('a field plot brings in the fall harvest: wheat and beans keep dry, potatoes go to the cellar; the first of it is next spring\'s seed', () => {
     const g = newGame(1, 250);
     noStores(g);
     built(g, 'f', 'field');
     g.people.length = 0; g.personState.length = 0;
-    const kcal = fieldHarvest(g);
+    const sp = fieldHarvestSplit(g), kcal = fieldHarvest(g);
     expect(kcal).toBeGreaterThan(5000);
+    expect(kcal).toBeCloseTo(sp.total);
     const st0 = g.stock.staples;
     liveDay(g, 0.5);
-    expect(g.stock.staples - st0).toBeCloseTo(kcal * 0.4 / KCAL.staples);
+    // a lone field starts on beans (dry): a share of the day's crop is set aside as seed, never over two fifths, the rest is the dry store
+    const kept = g.stock.seed_saved * SEED_UNIT_KCAL;
+    expect(kept).toBeGreaterThan(0);
+    expect(kept).toBeLessThanOrEqual(kcal * 0.4 + 1);
+    expect(g.stock.staples - st0).toBeCloseTo((sp.dry - kept) / KCAL.staples);
     // the season's total is in the hundreds of thousands of kcal
     expect(kcal * 65).toBeGreaterThan(FIELD_KCAL * 0.5);
     expect(fieldHarvest(newGame(1, 120))).toBe(0);
   });
 
-  it('surplus fresh food is canned in the home kitchen, two canner loads a day, if there are lids', () => {
+  it('surplus fresh food is canned in the home kitchen: a pressure canner takes two cases a day, a water bath one, and both need lids', () => {
     const g = newGame(1, 250);
     noStores(g);
     built(g, 'h', 'timber_cabin');
-    g.stock.fresh = 200; g.stock.canned = 0; g.stock.lids = 0;
+    g.stock.fresh = 200; g.stock.lids = 0; g.stock.canner = 1;
     liveDay(g, 0.5);
-    expect(g.stock.canned).toBe(0);                        // no lids
+    expect(foodUnits(g, 'home_canned')).toBe(0);              // no lids
     g.stock.lids = 24;
     liveDay(g, 0.5);
-    expect(g.stock.canned).toBeCloseTo(CANNER_CASES * CANNED_YIELD);
+    expect(foodUnits(g, 'home_canned')).toBeCloseTo(CANNER_CASES * CANNED_YIELD);
     expect(g.stock.lids).toBe(24 - CANNER_CASES);
   });
 

@@ -32,7 +32,8 @@ import { log } from './economy';
 import { logGate } from './nag';
 import { calendarOf, type GameState } from './state';
 import { REGIONS } from './regions';
-import { addFoodKcal } from './pantry';
+import { MANURE, PILE_MAX } from './crops';
+import { MEAT_WHERE, putUpMeat, renderLard } from './kitchen';
 
 export type Animal = 'goat' | 'pig' | 'steer' | 'rabbit' | 'sheep';
 export const ANIMALS: Animal[] = ['goat', 'pig', 'steer', 'rabbit', 'sheep'];
@@ -50,6 +51,8 @@ const BALE_LB = 50, BAG_LB = 50;
 const GRAZE = 0.15;
 const MILK_KCAL = 1300, PORK_KCAL = 150 * 1100, BEEF_KCAL = 450 * 1000, FRYER_KCAL = 2000;
 const LITTER = 6, RABBIT_CYCLE = 60, RABBIT_CAP = 12;
+/** The share of a pig's calories in fat that is rendered into lard. */
+const LARD_SHARE = 0.15;
 /** Sheep: a lamb crop, the flock's ceiling, mutton a head (kcal), a fleece's price, and the roof the barns give. */
 export const LAMBS_PER_EWE = 1.3, FLOCK_CAP = 40, MUTTON_KCAL = 50_000, FLEECE_USD = 22;
 export const BARN_SHEEP = 12, SHEEP_BARN_SHEEP = 30;
@@ -119,13 +122,13 @@ export function livestockDay(s: GameState, freezer: boolean): number {
     if (before >= 0.5 && l.condition[a] < 0.5) log(s, `The ${a === 'steer' ? 'steer is' : a + 's are'} short of feed and losing condition.`);
     if (l.condition[a] <= 0) { s.stock[a] = head(s, a) - 1; l.condition[a] = 0.4; log(s, `A ${a} died: starved for want of ${EAT[a].hay > 0 ? 'hay' : 'feed'}.`); }
   }
+  // the barn pile: what the animals leave in the stalls (less on pasture) for the fields (sim/crops.ts)
+  { const pile = ANIMALS.reduce((a, an) => a + head(s, an) * (MANURE[an] ?? 0), 0) * (grazing(s) ? 0.55 : 1); s.stock.manure = Math.min(PILE_MAX, (s.stock.manure ?? 0) + pile); }
   let kcal = 0;
-  const meat = (k: number, what: string) => {
-    kcal += k;
-    if (freezer) addFoodKcal(s, 'game_meat', k);
-    else if ((s.stock.smoker ?? 0) >= 1 && k > 8000) { addFoodKcal(s, 'smoked_meat', k * 0.8); kcal -= k * 0.2; }
-    else s.stock.fresh += k / 2000;
-    if (k >= 20000) log(s, `${what}: ${Math.round(k / 1000).toLocaleString('en-US')},000 kcal of meat${freezer ? ' in the freezer' : (s.stock.smoker ?? 0) >= 1 ? ' smoked and cured' : ' to eat before it turns'}.`);
+  const meat = (k: number, what: string, pork = false) => {
+    const put = putUpMeat(s, k, { freezer, pork });
+    kcal += put.kept;
+    if (k >= 20000) log(s, `${what}: ${Math.round(k / 1000).toLocaleString('en-US')},000 kcal of meat ${MEAT_WHERE[put.where]}.`);
   };
   // milk: dry from Dec to mid-February
   const goats = head(s, 'goat');
@@ -134,7 +137,14 @@ export function livestockDay(s: GameState, freezer: boolean): number {
   if (doy >= 305 && doy <= 334 && l.butchered !== year) {
     l.butchered = year;
     const pigs = head(s, 'pig');
-    if (pigs > 0) { s.stock.pig = 0; meat(pigs * PORK_KCAL * (0.5 + 0.5 * l.condition.pig), pigs === 1 ? 'The pig went to the butcher' : `${pigs} pigs went to the butcher`); }
+    if (pigs > 0) {
+      s.stock.pig = 0;
+      // the carcass is mostly meat to cure, smoke or freeze; the fat is rendered into lard (a kitchen day)
+      const total = pigs * PORK_KCAL * (0.5 + 0.5 * l.condition.pig);
+      meat(total * (1 - LARD_SHARE), pigs === 1 ? 'The pig went to the butcher' : `${pigs} pigs went to the butcher`, true);
+      renderLard(s, total * LARD_SHARE);
+      kcal += total * LARD_SHARE * 0.9;
+    }
     const steers = head(s, 'steer');
     const flock = head(s, 'sheep'), keep = Math.min(flock, Math.max(2, l.breeders ?? flock));
     if (flock > keep) { s.stock.sheep = keep; meat((flock - keep) * MUTTON_KCAL * (0.5 + 0.5 * l.condition.sheep), `${flock - keep} lambs went to the butcher`); }

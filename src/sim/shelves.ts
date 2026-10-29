@@ -20,7 +20,7 @@ export const SHELVES: Record<ShelfTab, MaterialId[]> = {
   bunker: ['rebar', 'membrane', 'container', 'blast_door', 'blast_valve', 'nbc_filter', 'filter_set', 'culvert', 'egress_hatch', 'passage_hatch', 'lead_sheet', 'faraday_mesh'],
   water: ['water_jugs', 'ibc_tote', 'water_trailer', 'water_filter', 'ro_system', 'softener', 'greywater', 'pipe', 'fixtures', 'pump', 'drilling', 'tank', 'septic_tank'],
   power: ['solar_panel', 'battery', 'inverter', 'generator', 'cable'],
-  food: ['seed', 'lids', 'fishing_gear', 'snares', 'smoker', 'goat', 'pig', 'steer', 'sheep', 'rabbit', 'hay', 'feed', 'trout_fry', 'crayfish_stock', 'fish_feed'],
+  food: ['seed', 'seed_hybrid', 'seed_cover', 'manure', 'lids', 'canner', 'dehydrator', 'crocks', 'grain_mill', 'fishing_gear', 'snares', 'smoker', 'goat', 'pig', 'steer', 'sheep', 'rabbit', 'hay', 'feed', 'trout_fry', 'crayfish_stock', 'fish_feed'],
   household: ['meds', 'hygiene', 'traps', 'tent', 'sleeping_bag', 'kibble', 'dogbed', 'doghouse'],
   fuel: ['fuel', 'vehicle_parts', 'stabilizer', 'firewood', 'excavator', 'plow', 'gun_safe', 'gun_cleaning'],
   defense: [...KIT_GOODS, ...WATCH_GOODS, ...HARDEN_GOODS],

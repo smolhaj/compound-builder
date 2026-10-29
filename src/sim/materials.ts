@@ -16,7 +16,9 @@ export type MaterialId = 'lumber' | 'logs' | 'firewood' | 'fieldstone' | 'concre
   | 'mines' | 'greenhouse_kit' | 'fruit_trees' | 'ground_sensor' | 'passage_hatch' | 'vehicle_parts'
   | 'gun_mount' | 'turret_head' | 'ai_sensor_module'
   | 'tent' | 'sleeping_bag'
-  | 'greenhouse_pro_kit' | 'trout_fry' | 'crayfish_stock' | 'fish_feed' | 'sheep';
+  | 'greenhouse_pro_kit' | 'trout_fry' | 'crayfish_stock' | 'fish_feed' | 'sheep'
+  // farm & kitchen (sim/crops.ts, sim/kitchen.ts)
+  | 'seed_hybrid' | 'seed_saved' | 'seed_cover' | 'canner' | 'dehydrator' | 'crocks' | 'grain_mill' | 'manure' | 'compost';
 
 export interface MaterialDef {
   id: MaterialId;
@@ -69,7 +71,16 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   canned: { id: 'canned', name: 'Canned food', unit: 'case of 12 (≈ 6,000 kcal)', price: 38 },
   staples: { id: 'staples', name: 'Bulk staples', unit: 'rice, beans, flour, oil (≈ 80,000 kcal, 25 kg)', price: 85 },
   meds: { id: 'meds', name: 'Medical supplies', unit: 'kit: dressings, antibiotics, painkillers', price: 160 },
-  seed: { id: 'seed', name: 'Field seed', unit: 'a season for a quarter acre: seed potatoes, dry beans, seed wheat', price: 200 },
+  seed: { id: 'seed', name: 'Heirloom field seed', unit: 'a season for a quarter acre: seed potatoes, dry beans, seed wheat; open-pollinated, so the seed you save comes true', price: 200 },
+  seed_hybrid: { id: 'seed_hybrid', name: 'Hybrid field seed', unit: 'a season for a quarter acre of certified hybrid seed: about 12 % more crop the year it is sown, but seed saved from it does not come true', price: 260 },
+  seed_saved: { id: 'seed_saved', name: 'Saved seed', unit: 'a season for a quarter acre, kept back from your own harvest', price: null },
+  seed_cover: { id: 'seed_cover', name: 'Cover-crop seed', unit: 'clover and vetch for one resting field: fixes nitrogen and builds the soil', price: 30 },
+  canner: { id: 'canner', name: 'Pressure canner', unit: '23-quart dial-gauge pressure canner: the only safe way to can vegetables, meat and fish (water-bath is for tomatoes, fruit and pickles)', price: 320 },
+  dehydrator: { id: 'dehydrator', name: 'Food dehydrator', unit: 'nine-tray electric dehydrator (about 600 W): dried fruit, vegetables and herbs that keep a year or two', price: 190 },
+  crocks: { id: 'crocks', name: 'Fermenting crocks', unit: 'stoneware crocks with weights and airlocks: sauerkraut, pickles, kimchi. No lids, no canner, no power', price: 90 },
+  grain_mill: { id: 'grain_mill', name: 'Grain mill', unit: 'a burr mill with a hand crank: wheat berries to flour, corn to meal', price: 120 },
+  manure: { id: 'manure', name: 'Manure', unit: 'a pickup load of aged manure (your own stock makes it for free)', price: 15 },
+  compost: { id: 'compost', name: 'Compost', unit: 'a barrow load of finished compost from kitchen scraps, weeds and straw', price: null },
   stabilizer: { id: 'stabilizer', name: 'Fuel stabilizer', unit: 'a bottle: keeps ten cans of gas good for two years', price: 15 },
   hygiene: { id: 'hygiene', name: 'Hygiene supplies', unit: 'a person-month: soap, toilet paper, toothpaste, shampoo, pads', price: 25 },
   plate_carrier: { id: 'plate_carrier', name: 'Plate carrier', unit: 'a carrier with a pair of level III plates', price: 600 },

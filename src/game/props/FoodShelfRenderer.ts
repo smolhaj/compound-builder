@@ -76,6 +76,7 @@ const MAKE: Record<ShelfProp, Array<{ part: Part; tint: 'item' | 'white' | 'card
   jar: [{ part: 'jar', tint: 'item' }, { part: 'jarLid', tint: 'white' }],
   case: [{ part: 'case', tint: 'card' }],
   pack: [{ part: 'soft', tint: 'paper' }],
+  crate: [{ part: 'case', tint: 'item' }],
 };
 
 /** Home-canned jars vary jar to jar (tomatoes, green beans, peaches, corn, beets). */

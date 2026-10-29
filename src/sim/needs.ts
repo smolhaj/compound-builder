@@ -23,12 +23,15 @@ import { tractorBoost } from './vehicles';
 import { SOIL_YIELD } from './site';
 import { REGIONS, seasons } from './regions';
 import { gardenSeason, greenhousePeak, greenhouseGreens, orchardYield } from './greenhouse';
-import { canningCases, careYield, lifeMorale, spoilFactor } from './daily';
+import { careYield, cookRatio, lifeMorale, spoilFactor } from './daily';
 import { socialMorale } from './gatherings';
-import { addFood, addFoodKcal, dietDay, dietEffects, eatFrom, inDateKcal, syncPantry } from './pantry';
+import { addFoodKcal, dietDay, dietEffects, eatFrom, inDateKcal, syncPantry } from './pantry';
 import { mulberry32 } from './rng';
 import { dogEffects } from './pets';
 import { sleepEffects } from './housing';
+import { CROPS, fieldFactor, fieldsOf, GROSS, gardenFactor, keepSeed, successionDays } from './crops';
+import { kitchenDay, putByDay } from './kitchen';
+import { freshSpoilRate, shelveRoots } from './storage';
 
 export type FoodId = 'fresh' | 'frozen' | 'canned' | 'staples';
 /** Food is kept in the stockpile in these units; kcal in one unit. */
@@ -68,6 +71,8 @@ export const freshNeeds = (): Needs => ({ health: 100, morale: 70, hunger: 0, do
  * keep dry (staples), the potatoes go to the cellar (fresh).
  */
 export const FIELD_KCAL = 700_000, FIELD_DRY = 0.4;
+/** Share of the orchard's fruit that keeps in the cellar bins (apples, pears); the rest is eaten fresh or put up. */
+export const ORCHARD_BINNED = 0.6;
 
 /** The best gardener among the living who are still on the place (the dead and the taken don't tend the beds). */
 export function bestGardener(s: GameState): number {
@@ -82,41 +87,66 @@ function hailThisYear(s: GameState): number | null {
   return h && h.year === calendarOf(s.clock).year ? h.doy : null;
 }
 
-/** The day's field harvest (kcal), before it is split into dry and fresh. */
-export function fieldHarvest(s: GameState): number {
+/**
+ * The day's field harvest (kcal), by what it is: the potatoes (they go to the cellar) and the dry crops (beans,
+ * wheat). Each field's crop, soil, rotation, seed and sowing date set its share (sim/crops.ts); the gardener's
+ * skill, the soil, the weather, the tractor, hail and the harvest chore are the same for all. A field earns
+ * the old flat 700,000 kcal a year on average, plus the seed unit the harvest sets aside (`keepSeed`).
+ */
+export function fieldHarvestSplit(s: GameState): { total: number; potato: number; dry: number } {
   const doy = calendarOf(s.clock).doy, HARVEST = seasons(REGIONS[s.site.region]).harvest;
-  if (doy < HARVEST[0] || doy >= HARVEST[1]) return 0;
-  const fields = s.structures.filter(st => st.kind === 'field' && isFinished(st)).length;
+  if (doy < HARVEST[0] || doy >= HARVEST[1]) return { total: 0, potato: 0, dry: 0 };
+  const fields = fieldsOf(s);
+  if (!fields.length) return { total: 0, potato: 0, dry: 0 };
   const skill = bestGardener(s);
   // hail on the standing crop: replanted early in the summer it still makes 70 %; in late summer a quick catch crop, 30 %
   const hd = hailThisYear(s), hail = hd == null || hd >= HARVEST[1] ? 1 : hd < HARVEST[0] - 60 ? 0.7 : 0.3;
-  return fields * FIELD_KCAL / (HARVEST[1] - HARVEST[0]) * (0.6 + 0.08 * skill) * SOIL_YIELD[s.site.soil] * climate(s).grow * tractorBoost(s) * hail * careYield(s, 'harvest');
+  const per = FIELD_KCAL * GROSS / (HARVEST[1] - HARVEST[0]) * (0.6 + 0.08 * skill) * SOIL_YIELD[s.site.soil] * climate(s).grow * tractorBoost(s) * hail * careYield(s, 'harvest');
+  let potato = 0, dry = 0;
+  for (const f of fields) {
+    const ff = fieldFactor(s, f), kcal = per * ff.total;
+    if (CROPS[ff.crop].dry) dry += kcal; else potato += kcal;
+  }
+  return { total: potato + dry, potato, dry };
 }
+export const fieldHarvest = (s: GameState): number => fieldHarvestSplit(s).total;
 
-/** What the place grows a day (kcal, fresh), by day of year: eggs from the coop, the garden in season, the field harvest. */
-export function produce(s: GameState): number {
+/** What the place grows a day (kcal), by source, after the weather and the tending chores. */
+export interface ProduceParts { eggs: number; veg: number; greens: number; orchard: number; field: { total: number; potato: number; dry: number } }
+export function produceParts(s: GameState): ProduceParts {
   const doy = calendarOf(s.clock).doy;
   const fin = s.structures.filter(isFinished);
   const coops = fin.filter(st => st.kind === 'chicken_coop').length;
   const gardens = fin.filter(st => st.kind === 'garden').length;
   // a dozen hens: ~8 eggs a day in summer, ~3 in midwinter (≈ 70 kcal each)
   const eggs = coops * 70 * (5.5 + 2.5 * Math.cos(2 * Math.PI * (doy - 172) / 365)) * careYield(s, 'animals') * layFactor(s);
-  // a kitchen garden: nothing until mid-June, a peak of ≈ 2,500 kcal a day in August–September, done by late October
-  // nothing until three weeks past the last frost, full by mid-summer, done a month past the first frost
-  // a finished greenhouse starts the garden six weeks earlier, runs it six weeks later and raises the peak (greenhouse.ts)
-  const [g0, g1] = gardenSeason(s);
+  // a kitchen garden: nothing until three weeks past the last frost, full by mid-summer, done a month past the first frost
+  // a finished greenhouse starts the garden six weeks earlier, runs it six weeks later and raises the peak (greenhouse.ts);
+  // later sowings (successions, sim/crops.ts) run the end of the season on a little and raise the crop
+  const [g0, g1a] = gardenSeason(s), g1 = g1a + successionDays(s);
   const season = doy < g0 || doy > g1 ? 0 : doy < g0 + 45 ? (doy - g0) / 45 : doy < g1 - 35 ? 1 : (g1 - doy) / 35;
   const skill = bestGardener(s);
   // a month to come back after hail (replanted from saved seed), then a shorter season
   const hd = hailThisYear(s), hail = hd == null || doy < hd ? 1 : doy - hd < 30 ? 0 : 0.7;
-  const veg = gardens * 2500 * season * (0.6 + 0.08 * skill) * SOIL_YIELD[s.site.soil] * greenhousePeak(s) * hail * careYield(s, 'weeds');
-  // winter greens on the greenhouse benches; the orchard's fruit, August to October
+  const veg = gardens * 2500 * season * (0.6 + 0.08 * skill) * SOIL_YIELD[s.site.soil] * greenhousePeak(s) * hail * careYield(s, 'weeds') * gardenFactor(s);
   const grow = climate(s).grow;
-  return Math.max(0, eggs) * Math.max(0.5, grow) + (veg + greenhouseGreens(s) * careYield(s, 'greenhouse') + orchardYield(s) * careYield(s, 'orchard')) * grow + fieldHarvest(s);
+  return {
+    eggs: Math.max(0, eggs) * Math.max(0.5, grow),
+    veg: Math.max(0, veg) * grow,
+    greens: greenhouseGreens(s) * careYield(s, 'greenhouse') * grow,
+    orchard: orchardYield(s) * careYield(s, 'orchard') * grow,
+    field: fieldHarvestSplit(s),
+  };
 }
 
-/** Fraction of fresh food that spoils a day: in the open vs a root cellar. */
-const SPOIL_FRESH = 0.08, SPOIL_CELLAR = 0.015, THAW = 0.3;
+/** What the place grows a day (kcal, fresh), by day of year: eggs from the coop, the garden in season, the field harvest. */
+export function produce(s: GameState): number {
+  const p = produceParts(s);
+  return Math.max(0, p.eggs + p.veg + p.greens + p.orchard + p.field.total);
+}
+
+/** Share of the frozen stock that thaws a day with the freezer off (the fresh pile's spoilage is sim/storage.ts `freshSpoilRate`). */
+const THAW = 0.3;
 /** Canning: cases a day (two pressure-canner loads), and the kcal kept (trimming, the odd jar that doesn't seal). */
 export const CANNER_CASES = 2, CANNED_YIELD = 0.85;
 
@@ -137,20 +167,25 @@ const alive = (s: GameState, i: number) => s.personState[i]?.needs?.died == null
  */
 export function liveDay(s: GameState, rnd: number): FoodReport {
   const fin = s.structures.filter(isFinished);
-  const cellar = fin.some(st => st.kind === 'root_cellar');
   const freezer = fin.some(st => st.kind === 'root_cellar' && s.utilities.lit.includes(st.id));
   // groceries need open stores with trucks restocking them
   const fromStores = s.disaster.tracks.stores > 0.5 && s.disaster.tracks.deliveries > 0.25;
   // spoilage (fractional units carry as a remainder on the stock count)
   let spoiled = 0;
   const spoil = (f: FoodId, rate: number) => { const lost = s.stock[f] * rate; s.stock[f] -= lost; spoiled += lost * KCAL[f]; };
-  spoil('fresh', (cellar ? SPOIL_CELLAR : SPOIL_FRESH) * spoilFactor(s));
+  spoil('fresh', freshSpoilRate(s) * spoilFactor(s));
   if (!freezer) spoil('frozen', fromStores ? 0 : THAW);
   // what grows
-  const grown = produce(s), dry = fieldHarvest(s) * FIELD_DRY;
+  const parts = produceParts(s);
+  const grown = Math.max(0, parts.eggs + parts.veg + parts.greens + parts.orchard + parts.field.total);
   syncPantry(s);
+  // harvest days set next spring's seed aside first (dry crops, then potatoes: sim/crops.ts)
+  const seedKept = keepSeed(s, parts.field.total);
+  const dry = Math.max(0, parts.field.dry - seedKept), potato = Math.max(0, parts.field.potato - Math.max(0, seedKept - parts.field.dry));
   if (dry > 0) addFoodKcal(s, 'home_dry', dry);
-  s.stock.fresh += (grown - dry) / KCAL.fresh;
+  // potatoes and the orchard's apples go to the cellar bins while there is room; the rest is fresh food
+  const binned = potato + parts.orchard * ORCHARD_BINNED, left = shelveRoots(s, binned);
+  s.stock.fresh += (parts.eggs + parts.veg + parts.greens + parts.orchard * (1 - ORCHARD_BINNED) + left) / KCAL.fresh;
   // hunting, fishing and snares (wildfood.ts: the region's game, seasons and tags, the game thinning out)
   const meat = wildDay(s, freezer);
   // goats, pigs, the steer, rabbits (livestock.ts: feed, hunger, milk, November butchering, litters)
@@ -195,15 +230,10 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
     }
   }
   const short = Math.max(0, need - ate);
-  // putting up the harvest: fresh beyond five days' eating is canned in the home kitchen, two canner loads a day
-  const kitchen = fin.some(st => isHome(st.kind));
-  const surplus = s.stock.fresh * KCAL.fresh - 5 * need;
-  if (kitchen && surplus > KCAL.canned && s.stock.lids >= 1) {
-    const cases = Math.min(Math.floor(surplus / KCAL.canned), canningCases(s, CANNER_CASES), Math.floor(s.stock.lids));
-    s.stock.lids -= cases;
-    s.stock.fresh -= cases * KCAL.canned / KCAL.fresh;
-    addFood(s, 'home_canned', cases * CANNED_YIELD);
-  }
+  // putting up the harvest: fresh beyond five days' eating is canned, dried or fermented in the home kitchen (sim/kitchen.ts)
+  const cookR = cookRatio(s);
+  putByDay(s, need, cookR);
+  const table = kitchenDay(s, cookR);
   if (short > need * 0.25 && !fromStores) log(s, `Short of food: ${Math.round(short)} kcal less than the family needs today.`);
   // needs, person by person
   const cozy = s.disaster.difficulty === 'cozy';
@@ -268,7 +298,7 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
     if (sl) dh -= sl.harm;
     n.health = Math.max(cozy ? 5 : 0, Math.min(100, n.health + dh));
     // morale: drifts to a baseline that variety, a home, light and safety raise; hunger and loss lower
-    const target = 45 + 6 * Math.min(variety, 4) + diet.morale + (home ? 8 : -6) + (dark ? -8 : 0) + darkMood(s, !!p.kid, (s.personState[i]?.task as string) === 'watch') + (s.utilities.hauling ? (s.utilities.haulFar ? -10 : -4) : 0) - Math.min(25, n.hunger / 1000) + social + lifeMorale(s, i) + (sl?.morale ?? 0) + dogEffects(s, p.id).morale;
+    const target = 45 + 6 * Math.min(variety, 4) + diet.morale + (home ? 8 : -6) + (dark ? -8 : 0) + darkMood(s, !!p.kid, (s.personState[i]?.task as string) === 'watch') + (s.utilities.hauling ? (s.utilities.haulFar ? -10 : -4) : 0) - Math.min(25, n.hunger / 1000) + social + lifeMorale(s, i) + (fromStores ? 0 : table) + (sl?.morale ?? 0) + dogEffects(s, p.id).morale;
     n.morale += (Math.max(0, Math.min(100, target)) - n.morale) * 0.08;
     // stumbling about in dark rooms under lights-out without curtains (sim/blackout.ts)
     const stumble = ((rnd * 7919 + i * 211 + 5) % 1 + 1) % 1;
@@ -291,7 +321,7 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
       s.people.splice(i, 1); s.personState.splice(i, 1);
     }
   }
-  return { needKcal: need, ateKcal: ate, producedKcal: grown + meat + stock, spoiledKcal: spoiled, fromStores, kinds, daysLeft: daysOfFood(s) };
+  return { needKcal: need, ateKcal: ate, producedKcal: grown - seedKept + meat + stock, spoiledKcal: spoiled, fromStores, kinds, daysLeft: daysOfFood(s) };
 }
 
 /** Work rate multiplier from health and morale (the hungry, hurt or hopeless get less done). */

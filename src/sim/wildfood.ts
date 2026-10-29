@@ -22,7 +22,7 @@ import { calendarOf, type GameState } from './state';
 import { REGIONS, type Game } from './regions';
 import { huntingRifle, smallGameGun } from './armory';
 import { mulberry32 } from './rng';
-import { addFoodKcal } from './pantry';
+import { MEAT_WHERE, putUpMeat } from './kitchen';
 import { gameCount, killShare, recoveryPerDay } from './wildlife';
 
 export type GameClass = 'big' | 'small' | 'fish';
@@ -98,15 +98,13 @@ export function wildDay(s: GameState, freezer: boolean): number {
   }
   let meat = 0;
   const bring = (baskets: number, what: string, cls: GameClass) => {
-    meat += baskets * 2000;
-    // a freezer, a smoker (jerky keeps like staples), or eat it fresh
-    if (freezer) addFoodKcal(s, 'game_meat', baskets * 2000);
-    else if (s.stock.smoker >= 1 && baskets > 4) { addFoodKcal(s, 'smoked_meat', baskets * 2000 * 0.8); meat -= baskets * 2000 * 0.2; }
-    else s.stock.fresh += baskets;
+    // the freezer, the smoker, the salt barrel or the canner (sim/kitchen.ts), else it is eaten fresh
+    const put = putUpMeat(s, baskets * 2000, { freezer });
+    meat += put.kept;
     // one animal's share of what the land holds: on 5 acres a deer is half the deer; on 80 a sixteenth
     w.abundance[cls] = Math.max(0.05, w.abundance[cls] - (cls === 'fish' ? 0.004 : killShare(s, cls)));
     if (day <= w.hotUntil) for (const ps of s.personState) if (ps.needs.died == null) ps.needs.dose += 0.004 * baskets / 4;
-    if (baskets >= 8) log(s, `${what} down: meat for weeks${s.stock.smoker >= 1 && !freezer ? ' (smoked into jerky)' : ''}.${day <= w.hotUntil ? ' It reads hot on the counter.' : ''}`);
+    if (baskets >= 8) log(s, `${what} down: meat for weeks${put.where === 'fresh' || put.where === 'freezer' ? '' : ` (${MEAT_WHERE[put.where]})`}.${day <= w.hotUntil ? ' It reads hot on the counter.' : ''}`);
   };
   const warden = () => { if (lawful(s) && r() < 0.15) { s.money -= POACH_FINE; log(s, `The game warden caught it: a $${POACH_FINE.toLocaleString('en-US')} fine and the meat taken.`); return true; } return false; };
   // big game: a hunter, a rifle, and (in peacetime) the season and a tag
