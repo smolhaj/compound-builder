@@ -43,6 +43,8 @@ export class PathLayer {
   private readonly _h: PathHost;
   /** QA: off draws nothing. */
   enabled = true;
+  /** QA: walkers go straight (to compare with keeping to the paths). */
+  qaNoVia = false;
 
   constructor(host: PathHost) {
     this._h = host;
@@ -61,7 +63,7 @@ export class PathLayer {
 
   /** The way along the paths from one point to another ([] = straight). */
   via(fx: number, fz: number, tx: number, tz: number): Pt[] {
-    return this._graph ? routeVia(this._graph, fx, fz, tx, tz) : [];
+    return this._graph && !this.qaNoVia ? routeVia(this._graph, fx, fz, tx, tz) : [];
   }
 
   private static layout(game: GameState): string {
