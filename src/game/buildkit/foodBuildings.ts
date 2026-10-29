@@ -481,7 +481,7 @@ function orchard(def: KitPieceDef, seed = 1): THREE.Group {
 
 function woodOven(_def: KitPieceDef, seed = 1): THREE.Group {
   const p = new Parts(seed);
-  const W = 0.2, D = 0.24;
+  const W = 0.26, D = 0.3;
   p.layer = 'stakes';
   for (const [x, z] of [[-W / 2, -D / 2], [W / 2, -D / 2], [-W / 2, D / 2], [W / 2, D / 2]]) p.add('trim', box(0.012, 0.09, 0.012, x, -0.02, z));
   // foundation: footing and the stone base (a hearth-high plinth with a wood storage arch)
@@ -490,9 +490,10 @@ function woodOven(_def: KitPieceDef, seed = 1): THREE.Group {
   p.add('cutcap', box(0.07, 0.07, 0.01, 0, 0.04, D / 2 + 0.002), 'foundation');
   // frame: the firebrick floor and the dome (a squashed half sphere, mouth to the front)
   p.add('whitewash', box(W - 0.02, 0.012, D - 0.02, 0, 0.22, 0), 'frame');
-  p.add('earth', new THREE.SphereGeometry(1, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2).scale(0.1, 0.085, 0.115).translate(0, 0.232, -0.01), 'walls');
+  p.add('whitewash', new THREE.SphereGeometry(1, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2).scale(0.125, 0.12, 0.14).translate(0, 0.232, -0.01), 'walls');
+  p.add('fieldstone', new THREE.TorusGeometry(0.038, 0.01, 6, 12, Math.PI).rotateY(0).translate(0, 0.232, D / 2 - 0.004), 'walls');
   // the arched mouth with its door, a chimney and the shelf to land the peel
-  p.add('cutcap', new THREE.CylinderGeometry(0.03, 0.03, 0.012, 12, 1, false, 0, Math.PI).rotateX(Math.PI / 2).rotateZ(Math.PI).translate(0, 0.25, D / 2 - 0.02), 'openings');
+  p.add('cutcap', box(0.07, 0.05, 0.012, 0, 0.234, D / 2 - 0.012), 'openings');
   p.add('wood_dark', box(0.05, 0.035, 0.008, 0.075, 0.23, D / 2 + 0.01).rotateY(0.5), 'openings');
   p.add('fieldstone', box(0.1, 0.014, 0.05, 0, 0.222, D / 2 + 0.02), 'foundation');
   p.add('iron', new THREE.CylinderGeometry(0.014, 0.017, 0.15, 8).translate(0.03, 0.36, -0.03), 'chimney');
