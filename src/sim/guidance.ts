@@ -38,6 +38,7 @@ import { eveningGaps, restockNeeds } from './evenings';
 import { medReport } from './medical';
 import { pharmacyOpen } from './body';
 import { gatheringProblem, type GatheringKind } from './gatherings';
+import { terrainCards } from './terrainFx';
 import { gradeBucket, roadDifficulty, winterRoadLine } from './slope';
 
 const usd = (n: number) => '$' + Math.round(n).toLocaleString('en-US');
@@ -151,6 +152,8 @@ export type SuggestionAct =
   | { type: 'quarantine'; on: boolean }
   | { type: 'rx' }
   | { type: 'gather'; kind: GatheringKind }
+  /** Show the terrain overlay in this mode (the land's suggestions: sim/terrainFx.ts). */
+  | { type: 'terrain'; mode: 'high' | 'lanes' | 'water' }
   | { type: 'enroll'; course: CourseId; pid: string; mode: CourseMode; teacher?: string }
   | { type: 'drills'; perWeek: 1 | 2 | 3 };
 export interface Suggestion {
@@ -310,6 +313,8 @@ export function suggestions(s: GameState): Suggestion[] {
         why: `${top.why}${ps?.weighs?.length ? `; mostly ${ps.weighs.slice(0, 2).map(w => w[0]).join(' and ')}` : ''}. Rest, company and an evening off help more than pushing on`,
         ...(acts.length ? { acts } : {}) });
     } }
+  // the land: a ridge that suits a keep, a gorge that is a choke, a bench for a reservoir (sim/terrainFx.ts): a card to look at, never a requirement
+  for (const c of terrainCards(s)) out.push({ id: c.id, kind: '', title: c.title, urgency: c.urgency, why: c.why, acts: [{ label: 'Show me on the map', act: { type: 'terrain', mode: c.mode } }] });
   { const c = courseSuggestion(s); if (c) out.push(c); }
   { const d = drillsSuggestion(s); if (d) out.push(d); }
   return out.sort((x, y) => y.urgency - x.urgency).slice(0, 3);

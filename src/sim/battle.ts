@@ -29,6 +29,7 @@ import { isHome } from './blueprints';
 import { isFinished } from './construction';
 import { PERIMETER, fenceLive, runFinished } from './perimeter';
 import { ARMORY_LIGHTS, floodlightLit } from './lights';
+import { raidAngle } from './terrainFx';
 import { WALK_CLIMB_FACTOR, WALK_POST, deckSpots, walkLength, walkRuns } from './walkway';
 import { TURRET_JAM, highBonus, litTowerIds, isTower, mountReady, towerPosture, towerPosts, towerReach, turretsReady } from './towers';
 import { enclosure } from './enclosure';
@@ -86,6 +87,8 @@ const GRENADE_RANGE = 5;   // ≈ 30 m
 const ROCKET_RANGE = 50;
 
 export interface BattleOptions {
+  /** false: the raid always comes up the road side (the ground's lanes are ignored: sim/terrainFx.ts). */
+  terrain?: boolean;
   /** Raiders armed with guns (false: clubs, the dead). Default true. */
   armed?: boolean;
   /** Override the explosives they carry (otherwise from how long since the collapse). */
@@ -248,8 +251,9 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
   const fin = s.structures.filter(isFinished);
   const home = fin.find(st => isHome(st.kind)) ?? fin[0] ?? { x: 0, z: 0 };
   const C = { x: home.x, z: home.z };
-  // the road side: raiders come up from +z, give or take
-  const ang = Math.PI / 2 + (r() - 0.5) * 0.8;
+  // the road side: raiders come up from +z, give or take; a way in that is much easier than the road (terrain: sim/terrainFx.ts) draws them round to it
+  const lane = opts.terrain === false ? null : raidAngle(s, r);
+  const ang = lane ? lane.ang : Math.PI / 2 + (r() - 0.5) * 0.8;
   const ax = Math.cos(ang), az = Math.sin(ang);       // unit vector from the house toward the raiders
   const lx = -az, lz = ax;                            // lateral
   const at = (d: number, lat: number) => ({ x: C.x + ax * d + lx * lat, z: C.z + az * d + lz * lat });

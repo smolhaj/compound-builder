@@ -13,6 +13,7 @@
  * The escape tunnel is never a way in (perimeter.canEnter): no outcome here
  * ever reaches the family through it. Pure and seeded.
  */
+import { terrainPoints } from './terrainFx';
 import { mulberry32, pick } from './rng';
 import { diffOf } from './difficulty';
 import { adaptation, adaptedHeads, adaptLevel, ADAPT, belowExtra, cadenceFactor, findBonus, followDays, probeHeads, probes, sinceHit, torchBonus, whyBigger } from './adaptive';
@@ -320,9 +321,10 @@ export function cadence(s: GameState, p: Posture): number {
 }
 
 /** How far the crews have learned this place, 0-1 (Hardcore only; sim/adaptive.ts): time since the hit and how well it is defended. */
-export function adaptOf(s: GameState, p: Posture = postureOf(s), terrain = 0): number {
+export function adaptOf(s: GameState, p: Posture = postureOf(s), terrain?: number): number {
   const lvl = adaptLevel(s);
-  return lvl > 0 ? adaptation(lvl, sinceHit(s), { defense: defenseOf(p), foodDays: daysOfFood(s), terrain }) : 0;
+  // the ground's share of the defense (sim/terrainFx.ts) is one input to the shared strength, not a second scaling
+  return lvl > 0 ? adaptation(lvl, sinceHit(s), { defense: defenseOf(p), foodDays: daysOfFood(s), terrain: terrain ?? terrainPoints(s) }) : 0;
 }
 
 /** What the battle sim is told about a crew: how they fight and how well they have learned this place. */

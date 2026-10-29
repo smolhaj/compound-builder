@@ -40,6 +40,7 @@ import { insuranceClaim } from './paperwork';
 import { mulberry32, pick } from './rng';
 import { DIFFICULTY } from './difficulty';
 import { crackGlass } from './improvements';
+import { floodCandidates } from './terrainFx';
 import { regionFor } from './climate';
 import { roadClosedFor } from './slope';
 
@@ -203,7 +204,7 @@ function hit(s: GameState, e: WeatherEvent, r: () => number, out: string[]): voi
   } else if (e.kind === 'heat_wave') {
     out.push('The heat wave is here.');
   } else if (e.kind === 'flood') {
-    const low = fin.filter(st => LOW.includes(st.kind));
+    const low = floodCandidates(s, fin, LOW);
     if (low.length) damage(s, pick(r, low), 0.5, 'The creek came over its banks.', out);
     else out.push('The creek came over its banks, but nothing of ours was in the bottom.');
   } else if (e.kind === 'lightning_fire') {
@@ -216,7 +217,7 @@ function hit(s: GameState, e: WeatherEvent, r: () => number, out: string[]): voi
       : e.kind === 'windstorm' ? 'The windstorm hit: firs going over all down the valley, and the power is out.'
       : 'The hurricane\'s remnants are here: rain in sheets, the creek roaring, the power out.');
     if (e.kind === 'hurricane_remnants' && s.site.creek) {
-      const low = fin.filter(st => LOW.includes(st.kind));
+      const low = floodCandidates(s, fin, LOW);
       if (low.length && r() < 0.6) damage(s, pick(r, low), 0.5, 'The creek came up over the bottom.', out);
     }
     if (e.kind === 'ice_storm') cracksGlass(s, r, 0.3, 'The ice', out);
@@ -226,7 +227,7 @@ function hit(s: GameState, e: WeatherEvent, r: () => number, out: string[]): voi
     if (!cleared && struck.length && r() < 0.3 * Math.min(1.5, s.site.timber)) damage(s, pick(r, struck), 0.4, 'A tree came down across a roof.', out);
     else out.push(cleared ? 'Trees are down in the woods, but none near the buildings.' : 'Trees are down all over, none on us.');
   } else if (e.kind === 'flash_flood') {
-    const low = fin.filter(st => LOW.includes(st.kind));
+    const low = floodCandidates(s, fin, LOW);
     if (low.length && r() < 0.5) damage(s, pick(r, low), 0.5, 'The wash came down in a brown wall.', out);
     else out.push('The wash ran bank-full for an hour and cut the drive. Nothing of ours was in its way.');
   }

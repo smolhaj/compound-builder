@@ -1,0 +1,73 @@
+/**
+ * Where the sim gets the lot's ground. The world draws the land from
+ * `ParcelTerrain` (a pure function of the seed, the region and the listing's
+ * creek and timber), so the sim can build the very same ground without the
+ * renderer: the analysis (sim/terrain.ts) and every effect that reads it
+ * (sim/terrainFx.ts) work headless, in tests and in the bot playtest.
+ * Cached per place. Pure (no three.js).
+ */
+import { ParcelTerrain } from '../game/parcel/parcelTerrain';
+import { analyzeTerrain, approachLanes, siteCandidates, type GroundSource, type Lane, type SiteCandidate, type Terrain } from './terrain';
+import type { GameState } from './state';
+import type { Pt } from './perimeter';
+
+let override: GroundSource | null = null;
+/** Tests (and the world, if it ever needs to) can pin the ground. */
+export const setGroundOverride = (g: GroundSource | null): void => { override = g; terrains.clear(); lanes.clear(); sources.clear(); sites.clear(); };
+
+const sources = new Map<string, GroundSource>();
+const terrains = new Map<string, Terrain>();
+const lanes = new Map<string, Lane[]>();
+
+const keyOf = (s: GameState) => `${s.seed}|${s.site.region}|${s.site.creek ? 1 : 0}|${s.site.timber}|${JSON.stringify(s.site.lot ?? null)}|${s.site.home.x0},${s.site.home.z0},${s.site.home.x1},${s.site.home.z1}`;
+
+/** The ground of this game's lot (null: none known). */
+export function groundOf(s: GameState): GroundSource | null {
+  if (override) return override;
+  const k = keyOf(s);
+  let g = sources.get(k);
+  if (!g) {
+    const pt = new ParcelTerrain(s.seed, { creek: s.site.creek, timber: s.site.timber, region: s.site.region, lot: s.site.lot ?? null, home: s.site.home });
+    g = { h: (x, z) => pt.natural(x, z).h, creek: pt.creek };
+    sources.set(k, g);
+  }
+  return g;
+}
+
+/** The whole lot analysed (heights, slope, high ground, sight, lanes' cost, water). Built once per place; ~0.5 s. */
+export function terrainOf(s: GameState): Terrain | null {
+  const g = groundOf(s);
+  if (!g) return null;
+  const k = keyOf(s) + (override ? '|o' : '');
+  let t = terrains.get(k);
+  if (!t) { t = analyzeTerrain(g, s.site.home, { step: 1 }); terrains.set(k, t); }
+  return t;
+}
+
+/** The middle of the family's buildings (else of the home block). */
+export function campOf(s: GameState): Pt {
+  const h = s.site.home;
+  const live = s.structures.filter(st => !st.unplaced && !st.kind.startsWith('bunker_') && st.x >= h.x0 && st.x <= h.x1 && st.z >= h.z0 && st.z <= h.z1);
+  return live.length ? [live.reduce((a, st) => a + st.x, 0) / live.length, live.reduce((a, st) => a + st.z, 0) / live.length] : [(h.x0 + h.x1) / 2, (h.z0 + h.z1) / 2];
+}
+
+/** The ways a crew could come at the camp, cached by place and camp (rounded to 4 units). */
+export function lanesOf(s: GameState): Lane[] {
+  const t = terrainOf(s);
+  if (!t) return [];
+  const c = campOf(s), k = `${keyOf(s)}|${override ? 'o' : ''}|${Math.round(c[0] / 4)}|${Math.round(c[1] / 4)}`;
+  let l = lanes.get(k);
+  if (!l) { l = approachLanes(t, c); lanes.set(k, l); }
+  return l;
+}
+
+const sites = new Map<string, SiteCandidate[]>();
+/** What the land suits, best first (cached by place and camp). */
+export function sitesOf(s: GameState): SiteCandidate[] {
+  const t = terrainOf(s);
+  if (!t) return [];
+  const c = campOf(s), k = `${keyOf(s)}|${override ? 'o' : ''}|${Math.round(c[0] / 4)}|${Math.round(c[1] / 4)}`;
+  let l = sites.get(k);
+  if (!l) { l = siteCandidates(t, { lot: s.site.home, camp: c }, lanesOf(s)); sites.set(k, l); }
+  return l;
+}

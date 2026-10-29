@@ -37,6 +37,9 @@ export interface WorldState {
   buildingView: BuildingView;
   /** Sightline overlay: off / exposure from the road / from the ridge / night lights / viewshed from a point. */
   sightMode: 'off' | 'road' | 'ridge' | 'night' | 'viewshed';
+  /** The terrain overlay (high ground, lanes, water, sun): game/terrain/TerrainOverlay.ts. */
+  terrainMode: 'off' | 'high' | 'lanes' | 'water' | 'sun';
+  setTerrainMode: (m: WorldState['terrainMode']) => void;
   /** The property line drawn on the ground (also shown while a fence or wall is being drawn). */
   showBoundary: boolean;
   setShowBoundary: (on: boolean) => void;
@@ -94,6 +97,7 @@ export const useWorldStore = create<WorldState>()(subscribeWithSelector((set) =>
   cameraMode: 'diorama',
   buildingView: 'full',
   sightMode: 'off',
+  terrainMode: 'off',
   showBoundary: false,
   siteGeo: null,
   setSiteGeo: (siteGeo) => set({ siteGeo }),
@@ -106,6 +110,7 @@ export const useWorldStore = create<WorldState>()(subscribeWithSelector((set) =>
   markNearestTrees: null,
   setMarkNearestTrees: (markNearestTrees) => set({ markNearestTrees }),
   setSightMode: (sightMode) => set({ sightMode }),
+  setTerrainMode: (terrainMode) => set({ terrainMode }),
   setShowBoundary: (showBoundary) => set({ showBoundary }),
   setBuildingView: (buildingView) => set({ buildingView }),
   tourCaption: null,
