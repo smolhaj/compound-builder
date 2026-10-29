@@ -45,6 +45,8 @@ export const T = {
   DRAW: 70,
   /** A cold-air pocket: this far below the ground round it (≈ 1.8 m) on near-level ground. */
   FROST_DROP: 0.3,
+  /** A lane is choked where the cheap going across it is this many units wide or less (48 m: a crew cannot spread; the coarse lane grid resolves features of about 4 units and up). */
+  CHOKE: 8,
 } as const;
 
 export interface Terrain {
@@ -81,8 +83,12 @@ export interface Terrain {
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 
-export function analyzeTerrain(src: GroundSource, rect: Rect, opts: { step?: number; pad?: number } = {}): Terrain {
-  const step = opts.step ?? 1, pad = opts.pad ?? 10;
+/**
+ * `lite`: only what the raid lanes read (heights, slope, foot-approach cost, the creek): no sight, high ground, water, frost, wind or sun.
+ * About a quarter of the work at step 2; the full pass is for the overlay and the siting cards.
+ */
+export function analyzeTerrain(src: GroundSource, rect: Rect, opts: { step?: number; pad?: number; lite?: boolean } = {}): Terrain {
+  const step = opts.step ?? 1, pad = opts.pad ?? 10, lite = !!opts.lite;
   const x0 = rect.x0 - pad, z0 = rect.z0 - pad;
   const nx = Math.ceil((rect.x1 - rect.x0 + 2 * pad) / step) + 1, nz = Math.ceil((rect.z1 - rect.z0 + 2 * pad) / step) + 1;
   const grid: TerrainGrid = { x0, z0, nx, nz, step };
@@ -104,6 +110,7 @@ export function analyzeTerrain(src: GroundSource, rect: Rect, opts: { step?: num
     const gx = (H(i + 1, j) - H(i - 1, j)) / (2 * step), gz = (H(i, j + 1) - H(i, j - 1)) / (2 * step), m = Math.hypot(gx, gz);
     slope[k] = m;
     if (m > 1e-6) { fall[k * 2] = -gx / m; fall[k * 2 + 1] = -gz / m; }
+    if (lite) continue;
     // high ground: this cell against the mean of an 8-point ring (the same test the towers use, sim/towers.highGroundAt)
     let ring = 0;
     for (let q = 0; q < 8; q++) ring += hAt(x0 + i * step + Math.cos(q * Math.PI / 4) * T.RING * step, z0 + j * step + Math.sin(q * Math.PI / 4) * T.RING * step);
@@ -114,7 +121,7 @@ export function analyzeTerrain(src: GroundSource, rect: Rect, opts: { step?: num
   }
   // visibility: march 16 rays out; a ray ends where the ground rises above the line from the eye (1.8 m = 0.3 u above the cell)
   const RAYS = 16;
-  for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+  if (!lite) for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
     const k = j * nx + i, eye = h[k] + 0.3;
     let total = 0;
     for (let q = 0; q < RAYS; q++) {
@@ -142,6 +149,7 @@ export function analyzeTerrain(src: GroundSource, rect: Rect, opts: { step?: num
 
   // flow accumulation (D8, from the highest cell down)
   const flow = new Float32Array(N).fill(1);
+  if (lite) return { grid, h, slope, fall, high, sight, cost, flow, wet: new Uint8Array(N), frost: new Uint8Array(N), wind, sun, creek, idx, hAt, inCreek };
   const order = Array.from({ length: N }, (_, k) => k).sort((a, b) => h[b] - h[a]);
   for (const k of order) {
     const i = k % nx, j = (k - i) / nx;
@@ -202,12 +210,32 @@ export interface Lane {
   fords: boolean;
   /** Does it have to go up a cliff (a stretch at cliff slope)? */
   cliff: boolean;
+  /** It goes over a tunnel-bridge or slope tunnel (the corridor's id): the crew comes to its outer door. */
+  via?: string;
 }
 
 export interface Choke { at: Pt; /** Width of cheap going across the lane there, units. */ width: number; /** Cost per unit along the path there. */ hardness: number }
 
-/** Cost-to-target for every cell (Dijkstra from `target`, 8-connected). */
-export function costToTarget(t: Terrain, target: Pt): Float64Array {
+/** A way across hard ground that a crew can use as easy going: a finished tunnel-bridge or slope tunnel (`outer` is the end away from the camp). */
+export interface Corridor { id: string; pts: Pt[]; outer: Pt }
+
+/** The cost array with each corridor made easy (cost 1 within one cell of its line). */
+function withCorridors(t: Terrain, corridors: readonly Corridor[]): Float32Array {
+  if (!corridors.length) return t.cost;
+  const cost = Float32Array.from(t.cost);
+  for (const c of corridors) for (let i = 1; i < c.pts.length; i++) {
+    const [ax, az] = c.pts[i - 1], [bx, bz] = c.pts[i], n = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az) / 0.5));
+    for (let k = 0; k <= n; k++) for (const [ox, oz] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const q = t.idx(ax + (bx - ax) * k / n + ox, az + (bz - az) * k / n + oz);
+      cost[q] = Math.min(cost[q], 1);
+    }
+  }
+  return cost;
+}
+
+/** Cost-to-target for every cell (Dijkstra from `target`, 8-connected). `corridors`: ways a crew can use as easy going over hard ground. */
+export function costToTarget(t: Terrain, target: Pt, corridors: readonly Corridor[] = []): Float64Array {
+  const cost = withCorridors(t, corridors);
   const { nx, nz } = t.grid, N = nx * nz, dist = new Float64Array(N).fill(Infinity);
   const start = t.idx(target[0], target[1]);
   dist[start] = 0;
@@ -223,7 +251,7 @@ export function costToTarget(t: Terrain, target: Pt): Float64Array {
       if (!di && !dj) continue;
       const ii = i + di, jj = j + dj;
       if (ii < 0 || jj < 0 || ii >= nx || jj >= nz) continue;
-      const q = jj * nx + ii, nd = d + (t.cost[k] + t.cost[q]) / 2 * Math.hypot(di, dj) * t.grid.step;
+      const q = jj * nx + ii, nd = d + (cost[k] + cost[q]) / 2 * Math.hypot(di, dj) * t.grid.step;
       if (nd < dist[q]) { dist[q] = nd; push([nd, q]); }
     }
   }
@@ -236,9 +264,9 @@ export function costToTarget(t: Terrain, target: Pt): Float64Array {
  * it is and where it narrows. `edgeR`: how far out (units) from the target
  * the crew starts (default: the grid edge).
  */
-export function approachLanes(t: Terrain, target: Pt, edgeR?: number): Lane[] {
+export function approachLanes(t: Terrain, target: Pt, edgeR?: number, corridors: readonly Corridor[] = []): Lane[] {
   const { nx, nz, x0, z0, step } = t.grid;
-  const dist = costToTarget(t, target);
+  const dist = costToTarget(t, target, corridors);
   const R = edgeR ?? Math.min(nx, nz) * step / 2 - 2;
   const out: Lane[] = [];
   for (let s = 0; s < 8; s++) {
@@ -274,7 +302,9 @@ export function approachLanes(t: Terrain, target: Pt, edgeR?: number): Lane[] {
       k = nk;
     }
     const a0 = path[0], d = Math.hypot(a0[0] - target[0], a0[1] - target[1]) || 1;
-    out.push({ ang: Math.atan2(a0[1] - target[1], a0[0] - target[0]), cost: bd, dist: d, hardness: bd / d, path, choke: chokeOf(t, path), fords, cliff });
+    // a lane that runs over a corridor comes to its outer door: that is the choke (one door wide)
+    const via = corridors.find(c => path.some(p => c.pts.some(q => Math.hypot(p[0] - q[0], p[1] - q[1]) <= 1.2)));
+    out.push({ ang: Math.atan2(a0[1] - target[1], a0[0] - target[0]), cost: bd, dist: d, hardness: bd / d, path, choke: via ? { at: via.outer, width: 1, hardness: 1 } : chokeOf(t, path), fords: via ? false : fords, cliff: via ? false : cliff, ...(via ? { via: via.id } : {}) });
   }
   return out;
 }
@@ -292,7 +322,7 @@ export function chokeOf(t: Terrain, path: readonly Pt[]): Choke | null {
       if (t.cost[k] > Math.max(3, 2 * here)) break;
       w++;
     }
-    if (w <= 3 && (!best || w < best.width)) best = { at: [path[n][0], path[n][1]], width: w, hardness: here };
+    if (w <= T.CHOKE && (!best || w < best.width)) best = { at: [path[n][0], path[n][1]], width: w, hardness: here };
   }
   return best;
 }
@@ -436,7 +466,7 @@ export function siteCandidates(t: Terrain, ctx: SiteContext, lanes?: readonly La
   }
   if (lanes) {
     const lane = bestLane(lanes);
-    if (lane?.choke && lane.choke.width <= 3 && inLot(lot, lane.choke.at[0], lane.choke.at[1])) out.push({ kind: 'choke', x: lane.choke.at[0], z: lane.choke.at[1], score: clamp(0.5 + (3 - lane.choke.width) * 0.15, 0, 1), reason: `The easiest way in narrows to ${Math.round(lane.choke.width * 6)} m here: wall and watch this and a crew has little room to spread.` });
+    if (lane?.choke && lane.choke.width <= T.CHOKE && inLot(lot, lane.choke.at[0], lane.choke.at[1])) out.push({ kind: 'choke', x: lane.choke.at[0], z: lane.choke.at[1], score: clamp(0.5 + (T.CHOKE - lane.choke.width) * 0.08, 0, 1), reason: `The easiest way in narrows to ${Math.round(lane.choke.width * 6)} m here: wall and watch this and a crew has little room to spread.` });
   }
   return out.sort((a, b) => b.score - a.score);
 }
@@ -462,3 +492,46 @@ export function riseAboveCreek(src: GroundSource, x: number, z: number): number 
 
 /** 2 floodplain, 0 not. (The grid's draws and wet flats are `wetAt`; this is the creek's floodplain only.) */
 export const floodplainAt = (src: GroundSource, x: number, z: number): boolean => { const r = riseAboveCreek(src, x, z); return r !== null && r < T.FLOOD_RISE; };
+
+// ── spans and slope tunnels: where the ground allows them ──
+
+export const SPAN = {
+  /** Shortest and longest tunnel-bridge (units): 18 m to 204 m. */
+  MIN_LEN: 3, MAX_LEN: 34,
+  /** The ground must fall this far below the deck somewhere under it (units = 3 m). */
+  MIN_SAG: 0.5,
+  /** A slope tunnel needs a hillside at least this steep on average. */
+  MIN_SLOPE: 0.2,
+} as const;
+
+/** Why a tunnel-bridge can't be laid from `a` to `b` on this ground (null = it can): a real dip under it, and a length a span can bear. */
+export function spanProblem(src: GroundSource, a: Pt, b: Pt): string | null {
+  const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  if (len < SPAN.MIN_LEN) return 'too short: a tunnel-bridge spans a gap of at least 18 m (use a covered walkway between yards)';
+  if (len > SPAN.MAX_LEN) return `too long: ${Math.round(len * 6)} m is more than a span can bear (200 m at the most)`;
+  const ha = src.h(a[0], a[1]), hb = src.h(b[0], b[1]);
+  let sag = 0;
+  for (let i = 1; i < 24; i++) { const f = i / 24; sag = Math.max(sag, (ha + (hb - ha) * f) - src.h(a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f)); }
+  if (sag < SPAN.MIN_SAG) return `nothing to span: the ground between is only ${Math.round(sag * 6)} m below the deck. A tunnel-bridge crosses a gorge, ravine or creek bed at least 3 m deep; on a hillside lay a slope tunnel`;
+  return null;
+}
+
+/** Why a slope tunnel can't follow this line (null = it can): it needs a hillside. */
+export function slopeTunnelProblem(src: GroundSource, pts: readonly Pt[]): string | null {
+  let len = 0, rise = 0;
+  for (let i = 1; i < pts.length; i++) { len += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); rise += Math.abs(src.h(pts[i][0], pts[i][1]) - src.h(pts[i - 1][0], pts[i - 1][1])); }
+  if (len < SPAN.MIN_LEN) return 'too short for a tunnel';
+  if (rise / len < SPAN.MIN_SLOPE) return `no hillside here: the ground falls only ${Math.round(rise / len * 100)} % along this line (a slope tunnel needs 20 % or more)`;
+  return null;
+}
+
+/** Does the lot have a hillside steep enough for a slope tunnel (a stretch of ground at 25 % or more)? */
+export function hasHillside(t: Terrain, lot: Rect): boolean {
+  let n = 0;
+  const { nx, nz, x0, z0, step } = t.grid;
+  for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+    const x = x0 + i * step, z = z0 + j * step;
+    if (x >= lot.x0 && x <= lot.x1 && z >= lot.z0 && z <= lot.z1 && t.slope[j * nx + i] >= 0.25) n++;
+  }
+  return n >= 25;
+}

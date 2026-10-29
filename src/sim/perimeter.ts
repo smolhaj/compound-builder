@@ -17,7 +17,7 @@ import type { GameState } from './state';
 import { openDoorways } from './compounds';
 import { COUNTY, PERMIT_FEE, countyWorks } from './paperwork';
 
-export type PerimeterKind = 'split_rail' | 'barbed_wire' | 'woven_wire' | 'thorn_hedge' | 'log_palisade' | 'container_wall' | 'earth_berm' | 'ditch' | 'creek_bars' | 'chain_link' | 'wrought_iron' | 'iron_barbed' | 'steel_wall' | 'electric_steel' | 'water_pipe' | 'power_cable' | 'escape_tunnel' | 'covered_walkway' | 'underground_passage' | 'concrete_wall' | 'wall_walk';
+export type PerimeterKind = 'split_rail' | 'barbed_wire' | 'woven_wire' | 'thorn_hedge' | 'log_palisade' | 'container_wall' | 'earth_berm' | 'ditch' | 'creek_bars' | 'chain_link' | 'wrought_iron' | 'iron_barbed' | 'steel_wall' | 'electric_steel' | 'water_pipe' | 'power_cable' | 'escape_tunnel' | 'covered_walkway' | 'underground_passage' | 'concrete_wall' | 'wall_walk' | 'stone_wall' | 'container_stack' | 'tunnel_bridge' | 'slope_tunnel';
 
 export interface PerimeterDef {
   id: PerimeterKind;
@@ -52,6 +52,10 @@ export interface PerimeterDef {
   walkway?: boolean;
   /** A patrol walkway on top of a finished wall (sim/walkway.ts): not a wall itself, it rides on the run named by `hostId`. */
   wallTop?: boolean;
+  /** A spanning tube: it crosses a gorge, ravine or creek bed on trusses (needs real low ground under it: sim/terrainFx.routeProblem). */
+  span?: boolean;
+  /** Vehicles drive through it (the doors at each end open to the fleet). */
+  vehicleWay?: boolean;
   /** Footing poured deep enough that a tunnel can't go under it (concrete and steel tiers); cheaper fences need a buried skirt. */
   deepFooting?: boolean;
 }
@@ -77,10 +81,14 @@ export const PERIMETER: Record<PerimeterKind, PerimeterDef> = {
   covered_walkway: { id: 'covered_walkway', name: 'Covered walkway (steel)', blurb: 'An enclosed steel walkway on trusses between two walled yards: 2 m wide, 2.6 m high, glass and mesh sides, a roof, handrails and pendant lights. The family goes house to house under cover. It is a wall in its own right (steel and mesh); the lights need power, and without it the walk is dark at night.', hours: 18, materials: { rebar: 0.7, hardware: 0.25, roofing: 0.3, cable: 0.1 }, height: 0.43, blocks: { people: 0.8, animals: 1, vehicles: 0.4 }, sight: 0.15, growYears: 0, walkway: true },
   underground_passage: { id: 'underground_passage', name: 'Underground passage', blurb: 'A buried concrete passage between two yards (or from a yard to a hatch out in the woods). Nothing shows from outside. Both ways: so each end has a lockable blast hatch, and a hatch that comes up outside a wall is a way in if raiders ever find it. Can be dug under, and it floods.', hours: 28, materials: { culvert: 0.8, excavator: 0.25 }, height: 0, blocks: { people: 0, animals: 0, vehicles: 0 }, sight: 0, growYears: 0, twoWay: true, hidden: true },
   wall_walk: { id: 'wall_walk', name: 'Wall-top walkway', blurb: 'A steel patrol deck along the top of a container, steel or concrete wall: 1.2 m wide with a handrail and a kick plate, steps up at each corner and gate. Guards walk it and see over the whole line; a post on it fights like a tower post. Added in place on a finished wall; it stays on through a wall upgrade.', hours: 8, materials: { rebar: 0.5, roofing: 0.4, hardware: 0.2 }, height: 0, blocks: { people: 0, animals: 0, vehicles: 0 }, sight: 0, growYears: 0, wallTop: true },
+  stone_wall: { id: 'stone_wall', name: 'Stone-and-timber wall', blurb: 'A 3.3 m wall of fieldstone laid in mortar, tapering up from a wide footing, with a timber coping and a post at every joint: the castle wall of the old stockades. Hard to climb or breach with hand tools, stops a truck, and costs stone and time instead of containers. A patrol walkway can ride on it.', hours: 38, materials: { fieldstone: 4, lumber: 0.3, concrete: 1 }, height: 0.55, blocks: { people: 0.94, animals: 1, vehicles: 0.95 }, sight: 0.9, growYears: 0, deepFooting: true },
+  container_stack: { id: 'container_stack', name: 'Stacked containers', blurb: 'Containers two high, end to end: a 5 m wall that no ladder from the yard reaches, and each box is still storage. It takes twice the boxes of a single row and a crane that can lift to the second tier. Take the colors you like; black reads as one dark wall.', hours: 6, materials: { container: 1 }, height: 0.86, blocks: { people: 0.95, animals: 1, vehicles: 1 }, sight: 1, growYears: 0 },
+  tunnel_bridge: { id: 'tunnel_bridge', name: 'Tunnel-bridge (enclosed steel)', blurb: 'A rust-red steel tube on trusses across a gorge, ravine or creek bed, joining the outer road or motor court to the compound, with a steel door at each end. Vehicles drive through; on foot or by truck it is the one way over the gap. A crew has to come by it (door by door) or ford and climb the gorge, and you can drop it. Needs real low ground to span: 3 m or more under the deck, no longer than 200 m. The county wants a permit.', hours: 30, materials: { rebar: 2.4, roofing: 4, hardware: 0.6, concrete: 1.2, cable: 0.1 }, height: 0.55, blocks: { people: 0.9, animals: 1, vehicles: 0.9 }, sight: 0.9, growYears: 0, walkway: true, span: true, vehicleWay: true },
+  slope_tunnel: { id: 'slope_tunnel', name: 'Slope tunnel (enclosed steel)', blurb: 'The same rust-red tube laid down a hillside, following the ground, with a steel door at each end: the secured way from the compound down to a lower yard or road on a slope of 20 % or more. Vehicles drive through.', hours: 22, materials: { rebar: 1.4, roofing: 2.6, hardware: 0.4, concrete: 0.8 }, height: 0.5, blocks: { people: 0.9, animals: 1, vehicles: 0.85 }, sight: 0.85, growYears: 0, walkway: true, vehicleWay: true },
   ditch: { id: 'ditch', name: 'Ditch / dry moat', blurb: 'A 2 m deep, 3 m wide ditch. No vehicle crosses; the spoil can build a berm.', hours: 40, materials: {}, height: -0.33, blocks: { people: 0.45, animals: 0.3, vehicles: 1 }, sight: 0, growYears: 0 },
 };
 
-export const PERIMETER_ORDER: readonly PerimeterKind[] = ['split_rail', 'barbed_wire', 'woven_wire', 'thorn_hedge', 'log_palisade', 'container_wall', 'earth_berm', 'ditch', 'creek_bars', 'chain_link', 'wrought_iron', 'iron_barbed', 'steel_wall', 'electric_steel', 'concrete_wall', 'covered_walkway'];
+export const PERIMETER_ORDER: readonly PerimeterKind[] = ['split_rail', 'barbed_wire', 'woven_wire', 'thorn_hedge', 'log_palisade', 'container_wall', 'earth_berm', 'ditch', 'creek_bars', 'chain_link', 'wrought_iron', 'iron_barbed', 'steel_wall', 'electric_steel', 'concrete_wall', 'covered_walkway', 'stone_wall', 'container_stack', 'tunnel_bridge', 'slope_tunnel'];
 /** Lines that carry utilities (drawn with the same tool, under Water & power). */
 export const UTILITY_LINES: readonly PerimeterKind[] = ['water_pipe', 'power_cable'];
 
@@ -94,9 +102,19 @@ export interface Gate {
   garage?: boolean;
 }
 
+/** How a container wall looks (cosmetic: the same wall, price and strength). `mixed` is the old four-color cycle. */
+export type ContainerLook = 'black' | 'rust' | 'red' | 'blue' | 'green' | 'tan' | 'mixed';
+export const CONTAINER_LOOKS: ReadonlyArray<{ id: ContainerLook; name: string }> = [
+  { id: 'black', name: 'Black' }, { id: 'rust', name: 'Rust' }, { id: 'red', name: 'Red' }, { id: 'blue', name: 'Blue' }, { id: 'green', name: 'Green' }, { id: 'tan', name: 'Tan' }, { id: 'mixed', name: 'Mixed' },
+];
+export const CONTAINER_KINDS: readonly PerimeterKind[] = ['container_wall', 'container_stack'];
+export const isContainerKind = (k: PerimeterKind): boolean => CONTAINER_KINDS.includes(k);
+
 export interface PerimeterRun {
   id: string;
   kind: PerimeterKind;
+  /** A container wall's paint (optional: older runs are `mixed`). */
+  look?: ContainerLook;
   pts: Pt[];
   gates: Gate[];
   /** Person-hours done of `hours`. */
@@ -118,6 +136,8 @@ export interface PerimeterRun {
   replaces?: string;
   /** The kind being replaced (an upgrade is drawn beside it: a container wall is wide, so the new wall stands further off). */
   replacesKind?: PerimeterKind;
+  /** A tunnel-bridge that was dropped (collapsed on purpose or by a blast): it is a plan again until rebuilt. */
+  dropped?: boolean;
   /** A wall-top walkway: the wall run it stands on (follows the wall through an upgrade; sim/walkway.ts). */
   hostId?: string;
 }
@@ -130,7 +150,7 @@ export interface PerimeterRun {
  */
 export const PREDATOR_BLOCK: Record<PerimeterKind, number> = {
   split_rail: 0.02, barbed_wire: 0.1, woven_wire: 0.35, thorn_hedge: 0.75, log_palisade: 0.97, container_wall: 1, earth_berm: 0.2, ditch: 0.2,
-  creek_bars: 0.95, chain_link: 0.9, wrought_iron: 0.97, iron_barbed: 0.98, steel_wall: 1, electric_steel: 1, water_pipe: 0, power_cable: 0, escape_tunnel: 0, covered_walkway: 1, underground_passage: 0, concrete_wall: 1, wall_walk: 0,
+  creek_bars: 0.95, chain_link: 0.9, wrought_iron: 0.97, iron_barbed: 0.98, steel_wall: 1, electric_steel: 1, water_pipe: 0, power_cable: 0, escape_tunnel: 0, covered_walkway: 1, underground_passage: 0, concrete_wall: 1, wall_walk: 0, stone_wall: 1, container_stack: 1, tunnel_bridge: 1, slope_tunnel: 1,
 };
 
 /** The next tier up, where there is one (upgraded in place: sim `upgradeRun`). */
@@ -139,6 +159,8 @@ export const UPGRADE_NEXT: Partial<Record<PerimeterKind, PerimeterKind>> = {
   wrought_iron: 'iron_barbed', iron_barbed: 'steel_wall', steel_wall: 'electric_steel', electric_steel: 'concrete_wall',
   // shipping containers join the chain: the containers go (their steel is worth something) and a steel wall takes their place
   container_wall: 'steel_wall',
+  // the log palisade's next step is a stone wall (the stockade becomes a castle wall)
+  log_palisade: 'stone_wall',
 };
 /**
  * What a wall stands on so it is closed to the ground (no gap to crawl or
@@ -152,7 +174,7 @@ export function footingOf(kind: PerimeterKind): Footing | null {
   const d = PERIMETER[kind];
   if (d.walkway || d.twoWay || d.egressOnly || d.height <= 0 || d.blocks.people <= 0) return null;
   switch (kind) {
-    case 'container_wall': case 'concrete_wall': return 'plinth';
+    case 'container_wall': case 'container_stack': case 'concrete_wall': case 'stone_wall': return 'plinth';
     case 'log_palisade': return 'trench';
     case 'thorn_hedge': case 'earth_berm': case 'creek_bars': return null;
     case 'split_rail': case 'barbed_wire': return 'mound';
@@ -188,6 +210,8 @@ export function runBill(kind: PerimeterKind, len: number): Partial<Stock> {
   for (const [k, v] of Object.entries(PERIMETER[kind].materials) as Array<[MaterialId, number]>) out[k] = Math.max(1, Math.ceil(v * len - 1e-9));
   // the passage: a lockable blast hatch at each end
   if (kind === 'underground_passage') Object.assign(out, { passage_hatch: 2, concrete: 3 });
+  // the steel door at each end of a tunnel-bridge or slope tunnel
+  if (kind === 'tunnel_bridge' || kind === 'slope_tunnel') out.blast_door = 2;
   // the tunnel's two locks: a blast door at the bunker end, the egress hatch at the far end
   if (kind === 'escape_tunnel') Object.assign(out, { blast_door: 1, egress_hatch: 1, concrete: 4 });
   return out;

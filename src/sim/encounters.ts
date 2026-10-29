@@ -13,6 +13,7 @@
  * The escape tunnel is never a way in (perimeter.canEnter): no outcome here
  * ever reaches the family through it. Pure and seeded.
  */
+import { ringPoints } from './rings';
 import { terrainPoints } from './terrainFx';
 import { mulberry32, pick } from './rng';
 import { diffOf } from './difficulty';
@@ -324,7 +325,7 @@ export function cadence(s: GameState, p: Posture): number {
 export function adaptOf(s: GameState, p: Posture = postureOf(s), terrain?: number): number {
   const lvl = adaptLevel(s);
   // the ground's share of the defense (sim/terrainFx.ts) is one input to the shared strength, not a second scaling
-  return lvl > 0 ? adaptation(lvl, sinceHit(s), { defense: defenseOf(p), foodDays: daysOfFood(s), terrain: terrain ?? terrainPoints(s) }) : 0;
+  return lvl > 0 ? adaptation(lvl, sinceHit(s), { defense: defenseOf(p), foodDays: daysOfFood(s), terrain: terrain ?? terrainPoints(s) + ringPoints(s) }) : 0;
 }
 
 /** What the battle sim is told about a crew: how they fight and how well they have learned this place. */
