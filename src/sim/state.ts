@@ -42,7 +42,7 @@ import type { Learning } from './skills';
 import type { MindState } from './mind';
 import type { Medical } from './medical';
 import { starterKit, type ToolKit } from './tools';
-export const SAVE_VERSION = 66;
+export const SAVE_VERSION = 67;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';

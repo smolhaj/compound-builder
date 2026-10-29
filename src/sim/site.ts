@@ -9,6 +9,7 @@
  * cheap land leaves more to build and stock with. Pure.
  */
 import { mulberry32 } from './rng';
+import type { LotSpec } from './lots';
 import { REGION_IDS, REGIONS, SIZE_FACTOR, type RegionId } from './regions';
 import { driveQuote, HOUSE_NAME, improvementValue, powerQuote, type Condition, type HouseKind, type Improvements } from './improvements';
 
@@ -51,6 +52,8 @@ export interface Site {
   miles: number;
   /** What's on it: a house, barn, well, septic, power, a drive (raw land: nothing). */
   improvements: Improvements;
+  /** The shape of the ground (sim/lots.ts): a ridge, a gorge, a bench ...; null / absent on the classic ground. */
+  lot?: LotSpec | null;
   price: number;
 }
 
