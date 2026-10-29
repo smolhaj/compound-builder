@@ -28,7 +28,7 @@ const at = (s: GameState, d: number, h: number): GameState => {
 
 describe('weekender start money', () => {
   it('has a bigger nest egg than before, inside the new range', () => {
-    expect(FUNDS_RANGE.weekend[0]).toBeGreaterThanOrEqual(330_000);
+    expect(FUNDS_RANGE.weekend[0]).toBeGreaterThanOrEqual(400_000);
     for (const seed of [3, 11, 19, 27, 35]) {
       const f = startFunds(generateFamily(seed), 'weekend', seed);
       expect(f.budget).toBeGreaterThanOrEqual(FUNDS_RANGE.weekend[0]);
