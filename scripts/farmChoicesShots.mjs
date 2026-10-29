@@ -52,15 +52,14 @@ try {
     g.clock.t = C.sowWindow(g)[1] + 28 - g.clock.startDoy + 0.3; if (g.clock.t < 0) g.clock.t += 365;
     g.clock.ticks = Math.round(g.clock.t / (0.25 / 24));
     G.setState({ game: g });
-    G.getState().advance(0.011);
+    G.getState().advance(1.2);
   });
+  await frames(2);
   await page.waitForTimeout(400);
   await page.screenshot({ path: `${out}/03-fields-weedy.png` });
   // the Shop: hybrid and heirloom seed
-  await page.evaluate(() => window.__cb.store.getState().openShop(true));
+  await page.evaluate(() => window.__cb.game.getState().openShop(true, 'food'));
   await page.waitForTimeout(400);
-  const food = page.getByRole('button', { name: /Food/ }).first();
-  await food.click();
   await page.waitForTimeout(400);
   await page.screenshot({ path: `${out}/04-shop-seed-cards.png` });
   console.error('done');

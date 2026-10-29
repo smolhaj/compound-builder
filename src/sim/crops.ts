@@ -443,7 +443,7 @@ export function seedWarning(s: GameState): { text: string; tone: 'warn' | 'bad';
   const need = fields.filter(f => { const p = P[f.id]; return p?.pin !== 'rest' && !(p?.sown && p.sown.y === y); }).length, have = seedTotal(s);
   if (need <= 0 || have >= need - 1e-6) return null;
   const left = w1 + 28 - doy;
-  return { text: `${need} field${need === 1 ? '' : 's'} to sow and ${have >= 10 ? Math.round(have) : have.toFixed(1)} unit${have === 1 ? '' : 's'} of seed on hand: buy field seed in the Shop, trade for it or find some${left >= 0 ? ` in the next ${left} days` : ''}, or the rest come up in weeds at about 40 % of a crop.`, tone: doy > w1 ? 'bad' : 'warn', fields: need - Math.floor(have) };
+  return { text: `${need} field${need === 1 ? '' : 's'} to sow and ${have >= 10 ? Math.round(have) : have.toFixed(1)} unit${have === 1 ? '' : 's'} of seed on hand: buy field seed in the Shop, trade for it or find some${left > 1 ? ` in the next ${left} days` : left >= 0 ? ' today' : ''}, or the rest come up in weeds at about 40 % of a crop.`, tone: doy > w1 ? 'bad' : 'warn', fields: need - Math.floor(have) };
 }
 
 /** Spreading and sowing in numbers for the Farm tab: the average field's fertility, the worst, and whether the rotation is clean. */
