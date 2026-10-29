@@ -31,6 +31,8 @@ export interface LivedHost {
   landing: (game: GameState) => LivedCtx['landing'];
   look: () => { season: Season; snow: boolean; mud: boolean; quality: Quality };
   aprons: (list: readonly Apron[], key: string) => void;
+  /** The props changed: redraw the shadows. */
+  changed: () => void;
   /** The bare earth at the foot of each building. */
   skirts: (list: ReadonlyArray<{ id: string; x0: number; z0: number; x1: number; z1: number; alpha: number }>, key: string) => void;
 }
@@ -93,6 +95,7 @@ export class LivedLayer {
       blocked: this._h.blocked, pathDist: this._h.pathDist, doors: this._h.doors(),
     };
     this._plan = planLived(ctx);
+    this._h.changed();
     this.renderer.update(this._plan, { ground: this._h.groundAt, floor: this._h.floorAt, season: look.season, quality: look.quality, key: this._plan.key + look.season });
     const skirts = buildings.flatMap(b => {
       const k = SKIRT[roleOf(b.kind)];

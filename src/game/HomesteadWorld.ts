@@ -257,6 +257,7 @@ export class HomesteadWorld {
       gate: () => this._livedGate(), landing: g => { const c = this._pathExtras(g).creek; return c ? { x: c.x, z: c.z, face: this.parcel.creek.zAt(c.x) > c.z ? 0 : Math.PI } : null; },
       look: () => ({ season: seasonState.visual, snow: seasonState.params.snow > 0.25, mud: this.atmos.mud > 0.4, quality: this._quality ?? 'high' }),
       aprons: (list, key) => this.paths.renderer.setAprons([...list, ...this._driveApron()], this.groundAt, key + '|' + this._drive),
+      changed: () => this._ws.invalidateShadows(),
       skirts: (list, key) => this.paths.renderer.setSkirts(list, this.groundAt, this._pathLook(), key),
     });
     this._drive = site.improvements?.drive ?? true;
