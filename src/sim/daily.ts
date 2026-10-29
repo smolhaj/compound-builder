@@ -32,6 +32,9 @@ import { raidPressure } from './opsec';
 import { logGate } from './nag';
 import type { Person } from './family';
 import { kinPersonal } from './kin';
+import { sowingRate, weedFactor } from './crops';
+import { putByHours } from './kitchen';
+import { wearTools, workSpeed } from './tools';
 import { absentIdx, jobDayOf } from './weekender';
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -93,16 +96,17 @@ export function canDo(p: Person, d: Duty): boolean {
 // Chores
 // ─────────────────────────────────────────────────────────────────────────
 
-export type ChoreId = 'weeds' | 'harvest' | 'animals' | 'pets' | 'hauling' | 'filters' | 'woodpile' | 'kitchen' | 'house' | 'laundry' | 'fences' | 'gear' | 'orchard' | 'greenhouse' | 'pond';
-export const CHORES: readonly ChoreId[] = ['weeds', 'harvest', 'animals', 'pets', 'hauling', 'filters', 'woodpile', 'kitchen', 'house', 'laundry', 'fences', 'gear', 'orchard', 'greenhouse', 'pond'];
+export type ChoreId = 'weeds' | 'sowing' | 'harvest' | 'animals' | 'pets' | 'hauling' | 'filters' | 'woodpile' | 'kitchen' | 'house' | 'laundry' | 'fences' | 'gear' | 'orchard' | 'greenhouse' | 'pond';
+export const CHORES: readonly ChoreId[] = ['weeds', 'sowing', 'harvest', 'animals', 'pets', 'hauling', 'filters', 'woodpile', 'kitchen', 'house', 'laundry', 'fences', 'gear', 'orchard', 'greenhouse', 'pond'];
 
 export const CHORE_NAME: Record<ChoreId, string> = {
-  weeds: 'Garden weeding', harvest: 'Harvest in the fields', animals: 'Feeding the animals', pets: 'Caring for the dogs', hauling: 'Hauling water', filters: 'Water filters',
+  weeds: 'Garden weeding', sowing: 'Spring sowing and soil work', harvest: 'Harvest in the fields', animals: 'Feeding the animals', pets: 'Caring for the dogs', hauling: 'Hauling water', filters: 'Water filters',
   woodpile: 'Splitting and stacking', kitchen: 'Cooking and washing up', house: 'Cleaning the house', laundry: 'Laundry', fences: 'Fences and roofs', gear: 'Guns, tools, the generator', orchard: 'Pruning and picking the orchard', greenhouse: 'Tending the greenhouses', pond: 'Feeding the fish',
 };
 /** What happens when it falls behind (the UI's tooltip). */
 export const CHORE_WHY: Record<ChoreId, string> = {
   weeds: 'Weeds choke the beds: the garden yields less.',
+  sowing: 'The spring work falls behind: the fields go in late and make a shorter crop (up to 40 % less).',
   harvest: 'The crop stands in the field and spoils: less of it comes in.',
   animals: 'The hens go off lay and the animals suffer: fewer eggs, lower morale.',
   pets: 'Hungry, unwalked dogs are a poor alarm and a sad sight: their warning and deterrence slip, and the kids mind.',
@@ -120,11 +124,11 @@ export const CHORE_WHY: Record<ChoreId, string> = {
 };
 /** Which duty works which chores (first one that needs it). */
 export const DUTY_CHORES: Partial<Record<Duty, ChoreId[]>> = {
-  garden: ['weeds', 'greenhouse', 'orchard'], fields: ['harvest', 'weeds', 'orchard'], livestock: ['animals', 'pond'], pets: ['pets'], water: ['hauling', 'filters'], wood: ['woodpile'],
+  garden: ['weeds', 'greenhouse', 'orchard'], fields: ['harvest', 'sowing', 'weeds', 'orchard'], livestock: ['animals', 'pond'], pets: ['pets'], water: ['hauling', 'filters'], wood: ['woodpile'],
   kitchen: ['kitchen'], cleaning: ['house'], laundry: ['laundry'], repairs: ['fences', 'gear'],
 };
 /** Person-hours to clear a full backlog (100). */
-export const CLEAR_HOURS: Record<ChoreId, number> = { weeds: 10, harvest: 8, animals: 2, pets: 2.5, hauling: 3, filters: 2, woodpile: 8, kitchen: 3, house: 4, laundry: 5, fences: 10, gear: 6, orchard: 12, greenhouse: 6, pond: 3 };
+export const CLEAR_HOURS: Record<ChoreId, number> = { weeds: 10, sowing: 8, harvest: 8, animals: 2, pets: 2.5, hauling: 3, filters: 2, woodpile: 8, kitchen: 3, house: 4, laundry: 5, fences: 10, gear: 6, orchard: 12, greenhouse: 6, pond: 3 };
 
 export interface ChoreState { levels: Record<ChoreId, number> }
 
@@ -149,7 +153,8 @@ export function choreRates(s: GameState): Record<ChoreId, number> {
   // without power, the wash is done by hand (half again as long)
   const powered = s.utilities.lit.length > 0 || (s.utilities.grid && s.disaster.tracks.grid > 0.5);
   return {
-    weeds: doy >= g0 && doy <= g1 ? 9 * count('garden') : 0,
+    weeds: doy >= g0 && doy <= g1 ? 9 * count('garden') * weedFactor(s) : 0,
+    sowing: sowingRate(s),
     harvest: doy >= H[0] && doy < H[1] ? HARVEST_RATE * count('field') : 0,
     animals: animals > 0 ? 50 * Math.min(4, animals) : 0,
     pets: petDogs(s) > 0 ? Math.min(100, 40 * petDogs(s)) : 0,
@@ -347,7 +352,7 @@ export function dutyWants(s: GameState, rates: Record<ChoreId, number>): Array<[
   for (const duty of Object.keys(DUTY_CHORES) as Duty[]) {
     let h = 0;
     for (const c of DUTY_CHORES[duty]!) if (rates[c] > 0 || lv[c] > 5) h += (rates[c] + lv[c] / 3) / 100 * CLEAR_HOURS[c];
-    if (duty === 'kitchen') h += cookNeed(s);                     // somebody has to cook the meals and put the harvest by
+    if (duty === 'kitchen') h += cookNeed(s) + putByHours(s);       // somebody has to cook the meals and put the harvest by (the jars, the dryer, the crocks, the smokehouse)
     if (h > 0.3) out.push([duty, h]);
   }
   // after the hit the wild is part of the larder: somebody hunts
@@ -778,6 +783,12 @@ export function dutyWork(s: GameState, p: Person, ps: PersonState, duty: Duty, p
     t[duty] = (t[duty] ?? 0) + personHours * (duty === 'hunt' ? 0.5 + p.skills.hunter / 10 : duty === 'teach' ? 0.5 + p.skills.teacher / 10 : 1);
     if (duty === 'hunt' && hour >= 17 && !tallyOf(s).dusk.includes(p.id)) tallyOf(s).dusk.push(p.id);
   }
+  // the garden and the fields are worked with a hoe, a fork or a shovel: bare hands are half as fast, and the tools wear (sim/tools.ts)
+  if (duty === 'garden' || duty === 'fields') {
+    const task = { kind: 'garden' } as const;
+    personHours *= workSpeed(s, task);
+    wearTools(s, task, personHours);
+  }
   if (DUTY_CHORES[duty]) { addChoreWork(s, duty, personHours); return; }
   if (duty === 'medic') {
     // the worst wound gets the care (on top of the daily healing in needs.ts)
@@ -918,6 +929,7 @@ export const BEHIND_NAG_DAYS = 21;
 
 const BEHIND_LINE: Record<ChoreId, string> = {
   weeds: 'The weeds are winning in the garden. Somebody needs to get out there with a hoe.',
+  sowing: 'The fields are still not sown and the window is closing. Every week of delay costs crop.',
   harvest: 'The harvest is standing in the field. "If we don\'t get it in this week, we lose it."',
   animals: 'The hens are off lay and the animals are bawling. Who was supposed to feed them?',
   pets: 'The dogs have been hanging around the empty bowl. Somebody needs to feed and walk them.',

@@ -39,7 +39,7 @@ import { DIFFICULTY } from './difficulty';
 import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
 import type { LightsState } from './lights';
 import { starterKit, type ToolKit } from './tools';
-export const SAVE_VERSION = 60;
+export const SAVE_VERSION = 61;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -336,7 +336,7 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     wildlife: newWildlife(),
     lineage: newLineage(people[0].last),
     site,
-    stock: { ...emptyStock(), firewood: STARTING_FIREWOOD, canned: 2, ...startingBedding(people.length) },
+    stock: { ...emptyStock(), firewood: STARTING_FIREWOOD, canned: 2, canner: 1, ...startingBedding(people.length) },
     neighbors: generateNeighbors(seed),
     land: newLand(seed, generateNeighbors(seed).map(n => n.id), (setup.site ?? CLASSIC).home),
     gate: newGate(seed),

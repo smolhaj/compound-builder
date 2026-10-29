@@ -42,6 +42,23 @@ type Raw = Record<string, unknown> & { version?: number };
 
 /** version n → n + 1 upgraders. */
 const STEPS: Record<number, (s: Raw) => Raw> = {
+  // 60 → 61: farm & kitchen (sim/crops.ts, sim/kitchen.ts, sim/storage.ts): new goods at zero; every field already on the place counts as sown this year (rotation starts fresh,
+  // fertility 1) with a season's saved seed in store; a family that had canning lids keeps its canning (a pressure canner); the spring sowing chore at zero
+  60: s => {
+    const st = (s.stock ?? {}) as Record<string, number>, clock = s.clock as { t: number; startDoy: number; startYear: number };
+    const day = Math.floor(clock.t + 0.25), year = clock.startYear + Math.floor((clock.startDoy - 1 + day) / 365);
+    const fields = ((s.structures as Array<{ id: string; kind: string }>) ?? []).filter(x => x.kind === 'field');
+    const farm = ((s.farm as Record<string, unknown> | undefined) ?? newFarm()) as Record<string, unknown>;
+    const plots: Record<string, unknown> = { ...((farm.plots as object | undefined) ?? {}) };
+    for (const f of fields) plots[f.id] ??= { kind: 'field', fert: 1, prev: null, prev2: null, crop: null, loads: 0, cover: false, settled: -1, planted: true, sown: { y: year, doy: 150, line: 'heirloom', v: 1, late: 1 } };
+    const daily = s.daily as { chores: { levels: Record<string, number> } } | undefined;
+    return {
+      ...s, version: 61,
+      stock: { seed_hybrid: 0, seed_cover: 0, canner: (st.lids ?? 0) > 0 ? 1 : 0, dehydrator: 0, crocks: 0, grain_mill: 0, manure: 0, compost: 0, ...st, seed_saved: st.seed_saved ?? Math.ceil(fields.length * 1.25) },
+      farm: { ...farm, plots },
+      daily: daily ? { ...daily, chores: { ...daily.chores, levels: { sowing: 0, ...daily.chores.levels } } } : daily,
+    };
+  },
   // 59 → 60: neighbors and strangers who joined (`newcomers`, sim/newcomers.ts); everyone already on the place is the founding household or kin, so no bonds
   59: s => ({ ...s, version: 60, newcomers: (s.newcomers as object | undefined) ?? newNewcomers() }),
   // 58 → 59: the weekender (`weekend`, sim/weekender.ts): a game that was set up as a weekend getaway (it could not be played before) gets the town house; everyone else has none

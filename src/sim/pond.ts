@@ -26,7 +26,7 @@ import { calendarOf, type GameState, type Structure } from './state';
 import { REGIONS } from './regions';
 import { log } from './economy';
 import { mulberry32 } from './rng';
-import { addFoodKcal } from './pantry';
+import { MEAT_WHERE, putUpMeat } from './kitchen';
 import { finishedOf, pondOf, type PondState } from './farm';
 import { attractants, predatorSpecies, proof } from './wildlife';
 import { careYield } from './daily';
@@ -71,11 +71,8 @@ export function oxygenOf(s: GameState, st: Structure, p: PondState, temp = water
 
 const idHash = (id: string): number => { let h = 0; for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0; return Math.abs(h); };
 export const putUp = (s: GameState, kcal: number): string => {
-  const freezer = s.structures.some(st => st.kind === 'root_cellar' && st.finishedAt !== null && s.utilities.lit.includes(st.id));
-  if (freezer) { addFoodKcal(s, 'game_meat', kcal); return 'in the freezer'; }
-  if ((s.stock.smoker ?? 0) >= 1 && kcal > 8000) { addFoodKcal(s, 'smoked_meat', kcal * 0.8); return 'smoked'; }
-  s.stock.fresh += kcal / 2000;
-  return 'on the table (it will not keep without a freezer or a smoker)';
+  const put = putUpMeat(s, kcal);
+  return put.where === 'fresh' ? 'on the table (it will not keep without a freezer, a smoker or salt)' : MEAT_WHERE[put.where];
 };
 
 /** Once a day: feed, growth, breeding, die-offs, predators and poachers. Returns log lines. */

@@ -53,4 +53,19 @@ describe('save migrations', () => {
     expect(g.money).toBeGreaterThanOrEqual(0);
     expect(g.fin.debt.owed).toBeGreaterThan(7000);
   });
+
+  it('v60 → v61: fields count as sown, a season of saved seed in store, canners for canning families', () => {
+    const g = newGame(3);
+    g.structures.push({ id: 'f1', kind: 'field', x: 5, z: 5, rot: 0, stage: 5, done: 0, supplied: true, finishedAt: -10 });
+    g.stock.lids = 12;
+    const old = JSON.parse(JSON.stringify(g));
+    old.version = 60;
+    for (const k of ['seed_hybrid', 'seed_saved', 'canner', 'compost', 'manure']) delete old.stock[k];
+    delete old.farm;
+    const m = migrate(old);
+    expect(m.version).toBe(SAVE_VERSION);
+    expect(m.stock.canner).toBe(1);
+    expect(m.stock.seed_saved).toBe(2);
+    expect(m.farm?.plots?.f1.planted).toBe(true);
+  });
 });

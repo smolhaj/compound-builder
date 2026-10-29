@@ -475,4 +475,45 @@ function orchard(def: KitPieceDef, seed = 1): THREE.Group {
   return g;
 }
 
-export const FOOD_BUILDERS: Record<string, (def: KitPieceDef, seed?: number) => THREE.Group> = { greenhouse, orchard };
+// ────────────────────────────────────────────────────
+// Wood-fired bread oven: stone base, cob dome, flue, a roof over the working side
+// ────────────────────────────────────────────────────
+
+function woodOven(_def: KitPieceDef, seed = 1): THREE.Group {
+  const p = new Parts(seed);
+  const W = 0.26, D = 0.3;
+  p.layer = 'stakes';
+  for (const [x, z] of [[-W / 2, -D / 2], [W / 2, -D / 2], [-W / 2, D / 2], [W / 2, D / 2]]) p.add('trim', box(0.012, 0.09, 0.012, x, -0.02, z));
+  // foundation: footing and the stone base (a hearth-high plinth with a wood storage arch)
+  p.add('concrete', box(W + 0.04, 0.02, D + 0.04, 0, 0, 0), 'foundation');
+  p.add('fieldstone', box(W, 0.2, D, 0, 0.02, 0), 'foundation');
+  p.add('cutcap', box(0.07, 0.07, 0.01, 0, 0.04, D / 2 + 0.002), 'foundation');
+  // frame: the firebrick floor and the dome (a squashed half sphere, mouth to the front)
+  p.add('whitewash', box(W - 0.02, 0.012, D - 0.02, 0, 0.22, 0), 'frame');
+  p.add('whitewash', new THREE.SphereGeometry(1, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2).scale(0.125, 0.12, 0.14).translate(0, 0.232, -0.01), 'walls');
+  p.add('fieldstone', new THREE.TorusGeometry(0.038, 0.01, 6, 12, Math.PI).rotateY(0).translate(0, 0.232, D / 2 - 0.004), 'walls');
+  // the arched mouth with its door, a chimney and the shelf to land the peel
+  p.add('cutcap', box(0.07, 0.05, 0.012, 0, 0.234, D / 2 - 0.012), 'openings');
+  p.add('wood_dark', box(0.05, 0.035, 0.008, 0.075, 0.23, D / 2 + 0.01).rotateY(0.5), 'openings');
+  p.add('fieldstone', box(0.1, 0.014, 0.05, 0, 0.222, D / 2 + 0.02), 'foundation');
+  p.add('iron', new THREE.CylinderGeometry(0.014, 0.017, 0.15, 8).translate(0.03, 0.36, -0.03), 'chimney');
+  // roof: four posts and a little metal roof over the working side
+  for (const [x, z] of [[-W / 2 - 0.02, D / 2 + 0.05], [W / 2 + 0.02, D / 2 + 0.05], [-W / 2 - 0.02, -D / 2], [W / 2 + 0.02, -D / 2]]) p.add('wood_mid', box(0.014, 0.4, 0.014, x, 0, z), 'rafters');
+  p.add('metal_roof', box(W + 0.12, 0.012, D + 0.16, 0, 0.4, 0.02).rotateX(0.08), 'roof');
+  // the firebox: coals and ash on the firebrick, a baking stone and two loaves (the interior layer)
+  p.add('wood_dark', new THREE.CylinderGeometry(0.05, 0.05, 0.006, 12).translate(0, 0.234, -0.02), 'interior');
+  p.add('trim', new THREE.CylinderGeometry(0.03, 0.03, 0.01, 10).translate(0.02, 0.24, 0.03), 'interior');
+  for (const x of [-0.02, 0.03]) p.add('wood_mid', new THREE.SphereGeometry(0.018, 8, 6).scale(1.2, 0.7, 0.8).translate(x, 0.252, 0.0), 'interior');
+  // colliders: the base and the four roof posts
+  p.collide({ x0: -W / 2, z0: -D / 2, x1: W / 2, z1: D / 2 });
+  for (const [x, z] of [[-W / 2 - 0.02, D / 2 + 0.05], [W / 2 + 0.02, D / 2 + 0.05], [-W / 2 - 0.02, -D / 2], [W / 2 + 0.02, -D / 2]]) p.collide({ x0: x - 0.01, z0: z - 0.01, x1: x + 0.01, z1: z + 0.01 });
+  // a woodpile and a peel leaning on the wall
+  for (let i = 0; i < 5; i++) p.add('wood_mid', new THREE.CylinderGeometry(0.012, 0.012, 0.08, 6).rotateZ(Math.PI / 2).translate(-W / 2 - 0.07, 0.015 + (i % 2) * 0.025, -0.05 + (i >> 1) * 0.027), 'decor');
+  p.add('wood_mid', box(0.01, 0.2, 0.008, W / 2 + 0.05, 0.02, D / 2 - 0.02).rotateZ(0.2), 'decor');
+  const g = p.finish();
+  g.userData.chimneyTop = new THREE.Vector3(0.03, 0.44, -0.03);
+  g.userData.keep = ['frame', 'rafters'];
+  return g;
+}
+
+export const FOOD_BUILDERS: Record<string, (def: KitPieceDef, seed?: number) => THREE.Group> = { greenhouse, orchard, wood_oven: woodOven };

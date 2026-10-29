@@ -13,6 +13,8 @@
  */
 import { isFinished } from './construction';
 import type { GameState, Structure } from './state';
+import type { Plot, Seeds } from './crops';
+import type { Kitchen } from './kitchen';
 
 export type HeatMode = 'electric' | 'wood';
 
@@ -54,6 +56,12 @@ export interface Farm {
   ponds: Record<string, PondState>;
   /** Equipment yards: yard id → bay → what is parked there (a fleet vehicle id), or null. */
   yard: Record<string, Array<string | null>>;
+  /** Fields and gardens: fertility, rotation, what was sown (sim/crops.ts; made lazily). */
+  plots?: Record<string, Plot>;
+  /** The seed store's habits and this year's sowing (sim/crops.ts). */
+  seeds?: Seeds;
+  /** The kitchen: methods, today's work, the year's totals (sim/kitchen.ts). */
+  kitchen?: Kitchen;
 }
 
 export const newFarm = (): Farm => ({ greenhouses: {}, orchards: {}, ponds: {}, yard: {} });

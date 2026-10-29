@@ -67,7 +67,7 @@ const BY_KIND: Record<string, Role> = {
   timber_cabin: 'home', log_house: 'home', farmhouse: 'home', trailer: 'home', cottage: 'guest',
   outhouse: 'privy', septic: 'other',
   well_hand: 'water', well_drilled: 'water', cistern: 'water', water_tower: 'water', filtration_shed: 'water',
-  garden: 'garden', field: 'field', orchard: 'orchard', greenhouse: 'greenhouse', chicken_coop: 'coop', barn: 'barn', root_cellar: 'store',
+  garden: 'garden', field: 'field', orchard: 'orchard', greenhouse: 'greenhouse', chicken_coop: 'coop', barn: 'barn', root_cellar: 'store', wood_oven: 'work',
   workshop: 'work', metal_garage: 'work', garage_solar: 'work', gate_garage: 'gate',
   battery_shed: 'power', generator_shed: 'power', solar_array: 'power',
   // the self-sufficient interior: the production greenhouse, the grove, the farm-scale power, the water bodies (a bench on the bank), the sheep barn, the yard of bays
