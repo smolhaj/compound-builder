@@ -119,7 +119,8 @@ const report = await page.evaluate(async () => {
   const boxes = g0.structures.filter(st => K.KIT[st.kind].level !== 'underground' && st.kind !== 'bunker_hatch').map(st => K.footprint(K.KIT[st.kind], st.x, st.z, st.rot, false));
   // what a walk may not cross (independent of the game's own tests): a building, the built wall, cliff ground
   const blockedAt = (x, z) => boxes.some(r => x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1) || slopeAt(x, z) > 1.0;
-  const wallAt = (x, z) => w._perimeterBlocked(x, z, 0.08);
+  // the wall of the perimeter, and a dry-stack retaining wall round a graded pad (game/terrain/RetainWalls: over it only at its stairs)
+  const wallAt = (x, z) => w._perimeterBlocked(x, z, 0.08) || w.walls.blocks(x, z);
   const step = (dt) => w.updatePeople(dt, G.getState().game, 14, 1);
   for (const ph of phases) {
     // everyone starts at home asleep (indoors), then goes to work

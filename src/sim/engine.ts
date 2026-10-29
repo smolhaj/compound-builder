@@ -13,8 +13,9 @@ import { paperworkDay } from './paperwork';
 import { addFellWork, nextFellJob } from './forestry';
 import { burnFirewood, demandNow } from './heating';
 import { upkeepDay } from './upkeep';
-import { snowedIn, weatherDay } from './weatherThreats';
+import { rainStormOn, snowedIn, weatherDay } from './weatherThreats';
 import { fogLog } from './fogFx';
+import { slumpDay } from './retaining';
 import { shelfDay } from './shelf';
 import { bodyDay } from './body';
 import { peopleDay } from './people';
@@ -206,6 +207,7 @@ function subStep(s: GameState): void {
     prisonersDay(s);   // (it logs its own lines)
     for (const line of weatherDay(s)) log(s, line);
     for (const line of fogLog(s)) log(s, line);   // valley fog and cloud: this morning, and the forecast for the next (sim/fog.ts)
+    for (const line of slumpDay(s, rainStormOn(s))) log(s, line);   // a tall retaining wall with no drainage behind it can let go (sim/retaining.ts)
     for (const line of winterDay(s, dayIndex(s.clock.t))) log(s, line);   // (Hardcore) the first hard winter
     for (const line of digDay(s)) log(s, line);
     for (const line of wildlifeDay(s, s.structures.some(st => st.kind === 'root_cellar' && isFinished(st) && s.utilities.lit.includes(st.id)))) log(s, line);

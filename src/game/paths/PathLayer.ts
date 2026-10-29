@@ -22,6 +22,8 @@ export interface PathHost {
   extras: (game: GameState) => PathExtras;
   look: () => PathLook;
   publish: (s: PathSummary) => void;
+  /** A stair set in a retaining wall is here (the trail drawing leaves its own stair out: game/terrain/RetainWalls). */
+  wallStair?: (x: number, z: number) => boolean;
 }
 
 const EMPTY: PathNetwork = { nodes: [], edges: [], trails: [], hub: null };
@@ -95,7 +97,7 @@ export class PathLayer {
     this._near = nearTrail(this._net);
     this.version++;
     const key = this._net.trails.map(t => `${t.id}${t.laid ?? ''}${Math.round(t.wear * 20)}${t.pts.length}`).join('|');
-    this.renderer.update(this._net, this._h.groundAt, this._h.look(), this._quality, key);
+    this.renderer.update(this._net, this._h.groundAt, this._h.look(), this._quality, key, this._h.wallStair);
     const sum = summarize(this._net);
     if (sum.key !== this._sumKey) { this._sumKey = sum.key; this._h.publish(sum); }
   }
