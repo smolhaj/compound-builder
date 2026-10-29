@@ -1590,6 +1590,7 @@ export class HomesteadWorld {
       blocked: (x, z) => this.onBuilding(x, z, 0.25) || this.onCamp(x, z, 0.5) || this.onAccess(x, z, 0.3),
       creek,
       threats,
+      cam: { x: this._ws.camera.position.x, z: this._ws.camera.position.z },
     }, speedK);
   }
   /** Where dogs are (animals bolt from them too); none until the dogs renderer exists. */
