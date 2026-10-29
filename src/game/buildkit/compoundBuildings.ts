@@ -7,7 +7,7 @@
  */
 import * as THREE from 'three';
 import { CELL, type KitPieceDef } from './kit';
-import { Furniture, M, pipe, type Add } from './interior';
+import { Furniture, M, pipe, type Add, sickSlot } from './interior';
 import { Clutter } from './clutter';
 import { dressEvenings } from './goodsDress';
 import { Equipment } from './utilityBuildings';
@@ -35,7 +35,7 @@ function cottage(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group 
     // bedroom (back): a double bed for the grandparents and a single for a grandchild
     c.partition(left, wallZ, right, wallZ, [{ at: 0.25, w: 0.14, sill: 0, h: 0.36 }], 'whitewash');
     I({ x: -0.2, z: back + 0.18 }, a => Furniture.bed(a, true, 'quilt_red'));
-    I({ x: 0.3, z: back + 0.18 }, a => Furniture.single(a, 'quilt_blue'));
+    I({ x: 0.3, z: back + 0.18 }, a => { Furniture.single(a, 'quilt_blue'); sickSlot(a); });
     I({ x: right - 0.05, z: wallZ - 0.12, rot: -Math.PI / 2 }, a => Furniture.dresser(a, 1.0));
     I({ x: left + 0.05, z: back + 0.05 }, a => Furniture.nightstand(a));
     // front room: counter and sink along the left wall, the wood cookstove on its hearth, a table with chairs

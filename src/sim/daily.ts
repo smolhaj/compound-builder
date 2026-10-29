@@ -23,9 +23,10 @@ import { dogCount } from './pets';
 import { calendarOf, dayIndex, hourOf, type GameState, type PersonState, type TaskKind } from './state';
 import { isFinished } from './construction';
 import { hasWalkway } from './walkway';
+import { CONSOLE_EYES, consoleManned } from './bunkerLife';
 import { isHome } from './blueprints';
 import { gardenSeason, selfSufficiencyRates } from './greenhouse';
-import { REGIONS, seasons } from './regions';
+import { seasons } from './regions';
 import { greenRicks } from './upkeep';
 import { routineAt } from './schedule';
 import { raidPressure } from './opsec';
@@ -42,6 +43,7 @@ import { bestLevel, levelFor, mentorSkill, practice, skillFactor, teach, type Pr
 import { ESSENTIAL, mindFit, mindStaysIn, resting } from './mind';
 import { classSlots, COURSES, courseHour, DRILL_HOUR, drillable, drillDay, drillHour, enrollmentOf, teachHour } from './courses';
 import { log } from './economy';
+import { regionFor } from './climate';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Duties
@@ -157,7 +159,7 @@ export function choreRates(s: GameState): Record<ChoreId, number> {
   const fin = s.structures.filter(isFinished);
   const count = (k: string) => fin.filter(st => st.kind === k).length;
   const doy = calendarOf(s.clock).doy;
-  const [g0, g1] = gardenSeason(s), H = seasons(REGIONS[s.site.region]).harvest;
+  const [g0, g1] = gardenSeason(s), H = seasons(regionFor(s.site)).harvest;
   const heads = Math.max(1, s.personState.filter(ps => ps.needs.died == null).length);
   const n = (k: string) => Math.floor((s.stock as Record<string, number>)[k] ?? 0);
   const animals = count('chicken_coop') + (n('goat') + n('pig') + n('steer') + n('rabbit') + n('sheep')) / 4;
@@ -397,7 +399,7 @@ interface PlanCtx {
 function seasonalWork(s: GameState, c: PlanCtx, p: Person): Duty {
   const fin = s.structures.filter(isFinished);
   const has = (k: string) => fin.some(st => st.kind === k);
-  const H = seasons(REGIONS[s.site.region]).harvest, [g0, g1] = gardenSeason(s);
+  const H = seasons(regionFor(s.site)).harvest, [g0, g1] = gardenSeason(s);
   if (has('field') && c.doy >= H[0] && c.doy < H[1]) return 'fields';
   if (c.fell) return 'wood';
   if (has('garden') && c.doy >= g0 && c.doy <= g1 && p.skills.gardener >= 3) return 'garden';
@@ -908,7 +910,7 @@ export function dutyWork(s: GameState, p: Person, ps: PersonState, duty: Duty, p
 // Watch
 // ─────────────────────────────────────────────────────────────────────────
 
-export type WatchPost = 'tower' | 'wall' | 'gate';
+export type WatchPost = 'tower' | 'wall' | 'gate' | 'console';
 export interface Watcher { id: string; post: WatchPost; night: boolean; alert: number; /** On the patrol deck of the wall (sim/walkway.ts): the people renderer puts them on top of it. */ walk?: boolean }
 
 /**
@@ -927,7 +929,8 @@ export function watchNow(s: GameState): Watcher[] {
   for (const ps of s.personState) {
     if (ps.task !== 'watch' || ps.needs.died != null) continue;
     const k = out.length;
-    const post: WatchPost = k === 0 && tower ? 'tower' : wall && k <= (deck ? 2 : 1) ? 'wall' : 'gate';
+    // at night the first watcher sits at the control room's screens when there are cameras and power (sim/bunkerLife.ts); the tower keeps the second
+    const post: WatchPost = k === 0 && night && consoleManned(s) ? 'console' : (k === 0 || (k === 1 && night && consoleManned(s))) && tower ? 'tower' : wall && k <= (deck ? 2 : 1) ? 'wall' : 'gate';
     out.push({ id: ps.id, post, night, alert: Math.max(0.3, 1 - (ps.fatigue ?? 0) / 140), ...(post === 'wall' && deck ? { walk: true } : {}) });
   }
   return out;
@@ -938,7 +941,7 @@ export function watchDetection(s: GameState): number {
   const w = watchNow(s).sort((a, b) => b.alert - a.alert);
   let sum = 0;
   const owl = w.length ? chronotypes(s) : {};
-  w.forEach((x, k) => { sum += ((k === 0 ? 10 : k === 1 ? 6 : 2) + (owl[x.id] === 'owl' ? 1.5 : 0)) * x.alert * (x.post === 'tower' ? 1.2 : x.walk ? 1.1 : 1); });
+  w.forEach((x, k) => { sum += ((k === 0 ? 10 : k === 1 ? 6 : 2) + (owl[x.id] === 'owl' ? 1.5 : 0)) * x.alert * (x.post === 'tower' ? 1.2 : x.post === 'console' ? CONSOLE_EYES : x.walk ? 1.1 : 1); });
   return Math.min(20, sum);
 }
 

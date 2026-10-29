@@ -44,7 +44,7 @@ import type { Medical } from './medical';
 import type { Evenings } from './evenings';
 import type { Courses } from './courses';
 import { starterKit, type ToolKit } from './tools';
-export const SAVE_VERSION = 67;
+export const SAVE_VERSION = 68;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -137,6 +137,8 @@ export interface Structure {
   high?: number;
   /** Gatehouse garage (sim/garage.ts): the vehicle id in each parking slot (null = free). */
   parked?: Array<string | null>;
+  /** Rise over run across its footprint when it was staked, on a lot with relief (sim/slope.ts): the pad takes longer and the foundation more stone. Absent: level. */
+  grade?: number;
 }
 
 export type TaskKind = 'idle' | 'build' | 'forestry' | 'sleep' | 'chores' | 'school' | 'leisure' | 'job' | 'gone' | 'shelter' | 'away'

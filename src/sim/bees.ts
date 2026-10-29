@@ -23,7 +23,7 @@
  */
 import { calendarOf, type GameState } from './state';
 import { isFinished } from './construction';
-import { REGIONS } from './regions';
+
 import { mulberry32 } from './rng';
 import { log } from './economy';
 import { logGate } from './nag';
@@ -31,6 +31,7 @@ import { addFood } from './pantry';
 import { farmOf, finishedOf } from './farm';
 import { ORCHARD_KINDS } from './greenhouse';
 import { predatorSpecies, proof } from './wildlife';
+import { regionFor } from './climate';
 
 export interface Apiary {
   /** Colonies in the hives (0–4), their strength (0–1), the pounds of honey in the hives above what winter needs, and the stores. */
@@ -57,7 +58,7 @@ const stock = (s: GameState, k: string): number => (s.stock as unknown as Record
 
 /** Days of the year the bees fly (the air warm enough): from the region's spring warmth to its fall cold. */
 export function flightDays(s: GameState): [number, number] {
-  const [last, first] = REGIONS[s.site.region].frost;
+  const [last, first] = regionFor(s.site).frost;
   return [last - 20, first + 25];
 }
 export const flying = (s: GameState): boolean => { const d = calendarOf(s.clock).doy, [a, b] = flightDays(s); return d >= a && d <= b; };
@@ -65,18 +66,18 @@ export const flying = (s: GameState): boolean => { const d = calendarOf(s.clock)
 /** What the place gives the bees (0.4–1.4). */
 export function forage(s: GameState): number {
   const fin = s.structures.filter(isFinished), n = (k: string) => fin.filter(x => x.kind === k).length;
-  const wet = Math.min(1.3, Math.max(0.6, REGIONS[s.site.region].rainMm / 900));
+  const wet = Math.min(1.3, Math.max(0.6, regionFor(s.site).rainMm / 900));
   return Math.max(0.4, Math.min(1.4, (0.55 + 0.08 * n('garden') + 0.14 * fin.filter(x => ORCHARD_KINDS.includes(x.kind)).length + 0.05 * n('field')) * wet + 0.1 * Math.min(1, s.site.timber / 1.2)));
 }
 /** The share of the nectar flow a day of the year is (June to August peak). */
 export function flow(s: GameState, doy = calendarOf(s.clock).doy): number {
   const [a, b] = flightDays(s);
   if (doy < a || doy > b) return 0;
-  const mid = 175 + (REGIONS[s.site.region].frost[0] - 140) * 0.3;
+  const mid = 175 + (regionFor(s.site).frost[0] - 140) * 0.3;
   return Math.max(0.1, Math.min(1, 1 - Math.abs(doy - mid) / 70));
 }
 /** Stores a colony needs to see out the winter (lb): more where winters are long. */
-export const winterNeed = (s: GameState): number => Math.round(WINTER_LB * (0.8 + 0.3 * REGIONS[s.site.region].cold));
+export const winterNeed = (s: GameState): number => Math.round(WINTER_LB * (0.8 + 0.3 * regionFor(s.site).cold));
 
 export const colonyCount = (s: GameState): number => apiaries(s).reduce((a, st) => a + apiaryOf(s, st.id).colonies, 0);
 export const healthyColonies = (s: GameState): number => apiaries(s).reduce((a, st) => { const p = apiaryOf(s, st.id); return a + (p.strength >= 0.4 ? p.colonies : 0); }, 0);
@@ -207,7 +208,7 @@ export function beesDay(s: GameState): string[] {
       const n = p.colonies;
       for (let k = 0; k < n; k++) {
         const stores = Math.min(1, p.stores / winterNeed(s));
-        const cold = Math.max(0, REGIONS[s.site.region].cold - 1);
+        const cold = Math.max(0, regionFor(s.site).cold - 1);
         const live = Math.max(0.05, Math.min(0.95, 0.9 - 0.55 * Math.max(0, p.mites - 0.15) - 0.35 * (1 - stores) - 0.12 * cold - 0.15 * (1 - Math.min(1, p.strength / 0.6))));
         if (r() < live) lived++;
       }

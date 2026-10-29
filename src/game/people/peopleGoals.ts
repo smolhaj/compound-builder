@@ -34,7 +34,7 @@ export interface GoalCtx {
   /** Where the daily work happens (finished structures, the wall). */
   spots?: WorkSpots;
   /** The watch post of a person (sim/daily.ts watchNow), by id order of the people. */
-  post?: (i: number) => 'tower' | 'wall' | 'gate';
+  post?: (i: number) => 'tower' | 'wall' | 'gate' | 'console';
   /** Fine weather for eating outdoors. */
   outdoors?: boolean;
   /** Anyone carries a long gun on watch. */
@@ -354,6 +354,8 @@ export function dailyGoal(i: number, kid: boolean, task: TaskKind, hour: number,
     }
     case 'watch': {
       const post = ctx.post?.(i) ?? 'gate';
+      // at the console in the bunker's control room: below ground, so not drawn up here (the bunker layer shows them at the screens)
+      if (post === 'console') return { x: ctx.camp.x, z: ctx.camp.z, pose: FIG_POSE.STAND, face: null, hidden: true, work: false };
       const rifle = ctx.armed ? FIG_TOOL.RIFLE : FIG_TOOL.NONE, pose = ctx.armed ? FIG_POSE.RIFLE : FIG_POSE.STAND;
       const tower = pickOf(sp?.towers ?? [], 0);
       if (post === 'tower' && tower) return goal(tower.x + 0.05, tower.z + 0.05, pose, faceTo(tower.x, tower.z, ctx.camp.x, ctx.camp.z) + Math.PI, { y: 0.9, tool: rifle, walkPose: pose });

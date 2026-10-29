@@ -4,7 +4,7 @@
  * from and what is missing. Pure; every number comes from the sims that own it.
  */
 import { calendarOf, type GameState } from './state';
-import { REGIONS, seasons } from './regions';
+import { seasons } from './regions';
 import { gardenSeason, ORCHARD_PICK, PRUNE_DAY, ORCHARD_KINDS, ORCHARD_TREES, orchardBearing, hasGreenhouse, inGreensSeason } from './greenhouse';
 import { sowWindow, fieldsOf, fieldRows, seedOnHand, seedTarget, plotFor, gardensOf, seedsOf } from './crops';
 import { bestGardener, FIELD_KCAL, KCAL, needOf } from './needs';
@@ -17,6 +17,7 @@ import { isFinished } from './construction';
 import { apiaries, apiaryOf, colonyCount, flightDays, winterNeed } from './bees';
 import { hasMaples, sapSeason, tapsOut, woodsTaps } from './maple';
 import { herdOf } from './herd';
+import { regionFor } from './climate';
 
 export type Tone = 'good' | 'warn' | 'bad';
 export const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -43,7 +44,7 @@ const inSpan = (doy: number, from: number, to: number) => (from <= to ? doy >= f
 
 /** The year's farm and kitchen calendar for this place. */
 export function calendar(s: GameState): CalItem[] {
-  const r = REGIONS[s.site.region], se = seasons(r), [w0, w1] = sowWindow(s), [g0, g1] = gardenSeason(s);
+  const r = regionFor(s.site), se = seasons(r), [w0, w1] = sowWindow(s), [g0, g1] = gardenSeason(s);
   const fin = s.structures.filter(isFinished), has = (k: string) => fin.some(x => x.kind === k);
   const n = (k: string) => Math.floor((s.stock as unknown as Record<string, number>)[k] ?? 0);
   const orchards = fin.some(x => ORCHARD_KINDS.includes(x.kind)), animals = n('goat') + n('pig') + n('steer') + n('sheep') + n('rabbit') > 0;
@@ -152,7 +153,7 @@ export function spoilageRisks(s: GameState): Risk[] {
 /** Everything the Food plan says should be done, most pressing first. */
 export function foodPlan(s: GameState): Risk[] {
   const out: Risk[] = [];
-  const { doy } = calendarOf(s.clock), [w0] = sowWindow(s), se = seasons(REGIONS[s.site.region]);
+  const { doy } = calendarOf(s.clock), [w0] = sowWindow(s), se = seasons(regionFor(s.site));
   const fields = fieldsOf(s, true), o = outlook(s);
   if (fields.length) {
     const have = seedOnHand(s), tot = have.heirloom + have.hybrid + have.saved, want = seedTarget(s);
