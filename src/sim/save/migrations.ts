@@ -42,6 +42,17 @@ type Raw = Record<string, unknown> & { version?: number };
 
 /** version n → n + 1 upgraders. */
 const STEPS: Record<number, (s: Raw) => Raw> = {
+  // 61 → 62: the herd, the bees and the sugar bush (sim/herd.ts, sim/bees.ts, sim/maple.ts): new goods at zero, the cow's condition, the bees and sugaring chores at zero
+  61: s => {
+    const daily = s.daily as { chores: { levels: Record<string, number> } } | undefined;
+    const lv = s.livestock as { condition?: Record<string, number> } | undefined;
+    return {
+      ...s, version: 62,
+      stock: { cow: 0, cheese_kit: 0, vet_kit: 0, bee_nuc: 0, hive_supplies: 0, beeswax: 0, maple_taps: 0, ...(s.stock as object) },
+      livestock: lv ? { ...lv, condition: { cow: 1, ...(lv.condition ?? {}) } } : s.livestock,
+      daily: daily ? { ...daily, chores: { ...daily.chores, levels: { bees: 0, sugaring: 0, ...daily.chores.levels } } } : daily,
+    };
+  },
   // 60 → 61: farm & kitchen (sim/crops.ts, sim/kitchen.ts, sim/storage.ts): new goods at zero; every field already on the place counts as sown this year (rotation starts fresh,
   // fertility 1) with a season's saved seed in store; a family that had canning lids keeps its canning (a pressure canner); the spring sowing chore at zero
   60: s => {

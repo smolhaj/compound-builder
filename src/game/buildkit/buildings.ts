@@ -18,6 +18,7 @@ import { COMPOUND_BUILDERS } from './compoundBuildings';
 import { GATEHOUSE_BUILDERS } from './gatehouseBuildings';
 import { FOOD_BUILDERS } from './foodBuildings';
 import { FARM_BUILDERS } from './farmBuildings';
+import { HERD_BUILDERS } from './herdBuildings';
 
 /** Seats for evenings at home: local x, z and the point the sitter faces. */
 export type Seat = [number, number, number, number];
@@ -500,6 +501,7 @@ const BUILDERS: Record<string, (def: KitPieceDef, seed?: number, opts?: BuildOpt
   ...COMPOUND_BUILDERS,
   ...GATEHOUSE_BUILDERS,
   ...FOOD_BUILDERS,
+  ...HERD_BUILDERS,
   ...FARM_BUILDERS,
 };
 

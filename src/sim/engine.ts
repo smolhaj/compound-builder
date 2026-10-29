@@ -23,6 +23,8 @@ import { toolsDay } from './tools';
 import { greenhouseDay, orchardDay } from './greenhouse';
 import { pondDay } from './pond';
 import { cropsDay } from './crops';
+import { beesDay } from './bees';
+import { mapleDay } from './maple';
 import { cellarDay, crowdDay } from './storage';
 import { vehiclesDay } from './vehicles';
 import { kinDay } from './kin';
@@ -197,6 +199,8 @@ function subStep(s: GameState): void {
     for (const line of pondDay(s)) log(s, line);
     // the fields and the soil: sowing, the seed store, the season's close; the cellar bins and the crowded shelves (sim/crops.ts, sim/storage.ts)
     for (const line of cropsDay(s)) log(s, line);
+    for (const line of beesDay(s)) log(s, line);
+    for (const line of mapleDay(s)) log(s, line);
     for (const line of cellarDay(s)) log(s, line);
     for (const line of crowdDay(s)) log(s, line);
     const e = gateDay(s);

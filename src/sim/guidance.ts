@@ -25,6 +25,7 @@ import { roadGateStatus } from './roadGate';
 import type { GameState, OrderLine } from './state';
 import { SEPARATE_DWELLINGS, housingShortfall } from './housing';
 import { joinNames } from './kin';
+import { hasMaples, woodsTaps } from './maple';
 import { CARETAKER, CARETAKER_KINDS, caretakerProblem, marketFactor, saleBlock, saleQuote, type CaretakerKind } from './weekender';
 import { tension } from './disaster';
 
@@ -156,6 +157,7 @@ export function suggestions(s: GameState): Suggestion[] {
   if (!hasKind(s, 'outhouse', 'septic')) add('toilet', 'outhouse', 'nowhere to go', 50);
   if (!hasPower(s)) add('power', 'solar_array', 'no power for the pump, lights and the freezer', 40);
   if (growing && !hasKind(s, 'root_cellar')) add('cellar', 'root_cellar', 'nowhere cool to keep what you grow', 30);
+  if (hasMaples(s) && woodsTaps(s) >= 60 && hasKind(s, 'timber_cabin', 'log_house', 'farmhouse') && !hasKind(s, 'sugar_shack')) add('sugar', 'sugar_shack', `the woods have maples for ${woodsTaps(s)} taps: late-winter syrup`, 14);
   if (hasKind(s, 'field') && hasKind(s, 'root_cellar') && !hasKind(s, 'wood_oven')) add('oven', 'wood_oven', 'the wheat and flour want an oven: bread and roasts without heating the house', 18);
 
   // the woodpile: out in the cold, or too thin for the next two months
@@ -275,6 +277,7 @@ export function selfSufficient(s: GameState): Goal {
 export function buildOff(s: GameState, kind: string): string | null {
   const site = planProblem(s, kind);
   if (site) return site;
+  if (kind === 'sugar_shack' && !hasMaples(s)) return 'no sugar maples in the woods here: the sap will not run';
   if (kind.startsWith('bunker_') && !BUNKER_ENTRANCES.includes(kind) && !bunkerKinds(s).some(st => BUNKER_ENTRANCES.includes(st.kind))) return 'needs a hatch or stairwell first: the way down';
   if (needsPermit(kind) && s.paper.permits && countyWorks(s) && s.money < permitFee(s, kind)) return `needs a ${usd(permitFee(s, kind))} county permit: you have ${usd(s.money)}`;
   return null;

@@ -15,6 +15,9 @@ import { isFinished } from './construction';
 import type { GameState, Structure } from './state';
 import type { Plot, Seeds } from './crops';
 import type { Kitchen } from './kitchen';
+import type { Apiary } from './bees';
+import type { Maple } from './maple';
+import type { Herd } from './herd';
 
 export type HeatMode = 'electric' | 'wood';
 
@@ -62,6 +65,12 @@ export interface Farm {
   seeds?: Seeds;
   /** The kitchen: methods, today's work, the year's totals (sim/kitchen.ts). */
   kitchen?: Kitchen;
+  /** Bee yards: colonies, strength, honey, mites (sim/bees.ts). */
+  apiaries?: Record<string, Apiary>;
+  /** The sugar bush: taps, the sap tank, the season's syrup (sim/maple.ts). */
+  maple?: Maple;
+  /** The barnyard: sickness, the herd's breeding, the dairy (sim/herd.ts). */
+  herd?: Herd;
 }
 
 export const newFarm = (): Farm => ({ greenhouses: {}, orchards: {}, ponds: {}, yard: {} });

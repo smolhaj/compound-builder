@@ -14,6 +14,9 @@ import { cellarCapacity, cellarKcal, cellarTempC, binShrink, freshSpoilRate, ove
 import { capacities, freezerOn, hasCanner, hasKitchen, hasOven, kitchenOf, METHOD_NAME, type Capacity } from './kitchen';
 import { cookRatio } from './daily';
 import { isFinished } from './construction';
+import { apiaries, apiaryOf, colonyCount, flightDays, winterNeed } from './bees';
+import { hasMaples, sapSeason, tapsOut, woodsTaps } from './maple';
+import { herdOf } from './herd';
 
 export type Tone = 'good' | 'warn' | 'bad';
 export const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -56,6 +59,10 @@ export function calendar(s: GameState): CalItem[] {
     { id: 'hay', group: 'animals', label: 'Put up hay', from: 150, to: 260, note: 'Buy the winter\'s hay at the fall cutting.', here: animals },
     { id: 'butcher', group: 'animals', label: 'Butchering', from: 305, to: 334, note: 'Pigs, surplus lambs and the steer go to the butcher; fat is rendered into lard.', here: n('pig') + n('steer') + n('sheep') > 0 },
     { id: 'eggs', group: 'animals', label: 'Hens lay best', from: 90, to: 250, note: 'About eight eggs a day from a dozen hens; three in midwinter.', here: has('chicken_coop') },
+    { id: 'sap', group: 'garden', label: 'Sap runs: tap, gather, boil', from: sapSeason(s)[0], to: sapSeason(s)[1], note: 'Freeze-thaw days: gather the buckets and boil the same day, 40 gallons of sap to one of syrup.', here: hasMaples(s) && (has('sugar_shack') || n('maple_taps') > 0) },
+    { id: 'bees', group: 'garden', label: 'Bees flying', from: flightDays(s)[0], to: flightDays(s)[1], note: 'Inspect weekly; a strong colony in May may swarm. The nectar flow is June to August.', here: apiaries(s).length > 0 },
+    { id: 'honey', group: 'preserve', label: 'Honey off, hives treated for mites', from: 245, to: 258, note: 'Take the surplus (the bees keep their winter stores) and treat for mites before the cold.', here: colonyCount(s) > 0 },
+    { id: 'kid', group: 'animals', label: 'Kidding and calving', from: 65, to: 100, note: 'Kids on the does, a calf on the cow; milk comes in. Keep the vet kit on the shelf.', here: n('goat') + n('cow') > 0 },
     { id: 'deer', group: 'wild', label: 'Deer season', from: 280, to: 330, note: 'In peacetime a tag; after the collapse, no seasons.', here: r.game.includes('deer') || r.game.includes('elk') },
     { id: 'fish', group: 'wild', label: 'Fishing season', from: 130, to: 300, note: 'A license in peacetime; the pond\'s crayfish are trapped May to October.', here: r.game.some(g => ['trout', 'bass', 'catfish', 'salmon', 'panfish'].includes(g)) || has('pond') },
   ];
@@ -161,6 +168,16 @@ export function foodPlan(s: GameState): Risk[] {
   if (o.coverage < 0.9 && o.yearNeed > 0) out.push({ text: `What is put by plus a normal year's harvest covers ${Math.round(o.coverage * 100)} % of a year's eating.`, tone: o.coverage < 0.6 ? 'bad' : 'warn' });
   else if (o.yearNeed > 0 && isFinite(o.coverage)) out.push({ text: `Stores plus a normal harvest cover about ${Math.round(o.coverage * 100)} % of a year.`, tone: 'good' });
   if (!hasOven(s) && (s.stock.grain_mill ?? 0) < 1 && (s.pantry?.items.wheat_bucket?.q ?? 0) + (s.pantry?.items.home_dry?.q ?? 0) > 1) out.push({ text: 'Whole wheat boiled again and again: a grain mill and a wood oven would make bread.', tone: 'warn' });
+  // the herd, the bees, the sugar bush
+  const hd = herdOf(s);
+  const sick = Object.values(hd.sick).reduce<number>((a, v) => a + (v ?? 0), 0);
+  if (sick > 0) out.push({ text: `${sick} sick animal${sick === 1 ? '' : 's'} in the barnyard: a vet kit (Shop) or the vet.`, tone: 'warn' });
+  for (const st of apiaries(s)) {
+    const p = apiaryOf(s, st.id);
+    if (p.colonies > 0 && p.mites > 0.5 && p.treated !== calendarOf(s.clock).year && (s.stock.hive_supplies ?? 0) < 1 && doy > 150) out.push({ text: 'The bees will not winter without a mite treatment: buy hive supplies.', tone: 'bad' });
+    if (p.colonies > 0 && p.stores * p.colonies < winterNeed(s) * p.colonies * 0.6 && doy > 270) out.push({ text: 'The hives are light on winter stores: leave them their honey.', tone: 'warn' });
+  }
+  if (hasMaples(s) && woodsTaps(s) > 30 && tapsOut(s) === 0 && doy > sapSeason(s)[0] - 30 && doy < sapSeason(s)[0] + 5) out.push({ text: `Sugar maples on the place (about ${woodsTaps(s)} taps): tapping sets and a sugar shack would make syrup this spring.`, tone: 'good' });
   return out;
 }
 

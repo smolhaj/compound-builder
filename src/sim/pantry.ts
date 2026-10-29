@@ -38,7 +38,8 @@ export type FoodItemId =
   | 'canned_veg' | 'canned_fruit' | 'canned_meat' | 'canned_soup' | 'home_canned' | 'snacks'
   | 'freezer_meat' | 'game_meat'
   // the kitchen (sim/kitchen.ts): put by from the place's own harvest
-  | 'cellar_roots' | 'dried_produce' | 'ferments' | 'cured_meat' | 'lard';
+  | 'cellar_roots' | 'dried_produce' | 'ferments' | 'cured_meat' | 'lard'
+  | 'butter' | 'cheese' | 'maple_syrup';
 
 export interface FoodItem {
   id: FoodItemId;
@@ -105,7 +106,7 @@ const DECAY_OF: Record<FoodItemId, Decay> = {
   sugar: 'never', honey: 'never', salt: 'never',
   canned_veg: 'can', canned_fruit: 'can', canned_meat: 'can', canned_soup: 'can', home_canned: 'homecan',
   snacks: 'snack', coffee: 'snack', freezer_meat: 'frozen', game_meat: 'frozen',
-  cellar_roots: 'roots', dried_produce: 'bag', ferments: 'can', cured_meat: 'rancid', lard: 'rancid',
+  cellar_roots: 'roots', dried_produce: 'bag', ferments: 'can', cured_meat: 'rancid', lard: 'rancid', butter: 'rancid', cheese: 'rancid', maple_syrup: 'never',
 };
 export const DECAY: Record<Decay, { maxLoss: number; tau: number; sick: number; sickCap: number; bot: number; toss: (over: number) => number; long: number }> = {
   never: { maxLoss: 0, tau: 1, sick: 0, sickCap: 0, bot: 0, toss: () => 0, long: Infinity },
@@ -174,6 +175,9 @@ export const FOOD: Record<FoodItemId, FoodItem> = {
   ferments: F('ferments', 'Sauerkraut, pickles & kimchi', 'case of 12 quarts of fermented cabbage, cucumbers and roots, kept cool', 'canned', 2400, 30, 0.02, 'fruitveg', 0.8, 'cool', null, 'jar', 12, 0x8aa84a, { dietMax: 0.12 }),
   cured_meat: F('cured_meat', 'Cured ham, bacon & salt pork', '10 lb of salt-cured pork, hung or packed in salt', 'staples', 18000, 70, 0.55, 'protein', 1, 'cool', null, 'mylar', 1, 0xb8606a, { dietMax: 0.3 }),
   lard: F('lard', 'Rendered lard', '1 gal pail of lard rendered from the fat (about 8 lb)', 'staples', 32000, 0, 1, 'fat', 1.5, 'cool', null, 'jug', 1, 0xf2ead2, { dietMax: 0.12 }),
+  butter: F('butter', 'Butter', '5 lb of butter, churned and salted, kept cool', 'staples', 16250, 3, 0.99, 'dairy', 0.6, 'cool', null, 'jar', 5, 0xf0d870, { dietMax: 0.12 }),
+  cheese: F('cheese', 'Hard cheese', 'a 5 lb wheel of cheese, waxed and kept cool', 'staples', 9000, 250, 0.7, 'dairy', 1, 'cool', null, 'case', 1, 0xe8b850, { dietMax: 0.2 }),
+  maple_syrup: F('maple_syrup', 'Maple syrup', '1 gal jug of syrup boiled down from the sugar bush (keeps for years sealed)', 'staples', 13000, 0, 0, 'sweet', Infinity, 'dry', null, 'honey', 1, 0xb8681c, { dietMax: 0.08 }),
   game_meat: F('game_meat', 'Game & home-raised meat', 'about 5 kg, wrapped and frozen', 'frozen', 10000, 160, 0.4, 'protein', 1, 'frozen', null, 'pack', 3, 0x8a3030),
 };
 export const FOOD_IDS = Object.keys(FOOD) as FoodItemId[];

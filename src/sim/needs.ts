@@ -32,6 +32,7 @@ import { dogEffects } from './pets';
 import { sleepEffects } from './housing';
 import { CROPS, fieldFactor, fieldsOf, GROSS, gardenFactor, keepSeed, successionDays } from './crops';
 import { kitchenDay, putByDay } from './kitchen';
+import { pollination } from './bees';
 import { freshSpoilRate, shelveRoots } from './storage';
 import { newcomerMorale } from './newcomers';
 
@@ -115,6 +116,17 @@ export function fieldHarvestSplit(s: GameState): { total: number; potato: number
 }
 export const fieldHarvest = (s: GameState): number => fieldHarvestSplit(s).total;
 
+/**
+ * The hens' year beyond the day length: the fall molt (October to mid-November) stops about half of them, and a coop with power
+ * for a light on a timer keeps a quarter more laying through the short days.
+ */
+export function henSeason(s: GameState, doy: number): number {
+  const molt = doy >= 280 && doy < 325 ? 0.55 : 1;
+  const short = doy > 280 || doy < 70;
+  const lit = short && s.structures.some(st => st.kind === 'chicken_coop' && isFinished(st) && s.utilities.lit.includes(st.id));
+  return molt * (lit ? 1.25 : 1) * 1.04;
+}
+
 /** What the place grows a day (kcal), by source, after the weather and the tending chores. */
 export interface ProduceParts { eggs: number; veg: number; greens: number; orchard: number; field: { total: number; potato: number; dry: number } }
 export function produceParts(s: GameState): ProduceParts {
@@ -133,12 +145,12 @@ export function produceParts(s: GameState): ProduceParts {
   // a month to come back after hail (replanted from saved seed), then a shorter season
   const hd = hailThisYear(s), hail = hd == null || doy < hd ? 1 : doy - hd < 30 ? 0 : 0.7;
   const veg = gardens * 2500 * season * (0.6 + 0.08 * skill) * SOIL_YIELD[s.site.soil] * greenhousePeak(s) * hail * careYield(s, 'weeds') * gardenFactor(s);
-  const grow = climate(s).grow;
+  const grow = climate(s).grow, pol = pollination(s);
   return {
-    eggs: Math.max(0, eggs) * Math.max(0.5, grow),
-    veg: Math.max(0, veg) * grow,
+    eggs: Math.max(0, eggs) * Math.max(0.5, grow) * henSeason(s, doy),
+    veg: Math.max(0, veg) * grow * pol.garden,
     greens: greenhouseGreens(s) * careYield(s, 'greenhouse') * grow,
-    orchard: orchardYield(s) * careYield(s, 'orchard') * grow,
+    orchard: orchardYield(s) * careYield(s, 'orchard') * grow * pol.orchard,
     field: fieldHarvestSplit(s),
   };
 }
