@@ -9,7 +9,7 @@ const LEVELS: Difficulty[] = ['cozy', 'standard', 'hardcore'];
 
 describe('difficulty table', () => {
   it('Standard is 1 everywhere, so a Standard run is exactly the intended game', () => {
-    for (const [k, v] of Object.entries(DIFFICULTY.standard)) expect(v).toBe(k === 'hunt' ? 0 : 1);
+    for (const [k, v] of Object.entries(DIFFICULTY.standard)) expect(v).toBe(k === 'hunt' || k === 'winter' ? 0 : k === 'adapt' ? 0.3 : 1);
   });
 
   it('each knob is ordered Cozy < Standard < Hardcore (hardness) or the reverse (warning, money)', () => {
@@ -75,7 +75,7 @@ describe('what the knobs do', () => {
 
 describe('the menu text', () => {
   it('Standard is the intended game; the others list what changes against it', () => {
-    expect(difficultySummary('standard')).toEqual(['the intended game']);
+    expect(difficultySummary('standard')).toEqual(['after the first year crews are a little bigger against a well-defended place']);
     const hc = difficultySummary('hardcore').join('; ');
     expect(hc).toContain('size of raiding crews +30%');
     expect(hc).toContain('raids at the gate +54%');
@@ -83,6 +83,8 @@ describe('the menu text', () => {
     expect(hc).toContain('a crew finds a hiding family 12 points more often');
     expect(hc).not.toMatch(/price|permit|savings/);
     expect(hc).toContain('permadeath');
+    expect(hc).toContain('after the first year the crews that come for a well-defended place are bigger');
+    expect(hc).toContain('the first winter after the hit brings a deep freeze');
     const cz = difficultySummary('cozy').join('; ');
     expect(cz).toContain('warning before the hit +60%');
     expect(cz).toContain('size of raiding crews -30%');

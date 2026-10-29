@@ -41,6 +41,8 @@ export const FX = {
   GRAVITY_M: 7, GRAVITY_CUT: 0.6,
   /** Raids: the road lane's cost counts this much (it is the easy way), and how much cheaper a lane must be to draw the crew off it. */
   ROAD_EASE: 0.75, LANE_MARGIN: 0.85,
+  /** The ground's share of the defense (0-1) counts as up to this many defense points in the shared strength (sim/adaptive.ts `terrain`; the scale runs 40 = nothing to 100 = full). */
+  DEFENSE_POINTS: 15,
 } as const;
 
 /** Sun on a structure's ground relative to level: 0.75–1.25, 1 on the level (or with no ground known). */
@@ -152,3 +154,6 @@ export function terrainCards(s: GameState): TerrainCard[] {
   if (res && !s.structures.some(st => st.kind === 'reservoir') && s.structures.some(st => st.kind === 'well_drilled' && isFinished(st))) out.push({ id: 'land_reservoir', title: 'A bench above the camp for a reservoir', why: res.reason, urgency: 21, mode: 'water' });
   return out.sort((a, b) => b.urgency - a.urgency).slice(0, 1);
 }
+
+/** The ground's share of the defense in the shared strength's own unit: defense-equivalent points (0 to `FX.DEFENSE_POINTS`). */
+export const terrainPoints = (s: GameState): number => Math.round(terrainDefense(s).score * FX.DEFENSE_POINTS * 10) / 10;

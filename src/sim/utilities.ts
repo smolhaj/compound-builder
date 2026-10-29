@@ -25,6 +25,7 @@ import { hasAll, type MaterialId, type Stock } from './materials';
 import { wellYield } from './effects';
 import { stormOutage } from './weatherThreats';
 import { greenhouseKwh } from './greenhouse';
+import { bestLevel } from './skills';
 
 /** What utility buildings provide. */
 export interface UtilityDef {
@@ -73,6 +74,14 @@ export const FIT = {
 };
 /** Generator fuel: liters per kWh (a small gas generator). */
 export const FUEL_L_PER_KWH = 0.45;
+/**
+ * A good hand at wiring and engines (sim/skills.ts: the wiring and solar course, the small engines course, an
+ * electrician in the family) keeps the pump controller and the inverter from tripping and the generator tuned:
+ * 7 % fewer pump faults a level above 3, a generator that burns 1.5 % less fuel a level above 3. Never worse than before.
+ */
+const handAt = (s: GameState): number => Math.max(bestLevel(s, 'electrical'), bestLevel(s, 'mechanic') * 0.7);
+export const faultFactor = (s: GameState): number => Math.max(0.6, 1 - 0.07 * Math.max(0, handAt(s) - 3));
+export const genTune = (s: GameState): number => Math.max(0.88, 1 - 0.015 * Math.max(0, handAt(s) - 3));
 /** Liters in one stock unit of fuel (a 20 L jerry can). */
 export const FUEL_UNIT_L = 20;
 
@@ -366,10 +375,10 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
     if (have < d - 0.05 && genKw > 0) {
       const need = Math.min(d - have, genKw * 8);
       const fuel = s.stock.fuel * FUEL_UNIT_L - u.fuelL;
-      const run = Math.min(need * FUEL_L_PER_KWH, Math.max(0, fuel));
+      const run = Math.min(need * FUEL_L_PER_KWH * genTune(s), Math.max(0, fuel));
       u.fuelL += run;
       while (u.fuelL >= FUEL_UNIT_L) { u.fuelL -= FUEL_UNIT_L; s.stock.fuel--; }
-      const made = run / FUEL_L_PER_KWH;
+      const made = run / (FUEL_L_PER_KWH * genTune(s));
       gen += made; have += made;
       if (fuel <= 0.01) log(s, 'The generator is out of fuel.');
     }
@@ -400,7 +409,7 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
       const powered = !def.water.needsPower || lit.has(st.id);
       if (!u.broken.includes(st.id) && powered) supply += def.water.lpd * wellYield(s, st.kind);
       // pumps wear out: ~1 failure in 2 years of use
-      if (def.water.needsPower && !u.broken.includes(st.id) && rnd < 1 / 700) { u.broken.push(st.id); log(s, townOpen ? 'The well pump has failed. The well company is coming out ($850).' : 'The well pump has failed: a mechanic and a hardware kit to fix it.'); }
+      if (def.water.needsPower && !u.broken.includes(st.id) && rnd < faultFactor(s) / 700) { u.broken.push(st.id); log(s, townOpen ? 'The well pump has failed. The well company is coming out ($850).' : 'The well pump has failed: a mechanic and a hardware kit to fix it.'); }
       // while the town works, the well company comes out and fixes it (playtest: an unrepaired pump in peacetime killed families)
       else if (u.broken.includes(st.id) && townOpen && rnd < 0.5) { u.broken = u.broken.filter(x => x !== st.id); s.money -= 850; log(s, 'The well company replaced the pump: $850.'); }
     }
