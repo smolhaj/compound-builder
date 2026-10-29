@@ -414,6 +414,21 @@ function paintMetalSiding(): HTMLCanvasElement {
   return c;
 }
 
+/** Painted container steel for a house: pale ribbed paint (the tint multiplies it, so it stays the colour it names instead of going near-black). */
+function paintShellSteel(): HTMLCanvasElement {
+  const N = 256, ribs = 12, pw = N / ribs;
+  const [c, g] = canvas(N);
+  const r = lcg(97);
+  for (let i = 0; i < ribs; i++) {
+    const grd = g.createLinearGradient(i * pw, 0, (i + 1) * pw, 0);
+    grd.addColorStop(0, rgb(190, 190, 186)); grd.addColorStop(0.5, rgb(250, 250, 246)); grd.addColorStop(1, rgb(176, 176, 172));
+    g.fillStyle = grd;
+    g.fillRect(i * pw, 0, pw, N);
+  }
+  for (let k = 0; k < 40; k++) { g.fillStyle = `rgba(120,90,60,${0.03 + r() * 0.06})`; g.fillRect(r() * N, r() * N * 0.5 + N * 0.5, 1 + r() * 3, 20 + r() * 60); }
+  return c;
+}
+
 /** Log wall: horizontal round logs (~30 cm) with pale chinking between. */
 function paintLogWall(): HTMLCanvasElement {
   const N = 512, n = 10, lh = N / n;
@@ -844,8 +859,8 @@ export function kitMaterial(id: KitMaterialId): THREE.MeshStandardMaterial {
     case 'led_amber': m = new THREE.MeshStandardMaterial({ color: 0x3a2a08, roughness: 0.4, emissive: new THREE.Color(1, 0.65, 0.1), emissiveIntensity: 1.4 }); break;
     case 'shell_blue': case 'shell_rust': case 'shell_tan': case 'shell_green': {
       const tint = { shell_blue: 0x4f78a8, shell_rust: 0xb0623a, shell_tan: 0xc9ad80, shell_green: 0x5f8a5a }[id];
-      const mm = texMat(id, paintMetalSiding, 1.6, 0.55, 0.08);
-      mm.color.set(tint).multiplyScalar(1.15);
+      const mm = texMat(id, paintShellSteel, 1.4, 0.55, 0.04);
+      mm.color.set(tint);
       m = mm; break;
     }
     case 'container_red': case 'container_blue': case 'container_green': case 'container_tan': case 'container_black': case 'container_rust': {
