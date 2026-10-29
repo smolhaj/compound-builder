@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { PARCEL_SIZE, ParcelTerrain } from './parcelTerrain';
 import { REGION_IDS } from '../../sim/regions';
+import type { LotKind, LotSpec } from '../../sim/lots';
 
 describe('ParcelTerrain', () => {
   it('is deterministic per seed and differs between seeds', () => {
@@ -109,5 +110,71 @@ describe('ParcelTerrain by region', () => {
   it('the Mountain West parcel is the one it always was', () => {
     const a = new ParcelTerrain(7), b = new ParcelTerrain(7, { region: 'mountain_west' });
     for (let x = 0; x <= PARCEL_SIZE; x += 11) for (let z = 0; z <= PARCEL_SIZE; z += 11) expect(b.natural(x, z)).toEqual(a.natural(x, z));
+  });
+
+  describe('lot archetypes', () => {
+    const rect = { x0: 0, z0: 0, x1: PARCEL_SIZE, z1: PARCEL_SIZE };
+    const mk = (kind: LotKind, over: Partial<LotSpec> = {}, region: 'mountain_west' | 'pnw' = 'mountain_west') =>
+      new ParcelTerrain(5, { region, home: rect, lot: { kind, seed: 4, relief: 8, outlier: false, elevM: 2000, flip: 1, creek: kind === 'hillside', ...over } });
+
+    it('draws the lot field: the ground is the datum plus the lot relief', () => {
+      const t = mk('gorge');
+      for (const [x, z] of [[20, 10], [40, 30], [60, 50]]) expect(t.natural(x, z).h).toBeCloseTo(-0.1 + t.lot!.h(x, z), 1);
+    });
+
+    it('a gorge has water in its bed and none on the rim; the stream runs downhill', () => {
+      const t = mk('gorge'), c = t.creek;
+      expect(t.hasStream).toBe(true);
+      for (const x of [10, 30, 50]) {
+        expect(t.isCreek(x, c.zAt(x))).toBe(true);
+        expect(t.isCreek(x, c.zAt(x) + 30)).toBe(false);
+      }
+      expect(c.waterY(60)).toBeLessThanOrEqual(c.waterY(10));
+    });
+
+    it('a ridge has no stream to draw; the lake kinds flood their basins, not the pad or the road', () => {
+      expect(mk('ridge').hasStream).toBe(false);
+      for (const kind of ['bluff', 'island'] as const) {
+        const t = mk(kind), st = t.lot!, wet = [0, 0];
+        for (let x = 0; x <= 67; x += 3) for (let z = 0; z <= 67; z += 3) wet[t.isCreek(x, z) ? 1 : 0]++;
+        expect(wet[1], kind).toBeGreaterThan(20);
+        expect(t.lakeY).toBeCloseTo(-0.1 + st.lake!.y, 5);
+        for (let z = 0; z <= 67; z += 5) expect(t.isCreek(70, z), `${kind} road`).toBe(false);
+      }
+      expect(mk('ridge').lakeY).toBeNull();
+    });
+
+    it('nothing grows under the lake', () => {
+      for (const kind of ['bluff', 'island'] as const) {
+        const t = mk(kind);
+        let wet = 0, grows = 0;
+        for (let x = 0; x <= 67; x += 1.5) for (let z = 0; z <= 67; z += 1.5) if (t.isCreek(x, z)) { wet++; if (t.natural(x, z).forest > 0) grows++; }
+        expect(wet, kind).toBeGreaterThan(30);
+        expect(grows, kind).toBe(0);
+      }
+    });
+
+    it('no timber on cliffs or above the tree line; timber on gentle ground below it', () => {
+      const t = mk('gorge', { relief: 30, outlier: true });
+      let steep = 0, steepForest = 0;
+      for (let x = 0; x <= 67; x += 2) for (let z = 0; z <= 67; z += 2) if (t.lotSlope(x, z) > 1.2) { steep++; steepForest += t.natural(x, z).forest > 0.3 ? 1 : 0; }
+      expect(steep).toBeGreaterThan(20);
+      expect(steepForest / steep).toBeLessThan(0.05);
+      const high = mk('ridge', { elevM: 3400 }), low = mk('ridge', { elevM: 2000 });
+      let fh = 0, fl = 0;
+      for (let x = 5; x <= 62; x += 3) for (let z = 5; z <= 62; z += 3) { fh += high.natural(x, z).forest; fl += low.natural(x, z).forest; }
+      expect(fh).toBeLessThan(fl * 0.3);
+    });
+
+    it('is deterministic, and the old Mountain West parcel is untouched when there is no lot', () => {
+      const a = mk('bench'), b = mk('bench');
+      expect(a.natural(30, 30)).toEqual(b.natural(30, 30));
+      expect(new ParcelTerrain(7, { lot: null }).natural(30, 30)).toEqual(new ParcelTerrain(7).natural(30, 30));
+    });
+
+    it('works in the other hill regions', () => {
+      const t = mk('hillside', {}, 'pnw');
+      expect(Number.isFinite(t.height(30, 30))).toBe(true);
+    });
   });
 });
