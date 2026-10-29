@@ -483,14 +483,19 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
           // trusses down to the ground at every other joint where the gap is more than a step: two legs and a cross brace, a concrete foot under each leg
           const pa = along(run.pts, s0), gy = ground(pa.x, pa.z), under = p.y - R - gy;
           if (i % 2 === 0 && under > 0.12) {
-            const nx = -pa.dz, nz = pa.dx;
+            const nx = -pa.dz, nz = pa.dx, legs: THREE.Vector3[] = [];
             for (const sg of [-1, 1]) {
-              const lx = pa.x + nx * sg * R * 0.8, lz = pa.z + nz * sg * R * 0.8, ly = ground(lx, lz);
-              add('steel', new THREE.BoxGeometry(0.1 * M, p.y - R * 0.7 - ly, 0.1 * M).translate(lx, ly + (p.y - R * 0.7 - ly) / 2, lz));
-              add('concrete', new THREE.BoxGeometry(0.4 * M, 0.3 * M, 0.4 * M).translate(lx, ly + 0.1 * M, lz));
+              const lx = pa.x + nx * sg * R * 0.8, lz = pa.z + nz * sg * R * 0.8, ly = ground(lx, lz), top = p.y - R * 0.75;
+              // a square steel leg (35 cm) up to the tube, on a concrete foot
+              add('steel', new THREE.BoxGeometry(0.35 * M, top - ly + 0.05, 0.35 * M).translate(lx, ly - 0.05 + (top - ly + 0.05) / 2, lz));
+              add('concrete', new THREE.BoxGeometry(0.9 * M, 0.45 * M, 0.9 * M).translate(lx, ly + 0.1 * M, lz));
+              legs.push(new THREE.Vector3(lx, ly, lz));
             }
-            const lowY = Math.min(ground(pa.x + nx * R * 0.8, pa.z + nz * R * 0.8), ground(pa.x - nx * R * 0.8, pa.z - nz * R * 0.8));
-            add('steel', new THREE.BoxGeometry(R * 1.8, 0.08 * M, 0.08 * M).rotateY(-Math.atan2(pa.dx, -pa.dz) + Math.PI / 2 * 0).translate(pa.x, lowY + (p.y - R * 0.7 - lowY) * 0.5, pa.z));
+            // X-bracing across the pair, a third of the way up, and a cross beam under the tube
+            const top0 = p.y - R * 0.75, mid = (a: THREE.Vector3, k: number) => new THREE.Vector3(a.x, a.y + (top0 - a.y) * k, a.z);
+            tube(mid(legs[0], 0.15), mid(legs[1], 0.85), 0.07 * M, 'steel', false);
+            tube(mid(legs[1], 0.15), mid(legs[0], 0.85), 0.07 * M, 'steel', false);
+            tube(new THREE.Vector3(legs[0].x, top0, legs[0].z), new THREE.Vector3(legs[1].x, top0, legs[1].z), 0.12 * M, 'steel', false);
           }
         }
       }
