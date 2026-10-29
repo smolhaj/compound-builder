@@ -9,8 +9,9 @@
  * cheap land leaves more to build and stock with. Pure.
  */
 import { mulberry32 } from './rng';
-import type { LotSpec } from './lots';
 import { REGION_IDS, REGIONS, SIZE_FACTOR, type RegionId } from './regions';
+import type { LotSpec } from './lots';
+import { GW_FACTOR, lotDriveFt, lotPriceFactor, rollLot } from './lotListing';
 import { driveQuote, HOUSE_NAME, improvementValue, powerQuote, type Condition, type HouseKind, type Improvements } from './improvements';
 
 /** The home square on the survey grid (world units; 67 = a quarter-quarter section, 40 acres). */
@@ -84,6 +85,7 @@ export function sitePrice(s: Omit<Site, 'price' | 'id' | 'name'>): number {
   k *= s.timber > 1.1 ? 1.08 : s.timber < 0.5 ? 0.95 : 1;
   k *= s.soil === 'deep' ? 1.1 : s.soil === 'thin' ? 0.9 : 1;
   k *= 1 + 0.2 * Math.max(0, 1 - s.miles / 20);       // close to town costs more
+  k *= lotPriceFactor(s);                              // flat pads and an easy road raise it, a lake raises it, cliffs lower it
   return Math.round(s.acres * r.perAcre * SIZE_FACTOR[s.acres] * k / 500) * 500 + improvementValue(s.improvements, s.gwDepth);
 }
 
@@ -176,14 +178,21 @@ export function listings(seed: number, region: RegionId = 'mountain_west', wish:
     const m = r();
     const ts = R.townScale ?? 1;
     const miles = Math.max(1, Math.round((wish.town === 'near' ? 2 + m * 8 : wish.town === 'far' ? 15 + m * 20 : acres === 5 ? 3 + m * 8 : 6 + m * 22) * ts));
-    const improvements = rollImprovements(ri, acres, miles, gwDepth, wish.built ?? 'any', region);
-    const base = { region, acres, home: HOME_RECT[acres], creek, spring, gwDepth, gwQuality, timber, soil, miles, improvements };
+    // the shape of the ground (sim/lotListing.ts), rolled on its own stream so the rest of the listing is what it always was
+    const lotR = mulberry32(seed * 6007 + REGION_IDS.indexOf(region) * 131 + k * 17 + 5);
+    const lr = rollLot(lotR, region, acres, wish.water !== 'any' ? wish.water : k === creekAt ? 'creek' : k === dryAt ? 'dry' : 'any', seed);
+    const gwLot = lr ? Math.max(3, Math.min(140, Math.round(gwDepth * GW_FACTOR[lr.spec.kind]))) : gwDepth;
+    const improved = rollImprovements(ri, acres, miles, gwLot, wish.built ?? 'any', region);
+    // the drive is as long as the run from the county road up to the best flat on this ground
+    const driveFt = lr ? lotDriveFt({ lot: lr.spec, home: HOME_RECT[acres] }) : null;
+    const improvements = driveFt ? { ...improved, driveFt } : improved;
+    const base = { region, acres, home: HOME_RECT[acres], creek: lr ? lr.creek : creek, spring: lr ? lr.spring : spring, gwDepth: gwLot, gwQuality, timber, soil, miles, improvements, lot: lr ? lr.spec : null };
     out.push({ id: `${region}-${k}`, name: `${ROADS[Math.floor(r() * ROADS.length)]} Road ${KIND[acres][Math.floor(r() * 2)]}`, ...base, price: sitePrice(base) });
   }
   // nothing in budget on an open search: the agent finds something that is (small, dry, way out)
   if (wish.acres === 'any' && !out.some(l => affordable(l, budget))) {
     const last = out[n - 1];
-    const cheap = { ...last, acres: 5 as Acres, home: HOME_RECT[5], creek: false, spring: false, timber: Math.min(last.timber, 0.6), miles: 24, name: 'Two Mile Road lot', improvements: { ...RAW, poleFt: 400, driveFt: 200 } };
+    const cheap = { ...last, lot: null, acres: 5 as Acres, home: HOME_RECT[5], creek: false, spring: false, timber: Math.min(last.timber, 0.6), miles: 24, name: 'Two Mile Road lot', improvements: { ...RAW, poleFt: 400, driveFt: 200 } };
     out[n - 1] = { ...cheap, price: sitePrice(cheap) };
   }
   return out;
