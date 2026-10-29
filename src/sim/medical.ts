@@ -98,6 +98,8 @@ const person = (s: GameState, pid: string) => s.people.find(p => p.id === pid);
 const here = (s: GameState, p: Person) => { const n = s.personState.find(x => x.id === p.id)?.needs; return !!n && n.died == null && !n.taken && !n.left; };
 const clamp = (v: number, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, v));
 const cozy = (s: GameState) => s.disaster.difficulty === 'cozy';
+/** Hardcore is realistic: untreated sepsis and dehydration kill adults too. Cozy and Standard are gentle (a healthy adult usually pulls through). */
+export const harsh = (s: GameState) => s.disaster.difficulty === 'hardcore';
 const hospitalOpen = (s: GameState) => s.disaster.tracks.medical >= 0.5 && s.disaster.tracks.banks >= 0.5;
 export const HOSPITAL_USD = 3500;
 /** Kit units one short course of antibiotics takes out of the medical kit. */
@@ -223,7 +225,7 @@ function course(x: Ctx): boolean {
         // untreated it creeps up; the body can turn the corner (a healthy adult more often), and about half do not
         h.sev = clamp(h.sev + 1.3 - skill * 0.1);
         if (h.sev >= 60 && n.health >= 50 && r() < 0.05 + skill * 0.01) { h.sev = Math.max(0, h.sev - 25); c.care = 'the fever broke'; }
-        if (h.sev >= 85 && r() < (0.07 - skill * 0.004) * (n.health >= 60 && !p.kid && !p.elder ? 0.3 : 1)) return die('blood poisoning');   // (a healthy adult more often pulls through)
+        if (h.sev >= 85 && r() < (0.07 - skill * 0.004) * (n.health >= 60 && !p.kid && !p.elder && !harsh(s) ? 0.3 : 1)) return die('blood poisoning');   // (a healthy adult more often pulls through)
         if (h.sev >= 70 && !c.noted) { c.noted = true; out.push(`${nameOf} has a fever and a racing heart: the infection is in the blood. It needs antibiotics now.`); }
       }
       if (on && h.sev > 80 && r() < 0.03) return die('blood poisoning');
@@ -283,7 +285,7 @@ function course(x: Ctx): boolean {
       if (c.abx === undefined && h.sev >= 50 && worthCourse(s, p, h.sev) && courses(s) >= 1 && takeCourse(s)) { c.abx = day; out.push(`${nameOf} started antibiotics for dysentery.`); }
       if (c.abx !== undefined && day - c.abx < 5) heal += 4;
       h.sev = Math.max(0, h.sev + (fluids === 0 ? 2.5 : -heal));
-      if (fluids < 0.5 && little && h.sev >= 65 && r() < 0.05) return die('dehydration');
+      if (fluids < 0.5 && (little || harsh(s) && n.health < 60) && h.sev >= 65 && r() < (harsh(s) ? 0.09 : 0.05)) return die('dehydration');
       // it goes round a house without soap and clean water
       if (!hygieneOk(s) || !s.utilities.report || s.utilities.report.shortL > 0) spread(x, 0.03);
       else spread(x, 0.01);
@@ -401,7 +403,7 @@ export function medicalDay(s: GameState): string[] {
   }
   // dysentery from bad water: no filter and no boiling, or a house with no soap
   { const noSoap = !hygieneOk(s), dirty = s.utilities.hauling && !s.structures.some(x => x.kind === 'filtration_shed' && x.stage >= 5) && s.stock.water_filter < 0.01 && s.stock.firewood < 0.05;
-    if ((noSoap || dirty) && r() < (dirty ? 0.006 : 0.0008) && living.length && !M.epidemic) {
+    if ((noSoap || dirty) && r() < (dirty ? 0.006 : 0.0008) * (harsh(s) ? 1.6 : 1) && living.length && !M.epidemic) {
       const p = living[Math.floor(r() * living.length)];
       if (startCase(s, p.id, 'dysentery', 38, { src: 'water' }, 'dysentery')) { out.push(`${p.first} has dysentery: cramps, a fever and the flux. ${dirty ? 'The water' : 'No soap in the house'} is the likely cause.`); M.epidemic = { kind: 'dysentery', since: day, quarantine: false, asked: false, cases: 1 }; }
     } }

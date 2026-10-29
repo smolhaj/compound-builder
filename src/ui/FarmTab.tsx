@@ -12,6 +12,7 @@ import { dishLines, hasMill, hasOven, kitchenOf, toggleMethod } from '../sim/kit
 import { cellarCapacity, cellarKcal, cellarTempC, overflow, pantryLoad, pantryRoom } from '../sim/storage';
 import { foodUnits } from '../sim/pantry';
 import { ANIMALS, feedDemand, sheepRoom, sheepSheltered, winterHay, type Animal } from '../sim/livestock';
+import { REGIONS } from '../sim/regions';
 import { apiaries, apiaryReport, harvestHoney, harvestProblem, HIVES, stockApiary, stockProblem as bStockProblem } from '../sim/bees';
 import { expectedSyrup, hasMaples, hasShack, mapleOf, sapSeason, setTaps, tapsOut, woodsTaps } from '../sim/maple';
 import { butcher, butcherProblem, feedBudget, herdOf, sheltered } from '../sim/herd';
@@ -78,9 +79,12 @@ function SeasonView({ game }: { game: GameState }) {
   </>;
 }
 
+/** The year chart's label column is narrow: short names, the full one in the tooltip. */
+const shortLabel = (l: string): string => l.split(':')[0].replace('Jars, dryer and crocks', 'Jars and dryer').replace('Sun-drying weather', 'Sun-drying').replace('Curing weather', 'Curing');
+
 function FragmentRow({ label, color, cells, cur }: { label: string; color: string; cells: number[]; cur: number }): ReactNode {
   return <>
-    <span style={{ fontSize: 10.5, color: DIM, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 92, paddingRight: 3 }} title={label}>{label}</span>
+    <span style={{ fontSize: 10.5, color: DIM, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 92, paddingRight: 3 }} title={label}>{shortLabel(label)}</span>
     {cells.map((c, i) => <span key={i} style={{ height: 11, background: c > 0 ? color : 'rgba(255,255,255,0.04)', opacity: c > 0 ? 0.35 + 0.65 * c : 1, outline: i === cur ? '1px solid rgba(255,255,255,0.5)' : undefined }} />)}
   </>;
 }
@@ -186,6 +190,8 @@ function AnimalsView({ game }: { game: GameState }) {
   const g = useGameStore();
   const have = ANIMALS.filter(a => (game.stock[a] ?? 0) >= 1), h = herdOf(game);
   const fb = feedBudget(game, feedDemand(game), winterHay(game));
+  const [frost0, frost1] = REGIONS[game.site.region].frost;
+  const hayWinterDays = fb.hayNeed > 0 ? fb.hayBales / (fb.hayNeed / (365 - (frost1 - frost0))) : Infinity;
   const act = (label: string, why: string | null, run: () => void, tip: string) => <button style={{ ...btn(!why), opacity: why ? 0.55 : 1 }} title={why ?? tip} disabled={!!why} onClick={run}>{label}</button>;
   const hives = apiaries(game), bush = hasMaples(game);
   return <>
@@ -203,7 +209,7 @@ function AnimalsView({ game }: { game: GameState }) {
       })}
       <Row label="Roof for the herd" value={`${Math.round(sheltered(game) * 100)} %`} tone={sheltered(game) < 0.6 ? 'warn' : 'good'} title="Animal units under a barn, barnyard or sheep barn: fewer sick animals, no winter wasting" />
       <Row label="Pasture" value={fb.pastureAcres < 0.1 ? 'none' : `${fb.units.toFixed(1)} of ${fb.carries.toFixed(1)} animal units`} tone={fb.stocking > 1.3 ? 'bad' : fb.stocking > 1 ? 'warn' : undefined} title={`${fb.pastureAcres.toFixed(1)} acres of open grass; the grass is at ${Math.round(fb.pasture * 100)} %`} />
-      <Row label="Hay" value={<span style={{ color: fb.hayBales < fb.hayNeed ? TONE.warn : undefined }}>{fb.hayBales} bales{isFinite(fb.hayDays) ? ` · ${fb.hayDays > 999 ? 'plenty' : `${Math.floor(fb.hayDays)} days`}` : ''} <span style={{ color: DIM }}>/ {fb.hayNeed} for winter</span></span>} />
+      <Row label="Hay" value={<span style={{ color: fb.hayBales < fb.hayNeed ? TONE.warn : undefined }}>{fb.hayBales} bales{hayWinterDays > 0 && isFinite(hayWinterDays) ? ` · ${hayWinterDays > 999 ? 'plenty' : `${Math.floor(hayWinterDays)} days`}` : ''} <span style={{ color: DIM }}>/ {fb.hayNeed} for winter</span></span>} title="Days of hay at the winter feeding rate (in summer the herd grazes and eats little, so the bales would seem to last forever)" />
       <Row label="Feed" value={<span style={{ color: fb.feedDays < 14 ? TONE.warn : undefined }}>{fb.feedBags} bags{isFinite(fb.feedDays) ? ` · ${fb.feedDays > 999 ? 'plenty' : `${Math.floor(fb.feedDays)} days`}` : ''}</span>} />
       {(game.stock.sheep ?? 0) >= 1 && <Note tone={sheepSheltered(game) < 1 ? 'warn' : 'good'}>{sheepSheltered(game) < 1 ? `Roof for ${sheepRoom(game)} of ${Math.floor(game.stock.sheep)} sheep: build a sheep barn (30) before winter.` : 'All the sheep have a roof for the winter.'}</Note>}
       <Row label="Manure pile" value={`${(game.stock.manure ?? 0).toFixed(1)} loads`} title="Goes on the fields at spring sowing" />

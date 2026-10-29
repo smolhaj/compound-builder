@@ -237,3 +237,20 @@ describe('medicines have a shelf life; the medic is the best present', () => {
     expect(() => step(up, 5)).not.toThrow();
   });
 });
+
+describe('difficulty scales how deadly it is', () => {
+  it('Hardcore kills healthy adults with untreated blood poisoning far more often than Standard; Cozy never', () => {
+    const deaths = (diff: 'standard' | 'hardcore' | 'cozy') => {
+      let d = 0;
+      for (let seed = 1; seed <= 40; seed++) {
+        const g = game(seed); g.disaster.difficulty = diff; noMedics(g);
+        startCase(g, g.people[0].id, 'infection', 80, {}, 'infected wound'); days(g, 40);
+        if (g.personState[0].needs.died != null) d++;
+      }
+      return d;
+    };
+    const std = deaths('standard'), hard = deaths('hardcore');
+    expect(hard).toBeGreaterThan(std + 5);
+    expect(deaths('cozy')).toBe(0);
+  });
+});
