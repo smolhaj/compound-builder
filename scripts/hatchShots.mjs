@@ -26,10 +26,10 @@ try {
   await page.evaluate(() => {
     const cb = window.__cb, G = cb.game, c = cb.world.camp; G.getState().setSpeed(0);
     window.__b = {};
-    const place = (key, kind, dx, dz, rot = 0, abs = false) => { const sp = abs ? [dx, dz] : cb.tool.findSpot(kind, c.x + dx, c.z + dz, rot, 6); if (!sp) { console.warn('no spot', key); return null; } G.getState().plan(kind, sp[0], sp[1], rot); const st = G.getState().game.structures.at(-1); window.__b[key] = st; return st; };
+    const place = (key, kind, dx, dz, rot = 0, abs = false) => { const sp = abs ? cb.tool.findSpot(kind, dx, dz, rot, 1.5) : cb.tool.findSpot(kind, c.x + dx, c.z + dz, rot, 6); if (!sp) { console.warn('no spot', key); return null; } G.getState().plan(kind, sp[0], sp[1], rot); const st = G.getState().game.structures.at(-1); window.__b[key] = st; return st; };
     // the house with the floor hatch in it, and a bunkroom and a corridor beyond
-    const h = place('log_house', -4, -3);
-    if (h) { place('floorhatch', h.x - 0.35, h.z + 0.2, 0, true); place('bunker_dorm', h.x + 0.4, h.z + 0.2, 0, true); }
+    const h = place('log_house', 'log_house', -4, -3);
+    if (h) { place('floorhatch', 'bunker_floorhatch', h.x - 0.25, h.z + 0.25, 0, true); place('bunker_dorm', 'bunker_dorm', h.x + 0.5, h.z + 0.25, 0, true); }
     // five stage sites: each a hatch, a corridor and the room being built
     const site = (key, dx, dz, room, stage, f) => {
       place(key + '_hatch', 'bunker_hatch', dx + 0.25, dz - 6.75); place(key + '_corr', 'bunker_corridor', dx + 1.0, dz - 6.75, 1);
