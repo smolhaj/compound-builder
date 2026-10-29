@@ -38,6 +38,13 @@ export type SpotKind = 'bed' | 'bunk' | 'couch' | 'floor' | 'tent' | 'outbuildin
 export const SPOT_ORDER: readonly SpotKind[] = ['bed', 'bunk', 'couch', 'floor', 'tent', 'outbuilding', 'nowhere'];
 export const SPOT_NAME: Record<SpotKind, string> = { bed: 'a bed', bunk: 'a bunk', couch: 'the couch', floor: 'a sleeping bag on the floor', tent: 'a tent', outbuilding: 'a bag on the shop floor', nowhere: 'nowhere (the truck, the porch)' };
 
+/** Dwellings with their own front door: relatives and elders sleep best in one (sim/kin.ts). */
+export const SEPARATE_DWELLINGS: ReadonlySet<string> = new Set(['cottage', 'guest_house', 'moms_house']);
+/** Who wants a place of their own: relatives who came to join, and the old. */
+const wantsOwnPlace = (p: Pick<Person, 'rel' | 'elder'>) => !!p.rel || !!p.elder;
+/** Morale target for a relative or an elder with a front door of their own (the porch, the kettle, their things). */
+export const OWN_PLACE_MORALE = 3;
+
 /** A dome tent sleeps 3 (a "4-person" tent holds 3 with gear); the camp wall tent sleeps 4. */
 export const TENT_SEATS = 3, WALL_TENT_SEATS = 4;
 /** Prices: a 4-person dome tent, a 20°F sleeping bag (stock goods `tent`, `sleeping_bag`). */
@@ -51,6 +58,8 @@ const HOMES: Record<string, Spec> = {
   farmhouse: { couches: 2, floorM2: 16 },
   trailer: { couches: 1, floorM2: 8 },
   cottage: { couches: 1, floorM2: 5 },
+  guest_house: { couches: 1, floorM2: 3 },
+  moms_house: { couches: 1, floorM2: 8 },
   bunker_dorm: { bunks: 8, floorM2: 6, floorQ: 0.5 },
   bunker_container: { bunks: 4, floorM2: 0 },
   bunker_medical: { bunks: 1, floorM2: 0 },
@@ -161,6 +170,8 @@ export interface Sleeper {
   tired: number;
   hasBag: boolean;
   note: string;
+  /** A relative or an elder in a dwelling of their own (a guest house, a cottage, Mom's house). */
+  own?: boolean;
 }
 
 /** Everybody on the place who sleeps here (the living, not the taken; `guests` are people being considered). */
@@ -281,14 +292,18 @@ export function housingPlan(s: GameState, guests: readonly Person[] = []): Housi
   const cost = (p: Person, k: SpotKind) => (k === 'bed' || k === 'couch' ? space(p) : 1);
   const give = (p: Person, pool: Pool) => { place.set(p.id, { kind: pool.kind, where: pool.where || null, slot: Math.floor(pool.used + 1e-9) }); pool.used += cost(p, pool.kind); pool.left -= cost(p, pool.kind); };
   const all = [...pl, nowhere];
+  // relatives and elders go to a separate dwelling's beds first, when there is one (a guest house, a cottage, Mom's house)
+  const kindOf = new Map(s.structures.map(st => [st.id, st.kind] as const));
+  const ownBeds = all.filter(q => q.kind === 'bed' && SEPARATE_DWELLINGS.has(kindOf.get(q.where) ?? ''));
+  const choices = (p: Person): Pool[] => (wantsOwnPlace(p) && ownBeds.length ? [...ownBeds, ...all] : all);
 
   for (const group of priority(list)) {
     // a couple takes the same place if one has room for both
     if (group.length > 1) {
-      const pool = all.find(q => q.left + 1e-9 >= group.reduce((a, x) => a + cost(x.p, q.kind), 0));
+      const pool = choices(group[0].p).find(q => q.left + 1e-9 >= group.reduce((a, x) => a + cost(x.p, q.kind), 0));
       if (pool) { for (const x of group) give(x.p, pool); continue; }
     }
-    for (const x of group) give(x.p, all.find(q => q.left + 1e-9 >= cost(x.p, q.kind))!);
+    for (const x of group) give(x.p, choices(x.p).find(q => q.left + 1e-9 >= cost(x.p, q.kind))!);
   }
 
   // bags go to the coldest places first
@@ -309,7 +324,8 @@ export function housingPlan(s: GameState, guests: readonly Person[] = []): Housi
     const crowd = spot.kind === 'tent' && spot.where ? Math.max(0, (pl.find(p => p.where === spot.where)?.used ?? 1) - 2) * 0.15 : 0;
     const privacy = Math.max(0, PRIVACY[spot.kind] - crowd);
     const fx = effects(sq.quality, privacy, x.p);
-    out.push({ index: x.index, id: x.p.id, spot, quality: sq.quality, privacy, morale: fx.morale, harm: sq.harm, tired: fx.tired, hasBag: bag, note: sq.note });
+    const own = spot.kind === 'bed' && wantsOwnPlace(x.p) && SEPARATE_DWELLINGS.has(kindOf.get(spot.where ?? '') ?? '');
+    out.push({ index: x.index, id: x.p.id, spot, quality: sq.quality, privacy, morale: fx.morale + (own ? OWN_PLACE_MORALE : 0), harm: sq.harm, tired: fx.tired, hasBag: bag, note: own ? 'a front door of their own' : sq.note, own });
   }
   const noBed = counts.couch + counts.floor + counts.tent + counts.outbuilding + counts.nowhere;
   const used = counts.bed + counts.bunk;
@@ -371,8 +387,9 @@ export interface Fix {
   text: string;
 }
 
+const HOME_NAME: Record<string, string> = { guest_house: 'a guest house', cottage: 'a cottage', moms_house: 'Mom\u2019s house', timber_cabin: 'a timber cabin', log_house: 'a log house' };
 /** Candidate homes to build, cheapest per bed first. (Kit pieces in the Build list.) */
-const BUILDABLE_HOMES = ['cottage', 'timber_cabin', 'log_house'] as const;
+const BUILDABLE_HOMES = ['guest_house', 'cottage', 'moms_house', 'timber_cabin', 'log_house'] as const;
 
 /** Ways to fix a shortage, best first; empty when everyone has a bed. `homeCost` gives the price of a kit piece (the UI's own figure). */
 export function housingFixes(s: GameState, homeCost: (kind: string) => number): Fix[] {
@@ -384,7 +401,7 @@ export function housingFixes(s: GameState, homeCost: (kind: string) => number): 
   const cands = BUILDABLE_HOMES.map(k => ({ k, beds: fixes(k), cost: homeCost(k) }));
   const enough = cands.filter(c => c.beds >= plan.noBed).sort((a, b) => a.cost - b.cost)[0];
   const best = enough ?? [...cands].sort((a, b) => b.beds - a.beds)[0];
-  out.push({ action: 'build', item: best.k, qty: 1, cost: best.cost, helps: Math.min(plan.noBed, best.beds), text: `build ${best.k === 'cottage' ? 'a cottage' : best.k === 'log_house' ? 'a log house' : 'a timber cabin'} (~$${Math.round(best.cost).toLocaleString('en-US')}, ${best.beds} beds)` });
+  out.push({ action: 'build', item: best.k, qty: 1, cost: best.cost, helps: Math.min(plan.noBed, best.beds), text: `build ${HOME_NAME[best.k]} (~$${Math.round(best.cost).toLocaleString('en-US')}, ${best.beds} beds)` });
   if (plan.outside > 0) {
     const have = plan.cap.tents * TENT_SEATS + WALL_TENT_SEATS;
     const seated = plan.sleepers.filter(x => x.spot.kind === 'tent').length;
@@ -429,6 +446,8 @@ export interface ArrivalOutlook {
   worst: number;
   /** Beds that would be free before they come. */
   bedsFree: number;
+  /** Relatives and elders among them who would have a dwelling of their own. */
+  own: number;
 }
 
 /** What taking these people in would mean for sleeping: the gate card's lines. */
@@ -451,7 +470,11 @@ export function arrivalOutlook(s: GameState, guests: readonly Person[]): Arrival
   const displaced = after.sleepers.filter(x => !ids.has(x.id) && before.sleepers.find(b => b.id === x.id && SPOT_ORDER.indexOf(b.spot.kind) < SPOT_ORDER.indexOf(x.spot.kind))).length;
   if (displaced > 0) lines.push(`${displaced} of yours would give up a better place for them.`);
   const worst = Math.min(0, ...after.sleepers.map(x => x.morale));
-  return { guests: kinds, displaced, lines, worst, bedsFree };
+  const own = mine.filter(x => x.own).length;
+  const wantsOwn = guests.filter(wantsOwnPlace).length;
+  if (own > 0) lines.push(`${own === 1 ? 'One' : own} would have a place of their own (a guest house or cottage): they will be happier there.`);
+  else if (wantsOwn > 0) lines.push('A guest house, a cottage or Mom\u2019s house would keep them happier than a spare bed in the main house.');
+  return { guests: kinds, displaced, lines, worst, bedsFree, own };
 }
 
 /** What a tent night is like at this time of year. */

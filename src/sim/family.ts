@@ -38,7 +38,14 @@ export interface Person {
   parents?: string[];
   /** Born on the place. */
   bornHere?: boolean;
+  /** An extended relative (sim/kin.ts): who they are to whom. Absent for the founding household. */
+  rel?: { role: KinRole; of: string };
+  /** Retirement income: Social Security and any pension, a day (stops at the collapse; sim/kin.ts). */
+  income?: { label: string; perDay: number };
 }
+
+/** Extended family (sim/kin.ts): parents, grandparents, in-laws, siblings and grown children. */
+export type KinRole = 'mother' | 'father' | 'grandmother' | 'grandfather' | 'mother_in_law' | 'father_in_law' | 'sister' | 'brother' | 'daughter' | 'son';
 
 const FIRST_F = ['Abigail', 'Ava', 'Beth', 'Carmen', 'Dana', 'Elena', 'Grace', 'Hannah', 'Ivy', 'June', 'Kate', 'Laura', 'Maya', 'Nora', 'Rosa', 'Ruth', 'Sara', 'Tessa', 'Wren'];
 const FIRST_M = ['Aaron', 'Ben', 'Caleb', 'Dan', 'Eli', 'Frank', 'Gabe', 'Hank', 'Isaac', 'Jake', 'Luis', 'Matt', 'Noah', 'Owen', 'Pete', 'Ray', 'Sam', 'Tom', 'Wade'];
@@ -50,7 +57,7 @@ const SHIRTS = [0x8a3b2e, 0x3b5b8c, 0x5a6e3a, 0x7a5a2a, 0x6a3a6a, 0x2f6f6f, 0xa8
  * 2 hobby) whatever the leads are, so changing an adult's job never changes
  * the rest of the family.
  */
-function skills(r: () => number, lead: SkillId[], kid: boolean): Record<SkillId, number> {
+export function skills(r: () => number, lead: SkillId[], kid: boolean): Record<SkillId, number> {
   const out = {} as Record<SkillId, number>;
   for (const s of SKILL_IDS) out[s] = kid ? Math.floor(r() * 2) : Math.floor(r() * 3);
   const bonus = [r(), r(), r()], hobbyAt = r(), hobbyLv = r();

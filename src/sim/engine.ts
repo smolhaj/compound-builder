@@ -21,6 +21,7 @@ import { armoryDay } from './armory';
 import { petsDay } from './pets';
 import { toolsDay } from './tools';
 import { vehiclesDay } from './vehicles';
+import { kinDay } from './kin';
 import { radioDay } from './radio';
 import { waterDay } from './water';
 import { addRunWork, nextRun } from './perimeter';
@@ -171,6 +172,7 @@ function subStep(s: GameState): void {
     for (const line of digDay(s)) log(s, line);
     for (const line of wildlifeDay(s, s.structures.some(st => st.kind === 'root_cellar' && isFinished(st) && s.utilities.lit.includes(st.id)))) log(s, line);
     const e = gateDay(s);
+    for (const line of kinDay(s)) log(s, line);
     // a raid has an hour of arrival (a gang at 2:15 AM); it waits for it and the game runs on until then
     if (e && !(hasCutscene(e) && scheduleArrival(s, e))) log(s, `${e.title}.`);
     rescueDay(s);   // the taken: their fate, leads, word from the crew, a rescue out (logs its own lines)

@@ -31,6 +31,7 @@ import { routineAt } from './schedule';
 import { raidPressure } from './opsec';
 import { logGate } from './nag';
 import type { Person } from './family';
+import { kinPersonal } from './kin';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Duties
@@ -280,9 +281,9 @@ export const owlCount = (n: number): number => (n <= 6 ? 0 : Math.floor((n - 6) 
 export function chronotypes(s: GameState): Record<string, Chrono> {
   const out: Record<string, Chrono> = {};
   const alive = s.people.filter((_, i) => s.personState[i]?.needs.died == null);
-  const eligible = alive.filter(p => !p.kid || p.age >= 15).map(p => ({ id: p.id, h: hash01(p.id, s.seed) })).sort((a, b) => a.h - b.h || (a.id < b.id ? -1 : 1));
+  const eligible = alive.filter(p => (!p.kid || p.age >= 15) && !(p.elder && p.age >= 65)).map(p => ({ id: p.id, h: hash01(p.id, s.seed) })).sort((a, b) => a.h - b.h || (a.id < b.id ? -1 : 1));
   const owls = new Set(eligible.slice(0, owlCount(alive.length)).map(x => x.id));
-  for (const p of s.people) out[p.id] = owls.has(p.id) ? 'owl' : p.kid && p.age < 15 ? 'normal' : hash01(p.id, s.seed) > 0.8 ? 'early' : 'normal';
+  for (const p of s.people) out[p.id] = owls.has(p.id) ? 'owl' : p.kid && p.age < 15 ? 'normal' : hash01(p.id, s.seed) > (p.elder || p.age >= 65 ? 0.4 : 0.8) ? 'early' : 'normal';   // the old rise early
   return out;
 }
 
@@ -494,8 +495,10 @@ export function autoPlan(s: GameState, ctx: { build: boolean; fell: boolean }, r
   if (cook) rows.get(cook.p.id)![17] = 'kitchen';
   // ── after the hit: the teacher teaches, the medic tends, the radio is listened to ──
   const schoolKids = free.filter(({ p }) => p.kid && p.age >= 5).length;
-  if (c.after && schoolKids && adults.length >= 2) {
-    const t = [...adults].sort((a, b) => fitness(s, b.i, 'teach') * (1 + b.p.skills.teacher) - fitness(s, a.i, 'teach') * (1 + a.p.skills.teacher))[0];
+  // a grandparent in good health takes the morning lessons (and the little ones) when there is one: parents keep their hours
+  const ableElders = free.filter(({ p, i }) => p.elder && p.age < 82 && s.personState[i].needs.hurt.length === 0);
+  if (c.after && schoolKids && (adults.length >= 2 || ableElders.length)) {
+    const t = [...adults, ...ableElders].sort((a, b) => fitness(s, b.i, 'teach') * (1 + b.p.skills.teacher) - fitness(s, a.i, 'teach') * (1 + a.p.skills.teacher))[0];
     const row = rows.get(t.p.id)!;
     for (let h = 8; h < 11; h++) row[h] = 'teach';
   }
@@ -946,6 +949,7 @@ export function lifeMorale(s: GameState, i: number): number {
   if (ps?.task === 'watch' && s.people[i] && chronotypes(s)[s.people[i].id] === 'owl') m += 1.5;
   if (lv.kitchen < 40 && s.structures.some(st => isFinished(st) && isHome(st.kind))) m += 2;
   if ((ps?.fatigue ?? 0) > 70) m -= 6;
+  m += kinPersonal(s, i);
   if ((s.daily?.plan.threat ?? 0) >= 1 && Object.values(s.daily!.plan.hours).some(r => r[1] === 'watch' || r[23] === 'watch')) m += 2;
   return m;
 }

@@ -159,6 +159,22 @@ export const COTTAGE: KitPieceDef = {
   maxSlope: 0.3, floorY: 0.08, porch: 0.28, sleeps: 3, light: [0, 0.3, -0.1],
 };
 /** A 9 × 12 m steel pole building with two roll-up doors (the trucks); `garage_solar` carries 8 kW on the roof. */
+/** A small guest house for a relative: 6 × 5 m on a 2 × 2-cell lot. Keeps visiting family happy with a front door of their own. */
+export const GUEST_HOUSE: KitPieceDef = {
+  id: 'guest_house', name: 'Guest house', category: 'home',
+  blurb: 'A small one-storey 6 × 5 m guest house with a porch, a bath and a kitchenette. Sleeps 2: a relative with a front door of their own is a happier relative.',
+  cellsX: 2, cellsZ: 2, frontCells: 1,
+  parts: { foundation: 'concrete', walls: 'timber_lap', roof: 'metal_roof' },
+  maxSlope: 0.3, floorY: 0.08, porch: 0.28, sleeps: 2, light: [0, 0.3, -0.1],
+};
+/** A house for Mom, the in-laws or the grandparents: 9 × 8 m, step-free, two bedrooms. */
+export const MOMS_HOUSE: KitPieceDef = {
+  id: 'moms_house', name: 'Mom\u2019s house', category: 'home',
+  blurb: 'A one-level 9 × 8 m house for Mom, the in-laws or the grandparents: ramp, covered porch, two bedrooms, a full kitchen. Sleeps 4. Old people keep their independence and their dignity.',
+  cellsX: 3, cellsZ: 3, frontCells: 1,
+  parts: { foundation: 'concrete', walls: 'timber_lap', roof: 'metal_roof' },
+  maxSlope: 0.25, floorY: 0.08, porch: 0.28, sleeps: 4, light: [0, 0.3, -0.1],
+};
 export const METAL_GARAGE: KitPieceDef = {
   id: 'metal_garage', name: 'Metal garage', category: 'work',
   blurb: '9 × 12 m steel pole building on a slab: corrugated walls and roof, two roll-up doors for the trucks.',
@@ -234,9 +250,9 @@ export const BUNKER_KIT: KitPieceDef[] = [
 /** Underground menu order. */
 export const BUNKER_ORDER: readonly string[] = BUNKER_KIT.map(d => d.id);
 
-export const KIT: Record<string, KitPieceDef> = Object.fromEntries([GATE_GARAGE_KIT, TIMBER_CABIN, LOG_HOUSE, FARMHOUSE, TRAILER, BARN, COTTAGE, METAL_GARAGE, GARAGE_SOLAR, OUTHOUSE, WORKSHOP, ROOT_CELLAR, CHICKEN_COOP, GARDEN, FIELD, GREENHOUSE, ORCHARD, ...UTILITY_KIT, ...BUNKER_KIT, ...TOWER_KIT].map(d => [d.id, d]));
+export const KIT: Record<string, KitPieceDef> = Object.fromEntries([GATE_GARAGE_KIT, TIMBER_CABIN, LOG_HOUSE, FARMHOUSE, TRAILER, BARN, COTTAGE, GUEST_HOUSE, MOMS_HOUSE, METAL_GARAGE, GARAGE_SOLAR, OUTHOUSE, WORKSHOP, ROOT_CELLAR, CHICKEN_COOP, GARDEN, FIELD, GREENHOUSE, ORCHARD, ...UTILITY_KIT, ...BUNKER_KIT, ...TOWER_KIT].map(d => [d.id, d]));
 /** Build-menu order. */
-export const KIT_ORDER: readonly string[] = ['timber_cabin', 'log_house', 'cottage', 'outhouse', 'garden', 'greenhouse', 'orchard', 'field', 'chicken_coop', 'root_cellar', 'workshop', 'metal_garage', 'barn'];
+export const KIT_ORDER: readonly string[] = ['timber_cabin', 'log_house', 'cottage', 'guest_house', 'moms_house', 'outhouse', 'garden', 'greenhouse', 'orchard', 'field', 'chicken_coop', 'root_cellar', 'workshop', 'metal_garage', 'barn'];
 /** Water & power menu order. */
 export const UTILITY_ORDER: readonly string[] = ['well_hand', 'well_drilled', 'cistern', 'water_tower', 'filtration_shed', 'septic', 'solar_array', 'garage_solar', 'battery_shed', 'generator_shed'];
 

@@ -38,7 +38,7 @@ import { DIFFICULTY } from './difficulty';
 import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
 import type { LightsState } from './lights';
 import { starterKit, type ToolKit } from './tools';
-export const SAVE_VERSION = 55;
+export const SAVE_VERSION = 56;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -48,6 +48,7 @@ import { newLocals, type LocalsState } from './neighborLife';
 import { newDigs, type DigState } from './tunnelers';
 import type { Dog, PetLife } from './pets';
 import { newDaily, type Daily } from './daily';
+import { linkKin, newKin, type Kin } from './kin';
 import type { Loss } from './grief';
 import { newPaths, type PathsState } from './paths';
 
@@ -265,13 +266,15 @@ export interface GameState {
   digs?: DigState;
   /** The family's dogs, each a named pet with its own health, bonds and moods (sim/pets.ts; save v43). Replaces the old `stock.dog` count. */
   dogs: Dog[];
+  /** Extended family: relatives in town, asking to join, waiting for a place, turned away (sim/kin.ts). Save v53; `kinOf` makes it lazily. */
+  kin?: Kin;
   /** Pet care settings, the family's grief for lost pets, yesterday's care (sim/pets.ts; save v43; `??=` for safety). */
   petLife?: PetLife;
   /** Daily life (sim/daily.ts): the roster, chores, gatherings. Save v49; `dailyOf` makes it lazily. */
   daily?: Daily;
   /** Deaths in the household and whether they were mourned (sim/grief.ts). Save v49; `lossesOf` makes it lazily. */
   losses?: Loss[];
-  /** Walks the family has laid (gravel, stepping stones, duckboards, concrete) between the stops on the place (sim/paths.ts). Save v55; `pathsOf` makes it lazily. Worn tracks are not saved: they follow from who lives here and for how long. */
+  /** Walks the family has laid (gravel, stepping stones, duckboards, concrete) between the stops on the place (sim/paths.ts). Save v56; `pathsOf` makes it lazily. Worn tracks are not saved: they follow from who lives here and for how long. */
   paths?: PathsState;
   /** Radio and rumors after the collapse (radio.ts); made on first use. */
   radio?: RadioState;
@@ -291,11 +294,12 @@ export interface GameState {
 }
 
 /** New-game choices (the setup screen). Defaults (tests, the dev scene): Free build, no day jobs. */
-export interface RunSetup { site?: Site; lifestyle?: Lifestyle; difficulty?: Difficulty; mode?: Mode; peace?: PeaceLength; kind?: DisasterKind | null; variant?: string; dayJobs?: boolean; grid?: boolean; family?: Person[]; funds?: StartFunds }
+export interface RunSetup { site?: Site; lifestyle?: Lifestyle; difficulty?: Difficulty; mode?: Mode; peace?: PeaceLength; kind?: DisasterKind | null; variant?: string; dayJobs?: boolean; grid?: boolean; family?: Person[]; funds?: StartFunds; /** Relatives left in town at setup (they may ask to come), and whether they may. */ kinAway?: Person[]; kinOpen?: boolean }
 
 export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: RunSetup = {}): GameState {
   const people = setup.family ? structuredClone(setup.family) : generateFamily(seed);
   for (const p of people) p.conditions ??= conditionsFor(p, seed);
+  linkKin(people);
   foundLineage(people, seed);
   const site = setup.site ?? CLASSIC;
   const funds: StartFunds | null = setup.site ? setup.funds ?? startFunds(people, setup.lifestyle ?? 'fulltime', seed) : null;
@@ -333,6 +337,7 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     market: newMarketState(),
     locals: newLocals(),
     digs: newDigs(),
+    kin: newKin(structuredClone(setup.kinAway ?? []), setup.kinOpen ?? true),
     daily: newDaily(),
     paths: newPaths(),
     stats: emptyStats(),

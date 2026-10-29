@@ -18,5 +18,6 @@ export const STANCE: Record<Stance, [string, string]> = {
   flood: ['Flood the tunnel', 'Let the ditch drain into the tunnel. The water table does the rest.'],
   collapse: ['Collapse the tunnel', 'Hire the excavator and bring the roof of the dig down on them.'],
   ignore: ['Ignore it', 'Leave them to it. They will be through in a few days, and inside the wall.'],
+  build_first: ['Build them a place first', 'Not a couch in the hall: tell them to wait until there is a house of their own for them. Beds in a guest house, a cottage or Mom\u2019s house end the wait; if the hit comes first, they come anyway.'],
   confront: ['Confront them', 'Gun in hand. They\'ll probably run, but a shooting means the sheriff\'s investigation, lawyers, and the guns held as evidence.'],
 };

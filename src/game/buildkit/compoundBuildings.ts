@@ -17,14 +17,14 @@ const STOVE = { x: -0.22, z: 0.12 }, HEARTH = 0.05 * M, STOVE_PIPE = { x: -0.35 
 
 /** 6 × 8 m one-storey cottage: a kitchen-sitting room at the front, a bedroom behind, a small porch. */
 function cottage(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
-  const W = def.cellsX * CELL, D = 8 * M;
+  const W = def.cellsX * CELL, D = def.cellsZ * CELL - M, small = D < 6.5 * M;   // the cottage 6 × 8 m; the guest house 6 × 5; Mom's house 9 × 8
   const { group } = buildGabled({
     W, D, floor: 0.08, wallH: 0.43, wallT: 0.03, rise: 0.24, eave: 0.05, gableOver: 0.05, porch: 0.28,
     foundation: 'concrete', floorMat: 'floorboards', outer: 'timber_lap', inner: 'whitewash', roof: 'metal_roof', trim: 'trim',
     front: [{ kind: 'door', at: 0.12 }, { kind: 'window', at: -0.25 }],
     back: [{ kind: 'window', at: -0.2 }, { kind: 'window', at: 0.22 }],
-    left: [{ kind: 'window', at: -0.35 }, { kind: 'window', at: 0.3 }],
-    right: [{ kind: 'window', at: -0.35 }, { kind: 'door', at: 0.38 }],
+    left: small ? [{ kind: 'window', at: 0 }] : [{ kind: 'window', at: -0.35 }, { kind: 'window', at: 0.3 }],
+    right: small ? [{ kind: 'window', at: 0 }] : [{ kind: 'window', at: -0.35 }, { kind: 'door', at: 0.38 }],
     chimney: { kind: 'pipe', x: STOVE.x + STOVE_PIPE.x, z: STOVE.z + STOVE_PIPE.z },
     corners: 'boards', curtains: 'curtain',
   }, (c: FurnishCtx) => {
@@ -211,4 +211,4 @@ function garageShell(def: KitPieceDef, seed: number, opts: BuildOpts, solar: boo
 const metalGarage = (def: KitPieceDef, seed = 1, opts: BuildOpts = {}) => garageShell(def, seed, opts, false);
 const garageSolar = (def: KitPieceDef, seed = 1, opts: BuildOpts = {}) => garageShell(def, seed, opts, true);
 
-export const COMPOUND_BUILDERS: Record<string, (def: KitPieceDef, seed?: number, opts?: BuildOpts) => THREE.Group> = { cottage, metal_garage: metalGarage, garage_solar: garageSolar };
+export const COMPOUND_BUILDERS: Record<string, (def: KitPieceDef, seed?: number, opts?: BuildOpts) => THREE.Group> = { cottage, guest_house: cottage, moms_house: cottage, metal_garage: metalGarage, garage_solar: garageSolar };
