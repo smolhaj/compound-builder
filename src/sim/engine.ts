@@ -237,10 +237,13 @@ function subStep(s: GameState): void {
 /** Advance `days` of game time. Returns a new state (the input is not mutated). */
 export function step(state: GameState, days: number): GameState {
   if (days <= 0) return state;
-  const s: GameState = structuredClone(state);
   // whole sub-steps on an integer counter, so chopping time up differently gives the same result
-  const end = s.clock.t + days;
+  const end = state.clock.t + days;
   const target = Math.floor(end / SUBSTEP + 1e-6);
+  // the common frame (a render frame is far shorter than a sub-step): no sub-step runs, only the clock moves, so
+  // share the rest of the state instead of deep-copying all of it sixty times a second
+  if (state.clock.ticks >= target) return { ...state, clock: { ...state.clock, t: end } };
+  const s: GameState = structuredClone(state);
   while (s.clock.ticks < target) {
     s.clock.ticks++;
     s.clock.t = s.clock.ticks * SUBSTEP;
