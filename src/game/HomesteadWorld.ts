@@ -53,6 +53,8 @@ import { buildExcavator, drapeSoil, spoilHeap } from './props/digSite';
 import { kitMaterial } from './buildkit/materials';
 import { orchardBearing, orchardFrost, ORCHARD_PICK } from '../sim/greenhouse';
 import { buildLayers, type Seat } from './buildkit/buildings';
+import { farHiddenLayers, isFar } from './buildkit/buildingLod';
+import { LIGHT_BUDGET, pickLights, type LightCandidate } from './lightPool';
 import { hashStr } from './buildkit/clutter';
 import { buildRun, solidSpans } from './perimeter/perimeterGeometry';
 import { PERIMETER, hasSkirt, runGrowth, runProgress, wallLength, type PerimeterRun } from '../sim/perimeter';
@@ -117,7 +119,15 @@ interface Built {
   opts: BuildOpts;
   /** Bunker rooms: floor level (the bunker's datum) and the doorway / depth key they were built for. */
   under: { datum: number; key: string } | null;
+  /** Layers hidden while the camera is far away (studs, furniture, loft of an enclosed building; buildkit/buildingLod). */
+  lod: string[];
+  /** The inside is hidden now (finished, far from the camera, full view). */
+  far: boolean;
+  /** The footprint with its porch / steps, and the body alone (computed once: hit tests run per tree, per animal, per frame). */
+  fpPorch: Rect4;
+  fpBody: Rect4;
 }
+interface Rect4 { x0: number; z0: number; x1: number; z1: number }
 
 /** See-through variants of the kit materials (x-ray view), shared. */
 const _xray = new Map<THREE.Material, THREE.Material>();
@@ -1057,8 +1067,8 @@ export class HomesteadWorld {
 
   /** Is (x, z) within `pad` of a built footprint (porch included)? */
   onBuilding(x: number, z: number, pad = 0, withPorch = true): boolean {
-    for (const { placed } of this._built.values()) {
-      const r = footprint(KIT[placed.kind], placed.x, placed.z, placed.rot, withPorch);
+    for (const b of this._built.values()) {
+      const r = withPorch ? b.fpPorch : b.fpBody;
       if (x > r.x0 - pad && x < r.x1 + pad && z > r.z0 - pad && z < r.z1 + pad) return true;
     }
     return false;
@@ -1115,14 +1125,16 @@ export class HomesteadWorld {
     }
     // a plan nobody has started is laid out in lime on the ground, so it reads from the air (the stakes alone don't)
     if (!below) group.add(planMark(def));
-    this._built.set(p.id, { placed: p, group, smoke, key: '', finished: false, padY: y, light, services: '000', opts, under });
+    this._built.set(p.id, { placed: p, group, smoke, key: '', finished: false, padY: y, light, services: '000', opts, under, lod: below ? [] : this._lodLayers(group), far: false, fpPorch: r, fpBody: footprint(def, p.x, p.z, p.rot, false) });
     if (pad) this.terrain.refresh(this._terrainSource, pad.x0 - pad.skirt - 1, pad.z0 - pad.skirt - 1, pad.x1 + pad.skirt + 1, pad.z1 + pad.skirt + 1);
     if (below) this._syncUnderground();
-    if (this._quality) this._plant(this._quality);
+    if (this._batchPlant) this._plantDirty = true; else if (this._quality) this._plant(this._quality);
     this._applyView(this._built.get(p.id)!);
     this._ws.invalidateShadows();
   }
 
+  private _batchPlant = false;
+  private _plantDirty = false;
   private readonly _naturalH = (x: number, z: number) => this.parcel.natural(x, z).h;
 
   /** A bunker room's doorways (its neighbors) and the ground above its surface point. */
@@ -1325,7 +1337,12 @@ export class HomesteadWorld {
 
   /** Sync with the game's structures (adds new ones). */
   syncStructures(list: readonly Placed[]): void {
-    for (const p of list) this.addStructure(p);
+    // a batch of new buildings re-plants the trees once, not once each
+    this._batchPlant = true;
+    try { for (const p of list) this.addStructure(p); } finally {
+      this._batchPlant = false;
+      if (this._plantDirty) { this._plantDirty = false; if (this._quality) this._plant(this._quality); }
+    }
     // one that is gone (an upgraded tower comes down when the new tier is up)
     if (this._built.size > list.length) {
       const keep = new Set(list.map(p => p.id));
@@ -1374,7 +1391,7 @@ export class HomesteadWorld {
       showStage(b.group, done ? 5 : st.stage, f, st.supplied);
       const mark = b.group.getObjectByName('planMark');
       if (mark) mark.visible = st.stage === 0;
-      if (done !== b.finished) { b.finished = done; if (b.light) b.light.visible = done; this._ws.invalidateShadows(); }
+      if (done !== b.finished) { b.finished = done; if (b.light && !done) b.light.visible = false; this._ws.invalidateShadows(); }
       this._applyView(b);
     }
     this._syncPits(list);
@@ -1415,6 +1432,8 @@ export class HomesteadWorld {
     this._ws.scene.remove(b.group);
     b.group.traverse(o => (o as THREE.Mesh).geometry?.dispose());
     b.group = g;
+    b.lod = b.under ? [] : this._lodLayers(g);
+    b.far = false;
     this._ws.scene.add(g);
     b.key = '';
     showStage(g, b.finished ? 5 : 0, 0);
@@ -1458,13 +1477,52 @@ export class HomesteadWorld {
       m.castShadow = !see && !['kit_glass', 'kit_string'].includes(ud.baseMat.name) && !ud.baseMat.name.startsWith('kit_glow');
       if (layer === 'cutwalls') m.visible = v === 'cutaway' && b.finished;
       else if (v === 'cutaway' && CUTAWAY_HIDE.includes(layer) && (b.finished || layer !== 'walls')) m.visible = false;
+      // seen from far off, the inside of an enclosed building is hidden (no draw, no shadow); only in the plain exterior view
+      else if (b.far && v === 'full' && b.lod.includes(layer)) m.visible = false;
+    }
+  }
+
+  /** The layers an enclosed building can drop when far (see buildkit/buildingLod). */
+  private _lodLayers(group: THREE.Group): string[] {
+    const meshes = group.children.filter(o => (o as THREE.Mesh).isMesh).map(o => {
+      const m = o as THREE.Mesh;
+      return { layer: m.userData.layer as string, material: ((m.userData.baseMat as THREE.Material | undefined) ?? (m.material as THREE.Material)).name };
+    });
+    return farHiddenLayers(meshes, (group.userData.keep ?? []) as string[]);
+  }
+
+  private _lodClock = 0;
+  /** Every few frames: buildings far from the camera lose their hidden layers; near ones get them back. */
+  private _updateBuildingLod(dt: number): void {
+    this._lodClock -= dt;
+    if (this._lodClock > 0) return;
+    this._lodClock = 0.15;
+    const cam = this._ws.camera.position, tier = this._quality ?? 'medium';
+    for (const b of this._built.values()) {
+      if (!b.lod.length) continue;
+      const far = b.finished && !b.under && this._view === 'full' && !this._under && isFar(Math.hypot(cam.x - b.group.position.x, cam.y - b.group.position.y, cam.z - b.group.position.z), b.far, tier);
+      if (far === b.far) continue;
+      b.far = far;
+      // back to near: re-show every layer at the building's stage (the next syncProgress), far: hide now
+      b.key = '';
+      if (far) this._applyView(b);
     }
   }
 
   /** Lamplight inside finished buildings: a low fill by day, warm lamps at night. */
-  private _updateLights(): void {
+  /** The building lights that were on in the last pick (the budget in game/lightPool keeps the best few). */
+  private _litNow = new Set<string>();
+  private _lightClock = 0;
+  private _updateLights(dt: number): void {
     const night = 1 - this.air.daylight;
     const lit = this.air.hour > 5.5 && this.air.hour < 23;
+    // who is on is picked a few times a second; the intensities are set every frame
+    this._lightClock -= dt;
+    const pick = this._lightClock <= 0;
+    if (pick) this._lightClock = 0.2;
+    const cands: LightCandidate[] = [];
+    const cam = this._ws.camera.position;
+    const above = cam.y > this.groundAt(cam.x, cam.z) - 0.12;
     for (const b of this._built.values()) {
       if (!b.finished || !b.light) continue;
       // bunker rooms are lit by their bulkhead lamps day and night
@@ -1474,6 +1532,7 @@ export class HomesteadWorld {
         // warm, low lamplight (incandescent-ish), not a bright work light
         b.light.intensity = (this._under ? 0.25 : 0.48) * Math.min(1, 0.2 + 0.8 * area);
         b.light.color.set(0xffd49e);
+        if (pick) this._noteLight(cands, b, above);
         continue;
       }
       // a tower's floodlights: hard white over the approach at night, only with power (the lenses glow with them)
@@ -1482,6 +1541,7 @@ export class HomesteadWorld {
         b.light.intensity = on ? 8 * night : 0;
         const bulb = b.group.getObjectByName('bldg_interior_bulb');
         if (bulb) bulb.visible = on;
+        if (pick) this._noteLight(cands, b, above);
         continue;
       }
       // the room as the household keeps it tonight (atmosphere/nightLife: up, asleep, on watch, away)
@@ -1489,7 +1549,19 @@ export class HomesteadWorld {
       const home = KIT[b.placed.kind].sleeps > 0;
       const fill = this._view === 'full' ? 0.25 : 0.12;
       b.light.intensity = room !== undefined ? fill * (0.3 + 0.7 * this.air.daylight) + room * 1.4 * night : fill + (home ? (lit ? night * 1.25 : night * 0.25) : night * 0.1);
+      if (pick) this._noteLight(cands, b, above);
     }
+    // only the lights that can matter stay on (every light costs every lit pixel); a fixed count, so no recompiles
+    if (!pick) return;
+    const on = pickLights(cands, LIGHT_BUDGET[this._quality ?? 'medium']);
+    for (const b of this._built.values()) if (b.light && b.finished) b.light.visible = on.has(b.placed.id);
+    this._litNow = on;
+  }
+  /** One building's light as a candidate for the budget. A bunker room seen from above ground, or a house seen from the underground view, cannot be seen. */
+  private _noteLight(cands: LightCandidate[], b: Built, above: boolean): void {
+    const cam = this._ws.camera.position;
+    const weight = b.under ? (above && !this._under ? 0.03 : 1) : (this._under ? 0.15 : 1);
+    cands.push({ id: b.placed.id, intensity: b.light!.intensity, dist: Math.hypot(cam.x - b.group.position.x, cam.y - b.group.position.y, cam.z - b.group.position.z), was: this._litNow.has(b.placed.id), weight });
   }
 
   /** Vehicles: in their bays and the yard, and out the gate on a run. */
@@ -1825,7 +1897,8 @@ export class HomesteadWorld {
     const heating = Math.min(1, p.cold * 1.2 + p.snow * 0.5 + (seasonState.visual === 'summer' ? 0 : 0.25));
     const fire = Math.max(cooking, heating * (h > 23 || h < 5 ? 0.5 : 1));
     const wx = 0.08 + a.wind * 0.45, wz = 0.03 + a.wind * 0.12;   // prevailing westerlies off the range
-    this._updateLights();
+    this._updateLights(dt);
+    this._updateBuildingLod(dt);
     for (const { smoke, finished } of this._built.values()) smoke?.update(this._clock, finished ? fire : 0, wx, wz, a.daylight, a.viewportH);
     if (seasonState.plants !== this._plantSeason) {
       this._plantSeason = seasonState.plants;
@@ -1870,7 +1943,7 @@ export class HomesteadWorld {
 
 /** Is (x, z) inside this building's footprint (plus r)? */
 function footprintHas(b: Built, x: number, z: number, r: number): boolean {
-  const f = footprint(KIT[b.placed.kind], b.placed.x, b.placed.z, b.placed.rot, false);
+  const f = b.fpBody;
   return x > f.x0 - r && x < f.x1 + r && z > f.z0 - r && z < f.z1 + r;
 }
 
