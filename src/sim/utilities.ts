@@ -12,6 +12,7 @@
  * plumbed), rain into the cisterns. Batteries fade, pumps fail and need
  * repair. Shortages are logged. Pure (tested).
  */
+import { pumpDrawFactor, sunFactor } from './terrainFx';
 import { SPRING_LPD } from './site';
 import { toteStorage, waterPrice } from './water';
 import { sound } from './improvements';
@@ -330,8 +331,10 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
   const spill = (kwh: number) => { if (kwh <= 0) return; if (gridUp) exported += kwh; else wasted += kwh; };
 
   const lit = new Set<string>(), shed: string[] = [];
+  // a reservoir 7 m or more above the houses feeds them by gravity: the well pump only tops it up (sim/terrainFx.ts)
+  const pumpFactor = pumpDrawFactor(s);
   const loadOf = (o: Node) => u.off.includes(o.id) ? 0
-    : UTILITY[o.kind]?.water?.needsPower ? (u.broken.includes(o.id) || u.fried.includes(o.id) ? 0 : UTILITY[o.kind]!.water!.needsPower!)
+    : UTILITY[o.kind]?.water?.needsPower ? (u.broken.includes(o.id) || u.fried.includes(o.id) ? 0 : UTILITY[o.kind]!.water!.needsPower! * pumpFactor)
     : fitted(s, o.id, 'wire') ? (o.kind === 'greenhouse_heated' ? greenhouseKwh(s, built.get(o.id)!) : DRAW_KWH[o.kind] ?? 0) : 0;
   const isSource = (o: Node) => !!(UTILITY[o.kind]?.solarKw || UTILITY[o.kind]?.genKw || UTILITY[o.kind]?.batteryKwh);
   const live = (o: Node) => !u.fried.includes(o.id);
@@ -356,7 +359,8 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
     const genKw = members.filter(live).reduce((a, o) => a + (UTILITY[o.kind]?.genKw ?? 0), 0);
     // grid-tied solar shuts off in a blackout unless a battery (hybrid inverter) is on the network
     const solarOk = gridUp || cap > 0 || !u.grid;
-    const sol = solarOk ? members.filter(live).reduce((a, o) => a + (UTILITY[o.kind]?.solarKw ?? 0), 0) * sunHours(doy) * 0.8 : 0;
+    // each array's ground faces the sun a little more or less (sim/terrainFx.ts: south-facing slope up to +25 %, north-facing down to -25 %)
+    const sol = solarOk ? members.filter(live).reduce((a, o) => a + (UTILITY[o.kind]?.solarKw ?? 0) * sunFactor(s, o), 0) * sunHours(doy) * 0.8 : 0;
     draw += d; solar += sol; capKwh += cap;
     let have = sol;
     // battery: bank the surplus, cover the shortfall

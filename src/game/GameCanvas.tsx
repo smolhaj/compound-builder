@@ -1,4 +1,7 @@
 import { litTowerIds } from '../sim/towers';
+import { TerrainOverlay } from './terrain/TerrainOverlay';
+import { campOf, lanesOf, terrainOf } from '../sim/terrainState';
+import { siteCandidates } from '../sim/terrain';
 import { goodsKey, houseGoods } from '../sim/evenings';
 import { blackoutNow } from '../sim/lights';
 import { burnedFarms } from '../sim/neighborLife';
@@ -179,6 +182,13 @@ export function GameCanvas() {
     rebuildBoundary(); showBoundary();
     useWorldStore.getState().setSiteGeo({ creekZ: x => world.parcel.creek.zAt(x), creekHalf: world.parcel.creek.halfWidth, roadGate: [world.access.gate.x, world.access.gate.z], drive: world.access.drive.map(p => [p[0], p[1]] as [number, number]), center: [world.camp.x, world.camp.z], ground: (x, z) => world.parcel.natural(x, z).h });
     world.setBurnedFarms(burnedFarms(useGameStore.getState().game));
+    const terrainOv = new TerrainOverlay(ws.scene, world.groundAt);
+    const showTerrain = () => {
+      const g = useGameStore.getState().game, m = useWorldStore.getState().terrainMode, t = terrainOf(g);
+      if (m === 'off' || !t) { terrainOv.set('off', null); return; }
+      const lanes = lanesOf(g);
+      terrainOv.set(m, t, lanes, siteCandidates(t, { lot: g.site.home, camp: campOf(g) }, lanes));
+    };
     const unsub = [
       // wildfire weather: measure the fuel round every building (what cleared ground there is decides what burns)
       useGameStore.subscribe(s => s.game.disaster.phase, ph => { const g = useGameStore.getState().game; if (g.disaster.kind === 'wildfire' && ph === 'warning' && !g.disaster.fuel) useGameStore.getState().setFuel(world.fuelNear(g.structures)); }),
@@ -202,6 +212,9 @@ export function GameCanvas() {
       useWorldStore.subscribe(s => s.buildingView, v => world.setBuildingView(v)),
       useWorldStore.subscribe(s => s.underground, on => world.setUnderground(on)),
       useWorldStore.subscribe(s => s.sightMode, m => sight.set(m)),
+      // the terrain overlay (sim/terrain.ts): high ground, lanes, water, sun
+      useWorldStore.subscribe(s => s.terrainMode, showTerrain),
+      useGameStore.subscribe(s => s.game.structures.length + '|' + s.game.perimeter.length, () => { if (useWorldStore.getState().terrainMode === 'lanes') showTerrain(); }),
       // the compound changed: recompute the overlay
       useGameStore.subscribe(s => `${s.game.structures.map(x => x.id + x.stage).join()}|${s.game.perimeter.map(r => r.id + (r.finishedAt === null ? Math.round(r.done) : 'f')).join()}`, () => sight.refresh()),
     ];
@@ -401,7 +414,7 @@ export function GameCanvas() {
     raf = requestAnimationFrame(frame);
 
     // QA hook (screenshot harness, console poking).
-    (window as unknown as Record<string, unknown>).__cb = { player, ws, world, weather, cam, tour, tool, marker, fence, sight, game: useGameStore, store: useWorldStore, THREE, qa, battle,
+    (window as unknown as Record<string, unknown>).__cb = { terrainOv, player, ws, world, weather, cam, tour, tool, marker, fence, sight, game: useGameStore, store: useWorldStore, THREE, qa, battle,
       demoBattle: () => {
         const g = useGameStore.getState().game;
         const b = demoBattle(g.structures, g.people, g.structures.length ? undefined : world.camp);
@@ -423,6 +436,7 @@ export function GameCanvas() {
       marker.dispose();
       fence.dispose();
       sight.dispose();
+      terrainOv.dispose();
       boundary.dispose();
       useWorldStore.getState().setSiteGeo(null);
       useWorldStore.getState().setMarkNearestTrees(null);
