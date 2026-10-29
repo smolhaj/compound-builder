@@ -11,6 +11,7 @@ import type { Site } from './site';
 import type { GameState, Structure } from './state';
 import { dayIndex } from './state';
 import { VEHICLES, fleetOf, runs } from './vehicles';
+import { roadResponse, roadWinter } from './roadFx';
 
 // ── the road and the line ──
 
@@ -115,10 +116,12 @@ export function gradeNote(site: Pick<Site, 'lot' | 'home'>, x: number, z: number
  * How hard the way in is in snow: the steepest stretch beyond 6 %, and altitude beyond 1,900 m. 0 on any place with an
  * easy road; at 1 or more the road closes on heavy snow days.
  */
-export function roadDifficulty(site: Pick<Site, 'lot' | 'home'>): number {
+export function roadDifficulty(site: Site, seed?: number): number {
   const lot = siteLot(site);
   if (!lot) return 0;
-  return Math.max(0, (lot.stats.accessMaxPct - 6) / 8) + Math.max(0, (site.lot!.elevM - 1900) / 900) + (site.lot!.kind === 'gorge' ? 0.2 : 0);
+  // with a game the road is the planned one (sim/roadFx.ts: switchbacks hold the grade down, but add hairpins and length); a listing reads the straight line
+  const road = seed !== undefined ? roadWinter({ site, seed }) : Math.max(0, (lot.stats.accessMaxPct - 6) / 8);
+  return road + Math.max(0, (site.lot!.elevM - 1900) / 900) + (site.lot!.kind === 'gorge' ? 0.2 : 0);
 }
 
 /** Best traction in the yard: the running road vehicle with the highest off-road rating (a pickup 0.6 ... the motorhome 0.85). */
@@ -137,7 +140,7 @@ function snowStartChance(s: GameState, day: number): number {
 
 /** Days the road stays shut after a heavy snow starts: 1 at the threshold, more the harder the way in; a plow blade halves it. */
 function closureDays(s: GameState): number {
-  const d = roadDifficulty(s.site) * (1.5 - traction(s));
+  const d = roadDifficulty(s.site, s.seed) * (1.5 - traction(s));
   if (d < 1) return 0;
   const days = Math.min(6, 1 + Math.floor(d * 1.5));
   return s.stock.plow >= 1 ? (d < 1.8 ? 0 : Math.max(1, Math.ceil(days / 2))) : days;
@@ -159,10 +162,10 @@ export function roadClosedFor(s: GameState, day = dayIndex(s.clock.t)): number {
 /** The text that goes with a closure (deliveries, the weekend commute). */
 export const ROAD_CLOSED_TEXT = 'the road up the hill is drifted shut and the plow has not been through';
 
-/** Deputy, ambulance and fire take longer up a steep road: +25 % past 10 % grade, +50 % past 16 %, and 2.5 times as long while it is closed. */
+/** Deputy, ambulance and fire take longer up a long, steep or winding road (sim/roadFx.ts), and 2.5 times as long while it is closed. */
 export function responseFactor(s: GameState): number {
-  const g = roadFactor(s.site).gradePct;
-  let k = g > 16 ? 1.5 : g > 10 ? 1.25 : 1;
+  // the planned road: its length, hairpins, grade and single-file structures (sim/roadFx.ts); a place with no lot keeps the old 1
+  let k = s.site.lot ? roadResponse(s) : 1;
   if (roadClosedFor(s) > 0) k *= s.stock.plow >= 1 ? 1.5 : 2.5;
   return k;
 }
@@ -171,7 +174,7 @@ export function responseFactor(s: GameState): number {
 export function winterRoadLine(s: GameState): string | null {
   if (!s.site.lot) return null;
   const n = closureDays(s), R = regionFor(s.site);
-  if (n <= 0) return roadDifficulty(s.site) > 0.5 ? 'The way in is steep, but a truck gets up it in snow.' : null;
+  if (n <= 0) return roadDifficulty(s.site, s.seed) > 0.5 ? 'The way in is steep, but a truck gets up it in snow.' : null;
   const heavy = Math.round(R.snowCm / 12);
   return `The road closes about ${Math.round(heavy * n * 0.6)} days a winter (${heavy} heavy snows, ${n} day${n === 1 ? '' : 's'} each)${s.stock.plow >= 1 ? ', fewer with the plow blade on the truck' : ': a plow blade would cut that in half'}.`;
 }

@@ -233,7 +233,7 @@ export function suggestions(s: GameState): Suggestion[] {
         acts: [...(lines.length ? [{ label: `Order ${short} pallet${short > 1 ? 's' : ''} of fieldstone (${usd(orderCost(lines, prices(s)))})`, act: { type: 'order' as const, lines } }] : []), { label: 'Show me', act: { type: 'select', id: cut.id } }] });
     }
     const doy = ((s.clock.startDoy + Math.floor(s.clock.t) - 1) % 365 + 365) % 365 + 1;
-    if (s.stock.plow < 1 && roadDifficulty(s.site) >= 1 && doy >= 230 && doy <= 345) {
+    if (s.stock.plow < 1 && roadDifficulty(s.site, s.seed) >= 1 && doy >= 230 && doy <= 345) {
       const lines: OrderLine[] = [{ material: 'plow', qty: 1 }];
       out.push({ id: 'plow', kind: '', title: 'The road closes in snow: buy a plow', urgency: 56,
         why: `${winterRoadLine(s) ?? 'the way in is steep and high'} A plow blade on the truck keeps the road open and the deliveries coming`,

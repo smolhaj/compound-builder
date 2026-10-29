@@ -41,10 +41,14 @@ describe('slope-driven costs', () => {
     expect(f.perFtMul).toBeGreaterThanOrEqual(1.5);
     expect(ff.lenMul).toBe(1);
     expect(f.text).toMatch(/switchback/);
-    const imp = { ...st.improvements, driveFt: 800 };
-    expect(driveQuote(imp, st).usd).toBeGreaterThan(driveQuote(imp).usd * 2.5);
-    expect(driveQuote(imp, flat).usd).toBe(driveQuote(imp).usd);
-    expect(driveQuote(imp, st).days).toBeGreaterThan(driveQuote(imp).days);
+    // the quote is the planned road (sim/roadPlan.ts): the steep lot's switchbacked, benched, walled road against the flat lot's straight drive
+    const imp = { ...st.improvements, driveFt: 800 }, qs = driveQuote(imp, st), qf = driveQuote(imp, flat);
+    expect(qs.plan && qf.plan).toBeTruthy();
+    expect(qs.usd).toBeGreaterThan(driveQuote(imp).usd * 2.5);
+    expect(qs.usd).toBeGreaterThan(qf.usd * 2);
+    expect(qf.usd).toBeLessThan(driveQuote(imp).usd * 2);
+    expect(qs.days).toBeGreaterThan(driveQuote(imp).days);
+    expect(qs.plan!.lengthM).toBeGreaterThan(qf.plan!.lengthM * 1.2);
   });
 
   it('poles cost more over rough ground, never more than about 2.3 times', () => {
@@ -179,7 +183,7 @@ describe('winter access', () => {
     fleetOf(m).push({ id: 'v9', kind: 'motorhome', mileage: 1000, condition: 1, fuel: 100, oilAt: 0, serviceAt: 0 });
     expect(closedDays(m)).toBeLessThanOrEqual(n);
     expect(winterRoadLine(g)).toMatch(/closes about/);
-    expect(winterRoadLine(p)).toMatch(/fewer with the plow/);
+    expect(winterRoadLine(p)).toMatch(/fewer with the plow|a truck gets up it in snow/);   // (a plowed switchback road is often open all winter)
   });
 
   it('holds up deliveries, slows the deputy, and says so', () => {

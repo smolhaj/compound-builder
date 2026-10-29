@@ -28,6 +28,7 @@ import { RegionalField, TOWN_Y } from '../../engine/world/terrain/regionalLandsc
 import { regionWorld, type Relief, type RegionWorld } from '../region/regionWorld';
 import { REGIONS, type RegionId } from '../../sim/regions';
 import { lotField, treeLineM, type LotField, type LotSpec } from '../../sim/lots';
+import type { RoadBed } from '../../sim/roadBed';
 
 /** Parcel side in world units (40 acres ≈ 402 m). */
 export const PARCEL_SIZE = 67;
@@ -485,8 +486,22 @@ export class ParcelTerrain {
   get pits(): readonly Pit[] { return this._pits; }
   get pads(): readonly Pad[] { return this._pads; }
 
+  private _bed: RoadBed | null = null;
+  /** The road's bench, cut banks and fill slopes (sim/roadBed.ts); null: no road built yet. */
+  setRoadBed(bed: RoadBed | null): void { this._bed = bed && !bed.empty ? bed : null; }
+  get roadBed(): RoadBed | null { return this._bed; }
+
   sample(x: number, z: number): ParcelSample {
     const s = this.natural(x, z);
+    const bed = this._bed;
+    if (bed) {
+      const b = bed.bbox;
+      if (x >= b[0] && x <= b[2] && z >= b[1] && z <= b[3]) {
+        const r = bed.apply(x, z, s.h);
+        s.h = r.h;
+        if (r.cleared) s.forest = 0;
+      }
+    }
     for (const p of this._pads) {
       const d = Math.max(p.x0 - x, x - p.x1, p.z0 - z, z - p.z1, 0);
       if (d >= p.skirt) continue;

@@ -1,5 +1,6 @@
 import { planProblem } from '../sim/construction';
 import { dropBridge, routeProblem } from '../sim/terrainFx';
+import { dropRoadBridge, rebuildRoadBridge } from '../sim/roadFx';
 import { AFTERMATH_TEXT, joinPrisoner, releasePrisoner, resolveAftermath, type AftermathChoice } from '../sim/aftermath';
 import { dismissCrew, hireCrew } from '../sim/crews';
 import { setFocus } from '../sim/priority';
@@ -130,6 +131,9 @@ export interface GameStore {
   planSpan: (kind: PerimeterKind, a: Pt, b: Pt) => string | null;
   /** Drop a standing tunnel-bridge or slope tunnel (it is a plan again until rebuilt). */
   dropBridge: (id: string) => string | null;
+  /** Bring the bridge on the way in down on purpose, or order its rebuilding (null on success, else why not). */
+  dropRoadBridge: () => string | null;
+  rebuildRoadBridge: () => string | null;
   /** "Wall my property": lay out the whole closed property line in one wall type (creek bars, a road gate, existing runs kept). Returns how many runs. */
   wallProperty: (kind: PerimeterKind, geo: PropertyGeometry, shape?: RingShape, look?: ContainerLook) => number;
   /** Upgrade a finished fence or wall to the next tier, in place (null = laid out; else why not). */
@@ -345,6 +349,20 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     if (locked()) return LOCKED_WHY;
     const g = structuredClone(get().game);
     const why = dropBridge(g, id);
+    if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); }
+    return why;
+  },
+  dropRoadBridge: () => {
+    if (locked()) return LOCKED_WHY;
+    const g = structuredClone(get().game);
+    const why = dropRoadBridge(g);
+    if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); }
+    return why;
+  },
+  rebuildRoadBridge: () => {
+    if (locked()) return LOCKED_WHY;
+    const g = structuredClone(get().game);
+    const why = rebuildRoadBridge(g);
     if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); }
     return why;
   },

@@ -31,6 +31,7 @@ import { highShare, isTower } from './towers';
 import { PERIMETER, runFinished, runBill, SALVAGE, type PerimeterKind, type Pt } from './perimeter';
 import { log } from './economy';
 import { DRAIN, cutSlopeAt, nearDrain, undrained, drainLineFor } from './drainage';
+import { DROPPED_SCORE, RFX, bridgeDown, roadBridgeOf, roadChokeLines, roadChokes, roadEase } from './roadFx';
 
 export const FX = {
   /** Solar: sun gain per unit of slope, and the cap. */
@@ -102,10 +103,11 @@ export function raidAngle(s: GameState, rnd: () => number): { ang: number; lane:
   const lanes = lanesOf(s);
   if (lanes.length < 4) return null;
   const road = lanes.reduce((a, l) => (Math.abs(l.ang - Math.PI / 2) < Math.abs(a.ang - Math.PI / 2) ? l : a), lanes[0]);
-  const best = bestLane(lanes, { ang: Math.PI / 2, bonus: FX.ROAD_EASE });
+  const ease = roadEase(s, FX.ROAD_EASE);   // (a long, winding road with a ford is not the easy way in)
+  const best = bestLane(lanes, { ang: Math.PI / 2, bonus: ease });
   // the road side is a lane over a standing tunnel-bridge: they come to its door whatever the margins
   if (!best || (best === road && !best.via)) return null;
-  if (!best.via && best.cost > road.cost * FX.ROAD_EASE * FX.LANE_MARGIN) return null;
+  if (!best.via && best.cost > road.cost * ease * FX.LANE_MARGIN) return null;
   // by a tunnel-bridge they gather at its outer door, so they come from the door's direction
   const c = campOf(s), toDoor = best.via && best.choke ? Math.atan2(best.choke.at[1] - c[1], best.choke.at[0] - c[0]) : null;
   return { ang: (toDoor ?? best.ang) + (rnd() - 0.5) * (toDoor !== null ? 0.12 : 0.5), lane: best, ...(best.via ? { via: best.via } : {}) };
@@ -123,11 +125,18 @@ export interface TerrainDefense { score: number; lines: string[]; lane: Lane | n
 /** The ground's share of the defense, 0–1, with plain-language lines. 0 where nothing is known. */
 export function terrainDefense(s: GameState): TerrainDefense {
   const lanes = lanesOf(s);
-  const best = lanes.length ? bestLane(lanes, { ang: Math.PI / 2, bonus: FX.ROAD_EASE }) : null;
+  const best = lanes.length ? bestLane(lanes, { ang: Math.PI / 2, bonus: roadEase(s, FX.ROAD_EASE) }) : null;
   const lines: string[] = [];
   const towers = s.structures.filter(st => isFinished(st) && isTower(st.kind));
   const hs = towers.length ? towers.reduce((a, st) => a + highShare(st), 0) / towers.length : 0;
-  if (!best) return { score: 0, lines, lane: null, held: false, highShare: hs };
+  // the road side: single file at a bridge, a bore, a ford or a chain of hairpins (sim/roadFx.ts); held when a tower or a wall stands on it
+  const chokes = roadChokes(s), roadHeld = chokes.some(c => chokeHeld(s, { at: c.at, width: c.width, hardness: 1 }));
+  // a bridge brought down on purpose stops every truck at the creek: worth a held choke (and it costs you the same: your own deliveries stop there too)
+  const down = bridgeDown(s) && roadBridgeOf(s) !== null;
+  const roadScore = Math.max(Math.min(1, 0.5 * chokes.length) * (roadHeld ? 1 : 0.6), down ? DROPPED_SCORE : 0);
+  if (chokes.length) { lines.push(...roadChokeLines(s).slice(0, 2)); lines.push(roadHeld ? 'You hold the choke on the road.' : 'A tower or a wall at the choke on the road would matter.'); }
+  if (down) lines.push('The bridge on the way in is down: a crew\'s trucks stop at the creek and they ford it on foot. Your own deliveries stop there too.');
+  if (!best) return { score: Math.min(1, RFX.DEFENSE_SHARE * roadScore), lines, lane: null, held: false, highShare: hs };
   const hard = Math.max(0, Math.min(1, (best.hardness - 1) / 0.6));
   const held = !!best.choke && chokeHeld(s, best.choke);
   if (hard > 0.15) lines.push(`The easiest way in is ${best.hardness.toFixed(1)}× slower than open ground${best.fords ? ' (it fords the creek)' : ''}${best.cliff ? ' (it has a cliff to climb)' : ''}.`);
@@ -135,7 +144,7 @@ export function terrainDefense(s: GameState): TerrainDefense {
   if (best.via) lines.push(`The easiest way in is your tunnel-bridge: a crew comes to its outer steel door and is held there ${DOOR_DELAY} s (in view of your towers and deck) before it can act. The doors lock by themselves at night and when the alarm goes; by day, unwarned, they stand open and hold a crew only ${DOOR_OPEN_DELAY} s. Drop it and they must ford and climb the gorge.`);
   else if (best.choke) lines.push(held ? `The easiest way in narrows to ${Math.round(best.choke.width * 6)} m and you hold it.` : `The easiest way in narrows to ${Math.round(best.choke.width * 6)} m at one place: a wall or tower there would matter.`);
   if (towers.length) lines.push(hs > 0.3 ? `Your towers stand on real high ground (${Math.round(hs * 100)} % of the full advantage).` : 'Your towers stand on the level: a hill would add range.');
-  return { score: Math.max(0, Math.min(1, 0.5 * hard + 0.3 * hs + 0.2 * (held ? 1 : 0))), lines, lane: best, held, highShare: hs };
+  return { score: Math.max(0, Math.min(1, 0.5 * hard + 0.3 * hs + 0.2 * (held ? 1 : 0) + RFX.DEFENSE_SHARE * roadScore)), lines, lane: best, held, highShare: hs };
 }
 
 /** A card for the Next-step list that reads the ground (the guidance turns it into a Suggestion). Suggest, never impose. */

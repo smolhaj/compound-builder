@@ -7,6 +7,8 @@
 import { ALT_RANGE, LOT_NAME, lotField, lotStats, profileLine, type LotField, type LotKind, type LotSpec, type LotStats } from './lots';
 import { HOME_RECT, sitePrice, RAW, type Acres, type Fact, type Site } from './site';
 import type { RegionId } from './regions';
+import { listingRoad } from './roadState';
+import { planWords } from './roadPlan';
 
 const statsCache = new WeakMap<LotField, LotStats>();
 /** The stats of a lot's ground (computed once per field). */
@@ -172,7 +174,7 @@ export function aspectWord(aspect: number): string {
  * The rows of the listing card's terrain block: what the ground is like, in plain words. Numbers come from the lot's
  * own ground (sim/lots.ts lotStats); the sim's costs and climate read the same numbers (sim/slope.ts).
  */
-export function terrainFacts(site: Pick<Site, 'lot' | 'home'>): Fact[] {
+export function terrainFacts(site: Pick<Site, 'lot' | 'home'> & Partial<Pick<Site, 'region' | 'creek' | 'timber'>>): Fact[] {
   const lot = siteLot(site);
   if (!lot) return [];
   const { stats: s } = lot, spec = site.lot!;
@@ -182,8 +184,10 @@ export function terrainFacts(site: Pick<Site, 'lot' | 'home'>): Fact[] {
   if (spec.cutbank) out.push({ label: 'Rock face', value: 'Rock face above the pad: a cutbank over a level shelf: a compound can be notched into it, and a crew on foot needs ladders to cross it', tone: 'good' });
   const flat = Math.round(s.padFrac * 100);
   out.push({ label: 'Flat ground', value: `${flat} % buildable${s.padM2 > 0 ? ` · best pad ${acresOfM2(s.padM2)} acre${acresOfM2(s.padM2) === 1 ? '' : 's'}` : ''}`, tone: flat >= 30 ? 'good' : flat < 12 ? 'bad' : undefined });
-  const g = s.accessMaxPct;
-  out.push({ label: 'Road in', value: `${n0(s.accessM)} m from the county road, steepest stretch ${Math.round(g)} %${g > 10 ? ' (needs switchbacks)' : ''}`, tone: g <= 8 ? 'good' : g > 10 ? 'bad' : undefined });
+  // the road in is the planned one (sim/roadPlan.ts): where it winds, switchbacks, bridges and bores
+  const rp = listingRoad({ region: site.region ?? 'mountain_west', creek: site.creek ?? false, timber: site.timber ?? 1, home: site.home, lot: site.lot }), words = planWords(rp);
+  out.push({ label: 'Road in', value: `${words[0]}${words.length > 1 ? ': ' + words.slice(1).filter(w => !/cattle guard|^\d* ?culverts?$|^a culvert$/.test(w)).join(', ') : ''}`.replace(/: $/, ''), tone: rp.engineer || rp.hairpins.length >= 3 || rp.structures.some(x => x.kind === 'bridge' || x.kind === 'bridge1' || x.kind === 'tunnel') ? 'bad' : rp.maxGradePct <= 8 && !rp.hairpins.length ? 'good' : undefined });
+  out.push({ label: 'Road cost', value: `about $${Math.round(rp.usd / 1000).toLocaleString('en-US')}k to put in, ${rp.days} days`, tone: rp.usd > 150_000 ? 'bad' : rp.usd < 30_000 ? 'good' : undefined });
   out.push({ label: 'Sun', value: s.sun >= 1.08 ? `Faces ${aspectWord(s.aspect)}: warm, good for solar and gardens` : s.sun <= 0.93 ? `Faces ${aspectWord(s.aspect)}: cool, slow to thaw` : 'Even sun', tone: s.sun >= 1.08 ? 'good' : s.sun <= 0.93 ? 'bad' : undefined });
   const head = s.reservoirM;
   out.push({ label: 'Water head', value: head >= 7 ? `A bench ${n0(head)} m above the camp: a tank there feeds the house by gravity` : head > 0 ? `Highest bench is ${n0(head)} m above the camp: pump it` : 'Nothing above the camp: pump everything', tone: head >= 7 ? 'good' : undefined });
