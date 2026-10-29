@@ -23,6 +23,8 @@ try {
     await page.evaluate(() => { window.__done = 0; });
     await page.evaluate(s => new Function('cb', s)(window.__cb), sc.setup);
     await page.waitForFunction(() => window.__done === 1, null, { timeout: 120000 }).catch(() => console.error('setup never finished', sc.name));
+    await page.waitForTimeout(sc.settle ?? 2500);
+    for (let k = 0; k < 6; k++) await page.evaluate(() => window.__cb.qa.renderNow());
     let n = 0;
     for (const s of sc.shots) {
       await page.evaluate(s => {

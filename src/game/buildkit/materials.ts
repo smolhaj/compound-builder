@@ -780,7 +780,7 @@ export function kitMaterial(id: KitMaterialId): THREE.MeshStandardMaterial {
     case 'hedge_berry': m = new THREE.MeshStandardMaterial({ color: 0xa3261e, roughness: 0.5 }); break;
     case 'food_slot': m = new THREE.MeshStandardMaterial({ visible: false }); break;
     case 'container_red': case 'container_blue': case 'container_green': case 'container_tan': case 'container_black': case 'container_rust': {
-      const tint = { container_red: 0xb0473a, container_blue: 0x4a6f9a, container_green: 0x6f8f62, container_tan: 0xc7aa7c, container_black: 0x2a2c30, container_rust: 0x8c5434 }[id];
+      const tint = { container_red: 0xb0473a, container_blue: 0x4a6f9a, container_green: 0x6f8f62, container_tan: 0xc7aa7c, container_black: 0x2a2c30, container_rust: 0xa8663c }[id];
       const mm = texMat(id, paintMetalSiding, 2.5, 0.6, 0.4);
       mm.color.set(tint).multiplyScalar(1.6);
       m = mm; break;
