@@ -54,6 +54,7 @@ try {
     for (const ps of g.personState) ps.employed = true;
     g.weekend = W.newWeekend(g.people, g.seed, g.site.miles);
     g.money = 58000;
+    for (const m of ['lumber', 'fieldstone', 'roofing', 'hardware', 'concrete', 'wire']) g.stock[m] = 0;
     C.planStructure(g, 'timber_cabin', c.x - 3, c.z - 3, 0);
     g.disaster.mode = 'sandbox';
     const day = 3; g.clock.t = day + (11 - 6) / 24; g.clock.ticks = Math.round(g.clock.t / (0.25 / 24));
