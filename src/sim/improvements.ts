@@ -21,6 +21,8 @@ import { isFinished } from './construction';
 import type { Stock } from './materials';
 import { hasAll, shortfall, waitingFor, type MaterialId } from './materials';
 import type { GameState, Structure } from './state';
+import type { Site } from './site';
+import { powerFactor, roadFactor } from './slope';
 
 export type HouseKind = 'farmhouse' | 'trailer' | 'timber_cabin' | 'log_house';
 export type Condition = 'good' | 'fair' | 'poor';
@@ -68,8 +70,15 @@ export const TRANSFORMER = 3_500;
 export const DRIVE_PER_FT = 20;
 export const CULVERT = 1_200;
 
-export const powerQuote = (i: Improvements) => ({ usd: Math.round((i.poleFt * POLE_PER_FT + TRANSFORMER) / 100) * 100, days: 35 + Math.round(i.poleFt / 150) });
-export const driveQuote = (i: Improvements) => ({ usd: Math.round((i.driveFt * DRIVE_PER_FT + CULVERT) / 100) * 100, days: 5 + Math.round(i.driveFt / 300) });
+/** The co-op's quote for the line, and the contractor's for the drive; on a lot with relief the poles and the road cost more (sim/slope.ts). */
+export const powerQuote = (i: Improvements, site?: Pick<Site, 'lot' | 'home'>) => {
+  const k = site ? powerFactor(site) : 1;
+  return { usd: Math.round((i.poleFt * POLE_PER_FT * k + TRANSFORMER) / 100) * 100, days: 35 + Math.round(i.poleFt * k / 150) };
+};
+export const driveQuote = (i: Improvements, site?: Pick<Site, 'lot' | 'home'>) => {
+  const f = site ? roadFactor(site) : { lenMul: 1, perFtMul: 1 };
+  return { usd: Math.round((i.driveFt * f.lenMul * DRIVE_PER_FT * f.perFtMul + CULVERT) / 100) * 100, days: 5 + Math.round(i.driveFt * f.lenMul / 300) };
+};
 
 /** Jobs the co-op or a contractor has on the books (due at game time). */
 export interface SiteJobs { power: number | null; drive: number | null }
@@ -80,7 +89,7 @@ export function hookupProblem(s: GameState, what: 'power' | 'drive'): string | n
   if (s.siteJobs[what] !== null) return 'on the books';
   const t = s.disaster.tracks;
   if (t.banks < 0.5 || t.law < 0.5 || (what === 'power' && t.grid < 0.5)) return 'nobody is taking jobs now';
-  const q = what === 'power' ? powerQuote(imp) : driveQuote(imp);
+  const q = what === 'power' ? powerQuote(imp, s.site) : driveQuote(imp, s.site);
   if (s.money < q.usd) return 'not enough money';
   return null;
 }
@@ -88,7 +97,7 @@ export function hookupProblem(s: GameState, what: 'power' | 'drive'): string | n
 export function orderHookup(s: GameState, what: 'power' | 'drive'): string | null {
   const why = hookupProblem(s, what);
   if (why) return why;
-  const q = what === 'power' ? powerQuote(s.site.improvements) : driveQuote(s.site.improvements);
+  const q = what === 'power' ? powerQuote(s.site.improvements, s.site) : driveQuote(s.site.improvements, s.site);
   s.money -= q.usd;
   s.siteJobs[what] = s.clock.t + q.days;
   log(s, what === 'power'

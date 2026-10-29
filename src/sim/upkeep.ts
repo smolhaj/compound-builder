@@ -18,13 +18,15 @@
  *              excavator, the drill rig) wait until the road firms up.
  */
 import { calendarOf, type GameState } from './state';
-import { REGIONS } from './regions';
+
 import { isFinished, knockBack } from './construction';
 import { isHome } from './blueprints';
 import type { MaterialId } from './materials';
 import type { Fix } from './improvements';
 import { insuranceClaim } from './paperwork';
 import { mulberry32 } from './rng';
+import { regionFor } from './climate';
+import { ROAD_CLOSED_TEXT, roadClosedFor } from './slope';
 
 /** Days green wood takes to season. */
 export const SEASON_DAYS = 270;
@@ -121,12 +123,14 @@ const HEAVY: readonly MaterialId[] = ['concrete', 'tank', 'container', 'septic_t
 
 /** Extra days on a delivery for snow on the drive and mud-season weight limits. */
 export function weatherDelay(s: GameState, materials: readonly MaterialId[]): { days: number; why: string | null } {
-  const R = REGIONS[s.site.region], { doy } = calendarOf(s.clock);
+  const R = regionFor(s.site), { doy } = calendarOf(s.clock);
   const winter = doy >= 335 || doy <= 60;
   // mud season: from about three weeks before the last frost until a couple of weeks after
   const [last] = R.frost;
   if (R.cold >= 0.9 && doy >= last - 20 && doy <= last + 14 && materials.some(m => HEAVY.includes(m)))
     return { days: last + 15 - doy, why: 'mud season: the county road has weight limits until it firms up' };
+  const shut = roadClosedFor(s);
+  if (shut > 0) return { days: shut, why: `${ROAD_CLOSED_TEXT}: the truck waits` };
   if (winter && R.cold >= 0.9 && s.site.improvements.driveFt > 250 && s.stock.plow < 1)
     return { days: 2 + Math.floor(R.cold * 2), why: 'snow on the drive: the truck waits for it to be cleared' };
   return { days: 0, why: null };

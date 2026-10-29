@@ -35,11 +35,12 @@
  * The yield formula that uses these is `fieldHarvest` in needs.ts; this file only has the per-plot factors.
  */
 import { calendarOf, type GameState, type Structure } from './state';
-import { REGIONS, seasons } from './regions';
+import { seasons } from './regions';
 import { isFinished } from './construction';
 import { mulberry32 } from './rng';
 import { logGate } from './nag';
 import { farmOf } from './farm';
+import { regionFor } from './climate';
 
 export type CropId = 'potatoes' | 'beans' | 'wheat' | 'rest';
 export const CROP_IDS: readonly CropId[] = ['potatoes', 'beans', 'wheat', 'rest'];
@@ -138,7 +139,7 @@ const year = (s: GameState) => calendarOf(s.clock).year;
 
 /** The sowing window (day of year): two weeks before the last frost to 85 days ahead of the first. */
 export function sowWindow(s: GameState): [number, number] {
-  const [last, first] = REGIONS[s.site.region].frost;
+  const [last, first] = regionFor(s.site).frost;
   return [last - 14, Math.max(last + 20, first - 85)];
 }
 /** The days of the window the spring work is piling up (the first six weeks of it). */
@@ -148,7 +149,7 @@ export const SOW_RATE = 1.5, CATCH_CROP = 0.35;
 
 /** A crop sown on `doy`: a full crop inside the window, fading over six weeks to the catch crop, nothing late in the season. */
 export function lateFactor(s: GameState, doy: number): number {
-  const [, w1] = sowWindow(s), first = REGIONS[s.site.region].frost[1];
+  const [, w1] = sowWindow(s), first = regionFor(s.site).frost[1];
   if (doy <= w1) return 1;
   if (doy > first - 55) return 0;
   return Math.max(CATCH_CROP, 1 - (1 - CATCH_CROP) * (doy - w1) / 42);
@@ -308,7 +309,7 @@ export function cropsDay(s: GameState): string[] {
   const out: string[] = [];
   const { doy, year: y } = calendarOf(s.clock);
   const P = plotsOf(s), sd = seedsOf(s), [w0, w1] = sowWindow(s);
-  const H = seasons(REGIONS[s.site.region]).harvest;
+  const H = seasons(regionFor(s.site)).harvest;
   const st = s.stock as unknown as Record<string, number>;
   if (sd.year !== y) { sd.year = y; sd.sown = 0; sd.unsown = 0; sd.kept = 0; }
   // the heap: kitchen scraps, weeds and straw

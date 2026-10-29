@@ -137,6 +137,8 @@ export interface Structure {
   high?: number;
   /** Gatehouse garage (sim/garage.ts): the vehicle id in each parking slot (null = free). */
   parked?: Array<string | null>;
+  /** Rise over run across its footprint when it was staked, on a lot with relief (sim/slope.ts): the pad takes longer and the foundation more stone. Absent: level. */
+  grade?: number;
 }
 
 export type TaskKind = 'idle' | 'build' | 'forestry' | 'sleep' | 'chores' | 'school' | 'leisure' | 'job' | 'gone' | 'shelter' | 'away'
