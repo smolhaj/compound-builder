@@ -336,7 +336,7 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     wildlife: newWildlife(),
     lineage: newLineage(people[0].last),
     site,
-    stock: { ...emptyStock(), firewood: STARTING_FIREWOOD, canned: 2, ...startingBedding(people.length) },
+    stock: { ...emptyStock(), firewood: STARTING_FIREWOOD, canned: 2, canner: 1, ...startingBedding(people.length) },
     neighbors: generateNeighbors(seed),
     land: newLand(seed, generateNeighbors(seed).map(n => n.id), (setup.site ?? CLASSIC).home),
     gate: newGate(seed),
