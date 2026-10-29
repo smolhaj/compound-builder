@@ -465,7 +465,6 @@ function corridor(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group
       { len: 2.0 * M, dep: 0.95 * M, along: true, fn: a => Furniture.bunk(a, 'quilt_red', 'quilt_blue'), sides: ['right'] },
       { len: 1.2 * M, dep: 0.4 * M, fn: a => Furniture.bench(a, 1.2), sides: ['right', 'left'] },
     ]);
-    c.I(0, 0, 0, a => Furniture.rug(a, 0.9, 3.4), false);
     c.hang(['left', 'right'], 1.0 * M, 0, a => Furniture.coatPegs(a, 1.0), 0.8);
     c.hang(['right', 'left'], 0.2 * M, 0.5 * M, a => Equipment.extinguisher(a), 1);
     c.hang(['left', 'right'], 0.3 * M, 1.5 * M, a => Equipment.sign(a), 0.7);

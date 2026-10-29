@@ -1171,6 +1171,7 @@ export class HomesteadWorld {
   private _power = false;
   private _morale: { games: boolean; music: boolean; books: boolean } | undefined;
   private _belowSeen = false;
+  private _belowCam = false;
   private _bunkerKey = '';
   private _screensKey = '';
   /** Per frame: refresh what the bunker rooms show (rebuilding the ones whose look changed), and redraw the screens while they can be seen. */
@@ -1187,8 +1188,9 @@ export class HomesteadWorld {
         this._syncUnderground();
       }
     }
-    // walking down (or back up) changes which rooms can be seen: draw only those
-    if (this._belowSeen !== this._below) { this._belowSeen = this._below; for (const b of this._built.values()) if (b.under) this._applyView(b); }
+    // walking down (or back up), or any camera under the ground, changes which rooms can be seen: draw only those
+    const cam = this._ws.camera.position, belowCam = cam.y < this.groundAt(cam.x, cam.z) - 0.12;
+    if (this._belowSeen !== (this._below || belowCam)) { this._belowSeen = this._below || belowCam; this._belowCam = belowCam; for (const b of this._built.values()) if (b.under) this._applyView(b); }
     // the screens (the control room's wall, the bunkroom's TV): only while one could be on screen (underground view, walking below, or the cutaway)
     const screens = [...this._built.values()].some(b => b.finished && (b.placed.kind === 'bunker_comms' || b.placed.kind === 'bunker_dorm'));
     if (screens && (this._under || this._below || this._view === 'cutaway')) { updateSiteMap(game); updateScreens(game, t, hour); }
@@ -1521,7 +1523,7 @@ export class HomesteadWorld {
     const v = this._under ? (b.under ? 'cutaway' : 'ghost') : this._view;
     // a finished bunker room is drawn only where somebody can see it (the underground view, walking below): from the surface the earth hides it, so skip its draw calls
     // (an entrance stays: its shaft or stairwell is part of the yard)
-    if (b.under) b.group.visible = !b.finished || this._under || this._below || isEntry(KIT[b.placed.kind]);
+    if (b.under) b.group.visible = !b.finished || this._under || this._below || this._belowCam || isEntry(KIT[b.placed.kind]);
     for (const o of b.group.children) {
       const m = o as THREE.Mesh;
       if (!m.isMesh) continue;
