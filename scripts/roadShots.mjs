@@ -21,6 +21,7 @@ const CASES = JSON.parse(opt('--cases', 'null')) ?? [
   ['app-hollow', 'lowrender&clean&seed=6&drive&region=appalachia', ['struct:low_water', 'side:struct:low_water', 'frac:0.5']],
   ['plains-section', 'lowrender&clean&seed=6&drive&region=plains', ['struct:bridge1', 'side:struct:bridge1', 'frac:0.4']],
   ['pnw-spur', 'lowrender&clean&seed=7&drive&lot=hillside&relief=9&region=pnw&lotseed=3&elev=900', ['side:struct:culvert', 'frac:0.5']],
+  ['plains-bridgedown', 'lowrender&clean&seed=6&drive&bridgedown&region=plains', ['side:struct:bridge1']],
   ['mw-tunnel', 'lowrender&clean&seed=7&drive&lot=saddle&relief=30&outlier&region=mountain_west&lotseed=6', ['portal:tunnel', 'orbit:portal:tunnel', 'frac:0.3']],
 ];
 

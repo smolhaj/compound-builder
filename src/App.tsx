@@ -36,6 +36,7 @@ export default function App() {
       const qaSite = lotSite ?? regionSite;
       if (qaSite && q.has('drive')) qaSite.improvements = { ...qaSite.improvements, drive: true };
       const game = saved ?? (qaSite ? newGame(useWorldStore.getState().seed, undefined, undefined, { site: qaSite }) : newGame(useWorldStore.getState().seed));
+      if (!saved && q.has('bridgedown')) game.roadBridge = { down: true, due: null };   // QA: the bridge on the way in, brought down
       useGameStore.getState().load(game);
       // no game to resume (and not a QA shot): the new-game screen
       if (!saved && (!q.has('seed') || q.has('new'))) useGameStore.getState().openSetup(true);

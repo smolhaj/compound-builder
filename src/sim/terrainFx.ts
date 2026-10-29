@@ -30,7 +30,7 @@ import { isHome } from './blueprints';
 import { highShare, isTower } from './towers';
 import { PERIMETER, runFinished, runBill, SALVAGE, type PerimeterKind, type Pt } from './perimeter';
 import { log } from './economy';
-import { RFX, roadChokeLines, roadChokes, roadEase } from './roadFx';
+import { DROPPED_SCORE, RFX, bridgeDown, roadBridgeOf, roadChokeLines, roadChokes, roadEase } from './roadFx';
 
 export const FX = {
   /** Solar: sun gain per unit of slope, and the cap. */
@@ -125,8 +125,11 @@ export function terrainDefense(s: GameState): TerrainDefense {
   const hs = towers.length ? towers.reduce((a, st) => a + highShare(st), 0) / towers.length : 0;
   // the road side: single file at a bridge, a bore, a ford or a chain of hairpins (sim/roadFx.ts); held when a tower or a wall stands on it
   const chokes = roadChokes(s), roadHeld = chokes.some(c => chokeHeld(s, { at: c.at, width: c.width, hardness: 1 }));
-  const roadScore = Math.min(1, 0.5 * chokes.length) * (roadHeld ? 1 : 0.6);
+  // a bridge brought down on purpose stops every truck at the creek: worth a held choke (and it costs you the same: your own deliveries stop there too)
+  const down = bridgeDown(s) && roadBridgeOf(s) !== null;
+  const roadScore = Math.max(Math.min(1, 0.5 * chokes.length) * (roadHeld ? 1 : 0.6), down ? DROPPED_SCORE : 0);
   if (chokes.length) { lines.push(...roadChokeLines(s).slice(0, 2)); lines.push(roadHeld ? 'You hold the choke on the road.' : 'A tower or a wall at the choke on the road would matter.'); }
+  if (down) lines.push('The bridge on the way in is down: a crew\'s trucks stop at the creek and they ford it on foot. Your own deliveries stop there too.');
   if (!best) return { score: Math.min(1, RFX.DEFENSE_SHARE * roadScore), lines, lane: null, held: false, highShare: hs };
   const hard = Math.max(0, Math.min(1, (best.hardness - 1) / 0.6));
   const held = !!best.choke && chokeHeld(s, best.choke);

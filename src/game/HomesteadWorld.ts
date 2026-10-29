@@ -330,9 +330,17 @@ export class HomesteadWorld {
   /** QA: a scale figure standing on the road (or its deck) at (x, z). */
   qaFigure(x: number, z: number): void { this._root.add(scaleFigure(x, z, this._driveY(x, z) ?? this.groundAt(x, z))); }
 
+  private _bridgeDown = false;
+  /** The bridge on the way in comes down (or goes back up): redraw the road without its deck and rails. */
+  setBridgeDown(on: boolean): void {
+    if (on === this._bridgeDown) return;
+    this._bridgeDown = on;
+    if (this._quality) this._buildRoads();
+  }
+
   /** The road's own height where it leaves the ground: on a bridge deck (null elsewhere, and while there is no drive). */
   private _driveY(x: number, z: number): number | null {
-    if (!this._drive) return null;
+    if (!this._drive || this._bridgeDown) return null;
     let best = 0.32 * 0.32, y: number | null = null;
     for (const sx of this.plan.structures) {
       if (sx.kind !== 'bridge1' && sx.kind !== 'bridge') continue;
@@ -420,7 +428,7 @@ export class HomesteadWorld {
     const track = this._drive ? mat : (() => { const m = mat.clone(); m.color = new THREE.Color(0x8a7a5c); return mud(m); })();
     road.receiveShadow = true; this._roads.add(road);
     // the way in: a curved ribbon on the benched ground, with its banks, rails, culverts, crossings and portals (game/region/roadWorks.ts)
-    this._roads.add(buildRoadWorks(this.plan, this.groundAt, { built: this._drive, surface: mat, track, driveW: DRIVE_W, natural: (x, z) => this.parcel.natural(x, z).h }));
+    this._roads.add(buildRoadWorks(this.plan, this.groundAt, { built: this._drive, bridgeDown: this._bridgeDown, surface: mat, track, driveW: DRIVE_W, natural: (x, z) => this.parcel.natural(x, z).h }));
     const gate = buildGate(DRIVE_W);
     const { gate: gp } = this.access;
     gate.position.set(gp.x, this.groundAt(gp.x, gp.z), gp.z);

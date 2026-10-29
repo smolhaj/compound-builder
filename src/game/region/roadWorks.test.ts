@@ -51,6 +51,19 @@ describe('the road, drawn', () => {
     expect(b.max.z).toBeGreaterThan(br.z + 0.4);
   });
 
+  it('a bridge that is down leaves its abutments and no deck or rails', () => {
+    const p = planRoad(input('mountain_west', wet, { frontage: { x: 67, zMin: 4, zMax: 63, band: [10, 26] }, yard: [30, 50] }));
+    used.clear();
+    const standing = buildRoadWorks(p, wet.h, opts(wet));
+    expect(used.has('deck')).toBe(true);
+    used.clear();
+    const down = buildRoadWorks(p, wet.h, { ...opts(wet), bridgeDown: true });
+    expect(used.has('deck')).toBe(false);
+    expect(used.has('fieldstone')).toBe(true);
+    expect(finite(down)).toBe(true);
+    expect(bounds(down).max.y).toBeLessThan(bounds(standing).max.y);
+  });
+
   it('a low-water crossing and a culvert: a slab with vent pipes and depth posts; a pipe through the fill with a headwall each end', () => {
     const p = planRoad(input('appalachia', wet, { frontage: { x: 67, zMin: 4, zMax: 63, band: [10, 26] }, yard: [30, 50] }));
     expect(p.structures.some(s => s.kind === 'low_water')).toBe(true);

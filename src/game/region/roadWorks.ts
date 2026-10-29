@@ -131,6 +131,8 @@ export interface RoadWorksOpts {
   /** Surface material for the built road, and the two-track's. */
   surface: THREE.Material; track: THREE.Material;
   driveW: number;
+  /** The bridge on the way in is down: its abutments stand, the deck and rails are gone. */
+  bridgeDown?: boolean;
   /** The natural ground (no road): culverts find where the fill meets it. */
   natural: Ground;
 }
@@ -208,7 +210,7 @@ export function buildRoadWorks(plan: RoadPlan, ground: Ground, o: RoadWorksOpts)
     switch (sx.kind) {
       case 'culvert': case 'arch_culvert': culvert(parts, fr, a, b, ground, o.natural, sx.kind === 'arch_culvert'); break;
       case 'ford': case 'low_water': slab(parts, fr, plan, a, b, ground, sx.kind === 'low_water'); break;
-      case 'bridge1': case 'bridge': bridge(parts, stone, fr, plan, a, b, ground, sx.kind === 'bridge'); break;
+      case 'bridge1': case 'bridge': bridge(parts, stone, fr, plan, a, b, ground, sx.kind === 'bridge', !!o.bridgeDown); break;
       case 'tunnel': portals(group, stone, fr, a, b, ground); break;
       case 'cattle_guard': cattleGuard(parts, fr[Math.round((a + b) / 2)]); break;
       case 'pass': cairn(stone, fr[Math.round((a + b) / 2)], ground); break;
@@ -296,9 +298,9 @@ function slab(parts: Parts, fr: readonly Frame[], plan: RoadPlan, a: number, b: 
 
 // ── a one-lane bridge: plank deck on two steel girders, stone abutments, a rail each side ──
 
-function bridge(parts: Parts, stone: Parts, fr: readonly Frame[], plan: RoadPlan, a: number, b: number, ground: Ground, big: boolean): void {
+function bridge(parts: Parts, stone: Parts, fr: readonly Frame[], plan: RoadPlan, a: number, b: number, ground: Ground, big: boolean, down: boolean): void {
   const W = big ? 0.78 : 0.62;
-  for (let i = a; i < b; i++) {
+  for (let i = a; !down && i < b; i++) {
     const p = fr[i], q = fr[i + 1], len = Math.hypot(q.x - p.x, q.z - p.z), y = (plan.pts[i].y + plan.pts[i + 1].y) / 2, rot = Math.atan2(q.x - p.x, q.z - p.z);
     const mx = (p.x + q.x) / 2, mz = (p.z + q.z) / 2, nx = Math.cos(rot), nz = -Math.sin(rot);
     parts.box('deck', mx, y - 0.0175, mz, W, 0.035, len + 0.02, rot);
@@ -309,7 +311,7 @@ function bridge(parts: Parts, stone: Parts, fr: readonly Frame[], plan: RoadPlan
     if ((i - a) % 3 === 0) parts.box('rust', mx, y - 0.075, mz, W * 0.7, 0.012, 0.014, rot);
   }
   // rails: posts every 0.3, two bars
-  for (const s of [-1, 1]) {
+  for (const s of down ? [] : [-1, 1]) {
     let prev: V3 | null = null, prev2: V3 | null = null;
     for (let i = a; i <= b; i += 2) {
       const f = fr[i], x = f.x + f.nx * s * (W / 2 - 0.015), z = f.z + f.nz * s * (W / 2 - 0.015), y = plan.pts[i].y;
@@ -362,7 +364,7 @@ function portals(group: THREE.Group, stone: Parts, fr: readonly Frame[], a: numb
 function portalFace(group: THREE.Group, stone: Parts, f: Frame, out: number, ground: Ground): void {
   // `out` is +1 where the opening looks along the road's heading (the far end of the bore), -1 at the near end.
   // The face is a stone block with the arch cut from it, extruded 0.3 deep into the hill.
-  const W = 1.9, H = 1.25, D = 0.3;
+  const W = 1.7, H = 1.0, D = 0.3;
   const shape = new THREE.Shape();
   shape.moveTo(-W / 2, -0.4); shape.lineTo(W / 2, -0.4); shape.lineTo(W / 2, H); shape.lineTo(-W / 2, H); shape.lineTo(-W / 2, -0.4);
   const hole = new THREE.Path();
@@ -387,7 +389,7 @@ function portalFace(group: THREE.Group, stone: Parts, f: Frame, out: number, gro
   }
   // wing walls stepping back along the cut, lower as they go
   for (const s of [-1, 1]) for (let k = 1; k <= 3; k++) {
-    const lat = 0.95 + 0.3 * k, back = 0.12 + 0.28 * k, hgt = 0.74 - 0.15 * k;
+    const lat = 0.85 + 0.3 * k, back = 0.12 + 0.28 * k, hgt = 0.6 - 0.14 * k;
     stone.box('fieldstone', f.x + f.nx * s * lat - f.fx * out * back, f.y + hgt / 2 - 0.04, f.z + f.nz * s * lat - f.fz * out * back, 0.12, hgt, 0.42, f.rot + s * out * 0.55);
   }
   void ground;

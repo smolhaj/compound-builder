@@ -25,7 +25,8 @@
  * relief, like sim/slope.ts (the plan costs a search, and every battle and test seed would pay it); a
  * flood still takes a low-water crossing on any place. Pure.
  */
-import type { GameState } from './state';
+import type { GameState, RoadBridgeState } from './state';
+import { log } from './economy';
 import { dayIndex } from './state';
 import type { Pt } from './perimeter';
 import type { RoadPlan, RoadStructure } from './roadPlan';
@@ -90,9 +91,9 @@ export function crossingOutFor(s: GameState, day = dayIndex(s.clock.t)): number 
 
 export interface RoadChoke { kind: RoadStructure['kind'] | 'hairpins'; at: Pt; /** Width of the way there, units (a one-lane structure is ~0.6). */ width: number }
 
-/** Where the road is single file. */
-export function chokesOf(p: RoadPlan): RoadChoke[] {
-  const out: RoadChoke[] = singleFile(p).map(x => ({ kind: x.kind, at: [x.x, x.z] as Pt, width: 0.6 }));
+/** Where the road is single file (a bridge that is down is no choke: nothing crosses there). */
+export function chokesOf(p: RoadPlan, bridgeDown = false): RoadChoke[] {
+  const out: RoadChoke[] = singleFile(p).filter(x => !(bridgeDown && (x.kind === 'bridge1' || x.kind === 'bridge'))).map(x => ({ kind: x.kind, at: [x.x, x.z] as Pt, width: 0.6 }));
   if (p.hairpins.length >= 2) { const h = p.hairpins[Math.floor(p.hairpins.length / 2)]; out.push({ kind: 'hairpins', at: [h.x, h.z], width: 0.8 }); }
   return out;
 }
@@ -101,11 +102,11 @@ export function chokesOf(p: RoadPlan): RoadChoke[] {
  * plan costs a search over the land, and every battle, every raid dossier and every test seed would pay it; the
  * classic ground's road is a short level drive.
  */
-export const roadChokes = (s: Pick<GameState, 'site' | 'seed'>): RoadChoke[] => (s.site.lot ? chokesOf(planOf(s)) : []);
+export const roadChokes = (s: Pick<GameState, 'site' | 'seed'> & Partial<Pick<GameState, 'roadBridge'>>): RoadChoke[] => (s.site.lot ? chokesOf(planOf(s), s.roadBridge?.down) : []);
 
 /** Extra distance (units) a vehicle crew's approach adds before the line: the watch sees it that much longer. */
-export const startOf = (p: RoadPlan): number => Math.min(RFX.START_CAP, singleFile(p).length * RFX.CHOKE_START + p.hairpins.length * RFX.HAIRPIN_START);
-export const roadStart = (s: Pick<GameState, 'site' | 'seed'>): number => (s.site.lot ? startOf(planOf(s)) : 0);
+export const startOf = (p: RoadPlan, bridgeDown = false): number => Math.min(RFX.START_CAP, chokesOf(p, bridgeDown).filter(c => c.kind !== 'hairpins').length * RFX.CHOKE_START + p.hairpins.length * RFX.HAIRPIN_START);
+export const roadStart = (s: Pick<GameState, 'site' | 'seed'> & Partial<Pick<GameState, 'roadBridge'>>): number => (s.site.lot ? startOf(planOf(s), s.roadBridge?.down) : 0);
 
 /** How much easier than open ground the road side is for a crew (the terrain's ROAD_EASE 0.75), eased back toward 1 as the road gets slow: +0.1 for each time its drive exceeds a straight level road's (cap 1). */
 export function easeOf(p: RoadPlan, base: number): number {
@@ -115,7 +116,7 @@ export function easeOf(p: RoadPlan, base: number): number {
 export const roadEase = (s: Pick<GameState, 'site' | 'seed'>, base: number): number => (s.site.lot ? easeOf(planOf(s), base) : base);
 
 /** Words for the Defense card and the log. */
-export function roadChokeLines(s: Pick<GameState, 'site' | 'seed'>): string[] {
+export function roadChokeLines(s: Pick<GameState, 'site' | 'seed'> & Partial<Pick<GameState, 'roadBridge'>>): string[] {
   const p = planOf(s);
   const kind: Record<string, string> = { bridge1: 'a one-lane bridge', bridge: 'a bridge', tunnel: 'a rock bore', ford: 'a ford', low_water: 'a low-water crossing', hairpins: `${p.hairpins.length} hairpins` };
   return roadChokes(s).map(c => `The road is single file at ${kind[c.kind]}: a crew's trucks stop there and walk`);
@@ -131,4 +132,57 @@ export function roadLine(s: Pick<GameState, 'site' | 'seed'>): string {
   if (p.hairpins.length) bits.push(`${p.hairpins.length} hairpin${p.hairpins.length === 1 ? '' : 's'}`);
   for (const k of ['bridge', 'bridge1', 'tunnel', 'low_water', 'ford'] as const) { const n = p.structures.filter(x => x.kind === k).length; if (n) bits.push(`${n > 1 ? n + ' ' : 'a '}${{ bridge: 'bridge', bridge1: 'one-lane bridge', tunnel: 'rock bore', low_water: 'low-water crossing', ford: 'ford' }[k]}${n > 1 ? 's' : ''}`); }
   return bits.join(', ');
+}
+
+// ── the bridge on the way in ──
+
+/** The bridge on this place's planned road, if it has one. */
+export function roadBridgeOf(s: Pick<GameState, 'site' | 'seed'>): RoadStructure | null {
+  return planOf(s).structures.find(x => x.kind === 'bridge1' || x.kind === 'bridge') ?? null;
+}
+export const bridgeDown = (s: Pick<GameState, 'roadBridge'>): boolean => !!s.roadBridge?.down;
+
+/** What a crew's trucks (and yours) find at a bridge that is down: it stops them at the creek. A held choke is worth this much to the road's share of the defense. */
+export const DROPPED_SCORE = 0.6;
+
+/**
+ * Bring the bridge on the way in down on purpose: nothing with wheels crosses until it is rebuilt (the delivery truck
+ * leaves its load at the creek, and the family carries it in), a crew's trucks stop there and they ford on foot, and the
+ * road's share of the defense counts it like a held choke. Null on success, else why not.
+ */
+export function dropRoadBridge(s: GameState): string | null {
+  const b = roadBridgeOf(s);
+  if (!b) return 'the way in has no bridge';
+  if (!s.site.improvements.drive) return 'there is no drive in yet';
+  if (s.roadBridge.down) return s.roadBridge.due !== null ? 'it is being rebuilt' : 'it is already down';
+  s.roadBridge = { down: true, due: null };
+  log(s, 'The bridge on the way in is down. Nothing with wheels crosses the creek until it is rebuilt: deliveries stop at the creek and get carried in, and a crew has to ford it on foot.');
+  return null;
+}
+
+/** What rebuilding it costs: the structure's price from the one table, and the days it takes. */
+export function rebuildQuote(s: Pick<GameState, 'site' | 'seed'>): { usd: number; days: number } | null {
+  const b = roadBridgeOf(s);
+  return b ? { usd: b.usd, days: b.days } : null;
+}
+
+/** Order the rebuilding (the crew comes, the money goes); null on success, else why not. */
+export function rebuildRoadBridge(s: GameState): string | null {
+  const q = rebuildQuote(s);
+  if (!q) return 'the way in has no bridge';
+  if (!s.roadBridge.down) return 'it is standing';
+  if (s.roadBridge.due !== null) return 'it is already being rebuilt';
+  if (s.money < q.usd) return 'not enough money';
+  s.money -= q.usd;
+  s.roadBridge = { down: true, due: s.clock.t + q.days };
+  log(s, `A crew is rebuilding the bridge on the way in ($${q.usd.toLocaleString('en-US')}, about ${q.days} days).`);
+  return null;
+}
+
+/** Once a day: a bridge being rebuilt is finished when its days are up. */
+export function roadBridgeDay(s: GameState): void {
+  const rb: RoadBridgeState | undefined = s.roadBridge;
+  if (!rb || !rb.down || rb.due === null || s.clock.t < rb.due) return;
+  s.roadBridge = { down: false, due: null };
+  log(s, 'The bridge on the way in is rebuilt: trucks cross again.');
 }

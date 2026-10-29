@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RFX, chokesOf, crossingOutFor, easeOf, responseOf, roadChokes, roadEase, roadStart, startOf, structureDelay, structureDelayOf, winterOf } from './roadFx';
+import { DROPPED_SCORE, RFX, bridgeDown, chokesOf, crossingOutFor, dropRoadBridge, easeOf, rebuildQuote, rebuildRoadBridge, responseOf, roadBridgeDay, roadBridgeOf, roadChokes, roadEase, roadStart, startOf, structureDelay, structureDelayOf, winterOf } from './roadFx';
 import { planRoad, type RoadGround, type RoadInput } from './roadPlan';
 import { roadPlanFor } from './roadState';
 import { makeLotSite } from './lotListing';
@@ -8,6 +8,7 @@ import { newGame, type GameState, type Structure } from './state';
 import { driveQuote, hookupProblem, orderHookup } from './improvements';
 import { terrainDefense, FX } from './terrainFx';
 import { weatherDelay } from './upkeep';
+import { deliverOrders, placeOrder } from './economy';
 import { responseFactor } from './slope';
 import type { RegionId } from './regions';
 
@@ -136,6 +137,71 @@ describe('what a game reads', () => {
     expect(orderHookup(g, 'drive')).toBeNull();
     expect(before - g.money).toBe(q.usd);
     expect(g.log.slice(-3).map(l => l.text).join(' ')).toMatch(/low-water crossing/);
+  });
+});
+
+describe('the bridge on the way in', () => {
+  const plains = (seed = 6): GameState => newGame(seed, 130, 2027, { site: { ...CLASSIC, region: 'plains', creek: true, improvements: { ...RAW, power: true, drive: true } } });
+
+  it('can be brought down on purpose and rebuilt for its price: trucks stop at the creek, the choke goes, the defense counts it', () => {
+    const g = plains(), b = roadBridgeOf(g)!;
+    expect(b).toBeTruthy();
+    expect(b.droppable).toBe(true);
+    expect(bridgeDown(g)).toBe(false);
+    const before = terrainDefense(g).score;
+    // a delivery crosses while it stands
+    g.money = 500_000;
+    placeOrder(g, [{ material: 'lumber', qty: 5 }]);
+    g.clock.t = g.orders[0].dueAt + 0.1; deliverOrders(g);
+    expect(g.roadside.length).toBe(0);
+    expect(dropRoadBridge(g)).toBeNull();
+    expect(bridgeDown(g)).toBe(true);
+    expect(dropRoadBridge(g)).toMatch(/already down/);
+    // now the truck leaves it at the creek and it is carried in
+    placeOrder(g, [{ material: 'lumber', qty: 5 }]);
+    g.clock.t = g.orders[1].dueAt + 0.1; deliverOrders(g);
+    expect(g.roadside.length).toBe(1);
+    // the defense counts it like a held choke
+    const after = terrainDefense(g);
+    expect(after.lines.join(' ')).toMatch(/bridge on the way in is down/);
+    expect(after.score).toBeGreaterThan(before);
+    expect(after.score - before).toBeLessThanOrEqual(RFX.DEFENSE_SHARE * DROPPED_SCORE + 0.01);
+  });
+
+  it('rebuilding costs the structure\'s price and its days, and the bridge stands again when they are up', () => {
+    const g = plains();
+    g.money = 500_000;
+    expect(rebuildRoadBridge(g)).toMatch(/standing/);
+    dropRoadBridge(g);
+    const q = rebuildQuote(g)!;
+    expect(q.usd).toBe(roadBridgeOf(g)!.usd);
+    g.money = q.usd - 1;
+    expect(rebuildRoadBridge(g)).toMatch(/not enough money/);
+    g.money = q.usd + 50;
+    expect(rebuildRoadBridge(g)).toBeNull();
+    expect(g.money).toBe(50);
+    expect(rebuildRoadBridge(g)).toMatch(/already being rebuilt/);
+    expect(bridgeDown(g)).toBe(true);
+    roadBridgeDay(g);
+    expect(bridgeDown(g)).toBe(true);                                        // not yet
+    g.clock.t = g.roadBridge.due! + 0.01;
+    roadBridgeDay(g);
+    expect(g.roadBridge).toEqual({ down: false, due: null });
+  });
+
+  it('a road with no bridge has nothing to drop, and a place with no drive has no road to cut', () => {
+    const noBridge = plains(1);
+    expect(roadBridgeOf(noBridge)).toBeNull();
+    expect(dropRoadBridge(noBridge)).toMatch(/no bridge/);
+    const g = newGame(6, 130, 2027, { site: { ...CLASSIC, region: 'plains', creek: true, improvements: { ...RAW, power: true } } });
+    expect(dropRoadBridge(g)).toMatch(/no drive/);
+  });
+
+  it('a bridge that is down is not a choke on the road and adds nothing to a crew\'s start', () => {
+    const p = cross('mountain_west');
+    expect(chokesOf(p).map(c => c.kind)).toContain('bridge1');
+    expect(chokesOf(p, true).map(c => c.kind)).not.toContain('bridge1');
+    expect(startOf(p, true)).toBeLessThan(startOf(p));
   });
 });
 

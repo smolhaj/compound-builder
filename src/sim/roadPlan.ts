@@ -407,8 +407,8 @@ function boreEdges(grid: GridData, style: RoadStyle, cx: number, cz: number): Ar
         const cover = grid.hAt(x, z) - (a + (b - a) * t);
         maxCover = Math.max(maxCover, cover);
         if (t > 0.2 && t < 0.8) { inner++; if (cover >= 1.3) innerOk++; }   // (the arch stands 0.8 above the road: it needs real rock over it, about 8 m)
-        if (t <= 0.04 && cover > 0.4) ok = false;     // portals open on the hillside, not under it
-        if (t >= 0.96 && cover > 0.4) ok = false;
+        // portals are cut into the hillside: some ground over the arch at each end (the face stands in a slope, not on the level), not a mountain
+        if (((t > 0.07 && t < 0.13) || (t > 0.87 && t < 0.93)) && (cover < 0.25 || cover > 1.8)) ok = false;
       }
       if (!ok || innerOk / Math.max(1, inner) < 0.9 || maxCover > 4) continue;
       const lengthM = len * UNIT_M;
