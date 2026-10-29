@@ -13,6 +13,8 @@ import { ProjectsTab } from './ProjectsTab';
 import { ShopWindow } from '../ShopWindow';
 import { FarmPanel } from '../FarmPanel';
 import { FarmTab } from '../FarmTab';
+import { WeekenderPanel } from '../WeekenderPanel';
+import { newWeekend } from '../../sim/weekender';
 import { pondOf } from '../../sim/farm';
 
 const text = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
@@ -151,6 +153,37 @@ describe('the guided HUD (server-rendered)', () => {
     expect(fields).toMatch(/Season/);
     expect(fields).not.toMatch(/\d\.\d{4,}/);
   });
+  it('the weekender: the belt control and a month in numbers in the Family tab, the Weekend plan in Projects, the first-stage order as a Next step', () => {
+    withGame(g => {
+      g.lifestyle = 'weekend'; g.weekend = newWeekend(g.people, g.seed, g.site.miles);
+      for (const ps of g.personState) ps.employed = true;
+      planStructure(g, 'timber_cabin', 10, 10, 0);
+      g.money = 40_000;
+    });
+    const game = useGameStore.getInitialState().game;
+    const fam = text(renderToStaticMarkup(<WeekenderPanel />));
+    expect(fam).toContain('Belt in town');
+    expect(fam).toContain('A month in numbers');
+    expect(fam).toContain('Tight');
+    const proj = text(renderToStaticMarkup(<ProjectsTab />));
+    expect(proj).toContain('Weekend plan');
+    expect(proj).toMatch(/Order this stage/);
+    const build = text(renderToStaticMarkup(<BuildMenu />));
+    expect(build).toMatch(/Order the timber cabin/);
+    expect(fam).not.toMatch(/\d\.\d{4,}/);
+    void game;
+  });
+
+  it('a renter sees the rent, not a sale', () => {
+    withGame(g => {
+      g.lifestyle = 'weekend'; g.weekend = newWeekend(g.people, g.seed, g.site.miles, 'rent');
+    });
+    const fam = text(renderToStaticMarkup(<WeekenderPanel />));
+    expect(fam).toContain('The rented place in town');
+    expect(fam).toMatch(/Rent \$[\d,]+ a month/);
+    expect(fam).not.toContain('Sells for');
+  });
+
   it('the Farm lives under Supplies: one row of right-hand tabs, a Stores | Farm switch, and a Next-step link that lands on the Farm', async () => {
     const { Hud } = await import('../Hud');
     (globalThis as unknown as { location: { search: string } }).location = { search: '' };

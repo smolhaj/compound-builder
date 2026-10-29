@@ -17,7 +17,7 @@ import { countyWorks, needsPermit, permitFee } from '../../sim/paperwork';
 import { BUNKER_ORDER, GATEHOUSE_ORDER, KIT, TOWER_ORDER, UTILITY_ORDER } from '../../game/buildkit/kit';
 import { PERIMETER, UTILITY_LINES, runBill, runHours, type PerimeterKind } from '../../sim/perimeter';
 import { bunkerChecklist, buildAdvice, longTerm, suggestions, type SuggestionAct, perimeterNote, perimeterOff, perimeterTiers, upgradeChain } from '../../sim/guidance';
-import { hireCaretaker, openMoveIn } from '../../sim/weekender';
+import { hireCaretaker, openMoveIn, setBelt } from '../../sim/weekender';
 import { Group, Item, Note } from './common';
 import { btn, DIM, usd } from './style';
 import { WallProperty } from './WallProperty';
@@ -60,6 +60,8 @@ export function BuildMenu({ showProjects = () => undefined }: { showProjects?: (
     else if (a.type === 'order') { if (!g.order(a.lines)) setNote('Could not place that order.'); }
     else if (a.type === 'markTrees') { const n = markTrees?.(a.n) ?? 0; setNote(n ? `Marked ${n} trees: the family fells them in work hours.` : 'No more trees to mark near the yard.'); }
     else if (a.type === 'caretaker') { const why = g.money(d => hireCaretaker(d, a.kind)); if (why) setNote(`Could not arrange that: ${why}.`); }
+    else if (a.type === 'belt') { const why = g.daily(d => setBelt(d, a.on)); if (why) setNote(why[0].toUpperCase() + why.slice(1) + '.'); }
+    else if (a.type === 'crew') { const why = g.hire(a.id); if (why) setNote(`Could not hire them: ${why}.`); }
     else if (a.type === 'open') g.focusHud({ right: a.right, ...(a.supplies ? { supplies: a.supplies } : {}) });
     else if (a.type === 'restDay') { const why = g.daily(d => takeRestDay(d)); if (why) setNote(why); }
     else if (a.type === 'quarantine') { const why = g.daily(d => setQuarantine(d, a.on)); if (why) setNote(why); }

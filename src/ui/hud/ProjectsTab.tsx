@@ -15,6 +15,9 @@ import { eta, paceOf, slowHint, totalHoursLeft, weeksFor, weeksUntil } from '../
 import { hookupsFor, fitRows, needsHookup } from '../../sim/hookups';
 import { projectRows } from '../../sim/priority';
 import { litersText } from '../../sim/format';
+import { setBelt } from '../../sim/weekender';
+import { CREW_DAY_USD, crewIdea, nextLongStay, nextStageOrder, weekendBudget, weekendsFor } from '../../sim/weekendPlan';
+import { dayIndex } from '../../sim/state';
 import { Note, Row, Section } from './common';
 import { TONE, DIM, LINE, btn, usd } from './style';
 
@@ -26,7 +29,23 @@ export function ProjectsTab() {
   const selWeeks = sel && !isFinished(sel) ? weeksUntil(game, sel.id, pace) : null;
   const hint = left > 0 ? slowHint(game, weeks, pace) : null;
   const rows = projectRows(game), todo = needsHookup(game);
+  const wkPlan = game.weekend?.mode === 'split' ? weekendBudget(game) : null;
+  const wkNext = wkPlan ? nextStageOrder(game, 1) : null, wkStay = wkPlan ? nextLongStay(game.clock.startDoy, game.clock.startYear, dayIndex(game.clock.t)) : null, wkCrew = wkPlan ? crewIdea(game) : null;
   return <>
+    {wkPlan && <Section title="Weekend plan">
+      <Row label="A month in town" value={<span style={{ color: wkPlan.net < 0 ? TONE.bad : wkPlan.net < 2000 ? TONE.warn : undefined }}>{wkPlan.net >= 0 ? '+' : '\u2212'}{usd(Math.abs(wkPlan.net))}</span>} title={`The jobs pay ${usd(wkPlan.wages)}; groceries and bills ${usd(wkPlan.living)}; the town ${wkPlan.rented ? 'rent' : 'house'} ${usd(wkPlan.town)}${wkPlan.caretaker ? `; the caretaker ${usd(wkPlan.caretaker)}` : ''}`} />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginTop: 3 }}>
+        <span style={{ color: DIM }}>Belt in town</span>
+        <button style={btn(wkPlan.belt)} title={wkPlan.belt ? 'Back to ordinary weekdays' : `Cheaper upkeep and groceries (about ${usd(wkPlan.beltSaves)} a month) for a little less mood in town`} onClick={() => g.daily(d => setBelt(d, !wkPlan.belt))}>{wkPlan.belt ? 'Tight: loosen it' : `Tighten it (saves ~${usd(wkPlan.beltSaves)}/mo)`}</button>
+      </div>
+      {wkNext && <>
+        <Row label="Order next" value={`${wkNext.name}: ${usd(wkNext.cost)}`} title={wkNext.stages.map(x => `${x.name} (${x.hours} h)`).join(', then ')} />
+        <div style={{ fontSize: 11, color: DIM }}>{wkNext.stages.map(x => x.name).join(', then ')} · {wkNext.hours} h{weekendsFor(game, wkNext.hours) ? `, about ${weekendsFor(game, wkNext.hours)} weekends` : ''}</div>
+        <button style={{ ...btn(), width: '100%', marginTop: 3 }} disabled={!!orderProblem(game, wkNext.lines)} title={orderProblem(game, wkNext.lines) ? 'Cannot order that now (money, or nobody delivering)' : 'A stage at a time keeps cash for the next one'} onClick={() => g.order(wkNext.lines)}>Order this stage ({usd(wkNext.cost)})</button>
+      </>}
+      {wkStay && <Row label="Next long stay" value={`${wkStay.name}, ${wkStay.days} days from ${wkStay.label}`} title="More building than three ordinary weekends: have the next stage on site before it" />}
+      {wkCrew && <button style={{ ...btn(), width: '100%', marginTop: 3 }} title={`${usd(CREW_DAY_USD)} a day for four, billed only for the hours they work; they build the weekdays while you are at the jobs`} onClick={() => g.hire(wkCrew.st.id)}>Hire a crew for the weekdays: ~{usd(wkCrew.usd)}, {wkCrew.weeks} week{wkCrew.weeks === 1 ? '' : 's'}</button>}
+    </Section>}
     {left > 0 && <Section title="Pace">
       <Row label="Work left" value={`${Math.round(left).toLocaleString('en-US')} h`} />
       <Row label="At the family's pace" value={eta(weeks)} tone={weeks !== null && weeks > 26 ? 'warn' : undefined} title={`${Math.round(pace.perWeek)} effective hours of building a week`} />
@@ -86,7 +105,9 @@ export function ProjectsTab() {
                   <button style={btn()} onClick={() => g.dismiss(crew.id)}>Send home</button>
                 </div>
               : <>
-                {!why && !isFinished(sel) && blockedReason(game, sel) && <Note tone="warn">The materials are not on site yet ({blockedReason(game, sel)!.replace(/^Waiting for /, 'still need ')}). A crew hired now stands idle (and bills nothing) until they arrive: order them first.</Note>}
+                {!why && !isFinished(sel) && blockedReason(game, sel) && <Note tone="warn">{blockedReason(game, sel) === holdReason(game, sel) && /permit/i.test(blockedReason(game, sel)!)
+                  ? 'A crew hired now stands idle (and bills nothing) until the permit clears.'
+                  : `The materials are not on site yet (${blockedReason(game, sel)!.replace(/^Waiting for /, 'still need ')}). A crew hired now stands idle (and bills nothing) until they arrive: order them first.`}</Note>}
                 <button style={{ ...btn(), width: '100%', marginTop: 4 }} disabled={!!why} title={why ?? `${CREW_SIZE} workers at $${CREW_RATE}/h, weekdays 8 to 5; you still buy the materials`} onClick={() => g.hire(sel.id)}>
                   Hire a crew{!why && !isFinished(sel) && blockedReason(game, sel) ? ' anyway' : ''}: ~{usd(q.usd)}, about {q.weeks} week{q.weeks > 1 ? 's' : ''}
                 </button>
