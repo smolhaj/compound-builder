@@ -33,11 +33,16 @@ import { newDaily } from '../daily';
 import { dayJob, type Person } from '../family';
 import { migrateDogs } from '../pets';
 import { starterKit } from '../tools';
+import { newKin } from '../kin';
 
 type Raw = Record<string, unknown> & { version?: number };
 
 /** version n → n + 1 upgraders. */
 const STEPS: Record<number, (s: Raw) => Raw> = {
+  // 55 → 56: the fleet (sim/vehicles.ts): vehicle parts in the stock, a service reading on each vehicle
+  55: s => ({ ...s, version: 56, stock: { vehicle_parts: 0, ...(s.stock as object) }, vehicles: (s.vehicles as Array<Record<string, unknown>> | undefined)?.map(v => ({ serviceAt: v.oilAt, ...v })) }),
+  // 54 → 55: extended family (sim/kin.ts): nobody in town, no requests in a game already under way
+  54: s => ({ ...s, version: 55, kin: (s.kin as object | undefined) ?? newKin([], false) }),
   // 53 → 54: the fortress ring (sim/walkway.ts, sim/garage.ts, sim/fortress.ts): runs may be a wall-top walkway (`kind: 'wall_walk'`, `hostId`), gates may be a garage's (`garage`),
   // and a gatehouse garage carries its parked vehicles (`Structure.parked`). All optional: an old save has none, and no field needs a default.
   53: s => ({ ...s, version: 54 }),
@@ -69,8 +74,8 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   5: s => ({ ...s, version: 6, stock: { rebar: 0, membrane: 0, excavator: 0, blast_door: 0, nbc_filter: 0, spoil: 0, ...(s.stock as object) } }),
   // 6 → 7: the escape tunnel (culvert, egress hatch)
   6: s => ({ ...s, version: 7, stock: { culvert: 0, egress_hatch: 0, ...(s.stock as object) } }),
-  // 54 → 55: the self-sufficient interior (sim/farm.ts): greenhouse heat, orchard care, ponds, equipment-yard bays; new goods (production greenhouse kit, trout fry, crayfish, fish feed, sheep) join the stockpile at zero; a flock's condition and the three new chores (orchard, greenhouse, pond) at zero
-  54: s => ({ ...s, version: 55, farm: (s.farm as object | undefined) ?? newFarm(), stock: { greenhouse_pro_kit: 0, trout_fry: 0, crayfish_stock: 0, fish_feed: 0, sheep: 0, ...(s.stock as object) }, livestock: s.livestock ? { ...(s.livestock as object), condition: { sheep: 1, ...((s.livestock as { condition: object }).condition) } } : s.livestock, daily: s.daily ? { ...(s.daily as object), chores: { ...((s.daily as { chores: object }).chores), levels: { orchard: 0, greenhouse: 0, pond: 0, ...((s.daily as { chores: { levels: object } }).chores.levels) } } } : s.daily }),
+  // 56 → 57: the self-sufficient interior (sim/farm.ts): greenhouse heat, orchard care, ponds, equipment-yard bays; new goods (production greenhouse kit, trout fry, crayfish, fish feed, sheep) join the stockpile at zero; a flock's condition and the three new chores (orchard, greenhouse, pond) at zero
+  56: s => ({ ...s, version: 57, farm: (s.farm as object | undefined) ?? newFarm(), stock: { greenhouse_pro_kit: 0, trout_fry: 0, crayfish_stock: 0, fish_feed: 0, sheep: 0, ...(s.stock as object) }, livestock: s.livestock ? { ...(s.livestock as object), condition: { sheep: 1, ...((s.livestock as { condition: object }).condition) } } : s.livestock, daily: s.daily ? { ...(s.daily as object), chores: { ...((s.daily as { chores: object }).chores), levels: { orchard: 0, greenhouse: 0, pond: 0, ...((s.daily as { chores: { levels: object } }).chores.levels) } } } : s.daily }),
   // 51 → 52: light discipline: the family's lights-out routine (`opsec.auto`) and blackout curtains join the stockpile at zero (sim/blackout.ts)
   51: s => ({ ...s, version: 52, stock: { blackout_curtains: 0, gen_baffles: 0, gen_vault: 0, ...(s.stock as object) }, opsec: s.opsec ? { auto: 'off', ...(s.opsec as object) } : s.opsec }),
   // 45 → 46: daily life (sim/daily.ts): an Auto roster (the planner fills it on the first sub-step), no chores behind, nobody tired; the losses ledger (sim/grief.ts)

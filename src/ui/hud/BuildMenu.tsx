@@ -24,7 +24,7 @@ import { FortifyRing } from './FortifyRing';
 
 /** The build menu's groups (kit pieces by what they are for). */
 const BUILD_GROUPS: Array<[string, string, readonly string[]]> = [
-  ['home', 'Home & work', ['timber_cabin', 'log_house', 'cottage', 'outhouse', 'workshop', 'metal_garage', 'barn', 'equipment_yard']],
+  ['home', 'Home & work', ['timber_cabin', 'log_house', 'cottage', 'guest_house', 'moms_house', 'outhouse', 'workshop', 'metal_garage', 'barn', 'equipment_yard']],
   ['food', 'Food', ['garden', 'greenhouse', 'greenhouse_heated', 'orchard', 'orchard_grove', 'field', 'chicken_coop', 'sheep_barn', 'pond', 'root_cellar']],
   ['water', 'Water & power', UTILITY_ORDER],
   ['defense', 'Watch towers & gatehouse', [...TOWER_ORDER, ...GATEHOUSE_ORDER]],

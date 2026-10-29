@@ -20,6 +20,8 @@ import { dailyOf, choreRates } from './daily';
 import { addFixWork, nextFix } from './improvements';
 import { produce } from './needs';
 import { step } from './engine';
+import { parkedText, parkingPlan, syncParking } from './parking';
+import { startingVehicles } from './vehicles';
 
 const built = (g: GameState, id: string, kind: string, x: number, z: number, finishedAt = 0): Structure => {
   const st: Structure = { id, kind, x, z, rot: 0, stage: 5, done: 0, supplied: true, finishedAt };
@@ -359,6 +361,27 @@ describe('the workshop and the equipment yard', () => {
     expect(yardFree(g)).toBe(YARD_BAYS);
     for (let i = 0; i < YARD_BAYS; i++) parkInYard(g, `v${i}`);
     expect(parkInYard(g, 'extra')).toBeNull();
+  });
+});
+
+describe('the equipment yard is the fleet\'s last parking tier', () => {
+  it('vehicles with no roof stand in the yard bays; a garage takes them back under cover', () => {
+    const g = newGame(1); g.vehicles = startingVehicles();
+    const id = g.vehicles[0].id;
+    expect(parkingPlan(g).yardSlots).toBe(0);
+    built(g, 'y', 'equipment_yard', 10, 10);
+    syncParking(g);
+    const plan = parkingPlan(g);
+    expect(plan.yardSlots).toBe(YARD_BAYS);
+    expect(plan.inYard).toContain(id);
+    expect(plan.outside).toContain(id);                // still weather: no roof
+    expect(parkedText(g, id)).toBe('in the equipment yard');
+    expect(yardOf(g, id)).toBe('y');
+    built(g, 'mg', 'metal_garage', 30, 30);
+    syncParking(g);
+    expect(parkingPlan(g).inYard).not.toContain(id);
+    expect(yardOf(g, id)).toBeNull();
+    expect(parkedText(g, id)).toMatch(/metal garage/);
   });
 });
 

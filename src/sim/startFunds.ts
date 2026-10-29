@@ -9,6 +9,7 @@
 import { mulberry32 } from './rng';
 import type { Person } from './family';
 import { jobDef } from './family';
+import { kinSavings, ROLE_NAME } from './kin';
 import type { Lifestyle } from './site';
 
 export interface FundLine { label: string; usd: number }
@@ -36,7 +37,8 @@ export function startFunds(people: readonly Person[], life: Lifestyle, seed: num
   // a fixed set of draws, so changing one adult's job never reshuffles the luck
   const luck = Array.from({ length: 16 }, () => r());
   const adults = people.filter(p => !p.kid && !p.elder);
-  const elders = people.filter(p => p.elder);
+  const elders = people.filter(p => p.elder && !p.rel);
+  const kin = people.filter(p => p.rel);
   const pay = adults.reduce((a, p) => a + (p.job?.wage ?? 200) * YEAR_DAYS, 0); // household take-home a year
   const age = adults.length ? adults.reduce((a, p) => a + p.age, 0) / adults.length : 40;
   const seasoned = Math.min(1.35, Math.max(0.55, (age - 22) / 20)); // years of saving, capped
@@ -54,6 +56,8 @@ export function startFunds(people: readonly Person[], life: Lifestyle, seed: num
     passive = k(22_000 + 40_000 * luck[6] + pay * 0.1);
   }
   if (elders.length) add(elders.length > 1 ? 'Grandparents’ savings and house' : 'Grandparent’s savings and house', elders.length * (50_000 + 140_000 * luck[7]));
+  // relatives who came along (sim/kin.ts): each brings their own savings, the house sale, a sibling's little nest egg
+  for (const p of kin) add(`${p.first}\u2019s savings${p.elder ? ' and house sale' : ''} (${ROLE_NAME[p.rel!.role]})`, kinSavings(p, seed));
   if (luck[8] < 0.17) add('Inheritance', 45_000 + 190_000 * luck[9]);
   if (life !== 'weekend' && luck[10] < 0.22) add('Sale of a second vehicle, tools and extras', 12_000 + 22_000 * luck[11]);
   // debts a household like this carries, paid off at closing

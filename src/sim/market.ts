@@ -33,6 +33,10 @@ import { applyCasualties } from './battle';
 import { pickedOver } from './scavenge';
 import { mulberry32, pick } from './rng';
 import { log } from './economy';
+import { driveTrip, tripPlan } from './vehicles';
+
+/** The crossroads market: kilometers from the place (a drive there and back). */
+export const MARKET_KM = 12;
 import { calendarOf, dayIndex, type GameState } from './state';
 import { BAG_BASE, BAG_GOODS, bagOf, newMarketState, type BagGood, type MarketGood, type MarketState, type Stall } from './tradeGoods';
 import type { Caliber } from './armory';
@@ -159,16 +163,24 @@ export function goProblem(s: GameState, pid: string): string | null {
 }
 
 /** Send someone to the crossroads for the day (armed or not). */
-export function goToMarket(s: GameState, pid: string, armed: boolean): string | null {
+export function goToMarket(s: GameState, pid: string, armed: boolean, byVehicle = false): string | null {
   const why = goProblem(s, pid);
   if (why) return why;
+  let vehicle: string | undefined;
+  if (byVehicle) {
+    const plan = tripPlan(s, MARKET_KM, 1);
+    if (!plan.truck) return 'no running vehicle';
+    if (plan.have < plan.liters) return `not enough fuel: ${plan.liters} L there and back`;
+    driveTrip(s, plan.truck, MARKET_KM, plan.liters, 0.004);
+    vehicle = plan.truck.id;
+  }
   const m = marketOf(s);
   const day = dayIndex(s.clock.t);
   if (m.day !== day) { m.day = day; m.stalls = makeStalls(s, day); }
-  m.trip = { day, pid, carried: 0, armed };
+  m.trip = { day, pid, carried: 0, armed, ...(vehicle ? { vehicle } : {}) };
   const ps = s.personState.find(x => x.id === pid);
   if (ps) { ps.task = 'away'; ps.target = null; }
-  log(s, `${s.people.find(x => x.id === pid)?.first} rode to the crossroads market${armed ? ' with a rifle across the saddle' : ''}.`);
+  log(s, `${s.people.find(x => x.id === pid)?.first} ${vehicle ? 'drove' : 'rode'} to the crossroads market${armed ? ' with a rifle across the saddle' : ''}.`);
   return null;
 }
 /** At the market today: off the place. */
@@ -278,7 +290,7 @@ export function roadHome(s: GameState, r: () => number): string[] {
   if (!p || !ps || ps.needs.died != null) return out;
   if (ps.task === 'away') { ps.task = 'idle'; ps.target = null; }
   const law = s.disaster.tracks.law;
-  const robP = (0.03 + 0.12 * (1 - law)) * (t.carried > 200 ? 1.5 : 1) * (t.armed ? 0.5 : 1);
+  const robP = (0.03 + 0.12 * (1 - law)) * (t.carried > 200 ? 1.5 : 1) * (t.armed ? 0.5 : 1) * (t.vehicle ? 0.55 : 1);   // a truck is gone before anyone steps out of the willows
   if (t.carried > 0 && r() < robP) {
     if (t.armed && r() < 0.5) {
       const f = fightAtCamp(s, [p.id], { camp: 2 + Math.floor(r() * 2), temper: 'hard', status: 'traded' }, s.seed * 31 + dayIndex(s.clock.t));
@@ -296,7 +308,7 @@ export function roadHome(s: GameState, r: () => number): string[] {
   }
   // followed home: somebody wants to know where those goods came from
   const neg = p.skills.negotiator, hunter = p.skills.hunter;
-  const follow = Math.max(0.02, 0.08 + (t.carried > 300 ? 0.1 : 0) + 0.01 * Math.min(10, m.deals) - 0.02 * neg);
+  const follow = Math.max(0.02, 0.08 + (t.carried > 300 ? 0.1 : 0) + 0.01 * Math.min(10, m.deals) - 0.02 * neg) * (t.vehicle ? 1.5 : 1);   // an engine is heard for miles
   if (t.carried > 0 && r() < follow) {
     if (hunter >= 4 && r() < 0.6) out.push(`${p.first} saw a rider hanging back on the county road all the way from the crossroads, and lost him in the timber on the long way round.`);
     else {

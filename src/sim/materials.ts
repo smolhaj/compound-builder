@@ -13,7 +13,7 @@ export type MaterialId = 'lumber' | 'logs' | 'firewood' | 'fieldstone' | 'concre
   | 'fresh' | 'frozen' | 'canned' | 'staples' | 'meds' | 'seed' | 'lids' | 'plow' | 'stabilizer' | 'traps' | 'hygiene' | 'gun_safe' | 'gun_cleaning' | 'fishing_gear' | 'snares' | 'smoker' | 'goat' | 'pig' | 'steer' | 'rabbit' | 'hay' | 'feed' | 'water_jugs' | 'ibc_tote' | 'water_trailer' | 'water_filter' | 'ro_system' | 'softener' | 'greywater'
   | 'plate_carrier' | 'ifak' | 'nvg' | 'thermal' | 'radios' | 'cameras' | 'thermal_cam' | 'driveway_alarm' | 'floodlights' | 'blackout_curtains' | 'gen_baffles' | 'gen_vault' | 'tripwire' | 'dog' | 'puppy' | 'kibble' | 'dogbed' | 'doghouse' | 'steel_door' | 'window_bars' | 'sandbags' | 'safe_room' | 'sw_radio' | 'ham_rig' | 'helmet' | 'soft_armor'
   | 'grenades' | 'rpg_launcher' | 'rpg_rounds' | 'suppressor'
-  | 'mines' | 'greenhouse_kit' | 'fruit_trees' | 'ground_sensor' | 'passage_hatch'
+  | 'mines' | 'greenhouse_kit' | 'fruit_trees' | 'ground_sensor' | 'passage_hatch' | 'vehicle_parts'
   | 'gun_mount' | 'turret_head' | 'ai_sensor_module'
   | 'tent' | 'sleeping_bag'
   | 'greenhouse_pro_kit' | 'trout_fry' | 'crayfish_stock' | 'fish_feed' | 'sheep';
@@ -88,6 +88,7 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   gen_baffles: { id: 'gen_baffles', name: 'Generator baffles', unit: 'an insulated, vented enclosure and exhaust muffler for the generator shed: about half the noise and light', price: 900 },
   gen_vault: { id: 'gen_vault', name: 'Generator vault', unit: 'a buried, lined generator room with an exhaust silencer and a baffled intake: the generator is not heard or seen from the road', price: 6500 },
   blackout_curtains: { id: 'blackout_curtains', name: 'Blackout curtains', unit: 'heavy light-blocking curtains and tracks for one house: the room stays lit, the window stays dark', price: 140 },
+  vehicle_parts: { id: 'vehicle_parts', name: 'Vehicle parts', unit: 'kit: filters, belts, hoses, plugs, a fuel pump and a battery for one truck or tractor', price: 260 },
   ground_sensor: { id: 'ground_sensor', name: 'Ground sensors', unit: 'a string of buried geophones along about 120 m of wall and a base unit: hears digging days out (needs power)', price: 1400 },
   passage_hatch: { id: 'passage_hatch', name: 'Passage hatch', unit: 'steel blast hatch, collar and locks from both sides (one for each end of an underground passage)', price: 3800 },
   ai_sensor_module: { id: 'ai_sensor_module', name: 'AI sensor module', unit: 'a chip and lens for one floodlight: tells people from animals, so the light comes on for people only (needs the light powered; fit it in Defense)', price: 180 },

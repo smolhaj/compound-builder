@@ -9,7 +9,9 @@ import { dayIndex, type GameState } from '../sim/state';
 import { canGo, tripFuel } from '../sim/rescue';
 import { NEIGHBOR_BLURB } from '../sim/encounters';
 import { PLACE_KIND_NAME, pickedOver, riskOf, riskWord, runDays, runProblem, scavengeOpen, startRun, type Roe } from '../sim/scavenge';
-import { askPrice, CURRENCY, daysToMarket, goodName, goProblem, goToMarket, haggle, isMarketDay, marketOpen, marketPrices, mhave, refuses, type DealMode, type MarketGood } from '../sim/market';
+import { litersText } from '../sim/format';
+import { tripPlan, VEHICLES } from '../sim/vehicles';
+import { askPrice, CURRENCY, daysToMarket, goodName, goProblem, goToMarket, MARKET_KM, haggle, isMarketDay, marketOpen, marketPrices, mhave, refuses, type DealMode, type MarketGood } from '../sim/market';
 import { BAG_BASE, BAG_GOODS } from '../sim/tradeGoods';
 import { answerCallout, askPact, joinGroup, joinGroupProblem, leaveGroup, leavePact, PACT_MIN, stateWord, surname } from '../sim/neighborLife';
 import { inPact } from '../sim/pact';
@@ -112,6 +114,8 @@ export function MarketSection() {
   const game = g.game;
   const [who, setWho] = useState<string[]>([]);
   const [armed, setArmed] = useState(true);
+  const [drive, setDrive] = useState(false);
+  const mp = tripPlan(game, MARKET_KM, 1);
   const [pickOffer, setPickOffer] = useState<{ stall: string; i: number } | null>(null);
   const [give, setGive] = useState<MarketGood>('ammo:22lr');
   const [qty, setQty] = useState(1);
@@ -140,8 +144,9 @@ export function MarketSection() {
       <Picker game={game} picked={who} set={x => setWho(x.slice(-1))} max={2} />
       <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
         <button style={btn(armed)} onClick={() => setArmed(!armed)} title="Half as likely to be robbed on the way home">{armed ? '✓ ' : ''}Take a rifle</button>
+        <button style={{ ...btn(drive && !!mp.truck), opacity: mp.truck && mp.have >= mp.liters ? 1 : 0.4 }} disabled={!mp.truck || mp.have < mp.liters} onClick={() => setDrive(!drive)} title={mp.truck ? `Take the ${VEHICLES[mp.truck.kind].name.toLowerCase()}: ${litersText(mp.liters)} of fuel there and back. Robbed far less on the road, but an engine is heard for miles: more likely to be followed home.` : 'No running vehicle'}>{drive ? '✓ ' : ''}Drive ({litersText(mp.liters)})</button>
         <button style={{ ...btn(true), flex: 1, opacity: who.length && !goProblem(game, who[0]) ? 1 : 0.4 }} disabled={!who.length || !!goProblem(game, who[0])} title={who.length ? goProblem(game, who[0]) ?? 'Away for the day' : 'pick who goes'}
-          onClick={() => { const w = g.money(d => goToMarket(d, who[0], armed)); if (w) alert(w); }}>Ride to the crossroads</button>
+          onClick={() => { const w = g.money(d => goToMarket(d, who[0], armed, drive)); if (w) alert(w); }}>{drive ? 'Drive' : 'Ride'} to the crossroads</button>
       </div>
     </div>}
     {there && <>

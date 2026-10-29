@@ -42,6 +42,8 @@ import { genSound, glowFactor } from './blackout';
 import { boltPassages, passageEntry } from './compounds';
 import { resolveDigWarning } from './tunnelers';
 import { addTool, stealTools, SWAP_KINDS, TOOLS, type ToolKind } from './tools';
+import { resolveKin } from './kin';
+import { raidTakesVehicles } from './vehicles';
 import { resolveTrialEnd, startTrial, trialDay, type TrialCamp } from './trial';
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -162,8 +164,8 @@ export function postureOf(s: GameState): Posture {
 // Encounters
 // ─────────────────────────────────────────────────────────────────────────
 
-export type EncounterKind = 'arrival' | 'looters' | 'gang' | 'refugees' | 'requisition' | 'neighbor_help' | 'trader' | 'horde' | 'patrol' | 'militia' | 'break_in' | 'ransom' | 'trial_end' | 'tunnelers';
-export type Stance = 'hide' | 'parley' | 'warn' | 'defend' | 'trade' | 'take_in' | 'trial' | 'turn_away' | 'call_911' | 'shout' | 'confront' | 'pay' | 'refuse' | 'ambush' | 'flood' | 'collapse' | 'ignore';
+export type EncounterKind = 'arrival' | 'looters' | 'gang' | 'refugees' | 'requisition' | 'neighbor_help' | 'trader' | 'horde' | 'patrol' | 'militia' | 'break_in' | 'ransom' | 'trial_end' | 'tunnelers' | 'kin';
+export type Stance = 'hide' | 'parley' | 'warn' | 'defend' | 'trade' | 'take_in' | 'trial' | 'turn_away' | 'call_911' | 'shout' | 'confront' | 'pay' | 'refuse' | 'ambush' | 'flood' | 'collapse' | 'ignore' | 'build_first';
 
 export interface Encounter {
   id: string;
@@ -194,6 +196,8 @@ export interface Encounter {
   /** A crew coming back to a place they found empty and stripped. */
   back?: boolean;
   /** Tunnelers (sim/tunnelers.ts): found digging under the wall (`warning`, the window to act), or up inside it (`inside`). */
+  /** A relative asking to join (sim/kin.ts): the savings they bring, and whether it is after the hit. */
+  kin?: { savings: number; late: boolean };
   dig?: { phase: 'warning' | 'inside'; id: string; /** Days left in the dig when it was found. */ lead: number; by?: string };
 }
 
@@ -593,6 +597,9 @@ export function resolve(s: GameState, stance: Stance): Outcome {
   } else if (e.kind === 'trial_end') {
     const o = resolveTrialEnd(s, e, stance);
     title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines);
+  } else if (e.kind === 'kin') {
+    const o = resolveKin(s, e, stance);
+    title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines);
   } else if (e.kind === 'arrival') {
     if (stance === 'trial') {
       // (round 4) a real trial: a camp outside the wall for a month, fed from the family's stores (sim/trial.ts)
@@ -690,6 +697,7 @@ export function resolve(s: GameState, stance: Stance): Outcome {
       } else {
         // (round 4: no second take of their wants here: applyBattle has already taken its 30–90 % share of the stores)
         if (e.kind === 'looters' || e.kind === 'gang' || e.kind === 'militia') lines.push(...stealTools(s, 0.3, 2).lines);
+        lines.push(...raidTakesVehicles(s, ORGANIZED.has(e.kind)));
         title = 'They got in'; text = b.result === 'overrun' ? 'They overran the place and took what they came for.' : 'They broke through the line and took what they came for.'; tone = 'bad';
         // picked over: for a while there's not much left worth coming for; but the place is known to be soft
         g.respect = Math.max(0, (g.respect ?? 0) - 0.3);

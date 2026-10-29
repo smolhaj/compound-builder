@@ -8,6 +8,8 @@ import type { Quality } from '../engine/world/WorldScene';
 import { SEASON_MODES, type SeasonMode } from '../engine/world/season/seasonState';
 import { WEATHER_MODES, type WeatherMode } from '../engine/world/weather/weatherState';
 import { DogsPanel } from './DogsPanel';
+import { KinPanel } from './KinPanel';
+import { kinTitle } from '../sim/kin';
 import { calendarOf, dayIndex, hourOf, type Speed } from '../sim/state';
 import { BACKGROUND_NAME, backgroundOf, fullName } from '../sim/family';
 import { MATERIALS, MATERIAL_IDS, qtyText, type MaterialId } from '../sim/materials';
@@ -19,7 +21,7 @@ import { CONDITION, pharmacyOpen } from '../sim/body';
 import { netWorth } from '../sim/finance';
 import { campNeed, trialCamps } from '../sim/trial';
 import { JUG_L, orderTanker } from '../sim/water';
-import { buyVehicle, startingVehicles, VEHICLES, type VehicleKind } from '../sim/vehicles';
+import { FleetPanel } from './FleetPanel';
 import { buyLicense, hasLicense, inSeason, lawful, TAG_USD, type License } from '../sim/wildfood';
 import { chimneyState, greenRicks, SEASON_DAYS, SWEEP_USD } from '../sim/upkeep';
 import { countyWorks, premium, yearlyTax } from '../sim/paperwork';
@@ -164,7 +166,7 @@ export function Hud() {
               const notes = n && n.died == null ? [n.hunger > 5000 ? 'hungry' : '', ...n.hurt.map(h => h.trauma ? `${h.what}: ${treating ? 'being treated' : 'needs dressings and antibiotics'}` : h.what), n.dose > 0.05 ? `${n.dose.toFixed(2)} Sv` : ''].filter(Boolean).join(', ') : '';
               return <div key={p.id} style={{ padding: '5px 0', borderBottom: `1px solid ${LINE}` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>
-                  <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 4, background: '#' + p.shirt.toString(16).padStart(6, '0'), marginRight: 6 }} />{fullName(p)}, {p.age}{backgroundOf(p) && <span style={{ color: '#c9b27a', fontSize: 11 }}> · {BACKGROUND_NAME[backgroundOf(p)!]}</span>}</span>
+                  <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 4, background: '#' + p.shirt.toString(16).padStart(6, '0'), marginRight: 6 }} />{fullName(p)}, {p.age}{p.rel && <span style={{ color: DIM, fontSize: 11 }}> · {kinTitle(p, game.people).toLowerCase()}</span>}{backgroundOf(p) && <span style={{ color: '#c9b27a', fontSize: 11 }}> · {BACKGROUND_NAME[backgroundOf(p)!]}</span>}</span>
                   <span style={{ color: DIM }}>{n?.taken ? 'Taken' : n?.died != null ? 'Died' : TASK_TEXT[st?.task ?? 'idle']}</span>
                 </div>
                 {n && n.died == null && <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 4, fontSize: 11 }}>
@@ -179,6 +181,7 @@ export function Hud() {
               </div>;
             })}
             <DogsPanel game={game} />
+            <KinPanel />
             <HousingPanel />
             <DailySection />
             {trialCamps(game).map(c => <Section key={c.id} title={`Camp outside the wall: ${c.title}`}>
@@ -333,9 +336,6 @@ export function Hud() {
                 {irrigationStore(game).cap > 0 && <Row label="Pond (garden, fire)" value={`${Math.round(irrigationStore(game).have).toLocaleString('en-US')} of ${irrigationStore(game).cap.toLocaleString('en-US')} L`} title="Pond water waters the garden and fills the fire line; it is not drinking water. A reservoir counts as drinking water once the filtration shed or a filter is on the place." />}
                 {game.stock.water_jugs >= 1 && <Row label="Drinking water put by" value={`${Math.floor(game.stock.water_jugs)} jugs (${Math.round(game.stock.water_jugs * JUG_L)} L)`} />}
                 {storageCapacity(game) - r.storedL > 1000 && game.disaster.tracks.deliveries >= 0.5 && game.disaster.tracks.banks >= 0.5 && <button style={{ ...btn(), width: '100%', marginTop: 3 }} title="A tanker load from town: 15,000 L" onClick={() => g.money(d => orderTanker(d, storageCapacity(d)))}>Order a tanker load ($450)</button>}
-                <div style={{ marginTop: 6, fontWeight: 600 }}>Vehicles</div>
-                {(game.vehicles ?? startingVehicles()).map(v => <Row key={v.id} label={VEHICLES[v.kind].name} value={v.fried ? 'killed by the EMP' : v.condition <= 0 ? 'dead' : `${Math.round(v.mileage).toLocaleString('en-US')} mi · ${Math.round(v.condition * 100)} % · ${Math.round(v.fuel)} L`} />)}
-                {(['tractor', 'atv', 'old_pickup', 'trailer'] as VehicleKind[]).filter(k => !(game.vehicles ?? []).some(v => v.kind === k)).map(k => <button key={k} style={{ ...btn(), width: '100%', marginTop: 3 }} onClick={() => g.money(d => buyVehicle(d, k))}>Buy {VEHICLES[k].name.toLowerCase()} (${VEHICLES[k].price.toLocaleString('en-US')})</button>)}
                 <Row label="Well depth here" value={`${game.site.gwDepth} m`} />
                 {game.utilities.hauling && <Note tone="warn">{game.utilities.haulFar ? 'Hauling water a quarter mile from the creek on the neighbor\'s land: a well or cistern would end it.' : 'Hauling water from the creek by the bucket: a well or cistern would end it.'}</Note>}
                 {r.shortL > 0 && <Note tone="bad">Water ran short.</Note>}
@@ -343,6 +343,7 @@ export function Hud() {
                 {game.site.gwQuality === 'arsenic' && game.stock.ro_system < 1 && <Note tone="warn">Arsenic in the well water: get reverse osmosis for drinking water.</Note>}
                 {game.site.gwQuality === 'hard' && game.stock.softener < 1 && <Note>Hard water: scale wears the pump faster without a softener.</Note>}
               </Section>
+              <FleetPanel />
             </>;
           })()}
 

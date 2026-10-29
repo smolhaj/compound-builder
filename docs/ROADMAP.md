@@ -41,7 +41,7 @@ Legend: **[user]** asked for by the user · **[gds]** already in the GDS · **[i
 - **[idea]** Medical: infirmary, quarantine room (pandemic scenario), dental, med stockpile with expiry.
 - **[idea]** Comms: ham / GMRS radio, antenna mast (useful *and* visible), field phones to neighbors, codes.
 - **[idea]** Workshop: forge, sawmill, reloading bench, vehicle repair; tool wear.
-- **[idea]** Bug-out: off-site caches, a bug-out vehicle and bags, a fallback retreat, rally points.
+- **[partly built]** Bug-out: the vehicle, the people and the supplies, and a one-way leave (sim/bugout.ts) are in; still ideas: off-site caches, a fallback retreat, rally points, a bug-out phase that continues the run.
 
 ## Community & people (GDS §3, §5)
 - **[idea]** Barter goods (salt, coffee, alcohol, medicine, fuel) and a trade post; mutual-aid pacts with the

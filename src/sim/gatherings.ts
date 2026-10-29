@@ -22,6 +22,7 @@ import { seasons, REGIONS } from './regions';
 import { log } from './economy';
 import { mulberry32 } from './rng';
 import { dailyOf } from './daily';
+import { kinMorale } from './kin';
 import { griefMorale, mourn, noteLosses, unmourned } from './grief';
 
 export type GatheringKind = 'cookout' | 'birthday' | 'thanksgiving' | 'christmas' | 'july4' | 'harvest' | 'movie' | 'campfire' | 'wedding' | 'funeral' | 'neighbors';
@@ -207,7 +208,7 @@ export function noiseNow(s: GameState): number {
 }
 
 /** Morale target terms from gatherings and grief (needs.ts). */
-export const socialMorale = (s: GameState) => glowNow(s) + griefMorale(s);
+export const socialMorale = (s: GameState) => glowNow(s) + griefMorale(s) + kinMorale(s);
 
 /** Once a day: deaths noted, and the gatherings that happen on their own. Returns log lines. */
 export function gatheringsDay(s: GameState): string[] {

@@ -184,6 +184,28 @@ export const COTTAGE_BLUEPRINT: Blueprint = {
     { id: 'finish', name: 'Lap siding, porch, windows, kitchen and bath', hours: 300, materials: { lumber: 7, hardware: 13, fixtures: 2, cable: 3 } },
   ],
 };
+/** 6 × 5 m guest house: two beds, a bath and a kitchenette; ≈ 560 person-hours; ≈ $29k of materials. */
+export const GUEST_HOUSE_BLUEPRINT: Blueprint = {
+  kind: 'guest_house',
+  stages: [
+    { id: 'site', name: 'Stake out & level the pad', hours: 20, materials: {} },
+    { id: 'foundation', name: 'Footings and a stem wall', hours: 55, materials: { concrete: 5 } },
+    { id: 'frame', name: 'Floor, stud walls and sheathing', hours: 200, materials: { lumber: 13 } },
+    { id: 'roof', name: 'Rafters and metal roof', hours: 100, materials: { lumber: 3, roofing: 5 } },
+    { id: 'finish', name: 'Lap siding, porch, windows, bath and kitchenette', hours: 185, materials: { lumber: 5, hardware: 8, fixtures: 1, cable: 2 } },
+  ],
+};
+/** 9 × 8 m one-level house for Mom, the in-laws or the grandparents: step-free, two bedrooms, a full kitchen; ≈ 1,250 person-hours; ≈ $63k. */
+export const MOMS_HOUSE_BLUEPRINT: Blueprint = {
+  kind: 'moms_house',
+  stages: [
+    { id: 'site', name: 'Stake out & level the pad', hours: 40, materials: {} },
+    { id: 'foundation', name: 'Footings and a stem wall', hours: 110, materials: { concrete: 11 } },
+    { id: 'frame', name: 'Floor, stud walls and sheathing', hours: 470, materials: { lumber: 30 } },
+    { id: 'roof', name: 'Rafters and metal roof', hours: 220, materials: { lumber: 7, roofing: 12 } },
+    { id: 'finish', name: 'Lap siding, covered porch and ramp, kitchen, bath and grab bars', hours: 410, materials: { lumber: 10, hardware: 18, fixtures: 3, cable: 4 } },
+  ],
+};
 /** 9 × 12 m steel pole building kit on a slab: ≈ 250 person-hours; ≈ $28k. */
 const garageStages = (solar: boolean): StageDef[] => [
   { id: 'site', name: 'Stake out & grade the pad', hours: 20, materials: {} },
@@ -196,10 +218,10 @@ export const METAL_GARAGE_BLUEPRINT: Blueprint = { kind: 'metal_garage', stages:
 export const GARAGE_SOLAR_BLUEPRINT: Blueprint = { kind: 'garage_solar', stages: garageStages(true) };
 
 /** Kinds people live in (a kitchen, a roof over the family). */
-export const HOMES: readonly string[] = ['timber_cabin', 'log_house', 'farmhouse', 'trailer', 'cottage'];
+export const HOMES: readonly string[] = ['timber_cabin', 'log_house', 'farmhouse', 'trailer', 'cottage', 'guest_house', 'moms_house'];
 export const isHome = (kind: string) => HOMES.includes(kind);
 /** People each home kind sleeps (matches the kit's `sleeps`). */
-export const HOME_BEDS: Record<string, number> = { timber_cabin: 4, log_house: 6, farmhouse: 6, trailer: 4, cottage: 3 };
+export const HOME_BEDS: Record<string, number> = { timber_cabin: 4, log_house: 6, farmhouse: 6, trailer: 4, cottage: 3, guest_house: 2, moms_house: 4 };
 /** Beds under a finished roof on the place (shelter for the household and anyone taken in). */
 export function homeBeds(s: { structures: ReadonlyArray<{ kind: string; stage: number }> }): number {
   return s.structures.reduce((a, st) => a + (BLUEPRINTS[st.kind] && st.stage >= BLUEPRINTS[st.kind].stages.length ? HOME_BEDS[st.kind] ?? 0 : 0), 0);
@@ -362,7 +384,7 @@ export const GATE_GARAGE_BLUEPRINT: Blueprint = bp('gate_garage', [
 ]);
 
 export const BLUEPRINTS: Record<string, Blueprint> = Object.fromEntries(
-  [CABIN_BLUEPRINT, OUTHOUSE_BLUEPRINT, WORKSHOP_BLUEPRINT, ROOT_CELLAR_BLUEPRINT, COOP_BLUEPRINT, GARDEN_BLUEPRINT, FIELD_BLUEPRINT, GREENHOUSE_BLUEPRINT, ORCHARD_BLUEPRINT, LOG_HOUSE_BLUEPRINT, FARMHOUSE_BLUEPRINT, TRAILER_BLUEPRINT, BARN_BLUEPRINT, COTTAGE_BLUEPRINT, METAL_GARAGE_BLUEPRINT, GARAGE_SOLAR_BLUEPRINT, ...UTILITY_BLUEPRINTS, GREENHOUSE_HEATED_BLUEPRINT, ORCHARD_GROVE_BLUEPRINT, SOLAR_FARM_BLUEPRINT, BATTERY_BANK_BLUEPRINT, POND_BLUEPRINT, RESERVOIR_BLUEPRINT, SHEEP_BARN_BLUEPRINT, EQUIPMENT_YARD_BLUEPRINT, ...BUNKER_BLUEPRINTS, ...TOWER_BLUEPRINTS, GATE_GARAGE_BLUEPRINT].map(b => [b.kind, b]));
+  [CABIN_BLUEPRINT, OUTHOUSE_BLUEPRINT, WORKSHOP_BLUEPRINT, ROOT_CELLAR_BLUEPRINT, COOP_BLUEPRINT, GARDEN_BLUEPRINT, FIELD_BLUEPRINT, GREENHOUSE_BLUEPRINT, ORCHARD_BLUEPRINT, LOG_HOUSE_BLUEPRINT, FARMHOUSE_BLUEPRINT, TRAILER_BLUEPRINT, BARN_BLUEPRINT, COTTAGE_BLUEPRINT, GUEST_HOUSE_BLUEPRINT, MOMS_HOUSE_BLUEPRINT, METAL_GARAGE_BLUEPRINT, GARAGE_SOLAR_BLUEPRINT, ...UTILITY_BLUEPRINTS, GREENHOUSE_HEATED_BLUEPRINT, ORCHARD_GROVE_BLUEPRINT, SOLAR_FARM_BLUEPRINT, BATTERY_BANK_BLUEPRINT, POND_BLUEPRINT, RESERVOIR_BLUEPRINT, SHEEP_BARN_BLUEPRINT, EQUIPMENT_YARD_BLUEPRINT, ...BUNKER_BLUEPRINTS, ...TOWER_BLUEPRINTS, GATE_GARAGE_BLUEPRINT].map(b => [b.kind, b]));
 
 /** Total bill of materials for a blueprint. */
 export function totalBill(bp: Blueprint): Partial<Stock> {

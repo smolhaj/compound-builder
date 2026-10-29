@@ -36,6 +36,7 @@ import type { SkillId } from './family';
 import { bagOf, BAG_BASE, type BagGood } from './tradeGoods';
 import { findTool, TOOLS } from './tools';
 import { diffOf } from './difficulty';
+import { cargoKg, driveTrip, roadTrouble } from './vehicles';
 
 // ─────────────────────────────────────────────────────────────────────────
 // State
@@ -68,6 +69,8 @@ export interface Run {
   place: string;
   team: string[];
   mode: 'foot' | 'truck';
+  /** The vehicle it went in (sim/vehicles.ts): what it carries comes home in it. */
+  vehicle?: string;
   roe: Roe;
   left: number;
   back: number;
@@ -242,9 +245,9 @@ export function runProblem(s: GameState, placeId: string, team: string[], mode: 
   if (team.length > 4) return 'four at most';
   if (team.some(id => { const q = s.people.find(x => x.id === id); return !q || !canGo(s, q) || q.age < 16; })) return 'someone picked can\'t go';
   if (mode === 'truck') {
-    if (team.length > 3) return 'the truck takes three';
-    const f = tripFuel(s, p.km);
-    if (!f.truck) return 'no running truck';
+    const f = tripFuel(s, p.km, Math.max(2, team.length));
+    if (!f.truck) return 'no running truck that seats them';
+    if (team.length > f.seats) return `the ${f.truck.kind === 'motorhome' ? 'motorhome' : 'truck'} takes ${f.seats}`;
     if (f.have < f.liters) return `not enough fuel: ${f.liters} L there and back`;
   }
   return null;
@@ -257,14 +260,17 @@ export function startRun(s: GameState, placeId: string, team: string[], mode: Ru
   const S = scavengeOf(s);
   const p = S.places.find(x => x.id === placeId)!;
   const day = dayIndex(s.clock.t);
+  let extra = 0, vehicle: string | undefined;
   if (mode === 'truck') {
-    const { truck, liters } = tripFuel(s, p.km);
-    const fromTank = Math.min(truck!.fuel, liters);
-    truck!.fuel -= fromTank;
-    s.stock.fuel = Math.max(0, s.stock.fuel - (liters - fromTank) / 20);
-    truck!.mileage += 2 * p.km / 1.609; truck!.condition = Math.max(0, truck!.condition - 0.01);
+    const { truck, liters } = tripFuel(s, p.km, Math.max(2, team.length));
+    driveTrip(s, truck!, p.km, liters, 0.01);
+    const trouble = roadTrouble(s, truck!, p.km);
+    if (trouble.line) log(s, trouble.line);
+    extra = trouble.extraDays;
+    vehicle = truck!.id;
+    truck!.away = true;   // it is out on the road: not in the yard, not at the pump
   }
-  S.run = { place: p.id, team: [...team], mode, roe, left: day, back: day + runDays(p, mode) };
+  S.run = { place: p.id, team: [...team], mode, roe, left: day, back: day + runDays(p, mode) + extra, ...(vehicle ? { vehicle } : {}) };
   for (const id of team) { const ps = s.personState.find(x => x.id === id); if (ps) { ps.task = 'away'; ps.target = null; } }
   const names = team.map(id => s.people.find(x => x.id === id)?.first).filter(Boolean).join(', ');
   log(s, `${names} set out for ${p.name}${mode === 'truck' ? ' in the truck' : ' on foot'}. Back in ${S.run.back - day} day${S.run.back - day > 1 ? 's' : ''}, if it goes right.`);
@@ -451,7 +457,7 @@ export function resolveRun(s: GameState, run: Run): RunResult {
       const f = 1 - Math.exp(-0.18 * team * search * (1 + 0.08 * best));
       found[k] = Math.floor(n * f + r());
     }
-    haul = chooseHaul(found, run.mode === 'truck' ? TRUCK_KG : PACK_KG * team);
+    haul = chooseHaul(found, run.mode === 'truck' ? (run.vehicle && s.vehicles?.find(v => v.id === run.vehicle) ? cargoKg(s, s.vehicles.find(v => v.id === run.vehicle)!) : TRUCK_KG) : PACK_KG * team);
     for (const [k, n] of Object.entries(haul) as Array<[LootKey, number]>) p.left[k] = Math.max(0, (p.left[k] ?? 0) - n);
     if (haulShare < 1) for (const k of Object.keys(haul) as LootKey[]) haul[k] = Math.floor(haul[k]! * haulShare);
     // stale gas
@@ -513,6 +519,7 @@ export function scavengeDay(s: GameState): string[] {
   if (run && day >= run.back) {
     const res = resolveRun(s, run);
     S.run = null;
+    { const v = run.vehicle ? s.vehicles?.find(x => x.id === run.vehicle) : undefined; if (v) delete v.away; }
     for (const id of run.team) { const ps = s.personState.find(x => x.id === id); if (ps && ps.needs.died == null) { ps.task = 'idle'; ps.target = null; } }
     out.push(`${res.title}. ${res.text}`);
     for (const l of res.lines) out.push(l);

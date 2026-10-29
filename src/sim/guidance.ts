@@ -22,6 +22,8 @@ import { PERIMETER, PERIMETER_ORDER, UPGRADE_NEXT, fenceLive, runBill, runFinish
 import { MAX_TOWERS, ringStatus } from './fortress';
 import { canHostWalkway } from './walkway';
 import type { GameState, OrderLine } from './state';
+import { SEPARATE_DWELLINGS, housingShortfall } from './housing';
+import { joinNames } from './kin';
 
 const usd = (n: number) => '$' + Math.round(n).toLocaleString('en-US');
 
@@ -137,6 +139,12 @@ export function suggestions(s: GameState): Suggestion[] {
   const add = (id: string, kind: string, why: string, urgency: number) => { if (!buildOff(s, kind)) out.push({ id, kind, why, urgency }); };
   if (homes.length === 0) add('roof', 'timber_cabin', 'no roof over the family yet', 100);
   else if (beds < people && homes.every(h => structDone(h))) add('beds', 'cottage', `${people - beds} of ${people} have no bed`, 80);
+  // relatives waiting on a place of their own (sim/kin.ts): a guest house for one or two, Mom's house for more
+  const wait = s.kin?.waiting ?? [];
+  if (wait.length && !s.structures.some(st => SEPARATE_DWELLINGS.has(st.kind) && !isFinished(st))) {
+    const n = wait.reduce((a, w) => a + w.people.length, 0);
+    add('kin_home', n > 2 ? 'moms_house' : 'guest_house', `${joinNames(wait.flatMap(w => w.people.map(p => p.first)))} ${n === 1 ? 'is' : 'are'} waiting for a place of their own`, 85);
+  }
   if (!hasKind(s, 'well_hand', 'well_drilled', 'cistern', 'water_tower')) add('water', s.site.gwDepth > 9 ? 'well_drilled' : 'well_hand', s.site.gwDepth > 9 ? `no water on the place (it is ${s.site.gwDepth} m down: drill)` : 'no water on the place', 90);
   const growing = hasKind(s, 'garden', 'field', 'greenhouse', 'orchard');
   if (!growing) add('food', 'garden', daysOfFood(s) < 90 ? 'little food put by and nothing growing' : 'nothing growing yet', daysOfFood(s) < 90 ? 70 : 45);
@@ -188,7 +196,19 @@ export function longTerm(s: GameState): Goal[] {
     { label: 'Gate garage', done: ring.garage, detail: ring.garage ? 'part of the closed line; the vehicles park inside it' : 'a garage built into the wall at the gate (Fortify my ring, or the Build menu)' },
   ] };
   const bunker: Goal = { id: 'bunker', title: 'A bunker underneath', steps: bunkerChecklist(s).map(c => ({ label: c.label, done: c.done, detail: c.detail })) };
-  return [enclose, bunker, selfSufficient(s)];
+  const goals = [enclose, bunker];
+  // room for the family: only once there are relatives (or elders) to make room for
+  const rel = s.people.some(p => p.rel || p.elder) || (s.kin?.away.length ?? 0) > 0 || (s.kin?.waiting.length ?? 0) > 0;
+  if (rel) {
+    const sf = housingShortfall(s);
+    const own = s.structures.filter(st => SEPARATE_DWELLINGS.has(st.kind) && isFinished(st)).length;
+    goals.push({ id: 'family', title: 'Room for the family', steps: [
+      { label: 'A bed for everyone', done: sf.noBed === 0, detail: sf.noBed === 0 ? 'nobody on a couch or in a tent' : `${sf.noBed} without a bed` },
+      { label: 'A place of their own for the old', done: own > 0, detail: own ? `${own} separate ${own === 1 ? 'dwelling' : 'dwellings'}` : 'a guest house, a cottage or Mom\u2019s house: elders and relatives sleep and live better with a front door of their own' },
+    ] });
+  }
+  goals.push(selfSufficient(s));
+  return goals;
 }
 
 /** The third goal, always shown, never required: feed and power the compound from its own land (the self-sufficient interior). */
