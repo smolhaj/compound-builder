@@ -38,7 +38,7 @@ export const SCENARIOS = [
   { name: 'mat-concrete', setup: ring({ wall: 'concrete_wall', shape: 'rounded' }), shots: [aerial(38, 0.6, 2.4), eyeWallPerson] },
   { name: 'mat-palisade', setup: around('log_palisade', 'rounded'), shots: [aerial(38, 0.6, 2.4), eyeWallPerson] },
   { name: 'mat-chainlink', setup: around('chain_link', 'octagon'), shots: [aerial(38, 0.6, 2.4), eyeWallPerson] },
-  { name: 'mat-berm-ditch', setup: around('earth_berm', 'rounded', `G.getState().wallProperty('ditch', geo, 'rounded');`), shots: [aerial(38, 0.6, 2.4), eyeWallPerson] },
+  { name: 'mat-berm-ditch', settle: 6000, setup: around('earth_berm', 'rounded', `G.getState().wallProperty('ditch', geo, 'rounded');`), shots: [aerial(38, 0.6, 2.4), eyeWallPerson] },
 ];
 
 /** The QA scale figure (a 1.7 m person) stood at a point. */
@@ -56,7 +56,7 @@ export const BRIDGE_SCENARIOS = [
   { name: 'bridge', setup: bridgeSetup(), shots: [
     spanCam('aerial-top', `cb.cam.target.set(mx, 0, mz); cb.cam.radius = 34; cb.cam.pitch = 1.2; cb.cam.yaw = 0.8;`),
     spanCam('aerial-oblique', `cb.cam.target.set(mx, 0, mz); cb.cam.radius = 26; cb.cam.pitch = 0.45; cb.cam.yaw = Math.atan2(ux, uz) + 1.2;`),
-    spanCam('eye-end-with-person', `const x = sp.a[0] - ux * 5, z = sp.a[1] - uz * 5; ${figure('(sp.a[0] - ux * 2.2)', '(sp.a[1] - uz * 2.2)')} cb.qa.pose = { x, y: gr(x, z) + 0.3, z, lx: sp.a[0], ly: gr(sp.a[0], sp.a[1]) + 0.3, lz: sp.a[1], fov: 62 };`),
+    spanCam('eye-end-with-person', `const sx = -uz, sz = ux, x = sp.a[0] + sx * 6 - ux * 3, z = sp.a[1] + sz * 6 - uz * 3; ${figure('(sp.a[0] + sx * 1.8 - ux * 1.5)', '(sp.a[1] + sz * 1.8 - uz * 1.5)')} cb.qa.pose = { x, y: gr(x, z) + 0.3, z, lx: sp.a[0] + ux * 1.5, ly: gr(sp.a[0], sp.a[1]) + 0.5, lz: sp.a[1] + uz * 1.5, fov: 66 };`),
     spanCam('eye-from-gorge-bed', `const x = mx - uz * 6, z = mz + ux * 6; cb.qa.pose = { x, y: gr(x, z) + 0.3, z, lx: mx, ly: gr(mx, mz) + 0.9, lz: mz, fov: 70 };`),
     spanCam('eye-door', `const x = sp.b[0] + ux * 4, z = sp.b[1] + uz * 4; cb.qa.pose = { x, y: gr(x, z) + 0.3, z, lx: sp.b[0], ly: gr(sp.b[0], sp.b[1]) + 0.35, lz: sp.b[1], fov: 62 };`),
   ] },
