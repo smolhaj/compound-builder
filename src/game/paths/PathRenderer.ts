@@ -168,8 +168,8 @@ export class PathRenderer {
       const seed = 17 + i * 31;
       // a worn track shows where nothing is laid
       if (!t.laid) for (const g of wornRibbons(t.pts, t.pts.map(() => t.wear), ground, colors, seed)) push('dirt', g);
-      else if (t.laid === 'gravel') push('gravel', laidRibbon(t.pts, ground, PATH_WIDTH.gravel, 0.016));
-      else if (t.laid === 'paved') push('paved', laidRibbon(t.pts, ground, PATH_WIDTH.paved, 0.02));
+      else if (t.laid === 'gravel') push('gravel', laidRibbon(t.pts, ground, PATH_WIDTH.gravel, 0.016, [0.8, 0.78, 0.74]));
+      else if (t.laid === 'paved') push('paved', laidRibbon(t.pts, ground, PATH_WIDTH.paved, 0.02, [0.68, 0.68, 0.66]));
       else if (t.laid === 'boards') {
         // a bare earth bed under the planks
         push('gravel', laidRibbon(t.pts, ground, PATH_WIDTH.boards * 0.9, 0.012, [0.45, 0.38, 0.3]));
