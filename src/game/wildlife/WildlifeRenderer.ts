@@ -38,6 +38,8 @@ const PAL: Record<SpeciesId, Pal> = {
 const tmpM = new THREE.Matrix4(), tmpB = new THREE.Matrix4(), tmpL = new THREE.Matrix4(), tmpQ = new THREE.Quaternion(), tmpE = new THREE.Euler(),
   tmpV = new THREE.Vector3(), tmpS = new THREE.Vector3(), tmpC = new THREE.Color();
 
+const COLOR_CACHE = new Map<number, THREE.Color>();
+
 interface Part { mesh: THREE.InstancedMesh; per: number; n: number }
 
 export interface WildlifeCtx {
@@ -48,7 +50,12 @@ export interface WildlifeCtx {
   creek: { zAt: (x: number) => number; halfWidth: number; waterY: (x: number) => number } | null;
   /** Where people and dogs are (animals bolt from them). */
   threats: ReadonlyArray<readonly [number, number]>;
+  /** Camera position: animals farther than DRAW_RANGE are not drawn (a deer is 0.17 tall: a speck past that). */
+  cam?: { x: number; z: number };
 }
+
+/** World units beyond which an animal is not put in the instance buffers. */
+export const DRAW_RANGE = 90;
 
 function hashRnd(seed: number): () => number {
   let s = seed >>> 0;
@@ -178,7 +185,9 @@ export class WildlifeRenderer {
   private _put(part: Part, m: THREE.Matrix4, color: number, tone: number): void {
     const i = part.n++;
     part.mesh.setMatrixAt(i, m);
-    tmpC.setHex(color); tmpC.multiplyScalar(0.88 + tone * 0.24);
+    let base = COLOR_CACHE.get(color);
+    if (!base) COLOR_CACHE.set(color, base = new THREE.Color().setHex(color));
+    tmpC.copy(base).multiplyScalar(0.88 + tone * 0.24);
     part.mesh.setColorAt(i, tmpC);
   }
   /** local → matrix: position, euler (x pitch, y yaw, z roll) and a non-uniform scale, on the animal's base. */
@@ -192,12 +201,11 @@ export class WildlifeRenderer {
     for (const p of Object.values(this._parts)) p.n = 0;
     for (const b of this._beasts.values()) {
       if (b.vis < 0.02) continue;
+      if (c.cam && Math.abs(b.x - c.cam.x) + Math.abs(b.z - c.cam.z) > DRAW_RANGE * 1.42) continue;
       const sd = SPECIES[b.sp], pal = PAL[b.sp], size = b.vis * (b.sp === 'moose' || b.sp === 'elk' ? 0.94 + b.k * 0.1 : 0.94 + b.k * 0.12);
       let gy = c.ground(b.x, b.z);
       if (b.sp === 'waterfowl' && c.creek && Math.abs(b.z - c.creek.zAt(b.x)) < c.creek.halfWidth) gy = Math.max(gy, c.creek.waterY(b.x)) - 0.004;
       tmpB.compose(tmpV.set(b.x, gy, b.z), tmpQ.setFromEuler(tmpE.set(0, b.rot, 0)), tmpS.set(size, size, size));
-      const base = tmpB.clone();
-      tmpB.copy(base);
       const H = sd.h, L = sd.len, swing = Math.sin(b.phase) * Math.min(0.7, b.v * 0.7 + 0.05) * (b.v > 0.01 ? 1 : 0);
       const bird = sd.kind === 'bird';
       const graze = b.mood === 'graze' ? 1 - b.head : 0;
