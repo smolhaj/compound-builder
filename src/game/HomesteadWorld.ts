@@ -58,7 +58,7 @@ import { SHAFT_HALF, setHatchLid, stairProfile, type RoomSpot } from './buildkit
 import { FLIGHT_W, hatchPlan } from './buildkit/bunkerHatchPlan';
 import { buildDumpTruck, buildExcavator, buildFormwork, buildTubeSegments, drapeSoil, earthMound, spoilHeap } from './props/digSite';
 import { kitMaterial } from './buildkit/materials';
-import { orchardBearing, orchardFrost, ORCHARD_PICK } from '../sim/greenhouse';
+import { FRUITS, fruitLook, isOrchard, type Fruit } from '../sim/orchard';
 import { buildLayers, type Seat } from './buildkit/buildings';
 import { farHiddenLayers, isFar } from './buildkit/buildingLod';
 import { LIGHT_BUDGET, pickLights, type LightCandidate } from './lightPool';
@@ -1864,17 +1864,24 @@ export class HomesteadWorld {
     this.dogs.update(dt, game, hour, game.clock.t, dctx, this.walkHeight, speedK);
     // crops stand in the ground from planting (mid-May) to the last of the harvest (late October); bare soil the rest of the year
     const doy = calendarOf(game.clock).doy, [c0, c1] = seasons(regionFor(game.site)).crops, growing = doy >= c0 && doy < c1;
-    // the orchard: leaves from blossom to a month past the first frost, fruit in late summer once the trees bear (and no late frost took it)
-    const [fr0, fr1] = regionFor(game.site).frost, cal = calendarOf(game.clock);
-    const leafy = doy >= fr0 - 15 && doy < fr1 + 25, picking = doy >= ORCHARD_PICK[0] - 25 && doy < ORCHARD_PICK[1] && !orchardFrost(game.seed, cal.year);
+    const cal = calendarOf(game.clock);
     for (const b of this._built.values()) {
-      if (b.placed.kind === 'orchard' || b.placed.kind === 'orchard_grove') {
+      if (isOrchard(b.placed.kind)) {
+        // the orchard (sim/orchard.ts `fruitLook`): each kind leafs out before its own bloom, blossoms in its own days (a hard frost on the open blossom
+        // browns it), and shows ripe fruit around its picking weeks once the trees bear and the frost left a crop
         const st = game.structures.find(x => x.id === b.placed.id);
-        const fruit = picking && b.finished && orchardBearing((game.clock.t - (st?.finishedAt ?? game.clock.t)) / 365) > 0;
+        const look = new Map<Fruit, ReturnType<typeof fruitLook>>();
+        for (const f of FRUITS) look.set(f, st && b.finished ? fruitLook(game, st, f, doy, cal.year) : { leaf: false, bloom: false, fruit: false });
+        const leafy = [...look.values()].some(l => l.leaf);
         for (const o of b.group.children) {
           const name = ((o as THREE.Mesh).userData.baseMat as THREE.Material | undefined)?.name ?? ((o as THREE.Mesh).material as THREE.Material | undefined)?.name;
           if (o.userData.layer === 'interior' && (name === 'kit_hedge' || name === 'kit_hedge2')) o.visible = leafy && b.finished;
-          if (o.userData.layer === 'decor') o.visible = fruit && leafy;
+          if (o.userData.layer !== 'decor') continue;
+          const fruitOf: Record<string, Fruit> = { kit_fruit: 'apple', kit_paint_yellow: 'pear', kit_fruit_cherry: 'cherry', kit_fruit_plum: 'plum' };
+          const bloomOf: Record<string, Fruit> = { kit_blossom_apple: 'apple', kit_blossom_pear: 'pear', kit_blossom_cherry: 'cherry', kit_blossom_plum: 'plum' };
+          const fr = name ? fruitOf[name] : undefined, bl = name ? bloomOf[name] : undefined;
+          if (fr) o.visible = look.get(fr)!.fruit && look.get(fr)!.leaf;
+          else if (bl) o.visible = look.get(bl)!.bloom;
         }
         continue;
       }

@@ -50,7 +50,7 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   wire: { id: 'wire', name: 'Fence wire', unit: 'roll (400 m barbed / 100 m woven)', price: 140 },
   greenhouse_kit: { id: 'greenhouse_kit', name: 'Greenhouse kit', unit: '12 × 24 ft aluminum-frame greenhouse, twin-wall polycarbonate, door, vents, benches', price: 4500 },
   greenhouse_pro_kit: { id: 'greenhouse_pro_kit', name: 'Production greenhouse kit', unit: '9 × 24 m gutter-connected steel-hoop house, twin-wall polycarbonate, roof vents, a heater and thermal curtain', price: 24000 },
-  fruit_trees: { id: 'fruit_trees', name: 'Fruit trees', unit: 'a bare-root semi-dwarf apple, peach or pear tree', price: 40 },
+  fruit_trees: { id: 'fruit_trees', name: 'Fruit trees', unit: 'a bare-root semi-dwarf apple, pear, cherry or plum tree', price: 40 },
   seedlings: { id: 'seedlings', name: 'Hedge whips', unit: 'bundle of 25 bare-root', price: 75 },
   container: { id: 'container', name: 'Shipping container', unit: '40 ft used, delivered', price: 4800 },
   pipe: { id: 'pipe', name: 'PEX pipe & fittings', unit: '30 m coil + fittings', price: 150 },

@@ -7,6 +7,8 @@ import * as THREE from 'three';
 import { CELL, type KitPieceDef } from './kit';
 import { M, piece, pipe, tube, type Add, type Place } from './interior';
 import { box, Parts } from './shell';
+import { ORCHARD_GRID, isOrchard, orchardColumns, type Fruit } from '../../sim/orchard';
+import type { KitMaterialId } from './materials';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Greenhouse: 12 × 24 ft (3.6 × 7.3 m), aluminum frame, polycarbonate panels
@@ -382,20 +384,30 @@ function greenhouse(_def: KitPieceDef, seed = 1): THREE.Group {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Orchard: twelve semi-dwarf apple, pear and peach trees on a 3.6 × 4.5 m grid
+// Orchard: rows of semi-dwarf apple, pear, cherry and plum trees on a 3.6 × 4.5 m grid (sim/orchard.ts: one column, one fruit)
 // ─────────────────────────────────────────────────────────────────────────
 
-export type FruitKind = 'apple' | 'pear' | 'peach';
-/** Tree positions (local) and kinds, four across and three deep. */
+export type FruitKind = Fruit;
+/** Tree positions (local) and kinds: a column of the grid is a row of one fruit (sim/orchard.ts `orchardColumns`). */
 export function orchardTrees(def: KitPieceDef): Array<{ x: number; z: number; kind: FruitKind }> {
   const LW = def.cellsX * CELL, LD = def.cellsZ * CELL;
-  const kinds: FruitKind[] = ['apple', 'apple', 'pear', 'peach'];
   const out: Array<{ x: number; z: number; kind: FruitKind }> = [];
-  // twelve trees four across and three deep; the grove is forty-eight, eight across and six deep
-  const cols = def.id === 'orchard_grove' ? 8 : 4, rows = def.id === 'orchard_grove' ? 6 : 3;
-  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) out.push({ x: (c - (cols - 1) / 2) * LW / cols, z: (r - (rows - 1) / 2) * LD / (rows + 0.3), kind: kinds[(c + r) % 4] });
+  if (!isOrchard(def.id)) return out;
+  const { cols, rows } = ORCHARD_GRID[def.id], fruits = orchardColumns(def.id);
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) out.push({ x: (c - (cols - 1) / 2) * LW / cols, z: (r - (rows - 1) / 2) * LD / (rows + 0.3), kind: fruits[c] });
   return out;
 }
+
+/**
+ * How each fruit's tree is drawn: trunk height (m), canopy radius (m) and its x / y / z stretch (a round apple, an upright pear,
+ * a tall open cherry, a low spreading plum), the limb lean, the leaf, and the fruit: material, radius (m) and how many on a tree.
+ */
+const TREE: Record<FruitKind, { trunk: number; crown: number; shape: [number, number, number]; lean: number; limbs: number; leaf: 'hedge' | 'hedge2'; fruit: KitMaterialId; fruitR: number; fruitN: number; blossom: KitMaterialId }> = {
+  apple:  { trunk: 0.8, crown: 1.4, shape: [1, 0.88, 1], lean: 0.6, limbs: 4, leaf: 'hedge', fruit: 'fruit', fruitR: 0.13, fruitN: 22, blossom: 'blossom_apple' },
+  pear:   { trunk: 0.8, crown: 1.35, shape: [0.8, 1.25, 0.8], lean: 0.35, limbs: 3, leaf: 'hedge2', fruit: 'paint_yellow', fruitR: 0.13, fruitN: 20, blossom: 'blossom_pear' },
+  cherry: { trunk: 1.0, crown: 1.5, shape: [0.92, 1.12, 0.92], lean: 0.5, limbs: 4, leaf: 'hedge', fruit: 'fruit_cherry', fruitR: 0.07, fruitN: 36, blossom: 'blossom_cherry' },
+  plum:   { trunk: 0.65, crown: 1.3, shape: [1.18, 0.74, 1.18], lean: 0.85, limbs: 4, leaf: 'hedge2', fruit: 'fruit_plum', fruitR: 0.09, fruitN: 26, blossom: 'blossom_plum' },
+};
 
 /** The orchard and the grove share one builder (the grove is the same trees, four times as many, with lighter canopies and fruit). */
 export function orchardBuilder(def: KitPieceDef, seed = 1): THREE.Group {
@@ -410,40 +422,43 @@ function orchard(def: KitPieceDef, seed = 1): THREE.Group {
   p.layer = 'stakes';
   for (const [x, z] of [[x0, z0], [x1, z0], [x0, z1], [x1, z1]]) p.add('trim', box(0.012, 0.09, 0.012, x, -0.02, z));
   for (const t of orchardTrees(def)) {
+    const T = TREE[t.kind];
     const s = 0.85 + 0.3 * p.rnd(), j = (p.rnd() - 0.5) * 0.03;
     const x = t.x + j, z = t.z - j;
     p.add('trim', box(0.01, 0.06, 0.01, x, -0.01, z), 'stakes');
     // foundation: the planting hole and a mulch ring
     p.add('soil', new THREE.CylinderGeometry(0.065, 0.07, 0.008, 12).translate(x, 0.0, z), 'foundation');
     // frame: the trunk and scaffold limbs (bare in winter)
-    const trunkH = (t.kind === 'peach' ? 0.6 : 0.8) * M * s;
+    const trunkH = T.trunk * M * s;
     p.add('wood_dark', new THREE.CylinderGeometry(0.06 * M * s, 0.09 * M * s, trunkH, 6).translate(x, trunkH / 2, z), 'frame');
-    const limbs = t.kind === 'pear' ? 3 : 4;
-    for (let k = 0; k < limbs; k++) {
-      const a = (k / limbs) * Math.PI * 2 + p.rnd(), lean = t.kind === 'pear' ? 0.35 : t.kind === 'peach' ? 0.85 : 0.6, len = 1.5 * M * s;
-      const g = new THREE.CylinderGeometry(0.025 * M * s, 0.05 * M * s, len, 5).translate(0, len / 2, 0).rotateZ(lean).rotateY(a).translate(x, trunkH * 0.95, z);
+    for (let k = 0; k < T.limbs; k++) {
+      const a = (k / T.limbs) * Math.PI * 2 + p.rnd(), len = 1.5 * M * s;
+      const g = new THREE.CylinderGeometry(0.025 * M * s, 0.05 * M * s, len, 5).translate(0, len / 2, 0).rotateZ(T.lean).rotateY(a).translate(x, trunkH * 0.95, z);
       p.add('wood_dark', g, 'frame');
     }
     // roof stage: a stake and a white trunk guard
     p.add('wood_mid', box(0.008, 0.25, 0.008, x + 0.03, 0, z), 'rafters');
     p.add('trim', new THREE.CylinderGeometry(0.1 * M, 0.1 * M, 0.45 * M, 8, 1, true).translate(x, 0.225 * M, z), 'rafters');
-    // finish: the canopy (round apple, upright pear, wide open peach) and the fruit
-    const cr = 1.4 * M * s;
-    const [sx, sy, sz] = t.kind === 'pear' ? [0.8, 1.25, 0.8] : t.kind === 'peach' ? [1.15, 0.7, 1.15] : [1, 0.88, 1];
+    // finish: the canopy and the fruit
+    const cr = T.crown * M * s;
+    const [sx, sy, sz] = T.shape;
     const cy = trunkH + cr * sy * 0.85;
-    const leaf = t.kind === 'apple' ? 'hedge' : 'hedge2';
+    const leaf = T.leaf;
     p.add(leaf, new THREE.IcosahedronGeometry(cr, 2).scale(sx, sy, sz).translate(x, cy, z), 'interior');
     for (let k = 0; k < (grove ? 3 : 5); k++) {
       const a = p.rnd() * Math.PI * 2, r = cr * 0.6;
       p.add(k % 2 ? 'hedge2' : leaf, new THREE.IcosahedronGeometry(cr * (0.45 + 0.15 * p.rnd()), 1).scale(sx, sy, sz).translate(x + Math.cos(a) * r * sx, cy + (p.rnd() - 0.6) * cr * 0.5, z + Math.sin(a) * r * sz), 'interior');
     }
-    // fruit dots on the outside of the canopy (shown in late summer by the world)
-    const fm = t.kind === 'pear' ? 'paint_yellow' : 'fruit';
-    for (let k = 0; k < (grove ? 9 : 22); k++) {
-      const a = p.rnd() * Math.PI * 2, e = (p.rnd() - 0.35) * 1.1;
-      const fx = Math.cos(a) * Math.cos(e) * cr * sx * 1.01, fy = Math.sin(e) * cr * sy * 1.01, fz = Math.sin(a) * Math.cos(e) * cr * sz * 1.01;
-      p.add(fm, new THREE.IcosahedronGeometry(0.13 * M, 0).translate(x + fx, cy + fy, z + fz), 'decor');
-    }
+    // fruit dots and blossom clusters on the outside of the canopy (the world shows each by the fruit's own season: HomesteadWorld, sim/orchard.ts `fruitLook`)
+    const onCanopy = (rad: number, mat: KitMaterialId, n: number, lo: number): void => {
+      for (let k = 0; k < n; k++) {
+        const a = p.rnd() * Math.PI * 2, e = (p.rnd() - lo) * 1.1;
+        const fx = Math.cos(a) * Math.cos(e) * cr * sx * 1.02, fy = Math.sin(e) * cr * sy * 1.02, fz = Math.sin(a) * Math.cos(e) * cr * sz * 1.02;
+        p.add(mat, new THREE.IcosahedronGeometry(rad * M, 0).translate(x + fx, cy + fy, z + fz), 'decor');
+      }
+    };
+    onCanopy(T.fruitR, T.fruit, grove ? Math.round(T.fruitN * 0.4) : T.fruitN, 0.35);
+    onCanopy(0.2, T.blossom, grove ? 26 : 44, 0.15);
     p.collide({ x0: x - 0.03, z0: z - 0.03, x1: x + 0.03, z1: z + 0.03 });
   }
   // finish: drip irrigation (the orchard's water): a valve box at the front corner, a mainline up the

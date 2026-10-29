@@ -5,7 +5,8 @@ import { balanceDay, irrigationStore, plant, storageCapacity } from './utilities
 import { crackGlass } from './improvements';
 import { weatherDay } from './weatherThreats';
 import { powerSummary, fmtKw } from './powerReport';
-import { greenhouseDay, greenhouseGreens, greenhouseKwh, GH_TIER, orchardDay, orchardHarvest, orchardYield, orchardPest, gardenSeason, greensFactor } from './greenhouse';
+import { greenhouseDay, greenhouseGreens, greenhouseKwh, GH_TIER, gardenSeason, greensFactor } from './greenhouse';
+import { orchardDay, orchardPest, orchardYearKcal, pruneDay } from './orchard';
 import { farmOf, pondOf, greenhouseCareOf, hasWorkshop, orchardCareOf, parkInYard, leaveYard, yardCapacity, yardFree, yardOf, shelterFor, YARD_BAYS } from './farm';
 import { harvestPond, pondDay, stockPond, stockProblem, troutGrowth, waterTempC, TABLE_G, troutSuited } from './pond';
 import { livestockDay, sheepRoom, sheepSheltered } from './livestock';
@@ -186,23 +187,20 @@ describe('orchards: pruning, pests and the grove', () => {
     const doy = 250;
     const find = (): GameState => { for (let seed = 1; seed < 60; seed++) { const g = at(doy, yr, seed); const y = calendarOf(g.clock).year; if (orchardPest(seed, y).loss === 0) return g; } throw new Error('no clean seed'); };
     const g = find(); built(g, 'o', 'orchard', 10, 10, 0);
-    const base = orchardHarvest(g);
-    // (a late frost can take the year: skip such seeds)
-    if (base > 0) {
-      const grove = find(); built(grove, 'o', 'orchard_grove', 10, 10, 0);
-      expect(orchardHarvest(grove)).toBeCloseTo(4 * base);
-      orchardCareOf(g, 'o').unprunedYear = calendarOf(g.clock).year;
-      expect(orchardYield(g)).toBeCloseTo(base * 0.8);
-    }
-    expect(true).toBe(true);
+    const base = orchardYearKcal(g);
+    expect(base).toBeGreaterThan(0);
+    const grove = find(); built(grove, 'o', 'orchard_grove', 10, 10, 0);
+    expect(orchardYearKcal(grove)).toBeCloseTo(4 * base);
+    orchardCareOf(g, 'o').unprunedYear = calendarOf(g.clock).year;
+    expect(orchardYearKcal(g)).toBeCloseTo(base * 0.8);
   });
   it('an orchard left unpruned when the buds break is judged by the chore backlog', () => {
-    const g = at(95, 8); built(g, 'o', 'orchard', 10, 10, 0);
+    const g = at(95, 8); g.clock.t += pruneDay(g) - 95; built(g, 'o', 'orchard', 10, 10, 0);
     const lines = orchardDay(g, 80);
     expect(orchardCareOf(g, 'o').unprunedYear).toBe(calendarOf(g.clock).year);
     expect(lines.join(' ')).toMatch(/unpruned/);
-    const h = at(95, 8); built(h, 'o', 'orchard', 10, 10, 0);
-    expect(orchardDay(h, 10)).toEqual([]);
+    const h = at(95, 8); h.clock.t += pruneDay(h) - 95; built(h, 'o', 'orchard', 10, 10, 0);
+    expect(orchardDay(h, 10).filter(l => /unpruned/.test(l))).toEqual([]);
     expect(orchardCareOf(h, 'o').unprunedYear).toBe(-1);
   });
   it('the chores: pruning and picking build a backlog on the Garden duty; the greenhouse and the pond too', () => {

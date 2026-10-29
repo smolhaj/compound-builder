@@ -1,3 +1,4 @@
+import { isOrchard, orchardSiteNote } from '../sim/orchard';
 import * as THREE from 'three';
 import { ownsAt } from '../sim/land';
 import { KIT, PROBLEM_TEXT, snapCenter, footprint, type SiteQuery } from './buildkit/kit';
@@ -102,7 +103,9 @@ export class PlacementTool {
     // one click stakes one building and puts the tool away (Shift-click keeps it armed to stake several), with a line saying so
     if (placed && !repeat) {
       this.setKind(null);
-      useGameStore.getState().flashStaked(`Staked out the ${kind.replace(/_/g, ' ')}. The family will start when the materials are in (Projects tab). Shift-click stakes several in a row.`);
+      // (an orchard planted in a cold-air pocket loses its blossom to the late frosts: say so while it can still be moved: sim/orchard.ts)
+      const note = isOrchard(kind) ? orchardSiteNote(useGameStore.getState().game, x, z) : null;
+      useGameStore.getState().flashStaked(`Staked out the ${kind.replace(/_/g, ' ')}. The family will start when the materials are in (Projects tab). Shift-click stakes several in a row.${note ? ' ' + note : ''}`);
       return;
     }
     this._update();

@@ -6,8 +6,10 @@
 import { useGameStore } from '../store/gameStore';
 import type { GameState } from '../sim/state';
 import { calendarOf } from '../sim/state';
-import { finishedOf, greenhouseCareOf, hasWorkshop, orchardCareOf, YARD_BAYS, yardBays } from '../sim/farm';
-import { GH_TIER, greensFactor, greenhouseGreens, inGreensSeason, isHeated, orchardBearing, orchardPest, ORCHARD_TREES, heatNeed, GH_WOOD_RICKS } from '../sim/greenhouse';
+import { finishedOf, greenhouseCareOf, hasWorkshop, YARD_BAYS, yardBays } from '../sim/farm';
+import { GH_TIER, greensFactor, greenhouseGreens, inGreensSeason, isHeated, heatNeed, GH_WOOD_RICKS } from '../sim/greenhouse';
+import { FRUIT, orchardPest, plotReport } from '../sim/orchard';
+import { pollination } from '../sim/bees';
 import { harvestPond, harvestProblem, pondReport, stockPond, stockProblem, TABLE_G } from '../sim/pond';
 
 import { Note, Row, Section } from './hud/common';
@@ -15,6 +17,9 @@ import { btn, DIM, TONE } from './hud/style';
 import { regionFor } from '../sim/climate';
 
 const oxygenWord = (o: number): [string, 'good' | 'warn' | 'bad'] => (o >= 0.7 ? ['fresh', 'good'] : o >= 0.45 ? ['low', 'warn'] : ['gasping', 'bad']);
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], MONTH_START = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+/** A day of the year as 'May 12'. */
+const dayText = (doy: number): string => { const d = ((Math.round(doy) - 1) % 365 + 365) % 365; let m = 11; while (m > 0 && d < MONTH_START[m]) m--; return `${MONTHS[m]} ${d - MONTH_START[m] + 1}`; };
 const kcal = (n: number) => `${Math.round(n).toLocaleString('en-US')} kcal`;
 
 export function FarmPanel({ game }: { game: GameState }) {
@@ -48,10 +53,19 @@ export function FarmPanel({ game }: { game: GameState }) {
     </Section>}
     {orchards.length > 0 && <Section title="Orchards">
       {orchards.map(st => {
-        const yrs = (game.clock.t - (st.finishedAt ?? game.clock.t)) / 365, bear = orchardBearing(yrs), care = orchardCareOf(game, st.id);
-        return <Row key={st.id} label={`${ORCHARD_TREES[st.kind]} trees`} value={bear > 0 ? `bearing ${Math.round(bear * 100)} %${care.unprunedYear === year ? ' · unpruned' : ''}` : `${Math.max(1, Math.ceil(3 - yrs))} ${Math.ceil(3 - yrs) <= 1 ? 'year' : 'years'} to first fruit`} />;
+        const r = plotReport(game, st, pollination(game).orchard);
+        const site = r.site.pocket ? 'in a cold-air pocket: late frosts take the blossom here' : r.site.drained ? 'on a slope that drains the cold air away' : null;
+        return <div key={st.id} style={{ marginBottom: 6 }}>
+          <Row label={`${r.trees} trees`} value={r.unpruned ? 'unpruned this year' : 'a row each of apple, pear, cherry and plum'} tone={r.unpruned ? 'warn' : undefined} />
+          {site && <Note tone={r.site.pocket ? 'warn' : 'good'}>This plot stands {site}.</Note>}
+          {r.fruits.map(f => <Row key={f.fruit} label={`${FRUIT[f.fruit].name}s (${f.trees})`}
+            value={f.bearing > 0 ? `bearing ${Math.round(f.bearing * 100)} %${f.lostThisYear >= 0.05 ? ` · frost took ${Math.round(f.lostThisYear * 100)} %` : ''}` : `${Math.max(1, f.yearsToFruit)} ${f.yearsToFruit <= 1 ? 'year' : 'years'} to first fruit`}
+            title={`Blossom ${dayText(f.bloom[0])} to ${dayText(f.bloom[1])}, picked ${dayText(f.pick[0])} to ${dayText(f.pick[1])}. A hard frost in an ordinary year takes about ${Math.round(f.risk * 100)} % of the crop here.${f.kcal > 0 ? ` About ${kcal(f.kcal)} this year.` : ''}`}
+            tone={f.risk >= 0.15 ? 'warn' : undefined} />)}
+          <Note>{r.bees ? 'The hives set more of the blossom: cherries and pears most.' : 'No hives: the wild bees carry the usual crop. An apiary adds up to a fifth, the cherries most.'}</Note>
+        </div>;
       })}
-      {(() => { const p = orchardPest(game.seed, year); return <Note tone={p.loss > 0 ? 'warn' : undefined}>{p.loss > 0 ? `${p.name[0].toUpperCase()}${p.name.slice(1)} this year (up to ${Math.round(p.loss * 100)} % of the crop); pruning and hens hold it down.` : 'No bad pests this year.'} Prune January to March: the Garden duty does it.</Note>; })()}
+      {(() => { const p = orchardPest(game.seed, year); return <Note tone={p.loss > 0 ? 'warn' : undefined}>{p.loss > 0 ? `${p.name[0].toUpperCase()}${p.name.slice(1)} this year (up to ${Math.round(p.loss * 100)} % of the pome and stone fruit it hits); pruning and hens hold it down.` : 'No bad pests this year.'} Prune January to the buds breaking; water the young trees through the dry months: the Garden duty does both.</Note>; })()}
     </Section>}
     {ponds.map(st => {
       const r = pondReport(game, st), [ow, ot] = oxygenWord(r.oxygen);
