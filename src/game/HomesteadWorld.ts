@@ -1217,6 +1217,9 @@ export class HomesteadWorld {
     this.sage.visible = !on;
     this.willow.visible = !on;
     this.rocks.visible = !on;
+    // the tracks and the yard clutter lie on the ground, not in the cut-away section
+    this.paths.enabled = !on;
+    this.lived.enabled = !on;
     this.stream.setEdgesVisible(!on);
     for (const [id, g] of this._runGroups) if (['escape_tunnel', 'underground_passage'].includes(this._runs.find(r => r.id === id)?.kind ?? '')) this._applyTunnelView(g.group);
     // a bed of dark earth under the bunkers, so the see-through ground reads as a cut-away section, not sky

@@ -1,5 +1,5 @@
 // Lived-in compound shots with ?lowrender (cheap on-demand frames).
-//   flock <lock> node scripts/livedShots.mjs <outDir> [port=5961] [only=-] [age=day1|year1|year3] [season=summer|fall|winter|spring] [full|-] [hour=11]
+//   flock <lock> node scripts/livedShots.mjs <outDir> [port=5961] [only=-] [age=day1|year1|year3|spring3] [season=summer|fall|winter|spring] [full|-] [hour=11]
 // One compound laid out round the camp (house, cottage, workshop, barn, coop, garden, greenhouse, outhouse, well, sheds, a container-wall ring),
 // the family with kids and dogs, aged by the game clock (finishedAt = 0, clock = age) so props and paths follow the place's age.
 // `only` is a comma list of view names. Env: Q=low|medium|high (default medium), SNOW=1 lays snow, MUD=1 forces mud season, DOGS=0 / KIDS=0.
@@ -9,7 +9,7 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 let chromium; try { ({ chromium } = require('playwright')); } catch { ({ chromium } = await import('/opt/node22/lib/node_modules/playwright/index.mjs')); }
 const out = process.argv[2], port = Number(process.argv[3] || 5961), only = process.argv[4] && process.argv[4] !== '-' ? process.argv[4].split(',') : null;
-const age = ['year1', 'year3'].includes(process.argv[5]) ? process.argv[5] : 'day1', season = process.argv[6] || 'summer', full = process.argv[7] === 'full', hour = Number(process.argv[8] || 11);
+const age = ['year1', 'year3', 'spring3'].includes(process.argv[5]) ? process.argv[5] : 'day1', season = process.argv[6] || 'summer', full = process.argv[7] === 'full', hour = Number(process.argv[8] || 11);
 const quality = process.env.Q || 'medium';
 mkdirSync(out, { recursive: true });
 const vite = spawn('node', ['node_modules/vite/bin/vite.js', '--config', 'scripts/vite.shots.config.ts', '--port', String(port), '--strictPort'], { stdio: ['ignore', 'pipe', 'inherit'] });
@@ -41,7 +41,7 @@ try {
     const R = 11.3, zc = c.z + 4.2;
     const run = P.planRun(g, 'container_wall', [[c.x - R, zc - R], [c.x + R, zc - R], [c.x + R, zc + R], [c.x - R, zc + R], [c.x - R, zc - R]], [{ at: 60, w: 0.6 }]);
     run.done = run.hours; run.supplied = true; run.finishedAt = 0;
-    g.clock.t = ({ day1: 2, year1: 365 + 120, year3: 3 * 365 + 120 })[age] + 0.4;
+    g.clock.t = ({ day1: 2, year1: 365 + 120, year3: 3 * 365 + 120, spring3: 3 * 365 + 8 })[age] + 0.4;
     g.clock.ticks = Math.round(g.clock.t / (0.25 / 24));
     g.stock.goat = 3; g.stock.hay = 20;
     if (env.kids === '0') g.people = g.people.filter(p => !p.kid), g.personState = g.personState.slice(0, g.people.length);
