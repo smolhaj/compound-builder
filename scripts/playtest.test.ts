@@ -342,6 +342,7 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
       const k = (f: string) => Math.round((s.stock as Record<string, number>)[f] * ({ fresh: 2000, frozen: 10000, canned: 6000, staples: 80000 } as Record<string, number>)[f] / 1000);
       console.log(`d${Math.floor(s.clock.t - s.disaster.hitAt)} ppl ${s.personState.filter(p => p.needs.died == null).length} need ${Math.round(s.food.needKcal)} grown ${Math.round(s.food.producedKcal)} fresh ${k('fresh')}k can ${k('canned')}k stap ${k('staples')}k jars ${Math.round(s.stock.lids)} fields ${s.structures.filter(x => x.kind === 'field' && isFinished(x)).length} grow ${s.stats.grownYear | 0}/${s.stats.needYear | 0}`);
     }
+    if (process.env.WKTRACE && day % 30 === 0) appendFileSync(process.env.WKTRACE, `${strat} ${kind} d${day} ph ${s.disaster.phase} hit ${Math.round(s.disaster.hitAt)} wk ${s.weekend?.mode ?? '-'} asked ${s.weekend?.asked ?? '-'} here ${s.weekend?.here ? 1 : 0} built ${s.structures.filter(isFinished).length}/${s.structures.length} money ${Math.round(s.money)} ppl ${livingCount(s)} planned ${planned} | ${s.structures.filter(x => !isFinished(x)).map(x => `${x.kind} st${x.stage} done${Math.round(x.done)} sup${x.supplied ? 1 : 0} permit ${x.permit}`).join('; ')} | orders ${s.orders.filter(o => o.status === 'ordered').length}\n`);
     if (!hitSeen && s.clock.t >= s.disaster.hitAt) { hitSeen = true; moneyAtHit = Math.round(s.money); builtAtHit = s.structures.filter(isFinished).length; }
     // answer the gate
     let guard = 0;
@@ -354,7 +355,8 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
       const oddsNow = process.env.GATES && e.stances.includes('defend') ? odds(s) : null, foundNow = e.stances.includes('hide') ? hideFoundChance(s, e) : 0;
       // (the weekender's cards: the idle family holds on; the others move in as soon as it is asked, selling while the market is open; caught in town, they drive straight home)
       const weekender = e.kind === 'move_in' ? (strat === 'idle' ? 'hold_on' : e.stances.includes('move_sell') ? 'move_sell' : 'move_keep') : e.kind === 'stranded' ? 'drive_now' : null;
-      const stance = ransom ?? weekender ?? (e.kind === 'trial_end' ? trialEnd(strat, s, e.size) : e.kind === 'shelter' ? (MARGIN[strat] && foodCovers(s, e.size, MARGIN[strat]) ? 'take_in' : 'turn_away') : STANCE[strat](e.stances, e.kind, s, e.size));
+      const welcome = process.env.WELCOME && e.stances.includes('take_in') && ['arrival', 'kin', 'shelter', 'trial_end'].includes(e.kind) ? 'take_in' : null;
+      const stance = ransom ?? weekender ?? welcome ?? (e.kind === 'trial_end' ? trialEnd(strat, s, e.size) : e.kind === 'shelter' ? (MARGIN[strat] && foodCovers(s, e.size, MARGIN[strat]) ? 'take_in' : 'turn_away') : STANCE[strat](e.stances, e.kind, s, e.size));
 
       const hidBefore = s.gate.history.length;
       const out = resolve(s, stance); s.gate.card = null;
@@ -418,7 +420,7 @@ describe.skipIf(!process.env.PLAYTEST || process.env.PLAYTEST === 'long')('playt
     const results: RunResult[] = [];
     // (the seed is fixed by the disaster's and the strategy's place in the full table, so a filtered run replays the same game)
     const ALL_KINDS = ['grid_down', 'nuclear', 'drought', 'pandemic', 'wildfire', 'ash_winter', 'financial', 'solar_flare', 'zombies'], ALL_STRATS: Strategy[] = ['idle', 'homestead', 'prepper', 'fortress'];
-    for (const kind of kinds) for (const strat of strats) { const seed = 11 + ALL_KINDS.indexOf(kind) * 4 + ALL_STRATS.indexOf(strat) + Number(process.env.SEEDOFF ?? 0), site = siteFor(seed); results.push(play(strat, kind, seed, 'medium', site)); }
+    for (const kind of kinds) for (const strat of strats) { const seed = 11 + ALL_KINDS.indexOf(kind) * 4 + ALL_STRATS.indexOf(strat) + Number(process.env.SEEDOFF ?? 0), site = siteFor(seed); const t0 = Date.now(); const yrs = Number(process.env.YEARS ?? 0); const r = play(strat, kind, seed, 'medium', site, yrs); results.push(r); if (process.env.TIMING) appendFileSync(process.env.TIMING, `${kind} ${strat} seed ${seed} ${yrs}y ${((Date.now() - t0) / 1000).toFixed(1)}s ${r.days} days ${(((Date.now() - t0) / Math.max(1, r.days))).toFixed(1)} ms/day ending ${r.ending} alive ${r.alive}\n`); }
     const md = ['# Playtest report (scripted)', '', '| Site | Disaster | Strategy | Variant | Ending | Grade | Alive | Lost to | Hungry days | Days | $ at hit | Built at hit | Fights | Hid (found) | Trials | Bugs |', '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|',
       ...results.map(r => `| ${r.site} | ${r.kind} | ${r.strat} | ${r.variant} | ${r.ending} | ${r.grade} | ${r.alive} | ${r.causes || '-'} | ${r.hungry} | ${r.days} | ${r.moneyAtHit.toLocaleString('en-US')} | ${r.builtAtHit} | ${r.fights.join(', ') || '-'}${r.prisoners ? ` · ${r.prisoners} held` : ''} | ${r.hides ? `${r.hides} (${r.hidFound})${r.burned ? `, ${r.burned} burned` : ''}` : '-'} | ${r.trials} | ${r.bugs.join('; ')} |`),
       '', '## Report card lines', '', ...results.map(r => `- **${r.kind} / ${r.strat}:** ${r.lines.join(' ')}`),

@@ -448,3 +448,36 @@ describe('save', () => {
     expect(askedAll).toBeGreaterThan(0);
   }, 120_000);
 });
+
+describe('playtest 3: whose in-laws they are', () => {
+  it('a household has one set of parents per adult: an in-law is named for the OTHER adult and linked to the one it belongs to', () => {
+    let seen = 0;
+    for (let seed = 1; seed <= 80; seed++) {
+      const fam = variedFamily(seed, 0).people, pool = kinPool(seed, 0, fam);
+      const adults = fam.filter(p => !p.kid && !p.elder);
+      if (adults.length < 2) continue;
+      const people = [...fam, ...pool];
+      linkKin(people);
+      for (const p of pool.filter(x => x.rel && /_in_law$/.test(x.rel.role))) {
+        seen++;
+        expect(p.rel!.of).toBe(adults[0].id);               // "Beth's mother-in-law"...
+        expect(people.find(x => x.id === adults[1].id)!.parents).toContain(p.id);   // ...is Pete's mother
+        expect(people.find(x => x.id === adults[0].id)!.parents ?? []).not.toContain(p.id);
+      }
+      for (const a of adults) expect((people.find(x => x.id === a.id)!.parents ?? []).length).toBeLessThanOrEqual(2);
+    }
+    expect(seen).toBeGreaterThan(5);
+  });
+  it('a request from both in-laws reads in the plural and names the in-laws, not "parents"', () => {
+    for (let seed = 1; seed <= 80; seed++) {
+      const g = game(seed), ins = g.kin!.away.filter(p => p.rel && /_in_law$/.test(p.rel.role));
+      if (ins.length !== 2) continue;
+      const e = makeKinRequest(g, ins, false, () => 0.3, 'e1');
+      const text = e.dossier.join(' ');
+      expect(text).not.toMatch(/ is finding/);
+      expect(text).not.toMatch(/’s parents \(/);
+      return;
+    }
+    throw new Error('no seed had both in-laws');
+  });
+});

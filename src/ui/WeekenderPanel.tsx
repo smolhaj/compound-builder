@@ -7,7 +7,7 @@ import { useGameStore } from '../store/gameStore';
 import { dayIndex } from '../sim/state';
 import { fleetOf } from '../sim/vehicles';
 import {
-  CARETAKER, CARETAKER_KINDS, caretakerProblem, dismissCaretaker, emptyNow, hireCaretaker, marketFactor, mortgagePayment, nextChange, openMoveIn,
+  CARETAKER, CARETAKER_KINDS, caretakerProblem, dismissCaretaker, emptyNow, hireCaretaker, marketFactor, mortgagePayment, nextChange, residents, openMoveIn,
   saleBlock, saleQuote, sellTown, setAwayLights, siteDaysPerWeek, townCostPerDay, townUpkeep,
 } from '../sim/weekender';
 import { Note, Row, Section } from './hud/common';
@@ -57,7 +57,9 @@ export function WeekenderPanel() {
         <span title={CARETAKER[w.caretaker.kind].blurb}>{CARETAKER[w.caretaker.kind].name} <span style={{ color: DIM }}>· {usd(CARETAKER[w.caretaker.kind].perMonth)}/mo{w.caretaker.missed ? ` · missed ${w.caretaker.missed}` : ''}</span></span>
         <button style={btn()} onClick={() => g.daily(d => { dismissCaretaker(d); return null; })}>Let go</button>
       </div>
-      : <Note tone="warn">Nobody is looking after the place Monday to Friday. The animals go unfed, the garden unwatered, and an empty place is far likelier to be broken into.</Note>}
+      : residents(game).length > 0
+        ? <Note>{residents(game).map(p => p.first).join(' and ')} live on the place and are here on weekdays, so it is not empty. A caretaker would still take the heavy work off them.</Note>
+        : <Note tone="warn">Nobody is looking after the place Monday to Friday. The animals go unfed, the garden unwatered, and an empty place is far likelier to be broken into.</Note>}
     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', margin: '3px 0' }}>
       {CARETAKER_KINDS.filter(k => w.caretaker?.kind !== k).map(k => {
         const why = caretakerProblem(game, k);

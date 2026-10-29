@@ -122,11 +122,13 @@ export function kinPool(seed: number, roll: number, family: readonly Person[]): 
   };
   /** Parents of an anchor: both, the mother alone, or the father alone. */
   const parentsOf = (anchor: Person, inLaw: boolean, last: string) => {
+    // an in-law is the partner's parent: they are named for the OTHER adult ("Beth's mother-in-law" is Pete's mother), so the two sets of parents are different people
+    const of = inLaw ? (adults.find(x => x.id !== anchor.id) ?? anchor) : anchor;
     const u = r();
     const base = Math.min(88, Math.max(60, anchor.age + 24 + Math.floor(r() * 9)));
     const pair: Person[] = [];
-    if (u < 0.85) pair.push(make(inLaw ? 'mother_in_law' : 'mother', anchor, 'f', base - Math.floor(r() * 3), last));
-    if (u < 0.55 || u >= 0.85) pair.push(make(inLaw ? 'father_in_law' : 'father', anchor, 'm', base + Math.floor(r() * 4) - 1, last));
+    if (u < 0.85) pair.push(make(inLaw ? 'mother_in_law' : 'mother', of, 'f', base - Math.floor(r() * 3), last));
+    if (u < 0.55 || u >= 0.85) pair.push(make(inLaw ? 'father_in_law' : 'father', of, 'm', base + Math.floor(r() * 4) - 1, last));
     if (pair.length === 2) { pair[0].partner = pair[1].id; pair[1].partner = pair[0].id; }
     return pair;
   };
@@ -255,13 +257,15 @@ const joinList = (names: string[]) => names.length <= 1 ? names[0] ?? '' : names
 function story(s: GameState, group: Person[], late: boolean, r: () => number): string {
   const lead = group[0];
   const call = joinList(group.map(p => kinCallName(p, s.people)));
-  const title = group.length === 1 ? kinTitle(lead, s.people) : `${kinTitle(lead, s.people).replace(/ (mother|father|mother-in-law|father-in-law)$/, '')} parents`;
+  const inLaws = group.length > 1 && /-in-law$/.test(kinTitle(lead, s.people));
+  const title = group.length === 1 ? kinTitle(lead, s.people) : `${kinTitle(lead, s.people).replace(/ (mother|father|mother-in-law|father-in-law)$/, '')} ${inLaws ? 'in-laws' : 'parents'}`;
+  const verb = group.length > 1 ? 'are' : 'is';
   const first = group.map(p => p.first).join(' and ');
   if (late) return `${cap(call)} made it out to the road and walked the last miles. ${first} ${group.length > 1 ? 'are' : 'is'} at the gate with ${group.length > 1 ? 'two bags' : 'a bag'}, tired and scared, asking for a place at the table.`;
   const old = group.every(p => p.elder);
   const peace = s.disaster.phase === 'peace';
   if (old) return pick(r, peace
-    ? [`${title} (${first}) is finding the house too much to keep up with, and the news makes ${group.length > 1 ? 'them' : lead.body === 'f' ? 'her' : 'him'} nervous. ${cap(call)} would like to be near family.`,
+    ? [`${title} (${first}) ${verb} finding the house too much to keep up with, and the news makes ${group.length > 1 ? 'them' : lead.body === 'f' ? 'her' : 'him'} nervous. ${cap(call)} would like to be near family.`,
        `${cap(call)} called again last night. The stairs are getting hard, and ${group.length > 1 ? 'they have' : 'there is'} nobody nearby. Could ${group.length > 1 ? 'they' : lead.body === 'f' ? 'she' : 'he'} come live with you?`]
     : [`With everything on the news getting worse, ${cap(call)} does not want to face it alone. ${first} ask${group.length > 1 ? '' : 's'} to come now, while the roads are still open.`,
        `${cap(call)} has packed the car. ${first} ${group.length > 1 ? 'say they are' : 'says they are'} coming up whether or not there is a bed ready, but would rather you said yes.`]);

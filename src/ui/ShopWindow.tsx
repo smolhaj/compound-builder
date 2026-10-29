@@ -152,6 +152,7 @@ export function ShopWindow() {
   const total = lines.length ? orderCost(lines, k) : 0;
   const why = lines.length ? orderProblem(game, lines) : 'empty';
   const pay = payWith(game);
+  const onWay = game.orders.filter(o => o.status === 'ordered');
   const add = (m: MaterialId, d: number) => setCart({ ...cart, [m]: Math.max(0, (cart[m] ?? 0) + d) });
   const close = () => g.openShop(false);
   return (
@@ -206,6 +207,10 @@ export function ShopWindow() {
               {lines.map(l => <div key={l.food ?? l.material} style={{ display: 'flex', justifyContent: 'space-between', gap: 6, padding: '2px 0' }}><span>{l.food ? `${l.n} × ${FOOD[l.food].name}` : `${l.qty} × ${MATERIALS[l.material].name}`}</span><span style={{ color: C.dim }}>{usd((l.food ? (FOOD[l.food].price ?? 0) * (l.n ?? 0) : (MATERIALS[l.material].price ?? 0) * l.qty) * k)}</span></div>)}
             </div>
             {lines.length > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: `1px solid ${C.line}`, paddingTop: 6 }}><span>Total, delivered</span><b>{usd(total)}</b></div>}
+            {onWay.length > 0 && <div style={{ borderTop: `1px solid ${C.line}`, paddingTop: 6, fontSize: 12 }} title="Orders already paid for; they arrive on their own">
+              <b>On the way</b>
+              {onWay.map(o => <div key={o.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 6, color: C.dim }}><span>{o.lines.length} item{o.lines.length > 1 ? 's' : ''} · {usd(o.cost)}</span><span>{o.dueAt - game.clock.t < 1 ? 'today' : `in ${Math.ceil(o.dueAt - game.clock.t)} d`}</span></div>)}
+            </div>}
             <div style={{ fontSize: 11.5, color: C.dim }}>{pay === 'cash' ? 'The banks are shut: paying cash from the safe.' : pay === 'bank' ? `From checking. The truck comes in about ${2 + Math.floor(game.site.miles / 15)} days.` : 'Nobody is delivering now.'}</div>
             <button style={{ ...btn(true, !!why), padding: '7px 10px', fontWeight: 600 }} disabled={!!why} onClick={() => { if (g.order(lines)) { setCart({}); setFoodCart({}); } }}>
               {why === 'cannot_afford' ? 'Not enough money' : why === 'no_deliveries' ? 'No deliveries' : 'Place the order'}
