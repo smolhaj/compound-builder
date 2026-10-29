@@ -25,6 +25,7 @@ import { fenceLean } from './atmosphere/aging';
 import { LEANS, leanRun } from './atmosphere/fenceAging';
 import { FamilyRenderer } from './people/FamilyRenderer';
 import { DogRenderer } from './people/DogRenderer';
+import { FleetRenderer } from './props/FleetRenderer';
 import type { DogCtx } from './people/dogGoals';
 import { WildlifeRenderer } from './wildlife/WildlifeRenderer';
 import { buildYard, type Yard } from './props/yardGeometry';
@@ -165,6 +166,8 @@ export class HomesteadWorld {
   private readonly _yard: Yard;
   readonly family: FamilyRenderer;
   readonly dogs: DogRenderer;
+  /** The fleet (sim/vehicles.ts): parked in the garages and the yard, driving out on runs. */
+  readonly fleet: FleetRenderer;
   /** Native wildlife (sim/wildlife.ts): deer, turkeys, bears and the rest, drawn as instanced animals. */
   readonly wildlife: WildlifeRenderer;
   /** Night life, weathering and the deeper seasons (atmosphere/). */
@@ -214,6 +217,7 @@ export class HomesteadWorld {
     this.lakes = new RegionalWaterRenderer(ws.scene);
     this.family = new FamilyRenderer(ws.scene);
     this.dogs = new DogRenderer(ws.scene);
+    this.fleet = new FleetRenderer(ws.scene);
     this.wildlife = new WildlifeRenderer(ws.scene);
     this._campGroup = buildCamp({ fire: false });
     this._campGroup.position.set(this.camp.x, this.parcel.height(this.camp.x, this.camp.z), this.camp.z);
@@ -1341,6 +1345,16 @@ export class HomesteadWorld {
     }
   }
 
+  /** Vehicles: in their bays and the yard, and out the gate on a run. */
+  updateFleet(dt: number, game: GameState, speedK: number): void {
+    this.fleet.update(dt, game, {
+      host: id => { const b = this._built.get(id); return b ? { x: b.placed.x, z: b.placed.z, rot: b.placed.rot, kind: b.placed.kind } : null; },
+      yard: this.camp,
+      drive: this.access.drive,
+      ground: this.groundAt,
+    }, speedK);
+  }
+
   /** Wildlife: the animals the sim says live here, grazing, wandering and bolting from people (and dogs). */
   updateWildlife(dt: number, game: GameState, speedK: number): void {
     const threats: Array<[number, number]> = this.family.positions().filter(p => this.family.shown.has(p.id)).map(p => [p.x, p.z] as [number, number]);
@@ -1650,6 +1664,7 @@ export class HomesteadWorld {
     this.stream.dispose();
     this.family.dispose();
     this.dogs.dispose();
+    this.fleet.dispose();
     this.wildlife.dispose();
     this._yard.dispose();
     this.atmos.dispose();

@@ -21,7 +21,7 @@ import { CONDITION, pharmacyOpen } from '../sim/body';
 import { netWorth } from '../sim/finance';
 import { campNeed, trialCamps } from '../sim/trial';
 import { JUG_L, orderTanker } from '../sim/water';
-import { buyVehicle, startingVehicles, VEHICLES, type VehicleKind } from '../sim/vehicles';
+import { FleetPanel } from './FleetPanel';
 import { buyLicense, hasLicense, inSeason, lawful, TAG_USD, type License } from '../sim/wildfood';
 import { chimneyState, greenRicks, SEASON_DAYS, SWEEP_USD } from '../sim/upkeep';
 import { countyWorks, premium, yearlyTax } from '../sim/paperwork';
@@ -324,9 +324,6 @@ export function Hud() {
                 <Row label="Stored" value={`${Math.round(r.storedL)} of ${storageCapacity(game).toLocaleString('en-US')} L`} />
                 {game.stock.water_jugs >= 1 && <Row label="Drinking water put by" value={`${Math.floor(game.stock.water_jugs)} jugs (${Math.round(game.stock.water_jugs * JUG_L)} L)`} />}
                 {storageCapacity(game) - r.storedL > 1000 && game.disaster.tracks.deliveries >= 0.5 && game.disaster.tracks.banks >= 0.5 && <button style={{ ...btn(), width: '100%', marginTop: 3 }} title="A tanker load from town: 15,000 L" onClick={() => g.money(d => orderTanker(d, storageCapacity(d)))}>Order a tanker load ($450)</button>}
-                <div style={{ marginTop: 6, fontWeight: 600 }}>Vehicles</div>
-                {(game.vehicles ?? startingVehicles()).map(v => <Row key={v.id} label={VEHICLES[v.kind].name} value={v.fried ? 'killed by the EMP' : v.condition <= 0 ? 'dead' : `${Math.round(v.mileage).toLocaleString('en-US')} mi · ${Math.round(v.condition * 100)} % · ${Math.round(v.fuel)} L`} />)}
-                {(['tractor', 'atv', 'old_pickup', 'trailer'] as VehicleKind[]).filter(k => !(game.vehicles ?? []).some(v => v.kind === k)).map(k => <button key={k} style={{ ...btn(), width: '100%', marginTop: 3 }} onClick={() => g.money(d => buyVehicle(d, k))}>Buy {VEHICLES[k].name.toLowerCase()} (${VEHICLES[k].price.toLocaleString('en-US')})</button>)}
                 <Row label="Well depth here" value={`${game.site.gwDepth} m`} />
                 {game.utilities.hauling && <Note tone="warn">{game.utilities.haulFar ? 'Hauling water a quarter mile from the creek on the neighbor\'s land: a well or cistern would end it.' : 'Hauling water from the creek by the bucket: a well or cistern would end it.'}</Note>}
                 {r.shortL > 0 && <Note tone="bad">Water ran short.</Note>}
@@ -334,6 +331,7 @@ export function Hud() {
                 {game.site.gwQuality === 'arsenic' && game.stock.ro_system < 1 && <Note tone="warn">Arsenic in the well water: get reverse osmosis for drinking water.</Note>}
                 {game.site.gwQuality === 'hard' && game.stock.softener < 1 && <Note>Hard water: scale wears the pump faster without a softener.</Note>}
               </Section>
+              <FleetPanel />
             </>;
           })()}
 

@@ -158,7 +158,6 @@ export const COTTAGE: KitPieceDef = {
   parts: { foundation: 'concrete', walls: 'timber_lap', roof: 'metal_roof' },
   maxSlope: 0.3, floorY: 0.08, porch: 0.28, sleeps: 3, light: [0, 0.3, -0.1],
 };
-/** A 9 × 12 m steel pole building with two roll-up doors (the trucks); `garage_solar` carries 8 kW on the roof. */
 /** A small guest house for a relative: 6 × 5 m on a 2 × 2-cell lot. Keeps visiting family happy with a front door of their own. */
 export const GUEST_HOUSE: KitPieceDef = {
   id: 'guest_house', name: 'Guest house', category: 'home',

@@ -26,6 +26,7 @@ import { mulberry32, pick } from './rng';
 import { jobTools, type Person, type SkillId } from './family';
 import type { StageId } from './blueprints';
 import type { GameState } from './state';
+import { burnTractor, tractorRuns } from './vehicles';
 
 // ─────────────────────────────────────────────────────────────────────────
 // What a tool is
@@ -48,9 +49,9 @@ export const ROLE_INFO: Record<ToolRole, { name: string; need: string }> = {
 export type ToolKind =
   | 'hammer' | 'nail_gun' | 'hand_saw' | 'circular_saw' | 'chainsaw' | 'axe' | 'screwdriver_set' | 'cordless_drill'
   | 'shovel' | 'pick_mattock' | 'hoe' | 'garden_fork' | 'wrench_set' | 'pliers' | 'bolt_cutters' | 'whetstone' | 'file'
-  | 'stone_axe' | 'scrap_saw' | 'rock_hammer' | 'scrap_driver' | 'digging_stick' | 'scrap_wrench' | 'bent_pliers';
+  | 'tractor_implements' | 'stone_axe' | 'scrap_saw' | 'rock_hammer' | 'scrap_driver' | 'digging_stick' | 'scrap_wrench' | 'bent_pliers';
 
-export type PowerKind = 'hand' | 'electric' | 'fuel';
+export type PowerKind = 'hand' | 'electric' | 'fuel' | 'tractor';
 
 export interface ToolDef {
   id: ToolKind;
@@ -91,6 +92,7 @@ export const TOOLS: Record<ToolKind, ToolDef> = {
   bolt_cutters: { id: 'bolt_cutters', name: 'Bolt cutters', blurb: '24 in cutters: fence wire, chain, rebar ties', roles: { wire: 1.3 }, power: 'hand', wear: HAND, dull: 0.0008, price: 45 },
   whetstone: { id: 'whetstone', name: 'Whetstone', blurb: 'a two-sided stone: puts a proper edge back', roles: {}, power: 'hand', wear: 0, dull: 0, price: 12, honing: true },
   file: { id: 'file', name: 'Mill file', blurb: 'for saws, axes and mower blades', roles: {}, power: 'hand', wear: 0, dull: 0, price: 10, honing: true },
+  tractor_implements: { id: 'tractor_implements', name: 'Tractor implements', blurb: 'plow, disc harrow and a loader bucket: they work only while a tractor runs with fuel (the fleet)', roles: { till: 3, dig: 2.2 }, power: 'tractor', wear: POWER * 0.8, dull: 0, price: 2400 },
   stone_axe: { id: 'stone_axe', name: 'Stone axe', blurb: 'a knapped stone head lashed to a hickory handle: it works', roles: { fell: 0.45 }, power: 'hand', wear: CRUDE, dull: 0.006, price: null, crude: true },
   scrap_saw: { id: 'scrap_saw', name: 'Scrap saw', blurb: 'a toothed strip of sheet steel on a wooden handle', roles: { cut: 0.4 }, power: 'hand', wear: CRUDE, dull: 0.006, price: null, crude: true },
   rock_hammer: { id: 'rock_hammer', name: 'Rock hammer', blurb: 'a fist-sized stone on a stick', roles: { nail: 0.4 }, power: 'hand', wear: CRUDE, dull: 0, price: null, crude: true },
@@ -209,9 +211,9 @@ export const BARE_HANDS = 0.5;
 export const FUEL_PER_HOUR = 0.04;
 
 /** Whether the electric and gas tools can run right now. */
-export interface WorkCtx { power: boolean; fuel: number }
+export interface WorkCtx { power: boolean; fuel: number; /** A tractor runs with fuel (sim/vehicles.ts). */ tractor?: boolean }
 export function ctxOf(s: GameState): WorkCtx {
-  return { power: s.utilities.lit.length > 0 || (s.utilities.grid && s.disaster.tracks.grid > 0.5), fuel: s.stock.fuel };
+  return { power: s.utilities.lit.length > 0 || (s.utilities.grid && s.disaster.tracks.grid > 0.5), fuel: s.stock.fuel, tractor: tractorRuns(s) };
 }
 
 /** A tool's efficiency in a role: its speed, dulled by the edge and the wear. 0: can't be used now. */
@@ -220,6 +222,7 @@ export function efficiency(t: Tool, role: ToolRole, ctx: WorkCtx): number {
   if (base <= 0 || t.cond <= 0) return 0;
   if (d.power === 'electric' && !ctx.power) return 0;
   if (d.power === 'fuel' && ctx.fuel < FUEL_PER_HOUR) return 0;
+  if (d.power === 'tractor' && !ctx.tractor) return 0;
   // a decently kept tool (edge ≥ 60 %, condition ≥ 50 %) works at full speed; past that it slows to half (a dull edge) and 60 % (worn)
   const edge = d.dull > 0 ? 0.5 + 0.5 * Math.min(1, t.sharp / 0.6) : 1;
   return base * edge * (0.6 + 0.4 * Math.min(1, t.cond / 0.5));
@@ -438,6 +441,7 @@ export function wearTools(s: GameState, task: ToolTask, hours: number): string[]
     t.cond = Math.max(0, t.cond - d.wear * GRADES[gradeOf(t)].wear * h * (1 + 0.5 * (1 - t.sharp)));
     if (d.dull > 0) t.sharp = Math.max(0, t.sharp - d.dull * h);
     if (d.power === 'fuel') s.stock.fuel = Math.max(0, s.stock.fuel - FUEL_PER_HOUR * h);
+    if (d.power === 'tractor') burnTractor(s, h);
     if (t.cond <= 0) { kit.broke++; broke.push(d.name); log(s, `The ${d.name.toLowerCase()} gives out${d.crude ? '' : ' (the handle splits, the teeth are gone)'}. It might be mended.`); }
   }
   return broke;

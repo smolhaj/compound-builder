@@ -43,6 +43,7 @@ import { boltPassages, passageEntry } from './compounds';
 import { resolveDigWarning } from './tunnelers';
 import { addTool, stealTools, SWAP_KINDS, TOOLS, type ToolKind } from './tools';
 import { resolveKin } from './kin';
+import { raidTakesVehicles } from './vehicles';
 import { resolveTrialEnd, startTrial, trialDay, type TrialCamp } from './trial';
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -696,6 +697,7 @@ export function resolve(s: GameState, stance: Stance): Outcome {
       } else {
         // (round 4: no second take of their wants here: applyBattle has already taken its 30–90 % share of the stores)
         if (e.kind === 'looters' || e.kind === 'gang' || e.kind === 'militia') lines.push(...stealTools(s, 0.3, 2).lines);
+        lines.push(...raidTakesVehicles(s, ORGANIZED.has(e.kind)));
         title = 'They got in'; text = b.result === 'overrun' ? 'They overran the place and took what they came for.' : 'They broke through the line and took what they came for.'; tone = 'bad';
         // picked over: for a while there's not much left worth coming for; but the place is known to be soft
         g.respect = Math.max(0, (g.respect ?? 0) - 0.3);

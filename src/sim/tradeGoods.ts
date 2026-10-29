@@ -38,7 +38,7 @@ export interface MarketState {
   day: number;
   stalls: Stall[];
   /** Who went today (they're away until evening); `carried`: dollars-equivalent of what they bought, for the road home. */
-  trip: { day: number; pid: string; carried: number; armed: boolean; bought?: Array<{ good: string; qty: number }> } | null;
+  trip: { day: number; pid: string; carried: number; armed: boolean; /** Drove (the vehicle's id) rather than rode: faster home, louder. */ vehicle?: string; bought?: Array<{ good: string; qty: number }> } | null;
   /** Vendors who won't deal with the family any more. */
   banned: string[];
   /** Cheating found out later (day it comes out, vendor). */

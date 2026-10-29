@@ -38,6 +38,8 @@ type Raw = Record<string, unknown> & { version?: number };
 
 /** version n → n + 1 upgraders. */
 const STEPS: Record<number, (s: Raw) => Raw> = {
+  // 55 → 56: the fleet (sim/vehicles.ts): vehicle parts in the stock, a service reading on each vehicle
+  55: s => ({ ...s, version: 56, stock: { vehicle_parts: 0, ...(s.stock as object) }, vehicles: (s.vehicles as Array<Record<string, unknown>> | undefined)?.map(v => ({ serviceAt: v.oilAt, ...v })) }),
   // 54 → 55: extended family (sim/kin.ts): nobody in town, no requests in a game already under way
   54: s => ({ ...s, version: 55, kin: (s.kin as object | undefined) ?? newKin([], false) }),
   // 53 → 54: the fortress ring (sim/walkway.ts, sim/garage.ts, sim/fortress.ts): runs may be a wall-top walkway (`kind: 'wall_walk'`, `hostId`), gates may be a garage's (`garage`),
