@@ -15,6 +15,7 @@ import * as THREE from 'three';
 import { CELL, type KitPieceDef } from './kit';
 import { Furniture, M } from './interior';
 import { Clutter } from './clutter';
+import { dressEvenings } from './goodsDress';
 import { box, buildGabled, Parts, layerFractions, showStage, BUILD_LAYERS, CUTAWAY_HIDE, CUT_H, XRAY_LAYERS, type BuildLayer, type BuildOpts, type FurnishCtx, type GabledSpec } from './shell';
 
 export { layerFractions, CUTAWAY_HIDE, XRAY_LAYERS, CUT_H };
@@ -105,6 +106,7 @@ function furnishCabin(c: FurnishCtx): void {
 /** Life in the cabin: dishes, books, boots, toys, the dog by the stove, pictures, the woodpile outside. */
 function dressCabin(c: FurnishCtx): void {
   const { C, y0, left, right, front, back } = c;
+  dressEvenings(c, { x: -0.25, z: 0.02 });
   const tableY = y0 + 0.004 + 0.76 * M, counterY = y0 + 0.004 + 0.9 * M, stoveY = y0 + 0.004 + 0.88 * M;
   const tx = -0.25, tz = 0.02;
   // table: supper things, a book, the mail, a game or the kids' drawing
