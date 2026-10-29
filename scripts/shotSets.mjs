@@ -761,3 +761,15 @@ SETS.fortress = [
   { name: 'fortress-aerial-corner-tower', time: 11, season: 'summer', setup: fortressSetup + `{ ${fortFind} const tw = g0.structures.filter(s => s.kind === 'watchtower_wood'); const t = tw[0]; if (!t) return; cb.qa.pose = null; cb.cam.target.set(t.x, 0.3, t.z); cb.cam.radius = 9; cb.cam.pitch = 0.5; cb.cam.yaw = 0.6; }`, cam: { x: C, z: C, yaw: 0, pitch: 0.5, radius: 9 }, frames: 14 },
   { name: 'fortress-night-gate', time: 22, season: 'summer', setup: fortressSetup + `{ ${fortFind} cb.qa.pose = null; cb.cam.target.set(gar.x, 0, gar.z); cb.cam.radius = 9; cb.cam.pitch = 0.3; cb.cam.yaw = 1.1; }`, cam: { x: C, z: C, yaw: 0, pitch: 0.4, radius: 18 }, frames: 14 },
 ];
+
+/** The fleet in the equipment yard: a tractor and an ATV bought through the real action with no garage, so they take yard bays. */
+const yardFleet = farmSet + farmDoy(190) + `{ if (!window.__yf) { window.__yf = 1; import('/src/sim/vehicles.ts').then(async m => { const G = cb.game;
+  G.setState(s => { const g = structuredClone(s.game); g.money = 500000; return { game: g }; });
+  for (const k of ['tractor', 'atv']) console.error('buy', k, G.getState().money(d => m.buyVehicle(d, k)));
+  const pk = await import('/src/sim/parking.ts'); const g = G.getState().game;
+  console.error('plan', JSON.stringify(pk.parkingPlan(g).parked.map(p => [p.vehicle, p.yard ?? null, !!p.bay])), 'yardbays', JSON.stringify(g.farm?.yard));
+}); } }`;
+SETS.fleetyard = [
+  { name: 'yard-vehicles-aerial', time: 14, season: 'summer', setup: yardFleet + farmAt('equipment_yard', 7, 0.7, 0.4), cam: D, frames: 14 },
+  { name: 'yard-vehicles-eye-level-person', time: 14, season: 'summer', setup: yardFleet + figureAt('equipment_yard', 0.2, 3.0) + eyeNear('equipment_yard', 1.6, 4.6, -0.3, 0.2, 0.3), cam: D, frames: 14 },
+];

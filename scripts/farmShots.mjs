@@ -8,7 +8,7 @@ let chromium; try { ({ chromium } = require('playwright')); } catch { ({ chromiu
 const out = process.argv[2], port = Number(process.argv[3] || 5991), only = process.argv[4] && process.argv[4] !== '-' ? process.argv[4] : null, full = process.argv[5] === 'full';
 mkdirSync(out, { recursive: true });
 const { SETS } = await import('./shotSets.mjs');
-const shots = SETS.farm.filter(s => !only || s.name.includes(only));
+const shots = SETS[process.argv[6] || 'farm'].filter(s => !only || s.name.includes(only));
 const vite = spawn('node', ['node_modules/vite/bin/vite.js', '--config', 'scripts/vite.shots.config.ts', '--port', String(port), '--strictPort'], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise((ok, fail) => { vite.stdout.on('data', d => { if (/localhost:\d+/.test(String(d).replace(/\x1b\[[0-9;]*m/g, ''))) ok(); }); vite.on('exit', c => fail(new Error('vite ' + c))); });
 const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
