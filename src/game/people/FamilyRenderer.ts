@@ -10,6 +10,7 @@ import { pickPersonaWear, type Wear, type WearSeason } from '../../engine/world/
 import type { Person } from '../../sim/family';
 import type { PersonState } from '../../sim/state';
 import { goalFor, type GoalCtx } from './peopleGoals';
+import { figureScale, type SickPose } from './sickbayPlan';
 
 /** Walking speed (world units per real second at 1×; ≈ brisk walk scaled for the diorama). */
 const WALK = 0.5;
@@ -55,7 +56,7 @@ export class FamilyRenderer {
   }
 
   update(dt: number, people: readonly Person[], states: readonly PersonState[], hour: number, clock: number, ctx: GoalCtx,
-    ground: (x: number, z: number) => number, season: WearSeason, speedK: number): void {
+    ground: (x: number, z: number) => number, season: WearSeason, speedK: number, sick?: ReadonlyMap<string, SickPose>): void {
     this._time += dt;
     // the sim clock jumped (load, debug advance): everyone is simply where they should be
     const jumped = this._lastClock >= 0 && Math.abs(clock - this._lastClock) > 0.05;
@@ -82,6 +83,15 @@ export class FamilyRenderer {
         if (!p.kid) { w.shirt = p.shirt; w.pants = season === 'summer' ? 0x4a5a7a : 0x3b4a66; w.shorts = false; }
         a.wear = w;
         this._layer.setWear(n, w);
+      }
+      // in the sickbay (sickbayPlan): the patient lying on the bed, the medic at the bedside; put there, not walked there
+      const bed = sick?.get(p.id);
+      if (bed) {
+        a.x = bed.x; a.z = bed.z; a.rot = bed.rot; a.via = []; a.viaFor = null;
+        if (!redress && a.wear) this._layer.setWear(n, a.wear);
+        this._layer.setPose(n, { x: bed.x, y: bed.y, z: bed.z, rot: bed.rot, scale: bed.scale, pose: bed.pose, phase: 0, amp: 0, ...(bed.pitch ? { pitch: bed.pitch } : {}) });
+        n++;
+        return;
       }
       // walk toward the goal, along the paths when they lead there (round the walls, not through them)
       if (ctx.via && (!a.viaFor || Math.hypot(a.viaFor.x - goal.x, a.viaFor.z - goal.z) > 0.3)) {
@@ -114,7 +124,7 @@ export class FamilyRenderer {
       if (!moving && goal.work && goal.pose === FIG_POSE.REACH) pose = Math.sin(this._time * 6 + i * 1.7) > 0 ? FIG_POSE.REACH : FIG_POSE.STAND;
       const fp: FigurePose = {
         x: a.x, y: ground(a.x, a.z) + (!moving || d < 0.3 ? goal.y ?? 0 : 0), z: a.z, rot: a.rot,
-        scale: p.kid ? (p.age < 3 ? 0.42 : p.age < 8 ? 0.62 : p.age < 13 ? 0.78 : 0.92) : 1,
+        scale: figureScale(p),
         pose, phase: a.phase, amp: moving ? 0.5 : 0,
         tool: goal.tool ?? 0,
       };

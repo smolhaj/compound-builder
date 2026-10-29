@@ -19,7 +19,7 @@
  *             job (2.5 person-hours a head) that the meat methods then put up (sim/kitchen.ts), lard from pigs.
  */
 import { calendarOf, type GameState } from './state';
-import { REGIONS } from './regions';
+
 import { mulberry32 } from './rng';
 import { log } from './economy';
 import { logGate } from './nag';
@@ -28,6 +28,7 @@ import { farmOf } from './farm';
 import { isFinished } from './construction';
 import { kitchenOf, putUpMeat, renderLard, MEAT_WHERE } from './kitchen';
 import type { Animal, Livestock } from './livestock';
+import { regionFor } from './climate';
 
 export interface Herd {
   /** Sick animals by kind. */
@@ -76,7 +77,7 @@ export function pastureAcres(s: GameState): number {
   return Math.max(0, 0.6 * (s.site.acres - woods) - built);
 }
 /** Animal units the pasture carries at full grass. */
-export const carrying = (s: GameState): number => pastureAcres(s) * Math.min(1.6, REGIONS[s.site.region].rainMm / 700) / 3;
+export const carrying = (s: GameState): number => pastureAcres(s) * Math.min(1.6, regionFor(s.site).rainMm / 700) / 3;
 export const unitsOn = (s: GameState): number => (Object.keys(AU) as Animal[]).reduce((a, k) => a + head(s, k) * AU[k], 0);
 /** Stocking against what the pasture carries (1 = just right; over 1 the grass wears). */
 export function stocking(s: GameState): number {
@@ -206,7 +207,7 @@ export function dairyDay(s: GameState, milk: number, cows: boolean, ratio: numbe
 export function butcherProblem(s: GameState, a: Animal, n: number): string | null {
   if (head(s, a) < n || n < 1) return `not ${n} ${a} on the place`;
   if (a === 'cow') return 'a milk cow is not for the butcher';
-  const cold = REGIONS[s.site.region].cold, { doy } = calendarOf(s.clock);
+  const cold = regionFor(s.site).cold, { doy } = calendarOf(s.clock);
   const warm = (doy > 120 && doy < 280) && cold < 1.3;
   if (warm && !(stock(s, 'smoker') >= 1) && !s.structures.some(st => st.kind === 'root_cellar' && isFinished(st)) && a !== 'rabbit') return 'too warm to hang the meat without a cellar or a smoker';
   return null;
@@ -247,7 +248,7 @@ export function herdDay(s: GameState, l: Livestock): string[] {
   out.push(...sicknessDay(s, l, r));
   out.push(...breedingDay(s, l));
   // the grass wears under too many animals in the growing season and comes back when it is eased
-  const { doy } = calendarOf(s.clock), [f0, f1] = REGIONS[s.site.region].frost;
+  const { doy } = calendarOf(s.clock), [f0, f1] = regionFor(s.site).frost;
   if (doy >= f0 && doy <= f1) {
     const over = stocking(s);
     h.pasture = over > 1 ? Math.max(0.3, h.pasture - 0.003 * (over - 1)) : Math.min(1, h.pasture + 0.002);

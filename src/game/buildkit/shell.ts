@@ -97,6 +97,18 @@ function readFoodSlot(g: THREE.BufferGeometry, ox: number, oz: number): FoodSlot
   return { o: [o.x, o.y, o.z], u: [a.x, a.y, a.z], f: [f.x, f.y, f.z], len, dep, clear: h, floor: o.y - v(4).y < 0.0015, freezer: o.y - v(4).y > 0.0025 };
 }
 
+/**
+ * A bed the sick are put in, as the building holds it (building frame, world units): `o` the middle of the mattress top,
+ * `foot` the unit vector from the head toward the foot, `side` a unit vector across the bed.
+ */
+export interface SickSlot { o: [number, number, number]; foot: [number, number, number]; side: [number, number, number] }
+function readSickSlot(g: THREE.BufferGeometry, ox: number, oz: number): SickSlot {
+  const p = g.getAttribute('position');
+  const v = (i: number) => new THREE.Vector3(p.getX(i) + ox, p.getY(i), p.getZ(i) + oz);
+  const o = v(0), f = v(1).sub(o).normalize(), s = v(2).sub(o).normalize();
+  return { o: [o.x, o.y, o.z], foot: [f.x, f.y, f.z], side: [s.x, s.y, s.z] };
+}
+
 export class Parts {
   layer: BuildLayer = 'stakes';
   /** Shift applied to everything added (and to colliders): a shell set off-center in its footprint. */
@@ -110,8 +122,11 @@ export class Parts {
   readonly colliders: Collider[] = [];
   /** Shelf boards and pallets where stored food goes (game/props/FoodShelfRenderer), in the building's frame. */
   readonly foodSlots: FoodSlot[] = [];
+  /** Beds the sick are put in (game/people/sickbayPlan), in the building's frame. */
+  readonly sickSlots: SickSlot[] = [];
   add(m: KitMaterialId, g: THREE.BufferGeometry, layer: BuildLayer = this.layer): void {
     if (m === 'food_slot') { this.foodSlots.push(readFoodSlot(g, this.ox, this.oz)); g.dispose(); return; }
+    if (m === 'sick_slot') { this.sickSlots.push(readSickSlot(g, this.ox, this.oz)); g.dispose(); return; }
     const k = `${layer}|${m}`;
     let l = this.map.get(k);
     if (!l) this.map.set(k, l = []);
@@ -143,6 +158,7 @@ export class Parts {
     }
     group.userData.colliders = this.colliders;
     group.userData.foodSlots = this.foodSlots;
+    group.userData.sickSlots = this.sickSlots;
     return group;
   }
 }

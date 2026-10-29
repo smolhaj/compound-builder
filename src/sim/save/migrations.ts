@@ -43,6 +43,8 @@ type Raw = Record<string, unknown> & { version?: number };
 /** version n → n + 1 upgraders. */
 const STEPS: Record<number, (s: Raw) => Raw> = {
   // 65 → 66: weekender cash pacing (sim/weekender.ts): the belt in town is off; a weekend game keeps its town house as it was (owned, with its mortgage), nobody rents
+  // 67 → 68 (provisional number, renumber at merge): the lot archetype of the land (sim/lots.ts): `site.lot`; old places have none (their ground is the classic benches)
+  67: s => ({ ...s, version: 68, site: { lot: null, ...(s.site as object) } }),
   65: s => ({ ...s, version: 66, ...(s.weekend ? { weekend: { belt: false, ...(s.weekend as object) } } : {}) }),
   // 64 → 65: farm choices (sim/crops.ts): the plain `seed` is now the cheap hybrid and the heirloom has its own good. Seed on the shelf keeps its kind: what was heirloom
   // (`seed`) becomes `seed_heirloom`, what was hybrid (`seed_hybrid`) becomes the plain `seed`. Fields already sown keep the line they were sown with.

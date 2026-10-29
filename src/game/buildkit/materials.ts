@@ -37,7 +37,9 @@ export type KitMaterialId = 'timber_lap' | 'trim' | 'fieldstone' | 'metal_roof' 
   // not drawn: marks a shelf board / pallet where the stored food goes (interior.ts foodSlot; Parts keeps it as a slot)
   | 'food_slot'
   // the control room: the live screens (emissive atlas), the corkboard's paper site plan, panel lamps
-  | 'screens' | 'sitemap' | 'led_green' | 'led_red' | 'led_amber';
+  | 'screens' | 'sitemap' | 'led_green' | 'led_red' | 'led_amber'
+  // not drawn: marks the mattress of a bed the sick are put in (interior.ts sickSlot; Parts keeps it as a slot)
+  | 'sick_slot';
 
 /** World units covered by one texture repeat. */
 const TEX_WORLD: Partial<Record<KitMaterialId, number>> = {
@@ -781,7 +783,7 @@ export function kitMaterial(id: KitMaterialId): THREE.MeshStandardMaterial {
     // an oil drip on the slab: dark, a little sheen, laid just above the floor
     case 'oil_stain': m = new THREE.MeshStandardMaterial({ color: 0x1d1a16, roughness: 0.3, metalness: 0.1, transparent: true, opacity: 0.55, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }); break;
     case 'hedge_berry': m = new THREE.MeshStandardMaterial({ color: 0xa3261e, roughness: 0.5 }); break;
-    case 'food_slot': m = new THREE.MeshStandardMaterial({ visible: false }); break;
+    case 'food_slot': case 'sick_slot': m = new THREE.MeshStandardMaterial({ visible: false }); break;
     // the wall of screens: one shared atlas the painter redraws (buildkit/screenFeeds.ts); it glows in the dark bunker
     case 'screens': { const tex = screenTexture(); m = new THREE.MeshStandardMaterial({ color: 0x000000, map: tex, emissive: new THREE.Color(1, 1, 1), emissiveMap: tex, emissiveIntensity: 0.95, roughness: 0.3, metalness: 0.1 }); break; }
     case 'sitemap': m = new THREE.MeshStandardMaterial({ map: siteMapTexture(), roughness: 0.9 }); break;

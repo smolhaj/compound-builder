@@ -69,7 +69,7 @@ import { hitsColliders, M, type Collider } from './buildkit/interior';
 import type { BuildingView } from '../store/worldStore';
 import type { Structure } from '../sim/state';
 import { calendarOf } from '../sim/state';
-import { REGIONS, seasons } from '../sim/regions';
+import { seasons } from '../sim/regions';
 import { BLUEPRINTS } from '../sim/blueprints';
 import { SmokePlume } from '../engine/world/fx/SmokePlume';
 import type { Pad, Pit } from './parcel/parcelTerrain';
@@ -78,10 +78,12 @@ import { SeasonController, climateFor, type SeasonMode } from '../engine/world/s
 import { writeSeasonUniforms } from '../engine/world/season/seasonShader';
 import { PARCEL_SIZE, ParcelTerrain } from './parcel/parcelTerrain';
 import { CLASSIC, type Site as LandSite } from '../sim/site';
+import { lotStatsOf } from '../sim/lotListing';
 import { DRIVE_W, ROAD_W, distToLine, planAccess, roadLine, roadX, type Access } from './region/access';
 import { buildRibbon } from '../engine/world/roads/RoadRibbon';
 import { gravelMaterial, roadMaterial } from '../engine/world/roads/roadTextures';
 import { RockField, type RockSpec } from '../engine/world/terrain/RockField';
+import { regionFor } from '../sim/climate';
 import { buildLineFences, buildPowerline, planLineFences } from './region/lineFences';
 import type { RegionWorld } from './region/regionWorld';
 import { buildGate } from './props/gateGeometry';
@@ -94,7 +96,8 @@ import { FoodShelfRenderer, type ShownPlace } from './props/FoodShelfRenderer';
 import { TentsRenderer, tentSpots } from './props/TentsRenderer';
 import { sleepSpotFor, tentsPitched } from '../sim/housing';
 import { planShelves, propsWanted, splitInUse } from './props/foodShelfPlan';
-import type { FoodSlot } from './buildkit/shell';
+import type { FoodSlot, SickSlot } from './buildkit/shell';
+import { sickbayPlan, type BedSlot } from './people/sickbayPlan';
 
 /** The order the stores take their turns: the buried storeroom, the root cellar, the bunker's galley and container, then the house pantries. */
 const FOOD_ORDER: Record<string, number> = { bunker_stores: 0, root_cellar: 1, bunker_galley: 2, bunker_container: 3, bunker_corridor: 4 };
@@ -231,7 +234,7 @@ export class HomesteadWorld {
     this._ws = ws;
     ws.setSite({ x0: 0, z0: 0, x1: PARCEL_SIZE, z1: PARCEL_SIZE });
     this.home = { ...site.home };
-    this.parcel = new ParcelTerrain(seed, { creek: site.creek, timber: site.timber, region: site.region });
+    this.parcel = new ParcelTerrain(seed, { creek: site.creek, timber: site.timber, region: site.region, lot: site.lot ?? null, home: site.home });
     setGroundProbe((x, z) => this.parcel.natural(x, z).h);
     this.regionWorld = this.parcel.world;
     this.climate = this.regionWorld.climate;
@@ -455,7 +458,8 @@ export class HomesteadWorld {
         return [...planParcelTrees(this.parcel, o), ...planUnderstory(this.parcel, o)];
       }),
     ];
-    const specs = plantAll(q === 'low' ? 0.5 : 1, blocked);
+    // (a lot with relief carries about twice the classic parcel's trees: Low plants a third of them, Medium most)
+    const specs = plantAll(this.parcel.lot ? (q === 'low' ? 0.35 : q === 'medium' ? 0.85 : 1) : q === 'low' ? 0.5 : 1, blocked);
     for (const t of specs) t.y = this.terrain.surfaceAt(t.x, t.z) - 0.03;
     this._planted = specs;
     // lookups cover every tree a full-density plan has (marks made on High survive a switch to Low)
@@ -529,14 +533,14 @@ export class HomesteadWorld {
         if (k > 0 && inHome(px, pz)) continue;
         if (roll > keep) continue;
         const s = this.parcel.natural(px, pz), dz = Math.abs(pz - creek.zAt(px)), hw = creek.halfWidth;
-        if (s.h < creek.waterY(px) + 0.05) continue;
+        if (s.h < creek.waterY(px) + 0.05 || (this.parcel.lot?.lake && this.parcel.isCreek(px, pz))) continue;
         // willow on the banks: a dense band just above the water
         if (dz > hw + 0.25 && dz < hw + 2.6) {
           if (roll / keep < (0.55 * (1 - (dz - hw) / 2.6) + 0.12) * rw.willow && !blocked(px, pz)) willow.push({ x: px, y: this.groundAt(px, pz) - 0.02, z: pz, s: 0.8 + sR * 0.6, rot, tone });
           continue;
         }
         // rocks: ledges and loose stone, more on the steep and wooded ground (one chance in a few hundred cells)
-        if (rw.rocks.count > 0 && (tone * 997) % 1 < rw.rocks.count / 4000 * (1 + 3 * Math.min(1, this.parcel.region.slope(px, pz) * 4 + s.forest * 0.5)) && dz > hw + 1.5 && !blocked(px, pz)) {
+        if (rw.rocks.count > 0 && (tone * 997) % 1 < rw.rocks.count / 4000 * (1 + 3 * Math.min(1, (this.parcel.lot ? this.parcel.lotSlope(px, pz) : this.parcel.region.slope(px, pz)) * 4 + s.forest * 0.5) + (this.parcel.lot ? 14 * this.parcel.lot.rock(px, pz) : 0)) && dz > hw + 1.5 && !blocked(px, pz)) {
           const [r0, r1] = rw.rocks.size;
           rocks.push({ x: px, y: this.groundAt(px, pz), z: pz, s: r0 + (r1 - r0) * sR * sR, flat: (tone * 31.7) % 1 < rw.rocks.flat ? 1 : 0, rot, tone: (tone * 13.3) % 1 });
         }
@@ -884,7 +888,7 @@ export class HomesteadWorld {
   private _water(q: Quality): void {
     const c = this.parcel.creek;
     // a dry desert place: the channel off the place is a dry wash too (no running water drawn)
-    if (this.parcel.relief === 'bajada' && !this.parcel.creekHome) this.stream.clear();
+    if ((this.parcel.relief === 'bajada' && !this.parcel.creekHome) || !this.parcel.hasStream) this.stream.clear();
     else this.stream.build({
       x0: this.center.x - 62, x1: this.center.x + 62, zAt: c.zAt, waterY: c.waterY, band: 3,
       site: {
@@ -893,10 +897,11 @@ export class HomesteadWorld {
       },
       quality: q, season: seasonState.plants, seed: this.parcel.seed,
     });
-    const kind = this.regionWorld.kind, wy = regionWaterY(kind);
+    const kind = this.regionWorld.kind, lakeY = this.parcel.lakeY, wy = lakeY ?? regionWaterY(kind);
     if (wy !== null) {
+      // a lot with a lake (the bluff, the island) has its own shore: the water follows the lot's ground, not the region's
       this.lakes.build({
-        kind, height: (x, z) => this.parcel.region.height(x, z), waterY: wy,
+        kind, height: lakeY !== null ? (x, z) => this.parcel.natural(x, z).h : (x, z) => this.parcel.region.height(x, z), waterY: wy,
         cx: this.center.x, cz: this.center.z, reedInner: PARCEL_SIZE, quality: q, season: seasonState.plants,
       });
     }
@@ -929,21 +934,28 @@ export class HomesteadWorld {
   private _pickCamp(): { x: number; z: number; rot: number } {
     const p = this.parcel, h = this.home;
     // inside the home forty part of the place (the 80's west forty is the back forty)
-    const x0 = Math.max(h.x0, 0) + 6, x1 = h.x1 - 6, z0 = h.z0 + 6, z1 = h.z1 - 6;
-    const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+    let x0 = Math.max(h.x0, 0) + 6, x1 = h.x1 - 6, z0 = h.z0 + 6, z1 = h.z1 - 6;
+    let cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+    if (p.lot) {
+      // a lot archetype: the camp goes on its best flat (the knoll's crown, the bench, the island), not the middle of the rect
+      const st = lotStatsOf(p.lot);
+      [cx, cz] = st.pad;
+      x0 = Math.max(h.x0, 0) + 2; x1 = h.x1 - 2; z0 = h.z0 + 2; z1 = h.z1 - 2;
+    }
     let best: { x: number; z: number; rot: number } | null = null, bestScore = Infinity;
     for (let pass = 0; pass < 2 && !best; pass++) {
       for (let x = x0; x <= x1; x += 1) {
         for (let z = z0; z <= z1; z += 1) {
           const dc = Math.abs(z - p.creek.zAt(x));
           // by the creek when it runs through (water), else anywhere open; the second pass takes whatever is level
-          if (p.creekHome && pass === 0 && (dc < 5 || dc > 14)) continue;
-          if (dc < 5) continue;
+          if (p.creekHome && !p.lot && pass === 0 && (dc < 5 || dc > 14)) continue;
+          if (dc < 5 && p.hasStream) continue;
+          if (p.lot && p.isCreek(x, z)) continue;
           const s = p.natural(x, z);
           if (s.forest > (pass === 0 ? 0.05 : 0.3)) continue;
           const slope = Math.hypot(p.height(x + 1, z) - p.height(x - 1, z), p.height(x, z + 1) - p.height(x, z - 1)) / 2;
           if (slope > (pass === 0 ? 0.08 : 0.16)) continue;
-          const score = Math.hypot(x - cx, z - cz) + slope * 40;
+          const score = Math.hypot(x - cx, z - cz) + slope * (p.lot ? 25 : 40);
           if (score < bestScore) {
             bestScore = score;
             // tent door toward the creek (or the road)
@@ -1659,6 +1671,34 @@ export class HomesteadWorld {
   /** Where dogs are (animals bolt from them too); none until the dogs renderer exists. */
   dogPositions(): Array<[number, number]> { return this.dogs.positions().map(d => [d.x, d.z] as [number, number]); }
 
+  private _bedKey = '';
+  private _beds: BedSlot[] = [];
+  /**
+   * The beds the sick can be put in, in world units (game/people/sickbayPlan): every marked bed of every finished building,
+   * with which sides of it have room to stand. Worked out again only when a building is finished, rebuilt or taken away.
+   */
+  private _bedSlots(): BedSlot[] {
+    const withBeds = [...this._built.values()].filter(b => b.finished && (b.group.userData.sickSlots as SickSlot[] | undefined)?.length);
+    const key = withBeds.map(b => b.group.uuid).join();
+    if (key === this._bedKey) return this._beds;
+    this._bedKey = key;
+    const out: BedSlot[] = [];
+    // the home with the most beds first (the home), then the rest by id; the bunker's medical corner is flagged
+    withBeds.sort((a, b) => KIT[b.placed.kind].sleeps - KIT[a.placed.kind].sleeps || a.placed.id.localeCompare(b.placed.id));
+    for (const b of withBeds) {
+      b.group.updateMatrixWorld(true);
+      const cs = (b.group.userData.colliders as Collider[] | undefined) ?? [];
+      (b.group.userData.sickSlots as SickSlot[]).forEach((s, n) => {
+        const o = new THREE.Vector3(...s.o).applyMatrix4(b.group.matrixWorld);
+        const f = new THREE.Vector3(...s.foot).transformDirection(b.group.matrixWorld), sd = new THREE.Vector3(...s.side).transformDirection(b.group.matrixWorld);
+        const clear = (k: number) => !hitsColliders(cs, s.o[0] + s.side[0] * k * 0.19, s.o[2] + s.side[2] * k * 0.19, 0.03);
+        out.push({ key: `${b.placed.id}:${n}`, bay: b.placed.kind === 'bunker_medical', x: o.x, y: o.y, z: o.z, fx: f.x, fz: f.z, sx: sd.x, sz: sd.z, floorY: o.y - 0.58 * M, openA: clear(1), openB: clear(-1) });
+      });
+    }
+    this._beds = out;
+    return out;
+  }
+
   /** People: walk the family to their tasks; tend the campfire. */
   updatePeople(dt: number, game: GameState, hour: number, speedK: number): void {
     const site = (id: string): Site | null => {
@@ -1684,16 +1724,16 @@ export class HomesteadWorld {
     const fx = yardFx(game, hour);
     this._yard.update(this._clock, fx.lights, fx.smoke);
     const season = (seasonState.visual === 'winter' && !seasonState.climate.freeze ? 'fall' : seasonState.visual) as WearSeason;
-    this.family.update(dt, game.people, game.personState, hour, game.clock.t, ctx, this.walkHeight, season, speedK);
+    this.family.update(dt, game.people, game.personState, hour, game.clock.t, ctx, this.walkHeight, season, speedK, sickbayPlan(game, this._bedSlots()));
     const dctx: DogCtx = {
       home: ctx.home, camp: this.camp, gate: this.access.gate, yard: this.access.yard, atGate: !!game.gate.pending,
       person: id => (this.family.shown.has(id) ? this.family.poseOf(id) : null),
     };
     this.dogs.update(dt, game, hour, game.clock.t, dctx, this.walkHeight, speedK);
     // crops stand in the ground from planting (mid-May) to the last of the harvest (late October); bare soil the rest of the year
-    const doy = calendarOf(game.clock).doy, [c0, c1] = seasons(REGIONS[game.site.region]).crops, growing = doy >= c0 && doy < c1;
+    const doy = calendarOf(game.clock).doy, [c0, c1] = seasons(regionFor(game.site)).crops, growing = doy >= c0 && doy < c1;
     // the orchard: leaves from blossom to a month past the first frost, fruit in late summer once the trees bear (and no late frost took it)
-    const [fr0, fr1] = REGIONS[game.site.region].frost, cal = calendarOf(game.clock);
+    const [fr0, fr1] = regionFor(game.site).frost, cal = calendarOf(game.clock);
     const leafy = doy >= fr0 - 15 && doy < fr1 + 25, picking = doy >= ORCHARD_PICK[0] - 25 && doy < ORCHARD_PICK[1] && !orchardFrost(game.seed, cal.year);
     for (const b of this._built.values()) {
       if (b.placed.kind === 'orchard' || b.placed.kind === 'orchard_grove') {

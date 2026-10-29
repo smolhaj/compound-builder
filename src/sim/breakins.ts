@@ -44,6 +44,7 @@ import type { Encounter, Outcome, Stance } from './encounters';
 import { stealTools } from './tools';
 import { emptyMultiplier, emptyNow, isSplit, reportFound, weekendOf } from './weekender';
 import type { Battle } from './battleTypes';
+import { responseFactor } from './slope';
 
 export interface Breakins {
   /** Break-ins so far (night and day). */
@@ -104,7 +105,8 @@ export function responseMinutes(s: GameState, r: () => number): number {
   const d = SHERIFF[s.site.region];
   const far = Math.max(0, Math.min(1, s.site.miles / 25));
   const m = d.min + (d.max - d.min) * (0.5 * far + 0.5 * r());
-  return Math.round(Math.max(d.min, Math.min(d.max, m)));
+  // up a steep road, or one the snow has shut, the deputy takes longer (sim/slope.ts)
+  return Math.round(Math.max(d.min, Math.min(d.max, m)) * responseFactor(s));
 }
 
 /** Charge a bill: checking, then savings, then cash; what's left is owed. */

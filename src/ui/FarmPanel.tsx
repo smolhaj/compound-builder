@@ -9,9 +9,10 @@ import { calendarOf } from '../sim/state';
 import { finishedOf, greenhouseCareOf, hasWorkshop, orchardCareOf, YARD_BAYS, yardBays } from '../sim/farm';
 import { GH_TIER, greensFactor, greenhouseGreens, inGreensSeason, isHeated, orchardBearing, orchardPest, ORCHARD_TREES, heatNeed, GH_WOOD_RICKS } from '../sim/greenhouse';
 import { harvestPond, harvestProblem, pondReport, stockPond, stockProblem, TABLE_G } from '../sim/pond';
-import { REGIONS } from '../sim/regions';
+
 import { Note, Row, Section } from './hud/common';
 import { btn, DIM, TONE } from './hud/style';
+import { regionFor } from '../sim/climate';
 
 const oxygenWord = (o: number): [string, 'good' | 'warn' | 'bad'] => (o >= 0.7 ? ['fresh', 'good'] : o >= 0.45 ? ['low', 'warn'] : ['gasping', 'bad']);
 const kcal = (n: number) => `${Math.round(n).toLocaleString('en-US')} kcal`;
@@ -23,7 +24,7 @@ export function FarmPanel({ game }: { game: GameState }) {
   const ponds = finishedOf(game, 'pond');
   const yards = finishedOf(game, 'equipment_yard');
   const { doy, year } = calendarOf(game.clock);
-  const cold = REGIONS[game.site.region].cold;
+  const cold = regionFor(game.site).cold;
   const act = (label: string, why: string | null, run: () => void, tip: string) => <button style={{ ...btn(!why), opacity: why ? 0.55 : 1 }} title={why ?? tip} disabled={!!why} onClick={run}>{label}</button>;
   return <>
     {houses.length > 0 && <Section title="Greenhouses">

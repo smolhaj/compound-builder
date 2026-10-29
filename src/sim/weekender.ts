@@ -32,6 +32,7 @@ import { mulberry32 } from './rng';
 import { tension, type Phase } from './disaster';
 import { CLEAR_HOURS, dailyOf, type ChoreId } from './daily';
 import { fleetOf, refuel, roadTrouble, runs, VEHICLES, type Vehicle } from './vehicles';
+import { ROAD_CLOSED_TEXT, roadClosedFor } from './slope';
 import { syncParking } from './parking';
 import { stealTools } from './tools';
 import { burgle } from './breakins';
@@ -419,6 +420,12 @@ function travel(s: GameState, w: Weekend, arriving: boolean): string[] {
       out.push(trouble.line);
       if (trouble.extraDays > 0) w.lateUntil = Math.max(w.lateUntil ?? 0, s.clock.t + Math.min(1.5, trouble.extraDays * 0.5 + 0.25));
     }
+  }
+  // the last stretch: a hill road the snow has shut holds them at the bottom of it (sim/slope.ts)
+  const shut = roadClosedFor(s);
+  if (shut > 0) {
+    out.push(`They got to the foot of the hill and ${ROAD_CLOSED_TEXT}. They wait it out${s.stock.plow >= 1 ? '' : ' (a plow blade on the truck would have had them up the hill)'}.`);
+    w.lateUntil = Math.max(w.lateUntil ?? 0, s.clock.t + Math.min(1.5, shut * 0.5 + 0.25));
   }
   const extra = townCars(s, cars);
   payTrip(s, w, extra * w.driveMiles * TOWN_CAR_USD_MILE);

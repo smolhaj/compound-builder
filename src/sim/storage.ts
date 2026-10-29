@@ -16,9 +16,10 @@
 import { calendarOf, type GameState } from './state';
 import { isFinished } from './construction';
 import { isHome } from './blueprints';
-import { REGIONS } from './regions';
+
 import { addFoodKcal, foodUnits, FOOD, pantryKcal, syncPantry } from './pantry';
 import { logGate } from './nag';
+import { regionFor } from './climate';
 
 export const CELLAR_KCAL = 2_500_000, BUNKER_ROOTS_KCAL = 1_000_000;
 /** Fresh food in the kitchen. */
@@ -38,7 +39,7 @@ const cellarPowered = (s: GameState): boolean => fin(s, 'root_cellar').some(st =
 
 /** The cellar's temperature (°C) on a day of the year: the ground's yearly mean, a third of the air's swing, 5 weeks behind. */
 export function cellarTempC(s: GameState, doy = calendarOf(s.clock).doy): number {
-  const r = REGIONS[s.site.region], mean = ((r.julyHighF + r.janLowF) / 2 - 32) / 1.8 - 1, amp = (r.julyHighF - r.janLowF) / 2 / 1.8;
+  const r = regionFor(s.site), mean = ((r.julyHighF + r.janLowF) / 2 - 32) / 1.8 - 1, amp = (r.julyHighF - r.janLowF) / 2 / 1.8;
   const t = mean + 0.3 * amp * Math.cos(2 * Math.PI * (doy - 197 - 35) / 365);
   return Math.max(1, t - (cellarPowered(s) ? 3 : 0));
 }

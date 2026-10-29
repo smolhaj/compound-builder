@@ -5,7 +5,7 @@
  * list groups by price. Pure (tested); the HUD only draws it.
  */
 import { KIT } from '../game/buildkit/kit';
-import { BLUEPRINTS, homeBeds, isHome } from './blueprints';
+import { homeBeds, isHome } from './blueprints';
 import { daysOfFood } from './needs';
 import { enclosure } from './enclosure';
 import { hardenCost } from './hardening';
@@ -37,6 +37,7 @@ import { eveningGaps, restockNeeds } from './evenings';
 import { medReport } from './medical';
 import { pharmacyOpen } from './body';
 import { gatheringProblem, type GatheringKind } from './gatherings';
+import { gradeBucket, roadDifficulty, winterRoadLine } from './slope';
 
 const usd = (n: number) => '$' + Math.round(n).toLocaleString('en-US');
 
@@ -48,7 +49,7 @@ export function plansNeed(s: GameState): Partial<Record<MaterialId, number>> {
   const add = (bill: Partial<Record<MaterialId, number>>) => { for (const [k, n] of Object.entries(bill) as Array<[MaterialId, number]>) need[k] = (need[k] ?? 0) + n; };
   for (const st of s.structures) {
     if (isFinished(st)) continue;
-    BLUEPRINTS[st.kind].stages.forEach((sg, i) => {
+    blueprintOf(st).stages.forEach((sg, i) => {
       if (i < st.stage || (i === st.stage && st.supplied)) return;
       add(sg.materials);
     });
@@ -210,6 +211,25 @@ export function suggestions(s: GameState): Suggestion[] {
       const n = Math.max(1, sw.fields), hybrid: OrderLine[] = [{ material: 'seed', qty: n }], heirloom: OrderLine[] = [{ material: 'seed_heirloom', qty: n }];
       out.push({ id: 'seed', kind: '', title: sw.tone === 'bad' && /came up/.test(sw.text) ? 'Fields came up weedy' : 'Seed for the fields', urgency: sw.tone === 'bad' ? 83 : 67, why: sw.text,
         acts: [{ label: `Order ${n} hybrid (${usd(orderCost(hybrid, prices(s)))})`, act: { type: 'order', lines: hybrid } }, { label: `${n} heirloom (${usd(orderCost(heirloom, prices(s)))})`, act: { type: 'order', lines: heirloom } }, { label: 'Open the Farm tab', act: { type: 'open', right: 'supplies', supplies: 'farm' } }] });
+    } }
+
+  // the lie of the land (sim/slope.ts): a pad cut into a slope wants a retaining wall; a steep or high road wants a plow before the snow
+  { const bucket = (st: { grade?: number }) => (st.grade ? gradeBucket(st.grade) : 0);
+    const cut = s.structures.find(st => !isFinished(st) && bucket(st) >= 2 && st.stage <= 1);
+    if (cut) {
+      const extra = 2 * bucket(cut) ** 2, name = cut.kind.replace(/_/g, ' '), pending = onOrder(s);
+      const short = Math.max(0, Math.ceil(extra - Math.max(0, s.stock.fieldstone - 0) - (pending.fieldstone ?? 0)));
+      const lines: OrderLine[] = short > 0 ? [{ material: 'fieldstone', qty: short }] : [];
+      out.push({ id: 'retaining', kind: '', title: 'This slope needs a retaining wall', urgency: 58,
+        why: `the ${name} is staked on a ${Math.round((cut.grade ?? 0) * 100)} % slope: the pad is cut into the hill and held by a wall behind it, about ${extra} pallets of fieldstone more than level ground${short > 0 ? '' : ' (you have them)'}`,
+        acts: [...(lines.length ? [{ label: `Order ${short} pallet${short > 1 ? 's' : ''} of fieldstone (${usd(orderCost(lines, prices(s)))})`, act: { type: 'order' as const, lines } }] : []), { label: 'Show me', act: { type: 'select', id: cut.id } }] });
+    }
+    const doy = ((s.clock.startDoy + Math.floor(s.clock.t) - 1) % 365 + 365) % 365 + 1;
+    if (s.stock.plow < 1 && roadDifficulty(s.site) >= 1 && doy >= 230 && doy <= 345) {
+      const lines: OrderLine[] = [{ material: 'plow', qty: 1 }];
+      out.push({ id: 'plow', kind: '', title: 'The road closes in snow: buy a plow', urgency: 56,
+        why: `${winterRoadLine(s) ?? 'the way in is steep and high'} A plow blade on the truck keeps the road open and the deliveries coming`,
+        acts: [{ label: `Order a plow blade (${usd(orderCost(lines, prices(s)))})`, act: { type: 'order', lines } }] });
     } }
 
   // the woodpile: out in the cold, or too thin for the next two months

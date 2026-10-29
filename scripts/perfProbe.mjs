@@ -1,5 +1,6 @@
 // Repeatable performance probe: a late-game compound at Low / Medium / High, day / night / snow / rain.
 //
+//   (--extra '&lot=gorge&relief=9' starts the probe place on a lot archetype, sim/lots.ts)
 //   flock <lock> node scripts/perfProbe.mjs [--out perf.json] [--port 5961] [--tiers low,medium,high] [--conds day,night,snow,rain]
 //                                           [--frames 24] [--warm 4] [--w 640] [--h 400] [--scene full|bare] [--shots dir] [--nolift] [--bunker]
 //   --bunker: also dig a full bunker under the compound (hatch, tunnel, galley, bunkroom, stores, plant, medical bay, control room, stairwell), every room finished,
@@ -40,7 +41,7 @@ try {
   page.setDefaultTimeout(600000);
   page.on('pageerror', e => console.error('pageerror:', e.message));
   page.on('console', m => { if (m.type() === 'error') console.error('console:', m.text()); });
-  await page.goto(`http://localhost:${port}/?clean${noRender ? '&lowrender' : ''}&seed=7`);
+  await page.goto(`http://localhost:${port}/?clean${noRender ? '&lowrender' : ''}&seed=7${opt('--extra', '')}`);
   await page.waitForFunction(() => window.__cb?.qa);
   const frames = n => page.evaluate(n => new Promise(ok => { const f0 = window.__cb.qa.frames; const w = () => (window.__cb.qa.frames >= f0 + n ? ok() : setTimeout(w, 30)); w(); }), n);
   await page.evaluate(() => window.__cb.store.getState().setQuality('low'));
