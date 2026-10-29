@@ -14,6 +14,7 @@
  */
 import { pumpDrawFactor, sunFactor } from './terrainFx';
 import { orchardWaterL } from './orchard';
+import { solarFogK } from './fogFx';
 import { SPRING_LPD } from './site';
 import { toteStorage, waterPrice } from './water';
 import { sound } from './improvements';
@@ -327,6 +328,8 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
   // ── power: each network's own sources (solar → battery → grid → generator), loads served by priority ──
   // the county grid, unless it's gone (the disaster) or a storm has the lines down
   const gridUp = u.grid && s.disaster.tracks.grid > 0.5 && !stormOutage(s);
+  // the day's cloud and morning fog (sim/fog.ts): overcast keeps about a third of the sun
+  const fogK = solarFogK(s);
   let solar = 0, draw = 0, gen = 0, short = 0, capKwh = 0, gridKwh = 0, wasted = 0, exported = 0, newBat = 0;
   // surplus the batteries cannot take: sold to the co-op while the grid is up, otherwise wasted
   const spill = (kwh: number) => { if (kwh <= 0) return; if (gridUp) exported += kwh; else wasted += kwh; };
@@ -361,7 +364,7 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
     // grid-tied solar shuts off in a blackout unless a battery (hybrid inverter) is on the network
     const solarOk = gridUp || cap > 0 || !u.grid;
     // each array's ground faces the sun a little more or less (sim/terrainFx.ts: south-facing slope up to +25 %, north-facing down to -25 %)
-    const sol = solarOk ? members.filter(live).reduce((a, o) => a + (UTILITY[o.kind]?.solarKw ?? 0) * sunFactor(s, o), 0) * sunHours(doy) * 0.8 : 0;
+    const sol = solarOk ? members.filter(live).reduce((a, o) => a + (UTILITY[o.kind]?.solarKw ?? 0) * sunFactor(s, o), 0) * sunHours(doy) * fogK * 0.8 : 0;
     draw += d; solar += sol; capKwh += cap;
     let have = sol;
     // battery: bank the surplus, cover the shortfall

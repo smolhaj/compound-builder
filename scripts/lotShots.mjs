@@ -1,12 +1,14 @@
 /**
  * Lot archetypes: an aerial and an eye-level shot (with a person) for each kind.
- *   flock $SP/render.lock node scripts/lotShots.mjs --out shots/lots [--port 5301] [--kinds ridge,bench,...] [--region mountain_west] [--acres 40] [--relief 8] [--outlier]
+ *   flock $SP/render.lock node scripts/lotShots.mjs --out shots/lots [--port 5301] [--kinds ridge,bench,...] [--region mountain_west] [--acres 40] [--relief 8] [--outlier] [--look misty|overcast|drizzle|dusk]
+ * (--look: a lighting / weather preset, scripts/lookPresets.mjs; the frames are then drawn at --q medium|high, since Low has no fog)
  * Always ?lowrender (drawn on request).
  */
 import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createRequire } from 'node:module';
+import { applyLook } from './lookPresets.mjs';
 const require = createRequire(import.meta.url);
 let chromium; try { ({ chromium } = require('playwright')); } catch { ({ chromium } = await import('/opt/node22/lib/node_modules/playwright/index.mjs')); }
 const args = process.argv.slice(2);
@@ -14,7 +16,7 @@ const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] :
 const port = Number(opt('--port', 5301)), outDir = resolve(opt('--out', 'shots/lots'));
 const kinds = opt('--kinds', 'ridge,hillside,bench,gorge,mesa,saddle,bluff,island').split(',');
 const region = opt('--region', 'mountain_west'), acres = opt('--acres', '40'), relief = opt('--relief', '8'), lotseed = opt('--lotseed', '3');
-const outlier = args.includes('--outlier'), tod = Number(opt('--tod', 15));
+const outlier = args.includes('--outlier'), tod = Number(opt('--tod', 15)), look = opt('--look', null), lookQ = opt('--q', 'medium');
 mkdirSync(outDir, { recursive: true });
 const vite = spawn('node', ['node_modules/vite/bin/vite.js', '--config', 'scripts/vite.shots.config.ts', '--port', String(port), '--strictPort'], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise((ok, fail) => { vite.stdout.on('data', d => { if (/localhost:\d+/.test(String(d).replace(/\x1b\[[0-9;]*m/g, ''))) ok(); }); vite.on('exit', c => fail(new Error('vite ' + c))); });
@@ -29,8 +31,9 @@ try {
     await page.goto(`http://localhost:${port}/?${q}`);
     await page.waitForFunction(() => window.__cb?.qa?.renderNow, null, { timeout: 240000 });
     await page.evaluate(([t]) => { const { game, store } = window.__cb; game.getState().setSpeed(0); store.getState().setQuality('low'); store.getState().setTimeOfDay(t); }, [tod]);
+    if (look) await applyLook(page, look);
     await page.waitForTimeout(1500);
-    const shot = async name => { await page.evaluate(() => window.__cb.qa.renderNow()); await page.waitForTimeout(300); const f = `${outDir}/${kind}-${name}.png`; await page.screenshot({ path: f }); console.log(f); };
+    const shot = async name => { await page.evaluate(([look, q]) => (look ? window.__cb.qa.renderFull(q) : window.__cb.qa.renderNow()), [look, lookQ]); await page.waitForTimeout(300); const f = `${outDir}/${kind}-${name}.png`; await page.screenshot({ path: f }); console.log(f); };
     const info = await page.evaluate(() => { const { world, cam } = window.__cb, h = world.home, s = world.parcel.lot; return { camp: world.camp, home: h, hasLot: !!s }; });
     console.log(kind, JSON.stringify(info));
     // aerial: over the home rect

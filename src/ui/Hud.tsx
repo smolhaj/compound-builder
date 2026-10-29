@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { TERRAIN_LEGEND, type TerrainMode } from '../game/terrain/TerrainOverlay';
 import { stormOutage } from '../sim/weatherThreats';
+import { fogLineFor } from '../sim/fogFx';
 import { PersonInsight, PeopleSection, MedicalSection, ClassesSection } from './PeoplePanel';
 import { DailySection } from './SchedulePanel';
 import { DAILY_TASK_TEXT } from './dailyText';
@@ -544,6 +545,7 @@ export function Hud() {
         <button style={btn(w.terrainMode === 'off')} title="Hide the terrain overlay" onClick={() => w.setTerrainMode('off')}>Off</button>
         {(Object.keys(TERRAIN_LEGEND) as Array<Exclude<TerrainMode, 'off'>>).map(m => <button key={m} title={TERRAIN_LEGEND[m].tip} style={btn(w.terrainMode === m)} onClick={() => w.setTerrainMode(m)}>{TERRAIN_LEGEND[m].label}</button>)}
         {w.terrainMode !== 'off' && <div style={{ flexBasis: '100%', fontSize: 11.5, opacity: 0.85 }}>{TERRAIN_LEGEND[w.terrainMode].legend}</div>}
+        {(w.terrainMode !== 'off' || w.sightMode !== 'off') && (() => { const t = fogLineFor(g.game, w.dayOfYear, w.timeOfDay, w.weatherMode); return t ? <div data-testid="fog-readout" style={{ flexBasis: '100%', fontSize: 11.5, color: '#bcd' }} title="Valley fog and low cloud (sim/fog.ts): it cuts what a watch, a camera or a night-vision tube sees; thermal sees through it. The same fog is drawn in the valley.">{t}</div> : null; })()}
         <button style={btn(w.showBoundary)} title="Draw the property line on the ground (it also shows while you draw a fence or wall)" onClick={() => w.setShowBoundary(!w.showBoundary)}>Boundary</button>
         <button style={btn(w.photo)} onClick={() => w.setPhoto(!w.photo)}>Photo</button>
         {w.photo && <>

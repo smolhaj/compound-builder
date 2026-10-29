@@ -14,6 +14,7 @@ import * as THREE from 'three';
 import { regionLookFor, type RegionKind, type RegionLook } from './regionalLandscape';
 import { CROP_SLOTS, cropSlotsFor } from './cropCalendar';
 import { applyEdgeHaze } from './edgeHaze';
+import { HEIGHT_FOG_GLSL } from '../fog/heightFog';
 import { applyGroundSkyFill, ensureGroundTextures, groundUniforms } from '../materials/groundTextures';
 import { seasonState } from '../season/seasonState';
 import type { Quality } from '../WorldScene';
@@ -388,6 +389,7 @@ export function makeTerrainMaterial(look: RegionLook, waterY: number | null): { 
           rk2 *= mix(1.0, 0.45, smoothstep(60.0, 300.0, vRPos.y)); // thinner air up high
           float rFog = 1.0 - exp(- fogDensity * fogDensity * rk2 * vFogDepth * vFogDepth);
           gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor, rFog);
+          ${HEIGHT_FOG_GLSL}
         #endif`);
   };
   mat.customProgramCacheKey = () => 'regional_terrain_v4_' + look.evergreen + (look.kudzu ? 'k' : '');

@@ -25,6 +25,7 @@ import { GUN, skillOf, type Caliber } from './armory';
 import { gearPosture } from './gear';
 import { dogCount, dogsInBattle } from './pets';
 import { watchDetection } from './daily';
+import { fogSightK } from './fogFx';
 import { backgroundOf } from './family';
 import { isHome } from './blueprints';
 import { isFinished } from './construction';
@@ -405,7 +406,9 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
   // by day, people on watch see a group coming up the drive a couple of hundred meters out; at night it's what the gear hears and sees
   const darkBlind = night && !lightsOn && !n('nvg') && !n('thermal') && !n('thermal_cam');
   // (round 4: measured from the line, where the watch stands and the sensors are, not from the house)
-  const detectAt = lineR + towerReach(s, night, lightsOn) + Math.max(2, (6 + detection * 0.24) * (darkBlind ? 0.7 : 1), night ? 0 : 16 + detection * 0.06);
+  // fog (sim/fog.ts): the towers and the people on watch see a crew a fraction as far out in dense fog (thermal gear keeps its reach, and it is in `detection`)
+  const fogEye = fogSightK(s, 'eye');
+  const detectAt = lineR + towerReach(s, night, lightsOn) * fogEye + Math.max(2, (6 + detection * 0.24) * (darkBlind ? 0.7 : 1), night ? 0 : (16 + detection * 0.06) * fogEye);
   const what: 'dog' | 'sensor' | 'tripwire' | 'camera' | 'watch' = dogCount(s) ? 'dog' : n('driveway_alarm') ? 'sensor' : n('tripwire') ? 'tripwire' : powered && (n('cameras') || n('thermal_cam')) ? 'camera' : 'watch';
   let alarmed = false;
   const mines = Math.min(n('mines'), 12);
