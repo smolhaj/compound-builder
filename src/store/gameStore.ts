@@ -23,6 +23,7 @@ import { setPassageLocked } from '../sim/compounds';
 import { lightsOf, setAiSensor, setAllAi, type LightMode } from '../sim/lights';
 import { AUTO_NAME, type AutoLightsOut } from '../sim/blackout';
 import { stampHighGround, upgradeTower } from '../sim/towers';
+import { cutRoadGates } from '../sim/roadGate';
 import { addSkirt, planRun, upgradeRun, type Gate, type PerimeterKind, type Pt } from '../sim/perimeter';
 import { layPropertyWall, planPropertyWall, type PropertyGeometry } from '../sim/propertyWall';
 import { addWalkway } from '../sim/walkway';
@@ -130,6 +131,8 @@ export interface GameStore {
   pickUpPath: (a: string, b: string) => void;
   /** "Fortify my ring": lay out the plan (container wall, decks, gate garage, towers, passage). Returns how many runs and structures. */
   fortifyRing: (geo: PropertyGeometry, opts: Partial<FortressOptions>) => { runs: number; structures: number };
+  /** Cut a gate through every wall that crosses the driveway without one (the one-click fix). Returns how many. */
+  cutRoadGates: (drive: Pt[] | undefined) => number;
   /** Bolt or unbolt the blast hatches of an underground passage. */
   lockPassage: (id: string, locked: boolean) => void;
   /** Upgrade a finished watch tower in place: the next tier rises beside it. */
@@ -305,7 +308,7 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
   wallProperty: (kind, geo) => {
     if (locked()) return 0;
     const g = structuredClone(get().game);
-    const n = layPropertyWall(g, planPropertyWall(g, kind, geo));
+    const n = layPropertyWall(g, planPropertyWall(g, kind, geo), geo);
     if (n) { set({ game: g }); void saveGame(AUTOSAVE, g); }
     return n;
   },
@@ -347,7 +350,16 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     if (locked()) return { runs: 0, structures: 0 };
     const g = structuredClone(get().game);
     const n = layFortress(g, planFortress(g, geo, opts));
+    // a wall already standing across the drive gets its gate too
+    cutRoadGates(g, geo.drive);
     if (n.runs + n.structures) { set({ game: g }); void saveGame(AUTOSAVE, g); }
+    return n;
+  },
+  cutRoadGates: (drive) => {
+    if (locked()) return 0;
+    const g = structuredClone(get().game);
+    const n = cutRoadGates(g, drive);
+    if (n) { set({ game: g }); void saveGame(AUTOSAVE, g); }
     return n;
   },
   lockPassage: (id, locked) => {

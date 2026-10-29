@@ -13,9 +13,9 @@ import { ownedRects } from './enclosure';
 import type { Rect } from './land';
 import { PERIMETER, planRun, runBill, runHours, wallLength, type Gate, type PerimeterKind, type PerimeterRun, type Pt } from './perimeter';
 import type { GameState } from './state';
+import { ROAD_GATE_W, cutRoadGates, firstEntry, gateWidthFor } from './roadGate';
 
-/** A vehicle gate (the drive's width), world units. */
-export const ROAD_GATE_W = 0.6;
+export { ROAD_GATE_W };
 /** A wall within this of the line holds it (matches enclosure.ts). */
 const REACH = 0.75;
 /** Sampling step along the line. */
@@ -32,6 +32,8 @@ export interface PropertyGeometry {
   creekHalf?: number;
   /** The farm gate on the county road. */
   roadGate?: Pt;
+  /** The driveway from the county road to the camp, road end first (game/region/access.ts): the road gate goes where it crosses the wall. */
+  drive?: Pt[];
   /** Where the family lives (the camp): a compound ring is centered here. */
   center?: Pt;
 }
@@ -145,7 +147,15 @@ function distToPolyline(pts: readonly Pt[], x: number, z: number): number {
 export interface PlannedRun { kind: PerimeterKind; pts: Pt[]; gates: Gate[] }
 
 /** Where the road gate is: its middle on the line, the direction of the wall there, and the unit vector from the wall into the compound. */
-export interface GateSpot { x: number; z: number; dx: number; dz: number; inx: number; inz: number }
+export interface GateSpot {
+  x: number; z: number; dx: number; dz: number; inx: number; inz: number;
+  /** The gate sits where the driveway crosses the line (else it is the nearest point to the farm gate). */
+  onDrive?: boolean;
+  /** How far (world units) the gate had to move off the driveway's crossing: the creek bars or a wall already there left no room. */
+  shift?: number;
+  /** The road comes in at a bend in the line: an ordinary gate, not room for a gatehouse garage. */
+  noGarage?: boolean;
+}
 
 export interface PlanOptions {
   /** The road gate's width, world units (default `ROAD_GATE_W`; a gatehouse garage is as wide as its footprint). */
@@ -184,7 +194,9 @@ const M = 6;
 const holdsLine = (r: Pick<PerimeterRun, 'kind' | 'pts'>) => r.kind !== 'creek_bars' && PERIMETER[r.kind].blocks.people > 0 && r.pts.length > 1;
 
 export function planPropertyWall(s: GameState, kind: PerimeterKind, geo: PropertyGeometry = {}, opts: PlanOptions = {}): WallPlan {
-  const gw = opts.gateW ?? ROAD_GATE_W;
+  let gw = opts.gateW ?? ROAD_GATE_W;
+  const shiftMax = 3;
+  let garageOk = !!opts.garage, onDrive = false;
   let gateSpot: GateSpot | null = null;
   const landRects = opts.rects ?? ownedRects(s);
   const loops = traceLoops(landRects).map(p => new Loop(p));
@@ -195,10 +207,25 @@ export function planPropertyWall(s: GameState, kind: PerimeterKind, geo: Propert
   let lineLen = 0, held = 0, crossings = 0, barsLen = 0, gateCount = 0;
   let gateNote: string | null = null;
 
-  // the road gate: the nearest point on any loop to the farm gate (else the middle of the eastmost side)
+  // the road gate: where the driveway crosses the line (first entry from the road); else the nearest point on any loop to the drive / the farm gate
+  // (else the middle of the eastmost side)
   let gateAt: { loop: Loop; s: number } | null = null;
   if (loops.length) {
-    if (geo.roadGate) {
+    const entry = geo.drive && geo.drive.length > 1 ? firstEntry(loops.map(l => l.pts), geo.drive) : null;
+    if (entry) {
+      const l = loops[entry.loop];
+      gateAt = { loop: l, s: entry.c.at };
+      onDrive = true;
+      // the gatehouse garage needs a straight stretch to stand on, centered on the drive: at a bend it is an ordinary gate
+      if (opts.garage) {
+        let i = 0;
+        while (i < l.pts.length - 1 && l.cum[i + 1] <= entry.c.at) i++;
+        if (entry.c.at < l.cum[i] + gw / 2 + 0.05 || entry.c.at > l.cum[i + 1] - gw / 2 - 0.05) { garageOk = false; gw = gateWidthFor(entry.c.sin); }
+      } else gw = opts.gateW ?? gateWidthFor(entry.c.sin);
+    } else if (geo.drive && geo.drive.length > 1) {
+      let bd = Infinity;
+      for (const p of geo.drive) for (const l of loops) { const n = l.nearest(p[0], p[1]); if (n.d < bd) { bd = n.d; gateAt = { loop: l, s: n.s }; } }
+    } else if (geo.roadGate) {
       for (const l of loops) { const n = l.nearest(geo.roadGate[0], geo.roadGate[1]); if (!gateAt || n.d < gateAt.loop.nearest(geo.roadGate[0], geo.roadGate[1]).d) gateAt = { loop: l, s: n.s }; }
     } else {
       const l = loops[0], maxX = Math.max(...l.pts.map(p => p[0]));
@@ -212,8 +239,8 @@ export function planPropertyWall(s: GameState, kind: PerimeterKind, geo: Propert
     }
   }
 
-  // a gatehouse garage needs a straight stretch: keep the gate clear of corners
-  if (opts.garage && gateAt) {
+  // a gatehouse garage needs a straight stretch: keep the gate clear of corners (centered on the drive when it comes in straight)
+  if (opts.garage && garageOk && gateAt && !onDrive) {
     const l = gateAt.loop;
     let i = 0;
     while (i < l.pts.length - 1 && l.cum[i + 1] <= gateAt.s) i++;
@@ -263,29 +290,36 @@ export function planPropertyWall(s: GameState, kind: PerimeterKind, geo: Propert
     // the wall
     const wallRuns: Array<{ s0: number; s1: number; closed: boolean }> = intervals(wallCut)
       .map(([i, n]) => ({ s0: i * seg, s1: (i + n) * seg, closed: n === N }))
-      .filter(r => r.closed || r.s1 - r.s0 >= MIN_RUN);
-    for (const w of wallRuns) {
-      let s0 = w.s0, s1 = w.s1;
+      .filter(r => r.closed || r.s1 - r.s0 >= MIN_RUN)
       // a closed loop starts opposite the gate so the seam is nowhere near it
-      if (w.closed) { s0 = gateAt && gateAt.loop === loop ? gateAt.s + L / 2 : 0; s1 = s0 + L; }
+      .map(r => (r.closed ? { ...r, s0: gateAt && gateAt.loop === loop ? gateAt.s + L / 2 : 0, s1: (gateAt && gateAt.loop === loop ? gateAt.s + L / 2 : 0) + L } : r));
+    // the gate goes in the stretch of wall nearest where the driveway crosses (creek bars or a wall already standing may leave none right there)
+    let gateRun = -1, gateRel = 0, bestShift = Infinity;
+    if (gateAt && gateAt.loop === loop) wallRuns.forEach((w, k) => {
+      const len = w.s1 - w.s0;
+      if (len < gw + 0.4) return;
+      const rel = (((gateAt!.s - w.s0) % L) + L) % L;
+      const target = rel <= len ? rel : (rel - len <= L - rel ? len : 0);
+      const at = Math.min(len - gw / 2 - 0.05, Math.max(gw / 2 + 0.05, target));
+      const shift = (rel <= len ? 0 : Math.min(rel - len, L - rel)) + Math.abs(at - target);
+      if (shift < bestShift) { bestShift = shift; gateRun = k; gateRel = at; }
+    });
+    wallRuns.forEach((w, k) => {
       const gates: Gate[] = [];
-      const pts = loop.slice(s0, s1);
-      if (gateAt && gateAt.loop === loop) {
-        const rel = (((gateAt.s - s0) % L) + L) % L, len = s1 - s0;
-        if (rel <= len && len >= gw + 0.4) {
-          const at = Math.min(len - gw / 2 - 0.05, Math.max(gw / 2 + 0.05, rel));
-          gates.push({ at, w: gw, ...(opts.garage ? { garage: true } : {}) });
-          const c = loop.at(s0 + at), a = loop.at(s0 + at - 0.05), b = loop.at(s0 + at + 0.05), dl = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
-          const dx = (b[0] - a[0]) / dl, dz = (b[1] - a[1]) / dl;
-          // inward: the normal that stays on the owned land
-          const owned = (x: number, z: number) => landRects.some(r => x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1);
-          const n: Pt = owned(c[0] - dz * 0.1, c[1] + dx * 0.1) ? [-dz, dx] : [dz, -dx];
-          gateSpot = { x: c[0], z: c[1], dx, dz, inx: n[0], inz: n[1] };
-        }
+      const pts = loop.slice(w.s0, w.s1);
+      if (k === gateRun && bestShift <= shiftMax) {
+        const at = gateRel;
+        gates.push({ at, w: gw, ...(garageOk && opts.garage ? { garage: true } : {}) });
+        const c = loop.at(w.s0 + at), a = loop.at(w.s0 + at - 0.05), b = loop.at(w.s0 + at + 0.05), dl = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+        const dx = (b[0] - a[0]) / dl, dz = (b[1] - a[1]) / dl;
+        // inward: the normal that stays on the owned land
+        const owned = (x: number, z: number) => landRects.some(r => x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1);
+        const n: Pt = owned(c[0] - dz * 0.1, c[1] + dx * 0.1) ? [-dz, dx] : [dz, -dx];
+        gateSpot = { x: c[0], z: c[1], dx, dz, inx: n[0], inz: n[1], ...(onDrive ? { onDrive: true } : {}), shift: bestShift, ...(opts.garage && !garageOk ? { noGarage: true } : {}) };
       }
       out.push({ kind, pts, gates });
       gateCount += gates.length;
-    }
+    });
     // the bars across the creek
     if (creek) for (const [i, n] of intervals(creekCut.map(c => !c))) {
       if (n === N) continue;
@@ -297,7 +331,7 @@ export function planPropertyWall(s: GameState, kind: PerimeterKind, geo: Propert
       barsLen += n * seg;
     }
   }
-  if (gateAt && gateCount === 0) gateNote = loops.length && out.some(r => r.kind === kind) ? 'the road side is already walled' : null;
+  if (gateAt && gateCount === 0) gateNote = loops.length && out.some(r => r.kind === kind) ? 'the road side is already walled' : onDrive ? 'a wall already stands where the road comes in: laying this out cuts a gate through it' : null;
 
   const bill: Partial<Stock> = {};
   for (const r of out) for (const [m, q] of Object.entries(runBill(r.kind, wallLength(r))) as Array<[MaterialId, number]>) bill[m] = (bill[m] ?? 0) + q;
@@ -309,8 +343,10 @@ export function planPropertyWall(s: GameState, kind: PerimeterKind, geo: Propert
 }
 
 /** Lay the plan out: every run goes on the list for the family to build. Returns how many runs. */
-export function layPropertyWall(s: GameState, plan: WallPlan): number {
+export function layPropertyWall(s: GameState, plan: WallPlan, geo: PropertyGeometry = {}): number {
   for (const r of plan.runs) planRun(s, r.kind, r.pts.map(p => [p[0], p[1]] as Pt), r.gates.map(g => ({ ...g })), 0, true);
+  // a wall already standing across the drive gets its gate too
+  cutRoadGates(s, geo.drive);
   if (plan.runs.length) log(s, `Laid out the property wall: ${plan.wallM} m of ${PERIMETER[plan.kind].name.toLowerCase()}${plan.barsM ? `, ${plan.barsM} m of creek bars` : ''}${plan.gates ? ', a gate on the road' : ''}.`);
   return plan.runs.length;
 }

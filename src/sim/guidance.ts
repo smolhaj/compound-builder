@@ -18,9 +18,10 @@ import { fmtKw } from './powerReport';
 import { ORCHARD_KINDS, orchardBearing } from './greenhouse';
 import { needsHookup, storageTip } from './hookups';
 import { MATERIAL_IDS, MATERIALS, type MaterialId } from './materials';
-import { PERIMETER, PERIMETER_ORDER, UPGRADE_NEXT, fenceLive, runBill, runFinished, wallLength, type PerimeterKind } from './perimeter';
+import { PERIMETER, PERIMETER_ORDER, UPGRADE_NEXT, fenceLive, runBill, runFinished, wallLength, type PerimeterKind, type Pt } from './perimeter';
 import { MAX_TOWERS, ringStatus } from './fortress';
 import { canHostWalkway } from './walkway';
+import { roadGateStatus } from './roadGate';
 import type { GameState, OrderLine } from './state';
 import { SEPARATE_DWELLINGS, housingShortfall } from './housing';
 import { joinNames } from './kin';
@@ -206,15 +207,16 @@ const structDone = (st: GameState['structures'][number]): boolean => isFinished(
 export interface Goal { id: string; title: string; steps: Array<{ label: string; done: boolean; detail: string }> }
 
 /** The two endgame goals, always shown, never required: a closed and hardened compound, and a bunker underneath. */
-export function longTerm(s: GameState): Goal[] {
+export function longTerm(s: GameState, drive?: readonly Pt[]): Goal[] {
   const line = enclosure(s, s.clock.t);
   const lineRuns = s.perimeter.filter(r => runFinished(r) && line.onLine.has(r.id));
   const best = lineRuns.reduce<PerimeterKind | null>((a, r) => (!a || PERIMETER[r.kind].blocks.people > PERIMETER[a].blocks.people ? r.kind : a), null);
   const closed = line.openShare === 0 && line.creekOpen === 0;
-  const ring = ringStatus(s), solid = s.perimeter.some(r => canHostWalkway(r.kind));
+  const rg = roadGateStatus(s, drive), ring = ringStatus(s), solid = s.perimeter.some(r => canHostWalkway(r.kind));
   const towers = s.structures.filter(st => (st.kind === 'rise_lookout' || st.kind.startsWith('watchtower')) && isFinished(st)).length;
   const enclose: Goal = { id: 'enclose', title: 'Enclose the compound', steps: [
     { label: 'Wall the property line', done: closed, detail: closed ? 'the line is closed all round' : line.openShare >= 1 ? 'nothing on the line yet' : `${Math.round(line.openShare * 100)}% of the line is open${line.creekOpen ? ' and the creek is unbarred' : ''}` },
+    { label: 'Gate at the road', done: rg.crossing > 0 && rg.missing === 0, detail: rg.crossing === 0 ? 'a gate goes where the driveway meets the wall (laid in with Wall my property or Fortify my ring, or free in a wall you draw)' : rg.missing === 0 ? (rg.garage ? 'the drive runs in through the gate garage' : 'a gate where the driveway comes through the wall') : `${rg.missing} wall${rg.missing > 1 ? 's' : ''} across the driveway with no gate (Defense tab: cut one)` },
     { label: 'Upgrade the walls', done: !!best && PERIMETER[best].blocks.people >= 0.7, detail: best ? `${PERIMETER[best].name.toLowerCase()} now${UPGRADE_NEXT[best] ? `, next: ${PERIMETER[UPGRADE_NEXT[best]!].name.toLowerCase()}` : ', the top of the chain'}` : 'a hard wall stops people far better than wire' },
     { label: 'Watch towers', done: towers > 0, detail: towers ? `${towers} standing${towers < MAX_TOWERS ? `, up to ${MAX_TOWERS} on the corners and mid-spans` : ''}` : `a place to see them coming from: up to ${MAX_TOWERS} on the ring (Fortify my ring)` },
     { label: 'Wall-top walkway', done: ring.walkway, detail: ring.walkway ? 'guards walk the top of the wall' : solid ? 'a deck on the wall: guards see farther and fight from above (Defense tab)' : 'needs a container, steel or concrete wall under it' },
