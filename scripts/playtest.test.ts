@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest';
 import { appendFileSync, writeFileSync } from 'node:fs';
 import { newGame, type GameState } from '../src/sim/state';
 import { step } from '../src/sim/engine';
-import { placeOrder, orderProblem, payWith } from '../src/sim/economy';
+import { placeOrder, orderProblem, orderCost, payWith } from '../src/sim/economy';
 import { planStructure, planProblem, isFinished } from '../src/sim/construction';
 import { affordable, CLASSIC, listings, type Lifestyle, type Site } from '../src/sim/site';
 import { generateFamily } from '../src/sim/family';
@@ -165,6 +165,36 @@ function orderNeeds(s: GameState, strat: Strategy): void {
   if (lines.length && !orderProblem(s, lines)) placeOrder(s, lines);
 }
 
+/**
+ * (weekender, round 5) A family with little cash orders a stage at a time, as a person at the Shop does: the open buildings' next
+ * unsupplied stage (and the one after it for the oldest building, so the weekend crew is never waiting on a truck), oldest first,
+ * as far as the money goes less a month's bills. The all-or-nothing order of the full-time bot never went through at $30k.
+ */
+function orderStages(s: GameState, reserve: number): void {
+  const avail: Record<string, number> = {};
+  for (const m of MATERIAL_IDS) avail[m] = s.stock[m];
+  for (const o of s.orders) if (o.status === 'ordered') for (const l of o.lines) avail[l.material] = (avail[l.material] ?? 0) + l.qty;
+  let left = s.money - reserve, first = true;
+  const lines: Partial<Record<MaterialId, number>> = {};
+  for (const st of s.structures) {
+    if (isFinished(st)) continue;
+    const stages = BLUEPRINTS[st.kind].stages, from = st.supplied ? st.stage + 1 : st.stage, to = Math.min(stages.length, first ? from + 2 : from + 1);
+    for (let i = from; i < to; i++) {
+      const need = Object.entries(stages[i].materials).map(([material, qty]) => ({ material: material as MaterialId, qty: Math.max(0, Math.ceil((qty as number) - (avail[material] ?? 0))) })).filter(l => l.qty > 0 && MATERIALS[l.material].price !== null);
+      if (!need.length) { for (const [m, n] of Object.entries(stages[i].materials)) avail[m] = (avail[m] ?? 0) - (n as number); continue; }
+      const cost = orderCost(need);
+      if (cost > left) { left = -1; break; }
+      left -= cost;
+      for (const l of need) lines[l.material] = (lines[l.material] ?? 0) + l.qty;
+      for (const [m, n] of Object.entries(stages[i].materials)) avail[m] = Math.max(0, (avail[m] ?? 0) - (n as number));
+    }
+    first = false;
+    if (left < 0) break;
+  }
+  const order = (Object.entries(lines) as Array<[MaterialId, number]>).map(([material, qty]) => ({ material, qty }));
+  if (order.length && !orderProblem(s, order)) placeOrder(s, order);
+}
+
 /** Fields put by for after the collapse, beyond what today's mouths need (arrivals, lost crops). */
 const FIELD_SPARE: Record<Strategy, number> = { idle: 0, homestead: 3, prepper: 6, fortress: 3 };
 /** Fields to keep for the mouths here: a year of eating over an ordinary year's field (less the garden and the hens), at least one per 1.5 mouths, 16 at most. */
@@ -192,14 +222,20 @@ function fieldSpot(s: GameState, M: (x: number, z: number) => [number, number]):
   return null;
 }
 
-/** The listing the old bots bought (the seed's pick of the first four); if this family can't afford it, the priciest one it can. */
+/**
+ * The listing the old bots bought (the seed's pick of the first four); if this family can't afford it, the priciest one it can.
+ * (weekender, round 5) The weekend family's own budget, not the full-time one, and a lot that leaves at least a third of it to build with:
+ * the bot used to buy the full-time family's lot with the weekend family's money and start the game at zero.
+ */
 function siteFor(seed: number, region?: RegionId): Site {
-  const budget = startFunds(generateFamily(seed), 'fulltime', seed).budget;
+  const life = (process.env.LIFESTYLE as Lifestyle | undefined) ?? 'fulltime';
+  const budget = startFunds(generateFamily(seed), life, seed).budget;
   const ls = listings(seed, region, undefined, 6, budget), want = ls[seed % 4];
-  if (affordable(want, budget)) return want;
-  return ls.filter(l => affordable(l, budget)).sort((a, b) => b.price - a.price)[0];
+  const room = life === 'weekend' ? 0.66 * budget : budget;
+  if (affordable(want, budget) && want.price <= room) return want;
+  const ok = ls.filter(l => affordable(l, budget) && l.price <= room);
+  return (ok.length ? ok : ls.filter(l => affordable(l, budget))).sort((a, b) => b.price - a.price)[0];
 }
-
 /** (neighbors and strangers who joined) how many came, left and how many shelter stays. */
 const newcomerNote = (s: GameState): string => {
   const N = s.newcomers;
@@ -229,7 +265,7 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
   // raw land: the line and the drive first thing
   for (const what of ['drive', 'power'] as const) orderHookup(s, what);
   const fights: string[] = [];
-  let planned = 0, moneyAtHit = 0, builtAtHit = 0, hitSeen = false, lastLog = -Infinity, minMoney = s.money, lastMoney = s.money, townSold = false;
+  let armed = false, planned = 0, moneyAtHit = 0, builtAtHit = 0, hitSeen = false, lastLog = -Infinity, minMoney = s.money, lastMoney = s.money, townSold = false;
   // (round 4) hiding, debt and the trial camps
   let hides = 0, hidFound = 0, owed = 0, debtStage = 'none', burned = 0, stripped = 0;
   const trial = { started: 0, in: 0, on: 0, stole: 0, left: 0 };
@@ -257,9 +293,14 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
       const st = planStructure(s, k, x, z, 0);
       applyForPermit(s, st);
       // money to spare: hire it out
-      if ((strat === 'prepper' || strat === 'fortress') && s.money > 150_000 && hoursLeft(st) > 300) hireCrew(s, st.id);
+      if ((strat === 'prepper' || strat === 'fortress') && s.money > (s.weekend?.mode === 'split' ? 60_000 : 150_000) && hoursLeft(st) > 300) hireCrew(s, st.id);
       if (k === 'solar_array' || k === 'battery_shed' || k === 'generator_shed') { const r = planRun(s, 'power_cable', [[x, z], C]); void r; }
       if (k === 'well_drilled' || k === 'cistern') planRun(s, 'water_pipe', [[x, z], C]);
+    }
+    // (weekender, round 5) a crew builds on the weekdays the family is in town: when the stage is supplied and a month of crew is in the account
+    if (s.weekend?.mode === 'split' && strat !== 'idle' && day % 7 === 0 && s.money > 55_000 && !(s.crews ?? []).length) {
+      const st = s.structures.find(x => !isFinished(x) && x.supplied && hoursLeft(x) > 200);
+      if (st) hireCrew(s, st.id);
     }
     // fields for the mouths here (v2: before and after the collapse, from the seed and fence put by; before, no field was ever added once it hit)
     if (strat !== 'idle' && day % 10 === 0 && s.structures.some(x => x.kind === 'field')) {
@@ -284,7 +325,13 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
     }
     if (strat === 'prepper' && day === 600) for (const id of ['fallout', 'faraday', 'nbc'] as const) orderHardenAll(s, id, 1);
     // (v2: and after the hit too, for as long as the trucks still deliver)
-    if (day % 3 === 0 && (s.clock.t < s.disaster.hitAt || payWith(s))) orderNeeds(s, strat);
+    if (day % 3 === 0 && (s.clock.t < s.disaster.hitAt || payWith(s))) {
+      // (weekender, round 5) a stage at a time while the family is in two homes; the whole list once the house is up and the cash is easy
+      if (s.weekend?.mode === 'split' && s.clock.t < s.disaster.hitAt) {
+        orderStages(s, 6000);
+        if (s.structures.some(x => isHome(x.kind) && isFinished(x)) && s.money > 90_000) orderNeeds(s, strat);
+      } else orderNeeds(s, strat);
+    }
     // (v2) someone taken: send word that the family will pay, whenever there's a lead to carry it
     if (strat !== 'idle' && day % 10 === 0) for (const c of openCaptives(s)) askRansom(s, c.pid);
     // (v2) a dead pump gets a hardware kit, an EMP-fried one its spare, as the HUD's buttons would
@@ -295,7 +342,11 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
     // the prescriptions, three months ahead, once the news turns
     if (strat !== 'idle' && s.disaster.phase === 'warning' && day % 30 === 0) stockUpRx(s);
     // the armory, bought early (a deer rifle and a .22; more for the preppers and the fortress)
-    if (day === 10 && strat !== 'idle') {
+    // (weekender, round 5) the guns wait for the roof: bought on day 10 they took the cash the cabin's first stages needed. Bought when the house is up and
+    // there is money, or once the warning is out
+    const armoryDue = s.weekend?.mode === 'split' ? !armed && (s.disaster.phase === 'warning' || (s.structures.some(x => isHome(x.kind) && isFinished(x)) && s.money > 60_000)) : day === 10;
+    if (armoryDue && strat !== 'idle') {
+      armed = true;
       const kit: Record<string, string[]> = { homestead: ['marlin_336', 'ruger_1022'], prepper: ['rem_700', 'sw_mp15', 'sw_mp15', 'mossberg_500', 'glock_19', 'ruger_1022'], fortress: ['sw_mp15', 'sw_mp15', 'ruger_mini14', 'mossberg_500', 'rem_700'] };
       for (const m of kit[strat] ?? []) buyGun(s, m);
       const ammo: Partial<Record<Caliber, number>> = strat === 'homestead' ? { '3030': 6, '22lr': 2 } : strat === 'prepper' ? { '308': 15, '556': 50, '12ga': 12, '9mm': 20, '22lr': 4 } : { '556': 75, '12ga': 12, '308': 10 };
