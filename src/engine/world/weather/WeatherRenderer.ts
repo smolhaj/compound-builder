@@ -331,6 +331,8 @@ export interface WeatherFrameInput {
   region?: string;
   /** Fog-bank strength for the site (PNW sound / river valleys thicker). Default 1. */
   fogBankScale?: number;
+  /** The sim's valley bank (fog/ValleyFog.ts): sheets of drifting mist ride its top (world Y) at this opacity 0–1, instead of lying on the ground. */
+  valleyBank?: { y: number; amount: number } | null;
 }
 
 export class WeatherRenderer {
@@ -511,7 +513,8 @@ export class WeatherRenderer {
     }
 
     // ── Fog banks ────────────────────────────────────────────────────────────
-    const bank = low ? 0 : Math.max(0, Math.min(1, (o.fog - 0.2) / 0.6)) * (f.fogBankScale ?? 1);
+    const vb = f.valleyBank;
+    const bank = low ? 0 : vb ? vb.amount : Math.max(0, Math.min(1, (o.fog - 0.2) / 0.6)) * (f.fogBankScale ?? 1);
     this._bank.visible = bank > 0.01;
     if (this._bank.visible) {
       const bu = this._bankMat.uniforms;
@@ -519,7 +522,7 @@ export class WeatherRenderer {
       bu.uTime.value = this._time;
       const fog = this._scene.fog as THREE.FogExp2 | null;
       if (fog) (bu.uColor.value as THREE.Color).copy(fog.color).multiplyScalar(1.08);
-      this._bank.position.set(f.focus.x, 0, f.focus.z);
+      this._bank.position.set(f.focus.x, vb ? vb.y - 0.9 : 0, f.focus.z);
       (bu.uCenter.value as THREE.Vector3).set(f.focus.x, 0, f.focus.z);
     }
 
