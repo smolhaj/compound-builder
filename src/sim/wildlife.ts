@@ -432,7 +432,8 @@ export function wildlifeDay(s: GameState, freezer = false): string[] {
   }
 
   // sightings of the ordinary animals: now and then, not every day
-  if (!hadPredator && w.lastSight < day - 1 && r() < 0.25) {
+  // (playtest 3: about one line in five days filled the log, the squirrel and the grouse most of all: now about one in a fortnight)
+  if (!hadPredator && w.lastSight < day - 3 && r() < 0.12) {
     const here = WILD_BY_REGION[s.site.region].filter(sp => !isPredator(sp) && count(s, sp) > 0);
     if (here.length) {
       const sp = here[Math.floor(r() * here.length) % here.length], n = count(s, sp), sd = SPECIES[sp];
