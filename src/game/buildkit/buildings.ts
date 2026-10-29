@@ -6,7 +6,7 @@
  */
 import * as THREE from 'three';
 import { CELL, KIT, type KitPieceDef } from './kit';
-import { foodSlot, Furniture, M, wallRun } from './interior';
+import { foodSlot, Furniture, M, wallRun, sickSlot } from './interior';
 import { buildCabinLayers } from './cabinGeometry';
 import { box, buildGabled, CUT_H, Parts, showStage, type BuildOpts, type FurnishCtx } from './shell';
 import { Clutter } from './clutter';
@@ -389,7 +389,7 @@ function logHouse(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group
     // stairs up to the loft, rising toward the back along the partition
     I({ x: 0.06, z: LH.loftZ + 0.3 }, a => Furniture.stairs(a, c.spec.wallH / M, 3.6, 0.85));
     // bedroom
-    I({ x: 0.45, z: back + 0.01 + 0.18 }, a => Furniture.bed(a, true, 'quilt_red'));
+    I({ x: 0.45, z: back + 0.01 + 0.18 }, a => { Furniture.bed(a, true, 'quilt_red'); sickSlot(a); });
     I({ x: right - 0.04, z: back + 0.05 }, a => Furniture.nightstand(a));
     I({ x: 0.22, z: back + 0.05 }, a => Furniture.nightstand(a));
     I({ x: right - 0.05, z: LH.bedZ - 0.1, rot: -Math.PI / 2 }, a => Furniture.dresser(a, 1.2));

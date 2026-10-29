@@ -92,7 +92,8 @@ import { FoodShelfRenderer, type ShownPlace } from './props/FoodShelfRenderer';
 import { TentsRenderer, tentSpots } from './props/TentsRenderer';
 import { sleepSpotFor, tentsPitched } from '../sim/housing';
 import { planShelves, propsWanted, splitInUse } from './props/foodShelfPlan';
-import type { FoodSlot } from './buildkit/shell';
+import type { FoodSlot, SickSlot } from './buildkit/shell';
+import { sickbayPlan, type BedSlot } from './people/sickbayPlan';
 
 /** The order the stores take their turns: the buried storeroom, the root cellar, the bunker's galley and container, then the house pantries. */
 const FOOD_ORDER: Record<string, number> = { bunker_stores: 0, root_cellar: 1, bunker_galley: 2, bunker_container: 3 };
@@ -1611,6 +1612,34 @@ export class HomesteadWorld {
   /** Where dogs are (animals bolt from them too); none until the dogs renderer exists. */
   dogPositions(): Array<[number, number]> { return this.dogs.positions().map(d => [d.x, d.z] as [number, number]); }
 
+  private _bedKey = '';
+  private _beds: BedSlot[] = [];
+  /**
+   * The beds the sick can be put in, in world units (game/people/sickbayPlan): every marked bed of every finished building,
+   * with which sides of it have room to stand. Worked out again only when a building is finished, rebuilt or taken away.
+   */
+  private _bedSlots(): BedSlot[] {
+    const withBeds = [...this._built.values()].filter(b => b.finished && (b.group.userData.sickSlots as SickSlot[] | undefined)?.length);
+    const key = withBeds.map(b => b.group.uuid).join();
+    if (key === this._bedKey) return this._beds;
+    this._bedKey = key;
+    const out: BedSlot[] = [];
+    // the home with the most beds first (the home), then the rest by id; the bunker's medical corner is flagged
+    withBeds.sort((a, b) => KIT[b.placed.kind].sleeps - KIT[a.placed.kind].sleeps || a.placed.id.localeCompare(b.placed.id));
+    for (const b of withBeds) {
+      b.group.updateMatrixWorld(true);
+      const cs = (b.group.userData.colliders as Collider[] | undefined) ?? [];
+      (b.group.userData.sickSlots as SickSlot[]).forEach((s, n) => {
+        const o = new THREE.Vector3(...s.o).applyMatrix4(b.group.matrixWorld);
+        const f = new THREE.Vector3(...s.foot).transformDirection(b.group.matrixWorld), sd = new THREE.Vector3(...s.side).transformDirection(b.group.matrixWorld);
+        const clear = (k: number) => !hitsColliders(cs, s.o[0] + s.side[0] * k * 0.19, s.o[2] + s.side[2] * k * 0.19, 0.03);
+        out.push({ key: `${b.placed.id}:${n}`, bay: b.placed.kind === 'bunker_medical', x: o.x, y: o.y, z: o.z, fx: f.x, fz: f.z, sx: sd.x, sz: sd.z, floorY: o.y - 0.58 * M, openA: clear(1), openB: clear(-1) });
+      });
+    }
+    this._beds = out;
+    return out;
+  }
+
   /** People: walk the family to their tasks; tend the campfire. */
   updatePeople(dt: number, game: GameState, hour: number, speedK: number): void {
     const site = (id: string): Site | null => {
@@ -1636,7 +1665,7 @@ export class HomesteadWorld {
     const fx = yardFx(game, hour);
     this._yard.update(this._clock, fx.lights, fx.smoke);
     const season = (seasonState.visual === 'winter' && !seasonState.climate.freeze ? 'fall' : seasonState.visual) as WearSeason;
-    this.family.update(dt, game.people, game.personState, hour, game.clock.t, ctx, this.walkHeight, season, speedK);
+    this.family.update(dt, game.people, game.personState, hour, game.clock.t, ctx, this.walkHeight, season, speedK, sickbayPlan(game, this._bedSlots()));
     const dctx: DogCtx = {
       home: ctx.home, camp: this.camp, gate: this.access.gate, yard: this.access.yard, atGate: !!game.gate.pending,
       person: id => (this.family.shown.has(id) ? this.family.poseOf(id) : null),
