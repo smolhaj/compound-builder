@@ -101,4 +101,14 @@ describe('save migrations', () => {
     const g = step(structuredClone(kept), 3);
     expect(g.site.lot?.kind).toBe('gorge');
   });
+
+  it('v68 → v69: the bridge on the way in is standing in every old game, and the road runs on', () => {
+    const old = JSON.parse(JSON.stringify(newGame(3)));
+    old.version = 68;
+    delete old.roadBridge;
+    const m = migrate(old);
+    expect(m.version).toBe(SAVE_VERSION);
+    expect(m.roadBridge).toEqual({ down: false, due: null });
+    expect(() => step(structuredClone(m), 3)).not.toThrow();
+  });
 });

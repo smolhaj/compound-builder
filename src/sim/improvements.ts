@@ -23,6 +23,10 @@ import { hasAll, shortfall, waitingFor, type MaterialId } from './materials';
 import type { GameState, Structure } from './state';
 import type { Site } from './site';
 import { powerFactor, roadFactor } from './slope';
+import { ROAD_PRICE } from './roadStyle';
+import { listingSeed, roadPlanFor } from './roadState';
+import { planWords, type RoadPlan } from './roadPlan';
+import { roadBridgeDay } from './roadFx';
 
 export type HouseKind = 'farmhouse' | 'trailer' | 'timber_cabin' | 'log_house';
 export type Condition = 'good' | 'fair' | 'poor';
@@ -67,15 +71,20 @@ export function improvementValue(i: Improvements, gwDepth: number): number {
 
 export const POLE_PER_FT = 28;
 export const TRANSFORMER = 3_500;
-export const DRIVE_PER_FT = 20;
-export const CULVERT = 1_200;
+export const DRIVE_PER_FT: number = ROAD_PRICE.perFt;
+export const CULVERT: number = ROAD_PRICE.culvert;
 
 /** The co-op's quote for the line, and the contractor's for the drive; on a lot with relief the poles and the road cost more (sim/slope.ts). */
 export const powerQuote = (i: Improvements, site?: Pick<Site, 'lot' | 'home'>) => {
   const k = site ? powerFactor(site) : 1;
   return { usd: Math.round((i.poleFt * POLE_PER_FT * k + TRANSFORMER) / 100) * 100, days: 35 + Math.round(i.poleFt * k / 150) };
 };
-export const driveQuote = (i: Improvements, site?: Pick<Site, 'lot' | 'home'>) => {
+export const driveQuote = (i: Improvements, site?: Site, seed?: number): { usd: number; days: number; plan?: RoadPlan } => {
+  // the road that follows the land (sim/roadPlan.ts): with a game (its seed), or a lot listing (the lot's own ground), the quote is the planned alignment's length, grade, cut and fill, structures and walls
+  if (site && (seed !== undefined || site.lot)) {
+    const plan = roadPlanFor(site, seed ?? listingSeed(site));
+    return { usd: plan.usd, days: plan.days, plan };
+  }
   const f = site ? roadFactor(site) : { lenMul: 1, perFtMul: 1 };
   return { usd: Math.round((i.driveFt * f.lenMul * DRIVE_PER_FT * f.perFtMul + CULVERT) / 100) * 100, days: 5 + Math.round(i.driveFt * f.lenMul / 300) };
 };
@@ -89,7 +98,7 @@ export function hookupProblem(s: GameState, what: 'power' | 'drive'): string | n
   if (s.siteJobs[what] !== null) return 'on the books';
   const t = s.disaster.tracks;
   if (t.banks < 0.5 || t.law < 0.5 || (what === 'power' && t.grid < 0.5)) return 'nobody is taking jobs now';
-  const q = what === 'power' ? powerQuote(imp, s.site) : driveQuote(imp, s.site);
+  const q = what === 'power' ? powerQuote(imp, s.site) : driveQuote(imp, s.site, s.seed);
   if (s.money < q.usd) return 'not enough money';
   return null;
 }
@@ -97,17 +106,21 @@ export function hookupProblem(s: GameState, what: 'power' | 'drive'): string | n
 export function orderHookup(s: GameState, what: 'power' | 'drive'): string | null {
   const why = hookupProblem(s, what);
   if (why) return why;
-  const q = what === 'power' ? powerQuote(s.site.improvements, s.site) : driveQuote(s.site.improvements, s.site);
+  const dq = what === 'drive' ? driveQuote(s.site.improvements, s.site, s.seed) : null;
+  const q = dq ?? powerQuote(s.site.improvements, s.site);
   s.money -= q.usd;
   s.siteJobs[what] = s.clock.t + q.days;
-  log(s, what === 'power'
-    ? `Paid the co-op $${q.usd.toLocaleString('en-US')} for ${s.site.improvements.poleFt.toLocaleString('en-US')} ft of line: power in about ${Math.round(q.days / 7)} weeks.`
-    : `Hired a contractor to put in ${s.site.improvements.driveFt.toLocaleString('en-US')} ft of gravel drive ($${q.usd.toLocaleString('en-US')}), about ${q.days} days.`);
+  if (what === 'power') log(s, `Paid the co-op $${q.usd.toLocaleString('en-US')} for ${s.site.improvements.poleFt.toLocaleString('en-US')} ft of line: power in about ${Math.round(q.days / 7)} weeks.`);
+  else {
+    const plan = dq?.plan;
+    log(s, `Hired a contractor to put in ${(plan ? plan.lengthFt : s.site.improvements.driveFt).toLocaleString('en-US')} ft of gravel drive ($${q.usd.toLocaleString('en-US')}), about ${q.days} days.${plan && (plan.structures.length || plan.hairpins.length) ? ` It has ${planWords(plan).slice(1).join(', ')}.` : ''}`);
+  }
   return null;
 }
 
 /** Once a day: finished hookups come in (or stall when the outside world fails). */
 export function siteJobsDay(s: GameState): void {
+  roadBridgeDay(s);
   const t = s.disaster.tracks;
   for (const what of ['power', 'drive'] as const) {
     const due = s.siteJobs[what];

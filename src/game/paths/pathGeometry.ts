@@ -251,3 +251,35 @@ export function skirtGeometry(r: SkirtRect, margin: number, ground: Ground, colo
   g.computeVertexNormals();
   return g;
 }
+
+/**
+ * A dry-stack stone stair up a riser: one flat tread per 27 cm of rise (0.045 u), each a slab of fieldstone a little wider than the path,
+ * bedded into the slope so it stands on the ground below it. `pts` are the stretch of trail the stair covers (from `stairRuns`).
+ */
+export function stairGeometry(pts: readonly Pt[], ground: Ground, seed: number): THREE.BufferGeometry[] {
+  const out: THREE.BufferGeometry[] = [];
+  if (pts.length < 2) return out;
+  const a = pts[0], b = pts[pts.length - 1], y0 = ground(a[0], a[1]), y1 = ground(b[0], b[1]);
+  const rise = y1 - y0, n = Math.max(2, Math.round(Math.abs(rise) / 0.045)), col = new THREE.Color();
+  let len = 0;
+  for (let k = 1; k < pts.length; k++) len += Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]);
+  const heading = Math.atan2(b[0] - a[0], b[1] - a[1]);
+  const at = (d: number): Pt => {
+    let left = d;
+    for (let k = 1; k < pts.length; k++) {
+      const l = Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]);
+      if (left <= l || k === pts.length - 1) { const t = l > 0 ? Math.min(1, left / l) : 0; return [pts[k - 1][0] + (pts[k][0] - pts[k - 1][0]) * t, pts[k - 1][1] + (pts[k][1] - pts[k - 1][1]) * t]; }
+      left -= l;
+    }
+    return a;
+  };
+  const tread = len / n;
+  for (let i = 0; i < n; i++) {
+    const [x, z] = at(tread * (i + 0.5)), gy = ground(x, z), top = Math.max(y0 + rise * (i + 1) / n + 0.03, gy + 0.02), base = Math.min(gy, top - 0.02) - 0.03;
+    const h = top - base, w = 0.26 + 0.03 * h2(i, seed);
+    col.setHSL(0.09 + 0.03 * h2(i, seed, 4), 0.05 + 0.05 * h2(i, seed, 5), 0.4 + 0.18 * h2(i, seed, 6));
+    const g = new THREE.BoxGeometry(w, h, tread * 1.05).rotateY(heading + (h2(i, seed, 2) - 0.5) * 0.08).translate(x, base + h / 2, z);
+    out.push(paint(g, col));
+  }
+  return out;
+}

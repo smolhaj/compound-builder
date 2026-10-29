@@ -81,6 +81,8 @@ export interface RingSpec {
   /** Mean ground height round the ring (units). */
   level: number;
   towers: Array<{ kind: TowerKind; x: number; z: number }>;
+  /** Creek bars across the creek where it crosses this ring (a ring that overlaps the creek is barred automatically). */
+  bars: Pt[][];
 }
 
 export interface RingPlan {
@@ -96,6 +98,27 @@ export interface RingPlan {
   own: Array<{ material: MaterialId; qty: number }>;
   permits: number;
   hours: number;
+}
+
+/** The creek is barred this far either side of its centerline, beyond its half width (matches propertyWall's BANK). */
+const BANK = 0.6;
+
+/**
+ * Where the creek (`creekZ`, flowing west to east) crosses the closed ring `poly`, one short bar run per crossing,
+ * laid along the ring's edge there so the bars close the water gap in the wall. Crossings that bars already stand across are left.
+ */
+export function ringBars(poly: readonly Pt[], creekZ: (x: number) => number, half: number, existing: ReadonlyArray<readonly Pt[]> = []): Pt[][] {
+  const out: Pt[][] = [], reach = half + BANK;
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i], b = poly[(i + 1) % poly.length];
+    const da = a[1] - creekZ(a[0]), db = b[1] - creekZ(b[0]);
+    if ((da < 0) === (db < 0)) continue;   // a vertex exactly on the creek counts as the near side once
+    const f = da / (da - db), cx = a[0] + (b[0] - a[0]) * f, cz = a[1] + (b[1] - a[1]) * f;
+    const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, dx = (b[0] - a[0]) / L, dz = (b[1] - a[1]) / L;
+    if (existing.some(r => r.some((q, k) => k > 0 && Math.hypot((q[0] + r[k - 1][0]) / 2 - cx, (q[1] + r[k - 1][1]) / 2 - cz) < reach))) continue;
+    out.push([[cx - dx * reach, cz - dz * reach], [cx + dx * reach, cz + dz * reach]]);
+  }
+  return out;
 }
 
 const centroid = (poly: readonly Pt[]): Pt => [poly.reduce((a, p) => a + p[0], 0) / poly.length, poly.reduce((a, p) => a + p[1], 0) / poly.length];
@@ -222,7 +245,10 @@ export function planRings(s: GameState, outer: readonly Pt[], outerGate: Pt | nu
     spots.forEach(p => taken.push(p));
     if (spots.length < options.towers) notes.push(`Ring ${i + 2}: ${spots.length} of ${options.towers} tower sites found.`);
     const level = ground ? g.poly.reduce((a, p) => a + ground(p[0], p[1]), 0) / g.poly.length : 0;
-    rings.push({ tier: i + 1, poly: g.poly, gate: { at: g.at, inward: g.inward }, kind: options.wall, level, towers: spots.map(p => ({ kind: options.towerKind, x: p[0], z: p[1] })) });
+    rings.push({ tier: i + 1, poly: g.poly, gate: { at: g.at, inward: g.inward }, kind: options.wall, level, towers: spots.map(p => ({ kind: options.towerKind, x: p[0], z: p[1] })), bars: [] });
+    if (s.site.creek && geo.creekZ) {
+      rings[rings.length - 1].bars = ringBars(g.poly, geo.creekZ, geo.creekHalf ?? 0.7, [...s.perimeter.filter(r => r.kind === 'creek_bars').map(r => r.pts), ...rings.flatMap(q => q.bars)]);
+    }
   });
   const bill: Partial<Stock> = {};
   let hours = 0, permits = 0;
@@ -230,6 +256,8 @@ export function planRings(s: GameState, outer: readonly Pt[], outerGate: Pt | nu
     const closed = [...r.poly, r.poly[0]], len = wallLength({ pts: closed, gates: [{ at: 0, w: RING.GATE_W }] });
     addBill(bill, runBill(r.kind, len)); hours += runHours(r.kind, len);
     if (options.sally) { addBill(bill, SALLY.BILL); hours += 14; }
+    for (const b of r.bars) { const l = wallLength({ pts: b, gates: [] }); addBill(bill, runBill('creek_bars', l)); hours += runHours('creek_bars', l); }
+    if (r.bars.length) notes.push(`Ring ${r.tier + 1}: the creek crosses it, so ${r.bars.length} set${r.bars.length > 1 ? 's' : ''} of creek bars go in.`);
     for (const t of r.towers) { addBill(bill, totalBill(BLUEPRINTS[t.kind])); hours += totalHours(BLUEPRINTS[t.kind]); if (needsPermit(t.kind) && s.paper.permits && countyWorks(s)) permits += permitFee(s, t.kind); }
   }
   const buy = (Object.entries(bill) as Array<[MaterialId, number]>).filter(([m]) => MATERIALS[m].price !== null).map(([material, qty]) => ({ material, qty }));
@@ -253,6 +281,7 @@ export function layRings(s: GameState, plan: RingPlan): { runs: number; structur
     if (plan.options.sally) gates.push({ at: sallyOn(r.poly, r.gate.at).at, w: SALLY.W, sally: true });
     planRun(s, r.kind, closed, gates, 0, true);
     runs++;
+    for (const b of r.bars) { planRun(s, 'creek_bars', b.map(p => [p[0], p[1]] as Pt), [], 0, true); runs++; }
     for (const t of r.towers) { const st = planStructure(s, t.kind, t.x, t.z, 0); stampHighGround(st); applyForPermit(s, st); structures++; }
   }
   if (plan.rings.length) log(s, `Laid out ${plan.rings.length} inner ring${plan.rings.length > 1 ? 's' : ''}${plan.contour ? ' along the contour of the hill' : ''}: a ${PERIMETER[plan.options.wall].name.toLowerCase()} each with its own gate${plan.options.towers ? ' and towers' : ''}.`);

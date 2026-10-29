@@ -79,6 +79,8 @@ export interface NetWorld {
   blocked: (x: number, z: number) => boolean;
   /** Extra cost of walking here (slopes, rough ground); 1 = easy. */
   cost?: (x: number, z: number) => number;
+  /** What a straight walk cannot cross (buildings, built wall, water, cliff ground), without the trees: for the people's own route finding (walkRoute). */
+  hard?: (x: number, z: number) => boolean;
 }
 
 interface Skel { sig: string; trails: Array<{ cells: number[]; pts: Pt[]; endA: number; endB: number }>; edgeTrails: Map<string, Array<{ trail: number; fwd: boolean }>> }
@@ -212,7 +214,12 @@ export function planNetwork(game: GameState, ex: PathExtras, world: NetWorld, ca
   for (const w of wants) {
     const a = endOf(w.a, w.b), b = endOf(w.b, w.a), key = edgeKey(w.a.id, w.b.id);
     let cells = cache.routes.get(key);
-    if (cells === undefined) { cells = findCells(a, b, { blocked: world.blocked, cost }); cache.routes.set(key, cells); }
+    if (cells === undefined) {
+      cells = findCells(a, b, { blocked: world.blocked, cost });
+      // a walk that has to go round a wall to its gate or a cliff to its stair is farther off its own line than the default search wanders
+      if (!cells) cells = findCells(a, b, { blocked: world.blocked, cost, margin: 24 });
+      cache.routes.set(key, cells);
+    }
     if (!cells || cells.length < 2) continue;
     for (const p of cells) used.add(cellOf(p));
     raws.push({ key, want: w, cells, a, b });
@@ -340,7 +347,7 @@ function nearestVertex(g: WalkGraph, x: number, z: number, reach: number): numbe
  * The points to walk through to go from (fx, fz) to (tx, tz) along the paths, or [] to go straight: only when
  * both ends are within reach of a path and the way along it is not much longer than the direct one.
  */
-export function routeVia(g: WalkGraph, fx: number, fz: number, tx: number, tz: number, reach = 1.4): Pt[] {
+export function routeVia(g: WalkGraph, fx: number, fz: number, tx: number, tz: number, reach = 1.4, detour = 1.3): Pt[] {
   if (!g.pts.length) return [];
   const direct = Math.hypot(tx - fx, tz - fz);
   if (direct < 1) return [];
@@ -360,7 +367,7 @@ export function routeVia(g: WalkGraph, fx: number, fz: number, tx: number, tz: n
   }
   if (!Number.isFinite(dist[e])) return [];
   const total = Math.hypot(g.pts[s][0] - fx, g.pts[s][1] - fz) + dist[e] + Math.hypot(g.pts[e][0] - tx, g.pts[e][1] - tz);
-  if (dist[e] < 0.6 || total > direct * 1.3 + 0.4) return [];
+  if (dist[e] < 0.6 || total > direct * detour + 0.4) return [];
   const out: Pt[] = [];
   for (let k = e; k !== -1; k = from[k]) out.push(g.pts[k]);
   out.reverse();

@@ -42,6 +42,8 @@ type Raw = Record<string, unknown> & { version?: number };
 
 /** version n → n + 1 upgraders. */
 const STEPS: Record<number, (s: Raw) => Raw> = {
+  // 68 → 69: the bridge on the planned way in can be brought down (sim/roadFx.ts): standing in every old game
+  68: s => ({ ...s, version: 69, roadBridge: { down: false, due: null } }),
   // 65 → 66: weekender cash pacing (sim/weekender.ts): the belt in town is off; a weekend game keeps its town house as it was (owned, with its mortgage), nobody rents
   // 67 → 68 (provisional number, renumber at merge): the lot archetype of the land (sim/lots.ts): `site.lot`; old places have none (their ground is the classic benches)
   67: s => ({ ...s, version: 68, site: { lot: null, ...(s.site as object) } }),

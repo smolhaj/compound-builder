@@ -31,6 +31,7 @@ import { isFinished } from './construction';
 import { PERIMETER, fenceLive, runFinished } from './perimeter';
 import { ARMORY_LIGHTS, floodlightLit } from './lights';
 import { DOOR_DELAY, doorDelay, raidAngle } from './terrainFx';
+import { roadStart } from './roadFx';
 import { WALK_CLIMB_FACTOR, WALK_POST, deckSpots, walkLength, walkRuns } from './walkway';
 import { TURRET_JAM, highBonus, litTowerIds, isTower, mountReady, towerPosture, towerPosts, towerReach, turretsReady } from './towers';
 import { enclosure } from './enclosure';
@@ -350,7 +351,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
   const kit = extraKit(raiders, opts.adapt ?? 0, organized);
   if (armedR && !peace) { gLeft += kit.grenades; if (kit.rocket && daysAfter > 120) rLeft = Math.max(rLeft, 1); }
   // they come up from out of sight, well beyond the line (round 4: they used to start 30–34 out whatever the wall, so a wide palisade had them at it before anyone was up)
-  const start = Math.max(30, lineR + 22);
+  const start = Math.max(30, lineR + 22) + (opts.terrain === false || lane ? 0 : roadStart(s));   // up the road: single file at a bridge, a bore or a ford, they dismount further out (sim/roadFx.ts)
   for (let i = 0; i < raiders; i++) {
     const p = peace ? at(1.5 + r() * 2, (r() - 0.5) * 3)
       : opts.insideBreach ? at(Math.max(1.5, lineR * 0.55) + r() * 1.5, (r() - 0.5) * 2.5)

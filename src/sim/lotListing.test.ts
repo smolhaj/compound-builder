@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { hasLots, lotPriceFactor, makeLotSite, profileChart, REGION_LOTS, siteLot, terrainFacts } from './lotListing';
-import { affordable, ANY_WISH, listings, SAVINGS, siteFacts, type Site } from './site';
+import { affordable, ANY_WISH, CLASSIC, listings, SAVINGS, siteFacts, type Site } from './site';
 import { LOT_KINDS, LOT_NAME, type LotKind } from './lots';
 import { REGION_IDS } from './regions';
 
@@ -89,7 +89,7 @@ describe('the listing card', () => {
       expect(text).not.toMatch(/metre|colour|favour|grey|kerb/);
       expect(text).not.toMatch(/NaN|undefined|Infinity/);
     }
-    expect(terrainFacts({ lot: null, home: { x0: 0, z0: 0, x1: 67, z1: 67 } })).toEqual([]);
+    expect(terrainFacts({ ...CLASSIC, lot: null })).toEqual([]);
   });
 
   it('a profile chart for every kind: across the valley for a gorge, along the fall for the rest', () => {
@@ -111,5 +111,25 @@ describe('the listing card', () => {
     expect(lotPriceFactor(dry)).toBeLessThan(lotPriceFactor(wet));
     expect(siteFacts(dry).find(f => f.label === 'Water')).toMatchObject({ value: expect.stringContaining('Dry heights'), tone: 'bad' });
     expect(siteFacts(wet).find(f => f.label === 'Water')!.value).not.toContain('Dry heights');
+  });
+});
+
+describe('cutbank listings', () => {
+  it('are a special listing (about one dry hillside in eight) and the card says so', async () => {
+    const { rollLot, terrainFacts } = await import('./lotListing');
+    const { mulberry32 } = await import('./rng');
+    let hill = 0, cut = 0, seen: ReturnType<typeof rollLot> = null;
+    for (let i = 1; i < 4000; i++) {
+      const r = rollLot(mulberry32(i * 7919), 'pnw', 40, 'any', i);
+      if (!r || r.spec.kind !== 'hillside' || r.spec.creek) continue;
+      hill++;
+      if (r.spec.cutbank) { cut++; seen = r; }
+    }
+    expect(hill).toBeGreaterThan(100);
+    expect(cut / hill).toBeGreaterThan(0.05);
+    expect(cut / hill).toBeLessThan(0.2);
+    const { HOME_RECT } = await import('./site');
+    expect(terrainFacts({ lot: seen!.spec, home: HOME_RECT[40] }).some(f => f.label === 'Rock face')).toBe(true);
+    expect(terrainFacts({ lot: { ...seen!.spec, cutbank: false }, home: HOME_RECT[40] }).some(f => f.label === 'Rock face')).toBe(false);
   });
 });

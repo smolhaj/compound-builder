@@ -21,6 +21,7 @@ const BLOBS = 48, BONES = 18;      // instances per dog
 interface Agent {
   x: number; z: number; rot: number; phase: number; stance: Stance; placed: boolean;
   lie: number; sit: number; up: number; bark: number; moving: boolean;
+  via?: Array<readonly [number, number]>; viaFor?: { x: number; z: number };
 }
 
 const tmpA = new THREE.Matrix4(), tmpB = new THREE.Matrix4(), tmpV = new THREE.Vector3(), tmpS = new THREE.Vector3(), tmpQ = new THREE.Quaternion(), tmpE = new THREE.Euler(), tmpC = new THREE.Color(), UP = new THREE.Vector3(0, 1, 0), tmpD = new THREE.Vector3();
@@ -74,16 +75,23 @@ export class DogRenderer {
       const goal = dogGoal(d, Math.max(0, idx), hour, day, ctx, clock);
       let a = this._agents.get(d.id);
       if (!a) { a = { x: goal.x, z: goal.z, rot: goal.face ?? 0, phase: i * 1.3, stance: goal.stance, placed: true, lie: goal.stance === 'lie' ? 1 : 0, sit: 0, up: 0, bark: 0, moving: false }; this._agents.set(d.id, a); }
-      // walk to the goal
-      const dx = goal.x - a.x, dz = goal.z - a.z, dist = Math.hypot(dx, dz);
+      // walk to the goal, round whatever is in the way (the same route finding as the people)
+      if (!a.via) a.via = [];
+      if (ctx.via && (!a.viaFor || Math.hypot(a.viaFor.x - goal.x, a.viaFor.z - goal.z) > 0.5)) {
+        a.viaFor = { x: goal.x, z: goal.z };
+        a.via = Math.hypot(goal.x - a.x, goal.z - a.z) > 25 ? [] : [...ctx.via(a.x, a.z, goal.x, goal.z)];
+      }
+      while (a.via!.length && Math.hypot(a.via[0][0] - a.x, a.via[0][1] - a.z) < 0.12) a.via!.shift();
+      const leg = a.via![0], gx = leg ? leg[0] : goal.x, gz = leg ? leg[1] : goal.z;
+      const dx = gx - a.x, dz = gz - a.z, dist = leg ? Math.hypot(goal.x - a.x, goal.z - a.z) : Math.hypot(dx, dz), legD = Math.hypot(dx, dz);
       let moving = false;
       const tol = goal.follow ? 0.1 : 0.04;
       if (dist > tol) {
-        if (dist > 30 || jumped) { a.x = goal.x; a.z = goal.z; }
+        if (dist > 30 || jumped) { a.x = goal.x; a.z = goal.z; a.via = []; }
         else {
           const v = (dist > 0.5 ? RUN : TROT) * Math.max(1, Math.min(3, speedK)) * (goal.follow ? 1.25 : 1);
-          const step = Math.min(dist - tol * 0.5, v * dt);
-          a.x += dx / dist * step; a.z += dz / dist * step; moving = true;
+          const step = Math.min(Math.max(legD - tol * 0.5, 0.001), v * dt);
+          a.x += dx / (legD || 1) * step; a.z += dz / (legD || 1) * step; moving = true;
           const want = Math.atan2(dx, dz);
           a.rot += Math.atan2(Math.sin(want - a.rot), Math.cos(want - a.rot)) * Math.min(1, dt * 9);
         }

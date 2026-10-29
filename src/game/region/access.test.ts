@@ -31,3 +31,17 @@ describe('access', () => {
     expect(s[s.length - 1]).toEqual([10, 10]);
   });
 });
+
+describe('access from the planned road', () => {
+  it('turns a plan into the drive the world draws: a point every half unit from the county road to the yard, with coarse points and a box for the distance tests', async () => {
+    const { accessFromPlan } = await import('./access');
+    const { planRoad } = await import('../../sim/roadPlan');
+    const plan = planRoad({ region: 'appalachia', seed: 3, ground: { h: () => 1 }, rect: { x0: 0, z0: 0, x1: 67, z1: 67 }, frontage: { x: 67, zMin: 4, zMax: 63, band: [24, 40] }, county: () => 70.4, roadHalf: 0.5, yard: [30, 32] });
+    const a = accessFromPlan(plan);
+    expect(a.drive.length).toBe(plan.pts.length);
+    expect(a.driveQ.length).toBeLessThan(a.drive.length / 2);
+    expect(distToLine(a.driveQ, a.gate.x, a.gate.z)).toBeLessThan(0.4);
+    expect(distToLine(a.drive, a.yard.x, a.yard.z)).toBeLessThan(0.05);
+    for (const [x, z] of a.drive) { expect(x).toBeGreaterThanOrEqual(a.box[0] - 1e-9); expect(x).toBeLessThanOrEqual(a.box[2] + 1e-9); expect(z).toBeGreaterThanOrEqual(a.box[1] - 1e-9); expect(z).toBeLessThanOrEqual(a.box[3] + 1e-9); }
+  });
+});

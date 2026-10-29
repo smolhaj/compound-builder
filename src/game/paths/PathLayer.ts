@@ -65,8 +65,8 @@ export class PathLayer {
   distTo = (x: number, z: number): number => this._near(x, z);
 
   /** The way along the paths from one point to another ([] = straight). */
-  via(fx: number, fz: number, tx: number, tz: number): Pt[] {
-    return this._graph && !this.qaNoVia ? routeVia(this._graph, fx, fz, tx, tz) : [];
+  via(fx: number, fz: number, tx: number, tz: number, detour = 1.3): Pt[] {
+    return this._graph && !this.qaNoVia ? routeVia(this._graph, fx, fz, tx, tz, 1.4, detour) : [];
   }
 
   private static layout(game: GameState): string {
