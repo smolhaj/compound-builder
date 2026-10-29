@@ -367,7 +367,7 @@ describe('gatherings and grief (one fading-grief implementation)', () => {
 
   it('every gathering kind is defined; the callable ones can be held; a movie needs power; a funeral needs a death', () => {
     const kinds = Object.keys(GATHERING) as GatheringKind[];
-    expect(kinds.length).toBe(11);
+    expect(kinds.length).toBe(12);
     const g = fed(game());
     expect(gatheringProblem(g, 'funeral')).toMatch(/nobody/);
     expect(gatheringProblem(g, 'movie')).toBe(g.utilities.lit.length > 0 || g.utilities.grid ? null : 'no power for a movie');

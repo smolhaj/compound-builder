@@ -24,6 +24,7 @@ import { WallProperty } from './WallProperty';
 import { FortifyRing } from './FortifyRing';
 import { PathsPanel } from './PathsPanel';
 import { takeRestDay } from '../../sim/mind';
+import { enroll, setDrills } from '../../sim/courses';
 import { setQuarantine } from '../../sim/medical';
 import { callGathering } from '../../sim/gatherings';
 
@@ -66,6 +67,8 @@ export function BuildMenu({ showProjects = () => undefined }: { showProjects?: (
     else if (a.type === 'restDay') { const why = g.daily(d => takeRestDay(d)); if (why) setNote(why); }
     else if (a.type === 'quarantine') { const why = g.daily(d => setQuarantine(d, a.on)); if (why) setNote(why); }
     else if (a.type === 'rx') g.stockUpRx();
+    else if (a.type === 'enroll') { const why = g.money(d => enroll(d, a.course, a.pid, a.mode, a.teacher)); if (why) setNote(`Could not sign up: ${why}.`); }
+    else if (a.type === 'drills') g.daily(d => { setDrills(d, a.perWeek); return null; });
     else if (a.type === 'gather') { const why = g.daily(d => callGathering(d, a.kind)); if (why) setNote(why); }
     else if (a.type === 'moveIn') { const why = g.money(d => openMoveIn(d)); if (why) setNote(why[0].toUpperCase() + why.slice(1) + '.'); }
     else { g.select(a.id); showProjects(); }
