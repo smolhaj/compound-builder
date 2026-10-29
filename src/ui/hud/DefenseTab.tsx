@@ -14,6 +14,9 @@ import { floodTowerIds, TOWERS, TOWER_NEXT, highBonus, highShare, isTower, tower
 import { ungatedCrossings } from '../../sim/roadGate';
 import { canHostWalkway, walkOn, walkwayBill, walkwayProblem } from '../../sim/walkway';
 import { Note, Row, Section } from './common';
+import { readiness } from '../../sim/courses';
+
+const DRILL_NAME = ['', 'weekly drills', 'drills twice a week', 'drills three times a week'] as const;
 import { TONE, DIM, btn, usd } from './style';
 import { WallProperty } from './WallProperty';
 import { FortifyRing } from './FortifyRing';
@@ -46,6 +49,7 @@ export function DefenseTab() {
       </div>
       <Row label="Line holds people out" value={`${Math.round(d.barrier)}%`} tone={d.barrier >= 65 ? 'good' : d.barrier >= 35 ? 'warn' : 'bad'} title="How hard the walls, gates and bars stop a crew, as the gate card and the battle read it" />
       <Row label="Seen coming" value={`${Math.round(d.detection)}%`} tone={d.detection >= 60 ? 'good' : d.detection >= 35 ? 'warn' : 'bad'} />
+      {game.armory.guns.length > 0 && <Row label="Drilled for the alarm" value={`${Math.round(100 * readiness(game))}%${game.courses?.drills.perWeek ? ` · ${DRILL_NAME[game.courses.drills.perWeek]}` : ' · no drills'}`} tone={readiness(game) >= 0.5 ? 'good' : readiness(game) >= 0.2 ? 'warn' : undefined} title="How practiced the household is at the alarm: fewer seconds frozen when it sounds. Set the drill schedule on the Family tab (Classes and drills)." />}
       <button style={{ ...btn(w.showBoundary), marginTop: 4 }} onClick={() => w.setShowBoundary(!w.showBoundary)} title="Draw the property line on the ground">{w.showBoundary ? 'Hide' : 'Show'} property line</button>
     </Section>
     <Section title="The property line">

@@ -172,7 +172,8 @@ export const sharedPoints = (s: GameState): number => (s.evenings?.sharedAt != n
 export function wearKits(s: GameState, users: Partial<Record<KitId, number>>): string[] {
   const E = eveningsOf(s), day = dayIndex(s.clock.t), out: string[] = [];
   for (const id of KIT_IDS) {
-    const n = users[id] ?? 0;
+    // a music player on the house power (or charged by the panels) hardly touches its batteries
+    const n = (users[id] ?? 0) * (id === 'player' && power(s) ? 0.35 : 1);
     if (n <= 0) continue;
     const D = KITS[id], before = E.cond[id] ?? 1;
     let c = Math.max(0, before - D.per * n ** 0.85);
