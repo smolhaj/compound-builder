@@ -21,6 +21,7 @@ import { Group, Item, Note } from './common';
 import { btn, DIM, usd } from './style';
 import { WallProperty } from './WallProperty';
 import { FortifyRing } from './FortifyRing';
+import { PathsPanel } from './PathsPanel';
 
 /** The build menu's groups (kit pieces by what they are for). */
 const BUILD_GROUPS: Array<[string, string, readonly string[]]> = [
@@ -109,6 +110,9 @@ export function BuildMenu({ showProjects = () => undefined }: { showProjects?: (
         {kinds.map(kit)}
       </Group>
     ))}
+    <Group id="paths" title="Footpaths">
+      <PathsPanel />
+    </Group>
     <Group id="lines" title="Pipes & cables">
       {UTILITY_LINES.map(kind => lineItem(kind, 100, '100 m'))}
     </Group>

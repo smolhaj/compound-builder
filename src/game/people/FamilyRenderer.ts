@@ -19,6 +19,9 @@ interface Agent {
   phase: number;
   placed: boolean;
   wear: Wear | null;
+  /** The way along the paths to the goal (game/paths), the goal it was found for. */
+  via: Array<readonly [number, number]>;
+  viaFor: { x: number; z: number } | null;
 }
 
 function hashRnd(seed: number): () => number {
@@ -67,7 +70,7 @@ export class FamilyRenderer {
       const goal = goalFor(i, p.kid, st.task, st.target, hour, ctx, clock);
       let a = this._agents.get(p.id);
       if (!a) {
-        a = { x: goal.x, z: goal.z, rot: 0, phase: i, placed: true, wear: null };
+        a = { x: goal.x, z: goal.z, rot: 0, phase: i, placed: true, wear: null, via: [], viaFor: null };
         this._agents.set(p.id, a);
       }
       if (redress || !a.wear) {
@@ -80,14 +83,20 @@ export class FamilyRenderer {
         a.wear = w;
         this._layer.setWear(n, w);
       }
-      // walk toward the goal
-      const dx = goal.x - a.x, dz = goal.z - a.z, d = Math.hypot(dx, dz);
-      const v = WALK * Math.max(1, speedK) * (p.kid ? 1.1 : 1);
+      // walk toward the goal, along the paths when they lead there (round the walls, not through them)
+      if (ctx.via && (!a.viaFor || Math.hypot(a.viaFor.x - goal.x, a.viaFor.z - goal.z) > 0.3)) {
+        a.viaFor = { x: goal.x, z: goal.z };
+        a.via = Math.hypot(goal.x - a.x, goal.z - a.z) > 25 ? [] : [...ctx.via(a.x, a.z, goal.x, goal.z)];
+      }
+      while (a.via.length && Math.hypot(a.via[0][0] - a.x, a.via[0][1] - a.z) < 0.1) a.via.shift();
+      const leg = a.via[0], tx = leg ? leg[0] : goal.x, tz = leg ? leg[1] : goal.z;
+      const dx = tx - a.x, dz = tz - a.z, dl = Math.hypot(dx, dz), d = leg ? Math.hypot(goal.x - a.x, goal.z - a.z) : dl;
+      const v = WALK * Math.max(1, speedK) * (p.kid ? 1.1 : 1) * (ctx.footing ? ctx.footing(a.x, a.z) : 1);
       let moving = false;
       if (d > 0.02) {
-        const stepLen = Math.min(d, v * dt);
-        if (d > 25 || jumped) { a.x = goal.x; a.z = goal.z; }          // far: just be there (fast-forward / load)
-        else { a.x += dx / d * stepLen; a.z += dz / d * stepLen; moving = true; }
+        const stepLen = Math.min(dl, v * dt);
+        if (d > 25 || jumped) { a.x = goal.x; a.z = goal.z; a.via = []; }          // far: just be there (fast-forward / load)
+        else if (dl > 1e-6) { a.x += dx / dl * stepLen; a.z += dz / dl * stepLen; moving = true; }
         const want = Math.atan2(dx, dz);
         let dr = want - a.rot;
         dr = Math.atan2(Math.sin(dr), Math.cos(dr));

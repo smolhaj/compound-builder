@@ -25,12 +25,25 @@ export interface FleetCtx {
 /** Bay spacing inside a garage (world units, ≈ 2.9 m): three across a 9 m building. */
 const BAY_DX = 0.48;
 
+/** A vehicle standing in the open yard, as an oriented box (center, heading, half width across and half length along the heading). */
+export interface CarBox { x: number; z: number; rot: number; hw: number; hl: number }
+
+/** Is (x, z) within `pad` of this box (a prop or a path keeps off the cars)? */
+export function inCarBox(b: CarBox, x: number, z: number, pad = 0): boolean {
+  const dx = x - b.x, dz = z - b.z, c = Math.cos(b.rot), s = Math.sin(b.rot);
+  // heading 0 faces +z: along = dot with (sin, cos), across = dot with (cos, -sin)
+  const along = dx * s + dz * c, across = dx * c - dz * s;
+  return Math.abs(along) < b.hl + pad && Math.abs(across) < b.hw + pad;
+}
+
 interface Item { v: Vehicle; group: THREE.Group; built: string; anim: { phase: 'out' | 'in'; d: number; path: Pt[] } | null; wasAway: boolean; spot: { x: number; z: number; rot: number } | null }
 
 export class FleetRenderer {
   readonly group = new THREE.Group();
   private readonly _items = new Map<string, Item>();
   private _key = '';
+  /** Vehicles the last `spots` call left standing in the open yard (no garage slot, bay or yard bay). */
+  private readonly _open = new Set<string>();
 
   constructor(scene: THREE.Scene) { scene.add(this.group); }
 
@@ -38,6 +51,7 @@ export class FleetRenderer {
   spots(game: GameState, ctx: FleetCtx): Map<string, { x: number; z: number; rot: number }> {
     const plan = parkingPlan(game);
     const out = new Map<string, { x: number; z: number; rot: number }>();
+    this._open.clear();
     let yardX = 0, yardRow = 0;
     const vs = game.vehicles ?? startingVehicles();
     for (const p of plan.parked) {
@@ -81,6 +95,19 @@ export class FleetRenderer {
       yardX += w;
       const c = Math.cos(y.rot), s = Math.sin(y.rot);
       out.set(v.id, { x: y.x + c * lx + s * lz, z: y.z - s * lx + c * lz, rot: y.rot + Math.PI });
+      this._open.add(v.id);
+    }
+    return out;
+  }
+
+  /** The vehicles standing in the open yard beside the camp, as boxes (paths route round them, props keep off them). Away ones are not there. */
+  openBoxes(game: GameState, ctx: FleetCtx): CarBox[] {
+    const spots = this.spots(game, ctx), out: CarBox[] = [];
+    for (const v of game.vehicles ?? startingVehicles()) {
+      const sp = spots.get(v.id);
+      if (!sp || !this._open.has(v.id) || v.away) continue;
+      const sz = VEHICLE_SIZE[v.kind];
+      out.push({ x: sp.x, z: sp.z, rot: sp.rot, hw: sz.w / 2, hl: sz.l / 2 });
     }
     return out;
   }

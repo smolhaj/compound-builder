@@ -26,6 +26,7 @@ import { stampHighGround, upgradeTower } from '../sim/towers';
 import { addSkirt, planRun, upgradeRun, type Gate, type PerimeterKind, type Pt } from '../sim/perimeter';
 import { layPropertyWall, planPropertyWall, type PropertyGeometry } from '../sim/propertyWall';
 import { addWalkway } from '../sim/walkway';
+import { layPaths, pickUpPath, type LaidKind, type LayEdge } from '../sim/paths';
 import { layFortress, planFortress, type FortressOptions } from '../sim/fortress';
 import { fitProblem, orderFit, plant, repairPump, replaceFried } from '../sim/utilities';
 
@@ -123,6 +124,10 @@ export interface GameStore {
   addSkirt: (id: string) => string | null;
   /** A patrol walkway on top of a finished wall (sim/walkway.ts). */
   addWalkway: (id: string) => string | null;
+  /** Lay a walk (gravel, stepping stones, duckboards, concrete) along these door-to-door walks, from the stock (null = laid; else why not). */
+  layPaths: (edges: LayEdge[], kind: LaidKind) => string | null;
+  /** Take a laid walk up again (back to a worn track). */
+  pickUpPath: (a: string, b: string) => void;
   /** "Fortify my ring": lay out the plan (container wall, decks, gate garage, towers, passage). Returns how many runs and structures. */
   fortifyRing: (geo: PropertyGeometry, opts: Partial<FortressOptions>) => { runs: number; structures: number };
   /** Bolt or unbolt the blast hatches of an underground passage. */
@@ -316,6 +321,20 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     const why = addSkirt(g, id);
     if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); }
     return why;
+  },
+  layPaths: (edges, kind) => {
+    if (locked()) return LOCKED_WHY;
+    const g = structuredClone(get().game);
+    const why = layPaths(g, edges, kind);
+    if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); }
+    return why;
+  },
+  pickUpPath: (a, b) => {
+    if (locked()) return;
+    const g = structuredClone(get().game);
+    pickUpPath(g, a, b);
+    set({ game: g });
+    void saveGame(AUTOSAVE, g);
   },
   addWalkway: (id) => {
     if (locked()) return LOCKED_WHY;

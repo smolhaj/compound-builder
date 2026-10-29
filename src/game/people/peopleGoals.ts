@@ -41,6 +41,10 @@ export interface GoalCtx {
   armed?: boolean;
   /** Where person `i` sleeps tonight (sim/housing.ts sleepSpotFor): the kind of place, the structure or tent it is in, and which seat. */
   sleepAt?: (i: number) => { kind: string; where: string | null; slot: number } | null;
+  /** Pace multiplier at a point (game/paths: a little quicker on a path, slower in mud off one); 1 = open dry ground. */
+  footing?: (x: number, z: number) => number;
+  /** The points to pass through to keep to the paths between two points ([] = straight). */
+  via?: (fx: number, fz: number, tx: number, tz: number) => ReadonlyArray<readonly [number, number]>;
   /** The yard position of dome tent `n` (props/TentsRenderer). */
   tentAt?: (n: number) => { x: number; z: number } | undefined;
 }

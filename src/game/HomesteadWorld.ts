@@ -21,15 +21,23 @@ import { onFarmstead, type Farmstead } from '../engine/world/houses/farmstead';
 import { planNeighbors } from './region/neighbors';
 import { buildCamp } from './props/campGeometry';
 import { Atmosphere, type AtmosBuilding, type AtmosFrame } from './atmosphere/Atmosphere';
+import { PathLayer } from './paths/PathLayer';
+import { LivedLayer } from './lived/LivedLayer';
+import type { Mode } from './lived/livedPlan';
+import { lightsOutNow } from '../sim/blackout';
+import type { NetWorld } from './paths/pathNet';
+import type { PathExtras } from '../sim/paths';
+import { walkFactor } from '../sim/paths';
+import { useWorldStore } from '../store/worldStore';
 import { fenceLean } from './atmosphere/aging';
 import { LEANS, leanRun } from './atmosphere/fenceAging';
 import { FamilyRenderer } from './people/FamilyRenderer';
 import { DogRenderer } from './people/DogRenderer';
-import { FleetRenderer } from './props/FleetRenderer';
+import { FleetRenderer, inCarBox, type CarBox, type FleetCtx } from './props/FleetRenderer';
 import type { DogCtx } from './people/dogGoals';
 import { WildlifeRenderer } from './wildlife/WildlifeRenderer';
 import { buildYard, type Yard } from './props/yardGeometry';
-import { dailyCtx, yardFx } from './people/dailyScene';
+import { dailyCtx, wallGate, yardFx } from './people/dailyScene';
 import type { GoalCtx, Site } from './people/peopleGoals';
 import { CELL, type KitPieceDef } from './buildkit/kit';
 import type { GameState } from '../sim/state';
@@ -172,6 +180,12 @@ export class HomesteadWorld {
   readonly wildlife: WildlifeRenderer;
   /** Night life, weathering and the deeper seasons (atmosphere/). */
   readonly atmos: Atmosphere;
+  /** The footpaths between the stops on the place, worn and laid (game/paths). */
+  readonly paths: PathLayer;
+  /** What people leave lying about (game/lived): mats, pots, bales, swings, a mailbox at the road. */
+  readonly lived: LivedLayer;
+  /** Mud, lying snow and rain right now (the footing under the walkers). */
+  private _underfoot = { mud: 0, snow: 0, rain: 0 };
   /** County road, driveway, gate and stockpile yard. */
   readonly access: Access;
   private readonly _roads = new THREE.Group();
@@ -236,6 +250,20 @@ export class HomesteadWorld {
       runs: () => this._runs.flatMap(run => { const g = this._runGroups.get(run.id); return g ? [{ run, group: g.group }] : []; }),
       blocked: (x, z) => this.onBuilding(x, z, 0.02, false) || this.onAccess(x, z, 0.1) || this.onCamp(x, z, 0.2),
     });
+    this.paths = new PathLayer({
+      scene: ws.scene, groundAt: this.groundAt, makeWorld: () => this._pathWorld(), extras: g => this._pathExtras(g),
+      look: () => this._pathLook(), publish: sum => useWorldStore.getState().setPathNet(sum),
+    });
+    this.lived = new LivedLayer({
+      scene: ws.scene, groundAt: this.groundAt, floorAt: this.walkHeight,
+      blocked: (x, z, r, self, mode) => this._livedBlocked(x, z, r, self, mode), pathDist: this.paths.distTo, pathVersion: () => this.paths.version,
+      doors: () => this.paths.network.nodes.filter(n => !n.ring).map(n => [n.ax, n.az] as const),
+      gate: () => this._livedGate(), landing: g => { const c = this._pathExtras(g).creek; return c ? { x: c.x, z: c.z, face: this.parcel.creek.zAt(c.x) > c.z ? 0 : Math.PI } : null; },
+      look: () => ({ season: seasonState.visual, snow: seasonState.params.snow > 0.25, mud: this.atmos.mud > 0.4, quality: this._quality ?? 'high' }),
+      aprons: (list, key) => this.paths.renderer.setAprons([...list, ...this._driveApron()], this.groundAt, key + '|' + this._drive),
+      changed: () => this._ws.invalidateShadows(),
+      skirts: (list, key) => this.paths.renderer.setSkirts(list, this.groundAt, this._pathLook(), key),
+    });
     this._drive = site.improvements?.drive ?? true;
     this.truck = new DeliveryTruck(ws.scene, this._truckRoute(), this.groundAt);
   }
@@ -247,6 +275,8 @@ export class HomesteadWorld {
   /** Night life, weathering, mud, frost, drifts (after tick, once the season is eased). */
   updateAtmosphere(f: AtmosFrame, game: GameState, doy: number): void {
     this.atmos.update(f, game, doy);
+    this._underfoot = { mud: this.atmos.mud, snow: f.snow, rain: f.rain };
+    this.lived.update(game, performance.now(), { night: f.night, lightsOut: lightsOutNow(game) });
   }
 
   /** A gravel drive in to the yard (else a two-track, and the truck stops at the gate). */
@@ -389,6 +419,7 @@ export class HomesteadWorld {
     this._water(q);
     this._buildRoads();
     this.atmos.setQuality(q);
+    this.paths.setQuality(q);
     this._ws.invalidateShadows();
   }
 
@@ -906,6 +937,119 @@ export class HomesteadWorld {
     return best ?? { x: cx, z: cz, rot: 0 };
   }
 
+  // ── Footpaths (game/paths) ────────────────────────────────────────────
+  /** The tests the path router uses now: buildings (padded, not below ground), the creek and its banks, the camp, the delivery yard, walls, trunks, land that is not ours. */
+  private _pathWorld(): NetWorld {
+    const trees = new Map<number, Array<[number, number, number]>>();
+    for (const t of this.treeSpecs) {
+      const k = Math.floor(t.x) * 4099 + Math.floor(t.z);
+      (trees.get(k) ?? trees.set(k, []).get(k)!).push([t.x, t.z, 0.07 * t.scale + 0.07]);
+    }
+    const boxes = [...this._built.values()].filter(b => !b.under && KIT[b.placed.kind].level !== 'underground').map(b => footprint(KIT[b.placed.kind], b.placed.x, b.placed.z, b.placed.rot, false));
+    const cars = this._cars, yard = this.access.yard, hasCreek = this.parcel.creekHome, half = this.parcel.creek.halfWidth;
+    const own = (x: number, z: number) => (x > this.home.x0 && x < this.home.x1 && z > this.home.z0 && z < this.home.z1) || this._inOwned(x, z);
+    const blocked = (x: number, z: number): boolean => {
+      if (!own(x, z)) return true;
+      for (const r of boxes) if (x > r.x0 - 0.14 && x < r.x1 + 0.14 && z > r.z0 - 0.14 && z < r.z1 + 0.14) return true;
+      if (hasCreek && Math.abs(z - this.parcel.creek.zAt(x)) < half + 0.25) return true;
+      if (Math.hypot(x - this.camp.x, z - this.camp.z) < 1.2 || Math.hypot(x - yard.x, z - yard.z) < 0.95) return true;
+      if (this._perimeterBlocked(x, z, 0.08)) return true;
+      for (const c of cars) if (inCarBox(c, x, z, 0.12)) return true;
+      const cx = Math.floor(x), cz = Math.floor(z);
+      for (let i = cx - 1; i <= cx + 1; i++) for (let j = cz - 1; j <= cz + 1; j++) for (const [tx, tz, r] of trees.get(i * 4099 + j) ?? []) if ((tx - x) ** 2 + (tz - z) ** 2 < r * r) return true;
+      return false;
+    };
+    const g = this.groundAt;
+    // steep ground and the unlevel: a path takes the easy way round
+    const cost = (x: number, z: number): number => { const sl = (Math.abs(g(x + 0.25, z) - g(x - 0.25, z)) + Math.abs(g(x, z + 0.25) - g(x, z - 0.25))) / 0.5; return 1 + 6 * Math.max(0, sl - 0.1); };
+    return { blocked, cost };
+  }
+
+  /** What the world adds to the stops: the camp, the delivery yard, the compound's own gate (when the drive does not go through it), a landing on the creek bank. */
+  private _pathExtras(game: GameState): PathExtras {
+    const done = game.structures.filter(s => !s.unplaced && s.stage >= 5);
+    const home = done.filter(s => (KIT[s.kind]?.sleeps ?? 0) > 0).sort((a, b) => KIT[b.kind].sleeps - KIT[a.kind].sleeps)[0];
+    const ex: PathExtras = { camp: this.camp, yard: this.access.yard };
+    const garage = done.find(s => s.kind === 'gate_garage');
+    if (!garage) {
+      const g = wallGate(game);
+      if (g && distToLine(this.access.drive, g.x, g.z) > 1.2) ex.gate = g;
+    }
+    if (this.parcel.creekHome && home) {
+      const cz = this.parcel.creek.zAt(home.x), side = Math.sign(home.z - cz) || 1, half = this.parcel.creek.halfWidth;
+      if (Math.abs(home.z - cz) < 22) ex.creek = { x: home.x - 1.5, z: this.parcel.creek.zAt(home.x - 1.5) + side * (half + 0.55) };
+    }
+    return ex;
+  }
+
+  // ── Lived-in (game/lived) ─────────────────────────────────────────────
+  private _treeCells: { for: readonly ParcelTree[]; cells: Map<number, Array<[number, number, number]>> } | null = null;
+  private _trunks(): Map<number, Array<[number, number, number]>> {
+    if (this._treeCells?.for !== this.treeSpecs) {
+      const cells = new Map<number, Array<[number, number, number]>>();
+      for (const t of this.treeSpecs) { const k = Math.floor(t.x) * 4099 + Math.floor(t.z); (cells.get(k) ?? cells.set(k, []).get(k)!).push([t.x, t.z, 0.07 * t.scale + 0.03]); }
+      this._treeCells = { for: this.treeSpecs, cells };
+    }
+    return this._treeCells.cells;
+  }
+
+  /**
+   * Is a prop of radius r at (x, z) in the way of something fixed? 'out': nothing of another building's body or front yard, the camp, the
+   * yard, the drive; a prop may touch its own building. 'porch': only bodies, water, walls and trunks (a mat on a porch, the mailbox at the
+   * road). 'inside': as 'out' but inside the building's own plot (a garden gate, a scarecrow in the field).
+   */
+  private _livedBlocked(x: number, z: number, r: number, self: string, mode: Mode): boolean {
+    const inHome = x > this.home.x0 && x < this.home.x1 && z > this.home.z0 && z < this.home.z1;
+    if (!inHome && !this._inOwned(x, z) && mode !== 'porch') return true;
+    if (this.parcel.creekHome && Math.abs(z - this.parcel.creek.zAt(x)) < this.parcel.creek.halfWidth + 0.2 + r * 0.3) return true;
+    for (const b of this._built.values()) {
+      const def = KIT[b.placed.kind];
+      if (b.under || def.level === 'underground') continue;
+      const body = footprint(def, b.placed.x, b.placed.z, b.placed.rot, false);
+      if (b.placed.id === self) {
+        if (mode !== 'inside' && x > body.x0 && x < body.x1 && z > body.z0 && z < body.z1) return true;
+        continue;
+      }
+      const f = mode === 'porch' ? body : footprint(def, b.placed.x, b.placed.z, b.placed.rot, true), pad = r + 0.04;
+      if (x > f.x0 - pad && x < f.x1 + pad && z > f.z0 - pad && z < f.z1 + pad) return true;
+    }
+    if (this._perimeterBlocked(x, z, r * 0.8)) return true;
+    const cells = this._trunks(), cx = Math.floor(x), cz = Math.floor(z);
+    for (let i = cx - 1; i <= cx + 1; i++) for (let j = cz - 1; j <= cz + 1; j++) for (const [tx, tz, tr] of cells.get(i * 4099 + j) ?? []) if ((tx - x) ** 2 + (tz - z) ** 2 < (tr + r * 0.6) ** 2) return true;
+    if (mode === 'porch') return false;
+    if (this.onCamp(x, z, r) || Math.hypot(x - this.access.yard.x, z - this.access.yard.z) < 0.9 + r) return true;
+    if (mode === 'out' && this.onAccess(x, z, r)) return true;
+    const tank = this.atmos.tankSpot;
+    if (tank && Math.hypot(x - tank.x, z - tank.z) < 0.4 + r) return true;
+    for (const t of this._tentPos) if (Math.hypot(x - t.x, z - t.z) < 0.35 + r) return true;
+    for (const c of this._cars) if (inCarBox(c, x, z, r + 0.06)) return true;
+    return false;
+  }
+
+  /** The mailbox at the mouth of the drive (road side, facing the road) and the sign just inside the gate. */
+  private _livedGate(): { mail: { x: number; z: number; rot: number }; sign: { x: number; z: number; rot: number } } | null {
+    if (!this._drive) return null;
+    const gz = this.access.gate.z;
+    return {
+      mail: { x: roadX(gz) - ROAD_W / 2 - 0.2, z: gz + DRIVE_W / 2 + 0.24, rot: Math.PI / 2 },
+      sign: { x: PARCEL_SIZE - 0.8, z: gz - DRIVE_W / 2 - 0.45, rot: Math.PI / 2 },
+    };
+  }
+
+  /** A flared gravel apron where the drive leaves the road (the truck's turn, the wheel-worn mouth). */
+  private _driveApron(): Array<{ x: number; z: number; w: number; d: number; rot: number }> {
+    if (!this._drive) return [];
+    const gz = this.access.gate.z;
+    return [{ x: roadX(gz) - ROAD_W / 2 - 0.5, z: gz, w: DRIVE_W + 0.6, d: 0.95, rot: Math.PI / 2 }];
+  }
+
+  /** The tint the tracks wear through: the region's grass, its bare earth. */
+  private _pathLook(): { grass: number; soil: number } {
+    const look = regionLookFor(this.regionWorld.kind);
+    const lerp = (a: number, b: number, t: number) => new THREE.Color(a).lerp(new THREE.Color(b), t).getHex();
+    return { grass: look.grass !== undefined && look.dryGrass !== undefined ? lerp(look.grass, look.dryGrass, 0.5) : (look.grass ?? 0x6c7550), soil: lerp(0x6b5a43, 0xa38d65, Math.min(1, look.dry * 0.8 + 0.2)) };
+  }
+
   /** Is (x, z) on the camp (plus `pad`)? */
   onCamp(x: number, z: number, pad = 0): boolean {
     return Math.hypot(x - this.camp.x, z - this.camp.z) < 1.1 + pad;
@@ -1080,6 +1224,9 @@ export class HomesteadWorld {
     this.sage.visible = !on;
     this.willow.visible = !on;
     this.rocks.visible = !on;
+    // the tracks and the yard clutter lie on the ground, not in the cut-away section
+    this.paths.enabled = !on;
+    this.lived.enabled = !on;
     this.stream.setEdgesVisible(!on);
     for (const [id, g] of this._runGroups) if (['escape_tunnel', 'underground_passage'].includes(this._runs.find(r => r.id === id)?.kind ?? '')) this._applyTunnelView(g.group);
     // a bed of dark earth under the bunkers, so the see-through ground reads as a cut-away section, not sky
@@ -1347,13 +1494,19 @@ export class HomesteadWorld {
 
   /** Vehicles: in their bays and the yard, and out the gate on a run. */
   updateFleet(dt: number, game: GameState, speedK: number): void {
-    this.fleet.update(dt, game, {
+    const ctx: FleetCtx = {
       host: id => { const b = this._built.get(id); return b ? { x: b.placed.x, z: b.placed.z, rot: b.placed.rot, kind: b.placed.kind } : null; },
       yard: this.camp,
       drive: this.access.drive,
       ground: this.groundAt,
-    }, speedK);
+    };
+    this.fleet.update(dt, game, ctx, speedK);
+    // the cars in the open yard are in the way of walks and yard props (re-found only when the fleet changes)
+    const key = (game.vehicles ?? []).map(v => `${v.id}${v.kind}${v.away ? 'a' : ''}`).join() + `|${[...this._built.keys()].length}`;
+    if (key !== this._carKey) { this._carKey = key; this._cars = this.fleet.openBoxes(game, ctx); this.paths.invalidate(); }
   }
+  private _cars: CarBox[] = [];
+  private _carKey = '';
 
   /** Wildlife: the animals the sim says live here, grazing, wandering and bolting from people (and dogs). */
   updateWildlife(dt: number, game: GameState, speedK: number): void {
@@ -1386,7 +1539,12 @@ export class HomesteadWorld {
       return j && t ? { x: t.x, z: t.z, scale: t.scale, stage: j.stage, fall: fallHeading(t.id), len: 2.6 * t.scale * t.sy } : null;
     };
     const refs = [...this._built.values()].filter(b => b.finished).map(b => ({ kind: b.placed.kind, site: site(b.placed.id)! }));
-    const ctx: GoalCtx = { camp: this.camp, site, home: homeB ? site(homeB.placed.id) : null, tree, yard: this.access.yard, sleepAt: i => sleepSpotFor(game, i), tentAt: n => this._tentPos[n], ...dailyCtx(refs, game, this.access.yard, seasonState.params.cold < 0.35) };
+    this.paths.update(game, performance.now());
+    const ctx: GoalCtx = {
+      camp: this.camp, site, home: homeB ? site(homeB.placed.id) : null, tree, yard: this.access.yard, sleepAt: i => sleepSpotFor(game, i), tentAt: n => this._tentPos[n],
+      footing: (x, z) => walkFactor(this.paths.surfaceAt(x, z), this._underfoot), via: (fx, fz, tx, tz) => this.paths.via(fx, fz, tx, tz),
+      ...dailyCtx(refs, game, this.access.yard, seasonState.params.cold < 0.35),
+    };
     const fx = yardFx(game, hour);
     this._yard.update(this._clock, fx.lights, fx.smoke);
     const season = (seasonState.visual === 'winter' && !seasonState.climate.freeze ? 'fall' : seasonState.visual) as WearSeason;
@@ -1698,6 +1856,8 @@ export class HomesteadWorld {
     this.wildlife.dispose();
     this._yard.dispose();
     this.atmos.dispose();
+    this.paths.dispose();
+    this.lived.dispose();
     this.lakes.dispose();
     this._ws.scene.remove(this._root);
     this._root.traverse(o => {

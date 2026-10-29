@@ -3,120 +3,121 @@
 | Site | Disaster | Strategy | Variant | Ending | Grade | Alive | Lost to | Hungry days | Days | $ at hit | Built at hit | Fights | Hid (found) | Trials | Bugs |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | 80 ac creek 26 m raw $322k | grid_down | idle | cascade | wipe | F | 0/4 | 4 hunger | 73 | 74 | 688,493 | 0 | - | 1 (0) | - |  |
-| 5 ac dry 34 m trailer $200k | grid_down | homestead | cyber | equilibrium | D | 2/5 | 2 killed in a fight, 1 taken | 14 | 400 | 631,176 | 22 | fled (lost people), overrun (lost people), repelled, repelled | 10 (6) | - |  |
-| 20 ac spring 26 m raw $134k | grid_down | prepper | ice_storm | recovered | C | 3/4 | 1 killed in a fight | 0 | 632 | 134,508 | 23 | fled, fled, fled, fled, fled, fled (lost people) | 18 (8), 1 burned | - |  |
-| 40 ac dry 10 m farmhouse $383k | grid_down | fortress | ice_storm | recovered | A | 4/4 | - | 0 | 91 | 262,323 | 15 | - | - | - |  |
+| 5 ac dry 34 m trailer $200k | grid_down | homestead | cyber | equilibrium | D | 2/5 | 2 killed in a fight, 1 taken | 0 | 400 | 657,700 | 16 | fled (lost people), overrun (lost people), repelled, repelled | 10 (6) | - |  |
+| 20 ac spring 26 m raw $134k | grid_down | prepper | ice_storm | recovered | C | 3/4 | 1 killed in a fight | 0 | 632 | 188,100 | 22 | fled, fled, fled, fled (lost people) | 23 (13) | - |  |
+| 40 ac dry 10 m farmhouse $383k | grid_down | fortress | ice_storm | recovered | A | 4/4 | - | 0 | 91 | 204,290 | 21 | - | - | - |  |
 | 80 ac spring 39 m raw $323k | nuclear | idle | nearby | wipe | F | 0/4 | 2 wounds, 2 hunger | 17 | 19 | 519,719 | 0 | - | - | - |  |
-| 5 ac creek 33 m raw $89k | nuclear | homestead | distant | wipe | F | 0/4 | 4 hunger | 62 | 472 | 418,956 | 22 | fled, fled, fled | 13 (10) | - |  |
-| 20 ac creek 30 m raw $146k | nuclear | prepper | nearby | equilibrium | B | 4/4 | - | 0 | 523 | 83,638 | 23 | fled, fled, fled, fled · 1 held | 18 (10) | - |  |
-| 40 ac creek 27 m farmhouse $482k | nuclear | fortress | distant | equilibrium | B | 4/4 | - | 0 | 533 | 185,794 | 14 | fled, breached, repelled, fled, fled, breached | 10 (2) | - |  |
+| 5 ac creek 33 m raw $89k | nuclear | homestead | distant | equilibrium | A | 4/4 | - | 0 | 400 | 418,630 | 16 | repelled, fled | 14 (10) | - |  |
+| 20 ac creek 30 m raw $146k | nuclear | prepper | nearby | equilibrium | B | 5/5 | - | 0 | 493 | 86,576 | 28 | fled, fled, fled · 1 held | 19 (12), 1 burned | 1: 1 in, 0 sent on, 0 stole, 0 left |  |
+| 40 ac creek 27 m farmhouse $482k | nuclear | fortress | distant | wipe | F | 0/4 | 3 killed in a fight, 1 hunger | 60 | 342 | 85,096 | 17 | overrun (lost people), overrun (lost people) | 16 (10), 2 burned | - |  |
 | 80 ac creek 18 m raw $316k | drought | idle | megadrought | still going (2 yrs) | B | 4/4 | - | 0 | 728 | 495,828 | 0 | - | 3 (0) | - |  |
-| 5 ac dry 108 m raw $52k | drought | homestead | megadrought | new_normal | B | 3/4 | 1 other | 0 | 158 | 293,793 | 13 | - | 2 (1) | - |  |
-| 20 ac dry 14 m raw $98k | drought | prepper | megadrought | new_normal | A | 4/4 | - | 0 | 91 | 143,694 | 22 | - | - | - |  |
-| 40 ac dry 40 m farmhouse $370k | drought | fortress | megadrought | still going (2 yrs) | C | 3/4 | 1 killed in a fight | 0 | 729 | 684,479 | 13 | breached, fled, breached (lost people) | 1 (0) | - |  |
+| 5 ac dry 108 m raw $52k | drought | homestead | megadrought | new_normal | B | 3/4 | 1 other | 0 | 158 | 293,248 | 11 | - | 2 (2) | - |  |
+| 20 ac dry 14 m raw $98k | drought | prepper | megadrought | new_normal | A | 4/4 | - | 0 | 91 | 96,284 | 23 | - | - | - |  |
+| 40 ac dry 40 m farmhouse $370k | drought | fortress | megadrought | equilibrium | B | 4/4 | - | 0 | 500 | 656,738 | 19 | breached, fled | 1 (0) | - |  |
 | 80 ac spring 25 m raw $283k | pandemic | idle | wave | wipe | F | 0/4 | 4 hunger | 73 | 88 | 454,189 | 0 | - | - | - |  |
-| 5 ac dry 81 m raw $75k | pandemic | homestead | wave | equilibrium | B | 4/5 | 1 wounds | 0 | 495 | 294,247 | 13 | - | 7 (3) | - |  |
-| 20 ac dry 88 m raw $108k | pandemic | prepper | wave | equilibrium | B | 4/4 | - | 0 | 400 | 596,386 | 10 | fled | 3 (3) | - |  |
-| 40 ac creek 42 m farmhouse $420k | pandemic | fortress | wave | equilibrium | F | 1/4 | 2 killed in a fight, 1 wounds | 0 | 501 | 497,104 | 11 | overrun (lost people), overrun, overrun | 2 (1) | - |  |
-| 80 ac creek 18 m trailer $418k | wildfire | idle | front | recovered | C | 2/4 | 2 hunger | 21 | 91 | 223,392 | 3 | - | - | - |  |
-| 5 ac creek 13 m raw $79k | wildfire | homestead | front | recovered | A | 4/4 | - | 0 | 91 | 342,889 | 6 | - | 2 (1) | - |  |
-| 20 ac dry 30 m raw $93k | wildfire | prepper | front | recovered | A | 4/4 | - | 0 | 91 | 123,195 | 13 | - | 2 (1) | - |  |
-| 40 ac spring 39 m raw $169k | wildfire | fortress | front | recovered | A | 4/4 | - | 0 | 91 | 347,748 | 13 | - | - | - |  |
+| 5 ac dry 81 m raw $75k | pandemic | homestead | wave | equilibrium | B | 4/5 | 1 wounds | 0 | 492 | 298,814 | 13 | - | 5 (1) | - |  |
+| 20 ac dry 88 m raw $108k | pandemic | prepper | wave | equilibrium | A | 4/4 | - | 0 | 400 | 179,301 | 22 | fled, fled · 1 held | 6 (4) | - |  |
+| 40 ac creek 42 m farmhouse $420k | pandemic | fortress | wave | equilibrium | B | 4/4 | - | 0 | 400 | 295,182 | 17 | - | 3 (2) | - |  |
+| 80 ac creek 18 m trailer $418k | wildfire | idle | front | recovered | C | 2/4 | 2 hunger | 21 | 91 | 223,387 | 3 | - | - | - |  |
+| 5 ac creek 13 m raw $79k | wildfire | homestead | front | recovered | A | 4/4 | - | 0 | 91 | 342,662 | 6 | - | 1 (0) | - |  |
+| 20 ac dry 30 m raw $93k | wildfire | prepper | front | recovered | A | 4/4 | - | 0 | 91 | 11,938 | 18 | - | 1 (1) | - |  |
+| 40 ac spring 39 m raw $169k | wildfire | fortress | front | recovered | A | 4/4 | - | 0 | 91 | 237,192 | 14 | - | - | - |  |
 | 80 ac creek 40 m timber_cabin $460k | ash_winter | idle | yellowstone | wipe | F | 0/4 | 4 hunger | 73 | 76 | 155,708 | 3 | - | - | - |  |
-| 5 ac creek 23 m raw $66k | ash_winter | homestead | yellowstone | recovered | A | 4/4 | - | 0 | 543 | 282,503 | 11 | - | 10 (7) | - |  |
-| 20 ac creek 23 m farmhouse $308k | ash_winter | prepper | yellowstone | wipe | F | 0/5 | 5 hunger | 59 | 494 | 286,877 | 16 | fled | 11 (7) | - |  |
-| 40 ac creek 14 m farmhouse $421k | ash_winter | fortress | yellowstone | wipe | F | 0/4 | 3 hunger, 1 killed in a fight | 69 | 359 | 283,463 | 12 | breached (lost people), repelled | 8 (5) | - |  |
-| 80 ac spring 35 m trailer $380k | financial | idle | hyperinflation | wipe | F | 0/5 | 5 hunger | 77 | 114 | 206,797 | 3 | - | 1 (0) | - |  |
-| 5 ac creek 36 m farmhouse $260k | financial | homestead | bank_holiday | wipe | F | 0/4 | 2 killed in a fight, 1 other, 1 taken | 0 | 122 | 1,092,328 | 12 | overrun (lost people) | 3 (2), 1 burned | - |  |
-| 20 ac creek 36 m raw $125k | financial | prepper | bank_holiday | new_normal | B | 4/4 | - | 0 | 488 | 384,004 | 13 | - | 10 (6), 1 burned | - |  |
-| 40 ac creek 32 m raw $189k | financial | fortress | bank_holiday | equilibrium | B | 4/4 | - | 0 | 529 | 92,795 | 6 | fled, fled | 11 (4) | - |  |
+| 5 ac creek 23 m raw $66k | ash_winter | homestead | yellowstone | equilibrium | A | 4/4 | - | 0 | 524 | 277,701 | 15 | - | 7 (7) | - |  |
+| 20 ac creek 23 m farmhouse $308k | ash_winter | prepper | yellowstone | equilibrium | B | 5/5 | - | 0 | 539 | 80,427 | 23 | fled, fled | 14 (10) | - |  |
+| 40 ac creek 14 m farmhouse $421k | ash_winter | fortress | yellowstone | equilibrium | B | 4/4 | - | 0 | 514 | 101,495 | 24 | fled, breached, fled | 6 (3) | - |  |
+| 80 ac spring 35 m trailer $380k | financial | idle | hyperinflation | wipe | F | 0/5 | 5 hunger | 77 | 114 | 207,376 | 4 | - | 2 (0) | - |  |
+| 5 ac creek 36 m farmhouse $260k | financial | homestead | bank_holiday | wipe | F | 0/4 | 2 taken, 1 other, 1 killed in a fight | 33 | 310 | 1,104,516 | 18 | repelled, overrun (lost people), overrun | 15 (9), 1 burned | - |  |
+| 20 ac creek 36 m raw $125k | financial | prepper | bank_holiday | new_normal | A | 4/4 | - | 0 | 488 | 121,248 | 20 | fled, fled · 1 held | 7 (4) | - |  |
+| 40 ac creek 32 m raw $189k | financial | fortress | bank_holiday | equilibrium | D | 2/4 | 2 taken | 0 | 400 | 77,623 | 12 | breached, fled, breached | 3 (2) | - |  |
 | 80 ac dry 51 m raw $214k | solar_flare | idle | carrington | wipe | F | 0/4 | 4 hunger | 73 | 75 | 646,525 | 0 | - | 1 (0) | - |  |
-| 5 ac creek 16 m raw $68k | solar_flare | homestead | carrington | wipe | F | 0/4 | 3 hunger, 1 killed in a fight | 64 | 460 | 412,191 | 19 | - | 19 (12) | - |  |
-| 20 ac creek 10 m farmhouse $358k | solar_flare | prepper | carrington | wipe | F | 0/4 | 3 hunger, 1 killed in a fight | 63 | 679 | 19,062 | 11 | fled, fled, fled, fled, fled (lost people), fled, fled | 16 (8), 2 burned | - |  |
-| 40 ac dry 32 m raw $154k | solar_flare | fortress | carrington | equilibrium | C | 4/4 | - | 0 | 512 | 44,181 | 9 | breached | 5 (2) | - |  |
+| 5 ac creek 16 m raw $68k | solar_flare | homestead | carrington | wipe | F | 0/4 | 4 hunger | 64 | 451 | 411,595 | 15 | - | 20 (14) | - |  |
+| 20 ac creek 10 m farmhouse $358k | solar_flare | prepper | carrington | equilibrium | B | 4/4 | - | 0 | 400 | 22,600 | 11 | fled, fled, fled, fled · 1 held | 7 (4), 1 burned | - |  |
+| 40 ac dry 32 m raw $154k | solar_flare | fortress | carrington | equilibrium | C | 3/4 | 1 killed in a fight | 0 | 400 | 35,663 | 10 | fled, overrun (lost people), fled | 3 (0) | - |  |
 | 80 ac dry 13 m raw $232k | zombies | idle | outbreak | wipe | F | 0/4 | 4 hunger | 73 | 79 | 1,137,716 | 0 | - | 1 (0) | - |  |
-| 5 ac dry 12 m raw $66k | zombies | homestead | outbreak | wipe | F | 0/4 | 4 hunger | 65 | 690 | 307,212 | 15 | fled, fled, fled | 32 (16), 1 burned | - |  |
-| 20 ac spring 17 m farmhouse $320k | zombies | prepper | outbreak | wipe | F | 0/4 | 3 hunger, 1 killed in a fight | 61 | 447 | 160,196 | 20 | fled, fled, breached | 27 (14) | - |  |
-| 40 ac dry 66 m raw $140k | zombies | fortress | outbreak | equilibrium | C | 4/4 | - | 0 | 524 | 98,736 | 10 | fled, breached, fled, fled, breached, breached | 14 (7) | - |  |
+| 5 ac dry 12 m raw $66k | zombies | homestead | outbreak | equilibrium | D | 2/4 | 2 killed in a fight | 0 | 400 | 306,753 | 12 | fled, overrun (lost people) | 20 (7) | - |  |
+| 20 ac spring 17 m farmhouse $320k | zombies | prepper | outbreak | equilibrium | B | 4/4 | - | 0 | 494 | 55,330 | 25 | fled, fled, fled | 30 (12), 1 burned | - |  |
+| 40 ac dry 66 m raw $140k | zombies | fortress | outbreak | equilibrium | B | 4/4 | - | 0 | 501 | 66,430 | 15 | fled, fled | 21 (11) | - |  |
 
 ## Report card lines
 
 - **grid_down / idle:** No well, no cistern: water came by the bucket from the creek. 73 hungry days. No one knew first aid. Hannah Quinn did not make it. Owen Quinn did not make it. Sara Quinn did not make it. Ben Quinn did not make it.
-- **grid_down / homestead:** Your cistern kept the water coming every day. 400 nights by lamplight. 14 hungry days. The fields, the garden and the hens covered 133 % of what everyone ate. No one knew first aid. Dana Mendez did not make it. Ben Mendez was taken. Nobody knows where. Laura Mendez did not make it. The line held 3 times, and broke 1.
-- **grid_down / prepper:** Your cistern kept the water coming every day. 632 nights by lamplight. Nobody went hungry. The fields, the garden and the hens covered 46 % of what everyone ate. Every wound was dressed and healed. Ava Ellison did not make it. You turned away 23. The line held 6 times.
-- **grid_down / fortress:** The well never went dry. 91 nights by lamplight. Nobody went hungry. The fields, the garden and the hens covered 13 % of what everyone ate. You turned away 7. The Running Horses stood with you.
+- **grid_down / homestead:** Your cistern kept the water coming every day. 400 nights by lamplight. Nobody went hungry. The fields, the garden and the hens covered 166 % of what everyone ate. No one knew first aid. Dana Mendez did not make it. Ben Mendez was taken. Nobody knows where. Laura Mendez did not make it. The line held 3 times, and broke 1.
+- **grid_down / prepper:** Your cistern kept the water coming every day. 632 nights by lamplight. Nobody went hungry. The fields, the garden and the hens covered 62 % of what everyone ate. Every wound was dressed and healed. Ava Ellison did not make it. You turned away 27. The line held 4 times.
+- **grid_down / fortress:** Your cistern kept the water coming every day. 91 nights by lamplight. Nobody went hungry. The fields, the garden and the hens covered 17 % of what everyone ate. Every wound was dressed and healed. The Running Horses stood with you.
 - **nuclear / idle:** No well, no cistern: water came by the bucket from the creek. Radiation sickness: the worst dose was 3.8 Sv. 17 hungry days. No one knew first aid. Ivy Garza did not make it. Wade Garza did not make it. Frank Garza did not make it. Wren Garza did not make it.
-- **nuclear / homestead:** Your cistern kept the water coming every day. 472 nights by lamplight. The EMP fried the electronics and there were no spares to put in. 62 hungry days. The fields, the garden and the hens covered 80 % of what everyone ate. No one knew first aid. Laura Larsen did not make it. Kate Larsen did not make it. Ruth Larsen did not make it. Maya Larsen did not make it. The line held 3 times.
-- **nuclear / prepper:** Your cistern kept the water coming every day. 523 nights by lamplight. The EMP fried the electronics and there were no spares to put in. Nobody went hungry. The fields, the garden and the hens covered 77 % of what everyone ate. Every wound was dressed and healed. You turned away 30. The line held 4 times.
-- **nuclear / fortress:** No well, no cistern: water came by the bucket from the creek. Nobody went hungry. The fields, the garden and the hens covered 71 % of what everyone ate. Every wound was dressed and healed. You turned away 15. The line held 4 times, and broke 2.
+- **nuclear / homestead:** Your cistern kept the water coming every day. 400 nights by lamplight. The EMP fried the electronics and there were no spares to put in. Nobody went hungry. The fields, the garden and the hens covered 129 % of what everyone ate. The line held 2 times.
+- **nuclear / prepper:** Your cistern kept the water coming every day. 493 nights by lamplight. The EMP fried the electronics and there were no spares to put in. Nobody went hungry. The fields, the garden and the hens covered 107 % of what everyone ate. Every wound was dressed and healed. You took in 1 person. You turned away 32. The line held 3 times.
+- **nuclear / fortress:** Your cistern kept the water coming every day. The EMP fried the electronics and there were no spares to put in. 60 hungry days. The fields and the garden covered 65 % of what everyone ate. No one knew first aid. Wren Parker did not make it. Kate Parker did not make it. Aaron Parker did not make it. June Parker did not make it. You turned away 7. They got in 2 times.
 - **drought / idle:** No well, no cistern: water came by the bucket from the creek. Nobody went hungry. You turned away 15.
-- **drought / homestead:** 50 days without enough water. Nobody went hungry. The fields, the garden and the hens covered 85 % of what everyone ate. No one knew first aid. Hank Nolan did not make it.
-- **drought / prepper:** Your cistern kept the water coming every day. Nobody went hungry. The fields, the garden and the hens covered 23 % of what everyone ate. You turned away 5.
-- **drought / fortress:** The well never went dry. Nobody went hungry. The fields, the garden and the hens covered 27 % of what everyone ate. Every wound was dressed and healed. Frank Quinn did not make it. You turned away 12. The line held 1 time, and broke 2.
+- **drought / homestead:** 50 days without enough water. Nobody went hungry. The fields, the garden and the hens covered 92 % of what everyone ate. No one knew first aid. Hank Nolan did not make it.
+- **drought / prepper:** Your cistern kept the water coming every day. Nobody went hungry. The fields, the garden and the hens covered 26 % of what everyone ate. Every wound was dressed and healed. You turned away 5.
+- **drought / fortress:** Your cistern kept the water coming every day. Nobody went hungry. The fields, the garden and the hens covered 88 % of what everyone ate. Every wound was dressed and healed. You turned away 18. The line held 1 time, and broke 1.
 - **pandemic / idle:** No well, no cistern: water came by the bucket from the creek. 73 hungry days. No one knew first aid. Ava Ortega did not make it. Laura Ortega did not make it. Aaron Ortega did not make it. Jake Ortega did not make it.
-- **pandemic / homestead:** Your cistern kept the water coming every day. Nobody went hungry. The fields, the garden and the hens covered 100 % of what everyone ate. No one knew first aid. Ruth Reyes did not make it.
-- **pandemic / prepper:** Your cistern kept the water coming every day. Nobody went hungry. The fields, the garden and the hens covered 131 % of what everyone ate. Every wound was dressed and healed. You turned away 18. The line held 1 time.
-- **pandemic / fortress:** The well never went dry. Nobody went hungry. The fields and the garden covered 95 % of what everyone ate. No one knew first aid. Sara Walsh did not make it. Wren Walsh did not make it. June Walsh did not make it. You turned away 14. They got in 3 times. The Bauers stood with you.
+- **pandemic / homestead:** Your cistern kept the water coming every day. Nobody went hungry. The fields, the garden and the hens covered 108 % of what everyone ate. No one knew first aid. Ruth Reyes did not make it.
+- **pandemic / prepper:** Your cistern kept the water coming every day. Nobody went hungry. The fields, the garden and the hens covered 143 % of what everyone ate. Every wound was dressed and healed. You turned away 5. The line held 2 times.
+- **pandemic / fortress:** Your cistern kept the water coming every day. Nobody went hungry. The fields, the garden and the hens covered 125 % of what everyone ate. You turned away 14. The Bauers stood with you.
 - **wildfire / idle:** The well never went dry. 21 hungry days. No one knew first aid. Ava Hale did not make it. Frank Hale did not make it. You turned away 4.
-- **wildfire / homestead:** Your cistern kept the water coming every day. Nobody went hungry. The fields, the garden and the hens covered 9 % of what everyone ate.
-- **wildfire / prepper:** Your cistern kept the water coming every day. Nobody went hungry. The fields, the garden and the hens covered 10 % of what everyone ate.
-- **wildfire / fortress:** The well never went dry. Nobody went hungry. The fields, the garden and the hens covered 69 % of what everyone ate. You turned away 1. The McAllisters stood with you.
+- **wildfire / homestead:** Your cistern kept the water coming every day. Nobody went hungry. The fields, the garden and the hens covered 9 % of what everyone ate. No one knew first aid.
+- **wildfire / prepper:** Your cistern kept the water coming every day. Nobody went hungry. The fields, the garden and the hens covered 12 % of what everyone ate. You turned away 2.
+- **wildfire / fortress:** Your cistern kept the water coming every day. Nobody went hungry. The fields, the garden and the hens covered 63 % of what everyone ate. The McAllisters stood with you.
 - **ash_winter / idle:** The well never went dry. 73 hungry days. No one knew first aid. Laura Garza did not make it. June Garza did not make it. Isaac Garza did not make it. Dana Garza did not make it. You turned away 1.
-- **ash_winter / homestead:** Your cistern kept the water coming every day. Nobody went hungry. The fields, the garden and the hens covered 48 % of what everyone ate. No one knew first aid.
-- **ash_winter / prepper:** Your cistern kept the water coming every day. 59 hungry days. The fields, the garden and the hens covered 22 % of what everyone ate. No one knew first aid. Wren Reyes did not make it. Jake Reyes did not make it. Rosa Reyes did not make it. Matt Reyes did not make it. Theo Reyes did not make it. You turned away 20. The line held 1 time.
-- **ash_winter / fortress:** The well never went dry. 69 hungry days. The fields and the garden covered 14 % of what everyone ate. No one knew first aid. Laura Nolan did not make it. Dan Nolan did not make it. Abigail Nolan did not make it. Wren Nolan did not make it. You turned away 9. The line held 1 time, and broke 1.
-- **financial / idle:** The well never went dry. 77 hungry days. No one knew first aid. Dana Carver did not make it. Luis Carver did not make it. Rosa Carver did not make it. Abigail Carver did not make it. Mae Carver did not make it.
-- **financial / homestead:** The well never went dry. Nobody went hungry. The fields, the garden and the hens covered 26 % of what everyone ate. No one knew first aid. Dana Garza did not make it. Owen Garza did not make it. Sara Garza did not make it. Wren Garza was taken. Nobody knows where. They got in 1 time.
-- **financial / prepper:** Your cistern kept the water coming every day. Nobody went hungry. The fields, the garden and the hens covered 66 % of what everyone ate. Every wound was dressed and healed. You turned away 26.
-- **financial / fortress:** The well never went dry. Nobody went hungry. The fields, the garden and the hens covered 80 % of what everyone ate. You turned away 19. The line held 2 times.
+- **ash_winter / homestead:** Your cistern kept the water coming every day. Nobody went hungry. The fields, the garden and the hens covered 63 % of what everyone ate. No one knew first aid.
+- **ash_winter / prepper:** Your cistern kept the water coming every day. Nobody went hungry. The fields, the garden and the hens covered 69 % of what everyone ate. Every wound was dressed and healed. You turned away 12. The line held 2 times. The McAllisters stood with you.
+- **ash_winter / fortress:** Your cistern kept the water coming every day. Nobody went hungry. The fields, the garden and the hens covered 75 % of what everyone ate. No one knew first aid. You turned away 29. The line held 2 times, and broke 1.
+- **financial / idle:** The well never went dry. 77 hungry days. No one knew first aid. Dana Carver did not make it. Luis Carver did not make it. Rosa Carver did not make it. Abigail Carver did not make it. Mae Carver did not make it. You turned away 4.
+- **financial / homestead:** Your cistern kept the water coming every day. 33 hungry days. The fields, the garden and the hens covered 174 % of what everyone ate. No one knew first aid. Dana Garza did not make it. Owen Garza did not make it. Sara Garza was taken. Nobody knows where. Wren Garza was taken. Nobody knows where. The line held 1 time, and broke 2.
+- **financial / prepper:** Your cistern kept the water coming every day. Nobody went hungry. The fields, the garden and the hens covered 94 % of what everyone ate. Every wound was dressed and healed. You turned away 5. The line held 2 times. The Running Horses stood with you.
+- **financial / fortress:** The well never went dry. Nobody went hungry. The fields, the garden and the hens covered 135 % of what everyone ate. No one knew first aid. Carmen Nolan was taken. Nobody knows where. Aaron Nolan was taken. Nobody knows where. You turned away 25. The line held 1 time, and broke 2.
 - **solar_flare / idle:** No well, no cistern: water came by the bucket from the creek. 73 hungry days. No one knew first aid. Sara Mendez did not make it. Luis Mendez did not make it. Maya Mendez did not make it. Grace Mendez did not make it.
-- **solar_flare / homestead:** Your cistern kept the water coming every day. 64 hungry days. The fields, the garden and the hens covered 25 % of what everyone ate. No one knew first aid. Ava Garza did not make it. Dan Garza did not make it. Carmen Garza did not make it. Tom Garza did not make it.
-- **solar_flare / prepper:** The well never went dry. 63 hungry days. The fields and the garden covered 75 % of what everyone ate. No one knew first aid. Rosa Fischer did not make it. Gabe Fischer did not make it. Isaac Fischer did not make it. Frank Fischer did not make it. You turned away 19. The line held 7 times.
-- **solar_flare / fortress:** The well never went dry. Nobody went hungry. The fields, the garden and the hens covered 95 % of what everyone ate. No one knew first aid. You turned away 20. They got in 1 time.
+- **solar_flare / homestead:** Your cistern kept the water coming every day. 64 hungry days. The fields, the garden and the hens covered 30 % of what everyone ate. No one knew first aid. Ava Garza did not make it. Dan Garza did not make it. Carmen Garza did not make it. Tom Garza did not make it.
+- **solar_flare / prepper:** The well never went dry. Nobody went hungry. The fields, the garden and the hens covered 139 % of what everyone ate. No one knew first aid. You turned away 25. The line held 4 times.
+- **solar_flare / fortress:** Your cistern kept the water coming every day. Nobody went hungry. The fields, the garden and the hens covered 116 % of what everyone ate. No one knew first aid. Maya Baker did not make it. You turned away 14. The line held 2 times, and broke 1.
 - **zombies / idle:** No well, no cistern: water came by the bucket from the creek. 73 hungry days. No one knew first aid. Ivy Garza did not make it. Sam Garza did not make it. Gabe Garza did not make it. Wade Garza did not make it.
-- **zombies / homestead:** Your cistern kept the water coming every day. 65 hungry days. The fields, the garden and the hens covered 59 % of what everyone ate. No one knew first aid. Wade Walsh did not make it. Luis Walsh did not make it. Noah Walsh did not make it. Abigail Walsh did not make it. The line held 3 times.
-- **zombies / prepper:** Your cistern kept the water coming every day. 61 hungry days. The fields, the garden and the hens covered 53 % of what everyone ate. No one knew first aid. Jake Walsh did not make it. Ray Walsh did not make it. Abigail Walsh did not make it. Gabe Walsh did not make it. You turned away 11. The line held 2 times, and broke 1.
-- **zombies / fortress:** The well never went dry. Nobody went hungry. The fields, the garden and the hens covered 84 % of what everyone ate. You turned away 15. The line held 3 times, and broke 3.
+- **zombies / homestead:** Your cistern kept the water coming every day. Nobody went hungry. The fields, the garden and the hens covered 120 % of what everyone ate. No one knew first aid. Wade Walsh did not make it. Luis Walsh did not make it. The line held 1 time, and broke 1.
+- **zombies / prepper:** Your cistern kept the water coming every day. Nobody went hungry. The fields, the garden and the hens covered 99 % of what everyone ate. No one knew first aid. You turned away 20. The line held 3 times.
+- **zombies / fortress:** Your cistern kept the water coming every day. Nobody went hungry. The fields, the garden and the hens covered 101 % of what everyone ate. You turned away 18. The line held 2 times.
 
 ## What keeps happening (log lines seen 40+ times in a run, numbers taken out)
 
 - **grid_down / idle:** 74× "Short of food: # kcal less than the family needs today#"; 47× "Out of firewood still: a cold night at camp# Order a few ricks in the Shop (Heat)# or mark trees to fell: green wood needs about nine months to season#"
-- **grid_down / homestead:** 71× "The hens are off lay and the animals are bawling# Who was supposed to feed them?"; 59× "A squirrel scolded the family from the nearest tree#"; 42× "A grouse drummed from the timber#"
-- **grid_down / prepper:** 106× "The hens are off lay and the animals are bawling# Who was supposed to feed them?"; 83× "The animals are standing about# off their feed# Something is wrong if nobody has seen to them in days#"; 65× "A grouse drummed from the timber#"; 60× "A squirrel scolded the family from the nearest tree#"
-- **grid_down / fortress:** 95× "The hens are off lay and the animals are bawling# Who was supposed to feed them?"; 81× "The animals are standing about# off their feed# Something is wrong if nobody has seen to them in days#"; 46× "A grouse drummed from the timber#"
+- **grid_down / homestead:** 59× "A squirrel scolded the family from the nearest tree#"; 43× "A grouse drummed from the timber#"
+- **grid_down / prepper:** 65× "A grouse drummed from the timber#"; 60× "A squirrel scolded the family from the nearest tree#"
 - **nuclear / idle:** 47× "Out of firewood still: a cold night at camp# Order a few ricks in the Shop (Heat)# or mark trees to fell: green wood needs about nine months to season#"
-- **nuclear / homestead:** 98× "The hens are off lay and the animals are bawling# Who was supposed to feed them?"; 69× "The animals are standing about# off their feed# Something is wrong if nobody has seen to them in days#"; 63× "Short of food: # kcal less than the family needs today#"; 55× "A squirrel scolded the family from the nearest tree#"; 47× "A grouse drummed from the timber#"
-- **nuclear / prepper:** 189× "The hens are off lay and the animals are bawling# Who was supposed to feed them?"; 55× "Cooper needs the vet and there are no medical supplies#"; 52× "A grouse drummed from the timber#"; 49× "A squirrel scolded the family from the nearest tree#"
-- **nuclear / fortress:** 141× "Clover needs the vet and there are no medical supplies#"; 116× "The hens are off lay and the animals are bawling# Who was supposed to feed them?"; 81× "Daisy needs the vet and there are no medical supplies#"; 64× "The animals are standing about# off their feed# Something is wrong if nobody has seen to them in days#"; 54× "A grouse drummed from the timber#"; 53× "A squirrel scolded the family from the nearest tree#"
+- **nuclear / homestead:** 55× "A squirrel scolded the family from the nearest tree#"; 46× "A grouse drummed from the timber#"
+- **nuclear / prepper:** 52× "A grouse drummed from the timber#"; 48× "A squirrel scolded the family from the nearest tree#"
+- **nuclear / fortress:** 61× "Short of food: # kcal less than the family needs today#"; 50× "A squirrel scolded the family from the nearest tree#"; 49× "A grouse drummed from the timber#"
 - **drought / idle:** 77× "Out of firewood still: a cold night at camp# Order a few ricks in the Shop (Heat)# or mark trees to fell: green wood needs about nine months to season#"; 61× "A grouse drummed from the timber#"; 55× "A squirrel scolded the family from the nearest tree#"
-- **drought / homestead:** 65× "Water ran short by # L#"; 45× "The hens are off lay and the animals are bawling# Who was supposed to feed them?"; 41× "A grouse drummed from the timber#"
-- **drought / prepper:** 95× "The hens are off lay and the animals are bawling# Who was supposed to feed them?"; 58× "The animals are standing about# off their feed# Something is wrong if nobody has seen to them in days#"; 47× "A grouse drummed from the timber#"
-- **drought / fortress:** 151× "The hens are off lay and the animals are bawling# Who was supposed to feed them?"; 66× "A grouse drummed from the timber#"; 60× "A squirrel scolded the family from the nearest tree#"
+- **drought / homestead:** 65× "Water ran short by # L#"; 41× "A grouse drummed from the timber#"
+- **drought / prepper:** 47× "A grouse drummed from the timber#"
+- **drought / fortress:** 57× "A grouse drummed from the timber#"; 43× "A squirrel scolded the family from the nearest tree#"
 - **pandemic / idle:** 74× "Short of food: # kcal less than the family needs today#"; 47× "Out of firewood still: a cold night at camp# Order a few ricks in the Shop (Heat)# or mark trees to fell: green wood needs about nine months to season#"; 42× "A coyote crossed the yard in the night# looked around and went on#"; 42× "A squirrel scolded the family from the nearest tree#"; 42× "A grouse drummed from the timber#"
-- **pandemic / homestead:** 59× "The hens are off lay and the animals are bawling# Who was supposed to feed them?"; 57× "A grouse drummed from the timber#"; 57× "A squirrel scolded the family from the nearest tree#"; 44× "The animals are standing about# off their feed# Something is wrong if nobody has seen to them in days#"
+- **pandemic / homestead:** 57× "A squirrel scolded the family from the nearest tree#"; 55× "A grouse drummed from the timber#"
 - **pandemic / prepper:** 54× "A squirrel scolded the family from the nearest tree#"; 52× "A grouse drummed from the timber#"
-- **pandemic / fortress:** 60× "The hens are off lay and the animals are bawling# Who was supposed to feed them?"; 52× "A squirrel scolded the family from the nearest tree#"; 43× "A grouse drummed from the timber#"; 41× "The animals are standing about# off their feed# Something is wrong if nobody has seen to them in days#"
+- **pandemic / fortress:** 48× "A grouse drummed from the timber#"; 46× "A squirrel scolded the family from the nearest tree#"
 - **wildfire / idle:** 47× "Out of firewood still: a cold night in the trailer# Order a few ricks in the Shop (Heat)# or mark trees to fell: green wood needs about nine months to season#"
-- **wildfire / homestead:** 42× "A grouse drummed from the timber#"; 40× "The hens are off lay and the animals are bawling# Who was supposed to feed them?"
+- **wildfire / homestead:** 42× "A grouse drummed from the timber#"
 - **wildfire / prepper:** 42× "A squirrel scolded the family from the nearest tree#"
-- **wildfire / fortress:** 78× "The hens are off lay and the animals are bawling# Who was supposed to feed them?"; 66× "The animals are standing about# off their feed# Something is wrong if nobody has seen to them in days#"; 45× "A squirrel scolded the family from the nearest tree#"
+- **wildfire / fortress:** 47× "A squirrel scolded the family from the nearest tree#"
 - **ash_winter / idle:** 74× "Short of food: # kcal less than the family needs today#"; 51× "Out of firewood still: a cold night in the timber cabin# Order a few ricks in the Shop (Heat)# or mark trees to fell: green wood needs about nine months to season#"; 48× "A grouse drummed from the timber#"; 41× "A coyote crossed the yard in the night# looked around and went on#"; 40× "A squirrel scolded the family from the nearest tree#"
-- **ash_winter / homestead:** 68× "A squirrel scolded the family from the nearest tree#"
-- **ash_winter / prepper:** 62× "A grouse drummed from the timber#"; 59× "Short of food: # kcal less than the family needs today#"; 54× "A squirrel scolded the family from the nearest tree#"; 44× "The hens are off lay and the animals are bawling# Who was supposed to feed them?"
-- **ash_winter / fortress:** 90× "The hens are off lay and the animals are bawling# Who was supposed to feed them?"; 69× "Short of food: # kcal less than the family needs today#"; 57× "Dot needs the vet and there are no medical supplies#"; 53× "The animals are standing about# off their feed# Something is wrong if nobody has seen to them in days#"; 51× "Juno needs the vet and there are no medical supplies#"; 45× "A grouse drummed from the timber#"
+- **ash_winter / homestead:** 66× "A squirrel scolded the family from the nearest tree#"
+- **ash_winter / prepper:** 64× "A grouse drummed from the timber#"; 58× "A squirrel scolded the family from the nearest tree#"; 42× "Felled a cottonwood: # ricks of green firewood (it burns well once it's seasoned# in about nine months)#"
+- **ash_winter / fortress:** 52× "A grouse drummed from the timber#"; 42× "A squirrel scolded the family from the nearest tree#"
 - **financial / idle:** 78× "Short of food: # kcal less than the family needs today#"; 47× "Out of firewood still: a cold night in the trailer# Order a few ricks in the Shop (Heat)# or mark trees to fell: green wood needs about nine months to season#"; 44× "A coyote crossed the yard in the night# looked around and went on#"
-- **financial / homestead:** 109× "The hens are off lay and the animals are bawling# Who was supposed to feed them?"; 46× "A squirrel scolded the family from the nearest tree#"
+- **financial / homestead:** 54× "A squirrel scolded the family from the nearest tree#"
 - **financial / prepper:** 59× "A grouse drummed from the timber#"; 54× "A squirrel scolded the family from the nearest tree#"
-- **financial / fortress:** 55× "Bonnie needs the vet and there are no medical supplies#"; 49× "A grouse drummed from the timber#"; 46× "Daisy needs the vet and there are no medical supplies#"; 44× "A squirrel scolded the family from the nearest tree#"
+- **financial / fortress:** 43× "A squirrel scolded the family from the nearest tree#"; 41× "A grouse drummed from the timber#"
 - **solar_flare / idle:** 74× "Short of food: # kcal less than the family needs today#"; 51× "A squirrel scolded the family from the nearest tree#"; 47× "Out of firewood still: a cold night at camp# Order a few ricks in the Shop (Heat)# or mark trees to fell: green wood needs about nine months to season#"
-- **solar_flare / homestead:** 94× "The hens are off lay and the animals are bawling# Who was supposed to feed them?"; 71× "The animals are standing about# off their feed# Something is wrong if nobody has seen to them in days#"; 64× "Short of food: # kcal less than the family needs today#"; 52× "A squirrel scolded the family from the nearest tree#"; 45× "A grouse drummed from the timber#"
-- **solar_flare / prepper:** 68× "A squirrel scolded the family from the nearest tree#"; 67× "A grouse drummed from the timber#"; 64× "Short of food: # kcal less than the family needs today#"; 59× "Bear needs the vet and there are no medical supplies#"; 41× "The hens are off lay and the animals are bawling# Who was supposed to feed them?"
-- **solar_flare / fortress:** 118× "Scout needs the vet and there are no medical supplies#"; 113× "Moose needs the vet and there are no medical supplies#"; 55× "A grouse drummed from the timber#"; 43× "A squirrel scolded the family from the nearest tree#"
+- **solar_flare / homestead:** 64× "Short of food: # kcal less than the family needs today#"; 50× "A squirrel scolded the family from the nearest tree#"; 42× "A grouse drummed from the timber#"
+- **solar_flare / prepper:** 54× "A grouse drummed from the timber#"; 48× "A squirrel scolded the family from the nearest tree#"
+- **solar_flare / fortress:** 43× "A grouse drummed from the timber#"
 - **zombies / idle:** 74× "Short of food: # kcal less than the family needs today#"; 47× "Out of firewood still: a cold night at camp# Order a few ricks in the Shop (Heat)# or mark trees to fell: green wood needs about nine months to season#"; 46× "A grouse drummed from the timber#"; 40× "A squirrel scolded the family from the nearest tree#"
-- **zombies / homestead:** 69× "A grouse drummed from the timber#"; 66× "Short of food: # kcal less than the family needs today#"; 57× "A squirrel scolded the family from the nearest tree#"; 47× "The hens are off lay and the animals are bawling# Who was supposed to feed them?"
-- **zombies / prepper:** 110× "The hens are off lay and the animals are bawling# Who was supposed to feed them?"; 62× "Short of food: # kcal less than the family needs today#"; 61× "A squirrel scolded the family from the nearest tree#"; 51× "A grouse drummed from the timber#"
-- **zombies / fortress:** 134× "Ziggy needs the vet and there are no medical supplies#"; 92× "Moose needs the vet and there are no medical supplies#"; 56× "A grouse drummed from the timber#"; 55× "The hens are off lay and the animals are bawling# Who was supposed to feed them?"; 42× "A squirrel scolded the family from the nearest tree#"
+- **zombies / homestead:** 61× "A grouse drummed from the timber#"; 50× "A squirrel scolded the family from the nearest tree#"
+- **zombies / prepper:** 67× "The animals are standing about# off their feed# Something is wrong if nobody has seen to them in days#"; 64× "A squirrel scolded the family from the nearest tree#"; 51× "A grouse drummed from the timber#"
+- **zombies / fortress:** 46× "A grouse drummed from the timber#"; 43× "A squirrel scolded the family from the nearest tree#"
 
 ## Money
 
+- **wildfire / prepper:** owed as much as $209 (worst: card)
+- **ash_winter / fortress:** owed as much as $28 (worst: card)
 - **financial / fortress:** owed as much as $2 (worst: card)

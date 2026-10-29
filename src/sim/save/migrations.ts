@@ -33,12 +33,15 @@ import { newDaily } from '../daily';
 import { dayJob, type Person } from '../family';
 import { migrateDogs } from '../pets';
 import { starterKit } from '../tools';
+import { newPaths } from '../paths';
 import { newKin } from '../kin';
 
 type Raw = Record<string, unknown> & { version?: number };
 
 /** version n → n + 1 upgraders. */
 const STEPS: Record<number, (s: Raw) => Raw> = {
+  // 57 → 58: laid walks (`paths`, sim/paths.ts); worn tracks are derived, not saved
+  57: s => ({ ...s, version: 58, paths: (s.paths as object | undefined) ?? newPaths() }),
   // 55 → 56: the fleet (sim/vehicles.ts): vehicle parts in the stock, a service reading on each vehicle
   55: s => ({ ...s, version: 56, stock: { vehicle_parts: 0, ...(s.stock as object) }, vehicles: (s.vehicles as Array<Record<string, unknown>> | undefined)?.map(v => ({ serviceAt: v.oilAt, ...v })) }),
   // 54 → 55: extended family (sim/kin.ts): nobody in town, no requests in a game already under way

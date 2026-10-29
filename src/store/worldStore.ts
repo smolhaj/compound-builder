@@ -5,6 +5,7 @@ import type { SeasonMode } from '../engine/world/season/seasonState';
 import type { WeatherMode } from '../engine/world/weather/weatherState';
 import type { TourCaption, TourMode } from '../engine/world/camera/TourController';
 import type { PropertyGeometry } from '../sim/propertyWall';
+import type { PathSummary } from '../game/paths/pathNet';
 
 export type CameraMode = 'diorama' | TourMode;
 /** How buildings are drawn: whole, cut to waist height with the roof off, or with see-through walls. */
@@ -42,6 +43,9 @@ export interface WorldState {
   /** What the world knows of the land that the sim does not (the creek's line, the road gate): the "Wall my property" planner reads it. Set by the canvas. */
   siteGeo: PropertyGeometry | null;
   setSiteGeo: (g: PropertyGeometry | null) => void;
+  /** The walks between the stops on the place (game/paths): what the Paths panel lists and prices. Set by the canvas. */
+  pathNet: PathSummary | null;
+  setPathNet: (p: PathSummary | null) => void;
   /** Underground view (bunker rooms; the ground goes see-through). */
   underground: boolean;
   setUnderground: (on: boolean) => void;
@@ -93,6 +97,8 @@ export const useWorldStore = create<WorldState>()(subscribeWithSelector((set) =>
   showBoundary: false,
   siteGeo: null,
   setSiteGeo: (siteGeo) => set({ siteGeo }),
+  pathNet: null,
+  setPathNet: (pathNet) => set({ pathNet }),
   underground: false,
   setUnderground: (underground) => set({ underground }),
   hudHidden: false,
