@@ -192,7 +192,7 @@ export function lotField(spec: LotSpec, rect: Rect): LotField {
         // a cliff in the middle of the wall with a talus apron at its foot, and a few ledges
         const prof = 0.12 * t + 0.88 * sst(0.1, 0.9, t), ledge = side ? 0.22 : 0.08;
         const wall = lerp(prof, terrace(t * 4, 0.5) / 4, ledge);
-        const rim = D * (1 + 0.12 * n(x, 0, 0.04, 3)) + 0.05 * Math.max(0, d - ww) + 0.04 * R * n(x, z, 0.1, 1);
+        const rim = D * (1 + 0.12 * n(x, 0, 0.04, 3)) + 0.05 * Math.max(0, d - ww) + 0.04 * Math.min(R, 10) * n(x, z, 0.1, 1);
         return bed(x) + 0.25 + wall * rim;
       };
       rock = (x, z) => { const d = Math.abs(z - zc(x)); const t = clamp((d - fw) / (flip * (z - zc(x)) < 0 ? wwL : wwR), 0, 1); return sst(0.08, 0.3, t) * (1 - sst(0.95, 1.05, t)) * (0.7 + 0.3 * n(x, z, 0.3, 8)); };
@@ -204,6 +204,7 @@ export function lotField(spec: LotSpec, rect: Rect): LotField {
       const gr = 0.17, xw = rect.x0 + 0.1 * w * r2;
       // the cliff stands 65 % of the relief; on a small lot it is cut down to what leaves the top a flat stretch before the ramp to the road
       const T = butte ? R : Math.min(R * 0.65, gr * 0.55 * (PARCEL - xw - 3));
+      const Tn = Math.min(T, 8);   // (the noise on the top stays the size of a hill, however high the cliff)
       const run = butte ? 20 : T / gr, xr0 = Math.max(xw + 3, PARCEL - run - 3);
       const half = (0.3 + 0.1 * r1) * hz, cw = T * 0.42 + 0.5, sw = T * 1.5 + 2;
       out.fall = 0;
@@ -212,12 +213,12 @@ export function lotField(spec: LotSpec, rect: Rect): LotField {
         const wob = 1.5 * n(x, z, 0.07, 3) + 0.6 * n(x, z, 0.22, 5);
         const dz = Math.abs(z - cz) - half + wob, dx = xw - x + wob;
         const sd = Math.max(dz, dx);   // > 0 outside the tongue
-        const top = topH(Math.min(x, PARCEL + 3)) + 0.1 * T * 0.2 * n(x, z, 0.15, 2);
-        if (sd <= 0) return 0.3 + Math.max(top, 0.1) + 0.04 * T * n(x, z, 0.3, 4);
+        const top = topH(Math.min(x, PARCEL + 3)) + 0.02 * Tn * n(x, z, 0.15, 2);
+        if (sd <= 0) return 0.3 + Math.max(top, 0.1) + 0.04 * Tn * n(x, z, 0.3, 4);
         // cliff down to 45% then talus to the plain
         const cliffTo = 0.42, t1 = clamp(sd / cw, 0, 1), t2 = clamp((sd - cw) / sw, 0, 1);
         const f = sd < cw ? 1 - (1 - cliffTo) * sst(0, 1, t1) : cliffTo * (1 - sst(0, 1, t2) ** 0.8);
-        return 0.3 + Math.max(top, 0.1) * f + 0.03 * T * n(x, z, 0.2, 6) * (1 - f);
+        return 0.3 + Math.max(top, 0.1) * f + 0.03 * Tn * n(x, z, 0.2, 6) * (1 - f);
       };
       rock = (x, z) => {
         const wob = 1.5 * n(x, z, 0.07, 3), dz = Math.abs(z - cz) - half + wob, dx = xw - x + wob, sd = Math.max(dz, dx);
@@ -246,7 +247,7 @@ export function lotField(spec: LotSpec, rect: Rect): LotField {
       raw = (x, z) => {
         const e = xb(z) - x;                       // distance west of the bluff edge (>0 over the water side)
         const lakeM = 1 - sst(46, 72, Math.abs(z - cz));   // the lake closes at its north and south ends
-        const up = LAKE_Y + Bh + 0.03 * (x - xb(z)) + 0.04 * R * n(x, z, 0.1, 2) + 0.03 * R * n(x, z, 0.3, 3);
+        const up = LAKE_Y + Bh + 0.03 * (x - xb(z)) + 0.04 * Math.min(R, 10) * n(x, z, 0.1, 2) + 0.03 * Math.min(R, 10) * n(x, z, 0.3, 3);
         if (e <= 0) return up;
         // the face drops from the upland to the shelf, then the bed; the lake closes at its north and south ends (the face eases out)
         const face = LAKE_Y + 0.25 + (up - LAKE_Y - 0.25) * (1 - sst(0, bf, e)) * (1 + 0.2 * n(x, z, 0.18, 7) * sst(0, 3, e) * Math.min(1, 10 / Bh));
