@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { TERRAIN_LEGEND, type TerrainMode } from '../game/terrain/TerrainOverlay';
 import { stormOutage } from '../sim/weatherThreats';
 import { PersonInsight, PeopleSection, MedicalSection } from './PeoplePanel';
 import { DailySection } from './SchedulePanel';
@@ -523,6 +524,10 @@ export function Hud() {
         </select>
         <span style={{ opacity: 0.7 }}>Sightlines</span>
         {SIGHTS.map(([m, label, tip]) => <button key={m} title={tip} style={btn(w.sightMode === m)} onClick={() => w.setSightMode(m)}>{label}</button>)}
+        <span style={{ opacity: 0.7 }}>Terrain</span>
+        <button style={btn(w.terrainMode === 'off')} title="Hide the terrain overlay" onClick={() => w.setTerrainMode('off')}>Off</button>
+        {(Object.keys(TERRAIN_LEGEND) as Array<Exclude<TerrainMode, 'off'>>).map(m => <button key={m} title={TERRAIN_LEGEND[m].tip} style={btn(w.terrainMode === m)} onClick={() => w.setTerrainMode(m)}>{TERRAIN_LEGEND[m].label}</button>)}
+        {w.terrainMode !== 'off' && <div style={{ flexBasis: '100%', fontSize: 11.5, opacity: 0.85 }}>{TERRAIN_LEGEND[w.terrainMode].legend}</div>}
         <button style={btn(w.showBoundary)} title="Draw the property line on the ground (it also shows while you draw a fence or wall)" onClick={() => w.setShowBoundary(!w.showBoundary)}>Boundary</button>
         <button style={btn(w.photo)} onClick={() => w.setPhoto(!w.photo)}>Photo</button>
         {w.photo && <>

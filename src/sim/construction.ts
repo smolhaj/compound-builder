@@ -4,6 +4,7 @@
  * then); builders add person-hours at their work rate; when the stage's
  * hours are done the next one begins.
  */
+import { mudFactor } from './terrainFx';
 import { drillExtra, siteProblem } from './site';
 import { permitHold } from './paperwork';
 import { BLUEPRINTS, totalBill } from './blueprints';
@@ -96,7 +97,8 @@ export function addWork(s: GameState, st: Structure, personHours: number, own = 
     const stage = bp.stages[st.stage];
     const need = stage.hours - st.done;
     const task = { kind: 'build', stage: stage.id } as const;
-    const m = own ? workSpeed(s, task) : 1;
+    // spring-thaw mud on a floodplain slows the work (sim/terrainFx.ts)
+    const m = (own ? workSpeed(s, task) : 1) * mudFactor(s, st);
     if (m <= 0) break;   // no tool for it (holdReason says which): the family makes do in a day or two
     const use = Math.min(need / m, left);
     st.done += use * m;
