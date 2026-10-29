@@ -450,7 +450,8 @@ export class HomesteadWorld {
         return [...planParcelTrees(this.parcel, o), ...planUnderstory(this.parcel, o)];
       }),
     ];
-    const specs = plantAll(q === 'low' ? 0.5 : 1, blocked);
+    // (a lot with relief carries about twice the classic parcel's trees: Low plants a third of them, Medium most)
+    const specs = plantAll(this.parcel.lot ? (q === 'low' ? 0.35 : q === 'medium' ? 0.85 : 1) : q === 'low' ? 0.5 : 1, blocked);
     for (const t of specs) t.y = this.terrain.surfaceAt(t.x, t.z) - 0.03;
     this._planted = specs;
     // lookups cover every tree a full-density plan has (marks made on High survive a switch to Low)

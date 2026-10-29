@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { makeLotSite, siteLot } from './lotListing';
+import { lotPriceFactor, makeLotSite, siteLot } from './lotListing';
 import { altitudeClimate, regionFor, REF_ALT_M } from './climate';
 import { gradeAt, gradeBucket, gradedBlueprint, gradeNote, powerFactor, responseFactor, roadClosedFor, roadDifficulty, roadFactor, winterRoadLine } from './slope';
 import { CLASSIC, type Site } from './site';
@@ -97,6 +97,15 @@ describe('slope-driven costs', () => {
     // the classic place never grades
     const c = newGame(3);
     expect(planStructure(c, 'timber_cabin', 30, 30, 0).grade).toBeUndefined();
+  });
+});
+
+describe('the butte', () => {
+  it('has no ramp: a cut zigzag, priced down', () => {
+    const butte = lot('mesa', { relief: 36, outlier: true, seed: 3 });
+    expect(roadFactor(butte).text).toMatch(/butte with no ramp/);
+    expect(roadFactor(butte).lenMul).toBe(3.6);
+    expect(lotPriceFactor(butte)).toBeLessThan(lotPriceFactor(lot('mesa', { relief: 6, seed: 3 })) * 0.6);
   });
 });
 

@@ -139,7 +139,7 @@ export const GW_FACTOR: Record<LotKind, number> = { ridge: 2.0, hillside: 1.3, b
  * What the ground does to the price: flat pads and an easy road raise it, a lake raises it, extreme relief lowers it.
  * Multiplies the region's per-acre price (sim/site.ts sitePrice).
  */
-export function lotPriceFactor(site: Pick<Site, 'lot' | 'home'>): number {
+export function lotPriceFactor(site: Pick<Site, 'lot' | 'home'> & Partial<Pick<Site, 'creek' | 'spring'>>): number {
   const lot = siteLot(site);
   if (!lot) return 1;
   const { stats: st } = lot, spec = site.lot!;
@@ -147,7 +147,9 @@ export function lotPriceFactor(site: Pick<Site, 'lot' | 'home'>): number {
   const g = st.accessMaxPct;
   k *= g <= 6 ? 1.06 : g <= 10 ? 1 : g <= 16 ? 0.9 : g <= 25 ? 0.78 : 0.6;
   k *= { ridge: 1.05, hillside: 0.95, bench: 1.1, gorge: 0.85, mesa: 1, saddle: 0.9, bluff: 1.1, island: 1.3 }[spec.kind];
-  if (spec.outlier) k *= 0.7;
+  if (spec.outlier) k *= spec.kind === 'mesa' ? 0.5 : 0.7;   // (a butte has no ramp: priced as all but unbuildable)
+  // dry heights (no creek, no spring on a ridge, mesa or saddle): the water is a deep well away, and the card says so
+  if ((spec.kind === 'ridge' || spec.kind === 'mesa' || spec.kind === 'saddle') && site.creek === false && site.spring === false) k *= 0.9;
   return Math.round(k * 100) / 100;
 }
 
