@@ -64,7 +64,7 @@ export interface Protection { pf: number; empSurvive: number; filter: FilterLeve
 export const isBunkerRoom = (kind: string) => kind.startsWith('bunker_');
 
 /** Small rooms (entrances, corridors, the comms room) take half the materials and time. */
-const SMALL = new Set(['bunker_hatch', 'bunker_stairs', 'bunker_corridor', 'bunker_comms']);
+const SMALL = new Set(['bunker_hatch', 'bunker_stairs', 'bunker_floorhatch', 'bunker_corridor', 'bunker_comms']);
 const scale = (kind: string) => (SMALL.has(kind) ? 0.5 : 1);
 
 export function tierOf(st: Structure, id: HardenId): 0 | Tier {

@@ -324,6 +324,7 @@ const room = (id: string, name: string, cx: number, cz: number, blurb: string, s
 });
 export const BUNKER_KIT: KitPieceDef[] = [
   room('bunker_hatch', 'Bunker hatch', 1, 1, 'The way down: a steel hatch in a concrete collar, a ladder down a 5 m shaft, a blast door at the bottom. Easy to hide under a woodpile.', 0, 'both'),
+  room('bunker_floorhatch', 'Floor hatch', 1, 1, 'A hatch in the floor of a house, hidden under a rug: an insulated lid over a switchback stair down to the bunker, lit warm. Opens when the family goes down. Build it inside a house.', 0, 'both'),
   room('bunker_stairs', 'Bunker stairwell', 1, 3, 'A stair down from a little headhouse on the surface to a blast door 5 m below. Carries stores and the old and young.', 0, 'both'),
   room('bunker_corridor', 'Tunnel', 1, 2, 'A 3 × 6 m concrete passage between rooms.'),
   room('bunker_container', 'Buried container', 1, 4, 'A 40 ft shipping container in a gravel bed, braced and waterproofed: the cheap first bunker. Bunks, a table, a pantry.', 4),
@@ -404,7 +405,7 @@ export interface SiteQuery {
   blocked?(x: number, z: number): boolean;
 }
 
-export type PlaceProblem = 'off_parcel' | 'water' | 'too_steep' | 'overlaps' | 'not_connected' | 'thin_cover' | 'too_deep';
+export type PlaceProblem = 'off_parcel' | 'water' | 'too_steep' | 'overlaps' | 'not_connected' | 'thin_cover' | 'too_deep' | 'needs_house';
 
 const levelOf = (d: KitPieceDef) => d.level ?? 'surface';
 /** Do pieces at these levels compete for the same ground? (Bunker rooms go under the yard and houses.) */
@@ -432,7 +433,11 @@ export function placementProblem(def: KitPieceDef, x: number, z: number, rot: nu
   for (let j = 0; j <= N; j++) grade = Math.max(grade, Math.abs(hs[N][j] - hs[0][j]) / (r.x1 - r.x0));
   for (let i = 0; i <= N; i++) grade = Math.max(grade, Math.abs(hs[i][N] - hs[i][0]) / (r.z1 - r.z0));
   if (grade > def.maxSlope) return 'too_steep';
+  // a floor hatch is built inside a house: the house it stands in is not in its way
+  const host = def.id === 'bunker_floorhatch' ? floorHatchHost(x, z, placed) : null;
+  if (def.id === 'bunker_floorhatch' && !host) return 'needs_house';
   for (const p of placed) {
+    if (host && p.id === host.id) continue;
     const od = KIT[p.kind];
     if (!levelsMeet(def, od)) continue;
     const o = footprint(od, p.x, p.z, p.rot, levelOf(od) !== 'underground');
@@ -449,4 +454,17 @@ export const PROBLEM_TEXT: Record<PlaceProblem, string> = {
   not_connected: 'Start a bunker at a hatch or stairwell, then add rooms wall to wall',
   thin_cover: 'Too little earth over it — the ground is too low here',
   too_deep: 'Too deep below the ground here to dig',
+  needs_house: 'A floor hatch goes inside a house, well in from the walls',
 };
+
+/** The enclosed building a floor hatch at (x, z) sits in: a home or workshop whose body holds the hatch's whole cell, with a wall's thickness to spare. */
+export function floorHatchHost(x: number, z: number, placed: readonly Placed[]): Placed | null {
+  const half = CELL / 2 + 0.06;
+  for (const p of placed) {
+    const d = KIT[p.kind];
+    if (!d || (d.category !== 'home' && d.category !== 'work') || d.floorY < 0.02) continue;
+    const r = footprint(d, p.x, p.z, p.rot, false);
+    if (x - half >= r.x0 && x + half <= r.x1 && z - half >= r.z0 && z + half <= r.z1) return p;
+  }
+  return null;
+}

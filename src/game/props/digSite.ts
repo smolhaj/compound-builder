@@ -101,3 +101,84 @@ export function drapeSoil(x0: number, z0: number, x1: number, z1: number, ground
   g.computeVertexNormals();
   return g;
 }
+
+/**
+ * A tipper truck (≈ 6 m long, 2.5 m wide), facing +z, bed hinged at the back (−z): `tip` 0..1 raises the bed (dumping the backfill).
+ * Not pooled: it exists only while a dig is open.
+ */
+export function buildDumpTruck(tip = 0, loaded = true): THREE.Group {
+  const b = new Bits();
+  b.add('iron', box(1.1 * M, 0.3 * M, 5.6 * M, 0, 0.55 * M, 0));                                   // chassis rails
+  for (const [z, d] of [[-1.7, 0.5], [-0.9, 0.5], [1.9, 0.45]] as const) for (const sx of [-1, 1]) {
+    b.add('iron', new THREE.CylinderGeometry(0.5 * M, 0.5 * M, 0.38 * M, 14).rotateZ(Math.PI / 2).translate(sx * 1.05 * M, 0.5 * M, z * M));
+    b.add('steel', new THREE.CylinderGeometry(0.22 * M, 0.22 * M, 0.4 * M, 10).rotateZ(Math.PI / 2).translate(sx * 1.05 * M, 0.5 * M, z * M));
+    void d;
+  }
+  // cab: forward, a high roof, glass
+  b.add('paint_yellow', box(2.3 * M, 1.5 * M, 1.5 * M, 0, 0.7 * M, 2.1 * M));
+  b.add('glass', box(2.1 * M, 0.7 * M, 0.02 * M, 0, 1.45 * M, 2.86 * M));
+  b.add('iron', box(2.4 * M, 0.4 * M, 0.6 * M, 0, 0.55 * M, 3.0 * M));                              // hood / bumper
+  b.add('paint_yellow', box(2.3 * M, 0.1 * M, 1.7 * M, 0, 2.2 * M, 2.1 * M));
+  // the tipper bed: floor, two sides, a front headboard over the cab; hinged at the rear
+  const bed = new THREE.Group(), bb = new Bits();
+  bb.add('rust', box(2.4 * M, 0.12 * M, 4.0 * M, 0, 0, 1.9 * M));
+  for (const sx of [-1, 1]) bb.add('rust', box(0.1 * M, 1.1 * M, 4.0 * M, sx * 1.15 * M, 0.1 * M, 1.9 * M));
+  bb.add('rust', box(2.4 * M, 1.1 * M, 0.1 * M, 0, 0.1 * M, 3.85 * M));
+  if (loaded) bb.add('soil', new THREE.SphereGeometry(1, 14, 6, 0, Math.PI * 2, 0, Math.PI / 2).scale(1.1 * M, 0.55 * M, 1.9 * M).translate(0, 1.0 * M, 1.9 * M));
+  const bg = bb.finish();
+  bed.add(bg);
+  bed.position.set(0, 0.85 * M, -0.1 * M);
+  bed.rotation.x = -tip * 0.6;           // the front rises: rotate about the rear hinge
+  const g = b.finish();
+  g.add(bed);
+  g.traverse(o => { o.userData.own = true; });
+  return g;
+}
+
+/** Plywood formwork round a wall pour: panels standing along the sides of a rect (x0..x1, z0..z1 in the group's frame), `h` tall, with walers, braces back to the soil and a rebar cage inside. */
+export function buildFormwork(w: number, d: number, h: number): THREE.Group {
+  const b = new Bits();
+  const side = (len: number, x: number, z: number, alongX: boolean) => {
+    const g = (m: KitMaterialId, bw: number, bh: number, bd: number, ox: number, oy: number, oz: number) => b.add(m, box(alongX ? bw : bd, bh, alongX ? bd : bw, x + (alongX ? ox : oz), oy, z + (alongX ? oz : ox)));
+    g('frame', len, h, 0.012, 0, 0, 0);                                                              // plywood sheet
+    for (const y of [0.25, 0.7]) if (y * h < h) g('wood_mid', len, 0.03 * M, 0.04 * M, 0, y * h, 0.02);        // walers
+    for (let i = 0; i <= Math.floor(len / 0.2); i++) g('wood_mid', 0.04 * M, h, 0.03 * M, -len / 2 + i * (len / Math.max(1, Math.floor(len / 0.2))), 0, 0.024);   // studs
+  };
+  side(w + 0.04, 0, d / 2 + 0.012, true); side(w + 0.04, 0, -d / 2 - 0.012, true);
+  side(d, w / 2 + 0.012, 0, false); side(d, -w / 2 - 0.012, 0, false);
+  // diagonal braces out to stakes in the soil
+  for (const [x, z, ax] of [[w * 0.3, d / 2 + 0.03, 0], [-w * 0.3, d / 2 + 0.03, 0], [w * 0.3, -d / 2 - 0.03, Math.PI], [-w * 0.3, -d / 2 - 0.03, Math.PI]] as const) {
+    b.add('wood_mid', new THREE.BoxGeometry(0.03 * M, 0.03 * M, h * 1.2).rotateX(-0.7 * Math.sign(z)).translate(x, h * 0.45, z + Math.sign(z) * 0.07));
+    void ax;
+  }
+  // rebar: horizontal mats, two layers a hand inside the sheet, bars every 20 cm
+  for (const y of [0.3, 0.65]) {
+    for (let i = -Math.floor(w / 0.08); i <= Math.floor(w / 0.08); i++) b.add('rust', box(0.012 * M, 0.012 * M, d - 0.04, i * 0.04, y * h, 0));
+    for (let k = -Math.floor(d / 0.08); k <= Math.floor(d / 0.08); k++) b.add('rust', box(w - 0.04, 0.012 * M, 0.012 * M, 0, y * h + 0.006, k * 0.04));
+  }
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) b.add('rust', box(0.018 * M, h * 1.08, 0.018 * M, sx * (w / 2 - 0.03), 0, sz * (d / 2 - 0.03)));    // corner starter bars
+  const g = b.finish(); g.traverse(o => { o.userData.own = true; });
+  return g;
+}
+
+/** Corrugated steel culvert tube segments (2.6 m across, 6 m long) lying on timber cribbing beside a trench, waiting to be laid. */
+export function buildTubeSegments(n: number): THREE.Group {
+  const b = new Bits(), R = 1.3 * M, L = 5.5 * M;
+  for (let i = 0; i < n; i++) {
+    const z = (i - (n - 1) / 2) * (L + 0.25 * M);
+    b.add('rust', new THREE.CylinderGeometry(R, R, L, 18, 1, true).rotateX(Math.PI / 2).translate(0, R + 0.2 * M, z));
+    for (let k = 0; k <= 10; k++) b.add('rust', new THREE.TorusGeometry(R + 0.012, 0.03 * M, 5, 22).translate(0, R + 0.2 * M, z - L / 2 + k * L / 10));
+    b.add('wood_dark', box(2.2 * M, 0.2 * M, 0.3 * M, 0, 0, z - L * 0.3)); b.add('wood_dark', box(2.2 * M, 0.2 * M, 0.3 * M, 0, 0, z + L * 0.3));
+  }
+  const g = b.finish(); g.traverse(o => { o.userData.own = true; });
+  return g;
+}
+
+/** A settled mound of fresh backfill over a finished roof slab: `w` × `d` footprint, `h` high. */
+export function earthMound(w: number, d: number, h: number): THREE.BufferGeometry {
+  const g = new THREE.SphereGeometry(1, 24, 8, 0, Math.PI * 2, 0, Math.PI / 2).scale(w / 2 + 0.1, h, d / 2 + 0.1);
+  const p = g.getAttribute('position');
+  for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i), n = Math.sin(x * 19.3 + z * 13.1) * 0.05 + Math.sin(x * 6.1 - z * 15.7) * 0.04; p.setXYZ(i, x, y * (1 + n * 1.6), z * (1 + n)); }
+  g.computeVertexNormals();
+  return g;
+}

@@ -34,7 +34,7 @@ import { fenceLean } from './atmosphere/aging';
 import { LEANS, leanRun } from './atmosphere/fenceAging';
 import { FamilyRenderer } from './people/FamilyRenderer';
 import { BunkerFolk, type WorldSpot } from './people/BunkerFolk';
-import { bunkerOccupants } from '../sim/bunkerLife';
+import { bunkerOccupants, hatchOpen } from '../sim/bunkerLife';
 import { DogRenderer } from './people/DogRenderer';
 import { FleetRenderer, inCarBox, type CarBox, type FleetCtx } from './props/FleetRenderer';
 import type { DogCtx } from './people/dogGoals';
@@ -46,15 +46,16 @@ import { CELL, type KitPieceDef } from './buildkit/kit';
 import type { GameState } from '../sim/state';
 import type { WearSeason } from '../engine/world/people/crowdWear';
 import type { TourBuildingInfo } from '../engine/world/camera/TourController';
-import { footprint, KIT, placementProblem, rotQ, type Placed, type SiteQuery } from './buildkit/kit';
+import { floorHatchHost, footprint, KIT, placementProblem, rotQ, type Placed, type SiteQuery } from './buildkit/kit';
 import { showStage, CUTAWAY_HIDE, XRAY_LAYERS, type BuildLayer as CabinLayer, type BuildOpts } from './buildkit/shell';
 import { bunkerRoots, datums, doorsOf, DEPTH, isEntry, isUnderground, tunnelDoorsOf, tunnelStart, type Side } from './buildkit/underground';
 import { updateScreens, updateSiteMap } from './buildkit/screenFeeds';
 import { powered as gearPowered } from '../sim/gear';
 import { floorAt, tunnelPath, tunnelProblem, TUNNEL_PROBLEM_TEXT, VAULT_W, type PathSample } from './buildkit/tunnelPath';
 import { buildTunnel } from './perimeter/tunnelGeometry';
-import { SHAFT_HALF, stairProfile, type RoomSpot } from './buildkit/bunkerBuildings';
-import { buildExcavator, drapeSoil, spoilHeap } from './props/digSite';
+import { SHAFT_HALF, setHatchLid, stairProfile, type RoomSpot } from './buildkit/bunkerBuildings';
+import { FLIGHT_W, hatchPlan } from './buildkit/bunkerHatchPlan';
+import { buildDumpTruck, buildExcavator, buildFormwork, buildTubeSegments, drapeSoil, earthMound, spoilHeap } from './props/digSite';
 import { kitMaterial } from './buildkit/materials';
 import { orchardBearing, orchardFrost, ORCHARD_PICK } from '../sim/greenhouse';
 import { buildLayers, type Seat } from './buildkit/buildings';
@@ -158,6 +159,9 @@ const INDOOR_R = 0.04;
  * Everything in the world that is Compound Builder's: the parcel terrain set
  * into the regional landscape, seasons, and (later) structures.
  */
+/** One open bunker dig and what the crew has at it (see _buildDigs). */
+interface DigSite { pit: Pit; spoil: number; machine: boolean; stage: number; f: number; kind: string; rot: number; datum: number; x: number; z: number }
+
 export class HomesteadWorld {
   readonly center = new THREE.Vector3(PARCEL_SIZE / 2, 0, PARCEL_SIZE / 2);
   readonly parcel: ParcelTerrain;
@@ -1106,7 +1110,7 @@ export class HomesteadWorld {
     const below = isUnderground(def);
     let y = this.parcel.padHeight(r.x0, r.z0, r.x1, r.z1);
     // bunker rooms take no pad (the yard above stays as it is); an entrance's hatch or headhouse gets a small one
-    const pad: Pad | null = !below || isEntry(def) ? { x0: r.x0 - 0.05, z0: r.z0 - 0.05, x1: r.x1 + 0.05, z1: r.z1 + 0.05, y, skirt: below ? 0.4 : 0.9 } : null;
+    const pad: Pad | null = !below || (isEntry(def) && p.kind !== 'bunker_floorhatch') ? { x0: r.x0 - 0.05, z0: r.z0 - 0.05, x1: r.x1 + 0.05, z1: r.z1 + 0.05, y, skirt: below ? 0.4 : 0.9 } : null;
     if (below && p.kind === 'bunker_stairs') {
       // the stairwell's headhouse is at its top (+z) end: grade only there
       const [hx, hz] = rotQ(0, def.cellsZ * CELL / 2 - 0.25, p.rot);
@@ -1165,7 +1169,9 @@ export class HomesteadWorld {
     const def = KIT[p.kind];
     // the surface point: the stairwell's top end, otherwise the middle
     const [sx, sz] = p.kind === 'bunker_stairs' ? rotQ(0, def.cellsZ * CELL / 2 - 0.25, p.rot) : [0, 0];
-    const ground = this.parcel.sample(p.x + sx, p.z + sz).h;
+    // a floor hatch: its top is the floor of the house it is in
+    const host = p.kind === 'bunker_floorhatch' ? this._hostOf(p) : null;
+    const ground = host ? host.padY + KIT[host.placed.kind].floorY : this.parcel.sample(p.x + sx, p.z + sz).h;
     // escape tunnels leave through a blast door, barred from the room side
     const starts = this._runs.filter(r => r.kind === 'escape_tunnel').map(r => r.pts[0]);
     const tunnelDoors = tunnelDoorsOf(p, starts);
@@ -1176,6 +1182,56 @@ export class HomesteadWorld {
       doors: { ...doorsOf(p, placed), ...tunnelDoors }, depth: Math.round((ground - datum) * 1000) / 1000, ...(blast.length ? { blast } : {}), ...(harden && Object.keys(harden).length ? { harden } : {}),
       ...(root && this._air.has(root) ? { air: true } : {}), ...(this._power ? { power: true } : {}), ...(this._morale ? { morale: this._morale } : {}),
     };
+  }
+
+  /** The built house a floor hatch is in (the host of its opening), or null. */
+  private _hostOf(p: Placed): Built | null {
+    const h = floorHatchHost(p.x, p.z, [...this._built.values()].filter(b => !b.under).map(b => b.placed));
+    return (h && this._built.get(h.id)) || null;
+  }
+
+  // ── Floor hatches: the opening in the house's floor, the lid swinging ──
+  /** QA: hold every floor hatch's lid at this opening (0 shut, 1 open) at once; null = the game's own state. */
+  qaLid: number | null = null;
+  private readonly _lid = new Map<string, number>();
+  private _lidT = -1;
+  /** Walking down through a hatch holds its lid open until the walker is back up. */
+  private _walkHatch: string | null = null;
+  private _hatchKey = '';
+  private _syncHatches(game: GameState, t: number): void {
+    const dt = this._lidT < 0 ? 0 : Math.min(0.1, Math.max(0, t - this._lidT));
+    this._lidT = t;
+    const hatches = [...this._built.values()].filter(b => b.placed.kind === 'bunker_floorhatch');
+    // openings cut in the floors of the houses that have a finished hatch
+    const key = hatches.map(b => `${b.placed.id}:${b.finished ? 1 : 0}`).join();
+    if (key !== this._hatchKey) {
+      this._hatchKey = key;
+      const holes = new Map<string, Array<{ x0: number; z0: number; x1: number; z1: number }>>();
+      for (const b of hatches) {
+        if (!b.finished) continue;
+        const host = this._hostOf(b.placed); if (!host) continue;
+        const plan = hatchPlan(b.opts.depth ?? 0.89), q = (((b.placed.rot - host.placed.rot) % 4) + 4) % 4, th = b.placed.rot * Math.PI / 2;
+        // the hole's middle in the world, then in the host's frame
+        const cxl = (plan.hole.x0 + plan.hole.x1) / 2, czl = (plan.hole.z0 + plan.hole.z1) / 2;
+        const [lx, lz] = this._local(host, b.placed.x + cxl * Math.cos(th) + czl * Math.sin(th), b.placed.z - cxl * Math.sin(th) + czl * Math.cos(th));
+        const hx = (plan.hole.x1 - plan.hole.x0) / 2, hz = (plan.hole.z1 - plan.hole.z0) / 2, [ex, ez] = q % 2 ? [hz, hx] : [hx, hz];
+        const list = holes.get(host.placed.id) ?? []; list.push({ x0: lx - ex, x1: lx + ex, z0: lz - ez, z1: lz + ez }); holes.set(host.placed.id, list);
+      }
+      for (const host of this._built.values()) {
+        if (host.under) continue;
+        const next = holes.get(host.placed.id), cur = host.opts.hatches;
+        if (JSON.stringify(next ?? null) === JSON.stringify(cur ?? null)) continue;
+        this._rebuild(host, { ...host.opts, hatches: next });
+      }
+    }
+    // the lids: open while the family goes down (an alert) or somebody is walking through, shut otherwise
+    const alert = hatchOpen(game);
+    for (const b of hatches) {
+      if (!b.finished) continue;
+      const want = this.qaLid ?? (alert || this._walkHatch === b.placed.id ? 1 : 0), cur = this._lid.get(b.placed.id) ?? 0;
+      const next = this.qaLid !== null ? want : cur + Math.sign(want - cur) * Math.min(Math.abs(want - cur), dt * 1.4);
+      if (Math.abs(next - cur) > 1e-4 || !this._lid.has(b.placed.id) || b.group.userData.lidK !== next) { this._lid.set(b.placed.id, next); b.group.userData.lidK = next; setHatchLid(b.group, next); }
+    }
   }
 
   // ── Bunker life: air from the plant room, power, the family's evenings, the control room's screens ──
@@ -1207,6 +1263,7 @@ export class HomesteadWorld {
     // the screens (the control room's wall, the bunkroom's TV): only while one could be on screen (underground view, walking below, or the cutaway)
     const screens = [...this._built.values()].some(b => b.finished && (b.placed.kind === 'bunker_comms' || b.placed.kind === 'bunker_dorm'));
     if (screens && (this._under || this._below || this._view === 'cutaway')) { updateSiteMap(game); updateScreens(game, t, hour); }
+    this._syncHatches(game, t);
     this.bunkerFolk.update(game.people, bunkerOccupants(game), this._bunkerSpots(), 'summer');
   }
 
@@ -1337,7 +1394,7 @@ export class HomesteadWorld {
   private _syncPits(list: readonly Structure[]): void {
     const pits: Pit[] = [];
     /** Per open dig: the spoil on its heap (m³) and whether the excavator is working it. */
-    const sites: Array<{ pit: Pit; spoil: number; machine: boolean }> = [];
+    const sites: DigSite[] = [];
     for (const st of list) {
       const b = this._built.get(st.id);
       if (!b?.under) continue;
@@ -1350,9 +1407,10 @@ export class HomesteadWorld {
       const pit = { x0: r.x0 - 0.08, z0: r.z0 - 0.08, x1: r.x1 + 0.08, z1: r.z1 + 0.08, floor: b.under.datum - 0.06, k: Math.round(k * 20) / 20 };
       pits.push(pit);
       const full = BLUEPRINTS[st.kind].stages.reduce((a, s) => a + (s.yields?.spoil ?? 0), 0) * 2.2;   // the gross dig (backfill goes back in)
-      if (!done && st.stage >= 1 && st.stage <= 3) sites.push({ pit, spoil: Math.round(full * pit.k), machine: (st.stage === 1 && pit.k < 1) || (st.stage === 3 && f > 0.5) || (st.stage === 1 && st.supplied) });
+      if (!done && st.stage >= 1 && st.stage <= 4) sites.push({ pit, spoil: Math.round(full * pit.k), machine: st.stage <= 3 && ((st.stage === 1 && pit.k < 1) || (st.stage === 3 && f > 0.5) || (st.stage === 1 && st.supplied)), stage: st.stage, f: Math.round(f * 20) / 20, kind: st.kind, rot: st.rot, datum: b.under.datum, x: st.x, z: st.z });
     }
-    const key = JSON.stringify(pits);
+    // what stands round an open dig changes with the stage: the pit, but also the trucks, formwork, tubes and the fresh mound
+    const key = JSON.stringify([pits, sites.map(s => [s.stage, s.f, s.machine])]);
     if (key === this._pitKey) return;
     const before = this.parcel.pits;
     this._pitKey = key;
@@ -1367,8 +1425,32 @@ export class HomesteadWorld {
     this._ws.invalidateShadows();
   }
 
+  /**
+   * The rest of the crew's site: a tipper truck at the edge while the earth goes out (stage 1) and comes back
+   * (backfill, tipping its bed), plywood formwork and rebar cages standing in the pit while the walls are poured
+   * (stage 2, stripped as the pour finishes), culvert tube lengths on cribbing beside a trench for the tunnel (stage 2).
+   */
+  private _digCrew(site: DigSite, alongX: boolean, reach: number): void {
+    const { pit, stage, f } = site, d = this._dig!;
+    const cx = (pit.x0 + pit.x1) / 2, cz = (pit.z0 + pit.z1) / 2;
+    const place = (g: THREE.Object3D, x: number, z: number, yaw: number) => { g.position.set(x, this.groundAt(x, z), z); g.rotation.y = yaw; g.traverse(o => { o.userData.own = true; }); d.add(g); };
+    if (stage === 1 || (stage === 3 && f > 0.5)) {
+      // the truck waits at the end of the pit's long side, nose away from it
+      const tx = alongX ? pit.x1 + reach + 0.5 : pit.x1 + reach + 0.45, tz = alongX ? pit.z0 - reach - 0.4 : pit.z0 - reach - 0.1;
+      place(buildDumpTruck(stage === 3 ? Math.min(1, (f - 0.5) * 4) % 1 : 0, stage === 1), alongX ? tx : tx, alongX ? tz : tz, alongX ? Math.PI / 2 : 0);
+    }
+    if (stage === 2 && f < 0.92 && pit.k >= 0.99) {
+      const w = pit.x1 - pit.x0 - 0.16, dd = pit.z1 - pit.z0 - 0.16, h = Math.max(0.05, 0.4 * Math.min(1, f * 1.15 + 0.15));
+      const fw = buildFormwork(w, dd, h); fw.position.set(cx, site.datum, cz); fw.traverse(o => { o.userData.own = true; }); d.add(fw);
+    }
+    if (stage === 2 && site.kind === 'bunker_corridor') {
+      const tubes = buildTubeSegments(2);
+      place(tubes, alongX ? cx : pit.x0 - reach - 0.9, alongX ? pit.z1 + reach + 0.9 : cz, alongX ? Math.PI / 2 : 0);
+    }
+  }
+
   /** Bare earth over each open dig, the spoil heap beside it, the excavator at its edge. */
-  private _buildDigs(sites: Array<{ pit: Pit; spoil: number; machine: boolean }>): void {
+  private _buildDigs(sites: DigSite[]): void {
     if (this._dig) { this._root.remove(this._dig); this._dig.traverse(o => { if ((o as THREE.Mesh).isMesh && o.userData.own) (o as THREE.Mesh).geometry.dispose(); }); }
     this._dig = new THREE.Group();
     if (!this._soilMat) {
@@ -1376,7 +1458,15 @@ export class HomesteadWorld {
       m.polygonOffset = true; m.polygonOffsetFactor = -2; m.polygonOffsetUnits = -2;
       this._soilMat = m;
     }
-    for (const { pit, spoil, machine } of sites) {
+    for (const site of sites) {
+      const { pit, spoil, machine } = site;
+      // the backfill mound: over the roof slab while the second half of the roof stage and the fit-out go on (the earth is on, the room is not done)
+      if (site.stage === 4 || (site.stage === 3 && site.f > 0.5)) {
+        const cx = (pit.x0 + pit.x1) / 2, cz = (pit.z0 + pit.z1) / 2, up = site.stage === 4 ? 1 : Math.min(1, (site.f - 0.5) * 2);
+        const mound = new THREE.Mesh(earthMound(pit.x1 - pit.x0 - 0.16, pit.z1 - pit.z0 - 0.16, 0.07 * up).translate(cx, this.groundAt(cx, cz) - 0.01, cz), kitMaterial('soil'));
+        mound.castShadow = mound.receiveShadow = true; mound.userData.own = true;
+        this._dig.add(mound);
+      }
       if (pit.k <= 0) continue;
       const reach = pitReach(Math.max(0, this._naturalH((pit.x0 + pit.x1) / 2, (pit.z0 + pit.z1) / 2) - pit.floor)) * pit.k + 0.06;   // the batter, from the uncut ground
       const soil = new THREE.Mesh(drapeSoil(pit.x0 - reach, pit.z0 - reach, pit.x1 + reach, pit.z1 + reach, this.groundAt), this._soilMat);
@@ -1400,6 +1490,7 @@ export class HomesteadWorld {
         g.traverse(o => { o.userData.own = true; });
         this._dig.add(g);
       }
+      this._digCrew(site, alongX, reach);
     }
     this._root.add(this._dig);
   }
@@ -1922,6 +2013,17 @@ export class HomesteadWorld {
       if (!this._below && this._house === b.placed.id && r.lz < pr.zHouse - 0.02) this._below = true;
       else if (this._below && r.lz > pr.zHouse + 0.02) this._below = false;
       this._house = r.lz > pr.zHouse - 0.06 || this._below ? b.placed.id : null;
+      return null;
+    }
+    if (kind === 'bunker_floorhatch') {
+      // down through the opening in the house floor (the lid swings up as you step on it), up from the foot of the last flight
+      const plan = hatchPlan(b.opts.depth ?? 0.89), [fx, fz] = plan.foot, f = plan.flights[2];
+      if (!this._below) {
+        if (r.lx > plan.hole.x0 && r.lx < plan.hole.x1 && r.lz > plan.hole.z0 && r.lz < plan.hole.z1) { this._below = true; this._walkHatch = b.placed.id; return toWorld(fx, fz - 0.05); }
+      } else if (Math.abs(r.lx - f.x) < FLIGHT_W / 2 && r.lz > plan.flights[2].zTo - 0.012) {
+        this._below = false; this._walkHatch = null;
+        return toWorld(plan.top[0], plan.top[1]);
+      }
       return null;
     }
     if (kind === 'bunker_hatch') {

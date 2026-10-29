@@ -4,6 +4,7 @@
  * what the bunker needs, what the plans still lack, and how the Perimeter
  * list groups by price. Pure (tested); the HUD only draws it.
  */
+import { BUNKER_ENTRANCES } from './bunkerEntrances';
 import { KIT } from '../game/buildkit/kit';
 import { homeBeds, isHome } from './blueprints';
 import { daysOfFood } from './needs';
@@ -79,7 +80,7 @@ export const plansNeedCost = (s: GameState, factor = 1): number => orderCost(pla
 
 // ── the bunker ──
 
-export const BUNKER_ENTRANCES: readonly string[] = ['bunker_hatch', 'bunker_stairs'];
+export { BUNKER_ENTRANCES } from './bunkerEntrances';
 const bunkerKinds = (s: GameState) => s.structures.filter(st => st.kind.startsWith('bunker_'));
 
 export interface BunkerCheck { id: string; label: string; done: boolean; /** Staked out and being built, but not finished (so not done yet). */ building: boolean; /** What to build for it. */ kind: string; detail: string }
@@ -95,7 +96,7 @@ export function bunkerChecklist(s: GameState): BunkerCheck[] {
   const people = Math.max(1, s.people.length);
   const note = (b: boolean, d: string) => (b ? `staked out, still being built: ${d}` : d);
   return [
-    { id: 'entrance', label: 'A way down', done: has(...BUNKER_ENTRANCES), building: going(...BUNKER_ENTRANCES), kind: 'bunker_hatch', detail: note(going(...BUNKER_ENTRANCES), 'a hatch or a stairwell; every room grows from it') },
+    { id: 'entrance', label: 'A way down', done: has(...BUNKER_ENTRANCES), building: going(...BUNKER_ENTRANCES), kind: 'bunker_hatch', detail: note(going(...BUNKER_ENTRANCES), 'a hatch, a stairwell, or a hatch in the house floor; every room grows from it') },
     { id: 'beds', label: `Beds for ${people}`, done: beds >= people, building: beds < people && bedsStaked > beds, kind: people <= 4 ? 'bunker_container' : 'bunker_dorm', detail: `${beds} of ${people} places built${bedsStaked > beds ? `, ${bedsStaked - beds} more staked out` : ''}` },
     { id: 'air', label: 'Clean air and power', done: has('bunker_plant'), building: going('bunker_plant'), kind: 'bunker_plant', detail: note(going('bunker_plant'), 'the plant room: NBC filter, batteries, a 2,000 L water tank') },
     { id: 'food', label: 'Food and water put by', done: has('bunker_stores', 'bunker_galley'), building: going('bunker_stores', 'bunker_galley'), kind: 'bunker_stores', detail: note(going('bunker_stores', 'bunker_galley'), 'a storeroom (or a galley)') },
