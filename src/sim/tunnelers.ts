@@ -232,7 +232,7 @@ export function warningEncounter(s: GameState, d: Dig, day: number, r: () => num
 /** Who goes to the dig site: the armed fighters (one adult stays home if there are three or more). */
 export function ambushParty(s: GameState, everyone = false): string[] {
   if (!armed(s)) return [];
-  const here = s.people.filter((p, i) => !p.kid && s.personState[i]?.needs.died == null && s.personState[i]?.task !== 'gone' && !isAwayNow(s, p.id));
+  const here = s.people.filter((p, i) => !p.kid && s.personState[i]?.needs.died == null && s.personState[i]?.task !== 'gone' && s.personState[i]?.task !== 'town' && !isAwayNow(s, p.id));
   const go = here.length >= 3 && !everyone ? here.slice(0, here.length - 1) : here;
   return go.map(p => p.id);
 }

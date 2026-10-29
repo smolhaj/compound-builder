@@ -8,6 +8,7 @@ import { canPay, DOUBLE_CROSS } from '../sim/rescue';
 import type { Caliber } from '../sim/armory';
 import { STANCE } from './stanceText';
 import { ArrivalHousing } from './HousingPanel';
+import { jobOutlook, setKeepJobs } from '../sim/weekender';
 
 
 /** The end of a month's trial. */
@@ -52,7 +53,7 @@ export function GateCard() {
     const picked = cut ? cut.stance ?? e.stances[0] : null;
     return (
       <div style={cut ? raidBox : box}>
-        <div style={{ fontSize: 11, letterSpacing: 1, opacity: 0.6, textTransform: 'uppercase' }}>{e.kind === 'break_in' ? 'In the night' : e.kind === 'ransom' ? 'Word about your child' : e.kind === 'trial_end' ? 'The camp outside the wall' : e.kind === 'kin' ? 'Family' : e.kind === 'shelter' ? 'Neighbors at the door' : e.neighbor ? 'A neighbor at the gate' : 'At the gate'}</div>
+        <div style={{ fontSize: 11, letterSpacing: 1, opacity: 0.6, textTransform: 'uppercase' }}>{e.kind === 'break_in' ? 'In the night' : e.kind === 'ransom' ? 'Word about your child' : e.kind === 'trial_end' ? 'The camp outside the wall' : e.kind === 'kin' ? 'Family' : e.kind === 'shelter' ? 'Neighbors at the door' : e.kind === 'move_in' ? (e.title.startsWith('Time') ? 'The warning signs' : 'A decision') : e.kind === 'stranded' ? 'Caught in town' : e.neighbor ? 'A neighbor at the gate' : 'At the gate'}</div>
         <div style={{ fontSize: 19, fontWeight: 700, margin: '2px 0 8px' }}>{e.title}</div>
         {e.dossier.filter(Boolean).map((l, i) => <div key={i} style={{ marginBottom: 4, opacity: 0.9 }}>{l}</div>)}
         {(e.kind === 'arrival' || e.kind === 'trial_end' || e.kind === 'kin' || (e.kind === 'shelter' && !e.shelter?.settle)) && !!e.people?.length && <ArrivalHousing people={e.people} />}
@@ -85,6 +86,9 @@ export function GateCard() {
           const o = ambushOdds(g.game, { size: e.size, lead: e.dig!.lead, temper: e.temper });
           return <div style={{ margin: '8px 0', fontSize: 12, opacity: 0.75 }}>If you ambush them: you hold {inTen(o.win)} · someone of yours killed or taken {o.lost < 0.05 ? 'almost never' : `about ${Math.round(o.lost * 10) / 10} on average`}</div>;
         })()}
+        {e.kind === 'move_in' && jobOutlook(g.game).some(j => j.remote) && <label style={{ display: 'block', margin: '8px 0', fontSize: 12, opacity: 0.85 }}>
+          <input type="checkbox" checked={!(g.game.weekend?.keepJobs ?? true)} onChange={ev => g.daily(d => setKeepJobs(d, !ev.target.checked))} /> Quit the jobs that could be kept, too (everyone builds all week)
+        </label>}
         {e.strength > 0 && e.kind !== 'break_in' && <div style={{ margin: '8px 0', fontSize: 12, opacity: 0.75 }}>
           <div>{e.size} {e.armed ? 'armed' : 'unarmed'} · walls {Math.round(p.barrier)} % · seen early {Math.round(p.detection)} %{p.bunker ? ' · bunker to hide in' : p.safeRoom ? ' · safe room' : ''}</div>
           {odds && <div>If you fight: you hold {inTen(odds.win)} · someone of yours killed or taken {inTen(odds.loseSomeone)}</div>}

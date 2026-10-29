@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { newGame, SAVE_VERSION, dayIndex, type GameState } from './state';
-import { gateDay, resolve, type Encounter } from './encounters';
+import { gateDay, hideFoundChance, resolve, scoutCrew, SCOUT_CREW_BONUS, SCOUT_HIDE_BONUS, type Encounter } from './encounters';
 import { BLUEPRINTS } from './blueprints';
 import { cachedPlan } from './housing';
 import { migrate } from './save/migrations';
@@ -456,7 +456,44 @@ describe('the gate card extends, it does not duplicate', () => {
   });
 });
 
-describe('save v59', () => {
+describe('the scout who betrays you', () => {
+  it('sends a crew larger than the same roll would otherwise be, flagged as scouted', () => {
+    for (let seed = 1; seed <= 20; seed++) {
+      const g = afterHit();
+      const plain = 5 + Math.floor(mulberry32(seed)() * 5);
+      scoutCrew(g, 'Dale', mulberry32(seed));
+      expect(g.gate.comeBack?.scouted).toBe(true);
+      expect(g.gate.comeBack!.size).toBeGreaterThanOrEqual(plain + SCOUT_CREW_BONUS);
+    }
+  });
+  it('the arriving crew names the scout, hides are found more often, and the raid log says why', () => {
+    const g = afterHit();
+    scoutCrew(g, 'Dale', mulberry32(3));
+    g.gate.next = 0; g.gate.pending = null; g.gate.day = -1; g.clock.t += 1;
+    let e: Encounter | null = null;
+    for (let i = 0; i < 6 && !e?.scouted; i++) { g.gate.comeBack = g.gate.comeBack ?? { kind: 'gang', size: 9, armed: true, temper: 'hard', until: 1e9, guide: 'Dale', scouted: true }; g.gate.comeBack.until = 1e9; g.gate.next = 0; g.gate.pending = null; g.gate.day = -1; g.clock.t += 1; e = gateDay(g); }
+    expect(e?.scouted).toBe('Dale');
+    expect(e!.dossier[0]).toMatch(/Dale told them/);
+    const base = hideFoundChance(g, { ...e!, scouted: undefined });
+    expect(hideFoundChance(g, e!)).toBeCloseTo(Math.min(0.95, base + SCOUT_HIDE_BONUS / 100), 5);
+    expect(hideFoundChance(g, e!)).toBeGreaterThan(base);
+    g.gate.pending = e;
+    const o = resolve(g, 'hide');
+    expect(o.lines.join(' ')).toMatch(/Dale/);
+  });
+});
+
+describe('save v60', () => {
+  it('a v59 save gains the newcomers ledger', () => {
+    const old = JSON.parse(JSON.stringify(newGame(2))) as Record<string, unknown>;
+    old.version = 59; delete old.newcomers;
+    const s = migrate(old);
+    expect(s.version).toBe(SAVE_VERSION);
+    expect(s.newcomers?.bonds).toEqual({});
+  });
+});
+
+describe('save v59 migration', () => {
   it('an older save gains an empty newcomers ledger', () => {
     const old = JSON.parse(JSON.stringify(newGame(2))) as Record<string, unknown>;
     old.version = 58; delete old.newcomers;

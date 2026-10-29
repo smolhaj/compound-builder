@@ -18,6 +18,7 @@
 import { isHome } from './blueprints';
 import { isFinished } from './construction';
 import { dayIndex, hourOf, type GameState } from './state';
+import { emptyNow } from './weekender';
 
 export type AutoLightsOut = 'off' | 'warned' | 'dusk';
 export const AUTO_MODES: readonly AutoLightsOut[] = ['off', 'warned', 'dusk'];
@@ -42,17 +43,19 @@ export function warningSigns(s: GameState): boolean {
 }
 
 /** Why the lights are out now ('manual' | 'dusk' | 'warned'), or null. */
-export function lightsOutReason(s: GameState): 'manual' | 'dusk' | 'warned' | null {
+export function lightsOutReason(s: GameState): 'manual' | 'dusk' | 'warned' | 'away' | null {
   if (op(s).blackout) return 'manual';
   const a = autoMode(s);
   if (a === 'dusk') return 'dusk';
   if (a === 'warned' && warningSigns(s)) return 'warned';
+  // the weekender's empty place, set to stay dark (sim/weekender.ts): no lamps in the windows, no floodlights, nobody there to see them
+  if (s.weekend?.lights === 'dark' && emptyNow(s)) return 'away';
   return null;
 }
 /** Household lights out (windows, fire pit, lamps, flashlights); the hour is the renderer's (`night`). */
 export const lightsOutNow = (s: GameState): boolean => lightsOutReason(s) !== null;
 /** Floodlights forced off too: manual or every-dusk discipline (a warning keeps the sensor lights). */
-export const floodsOut = (s: GameState): boolean => { const r = lightsOutReason(s); return r === 'manual' || r === 'dusk'; };
+export const floodsOut = (s: GameState): boolean => { const r = lightsOutReason(s); return r === 'manual' || r === 'dusk' || r === 'away'; };
 
 /** Sets of blackout curtains in the stockpile, and houses that need one. */
 export const curtainSets = (s: GameState): number => Math.floor(s.stock[CURTAIN_GOOD] ?? 0);

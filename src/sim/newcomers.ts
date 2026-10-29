@@ -43,7 +43,7 @@ import { addTool, type ToolKind } from './tools';
 import { fleetOf } from './vehicles';
 import { syncParking } from './parking';
 import type { Stock } from './materials';
-import type { Encounter, Neighbor, NeighborKind, Outcome, Stance } from './encounters';
+import { scoutCrew, type Encounter, type Neighbor, type NeighborKind, type Outcome, type Stance } from './encounters';
 import type { Character } from './trial';
 import { lifeOf, plural, surname } from './neighborLife';
 
@@ -726,10 +726,7 @@ const REVEAL_STEAL: Array<[keyof Stock, number]> = [['canned', 0.12], ['fuel', 0
 
 /** Raiders told where to hit: a crew comes back for the place, knowing it (sim/encounters.ts `comeBack`, `guide`). */
 function sendCrew(s: GameState, guide: string, r: () => number): void {
-  const day = dayIndex(s.clock.t);
-  const size = 5 + Math.floor(r() * 5);
-  s.gate.comeBack = { kind: 'gang', size, armed: true, temper: 'hard', until: day + 40, guide };
-  s.gate.next = Math.min(s.gate.next < 0 ? day + 6 : s.gate.next, day + 3 + Math.floor(r() * 6));
+  scoutCrew(s, guide, r);
 }
 
 /** Once a day: loyalty, what the family notices, thieves and scouts, people who walk out, guests going home, neighbors asking for shelter. Returns lines for the log. */

@@ -33,7 +33,7 @@ export interface RunStats {
   grownYear: number;
   needYear: number;
   /** The bug-out that ended the run (sim/bugout.ts). */
-  bugOut?: { day: number; going: number; left: number; vehicles: string[]; foodDays: number; rangeKm: number; covered: boolean };
+  bugOut?: { day: number; going: number; left: number; vehicles: string[]; foodDays: number; rangeKm: number; covered: boolean; /** The kept town house, as somewhere to go (sim/weekender.ts). */ fallback?: string };
 }
 
 export const emptyStats = (): RunStats => ({ days: 0, hungryDays: 0, dryDays: 0, darkDays: 0, kcalNeed: 0, kcalGrown: 0, wounds: 0, maxDose: 0, peak: 0, okSince: -1, selfFed: 0, grownYear: 0, needYear: 0 });
@@ -119,6 +119,7 @@ export function reportCard(s: GameState): ReportCard {
     lines.push(`${bo.going} aboard ${bo.vehicles.length} vehicle${bo.vehicles.length === 1 ? '' : 's'} (${bo.vehicles.map(k => VEHICLES[k as keyof typeof VEHICLES]?.name.toLowerCase() ?? k).join(', ')}), loaded ${bo.covered ? 'under cover, by the passage from the house to the garage' : 'in the open, in plain view of the road'}.`);
     lines.push(`${bo.foodDays} days of food and water aboard and fuel for about ${bo.rangeKm} km.`);
     if (bo.left) lines.push(`${bo.left} had no seat and stayed behind to hold the place.`);
+    if (bo.fallback) lines.push(`They had somewhere to go: ${bo.fallback} was kept for this, with the lights still paid for.`);
   }
   // water
   const water = has('well_drilled') || has('well_hand') || has('cistern') || has('water_tower');

@@ -23,7 +23,7 @@ import { contagion } from './effects';
 import { SKILL_IDS, type Person, type SkillId } from './family';
 import { dayIndex, type GameState } from './state';
 import type { Stock } from './materials';
-import type { Encounter, Outcome, Stance } from './encounters';
+import { scoutCrew, type Encounter, type Outcome, type Stance } from './encounters';
 
 /** What they turn out to be (hidden until the month shows it). */
 export type Character = 'solid' | 'gem' | 'lazy' | 'thief' | 'sick' | 'scout';
@@ -142,9 +142,7 @@ export function trialDay(s: GameState): string[] {
     if (c.character === 'scout' && d >= 8 && r() < 0.06) {
       camps.splice(camps.indexOf(c), 1);
       const a = adults[0] ?? c.people[0];
-      const size = 5 + Math.floor(r() * 5);
-      s.gate.comeBack = { kind: 'gang', size, armed: true, temper: 'hard', until: day + 40, guide: a?.first ?? 'The stranger' };
-      s.gate.next = Math.min(s.gate.next < 0 ? day + 6 : s.gate.next, day + 3 + Math.floor(r() * 6));
+      scoutCrew(s, a?.first ?? 'The stranger', r);
       out.push(`${c.title}: gone in the night. They had been counting the posts.`);
       if (!s.gate.card && !s.gate.pending) s.gate.card = { title: 'The camp is empty', text: `${a?.first ?? 'The stranger'} and the rest were gone by first light. They took nothing. They did not need to: they had walked the fence line every evening for three weeks.`, tone: 'bad', lines: ['They were scouting for a crew. You will see them again.'] };
       continue;

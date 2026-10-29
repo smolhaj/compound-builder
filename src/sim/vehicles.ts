@@ -331,7 +331,8 @@ export function vehiclesDay(s: GameState): string[] {
   const vs = fleetOf(s);
   const out: string[] = [];
   const peace = shopsUp(s);
-  const commuting = peace && s.personState.some(ps => ps.employed);
+  // (a weekender's commute is counted on the trip up and down, sim/weekender.ts)
+  const commuting = peace && s.weekend?.mode !== 'split' && s.personState.some(ps => ps.employed);
   // (the living: a dead mechanic used to keep the trucks running)
   const mechanic = mechanicOf(s);
   syncParking(s);

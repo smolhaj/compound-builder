@@ -42,6 +42,7 @@ import { boltPassages, passageEntry } from './compounds';
 import { resolveDigWarning } from './tunnelers';
 import { addTool, stealTools, SWAP_KINDS, TOOLS, type ToolKind } from './tools';
 import { resolveKin } from './kin';
+import { emptyLooting, emptyNow, resolveMoveIn, resolveStranded } from './weekender';
 import { raidTakesVehicles } from './vehicles';
 import { resolveTrialEnd, startTrial, trialDay, type Character, type TrialCamp } from './trial';
 import { admitNewcomers, resolveShelter, strangerArrival, type Extras, type ShelterWhy } from './newcomers';
@@ -164,8 +165,8 @@ export function postureOf(s: GameState): Posture {
 // Encounters
 // ─────────────────────────────────────────────────────────────────────────
 
-export type EncounterKind = 'arrival' | 'looters' | 'gang' | 'refugees' | 'requisition' | 'neighbor_help' | 'trader' | 'horde' | 'patrol' | 'militia' | 'break_in' | 'ransom' | 'trial_end' | 'tunnelers' | 'kin' | 'shelter';
-export type Stance = 'hide' | 'parley' | 'warn' | 'defend' | 'trade' | 'take_in' | 'trial' | 'turn_away' | 'call_911' | 'shout' | 'confront' | 'pay' | 'refuse' | 'ambush' | 'flood' | 'collapse' | 'ignore' | 'build_first';
+export type EncounterKind = 'arrival' | 'looters' | 'gang' | 'refugees' | 'requisition' | 'neighbor_help' | 'trader' | 'horde' | 'patrol' | 'militia' | 'break_in' | 'ransom' | 'trial_end' | 'tunnelers' | 'kin' | 'shelter' | 'move_in' | 'stranded';
+export type Stance = 'hide' | 'parley' | 'warn' | 'defend' | 'trade' | 'take_in' | 'trial' | 'turn_away' | 'call_911' | 'shout' | 'confront' | 'pay' | 'refuse' | 'ambush' | 'flood' | 'collapse' | 'ignore' | 'build_first' | 'move_sell' | 'move_keep' | 'hold_on' | 'drive_now' | 'back_roads' | 'resupply';
 
 export interface Encounter {
   id: string;
@@ -195,6 +196,8 @@ export interface Encounter {
   trial?: string;
   /** A crew coming back to a place they found empty and stripped. */
   back?: boolean;
+  /** A crew a scout sent for (`scoutCrew`): more of them, and they look where the family hides and keeps things. */
+  scouted?: string;
   /** Tunnelers (sim/tunnelers.ts): found digging under the wall (`warning`, the window to act), or up inside it (`inside`). */
   /** A relative asking to join (sim/kin.ts): the savings they bring, and whether it is after the hit. */
   kin?: { savings: number; late: boolean };
@@ -214,7 +217,20 @@ export interface Encounter {
 /** Crews that plan, carry more and might bring explosives (battle.ts `organized`). */
 export const ORGANIZED: ReadonlySet<EncounterKind> = new Set(['gang', 'militia', 'patrol', 'requisition', 'tunnelers']);
 /** A crew that found the place empty and stripped it: they know it's lived in and come back sooner. */
-export interface ComeBack { kind: EncounterKind; size: number; armed: boolean; temper?: RaiderTemper; until: number; /** A scout who walked out and told them how the place lies (sim/newcomers.ts). */ guide?: string }
+export interface ComeBack { kind: EncounterKind; size: number; armed: boolean; temper?: RaiderTemper; until: number; /** A scout who walked out and told them how the place lies (sim/newcomers.ts). */ guide?: string; /** The crew the scout's report brought: bigger, and they know where the hides are. */ scouted?: boolean }
+
+/** What a betraying scout's report is worth to the crew: more hands, and they know where to look for the hide, the hatch and the stores below. */
+export const SCOUT_CREW_BONUS = 2;
+export const SCOUT_HIDE_BONUS = 25;
+export const SCOUT_HATCH_FOUND = 3;
+export const SCOUT_BELOW_EXTRA = 0.3;
+/** A scout walked out: a crew is sent for the place, larger than a gang it would otherwise have met, knowing how it lies. */
+export function scoutCrew(s: GameState, guide: string, r: () => number): void {
+  const day = dayIndex(s.clock.t);
+  const size = 5 + Math.floor(r() * 5) + SCOUT_CREW_BONUS + Math.floor(r() * 2);
+  s.gate.comeBack = { kind: 'gang', size, armed: true, temper: 'hard', until: day + 40, guide, scouted: true };
+  s.gate.next = Math.min(s.gate.next < 0 ? day + 6 : s.gate.next, day + 3 + Math.floor(r() * 6));
+}
 
 /**
  * How ruthless a crew is. Most are desperate people after food; some will kill
@@ -394,6 +410,8 @@ export function gateDay(s: GameState): Encounter | null {
   // while the law works (before the collapse, or once it's back): now and then a break-in (sim/breakins.ts)
   if (d.tracks.law >= 0.5) { const b = breakInDay(s, day); if (b) { g.pending = b; return b; } }
   if (!d.kind || s.clock.t < d.hitAt + 1) return null;
+  // the family is in town and the place stands empty (sim/weekender.ts): nobody to answer the gate, only what the strangers take
+  if (emptyNow(s)) { const l = emptyLooting(s, mulberry32(s.seed * 7907 + day * 31 + 5)); if (l) log(s, l); return null; }
   // fallout keeps everyone indoors for the first two weeks of a nuclear war
   if (d.kind === 'nuclear' && s.clock.t < d.hitAt + 14) return null;
   const r = mulberry32(s.seed * 7907 + day * 31);
@@ -407,9 +425,10 @@ export function gateDay(s: GameState): Encounter | null {
   const e = makeThreat(kind, r, `e${s.nextId++}`, day, s);
   if (cb && kind === cb.kind) {
     e.size = cb.size; e.armed = cb.armed; e.temper = cb.temper; e.back = true;
+    if (cb.scouted && cb.guide) e.scouted = cb.guide;
     e.strength = Math.round(cb.size * (kind === 'gang' ? 12 : kind === 'militia' ? 11 : 9));
     e.title = `Back again: ${e.title[0].toLowerCase()}${e.title.slice(1)}`;
-    e.dossier = [cb.guide ? `${cb.size} of them. ${cb.guide} told them how the place lies: the posts, the guns, the hours of the watch. They come in knowing where to go.` : `${cb.size} of them: the same ones who went through the place. They know somebody lives here now, and they mean to find them.`, ...e.dossier.slice(1, 2)];
+    e.dossier = [cb.guide ? `${cb.size} of them. ${cb.guide} told them how the place lies: the posts, the guns, the hours of the watch. They come in knowing where to go: more of them than a crew would send blind, and they will look in the timber, the stores and the hatches.` : `${cb.size} of them: the same ones who went through the place. They know somebody lives here now, and they mean to find them.`, ...e.dossier.slice(1, 2)];
     g.comeBack = null;
   }
   // the difficulty's crew size (the battle counts heads: `strength` is only the dossier's figure for them)
@@ -467,7 +486,7 @@ const raidersAfterHelp = (e: Encounter, help: number) => Math.max(1, e.size - Ma
 export function hideFoundChance(s: GameState, e: Encounter, p: Posture = postureOf(s)): number {
   const hunt = diffOf(s.disaster).hunt;
   if (e.kind === 'horde') return Math.min(0.95, p.visibility * 0.6 / 100);
-  return Math.max(0, Math.min(0.95, (p.visibility * 0.6 + (e.temper === 'savage' ? 25 : 0) + (e.back ? 20 : 0) + (e.dig ? 40 : 0) + hunt) / 100));
+  return Math.max(0, Math.min(0.95, (p.visibility * 0.6 + (e.temper === 'savage' ? 25 : 0) + (e.back ? 20 : 0) + (e.scouted ? SCOUT_HIDE_BONUS : 0) + (e.dig ? 40 : 0) + hunt) / 100));
 }
 
 /**
@@ -483,7 +502,9 @@ function stripEmpty(s: GameState, e: Encounter, p: Posture, r: () => number, los
   if (e.kind === 'horde') { if (lost.length) out.push(`Lost: ${lost.join(', ')}`); return out; }
   const crew = e.kind === 'looters' || e.kind === 'gang' || e.kind === 'militia';
   // the bunker's stores room keeps most of it below with the family; refugees on foot carry little
-  const below = s.structures.some(st => st.kind === 'bunker_stores' && isFinished(st)) ? 0.3 : p.bunker ? 0.6 : 1;
+  const belowBase = s.structures.some(st => st.kind === 'bunker_stores' && isFinished(st)) ? 0.3 : p.bunker ? 0.6 : 1;
+  // a scout counted the doors: they know there is a stores room below, and dig for it
+  const below = e.scouted ? Math.min(1, belowBase + SCOUT_BELOW_EXTRA) : belowBase;
   const share = Math.min(0.3, 0.08 + 0.015 * e.size) * (e.temper === 'savage' || e.temper === 'hard' ? 1.3 : 1) * below * (crew ? 1 : e.kind === 'refugees' ? 0.3 : 0.5);
   for (const k of ['fresh', 'canned', 'staples', 'frozen', 'fuel', 'meds'] as const) {
     const t = Math.floor((s.stock[k] ?? 0) * share);
@@ -576,6 +597,13 @@ export function resolve(s: GameState, stance: Stance): Outcome {
     title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines);
   } else if (e.kind === 'shelter') {
     const o = resolveShelter(s, e, stance);
+
+    title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines);
+  } else if (e.kind === 'move_in') {
+    const o = resolveMoveIn(s, stance);
+    title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines);
+  } else if (e.kind === 'stranded') {
+    const o = resolveStranded(s, stance);
     title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines);
   } else if (e.kind === 'arrival') {
     if (stance === 'trial') {
@@ -619,6 +647,7 @@ export function resolve(s: GameState, stance: Stance): Outcome {
     if (stance === 'hide') {
       // everyone underground (or in the timber); they take what's lying about. Nobody gets in by the tunnel: it only opens from inside.
       const found = r() < hideFoundChance(s, e, p);
+      if (e.scouted) lines.push(found ? `${e.scouted} had walked your fence line and told them where you would go to ground. They knew where to look.` : `${e.scouted} told them where you would hide. They looked, and did not find it.`);
       const hidden = p.bunker || p.safeRoom;
       // a savage crew doesn't stop at the stores: they hunt for whoever lives here; so does a crew come back for them
       // (a crew of hungry men back for more stores takes them; a hard one back for whoever lives here looks harder)
@@ -655,7 +684,8 @@ export function resolve(s: GameState, stance: Stance): Outcome {
       // the fight itself, second by second (sim/battle.ts); the world can play it back from g.battle
       // a crew up inside the wall (tunnelers), or one that finds a hatch outside it (an underground passage's way in): no wall to get over
       boltPassages(s);
-      const via = e.dig ? null : passageEntry(s, r, ORGANIZED.has(e.kind));
+      const via = e.dig ? null : passageEntry(s, r, ORGANIZED.has(e.kind), e.scouted ? SCOUT_HATCH_FOUND : 1);
+      if (via && e.scouted) lines.push(`${e.scouted} had marked the hatch on the way in.`);
       if (via) lines.push(via.forced ? 'They found a steel hatch in the leaf litter out in the trees and blew the blast door. They are in the passage.' : 'They found a steel hatch out in the trees, left unbolted. They are in the passage.');
       const raiders = via ? Math.min(raidersAfterHelp(e, help), 4 + Math.floor(e.size / 4)) : raidersAfterHelp(e, help);
       const b = planBattle(s, raiders, s.seed * 131 + e.day * 7 + 1, { armed: e.armed, temper: e.temper, organized: ORGANIZED.has(e.kind), ...(e.dig || via ? { insideBreach: true } : {}) });
