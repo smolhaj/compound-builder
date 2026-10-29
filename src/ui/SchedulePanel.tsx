@@ -119,7 +119,7 @@ export function SchedulePanel() {
                   <select value={plan.focus?.[p.id] ?? ''} style={{ fontSize: 11, background: '#222', color: '#eee', border: `1px solid ${C.line}`, borderRadius: 4 }}
                     onChange={e => setMsg(g.daily(s => setFocus(s, p.id, (e.target.value || null) as Duty | null)))}>
                     <option value="">Planner decides</option>
-                    {DUTIES.filter(k => DUTY[k].work && canDo(p, k)).map(k => <option key={k} value={k}>{DUTY[k].name}</option>)}
+                    {DUTIES.filter(k => DUTY[k].work && k !== 'study' && k !== 'drill' && canDo(p, k)).map(k => <option key={k} value={k}>{DUTY[k].name}</option>)}
                   </select>
                 </td>
               </tr>;
@@ -132,7 +132,7 @@ export function SchedulePanel() {
             {whoShouldDo(game).map(a => <div key={a.duty} style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
               <span style={{ width: 12, height: 12, borderRadius: 3, background: DUTY[a.duty].color, display: 'inline-block' }} />
               <b style={{ minWidth: 70 }}>{DUTY[a.duty].name}</b>
-              {a.best.map(b => <button key={b.p.id} style={{ ...btn(plan.focus?.[b.p.id] === a.duty), padding: '1px 6px', fontSize: 11 }} title={`${b.p.first}: ${b.why}. Click to always put ${b.p.first} on ${DUTY[a.duty].name.toLowerCase()} first.`} onClick={() => setMsg(g.daily(s => setFocus(s, b.p.id, plan.focus?.[b.p.id] === a.duty ? null : a.duty)))}>{b.p.first}{b.level !== null ? ` ${Math.floor(b.level)}` : ''}</button>)}
+              {(a.duty === 'study' || a.duty === 'drill') ? a.best.map((b, k) => <span key={b.p.id + k} style={{ padding: '1px 6px', fontSize: 11, border: `1px solid ${C.line}`, borderRadius: 6 }} title={`${b.p.first}: ${b.why}. Set up in the Family tab → Classes and drills.`}>{b.p.first}{b.level !== null ? ` ${Math.floor(b.level)}` : ''}</span>) : a.best.map(b => <button key={b.p.id} style={{ ...btn(plan.focus?.[b.p.id] === a.duty), padding: '1px 6px', fontSize: 11 }} title={`${b.p.first}: ${b.why}. Click to always put ${b.p.first} on ${DUTY[a.duty].name.toLowerCase()} first.`} onClick={() => setMsg(g.daily(s => setFocus(s, b.p.id, plan.focus?.[b.p.id] === a.duty ? null : a.duty)))}>{b.p.first}{b.level !== null ? ` ${Math.floor(b.level)}` : ''}</button>)}
             </div>)}
             {whoShouldDo(game).length === 0 && <span style={{ color: C.dim }}>Nothing pressing needs hands right now.</span>}
           </div>

@@ -309,18 +309,29 @@ export function skillsDay(s: GameState): string[] {
 
 /** Rounds an hour at the range (.22 or whatever they carry). */
 export const RANGE_ROUNDS = 40;
-/** Range time costs ammunition; with none it is dry-fire drills, worth a third. Returns a log line, or an explanation when it cannot happen. */
-export function rangeTime(s: GameState, pid: string, hours: number): string {
+/**
+ * An hour (or part of one) of shooting practice with the gun a person carries (else the first one): costs
+ * ammunition, wears the gun a little, and is practice in shooting. With no ammunition (or `live` off) it is
+ * dry-fire drills, worth a third. Silent; `rangeTime` and the drill duty (courses.ts) report it.
+ */
+export function rangeWork(s: GameState, pid: string, hours: number, perHour = RANGE_ROUNDS, live = true): { ok: boolean; why?: string; fired: number; gun?: string } {
   const p = person(s, pid);
-  if (!p || !here(s, pid)) return 'not here';
-  if (p.kid && p.age < 12) return `${p.first} is too young for the range`;
+  if (!p || !here(s, pid)) return { ok: false, why: 'not here', fired: 0 };
+  if (p.kid && p.age < 12) return { ok: false, why: `${p.first} is too young for the range`, fired: 0 };
   const gun = s.armory.guns.find(g => g.carrier === pid) ?? s.armory.guns[0];
-  if (!gun) return 'There is no gun to practice with.';
+  if (!gun) return { ok: false, why: 'There is no gun to practice with.', fired: 0 };
   const cal = GUN[gun.model].cal;
-  const want = Math.round(RANGE_ROUNDS * hours), have = Math.floor(s.armory.ammo[cal] ?? 0), fired = Math.min(want, have);
+  const want = live ? Math.round(perHour * hours) : 0, have = Math.floor(s.armory.ammo[cal] ?? 0), fired = Math.min(want, have);
   s.armory.ammo[cal] = have - fired;
   gun.fired += fired; gun.condition = Math.max(0, gun.condition - 0.0002 * fired);
-  const live = want > 0 ? fired / want : 0;
-  practice(s, pid, 'shooting', hours * (live + (1 - live) / 3));
-  return fired > 0 ? `${p.first} put ${fired} rounds through the ${GUN[gun.model].name} at the range.` : `${p.first} ran dry-fire drills: no ammunition to spare.`;
+  const liveShare = want > 0 ? fired / want : 0;
+  practice(s, pid, 'shooting', hours * (liveShare + (1 - liveShare) / 3));
+  return { ok: true, fired, gun: GUN[gun.model].name };
+}
+
+/** Range time costs ammunition; with none it is dry-fire drills, worth a third. Returns a log line, or an explanation when it cannot happen. */
+export function rangeTime(s: GameState, pid: string, hours: number): string {
+  const p = person(s, pid), r = rangeWork(s, pid, hours);
+  if (!r.ok) return r.why!;
+  return r.fired > 0 ? `${p!.first} put ${r.fired} rounds through the ${r.gun} at the range.` : `${p!.first} ran dry-fire drills: no ammunition to spare.`;
 }
