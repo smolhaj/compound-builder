@@ -11,6 +11,7 @@ import { PERIMETER, SALVAGE, UPGRADE_NEXT, runBill, runFinished, runHours, upgra
 import { STRUCTURE_SALVAGE, isFinished as structFinished } from '../../sim/construction';
 import { AI_MODULE, ARMORY_LIGHTS, LIGHT_MODES, LIGHT_MODE_NAME, aiModulesUsed, hasAiSensor, lightList, lightMode, lightsOf } from '../../sim/lights';
 import { floodTowerIds, TOWERS, TOWER_NEXT, highBonus, highShare, isTower, towerBill, towerUpgradeProblem } from '../../sim/towers';
+import { ungatedCrossings } from '../../sim/roadGate';
 import { canHostWalkway, walkOn, walkwayBill, walkwayProblem } from '../../sim/walkway';
 import { Note, Row, Section } from './common';
 import { TONE, DIM, btn, usd } from './style';
@@ -33,7 +34,8 @@ function CheckRow({ c }: { c: Check }) {
 export function DefenseTab() {
   const game = useGameStore(s => s.game);
   const w = useWorldStore();
-  const d = defenseReport(game);
+  const d = defenseReport(game, w.siteGeo?.drive);
+  const missingGate = ungatedCrossings(game, w.siteGeo?.drive).length;
   const exposed = d.homes.filter(h => !h.covered);
   return <>
     <Section title="Defense">
@@ -48,6 +50,10 @@ export function DefenseTab() {
     </Section>
     <Section title="The property line">
       {d.walls.map(c => <CheckRow key={c.id} c={c} />)}
+      {missingGate > 0 && <div style={{ border: '1px solid #c9a24a', borderRadius: 6, padding: 6, margin: '4px 0' }}>
+        <Note tone="warn">The road comes through here: {missingGate} wall{missingGate > 1 ? 's' : ''} cross{missingGate > 1 ? '' : 'es'} the driveway with no gate, so the trucks and the family's vehicles cannot get in.</Note>
+        <button style={{ ...btn(true), width: '100%' }} title="Opens a vehicle gate in each wall where the driveway crosses it" onClick={() => useGameStore.getState().cutRoadGates(w.siteGeo?.drive)}>Add a gate where the road comes in</button>
+      </div>}
       <WallProperty />
       <FortifyRing />
       {d.gaps.length > 0 && <Note tone="warn">Open ground on the line, e.g. on the {spotsText(d.gaps, game.site.home)}. Turn on the property line to see it.</Note>}
