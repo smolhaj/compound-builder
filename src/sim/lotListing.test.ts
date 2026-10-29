@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { hasLots, lotPriceFactor, makeLotSite, profileChart, REGION_LOTS, siteLot, terrainFacts } from './lotListing';
-import { affordable, ANY_WISH, listings, SAVINGS, type Site } from './site';
+import { affordable, ANY_WISH, listings, SAVINGS, siteFacts, type Site } from './site';
 import { LOT_KINDS, LOT_NAME, type LotKind } from './lots';
 import { REGION_IDS } from './regions';
 
@@ -104,5 +104,12 @@ describe('the listing card', () => {
     }
     expect(profileChart(makeLotSite({ kind: "bluff" }))!.waterM).not.toBeNull();
     expect(profileChart(makeLotSite({ kind: 'ridge' }))!.waterM).toBeNull();
+  });
+
+  it('dry heights are flagged in the Water row and priced down', () => {
+    const dry = { ...makeLotSite({ kind: 'ridge', seed: 5 }), creek: false, spring: false }, wet = { ...dry, spring: true };
+    expect(lotPriceFactor(dry)).toBeLessThan(lotPriceFactor(wet));
+    expect(siteFacts(dry).find(f => f.label === 'Water')).toMatchObject({ value: expect.stringContaining('Dry heights'), tone: 'bad' });
+    expect(siteFacts(wet).find(f => f.label === 'Water')!.value).not.toContain('Dry heights');
   });
 });

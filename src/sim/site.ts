@@ -219,7 +219,7 @@ export interface Fact { label: string; value: string; tone?: 'good' | 'bad' }
 /** The listing card's rows. */
 export function siteFacts(s: Site): Fact[] {
   return [
-    { label: 'Water', value: s.creek ? 'Creek runs through' : s.spring ? 'Spring, no creek' : s.region === 'desert' ? 'Dry: a wash runs only after storms' : 'Dry (creek on the neighbor\'s)', tone: s.creek || s.spring ? 'good' : 'bad' },
+    { label: 'Water', value: !s.creek && !s.spring && s.lot && (s.lot.kind === 'ridge' || s.lot.kind === 'mesa' || s.lot.kind === 'saddle') ? `Dry heights: the well is ${s.gwDepth} m down, haul or catch the rest` : s.creek ? 'Creek runs through' : s.spring ? 'Spring, no creek' : s.region === 'desert' ? 'Dry: a wash runs only after storms' : 'Dry (creek on the neighbor\'s)', tone: s.creek || s.spring ? 'good' : 'bad' },
     { label: 'Well', value: `${s.gwDepth} m${s.gwDepth <= 9 ? ' (hand-dug OK)' : ''}`, tone: s.gwDepth <= 20 ? 'good' : s.gwDepth > 90 ? 'bad' : undefined },
     { label: 'Groundwater', value: GW_SHORT[s.gwQuality], tone: s.gwQuality === 'good' ? 'good' : s.gwQuality === 'arsenic' ? 'bad' : undefined },
     { label: 'Timber', value: s.timber > 1.1 ? 'Heavy' : s.timber < 0.5 ? 'Open ground' : 'Some' },
