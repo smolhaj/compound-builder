@@ -40,8 +40,9 @@ import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceL
 import type { LightsState } from './lights';
 import type { Learning } from './skills';
 import type { MindState } from './mind';
+import type { Medical } from './medical';
 import { starterKit, type ToolKit } from './tools';
-export const SAVE_VERSION = 63;
+export const SAVE_VERSION = 64;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -287,6 +288,8 @@ export interface GameState {
   learning?: Learning;
   /** Mental health: strain, trauma, low mood, breakdowns, the fight a household remembers (sim/mind.ts). Save v63; `mindOf` makes it lazily. */
   mind?: MindState;
+  /** Medical depth: lasting effects, pregnancies, the epidemic, the antibiotics policy (sim/medical.ts). Save v64; `medicalOf` makes it lazily. */
+  medical?: Medical;
   /** Deaths in the household and whether they were mourned (sim/grief.ts). Save v49; `lossesOf` makes it lazily. */
   losses?: Loss[];
   /** The weekender (sim/weekender.ts): the town house, the caretaker, the trips, the way home. Present while the family splits its week between town and the place, and after the move (the town house may be kept). Save v59. */

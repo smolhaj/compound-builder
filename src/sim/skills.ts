@@ -175,6 +175,7 @@ export const skillFactor = (level: number): number => 1 + 0.03 * (Math.max(0, Ma
 
 /** Books that help with a skill (stock ids). */
 export function hasBooks(s: GameState, k: Practiced): boolean {
+  if (k === 'medic' && (s.stock.medical_books ?? 0) >= 1) return true;
   return (s.stock.manuals ?? 0) >= 1 && k !== 'negotiator' && k !== 'leadership';
 }
 

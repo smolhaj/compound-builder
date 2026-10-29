@@ -52,7 +52,11 @@ export interface Body {
   rx: Record<string, number>;
   /** Days each has gone without it. */
   without: Record<string, number>;
+  /** Days since each person's stock was last filled: pills keep about two and a half years, then work half as well (sim/medical.ts reports it). */
+  age?: Record<string, number>;
 }
+/** Days a bottle of pills keeps its strength. */
+export const RX_SHELF = 900;
 export const newBody = (): Body => ({ rx: {}, without: {} });
 
 export const pharmacyOpen = (s: GameState) => s.disaster.tracks.medical >= 0.5 && s.disaster.tracks.banks >= 0.5;
@@ -68,6 +72,7 @@ export function stockUpRx(s: GameState): number {
     if (have >= want) continue;
     cost += monthlyRx(p) * (want - have) / 30;
     s.body.rx[p.id] = want;
+    (s.body.age ??= {})[p.id] = 0;
   }
   s.money -= Math.round(cost);
   return Math.round(cost);
@@ -93,10 +98,14 @@ export function bodyDay(s: GameState): string[] {
     // medicine
     if (p.conditions?.length) {
       let have = s.body.rx[p.id] ?? 30;
-      if (pharmacy && have < 30) { s.money -= monthlyRx(p) * (30 - have) / 30; have = 30; }
+      const ages = (s.body.age ??= {});
+      if (pharmacy && have < 30) { s.money -= monthlyRx(p) * (30 - have) / 30; have = 30; ages[p.id] = 0; }
+      else ages[p.id] = (ages[p.id] ?? 0) + 1;
+      const stale = (ages[p.id] ?? 0) > RX_SHELF;
+      if (stale && have > 0 && (ages[p.id] ?? 0) === RX_SHELF + 1) out.push(`${p.first}'s medicine is past its date: it still works, but only half as well, so it runs out twice as fast.`);
       // insulin spoils within about a month without a fridge: the stash past that goes bad
       if (p.conditions.includes('insulin') && !fridge && have > 28) have = 28;
-      have = Math.max(0, have - 1);
+      have = Math.max(0, have - (stale ? 2 : 1));
       s.body.rx[p.id] = have;
       const w = have > 0 ? 0 : (s.body.without[p.id] ?? 0) + 1;
       s.body.without[p.id] = w;

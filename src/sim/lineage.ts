@@ -28,6 +28,7 @@ import { isFinished } from './construction';
 import { isHome } from './blueprints';
 import { mulberry32 } from './rng';
 import { log } from './economy';
+import { afterBirth, birthRisk, duePregnancies, startPregnancy } from './medical';
 
 export type ChronicleKind = 'era' | 'birth' | 'death' | 'partner' | 'coming' | 'milestone' | 'retire' | 'home';
 export interface ChronicleEntry { t: number; year: number; kind: ChronicleKind; text: string }
@@ -139,7 +140,6 @@ export function lineageDay(s: GameState): string[] {
   const d = s.disaster, { doy, year } = calendarOf(s.clock);
   const town = d.tracks.stores >= 0.5 && d.tracks.banks >= 0.5;
   const doctor = d.tracks.medical >= 0.5;
-  const medic = s.people.some(p => alive(s, p) && !p.kid && p.skills.medic >= 5) || s.structures.some(x => isFinished(x) && x.kind === 'bunker_medical');
   const living = s.people.filter(p => alive(s, p));
   // deaths (any cause) go in the chronicle
   for (const p of s.people) if (!alive(s, p) && !L.mourned.includes(p.id)) {
@@ -202,6 +202,17 @@ export function lineageDay(s: GameState): string[] {
     if (!here && town) { mate.job = dayJob(mate, s.seed + day); const ms = s.personState.find(x => x.id === mate.id); if (ms) ms.employed = true; }
     say('partner', here ? `${p.first} and ${mate.first} are together now.` : `${p.first} married ${fullName(mate)}, ${lawful ? 'from town' : 'who came up the road one spring and stayed'}.`);
   }
+  // deliveries: a pregnancy comes due (sim/medical.ts: who is there and what they have decides the risk)
+  for (const { mother, father } of duePregnancies(s)) {
+    const risk = birthRisk(s, mother), mate = father ?? s.people.find(x => x.id === mother.partner) ?? mother;
+    const body: 'f' | 'm' = r() < 0.5 ? 'f' : 'm';
+    if (r() < risk.baby) { say('birth', `${mother.first}'s baby didn't live (${risk.how}).`); afterBirth(s, mother, r); continue; }
+    const kid = newPerson(s, { first: pickName(s, body, r), last: L.family, age: 0, kid: true, body, kin: true, bornHere: true, bday: doy, gen: Math.max(mother.gen ?? 1, mate.gen ?? 1) + 1, parents: [mother.id, mate.id] }, r);
+    L.points += 25;
+    say('birth', `${kid.first} ${kid.last} was born to ${mother.first} and ${mate.first}, ${risk.how}.`);
+    if (r() < risk.mother) { const ps = s.personState.find(x => x.id === mother.id)!; ps.needs.died = Math.floor(s.clock.t); L.mourned.push(mother.id); say('death', `${fullName(mother)} died in childbirth, aged ${mother.age}.`); }
+    else afterBirth(s, mother, r);
+  }
   // births (and, for couples who can't, adoption or a child with no one left)
   const doneP = new Set<string>();
   for (const p of s.people.filter(x => alive(s, x) && x.partner && !x.kid)) {
@@ -214,14 +225,10 @@ export function lineageDay(s: GameState): string[] {
     const kidsNow = s.people.filter(k => k.kid && alive(s, k) && k.parents?.includes(p.id)).length;
     if (mother) {
       if (mother.age < 18 || mother.age > 43 || r() >= (town ? 0.1 : 0.07) * (kidsNow >= 4 ? 0.3 : 1) / 365) continue;
-      const body: 'f' | 'm' = r() < 0.5 ? 'f' : 'm';
-      const risky = !doctor && !medic;
       L.lastBirth[p.id] = L.lastBirth[mate.id] = day;
-      if (risky && r() < 0.04) { say('birth', `${mother.first}'s baby didn't live. There was no one to help.`); continue; }
-      const kid = newPerson(s, { first: pickName(s, body, r), last: L.family, age: 0, kid: true, body, kin: true, bornHere: true, bday: doy, gen: Math.max(p.gen ?? 1, mate.gen ?? 1) + 1, parents: [p.id, mate.id] }, r);
-      L.points += 25;
-      say('birth', `${kid.first} ${kid.last} was born to ${p.first} and ${mate.first}.`);
-      if (risky && r() < 0.015) { const ps = s.personState.find(x => x.id === mother.id)!; ps.needs.died = Math.floor(s.clock.t); L.mourned.push(mother.id); say('death', `${fullName(mother)} died in childbirth, aged ${mother.age}.`); }
+      r();   // (the draw the sex of the baby used to take, kept so a seeded game's other rolls do not move)
+      startPregnancy(s, mother, mother === p ? mate : p);
+      say('birth', `${mother.first} is expecting. The baby is due in about nine months.`);
     } else if (p.age <= 50 && kidsNow < 3 && r() < 0.04 / 365) {
       L.lastBirth[p.id] = L.lastBirth[mate.id] = day;
       const body: 'f' | 'm' = r() < 0.5 ? 'f' : 'm';

@@ -29,6 +29,8 @@ import { hasMaples, woodsTaps } from './maple';
 import { CARETAKER, CARETAKER_KINDS, caretakerProblem, marketFactor, saleBlock, saleQuote, type CaretakerKind } from './weekender';
 import { tension } from './disaster';
 import { moodSummary, resting } from './mind';
+import { medReport } from './medical';
+import { pharmacyOpen } from './body';
 import { gatheringProblem, type GatheringKind } from './gatherings';
 
 const usd = (n: number) => '$' + Math.round(n).toLocaleString('en-US');
@@ -122,6 +124,8 @@ export type SuggestionAct =
   | { type: 'caretaker'; kind: CaretakerKind }
   | { type: 'moveIn' }
   | { type: 'restDay' }
+  | { type: 'quarantine'; on: boolean }
+  | { type: 'rx' }
   | { type: 'gather'; kind: GatheringKind };
 export interface Suggestion {
   id: string;
@@ -205,6 +209,25 @@ export function suggestions(s: GameState): Suggestion[] {
     } else if (s.disaster.kind && tension(s.disaster, s.clock.t) > 0 && wk.asked === 0) {
       out.push({ id: 'move_in', kind: '', title: 'Think about moving in', urgency: 50, why: 'the longer they wait the less the town house is worth, and the harder it is to get out', acts: [{ label: 'See the numbers', act: { type: 'moveIn' } }] });
     }
+  }
+  // medical: an illness going round (keep the sick apart?), what the sick are missing, medicines running low
+  { const med = medReport(s);
+    if (med.epidemic && !med.epidemic.asked && med.epidemic.cases >= 1) {
+      out.push({ id: 'epidemic', kind: '', title: med.epidemic.kind === 'flu' ? 'The flu is going round' : 'Dysentery in the house', urgency: 79,
+        why: `${med.epidemic.cases} sick so far. Keeping the sick apart${med.bay ? ' in the medical bay' : ' in a spare room'} slows it a lot, at the cost of the one who nurses them and a lonely few days`,
+        acts: [{ label: 'Keep the sick apart', act: { type: 'quarantine', on: true } }, { label: 'Carry on as we are', act: { type: 'quarantine', on: false } }] });
+    }
+    if (med.needs.length) {
+      const lines: OrderLine[] = [];
+      if (med.needs.some(x => x.includes('antibiotics')) && s.disaster.tracks.stores >= 0.5) lines.push({ material: 'antibiotics', qty: 2 });
+      if (med.needs.some(x => x.includes('splint'))) lines.push({ material: 'splints', qty: 1 });
+      if (med.needs.some(x => x.includes('rehydration'))) lines.push({ material: 'ors', qty: 1 });
+      if (med.needs.some(x => x.includes('dressings'))) lines.push({ material: 'meds', qty: 1 });
+      out.push({ id: 'sick', kind: '', title: 'The sick need care', urgency: 74, why: med.needs.slice(0, 2).join('; '),
+        ...(lines.length && s.disaster.tracks.deliveries >= 0.25 ? { acts: [{ label: `Order ${lines.map(l => MATERIALS[l.material].name.toLowerCase()).join(', ')} (${usd(orderCost(lines, prices(s)))})`, act: { type: 'order' as const, lines } }] } : {}) });
+    }
+    const low = s.people.filter((p, i) => p.conditions?.length && s.personState[i]?.needs.died == null && (s.body.rx[p.id] ?? 30) < 21);
+    if (low.length && pharmacyOpen(s)) out.push({ id: 'rx', kind: '', title: 'Medicine running low', urgency: 56, why: `${joinNames(low.map(p => p.first))} ${low.length === 1 ? 'has' : 'have'} under three weeks of medicine and the pharmacy is still open`, acts: [{ label: 'Fill prescriptions 90 days ahead', act: { type: 'rx' } }] });
   }
   // people: someone who is not coping, or badly strained (sim/mind.ts). Rest, company and the evenings' goods are the answers.
   { const mood = moodSummary(s);

@@ -51,3 +51,29 @@ describe('the people panels (server-rendered)', () => {
     for (const a of adv) expect(a.best.length).toBeGreaterThan(0);
   });
 });
+
+import { MedicalSection } from './PeoplePanel';
+import { startCase, medicalDay, medicalOf } from '../sim/medical';
+
+describe('the Medical section (server-rendered)', () => {
+  it('shows the medic, the supplies, the sick with what is being done, and the quarantine choice', () => {
+    const g = withGame(g2 => {
+      g2.people[1].skills.medic = 10; g2.stock.antibiotics = 2;
+      startCase(g2, g2.people[0].id, 'fracture', 45, { bone: 'arm' }, 'broken arm');
+      startCase(g2, g2.people[2].id, 'flu', 40, {}, 'flu');
+      medicalDay(g2);
+    });
+    const t = text(renderToStaticMarkup(<MedicalSection />));
+    expect(t).toContain(g.people[1].first);
+    expect(t).toContain('2 courses');
+    expect(t).toContain('broken arm');
+    expect(t).toContain('Keep the sick apart');
+    expect(medicalOf(g).epidemic?.kind).toBe('flu');
+  });
+
+  it('with nobody sick it says so and suggests what to put by', () => {
+    withGame(() => undefined);
+    const t = text(renderToStaticMarkup(<MedicalSection />));
+    expect(t).toContain('Nobody is sick or hurt');
+  });
+});

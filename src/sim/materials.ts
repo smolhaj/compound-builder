@@ -21,6 +21,8 @@ export type MaterialId = 'lumber' | 'logs' | 'firewood' | 'fieldstone' | 'concre
   | 'seed_hybrid' | 'seed_saved' | 'seed_cover' | 'canner' | 'dehydrator' | 'crocks' | 'grain_mill' | 'manure' | 'compost'
   // the household's evenings and learning (sim/mind.ts, sim/skills.ts)
   | 'games' | 'instrument' | 'novels' | 'manuals'
+  // medical depth (sim/medical.ts)
+  | 'antibiotics' | 'splints' | 'ors' | 'dental_kit' | 'midwife_kit' | 'medical_books'
   // the herd, the bees and the sugar bush (sim/herd.ts, sim/bees.ts, sim/maple.ts)
   | 'cow' | 'cheese_kit' | 'vet_kit' | 'bee_nuc' | 'hive_supplies' | 'beeswax' | 'maple_taps';
 
@@ -89,6 +91,12 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   bee_nuc: { id: 'bee_nuc', name: 'Bee colony', unit: 'a five-frame nucleus colony with a laying queen, delivered in spring: honey, wax and pollination (needs an apiary)', price: 220 },
   hive_supplies: { id: 'hive_supplies', name: 'Hive supplies', unit: 'a year for the apiary: frames and foundation, mite strips, sugar for a lean fall, a smoker and a veil', price: 75 },
   beeswax: { id: 'beeswax', name: 'Beeswax', unit: 'a pound of cleaned wax: candles, salves, polish, trade', price: null },
+  antibiotics: { id: 'antibiotics', name: 'Antibiotics', unit: 'a full course for one person, from the vet-and-farm supply or a prescription (scarce once the pharmacy shuts)', price: 70 },
+  splints: { id: 'splints', name: 'Splint and bandage set', unit: 'moldable splints, elastic wraps, a sling and tape: sets about three broken limbs', price: 45 },
+  ors: { id: 'ors', name: 'Rehydration salts', unit: 'a box of ten packets: a day of fluids for ten sick people', price: 25 },
+  dental_kit: { id: 'dental_kit', name: 'Emergency dental kit', unit: 'temporary filling, dental instruments and a how-to sheet: one tooth', price: 80 },
+  midwife_kit: { id: 'midwife_kit', name: 'Birthing kit', unit: 'clean sheets, gloves, cord clamps and a midwife\'s handbook: one delivery', price: 120 },
+  medical_books: { id: 'medical_books', name: 'Medical books', unit: 'a home medical reference and a nursing handbook: the medic is a level better, and learns faster', price: 140 },
   games: { id: 'games', name: 'Cards and board games', unit: 'a box of decks, dice, checkers and board games: evenings for about four people', price: 60 },
   instrument: { id: 'instrument', name: 'A guitar', unit: 'acoustic guitar with a strap, spare strings and a songbook', price: 220 },
   novels: { id: 'novels', name: 'Paperbacks', unit: 'a box of fifty used novels and children\'s books', price: 90 },
