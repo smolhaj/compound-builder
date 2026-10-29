@@ -332,7 +332,7 @@ export class Atmosphere {
 
   // ── seasons ─────────────────────────────────────────────────────────────
   private _driftKey(built: readonly AtmosBuilding[]): string {
-    return built.filter(b => b.finished && !b.under).map(b => b.id).join(',') + '|' + [...this._h.runs()].filter(r => r.run.kind === 'container_wall' && r.run.finishedAt !== null).map(r => r.run.id).join(',');
+    return built.filter(b => b.finished && !b.under).map(b => b.id).join(',') + '|' + [...this._h.runs()].filter(r => (r.run.kind === 'container_wall' || r.run.kind === 'container_stack') && r.run.finishedAt !== null).map(r => r.run.id).join(',');
   }
 
   private _driftWalls(built: readonly AtmosBuilding[], runs: readonly PerimeterRun[]): DriftWall[] {
@@ -348,7 +348,7 @@ export class Atmosphere {
       );
     }
     for (const run of runs) {
-      if (run.kind !== 'container_wall' || run.finishedAt === null) continue;
+      if ((run.kind !== 'container_wall' && run.kind !== 'container_stack') || run.finishedAt === null) continue;
       for (let i = 1; i < run.pts.length; i++) {
         const [ax, az] = run.pts[i - 1], [bx, bz] = run.pts[i], l = Math.hypot(bx - ax, bz - az);
         if (l < 0.1) continue;

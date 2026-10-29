@@ -176,7 +176,7 @@ export function GameCanvas() {
     const rebuildBoundary = () => boundary.build([world.home, ...ownedRects(useGameStore.getState().game)]);
     const showBoundary = () => { boundary.visible = useWorldStore.getState().showBoundary || !!useGameStore.getState().tool?.startsWith('fence:'); };
     rebuildBoundary(); showBoundary();
-    useWorldStore.getState().setSiteGeo({ creekZ: x => world.parcel.creek.zAt(x), creekHalf: world.parcel.creek.halfWidth, roadGate: [world.access.gate.x, world.access.gate.z], drive: world.access.drive.map(p => [p[0], p[1]] as [number, number]), center: [world.camp.x, world.camp.z] });
+    useWorldStore.getState().setSiteGeo({ creekZ: x => world.parcel.creek.zAt(x), creekHalf: world.parcel.creek.halfWidth, roadGate: [world.access.gate.x, world.access.gate.z], drive: world.access.drive.map(p => [p[0], p[1]] as [number, number]), center: [world.camp.x, world.camp.z], ground: (x, z) => world.parcel.natural(x, z).h });
     world.setBurnedFarms(burnedFarms(useGameStore.getState().game));
     const unsub = [
       // wildfire weather: measure the fuel round every building (what cleared ground there is decides what burns)

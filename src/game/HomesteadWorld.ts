@@ -795,7 +795,7 @@ export class HomesteadWorld {
   private _perimeterBlocked(x: number, z: number, r: number): boolean {
     for (const run of this._runs) {
       if (run.kind === 'escape_tunnel' || run.kind === 'underground_passage') continue;
-      const th = run.kind === 'container_wall' ? 0.21 : run.kind === 'concrete_wall' ? 0.15 : run.kind === 'thorn_hedge' ? 0.15 * runGrowth(run, this._simT) : run.kind === 'log_palisade' ? 0.03 : run.kind === 'earth_berm' || run.kind === 'ditch' ? 0 : 0.01;
+      const th = run.kind === 'container_wall' || run.kind === 'container_stack' ? 0.21 : run.kind === 'stone_wall' ? 0.15 : run.kind === 'concrete_wall' ? 0.15 : run.kind === 'thorn_hedge' ? 0.15 * runGrowth(run, this._simT) : run.kind === 'log_palisade' ? 0.03 : run.kind === 'earth_berm' || run.kind === 'ditch' ? 0 : 0.01;
       if (th < 0.01) continue;
       const { d, s } = closestOnLine(run.pts, x, z);
       if (d > th + r) continue;

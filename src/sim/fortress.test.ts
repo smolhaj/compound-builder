@@ -24,7 +24,7 @@ const wall = (g: GameState, kind: 'container_wall' | 'chain_link' = 'container_w
 describe('wall-top walkway', () => {
   it('goes on solid walls only, once, and not before the wall stands', () => {
     const g = game();
-    expect(WALKWAY_HOSTS).toEqual(['container_wall', 'steel_wall', 'electric_steel', 'concrete_wall']);
+    expect(WALKWAY_HOSTS).toEqual(['container_wall', 'container_stack', 'stone_wall', 'steel_wall', 'electric_steel', 'concrete_wall']);
     const fence = wall(g, 'chain_link');
     expect(walkwayProblem(g, fence.id)).toMatch(/solid wall/);
     const open = planRun(g, 'container_wall', square());
