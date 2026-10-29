@@ -11,7 +11,8 @@ import { dogCount } from '../../sim/pets';
 import { householdOf, structureSince } from '../../sim/paths';
 import type { GameState } from '../../sim/state';
 import { isFinished } from '../../sim/construction';
-import { KIT } from '../buildkit/kit';
+import { KIT, footprint } from '../buildkit/kit';
+import { roleOf, type Role } from '../../sim/paths';
 import { planLived, type Apron, type LivedBuilding, type LivedCtx, type LivedFolks, type LivedPlan, type Mode } from './livedPlan';
 import { LivedRenderer, yardLamp } from './LivedRenderer';
 import type { Season } from './propGeometry';
@@ -30,7 +31,12 @@ export interface LivedHost {
   landing: (game: GameState) => LivedCtx['landing'];
   look: () => { season: Season; snow: boolean; mud: boolean; quality: Quality };
   aprons: (list: readonly Apron[], key: string) => void;
+  /** The bare earth at the foot of each building. */
+  skirts: (list: ReadonlyArray<{ id: string; x0: number; z0: number; x1: number; z1: number; alpha: number }>, key: string) => void;
 }
+
+/** Roles that get bare ground at the foot of the wall (the dripline, the boot-scuffed step), and how much of it. */
+const SKIRT: Partial<Record<Role, number>> = { home: 1, guest: 0.9, barn: 1, work: 1, coop: 0.8, water: 0.7, power: 0.6, store: 0.7, greenhouse: 0.5, privy: 0.8, gate: 0.6 };
 
 /** Age steps that matter: every day for the first two months, then every ten days. */
 const bucket = (d: number): number => (d < 60 ? Math.floor(d) : 60 + Math.floor((d - 60) / 10));
@@ -88,6 +94,13 @@ export class LivedLayer {
     };
     this._plan = planLived(ctx);
     this.renderer.update(this._plan, { ground: this._h.groundAt, floor: this._h.floorAt, season: look.season, quality: look.quality, key: this._plan.key + look.season });
+    const skirts = buildings.flatMap(b => {
+      const k = SKIRT[roleOf(b.kind)];
+      if (!k || b.ageDays < 6) return [];
+      const f = footprint(KIT[b.kind], b.x, b.z, b.rot, false);
+      return [{ id: b.id, x0: f.x0, z0: f.z0, x1: f.x1, z1: f.z1, alpha: Math.min(0.85, k * (0.14 + 0.72 * (1 - Math.exp(-b.ageDays / 170)))) }];
+    });
+    this._h.skirts(skirts, skirts.map(x => `${x.id}${Math.round(x.alpha * 20)}`).join(','));
     this._h.aprons(this._plan.aprons, this._plan.aprons.map(a => `${a.x.toFixed(2)},${a.z.toFixed(2)}`).join('|'));
   }
 

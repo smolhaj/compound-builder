@@ -12,7 +12,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import type { Quality } from '../../engine/world/WorldScene';
 import { PATH_WIDTH, type PathSurface } from '../../sim/paths';
 import type { PathNetwork } from './pathNet';
-import { boardGeometry, h2, laidRibbon, patchGeometry, stoneGeometry, wornRibbons } from './pathGeometry';
+import { boardGeometry, h2, laidRibbon, patchGeometry, skirtGeometry, stoneGeometry, wornRibbons, type SkirtRect } from './pathGeometry';
 
 type Ground = (x: number, z: number) => number;
 
@@ -88,6 +88,20 @@ function pavedTexture(): THREE.CanvasTexture {
   });
 }
 
+/** Fine earth speckle, solid (the fade is the vertex alpha): the bare ground under the eaves. */
+function speckTexture(): THREE.CanvasTexture {
+  const t = tex(64, 64, (g, w, h) => {
+    const img = g.createImageData(w, h), r = lcg(21);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const n = r(), k = 214 + n * 41 - (r() < 0.06 ? 50 : 0), q = (y * w + x) * 4;
+      img.data[q] = k; img.data[q + 1] = k * 0.98; img.data[q + 2] = k * 0.95; img.data[q + 3] = 255;
+    }
+    g.putImageData(img, 0, 0);
+  });
+  t.wrapS = THREE.RepeatWrapping;
+  return t;
+}
+
 /** The bare patch: soft round blob, ragged, speckled. */
 function patchTexture(): THREE.CanvasTexture {
   const t = tex(64, 64, (g, w, h) => {
@@ -112,6 +126,8 @@ export class PathRenderer {
   private _key = '';
   private _apronKey = '';
   private _aprons: THREE.Mesh | null = null;
+  private _skirtKey = '';
+  private _skirts: THREE.Mesh | null = null;
 
   constructor() { this.group.name = 'paths'; }
 
@@ -210,7 +226,7 @@ export class PathRenderer {
         pos.push(x, ground(x, z) + 0.013, z);
         uv.push(i / nx, j / nz * a.d / 0.5);
         const edge = i === 0 || j === 0 || i === nx || j === nz;
-        col.push(0.92, 0.9, 0.84, edge ? 0 : 0.97);
+        col.push(0.66, 0.63, 0.57, edge ? 0 : 0.97);
       }
       for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) { const q = j * (nx + 1) + i; idx.push(q, q + nx + 1, q + 1, q + 1, q + nx + 1, q + nx + 2); }
       const g = new THREE.BufferGeometry();
@@ -231,9 +247,25 @@ export class PathRenderer {
     this.group.add(this._aprons);
   }
 
+  /** The bare earth at the foot of each building (alpha 0-1 by how long it has stood and how much it is used). */
+  setSkirts(list: ReadonlyArray<SkirtRect & { alpha: number; id: string }>, ground: Ground, look: PathLook, key: string): void {
+    if (key === this._skirtKey) return;
+    this._skirtKey = key;
+    if (this._skirts) { this.group.remove(this._skirts); this._skirts.geometry.dispose(); this._skirts = null; }
+    if (!list.length) return;
+    const c = new THREE.Color(look.grass).lerp(new THREE.Color(look.soil), 0.92);
+    const geos = list.map(b => skirtGeometry(b, 0.3, ground, [c.r, c.g, c.b], b.alpha, hashId(b.id)));
+    const merged = mergeGeometries(geos, false);
+    for (const g of geos) g.dispose();
+    if (!merged) return;
+    this._skirts = new THREE.Mesh(merged, this._ribbonMat('skirt', speckTexture, 'SEA_MUD', 0.97));
+    this._skirts.name = 'path_skirts'; this._skirts.receiveShadow = true; this._skirts.renderOrder = 1;
+    this.group.add(this._skirts);
+  }
+
   clear(): void {
     for (const o of [...this.group.children]) {
-      if (o === this._aprons) continue;
+      if (o === this._aprons || o === this._skirts) continue;
       this.group.remove(o);
       (o as THREE.Mesh).geometry?.dispose();
     }
@@ -242,6 +274,7 @@ export class PathRenderer {
   dispose(): void {
     this.clear();
     if (this._aprons) { this.group.remove(this._aprons); this._aprons.geometry.dispose(); this._aprons = null; }
+    if (this._skirts) { this.group.remove(this._skirts); this._skirts.geometry.dispose(); this._skirts = null; }
     for (const m of this._mats.values()) m.dispose();
     for (const t of this._tex) t.dispose();
     this._mats.clear();

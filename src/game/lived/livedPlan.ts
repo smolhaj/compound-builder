@@ -159,7 +159,7 @@ function wantsFor(b: LivedBuilding, ctx: LivedCtx, main: boolean): Want[] {
       W({ kind: 'pottingbench', min: 25, tier: 1, slots: [{ lx: hw + 0.36, lz: 0.05, rot: HALF_PI }, { lx: -hw - 0.36, lz: 0.05, rot: -HALF_PI }], variant: hash(b.id) });
     }
   } else if (role === 'water') {
-    if (b.kind === 'well_hand' || b.kind === 'well_drilled') W({ kind: 'wellapron', min: 15, tier: 1, slots: [{ lx: 0, lz: hd + 0.42 }, { lx: 0, lz: -hd - 0.42 }], variant: hash(b.id) });
+    if (b.kind === 'well_hand' || b.kind === 'well_drilled') W({ kind: 'wellapron', min: 15, tier: 1, slots: [{ lx: 0, lz: hd + 0.12 }, { lx: 0, lz: -hd - 0.12 }], variant: hash(b.id) });
   } else if (role === 'power') {
     if (b.kind === 'generator_shed') W({ kind: 'fuelcans', min: 8, tier: 1, slots: [{ lx: hw + 0.16, lz: 0.0, rot: HALF_PI }, { lx: -hw - 0.16, lz: 0.0, rot: -HALF_PI }] });
   }

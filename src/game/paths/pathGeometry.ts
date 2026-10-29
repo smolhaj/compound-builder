@@ -205,3 +205,49 @@ export function patchGeometry(cx: number, cz: number, r: number, ground: Ground,
   g.computeVertexNormals();
   return g;
 }
+
+export interface SkirtRect { x0: number; z0: number; x1: number; z1: number }
+
+/**
+ * The bare earth round a building's foot: where the eaves drip and the boots
+ * come and go the grass gives up. A ring round the rectangle, `margin` wide,
+ * solid at the wall and fading to nothing at the outer edge, draped on the
+ * ground; ragged by noise so it is no neat frame. UVs are planar world
+ * coordinates (a repeating speckle).
+ */
+export function skirtGeometry(r: SkirtRect, margin: number, ground: Ground, color: readonly [number, number, number], alpha: number, seed: number, step = 0.22): THREE.BufferGeometry {
+  const pairs: Array<{ i: Pt; o: Pt }> = [];
+  const sides: Array<{ a: Pt; b: Pt; n: Pt }> = [
+    { a: [r.x0, r.z0], b: [r.x1, r.z0], n: [0, -1] }, { a: [r.x1, r.z0], b: [r.x1, r.z1], n: [1, 0] },
+    { a: [r.x1, r.z1], b: [r.x0, r.z1], n: [0, 1] }, { a: [r.x0, r.z1], b: [r.x0, r.z0], n: [-1, 0] },
+  ];
+  sides.forEach((s, si) => {
+    const len = Math.hypot(s.b[0] - s.a[0], s.b[1] - s.a[1]), n = Math.max(2, Math.round(len / step));
+    const prev = sides[(si + 3) % 4].n;
+    for (let k = 0; k < n; k++) {
+      const t = k / n, ix = s.a[0] + (s.b[0] - s.a[0]) * t, iz = s.a[1] + (s.b[1] - s.a[1]) * t;
+      // the corner vertex leaves on the diagonal (the outer corner of the rectangle), the rest straight out; the width wanders a little
+      const w = margin * (0.78 + 0.4 * h2(ix * 4, iz * 4, seed));
+      const [ox, oz] = k === 0 ? [(prev[0] + s.n[0]) * w, (prev[1] + s.n[1]) * w] : [s.n[0] * w, s.n[1] * w];
+      pairs.push({ i: [ix, iz], o: [ix + ox, iz + oz] });
+    }
+  });
+  const pos: number[] = [], uv: number[] = [], col: number[] = [], idx: number[] = [];
+  for (const p of pairs) {
+    for (const [pt, a] of [[p.i, alpha], [p.o, 0]] as const) {
+      pos.push(pt[0], ground(pt[0], pt[1]) + 0.009, pt[1]);
+      uv.push(pt[0] * 0.9, pt[1] * 0.9);
+      const j = 0.9 + 0.2 * h2(pt[0] * 7, pt[1] * 7, seed + 2);
+      col.push(color[0] * j, color[1] * j, color[2] * j, a * (0.8 + 0.2 * h2(pt[0] * 5, pt[1] * 5, seed + 4)));
+    }
+  }
+  const n = pairs.length;
+  for (let k = 0; k < n; k++) { const a = k * 2, b = ((k + 1) % n) * 2; idx.push(a, a + 1, b, b, a + 1, b + 1); }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 4));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
+}

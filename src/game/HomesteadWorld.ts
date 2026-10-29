@@ -257,6 +257,7 @@ export class HomesteadWorld {
       gate: () => this._livedGate(), landing: g => { const c = this._pathExtras(g).creek; return c ? { x: c.x, z: c.z, face: this.parcel.creek.zAt(c.x) > c.z ? 0 : Math.PI } : null; },
       look: () => ({ season: seasonState.visual, snow: seasonState.params.snow > 0.25, mud: this.atmos.mud > 0.4, quality: this._quality ?? 'high' }),
       aprons: (list, key) => this.paths.renderer.setAprons([...list, ...this._driveApron()], this.groundAt, key + '|' + this._drive),
+      skirts: (list, key) => this.paths.renderer.setSkirts(list, this.groundAt, this._pathLook(), key),
     });
     this._drive = site.improvements?.drive ?? true;
     this.truck = new DeliveryTruck(ws.scene, this._truckRoute(), this.groundAt);
@@ -1039,7 +1040,7 @@ export class HomesteadWorld {
   private _pathLook(): { grass: number; soil: number } {
     const look = regionLookFor(this.regionWorld.kind);
     const lerp = (a: number, b: number, t: number) => new THREE.Color(a).lerp(new THREE.Color(b), t).getHex();
-    return { grass: look.grass !== undefined && look.dryGrass !== undefined ? lerp(look.grass, look.dryGrass, 0.5) : (look.grass ?? 0x6c7550), soil: lerp(0x66543a, 0xa68a60, Math.min(1, look.dry * 0.8 + 0.15)) };
+    return { grass: look.grass !== undefined && look.dryGrass !== undefined ? lerp(look.grass, look.dryGrass, 0.5) : (look.grass ?? 0x6c7550), soil: lerp(0x7d6e55, 0xb39d74, Math.min(1, look.dry * 0.8 + 0.2)) };
   }
 
   /** Is (x, z) on the camp (plus `pad`)? */

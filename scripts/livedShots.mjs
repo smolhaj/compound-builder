@@ -64,7 +64,7 @@ try {
     { name: 'barn', at: 'barn', mode: 'orbit', radius: 6.0, pitch: 0.28, yawOff: -0.5 },
     { name: 'barn-eye', at: 'barn', mode: 'eye', dist: 3.2, lat: -0.8, look: 0.2, person: 1.2 },
     { name: 'shop', at: 'workshop', mode: 'orbit', radius: 5.5, pitch: 0.3, yawOff: 0.5 },
-    { name: 'garden', at: 'garden', mode: 'orbit', radius: 4.2, pitch: 0.35, yawOff: 0.5 },
+    { name: 'garden', at: 'garden', mode: 'orbit', radius: 6.5, pitch: 0.55, yawOff: 0.6 },
     { name: 'well', at: 'well_hand', mode: 'orbit', radius: 2.6, pitch: 0.3, yawOff: 0.4 },
     { name: 'coop', at: 'chicken_coop', mode: 'orbit', radius: 3.4, pitch: 0.3, yawOff: 0.5 },
     { name: 'gate', at: 'gate', mode: 'orbit', radius: 4.5, pitch: 0.22, yawOff: 0 },
