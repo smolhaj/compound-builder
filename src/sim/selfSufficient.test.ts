@@ -435,7 +435,7 @@ describe('integration', () => {
   });
   it('the save migrates from the version before: farm state, new goods, the new chores', () => {
     const old = structuredClone(newGame(9)) as unknown as Record<string, unknown>;
-    old.version = SAVE_VERSION - 1; delete old.farm;
+    old.version = 56; delete old.farm;
     for (const k of ['greenhouse_pro_kit', 'trout_fry', 'crayfish_stock', 'fish_feed', 'sheep']) delete (old.stock as Record<string, number>)[k];
     delete (dailyOf(old as unknown as GameState).chores.levels as Record<string, number>).orchard;
     const m = migrate(old);
