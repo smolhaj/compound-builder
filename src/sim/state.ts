@@ -144,6 +144,8 @@ export interface Structure {
   grade?: number;
   /** Housing styles (sim/housingStyles.ts): how local the walls' material is where it was staked (stone gathered off the land, hauled in, a wet climate for earth walls); absent: the plain bill. Optional, so no save bump. */
   mat?: 'local' | 'hauled' | 'wet';
+  /** Day a tall retaining wall behind its pad let go in a storm or the thaw (sim/retaining.ts); cleared when the family has restacked it (optional, so no save bump). */
+  slumpedAt?: number;
 }
 
 export type TaskKind = 'idle' | 'build' | 'forestry' | 'sleep' | 'chores' | 'school' | 'leisure' | 'job' | 'gone' | 'shelter' | 'away'

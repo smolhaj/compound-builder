@@ -13,6 +13,8 @@
  * repair. Shortages are logged. Pure (tested).
  */
 import { pumpDrawFactor, sunFactor } from './terrainFx';
+import { orchardWaterL } from './orchard';
+import { solarFogK } from './fogFx';
 import { SPRING_LPD } from './site';
 import { toteStorage, waterPrice } from './water';
 import { sound } from './improvements';
@@ -327,6 +329,8 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
   // ── power: each network's own sources (solar → battery → grid → generator), loads served by priority ──
   // the county grid, unless it's gone (the disaster) or a storm has the lines down
   const gridUp = u.grid && s.disaster.tracks.grid > 0.5 && !stormOutage(s);
+  // the day's cloud and morning fog (sim/fog.ts): overcast keeps about a third of the sun
+  const fogK = solarFogK(s);
   let solar = 0, draw = 0, gen = 0, short = 0, capKwh = 0, gridKwh = 0, wasted = 0, exported = 0, newBat = 0;
   // surplus the batteries cannot take: sold to the co-op while the grid is up, otherwise wasted
   const spill = (kwh: number) => { if (kwh <= 0) return; if (gridUp) exported += kwh; else wasted += kwh; };
@@ -361,7 +365,7 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
     // grid-tied solar shuts off in a blackout unless a battery (hybrid inverter) is on the network
     const solarOk = gridUp || cap > 0 || !u.grid;
     // each array's ground faces the sun a little more or less (sim/terrainFx.ts: south-facing slope up to +25 %, north-facing down to -25 %)
-    const sol = solarOk ? members.filter(live).reduce((a, o) => a + (UTILITY[o.kind]?.solarKw ?? 0) * sunFactor(s, o), 0) * sunHours(doy) * 0.8 : 0;
+    const sol = solarOk ? members.filter(live).reduce((a, o) => a + (UTILITY[o.kind]?.solarKw ?? 0) * sunFactor(s, o), 0) * sunHours(doy) * fogK * 0.8 : 0;
     draw += d; solar += sol; capKwh += cap;
     let have = sol;
     // battery: bank the surplus, cover the shortfall
@@ -436,10 +440,12 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
   const people = s.personState.filter(ps => ps.needs?.died == null).length;
   const homePlumbed = fin.some(st => fitted(s, st.id, 'plumb') && (DRAW_KWH[st.kind] ?? 0) >= 5);
   const gardenUse = fin.some(st => st.kind === 'garden') && doy > 120 && doy < 270 ? (s.stock.greywater >= 1 && homePlumbed ? 200 : 400) : 0;
-  // the garden drinks from the pond first: irrigation is what it is for
-  const fromPond = Math.min(u.pondL ?? 0, gardenUse);
+  // the orchard's drip line (sim/orchard.ts: young trees 7 L a day each, the dry months) is irrigation too
+  const orchardUse = orchardWaterL(s);
+  // the garden and the orchard drink from the pond first: irrigation is what it is for
+  const fromPond = Math.min(u.pondL ?? 0, gardenUse + orchardUse);
   u.pondL = (u.pondL ?? 0) - fromPond;
-  const use = people * (homePlumbed ? WATER_PLUMBED : WATER_CARRIED) + (gardenUse - fromPond) + (fin.some(st => st.kind === 'chicken_coop') ? 10 : 0);
+  const use = people * (homePlumbed ? WATER_PLUMBED : WATER_CARRIED) + (gardenUse + orchardUse - fromPond) + (fin.some(st => st.kind === 'chicken_coop') ? 10 : 0);
   u.storedL = Math.max(0, Math.min(store, u.storedL + rainL));
   let left = supply - use, shortL = 0;
   if (left < 0) { const take = Math.min(-left, u.storedL); u.storedL -= take; left += take; }

@@ -11,6 +11,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { InstancedLodSet } from './instancedLod';
 import { applySeasonToFarTrees } from '../season/seasonShader';
+import { HEIGHT_FOG_GLSL } from '../fog/heightFog';
 import { TOWN_Y, type RegionKind, type RegionLook } from '../terrain/regionalLandscape';
 import type { Quality } from '../WorldScene';
 
@@ -244,6 +245,7 @@ export class FarTreeRenderer {
         sh.fragmentShader = sh.fragmentShader.replace('#include <fog_fragment>', /* glsl */`#ifdef USE_FOG
             float rk2 = mix(1.0, 0.1, smoothstep(80.0, 420.0, vFogDepth));
             gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor, 1.0 - exp(- fogDensity * fogDensity * rk2 * vFogDepth * vFogDepth));
+            ${HEIGHT_FOG_GLSL}
           #endif`);
       };
       mat.customProgramCacheKey = () => `regional_trees_v2_${decid ? 'd' : 'e'}`;

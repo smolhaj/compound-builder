@@ -16,7 +16,7 @@ import { onOrder, orderCost, prices } from './economy';
 import { firewoodOutlook } from './heating';
 import { UTILITY } from './utilities';
 import { fmtKw } from './powerReport';
-import { ORCHARD_KINDS, orchardBearing } from './greenhouse';
+import { anyBearing } from './orchard';
 import { needsHookup, storageTip } from './hookups';
 import { MATERIAL_IDS, MATERIALS, type MaterialId } from './materials';
 import { PERIMETER, PERIMETER_ORDER, UPGRADE_NEXT, fenceLive, runBill, runFinished, wallLength, type PerimeterKind, type Pt } from './perimeter';
@@ -40,6 +40,8 @@ import { pharmacyOpen } from './body';
 import { gatheringProblem, type GatheringKind } from './gatherings';
 import { terrainCards, terrainOff } from './terrainFx';
 import { gradeBucket, roadDifficulty, winterRoadLine } from './slope';
+import { terraceSite, terraceText } from './terrace';
+import { restackPallets, slumped, wallOf } from './retaining';
 
 const usd = (n: number) => '$' + Math.round(n).toLocaleString('en-US');
 
@@ -159,7 +161,9 @@ export type SuggestionAct =
   /** Lay a tunnel-bridge across the gorge the land invites (the player confirms). */
   | { type: 'span'; a: Pt; b: Pt }
   /** Lay a drainage channel along the contour above a building cut into a slope (the player confirms). */
-  | { type: 'drain'; a: Pt; b: Pt };
+  | { type: 'drain'; a: Pt; b: Pt }
+  /** Stake terraced garden beds down a slope, each on its own walled terrace (sim/terrace.ts; the player confirms). */
+  | { type: 'terraces'; tiers: Pt[] };
 export interface Suggestion {
   id: string;
   /** The kit piece to stake ('' when the suggestion is something else). */
@@ -178,6 +182,47 @@ export interface Suggestion {
  * growing, no toilet, no power. There is no fixed route; once something is
  * staked or built it stops being suggested.
  */
+/** What the lie of the land asks for (sim/slope.ts, sim/retaining.ts): a retaining wall for a pad cut into a slope, the stone to restack one that came down, a plow before the snow. */
+export function landSuggestions(s: GameState): Suggestion[] {
+  const out: Suggestion[] = [];
+  // the lie of the land (sim/slope.ts): a pad cut into a slope wants a retaining wall; a steep or high road wants a plow before the snow
+  { const bucket = (st: { grade?: number }) => (st.grade ? gradeBucket(st.grade) : 0);
+    const cut = s.structures.find(st => !isFinished(st) && bucket(st) >= 2 && st.stage <= 1);
+    if (cut) {
+      const extra = 2 * bucket(cut) ** 2, name = cut.kind.replace(/_/g, ' '), pending = onOrder(s), wall = wallOf(s, cut);
+      const short = Math.max(0, Math.ceil(extra - Math.max(0, s.stock.fieldstone - 0) - (pending.fieldstone ?? 0)));
+      const lines: OrderLine[] = short > 0 ? [{ material: 'fieldstone', qty: short }] : [];
+      out.push({ id: 'retaining', kind: '', title: 'This slope needs a retaining wall', urgency: 58,
+        why: `the ${name} is staked on a ${Math.round((cut.grade ?? 0) * 100)} % slope: the pad is cut into the hill and held by a dry-stack wall${wall ? ` (up to ${Math.round(wall.heightM * 10) / 10} m high and ${Math.round(wall.lenM)} m long, with ${wall.stairs ? 'a stair' : 'no stair'} set in it${wall.tall ? '; a wall that tall wants a drainage channel above it' : ''})` : ''}, about ${extra} pallets of fieldstone more than level ground${short > 0 ? '' : ' (you have them)'}. The wall goes up with the foundation and is paid for by those pallets`,
+        acts: [...(lines.length ? [{ label: `Order ${short} pallet${short > 1 ? 's' : ''} of fieldstone (${usd(orderCost(lines, prices(s)))})`, act: { type: 'order' as const, lines } }] : []), { label: 'Show me', act: { type: 'select', id: cut.id } }] });
+    }
+    // a retaining wall that let go (sim/retaining.ts): the stone to put it back
+    const down = slumped(s)[0];
+    if (down) {
+      const need = restackPallets(down.w), have = s.stock.fieldstone, pending = onOrder(s), short = Math.max(0, Math.ceil(need - have - (pending.fieldstone ?? 0)));
+      const lines: OrderLine[] = short > 0 ? [{ material: 'fieldstone', qty: short }] : [];
+      out.push({ id: 'wall_down', kind: '', title: 'A retaining wall came down', urgency: 61,
+        why: `the wall behind the ${down.st.kind.replace(/_/g, ' ')} let go: ${need} pallet${need > 1 ? 's' : ''} of fieldstone to restack it${short > 0 ? '' : ' (you have them: the family does it in a few days)'}. A drainage channel above a tall wall stops it happening again`,
+        acts: [...(lines.length ? [{ label: `Order ${short} pallet${short > 1 ? 's' : ''} of fieldstone (${usd(orderCost(lines, prices(s)))})`, act: { type: 'order' as const, lines } }] : []), { label: 'Show me', act: { type: 'select', id: down.st.id } }] });
+    }
+    const doy = ((s.clock.startDoy + Math.floor(s.clock.t) - 1) % 365 + 365) % 365 + 1;
+    if (s.stock.plow < 1 && roadDifficulty(s.site, s.seed) >= 1 && doy >= 230 && doy <= 345) {
+      const lines: OrderLine[] = [{ material: 'plow', qty: 1 }];
+      out.push({ id: 'plow', kind: '', title: 'The road closes in snow: buy a plow', urgency: 56,
+        why: `${winterRoadLine(s) ?? 'the way in is steep and high'} A plow blade on the truck keeps the road open and the deliveries coming`,
+        acts: [{ label: `Order a plow blade (${usd(orderCost(lines, prices(s)))})`, act: { type: 'order', lines } }] });
+    } }
+  return out;
+}
+
+/** A slope near the home that suits terraced garden beds, each on its own walled terrace (sim/terrace.ts): a card to confirm, never staked unasked. */
+export function terraceSuggestion(s: GameState): Suggestion | null {
+  const tp = terraceSite(s);
+  if (!tp) return null;
+  return { id: 'terraces', kind: '', title: 'A slope that suits terraced garden beds', urgency: 22, why: terraceText(tp),
+    acts: [{ label: `Stake ${tp.tiers.length} terraced beds (~${usd(tp.usd)} of fieldstone for the walls)`, act: { type: 'terraces', tiers: tp.tiers.map(t => [t.x, t.z] as Pt) } }, { label: 'Show me on the map', act: { type: 'terrain', mode: 'high' } }] };
+}
+
 export function suggestions(s: GameState): Suggestion[] {
   const people = s.people.length;
   const homes = s.structures.filter(st => isHome(st.kind));
@@ -221,24 +266,7 @@ export function suggestions(s: GameState): Suggestion[] {
         acts: [{ label: `Order ${n} hybrid (${usd(orderCost(hybrid, prices(s)))})`, act: { type: 'order', lines: hybrid } }, { label: `${n} heirloom (${usd(orderCost(heirloom, prices(s)))})`, act: { type: 'order', lines: heirloom } }, { label: 'Open the Farm tab', act: { type: 'open', right: 'supplies', supplies: 'farm' } }] });
     } }
 
-  // the lie of the land (sim/slope.ts): a pad cut into a slope wants a retaining wall; a steep or high road wants a plow before the snow
-  { const bucket = (st: { grade?: number }) => (st.grade ? gradeBucket(st.grade) : 0);
-    const cut = s.structures.find(st => !isFinished(st) && bucket(st) >= 2 && st.stage <= 1);
-    if (cut) {
-      const extra = 2 * bucket(cut) ** 2, name = cut.kind.replace(/_/g, ' '), pending = onOrder(s);
-      const short = Math.max(0, Math.ceil(extra - Math.max(0, s.stock.fieldstone - 0) - (pending.fieldstone ?? 0)));
-      const lines: OrderLine[] = short > 0 ? [{ material: 'fieldstone', qty: short }] : [];
-      out.push({ id: 'retaining', kind: '', title: 'This slope needs a retaining wall', urgency: 58,
-        why: `the ${name} is staked on a ${Math.round((cut.grade ?? 0) * 100)} % slope: the pad is cut into the hill and held by a wall behind it, about ${extra} pallets of fieldstone more than level ground${short > 0 ? '' : ' (you have them)'}`,
-        acts: [...(lines.length ? [{ label: `Order ${short} pallet${short > 1 ? 's' : ''} of fieldstone (${usd(orderCost(lines, prices(s)))})`, act: { type: 'order' as const, lines } }] : []), { label: 'Show me', act: { type: 'select', id: cut.id } }] });
-    }
-    const doy = ((s.clock.startDoy + Math.floor(s.clock.t) - 1) % 365 + 365) % 365 + 1;
-    if (s.stock.plow < 1 && roadDifficulty(s.site, s.seed) >= 1 && doy >= 230 && doy <= 345) {
-      const lines: OrderLine[] = [{ material: 'plow', qty: 1 }];
-      out.push({ id: 'plow', kind: '', title: 'The road closes in snow: buy a plow', urgency: 56,
-        why: `${winterRoadLine(s) ?? 'the way in is steep and high'} A plow blade on the truck keeps the road open and the deliveries coming`,
-        acts: [{ label: `Order a plow blade (${usd(orderCost(lines, prices(s)))})`, act: { type: 'order', lines } }] });
-    } }
+  out.push(...landSuggestions(s));
 
   // the woodpile: out in the cold, or too thin for the next two months
   { const w = firewoodOutlook(s);
@@ -319,6 +347,7 @@ export function suggestions(s: GameState): Suggestion[] {
     } }
   // the land: a ridge that suits a keep, a gorge that is a choke, a bench for a reservoir (sim/terrainFx.ts): a card to look at, never a requirement
   for (const c of terrainCards(s)) out.push({ id: c.id, kind: '', title: c.title, urgency: c.urgency, why: c.why, acts: [{ label: 'Show me on the map', act: { type: 'terrain', mode: c.mode } }, ...(c.span ? [{ label: `Plan a tunnel-bridge across it (~${usd(costPer100m('tunnel_bridge') * c.span.lengthM / 100)})`, act: { type: 'span' as const, a: c.span.a, b: c.span.b } }] : []), ...(c.drain ? [{ label: `Plan a drainage channel (~${usd(costPer100m('drain_channel') * Math.hypot(c.drain.b[0] - c.drain.a[0], c.drain.b[1] - c.drain.a[1]) * 6 / 100)})`, act: { type: 'drain' as const, a: c.drain.a, b: c.drain.b } }] : [])] });
+  { const t = terraceSuggestion(s); if (t) out.push(t); }   // a slope that suits terraced beds: offered, never staked unasked
   { const c = courseSuggestion(s); if (c) out.push(c); }
   { const d = drillsSuggestion(s); if (d) out.push(d); }
   return out.sort((x, y) => y.urgency - x.urgency).slice(0, 3);
@@ -453,13 +482,13 @@ export function selfSufficient(s: GameState): Goal {
   const fin = s.structures.filter(isFinished);
   const kw = fin.reduce((a, st) => a + (UTILITY[st.kind]?.solarKw ?? 0), 0), kwh = fin.reduce((a, st) => a + (UTILITY[st.kind]?.batteryKwh ?? 0), 0);
   const has = (...k: string[]) => fin.some(st => k.includes(st.kind));
-  const bearing = fin.some(st => ORCHARD_KINDS.includes(st.kind) && orchardBearing((s.clock.t - (st.finishedAt ?? s.clock.t)) / 365) > 0);
+  const bearing = anyBearing(s);
   const stocked = Object.values(s.farm?.ponds ?? {}).some(p => p.trout + p.crayfish > 0);
   return { id: 'self', title: 'Feed and power the compound', steps: [
     { label: '20 kW of solar', done: kw >= 20, detail: kw > 0 ? `${fmtKw(kw)} of 20 kW built` : 'a solar farm of 50 panels' },
     { label: 'Battery storage', done: kwh >= 40, detail: kwh > 0 ? `${Math.round(kwh)} kWh of 40 built` : 'a battery container beside the array' },
     { label: 'A heated greenhouse', done: has('greenhouse_heated'), detail: 'fresh greens all winter' },
-    { label: 'An orchard bearing fruit', done: bearing, detail: has('orchard', 'orchard_grove') ? 'planted: fruit from the fourth year' : 'fruit trees take years' },
+    { label: 'An orchard bearing fruit', done: bearing, detail: has('orchard', 'orchard_grove') ? 'planted: the plums first, from the third year' : 'fruit trees take years' },
     { label: 'A stocked pond', done: stocked, detail: has('pond') ? 'dug: add trout or crayfish' : 'trout and crayfish' },
     { label: 'Barn and sheep barn', done: has('barn') && has('sheep_barn'), detail: 'a roof for the stock in winter' },
     { label: 'Workshop and equipment yard', done: has('workshop') && has('equipment_yard'), detail: 'tools last longer; a yard for the tractor' },

@@ -1,4 +1,6 @@
 import { setGroundProbe } from '../sim/towers';
+import { RetainWallLayer } from './terrain/RetainWalls';
+import { planPad, type PadPlan } from '../sim/retainPlan';
 import * as THREE from 'three';
 import { mulberry32 } from '../sim/rng';
 import { ShrubField, SAGE, WILLOW, type ShrubSpec } from '../engine/world/trees/ShrubField';
@@ -58,7 +60,7 @@ import { SHAFT_HALF, setHatchLid, stairProfile, type RoomSpot } from './buildkit
 import { FLIGHT_W, hatchPlan } from './buildkit/bunkerHatchPlan';
 import { buildDumpTruck, buildExcavator, buildFormwork, buildTubeSegments, drapeSoil, earthMound, spoilHeap } from './props/digSite';
 import { kitMaterial } from './buildkit/materials';
-import { orchardBearing, orchardFrost, ORCHARD_PICK } from '../sim/greenhouse';
+import { FRUITS, fruitLook, isOrchard, type Fruit } from '../sim/orchard';
 import { buildLayers, type Seat } from './buildkit/buildings';
 import { farHiddenLayers, isFar } from './buildkit/buildingLod';
 import { LIGHT_BUDGET, pickLights, type LightCandidate } from './lightPool';
@@ -141,6 +143,8 @@ interface Built {
   /** The footprint with its porch / steps, and the body alone (computed once: hit tests run per tree, per animal, per frame). */
   fpPorch: Rect4;
   fpBody: Rect4;
+  /** The plan of the retaining wall round its graded pad (sim/retainPlan.ts), null when the pad is gentle. */
+  wall: PadPlan | null;
 }
 interface Rect4 { x0: number; z0: number; x1: number; z1: number }
 
@@ -212,6 +216,9 @@ export class HomesteadWorld {
   readonly atmos: Atmosphere;
   /** The footpaths between the stops on the place, worn and laid (game/paths). */
   readonly paths: PathLayer;
+  /** The dry-stack retaining walls round graded pads, with their stairs (game/terrain/RetainWalls). */
+  readonly walls = new RetainWallLayer();
+  private _wallVer = 0;
   /** What people leave lying about (game/lived): mats, pots, bales, swings, a mailbox at the road. */
   readonly lived: LivedLayer;
   /** Mud, lying snow and rain right now (the footing under the walkers). */
@@ -278,6 +285,7 @@ export class HomesteadWorld {
     this._yard.group.position.copy(this._campGroup.position);
     this._yard.group.rotation.y = this.camp.rot;
     this._root.add(this._yard.group);
+    this._root.add(this.walls.group);
     const zc = this.parcel.creek.zAt(this.center.x + 3);
     this._root.add(scaleFigure(this.center.x + 3, zc + 4, this.parcel.height(this.center.x + 3, zc + 4)));
     ws.scene.add(this._root);
@@ -290,6 +298,7 @@ export class HomesteadWorld {
     this.paths = new PathLayer({
       scene: ws.scene, groundAt: this.groundAt, makeWorld: () => this._pathWorld(), extras: g => this._pathExtras(g),
       look: () => this._pathLook(), publish: sum => useWorldStore.getState().setPathNet(sum),
+      wallStair: (x, z) => this.walls.atStair(x, z),
     });
     this.lived = new LivedLayer({
       scene: ws.scene, groundAt: this.groundAt, floorAt: this.walkHeight,
@@ -1003,7 +1012,8 @@ export class HomesteadWorld {
       for (const r of boxes) if (x > r.x0 - 0.14 && x < r.x1 + 0.14 && z > r.z0 - 0.14 && z < r.z1 + 0.14) return true;
       if (hasCreek && Math.abs(z - this.parcel.creek.zAt(x)) < half + 0.25) return true;
       if (this._perimeterBlocked(x, z, 0.08)) return true;
-      return slope(x, z) > WALK_CLIFF;
+      if (this.walls.blocks(x, z)) return true;     // a retaining wall: over only at its stairs
+      return slope(x, z) > WALK_CLIFF && !this.walls.atStair(x, z);
     };
     const blocked = (x: number, z: number): boolean => {
       if (!own(x, z)) return true;
@@ -1015,14 +1025,14 @@ export class HomesteadWorld {
       return false;
     };
     // steep ground and the unlevel: a path takes the easy way round
-    const cost = (x: number, z: number): number => 1 + 6 * Math.max(0, slope(x, z) - 0.1);
+    const cost = (x: number, z: number): number => (this.walls.atStair(x, z) ? 1.4 : 1 + 6 * Math.max(0, slope(x, z) - 0.1));
     return { blocked, cost, hard };
   }
 
   /** The people's route finding world, rebuilt when the paths are (the layout, the cars, the wear). */
   private _walkCache: { key: string; w: NetWorld } | null = null;
   private _walkWorld(): NetWorld {
-    const key = `${this.paths.version}|${this._carKey}|${this.treeSpecs.length}|${this._runs.length}`;
+    const key = `${this.paths.version}|${this._carKey}|${this.treeSpecs.length}|${this._runs.length}|${this.walls.version}`;
     if (this._walkCache?.key !== key) this._walkCache = { key, w: this._pathWorld() };
     return this._walkCache.w;
   }
@@ -1082,7 +1092,7 @@ export class HomesteadWorld {
       const f = mode === 'porch' ? body : footprint(def, b.placed.x, b.placed.z, b.placed.rot, true), pad = r + 0.04;
       if (x > f.x0 - pad && x < f.x1 + pad && z > f.z0 - pad && z < f.z1 + pad) return true;
     }
-    if (this._perimeterBlocked(x, z, r * 0.8)) return true;
+    if (this._perimeterBlocked(x, z, r * 0.8) || this.walls.blocks(x, z)) return true;   // (a retaining wall is no place for a prop or a pet either)
     const cells = this._trunks(), cx = Math.floor(x), cz = Math.floor(z);
     for (let i = cx - 1; i <= cx + 1; i++) for (let j = cz - 1; j <= cz + 1; j++) for (const [tx, tz, tr] of cells.get(i * 4099 + j) ?? []) if ((tx - x) ** 2 + (tz - z) ** 2 < (tr + r * 0.6) ** 2) return true;
     if (mode === 'porch') return false;
@@ -1145,7 +1155,15 @@ export class HomesteadWorld {
     const below = isUnderground(def);
     let y = this.parcel.padHeight(r.x0, r.z0, r.x1, r.z1);
     // bunker rooms take no pad (the yard above stays as it is); an entrance's hatch or headhouse gets a small one
-    const pad: Pad | null = !below || (isEntry(def) && p.kind !== 'bunker_floorhatch') ? { x0: r.x0 - 0.05, z0: r.z0 - 0.05, x1: r.x1 + 0.05, z1: r.z1 + 0.05, y, skirt: below ? 0.4 : 0.9 } : null;
+    let pad: Pad | null = !below || (isEntry(def) && p.kind !== 'bunker_floorhatch') ? { x0: r.x0 - 0.05, z0: r.z0 - 0.05, x1: r.x1 + 0.05, z1: r.z1 + 0.05, y, skirt: below ? 0.4 : 0.9 } : null;
+    // a pad cut into a slope is held by a dry-stack wall (sim/retainPlan): a flat apron round the building on the walled sides, the terrain eased only over the wall
+    let wall: PadPlan | null = null;
+    if (!below && pad && this.parcel.lot) {
+      const near = [...this._built.values()].filter(b => !b.under && b.placed.id !== p.id).map(b => b.fpPorch);
+      wall = planPad(r, this._naturalH, near);
+      if (wall.runs.length) pad = { x0: wall.rect.x0, z0: wall.rect.z0, x1: wall.rect.x1, z1: wall.rect.z1, y: wall.y, skirt: wall.skirt };
+      else wall = null;
+    }
     if (below && p.kind === 'bunker_stairs') {
       // the stairwell's headhouse is at its top (+z) end: grade only there
       const [hx, hz] = rotQ(0, def.cellsZ * CELL / 2 - 0.25, p.rot);
@@ -1184,7 +1202,7 @@ export class HomesteadWorld {
     }
     // a plan nobody has started is laid out in lime on the ground, so it reads from the air (the stakes alone don't)
     if (!below) group.add(planMark(def));
-    this._built.set(p.id, { placed: p, group, smoke, key: '', finished: false, padY: y, light, services: '000', opts, under, lod: below ? [] : this._lodLayers(group), far: false, fpPorch: r, fpBody: footprint(def, p.x, p.z, p.rot, false) });
+    this._built.set(p.id, { placed: p, group, smoke, key: '', finished: false, padY: y, light, services: '000', opts, under, lod: below ? [] : this._lodLayers(group), far: false, fpPorch: r, fpBody: footprint(def, p.x, p.z, p.rot, false), wall });
     if (pad) this.terrain.refresh(this._terrainSource, pad.x0 - pad.skirt - 1, pad.z0 - pad.skirt - 1, pad.x1 + pad.skirt + 1, pad.z1 + pad.skirt + 1);
     if (below) this._syncUnderground();
     if (this._batchPlant) this._plantDirty = true; else if (this._quality) this._plant(this._quality);
@@ -1565,6 +1583,7 @@ export class HomesteadWorld {
     b.group.traverse(o => (o as THREE.Mesh).geometry?.dispose());
     if (b.smoke) this._ws.scene.remove(b.smoke.points);
     this._built.delete(id);
+    this.walls.remove(id);
     this._harden.delete(id);
     if (b.under) this._syncUnderground();
     this._ws.invalidateShadows();
@@ -1587,9 +1606,14 @@ export class HomesteadWorld {
       const stages = blueprintOf(st).stages;   // (the slope's and the local material's bill: its hours, not the plain blueprint's)
       const done = st.stage >= stages.length;
       const f = done ? 0 : st.done / stages[st.stage].hours;
-      const key = `${st.stage}:${Math.round(f * 200)}:${st.supplied ? 1 : 0}`;
+      const key = `${st.stage}:${Math.round(f * 200)}:${st.supplied ? 1 : 0}:${st.slumpedAt === undefined ? 0 : 1}`;
       if (key === b.key) continue;
       b.key = key;
+      if (b.wall) {
+        // the wall behind a graded pad goes up with the foundation (the stage that pays the fieldstone: sim/slope.ts)
+        const fi = Math.max(0, stages.findIndex(x => x.id === 'foundation'));
+        this.walls.set(st.id, b.wall, st.slumpedAt !== undefined ? 0.375 : done || st.stage > fi ? 1 : st.stage === fi ? f : 0, hashStr(st.id + ':wall'));   // a fallen wall is a heap at the foot (a third of its height)
+      }
       showStage(b.group, done ? 5 : st.stage, f, st.supplied);
       const mark = b.group.getObjectByName('planMark');
       if (mark) mark.visible = st.stage === 0;
@@ -1866,17 +1890,24 @@ export class HomesteadWorld {
     this.dogs.update(dt, game, hour, game.clock.t, dctx, this.walkHeight, speedK);
     // crops stand in the ground from planting (mid-May) to the last of the harvest (late October); bare soil the rest of the year
     const doy = calendarOf(game.clock).doy, [c0, c1] = seasons(regionFor(game.site)).crops, growing = doy >= c0 && doy < c1;
-    // the orchard: leaves from blossom to a month past the first frost, fruit in late summer once the trees bear (and no late frost took it)
-    const [fr0, fr1] = regionFor(game.site).frost, cal = calendarOf(game.clock);
-    const leafy = doy >= fr0 - 15 && doy < fr1 + 25, picking = doy >= ORCHARD_PICK[0] - 25 && doy < ORCHARD_PICK[1] && !orchardFrost(game.seed, cal.year);
+    const cal = calendarOf(game.clock);
     for (const b of this._built.values()) {
-      if (b.placed.kind === 'orchard' || b.placed.kind === 'orchard_grove') {
+      if (isOrchard(b.placed.kind)) {
+        // the orchard (sim/orchard.ts `fruitLook`): each kind leafs out before its own bloom, blossoms in its own days (a hard frost on the open blossom
+        // browns it), and shows ripe fruit around its picking weeks once the trees bear and the frost left a crop
         const st = game.structures.find(x => x.id === b.placed.id);
-        const fruit = picking && b.finished && orchardBearing((game.clock.t - (st?.finishedAt ?? game.clock.t)) / 365) > 0;
+        const look = new Map<Fruit, ReturnType<typeof fruitLook>>();
+        for (const f of FRUITS) look.set(f, st && b.finished ? fruitLook(game, st, f, doy, cal.year) : { leaf: false, bloom: false, fruit: false });
+        const leafy = [...look.values()].some(l => l.leaf);
         for (const o of b.group.children) {
           const name = ((o as THREE.Mesh).userData.baseMat as THREE.Material | undefined)?.name ?? ((o as THREE.Mesh).material as THREE.Material | undefined)?.name;
           if (o.userData.layer === 'interior' && (name === 'kit_hedge' || name === 'kit_hedge2')) o.visible = leafy && b.finished;
-          if (o.userData.layer === 'decor') o.visible = fruit && leafy;
+          if (o.userData.layer !== 'decor') continue;
+          const fruitOf: Record<string, Fruit> = { kit_fruit: 'apple', kit_paint_yellow: 'pear', kit_fruit_cherry: 'cherry', kit_fruit_plum: 'plum' };
+          const bloomOf: Record<string, Fruit> = { kit_blossom_apple: 'apple', kit_blossom_pear: 'pear', kit_blossom_cherry: 'cherry', kit_blossom_plum: 'plum' };
+          const fr = name ? fruitOf[name] : undefined, bl = name ? bloomOf[name] : undefined;
+          if (fr) o.visible = look.get(fr)!.fruit && look.get(fr)!.leaf;
+          else if (bl) o.visible = look.get(bl)!.bloom;
         }
         continue;
       }
@@ -2148,6 +2179,8 @@ export class HomesteadWorld {
     const wx = 0.08 + a.wind * 0.45, wz = 0.03 + a.wind * 0.12;   // prevailing westerlies off the range
     this._updateLights(dt);
     this._updateBuildingLod(dt);
+    this.walls.update(this._ws.camera.position, this._quality ?? 'medium', this.groundAt, dt);
+    if (this.walls.version !== this._wallVer) { this._wallVer = this.walls.version; this.paths.invalidate(); }
     for (const { smoke, finished } of this._built.values()) smoke?.update(this._clock, finished ? fire : 0, wx, wz, a.daylight, a.viewportH);
     if (seasonState.plants !== this._plantSeason) {
       this._plantSeason = seasonState.plants;

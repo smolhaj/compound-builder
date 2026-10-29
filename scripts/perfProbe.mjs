@@ -1,7 +1,7 @@
 // Repeatable performance probe: a late-game compound at Low / Medium / High, day / night / snow / rain.
 //
 //   (--extra '&lot=gorge&relief=9' starts the probe place on a lot archetype, sim/lots.ts)
-//   flock <lock> node scripts/perfProbe.mjs [--out perf.json] [--port 5961] [--tiers low,medium,high] [--conds day,night,snow,rain]
+//   flock <lock> node scripts/perfProbe.mjs [--out perf.json] [--port 5961] [--tiers low,medium,high] [--conds day,night,snow,rain,mist]
 //                                           [--frames 24] [--warm 4] [--w 640] [--h 400] [--scene full|bare] [--shots dir] [--nolift] [--bunker]
 //   --bunker: also dig a full bunker under the compound (hatch, tunnel, galley, bunkroom, stores, plant, medical bay, control room, stairwell), every room finished,
 //             with the gear its screens read (cameras, games), so the numbers include the underground rooms the surface view never sees
@@ -159,7 +159,7 @@ try {
     for (const cond of conds) {
       await page.evaluate(([cond]) => {
         const st = window.__cb.store.getState(); window.__cb.game.getState().setSpeed(1);
-        const C = { day: [11, 'summer', 'clear'], night: [23, 'summer', 'clear'], snow: [11, 'winter', 'snow'], rain: [14, 'summer', 'rain'] }[cond];
+        const C = { day: [11, 'summer', 'clear'], night: [23, 'summer', 'clear'], snow: [11, 'winter', 'snow'], rain: [14, 'summer', 'rain'], mist: [7, 'fall', 'fog'] }[cond];
         st.setTimeOfDay(C[0]); st.setSeasonMode(C[1]); st.setWeatherMode(C[2]);
         const cb = window.__cb, c = cb.world.camp; cb.qa.pose = null; cb.cam.target.set(c.x, 0, c.z + 4); cb.cam.yaw = 0.4; cb.cam.pitch = 0.75; cb.cam.radius = 34;
       }, [cond]);
@@ -182,7 +182,7 @@ try {
     const cdp = await page.context().newCDPSession(page);
     const ptier = tiers[0], pcond = conds[0];
     await page.evaluate(q => window.__cb.store.getState().setQuality(q), ptier);
-    await page.evaluate(([cond]) => { const st = window.__cb.store.getState(); window.__cb.game.getState().setSpeed(1); const C = { day: [11, 'summer', 'clear'], night: [23, 'summer', 'clear'], snow: [11, 'winter', 'snow'], rain: [14, 'summer', 'rain'] }[cond]; st.setTimeOfDay(C[0]); st.setSeasonMode(C[1]); st.setWeatherMode(C[2]); const cb = window.__cb, c = cb.world.camp; cb.qa.pose = null; cb.cam.target.set(c.x, 0, c.z + 4); cb.cam.yaw = 0.4; cb.cam.pitch = 0.75; cb.cam.radius = 34; }, [pcond]);
+    await page.evaluate(([cond]) => { const st = window.__cb.store.getState(); window.__cb.game.getState().setSpeed(1); const C = { day: [11, 'summer', 'clear'], night: [23, 'summer', 'clear'], snow: [11, 'winter', 'snow'], rain: [14, 'summer', 'rain'], mist: [7, 'fall', 'fog'] }[cond]; st.setTimeOfDay(C[0]); st.setSeasonMode(C[1]); st.setWeatherMode(C[2]); const cb = window.__cb, c = cb.world.camp; cb.qa.pose = null; cb.cam.target.set(c.x, 0, c.z + 4); cb.cam.yaw = 0.4; cb.cam.pitch = 0.75; cb.cam.radius = 34; }, [pcond]);
     await frames(8);
     await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 200 }); await cdp.send('HeapProfiler.enable'); await cdp.send('HeapProfiler.startSampling', { samplingInterval: 4096 });
     await cdp.send('Profiler.start');
@@ -216,7 +216,7 @@ try {
       await page.evaluate(([cond]) => {
         const st = window.__cb.store.getState(), G = window.__cb.game.getState();
         G.setSpeed(1);
-        const C = { day: [11, 'summer', 'clear'], night: [23, 'summer', 'clear'], snow: [11, 'winter', 'snow'], rain: [14, 'summer', 'rain'] }[cond];
+        const C = { day: [11, 'summer', 'clear'], night: [23, 'summer', 'clear'], snow: [11, 'winter', 'snow'], rain: [14, 'summer', 'rain'], mist: [7, 'fall', 'fog'] }[cond];
         st.setTimeOfDay(C[0]); st.setSeasonMode(C[1]); st.setWeatherMode(C[2]);
       }, [cond]);
       await frames(WARM + 4);

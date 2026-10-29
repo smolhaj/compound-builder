@@ -28,6 +28,7 @@ import {
 import { godRayStrength, milkyWayVisibility, moonAngle, moonIllumination, starVisibility } from './sky/skyState';
 import { phaseWeights, type DayPhase } from './sky/dayPhase';
 import { installSeasonShaderPatch } from './season/seasonShader';
+import { NO_HEIGHT_FOG, installHeightFogPatch, setHeightFog as applyHeightFog, type HeightFogParams } from './fog/heightFog';
 
 export type Quality = 'high' | 'medium' | 'low';
 
@@ -48,18 +49,10 @@ export interface WorldSite {
 }
 
 /*
- * Aerial perspective for every material: exp² fog thins with distance past
- * ~80 units, so the far landscape keeps a light haze instead of a fog sheet.
+ * Aerial perspective for every material: exp² fog thins with distance past ~80 units, so the far landscape keeps a
+ * light haze instead of a fog sheet; on top of it the height fog (fog/heightFog.ts): valley banks and low cloud.
  */
-THREE.ShaderChunk.fog_fragment = /* glsl */`#ifdef USE_FOG
-  #ifdef FOG_EXP2
-    float fogThin = mix(1.0, 0.1, smoothstep(80.0, 420.0, vFogDepth));
-    float fogFactor = 1.0 - exp(- fogDensity * fogDensity * fogThin * vFogDepth * vFogDepth);
-  #else
-    float fogFactor = smoothstep(fogNear, fogFar, vFogDepth);
-  #endif
-  gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor, fogFactor);
-#endif`;
+installHeightFogPatch();
 
 /** Far plane: the regional landscape (mountain ranges) reaches ~2 km out. */
 export const CAMERA_FAR = 2600;
@@ -128,10 +121,19 @@ export class WorldScene {
   /** Floodlit-site glow over the haze (world position + strength). */
   private readonly _groundGlow = { x: 0, y: 0, z: 0, on: 0 };
 
+  /** Valley fog and low cloud (fog/heightFog.ts), set by the game each frame; ignored on Low. */
+  private _hfog: HeightFogParams = NO_HEIGHT_FOG;
+
   private _wetnessTarget = 0;
   private _wetnessCurrent = 0;
 
   private readonly _weather = {
+    cloud: 0, fog: 0, rain: 0, snow: 0, flash: 0,
+    cumulus: 0.12, cirrus: 0.2, storm: 0, distantStorm: 0, wind: 0.2, haze: 0.4,
+    skyFlash: 0, bolt: 0, boltAz: 0, boltSeed: 0, stormAz: 0.6,
+  };
+  /** What Low sees of the weather: nothing (clear, a fixed noon, no fog). */
+  private readonly _noWeather = {
     cloud: 0, fog: 0, rain: 0, snow: 0, flash: 0,
     cumulus: 0.12, cirrus: 0.2, storm: 0, distantStorm: 0, wind: 0.2, haze: 0.4,
     skyFlash: 0, bolt: 0, boltAz: 0, boltSeed: 0, stormAz: 0.6,
@@ -235,16 +237,16 @@ export class WorldScene {
    */
   setWeather(w: SceneWeather, flash = 0, sky?: SkyLightning): void {
     const x = this._weather;
-    if (this._quality === 'low') {
-      x.cloud = x.fog = x.rain = x.snow = x.flash = x.storm = x.distantStorm = x.skyFlash = x.bolt = 0;
-      return;
-    }
+    // (Low draws none of it: updateDayNight reads the zeroed copy; the values are kept so a QA frame lifted to a higher tier still has them)
     x.cloud = w.cloud; x.fog = w.fog; x.rain = w.rain; x.snow = w.snow; x.flash = flash;
     x.cumulus = w.cumulus ?? 0.12; x.cirrus = w.cirrus ?? 0.2; x.storm = w.storm ?? 0;
     x.distantStorm = w.distantStorm ?? 0; x.wind = w.wind ?? 0.2; x.haze = w.haze ?? 0.4;
     x.skyFlash = sky?.flash ?? flash; x.bolt = sky?.bolt ?? 0; x.boltAz = sky?.boltAz ?? 0;
     x.boltSeed = sky?.boltSeed ?? 0; x.stormAz = sky?.stormAz ?? x.stormAz;
   }
+
+  /** Valley fog bank and low cloud for the next updateDayNight(). Low quality has no fog at all, so it ignores them. */
+  setHeightFog(p: HeightFogParams): void { this._hfog = p; }
 
   /**
    * Night sky inputs: moon phase (0 new … 0.5 full, skyState.moonPhase) and
@@ -442,7 +444,7 @@ export class WorldScene {
       [isMorning ? SKY_PALETTES.dawn : SKY_PALETTES.golden, wg],
       [SKY_PALETTES.night, wn],
     ]);
-    const wx = this._weather;
+    const wx = this._quality === 'low' ? this._noWeather : this._weather;
     const overcast = Math.min(1, wx.cloud);
     if (overcast > 0.001 || wx.fog > 0.001 || wx.flash > 0.001) this._applyWeatherToSky(sky, overcast, wx.fog, wx.flash);
     sky.glow.multiplyScalar(0.5 + 1.6 * (1 - this._skyDark));
@@ -512,6 +514,8 @@ export class WorldScene {
       }
       fog.density = Math.min(fog.density, WorldScene.FOG_WEATHER_DEPTH / Math.max(1, r));
     }
+
+    applyHeightFog(this._quality === 'low' || !this.scene.fog ? NO_HEIGHT_FOG : this._hfog);
 
     this.scene.environmentIntensity = 0.10 + (1 - wn) * 0.24;
     if (this.outdoorLight < 0.999) {
@@ -693,7 +697,6 @@ export class WorldScene {
         this.scene.background = null;
         break;
       case 'low':
-        this.setWeather({ cloud: 0, fog: 0, rain: 0, snow: 0 });
         this.updateDayNight(11);
         this.renderer.shadowMap.enabled = false;
         this.renderer.shadowMap.needsUpdate = true;
@@ -863,10 +866,13 @@ export class WorldScene {
     const u = this._colorGradingPass.uniforms;
     const g = this._gradeBase;
     const { golden: wg, night: wn } = this._phase;
-    u['uContrast'].value = g.contrast + wg * 0.05 - wn * 0.08;
-    u['uSaturation'].value = g.saturation + wg * 0.10;
-    u['uWarmStrength'].value = g.warm + wg * 0.16;
+    // overcast (a gray, soft-lit day): flatter contrast, quieter colour, no amber on the highlights, a cool cast in the shadows
+    const oc = Math.min(1, (this._quality === 'low' ? this._noWeather : this._weather).cloud) * (1 - wn);
+    u['uContrast'].value = g.contrast + wg * 0.05 - wn * 0.08 - oc * 0.14;
+    u['uSaturation'].value = g.saturation + wg * 0.10 - oc * 0.16;
+    u['uWarmStrength'].value = (g.warm + wg * 0.16) * (1 - 0.8 * oc);
     u['uWarmThreshold'].value = g.threshold - wg * 0.22;
+    u['uShadowTintStrength'].value = 0.5 + 0.4 * oc;
     u['uNight'].value = wn;
   }
 

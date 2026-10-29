@@ -28,6 +28,8 @@ export type KitMaterialId = 'timber_lap' | 'trim' | 'fieldstone' | 'metal_roof' 
   'art_mountains' | 'art_sunset' | 'art_lake' | 'photo_family' | 'photo_couple' | 'poster_map' | 'poster_seeds' | 'sampler' | 'curtain' | 'curtain_red' | 'flowers'
   // greenhouse and orchard
   | 'polycarb' | 'aluminum' | 'fruit'
+  // the orchard's other fruit and its blossom (sim/orchard.ts: each kind blooms and ripens in its own weeks)
+  | 'fruit_cherry' | 'fruit_plum' | 'blossom_apple' | 'blossom_pear' | 'blossom_cherry' | 'blossom_plum'
   // the pond, its fish and crayfish, the flock
   | 'pond_water' | 'fish' | 'crayfish' | 'sheepwool'
   // the barnyard's animals and the apiary
@@ -809,6 +811,13 @@ export function kitMaterial(id: KitMaterialId): THREE.MeshStandardMaterial {
     case 'polycarb': m = new THREE.MeshStandardMaterial({ color: 0xdfeef0, roughness: 0.25, metalness: 0.05, transparent: true, opacity: 0.32, depthWrite: false, side: THREE.DoubleSide }); break;
     case 'aluminum': m = new THREE.MeshStandardMaterial({ color: 0xc4c8cc, roughness: 0.35, metalness: 0.7 }); break;
     case 'fruit': m = new THREE.MeshStandardMaterial({ color: 0xc23a22, roughness: 0.45 }); break;
+    case 'fruit_cherry': m = new THREE.MeshStandardMaterial({ color: 0x7a0f1c, roughness: 0.3 }); break;
+    case 'fruit_plum': m = new THREE.MeshStandardMaterial({ color: 0x4a2a5e, roughness: 0.4 }); break;
+    // blossom: soft, a little emissive so a spring morning's white reads against the leaf (pink-white apple, white pear and plum, the cherry's pinker white)
+    case 'blossom_apple': m = new THREE.MeshStandardMaterial({ color: 0xf6d6df, roughness: 0.85, emissive: new THREE.Color(0.16, 0.1, 0.12) }); break;
+    case 'blossom_pear': m = new THREE.MeshStandardMaterial({ color: 0xf8f6f0, roughness: 0.85, emissive: new THREE.Color(0.14, 0.14, 0.13) }); break;
+    case 'blossom_cherry': m = new THREE.MeshStandardMaterial({ color: 0xfbe9ee, roughness: 0.85, emissive: new THREE.Color(0.15, 0.11, 0.12) }); break;
+    case 'blossom_plum': m = new THREE.MeshStandardMaterial({ color: 0xf5f3ee, roughness: 0.85, emissive: new THREE.Color(0.13, 0.13, 0.12) }); break;
     // a dark green-brown pond: glossy, a little clear so the fish show through, doubled-sided for the reservoir edge
     case 'pond_water': m = new THREE.MeshStandardMaterial({ color: 0x2f5a52, roughness: 0.06, metalness: 0.25, transparent: true, opacity: 0.72, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }); break;
     case 'fish': m = new THREE.MeshStandardMaterial({ color: 0x9aa8a0, roughness: 0.4, metalness: 0.3, side: THREE.DoubleSide }); break;

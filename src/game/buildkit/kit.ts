@@ -150,7 +150,7 @@ export const GREENHOUSE: KitPieceDef = {
 
 export const ORCHARD: KitPieceDef = {
   id: 'orchard', name: 'Orchard', category: 'food',
-  blurb: 'Twelve apple, peach and pear trees on a grid. No fruit for three years; from the sixth, about 1,800 lb a year.',
+  blurb: 'Twelve trees in four rows: apple, pear, cherry and plum. First plums in the third year, apples and cherries in the fourth, pears in the fifth; a full crop of about 1,350 lb by year 7 to 10. Blossom in spring (frost takes it in a cold hollow), bees help, prune in winter, water the young trees.',
   cellsX: 5, cellsZ: 5, frontCells: 0,
   parts: { foundation: 'fieldstone', walls: 'board_batten', roof: 'metal_roof' },
   maxSlope: 0.35, floorY: 0.0, porch: 0, sleeps: 0, light: null,
@@ -168,7 +168,7 @@ export const GREENHOUSE_HEATED: KitPieceDef = {
 /** Forty-eight trees: the orchard at farm scale. */
 export const ORCHARD_GROVE: KitPieceDef = {
   id: 'orchard_grove', name: 'Orchard grove', category: 'food',
-  blurb: 'Forty-eight apple, pear and peach trees in rows: four plots of the orchard. Prune it in winter, hens help with the pests; from year six about 7,200 lb of fruit.',
+  blurb: 'Forty-eight trees in eight rows: apple, pear, cherry and plum, four plots of the orchard. Prune it in winter, hens help with the pests, bees set the blossom; a full crop of about 5,400 lb by year 7 to 10.',
   cellsX: 8, cellsZ: 6, frontCells: 0,
   parts: { foundation: 'fieldstone', walls: 'board_batten', roof: 'metal_roof' },
   maxSlope: 0.3, floorY: 0.0, porch: 0, sleeps: 0, light: null,

@@ -1,6 +1,6 @@
 /**
  * Terraced-compound walk test on the cutbank hillside (the "compound notched into the mountain" lot).
- *   flock $SP/render.lock node scripts/hillsideWalk.mjs --out shots/hillside [--port 5410] [--shots] [--serve]
+ *   flock $SP/render.lock node scripts/hillsideWalk.mjs --out shots/hillside [--port 5410] [--shots] [--serve] [--look misty|overcast|drizzle|dusk] [--q medium|high]
  * Loads the lot, places a house + garden + tower + coop + well + wall with a gate (+ bunker hatch) on the shelf below the rock face and the
  * terraces under it, then forces each duty (garden, watch tower / wall / gate, water, livestock, pets, cleaning, kitchen, repairs) and steps the real
  * people update (world.updatePeople), recording every step. Reports reachability, the length and steepest grade of every walk, and whether anyone
@@ -9,12 +9,13 @@
  */
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { LOOKS, applyLook } from './lookPresets.mjs';
 import { resolve } from 'node:path';
 const { chromium } = await import('/opt/node22/lib/node_modules/playwright/index.mjs');
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
 const layoutKind = opt('--layout', 'terrace');   // terrace: the wall takes in the garden terrace below the shelf; shelf: the wall stops at the shelf edge, the garden is outside it
-const TOD = Number(opt('--tod', 10)), only = opt('--only', 'aerial,top,walk,eye,stair').split(',');   // which shot groups
+const LOOK = opt('--look', null), TOD = Number(opt('--tod', LOOK ? LOOKS[LOOK]?.tod ?? 10 : 10)), only = opt('--only', 'aerial,top,walk,eye,stair').split(',');   // which shot groups
 const port = Number(opt('--port', 5410)), outDir = resolve(opt('--out', 'shots/hillside')), shots = args.includes('--shots');
 mkdirSync(outDir, { recursive: true });
 let vite = null;
@@ -30,8 +31,10 @@ page.on('pageerror', e => console.error('PAGEERROR', e.message));
 await page.goto(`http://localhost:${port}/?lowrender=0.75&clean&seed=7&${LOT}`);
 await page.waitForFunction(() => window.__cb?.qa?.renderNow);
 await page.evaluate(TOD => { const { game, store } = window.__cb; game.getState().setSpeed(0); store.getState().setQuality('low'); store.getState().setTimeOfDay(TOD); store.getState().setWeatherMode('clear'); store.getState().setSeasonMode('summer'); });
+if (LOOK) await applyLook(page, LOOK);
 await page.waitForTimeout(1500);
-const frames = async () => { await page.evaluate(() => window.__cb.qa.renderNow()); await page.waitForTimeout(250); };
+const lookQ = opt('--q', 'medium');
+const frames = async () => { await page.evaluate(([look, q]) => (look ? window.__cb.qa.renderFull(q) : window.__cb.qa.renderNow()), [LOOK, lookQ]); await page.waitForTimeout(250); };
 const shot = async name => { await frames(); const f = `${outDir}/${name}.png`; await page.screenshot({ path: f }); console.error('shot', f); };
 
 // ── lay out the compound ────────────────────────────────────────────────────────────────────────────
@@ -116,7 +119,8 @@ const report = await page.evaluate(async () => {
   const boxes = g0.structures.filter(st => K.KIT[st.kind].level !== 'underground' && st.kind !== 'bunker_hatch').map(st => K.footprint(K.KIT[st.kind], st.x, st.z, st.rot, false));
   // what a walk may not cross (independent of the game's own tests): a building, the built wall, cliff ground
   const blockedAt = (x, z) => boxes.some(r => x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1) || slopeAt(x, z) > 1.0;
-  const wallAt = (x, z) => w._perimeterBlocked(x, z, 0.08);
+  // the wall of the perimeter, and a dry-stack retaining wall round a graded pad (game/terrain/RetainWalls: over it only at its stairs)
+  const wallAt = (x, z) => w._perimeterBlocked(x, z, 0.08) || w.walls.blocks(x, z);
   const step = (dt) => w.updatePeople(dt, G.getState().game, 14, 1);
   for (const ph of phases) {
     // everyone starts at home asleep (indoors), then goes to work

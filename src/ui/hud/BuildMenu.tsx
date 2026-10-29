@@ -71,6 +71,7 @@ export function BuildMenu({ showProjects = () => undefined }: { showProjects?: (
     else if (a.type === 'terrain') useWorldStore.getState().setTerrainMode(a.mode);
     else if (a.type === 'enroll') { const why = g.money(d => enroll(d, a.course, a.pid, a.mode, a.teacher)); if (why) setNote(`Could not sign up: ${why}.`); }
     else if (a.type === 'drills') g.daily(d => { setDrills(d, a.perWeek); return null; });
+    else if (a.type === 'terraces') { const why = g.stakeTerraces(a.tiers); setNote(why ? `Cannot stake the terraces: ${why}.` : `Staked ${a.tiers.length} terraced garden beds down the slope: each is cut into the hill on its own flat pad and walled in dry-stack stone as its foundation goes in (Projects).`); }
     else if (a.type === 'drain') { const why = g.planSpan('drain_channel', a.a, a.b); setNote(why ? `Cannot lay it there: ${why}.` : 'Planned the drainage channel above the building: the family digs it as the materials come in (Projects).'); }
     else if (a.type === 'span') { const why = g.planSpan('tunnel_bridge', a.a, a.b); setNote(why ? `Cannot lay it there: ${why}.` : 'Planned the tunnel-bridge across the gorge: the family builds it as the materials come in (Projects).'); }
     else if (a.type === 'gather') { const why = g.daily(d => callGathering(d, a.kind)); if (why) setNote(why); }

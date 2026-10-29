@@ -106,6 +106,12 @@ export function snowedIn(s: GameState, day = dayIndex(s.clock.t)): boolean {
   return !!a && (a.kind === 'blizzard' || a.kind === 'ice_storm' || a.kind === 'flash_flood') && day >= a.at && day <= a.until;
 }
 
+/** A rain storm is on today (a flood, a flash flood, the remnants of a hurricane): the hillside runs with water (sim/retaining.ts). */
+export function rainStormOn(s: GameState, day = dayIndex(s.clock.t)): boolean {
+  const a = weatherOf(s).active;
+  return !!a && (a.kind === 'flood' || a.kind === 'flash_flood' || a.kind === 'hurricane_remnants') && day >= a.at && day <= a.until;
+}
+
 /** The power is out from the storm today (lines down: the grid is gone until the crews get round). */
 export function stormOutage(s: GameState, day = dayIndex(s.clock.t)): boolean {
   const a = s.weather?.active;
