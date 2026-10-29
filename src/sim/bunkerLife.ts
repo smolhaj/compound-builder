@@ -18,6 +18,7 @@
  * encounters.ts (the crew at the gate), radio.ts (what the set can hear).
  */
 import { isFinished } from './construction';
+import { isHome } from './blueprints';
 import { powered } from './gear';
 import { radioSet, type RadioSet } from './radio';
 import { isNuclear, SHELTER_DAYS } from './nuclear';
@@ -81,9 +82,9 @@ const hash = (str: string): number => { let h = 2166136261; for (let i = 0; i < 
 /** What the screens show right now (a pure function of the state; the painter turns it into pixels). */
 export function securityFeeds(s: GameState): Feeds {
   const c = cameraCount(s), pw = powered(s);
-  const home = have(s, k => ['timber_cabin', 'log_house', 'cottage', 'farmhouse', 'guest_house', 'moms_house', 'trailer'].includes(k));
+  const home = have(s, k => isHome(k));
   const garden = have(s, k => ['garden', 'greenhouse', 'greenhouse_heated', 'field', 'orchard', 'orchard_grove'].includes(k));
-  const solar = have(s, k => ['solar_array', 'solar_farm', 'garage_solar'].includes(k));
+  const solar = have(s, k => ['solar_array', 'solar_farm', 'garage_solar', 'lodge_solar'].includes(k));
   const someone = !!s.gate.pending;
   const sensor = n(s, 'driveway_alarm') > 0;
   const state = (needsIr: boolean, subject: boolean): FeedState =>

@@ -27,6 +27,7 @@ import { dogCount, dogsInBattle } from './pets';
 import { watchDetection } from './daily';
 import { backgroundOf } from './family';
 import { isHome } from './blueprints';
+import { coverFactor } from './housingStyles';
 import { isFinished } from './construction';
 import { PERIMETER, fenceLive, runFinished } from './perimeter';
 import { ARMORY_LIGHTS, floodlightLit } from './lights';
@@ -302,7 +303,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
     else for (let i = 0; i < 3; i++) { const p = at(wallR, (i - 1) * 4); posts.push({ kind: 'wall', ...p, y: 0, cover: 0.22, value: 2, cap: 1, wrecked: false, fire: 0 }); }
   }
   const bars = n('window_bars') > 0 ? 0.28 : 0.35;
-  for (const st of fin) if (!st.kind.startsWith('bunker_') && !isPostKind(st.kind) && dist(st, C) < 25) posts.push({ kind: 'building', x: st.x + ax * 0.5, z: st.z + az * 0.5, y: 0.3, cover: bars, value: 1, cap: isHome(st.kind) ? 2 : 1, wrecked: false, fire: 0 });
+  for (const st of fin) if (!st.kind.startsWith('bunker_') && !isPostKind(st.kind) && dist(st, C) < 25) posts.push({ kind: 'building', x: st.x + ax * 0.5, z: st.z + az * 0.5, y: 0.3, cover: bars * coverFactor(st.kind), value: 1, cap: isHome(st.kind) ? 2 : 1, wrecked: false, fire: 0 });
   posts.push({ kind: 'open', x: C.x + ax * 1.5, z: C.z + az * 1.5, y: 0, cover: 1, value: 0, cap: 99, wrecked: false, fire: 0 });
   posts.sort((a, b) => b.value - a.value);
   const lineR = wallR || 2;

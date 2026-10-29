@@ -20,6 +20,7 @@ import { GATEHOUSE_BUILDERS } from './gatehouseBuildings';
 import { FOOD_BUILDERS } from './foodBuildings';
 import { FARM_BUILDERS } from './farmBuildings';
 import { HERD_BUILDERS } from './herdBuildings';
+import { HOUSING_BUILDERS, HOUSING_SEATS } from './housingStyleBuildings';
 
 /** Seats for evenings at home: local x, z and the point the sitter faces. */
 export type Seat = [number, number, number, number];
@@ -485,6 +486,7 @@ function dressLogHouse(c: FurnishCtx): void {
 /** Evening seats per kind (local). */
 const SEATS: Record<string, Seat[]> = {
   log_house: [[-0.3, -0.45, -0.4, -1.1], [-0.5, -0.45, -0.4, -1.1], [0.35, 0.62, 0.35, 0.78], [0.35, 0.94, 0.35, 0.78]],
+  ...HOUSING_SEATS,
 };
 
 const BUILDERS: Record<string, (def: KitPieceDef, seed?: number, opts?: BuildOpts) => THREE.Group> = {
@@ -505,6 +507,7 @@ const BUILDERS: Record<string, (def: KitPieceDef, seed?: number, opts?: BuildOpt
   ...FOOD_BUILDERS,
   ...HERD_BUILDERS,
   ...FARM_BUILDERS,
+  ...HOUSING_BUILDERS,
 };
 
 /** Every layer of a kit piece (construction shows them stage by stage). */

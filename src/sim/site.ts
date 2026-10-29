@@ -8,6 +8,7 @@
  * land values) and the features, and comes out of the family's savings, so
  * cheap land leaves more to build and stock with. Pure.
  */
+import { styleOff } from './housingStyles';
 import { mulberry32 } from './rng';
 import { REGION_IDS, REGIONS, SIZE_FACTOR, type RegionId } from './regions';
 import type { LotSpec } from './lots';
@@ -257,7 +258,7 @@ export function homeOutsideForty(s: Site): Rect[] {
 /** Why a piece can't go on this land (null = it can): a hand-dug well needs water within about 9 m. */
 export function siteProblem(s: Site, kind: string): string | null {
   if (kind === 'well_hand' && s.gwDepth > 9) return `Water is ${s.gwDepth} m down here: too deep to dig by hand (drill a well)`;
-  return null;
+  return styleOff(s, kind);   // the housing styles: logs need timber, adobe a dry climate, the lodge a slope (sim/housingStyles.ts)
 }
 
 /** What the driller charges past the usual 60 m bore ($/m, about $45 a foot). */

@@ -384,7 +384,7 @@ export function courseIdea(s: GameState): CourseIdea | null {
   const built = (...k: string[]) => s.structures.some(st => k.includes(st.kind) && st.finishedAt !== null);
   const wants: Array<[CourseId, boolean, string]> = [
     ['firstaid', bestLevel(s, 'medic') < TEACH_LEVEL, 'nobody here is trained in first aid'],
-    ['wiring', bestLevel(s, 'electrical') < 2 && built('solar_array', 'solar_farm', 'garage_solar', 'battery_shed', 'battery_bank', 'generator_shed'), 'the solar and the generator need someone who can read a wiring diagram'],
+    ['wiring', bestLevel(s, 'electrical') < 2 && built('solar_array', 'solar_farm', 'garage_solar', 'lodge_solar', 'battery_shed', 'battery_bank', 'generator_shed'), 'the solar and the generator need someone who can read a wiring diagram'],
     ['engines', bestLevel(s, 'mechanic') < TEACH_LEVEL && (has(s, 'generator') >= 1 || s.structures.some(st => st.kind === 'generator_shed')), 'the generator and the saws need someone who knows engines'],
     ['ham', bestLevel(s, 'radio') < 2 && (has(s, 'ham_rig') >= 1 || has(s, 'sw_radio') >= 1), 'the radio sits unused: nobody has the licence'],
     ['gardening', bestLevel(s, 'gardener') < TEACH_LEVEL && built('garden', 'field', 'greenhouse'), 'the garden would give more with someone who has the training'],

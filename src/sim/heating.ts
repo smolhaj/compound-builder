@@ -13,6 +13,7 @@ import { roofLoss } from './improvements';
 import { isHome } from './blueprints';
 import { isFinished } from './construction';
 import { regionFor } from './climate';
+import { heatFactor } from './housingStyles';
 
 /** Heating demand 0–1 by day of year (peaks mid-January, nil June–August). */
 export function heatDemand(doy: number): number {
@@ -28,7 +29,7 @@ export const BURN_PER_DAY = 0.12;
 
 /** Today's heating demand (0 = none, ~1.6 = a bitter cold snap), with a leaky roof. */
 export function demandNow(s: GameState): number {
-  return Math.min(2, (heatDemand(calendarOf(s.clock).doy) * regionFor(s.site).cold + climate(s).cold) * roofLoss(s));
+  return Math.min(2, (heatDemand(calendarOf(s.clock).doy) * regionFor(s.site).cold + climate(s).cold) * roofLoss(s) * heatFactor(s));
 }
 
 /** Burn `days` worth of firewood (called each sub-step). */

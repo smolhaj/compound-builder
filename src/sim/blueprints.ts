@@ -189,6 +189,78 @@ export const LOG_HOUSE_BLUEPRINT: Blueprint = {
   ],
 };
 
+// ── Housing styles (sim/housingStyles.ts): each priced from the one materials table; hours are person-hours for a competent owner-builder ──
+
+/**
+ * 12 × 15 m log lodge, two storeys over a stone-faced walkout basement, a wraparound deck and a glass gable (≈ 540 m² in all):
+ * ≈ 8,000 person-hours (a crew of four for two years, or the family for five); ≈ $215k of bought materials plus about 90 saw logs from
+ * your own timber. Only on a slope: the basement is cut into the hill (sim/slope.ts adds the retaining stone and the cut).
+ */
+export const LODGE_BLUEPRINT: Blueprint = {
+  kind: 'lodge',
+  stages: [
+    { id: 'site', name: 'Stake out, cut the pad into the slope (hired excavator)', hours: 140, materials: { excavator: 4 } },
+    { id: 'foundation', name: 'Footings, poured basement walls and slab, stone facing, waterproofing', hours: 1100, materials: { concrete: 100, rebar: 8, fieldstone: 40, membrane: 6 } },
+    { id: 'frame', name: 'Raise the two-storey log walls, floors, stone piers and the deck frame', hours: 3000, materials: { logs: 90, lumber: 45 } },
+    { id: 'roof', name: 'Ridge beam, rafters and the standing-seam roof', hours: 1100, materials: { lumber: 30, roofing: 40 } },
+    { id: 'finish', name: 'Glass gable, stone chimney, floors, stairs, kitchen, four baths, wraparound deck and rails', hours: 2700, materials: { lumber: 40, hardware: 70, fixtures: 6, cable: 10, pipe: 8, fieldstone: 6 } },
+  ],
+};
+/** The lodge with 25 × 400 W panels on its south roof (≈ 10 kW): the panels and an inverter on top of the lodge's bill. */
+export const LODGE_SOLAR_BLUEPRINT: Blueprint = {
+  kind: 'lodge_solar',
+  stages: LODGE_BLUEPRINT.stages.map(st => st.id === 'finish'
+    ? { ...st, name: st.name + ', 25 panels on the south roof', hours: st.hours + 120, materials: { ...st.materials, solar_panel: 25, inverter: 1, cable: (st.materials.cable ?? 0) + 3 } }
+    : st),
+};
+/** 9 × 12 m two-storey fieldstone house, 45 cm walls: ≈ 4,800 person-hours (stone is slow); ≈ $108k of materials. */
+export const STONE_HOUSE_BLUEPRINT: Blueprint = {
+  kind: 'stone_house',
+  stages: [
+    { id: 'site', name: 'Stake out & level the pad', hours: 60, materials: {} },
+    { id: 'foundation', name: 'Footings and a stone-faced stem wall', hours: 500, materials: { concrete: 30, rebar: 3, fieldstone: 12 } },
+    { id: 'frame', name: 'Lay the stone walls, two storeys, and the floor joists', hours: 2300, materials: { fieldstone: 48, concrete: 6, lumber: 24 } },
+    { id: 'roof', name: 'Rafters, sheathing and the metal roof', hours: 500, materials: { lumber: 14, roofing: 18 } },
+    { id: 'finish', name: 'Windows, doors, floors, stairs, kitchen and baths, the stone chimney', hours: 1440, materials: { lumber: 20, hardware: 40, fixtures: 3, cable: 5, pipe: 4, fieldstone: 4 } },
+  ],
+};
+/** 9 × 12 m two-storey post-and-beam house with insulated panels: ≈ 3,000 person-hours; ≈ $105k of materials. */
+export const TIMBER_FRAME_BLUEPRINT: Blueprint = {
+  kind: 'timber_frame',
+  stages: [
+    { id: 'site', name: 'Stake out & level the pad', hours: 50, materials: {} },
+    { id: 'foundation', name: 'Footings and a stem wall', hours: 280, materials: { concrete: 22, rebar: 2, fieldstone: 4 } },
+    { id: 'frame', name: 'Cut and raise the posts, beams and braces, then the insulated panels', hours: 1250, materials: { lumber: 48 } },
+    { id: 'roof', name: 'Panel roof, sheathing and the standing-seam roof', hours: 420, materials: { lumber: 14, roofing: 16 } },
+    { id: 'finish', name: 'Siding, windows, doors, floors, stairs, kitchen and baths', hours: 1000, materials: { lumber: 18, hardware: 38, fixtures: 3, cable: 5, pipe: 4 } },
+  ],
+};
+/** Three 40 ft containers (two below, one across the top), cut, welded, foamed and fitted: ≈ 1,500 person-hours; ≈ $65k. */
+export const CONTAINER_HOUSE_BLUEPRINT: Blueprint = {
+  kind: 'container_house',
+  stages: [
+    { id: 'site', name: 'Stake out & level the pad', hours: 30, materials: {} },
+    { id: 'foundation', name: 'Concrete piers and a steel grade beam', hours: 140, materials: { concrete: 12, rebar: 3 } },
+    { id: 'frame', name: 'Crane the containers, weld, cut the openings, frame them out', hours: 380, materials: { container: 3, hardware: 6, lumber: 8 } },
+    { id: 'roof', name: 'Insulated roof deck and membrane, shade roof over it', hours: 200, materials: { membrane: 4, roofing: 6, lumber: 4 } },
+    { id: 'finish', name: 'Spray foam, glazing, stair, deck, kitchen, bath and the wiring', hours: 750, materials: { lumber: 10, hardware: 22, fixtures: 2, cable: 4, pipe: 3 } },
+  ],
+};
+/**
+ * 9 × 12 m single-storey adobe house of rammed earth, 45 cm walls, a viga ceiling and a covered portal: ≈ 2,600 person-hours; ≈ $55k.
+ * The footings' borrow pit is where the wall earth comes from (the foundation stage yields the spoil the frame stage rams).
+ */
+export const ADOBE_HOUSE_BLUEPRINT: Blueprint = {
+  kind: 'adobe_house',
+  stages: [
+    { id: 'site', name: 'Stake out & level the pad', hours: 40, materials: {} },
+    { id: 'foundation', name: 'Dig the footings and the borrow pit (hired excavator), pour the stem wall', hours: 260, materials: { excavator: 3, concrete: 8 }, yields: { spoil: 70 } },
+    { id: 'frame', name: 'Ram the earth walls in forms, cement-stabilised, and set the vigas', hours: 1100, materials: { spoil: 60, concrete: 6, lumber: 12 } },
+    { id: 'roof', name: 'Viga and plank roof, membrane and the metal roof', hours: 360, materials: { lumber: 10, membrane: 6, roofing: 10 } },
+    { id: 'finish', name: 'Plaster, deep-set windows, slab floor, portal, kitchen and bath', hours: 840, materials: { concrete: 6, hardware: 24, fixtures: 2, cable: 4, pipe: 3 } },
+  ],
+};
+
 /** What came with the land (sim/improvements.ts): an old farmhouse, a manufactured home, a barn. Not in the build menu (the barn is). */
 export const FARMHOUSE_BLUEPRINT: Blueprint = {
   kind: 'farmhouse',
@@ -266,10 +338,11 @@ export const METAL_GARAGE_BLUEPRINT: Blueprint = { kind: 'metal_garage', stages:
 export const GARAGE_SOLAR_BLUEPRINT: Blueprint = { kind: 'garage_solar', stages: garageStages(true) };
 
 /** Kinds people live in (a kitchen, a roof over the family). */
-export const HOMES: readonly string[] = ['timber_cabin', 'log_house', 'farmhouse', 'trailer', 'cottage', 'guest_house', 'moms_house'];
-export const isHome = (kind: string) => HOMES.includes(kind);
+export const HOMES: readonly string[] = ['timber_cabin', 'log_house', 'farmhouse', 'trailer', 'cottage', 'guest_house', 'moms_house', 'lodge', 'lodge_solar', 'stone_house', 'timber_frame', 'container_house', 'adobe_house'];
+const HOME_SET: ReadonlySet<string> = new Set(HOMES);
+export const isHome = (kind: string) => HOME_SET.has(kind);
 /** People each home kind sleeps (matches the kit's `sleeps`). */
-export const HOME_BEDS: Record<string, number> = { timber_cabin: 4, log_house: 6, farmhouse: 6, trailer: 4, cottage: 3, guest_house: 2, moms_house: 4 };
+export const HOME_BEDS: Record<string, number> = { timber_cabin: 4, log_house: 6, farmhouse: 6, trailer: 4, cottage: 3, guest_house: 2, moms_house: 4, lodge: 10, lodge_solar: 10, stone_house: 6, timber_frame: 6, container_house: 4, adobe_house: 4 };
 /** Beds under a finished roof on the place (shelter for the household and anyone taken in). */
 export function homeBeds(s: { structures: ReadonlyArray<{ kind: string; stage: number }> }): number {
   return s.structures.reduce((a, st) => a + (BLUEPRINTS[st.kind] && st.stage >= BLUEPRINTS[st.kind].stages.length ? HOME_BEDS[st.kind] ?? 0 : 0), 0);
@@ -444,7 +517,7 @@ export const GATE_GARAGE_BLUEPRINT: Blueprint = bp('gate_garage', [
 ]);
 
 export const BLUEPRINTS: Record<string, Blueprint> = Object.fromEntries(
-  [CABIN_BLUEPRINT, OUTHOUSE_BLUEPRINT, WORKSHOP_BLUEPRINT, ROOT_CELLAR_BLUEPRINT, WOOD_OVEN_BLUEPRINT, APIARY_BLUEPRINT, SUGAR_SHACK_BLUEPRINT, BARNYARD_BLUEPRINT, COOP_BLUEPRINT, GARDEN_BLUEPRINT, FIELD_BLUEPRINT, GREENHOUSE_BLUEPRINT, ORCHARD_BLUEPRINT, LOG_HOUSE_BLUEPRINT, FARMHOUSE_BLUEPRINT, TRAILER_BLUEPRINT, BARN_BLUEPRINT, COTTAGE_BLUEPRINT, GUEST_HOUSE_BLUEPRINT, MOMS_HOUSE_BLUEPRINT, METAL_GARAGE_BLUEPRINT, GARAGE_SOLAR_BLUEPRINT, ...UTILITY_BLUEPRINTS, GREENHOUSE_HEATED_BLUEPRINT, ORCHARD_GROVE_BLUEPRINT, SOLAR_FARM_BLUEPRINT, BATTERY_BANK_BLUEPRINT, POND_BLUEPRINT, RESERVOIR_BLUEPRINT, SHEEP_BARN_BLUEPRINT, EQUIPMENT_YARD_BLUEPRINT, ...BUNKER_BLUEPRINTS, ...TOWER_BLUEPRINTS, GATE_GARAGE_BLUEPRINT, MOTOR_COURT_BLUEPRINT].map(b => [b.kind, b]));
+  [CABIN_BLUEPRINT, OUTHOUSE_BLUEPRINT, WORKSHOP_BLUEPRINT, ROOT_CELLAR_BLUEPRINT, WOOD_OVEN_BLUEPRINT, APIARY_BLUEPRINT, SUGAR_SHACK_BLUEPRINT, BARNYARD_BLUEPRINT, COOP_BLUEPRINT, GARDEN_BLUEPRINT, FIELD_BLUEPRINT, GREENHOUSE_BLUEPRINT, ORCHARD_BLUEPRINT, LOG_HOUSE_BLUEPRINT, FARMHOUSE_BLUEPRINT, TRAILER_BLUEPRINT, BARN_BLUEPRINT, COTTAGE_BLUEPRINT, GUEST_HOUSE_BLUEPRINT, MOMS_HOUSE_BLUEPRINT, LODGE_BLUEPRINT, LODGE_SOLAR_BLUEPRINT, STONE_HOUSE_BLUEPRINT, TIMBER_FRAME_BLUEPRINT, CONTAINER_HOUSE_BLUEPRINT, ADOBE_HOUSE_BLUEPRINT, METAL_GARAGE_BLUEPRINT, GARAGE_SOLAR_BLUEPRINT, ...UTILITY_BLUEPRINTS, GREENHOUSE_HEATED_BLUEPRINT, ORCHARD_GROVE_BLUEPRINT, SOLAR_FARM_BLUEPRINT, BATTERY_BANK_BLUEPRINT, POND_BLUEPRINT, RESERVOIR_BLUEPRINT, SHEEP_BARN_BLUEPRINT, EQUIPMENT_YARD_BLUEPRINT, ...BUNKER_BLUEPRINTS, ...TOWER_BLUEPRINTS, GATE_GARAGE_BLUEPRINT, MOTOR_COURT_BLUEPRINT].map(b => [b.kind, b]));
 
 /** Total bill of materials for a blueprint. */
 export function totalBill(bp: Blueprint): Partial<Stock> {

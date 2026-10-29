@@ -24,6 +24,7 @@
  *               oven and flour or a mill. Cooking skill is the gardener's. `moraleTerm` is added to the
  *               morale target in needs.ts: about 0 for rice and beans, up to +2.4 for a well-stocked kitchen.
  */
+import { cellarHouses } from './housingStyles';
 import { calendarOf, type GameState } from './state';
 import { isHome } from './blueprints';
 import { isFinished } from './construction';
@@ -88,7 +89,7 @@ export const kitchenPowered = (s: GameState): boolean => { const h = homeOf(s); 
 export const hasCanner = (s: GameState): boolean => stock(s, 'canner') >= 1;
 export const hasOven = (s: GameState): boolean => fin(s, 'wood_oven').length > 0;
 export const hasMill = (s: GameState): boolean => stock(s, 'grain_mill') >= 1;
-export const freezerOn = (s: GameState): boolean => fin(s, 'root_cellar').some(st => s.utilities.lit.includes(st.id));
+export const freezerOn = (s: GameState): boolean => [...fin(s, 'root_cellar'), ...cellarHouses(s)].some(st => s.utilities.lit.includes(st.id));
 export const isOff = (s: GameState, m: Method): boolean => kitchenOf(s).off.includes(m);
 export function toggleMethod(s: GameState, m: Method): void {
   const k = kitchenOf(s);
@@ -194,7 +195,7 @@ export function putByDay(s: GameState, need: number, ratio: number): void {
 export type MeatWhere = 'freezer' | 'smoked' | 'cured' | 'canned' | 'fresh';
 
 /** It is cold enough (or the cellar cool enough) to cure meat safely. */
-export const coolEnoughToCure = (s: GameState): boolean => { const { doy } = calendarOf(s.clock); return doy < 80 || doy > 285 || fin(s, 'root_cellar', 'bunker_stores').length > 0; };
+export const coolEnoughToCure = (s: GameState): boolean => { const { doy } = calendarOf(s.clock); return doy < 80 || doy > 285 || (fin(s, 'root_cellar', 'bunker_stores').length > 0 || cellarHouses(s).length > 0); };
 
 /**
  * Put up `kcal` of meat (any animal, fish too). Returns the calories kept and where they went. The pantry

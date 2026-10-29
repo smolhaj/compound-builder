@@ -18,6 +18,7 @@
  *  Butchering the November butchering is automatic (livestock.ts); `butcher` kills any surplus on a cold day by hand: a kitchen
  *             job (2.5 person-hours a head) that the meat methods then put up (sim/kitchen.ts), lard from pigs.
  */
+import { hasBasement } from './housingStyles';
 import { calendarOf, type GameState } from './state';
 
 import { mulberry32 } from './rng';
@@ -209,7 +210,7 @@ export function butcherProblem(s: GameState, a: Animal, n: number): string | nul
   if (a === 'cow') return 'a milk cow is not for the butcher';
   const cold = regionFor(s.site).cold, { doy } = calendarOf(s.clock);
   const warm = (doy > 120 && doy < 280) && cold < 1.3;
-  if (warm && !(stock(s, 'smoker') >= 1) && !s.structures.some(st => st.kind === 'root_cellar' && isFinished(st)) && a !== 'rabbit') return 'too warm to hang the meat without a cellar or a smoker';
+  if (warm && !(stock(s, 'smoker') >= 1) && !s.structures.some(st => (st.kind === 'root_cellar' || hasBasement(st.kind)) && isFinished(st)) && a !== 'rabbit') return 'too warm to hang the meat without a cellar or a smoker';
   return null;
 }
 /** Kill and dress `n` head: the meat goes to the freezer, smoker, salt barrel or canner (sim/kitchen.ts), the pig's fat to lard. */

@@ -56,6 +56,13 @@ interface Spec { bunks?: number; couches?: number; floorM2?: number; /** Base sl
 const HOMES: Record<string, Spec> = {
   timber_cabin: { couches: 1, floorM2: 8 },
   log_house: { couches: 2, floorM2: 18 },
+  // the housing styles: a lodge's great room, basement rec room and loft take a lot of sleeping bags
+  lodge: { couches: 4, floorM2: 60 },
+  lodge_solar: { couches: 4, floorM2: 60 },
+  stone_house: { couches: 2, floorM2: 22 },
+  timber_frame: { couches: 2, floorM2: 24 },
+  container_house: { couches: 1, floorM2: 8 },
+  adobe_house: { couches: 2, floorM2: 14 },
   farmhouse: { couches: 2, floorM2: 16 },
   trailer: { couches: 1, floorM2: 8 },
   cottage: { couches: 1, floorM2: 5 },
@@ -396,7 +403,7 @@ export interface Fix {
   text: string;
 }
 
-const HOME_NAME: Record<string, string> = { guest_house: 'a guest house', cottage: 'a cottage', moms_house: 'Mom\u2019s house', timber_cabin: 'a timber cabin', log_house: 'a log house' };
+const HOME_NAME: Record<string, string> = { guest_house: 'a guest house', cottage: 'a cottage', moms_house: 'Mom\u2019s house', timber_cabin: 'a timber cabin', log_house: 'a log house', lodge: 'a lodge', lodge_solar: 'a lodge', stone_house: 'a stone house', timber_frame: 'a timber-frame house', container_house: 'a container house', adobe_house: 'an adobe house' };
 /** Candidate homes to build, cheapest per bed first. (Kit pieces in the Build list.) */
 const BUILDABLE_HOMES = ['guest_house', 'cottage', 'moms_house', 'timber_cabin', 'log_house'] as const;
 

@@ -8,6 +8,7 @@ import { mudFactor } from './terrainFx';
 import { drillExtra, siteProblem } from './site';
 import { gradedBlueprint, stampGrade } from './slope';
 import { permitHold } from './paperwork';
+import { keepsWalls, stampStyle, styledBlueprint } from './housingStyles';
 import { BLUEPRINTS, totalBill } from './blueprints';
 import { hasAll, shortfall, waitingFor, type Stock } from './materials';
 import { log } from './economy';
@@ -16,7 +17,7 @@ import type { GameState, Structure } from './state';
 
 export function blueprintOf(st: Structure) {
   const bp = BLUEPRINTS[st.kind];
-  return st.grade ? gradedBlueprint(bp, st.grade) : bp;
+  return st.grade ? gradedBlueprint(styledBlueprint(bp, st.mat), st.grade) : styledBlueprint(bp, st.mat);
 }
 
 export function isFinished(st: Structure): boolean {
@@ -45,6 +46,7 @@ export function planProblem(s: GameState, kind: string): string | null {
 export function planStructure(s: GameState, kind: string, x: number, z: number, rot: number): Structure {
   const st: Structure = { id: `s${s.nextId++}`, kind, x, z, rot, stage: 0, done: 0, supplied: false, finishedAt: null };
   stampGrade(s, st);
+  stampStyle(s, st);
   s.structures.push(st);
   log(s, `Staked out a ${kind.replace('_', ' ')}.`);
   return st;
@@ -165,6 +167,11 @@ export function burnStructure(s: GameState, st: Structure): boolean {
     // (a hand well keeps its roof stage to redo, and gets the hand pump back from knockBack)
     if (st.kind === 'well_drilled') { s.stock.hardware = hw; s.stock.roofing = Math.max(0, s.stock.roofing - (stages[3]?.materials.roofing ?? 0)); }
     return true;
+  }
+  // stone, earth and steel walls come through a fire: the roof and everything inside burn, and it has to be re-roofed and refinished
+  if (keepsWalls(st.kind)) {
+    const roof = stages.findIndex(x => x.id === 'roof');
+    if (roof >= 0 && st.stage > roof) { st.stage = roof; st.done = 0; st.supplied = false; st.finishedAt = null; st.roofLost = true; return true; }
   }
   st.stage = 0; st.done = 0; st.supplied = false; st.finishedAt = null;
   return true;

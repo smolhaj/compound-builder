@@ -43,6 +43,11 @@ export interface KitPieceDef {
   shelters?: number;
   /** Floodlights on a mast: a hard white lamp over the approach at night, with power (towers.ts tier 4+). */
   floodlit?: boolean;
+  /**
+   * A walkout basement (the lodge): the ground must fall toward the back (local −z) by at least this much (rise over run between the
+   * front and back halves of the footprint), so the basement's back wall stands out of the hill and its front is cut into it.
+   */
+  walkoutFall?: number;
 }
 
 export const TIMBER_CABIN: KitPieceDef = {
@@ -213,6 +218,55 @@ export const LOG_HOUSE: KitPieceDef = {
   maxSlope: 0.3, floorY: 0.1, porch: 0.45, sleeps: 6, light: [0, 0.34, 0],
 };
 
+/**
+ * The lodge (sim/housingStyles.ts): 12 × 15 m log lodge on a stone-faced walkout basement, a wraparound deck all round (1.5 m, inside the
+ * footprint) and a glass gable. 15 × 18 m with the deck; floorY is the basement's height (3 m): the pad is the basement floor. Slope only.
+ */
+export const LODGE: KitPieceDef = {
+  id: 'lodge', name: 'Lodge', category: 'home',
+  blurb: 'A 12 × 15 m log lodge on a stone-faced walkout basement: two storeys under a green standing-seam roof, a wraparound deck on stone piers, a glass gable and a stone chimney. The basement (cellar, storage, mechanical room) is cut into the slope; its walkout side faces downhill.',
+  cellsX: 5, cellsZ: 6, frontCells: 0,
+  parts: { foundation: 'fieldstone', walls: 'log_wall', roof: 'metal_roof_green' },
+  maxSlope: 0.45, floorY: 0.5, porch: 0, sleeps: 10, light: [0, 0.55, 0], walkoutFall: 0.07,
+};
+/** The lodge with 25 × 400 W panels on its south roof slope (≈ 10 kW). */
+export const LODGE_SOLAR: KitPieceDef = {
+  ...LODGE, id: 'lodge_solar', name: 'Lodge with a solar roof',
+  blurb: 'The same lodge with 25 × 400 W panels on its south roof slope: about 10 kW, 36 kWh on a summer day. Wire it to a battery shed beside it.',
+};
+/** The stone house: 9 × 12 m, two storeys of 45 cm fieldstone walls. */
+export const STONE_HOUSE: KitPieceDef = {
+  id: 'stone_house', name: 'Stone house', category: 'home',
+  blurb: 'A two-storey 9 × 12 m house of 45 cm fieldstone walls under a slate-grey metal roof: warm in winter, cool in summer, slow to burn and hard to shoot through. Stone is slow to lay.',
+  cellsX: 3, cellsZ: 4, frontCells: 1,
+  parts: { foundation: 'fieldstone', walls: 'fieldstone', roof: 'metal_roof_grey' },
+  maxSlope: 0.3, floorY: 0.12, porch: 0.3, sleeps: 6, light: [0, 0.4, 0],
+};
+/** The timber-frame house: 9 × 12 m, two storeys of pegged posts and beams with insulated panel walls. */
+export const TIMBER_FRAME_HOUSE: KitPieceDef = {
+  id: 'timber_frame', name: 'Timber-frame house', category: 'home',
+  blurb: 'A two-storey 9 × 12 m post-and-beam house: pegged timbers showing outside, plaster-faced insulated panels between them, a glass gable. The best-insulated wall in the kit.',
+  cellsX: 3, cellsZ: 4, frontCells: 1,
+  parts: { foundation: 'concrete', walls: 'plaster', roof: 'metal_roof_green' },
+  maxSlope: 0.3, floorY: 0.1, porch: 0.3, sleeps: 6, light: [0, 0.4, 0],
+};
+/** The container house: three 40 ft containers, two below and one across the top. */
+export const CONTAINER_HOUSE: KitPieceDef = {
+  id: 'container_house', name: 'Container house', category: 'home',
+  blurb: 'Three 40 ft shipping containers: two side by side below, one across the top, cut for big glass, spray-foamed, with a deck and stair. The quickest house in the kit; steel is tough and cold.',
+  cellsX: 2, cellsZ: 5, frontCells: 1,
+  parts: { foundation: 'concrete', walls: 'container_rust', roof: 'metal_roof_grey' },
+  maxSlope: 0.25, floorY: 0.1, porch: 0.3, sleeps: 4, light: [0, 0.3, 0],
+};
+/** The adobe house: 9 × 12 m, one storey, 45 cm rammed earth with vigas and a covered portal. */
+export const ADOBE_HOUSE: KitPieceDef = {
+  id: 'adobe_house', name: 'Adobe house', category: 'home',
+  blurb: 'A one-storey 9 × 12 m rammed-earth house, 45 cm walls, log vigas, deep-set windows, a covered portal and a corner fireplace. Dry country only; the walls are rammed from the earth you dig for the footings.',
+  cellsX: 3, cellsZ: 4, frontCells: 1,
+  parts: { foundation: 'concrete', walls: 'adobe', roof: 'metal_roof_grey' },
+  maxSlope: 0.2, floorY: 0.08, porch: 0.34, sleeps: 4, light: [0, 0.3, 0],
+};
+
 /** What comes with improved land (sim/improvements.ts); the barn is also in the build menu. */
 export const FARMHOUSE: KitPieceDef = {
   id: 'farmhouse', name: 'Old farmhouse', category: 'home',
@@ -348,9 +402,9 @@ export const BUNKER_KIT: KitPieceDef[] = [
 /** Underground menu order. */
 export const BUNKER_ORDER: readonly string[] = BUNKER_KIT.map(d => d.id);
 
-export const KIT: Record<string, KitPieceDef> = Object.fromEntries([APIARY, SUGAR_SHACK, BARNYARD, WOOD_OVEN, GATE_GARAGE_KIT, MOTOR_COURT_KIT, TIMBER_CABIN, LOG_HOUSE, FARMHOUSE, TRAILER, BARN, COTTAGE, GUEST_HOUSE, MOMS_HOUSE, METAL_GARAGE, GARAGE_SOLAR, OUTHOUSE, WORKSHOP, ROOT_CELLAR, CHICKEN_COOP, GARDEN, FIELD, GREENHOUSE, GREENHOUSE_HEATED, ORCHARD, ORCHARD_GROVE, POND, RESERVOIR, SHEEP_BARN, EQUIPMENT_YARD, ...UTILITY_KIT, ...BUNKER_KIT, ...TOWER_KIT].map(d => [d.id, d]));
+export const KIT: Record<string, KitPieceDef> = Object.fromEntries([LODGE, LODGE_SOLAR, STONE_HOUSE, TIMBER_FRAME_HOUSE, CONTAINER_HOUSE, ADOBE_HOUSE, APIARY, SUGAR_SHACK, BARNYARD, WOOD_OVEN, GATE_GARAGE_KIT, MOTOR_COURT_KIT, TIMBER_CABIN, LOG_HOUSE, FARMHOUSE, TRAILER, BARN, COTTAGE, GUEST_HOUSE, MOMS_HOUSE, METAL_GARAGE, GARAGE_SOLAR, OUTHOUSE, WORKSHOP, ROOT_CELLAR, CHICKEN_COOP, GARDEN, FIELD, GREENHOUSE, GREENHOUSE_HEATED, ORCHARD, ORCHARD_GROVE, POND, RESERVOIR, SHEEP_BARN, EQUIPMENT_YARD, ...UTILITY_KIT, ...BUNKER_KIT, ...TOWER_KIT].map(d => [d.id, d]));
 /** Build-menu order. */
-export const KIT_ORDER: readonly string[] = ['timber_cabin', 'log_house', 'cottage', 'guest_house', 'moms_house', 'outhouse', 'garden', 'greenhouse', 'greenhouse_heated', 'orchard', 'orchard_grove', 'field', 'chicken_coop', 'sheep_barn', 'pond', 'root_cellar', 'wood_oven', 'apiary', 'sugar_shack', 'barnyard', 'workshop', 'metal_garage', 'barn', 'equipment_yard'];
+export const KIT_ORDER: readonly string[] = ['timber_cabin', 'log_house', 'lodge', 'lodge_solar', 'stone_house', 'timber_frame', 'container_house', 'adobe_house', 'cottage', 'guest_house', 'moms_house', 'outhouse', 'garden', 'greenhouse', 'greenhouse_heated', 'orchard', 'orchard_grove', 'field', 'chicken_coop', 'sheep_barn', 'pond', 'root_cellar', 'wood_oven', 'apiary', 'sugar_shack', 'barnyard', 'workshop', 'metal_garage', 'barn', 'equipment_yard'];
 /** Water & power menu order. */
 export const UTILITY_ORDER: readonly string[] = ['well_hand', 'well_drilled', 'cistern', 'water_tower', 'filtration_shed', 'septic', 'solar_array', 'solar_farm', 'garage_solar', 'battery_shed', 'battery_bank', 'generator_shed', 'reservoir'];
 
@@ -415,7 +469,7 @@ export interface SiteQuery {
   blocked?(x: number, z: number): boolean;
 }
 
-export type PlaceProblem = 'off_parcel' | 'water' | 'too_steep' | 'overlaps' | 'not_connected' | 'thin_cover' | 'too_deep' | 'needs_house';
+export type PlaceProblem = 'off_parcel' | 'water' | 'too_steep' | 'overlaps' | 'not_connected' | 'thin_cover' | 'too_deep' | 'needs_house' | 'needs_slope';
 
 const levelOf = (d: KitPieceDef) => d.level ?? 'surface';
 /** Do pieces at these levels compete for the same ground? (Bunker rooms go under the yard and houses.) */
@@ -445,6 +499,17 @@ export function placementProblem(def: KitPieceDef, x: number, z: number, rot: nu
   // (a floor hatch stands on its house's graded pad, whatever the natural ground does)
   const isFloorHatch = def.id === 'bunker_floorhatch';
   if (grade > def.maxSlope && !isFloorHatch) return 'too_steep';
+  // a walkout basement stands out of the hill: the ground must fall toward the back of the footprint (local -z)
+  if (def.walkoutFall) {
+    const q = ((rot % 4) + 4) % 4, cx = (r.x0 + r.x1) / 2, cz = (r.z0 + r.z1) / 2;
+    let front = 0, back = 0, nf = 0, nb = 0;
+    for (let i = 0; i <= N; i++) for (let j = 0; j <= N; j++) {
+      const [, lz] = rotQ(r.x0 + (r.x1 - r.x0) * i / N - cx, r.z0 + (r.z1 - r.z0) * j / N - cz, -q);
+      if (lz > 1e-6) { front += hs[i][j]; nf++; } else if (lz < -1e-6) { back += hs[i][j]; nb++; }
+    }
+    const run = (def.cellsZ * CELL) / 2;                  // front and back halves' centers stand half a depth apart
+    if (nf && nb && (front / nf - back / nb) / run < def.walkoutFall) return 'needs_slope';
+  }
   // a floor hatch is built inside a house: the house it stands in is not in its way
   const host = def.id === 'bunker_floorhatch' ? floorHatchHost(x, z, placed) : null;
   if (def.id === 'bunker_floorhatch' && !host) return 'needs_house';
@@ -467,6 +532,7 @@ export const PROBLEM_TEXT: Record<PlaceProblem, string> = {
   thin_cover: 'Too little earth over it — the ground is too low here',
   too_deep: 'Too deep below the ground here to dig',
   needs_house: 'A floor hatch goes inside a house, well in from the walls',
+  needs_slope: 'The lodge needs a slope that falls away behind it: turn it (R) so the walkout side, the back with the big deck, faces downhill',
 };
 
 /** The enclosed building a floor hatch at (x, z) sits in: a home or workshop whose body holds the hatch's whole cell, with a wall's thickness to spare. */
@@ -476,6 +542,8 @@ export function floorHatchHost(x: number, z: number, placed: readonly Placed[]):
     const d = KIT[p.kind];
     if (!d || (d.category !== 'home' && d.category !== 'work') || d.floorY < 0.02) continue;
     const r = footprint(d, p.x, p.z, p.rot, false);
+    // (a lodge's wraparound deck is part of its footprint, but the hatch goes inside the body)
+    if (d.walkoutFall) { r.x0 += 0.25; r.x1 -= 0.25; r.z0 += 0.25; r.z1 -= 0.25; }
     if (x - half >= r.x0 && x + half <= r.x1 && z - half >= r.z0 && z + half <= r.z1) return p;
   }
   return null;
