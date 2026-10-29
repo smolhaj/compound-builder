@@ -41,6 +41,8 @@ import { wearTools, workSpeed } from './tools';
 import { absentIdx, jobDayOf } from './weekender';
 import { bestLevel, levelFor, mentorSkill, practice, skillFactor, teach, type Practiced } from './skills';
 import { ESSENTIAL, mindFit, mindStaysIn, resting } from './mind';
+import { classSlots, COURSES, courseHour, DRILL_HOUR, drillable, drillDay, drillHour, enrollmentOf, teachHour } from './courses';
+import { log } from './economy';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Duties
@@ -49,7 +51,7 @@ import { ESSENTIAL, mindFit, mindStaysIn, resting } from './mind';
 export type Duty =
   | 'sleep' | 'meal' | 'leisure' | 'school'
   | 'build' | 'garden' | 'fields' | 'livestock' | 'pets' | 'wood' | 'water' | 'kitchen' | 'cleaning' | 'laundry' | 'repairs'
-  | 'hunt' | 'medic' | 'teach' | 'mentor' | 'radio' | 'watch';
+  | 'hunt' | 'medic' | 'teach' | 'mentor' | 'radio' | 'watch' | 'study' | 'drill';
 
 export interface DutyDef {
   name: string;
@@ -87,11 +89,15 @@ export const DUTY: Record<Duty, DutyDef> = {
   mentor: { name: 'Mentoring', short: 'Mn', color: '#5f8f9f', work: true, tire: 2, kid: true, hint: 'An elder or a skilled adult shows a youth the trade they know best, side by side; the youth learns faster than alone and the elder is needed.' },
   radio: { name: 'Radio', short: 'Ra', color: '#7a6aa8', work: true, tire: 1.5, kid: false, hint: 'Listening on the radio for news and the net.' },
   watch: { name: 'Watch', short: '!', color: '#c8a030', work: true, tire: 4, kid: false, hint: 'On watch: the tower, the wall (or its walkway, if there is one), the gate. Helps see trouble coming.' },
+  study: { name: 'Class', short: 'Cl', color: '#8a7ab8', work: true, tire: 1.5, kid: true, hint: 'An evening class (Family tab → Classes and drills): a student with a teacher, a book set or an online course. The teacher sits in on the same hours.' },
+  drill: { name: 'Drill', short: 'Dr', color: '#a05a4a', work: true, tire: 3, kid: false, hint: 'Firearms drill at the range: spends ammunition, steadies the aim and the response at the alarm (Family tab → Classes and drills).' },
 };
 export const DUTIES = Object.keys(DUTY) as Duty[];
 
 /** Duties that are an adult's job (a teen 15+ can stand watch). */
 export function canDo(p: Person, d: Duty): boolean {
+  if (d === 'study') return p.age >= 10;
+  if (d === 'drill') return !p.kid || p.age >= 15;
   if (!p.kid) return d !== 'school';
   if (p.age < 5) return d === 'sleep' || d === 'meal' || d === 'leisure';
   if (d === 'watch') return p.age >= 15;
@@ -471,7 +477,7 @@ export function autoPlan(s: GameState, ctx: { build: boolean; fell: boolean }, r
   // ── the player's standing assignments first (watch is dealt with below) ──
   for (const { p, i } of free) {
     const f = focus[p.id];
-    if (!f || f === 'watch' || fitness(s, i, f) <= 0) continue;
+    if (!f || f === 'watch' || f === 'study' || f === 'drill' || fitness(s, i, f) <= 0) continue;
     if (DUTY_CHORES[f] && !dutyApplies(s, f, rates)) continue;   // nothing to do of it just now: the planner uses them elsewhere
     const n = give(p, i, f, 99);
     if (n) notes[p.id] = `Assigned: ${DUTY[f].name.toLowerCase()}`;
@@ -549,6 +555,29 @@ export function autoPlan(s: GameState, ctx: { build: boolean; fell: boolean }, r
         if (hours.length) notes[mentor.p.id] = `${notes[mentor.p.id] ? notes[mentor.p.id] + '; ' : ''}Mentoring ${pupils.map(y => y.p.first).join(', ')} at 15:00`;
       }
     }
+  }
+  // ── classes (sim/courses.ts): two evening hours for each student, the teacher on the same hours; the idle afternoon hours if the evening is taken ──
+  for (const { e, teacher } of classSlots(s)) {
+    const srow = rows.get(e.pid), trow = teacher ? rows.get(teacher) : undefined;
+    if (!srow || (teacher && !trow)) continue;
+    const soft = (r: Duty[], h: number) => r[h] === 'leisure' || r[h] === 'radio';
+    const hrs = [19, 20, 21, 17, 16, 15].filter(h => soft(srow, h) && (!trow || soft(trow, h))).slice(0, 2).sort((a, b) => a - b);
+    for (const h of hrs) { srow[h] = 'study'; if (trow) trow[h] = 'study'; }
+    if (hrs.length) {
+      notes[e.pid] = `${notes[e.pid] ? notes[e.pid] + '; ' : ''}Class: ${COURSES[e.course].name.toLowerCase()} at ${hrs[0]}:00`;
+      if (teacher) notes[teacher] = `${notes[teacher] ? notes[teacher] + '; ' : ''}Teaching ${s.people.find(x => x.id === e.pid)?.first} at ${hrs[0]}:00`;
+    }
+  }
+  // ── the drill (sim/courses.ts): one hour at three on the days the household set, for everyone who can shoot and is well ──
+  if (drillDay(s, day)) {
+    let n = 0;
+    for (const { p, i } of free) {
+      const row = rows.get(p.id)!;
+      if (!drillable(s, p) || fitness(s, i, 'drill') <= 0 || ['sleep', 'watch', 'school', 'meal', 'study', 'medic', 'livestock', 'pets', 'kitchen', 'mentor'].includes(row[DRILL_HOUR])) continue;
+      row[DRILL_HOUR] = 'drill'; n++;
+      notes[p.id] = `${notes[p.id] ? notes[p.id] + '; ' : ''}Drill at ${DRILL_HOUR}:00`;
+    }
+    void n;
   }
   const hurt = s.personState.some(ps => ps.needs.died == null && ps.needs.hurt.length > 0);
   if (hurt) {
@@ -657,6 +686,7 @@ export function setFocus(s: GameState, personId: string, duty: Duty | null): str
   const plan = dailyOf(s).plan;
   plan.focus ??= {};
   if (duty === null) delete plan.focus[personId];
+  else if (duty === 'study' || duty === 'drill') return 'Classes and drills are set up on the Family tab';
   else if (!canDo(s.people[i], duty) || DUTY[duty].work === false) return `${s.people[i].first} can't do that`;
   else plan.focus[personId] = duty;
   plan.day = -1;   // the planner runs again at once
@@ -684,7 +714,7 @@ export function dutyAt(s: GameState, p: Person, hour: number): Duty {
 /** Task kinds the renderer reads, per duty (build is decided by the engine: build or forestry). */
 export const DUTY_TASK: Record<Exclude<Duty, 'build'>, TaskKind> = {
   sleep: 'sleep', meal: 'meal', leisure: 'leisure', school: 'school', garden: 'garden', fields: 'fields', livestock: 'livestock', pets: 'pets', wood: 'wood',
-  water: 'water', kitchen: 'kitchen', cleaning: 'cleaning', laundry: 'laundry', repairs: 'repairs', hunt: 'hunt', medic: 'medic', teach: 'teach', mentor: 'teach', radio: 'radio', watch: 'watch',
+  water: 'water', kitchen: 'kitchen', cleaning: 'cleaning', laundry: 'laundry', repairs: 'repairs', hunt: 'hunt', medic: 'medic', teach: 'teach', mentor: 'teach', radio: 'radio', watch: 'watch', study: 'study', drill: 'drill',
 };
 
 /** Restedness multiplier on work: full to fatigue 50, half at 100. */
@@ -844,6 +874,15 @@ export function dutyWork(s: GameState, p: Person, ps: PersonState, duty: Duty, p
   if (sk && duty !== 'build') practice(s, p.id, sk, personHours);
   if (duty === 'hunt' && s.armory.guns.length) practice(s, p.id, 'shooting', personHours * 0.15);
   if (duty === 'mentor') { mentorHour(s, p, hour, personHours); return; }
+  // an evening class (sim/courses.ts): the student studies, the teacher on the same hours teaches; a drill spends ammunition at the range
+  if (duty === 'study') {
+    if (enrollmentOf(s, p.id)) {
+      const line = courseHour(s, p, personHours, tid => { const j = s.people.findIndex(x => x.id === tid); return j >= 0 && ableAt(s, j) && dutyAt(s, s.people[j], hour) === 'study'; });
+      if (line) log(s, line);
+    } else teachHour(s, p, personHours);
+    return;
+  }
+  if (duty === 'drill') { drillHour(s, p, personHours); return; }
   if (duty === 'kitchen' || duty === 'hunt' || duty === 'teach') {
     const t = tallyOf(s).today;
     // skilled hunters, cooks and teachers count for more

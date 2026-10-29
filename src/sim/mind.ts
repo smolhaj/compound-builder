@@ -40,6 +40,7 @@
  * symptoms. Acute grief typically eases over 6 to 12 months. Children's
  * distress tracks their caregivers'. Seasonal low mood is common.
  */
+import { beltMorale } from './weekender';
 import type { Battle } from './battleTypes';
 import { backgroundOf, type Person } from './family';
 import { mulberry32 } from './rng';
@@ -52,6 +53,8 @@ import { bestLevel, levelFor, PRACTICED } from './skills';
 import { isFinished } from './construction';
 import { isHome } from './blueprints';
 import { tension } from './disaster';
+import { eveningHelps, sharedPoints, wearKits, type KitId } from './evenings';
+import { drilledOf } from './courses';
 
 export type TraumaKind = 'raid' | 'wounded' | 'killed' | 'execution' | 'captivity' | 'witness' | 'disaster';
 export type BreakKind = 'irritable' | 'withdrawn' | 'panic' | 'burnout' | 'reckless';
@@ -284,7 +287,8 @@ export function fightNerves(s: GameState, p: Person): { freeze: number; shelter:
   const ps = s.mind?.psyche[p.id];
   if (!ps) return { freeze: 0, shelter: false };
   const vet = backgroundOf(p) !== null;
-  const freeze = (ps.trauma / 100) * (vet ? 1.5 : 4) + Math.max(0, ps.stress - 40) / 60 * (vet ? 0.4 : 1.2);
+  // a household that drills (sim/courses.ts) freezes less at the alarm: everyone knows where to go and what to do
+  const freeze = ((ps.trauma / 100) * (vet ? 1.5 : 4) + Math.max(0, ps.stress - 40) / 60 * (vet ? 0.4 : 1.2)) * (1 - 0.45 * drilledOf(s, p.id));
   return { freeze, shelter: breaking(s, ps)?.kind === 'panic' };
 }
 /** The roster's view of a person: 1 = fine, 0 = should not be given this duty now. */
@@ -353,7 +357,7 @@ export function griefFor(s: GameState, p: Person): number {
 
 // ── the day's reading ──
 
-export interface Reading { weighs: Array<[string, number]>; helps: Array<[string, number]>; target: number }
+export interface Reading { weighs: Array<[string, number]>; helps: Array<[string, number]>; target: number; /** The evening kits this person used today (they wear). */ used: KitId[] }
 
 /** What weighs on a person today and what lifts it, and where the strain is heading. */
 export function reading(s: GameState, p: Person, sleeping: ReturnType<typeof sleepEffects> = sleepEffects(s)): Reading {
@@ -374,6 +378,7 @@ export function reading(s: GameState, p: Person, sleeping: ReturnType<typeof sle
   w('not sleeping enough', (fat > 80 ? 14 : fat > 60 ? 7 : 0) + Math.min(8, (n.tired ?? 0) * 1.5));
   const wh = row.length ? workHours(row) : 0;
   w('overwork', p.kid ? 0 : wh >= 12 ? 12 : wh >= 10 ? 6 : 0);
+  w('tight months in town', beltMorale(s, p.id) > 0 ? 1.5 : 0);
   const sinceFight = day - M.lastFight;
   w('the last fight', sinceFight < 14 ? 16 * (1 - sinceFight / 14) : 0);
   const threat = dailyOf(s).plan.threat;
@@ -400,14 +405,14 @@ export function reading(s: GameState, p: Person, sleeping: ReturnType<typeof sle
   const faith = faithOf(s, p);
   h('faith', faith ? 3 : 0);
   const soc = dailyOf(s).social, lastGather = Math.max(0, ...Object.values(soc.last).map(x => x ?? 0));
-  h('a gathering lately', lastGather > 0 && s.clock.t - lastGather < 8 ? 4 : 0);
+  h('a gathering lately', lastGather > 0 && s.clock.t - lastGather < 8 ? 4 + sharedPoints(s) : 0);
+  // a service or meeting: people of faith get a lot out of it, the rest of the household a little
+  const lastService = soc.last.service;
+  if (lastService != null && s.clock.t - lastService < 8) h(faith ? 'the service' : 'meeting together', faith ? 5 : 2);
   h('friends nearby', friends >= 2 ? 2 : 0);
-  const free = leisure >= 2;
-  const heads = Math.max(1, living.length);
-  const games = (s.stock.games ?? 0) >= Math.ceil(heads / 4), music = (s.stock.instrument ?? 0) >= 1, books = (s.stock.novels ?? 0) >= 1;
-  h('cards and games', free && games ? (p.kid ? 4 : 3) : 0);
-  h('music', free && music ? 2 : 0);
-  h('something to read', free && books && !(p.kid && p.age < 7) ? (p.kid ? 1 : 2) : 0);
+  // the evenings' goods (sim/evenings.ts): cards, music, something to read, the little ones' toys; they wear with use
+  const ev = eveningHelps(s, p, leisure >= 2);
+  for (const [label, v] of ev.helps) h(label, v);
   // meaning: work in what they are best at; an elder passing a trade on
   const top = PRACTICED.filter(k => k !== 'shooting').map(k => [k, levelFor(s, p, k)] as const).sort((a, b) => b[1] - a[1])[0];
   const meaningful = top && top[1] >= 4 && row.some(d => d !== 'sleep' && d !== 'meal' && d !== 'leisure' && DUTY[d].work);
@@ -425,7 +430,7 @@ export function reading(s: GameState, p: Person, sleeping: ReturnType<typeof sle
   void ps;
   const target = Math.max(0, wsum / res - hsum);
   weighs.sort((a, b) => b[1] - a[1]); helps.sort((a, b) => b[1] - a[1]);
-  return { weighs, helps, target: Math.min(100, target) };
+  return { weighs, helps, target: Math.min(100, target), used: ev.used };
 }
 
 const LINES = {
@@ -468,10 +473,12 @@ export function mindDay(s: GameState): string[] {
   // the day the lights go out
   if (after && !M.hit && s.clock.t - s.disaster.hitAt < 3) { M.hit = true; afterDisaster(s); }
   const sleeping = sleepEffects(s);
+  const kitUse: Partial<Record<KitId, number>> = {};
   for (const p of living) {
     const ps = psyOf(s, p.id), n = needsOf(s, p.id)!, res = resilienceOf(s, p);
     const rd = reading(s, p, sleeping);
     ps.weighs = rd.weighs; ps.helps = rd.helps;
+    for (const k of rd.used) kitUse[k] = (kitUse[k] ?? 0) + 1;
     const help = rd.helps.reduce((a, x) => a + x[1], 0);
     // strain: it sets in fast and eases more slowly, faster with support
     ps.stress = clamp(ps.stress + (rd.target - ps.stress) * (rd.target > ps.stress ? 0.15 : Math.min(0.3, 0.05 + 0.01 * help)));
@@ -550,6 +557,8 @@ export function mindDay(s: GameState): string[] {
     else if ((ps.better ?? -999) < day - 45 && ps.trauma < 18 && ps.since != null && day - ps.since > 30 && r() < 0.2) { line = pickL(r, LINES.better(p.first)); ps.better = day; }
     if (line) { out.push(line); ps.said = day; break; }
   }
+  // the evenings wore the cards, strings, books and toys a little (sim/evenings.ts): a cheap restock on the shelf makes them good again
+  out.push(...wearKits(s, kitUse));
   // the work rate for tomorrow, written where workFactor reads it
   for (const p of living) { const n = needsOf(s, p.id)!; const f = mindWork(s, p.id); if (f < 0.999) n.coping = Math.round(f * 100) / 100; else delete n.coping; }
   return out;

@@ -10,11 +10,11 @@ describe('quantities for people', () => {
     expect(qtyText(0.004)).toBeNull();
   });
   it('writes a bill without raw floats and hides what rounds to zero', () => {
-    expect(billText({ seed: 0.013801845388343725, lumber: 3 })).toBe('0.01 heirloom field seed, 3 lumber');
+    expect(billText({ seed: 0.013801845388343725, lumber: 3 })).toBe('0.01 hybrid field seed, 3 lumber');
     expect(billText({ seed: 0.001 })).toBe('');
   });
   it('says something even when only a sliver is missing', () => {
-    expect(waitingFor({ seed: 0.013801845388343725 })).toBe('Waiting for 0.01 heirloom field seed');
+    expect(waitingFor({ seed: 0.013801845388343725 })).toBe('Waiting for 0.01 hybrid field seed');
     expect(waitingFor({ seed: 0.001 })).toBe('Waiting for a little more material');
   });
 });

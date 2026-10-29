@@ -75,6 +75,8 @@ export interface BuildOpts {
   power?: boolean;
   /** Bunkroom: what the family owns for the long evenings (sim stock: games, an instrument, paperbacks); the room shows them. */
   morale?: { games: boolean; music: boolean; books: boolean };
+  /** The evenings' goods on and by the family's table (sim/evenings.ts `houseGoods`): 1 in good shape, 2 worn thin. Only the main home gets them. */
+  goods?: Partial<Record<'games' | 'guitar' | 'player' | 'books' | 'toys' | 'kidbooks', 1 | 2>>;
 }
 
 /** Collects geometry per layer × material. */

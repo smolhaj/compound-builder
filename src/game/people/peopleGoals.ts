@@ -341,6 +341,17 @@ export function dailyGoal(i: number, kid: boolean, task: TaskKind, hour: number,
       const [tx, tz] = at(CAMP.table.x, CAMP.table.z);
       return goal(x, z, FIG_POSE.REACH, faceTo(x, z, tx, tz), { work: true });
     }
+    case 'study': {
+      // an evening class: round the table at home, else at the camp table with the books
+      if (ctx.home?.seats?.length) return goalFor(i, kid, 'leisure', null, 19, ctx, clock);
+      return goalFor(i, kid, 'school', null, hour, ctx, clock);
+    }
+    case 'drill': {
+      // the firing line: side by side past the yard, rifles up, facing out from the camp
+      // (offsets in the world frame, well past the picnic table and the line)
+      const x = ctx.camp.x - 0.6 + (i % 5) * 0.3, z = ctx.camp.z + 4.5, tx = x, tz = z + 3;
+      return goal(x, z, FIG_POSE.RIFLE, faceTo(x, z, tx, tz), { tool: FIG_TOOL.RIFLE, walkPose: FIG_POSE.RIFLE, work: true });
+    }
     case 'watch': {
       const post = ctx.post?.(i) ?? 'gate';
       // at the console in the bunker's control room: below ground, so not drawn up here (the bunker layer shows them at the screens)

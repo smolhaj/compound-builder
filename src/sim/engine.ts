@@ -44,6 +44,7 @@ import { reviewFacts } from './yearReview';
 import { liveDay, workFactor } from './needs';
 import { gateDay, neighborGossip } from './encounters';
 import { digDay } from './tunnelers';
+import { winterDay } from './adaptive';
 import { mutualAidDay } from './barter';
 import { arrivalCheck, hasCutscene, scheduleArrival } from './siege';
 import { scavengeDay } from './scavenge';
@@ -67,7 +68,7 @@ import { taskFor } from './schedule';
 import { nightWork } from './blackout';
 import { choresDay, choresStep, dailyTick, DUTY, DUTY_TASK, restFactor, tire, dutyWork, choreRate } from './daily';
 import { gatheringStep, gatheringsDay } from './gatherings';
-import { awayRates, caretakerWork, heatShare, presenceStep, weekenderDay, workDay } from './weekender';
+import { awayRates, caretakerWork, heatShare, presenceStep, weekenderDay, workDay, livingShare } from './weekender';
 import type { GameState, Structure } from './state';
 
 /** Household running costs a day in peacetime (rural Mountain West, 2020s): the truck, insurance, phone and property tax for the household, plus groceries a head ($160 for a family of four). Stops once the stores and banks are gone. */
@@ -165,7 +166,7 @@ function subStep(s: GameState): void {
   if (hourly) choresStep(s, 1 / 24, split ? awayRates(s, rates) : rates);
   if (split && hourly && h === 10) caretakerWork(s, rates);
   // (broke: the bills stop at nothing; food stamps and the food bank keep the table going)
-  if (s.disaster.tracks.banks > 0.5 && s.disaster.tracks.stores > 0.5 && s.money > 0) s.money -= livingPerDay(s) * SUBSTEP;
+  if (s.disaster.tracks.banks > 0.5 && s.disaster.tracks.stores > 0.5 && s.money > 0) s.money -= livingPerDay(s) * livingShare(s) * SUBSTEP;
   // investment income comes in while the banks work
   if (s.disaster.tracks.banks > 0.5) s.money += (s.startFunds ? s.startFunds.passive : LIFESTYLE[s.lifestyle].passive) / 365 * SUBSTEP;
   crewStep(s, SUBSTEP);
@@ -203,6 +204,7 @@ function subStep(s: GameState): void {
     for (const line of legalDay(s)) log(s, line);
     prisonersDay(s);   // (it logs its own lines)
     for (const line of weatherDay(s)) log(s, line);
+    for (const line of winterDay(s, dayIndex(s.clock.t))) log(s, line);   // (Hardcore) the first hard winter
     for (const line of digDay(s)) log(s, line);
     for (const line of wildlifeDay(s, s.structures.some(st => st.kind === 'root_cellar' && isFinished(st) && s.utilities.lit.includes(st.id)))) log(s, line);
     // the self-sufficient interior: greenhouse heat, orchard pruning and pests, the pond's fish (sim/greenhouse.ts, sim/pond.ts)

@@ -1,4 +1,5 @@
 import { litTowerIds } from '../sim/towers';
+import { goodsKey, houseGoods } from '../sim/evenings';
 import { blackoutNow } from '../sim/lights';
 import { burnedFarms } from '../sim/neighborLife';
 import { useEffect, useRef } from 'react';
@@ -281,7 +282,7 @@ export function GameCanvas() {
       world.syncForestry(game.forestry);
       world.simTime = game.clock.t;
       world.syncPerimeter(game.perimeter, game.clock.t, { lit: fenceLive(game) && !blackoutNow(game), sensors: (game.stock.ground_sensor ?? 0) > 0 });
-      const svKey = `${game.structures.filter(x => x.stage >= 5).length}|${game.perimeter.filter(r => r.finishedAt !== null).length}|${game.utilities.fittings.filter(f => f.finishedAt !== null).length}`;
+      const svKey = `${game.structures.filter(x => x.stage >= 5).length}|${game.perimeter.filter(r => r.finishedAt !== null).length}|${game.utilities.fittings.filter(f => f.finishedAt !== null).length}|${goodsKey(houseGoods(game))}`;
       if (svKey !== servicesKey) { servicesKey = svKey; world.syncServices(game); }
       sight.update(6);
       const speedK = game.clock.speed === 0 ? 0 : 60 / SECONDS_PER_DAY[game.clock.speed];

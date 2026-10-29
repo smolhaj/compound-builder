@@ -16,6 +16,7 @@ import {
 import type { GameState, OrderLine } from '../sim/state';
 import { buyOffer, canTrade, findContact, heatNow, INTRO_CASH, lawless, offers, peekBm, priceOfOffer, risk } from '../sim/blackMarket';
 import { ToolShop } from './ToolShop';
+import { kitNote } from '../sim/evenings';
 import { SHELF_TABS, SHELVES, shelvesNeeding, type ShelfTab } from '../sim/shelves';
 import { plansNeed, plansNeedLines } from '../sim/guidance';
 import { ammoLimit, buyAmmo, buyGun, CALIBER, CALIBERS, CLASS_USD, GUN, GUN_GROUP, GUNS, groupOf, gunPrices, issue, NFA_STAMP, practice, shopOpen, skillOf, stateBan, takeClass, type Caliber, type GunGroup, type GunModel } from '../sim/armory';
@@ -66,8 +67,8 @@ function Icon({ id, tint }: { id: string; tint?: number }) {
     case 'f:pack': return box('#8ab0c8', 'MEAT');
     case 'canned': return can('#b04a30');
     case 'frozen': return box('#8ab0c8', 'MEAT');
-    case 'seed': return bag('#c8b070', 'SEED');
-    case 'seed_hybrid': return bag('#9a8ac0', 'F1');
+    case 'seed': return bag('#9a8ac0', 'F1');
+    case 'seed_heirloom': return bag('#c8b070', 'HEIR');
     case 'seed_saved': return bag('#b8a070', 'MINE');
     case 'seed_cover': return bag('#7aa860', 'CLOVER');
     case 'canner': return g(<><ellipse cx="22" cy="14" rx="12" ry="4" fill="#b8bcc0" /><path d="M10 14 v18 q12 6 24 0 v-18" fill="#9aa0a6" /><circle cx="22" cy="9" r="3.5" fill="#e8e4dc" stroke="#555" /><path d="M22 9 l2 -2" stroke="#c03030" /></>);
@@ -141,6 +142,27 @@ function Icon({ id, tint }: { id: string; tint?: number }) {
     case 'instrument': return g(<><ellipse cx="17" cy="28" rx="9" ry="8" fill="#b57a3a" stroke="#6a4520" /><circle cx="17" cy="28" r="3" fill="#2a1a10" /><rect x="22" y="9" width="4" height="20" rx="1.5" fill="#6a4520" transform="rotate(35 24 19)" /><rect x="31" y="6" width="6" height="7" rx="1" fill="#3a2a1a" transform="rotate(35 34 9)" /></>);
     case 'novels': return g(<>{[[9, '#6a8aa8'], [15, '#a8644a'], [21, '#7a9a5a'], [27, '#c8a85a']].map(([x, c]) => <rect key={String(x)} x={Number(x)} y={12} width="6" height="24" rx="1" fill={String(c)} stroke="rgba(0,0,0,0.3)" />)}<rect x="33" y="16" width="5" height="20" rx="1" fill="#8a6a9a" transform="rotate(10 35 26)" /></>);
     case 'manuals': return g(<><rect x="9" y="9" width="26" height="28" rx="2" fill="#4a6a4a" stroke="#223" /><rect x="13" y="13" width="18" height="6" fill="#e8dfc0" /><path d="M13 24 h18 M13 28 h14 M13 32 h16" stroke="#e8dfc0" strokeWidth="1.4" /></>);
+    case 'game_pieces': return g(<><rect x="8" y="14" width="14" height="20" rx="2" fill="#f2efe6" stroke="#6a6a60" transform="rotate(-8 15 24)" /><text x="15" y="29" textAnchor="middle" fontSize="12" fill="#b03a3a" transform="rotate(-8 15 24)">K</text><rect x="26" y="22" width="12" height="12" rx="2" fill="#f2efe6" stroke="#6a6a60" /><circle cx="30" cy="26" r="1.3" fill="#222" /><circle cx="34" cy="30" r="1.3" fill="#222" /><circle cx="30" cy="30" r="1.3" fill="#222" /><circle cx="34" cy="26" r="1.3" fill="#222" /></>);
+    case 'guitar_strings': return g(<><rect x="6" y="12" width="32" height="20" rx="2" fill="#e8dfc0" stroke="#8a7a50" />{[16, 20, 24, 28].map(y => <path key={y} d={`M9 ${y} h26`} stroke="#8a6a3a" strokeWidth="1" />)}<circle cx="32" cy="22" r="3" fill="#c8a040" /></>);
+    case 'music_player': return g(<><rect x="9" y="12" width="26" height="22" rx="4" fill="#3a3c40" stroke="#6a6e72" /><circle cx="17" cy="26" r="5" fill="#222" stroke="#8a8e92" /><circle cx="28" cy="26" r="3" fill="#222" stroke="#8a8e92" /><rect x="13" y="15" width="18" height="4" rx="1" fill="#7fd08a" /><path d="M32 12 l4 -6" stroke="#8a8e92" strokeWidth="1.5" /></>);
+    case 'batteries': return g(<>{[11, 19, 27].map(x => <g key={x}><rect x={x} y="12" width="6" height="22" rx="1.5" fill="#c8a040" /><rect x={x} y="12" width="6" height="6" rx="1.5" fill="#2a2a2a" /><rect x={x + 1.5} y="9" width="3" height="3" fill="#aaa" /></g>)}</>);
+    case 'paperbacks_bag': return g(<><path d="M10 14 h24 l2 22 h-28 z" fill="#c8b890" stroke="#7a6a48" />{[[14, '#a8644a'], [20, '#6a8aa8'], [26, '#7a9a5a']].map(([x, c]) => <rect key={String(x)} x={Number(x)} y="8" width="5" height="12" rx="1" fill={String(c)} />)}</>);
+    case 'toys': return g(<><rect x="9" y="24" width="12" height="12" fill="#d8503a" stroke="#7a2a1a" /><rect x="23" y="24" width="12" height="12" fill="#3a78d8" stroke="#1a3a7a" /><rect x="16" y="12" width="12" height="12" fill="#e8c83a" stroke="#8a7210" /><circle cx="22" cy="18" r="2" fill="#7a5a10" /></>);
+    case 'picture_books': return g(<><rect x="8" y="14" width="18" height="22" rx="2" fill="#e8a8b8" stroke="#8a4a5a" /><circle cx="17" cy="23" r="4" fill="#f8e068" /><path d="M12 31 q5 -4 10 0" stroke="#4a8a4a" strokeWidth="2" fill="none" /><rect x="24" y="10" width="14" height="22" rx="2" fill="#8ac8e8" stroke="#3a6a8a" transform="rotate(8 31 21)" /></>);
+    case 'course_firstaid': case 'course_ham': case 'course_engines': case 'course_welding': case 'course_carpentry': case 'course_wiring': case 'course_gardening': case 'course_husbandry': case 'course_canning': {
+      const sym = ({
+        course_firstaid: <><path d="M22 14 v14 M15 21 h14" stroke="#c03030" strokeWidth="4" /></>,
+        course_ham: <><path d="M14 30 l8 -16 l8 16 z" fill="none" stroke="#e8dfc0" strokeWidth="2" /><path d="M22 14 v-4" stroke="#e8dfc0" strokeWidth="2" /></>,
+        course_engines: <><circle cx="22" cy="22" r="6" fill="none" stroke="#e8dfc0" strokeWidth="2.5" />{[0, 60, 120, 180, 240, 300].map(a => <path key={a} d="M22 12 v3" stroke="#e8dfc0" strokeWidth="2.5" transform={`rotate(${a} 22 22)`} />)}</>,
+        course_welding: <><path d="M14 30 l10 -10" stroke="#e8dfc0" strokeWidth="3" /><path d="M24 20 l6 -6 M26 24 l6 -2 M22 17 l2 -7" stroke="#ffb040" strokeWidth="2" /></>,
+        course_carpentry: <><path d="M13 30 l15 -15" stroke="#e8dfc0" strokeWidth="3" /><rect x="24" y="12" width="9" height="6" rx="1" fill="#c8a85a" transform="rotate(45 28 15)" /></>,
+        course_wiring: <><path d="M24 11 l-7 12 h6 l-3 10 l10 -14 h-6 l4 -8 z" fill="#f2d038" stroke="#8a7210" /></>,
+        course_gardening: <><path d="M22 32 v-12" stroke="#7ac060" strokeWidth="2.5" /><path d="M22 24 q-8 -2 -8 -10 q8 0 8 10 M22 20 q8 -2 8 -9 q-8 0 -8 9" fill="#5a9a3a" /></>,
+        course_husbandry: <><ellipse cx="22" cy="24" rx="9" ry="6" fill="#e8dfc0" /><circle cx="31" cy="20" r="3.5" fill="#e8dfc0" /><path d="M16 29 v5 M26 29 v5" stroke="#e8dfc0" strokeWidth="2" /></>,
+        course_canning: <><rect x="14" y="14" width="16" height="20" rx="3" fill="#e8dfc0" fillOpacity="0.3" stroke="#e8dfc0" strokeWidth="1.5" /><rect x="14" y="11" width="16" height="4" fill="#c8a040" /><circle cx="22" cy="25" r="4" fill="#c0392b" /></>,
+      } as Record<string, ReactNode>)[id];
+      return g(<><rect x="6" y="6" width="32" height="32" rx="3" fill="#3a4a6a" stroke="#1a2438" />{sym}<rect x="9" y="33" width="26" height="2" fill="#e8dfc0" opacity="0.6" /></>);
+    }
     default: return box('#555');
   }
 }
@@ -195,6 +217,7 @@ export function ShopWindow() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}><b>{MATERIALS[m].name}</b><span style={{ color: C.gold }}>{usd((MATERIALS[m].price ?? 0) * k)}</span></div>
                     <div style={{ fontSize: 11.5, color: C.dim, lineHeight: 1.3, margin: '2px 0 6px' }}>{MATERIALS[m].unit}</div>
+                    {(() => { const kn = kitNote(game, m); return kn ? <div style={{ fontSize: 11.5, margin: '-2px 0 5px', color: kn.urgent ? '#e0b050' : C.good }}>{kn.text}</div> : null; })()}
                     {(need[m] ?? 0) > 0 && <div style={{ fontSize: 11.5, margin: '-2px 0 5px' }}><span style={{ color: '#1c1d18', background: C.gold, borderRadius: 8, padding: '0 6px', fontWeight: 600 }}>needed now</span> <span style={{ color: C.gold }}>plans lack {need[m]}</span> <button style={{ ...btn(), padding: '0 6px', fontSize: 11 }} onClick={() => setCart(c => ({ ...c, [m]: Math.max(c[m] ?? 0, need[m]!) }))}>add {need[m]}</button></div>}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <button style={btn()} onClick={() => add(m, -1)}>−</button>

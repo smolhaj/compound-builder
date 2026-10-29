@@ -7,7 +7,7 @@ import { useState, type ReactNode } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { calendarOf, type GameState } from '../sim/state';
 import { calendar, dateText, foodPlan, MONTH_NAMES, methodLines, monthOf, outlook, spoilageRisks, stores, thisSeason, type CalGroup } from '../sim/farmPlan';
-import { CROPS, fieldRows, gardensOf, plotFor, pinField, seedOnHand, seedsOf, seedTarget, setSeedFirst, setSuccession, sowWindow, type CropId, type SeedLine } from '../sim/crops';
+import { CROPS, fieldRows, gardensOf, plotFor, pinField, seedOnHand, seedsOf, seedTarget, seedWarning, setSeedFirst, setSuccession, sowWindow, type CropId, type StockLine } from '../sim/crops';
 import { dishLines, hasMill, hasOven, kitchenOf, toggleMethod } from '../sim/kitchen';
 import { cellarCapacity, cellarKcal, cellarTempC, overflow, pantryLoad, pantryRoom } from '../sim/storage';
 import { foodUnits } from '../sim/pantry';
@@ -96,9 +96,10 @@ function FieldsView({ game }: { game: GameState }) {
   const g = useGameStore();
   const rows = fieldRows(game), gardens = gardensOf(game), have = seedOnHand(game), sd = seedsOf(game);
   const [w0, w1] = sowWindow(game);
-  const lines: Array<[SeedLine, string, string]> = [['saved', 'Saved', 'Kept back from your own harvest'], ['heirloom', 'Heirloom', 'Open-pollinated: the seed you save comes true'], ['hybrid', 'Hybrid', 'About 12 % more crop the year it is sown; seed saved from it does not come true']];
+  const lines: Array<[StockLine, string, string]> = [['saved', 'Saved', 'Kept back from your own harvest'], ['hybrid', 'Hybrid', 'The Shop\u2019s plain seed, cheap: about 12 % more crop and a third less blight and rust the year it is sown; seed saved from it comes back at about 80 %'], ['heirloom', 'Heirloom', 'Pricier, an ordinary crop the first year, but open-pollinated: the seed you save comes true']];
   return <>
     <Section title="Fields">
+      {(() => { const w = seedWarning(game); return w ? <Note tone={w.tone}>{w.text}</Note> : null; })()}
       {rows.length === 0 && <Note>No fields yet. A quarter acre of potatoes, beans and wheat is the calories a garden cannot grow (Build → Food).</Note>}
       {rows.map((r, i) => {
         const next = () => { const idx = NEXT.indexOf(r.pinned ? r.crop : null); g.money(d => pinField(d, r.id, NEXT[(idx + 1) % NEXT.length])); };
@@ -111,9 +112,9 @@ function FieldsView({ game }: { game: GameState }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
             <span style={{ width: 54, color: DIM, fontSize: 11 }}>soil</span>
             <Bar v={r.fert / 1.45} color={r.fert < 0.8 ? TONE.bad : r.fert < 0.95 ? TONE.warn : '#9cc070'} title={`Fertility ${Math.round(r.fert * 100)} %`} />
-            <span style={{ fontSize: 11, fontVariantNumeric: 'tabular-nums', width: 82, textAlign: 'right' }} title="This year's crop against an average field">{r.factor.sown ? `crop ×${r.factor.total.toFixed(2)}` : r.crop === 'rest' ? 'resting' : 'not sown'}</span>
+            <span style={{ fontSize: 11, fontVariantNumeric: 'tabular-nums', width: 82, textAlign: 'right' }} title="This year's crop against an average field">{r.weedy ? `weedy ×${r.factor.total.toFixed(2)}` : r.factor.sown ? `crop ×${r.factor.total.toFixed(2)}` : r.crop === 'rest' ? 'resting' : 'not sown'}</span>
           </div>
-          {r.note && <Note tone="warn">{r.note}</Note>}
+          {r.note && <Note tone={r.weedy ? 'bad' : 'warn'}>{r.note}</Note>}
         </div>;
       })}
       {rows.length > 0 && <Note>Sowing runs {dateText(w0)} to {dateText(w1)}. Auto rotates beans, then potatoes, then wheat, staggered across the fields.</Note>}
@@ -127,7 +128,7 @@ function FieldsView({ game }: { game: GameState }) {
         </span>
       </div>)}
       <Row label="Wanted for next spring" value={`${seedTarget(game)} units`} tone={have.heirloom + have.hybrid + have.saved < seedTarget(game) ? 'warn' : 'good'} />
-      <Note>Harvest days set next spring's seed aside first. Hybrid seed is a one-year bargain; heirloom is a lifetime's.</Note>
+      <Note>Harvest days set next spring's seed aside first. Hybrid seed is the cheap bargain for a year; heirloom costs more and breeds true, so what you save from it is as good as what you bought.</Note>
     </Section>
     <Section title="Soil">
       <Row label="Manure pile" value={`${(game.stock.manure ?? 0).toFixed(1)} loads`} title="Your animals' pile; a neighbor's load is $15 in the Shop. Spread at sowing, 3 loads a field." />
@@ -192,7 +193,11 @@ function AnimalsView({ game }: { game: GameState }) {
   const fb = feedBudget(game, feedDemand(game), winterHay(game));
   const [frost0, frost1] = REGIONS[game.site.region].frost;
   const hayWinterDays = fb.hayNeed > 0 ? fb.hayBales / (fb.hayNeed / (365 - (frost1 - frost0))) : Infinity;
-  const act = (label: string, why: string | null, run: () => void, tip: string) => <button style={{ ...btn(!why), opacity: why ? 0.55 : 1 }} title={why ?? tip} disabled={!!why} onClick={run}>{label}</button>;
+  // a greyed button says why on the page, not only in its tooltip
+  const act = (label: string, why: string | null, run: () => void, tip: string) => <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 1 }}>
+    <button style={{ ...btn(!why), opacity: why ? 0.55 : 1 }} title={why ?? tip} disabled={!!why} onClick={run}>{label}</button>
+    {why && <span style={{ fontSize: 10.5, color: DIM, maxWidth: 140, lineHeight: 1.25 }}>{why[0].toUpperCase() + why.slice(1)}</span>}
+  </span>;
   const hives = apiaries(game), bush = hasMaples(game);
   return <>
     {have.length > 0 && <Section title="Barnyard">
