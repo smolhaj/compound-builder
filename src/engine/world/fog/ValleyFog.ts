@@ -75,6 +75,14 @@ export class ValleyFog {
   /** Jump to the last target (QA shots: no waiting for the fog to roll in). */
   snap(): void { Object.assign(this.cur, this._target); }
 
+  /** 0-1: how much of the bank or the low cloud the camera stands in (fine mist droplets drift past the lens). */
+  nearMist(camY: number): number {
+    const c = this.cur;
+    const inBank = c.bankDensity > 0 ? Math.min(1, Math.max(0, (c.bankTopY - camY) / 1.5)) * Math.min(1, c.bankDensity * 2.5) : 0;
+    const inCloud = c.cloudDensity > 0 ? Math.min(1, Math.max(0, (camY - c.cloudBaseY) / 3)) * Math.min(1, c.cloudDensity * 6) : 0;
+    return Math.max(inBank, inCloud);
+  }
+
   /** The height-fog parameters for the shader. `noise` by quality (0 = flat), `tint` follows the sky. */
   params(noise: number): HeightFogParams {
     const c = this.cur;

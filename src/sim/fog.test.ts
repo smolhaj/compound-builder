@@ -147,3 +147,21 @@ describe('readout and forecast', () => {
     expect(fogForecast(4, 100, 'desert', HILL)).toBeNull();
   });
 });
+
+describe('low cloud', () => {
+  const place: FogPlace = { campAboveFloorM: 73, ridgeAboveCampM: 60, mountain: true };
+  it('a drizzling day puts the cloud base on the ridgelines, a clear one has none', () => {
+    const rainy = fogAt({ ...fogDay(1, 200, 'desert'), overcast: 1, drizzle: 0.7, valley: 0.3, depth: 0.3 }, 10, place);
+    expect(rainy.cloudBaseM).toBeGreaterThan(100);
+    expect(rainy.cloudBaseM).toBeLessThan(200);
+    const gray = fogAt({ ...fogDay(1, 200, 'desert'), overcast: 0.85, drizzle: 0.3 }, 10, place);
+    expect(gray.cloudBaseM).toBeGreaterThan(rainy.cloudBaseM);
+    const clear = fogAt(fogDay(1, 200, 'desert'), 10, place);
+    expect(clear.cloudBaseM).toBeGreaterThan(1200);
+    expect(clear.lowCloud).toBe(0);
+  });
+  it('the readout names the cloud when it is low', () => {
+    const rainy = fogAt({ ...fogDay(1, 200, 'desert'), overcast: 1, drizzle: 0.9, valley: 0, depth: 0 }, 10, place);
+    expect(fogReadout(rainy)).toMatch(/^Cloud \d+ m over the camp, sight range/);
+  });
+});

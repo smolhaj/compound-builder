@@ -127,6 +127,14 @@ describe('ValleyFog easing', () => {
     expect(v.params(0.8).noise).toBe(0.8);
     expect(v.params(0.4).bankTop).toBe(8);
   });
+  it('mist drifts past a camera that stands in the bank or the cloud, not one above them', () => {
+    const v = new ValleyFog();
+    v.update(0.1, { ...NO_FOG_TARGET, bankTopY: 8, bankDensity: 0.3, cloudBaseY: 40, cloudDensity: 0.08 }); v.snap();
+    expect(v.nearMist(3)).toBeGreaterThan(0.5);      // in the bank
+    expect(v.nearMist(20)).toBe(0);                  // between the bank and the cloud
+    expect(v.nearMist(60)).toBeGreaterThan(0.3);     // in the cloud
+    expect(new ValleyFog().nearMist(3)).toBe(0);
+  });
   const wx = (): WeatherOutputs => ({ cloud: 0.8, cumulus: 0.2, cirrus: 0, rain: 0, snow: 0, fog: 0.9, storm: 0, distantStorm: 0, wind: 0.3, haze: 0.4, wetness: 0, snowCover: 0 });
   it('in auto the sim\'s sky replaces the weather layer\'s own overcast and fog, and drizzle becomes fine rain and damp ground', () => {
     const v = new ValleyFog(); v.update(0.1, t); v.snap();

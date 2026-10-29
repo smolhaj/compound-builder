@@ -347,6 +347,7 @@ export function GameCanvas() {
         camera: ws.camera, focus: cam.target,
         snowBase: sp.snow, snowAllow: seasonState.weatherSnow, region: seasonState.climate.id,
         valleyBank: vc.bankDensity > 1e-4 ? { y: vc.bankTopY, amount: Math.min(1, vc.bankDensity * 2.5) } : null,
+        mist: valley.nearMist(ws.camera.position.y),
       });
       valley.applyTo(wx, weatherMode === 'auto');
       ws.setHeightFog(valley.params((renderReq.quality ?? ws.quality) === 'high' ? 0.8 : 0.4));

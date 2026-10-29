@@ -182,16 +182,15 @@ export function fogAt(day: FogDay, hour: number, place: FogPlace = DEFAULT_PLACE
   const density = clamp(day.valley * Math.pow(b, 0.7), 0, 1);
   const belowCampM = place.campAboveFloorM - bankM;
   const inFog = bankM > 0 && belowCampM < 0 && density > 0.04;
-  // cloud: overcast and drizzle pull the base down toward the ridges; a clear sky has none
-  const lowness = clamp(day.overcast * 0.75 + day.drizzle * 0.45, 0, 1);
+  // cloud: drizzle and overcast pull the base down onto the ridgelines (a drizzling day sits right on them); a clear sky has none
+  const ridgeM = Math.max(place.ridgeAboveCampM, place.mountain ? 140 : 60);
+  const lowness = clamp(day.drizzle * 0.9 + day.overcast * 0.25 + day.valley * 0.05, 0, 1);
   const lowCloud = clamp(day.overcast * (0.45 + 0.55 * day.drizzle) + 0.15 * day.valley * b, 0, 1);
-  const cloudBaseM = Math.round(1400 - 1330 * lowness * lowness - (day.drizzle > 0 ? 70 * day.drizzle : 0));
-  const inCloud = cloudBaseM < 0 ? 1 : 0;
+  const cloudBaseM = Math.round(ridgeM * 0.8 + (1500 - ridgeM * 0.8) * Math.pow(1 - lowness, 2.2));
   // what the naked eye sees at the camp
   const haze = 5000 * (1 - 0.65 * day.drizzle) * (1 - 0.15 * day.overcast);
   const fogV = inFog ? fogVisibilityM(clamp(density * (0.7 + 0.3 * smooth(0, 40, -belowCampM)), 0, 1)) : 5000;
-  const cloudV = cloudBaseM < place.ridgeAboveCampM * 0.3 ? 120 + 300 * smooth(0, 80, cloudBaseM) : 5000;
-  const sightM = Math.round(Math.max(30, Math.min(haze, fogV, cloudV * (inCloud ? 0.6 : 1))));
+  const sightM = Math.round(Math.max(30, Math.min(haze, fogV)));
   return { day, hour, density, bankM, belowCampM, inFog, cloudBaseM, lowCloud, overcast: day.overcast, drizzle: day.drizzle, sightM };
 }
 
@@ -265,7 +264,7 @@ export function fogForecast(seed: number, doy: number, region: RegionId, place: 
 export function fogForMode(mode: string, place: FogPlace = DEFAULT_PLACE): FogNow | null {
   const base: FogDay = { doy: 0, valley: 0, depth: 0, overcast: 0, drizzle: 0, inversion: false, burnOffH: 24 };
   const day: FogDay | null = mode === 'fog' ? { ...base, valley: 0.85, depth: 0.45, overcast: 0.5, burnOffH: 24 }
-    : mode === 'overcast' ? { ...base, valley: 0.3, depth: 0.3, overcast: 0.85, drizzle: 0.15, burnOffH: 24 }
+    : mode === 'overcast' ? { ...base, valley: 0.3, depth: 0.3, overcast: 0.85, drizzle: 0.3, burnOffH: 24 }
     : mode === 'rain' || mode === 'storm' ? { ...base, valley: 0.45, depth: 0.4, overcast: 1, drizzle: 0.7, burnOffH: 24 }
     : mode === 'snow' ? { ...base, valley: 0.3, depth: 0.3, overcast: 0.85, burnOffH: 24 }
     : null;
