@@ -5,6 +5,8 @@
  * looks like a bug (NaN, negative stock, a stuck run). Slow: only with
  *   PLAYTEST=1 npx vitest run scripts/playtest.test.ts
  * Report: playtest-report.md (repo root).
+ * Default: each run stops at its first ending, about 400 days after the hit (the year-one measure). YEARS=6 plays on to about three years
+ * after the hit (the horizon the Hardcore prepper target is measured at; docs/DECISIONS.md). Other env: STRATS, KINDS, DIFF, SEEDOFF, LIFESTYLE, WELCOME.
  */
 import { describe, expect, it } from 'vitest';
 import { appendFileSync, writeFileSync } from 'node:fs';
