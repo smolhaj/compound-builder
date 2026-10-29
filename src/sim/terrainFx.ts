@@ -31,6 +31,7 @@ import { highShare, isTower } from './towers';
 import { PERIMETER, runFinished, runBill, SALVAGE, type PerimeterKind, type Pt } from './perimeter';
 import { log } from './economy';
 import { DRAIN, cutSlopeAt, nearDrain, undrained, drainLineFor } from './drainage';
+import { wallHoldsAt } from './retaining';
 import { DROPPED_SCORE, RFX, bridgeDown, roadBridgeOf, roadChokeLines, roadChokes, roadEase } from './roadFx';
 
 export const FX = {
@@ -73,7 +74,7 @@ export function floodCandidates(s: GameState, fin: readonly Structure[], lowKind
 export function muddy(s: GameState, st: Pick<Structure, 'x' | 'z'>, storm = false): boolean {
   const { doy } = calendarOf(s.clock);
   if (!storm && (doy < FX.MUD_FROM || doy > FX.MUD_TO)) return false;
-  if (cutSlopeAt(s, st.x, st.z)) return true;   // the runoff of the cut it is built into (sim/drainage.ts)
+  if (cutSlopeAt(s, st.x, st.z) && !wallHoldsAt(s, st.x, st.z)) return true;   // the runoff of the cut it is built into (sim/drainage.ts), unless a finished retaining wall holds it (sim/retaining.ts)
   if (!s.site.creek) return false;   // the creek is on a neighbor's land: no floodplain here
   const g = groundOf(s);
   return !!g && floodplainAt(g, st.x, st.z);

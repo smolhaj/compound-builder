@@ -125,6 +125,8 @@ export interface GameStore {
   advance: (days: number) => void;
   order: (lines: OrderLine[]) => boolean;
   plan: (kind: string, x: number, z: number, rot: number) => void;
+  /** Stake terraced garden beds, one per spot (the Next-step card's confirm; sim/terrace.ts). Returns why not, or null. */
+  stakeTerraces: (spots: Array<[number, number]>) => string | null;
   load: (g: GameState) => void;
   /** Lay out a fence / hedge / wall run for the family to build. */
   planRun: (kind: PerimeterKind, pts: Pt[], gates: Gate[], offLen?: number) => void;
@@ -321,6 +323,17 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     applyForPermit(g, st);
     set({ game: g, selected: st.id });
     void saveGame(AUTOSAVE, g);
+  },
+  stakeTerraces: (spots) => {
+    if (locked()) return LOCKED_WHY;
+    if (!spots.length) return 'nothing to stake';
+    const why = planProblem(get().game, 'garden');
+    if (why) return why;
+    const g = structuredClone(get().game);
+    for (const [x, z] of spots) { const st = planStructure(g, 'garden', x, z, 0); applyForPermit(g, st); }
+    set({ game: g });
+    void saveGame(AUTOSAVE, g);
+    return null;
   },
   load: (game) => set({ game, selected: null, tool: null, cutscene: promptFor(game) }),
   planRun: (kind, pts, gates, offLen = 0) => {

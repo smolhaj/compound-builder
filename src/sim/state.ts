@@ -142,6 +142,8 @@ export interface Structure {
   parked?: Array<string | null>;
   /** Rise over run across its footprint when it was staked, on a lot with relief (sim/slope.ts): the pad takes longer and the foundation more stone. Absent: level. */
   grade?: number;
+  /** Day a tall retaining wall behind its pad let go in a storm or the thaw (sim/retaining.ts); cleared when the family has restacked it (optional, so no save bump). */
+  slumpedAt?: number;
 }
 
 export type TaskKind = 'idle' | 'build' | 'forestry' | 'sleep' | 'chores' | 'school' | 'leisure' | 'job' | 'gone' | 'shelter' | 'away'
