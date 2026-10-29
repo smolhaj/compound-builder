@@ -62,6 +62,7 @@ export function BuildMenu({ showProjects = () => undefined }: { showProjects?: (
     else if (a.type === 'caretaker') { const why = g.money(d => hireCaretaker(d, a.kind)); if (why) setNote(`Could not arrange that: ${why}.`); }
     else if (a.type === 'belt') { const why = g.daily(d => setBelt(d, a.on)); if (why) setNote(why[0].toUpperCase() + why.slice(1) + '.'); }
     else if (a.type === 'crew') { const why = g.hire(a.id); if (why) setNote(`Could not hire them: ${why}.`); }
+    else if (a.type === 'open') g.focusHud({ right: a.right, ...(a.supplies ? { supplies: a.supplies } : {}) });
     else if (a.type === 'restDay') { const why = g.daily(d => takeRestDay(d)); if (why) setNote(why); }
     else if (a.type === 'quarantine') { const why = g.daily(d => setQuarantine(d, a.on)); if (why) setNote(why); }
     else if (a.type === 'rx') g.stockUpRx();

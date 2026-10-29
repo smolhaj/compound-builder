@@ -100,7 +100,7 @@ export interface Weekend {
   caretaker: Caretaker | null;
   /** What the empty place does with its lights: timers (looks lived in) or dark. */
   lights: 'timers' | 'dark';
-  /** Tighten the belt in town (save v65): cheaper upkeep and groceries on the weekdays, a little lower mood. */
+  /** Tighten the belt in town (save v66): cheaper upkeep and groceries on the weekdays, a little lower mood. */
   belt?: boolean;
   /** Is the family on the place right now (updated each sub-step). */
   here: boolean;

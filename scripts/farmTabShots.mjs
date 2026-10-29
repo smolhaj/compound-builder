@@ -39,6 +39,8 @@ try {
       }
       return { game: g }; });
   }, herd);
+  // the Farm is a sub-tab of Supplies now
+  await page.getByText('Supplies', { exact: true }).first().click();
   await page.getByText('Farm', { exact: true }).first().click();
   const tabs = herd ? ['Season', 'Animals'] : ['Season', 'Fields', 'Kitchen', 'Food plan'];
   let n = 0;

@@ -21,6 +21,9 @@ import { herdOf } from './herd';
 export type Tone = 'good' | 'warn' | 'bad';
 export const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const MONTH_START = [1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335];
+/** The cellar bins' daily loss as one phrase wherever it is shown (the stores line and the warning round it the same way): "0.25 %". */
+export const shrinkText = (tC: number): string => `${(Math.round(binShrink(tC) * 10000) / 100).toString()} %`;
+
 /** Month index (0–11) of a day of the year. */
 export const monthOf = (doy: number): number => { let m = 11; while (m > 0 && doy < MONTH_START[m]) m--; return m; };
 const wrap = (d: number) => ((d - 1) % 365 + 365) % 365 + 1;
@@ -99,7 +102,7 @@ export function stores(s: GameState): Stores {
   const fresh = s.stock.fresh * KCAL.fresh, roots = sum(['cellar_roots']);
   const lines: StoreLine[] = [
     L('fresh', 'Fresh from the place', fresh, fresh > 5 * need ? `rotting ${Math.round(freshSpoilRate(s) * 100 * 10) / 10} % a day${hasCellar(s) ? '' : ' with no cellar'}` : null, fresh > 5 * need && !hasCellar(s) ? 'warn' : 'good'),
-    L('roots', 'Cellar bins (potatoes, apples)', roots, hasCellar(s) ? `${Math.round(cellarKcal(s) / Math.max(1, cellarCapacity(s)) * 100)} % of the bins, shrinking ${(binShrink(cellarTempC(s)) * 100).toFixed(2)} % a day` : roots > 0 ? 'no cellar' : null),
+    L('roots', 'Cellar bins (potatoes, apples)', roots, hasCellar(s) ? `${Math.round(cellarKcal(s) / Math.max(1, cellarCapacity(s)) * 100)} % of the bins, shrinking ${shrinkText(cellarTempC(s))} a day` : roots > 0 ? 'no cellar' : null),
     L('jars', 'Home jars, dried and fermented', sum(['home_canned', 'dried_produce', 'ferments'])),
     L('dry', 'Dry staples', sum(['rice_bucket', 'rice_bag', 'beans_bucket', 'black_beans', 'wheat_bucket', 'flour', 'oats', 'cornmeal', 'pasta', 'home_dry', 'sugar', 'honey', 'oil', 'lard', 'milk_powder', 'peanut_butter', 'freeze_dried'])),
     L('meat', 'Meat: cured, smoked, frozen', sum(['cured_meat', 'smoked_meat', 'freezer_meat', 'game_meat']), s.stock.frozen > 0.05 && !freezerOn(s) ? 'the freezer has no power: it is thawing' : null, s.stock.frozen > 0.05 && !freezerOn(s) ? 'bad' : 'good'),
@@ -140,7 +143,7 @@ export function spoilageRisks(s: GameState): Risk[] {
   if (fresh > 6 * need && need > 0) out.push({ text: `${Math.round(fresh / need)} days of fresh food on hand and ${Math.round(freshSpoilRate(s) * 100)} % of it rotting a day${hasCellar(s) ? ' (cellar)' : ': a root cellar would cut that to a fifth'}. Can, dry or ferment it.`, tone: 'warn' });
   const o = overflow(s);
   if (o > 0.1) out.push({ text: `Stores ${Math.round(o * 100)} % past the shelves (${Math.round(pantryLoad(s) / 1000).toLocaleString('en-US')}k kcal in ${Math.round(pantryRoom(s) / 1000).toLocaleString('en-US')}k of room): cool-kept goods keep worse.`, tone: 'warn' });
-  if (cellarKcal(s) > 100_000 && cellarTempC(s) > 9) out.push({ text: `The cellar is ${Math.round(cellarTempC(s))} °C: the bins lose ${(binShrink(cellarTempC(s)) * 100).toFixed(1)} % a day. Eat the potatoes first.`, tone: 'warn' });
+  if (cellarKcal(s) > 100_000 && cellarTempC(s) > 9) out.push({ text: `The cellar is ${Math.round(cellarTempC(s))} °C: the bins lose ${shrinkText(cellarTempC(s))} a day. Eat the potatoes first.`, tone: 'warn' });
   for (const r of pantryRows(s, need).filter(x => FOOD[x.id].kcal > 0 && x.left < 90).slice(0, 3)) out.push({ text: `${FOOD[r.id].name.split(',')[0]} ${r.left <= 0 ? 'is past its date' : `keeps ${Math.max(0, Math.round(r.left))} more days`}.`, tone: r.left <= 0 ? 'bad' : 'warn' });
   if (s.stock.frozen > 0.05 && !freezerOn(s)) out.push({ text: 'Frozen meat with no power to the cellar freezer: it thaws and spoils.', tone: 'bad' });
   return out;
@@ -153,9 +156,11 @@ export function foodPlan(s: GameState): Risk[] {
   const fields = fieldsOf(s, true), o = outlook(s);
   if (fields.length) {
     const have = seedOnHand(s), tot = have.heirloom + have.hybrid + have.saved, want = seedTarget(s);
-    if (tot < fields.length && doy >= w0 - 40 && doy <= w0 + 20) out.push({ text: `Seed for ${fields.length} fields needed by ${dateText(w0)} and only ${tot.toFixed(1)} units on hand: buy field seed in the Shop, trade for it or the fields lie fallow.`, tone: 'bad' });
+    const weedy = fieldRows(s).filter(r => r.weedy).length;
+    if (weedy) out.push({ text: `${weedy} field${weedy === 1 ? '' : 's'} came up in weeds and volunteers this year (no seed): about 40 % of a crop. Buy field seed in the Shop before next spring.`, tone: 'bad' });
+    else if (tot < fields.length && doy >= w0 - 40 && doy <= w0 + 20) out.push({ text: `Seed for ${fields.length} fields needed by ${dateText(w0)} and only ${tot.toFixed(1)} units on hand: buy field seed in the Shop, trade for it, or the fields come up in weeds at 40 % of a crop.`, tone: 'bad' });
     else if (tot < want && doy < se.harvest[0]) out.push({ text: `Next spring's seed: ${tot.toFixed(1)} of ${want} units. The harvest will set it aside first.`, tone: 'good' });
-    if (have.saved > 0 && seedsOf(s).savedVigor < 0.95) out.push({ text: `Your saved seed is from a hybrid line: it yields about ${Math.round(seedsOf(s).savedVigor * 100)} % of a true crop (it recovers 4 % a year). Heirloom seed saves true.`, tone: 'warn' });
+    if (have.saved > 0 && seedsOf(s).savedVigor < 0.95) out.push({ text: `Your saved seed is from a hybrid line: it yields about ${Math.round(seedsOf(s).savedVigor * 100)} % of a true crop (it recovers 4 % a year). Heirloom seed breeds true: sow some and save from it.`, tone: 'warn' });
     for (const r of fieldRows(s)) if (r.note && r.note.startsWith('Tired')) out.push({ text: `A field's soil is tired (fertility ${Math.round(r.fert * 100)} %). ${r.note.replace('Tired soil: ', '')}.`, tone: 'warn' });
     const cropKcal: Record<string, number> = {};
     for (const r of fieldRows(s)) cropKcal[r.crop] = (cropKcal[r.crop] ?? 0) + 1;

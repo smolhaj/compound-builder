@@ -6,6 +6,7 @@ import { bunkerChecklist, bunkerNext, buildAdvice, longTerm, suggestions, perime
 import { PERIMETER_ORDER, UPGRADE_NEXT, planRun } from './perimeter';
 import { SHELVES, shelvesNeeding } from './shelves';
 import { BUNKER_ORDER } from '../game/buildkit/kit';
+import { sowWindow, plotsOf } from './crops';
 
 const built = (g: ReturnType<typeof newGame>, kind: string, x = 0, z = 0) => { const st = planStructure(g, kind, x, z, 0); st.stage = 99; st.finishedAt = 0; return st; };
 const fresh = () => { const g = newGame(11); g.structures = []; g.perimeter = []; g.stock = { ...g.stock }; return g; };
@@ -194,5 +195,38 @@ describe('a home that lost its roof', () => {
     expect(order.lines.map(l => l.material).sort()).toEqual(['lumber', 'roofing']);
     cabin.stage = 5; cabin.finishedAt = 9;
     expect(suggestions(g).map(x => x.id)).not.toContain('reroof');
+  });
+});
+
+describe('seed for the fields', () => {
+  it('warns in the sowing season when there is not seed for every field, and the card links to the Farm tab', () => {
+    const g = fresh();
+    built(g, 'timber_cabin'); built(g, 'well_hand'); built(g, 'garden'); built(g, 'outhouse'); built(g, 'solar_array'); built(g, 'root_cellar');
+    const f1 = built(g, 'field', 10, 0), f2 = built(g, 'field', 20, 0);
+    plotsOf(g)[f1.id] = { kind: 'field', fert: 1, prev: null, prev2: null, crop: null, loads: 0, cover: false, settled: -1, planted: true };
+    plotsOf(g)[f2.id] = { ...plotsOf(g)[f1.id] };
+    g.stock.seed = 0; g.stock.seed_heirloom = 0; g.stock.seed_saved = 0;
+    g.clock.t = sowWindow(g)[0] + 2 - g.clock.startDoy + 0.3;
+    const card = suggestions(g).find(x => x.id === 'seed');
+    expect(card).toBeTruthy();
+    expect(card!.why).toMatch(/weeds at about 40 %/);
+    const open = card!.acts!.find(a => a.act.type === 'open')!.act;
+    expect(open).toEqual({ type: 'open', right: 'supplies', supplies: 'farm' });
+    const orders = card!.acts!.filter(a => a.act.type === 'order').map(a => (a.act as { lines: Array<{ material: string; qty: number }> }).lines[0].material);
+    expect(orders).toEqual(['seed', 'seed_heirloom']);
+    // seed in the barn: no card
+    g.stock.seed = 2;
+    expect(suggestions(g).find(x => x.id === 'seed')).toBeUndefined();
+  });
+});
+
+describe('the two field seeds in the Shop', () => {
+  it('the plain seed is the cheap hybrid and the heirloom costs more', () => {
+    expect(MATERIALS.seed.name).toMatch(/Hybrid/);
+    expect(MATERIALS.seed_heirloom.name).toMatch(/Heirloom/);
+    expect(MATERIALS.seed_heirloom.price!).toBeGreaterThan(MATERIALS.seed.price! * 2);
+    expect(SHELVES.food).toContain('seed');
+    expect(SHELVES.food).toContain('seed_heirloom');
+    expect(MATERIAL_IDS as readonly string[]).not.toContain('seed_hybrid');
   });
 });

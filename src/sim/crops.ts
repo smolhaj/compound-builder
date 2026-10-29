@@ -15,13 +15,15 @@
  *              spread in spring raise it; fertility above 1 leaches 35 % a year. The crop follows it:
  *              yield ×(0.7 + 0.3 × fertility).
  *  Seed        every field is sown each spring from the seed store (one unit a field) inside the sowing
- *              window (before the last frost to ~85 days ahead of the first). Three kinds: heirloom (the
- *              Shop's field seed: open-pollinated, the seed you save comes true), hybrid (about 12 % more
- *              crop and some resistance the year it is sown; seed saved from it does not come true and
- *              yields ×0.8, recovering 4 % a year) and saved (kept back from your own harvest, at its
- *              line's vigor; heirloom lines adapt to the place, +1 % a year up to 1.04). Harvest days
- *              first fill next spring's seed (a unit a field and a quarter spare, never more than 40 %
- *              of a day's crop). A field with no seed is not sown that year: rest and weeds, no harvest.
+ *              window (before the last frost to ~85 days ahead of the first). Three kinds: hybrid (the
+ *              Shop's plain field seed, cheap: about 12 % more crop and a third less hurt by blight and rust
+ *              the year it is sown; seed saved from it does not come true and yields ×0.8, recovering 4 % a
+ *              year), heirloom (pricier: an ordinary crop, but open-pollinated, so the seed you save
+ *              comes true and the line adapts to the place, +1 % a year up to 1.04) and saved (kept back
+ *              from your own harvest, at its line's vigor). Harvest days first fill next spring's seed (a
+ *              unit a field and a quarter spare, never more than 40 % of a day's crop). A field with no
+ *              seed when the window closes is not left fallow: it comes up in weeds and volunteers from
+ *              last year's crop, about 40 % of a crop, and the log and the Farm tab say so.
  *  Timing      sown late the crop is short: the Fields duty works the spring `sowing` chore; behind it,
  *              the whole sowing is late (up to ~40 % off). A field planted when it was built counts as
  *              sown that day (inside the window: full crop; later it fades, a catch crop at ~35 %).
@@ -68,10 +70,13 @@ export const SEED_UNIT_KCAL = 45_000;
 export const FIELD_NET_KCAL = 700_000;
 export const GROSS = 1 + SEED_UNIT_KCAL / FIELD_NET_KCAL;
 
-export type SeedLine = 'heirloom' | 'hybrid' | 'saved';
-export const SEED_STOCK = { heirloom: 'seed', hybrid: 'seed_hybrid', saved: 'seed_saved' } as const;
-/** Yield of the line's first sowing; what saved seed of a hybrid is worth; its recovery a year; the adapted heirloom's cap. */
-export const VIGOR = { hybrid: 1.12, fromHybrid: 0.8, regain: 0.04, regainCap: 0.96, adapt: 0.01, adaptCap: 1.04 } as const;
+export type SeedLine = 'heirloom' | 'hybrid' | 'saved' | 'volunteer';
+/** The lines that come out of the seed store (a field with none is sown with `volunteer`: weeds and last year's strays). */
+export type StockLine = Exclude<SeedLine, 'volunteer'>;
+/** The plain Shop seed is the hybrid (save v65); the pricier heirloom has its own good. */
+export const SEED_STOCK = { heirloom: 'seed_heirloom', hybrid: 'seed', saved: 'seed_saved' } as const;
+/** Yield of the line's first sowing; what saved seed of a hybrid is worth; its recovery a year; the adapted heirloom's cap; a field of weeds and volunteers. */
+export const VIGOR = { hybrid: 1.12, fromHybrid: 0.8, regain: 0.04, regainCap: 0.96, adapt: 0.01, adaptCap: 1.04, volunteer: 0.4 } as const;
 /** Fertility: the start, the yearly recovery, the leaching of what is above 1, the bounds, the gains per load. */
 export const FERT = { start: 1, recover: 0.075, leach: 0.35, min: 0.35, max: 1.45, manure: 0.05, compost: 0.035, coverGain: 0.2 } as const;
 export const MAX_LOADS = 3;
@@ -105,7 +110,7 @@ export const newPlot = (kind: Plot['kind']): Plot => ({ kind, fert: FERT.start, 
 
 export interface Seeds {
   /** Which seed is sown first. */
-  first: SeedLine;
+  first: StockLine;
   /** Vigor of the saved seed on hand (weighted by what was kept back from). */
   savedVigor: number;
   /** This year: fields sown, left unsown, units kept back; the year; the spring summary was told. */
@@ -240,22 +245,22 @@ export const weedFactor = (s: GameState): number => { const gs = gardensOf(s); r
 // ─────────────────────────────────────────────────────────────────────────
 
 /** Seed units on hand by line. */
-export const seedOnHand = (s: GameState): Record<SeedLine, number> => ({ heirloom: stock(s, 'seed'), hybrid: stock(s, 'seed_hybrid'), saved: stock(s, 'seed_saved') });
+export const seedOnHand = (s: GameState): Record<StockLine, number> => ({ heirloom: stock(s, 'seed_heirloom'), hybrid: stock(s, 'seed'), saved: stock(s, 'seed_saved') });
 export const seedTotal = (s: GameState): number => { const h = seedOnHand(s); return h.heirloom + h.hybrid + h.saved; };
 /** Seed wanted for next spring: a unit a field and a quarter spare. */
 export const seedTarget = (s: GameState): number => Math.ceil(fieldsOf(s, true).length * 1.25 - 1e-9);
 
 /** Vigor a line's first sowing has, given the saved seed's vigor. */
-export const lineVigor = (s: GameState, line: SeedLine): number => (line === 'hybrid' ? VIGOR.hybrid : line === 'saved' ? seedsOf(s).savedVigor : 1);
+export const lineVigor = (s: GameState, line: SeedLine): number => (line === 'hybrid' ? VIGOR.hybrid : line === 'saved' ? seedsOf(s).savedVigor : line === 'volunteer' ? VIGOR.volunteer : 1);
 
 /** The order seed is drawn in. */
-function lineOrder(first: SeedLine): SeedLine[] {
-  const all: SeedLine[] = ['saved', 'heirloom', 'hybrid'];
+function lineOrder(first: StockLine): StockLine[] {
+  const all: StockLine[] = ['saved', 'heirloom', 'hybrid'];
   return [first, ...all.filter(x => x !== first)];
 }
 
 /** Take one unit of seed (the player's order first); null when there is none. */
-export function takeSeed(s: GameState, first = seedsOf(s).first): { line: SeedLine; v: number } | null {
+export function takeSeed(s: GameState, first: StockLine = seedsOf(s).first): { line: StockLine; v: number } | null {
   for (const line of lineOrder(first)) {
     const k = SEED_STOCK[line];
     if (stock(s, k) >= 0.999) { (s.stock as unknown as Record<string, number>)[k] = stock(s, k) - 1; return { line, v: lineVigor(s, line) }; }
@@ -320,7 +325,8 @@ export function cropsDay(s: GameState): string[] {
       const old = f.finishedAt !== null && s.clock.t - f.finishedAt > 5;
       const late = old ? 1 : lateFactor(s, doy);
       p.crop = p.pin && p.pin !== 'rest' ? p.pin : autoCrop(s, p.prev, i);
-      p.sown = { y, doy, line: 'heirloom', v: 1, late: late * sowDelay(s) };
+      // the planting stage used the plain Shop seed: hybrid (a field finished long ago, in an old save or a test state, was heirloom)
+      p.sown = old ? { y, doy, line: 'heirloom', v: 1, late: late * sowDelay(s) } : { y, doy, line: 'hybrid', v: VIGOR.hybrid, late: late * sowDelay(s) };
       if (late <= 0) { p.sown = undefined; p.crop = null; if (logGate(s, `late-plant:${f.id}`, 300)) out.push('A field was planted too late in the year to make a crop: it will be sown properly next spring.'); }
       else if (late < 0.99 && logGate(s, `late-plant:${f.id}`, 300)) out.push(`The new field went in late: about ${Math.round(late * 100)} % of a crop this year.`);
     }
@@ -329,7 +335,7 @@ export function cropsDay(s: GameState): string[] {
   // the spring sowing: every plot not sown this year draws a unit of seed, inside the window and the weeks after it
   if (doy >= w0 && doy <= w1 + 28) {
     const todo = fields.filter(f => { const p = P[f.id]; return !!p && p.planted && (!p.sown || p.sown.y !== y); });
-    let sown = 0, rested = 0, unsown = 0, loads = 0;
+    let sown = 0, rested = 0, unsown = 0, loads = 0, volunteers = 0;
     todo.forEach(f => {
       const p = P[f.id];
       if (p.pin === 'rest') {
@@ -338,7 +344,16 @@ export function cropsDay(s: GameState): string[] {
         return;
       }
       const got = takeSeed(s);
-      if (!got) { unsown++; return; }
+      if (!got) {
+        // the window is closing and the seed never came: the field comes up in weeds and last year's strays, a poor crop and not a bare one
+        if (doy >= w1 + 28) {
+          p.crop = p.pin ?? autoCrop(s, p.prev, fields.indexOf(f));
+          p.cover = false; p.loads = 0;
+          p.sown = { y, doy, line: 'volunteer', v: VIGOR.volunteer, late: 1 };
+          volunteers++;
+        } else unsown++;
+        return;
+      }
       p.crop = p.pin ?? autoCrop(s, p.prev, fields.indexOf(f));
       p.cover = false; p.loads = 0;
       const late = lateFactor(s, doy);
@@ -356,13 +371,14 @@ export function cropsDay(s: GameState): string[] {
         }
       }
     }
-    sd.sown += sown; sd.unsown = unsown;
-    if (sown + rested + unsown > 0 && sd.told !== y) {
+    sd.sown += sown; sd.unsown = unsown + volunteers;
+    if (sown + rested + unsown + volunteers > 0 && sd.told !== y) {
       sd.told = y;
       const parts = [sown ? `${sown} field${sown === 1 ? '' : 's'} sown` : '', rested ? `${rested} resting under cover` : '', loads ? `${loads} loads of manure and compost spread` : ''].filter(Boolean);
       if (parts.length) out.push(`Spring work: ${parts.join(', ')}.`);
     }
-    if (unsown > 0 && logGate(s, 'no-seed', 20)) out.push(`No seed left for ${unsown} field${unsown === 1 ? '' : 's'}: they lie fallow this year unless some turns up. Seed is bought in the Shop, traded for or found scavenging.`);
+    if (unsown > 0 && logGate(s, 'no-seed', 20)) out.push(`No seed left for ${unsown} field${unsown === 1 ? '' : 's'}: buy field seed in the Shop, trade for it or find some before the sowing window closes, or ${unsown === 1 ? 'it comes' : 'they come'} up in weeds at about 40 % of a crop.`);
+    if (volunteers > 0 && logGate(s, 'volunteers', 200)) out.push(`No seed came for ${volunteers} field${volunteers === 1 ? '' : 's'}, so ${volunteers === 1 ? 'it was' : 'they were'} left to weeds and volunteers from last year: about 40 % of a crop, and seed saved from it is poor. Seed is bought in the Shop, traded for or found scavenging.`);
   }
   // the season's close (the last day of the harvest window): fertility, rotation, the year's trouble
   if (doy === H[1] % 365) {
@@ -414,18 +430,34 @@ export function setSuccession(s: GameState, id: string, n: number): string | nul
   (plotsOf(s)[id] ??= newPlot('garden')).succ = Math.max(1, Math.min(3, Math.round(n)));
   return null;
 }
-export function setSeedFirst(s: GameState, line: SeedLine): void { seedsOf(s).first = line; }
+export function setSeedFirst(s: GameState, line: StockLine): void { seedsOf(s).first = line; }
+
+/** A warning for the Farm tab and the Next-step cards: fields still to sow with too little seed (before the window closes), or fields that came up in weeds. */
+export function seedWarning(s: GameState): { text: string; tone: 'warn' | 'bad'; fields: number } | null {
+  const fields = fieldsOf(s, true);
+  if (!fields.length) return null;
+  const { doy } = calendarOf(s.clock), [w0, w1] = sowWindow(s), P = plotsOf(s), y = year(s);
+  const weedy = fields.filter(f => P[f.id]?.sown?.y === y && P[f.id]?.sown?.line === 'volunteer').length;
+  if (weedy) return { text: `${weedy} field${weedy === 1 ? '' : 's'} came up in weeds and volunteers this year because no seed came: about 40 % of a crop. Buy field seed in the Shop before next spring.`, tone: 'bad', fields: weedy };
+  if (doy < w0 - 30 || doy > w1 + 28) return null;
+  const need = fields.filter(f => { const p = P[f.id]; return p?.pin !== 'rest' && !(p?.sown && p.sown.y === y); }).length, have = seedTotal(s);
+  if (need <= 0 || have >= need - 1e-6) return null;
+  const left = w1 + 28 - doy;
+  return { text: `${need} field${need === 1 ? '' : 's'} to sow and ${have >= 10 ? Math.round(have) : have.toFixed(1)} unit${have === 1 ? '' : 's'} of seed on hand: buy field seed in the Shop, trade for it or find some${left > 1 ? ` in the next ${left} days` : left >= 0 ? ' today' : ''}, or the rest come up in weeds at about 40 % of a crop.`, tone: doy > w1 ? 'bad' : 'warn', fields: need - Math.floor(have) };
+}
 
 /** Spreading and sowing in numbers for the Farm tab: the average field's fertility, the worst, and whether the rotation is clean. */
-export interface FieldRow { id: string; crop: CropId; pinned: boolean; fert: number; prev: CropId | null; factor: FieldFactor; note: string | null }
+export interface FieldRow { id: string; crop: CropId; pinned: boolean; fert: number; prev: CropId | null; factor: FieldFactor; note: string | null; /** Sown with weeds and volunteers this year: no seed came. */ weedy: boolean }
 export function fieldRows(s: GameState): FieldRow[] {
   return fieldsOf(s, true).map((f, i) => {
     const p = plotFor(s, f), ff = fieldFactor(s, f);
     const crop = p.crop ?? p.pin ?? autoCrop(s, p.prev, i);
     let note: string | null = null;
-    if (p.fert < 0.8) note = 'Tired soil: rest it under a cover crop or spread manure';
+    const weedy = !!p.sown && p.sown.y === year(s) && p.sown.line === 'volunteer';
+    if (weedy) note = 'No seed came: weeds and volunteers, about 40 % of a crop. Buy field seed in the Shop for next spring';
+    else if (p.fert < 0.8) note = 'Tired soil: rest it under a cover crop or spread manure';
     else if (p.prev === crop && crop !== 'rest') note = `${CROPS[crop].name} after ${CROPS[crop].name.toLowerCase()}: the yield pays for it`;
     else if (p.sown && p.sown.y === year(s) && p.sown.late < 0.8) note = 'Sown late this year';
-    return { id: f.id, crop, pinned: !!p.pin, fert: p.fert, prev: p.prev, factor: ff, note };
+    return { id: f.id, crop, pinned: !!p.pin, fert: p.fert, prev: p.prev, factor: ff, note, weedy };
   });
 }

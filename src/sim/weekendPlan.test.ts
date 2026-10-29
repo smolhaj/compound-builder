@@ -190,12 +190,12 @@ describe('the weekender cards', () => {
   });
 });
 
-describe('save v65', () => {
-  it('is the current version, and a v64 weekend save keeps its town house with the belt off', () => {
-    expect(SAVE_VERSION).toBeGreaterThanOrEqual(65);
+describe('weekender save step (65 to 66)', () => {
+  it('is the current version, and a v65 weekend save keeps its town house with the belt off', () => {
+    expect(SAVE_VERSION).toBeGreaterThanOrEqual(66);
     const g = game();
     const old = JSON.parse(exportJson(g));
-    old.version = 64; delete old.game; delete old.weekend.belt;
+    old.version = 65; delete old.game; delete old.weekend.belt;
     const up = migrate(old);
     expect(up.version).toBe(SAVE_VERSION);
     expect(up.weekend!.belt).toBe(false);

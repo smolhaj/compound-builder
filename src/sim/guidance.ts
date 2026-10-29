@@ -26,6 +26,7 @@ import type { GameState, OrderLine } from './state';
 import { SEPARATE_DWELLINGS, housingShortfall } from './housing';
 import { joinNames } from './kin';
 import { hasMaples, woodsTaps } from './maple';
+import { seedWarning } from './crops';
 import { CARETAKER, CARETAKER_KINDS, caretakerProblem, marketFactor, saleBlock, saleQuote, SETTLE_DAYS, type CaretakerKind } from './weekender';
 import { CREW_DAY_USD, crewIdea, nextLongStay, nextStageOrder, weekendBudget, weekendsFor } from './weekendPlan';
 import { dayIndex } from './state';
@@ -126,6 +127,7 @@ export type SuggestionAct =
   | { type: 'caretaker'; kind: CaretakerKind }
   | { type: 'belt'; on: boolean }
   | { type: 'crew'; id: string }
+  | { type: 'open'; right: 'family' | 'supplies' | 'utilities' | 'land' | 'defense' | 'outside' | 'chronicle'; supplies?: 'stores' | 'farm' }
   | { type: 'moveIn' }
   | { type: 'restDay' }
   | { type: 'quarantine'; on: boolean }
@@ -183,6 +185,14 @@ export function suggestions(s: GameState): Suggestion[] {
   if (growing && !hasKind(s, 'root_cellar')) add('cellar', 'root_cellar', 'nowhere cool to keep what you grow', 30);
   if (hasMaples(s) && woodsTaps(s) >= 60 && hasKind(s, 'timber_cabin', 'log_house', 'farmhouse') && !hasKind(s, 'sugar_shack')) add('sugar', 'sugar_shack', `the woods have maples for ${woodsTaps(s)} taps: late-winter syrup`, 14);
   if (hasKind(s, 'field') && hasKind(s, 'root_cellar') && !hasKind(s, 'wood_oven')) add('oven', 'wood_oven', 'the wheat and flour want an oven: bread and roasts without heating the house', 18);
+
+  // fields with no seed to sow: a weedy forty percent is what they get (sim/crops.ts)
+  { const sw = seedWarning(s);
+    if (sw) {
+      const n = Math.max(1, sw.fields), hybrid: OrderLine[] = [{ material: 'seed', qty: n }], heirloom: OrderLine[] = [{ material: 'seed_heirloom', qty: n }];
+      out.push({ id: 'seed', kind: '', title: sw.tone === 'bad' && /came up/.test(sw.text) ? 'Fields came up weedy' : 'Seed for the fields', urgency: sw.tone === 'bad' ? 83 : 67, why: sw.text,
+        acts: [{ label: `Order ${n} hybrid (${usd(orderCost(hybrid, prices(s)))})`, act: { type: 'order', lines: hybrid } }, { label: `${n} heirloom (${usd(orderCost(heirloom, prices(s)))})`, act: { type: 'order', lines: heirloom } }, { label: 'Open the Farm tab', act: { type: 'open', right: 'supplies', supplies: 'farm' } }] });
+    } }
 
   // the woodpile: out in the cold, or too thin for the next two months
   { const w = firewoodOutlook(s);

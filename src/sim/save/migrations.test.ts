@@ -68,4 +68,20 @@ describe('save migrations', () => {
     expect(m.stock.seed_saved).toBe(2);
     expect(m.farm?.plots?.f1.planted).toBe(true);
   });
+  it('v64 → v65: the plain seed is the hybrid now, the old heirloom stock moves to its own good, fields keep the line they were sown with', () => {
+    const g = newGame(3);
+    g.structures.push({ id: 'f1', kind: 'field', x: 5, z: 5, rot: 0, stage: 5, done: 0, supplied: true, finishedAt: -10 });
+    const old = JSON.parse(JSON.stringify(g));
+    old.version = 64;
+    delete old.stock.seed_heirloom;
+    old.stock.seed = 5; old.stock.seed_hybrid = 2; old.stock.seed_saved = 3;
+    old.farm = { plots: { f1: { kind: 'field', fert: 1, prev: null, prev2: null, crop: 'beans', loads: 0, cover: false, settled: -1, planted: true, sown: { y: 2027, doy: 140, line: 'heirloom', v: 1, late: 1 } } } };
+    const m = migrate(old);
+    expect(m.version).toBe(SAVE_VERSION);
+    expect(m.stock.seed_heirloom).toBe(5);
+    expect(m.stock.seed).toBe(2);
+    expect((m.stock as unknown as Record<string, number>).seed_hybrid).toBeUndefined();
+    expect(m.stock.seed_saved).toBe(3);
+    expect(m.farm?.plots?.f1.sown?.line).toBe('heirloom');
+  });
 });

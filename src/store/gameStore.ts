@@ -86,6 +86,9 @@ function promptFor(g: GameState): CutsceneState | null {
 }
 
 /** Game state (the simulation) + transient UI state for the build tool. */
+/** Where a link in the text or a Next-step card sends the HUD: a right-hand tab, and for Supplies its sub-tab. */
+export interface HudFocus { right: 'family' | 'supplies' | 'utilities' | 'land' | 'defense' | 'outside' | 'chronicle'; supplies?: 'stores' | 'farm' }
+
 export interface GameStore {
   game: GameState;
   /** Build tool: the kit piece being placed, 'fell' for marking trees (null = no tool). */
@@ -96,6 +99,8 @@ export interface GameStore {
   stakedNote: string | null;
   /** Selected structure (construction panel). */
   selected: string | null;
+  /** A request for the HUD to open a panel (a Next-step card or a link in the text): the right-hand tab and its sub-tab. The HUD takes it and clears it. */
+  hudFocus: HudFocus | null;
   /** The raid cutscene, or null. */
   cutscene: CutsceneState | null;
   /** Pick the stance on the gate card (the cutscene's prompt); Watch then plays it. */
@@ -164,6 +169,8 @@ export interface GameStore {
   setToolProblem: (t: string | null) => void;
   flashStaked: (text: string) => void;
   select: (id: string | null) => void;
+  /** Ask the HUD to open a right-hand tab (and, for Supplies, its Stores / Farm sub-tab). */
+  focusHud: (f: HudFocus | null) => void;
   /** Answer whoever is at the gate. */
   answer: (stance: Stance) => void;
   /** Pick who goes to a dig site (gate card). */
@@ -240,6 +247,7 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
   toolProblem: null,
   stakedNote: null,
   selected: null,
+  hudFocus: null,
   cutscene: null,
   chooseStance: (stance) => { const c = get().cutscene; if (c?.phase === 'prompt') set({ cutscene: { ...c, stance } }); },
   watchRaid: () => {
@@ -426,6 +434,7 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     setTimeout(() => { if (useGameStore.getState().stakedNote === text) useGameStore.setState({ stakedNote: null }); }, 9000);
   },
   select: (selected) => { if (!locked()) set({ selected }); },
+  focusHud: (hudFocus) => set({ hudFocus }),
   hire: (id) => {
     if (locked()) return LOCKED_WHY;
     const g = structuredClone(get().game);

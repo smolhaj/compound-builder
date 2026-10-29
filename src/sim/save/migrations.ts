@@ -42,8 +42,16 @@ type Raw = Record<string, unknown> & { version?: number };
 
 /** version n → n + 1 upgraders. */
 const STEPS: Record<number, (s: Raw) => Raw> = {
-  // 64 → 65: weekender cash pacing (sim/weekender.ts): the belt in town is off; a weekend game keeps its town house as it was (owned, with its mortgage), nobody rents
-  64: s => ({ ...s, version: 65, ...(s.weekend ? { weekend: { belt: false, ...(s.weekend as object) } } : {}) }),
+  // 65 → 66: weekender cash pacing (sim/weekender.ts): the belt in town is off; a weekend game keeps its town house as it was (owned, with its mortgage), nobody rents
+  65: s => ({ ...s, version: 66, ...(s.weekend ? { weekend: { belt: false, ...(s.weekend as object) } } : {}) }),
+  // 64 → 65: farm choices (sim/crops.ts): the plain `seed` is now the cheap hybrid and the heirloom has its own good. Seed on the shelf keeps its kind: what was heirloom
+  // (`seed`) becomes `seed_heirloom`, what was hybrid (`seed_hybrid`) becomes the plain `seed`. Fields already sown keep the line they were sown with.
+  64: s => {
+    const st = { ...((s.stock ?? {}) as Record<string, number>) };
+    const heirloom = st.seed ?? 0, hybrid = st.seed_hybrid ?? 0;
+    delete st.seed_hybrid;
+    return { ...s, version: 65, stock: { ...st, seed: hybrid, seed_heirloom: (st.seed_heirloom ?? 0) + heirloom } };
+  },
   // 61 → 62: the herd, the bees and the sugar bush (sim/herd.ts, sim/bees.ts, sim/maple.ts): new goods at zero, the cow's condition, the bees and sugaring chores at zero
   // 63 → 64: medical depth (sim/medical.ts): the supplies at zero, no cases yet
   63: s => ({ ...s, version: 64, stock: { antibiotics: 0, splints: 0, ors: 0, dental_kit: 0, midwife_kit: 0, medical_books: 0, ...(s.stock as object) } }),
