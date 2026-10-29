@@ -59,7 +59,7 @@ export interface Needs {
   dose: number;
   /** Wounds / illness being treated: severity 0–100, what it is. */
   /** `trauma`: a wound from a fight (gunshot, shrapnel) that needs treating: meds, a medic or a medical bay. Untreated it barely heals and can go septic. */
-  hurt: Array<{ what: string; sev: number; trauma?: boolean }>;
+  hurt: Array<{ what: string; sev: number; trauma?: boolean; /** A case in a treatment chain (sim/medical.ts runs its course). */ med?: import('./medical').MedCase }>;
   /** Dead (day), or null. Also set when someone was taken by raiders (`taken`): gone from the place either way. */
   died: number | null;
   taken?: boolean;
@@ -69,6 +69,8 @@ export interface Needs {
   tired?: number;
   /** Work rate from the state of mind (0.2–1; absent = 1): set each night by sim/mind.ts, read by `workFactor`. */
   coping?: number;
+  /** Work rate from lasting injuries (a bad leg, a stiff arm): set each night by sim/medical.ts. */
+  lasting?: number;
 }
 
 export const freshNeeds = (): Needs => ({ health: 100, morale: 70, hunger: 0, dose: 0, hurt: [], died: null });
@@ -298,7 +300,9 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
     // health: hunger, wounds and radiation take it; rest and food bring it back
     let dh = n.hunger > 15000 ? -1.5 : n.hunger > 5000 ? -0.5 : 0.6;
     n.hurt.forEach((h, k) => {
-      dh -= h.sev / 60;
+      // (a broken bone or a baby's recovery does not wear the body down like an infection does)
+      dh -= h.sev / 60 * (h.med && (h.med.kind === 'fracture' || h.med.kind === 'postpartum' || h.med.kind === 'frostbite' || h.med.kind === 'abscess') ? 0.25 : 1);
+      if (h.med) return;   // its course is run by sim/medical.ts
       const meds = s.stock.meds >= 0.1;
       if (meds) s.stock.meds -= 0.1;            // a kit lasts about ten wound-days
       // food poisoning: a few days, longer without enough to drink; meds (rehydration salts, antiemetics) help
@@ -355,5 +359,5 @@ export function workFactor(n: Needs | undefined): number {
   if (n.hurt.some(h => h.trauma && h.sev >= 50)) return 0.1;
   const h = n.health >= 60 ? 1 : 0.35 + 0.65 * n.health / 60;
   const m = n.morale >= 35 ? 1 : 0.6 + 0.4 * n.morale / 35;
-  return h * m * (1 - Math.min(0.35, (n.tired ?? 0) * 0.05)) * (n.coping ?? 1);
+  return h * m * (1 - Math.min(0.35, (n.tired ?? 0) * 0.05)) * (n.coping ?? 1) * (n.lasting ?? 1);
 }

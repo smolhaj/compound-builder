@@ -319,8 +319,16 @@ export function dailyGoal(i: number, kid: boolean, task: TaskKind, hour: number,
       const [x, z] = inSite(st, 1.15, (i % 2) - 0.5);
       return goal(x, z, FIG_POSE.REACH, faceTo(x, z, st.x, st.z), { work: true, tool: FIG_TOOL.HAMMER });
     }
+    case 'medic': {
+      // tending the sick: at the door of the house, bent over the bed, not hidden indoors
+      const h = ctx.home;
+      if (h) {
+        const [x, z] = inSite(h, 0.95, 0.25);
+        return goal(x, z, FIG_POSE.REACH, faceTo(x, z, h.x, h.z), { work: true });
+      }
+      return { x: ctx.camp.x, z: ctx.camp.z, pose: FIG_POSE.STAND, face: null, hidden: true, work: false };
+    }
     case 'hunt':
-    case 'medic':
     case 'radio': {
       // out in the woods / indoors with the sick / at the set
       const h = ctx.home;

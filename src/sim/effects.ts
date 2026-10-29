@@ -110,7 +110,7 @@ export function effectsDay(s: GameState): string[] {
   if (c.spread > 0) {
     const sick = s.personState.filter(ps => ps.needs.died == null && ps.needs.hurt.some(h => h.what === 'fever')).length;
     const bay = s.structures.some(st => st.kind === 'bunker_medical' && isFinished(st));
-    for (let k = 0; k < sick; k++) if (r() < c.spread * (bay ? 0.25 : 1)) { const l = infect(s, r, 'caught it at home'); if (l) out.push(l); }
+    for (let k = 0; k < sick; k++) if (r() < c.spread * (bay ? 0.25 : 1) * (s.medical?.epidemic?.quarantine ? 0.4 : 1)) { const l = infect(s, r, 'caught it at home'); if (l) out.push(l); }
   }
   return out;
 }

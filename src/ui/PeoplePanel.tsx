@@ -11,6 +11,7 @@ import type { Person } from '../sim/family';
 import { BREAK_NAME, breakOf, hardened, moodSummary, moodText, mindOf, reading, resting, takeRestDay } from '../sim/mind';
 import { PRACTICED, SKILL_NAME, bestHand, levelFor, progressOf, rangeTime, rusting, topSkills, type Practiced } from '../sim/skills';
 import { callGathering, gatheringProblem } from '../sim/gatherings';
+import { casesOf, lastingOf, medReport, setPolicy, setQuarantine } from '../sim/medical';
 import { dayIndex } from '../sim/state';
 import { DIM, LINE, TONE, btn } from './hud/style';
 import { Note, Row, Section } from './hud/common';
@@ -91,5 +92,36 @@ export function PeopleSection() {
       </div>}
     </div>
     {sum.breaking > 0 && !rest && <Note tone="bad">Someone is not coping. A rest day and company help more than pushing on.</Note>}
+  </Section>;
+}
+
+/** The household's medical picture: the medic, the supplies, the antibiotics policy, what the sick lack, an epidemic's quarantine, lasting injuries, a pregnancy. */
+export function MedicalSection() {
+  const game = useGameStore(s => s.game), g = useGameStore();
+  const r = medReport(game);
+  const sick = game.people.filter(p => casesOf(game, p.id).length > 0);
+  const lasting = r.lasting.filter(([, l]) => l.length);
+  const hasBits = sick.length > 0 || lasting.length > 0 || r.pregnant.length > 0 || r.epidemic || r.courses > 0 || r.splints > 0;
+  return <Section title="Medical">
+    <Row label="Who tends the sick" value={r.medic ? `${r.medic.first} (medicine ${Math.floor(r.skill)})${r.bay ? ' · bay' : ''}` : <span style={{ color: TONE.warn }}>nobody who knows how</span>} title="The best adult medic on the place, a medical book a level above. A medic's corner in the bunker heals faster and cuts infection." />
+    <Row label="Antibiotics" value={<span style={{ color: r.courses < 2 ? TONE.warn : undefined }}>{r.courses} course{r.courses === 1 ? '' : 's'}</span>} title="Loose courses plus two short courses in each medical kit. Scarce once the pharmacy shuts." />
+    <Row label="Splints · rehydration salts" value={`${Math.floor(r.splints)} sets · ${Math.floor(r.salts * 10)} packets`} />
+    <div style={{ display: 'flex', gap: 4, alignItems: 'center', margin: '3px 0', fontSize: 11.5 }}>
+      <span style={{ color: DIM }}>Spend antibiotics on</span>
+      <button style={btn(r.policy === 'serious')} onClick={() => g.daily(d => { setPolicy(d, 'serious'); return null; })} title="Serious infections, the very young and the old: saves them for when it counts">serious cases</button>
+      <button style={btn(r.policy === 'all')} onClick={() => g.daily(d => { setPolicy(d, 'all'); return null; })} title="Every infection">everything</button>
+    </div>
+    {sick.map(p => casesOf(game, p.id).map((h, i) => <Row key={p.id + i} label={p.first} value={<span style={{ fontSize: 11 }}>{h.what}: {h.med!.care}</span>} tone={h.sev >= 60 ? 'bad' : 'warn'} />))}
+    {r.needs.map(x => <Note key={x} tone="warn">{x}</Note>)}
+    {r.epidemic && <div style={{ marginTop: 3 }}>
+      <Note tone="warn">{r.epidemic.kind === 'flu' ? 'The flu is going round' : 'Dysentery is going round'} ({r.epidemic.cases} so far).{r.epidemic.quarantine ? ' The sick are being kept apart.' : ''}</Note>
+      <div style={{ display: 'flex', gap: 4 }}>
+        <button style={btn(r.epidemic.quarantine)} onClick={() => g.daily(d => setQuarantine(d, true))}>Keep the sick apart</button>
+        <button style={btn(!r.epidemic.quarantine && r.epidemic.asked)} onClick={() => g.daily(d => setQuarantine(d, false))}>Carry on</button>
+      </div>
+    </div>}
+    {lasting.map(([id]) => <Row key={id} label={game.people.find(p => p.id === id)?.first ?? ''} value={<span style={{ fontSize: 11 }}>{lastingOf(game, id).join(', ')}</span>} />)}
+    {r.pregnant.map(([name, days]) => <Row key={name} label={name} value={`expecting: about ${Math.max(0, Math.round(days / 30))} month${Math.round(days / 30) === 1 ? '' : 's'} to go`} title="A medic and a birthing kit (or the hospital) make the delivery much safer." />)}
+    {!hasBits && <Note>Nobody is sick or hurt. A splint set, rehydration salts and a course or two of antibiotics are worth having put by (Shop → Medical & household).</Note>}
   </Section>;
 }

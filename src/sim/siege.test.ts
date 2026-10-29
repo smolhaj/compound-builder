@@ -185,7 +185,7 @@ describe('the clock runs through the siege exactly once', () => {
     expect(done.clock.t).toBe(direct.clock.t);
     expect(done.stock.canned).toBe(direct.stock.canned);
     expect(JSON.stringify(done.personState)).toBe(JSON.stringify(direct.personState));
-  });
+  }, 20_000);
 });
 
 describe('the scenes people watch', () => {

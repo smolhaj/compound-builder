@@ -17,6 +17,7 @@ import { snowedIn, weatherDay } from './weatherThreats';
 import { shelfDay } from './shelf';
 import { bodyDay } from './body';
 import { peopleDay } from './people';
+import { medicalDay } from './medical';
 import { levelFor, practice } from './skills';
 import { financeDay } from './finance';
 import { armoryDay } from './armory';
@@ -242,6 +243,7 @@ function subStep(s: GameState): void {
     for (const line of waterDay(s)) log(s, line);
     s.food = liveDay(s, y - Math.floor(y));
     for (const line of bodyDay(s)) log(s, line);
+    for (const line of medicalDay(s)) log(s, line);
     for (const line of peopleDay(s)) log(s, line);
     const end = tallyDay(s);
     if (end) log(s, end.kind === 'wipe' ? 'The last of the family is gone.' : end.kind === 'recovered' ? 'The outside world is coming back.' : end.kind === 'new_normal' ? 'The outside world has come back as far as it will.' : 'A full year the place has fed itself.');
