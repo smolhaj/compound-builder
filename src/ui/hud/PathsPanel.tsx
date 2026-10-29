@@ -10,7 +10,7 @@
 import { useMemo, useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { useWorldStore } from '../../store/worldStore';
-import { worthLaying, type PathSummaryEdge } from '../../game/paths/pathNet';
+import { layShares, worthLaying, type PathSummaryEdge } from '../../game/paths/pathNet';
 import { LAID_BLURB, LAID_KINDS, LAID_NAME, billPrice, laidBill, planLay, type LaidKind } from '../../sim/paths';
 import { orderCost, orderProblem, prices } from '../../sim/economy';
 import { billText, type MaterialId } from '../../sim/materials';
@@ -33,12 +33,13 @@ export function PathsPanel({ startOpen = false }: { startOpen?: boolean }) {
   const laidM = edges.filter(e => e.laid).reduce((a, e) => a + e.lenM, 0);
   const tracks = edges.filter(e => !e.laid && e.worn !== 'none').length;
   const todo = edges.filter(e => worthLaying(e, kind));
-  const plan = useMemo(() => planLay(game, todo.map(e => ({ a: e.a, b: e.b, lenM: e.uniqueM })), kind), [game, todo, kind]);
+  const shares = useMemo(() => (net ? layShares(net, todo, kind) : []), [net, todo, kind]);
+  const plan = useMemo(() => planLay(game, shares, kind), [game, shares, kind]);
   const lines = (Object.entries(plan.short) as Array<[MaterialId, number]>).map(([material, n]) => ({ material, qty: Math.ceil(n) }));
   const orderWhy = lines.length ? orderProblem(game, lines) : null;
 
   const lay = (list: PathSummaryEdge[], k: LaidKind) => {
-    const why = g.layPaths(list.map(e => ({ a: e.a, b: e.b, lenM: e.uniqueM || e.lenM })), k);
+    const why = g.layPaths(net ? layShares(net, list, k) : [], k);
     setNote(why ? { tone: 'warn', text: why } : { tone: 'good', text: `Laid ${LAID_NAME[k].toLowerCase()} on ${list.length} walk${list.length > 1 ? 's' : ''}.` });
   };
 
@@ -77,7 +78,7 @@ export function PathsPanel({ startOpen = false }: { startOpen?: boolean }) {
         <button style={{ ...btn(), padding: '0 6px', fontSize: 11 }} onClick={() => setAll(!all)}>{all ? 'Busiest only' : `All ${edges.length}`}</button>
       </div>
       {(all ? edges : edges.slice(0, 8)).map(e => {
-        const one = planLay(game, [{ a: e.a, b: e.b, lenM: e.uniqueM || e.lenM }], kind);
+        const one = planLay(game, net ? layShares(net, [e], kind) : [], kind);
         const can = e.can[kind], why = e.hidden ? 'a track to the hatch stays unmarked' : !can ? 'concrete only joins the main buildings' : null;
         return <div key={e.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, padding: '2px 0', borderBottom: `1px solid ${LINE}` }}>
           <span style={{ minWidth: 0 }} title={`${e.lenM} m, ${e.trips} trips a day`}>

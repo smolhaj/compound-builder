@@ -107,9 +107,9 @@ describe('the guided HUD (server-rendered)', () => {
     const { PathsPanel } = await import('./PathsPanel');
     const { useWorldStore } = await import('../../store/worldStore');
     // a planned network the world would publish: one busy walk, one to the hidden hatch
-    Object.assign(useWorldStore.getInitialState(), { pathNet: { key: 'k', edges: [
-      { key: 'a~b', a: 'a', b: 'b', aName: 'old farmhouse', bName: 'barn', lenM: 40, uniqueM: 40, trips: 4, wear: 0.6, worn: 'dirt', laid: null, can: { gravel: true, stones: true, boards: true, paved: true }, hidden: false },
-      { key: 'a~h', a: 'a', b: 'h', aName: 'old farmhouse', bName: 'bunker hatch', lenM: 20, uniqueM: 20, trips: 0.1, wear: 0.2, worn: 'desire', laid: null, can: { gravel: false, stones: false, boards: false, paved: false }, hidden: true },
+    Object.assign(useWorldStore.getInitialState(), { pathNet: { key: 'k', trails: [{ m: 40, laid: null }, { m: 20, laid: null }], edges: [
+      { key: 'a~b', a: 'a', b: 'b', aName: 'old farmhouse', bName: 'barn', lenM: 40, uniqueM: 40, trips: 4, wear: 0.6, worn: 'dirt', laid: null, can: { gravel: true, stones: true, boards: true, paved: true }, hidden: false, trailIds: [0] },
+      { key: 'a~h', a: 'a', b: 'h', aName: 'old farmhouse', bName: 'bunker hatch', lenM: 20, uniqueM: 20, trips: 0.1, wear: 0.2, worn: 'desire', laid: null, can: { gravel: false, stones: false, boards: false, paved: false }, hidden: true, trailIds: [1] },
     ] } });
     const t = text(renderToStaticMarkup(<PathsPanel startOpen />));
     expect(t).toContain('Footpaths');

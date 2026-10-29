@@ -373,15 +373,41 @@ export function routeVia(g: WalkGraph, fx: number, fz: number, tx: number, tz: n
 export interface PathSummaryEdge {
   key: string; a: string; b: string; aName: string; bName: string;
   lenM: number; uniqueM: number; trips: number; wear: number; worn: NetEdge['worn']; laid: LaidKind | null; can: NetEdge['can']; hidden: boolean;
+  /** The trails it runs along (indexes into `PathSummary.trails`). */
+  trailIds: number[];
 }
-export interface PathSummary { edges: PathSummaryEdge[]; key: string }
+export interface PathSummary {
+  edges: PathSummaryEdge[];
+  /** Each trail's length (metres) and what is laid on it. */
+  trails: Array<{ m: number; laid: LaidKind | null }>;
+  key: string;
+}
 
-export function summarize(net: Pick<PathNetwork, 'edges'>): PathSummary {
+export function summarize(net: Pick<PathNetwork, 'edges' | 'trails'>): PathSummary {
   const edges = net.edges.map(e => ({
     key: e.key, a: e.a, b: e.b, aName: e.aName, bName: e.bName, lenM: e.lenM, uniqueM: e.uniqueM, trips: Math.round(e.trips * 10) / 10,
-    wear: Math.round(e.meanWear * 100) / 100, worn: e.worn, laid: e.laid, can: e.can, hidden: e.hidden,
+    wear: Math.round(e.meanWear * 100) / 100, worn: e.worn, laid: e.laid, can: e.can, hidden: e.hidden, trailIds: e.trails,
   }));
-  return { edges, key: edges.map(e => `${e.key}:${e.laid ?? e.worn}:${Math.round(e.wear * 10)}`).join('|') };
+  const trails = net.trails.map(t => ({ m: t.lenM, laid: t.laid }));
+  return { edges, trails, key: edges.map(e => `${e.key}:${e.laid ?? e.worn}:${Math.round(e.wear * 10)}`).join('|') + '#' + trails.map(t => t.laid ?? '-').join('') };
+}
+
+/**
+ * What laying `kind` on these walks adds, walk by walk: the metres of trail not already laid with this kind or a better one, each trail
+ * counted once (the first walk on it pays for it), so a shared trunk is bought once however many walks are laid on it.
+ */
+export function layShares(sum: Pick<PathSummary, 'trails'>, edges: ReadonlyArray<Pick<PathSummaryEdge, 'a' | 'b' | 'trailIds'>>, kind: LaidKind): Array<{ a: string; b: string; lenM: number }> {
+  const claimed = new Set<number>(), rank = (k: LaidKind | null) => (k === null ? -1 : LAID_KINDS.indexOf(k));
+  return edges.map(e => {
+    let m = 0;
+    for (const i of e.trailIds) {
+      if (claimed.has(i)) continue;
+      claimed.add(i);
+      const t = sum.trails[i];
+      if (t && rank(t.laid) < rank(kind)) m += t.m;
+    }
+    return { a: e.a, b: e.b, lenM: m };
+  });
 }
 
 /** The walks worth laying: busy (a trip or two a day at least) or already a visible track; never to a hidden hatch. */

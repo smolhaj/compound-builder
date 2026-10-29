@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { newGame, type GameState } from '../../sim/state';
 import { HIDDEN_WEAR, PATH_WIDTH, doorOf, edgeKey, layPaths, pathsOf } from '../../sim/paths';
 import { CELL, KIT, footprint } from '../buildkit/kit';
-import { hubOf, newNetCache, planNetwork, routeVia, summarize, surfaceIndex, walkGraph, wantedWalks, type NetWorld, type PathNetwork } from './pathNet';
+import { hubOf, layShares, newNetCache, planNetwork, routeVia, summarize, surfaceIndex, walkGraph, wantedWalks, type NetWorld, type PathNetwork } from './pathNet';
 import { pathNodes } from '../../sim/paths';
 
 const fin = (id: string, kind: string, x: number, z: number, rot = 0, at = 0) => ({ id, kind, x, z, rot, stage: 99, done: 0, supplied: true, finishedAt: at as number | null });
@@ -154,6 +154,25 @@ describe('the network', () => {
     const b = planNetwork(g, { camp: { x: 36, z: 36 } }, w, cache);
     expect(b.edges.map(e => e.key)).toEqual(a.edges.map(e => e.key));
     expect(b.trails.map(t => t.pts.length)).toEqual(a.trails.map(t => t.pts.length));
+  });
+});
+
+describe('what laying costs', () => {
+  it('buys a shared trunk once, however many walks are laid on it, and not at all where it is already laid', () => {
+    const g = place(400);
+    const n = planNetwork(g, { camp: { x: 36, z: 36 }, yard: { x: 62, z: 40 } }, world(g), newNetCache());
+    const sum = summarize(n);
+    const walks = sum.edges.filter(e => !e.hidden);
+    const shares = layShares(sum, walks, 'gravel');
+    const total = shares.reduce((a, x) => a + x.lenM, 0);
+    const used = new Set(walks.flatMap(e => e.trailIds));
+    expect(total).toBe([...used].reduce((a, i) => a + sum.trails[i].m, 0));
+    expect(total).toBeLessThan(walks.reduce((a, e) => a + e.lenM, 0));
+    // laying it again with the same surface costs nothing; a better one costs again; a worse one nothing
+    const laidAll = { trails: sum.trails.map(t => ({ ...t, laid: 'gravel' as const })) };
+    expect(layShares(laidAll, walks, 'gravel').reduce((a, x) => a + x.lenM, 0)).toBe(0);
+    expect(layShares(laidAll, walks, 'paved').reduce((a, x) => a + x.lenM, 0)).toBe(total);
+    expect(layShares({ trails: sum.trails.map(t => ({ ...t, laid: 'paved' as const })) }, walks, 'gravel').reduce((a, x) => a + x.lenM, 0)).toBe(0);
   });
 });
 
