@@ -18,6 +18,7 @@
  *
  * Distances are world units (1 ≈ 6 m).
  */
+import { BUNKER_ENTRANCES } from './bunkerEntrances';
 import type { Battle, BattleEvent, BattleUnit } from './battleTypes';
 import { GUN, skillOf, type Caliber } from './armory';
 import { gearPosture } from './gear';
@@ -304,7 +305,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
   posts.sort((a, b) => b.value - a.value);
   const lineR = wallR || 2;
 
-  const shelterAt = fin.find(st => st.kind === 'bunker_hatch' || st.kind === 'bunker_stairs') ?? home;
+  const shelterAt = fin.find(st => BUNKER_ENTRANCES.includes(st.kind)) ?? home;
   const hardShelter = shelterAt !== home || g.safeRoom;
 
   // ── units ──

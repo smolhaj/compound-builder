@@ -8,10 +8,11 @@ import { log } from './economy';
 import { burnRick } from './upkeep';
 import { calendarOf, dayIndex, type GameState } from './state';
 import { climate } from './effects';
-import { REGIONS } from './regions';
+
 import { roofLoss } from './improvements';
 import { isHome } from './blueprints';
 import { isFinished } from './construction';
+import { regionFor } from './climate';
 
 /** Heating demand 0–1 by day of year (peaks mid-January, nil June–August). */
 export function heatDemand(doy: number): number {
@@ -27,7 +28,7 @@ export const BURN_PER_DAY = 0.12;
 
 /** Today's heating demand (0 = none, ~1.6 = a bitter cold snap), with a leaky roof. */
 export function demandNow(s: GameState): number {
-  return Math.min(2, (heatDemand(calendarOf(s.clock).doy) * REGIONS[s.site.region].cold + climate(s).cold) * roofLoss(s));
+  return Math.min(2, (heatDemand(calendarOf(s.clock).doy) * regionFor(s.site).cold + climate(s).cold) * roofLoss(s));
 }
 
 /** Burn `days` worth of firewood (called each sub-step). */
@@ -61,7 +62,7 @@ export function burnFirewood(s: GameState, days: number): void {
  * will burn, and what is short. Pure; drives the "Most pressing" firewood prompt.
  */
 export function firewoodOutlook(s: GameState, horizon = 60): { have: number; need: number; short: number; coldNow: boolean } {
-  const doy = calendarOf(s.clock).doy, cold = REGIONS[s.site.region].cold;
+  const doy = calendarOf(s.clock).doy, cold = regionFor(s.site).cold;
   let need = 0;
   for (let k = 0; k < horizon; k++) need += heatDemand(((doy - 1 + k) % 365) + 1) * cold * BURN_PER_DAY;
   const have = s.stock.firewood;

@@ -45,6 +45,8 @@ export const T = {
   DRAW: 70,
   /** A cold-air pocket: this far below the ground round it (≈ 1.8 m) on near-level ground. */
   FROST_DROP: 0.3,
+  /** A lane is choked where the cheap going across it is this many units wide or less (48 m: a crew cannot spread; the coarse lane grid resolves features of about 4 units and up). */
+  CHOKE: 8,
 } as const;
 
 export interface Terrain {
@@ -81,8 +83,12 @@ export interface Terrain {
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 
-export function analyzeTerrain(src: GroundSource, rect: Rect, opts: { step?: number; pad?: number } = {}): Terrain {
-  const step = opts.step ?? 1, pad = opts.pad ?? 10;
+/**
+ * `lite`: only what the raid lanes read (heights, slope, foot-approach cost, the creek): no sight, high ground, water, frost, wind or sun.
+ * About a quarter of the work at step 2; the full pass is for the overlay and the siting cards.
+ */
+export function analyzeTerrain(src: GroundSource, rect: Rect, opts: { step?: number; pad?: number; lite?: boolean } = {}): Terrain {
+  const step = opts.step ?? 1, pad = opts.pad ?? 10, lite = !!opts.lite;
   const x0 = rect.x0 - pad, z0 = rect.z0 - pad;
   const nx = Math.ceil((rect.x1 - rect.x0 + 2 * pad) / step) + 1, nz = Math.ceil((rect.z1 - rect.z0 + 2 * pad) / step) + 1;
   const grid: TerrainGrid = { x0, z0, nx, nz, step };
@@ -104,6 +110,7 @@ export function analyzeTerrain(src: GroundSource, rect: Rect, opts: { step?: num
     const gx = (H(i + 1, j) - H(i - 1, j)) / (2 * step), gz = (H(i, j + 1) - H(i, j - 1)) / (2 * step), m = Math.hypot(gx, gz);
     slope[k] = m;
     if (m > 1e-6) { fall[k * 2] = -gx / m; fall[k * 2 + 1] = -gz / m; }
+    if (lite) continue;
     // high ground: this cell against the mean of an 8-point ring (the same test the towers use, sim/towers.highGroundAt)
     let ring = 0;
     for (let q = 0; q < 8; q++) ring += hAt(x0 + i * step + Math.cos(q * Math.PI / 4) * T.RING * step, z0 + j * step + Math.sin(q * Math.PI / 4) * T.RING * step);
@@ -114,7 +121,7 @@ export function analyzeTerrain(src: GroundSource, rect: Rect, opts: { step?: num
   }
   // visibility: march 16 rays out; a ray ends where the ground rises above the line from the eye (1.8 m = 0.3 u above the cell)
   const RAYS = 16;
-  for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+  if (!lite) for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
     const k = j * nx + i, eye = h[k] + 0.3;
     let total = 0;
     for (let q = 0; q < RAYS; q++) {
@@ -142,6 +149,7 @@ export function analyzeTerrain(src: GroundSource, rect: Rect, opts: { step?: num
 
   // flow accumulation (D8, from the highest cell down)
   const flow = new Float32Array(N).fill(1);
+  if (lite) return { grid, h, slope, fall, high, sight, cost, flow, wet: new Uint8Array(N), frost: new Uint8Array(N), wind, sun, creek, idx, hAt, inCreek };
   const order = Array.from({ length: N }, (_, k) => k).sort((a, b) => h[b] - h[a]);
   for (const k of order) {
     const i = k % nx, j = (k - i) / nx;
@@ -314,7 +322,7 @@ export function chokeOf(t: Terrain, path: readonly Pt[]): Choke | null {
       if (t.cost[k] > Math.max(3, 2 * here)) break;
       w++;
     }
-    if (w <= 3 && (!best || w < best.width)) best = { at: [path[n][0], path[n][1]], width: w, hardness: here };
+    if (w <= T.CHOKE && (!best || w < best.width)) best = { at: [path[n][0], path[n][1]], width: w, hardness: here };
   }
   return best;
 }
@@ -458,7 +466,7 @@ export function siteCandidates(t: Terrain, ctx: SiteContext, lanes?: readonly La
   }
   if (lanes) {
     const lane = bestLane(lanes);
-    if (lane?.choke && lane.choke.width <= 3 && inLot(lot, lane.choke.at[0], lane.choke.at[1])) out.push({ kind: 'choke', x: lane.choke.at[0], z: lane.choke.at[1], score: clamp(0.5 + (3 - lane.choke.width) * 0.15, 0, 1), reason: `The easiest way in narrows to ${Math.round(lane.choke.width * 6)} m here: wall and watch this and a crew has little room to spread.` });
+    if (lane?.choke && lane.choke.width <= T.CHOKE && inLot(lot, lane.choke.at[0], lane.choke.at[1])) out.push({ kind: 'choke', x: lane.choke.at[0], z: lane.choke.at[1], score: clamp(0.5 + (T.CHOKE - lane.choke.width) * 0.08, 0, 1), reason: `The easiest way in narrows to ${Math.round(lane.choke.width * 6)} m here: wall and watch this and a crew has little room to spread.` });
   }
   return out.sort((a, b) => b.score - a.score);
 }

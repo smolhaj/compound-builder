@@ -114,6 +114,14 @@ export const Clutter = {
     const c: KitMaterialId[] = ['paint_red', 'quilt_blue', 'paint_green'];
     for (let i = 0; i < (worn ? 2 : 3); i++) add(c[i], box(0.24 * M, 0.012 * M, 0.2 * M, i * 0.13 * M, i * 0.002 * M, (i % 2) * 0.06 * M).rotateY(0.5 - i * 0.7));
   },
+  /** On a bedside stand: an enamel basin, brown bottles, a roll of bandage and a folded cloth. */
+  sickTray(add: Add): void {
+    add('enamel', cyl(0.14 * M, 0.06 * M, -0.08 * M, 0, 0.02 * M, 12));
+    add('wood_dark', cyl(0.025 * M, 0.11 * M, 0.08 * M, 0, -0.07 * M, 8));
+    add('wood_dark', cyl(0.02 * M, 0.08 * M, 0.08 * M, 0, 0.0 * M, 8));
+    add('linen', cyl(0.035 * M, 0.04 * M, 0.08 * M, 0, 0.06 * M, 10));
+    add('linen', box(0.12 * M, 0.02 * M, 0.09 * M, 0.02 * M, 0, -0.07 * M).rotateY(0.3));
+  },
   radio(add: Add): void { add('wood_dark', box(0.32 * M, 0.2 * M, 0.14 * M, 0, 0, 0)); add('linen', box(0.18 * M, 0.12 * M, 0.005 * M, -0.05 * M, 0.04 * M, 0.071 * M)); add('steel', cyl(0.02 * M, 0.02 * M, 0.1 * M, 0.08 * M, 0.072 * M, 8).rotateX(Math.PI / 2)); add('steel', box(0.005 * M, 0.45 * M, 0.005 * M, 0.12 * M, 0.2 * M, -0.04 * M).rotateZ(-0.3)); },
   dishes(add: Add): void { for (let i = 0; i < 4; i++) add('crockery', cyl(0.11 * M, 0.012 * M, 0, i * 0.014 * M, 0, 12).rotateX(0.15)); add('enamel', cyl(0.045 * M, 0.1 * M, 0.13 * M, 0, 0, 8)); },
   potOnStove(add: Add): void { add('iron', cyl(0.14 * M, 0.16 * M, 0, 0, 0, 12)); add('iron', box(0.18 * M, 0.02 * M, 0.025 * M, 0.2 * M, 0.12 * M, 0)); add('iron', cyl(0.145 * M, 0.015 * M, 0, 0.16 * M, 0, 12)); },

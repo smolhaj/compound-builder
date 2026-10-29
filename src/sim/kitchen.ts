@@ -27,11 +27,12 @@
 import { calendarOf, type GameState } from './state';
 import { isHome } from './blueprints';
 import { isFinished } from './construction';
-import { REGIONS } from './regions';
+
 import { mulberry32 } from './rng';
 import { addFood, addFoodKcal, foodUnits, FOOD, takeSalt, type FoodItemId } from './pantry';
 import { farmOf } from './farm';
 import { burnRick, greenRicks } from './upkeep';
+import { regionFor } from './climate';
 
 export type Method = 'canning' | 'waterbath' | 'drying' | 'fermenting' | 'curing' | 'smoking' | 'freezing';
 export const METHODS: readonly Method[] = ['canning', 'waterbath', 'drying', 'fermenting', 'curing', 'smoking', 'freezing'];
@@ -94,7 +95,7 @@ export function toggleMethod(s: GameState, m: Method): void {
   k.off = k.off.includes(m) ? k.off.filter(x => x !== m) : [...k.off, m];
 }
 /** Share of summer days dry and sunny enough to dry on screens (wetter climates fewer). */
-export const sunShare = (s: GameState): number => Math.max(0.25, Math.min(0.92, 1 - REGIONS[s.site.region].rainMm / 1800));
+export const sunShare = (s: GameState): number => Math.max(0.25, Math.min(0.92, 1 - regionFor(s.site).rainMm / 1800));
 /** Is there fuel for the cookstove (or power)? */
 export const canHeat = (s: GameState): boolean => kitchenPowered(s) || stock(s, 'firewood') >= 1 || greenRicks(s) >= 1.5;
 

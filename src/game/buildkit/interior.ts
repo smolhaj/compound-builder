@@ -66,21 +66,40 @@ export function foodSlot(add: (m: KitMaterialId, g: THREE.BufferGeometry) => voi
 }
 
 /**
+ * Mark a bed the sick are put in (game/people/sickbayPlan.ts): at the middle of the mattress top, 0.58 m above the bed's
+ * origin by default. Not geometry: Parts keeps it as a sick slot (shell.ts `SickSlot`) wherever the piece ends up. The
+ * marker is a few millimetres across, so it does not change the piece's footprint. In the bed's frame the head is at -z
+ * and the foot at +z, as `Furniture.bed` draws it.
+ */
+export function sickSlot(add: (m: KitMaterialId, g: THREE.BufferGeometry) => void, x = 0, y = 0.58 * M, z = 0): void {
+  const e = 0.004;
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute([x, y, z, x, y, z + e, x + e, y, z, x, y + e, z], 3));
+  add('sick_slot', g);
+}
+
+/**
  * Build a piece in its own frame with `fn(add)`, move it to `p`, send it to
  * the sink, and return its footprint (null if `solid` is false).
  */
-export function piece(sink: Sink, layer: string, p: Place, fn: (add: (m: KitMaterialId, g: THREE.BufferGeometry) => void) => void, solid = true): Collider | null {
+export function piece(sink: Sink, layer: string, p: Place, fn: (add: (m: KitMaterialId, g: THREE.BufferGeometry) => void) => void, solid = true, avoid: readonly Collider[] = []): Collider | null {
   const rot = p.rot ?? 0, y = p.y ?? 0;
   const bb = new THREE.Box3(), tmp = new THREE.Box3();
   let any = false;
+  // with floor hatches to keep clear of, collect first: a piece that would stand in one is dropped whole
+  const held: Array<[KitMaterialId, THREE.BufferGeometry]> = [];
   fn((m, g) => {
     g.rotateY(rot);
     g.translate(p.x, y, p.z);
     g.computeBoundingBox();
     tmp.copy(g.boundingBox!);
     if (any) bb.union(tmp); else { bb.copy(tmp); any = true; }
-    sink(layer, m, g);
+    if (avoid.length) held.push([m, g]); else sink(layer, m, g);
   });
+  if (avoid.length) {
+    if (any && avoid.some(a => bb.min.x < a.x1 && bb.max.x > a.x0 && bb.min.z < a.z1 && bb.max.z > a.z0)) { held.forEach(([, g]) => g.dispose()); return null; }
+    for (const [m, g] of held) sink(layer, m, g);
+  }
   return solid && any ? { x0: bb.min.x, z0: bb.min.z, x1: bb.max.x, z1: bb.max.z } : null;
 }
 

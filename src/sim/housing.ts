@@ -29,10 +29,11 @@
 import { calendarOf, dayIndex, type GameState } from './state';
 import { HOME_BEDS } from './blueprints';
 import { isFinished } from './construction';
-import { REGIONS } from './regions';
+
 import { climate } from './effects';
 import { mulberry32 } from './rng';
 import type { Person } from './family';
+import { regionFor } from './climate';
 
 export type SpotKind = 'bed' | 'bunk' | 'couch' | 'floor' | 'tent' | 'outbuilding' | 'nowhere';
 export const SPOT_ORDER: readonly SpotKind[] = ['bed', 'bunk', 'couch', 'floor', 'tent', 'outbuilding', 'nowhere'];
@@ -83,13 +84,13 @@ const STORMY = new Set(['blizzard', 'ice_storm', 'flood', 'hurricane_remnants', 
 
 /** The mean overnight low (°F) for a day of the year here: January's low at mid-January, a summer low 26° under July's high. */
 export function meanLow(s: GameState, doy: number): number {
-  const R = REGIONS[s.site.region], a = R.janLowF, b = R.julyHighF - 26;
+  const R = regionFor(s.site), a = R.janLowF, b = R.julyHighF - 26;
   return (a + b) / 2 - (b - a) / 2 * Math.cos(2 * Math.PI * (doy - 15) / 365) - climate(s).cold * 40;
 }
 
 /** Tonight's weather. `calm` leaves out the day-to-day noise and any storm (the season's usual night: used to decide who goes where). */
 export function nightOf(s: GameState, day = dayIndex(s.clock.t), calm = false): Night {
-  const R = REGIONS[s.site.region];
+  const R = regionFor(s.site);
   const doy = ((s.clock.startDoy - 1 + day) % 365) + 1;
   const base = meanLow(s, doy);
   if (calm) return { lowF: base, stormy: false, rainy: false, snowy: false, hot: false };

@@ -290,6 +290,7 @@ export function GameCanvas() {
       } else promptAt = -1;
       world.syncProgress(game.structures);
       world.syncFood(game);
+      world.syncBunker(game, now / 1000, hourOf(game.clock.t));
       world.syncTents(game);
       world.syncForestry(game.forestry);
       world.simTime = game.clock.t;
