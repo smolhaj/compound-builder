@@ -259,6 +259,6 @@ export function wallAt(p: PadPlan, x: number, z: number, pad = 0): number {
 /** Does this plan's wall stop a walker at (x, z)? (High enough, a barrier at all, and not at one of its stairs.) */
 export function blocksWalk(p: PadPlan, x: number, z: number): boolean {
   if (!p.barrier) return false;
-  if (wallAt(p, x, z, 0.05) < RW.BARRIER_H) return false;
+  if (wallAt(p, x, z, 0) < RW.BARRIER_H) return false;
   return !inStair(p.stairs, x, z);
 }

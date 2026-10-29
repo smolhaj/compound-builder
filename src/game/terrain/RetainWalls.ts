@@ -3,7 +3,7 @@
  * running bond with a batter (the face leans back), lower courses greener, a flat coping on top, a weep-hole every couple of metres at the foot, and a flight
  * of steps set through the wall where the plan has one (the cheeks are the wall's ends). A wall rises with the foundation work on its building. Two
  * levels of detail per wall (stones near; a battered slab with the same stair far) swap by distance; one draw call per wall, vertex colours, no textures.
- * Sizes are in world units (1 u = 6 m): courses 24 cm, stones 35-80 cm, coping 8 cm.
+ * Sizes are in world units (1 u = 6 m): courses 33 cm, stones 60-130 cm, coping 8 cm.
  */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -18,7 +18,7 @@ const TAN: ReadonlyArray<readonly [number, number]> = [[1, 0], [0, 1], [-1, 0], 
 const NOR: ReadonlyArray<readonly [number, number]> = [[0, -1], [1, 0], [0, 1], [-1, 0]];
 
 const DEPTH = 0.11;         // a stone is 66 cm into the wall
-const COURSE = 0.04;        // 24 cm
+const COURSE = 0.055;       // 33 cm
 const EMBED = 0.03;         // the footing is bedded below the ground
 const BATTER = 0.14;        // the face leans back 1 : 7
 const COPING_T = 0.014;
@@ -97,7 +97,7 @@ function stretchNear(parts: THREE.BufferGeometry[], plan: PadPlan, run: WallRun,
     for (let j = 0, base = 0; j < 40; j++) {
       const ch = COURSE * (0.85 + 0.3 * r());
       // every stone of the course across the span, in a running bond (alternate courses start half a stone in)
-      const n0 = Math.max(1, Math.round((b - a) / 0.095));
+      const n0 = Math.max(1, Math.round((b - a) / 0.15));
       const lens: number[] = [];
       let tot = 0;
       for (let q = 0; q < n0; q++) { const l = 0.6 + 0.8 * r(); lens.push(l); tot += l; }
@@ -174,7 +174,7 @@ export function wallGeometry(plan: PadPlan, k: number, ground: Ground, seed: num
   return g;
 }
 
-const DIST: Record<Quality, number> = { high: 40, medium: 28, low: 16 };
+const DIST: Record<Quality, number> = { high: 24, medium: 17, low: 10 };
 
 interface WallEntry { plan: PadPlan; k: number; seed: number; built: string; near: THREE.Mesh | null; far: THREE.Mesh | null; isFar: boolean }
 
@@ -254,7 +254,7 @@ export class RetainWallLayer {
           if (!g) return null;
           const m = new THREE.Mesh(g, this._mat);
           m.name = `retaining_${id}_${detail}`;
-          m.castShadow = detail === 'near'; m.receiveShadow = true;
+          m.castShadow = false; m.receiveShadow = true;   // (a wall hugs the ground: no shadow pass cost)
           m.visible = false;
           this.group.add(m);
           return m;
