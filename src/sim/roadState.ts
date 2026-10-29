@@ -44,6 +44,7 @@ export function roadGroundOf(p: ParcelTerrain): RoadGround {
     : p.creek;
   return {
     h: (x, z) => p.natural(x, z).h,
+    sample: (x, z) => { const n = p.natural(x, z); return { h: n.h, forest: n.forest }; },
     creek,
     lakeY: p.lakeY,
     rock: lot ? (x, z) => lot.rock(x, z) : undefined,

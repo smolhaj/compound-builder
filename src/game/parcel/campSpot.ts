@@ -20,6 +20,10 @@ export function pickCamp(p: ParcelTerrain, h: { x0: number; z0: number; x1: numb
     x0 = Math.max(h.x0, 0) + 2; x1 = h.x1 - 2; z0 = h.z0 + 2; z1 = h.z1 - 2;
   }
   let best: CampSpot | null = null, bestScore = Infinity;
+  // the ground at integer points, once each (the slope reads the four neighbours of every candidate)
+  const memo = new Map<number, { h: number; forest: number }>();
+  const at = (x: number, z: number) => { const k = (x + 2048) * 8192 + (z + 2048); let v = memo.get(k); if (!v) { const n = p.natural(x, z); v = { h: n.h, forest: n.forest }; memo.set(k, v); } return v; };
+  const whole = Number.isInteger(x0) && Number.isInteger(z0);
   for (let pass = 0; pass < 2 && !best; pass++) {
     for (let x = x0; x <= x1; x += 1) {
       for (let z = z0; z <= z1; z += 1) {
@@ -28,9 +32,10 @@ export function pickCamp(p: ParcelTerrain, h: { x0: number; z0: number; x1: numb
         if (p.creekHome && !p.lot && pass === 0 && (dc < 5 || dc > 14)) continue;
         if (dc < 5 && p.hasStream) continue;
         if (p.lot && p.isCreek(x, z)) continue;
-        const s = p.natural(x, z);
+        const s = whole ? at(x, z) : p.natural(x, z);
         if (s.forest > (pass === 0 ? 0.05 : 0.3)) continue;
-        const slope = Math.hypot(p.height(x + 1, z) - p.height(x - 1, z), p.height(x, z + 1) - p.height(x, z - 1)) / 2;
+        const hh = whole ? (a: number, b: number) => at(a, b).h : (a: number, b: number) => p.height(a, b);
+        const slope = Math.hypot(hh(x + 1, z) - hh(x - 1, z), hh(x, z + 1) - hh(x, z - 1)) / 2;
         if (slope > (pass === 0 ? 0.08 : 0.16)) continue;
         const score = Math.hypot(x - cx, z - cz) + slope * (p.lot ? 25 : 40);
         if (score < bestScore) {

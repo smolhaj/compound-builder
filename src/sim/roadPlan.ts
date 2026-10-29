@@ -38,6 +38,8 @@ export type Pt = [number, number];
 export interface RoadGround {
   /** Natural ground height at (x, z). */
   h(x: number, z: number): number;
+  /** Height and timber (0-1) in one call, when the ground can give both at once (the search reads both at every cell). */
+  sample?: (x: number, z: number) => { h: number; forest: number };
   creek?: { zAt(x: number): number; waterY(x: number): number; halfWidth: number } | null;
   /** Still water level (a lake): never driven through. */
   lakeY?: number | null;
@@ -85,7 +87,8 @@ export interface RoadWall { side: 'L' | 'R'; kind: 'cut' | 'fill'; s0: number; s
 export interface RoadSpan { side: 'L' | 'R'; s0: number; s1: number }
 /** A station: the road's height `y`, and `bank` the superelevation (rise per unit across, left of the heading positive: the outside of a curve is higher). */
 export interface RoadPt { x: number; z: number; y: number; s: number; bank: number }
-export interface Hairpin { s: number; x: number; z: number; turnDeg: number }
+/** A hairpin: where it turns, and which side is the outside of the bend (`out`: the road turns away from it). */
+export interface Hairpin { s: number; x: number; z: number; turnDeg: number; out: 'L' | 'R' }
 
 export interface RoadPlan {
   region: RegionId;
@@ -187,12 +190,16 @@ function search(style: RoadStyle, ph: Phase, grid: GridData): Search {
   const heap: Array<[number, number]> = [];
   const push = (f: number, s: number) => { heap.push([f, s]); let i = heap.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (heap[p][0] <= heap[i][0]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p; } };
   const pop = (): [number, number] => { const top = heap[0], last = heap.pop()!; if (heap.length) { heap[0] = last; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let m = i; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; i = m; } } return top; };
-  const gx1 = grid.gateX, maxTurn = style.grid ? Math.PI / 2 + 0.05 : style.hairpinM <= 12 ? 0.9 : 0.5;
+  const W_A = 1.8, gx1 = grid.gateX, maxTurn = style.grid ? Math.PI / 2 + 0.05 : style.hairpinM <= 12 ? 0.7 : 0.5;   // 40 degrees a move in the hill country (a hairpin of about 10-15 m radius), 29 elsewhere (about 20 m)
   const dirList = style.grid ? [0, 4, 8, 12] : DIRS.map((_, i) => i);
   const turnK = style.grid ? 4 : 5 - 4 * style.curviness;
   const start = target.z * nx + target.x;
+  // the gate cells' extent: the straight distance to them is a lower bound on what is left to pay
+  let gLo = nz, gHi = -1;
+  for (let j = 0; j < nz; j++) if (active[j]) { gLo = Math.min(gLo, j); gHi = Math.max(gHi, j); }
+  const gh = (cx: number, cz: number) => Math.hypot(Math.max(0, gx1 - (cx + gx0)), Math.max(0, gLo - cz, cz - gHi));
   gscore[start * 17 + 16] = 0;
-  push(gx1 - (target.x + gx0), start * 17 + 16);
+  push(W_A * gh(target.x, target.z), start * 17 + 16);
   const edgeMemo = new Float32Array(N * 16).fill(-1);
   const boreMemo = new Map<number, Array<{ dx: number; dz: number; cost: number }>>();
   const edge = (cx: number, cz: number, d: number): number => {
@@ -215,16 +222,19 @@ function search(style: RoadStyle, ph: Phase, grid: GridData): Search {
       return { ok: true, path: out };
     }
     if (g > gscore[st] + 1e-9) continue;
-    const gh = (nxc: number) => Math.max(0, gx1 - (nxc + gx0));
+
     const relax = (tx: number, tz: number, dirOut: number, c: number) => {
       if (!isFinite(c) || tx < 0 || tz < 0 || tx >= nx || tz >= nz || !valid[tz * nx + tx]) return;
       const turn = din === 16 ? 0 : angDiff(ANG[din], ANG[dirOut]);
       if (turn > maxTurn + 1e-6) return;
       const pen = din === 16 ? 0 : turnK * (turn / maxTurn) ** 2;
       const ns = (tz * nx + tx) * 17 + dirOut, ng = g + c + pen;
-      if (ng < gscore[ns]) { gscore[ns] = ng; parent[ns] = st; push(ng + gh(tx), ns); }
+      if (ng < gscore[ns]) { gscore[ns] = ng; parent[ns] = st; push(ng + W_A * gh(tx, tz), ns); }
     };
-    for (const d of dirList) relax(cx + DIRS[d][0], cz + DIRS[d][1], d, edge(cx, cz, d));
+    for (const d of dirList) {
+      if (din !== 16 && angDiff(ANG[din], ANG[d]) > maxTurn + 1e-6) continue;   // (the turn limit first: only the moves that can be taken are priced)
+      relax(cx + DIRS[d][0], cz + DIRS[d][1], d, edge(cx, cz, d));
+    }
     // the creek: square across it (north / south), at the price of whatever the region builds there
     if (grid.creek) {
       for (const sg of [1, -1]) {
@@ -278,14 +288,15 @@ function buildGrid(inp: RoadInput, style: RoadStyle): GridData {
   const hw = creek ? creek.halfWidth + 0.35 : 0;
   for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
     const x = gx0 + i, z = gz0 + j, k = j * nx + i;
-    H[k] = ground.h(x, z);
+    const smp = ground.sample ? ground.sample(x, z) : null;
+    H[k] = smp ? smp.h : ground.h(x, z);
     const lake = ground.lakeY != null && H[k] < ground.lakeY + 0.02;
     const isWet = (creek && Math.abs(z - creek.zAt(x)) < hw) || lake ? 1 : 0;
     wet[k] = isWet;
     // the gate column is only open at the gate; the others keep one unit inside the line
     valid[k] = isWet || (i === nx - 1 && !gateOk[j]) ? 0 : 1;
     rockC[k] = ground.rock ? ground.rock(x, z) : 0;
-    coverC[k] = ground.cover ? ground.cover(x, z) : 0;
+    coverC[k] = smp ? smp.forest : ground.cover ? ground.cover(x, z) : 0;
     wander[k] = noise(x * 0.07, z * 0.07) + 0.5 * noise(x * 0.19 + 17, z * 0.19 - 5);
   }
   const hAt = (x: number, z: number) => {
@@ -307,7 +318,7 @@ function buildGrid(inp: RoadInput, style: RoadStyle): GridData {
   const r2 = mulberry32(inp.seed * 7177 + 5);
   const len = Math.hypot(yard[0] - gx1, yard[1] - gm);
   const guide = style.curviness > 0 && !style.grid && len > 8
-    ? { ax: gx1, az: gm, bx: yard[0], bz: yard[1], len, amp: 0.8 + 1.7 * style.curviness, k: Math.max(0.75, Math.round(len / (20 + 10 * (1 - style.curviness)) * 2) / 2) + (r2() < 0.5 ? 0 : 0.25), ph: r2() * 0.8 }
+    ? { ax: gx1, az: gm, bx: yard[0], bz: yard[1], len, amp: 1.0 + 2.5 * style.curviness, k: Math.max(0.75, Math.round(len / (20 + 10 * (1 - style.curviness)) * 2) / 2) + (r2() < 0.5 ? 0 : 0.25), ph: r2() * 0.8 }
     : null;
   return { nx, nz, gx0, gz0, H, valid, wet, rockC, coverC, wander, target: { x: tx, z: tz }, gateX: gx1, gateOk, gateBand, creek, hAt, crossUnits, crossKind, crossWidthM: widthM, bounds: { x0: rect.x0, z0: rect.z0, x1: rect.x1, z1: rect.z1 }, guide };
 }
@@ -345,7 +356,7 @@ function moveCost(grid: GridData, style: RoadStyle, ph: Phase, cx: number, cz: n
     const t = clamp(((mx - g.ax) * ux + (mz - g.az) * uz) / g.len, 0, 1), e = -(mx - g.ax) * uz + (mz - g.az) * ux;
     // the meander is the guide's lateral offset: a sine over the run, faded to nothing at both ends
     const want = g.amp * Math.sin(Math.PI * t) * Math.sin(2 * Math.PI * g.k * t + g.ph * Math.PI);
-    wander += style.curviness * (1.0 - 0.5 * style.follows) * Math.min(1.2, Math.abs(e - want) / 1.6);
+    wander += style.curviness * (1.5 - 0.5 * style.follows) * Math.min(1.2, Math.abs(e - want) / 1.6);
   }
   // a hollow road keeps to the creek's side of the valley
   if (grid.creek && style.follows > 0 && grid.guide) {
@@ -395,7 +406,7 @@ function boreEdges(grid: GridData, style: RoadStyle, cx: number, cz: number): Ar
         const t = q / (len * 2), x = gx0 + cx + ux * L * t, z = gz0 + cz + uz * L * t;
         const cover = grid.hAt(x, z) - (a + (b - a) * t);
         maxCover = Math.max(maxCover, cover);
-        if (t > 0.2 && t < 0.8) { inner++; if (cover >= 0.5) innerOk++; }
+        if (t > 0.2 && t < 0.8) { inner++; if (cover >= 1.3) innerOk++; }   // (the arch stands 0.8 above the road: it needs real rock over it, about 8 m)
         if (t <= 0.04 && cover > 0.4) ok = false;     // portals open on the hillside, not under it
         if (t >= 0.96 && cover > 0.4) ok = false;
       }
@@ -463,24 +474,32 @@ function zigzag(inp: RoadInput, style: RoadStyle, grid: GridData): Array<{ x: nu
   return out;
 }
 
+/** Offsets across the road at which the cut and fill are sampled, with the width each stands for (they sum to the bed's reach on each side). */
+const OFFSETS: ReadonlyArray<readonly [number, number]> = [[0.2, 0.4], [0.55, 0.3], [0.9, 0.4], [1.4, 0.6], [2.0, 0.6], [2.8, 0.9]];
+
 // ── the plan ──
 
 export function planRoad(inp: RoadInput): RoadPlan {
   const style = ROAD_STYLE[inp.region];
   const grid = buildGrid(inp, style);
+  // The limit is on the *ground's* slope along a move, not on the road's grade: the road is cut into the slope (the profile is held to the
+  // style's grade below, and the earthwork is priced), so a switchback's turn may cross the steepest line of the slope at a price that
+  // climbs with it (gradePen). Phase 3 also accepts steep cross-slopes, phase 4 anything.
   const phases: Phase[] = [
-    { limitGrade: style.gradeMax, limitSide: 0.85, bore: false, band: true },
-    { limitGrade: style.gradeMax, limitSide: 0.85, bore: false },
-    ...(style.tunnels ? [{ limitGrade: style.gradeMax, limitSide: 0.85, bore: true }] : []),
-    { limitGrade: style.gradeHard, limitSide: 1.3, bore: style.tunnels },
-    { limitGrade: 0.3, limitSide: 6, bore: style.tunnels },
+    { limitGrade: 0.3, limitSide: 0.85, bore: false, band: true },
+    { limitGrade: 0.3, limitSide: 0.85, bore: false },
+    ...(style.tunnels ? [{ limitGrade: 0.3, limitSide: 0.85, bore: true }] : []),
+    { limitGrade: 0.45, limitSide: 1.3, bore: style.tunnels },
+    { limitGrade: 0.8, limitSide: 6, bore: style.tunnels },
   ];
   let found: Search | null = null, phaseNo: 1 | 2 | 3 | 4 = 4;
   for (let i = 0; i < phases.length && !found; i++) {
     const r = search(style, phases[i], grid);
     if (r.ok) {
       found = r;
-      phaseNo = (phases[i].limitGrade === 0.3 ? 4 : phases[i].limitGrade === style.gradeHard ? 3 : phases[i].bore ? 2 : 1) as 1 | 2 | 3 | 4;
+      phaseNo = (phases[i].limitGrade === 0.8 ? 4 : phases[i].limitGrade === 0.45 ? 3 : phases[i].bore ? 2 : 1) as 1 | 2 | 3 | 4;
+      // a bore phase whose path has no bore in it is simply the strict road
+      if (phaseNo === 2 && !r.path.some((c, k) => k > 0 && Math.max(Math.abs(c.x - r.path[k - 1].x), Math.abs(c.z - r.path[k - 1].z)) >= 5)) phaseNo = 1;
     }
   }
   return finish(inp, style, grid, found, phaseNo);
@@ -556,7 +575,7 @@ function finish(inp: RoadInput, style: RoadStyle, grid: GridData, found: Search 
       if (kindAt[i] || !wetPt(st[i][0], st[i][1])) { i++; continue; }
       let j = i;
       while (j + 1 < n && !kindAt[j + 1] && wetPt(st[j + 1][0], st[j + 1][1])) j++;
-      const i0 = Math.max(0, i - 1), i1 = Math.min(n - 1, j + 1), widthM = Math.max(creek ? creek.halfWidth * 2 * UNIT_M : 0, (s[j] - s[i] + 0.5) * UNIT_M);
+      const i0 = Math.max(0, i - 1), i1 = Math.min(n - 1, j + 1), channelM = creek ? creek.halfWidth * 2 * UNIT_M : 0, widthM = Math.max(channelM, Math.min((s[j] - s[i] + 0.5) * UNIT_M, channelM * 1.25));   // (a diagonal crossing is a little wider than the channel)
       const kind = crossingFor(style, widthM);
       for (let q = i0; q <= i1; q++) kindAt[q] = kind;
       structures.push(mk(kind, i0, i1, kind === 'culvert' || kind === 'arch_culvert' ? Math.min(widthM, 6) : widthM + 2));
@@ -590,20 +609,22 @@ function finish(inp: RoadInput, style: RoadStyle, grid: GridData, found: Search 
   const turnOver = (i0: number, i1: number) => { let t = 0; for (let i = i0 + 1; i <= i1; i++) { let d = head[i] - head[i - 1]; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; t += d; } return t; };
   const hairpins: Hairpin[] = [];
   {
-    const W = 6;   // 6 units (36 m) of road each way
+    const W = 12;   // twelve stations (6 units, 36 m) of road each way
     let i = style.grid ? n : W;   // (the survey grid has right-angle jogs, no hairpins)
     while (i < n - W) {
       const t = turnOver(i - W, i + W);
-      if (Math.abs(t) >= (130 * Math.PI) / 180) {
-        let j = i; while (j + 1 < n - W && Math.abs(turnOver(j + 1 - W, j + 1 + W)) >= (130 * Math.PI) / 180) j++;
+      if (Math.abs(t) >= (120 * Math.PI) / 180) {
+        let j = i; while (j + 1 < n - W && Math.abs(turnOver(j + 1 - W, j + 1 + W)) >= (120 * Math.PI) / 180) j++;
         const mid = Math.round((i + j) / 2);
-        hairpins.push({ s: s[mid], x: st[mid][0], z: st[mid][1], turnDeg: Math.round(Math.abs(turnOver(Math.max(0, i - W), Math.min(n - 1, j + W))) * 180 / Math.PI) });
+        const turn = turnOver(Math.max(0, i - W), Math.min(n - 1, j + W));
+        // (the centre of the bend is on the left when the heading increases: the outside is the right)
+        hairpins.push({ s: s[mid], x: st[mid][0], z: st[mid][1], turnDeg: Math.round(Math.abs(turn) * 180 / Math.PI), out: turn > 0 ? 'R' : 'L' });
         i = j + W;
       } else i++;
     }
   }
   // grade limit (the landing on a hairpin is eased)
-  const lim = new Float64Array(n).fill(phaseNo === 4 ? (found ? 0.3 : style.gradeHard) : phaseNo === 3 ? style.gradeHard : style.gradeMax);
+  const lim = new Float64Array(n).fill(phaseNo >= 3 ? style.gradeHard : style.gradeMax);
   for (const h of hairpins) for (let i = 0; i < n; i++) if (Math.abs(s[i] - h.s) < 1.4) lim[i] = Math.min(lim[i], 0.05);
   const y = Float64Array.from(y0);
   for (let it = 0; it < 6; it++) {
@@ -623,7 +644,6 @@ function finish(inp: RoadInput, style: RoadStyle, grid: GridData, found: Search 
   // 6. cross-drains (a culvert at each sag the road fills across, and at least every ~150 m on a grade), the cattle guard, the pass
   {
     let lastS = s[gateAt], added = 0;
-    for (const sx of structures) if (sx.kind !== 'tunnel' || true) lastS = Math.max(lastS, 0);
     for (let i = gateAt + 6; i < n - 6 && added < 10; i++) {
       if (kindAt.slice(Math.max(0, i - 3), i + 4).some(Boolean)) { lastS = Math.max(lastS, s[i]); continue; }
       const fillDepth = y[i] - gz[i];
@@ -657,10 +677,10 @@ function finish(inp: RoadInput, style: RoadStyle, grid: GridData, found: Search 
     const rot = rotAt(i), nxv = Math.cos(rot), nzv = -Math.sin(rot);   // left normal of heading (sin, cos)
     const ds = i === 0 ? 0 : s[i] - s[i - 1];
     let area = 0;
-    for (let o = 0.125; o <= BED.reach; o += 0.25) for (const sg of [1, -1]) {
+    for (const [o, wdt] of OFFSETS) for (const sg of [1, -1]) {
       const px = st[i][0] + nxv * o * sg, pz = st[i][1] + nzv * o * sg, nat = ground.h(px, pz);
       let bh: number; if (o <= BED.halfW) bh = y[i]; else if (nat > y[i]) bh = Math.min(nat, y[i] + (o - BED.halfW) / BED.cutRatio); else bh = Math.max(nat, y[i] - (o - BED.halfW) / BED.fillRatio);
-      area += Math.min(0.6, Math.abs(bh - nat)) * 0.25;
+      area += Math.min(0.6, Math.abs(bh - nat)) * wdt;
     }
     earthU2 += area * ds;
     for (const sg of [1, -1] as const) {
@@ -671,6 +691,9 @@ function finish(inp: RoadInput, style: RoadStyle, grid: GridData, found: Search 
       if (style.guardrail !== 'none' && y[i] - out > BED.railAt) flagRail[side].push(i);
     }
   }
+  // a guardrail round the outside of each hairpin, drop or no drop, where the region builds one
+  if (style.guardrail !== 'none') for (const h of hairpins) for (let i = 0; i < n; i++) if (Math.abs(s[i] - h.s) < 3.5 && !flagRail[h.out].includes(i)) flagRail[h.out].push(i);
+  for (const side of ['L', 'R'] as const) flagRail[side].sort((a, b) => a - b);
   const spans = (idx: number[], minLen: number): Array<[number, number]> => {
     const out: Array<[number, number]> = [];
     let a = -1, b = -1;
@@ -681,7 +704,7 @@ function finish(inp: RoadInput, style: RoadStyle, grid: GridData, found: Search 
   for (const side of ['L', 'R'] as const) {
     for (const [a, b] of spans(flagWall[side], 1.5)) {
       let mx = 0; for (let i = a; i <= b; i++) if (Math.abs(wallH[side][i]) > Math.abs(mx)) mx = wallH[side][i];
-      walls.push({ side, kind: mx > 0 ? 'cut' : 'fill', s0: s[a], s1: s[b], heightU: Math.min(0.9, Math.abs(mx)) });
+      walls.push({ side, kind: mx > 0 ? 'cut' : 'fill', s0: s[a], s1: s[b], heightU: Math.min(0.5, Math.abs(mx)) });
     }
     for (const [a, b] of spans(flagRail[side], 1.5)) rails.push({ side, s0: s[a], s1: s[b] });
   }
@@ -713,9 +736,9 @@ function finish(inp: RoadInput, style: RoadStyle, grid: GridData, found: Search 
   if (wallUsd > 0) lines.push({ label: 'retaining walls', usd: wallUsd });
   let railUsd = 0; for (const r of rails) railUsd += (r.s1 - r.s0) * UNIT_M * M_TO_FT * P.guardrailPerFt * (style.guardrail === 'timber' ? 0.6 : 1);
   if (railUsd > 0) lines.push({ label: 'guardrail', usd: railUsd });
-  const engineer = phaseNo === 4 || maxG > style.gradeMax + 0.005;
+  const engineer = phaseNo === 4 || maxG > style.gradeMax + 0.005;   // (the ground past the hard grade, or a profile past the maximum)
   if (engineer) lines.push({ label: 'engineer and survey', usd: P.engineer });
-  if (phaseNo === 4) lines.push({ label: found ? 'a mule track on a grade no truck climbs: heavy base, walls' : 'a zigzag blasted across the face', usd: lengthFt * P.perFt * (found ? 2 : 6) + (found ? 0 : earthM3 * P.earthM3) });
+  if (!found) lines.push({ label: 'a zigzag blasted across the face', usd: lengthFt * P.perFt * 6 + earthM3 * P.earthM3 });
   const total = lines.reduce((a, l) => a + l.usd, 0) * (engineer ? 1.25 : 1);
   const days = 5 + Math.round(lengthFt / 300) + Math.round(structures.reduce((a, x) => a + x.days, 0)) + Math.round(walls.reduce((a, w) => a + (w.s1 - w.s0) * UNIT_M * M_TO_FT / 100 * ROAD_DAYS.wall100ft, 0));
   // drive time (km/h): 35 on easy gravel; hairpins 12; grades over 10 % 18; one-lane structures 15; fords 8; the curve radius slows it

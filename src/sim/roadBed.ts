@@ -16,8 +16,8 @@ export const BED = {
   cutRatio: 1.2, fillRatio: 1.8,
   /** The furthest the bed reaches from the centre line. */
   reach: 3.2,
-  /** A cut or fill taller than this at the bench edge wants a retaining wall (world units, 1.3 m), and a drop beyond this wants a guardrail (2.4 m). */
-  wallAt: 0.22, railAt: 0.4,
+  /** A cut or fill taller than this at the bench edge wants a retaining wall (world units, 2.3 m), and a drop beyond this wants a guardrail (2.4 m). */
+  wallAt: 0.38, railAt: 0.4,
 } as const;
 
 /**
@@ -44,23 +44,28 @@ export interface BedStation { x: number; z: number; y: number; bank?: number }
 export class RoadBed {
   private readonly _seg: Array<{ ax: number; az: number; bx: number; bz: number; ay: number; by: number; ka: number; kb: number }> = [];
   private readonly _cells = new Map<number, number[]>();
+  /** The stretches with no bed (a deck, a bore, a slab): the ground there is left as it is, and the banks of the approaches do not spread under them. */
+  private readonly _void: Array<{ ax: number; az: number; bx: number; bz: number }> = [];
+  private readonly _voidCells = new Map<number, number[]>();
   readonly bbox: [number, number, number, number];
   private static readonly CELL = 2;
 
   constructor(pts: readonly BedStation[], skip: ReadonlyArray<boolean> = []) {
     let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
-    for (let i = 1; i < pts.length; i++) {
-      if (skip[i - 1] || skip[i]) continue;
-      const a = pts[i - 1], b = pts[i], id = this._seg.length;
-      this._seg.push({ ax: a.x, az: a.z, bx: b.x, bz: b.z, ay: a.y, by: b.y, ka: a.bank ?? 0, kb: b.bank ?? 0 });
+    const index = (cells: Map<number, number[]>, id: number, a: BedStation, b: BedStation) => {
       const c = RoadBed.CELL, lo = BED.reach;
       const ix0 = Math.floor((Math.min(a.x, b.x) - lo) / c), ix1 = Math.floor((Math.max(a.x, b.x) + lo) / c);
       const iz0 = Math.floor((Math.min(a.z, b.z) - lo) / c), iz1 = Math.floor((Math.max(a.z, b.z) + lo) / c);
       for (let ix = ix0; ix <= ix1; ix++) for (let iz = iz0; iz <= iz1; iz++) {
-        const k = ix * 8191 + iz;
-        const l = this._cells.get(k);
-        if (l) l.push(id); else this._cells.set(k, [id]);
+        const k = ix * 8191 + iz, l = cells.get(k);
+        if (l) l.push(id); else cells.set(k, [id]);
       }
+    };
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1], b = pts[i];
+      if (skip[i - 1] || skip[i]) { this._void.push({ ax: a.x, az: a.z, bx: b.x, bz: b.z }); index(this._voidCells, this._void.length - 1, a, b); continue; }
+      this._seg.push({ ax: a.x, az: a.z, bx: b.x, bz: b.z, ay: a.y, by: b.y, ka: a.bank ?? 0, kb: b.bank ?? 0 });
+      index(this._cells, this._seg.length - 1, a, b);
       x0 = Math.min(x0, a.x, b.x); z0 = Math.min(z0, a.z, b.z); x1 = Math.max(x1, a.x, b.x); z1 = Math.max(z1, a.z, b.z);
     }
     this.bbox = [x0 - BED.reach, z0 - BED.reach, x1 + BED.reach, z1 + BED.reach];
@@ -79,17 +84,31 @@ export class RoadBed {
       const px = s.ax + dx * t, pz = s.az + dz * t, d = Math.hypot(x - px, z - pz);
       if (d < best) {
         best = d; y = s.ay + (s.by - s.ay) * t; bank = s.ka + (s.kb - s.ka) * t; found = true;
-        // left of the heading (sin r, cos r) is (cos r, -sin r) = (dz, -dx) / len
-        const len = Math.sqrt(l2) || 1;
-        o = ((x - px) * dz - (z - pz) * dx) / len;
+        // (the sign from the cross product; the size is the true distance, which beyond a segment's end is not the perpendicular one)
+        o = (((x - px) * dz - (z - pz) * dx) >= 0 ? 1 : -1) * d;
       }
     }
     return found ? { o, y, bank } : null;
   }
 
+  /** Distance to the nearest stretch with no bed (Infinity beyond the reach). */
+  private _voidDist(x: number, z: number): number {
+    const c = RoadBed.CELL, l = this._voidCells.get(Math.floor(x / c) * 8191 + Math.floor(z / c));
+    let best = Infinity;
+    if (!l) return best;
+    for (const id of l) {
+      const s = this._void[id], dx = s.bx - s.ax, dz = s.bz - s.az, l2 = dx * dx + dz * dz;
+      const t = l2 > 0 ? Math.max(0, Math.min(1, ((x - s.ax) * dx + (z - s.az) * dz) / l2)) : 0;
+      best = Math.min(best, Math.hypot(x - (s.ax + dx * t), z - (s.az + dz * t)));
+    }
+    return best;
+  }
+
   /** The ground after the bed. `cleared` is true inside the bench and its banks (no trees). */
   apply(x: number, z: number, natural: number): { h: number; cleared: boolean } {
-    const n = this.nearest(x, z);
+    const n = this.nearest(x, z), v = this._void.length ? this._voidDist(x, z) : Infinity;
+    // nearer a deck or a bore than a bench: the ground is left as it is
+    if (v < Infinity && (!n || v < Math.abs(n.o))) return { h: natural, cleared: v <= BED.halfW + 0.35 };
     if (!n) return { h: natural, cleared: false };
     return { h: bedHeight(natural, n.y, n.o, n.bank), cleared: Math.abs(n.o) <= BED.halfW + 0.35 };
   }

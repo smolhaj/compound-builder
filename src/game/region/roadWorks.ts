@@ -18,7 +18,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { buildRibbon } from '../../engine/world/roads/RoadRibbon';
 import { kitMaterial, type KitMaterialId } from '../buildkit/materials';
 import { BED } from '../../sim/roadBed';
-import { NO_BED, spanIndices, type RoadPlan, type RoadStructure } from '../../sim/roadPlan';
+import { NO_BED, spanIndices, type RoadPlan } from '../../sim/roadPlan';
 import { ROAD_STYLE } from '../../sim/roadStyle';
 
 type Ground = (x: number, z: number) => number;
@@ -135,23 +135,23 @@ export interface RoadWorksOpts {
   natural: Ground;
 }
 
-const KIND_OF = (plan: RoadPlan, k: RoadStructure['kind']) => plan.structures.filter(s => s.kind === k);
-
 /** Everything the plan draws on the ground, in one group. */
 export function buildRoadWorks(plan: RoadPlan, ground: Ground, o: RoadWorksOpts): THREE.Group {
   const group = new THREE.Group();
   group.name = 'roadworks';
   const fr = frames(plan), n = fr.length;
   const style = ROAD_STYLE[plan.region];
+  /** The first station at or past a distance along the road. */
+  const stationAt = (sAlong: number) => { let lo = 0, hi = n - 1; while (lo < hi) { const m = (lo + hi) >> 1; if (plan.pts[m].s < sAlong) lo = m + 1; else hi = m; } return lo; };
   // the surface runs: everything but the spans a deck, a bore or a slab covers
   const cover = new Uint8Array(n);
-  if (o.built) for (const s of plan.structures) if (NO_BED.has(s.kind)) { const [a, b] = spanIndices(plan, s); for (let i = a; i <= b; i++) cover[i] = 1; }
+  // (the ribbon runs on to the first and last station of the span, so no gap shows at a portal or an abutment)
+  if (o.built) for (const s of plan.structures) if (NO_BED.has(s.kind)) { const [a, b] = spanIndices(plan, s); for (let i = a + 1; i < b; i++) cover[i] = 1; }
   const runs: Array<[number, number]> = [];
   for (let i = 0; i < n;) {
     if (cover[i]) { i++; continue; }
     let j = i; while (j + 1 < n && !cover[j + 1]) j++;
-    // a run joins the structure at each end: one station into the span, so no gap shows at the abutment
-    if (j - i >= 1) runs.push([Math.max(0, i - (i > 0 && cover[i - 1] ? 0 : 0)), j]);
+    if (j - i >= 1) runs.push([i, j]);
     i = j + 1;
   }
   const w = o.built ? o.driveW : o.driveW * 0.55;
@@ -166,13 +166,12 @@ export function buildRoadWorks(plan: RoadPlan, ground: Ground, o: RoadWorksOpts)
   const stone = new Parts();
   // ── stone facing on tall banks, a parapet on a tall fill ──
   for (const wl of plan.walls) {
-    const i0 = fr.findIndex((_, i) => plan.pts[i].s >= wl.s0 - 1e-6), i1 = fr.length - 1 - [...fr].reverse().findIndex((_, i) => plan.pts[n - 1 - i].s <= wl.s1 + 1e-6);
-    if (i0 < 0 || i1 <= i0) continue;
+    const i0 = stationAt(wl.s0 - 1e-6), i1 = stationAt(wl.s1 + 1e-6);
+    if (i1 <= i0) continue;
     const sg = wl.side === 'L' ? 1 : -1, h = Math.min(0.5, wl.heightU), reach = h * (wl.kind === 'cut' ? BED.cutRatio : BED.fillRatio);
     const g = bankStrip(fr, i0, i1, sg * BED.halfW, sg * (BED.halfW + reach), ground, 0.012);
     const mesh = new THREE.Mesh(g, kitMaterial('fieldstone'));
     mesh.receiveShadow = true; mesh.castShadow = false;
-    (mesh.material as THREE.Material);
     group.add(mesh);
     if (wl.kind === 'fill') for (let i = i0; i < i1; i += 2) {
       const f = fr[i], ox = f.x + f.nx * sg * (BED.halfW + 0.02), oz = f.z + f.nz * sg * (BED.halfW + 0.02);
@@ -182,9 +181,9 @@ export function buildRoadWorks(plan: RoadPlan, ground: Ground, o: RoadWorksOpts)
   // ── guardrail ──
   const rail = style.guardrail;
   for (const r of plan.rails) {
-    const i0 = fr.findIndex((_, i) => plan.pts[i].s >= r.s0 - 1e-6);
+    const i0 = stationAt(r.s0 - 1e-6);
     let i1 = i0; while (i1 + 1 < n && plan.pts[i1 + 1].s <= r.s1 + 1e-6) i1++;
-    if (i0 < 0 || i1 <= i0) continue;
+    if (i1 <= i0) continue;
     const sg = r.side === 'L' ? 1 : -1;
     let prev: V3 | null = null;
     for (let i = i0; i <= i1; i += 3) {
@@ -207,7 +206,7 @@ export function buildRoadWorks(plan: RoadPlan, ground: Ground, o: RoadWorksOpts)
   for (const sx of plan.structures) {
     const [a, b] = spanIndices(plan, sx);
     switch (sx.kind) {
-      case 'culvert': case 'arch_culvert': culvert(parts, stone, fr, plan, a, b, ground, o.natural, sx.kind === 'arch_culvert'); break;
+      case 'culvert': case 'arch_culvert': culvert(parts, fr, a, b, ground, o.natural, sx.kind === 'arch_culvert'); break;
       case 'ford': case 'low_water': slab(parts, fr, plan, a, b, ground, sx.kind === 'low_water'); break;
       case 'bridge1': case 'bridge': bridge(parts, stone, fr, plan, a, b, ground, sx.kind === 'bridge'); break;
       case 'tunnel': portals(group, stone, fr, a, b, ground); break;
@@ -217,17 +216,16 @@ export function buildRoadWorks(plan: RoadPlan, ground: Ground, o: RoadWorksOpts)
   }
   // ── signs and delineators on the hairpins ──
   for (const h of plan.hairpins) {
-    // the sign stands on the outside of the approach, 4 units before the apex
-    const i = fr.findIndex(f => plan.pts[fr.indexOf(f)].s >= h.s - 4);
-    const f = fr[Math.max(0, i)];
-    // the outside of the bend is the side away from the turn; read it from the heading change ahead
-    const j = Math.min(n - 1, Math.max(0, i) + 14), dh = Math.atan2(Math.sin(fr[j].rot - f.rot), Math.cos(fr[j].rot - f.rot)), outSide = dh > 0 ? -1 : 1;
+    // the sign stands on the outside of the approach, 4 units before the apex, turned to the traffic coming in
+    const i = stationAt(h.s - 4), f = fr[i], outSide = h.out === 'L' ? 1 : -1;
     const x = f.x + f.nx * outSide * (BED.halfW + 0.05), z = f.z + f.nz * outSide * (BED.halfW + 0.05), y = ground(x, z);
     parts.box('steel', x, y + 0.08, z, 0.012, 0.16, 0.012, f.rot);
-    parts.box('paint_yellow', x, y + 0.19, z, 0.1, 0.1, 0.01, f.rot + Math.PI / 4 * 0);   // the diamond, faced to the traffic
+    const sign = new THREE.BoxGeometry(0.11, 0.11, 0.008);
+    sign.applyMatrix4(new THREE.Matrix4().makeRotationZ(Math.PI / 4));
+    sign.applyMatrix4(new THREE.Matrix4().makeRotationY(f.rot + Math.PI).setPosition(x, y + 0.2, z));
+    parts.add('paint_yellow', sign);
     // delineator posts round the apex
-    const ia = fr.findIndex((_, k) => plan.pts[k].s >= h.s - 2.5);
-    for (let k = Math.max(0, ia); k < n && plan.pts[k].s < h.s + 2.5; k += 5) {
+    for (let k = stationAt(h.s - 2.5); k < n && plan.pts[k].s < h.s + 2.5; k += 5) {
       const q = fr[k], px = q.x + q.nx * outSide * (BED.halfW + 0.03), pz = q.z + q.nz * outSide * (BED.halfW + 0.03);
       parts.box('white', px, ground(px, pz) + 0.035, pz, 0.014, 0.07, 0.014, q.rot);
     }
@@ -251,8 +249,7 @@ export function buildRoadWorks(plan: RoadPlan, ground: Ground, o: RoadWorksOpts)
 
 // ── culvert: a corrugated pipe through the fill, ends at the toe of the slope, a headwall each ──
 
-function culvert(parts: Parts, stone: Parts, fr: readonly Frame[], plan: RoadPlan, a: number, b: number, ground: Ground, natural: Ground, big: boolean): void {
-  void plan;
+function culvert(parts: Parts, fr: readonly Frame[], a: number, b: number, ground: Ground, natural: Ground, big: boolean): void {
   const f = fr[Math.round((a + b) / 2)], r = big ? 0.08 : 0.05;
   const toe = (sg: number): V3 => {
     // walk out along the cross-section to where the fill slope meets the natural ground
@@ -270,7 +267,6 @@ function culvert(parts: Parts, stone: Parts, fr: readonly Frame[], plan: RoadPla
     // the dark inside
     parts.tube('dark', [e[0], e[1], e[2]], [e[0] + (e === A ? -1 : 1) * f.nx * 0.001, e[1], e[2] + (e === A ? -1 : 1) * f.nz * 0.001], r * 0.92, 10, false);
   }
-  void stone;
 }
 
 // ── a ford / low-water slab with vent pipes and depth posts ──
@@ -418,4 +414,3 @@ function cairn(stone: Parts, f: Frame, ground: Ground): void {
   stone.box('fieldstone', x, y + 0.108, z, 0.04, 0.025, 0.04, f.rot);
 }
 
-export { KIND_OF };

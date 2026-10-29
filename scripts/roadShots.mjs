@@ -17,11 +17,11 @@ mkdirSync(outDir, { recursive: true });
 
 /** name, query, focus list */
 const CASES = JSON.parse(opt('--cases', 'null')) ?? [
-  ['mw-switchbacks', 'lowrender&clean&seed=7&drive&lot=hillside&relief=11&region=mountain_west&lotseed=2&elev=2500', ['hairpin:0', 'frac:0.5', 'gate']],
-  ['app-hollow', 'lowrender&clean&seed=5&drive&region=appalachia', ['struct:low_water', 'frac:0.5', 'gate']],
-  ['plains-section', 'lowrender&clean&seed=6&drive&region=plains', ['frac:0.4', 'gate']],
-  ['pnw-spur', 'lowrender&clean&seed=3&drive&lot=hillside&relief=9&region=pnw&lotseed=2&elev=800', ['struct:culvert', 'frac:0.5']],
-  ['mw-tunnel', 'lowrender&clean&seed=7&drive&lot=gorge&relief=30&outlier&region=mountain_west&lotseed=3', ['struct:tunnel', 'frac:0.5']],
+  ['mw-switchbacks', 'lowrender&clean&seed=7&drive&lot=hillside&relief=9&region=mountain_west&lotseed=1&elev=2500', ['hairpin:0', 'hairpin:1', 'frac:0.5', 'gate']],
+  ['app-hollow', 'lowrender&clean&seed=6&drive&region=appalachia', ['struct:low_water', 'side:struct:low_water', 'frac:0.5']],
+  ['plains-section', 'lowrender&clean&seed=6&drive&region=plains', ['struct:bridge1', 'side:struct:bridge1', 'frac:0.4']],
+  ['pnw-spur', 'lowrender&clean&seed=7&drive&lot=hillside&relief=9&region=pnw&lotseed=3&elev=900', ['side:struct:culvert', 'frac:0.5']],
+  ['mw-tunnel', 'lowrender&clean&seed=7&drive&lot=saddle&relief=30&outlier&region=mountain_west&lotseed=6', ['portal:tunnel', 'orbit:portal:tunnel', 'frac:0.3']],
 ];
 
 const vite = spawn('node', ['node_modules/vite/bin/vite.js', '--config', 'scripts/vite.shots.config.ts', '--port', String(port), '--strictPort'], { stdio: ['ignore', 'pipe', 'inherit'] });
@@ -55,15 +55,36 @@ try {
     });
     await shot('aerial');
     for (const f of focus) {
-      const ok = await page.evaluate(spec => {
+      const ok = await page.evaluate(spec0 => {
         const { world } = window.__cb, plan = world.plan, P = plan.pts;
+        // side:<focus> looks at the feature from beside the road (a person on it), 3 units off and a little above the ground
+        const side = spec0.startsWith('side:'), orbit = spec0.startsWith('orbit:'), spec = side ? spec0.slice(5) : orbit ? spec0.slice(6) : spec0;
         let s;
         if (spec === 'gate') s = P[plan.gateAt].s + 1.5;
         else if (spec.startsWith('frac:')) s = P[P.length - 1].s * Number(spec.slice(5));
         else if (spec.startsWith('hairpin:')) { const h = plan.hairpins[Number(spec.slice(8))]; if (!h) return false; s = h.s; }
         else if (spec.startsWith('struct:')) { const k = spec.slice(7), st = plan.structures.find(x => x.kind === k); if (!st) return false; s = (st.s0 + st.s1) / 2; }
+        else if (spec.startsWith('portal:')) { const k = spec.slice(7), st = plan.structures.find(x => x.kind === k); if (!st) return false; s = st.s0 - 0.2; }
         else return false;
         const at = ss => { let i = 0; while (i < P.length - 2 && P[i + 1].s < ss) i++; const a = P[i], b = P[i + 1], t = Math.max(0, Math.min(1, (ss - a.s) / Math.max(1e-6, b.s - a.s))); return { x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t, y: a.y + (b.y - a.y) * t }; };
+        if (spec0.startsWith('orbit:')) {
+          // the orbit camera (kept out of the ground) on the approach side, looking at the feature from above and to the side
+          const c = at(s), a = at(s - 0.6), b = at(s + 0.6), tx = b.x - a.x, tz = b.z - a.z, tl = Math.hypot(tx, tz) || 1;
+          const man = at(s - 1.3);
+          world.qaFigure(man.x + tz / tl * 0.2, man.z - tx / tl * 0.2);
+          window.__cb.qa.pose = null;
+          const cm = window.__cb.cam;
+          cm.target.set(c.x, c.y + 0.3, c.z); cm.radius = 5.2; cm.pitch = 0.42; cm.yaw = Math.atan2(-tx, -tz) + 0.5;
+          return true;
+        }
+        if (side) {
+          const c = at(s), a = at(s - 0.6), b = at(s + 0.6), tx = b.x - a.x, tz = b.z - a.z, tl = Math.hypot(tx, tz) || 1, nx = tz / tl, nz = -tx / tl;
+          const man = at(s + 1.4);
+          world.qaFigure(man.x + nx * 0.2, man.z + nz * 0.2);
+          const cx = c.x + nx * 1.6 - tx / tl * 3.4, cz = c.z + nz * 1.6 - tz / tl * 3.4;
+          window.__cb.qa.pose = { x: cx, y: Math.max(world.groundAt(cx, cz), c.y - 0.5) + 0.45, z: cz, lx: c.x, ly: c.y + 0.05, lz: c.z, fov: 58 };
+          return true;
+        }
         const cam = at(Math.max(0.5, s - 4.5)), look = at(s + 1.5), man = at(Math.max(0.5, s - 1.6)), fx = look.x - cam.x, fz = look.z - cam.z, fl = Math.hypot(fx, fz) || 1;
         // the person stands beside the road, 0.22 to the left of the centre line
         const nx = fz / fl, nz = -fx / fl;
@@ -74,7 +95,7 @@ try {
       }, f);
       if (!ok) { console.log('no focus', name, f); continue; }
       await page.waitForTimeout(400);
-      await shot('eye-' + f.replace(':', ''));
+      await shot((f.startsWith('side:') || f.startsWith('orbit:') ? '' : 'eye-') + f.replace(/:/g, ''));
     }
     // a second, higher look from the side at the first feature
     await page.evaluate(() => { window.__cb.qa.pose = null; });

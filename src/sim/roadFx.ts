@@ -20,7 +20,10 @@
  *    on open ground, so the watch sees it that much longer. Hold the choke (a
  *    tower or wall within 4 units) and it counts as a held choke in the shared
  *    defensive strength, small: at most 25 % of the terrain's share.
- * Pure.
+ * Scope: the quote and the drawing read the plan on every place; the raid, delivery and winter effects
+ * (and the response time) read it on a place on a lot archetype, the hill country where the road has real
+ * relief, like sim/slope.ts (the plan costs a search, and every battle and test seed would pay it); a
+ * flood still takes a low-water crossing on any place. Pure.
  */
 import type { GameState } from './state';
 import { dayIndex } from './state';
@@ -45,30 +48,34 @@ const planOf = (s: Pick<GameState, 'site' | 'seed'>): RoadPlan => roadPlanOf(s);
 export const singleFile = (p: RoadPlan): RoadStructure[] => p.structures.filter(x => x.choke);
 
 /** Winter difficulty from the road alone (1 or more: the road closes on heavy snow days). */
-export function roadWinter(s: Pick<GameState, 'site' | 'seed'>): number {
-  const p = planOf(s);
+export function winterOf(p: RoadPlan): number {
   return Math.max(0, (p.maxGradePct / 100 - 0.06) / 0.08)
     + Math.min(RFX.HAIRPIN_WINTER_CAP, p.hairpins.length * RFX.HAIRPIN_WINTER)
     + (p.lengthM / 1000) * RFX.PER_KM_WINTER
     + (p.structures.some(x => x.kind === 'bridge' || x.kind === 'bridge1' || x.kind === 'ford' || x.kind === 'low_water') ? RFX.ICE : 0);
 }
+export const roadWinter = (s: Pick<GameState, 'site' | 'seed'>): number => winterOf(planOf(s));
 
 /** Multiplier on the deputy, ambulance and fire response time from the road alone. */
-export function roadResponse(s: Pick<GameState, 'site' | 'seed'>): number {
-  const p = planOf(s), g = p.maxGradePct;
+export function responseOf(p: RoadPlan): number {
+  const g = p.maxGradePct;
   let k = 1 + Math.min(RFX.KM_RESPONSE_CAP, Math.max(0, (p.lengthM - 300) / 1000 * RFX.KM_RESPONSE));
   k += p.hairpins.length * RFX.HAIRPIN_RESPONSE + (g > 10 ? RFX.GRADE10 : 0) + (g > 16 ? RFX.GRADE16 : 0) + singleFile(p).length * RFX.SINGLE_FILE;
   return Math.round(k * 100) / 100;
 }
+export const roadResponse = (s: Pick<GameState, 'site' | 'seed'>): number => responseOf(planOf(s));
 
 const HEAVY = ['concrete', 'tank', 'container', 'septic_tank', 'excavator', 'drilling'];
 export const BRIDGE_TEXT = 'the one-lane bridge is posted at 10 tons: the heavy load is shuttled across in pieces';
 export const CROSSING_OUT_TEXT = 'the low-water crossing is under the creek';
 
 /** Extra days on a delivery that the road's structures cost. */
+export function structureDelayOf(p: RoadPlan, materials: readonly string[]): { days: number; why: string | null } {
+  return materials.some(m => HEAVY.includes(m)) && p.structures.some(x => x.kind === 'bridge1') ? { days: 2, why: BRIDGE_TEXT } : { days: 0, why: null };
+}
 export function structureDelay(s: Pick<GameState, 'site' | 'seed'>, materials: readonly string[]): { days: number; why: string | null } {
-  if (!materials.some(m => HEAVY.includes(m))) return { days: 0, why: null };   // (cheap first: the plan is only read for a heavy load)
-  return planOf(s).structures.some(x => x.kind === 'bridge1') ? { days: 2, why: BRIDGE_TEXT } : { days: 0, why: null };
+  if (!s.site.lot || !materials.some(m => HEAVY.includes(m))) return { days: 0, why: null };   // (cheap first: the plan is only read for a heavy load, on a lot)
+  return structureDelayOf(planOf(s), materials);
 }
 
 /** Days left that a flood has the low-water crossing under (0: open). A bridge or a culvert stays open. */
@@ -84,30 +91,34 @@ export function crossingOutFor(s: GameState, day = dayIndex(s.clock.t)): number 
 export interface RoadChoke { kind: RoadStructure['kind'] | 'hairpins'; at: Pt; /** Width of the way there, units (a one-lane structure is ~0.6). */ width: number }
 
 /** Where the road is single file. */
-export function roadChokes(s: Pick<GameState, 'site' | 'seed'>): RoadChoke[] {
-  const p = planOf(s), out: RoadChoke[] = singleFile(p).map(x => ({ kind: x.kind, at: [x.x, x.z] as Pt, width: 0.6 }));
+export function chokesOf(p: RoadPlan): RoadChoke[] {
+  const out: RoadChoke[] = singleFile(p).map(x => ({ kind: x.kind, at: [x.x, x.z] as Pt, width: 0.6 }));
   if (p.hairpins.length >= 2) { const h = p.hairpins[Math.floor(p.hairpins.length / 2)]; out.push({ kind: 'hairpins', at: [h.x, h.z], width: 0.8 }); }
   return out;
 }
+/**
+ * Only a place on a lot archetype (the hill country, where the ground has relief) reads the road in a raid: the
+ * plan costs a search over the land, and every battle, every raid dossier and every test seed would pay it; the
+ * classic ground's road is a short level drive.
+ */
+export const roadChokes = (s: Pick<GameState, 'site' | 'seed'>): RoadChoke[] => (s.site.lot ? chokesOf(planOf(s)) : []);
 
 /** Extra distance (units) a vehicle crew's approach adds before the line: the watch sees it that much longer. */
-export function roadStart(s: Pick<GameState, 'site' | 'seed'>): number {
-  const p = planOf(s);
-  return Math.min(RFX.START_CAP, singleFile(p).length * RFX.CHOKE_START + p.hairpins.length * RFX.HAIRPIN_START);
+export const startOf = (p: RoadPlan): number => Math.min(RFX.START_CAP, singleFile(p).length * RFX.CHOKE_START + p.hairpins.length * RFX.HAIRPIN_START);
+export const roadStart = (s: Pick<GameState, 'site' | 'seed'>): number => (s.site.lot ? startOf(planOf(s)) : 0);
+
+/** How much easier than open ground the road side is for a crew (the terrain's ROAD_EASE 0.75), eased back toward 1 as the road gets slow: +0.1 for each time its drive exceeds a straight level road's (cap 1). */
+export function easeOf(p: RoadPlan, base: number): number {
+  const slow = p.straightMin > 0 ? p.driveMin / p.straightMin : 1;
+  return Math.round(Math.min(1, base + 0.1 * Math.max(0, slow - 1)) * 100) / 100;
 }
+export const roadEase = (s: Pick<GameState, 'site' | 'seed'>, base: number): number => (s.site.lot ? easeOf(planOf(s), base) : base);
 
 /** Words for the Defense card and the log. */
 export function roadChokeLines(s: Pick<GameState, 'site' | 'seed'>): string[] {
-  const p = planOf(s), out: string[] = [];
+  const p = planOf(s);
   const kind: Record<string, string> = { bridge1: 'a one-lane bridge', bridge: 'a bridge', tunnel: 'a rock bore', ford: 'a ford', low_water: 'a low-water crossing', hairpins: `${p.hairpins.length} hairpins` };
-  for (const c of roadChokes(s)) out.push(`The road is single file at ${kind[c.kind]}: a crew's trucks stop there and walk`);
-  return out;
-}
-
-/** How much easier than open ground the road side is for a crew (the terrain's ROAD_EASE 0.75), eased back toward 1 as the road gets slow: +0.1 for each time its drive exceeds a straight level road's (cap 1). */
-export function roadEase(s: Pick<GameState, 'site' | 'seed'>, base: number): number {
-  const p = planOf(s), slow = p.straightMin > 0 ? p.driveMin / p.straightMin : 1;
-  return Math.round(Math.min(1, base + 0.1 * Math.max(0, slow - 1)) * 100) / 100;
+  return roadChokes(s).map(c => `The road is single file at ${kind[c.kind]}: a crew's trucks stop there and walk`);
 }
 
 // ── words ──
