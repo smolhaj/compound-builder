@@ -33,6 +33,7 @@ import { TURRET_JAM, highBonus, litTowerIds, isTower, mountReady, towerPosture, 
 import { enclosure } from './enclosure';
 import { mulberry32 } from './rng';
 import { diffOf } from './difficulty';
+import { extraKit } from './adaptive';
 import { leaveAftermath } from './aftermath';
 import { peopleAfterFight } from './people';
 import { fightNerves } from './mind';
@@ -114,6 +115,11 @@ export interface BattleOptions {
    * moment they reach it. A few raiders, near the house.
    */
   insideBreach?: boolean;
+  /**
+   * 0-1: how far the crew has learned this place (sim/adaptive.ts, Hardcore):
+   * more grenades, a rocket for an organized crew, more plate and automatic rifles.
+   */
+  adapt?: number;
   /**
    * An ambush at the breakout point: the crew comes up out of a hole in a
    * bunch, and is caught flat-footed for this many seconds (the family is
@@ -328,6 +334,9 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
   const organized = opts.organized ?? raiders >= 5;
   let gLeft = opts.grenades ?? (armedR && !peace ? (organized ? Math.round(raiders * late * 0.4 * r()) : r() < late * 0.15 ? 1 : 0) : 0);
   let rLeft = opts.rockets ?? (armedR && !peace && organized && daysAfter > 120 && r() < late * 0.3 ? 1 : 0);
+  // (Hardcore) a crew that has learned the place brings more of it (sim/adaptive.ts; nothing at adapt 0)
+  const kit = extraKit(raiders, opts.adapt ?? 0, organized);
+  if (armedR && !peace) { gLeft += kit.grenades; if (kit.rocket && daysAfter > 120) rLeft = Math.max(rLeft, 1); }
   // they come up from out of sight, well beyond the line (round 4: they used to start 30–34 out whatever the wall, so a wide palisade had them at it before anyone was up)
   const start = Math.max(30, lineR + 22);
   for (let i = 0; i < raiders; i++) {
@@ -335,11 +344,11 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
       : opts.insideBreach ? at(Math.max(1.5, lineR * 0.55) + r() * 1.5, (r() - 0.5) * 2.5)
       : opts.ambush !== undefined ? at(lineR + 0.8 + r() * 0.8, (r() - 0.5) * 1.2)
       : at(start + r() * 4, (r() - 0.5) * 8);
-    const autoR = armedR && late > 0.5 && r() < 0.3;
+    const autoR = armedR && late > 0.5 && r() < 0.3 + kit.auto;
     const arm: Arm = !armedR ? FISTS : peace ? { ...ARMS.pistol, cal: null } : { ...(autoR ? ARMS.auto_rifle : r() < 0.55 ? ARMS.semi_rifle : r() < 0.6 ? ARMS.pump : ARMS.pistol), cal: null };
     const gr = gLeft > 0 ? 1 : 0; gLeft -= gr;
     const rk = rLeft > 0 && i > 0 ? 1 : 0; rLeft -= rk;
-    const f: Fighter = { id: `r${i}`, side: 'raider', ...p, y: 0, hp: 100, out: false, dead: false, arm, skill: 3 + Math.floor(r() * 4), readyAt: opts.ambush ?? 0, post: null, cover: 1, moving: true, nextMove: 0, shelter: false, grenades: gr, rockets: rk, leader: i === 0, armor: { plate: armedR && !peace && r() < late * 0.35, soft: armedR && !peace && r() < 0.15 + late * 0.2, helmet: armedR && !peace && r() < late * 0.3 }, inGun: arm.mag, spare: 2 + Math.round(late * 3), bleed: 0, supp: 0, nvg: armedR && !peace && late > 0.6 && r() < 0.25, wear: 0.5 + r() * 0.4 };
+    const f: Fighter = { id: `r${i}`, side: 'raider', ...p, y: 0, hp: 100, out: false, dead: false, arm, skill: 3 + Math.floor(r() * 4), readyAt: opts.ambush ?? 0, post: null, cover: 1, moving: true, nextMove: 0, shelter: false, grenades: gr, rockets: rk, leader: i === 0, armor: { plate: armedR && !peace && r() < late * 0.35 + kit.plate, soft: armedR && !peace && r() < 0.15 + late * 0.2, helmet: armedR && !peace && r() < late * 0.3 }, inGun: arm.mag, spare: 2 + Math.round(late * 3), bleed: 0, supp: 0, nvg: armedR && !peace && late > 0.6 && r() < 0.25, wear: 0.5 + r() * 0.4 };
     F.push(f); units.push({ id: f.id, side: 'raider', x: r2(p.x), z: r2(p.z), post: 'open' });
   }
   const H = F.filter(f => f.side === 'home'), R = F.filter(f => f.side === 'raider');
