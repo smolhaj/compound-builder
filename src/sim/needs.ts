@@ -21,7 +21,7 @@ import { isFinished } from './construction';
 import { climate } from './effects';
 import { tractorBoost } from './vehicles';
 import { SOIL_YIELD } from './site';
-import { REGIONS, seasons } from './regions';
+import { seasons } from './regions';
 import { gardenSeason, greenhousePeak, greenhouseGreens, orchardYield } from './greenhouse';
 import { careYield, cookRatio, lifeMorale, spoilFactor } from './daily';
 import { beltMorale, isAbsent } from './weekender';
@@ -37,6 +37,7 @@ import { freshSpoilRate, shelveRoots } from './storage';
 import { newcomerMorale } from './newcomers';
 import { mindMorale } from './mind';
 import { bestLevel } from './skills';
+import { regionFor } from './climate';
 
 export type FoodId = 'fresh' | 'frozen' | 'canned' | 'staples';
 /** Food is kept in the stockpile in these units; kcal in one unit. */
@@ -105,7 +106,7 @@ function hailThisYear(s: GameState): number | null {
  * the old flat 700,000 kcal a year on average, plus the seed unit the harvest sets aside (`keepSeed`).
  */
 export function fieldHarvestSplit(s: GameState): { total: number; potato: number; dry: number } {
-  const doy = calendarOf(s.clock).doy, HARVEST = seasons(REGIONS[s.site.region]).harvest;
+  const doy = calendarOf(s.clock).doy, HARVEST = seasons(regionFor(s.site)).harvest;
   if (doy < HARVEST[0] || doy >= HARVEST[1]) return { total: 0, potato: 0, dry: 0 };
   const fields = fieldsOf(s);
   if (!fields.length) return { total: 0, potato: 0, dry: 0 };

@@ -65,7 +65,7 @@ import { hitsColliders, M, type Collider } from './buildkit/interior';
 import type { BuildingView } from '../store/worldStore';
 import type { Structure } from '../sim/state';
 import { calendarOf } from '../sim/state';
-import { REGIONS, seasons } from '../sim/regions';
+import { seasons } from '../sim/regions';
 import { BLUEPRINTS } from '../sim/blueprints';
 import { SmokePlume } from '../engine/world/fx/SmokePlume';
 import type { Pad, Pit } from './parcel/parcelTerrain';
@@ -79,6 +79,7 @@ import { DRIVE_W, ROAD_W, distToLine, planAccess, roadLine, roadX, type Access }
 import { buildRibbon } from '../engine/world/roads/RoadRibbon';
 import { gravelMaterial, roadMaterial } from '../engine/world/roads/roadTextures';
 import { RockField, type RockSpec } from '../engine/world/terrain/RockField';
+import { regionFor } from '../sim/climate';
 import { buildLineFences, buildPowerline, planLineFences } from './region/lineFences';
 import type { RegionWorld } from './region/regionWorld';
 import { buildGate } from './props/gateGeometry';
@@ -450,7 +451,8 @@ export class HomesteadWorld {
         return [...planParcelTrees(this.parcel, o), ...planUnderstory(this.parcel, o)];
       }),
     ];
-    const specs = plantAll(q === 'low' ? 0.5 : 1, blocked);
+    // (a lot with relief carries about twice the classic parcel's trees: Low plants a third of them, Medium most)
+    const specs = plantAll(this.parcel.lot ? (q === 'low' ? 0.35 : q === 'medium' ? 0.85 : 1) : q === 'low' ? 0.5 : 1, blocked);
     for (const t of specs) t.y = this.terrain.surfaceAt(t.x, t.z) - 0.03;
     this._planted = specs;
     // lookups cover every tree a full-density plan has (marks made on High survive a switch to Low)
@@ -1670,9 +1672,9 @@ export class HomesteadWorld {
     };
     this.dogs.update(dt, game, hour, game.clock.t, dctx, this.walkHeight, speedK);
     // crops stand in the ground from planting (mid-May) to the last of the harvest (late October); bare soil the rest of the year
-    const doy = calendarOf(game.clock).doy, [c0, c1] = seasons(REGIONS[game.site.region]).crops, growing = doy >= c0 && doy < c1;
+    const doy = calendarOf(game.clock).doy, [c0, c1] = seasons(regionFor(game.site)).crops, growing = doy >= c0 && doy < c1;
     // the orchard: leaves from blossom to a month past the first frost, fruit in late summer once the trees bear (and no late frost took it)
-    const [fr0, fr1] = REGIONS[game.site.region].frost, cal = calendarOf(game.clock);
+    const [fr0, fr1] = regionFor(game.site).frost, cal = calendarOf(game.clock);
     const leafy = doy >= fr0 - 15 && doy < fr1 + 25, picking = doy >= ORCHARD_PICK[0] - 25 && doy < ORCHARD_PICK[1] && !orchardFrost(game.seed, cal.year);
     for (const b of this._built.values()) {
       if (b.placed.kind === 'orchard' || b.placed.kind === 'orchard_grove') {

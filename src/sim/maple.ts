@@ -16,12 +16,13 @@
  */
 import { calendarOf, type GameState } from './state';
 import { isFinished } from './construction';
-import { REGIONS, type RegionId } from './regions';
+import { type RegionId } from './regions';
 import { mulberry32 } from './rng';
 import { logGate } from './nag';
 import { addFood } from './pantry';
 import { farmOf } from './farm';
 import { burnRick, greenRicks } from './upkeep';
+import { regionFor } from './climate';
 
 /** Share of the woods in sugar maple, by region (absent: none). */
 export const MAPLE_SHARE: Partial<Record<RegionId, number>> = { new_england: 0.45, upper_midwest: 0.3, north_woods: 0.2, rust_belt: 0.2, appalachia: 0.15 };
@@ -68,7 +69,7 @@ export function setTaps(s: GameState, n: number | null): void { mapleOf(s).taps 
 
 /** The sap runs from 80 to 30 days before the last frost. */
 export function sapSeason(s: GameState): [number, number] {
-  const last = REGIONS[s.site.region].frost[0];
+  const last = regionFor(s.site).frost[0];
   return [last - 80, last - 30];
 }
 export const inSeason = (s: GameState): boolean => { const d = calendarOf(s.clock).doy, [a, b] = sapSeason(s); return hasMaples(s) && d >= a && d <= b; };

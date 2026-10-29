@@ -18,7 +18,7 @@
 import { calendarOf, dayIndex, hourOf, type GameState } from './state';
 import { KCAL, FOODS, type FoodId } from './needs';
 import { isFinished } from './construction';
-import { seasons, REGIONS } from './regions';
+import { seasons } from './regions';
 import { log } from './economy';
 import { mulberry32 } from './rng';
 import { dailyOf } from './daily';
@@ -27,6 +27,7 @@ import { griefMorale, mourn, noteLosses, unmourned } from './grief';
 import { bestHand, practice } from './skills';
 import { faithOf } from './mind';
 import { gatheringKitLift, noteShared, wearKits, type KitId } from './evenings';
+import { regionFor } from './climate';
 
 export type GatheringKind = 'cookout' | 'birthday' | 'thanksgiving' | 'christmas' | 'july4' | 'harvest' | 'movie' | 'campfire' | 'wedding' | 'funeral' | 'neighbors' | 'service';
 
@@ -258,7 +259,7 @@ export function gatheringsDay(s: GameState): string[] {
   const bd = s.people.find((p, i) => p.bday === doy && p.age >= 1 && s.personState[i]?.needs.died == null && (p.kin || p.kid));
   if (bd && since('birthday') > 0.8) { auto('birthday', bd.id); return out; }
   // the harvest is in (the day after the field harvest ends)
-  const H = seasons(REGIONS[s.site.region]).harvest;
+  const H = seasons(regionFor(s.site)).harvest;
   if (doy === H[1] && s.structures.some(st => st.kind === 'field' && isFinished(st)) && since('harvest') > 300) { auto('harvest'); return out; }
   // a campfire on a mild evening when spirits are low
   const alive = s.personState.filter(ps => ps.needs.died == null);

@@ -17,7 +17,7 @@ import * as THREE from 'three';
 import type { Quality } from '../../engine/world/WorldScene';
 import type { GameState, Structure } from '../../sim/state';
 import { calendarOf, dayIndex } from '../../sim/state';
-import { REGIONS } from '../../sim/regions';
+
 import { dogCount } from '../../sim/pets';
 import { isHome } from '../../sim/blueprints';
 import type { PerimeterRun } from '../../sim/perimeter';
@@ -38,6 +38,7 @@ import { frostAt, mudSeason, troughIce } from './seasonCover';
 import { kitIdOf, setMeshWear, WEAR_CLASS } from './weathering';
 import { SnowDrifts, type DriftWall } from './snowDrifts';
 import { Overgrowth, type WildArea } from './Overgrowth';
+import { regionFor } from '../../sim/climate';
 
 /** What the atmosphere needs of a built structure. */
 export interface AtmosBuilding {
@@ -146,7 +147,7 @@ export class Atmosphere {
     const lightsOut = lightsOutNow(game), curtains = curtainSets(game);
     const built = [...this._h.buildings()];
     // ── seasons: mud, frost, drifts, the stock tank ──
-    const R = REGIONS[game.site.region];
+    const R = regionFor(game.site);
     const sp = seasonState.params;
     this._mud = mudSeason(doy, R.frost[0], R.cold, sp.snow);
     this._frost = frostAt(f.hour, sp.cold, f.snow, f.cloud);
@@ -268,7 +269,7 @@ export class Atmosphere {
   }
 
   private _syncWear(built: readonly AtmosBuilding[], game: GameState): void {
-    const wet = wetnessOf(REGIONS[game.site.region].rainMm);
+    const wet = wetnessOf(regionFor(game.site).rainMm);
     const byId = new Map(game.structures.map(s => [s.id, s]));
     for (const b of built) {
       const a = this._ages(byId.get(b.id), game);

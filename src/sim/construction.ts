@@ -5,6 +5,7 @@
  * hours are done the next one begins.
  */
 import { drillExtra, siteProblem } from './site';
+import { gradedBlueprint, stampGrade } from './slope';
 import { permitHold } from './paperwork';
 import { BLUEPRINTS, totalBill } from './blueprints';
 import { hasAll, shortfall, waitingFor, type Stock } from './materials';
@@ -13,7 +14,8 @@ import { payUpkeep, toolHold, wearTools, workSpeed } from './tools';
 import type { GameState, Structure } from './state';
 
 export function blueprintOf(st: Structure) {
-  return BLUEPRINTS[st.kind];
+  const bp = BLUEPRINTS[st.kind];
+  return st.grade ? gradedBlueprint(bp, st.grade) : bp;
 }
 
 export function isFinished(st: Structure): boolean {
@@ -41,6 +43,7 @@ export function planProblem(s: GameState, kind: string): string | null {
 
 export function planStructure(s: GameState, kind: string, x: number, z: number, rot: number): Structure {
   const st: Structure = { id: `s${s.nextId++}`, kind, x, z, rot, stage: 0, done: 0, supplied: false, finishedAt: null };
+  stampGrade(s, st);
   s.structures.push(st);
   log(s, `Staked out a ${kind.replace('_', ' ')}.`);
   return st;

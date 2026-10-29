@@ -12,7 +12,7 @@ import { dishLines, hasMill, hasOven, kitchenOf, toggleMethod } from '../sim/kit
 import { cellarCapacity, cellarKcal, cellarTempC, overflow, pantryLoad, pantryRoom } from '../sim/storage';
 import { foodUnits } from '../sim/pantry';
 import { ANIMALS, feedDemand, sheepRoom, sheepSheltered, winterHay, type Animal } from '../sim/livestock';
-import { REGIONS } from '../sim/regions';
+
 import { apiaries, apiaryReport, harvestHoney, harvestProblem, HIVES, stockApiary, stockProblem as bStockProblem } from '../sim/bees';
 import { expectedSyrup, hasMaples, hasShack, mapleOf, sapSeason, setTaps, tapsOut, woodsTaps } from '../sim/maple';
 import { butcher, butcherProblem, feedBudget, herdOf, sheltered } from '../sim/herd';
@@ -20,6 +20,7 @@ import { MATERIALS } from '../sim/materials';
 import { FarmPanel } from './FarmPanel';
 import { Note, Row, Section, Tabs } from './hud/common';
 import { btn, DIM, TONE, type Tone } from './hud/style';
+import { regionFor } from '../sim/climate';
 
 type Sub = 'season' | 'fields' | 'kitchen' | 'animals' | 'plan';
 const k = (n: number) => `${Math.round(n / 1000).toLocaleString('en-US')}k kcal`;
@@ -191,7 +192,7 @@ function AnimalsView({ game }: { game: GameState }) {
   const g = useGameStore();
   const have = ANIMALS.filter(a => (game.stock[a] ?? 0) >= 1), h = herdOf(game);
   const fb = feedBudget(game, feedDemand(game), winterHay(game));
-  const [frost0, frost1] = REGIONS[game.site.region].frost;
+  const [frost0, frost1] = regionFor(game.site).frost;
   const hayWinterDays = fb.hayNeed > 0 ? fb.hayBales / (fb.hayNeed / (365 - (frost1 - frost0))) : Infinity;
   // a greyed button says why on the page, not only in its tooltip
   const act = (label: string, why: string | null, run: () => void, tip: string) => <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 1 }}>
