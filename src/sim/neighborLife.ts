@@ -41,9 +41,10 @@ import { addWork, blockedReason, isFinished } from './construction';
 import { canGo, fightAtCamp } from './rescue';
 import { applyCasualties, type RaiderTemper } from './battle';
 import { raiderTemper, type Encounter, type Neighbor, type NeighborKind } from './encounters';
-import { dayJob, SKILL_IDS, type Person, type SkillId } from './family';
+import type { Person, SkillId } from './family';
 import { calendarOf, dayIndex, type GameState } from './state';
 import { inPact } from './pact';
+import { bringsLine, householdPeople, neighborBrings, neighborSecret, requestShelter, trustLine, trustMult } from './newcomers';
 import type { Caliber } from './armory';
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -244,20 +245,14 @@ export function raidHousehold(s: GameState, n: Neighbor, raiders: number, temper
 function askToJoin(s: GameState, n: Neighbor, why: string, r: () => number): boolean {
   if (s.gate.pending || n.members <= 0) return false;
   const l = lifeOf(s, n), day = dayIndex(s.clock.t);
-  const people: Person[] = Array.from({ length: Math.min(3, n.members) }, (_, i) => {
-    const kid = n.kind === 'young_family' && i >= 2;
-    const skills = Object.fromEntries(SKILL_IDS.map(k => [k, Math.floor(r() * (kid ? 2 : 3))])) as Record<SkillId, number>;
-    if (!kid) skills[n.skill] = 5 + Math.floor(r() * 3);
-    const body: 'f' | 'm' = n.kind === 'widow' ? 'f' : i === 0 ? 'm' : 'f';
-    const p: Person = { id: `pn_${n.id}_${i}`, first: pick(r, body === 'f' ? ['Ruth', 'Marlene', 'Jo', 'Kate', 'Ada', 'Lorna', 'Bea'] : ['Walt', 'Gene', 'Earl', 'Dale', 'Luis', 'Tom', 'Marty']), last: surname(n), age: i === 0 ? l.head : kid ? 6 + Math.floor(r() * 9) : Math.max(18, l.head - Math.floor(r() * 6)), kid, body, skills, shirt: Math.floor(r() * 0xffffff) & 0x7f7f7f };
-    if (!kid && p.age < 66) p.job = dayJob(p, s.seed);
-    if (p.age >= 66) p.elder = true;
-    return p;
-  });
+  const people = householdPeople(s, n, Math.min(3, n.members), r, i => `pn_${n.id}_${i}`);
+  const carried = neighborBrings(n, r);
+  const brings = { canned: 2 + Math.floor(r() * 4), staples: 1, ...carried.brings };
   const e: Encounter = {
     id: `e${s.nextId++}`, kind: 'arrival', day, title: `The ${plural(surname(n))} at the gate`,
-    dossier: [why, `${people.length} of them: ${people.map(p => `${p.first}, ${p.age}`).join('; ')}.`, `Good at: ${n.skill}.`, `${people.length} more to feed: about ${people.length * 2200} kcal a day.`],
-    size: people.length, armed: false, strength: 0, people, brings: { canned: 2 + Math.floor(r() * 4), staples: 1 }, neighbor: n.id,
+    dossier: [why, `${people.length} of them: ${people.map(p => `${p.first}, ${p.age}`).join('; ')}.`, `Good at: ${n.skill}.`, trustLine(n), `They carry: ${bringsLine(brings, carried.extras)}.`, `${people.length} more to feed: about ${people.length * 2200} kcal a day.`],
+    size: people.length, armed: false, strength: 0, people, brings, extras: carried.extras, arche: 'neighbor', neighbor: n.id,
+    secret: neighborSecret(n.disposition, mulberry32(s.seed * 3169 + hashId(n.id) + 1)),
     stances: ['take_in', 'trial', 'turn_away'],
   };
   s.gate.pending = e;
@@ -440,9 +435,14 @@ export function neighborLifeDay(s: GameState): string[] {
   for (const n of s.neighbors) {
     const l = L.lives[n.id];
     if (!l?.asked || s.gate.pending?.id === l.asked) continue;
+    if (s.gate.camps?.some(c => c.neighbor === n.id)) continue;   // on a month's trial: the answer comes at the end of it
     l.asked = undefined;
     if (s.people.some(p => p.id.startsWith(`pn_${n.id}_`))) { n.status = 'joined'; n.members = 0; l.history.push({ day, text: 'Came to live with the family.', known: true, how: 'seen' }); L.pact = L.pact.filter(x => x !== n.id); }
-    else { emptied(s, n, 'left'); n.disposition = Math.max(-100, n.disposition - 40); l.history.push({ day, text: 'Turned away at the family\'s gate. They went on down the road.', known: true, how: 'seen' }); }
+    else {
+      emptied(s, n, 'left'); n.disposition = Math.max(-100, n.disposition - 40); l.history.push({ day, text: 'Turned away at the family\'s gate. They went on down the road.', known: true, how: 'seen' });
+      // word gets round the other households
+      for (const o of s.neighbors) if (o.id !== n.id && o.status === 'home' && o.members > 0) o.disposition = Math.max(-100, o.disposition - 4);
+    }
   }
   // a callout nobody answered by the next day
   if (L.callout && day > L.callout.day) answerCallout(s, null);
@@ -493,13 +493,14 @@ export function neighborLifeDay(s: GameState): string[] {
       const u = nr();
       if (hit && u < 0.4) { emptied(s, n, 'left'); happen(s, n, `The ${plural(surname(n))} packed what was left and went to family out of state.`, 'quiet', nr); }
       else if (hit && u < 0.7 && n.disposition > 20) askToJoin(s, n, `${text} They're living in the truck.`, nr);
+      else if (!hit && n.disposition > -10 && nr() < 0.7) requestShelter(s, n, 'fire', nr);
       continue;
     }
     // leaving
     const leaveP = hit ? 0.0006 + (s.disaster.tracks.stores < 0.3 && (n.kind === 'young_family' || n.kind === 'loner') ? 0.0012 : 0) + (l.raidedDay != null && day - l.raidedDay < 30 ? 0.01 : 0) : 0.00005;
     if (nr() < leaveP) { emptied(s, n, 'left'); happen(s, n, `The ${plural(surname(n))} loaded the truck and left. ${pick(nr, ['Going to her sister in Idaho.', 'Heading for the FEMA camp, they said.', 'Nobody knows where.', 'Back to the city, if there is one.'])}`, 'quiet', nr); continue; }
     // the old and alone ask to come in
-    if (hit && since > 30 && n.members <= 2 && (n.kind === 'widow' || n.kind === 'old_farmer') && n.disposition > 30 && nr() < 0.004) askToJoin(s, n, `${n.kind === 'widow' ? 'She' : 'They'} can't keep the place going: no wood split, the well pump dead.`, nr);
+    if (hit && since > 30 && n.members <= 2 && (n.kind === 'widow' || n.kind === 'old_farmer') && n.disposition > 30 && nr() < 0.004 * trustMult(n)) askToJoin(s, n, `${n.kind === 'widow' ? 'She' : 'They'} can't keep the place going: no wood split, the well pump dead.`, nr);
   }
   // refugees settle on the empty ground
   if (hit && since > 20 && since < 400 && L.refugees < 3 && s.neighbors.filter(n => n.status === 'home').length < 8) {
@@ -551,6 +552,7 @@ export function neighborLifeDay(s: GameState): string[] {
 export function stateWord(s: GameState, n: Neighbor): string {
   const l = s.locals?.lives[n.id];
   if (n.status === 'joined') return 'living with you';
+  if (s.newcomers?.guests[n.id]) return 'sheltering with you';
   if (n.status === 'left') return l?.farm === 'burned' ? 'burned out, gone' : 'gone away';
   if (n.status === 'gone') return 'all dead';
   const bits: string[] = [];

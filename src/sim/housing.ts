@@ -296,8 +296,16 @@ export function housingPlan(s: GameState, guests: readonly Person[] = []): Housi
   const kindOf = new Map(s.structures.map(st => [st.id, st.kind] as const));
   const ownBeds = all.filter(q => q.kind === 'bed' && SEPARATE_DWELLINGS.has(kindOf.get(q.where) ?? ''));
   const choices = (p: Person): Pool[] => (wantsOwnPlace(p) && ownBeds.length ? [...ownBeds, ...all] : all);
+  // someone the family gave a home to (sim/newcomers.ts givePlace) has a bed there first
+  for (const x of list) {
+    if (!x.p.home) continue;
+    const pool = all.find(q => q.kind === 'bed' && q.where === x.p.home && q.left + 1e-9 >= cost(x.p, 'bed'));
+    if (pool) give(x.p, pool);
+  }
 
-  for (const group of priority(list)) {
+  for (const whole of priority(list)) {
+    const group = whole.filter(x => !place.has(x.p.id));
+    if (!group.length) continue;
     // a couple takes the same place if one has room for both
     if (group.length > 1) {
       const pool = choices(group[0].p).find(q => q.left + 1e-9 >= group.reduce((a, x) => a + cost(x.p, q.kind), 0));
@@ -324,7 +332,7 @@ export function housingPlan(s: GameState, guests: readonly Person[] = []): Housi
     const crowd = spot.kind === 'tent' && spot.where ? Math.max(0, (pl.find(p => p.where === spot.where)?.used ?? 1) - 2) * 0.15 : 0;
     const privacy = Math.max(0, PRIVACY[spot.kind] - crowd);
     const fx = effects(sq.quality, privacy, x.p);
-    const own = spot.kind === 'bed' && wantsOwnPlace(x.p) && SEPARATE_DWELLINGS.has(kindOf.get(spot.where ?? '') ?? '');
+    const own = spot.kind === 'bed' && ((wantsOwnPlace(x.p) && SEPARATE_DWELLINGS.has(kindOf.get(spot.where ?? '') ?? '')) || (!!x.p.home && spot.where === x.p.home));
     out.push({ index: x.index, id: x.p.id, spot, quality: sq.quality, privacy, morale: fx.morale + (own ? OWN_PLACE_MORALE : 0), harm: sq.harm, tired: fx.tired, hasBag: bag, note: own ? 'a front door of their own' : sq.note, own });
   }
   const noBed = counts.couch + counts.floor + counts.tent + counts.outbuilding + counts.nowhere;
@@ -336,7 +344,7 @@ let memo: { key: string; plan: HousingPlan } | null = null;
 /** The plan, reused while nothing it depends on has changed (the world asks every frame). */
 export function cachedPlan(s: GameState): HousingPlan {
   const fin = finished(s).length;
-  const key = `${s.seed}|${s.clock.startDoy}|${dayIndex(s.clock.t)}|${s.site.region}|${s.people.length}|${s.personState.map(p => (p.needs.died != null || p.needs.taken ? 1 : 0)).join('')}|${s.structures.length}|${fin}|${s.stock.tent}|${s.stock.sleeping_bag}|${heatOn(s) ? 1 : 0}|${s.weather?.active?.kind ?? ''}`;
+  const key = `${s.seed}|${s.clock.startDoy}|${dayIndex(s.clock.t)}|${s.site.region}|${s.people.length}|${s.personState.map(p => (p.needs.died != null || p.needs.taken ? 1 : 0)).join('')}|${s.structures.length}|${fin}|${s.people.map(p => p.home ?? '').join(',')}|${s.stock.tent}|${s.stock.sleeping_bag}|${heatOn(s) ? 1 : 0}|${s.weather?.active?.kind ?? ''}`;
   if (memo?.key === key) return memo.plan;
   const plan = housingPlan(s);
   memo = { key, plan };

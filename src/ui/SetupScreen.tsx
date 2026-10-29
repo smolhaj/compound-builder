@@ -6,6 +6,7 @@ import { kinPool, kinTitle, ROLE_NAME, retirementIncome } from '../sim/kin';
 import { CONDITION } from '../sim/body';
 import { fullName, HOUSEHOLD_NAME, JOB_POOL, jobDef, randomJobId, variedFamily } from '../sim/family';
 import { FUNDS_RANGE, startFunds } from '../sim/startFunds';
+import { mortgagePayment, townHouseFor, townUpkeep } from '../sim/weekender';
 import { difficultySummary } from '../sim/difficulty';
 import { DISASTERS, type Difficulty, type DisasterKind, type Mode, type PeaceLength } from '../sim/disaster';
 import { saveGame, AUTOSAVE } from '../sim/save/saveSystem';
@@ -102,6 +103,7 @@ export function SetupScreen() {
   const brought = pool.filter(p => kinWith.includes(p.id));
   const family = [...baseFamily, ...brought];
   const funds = startFunds(family, life, seed, famRoll);
+  const town = townHouseFor(family, seed);
   const budget = funds.budget;
   const lots = listings(seed + batch * 1013, region, wish, 6, budget);
   const [lotId, setLotId] = useState<string | null>(null);
@@ -174,11 +176,12 @@ export function SetupScreen() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 8, marginBottom: 6 }}>
               {(['fulltime', 'independent', 'weekend'] as Lifestyle[]).map(id => {
                 const L = LIFESTYLE[id];
-                return <button key={id} style={tile(life === id, !L.ready)} onClick={() => L.ready && (setLife(id), setLotId(null))} title={L.ready ? undefined : 'Coming: being away from the place during the week is still being built'}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}><span style={{ fontWeight: 700 }}>{L.name}</span>{!L.ready && <span style={{ fontSize: 11, color: C.dim }}>coming</span>}</div>
+                return <button key={id} style={tile(life === id, !L.ready)} onClick={() => L.ready && (setLife(id), setLotId(null))}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}><span style={{ fontWeight: 700 }}>{L.name}</span></div>
                   <div style={{ fontSize: 12, color: C.dim, margin: '3px 0 6px', lineHeight: 1.35 }}>{L.blurb}</div>
                   <div style={{ fontSize: 12.5 }}>{usdK(FUNDS_RANGE[id][0])} to {usdK(FUNDS_RANGE[id][1])} to spend{L.passive ? ' · investment income' : L.jobs ? ' · two wages' : ''}</div>
                   {life === id && <div style={{ fontSize: 12, color: C.gold, marginTop: 2 }}>This family: {usd(budget)}</div>}
+                  {life === id && id === 'weekend' && <div style={{ fontSize: 11.5, color: C.dim, marginTop: 3, lineHeight: 1.35 }}>Keeps a town house worth about {usd(town.value)} ({usd(town.mortgage)} owed): not part of the budget. Building goes at weekend pace, and the place needs a caretaker.</div>}
                 </button>;
               })}
             </div>
@@ -259,6 +262,7 @@ export function SetupScreen() {
                 <span>To spend on land and building</span><span style={{ color: C.gold }}>{usd(budget)}</span>
               </div>
               {funds.passive > 0 && <div style={{ fontSize: 12, color: C.dim, marginTop: 3 }}>Plus about {usd(funds.passive)} a year in investment income.</div>}
+              {life === 'weekend' && <div style={{ fontSize: 12, color: C.dim, marginTop: 3 }}>The town house stays theirs: about {usd(town.value)} with {usd(town.mortgage)} owed (about {usd(mortgagePayment(town) + townUpkeep(town))} a month to keep). Selling it later, if the signs come, adds to the account.</div>}
               <div style={{ fontSize: 11.5, color: C.dim, marginTop: 3 }}>{LIFESTYLE[life].name} families start with {usdK(FUNDS_RANGE[life][0])} to {usdK(FUNDS_RANGE[life][1])}; better jobs, age and a bit of luck raise it, debts take it down.</div>
               {!lot && <div style={{ color: C.bad, fontSize: 12.5, marginTop: 6 }}>The place you picked is over this budget: go back to Land and pick another.</div>}
             </div>

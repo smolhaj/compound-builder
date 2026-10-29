@@ -309,7 +309,7 @@ export class Atmosphere {
    */
   private _syncWild(built: readonly AtmosBuilding[], game: GameState): void {
     const t = game.clock.t;
-    const living = game.personState.filter(p => p.needs.died == null && p.task !== 'gone');
+    const living = game.personState.filter(p => p.needs.died == null && p.task !== 'gone' && p.task !== 'town');
     const goneSince = living.length ? null : game.ending?.day ?? Math.max(0, ...game.personState.map(p => p.needs.died ?? 0));
     const days = goneSince === null ? 0 : Math.max(0, t - goneSince);
     const og = overgrowth(days);

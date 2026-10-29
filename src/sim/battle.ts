@@ -244,7 +244,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
   const ax = Math.cos(ang), az = Math.sin(ang);       // unit vector from the house toward the raiders
   const lx = -az, lz = ax;                            // lateral
   const at = (d: number, lat: number) => ({ x: C.x + ax * d + lx * lat, z: C.z + az * d + lz * lat });
-  const alive = s.people.map((p, i) => ({ p, i })).filter(({ i }) => s.personState[i]?.needs.died == null && s.personState[i]?.task !== 'gone' && !s.rescue?.raid?.team.includes(s.personState[i]?.id ?? ''));
+  const alive = s.people.map((p, i) => ({ p, i })).filter(({ i }) => s.personState[i]?.needs.died == null && s.personState[i]?.task !== 'gone' && s.personState[i]?.task !== 'town' && !s.rescue?.raid?.team.includes(s.personState[i]?.id ?? ''));
   // the adults fight; kids hide (and get out through the tunnel if it comes to that); a teenager picks up a gun only if there aren't two adults who can
   const adultsN = alive.filter(({ p }) => !p.kid).length;
   const canFight = (p: { kid: boolean; age: number }) => !p.kid || (p.age >= 15 && adultsN < 2);
