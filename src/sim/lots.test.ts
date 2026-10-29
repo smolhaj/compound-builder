@@ -147,3 +147,43 @@ describe('lot archetypes: the ground', { timeout: 60_000 }, () => {
     expect(treeLineM('plains')).toBeGreaterThan(5000);
   });
 });
+
+describe('hillside cutbank: a rock face over a level shelf', { timeout: 60_000 }, () => {
+  const cut = (seed: number, over: Partial<LotSpec> = {}) => spec('hillside', seed, 9, { flip: 1, creek: false, cutbank: true, ...over });
+  const plain = (seed: number) => spec('hillside', seed, 9, { flip: 1, creek: false });
+
+  it('adds cliff ground and a bigger flat pad, and leaves a hillside without the flag exactly as it was', () => {
+    for (const seed of [1, 2, 8, 9]) {
+      const a = lotStats(lotField(plain(seed), RECT)), b = lotStats(lotField(cut(seed), RECT));
+      expect(a.cliffFrac, `plain ${seed}`).toBe(0);
+      expect(b.cliffFrac, `cut ${seed}`).toBeGreaterThan(0.02);
+      expect(b.maxSlopePct).toBeGreaterThan(100);
+      expect(b.padM2).toBeGreaterThanOrEqual(a.padM2 * 0.9);
+    }
+    // the flag is the only thing that changes the ground
+    const f0 = lotField(plain(8), RECT), f1 = lotField({ ...plain(8), cutbank: false }, RECT);
+    for (let i = 0; i < 30; i++) expect(f0.h(i * 2.1, i * 1.7)).toBe(f1.h(i * 2.1, i * 1.7));
+  });
+
+  it('is a face: along the fall line the ground steps up over a few metres onto a level shelf, and the face is bare rock', () => {
+    const f = lotField(cut(8), RECT), cf = Math.cos(f.fall), sf = Math.sin(f.fall);
+    const at = (d: number) => [33.5 + d * cf, 33.5 + d * sf] as const;
+    let face = -1, shelf = 0, rise = 0;
+    for (let d = 0; d > -40; d -= 0.25) {
+      const [x, z] = at(d), [x2, z2] = at(d - 0.5), g = (f.h(x2, z2) - f.h(x, z)) / 0.5;
+      if (g > 1) { face = d; rise = f.h(...at(d - 3)) - f.h(...at(d + 1)); break; }
+    }
+    expect(face).toBeLessThan(0);
+    expect(rise).toBeGreaterThan(2.5);                                  // 15 m or more of rock
+    for (let d = face + 1; d < face + 9; d += 0.5) { const [x, z] = at(d); shelf = Math.max(shelf, Math.abs(f.h(x, z) - f.h(...at(face + 1)))); }
+    expect(shelf, 'a level shelf at the foot of the face').toBeLessThan(0.45);
+    expect(f.rock(...at(face - 1))).toBeGreaterThan(0.9);
+  });
+
+  it('is skipped on a hillside with a creek (the creek bed runs the fall line), and finite everywhere', () => {
+    const wet = lotField(spec('hillside', 3, 9, { flip: 1, creek: true, cutbank: true }), RECT), dry = lotField(spec('hillside', 3, 9, { flip: 1, creek: true }), RECT);
+    for (let i = 0; i < 30; i++) expect(wet.h(i * 2.2, i * 1.9)).toBe(dry.h(i * 2.2, i * 1.9));
+    const f = lotField(cut(5), RECT);
+    for (let x = -60; x <= 130; x += 4) for (let z = -30; z <= 100; z += 4) expect(Number.isFinite(f.h(x, z))).toBe(true);
+  });
+});
