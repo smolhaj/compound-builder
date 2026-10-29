@@ -66,3 +66,24 @@ export const RING_SCENARIOS = [
   { name: 'rings-3-rounded', setup: ring({ shape: 'rounded', rings: 3, ringWall: 'stone_wall', towers: 3 }), shots: [aerial(46, 1.15), aerial(38, 0.5, 2.2), eyeWallPerson] },
   { name: 'rings-4-octagon', setup: ring({ shape: 'octagon', rings: 4, ringWall: 'container_stack', towers: 2 }), shots: [aerial(46, 1.15), aerial(38, 0.5, 2.2)] },
 ];
+
+/** A workshop cut into a steep spot of a hillside lot with a drainage channel above it (the sim finds the spot and the line). */
+const drainSetup = `Promise.all([import('/src/sim/lotListing.ts'), import('/src/sim/construction.ts'), import('/src/sim/drainage.ts'), import('/src/sim/perimeter.ts')]).then(([ll, cons, dr, per]) => {
+    const G = cb.game;
+    G.setState(s => { const g = structuredClone(s.game); const lot = ll.siteLot(g.site), h = g.site.home; let spot = null;
+      if (lot) for (let x = h.x0 + 4; x < h.x1 - 4 && !spot; x += 2) for (let z = h.z0 + 4; z < h.z1 - 4 && !spot; z += 2) { const e = 0.8, gx = (lot.field.h(x + e, z) - lot.field.h(x - e, z)) / (2 * e), gz = (lot.field.h(x, z + e) - lot.field.h(x, z - e)) / (2 * e); if (Math.hypot(gx, gz) > 0.17) spot = [x, z]; }
+      if (!spot) { console.error('NO STEEP SPOT'); return { game: g }; }
+      const st = cons.planStructure(g, 'workshop', spot[0], spot[1], 0), line = dr.drainLineFor(g, st);
+      if (line) per.planRun(g, 'drain_channel', line);
+      window.__drain = { spot, line };
+      return { game: g }; });
+    ${finish}
+    window.__done = 1; });`;
+const drainCam = (name, f) => ({ name, cam: `${pre} const d = window.__drain; if (!d || !d.line) return; const mx = (d.line[0][0] + d.line[1][0]) / 2, mz = (d.line[0][1] + d.line[1][1]) / 2, sx = d.spot[0] - mx, sz = d.spot[1] - mz, sl = Math.hypot(sx, sz) || 1, ux = sx / sl, uz = sz / sl; ${f}` });
+export const DRAIN_SCENARIOS = [
+  { name: 'drain-hill', extra: '&lot=hillside&relief=11', settle: 4000, setup: drainSetup, shots: [
+    drainCam('aerial-top', `cb.cam.target.set(d.spot[0], 0, d.spot[1]); cb.cam.radius = 16; cb.cam.pitch = 1.2; cb.cam.yaw = 0.8;`),
+    drainCam('aerial-oblique', `cb.cam.target.set(d.spot[0], gr(d.spot[0], d.spot[1]), d.spot[1]); cb.cam.radius = 14; cb.cam.pitch = 0.4; cb.cam.yaw = Math.atan2(ux, uz) + 0.7;`),
+    drainCam('eye-channel-with-person', `const x = mx + ux * 2.2 + (-uz) * 3.0, z = mz + uz * 2.2 + ux * 3.0; ${figure('(mx + (-uz) * 0.4)', '(mz + ux * 0.4)')} cb.qa.pose = { x, y: gr(x, z) + 0.3, z, lx: mx, ly: gr(mx, mz) + 0.1, lz: mz, fov: 64 };`),
+  ] },
+];

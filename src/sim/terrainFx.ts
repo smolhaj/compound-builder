@@ -30,6 +30,7 @@ import { isHome } from './blueprints';
 import { highShare, isTower } from './towers';
 import { PERIMETER, runFinished, runBill, SALVAGE, type PerimeterKind, type Pt } from './perimeter';
 import { log } from './economy';
+import { DRAIN, cutSlopeAt, nearDrain, undrained, drainLineFor } from './drainage';
 
 export const FX = {
   /** Solar: sun gain per unit of slope, and the cap. */
@@ -69,13 +70,18 @@ export function floodCandidates(s: GameState, fin: readonly Structure[], lowKind
 
 /** Is the ground at a structure mud right now (spring thaw or a storm, on the floodplain)? */
 export function muddy(s: GameState, st: Pick<Structure, 'x' | 'z'>, storm = false): boolean {
-  if (!s.site.creek) return false;   // the creek is on a neighbor's land: no floodplain here
   const { doy } = calendarOf(s.clock);
   if (!storm && (doy < FX.MUD_FROM || doy > FX.MUD_TO)) return false;
+  if (cutSlopeAt(s, st.x, st.z)) return true;   // the runoff of the cut it is built into (sim/drainage.ts)
+  if (!s.site.creek) return false;   // the creek is on a neighbor's land: no floodplain here
   const g = groundOf(s);
   return !!g && floodplainAt(g, st.x, st.z);
 }
-export const mudFactor = (s: GameState, st: Pick<Structure, 'x' | 'z'>, storm = false): number => (muddy(s, st, storm) ? FX.MUD_SLOW : 1);
+/** How fast work goes on the ground at a structure: 1, or the mud slowdown, which a finished drainage channel near the site mostly takes away. */
+export function mudFactor(s: GameState, st: Pick<Structure, 'x' | 'z'>, storm = false): number {
+  if (!muddy(s, st, storm)) return 1;
+  return nearDrain(s, st.x, st.z) ? 1 - (1 - FX.MUD_SLOW) * (1 - DRAIN.MUD_CUT) : FX.MUD_SLOW;
+}
 
 /** Head (m) of the best finished reservoir over the houses, 0 if none. */
 export function gravityHeadM(s: GameState): number {
@@ -133,7 +139,7 @@ export function terrainDefense(s: GameState): TerrainDefense {
 }
 
 /** A card for the Next-step list that reads the ground (the guidance turns it into a Suggestion). Suggest, never impose. */
-export interface TerrainCard { id: string; title: string; why: string; urgency: number; mode: 'high' | 'lanes' | 'water'; /** For the gorge card: the span it invites. */ span?: { a: Pt; b: Pt; lengthM: number } }
+export interface TerrainCard { id: string; title: string; why: string; urgency: number; mode: 'high' | 'lanes' | 'water'; /** For the gorge card: the span it invites. */ span?: { a: Pt; b: Pt; lengthM: number }; /** For the drainage card: the channel above the worst undrained cut. */ drain?: { a: Pt; b: Pt; count: number } }
 
 /**
  * At most one card, and only once the family has a roof and is thinking about
@@ -157,6 +163,12 @@ export function terrainCards(s: GameState): TerrainCard[] {
   if (choke && !gorge) out.push({ id: 'land_choke', title: 'The way in narrows', why: choke.reason, urgency: 23, mode: 'lanes' });
   const res = sites.find(c => c.kind === 'reservoir');
   if (res && !s.structures.some(st => st.kind === 'reservoir') && s.structures.some(st => st.kind === 'well_drilled' && isFinished(st))) out.push({ id: 'land_reservoir', title: 'A bench above the camp for a reservoir', why: res.reason, urgency: 21, mode: 'water' });
+  // a building cut into a slope with nothing to turn the runoff: the thaw and the storms bog it down (sim/drainage.ts)
+  const wet = undrained(s).sort((a, b) => (b.grade ?? 0) - (a.grade ?? 0));
+  const line = wet.length ? drainLineFor(s, wet[0]) : null;
+  if (wet.length && line && !s.perimeter.some(r => r.kind === 'drain_channel' && !runFinished(r))) {
+    out.push({ id: 'land_drain', title: `${wet.length} cut slope${wet.length > 1 ? 's' : ''} with no drainage`, why: `The ${wet.length > 1 ? 'buildings' : 'building'} cut into the hill ${wet.length > 1 ? 'shed' : 'sheds'} water onto the pad: in the thaw and in storms the work bogs down. A channel along the contour above it takes most of that away.`, urgency: wet.some(isFinished) ? 25 : 21, mode: 'water', drain: { a: line[0], b: line[1], count: wet.length } });
+  }
   return out.sort((a, b) => b.urgency - a.urgency).slice(0, 1);
 }
 

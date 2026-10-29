@@ -157,7 +157,9 @@ export type SuggestionAct =
   | { type: 'enroll'; course: CourseId; pid: string; mode: CourseMode; teacher?: string }
   | { type: 'drills'; perWeek: 1 | 2 | 3 }
   /** Lay a tunnel-bridge across the gorge the land invites (the player confirms). */
-  | { type: 'span'; a: Pt; b: Pt };
+  | { type: 'span'; a: Pt; b: Pt }
+  /** Lay a drainage channel along the contour above a building cut into a slope (the player confirms). */
+  | { type: 'drain'; a: Pt; b: Pt };
 export interface Suggestion {
   id: string;
   /** The kit piece to stake ('' when the suggestion is something else). */
@@ -316,7 +318,7 @@ export function suggestions(s: GameState): Suggestion[] {
         ...(acts.length ? { acts } : {}) });
     } }
   // the land: a ridge that suits a keep, a gorge that is a choke, a bench for a reservoir (sim/terrainFx.ts): a card to look at, never a requirement
-  for (const c of terrainCards(s)) out.push({ id: c.id, kind: '', title: c.title, urgency: c.urgency, why: c.why, acts: [{ label: 'Show me on the map', act: { type: 'terrain', mode: c.mode } }, ...(c.span ? [{ label: `Plan a tunnel-bridge across it (~${usd(costPer100m('tunnel_bridge') * c.span.lengthM / 100)})`, act: { type: 'span' as const, a: c.span.a, b: c.span.b } }] : [])] });
+  for (const c of terrainCards(s)) out.push({ id: c.id, kind: '', title: c.title, urgency: c.urgency, why: c.why, acts: [{ label: 'Show me on the map', act: { type: 'terrain', mode: c.mode } }, ...(c.span ? [{ label: `Plan a tunnel-bridge across it (~${usd(costPer100m('tunnel_bridge') * c.span.lengthM / 100)})`, act: { type: 'span' as const, a: c.span.a, b: c.span.b } }] : []), ...(c.drain ? [{ label: `Plan a drainage channel (~${usd(costPer100m('drain_channel') * Math.hypot(c.drain.b[0] - c.drain.a[0], c.drain.b[1] - c.drain.a[1]) * 6 / 100)})`, act: { type: 'drain' as const, a: c.drain.a, b: c.drain.b } }] : [])] });
   { const c = courseSuggestion(s); if (c) out.push(c); }
   { const d = drillsSuggestion(s); if (d) out.push(d); }
   return out.sort((x, y) => y.urgency - x.urgency).slice(0, 3);
