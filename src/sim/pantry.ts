@@ -19,6 +19,7 @@
  * outside the kcal sums, and are used up by the day (a few grams of salt a
  * head, two cups of coffee an adult).
  */
+import { hasBasement } from './housingStyles';
 import type { GameState } from './state';
 import { logGate } from './nag';
 
@@ -286,7 +287,7 @@ export function lifeLeft(s: GameState, id: FoodItemId): number {
 }
 
 /** A cool store: a finished root cellar or bunker storeroom (oil, flour and nuts keep their full life there; about 70 % in a warm house). */
-export const hasCoolStore = (s: GameState) => s.structures.some(st => (st.kind === 'root_cellar' || st.kind === 'bunker_stores') && st.finishedAt !== null);
+export const hasCoolStore = (s: GameState) => s.structures.some(st => (st.kind === 'root_cellar' || st.kind === 'bunker_stores' || hasBasement(st.kind)) && st.finishedAt !== null);
 export function lifeDays(s: GameState, id: FoodItemId): number {
   return lifeWith(id, coolK(s));
 }

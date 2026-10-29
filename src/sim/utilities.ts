@@ -57,6 +57,7 @@ export const UTILITY: Record<string, UtilityDef> = {
   /** 50 × 400 W panels in five rows: the 20 kW benchmark array. */
   solar_farm: { solarKw: 20 },
   garage_solar: { solarKw: 8 },
+  lodge_solar: { solarKw: 10 },
   battery_shed: { batteryKwh: 20 },
   /** A battery container: twelve 5 kWh racks. */
   battery_bank: { batteryKwh: 60 },
@@ -68,7 +69,7 @@ export const UTILITY: Record<string, UtilityDef> = {
 };
 
 /** Daily power draw (kWh) of a wired building by kind, and water use (L/person/day) carried vs plumbed. */
-export const DRAW_KWH: Record<string, number> = { timber_cabin: 5, log_house: 8, farmhouse: 9, trailer: 6, cottage: 4, guest_house: 3, moms_house: 5, barn: 1, workshop: 4, metal_garage: 1, garage_solar: 1, filtration_shed: 0.3, root_cellar: 0.2, chicken_coop: 0.3, outhouse: 0, garden: 0, field: 0, greenhouse: 1, greenhouse_heated: 4, orchard: 0, orchard_grove: 0, pond: 1.5, reservoir: 1, sheep_barn: 0.3, equipment_yard: 0.2, solar_farm: 0, battery_bank: 0 };
+export const DRAW_KWH: Record<string, number> = { lodge: 16, lodge_solar: 16, stone_house: 8, timber_frame: 6, container_house: 5, adobe_house: 5, timber_cabin: 5, log_house: 8, farmhouse: 9, trailer: 6, cottage: 4, guest_house: 3, moms_house: 5, barn: 1, workshop: 4, metal_garage: 1, garage_solar: 1, filtration_shed: 0.3, root_cellar: 0.2, chicken_coop: 0.3, outhouse: 0, garden: 0, field: 0, greenhouse: 1, greenhouse_heated: 4, orchard: 0, orchard_grove: 0, pond: 1.5, reservoir: 1, sheep_barn: 0.3, equipment_yard: 0.2, solar_farm: 0, battery_bank: 0 };
 export const WATER_CARRIED = 25, WATER_PLUMBED = 130;
 /** Fitting jobs: hours and materials (per building). */
 export const FIT = {
@@ -96,7 +97,7 @@ export const NET_METER_USD_PER_KWH = 0.05;
  * Who gets power first when there isn't enough (lower first): pumps, the
  * root cellar (freezer), homes, then the coop and the workshop.
  */
-export const LOAD_PRIORITY: Record<string, number> = { well_drilled: 0, root_cellar: 1, timber_cabin: 2, log_house: 2, farmhouse: 2, trailer: 2, cottage: 2, guest_house: 2, moms_house: 2, filtration_shed: 0, barn: 4, chicken_coop: 3, workshop: 4, metal_garage: 4, garage_solar: 4, greenhouse: 3, greenhouse_heated: 3, pond: 1, reservoir: 3, sheep_barn: 4, equipment_yard: 5 };
+export const LOAD_PRIORITY: Record<string, number> = { well_drilled: 0, root_cellar: 1, timber_cabin: 2, log_house: 2, lodge: 2, lodge_solar: 2, stone_house: 2, timber_frame: 2, container_house: 2, adobe_house: 2, farmhouse: 2, trailer: 2, cottage: 2, guest_house: 2, moms_house: 2, filtration_shed: 0, barn: 4, chicken_coop: 3, workshop: 4, metal_garage: 4, garage_solar: 4, greenhouse: 3, greenhouse_heated: 3, pond: 1, reservoir: 3, sheep_barn: 4, equipment_yard: 5 };
 
 export interface Fitting { building: string; kind: 'plumb' | 'wire'; done: number; hours: number; supplied: boolean; finishedAt: number | null }
 
@@ -215,7 +216,7 @@ export function plant(s: GameState, halfSize: (kind: string) => number = k => NO
 }
 
 /** What a power bank is made of: panels, batteries, a generator. Equipment standing together is one bank (the bus bars and conduit are part of the kit). */
-export const BANK_KINDS = ['solar_array', 'solar_farm', 'garage_solar', 'battery_shed', 'battery_bank', 'generator_shed'];
+export const BANK_KINDS = ['solar_array', 'solar_farm', 'garage_solar', 'lodge_solar', 'battery_shed', 'battery_bank', 'generator_shed'];
 /** How close (world units, edge to edge, by reach) bank equipment must stand to share a bus: about 6 m of conduit. */
 export const BANK_GAP = 1.0;
 
@@ -308,8 +309,8 @@ export function sunHours(doy: number): number {
 }
 
 /** Half-size (world units) a line must reach to touch a building, and its roof area (m²) for rain catchment, by kind. */
-export const NODE_R: Record<string, number> = { solar_farm: 1.5, battery_bank: 0.5, greenhouse_heated: 1.5, orchard_grove: 2, pond: 1.5, reservoir: 1.2, sheep_barn: 1, equipment_yard: 1, timber_cabin: 0.5, log_house: 0.75, farmhouse: 0.75, trailer: 0.6, cottage: 0.55, guest_house: 0.45, moms_house: 0.75, barn: 1.0, workshop: 0.75, metal_garage: 0.8, garage_solar: 0.8, filtration_shed: 0.2, root_cellar: 0.4, chicken_coop: 0.4, garden: 0.7, field: 2.2, outhouse: 0.2, well_hand: 0.25, well_drilled: 0.3, cistern: 0.3, water_tower: 0.35, solar_array: 0.6, battery_shed: 0.3, generator_shed: 0.3, septic: 0.4, greenhouse: 0.6, orchard: 1.3 };
-export const ROOF_M2: Record<string, number> = { timber_cabin: 70, log_house: 160, farmhouse: 140, trailer: 90, cottage: 60, guest_house: 40, moms_house: 80, barn: 220, workshop: 120, metal_garage: 120, garage_solar: 120, filtration_shed: 5, chicken_coop: 6, outhouse: 2, battery_shed: 8, generator_shed: 8, well_drilled: 6, well_hand: 3, greenhouse: 26, greenhouse_heated: 216, sheep_barn: 110, battery_bank: 18 };
+export const NODE_R: Record<string, number> = { solar_farm: 1.5, battery_bank: 0.5, greenhouse_heated: 1.5, orchard_grove: 2, pond: 1.5, reservoir: 1.2, sheep_barn: 1, equipment_yard: 1, timber_cabin: 0.5, lodge: 1.3, lodge_solar: 1.3, stone_house: 0.8, timber_frame: 0.8, container_house: 0.6, adobe_house: 0.8, log_house: 0.75, farmhouse: 0.75, trailer: 0.6, cottage: 0.55, guest_house: 0.45, moms_house: 0.75, barn: 1.0, workshop: 0.75, metal_garage: 0.8, garage_solar: 0.8, filtration_shed: 0.2, root_cellar: 0.4, chicken_coop: 0.4, garden: 0.7, field: 2.2, outhouse: 0.2, well_hand: 0.25, well_drilled: 0.3, cistern: 0.3, water_tower: 0.35, solar_array: 0.6, battery_shed: 0.3, generator_shed: 0.3, septic: 0.4, greenhouse: 0.6, orchard: 1.3 };
+export const ROOF_M2: Record<string, number> = { timber_cabin: 70, lodge: 330, lodge_solar: 330, stone_house: 140, timber_frame: 150, container_house: 90, adobe_house: 120, log_house: 160, farmhouse: 140, trailer: 90, cottage: 60, guest_house: 40, moms_house: 80, barn: 220, workshop: 120, metal_garage: 120, garage_solar: 120, filtration_shed: 5, chicken_coop: 6, outhouse: 2, battery_shed: 8, generator_shed: 8, well_drilled: 6, well_hand: 3, greenhouse: 26, greenhouse_heated: 216, sheep_barn: 110, battery_bank: 18 };
 
 /** Rain and snowmelt (mm a day, averaged by month): wet spring, dry late summer. */
 export function rainMm(doy: number): number {
@@ -489,7 +490,7 @@ export function repairPump(s: GameState, id: string): boolean {
 }
 
 /** The spare an EMP-fried building needs (inverter, generator, pump). */
-export const SPARE_FOR: Record<string, MaterialId> = { solar_array: 'inverter', garage_solar: 'inverter', battery_shed: 'inverter', generator_shed: 'generator', well_drilled: 'pump' };
+export const SPARE_FOR: Record<string, MaterialId> = { solar_array: 'inverter', garage_solar: 'inverter', lodge_solar: 'inverter', battery_shed: 'inverter', generator_shed: 'generator', well_drilled: 'pump' };
 
 /** Put a spare into what the EMP fried (the spare and a hardware kit). */
 export function replaceFried(s: GameState, id: string): string | null {

@@ -43,15 +43,19 @@ export type KitMaterialId = 'timber_lap' | 'trim' | 'fieldstone' | 'metal_roof' 
   // not drawn: marks the mattress of a bed the sick are put in (interior.ts sickSlot; Parts keeps it as a slot)
   | 'sick_slot'
   // a dig site: rusted steel (rebar, a delivered culvert tube)
-  | 'rust';
+  | 'rust'
+  // housing styles (sim/housingStyles.ts): painted standing-seam roofs, rammed earth, lime plaster
+  | 'metal_roof_green' | 'metal_roof_grey' | 'adobe' | 'plaster'
+  // a house's shipping container, painted (less metal sheen than the perimeter's)
+  | 'shell_blue' | 'shell_rust' | 'shell_tan' | 'shell_green';
 
 /** World units covered by one texture repeat. */
 const TEX_WORLD: Partial<Record<KitMaterialId, number>> = {
-  timber_lap: 0.5, fieldstone: 0.5, metal_roof: 0.5, deck: 0.5, door: 0.2,
+  timber_lap: 0.5, fieldstone: 0.5, metal_roof: 0.5, metal_roof_green: 0.5, metal_roof_grey: 0.5, adobe: 0.9, plaster: 0.5, deck: 0.5, door: 0.2,
   curtain: 0.15, curtain_red: 0.15, hedge: 0.25, hedge2: 0.25,
   pine_panel: 0.5, quilt_red: 0.12, quilt_blue: 0.12, rug: 0.3, books: 0.1,
   lap_white: 0.5, vinyl: 0.5, shingle: 0.5,
-  concrete: 0.6, whitewash: 0.5, wet_concrete: 0.6, metal_siding: 0.5, container_red: 0.4, container_blue: 0.4, container_green: 0.4, container_tan: 0.4, container_black: 0.4, container_rust: 0.4, log_wall: 0.5, board_batten: 0.5, wire_mesh: 0.15, straw: 0.3, soil: 0.4, earth: 0.8, pegboard: 0.2,
+  concrete: 0.6, whitewash: 0.5, wet_concrete: 0.6, metal_siding: 0.5, container_red: 0.4, container_blue: 0.4, container_green: 0.4, container_tan: 0.4, container_black: 0.4, container_rust: 0.4, shell_blue: 0.4, shell_rust: 0.4, shell_tan: 0.4, shell_green: 0.4, log_wall: 0.5, board_batten: 0.5, wire_mesh: 0.15, straw: 0.3, soil: 0.4, earth: 0.8, pegboard: 0.2,
   // 1 repeat: a 1.5 × 1.5 m patch of pea gravel; 2 × 2 pavers of 45 cm; 1.8 m of 13 cm floorboards
   gravel: 0.25, pavers: 0.15, floorboards: 0.3,
 };
@@ -136,14 +140,14 @@ function paintFieldstone(): HTMLCanvasElement {
   return c;
 }
 
-/** Standing-seam metal roof: ribs every ~45 cm, faded barn red with streaks. */
-function paintMetalRoof(): HTMLCanvasElement {
+/** Standing-seam metal roof: ribs every ~45 cm, faded barn red (or a painted colour) with streaks. */
+function paintMetalRoof(base: [number, number, number] = [122, 52, 40]): HTMLCanvasElement {
   const N = 256, ribs = 7, pw = N / ribs;
   const [c, g] = canvas(N);
   const r = lcg(37);
   for (let i = 0; i < ribs; i++) {
     const t = 0.92 + r() * 0.12;
-    g.fillStyle = rgb(122 * t, 52 * t, 40 * t);
+    g.fillStyle = rgb(base[0] * t, base[1] * t, base[2] * t);
     g.fillRect(i * pw, 0, pw, N);
     for (let k = 0; k < 14; k++) {
       g.fillStyle = `rgba(${r() < 0.5 ? '90,60,50' : '170,120,100'},${0.08 + r() * 0.1})`;
@@ -154,6 +158,38 @@ function paintMetalRoof(): HTMLCanvasElement {
     g.fillStyle = 'rgba(40,15,10,0.6)';
     g.fillRect(i * pw + 2, 0, 3, N);
   }
+  return c;
+}
+
+/** Rammed earth / adobe: warm sandy plaster with faint horizontal lifts (about 30 cm), soft mottling, hairline cracks and chalky patches. */
+function paintAdobe(): HTMLCanvasElement {
+  const N = 512, lifts = 5, lh = N / lifts;
+  const [c, g] = canvas(N);
+  const r = lcg(149);
+  g.fillStyle = rgb(196, 166, 128); g.fillRect(0, 0, N, N);
+  for (let i = 0; i < lifts; i++) {
+    const t = 0.95 + r() * 0.1;
+    g.fillStyle = rgb(196 * t, 164 * t, 124 * t);
+    g.fillRect(0, i * lh, N, lh);
+    for (let k = 0; k < 60; k++) { g.fillStyle = `rgba(${r() < 0.5 ? '150,118,84' : '222,196,158'},${0.04 + r() * 0.08})`; g.fillRect(r() * N, i * lh + r() * lh, 10 + r() * 60, 1 + r() * 3); }
+    g.fillStyle = 'rgba(140,108,76,0.22)'; g.fillRect(0, i * lh, N, 2);           // the faint seam between lifts
+  }
+  for (let k = 0; k < 420; k++) { g.fillStyle = `rgba(${r() < 0.5 ? '160,126,92' : '228,204,168'},${0.04 + r() * 0.08})`; g.beginPath(); g.arc(r() * N, r() * N, 4 + r() * 18, 0, Math.PI * 2); g.fill(); }
+  for (let k = 0; k < 2200; k++) { g.fillStyle = `rgba(${r() < 0.5 ? '120,92,64' : '236,214,180'},${0.1 + r() * 0.15})`; g.fillRect(r() * N, r() * N, 1, 1); }   // sand grain
+  g.strokeStyle = 'rgba(110,84,58,0.3)';
+  for (let k = 0; k < 3; k++) { g.beginPath(); let x = r() * N, y = r() * N; g.moveTo(x, y); for (let i = 0; i < 5; i++) { x += (r() - 0.5) * 24; y += 10 + r() * 22; g.lineTo(x, y); } g.stroke(); }
+  return c;
+}
+
+/** Lime plaster between timbers: cream, with trowel sweeps and a little hairline crazing. */
+function paintPlaster(): HTMLCanvasElement {
+  const N = 256;
+  const [c, g] = canvas(N);
+  const r = lcg(151);
+  g.fillStyle = rgb(228, 220, 200); g.fillRect(0, 0, N, N);
+  for (let k = 0; k < 260; k++) { g.fillStyle = `rgba(${r() < 0.5 ? '190,178,150' : '244,238,222'},${0.06 + r() * 0.12})`; g.beginPath(); g.ellipse(r() * N, r() * N, 8 + r() * 26, 3 + r() * 9, (r() - 0.5) * 1.2, 0, Math.PI * 2); g.fill(); }
+  g.strokeStyle = 'rgba(120,108,84,0.3)';
+  for (let k = 0; k < 6; k++) { g.beginPath(); let x = r() * N, y = r() * N; g.moveTo(x, y); for (let i = 0; i < 5; i++) { x += (r() - 0.5) * 30; y += (r() - 0.5) * 30; g.lineTo(x, y); } g.stroke(); }
   return c;
 }
 
@@ -687,6 +723,10 @@ export function kitMaterial(id: KitMaterialId): THREE.MeshStandardMaterial {
     case 'timber_lap': m = texMat(id, paintLapSiding, 2.2, 0.86, 0, 0.8); break;
     case 'fieldstone': m = texMat(id, paintFieldstone, 3.5, 0.92, 0, 1.2); break;
     case 'metal_roof': m = texMat(id, paintMetalRoof, 2.0, 0.55, 0.35, 0.9); break;
+    case 'metal_roof_green': m = texMat(id, () => paintMetalRoof([46, 84, 62]), 2.0, 0.5, 0.4, 0.9); break;
+    case 'metal_roof_grey': m = texMat(id, () => paintMetalRoof([104, 110, 116]), 2.0, 0.5, 0.45, 0.9); break;
+    case 'adobe': m = texMat(id, paintAdobe, 1.2, 0.97, 0, 0.8); break;
+    case 'plaster': m = texMat(id, paintPlaster, 1.2, 0.9, 0, 0.8); break;
     case 'deck': m = texMat(id, paintDeck, 1.6, 0.85); break;
     case 'door': m = texMat(id, paintDoor, 1.5, 0.75); break;
     case 'trim': m = new THREE.MeshStandardMaterial({ color: 0xe9e2cf, roughness: 0.7 }); break;
@@ -802,6 +842,12 @@ export function kitMaterial(id: KitMaterialId): THREE.MeshStandardMaterial {
     case 'led_red': m = new THREE.MeshStandardMaterial({ color: 0x3a1010, roughness: 0.4, emissive: new THREE.Color(1, 0.15, 0.1), emissiveIntensity: 1.6 }); break;
     case 'rust': m = new THREE.MeshStandardMaterial({ color: 0x8a4a2a, roughness: 0.85, metalness: 0.45 }); break;
     case 'led_amber': m = new THREE.MeshStandardMaterial({ color: 0x3a2a08, roughness: 0.4, emissive: new THREE.Color(1, 0.65, 0.1), emissiveIntensity: 1.4 }); break;
+    case 'shell_blue': case 'shell_rust': case 'shell_tan': case 'shell_green': {
+      const tint = { shell_blue: 0x4f78a8, shell_rust: 0xb0623a, shell_tan: 0xc9ad80, shell_green: 0x5f8a5a }[id];
+      const mm = texMat(id, paintMetalSiding, 1.6, 0.55, 0.08);
+      mm.color.set(tint).multiplyScalar(1.15);
+      m = mm; break;
+    }
     case 'container_red': case 'container_blue': case 'container_green': case 'container_tan': case 'container_black': case 'container_rust': {
       const tint = { container_red: 0xb0473a, container_blue: 0x4a6f9a, container_green: 0x6f8f62, container_tan: 0xc7aa7c, container_black: 0x2a2c30, container_rust: 0xa8663c }[id];
       const mm = texMat(id, paintMetalSiding, 2.5, 0.6, 0.4);

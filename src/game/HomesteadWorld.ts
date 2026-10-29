@@ -74,6 +74,7 @@ import type { BuildingView } from '../store/worldStore';
 import type { Structure } from '../sim/state';
 import { calendarOf } from '../sim/state';
 import { seasons } from '../sim/regions';
+import { blueprintOf } from '../sim/construction';
 import { BLUEPRINTS } from '../sim/blueprints';
 import { SmokePlume } from '../engine/world/fx/SmokePlume';
 import type { Pad, Pit } from './parcel/parcelTerrain';
@@ -1223,7 +1224,8 @@ export class HomesteadWorld {
     const [sx, sz] = p.kind === 'bunker_stairs' ? rotQ(0, def.cellsZ * CELL / 2 - 0.25, p.rot) : [0, 0];
     // a floor hatch: its top is the floor of the house it is in
     const host = p.kind === 'bunker_floorhatch' ? this._hostOf(p) : null;
-    const ground = host ? host.padY + KIT[host.placed.kind].floorY : this.parcel.sample(p.x + sx, p.z + sz).h;
+    // (a lodge's hatch opens in its basement slab, a few cm over the pad; any other house's in its floor)
+    const ground = host ? host.padY + (KIT[host.placed.kind].walkoutFall ? 0.012 : KIT[host.placed.kind].floorY) : this.parcel.sample(p.x + sx, p.z + sz).h;
     // escape tunnels leave through a blast door, barred from the room side
     const starts = this._runs.filter(r => r.kind === 'escape_tunnel').map(r => r.pts[0]);
     const tunnelDoors = tunnelDoorsOf(p, starts);
@@ -1601,7 +1603,7 @@ export class HomesteadWorld {
     for (const st of list) {
       const b = this._built.get(st.id);
       if (!b) continue;
-      const stages = BLUEPRINTS[st.kind].stages;
+      const stages = blueprintOf(st).stages;   // (the slope's and the local material's bill: its hours, not the plain blueprint's)
       const done = st.stage >= stages.length;
       const f = done ? 0 : st.done / stages[st.stage].hours;
       const key = `${st.stage}:${Math.round(f * 200)}:${st.supplied ? 1 : 0}:${st.slumpedAt === undefined ? 0 : 1}`;

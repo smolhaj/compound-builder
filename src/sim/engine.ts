@@ -3,6 +3,7 @@
  * quarter-hour sub-step (deterministic regardless of frame rate or speed).
  * Systems mutate a draft; `step` returns a fresh state object.
  */
+import { hasBasement } from './housingStyles';
 import { wildlifeDay, wildlifeNight } from './wildlife';
 import { LIFESTYLE } from './site';
 import { crewStep } from './crews';
@@ -210,7 +211,7 @@ function subStep(s: GameState): void {
     for (const line of slumpDay(s, rainStormOn(s))) log(s, line);   // a tall retaining wall with no drainage behind it can let go (sim/retaining.ts)
     for (const line of winterDay(s, dayIndex(s.clock.t))) log(s, line);   // (Hardcore) the first hard winter
     for (const line of digDay(s)) log(s, line);
-    for (const line of wildlifeDay(s, s.structures.some(st => st.kind === 'root_cellar' && isFinished(st) && s.utilities.lit.includes(st.id)))) log(s, line);
+    for (const line of wildlifeDay(s, s.structures.some(st => (st.kind === 'root_cellar' || hasBasement(st.kind)) && isFinished(st) && s.utilities.lit.includes(st.id)))) log(s, line);
     // the self-sufficient interior: greenhouse heat, orchard pruning and pests, the pond's fish (sim/greenhouse.ts, sim/pond.ts)
     for (const line of greenhouseDay(s)) log(s, line);
     for (const line of orchardDay(s, s.daily?.chores.levels.orchard ?? 0)) log(s, line);

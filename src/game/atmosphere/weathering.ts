@@ -19,12 +19,12 @@ import type { WearClass } from './aging';
 
 /** Exterior kit materials and how they weather (others never age). */
 export const WEAR_CLASS: Readonly<Record<string, WearClass>> = {
-  metal_roof: 'metal', metal_siding: 'metal', steel: 'metal', chimney_cap: 'metal',
-  container_red: 'container', container_blue: 'container', container_green: 'container', container_tan: 'container', container_black: 'container', container_rust: 'container',
+  metal_roof: 'metal', metal_roof_green: 'metal', metal_roof_grey: 'metal', metal_siding: 'metal', steel: 'metal', chimney_cap: 'metal',
+  container_red: 'container', container_blue: 'container', container_green: 'container', container_tan: 'container', container_black: 'container', container_rust: 'container', shell_blue: 'container', shell_rust: 'container', shell_tan: 'container', shell_green: 'container',
   timber_lap: 'wood', board_batten: 'wood', log_wall: 'wood', log_end: 'wood', deck: 'wood', frame: 'wood', wood_mid: 'wood', wood_dark: 'wood',
   lap_white: 'paint', trim: 'paint', door: 'paint', paint_red: 'paint', paint_green: 'paint', vinyl: 'paint',
   shingle: 'roof',
-  fieldstone: 'stone', concrete: 'stone',
+  fieldstone: 'stone', concrete: 'stone', adobe: 'stone', plaster: 'paint',
 };
 
 const VERT_PARS = /* glsl */`

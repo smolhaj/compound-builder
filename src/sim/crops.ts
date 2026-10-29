@@ -34,6 +34,7 @@
  *
  * The yield formula that uses these is `fieldHarvest` in needs.ts; this file only has the per-plot factors.
  */
+import { hasBasement } from './housingStyles';
 import { calendarOf, type GameState, type Structure } from './state';
 import { seasons } from './regions';
 import { isFinished } from './construction';
@@ -171,7 +172,7 @@ export function sowingRate(s: GameState): number {
 /** The crop Auto picks after `prev`: the rotation's next; no cellar means no potatoes (they would rot in the kitchen). */
 export function autoCrop(s: GameState, prev: CropId | null, index: number): CropId {
   let c: CropId = prev === null ? CYCLE[index % CYCLE.length] : prev === 'rest' ? 'potatoes' : CYCLE[(CYCLE.indexOf(prev) + 1) % CYCLE.length];
-  if (c === 'potatoes' && !s.structures.some(st => st.kind === 'root_cellar' && isFinished(st)) && !s.structures.some(st => st.kind === 'bunker_stores' && isFinished(st))) c = 'wheat';
+  if (c === 'potatoes' && !s.structures.some(st => st.kind === 'root_cellar' && isFinished(st)) && !s.structures.some(st => st.kind === 'bunker_stores' && isFinished(st)) && !s.structures.some(st => hasBasement(st.kind) && isFinished(st))) c = 'wheat';
   return c;
 }
 

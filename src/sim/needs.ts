@@ -10,6 +10,7 @@
  * bulk staples. A diet of one thing wears on morale; going hungry wears on
  * health, and with it how much work people can do.
  */
+import { hasBasement } from './housingStyles';
 import { layFactor } from './wildlife';
 import { calendarOf, type GameState } from './state';
 import { darkMood, mishapChance } from './blackout';
@@ -193,7 +194,7 @@ const alive = (s: GameState, i: number) => s.personState[i]?.needs?.died == null
  */
 export function liveDay(s: GameState, rnd: number): FoodReport {
   const fin = s.structures.filter(isFinished);
-  const freezer = fin.some(st => st.kind === 'root_cellar' && s.utilities.lit.includes(st.id));
+  const freezer = fin.some(st => (st.kind === 'root_cellar' || hasBasement(st.kind)) && s.utilities.lit.includes(st.id));
   // groceries need open stores with trucks restocking them
   const fromStores = s.disaster.tracks.stores > 0.5 && s.disaster.tracks.deliveries > 0.25;
   // spoilage (fractional units carry as a remainder on the stock count)

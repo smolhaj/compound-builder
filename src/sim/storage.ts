@@ -20,6 +20,7 @@ import { isHome } from './blueprints';
 import { addFoodKcal, foodUnits, FOOD, pantryKcal, syncPantry } from './pantry';
 import { logGate } from './nag';
 import { regionFor } from './climate';
+import { cellarHouses, cellarKcalOf } from './housingStyles';
 
 export const CELLAR_KCAL = 2_500_000, BUNKER_ROOTS_KCAL = 1_000_000;
 /** Fresh food in the kitchen. */
@@ -28,14 +29,14 @@ export const KITCHEN_SPOIL = 0.08;
 const fin = (s: GameState, kind: string) => s.structures.filter(st => st.kind === kind && isFinished(st));
 
 /** Bin room for roots and apples (kcal). */
-export const cellarCapacity = (s: GameState): number => fin(s, 'root_cellar').length * CELLAR_KCAL + fin(s, 'bunker_stores').length * BUNKER_ROOTS_KCAL;
+export const cellarCapacity = (s: GameState): number => fin(s, 'root_cellar').length * CELLAR_KCAL + fin(s, 'bunker_stores').length * BUNKER_ROOTS_KCAL + cellarHouses(s).reduce((a, st) => a + cellarKcalOf(st.kind), 0);
 /** What the bins hold (kcal). */
 export const cellarKcal = (s: GameState): number => foodUnits(s, 'cellar_roots') * FOOD.cellar_roots.kcal;
 export const cellarFree = (s: GameState): number => Math.max(0, cellarCapacity(s) - cellarKcal(s));
 export const hasCellar = (s: GameState): boolean => cellarCapacity(s) > 0;
 
 /** A cellar with power runs cooler. */
-const cellarPowered = (s: GameState): boolean => fin(s, 'root_cellar').some(st => s.utilities.lit.includes(st.id));
+const cellarPowered = (s: GameState): boolean => [...fin(s, 'root_cellar'), ...cellarHouses(s)].some(st => s.utilities.lit.includes(st.id));
 
 /** The cellar's temperature (°C) on a day of the year: the ground's yearly mean, a third of the air's swing, 5 weeks behind. */
 export function cellarTempC(s: GameState, doy = calendarOf(s.clock).doy): number {
@@ -83,7 +84,7 @@ export function cellarDay(s: GameState): string[] {
 
 /** Dry-goods shelf room (kcal) by building kind; a home the list lacks gets a cabin's. */
 export const PANTRY_ROOM: Record<string, number> = {
-  timber_cabin: 1_400_000, log_house: 3_000_000, farmhouse: 3_000_000, trailer: 600_000, cottage: 1_000_000, guest_house: 500_000, moms_house: 1_000_000,
+  timber_cabin: 1_400_000, lodge: 5_000_000, lodge_solar: 5_000_000, stone_house: 3_000_000, timber_frame: 3_000_000, container_house: 1_400_000, adobe_house: 2_000_000, log_house: 3_000_000, farmhouse: 3_000_000, trailer: 600_000, cottage: 1_000_000, guest_house: 500_000, moms_house: 1_000_000,
   barn: 1_000_000, workshop: 600_000, root_cellar: 4_000_000, bunker_stores: 15_000_000, bunker_dorm: 400_000,
 };
 export function pantryRoom(s: GameState): number {

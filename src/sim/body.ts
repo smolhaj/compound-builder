@@ -24,6 +24,7 @@ import type { GameState } from './state';
 import type { Person } from './family';
 import { mulberry32 } from './rng';
 import { logGate } from './nag';
+import { isStyleHome } from './housingStyles';
 
 export type Condition = 'blood_pressure' | 'thyroid' | 'asthma' | 'insulin';
 export const CONDITION: Record<Condition, { name: string; rx: string; monthly: number }> = {
@@ -85,7 +86,7 @@ export function bodyDay(s: GameState): string[] {
   const day = Math.floor(s.clock.t + 0.25);
   const r = mulberry32(s.seed * 3571 + day * 13 + 7);
   const pharmacy = pharmacyOpen(s), stores = s.disaster.tracks.stores >= 0.5 && s.disaster.tracks.banks >= 0.5;
-  const fridge = s.utilities.lit.some(id => s.structures.find(x => x.id === id && ['timber_cabin', 'log_house', 'farmhouse', 'trailer', 'root_cellar'].includes(x.kind)));
+  const fridge = s.utilities.lit.some(id => s.structures.find(x => x.id === id && (['timber_cabin', 'log_house', 'farmhouse', 'trailer', 'root_cellar'].includes(x.kind) || isStyleHome(x.kind))));
   const living = s.people.filter((_, i) => s.personState[i]?.needs.died == null);
   // hygiene supplies come out of the stockpile once the stores close
   let hygiene = true;

@@ -14,6 +14,7 @@
 import { BUNKER_ENTRANCES } from './bunkerEntrances';
 import type { GameState } from './state';
 import { isFinished } from './construction';
+import { hasBasement, stylePF } from './housingStyles';
 import { protectionOf } from './hardening';
 import { SPARE_FOR } from './utilities';
 import { winterFactor } from './effects';
@@ -51,6 +52,7 @@ export function bestShelter(s: GameState): [number, string] {
   for (const st of fin) {
     if (st.kind.startsWith('bunker_') && !BUNKER_ENTRANCES.includes(st.kind)) consider(protectionOf(st).pf, 'the bunker');
     else if (st.kind === 'root_cellar') consider(40, 'the root cellar');
+    else if (stylePF(st.kind)) consider(stylePF(st.kind), hasBasement(st.kind) ? 'the lodge basement' : `the ${st.kind.replace(/_/g, ' ')}`);
     else if (st.kind === 'farmhouse') consider(10, 'the farmhouse basement');
     else if (st.kind === 'log_house') consider(8, 'the log house');
     else if (st.kind === 'trailer') consider(1.5, 'the trailer');

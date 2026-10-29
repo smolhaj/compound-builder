@@ -23,6 +23,8 @@ import { roadGateStatus } from './roadGate';
 import { HEAVY_CALIBERS, MOUNT_ROUNDS, TURRET_ROUNDS, TOWERS, floodReady, mountReady, towerPosts, towersBuilt, turretsReady } from './towers';
 import { dayIndex, type GameState } from './state';
 import { bondOf, dogWatch, livingDogs, temperOf } from './pets';
+import { bestShelter } from './nuclear';
+import { HOUSING_STYLES, coverFactor, mainHome } from './housingStyles';
 
 export type Tone = 'good' | 'warn' | 'bad';
 export interface Check { id: string; label: string; ok: boolean; tone: Tone; detail: string }
@@ -57,6 +59,15 @@ export interface DefenseReport {
 
 const n = (s: GameState, k: string) => Math.floor((s.stock as unknown as Record<string, number>)[k] ?? 0);
 const chk = (id: string, label: string, ok: boolean, detail: string, warn = false): Check => ({ id, label, ok, tone: ok ? 'good' : warn ? 'warn' : 'bad', detail });
+
+/** What the main home's walls are worth in a raid (the housing styles; sim/battle.ts takes the same factor): one row, only once the family lives in a style home. */
+function houseWallsRow(s: GameState): Check[] {
+  const home = mainHome(s);
+  const style = home && HOUSING_STYLES[home.kind];
+  if (!home || !style) return [];
+  const k = coverFactor(home.kind);
+  return [chk('housewalls', 'House walls', k <= 0.85, k <= 0.75 ? `${style.name.toLowerCase()}: ${style.walls}: thick enough to stop rifle rounds` : k <= 0.85 ? `${style.name.toLowerCase()}: solid walls, decent cover` : `${style.name.toLowerCase()}: thin walls, a rifle round goes through: bars and sandbags help`, true)];
+}
 
 /** The dogs, one row each: who is on a post and who is kept inside, and how they are. */
 function dogRows(s: GameState): Check[] {
@@ -181,6 +192,7 @@ export function defenseReport(s: GameState, drive?: readonly Pt[]): DefenseRepor
     chk('guns', 'Armed with ammo', p.armed, guns ? (p.armed ? `${guns} gun${guns > 1 ? 's' : ''}, loaded` : 'guns but no ammunition') : 'no firearms', false),
     chk('gear', 'Armor and night vision', n(s, 'plate_carrier') + n(s, 'soft_armor') + n(s, 'nvg') + n(s, 'thermal') > 0, 'plates, vests, NVG or thermal', true),
     chk('cover', 'Cover on the line', n(s, 'sandbags') > 0 || n(s, 'steel_door') > 0 || n(s, 'window_bars') > 0, 'sandbags, a steel door, bars on the windows', true),
+    ...houseWallsRow(s),
   ];
   const bunker = fin.some(st => BUNKER_ENTRANCES.includes(st.kind));
   const shelter: Check[] = [
@@ -199,7 +211,7 @@ export function defenseReport(s: GameState, drive?: readonly Pt[]): DefenseRepor
     (() => { const bp = backupPower(s); return chk('power', 'Power if the grid goes', bp.ok, bp.detail, true); })(),
     chk('heat', 'Winter heat', n(s, 'firewood') >= 8, `${n(s, 'firewood')} cords of firewood`, n(s, 'firewood') >= 3),
     chk('meds', 'Medical supplies', n(s, 'meds') + n(s, 'ifak') >= 3, `${n(s, 'meds')} meds, ${n(s, 'ifak')} first-aid kits`, n(s, 'meds') + n(s, 'ifak') >= 1),
-    chk('fallout', 'Shelter from fallout', bunker, bunker ? 'the bunker' : 'no shielded room', true),
+    (() => { const [pf, what] = bestShelter(s); return chk('fallout', 'Shelter from fallout', bunker || pf >= 20, bunker ? 'the bunker' : pf >= 20 ? `${what} (protection factor ${pf})` : 'no shielded room', true); })(),
   ];
 
   // ── what's been built ──

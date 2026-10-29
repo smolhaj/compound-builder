@@ -122,7 +122,7 @@ export interface BuildAdvice {
 }
 
 const hasKind = (s: GameState, ...kinds: string[]) => s.structures.some(st => kinds.includes(st.kind));
-const hasPower = (s: GameState) => !!s.site.improvements?.power || hasKind(s, 'solar_array', 'garage_solar', 'generator_shed', 'battery_shed');
+const hasPower = (s: GameState) => !!s.site.improvements?.power || hasKind(s, 'solar_array', 'garage_solar', 'lodge_solar', 'generator_shed', 'battery_shed');
 
 /** What to order for people who are strained: wearing-thin restocks first, then the evenings' missing goods (a strained child wants toys and picture books). At most three lines. */
 export function moodOrderLines(s: GameState, mood: ReturnType<typeof moodSummary>): OrderLine[] {
@@ -255,7 +255,7 @@ export function suggestions(s: GameState): Suggestion[] {
   if (!hasKind(s, 'outhouse', 'septic')) add('toilet', 'outhouse', 'nowhere to go', 50);
   if (!hasPower(s)) add('power', 'solar_array', 'no power for the pump, lights and the freezer', 40);
   if (growing && !hasKind(s, 'root_cellar')) add('cellar', 'root_cellar', 'nowhere cool to keep what you grow', 30);
-  if (hasMaples(s) && woodsTaps(s) >= 60 && hasKind(s, 'timber_cabin', 'log_house', 'farmhouse') && !hasKind(s, 'sugar_shack')) add('sugar', 'sugar_shack', `the woods have maples for ${woodsTaps(s)} taps: late-winter syrup`, 14);
+  if (hasMaples(s) && woodsTaps(s) >= 60 && hasKind(s, 'timber_cabin', 'log_house', 'farmhouse', 'lodge', 'lodge_solar', 'stone_house', 'timber_frame') && !hasKind(s, 'sugar_shack')) add('sugar', 'sugar_shack', `the woods have maples for ${woodsTaps(s)} taps: late-winter syrup`, 14);
   if (hasKind(s, 'field') && hasKind(s, 'root_cellar') && !hasKind(s, 'wood_oven')) add('oven', 'wood_oven', 'the wheat and flour want an oven: bread and roasts without heating the house', 18);
 
   // fields with no seed to sow: a weedy forty percent is what they get (sim/crops.ts)

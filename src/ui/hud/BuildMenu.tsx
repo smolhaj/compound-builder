@@ -4,7 +4,7 @@
  * sensible piece is highlighted, and the bunker says what it needs right
  * now. Nothing is hidden (sim/guidance.ts decides; this draws).
  */
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { useWorldStore } from '../../store/worldStore';
 import { orderProblem } from '../../sim/economy';
@@ -27,6 +27,7 @@ import { takeRestDay } from '../../sim/mind';
 import { enroll, setDrills } from '../../sim/courses';
 import { setQuarantine } from '../../sim/medical';
 import { callGathering } from '../../sim/gatherings';
+import { HousingStyleCards } from './HousingStyles';
 
 /** The build menu's groups (kit pieces by what they are for). */
 const BUILD_GROUPS: Array<[string, string, readonly string[]]> = [
@@ -127,9 +128,15 @@ export function BuildMenu({ showProjects = () => undefined }: { showProjects?: (
       })}
     </div>
     {BUILD_GROUPS.map(([gid, title, kinds]) => (
-      <Group key={gid} id={gid} title={title} extra={gid === 'home' ? housingSummary(game) : undefined}>
-        {kinds.map(kit)}
-      </Group>
+      <Fragment key={gid}>
+        <Group id={gid} title={title} extra={gid === 'home' ? housingSummary(game) : undefined}>
+          {kinds.map(kit)}
+        </Group>
+        {gid === 'home' && <Group id="housing" title="Housing styles" extra="by what is local">
+          <Note>Each style is priced for this region: logs from your own timber, stone gathered or hauled, adobe only in dry country. The lodge needs a slope.</Note>
+          <HousingStyleCards game={game} tool={g.tool} arm={arm} />
+        </Group>}
+      </Fragment>
     ))}
     <Group id="paths" title="Footpaths">
       <PathsPanel />

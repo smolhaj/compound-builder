@@ -20,6 +20,7 @@
  */
 import type { GameState, Structure } from './state';
 import { isFinished } from './construction';
+import { isHome } from './blueprints';
 import { links } from './compounds';
 import { PERIMETER, runFinished } from './perimeter';
 import { startingVehicles, VEHICLES, type Vehicle } from './vehicles';
@@ -145,7 +146,7 @@ export interface GarageLink { run: string; kind: 'passage' | 'walkway'; garage: 
 export function garageLinks(s: GameState): GarageLink[] {
   const out: GarageLink[] = [];
   const garages = s.structures.filter(st => isFinished(st) && (st.kind === GATE_GARAGE || (GARAGES[st.kind] && st.kind !== 'barn' && st.kind !== 'workshop')));
-  const homes = s.structures.filter(st => isFinished(st) && (st.kind === 'timber_cabin' || st.kind === 'log_house' || st.kind === 'farmhouse' || st.kind === 'trailer' || st.kind === 'cottage' || st.kind === 'moms_house' || st.kind === 'guest_house'));
+  const homes = s.structures.filter(st => isFinished(st) && isHome(st.kind));
   const kinds = links(s);
   for (const l of kinds) {
     const run = s.perimeter.find(r => r.id === l.runId);

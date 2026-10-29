@@ -381,7 +381,10 @@ export interface GabledSpec {
   rise: number; eave: number; gableOver: number;
   /** Front porch depth (0 = none) under the roof run-out. */
   porch: number;
-  foundation: 'fieldstone' | 'concrete' | 'piers';
+  /** `none`: the building draws its own foundation (the lodge's walkout basement) in its `extras`. */
+  foundation: 'fieldstone' | 'concrete' | 'piers' | 'none';
+  /** No entry steps at the front door (the building builds its own stair). */
+  noSteps?: boolean;
   floorMat: KitMaterialId;
   /** Outer cladding, inner lining (null = single skin, studs show inside). */
   outer: KitMaterialId; inner: KitMaterialId | null;
@@ -464,7 +467,7 @@ export function buildGabled(s: GabledSpec, furnish?: (c: FurnishCtx) => void, pa
   } else if (s.foundation === 'concrete') {
     slab('concrete', W + 0.02, D + 0.02, -0.03, y0 + 0.03);
     if (s.porch > 0) parts.add('concrete', box(W + 0.02, y0 + 0.02, s.porch, 0, -0.03, hd + s.porch / 2));
-  } else {
+  } else if (s.foundation === 'piers') {
     // piers (posts on footing blocks)
     for (let x = -hw + 0.03; x <= hw - 0.03 + 1e-6; x += (W - 0.06) / Math.max(1, Math.round(W / 0.3))) {
       for (let z = -hd + 0.03; z <= hd - 0.03 + 1e-6; z += (D - 0.06) / Math.max(1, Math.round(D / 0.3))) {
@@ -482,7 +485,7 @@ export function buildGabled(s: GabledSpec, furnish?: (c: FurnishCtx) => void, pa
   if (s.porch > 0) {
     parts.add('deck', box(W + 0.02, 0.025, s.porch, 0, y0 - 0.025, (hd + pz1) / 2));
   }
-  if (frontDoor && y0 > 0.04) {
+  if (frontDoor && y0 > 0.04 && !s.noSteps) {
     const sz = hd + Math.max(0, s.porch);
     parts.add('deck', box(0.32, 0.03, 0.06, frontDoor.at, y0 * 0.5 - 0.03, sz + 0.03));
     parts.add('deck', box(0.32, 0.03, 0.06, frontDoor.at, -0.03, sz + 0.09));
