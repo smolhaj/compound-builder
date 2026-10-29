@@ -1,5 +1,6 @@
 /** The Defense tab: score, the property line (with "Wall my property"), upgrades, lights, towers, readiness checks. */
 import { terrainDefense } from '../../sim/terrainFx';
+import { drainageLines } from '../../sim/drainage';
 import { spotsText } from '../../sim/format';
 import { LightDiscipline } from '../LightDiscipline';
 import { useGameStore } from '../../store/gameStore';
@@ -99,6 +100,7 @@ export function DefenseTab() {
     </Section>
     <Section title="The ground and the tunnels">
       {terrain.lines.length > 0 ? terrain.lines.map(l => <Note key={l}>{l}</Note>) : <Note>The ground here gives a crew no particular way in (Terrain overlay: Lanes).</Note>}
+      {drainageLines(game).map(l => <Note key={l}>{l}</Note>)}
       <Row label="The ground's share of the defense" value={`${Math.round(terrain.score * 100)}%`} tone={terrain.score >= 0.5 ? 'good' : terrain.score >= 0.25 ? 'warn' : undefined} title="Hard lanes, a held choke and towers on real high ground: one input to how hard a crew finds the place (never a second scaling)" />
       {game.perimeter.filter(r => PERIMETER[r.kind].vehicleWay).map(r => <div key={r.id} style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '3px 0' }}>
         <span style={{ flex: 1 }}>{PERIMETER[r.kind].name} <span style={{ color: DIM }}>({Math.round(wallLength(r) * 6)} m, {runFinished(r) ? 'standing' : r.dropped ? 'dropped: rebuild it from Projects' : 'being built'})</span></span>

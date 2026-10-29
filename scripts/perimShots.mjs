@@ -7,8 +7,8 @@ const require = createRequire(import.meta.url);
 let chromium; try { ({ chromium } = require('playwright')); } catch { ({ chromium } = await import('/opt/node22/lib/node_modules/playwright/index.mjs')); }
 const out = process.argv[2], port = Number(process.argv[3] || 5961), only = process.argv[4] && process.argv[4] !== '-' ? process.argv[4] : null;
 mkdirSync(out, { recursive: true });
-const { SCENARIOS, BRIDGE_SCENARIOS = [], RING_SCENARIOS = [], GATE_SCENARIOS = [] } = await import('./perimSets.mjs');
-SCENARIOS.push(...BRIDGE_SCENARIOS, ...RING_SCENARIOS, ...GATE_SCENARIOS);
+const { SCENARIOS, BRIDGE_SCENARIOS = [], RING_SCENARIOS = [], GATE_SCENARIOS = [], DRAIN_SCENARIOS = [] } = await import('./perimSets.mjs');
+SCENARIOS.push(...BRIDGE_SCENARIOS, ...RING_SCENARIOS, ...GATE_SCENARIOS, ...DRAIN_SCENARIOS);
 const vite = spawn('node', ['node_modules/vite/bin/vite.js', '--config', 'scripts/vite.shots.config.ts', '--port', String(port), '--strictPort'], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise((ok, fail) => { vite.stdout.on('data', d => { if (/localhost:\d+/.test(String(d).replace(/\x1b\[[0-9;]*m/g, ''))) ok(); }); vite.on('exit', c => fail(new Error('vite ' + c))); });
 const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
@@ -18,7 +18,7 @@ try {
     page.setDefaultTimeout(120000);
     page.on('pageerror', e => console.error('pageerror:', e.message));
     page.on('console', m => { if (m.type() === 'error') console.error('console:', m.text()); });
-    await page.goto(`http://localhost:${port}/?clean&lowrender=0.75&seed=${sc.seed ?? 7}`);
+    await page.goto(`http://localhost:${port}/?clean&lowrender=0.75&seed=${sc.seed ?? 7}${sc.extra ?? ''}`);
     await page.waitForFunction(() => window.__cb?.qa?.lowrender);
     await page.evaluate(() => window.__cb.store.getState().setQuality('medium'));
     await page.evaluate(() => { window.__done = 0; });

@@ -537,6 +537,26 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
       }
       break;
     }
+    case 'drain_channel': {
+      // a 1 m stone-lined swale: a gravel bed between two fieldstone lips, a culvert stub and an iron grating at each end (a dug, spoil-lipped trench while it is being laid)
+      const open = run.finishedAt === null, w = 0.9 * M;
+      for (const [s0, s1] of spans) {
+        const n = Math.max(1, Math.ceil((s1 - s0) / 0.3));
+        for (let i = 0; i < n; i++) {
+          const a = along(run.pts, s0 + (s1 - s0) * i / n), b = along(run.pts, s0 + (s1 - s0) * (i + 1) / n);
+          beam(a.x, a.z, b.x, b.z, -0.004, 0.012, w, open ? 'soil' : 'gravel');
+          for (const sg of [-1, 1]) {
+            const o = (w / 2 + 0.11 * M) * sg;
+            beam(a.x + a.dz * o, a.z - a.dx * o, b.x + b.dz * o, b.z - b.dx * o, 0, open ? 0.08 * M : 0.16 * M, open ? 0.3 * M : 0.22 * M, open ? 'soil' : 'fieldstone');
+          }
+        }
+      }
+      if (!open) for (const e of spanEnds()) {
+        add('concrete', new THREE.CylinderGeometry(0.2 * M, 0.2 * M, 0.5 * M, 10).rotateZ(Math.PI / 2).rotateY(-Math.atan2(e.dz, e.dx)).translate(e.x, ground(e.x, e.z) + 0.15 * M, e.z));
+        add('iron', new THREE.BoxGeometry(0.03 * M, 0.34 * M, 0.5 * M).rotateY(-Math.atan2(e.dz, e.dx)).translate(e.x, ground(e.x, e.z) + 0.17 * M, e.z));
+      }
+      break;
+    }
     case 'water_pipe': case 'power_cable': {
       // an open trench while it's being laid, then a backfilled strip that greens over; marker posts at the bends
       const open = run.finishedAt === null, age = open ? 0 : Math.min(1, (t - run.finishedAt!) / 120);
