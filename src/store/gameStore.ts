@@ -1,4 +1,5 @@
 import { planProblem } from '../sim/construction';
+import { dropBridge, routeProblem } from '../sim/terrainFx';
 import { AFTERMATH_TEXT, joinPrisoner, releasePrisoner, resolveAftermath, type AftermathChoice } from '../sim/aftermath';
 import { dismissCrew, hireCrew } from '../sim/crews';
 import { setFocus } from '../sim/priority';
@@ -125,6 +126,10 @@ export interface GameStore {
   load: (g: GameState) => void;
   /** Lay out a fence / hedge / wall run for the family to build. */
   planRun: (kind: PerimeterKind, pts: Pt[], gates: Gate[], offLen?: number) => void;
+  /** Lay a tunnel-bridge or slope tunnel along a line the ground allows. Null on success, else why not. */
+  planSpan: (kind: PerimeterKind, a: Pt, b: Pt) => string | null;
+  /** Drop a standing tunnel-bridge or slope tunnel (it is a plan again until rebuilt). */
+  dropBridge: (id: string) => string | null;
   /** "Wall my property": lay out the whole closed property line in one wall type (creek bars, a road gate, existing runs kept). Returns how many runs. */
   wallProperty: (kind: PerimeterKind, geo: PropertyGeometry, shape?: RingShape, look?: ContainerLook) => number;
   /** Upgrade a finished fence or wall to the next tier, in place (null = laid out; else why not). */
@@ -313,6 +318,7 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
   load: (game) => set({ game, selected: null, tool: null, cutscene: promptFor(game) }),
   planRun: (kind, pts, gates, offLen = 0) => {
     if (locked()) return;
+    if (routeProblem(get().game, kind, pts)) return;   // a tunnel-bridge needs real low ground, a slope tunnel a hillside (the tool says why)
     const g = structuredClone(get().game);
     planRun(g, kind, pts, gates, offLen);
     set({ game: g });
@@ -324,6 +330,23 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     const n = layPropertyWall(g, planPropertyWall(g, kind, geo, { ...(shape ? { region: compoundRegion(g, geo, shape, ROAD_GATE_W) } : {}), ...(look ? { look } : {}) }), geo);
     if (n) { set({ game: g }); void saveGame(AUTOSAVE, g); }
     return n;
+  },
+  planSpan: (kind, a, b) => {
+    if (locked()) return LOCKED_WHY;
+    const why = routeProblem(get().game, kind, [a, b]);
+    if (why) return why;
+    const g = structuredClone(get().game);
+    planRun(g, kind, [a, b], []);
+    set({ game: g });
+    void saveGame(AUTOSAVE, g);
+    return null;
+  },
+  dropBridge: (id) => {
+    if (locked()) return LOCKED_WHY;
+    const g = structuredClone(get().game);
+    const why = dropBridge(g, id);
+    if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); }
+    return why;
   },
   upgradeRun: (id) => {
     if (locked()) return LOCKED_WHY;

@@ -1,4 +1,5 @@
 /** The Defense tab: score, the property line (with "Wall my property"), upgrades, lights, towers, readiness checks. */
+import { terrainDefense } from '../../sim/terrainFx';
 import { spotsText } from '../../sim/format';
 import { LightDiscipline } from '../LightDiscipline';
 import { useGameStore } from '../../store/gameStore';
@@ -58,6 +59,7 @@ export function DefenseTab() {
   const missingGate = ungatedCrossings(game, w.siteGeo?.drive).length;
   const exposed = d.homes.filter(h => !h.covered);
   const hardcore = adaptLevel(game) > 0;
+  const terrain = terrainDefense(game);
   return <>
     <Section title="Defense">
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
@@ -93,6 +95,14 @@ export function DefenseTab() {
           <button style={btn(false)} disabled={!!why} title={why ?? `${Math.round(runHours(next, len))} h of work; about ${usd(net)} after the salvage of the old one (${Math.round(SALVAGE * 100)}% of its materials back)`} onClick={() => { const w = useGameStore.getState().upgradeRun(r.id); if (w) alert(w); }}>{why ? 'Under way' : `Upgrade ~${usd(net)}`}</button>
         </div>;
       })}
+    </Section>
+    <Section title="The ground and the tunnels">
+      {terrain.lines.length > 0 ? terrain.lines.map(l => <Note key={l}>{l}</Note>) : <Note>The ground here gives a crew no particular way in (Terrain overlay: Lanes).</Note>}
+      <Row label="The ground's share of the defense" value={`${Math.round(terrain.score * 100)}%`} tone={terrain.score >= 0.5 ? 'good' : terrain.score >= 0.25 ? 'warn' : undefined} title="Hard lanes, a held choke and towers on real high ground: one input to how hard a crew finds the place (never a second scaling)" />
+      {game.perimeter.filter(r => PERIMETER[r.kind].vehicleWay).map(r => <div key={r.id} style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '3px 0' }}>
+        <span style={{ flex: 1 }}>{PERIMETER[r.kind].name} <span style={{ color: DIM }}>({Math.round(wallLength(r) * 6)} m, {runFinished(r) ? 'standing' : r.dropped ? 'dropped: rebuild it from Projects' : 'being built'})</span></span>
+        {runFinished(r) && <button style={btn(false)} title="Bring it down on purpose: nothing crosses there until it is rebuilt, and a crew has to ford and climb the gorge. Half the steel comes back." onClick={() => { if (window.confirm('Drop this tunnel? It has to be rebuilt to use it again.')) { const w = useGameStore.getState().dropBridge(r.id); if (w) alert(w); } }}>Drop it</button>}
+      </div>)}
     </Section>
     <Section title="Wall-top walkway">
       <Note>A steel patrol deck along the top of a container, steel or concrete wall (1.2 m wide, a handrail, stairs at the gates and about every 80 m). Guards on watch walk it and see farther; a post on it fights from above and fewer crews get over. It stays on through a wall upgrade.</Note>

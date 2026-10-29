@@ -23,12 +23,13 @@
  * Pure.
  */
 import { calendarOf, type GameState, type Structure } from './state';
-import { bestLane, floodplainAt, localSun, riseAboveCreek, type Choke, type Lane } from './terrain';
-import { campOf, groundOf, lanesOf, sitesOf } from './terrainState';
+import { bestLane, floodplainAt, hasHillside, localSun, riseAboveCreek, slopeTunnelProblem, spanProblem, type Choke, type Lane } from './terrain';
+import { campOf, groundOf, lanesOf, sitesOf, terrainOf } from './terrainState';
 import { isFinished } from './construction';
 import { isHome } from './blueprints';
 import { highShare, isTower } from './towers';
-import { runFinished } from './perimeter';
+import { PERIMETER, runFinished, runBill, SALVAGE, type PerimeterKind, type Pt } from './perimeter';
+import { log } from './economy';
 
 export const FX = {
   /** Solar: sun gain per unit of slope, and the cap. */
@@ -91,14 +92,17 @@ export function gravityHeadM(s: GameState): number {
 export const pumpDrawFactor = (s: GameState): number => (gravityHeadM(s) >= FX.GRAVITY_M ? 1 - FX.GRAVITY_CUT : 1);
 
 /** The way a raid comes from (radians, 0 = east, π/2 = the road side to the south), or null to take the road. */
-export function raidAngle(s: GameState, rnd: () => number): { ang: number; lane: Lane } | null {
+export function raidAngle(s: GameState, rnd: () => number): { ang: number; lane: Lane; via?: string } | null {
   const lanes = lanesOf(s);
   if (lanes.length < 4) return null;
   const road = lanes.reduce((a, l) => (Math.abs(l.ang - Math.PI / 2) < Math.abs(a.ang - Math.PI / 2) ? l : a), lanes[0]);
   const best = bestLane(lanes, { ang: Math.PI / 2, bonus: FX.ROAD_EASE });
-  if (!best || best === road) return null;
-  if (best.cost > road.cost * FX.ROAD_EASE * FX.LANE_MARGIN) return null;
-  return { ang: best.ang + (rnd() - 0.5) * 0.5, lane: best };
+  // the road side is a lane over a standing tunnel-bridge: they come to its door whatever the margins
+  if (!best || (best === road && !best.via)) return null;
+  if (!best.via && best.cost > road.cost * FX.ROAD_EASE * FX.LANE_MARGIN) return null;
+  // by a tunnel-bridge they gather at its outer door, so they come from the door's direction
+  const c = campOf(s), toDoor = best.via && best.choke ? Math.atan2(best.choke.at[1] - c[1], best.choke.at[0] - c[0]) : null;
+  return { ang: (toDoor ?? best.ang) + (rnd() - 0.5) * (toDoor !== null ? 0.12 : 0.5), lane: best, ...(best.via ? { via: best.via } : {}) };
 }
 
 /** Is the choke of the easiest lane held (a finished tower or wall within 4 units of it)? */
@@ -122,13 +126,14 @@ export function terrainDefense(s: GameState): TerrainDefense {
   const held = !!best.choke && chokeHeld(s, best.choke);
   if (hard > 0.15) lines.push(`The easiest way in is ${best.hardness.toFixed(1)}× slower than open ground${best.fords ? ' (it fords the creek)' : ''}${best.cliff ? ' (it has a cliff to climb)' : ''}.`);
   else lines.push('The ground is open all round: nothing slows a crew.');
-  if (best.choke) lines.push(held ? `The easiest way in narrows to ${Math.round(best.choke.width * 6)} m and you hold it.` : `The easiest way in narrows to ${Math.round(best.choke.width * 6)} m at one place: a wall or tower there would matter.`);
+  if (best.via) lines.push(`The easiest way in is your tunnel-bridge: a crew comes to its outer steel door and is held there ${DOOR_DELAY} s (in view of your towers and deck) before it can act. Drop it and they must ford and climb the gorge.`);
+  else if (best.choke) lines.push(held ? `The easiest way in narrows to ${Math.round(best.choke.width * 6)} m and you hold it.` : `The easiest way in narrows to ${Math.round(best.choke.width * 6)} m at one place: a wall or tower there would matter.`);
   if (towers.length) lines.push(hs > 0.3 ? `Your towers stand on real high ground (${Math.round(hs * 100)} % of the full advantage).` : 'Your towers stand on the level: a hill would add range.');
   return { score: Math.max(0, Math.min(1, 0.5 * hard + 0.3 * hs + 0.2 * (held ? 1 : 0))), lines, lane: best, held, highShare: hs };
 }
 
 /** A card for the Next-step list that reads the ground (the guidance turns it into a Suggestion). Suggest, never impose. */
-export interface TerrainCard { id: string; title: string; why: string; urgency: number; mode: 'high' | 'lanes' | 'water' }
+export interface TerrainCard { id: string; title: string; why: string; urgency: number; mode: 'high' | 'lanes' | 'water'; /** For the gorge card: the span it invites. */ span?: { a: Pt; b: Pt; lengthM: number } }
 
 /**
  * At most one card, and only once the family has a roof and is thinking about
@@ -147,7 +152,7 @@ export function terrainCards(s: GameState): TerrainCard[] {
   const keep = sites.find(c => c.kind === 'keep_ridge' && c.score >= 0.5);
   if (keep && !s.structures.some(st => st.kind === 'keep')) out.push({ id: 'land_keep', title: 'This ridge suits a terraced keep', why: keep.reason, urgency: 24, mode: 'high' });
   const gorge = sites.find(c => c.kind === 'gorge');
-  if (gorge) out.push({ id: 'land_gorge', title: 'The gorge is a natural choke point', why: gorge.reason, urgency: 26, mode: 'lanes' });
+  if (gorge) out.push({ id: 'land_gorge', title: 'The gorge is a natural choke point', why: gorge.reason, urgency: 26, mode: 'lanes', ...(gorge.span && !s.perimeter.some(r => PERIMETER[r.kind].span) ? { span: gorge.span } : {}) });
   const choke = sites.find(c => c.kind === 'choke');
   if (choke && !gorge) out.push({ id: 'land_choke', title: 'The way in narrows', why: choke.reason, urgency: 23, mode: 'lanes' });
   const res = sites.find(c => c.kind === 'reservoir');
@@ -157,3 +162,43 @@ export function terrainCards(s: GameState): TerrainCard[] {
 
 /** The ground's share of the defense in the shared strength's own unit: defense-equivalent points (0 to `FX.DEFENSE_POINTS`). */
 export const terrainPoints = (s: GameState): number => Math.round(terrainDefense(s).score * FX.DEFENSE_POINTS * 10) / 10;
+
+// ── tunnel-bridges and slope tunnels ──
+
+/** Seconds a crew coming by a tunnel-bridge spends at its steel door before it can act (the family sees them on the deck and the towers). */
+export const DOOR_DELAY = 8;
+
+/** Why a run of this kind can't be laid along `pts` on this ground (null = it can). Only the span kinds have a rule. */
+export function routeProblem(s: GameState, kind: PerimeterKind, pts: readonly Pt[]): string | null {
+  const d = PERIMETER[kind];
+  if (!d.span && kind !== 'slope_tunnel') return null;
+  const g = groundOf(s);
+  if (!g || pts.length < 2) return null;
+  if (d.span) return spanProblem(g, pts[0], pts[pts.length - 1]);
+  return slopeTunnelProblem(g, pts);
+}
+
+/** Build-menu grey-out: why this kind does not suit the land at all (null = it can go somewhere here). */
+export function terrainOff(s: GameState, kind: PerimeterKind): string | null {
+  if (kind === 'tunnel_bridge') return sitesOf(s).some(c => c.kind === 'gorge') ? null : 'no gorge, ravine or deep creek bed on this land to span: a tunnel-bridge needs real low ground';
+  if (kind === 'slope_tunnel') { const t = terrainOf(s); return t && hasHillside(t, s.site.home) ? null : 'no hillside steep enough (20 % or more) on this land: a slope tunnel needs a slope to go down'; }
+  return null;
+}
+
+/** The span a gorge on the lot invites (rim to rim), or null. */
+export function gorgeSpan(s: GameState): { a: Pt; b: Pt; lengthM: number; depthM: number } | null {
+  const g = sitesOf(s).find(c => c.kind === 'gorge');
+  return g?.span ? { a: g.span.a, b: g.span.b, lengthM: g.span.lengthM, depthM: g.span.depthM } : null;
+}
+
+/** Drop a standing tunnel-bridge or slope tunnel: it comes down and is a plan again until rebuilt (the salvage half-steel comes back). Null on success, else why not. */
+export function dropBridge(s: GameState, id: string): string | null {
+  const r = s.perimeter.find(x => x.id === id);
+  if (!r) return 'no such tunnel';
+  if (!PERIMETER[r.kind].vehicleWay) return 'only a tunnel-bridge or slope tunnel can be dropped';
+  if (!runFinished(r)) return 'it is not standing';
+  for (const [k, q] of Object.entries(runBill(r.kind, r.hours / PERIMETER[r.kind].hours)) as Array<[keyof typeof s.stock, number]>) if (k !== 'blast_door') s.stock[k] += Math.floor(q * SALVAGE * 0.5);
+  r.finishedAt = null; r.done = 0; r.supplied = false; r.dropped = true;
+  log(s, `The ${PERIMETER[r.kind].name.toLowerCase()} is down. Nothing crosses there until it is rebuilt, and a crew has to ford and climb.`);
+  return null;
+}

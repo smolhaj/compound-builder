@@ -477,6 +477,66 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
       for (const e of spanEnds()) add('fieldstone', new THREE.BoxGeometry(0.7 * M, H, 0.7 * M).translate(e.x, ground(e.x, e.z) + H / 2, e.z));
       break;
     }
+    case 'tunnel_bridge':
+    case 'slope_tunnel': {
+      // an enclosed rust-red steel tube (4 m across inside: a truck drives through) with a steel door at each end. The bridge spans a gorge on trusses in a straight
+      // line between its two rims; the slope tunnel lies along the hillside, half sunk in it. Ribs every 3 m, a concrete portal and a pair of closed steel doors at each end.
+      const R = 2.0 * M, spanKind = run.kind === 'tunnel_bridge';
+      const a0 = run.pts[0], b0 = run.pts[run.pts.length - 1];
+      const axisY = (x: number, z: number, t: number) => spanKind
+        ? ground(a0[0], a0[1]) + (ground(b0[0], b0[1]) - ground(a0[0], a0[1])) * t + R
+        : ground(x, z) + R * 0.55;
+      const L = wl, builtL = built;
+      const v3 = (s_: number) => { const p = along(run.pts, s_), t = L > 0 ? s_ / L : 0; return new THREE.Vector3(p.x, axisY(p.x, p.z, t), p.z); };
+      const tube = (p: THREE.Vector3, q: THREE.Vector3, r: number, m: KitMaterialId, open = true) => {
+        const d = q.clone().sub(p), l = d.length();
+        if (l < 1e-5) return;
+        const g = new THREE.CylinderGeometry(r, r, l, 14, 1, open).applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()));
+        add(m, g.translate((p.x + q.x) / 2, (p.y + q.y) / 2, (p.z + q.z) / 2));
+      };
+      const n = Math.max(1, Math.round(builtL / (3 * M)));
+      for (let i = 0; i < n && builtL > 0.05; i++) {
+        const s0 = builtL * i / n, s1 = builtL * (i + 1) / n, p = v3(s0), q = v3(s1);
+        tube(p, q, R, 'container_rust');
+        // a rib ring round the tube at the bay joint, proud of the skin
+        tube(p.clone().lerp(q, 0.02), p.clone().lerp(q, 0.1), R * 1.05, 'iron');
+        if (spanKind) {
+          // trusses down to the ground at every other joint where the gap is more than a step: two legs and a cross brace, a concrete foot under each leg
+          const pa = along(run.pts, s0), gy = ground(pa.x, pa.z), under = p.y - R - gy;
+          if (i % 2 === 0 && under > 0.12) {
+            const nx = -pa.dz, nz = pa.dx, legs: THREE.Vector3[] = [];
+            for (const sg of [-1, 1]) {
+              const lx = pa.x + nx * sg * R * 0.8, lz = pa.z + nz * sg * R * 0.8, ly = ground(lx, lz), top = p.y - R * 0.75;
+              // a square steel leg (35 cm) up to the tube, on a concrete foot
+              add('steel', new THREE.BoxGeometry(0.35 * M, top - ly + 0.05, 0.35 * M).translate(lx, ly - 0.05 + (top - ly + 0.05) / 2, lz));
+              add('concrete', new THREE.BoxGeometry(0.9 * M, 0.45 * M, 0.9 * M).translate(lx, ly + 0.1 * M, lz));
+              legs.push(new THREE.Vector3(lx, ly, lz));
+            }
+            // X-bracing across the pair, a third of the way up, and a cross beam under the tube
+            const top0 = p.y - R * 0.75, mid = (a: THREE.Vector3, k: number) => new THREE.Vector3(a.x, a.y + (top0 - a.y) * k, a.z);
+            tube(mid(legs[0], 0.15), mid(legs[1], 0.85), 0.07 * M, 'steel', false);
+            tube(mid(legs[1], 0.15), mid(legs[0], 0.85), 0.07 * M, 'steel', false);
+            tube(new THREE.Vector3(legs[0].x, top0, legs[0].z), new THREE.Vector3(legs[1].x, top0, legs[1].z), 0.12 * M, 'steel', false);
+          }
+        }
+      }
+      // the ends: a concrete portal (a frame round the opening), a pair of closed steel doors, an abutment under it, a lamp; drawn once the run is far enough built
+      const end = (s_: number, sign: number) => {
+        const p = v3(s_), d = along(run.pts, s_), yaw = -Math.atan2(d.dz, d.dx);
+        const place = (g: THREE.BufferGeometry) => g.rotateY(yaw).translate(p.x + d.dx * sign * 0.05, 0, p.z + d.dz * sign * 0.05);
+        const gy = ground(p.x, p.z);
+        add('concrete', place(new THREE.BoxGeometry(0.5 * M, R * 2.4 + 0.1 * M, 0.9 * M).translate(0, p.y - R + (R * 2.4) / 2 + 0.02, 0)));      // portal block (the frame is the thick face round the doors)
+        for (const sg of [-1, 1]) add('steel', place(new THREE.BoxGeometry(0.12 * M, R * 1.75, R * 0.95).translate(sign * 0.3 * M, p.y - R * 0.9 + R * 0.875, sg * R * 0.48)));   // the two door leaves
+        add('paint_yellow', place(new THREE.BoxGeometry(0.02 * M, 0.25 * M, R * 1.9).translate(sign * 0.37 * M, p.y - R * 0.4, 0)));   // a hazard band across the doors
+        if (spanKind && p.y - R - gy > 0.05) add('concrete', place(new THREE.BoxGeometry(0.9 * M, p.y - R - gy + 0.05, R * 2.3).translate(0, gy - 0.05 + (p.y - R - gy + 0.05) / 2, 0)));   // abutment down to the ground
+        add(lit ? 'bulb' : 'enamel', new THREE.SphereGeometry(0.07 * M, 8, 6).translate(p.x - d.dx * sign * 0.0, p.y + R + 0.18 * M, p.z));
+      };
+      if (builtL > 0.05) { end(0, -1); if (run.finishedAt !== null) end(L, 1); }
+      else if (run.dropped) {   // a dropped bridge leaves its abutments
+        for (const [s_, sign] of [[0, -1], [L, 1]] as const) { const p = along(run.pts, s_), gy = ground(p.x, p.z); add('concrete', new THREE.BoxGeometry(0.9 * M, 0.5 * M, R * 2.3).rotateY(-Math.atan2(p.dz, p.dx)).translate(p.x, gy + 0.2 * M, p.z)); void sign; }
+      }
+      break;
+    }
     case 'water_pipe': case 'power_cable': {
       // an open trench while it's being laid, then a backfilled strip that greens over; marker posts at the bends
       const open = run.finishedAt === null, age = open ? 0 : Math.min(1, (t - run.finishedAt!) / 120);
