@@ -7,13 +7,14 @@
  * Cached per place. Pure (no three.js).
  */
 import { ParcelTerrain } from '../game/parcel/parcelTerrain';
-import { analyzeTerrain, approachLanes, siteCandidates, type GroundSource, type Lane, type SiteCandidate, type Terrain } from './terrain';
+import { analyzeTerrain, approachLanes, siteCandidates, type Corridor, type GroundSource, type Lane, type SiteCandidate, type Terrain } from './terrain';
+import { PERIMETER, runFinished } from './perimeter';
 import type { GameState } from './state';
 import type { Pt } from './perimeter';
 
 let override: GroundSource | null = null;
 /** Tests (and the world, if it ever needs to) can pin the ground. */
-export const setGroundOverride = (g: GroundSource | null): void => { override = g; terrains.clear(); lanes.clear(); sources.clear(); sites.clear(); };
+export const setGroundOverride = (g: GroundSource | null): void => { override = g; terrains.clear(); liteTerrains.clear(); lanes.clear(); sources.clear(); sites.clear(); };
 
 const sources = new Map<string, GroundSource>();
 const terrains = new Map<string, Terrain>();
@@ -51,13 +52,32 @@ export function campOf(s: GameState): Pt {
   return live.length ? [live.reduce((a, st) => a + st.x, 0) / live.length, live.reduce((a, st) => a + st.z, 0) / live.length] : [(h.x0 + h.x1) / 2, (h.z0 + h.z1) / 2];
 }
 
-/** The ways a crew could come at the camp, cached by place and camp (rounded to 4 units). */
+const liteTerrains = new Map<string, Terrain>();
+/** Just what the raid lanes read, at step 2 (a quarter of the work): the cost grid and the creek. Built once per place. */
+export function laneTerrainOf(s: GameState): Terrain | null {
+  const g = groundOf(s);
+  if (!g) return null;
+  const k = keyOf(s) + (override ? '|o' : '');
+  let t = liteTerrains.get(k);
+  if (!t) { t = analyzeTerrain(g, s.site.home, { step: 2, lite: true }); liteTerrains.set(k, t); }
+  return t;
+}
+/** The finished, standing tunnel-bridges and slope tunnels: ways a crew can use as easy going over hard ground (`outer` = the end away from the camp). */
+export function corridorsOf(s: GameState): Corridor[] {
+  const c = campOf(s);
+  return s.perimeter.filter(r => PERIMETER[r.kind].vehicleWay && runFinished(r) && r.pts.length > 1).map(r => {
+    const a = r.pts[0], b = r.pts[r.pts.length - 1];
+    return { id: r.id, pts: r.pts.map(p => [p[0], p[1]] as [number, number]), outer: Math.hypot(a[0] - c[0], a[1] - c[1]) > Math.hypot(b[0] - c[0], b[1] - c[1]) ? a : b };
+  });
+}
+
+/** The ways a crew could come at the camp, cached by place, camp (rounded to 4 units) and the tunnels standing. */
 export function lanesOf(s: GameState): Lane[] {
-  const t = terrainOf(s);
+  const t = laneTerrainOf(s);
   if (!t) return [];
-  const c = campOf(s), k = `${keyOf(s)}|${override ? 'o' : ''}|${Math.round(c[0] / 4)}|${Math.round(c[1] / 4)}`;
+  const cor = corridorsOf(s), c = campOf(s), k = `${keyOf(s)}|${override ? 'o' : ''}|${Math.round(c[0] / 4)}|${Math.round(c[1] / 4)}|${cor.map(x => x.id).join(',')}`;
   let l = lanes.get(k);
-  if (!l) { l = approachLanes(t, c); lanes.set(k, l); }
+  if (!l) { l = approachLanes(t, c, undefined, cor); lanes.set(k, l); }
   return l;
 }
 

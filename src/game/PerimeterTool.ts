@@ -5,6 +5,7 @@
  * Backspace drops the last point; Esc / right-click cancels. The HUD shows
  * length, cost and hours as you draw.
  */
+import { routeProblem } from '../sim/terrainFx';
 import { ownsAt } from '../sim/land';
 import * as THREE from 'three';
 import type { HomesteadWorld } from './HomesteadWorld';
@@ -79,7 +80,7 @@ export class PerimeterTool {
       const now = performance.now();
       if (now - this._lastClick < 320 && this._pts.length >= 2) { this.finish(); return; }
       this._lastClick = now;
-      if (e.shiftKey && this._kind !== 'escape_tunnel' && this._kind !== 'underground_passage' && this._kind !== 'covered_walkway') this.addGateAt(p[0], p[1], e.altKey || e.ctrlKey ? PED_GATE_W : GATE_W);
+      if (e.shiftKey && this._kind !== 'escape_tunnel' && this._kind !== 'underground_passage' && !PERIMETER[this._kind].walkway) this.addGateAt(p[0], p[1], e.altKey || e.ctrlKey ? PED_GATE_W : GATE_W);
       else this.addPoint(p[0], p[1]);
     });
     on(window, 'keydown', e => {
@@ -153,6 +154,7 @@ export class PerimeterTool {
   finish(): void {
     if (!this._kind || this._pts.length < 2) return;
     if (this._kind === 'escape_tunnel' && this._world.tunnelRouteProblem(this._pts)) return;
+    if (routeProblem(useGameStore.getState().game, this._kind, this._pts)) return;   // a tunnel-bridge needs real low ground, a slope tunnel a hillside
     useGameStore.getState().planRun(this._kind, this._pts.map(p => [p[0], p[1]] as Pt), this._gatesFor(this._pts).gates.map(g => ({ ...g })), this._kind === 'escape_tunnel' ? offParcel(this._pts) : 0);
     this._pts = []; this._gates = [];
     this._redraw();
@@ -190,10 +192,12 @@ export class PerimeterTool {
     const lines = Object.entries(bill).map(([k, q]) => ({ material: k as MaterialId, qty: q as number }));
     const buyable = lines.filter(l => MATERIALS[l.material].price !== null);
     const own = [billText(Object.fromEntries(lines.filter(l => MATERIALS[l.material].price === null).map(l => [l.material, l.qty])))].filter(Boolean);
-    const tunnelWhy = this._kind === 'escape_tunnel' ? this._world.tunnelRouteProblem(pts as Pt[]) : null;
+    const tunnelWhy = this._kind === 'escape_tunnel' ? this._world.tunnelRouteProblem(pts as Pt[]) : pts.length >= 2 ? routeProblem(useGameStore.getState().game, this._kind, pts as Pt[]) : null;
     (this._line.material as THREE.LineBasicMaterial).color.set(tunnelWhy ? 0xe36a5a : 0xffd27a);
     const txt = tunnelWhy ? tunnelWhy
       : this._pts.length === 0 ? (this._kind === 'escape_tunnel' ? 'Escape tunnel: click a bunker room to start at its wall, then out to the exit'
+        : this._kind === 'tunnel_bridge' ? 'Tunnel-bridge: click the rim on one side of the gorge (or the compound\'s motor court), then the rim on the other. It needs real low ground under it'
+        : this._kind === 'slope_tunnel' ? 'Slope tunnel: click at the top of the hillside, then down the slope to the lower yard or road'
         : this._kind === 'covered_walkway' ? 'Covered walkway: click against the wall of one walled yard, then against the wall of the next'
         : this._kind === 'underground_passage' ? 'Underground passage: click inside one yard (the hatch goes there), then inside the next, or out to a hatch in the woods'
         : `${PERIMETER[this._kind].name}: click to start the line`)

@@ -8,8 +8,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { useWorldStore } from '../../store/worldStore';
-import { MAX_TOWERS, RING_TOWER_KINDS, DEFAULT_FORTRESS, planFortress, type FortressOptions } from '../../sim/fortress';
+import { MAX_TOWERS, RING_TOWER_KINDS, RING_WALLS, DEFAULT_FORTRESS, planFortress, type FortressOptions } from '../../sim/fortress';
+import { CONTAINER_LOOKS, PERIMETER, isContainerKind } from '../../sim/perimeter';
 import { TOWERS } from '../../sim/towers';
+import { RING_SHAPES } from '../../sim/ringShape';
 import { plansNeedLines } from '../../sim/guidance';
 import { eta, paceOf, slowHint, totalHoursLeft, weeksFor } from '../../sim/pace';
 import { billText } from '../../sim/materials';
@@ -63,6 +65,18 @@ export function FortifyRing() {
               <div>{label}</div><div style={{ fontSize: 11, opacity: 0.75 }}>{usd(p.cost)} · {p.hours.toLocaleString('en-US')} h</div>
             </button>)}
         </div>)}
+      <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', padding: '3px 0', opacity: opts.scope === 'full' && !(priced?.core.coreIsFull) ? 0.5 : 1 }} title="The outline of the ring round the core compound. The whole-property wall follows the land's own line.">
+        <span style={{ flex: 1, color: DIM }}>Shape</span>
+        {RING_SHAPES.map(sh => <button key={sh.id} style={{ ...btn(opts.shape === sh.id), padding: '2px 7px' }} title={sh.blurb} disabled={opts.scope === 'full' && !(priced?.core.coreIsFull)} onClick={() => setOpts({ ...opts, shape: sh.id })}>{sh.name}</button>)}
+      </div>
+      <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', padding: '3px 0' }}>
+        <span style={{ flex: 1, color: DIM }}>Wall</span>
+        {RING_WALLS.map(k => <button key={k} style={{ ...btn(opts.wall === k), padding: '2px 7px' }} title={PERIMETER[k].blurb} onClick={() => setOpts({ ...opts, wall: k })}>{PERIMETER[k].name.replace('Poured-concrete wall', 'Concrete').replace('Stone-and-timber wall', 'Stone and timber').replace('Container wall', 'Containers').replace('Stacked containers', 'Stacked')}</button>)}
+      </div>
+      {isContainerKind(opts.wall) && <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', padding: '3px 0' }}>
+        <span style={{ flex: 1, color: DIM }}>Paint</span>
+        {CONTAINER_LOOKS.map(l => <button key={l.id} style={{ ...btn(opts.look === l.id), padding: '2px 7px' }} onClick={() => setOpts({ ...opts, look: l.id })}>{l.name}</button>)}
+      </div>}
       <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', padding: '3px 0' }}>
         <span style={{ flex: 1, color: DIM }}>Towers</span>
         {Array.from({ length: MAX_TOWERS + 1 }, (_, n) => <button key={n} style={{ ...btn(opts.towers === n), padding: '2px 7px' }} onClick={() => setOpts({ ...opts, towers: n })}>{n}</button>)}
@@ -77,7 +91,7 @@ export function FortifyRing() {
       </div>
       {plan && <div style={{ borderTop: `1px solid ${LINE}`, borderBottom: `1px solid ${LINE}`, margin: '6px 0', padding: '6px 0' }}>
         {nothing ? <Note tone="good">Nothing to add: the line is already held and has what this plan would give it.</Note> : <>
-          <div>Container wall <b>{plan.wall.wallM.toLocaleString('en-US')} m</b>{opts.scope === 'core' && !plan.coreIsFull && <span style={{ color: DIM }}> round the compound</span>}{plan.wall.heldM > 0 && <span style={{ color: DIM }}> · {plan.wall.heldM.toLocaleString('en-US')} m already held</span>}</div>
+          <div>{PERIMETER[opts.wall].name} <b>{plan.wall.wallM.toLocaleString('en-US')} m</b>{opts.scope === 'core' && !plan.coreIsFull && <span style={{ color: DIM }}> round the compound</span>}{plan.wall.heldM > 0 && <span style={{ color: DIM }}> · {plan.wall.heldM.toLocaleString('en-US')} m already held</span>}</div>
           {plan.wall.creekCrossings > 0 && <div>Creek bars at <b>{plan.wall.creekCrossings}</b> crossing{plan.wall.creekCrossings > 1 ? 's' : ''}</div>}
           <div>Patrol walkway on top <b>{Math.round(plan.walkwayLen * 6).toLocaleString('en-US')} m</b>{plan.walkwayRuns > 0 && <span style={{ color: DIM }}> · stairs at the gate and every ~80 m</span>}</div>
           <div>{plan.garage ? <>Gate at the road: a gatehouse garage where the driveway crosses the wall <span style={{ color: DIM }}>· 4 bays, a steel drive-through gate</span></> : <span style={{ color: DIM }}>{plan.wall.gateSpot ? 'Gate at the road: an ordinary gate where the driveway crosses (no gate garage)' : 'No gate garage'}</span>}</div>

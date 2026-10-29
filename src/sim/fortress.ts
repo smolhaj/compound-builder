@@ -21,12 +21,13 @@ import { BLUEPRINTS, isHome, totalBill, totalHours } from './blueprints';
 import { log, orderCost } from './economy';
 import { isFinished, planStructure } from './construction';
 import { applyForPermit, countyWorks, needsPermit, permitFee } from './paperwork';
-import { PERIMETER, planRun, runBill, runHours, wallLength, type PerimeterRun, type Pt } from './perimeter';
+import { PERIMETER, planRun, runBill, runHours, wallLength, type ContainerLook, type PerimeterKind, type PerimeterRun, type Pt } from './perimeter';
 import { GATE_GARAGE, GARAGE_CELLS_Z, GARAGE_W, garageRotFor } from './garage';
 import { canHostWalkway, layWalkway, walkOn, walkwayBill } from './walkway';
 import { TOWERS, stampHighGround, type TowerKind } from './towers';
 import { ownedRects } from './enclosure';
-import { planPropertyWall, traceLoops, type GateSpot, type PropertyGeometry, type WallPlan } from './propertyWall';
+import { planPropertyWall, regionFromRects, type GateSpot, type PropertyGeometry, type WallPlan } from './propertyWall';
+import { cornersOf, regionFromPolygon, ringPolygon, type Region, type RingShape } from './ringShape';
 import { CELL } from '../game/buildkit/kit';
 import type { Rect } from './land';
 import type { GameState } from './state';
@@ -48,8 +49,15 @@ export interface FortressOptions {
   towerKind: TowerKind;
   /** Plan an underground passage from the garage to the nearest house. */
   passage: boolean;
+  /** The outline of the core ring (sim/ringShape.ts); the whole-property line follows the land, so a shape applies to the core only. */
+  shape: RingShape;
+  /** What the wall is made of (any solid wall that takes a patrol deck) and, for containers, how they are painted. */
+  wall: PerimeterKind;
+  look: ContainerLook;
 }
-export const DEFAULT_FORTRESS: FortressOptions = { scope: 'core', towers: MAX_TOWERS, towerKind: 'watchtower_wood', passage: true };
+/** The walls a ring can be built in (each takes a patrol walkway). */
+export const RING_WALLS: readonly PerimeterKind[] = ['container_wall', 'container_stack', 'stone_wall', 'concrete_wall'];
+export const DEFAULT_FORTRESS: FortressOptions = { scope: 'core', towers: MAX_TOWERS, towerKind: 'watchtower_wood', passage: true, shape: 'square', wall: 'container_wall', look: 'black' };
 
 export interface PlannedStructure { kind: string; x: number; z: number; rot: number }
 
@@ -57,6 +65,8 @@ export interface FortressPlan {
   options: FortressOptions;
   /** The land the ring encloses (the core square, or the owned rectangles). */
   rects: Rect[];
+  /** The area the wall encloses, in whatever shape. */
+  region: Region;
   /** The core compound is the whole home block already (a small lot): the two scopes are the same ring. */
   coreIsFull: boolean;
   wall: WallPlan;
@@ -77,6 +87,12 @@ export interface FortressPlan {
 }
 
 const GARAGE_D = GARAGE_CELLS_Z * CELL;
+
+/** The area a ring of this shape encloses in the core compound (or in `rect`): the outline is cut flat at the gate. */
+export function compoundRegion(s: GameState, geo: PropertyGeometry, shape: RingShape, gateW: number, rect: Rect = coreRect(s, geo)): Region {
+  if (shape === 'square') return regionFromRects([rect]);
+  return regionFromPolygon(ringPolygon(shape, rect, { drive: geo.drive, roadGate: geo.roadGate, gateW, seed: s.seed, ground: geo.ground }));
+}
 
 /**
  * The core compound: a square of `CORE_SIDE` centered on the family's buildings (the camp, else the middle of the staked buildings, else the middle of the
@@ -99,15 +115,50 @@ function clearOf(s: GameState, x: number, z: number, half: number): boolean {
   return s.structures.every(o => o.unplaced || o.kind.startsWith('bunker_') || Math.abs(o.x - x) > half + 0.8 || Math.abs(o.z - z) > half + 0.8);
 }
 
+/** Is the whole footprint of a tower at (x, z) inside the region (its four corners), with a little room? */
+const footprintInside = (region: Pick<Region, 'contains'>, x: number, z: number, half: number, pad = 0.12): boolean =>
+  [[-1, -1], [1, -1], [1, 1], [-1, 1]].every(([sx, sz]) => region.contains(x + sx * (half + pad), z + sz * (half + pad)));
+
+/** Candidate tower sites on a ring of any shape: the real corners, and a point every few units of wall, each pushed in until the footprint is inside. */
+function polygonCandidates(loop: readonly Pt[], region: Region, kind: TowerKind): Array<{ line: Pt; site: Pt }> {
+  const half = TOWERS[kind].cells * CELL / 2, inset = towerInset(kind), cand: Array<{ line: Pt; site: Pt }> = [];
+  const push = (line: Pt, inward: Pt, scale: number) => {
+    for (let k = 0; k < 8; k++) {
+      const d = inset * scale + k * 0.25, x = line[0] + inward[0] * d, z = line[1] + inward[1] * d;
+      if (footprintInside(region, x, z, half)) { cand.push({ line, site: [x, z] }); return; }
+    }
+  };
+  for (const c of cornersOf(loop, region)) push(c.at, c.inward, 1.2);
+  // along the wall: every ~6 units of its length, the inward normal of the stretch there
+  const n = loop.length;
+  let carry = 3;
+  for (let i = 0; i < n; i++) {
+    const a = loop[i], b = loop[(i + 1) % n], l = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (l < 1e-6) continue;
+    const dx = (b[0] - a[0]) / l, dz = (b[1] - a[1]) / l;
+    for (let d = carry; d < l; d += 6) {
+      const q: Pt = [a[0] + dx * d, a[1] + dz * d];
+      const nrm: Pt = region.contains(q[0] - dz * 0.1, q[1] + dx * 0.1) ? [-dz, dx] : [dz, -dx];
+      push(q, nrm, 1);
+      carry = d + 6 - l;
+    }
+    if (l <= carry) carry -= l;
+  }
+  return cand;
+}
+
 /** Sites for `n` towers just inside the wall: corners first, then the middle of the longest sides, spread out and clear of the gate. */
-export function towerSites(s: GameState, kind: TowerKind, n: number, gate: GateSpot | null, taken: ReadonlyArray<{ x: number; z: number }> = [], rects: readonly Rect[] = ownedRects(s)): Pt[] {
-  const loops = traceLoops(rects);
+export function towerSites(s: GameState, kind: TowerKind, n: number, gate: GateSpot | null, taken: ReadonlyArray<{ x: number; z: number }> = [], area: readonly Rect[] | Region = ownedRects(s)): Pt[] {
+  const region: Region = 'loops' in area ? area : regionFromRects(area);
+  const loops = region.loops.slice().sort((a, b) => b.length - a.length);
   if (!loops.length || n <= 0) return [];
   const loop = loops[0], inset = towerInset(kind);
-  const owned = (x: number, z: number) => rects.some(r => x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1);
+  const owned = region.contains;
+  const rects = region.rects;
   const cand: Array<{ line: Pt; site: Pt }> = [];
+  if (!rects) cand.push(...polygonCandidates(loop, region, kind));
   const m = loop.length;
-  for (let i = 0; i < m; i++) {
+  for (let i = 0; rects && i < m; i++) {
     const a = loop[i], b = loop[(i + 1) % m], pa = loop[(i + m - 1) % m];
     // a corner: step diagonally inside
     const dxs = [Math.sign(b[0] - a[0]), Math.sign(pa[0] - a[0])].find(v => v !== 0) ?? 0, dzs = [Math.sign(b[1] - a[1]), Math.sign(pa[1] - a[1])].find(v => v !== 0) ?? 0;
@@ -154,7 +205,11 @@ export function planFortress(s: GameState, geo: PropertyGeometry = {}, opts: Par
   const home = s.site.home, core = coreRect(s, geo);
   const coreIsFull = ownedRects(s).length === 1 && (core.x1 - core.x0) * (core.z1 - core.z0) >= 0.9 * (home.x1 - home.x0) * (home.z1 - home.z0);
   const rects: Rect[] = options.scope === 'core' && !coreIsFull ? [core] : ownedRects(s);
-  const wall = planPropertyWall(s, 'container_wall', geo, { gateW: GARAGE_W, garage: true, rects });
+  // a shaped ring is cut inside the core rectangle; the whole property line follows the land, so it keeps its own outline
+  const shaped = options.shape !== 'square' && (options.scope === 'core' || coreIsFull);
+  const region: Region = shaped ? compoundRegion(s, geo, options.shape, GARAGE_W, coreIsFull && options.scope === 'full' ? home : core) : regionFromRects(rects);
+  if (options.shape !== 'square' && !shaped) notes.push('The whole-property wall follows the line of the land: a round or octagonal ring is for the core compound.');
+  const wall = planPropertyWall(s, RING_WALLS.includes(options.wall) ? options.wall : 'container_wall', geo, { gateW: GARAGE_W, garage: true, region, look: options.look });
 
   // the garage: in the gate gap, door side facing in; it must have the ground to itself
   let garage: PlannedStructure | null = null;
@@ -168,7 +223,7 @@ export function planFortress(s: GameState, geo: PropertyGeometry = {}, opts: Par
   } else if (!gs) notes.push(wall.gateNote ? `No gate garage: ${wall.gateNote}. Add a gate to the wall or stake the garage from the Build menu.` : 'No gate garage planned (no road side on the line).');
   if (!garage && gs) { wall.runs.forEach(r => r.gates.forEach(g => { delete g.garage; })); }
 
-  const towers = towerSites(s, options.towerKind, options.towers, gs, garage ? [garage] : [], rects).map((p): PlannedStructure => ({ kind: options.towerKind, x: p[0], z: p[1], rot: 0 }));
+  const towers = towerSites(s, options.towerKind, options.towers, gs, garage ? [garage] : [], region).map((p): PlannedStructure => ({ kind: options.towerKind, x: p[0], z: p[1], rot: 0 }));
   if (towers.length < options.towers) notes.push(`${towers.length} of ${options.towers} tower sites found clear of buildings.`);
 
   // the underground passage from the garage to the nearest house (staked or built)
@@ -205,14 +260,14 @@ export function planFortress(s: GameState, geo: PropertyGeometry = {}, opts: Par
   const buy = (Object.entries(bill) as Array<[MaterialId, number]>).filter(([m]) => MATERIALS[m].price !== null).map(([material, qty]) => ({ material, qty }));
   const own = (Object.entries(bill) as Array<[MaterialId, number]>).filter(([m]) => MATERIALS[m].price === null).map(([material, qty]) => ({ material, qty }));
   return {
-    options, rects, coreIsFull, wall, garage, towers, passage, walkwayLen: walkLen, walkwayRuns: planned.length + existing.length, notes,
+    options, rects, region, coreIsFull, wall, garage, towers, passage, walkwayLen: walkLen, walkwayRuns: planned.length + existing.length, notes,
     bill, cost: orderCost(buy) + permits, own, permits, hours: Math.round(hours),
   };
 }
 
 /** Lay the plan out: walls, decks, the garage, the towers and the passage all go on the family's list. Returns what was laid. */
 export function layFortress(s: GameState, plan: FortressPlan): { runs: number; structures: number } {
-  const made: PerimeterRun[] = plan.wall.runs.map(r => planRun(s, r.kind, r.pts.map(p => [p[0], p[1]] as Pt), r.gates.map(g => ({ ...g })), 0, true));
+  const made: PerimeterRun[] = plan.wall.runs.map(r => { const run = planRun(s, r.kind, r.pts.map(p => [p[0], p[1]] as Pt), r.gates.map(g => ({ ...g })), 0, true); if (r.look) run.look = r.look; return run; });
   // a deck on every container wall (new and old) that does not have one
   for (const r of s.perimeter) if (canHostWalkway(r.kind) && !walkOn(s, r.id) && !r.replaces && !PERIMETER[r.kind].wallTop) layWalkway(s, r, true);
   let structures = 0;
@@ -224,7 +279,7 @@ export function layFortress(s: GameState, plan: FortressPlan): { runs: number; s
   }
   let runs = made.length;
   if (plan.passage) { planRun(s, 'underground_passage', plan.passage.map(p => [p[0], p[1]] as Pt), [], 0, true); runs++; }
-  log(s, `Laid out the fortress ring: ${plan.wall.wallM} m of container wall${plan.walkwayLen > 0 ? ' with a patrol walkway on top' : ''}${plan.garage ? ', a gatehouse garage at the gate' : ''}${plan.towers.length ? `, ${plan.towers.length} tower${plan.towers.length > 1 ? 's' : ''}` : ''}${plan.passage ? ' and an underground passage to the house' : ''}.`);
+  log(s, `Laid out the fortress ring: ${plan.wall.wallM} m of ${PERIMETER[plan.wall.kind].name.toLowerCase()}${plan.walkwayLen > 0 ? ' with a patrol walkway on top' : ''}${plan.garage ? ', a gatehouse garage at the gate' : ''}${plan.towers.length ? `, ${plan.towers.length} tower${plan.towers.length > 1 ? 's' : ''}` : ''}${plan.passage ? ' and an underground passage to the house' : ''}.`);
   return { runs, structures };
 }
 

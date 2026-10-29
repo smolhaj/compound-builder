@@ -48,7 +48,7 @@ export function exposureParts(s: GameState): Record<ExposureSource, number> {
   const deliveries = Math.min(25, (delivered.length * 1.5 + big * 2) * (o.quietDeliveries ? 0.4 : 1));
   let structures = 0;
   for (const st of s.structures) if (isFinished(st)) structures += STRUCTURE_WEIGHT[st.kind] ?? 0;
-  if (s.perimeter.some(r => r.kind === 'log_palisade' || r.kind === 'container_wall')) structures += 6;
+  if (s.perimeter.some(r => r.kind === 'log_palisade' || r.kind === 'container_wall' || r.kind === 'container_stack' || r.kind === 'stone_wall')) structures += 6;
   structures = Math.min(25, structures);
   const guns = Math.min(15, s.armory.onBooks * 2);
   const metals = Math.min(10, s.fin.onBooks / 5000);

@@ -23,7 +23,7 @@ import { PERIMETER, planRun, runBill, runFinished, wallLength, type PerimeterKin
 import type { GameState } from './state';
 
 /** The wall tiers a patrol deck can be added to (a deck needs a solid wall under it). */
-export const WALKWAY_HOSTS: readonly PerimeterKind[] = ['container_wall', 'steel_wall', 'electric_steel', 'concrete_wall'];
+export const WALKWAY_HOSTS: readonly PerimeterKind[] = ['container_wall', 'container_stack', 'stone_wall', 'steel_wall', 'electric_steel', 'concrete_wall'];
 export const canHostWalkway = (kind: PerimeterKind): boolean => WALKWAY_HOSTS.includes(kind);
 
 /** Deck width (≈ 1.2 m) and rail height (≈ 1.1 m), world units. */
