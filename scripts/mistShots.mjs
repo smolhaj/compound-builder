@@ -2,11 +2,7 @@
  * Misty-valley shots on the hillside lot: aerial up the slope, an eye-level view with a person, and the view out over the fog from the camp.
  *   flock $SP/render.lock node scripts/mistShots.mjs --out shots/mist [--port 5420] [--preset misty|overcast|clear|drizzle] [--q medium|high] [--tod 7] [--doy 288]
  * Always ?lowrender (drawn on request); the frames are drawn at the full-quality look (`renderFull`), because Low has no fog at all.
- * Presets (the shots tooling's lighting presets; the default look is 10:00 clear, mid-August):
- *   clear     10:00, August, forced clear               (the old default, for before / after)
- *   misty     07:00, mid-October, the weather forced to fog: a valley fog bank under the camp, low cloud on the ridges, cool overcast light
- *   overcast  11:00, November, overcast: soft light, cool grade, cloud hugging the ridgelines
- *   drizzle   09:00, October, rain: mist and droplets near the camera
+ * Presets: scripts/lookPresets.mjs (clear = the old 10:00 August default, for before / after; misty, overcast, drizzle, dusk).
  */
 import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
@@ -16,13 +12,8 @@ const require = createRequire(import.meta.url);
 let chromium; try { ({ chromium } = require('playwright')); } catch { ({ chromium } = await import('/opt/node22/lib/node_modules/playwright/index.mjs')); }
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
-const PRESETS = {
-  clear: { tod: 10, doy: 226, mode: 'clear', season: 'summer' },
-  misty: { tod: 7, doy: 288, mode: 'fog', season: 'fall' },
-  overcast: { tod: 11, doy: 315, mode: 'overcast', season: 'fall' },
-  drizzle: { tod: 9, doy: 292, mode: 'rain', season: 'fall' },
-};
-const preset = { ...(PRESETS[opt('--preset', 'misty')] ?? PRESETS.misty) };
+import { LOOKS, applyLook } from './lookPresets.mjs';
+const preset = { ...(LOOKS[opt('--preset', 'misty')] ?? LOOKS.misty) };
 if (args.includes('--tod')) preset.tod = Number(opt('--tod'));
 if (args.includes('--doy')) preset.doy = Number(opt('--doy'));
 const port = Number(opt('--port', 5420)), outDir = resolve(opt('--out', 'shots/mist')), q = opt('--q', 'medium'), tag = opt('--tag', preset.mode);
@@ -41,12 +32,10 @@ page.on('console', m => { if (m.type() === 'error') console.error('console', m.t
 try {
   await page.goto(`http://localhost:${port}/?lowrender=0.75&clean&seed=7&${LOT}${opt('--extra', '')}`);
   await page.waitForFunction(() => window.__cb?.qa?.renderNow);
-  await page.evaluate(p => { const { game, store } = window.__cb; window.__cb.qa.weather = true; game.getState().setSpeed(0); const s = store.getState(); s.setWeatherMode(p.mode); s.setSeasonMode(p.season); s.setTimeOfDay(p.tod); s.setDayOfYear(p.doy); s.setTimeOfDay(p.tod); }, preset);
+  await page.evaluate(() => { window.__cb.qa.weather = true; window.__cb.game.getState().setSpeed(0); });
+  await applyLook(page, 'misty', preset);
   await page.waitForTimeout(1500);
-  // let the weather layer and the valley fog arrive (they ease in over some seconds): step them instead of waiting
-  await page.evaluate(p => { const { weather, valley } = window.__cb; for (let i = 0; i < 14; i++) weather.sim.update(5, p.season === 'summer' ? 'summer' : 'fall', p.tod, p.mode); }, preset);
-  await page.waitForTimeout(500);
-  await page.evaluate(() => window.__cb.valley.snap());
+  await applyLook(page, 'misty', preset);   // (a second pass once the world has run a few frames)
   const settle = async () => { for (let i = 0; i < 4; i++) { await page.evaluate(() => window.__cb.qa.renderNow()); await page.waitForTimeout(120); } };
   const shot = async name => {
     await settle();
