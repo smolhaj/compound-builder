@@ -14,7 +14,7 @@ const { chromium } = await import('/opt/node22/lib/node_modules/playwright/index
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
 const layoutKind = opt('--layout', 'terrace');   // terrace: the wall takes in the garden terrace below the shelf; shelf: the wall stops at the shelf edge, the garden is outside it
-const TOD = Number(opt('--tod', 10)), only = opt('--only', 'aerial,top,walk,eye').split(',');   // which shot groups
+const TOD = Number(opt('--tod', 10)), only = opt('--only', 'aerial,top,walk,eye,stair').split(',');   // which shot groups
 const port = Number(opt('--port', 5410)), outDir = resolve(opt('--out', 'shots/hillside')), shots = args.includes('--shots');
 mkdirSync(outDir, { recursive: true });
 let vite = null;
@@ -229,6 +229,34 @@ if (shots) {
     }, frac);
     console.error('walker', JSON.stringify(at));
     await shot(`4-walking-terrace-route-${++n}`);
+  }
+  // a person on a stair between terraces: find the trail stretches steep enough to carry a stair, then walk the gardener (and a second person) until one stands on it
+  if (only.includes('stair')) {
+    const info = await page.evaluate(async () => {
+      const cb = window.__cb, w = cb.world, G = cb.game, gr = w.groundAt;
+      const { stairRuns } = await import('/src/game/paths/walkRoute.ts');
+      const runs = [];
+      for (const t of w.paths.network.trails) if (t.surface) for (const r of stairRuns(t.pts, gr)) runs.push({ trail: t.id, pts: t.pts.slice(r.a, r.b + 1), lenM: Math.round(r.lenU * 6), riseM: +(r.riseU * 6).toFixed(1) });
+      window.__stairs = runs;
+      if (!runs.length) return { runs: 0 };
+      const setTasks = tasks => { const g = structuredClone(G.getState().game); g.personState.forEach((ps, i) => { ps.task = tasks[i % tasks.length]; ps.target = null; }); G.setState({ game: g }); };
+      const near = (p, run) => { const m = run.pts[Math.floor(run.pts.length / 2)]; return Math.hypot(m[0] - p.x, m[1] - p.z) < 0.07; };
+      // the tasks that take people up and down the terrace route, one after another, until someone is on a stair
+      let hit = null;
+      for (const tasks of [['garden', 'sleep', 'sleep', 'sleep'], ['sleep', 'sleep', 'sleep', 'sleep'], ['garden', 'repairs', 'garden', 'pets'], ['kitchen', 'garden', 'kitchen', 'garden'], ['repairs', 'pets', 'repairs', 'pets']]) {
+        setTasks(tasks);
+        for (let i = 0; i < 2500 && !hit; i++) {
+          w.updatePeople(0.05, G.getState().game, 10, 1);
+          for (const p of w.family.positions()) for (const run of window.__stairs) if (near(p, run)) { hit = { id: p.id, x: p.x, z: p.z, y: gr(p.x, p.z), run: run.lenM + ' m long, ' + run.riseM + ' m rise' }; break; }
+          if (hit) break;
+        }
+        if (hit) break;
+      }
+      if (hit) { const f = w.parcel.lot.fall; cb.cam.target.set(hit.x, hit.y + 0.2, hit.z); const r0 = window.__stairs.find(r => r.pts.some(q => Math.hypot(q[0] - hit.x, q[1] - hit.z) < 0.3)); const m = r0.pts[Math.floor(r0.pts.length / 2)], d = Math.atan2(r0.pts[r0.pts.length - 1][0] - r0.pts[0][0], r0.pts[r0.pts.length - 1][1] - r0.pts[0][1]); cb.cam.target.set(m[0], gr(m[0], m[1]) + 0.1, m[1]); cb.cam.radius = 3.0; cb.cam.pitch = 0.4; cb.cam.yaw = d + 2.2; hit.mid = m; }
+      return { names: w.paths.renderer.group.children.map(c => c.name + ':' + (c.geometry?.attributes?.position?.count ?? 0)), runs: runs.length, summary: runs.map(r => r.lenM + ' m / ' + r.riseM + ' m'), hit };
+    });
+    console.error('stairs', JSON.stringify(info));
+    if (info.hit) await shot('5-stair-between-terraces-with-person');
   }
   // eye level on the shelf below the rock face, a person in frame (everyone back at the house, the gardener beside the wall)
   await page.evaluate(() => window.__setTasks(['kitchen', 'pets', 'pets', 'pets']));

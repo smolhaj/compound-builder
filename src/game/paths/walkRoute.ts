@@ -59,3 +59,33 @@ export function slopePace(grade: number): number {
   const up = Math.max(0, grade - 0.08), down = Math.max(0, -grade - 0.18);
   return Math.max(0.35, 1 / (1 + 1.6 * up + 0.7 * down));
 }
+
+/** A stretch of a trail that climbs steeply enough to want steps (a riser between terraces): indices into the trail's points. */
+export interface StairRun { a: number; b: number; lenU: number; riseU: number }
+
+/**
+ * Where a trail needs a dry-stack stair: stretches whose grade is over `minGrade` (default 0.32, about 18 degrees) for at least `minLen` units
+ * (0.6 u = 3.6 m), with a gap of one gentle segment allowed inside a run. Crossing a riser stays a cost (the router's slope cost and `slopePace`);
+ * the stair is what makes it a walkable one.
+ */
+export function stairRuns(line: readonly Pt[], height: (x: number, z: number) => number, minGrade = 0.32, minLen = 0.6): StairRun[] {
+  const out: StairRun[] = [];
+  let a = -1, last = -1;
+  const close = () => {
+    if (a >= 0 && last > a) {
+      let len = 0;
+      for (let k = a + 1; k <= last; k++) len += Math.hypot(line[k][0] - line[k - 1][0], line[k][1] - line[k - 1][1]);
+      const rise = Math.abs(height(line[last][0], line[last][1]) - height(line[a][0], line[a][1]));
+      if (len >= minLen && rise / Math.max(len, 1e-6) >= minGrade * 0.8) out.push({ a, b: last, lenU: len, riseU: rise });
+    }
+    a = -1; last = -1;
+  };
+  for (let k = 1; k < line.length; k++) {
+    const d = Math.hypot(line[k][0] - line[k - 1][0], line[k][1] - line[k - 1][1]) || 1e-6;
+    const steep = Math.abs(height(line[k][0], line[k][1]) - height(line[k - 1][0], line[k - 1][1])) / d >= minGrade;
+    if (steep) { if (a < 0) a = k - 1; last = k; }
+    else if (a >= 0 && k - last > 1) close();
+  }
+  close();
+  return out;
+}

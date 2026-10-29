@@ -121,8 +121,8 @@ export function rollLot(r: () => number, region: RegionId, acres: Acres, water: 
     kind, seed: Math.floor(spare * 1e6) + seed % 1000, relief: Math.round(relief * 10) / 10, outlier, elevM, flip: kind === 'hillside' && w === 'creek' ? 1 : kind === 'hillside' || kind === 'bench' || kind === 'ridge' ? flip : 1,
     creek: kind === 'hillside' ? w === 'creek' : undefined,
   };
-  // a third of the dry hillsides are cut into the slope (a rock face over a level shelf); a hash of the seed, so the rolls above never move
-  if (kind === 'hillside' && w !== 'creek' && (spec.seed * 0.6180339887) % 1 < 0.33) spec.cutbank = true;
+  // one in eight dry hillsides is a special listing cut into the slope (a rock face over a level shelf); a hash of the seed, so the rolls above never move
+  if (kind === 'hillside' && w !== 'creek' && (spec.seed * 0.6180339887) % 1 < 0.125) spec.cutbank = true;
   // (a hillside with a creek always falls toward the road: the creek would run uphill from it otherwise)
   return { spec, creek: w === 'creek' || w === 'lake', spring: w === 'spring', lake: w === 'lake' };
 }
@@ -179,6 +179,7 @@ export function terrainFacts(site: Pick<Site, 'lot' | 'home'>): Fact[] {
   const out: Fact[] = [];
   out.push({ label: 'Ground', value: `${LOT_NAME[spec.kind]}${spec.outlier ? ', extreme relief' : ''}, ${n0(spec.elevM)} m (${n0(spec.elevM * M_TO_FT)} ft)` });
   out.push({ label: 'Relief', value: `${n0(s.dropM)} m from low to high · slopes avg ${Math.round(s.meanSlopePct)} %, steepest ${n0(s.maxSlopePct)} %`, tone: s.dropM > 140 ? 'bad' : undefined });
+  if (spec.cutbank) out.push({ label: 'Rock face', value: 'Rock face above the pad: a cutbank over a level shelf: a compound can be notched into it, and a crew on foot needs ladders to cross it', tone: 'good' });
   const flat = Math.round(s.padFrac * 100);
   out.push({ label: 'Flat ground', value: `${flat} % buildable${s.padM2 > 0 ? ` · best pad ${acresOfM2(s.padM2)} acre${acresOfM2(s.padM2) === 1 ? '' : 's'}` : ''}`, tone: flat >= 30 ? 'good' : flat < 12 ? 'bad' : undefined });
   const g = s.accessMaxPct;

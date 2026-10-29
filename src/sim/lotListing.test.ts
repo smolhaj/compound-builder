@@ -113,3 +113,23 @@ describe('the listing card', () => {
     expect(siteFacts(wet).find(f => f.label === 'Water')!.value).not.toContain('Dry heights');
   });
 });
+
+describe('cutbank listings', () => {
+  it('are a special listing (about one dry hillside in eight) and the card says so', async () => {
+    const { rollLot, terrainFacts } = await import('./lotListing');
+    const { mulberry32 } = await import('./rng');
+    let hill = 0, cut = 0, seen: ReturnType<typeof rollLot> = null;
+    for (let i = 1; i < 4000; i++) {
+      const r = rollLot(mulberry32(i * 7919), 'pnw', 40, 'any', i);
+      if (!r || r.spec.kind !== 'hillside' || r.spec.creek) continue;
+      hill++;
+      if (r.spec.cutbank) { cut++; seen = r; }
+    }
+    expect(hill).toBeGreaterThan(100);
+    expect(cut / hill).toBeGreaterThan(0.05);
+    expect(cut / hill).toBeLessThan(0.2);
+    const { HOME_RECT } = await import('./site');
+    expect(terrainFacts({ lot: seen!.spec, home: HOME_RECT[40] }).some(f => f.label === 'Rock face')).toBe(true);
+    expect(terrainFacts({ lot: { ...seen!.spec, cutbank: false }, home: HOME_RECT[40] }).some(f => f.label === 'Rock face')).toBe(false);
+  });
+});
