@@ -74,7 +74,7 @@ interface RegionLots {
 export const REGION_LOTS: Partial<Record<RegionId, RegionLots>> = {
   mountain_west: { share: 0.9, kinds: { ridge: 1, hillside: 2.2, bench: 1.6, gorge: 1, mesa: 0.8, saddle: 0.8, bluff: 0.7, island: 0.4 }, relief: 1, outlier: 0.1 },
   appalachia: { share: 0.8, kinds: { ridge: 1.5, hillside: 2.5, bench: 1.5, gorge: 1, saddle: 0.7, bluff: 0.3 }, relief: 0.8, outlier: 0.04 },
-  pnw: { share: 0.75, kinds: { ridge: 1, hillside: 2, bench: 1.5, gorge: 0.8, saddle: 0.4, bluff: 1, island: 0.8 }, relief: 0.85, outlier: 0.04 },
+  pnw: { share: 0.55, kinds: { ridge: 1.2, hillside: 2.4, bench: 1.2, gorge: 0.8, saddle: 0.5, bluff: 0.6, island: 0.4 }, relief: 0.85, outlier: 0.04 },
   north_woods: { share: 0.3, kinds: { bluff: 1, island: 1 }, relief: 0.4, outlier: 0 },
 };
 
@@ -143,10 +143,10 @@ export function lotPriceFactor(site: Pick<Site, 'lot' | 'home'>): number {
   const lot = siteLot(site);
   if (!lot) return 1;
   const { stats: st } = lot, spec = site.lot!;
-  let k = 0.62 + 0.55 * Math.min(1, st.padFrac / 0.4);
+  let k = 0.55 + 0.55 * Math.min(1, st.padFrac / 0.4);
   const g = st.accessMaxPct;
   k *= g <= 6 ? 1.06 : g <= 10 ? 1 : g <= 16 ? 0.9 : g <= 25 ? 0.78 : 0.6;
-  k *= { ridge: 1.1, hillside: 1, bench: 1.15, gorge: 0.9, mesa: 1.05, saddle: 0.95, bluff: 1.2, island: 1.5 }[spec.kind];
+  k *= { ridge: 1.05, hillside: 0.95, bench: 1.1, gorge: 0.85, mesa: 1, saddle: 0.9, bluff: 1.1, island: 1.3 }[spec.kind];
   if (spec.outlier) k *= 0.7;
   return Math.round(k * 100) / 100;
 }
