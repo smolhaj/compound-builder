@@ -17,6 +17,8 @@ import { DioramaCamera } from './DioramaCamera';
 import { HomesteadWorld } from './HomesteadWorld';
 import { seasonState, type VisualSeason } from '../engine/world/season/seasonState';
 import { WeatherRenderer } from '../engine/world/weather/WeatherRenderer';
+import { ValleyFog, fogTarget, NO_FOG_TARGET } from '../engine/world/fog/ValleyFog';
+import { fogForView, fogPlaceOf } from '../sim/fogFx';
 import { TourController } from '../engine/world/camera/TourController';
 import { CameraOccluders } from '../engine/world/camera/cameraOcclusion';
 import { PARCEL_SIZE } from './HomesteadWorld';
@@ -58,6 +60,9 @@ export function GameCanvas() {
     const world = new HomesteadWorld(ws, useGameStore.getState().game.seed, useGameStore.getState().game.site);
     world.setBridgeDown(useGameStore.getState().game.roadBridge?.down ?? false);   // (the bridge on the way in, brought down on purpose or standing)
     const weather = new WeatherRenderer(ws.scene, useGameStore.getState().game.seed);
+    // valley fog and low cloud: the sim's fog (sim/fog.ts), eased and drawn as height fog (engine/world/fog)
+    const valley = new ValleyFog();
+    let fogPlace: ReturnType<typeof fogPlaceOf> | null = null, fogPlaceAt = -9, fogCampY = 0;
     const cam = new DioramaCamera(canvas);
     cam.groundAt = world.groundAt;
     cam.solidAt = world.crownAt;
@@ -241,7 +246,7 @@ export function GameCanvas() {
     let cineSaved: { fov: number; near: number } | null = null;
     let promptAt = -1, skipScene = useCutsceneView.getState().skipScene, skipAll = useCutsceneView.getState().skipAll;
     let battleView: { x: number; z: number; radius: number; pitch: number } | null = null;
-    const qa: { frames: number; frameMs: number; lowrender?: boolean; renderNow?: () => Promise<void>; renderFull?: (q?: QaQuality) => Promise<void>; pose: null | { x: number; y: number; z: number; lx: number; ly: number; lz: number; fov?: number } } = { frames: 0, frameMs: 0, pose: null };
+    const qa: { frames: number; frameMs: number; lowrender?: boolean; weather?: boolean; renderNow?: () => Promise<void>; renderFull?: (q?: QaQuality) => Promise<void>; pose: null | { x: number; y: number; z: number; lx: number; ly: number; lz: number; fov?: number } } = { frames: 0, frameMs: 0, pose: null };
     // window.__cb.qa.renderNow(): draw one frame (a promise); renderFull('high'|'medium'): one slow full-quality, full-resolution shot
     if (lowRender.on) Object.assign(qa, { lowrender: true, renderNow: () => renderReq.request(), renderFull: (q: QaQuality = 'high') => renderReq.request(q) });
     let slow = 0;
@@ -321,12 +326,31 @@ export function GameCanvas() {
       if (wetKey !== lastWetKey) { lastWetKey = wetKey; ws.setWetness(wetKey / 50); }
       // Weather → sky / light / fog (next frame), wet + snowy surfaces.
       const wxSeason = vis === 'winter' && seasonState.weatherSnow <= 0 ? 'fall' : vis;
+      // the sim's fog at the view's day and hour (or the look Settings forces): the bank's top, the cloud base, the drizzle
+      const gsF = useGameStore.getState().game;
+      // (?lowrender draws no weather unless the QA script opts in with `__cb.qa.weather = true`: the sky, the fog and the weather layer then run as at Medium, for the frames lifted with renderFull)
+      const wxOn = lowRender.on ? !!qa.weather : ws.quality !== 'low';
+      if (lowRender.on) weather.setQuality(qa.weather ? 'medium' : 'low');
+      if (!wxOn || weatherMode === 'off') valley.update(dt, NO_FOG_TARGET);
+      else {
+        if (!fogPlace || now / 1000 - fogPlaceAt > 1.5) {
+          fogPlaceAt = now / 1000; fogPlace = fogPlaceOf(gsF);
+          const c = campOf(gsF); fogCampY = world.groundAt(c[0], c[1]);
+        }
+        const fn = fogForView(gsF, dayOfYear, t, weatherMode);
+        valley.update(dt, fogTarget(fn, { campY: fogCampY, floorY: fogCampY - fogPlace.campAboveFloorM / 6 }));
+      }
+      const vc = valley.cur;
       const wx = weather.update({
         dt, speed: speed === 0 ? 1 : 60 / SECONDS_PER_DAY[speed], season: wxSeason, hour: t,
         mode: weatherMode, eventWetness: ws.eventWetness, night: ws.nightFactor,
         camera: ws.camera, focus: cam.target,
         snowBase: sp.snow, snowAllow: seasonState.weatherSnow, region: seasonState.climate.id,
+        valleyBank: vc.bankDensity > 1e-4 ? { y: vc.bankTopY, amount: Math.min(1, vc.bankDensity * 2.5) } : null,
+        mist: valley.nearMist(ws.camera.position.y),
       });
+      valley.applyTo(wx, weatherMode === 'auto');
+      ws.setHeightFog(valley.params((renderReq.quality ?? ws.quality) === 'high' ? 0.8 : 0.4));
       // nuclear war: the flash, a mushroom cloud on the northern skyline, a sickly hazed sky, grey dust falling
       const gs = useGameStore.getState().game, nk = disasterSky(gs);
       if (gs.disaster.kind === 'nuclear' && gs.clock.t >= gs.disaster.hitAt && gs.disaster.variant !== 'exchange') {
@@ -416,7 +440,7 @@ export function GameCanvas() {
     raf = requestAnimationFrame(frame);
 
     // QA hook (screenshot harness, console poking).
-    (window as unknown as Record<string, unknown>).__cb = { terrainOv, player, ws, world, weather, cam, tour, tool, marker, fence, sight, game: useGameStore, store: useWorldStore, THREE, qa, battle,
+    (window as unknown as Record<string, unknown>).__cb = { terrainOv, player, ws, world, weather, valley, cam, tour, tool, marker, fence, sight, game: useGameStore, store: useWorldStore, THREE, qa, battle,
       demoBattle: () => {
         const g = useGameStore.getState().game;
         const b = demoBattle(g.structures, g.people, g.structures.length ? undefined : world.camp);

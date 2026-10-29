@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { RegionKind } from '../terrain/regionalLandscape';
+import { HEIGHT_FOG_GLSL } from '../fog/heightFog';
 
 /** Patch a material with the regional terrain's thinning-with-distance fog. */
 export function patchFog(mat: THREE.Material, key: string): void {
@@ -14,6 +15,7 @@ export function patchFog(mat: THREE.Material, key: string): void {
     sh.fragmentShader = sh.fragmentShader.replace('#include <fog_fragment>', /* glsl */`#ifdef USE_FOG
         float rk2 = mix(1.0, 0.1, smoothstep(80.0, 420.0, vFogDepth));
         gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor, 1.0 - exp(- fogDensity * fogDensity * rk2 * vFogDepth * vFogDepth));
+        ${HEIGHT_FOG_GLSL}
       #endif`);
   };
   mat.customProgramCacheKey = () => key;

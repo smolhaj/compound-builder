@@ -21,6 +21,8 @@ import { TRACK_NAME, TRACKS, type Track } from './disaster';
 import { powered } from './gear';
 import { mulberry32 as rng } from './rng';
 import { dayIndex } from './state';
+import { fogRadioLine } from './fogFx';
+import { fogHash } from './fog';
 
 export interface RadioState {
   /** Day index until which the watch is up after a raider warning, and its detection bonus. */
@@ -89,6 +91,8 @@ export function radioDay(s: GameState): string[] {
   };
   const warn = (days: number) => { st.warnedUntil = day + days; st.bonus = set === 'ham' ? 15 : set === 'shortwave' ? 10 : 5; };
   const lawless = 1 - (d.tracks.law ?? 1);
+  // the weather loop: a fog or low-cloud forecast for tomorrow (own random stream, so the rest of the day's news is unchanged)
+  if (set !== 'none') { const fl = fogRadioLine(s); if (fl && fogHash(s.seed * 6007 + day, 11) < 0.4) return say(`${src} ${fl.replace(/^Forecast: /, 'the weather: ')}`, 0); }
 
   if (r() < truth) {
     st.truths++;

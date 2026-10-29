@@ -192,12 +192,14 @@ const PRECIP_VERT = /* glsl */`
   uniform vec3 uBox;
   uniform float uTime;
   uniform float uSnow;
+  uniform float uSize;
+  uniform float uDrift;
   uniform vec2 uWind;
   varying vec2 vUv;
   varying float vFade;
   #include <fog_pars_vertex>
   void main() {
-    float spd = mix( 14.0, 0.7, uSnow ) * ( 0.8 + 0.4 * fract( aSeed.x * 37.1 ) );   // 1 unit ≈ 6 m
+    float spd = mix( 14.0, 0.7 * uDrift, uSnow ) * ( 0.8 + 0.4 * fract( aSeed.x * 37.1 ) );   // 1 unit ≈ 6 m
     vec3 p = aSeed * uBox;
     p.y -= uTime * spd;
     p.xz += uWind * uTime * mix( 1.0, 0.7, uSnow );
@@ -222,7 +224,7 @@ const PRECIP_VERT = /* glsl */`
       // Snow flake: small camera-facing disc
       vec3 right = vec3( viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0] );
       vec3 up = vec3( viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1] );
-      float sz = 0.014 + 0.012 * fract( aSeed.y * 51.3 );
+      float sz = ( 0.014 + 0.012 * fract( aSeed.y * 51.3 ) ) * uSize;
       offs = ( right * position.x + up * ( position.y - 0.5 ) ) * sz * 2.0;
     }
     vec3 wp = p + offs;
@@ -331,6 +333,10 @@ export interface WeatherFrameInput {
   region?: string;
   /** Fog-bank strength for the site (PNW sound / river valleys thicker). Default 1. */
   fogBankScale?: number;
+  /** The sim's valley bank (fog/ValleyFog.ts): sheets of drifting mist ride its top (world Y) at this opacity 0–1, instead of lying on the ground. */
+  valleyBank?: { y: number; amount: number } | null;
+  /** 0-1: the camera stands in the valley bank or the low cloud (fog/ValleyFog.nearMist): fine mist droplets drift past the lens. */
+  mist?: number;
 }
 
 export class WeatherRenderer {
@@ -388,6 +394,8 @@ export class WeatherRenderer {
           uBox: { value: new THREE.Vector3(32, 18, 32) },
           uTime: { value: 0 },
           uSnow: { value: 0 },
+          uSize: { value: 1 },
+          uDrift: { value: 1 },
           uWind: { value: new THREE.Vector2(2.2, 0.9) },
           uOpacity: { value: 0 },
           uColor: { value: new THREE.Color(0.75, 0.8, 0.88) },
@@ -511,7 +519,8 @@ export class WeatherRenderer {
     }
 
     // ── Fog banks ────────────────────────────────────────────────────────────
-    const bank = low ? 0 : Math.max(0, Math.min(1, (o.fog - 0.2) / 0.6)) * (f.fogBankScale ?? 1);
+    const vb = f.valleyBank;
+    const bank = low ? 0 : vb ? vb.amount : Math.max(0, Math.min(1, (o.fog - 0.2) / 0.6)) * (f.fogBankScale ?? 1);
     this._bank.visible = bank > 0.01;
     if (this._bank.visible) {
       const bu = this._bankMat.uniforms;
@@ -519,12 +528,15 @@ export class WeatherRenderer {
       bu.uTime.value = this._time;
       const fog = this._scene.fog as THREE.FogExp2 | null;
       if (fog) (bu.uColor.value as THREE.Color).copy(fog.color).multiplyScalar(1.08);
-      this._bank.position.set(f.focus.x, 0, f.focus.z);
+      this._bank.position.set(f.focus.x, vb ? vb.y - 0.9 : 0, f.focus.z);
       (bu.uCenter.value as THREE.Vector3).set(f.focus.x, 0, f.focus.z);
     }
 
     // ── Precipitation particles ──────────────────────────────────────────────
-    const amount = mode === 'snow' ? o.snow : mode === 'rain' ? o.rain : Math.max(o.rain, o.snow);
+    const precip = mode === 'snow' ? o.snow : mode === 'rain' ? o.rain : Math.max(o.rain, o.snow);
+    // mist: where there is no rain or snow, a fog the camera stands in sends fine droplets drifting past (the snow-flake draw, a third the size, hardly falling)
+    const mist = low ? 0 : (f.mist ?? 0), misty = mist > 0.05 && precip < 0.05;
+    const amount = misty ? mist * 0.3 : precip;
     const max = PRECIP_MAX[this._quality];
     const count = Math.floor(max * Math.min(1, amount * 1.15 + o.wind * 0.1));
     if (count < 30 || low) {
@@ -534,11 +546,13 @@ export class WeatherRenderer {
     // A forced Settings mode decides the particle type outright: while the
     // sim eases from a previous rain spell into forced snow (or the season
     // isn't winter) the lingering rain must not win and draw rain streaks.
-    const snowy = mode === 'snow' ? true : mode === 'rain' ? false : o.snow > o.rain;
+    const snowy = misty ? true : mode === 'snow' ? true : mode === 'rain' ? false : o.snow > o.rain;
     const u = this._mat.uniforms;
     u.uTime.value = this._time;
     u.uSnow.value = snowy ? 1 : 0;
-    u.uOpacity.value = snowy ? 0.9 : 0.3 + 0.2 * o.rain;
+    u.uSize.value = misty ? 0.4 : 1;
+    u.uDrift.value = misty ? 0.25 : 1;
+    u.uOpacity.value = misty ? 0.35 : snowy ? 0.9 : 0.3 + 0.2 * o.rain;
     // Light level: precipitation is lit by the (dim, overcast) sky
     const lit = 1 - 0.8 * f.night;
     (u.uColor.value as THREE.Color).setRGB(
