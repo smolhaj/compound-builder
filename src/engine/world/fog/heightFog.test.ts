@@ -120,6 +120,16 @@ describe('ValleyFog easing', () => {
     expect(v.cur.bankDensity).toBe(0);
     expect(v.cur.overcast).toBeLessThan(0.01);
   });
+  it('the cloud thins away round its base as the camera climbs into it, so the map is never whited out; the bank does not', () => {
+    const v = new ValleyFog();
+    v.update(0.1, { ...NO_FOG_TARGET, bankTopY: 8, bankDensity: 0.3, cloudBaseY: 30, cloudDensity: 0.1 }); v.snap();
+    expect(v.params(0.5, 20).cloudDensity).toBeCloseTo(0.1, 6);      // below the deck: all of it
+    expect(v.params(0.5, 30).cloudDensity).toBeLessThan(0.1);
+    expect(v.params(0.5, 30).cloudDensity).toBeGreaterThan(0.01);
+    expect(v.params(0.5, 40).cloudDensity).toBe(0);                  // up in it: cleared
+    expect(v.params(0.5, 40).bankDensity).toBe(0.3);
+    expect(v.params(0.5).cloudDensity).toBeCloseTo(0.1, 6);          // (no camera given: untouched)
+  });
   it('snap jumps to the target; params carry the quality noise', () => {
     const v = new ValleyFog();
     v.update(0.016, t); v.snap();

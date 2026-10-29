@@ -48,6 +48,7 @@ export function fogTarget(now: FogNow | null, g: FogGround): FogTarget {
 }
 
 const approach = (cur: number, target: number, dt: number, tau: number): number => cur + (target - cur) * (1 - Math.exp(-Math.min(dt, 1) / tau));
+const smooth = (a: number, b: number, x: number): number => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
 export class ValleyFog {
   /** The eased state. */
@@ -83,10 +84,16 @@ export class ValleyFog {
     return Math.max(inBank, inCloud);
   }
 
-  /** The height-fog parameters for the shader. `noise` by quality (0 = flat), `tint` follows the sky. */
-  params(noise: number): HeightFogParams {
+  /**
+   * The height-fog parameters for the shader. `noise` by quality (0 = flat), `tint` follows the sky. `camY`: the camera's height. A cloud deck has no
+   * top, so a game camera that climbs into it would be whited out (the diorama camera hovers anywhere from the yard to 60 units up): the cloud
+   * thins away over the few units round its base as the camera goes up, so low cloud hugs the ridgelines seen from the ground and does not swallow the map.
+   * The valley bank keeps its density: standing in it is the point.
+   */
+  params(noise: number, camY = -1e9): HeightFogParams {
     const c = this.cur;
-    return { bankTop: c.bankTopY, bankDensity: c.bankDensity, cloudBase: c.cloudBaseY, cloudDensity: c.cloudDensity, noise, tint: [1.1, 1.1, 1.13], time: this._time };
+    const clear = c.cloudDensity > 0 ? 1 - smooth(c.cloudBaseY - 3, c.cloudBaseY + 5, camY) : 1;
+    return { bankTop: c.bankTopY, bankDensity: c.bankDensity, cloudBase: c.cloudBaseY, cloudDensity: c.cloudDensity * clear, noise, tint: [1.1, 1.1, 1.13], time: this._time };
   }
 
   /**

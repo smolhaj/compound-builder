@@ -350,7 +350,7 @@ export function GameCanvas() {
         mist: valley.nearMist(ws.camera.position.y),
       });
       valley.applyTo(wx, weatherMode === 'auto');
-      ws.setHeightFog(valley.params((renderReq.quality ?? ws.quality) === 'high' ? 0.8 : 0.4));
+      ws.setHeightFog(valley.params((renderReq.quality ?? ws.quality) === 'high' ? 0.8 : 0.4, ws.camera.position.y));
       // nuclear war: the flash, a mushroom cloud on the northern skyline, a sickly hazed sky, grey dust falling
       const gs = useGameStore.getState().game, nk = disasterSky(gs);
       if (gs.disaster.kind === 'nuclear' && gs.clock.t >= gs.disaster.hitAt && gs.disaster.variant !== 'exchange') {
