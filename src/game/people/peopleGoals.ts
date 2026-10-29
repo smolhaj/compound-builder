@@ -347,8 +347,8 @@ export function dailyGoal(i: number, kid: boolean, task: TaskKind, hour: number,
       return goalFor(i, kid, 'school', null, hour, ctx, clock);
     }
     case 'drill': {
-      // the firing line: side by side in the yard, rifles up, facing out from the camp
-      const [x, z] = at(-0.55 + (i % 5) * 0.28, 1.9), [tx, tz] = at(-0.55 + (i % 5) * 0.28, 4);
+      // the firing line: side by side past the yard, rifles up, facing out from the camp
+      const [x, z] = at(-0.6 + (i % 5) * 0.3, 2.7), [tx, tz] = at(-0.6 + (i % 5) * 0.3, 5);
       return goal(x, z, FIG_POSE.RIFLE, faceTo(x, z, tx, tz), { tool: FIG_TOOL.RIFLE, walkPose: FIG_POSE.RIFLE, work: true });
     }
     case 'watch': {
