@@ -11,6 +11,7 @@ import * as THREE from 'three';
 import { CELL, type KitPieceDef } from './kit';
 import { Furniture, M } from './interior';
 import { Clutter } from './clutter';
+import { dressEvenings } from './goodsDress';
 import { box, buildGabled, Parts, type BuildOpts, type FurnishCtx } from './shell';
 
 /** 9 × 12 m two-storey farmhouse (1920s–70s): front porch, kitchen and parlor down, bedrooms up. */
@@ -43,6 +44,7 @@ function farmhouse(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Grou
     I({ x: left + 0.06, z: -0.05, rot: Math.PI / 2 }, a => Furniture.cookstove(a));
     if (o.wired) I({ x: left + 0.065, z: back + 0.12, rot: Math.PI / 2 }, a => Furniture.fridge(a));
     I({ x: 0.0, z: -0.55 }, a => Furniture.diningTable(a));
+    dressEvenings(c, { x: 0.0, z: -0.55 });
     // the stair up along the right wall
     I({ x: right - 0.1, z: 0.05 }, a => Furniture.stairs(a, up / M, 3.6, 0.85));
     // the bathroom, a 1950s addition off the kitchen (back right): a tub along the right wall, a toilet and a washstand
@@ -83,6 +85,7 @@ function trailer(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group 
     I({ x: left + 0.05, z: 0.1, rot: Math.PI / 2 }, a => Furniture.counter(a, 3.4, 0.4, !!o.plumbed));
     if (o.wired) I({ x: left + 0.065, z: -0.25, rot: Math.PI / 2 }, a => Furniture.fridge(a));
     I({ x: 0.1, z: 0.45 }, a => Furniture.table(a, 1.1, 0.8));
+    dressEvenings(c, { x: 0.1, z: 0.45 });
     I({ x: 0, z: front - 0.25, rot: Math.PI }, a => Furniture.sofa(a, 'quilt_blue'));
     I({ x: 0, z: back + 0.2 }, a => Furniture.bed(a, true, 'quilt_red'));
     I({ x: 0.15, z: -0.75 }, a => Furniture.single(a, 'quilt_blue'));

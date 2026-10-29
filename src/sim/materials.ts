@@ -21,6 +21,10 @@ export type MaterialId = 'lumber' | 'logs' | 'firewood' | 'fieldstone' | 'concre
   | 'seed_hybrid' | 'seed_saved' | 'seed_cover' | 'canner' | 'dehydrator' | 'crocks' | 'grain_mill' | 'manure' | 'compost'
   // the household's evenings and learning (sim/mind.ts, sim/skills.ts)
   | 'games' | 'instrument' | 'novels' | 'manuals'
+  // the evenings' wear and restock goods, kids' things (sim/evenings.ts)
+  | 'game_pieces' | 'guitar_strings' | 'music_player' | 'batteries' | 'paperbacks_bag' | 'toys' | 'picture_books'
+  // classes and courses (sim/courses.ts): a book set (with a DVD) for each
+  | 'course_firstaid' | 'course_ham' | 'course_engines' | 'course_welding' | 'course_carpentry' | 'course_wiring' | 'course_gardening' | 'course_husbandry' | 'course_canning'
   // medical depth (sim/medical.ts)
   | 'antibiotics' | 'splints' | 'ors' | 'dental_kit' | 'midwife_kit' | 'medical_books'
   // the herd, the bees and the sugar bush (sim/herd.ts, sim/bees.ts, sim/maple.ts)
@@ -100,6 +104,22 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   games: { id: 'games', name: 'Cards and board games', unit: 'a box of decks, dice, checkers and board games: evenings for about four people', price: 60 },
   instrument: { id: 'instrument', name: 'A guitar', unit: 'acoustic guitar with a strap, spare strings and a songbook', price: 220 },
   novels: { id: 'novels', name: 'Paperbacks', unit: 'a box of fifty used novels and children\'s books', price: 90 },
+  game_pieces: { id: 'game_pieces', name: 'Cards, dice and game pieces', unit: 'new decks, a bag of dice, tokens and the pieces the old games lost: makes a worn-out games box whole again', price: 15 },
+  guitar_strings: { id: 'guitar_strings', name: 'Guitar strings and a tuner', unit: 'three sets of strings, a tuner and picks: a guitar with dead strings plays badly', price: 14 },
+  music_player: { id: 'music_player', name: 'Radio and music player', unit: 'a battery speaker with a radio, a card slot and a big folder of music: plays from the house power or from batteries', price: 65 },
+  batteries: { id: 'batteries', name: 'Batteries', unit: 'a bulk pack of 48 AA and AAA cells for the music player, the lanterns and the toys', price: 22 },
+  paperbacks_bag: { id: 'paperbacks_bag', name: 'Used paperbacks', unit: 'a bag of twenty used paperbacks and magazines to swap in for the ones that fell apart', price: 28 },
+  toys: { id: 'toys', name: 'Kids\' toys', unit: 'blocks, dolls, a ball, a jump rope, puzzles, crayons and paper: something to do for the little ones, who wear it out', price: 45 },
+  picture_books: { id: 'picture_books', name: 'Picture books', unit: 'a crate of picture books and early readers for the little ones, to read aloud at bedtime', price: 32 },
+  course_firstaid: { id: 'course_firstaid', name: 'First aid course', unit: 'workbooks, a CPR practice dummy and a DVD set: a first-aid and first-responder course (about 20 hours)', price: 45 },
+  course_ham: { id: 'course_ham', name: 'Ham radio licence guide', unit: 'the licence study guide, practice exams and a code-practice set: radio licence study (about 20 hours)', price: 35 },
+  course_engines: { id: 'course_engines', name: 'Small engines course', unit: 'a shop manual set and a teardown DVD course for chainsaws, mowers and generators (about 30 hours)', price: 48 },
+  course_welding: { id: 'course_welding', name: 'Welding course', unit: 'a welding handbook, practice coupons and a DVD course: stick and wire basics (about 40 hours)', price: 60 },
+  course_carpentry: { id: 'course_carpentry', name: 'Carpentry course', unit: 'framing and finish carpentry books with a DVD course (about 30 hours)', price: 42 },
+  course_wiring: { id: 'course_wiring', name: 'Wiring and solar course', unit: 'a home-wiring and off-grid solar workbook set with a DVD course (about 30 hours)', price: 52 },
+  course_gardening: { id: 'course_gardening', name: 'Gardening course', unit: 'a market-garden and seed-saving book set with a DVD course (about 24 hours)', price: 32 },
+  course_husbandry: { id: 'course_husbandry', name: 'Animal husbandry course', unit: 'a homestead livestock handbook set with a DVD course: feeding, birthing, hooves, sickness (about 24 hours)', price: 38 },
+  course_canning: { id: 'course_canning', name: 'Canning and cooking course', unit: 'a preserving and from-scratch cooking book set with a DVD course (about 20 hours)', price: 30 },
   manuals: { id: 'manuals', name: 'How-to manuals', unit: 'a shelf of repair, garden, building, cooking and field guides: skills come on faster', price: 180 },
   maple_taps: { id: 'maple_taps', name: 'Maple taps', unit: '25 spiles with buckets and lids for the sugar bush', price: 120 },
   manure: { id: 'manure', name: 'Manure', unit: 'a pickup load of aged manure (your own stock makes it for free)', price: 15 },

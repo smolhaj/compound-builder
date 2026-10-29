@@ -8,10 +8,10 @@
 import type { MaterialId } from './materials';
 import { HARDEN_GOODS, KIT_GOODS, WATCH_GOODS } from './gear';
 
-export type ShelfTab = 'build' | 'fencing' | 'bunker' | 'water' | 'power' | 'food' | 'household' | 'fuel' | 'defense';
+export type ShelfTab = 'build' | 'fencing' | 'bunker' | 'water' | 'power' | 'food' | 'household' | 'learning' | 'fuel' | 'defense';
 
 export const SHELF_TABS: ReadonlyArray<[ShelfTab, string]> = [
-  ['build', 'Building'], ['fencing', 'Fencing'], ['bunker', 'Bunker'], ['water', 'Water'], ['power', 'Power'], ['food', 'Food & farm'], ['household', 'Medical & household'], ['fuel', 'Fuel & hire'], ['defense', 'Kit & security'],
+  ['build', 'Building'], ['fencing', 'Fencing'], ['bunker', 'Bunker'], ['water', 'Water'], ['power', 'Power'], ['food', 'Food & farm'], ['household', 'Medical & household'], ['learning', 'Courses & evenings'], ['fuel', 'Fuel & hire'], ['defense', 'Kit & security'],
 ];
 
 export const SHELVES: Record<ShelfTab, MaterialId[]> = {
@@ -21,7 +21,8 @@ export const SHELVES: Record<ShelfTab, MaterialId[]> = {
   water: ['water_jugs', 'ibc_tote', 'water_trailer', 'water_filter', 'ro_system', 'softener', 'greywater', 'pipe', 'fixtures', 'pump', 'drilling', 'tank', 'septic_tank'],
   power: ['solar_panel', 'battery', 'inverter', 'generator', 'cable'],
   food: ['seed', 'seed_hybrid', 'seed_cover', 'manure', 'lids', 'canner', 'dehydrator', 'crocks', 'grain_mill', 'fishing_gear', 'snares', 'smoker', 'goat', 'cow', 'pig', 'steer', 'sheep', 'rabbit', 'hay', 'feed', 'vet_kit', 'cheese_kit', 'bee_nuc', 'hive_supplies', 'maple_taps', 'trout_fry', 'crayfish_stock', 'fish_feed'],
-  household: ['meds', 'antibiotics', 'splints', 'ors', 'dental_kit', 'midwife_kit', 'medical_books', 'hygiene', 'games', 'instrument', 'novels', 'manuals', 'traps', 'tent', 'sleeping_bag', 'kibble', 'dogbed', 'doghouse'],
+  household: ['meds', 'antibiotics', 'splints', 'ors', 'dental_kit', 'midwife_kit', 'medical_books', 'hygiene', 'traps', 'tent', 'sleeping_bag', 'kibble', 'dogbed', 'doghouse'],
+  learning: ['games', 'game_pieces', 'instrument', 'guitar_strings', 'music_player', 'batteries', 'novels', 'paperbacks_bag', 'toys', 'picture_books', 'manuals', 'course_firstaid', 'course_ham', 'course_engines', 'course_welding', 'course_carpentry', 'course_wiring', 'course_gardening', 'course_husbandry', 'course_canning'],
   fuel: ['fuel', 'vehicle_parts', 'stabilizer', 'firewood', 'excavator', 'plow', 'gun_safe', 'gun_cleaning'],
   defense: [...KIT_GOODS, ...WATCH_GOODS, ...HARDEN_GOODS],
 };

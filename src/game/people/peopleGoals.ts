@@ -341,6 +341,16 @@ export function dailyGoal(i: number, kid: boolean, task: TaskKind, hour: number,
       const [tx, tz] = at(CAMP.table.x, CAMP.table.z);
       return goal(x, z, FIG_POSE.REACH, faceTo(x, z, tx, tz), { work: true });
     }
+    case 'study': {
+      // an evening class: round the table at home, else at the camp table with the books
+      if (ctx.home?.seats?.length) return goalFor(i, kid, 'leisure', null, 19, ctx, clock);
+      return goalFor(i, kid, 'school', null, hour, ctx, clock);
+    }
+    case 'drill': {
+      // the firing line: side by side in the yard, rifles up, facing out from the camp
+      const [x, z] = at(-0.55 + (i % 5) * 0.28, 1.9), [tx, tz] = at(-0.55 + (i % 5) * 0.28, 4);
+      return goal(x, z, FIG_POSE.RIFLE, faceTo(x, z, tx, tz), { tool: FIG_TOOL.RIFLE, walkPose: FIG_POSE.RIFLE, work: true });
+    }
     case 'watch': {
       const post = ctx.post?.(i) ?? 'gate';
       const rifle = ctx.armed ? FIG_TOOL.RIFLE : FIG_TOOL.NONE, pose = ctx.armed ? FIG_POSE.RIFLE : FIG_POSE.STAND;
