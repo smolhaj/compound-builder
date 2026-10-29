@@ -240,9 +240,110 @@ function concreteTower(opts: ConcreteOpts): (def: KitPieceDef, seed?: number) =>
   };
 }
 
+
+// ─────────────────────────────────────────────────────────────────────
+// Plan variants: the eight-sided timber tower and the six-sided concrete tower
+// ─────────────────────────────────────────────────────────────────────
+
+/** A box on face `k` of an n-sided plan whose faces are centered on the +z axis at k = 0: `w` along the face, `t` thick, apothem `ap` to its middle. */
+const faceBox = (n: number, k: number, ap: number, w: number, h: number, t: number, y: number): THREE.BufferGeometry =>
+  box(w, h, t, 0, y, ap).rotateY(k * Math.PI * 2 / n);
+
+/** A prism with n sides whose faces are centered on the axes (apothem `ap`): a vertical post, a plate or a slab. */
+const prism = (n: number, ap: number, h: number, y: number): THREE.BufferGeometry =>
+  new THREE.CylinderGeometry(ap / Math.cos(Math.PI / n), ap / Math.cos(Math.PI / n), h, n).rotateY(Math.PI / n).translate(0, y + h / 2, 0);
+
+/** The eight-sided timber tower: a stone course, eight splayed posts with girts and braces, an eight-sided cab under a cone of tin, a ladder to a trapdoor. */
+function octagonTower(_def: KitPieceDef, seed = 1): THREE.Group {
+  const p = new Parts(seed);
+  const n = 8, deck = 1.0, apB = 0.26, apT = 0.2, stone = 0.14, cabH = 0.3;
+  const apAt = (y: number) => apB + (apT - apB) * Math.min(1, y / deck);
+  p.layer = 'stakes';
+  for (let k = 0; k < n; k++) p.add('trim', box(0.012, 0.09, 0.012, Math.sin(k * Math.PI / 4) * 0.45, -0.02, Math.cos(k * Math.PI / 4) * 0.45));
+  // the stone course the posts stand on, in two lifts with a rough top
+  p.add('fieldstone', prism(n, apB + 0.045, stone, -0.02), 'foundation');
+  p.add('fieldstone', prism(n, apB + 0.02, 0.03, stone - 0.02), 'foundation');
+  // eight posts, one at every corner, leaning in toward the deck
+  const vr = (ap: number) => ap / Math.cos(Math.PI / n);
+  for (let k = 0; k < n; k++) {
+    const a = (k + 0.5) * Math.PI * 2 / n, h = deck - stone;
+    const g = new THREE.BoxGeometry(0.036, h, 0.036, 1, 1, 1), pos = g.getAttribute('position');
+    for (let i = 0; i < pos.count; i++) { const t = pos.getY(i) / h + 0.5, r = vr(apAt(stone + t * h)); pos.setX(i, pos.getX(i) + Math.sin(a) * r); pos.setZ(i, pos.getZ(i) + Math.cos(a) * r); pos.setY(i, pos.getY(i) + stone + h / 2); }
+    pos.needsUpdate = true; g.computeVertexNormals();
+    p.add('wood_dark', g, 'frame');
+  }
+  // three levels of girts round every face, and a pair of braces on the four faces that sit on the axes
+  for (const y of [0.3, 0.57, 0.84]) for (let k = 0; k < n; k++) {
+    const ap = apAt(y), w = 2 * ap * Math.tan(Math.PI / n);
+    p.add('wood_mid', faceBox(n, k, ap, w, 0.022, 0.022, y), 'frame');
+  }
+  for (let k = 0; k < n; k += 2) for (const [y0, y1] of [[0.3, 0.57], [0.57, 0.84]]) {
+    const ap = (apAt(y0) + apAt(y1)) / 2, w = 2 * ap * Math.tan(Math.PI / n), len = Math.hypot(w, y1 - y0);
+    for (const sg of [-1, 1]) p.add('wood_mid', box(len, 0.014, 0.014, 0, 0, 0).rotateZ(sg * Math.atan2(y1 - y0, w)).translate(0, (y0 + y1) / 2, ap).rotateY(k * Math.PI * 2 / n), 'frame');
+  }
+  // the deck and the cab: board walls with an open band for the rifles, posts at the corners, a cone of tin
+  const apD = apT + 0.03;
+  p.add('deck', prism(n, apD, 0.026, deck - 0.0), 'deck');
+  for (let k = 0; k < n; k++) {
+    const a = (k + 0.5) * Math.PI * 2 / n, r = vr(apD - 0.012);
+    p.add('wood_dark', box(0.024, cabH, 0.024, Math.sin(a) * r, deck + 0.026, Math.cos(a) * r), 'rafters');
+    const w = 2 * (apD - 0.012) * Math.tan(Math.PI / n);
+    p.add('board_batten', faceBox(n, k, apD - 0.012, w, 0.11, 0.014, deck + 0.026), 'walls');          // the lower boards
+    p.add('wood_mid', faceBox(n, k, apD - 0.012, w, 0.02, 0.02, deck + 0.026 + cabH - 0.02), 'walls');   // the header
+  }
+  p.add('metal_roof', new THREE.ConeGeometry(vr(apD) * 1.28, 0.2, n).rotateY(Math.PI / n).translate(0, deck + 0.026 + cabH + 0.1, 0), 'roof');
+  p.add('wood_dark', cyl(0.006, 0.07, 0, deck + 0.026 + cabH + 0.2, 0, 5), 'roof');
+  // ladder up the +z face to a trapdoor, and a lantern
+  ladder(p, 0, apAt(0) + 0.03, deck + 0.02);
+  p.add('wood_mid', box(0.18, 0.012, 0.16, 0, deck + 0.026, apD - 0.12), 'openings');
+  p.add('iron', cyl(0.012, 0.03, apD * 0.5, deck + 0.026 + cabH - 0.05, apD - 0.03, 6), 'openings');
+  p.collide({ x0: -0.28, z0: -0.28, x1: 0.28, z1: 0.28 });
+  const g = p.finish();
+  g.userData.keep = ['frame', 'rafters'];
+  g.userData.chimneyTop = null;
+  return g;
+}
+
+/** The six-sided concrete tower: a hex footing, a poured shaft in lifts with slits, a hex steel cab with slit glazing, a slab roof, a caged ladder and a hatch door. */
+function hexTower(_def: KitPieceDef, seed = 1): THREE.Group {
+  const p = new Parts(seed);
+  const n = 6, fy = 1.22, ap = 0.14, cabAp = 0.27, cabH = 0.3;
+  p.layer = 'stakes';
+  for (let k = 0; k < n; k++) p.add('trim', box(0.012, 0.09, 0.012, Math.sin(k * Math.PI / 3 + Math.PI / 6) * 0.45, -0.02, Math.cos(k * Math.PI / 3 + Math.PI / 6) * 0.45));
+  p.add('concrete', prism(n, 0.26, 0.05, -0.01), 'foundation');
+  const lifts = Math.round((fy - 0.04) / 0.22);
+  p.add('concrete', prism(n, ap, fy - 0.04, 0.04), 'frame');
+  for (let k = 1; k < lifts; k++) p.add('iron', prism(n, ap + 0.002, 0.004, 0.04 + k * (fy - 0.04) / lifts), 'frame');
+  for (const y of [0.45, 0.8]) if (y < fy - 0.1) for (const k of [1, 2, 4, 5]) p.add('iron', faceBox(n, k, ap + 0.001, 0.03, 0.09, 0.004, y), 'frame');
+  // the corbelled slab the cab stands on
+  p.add('concrete', prism(n, cabAp + 0.03, 0.03, fy - 0.03), 'deck');
+  // plate walls round the cab with a band of slit glazing, a post at every corner, a slab roof with a parapet
+  const w = 2 * cabAp * Math.tan(Math.PI / n);
+  for (let k = 0; k < n; k++) {
+    const a = (k + 0.5) * Math.PI * 2 / n, r = cabAp / Math.cos(Math.PI / n);
+    p.add('steel', box(0.03, cabH, 0.03, Math.sin(a) * r, fy, Math.cos(a) * r), 'rafters');
+    p.add('steel', faceBox(n, k, cabAp - 0.008, w, 0.09, 0.016, fy), 'walls');
+    p.add('steel', faceBox(n, k, cabAp - 0.008, w, 0.1, 0.016, fy + cabH - 0.1), 'walls');
+    p.add('glass', faceBox(n, k, cabAp - 0.008, w - 0.05, 0.1, 0.008, fy + 0.09), 'openings');
+  }
+  p.add('concrete', prism(n, cabAp + 0.05, 0.035, fy + cabH), 'roof');
+  for (let k = 0; k < n; k++) p.add('concrete', faceBox(n, k, cabAp + 0.045, 2 * (cabAp + 0.045) * Math.tan(Math.PI / n), 0.035, 0.016, fy + cabH + 0.035), 'roof');
+  p.add('steel', box(0.1, 0.03, 0.1, cabAp * 0.4, fy + cabH + 0.035, -cabAp * 0.3), 'roof');
+  // the caged ladder on the +z face up to the hatch, and a steel door at its foot
+  ladder(p, 0, ap + 0.03, fy - 0.02, 'steel', true);
+  p.add('iron', box(0.085, 0.16, 0.012, -0.05, 0.04, ap + 0.006), 'openings');
+  p.collide({ x0: -0.27, z0: -0.27, x1: 0.27, z1: 0.27 });
+  const g = p.finish();
+  g.userData.keep = ['frame', 'rafters'];
+  g.userData.chimneyTop = null;
+  return g;
+}
+
 export const TOWER_BUILDERS: Record<string, (def: KitPieceDef, seed?: number) => THREE.Group> = {
   rise_lookout: riseLookout,
   watchtower_wood: woodTower,
+  watchtower_octagon: octagonTower,
+  watchtower_hex: hexTower,
   watchtower_concrete: concreteTower({ floorY: 1.22, mast: false, ring: false, turret: false }),
   watchtower_flood: concreteTower({ floorY: 1.27, mast: true, ring: false, turret: false }),
   watchtower_mount: concreteTower({ floorY: 1.0, mast: true, ring: true, turret: false }),

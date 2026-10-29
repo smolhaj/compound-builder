@@ -62,6 +62,21 @@ export const BRIDGE_SCENARIOS = [
   ] },
 ];
 
+/** Camera at a gate (the first matching `pick`) of a finished run: `back` units off its outside/inside, looking at the gate, a QA person beside it. */
+const gateCam = (name, pick, back, side, fov = 62) => ({ name, cam: `${pre} let G0 = null; for (const r of g0.perimeter) { if (!r.finishedAt && r.finishedAt !== 0) continue; for (const g of r.gates) if (${pick}) { G0 = { r, g }; break; } if (G0) break; } if (!G0) return; let s = 0, pt = r0pt(G0.r, G0.g.at); function r0pt(r, at) { let d = 0; for (let i = 1; i < r.pts.length; i++) { const a = r.pts[i - 1], b = r.pts[i], l = Math.hypot(b[0] - a[0], b[1] - a[1]); if (d + l >= at) { const f = (at - d) / l; return { x: a[0] + (b[0] - a[0]) * f, z: a[1] + (b[1] - a[1]) * f, dx: (b[0] - a[0]) / l, dz: (b[1] - a[1]) / l }; } d += l; } const a = r.pts[r.pts.length - 1]; return { x: a[0], z: a[1], dx: 1, dz: 0 }; } const nx = -pt.dz * ${side}, nz = pt.dx * ${side}; const x = pt.x + nx * ${back}, z = pt.z + nz * ${back}; ${figure('(pt.x + nx * 1.4 + pt.dx * 1.0)', '(pt.z + nz * 1.4 + pt.dz * 1.0)')} cb.qa.pose = { x, y: gr(x, z) + 0.3, z, lx: pt.x, ly: gr(pt.x, pt.z) + 0.3, lz: pt.z, fov: ${fov} };` });
+const towerCam = (name, kind, back, yawOff = 0.6) => ({ name, cam: `${pre} const t = g0.structures.find(s => s.kind === '${kind}'); if (!t) return; const x = t.x + Math.sin(${yawOff}) * ${back} * 0.3, z = t.z + Math.cos(${yawOff}) * ${back} * 0.3; ${figure('(t.x + Math.sin(' + yawOff + ' + 0.5) * 0.8)', '(t.z + Math.cos(' + yawOff + ' + 0.5) * 0.8)')} cb.qa.pose = { x, y: gr(x, z) + 0.3, z, lx: t.x, ly: gr(t.x, t.z) + 0.6, lz: t.z, fov: 62 };` });
+export const GATE_SCENARIOS = [
+  { name: 'gate-stone', setup: ring({ shape: 'rounded', wall: 'stone_wall', rings: 2, ringWall: 'stone_wall', ringSally: true, towers: 4, towerKind: 'watchtower_octagon' }), shots: [
+    aerial(40, 1.1), aerial(32, 0.5, 2.2),
+    gateCam('eye-gatehouse-with-person', '!g.sally && g.w >= 0.35', 7, 1),
+    gateCam('eye-sally-with-person', 'g.sally', 5.5, 1, 58),
+    towerCam('tower-octagon', 'watchtower_octagon', 9),
+  ] },
+  { name: 'gate-hex', setup: ring({ shape: 'octagon', wall: 'concrete_wall', rings: 2, ringWall: 'concrete_wall', ringSally: true, towers: 4, towerKind: 'watchtower_hex' }), shots: [
+    gateCam('eye-sally-concrete', 'g.sally', 5.5, 1, 58), towerCam('tower-hex', 'watchtower_hex', 9),
+  ] },
+];
+
 export const RING_SCENARIOS = [
   { name: 'rings-3-rounded', setup: ring({ shape: 'rounded', rings: 3, ringWall: 'stone_wall', towers: 3 }), shots: [aerial(46, 1.15), aerial(38, 0.5, 2.2), eyeWallPerson] },
   { name: 'rings-4-octagon', setup: ring({ shape: 'octagon', rings: 4, ringWall: 'container_stack', towers: 2 }), shots: [aerial(46, 1.15), aerial(38, 0.5, 2.2)] },

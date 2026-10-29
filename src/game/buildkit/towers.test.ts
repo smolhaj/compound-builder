@@ -8,14 +8,17 @@ import { KIT, TOWER_KIT, TOWER_ORDER } from './kit';
 import { buildLayers, buildGhost } from './buildings';
 import { SPEC_PROBLEMS } from './shell';
 import { BLUEPRINTS } from '../../sim/blueprints';
-import { TOWERS, TOWER_CHAIN } from '../../sim/towers';
+import { TOWERS, TOWER_CHAIN, type TowerKind } from '../../sim/towers';
+
+/** The chain plus the plan variants (octagonal timber, hexagonal concrete). */
+const ALL: TowerKind[] = [...TOWER_CHAIN, 'watchtower_octagon', 'watchtower_hex'];
 import { offsetPts, UPGRADE_OFFSET } from '../perimeter/perimeterGeometry';
 
 describe('watch tower pieces', () => {
   it('every tier has a kit piece the size the sim thinks it is, a blueprint and a drawing; only the first is on the build menu', () => {
-    expect(TOWER_KIT.map(d => d.id)).toEqual([...TOWER_CHAIN]);
+    expect(TOWER_KIT.map(d => d.id).sort()).toEqual([...ALL].sort());
     expect(TOWER_ORDER).toEqual(['rise_lookout']);
-    for (const kind of TOWER_CHAIN) {
+    for (const kind of ALL) {
       expect(KIT[kind].cellsX).toBe(TOWERS[kind].cells);
       expect(KIT[kind].cellsZ).toBe(TOWERS[kind].cells);
       expect(BLUEPRINTS[kind].stages).toHaveLength(5);
@@ -28,7 +31,7 @@ describe('watch tower pieces', () => {
   });
 
   it('the floodlit tiers (4 up) carry lamp lenses the world switches on with power', () => {
-    for (const kind of TOWER_CHAIN) {
+    for (const kind of ALL) {
       const g = buildLayers(KIT[kind]);
       const bulb = g.getObjectByName('bldg_interior_bulb');
       expect(!!bulb).toBe(!!TOWERS[kind].flood);
@@ -37,7 +40,7 @@ describe('watch tower pieces', () => {
   });
 
   it('a person is 0.28 tall: every tower\'s fighting post is well above head height, and the geometry reaches it', () => {
-    for (const kind of TOWER_CHAIN) {
+    for (const kind of ALL) {
       const g = buildLayers(KIT[kind]);
       let top = 0;
       g.traverse(o => { const m = o as { isMesh?: boolean; geometry?: { boundingBox: { max: { y: number } } | null; computeBoundingBox(): void } }; if (m.isMesh && m.geometry) { m.geometry.computeBoundingBox(); top = Math.max(top, m.geometry.boundingBox!.max.y); } });

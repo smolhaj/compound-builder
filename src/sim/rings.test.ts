@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { newGame, type GameState, type Structure } from './state';
 import { setGroundOverride } from './terrainState';
-import { RING, DEFAULT_RINGS, layRings, ringBars, planRings, ringCount, ringHoldSeconds, ringPoints, ringPolygons, ringsHolding } from './rings';
+import { RING, SALLY, DEFAULT_RINGS, sallyPorts, sortieFactor, layRings, ringBars, planRings, ringCount, ringHoldSeconds, ringPoints, ringPolygons, ringsHolding } from './rings';
 import { DEFAULT_FORTRESS, layFortress, planFortress } from './fortress';
 import { pointInPolygon, polygonArea, selfIntersects } from './ringShape';
 import { PERIMETER, planRun, type Pt } from './perimeter';
@@ -135,6 +135,49 @@ describe('what finished rings do', () => {
     const a = t(withRings(1, 4)), b = t(withRings(3, 4));
     if (a.length && b.length) expect(b.reduce((x, y) => x + y, 0) / b.length).toBeGreaterThanOrEqual(a.reduce((x, y) => x + y, 0) / a.length);
     else expect(b.length).toBeLessThanOrEqual(a.length);   // or fewer breaches at all
+  });
+});
+
+describe('sally ports', () => {
+  it('each inner ring gets a small side door opposite its main gate, priced, and flagged on the gate', () => {
+    const g = game();
+    const plain = planRings(g, OUTER, [42, 30], {}, { count: 3, sally: false });
+    const withS = planRings(g, OUTER, [42, 30], {}, { count: 3, sally: true });
+    expect(withS.cost).toBeGreaterThan(plain.cost);
+    expect(withS.hours).toBeGreaterThan(plain.hours);
+    layRings(g, withS);
+    const runs = g.perimeter.filter(r => r.gates.some(x => x.sally));
+    expect(runs).toHaveLength(2);
+    for (const r of runs) {
+      expect(r.gates).toHaveLength(2);
+      const [main, sally] = r.gates[0].sally ? [r.gates[1], r.gates[0]] : r.gates;
+      expect(sally.w).toBe(SALLY.W);
+      expect(sally.w).toBeLessThan(main.w);
+      expect(Math.abs(sally.at - main.at)).toBeGreaterThan(5);
+    }
+  });
+
+  it('no tower stands in front of the sally port', () => {
+    const g = game();
+    const plan = planRings(g, OUTER, [42, 30], {}, { count: 3, sally: true, towers: 3 });
+    layRings(g, plan);
+    for (const r of g.perimeter.filter(x => x.gates.some(y => y.sally))) {
+      const s = r.gates.find(y => y.sally)!;
+      let d = 0, pt: Pt = r.pts[0];
+      for (let i = 1; i < r.pts.length; i++) { const a = r.pts[i - 1], b = r.pts[i], l = Math.hypot(b[0] - a[0], b[1] - a[1]); if (d + l >= s.at) { const f = (s.at - d) / l; pt = [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]; break; } d += l; }
+      for (const st of g.structures) expect(Math.hypot(st.x - pt[0], st.z - pt[1])).toBeGreaterThan(2);
+    }
+  });
+
+  it('a standing sally port shortens the hold a little and gives the defenders a flank; none counted until built', () => {
+    const g = game();
+    layRings(g, planRings(g, OUTER, [42, 30], {}, { count: 3, sally: true }));
+    expect(sallyPorts(g)).toBe(0);
+    expect(sortieFactor(g)).toBe(1);
+    finishAll(g);
+    expect(sallyPorts(g)).toBe(2);
+    expect(sortieFactor(g)).toBeCloseTo(1 + 2 * SALLY.SORTIE, 6);
+    expect(SALLY.CHOKE).toBeLessThan(RING.DELAY);
   });
 });
 
