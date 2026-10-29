@@ -19,7 +19,7 @@
  * Distances are world units (1 ≈ 6 m).
  */
 import { BUNKER_ENTRANCES } from './bunkerEntrances';
-import { ringHoldSeconds } from './rings';
+import { ringHoldSeconds, sortieFactor } from './rings';
 import type { Battle, BattleEvent, BattleUnit } from './battleTypes';
 import { GUN, skillOf, type Caliber } from './armory';
 import { gearPosture } from './gear';
@@ -307,6 +307,8 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
   const lineR = wallR || 2;
   // manned inner rings (sim/rings.ts): each makes the crew take another wall under fire before the line is breached
   const ringHold = opts.insideBreach ? 0 : ringHoldSeconds(s);
+  // a sally port lets the defenders catch a crew held at the wall from the flank
+  const sortie = sortieFactor(s);
 
   const shelterAt = fin.find(st => BUNKER_ENTRANCES.includes(st.kind)) ?? home;
   const hardShelter = shelterAt !== home || g.safeRoom;
@@ -568,6 +570,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
     const steady = 1 / (1 + a.supp * (a.vet ? 0.07 : 0.16));
     let p = (0.06 + 0.025 * a.skill) * a.arm.acc * rangeF * tgtCover * see * steady * (a.side === 'home' ? a.post?.acc ?? 1 : 1);
     if (a.side === 'home' && a.moving) p *= 0.5;
+    if (sortie > 1 && a.side === 'home' && b.side === 'raider' && dist(b, C) <= lineR + 2) p *= sortie;
     if (a.arm.auto) p *= 1.6;
     p *= eff(a);                                   // a wounded shooter shoots worse
     const hit = r() < Math.min(0.9, p);

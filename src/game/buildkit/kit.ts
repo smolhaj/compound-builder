@@ -299,6 +299,8 @@ const tower = (id: string, name: string, cx: number, blurb: string, over: Partia
 export const TOWER_KIT: KitPieceDef[] = [
   tower('rise_lookout', 'Rise & lookout', 2, 'A mound of earth with a sandbagged nest and a plank roof on top: one rifle and a pair of eyes above the grass. Cheap; a small view bonus. Build it on a natural rise if you have one.', { parts: { foundation: 'fieldstone', walls: 'timber_lap', roof: 'metal_roof' } }),
   tower('watchtower_wood', 'Wooden watchtower', 1, 'A 6 m timber tower with a roofed cab.', { parts: { foundation: 'concrete', walls: 'board_batten', roof: 'metal_roof' } }),
+  tower('watchtower_octagon', 'Octagonal timber tower', 1, 'An eight-sided timber tower on a stone course with a roofed cab.', { parts: { foundation: 'concrete', walls: 'board_batten', roof: 'metal_roof' } }),
+  tower('watchtower_hex', 'Hexagonal concrete tower', 1, 'A six-sided poured shaft with a steel cab and firing slits.'),
   tower('watchtower_concrete', 'Concrete & steel tower', 1, 'A poured shaft with a steel cab and firing slits.'),
   tower('watchtower_flood', 'Tower with floodlights', 1, 'The concrete tower with a light mast (needs power at night).', { floodlit: true, light: [0, 1.4, 0] }),
   tower('watchtower_mount', 'Tower with a mounted gun', 1, 'An armored cab with a ring-mounted machine gun.', { floodlit: true, light: [0, 1.5, 0] }),

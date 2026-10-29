@@ -14,7 +14,7 @@
  *    (`RING.POINTS` defense points), but it has to be manned: two armed adults a ring,
  *    or it holds no better than the one outside it.
  */
-import type { Pt, PerimeterKind, PerimeterRun } from './perimeter';
+import type { Gate, Pt, PerimeterKind, PerimeterRun } from './perimeter';
 import { PERIMETER, planRun, runBill, runFinished, runHours, wallLength } from './perimeter';
 import { flattenAt, polygonArea, regionFromPolygon, selfIntersects } from './ringShape';
 import { BLUEPRINTS, isHome, totalBill, totalHours } from './blueprints';
@@ -43,6 +43,18 @@ export const RING = {
   GATE_W: 0.6,
 } as const;
 
+/** The sally port: a man-door in a ring wall, opposite its main gate (docs/DECISIONS.md, "Gatehouse leaf and sally port"). */
+export const SALLY = {
+  /** Width of the door (units: 1.8 m, one person at a time). */
+  W: 0.3,
+  /** Seconds off the manned rings' hold for each port, up to `MAX` of them: the crew finds the door and funnels to it. */
+  CHOKE: 6, MAX: 2,
+  /** The defenders' share of extra hits on crews held at the line for each port (a sortie from the flank), up to `MAX` ports. */
+  SORTIE: 0.06,
+  /** What a port costs the family on top of the wall: a plank door, straps and a lock. */
+  BILL: { lumber: 3, hardware: 2 } as Partial<Stock>,
+} as const;
+
 export type RingGates = 'alternate' | 'aligned';
 export interface RingOptions {
   /** Rings in all, the outer (Fortify) ring included: 1-4. */
@@ -54,8 +66,10 @@ export interface RingOptions {
   /** Towers on each inner ring. */
   towers: number;
   towerKind: TowerKind;
+  /** A sally port in each inner ring, on the far side from its main gate. */
+  sally: boolean;
 }
-export const DEFAULT_RINGS: RingOptions = { count: 1, wall: 'stone_wall', gates: 'alternate', towers: 2, towerKind: 'watchtower_wood' };
+export const DEFAULT_RINGS: RingOptions = { count: 1, wall: 'stone_wall', gates: 'alternate', towers: 2, towerKind: 'watchtower_wood', sally: false };
 
 export interface RingSpec {
   /** 1 = the first inner ring ... */
@@ -149,7 +163,18 @@ function gateOn(poly: readonly Pt[], c: Pt, ang: number): { poly: Pt[]; at: Pt; 
 }
 
 /** Pick `n` tower sites just inside a ring (corners and mid-spans, spread out, clear of its gate and of `taken`). Pure geometry (no buildings are checked here: the caller does). */
-function towerSpots(poly: readonly Pt[], n: number, gate: Pt, taken: readonly Pt[]): Pt[] {
+/** The ring outline rotated to start at the gate's chord, closed (as `layRings` lays it), and where the sally port sits on it (half way round: distance along, and the point). */
+function sallyOn(poly: readonly Pt[], gateAt: Pt): { closed: Pt[]; at: number; pt: Pt } {
+  let best = 0, bd = Infinity;
+  poly.forEach((p, i) => { const q = poly[(i + 1) % poly.length], d = Math.hypot((p[0] + q[0]) / 2 - gateAt[0], (p[1] + q[1]) / 2 - gateAt[1]); if (d < bd) { bd = d; best = i; } });
+  const rot = [...poly.slice(best), ...poly.slice(0, best)].map(p => [p[0], p[1]] as Pt), closed = [...rot, rot[0]];
+  const L = wallLength({ pts: closed, gates: [] }), at = L / 2;
+  let d = 0, pt: Pt = rot[0];
+  for (let i = 1; i < closed.length; i++) { const a = closed[i - 1], b = closed[i], l = Math.hypot(b[0] - a[0], b[1] - a[1]); if (d + l >= at) { const f = l ? (at - d) / l : 0; pt = [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]; break; } d += l; }
+  return { closed, at, pt };
+}
+
+function towerSpots(poly: readonly Pt[], n: number, gate: Pt, taken: readonly Pt[], avoid: readonly Pt[] = []): Pt[] {
   if (n <= 0) return [];
   const region = regionFromPolygon(poly), cands: Pt[] = [];
   const inset = TOWERS.watchtower_wood.cells * 0.5 / 2 + 0.3;
@@ -162,7 +187,7 @@ function towerSpots(poly: readonly Pt[], n: number, gate: Pt, taken: readonly Pt
     }
   }
   const out: Pt[] = [], ref: Pt[] = [gate, ...taken];
-  const pool = cands.filter(p => Math.hypot(p[0] - gate[0], p[1] - gate[1]) > 3);
+  const pool = cands.filter(p => Math.hypot(p[0] - gate[0], p[1] - gate[1]) > 3 && avoid.every(a => Math.hypot(p[0] - a[0], p[1] - a[1]) > 2.4));
   while (out.length < n && pool.length) {
     let best = 0, bd = -1;
     pool.forEach((p, i) => { const d = ref.concat(out).reduce((a, q) => Math.min(a, Math.hypot(q[0] - p[0], q[1] - p[1])), Infinity); if (d > bd) { bd = d; best = i; } });
@@ -193,7 +218,7 @@ export function planRings(s: GameState, outer: readonly Pt[], outerGate: Pt | nu
   polys.forEach((poly, i) => {
     const ang = baseAng + (options.gates === 'alternate' ? (i + 1) * Math.PI : 0);
     const g = gateOn(poly, center, ang);
-    const spots = towerSpots(g.poly, options.towers, g.at, taken);
+    const spots = towerSpots(g.poly, options.towers, g.at, taken, options.sally ? [sallyOn(g.poly, g.at).pt] : []);
     spots.forEach(p => taken.push(p));
     if (spots.length < options.towers) notes.push(`Ring ${i + 2}: ${spots.length} of ${options.towers} tower sites found.`);
     const level = ground ? g.poly.reduce((a, p) => a + ground(p[0], p[1]), 0) / g.poly.length : 0;
@@ -204,6 +229,7 @@ export function planRings(s: GameState, outer: readonly Pt[], outerGate: Pt | nu
   for (const r of rings) {
     const closed = [...r.poly, r.poly[0]], len = wallLength({ pts: closed, gates: [{ at: 0, w: RING.GATE_W }] });
     addBill(bill, runBill(r.kind, len)); hours += runHours(r.kind, len);
+    if (options.sally) { addBill(bill, SALLY.BILL); hours += 14; }
     for (const t of r.towers) { addBill(bill, totalBill(BLUEPRINTS[t.kind])); hours += totalHours(BLUEPRINTS[t.kind]); if (needsPermit(t.kind) && s.paper.permits && countyWorks(s)) permits += permitFee(s, t.kind); }
   }
   const buy = (Object.entries(bill) as Array<[MaterialId, number]>).filter(([m]) => MATERIALS[m].price !== null).map(([material, qty]) => ({ material, qty }));
@@ -223,7 +249,9 @@ export function layRings(s: GameState, plan: RingPlan): { runs: number; structur
     const rot = [...pts.slice(best), ...pts.slice(0, best)];
     const closed = [...rot, rot[0]];
     const chord = Math.hypot(rot[1][0] - rot[0][0], rot[1][1] - rot[0][1]);
-    planRun(s, r.kind, closed, [{ at: chord / 2, w: Math.min(RING.GATE_W, Math.max(0.3, chord - 0.4)) }], 0, true);
+    const gates: Gate[] = [{ at: chord / 2, w: Math.min(RING.GATE_W, Math.max(0.3, chord - 0.4)) }];
+    if (plan.options.sally) gates.push({ at: sallyOn(r.poly, r.gate.at).at, w: SALLY.W, sally: true });
+    planRun(s, r.kind, closed, gates, 0, true);
     runs++;
     for (const t of r.towers) { const st = planStructure(s, t.kind, t.x, t.z, 0); stampHighGround(st); applyForPermit(s, st); structures++; }
   }
@@ -262,8 +290,17 @@ export function ringsHolding(s: GameState): number {
   return Math.max(1, Math.min(n, 1 + Math.floor(fighters(s) / RING.FIGHTERS) - 0));
 }
 
-/** Seconds a raid spends at the line for the manned inner rings (0 with one ring or none). */
-export const ringHoldSeconds = (s: GameState): number => Math.max(0, ringsHolding(s) - 1) * RING.DELAY;
+/** The finished sally ports on the rings (a standing wall with a port gate in it). */
+export const sallyPorts = (s: GameState): number => s.perimeter.reduce((a, r) => a + (runFinished(r) ? r.gates.filter(g => g.sally).length : 0), 0);
+
+/** Extra hits the defenders get on crews held at the line: a sortie from the sally port's flank (1 = none). */
+export const sortieFactor = (s: GameState): number => 1 + Math.min(SALLY.MAX, sallyPorts(s)) * SALLY.SORTIE;
+
+/** Seconds a raid spends at the line for the manned inner rings (0 with one ring or none); a sally port is a weak door, so each takes a few seconds off. */
+export const ringHoldSeconds = (s: GameState): number => {
+  const hold = Math.max(0, ringsHolding(s) - 1) * RING.DELAY;
+  return hold > 0 ? Math.max(0, hold - Math.min(SALLY.MAX, sallyPorts(s)) * SALLY.CHOKE) : 0;
+};
 
 /** Defense-equivalent points the manned inner rings add to how hard crews find the place. */
 export const ringPoints = (s: GameState): number => Math.max(0, ringsHolding(s) - 1) * RING.POINTS;

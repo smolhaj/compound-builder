@@ -86,6 +86,10 @@ export function FortifyRing() {
         {RING_WALLS.map(k => <button key={k} style={{ ...btn(opts.ringWall === k), padding: '2px 7px', fontSize: 11.5 }} title={PERIMETER[k].blurb} onClick={() => setOpts({ ...opts, ringWall: k })}>{PERIMETER[k].name.replace('Poured-concrete wall', 'Concrete').replace('Stone-and-timber wall', 'Stone').replace('Container wall', 'Containers').replace('Stacked containers', 'Stacked')}</button>)}
         <button style={{ ...btn(opts.ringGates === 'alternate'), padding: '2px 7px', fontSize: 11.5 }} title="Gates on opposite sides, ring by ring: a crew has to walk round each" onClick={() => setOpts({ ...opts, ringGates: opts.ringGates === 'alternate' ? 'aligned' : 'alternate' })}>{opts.ringGates === 'alternate' ? 'Gates alternate' : 'Gates aligned'}</button>
       </div>}
+      {opts.rings > 1 && <div style={{ display: 'flex', gap: 4, alignItems: 'center', padding: '3px 0' }} title="A small man-door in each inner wall, opposite its main gate. A crew finds it and funnels to it (the manned rings hold a few seconds less), and the defenders can sortie from it and catch the crew at the wall from the flank. Costs lumber and hardware per ring.">
+        <span style={{ flex: 1, color: DIM }}>Sally ports</span>
+        <button style={{ ...btn(opts.ringSally), padding: '2px 7px' }} onClick={() => setOpts({ ...opts, ringSally: !opts.ringSally })}>{opts.ringSally ? 'Yes' : 'No'}</button>
+      </div>}
       <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', padding: '3px 0' }}>
         <span style={{ flex: 1, color: DIM }}>Towers</span>
         {Array.from({ length: MAX_TOWERS + 1 }, (_, n) => <button key={n} style={{ ...btn(opts.towers === n), padding: '2px 7px' }} onClick={() => setOpts({ ...opts, towers: n })}>{n}</button>)}
