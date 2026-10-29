@@ -127,7 +127,7 @@ export function buildDumpTruck(tip = 0, loaded = true): THREE.Group {
   if (loaded) bb.add('soil', new THREE.SphereGeometry(1, 14, 6, 0, Math.PI * 2, 0, Math.PI / 2).scale(1.1 * M, 0.55 * M, 1.9 * M).translate(0, 1.0 * M, 1.9 * M));
   const bg = bb.finish();
   bed.add(bg);
-  bed.position.set(0, 0.85 * M, -0.1 * M);
+  bed.position.set(0, 0.85 * M, -2.8 * M);
   bed.rotation.x = -tip * 0.6;           // the front rises: rotate about the rear hinge
   const g = b.finish();
   g.add(bed);

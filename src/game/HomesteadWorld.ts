@@ -1451,7 +1451,7 @@ export class HomesteadWorld {
     }
     if (stage === 2 && site.kind === 'bunker_corridor') {
       const tubes = buildTubeSegments(2);
-      place(tubes, alongX ? cx : pit.x0 - reach - 0.9, alongX ? pit.z1 + reach + 0.9 : cz, alongX ? Math.PI / 2 : 0);
+      place(tubes, alongX ? cx : pit.x0 - reach - 1.5, alongX ? pit.z1 + reach + 1.5 : cz, alongX ? Math.PI / 2 : 0);
     }
   }
 
