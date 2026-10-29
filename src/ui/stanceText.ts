@@ -21,6 +21,7 @@ export const STANCE: Record<Stance, [string, string]> = {
   build_first: ['Build them a place first', 'Not a couch in the hall: tell them to wait until there is a house of their own for them. Beds in a guest house, a cottage or Mom\u2019s house end the wait; if the hit comes first, they come anyway.'],
   move_sell: ['Sell the town house and move in', 'List it at today\'s price, pay off the mortgage, put the rest in the account and move everything up this weekend. There is no going back to it.'],
   move_keep: ['Move in, and keep the town house', 'Lock it up and keep paying the mortgage and the bills while the banks work. Somewhere to go if the place falls, and a house you can still sell, if the market allows.'],
+  move_lease: ['Give notice and move in', 'End the lease this weekend, take the deposit back and move everything up. There is no house to sell and none to go back to.'],
   hold_on: ['Hold on a while longer', 'Stay weekenders: the paychecks, the town house. The price will be lower next time, and the sale may not close at all.'],
   drive_now: ['Drive straight home', 'The highway, now, with what is in the tank. Quickest if the road is clear; checkpoints and traffic are the risk.'],
   back_roads: ['Take the back roads', 'Slower, and it uses more fuel, but fewer checkpoints and fewer people with the same idea.'],

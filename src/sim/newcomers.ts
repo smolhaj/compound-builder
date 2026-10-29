@@ -291,7 +291,7 @@ export function strangerArrival(s: GameState, r: () => number, id: string, day: 
   return e;
 }
 
-const BRING_NAME: Partial<Record<keyof Stock, string>> = { canned: 'cans of food', staples: 'sacks of staples', meds: 'meds', fuel: 'cans of fuel', goat: 'goats', sheep: 'sheep', hardware: 'hardware', seed: 'seed', tent: 'a tent', feed: 'bags of feed', lids: 'canning lids', vehicle_parts: 'vehicle parts', rabbit: 'rabbits', fresh: 'fresh food' };
+const BRING_NAME: Partial<Record<keyof Stock, string>> = { canned: 'cans of food', staples: 'sacks of staples', meds: 'meds', fuel: 'cans of fuel', goat: 'goats', sheep: 'sheep', hardware: 'hardware', seed: 'seed', seed_heirloom: 'heirloom seed', tent: 'a tent', feed: 'bags of feed', lids: 'canning lids', vehicle_parts: 'vehicle parts', rabbit: 'rabbits', fresh: 'fresh food' };
 /** "2 cans of food, 3 sheep, a dog and a wrench set". */
 export function bringsLine(brings: Partial<Stock> | undefined, ex: Extras | undefined): string {
   const out: string[] = [];
@@ -429,7 +429,7 @@ export function admitNewcomers(s: GameState, people: readonly Person[], o: Admit
 export type ShelterWhy = 'storm' | 'fire' | 'warning' | 'raided' | 'sick' | 'hungry' | 'settle';
 
 const BRING: Record<NeighborKind, (r: () => number) => { brings: Partial<Stock>; extras: Extras }> = {
-  old_farmer: r => ({ brings: { canned: 2, staples: 1, seed: 1, ...(r() < 0.4 ? { goat: 2 } : {}) }, extras: r() < 0.5 ? { dogs: 1 } : {} }),
+  old_farmer: r => ({ brings: { canned: 2, staples: 1, seed_heirloom: 1, ...(r() < 0.4 ? { goat: 2 } : {}) }, extras: r() < 0.5 ? { dogs: 1 } : {} }),
   young_family: r => ({ brings: { canned: 3, ...(r() < 0.6 ? { tent: 1 } : {}) }, extras: r() < 0.3 ? { dogs: 1 } : {} }),
   prepper: () => ({ brings: { canned: 6, meds: 1, fuel: 2 }, extras: {} }),
   widow: r => ({ brings: { meds: 2, canned: 2, lids: 12 }, extras: r() < 0.4 ? { dogs: 1 } : {} }),
