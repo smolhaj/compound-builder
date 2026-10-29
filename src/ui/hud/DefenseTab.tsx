@@ -13,6 +13,9 @@ import { AI_MODULE, ARMORY_LIGHTS, LIGHT_MODES, LIGHT_MODE_NAME, aiModulesUsed, 
 import { floodTowerIds, TOWERS, TOWER_NEXT, highBonus, highShare, isTower, towerBill, towerUpgradeProblem } from '../../sim/towers';
 import { ungatedCrossings } from '../../sim/roadGate';
 import { canHostWalkway, walkOn, walkwayBill, walkwayProblem } from '../../sim/walkway';
+import { adaptLevel, firstWinter, sinceHit } from '../../sim/adaptive';
+import { adaptOf } from '../../sim/encounters';
+import { dayIndex } from '../../sim/state';
 import { Note, Row, Section } from './common';
 import { readiness } from '../../sim/courses';
 
@@ -33,6 +36,20 @@ function CheckRow({ c }: { c: Check }) {
   </div>;
 }
 
+/** Hardcore only: why the crews are getting bigger and what the first winter will take (sim/adaptive.ts), so it reads as a world that learns. */
+function HardcoreNotes() {
+  const game = useGameStore(s => s.game);
+  const a = adaptOf(game), since = sinceHit(game), w = firstWinter(game);
+  const winterOver = !w || dayIndex(game.clock.t) > w.thaw;
+  return <>
+    {!!game.disaster.kind && <Row label="What the crews have learned" value={a <= 0 ? 'nothing yet' : `${Math.round(a * 100)}%`} tone={a >= 0.67 ? 'bad' : a > 0 ? 'warn' : 'good'} title="Hardcore: after the first year, the better a place is defended, the more the crews that come for it have prepared" />}
+    <Note>{since <= 365 || a <= 0
+      ? 'Hardcore: the world learns. From the second year on, the crews that come for a well-defended place come bigger, better armed and oftener, and may test the wire with a pair of men first. A weak place draws no such attention.'
+      : 'Word has gone round that this place holds. The crews that still come have learned from the ones who failed: more of them, better armed, oftener. Walls and rifles buy time, not immunity: keep adding to them.'}</Note>
+    {!winterOver && <Note tone="warn">Hardcore: the first winter after the hit brings a deep freeze that burns the woodpile and the fuel, then a thaw that spoils fresh and frozen food. Put wood and fuel by, and eat the fresh food first.</Note>}
+  </>;
+}
+
 /** Defense and preparedness: a score, whether the place is walled in, what's built, and how ready it is for other trouble. */
 export function DefenseTab() {
   const game = useGameStore(s => s.game);
@@ -40,6 +57,7 @@ export function DefenseTab() {
   const d = defenseReport(game, w.siteGeo?.drive);
   const missingGate = ungatedCrossings(game, w.siteGeo?.drive).length;
   const exposed = d.homes.filter(h => !h.covered);
+  const hardcore = adaptLevel(game) > 0;
   return <>
     <Section title="Defense">
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
@@ -51,6 +69,7 @@ export function DefenseTab() {
       <Row label="Seen coming" value={`${Math.round(d.detection)}%`} tone={d.detection >= 60 ? 'good' : d.detection >= 35 ? 'warn' : 'bad'} />
       {game.armory.guns.length > 0 && <Row label="Drilled for the alarm" value={`${Math.round(100 * readiness(game))}%${game.courses?.drills.perWeek ? ` · ${DRILL_NAME[game.courses.drills.perWeek]}` : ' · no drills'}`} tone={readiness(game) >= 0.5 ? 'good' : readiness(game) >= 0.2 ? 'warn' : undefined} title="How practiced the household is at the alarm: fewer seconds frozen when it sounds. Set the drill schedule on the Family tab (Classes and drills)." />}
       <button style={{ ...btn(w.showBoundary), marginTop: 4 }} onClick={() => w.setShowBoundary(!w.showBoundary)} title="Draw the property line on the ground">{w.showBoundary ? 'Hide' : 'Show'} property line</button>
+      {hardcore && <HardcoreNotes />}
     </Section>
     <Section title="The property line">
       {d.walls.map(c => <CheckRow key={c.id} c={c} />)}
