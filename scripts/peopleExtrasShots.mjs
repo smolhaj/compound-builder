@@ -77,7 +77,7 @@ try {
   await frames(); lap('built');
   console.error(JSON.stringify(await page.evaluate(() => window.__who)));
 
-  if (only !== 'world') {
+  if (only !== 'world' && only !== 'drill') {
     // 1. the shop shelf
     await page.evaluate(() => window.__cb.game.getState().openShop(true, 'learning'));
     await frames();

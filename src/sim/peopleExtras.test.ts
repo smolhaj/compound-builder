@@ -93,6 +93,14 @@ describe('stronger coping goods', () => {
     expect(restockNeeds(g)).toContain('game_pieces');
   });
 
+  it('a music player on the house power wears its batteries a third as fast', () => {
+    const a = game(), b = game();
+    for (const g of [a, b]) { afterTheHit(g); g.stock.music_player = 1; }
+    b.utilities.lit = ['x'];
+    wearKits(a, { player: 3 }); wearKits(b, { player: 3 });
+    expect(1 - kitCond(b, 'player')).toBeLessThan((1 - kitCond(a, 'player')) * 0.5);
+  });
+
   it('a second box of toys swaps in when the first is loved to pieces', () => {
     const g = game(); afterTheHit(g);
     addPerson(g, { id: 'Pip', kid: true, age: 5, parents: [g.people[0].id] });
