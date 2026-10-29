@@ -313,10 +313,18 @@ export const GATE_GARAGE_KIT: KitPieceDef = {
   cellsX: 6, cellsZ: 3, frontCells: 1,
   parts: { foundation: 'concrete', walls: 'container_blue', roof: 'metal_roof' }, maxSlope: 0.35, floorY: 0.03, porch: 0, sleeps: 0, light: [0, 0.4, 0.1],
 };
+/** The motor court (sim/motorCourt.ts): a black-bar-fenced gravel forecourt in front of the gate with six marked bays; the fleet parks here before the open yard. */
+export const MOTOR_COURT_KIT: KitPieceDef = {
+  id: 'motor_court', name: 'Motor court', category: 'defense',
+  blurb: 'A gravel forecourt in front of the gatehouse garage, 18 × 12 m, fenced on three sides in black steel bars with a double drive gate, six marked bays and light poles. The fleet parks here before it parks in the open: a vehicle behind the bars is much harder to drive off. Built outside the gate, back to the wall.',
+  cellsX: 6, cellsZ: 4, frontCells: 0,
+  parts: { foundation: 'fieldstone', walls: 'metal_siding', roof: 'metal_roof' },
+  maxSlope: 0.15, floorY: 0.0, porch: 0, sleeps: 0, light: null,
+};
 /** Defense menu: only the first tier is built from scratch; the rest are upgrades from the Defense tab. */
 export const TOWER_ORDER: readonly string[] = ['rise_lookout'];
 /** The gatehouse garage joins the Defense menu beside the first tower. */
-export const GATEHOUSE_ORDER: readonly string[] = ['gate_garage'];
+export const GATEHOUSE_ORDER: readonly string[] = ['gate_garage', 'motor_court'];
 
 // ── Underground (GDS §2.2; underground.ts) ──
 const room = (id: string, name: string, cx: number, cz: number, blurb: string, shelters = 0, level: 'underground' | 'both' = 'underground'): KitPieceDef => ({
@@ -340,7 +348,7 @@ export const BUNKER_KIT: KitPieceDef[] = [
 /** Underground menu order. */
 export const BUNKER_ORDER: readonly string[] = BUNKER_KIT.map(d => d.id);
 
-export const KIT: Record<string, KitPieceDef> = Object.fromEntries([APIARY, SUGAR_SHACK, BARNYARD, WOOD_OVEN, GATE_GARAGE_KIT, TIMBER_CABIN, LOG_HOUSE, FARMHOUSE, TRAILER, BARN, COTTAGE, GUEST_HOUSE, MOMS_HOUSE, METAL_GARAGE, GARAGE_SOLAR, OUTHOUSE, WORKSHOP, ROOT_CELLAR, CHICKEN_COOP, GARDEN, FIELD, GREENHOUSE, GREENHOUSE_HEATED, ORCHARD, ORCHARD_GROVE, POND, RESERVOIR, SHEEP_BARN, EQUIPMENT_YARD, ...UTILITY_KIT, ...BUNKER_KIT, ...TOWER_KIT].map(d => [d.id, d]));
+export const KIT: Record<string, KitPieceDef> = Object.fromEntries([APIARY, SUGAR_SHACK, BARNYARD, WOOD_OVEN, GATE_GARAGE_KIT, MOTOR_COURT_KIT, TIMBER_CABIN, LOG_HOUSE, FARMHOUSE, TRAILER, BARN, COTTAGE, GUEST_HOUSE, MOMS_HOUSE, METAL_GARAGE, GARAGE_SOLAR, OUTHOUSE, WORKSHOP, ROOT_CELLAR, CHICKEN_COOP, GARDEN, FIELD, GREENHOUSE, GREENHOUSE_HEATED, ORCHARD, ORCHARD_GROVE, POND, RESERVOIR, SHEEP_BARN, EQUIPMENT_YARD, ...UTILITY_KIT, ...BUNKER_KIT, ...TOWER_KIT].map(d => [d.id, d]));
 /** Build-menu order. */
 export const KIT_ORDER: readonly string[] = ['timber_cabin', 'log_house', 'cottage', 'guest_house', 'moms_house', 'outhouse', 'garden', 'greenhouse', 'greenhouse_heated', 'orchard', 'orchard_grove', 'field', 'chicken_coop', 'sheep_barn', 'pond', 'root_cellar', 'wood_oven', 'apiary', 'sugar_shack', 'barnyard', 'workshop', 'metal_garage', 'barn', 'equipment_yard'];
 /** Water & power menu order. */

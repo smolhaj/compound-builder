@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import type { GameState } from '../../sim/state';
 import { GARAGES, parkingPlan, type Bay } from '../../sim/parking';
+import { KIT } from '../buildkit/kit';
 import { startingVehicles, type Vehicle } from '../../sim/vehicles';
 import { buildVehicle, paintFor, VEHICLE_SIZE } from './vehicleGeometry';
 import { lineLength, pointAt, type Pt } from '../region/access';
@@ -80,7 +81,7 @@ export class FleetRenderer {
         // a marked bay in the equipment yard (sim/farm.ts; farmBuildings.ts paints two rows of three): nose toward the gate side
         const host = ctx.host(p.yard.yard);
         if (host) {
-          const W = 4 * 0.5, D = 4 * 0.5, bw = (W - 0.3) / 3, r = Math.floor(p.yard.bay / 3), k = p.yard.bay % 3;
+          const kd = KIT[host.kind], W = (kd?.cellsX ?? 4) * 0.5, D = (kd?.cellsZ ?? 4) * 0.5, bw = (W - 0.3) / 3, r = Math.floor(p.yard.bay / 3), k = p.yard.bay % 3;
           const lx = -W / 2 + 0.15 + (k + 0.5) * bw, lz = -(D / 2 - 0.03) + 0.45 + r * 0.8;
           const rot = host.rot * Math.PI / 2;
           out.set(v.id, { x: host.x + Math.cos(rot) * lx + Math.sin(rot) * lz, z: host.z - Math.sin(rot) * lx + Math.cos(rot) * lz, rot });
