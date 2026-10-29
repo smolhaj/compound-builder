@@ -5,6 +5,9 @@ import { variedFamily } from './family';
 import { step, SUBSTEP } from './engine';
 import { resolve } from './encounters';
 import { migrate } from './save/migrations';
+import { placeOrder } from './economy';
+import { layPropertyWall, planPropertyWall } from './propertyWall';
+import { roadGateStatus } from './roadGate';
 import { paceOf, slowHint } from './pace';
 import { breakInRate } from './breakins';
 import { dailyOf, choreRates } from './daily';
@@ -499,5 +502,31 @@ describe('the calendar and the first week', () => {
     g = at(g, SATURDAY, 9);
     expect(Object.keys(dailyOf(g).plan.hours).length).toBeGreaterThan(0);
     void newWeekend;
+  });
+});
+
+describe('the empty place and the gate at the road', () => {
+  it('a walled compound with its road gate shut still gets deliveries and sees the family come and go', () => {
+    const geo = { roadGate: [60, 5] as [number, number], drive: [[60, 5], [60, 20], [40, 30]] as Array<[number, number]>, center: [40, 40] as [number, number] };
+    const run = (walled: boolean) => {
+      let g = game(3, { mode: 'sandbox' });
+      g = step(g, 8);                                   // past the settling week
+      if (walled) {
+        layPropertyWall(g, planPropertyWall(g, 'chain_link', geo), geo);
+        for (const r of g.perimeter) r.finishedAt = 0;
+        expect(roadGateStatus(g, geo.drive).missing).toBe(0);
+      }
+      placeOrder(g, [{ material: 'lumber', qty: 10 }]);
+      g = at(g, MONDAY, 10);                            // an empty weekday compound
+      expect(emptyNow(g)).toBe(true);
+      for (let d = 0; d < 9; d++) g = at(g, MONDAY + d, 10);
+      g = step(g, 3);
+      return g;
+    };
+    const open = run(false), walled = run(true);
+    expect(walled.orders.map(o => o.status)).toEqual(open.orders.map(o => o.status));
+    expect(walled.orders.some(o => o.status === 'delivered')).toBe(true);
+    expect(walled.weekend!.tally.trips).toBe(open.weekend!.tally.trips);
+    expect(walled.weekend!.tally.trips).toBeGreaterThan(0);
   });
 });

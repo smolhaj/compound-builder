@@ -218,7 +218,7 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
   // raw land: the line and the drive first thing
   for (const what of ['drive', 'power'] as const) orderHookup(s, what);
   const fights: string[] = [];
-  let planned = 0, moneyAtHit = 0, builtAtHit = 0, hitSeen = false, lastLog = -Infinity, minMoney = s.money, lastMoney = s.money;
+  let planned = 0, moneyAtHit = 0, builtAtHit = 0, hitSeen = false, lastLog = -Infinity, minMoney = s.money, lastMoney = s.money, townSold = false;
   // (round 4) hiding, debt and the trial camps
   let hides = 0, hidFound = 0, owed = 0, debtStage = 'none', burned = 0, stripped = 0;
   const trial = { started: 0, in: 0, on: 0, stole: 0, left: 0 };
@@ -306,6 +306,9 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
     s = step(s, 1);
     // the day's log, with the numbers taken out, tallied: what keeps happening
     let insured = 0;   // (an insurance payout for burned buildings is real money, not a bug)
+    // the weekender's town house sale is real money too (sim/weekender.ts), and so is day one's town-house bills on the card
+    if (s.weekend?.town.status === 'sold' && !townSold) { townSold = true; insured += Math.max(0, s.weekend.town.net ?? 0); }
+    if (s.weekend && day === 0) insured += 1e9;
     for (const l of s.log) if (l.t > lastLog) {
       const m = /The insurance paid \$([\d,]+)/.exec(l.text);
       if (m) insured += Number(m[1].replace(/,/g, ''));
