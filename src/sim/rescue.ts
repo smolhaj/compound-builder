@@ -42,6 +42,7 @@ import { driveTrip, roadTrouble, tripPlan, type Vehicle } from './vehicles';
 import { mulberry32 } from './rng';
 import { calendarOf, dayIndex, type GameState } from './state';
 import type { Stock } from './materials';
+import { homeFromCaptivity } from './mind';
 import type { Encounter, Outcome, Stance } from './encounters';
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -456,6 +457,7 @@ export function bringHome(s: GameState, c: Captive, how: 'ransom' | 'rescue' | '
   n.hunger = Math.max(n.hunger, Math.min(12000, gone * 300));
   n.morale = Math.min(n.morale, 20);
   n.hurt.push({ what: 'home from captivity: nightmares, won\'t sleep alone', sev: Math.min(60, 20 + gone) });
+  homeFromCaptivity(s, p.id, gone);
   // the birthdays missed while gone
   for (let d = c.day + 1; d <= day; d++) if (calendarOf(s.clock, d).doy === (p.bday ?? -1)) p.age++;
   if (p.kid && p.age >= 18) p.kid = false;

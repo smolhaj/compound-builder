@@ -328,7 +328,8 @@ export function dailyGoal(i: number, kid: boolean, task: TaskKind, hour: number,
       return { x: h?.x ?? ctx.camp.x, z: h?.z ?? ctx.camp.z, pose: FIG_POSE.STAND, face: null, hidden: true, work: false };
     }
     case 'teach': {
-      const [x, z] = at(CAMP.table.x + 0.2, CAMP.table.z);
+      // a teacher and their pupils (lessons, or the Mentor duty) stand side by side at the table, not on one spot
+      const [x, z] = at(CAMP.table.x + 0.2 + ((i % 3) - 1) * 0.09, CAMP.table.z + (i % 2 ? 0.07 : -0.05));
       const [tx, tz] = at(CAMP.table.x, CAMP.table.z);
       return goal(x, z, FIG_POSE.REACH, faceTo(x, z, tx, tz), { work: true });
     }

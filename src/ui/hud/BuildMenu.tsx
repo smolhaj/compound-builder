@@ -23,6 +23,8 @@ import { btn, DIM, usd } from './style';
 import { WallProperty } from './WallProperty';
 import { FortifyRing } from './FortifyRing';
 import { PathsPanel } from './PathsPanel';
+import { takeRestDay } from '../../sim/mind';
+import { callGathering } from '../../sim/gatherings';
 
 /** The build menu's groups (kit pieces by what they are for). */
 const BUILD_GROUPS: Array<[string, string, readonly string[]]> = [
@@ -57,6 +59,8 @@ export function BuildMenu({ showProjects = () => undefined }: { showProjects?: (
     else if (a.type === 'order') { if (!g.order(a.lines)) setNote('Could not place that order.'); }
     else if (a.type === 'markTrees') { const n = markTrees?.(a.n) ?? 0; setNote(n ? `Marked ${n} trees: the family fells them in work hours.` : 'No more trees to mark near the yard.'); }
     else if (a.type === 'caretaker') { const why = g.money(d => hireCaretaker(d, a.kind)); if (why) setNote(`Could not arrange that: ${why}.`); }
+    else if (a.type === 'restDay') { const why = g.daily(d => takeRestDay(d)); if (why) setNote(why); }
+    else if (a.type === 'gather') { const why = g.daily(d => callGathering(d, a.kind)); if (why) setNote(why); }
     else if (a.type === 'moveIn') { const why = g.money(d => openMoveIn(d)); if (why) setNote(why[0].toUpperCase() + why.slice(1) + '.'); }
     else { g.select(a.id); showProjects(); }
   };

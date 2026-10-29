@@ -43,6 +43,8 @@ type Raw = Record<string, unknown> & { version?: number };
 /** version n → n + 1 upgraders. */
 const STEPS: Record<number, (s: Raw) => Raw> = {
   // 61 → 62: the herd, the bees and the sugar bush (sim/herd.ts, sim/bees.ts, sim/maple.ts): new goods at zero, the cow's condition, the bees and sugaring chores at zero
+  // 62 → 63: people depth (sim/skills.ts, sim/mind.ts): practice and rust, mental health; the evenings' goods at zero
+  62: s => ({ ...s, version: 63, stock: { games: 0, instrument: 0, novels: 0, manuals: 0, ...(s.stock as object) } }),
   61: s => {
     const daily = s.daily as { chores: { levels: Record<string, number> } } | undefined;
     const lv = s.livestock as { condition?: Record<string, number> } | undefined;

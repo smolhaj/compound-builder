@@ -28,6 +28,8 @@ import { joinNames } from './kin';
 import { hasMaples, woodsTaps } from './maple';
 import { CARETAKER, CARETAKER_KINDS, caretakerProblem, marketFactor, saleBlock, saleQuote, type CaretakerKind } from './weekender';
 import { tension } from './disaster';
+import { moodSummary, resting } from './mind';
+import { gatheringProblem, type GatheringKind } from './gatherings';
 
 const usd = (n: number) => '$' + Math.round(n).toLocaleString('en-US');
 
@@ -118,7 +120,9 @@ export type SuggestionAct =
   | { type: 'select'; id: string }
   | { type: 'tool'; tool: string }
   | { type: 'caretaker'; kind: CaretakerKind }
-  | { type: 'moveIn' };
+  | { type: 'moveIn' }
+  | { type: 'restDay' }
+  | { type: 'gather'; kind: GatheringKind };
 export interface Suggestion {
   id: string;
   /** The kit piece to stake ('' when the suggestion is something else). */
@@ -202,6 +206,22 @@ export function suggestions(s: GameState): Suggestion[] {
       out.push({ id: 'move_in', kind: '', title: 'Think about moving in', urgency: 50, why: 'the longer they wait the less the town house is worth, and the harder it is to get out', acts: [{ label: 'See the numbers', act: { type: 'moveIn' } }] });
     }
   }
+  // people: someone who is not coping, or badly strained (sim/mind.ts). Rest, company and the evenings' goods are the answers.
+  { const mood = moodSummary(s);
+    if (mood.struggling.length) {
+      const top = mood.struggling[0], ps = s.mind?.psyche[top.p.id];
+      const names = joinNames(mood.struggling.slice(0, 3).map(x => x.p.first));
+      const acts: NonNullable<Suggestion['acts']> = [];
+      if (!resting(s)) acts.push({ label: 'Take a rest day', act: { type: 'restDay' } });
+      if (!gatheringProblem(s, 'campfire')) acts.push({ label: 'Campfire tonight', act: { type: 'gather', kind: 'campfire' } });
+      const lines: OrderLine[] = [];
+      if (s.stock.games < 1) lines.push({ material: 'games', qty: 1 });
+      if (s.stock.instrument < 1 && mood.struggling.length >= 2) lines.push({ material: 'instrument', qty: 1 });
+      if (lines.length && s.disaster.tracks.stores >= 0.5) acts.push({ label: `Order ${lines.map(l => MATERIALS[l.material].name.toLowerCase()).join(' and ')} (${usd(orderCost(lines, prices(s)))})`, act: { type: 'order', lines } });
+      out.push({ id: 'mood', kind: '', title: mood.breaking ? `${names}: not coping` : `${names}: under strain`, urgency: mood.breaking ? 77 : 48,
+        why: `${top.why}${ps?.weighs?.length ? `; mostly ${ps.weighs.slice(0, 2).map(w => w[0]).join(' and ')}` : ''}. Rest, company and an evening off help more than pushing on`,
+        ...(acts.length ? { acts } : {}) });
+    } }
   return out.sort((x, y) => y.urgency - x.urgency).slice(0, 3);
 }
 

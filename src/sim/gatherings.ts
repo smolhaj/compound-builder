@@ -24,6 +24,7 @@ import { mulberry32 } from './rng';
 import { dailyOf } from './daily';
 import { kinMorale } from './kin';
 import { griefMorale, mourn, noteLosses, unmourned } from './grief';
+import { bestHand, practice } from './skills';
 
 export type GatheringKind = 'cookout' | 'birthday' | 'thanksgiving' | 'christmas' | 'july4' | 'harvest' | 'movie' | 'campfire' | 'wedding' | 'funeral' | 'neighbors';
 
@@ -111,6 +112,8 @@ export function callGathering(s: GameState, kind: GatheringKind, who?: string): 
   if (kind === 'neighbors') g.guests = friendlyNeighbor(s)?.id;
   so.active = g;
   log(s, CALL_LINE[kind](s, g));
+  // putting an evening together is practice in running things (sim/skills.ts)
+  { const lead = bestHand(s, 'leadership'); if (lead) practice(s, lead.id, 'leadership', 1); }
   return null;
 }
 

@@ -14,6 +14,7 @@ import { griefMorale, griefPoints, lossesOf, noteLosses } from './grief';
 import { callGathering, gatheringProblem, gatheringsDay, GATHERING, glowNow, holdGathering, noiseNow, type GatheringKind } from './gatherings';
 import { freshNeeds } from './needs';
 import type { Person } from './family';
+import { progressOf } from './skills';
 
 const HEAVYDUTY = ['fields', 'wood', 'repairs', 'hunt', 'water', 'watch', 'build'];
 const game = (seed = 3, law = 1) => { const g = newGame(seed, 105, 2027, { site: CLASSIC }); g.disaster.tracks.law = law; return g; };
@@ -490,7 +491,8 @@ describe('hours that do something: cooking, livestock, hunting, teaching', () =>
   });
 
   it('teaching hours raise a school kid\'s skills, slowly, more with long lessons; no lessons, no gain', () => {
-    const sum = (g: GameState, i: number) => Object.values(g.people[i].skills).reduce((a, b) => a + b, 0);
+    // (lessons are practice now: hours toward the next level count as much as the level)
+    const sum = (g: GameState, i: number) => Object.values(g.people[i].skills).reduce((a, b) => a + b, 0) + (Object.keys(g.people[i].skills) as Array<keyof Person['skills']>).reduce((a, k) => a + progressOf(g, g.people[i].id, k), 0);
     const g = game();
     const kid = g.people.findIndex(p => p.kid && p.age >= 5);
     const s0 = sum(g, kid);
@@ -500,7 +502,7 @@ describe('hours that do something: cooking, livestock, hunting, teaching', () =>
     choresDay(g, rnd(0.5));
     const one = sum(g, kid) - s0;
     expect(one).toBeGreaterThan(0);
-    expect(one).toBeLessThan(0.1);
+    expect(one).toBeLessThan(0.5);
     const h = game();
     dutyWork(h, h.people[0], h.personState[0], 'teach', 6);
     choresDay(h, rnd(0.5));

@@ -137,6 +137,10 @@ function Icon({ id, tint }: { id: string; tint?: number }) {
     case 'gold_bar': return coin('#e0b030', 1, true);
     case 'silver_coin': case 'silver_round': return coin('#c8ccd0');
     case 'junk_silver': return g(<>{[[14, 18], [26, 16], [20, 26], [30, 28], [12, 30]].map(([x, y]) => <circle key={x + '' + y} cx={x} cy={y} r="6" fill="#c0c4c8" stroke="#808488" />)}</>);
+    case 'games': return g(<><rect x="8" y="12" width="20" height="24" rx="2" fill="#f2efe6" stroke="#6a6a60" /><text x="18" y="29" textAnchor="middle" fontSize="14" fill="#b03a3a">A</text><rect x="19" y="8" width="18" height="22" rx="2" fill="#f2efe6" stroke="#6a6a60" transform="rotate(12 28 19)" /><circle cx="29" cy="20" r="3" fill="#2a2a2a" transform="rotate(12 28 19)" /></>);
+    case 'instrument': return g(<><ellipse cx="17" cy="28" rx="9" ry="8" fill="#b57a3a" stroke="#6a4520" /><circle cx="17" cy="28" r="3" fill="#2a1a10" /><rect x="22" y="9" width="4" height="20" rx="1.5" fill="#6a4520" transform="rotate(35 24 19)" /><rect x="31" y="6" width="6" height="7" rx="1" fill="#3a2a1a" transform="rotate(35 34 9)" /></>);
+    case 'novels': return g(<>{[[9, '#6a8aa8'], [15, '#a8644a'], [21, '#7a9a5a'], [27, '#c8a85a']].map(([x, c]) => <rect key={String(x)} x={Number(x)} y={12} width="6" height="24" rx="1" fill={String(c)} stroke="rgba(0,0,0,0.3)" />)}<rect x="33" y="16" width="5" height="20" rx="1" fill="#8a6a9a" transform="rotate(10 35 26)" /></>);
+    case 'manuals': return g(<><rect x="9" y="9" width="26" height="28" rx="2" fill="#4a6a4a" stroke="#223" /><rect x="13" y="13" width="18" height="6" fill="#e8dfc0" /><path d="M13 24 h18 M13 28 h14 M13 32 h16" stroke="#e8dfc0" strokeWidth="1.4" /></>);
     default: return box('#555');
   }
 }

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { stormOutage } from '../sim/weatherThreats';
+import { PersonInsight, PeopleSection } from './PeoplePanel';
 import { DailySection } from './SchedulePanel';
 import { DAILY_TASK_TEXT } from './dailyText';
 import { useWorldStore, type BuildingView, type CameraMode } from '../store/worldStore';
@@ -178,6 +179,7 @@ export function Hud() {
                   <span style={{ color: DIM, width: 36 }}>morale</span>{bar(n.morale, '#7aa0d0', `Morale ${Math.round(n.morale)}`)}
                 </div>}
                 {notes && <Note tone="warn">{notes}</Note>}
+                <PersonInsight p={p} />
                 {n && n.died == null && (p.conditions?.length ?? 0) > 0 && (() => {
                   const days = Math.floor(game.body.rx[p.id] ?? 30);
                   return <div style={{ fontSize: 11, color: days < 14 ? TONE.bad : days < 45 ? TONE.warn : DIM, marginTop: 2 }}>{p.conditions!.map(c => CONDITION[c].name).join(', ')}: {days > 0 ? `${days} days of ${p.conditions!.map(c => CONDITION[c].rx).join(' and ')}` : 'out of medicine'}</div>;
@@ -189,6 +191,7 @@ export function Hud() {
             <KinPanel />
             <NewcomersPanel />
             <HousingPanel />
+            <PeopleSection />
             <DailySection />
             {trialCamps(game).map(c => <Section key={c.id} title={`Camp outside the wall: ${c.title}`}>
               <Row label="On trial" value={`day ${Math.max(0, dayIndex(game.clock.t) - c.from)} of ${c.until - c.from}`} />
