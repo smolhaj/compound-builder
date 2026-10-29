@@ -40,6 +40,7 @@
  * symptoms. Acute grief typically eases over 6 to 12 months. Children's
  * distress tracks their caregivers'. Seasonal low mood is common.
  */
+import { beltMorale } from './weekender';
 import type { Battle } from './battleTypes';
 import { backgroundOf, type Person } from './family';
 import { mulberry32 } from './rng';
@@ -377,6 +378,7 @@ export function reading(s: GameState, p: Person, sleeping: ReturnType<typeof sle
   w('not sleeping enough', (fat > 80 ? 14 : fat > 60 ? 7 : 0) + Math.min(8, (n.tired ?? 0) * 1.5));
   const wh = row.length ? workHours(row) : 0;
   w('overwork', p.kid ? 0 : wh >= 12 ? 12 : wh >= 10 ? 6 : 0);
+  w('tight months in town', beltMorale(s, p.id) > 0 ? 1.5 : 0);
   const sinceFight = day - M.lastFight;
   w('the last fight', sinceFight < 14 ? 16 * (1 - sinceFight / 14) : 0);
   const threat = dailyOf(s).plan.threat;

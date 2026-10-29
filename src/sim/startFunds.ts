@@ -11,6 +11,7 @@ import type { Person } from './family';
 import { jobDef } from './family';
 import { kinSavings, ROLE_NAME } from './kin';
 import type { Lifestyle } from './site';
+import { equityNet, rentFor, RENT_DEPOSIT_MONTHS, townHouseFor, type TownPlan } from './townHouse';
 
 export interface FundLine { label: string; usd: number }
 export interface StartFunds {
@@ -23,7 +24,8 @@ export interface StartFunds {
 
 /** What each lifestyle can start with, whatever the family. */
 export const FUNDS_RANGE: Record<Lifestyle, [number, number]> = {
-  weekend: [250_000, 650_000],
+  // (round 5) the floor was $250k: with the town house's bills the weekend family could not build; two incomes and no land debt put it at $400k
+  weekend: [400_000, 750_000],
   fulltime: [450_000, 1_100_000],
   independent: [1_000_000, 2_000_000],
 };
@@ -32,7 +34,7 @@ const k = (n: number) => Math.round(n / 1000) * 1000;
 const YEAR_DAYS = 260;
 
 /** Deterministic: same seed, roll, family and lifestyle give the same money. */
-export function startFunds(people: readonly Person[], life: Lifestyle, seed: number, roll = 0): StartFunds {
+export function startFunds(people: readonly Person[], life: Lifestyle, seed: number, roll = 0, town: TownPlan = 'own'): StartFunds {
   const r = mulberry32(seed * 4409 + roll * 1237 + (life === 'weekend' ? 1 : life === 'fulltime' ? 2 : 3) * 31 + 5);
   // a fixed set of draws, so changing one adult's job never reshuffles the luck
   const luck = Array.from({ length: 16 }, () => r());
@@ -80,5 +82,12 @@ export function startFunds(people: readonly Person[], life: Lifestyle, seed: num
   const big = lines.reduce((a, l) => (l.usd > a.usd ? l : a), lines[0]);
   const off = Math.min(hi, Math.max(lo, sum())) - sum();
   big.usd += off;
+  // a weekender who sells the town house before day one and rents in town: the equity (after the agent and the mortgage) is start money on top of the
+  // range, less the deposit and the first month's rent
+  if (life === 'weekend' && town === 'rent') {
+    const th = townHouseFor(people, seed), rent = rentFor(th.value);
+    lines.push({ label: 'Town house sold (after the mortgage and fees)', usd: equityNet(th) });
+    lines.push({ label: 'Deposit and first month on a rented place in town', usd: k(-rent * RENT_DEPOSIT_MONTHS) });
+  }
   return { budget: sum(), passive, lines: lines.sort((a, b) => b.usd - a.usd) };
 }

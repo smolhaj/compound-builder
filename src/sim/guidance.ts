@@ -26,7 +26,10 @@ import type { GameState, OrderLine } from './state';
 import { SEPARATE_DWELLINGS, housingShortfall } from './housing';
 import { joinNames } from './kin';
 import { hasMaples, woodsTaps } from './maple';
-import { CARETAKER, CARETAKER_KINDS, caretakerProblem, marketFactor, saleBlock, saleQuote, type CaretakerKind } from './weekender';
+import { seedWarning } from './crops';
+import { CARETAKER, CARETAKER_KINDS, caretakerProblem, marketFactor, saleBlock, saleQuote, SETTLE_DAYS, type CaretakerKind } from './weekender';
+import { CREW_DAY_USD, crewIdea, nextLongStay, nextStageOrder, weekendBudget, weekendsFor } from './weekendPlan';
+import { dayIndex } from './state';
 import { tension } from './disaster';
 import { faithOf, moodSummary, resting } from './mind';
 import { COURSES, COURSE_MODE_NAME, bestMode, courseIdea, skillsGoalSteps, type CourseId, type CourseMode } from './courses';
@@ -138,6 +141,9 @@ export type SuggestionAct =
   | { type: 'select'; id: string }
   | { type: 'tool'; tool: string }
   | { type: 'caretaker'; kind: CaretakerKind }
+  | { type: 'belt'; on: boolean }
+  | { type: 'crew'; id: string }
+  | { type: 'open'; right: 'family' | 'supplies' | 'utilities' | 'land' | 'defense' | 'outside' | 'chronicle'; supplies?: 'stores' | 'farm' }
   | { type: 'moveIn' }
   | { type: 'restDay' }
   | { type: 'quarantine'; on: boolean }
@@ -198,6 +204,14 @@ export function suggestions(s: GameState): Suggestion[] {
   if (hasMaples(s) && woodsTaps(s) >= 60 && hasKind(s, 'timber_cabin', 'log_house', 'farmhouse') && !hasKind(s, 'sugar_shack')) add('sugar', 'sugar_shack', `the woods have maples for ${woodsTaps(s)} taps: late-winter syrup`, 14);
   if (hasKind(s, 'field') && hasKind(s, 'root_cellar') && !hasKind(s, 'wood_oven')) add('oven', 'wood_oven', 'the wheat and flour want an oven: bread and roasts without heating the house', 18);
 
+  // fields with no seed to sow: a weedy forty percent is what they get (sim/crops.ts)
+  { const sw = seedWarning(s);
+    if (sw) {
+      const n = Math.max(1, sw.fields), hybrid: OrderLine[] = [{ material: 'seed', qty: n }], heirloom: OrderLine[] = [{ material: 'seed_heirloom', qty: n }];
+      out.push({ id: 'seed', kind: '', title: sw.tone === 'bad' && /came up/.test(sw.text) ? 'Fields came up weedy' : 'Seed for the fields', urgency: sw.tone === 'bad' ? 83 : 67, why: sw.text,
+        acts: [{ label: `Order ${n} hybrid (${usd(orderCost(hybrid, prices(s)))})`, act: { type: 'order', lines: hybrid } }, { label: `${n} heirloom (${usd(orderCost(heirloom, prices(s)))})`, act: { type: 'order', lines: heirloom } }, { label: 'Open the Farm tab', act: { type: 'open', right: 'supplies', supplies: 'farm' } }] });
+    } }
+
   // the woodpile: out in the cold, or too thin for the next two months
   { const w = firewoodOutlook(s);
     if (w.short >= 1 && (w.coldNow || w.have < 2 || w.short >= 4)) {
@@ -230,6 +244,7 @@ export function suggestions(s: GameState): Suggestion[] {
         why: animals ? 'the animals go unfed five days a week, and an empty place is six times as likely to be broken into' : crops ? 'the garden and the greenhouse go untended all week, and an empty place is six times as likely to be broken into' : 'an empty place is six times as likely to be broken into as one with people in it',
         ...(acts.length ? { acts } : {}) });
     }
+    out.push(...weekenderPlan(s));
     const warned = s.disaster.kind && s.disaster.phase === 'warning';
     if (warned) {
       const q = saleQuote(s), blocked = saleBlock(s);
@@ -300,6 +315,56 @@ export function drillsSuggestion(s: GameState): Suggestion | null {
   if (!armed || !danger || (D && (D.perWeek > 0 || D.last != null || Object.keys(D.ready).length > 0))) return null;
   return { id: 'drills', kind: '', title: 'Run drills', urgency: 38, why: 'the family has guns and has never practiced together; a weekly hour at the range steadies the aim and cuts the seconds frozen at the alarm (it spends about 15 rounds a person)',
     acts: [{ label: 'Drill weekly', act: { type: 'drills', perWeek: 1 } }, { label: 'Twice a week', act: { type: 'drills', perWeek: 2 } }] };
+}
+
+/**
+ * The weekender's first weeks and every week after (docs/DECISIONS.md, "Weekender cash pacing"): money is the limit before hours are,
+ * so these cards say what to order first (a stage at a time, not the whole list), how to use the long stays, when a crew is worth
+ * hiring for the weekdays, and when to tighten the belt in town.
+ */
+export function weekenderPlan(s: GameState): Suggestion[] {
+  const w = s.weekend;
+  const out: Suggestion[] = [];
+  if (!w || w.mode !== 'split' || s.disaster.phase === 'impact' || s.disaster.phase === 'survival') return out;
+  const day = dayIndex(s.clock.t);
+  const budget = weekendBudget(s);
+  const stay = nextLongStay(s.clock.startDoy, s.clock.startYear, day);
+  const soon = stay && stay.startDay - day <= 12 ? stay : null;
+  // 1. what to order: one stage (two in the free first week and before a long stay), so the account keeps a month's bills
+  const home = s.structures.find(st => isHome(st.kind));
+  const ahead = day < SETTLE_DAYS + 3 || soon ? 2 : 1;
+  const next = nextStageOrder(s, ahead);
+  if (next) {
+    const names = next.stages.map(x => x.name.toLowerCase()).join(', then ');
+    const weekends = weekendsFor(s, next.hours);
+    const first = day < SETTLE_DAYS + 3 ? ' The first week is yours to build in: the whole family is on the place until the second Friday.' : '';
+    const can = s.money >= next.cost;
+    const blocking = !!home && !isFinished(home) && next.id === home.id;   // the house is the one waiting on materials
+    out.push({ id: 'wk_order', kind: '', title: `Order the ${next.name}: ${names}`, urgency: blocking || !home ? 88 : 62,
+      why: `${next.hours} h of work${weekends ? `, about ${weekends} weekend${weekends === 1 ? '' : 's'} at your pace` : ''}, and it needs ${usd(next.cost)} of materials${can ? '' : ` (you have ${usd(s.money)}: a stage at a time is all the account allows)`}. Ordering a stage ahead of the weekend keeps every hour on the place for building, and keeps the rest of the cash for the next stage.${first}`,
+      acts: [{ label: `Order it (${usd(next.cost)})`, act: { type: 'order', lines: next.lines } }, { label: 'Show me', act: { type: 'select', id: next.id } }] });
+  }
+  // 2. the long stays are the weekender's best building days
+  if (soon) {
+    out.push({ id: 'wk_stay', kind: '', title: `${soon.name}: ${soon.days} days on the place`, urgency: 58,
+      why: `from ${soon.label} (${soon.startDay - day <= 0 ? 'now' : `in ${soon.startDay - day} days`}). That is more building than three ordinary weekends: have the next stage on site before then (an order takes a few days to arrive), and keep the chores light so the hours go to the walls.`,
+      ...(next ? { acts: [{ label: `Order the next stage (${usd(next.cost)})`, act: { type: 'order' as const, lines: next.lines } }] } : {}) });
+  }
+  // 3. a crew works the weekdays while the family is at its jobs
+  const crew = crewIdea(s);
+  if (crew && s.money >= Math.min(crew.usd, 4 * CREW_DAY_USD) + 6000) {
+    const nm = crew.st.kind.replace(/_/g, ' ');
+    out.push({ id: 'wk_crew', kind: '', title: `Hire a crew for the weekdays: the ${nm}`, urgency: 60,
+      why: `${Math.round(crew.hours)} h left, about ${usd(crew.usd)} and ${crew.weeks} week${crew.weeks === 1 ? '' : 's'} of a crew of four (${usd(CREW_DAY_USD)} a day, billed only for the hours they work). They build Monday to Friday while you are at the jobs, so the weekend crew's hours are doubled. They go home when the money does.`,
+      acts: [{ label: `Hire the crew (about ${usd(crew.usd)})`, act: { type: 'crew', id: crew.st.id } }, { label: 'Show me', act: { type: 'select', id: crew.st.id } }] });
+  }
+  // 4. the belt: when the account barely moves
+  if (budget && !budget.belt && budget.beltSaves > 600 && budget.net < 4000 && s.money < 200_000) {
+    out.push({ id: 'wk_belt', kind: '', title: 'Tighten the belt in town', urgency: 64,
+      why: `the jobs bring in about ${usd(budget.wages)} a month and the groceries, the bills and ${budget.rented ? 'the rent' : 'the town house'}${budget.caretaker ? ' and the caretaker' : ''} take ${usd(budget.living + budget.town + budget.caretaker)}: the account moves ${budget.net >= 0 ? 'only ' : 'down '}${usd(Math.abs(budget.net))} a month. Cutting the town upkeep and the weekday extras saves about ${usd(budget.beltSaves)} a month, at some cost to the family's mood on weekdays. It is a dial you can turn back (Family tab, Two homes).`,
+      acts: [{ label: `Tighten the belt (saves ~${usd(budget.beltSaves)}/mo)`, act: { type: 'belt', on: true } }] });
+  }
+  return out;
 }
 
 const structDone = (st: GameState['structures'][number]): boolean => isFinished(st);

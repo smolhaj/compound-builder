@@ -6,7 +6,7 @@ import { kinPool, kinTitle, ROLE_NAME, retirementIncome } from '../sim/kin';
 import { CONDITION } from '../sim/body';
 import { fullName, HOUSEHOLD_NAME, JOB_POOL, jobDef, randomJobId, variedFamily } from '../sim/family';
 import { FUNDS_RANGE, startFunds } from '../sim/startFunds';
-import { mortgagePayment, townHouseFor, townUpkeep } from '../sim/weekender';
+import { BELT_UPKEEP, equityNet, mortgagePayment, rentFor, townHouseFor, townTaxHalf, townUpkeep, type TownPlan } from '../sim/weekender';
 import { difficultySummary } from '../sim/difficulty';
 import { DISASTERS, type Difficulty, type DisasterKind, type Mode, type PeaceLength } from '../sim/disaster';
 import { saveGame, AUTOSAVE } from '../sim/save/saveSystem';
@@ -91,6 +91,7 @@ export function SetupScreen() {
   const [wish, setWish] = useState<LandWish>(ANY_WISH);
   const [batch, setBatch] = useState(0);
   const [life, setLife] = useState<Lifestyle>('fulltime');
+  const [townPlan, setTownPlan] = useState<TownPlan>('own');
   const [famRoll, setFamRoll] = useState(0);
   // each adult's occupation: undefined = whatever the roll gave; a pool id = chosen or shuffled
   const [picks, setPicks] = useState<Array<string | undefined>>([]);
@@ -102,7 +103,8 @@ export function SetupScreen() {
   const [kinOpen, setKinOpen] = useState(true);
   const brought = pool.filter(p => kinWith.includes(p.id));
   const family = [...baseFamily, ...brought];
-  const funds = startFunds(family, life, seed, famRoll);
+  const plan: TownPlan = life === 'weekend' ? townPlan : 'own';
+  const funds = startFunds(family, life, seed, famRoll, plan);
   const town = townHouseFor(family, seed);
   const budget = funds.budget;
   const lots = listings(seed + batch * 1013, region, wish, 6, budget);
@@ -119,7 +121,7 @@ export function SetupScreen() {
   try { unlocked = localStorage.getItem('cb.unlocked') === '1'; } catch { /* storage blocked */ }
   const start = () => {
     if (!lot) return;
-    const game = newGame(seed, NEW_GAME_START.doy, NEW_GAME_START.year, { site: lot, lifestyle: life, mode, peace: mode === 'scenario' ? peace : 'random', kind: mode === 'scenario' ? kind : null, dayJobs: LIFESTYLE[life].jobs, difficulty: diff, grid: true, family, funds, kinAway: pool.filter(p => !kinWith.includes(p.id)), kinOpen });
+    const game = newGame(seed, NEW_GAME_START.doy, NEW_GAME_START.year, { site: lot, lifestyle: life, townPlan: plan, mode, peace: mode === 'scenario' ? peace : 'random', kind: mode === 'scenario' ? kind : null, dayJobs: LIFESTYLE[life].jobs, difficulty: diff, grid: true, family, funds, kinAway: pool.filter(p => !kinWith.includes(p.id)), kinOpen });
     g.load(game);
     g.openSetup(false);
     void saveGame(AUTOSAVE, game);
@@ -181,10 +183,20 @@ export function SetupScreen() {
                   <div style={{ fontSize: 12, color: C.dim, margin: '3px 0 6px', lineHeight: 1.35 }}>{L.blurb}</div>
                   <div style={{ fontSize: 12.5 }}>{usdK(FUNDS_RANGE[id][0])} to {usdK(FUNDS_RANGE[id][1])} to spend{L.passive ? ' · investment income' : L.jobs ? ' · two wages' : ''}</div>
                   {life === id && <div style={{ fontSize: 12, color: C.gold, marginTop: 2 }}>This family: {usd(budget)}</div>}
-                  {life === id && id === 'weekend' && <div style={{ fontSize: 11.5, color: C.dim, marginTop: 3, lineHeight: 1.35 }}>Keeps a town house worth about {usd(town.value)} ({usd(town.mortgage)} owed): not part of the budget. Building goes at weekend pace, and the place needs a caretaker.</div>}
+                  {life === id && id === 'weekend' && <div style={{ fontSize: 11.5, color: C.dim, marginTop: 3, lineHeight: 1.35 }}>{plan === 'rent'
+                    ? `Sells the town house before day one (about ${usd(equityNet(town))} after the agent and the mortgage goes into the budget) and rents in town. Building goes at weekend pace, and the place needs a caretaker.`
+                    : `Keeps a town house worth about ${usd(town.value)} (${usd(town.mortgage)} owed): not part of the budget. Building goes at weekend pace, and the place needs a caretaker.`}</div>}
                 </button>;
               })}
             </div>
+            {life === 'weekend' && <div style={{ ...tile(false), cursor: 'default', padding: '10px 14px', marginBottom: 6 }}>
+              <Chips label="Town home" value={townPlan} set={v => { setTownPlan(v); setLotId(null); }} opts={[['own', 'Keep the house'], ['rent', 'Sell it and rent']]} />
+              <div style={{ fontSize: 12, color: C.dim, lineHeight: 1.4 }}>
+                {townPlan === 'own'
+                  ? <>The house stays theirs: worth about {usd(town.value)}, {usd(town.mortgage)} owed. The mortgage, the upkeep and the property tax come to about {usd(Math.round((mortgagePayment(town) + townUpkeep(town)) + townTaxHalf(town) * 2 / 12))} a month, about {usd(Math.round((mortgagePayment(town) + townUpkeep(town) * BELT_UPKEEP) + townTaxHalf(town) * 2 / 12))} with the belt tight. The equity stays in the walls: it sells for less every week the signs grow, and the house is somewhere to go if the place falls.</>
+                  : <>Sold before the first day: the {usd(equityNet(town))} left after the agent and the mortgage goes into the budget. Rent is about {usd(rentFor(town.value))} a month, with a deposit and the first month up front; no mortgage, no tax, nothing to sell later, and no house to fall back on.</>}
+              </div>
+            </div>}
             <H>What you're looking for in {R.name}</H>
             <Chips label="Size" value={wish.acres} set={v => setW({ acres: v as Acres | 'any' })} opts={[['any', 'Any'], [5, '5 acres'], [20, '20'], [40, '40'], [80, '80']]} />
             <Chips label="Water" value={wish.water} set={v => setW({ water: v })} opts={[['any', 'Any'], ['creek', 'Creek'], ['spring', 'Spring'], ['dry', 'Dry (cheaper)']]} />
@@ -262,7 +274,9 @@ export function SetupScreen() {
                 <span>To spend on land and building</span><span style={{ color: C.gold }}>{usd(budget)}</span>
               </div>
               {funds.passive > 0 && <div style={{ fontSize: 12, color: C.dim, marginTop: 3 }}>Plus about {usd(funds.passive)} a year in investment income.</div>}
-              {life === 'weekend' && <div style={{ fontSize: 12, color: C.dim, marginTop: 3 }}>The town house stays theirs: about {usd(town.value)} with {usd(town.mortgage)} owed (about {usd(mortgagePayment(town) + townUpkeep(town))} a month to keep). Selling it later, if the signs come, adds to the account.</div>}
+              {life === 'weekend' && <div style={{ fontSize: 12, color: C.dim, marginTop: 3 }}>{plan === 'rent'
+                ? `They rent in town: about ${usd(rentFor(town.value))} a month. Moving in later is giving notice; there is no house to sell.`
+                : `The town house stays theirs: about ${usd(town.value)} with ${usd(town.mortgage)} owed (about ${usd(mortgagePayment(town) + townUpkeep(town))} a month to keep, and the property tax twice a year). Selling it later, if the signs come, adds to the account.`}</div>}
               <div style={{ fontSize: 11.5, color: C.dim, marginTop: 3 }}>{LIFESTYLE[life].name} families start with {usdK(FUNDS_RANGE[life][0])} to {usdK(FUNDS_RANGE[life][1])}; better jobs, age and a bit of luck raise it, debts take it down.</div>
               {!lot && <div style={{ color: C.bad, fontSize: 12.5, marginTop: 6 }}>The place you picked is over this budget: go back to Land and pick another.</div>}
             </div>
@@ -286,7 +300,7 @@ export function SetupScreen() {
                 <Chips label="Peace" value={peace} set={setPeace} opts={PEACE} />
               </>}
               <Chips label="Difficulty" value={diff} set={setDiff} opts={DIFFS.map(([d, l]) => [d, l] as [Difficulty, string])} />
-              <div style={{ marginLeft: 68, marginBottom: 6, fontSize: 12, color: C.dim }}>{DIFFS.find(x => x[0] === diff)![2]}. Against Standard: {difficultySummary(diff).join(', ')}.</div>
+              <div style={{ marginLeft: 68, marginBottom: 6, fontSize: 12, color: C.dim }}>{DIFFS.find(x => x[0] === diff)![2]}.{diff === 'standard' ? '' : ` Against Standard: ${difficultySummary(diff).join(', ')}.`}</div>
             </div>
           </>}
         </div>

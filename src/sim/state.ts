@@ -44,7 +44,7 @@ import type { Medical } from './medical';
 import type { Evenings } from './evenings';
 import type { Courses } from './courses';
 import { starterKit, type ToolKit } from './tools';
-export const SAVE_VERSION = 65;
+export const SAVE_VERSION = 67;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -58,7 +58,7 @@ import { linkKin, newKin, type Kin } from './kin';
 import type { Loss } from './grief';
 import { newPaths, type PathsState } from './paths';
 import { newNewcomers, type NewcomerState } from './newcomers';
-import { newWeekend, type Weekend } from './weekender';
+import { newWeekend, type TownPlan, type Weekend } from './weekender';
 
 /** What the family packs to sleep in: a bag each and, past the wall tent's four, a dome tent for the rest (sim/housing.ts). */
 export const startingBedding = (n: number): { sleeping_bag: number; tent: number } => ({ sleeping_bag: n, tent: Math.max(0, Math.ceil((n - 4) / 3)) });
@@ -322,7 +322,7 @@ export interface GameState {
 }
 
 /** New-game choices (the setup screen). Defaults (tests, the dev scene): Free build, no day jobs. */
-export interface RunSetup { site?: Site; lifestyle?: Lifestyle; difficulty?: Difficulty; mode?: Mode; peace?: PeaceLength; kind?: DisasterKind | null; variant?: string; dayJobs?: boolean; grid?: boolean; family?: Person[]; funds?: StartFunds; /** Relatives left in town at setup (they may ask to come), and whether they may. */ kinAway?: Person[]; kinOpen?: boolean }
+export interface RunSetup { site?: Site; lifestyle?: Lifestyle; /** The weekender's town home: keep the house (default) or sell it before day one and rent. */ townPlan?: TownPlan; difficulty?: Difficulty; mode?: Mode; peace?: PeaceLength; kind?: DisasterKind | null; variant?: string; dayJobs?: boolean; grid?: boolean; family?: Person[]; funds?: StartFunds; /** Relatives left in town at setup (they may ask to come), and whether they may. */ kinAway?: Person[]; kinOpen?: boolean }
 
 /**
  * Where a game started from the setup screen begins: Monday 12 April 2027. The weekender's week (sim/weekender.ts) and the market,
@@ -337,7 +337,7 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
   linkKin(people);
   foundLineage(people, seed);
   const site = setup.site ?? CLASSIC;
-  const funds: StartFunds | null = setup.site ? setup.funds ?? startFunds(people, setup.lifestyle ?? 'fulltime', seed) : null;
+  const funds: StartFunds | null = setup.site ? setup.funds ?? startFunds(people, setup.lifestyle ?? 'fulltime', seed, 0, setup.townPlan) : null;
   const g: GameState = {
     version: SAVE_VERSION,
     seed,
@@ -376,7 +376,7 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     newcomers: newNewcomers(),
     daily: newDaily(),
     paths: newPaths(),
-    ...(setup.lifestyle === 'weekend' && setup.site ? { weekend: newWeekend(people, seed, setup.site.miles) } : {}),
+    ...(setup.lifestyle === 'weekend' && setup.site ? { weekend: newWeekend(people, seed, setup.site.miles, setup.townPlan) } : {}),
     stats: emptyStats(),
     ending: null,
     food: { needKcal: 0, ateKcal: 0, producedKcal: 0, spoiledKcal: 0, fromStores: true, kinds: [], daysLeft: 0 },

@@ -67,8 +67,8 @@ function Icon({ id, tint }: { id: string; tint?: number }) {
     case 'f:pack': return box('#8ab0c8', 'MEAT');
     case 'canned': return can('#b04a30');
     case 'frozen': return box('#8ab0c8', 'MEAT');
-    case 'seed': return bag('#c8b070', 'SEED');
-    case 'seed_hybrid': return bag('#9a8ac0', 'F1');
+    case 'seed': return bag('#9a8ac0', 'F1');
+    case 'seed_heirloom': return bag('#c8b070', 'HEIR');
     case 'seed_saved': return bag('#b8a070', 'MINE');
     case 'seed_cover': return bag('#7aa860', 'CLOVER');
     case 'canner': return g(<><ellipse cx="22" cy="14" rx="12" ry="4" fill="#b8bcc0" /><path d="M10 14 v18 q12 6 24 0 v-18" fill="#9aa0a6" /><circle cx="22" cy="9" r="3.5" fill="#e8e4dc" stroke="#555" /><path d="M22 9 l2 -2" stroke="#c03030" /></>);

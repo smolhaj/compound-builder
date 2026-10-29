@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { newGame, type GameState, type Structure } from './state';
 import { REGIONS } from './regions';
-import { autoCrop, cropsDay, fertFactor, fieldFactor, keepSeed, lateFactor, offspringVigor, pinField, plotsOf, rotationFactor, seedTarget, sowWindow, troubleOf, VIGOR, setSuccession, gardenFactor, successionDays } from './crops';
+import { autoCrop, cropsDay, fertFactor, fieldFactor, keepSeed, lateFactor, offspringVigor, pinField, plotsOf, rotationFactor, seedTarget, seedWarning, fieldRows, sowWindow, troubleOf, VIGOR, setSuccession, gardenFactor, successionDays } from './crops';
 import { fieldHarvestSplit } from './needs';
 import { dutyWork } from './daily';
 import { kitOf } from './tools';
@@ -54,19 +54,51 @@ describe('crops', () => {
     expect(lateFactor(g, REGIONS[g.site.region].frost[1] - 40)).toBe(0);
   });
 
-  it('spring sowing draws a unit of seed a field in the player order; none means fallow', () => {
+  it('spring sowing draws a unit of seed a field in the player order; no seed is a weedy forty percent when the window closes', () => {
     const g = newGame(1);
     built(g, 'f1', 'field'); built(g, 'f2', 'field');
     plotsOf(g).f1 = { kind: 'field', fert: 1, prev: null, prev2: null, crop: null, loads: 0, cover: false, settled: -1, planted: true };
     plotsOf(g).f2 = { ...plotsOf(g).f1 };
-    g.stock.seed = 1; g.stock.seed_saved = 0; g.stock.seed_hybrid = 0;
-    atDoy(g, sowWindow(g)[0] + 1);
+    g.stock.seed = 1; g.stock.seed_saved = 0; g.stock.seed_heirloom = 0;
+    const [w0, w1] = sowWindow(g);
+    atDoy(g, w0 + 1);
     const lines = cropsDay(g);
-    expect(plotsOf(g).f1.sown?.line).toBe('heirloom');
-    expect(plotsOf(g).f2.sown).toBeUndefined();
+    expect(plotsOf(g).f1.sown?.line).toBe('hybrid');           // the plain Shop seed is the hybrid
+    expect(plotsOf(g).f1.sown?.v).toBe(VIGOR.hybrid);
+    expect(plotsOf(g).f2.sown).toBeUndefined();                // still time: seed may turn up
     expect(g.stock.seed).toBe(0);
     expect(lines.join(' ')).toMatch(/No seed left for 1 field/);
-    expect(fieldFactor(g, g.structures.find(s => s.id === 'f2')!).total).toBe(0);
+    expect(lines.join(' ')).toMatch(/weeds at about 40 %/);
+    expect(seedWarning(g)?.tone).toBe('warn');
+    // the window closes with no seed: weeds and volunteers, not a bare field
+    atDoy(g, w1 + 28);
+    const late = cropsDay(g);
+    const p = plotsOf(g).f2;
+    expect(p.sown?.line).toBe('volunteer');
+    expect(p.sown?.v).toBe(VIGOR.volunteer);
+    expect(late.join(' ')).toMatch(/weeds and volunteers/);
+    const ff = fieldFactor(g, g.structures.find(s => s.id === 'f2')!);
+    expect(ff.sown).toBe(true);
+    expect(ff.total).toBeGreaterThan(0.3 * ff.share);
+    expect(ff.total).toBeLessThan(0.5);
+    expect(fieldRows(g).find(r => r.id === 'f2')!.weedy).toBe(true);
+    expect(seedWarning(g)?.tone).toBe('bad');
+  });
+
+  it('seed bought in the window is sown before the weeds are', () => {
+    const g = newGame(1);
+    built(g, 'f1', 'field');
+    plotsOf(g).f1 = { kind: 'field', fert: 1, prev: null, prev2: null, crop: null, loads: 0, cover: false, settled: -1, planted: true };
+    g.stock.seed = 0; g.stock.seed_saved = 0; g.stock.seed_heirloom = 0;
+    const [w0, w1] = sowWindow(g);
+    atDoy(g, w0 + 3); cropsDay(g);
+    expect(plotsOf(g).f1.sown).toBeUndefined();
+    g.stock.seed_heirloom = 1;
+    atDoy(g, w0 + 10); cropsDay(g);
+    expect(plotsOf(g).f1.sown?.line).toBe('heirloom');
+    expect(plotsOf(g).f1.sown?.v).toBe(1);
+    atDoy(g, w1 + 28); cropsDay(g);
+    expect(plotsOf(g).f1.sown?.line).toBe('heirloom');
   });
 
   it('manure and compost raise fertility at sowing; a pinned rest year builds the soil', () => {
