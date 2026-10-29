@@ -401,6 +401,8 @@ export interface FigurePose {
   amp: number;
   /** Tool in hand (FIG_TOOL; default none). */
   tool?: number;
+  /** Pitch about the figure's own x axis, radians, applied before the turn: -PI / 2 lays it on its back (head toward -z). Default 0. */
+  pitch?: number;
 }
 
 /**
@@ -419,6 +421,8 @@ export class FigureLayer {
   private readonly _q = new THREE.Quaternion();
   private readonly _s = new THREE.Vector3();
   private readonly _up = new THREE.Vector3(0, 1, 0);
+  private readonly _right = new THREE.Vector3(1, 0, 0);
+  private readonly _pq = new THREE.Quaternion();
   private readonly _c = new THREE.Color();
   private _scene: THREE.Scene | null;
   readonly capacity: number;
@@ -462,6 +466,7 @@ export class FigureLayer {
   /** Place instance i. */
   setPose(i: number, p: FigurePose): void {
     this._q.setFromAxisAngle(this._up, p.rot);
+    if (p.pitch) this._q.multiply(this._pq.setFromAxisAngle(this._right, p.pitch));
     this._m.compose(this._p.set(p.x, p.y, p.z), this._q, this._s.setScalar(p.scale * FIG_SCALE));
     this._m.toArray(this.mesh.instanceMatrix.array as Float32Array, i * 16);
     const st = this._attrs.aStyle.array as Float32Array;

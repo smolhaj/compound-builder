@@ -66,6 +66,19 @@ export function foodSlot(add: (m: KitMaterialId, g: THREE.BufferGeometry) => voi
 }
 
 /**
+ * Mark a bed the sick are put in (game/people/sickbayPlan.ts): at the middle of the mattress top, 0.58 m above the bed's
+ * origin by default. Not geometry: Parts keeps it as a sick slot (shell.ts `SickSlot`) wherever the piece ends up. The
+ * marker is a few millimetres across, so it does not change the piece's footprint. In the bed's frame the head is at -z
+ * and the foot at +z, as `Furniture.bed` draws it.
+ */
+export function sickSlot(add: (m: KitMaterialId, g: THREE.BufferGeometry) => void, x = 0, y = 0.58 * M, z = 0): void {
+  const e = 0.004;
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute([x, y, z, x, y, z + e, x + e, y, z, x, y + e, z], 3));
+  add('sick_slot', g);
+}
+
+/**
  * Build a piece in its own frame with `fn(add)`, move it to `p`, send it to
  * the sink, and return its footprint (null if `solid` is false).
  */
