@@ -24,6 +24,7 @@ import { isHome, totalBill } from './blueprints';
 import { MATERIALS, type MaterialId } from './materials';
 import { calendarOf, dayIndex, type GameState, type Structure } from './state';
 import type { RegionId } from './regions';
+import { townTaxHalf } from './weekender';
 import { mulberry32 } from './rng';
 import { diffOf } from './difficulty';
 
@@ -132,6 +133,12 @@ export function paperworkDay(s: GameState): string[] {
     const half = Math.round(yearlyTax(s) / 2);
     if (works) { s.money -= half; out.push(`Property tax: $${half.toLocaleString('en-US')} (half the year's bill).`); }
     else s.paper.backTax += half;
+    // two homes while the family splits its week (sim/weekender.ts): the town house's bill comes in the same halves
+    if (s.weekend && s.weekend.town.status !== 'sold') {
+      const town = townTaxHalf(s.weekend.town);
+      if (works) { s.money -= town; s.weekend.tally.spent += town; out.push(`Property tax on the town house: $${town.toLocaleString('en-US')}.`); }
+      else s.paper.backTax += town;
+    }
   }
   // back taxes, once the county is properly back
   if (s.paper.backTax > 0 && s.disaster.tracks.banks >= 0.9 && s.disaster.tracks.law >= 0.9) {

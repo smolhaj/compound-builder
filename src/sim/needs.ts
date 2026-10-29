@@ -24,6 +24,7 @@ import { SOIL_YIELD } from './site';
 import { REGIONS, seasons } from './regions';
 import { gardenSeason, greenhousePeak, greenhouseGreens, orchardYield } from './greenhouse';
 import { canningCases, careYield, lifeMorale, spoilFactor } from './daily';
+import { isAbsent } from './weekender';
 import { socialMorale } from './gatherings';
 import { addFood, addFoodKcal, dietDay, dietEffects, eatFrom, inDateKcal, syncPantry } from './pantry';
 import { mulberry32 } from './rng';
@@ -124,7 +125,8 @@ export interface FoodReport { needKcal: number; ateKcal: number; producedKcal: n
 
 /** Days the family can eat from what's put by (not counting what grows). */
 export function daysOfFood(s: GameState): number {
-  const need = s.people.reduce((a, p, i) => a + (alive(s, i) ? needOf(p) : 0), 0);
+  // (the family in town eats there: the weekender's weekdays, or the days on the road home)
+  const need = s.people.reduce((a, p, i) => a + (alive(s, i) && !isAbsent(s, p.id) ? needOf(p) : 0), 0);
   const have = FOODS.reduce((a, f) => a + s.stock[f] * KCAL[f], 0);
   return need > 0 ? have / need : Infinity;
 }

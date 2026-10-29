@@ -32,6 +32,7 @@ import { raidPressure } from './opsec';
 import { logGate } from './nag';
 import type { Person } from './family';
 import { kinPersonal } from './kin';
+import { absentIdx, jobDayOf } from './weekender';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Duties
@@ -242,7 +243,7 @@ export function threatLevel(s: GameState, pressure?: number): number {
 /** Is a person here and able (alive, not taken or away)? */
 const ableAt = (s: GameState, i: number) => {
   const ps = s.personState[i];
-  return !!ps && ps.needs.died == null && ps.task !== 'away' && !ps.needs.hurt.some(h => h.trauma && h.sev >= 50);
+  return !!ps && ps.needs.died == null && ps.task !== 'away' && !absentIdx(s, i) && !ps.needs.hurt.some(h => h.trauma && h.sev >= 50);
 };
 
 /** The hour after which a kid is in bed. */
@@ -402,7 +403,7 @@ export function autoPlan(s: GameState, ctx: { build: boolean; fell: boolean }, r
   const day = dayIndex(s.clock.t);
   const c: PlanCtx = { ...ctx, doy: calendarOf(s.clock).doy, threat: threatLevel(s, pressure), after: s.disaster.phase === 'impact' || s.disaster.phase === 'survival' };
   const rates = ratesNow ?? choreRates(s);
-  const weekday = day % 7 < 5;
+  const weekday = jobDayOf(s, day);
   const chrono = chronotypes(s);
   const free: Array<{ p: Person; i: number }> = [];
   s.people.forEach((p, i) => { if (ableAt(s, i) && !plan.locked.includes(p.id)) free.push({ p, i }); });

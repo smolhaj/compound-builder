@@ -43,6 +43,7 @@ import { boltPassages, passageEntry } from './compounds';
 import { resolveDigWarning } from './tunnelers';
 import { addTool, stealTools, SWAP_KINDS, TOOLS, type ToolKind } from './tools';
 import { resolveKin } from './kin';
+import { emptyLooting, emptyNow, resolveMoveIn, resolveStranded } from './weekender';
 import { raidTakesVehicles } from './vehicles';
 import { resolveTrialEnd, startTrial, trialDay, type TrialCamp } from './trial';
 
@@ -164,8 +165,8 @@ export function postureOf(s: GameState): Posture {
 // Encounters
 // ─────────────────────────────────────────────────────────────────────────
 
-export type EncounterKind = 'arrival' | 'looters' | 'gang' | 'refugees' | 'requisition' | 'neighbor_help' | 'trader' | 'horde' | 'patrol' | 'militia' | 'break_in' | 'ransom' | 'trial_end' | 'tunnelers' | 'kin';
-export type Stance = 'hide' | 'parley' | 'warn' | 'defend' | 'trade' | 'take_in' | 'trial' | 'turn_away' | 'call_911' | 'shout' | 'confront' | 'pay' | 'refuse' | 'ambush' | 'flood' | 'collapse' | 'ignore' | 'build_first';
+export type EncounterKind = 'arrival' | 'looters' | 'gang' | 'refugees' | 'requisition' | 'neighbor_help' | 'trader' | 'horde' | 'patrol' | 'militia' | 'break_in' | 'ransom' | 'trial_end' | 'tunnelers' | 'kin' | 'move_in' | 'stranded';
+export type Stance = 'hide' | 'parley' | 'warn' | 'defend' | 'trade' | 'take_in' | 'trial' | 'turn_away' | 'call_911' | 'shout' | 'confront' | 'pay' | 'refuse' | 'ambush' | 'flood' | 'collapse' | 'ignore' | 'build_first' | 'move_sell' | 'move_keep' | 'hold_on' | 'drive_now' | 'back_roads' | 'resupply';
 
 export interface Encounter {
   id: string;
@@ -420,6 +421,8 @@ export function gateDay(s: GameState): Encounter | null {
   // while the law works (before the collapse, or once it's back): now and then a break-in (sim/breakins.ts)
   if (d.tracks.law >= 0.5) { const b = breakInDay(s, day); if (b) { g.pending = b; return b; } }
   if (!d.kind || s.clock.t < d.hitAt + 1) return null;
+  // the family is in town and the place stands empty (sim/weekender.ts): nobody to answer the gate, only what the strangers take
+  if (emptyNow(s)) { const l = emptyLooting(s, mulberry32(s.seed * 7907 + day * 31 + 5)); if (l) log(s, l); return null; }
   // fallout keeps everyone indoors for the first two weeks of a nuclear war
   if (d.kind === 'nuclear' && s.clock.t < d.hitAt + 14) return null;
   const r = mulberry32(s.seed * 7907 + day * 31);
@@ -599,6 +602,12 @@ export function resolve(s: GameState, stance: Stance): Outcome {
     title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines);
   } else if (e.kind === 'kin') {
     const o = resolveKin(s, e, stance);
+    title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines);
+  } else if (e.kind === 'move_in') {
+    const o = resolveMoveIn(s, stance);
+    title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines);
+  } else if (e.kind === 'stranded') {
+    const o = resolveStranded(s, stance);
     title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines);
   } else if (e.kind === 'arrival') {
     if (stance === 'trial') {

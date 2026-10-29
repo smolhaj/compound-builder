@@ -35,11 +35,14 @@ import { migrateDogs } from '../pets';
 import { starterKit } from '../tools';
 import { newPaths } from '../paths';
 import { newKin } from '../kin';
+import { newWeekend } from '../weekender';
 
 type Raw = Record<string, unknown> & { version?: number };
 
 /** version n → n + 1 upgraders. */
 const STEPS: Record<number, (s: Raw) => Raw> = {
+  // 58 → 59: the weekender (`weekend`, sim/weekender.ts): a game that was set up as a weekend getaway (it could not be played before) gets the town house; everyone else has none
+  58: s => ({ ...s, version: 59, ...(s.lifestyle === 'weekend' && !s.weekend ? { weekend: newWeekend(s.people as Person[], s.seed as number, ((s.site as { miles?: number } | undefined)?.miles) ?? 10) } : {}) }),
   // 57 → 58: laid walks (`paths`, sim/paths.ts); worn tracks are derived, not saved
   57: s => ({ ...s, version: 58, paths: (s.paths as object | undefined) ?? newPaths() }),
   // 55 → 56: the fleet (sim/vehicles.ts): vehicle parts in the stock, a service reading on each vehicle

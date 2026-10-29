@@ -12,6 +12,7 @@ import { hoursLeft } from './crews';
 import { isAway } from './rescue';
 import { runFinished, type PerimeterRun } from './perimeter';
 import type { GameState } from './state';
+import { siteDaysPerWeek } from './weekender';
 
 export interface Pace {
   /** Rate-weighted person-hours the family puts in per week. */
@@ -20,6 +21,8 @@ export interface Pace {
   employed: string[];
   /** Adults / teens building every day. */
   fullTime: number;
+  /** Weekenders (sim/weekender.ts): the family lives in town and builds only while it is on the place, this many days a week on average. */
+  siteDays?: number;
 }
 
 const WEEKDAYS = 5, WEEKEND = 2;
@@ -28,15 +31,19 @@ const WEEKDAYS = 5, WEEKEND = 2;
 export function paceOf(s: GameState): Pace {
   let perWeek = 0, fullTime = 0;
   const employed: string[] = [];
+  const split = s.weekend?.mode === 'split';
+  const siteDays = split ? siteDaysPerWeek(s.clock.startDoy) : undefined;
   s.people.forEach(p => {
     const ps = s.personState.find(x => x.id === p.id);
     if (!ps || ps.needs.died != null || isAway(s, p.id)) return;
     const hours = workHoursPerDay(p) * buildRate(p);
+    // weekenders build while they are on the place; the ones who live there build all week
+    if (split && s.weekend!.travelers.includes(p.id)) { perWeek += hours * siteDays!; return; }
     const job = !!ps.employed && !!p.job && !p.kid;
     perWeek += hours * (job ? WEEKEND : WEEKDAYS + WEEKEND);
     if (job) employed.push(p.first); else if (!p.kid && !p.elder) fullTime++;
   });
-  return { perWeek, employed, fullTime };
+  return { perWeek, employed, fullTime, ...(split ? { siteDays } : {}) };
 }
 
 const runLeft = (r: PerimeterRun) => (runFinished(r) ? 0 : Math.max(0, r.hours - r.done));
@@ -83,6 +90,12 @@ export function slowHint(s: GameState, weeks: number | null, pace = paceOf(s), s
   if (weeks === null) return 'No one is free to build.';
   if (weeks < slow) return null;
   const parts: string[] = [];
+  if (pace.siteDays !== undefined) {
+    parts.push(`the family is on the place only about ${Math.round(pace.siteDays * 10) / 10} days a week (Friday night to Sunday afternoon, the holidays and three vacation weeks); the rest of the week goes to the jobs and the town house`);
+    parts.push('a hired crew works the weekdays while you are away (Projects: Hire a crew)');
+    parts.push('moving in full time (Family tab) puts everyone on the site seven days a week');
+    return `Slow going: ${parts.join('; ')}.`;
+  }
   if (pace.employed.length) parts.push(`${pace.employed.join(' and ')} ${pace.employed.length > 1 ? 'work' : 'works'} in town on weekdays and build${pace.employed.length > 1 ? '' : 's'} only on weekends: quitting the job (Family tab) puts them on the site five more days a week`);
   parts.push('a hired crew works weekdays on one building (Projects: Hire a crew)');
   return `Slow going: ${parts.join('; ')}.`;

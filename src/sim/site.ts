@@ -63,7 +63,7 @@ export const MIN_LEFT = 20_000;
  */
 export type Lifestyle = 'weekend' | 'fulltime' | 'independent';
 export const LIFESTYLE: Record<Lifestyle, { name: string; blurb: string; budget: number; passive: number; jobs: boolean; ready: boolean }> = {
-  weekend: { name: 'Weekend getaway', blurb: 'They keep the town house and both jobs, and come up on weekends and vacations to improve the place a little at a time.', budget: 450_000, passive: 0, jobs: true, ready: false },
+  weekend: { name: 'Weekend getaway', blurb: 'They keep the town house and both jobs and drive up Friday night to Sunday afternoon, on holidays and on vacations. The place stands empty the rest of the week. When the warning signs grow, they decide whether to move in for good.', budget: 450_000, passive: 0, jobs: true, ready: true },
   fulltime: { name: 'Full-time, with jobs', blurb: 'They sold the town house and live on the place. Both still work in town on weekdays.', budget: 800_000, passive: 0, jobs: true, ready: true },
   independent: { name: 'Financially independent', blurb: 'No nine-to-five: they live on the place full time on savings and investment income.', budget: 1_400_000, passive: 45_000, jobs: false, ready: true },
 };

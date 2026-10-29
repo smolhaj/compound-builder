@@ -12,11 +12,11 @@ import { litersText } from '../sim/format';
 import { Note, Row, Section } from './hud/common';
 import { btn, DIM, TONE, usd } from './hud/style';
 
-function statusOf(v: Vehicle): { text: string; tone: keyof typeof TONE | null } {
+function statusOf(v: Vehicle, atTown = false): { text: string; tone: keyof typeof TONE | null } {
   if (v.fried) return { text: 'killed by the EMP', tone: 'bad' };
   if (v.condition <= 0) return { text: 'dead', tone: 'bad' };
   if (v.down) return { text: `broken down: ${v.down.part}${v.down.left !== undefined ? `, ${v.down.left} days` : ''}`, tone: 'bad' };
-  if (v.away) return { text: 'out on a run', tone: null };
+  if (v.away) return { text: atTown ? 'at the town house' : 'out on a run', tone: null };
   if (overdue(v)) return { text: 'overdue for a service', tone: 'warn' };
   return { text: 'runs', tone: 'good' };
 }
@@ -39,7 +39,7 @@ export function FleetPanel() {
       {plan.yardSlots > 0 && <Row label="Equipment yard" value={`${plan.yardSlots - plan.yardFree} of ${plan.yardSlots} bays`} title="Vehicles with no roof stand in the yard's marked bays: fenced and lit, but still in the weather" />}
       {plan.outside.length > 0 && plan.slots === 0 && <Note>Weather wears what stands outside. A garage (Build → Home & work) keeps them dry.</Note>}
       {vs.map(v => {
-        const st = statusOf(v), def = VEHICLES[v.kind];
+        const st = statusOf(v, !!game.weekend && game.weekend.cars.includes(v.id)), def = VEHICLES[v.kind];
         const fuelPct = def.tankL ? v.fuel / def.tankL : 1;
         return <div key={v.id} style={{ padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>
@@ -69,7 +69,7 @@ export function FleetPanel() {
         {!confirm
           ? <button style={{ ...btn(), width: '100%', opacity: bo.ok ? 1 : 0.5 }} disabled={!bo.ok} title={bo.why ?? 'Load up and leave. This ends the run.'} onClick={() => setConfirm(true)}>Bug out…</button>
           : <div style={{ border: '1px solid #c9564a', borderRadius: 6, padding: 6 }}>
-            <Note tone="bad">Bugging out ends this run. {bo.going.length} go ({bo.going.map(p => p.first).join(', ')}); {bo.left.length ? `${bo.left.map(p => p.first).join(', ')} stay behind. ` : ''}{bo.foodDays} days of food and water, fuel for about {bo.rangeKm} km, {bo.hours} h to load{bo.covered ? ', all of it under cover' : ', in plain view'}.</Note>
+            <Note tone="bad">Bugging out ends this run. {bo.going.length} go ({bo.going.map(p => p.first).join(', ')}); {bo.left.length ? `${bo.left.map(p => p.first).join(', ')} stay behind. ` : ''}{bo.foodDays} days of food and water, fuel for about {bo.rangeKm} km, {bo.hours} h to load{bo.covered ? ', all of it under cover' : ', in plain view'}.{bo.fallback ? ` They head for ${bo.fallback}, ${bo.fallback ? game.weekend?.driveMiles : 0} miles off, kept for exactly this.` : ''}</Note>
             <div style={{ display: 'flex', gap: 6 }}>
               <button style={btn(true)} onClick={() => { g.money(d => bugOut(d)); setConfirm(false); }}>Go now</button>
               <button style={btn()} onClick={() => setConfirm(false)}>Stay</button>

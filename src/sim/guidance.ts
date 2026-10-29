@@ -25,6 +25,8 @@ import { roadGateStatus } from './roadGate';
 import type { GameState, OrderLine } from './state';
 import { SEPARATE_DWELLINGS, housingShortfall } from './housing';
 import { joinNames } from './kin';
+import { CARETAKER, CARETAKER_KINDS, caretakerProblem, marketFactor, saleBlock, saleQuote, type CaretakerKind } from './weekender';
+import { tension } from './disaster';
 
 const usd = (n: number) => '$' + Math.round(n).toLocaleString('en-US');
 
@@ -113,7 +115,9 @@ export type SuggestionAct =
   | { type: 'order'; lines: OrderLine[] }
   | { type: 'markTrees'; n: number }
   | { type: 'select'; id: string }
-  | { type: 'tool'; tool: string };
+  | { type: 'tool'; tool: string }
+  | { type: 'caretaker'; kind: CaretakerKind }
+  | { type: 'moveIn' };
 export interface Suggestion {
   id: string;
   /** The kit piece to stake ('' when the suggestion is something else). */
@@ -174,6 +178,27 @@ export function suggestions(s: GameState): Suggestion[] {
     } }
   { const tip = storageTip(s);
     if (tip && !buildOff(s, tip.kind)) add('storage', tip.kind, tip.why, 58); }
+  // the weekender (sim/weekender.ts): who looks after the place on weekdays, and when to move in
+  const wk = s.weekend;
+  if (wk?.mode === 'split') {
+    const animals = ['goat', 'pig', 'steer', 'sheep', 'rabbit'].some(a => ((s.stock as unknown as Record<string, number>)[a] ?? 0) >= 1) || hasKind(s, 'chicken_coop');
+    const crops = hasKind(s, 'garden', 'field', 'greenhouse', 'greenhouse_heated', 'orchard', 'orchard_grove', 'pond');
+    if (!wk.caretaker && (animals || crops || s.structures.some(isFinished))) {
+      const acts = CARETAKER_KINDS.filter(k => !caretakerProblem(s, k)).map(k => ({ label: `${CARETAKER[k].name} (${usd(CARETAKER[k].perMonth)}/mo)`, act: { type: 'caretaker' as const, kind: k } }));
+      out.push({ id: 'caretaker', kind: '', title: 'A caretaker for the weekdays', urgency: animals || crops ? 66 : 44,
+        why: animals ? 'the animals go unfed five days a week, and an empty place is six times as likely to be broken into' : crops ? 'the garden and the greenhouse go untended all week, and an empty place is six times as likely to be broken into' : 'an empty place is six times as likely to be broken into as one with people in it',
+        ...(acts.length ? { acts } : {}) });
+    }
+    const warned = s.disaster.kind && s.disaster.phase === 'warning';
+    if (warned) {
+      const q = saleQuote(s), blocked = saleBlock(s);
+      out.push({ id: 'move_in', kind: '', title: 'Move in now?', urgency: 96,
+        why: `the warning signs are out and the family still lives in town${q && !blocked ? `; the house would sell for about ${usd(q.net)} after the mortgage, at ${Math.round(marketFactor(s) * 100)} % of its worth and falling` : blocked ? `; the house cannot be sold now (${blocked})` : ''}`,
+        acts: [{ label: 'Decide now', act: { type: 'moveIn' } }] });
+    } else if (s.disaster.kind && tension(s.disaster, s.clock.t) > 0 && wk.asked === 0) {
+      out.push({ id: 'move_in', kind: '', title: 'Think about moving in', urgency: 50, why: 'the longer they wait the less the town house is worth, and the harder it is to get out', acts: [{ label: 'See the numbers', act: { type: 'moveIn' } }] });
+    }
+  }
   return out.sort((x, y) => y.urgency - x.urgency).slice(0, 3);
 }
 
@@ -199,6 +224,7 @@ export function longTerm(s: GameState, drive?: readonly Pt[]): Goal[] {
   ] };
   const bunker: Goal = { id: 'bunker', title: 'A bunker underneath', steps: bunkerChecklist(s).map(c => ({ label: c.label, done: c.done, detail: c.detail })) };
   const goals = [enclose, bunker];
+  if (s.weekend?.mode === 'split') goals.unshift(movingIn(s));
   // room for the family: only once there are relatives (or elders) to make room for
   const rel = s.people.some(p => p.rel || p.elder) || (s.kin?.away.length ?? 0) > 0 || (s.kin?.waiting.length ?? 0) > 0;
   if (rel) {
@@ -211,6 +237,19 @@ export function longTerm(s: GameState, drive?: readonly Pt[]): Goal[] {
   }
   goals.push(selfSufficient(s));
   return goals;
+}
+
+/** The weekender's goal (shown while the family splits its week): be ready to live here, and decide about the town house. */
+export function movingIn(s: GameState): Goal {
+  const w = s.weekend!;
+  const homes = s.structures.filter(st => isHome(st.kind) && isFinished(st)).length;
+  return { id: 'moving', title: 'Move in full time', steps: [
+    { label: 'A caretaker for the weekdays', done: !!w.caretaker, detail: w.caretaker ? CARETAKER[w.caretaker.kind].name.toLowerCase() : 'the animals, the garden and the doors, five days a week' },
+    { label: 'A finished home with a bed for everyone', done: homes > 0 && homeBeds(s) >= s.people.length, detail: homes ? `${homeBeds(s)} of ${s.people.length} beds` : 'a roof you can live under all week' },
+    { label: 'Food put by for 90 days', done: daysOfFood(s) >= 90, detail: `${Math.round(Math.min(daysOfFood(s), 999))} days put by` },
+    { label: 'Water and power that run themselves', done: hasKind(s, 'well_drilled', 'well_hand', 'cistern', 'water_tower') && hasPower(s), detail: 'the pump and the freezers keep running while you are away' },
+    { label: 'Decide about the town house', done: w.town.status === 'sold', detail: w.town.status === 'sold' ? 'sold' : `worth ${usd(w.town.value * marketFactor(s))} now, with ${usd(w.town.mortgage)} owed; it sells for less every week the signs grow` },
+  ] };
 }
 
 /** The third goal, always shown, never required: feed and power the compound from its own land (the self-sufficient interior). */
