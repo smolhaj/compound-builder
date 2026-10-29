@@ -17,7 +17,7 @@ import type { GameState } from './state';
 import { openDoorways } from './compounds';
 import { COUNTY, PERMIT_FEE, countyWorks } from './paperwork';
 
-export type PerimeterKind = 'split_rail' | 'barbed_wire' | 'woven_wire' | 'thorn_hedge' | 'log_palisade' | 'container_wall' | 'earth_berm' | 'ditch' | 'creek_bars' | 'chain_link' | 'wrought_iron' | 'iron_barbed' | 'steel_wall' | 'electric_steel' | 'water_pipe' | 'power_cable' | 'escape_tunnel' | 'covered_walkway' | 'underground_passage' | 'concrete_wall' | 'wall_walk' | 'stone_wall' | 'container_stack' | 'tunnel_bridge' | 'slope_tunnel' | 'bar_fence';
+export type PerimeterKind = 'split_rail' | 'barbed_wire' | 'woven_wire' | 'thorn_hedge' | 'log_palisade' | 'container_wall' | 'earth_berm' | 'ditch' | 'creek_bars' | 'chain_link' | 'wrought_iron' | 'iron_barbed' | 'steel_wall' | 'electric_steel' | 'water_pipe' | 'power_cable' | 'escape_tunnel' | 'covered_walkway' | 'underground_passage' | 'concrete_wall' | 'wall_walk' | 'stone_wall' | 'container_stack' | 'tunnel_bridge' | 'slope_tunnel' | 'bar_fence' | 'drain_channel';
 
 export interface PerimeterDef {
   id: PerimeterKind;
@@ -86,12 +86,13 @@ export const PERIMETER: Record<PerimeterKind, PerimeterDef> = {
   tunnel_bridge: { id: 'tunnel_bridge', name: 'Tunnel-bridge (enclosed steel)', blurb: 'A rust-red steel tube on trusses across a gorge, ravine or creek bed, joining the outer road or motor court to the compound, with a steel door at each end. Vehicles drive through; on foot or by truck it is the one way over the gap. A crew has to come by it (door by door) or ford and climb the gorge, and you can drop it. Needs real low ground to span: 3 m or more under the deck, no longer than 200 m. The county wants a permit.', hours: 30, materials: { rebar: 2.4, roofing: 4, hardware: 0.6, concrete: 1.2, cable: 0.1 }, height: 0.55, blocks: { people: 0.9, animals: 1, vehicles: 0.9 }, sight: 0.9, growYears: 0, walkway: true, span: true, vehicleWay: true },
   slope_tunnel: { id: 'slope_tunnel', name: 'Slope tunnel (enclosed steel)', blurb: 'The same rust-red tube laid down a hillside, following the ground, with a steel door at each end: the secured way from the compound down to a lower yard or road on a slope of 20 % or more. Vehicles drive through.', hours: 22, materials: { rebar: 1.4, roofing: 2.6, hardware: 0.4, concrete: 0.8 }, height: 0.5, blocks: { people: 0.9, animals: 1, vehicles: 0.85 }, sight: 0.85, growYears: 0, walkway: true, vehicleWay: true },
   bar_fence: { id: 'bar_fence', name: 'Black bar fence', blurb: 'Plain black steel bars, 2.4 m tall, welded to top and bottom rails and set in a low concrete curb, with no spear points to catch a coat: the fence of an embassy or a good estate. You can see through it, but it is hard to climb and cannot be cut with hand tools. Used for the motor court in front of the gate.', hours: 13, materials: { rebar: 0.95, hardware: 0.22, concrete: 0.3 }, height: 0.4, blocks: { people: 0.7, animals: 0.98, vehicles: 0.5 }, sight: 0.04, growYears: 0, deepFooting: true },
+  drain_channel: { id: 'drain_channel', name: 'Drainage channel', blurb: 'A 1 m stone-lined swale with a perforated pipe under a gravel bed and a grating at each end, laid along the contour above a building cut into a slope, or along the foot of a wall on the downhill side. It takes the runoff of the cut away before it turns the pad to mud in the thaw and in storms. A truck crosses it at a culvert; it stops no one.', hours: 6, materials: { pipe: 0.25, concrete: 0.12 }, height: -0.05, blocks: { people: 0, animals: 0, vehicles: 0.2 }, sight: 0, growYears: 0 },
   ditch: { id: 'ditch', name: 'Ditch / dry moat', blurb: 'A 2 m deep, 3 m wide ditch. No vehicle crosses; the spoil can build a berm.', hours: 40, materials: {}, height: -0.33, blocks: { people: 0.45, animals: 0.3, vehicles: 1 }, sight: 0, growYears: 0 },
 };
 
 export const PERIMETER_ORDER: readonly PerimeterKind[] = ['split_rail', 'barbed_wire', 'woven_wire', 'thorn_hedge', 'log_palisade', 'container_wall', 'earth_berm', 'ditch', 'creek_bars', 'chain_link', 'wrought_iron', 'iron_barbed', 'steel_wall', 'electric_steel', 'concrete_wall', 'covered_walkway', 'stone_wall', 'container_stack', 'tunnel_bridge', 'slope_tunnel', 'bar_fence'];
 /** Lines that carry utilities (drawn with the same tool, under Water & power). */
-export const UTILITY_LINES: readonly PerimeterKind[] = ['water_pipe', 'power_cable'];
+export const UTILITY_LINES: readonly PerimeterKind[] = ['water_pipe', 'power_cable', 'drain_channel'];
 
 export type Pt = [number, number];
 
@@ -155,7 +156,7 @@ export interface PerimeterRun {
  */
 export const PREDATOR_BLOCK: Record<PerimeterKind, number> = {
   split_rail: 0.02, barbed_wire: 0.1, woven_wire: 0.35, thorn_hedge: 0.75, log_palisade: 0.97, container_wall: 1, earth_berm: 0.2, ditch: 0.2,
-  creek_bars: 0.95, chain_link: 0.9, wrought_iron: 0.97, iron_barbed: 0.98, steel_wall: 1, electric_steel: 1, water_pipe: 0, power_cable: 0, escape_tunnel: 0, covered_walkway: 1, underground_passage: 0, concrete_wall: 1, wall_walk: 0, stone_wall: 1, container_stack: 1, tunnel_bridge: 1, slope_tunnel: 1, bar_fence: 0.97,
+  creek_bars: 0.95, chain_link: 0.9, wrought_iron: 0.97, iron_barbed: 0.98, steel_wall: 1, electric_steel: 1, water_pipe: 0, power_cable: 0, escape_tunnel: 0, covered_walkway: 1, underground_passage: 0, concrete_wall: 1, wall_walk: 0, stone_wall: 1, container_stack: 1, tunnel_bridge: 1, slope_tunnel: 1, bar_fence: 0.97, drain_channel: 0,
 };
 
 /** The next tier up, where there is one (upgraded in place: sim `upgradeRun`). */
@@ -396,7 +397,7 @@ export function addRunWork(s: GameState, r: PerimeterRun, hours: number): void {
       }
       r.replaces = undefined;
     }
-    log(s, d.growYears ? `${d.name} planted. Give it ${d.growYears} years.` : `${d.name} ${r.kind === 'water_pipe' || r.kind === 'power_cable' ? 'laid' : 'finished'}.`);
+    log(s, d.growYears ? `${d.name} planted. Give it ${d.growYears} years.` : `${d.name} ${r.kind === 'water_pipe' || r.kind === 'power_cable' || r.kind === 'drain_channel' ? 'laid' : 'finished'}.`);
   }
 }
 
