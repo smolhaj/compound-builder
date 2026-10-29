@@ -96,6 +96,14 @@ describe('linked compounds: the underground passage', () => {
     expect(passageEntry(g, seq(0.3, 0.99), false)).not.toBeNull();
     expect(defenseReport(g).linked.some(c => c.id === `pass_${p.id}`)).toBe(true);
   });
+
+  it('a scouted crew finds the hatch far more often', () => {
+    const { g, cx, cz } = twoYards();
+    done(g, 'underground_passage', [[cx - 8, cz], [cx - 8, cz - 25]]);
+    setPassageLocked(g, hatches(g).find(h => h.exposed)!.runId, false);
+    expect(passageEntry(g, () => 0.15, false)).toBeNull();
+    expect(passageEntry(g, () => 0.15, false, 3)).not.toBeNull();
+  });
 });
 
 describe('doorways and footings', () => {

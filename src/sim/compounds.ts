@@ -153,11 +153,11 @@ export const DOOR_HOLDS = 0.97, DOOR_HOLDS_BLASTED = 0.6;
  * at all, and only if found. Draws from `r` only when there is one (so a
  * place without a passage plays out exactly as before). Returns the run, or null.
  */
-export function passageEntry(s: GameState, r: () => number, organized: boolean): { runId: string; forced: boolean } | null {
+export function passageEntry(s: GameState, r: () => number, organized: boolean, findMult = 1): { runId: string; forced: boolean } | null {
   for (const h of hatches(s)) {
     if (!h.exposed) continue;
     const run = s.perimeter.find(x => x.id === h.runId)!;
-    if (r() >= (run.revealed ? HATCH_FOUND_REVEALED : HATCH_FOUND)) continue;
+    if (r() >= Math.min(0.95, (run.revealed ? HATCH_FOUND_REVEALED : HATCH_FOUND) * findMult)) continue;
     if (!h.locked) return { runId: h.runId, forced: false };
     if (r() >= (organized ? DOOR_HOLDS_BLASTED : DOOR_HOLDS)) return { runId: h.runId, forced: true };
   }

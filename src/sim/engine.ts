@@ -24,6 +24,7 @@ import { greenhouseDay, orchardDay } from './greenhouse';
 import { pondDay } from './pond';
 import { vehiclesDay } from './vehicles';
 import { kinDay } from './kin';
+import { newcomersDay } from './newcomers';
 import { radioDay } from './radio';
 import { waterDay } from './water';
 import { addRunWork, nextRun } from './perimeter';
@@ -194,6 +195,7 @@ function subStep(s: GameState): void {
     for (const line of pondDay(s)) log(s, line);
     const e = gateDay(s);
     for (const line of kinDay(s)) log(s, line);
+    for (const line of newcomersDay(s)) log(s, line);   // neighbors and strangers who joined; neighbors asking for shelter (after the gate: a card waits its turn)
     // a raid has an hour of arrival (a gang at 2:15 AM); it waits for it and the game runs on until then
     if (e && !(hasCutscene(e) && scheduleArrival(s, e))) log(s, `${e.title}.`);
     rescueDay(s);   // the taken: their fate, leads, word from the crew, a rescue out (logs its own lines)

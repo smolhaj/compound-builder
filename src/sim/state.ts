@@ -39,7 +39,7 @@ import { DIFFICULTY } from './difficulty';
 import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
 import type { LightsState } from './lights';
 import { starterKit, type ToolKit } from './tools';
-export const SAVE_VERSION = 59;
+export const SAVE_VERSION = 60;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -52,6 +52,7 @@ import { newDaily, type Daily } from './daily';
 import { linkKin, newKin, type Kin } from './kin';
 import type { Loss } from './grief';
 import { newPaths, type PathsState } from './paths';
+import { newNewcomers, type NewcomerState } from './newcomers';
 import { newWeekend, type Weekend } from './weekender';
 
 /** What the family packs to sleep in: a bag each and, past the wall tent's four, a dome tent for the rest (sim/housing.ts). */
@@ -274,6 +275,8 @@ export interface GameState {
   dogs: Dog[];
   /** Extended family: relatives in town, asking to join, waiting for a place, turned away (sim/kin.ts). Save v53; `kinOf` makes it lazily. */
   kin?: Kin;
+  /** Neighbors and strangers who joined: loyalty, hidden character, guests sheltering, who left (sim/newcomers.ts). Save v60; `newcomersOf` makes it lazily. */
+  newcomers?: NewcomerState;
   /** Pet care settings, the family's grief for lost pets, yesterday's care (sim/pets.ts; save v43; `??=` for safety). */
   petLife?: PetLife;
   /** Daily life (sim/daily.ts): the roster, chores, gatherings. Save v49; `dailyOf` makes it lazily. */
@@ -346,6 +349,7 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     locals: newLocals(),
     digs: newDigs(),
     kin: newKin(structuredClone(setup.kinAway ?? []), setup.kinOpen ?? true),
+    newcomers: newNewcomers(),
     daily: newDaily(),
     paths: newPaths(),
     ...(setup.lifestyle === 'weekend' && setup.site ? { weekend: newWeekend(people, seed, setup.site.miles) } : {}),

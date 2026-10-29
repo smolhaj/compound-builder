@@ -242,7 +242,8 @@ describe('the empty place', () => {
     for (let seed = 1; seed <= 6; seed++) {
       let g = at(game(seed, { mode: 'sandbox' }), MONDAY, 6);
       g.disaster.tracks.law = 1;
-      g = step(g, 365 * 8);   // eight years of weeks
+      // eight years of weeks (the family answers the gate in between: an unanswered neighbor at the door would hold the empty place's events back)
+      for (let m = 0; m < 96; m++) { g = step(g, 30.4); g.gate.pending = null; g.gate.card = null; }
       const t = g.weekend!.tally;
       hits += t.breakIns + t.vandalism + t.squatters + t.pipes + t.theft;
       expect(g.money).toBeDefined();
