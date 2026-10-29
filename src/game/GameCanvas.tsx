@@ -56,6 +56,7 @@ export function GameCanvas() {
     const canvas = ref.current!;
     const ws = new WorldScene(canvas);
     const world = new HomesteadWorld(ws, useGameStore.getState().game.seed, useGameStore.getState().game.site);
+    world.setBridgeDown(useGameStore.getState().game.roadBridge?.down ?? false);   // (the bridge on the way in, brought down on purpose or standing)
     const weather = new WeatherRenderer(ws.scene, useGameStore.getState().game.seed);
     const cam = new DioramaCamera(canvas);
     cam.groundAt = world.groundAt;
@@ -199,6 +200,7 @@ export function GameCanvas() {
       useWorldStore.subscribe(s => s.cameraMode, applyCameraMode),
       useGameStore.subscribe(s => s.game.structures, list => { world.syncStructures(placedOnly(list)); occluders.invalidate(); }),
       useGameStore.subscribe(s => s.game.site.improvements.drive, on => world.setDrive(on)),
+      useGameStore.subscribe(s => s.game.roadBridge?.down ?? false, on => world.setBridgeDown(on)),
       // a neighbor's farm burned (sim/neighborLife.ts): drawn charred once the family knows
       useGameStore.subscribe(s => burnedFarms(s.game).join(), () => world.setBurnedFarms(burnedFarms(useGameStore.getState().game))),
       useGameStore.subscribe(s => s.tool, k => {

@@ -34,6 +34,7 @@ import { countyWorks, premium, yearlyTax } from '../sim/paperwork';
 import { altitudeClimate } from '../sim/climate';
 import { LOT_NAME } from '../sim/lots';
 import { roadClosedFor, winterRoadLine } from '../sim/slope';
+import { roadLine } from '../sim/roadFx';
 import { DRIVE_PER_FT, driveQuote, hookupProblem, POLE_PER_FT, powerQuote } from '../sim/improvements';
 import { KIT } from '../game/buildkit/kit';
 import { FUEL_UNIT_L, irrigationStore, storageCapacity } from '../sim/utilities';
@@ -383,15 +384,17 @@ export function Hud() {
               })()}
               {(['power', 'drive'] as const).map(what => {
                 const imp = game.site.improvements, have = what === 'power' ? imp.power : imp.drive, due = game.siteJobs[what];
-                const q = what === 'power' ? powerQuote(imp, game.site) : driveQuote(imp, game.site), why = hookupProblem(game, what);
+                const dq = what === 'drive' ? driveQuote(imp, game.site, game.seed) : null, q = dq ?? powerQuote(imp, game.site), why = hookupProblem(game, what);
+                const plan = dq?.plan;
                 const label = what === 'power' ? 'Power' : 'Drive';
                 return have ? <Row key={what} label={label} value={what === 'power' ? 'On the grid' : 'Gravel'} />
                   : due !== null ? <Row key={what} label={label} value={`coming in ${Math.max(1, Math.ceil(due - game.clock.t))} days`} />
                   : <div key={what} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginTop: 3 }}>
-                      <span style={{ color: DIM }}>{label}: <span style={{ color: TONE.warn }}>{what === 'power' ? `${imp.poleFt.toLocaleString('en-US')} ft to the pole` : `none (${imp.driveFt.toLocaleString('en-US')} ft)`}</span></span>
-                      <button style={btn(!why)} disabled={!!why} title={why ?? (what === 'power' ? `The co-op runs the line ($${POLE_PER_FT}/ft + transformer), about ${Math.round(q.days / 7)} weeks` : `12 ft gravel and a culvert ($${DRIVE_PER_FT}/ft), about ${q.days} days`)} onClick={() => g.hookup(what)}>{usd(q.usd)}</button>
+                      <span style={{ color: DIM }}>{label}: <span style={{ color: TONE.warn }}>{what === 'power' ? `${imp.poleFt.toLocaleString('en-US')} ft to the pole` : `none (${(plan ? plan.lengthFt : imp.driveFt).toLocaleString('en-US')} ft)`}</span></span>
+                      <button style={btn(!why)} disabled={!!why} title={why ?? (what === 'power' ? `The co-op runs the line ($${POLE_PER_FT}/ft + transformer), about ${Math.round(q.days / 7)} weeks` : plan ? `${plan.lines.map(l => `${l.label}: ${usd(l.usd)}`).join('; ')}. About ${q.days} days` : `12 ft gravel and a culvert ($${DRIVE_PER_FT}/ft), about ${q.days} days`)} onClick={() => g.hookup(what)}>{usd(q.usd)}</button>
                     </div>;
               })}
+              <Note>The way in: {roadLine(game)}.</Note>
               {(game.roadside ?? []).length > 0 && <Note tone="warn">{game.roadside.length} deliver{game.roadside.length > 1 ? 'ies' : 'y'} at the road: about {Math.round(game.roadside.reduce((a, r) => a + r.hours - r.done, 0))} h of carrying before building goes on.</Note>}
               {!game.site.improvements.power && !game.utilities.grid && <Note>No power at the place: run the line, or go solar or a generator.</Note>}
               {game.land.parcels.some(p => p.owner === 'you') && <Row label="Bought since" value={`${game.land.parcels.filter(p => p.owner === 'you').reduce((a, p) => a + acresOf(p.rect), 0)} acres`} />}

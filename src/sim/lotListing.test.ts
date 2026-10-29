@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { hasLots, lotPriceFactor, makeLotSite, profileChart, REGION_LOTS, siteLot, terrainFacts } from './lotListing';
-import { affordable, ANY_WISH, listings, SAVINGS, siteFacts, type Site } from './site';
+import { affordable, ANY_WISH, CLASSIC, listings, SAVINGS, siteFacts, type Site } from './site';
 import { LOT_KINDS, LOT_NAME, type LotKind } from './lots';
 import { REGION_IDS } from './regions';
 
@@ -89,7 +89,7 @@ describe('the listing card', () => {
       expect(text).not.toMatch(/metre|colour|favour|grey|kerb/);
       expect(text).not.toMatch(/NaN|undefined|Infinity/);
     }
-    expect(terrainFacts({ lot: null, home: { x0: 0, z0: 0, x1: 67, z1: 67 } })).toEqual([]);
+    expect(terrainFacts({ ...CLASSIC, lot: null })).toEqual([]);
   });
 
   it('a profile chart for every kind: across the valley for a gorge, along the fall for the rest', () => {
