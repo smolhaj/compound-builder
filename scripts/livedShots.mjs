@@ -55,6 +55,16 @@ try {
   }, [age, season, hour, { snow: process.env.SNOW, mud: process.env.MUD, kids: process.env.KIDS, dogs: process.env.DOGS, q: quality }]);
   lap('built ' + JSON.stringify(info));
   await frames(); await frames(); await frames();
+  // LAY=1: lay a different walk on each of the busiest walks (gravel, stepping stones, duckboards, concrete), to see what each looks like
+  if (process.env.LAY) {
+    await page.evaluate(async () => {
+      const cb = window.__cb, net = cb.world.paths.network, G = cb.game;
+      const g = structuredClone(G.getState().game); g.stock.fieldstone = 99; g.stock.lumber = 99; g.stock.concrete = 99; G.setState({ game: g });
+      const kinds = ['gravel', 'stones', 'boards', 'paved'];
+      net.edges.filter(e => !e.hidden).sort((a, b) => b.trips - a.trips).slice(0, 10).forEach((e, i) => { let k = kinds[i % 4]; if (k === 'paved' && !e.can.paved) k = 'gravel'; G.getState().layPaths([{ a: e.a, b: e.b, lenM: e.lenM }], k); });
+    });
+    await frames(); await frames(); await frames();
+  }
   const VIEWS = [
     { name: 'aerial', at: 'center', mode: 'orbit', radius: 30, pitch: 0.95, yaw: 0.4 },
     { name: 'aerial-low', at: 'center', mode: 'orbit', radius: 19, pitch: 0.55, yaw: 2.2 },
@@ -69,6 +79,9 @@ try {
     { name: 'coop', at: 'chicken_coop', mode: 'orbit', radius: 3.4, pitch: 0.3, yawOff: 0.5 },
     { name: 'gate', at: 'gate', mode: 'orbit', radius: 4.5, pitch: 0.22, yawOff: 0 },
     { name: 'creek', at: 'landing', mode: 'orbit', radius: 4.0, pitch: 0.25, yawOff: 0 },
+    { name: 'laid-aerial', at: 'center', mode: 'orbit', radius: 16, pitch: 0.7, yaw: 0.3 },
+    { name: 'laid-house', at: 'farmhouse', mode: 'orbit', radius: 4.0, pitch: 0.55, yawOff: 0.6 },
+    { name: 'laid-eye', at: 'farmhouse', mode: 'eye', dist: 2.6, lat: 0.6, look: 0.12, person: 1.0 },
     { name: 'yard-eye', at: 'center', mode: 'eye', dist: 5.5, lat: 0, look: 0.3, person: 2, dir: [0.2, 1] },
   ].filter(v => !only || only.includes(v.name));
   let n = 0;

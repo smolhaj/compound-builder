@@ -6,7 +6,7 @@ import { BUILD, M, P, PROP_R, type PropKind } from './propGeometry';
 import { yardLamp } from './LivedRenderer';
 
 const B = (id: string, kind: string, x: number, z: number, rot = 0, ageDays = 400): LivedBuilding => ({ id, kind, x, z, rot, ageDays });
-const place: LivedBuilding[] = [B('h', 'farmhouse', 40, 40), B('b', 'barn', 30, 30), B('w', 'workshop', 52, 44, 3), B('c', 'chicken_coop', 28, 42), B('g', 'garden', 40, 28), B('gh', 'greenhouse', 52, 30), B('f', 'field', 20, 55), B('wl', 'well_hand', 46, 52), B('gs', 'generator_shed', 58, 36)];
+const place: LivedBuilding[] = [B('h', 'farmhouse', 40, 40), B('b', 'barn', 30, 30), B('w', 'workshop', 52, 44, 3), B('c', 'chicken_coop', 28, 42), B('g', 'garden', 40, 28), B('gh', 'greenhouse', 52, 30), B('f', 'field', 20, 55), B('wl', 'well_hand', 46, 52), B('gs', 'generator_shed', 58, 36), B('mh', 'moms_house', 56, 24), B('gu', 'guest_house', 24, 20, 2)];
 const folks: LivedFolks = { kids: 2, youngKids: 2, adults: 2, dogs: 2, animals: 4, hay: 12, growing: true };
 
 const ctxOf = (o: Partial<LivedCtx> = {}, bs: LivedBuilding[] = place): LivedCtx => ({
@@ -128,6 +128,15 @@ describe('what a place has lying about', () => {
     for (let i = 0; i < props.length; i++) for (let j = i + 1; j < props.length; j++) {
       const a = props[i], b = props[j];
       expect(Math.hypot(a.x - b.x, a.z - b.z), `${a.id} / ${b.id}`).toBeGreaterThanOrEqual(PROP_R[a.kind] * M + PROP_R[b.kind] * M - 1e-9);
+    }
+  });
+
+  it('the relatives\' houses are homes too: a mat, pots and a lantern, but the flagpole, the swing and the dog are the main house\'s', () => {
+    const props = planLived(ctxOf()).props;
+    for (const id of ['mh', 'gu']) {
+      expect(props.some(p => p.of === id && p.kind === 'doormat'), id).toBe(true);
+      expect(props.some(p => p.of === id && p.kind === 'lantern'), id).toBe(true);
+      expect(props.some(p => p.of === id && (p.kind === 'flagpole' || p.kind === 'swingset' || p.kind === 'dogbed')), id).toBe(false);
     }
   });
 

@@ -131,12 +131,13 @@ export class PathRenderer {
 
   constructor() { this.group.name = 'paths'; }
 
+  /** `define`: SEA_MUD (an earth track: goes to mud, and snow lies thin on it where feet have packed it) or SEA_PLOWED (a laid walk: cleared of snow). */
   private _ribbonMat(name: string, make: () => THREE.Texture, define: 'SEA_MUD' | 'SEA_PLOWED', rough = 0.96): THREE.MeshStandardMaterial {
     const have = this._mats.get(name) as THREE.MeshStandardMaterial | undefined;
     if (have) return have;
     const map = make();
     const m = new THREE.MeshStandardMaterial({ map, vertexColors: true, transparent: true, depthWrite: false, roughness: rough, metalness: 0, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 });
-    m.defines = { [define]: '' };
+    m.defines = define === 'SEA_MUD' ? { SEA_MUD: '', SEA_DECID: '' } : { SEA_PLOWED: '' };
     m.name = 'path_' + name;
     this._mats.set(name, m);
     this._tex.push(map);
