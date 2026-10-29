@@ -39,7 +39,9 @@ export type KitMaterialId = 'timber_lap' | 'trim' | 'fieldstone' | 'metal_roof' 
   // the control room: the live screens (emissive atlas), the corkboard's paper site plan, panel lamps
   | 'screens' | 'sitemap' | 'led_green' | 'led_red' | 'led_amber'
   // not drawn: marks the mattress of a bed the sick are put in (interior.ts sickSlot; Parts keeps it as a slot)
-  | 'sick_slot';
+  | 'sick_slot'
+  // a dig site: rusted steel (rebar, a delivered culvert tube)
+  | 'rust';
 
 /** World units covered by one texture repeat. */
 const TEX_WORLD: Partial<Record<KitMaterialId, number>> = {
@@ -789,6 +791,7 @@ export function kitMaterial(id: KitMaterialId): THREE.MeshStandardMaterial {
     case 'sitemap': m = new THREE.MeshStandardMaterial({ map: siteMapTexture(), roughness: 0.9 }); break;
     case 'led_green': m = new THREE.MeshStandardMaterial({ color: 0x103a18, roughness: 0.4, emissive: new THREE.Color(0.2, 1, 0.3), emissiveIntensity: 1.6 }); break;
     case 'led_red': m = new THREE.MeshStandardMaterial({ color: 0x3a1010, roughness: 0.4, emissive: new THREE.Color(1, 0.15, 0.1), emissiveIntensity: 1.6 }); break;
+    case 'rust': m = new THREE.MeshStandardMaterial({ color: 0x8a4a2a, roughness: 0.85, metalness: 0.45 }); break;
     case 'led_amber': m = new THREE.MeshStandardMaterial({ color: 0x3a2a08, roughness: 0.4, emissive: new THREE.Color(1, 0.65, 0.1), emissiveIntensity: 1.4 }); break;
     case 'container_red': case 'container_blue': case 'container_green': case 'container_tan': {
       const tint = { container_red: 0xb0473a, container_blue: 0x4a6f9a, container_green: 0x6f8f62, container_tan: 0xc7aa7c }[id];

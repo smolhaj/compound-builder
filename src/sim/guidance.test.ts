@@ -16,7 +16,7 @@ describe('the bunker', () => {
     const g = fresh();
     for (const k of BUNKER_ORDER) {
       const a = buildAdvice(g, k);
-      if (k === 'bunker_hatch' || k === 'bunker_stairs') expect(a.off).toBeNull(); else expect(a.off).toMatch(/hatch or stairwell/);
+      if (k === 'bunker_hatch' || k === 'bunker_stairs' || k === 'bunker_floorhatch') expect(a.off).toBeNull(); else expect(a.off).toMatch(/hatch or stairwell/);
     }
     planStructure(g, 'bunker_hatch', 0, 0, 0);
     expect(buildAdvice(g, 'bunker_dorm').off).toBeNull();

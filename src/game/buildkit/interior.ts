@@ -82,18 +82,24 @@ export function sickSlot(add: (m: KitMaterialId, g: THREE.BufferGeometry) => voi
  * Build a piece in its own frame with `fn(add)`, move it to `p`, send it to
  * the sink, and return its footprint (null if `solid` is false).
  */
-export function piece(sink: Sink, layer: string, p: Place, fn: (add: (m: KitMaterialId, g: THREE.BufferGeometry) => void) => void, solid = true): Collider | null {
+export function piece(sink: Sink, layer: string, p: Place, fn: (add: (m: KitMaterialId, g: THREE.BufferGeometry) => void) => void, solid = true, avoid: readonly Collider[] = []): Collider | null {
   const rot = p.rot ?? 0, y = p.y ?? 0;
   const bb = new THREE.Box3(), tmp = new THREE.Box3();
   let any = false;
+  // with floor hatches to keep clear of, collect first: a piece that would stand in one is dropped whole
+  const held: Array<[KitMaterialId, THREE.BufferGeometry]> = [];
   fn((m, g) => {
     g.rotateY(rot);
     g.translate(p.x, y, p.z);
     g.computeBoundingBox();
     tmp.copy(g.boundingBox!);
     if (any) bb.union(tmp); else { bb.copy(tmp); any = true; }
-    sink(layer, m, g);
+    if (avoid.length) held.push([m, g]); else sink(layer, m, g);
   });
+  if (avoid.length) {
+    if (any && avoid.some(a => bb.min.x < a.x1 && bb.max.x > a.x0 && bb.min.z < a.z1 && bb.max.z > a.z0)) { held.forEach(([, g]) => g.dispose()); return null; }
+    for (const [m, g] of held) sink(layer, m, g);
+  }
   return solid && any ? { x0: bb.min.x, z0: bb.min.z, x1: bb.max.x, z1: bb.max.z } : null;
 }
 
