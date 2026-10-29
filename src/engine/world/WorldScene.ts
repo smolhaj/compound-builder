@@ -521,6 +521,10 @@ export class WorldScene {
     }
     if (this._bloomPass) this._bloomPass.threshold = 0.85 + (1 - wn) * 0.75;
     this._applyGradeForTime();
+    // the rig as the clock and weather set it; renderFrame lifts it from there when the camera is high at night
+    const ab = this._aerialBase;
+    ab.hemi = this._hemiLight.intensity; ab.fill = this._fillLight.intensity; ab.sun = this._sunLight.intensity; ab.env = this.scene.environmentIntensity;
+    this._aerialLift = -1;
 
     if (this._particleSystem) this._particleSystem.visible = wn < 0.5 && this._quality !== 'low';
 
@@ -784,8 +788,38 @@ export class WorldScene {
   /** QA only (`?lowrender`): a fixed pixel ratio that overrides the tier's, or null for the tier's own. */
   qaPixelRatio: number | null = null;
 
+  /** Night readability from above (see _applyAerialLift). QA turns it off for the "before" shots. */
+  aerialLiftOn = true;
+  /** QA: scale the lift while tuning it (1 = as shipped). */
+  aerialLiftGain = 1;
+  private readonly _aerialBase = { hemi: 0, fill: 0, sun: 0, env: 0 };
+  private _aerialLift = 0;
+  private _gainSeen = 1;
+
+  /**
+   * Seen from high up at night the compound is near-black: the hemisphere and moon light are tuned for eye level, where lamps and
+   * windows do the work. Past about 14 units of camera height the sky fill, the moon and the environment ease up (full lift by 48),
+   * scaled by how dark it is, a little less under a bright moon. Four uniform multiplies, only when the lift moves: no extra
+   * passes, lights or draw calls. At eye level (or by day) the lift is 0 and the rig is exactly the one updateDayNight set.
+   */
+  private _applyAerialLift(): void {
+    const wn = this._phase.night;
+    const h = this.camera.position.y;
+    const t = Math.min(1, Math.max(0, (h - 14) / 34));
+    const lift = this.aerialLiftOn && wn > 0.001 ? t * t * (3 - 2 * t) * wn : 0;
+    if (Math.abs(lift - this._aerialLift) < 0.004 && this.aerialLiftGain === this._gainSeen && !(lift === 0 && this._aerialLift !== 0)) return;
+    this._aerialLift = lift; this._gainSeen = this.aerialLiftGain;
+    const b = this._aerialBase, dark = 1 - 0.4 * moonIllumination(this._moonPhase) * this._moonUp;
+    const k = lift * dark * this.aerialLiftGain;
+    this._hemiLight.intensity = b.hemi * (1 + 2.4 * k);
+    this._fillLight.intensity = b.fill * (1 + 4.5 * k);
+    this._sunLight.intensity = b.sun * (1 + 0.8 * k);
+    this.scene.environmentIntensity = b.env + 0.24 * k;
+  }
+
   /** Render one frame (EffectComposer when available and enabled). */
   renderFrame(): void {
+    this._applyAerialLift();
     // Shadows every other frame (the sun moves slowly).
     if (this.renderer.shadowMap.enabled && !this.renderer.shadowMap.autoUpdate) {
       this._shadowFrame = (this._shadowFrame + 1) % 2;

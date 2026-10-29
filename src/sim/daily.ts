@@ -924,7 +924,7 @@ export function choresDay(s: GameState, r: () => number): string[] {
     const v = lv[c];
     if (v >= 80 && (d.chores as { warned?: Partial<Record<ChoreId, number>> }).warned?.[c] !== 1) {
       ((d.chores as { warned?: Partial<Record<ChoreId, number>> }).warned ??= {})[c] = 1;
-      if (logGate(s, `behind:${c}`, BEHIND_NAG_DAYS)) out.push(BEHIND_LINE[c]);
+      if (logGate(s, `behind:${c}`, BEHIND_NAG_OVERRIDE[c] ?? BEHIND_NAG_DAYS)) out.push(BEHIND_LINE[c]);
     } else if (v < 40 && (d.chores as { warned?: Partial<Record<ChoreId, number>> }).warned?.[c]) delete (d.chores as { warned?: Partial<Record<ChoreId, number>> }).warned![c];
   }
   return out;
@@ -932,6 +932,8 @@ export function choresDay(s: GameState, r: () => number): string[] {
 
 /** A chore's "falling behind" line shows at most this often (days). */
 export const BEHIND_NAG_DAYS = 21;
+/** Some lines are not worth repeating that often (the empty dog bowl comes round again every few weeks otherwise). */
+const BEHIND_NAG_OVERRIDE: Partial<Record<ChoreId, number>> = { pets: 75 };
 
 const BEHIND_LINE: Record<ChoreId, string> = {
   weeds: 'The weeds are winning in the garden. Somebody needs to get out there with a hoe.',

@@ -55,7 +55,7 @@ export class PlacementTool {
       const d = this._down;
       this._down = null;
       if (e.button !== 0 || !d || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 5) return;
-      this._place();
+      this._place(e.shiftKey);
     });
     on(window, 'keydown', e => {
       if (!this._kind) return;
@@ -92,15 +92,24 @@ export class PlacementTool {
   }
 
   /** QA / click: place at the current hover point if allowed. */
-  private _place(): void {
+  private _place(repeat = false): void {
     if (!this._kind || !this._at || !this._ok) return;
-    const [x, z] = this._at;
-    useGameStore.getState().plan(this._kind, x, z, this._rot);
+    const [x, z] = this._at, kind = this._kind;
+    const store = useGameStore.getState(), before = store.game.structures.length;
+    store.plan(kind, x, z, this._rot);
+    const placed = useGameStore.getState().game.structures.length > before;
     this._just = { x, z, rot: this._rot };
+    // one click stakes one building and puts the tool away (Shift-click keeps it armed to stake several), with a line saying so
+    if (placed && !repeat) {
+      this.setKind(null);
+      useGameStore.getState().flashStaked(`Staked out the ${kind.replace(/_/g, ' ')}. The family will start when the materials are in (Projects tab). Shift-click stakes several in a row.`);
+      return;
+    }
     this._update();
   }
 
-  placeHere(): void { this._place(); }
+  /** QA: place at the hover point and keep the tool armed (screenshot scripts stake several pieces in a row). */
+  placeHere(): void { this._place(true); }
 
   /** QA: the nearest valid spot for a piece to (x, z) (searched in a growing ring on the build grid), or null. */
   findSpot(kind: string, x: number, z: number, rot = 0, maxR = 30): [number, number] | null {

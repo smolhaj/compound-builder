@@ -1,7 +1,7 @@
 import { useState, type CSSProperties, type ReactNode } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { useWorldStore } from '../store/worldStore';
-import { newGame } from '../sim/state';
+import { newGame, NEW_GAME_START } from '../sim/state';
 import { kinPool, kinTitle, ROLE_NAME, retirementIncome } from '../sim/kin';
 import { CONDITION } from '../sim/body';
 import { fullName, HOUSEHOLD_NAME, JOB_POOL, jobDef, randomJobId, variedFamily } from '../sim/family';
@@ -10,7 +10,7 @@ import { mortgagePayment, townHouseFor, townUpkeep } from '../sim/weekender';
 import { difficultySummary } from '../sim/difficulty';
 import { DISASTERS, type Difficulty, type DisasterKind, type Mode, type PeaceLength } from '../sim/disaster';
 import { saveGame, AUTOSAVE } from '../sim/save/saveSystem';
-import { affordable, ANY_WISH, builtFacts, LIFESTYLE, listings, siteFacts, type Acres, type LandWish, type Lifestyle, type Site } from '../sim/site';
+import { affordable, ANY_WISH, builtFacts, LIFESTYLE, landPriceRange, listings, siteFacts, type Acres, type LandWish, type Lifestyle, type Site } from '../sim/site';
 import { PLAYABLE, REGION_IDS, REGIONS, type RegionDef, type RegionId, type StormKind } from '../sim/regions';
 
 const MODES: Array<[Mode, string, string]> = [
@@ -26,7 +26,7 @@ const usd = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
 const usdK = (n: number) => (n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(2).replace(/0$/, '')}M` : `$${Math.round(n / 1000)}k`);
 const month = (doy: number) => new Date(2027, 0, doy).toLocaleString('en-US', { month: 'short' });
 const tile = (on: boolean, off = false): CSSProperties => ({
-  textAlign: 'left', padding: '12px 14px', borderRadius: 10, border: `1.5px solid ${on ? C.gold : C.line}`,
+  textAlign: 'left', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'stretch', padding: '12px 14px', borderRadius: 10, border: `1.5px solid ${on ? C.gold : C.line}`,
   background: on ? 'rgba(216,201,160,0.12)' : C.card, color: '#eee', cursor: off ? 'not-allowed' : 'pointer', opacity: off ? 0.45 : 1,
 });
 const chip = (on: boolean): CSSProperties => ({ padding: '5px 11px', borderRadius: 999, border: `1px solid ${on ? C.gold : C.line}`, background: on ? 'rgba(216,201,160,0.18)' : 'transparent', color: '#eee', cursor: 'pointer', fontSize: 12.5 });
@@ -119,7 +119,7 @@ export function SetupScreen() {
   try { unlocked = localStorage.getItem('cb.unlocked') === '1'; } catch { /* storage blocked */ }
   const start = () => {
     if (!lot) return;
-    const game = newGame(seed, 105, 2027, { site: lot, lifestyle: life, mode, peace: mode === 'scenario' ? peace : 'random', kind: mode === 'scenario' ? kind : null, dayJobs: LIFESTYLE[life].jobs, difficulty: diff, grid: true, family, funds, kinAway: pool.filter(p => !kinWith.includes(p.id)), kinOpen });
+    const game = newGame(seed, NEW_GAME_START.doy, NEW_GAME_START.year, { site: lot, lifestyle: life, mode, peace: mode === 'scenario' ? peace : 'random', kind: mode === 'scenario' ? kind : null, dayJobs: LIFESTYLE[life].jobs, difficulty: diff, grid: true, family, funds, kinAway: pool.filter(p => !kinWith.includes(p.id)), kinOpen });
     g.load(game);
     g.openSetup(false);
     void saveGame(AUTOSAVE, game);
@@ -158,7 +158,7 @@ export function SetupScreen() {
                     <div style={{ fontSize: 12, color: C.dim, margin: '2px 0 6px' }}>{r.where}</div>
                     <div style={{ fontSize: 12.5, lineHeight: 1.35, marginBottom: 8 }}>{r.blurb}</div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', columnGap: 10, rowGap: 2, fontSize: 12 }}>
-                      <span style={{ color: C.dim }}>Land</span><span>~{usd(r.perAcre)}/acre</span>
+                      <span style={{ color: C.dim }}>Raw land</span><span>{(() => { const [lo, hi] = landPriceRange(id); return `${usd(lo)} to ${usd(hi)}/acre`; })()}</span>
                       <span style={{ color: C.dim }}>Frost-free</span><span>{month(r.frost[0])} to {month(r.frost[1])}</span>
                       <span style={{ color: C.dim }}>Zone</span><span>{r.zone} · {r.frost[1] - r.frost[0]} days</span>
                       <span style={{ color: C.dim }}>Winter</span><span>{r.cold >= 1.25 ? 'Bitter' : r.cold >= 0.9 ? 'Cold' : r.cold >= 0.5 ? 'Mild' : 'Short, mild'} · lows {r.janLowF}°F · {Math.round(r.snowCm / 2.54)} in of snow</span>
@@ -173,7 +173,7 @@ export function SetupScreen() {
 
           {step === 1 && <>
             <H>How the family will live</H>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 8, marginBottom: 6 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 8, marginBottom: 6, alignItems: 'start' }}>
               {(['fulltime', 'independent', 'weekend'] as Lifestyle[]).map(id => {
                 const L = LIFESTYLE[id];
                 return <button key={id} style={tile(life === id, !L.ready)} onClick={() => L.ready && (setLife(id), setLotId(null))}>

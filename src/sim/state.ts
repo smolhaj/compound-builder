@@ -124,6 +124,8 @@ export interface Structure {
   /** County permit (sim/paperwork.ts): under review, approved, built without one, or stopped by the inspector; when review / the stop ends. */
   permit?: 'review' | 'ok' | 'none' | 'stopped';
   permitAt?: number;
+  /** A fire, storm or looters took its roof off after it stood: the guidance suggests re-roofing it until it is finished again (optional, so no save bump). */
+  roofLost?: boolean;
   /** An upgrade of this finished structure (sim/towers.ts): the old tier keeps working until this one is done, then goes (half its materials back). */
   replaces?: string;
   /** Towers: how far the ground at the site stands above the land round it (world units, ≥ 0; sim/towers.ts `stampHighGround`). */
@@ -306,6 +308,13 @@ export interface GameState {
 
 /** New-game choices (the setup screen). Defaults (tests, the dev scene): Free build, no day jobs. */
 export interface RunSetup { site?: Site; lifestyle?: Lifestyle; difficulty?: Difficulty; mode?: Mode; peace?: PeaceLength; kind?: DisasterKind | null; variant?: string; dayJobs?: boolean; grid?: boolean; family?: Person[]; funds?: StartFunds; /** Relatives left in town at setup (they may ask to come), and whether they may. */ kinAway?: Person[]; kinOpen?: boolean }
+
+/**
+ * Where a game started from the setup screen begins: Monday 12 April 2027. The weekender's week (sim/weekender.ts) and the market,
+ * crews and day jobs count day 0 as a Monday, so the real calendar has to say Monday there too (the old 15 April was a Thursday,
+ * and the panel announced "Fri 19:10" on a Friday that the HUD date called a different weekday).
+ */
+export const NEW_GAME_START = { doy: 102, year: 2027 } as const;
 
 export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: RunSetup = {}): GameState {
   const people = setup.family ? structuredClone(setup.family) : generateFamily(seed);

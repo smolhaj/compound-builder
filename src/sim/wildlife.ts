@@ -32,6 +32,7 @@ import { PERIMETER, runFinished } from './perimeter';
 import { ANIMALS } from './livestock';
 import { isFinished } from './construction';
 import { openLineText } from './format';
+import { logGate } from './nag';
 
 export type SpeciesId = 'deer' | 'elk' | 'moose' | 'antelope' | 'javelina' | 'turkey' | 'rabbit' | 'squirrel' | 'grouse' | 'waterfowl'
   | 'bear' | 'cougar' | 'wolf' | 'coyote';
@@ -398,7 +399,7 @@ export function wildlifeDay(s: GameState, freezer = false): string[] {
     const tot = opts.reduce((x, o) => x + o[1], 0);
     let target: Target | null = null;
     if (tot > 0) { let u = r() * tot; for (const [t, wt] of opts) { u -= wt; if (u <= 0) { target = t; break; } } }
-    if (!target) { if (w.lastSight !== day) { w.lastSight = day; lines.push(`${cap1(one(sp))} crossed the yard in the night, looked around and went on.`); } continue; }
+    if (!target) { if (w.lastSight !== day) { w.lastSight = day; if (logGate(s, `sight:${sp}`, 12)) lines.push(`${cap1(one(sp))} crossed the yard in the night, looked around and went on.`); } continue; }
     // somebody with a rifle at home: a good shot, or at least it is driven off
     const hunter = Math.max(0, ...s.people.filter((p, i) => !p.kid && s.personState[i]?.needs.died == null).map(p => p.skills.hunter));
     if (a.shooter && r() < 0.35 + 0.07 * hunter) {
