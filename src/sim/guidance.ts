@@ -35,7 +35,7 @@ import { moodSummary, resting } from './mind';
 import { medReport } from './medical';
 import { pharmacyOpen } from './body';
 import { gatheringProblem, type GatheringKind } from './gatherings';
-import { terrainCards } from './terrainFx';
+import { terrainCards, terrainOff } from './terrainFx';
 
 const usd = (n: number) => '$' + Math.round(n).toLocaleString('en-US');
 
@@ -135,7 +135,9 @@ export type SuggestionAct =
   | { type: 'rx' }
   | { type: 'gather'; kind: GatheringKind }
   /** Show the terrain overlay in this mode (the land's suggestions: sim/terrainFx.ts). */
-  | { type: 'terrain'; mode: 'high' | 'lanes' | 'water' };
+  | { type: 'terrain'; mode: 'high' | 'lanes' | 'water' }
+  /** Lay a tunnel-bridge across the gorge the land invites (the player confirms). */
+  | { type: 'span'; a: Pt; b: Pt };
 export interface Suggestion {
   id: string;
   /** The kit piece to stake ('' when the suggestion is something else). */
@@ -276,7 +278,7 @@ export function suggestions(s: GameState): Suggestion[] {
         ...(acts.length ? { acts } : {}) });
     } }
   // the land: a ridge that suits a keep, a gorge that is a choke, a bench for a reservoir (sim/terrainFx.ts): a card to look at, never a requirement
-  for (const c of terrainCards(s)) out.push({ id: c.id, kind: '', title: c.title, urgency: c.urgency, why: c.why, acts: [{ label: 'Show me on the map', act: { type: 'terrain', mode: c.mode } }] });
+  for (const c of terrainCards(s)) out.push({ id: c.id, kind: '', title: c.title, urgency: c.urgency, why: c.why, acts: [{ label: 'Show me on the map', act: { type: 'terrain', mode: c.mode } }, ...(c.span ? [{ label: `Plan a tunnel-bridge across it (~${usd(costPer100m('tunnel_bridge') * c.span.lengthM / 100)})`, act: { type: 'span' as const, a: c.span.a, b: c.span.b } }] : [])] });
   return out.sort((x, y) => y.urgency - x.urgency).slice(0, 3);
 }
 
@@ -421,6 +423,7 @@ export function buildAdvice(s: GameState, kind: string): BuildAdvice {
 /** Wall kinds that cannot be laid now, and why (null = fine). Soft hints (power, years) go in `perimeterNote`. */
 export function perimeterOff(s: GameState, kind: PerimeterKind): string | null {
   if (kind === 'creek_bars' && !s.site.creek) return 'no creek runs through this land';
+  { const t = terrainOff(s, kind); if (t) return t; }
   if (kind === 'escape_tunnel' && !bunkerKinds(s).length) return 'needs a bunker room first: the tunnel starts at its wall';
   return null;
 }
