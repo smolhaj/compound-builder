@@ -10,7 +10,7 @@ import { lightLinesOf, raidPressure } from '../sim/opsec';
 const DIM = 'rgba(238,238,238,0.6)';
 const btn = (on = false): CSSProperties => ({ padding: '4px 9px', borderRadius: 6, border: 0, cursor: 'pointer', background: on ? '#d8c9a0' : '#3a3d34', color: on ? '#1c1d18' : '#eee', fontSize: 12.5 });
 const row: CSSProperties = { display: 'flex', justifyContent: 'space-between', gap: 8, padding: '2px 0' };
-const REASON = { manual: 'switched on by you', dusk: 'every-dusk routine', warned: 'a warning sign' } as const;
+const REASON = { manual: 'switched on by you', dusk: 'every-dusk routine', warned: 'a warning sign', away: 'the empty place left dark' } as const;
 
 export function LightDiscipline() {
   const game = useGameStore(s => s.game);

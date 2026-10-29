@@ -17,15 +17,16 @@
  */
 import { mulberry32, pick } from './rng';
 import { addWork, isFinished } from './construction';
-import { KCAL, NEED_ADULT, NEED_KID, freshNeeds } from './needs';
+import { KCAL, NEED_ADULT, NEED_KID } from './needs';
+import { admitNewcomers, type Extras } from './newcomers';
 import { contagion } from './effects';
 import { SKILL_IDS, type Person, type SkillId } from './family';
 import { dayIndex, type GameState } from './state';
 import type { Stock } from './materials';
-import type { Encounter, Outcome, Stance } from './encounters';
+import { scoutCrew, type Encounter, type Outcome, type Stance } from './encounters';
 
 /** What they turn out to be (hidden until the month shows it). */
-export type Character = 'solid' | 'gem' | 'lazy' | 'thief' | 'sick';
+export type Character = 'solid' | 'gem' | 'lazy' | 'thief' | 'sick' | 'scout';
 export const TRIAL_DAYS = 30;
 
 export interface TrialCamp {
@@ -49,6 +50,16 @@ export interface TrialCamp {
   shown?: boolean;
   /** Who in the camp is running a fever (they bring it in if taken in). */
   fever?: string;
+  /** A wound that came with them (sim/newcomers.ts), eased over the month. */
+  hurt?: { who: string; what: string; sev: number };
+  /** Which kind of stranger they are, for the card. */
+  arche?: string;
+  /** The household they came from (a neighbor asking for a place). */
+  neighbor?: string;
+  /** What they carry besides stock. */
+  extras?: Extras;
+  /** What the family noticed at the gate. */
+  tells?: string[];
 }
 
 /** Odds of each character in a group that asks for a trial (most are what they say). */
@@ -66,7 +77,9 @@ export function startTrial(s: GameState, e: Encounter): Outcome {
   const r = mulberry32(s.seed * 5003 + day * 17 + (e.size * 31));
   let u = r(), character: Character = 'solid';
   for (const [c, w] of CHARACTER_ODDS) { if (u < w) { character = c; break; } u -= w; }
-  const camp: TrialCamp = { id: e.id, title: e.title.replace(/ at the gate$/, ''), people: e.people ?? [], brings: { ...(e.brings ?? {}) }, from: day, until: day + TRIAL_DAYS, character, learned: [], hungry: 0, fed: 0, worked: 0 };
+  // a stranger who came with a character of their own (sim/newcomers.ts) keeps it: the month will show it
+  if (e.secret) character = e.secret;
+  const camp: TrialCamp = { id: e.id, title: e.title.replace(/ at the gate$/, ''), people: e.people ?? [], brings: { ...(e.brings ?? {}) }, from: day, until: day + TRIAL_DAYS, character, learned: [], hungry: 0, fed: 0, worked: 0, ...(e.hurt ? { hurt: e.hurt } : {}), ...(e.arche ? { arche: e.arche } : {}), ...(e.neighbor ? { neighbor: e.neighbor } : {}), ...(e.extras ? { extras: e.extras } : {}), ...(e.tells ? { tells: e.tells } : {}) };
   campsOf(s).push(camp);
   s.gate.humanity = Math.min(100, s.gate.humanity + 3);
   return { title: 'On trial', text: `They can camp outside the wall for a month and work for their keep. You'll feed them from your own stores. Then you'll see.`, tone: 'good', lines: [`${camp.people.length} in the camp: about ${campNeed(camp).toLocaleString('en-US')} kcal a day from the pantry.`] };
@@ -125,6 +138,15 @@ export function trialDay(s: GameState): string[] {
       if (!s.gate.card && !s.gate.pending) s.gate.card = { title: 'The camp is empty', text, tone: 'bad', lines: ['You trusted them with the run of the place for a few weeks. That was the mistake.'] };
       continue;
     }
+    // the scout: a crew's eyes. One night they are gone, and a crew that knows the place is on its way
+    if (c.character === 'scout' && d >= 8 && r() < 0.06) {
+      camps.splice(camps.indexOf(c), 1);
+      const a = adults[0] ?? c.people[0];
+      scoutCrew(s, a?.first ?? 'The stranger', r);
+      out.push(`${c.title}: gone in the night. They had been counting the posts.`);
+      if (!s.gate.card && !s.gate.pending) s.gate.card = { title: 'The camp is empty', text: `${a?.first ?? 'The stranger'} and the rest were gone by first light. They took nothing. They did not need to: they had walked the fence line every evening for three weeks.`, tone: 'bad', lines: ['They were scouting for a crew. You will see them again.'] };
+      continue;
+    }
     // a hungry camp drifts off on its own
     if (c.hungry >= 4 && r() < 0.1) {
       camps.splice(camps.indexOf(c), 1);
@@ -152,6 +174,8 @@ export function trialDay(s: GameState): string[] {
         if (k > 0) c.learned.push('With what\'s going round, nobody from the house goes near the camp now.');
       } else if (c.character === 'thief') {
         c.learned.push('Things go missing: a box of shells, a can of fuel from the shed. Nobody saw anything.');
+      } else if (c.character === 'scout') {
+        c.learned.push(`${name(a)} walks the fence line at dusk "for the air", and asks who stands the night watch.`);
       } else if (a) {
         c.learned.push(`They pull their weight. ${name(a)}'s ${top(a)} is the real thing.`);
       }
@@ -187,16 +211,11 @@ export function resolveTrialEnd(s: GameState, e: Encounter, stance: Stance): Out
   if (c) camps.splice(camps.indexOf(c), 1);
   const people = c?.people ?? e.people ?? [];
   if (stance === 'take_in') {
-    const fever = c?.fever;
-    for (const p of people) {
-      const needs = freshNeeds();
-      if (p.id === fever) needs.hurt.push({ what: 'fever', sev: 40 });
-      s.people.push(p); s.personState.push({ id: p.id, task: 'idle', target: null, needs });
-    }
-    for (const [k, v] of Object.entries(c?.brings ?? e.brings ?? {}) as Array<[keyof Stock, number]>) s.stock[k] += v;
-    s.stock.sleeping_bag += people.length;     // a bedroll each (sim/housing.ts)
-    s.gate.tookIn += people.length; s.gate.humanity = Math.min(100, s.gate.humanity + 4);
-    return { title: 'Inside the wall', text: `They move their things in from the camp. ${people.length} more at the table tonight.`, tone: 'good', lines: [] };
+    // a month in the camp has shown them: the wound has mended some, and what they are is known (sim/newcomers.ts)
+    const hurt = c?.hurt ? { ...c.hurt, sev: Math.max(8, c.hurt.sev - (c ? c.until - c.from : 0) * 1.2) } : undefined;
+    const lines = admitNewcomers(s, people, { kind: c?.neighbor ? 'neighbor' : 'stranger', neighbor: c?.neighbor, arche: c?.arche, secret: c?.character, brings: c?.brings ?? e.brings, extras: c?.extras, known: true, tried: true, fever: c?.fever, hurt, tells: c?.tells });
+    s.gate.humanity = Math.min(100, s.gate.humanity + 4);
+    return { title: 'Inside the wall', text: `They move their things in from the camp. ${people.length} more at the table tonight.`, tone: 'good', lines };
   }
   s.gate.turnedAway += people.length; s.gate.humanity = Math.max(0, s.gate.humanity - 3);
   return { title: 'Sent on', text: 'A handshake at the gate for the month\'s work, and directions down the road. They don\'t look back.', tone: 'mixed', lines: [] };

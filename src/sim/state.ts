@@ -39,7 +39,7 @@ import { DIFFICULTY } from './difficulty';
 import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
 import type { LightsState } from './lights';
 import { starterKit, type ToolKit } from './tools';
-export const SAVE_VERSION = 58;
+export const SAVE_VERSION = 60;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -52,6 +52,8 @@ import { newDaily, type Daily } from './daily';
 import { linkKin, newKin, type Kin } from './kin';
 import type { Loss } from './grief';
 import { newPaths, type PathsState } from './paths';
+import { newNewcomers, type NewcomerState } from './newcomers';
+import { newWeekend, type Weekend } from './weekender';
 
 /** What the family packs to sleep in: a bag each and, past the wall tent's four, a dome tent for the rest (sim/housing.ts). */
 export const startingBedding = (n: number): { sleeping_bag: number; tent: number } => ({ sleeping_bag: n, tent: Math.max(0, Math.ceil((n - 4) / 3)) });
@@ -131,6 +133,8 @@ export interface Structure {
 }
 
 export type TaskKind = 'idle' | 'build' | 'forestry' | 'sleep' | 'chores' | 'school' | 'leisure' | 'job' | 'gone' | 'shelter' | 'away'
+  // the weekender (sim/weekender.ts): at the town house, or at work in town, while the family is not on the place
+  | 'town'
   // daily life (sim/daily.ts): the duty on the roster, and a gathering
   | 'garden' | 'fields' | 'livestock' | 'pets' | 'cleaning' | 'wood' | 'water' | 'kitchen' | 'laundry' | 'repairs' | 'hunt' | 'medic' | 'teach' | 'radio' | 'watch' | 'meal' | 'party';
 
@@ -271,12 +275,16 @@ export interface GameState {
   dogs: Dog[];
   /** Extended family: relatives in town, asking to join, waiting for a place, turned away (sim/kin.ts). Save v53; `kinOf` makes it lazily. */
   kin?: Kin;
+  /** Neighbors and strangers who joined: loyalty, hidden character, guests sheltering, who left (sim/newcomers.ts). Save v60; `newcomersOf` makes it lazily. */
+  newcomers?: NewcomerState;
   /** Pet care settings, the family's grief for lost pets, yesterday's care (sim/pets.ts; save v43; `??=` for safety). */
   petLife?: PetLife;
   /** Daily life (sim/daily.ts): the roster, chores, gatherings. Save v49; `dailyOf` makes it lazily. */
   daily?: Daily;
   /** Deaths in the household and whether they were mourned (sim/grief.ts). Save v49; `lossesOf` makes it lazily. */
   losses?: Loss[];
+  /** The weekender (sim/weekender.ts): the town house, the caretaker, the trips, the way home. Present while the family splits its week between town and the place, and after the move (the town house may be kept). Save v59. */
+  weekend?: Weekend;
   /** Walks the family has laid (gravel, stepping stones, duckboards, concrete) between the stops on the place (sim/paths.ts). Save v56; `pathsOf` makes it lazily. Worn tracks are not saved: they follow from who lives here and for how long. */
   paths?: PathsState;
   /** Radio and rumors after the collapse (radio.ts); made on first use. */
@@ -341,8 +349,10 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     locals: newLocals(),
     digs: newDigs(),
     kin: newKin(structuredClone(setup.kinAway ?? []), setup.kinOpen ?? true),
+    newcomers: newNewcomers(),
     daily: newDaily(),
     paths: newPaths(),
+    ...(setup.lifestyle === 'weekend' && setup.site ? { weekend: newWeekend(people, seed, setup.site.miles) } : {}),
     stats: emptyStats(),
     ending: null,
     food: { needKcal: 0, ateKcal: 0, producedKcal: 0, spoiledKcal: 0, fromStores: true, kinds: [], daysLeft: 0 },

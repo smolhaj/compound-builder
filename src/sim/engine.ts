@@ -26,6 +26,7 @@ import { cropsDay } from './crops';
 import { cellarDay, crowdDay } from './storage';
 import { vehiclesDay } from './vehicles';
 import { kinDay } from './kin';
+import { newcomersDay } from './newcomers';
 import { radioDay } from './radio';
 import { waterDay } from './water';
 import { addRunWork, nextRun } from './perimeter';
@@ -61,6 +62,7 @@ import { taskFor } from './schedule';
 import { nightWork } from './blackout';
 import { choresDay, choresStep, dailyTick, DUTY, DUTY_TASK, restFactor, tire, dutyWork, choreRate } from './daily';
 import { gatheringStep, gatheringsDay } from './gatherings';
+import { awayRates, caretakerWork, heatShare, presenceStep, weekenderDay, workDay } from './weekender';
 import type { GameState, Structure } from './state';
 
 /** Household running costs a day in peacetime (rural Mountain West, 2020s): the truck, insurance, phone and property tax for the household, plus groceries a head ($160 for a family of four). Stops once the stores and banks are gone. */
@@ -92,7 +94,10 @@ function subStep(s: GameState): void {
   const carry = s.roadside?.length > 0;
   const job = nextFellJob(s);
   // with both building and felling to do, the family splits: every other person to the woods
-  const weekday = dayIndex(s.clock.t) % 7 < 5;
+  // the weekender (sim/weekender.ts): the family drives up Friday night and back Sunday afternoon; relatives and anyone taken in stay
+  const wk = s.weekend, split = wk?.mode === 'split';
+  if (split) for (const line of presenceStep(s)) log(s, line);
+  const weekday = split ? workDay(s.clock.startDoy, dayIndex(s.clock.t)) : dayIndex(s.clock.t) % 7 < 5;
   const canBuild = carry || target !== null || run !== null || fit !== null || harden !== null || fix !== null;
   // daily life (sim/daily.ts): the roster, refilled each day on Auto (and when the threat changes, checked hourly)
   // (fatigue and chores are counted once a game hour; building work every sub-step)
@@ -103,6 +108,14 @@ function subStep(s: GameState): void {
     if (ps.needs.died != null) { ps.task = 'gone'; ps.target = null; return; }
     // gone after a taken child: off the place until they're back
     if (isAway(s, p.id)) { ps.task = 'away'; ps.target = null; return; }
+    // in town: at the town house, at the job (paid by the hour), or on the road home
+    if (split && !wk!.here && wk!.travelers.includes(p.id)) {
+      const atWork = !!ps.employed && !!p.job && !p.kid && weekday && h >= 7 && h < 16 && !wk!.stranded && !snowedIn(s);
+      ps.task = atWork ? 'job' : 'town'; ps.target = null;
+      if (hourly) tire(ps, 'leisure', h, 1);
+      if (atWork) s.money += p.job!.wage / 8 * SUBSTEP * 24;
+      return;
+    }
     const duty = tk.duties[i];
     // between the hour marks nothing changes for someone already on a plain duty (building and felling are worked every sub-step)
     if (!hourly && !party && duty !== 'build' && duty !== 'wood' && ps.task === DUTY_TASK[duty]) return;
@@ -135,17 +148,20 @@ function subStep(s: GameState): void {
     ps.target = null;
     if (hourly) dutyWork(s, p, ps, duty, choreRate(p) * workFactor(ps.needs) * restFactor(ps) * nightWork(s, h), h);
   });
-  if (hourly) choresStep(s, 1 / 24, rates);
+  if (hourly) choresStep(s, 1 / 24, split ? awayRates(s, rates) : rates);
+  if (split && hourly && h === 10) caretakerWork(s, rates);
   // (broke: the bills stop at nothing; food stamps and the food bank keep the table going)
   if (s.disaster.tracks.banks > 0.5 && s.disaster.tracks.stores > 0.5 && s.money > 0) s.money -= livingPerDay(s) * SUBSTEP;
   // investment income comes in while the banks work
   if (s.disaster.tracks.banks > 0.5) s.money += (s.startFunds ? s.startFunds.passive : LIFESTYLE[s.lifestyle].passive) / 365 * SUBSTEP;
   crewStep(s, SUBSTEP);
-  burnFirewood(s, SUBSTEP);
+  burnFirewood(s, SUBSTEP * (split ? heatShare(s) : 1));
   // the collapse clock, once a day: warning signs, the hit, the outside world's services
   if (dayIndex(s.clock.t) !== s.disaster.day) {
     const before = s.disaster.phase;
     for (const line of updateDisaster(s.disaster, s.clock.t, s.seed, { region: s.site.region, doy: calendarOf(s.clock).doy })) log(s, line);
+    // two homes: the town house's bills, the caretaker, an empty place's troubles, the move-in card, the hit while away
+    for (const line of weekenderDay(s, before)) log(s, line);
     // the start of a season: a line of "years in review" in the log
     { const sea = isSeasonStart(calendarOf(s.clock).doy); if (sea) log(s, seasonReviewLine(reviewFacts(s, sea))); }
     if (s.disaster.phase === 'warning') {
@@ -185,6 +201,7 @@ function subStep(s: GameState): void {
     for (const line of crowdDay(s)) log(s, line);
     const e = gateDay(s);
     for (const line of kinDay(s)) log(s, line);
+    for (const line of newcomersDay(s)) log(s, line);   // neighbors and strangers who joined; neighbors asking for shelter (after the gate: a card waits its turn)
     // a raid has an hour of arrival (a gang at 2:15 AM); it waits for it and the game runs on until then
     if (e && !(hasCutscene(e) && scheduleArrival(s, e))) log(s, `${e.title}.`);
     rescueDay(s);   // the taken: their fate, leads, word from the crew, a rescue out (logs its own lines)

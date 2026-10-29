@@ -42,6 +42,10 @@ export interface Person {
   rel?: { role: KinRole; of: string };
   /** Retirement income: Social Security and any pension, a day (stops at the collapse; sim/kin.ts). */
   income?: { label: string; perDay: number };
+  /** Someone who joined from outside (sim/newcomers.ts): a neighbor, a guest sheltering, a stranger taken in. */
+  origin?: { kind: 'neighbor' | 'stranger' | 'guest'; from?: string; arche?: string; since: number };
+  /** The building they have been given as their own home (a structure id; sim/housing.ts honors it). */
+  home?: string;
 }
 
 /** Extended family (sim/kin.ts): parents, grandparents, in-laws, siblings and grown children. */

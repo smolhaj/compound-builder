@@ -24,6 +24,7 @@ import { SOIL_YIELD } from './site';
 import { REGIONS, seasons } from './regions';
 import { gardenSeason, greenhousePeak, greenhouseGreens, orchardYield } from './greenhouse';
 import { careYield, cookRatio, lifeMorale, spoilFactor } from './daily';
+import { isAbsent } from './weekender';
 import { socialMorale } from './gatherings';
 import { addFoodKcal, dietDay, dietEffects, eatFrom, inDateKcal, syncPantry } from './pantry';
 import { mulberry32 } from './rng';
@@ -32,6 +33,7 @@ import { sleepEffects } from './housing';
 import { CROPS, fieldFactor, fieldsOf, GROSS, gardenFactor, keepSeed, successionDays } from './crops';
 import { kitchenDay, putByDay } from './kitchen';
 import { freshSpoilRate, shelveRoots } from './storage';
+import { newcomerMorale } from './newcomers';
 
 export type FoodId = 'fresh' | 'frozen' | 'canned' | 'staples';
 /** Food is kept in the stockpile in these units; kcal in one unit. */
@@ -58,6 +60,8 @@ export interface Needs {
   /** Dead (day), or null. Also set when someone was taken by raiders (`taken`): gone from the place either way. */
   died: number | null;
   taken?: boolean;
+  /** Moved away (a guest gone home, someone sent on or walked out): `died` is the day they left, but they did not die (sim/newcomers.ts moveOut). */
+  left?: boolean;
   /** Hours of sleep owed after a night under siege (sim/siege.ts siegeStrain): slows work, wears off 3 a day. */
   tired?: number;
 }
@@ -154,7 +158,8 @@ export interface FoodReport { needKcal: number; ateKcal: number; producedKcal: n
 
 /** Days the family can eat from what's put by (not counting what grows). */
 export function daysOfFood(s: GameState): number {
-  const need = s.people.reduce((a, p, i) => a + (alive(s, i) ? needOf(p) : 0), 0);
+  // (the family in town eats there: the weekender's weekdays, or the days on the road home)
+  const need = s.people.reduce((a, p, i) => a + (alive(s, i) && !isAbsent(s, p.id) ? needOf(p) : 0), 0);
   const have = FOODS.reduce((a, f) => a + s.stock[f] * KCAL[f], 0);
   return need > 0 ? have / need : Infinity;
 }
@@ -298,7 +303,7 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
     if (sl) dh -= sl.harm;
     n.health = Math.max(cozy ? 5 : 0, Math.min(100, n.health + dh));
     // morale: drifts to a baseline that variety, a home, light and safety raise; hunger and loss lower
-    const target = 45 + 6 * Math.min(variety, 4) + diet.morale + (home ? 8 : -6) + (dark ? -8 : 0) + darkMood(s, !!p.kid, (s.personState[i]?.task as string) === 'watch') + (s.utilities.hauling ? (s.utilities.haulFar ? -10 : -4) : 0) - Math.min(25, n.hunger / 1000) + social + lifeMorale(s, i) + (fromStores ? 0 : table) + (sl?.morale ?? 0) + dogEffects(s, p.id).morale;
+    const target = 45 + 6 * Math.min(variety, 4) + diet.morale + (home ? 8 : -6) + (dark ? -8 : 0) + darkMood(s, !!p.kid, (s.personState[i]?.task as string) === 'watch') + (s.utilities.hauling ? (s.utilities.haulFar ? -10 : -4) : 0) - Math.min(25, n.hunger / 1000) + social + lifeMorale(s, i) + newcomerMorale(s, p.id) + (fromStores ? 0 : table) + (sl?.morale ?? 0) + dogEffects(s, p.id).morale;
     n.morale += (Math.max(0, Math.min(100, target)) - n.morale) * 0.08;
     // stumbling about in dark rooms under lights-out without curtains (sim/blackout.ts)
     const stumble = ((rnd * 7919 + i * 211 + 5) % 1 + 1) % 1;

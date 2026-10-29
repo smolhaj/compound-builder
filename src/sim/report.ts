@@ -33,7 +33,7 @@ export interface RunStats {
   grownYear: number;
   needYear: number;
   /** The bug-out that ended the run (sim/bugout.ts). */
-  bugOut?: { day: number; going: number; left: number; vehicles: string[]; foodDays: number; rangeKm: number; covered: boolean };
+  bugOut?: { day: number; going: number; left: number; vehicles: string[]; foodDays: number; rangeKm: number; covered: boolean; /** The kept town house, as somewhere to go (sim/weekender.ts). */ fallback?: string };
 }
 
 export const emptyStats = (): RunStats => ({ days: 0, hungryDays: 0, dryDays: 0, darkDays: 0, kcalNeed: 0, kcalGrown: 0, wounds: 0, maxDose: 0, peak: 0, okSince: -1, selfFed: 0, grownYear: 0, needYear: 0 });
@@ -91,8 +91,8 @@ export function reportCard(s: GameState): ReportCard {
   const d = s.disaster, st = s.stats, g = s.gate;
   const fin = s.structures.filter(isFinished);
   const has = (k: string) => fin.some(x => x.kind === k);
-  const alive = living(s), total = s.personState.length;
-  const lost = s.people.filter((_, i) => s.personState[i]?.needs.died != null);
+  const alive = living(s), total = s.personState.filter(p => !p.needs.left).length;
+  const lost = s.people.filter((_, i) => s.personState[i]?.needs.died != null && !s.personState[i]?.needs.left);
   const def = d.kind ? DISASTERS[d.kind] : undefined;
   const name = def?.name ?? 'The collapse';
   const end = s.ending?.kind ?? 'recovered';
@@ -119,6 +119,7 @@ export function reportCard(s: GameState): ReportCard {
     lines.push(`${bo.going} aboard ${bo.vehicles.length} vehicle${bo.vehicles.length === 1 ? '' : 's'} (${bo.vehicles.map(k => VEHICLES[k as keyof typeof VEHICLES]?.name.toLowerCase() ?? k).join(', ')}), loaded ${bo.covered ? 'under cover, by the passage from the house to the garage' : 'in the open, in plain view of the road'}.`);
     lines.push(`${bo.foodDays} days of food and water aboard and fuel for about ${bo.rangeKm} km.`);
     if (bo.left) lines.push(`${bo.left} had no seat and stayed behind to hold the place.`);
+    if (bo.fallback) lines.push(`They had somewhere to go: ${bo.fallback} was kept for this, with the lights still paid for.`);
   }
   // water
   const water = has('well_drilled') || has('well_hand') || has('cistern') || has('water_tower');
@@ -153,6 +154,12 @@ export function reportCard(s: GameState): ReportCard {
   else if (st.wounds > 0 && (medic >= 5 || has('bunker_medical'))) lines.push('Every wound was dressed and healed.');
   for (const p of lost) lines.push(s.personState.find(ps => ps.id === p.id)?.needs.taken ? `${p.first} ${p.last} was taken. Nobody knows where.` : `${p.first} ${p.last} did not make it.`);
   if (g.tookIn) lines.push(`You took in ${g.tookIn} ${g.tookIn === 1 ? 'person' : 'people'}.`);
+  {
+    // the neighbors and strangers who came to stay (sim/newcomers.ts)
+    const stayed = s.people.filter((p, i) => p.origin && p.origin.kind !== 'guest' && s.personState[i]?.needs.died == null).length;
+    const left = s.newcomers?.departed.filter(x => x.kind !== 'guest').length ?? 0;
+    if (g.tookIn && (stayed || left)) lines.push(`${stayed} ${stayed === 1 ? 'of them was' : 'of them were'} still at the table at the end${left ? `; ${left} had left` : ''}.`);
+  }
   if (g.turnedAway) lines.push(`You turned away ${g.turnedAway}.`);
   if (g.raidsHeld) lines.push(`The line held ${g.raidsHeld} ${g.raidsHeld === 1 ? 'time' : 'times'}${g.raidsLost ? `, and broke ${g.raidsLost}` : ''}.`);
   else if (g.raidsLost) lines.push(`They got in ${g.raidsLost} ${g.raidsLost === 1 ? 'time' : 'times'}.`);

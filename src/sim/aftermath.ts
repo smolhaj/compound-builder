@@ -22,7 +22,7 @@ import { log } from './economy';
 import { mulberry32 } from './rng';
 import type { GameState } from './state';
 import { SKILL_IDS, type Person, type SkillId } from './family';
-import { freshNeeds } from './needs';
+import { admitNewcomers } from './newcomers';
 import { prisonerLead } from './rescue';
 
 export type AftermathChoice = 'treat_release' | 'hold' | 'leave' | 'finish';
@@ -162,9 +162,8 @@ export function joinPrisoner(s: GameState, id: string): string | null {
   const skills = Object.fromEntries(SKILL_IDS.map(k => [k, Math.floor(r() * 3)])) as Record<SkillId, number>;
   skills.hunter = 4 + Math.floor(r() * 3);
   const person: Person = { id: `p${s.nextId++}`, first: p.name, last: '', age: 20 + Math.floor(r() * 25), kid: false, body: 'm', skills, shirt: Math.floor(r() * 0xffffff) & 0x7f7f7f };
-  s.people.push(person);
-  s.personState.push({ id: person.id, task: 'idle', target: null, needs: freshNeeds() });
-  s.gate.tookIn++; s.gate.humanity = Math.min(100, s.gate.humanity + 5);
+  admitNewcomers(s, [person], { kind: 'stranger', arche: 'prisoner', secret: 'solid', known: true, tried: true });   // a bond, a bedroll (sim/newcomers.ts)
+  s.gate.humanity = Math.min(100, s.gate.humanity + 5);
   log(s, `${p.name} came to rob you and stayed to help. He's one of the family now.`);
   return null;
 }

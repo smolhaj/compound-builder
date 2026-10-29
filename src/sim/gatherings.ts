@@ -158,7 +158,7 @@ export function gatheringStep(s: GameState): Gathering | null {
 /** Hold it: food, firewood, the lift, the noise. */
 export function holdGathering(s: GameState, g: Gathering): string[] {
   const so = socialOf(s), def = GATHERING[g.kind], out: string[] = [];
-  const here = s.personState.filter(ps => ps.needs.died == null && ps.task !== 'away');
+  const here = s.personState.filter(ps => ps.needs.died == null && ps.task !== 'away' && ps.task !== 'town');
   const guests = g.kind === 'neighbors' ? Math.min(6, s.neighbors.find(n => n.id === g.guests)?.members ?? 3) : 0;
   const { covered, quality } = serve(s, def.kcal * (here.length + guests));
   s.stock.firewood = Math.max(0, s.stock.firewood - def.wood);

@@ -42,6 +42,7 @@ import type { RegionId } from './regions';
 import type { GameState } from './state';
 import type { Encounter, Outcome, Stance } from './encounters';
 import { stealTools } from './tools';
+import { emptyMultiplier, emptyNow, isSplit, reportFound, weekendOf } from './weekender';
 import type { Battle } from './battleTypes';
 
 export interface Breakins {
@@ -89,12 +90,13 @@ export function breakInRate(s: GameState): number {
   if (!lawWorks(s)) return 0;
   const seen = (raidPressure(s) / 0.835) ** 2;   // 0.7 (nobody knows) · 1 (an ordinary place, exposure ≈ 15) · 3.7 (everybody does)
   let deter = 1;
-  if (dogCount(s)) deter *= 0.35;
+  if (dogCount(s) && !emptyNow(s)) deter *= 0.35;   // (the dogs go to town with the family: nothing to bark on a weekday)
   if (n(s, 'driveway_alarm')) deter *= 0.6;
   if (powered(s) && (n(s, 'cameras') || n(s, 'thermal_cam'))) deter *= 0.75;
   if (powered(s) && n(s, 'floodlights')) deter *= 0.9;
   const town = 1 + 0.3 * Math.max(0, 1 - s.site.miles / 10);   // close to town: more traffic past the drive
-  return BASE_PER_YEAR * seen * deter * town;
+  // a place nobody is at (the weekender's weekdays) is a mark; a caretaker and lights on timers take some of that back
+  return BASE_PER_YEAR * seen * deter * town * emptyMultiplier(s);
 }
 
 /** Minutes for a deputy to get there after the 911 call (region and miles to town). */
@@ -130,11 +132,20 @@ export function breakInDay(s: GameState, day: number): Encounter | null {
   if (r() >= rate / 365) return null;
   const b = breakinsOf(s);
   b.count++; b.lastAt = s.clock.t;
-  if (r() < 0.33) {
+  // (a place that stands empty is always the daytime kind: nobody there to wake)
+  const empty = emptyNow(s);
+  if (empty || r() < 0.33) {
     // nobody home: the back door kicked in while everyone was in town
     const lines = burgle(s, r, 1);
     const mins = responseMinutes(s, r);
     lines.push(...plainView(s, r, 0.5));
+    if (empty && isSplit(s)) {
+      const w = weekendOf(s)!;
+      w.tally.breakIns++;
+      const l = reportFound(s, `The back door was kicked in while nobody was there. A deputy took a report (${mins} minutes out once it was called in).${lines.length ? ' ' + lines.join(' ') : ''}`);
+      if (l) log(s, l);
+      return null;
+    }
     log(s, `Came home to the back door kicked in. A deputy came out in ${mins} minutes and took a report.${lines.length ? ' ' + lines.join(' ') : ''}`);
     return null;
   }

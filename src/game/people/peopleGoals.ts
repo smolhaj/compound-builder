@@ -140,6 +140,7 @@ export function goalFor(i: number, kid: boolean, task: TaskKind, target: string 
     }
     case 'gone':
     case 'away':
+    case 'town':
     case 'shelter':
     case 'job': {
       // in town at the day job: off the land

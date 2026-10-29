@@ -17,6 +17,6 @@ export function reviewFacts(s: GameState, season: Season): ReviewFacts {
     openShare: s.perimeter.length ? enclosure(s, s.clock.t).openShare : 1,
     firewood: s.stock.firewood,
     money: s.money,
-    deaths: s.personState.filter(p => p.needs.died != null).length,
+    deaths: s.personState.filter(p => p.needs.died != null && !p.needs.left).length,
   };
 }

@@ -99,6 +99,8 @@ function newPerson(s: GameState, p: Omit<Person, 'id' | 'shirt' | 'skills'> & { 
   const out: Person = { id: `b${s.nextId++}`, shirt: [0x8a3b2e, 0x3b5b8c, 0x5a6e3a, 0x7a5a2a, 0x6a3a6a, 0x2f6f6f, 0xa86a2a, 0x4a4a52][Math.floor(r() * 8)], ...p, skills };
   s.people.push(out);
   s.personState.push({ id: out.id, task: 'idle', target: null, needs: freshNeeds() });
+  // a weekender's baby goes back and forth with its parents (sim/weekender.ts)
+  if (s.weekend?.mode === 'split' && out.parents?.some(id => s.weekend!.travelers.includes(id))) s.weekend.travelers.push(out.id);
   return out;
 }
 const pickName = (s: GameState, body: 'f' | 'm', r: () => number) => {
@@ -196,6 +198,7 @@ export function lineageDay(s: GameState): string[] {
     }, r);
     mate.kin = true; mate.gen ??= p.gen;
     p.partner = mate.id; mate.partner = p.id;
+    if (s.weekend?.mode === 'split' && s.weekend.travelers.includes(p.id)) s.weekend.travelers.push(mate.id);
     if (!here && town) { mate.job = dayJob(mate, s.seed + day); const ms = s.personState.find(x => x.id === mate.id); if (ms) ms.employed = true; }
     say('partner', here ? `${p.first} and ${mate.first} are together now.` : `${p.first} married ${fullName(mate)}, ${lawful ? 'from town' : 'who came up the road one spring and stayed'}.`);
   }
