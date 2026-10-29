@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { stormOutage } from '../sim/weatherThreats';
 import { PersonInsight, PeopleSection, MedicalSection } from './PeoplePanel';
 import { DailySection } from './SchedulePanel';
@@ -99,16 +99,29 @@ function FreeBuild() {
   </Section>;
 }
 
+/** The more urgent of two tab alerts. */
+const worstTone = (a?: Tone, b?: Tone): Tone | undefined => (a === 'bad' || b === 'bad' ? 'bad' : a === 'warn' || b === 'warn' ? 'warn' : a ?? b);
+
 /** Game HUD. Hidden with ?clean (QA shots). */
 export function Hud() {
   const w = useWorldStore();
   const g = useGameStore();
   const [leftTab, setLeftTab] = useState<'build' | 'projects' | 'log'>('build');
-  const [rightTab, setRightTab] = useState<'family' | 'supplies' | 'utilities' | 'land' | 'defense' | 'outside' | 'chronicle' | 'farm'>('family');
+  const [rightTab, setRightTab] = useState<'family' | 'supplies' | 'utilities' | 'land' | 'defense' | 'outside' | 'chronicle'>(() => g.hudFocus?.right ?? 'family');
+  // Supplies holds the stores and, as a sub-tab, the Farm (it used to be a tab of its own)
+  const [suppliesTab, setSuppliesTab] = useState<'stores' | 'farm'>(() => g.hudFocus?.supplies ?? 'stores');
   // picking a building on the map opens its project card (not while a build tool is armed: placing a row of things keeps the Build list up)
   const [quitAsk, setQuitAsk] = useState<string | null>(null);
   const [lastSel, setLastSel] = useState<string | null>(null);
   if (g.selected !== lastSel) { setLastSel(g.selected); if (g.selected && !g.tool) setLeftTab('projects'); }
+  // a link elsewhere asked for a panel (hudFocus is taken once)
+  const { hudFocus, focusHud } = g;
+  useEffect(() => {
+    if (!hudFocus) return;
+    setRightTab(hudFocus.right);
+    if (hudFocus.supplies) setSuppliesTab(hudFocus.supplies);
+    focusHud(null);
+  }, [hudFocus, focusHud]);
   if (new URLSearchParams(location.search).has('clean')) return null;
   const game = g.game;
   const cal = calendarOf(game.clock);
@@ -162,7 +175,7 @@ export function Hud() {
 
       {/* Right: the family, supplies, water & power, land, the outside world */}
       <div style={{ ...panel, position: 'fixed', right: 10, top: 10, width: 320, maxHeight: 'calc(100vh - 90px)', display: w.hudHidden ? 'none' : 'flex', flexDirection: 'column' }}>
-        <Tabs tabs={[['family', 'Family', familyAlert], ['supplies', 'Supplies', foodAlert], ['farm', 'Farm', farmAlert(game)], ['utilities', 'Utilities', utilAlert], ['land', 'Land'], ['defense', 'Defense', defenseAlert], ['outside', 'Outside', outsideAlert], ['chronicle', 'Years']]} value={rightTab} set={setRightTab} />
+        <Tabs tabs={[['family', 'Family', familyAlert], ['supplies', 'Supplies', worstTone(foodAlert, farmAlert(game))], ['utilities', 'Utilities', utilAlert], ['land', 'Land'], ['defense', 'Defense', defenseAlert], ['outside', 'Outside', outsideAlert], ['chronicle', 'Years']]} value={rightTab} set={setRightTab} />
         <div style={{ overflowY: 'auto', flex: 1, paddingRight: 2 }}>
           {rightTab === 'family' && <>
             {game.people.map((p, i) => {
@@ -227,6 +240,9 @@ export function Hud() {
           </>}
 
           {rightTab === 'supplies' && <>
+            <Tabs tabs={[['stores', 'Stores', foodAlert], ['farm', 'Farm', farmAlert(game)]]} value={suppliesTab} set={setSuppliesTab} />
+            {suppliesTab === 'farm' && <FarmTab game={game} />}
+            {suppliesTab === 'stores' && <>
             <PantryPanel game={game} />
             <ToolsPanel game={game} />
             <Section title="Keeping">
@@ -294,9 +310,8 @@ export function Hud() {
                 <button style={btn()} title="Everything else is bought here, grouped by use: building, fencing, water, power, food, and so on" onClick={() => g.openShop(true)}>Buy materials in the Shop…</button>
               </div>
             </Section>
+            </>}
           </>}
-
-          {rightTab === 'farm' && <FarmTab game={game} />}
 
           {rightTab === 'utilities' && (() => {
             const r = game.utilities.report, up = game.disaster.tracks.grid > 0.5 && !stormOutage(game);

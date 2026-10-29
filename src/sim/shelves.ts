@@ -20,7 +20,7 @@ export const SHELVES: Record<ShelfTab, MaterialId[]> = {
   bunker: ['rebar', 'membrane', 'container', 'blast_door', 'blast_valve', 'nbc_filter', 'filter_set', 'culvert', 'egress_hatch', 'passage_hatch', 'lead_sheet', 'faraday_mesh'],
   water: ['water_jugs', 'ibc_tote', 'water_trailer', 'water_filter', 'ro_system', 'softener', 'greywater', 'pipe', 'fixtures', 'pump', 'drilling', 'tank', 'septic_tank'],
   power: ['solar_panel', 'battery', 'inverter', 'generator', 'cable'],
-  food: ['seed', 'seed_hybrid', 'seed_cover', 'manure', 'lids', 'canner', 'dehydrator', 'crocks', 'grain_mill', 'fishing_gear', 'snares', 'smoker', 'goat', 'cow', 'pig', 'steer', 'sheep', 'rabbit', 'hay', 'feed', 'vet_kit', 'cheese_kit', 'bee_nuc', 'hive_supplies', 'maple_taps', 'trout_fry', 'crayfish_stock', 'fish_feed'],
+  food: ['seed', 'seed_heirloom', 'seed_cover', 'manure', 'lids', 'canner', 'dehydrator', 'crocks', 'grain_mill', 'fishing_gear', 'snares', 'smoker', 'goat', 'cow', 'pig', 'steer', 'sheep', 'rabbit', 'hay', 'feed', 'vet_kit', 'cheese_kit', 'bee_nuc', 'hive_supplies', 'maple_taps', 'trout_fry', 'crayfish_stock', 'fish_feed'],
   household: ['meds', 'antibiotics', 'splints', 'ors', 'dental_kit', 'midwife_kit', 'medical_books', 'hygiene', 'games', 'instrument', 'novels', 'manuals', 'traps', 'tent', 'sleeping_bag', 'kibble', 'dogbed', 'doghouse'],
   fuel: ['fuel', 'vehicle_parts', 'stabilizer', 'firewood', 'excavator', 'plow', 'gun_safe', 'gun_cleaning'],
   defense: [...KIT_GOODS, ...WATCH_GOODS, ...HARDEN_GOODS],

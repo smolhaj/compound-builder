@@ -151,4 +151,25 @@ describe('the guided HUD (server-rendered)', () => {
     expect(fields).toMatch(/Season/);
     expect(fields).not.toMatch(/\d\.\d{4,}/);
   });
+  it('the Farm lives under Supplies: one row of right-hand tabs, a Stores | Farm switch, and a Next-step link that lands on the Farm', async () => {
+    const { Hud } = await import('../Hud');
+    (globalThis as unknown as { location: { search: string } }).location = { search: '' };
+    withGame(g => { const st = planStructure(g, 'field', 10, 10, 0); st.stage = 5; st.finishedAt = -300; });
+    // the default: Family, with no tab called Farm beside Supplies
+    Object.assign(useGameStore.getInitialState(), { hudFocus: null });
+    const plain = text(renderToStaticMarkup(<Hud />));
+    expect(plain).toContain('Supplies');
+    expect(plain).not.toMatch(/Supplies\s+Farm\s+Utilities/);
+    // a deep link to Supplies > Farm
+    Object.assign(useGameStore.getInitialState(), { hudFocus: { right: 'supplies', supplies: 'farm' } });
+    const farm = text(renderToStaticMarkup(<Hud />));
+    expect(farm).toMatch(/Stores\s+Farm/);
+    expect(farm).toContain('Season');
+    expect(farm).toContain('Food plan');
+    Object.assign(useGameStore.getInitialState(), { hudFocus: { right: 'supplies', supplies: 'stores' } });
+    const stores = text(renderToStaticMarkup(<Hud />));
+    expect(stores).toMatch(/Stores\s+Farm/);
+    expect(stores).toContain('Stockpile');
+    Object.assign(useGameStore.getInitialState(), { hudFocus: null });
+  });
 });
