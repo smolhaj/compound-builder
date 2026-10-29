@@ -10,7 +10,7 @@
  */
 import * as THREE from 'three';
 import { CELL, type KitPieceDef } from './kit';
-import { Furniture, M, piece, wallRun, type Add, type Collider, type Opening } from './interior';
+import { Furniture, M, piece, sickSlot, wallRun, type Add, type Collider, type Opening } from './interior';
 import { box, CUT_H, Parts, type BuildLayer, type BuildOpts } from './shell';
 import { Clutter } from './clutter';
 import { Equipment } from './utilityBuildings';
@@ -568,8 +568,8 @@ function waterTank(a: Add): void {
 function medical(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
   return vault(def, seed, opts, { ...CONCRETE, vents: [[0.3, 0.3]] }, c => {
     c.pack([
-      { len: 2.0 * M, dep: 0.95 * M, along: true, fn: a => Furniture.bed(a, false, 'linen'), sides: ['left', 'right', 'back', 'front'] },
-      { len: 2.0 * M, dep: 0.95 * M, along: true, fn: a => Furniture.single(a, 'quilt_blue'), sides: ['right', 'left', 'back', 'front'] },
+      { len: 2.0 * M, dep: 0.95 * M, along: true, fn: a => { Furniture.bed(a, false, 'linen'); sickSlot(a); }, sides: ['left', 'right', 'back', 'front'] },
+      { len: 2.0 * M, dep: 0.95 * M, along: true, fn: a => { Furniture.single(a, 'quilt_blue'); sickSlot(a); }, sides: ['right', 'left', 'back', 'front'] },
       { len: 1.2 * M, dep: 0.6 * M, fn: a => Furniture.counter(a, 1.2, 0.4, true), sides: ['back', 'front', 'left', 'right'] },
       { len: 1.0 * M, dep: 0.45 * M, fn: a => { Furniture.shelfUnit(a, 1.0, 1.9, 'jars'); }, sides: ['front', 'back', 'left', 'right'] },
     ]);
