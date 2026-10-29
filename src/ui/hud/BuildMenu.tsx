@@ -43,7 +43,8 @@ export function BuildMenu({ showProjects = () => undefined }: { showProjects?: (
   const shelters = game.structures.filter(s => s.finishedAt !== null).reduce((a, s) => a + (KIT[s.kind]?.shelters ?? 0), 0);
   const arm = (tool: string) => g.setTool(g.tool === tool ? null : tool);
   const sug = suggestions(game);
-  const goals = longTerm(game);
+  const drive = useWorldStore(w => w.siteGeo)?.drive;
+  const goals = longTerm(game, drive);
   const bunker = bunkerChecklist(game);
   const bunkerStarted = bunker.some(c => c.done || c.building);
 

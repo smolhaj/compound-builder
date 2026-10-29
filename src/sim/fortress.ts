@@ -159,12 +159,13 @@ export function planFortress(s: GameState, geo: PropertyGeometry = {}, opts: Par
   // the garage: in the gate gap, door side facing in; it must have the ground to itself
   let garage: PlannedStructure | null = null;
   const gs = wall.gateSpot;
-  if (gs) {
+  if (gs?.noGarage) notes.push('The road comes in at a bend in the wall: an ordinary gate, with no room for a gate garage beside it.');
+  if (gs && !gs.noGarage) {
     const x = gs.x + gs.inx * (GARAGE_D / 2 - 0.04), z = gs.z + gs.inz * (GARAGE_D / 2 - 0.04);
     const half = Math.max(GARAGE_W, GARAGE_D) / 2;
     if (clearOf(s, x, z, half - 0.5)) garage = { kind: GATE_GARAGE, x, z, rot: garageRotFor([gs.inx, gs.inz]) };
     else notes.push('Something already stands where the gate garage would go: the gap is left as an ordinary gate.');
-  } else notes.push(wall.gateNote ? `No gate garage: ${wall.gateNote}. Add a gate to the wall or stake the garage from the Build menu.` : 'No gate garage planned (no road side on the line).');
+  } else if (!gs) notes.push(wall.gateNote ? `No gate garage: ${wall.gateNote}. Add a gate to the wall or stake the garage from the Build menu.` : 'No gate garage planned (no road side on the line).');
   if (!garage && gs) { wall.runs.forEach(r => r.gates.forEach(g => { delete g.garage; })); }
 
   const towers = towerSites(s, options.towerKind, options.towers, gs, garage ? [garage] : [], rects).map((p): PlannedStructure => ({ kind: options.towerKind, x: p[0], z: p[1], rot: 0 }));

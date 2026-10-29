@@ -58,7 +58,7 @@ export function WallProperty() {
             <div>Property line <b>{plan.lineM.toLocaleString('en-US')} m</b>{plan.heldM > 0 && <span style={{ color: DIM }}> · {plan.heldM.toLocaleString('en-US')} m already held</span>}</div>
             <div>New wall <b>{plan.wallM.toLocaleString('en-US')} m</b></div>
             {plan.creekCrossings > 0 && <div>Creek bars at <b>{plan.creekCrossings}</b> crossing{plan.creekCrossings > 1 ? 's' : ''} ({plan.barsM} m)</div>}
-            <div>{plan.gates > 0 ? <>A vehicle gate on the road side</> : <span style={{ color: DIM }}>No gate planned{plan.gateNote ? `: ${plan.gateNote}` : ''}</span>}</div>
+            <div>{plan.gates > 0 ? <>Gate at the road <span style={{ color: DIM }}>· {plan.gateSpot?.onDrive ? 'where the driveway crosses the wall' : 'on the road side'}</span></> : <span style={{ color: DIM }}>No gate planned{plan.gateNote ? `: ${plan.gateNote}` : ''}</span>}</div>
             <div style={{ marginTop: 3 }}>Cost <b>{usd(plan.cost)}</b>{own ? <span style={{ color: DIM }}> + {own}</span> : null} · <b>{plan.hours.toLocaleString('en-US')} h</b> of work</div>
             <div style={{ color: DIM, fontSize: 11.5 }}>With everything else on the list: {eta(weeks)}.</div>
             {note && <Note tone="warn">{note}</Note>}

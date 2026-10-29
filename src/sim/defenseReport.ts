@@ -18,6 +18,7 @@ import { dogCount } from './pets';
 import { canHostWalkway, walkLength, walkOn, walkwayWatch } from './walkway';
 import { GATE_GARAGE, garages, occupiedSlots, parkingSlots } from './garage';
 import { MAX_TOWERS } from './fortress';
+import { roadGateStatus } from './roadGate';
 import { HEAVY_CALIBERS, MOUNT_ROUNDS, TURRET_ROUNDS, TOWERS, floodReady, mountReady, towerPosts, towersBuilt, turretsReady } from './towers';
 import { dayIndex, type GameState } from './state';
 import { bondOf, dogWatch, livingDogs, temperOf } from './pets';
@@ -77,7 +78,8 @@ function dogRows(s: GameState): Check[] {
   });
 }
 
-export function defenseReport(s: GameState): DefenseReport {
+/** `drive`: the driveway from the road (PropertyGeometry.drive), so the report can say whether the wall has a gate where it comes in. */
+export function defenseReport(s: GameState, drive?: readonly Pt[]): DefenseReport {
   const p = postureOf(s), line = enclosure(s, s.clock.t);
   const fin = s.structures.filter(isFinished);
   const closed = line.openShare === 0 && line.creekOpen === 0;
@@ -91,6 +93,8 @@ export function defenseReport(s: GameState): DefenseReport {
   if (s.site.creek) walls.push(chk('creek', 'Creek barred where it crosses the line', line.creekOpen === 0, line.creekOpen === 0 ? 'steel bars at both crossings' : `${line.creekOpen} crossing${line.creekOpen > 1 ? 's' : ''} open: the creek is the way round every wall and gate`));
   // bears, cougars, wolves and coyotes: kept out only by a line that holds them (solid fence, chain link, wrought iron, steel, container, palisade), gates shut, creek barred
   { const pl = predatorLine(s); walls.push(chk('predators', 'Keeps predators out', pl.ok, pl.detail, predatorSpecies(s).length > 0 && line.openShare < 0.15)); }
+  { const rg = roadGateStatus(s, drive);
+    if (rg.crossing > 0) walls.push(chk('roadgate', 'Gate at the road', rg.missing === 0, rg.missing === 0 ? (rg.garage ? 'the drive runs in through the gate garage' : 'a gate where the driveway comes through the wall') : `${rg.missing} wall${rg.missing > 1 ? 's' : ''} cross${rg.missing > 1 ? '' : 'es'} the driveway with no gate: trucks and the family’s vehicles cannot get in`)); }
   if (gates > 0) walls.push(chk('gates', `${gates} gate${gates > 1 ? 's' : ''} in the line`, true, 'a closed gate holds about as well as 60 % of its fence'));
   // the fortress ring: a patrol deck on the wall, the gatehouse garage (sim/walkway.ts, sim/garage.ts)
   const hosts = s.perimeter.filter(r => canHostWalkway(r.kind) && !r.replaces);
