@@ -1207,6 +1207,7 @@ export class HomesteadWorld {
     if (key !== this._hatchKey) {
       this._hatchKey = key;
       const holes = new Map<string, Array<{ x0: number; z0: number; x1: number; z1: number }>>();
+      const ground: Array<[number, number, number, number]> = [];
       for (const b of hatches) {
         if (!b.finished) continue;
         const host = this._hostOf(b.placed); if (!host) continue;
@@ -1216,7 +1217,12 @@ export class HomesteadWorld {
         const [lx, lz] = this._local(host, b.placed.x + cxl * Math.cos(th) + czl * Math.sin(th), b.placed.z - cxl * Math.sin(th) + czl * Math.cos(th));
         const hx = (plan.hole.x1 - plan.hole.x0) / 2, hz = (plan.hole.z1 - plan.hole.z0) / 2, [ex, ez] = q % 2 ? [hz, hx] : [hx, hz];
         const list = holes.get(host.placed.id) ?? []; list.push({ x0: lx - ex, x1: lx + ex, z0: lz - ez, z1: lz + ez }); holes.set(host.placed.id, list);
+        // and the ground under the opening is cut clean through, so the stairwell shows
+        const wx = b.placed.x + cxl * Math.cos(th) + czl * Math.sin(th), wz = b.placed.z - cxl * Math.sin(th) + czl * Math.cos(th), gq = (b.placed.rot % 2 + 2) % 2;
+        const [gx, gz] = gq ? [hz, hx] : [hx, hz];
+        ground.push([wx - gx, wz - gz, wx + gx, wz + gz]);
       }
+      this.terrain.setHoles(ground);
       for (const host of this._built.values()) {
         if (host.under) continue;
         const next = holes.get(host.placed.id), cur = host.opts.hatches;
