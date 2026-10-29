@@ -64,6 +64,11 @@ export interface TownHouse {
   /** owned: lived in on weekdays · kept: moved up but not sold (a fallback) · sold. */
   status: 'owned' | 'kept' | 'sold';
   soldFor?: number;
+  /**
+   * Rented, not owned (the family chose to sell the house at setup and rent in town): the monthly rent. The house reads as
+   * sold from the first day; there is no mortgage, no property tax, nothing to sell and no fallback house.
+   */
+  rent?: number;
   /** What the sale cleared after the agent and the mortgage. */
   net?: number;
   soldDay?: number;
@@ -95,6 +100,8 @@ export interface Weekend {
   caretaker: Caretaker | null;
   /** What the empty place does with its lights: timers (looks lived in) or dark. */
   lights: 'timers' | 'dark';
+  /** Tighten the belt in town (save v65): cheaper upkeep and groceries on the weekdays, a little lower mood. */
+  belt?: boolean;
   /** Is the family on the place right now (updated each sub-step). */
   here: boolean;
   /** The vehicles that made the trip (away while the family is). */
@@ -147,6 +154,9 @@ export function onSiteAt(startDoy: number, d: number, h: number): boolean {
   return free ? next || h < DEPART_H : next && h >= ARRIVE_H;
 }
 
+/** A weekday off that is still paid: a holiday or a vacation day (not the week they take to settle in, and not a weekend). */
+export const paidLeaveDay = (startDoy: number, d: number): boolean => d >= SETTLE_DAYS && dow(d) < 5 && isFreeDay(startDoy, d);
+
 /** Whether the jobs are working today (the family's weekdays; not on a holiday). */
 export const workDay = (startDoy: number, d: number): boolean => !isFreeDay(startDoy, d);
 /** Is the day-job day (for whoever holds one): Monday to Friday, less the weekender's holidays and vacations. */
@@ -169,40 +179,46 @@ export const weekendOf = (s: GameState): Weekend | undefined => s.weekend;
 export const isSplit = (s: GameState): boolean => s.weekend?.mode === 'split';
 export const hourNow = (s: GameState): number => (s.clock.ticks * 0.25 + 6) % 24;
 
-const k1000 = (n: number) => Math.round(n / 1000) * 1000;
+import { equityNet, mortgagePayment, rentFor, SALE_FEES, townHouseFor, townTaxHalf, townUpkeep, type TownPlan } from './townHouse';
+export { townHouseFor, mortgagePayment, townUpkeep, townTaxHalf, SALE_FEES, rentFor, equityNet, RENT_DEPOSIT_MONTHS, type TownPlan } from './townHouse';
 
-/** The town house the family keeps: its value and mortgage, from their jobs, ages and a little luck. Seeded, so the setup screen and the game agree. */
-export function townHouseFor(people: readonly Person[], seed: number): { value: number; mortgage: number } {
-  const adults = people.filter(p => !p.kid && !p.elder && !p.rel);
-  const pay = adults.reduce((a, p) => a + (p.job?.wage ?? 200) * 260, 0);
-  const age = adults.length ? adults.reduce((a, p) => a + p.age, 0) / adults.length : 40;
-  const seasoned = Math.min(1.35, Math.max(0.55, (age - 22) / 20));
-  const r = mulberry32(seed * 3109 + 17);
-  const luck = r(), ltvU = r();
-  const equity = (90_000 + 2.2 * pay * Math.min(1.2, 0.7 + seasoned * 0.4)) * (0.8 + 0.5 * luck);
-  const ltv = Math.min(0.7, Math.max(0.15, 0.62 - (age - 30) * 0.01 + (ltvU - 0.5) * 0.2));
-  const value = Math.round(equity / (1 - ltv) / 5000) * 5000;
-  return { value, mortgage: k1000(value * ltv) };
-}
+/** Tightening the belt in town: the share of the upkeep that is left (thermostat down, the streaming and the yard service dropped, the second car parked). */
+export const BELT_UPKEEP = 0.55;
+/** ... and of the household's groceries and bills (the weekday meals out, the kids' activities, the shopping). */
+export const BELT_LIVING = 0.85;
+/** ... and what it takes out of the mood of the people in town (points of the morale a day settles toward). */
+export const BELT_MORALE = 3;
 
-/** The monthly mortgage payment (30 years at about 6 %). */
-export const mortgagePayment = (t: Pick<TownHouse, 'mortgage'>): number => Math.round(t.mortgage * 0.0062);
-/** The town house's upkeep a month while it stands empty or lived in: utilities, insurance, a yard. */
-export const townUpkeep = (t: Pick<TownHouse, 'value'>): number => Math.round(150 + t.value * 0.0022);
-/** Half a year's property tax on the town house. */
-export const townTaxHalf = (t: Pick<TownHouse, 'value'>): number => Math.round(t.value * 0.0105 / 2);
-/** What the town house costs a day while it is kept and the banks work (mortgage, upkeep). */
-export const townCostPerDay = (t: TownHouse): number => (t.status === 'sold' ? 0 : (mortgagePayment(t) + townUpkeep(t)) / 30);
+export const isRented = (t: Pick<TownHouse, 'rent'>): boolean => t.rent !== undefined;
+/** Belt-tightening is on for a family that splits its week. */
+export const beltOn = (s: GameState): boolean => s.weekend?.mode === 'split' && !!s.weekend.belt;
+/** Mood lost to a lean household in town (only the people who go back and forth feel it). */
+export const beltMorale = (s: GameState, id: string): number => (beltOn(s) && s.weekend!.travelers.includes(id) ? BELT_MORALE : 0);
+/** The share of the household's groceries and bills that is paid while the belt is tight. */
+export const livingShare = (s: GameState): number => (beltOn(s) ? BELT_LIVING : 1);
 
-export function newWeekend(people: readonly Person[], seed: number, siteMiles: number): Weekend {
+/** The town house's upkeep a month at the moment: less with the belt tight. */
+export const townUpkeepNow = (w: Pick<Weekend, 'town' | 'belt' | 'mode'>): number => Math.round(townUpkeep(w.town) * (w.belt && w.mode === 'split' ? BELT_UPKEEP : 1));
+/** What the town home costs a month while the banks work: the rent, or the mortgage and the upkeep (the property tax comes twice a year, apart). */
+export const townCostPerMonth = (w: Pick<Weekend, 'town' | 'belt' | 'mode'>): number =>
+  w.town.rent !== undefined ? w.town.rent : w.town.status === 'sold' ? 0 : mortgagePayment(w.town) + townUpkeepNow(w);
+/** ... by the day. */
+export const townCostPerDay = (w: Pick<Weekend, 'town' | 'belt' | 'mode'>): number => townCostPerMonth(w) / 30;
+/** Everything the town home costs in a year, tax included (the number the setup screen and the Family tab show). */
+export const townCostPerYear = (w: Pick<Weekend, 'town' | 'belt' | 'mode'>): number =>
+  townCostPerMonth(w) * 12 + (w.town.status === 'sold' ? 0 : townTaxHalf(w.town) * 2);
+
+export function newWeekend(people: readonly Person[], seed: number, siteMiles: number, plan: TownPlan = 'own'): Weekend {
   const th = townHouseFor(people, seed);
   const r = mulberry32(seed * 7001 + 3);
   return {
     mode: 'split',
     travelers: people.map(p => p.id),
     driveMiles: Math.round(35 + siteMiles * 1.2 + r() * 55),
-    town: { ...th, status: 'owned' },
-    caretaker: null, lights: 'timers', here: true, cars: [], keepJobs: true,
+    town: plan === 'rent'
+      ? { ...th, mortgage: 0, status: 'sold', soldFor: th.value, net: equityNet(th), soldDay: -1, rent: rentFor(th.value) }
+      : { ...th, status: 'owned' },
+    caretaker: null, lights: 'timers', here: true, cars: [], keepJobs: true, belt: false,
     askAt: -1, asked: 0, stranded: null, found: [],
     tally: { trips: 0, miles: 0, spent: 0, breakIns: 0, vandalism: 0, squatters: 0, pipes: 0, theft: 0, lapses: 0 },
     day: -1,
@@ -546,13 +562,12 @@ export function marketFactor(s: GameState): number {
   const w = tension(d, s.clock.t);
   return 1 - 0.45 * Math.pow(w, 1.15);
 }
-export const SALE_FEES = 0.06;
 
 export interface Quote { value: number; fees: number; mortgage: number; net: number; factor: number }
 /** What a sale clears today: the market price, the agent and closing, then the mortgage. */
 export function saleQuote(s: GameState): Quote | null {
   const w = s.weekend;
-  if (!w || w.town.status === 'sold') return null;
+  if (!w || w.town.status === 'sold' || isRented(w.town)) return null;
   const factor = marketFactor(s), value = Math.round(w.town.value * factor / 1000) * 1000;
   const fees = Math.round(value * SALE_FEES);
   return { value, fees, mortgage: w.town.mortgage, net: value - fees - w.town.mortgage, factor };
@@ -607,8 +622,14 @@ export function moveIn(s: GameState, opts: MoveOpts): string[] {
   for (const v of fleetOf(s)) if (w.cars.includes(v.id)) delete v.away;
   w.cars = [];
   syncParking(s);
-  // the town house
-  if (opts.sell && q && !saleBlock(s)) {
+  // the town home
+  if (isRented(w.town)) {
+    out.push(opts.reason === 'hit'
+      ? 'The lease on the rented place in town runs on without them; nobody there is going to chase the rent.'
+      : `They give notice on the rented place in town: the lease ends and the deposit comes back (${money(w.town.rent! * 1)}).`);
+    if (opts.reason !== 'hit' && s.disaster.tracks.banks >= 0.5) s.money += w.town.rent!;
+    delete w.town.rent;
+  } else if (opts.sell && q && !saleBlock(s)) {
     s.money += q.net;
     w.town.status = 'sold'; w.town.soldFor = q.value; w.town.net = q.net; w.town.soldDay = dayIndex(s.clock.t);
     out.push(`The town house sold for ${money(q.value)} (${Math.round(q.factor * 100)} % of what it was worth): the agent and closing took ${money(q.fees)}, the mortgage ${money(q.mortgage)}, and ${q.net >= 0 ? `${money(q.net)} went into the account` : `${money(-q.net)} came out of it`}.`);
@@ -642,6 +663,13 @@ export function moveIn(s: GameState, opts: MoveOpts): string[] {
 export function setAwayLights(s: GameState, mode: 'timers' | 'dark'): string | null {
   if (!s.weekend) return 'not a weekender';
   s.weekend.lights = mode;
+  return null;
+}
+/** Tighten the belt in town (or loosen it again): the Family tab and the Next-step card. */
+export function setBelt(s: GameState, on: boolean): string | null {
+  const w = s.weekend;
+  if (!w || w.mode !== 'split') return 'the family lives on the place';
+  w.belt = on;
   return null;
 }
 /** On the move-in card: keep the jobs that can be done from the place, or quit them all. */
@@ -681,13 +709,15 @@ const headlines = (s: GameState): string[] => s.disaster.news.filter(n => n.tone
 
 /** The decision card: the signs, the market, the sale, the jobs. */
 export function moveInCard(s: GameState, id: string, voluntary = false): Encounter {
-  const w = s.weekend!, q = saleQuote(s)!, block = saleBlock(s);
+  const w = s.weekend!, q = saleQuote(s), block = saleBlock(s), rented = isRented(w.town);
   const day = dayIndex(s.clock.t);
   const news = headlines(s);
   const jobs = jobOutlook(s);
   const dossier = [
     voluntary ? 'You decide to settle the question: is it time to live on the place?' : (news.length ? `The signs are everywhere. ${news.join(' ')}` : 'The talk in town has changed. People are stocking up and watching the news.'),
-    `The town house: worth about ${money(w.town.value)} in a normal market, ${money(q.value)} now (${Math.round(q.factor * 100)} %) with ${money(q.mortgage)} still owed. ${block ? `You cannot sell: ${block}.` : q.net >= 0 ? `Sold today it would clear ${money(q.net)} after the agent and the mortgage. Next month it will be worth less, and soon it will not sell at all.` : `Sold today it would leave ${money(-q.net)} owed.`}`,
+    rented
+      ? `The place in town is rented, ${money(w.town.rent!)} a month. Nothing to sell and no market to fall: give notice and the deposit comes back. The rent is the cost of every week they wait.`
+      : q ? `The town house: worth about ${money(w.town.value)} in a normal market, ${money(q.value)} now (${Math.round(q.factor * 100)} %) with ${money(q.mortgage)} still owed. ${block ? `You cannot sell: ${block}.` : q.net >= 0 ? `Sold today it would clear ${money(q.net)} after the agent and the mortgage. Next month it will be worth less, and soon it will not sell at all.` : `Sold today it would leave ${money(-q.net)} owed on the mortgage, which you would have to cover. Next month it will be worth less, and soon it will not sell at all.`}` : 'The town house is already sold.',
     jobs.length ? `Jobs: ${jobs.map(j => `${j.person.first} (${j.person.job!.title.toLowerCase()}) ${j.remote ? (w.keepJobs ? 'can keep working from the place' : 'would quit (you chose to quit them all)') : 'would have to quit: the drive is ' + Math.round(w.driveMiles / 55 * 60) + ' minutes each way'}`).join('; ')}.` : 'Nobody has a job left to give up.',
     `The place is ${w.driveMiles} miles up the road: about ${Math.round(w.driveMiles / 55 * 10) / 10} hours each way. Every week in town is a week not building, and the day the roads close they are on the wrong end.`,
   ];
@@ -695,7 +725,7 @@ export function moveInCard(s: GameState, id: string, voluntary = false): Encount
     id, kind: 'move_in', day,
     title: voluntary ? 'Move in for good?' : 'Time to move in?',
     dossier, size: 0, armed: false, strength: 0,
-    stances: block ? ['move_keep', 'hold_on'] : ['move_sell', 'move_keep', 'hold_on'],
+    stances: rented ? ['move_lease', 'hold_on'] : block ? ['move_keep', 'hold_on'] : ['move_sell', 'move_keep', 'hold_on'],
   };
 }
 
@@ -716,8 +746,10 @@ export function resolveMoveIn(s: GameState, stance: Stance): Outcome {
     w.askAt = Math.min(0.9, t + 0.22);
     return { title: 'Holding on', text: 'You decide to wait one more week. The jobs pay, and the place is not done. The price of the house will be lower next time, and you will have less time to move.', tone: 'mixed', lines: [] };
   }
+  const lease = stance === 'move_lease' || isRented(w.town);
   const sell = stance === 'move_sell';
   const lines = moveIn(s, { sell, reason: 'chosen' });
+  if (lease) return { title: 'Notice given, and home', text: 'The landlord gets the keys on Sunday. The family drives up with the trucks loaded and does not go back.', tone: 'good', lines };
   return { title: sell ? 'Sold, and home' : 'Moved in', text: sell ? 'The For Sale sign goes up in town on Saturday and comes down on Sunday: sold. The family drives up and does not go back.' : 'The family drives up with the trucks loaded and stays. The town house is locked, the key on the hook.', tone: 'good', lines };
 }
 
@@ -871,11 +903,16 @@ export function weekenderDay(s: GameState, before: Phase): string[] {
   w.day = day;
   const out: string[] = [];
   const hit = before !== 'impact' && s.disaster.phase === 'impact';
-  // the town house costs money while the banks work, whether or not they live in it
-  if (w.town.status !== 'sold' && banksOpen(s)) {
-    const c = townCostPerDay(w.town);
+  // the town home costs money while the banks work, whether or not they live in it: the rent, or the mortgage and the upkeep
+  if (banksOpen(s) && (w.town.status !== 'sold' || (w.town.rent !== undefined && w.mode === 'split'))) {
+    const c = townCostPerDay(w);
     s.money -= c; w.tally.spent += c;
-    w.town.mortgage = Math.max(0, w.town.mortgage - mortgagePayment(w.town) * 0.22 / 30);
+    if (w.town.status !== 'sold') w.town.mortgage = Math.max(0, w.town.mortgage - mortgagePayment(w.town) * 0.22 / 30);
+  }
+  // paid time off: a vacation week or a holiday that falls on a workday is still paid (the jobs are salaried), the first week's settling in is not
+  if (w.mode === 'split' && banksOpen(s) && paidLeaveDay(s.clock.startDoy, day)) {
+    const pay = s.people.reduce((a, p, i) => a + (s.personState[i]?.employed && p.job && !p.kid && w.travelers.includes(p.id) && s.personState[i].needs.died == null ? p.job.wage : 0), 0);
+    if (pay > 0) s.money += pay;
   }
   if (w.mode === 'moved') return out;
   // the caretaker: paid, reliable or not, gone when the money is
@@ -910,6 +947,6 @@ export function weekenderDay(s: GameState, before: Phase): string[] {
 /** The house after the family is gone for good from town (kept): who can still use it. Bug-out reads this. */
 export function fallbackHouse(s: GameState): { name: string; miles: number } | null {
   const w = s.weekend;
-  if (!w || w.town.status === 'sold') return null;
+  if (!w || w.town.status === 'sold' || isRented(w.town)) return null;
   return { name: 'the town house', miles: w.driveMiles };
 }

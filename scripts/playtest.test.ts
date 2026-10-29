@@ -35,6 +35,8 @@ import { resolveAftermath, type AftermathChoice } from '../src/sim/aftermath';
 import type { PlannedBattle } from '../src/sim/battle';
 const AFTER: Record<string, AftermathChoice> = { idle: 'leave', homestead: 'treat_release', prepper: 'hold', fortress: 'leave' };
 import { reportCard } from '../src/sim/report';
+import { setBelt } from '../src/sim/weekender';
+import { weekendBudget } from '../src/sim/weekendPlan';
 import { bestShelter } from '../src/sim/nuclear';
 import { daysOfFood, FIELD_KCAL, fieldHarvest, KCAL, needOf } from '../src/sim/needs';
 import { SOIL_YIELD } from '../src/sim/site';
@@ -229,7 +231,7 @@ function fieldSpot(s: GameState, M: (x: number, z: number) => [number, number]):
  */
 function siteFor(seed: number, region?: RegionId): Site {
   const life = (process.env.LIFESTYLE as Lifestyle | undefined) ?? 'fulltime';
-  const budget = startFunds(generateFamily(seed), life, seed).budget;
+  const budget = startFunds(generateFamily(seed), life, seed, 0, process.env.TOWN === 'rent' ? 'rent' : 'own').budget;
   const ls = listings(seed, region, undefined, 6, budget), want = ls[seed % 4];
   const room = life === 'weekend' ? 0.66 * budget : budget;
   if (affordable(want, budget) && want.price <= room) return want;
@@ -247,9 +249,9 @@ const newcomerNote = (s: GameState): string => {
 interface RunResult { causes: string; often: Array<[string, number]>; minMoney: number; site: string; strat: Strategy; kind: DisasterKind; variant: string; ending: string; grade: string; alive: string; hungry: number; days: number; moneyAtHit: number; builtAtHit: number; bugs: string[]; lines: string[]; fights: string[]; prisoners: number; hides: number; hidFound: number; owed: number; debtStage: string; trials: string; stripped: number; burned: number }
 
 function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' | 'medium', site: Site = CLASSIC, years = 0): RunResult & { s: GameState } {
-  // (LIFESTYLE=weekend plays the weekender: the family in town on weekdays, the move-in card, the road home)
+  // (LIFESTYLE=weekend plays the weekender: the family in town on weekdays, the move-in card, the road home; TOWN=rent sells the town house at setup and rents; BELT=1 tightens the belt from day one)
   const life = process.env.LIFESTYLE as Lifestyle | undefined;
-  let s = newGame(seed, 105, 2027, { site: site === CLASSIC && !life ? undefined : site, lifestyle: life, mode: 'scenario', peace, kind, dayJobs: true, grid: true, difficulty: process.env.DIFF as Difficulty | undefined });
+  let s = newGame(seed, 105, 2027, { site: site === CLASSIC && !life ? undefined : site, lifestyle: life, townPlan: process.env.TOWN === 'rent' ? 'rent' : 'own', mode: 'scenario', peace, kind, dayJobs: true, grid: true, difficulty: process.env.DIFF as Difficulty | undefined });
   // the plans are drawn on the 40; squeeze them into the place actually bought
   const h = s.site.home, M = (x: number, z: number): [number, number] => [h.x0 + x / 67 * (h.x1 - h.x0), h.z0 + z / 67 * (h.z1 - h.z0)];
   let C = M(30, 30);
@@ -296,6 +298,11 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
       if ((strat === 'prepper' || strat === 'fortress') && s.money > (s.weekend?.mode === 'split' ? 60_000 : 150_000) && hoursLeft(st) > 300) hireCrew(s, st.id);
       if (k === 'solar_array' || k === 'battery_shed' || k === 'generator_shed') { const r = planRun(s, 'power_cable', [[x, z], C]); void r; }
       if (k === 'well_drilled' || k === 'cistern') planRun(s, 'water_pipe', [[x, z], C]);
+    }
+    // (weekender, round 5) the Next-step card "Tighten the belt in town", taken when the account barely moves (BELT=0 turns the bot's belt off)
+    if (s.weekend?.mode === 'split' && process.env.BELT !== '0' && day % 30 === 0) {
+      const b = weekendBudget(s);
+      if (b && !b.belt && b.beltSaves > 600 && b.net < 4000 && s.money < 200_000) setBelt(s, true);
     }
     // (weekender, round 5) a crew builds on the weekdays the family is in town: when the stage is supplied and a month of crew is in the account
     if (s.weekend?.mode === 'split' && strat !== 'idle' && day % 7 === 0 && s.money > 55_000 && !(s.crews ?? []).length) {
