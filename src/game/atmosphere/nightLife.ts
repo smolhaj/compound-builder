@@ -16,7 +16,7 @@ export interface NightPerson {
 }
 
 /** Tasks that take someone off the place (or out of the house) entirely. */
-const AWAY = new Set(['gone', 'away', 'job', 'shelter']);
+const AWAY = new Set(['gone', 'away', 'job', 'shelter', 'town']);
 
 /** Living people at home and awake. */
 export function awakeAtHome(people: readonly NightPerson[]): number {

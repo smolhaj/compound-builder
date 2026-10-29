@@ -129,7 +129,7 @@ export function heavyCaliber(s: GameState, need: number): Caliber | null {
 
 /** Adults (and big teens) who could be sent up a tower: not dead, not away. */
 function crewAvailable(s: GameState): number {
-  return s.people.filter((p, i) => s.personState[i]?.needs.died == null && s.personState[i]?.task !== 'gone' && s.personState[i]?.task !== 'away' && (!p.kid || p.age >= 15)).length;
+  return s.people.filter((p, i) => s.personState[i]?.needs.died == null && s.personState[i]?.task !== 'gone' && s.personState[i]?.task !== 'away' && s.personState[i]?.task !== 'town' && (!p.kid || p.age >= 15)).length;
 }
 
 /** The manned mount is in use: a finished mount tower, a person to put on it, and the ammunition. */

@@ -21,6 +21,7 @@ import { log } from './economy';
 import { roadVehicles, VEHICLES, cargoKg, type Vehicle } from './vehicles';
 import { garageConnected } from './parking';
 import type { Person } from './family';
+import { fallbackHouse } from './weekender';
 
 export interface BugOutPlan {
   ok: boolean;
@@ -37,6 +38,8 @@ export interface BugOutPlan {
   /** Loaded under cover. */
   covered: boolean;
   seats: number;
+  /** The kept town house (sim/weekender.ts): somewhere to head for, and how far. */
+  fallback: { name: string; miles: number } | null;
 }
 
 const FOOD_KG = 2, WATER_KG = 3, CAN_L = 20;
@@ -68,9 +71,11 @@ export function bugOutPlan(s: GameState): BugOutPlan {
   let why: string | null = null;
   if (s.ending && !s.ending.continued) why = 'the run is over';
   else if (!people.length) why = 'nobody is left';
+  else if (s.weekend?.mode === 'split' && !s.weekend.here) why = 'the family is in town, away from the place';
   else if (!vs.length) why = 'no running vehicle with fuel';
   else if (!s.disaster.kind) why = 'nothing is wrong yet: this is a free-build game';
-  return { ok: !why, why, going, left, vehicles: vs, foodDays, rangeKm, hours, covered, seats };
+  const fb = fallbackHouse(s);
+  return { ok: !why, why, going, left, vehicles: vs, foodDays, rangeKm, hours, covered, seats, fallback: fb && s.weekend?.town.status === 'kept' ? fb : null };
 }
 
 /** Load up and go. The run ends here: the report card tells who made it and what they took. */
@@ -81,7 +86,7 @@ export function bugOut(s: GameState): string | null {
   // the people who go are off the place; the rest stay at the gate
   for (const p of plan.going) { const ps = s.personState.find(x => x.id === p.id); if (ps) { ps.task = 'away'; ps.target = null; } }
   for (const v of plan.vehicles) v.away = true;
-  s.stats.bugOut = { day, going: plan.going.length, left: plan.left.length, vehicles: plan.vehicles.map(v => v.kind), foodDays: plan.foodDays, rangeKm: plan.rangeKm, covered: plan.covered };
+  s.stats.bugOut = { day, going: plan.going.length, left: plan.left.length, vehicles: plan.vehicles.map(v => v.kind), foodDays: plan.foodDays, rangeKm: plan.rangeKm, covered: plan.covered, ...(plan.fallback ? { fallback: plan.fallback.name } : {}) };
   s.ending = { kind: 'bug_out', day, continued: false };
   s.clock.speed = 0;
   log(s, `The ${s.people[0]?.last ?? ''} family bugged out: ${plan.going.length} of ${plan.going.length + plan.left.length} in ${plan.vehicles.length} vehicle${plan.vehicles.length === 1 ? '' : 's'}, ${plan.foodDays} days of food, about ${plan.rangeKm} km of fuel.`);

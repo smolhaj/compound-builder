@@ -12,7 +12,7 @@ import { newGame, type GameState } from '../src/sim/state';
 import { step } from '../src/sim/engine';
 import { placeOrder, orderProblem, payWith } from '../src/sim/economy';
 import { planStructure, planProblem, isFinished } from '../src/sim/construction';
-import { affordable, CLASSIC, listings, type Site } from '../src/sim/site';
+import { affordable, CLASSIC, listings, type Lifestyle, type Site } from '../src/sim/site';
 import { generateFamily } from '../src/sim/family';
 import { startFunds } from '../src/sim/startFunds';
 import { BLUEPRINTS, isHome } from '../src/sim/blueprints';
@@ -200,7 +200,9 @@ function siteFor(seed: number, region?: RegionId): Site {
 interface RunResult { causes: string; often: Array<[string, number]>; minMoney: number; site: string; strat: Strategy; kind: DisasterKind; variant: string; ending: string; grade: string; alive: string; hungry: number; days: number; moneyAtHit: number; builtAtHit: number; bugs: string[]; lines: string[]; fights: string[]; prisoners: number; hides: number; hidFound: number; owed: number; debtStage: string; trials: string; stripped: number; burned: number }
 
 function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' | 'medium', site: Site = CLASSIC, years = 0): RunResult & { s: GameState } {
-  let s = newGame(seed, 105, 2027, { site: site === CLASSIC ? undefined : site, mode: 'scenario', peace, kind, dayJobs: true, grid: true, difficulty: process.env.DIFF as Difficulty | undefined });
+  // (LIFESTYLE=weekend plays the weekender: the family in town on weekdays, the move-in card, the road home)
+  const life = process.env.LIFESTYLE as Lifestyle | undefined;
+  let s = newGame(seed, 105, 2027, { site: site === CLASSIC && !life ? undefined : site, lifestyle: life, mode: 'scenario', peace, kind, dayJobs: true, grid: true, difficulty: process.env.DIFF as Difficulty | undefined });
   // the plans are drawn on the 40; squeeze them into the place actually bought
   const h = s.site.home, M = (x: number, z: number): [number, number] => [h.x0 + x / 67 * (h.x1 - h.x0), h.z0 + z / 67 * (h.z1 - h.z0)];
   let C = M(30, 30);
@@ -339,7 +341,9 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
       const ransom = e.kind === 'ransom' && e.ransom ? (strat === 'idle' ? 'refuse' : canPay(s, e.ransom) ? 'pay' : canPay(s, e.ransom, 0.6) ? 'parley' : 'refuse') : null;
       if (process.env.GATES) { const q = postureOf(s); dbg(`  posture d${Math.floor(s.clock.t - s.disaster.hitAt)}: barrier ${Math.round(q.barrier)} fighters ${q.fighters} fire ${(q.firepower ?? 0).toFixed(2)} det ${Math.round(q.detection)} towers ${s.structures.filter(x => x.kind.startsWith('watchtower') && isFinished(x)).length} built ${s.structures.filter(isFinished).length} runs ${s.perimeter.filter(runFinished).map(r => r.kind).join('+')} fields ${s.structures.filter(x => x.kind === 'field' && isFinished(x)).length} food ${Math.round(daysOfFood(s))}d people ${livingCount(s)}`); }
       const oddsNow = process.env.GATES && e.stances.includes('defend') ? odds(s) : null, foundNow = e.stances.includes('hide') ? hideFoundChance(s, e) : 0;
-      const stance = ransom ?? (e.kind === 'trial_end' ? trialEnd(strat, s, e.size) : STANCE[strat](e.stances, e.kind, s, e.size));
+      // (the weekender's cards: the idle family holds on; the others move in as soon as it is asked, selling while the market is open; caught in town, they drive straight home)
+      const weekender = e.kind === 'move_in' ? (strat === 'idle' ? 'hold_on' : e.stances.includes('move_sell') ? 'move_sell' : 'move_keep') : e.kind === 'stranded' ? 'drive_now' : null;
+      const stance = ransom ?? weekender ?? (e.kind === 'trial_end' ? trialEnd(strat, s, e.size) : STANCE[strat](e.stances, e.kind, s, e.size));
       const hidBefore = s.gate.history.length;
       const out = resolve(s, stance); s.gate.card = null;
       if (out.lines.some(l => l.includes('set fire'))) burned++;

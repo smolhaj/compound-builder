@@ -9,6 +9,8 @@ import { SEASON_MODES, type SeasonMode } from '../engine/world/season/seasonStat
 import { WEATHER_MODES, type WeatherMode } from '../engine/world/weather/weatherState';
 import { DogsPanel } from './DogsPanel';
 import { KinPanel } from './KinPanel';
+import { WeekenderPanel } from './WeekenderPanel';
+import { isAbsent, whereIs, WHERE_TEXT } from '../sim/weekender';
 import { kinTitle } from '../sim/kin';
 import { calendarOf, dayIndex, hourOf, type Speed } from '../sim/state';
 import { BACKGROUND_NAME, backgroundOf, fullName } from '../sim/family';
@@ -69,7 +71,7 @@ const VIEWS: Array<[BuildingView, string, string]> = [['full', 'Walls', 'Whole b
 const SPEEDS: Array<[Speed, string]> = [[0, '❚❚'], [1, '▶'], [2, '▶▶'], [3, '▶▶▶'], [4, '⏩']];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const MONTH_START = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
-const TASK_TEXT: Record<string, string> = { build: 'Building', forestry: 'In the woods', chores: 'Chores', sleep: 'Asleep', school: 'School', leisure: 'Free time', idle: 'Idle', job: 'At work in town', gone: 'Died', shelter: 'Sheltering', away: 'Away from the place', ...DAILY_TASK_TEXT };
+const TASK_TEXT: Record<string, string> = { build: 'Building', forestry: 'In the woods', chores: 'Chores', sleep: 'Asleep', school: 'School', leisure: 'Free time', idle: 'Idle', job: 'At work in town', gone: 'Died', shelter: 'Sheltering', away: 'Away from the place', town: 'At the town house', ...DAILY_TASK_TEXT };
 
 function dateLabel(doy: number): string {
   let m = 11;
@@ -167,7 +169,7 @@ export function Hud() {
               return <div key={p.id} style={{ padding: '5px 0', borderBottom: `1px solid ${LINE}` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>
                   <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 4, background: '#' + p.shirt.toString(16).padStart(6, '0'), marginRight: 6 }} />{fullName(p)}, {p.age}{p.rel && <span style={{ color: DIM, fontSize: 11 }}> · {kinTitle(p, game.people).toLowerCase()}</span>}{backgroundOf(p) && <span style={{ color: '#c9b27a', fontSize: 11 }}> · {BACKGROUND_NAME[backgroundOf(p)!]}</span>}</span>
-                  <span style={{ color: DIM }}>{n?.taken ? 'Taken' : n?.died != null ? 'Died' : TASK_TEXT[st?.task ?? 'idle']}</span>
+                  <span style={{ color: DIM }}>{n?.taken ? 'Taken' : n?.died != null ? 'Died' : isAbsent(game, p.id) ? WHERE_TEXT[whereIs(game, p.id) as 'work'] : TASK_TEXT[st?.task ?? 'idle']}</span>
                 </div>
                 {n && n.died == null && <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 4, fontSize: 11 }}>
                   <span style={{ color: DIM, width: 34 }}>health</span>{bar(n.health, n.health > 60 ? '#9cc070' : n.health > 30 ? '#e0b050' : '#e06a50', `Health ${Math.round(n.health)}`)}
@@ -180,6 +182,7 @@ export function Hud() {
                 })()}
               </div>;
             })}
+            <WeekenderPanel />
             <DogsPanel game={game} />
             <KinPanel />
             <HousingPanel />
