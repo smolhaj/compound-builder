@@ -2,6 +2,7 @@
 //   flock <lock> node scripts/livedShots.mjs <outDir> [port=5961] [only=-] [age=day1|year1|year3|spring3] [season=summer|fall|winter|spring] [full|-] [hour=11]
 // One compound laid out round the camp (house, cottage, workshop, barn, coop, garden, greenhouse, outhouse, well, sheds, a container-wall ring),
 // the family with kids and dogs, aged by the game clock (finishedAt = 0, clock = age) so props and paths follow the place's age.
+// EXTRA=1 adds the greenhouse, orchard grove, solar farm + battery, pond, reservoir, sheep barn, equipment yard, guest house, Mom's house and the fleet (wider ring; views x-aerial, x-aerial-low).
 // `only` is a comma list of view names. Env: Q=low|medium|high (default medium), SNOW=1 lays snow, MUD=1 forces mud season, DOGS=0 / KIDS=0.
 import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
@@ -36,9 +37,13 @@ try {
       ['farmhouse', -3, -4, 0], ['cottage', 4.5, -4.5, 0], ['workshop', 7, 4.5, 3], ['barn', -8.5, -7.5, 0], ['chicken_coop', -8, -1.5, 1], ['garden', -3.5, -9, 0],
       ['greenhouse', 1.5, -9, 0], ['outhouse', 8, -2, 3], ['well_hand', 0.5, 4.5, 0], ['generator_shed', 3.5, 5.5, 0], ['solar_array', -2, 8, 0], ['orchard', 5, -10.5, 0], ['field', -9, 3, 0],
     ];
-    for (const [kind, dx, dz, rot] of B) g.structures.push({ id: 'cb' + kind + dx, kind, x: c.x + dx, z: c.z + dz + 5, rot, stage: 99, done: 0, supplied: true, finishedAt: 0 });
+    // EXTRA=1: the self-sufficient interior, the family's houses and the fleet, inside a wider ring
+    if (env.extra) B.push(['greenhouse_heated', 13.5, -8, 0], ['orchard_grove', -13, -12, 0], ['solar_farm', 13, 8, 0], ['battery_bank', 14.8, 8.6, 0], ['pond', -13, 9, 0], ['reservoir', -4, 13, 0],
+      ['sheep_barn', -14, -2.5, 0], ...(env.noyard ? [] : [['equipment_yard', 12.5, 0.5, 3]]), ['guest_house', 10.5, -3.5, 0], ['moms_house', 1, 12.5, 2]);
+    // NOYARD=1: no equipment yard, workshop or barn, so the fleet stands in the open yard beside the camp
+    for (const [kind, dx, dz, rot] of B.filter(b => !(env.noyard && ['workshop', 'barn', 'sheep_barn'].includes(b[0])))) g.structures.push({ id: 'cb' + kind + dx, kind, x: c.x + dx, z: c.z + dz + 5, rot, stage: 99, done: 0, supplied: true, finishedAt: 0 });
     const P = await import('/src/sim/perimeter.ts');
-    const R = 11.3, zc = c.z + 4.2;
+    const R = env.extra ? 17 : 11.3, zc = c.z + 4.2;
     const run = P.planRun(g, 'container_wall', [[c.x - R, zc - R], [c.x + R, zc - R], [c.x + R, zc + R], [c.x - R, zc + R], [c.x - R, zc - R]], [{ at: 60, w: 0.6 }]);
     run.done = run.hours; run.supplied = true; run.finishedAt = 0;
     g.clock.t = ({ day1: 2, year1: 365 + 120, year3: 3 * 365 + 120, spring3: 3 * 365 + 8 })[age] + 0.4;
@@ -46,15 +51,18 @@ try {
     g.stock.goat = 3; g.stock.hay = 20;
     if (env.kids === '0') g.people = g.people.filter(p => !p.kid), g.personState = g.personState.slice(0, g.people.length);
     if (env.dogs !== '0') { const pets = await import('/src/sim/pets.ts'); pets.adoptDog(g); pets.adoptDog(g); }
+    if (env.extra) { const V = await import('/src/sim/vehicles.ts'); g.vehicles = V.startingVehicles(); }
     G.setState({ game: g });
     cb.world.lived.qaTier = ({ low: 0, medium: 1, high: 2 })[env.q];
     st.setSeasonMode(season); st.setWeatherMode(env.snow === '1' ? 'snow' : 'clear'); st.setTimeOfDay(hour);
     if (env.mud === '1') { /* mud season shows in spring */ }
     window.__scene = { c, zc };
     return { c, people: g.people.length };
-  }, [age, season, hour, { snow: process.env.SNOW, mud: process.env.MUD, kids: process.env.KIDS, dogs: process.env.DOGS, q: quality }]);
+  }, [age, season, hour, { snow: process.env.SNOW, mud: process.env.MUD, kids: process.env.KIDS, dogs: process.env.DOGS, extra: process.env.EXTRA, noyard: process.env.NOYARD, q: quality }]);
   lap('built ' + JSON.stringify(info));
   await frames(); await frames(); await frames();
+  // the fleet draws and registers its open-yard cars when the world updates it (the sim is paused here)
+  if (process.env.EXTRA) { await page.evaluate(() => { const w = window.__cb.world; for (let i = 0; i < 3; i++) w.updateFleet(0.05, window.__cb.game.getState().game, 1); }); await frames(); await frames(); await frames(); lap('cars ' + JSON.stringify(await page.evaluate(() => { const w = window.__cb.world; return { boxes: w._cars, kids: w.fleet.group.children.map(c => [c.visible, +c.position.x.toFixed(1), +c.position.z.toFixed(1)]), camp: w.camp, v: window.__cb.game.getState().game.vehicles?.map(v => [v.kind, v.away]) }; }))); }
   // LAY=1: lay a different walk on each of the busiest walks (gravel, stepping stones, duckboards, concrete), to see what each looks like
   if (process.env.LAY) {
     await page.evaluate(async () => {
@@ -79,6 +87,8 @@ try {
     { name: 'coop', at: 'chicken_coop', mode: 'orbit', radius: 3.4, pitch: 0.3, yawOff: 0.5 },
     { name: 'gate', at: 'gate', mode: 'orbit', radius: 4.5, pitch: 0.22, yawOff: 0 },
     { name: 'creek', at: 'landing', mode: 'orbit', radius: 4.0, pitch: 0.25, yawOff: 0 },
+    { name: 'x-aerial', at: 'center', mode: 'orbit', radius: 40, pitch: 0.95, yaw: 0.4 },
+    { name: 'x-aerial-low', at: 'center', mode: 'orbit', radius: 24, pitch: 0.6, yaw: 2.4 },
     { name: 'laid-aerial', at: 'center', mode: 'orbit', radius: 16, pitch: 0.7, yaw: 0.3 },
     { name: 'laid-house', at: 'farmhouse', mode: 'orbit', radius: 4.0, pitch: 0.55, yawOff: 0.6 },
     { name: 'laid-eye', at: 'farmhouse', mode: 'eye', dist: 2.6, lat: 0.6, look: 0.12, person: 1.0 },
