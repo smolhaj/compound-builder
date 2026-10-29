@@ -7,24 +7,31 @@
  * winter closure, the raid lanes and the world's mesh all read one plan.
  *
  * How it is found:
- *  1. A* over a 1-unit (6 m) grid of the owned land with a *state* of cell and
- *     heading, so a turn is bounded (a pickup and trailer cannot make a
- *     hairpin tighter than the style's radius) and a cost for each: the grade
- *     of the move against the region's design / maximum grade (the road runs
- *     along the contour when the slope is steeper than that, and doubles back
- *     when it has to), the cross-slope (cut and fill), rock, timber, the
- *     region's habit of winding on level ground, and the creek (only crossed
- *     square, at the price of the structure the region builds there).
- *  2. Phase 2 only when nothing within the maximum grade reaches the yard and
- *     the country holds a bore: straight bore edges under a spur (portals on
- *     the hillside, solid cover between).
- *  3. Phase 3, the engineer's road, with the hard grade limit and a surcharge,
- *     if even that fails; a flagged straight line if all fails.
- *  4. The grid path is smoothed into a curve, resampled every 0.5 unit, given
- *     a vertical profile with the grade limited (landings eased on hairpins),
- *     and read for structures (culverts, fords, low-water slabs, bridges,
- *     bores, cattle guard), retaining walls, guardrails, earthwork and the
- *     price, all from the one table in sim/roadStyle.ts.
+ *  1. A* over a 1-unit (6 m) grid of the owned land whose *state* is the cell
+ *     and the heading, so a turn is bounded (about 13-20 m radius at the
+ *     tightest: a pickup and trailer cannot do better). A move costs its
+ *     length times: the *ground's* slope along it against the style's design
+ *     and maximum grade (the road is cut into the slope and the profile held
+ *     to the grade afterwards, so a switchback's turn may cross the steepest
+ *     line of the slope, at a price), the cross-slope (cut and fill), rock,
+ *     timber, a seeded meander where the ground does not care (a winding
+ *     country winds), and the creek, which is only crossed square, at the
+ *     price of the structure the region builds there. The gate is the habitual
+ *     entrance first, then anywhere on the frontage.
+ *  2. A short straight bore under a spur only if nothing else reaches the yard
+ *     and the country holds one (portals cut into the hillside, rock over the
+ *     arch between): a bore is the dearest thing in the table, so it is the
+ *     answer to a spur, never a shortcut.
+ *  3. Then the engineer's road (steeper ground, steeper cross-slope), then
+ *     anything, and if nothing reaches the yard a zigzag blasted across the
+ *     face, priced as what it is.
+ *  4. The grid path is smoothed (Chaikin), resampled every 0.5 unit and given
+ *     a vertical profile (the grade held, a landing on each hairpin, a level
+ *     deck over a bridge, the slab level at a ford, the bank level over a
+ *     culvert) and superelevation; then read for structures (culverts, fords,
+ *     low-water slabs, bridges, bores, a cattle guard, a pass), retaining
+ *     walls, guardrails, hairpins, earthwork and the price, all from the one
+ *     table in sim/roadStyle.ts.
  * Pure (tested): no three.js.
  */
 import type { RegionId } from './regions';

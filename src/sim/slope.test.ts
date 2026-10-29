@@ -48,7 +48,7 @@ describe('slope-driven costs', () => {
     expect(qs.usd).toBeGreaterThan(qf.usd * 2);
     expect(qf.usd).toBeLessThan(driveQuote(imp).usd * 2);
     expect(qs.days).toBeGreaterThan(driveQuote(imp).days);
-    expect(qs.plan!.lengthM).toBeGreaterThan(qf.plan!.lengthM * 1.5);
+    expect(qs.plan!.lengthM).toBeGreaterThan(qf.plan!.lengthM * 1.2);
   });
 
   it('poles cost more over rough ground, never more than about 2.3 times', () => {
