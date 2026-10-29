@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { stormOutage } from '../sim/weatherThreats';
 import { PersonInsight, PeopleSection, MedicalSection } from './PeoplePanel';
 import { DailySection } from './SchedulePanel';
@@ -114,14 +114,12 @@ export function Hud() {
   const [quitAsk, setQuitAsk] = useState<string | null>(null);
   const [lastSel, setLastSel] = useState<string | null>(null);
   if (g.selected !== lastSel) { setLastSel(g.selected); if (g.selected && !g.tool) setLeftTab('projects'); }
-  // a link elsewhere asked for a panel (hudFocus is taken once)
-  const { hudFocus, focusHud } = g;
-  useEffect(() => {
-    if (!hudFocus) return;
-    setRightTab(hudFocus.right);
-    if (hudFocus.supplies) setSuppliesTab(hudFocus.supplies);
-    focusHud(null);
-  }, [hudFocus, focusHud]);
+  // a link elsewhere asked for a panel: each request is a new object, so a changed one is taken once (state adjusted while rendering, as for the selection above)
+  const [lastFocus, setLastFocus] = useState<typeof g.hudFocus>(g.hudFocus);
+  if (g.hudFocus !== lastFocus) {
+    setLastFocus(g.hudFocus);
+    if (g.hudFocus) { setRightTab(g.hudFocus.right); if (g.hudFocus.supplies) setSuppliesTab(g.hudFocus.supplies); }
+  }
   if (new URLSearchParams(location.search).has('clean')) return null;
   const game = g.game;
   const cal = calendarOf(game.clock);
