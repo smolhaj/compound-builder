@@ -6,8 +6,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { useWorldStore } from '../../store/worldStore';
-import { PERIMETER, type PerimeterKind } from '../../sim/perimeter';
-import { WALL_CHOICES, planPropertyWall } from '../../sim/propertyWall';
+import { CONTAINER_LOOKS, PERIMETER, isContainerKind, type ContainerLook, type PerimeterKind } from '../../sim/perimeter';
+import { ROAD_GATE_W, WALL_CHOICES, planPropertyWall } from '../../sim/propertyWall';
+import { compoundRegion } from '../../sim/fortress';
+import { RING_SHAPES, type RingShape } from '../../sim/ringShape';
 import { costPer100m, perimeterNote, perimeterTiers, plansNeedLines } from '../../sim/guidance';
 import { eta, paceOf, slowHint, totalHoursLeft, weeksFor } from '../../sim/pace';
 import { billText } from '../../sim/materials';
@@ -22,6 +24,9 @@ export function WallProperty() {
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<PerimeterKind>('chain_link');
   const [laid, setLaid] = useState(false);
+  const [look, setLook] = useState<ContainerLook>('black');
+  /** 'line' walls the property line; any other value walls a compound of that shape round the family's buildings. */
+  const [around, setAround] = useState<'line' | RingShape>('line');
   // show the property line on the ground while planning; put it back as it was
   useEffect(() => {
     if (!open) return;
@@ -29,7 +34,7 @@ export function WallProperty() {
     useWorldStore.getState().setShowBoundary(true);
     return () => useWorldStore.getState().setShowBoundary(was);
   }, [open]);
-  const plan = useMemo(() => (open ? planPropertyWall(game, kind, w.siteGeo ?? {}) : null), [open, game, kind, w.siteGeo]);
+  const plan = useMemo(() => (open ? planPropertyWall(game, kind, w.siteGeo ?? {}, around === 'line' ? {} : { region: compoundRegion(game, w.siteGeo ?? {}, around, ROAD_GATE_W) }) : null), [open, game, kind, w.siteGeo, around]);
   const tiers = useMemo(() => perimeterTiers().map(t => ({ ...t, kinds: t.kinds.filter(k => WALL_CHOICES.includes(k)) })).filter(t => t.kinds.length), []);
 
   if (!open) {
@@ -49,7 +54,12 @@ export function WallProperty() {
       <Note tone="good">Laid out. The family builds it as the materials come in; the Defense tab's "Property line closed" check turns green when it is done.</Note>
       {need.length > 0 && <button style={{ ...btn(true), width: '100%' }} disabled={!!orderProblem(game, need)} onClick={() => g.order(need)}>Order what the plans need ({usd(orderCost(need, prices(game)))})</button>}
     </> : <>
-      <Note>One wall type for the whole line. Pick it; the plan below updates.</Note>
+      <Note>One wall type for the whole line, or round a compound of the shape you pick. Pick it; the plan below updates.</Note>
+      <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'center', padding: '2px 0 4px' }}>
+        <span style={{ flex: 1, color: DIM }}>Around</span>
+        <button style={{ ...btn(around === 'line'), padding: '2px 7px' }} title="The whole property line (the Defense tab's line check reads it)" onClick={() => setAround('line')}>Property line</button>
+        {RING_SHAPES.map(sh => <button key={sh.id} style={{ ...btn(around === sh.id), padding: '2px 7px' }} title={`A ${sh.name.toLowerCase()} compound round the family's buildings: ${sh.blurb}`} onClick={() => setAround(sh.id)}>{sh.name}</button>)}
+      </div>
       {plan && <div style={{ borderTop: `1px solid ${LINE}`, borderBottom: `1px solid ${LINE}`, margin: '6px 0', padding: '6px 0' }}>
         <div style={{ color: DIM, fontSize: 11.5, marginBottom: 2 }}>The plan for {PERIMETER[kind].name.toLowerCase()} (chips below show $ per 100 m):</div>
         {plan.runs.length === 0
@@ -64,8 +74,12 @@ export function WallProperty() {
             {note && <Note tone="warn">{note}</Note>}
             {slowHint(game, weeks, pace, 10) && <Note tone="warn">{slowHint(game, weeks, pace, 10)}</Note>}
             {game.money < plan.cost && <Note tone="warn">You have {usd(game.money)}: the materials are bought as you can pay (Supplies: Order what the plans need).</Note>}
-            <button style={{ ...btn(true), width: '100%', marginTop: 4 }} onClick={() => { if (g.wallProperty(kind, w.siteGeo ?? {}) > 0) setLaid(true); }}>Lay it out: {usd(plan.cost)}, {plan.hours} h</button>
+            <button style={{ ...btn(true), width: '100%', marginTop: 4 }} onClick={() => { if (g.wallProperty(kind, w.siteGeo ?? {}, around === 'line' ? undefined : around, isContainerKind(kind) ? look : undefined) > 0) setLaid(true); }}>Lay it out: {usd(plan.cost)}, {plan.hours} h</button>
           </>}
+      </div>}
+      {isContainerKind(kind) && <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'center', padding: '2px 0 4px' }}>
+        <span style={{ flex: 1, color: DIM }}>Paint</span>
+        {CONTAINER_LOOKS.map(l => <button key={l.id} style={{ ...btn(look === l.id), padding: '2px 7px' }} onClick={() => setLook(l.id)}>{l.name}</button>)}
       </div>}
       {tiers.map(t => <div key={t.id} style={{ marginBottom: 4 }}>
         <div style={{ fontSize: 11, color: DIM }} title={t.hint}>{t.title} <span style={{ opacity: 0.7 }}>· {t.hint}</span></div>

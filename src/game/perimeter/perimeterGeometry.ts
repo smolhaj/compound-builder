@@ -80,7 +80,7 @@ export function offsetPts(pts: readonly Pt[], d: number): Pt[] {
 export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (x: number, z: number) => boolean = () => false, opts: { lit?: boolean; sensors?: boolean; hostKind?: PerimeterKind } = {}): THREE.Group {
   const lit = opts.lit ?? true;
   // an upgrade of a finished run is drawn beside the old tier (not on top of it) until it is done and the old one comes down
-  const run = run0.replaces ? { ...run0, pts: offsetPts(run0.pts, run0.replacesKind === 'container_wall' ? 0.36 : UPGRADE_OFFSET) } : run0;
+  const run = run0.replaces ? { ...run0, pts: offsetPts(run0.pts, (run0.replacesKind === 'container_wall' || run0.replacesKind === 'container_stack') ? 0.36 : UPGRADE_OFFSET) } : run0;
   const bits = new Map<KitMaterialId, THREE.BufferGeometry[]>();
   const add = (m: KitMaterialId, g: THREE.BufferGeometry) => { let l = bits.get(m); if (!l) bits.set(m, l = []); l.push(worldUV(g)); };
   const def = PERIMETER[run.kind];
@@ -292,13 +292,14 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
       const p0 = along(run.pts, Math.min(0.3, wl / 2)), left0 = { x: p0.x - p0.dz * 0.3, z: p0.z + p0.dx * 0.3 };
       const inSign = closedRing ? (insideRing(run.pts, left0.x, left0.z) ? 1 : -1) : 1;
       // thick walls carry the deck on top (centered); thin ones carry it on brackets, set back inside
-      const thick = host === 'container_wall' || host === 'concrete_wall';
+      const contLike = host === 'container_wall' || host === 'container_stack';
+      const thick = contLike || host === 'concrete_wall' || host === 'stone_wall';
       const off = thick ? 0 : 0.5 * M + DW / 2 - 0.1 * M;
       const gx = (a: ReturnType<typeof along>, u: number) => a.x - a.dz * u * inSign, gz = (a: ReturnType<typeof along>, u: number) => a.z + a.dx * u * inSign;
       /** The top of the wall at a bay: containers and concrete panels are level at the high point of their bay, steel plate follows the ground. */
       const level = (a: ReturnType<typeof along>, b: ReturnType<typeof along>) => {
         const hi = Math.max(...[0, 0.25, 0.5, 0.75, 1].map(f => ground(a.x + (b.x - a.x) * f, a.z + (b.z - a.z) * f)));
-        return host === 'container_wall' ? hi + 0.015 + HW : host === 'concrete_wall' ? hi + 0.02 + HW + 0.12 * M : null;
+        return contLike ? hi + 0.015 + HW : host === 'concrete_wall' ? hi + 0.02 + HW + 0.12 * M : host === 'stone_wall' ? hi + 0.02 + HW + 0.2 * M : null;
       };
       const seg3 = (x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, th: number, m: KitMaterialId) => {
         const d = new THREE.Vector3(x1 - x0, y1 - y0, z1 - z0), l = d.length();
@@ -307,7 +308,7 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
         add(m, g.translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2));
       };
       const access = walkwayAccess(run);
-      const bayLen = host === 'container_wall' ? 12.2 * M : 3 * M;
+      const bayLen = contLike ? 12.2 * M : 3 * M;
       let lampK = 0;
       for (const [s0, s1] of spans) {
         const n = Math.max(1, Math.round((s1 - s0) / bayLen));
@@ -339,9 +340,9 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
             }
           }
           // posts at the bay end (a post every 3 m: containers get three more along their length)
-          const posts = host === 'container_wall' ? 4 : 1;
+          const posts = contLike ? 4 : 1;
           for (let k = 0; k <= posts; k++) {
-            if (k === 0 && i > 0 && host !== 'container_wall') continue;
+            if (k === 0 && i > 0 && !contLike) continue;
             const f = k / posts, px = a.x + (b.x - a.x) * f, pz = a.z + (b.z - a.z) * f, py = yA + (yB - yA) * f;
             const pa = { x: px, z: pz, dx: a.dx, dz: a.dz };
             for (const side of [-1, 1]) {
@@ -422,14 +423,17 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
       });
       break;
     }
-    case 'container_wall': {
-      const cols: KitMaterialId[] = ['container_red', 'container_blue', 'container_green', 'container_tan'];
-      const L = 12.2 * M, W = 2.44 * M, H = 2.6 * M;
+    case 'container_wall':
+    case 'container_stack': {
+      // used 40 ft boxes end to end, one or two high, painted to the run's `look` (black, rust, a single color, or the mixed old cycle)
+      const look = run.look ?? 'mixed';
+      const mixed: KitMaterialId[] = ['container_red', 'container_blue', 'container_green', 'container_tan'];
+      const single: Partial<Record<string, KitMaterialId>> = { black: 'container_black', rust: 'container_rust', red: 'container_red', blue: 'container_blue', green: 'container_green', tan: 'container_tan' };
+      const L = 12.2 * M, W = 2.44 * M, H = 2.6 * M, layers = run.kind === 'container_stack' ? 2 : 1;
       let k = Math.abs(Math.round(run.pts[0][0] * 7 + run.pts[0][1] * 13));
       for (const [s0, s1] of spans) for (let s = s0; s < s1 - 0.3 * M; s += L) {
         const e = Math.min(s1, s + L);
         const a = along(run.pts, s), b = along(run.pts, e);
-        const m = cols[k++ % cols.length];
         // set level on concrete piers at the high point (containers don't bend to the ground)
         const len = Math.hypot(b.x - a.x, b.z - a.z);
         const samples = [0, 0.25, 0.5, 0.75, 1].map(f => ground(a.x + (b.x - a.x) * f, a.z + (b.z - a.z) * f));
@@ -442,10 +446,13 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
           const gy = Math.min(ground(x0, z0), ground(x1, z1), ground((x0 + x1) / 2, (z0 + z1) / 2)) - 0.05;
           if (y - gy > 0.004) add('concrete', new THREE.BoxGeometry(Math.hypot(x1 - x0, z1 - z0) + 0.004, y - gy, W * 1.02).translate(0, (y - gy) / 2, 0).rotateY(-Math.atan2(z1 - z0, x1 - x0)).translate((x0 + x1) / 2, gy, (z0 + z1) / 2));
         }
-        const g = new THREE.BoxGeometry(len - 0.02 * M, H, W).translate(0, H / 2, 0).rotateY(-Math.atan2(b.z - a.z, b.x - a.x)).translate((a.x + b.x) / 2, y, (a.z + b.z) / 2);
-        add(m, g);
-        // corner castings and the door end
-        for (const c of [a, b]) add('iron', new THREE.BoxGeometry(0.2 * M, H + 0.02 * M, W + 0.02 * M).rotateY(-Math.atan2(c.dz, c.dx)).translate(c.x, y + H / 2, c.z));
+        for (let layer = 0; layer < layers; layer++) {
+          const m: KitMaterialId = single[look] ?? mixed[k++ % mixed.length];
+          const y0 = y + layer * H;
+          add(m, new THREE.BoxGeometry(len - 0.02 * M, H, W).translate(0, H / 2, 0).rotateY(-Math.atan2(b.z - a.z, b.x - a.x)).translate((a.x + b.x) / 2, y0, (a.z + b.z) / 2));
+          // corner castings and the door end
+          for (const c of [a, b]) add('iron', new THREE.BoxGeometry(0.2 * M, H + 0.02 * M, W + 0.02 * M).rotateY(-Math.atan2(c.dz, c.dx)).translate(c.x, y0 + H / 2, c.z));
+        }
       }
       break;
     }
@@ -502,6 +509,27 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
       else if (run.dropped) {   // a dropped bridge leaves its abutments
         for (const [s_, sign] of [[0, -1], [L, 1]] as const) { const p = along(run.pts, s_), gy = ground(p.x, p.z); add('concrete', new THREE.BoxGeometry(0.9 * M, 0.5 * M, R * 2.3).rotateY(-Math.atan2(p.dz, p.dx)).translate(p.x, gy + 0.2 * M, p.z)); void sign; }
       }
+      break;
+    }
+    case 'stone_wall': {
+      // 3.3 m of mortared fieldstone: a wide footing course, the wall tapering up (a batter), a timber coping on the top and a squared post at every 3 m joint
+      const H = 3.3 * M;
+      bays(3 * M, (a, b, i) => {
+        const len = Math.hypot(b.x - a.x, b.z - a.z), yaw = -Math.atan2(b.z - a.z, b.x - a.x), mx = (a.x + b.x) / 2, mz = (a.z + b.z) / 2;
+        const samples = [0, 0.25, 0.5, 0.75, 1].map(f => ground(a.x + (b.x - a.x) * f, a.z + (b.z - a.z) * f));
+        const hi = Math.max(...samples), lo = Math.min(...samples) - 0.06;
+        const box = (l: number, h: number, w: number, y0: number, m: KitMaterialId, dx = 0) => add(m, new THREE.BoxGeometry(l, h, w).translate(0, h / 2, dx).rotateY(yaw).translate(mx, y0, mz));
+        box(len + 0.004, hi - lo + 0.03, 0.62 * M, lo, 'fieldstone');                           // the footing, from the lowest ground to the first course
+        box(len, H * 0.42, 0.58 * M, hi + 0.02, 'fieldstone');                                   // the lower, wider part
+        box(len, H * 0.46, 0.46 * M, hi + 0.02 + H * 0.42, 'fieldstone');                        // the upper part, set back
+        box(len + 0.01, 0.1 * M, 0.5 * M, hi + 0.02 + H * 0.88, 'wood_mid');                     // the timber coping
+        box(len + 0.01, 0.1 * M, 0.34 * M, hi + 0.02 + H * 0.88 + 0.1 * M, 'wood_dark');
+        // a squared timber post at the joint, standing proud of the coping
+        add('wood_dark', new THREE.BoxGeometry(0.2 * M, H * 0.28, 0.2 * M).translate(a.x, hi + 0.02 + H * 0.88, a.z));
+        add('wood_mid', new THREE.BoxGeometry(0.26 * M, 0.06 * M, 0.26 * M).translate(a.x, hi + 0.02 + H * 0.88 + H * 0.28, a.z));
+        void i;
+      });
+      for (const e of spanEnds()) add('fieldstone', new THREE.BoxGeometry(0.7 * M, H, 0.7 * M).translate(e.x, ground(e.x, e.z) + H / 2, e.z));
       break;
     }
     case 'water_pipe': case 'power_cable': {
@@ -583,7 +611,7 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
         for (const p of [p0, p1]) post(p.x, p.z, def.height + 0.08 * M, 0.1 * M, 'steel');
         beam(p0.x, p0.z, p1.x, p1.z, def.height, 0.14 * M, 0.3 * M, 'steel');
       }
-      const wall = run.kind === 'log_palisade' || run.kind === 'container_wall' || run.kind === 'concrete_wall';
+      const wall = run.kind === 'log_palisade' || run.kind === 'container_wall' || run.kind === 'container_stack' || run.kind === 'stone_wall' || run.kind === 'concrete_wall';
       const leafH = wall ? Math.abs(def.height) * 0.95 : 1.3 * M;
       const ang = -Math.atan2(p0.dz, p0.dx);
       /** A gate leaf, hinged at (hx, hz), `w` wide, swung open by `open` radians. */

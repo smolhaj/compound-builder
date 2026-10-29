@@ -55,7 +55,7 @@ export function campOf(s: GameState): Pt {
 /** The finished, standing tunnel-bridges and slope tunnels: ways a crew can use as easy going over hard ground (`outer` = the end away from the camp). */
 export function corridorsOf(s: GameState): Corridor[] {
   const c = campOf(s);
-  return s.perimeter.filter(r => PERIMETER[r.kind].vehicleWay && runFinished(r) && !r.dropped && r.pts.length > 1).map(r => {
+  return s.perimeter.filter(r => PERIMETER[r.kind].vehicleWay && runFinished(r) && r.pts.length > 1).map(r => {
     const a = r.pts[0], b = r.pts[r.pts.length - 1];
     return { id: r.id, pts: r.pts.map(p => [p[0], p[1]] as [number, number]), outer: Math.hypot(a[0] - c[0], a[1] - c[1]) > Math.hypot(b[0] - c[0], b[1] - c[1]) ? a : b };
   });

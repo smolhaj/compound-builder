@@ -20,7 +20,7 @@ export type KitMaterialId = 'timber_lap' | 'trim' | 'fieldstone' | 'metal_roof' 
   // more buildings
   | 'concrete' | 'metal_siding' | 'log_wall' | 'log_end' | 'board_batten' | 'wire_mesh' | 'straw' | 'soil' | 'crop' | 'grain' | 'earth' | 'pegboard' | 'steel' | 'paint_red' | 'paint_green' | 'paint_yellow' | 'paint_bunker' | 'paint_dado' | 'bulkhead' | 'glow' | 'glow_oil' | 'glow_electric' | 'glow_curtain' | 'glow_off' | 'whitewash' | 'wet_concrete' | 'bulb' | 'copper' | 'lead' | 'rubber' | 'gauge'
   // perimeter
-  | 'hedge' | 'hedge2' | 'hedge_berry' | 'container_red' | 'container_blue' | 'container_green' | 'container_tan'
+  | 'hedge' | 'hedge2' | 'hedge_berry' | 'container_red' | 'container_blue' | 'container_green' | 'container_tan' | 'container_black' | 'container_rust'
   // homey decor (procedural art)
   | 'solar_cell' | 'poly_tank' | 'blue_tank' |
   'lap_white' | 'vinyl' | 'shingle' |
@@ -42,7 +42,7 @@ const TEX_WORLD: Partial<Record<KitMaterialId, number>> = {
   curtain: 0.15, curtain_red: 0.15, hedge: 0.25, hedge2: 0.25,
   pine_panel: 0.5, quilt_red: 0.12, quilt_blue: 0.12, rug: 0.3, books: 0.1,
   lap_white: 0.5, vinyl: 0.5, shingle: 0.5,
-  concrete: 0.6, whitewash: 0.5, wet_concrete: 0.6, metal_siding: 0.5, container_red: 0.4, container_blue: 0.4, container_green: 0.4, container_tan: 0.4, log_wall: 0.5, board_batten: 0.5, wire_mesh: 0.15, straw: 0.3, soil: 0.4, earth: 0.8, pegboard: 0.2,
+  concrete: 0.6, whitewash: 0.5, wet_concrete: 0.6, metal_siding: 0.5, container_red: 0.4, container_blue: 0.4, container_green: 0.4, container_tan: 0.4, container_black: 0.4, container_rust: 0.4, log_wall: 0.5, board_batten: 0.5, wire_mesh: 0.15, straw: 0.3, soil: 0.4, earth: 0.8, pegboard: 0.2,
   // 1 repeat: a 1.5 × 1.5 m patch of pea gravel; 2 × 2 pavers of 45 cm; 1.8 m of 13 cm floorboards
   gravel: 0.25, pavers: 0.15, floorboards: 0.3,
 };
@@ -779,8 +779,8 @@ export function kitMaterial(id: KitMaterialId): THREE.MeshStandardMaterial {
     case 'oil_stain': m = new THREE.MeshStandardMaterial({ color: 0x1d1a16, roughness: 0.3, metalness: 0.1, transparent: true, opacity: 0.55, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }); break;
     case 'hedge_berry': m = new THREE.MeshStandardMaterial({ color: 0xa3261e, roughness: 0.5 }); break;
     case 'food_slot': m = new THREE.MeshStandardMaterial({ visible: false }); break;
-    case 'container_red': case 'container_blue': case 'container_green': case 'container_tan': {
-      const tint = { container_red: 0xb0473a, container_blue: 0x4a6f9a, container_green: 0x6f8f62, container_tan: 0xc7aa7c }[id];
+    case 'container_red': case 'container_blue': case 'container_green': case 'container_tan': case 'container_black': case 'container_rust': {
+      const tint = { container_red: 0xb0473a, container_blue: 0x4a6f9a, container_green: 0x6f8f62, container_tan: 0xc7aa7c, container_black: 0x2a2c30, container_rust: 0x8c5434 }[id];
       const mm = texMat(id, paintMetalSiding, 2.5, 0.6, 0.4);
       mm.color.set(tint).multiplyScalar(1.6);
       m = mm; break;

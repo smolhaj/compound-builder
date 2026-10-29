@@ -25,11 +25,12 @@ import { lightsOf, setAiSensor, setAllAi, type LightMode } from '../sim/lights';
 import { AUTO_NAME, type AutoLightsOut } from '../sim/blackout';
 import { stampHighGround, upgradeTower } from '../sim/towers';
 import { cutRoadGates } from '../sim/roadGate';
-import { addSkirt, planRun, upgradeRun, type Gate, type PerimeterKind, type Pt } from '../sim/perimeter';
-import { layPropertyWall, planPropertyWall, type PropertyGeometry } from '../sim/propertyWall';
+import { addSkirt, planRun, upgradeRun, type ContainerLook, type Gate, type PerimeterKind, type Pt } from '../sim/perimeter';
+import { ROAD_GATE_W, layPropertyWall, planPropertyWall, type PropertyGeometry } from '../sim/propertyWall';
 import { addWalkway } from '../sim/walkway';
 import { layPaths, pickUpPath, type LaidKind, type LayEdge } from '../sim/paths';
-import { layFortress, planFortress, type FortressOptions } from '../sim/fortress';
+import { compoundRegion, layFortress, planFortress, type FortressOptions } from '../sim/fortress';
+import type { RingShape } from '../sim/ringShape';
 import { fitProblem, orderFit, plant, repairPump, replaceFried } from '../sim/utilities';
 
 /** Reconnection fee to get back on the grid after leaving it. */
@@ -130,7 +131,7 @@ export interface GameStore {
   /** Drop a standing tunnel-bridge or slope tunnel (it is a plan again until rebuilt). */
   dropBridge: (id: string) => string | null;
   /** "Wall my property": lay out the whole closed property line in one wall type (creek bars, a road gate, existing runs kept). Returns how many runs. */
-  wallProperty: (kind: PerimeterKind, geo: PropertyGeometry) => number;
+  wallProperty: (kind: PerimeterKind, geo: PropertyGeometry, shape?: RingShape, look?: ContainerLook) => number;
   /** Upgrade a finished fence or wall to the next tier, in place (null = laid out; else why not). */
   upgradeRun: (id: string) => string | null;
   /** Bury a steel-and-concrete skirt under a finished wall (null = done, else why not). */
@@ -323,10 +324,10 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     set({ game: g });
     void saveGame(AUTOSAVE, g);
   },
-  wallProperty: (kind, geo) => {
+  wallProperty: (kind, geo, shape, look) => {
     if (locked()) return 0;
     const g = structuredClone(get().game);
-    const n = layPropertyWall(g, planPropertyWall(g, kind, geo), geo);
+    const n = layPropertyWall(g, planPropertyWall(g, kind, geo, { ...(shape ? { region: compoundRegion(g, geo, shape, ROAD_GATE_W) } : {}), ...(look ? { look } : {}) }), geo);
     if (n) { set({ game: g }); void saveGame(AUTOSAVE, g); }
     return n;
   },
