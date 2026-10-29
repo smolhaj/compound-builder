@@ -30,9 +30,8 @@ import { burnStructure, isFinished } from './construction';
 import { raidPressure } from './opsec';
 import { PERIMETER, peopleBlock, runFinished, runGrowth, wallLength } from './perimeter';
 import { enclosure } from './enclosure';
-import { freshNeeds } from './needs';
 import { contagion, infect } from './effects';
-import { dayJob, type Person, type SkillId, SKILL_IDS } from './family';
+import type { Person, SkillId } from './family';
 import { dayIndex, type GameState } from './state';
 import type { Stock } from './materials';
 import type { Battle } from './battleTypes';
@@ -44,7 +43,8 @@ import { resolveDigWarning } from './tunnelers';
 import { addTool, stealTools, SWAP_KINDS, TOOLS, type ToolKind } from './tools';
 import { resolveKin } from './kin';
 import { raidTakesVehicles } from './vehicles';
-import { resolveTrialEnd, startTrial, trialDay, type TrialCamp } from './trial';
+import { resolveTrialEnd, startTrial, trialDay, type Character, type TrialCamp } from './trial';
+import { admitNewcomers, resolveShelter, strangerArrival, type Extras, type ShelterWhy } from './newcomers';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Neighbors
@@ -164,7 +164,7 @@ export function postureOf(s: GameState): Posture {
 // Encounters
 // ─────────────────────────────────────────────────────────────────────────
 
-export type EncounterKind = 'arrival' | 'looters' | 'gang' | 'refugees' | 'requisition' | 'neighbor_help' | 'trader' | 'horde' | 'patrol' | 'militia' | 'break_in' | 'ransom' | 'trial_end' | 'tunnelers' | 'kin';
+export type EncounterKind = 'arrival' | 'looters' | 'gang' | 'refugees' | 'requisition' | 'neighbor_help' | 'trader' | 'horde' | 'patrol' | 'militia' | 'break_in' | 'ransom' | 'trial_end' | 'tunnelers' | 'kin' | 'shelter';
 export type Stance = 'hide' | 'parley' | 'warn' | 'defend' | 'trade' | 'take_in' | 'trial' | 'turn_away' | 'call_911' | 'shout' | 'confront' | 'pay' | 'refuse' | 'ambush' | 'flood' | 'collapse' | 'ignore' | 'build_first';
 
 export interface Encounter {
@@ -198,13 +198,23 @@ export interface Encounter {
   /** Tunnelers (sim/tunnelers.ts): found digging under the wall (`warning`, the window to act), or up inside it (`inside`). */
   /** A relative asking to join (sim/kin.ts): the savings they bring, and whether it is after the hit. */
   kin?: { savings: number; late: boolean };
+  /** Strangers (sim/newcomers.ts): which kind of person, what they really are (hidden), what they say, the questions asked so far, what you noticed, a wound, tools and dogs they bring. */
+  arche?: string;
+  secret?: Character;
+  said?: string[];
+  asked?: number;
+  tells?: string[];
+  hurt?: { who: string; what: string; sev: number };
+  extras?: Extras;
+  /** A neighbor household asking to shelter (or, for `settle`, to stay for good). */
+  shelter?: { nid: string; why: ShelterWhy; days: number; settle?: boolean };
   dig?: { phase: 'warning' | 'inside'; id: string; /** Days left in the dig when it was found. */ lead: number; by?: string };
 }
 
 /** Crews that plan, carry more and might bring explosives (battle.ts `organized`). */
 export const ORGANIZED: ReadonlySet<EncounterKind> = new Set(['gang', 'militia', 'patrol', 'requisition', 'tunnelers']);
 /** A crew that found the place empty and stripped it: they know it's lived in and come back sooner. */
-export interface ComeBack { kind: EncounterKind; size: number; armed: boolean; temper?: RaiderTemper; until: number }
+export interface ComeBack { kind: EncounterKind; size: number; armed: boolean; temper?: RaiderTemper; until: number; /** A scout who walked out and told them how the place lies (sim/newcomers.ts). */ guide?: string }
 
 /**
  * How ruthless a crew is. Most are desperate people after food; some will kill
@@ -271,42 +281,6 @@ export interface GateState {
 export function newGate(seed: number): GateState {
   const r = mulberry32(seed * 811 + 5);
   return { pending: null, card: null, humanity: 70, tookIn: 0, turnedAway: 0, raidsHeld: 0, raidsLost: 0, government: r() < 0.5 ? 'help' : 'hindrance', day: -1, next: -1, history: [], aftermath: null, prisoners: [], camps: [], comeBack: null, incoming: null };
-}
-
-const FIRST = ['Alex', 'Jordan', 'Casey', 'Morgan', 'Riley', 'Jamie', 'Drew', 'Quinn', 'Avery', 'Rowan', 'Elena', 'Marcus', 'Dolores', 'Hector', 'Lena', 'Walt', 'Tomas', 'Bea'];
-const LAST = ['Reyes', 'Holt', 'Vance', 'Okafor', 'Brandt', 'Sato', 'Larkin', 'Moreau', 'Pruitt', 'Szabo'];
-const STORY = [
-  ['Your cousin', 'drove up from the city on back roads; the car died at the county line.'],
-  ['A family from town', 'walked out when the water stopped. The youngest has a fever.'],
-  ['A couple', 'from the subdivision by the highway. Their house was broken into last night.'],
-  ['A man alone', 'says he was a lineman for the co-op. Carries his own tools.'],
-  ['A nurse and her son', 'left the county hospital when the generators ran dry.'],
-  ['Two brothers', 'from a ranch to the south. Good shots; they want work and a roof.'],
-];
-
-function makeArrival(r: () => number, id: string, day: number, seed: number): Encounter {
-  const [who, story] = pick(r, STORY);
-  const n = who.startsWith('A man') ? 1 : who.startsWith('A couple') || who.startsWith('Two') || who.startsWith('A nurse') ? 2 : 3 + Math.floor(r() * 2);
-  const last = pick(r, LAST);
-  const people: Person[] = Array.from({ length: n }, (_, i) => {
-    const kid = n > 2 && i >= 2;
-    const skills = Object.fromEntries(SKILL_IDS.map(k => [k, Math.floor(r() * (kid ? 2 : 4))])) as Record<SkillId, number>;
-    if (!kid) skills[pick(r, SKILL_IDS)] = 5 + Math.floor(r() * 4);
-    if (story.includes('nurse') && i === 0) skills.medic = 8;
-    if (story.includes('lineman') && i === 0) skills.mechanic = 8;
-    if (story.includes('ranch')) skills.hunter = 6 + Math.floor(r() * 3);
-    const body: 'f' | 'm' = story.includes('nurse') && i === 0 ? 'f' : r() < 0.5 ? 'f' : 'm';
-    const p: Person = { id: `p${id}_${i}`, first: pick(r, FIRST), last, age: kid ? 5 + Math.floor(r() * 10) : 22 + Math.floor(r() * 40), kid, body, skills, shirt: Math.floor(r() * 0xffffff) & 0x7f7f7f };
-    if (!kid) p.job = dayJob(p, seed);
-    return p;
-  });
-  const best = people.filter(p => !p.kid).map(p => { const top = SKILL_IDS.reduce((a, b) => (p.skills[b] > p.skills[a] ? b : a)); return `${p.first} (${top} ${p.skills[top]})`; });
-  return {
-    id, kind: 'arrival', day, title: `${who} at the gate`,
-    dossier: [story, `${n} ${n === 1 ? 'person' : 'people'}${people.some(p => p.kid) ? `, ${people.filter(p => p.kid).length} kids` : ''}.`, `Good at: ${best.join(', ') || 'not much yet'}.`, `${n} more to feed: about ${n * 2200} kcal a day.`],
-    size: n, armed: false, strength: 0, people, brings: r() < 0.5 ? { canned: 1 + Math.floor(r() * 3) } : {},
-    stances: ['take_in', 'trial', 'trade', 'turn_away'],
-  };
 }
 
 /** How often someone comes (days between), from law and order outside and how much the place shows. */
@@ -402,7 +376,7 @@ function makeThreat0(kind: EncounterKind, r: () => number, id: string, day: numb
       const size = 6 + Math.floor(r() * 8);
       return { id, kind, day, title: 'Militia at the gate', dossier: [`${size} armed men from the Plains Alliance, a recruiter with a list.`, 'They want food, fuel, and a fighting-age man or woman for the line.'], size, armed: true, strength: size * 11, wants: { canned: 5, fuel: 3 }, stances: ['parley', 'trade', 'hide', 'defend'] };
     }
-    default: return makeArrival(r, id, day, s.seed);
+    default: return strangerArrival(s, r, id, day);
   }
 }
 
@@ -435,7 +409,7 @@ export function gateDay(s: GameState): Encounter | null {
     e.size = cb.size; e.armed = cb.armed; e.temper = cb.temper; e.back = true;
     e.strength = Math.round(cb.size * (kind === 'gang' ? 12 : kind === 'militia' ? 11 : 9));
     e.title = `Back again: ${e.title[0].toLowerCase()}${e.title.slice(1)}`;
-    e.dossier = [`${cb.size} of them: the same ones who went through the place. They know somebody lives here now, and they mean to find them.`, ...e.dossier.slice(1, 2)];
+    e.dossier = [cb.guide ? `${cb.size} of them. ${cb.guide} told them how the place lies: the posts, the guns, the hours of the watch. They come in knowing where to go.` : `${cb.size} of them: the same ones who went through the place. They know somebody lives here now, and they mean to find them.`, ...e.dossier.slice(1, 2)];
     g.comeBack = null;
   }
   // the difficulty's crew size (the battle counts heads: `strength` is only the dossier's figure for them)
@@ -600,17 +574,19 @@ export function resolve(s: GameState, stance: Stance): Outcome {
   } else if (e.kind === 'kin') {
     const o = resolveKin(s, e, stance);
     title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines);
+  } else if (e.kind === 'shelter') {
+    const o = resolveShelter(s, e, stance);
+    title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines);
   } else if (e.kind === 'arrival') {
     if (stance === 'trial') {
       // (round 4) a real trial: a camp outside the wall for a month, fed from the family's stores (sim/trial.ts)
       const o = startTrial(s, e);
       title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines);
     } else if (stance === 'take_in') {
-      for (const person of e.people ?? []) { s.people.push(person); s.personState.push({ id: person.id, task: 'idle', target: null, needs: freshNeeds() }); }
-      give(s, e.brings ?? {});
-      s.stock.sleeping_bag += (e.people ?? []).length;     // they come with a bedroll each (sim/housing.ts)
-      g.tookIn += e.size; g.humanity = Math.min(100, g.humanity + 6);
-      title = 'They\'re family now';
+      // everyone who joins goes through sim/newcomers.ts: a bond (loyalty, hidden character), a bedroll, what they carry
+      lines.push(...admitNewcomers(s, e.people ?? [], { kind: e.neighbor ? 'neighbor' : 'stranger', neighbor: e.neighbor, arche: e.arche, secret: e.secret, brings: e.brings, extras: e.extras, hurt: e.hurt, tells: e.tells }));
+      g.humanity = Math.min(100, g.humanity + 6);
+      title = e.neighbor ? 'They\'re staying' : 'They\'re family now';
       text = `You open the gate. ${e.size} more at the table tonight.`;
       tone = 'good';
     } else if (stance === 'trade') {

@@ -35,11 +35,14 @@ import { migrateDogs } from '../pets';
 import { starterKit } from '../tools';
 import { newPaths } from '../paths';
 import { newKin } from '../kin';
+import { newNewcomers } from '../newcomers';
 
 type Raw = Record<string, unknown> & { version?: number };
 
 /** version n → n + 1 upgraders. */
 const STEPS: Record<number, (s: Raw) => Raw> = {
+  // 58 → 59: neighbors and strangers who joined (`newcomers`, sim/newcomers.ts); everyone already on the place is the founding household or kin, so no bonds
+  58: s => ({ ...s, version: 59, newcomers: (s.newcomers as object | undefined) ?? newNewcomers() }),
   // 57 → 58: laid walks (`paths`, sim/paths.ts); worn tracks are derived, not saved
   57: s => ({ ...s, version: 58, paths: (s.paths as object | undefined) ?? newPaths() }),
   // 55 → 56: the fleet (sim/vehicles.ts): vehicle parts in the stock, a service reading on each vehicle

@@ -26,7 +26,7 @@ export const lossesOf = (s: GameState): Loss[] => (s.losses ??= []);
 export function noteLosses(s: GameState): void {
   const ledger = lossesOf(s);
   for (const ps of s.personState) {
-    if (ps.needs.died == null || ps.needs.taken || ledger.some(l => l.id === ps.id)) continue;
+    if (ps.needs.died == null || ps.needs.taken || ps.needs.left || ledger.some(l => l.id === ps.id)) continue;
     ledger.push({ id: ps.id, at: ps.needs.died, mourned: false });
   }
 }
@@ -49,7 +49,7 @@ export function griefPoints(mourned: boolean, days: number): number {
 export function griefMorale(s: GameState): number {
   let sum = 0;
   for (const ps of s.personState) {
-    if (ps.needs.died == null) continue;
+    if (ps.needs.died == null || ps.needs.left) continue;
     const l = s.losses?.find(x => x.id === ps.id);
     sum += griefPoints(!!l?.mourned, s.clock.t - (l?.at ?? ps.needs.died));
   }

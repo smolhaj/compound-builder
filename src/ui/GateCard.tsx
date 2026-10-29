@@ -2,7 +2,7 @@ import type { CSSProperties } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { ambushOdds, ambushParty, chosenParty } from '../sim/tunnelers';
 import { fightOdds, hideFoundChance, postureOf, type Stance } from '../sim/encounters';
-import { daysOfFood } from '../sim/needs';
+import { askQuestion, carryLines, carryOf, MAX_QUESTIONS, QUESTIONS } from '../sim/newcomers';
 import { AFTERMATH_TEXT } from '../sim/aftermath';
 import { canPay, DOUBLE_CROSS } from '../sim/rescue';
 import type { Caliber } from '../sim/armory';
@@ -16,6 +16,11 @@ const TRIAL_END: Partial<Record<Stance, [string, string]>> = {
   turn_away: ['Send them on', 'Thank them for the month\'s work and point them down the road.'],
 };
 
+/** A neighbor household at the door: the same two answers, in their words. */
+const SHELTER: Partial<Record<Stance, [string, string]>> = {
+  take_in: ['Open the house', 'They come in out of it and stay until it has passed. Their own place stays theirs, and they will not forget it.'],
+  turn_away: ['Send them on', 'The gate stays shut. They will remember, and so will every household that hears of it.'],
+};
 /** "about 7 in 10", from a share. */
 const inTen = (x: number) => (x < 0.05 ? 'almost never' : x > 0.95 ? 'almost always' : `about ${Math.round(x * 10)} in 10`);
 
@@ -43,17 +48,27 @@ export function GateCard() {
     const p = postureOf(g.game);
     // honest odds: the battle sim itself, a couple of dozen times (cached per encounter)
     const odds = e.strength > 0 && e.kind !== 'break_in' && e.stances.includes('defend') ? fightOdds(g.game, e) : null;
-    const label = (st: Stance) => (e.ransom && RANSOM[st]) || (e.kind === 'trial_end' && TRIAL_END[st]) || STANCE[st];
+    const label = (st: Stance) => (e.ransom && RANSOM[st]) || (e.kind === 'trial_end' && TRIAL_END[st]) || (e.kind === 'shelter' && SHELTER[st]) || STANCE[st];
     const picked = cut ? cut.stance ?? e.stances[0] : null;
     return (
       <div style={cut ? raidBox : box}>
-        <div style={{ fontSize: 11, letterSpacing: 1, opacity: 0.6, textTransform: 'uppercase' }}>{e.kind === 'break_in' ? 'In the night' : e.kind === 'ransom' ? 'Word about your child' : e.kind === 'trial_end' ? 'The camp outside the wall' : e.kind === 'kin' ? 'Family' : 'At the gate'}</div>
+        <div style={{ fontSize: 11, letterSpacing: 1, opacity: 0.6, textTransform: 'uppercase' }}>{e.kind === 'break_in' ? 'In the night' : e.kind === 'ransom' ? 'Word about your child' : e.kind === 'trial_end' ? 'The camp outside the wall' : e.kind === 'kin' ? 'Family' : e.kind === 'shelter' ? 'Neighbors at the door' : e.neighbor ? 'A neighbor at the gate' : 'At the gate'}</div>
         <div style={{ fontSize: 19, fontWeight: 700, margin: '2px 0 8px' }}>{e.title}</div>
         {e.dossier.filter(Boolean).map((l, i) => <div key={i} style={{ marginBottom: 4, opacity: 0.9 }}>{l}</div>)}
-        {(e.kind === 'arrival' || e.kind === 'trial_end' || e.kind === 'kin') && !!e.people?.length && <ArrivalHousing people={e.people} />}
-        {(e.kind === 'arrival' || e.kind === 'kin') && !g.game.food.fromStores && (() => {
-          const here = g.game.personState.filter(ps => ps.needs.died == null).length, days = daysOfFood(g.game);
-          return <div style={{ margin: '8px 0', fontSize: 12, opacity: 0.75 }}>Put by: {Math.round(days)} days of food for {here}; with them, {Math.round(days * here / (here + e.size))} days.</div>;
+        {(e.kind === 'arrival' || e.kind === 'trial_end' || e.kind === 'kin' || (e.kind === 'shelter' && !e.shelter?.settle)) && !!e.people?.length && <ArrivalHousing people={e.people} />}
+        {(e.kind === 'arrival' || e.kind === 'kin' || e.kind === 'trial_end' || e.kind === 'shelter') && !!e.people?.length && !(e.shelter?.settle) && (() => {
+          const c = carryOf(g.game, e.people!), lines = carryLines(c);
+          const tone = c.levelWith === 'over' ? '#f08060' : c.levelWith === 'tight' ? '#f0c070' : undefined;
+          return <div data-testid="carry" style={{ margin: '8px 0', fontSize: 12, opacity: 0.9, color: tone }}>{lines.map((l, i) => <div key={i}>{l}</div>)}</div>;
+        })()}
+        {e.kind === 'arrival' && !!e.secret && (() => {
+          const asked = e.asked ?? 0;
+          return <div style={{ margin: '6px 0' }}>
+            <button disabled={asked >= MAX_QUESTIONS} style={{ ...button(false), opacity: asked >= MAX_QUESTIONS ? 0.5 : 1, width: '100%' }} title="Talk to them through the gate before you decide. A good talker hears more than they say." onClick={() => g.money(d => askQuestion(d))}>
+              <div style={{ fontWeight: 600 }}>{asked >= MAX_QUESTIONS ? 'You have asked what you can' : `Ask them: \u201c${QUESTIONS[asked]}\u201d`}</div>
+              <div style={{ fontSize: 11.5, opacity: 0.75 }}>{asked}/{MAX_QUESTIONS} asked. It costs nothing, and you cannot tell everything from the gate.</div>
+            </button>
+          </div>;
         })()}
         {e.ransom && (() => {
           const t = e.ransom, gm = g.game;

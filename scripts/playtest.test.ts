@@ -197,6 +197,14 @@ function siteFor(seed: number, region?: RegionId): Site {
   return ls.filter(l => affordable(l, budget)).sort((a, b) => b.price - a.price)[0];
 }
 
+/** (neighbors and strangers who joined) how many came, left and how many shelter stays. */
+const newcomerNote = (s: GameState): string => {
+  const N = s.newcomers;
+  if (!N) return '';
+  const bonds = Object.values(N.bonds), came = bonds.filter(b => b.kind !== 'guest').length, stays = Object.keys(N.stays).reduce((a, k) => a + N.stays[k], 0);
+  const gone = N.departed.filter(d => d.kind !== 'guest');
+  return came || stays ? `joined ${came} (${gone.length} left${gone.some(d => /stole|night/.test(d.why)) ? ', incl. thief/scout' : ''}), ${stays} shelter stays` : '';
+};
 interface RunResult { causes: string; often: Array<[string, number]>; minMoney: number; site: string; strat: Strategy; kind: DisasterKind; variant: string; ending: string; grade: string; alive: string; hungry: number; days: number; moneyAtHit: number; builtAtHit: number; bugs: string[]; lines: string[]; fights: string[]; prisoners: number; hides: number; hidFound: number; owed: number; debtStage: string; trials: string; stripped: number; burned: number }
 
 function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' | 'medium', site: Site = CLASSIC, years = 0): RunResult & { s: GameState } {
@@ -226,7 +234,7 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
   const causes = new Map<string, number>(), mourned = new Set<string>();
   const tallyDeaths = (fought: boolean) => s.personState.forEach((ps, i) => {
     const n = ps.needs, p = s.people[i];
-    if (n.died == null || mourned.has(ps.id)) return;
+    if (n.died == null || n.left || mourned.has(ps.id)) return;   // (people who moved away are not lost)
     mourned.add(ps.id);
     const why = n.taken ? 'taken' : fought ? 'killed in a fight' : n.hunger > 5000 ? 'hunger' : n.hurt.some(h => h.trauma) ? 'wounds' : n.dose > 1 ? 'radiation' : s.utilities.report.shortL > s.utilities.report.useL * 0.5 ? 'thirst' : n.hurt.some(h => h.what === 'fever') ? 'sickness' : (p?.age ?? 0) >= 65 ? 'old age' : 'other';
     causes.set(why, (causes.get(why) ?? 0) + 1);
@@ -339,7 +347,7 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
       const ransom = e.kind === 'ransom' && e.ransom ? (strat === 'idle' ? 'refuse' : canPay(s, e.ransom) ? 'pay' : canPay(s, e.ransom, 0.6) ? 'parley' : 'refuse') : null;
       if (process.env.GATES) { const q = postureOf(s); dbg(`  posture d${Math.floor(s.clock.t - s.disaster.hitAt)}: barrier ${Math.round(q.barrier)} fighters ${q.fighters} fire ${(q.firepower ?? 0).toFixed(2)} det ${Math.round(q.detection)} towers ${s.structures.filter(x => x.kind.startsWith('watchtower') && isFinished(x)).length} built ${s.structures.filter(isFinished).length} runs ${s.perimeter.filter(runFinished).map(r => r.kind).join('+')} fields ${s.structures.filter(x => x.kind === 'field' && isFinished(x)).length} food ${Math.round(daysOfFood(s))}d people ${livingCount(s)}`); }
       const oddsNow = process.env.GATES && e.stances.includes('defend') ? odds(s) : null, foundNow = e.stances.includes('hide') ? hideFoundChance(s, e) : 0;
-      const stance = ransom ?? (e.kind === 'trial_end' ? trialEnd(strat, s, e.size) : STANCE[strat](e.stances, e.kind, s, e.size));
+      const stance = ransom ?? (e.kind === 'trial_end' ? trialEnd(strat, s, e.size) : e.kind === 'shelter' ? (MARGIN[strat] && foodCovers(s, e.size, MARGIN[strat]) ? 'take_in' : 'turn_away') : STANCE[strat](e.stances, e.kind, s, e.size));
       const hidBefore = s.gate.history.length;
       const out = resolve(s, stance); s.gate.card = null;
       if (out.lines.some(l => l.includes('set fire'))) burned++;
@@ -367,7 +375,7 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
   const r = reportCard(s);
   const alive = s.personState.filter(ps => ps.needs.died == null).length;
   const often = [...seen].filter(([, n]) => n >= 40).sort((a, b) => b[1] - a[1]).slice(0, 6);
-  return { causes: [...causes].sort((a, b) => b[1] - a[1]).map(([k, n]) => `${n} ${k}`).join(', '), often, minMoney: Math.round(minMoney), site: `${s.site.acres} ac ${s.site.creek ? 'creek' : s.site.spring ? 'spring' : 'dry'} ${s.site.gwDepth} m ${s.site.improvements.house ? s.site.improvements.house.kind + ' ' : 'raw '}$${Math.round(s.site.price / 1000)}k`, strat, kind, variant: s.disaster.variant, ending: s.ending?.kind ?? 'still going (2 yrs)', grade: r.grade, alive: `${alive}/${s.personState.length}`, hungry: s.stats.hungryDays, days: s.stats.days, moneyAtHit, builtAtHit, bugs: [...new Set(bugs)].slice(0, 5), lines: r.lines, fights, prisoners: s.gate.prisoners?.length ?? 0, hides, hidFound, owed: Math.round(owed), debtStage, trials: trial.started ? `${trial.started}: ${trial.in} in, ${trial.on} sent on, ${trial.stole} stole, ${trial.left} left` : '-', stripped, burned, s };
+  return { causes: [...causes].sort((a, b) => b[1] - a[1]).map(([k, n]) => `${n} ${k}`).join(', '), often, minMoney: Math.round(minMoney), site: `${s.site.acres} ac ${s.site.creek ? 'creek' : s.site.spring ? 'spring' : 'dry'} ${s.site.gwDepth} m ${s.site.improvements.house ? s.site.improvements.house.kind + ' ' : 'raw '}$${Math.round(s.site.price / 1000)}k`, strat, kind, variant: s.disaster.variant, ending: s.ending?.kind ?? 'still going (2 yrs)', grade: r.grade, alive: `${alive}/${s.personState.filter(ps => !ps.needs.left).length}`, hungry: s.stats.hungryDays, days: s.stats.days, moneyAtHit, builtAtHit, bugs: [...new Set(bugs)].slice(0, 5), lines: r.lines, fights, prisoners: s.gate.prisoners?.length ?? 0, hides, hidFound, owed: Math.round(owed), debtStage, trials: [trial.started ? `${trial.started}: ${trial.in} in, ${trial.on} sent on, ${trial.stole} stole, ${trial.left} left` : '', newcomerNote(s)].filter(Boolean).join(' · ') || '-', stripped, burned, s };
 }
 
 describe.skipIf(process.env.PLAYTEST !== 'long')('the long game', () => {
@@ -383,7 +391,8 @@ describe.skipIf(process.env.PLAYTEST !== 'long')('the long game', () => {
       const r = play(strat, kind, seed, 'short', siteFor(seed, region), 40);
       const s = r.s, L = s.lineage;
       const living = s.people.filter((_, i) => s.personState[i].needs.died == null);
-      rows.push(`| ${seed} | ${region} | ${strat} | ${L.eras.map(e => `${e.name} ${e.grade} (${e.fate})`).join(', ') || '-'}${s.ending?.kind === 'wipe' ? ' · wiped' : ''} | ${living.length}/${s.people.length} | ${r.causes || '-'} | ${s.ending?.kind === 'wipe' ? `${calendarOf(s.clock).year} (${s.disaster.phase})` : '-'} | ${s.people.filter(p => p.bornHere).length} | ${new Set(living.filter(p => p.kin).map(p => p.gen)).size} | ${Math.round(L.points)} | ${L.milestones.length} | ${r.bugs.join('; ')} |`);
+      const total = s.people.filter((_, i) => !s.personState[i].needs.left).length;
+      rows.push(`| ${seed} | ${region} | ${strat} | ${L.eras.map(e => `${e.name} ${e.grade} (${e.fate})`).join(', ') || '-'}${s.ending?.kind === 'wipe' ? ' · wiped' : ''} | ${living.length}/${total} | ${r.causes || '-'} | ${s.ending?.kind === 'wipe' ? `${calendarOf(s.clock).year} (${s.disaster.phase})` : '-'} | ${s.people.filter(p => p.bornHere).length} | ${new Set(living.filter(p => p.kin).map(p => p.gen)).size} | ${Math.round(L.points)} | ${L.milestones.length} | ${r.bugs.join('; ')} |`);
       notes.push(`## Seed ${seed} (${strat}, ${region})`, '', ...L.chronicle.map(e => `- ${e.year}: ${e.text}`), '');
       bugs.push(...r.bugs);
       if (s.people.length !== s.personState.length) bugs.push('people / personState out of step');
