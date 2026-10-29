@@ -38,8 +38,10 @@ import type { WeatherState } from './weatherThreats';
 import { DIFFICULTY } from './difficulty';
 import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
 import type { LightsState } from './lights';
+import type { Learning } from './skills';
+import type { MindState } from './mind';
 import { starterKit, type ToolKit } from './tools';
-export const SAVE_VERSION = 62;
+export const SAVE_VERSION = 63;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -283,6 +285,10 @@ export interface GameState {
   petLife?: PetLife;
   /** Daily life (sim/daily.ts): the roster, chores, gatherings. Save v49; `dailyOf` makes it lazily. */
   daily?: Daily;
+  /** Skills from practice: hours toward the next level, when each was last used, the four skills kept here (sim/skills.ts). Save v63; `learningOf` makes it lazily. */
+  learning?: Learning;
+  /** Mental health: strain, trauma, low mood, breakdowns, the fight a household remembers (sim/mind.ts). Save v63; `mindOf` makes it lazily. */
+  mind?: MindState;
   /** Deaths in the household and whether they were mourned (sim/grief.ts). Save v49; `lossesOf` makes it lazily. */
   losses?: Loss[];
   /** The weekender (sim/weekender.ts): the town house, the caretaker, the trips, the way home. Present while the family splits its week between town and the place, and after the move (the town house may be kept). Save v59. */

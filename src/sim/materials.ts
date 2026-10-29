@@ -19,6 +19,8 @@ export type MaterialId = 'lumber' | 'logs' | 'firewood' | 'fieldstone' | 'concre
   | 'greenhouse_pro_kit' | 'trout_fry' | 'crayfish_stock' | 'fish_feed' | 'sheep'
   // farm & kitchen (sim/crops.ts, sim/kitchen.ts)
   | 'seed_hybrid' | 'seed_saved' | 'seed_cover' | 'canner' | 'dehydrator' | 'crocks' | 'grain_mill' | 'manure' | 'compost'
+  // the household's evenings and learning (sim/mind.ts, sim/skills.ts)
+  | 'games' | 'instrument' | 'novels' | 'manuals'
   // the herd, the bees and the sugar bush (sim/herd.ts, sim/bees.ts, sim/maple.ts)
   | 'cow' | 'cheese_kit' | 'vet_kit' | 'bee_nuc' | 'hive_supplies' | 'beeswax' | 'maple_taps';
 
@@ -87,6 +89,10 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   bee_nuc: { id: 'bee_nuc', name: 'Bee colony', unit: 'a five-frame nucleus colony with a laying queen, delivered in spring: honey, wax and pollination (needs an apiary)', price: 220 },
   hive_supplies: { id: 'hive_supplies', name: 'Hive supplies', unit: 'a year for the apiary: frames and foundation, mite strips, sugar for a lean fall, a smoker and a veil', price: 75 },
   beeswax: { id: 'beeswax', name: 'Beeswax', unit: 'a pound of cleaned wax: candles, salves, polish, trade', price: null },
+  games: { id: 'games', name: 'Cards and board games', unit: 'a box of decks, dice, checkers and board games: evenings for about four people', price: 60 },
+  instrument: { id: 'instrument', name: 'A guitar', unit: 'acoustic guitar with a strap, spare strings and a songbook', price: 220 },
+  novels: { id: 'novels', name: 'Paperbacks', unit: 'a box of fifty used novels and children\'s books', price: 90 },
+  manuals: { id: 'manuals', name: 'How-to manuals', unit: 'a shelf of repair, garden, building, cooking and field guides: skills come on faster', price: 180 },
   maple_taps: { id: 'maple_taps', name: 'Maple taps', unit: '25 spiles with buckets and lids for the sugar bush', price: 120 },
   manure: { id: 'manure', name: 'Manure', unit: 'a pickup load of aged manure (your own stock makes it for free)', price: 15 },
   compost: { id: 'compost', name: 'Compost', unit: 'a barrow load of finished compost from kitchen scraps, weeds and straw', price: null },

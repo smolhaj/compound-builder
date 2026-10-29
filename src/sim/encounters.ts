@@ -44,6 +44,7 @@ import { addTool, stealTools, SWAP_KINDS, TOOLS, type ToolKind } from './tools';
 import { resolveKin } from './kin';
 import { emptyLooting, emptyNow, resolveMoveIn, resolveStranded } from './weekender';
 import { raidTakesVehicles } from './vehicles';
+import { practice } from './skills';
 import { resolveTrialEnd, startTrial, trialDay, type Character, type TrialCamp } from './trial';
 import { admitNewcomers, resolveShelter, strangerArrival, type Extras, type ShelterWhy } from './newcomers';
 
@@ -578,6 +579,9 @@ export function resolve(s: GameState, stance: Stance): Outcome {
   const p = postureOf(s);
   const g = s.gate;
   const negotiator = Math.max(0, ...s.people.filter((x, i) => !x.kid && s.personState[i]?.needs.died == null).map(x => x.skills.negotiator));
+  // every answer given at the gate is practice for whoever does the talking (sim/skills.ts)
+  { const talker = s.people.filter((x, i) => !x.kid && s.personState[i]?.needs.died == null).sort((a, b) => b.skills.negotiator - a.skills.negotiator)[0];
+    if (talker) { practice(s, talker.id, 'negotiator', 1.5); practice(s, talker.id, 'leadership', 0.5); } }
   const lines: string[] = [];
   let title = '', text = '', tone: Outcome['tone'] = 'mixed';
   if (e.kind === 'ransom') {

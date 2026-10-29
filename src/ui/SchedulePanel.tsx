@@ -14,6 +14,7 @@ import {
   type Duty, type TemplateId,
 } from '../sim/daily';
 import { GATHERING, gatheringProblem, callGathering, type GatheringKind } from '../sim/gatherings';
+import { whoShouldDo } from '../sim/roster';
 
 const C = { bg: 'rgba(22,24,20,0.98)', line: 'rgba(255,255,255,0.09)', gold: '#d8c9a0', dim: 'rgba(238,238,238,0.62)', warn: '#e0b050', bad: '#f0a080', good: '#a8d080' };
 const btn = (on = false, off = false): CSSProperties => ({ padding: '4px 9px', borderRadius: 6, border: `1px solid ${on ? C.gold : C.line}`, background: on ? 'rgba(216,201,160,0.18)' : 'rgba(255,255,255,0.06)', color: '#eee', cursor: off ? 'not-allowed' : 'pointer', opacity: off ? 0.45 : 1, fontSize: 12 });
@@ -124,6 +125,17 @@ export function SchedulePanel() {
               </tr>;
             })}</tbody>
           </table>
+        </div>
+        <div style={{ padding: '2px 20px 8px' }}>
+          <div style={{ color: C.gold, fontWeight: 600, marginBottom: 4 }}>Who should do what <span style={{ color: C.dim, fontWeight: 400, fontSize: 11.5 }}>· by skill, health, age and state of mind; the planner already prefers them</span></div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '2px 18px', fontSize: 12 }}>
+            {whoShouldDo(game).map(a => <div key={a.duty} style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+              <span style={{ width: 12, height: 12, borderRadius: 3, background: DUTY[a.duty].color, display: 'inline-block' }} />
+              <b style={{ minWidth: 70 }}>{DUTY[a.duty].name}</b>
+              {a.best.map(b => <button key={b.p.id} style={{ ...btn(plan.focus?.[b.p.id] === a.duty), padding: '1px 6px', fontSize: 11 }} title={`${b.p.first}: ${b.why}. Click to always put ${b.p.first} on ${DUTY[a.duty].name.toLowerCase()} first.`} onClick={() => setMsg(g.daily(s => setFocus(s, b.p.id, plan.focus?.[b.p.id] === a.duty ? null : a.duty)))}>{b.p.first}{b.level !== null ? ` ${Math.floor(b.level)}` : ''}</button>)}
+            </div>)}
+            {whoShouldDo(game).length === 0 && <span style={{ color: C.dim }}>Nothing pressing needs hands right now.</span>}
+          </div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: 18, padding: '6px 20px 18px' }}>
           <div>

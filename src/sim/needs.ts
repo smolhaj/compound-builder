@@ -35,6 +35,8 @@ import { kitchenDay, putByDay } from './kitchen';
 import { pollination } from './bees';
 import { freshSpoilRate, shelveRoots } from './storage';
 import { newcomerMorale } from './newcomers';
+import { mindMorale } from './mind';
+import { bestLevel } from './skills';
 
 export type FoodId = 'fresh' | 'frozen' | 'canned' | 'staples';
 /** Food is kept in the stockpile in these units; kcal in one unit. */
@@ -65,6 +67,8 @@ export interface Needs {
   left?: boolean;
   /** Hours of sleep owed after a night under siege (sim/siege.ts siegeStrain): slows work, wears off 3 a day. */
   tired?: number;
+  /** Work rate from the state of mind (0.2–1; absent = 1): set each night by sim/mind.ts, read by `workFactor`. */
+  coping?: number;
 }
 
 export const freshNeeds = (): Needs => ({ health: 100, morale: 70, hunger: 0, dose: 0, hurt: [], died: null });
@@ -258,6 +262,8 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
   // the diet: a month's mix of foods (monotony), protein, fat, salt, sweets, coffee (sim/pantry.ts)
   dietDay(s, plate, s.people.filter((_, i) => alive(s, i)).length, s.people.filter((p, i) => !p.kid && alive(s, i)).length, fromStores, ate > 0 ? old / ate : 0);
   // food sickness from old or thawed food: each person's chance is the day's kcal-weighted risk (sim/pantry.ts sickness)
+  // the best cook in the house knows which jar to throw out (sim/skills.ts): 4 % less risk a level over three
+  { const safe = Math.max(0.7, Math.min(1.15, 1 - 0.04 * (bestLevel(s, 'cooking') - 3))); risk *= safe; botRisk *= safe; }
   if (risk > 0 || botRisk > 0) {
     const r = mulberry32(s.seed * 7919 + Math.floor(s.clock.t + 0.25) * 31 + 5);
     s.people.forEach((p, i) => {
@@ -316,7 +322,7 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
     if (sl) dh -= sl.harm;
     n.health = Math.max(cozy ? 5 : 0, Math.min(100, n.health + dh));
     // morale: drifts to a baseline that variety, a home, light and safety raise; hunger and loss lower
-    const target = 45 + 6 * Math.min(variety, 4) + diet.morale + (home ? 8 : -6) + (dark ? -8 : 0) + darkMood(s, !!p.kid, (s.personState[i]?.task as string) === 'watch') + (s.utilities.hauling ? (s.utilities.haulFar ? -10 : -4) : 0) - Math.min(25, n.hunger / 1000) + social + lifeMorale(s, i) + newcomerMorale(s, p.id) + (fromStores ? 0 : table) + (sl?.morale ?? 0) + dogEffects(s, p.id).morale;
+    const target = 45 + 6 * Math.min(variety, 4) + diet.morale + (home ? 8 : -6) + (dark ? -8 : 0) + darkMood(s, !!p.kid, (s.personState[i]?.task as string) === 'watch') + (s.utilities.hauling ? (s.utilities.haulFar ? -10 : -4) : 0) - Math.min(25, n.hunger / 1000) + social + lifeMorale(s, i) + newcomerMorale(s, p.id) + (fromStores ? 0 : table) + (sl?.morale ?? 0) + dogEffects(s, p.id).morale + mindMorale(s, p.id);
     n.morale += (Math.max(0, Math.min(100, target)) - n.morale) * 0.08;
     // stumbling about in dark rooms under lights-out without curtains (sim/blackout.ts)
     const stumble = ((rnd * 7919 + i * 211 + 5) % 1 + 1) % 1;
@@ -349,5 +355,5 @@ export function workFactor(n: Needs | undefined): number {
   if (n.hurt.some(h => h.trauma && h.sev >= 50)) return 0.1;
   const h = n.health >= 60 ? 1 : 0.35 + 0.65 * n.health / 60;
   const m = n.morale >= 35 ? 1 : 0.6 + 0.4 * n.morale / 35;
-  return h * m * (1 - Math.min(0.35, (n.tired ?? 0) * 0.05));
+  return h * m * (1 - Math.min(0.35, (n.tired ?? 0) * 0.05)) * (n.coping ?? 1);
 }

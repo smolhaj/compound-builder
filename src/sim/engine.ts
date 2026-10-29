@@ -16,6 +16,8 @@ import { upkeepDay } from './upkeep';
 import { snowedIn, weatherDay } from './weatherThreats';
 import { shelfDay } from './shelf';
 import { bodyDay } from './body';
+import { peopleDay } from './people';
+import { levelFor, practice } from './skills';
 import { financeDay } from './finance';
 import { armoryDay } from './armory';
 import { petsDay } from './pets';
@@ -137,10 +139,19 @@ function subStep(s: GameState): void {
       const task = duty === 'wood' ? 'forestry' : taskFor('work', canBuild, job !== null, i % 2 === 1);
       ps.task = task;
       ps.target = task === 'build' && !carry ? (target?.id ?? run?.id ?? fit?.building ?? harden?.building ?? fix?.st.id ?? null) : task === 'forestry' && job ? job.id : null;
+      // the hours are practice: building and felling are carpentry, wiring is electrical work, pipes and pumps mechanics (sim/skills.ts)
+      // (once an hour: a whole hour's worth at the hour mark)
+      if (hourly) {
+        if (task === 'build' && fit) {
+          const wire = fit.kind === 'wire', skill = wire ? 'electrical' : 'mechanic';
+          practice(s, p.id, skill, 1);
+          if (wire) practice(s, p.id, 'mechanic', 0.3);
+        } else practice(s, p.id, 'builder', task === 'forestry' ? 0.6 : task === 'build' && carry ? 0.2 : 1);
+      }
       if (task === 'build' && carry) addCarryWork(s, hrs * rate);
       else if (task === 'build' && target) addWork(s, target, hrs * rate, true);
       else if (task === 'build' && run) addRunWork(s, run, hrs * rate);
-      else if (task === 'build' && fit) addFitWork(s, fit, hrs, p.skills.mechanic);
+      else if (task === 'build' && fit) addFitWork(s, fit, hrs, fit.kind === 'wire' ? Math.max(p.skills.mechanic, levelFor(s, p, 'electrical')) : p.skills.mechanic);
       else if (task === 'build' && harden) addHardenWork(s, harden, hrs * rate);
       else if (task === 'build' && fix) addFixWork(s, fix.st, fix.f, hrs * rate);
       else if (task === 'forestry' && job) addFellWork(s, job, hrs * rate);
@@ -231,6 +242,7 @@ function subStep(s: GameState): void {
     for (const line of waterDay(s)) log(s, line);
     s.food = liveDay(s, y - Math.floor(y));
     for (const line of bodyDay(s)) log(s, line);
+    for (const line of peopleDay(s)) log(s, line);
     const end = tallyDay(s);
     if (end) log(s, end.kind === 'wipe' ? 'The last of the family is gone.' : end.kind === 'recovered' ? 'The outside world is coming back.' : end.kind === 'new_normal' ? 'The outside world has come back as far as it will.' : 'A full year the place has fed itself.');
     for (const line of lineageDay(s)) log(s, line);

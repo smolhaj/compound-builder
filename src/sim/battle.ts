@@ -34,6 +34,8 @@ import { enclosure } from './enclosure';
 import { mulberry32 } from './rng';
 import { diffOf } from './difficulty';
 import { leaveAftermath } from './aftermath';
+import { peopleAfterFight } from './people';
+import { fightNerves } from './mind';
 import { hourOf, type GameState } from './state';
 
 type Post = NonNullable<BattleUnit['post']>;
@@ -303,7 +305,8 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
   const medicId = fightersP.filter(({ p }) => p.skills.medic >= 3).sort((a, b) => b.p.skills.medic - a.p.skills.medic)[0]?.p.id;
   for (const { p } of alive) {
     const x = C.x + (r() - 0.5) * 2, z = C.z + (r() - 0.5) * 2;
-    const fights = canFight(p);
+    // someone in a panic does not stand a post: the shelter (sim/mind.ts)
+    const fights = canFight(p) && !fightNerves(s, p).shelter;
     let arm = FISTS, wear = 1;
     if (fights) {
       const gun = free.find(x => x.carrier === p.id) ?? free.find(x => !x.carrier);
@@ -576,7 +579,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
       }
       if (peace) say(t + 1.5, v(l0, ['I called 911! The police are on their way! GET OUT OF MY HOUSE!', 'The sheriff\'s coming — get out, GET OUT!'], ['Sheriff\'s on the way. Leave. Now.']), l0);
       if (peace) say(t + 2, pick(['Shit — somebody\'s home!', 'Go, go — he\'s got a gun!']), R[0]); else say(t + 2, pick(['Spread out! Hit the house!', 'Go, go — flank \'em!', 'Come out and nobody gets hurt! We just want the food!', 'Light \'em up!']), R[0]);
-      for (const f of H) if (f.shelter) toShelter(f, t); else { assignPost(f, t); if (!f.vet && opts.ambush === undefined) f.readyAt += 1 + r() * 3; }   // civilians freeze a moment; those who served go straight to it
+      for (const f of H) if (f.shelter) toShelter(f, t); else { assignPost(f, t); if (!f.vet && opts.ambush === undefined) f.readyAt += 1 + r() * 3 + (f.pid ? fightNerves(s, s.people.find(q => q.id === f.pid)!).freeze : 0); }   // civilians freeze a moment; those who served go straight to it
     }
     for (const p of posts) p.fire *= 0.7;
     for (const f of F) {
@@ -837,6 +840,7 @@ export function applyBattle(s: GameState, b: Battle): string[] {
   const endEv = b.events.find(e => e.kind === 'end');
   const result = endEv && endEv.kind === 'end' ? endEv.result : 'repelled';
   out.push(...applyCasualties(s, b));
+  peopleAfterFight(s, b);   // the mind's toll and the practice a real fight is (sim/people.ts)
   {
     // the dogs on the post: hurt or killed by the fight, never automatically
     const home = new Set(b.units.filter(u => u.personId).map(u => u.id));

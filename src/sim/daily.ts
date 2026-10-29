@@ -38,6 +38,8 @@ import { sugaringRate } from './maple';
 import { putByHours } from './kitchen';
 import { wearTools, workSpeed } from './tools';
 import { absentIdx, jobDayOf } from './weekender';
+import { bestLevel, levelFor, mentorSkill, practice, skillFactor, teach, type Practiced } from './skills';
+import { ESSENTIAL, mindFit, mindStaysIn, resting } from './mind';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Duties
@@ -46,7 +48,7 @@ import { absentIdx, jobDayOf } from './weekender';
 export type Duty =
   | 'sleep' | 'meal' | 'leisure' | 'school'
   | 'build' | 'garden' | 'fields' | 'livestock' | 'pets' | 'wood' | 'water' | 'kitchen' | 'cleaning' | 'laundry' | 'repairs'
-  | 'hunt' | 'medic' | 'teach' | 'radio' | 'watch';
+  | 'hunt' | 'medic' | 'teach' | 'mentor' | 'radio' | 'watch';
 
 export interface DutyDef {
   name: string;
@@ -81,6 +83,7 @@ export const DUTY: Record<Duty, DutyDef> = {
   hunt: { name: 'Hunt & fish', short: 'Hu', color: '#6a7a3a', work: true, tire: 4.5, kid: false, hint: 'Hunting, fishing, running the trap line.' },
   medic: { name: 'Medic', short: '+', color: '#c04a5a', work: true, tire: 3, kid: false, hint: 'Tending the sick and the wounded.' },
   teach: { name: 'Teaching', short: 'T', color: '#6a8ac8', work: true, tire: 2.5, kid: false, hint: 'Teaching the kids.' },
+  mentor: { name: 'Mentoring', short: 'Mn', color: '#5f8f9f', work: true, tire: 2, kid: true, hint: 'An elder or a skilled adult shows a youth the trade they know best, side by side; the youth learns faster than alone and the elder is needed.' },
   radio: { name: 'Radio', short: 'Ra', color: '#7a6aa8', work: true, tire: 1.5, kid: false, hint: 'Listening on the radio for news and the net.' },
   watch: { name: 'Watch', short: '!', color: '#c8a030', work: true, tire: 4, kid: false, hint: 'On watch: the tower, the wall (or its walkway, if there is one), the gate. Helps see trouble coming.' },
 };
@@ -320,7 +323,8 @@ function applyChrono(row: Duty[], c: Chrono): void {
 
 /** Duties that take a strong, healthy body. */
 export const HEAVY = new Set<Duty>(['build', 'fields', 'wood', 'repairs', 'hunt', 'water', 'watch']);
-const SKILL: Partial<Record<Duty, keyof Person['skills']>> = { garden: 'gardener', fields: 'gardener', livestock: 'gardener', repairs: 'mechanic', wood: 'builder', water: 'builder', kitchen: 'medic', hunt: 'hunter', build: 'builder', medic: 'medic', teach: 'teacher', radio: 'radio', watch: 'hunter' };
+/** The skill each duty exercises (fitness reads it for who suits what; `dutyWork` awards practice in it). */
+export const SKILL: Partial<Record<Duty, Practiced>> = { garden: 'gardener', fields: 'gardener', livestock: 'husbandry', repairs: 'mechanic', wood: 'builder', water: 'builder', kitchen: 'cooking', hunt: 'hunter', build: 'builder', medic: 'medic', teach: 'teacher', radio: 'radio', watch: 'hunter' };
 
 /**
  * How well person `i` suits a duty right now: 0 = should not (too young, too
@@ -339,14 +343,16 @@ export function fitness(s: GameState, i: number, duty: Duty): number {
   if (heavy && p.elder && p.age >= 70) return 0;
   let f = 1;
   const sk = SKILL[duty];
-  if (sk) f += (p.skills[sk] - 3) * 0.12;
+  if (sk) f += (levelFor(s, p, sk) - 3) * 0.12;
   const fat = ps.fatigue ?? 0;
   if (fat > 60) f *= heavy ? 0.5 : 0.8;
   if (duty === 'watch' && fat > 75) f *= 0.4;
   if (duty === 'pets' && (p.kid || p.elder)) f *= 1.3;
   if (p.elder && heavy) f *= 0.5;
   if (s.daily?.plan.focus?.[p.id] === duty) f *= 3;
-  return Math.max(0.05, f);
+  const mf = mindFit(s, p.id, duty);
+  if (mf <= 0) return 0;
+  return Math.max(0.05, f * mf);
 }
 
 /** Someone who should rest rather than work (ill, or hurt). */
@@ -429,6 +435,10 @@ export function autoPlan(s: GameState, ctx: { build: boolean; fell: boolean }, r
       const bad = s.personState[i].needs.health < 35;
       for (let h = 6; h < 22; h++) if (DUTY[row[h]].work) row[h] = bad ? 'sleep' : 'leisure';
       notes[p.id] = bad ? 'Resting: too unwell to work' : 'Light duty: not well';
+    } else if (mindStaysIn(s, p.id)) {
+      // someone who cannot face it stays in (sim/mind.ts); the rest of the house covers
+      for (let h = 6; h < 22; h++) if (DUTY[row[h]].work && row[h] !== 'watch') row[h] = 'leisure';
+      notes[p.id] = 'Not coping: resting';
     }
     rows.set(p.id, row);
   }
@@ -517,6 +527,27 @@ export function autoPlan(s: GameState, ctx: { build: boolean; fell: boolean }, r
     const t = [...adults, ...ableElders].sort((a, b) => fitness(s, b.i, 'teach') * (1 + b.p.skills.teacher) - fitness(s, a.i, 'teach') * (1 + a.p.skills.teacher))[0];
     const row = rows.get(t.p.id)!;
     for (let h = 8; h < 11; h++) row[h] = 'teach';
+  }
+  // ── mentoring: mid-afternoon an elder (else the most skilled free adult) works beside the youths who have something to learn from them ──
+  {
+    const youths = free.filter(({ p }) => p.kid && p.age >= 10);
+    const soft = new Set<Duty>(['leisure', 'school', 'laundry', 'cleaning', 'water', 'garden', 'build']);
+    if (youths.length) {
+      let mentor: { p: Person; i: number } | null = null, pupils: typeof youths = [], bestScore = 0;
+      for (const m of [...ableElders, ...adults]) {
+        if (fitness(s, m.i, 'mentor') <= 0) continue;
+        const who = youths.filter(y => mentorSkill(s, m.p.id, y.p.id) !== null);
+        const score = who.length + (m.p.elder ? 0.5 : 0) + (m.p.skills.teacher >= 4 ? 0.25 : 0);
+        if (who.length && score > bestScore) { bestScore = score; mentor = m; pupils = who; }
+      }
+      if (mentor) {
+        const mrow = rows.get(mentor.p.id)!;
+        const hours = [15, 16, 14, 13].filter(h => soft.has(mrow[h]) || mrow[h] === 'repairs').slice(0, 2).sort((a, b) => a - b);
+        for (const h of hours) mrow[h] = 'mentor';
+        for (const y of pupils) { const yr = rows.get(y.p.id)!; for (const h of hours) if (soft.has(yr[h])) yr[h] = 'mentor'; }
+        if (hours.length) notes[mentor.p.id] = `${notes[mentor.p.id] ? notes[mentor.p.id] + '; ' : ''}Mentoring ${pupils.map(y => y.p.first).join(', ')} at 15:00`;
+      }
+    }
   }
   const hurt = s.personState.some(ps => ps.needs.died == null && ps.needs.hurt.length > 0);
   if (hurt) {
@@ -652,7 +683,7 @@ export function dutyAt(s: GameState, p: Person, hour: number): Duty {
 /** Task kinds the renderer reads, per duty (build is decided by the engine: build or forestry). */
 export const DUTY_TASK: Record<Exclude<Duty, 'build'>, TaskKind> = {
   sleep: 'sleep', meal: 'meal', leisure: 'leisure', school: 'school', garden: 'garden', fields: 'fields', livestock: 'livestock', pets: 'pets', wood: 'wood',
-  water: 'water', kitchen: 'kitchen', cleaning: 'cleaning', laundry: 'laundry', repairs: 'repairs', hunt: 'hunt', medic: 'medic', teach: 'teach', radio: 'radio', watch: 'watch',
+  water: 'water', kitchen: 'kitchen', cleaning: 'cleaning', laundry: 'laundry', repairs: 'repairs', hunt: 'hunt', medic: 'medic', teach: 'teach', mentor: 'teach', radio: 'radio', watch: 'watch',
 };
 
 /** Restedness multiplier on work: full to fatigue 50, half at 100. */
@@ -778,15 +809,44 @@ export function nightDuty(s: GameState, p: Person, i: number, duty: Duty, h: num
 /** A person's planned duty at an hour, or what they do instead when it has nothing to work on. */
 export function resolveDuty(s: GameState, p: Person, h: number, rates: Record<ChoreId, number>, canWork: boolean): Duty {
   const d = dutyAt(s, p, h);
+  // someone who cannot face it stays in; a rest day takes the household's work off its hands (the animals, the kitchen, the watch and the sick still need tending)
+  if (DUTY[d].work && d !== 'watch' && mindStaysIn(s, p.id)) return 'leisure';
+  if (DUTY[d].work && !ESSENTIAL.has(d) && resting(s)) return 'leisure';
   return !dutyApplies(s, d, rates) || (d === 'build' && !canWork) ? fallbackDuty(s, p, rates) : d;
+}
+
+/**
+ * An hour of mentoring (the Mentor duty): the mentor, an elder or a skilled
+ * adult, works beside each youth who is on the duty at the same hour and
+ * passes on the skill they lead in by most (sim/skills.ts `teach`). The elder
+ * is needed, the youth learns faster than alone.
+ */
+function mentorHour(s: GameState, p: Person, hour: number, personHours: number): void {
+  if (p.kid) return;
+  const prefer: Practiced[] = [];
+  const lv = dailyOf(s).chores.levels;
+  if (lv.weeds > 40 || lv.harvest > 40) prefer.push('gardener');
+  if (lv.animals > 40) prefer.push('husbandry');
+  if (lv.kitchen > 40) prefer.push('cooking');
+  for (const [j, q] of s.people.entries()) {
+    if (!q.kid || q.age < 8 || !ableAt(s, j) || dutyAt(s, q, hour) !== 'mentor') continue;
+    const k = mentorSkill(s, p.id, q.id, prefer);
+    if (k) teach(s, p.id, q.id, k, Math.max(0.25, personHours));
+  }
+  practice(s, p.id, 'leadership', personHours * 0.1);
 }
 
 /** An hour slice of a duty's work: chores come down; the medic tends the hurt. */
 export function dutyWork(s: GameState, p: Person, ps: PersonState, duty: Duty, personHours: number, hour = 12): void {
+  // the hour is practice in the duty's skill (people get better at what they do, sim/skills.ts); the level it started at sets the pace
+  const sk = SKILL[duty], lvl = sk ? levelFor(s, p, sk) : 3;
+  if (sk && duty !== 'build') practice(s, p.id, sk, personHours);
+  if (duty === 'hunt' && s.armory.guns.length) practice(s, p.id, 'shooting', personHours * 0.15);
+  if (duty === 'mentor') { mentorHour(s, p, hour, personHours); return; }
   if (duty === 'kitchen' || duty === 'hunt' || duty === 'teach') {
     const t = tallyOf(s).today;
-    // skilled hunters and teachers count for more
-    t[duty] = (t[duty] ?? 0) + personHours * (duty === 'hunt' ? 0.5 + p.skills.hunter / 10 : duty === 'teach' ? 0.5 + p.skills.teacher / 10 : 1);
+    // skilled hunters, cooks and teachers count for more
+    t[duty] = (t[duty] ?? 0) + personHours * (duty === 'hunt' ? 0.5 + p.skills.hunter / 10 : duty === 'teach' ? 0.5 + p.skills.teacher / 10 : 0.85 + 0.05 * lvl);
     if (duty === 'hunt' && hour >= 17 && !tallyOf(s).dusk.includes(p.id)) tallyOf(s).dusk.push(p.id);
   }
   // the garden and the fields are worked with a hoe, a fork or a shovel: bare hands are half as fast, and the tools wear (sim/tools.ts)
@@ -795,7 +855,7 @@ export function dutyWork(s: GameState, p: Person, ps: PersonState, duty: Duty, p
     personHours *= workSpeed(s, task);
     wearTools(s, task, personHours);
   }
-  if (DUTY_CHORES[duty]) { addChoreWork(s, duty, personHours); return; }
+  if (DUTY_CHORES[duty]) { addChoreWork(s, duty, sk ? personHours * skillFactor(lvl) : personHours); return; }
   if (duty === 'medic') {
     // the worst wound gets the care (on top of the daily healing in needs.ts)
     let worst: { sev: number } | null = null;
@@ -853,7 +913,9 @@ export const HARVEST_FLOOR_LOSS = 0.3;
 export function careYield(s: GameState, c: 'weeds' | 'harvest' | 'animals' | 'orchard' | 'greenhouse' | 'pond'): number {
   const v = s.daily?.chores.levels[c] ?? 0;
   const k = c === 'weeds' ? 0.5 : c === 'harvest' ? HARVEST_FLOOR_LOSS : c === 'greenhouse' ? 0.4 : c === 'orchard' ? 0.35 : c === 'pond' ? 0.5 : 0.6;
-  return 1 - k * Math.max(0, v - 20) / 80;
+  // a good hand with animals gets more from the same care (the herd, the hens and the fish pond; sim/skills.ts)
+  const hand = c === 'animals' || c === 'pond' ? skillFactor(bestLevel(s, 'husbandry')) : 1;
+  return (1 - k * Math.max(0, v - 20) / 80) * hand;
 }
 
 /** Person-hours of cooking the household needs a day (about one an hour-and-a-bit per three mouths). */
@@ -884,7 +946,8 @@ export function choresDay(s: GameState, r: () => number): string[] {
     const i = s.people.findIndex(x => x.id === id), ps = s.personState[i];
     if (!ps || ps.needs.died != null) continue;
     // a hunter out at dusk: a fall, a bad shot, something in the dark (worse with no law and no one to send after them)
-    if (r() < (s.disaster.tracks.law < 0.5 ? 0.07 : 0.03) && !ps.needs.hurt.some(h => h.what === 'hunting accident')) {
+    const hs = bestLevel(s, 'hunter', [id]);
+    if (r() < (s.disaster.tracks.law < 0.5 ? 0.07 : 0.03) * (1.3 - 0.1 * Math.min(8, hs)) * (s.mind?.psyche[id]?.broke?.kind === 'reckless' ? 2 : 1) && !ps.needs.hurt.some(h => h.what === 'hunting accident')) {
       ps.needs.hurt.push({ what: 'hunting accident', sev: 20 + Math.floor(r() * 25) });
       out.push(`${s.people[i].first} came back from the woods after dark limping, with a gash. "Should've been in before the light went."`);
     }
@@ -895,7 +958,8 @@ export function choresDay(s: GameState, r: () => number): string[] {
     if (!p.kid || p.age < 5 || p.age > 17 || s.personState[i]?.needs.died != null) return;
     const keys = Object.keys(p.skills) as Array<keyof Person['skills']>;
     const k = keys[Math.floor(r() * keys.length)];
-    p.skills[k] = Math.min(6, p.skills[k] + 0.006 * taught);
+    // lessons are practice (sim/skills.ts): a good teacher and long lessons teach more; school goes no further than level 6
+    if (p.skills[k] < 6) practice(s, p.id, k, taught * 0.55);
   });
   // animals unfed for days: first off their feed, then they die one by one
   d.neglect = lv.animals >= 90 ? (d.neglect ?? 0) + 1 : Math.max(0, (d.neglect ?? 0) - 2);
