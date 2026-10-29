@@ -18,7 +18,7 @@ export type MaterialId = 'lumber' | 'logs' | 'firewood' | 'fieldstone' | 'concre
   | 'tent' | 'sleeping_bag'
   | 'greenhouse_pro_kit' | 'trout_fry' | 'crayfish_stock' | 'fish_feed' | 'sheep'
   // farm & kitchen (sim/crops.ts, sim/kitchen.ts)
-  | 'seed_hybrid' | 'seed_saved' | 'seed_cover' | 'canner' | 'dehydrator' | 'crocks' | 'grain_mill' | 'manure' | 'compost'
+  | 'seed_heirloom' | 'seed_saved' | 'seed_cover' | 'canner' | 'dehydrator' | 'crocks' | 'grain_mill' | 'manure' | 'compost'
   // the household's evenings and learning (sim/mind.ts, sim/skills.ts)
   | 'games' | 'instrument' | 'novels' | 'manuals'
   // medical depth (sim/medical.ts)
@@ -77,8 +77,8 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   canned: { id: 'canned', name: 'Canned food', unit: 'case of 12 (≈ 6,000 kcal)', price: 38 },
   staples: { id: 'staples', name: 'Bulk staples', unit: 'rice, beans, flour, oil (≈ 80,000 kcal, 25 kg)', price: 85 },
   meds: { id: 'meds', name: 'Medical supplies', unit: 'kit: dressings, antibiotics, painkillers', price: 160 },
-  seed: { id: 'seed', name: 'Heirloom field seed', unit: 'a season for a quarter acre: seed potatoes, dry beans, seed wheat; open-pollinated, so the seed you save comes true', price: 200 },
-  seed_hybrid: { id: 'seed_hybrid', name: 'Hybrid field seed', unit: 'a season for a quarter acre of certified hybrid seed: about 12 % more crop the year it is sown, but seed saved from it does not come true', price: 260 },
+  seed: { id: 'seed', name: 'Hybrid field seed', unit: 'a season for a quarter acre of certified hybrid seed potatoes, beans and wheat: about 12 % more crop the year it is sown and a third less hurt by blight and rust, but seed saved from it comes back at only about 80 %', price: 160 },
+  seed_heirloom: { id: 'seed_heirloom', name: 'Heirloom field seed', unit: 'a season for a quarter acre of open-pollinated seed: an ordinary crop the first year, but the seed you save comes true and the line adapts to your place', price: 360 },
   seed_saved: { id: 'seed_saved', name: 'Saved seed', unit: 'a season for a quarter acre, kept back from your own harvest', price: null },
   seed_cover: { id: 'seed_cover', name: 'Cover-crop seed', unit: 'clover and vetch for one resting field: fixes nitrogen and builds the soil', price: 30 },
   canner: { id: 'canner', name: 'Pressure canner', unit: '23-quart dial-gauge pressure canner: the only safe way to can vegetables, meat and fish (water-bath is for tomatoes, fruit and pickles)', price: 320 },

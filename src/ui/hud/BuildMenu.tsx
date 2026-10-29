@@ -60,6 +60,7 @@ export function BuildMenu({ showProjects = () => undefined }: { showProjects?: (
     else if (a.type === 'order') { if (!g.order(a.lines)) setNote('Could not place that order.'); }
     else if (a.type === 'markTrees') { const n = markTrees?.(a.n) ?? 0; setNote(n ? `Marked ${n} trees: the family fells them in work hours.` : 'No more trees to mark near the yard.'); }
     else if (a.type === 'caretaker') { const why = g.money(d => hireCaretaker(d, a.kind)); if (why) setNote(`Could not arrange that: ${why}.`); }
+    else if (a.type === 'open') g.focusHud({ right: a.right, ...(a.supplies ? { supplies: a.supplies } : {}) });
     else if (a.type === 'restDay') { const why = g.daily(d => takeRestDay(d)); if (why) setNote(why); }
     else if (a.type === 'quarantine') { const why = g.daily(d => setQuarantine(d, a.on)); if (why) setNote(why); }
     else if (a.type === 'rx') g.stockUpRx();
