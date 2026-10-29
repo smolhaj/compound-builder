@@ -126,7 +126,7 @@ export function terrainDefense(s: GameState): TerrainDefense {
   const held = !!best.choke && chokeHeld(s, best.choke);
   if (hard > 0.15) lines.push(`The easiest way in is ${best.hardness.toFixed(1)}× slower than open ground${best.fords ? ' (it fords the creek)' : ''}${best.cliff ? ' (it has a cliff to climb)' : ''}.`);
   else lines.push('The ground is open all round: nothing slows a crew.');
-  if (best.via) lines.push(`The easiest way in is your tunnel-bridge: a crew comes to its outer steel door and is held there ${DOOR_DELAY} s (in view of your towers and deck) before it can act. Drop it and they must ford and climb the gorge.`);
+  if (best.via) lines.push(`The easiest way in is your tunnel-bridge: a crew comes to its outer steel door and is held there ${DOOR_DELAY} s (in view of your towers and deck) before it can act. The doors lock by themselves at night and when the alarm goes; by day, unwarned, they stand open and hold a crew only ${DOOR_OPEN_DELAY} s. Drop it and they must ford and climb the gorge.`);
   else if (best.choke) lines.push(held ? `The easiest way in narrows to ${Math.round(best.choke.width * 6)} m and you hold it.` : `The easiest way in narrows to ${Math.round(best.choke.width * 6)} m at one place: a wall or tower there would matter.`);
   if (towers.length) lines.push(hs > 0.3 ? `Your towers stand on real high ground (${Math.round(hs * 100)} % of the full advantage).` : 'Your towers stand on the level: a hill would add range.');
   return { score: Math.max(0, Math.min(1, 0.5 * hard + 0.3 * hs + 0.2 * (held ? 1 : 0))), lines, lane: best, held, highShare: hs };
@@ -167,6 +167,15 @@ export const terrainPoints = (s: GameState): number => Math.round(terrainDefense
 
 /** Seconds a crew coming by a tunnel-bridge spends at its steel door before it can act (the family sees them on the deck and the towers). */
 export const DOOR_DELAY = 8;
+/** By day the doors stand open for the traffic: a crew that comes unannounced walks in and is only slowed this long (s). */
+export const DOOR_OPEN_DELAY = 2;
+/** The watch (detection score, 0 to 100) from which a raid is called before it reaches the outer door, and the doors lock on the alarm. */
+export const DOOR_ALARM_DETECTION = 45;
+
+/** The bridge doors lock on their own at night (dusk to dawn) and the moment the alarm goes; by day, with nobody warned, they stand open. */
+export const doorsLocked = (night: boolean, detection: number): boolean => night || detection >= DOOR_ALARM_DETECTION;
+/** Seconds a crew is held at the outer door: the full lock, or the open-door walk-in. */
+export const doorDelay = (night: boolean, detection: number): number => doorsLocked(night, detection) ? DOOR_DELAY : DOOR_OPEN_DELAY;
 
 /** Why a run of this kind can't be laid along `pts` on this ground (null = it can). Only the span kinds have a rule. */
 export function routeProblem(s: GameState, kind: PerimeterKind, pts: readonly Pt[]): string | null {

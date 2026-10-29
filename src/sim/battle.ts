@@ -30,7 +30,7 @@ import { isHome } from './blueprints';
 import { isFinished } from './construction';
 import { PERIMETER, fenceLive, runFinished } from './perimeter';
 import { ARMORY_LIGHTS, floodlightLit } from './lights';
-import { DOOR_DELAY, raidAngle } from './terrainFx';
+import { DOOR_DELAY, doorDelay, raidAngle } from './terrainFx';
 import { WALK_CLIMB_FACTOR, WALK_POST, deckSpots, walkLength, walkRuns } from './walkway';
 import { TURRET_JAM, highBonus, litTowerIds, isTower, mountReady, towerPosture, towerPosts, towerReach, turretsReady } from './towers';
 import { enclosure } from './enclosure';
@@ -397,6 +397,8 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
 
   // ── detection, alarm, lights ──
   const detection = Math.min(100, 25 + (s.gate.forewarned ? 20 : 0) + g.detection + tw.detection + watchDetection(s) + Math.max(0, ...fightersP.map(({ p }) => p.skills.hunter)) * 4);
+  // the tunnel-bridge's doors lock at night and on the alarm (a watch good enough to call it before they arrive); by day, unwarned, they stand open
+  if (lane?.via && opts.ambush === undefined) { const d = doorDelay(night, detection); for (const f of F) if (f.side === 'raider') f.readyAt = d; }
   // by day, people on watch see a group coming up the drive a couple of hundred meters out; at night it's what the gear hears and sees
   const darkBlind = night && !lightsOn && !n('nvg') && !n('thermal') && !n('thermal_cam');
   // (round 4: measured from the line, where the watch stands and the sensors are, not from the house)
