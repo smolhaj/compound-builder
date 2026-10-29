@@ -34,12 +34,14 @@
  * `storms`); the seasons are here.
  */
 import { calendarOf, dayIndex, type GameState, type Structure } from './state';
-import { REGIONS, type RegionId, type StormKind } from './regions';
+import { type RegionId, type StormKind } from './regions';
 import { blueprintOf, isFinished, knockBack } from './construction';
 import { insuranceClaim } from './paperwork';
 import { mulberry32, pick } from './rng';
 import { DIFFICULTY } from './difficulty';
 import { crackGlass } from './improvements';
+import { regionFor } from './climate';
+import { roadClosedFor } from './slope';
 
 export type WeatherKind = StormKind;
 
@@ -52,6 +54,8 @@ export interface WeatherState {
   last: number;
   /** The last hail: year and day of year (it takes that season's crop, not the beds). */
   hail?: { year: number; doy: number };
+  /** The last day the snow-shut road was told of (sim/slope.ts roadClosedFor; so it is said once per closing). */
+  shutLogged?: number;
 }
 
 /** Days of quiet after a storm before another can come. */
@@ -109,7 +113,7 @@ export function stormOutage(s: GameState, day = dayIndex(s.clock.t)): boolean {
 
 /** Chance a day of each storm here, today. */
 export function odds(s: GameState, doy: number): Partial<Record<WeatherKind, number>> {
-  const R = REGIONS[s.site.region], seasons = REGION_SEASON[s.site.region] ?? {};
+  const R = regionFor(s.site), seasons = REGION_SEASON[s.site.region] ?? {};
   const o: Partial<Record<WeatherKind, number>> = {};
   for (const k of ORDER) {
     const p = R.storms[k];
@@ -235,6 +239,13 @@ export function weatherDay(s: GameState): string[] {
   const day = dayIndex(s.clock.t);
   const r = mulberry32(s.seed * 4099 + day * 13 + 7);
   const a = w.active;
+  // a steep or high road is shut by heavy snow (sim/slope.ts): the truck waits at the bottom of the hill, and the closing is told once
+  const shut = roadClosedFor(s, day);
+  if (shut > 0) {
+    for (const o of s.orders) if (o.status === 'ordered' && o.dueAt < s.clock.t + 1) o.dueAt += 1;
+    if (!w.shutLogged || w.shutLogged < day - 1) out.push(`Snow has shut the road up to the place (${shut} more day${shut === 1 ? '' : 's'}): deliveries wait at the bottom of the hill${s.stock.plow >= 1 ? '' : '. A plow blade on the truck would open it sooner'}.`);
+    w.shutLogged = day;
+  }
   if (a) {
     if (day === a.at) hit(s, a, r, out);
     if (day >= a.at && day <= a.until) {

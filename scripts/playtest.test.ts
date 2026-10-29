@@ -15,6 +15,7 @@ import { step } from '../src/sim/engine';
 import { placeOrder, orderProblem, orderCost, payWith } from '../src/sim/economy';
 import { planStructure, planProblem, isFinished } from '../src/sim/construction';
 import { affordable, CLASSIC, listings, type Lifestyle, type Site } from '../src/sim/site';
+import { gradeAt } from '../src/sim/slope';
 import { generateFamily } from '../src/sim/family';
 import { startFunds } from '../src/sim/startFunds';
 import { BLUEPRINTS, isHome } from '../src/sim/blueprints';
@@ -234,6 +235,15 @@ function fieldSpot(s: GameState, M: (x: number, z: number) => [number, number]):
 function siteFor(seed: number, region?: RegionId): Site {
   const life = (process.env.LIFESTYLE as Lifestyle | undefined) ?? 'fulltime';
   const budget = startFunds(generateFamily(seed), life, seed, 0, process.env.TOWN === 'rent' ? 'rent' : 'own').budget;
+  // LOTKIND=gorge plays the first affordable listing of that lot archetype (sim/lots.ts) in the search for this seed; LOTKIND=none plays an
+  // affordable listing's acreage and money on the region's ordinary ground (the control: the same family, no relief)
+  const lotKind = process.env.LOTKIND;
+  if (lotKind) {
+    for (let k = 0; k < 400; k++) {
+      const found = listings(seed + k * 7919, region, undefined, 6, budget).find(l => (lotKind === 'none' ? l.lot === null || l.lot === undefined : l.lot?.kind === lotKind) && affordable(l, budget));
+      if (found) return lotKind === 'none' ? { ...found, lot: null } : found;
+    }
+  }
   const ls = listings(seed, region, undefined, 6, budget), want = ls[seed % 4];
   const room = life === 'weekend' ? 0.66 * budget : budget;
   if (affordable(want, budget) && want.price <= room) return want;
@@ -255,7 +265,23 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
   const life = process.env.LIFESTYLE as Lifestyle | undefined;
   let s = newGame(seed, 105, 2027, { site: site === CLASSIC && !life ? undefined : site, lifestyle: life, townPlan: process.env.TOWN === 'rent' ? 'rent' : 'own', mode: 'scenario', peace, kind, dayJobs: true, grid: true, difficulty: process.env.DIFF as Difficulty | undefined });
   // the plans are drawn on the 40; squeeze them into the place actually bought
-  const h = s.site.home, M = (x: number, z: number): [number, number] => [h.x0 + x / 67 * (h.x1 - h.x0), h.z0 + z / 67 * (h.z1 - h.z0)];
+  const h = s.site.home, M0 = (x: number, z: number): [number, number] => [h.x0 + x / 67 * (h.x1 - h.x0), h.z0 + z / 67 * (h.z1 - h.z0)];
+  // on a lot with relief a player picks level ground: the nearest spot under a 7 % grade that is not on top of one already picked
+  const picked = new Map<string, [number, number]>(), mem: Array<[number, number]> = [];
+  const M = (x: number, z: number): [number, number] => {
+    const want = M0(x, z);
+    if (!s.site.lot) return want;
+    const key = `${x},${z}`, hit = picked.get(key);
+    if (hit) return hit;
+    for (let r = 0; r <= 40; r += 1.5) for (let a = 0; a < (r ? 16 : 1); a++) {
+      const px = want[0] + Math.cos(a * Math.PI / 8 + r) * r, pz = want[1] + Math.sin(a * Math.PI / 8 + r) * r;
+      if (px < h.x0 + 2 || px > h.x1 - 2 || pz < h.z0 + 2 || pz > h.z1 - 2) continue;
+      if (gradeAt(s.site, px, pz, 1.0) > 0.07 || mem.some(m => Math.hypot(m[0] - px, m[1] - pz) < 2.6)) continue;
+      picked.set(key, [px, pz]); mem.push([px, pz]);
+      return [px, pz];
+    }
+    return want;
+  };
   let C = M(30, 30);
   const bugs: string[] = [];
   // what came with the land: laid in beside the plans' cabin spot (the world would pick these)
@@ -448,7 +474,7 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
   const r = reportCard(s);
   const alive = s.personState.filter(ps => ps.needs.died == null).length;
   const often = [...seen].filter(([, n]) => n >= 40).sort((a, b) => b[1] - a[1]).slice(0, 6);
-  return { causes: [...causes].sort((a, b) => b[1] - a[1]).map(([k, n]) => `${n} ${k}`).join(', '), often, minMoney: Math.round(minMoney), site: `${s.site.acres} ac ${s.site.creek ? 'creek' : s.site.spring ? 'spring' : 'dry'} ${s.site.gwDepth} m ${s.site.improvements.house ? s.site.improvements.house.kind + ' ' : 'raw '}$${Math.round(s.site.price / 1000)}k`, strat, kind, variant: s.disaster.variant, ending: s.ending?.kind ?? 'still going (2 yrs)', grade: r.grade, alive: `${alive}/${s.personState.filter(ps => !ps.needs.left).length}`, hungry: s.stats.hungryDays, days: s.stats.days, moneyAtHit, builtAtHit, bugs: [...new Set(bugs)].slice(0, 5), lines: r.lines, fights, prisoners: s.gate.prisoners?.length ?? 0, hides, hidFound, owed: Math.round(owed), debtStage, trials: [trial.started ? `${trial.started}: ${trial.in} in, ${trial.on} sent on, ${trial.stole} stole, ${trial.left} left` : '', newcomerNote(s)].filter(Boolean).join(' · ') || '-', stripped, burned, s };
+  return { causes: [...causes].sort((a, b) => b[1] - a[1]).map(([k, n]) => `${n} ${k}`).join(', '), often, minMoney: Math.round(minMoney), site: `${s.site.lot ? s.site.lot.kind + ' ' + s.site.lot.elevM + ' m, ' : ''}${s.site.acres} ac ${s.site.creek ? 'creek' : s.site.spring ? 'spring' : 'dry'} ${s.site.gwDepth} m ${s.site.improvements.house ? s.site.improvements.house.kind + ' ' : 'raw '}$${Math.round(s.site.price / 1000)}k`, strat, kind, variant: s.disaster.variant, ending: s.ending?.kind ?? 'still going (2 yrs)', grade: r.grade, alive: `${alive}/${s.personState.filter(ps => !ps.needs.left).length}`, hungry: s.stats.hungryDays, days: s.stats.days, moneyAtHit, builtAtHit, bugs: [...new Set(bugs)].slice(0, 5), lines: r.lines, fights, prisoners: s.gate.prisoners?.length ?? 0, hides, hidFound, owed: Math.round(owed), debtStage, trials: [trial.started ? `${trial.started}: ${trial.in} in, ${trial.on} sent on, ${trial.stole} stole, ${trial.left} left` : '', newcomerNote(s)].filter(Boolean).join(' · ') || '-', stripped, burned, s };
 }
 
 describe.skipIf(process.env.PLAYTEST !== 'long')('the long game', () => {

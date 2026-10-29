@@ -384,6 +384,7 @@ const vaultBp = (kind: string, spoil: number, conc: [number, number, number], re
 });
 export const BUNKER_BLUEPRINTS: Blueprint[] = [
   vaultBp('bunker_hatch', 45, [4, 10, 4], [1, 3, 1], 20, 70, 30, 24, { blast_door: 1, hardware: 2 }, 'Blast door, hatch lid and the ladder'),
+  vaultBp('bunker_floorhatch', 55, [5, 12, 5], [1, 4, 1], 24, 80, 34, 28, { blast_door: 1, hardware: 4, lumber: 3 }, 'Insulated hatch lid, frame, stairs and lamps'),
   vaultBp('bunker_stairs', 110, [8, 18, 8], [2, 5, 2], 30, 120, 60, 36, { blast_door: 1, hardware: 2, lumber: 3, roofing: 2 }, 'Blast door, handrail and the headhouse'),
   vaultBp('bunker_corridor', 50, [6, 10, 6], [2, 3, 2], 20, 70, 40, 16, { hardware: 1, cable: 1 }),
   vaultBp('bunker_dorm', 120, [14, 22, 16], [4, 8, 6], 40, 140, 90, 60, { lumber: 10, hardware: 3, cable: 1 }, 'Vents, bunks, lockers, wiring'),

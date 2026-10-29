@@ -9,7 +9,7 @@
  */
 import * as THREE from 'three';
 import { CELL, type KitPieceDef } from './kit';
-import { Furniture, M } from './interior';
+import { Furniture, M, sickSlot } from './interior';
 import { Clutter } from './clutter';
 import { dressEvenings } from './goodsDress';
 import { box, buildGabled, Parts, type BuildOpts, type FurnishCtx } from './shell';
@@ -36,7 +36,10 @@ function farmhouse(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Grou
     // parlor (front): a sofa, a chair, a rug, a bookcase
     I({ x: -0.25, z: 0.55 }, a => Furniture.rug(a, 2.4, 1.8), false);
     I({ x: -0.25, z: 0.3 }, a => Furniture.sofa(a, 'quilt_red'));
-    I({ x: 0.3, z: 0.7, rot: -Math.PI / 2 }, a => Furniture.armchair(a, 'quilt_blue'));
+    // the sickbay corner: an iron cot under the front window, head to the wall, a stand with the basin, the bottles and a roll of bandage
+    I({ x: 0.53, z: 0.66, rot: -Math.PI / 2 }, a => { Furniture.single(a, 'linen'); sickSlot(a); });
+    I({ x: 0.675, z: 0.53 }, a => Furniture.table(a, 0.5, 0.42));
+    I({ x: 0.675, z: 0.53, y: c.y0 + 0.004 + 0.76 * M }, a => Clutter.sickTray(a), false);
     I({ x: left + 0.04, z: 0.75, rot: Math.PI / 2 }, a => Furniture.shelfUnit(a, 1.2, 1.9, 'books'));
     // kitchen (back): counter, range, table, the fridge if it's wired
     const o = c.parts.opts;
@@ -88,7 +91,7 @@ function trailer(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group 
     dressEvenings(c, { x: 0.1, z: 0.45 });
     I({ x: 0, z: front - 0.25, rot: Math.PI }, a => Furniture.sofa(a, 'quilt_blue'));
     I({ x: 0, z: back + 0.2 }, a => Furniture.bed(a, true, 'quilt_red'));
-    I({ x: 0.15, z: -0.75 }, a => Furniture.single(a, 'quilt_blue'));
+    I({ x: 0.15, z: -0.75 }, a => { Furniture.single(a, 'quilt_blue'); sickSlot(a); });
     c.partition(left, -0.5, right, -0.5, [{ at: 0.25, w: 0.14, sill: 0, h: 0.36 }], 'pine_panel');
     c.partition(left, -1.05, right, -1.05, [{ at: -0.25, w: 0.14, sill: 0, h: 0.36 }], 'pine_panel');
     // the bath: the left half of the middle room, a toilet and a washstand against the back wall, a shower by the front one

@@ -31,11 +31,12 @@ import { careYield } from './daily';
 import { log } from './economy';
 import { logGate } from './nag';
 import { calendarOf, type GameState } from './state';
-import { REGIONS } from './regions';
+
 import { MANURE, PILE_MAX } from './crops';
 import { butcherKids, COW_MILK_KCAL, cowInMilk, dairyDay, GOAT_MILK_KCAL, grazeShare, herdDay, sheltered, sickShare } from './herd';
 import { cookRatio } from './daily';
 import { MEAT_WHERE, putUpMeat, renderLard } from './kitchen';
+import { regionFor } from './climate';
 
 export type Animal = 'goat' | 'pig' | 'steer' | 'rabbit' | 'sheep' | 'cow';
 export const ANIMALS: Animal[] = ['goat', 'cow', 'pig', 'steer', 'rabbit', 'sheep'];
@@ -76,14 +77,14 @@ export interface Livestock {
 export const newLivestock = (): Livestock => ({ condition: { goat: 1, pig: 1, steer: 1, rabbit: 1, sheep: 1, cow: 1 }, butchered: -1, steerSince: null, litterAt: -1 });
 
 const head = (s: GameState, a: Animal) => Math.floor(s.stock[a] ?? 0);
-const grazing = (s: GameState) => { const doy = calendarOf(s.clock).doy, [f0, f1] = REGIONS[s.site.region].frost; return doy >= f0 && doy <= f1; };
+const grazing = (s: GameState) => { const doy = calendarOf(s.clock).doy, [f0, f1] = regionFor(s.site).frost; return doy >= f0 && doy <= f1; };
 /** Sheep the barns roof: a sheep barn 30, the family barn 12. */
 export const sheepRoom = (s: GameState): number => s.structures.reduce((a, st) => a + (st.finishedAt === null ? 0 : st.kind === 'sheep_barn' ? SHEEP_BARN_SHEEP : st.kind === 'barn' ? BARN_SHEEP : 0), 0);
 /** Share of the flock under a roof (1 = all of them). */
 export const sheepSheltered = (s: GameState): number => { const n = head(s, 'sheep'); return n <= 0 ? 1 : Math.min(1, sheepRoom(s) / n); };
 
 /** Hay share fed off-season: more in a hard-winter region. */
-const winterHayScale = (s: GameState) => 1 + 0.2 * Math.max(0, REGIONS[s.site.region].cold - 1);
+const winterHayScale = (s: GameState) => 1 + 0.2 * Math.max(0, regionFor(s.site).cold - 1);
 
 /** Bales of hay and bags of feed the animals on the place eat a day now. */
 export function feedDemand(s: GameState): { hay: number; feed: number } {
@@ -95,7 +96,7 @@ export function feedDemand(s: GameState): { hay: number; feed: number } {
 
 /** Bales to put up in the fall for the winter (the frost-to-frost gap) at the current herd. */
 export function winterHay(s: GameState): number {
-  const [f0, f1] = REGIONS[s.site.region].frost;
+  const [f0, f1] = regionFor(s.site).frost;
   const days = 365 - (f1 - f0);
   return Math.ceil(ANIMALS.reduce((t, a) => t + head(s, a) * EAT[a].hay, 0) * winterHayScale(s) * days / BALE_LB);
 }
@@ -119,7 +120,7 @@ export function livestockDay(s: GameState, freezer: boolean): number {
     const fed = w > 0 ? (hayW * hayFed + EAT[a].feed * feedFed) / w : 1;
     const before = l.condition[a];
     // sheep with no roof in the cold months waste: the wool is not enough in a Mountain West January
-    const exposed = a === 'sheep' && !grazing(s) ? 0.03 * (1 - sheepSheltered(s)) * Math.max(0.3, REGIONS[s.site.region].cold) : (a === 'goat' || a === 'cow') && !grazing(s) ? 0.006 * (1 - sheltered(s)) * Math.max(0.3, REGIONS[s.site.region].cold) : 0;
+    const exposed = a === 'sheep' && !grazing(s) ? 0.03 * (1 - sheepSheltered(s)) * Math.max(0.3, regionFor(s.site).cold) : (a === 'goat' || a === 'cow') && !grazing(s) ? 0.006 * (1 - sheltered(s)) * Math.max(0.3, regionFor(s.site).cold) : 0;
     l.condition[a] = Math.min(1, Math.max(0, before + (fed >= 0.95 ? 0.02 : -0.06 * (1 - fed)) - exposed));
     if (exposed > 0.008 && logGate(s, 'sheep-cold', 20)) log(s, 'The sheep are standing in the snow with no barn: they are losing condition.');
     if (before >= 0.5 && l.condition[a] < 0.5) log(s, `The ${a === 'steer' ? 'steer is' : a + 's are'} short of feed and losing condition.`);

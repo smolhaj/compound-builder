@@ -15,7 +15,7 @@
 import { SPRING_LPD } from './site';
 import { toteStorage, waterPrice } from './water';
 import { sound } from './improvements';
-import { REGIONS } from './regions';
+
 import { log } from './economy';
 import { calendarOf, dayIndex, type GameState, type Structure } from './state';
 import { isFinished } from './construction';
@@ -25,6 +25,7 @@ import { wellYield } from './effects';
 import { stormOutage } from './weatherThreats';
 import { greenhouseKwh } from './greenhouse';
 import { bestLevel } from './skills';
+import { regionFor } from './climate';
 
 /** What utility buildings provide. */
 export interface UtilityDef {
@@ -421,11 +422,11 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
   for (const st of fin) if (p.water.has(st.id) && p.nodes.some(o => p.water.get(o.id) === p.water.get(st.id) && UTILITY[o.kind]?.store)) roof += roofM2(kinds.get(st.id)!);
   // a dug pond or reservoir takes the rain on its own surface and a seep (or the creek) all year, and loses water in the summer heat
   const ponds = fin.filter(st => st.kind === 'pond').length, reservoirs = fin.filter(st => st.kind === 'reservoir').length;
-  const perBasin = (rainMm(doy) * 330 * REGIONS[s.site.region].rainMm / 400 * 0.8 + (s.site.creek ? 2200 : 600)) * (s.disaster.kind === 'drought' && s.clock.t >= s.disaster.hitAt ? 0.3 : 1) - (doy > 150 && doy < 250 ? 800 : 150);
+  const perBasin = (rainMm(doy) * 330 * regionFor(s.site).rainMm / 400 * 0.8 + (s.site.creek ? 2200 : 600)) * (s.disaster.kind === 'drought' && s.clock.t >= s.disaster.hitAt ? 0.3 : 1) - (doy > 150 && doy < 250 ? 800 : 150);
   // the ponds (and a reservoir nobody filters) fill their own pool; a filtered reservoir fills the drinking store
   const toPool = (ponds + (drinkOk ? 0 : reservoirs)) * perBasin, toStore = (drinkOk ? reservoirs : 0) * perBasin;
   u.pondL = Math.max(0, Math.min(irrigCap, (u.pondL ?? 0) + toPool));
-  const rainL = roof * rainMm(doy) * REGIONS[s.site.region].rainMm / 400 * 0.8 + toStore;
+  const rainL = roof * rainMm(doy) * regionFor(s.site).rainMm / 400 * 0.8 + toStore;
   // the living drink and wash (playtest round 3: the dead and the taken were still counted, doubling a long game's water use)
   const people = s.personState.filter(ps => ps.needs?.died == null).length;
   const homePlumbed = fin.some(st => fitted(s, st.id, 'plumb') && (DRAW_KWH[st.kind] ?? 0) >= 5);
