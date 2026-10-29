@@ -1,7 +1,7 @@
 // Repeatable performance probe: a late-game compound at Low / Medium / High, day / night / snow / rain.
 //
 //   flock <lock> node scripts/perfProbe.mjs [--out perf.json] [--port 5961] [--tiers low,medium,high] [--conds day,night,snow,rain]
-//                                           [--frames 24] [--warm 4] [--w 640] [--h 400] [--scene full|bare] [--shots dir]
+//                                           [--frames 24] [--warm 4] [--w 640] [--h 400] [--scene full|bare] [--shots dir] [--nolift]
 //
 // The scene (built through the real store actions, no saved-state changes): the fortress ring (container wall, wall-top deck, gatehouse
 // garage, five towers), heated greenhouse, orchard grove, 20 kW solar farm + battery, pond, reservoir, sheep barn, equipment yard, guest
@@ -25,7 +25,7 @@ const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] :
 const outFile = opt('--out', 'perf.json'), port = Number(opt('--port', 5961));
 const tiers = opt('--tiers', 'low,medium,high').split(','), conds = opt('--conds', 'day,night,snow,rain').split(',');
 const FRAMES = Number(opt('--frames', 24)), WARM = Number(opt('--warm', 4)), W = Number(opt('--w', 640)), H = Number(opt('--h', 400));
-const scene = opt('--scene', 'full'), shotDir = opt('--shots', null), censusOnly = args.includes('--census-only'), noRender = args.includes('--norender'), profile = args.includes('--profile');
+const scene = opt('--scene', 'full'), shotDir = opt('--shots', null), censusOnly = args.includes('--census-only'), noRender = args.includes('--norender'), noLift = args.includes('--nolift'), profile = args.includes('--profile');
 mkdirSync(dirname(outFile) || '.', { recursive: true }); if (shotDir) mkdirSync(shotDir, { recursive: true });
 
 const vite = spawn('node', ['node_modules/vite/bin/vite.js', '--config', 'scripts/vite.shots.config.ts', '--port', String(port), '--strictPort'], { stdio: ['ignore', 'pipe', 'inherit'] });
@@ -88,6 +88,7 @@ try {
   });
   await frames(6);
 
+  if (noLift) await page.evaluate(() => { window.__cb.ws.aerialLiftOn = false; });   // (the night aerial readability lift off, to measure what it costs)
   // ── instrumentation ──
   await page.evaluate(() => {
     const cb = window.__cb, ws = cb.ws, world = cb.world;

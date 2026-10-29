@@ -92,6 +92,8 @@ export interface GameStore {
   tool: string | null;
   /** Placement feedback for the HUD (null = valid or no tool). */
   toolProblem: string | null;
+  /** A short confirmation after a building is staked and the tool put away (clears itself). */
+  stakedNote: string | null;
   /** Selected structure (construction panel). */
   selected: string | null;
   /** The raid cutscene, or null. */
@@ -160,6 +162,7 @@ export interface GameStore {
   toggleMark: (t: TreeRef, haulDist: number) => void;
   setTool: (kind: string | null) => void;
   setToolProblem: (t: string | null) => void;
+  flashStaked: (text: string) => void;
   select: (id: string | null) => void;
   /** Answer whoever is at the gate. */
   answer: (stance: Stance) => void;
@@ -235,6 +238,7 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
   game: newGame(1),
   tool: null,
   toolProblem: null,
+  stakedNote: null,
   selected: null,
   cutscene: null,
   chooseStance: (stance) => { const c = get().cutscene; if (c?.phase === 'prompt') set({ cutscene: { ...c, stance } }); },
@@ -415,8 +419,12 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     const changed = isMarked(g, t.id) ? unmarkTree(g, t.id) : markTree(g, t, haulDist) !== null;
     if (changed) set({ game: g });
   },
-  setTool: (tool) => { if (!locked()) set({ tool, toolProblem: null }); },
+  setTool: (tool) => { if (!locked()) set({ tool, toolProblem: null, ...(tool ? { stakedNote: null } : {}) }); },
   setToolProblem: (toolProblem) => set({ toolProblem }),
+  flashStaked: (text) => {
+    set({ stakedNote: text });
+    setTimeout(() => { if (useGameStore.getState().stakedNote === text) useGameStore.setState({ stakedNote: null }); }, 9000);
+  },
   select: (selected) => { if (!locked()) set({ selected }); },
   hire: (id) => {
     if (locked()) return LOCKED_WHY;

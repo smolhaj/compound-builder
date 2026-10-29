@@ -186,6 +186,23 @@ export function listings(seed: number, region: RegionId = 'mountain_west', wish:
   return out;
 }
 
+const rangeMemo = new Map<RegionId, [number, number]>();
+/**
+ * What land in a region actually lists for, per acre (the middle 80% of a sample of listings, so the setup card
+ * quotes the same price model the listings use, size and features included).
+ */
+export function landPriceRange(region: RegionId): [number, number] {
+  const hit = rangeMemo.get(region);
+  if (hit) return hit;
+  const per: number[] = [];
+  for (let seed = 1; seed <= 10; seed++) for (const l of listings(seed, region, { ...ANY_WISH, built: 'raw' }, 6, Infinity)) per.push(l.price / l.acres);
+  per.sort((a, b) => a - b);
+  const q = (f: number) => Math.round(per[Math.min(per.length - 1, Math.floor(f * per.length))] / 100) * 100;
+  const out: [number, number] = [q(0.1), q(0.9)];
+  rangeMemo.set(region, out);
+  return out;
+}
+
 export interface Fact { label: string; value: string; tone?: 'good' | 'bad' }
 /** The listing card's rows. */
 export function siteFacts(s: Site): Fact[] {
