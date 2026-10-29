@@ -128,9 +128,9 @@ try {
       const ps = world.family.positions().filter(p => Math.hypot(p.x - ox, p.z - oz) < 9);
       ps.sort((a, b) => Math.hypot(a.x - ox, a.z - oz) - Math.hypot(b.x - ox, b.z - oz));
       const p = ps[0] ?? world.family.positions()[0];
-      const dx = p.x - ox, dz = p.z - oz, d = Math.max(0.5, Math.hypot(dx, dz));
-      const [cx, cz] = world.openSpotNear(p.x + dx / d * 0.9 + dz / d * 0.25, p.z + dz / d * 0.9 - dx / d * 0.25, 0.3);
-      cam.placeEye(cx, cz, ox, oz, 0.4);
+      // from the far side of the rows (away from the garden fence), looking across the trees at the person
+      const [cx, cz] = world.openSpotNear(ox - 0.6, oz + 2.7, 0.3);
+      cam.placeEye(cx, cz, (ox + p.x) / 2, (oz + p.z) / 2, 0.4);
       window.__eyePerson = { x: p.x, z: p.z, dist: Math.hypot(p.x - ox, p.z - oz) };
     }, ost.at);
     console.log('person', JSON.stringify(await page.evaluate(() => window.__eyePerson)));

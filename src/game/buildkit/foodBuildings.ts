@@ -458,7 +458,7 @@ function orchard(def: KitPieceDef, seed = 1): THREE.Group {
       }
     };
     onCanopy(T.fruitR, T.fruit, grove ? Math.round(T.fruitN * 0.4) : T.fruitN, 0.35);
-    onCanopy(0.2, T.blossom, grove ? 26 : 44, 0.15);
+    onCanopy(0.17, T.blossom, grove ? 40 : 90, 0.12);
     p.collide({ x0: x - 0.03, z0: z - 0.03, x1: x + 0.03, z1: z + 0.03 });
   }
   // finish: drip irrigation (the orchard's water): a valve box at the front corner, a mainline up the
