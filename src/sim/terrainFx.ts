@@ -95,8 +95,9 @@ export function raidAngle(s: GameState, rnd: () => number): { ang: number; lane:
   if (lanes.length < 4) return null;
   const road = lanes.reduce((a, l) => (Math.abs(l.ang - Math.PI / 2) < Math.abs(a.ang - Math.PI / 2) ? l : a), lanes[0]);
   const best = bestLane(lanes, { ang: Math.PI / 2, bonus: FX.ROAD_EASE });
-  if (!best || best === road) return null;
-  if (best.cost > road.cost * FX.ROAD_EASE * FX.LANE_MARGIN) return null;
+  // the road side is a lane over a standing tunnel-bridge: they come to its door whatever the margins
+  if (!best || (best === road && !best.via)) return null;
+  if (!best.via && best.cost > road.cost * FX.ROAD_EASE * FX.LANE_MARGIN) return null;
   // by a tunnel-bridge they gather at its outer door, so they come from the door's direction
   const c = campOf(s), toDoor = best.via && best.choke ? Math.atan2(best.choke.at[1] - c[1], best.choke.at[0] - c[0]) : null;
   return { ang: (toDoor ?? best.ang) + (rnd() - 0.5) * (toDoor !== null ? 0.12 : 0.5), lane: best, ...(best.via ? { via: best.via } : {}) };
