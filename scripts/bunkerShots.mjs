@@ -47,7 +47,7 @@ try {
     const e = W.localToWorld(b.id, ex, ey, ez), l = W.localToWorld(b.id, lx, ly, lz);
     cb.qa.pose = { x: e.x, y: e.y, z: e.z, lx: l.x, ly: l.y, lz: l.z, fov };
   }, [kind, ex, ey, ez, lx, ly, lz, fov]);
-  const set = (js) => page.evaluate(new Function('cb', js));
+  const set = (js) => page.evaluate(js => new Function("cb", js)(window.__cb), js);
   // underground view from above (pose-based: no camera easing to wait for)
   await set("cb.store.getState().setTimeOfDay(12); cb.store.getState().setUnderground(true);");
   await page.evaluate(() => window.__cb.world.bunkerFolk.setDebug([{ room: 'bunker_comms', role: 'console' }, { room: 'bunker_dorm', role: 'seat' }, { room: 'bunker_galley', role: 'seat' }, { room: 'bunker_medical', role: 'bed' }]));
