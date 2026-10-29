@@ -74,7 +74,7 @@ describe('approach lanes and chokes', () => {
     const others = lanes.filter(l => l !== best);
     expect(others.every(l => l.cost > best.cost)).toBe(true);
     expect(best.choke).toBeTruthy();
-    expect(best.choke!.width).toBeLessThanOrEqual(3);
+    expect(best.choke!.width).toBeLessThanOrEqual(T.CHOKE);
   });
 
   it('flat open ground has no choke and no lane is much harder than another', () => {

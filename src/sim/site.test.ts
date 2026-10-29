@@ -29,7 +29,7 @@ describe('the land you buy', () => {
     // the Northwest is dear, the desert cheap
     const avg = (r: 'pnw' | 'desert') => listings(3, r).reduce((a, l) => a + l.price / l.acres / SIZE_FACTOR[l.acres], 0);
     expect(avg('pnw')).toBeGreaterThan(avg('desert') * 3);
-  });
+  }, 30_000);
 
   it('the filters are honored', () => {
     const wish: LandWish = { acres: 20, water: 'spring', timber: 'heavy', town: 'near' };

@@ -18,6 +18,7 @@
  *
  * Distances are world units (1 ≈ 6 m).
  */
+import { BUNKER_ENTRANCES } from './bunkerEntrances';
 import { ringHoldSeconds } from './rings';
 import type { Battle, BattleEvent, BattleUnit } from './battleTypes';
 import { GUN, skillOf, type Caliber } from './armory';
@@ -307,7 +308,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
   // manned inner rings (sim/rings.ts): each makes the crew take another wall under fire before the line is breached
   const ringHold = opts.insideBreach ? 0 : ringHoldSeconds(s);
 
-  const shelterAt = fin.find(st => st.kind === 'bunker_hatch' || st.kind === 'bunker_stairs') ?? home;
+  const shelterAt = fin.find(st => BUNKER_ENTRANCES.includes(st.kind)) ?? home;
   const hardShelter = shelterAt !== home || g.safeRoom;
 
   // ── units ──

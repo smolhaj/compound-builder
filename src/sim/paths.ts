@@ -29,8 +29,9 @@ import { structureAge } from '../game/atmosphere/aging';
 import { log } from './economy';
 import { MATERIALS, hasAll, shortfall, billText, type MaterialId, type Stock } from './materials';
 import { isFinished } from './construction';
-import { REGIONS, seasons } from './regions';
+import { seasons } from './regions';
 import { calendarOf, type GameState, type Structure } from './state';
+import { regionFor } from './climate';
 
 export type LaidKind = 'gravel' | 'stones' | 'boards' | 'paved';
 export type PathSurface = 'desire' | 'dirt' | LaidKind;
@@ -185,7 +186,7 @@ export interface Household {
 export function householdOf(s: GameState): Household {
   const alive = s.people.filter((_, i) => s.personState[i]?.needs?.died == null);
   const adults = alive.filter(p => !p.kid).length;
-  const doy = calendarOf(s.clock).doy, [c0, c1] = seasons(REGIONS[s.site.region]).crops;
+  const doy = calendarOf(s.clock).doy, [c0, c1] = seasons(regionFor(s.site)).crops;
   const homeBuilt = s.structures.some(st => isFinished(st) && ['septic'].includes(st.kind));
   const heads = (['goat', 'pig', 'steer', 'rabbit', 'sheep'] as const).reduce((a, k) => a + Math.floor(s.stock[k] ?? 0), 0);
   return {

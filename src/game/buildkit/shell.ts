@@ -69,6 +69,14 @@ export interface BuildOpts {
   blast?: Array<'front' | 'back' | 'left' | 'right'>;
   /** Bunker hardening fitted (sim/hardening): what shows inside the room. */
   harden?: Partial<Record<HardenId, 1 | 2 | 3>>;
+  /** Bunker rooms: the bunker's plant room is built (ducts run, the air handler's lamp is green). */
+  air?: boolean;
+  /** Bunker rooms: the power is on (the control room's lamps). */
+  power?: boolean;
+  /** A house with a floor hatch in it (bunker_floorhatch): the openings in its floor, in the building's frame. The floor, the foundation under it and the furniture leave them clear. */
+  hatches?: Array<{ x0: number; z0: number; x1: number; z1: number }>;
+  /** Bunkroom: what the family owns for the long evenings (sim stock: games, an instrument, paperbacks); the room shows them. */
+  morale?: { games: boolean; music: boolean; books: boolean };
   /** The evenings' goods on and by the family's table (sim/evenings.ts `houseGoods`): 1 in good shape, 2 worn thin. Only the main home gets them. */
   goods?: Partial<Record<'games' | 'guitar' | 'player' | 'books' | 'toys' | 'kidbooks', 1 | 2>>;
 }
@@ -91,6 +99,18 @@ function readFoodSlot(g: THREE.BufferGeometry, ox: number, oz: number): FoodSlot
   return { o: [o.x, o.y, o.z], u: [a.x, a.y, a.z], f: [f.x, f.y, f.z], len, dep, clear: h, floor: o.y - v(4).y < 0.0015, freezer: o.y - v(4).y > 0.0025 };
 }
 
+/**
+ * A bed the sick are put in, as the building holds it (building frame, world units): `o` the middle of the mattress top,
+ * `foot` the unit vector from the head toward the foot, `side` a unit vector across the bed.
+ */
+export interface SickSlot { o: [number, number, number]; foot: [number, number, number]; side: [number, number, number] }
+function readSickSlot(g: THREE.BufferGeometry, ox: number, oz: number): SickSlot {
+  const p = g.getAttribute('position');
+  const v = (i: number) => new THREE.Vector3(p.getX(i) + ox, p.getY(i), p.getZ(i) + oz);
+  const o = v(0), f = v(1).sub(o).normalize(), s = v(2).sub(o).normalize();
+  return { o: [o.x, o.y, o.z], foot: [f.x, f.y, f.z], side: [s.x, s.y, s.z] };
+}
+
 export class Parts {
   layer: BuildLayer = 'stakes';
   /** Shift applied to everything added (and to colliders): a shell set off-center in its footprint. */
@@ -104,8 +124,11 @@ export class Parts {
   readonly colliders: Collider[] = [];
   /** Shelf boards and pallets where stored food goes (game/props/FoodShelfRenderer), in the building's frame. */
   readonly foodSlots: FoodSlot[] = [];
+  /** Beds the sick are put in (game/people/sickbayPlan), in the building's frame. */
+  readonly sickSlots: SickSlot[] = [];
   add(m: KitMaterialId, g: THREE.BufferGeometry, layer: BuildLayer = this.layer): void {
     if (m === 'food_slot') { this.foodSlots.push(readFoodSlot(g, this.ox, this.oz)); g.dispose(); return; }
+    if (m === 'sick_slot') { this.sickSlots.push(readSickSlot(g, this.ox, this.oz)); g.dispose(); return; }
     const k = `${layer}|${m}`;
     let l = this.map.get(k);
     if (!l) this.map.set(k, l = []);
@@ -137,8 +160,27 @@ export class Parts {
     }
     group.userData.colliders = this.colliders;
     group.userData.foodSlots = this.foodSlots;
+    group.userData.sickSlots = this.sickSlots;
     return group;
   }
+}
+
+/** A rectangle (x0..x1, z0..z1) minus rectangular holes, as a list of rectangles (a floor with a stair hatch cut in it). */
+export function minusHoles(base: { x0: number; z0: number; x1: number; z1: number }, holes: ReadonlyArray<{ x0: number; z0: number; x1: number; z1: number }>): Array<{ x0: number; z0: number; x1: number; z1: number }> {
+  let rects = [base];
+  for (const h of holes) {
+    const next: typeof rects = [];
+    for (const r of rects) {
+      if (h.x0 >= r.x1 || h.x1 <= r.x0 || h.z0 >= r.z1 || h.z1 <= r.z0) { next.push(r); continue; }
+      if (h.z0 > r.z0) next.push({ x0: r.x0, x1: r.x1, z0: r.z0, z1: h.z0 });
+      if (h.z1 < r.z1) next.push({ x0: r.x0, x1: r.x1, z0: h.z1, z1: r.z1 });
+      const z0 = Math.max(r.z0, h.z0), z1 = Math.min(r.z1, h.z1);
+      if (h.x0 > r.x0) next.push({ x0: r.x0, x1: h.x0, z0, z1 });
+      if (h.x1 < r.x1) next.push({ x0: h.x1, x1: r.x1, z0, z1 });
+    }
+    rects = next;
+  }
+  return rects;
 }
 
 export const box = (w: number, h: number, d: number, x: number, y: number, z: number) =>
@@ -409,12 +451,18 @@ export function buildGabled(s: GabledSpec, furnish?: (c: FurnishCtx) => void, pa
 
   // ── Foundation ──
   parts.layer = 'foundation';
+  const holes = parts.opts.hatches ?? [];
+  /** A slab W' × D' at y with the hatch openings cut out. */
+  const slab = (m: KitMaterialId, w: number, d: number, y: number, h: number): void => {
+    if (!holes.length) { parts.add(m, box(w, h, d, 0, y, 0)); return; }
+    for (const r of minusHoles({ x0: -w / 2, x1: w / 2, z0: -d / 2, z1: d / 2 }, holes)) parts.add(m, box(r.x1 - r.x0, h, r.z1 - r.z0, (r.x0 + r.x1) / 2, y, (r.z0 + r.z1) / 2));
+  };
   if (s.foundation === 'fieldstone') {
     const courses = 4, ch = (y0 + 0.03) / courses;
-    for (let i = 0; i < courses; i++) parts.add('fieldstone', box(W + 0.03, ch, D + 0.03, 0, -0.03 + i * ch, 0));
+    for (let i = 0; i < courses; i++) slab('fieldstone', W + 0.03, D + 0.03, -0.03 + i * ch, ch);
     if (s.porch > 0) parts.add('fieldstone', box(W, y0 - 0.025 + 0.03, 0.04, 0, -0.03, pz1 - 0.02));
   } else if (s.foundation === 'concrete') {
-    parts.add('concrete', box(W + 0.02, y0 + 0.03, D + 0.02, 0, -0.03, 0));
+    slab('concrete', W + 0.02, D + 0.02, -0.03, y0 + 0.03);
     if (s.porch > 0) parts.add('concrete', box(W + 0.02, y0 + 0.02, s.porch, 0, -0.03, hd + s.porch / 2));
   } else {
     // piers (posts on footing blocks)
@@ -428,8 +476,8 @@ export function buildGabled(s: GabledSpec, furnish?: (c: FurnishCtx) => void, pa
 
   // ── Floor deck + porch deck + steps ──
   parts.layer = 'deck';
-  if (s.foundation !== 'concrete') parts.add(s.floorMat, box(W - 0.01, 0.012, D - 0.01, 0, y0 - 0.004, 0));
-  else parts.add(s.floorMat, box(W - 0.01, 0.004, D - 0.01, 0, y0 - 0.002, 0));
+  if (s.foundation !== 'concrete') slab(s.floorMat, W - 0.01, D - 0.01, y0 - 0.004, 0.012);
+  else slab(s.floorMat, W - 0.01, D - 0.01, y0 - 0.002, 0.004);
   const frontDoor = (s.front ?? []).find(o => o.kind === 'door' || o.kind === 'arch');
   if (s.porch > 0) {
     parts.add('deck', box(W + 0.02, 0.025, s.porch, 0, y0 - 0.025, (hd + pz1) / 2));
@@ -640,13 +688,15 @@ export function buildGabled(s: GabledSpec, furnish?: (c: FurnishCtx) => void, pa
   }
 
   // ── Interior ──
+  // furniture keeps a hand clear of the floor hatch's opening and its swing
+  const clear = holes.map(h => ({ x0: h.x0 - 0.05, x1: h.x1 + 0.05, z0: h.z0 - 0.05, z1: h.z1 + 0.05 }));
   if (furnish) {
     const ctx: FurnishCtx = {
       parts, spec: s, hw, hd, y0, yE,
       left: -hw + T, right: hw - T, front: hd - T, back: -hd + T,
       rnd: parts.rnd,
-      C: (p, fn, prob = 0.75) => { if (parts.rnd() < prob) piece(parts.sink, (p.y ?? y0) > y0 + CUT_H ? 'decor' : 'interior', { ...p, y: p.y ?? y0 + 0.004 }, fn, false); },
-      I: (p, fn, solid = true) => { const c = piece(parts.sink, 'interior', { ...p, y: p.y ?? y0 + 0.004 }, fn, solid); if (c) parts.collide(c); },
+      C: (p, fn, prob = 0.75) => { if (parts.rnd() < prob) piece(parts.sink, (p.y ?? y0) > y0 + CUT_H ? 'decor' : 'interior', { ...p, y: p.y ?? y0 + 0.004 }, fn, false, clear); },
+      I: (p, fn, solid = true) => { const c = piece(parts.sink, 'interior', { ...p, y: p.y ?? y0 + 0.004 }, fn, solid, clear); if (c) parts.collide(c); },
       L: (p, fn, solid = false) => { const c = piece(parts.sink, 'loft', { ...p, y: p.y ?? yE }, fn, solid); if (c) parts.collide(c); },
       partition: (ax, az, bx, bz, openings = [], mat = s.inner ?? 'pine_panel', h = s.wallH) => {
         parts.collide(...wallRun(parts.sink, 'walls', mat, { ax, az, bx, bz, y0, h, t: 0.02, openings }));

@@ -160,6 +160,9 @@ export function terrainCards(s: GameState): TerrainCard[] {
   return out.sort((a, b) => b.urgency - a.urgency).slice(0, 1);
 }
 
+/** The ground's share of the defense in the shared strength's own unit: defense-equivalent points (0 to `FX.DEFENSE_POINTS`). */
+export const terrainPoints = (s: GameState): number => Math.round(terrainDefense(s).score * FX.DEFENSE_POINTS * 10) / 10;
+
 // ── tunnel-bridges and slope tunnels ──
 
 /** Seconds a crew coming by a tunnel-bridge spends at its steel door before it can act (the family sees them on the deck and the towers). */
@@ -199,5 +202,3 @@ export function dropBridge(s: GameState, id: string): string | null {
   log(s, `The ${PERIMETER[r.kind].name.toLowerCase()} is down. Nothing crosses there until it is rebuilt, and a crew has to ford and climb.`);
   return null;
 }
-/** The ground's share of the defense in the shared strength's own unit: defense-equivalent points (0 to `FX.DEFENSE_POINTS`). */
-export const terrainPoints = (s: GameState): number => Math.round(terrainDefense(s).score * FX.DEFENSE_POINTS * 10) / 10;

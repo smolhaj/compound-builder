@@ -58,8 +58,8 @@ export function DefenseTab() {
   const d = defenseReport(game, w.siteGeo?.drive);
   const missingGate = ungatedCrossings(game, w.siteGeo?.drive).length;
   const exposed = d.homes.filter(h => !h.covered);
-  const terrain = terrainDefense(game);
   const hardcore = adaptLevel(game) > 0;
+  const terrain = terrainDefense(game);
   return <>
     <Section title="Defense">
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>

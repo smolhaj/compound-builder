@@ -4,6 +4,7 @@
  * can go wrong. Pure (tested); reads the same posture and enclosure the gate
  * and the battle read, so what it says is what will happen.
  */
+import { BUNKER_ENTRANCES } from './bunkerEntrances';
 import { backupPower } from './hookups';
 import { isFinished } from './construction';
 import { isHome } from './blueprints';
@@ -181,7 +182,7 @@ export function defenseReport(s: GameState, drive?: readonly Pt[]): DefenseRepor
     chk('gear', 'Armor and night vision', n(s, 'plate_carrier') + n(s, 'soft_armor') + n(s, 'nvg') + n(s, 'thermal') > 0, 'plates, vests, NVG or thermal', true),
     chk('cover', 'Cover on the line', n(s, 'sandbags') > 0 || n(s, 'steel_door') > 0 || n(s, 'window_bars') > 0, 'sandbags, a steel door, bars on the windows', true),
   ];
-  const bunker = fin.some(st => st.kind === 'bunker_hatch' || st.kind === 'bunker_stairs');
+  const bunker = fin.some(st => BUNKER_ENTRANCES.includes(st.kind));
   const shelter: Check[] = [
     chk('bunker', 'Bunker', bunker, bunker ? 'the family can hide' : 'nowhere to hide if the line falls', true),
     chk('safe', 'Safe room', n(s, 'safe_room') > 0, 'a hard room in the house', true),

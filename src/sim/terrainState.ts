@@ -14,13 +14,13 @@ import type { Pt } from './perimeter';
 
 let override: GroundSource | null = null;
 /** Tests (and the world, if it ever needs to) can pin the ground. */
-export const setGroundOverride = (g: GroundSource | null): void => { override = g; terrains.clear(); lanes.clear(); sources.clear(); sites.clear(); };
+export const setGroundOverride = (g: GroundSource | null): void => { override = g; terrains.clear(); liteTerrains.clear(); lanes.clear(); sources.clear(); sites.clear(); };
 
 const sources = new Map<string, GroundSource>();
 const terrains = new Map<string, Terrain>();
 const lanes = new Map<string, Lane[]>();
 
-const keyOf = (s: GameState) => `${s.seed}|${s.site.region}|${s.site.creek ? 1 : 0}|${s.site.timber}`;
+const keyOf = (s: GameState) => `${s.seed}|${s.site.region}|${s.site.creek ? 1 : 0}|${s.site.timber}|${JSON.stringify(s.site.lot ?? null)}|${s.site.home.x0},${s.site.home.z0},${s.site.home.x1},${s.site.home.z1}`;
 
 /** The ground of this game's lot (null: none known). */
 export function groundOf(s: GameState): GroundSource | null {
@@ -28,7 +28,7 @@ export function groundOf(s: GameState): GroundSource | null {
   const k = keyOf(s);
   let g = sources.get(k);
   if (!g) {
-    const pt = new ParcelTerrain(s.seed, { creek: s.site.creek, timber: s.site.timber, region: s.site.region });
+    const pt = new ParcelTerrain(s.seed, { creek: s.site.creek, timber: s.site.timber, region: s.site.region, lot: s.site.lot ?? null, home: s.site.home });
     g = { h: (x, z) => pt.natural(x, z).h, creek: pt.creek };
     sources.set(k, g);
   }
@@ -52,6 +52,16 @@ export function campOf(s: GameState): Pt {
   return live.length ? [live.reduce((a, st) => a + st.x, 0) / live.length, live.reduce((a, st) => a + st.z, 0) / live.length] : [(h.x0 + h.x1) / 2, (h.z0 + h.z1) / 2];
 }
 
+const liteTerrains = new Map<string, Terrain>();
+/** Just what the raid lanes read, at step 2 (a quarter of the work): the cost grid and the creek. Built once per place. */
+export function laneTerrainOf(s: GameState): Terrain | null {
+  const g = groundOf(s);
+  if (!g) return null;
+  const k = keyOf(s) + (override ? '|o' : '');
+  let t = liteTerrains.get(k);
+  if (!t) { t = analyzeTerrain(g, s.site.home, { step: 2, lite: true }); liteTerrains.set(k, t); }
+  return t;
+}
 /** The finished, standing tunnel-bridges and slope tunnels: ways a crew can use as easy going over hard ground (`outer` = the end away from the camp). */
 export function corridorsOf(s: GameState): Corridor[] {
   const c = campOf(s);
@@ -63,7 +73,7 @@ export function corridorsOf(s: GameState): Corridor[] {
 
 /** The ways a crew could come at the camp, cached by place, camp (rounded to 4 units) and the tunnels standing. */
 export function lanesOf(s: GameState): Lane[] {
-  const t = terrainOf(s);
+  const t = laneTerrainOf(s);
   if (!t) return [];
   const cor = corridorsOf(s), c = campOf(s), k = `${keyOf(s)}|${override ? 'o' : ''}|${Math.round(c[0] / 4)}|${Math.round(c[1] / 4)}|${cor.map(x => x.id).join(',')}`;
   let l = lanes.get(k);

@@ -23,7 +23,7 @@
  *              else the table; crayfish the same.
  */
 import { calendarOf, type GameState, type Structure } from './state';
-import { REGIONS } from './regions';
+
 import { log } from './economy';
 import { mulberry32 } from './rng';
 import { MEAT_WHERE, putUpMeat } from './kitchen';
@@ -31,6 +31,7 @@ import { finishedOf, pondOf, type PondState } from './farm';
 import { attractants, predatorSpecies, proof } from './wildlife';
 import { careYield } from './daily';
 import { logGate } from './nag';
+import { regionFor } from './climate';
 
 export const TROUT_FRY = 100, TROUT_FRY_G = 8, TABLE_G = 350, CRAY_BAG = 50;
 export const TROUT_CAP = 450, TROUT_CAP_AERATED = 800, CRAY_CAP = 2400;
@@ -42,13 +43,13 @@ export const HARVEST_TROUT = 60, HARVEST_CRAY = 400;
 
 /** Water temperature (C) by day of year, from the region's July high and January low. */
 export function waterTempC(s: GameState, doy = calendarOf(s.clock).doy): number {
-  const r = REGIONS[s.site.region], mid = (r.julyHighF + r.janLowF) / 2, amp = (r.julyHighF - r.janLowF) / 2;
+  const r = regionFor(s.site), mid = (r.julyHighF + r.janLowF) / 2, amp = (r.julyHighF - r.janLowF) / 2;
   const airF = mid + amp * Math.cos(2 * Math.PI * (doy - 197) / 365);
   return Math.max(1, (airF - 32) / 1.8 * 0.6 + 3);
 }
 
 /** Trout live where July stays under 90 F (the water under 22 C). */
-export const troutSuited = (s: GameState): boolean => REGIONS[s.site.region].julyHighF < 90;
+export const troutSuited = (s: GameState): boolean => regionFor(s.site).julyHighF < 90;
 
 /** Grams a trout gains a day at a water temperature (C): about 2.4 g between 12 and 17 C, none under 3 or over 22. */
 export function troutGrowth(temp: number): number {

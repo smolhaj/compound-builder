@@ -456,6 +456,27 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
       }
       break;
     }
+    case 'stone_wall': {
+      // 3.3 m of mortared fieldstone: a wide footing course, the wall tapering up (a batter), a timber coping on the top and a squared post at every 3 m joint
+      const H = 3.3 * M;
+      bays(3 * M, (a, b, i) => {
+        const len = Math.hypot(b.x - a.x, b.z - a.z), yaw = -Math.atan2(b.z - a.z, b.x - a.x), mx = (a.x + b.x) / 2, mz = (a.z + b.z) / 2;
+        const samples = [0, 0.25, 0.5, 0.75, 1].map(f => ground(a.x + (b.x - a.x) * f, a.z + (b.z - a.z) * f));
+        const hi = Math.max(...samples), lo = Math.min(...samples) - 0.06;
+        const box = (l: number, h: number, w: number, y0: number, m: KitMaterialId, dx = 0) => add(m, new THREE.BoxGeometry(l, h, w).translate(0, h / 2, dx).rotateY(yaw).translate(mx, y0, mz));
+        box(len + 0.004, hi - lo + 0.03, 0.62 * M, lo, 'fieldstone');                           // the footing, from the lowest ground to the first course
+        box(len, H * 0.42, 0.58 * M, hi + 0.02, 'fieldstone');                                   // the lower, wider part
+        box(len, H * 0.46, 0.46 * M, hi + 0.02 + H * 0.42, 'fieldstone');                        // the upper part, set back
+        box(len + 0.01, 0.1 * M, 0.5 * M, hi + 0.02 + H * 0.88, 'wood_mid');                     // the timber coping
+        box(len + 0.01, 0.1 * M, 0.34 * M, hi + 0.02 + H * 0.88 + 0.1 * M, 'wood_dark');
+        // a squared timber post at the joint, standing proud of the coping
+        add('wood_dark', new THREE.BoxGeometry(0.2 * M, H * 0.28, 0.2 * M).translate(a.x, hi + 0.02 + H * 0.88, a.z));
+        add('wood_mid', new THREE.BoxGeometry(0.26 * M, 0.06 * M, 0.26 * M).translate(a.x, hi + 0.02 + H * 0.88 + H * 0.28, a.z));
+        void i;
+      });
+      for (const e of spanEnds()) add('fieldstone', new THREE.BoxGeometry(0.7 * M, H, 0.7 * M).translate(e.x, ground(e.x, e.z) + H / 2, e.z));
+      break;
+    }
     case 'tunnel_bridge':
     case 'slope_tunnel': {
       // an enclosed rust-red steel tube (4 m across inside: a truck drives through) with a steel door at each end. The bridge spans a gorge on trusses in a straight
@@ -514,27 +535,6 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
       else if (run.dropped) {   // a dropped bridge leaves its abutments
         for (const [s_, sign] of [[0, -1], [L, 1]] as const) { const p = along(run.pts, s_), gy = ground(p.x, p.z); add('concrete', new THREE.BoxGeometry(0.9 * M, 0.5 * M, R * 2.3).rotateY(-Math.atan2(p.dz, p.dx)).translate(p.x, gy + 0.2 * M, p.z)); void sign; }
       }
-      break;
-    }
-    case 'stone_wall': {
-      // 3.3 m of mortared fieldstone: a wide footing course, the wall tapering up (a batter), a timber coping on the top and a squared post at every 3 m joint
-      const H = 3.3 * M;
-      bays(3 * M, (a, b, i) => {
-        const len = Math.hypot(b.x - a.x, b.z - a.z), yaw = -Math.atan2(b.z - a.z, b.x - a.x), mx = (a.x + b.x) / 2, mz = (a.z + b.z) / 2;
-        const samples = [0, 0.25, 0.5, 0.75, 1].map(f => ground(a.x + (b.x - a.x) * f, a.z + (b.z - a.z) * f));
-        const hi = Math.max(...samples), lo = Math.min(...samples) - 0.06;
-        const box = (l: number, h: number, w: number, y0: number, m: KitMaterialId, dx = 0) => add(m, new THREE.BoxGeometry(l, h, w).translate(0, h / 2, dx).rotateY(yaw).translate(mx, y0, mz));
-        box(len + 0.004, hi - lo + 0.03, 0.62 * M, lo, 'fieldstone');                           // the footing, from the lowest ground to the first course
-        box(len, H * 0.42, 0.58 * M, hi + 0.02, 'fieldstone');                                   // the lower, wider part
-        box(len, H * 0.46, 0.46 * M, hi + 0.02 + H * 0.42, 'fieldstone');                        // the upper part, set back
-        box(len + 0.01, 0.1 * M, 0.5 * M, hi + 0.02 + H * 0.88, 'wood_mid');                     // the timber coping
-        box(len + 0.01, 0.1 * M, 0.34 * M, hi + 0.02 + H * 0.88 + 0.1 * M, 'wood_dark');
-        // a squared timber post at the joint, standing proud of the coping
-        add('wood_dark', new THREE.BoxGeometry(0.2 * M, H * 0.28, 0.2 * M).translate(a.x, hi + 0.02 + H * 0.88, a.z));
-        add('wood_mid', new THREE.BoxGeometry(0.26 * M, 0.06 * M, 0.26 * M).translate(a.x, hi + 0.02 + H * 0.88 + H * 0.28, a.z));
-        void i;
-      });
-      for (const e of spanEnds()) add('fieldstone', new THREE.BoxGeometry(0.7 * M, H, 0.7 * M).translate(e.x, ground(e.x, e.z) + H / 2, e.z));
       break;
     }
     case 'water_pipe': case 'power_cable': {

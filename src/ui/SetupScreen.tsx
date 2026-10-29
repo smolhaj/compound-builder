@@ -11,6 +11,7 @@ import { difficultySummary } from '../sim/difficulty';
 import { DISASTERS, type Difficulty, type DisasterKind, type Mode, type PeaceLength } from '../sim/disaster';
 import { saveGame, AUTOSAVE } from '../sim/save/saveSystem';
 import { affordable, ANY_WISH, builtFacts, LIFESTYLE, landPriceRange, listings, siteFacts, type Acres, type LandWish, type Lifestyle, type Site } from '../sim/site';
+import { LotTerrain } from './LotTerrain';
 import { PLAYABLE, REGION_IDS, REGIONS, type RegionDef, type RegionId, type StormKind } from '../sim/regions';
 
 const MODES: Array<[Mode, string, string]> = [
@@ -57,6 +58,7 @@ function ListingCard({ l, on, pick, budget }: { l: Site; on: boolean; pick: () =
           <span key={f.label + 'v'} style={{ color: f.tone === 'good' ? C.good : f.tone === 'bad' ? C.bad : '#eee' }}>{f.value}</span>,
         ])}
       </div>
+      <LotTerrain site={l} />
       <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', columnGap: 10, rowGap: 3, fontSize: 12.5, borderTop: `1px solid ${C.line}`, paddingTop: 6 }}>
         {builtFacts(l).map((f, k) => [
           <span key={k + 'l'} style={{ color: C.dim }}>{f.label}</span>,
