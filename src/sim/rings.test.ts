@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { newGame, type GameState, type Structure } from './state';
 import { setGroundOverride } from './terrainState';
-import { RING, DEFAULT_RINGS, layRings, planRings, ringCount, ringHoldSeconds, ringPoints, ringPolygons, ringsHolding } from './rings';
+import { RING, DEFAULT_RINGS, layRings, ringBars, planRings, ringCount, ringHoldSeconds, ringPoints, ringPolygons, ringsHolding } from './rings';
 import { DEFAULT_FORTRESS, layFortress, planFortress } from './fortress';
 import { pointInPolygon, polygonArea, selfIntersects } from './ringShape';
 import { PERIMETER, planRun, type Pt } from './perimeter';
@@ -135,5 +135,37 @@ describe('what finished rings do', () => {
     const a = t(withRings(1, 4)), b = t(withRings(3, 4));
     if (a.length && b.length) expect(b.reduce((x, y) => x + y, 0) / b.length).toBeGreaterThanOrEqual(a.reduce((x, y) => x + y, 0) / a.length);
     else expect(b.length).toBeLessThanOrEqual(a.length);   // or fewer breaches at all
+  });
+});
+
+describe('rings over the creek', () => {
+  const creekZ = (x: number) => 30 + 0 * x;   // runs west to east through the middle of the ring
+  it('every ring the creek crosses gets bars across it; none where it does not', () => {
+    const g = game(); g.site = { ...g.site, creek: true };
+    const plan = planRings(g, OUTER, [42, 30], { creekZ, creekHalf: 0.7 }, { count: 3 });
+    expect(plan.rings.every(r => r.bars.length === 2)).toBe(true);   // west and east crossings
+    for (const r of plan.rings) for (const b of r.bars) {
+      const mid = [(b[0][0] + b[1][0]) / 2, (b[0][1] + b[1][1]) / 2];
+      expect(Math.abs(mid[1] - 30)).toBeLessThan(0.5);
+    }
+    expect(plan.notes.join(' ')).toMatch(/creek crosses it/);
+    const dry = planRings(g, OUTER, [42, 30], { creekZ: () => 90 }, { count: 3 });
+    expect(dry.rings.every(r => r.bars.length === 0)).toBe(true);
+    const flat = planRings(game(), OUTER, [42, 30], { creekZ }, { count: 3 });
+    expect(flat.rings.every(r => r.bars.length === 0)).toBe(true);   // no creek on this land
+  });
+
+  it('costs more with bars, and lays them as creek_bars runs; bars already standing are not doubled', () => {
+    const g = game(); g.site = { ...g.site, creek: true };
+    const withBars = planRings(g, OUTER, [42, 30], { creekZ }, { count: 2 });
+    const without = planRings(game(), OUTER, [42, 30], {}, { count: 2 });
+    expect(withBars.cost).toBeGreaterThan(without.cost);
+    const before = g.perimeter.length;
+    layRings(g, withBars);
+    expect(g.perimeter.filter(r => r.kind === 'creek_bars')).toHaveLength(2);
+    expect(g.perimeter.length).toBeGreaterThan(before + 2);
+    const again = planRings(g, OUTER, [42, 30], { creekZ }, { count: 2 });
+    expect(again.rings[0].bars).toHaveLength(0);
+    expect(ringBars(OUTER, creekZ, 0.7)).toHaveLength(2);
   });
 });

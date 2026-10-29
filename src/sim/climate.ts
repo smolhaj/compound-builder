@@ -41,7 +41,7 @@ export function altitudeClimate(site: Pick<Site, 'region' | 'lot' | 'home'>): Al
   const lot = siteLot(site);
   if (!lot) return null;
   const spec = site.lot!, st = lot.stats, R = REGIONS[site.region];
-  const key = `${site.region}|${spec.kind}:${spec.seed}:${spec.relief}:${spec.elevM}:${spec.flip}:${spec.creek ? 1 : 0}|${site.home.x0},${site.home.z0},${site.home.x1},${site.home.z1}`;
+  const key = `${site.region}|${spec.kind}:${spec.seed}:${spec.relief}:${spec.elevM}:${spec.flip}:${spec.creek ? 1 : 0}${spec.cutbank ? "c" : ""}|${site.home.x0},${site.home.z0},${site.home.x1},${site.home.z1}`;
   const hit = cache.get(key);
   if (hit !== undefined) return hit;
   const dM = spec.elevM - (REF_ALT_M[site.region] ?? spec.elevM);
@@ -73,7 +73,7 @@ export function regionFor(site: Pick<Site, 'region' | 'lot' | 'home'>): RegionDe
   const R = REGIONS[site.region];
   const a = altitudeClimate(site);
   if (!a) return R;
-  const spec = site.lot!, key = `${site.region}|${spec.kind}:${spec.seed}:${spec.relief}:${spec.elevM}:${spec.flip}:${spec.creek ? 1 : 0}|${site.home.x0},${site.home.z0}`;
+  const spec = site.lot!, key = `${site.region}|${spec.kind}:${spec.seed}:${spec.relief}:${spec.elevM}:${spec.flip}:${spec.creek ? 1 : 0}${spec.cutbank ? "c" : ""}|${site.home.x0},${site.home.z0}`;
   const hit = regionCache.get(key);
   if (hit) return hit;
   const storms = { ...R.storms };

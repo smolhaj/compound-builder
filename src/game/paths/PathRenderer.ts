@@ -12,7 +12,8 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import type { Quality } from '../../engine/world/WorldScene';
 import { PATH_WIDTH, type PathSurface } from '../../sim/paths';
 import type { PathNetwork } from './pathNet';
-import { boardGeometry, h2, laidRibbon, patchGeometry, skirtGeometry, stoneGeometry, wornRibbons, type SkirtRect } from './pathGeometry';
+import { stairRuns } from './walkRoute';
+import { boardGeometry, h2, laidRibbon, patchGeometry, skirtGeometry, stairGeometry, stoneGeometry, wornRibbons, type SkirtRect } from './pathGeometry';
 
 type Ground = (x: number, z: number) => number;
 
@@ -163,9 +164,11 @@ export class PathRenderer {
     const colors = { grass: new THREE.Color(look.grass), soil: new THREE.Color(look.soil) };
     const bySurface = new Map<PathSurface, THREE.BufferGeometry[]>();
     const push = (s: PathSurface, g: THREE.BufferGeometry | null) => { if (g) (bySurface.get(s) ?? bySurface.set(s, []).get(s)!).push(g); };
-    const planks: THREE.BufferGeometry[] = [], stones: THREE.BufferGeometry[] = [];
+    const planks: THREE.BufferGeometry[] = [], stones: THREE.BufferGeometry[] = [], stairs: THREE.BufferGeometry[] = [];
     net.trails.forEach((t, i) => {
       const seed = 17 + i * 31;
+      // a riser between terraces: a dry-stack stair, whatever is laid on the rest of the trail
+      for (const r of stairRuns(t.pts, ground)) stairs.push(...stairGeometry(t.pts.slice(r.a, r.b + 1), ground, seed + r.a));
       // a worn track shows where nothing is laid
       if (!t.laid) for (const g of wornRibbons(t.pts, t.pts.map(() => t.wear), ground, colors, seed)) push('dirt', g);
       else if (t.laid === 'gravel') push('gravel', laidRibbon(t.pts, ground, PATH_WIDTH.gravel, 0.016, [0.8, 0.78, 0.74]));
@@ -209,6 +212,7 @@ export class PathRenderer {
     addMerged(bySurface.get('paved') ?? [], this._ribbonMat('paved', pavedTexture, 'SEA_PLOWED', 0.88), 'path_paved');
     addMerged(planks, this._solid('boards', 0xb0a090, 0.9), 'path_boards', true);
     addMerged(stones, this._solid('stones', 0xc0b8a8, 0.95), 'path_stones', true);
+    addMerged(stairs, this._solid('stairs', 0xb4ab9a, 0.97), 'path_stairs', true);
   }
 
   /** Hard-packed gravel where the trucks stand and where the drive meets the road: soft-edged rectangles on the ground. */

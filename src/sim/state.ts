@@ -44,7 +44,7 @@ import type { Medical } from './medical';
 import type { Evenings } from './evenings';
 import type { Courses } from './courses';
 import { starterKit, type ToolKit } from './tools';
-export const SAVE_VERSION = 68;
+export const SAVE_VERSION = 69;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -71,6 +71,9 @@ export const STARTING_FIREWOOD = 2;
 
 /** A delivery dropped at the road, and the person-hours to carry it in. */
 export interface Roadside { lines: OrderLine[]; hours: number; done: number }
+
+/** The bridge on the way in (sim/roadFx.ts): brought down on purpose, and the day its rebuilding is done (null: none under way). */
+export interface RoadBridgeState { down: boolean; due: number | null }
 
 export type Speed = 0 | 1 | 2 | 3 | 4;
 /** Real seconds per in-game day at each speed (docs/DECISIONS.md: 1× = 60 s … 1.5 s). */
@@ -230,6 +233,8 @@ export interface GameState {
   siteJobs: SiteJobs;
   /** Deliveries left at the road (no drive yet): carried in by hand, oldest first. */
   roadside: Roadside[];
+  /** The bridge on the planned way in, if it has one: standing, or brought down (a crew's trucks stop at the creek, and so do yours). */
+  roadBridge: RoadBridgeState;
   /** Permits, property tax, insurance. */
   paper: Paper;
   /** Seasoning firewood, creosote in the flue. */
@@ -351,6 +356,7 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     focus: null,
     siteJobs: { power: null, drive: null },
     roadside: [],
+    roadBridge: { down: false, due: null },
     paper: newPaper(),
     upkeep: newUpkeep(),
     shelf: newShelf(),

@@ -14,6 +14,7 @@ import { AI_MODULE, ARMORY_LIGHTS, LIGHT_MODES, LIGHT_MODE_NAME, aiModulesUsed, 
 import { floodTowerIds, TOWERS, TOWER_NEXT, highBonus, highShare, isTower, towerBill, towerUpgradeProblem } from '../../sim/towers';
 import { ungatedCrossings } from '../../sim/roadGate';
 import { razorBill, razorHours, razorProblem } from '../../sim/razor';
+import { bridgeDown, rebuildQuote, roadBridgeOf, roadLine } from '../../sim/roadFx';
 import { canHostWalkway, walkOn, walkwayBill, walkwayProblem } from '../../sim/walkway';
 import { adaptLevel, firstWinter, sinceHit } from '../../sim/adaptive';
 import { adaptOf } from '../../sim/encounters';
@@ -105,6 +106,17 @@ export function DefenseTab() {
         {runFinished(r) && <button style={btn(false)} title="Bring it down on purpose: nothing crosses there until it is rebuilt, and a crew has to ford and climb the gorge. Half the steel comes back." onClick={() => { if (window.confirm('Drop this tunnel? It has to be rebuilt to use it again.')) { const w = useGameStore.getState().dropBridge(r.id); if (w) alert(w); } }}>Drop it</button>}
       </div>)}
     </Section>
+    {game.site.improvements.drive && roadBridgeOf(game) && (() => {
+      const q = rebuildQuote(game)!, down = bridgeDown(game), due = game.roadBridge.due;
+      return <Section title="The way in">
+        <Note>{roadLine(game)}.</Note>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '3px 0' }}>
+          <span style={{ flex: 1 }}>The bridge on the way in <span style={{ color: DIM }}>({down ? (due !== null ? `being rebuilt, ${Math.max(1, Math.ceil(due - game.clock.t))} days` : 'down') : 'standing'})</span></span>
+          {!down && <button style={btn(false)} title="Bring it down on purpose: nothing with wheels crosses the creek until it is rebuilt. A crew's trucks stop there and they have to ford it on foot, but your own deliveries stop there too and get carried in by hand." onClick={() => { if (window.confirm('Drop the bridge on the way in? Trucks, yours and theirs, stop at the creek until it is rebuilt.')) { const w = useGameStore.getState().dropRoadBridge(); if (w) alert(w); } }}>Drop it</button>}
+          {down && due === null && <button style={btn(game.money >= q.usd)} disabled={game.money < q.usd} title={`A crew rebuilds it: about ${q.days} days`} onClick={() => { const w = useGameStore.getState().rebuildRoadBridge(); if (w) alert(w); }}>Rebuild {usd(q.usd)}</button>}
+        </div>
+      </Section>;
+    })()}
     <Section title="Wall-top walkway">
       <Note>A steel patrol deck along the top of a container, steel or concrete wall (1.2 m wide, a handrail, stairs at the gates and about every 80 m). Guards on watch walk it and see farther; a post on it fights from above and fewer crews get over. It stays on through a wall upgrade.</Note>
       {game.perimeter.filter(r => canHostWalkway(r.kind) && !r.replaces).length === 0 && <Note>No wall that can take one yet: container, steel or concrete.</Note>}

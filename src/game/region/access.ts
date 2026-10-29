@@ -5,30 +5,26 @@
  * by truck on a county road). Pure geometry (tested).
  */
 import { PARCEL_SIZE } from '../parcel/parcelTerrain';
+import { ROAD_EXTENT, ROAD_W, roadLine as countyLine, countyRoad } from './countyRoad';
+import type { RoadPlan } from '../../sim/roadPlan';
 
-/** Road surface width (≈ 6 m gravel). */
-export const ROAD_W = 1.0;
+export { ROAD_W, ROAD_EXTENT };
 export const DRIVE_W = 0.55;
-/** The county road runs this far north and south of the parcel. */
-export const ROAD_EXTENT = 700;
 
 export type Pt = [number, number];
 
-/** County road center x at z: a few units east of the parcel, gently wandering. */
-export function roadX(z: number): number {
-  return PARCEL_SIZE + 3.2 + 1.6 * Math.sin(z / 85 + 0.7) + 0.6 * Math.sin(z / 31);
-}
-
-/** County road center line, sampled every `step` units. */
-export function roadLine(step = 4): Pt[] {
-  const out: Pt[] = [];
-  for (let z = -ROAD_EXTENT; z <= PARCEL_SIZE + ROAD_EXTENT; z += step) out.push([roadX(z), z]);
-  return out;
-}
+/** The classic county road (Mountain West, seed 0): kept for tests and the old callers. */
+const CLASSIC_ROAD = countyRoad('mountain_west', 0);
+export const roadX = (z: number): number => CLASSIC_ROAD.x(z);
+export const roadLine = (step = 4): Pt[] => countyLine(CLASSIC_ROAD, step);
 
 export interface Access {
-  /** Driveway center line from the road to the yard (first point on the road). */
+  /** Driveway center line from the road to the yard (first point on the road), a point every half unit. */
   drive: Pt[];
+  /** The same, every ~1.5 units, for the distance tests (`onAccess`). */
+  driveQ: Pt[];
+  /** Its bounding box. */
+  box: [number, number, number, number];
   /** Gate on the property line. */
   gate: { x: number; z: number; rot: number };
   /** Stockpile yard (where trucks unload). */
@@ -97,5 +93,20 @@ export function planAccess(camp: { x: number; z: number }, zMin = 4, zMax = PARC
   const rx = roadX(gz);
   const yard = { x: camp.x + 2.2, z: camp.z + 1.2 };
   const raw: Pt[] = [[rx - ROAD_W / 2, gz], [PARCEL_SIZE + 0.6, gz], [PARCEL_SIZE - 3, gz], [(PARCEL_SIZE - 3 + yard.x) / 2, (gz + yard.z) / 2], [yard.x + 0.6, yard.z]];
-  return { drive: smoothLine(raw, 0.5), gate: { x: PARCEL_SIZE, z: gz, rot: 0 }, yard };
+  const drive = smoothLine(raw, 0.5);
+  return { drive, ...queryForm(drive), gate: { x: PARCEL_SIZE, z: gz, rot: 0 }, yard };
+}
+
+/** The coarse polyline and bounding box the distance tests use. */
+function queryForm(drive: readonly Pt[]): { driveQ: Pt[]; box: [number, number, number, number] } {
+  const q: Pt[] = drive.filter((_, i) => i % 3 === 0 || i === drive.length - 1);
+  let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
+  for (const [x, z] of drive) { x0 = Math.min(x0, x); z0 = Math.min(z0, z); x1 = Math.max(x1, x); z1 = Math.max(z1, z); }
+  return { driveQ: q, box: [x0, z0, x1, z1] };
+}
+
+/** The access the world draws and walks, from the planned road (sim/roadPlan.ts). */
+export function accessFromPlan(plan: RoadPlan): Access {
+  const drive = plan.pts.map(p => [p.x, p.z] as Pt);
+  return { drive, ...queryForm(drive), gate: { x: plan.gate.x, z: plan.gate.z, rot: 0 }, yard: { x: plan.yard[0], z: plan.yard[1] } };
 }

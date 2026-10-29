@@ -10,7 +10,7 @@ import { buildTruck } from './props/truckGeometry';
 import { buildStockpile } from './props/stockpileGeometry';
 import { emptyStock, type Stock } from '../sim/materials';
 import type { OrderLine } from '../sim/state';
-import { lineLength, pointAt, roadX, type Pt } from './region/access';
+import { lineLength, pointAt, type Pt } from './region/access';
 
 type Phase = 'in' | 'unload' | 'out';
 
@@ -28,9 +28,9 @@ export class DeliveryTruck {
 
   private readonly _ground: (x: number, z: number) => number;
 
-  constructor(scene: THREE.Scene, drive: readonly Pt[], ground: (x: number, z: number) => number) {
+  constructor(scene: THREE.Scene, drive: readonly Pt[], ground: (x: number, z: number) => number, roadX: (z: number) => number, roadY: (x: number, z: number) => number | null = () => null) {
     this._scene = scene;
-    this._ground = ground;
+    this._ground = (x, z) => roadY(x, z) ?? ground(x, z);   // (over a bridge deck the truck rides the deck, not the creek bed)
     this._truck = buildTruck();
     this._truck.visible = false;
     scene.add(this._truck);

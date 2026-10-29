@@ -27,6 +27,7 @@ import { LivedLayer } from './lived/LivedLayer';
 import type { Mode } from './lived/livedPlan';
 import { lightsOutNow } from '../sim/blackout';
 import type { NetWorld } from './paths/pathNet';
+import { WALK_CLIFF, walkRoute } from './paths/walkRoute';
 import type { PathExtras } from '../sim/paths';
 import { walkFactor } from '../sim/paths';
 import { useWorldStore } from '../store/worldStore';
@@ -79,8 +80,12 @@ import { SeasonController, climateFor, type SeasonMode } from '../engine/world/s
 import { writeSeasonUniforms } from '../engine/world/season/seasonShader';
 import { PARCEL_SIZE, ParcelTerrain } from './parcel/parcelTerrain';
 import { CLASSIC, type Site as LandSite } from '../sim/site';
-import { lotStatsOf } from '../sim/lotListing';
-import { DRIVE_W, ROAD_W, distToLine, planAccess, roadLine, roadX, type Access } from './region/access';
+import { pickCamp } from './parcel/campSpot';
+import { DRIVE_W, accessFromPlan, distToLine, type Access } from './region/access';
+import { ROAD_W, countyRoad, roadLine, type CountyRoad } from './region/countyRoad';
+import { buildRoadWorks } from './region/roadWorks';
+import { roadPlanFor } from '../sim/roadState';
+import { roadBedOf, type RoadPlan } from '../sim/roadPlan';
 import { buildRibbon } from '../engine/world/roads/RoadRibbon';
 import { gravelMaterial, roadMaterial } from '../engine/world/roads/roadTextures';
 import { RockField, type RockSpec } from '../engine/world/terrain/RockField';
@@ -211,6 +216,10 @@ export class HomesteadWorld {
   /** Mud, lying snow and rain right now (the footing under the walkers). */
   private _underfoot = { mud: 0, snow: 0, rain: 0 };
   /** County road, driveway, gate and stockpile yard. */
+  /** The county road past the place, the region's way (game/region/countyRoad.ts). */
+  readonly county: CountyRoad;
+  /** The planned way in: curves, switchbacks, crossings, a bore (sim/roadPlan.ts); the sim reads the very same plan. */
+  readonly plan: RoadPlan;
   readonly access: Access;
   private readonly _roads = new THREE.Group();
   truck: DeliveryTruck;
@@ -244,7 +253,9 @@ export class HomesteadWorld {
     this.climate = this.regionWorld.climate;
     this.farms = planNeighbors(this.parcel);
     this.camp = this._pickCamp();
-    this.access = planAccess(this.camp, Math.max(4, this.home.z0 + 3), Math.min(PARCEL_SIZE - 4, this.home.z1 - 3));
+    this.county = countyRoad(site.region, seed);
+    this.plan = roadPlanFor(site, seed, this.parcel);
+    this.access = accessFromPlan(this.plan);
     this.terrain = new TerrainRenderer(ws.scene);
     this.forest = new ForestRenderer(ws.scene);
     this.sage = new ShrubField(ws.scene, 'sagebrush', this.regionWorld.sagePalette ?? SAGE, 1);
@@ -290,7 +301,9 @@ export class HomesteadWorld {
       skirts: (list, key) => this.paths.renderer.setSkirts(list, this.groundAt, this._pathLook(), key),
     });
     this._drive = site.improvements?.drive ?? true;
-    this.truck = new DeliveryTruck(ws.scene, this._truckRoute(), this.groundAt);
+    // a built drive is benched into the ground (cut banks, fill slopes, banked curves): before the terrain mesh and the trees are made
+    this.parcel.setRoadBed(this._drive ? roadBedOf(this.plan) : null);
+    this.truck = new DeliveryTruck(ws.scene, this._truckRoute(), this.groundAt, this.county.x, (x, z) => this._driveY(x, z));
   }
 
   private *_atmosBuildings(): Iterable<AtmosBuilding> {
@@ -314,13 +327,46 @@ export class HomesteadWorld {
     return inside.length >= 2 ? inside : this.access.drive.slice(0, 3);
   }
 
+  /** QA: a scale figure standing on the road (or its deck) at (x, z). */
+  qaFigure(x: number, z: number): void { this._root.add(scaleFigure(x, z, this._driveY(x, z) ?? this.groundAt(x, z))); }
+
+  private _bridgeDown = false;
+  /** The bridge on the way in comes down (or goes back up): redraw the road without its deck and rails. */
+  setBridgeDown(on: boolean): void {
+    if (on === this._bridgeDown) return;
+    this._bridgeDown = on;
+    if (this._quality) this._buildRoads();
+  }
+
+  /** The road's own height where it leaves the ground: on a bridge deck (null elsewhere, and while there is no drive). */
+  private _driveY(x: number, z: number): number | null {
+    if (!this._drive || this._bridgeDown) return null;
+    let best = 0.32 * 0.32, y: number | null = null;
+    for (const sx of this.plan.structures) {
+      if (sx.kind !== 'bridge1' && sx.kind !== 'bridge') continue;
+      for (const p of this.plan.pts) {
+        if (p.s < sx.s0 - 1e-6 || p.s > sx.s1 + 1e-6) continue;
+        const d = (p.x - x) ** 2 + (p.z - z) ** 2;
+        if (d < best) { best = d; y = p.y; }
+      }
+    }
+    return y;
+  }
+
   /** The drive went in (or the place has none yet): redraw it and send the truck the new way. */
   setDrive(on: boolean): void {
     if (on === this._drive) return;
     this._drive = on;
+    // the bench goes into the ground (or, if the drive is gone, comes out): redraw the land along it, replant the banks, redraw the road
+    const bed = on ? roadBedOf(this.plan) : null, b = (roadBedOf(this.plan)).bbox;
+    this.parcel.setRoadBed(bed);
+    if (this._quality) {
+      this.terrain.refresh(this._terrainSource, b[0], b[1], b[2], b[3]);
+      this._plant(this._quality);
+    }
     this._buildRoads();
     this.truck.dispose();
-    this.truck = new DeliveryTruck(this._ws.scene, this._truckRoute(), this.groundAt);
+    this.truck = new DeliveryTruck(this._ws.scene, this._truckRoute(), this.groundAt, this.county.x, (x, z) => this._driveY(x, z));
   }
 
   /**
@@ -365,9 +411,9 @@ export class HomesteadWorld {
 
   /** Is (x, z) on the county road or the driveway (plus `pad`)? */
   onAccess(x: number, z: number, pad = 0): boolean {
-    if (Math.abs(x - roadX(z)) < ROAD_W / 2 + pad) return true;
-    const a = this.access;
-    if (x < PARCEL_SIZE + 2 && Math.abs(z - a.gate.z) < 12 + pad && distToLine(a.drive, x, z) < DRIVE_W / 2 + pad) return true;
+    if (Math.abs(x - this.county.x(z)) < ROAD_W / 2 + pad) return true;
+    const a = this.access, b = a.box, m = DRIVE_W / 2 + pad;
+    if (x > b[0] - m && x < b[2] + m && z > b[1] - m && z < b[3] + m && distToLine(a.driveQ, x, z) < m) return true;
     return Math.hypot(x - a.yard.x, z - a.yard.z) < 0.8 + pad;
   }
 
@@ -378,10 +424,11 @@ export class HomesteadWorld {
     // the county road the region's way (gravel, blacktop, caliche); the drive is gravel (caliche in the desert)
     const mud = <M extends THREE.Material>(m: M): M => { m.defines = { ...m.defines, SEA_MUD: '', SEA_MUD_UV: '' }; return m; };   // mud season: the surface goes soft and the tire tracks hold water (season patch)
     const mat = mud((this.regionWorld.drive ?? (this.regionWorld.road === 'caliche' ? 'caliche' : 'gravel')) === 'caliche' ? roadMaterial('caliche') : gravelMaterial());
-    const road = new THREE.Mesh(buildRibbon(roadLine(1), ROAD_W, this.groundAt, 0.02, 6), mud(roadMaterial(this.regionWorld.road)));
+    const road = new THREE.Mesh(buildRibbon(roadLine(this.county, 1), ROAD_W, this.groundAt, 0.02, 6), mud(roadMaterial(this.regionWorld.road)));
     const track = this._drive ? mat : (() => { const m = mat.clone(); m.color = new THREE.Color(0x8a7a5c); return mud(m); })();
-    const drive = new THREE.Mesh(buildRibbon(this.access.drive, this._drive ? DRIVE_W : DRIVE_W * 0.55, this.groundAt, this._drive ? 0.024 : 0.012, 4), track);
-    for (const m of [road, drive]) { m.receiveShadow = true; this._roads.add(m); }
+    road.receiveShadow = true; this._roads.add(road);
+    // the way in: a curved ribbon on the benched ground, with its banks, rails, culverts, crossings and portals (game/region/roadWorks.ts)
+    this._roads.add(buildRoadWorks(this.plan, this.groundAt, { built: this._drive, bridgeDown: this._bridgeDown, surface: mat, track, driveW: DRIVE_W, natural: (x, z) => this.parcel.natural(x, z).h }));
     const gate = buildGate(DRIVE_W);
     const { gate: gp } = this.access;
     gate.position.set(gp.x, this.groundAt(gp.x, gp.z), gp.z);
@@ -498,7 +545,7 @@ export class HomesteadWorld {
     for (const f of this.farms) buildFarmstead(f, kind, props, this.groundAt, slope, tree);
     // the neighbors' line fences, the region's way (wire on T-posts, split rail, stone walls, woven wire)
     const creek = this.parcel.creek;
-    buildLineFences(planLineFences(roadX, ROAD_W / 2, -330, PARCEL_SIZE + 330), this.regionWorld.fence, props, this.groundAt,
+    buildLineFences(planLineFences(this.county.x, ROAD_W / 2, -330, PARCEL_SIZE + 330), this.regionWorld.fence, props, this.groundAt,
       (x, z) => onFarmstead(this.farms, x, z, 1.5) || Math.abs(z - creek.zAt(x)) < 2.2 || (wy !== null && this.parcel.region.height(x, z) < wy + 0.15) || insideHome(x, z),
       (a, b) => { const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return s - Math.floor(s); });
     if (this.regionWorld.powerline) buildPowerline(props, this.groundAt, (x, z) => onFarmstead(this.farms, x, z, 4) || (wy !== null && this.parcel.region.height(x, z) < wy + 0.3) || insideHome(x, z));
@@ -844,7 +891,7 @@ export class HomesteadWorld {
   observers(kind: 'road' | 'ridge'): Observer[] {
     if (kind === 'road') {
       const out: Observer[] = [];
-      for (let z = -12; z <= PARCEL_SIZE + 12; z += 5) out.push({ x: roadX(z), z, eye: 0.3 });
+      for (let z = -12; z <= PARCEL_SIZE + 12; z += 5) out.push({ x: this.county.x(z), z, eye: 0.3 });
       return out;
     }
     // the highest ground in a band 40–90 units west of the parcel
@@ -935,41 +982,7 @@ export class HomesteadWorld {
    * The camp: open, level, dry ground a short walk from the creek (water),
    * nearest the middle of the parcel. Deterministic per seed.
    */
-  private _pickCamp(): { x: number; z: number; rot: number } {
-    const p = this.parcel, h = this.home;
-    // inside the home forty part of the place (the 80's west forty is the back forty)
-    let x0 = Math.max(h.x0, 0) + 6, x1 = h.x1 - 6, z0 = h.z0 + 6, z1 = h.z1 - 6;
-    let cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
-    if (p.lot) {
-      // a lot archetype: the camp goes on its best flat (the knoll's crown, the bench, the island), not the middle of the rect
-      const st = lotStatsOf(p.lot);
-      [cx, cz] = st.pad;
-      x0 = Math.max(h.x0, 0) + 2; x1 = h.x1 - 2; z0 = h.z0 + 2; z1 = h.z1 - 2;
-    }
-    let best: { x: number; z: number; rot: number } | null = null, bestScore = Infinity;
-    for (let pass = 0; pass < 2 && !best; pass++) {
-      for (let x = x0; x <= x1; x += 1) {
-        for (let z = z0; z <= z1; z += 1) {
-          const dc = Math.abs(z - p.creek.zAt(x));
-          // by the creek when it runs through (water), else anywhere open; the second pass takes whatever is level
-          if (p.creekHome && !p.lot && pass === 0 && (dc < 5 || dc > 14)) continue;
-          if (dc < 5 && p.hasStream) continue;
-          if (p.lot && p.isCreek(x, z)) continue;
-          const s = p.natural(x, z);
-          if (s.forest > (pass === 0 ? 0.05 : 0.3)) continue;
-          const slope = Math.hypot(p.height(x + 1, z) - p.height(x - 1, z), p.height(x, z + 1) - p.height(x, z - 1)) / 2;
-          if (slope > (pass === 0 ? 0.08 : 0.16)) continue;
-          const score = Math.hypot(x - cx, z - cz) + slope * (p.lot ? 25 : 40);
-          if (score < bestScore) {
-            bestScore = score;
-            // tent door toward the creek (or the road)
-            best = { x, z, rot: p.creekHome ? Math.atan2(0, p.creek.zAt(x) - z) : Math.PI / 2 };
-          }
-        }
-      }
-    }
-    return best ?? { x: cx, z: cz, rot: 0 };
-  }
+  private _pickCamp(): { x: number; z: number; rot: number } { return pickCamp(this.parcel, this.home); }
 
   // ── Footpaths (game/paths) ────────────────────────────────────────────
   /** The tests the path router uses now: buildings (padded, not below ground), the creek and its banks, the camp, the delivery yard, walls, trunks, land that is not ours. */
@@ -982,21 +995,42 @@ export class HomesteadWorld {
     const boxes = [...this._built.values()].filter(b => !b.under && KIT[b.placed.kind].level !== 'underground').map(b => footprint(KIT[b.placed.kind], b.placed.x, b.placed.z, b.placed.rot, false));
     const cars = this._cars, yard = this.access.yard, hasCreek = this.parcel.creekHome, half = this.parcel.creek.halfWidth;
     const own = (x: number, z: number) => (x > this.home.x0 && x < this.home.x1 && z > this.home.z0 && z < this.home.z1) || this._inOwned(x, z);
-    const blocked = (x: number, z: number): boolean => {
-      if (!own(x, z)) return true;
+    const g = this.groundAt;
+    const slope = (x: number, z: number): number => (Math.abs(g(x + 0.25, z) - g(x - 0.25, z)) + Math.abs(g(x, z + 0.25) - g(x, z - 0.25))) / 0.5;
+    // what a straight walk cannot cross: a building, the built wall, the creek, and cliff ground (a rock face, a cutbank)
+    const hard = (x: number, z: number): boolean => {
       for (const r of boxes) if (x > r.x0 - 0.14 && x < r.x1 + 0.14 && z > r.z0 - 0.14 && z < r.z1 + 0.14) return true;
       if (hasCreek && Math.abs(z - this.parcel.creek.zAt(x)) < half + 0.25) return true;
-      if (Math.hypot(x - this.camp.x, z - this.camp.z) < 1.2 || Math.hypot(x - yard.x, z - yard.z) < 0.95) return true;
       if (this._perimeterBlocked(x, z, 0.08)) return true;
+      return slope(x, z) > WALK_CLIFF;
+    };
+    const blocked = (x: number, z: number): boolean => {
+      if (!own(x, z)) return true;
+      if (hard(x, z)) return true;
+      if (Math.hypot(x - this.camp.x, z - this.camp.z) < 1.2 || Math.hypot(x - yard.x, z - yard.z) < 0.95) return true;
       for (const c of cars) if (inCarBox(c, x, z, 0.12)) return true;
       const cx = Math.floor(x), cz = Math.floor(z);
       for (let i = cx - 1; i <= cx + 1; i++) for (let j = cz - 1; j <= cz + 1; j++) for (const [tx, tz, r] of trees.get(i * 4099 + j) ?? []) if ((tx - x) ** 2 + (tz - z) ** 2 < r * r) return true;
       return false;
     };
-    const g = this.groundAt;
     // steep ground and the unlevel: a path takes the easy way round
-    const cost = (x: number, z: number): number => { const sl = (Math.abs(g(x + 0.25, z) - g(x - 0.25, z)) + Math.abs(g(x, z + 0.25) - g(x, z - 0.25))) / 0.5; return 1 + 6 * Math.max(0, sl - 0.1); };
-    return { blocked, cost };
+    const cost = (x: number, z: number): number => 1 + 6 * Math.max(0, slope(x, z) - 0.1);
+    return { blocked, cost, hard };
+  }
+
+  /** The people's route finding world, rebuilt when the paths are (the layout, the cars, the wear). */
+  private _walkCache: { key: string; w: NetWorld } | null = null;
+  private _walkWorld(): NetWorld {
+    const key = `${this.paths.version}|${this._carKey}|${this.treeSpecs.length}|${this._runs.length}`;
+    if (this._walkCache?.key !== key) this._walkCache = { key, w: this._pathWorld() };
+    return this._walkCache.w;
+  }
+
+  /** The way person `from` walks to `to`: the trails when they lead there, round buildings, the wall and cliffs when the straight line crosses them, else straight ([]). */
+  private _walkVia(fx: number, fz: number, tx: number, tz: number): Array<[number, number]> {
+    const w = this._walkWorld();
+    if (!w.hard) return this.paths.via(fx, fz, tx, tz);
+    return walkRoute([fx, fz], [tx, tz], { blocked: w.blocked, hard: w.hard, cost: w.cost }, detour => this.paths.via(fx, fz, tx, tz, detour));
   }
 
   /** What the world adds to the stops: the camp, the delivery yard, the compound's own gate (when the drive does not go through it), a landing on the creek bank. */
@@ -1007,7 +1041,7 @@ export class HomesteadWorld {
     const garage = done.find(s => s.kind === 'gate_garage');
     if (!garage) {
       const g = wallGate(game);
-      if (g && distToLine(this.access.drive, g.x, g.z) > 1.2) ex.gate = g;
+      if (g && distToLine(this.access.driveQ, g.x, g.z) > 1.2) ex.gate = g;
     }
     if (this.parcel.creekHome && home) {
       const cz = this.parcel.creek.zAt(home.x), side = Math.sign(home.z - cz) || 1, half = this.parcel.creek.halfWidth;
@@ -1065,7 +1099,7 @@ export class HomesteadWorld {
     if (!this._drive) return null;
     const gz = this.access.gate.z;
     return {
-      mail: { x: roadX(gz) - ROAD_W / 2 - 0.2, z: gz + DRIVE_W / 2 + 0.24, rot: Math.PI / 2 },
+      mail: { x: this.county.x(gz) - ROAD_W / 2 - 0.2, z: gz + DRIVE_W / 2 + 0.24, rot: Math.PI / 2 },
       sign: { x: PARCEL_SIZE - 0.8, z: gz - DRIVE_W / 2 - 0.45, rot: Math.PI / 2 },
     };
   }
@@ -1074,7 +1108,7 @@ export class HomesteadWorld {
   private _driveApron(): Array<{ x: number; z: number; w: number; d: number; rot: number }> {
     if (!this._drive) return [];
     const gz = this.access.gate.z;
-    return [{ x: roadX(gz) - ROAD_W / 2 - 0.5, z: gz, w: DRIVE_W + 0.6, d: 0.95, rot: Math.PI / 2 }];
+    return [{ x: this.county.x(gz) - ROAD_W / 2 - 0.5, z: gz, w: DRIVE_W + 0.6, d: 0.95, rot: Math.PI / 2 }];
   }
 
   /** The tint the tracks wear through: the region's grass, its bare earth. */
@@ -1815,7 +1849,7 @@ export class HomesteadWorld {
     this.paths.update(game, performance.now());
     const ctx: GoalCtx = {
       camp: this.camp, site, home: homeB ? site(homeB.placed.id) : null, tree, yard: this.access.yard, sleepAt: i => sleepSpotFor(game, i), tentAt: n => this._tentPos[n],
-      footing: (x, z) => walkFactor(this.paths.surfaceAt(x, z), this._underfoot), via: (fx, fz, tx, tz) => this.paths.via(fx, fz, tx, tz),
+      footing: (x, z) => walkFactor(this.paths.surfaceAt(x, z), this._underfoot), via: (fx, fz, tx, tz) => this._walkVia(fx, fz, tx, tz),
       ...dailyCtx(refs, game, this.access.yard, seasonState.params.cold < 0.35),
     };
     const fx = yardFx(game, hour);
@@ -1825,6 +1859,7 @@ export class HomesteadWorld {
     const dctx: DogCtx = {
       home: ctx.home, camp: this.camp, gate: this.access.gate, yard: this.access.yard, atGate: !!game.gate.pending,
       person: id => (this.family.shown.has(id) ? this.family.poseOf(id) : null),
+      via: (fx, fz, tx, tz) => this._walkVia(fx, fz, tx, tz),
     };
     this.dogs.update(dt, game, hour, game.clock.t, dctx, this.walkHeight, speedK);
     // crops stand in the ground from planting (mid-May) to the last of the harvest (late October); bare soil the rest of the year
@@ -1927,7 +1962,7 @@ export class HomesteadWorld {
       // a building whose floor is its graded pad (greenhouse gravel, a garage slab): stand on the pad, not the raw slope under it
       if (Math.abs(lx) < hw && Math.abs(lz) < hd && def.category !== 'bunker' && (def.category !== 'food' || b.placed.kind === 'greenhouse' || b.placed.kind === 'greenhouse_heated' || b.placed.kind === 'sheep_barn')) return b.padY + Math.max(0, def.floorY);
     }
-    return this.groundAt(x, z);
+    return this._driveY(x, z) ?? this.groundAt(x, z);
   };
 
   // ── Walking below (walk mode) ─────────────────────────────────────────
