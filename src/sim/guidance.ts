@@ -9,7 +9,7 @@ import { BLUEPRINTS, homeBeds, isHome } from './blueprints';
 import { daysOfFood } from './needs';
 import { enclosure } from './enclosure';
 import { hardenCost } from './hardening';
-import { isFinished, planProblem } from './construction';
+import { blueprintOf, isFinished, planProblem } from './construction';
 import { countyWorks, needsPermit, permitFee, reviewDays } from './paperwork';
 import { onOrder, orderCost, prices } from './economy';
 import { firewoodOutlook } from './heating';
@@ -152,6 +152,18 @@ export function suggestions(s: GameState): Suggestion[] {
     add('kin_home', n > 2 ? 'moms_house' : 'guest_house', `${joinNames(wait.flatMap(w => w.people.map(p => p.first)))} ${n === 1 ? 'is' : 'are'} waiting for a place of their own`, 85);
   }
   if (!hasKind(s, 'well_hand', 'well_drilled', 'cistern', 'water_tower')) add('water', s.site.gwDepth > 9 ? 'well_drilled' : 'well_hand', s.site.gwDepth > 9 ? `no water on the place (it is ${s.site.gwDepth} m down: drill)` : 'no water on the place', 90);
+  // a home that lost its roof (chimney fire, storm, looters): re-roof it before anything else, the family should not winter in tents
+  { const bare = homes.find(h => h.roofLost && !isFinished(h));
+    if (bare) {
+      const need = blueprintOf(bare).stages[bare.stage]?.materials ?? {}, pending = onOrder(s);
+      const lines: OrderLine[] = (Object.entries(need) as Array<[MaterialId, number]>)
+        .map(([material, n]) => ({ material, qty: Math.ceil(n - (bare.supplied ? n : s.stock[material]) - (pending[material] ?? 0) - 1e-6) }))
+        .filter(l => l.qty > 0 && MATERIALS[l.material].price !== null);
+      const name = bare.kind.replace(/_/g, ' ');
+      out.push({ id: 'reroof', kind: '', title: 'Re-roof your home', urgency: 97,
+        why: lines.length ? `the ${name} lost its roof and the family cannot live in it; the roof needs ${lines.map(l => `${l.qty} ${MATERIALS[l.material].name.toLowerCase()}`).join(' and ')} more` : `the ${name} lost its roof; the crew is on it, and it is the first thing to finish`,
+        acts: [...(lines.length ? [{ label: `Order the roof materials (${usd(orderCost(lines, prices(s)))})`, act: { type: 'order' as const, lines } }] : []), { label: 'Show me', act: { type: 'select', id: bare.id } }] });
+    } }
   const growing = hasKind(s, 'garden', 'field', 'greenhouse', 'orchard');
   if (!growing) add('food', 'garden', daysOfFood(s) < 90 ? 'little food put by and nothing growing' : 'nothing growing yet', daysOfFood(s) < 90 ? 70 : 45);
   if (!hasKind(s, 'outhouse', 'septic')) add('toilet', 'outhouse', 'nowhere to go', 50);

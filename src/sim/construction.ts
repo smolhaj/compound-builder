@@ -113,7 +113,7 @@ export function addWork(s: GameState, st: Structure, personHours: number, own = 
       st.done = 0;
       st.supplied = false;
       if (isFinished(st)) {
-        st.finishedAt = s.clock.t;
+        st.finishedAt = s.clock.t; delete st.roofLost;
         log(s, `The ${st.kind.replace('_', ' ')} is finished!`);
         if (st.replaces) completeUpgrade(s, st);
       } else log(s, `${stage.name} done — on to: ${bp.stages[st.stage].name.toLowerCase()}.`);
@@ -135,6 +135,7 @@ export function knockBack(s: GameState, st: Structure, stage: number): void {
   for (let i = stage + 1; i < from; i++) for (const [k, n] of Object.entries(stages[i].materials) as Array<[keyof Stock, number]>) s.stock[k] += n;
   // the current stage's own materials, if they were already taken in
   if (st.stage > stage && st.stage < stages.length && st.supplied) for (const [k, n] of Object.entries(stages[st.stage].materials) as Array<[keyof Stock, number]>) s.stock[k] += n;
+  if (stages[stage]?.id === 'roof' && from > stage) st.roofLost = true;
   st.stage = stage; st.done = 0; st.supplied = false; st.finishedAt = null;
 }
 

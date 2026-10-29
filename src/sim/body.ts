@@ -23,6 +23,7 @@
 import type { GameState } from './state';
 import type { Person } from './family';
 import { mulberry32 } from './rng';
+import { logGate } from './nag';
 
 export type Condition = 'blood_pressure' | 'thyroid' | 'asthma' | 'insulin';
 export const CONDITION: Record<Condition, { name: string; rx: string; monthly: number }> = {
@@ -121,6 +122,6 @@ export function bodyDay(s: GameState): string[] {
     n.health = Math.max(s.disaster.difficulty === 'cozy' ? 5 : 0, n.health);
     n.morale = Math.max(0, Math.min(100, n.morale));
   });
-  if (!hygiene && day % 14 === 0) out.push('Out of soap and toilet paper. It\'s getting grim.');
+  if (!hygiene && logGate(s, 'soap', 60)) out.push('Out of soap and toilet paper. It\'s getting grim.');
   return out;
 }

@@ -20,6 +20,7 @@
  * head, two cups of coffee an adult).
  */
 import type { GameState } from './state';
+import { logGate } from './nag';
 
 export type FoodCat = 'staples' | 'canned' | 'frozen';
 export const FOOD_CATS: readonly FoodCat[] = ['staples', 'canned', 'frozen'];
@@ -455,7 +456,7 @@ export function pantryDay(s: GameState, opts: { rotate: boolean; mice: boolean; 
       if (over > 0 && d.toss(over) > 0) {
         const before = e.tossed ?? 0;
         e.tossed = before + dq;
-        if (Math.floor(e.tossed) > Math.floor(before)) out.push(`Threw out ${TOSS_WHY[it.decay]} (${name(id)}).`);
+        if (Math.floor(e.tossed) > Math.floor(before) && logGate(s, `toss:${id}`, 21)) out.push(`Threw out ${TOSS_WHY[it.decay]} (${name(id)}).`);
       }
       if (e.q < 1e-9) delete p.items[id];
     }

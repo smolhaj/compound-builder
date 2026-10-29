@@ -153,8 +153,9 @@ export function Hud() {
 
           {leftTab === 'log' && game.log.slice(-14).reverse().map((e, i) => <div key={i} style={{ padding: '3px 0', borderBottom: `1px solid ${LINE}`, opacity: 1 - i * 0.04 }}>{e.text}</div>)}
         </div>
+        {!g.tool && g.stakedNote && <div style={{ borderTop: `1px solid ${LINE}`, marginTop: 6, paddingTop: 6 }}><Note tone="good">{g.stakedNote}</Note></div>}
         {g.tool && <div style={{ borderTop: `1px solid ${LINE}`, marginTop: 6, paddingTop: 6 }}>
-          <Note tone={g.toolProblem ? 'warn' : undefined}>{g.toolProblem ?? (g.tool === 'fell' ? 'Point at a tree · click marks or unmarks · Esc stops' : g.tool.startsWith('fence:') ? 'Click corners · Shift-click the line for a vehicle gate (Shift+Alt: a pedestrian gate) · Enter lays it out · Backspace undoes · Esc cancels' : 'Click to stake it out · R rotates · Esc cancels')}</Note>
+          <Note tone={g.toolProblem ? 'warn' : undefined}>{g.toolProblem ?? (g.tool === 'fell' ? 'Point at a tree · click marks or unmarks · Esc stops' : g.tool.startsWith('fence:') ? 'Click corners · Shift-click the line for a vehicle gate (Shift+Alt: a pedestrian gate) · Enter lays it out · Backspace undoes · Esc cancels' : 'Click to stake it out (Shift-click to keep going) · R rotates · Esc cancels')}</Note>
         </div>}
       </div>
 

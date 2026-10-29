@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { newGame } from './state';
-import { planStructure } from './construction';
+import { knockBack, planStructure } from './construction';
 import { MATERIAL_IDS, MATERIALS } from './materials';
 import { bunkerChecklist, bunkerNext, buildAdvice, longTerm, suggestions, perimeterOff, perimeterTiers, plansNeed, plansNeedLines, upgradeChain } from './guidance';
 import { PERIMETER_ORDER, UPGRADE_NEXT, planRun } from './perimeter';
@@ -176,5 +176,23 @@ describe('the Perimeter list', () => {
     expect(chain[0]).toBe('split_rail');
     expect(chain.at(-1)).toBe('concrete_wall');
     for (let i = 1; i < chain.length; i++) expect(UPGRADE_NEXT[chain[i - 1]]).toBe(chain[i]);
+  });
+});
+
+describe('a home that lost its roof', () => {
+  it('is the top suggestion, with the roof order one click away, until it is finished again', () => {
+    const g = fresh();
+    const cabin = built(g, 'timber_cabin');
+    expect(suggestions(g).map(x => x.id)).not.toContain('reroof');
+    cabin.stage = 5; cabin.finishedAt = 1;
+    knockBack(g, cabin, 3);                        // a chimney fire (sim/upkeep.ts)
+    g.stock.lumber = 0; g.stock.roofing = 0;
+    const sg = suggestions(g);
+    expect(sg[0].id).toBe('reroof');
+    expect(sg[0].title).toBe('Re-roof your home');
+    const order = sg[0].acts!.find(a => a.act.type === 'order')!.act as { type: 'order'; lines: Array<{ material: string; qty: number }> };
+    expect(order.lines.map(l => l.material).sort()).toEqual(['lumber', 'roofing']);
+    cabin.stage = 5; cabin.finishedAt = 9;
+    expect(suggestions(g).map(x => x.id)).not.toContain('reroof');
   });
 });
