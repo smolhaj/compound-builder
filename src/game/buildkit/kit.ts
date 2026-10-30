@@ -29,6 +29,8 @@ export interface KitPieceDef {
   /** Floor height above the pad (walking height inside) and porch depth in front of the +z wall (world units). */
   floorY: number;
   porch: number;
+  /** A stair or a ramp: it joins two levels along its length (local z); the ground must climb at least `min` and at most `max` (world units) from one end to the other, and it takes no pad of its own. */
+  climbs?: { min: number; max: number };
   /** People it sleeps (0 = not a home). */
   sleeps: number;
   /** Interior lamp position (local, above the floor), or null for no lamplight. */
@@ -59,6 +61,26 @@ export const TIMBER_CABIN: KitPieceDef = {
   parts: { foundation: 'fieldstone', walls: 'timber_lap', roof: 'metal_roof' },
   maxSlope: 0.35, floorY: 0.09, porch: 0.42, sleeps: 4, light: [-0.2, 0.32, -0.05],
 };
+
+/** A flight of stone steps between two terraces (3 m wide, 6 m long: climbs 0.45 m to 3.6 m at up to 31 degrees). Set along the slope with R. */
+export const TERRACE_STAIR: KitPieceDef = {
+  id: 'terrace_stair', name: 'Stone stair', category: 'work',
+  blurb: 'A flight of dry-laid fieldstone steps with cheek walls and a pipe handrail, set along the slope between two terraces. Turn it with R until it runs up the hill; it climbs from 0.5 m to 3.6 m.',
+  cellsX: 1, cellsZ: 2, frontCells: 0,
+  parts: { foundation: 'fieldstone', walls: 'fieldstone', roof: 'steel' },
+  maxSlope: 3, floorY: 0, porch: 0, sleeps: 0, light: null, climbs: { min: 0.075, max: 0.6 },
+};
+
+/** A gravel ramp between two terraces (3 m wide, 12 m long: climbs up to 1.2 m): for the cart, the wheelbarrow and the wheelchair. */
+export const TERRACE_RAMP: KitPieceDef = {
+  id: 'terrace_ramp', name: 'Terrace ramp', category: 'work',
+  blurb: 'A packed-gravel ramp in timber curbs with a rail, set along the slope between two terraces: a 1:10 grade for the garden cart, the wheelbarrow, a wheelchair and the tractor trailer. Climbs up to 1.2 m over 12 m.',
+  cellsX: 1, cellsZ: 4, frontCells: 0,
+  parts: { foundation: 'gravel', walls: 'wood_dark', roof: 'steel' },
+  maxSlope: 3, floorY: 0, porch: 0, sleeps: 0, light: null, climbs: { min: 0.05, max: 0.2 },
+};
+
+export const TERRACE_ORDER: readonly string[] = ['terrace_stair', 'terrace_ramp'];
 
 export const OUTHOUSE: KitPieceDef = {
   id: 'outhouse', name: 'Outhouse', category: 'sanitation',
@@ -408,7 +430,7 @@ export const BUNKER_KIT: KitPieceDef[] = [
 /** Underground menu order. */
 export const BUNKER_ORDER: readonly string[] = BUNKER_KIT.map(d => d.id);
 
-export const KIT: Record<string, KitPieceDef> = Object.fromEntries([LODGE, LODGE_PLINTH, LODGE_SOLAR, STONE_HOUSE, TIMBER_FRAME_HOUSE, CONTAINER_HOUSE, ADOBE_HOUSE, APIARY, SUGAR_SHACK, BARNYARD, WOOD_OVEN, GATE_GARAGE_KIT, MOTOR_COURT_KIT, TIMBER_CABIN, LOG_HOUSE, FARMHOUSE, TRAILER, BARN, COTTAGE, GUEST_HOUSE, MOMS_HOUSE, METAL_GARAGE, GARAGE_SOLAR, OUTHOUSE, WORKSHOP, ROOT_CELLAR, CHICKEN_COOP, GARDEN, FIELD, GREENHOUSE, GREENHOUSE_HEATED, ORCHARD, ORCHARD_GROVE, POND, RESERVOIR, SHEEP_BARN, EQUIPMENT_YARD, ...UTILITY_KIT, ...BUNKER_KIT, ...TOWER_KIT].map(d => [d.id, d]));
+export const KIT: Record<string, KitPieceDef> = Object.fromEntries([LODGE, LODGE_PLINTH, LODGE_SOLAR, STONE_HOUSE, TIMBER_FRAME_HOUSE, CONTAINER_HOUSE, ADOBE_HOUSE, APIARY, SUGAR_SHACK, BARNYARD, WOOD_OVEN, GATE_GARAGE_KIT, MOTOR_COURT_KIT, TIMBER_CABIN, LOG_HOUSE, FARMHOUSE, TRAILER, BARN, COTTAGE, GUEST_HOUSE, MOMS_HOUSE, METAL_GARAGE, GARAGE_SOLAR, OUTHOUSE, WORKSHOP, ROOT_CELLAR, CHICKEN_COOP, GARDEN, FIELD, GREENHOUSE, GREENHOUSE_HEATED, ORCHARD, ORCHARD_GROVE, POND, RESERVOIR, SHEEP_BARN, EQUIPMENT_YARD, TERRACE_STAIR, TERRACE_RAMP, ...UTILITY_KIT, ...BUNKER_KIT, ...TOWER_KIT].map(d => [d.id, d]));
 /** Build-menu order. */
 export const KIT_ORDER: readonly string[] = ['timber_cabin', 'log_house', 'lodge', 'lodge_plinth', 'lodge_solar', 'stone_house', 'timber_frame', 'container_house', 'adobe_house', 'cottage', 'guest_house', 'moms_house', 'outhouse', 'garden', 'greenhouse', 'greenhouse_heated', 'orchard', 'orchard_grove', 'field', 'chicken_coop', 'sheep_barn', 'pond', 'root_cellar', 'wood_oven', 'apiary', 'sugar_shack', 'barnyard', 'workshop', 'metal_garage', 'barn', 'equipment_yard'];
 /** Water & power menu order. */
@@ -464,6 +486,22 @@ export function snapCenter(def: KitPieceDef, x: number, z: number, rot: number):
   return [s(x, odd(nx)), s(z, odd(nz))];
 }
 
+/**
+ * How a stair or ramp at (x, z) meets the ground: `rise` is the height of the +z end over the -z end of its local frame (world units; a stair
+ * built from it climbs toward the higher end), `cross` the sideways fall across its width (rise over run), `low` the ground at the lower end.
+ */
+export function climbOf(def: KitPieceDef, x: number, z: number, rot: number, height: (x: number, z: number) => number): { rise: number; cross: number; low: number } {
+  const hx = def.cellsX * CELL / 2, hz = def.cellsZ * CELL / 2, N = 4;
+  const at = (lx: number, lz: number): number => { const [wx, wz] = rotQ(lx, lz, rot); return height(x + wx, z + wz); };
+  let a = 0, b = 0, left = 0, right = 0;
+  for (let i = 0; i <= N; i++) {
+    const lx = -hx + 2 * hx * i / N;
+    a += at(lx, -hz) / (N + 1); b += at(lx, hz) / (N + 1);
+  }
+  for (let j = 0; j <= N; j++) { const lz = -hz + 2 * hz * j / N; left += at(-hx, lz) / (N + 1); right += at(hx, lz) / (N + 1); }
+  return { rise: b - a, cross: Math.abs(right - left) / (2 * hx), low: Math.min(a, b) };
+}
+
 export interface SiteQuery {
   /** Natural ground height. */
   height(x: number, z: number): number;
@@ -475,7 +513,7 @@ export interface SiteQuery {
   blocked?(x: number, z: number): boolean;
 }
 
-export type PlaceProblem = 'off_parcel' | 'water' | 'too_steep' | 'overlaps' | 'not_connected' | 'thin_cover' | 'too_deep' | 'needs_house' | 'needs_slope';
+export type PlaceProblem = 'off_parcel' | 'water' | 'too_steep' | 'overlaps' | 'not_connected' | 'thin_cover' | 'too_deep' | 'needs_house' | 'needs_slope' | 'no_climb' | 'too_much_climb' | 'cross_slope' | 'pad_clash';
 
 const levelOf = (d: KitPieceDef) => d.level ?? 'surface';
 /** Do pieces at these levels compete for the same ground? (Bunker rooms go under the yard and houses.) */
@@ -505,6 +543,12 @@ export function placementProblem(def: KitPieceDef, x: number, z: number, rot: nu
   // (a floor hatch stands on its house's graded pad, whatever the natural ground does)
   const isFloorHatch = def.id === 'bunker_floorhatch';
   if (grade > def.maxSlope && !isFloorHatch) return 'too_steep';
+  if (def.climbs) {
+    const c = climbOf(def, x, z, rot, site.height);
+    if (c.cross > 0.4) return 'cross_slope';
+    if (Math.abs(c.rise) < def.climbs.min) return 'no_climb';
+    if (Math.abs(c.rise) > def.climbs.max) return 'too_much_climb';
+  }
   // a walkout basement stands out of the hill: the ground must fall toward the back of the footprint (local -z)
   if (def.walkoutFall) {
     const q = ((rot % 4) + 4) % 4, cx = (r.x0 + r.x1) / 2, cz = (r.z0 + r.z1) / 2;
@@ -538,6 +582,10 @@ export const PROBLEM_TEXT: Record<PlaceProblem, string> = {
   thin_cover: 'Too little earth over it — the ground is too low here',
   too_deep: 'Too deep below the ground here to dig',
   needs_house: 'A floor hatch goes inside a house, well in from the walls',
+  no_climb: 'Nothing to climb here: a stair or ramp goes where the ground steps up between two terraces (turn it with R to run along the slope)',
+  too_much_climb: 'The ground climbs too much along it: a stair takes up to 3.6 m, a ramp 1.2 m. Terrace the slope or switch back',
+  cross_slope: 'The ground falls away sideways across it: turn it (R) to run up the hill, not across',
+  pad_clash: 'Its graded pad would cut into a neighbour\'s pad at another level',
   needs_slope: 'The lodge needs a slope that falls away behind it: turn it (R) so the walkout side, the back with the big deck, faces downhill',
 };
 

@@ -49,7 +49,7 @@ import { CELL, type KitPieceDef } from './buildkit/kit';
 import type { GameState } from '../sim/state';
 import type { WearSeason } from '../engine/world/people/crowdWear';
 import type { TourBuildingInfo } from '../engine/world/camera/TourController';
-import { floorHatchHost, footprint, KIT, placementProblem, rotQ, type Placed, type SiteQuery } from './buildkit/kit';
+import { climbOf, floorHatchHost, footprint, KIT, placementProblem, rotQ, type Placed, type SiteQuery } from './buildkit/kit';
 import { showStage, CUTAWAY_HIDE, XRAY_LAYERS, type BuildLayer as CabinLayer, type BuildOpts } from './buildkit/shell';
 import { bunkerRoots, datums, doorsOf, DEPTH, isEntry, isUnderground, tunnelDoorsOf, tunnelStart, type Side } from './buildkit/underground';
 import { updateScreens, updateSiteMap } from './buildkit/screenFeeds';
@@ -62,6 +62,7 @@ import { buildDumpTruck, buildExcavator, buildFormwork, buildTubeSegments, drape
 import { kitMaterial } from './buildkit/materials';
 import { FRUITS, fruitLook, isOrchard, type Fruit } from '../sim/orchard';
 import { buildLayers, type Seat } from './buildkit/buildings';
+import { treadHeight } from './buildkit/terraceProps';
 import { farHiddenLayers, isFar } from './buildkit/buildingLod';
 import { LIGHT_BUDGET, pickLights, type LightCandidate } from './lightPool';
 import { hashStr } from './buildkit/clutter';
@@ -173,6 +174,9 @@ const INDOOR_R = 0.04;
  */
 /** One open bunker dig and what the crew has at it (see _buildDigs). */
 interface DigSite { pit: Pit; spoil: number; machine: boolean; stage: number; f: number; kind: string; rot: number; datum: number; x: number; z: number }
+
+/** Kinds with a basement under the main floor (their floorboards are see-through in the cutaway views). */
+const SEE_THROUGH_FLOOR: ReadonlySet<string> = new Set(['lodge', 'lodge_solar']);
 
 export class HomesteadWorld {
   readonly center = new THREE.Vector3(PARCEL_SIZE / 2, 0, PARCEL_SIZE / 2);
@@ -1175,8 +1179,12 @@ export class HomesteadWorld {
       if (wall && wall.runs.length) pad = { x0: wall.rect.x0, z0: wall.rect.z0, x1: wall.rect.x1, z1: wall.rect.z1, y: wall.y, skirt: wall.skirt };
       else wall = null;
     }
+    // a stair or a ramp takes no pad: it stands on the hill from its low end and rises with it (game/buildkit/terraceProps.ts)
+    const climb = def.climbs ? climbOf(def, p.x, p.z, p.rot, this._naturalH) : null;
+    if (climb) { pad = null; wall = null; y = climb.low; }
     if (pad) this.parcel.setPads([...this.parcel.pads, pad]);
     const opts: BuildOpts = {};
+    if (climb) opts.rise = climb.rise;
     let under: Built['under'] = null;
     if (below) {
       const placed = [...[...this._built.values()].map(b => b.placed), p];
@@ -1719,7 +1727,9 @@ export class HomesteadWorld {
       const ud = m.userData as { baseMat?: THREE.Material };
       ud.baseMat ??= m.material as THREE.Material;
       // x-ray: the shell goes see-through, the furniture stays solid
-      const see = v === 'ghost' || (v === 'xray' && XRAY_LAYERS.includes(layer));
+      // a walkout lodge has a basement under its main floor: in the cutaway and x-ray views the floorboards go see-through so the cellar and the family room below show
+      const floorSee = (v === 'cutaway' || v === 'xray') && b.finished && SEE_THROUGH_FLOOR.has(b.placed.kind) && m.name === 'bldg_deck_floorboards';
+      const see = v === 'ghost' || (v === 'xray' && XRAY_LAYERS.includes(layer)) || floorSee;
       m.material = see ? xrayOf(ud.baseMat) : ud.baseMat;
       m.castShadow = !see && !['kit_glass', 'kit_string'].includes(ud.baseMat.name) && !ud.baseMat.name.startsWith('kit_glow');
       if (layer === 'cutwalls') m.visible = v === 'cutaway' && b.finished;
@@ -2006,6 +2016,8 @@ export class HomesteadWorld {
       const def = KIT[b.placed.kind];
       const [lx, lz] = this._local(b, x, z);
       const hw = def.cellsX * CELL / 2, hd = def.cellsZ * CELL / 2;
+      // a stair or a ramp: up the steps (or the grade) from its low end
+      if (def.climbs) { if (Math.abs(lx) < hw && Math.abs(lz) < hd) return b.padY + treadHeight(b.placed.kind, b.opts.rise ?? 0, def.cellsZ * CELL, lz); continue; }
       if (Math.abs(lx) < hw && lz > -hd && lz < hd + def.porch && def.floorY > 0.02) return b.padY + def.floorY;
       // a building whose floor is its graded pad (greenhouse gravel, a garage slab): stand on the pad, not the raw slope under it
       if (Math.abs(lx) < hw && Math.abs(lz) < hd && def.category !== 'bunker' && (def.category !== 'food' || b.placed.kind === 'greenhouse' || b.placed.kind === 'greenhouse_heated' || b.placed.kind === 'sheep_barn')) return b.padY + Math.max(0, def.floorY);
