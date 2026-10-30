@@ -11,6 +11,7 @@ import type { GameState } from './state';
 import type { Pt } from './perimeter';
 import { drainLineFor, undrained } from './drainage';
 import { terraceSite } from './terrace';
+import { orchardSiteNote } from './orchard';
 import type { FortressOptions } from './fortress';
 
 /** What the design drives. The browser and the tests each supply their own. */
@@ -83,7 +84,8 @@ export function runMountainShowcase(io: ShowcaseIO, opts: ShowcaseOptions = {}):
   S('greenhouse_heated', dFace + 3, -6, { label: 'Glass greenhouse' });
   S('garden', dFace + 7, -7, { radius: 4, label: 'Vegetable bed 1' });
   S('garden', dFace + 10.5, -7, { radius: 4, label: 'Vegetable bed 2' });
-  S('orchard', dFace + 3, 3, { label: 'Orchard' });
+  const orchard = S('orchard', dFace + 3, 3, { label: 'Orchard' });
+  if (orchard) { const n = orchardSiteNote(io.game(), orchard.x, orchard.z); if (n) notes.push(`Orchard: ${n}`); }
   S('solar_farm', dFace + 2, 8, { label: 'Solar farm' });
   S('battery_bank', dFace + 6.5, 9, { label: 'Battery container' });
   S('bunker_hatch', dEdge - 7, 0, { label: 'Bunker hatch' });

@@ -37,6 +37,7 @@ export function buildMountainShowcase(ctx: ShowcaseCtx, opts: ShowcaseOptions = 
     stake: (kind, x, z, rot) => {
       const before = G.getState().game.structures.length;
       ctx.tool.setKind(kind); ctx.tool.hoverAt(x, z, rot); ctx.tool.placeHere(); ctx.tool.setKind(null);
+      ctx.store.getState().setUnderground(false);   // (arming an underground piece, the bunker hatch, turns the x-ray view on: the ground goes see-through, the woods and buildings with it)
       return G.getState().game.structures.length > before;
     },
     stakeTerraces: spots => G.getState().stakeTerraces(spots),
