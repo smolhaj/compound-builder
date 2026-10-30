@@ -13,7 +13,7 @@ let chromium; try { ({ chromium } = require('playwright')); } catch { ({ chromiu
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
 const port = Number(opt('--port', 5440)), outDir = resolve(opt('--out', 'shots/areaE')), q = opt('--q', 'medium');
-const only = opt('--only', 'hydro,wind,tunnels,aqua,lake,outposts').split(',');
+const only = opt('--only', 'hydro,wind,tunnels,aqua,terrace,lake,outposts').split(',');
 const HILL = 'region=pnw&lot=hillside&lotcreek&relief=9&acres=40&lotseed=8&elev=600';
 const LAKE = 'region=mountain_west&lot=bluff&relief=9&acres=40&lotseed=4&elev=1600';
 mkdirSync(outDir, { recursive: true });
@@ -65,7 +65,7 @@ const eyeWithPerson = async (name, at, back = [-3, 2], lift = 0.4, look = null) 
   await shot(name);
 };
 try {
-  if (only.some(o => ['hydro', 'wind', 'tunnels', 'aqua', 'outposts'].includes(o))) {
+  if (only.some(o => ['hydro', 'wind', 'tunnels', 'aqua', 'terrace', 'outposts'].includes(o))) {
     await load(HILL);
     const hy = await page.evaluate(async () => {
       const cb = window.__cb, w = cb.world, R = await import('/src/sim/renewables.ts'), g0 = cb.game.getState().game;
@@ -121,6 +121,17 @@ try {
         await orbit(r[0].at, 9, 0.6, 0.3, 0.2); await shot('aqua-2-cutaway');
         await page.evaluate(() => window.__cb.store.getState().setBuildingView?.('full'));
         await eyeWithPerson('aqua-3-eye-person', r[0].at, [-4, 4]);
+      }
+    }
+    if (only.includes('terrace')) {
+      const c = hy.camp;
+      const r = await put([['orchard_terraced', c[0] + 6, c[1] - 6, 0, 24]], { clear: true });
+      console.log('terrace', JSON.stringify(r));
+      if (r[0].ok) {
+        await page.evaluate(() => { const G = window.__cb.game, g = structuredClone(G.getState().game); g.clock.t = 12 * 365 + 4 / 24; G.setState({ game: g }); });
+        await orbit(r[0].at, 18, 0.55, 0.5, 0.3); await shot('terrace-1-aerial');
+        await orbit(r[0].at, 7, 0.22, -0.4, 0.4); await shot('terrace-2-benches');
+        await eyeWithPerson('terrace-3-eye-person', r[0].at, [-4, 5]);
       }
     }
     if (only.includes('outposts')) {
