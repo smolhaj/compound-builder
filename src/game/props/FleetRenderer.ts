@@ -10,7 +10,9 @@ import { GARAGES, parkingPlan, type Bay } from '../../sim/parking';
 import { KIT } from '../buildkit/kit';
 import { startingVehicles, type Vehicle } from '../../sim/vehicles';
 import { buildVehicle, paintFor, VEHICLE_SIZE } from './vehicleGeometry';
-import { lineLength, pointAt, type Pt } from '../region/access';
+import { lineLength, type Pt } from '../region/access';
+import { sampleRoute, inCorridorAt } from '../paths/deckWalk';
+import type { Wp } from '../paths/linkRoute';
 
 /** A placed building the bays are laid out in (world position, rotation about y, structure kind). */
 export interface BayHost { x: number; z: number; rot: number; kind: string }
@@ -21,6 +23,12 @@ export interface FleetCtx {
   /** The drive, gate end first (the delivery truck's). */
   drive: readonly Pt[];
   ground: (x: number, z: number) => number;
+  /** The way from one spot to another through the tunnels when they are on different sides of the rock or the gorge (null / empty: straight; game/paths/linkRoute). */
+  route?: (from: Pt, to: Pt) => Wp[] | null;
+  /** QA: park a vehicle somewhere (id -> spot) instead of where the parking plan puts it. */
+  park?: ReadonlyMap<string, { x: number; z: number; rot: number }>;
+  /** Where the n-th vehicle cut off outside a lost way waits (a bridge that is down, a fallen tunnel): null when there is no such place. */
+  stranded?: (n: number) => { x: number; z: number; rot: number } | null;
 }
 
 /** Bay spacing inside a garage (world units, ≈ 2.9 m): three across a 9 m building. */
@@ -37,7 +45,7 @@ export function inCarBox(b: CarBox, x: number, z: number, pad = 0): boolean {
   return Math.abs(along) < b.hl + pad && Math.abs(across) < b.hw + pad;
 }
 
-interface Item { v: Vehicle; group: THREE.Group; built: string; anim: { phase: 'out' | 'in'; d: number; path: Pt[] } | null; wasAway: boolean; spot: { x: number; z: number; rot: number } | null }
+interface Item { v: Vehicle; group: THREE.Group; built: string; anim: { phase: 'out' | 'in'; d: number; path: Wp[] } | null; wasAway: boolean; spot: { x: number; z: number; rot: number } | null }
 
 export class FleetRenderer {
   readonly group = new THREE.Group();
@@ -45,6 +53,8 @@ export class FleetRenderer {
   private _key = '';
   /** Vehicles the last `spots` call left standing in the open yard (no garage slot, bay or yard bay). */
   private readonly _open = new Set<string>();
+  /** Where the vehicles on the move are this frame (they carry the key: a locked door opens for them). */
+  moving: Array<[number, number]> = [];
 
   constructor(scene: THREE.Scene) { scene.add(this.group); }
 
@@ -98,6 +108,7 @@ export class FleetRenderer {
       out.set(v.id, { x: y.x + c * lx + s * lz, z: y.z - s * lx + c * lz, rot: y.rot + Math.PI });
       this._open.add(v.id);
     }
+    if (ctx.park) for (const [id, sp] of ctx.park) if (out.has(id)) out.set(id, sp);
     return out;
   }
 
@@ -122,6 +133,8 @@ export class FleetRenderer {
       for (const [id, it] of this._items) if (!vs.some(v => v.id === id)) { this.group.remove(it.group); it.group.traverse(o => (o as THREE.Mesh).geometry?.dispose()); this._items.delete(id); }
     }
     const spots = this.spots(game, ctx);
+    this.moving = [];
+    let cutOff = 0;
     for (const v of vs) {
       let it = this._items.get(v.id);
       if (!it) {
@@ -133,22 +146,30 @@ export class FleetRenderer {
       it.v = v;
       const spot = spots.get(v.id) ?? it.spot;
       if (spot) it.spot = spot;
-      // leaving and coming home: drive the road out the gate
+      // leaving and coming home: drive the road out the gate (through the tunnel first, when the vehicle stands on the far side of the rock or the gorge)
       if (!!v.away !== it.wasAway && spot && ctx.drive.length > 1) {
         const drive = [...ctx.drive].reverse() as Pt[];
-        const out: Pt[] = [[spot.x, spot.z], ...drive];
-        it.anim = v.away ? { phase: 'out', d: 0, path: out } : { phase: 'in', d: 0, path: [...out].reverse() as Pt[] };
+        const yardEnd = drive[0], through = ctx.route?.([spot.x, spot.z], yardEnd) ?? [];
+        const out: Wp[] = [[spot.x, spot.z], ...through, ...drive];
+        it.anim = v.away ? { phase: 'out', d: 0, path: out } : { phase: 'in', d: 0, path: [...out].reverse() as Wp[] };
         it.wasAway = !!v.away;
       } else if (!!v.away !== it.wasAway) it.wasAway = !!v.away;
       if (it.anim) {
-        const len = lineLength(it.anim.path);
-        it.anim.d += dt * Math.max(1, Math.min(4, speedK)) * 3;
-        const p = pointAt(it.anim.path, Math.min(it.anim.d, len));
-        it.group.position.set(p.x, ctx.ground(p.x, p.z), p.z);
-        it.group.rotation.y = p.rot;
+        const len = lineLength(it.anim.path as unknown as Pt[]);
+        const inside = inCorridorAt(it.anim.path, it.anim.d);
+        it.anim.d += dt * Math.max(1, Math.min(4, speedK)) * (inside ? 1.5 : 3);       // (a lane in a tunnel: half the pace of the open drive)
+        const p = sampleRoute(it.anim.path, Math.min(it.anim.d, len));
+        it.group.position.set(p.x, p.y ?? ctx.ground(p.x, p.z), p.z);
+        it.group.rotation.order = 'YXZ';
+        it.group.rotation.set(-p.pitch, p.rot, 0);
         it.group.visible = true;
-        if (it.anim.d >= len) it.anim = null;
+        this.moving.push([p.x, p.z]);
+        if (it.anim.d >= len) { it.anim = null; it.group.rotation.set(0, 0, 0); }
         continue;
+      }
+      if (v.stranded && v.away) {
+        const sp = ctx.stranded?.(cutOff++);
+        if (sp) { it.group.visible = true; it.group.position.set(sp.x, ctx.ground(sp.x, sp.z), sp.z); it.group.rotation.set(0, sp.rot, 0); it.group.userData.status = 'stranded'; continue; }
       }
       if (v.away || !spot) { it.group.visible = false; continue; }
       it.group.visible = true;

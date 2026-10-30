@@ -88,6 +88,8 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
   const bits = new Map<KitMaterialId, THREE.BufferGeometry[]>();
   /** Geometry drawn with its own material (the dark inside of a bore, seen from inside). */
   const tubes: THREE.BufferGeometry[] = [];
+  /** The steel doors of a corridor, each its own group so the world can open and close it (game/perimeter/CorridorDoors). */
+  const doors: THREE.Group[] = [];
   const add = (m: KitMaterialId, g: THREE.BufferGeometry) => { let l = bits.get(m); if (!l) bits.set(m, l = []); l.push(worldUV(g)); };
   const def = PERIMETER[run.kind];
   const wl = wallLength(run);
@@ -578,7 +580,16 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
         const place = (g: THREE.BufferGeometry) => g.rotateY(yaw).translate(p.x + d.dx * sign * 0.05, 0, p.z + d.dz * sign * 0.05);
         const gy = ground(p.x, p.z);
         add('concrete', place(new THREE.BoxGeometry(0.5 * M, R * 2.4 + 0.1 * M, 0.9 * M).translate(0, p.y - R + (R * 2.4) / 2 + 0.02, 0)));      // portal block (the frame is the thick face round the doors)
-        for (const sg of [-1, 1]) add('steel', place(new THREE.BoxGeometry(0.12 * M, R * 1.75, R * 0.95).translate(sign * 0.3 * M, p.y - R * 0.9 + R * 0.875, sg * R * 0.48)));   // the two door leaves
+        // the two door leaves, each hinged at the tube's wall (a swinging leaf; the world opens them: game/perimeter/CorridorDoors)
+        for (const sg of [-1, 1]) {
+          const leaf = new THREE.Group();
+          leaf.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.12 * M, R * 1.75, R * 0.95).translate(0, R * 0.875, -sg * R * 0.475), kitMaterial('steel')), { castShadow: true, receiveShadow: true }));
+          const hinge = new THREE.Vector3(sign * 0.3 * M, p.y - R * 0.9, sg * R * 0.955).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+          leaf.position.set(hinge.x + p.x + d.dx * sign * 0.05, hinge.y, hinge.z + p.z + d.dz * sign * 0.05);
+          leaf.rotation.y = yaw;
+          leaf.userData = { door: { end: sign < 0 ? 0 : 1, swing: sg * sign * 1.6, base: yaw } };
+          doors.push(leaf);
+        }
         add('paint_yellow', place(new THREE.BoxGeometry(0.02 * M, 0.25 * M, R * 1.9).translate(sign * 0.37 * M, p.y - R * 0.4, 0)));   // a hazard band across the doors
         if (spanKind && p.y - R - gy > 0.05) add('concrete', place(new THREE.BoxGeometry(0.9 * M, p.y - R - gy + 0.05, R * 2.3).translate(0, gy - 0.05 + (p.y - R - gy + 0.05) / 2, 0)));   // abutment down to the ground
         add(lit ? 'bulb' : 'enamel', new THREE.SphereGeometry(0.07 * M, 8, 6).translate(p.x - d.dx * sign * 0.0, p.y + R + 0.18 * M, p.z));
@@ -591,9 +602,15 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
     }
     case 'rock_tunnel': {
       // driven through the hill: only the two stone portals, the earth banked over the tube where the hill has not closed over it, and the dark inside show (game/perimeter/boreGeometry.ts)
-      const b = boreParts(run.pts, ground, run.finishedAt !== null ? 1 : runProgress(run), run.finishedAt !== null, lit);
+      const b = boreParts(run.pts, ground, run.finishedAt !== null ? 1 : runProgress(run), run.finishedAt !== null, lit, !!run.collapsed);
       for (const [m, g] of b.parts) add(m, g);
       if (b.tube) tubes.push(b.tube);
+      for (const bd of b.doors) {
+        const leaf = new THREE.Group();
+        for (const [m, g] of bd.parts) leaf.add(Object.assign(new THREE.Mesh(worldUV(g), kitMaterial(m)), { castShadow: m === 'steel', receiveShadow: true }));      // (only the leaf itself casts: the band and the seam are thin)
+        leaf.userData = { door: { end: bd.end, lift: bd.lift } };
+        doors.push(leaf);
+      }
       break;
     }
     case 'drain_channel': {
@@ -797,6 +814,7 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
     group.add(mesh);
   }
   for (const g of tubes) group.add(new THREE.Mesh(g, boreDark()));
+  for (const dg of doors) group.add(dg);
   group.userData = { type: 'perimeter', runId: run.id };
   return group;
 }

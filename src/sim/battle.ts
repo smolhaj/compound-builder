@@ -40,6 +40,7 @@ import { PERIMETER, fenceLive, runFinished } from './perimeter';
 import { ARMORY_LIGHTS, floodlightLit } from './lights';
 import { DOOR_DELAY, doorsLocked, raidAngle } from './terrainFx';
 import { doorTierOf, planBreach, type DoorPlan } from './doorBreach';
+import { sapperBreach } from './corridors';
 import { roadStart } from './roadFx';
 import { WALK_CLIMB_FACTOR, WALK_POST, deckSpots, walkLength, walkRuns } from './walkway';
 import { TURRET_JAM, highBonus, litTowerIds, isTower, mountReady, towerPosture, towerPosts, towerReach, turretsReady } from './towers';
@@ -158,6 +159,9 @@ export interface PlannedBattle extends Battle {
   leftBehind?: { wounded: number; dead: number };
   /** The rings the defenders fell back through: how many inner rings there were, how many the crew took, who was hurt or killed while each was the line. */
   rings?: { of: number; fell: number; losses: RingLoss[] };
+  /** The corridor (tunnel run id) the crew came by, and the charges they carried (a rocket counts two): a breach there can bring a portal down (sim/corridors `sapperBreach`). */
+  via?: string;
+  charges?: number;
 }
 
 interface Fighter {
@@ -388,6 +392,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
     F.push(f); units.push({ id: f.id, side: 'raider', x: r2(p.x), z: r2(p.z), post: 'open' });
   }
   const H = F.filter(f => f.side === 'home'), R = F.filter(f => f.side === 'raider');
+  const charges0 = R.reduce((a, f) => a + f.grenades + f.rockets * 2, 0);      // (what the crew carries in: sim/corridors `sapperBreach`)
   // automated turrets (towers.ts): powered, fed from the armory, nobody on them; never in F (they are not people, nobody hits back at them)
   const T: Fighter[] = [];
   for (const tu of turretsReady(s)) {
@@ -942,7 +947,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
   ev.sort((a, b) => a.t - b.t);
   const dropped = { grenades: R.filter(f => f.out).reduce((a, f) => a + f.grenades, 0), rpg_rounds: R.filter(f => f.out).reduce((a, f) => a + f.rockets, 0) };
   const leftBehind = { wounded: R.filter(f => f.out && !f.dead).length, dead: R.filter(f => f.dead).length };
-  return { night, units, events: ev, duration, spent, minesUsed: mines - minesLeft, dropped, result: end, leftBehind, ...(ringRs.length ? { rings: { of: ringRs.length, fell: ringK, losses: lossesByRing(ev, units, fallTimes) } } : {}) };
+  return { night, units, events: ev, duration, spent, minesUsed: mines - minesLeft, dropped, result: end, leftBehind, ...(ringRs.length ? { rings: { of: ringRs.length, fell: ringK, losses: lossesByRing(ev, units, fallTimes) } } : {}), ...(lane?.via ? { via: lane.via, charges: charges0 } : {}) };
 }
 
 /** Write a fought battle into the game: wounds, deaths, ammo, mines, loot, the tallies. */
@@ -971,6 +976,8 @@ export function applyBattle(s: GameState, b: Battle): string[] {
   if (pb.minesUsed) { s.stock.mines = Math.max(0, (s.stock.mines ?? 0) - pb.minesUsed); out.push(`${pb.minesUsed} mine${pb.minesUsed > 1 ? 's' : ''} went off.`); }
   const thrown = b.events.filter(e => e.kind === 'throw' && e.from.startsWith('h_')).length;
   if (thrown) s.stock.grenades = Math.max(0, (s.stock.grenades ?? 0) - thrown);
+  // a crew that came by a tunnel and got in may have brought its portal down behind it (sappers: sim/corridors)
+  if (pb.via && (result === 'breached' || result === 'overrun')) out.push(...sapperBreach(s, pb.via, pb.charges ?? 0, result));
   if (result === 'breached' || result === 'overrun') {
     s.gate.raidsLost++;
     const kidOf = (unit: string) => s.people.find(p => p.id === b.units.find(u => u.id === unit)?.personId)?.kid;

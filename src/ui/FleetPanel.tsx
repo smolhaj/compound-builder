@@ -16,6 +16,7 @@ function statusOf(v: Vehicle, atTown = false): { text: string; tone: keyof typeo
   if (v.fried) return { text: 'killed by the EMP', tone: 'bad' };
   if (v.condition <= 0) return { text: 'dead', tone: 'bad' };
   if (v.down) return { text: `broken down: ${v.down.part}${v.down.left !== undefined ? `, ${v.down.left} days` : ''}`, tone: 'bad' };
+  if (v.stranded) return { text: 'cut off outside the lost way in: it waits at the outer end', tone: 'warn' };
   if (v.away) return { text: atTown ? 'at the town house' : 'out on a run', tone: null };
   if (overdue(v)) return { text: 'overdue for a service', tone: 'warn' };
   return { text: 'runs', tone: 'good' };
