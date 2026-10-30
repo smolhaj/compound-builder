@@ -45,6 +45,7 @@ describe('the water', () => {
     // a fake shore running along x = 30: water to the west
     const q: SiteQuery = { height: (x) => (x < 30 ? lakeY - 1 : lakeY + 1), owned: () => true, water: (x) => x < 30 };
     expect(placementProblem(dock, 30, 33, 1, q, [])).toBeNull();    // turned east-west, across the shoreline
+    expect(placementProblem(dock, 30, 33, 0, q, [])).toBe('not_shore');   // turned north-south: along the shore, half in and half out
     expect(placementProblem(dock, 10, 33, 1, q, [])).toBe('not_shore');   // wholly in the lake
     expect(placementProblem(dock, 50, 33, 1, q, [])).toBe('not_shore');   // wholly on land
     expect(placementProblem(KIT.garden, 10, 33, 0, q, [])).toBe('water');   // everything else still refuses water
