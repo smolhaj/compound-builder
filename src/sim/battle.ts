@@ -466,7 +466,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
     const p = posts.find(p => p !== exclude && !p.wrecked && used(p) < p.cap) ?? posts[posts.length - 1];
     f.post = p;
     armFor(f, p);
-    const tr = opts.ambush !== undefined ? 0.3 : Math.max(1, dist(f, p) / MOVE) / (0.4 + 0.6 * eff(f));   // an ambush is already waiting at its posts
+    const tr = opts.ambush !== undefined || p.kind === 'tower' || p.kind === 'sandbags' ? 0.3 : Math.max(1, dist(f, p) / MOVE) / (0.4 + 0.6 * eff(f));   // an ambush is already waiting at its posts, and so is the watch up a tower (it is what the tower's detection is), and so are sandbags (laid before the night, nobody runs to them)   // an ambush is already waiting at its posts
     f.x = p.x; f.z = p.z; f.y = p.y; f.cover = p.cover; f.readyAt = t + tr; f.movedAt = t;
     ev.push({ t: r2(t + 0.2), kind: 'move', unit: f.id, x: r2(p.x), z: r2(p.z), ...(p.y ? { y: p.y } : {}) });
   };
