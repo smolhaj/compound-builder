@@ -767,7 +767,8 @@ SETS.farmkitchen = [
 /** The forge (docs/DECISIONS.md): the compound plus a finished forge, an eye-level shot with a person and one from above. */
 const forgeSet = compound + `{ if (!window.__forge) { window.__forge = true;
   const G = cb.game, c = cb.world.camp;
-  const sp = cb.tool.findSpot('forge', c.x + 9, c.z - 4, 3, 4); if (sp) G.getState().plan('forge', sp[0], sp[1], 3); else console.error('no spot forge');
+  window.__b = window.__b || {};
+  const sp = cb.tool.findSpot('forge', c.x + 9, c.z - 4, 3, 6); if (sp) { G.getState().plan('forge', sp[0], sp[1], 3); window.__b.forge = G.getState().game.structures.at(-1); } else console.error('no spot forge');
   G.setState(s => { const g = structuredClone(s.game);
     for (const st of g.structures) { st.stage = 5; st.done = 0; st.supplied = true; st.finishedAt = g.clock.t - 3000; }
     return { game: g }; });
