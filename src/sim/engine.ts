@@ -3,6 +3,7 @@
  * quarter-hour sub-step (deterministic regardless of frame rate or speed).
  * Systems mutate a draft; `step` returns a fresh state object.
  */
+import { sharedHarvestDay } from './sharedHarvest';
 import { hasBasement } from './housingStyles';
 import { wildlifeDay, wildlifeNight } from './wildlife';
 import { LIFESTYLE } from './site';
@@ -203,6 +204,7 @@ function subStep(s: GameState): void {
     for (const line of mutualAidDay(s)) log(s, line);
     // the world round the place: the neighbors' lives, the market, scavenging runs coming home
     for (const line of neighborLifeDay(s)) log(s, line);
+    for (const line of sharedHarvestDay(s)) log(s, line);
     for (const line of marketDay(s)) log(s, line);
     for (const line of scavengeDay(s)) log(s, line);
     for (const line of minesDay(s)) log(s, line);

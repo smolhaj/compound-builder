@@ -20,6 +20,7 @@ import { kitMaterial, type KitMaterialId } from '../buildkit/materials';
 import { BED } from '../../sim/roadBed';
 import { NO_BED, spanIndices, type RoadPlan } from '../../sim/roadPlan';
 import { ROAD_STYLE } from '../../sim/roadStyle';
+import { deerCrossings } from '../../sim/roadWildlife';
 
 type Ground = (x: number, z: number) => number;
 type V3 = [number, number, number];
@@ -93,7 +94,7 @@ const WHITE = new THREE.MeshStandardMaterial({ color: 0xe8e4d8, roughness: 0.6 }
 
 // ── helpers ──
 
-interface Frame { x: number; z: number; y: number; rot: number; fx: number; fz: number; nx: number; nz: number; bank: number }
+export interface Frame { x: number; z: number; y: number; rot: number; fx: number; fz: number; nx: number; nz: number; bank: number }
 
 function frames(plan: RoadPlan): Frame[] {
   const p = plan.pts, n = p.length;
@@ -103,19 +104,40 @@ function frames(plan: RoadPlan): Frame[] {
   });
 }
 
-/** A strip following the ground at signed offsets [o0, o1] from the centre line of stations i0..i1 (the stone facing on a bank), UVs in world units. */
-function bankStrip(fr: readonly Frame[], i0: number, i1: number, o0: number, o1: number, ground: Ground, lift: number): THREE.BufferGeometry {
+/**
+ * How far out from the bench edge a bank really stands: the offset (0..`reach`) where the road's ground meets the natural ground again.
+ * `cut(o)` is the height of the roads's ground minus the natural at `o` beyond the bench edge. A bank facing never runs on past this
+ * (it would lie flat on the grass as a loose strip) and shrinks to nothing where the bank dies away.
+ */
+export function bankExtent(diffAt: (o: number) => number, reach: number, step = 0.05, eps = 0.02): number {
+  let end = 0;
+  for (let o = step; o <= reach + 1e-9; o += step) if (Math.abs(diffAt(o)) > eps) end = o;
+  return end === 0 ? 0 : Math.min(reach, end + step);
+}
+
+/**
+ * A strip following the ground at signed offsets from the bench edge of stations i0..i1 (the stone facing on a bank), UVs in world
+ * units. Each row reaches only as far as the bank does (`bankExtent`) and the rows past the flagged span are included so the facing
+ * dies away along the slope instead of ending square; a row with no bank collapses to a line.
+ */
+function bankStrip(fr: readonly Frame[], i0: number, i1: number, sg: number, reachMax: number, ground: Ground, natural: Ground, lift: number): THREE.BufferGeometry | null {
   const rows = i1 - i0 + 1, across = 4, pos = new Float32Array(rows * (across + 1) * 3), uv = new Float32Array(rows * (across + 1) * 2), idx: number[] = [];
-  let sAcc = 0;
+  let sAcc = 0, any = false;
   for (let r = 0; r < rows; r++) {
     const f = fr[i0 + r];
     if (r > 0) sAcc += Math.hypot(f.x - fr[i0 + r - 1].x, f.z - fr[i0 + r - 1].z);
+    const at = (o: number): [number, number] => [f.x + f.nx * sg * (BED.halfW + o), f.z + f.nz * sg * (BED.halfW + o)];
+    const ext = bankExtent(o => { const [x, z] = at(o); return ground(x, z) - natural(x, z); }, reachMax);
+    // the facing starts a hair out from the bench edge and ends before the toe: it never lies on level ground
+    const reach = Math.max(0, ext - 0.04);
+    if (reach > 0.06) any = true;
     for (let k = 0; k <= across; k++) {
-      const o = o0 + (o1 - o0) * k / across, x = f.x + f.nx * o, z = f.z + f.nz * o, q = r * (across + 1) + k;
+      const o = reach * k / across, [x, z] = at(o), q = r * (across + 1) + k;
       pos[q * 3] = x; pos[q * 3 + 1] = ground(x, z) + lift; pos[q * 3 + 2] = z;
-      uv[q * 2] = sAcc; uv[q * 2 + 1] = Math.abs(o - o0);
+      uv[q * 2] = sAcc; uv[q * 2 + 1] = o;
     }
   }
+  if (!any) return null;
   for (let r = 0; r < rows - 1; r++) for (let k = 0; k < across; k++) { const a = r * (across + 1) + k, b = a + 1, c = a + across + 1, d = c + 1; idx.push(a, c, b, b, c, d); }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
@@ -123,6 +145,57 @@ function bankStrip(fr: readonly Frame[], i0: number, i1: number, o0: number, o1:
   g.setIndex(idx);
   g.computeVertexNormals();
   return g;
+}
+
+const smooth01 = (t: number) => { const x = Math.max(0, Math.min(1, t)); return x * x * (3 - 2 * x); };
+
+/** A strip on the ground with an alpha per vertex (0 at the outer edge, 1 at the inner), for the soft edges of a road. Rows `i0..i1`, offsets `o0..o1` (signed, left positive). */
+export function featherStrip(fr: readonly Frame[], i0: number, i1: number, o0: number, o1: number, ground: Ground, lift: number, rgb: [number, number, number], alphaAt: (row: number, u: number) => number, across = 4): THREE.BufferGeometry | null {
+  const rows = i1 - i0 + 1;
+  if (rows < 2) return null;
+  const pos = new Float32Array(rows * (across + 1) * 3), col = new Float32Array(rows * (across + 1) * 4), idx: number[] = [];
+  for (let r = 0; r < rows; r++) {
+    const f = fr[i0 + r];
+    for (let k = 0; k <= across; k++) {
+      const u = k / across, o = o0 + (o1 - o0) * u, x = f.x + f.nx * o, z = f.z + f.nz * o, q = r * (across + 1) + k;
+      pos[q * 3] = x; pos[q * 3 + 1] = ground(x, z) + lift; pos[q * 3 + 2] = z;
+      col[q * 4] = rgb[0]; col[q * 4 + 1] = rgb[1]; col[q * 4 + 2] = rgb[2]; col[q * 4 + 3] = alphaAt(r, u);
+    }
+  }
+  for (let r = 0; r < rows - 1; r++) for (let k = 0; k < across; k++) { const a = r * (across + 1) + k, b = a + 1, c = a + across + 1, d = c + 1; idx.push(a, c, b, b, c, d); }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(col, 4));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
+}
+
+let EDGE_MAT: THREE.Material | null = null;
+const edgeMat = (): THREE.Material => EDGE_MAT ??= new THREE.MeshStandardMaterial({ vertexColors: true, transparent: true, roughness: 1, metalness: 0, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
+
+/** The shoulder (a gravel wash 0.12 either side of the surface, soft at its outer edge, fading out along the last stations of a road that ends on open ground) and the ditch on a cut bank's foot. */
+export function edgeGeometries(fr: readonly Frame[], a: number, b: number, w: number, cover: Uint8Array, plan: RoadPlan, ground: Ground, startOpen: boolean, endOpen: boolean): THREE.BufferGeometry[] {
+  const out: THREE.BufferGeometry[] = [], half = w / 2, FADE = 8, rows = b - a + 1;
+  const endK = (r: number) => Math.min(startOpen ? smooth01(r / FADE) : 1, endOpen ? smooth01((rows - 1 - r) / FADE) : 1);
+  for (const sg of [1, -1]) {
+    const lo = sg > 0 ? half - 0.03 : -(half + 0.2), hi = sg > 0 ? half + 0.2 : -(half - 0.03);
+    // u runs from the first offset to the second: alpha 1 at the surface edge, 0 at the far edge
+    const g = featherStrip(fr, a, b, lo, hi, ground, 0.016, [0.5, 0.45, 0.37], (r, u) => 0.85 * endK(r) * (sg > 0 ? 1 - u : u));
+    if (g) out.push(g);
+  }
+  // a ditch where the bank is cut: the dark gutter at the foot of the cut, a little out from the shoulder
+  for (const wl of plan.walls) {
+    if (wl.kind !== 'cut') continue;
+    const sg = wl.side === 'L' ? 1 : -1;
+    let i0 = -1, i1 = -1;
+    for (let i = a; i <= b; i++) { if (cover[i]) continue; const s = plan.pts[i].s; if (s >= wl.s0 - 1e-6 && s <= wl.s1 + 1e-6) { if (i0 < 0) i0 = i; i1 = i; } }
+    if (i0 < 0 || i1 - i0 < 2) continue;
+    const o0 = sg * (half + 0.1), o1 = sg * (half + 0.3), len = i1 - i0;
+    const g = featherStrip(fr, i0, i1, Math.min(o0, o1), Math.max(o0, o1), ground, 0.014, [0.2, 0.17, 0.13], (r, u) => 0.55 * smooth01(Math.min(r, len - r) / 4) * Math.sin(Math.PI * u));
+    if (g) out.push(g);
+  }
+  return out;
 }
 
 export interface RoadWorksOpts {
@@ -163,6 +236,12 @@ export function buildRoadWorks(plan: RoadPlan, ground: Ground, o: RoadWorksOpts)
     m.receiveShadow = true; group.add(m);
   }
   if (!o.built) return group;
+  // ── the edge of the road blends into the ground: a gravel shoulder that fades out across and away at the ends, a ditch on the cut side ──
+  const edge: THREE.BufferGeometry[] = [];
+  for (const [a, b] of runs) edge.push(...edgeGeometries(fr, a, b, w, cover, plan, ground, a === 0, b === n - 1));
+  const edgeMerged = edge.length ? mergeGeometries(edge, false) : null;
+  for (const g of edge) g.dispose();
+  if (edgeMerged) { const m = new THREE.Mesh(edgeMerged, edgeMat()); m.receiveShadow = true; m.renderOrder = 1; group.add(m); }   // (one mesh for every soft edge of the road)
 
   const parts = new Parts();
   const stone = new Parts();
@@ -171,13 +250,17 @@ export function buildRoadWorks(plan: RoadPlan, ground: Ground, o: RoadWorksOpts)
     const i0 = stationAt(wl.s0 - 1e-6), i1 = stationAt(wl.s1 + 1e-6);
     if (i1 <= i0) continue;
     const sg = wl.side === 'L' ? 1 : -1, h = Math.min(0.5, wl.heightU), reach = h * (wl.kind === 'cut' ? BED.cutRatio : BED.fillRatio);
-    const g = bankStrip(fr, i0, i1, sg * BED.halfW, sg * (BED.halfW + reach), ground, 0.012);
+    // (a few stations either side: the facing fades out along the slope where the bank dies away, never ends square on the grass)
+    const g = bankStrip(fr, Math.max(0, i0 - 6), Math.min(n - 1, i1 + 6), sg, reach + 0.1, ground, o.natural, 0.012);
+    if (!g) continue;
     const mesh = new THREE.Mesh(g, kitMaterial('fieldstone'));
     mesh.receiveShadow = true; mesh.castShadow = false;
     group.add(mesh);
+    // (a parapet of one unbroken course, lower toward each end: the curb does not stop square)
     if (wl.kind === 'fill') for (let i = i0; i < i1; i += 2) {
       const f = fr[i], ox = f.x + f.nx * sg * (BED.halfW + 0.02), oz = f.z + f.nz * sg * (BED.halfW + 0.02);
-      stone.box('fieldstone', ox, ground(ox, oz) + 0.03, oz, 0.07, 0.06 + 0.01 * ((i * 7) % 3), 0.5, f.rot);
+      const ramp = Math.min(1, (i - i0 + 2) / 6, (i1 - i + 2) / 6), hgt = (0.06 + 0.01 * ((i * 7) % 3)) * (0.35 + 0.65 * ramp);
+      stone.box('fieldstone', ox, ground(ox, oz) + hgt / 2, oz, 0.07, hgt, 1.04, f.rot);
     }
   }
   // ── guardrail ──
@@ -231,6 +314,27 @@ export function buildRoadWorks(plan: RoadPlan, ground: Ground, o: RoadWorksOpts)
       const q = fr[k], px = q.x + q.nx * outSide * (BED.halfW + 0.03), pz = q.z + q.nz * outSide * (BED.halfW + 0.03);
       parts.box('white', px, ground(px, pz) + 0.035, pz, 0.014, 0.07, 0.014, q.rot);
     }
+  }
+  // ── wildlife crossing signs: a yellow diamond with a deer, either side of every crossing deer use (sim/roadWildlife.ts) ──
+  for (const c of deerCrossings(plan)) for (const dir of [-1, 1]) {
+    if (o.bridgeDown && (c.kind === 'bridge' || c.kind === 'bridge1')) continue;   // (no road over it now: nothing to warn of)
+    const i = stationAt(c.s + dir * 3.5), f = fr[Math.min(n - 1, Math.max(0, i))];
+    if (cover[i]) continue;
+    // on the verge the traffic meets it on: coming in (dir -1) on the right of the heading, going out on the left of it
+    const side = dir < 0 ? -1 : 1, x = f.x + f.nx * side * (BED.halfW + 0.04), z = f.z + f.nz * side * (BED.halfW + 0.04), y = ground(x, z), face = f.rot + (dir < 0 ? Math.PI : 0);
+    parts.box('steel', x, y + 0.08, z, 0.012, 0.16, 0.012, f.rot);
+    const sign = new THREE.BoxGeometry(0.11, 0.11, 0.008);
+    sign.applyMatrix4(new THREE.Matrix4().makeRotationZ(Math.PI / 4));
+    sign.applyMatrix4(new THREE.Matrix4().makeRotationY(face).setPosition(x, y + 0.2, z));
+    parts.add('paint_yellow', sign);
+    // the deer: a dark body, a neck and head, four legs, set a hair proud of the sign's face
+    const px = Math.sin(face) * 0.006, pz = Math.cos(face) * 0.006, rx = Math.cos(face), rz = -Math.sin(face);
+    const put = (dx: number, dy: number, w: number, h: number) => parts.box('dark', x + px + rx * dx, y + 0.2 + dy, z + pz + rz * dx, w, h, 0.004, face, false);
+    put(0, -0.005, 0.044, 0.02);          // body
+    put(0.026, 0.017, 0.01, 0.026);       // neck
+    put(0.034, 0.03, 0.016, 0.009);       // head
+    put(0.03, 0.044, 0.014, 0.012);       // antlers
+    for (const lx of [-0.018, -0.008, 0.008, 0.018]) put(lx, -0.025, 0.005, 0.022);   // legs
   }
   // ── a dry-stack wall along the lane (New England) ──
   if (style.laneWall) {

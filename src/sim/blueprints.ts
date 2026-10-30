@@ -528,6 +528,25 @@ export const GATE_GARAGE_BLUEPRINT: Blueprint = bp('gate_garage', [
   ['finish', 'Steel gates, two roll-up doors, lights and the vehicle apron', 110, { hardware: 8, roofing: 2, cable: 2 }],
 ]);
 
+// ── Micro-hydro and the small wind turbine (sim/renewables.ts) ──
+/** A 3 kW micro-hydro plant on the creek bank: a concrete intake weir with a screen, 100 m of buried penstock, a turbine house on a slab. About $17,000 and 240 person-hours. */
+export const MICRO_HYDRO_BLUEPRINT: Blueprint = bp('micro_hydro', [
+  ['site', 'Walk the creek, stake the intake, the penstock line and the house', 8, {}],
+  ['foundation', 'Trench the penstock (hired excavator), pour the house slab and the tailrace', 70, { excavator: 3, concrete: 3 }],
+  ['frame', 'Lay and fuse the penstock, frame the turbine house', 70, { penstock: 2, lumber: 2 }],
+  ['roof', 'Pour the intake weir and screen box, roof the house', 40, { concrete: 3, roofing: 1, rebar: 1 }],
+  ['finish', 'Set the turbine and alternator, wire the controller and the diversion load, bury the line', 52, { hydro_set: 1, cable: 2, hardware: 1 }],
+]);
+
+/** A 5 kW wind turbine on an 18 m guyed tilt-up tower: footing and four guy anchors, the tower, the raise, the buried line. About $25,000. */
+export const WIND_TURBINE_BLUEPRINT: Blueprint = bp('wind_turbine', [
+  ['site', 'Stake the tower base and the four guy anchors (the guys reach 12 m out)', 4, {}],
+  ['foundation', 'Dig and pour the footing and the guy anchors', 34, { concrete: 4, rebar: 1 }],
+  ['frame', 'Assemble the tilt-up tower on the ground and set the guys', 40, { tilt_tower: 1, hardware: 1 }],
+  ['roof', 'Bolt on the turbine and raise the tower with the winch', 20, { wind_turbine: 1 }],
+  ['finish', 'Bury the cable to the controller and set the dump load', 24, { cable: 3, hardware: 1 }],
+]);
+
 /** A stone stair between two terraces (game/buildkit/terraceProps.ts): dry-laid treads, cheek walls and a pipe rail; the bill is for a mid-height flight. */
 export const TERRACE_STAIR_BLUEPRINT: Blueprint = bp('terrace_stair', [
   ['site', 'Stake the flight and cut the treads into the hill', 10, {}],
@@ -547,7 +566,7 @@ export const TERRACE_RAMP_BLUEPRINT: Blueprint = bp('terrace_ramp', [
 ]);
 
 export const BLUEPRINTS: Record<string, Blueprint> = Object.fromEntries(
-  [CABIN_BLUEPRINT, OUTHOUSE_BLUEPRINT, WORKSHOP_BLUEPRINT, ROOT_CELLAR_BLUEPRINT, WOOD_OVEN_BLUEPRINT, FORGE_BLUEPRINT, APIARY_BLUEPRINT, SUGAR_SHACK_BLUEPRINT, BARNYARD_BLUEPRINT, COOP_BLUEPRINT, GARDEN_BLUEPRINT, FIELD_BLUEPRINT, GREENHOUSE_BLUEPRINT, ORCHARD_BLUEPRINT, LOG_HOUSE_BLUEPRINT, FARMHOUSE_BLUEPRINT, TRAILER_BLUEPRINT, BARN_BLUEPRINT, COTTAGE_BLUEPRINT, GUEST_HOUSE_BLUEPRINT, MOMS_HOUSE_BLUEPRINT, LODGE_BLUEPRINT, LODGE_SOLAR_BLUEPRINT, STONE_HOUSE_BLUEPRINT, TIMBER_FRAME_BLUEPRINT, CONTAINER_HOUSE_BLUEPRINT, ADOBE_HOUSE_BLUEPRINT, METAL_GARAGE_BLUEPRINT, GARAGE_SOLAR_BLUEPRINT, ...UTILITY_BLUEPRINTS, GREENHOUSE_HEATED_BLUEPRINT, ORCHARD_GROVE_BLUEPRINT, SOLAR_FARM_BLUEPRINT, BATTERY_BANK_BLUEPRINT, POND_BLUEPRINT, RESERVOIR_BLUEPRINT, SHEEP_BARN_BLUEPRINT, EQUIPMENT_YARD_BLUEPRINT, ...BUNKER_BLUEPRINTS, ...TOWER_BLUEPRINTS, GATE_GARAGE_BLUEPRINT, MOTOR_COURT_BLUEPRINT, TERRACE_STAIR_BLUEPRINT, TERRACE_RAMP_BLUEPRINT].map(b => [b.kind, b]));
+  [MICRO_HYDRO_BLUEPRINT, WIND_TURBINE_BLUEPRINT, CABIN_BLUEPRINT, OUTHOUSE_BLUEPRINT, WORKSHOP_BLUEPRINT, ROOT_CELLAR_BLUEPRINT, WOOD_OVEN_BLUEPRINT, FORGE_BLUEPRINT, APIARY_BLUEPRINT, SUGAR_SHACK_BLUEPRINT, BARNYARD_BLUEPRINT, COOP_BLUEPRINT, GARDEN_BLUEPRINT, FIELD_BLUEPRINT, GREENHOUSE_BLUEPRINT, ORCHARD_BLUEPRINT, LOG_HOUSE_BLUEPRINT, FARMHOUSE_BLUEPRINT, TRAILER_BLUEPRINT, BARN_BLUEPRINT, COTTAGE_BLUEPRINT, GUEST_HOUSE_BLUEPRINT, MOMS_HOUSE_BLUEPRINT, LODGE_BLUEPRINT, LODGE_SOLAR_BLUEPRINT, STONE_HOUSE_BLUEPRINT, TIMBER_FRAME_BLUEPRINT, CONTAINER_HOUSE_BLUEPRINT, ADOBE_HOUSE_BLUEPRINT, METAL_GARAGE_BLUEPRINT, GARAGE_SOLAR_BLUEPRINT, ...UTILITY_BLUEPRINTS, GREENHOUSE_HEATED_BLUEPRINT, ORCHARD_GROVE_BLUEPRINT, SOLAR_FARM_BLUEPRINT, BATTERY_BANK_BLUEPRINT, POND_BLUEPRINT, RESERVOIR_BLUEPRINT, SHEEP_BARN_BLUEPRINT, EQUIPMENT_YARD_BLUEPRINT, ...BUNKER_BLUEPRINTS, ...TOWER_BLUEPRINTS, GATE_GARAGE_BLUEPRINT, MOTOR_COURT_BLUEPRINT, TERRACE_STAIR_BLUEPRINT, TERRACE_RAMP_BLUEPRINT].map(b => [b.kind, b]));
 
 /** Total bill of materials for a blueprint. */
 export function totalBill(bp: Blueprint): Partial<Stock> {
