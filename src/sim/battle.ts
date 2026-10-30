@@ -19,7 +19,7 @@
  * Distances are world units (1 ≈ 6 m).
  */
 import { BUNKER_ENTRANCES } from './bunkerEntrances';
-import { ringHoldSeconds, sortieFactor } from './rings';
+import { ringHoldSeconds, sallyPorts, sortieFactor } from './rings';
 import { wallHoldSeconds } from './retaining';
 import type { Battle, BattleEvent, BattleUnit } from './battleTypes';
 import { GUN, skillOf, type Caliber } from './armory';
@@ -33,7 +33,8 @@ import { coverFactor } from './housingStyles';
 import { isFinished } from './construction';
 import { PERIMETER, fenceLive, runFinished } from './perimeter';
 import { ARMORY_LIGHTS, floodlightLit } from './lights';
-import { DOOR_DELAY, doorDelay, raidAngle } from './terrainFx';
+import { DOOR_DELAY, doorsLocked, raidAngle } from './terrainFx';
+import { doorTierOf, planBreach, type DoorPlan } from './doorBreach';
 import { roadStart } from './roadFx';
 import { WALK_CLIMB_FACTOR, WALK_POST, deckSpots, walkLength, walkRuns } from './walkway';
 import { TURRET_JAM, highBonus, litTowerIds, isTower, mountReady, towerPosture, towerPosts, towerReach, turretsReady } from './towers';
@@ -404,7 +405,23 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
   // ── detection, alarm, lights ──
   const detection = Math.min(100, 25 + (s.gate.forewarned ? 20 : 0) + g.detection + tw.detection + watchDetection(s) + Math.max(0, ...fightersP.map(({ p }) => p.skills.hunter)) * 4);
   // the tunnel-bridge's doors lock at night and on the alarm (a watch good enough to call it before they arrive); by day, unwarned, they stand open
-  if (lane?.via && opts.ambush === undefined) { const d = doorDelay(night, detection); for (const f of F) if (f.side === 'raider') f.readyAt = d; }
+  // (sim/doorBreach.ts) a locked door is a job: tools, a ram, a torch, charges against its tier, slowed by the towers that see it and a sortie from the sally port
+  let door: DoorPlan | null = null;
+  if (lane?.via && opts.ambush === undefined) {
+    const run = s.perimeter.find(x => x.id === lane.via), chokeAt = lane.lane.choke?.at;
+    const overwatch = chokeAt ? towerPosts(s).filter(tp => Math.hypot(tp.st.x - chokeAt[0], tp.st.z - chokeAt[1]) <= 14).length : 0;
+    door = planBreach({ men: R.length, grenades: R.reduce((a, f) => a + f.grenades, 0), rockets: R.reduce((a, f) => a + f.rockets, 0), organized, late, adapt: opts.adapt ?? 0 },
+      { tier: doorTierOf(run?.kind, !!(run && PERIMETER[run.kind].bore)), locked: doorsLocked(night, detection), overwatch, sallyPorts: sallyPorts(s) }, r);
+    for (const f of R) f.readyAt = door.secs;
+    // what went into the door is not in the fight
+    for (let g = door.spent.grenades; g > 0;) { const f = R.find(x => x.grenades > 0); if (!f) break; f.grenades--; g--; }
+    if (door.spent.rockets) { const f = R.find(x => x.rockets > 0); if (f) f.rockets--; }
+    if (door.method !== 'an open door') ev.push({ t: 0, kind: 'door', what: door.method, open: false, ...(chokeAt ? { x: r2(chokeAt[0]), z: r2(chokeAt[1]) } : {}) });
+    if (!door.gaveUp && door.method !== 'an open door') {
+      ev.push({ t: r2(door.secs), kind: 'door', what: door.method, open: true, ...(chokeAt ? { x: r2(chokeAt[0]), z: r2(chokeAt[1]) } : {}) });
+      if (door.method === 'a charge' && chokeAt) ev.push({ t: r2(door.secs), kind: 'explosion', x: r2(chokeAt[0]), z: r2(chokeAt[1]), radius: 1, hits: [] });
+    }
+  }
   // by day, people on watch see a group coming up the drive a couple of hundred meters out; at night it's what the gear hears and sees
   const darkBlind = night && !lightsOn && !n('nvg') && !n('thermal') && !n('thermal_cam');
   // (round 4: measured from the line, where the watch stands and the sensors are, not from the house)
@@ -590,9 +607,11 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
     const hUp = H.filter(f => !f.out && !f.shelter), rUp = R.filter(f => !f.out && !f.fled);
     // alarm
     const nearest = Math.min(...rUp.map(f => dist(f, C)));
-    if (!alarmed && (nearest <= detectAt || t > 0 && rUp.length === 0)) {
+    const doorNoise = !!door && !door.gaveUp && t >= door.noiseAt && door.noiseAt < Infinity;   // the work on the door carries (a ram, a sledge, a charge going off)
+    if (!alarmed && (nearest <= detectAt || doorNoise || t > 0 && rUp.length === 0)) {
       alarmed = true;
       ev.push({ t, kind: 'alarm', what });
+      if (doorNoise && nearest > detectAt) say(t + 0.4, v(lead(), ['That noise — the door! Somebody\'s at the door!', 'Oh God, that banging — they\'re on the gate!'], ['Contact at the tunnel door. Everyone up.']), lead());
       if (lightsOn) {
         const masts = mast ? towerPosts(s).filter(x => x.def?.flood && mastIds.includes(x.st.id)).slice(0, 3).map(x => ({ x: r2(x.st.x), z: r2(x.st.z), y: x.post.y + 0.1 })) : [];
         const aimAt = at(lineR + 8, 0);
@@ -704,6 +723,13 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
       if (!R[0].out) say(t + 0.5, pick(['Fall back! Fall back!', 'Fuck this — it\'s not worth it, go!']), R[0]);
       for (const f of rUp) { f.fled = true; const p = at(36, (r() - 0.5) * 10); ev.push({ t: r2(t + r()), kind: 'flee', unit: f.id }); ev.push({ t: r2(t + 1), kind: 'move', unit: f.id, x: r2(p.x), z: r2(p.z) }); }
       end = 'fled'; endT = t + 8; break;
+    }
+    // a door that will not give: the crew has been at it as long as it will stay
+    if (door?.gaveUp && t >= door.secs && !breached && rUp.length) {
+      const l1 = lead();
+      say(t, v(l1, ['They\'re leaving — they couldn\'t get through the door!', 'They gave up on the door — oh thank God —'], ['They\'re pulling back from the door.']), l1);
+      for (const f of rUp) { f.fled = true; const p = at(36, (r() - 0.5) * 10); ev.push({ t: r2(t + r()), kind: 'flee', unit: f.id }); ev.push({ t: r2(t + 1), kind: 'move', unit: f.id, x: r2(p.x), z: r2(p.z) }); }
+      end = 'fled'; endT = t + 6; break;
     }
     if (!rUp.length) { end = 'repelled'; endT = t + 3; break; }
     // they can't get over the wall and give up

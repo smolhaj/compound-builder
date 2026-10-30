@@ -32,6 +32,7 @@ import { PERIMETER, runFinished, runBill, SALVAGE, type PerimeterKind, type Pt }
 import { log } from './economy';
 import { DRAIN, cutSlopeAt, nearDrain, undrained, drainLineFor } from './drainage';
 import { wallHoldsAt } from './retaining';
+import { doorTierOf, holdLine } from './doorBreach';
 import { DROPPED_SCORE, RFX, bridgeDown, roadBridgeOf, roadChokeLines, roadChokes, roadEase } from './roadFx';
 
 export const FX = {
@@ -122,11 +123,10 @@ export function chokeHeld(s: GameState, choke: Choke): boolean {
 }
 
 /** The Defense tab's line when the easiest way in is one of your tunnels (the doors: how long a crew is held, when they lock, whether it can be dropped). */
-export function wayInLine(kind: PerimeterKind | undefined): string {
+export function wayInLine(kind: PerimeterKind | undefined, overwatch = 0, sallyPorts = 0): string {
   const bore = !!kind && !!PERIMETER[kind].bore;
-  return bore
-    ? `The easiest way in is your rock tunnel: the rock leaves a crew only its outer steel door, and they are held there ${DOOR_DELAY} s (in view of your towers) before it can act. The doors lock by themselves at night and when the alarm goes; by day, unwarned, they stand open and hold a crew only ${DOOR_OPEN_DELAY} s. A bore cannot be dropped: hold the door.`
-    : `The easiest way in is your ${kind ? PERIMETER[kind].name.split(' (')[0].toLowerCase() : 'tunnel-bridge'}: a crew comes to its outer steel door and is held there ${DOOR_DELAY} s (in view of your towers and deck) before it can act. The doors lock by themselves at night and when the alarm goes; by day, unwarned, they stand open and hold a crew only ${DOOR_OPEN_DELAY} s. Drop it and they must ford and climb the gorge.`;
+  const name = bore ? 'rock tunnel' : kind ? PERIMETER[kind].name.split(' (')[0].toLowerCase() : 'tunnel-bridge';
+  return `The easiest way in is your ${name}: a crew comes to its outer door. ${holdLine(doorTierOf(kind, bore), overwatch, sallyPorts)} The doors lock by themselves at night and when the alarm goes; by day, unwarned, they stand open and hold a crew only ${DOOR_OPEN_DELAY} s. ${bore ? 'A bore cannot be dropped: hold the door.' : 'Drop it and they must ford and climb the gorge.'}`;
 }
 
 export interface TerrainDefense { score: number; lines: string[]; lane: Lane | null; held: boolean; highShare: number }
