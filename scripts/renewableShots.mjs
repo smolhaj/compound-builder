@@ -24,7 +24,7 @@ const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 page.setDefaultTimeout(300000);
 page.on('pageerror', e => console.error('PAGEERROR', e.message));
 page.on('console', m => { if (m.type() === 'error') console.error('console', m.text().slice(0, 300)); });
-const settle = async () => { for (let i = 0; i < 4; i++) { await page.evaluate(() => window.__cb.qa.renderNow()); await page.waitForTimeout(120); } };
+const settle = async (n = 4, ms = 120) => { for (let i = 0; i < n; i++) { await page.evaluate(() => window.__cb.qa.renderNow()); await page.waitForTimeout(ms); } };
 const shot = async name => { try { await settle(); await page.evaluate(q => window.__cb.qa.renderFull(q), q); await page.waitForTimeout(250); const f = `${outDir}/${name}.png`; await page.screenshot({ path: f }); console.log(f); } catch (e) { console.error('SHOTERR', name, e.message); } };
 const orbit = (at, r, pitch, yaw, lift = 0.3) => page.evaluate(([at, r, pitch, yaw, lift]) => { const { world, cam } = window.__cb; cam.target.set(at[0], world.groundAt(at[0], at[1]) + lift, at[1]); cam.radius = r; cam.pitch = pitch; cam.yaw = yaw; }, [at, r, pitch, yaw, lift]);
 const load = async query => {
@@ -49,7 +49,7 @@ const put = (list, opts = {}) => page.evaluate(async ([list, opts]) => {
     out.push({ kind, ok: true, at: spot.map(v => +v.toFixed(2)) });
   }
   return out;
-}, [list, opts]);
+}, [list, opts]).then(async r => { await settle(10, 250); return r; });
 /** The family goes to a garden beside the spot, then the camera stands at eye level behind the nearest person, looking at the thing. */
 const eyeWithPerson = async (name, at, back = [-3, 2], lift = 0.4, look = null) => {
   await put([['garden', at[0] + 2.4, at[1] + 1.5, 0, 8]]);
@@ -63,6 +63,19 @@ const eyeWithPerson = async (name, at, back = [-3, 2], lift = 0.4, look = null) 
     cam.placeEye(cx, cz, tx, tz, lift);
   }, [at, back, lift, look]);
   await shot(name);
+  // three more eye positions round it (a tree often stands in the first)
+  let k = 0;
+  for (const [bx, bz] of [[back[1], -back[0]], [-back[0], -back[1]], [-back[1], back[0]]]) {
+    k++;
+    await page.evaluate(([at, bx, bz, lift, look]) => {
+      const { world, cam } = window.__cb;
+      const ps = world.family.positions().filter(p => Math.hypot(p.x - at[0], p.z - at[1]) < 14).sort((a, b) => Math.hypot(a.x - at[0], a.z - at[1]) - Math.hypot(b.x - at[0], b.z - at[1]));
+      const p = ps[0] ?? world.family.positions()[0];
+      const [cx, cz] = world.openSpotNear(at[0] + bx, at[1] + bz, 0.3);
+      cam.placeEye(cx, cz, look ? look[0] : (at[0] + p.x) / 2, look ? look[1] : (at[1] + p.z) / 2, lift);
+    }, [at, bx, bz, lift, look]);
+    await shot(`${name}-alt${k}`);
+  }
 };
 try {
   if (only.some(o => ['hydro', 'wind', 'tunnels', 'aqua', 'terrace', 'outposts'].includes(o))) {
