@@ -65,10 +65,12 @@ export interface FortressOptions {
   ringSally: boolean;
   /** A motor court in front of the gate garage (sim/motorCourt.ts). */
   motorCourt: boolean;
+  /** A road gate (and its gate garage and court) on the road side. Off: a wall with no gate, for a compound whose way in is elsewhere (a rock tunnel). */
+  gate: boolean;
 }
 /** The walls a ring can be built in (each takes a patrol walkway). */
 export const RING_WALLS: readonly PerimeterKind[] = ['container_wall', 'container_stack', 'stone_wall', 'concrete_wall'];
-export const DEFAULT_FORTRESS: FortressOptions = { scope: 'core', towers: MAX_TOWERS, towerKind: 'watchtower_wood', passage: true, shape: 'square', wall: 'container_wall', look: 'black', rings: 1, ringWall: 'stone_wall', ringGates: 'alternate', ringSally: false, motorCourt: false };
+export const DEFAULT_FORTRESS: FortressOptions = { scope: 'core', towers: MAX_TOWERS, towerKind: 'watchtower_wood', passage: true, shape: 'square', wall: 'container_wall', look: 'black', rings: 1, ringWall: 'stone_wall', ringGates: 'alternate', ringSally: false, motorCourt: false, gate: true };
 
 export interface PlannedStructure { kind: string; x: number; z: number; rot: number }
 
@@ -236,7 +238,7 @@ export function planFortress(s: GameState, geo: PropertyGeometry = {}, opts: Par
   const shaped = (options.shape !== 'square' || rects.length === 1) && (options.scope === 'core' || coreIsFull);
   const region: Region = shaped ? compoundRegion(s, geo, options.shape, GARAGE_W, coreIsFull && options.scope === 'full' ? home : core) : regionFromRects(rects);
   if (options.shape !== 'square' && !shaped) notes.push('The whole-property wall follows the line of the land: a round or octagonal ring is for the core compound.');
-  const wall = planPropertyWall(s, RING_WALLS.includes(options.wall) ? options.wall : 'container_wall', geo, { gateW: GARAGE_W, garage: true, region, look: options.look });
+  const wall = planPropertyWall(s, RING_WALLS.includes(options.wall) ? options.wall : 'container_wall', geo, { gateW: GARAGE_W, garage: options.gate, gate: options.gate, region, look: options.look });
 
   // the garage: in the gate gap, door side facing in; it must have the ground to itself
   let garage: PlannedStructure | null = null;

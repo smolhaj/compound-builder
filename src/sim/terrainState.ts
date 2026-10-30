@@ -7,7 +7,7 @@
  * Cached per place. Pure (no three.js).
  */
 import { ParcelTerrain } from '../game/parcel/parcelTerrain';
-import { analyzeTerrain, approachLanes, findBore, siteCandidates, type BoreStats, type Corridor, type GroundSource, type Lane, type SiteCandidate, type Terrain } from './terrain';
+import { analyzeTerrain, approachLanes, boreProblem, findBore, siteCandidates, type BoreStats, type Corridor, type GroundSource, type Lane, type SiteCandidate, type Terrain } from './terrain';
 import { PERIMETER, runFinished } from './perimeter';
 import type { GameState } from './state';
 import type { Pt } from './perimeter';
@@ -98,6 +98,13 @@ export function boreOf(s: GameState): { a: Pt; b: Pt; stats: BoreStats } | null 
   const t = terrainOf(s);
   if (!t) return null;
   const c = campOf(s), k = `${keyOf(s)}|${override ? 'o' : ''}|${Math.round(c[0] / 4)}|${Math.round(c[1] / 4)}`;
-  if (!bores.has(k)) { if (bores.size > 16) bores.clear(); bores.set(k, findBore(t.hAt, s.site.home, c)); }
+  if (!bores.has(k)) { if (bores.size > 16) bores.clear(); const g = groundOf(s); bores.set(k, findBore(t.hAt, s.site.home, c, 22, g ? (a, b) => boreProblem(g, a, b) === null : undefined)); }
   return bores.get(k) ?? null;
+}
+
+/** The best bore from the low ground within `reach` of `near` to one of `ends` (points on a wall, say), or null: the same search as `boreOf`, not kept. */
+export function boreTo(s: GameState, near: Pt, reach: number, ends?: readonly Pt[]): { a: Pt; b: Pt; stats: BoreStats } | null {
+  const t = terrainOf(s), g = groundOf(s);
+  if (!t) return null;
+  return findBore(t.hAt, s.site.home, near, reach, g ? (a, b) => boreProblem(g, a, b) === null : undefined, ends);
 }

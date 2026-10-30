@@ -625,14 +625,17 @@ export function boreProblem(src: GroundSource, a: Pt, b: Pt): string | null {
 
 /**
  * The best bore the land offers near `near` (the camp): a straight run with one end within `reach` of it and the other anywhere in `rect`, scored
- * by how much rock lies over it and how short it and its cuttings are. Coarse (two-unit grid) and pure: `h` is a cheap lookup (the analysed grid).
+ * by how much rock lies over it and how short it and its cuttings are. Coarse (two-unit grid) and pure: `h` is a cheap lookup (the analysed grid), `accept`
+ * re-checks a would-be winner against the real ground, and `ends` names the only places the far end may be (the ring wall, say).
  */
-export function findBore(h: (x: number, z: number) => number, rect: Rect, near: Pt, reach = 22): { a: Pt; b: Pt; stats: BoreStats } | null {
+export function findBore(h: (x: number, z: number) => number, rect: Rect, near: Pt, reach = 22, accept?: (a: Pt, b: Pt) => boolean, ends?: readonly Pt[]): { a: Pt; b: Pt; stats: BoreStats } | null {
   let best: { a: Pt; b: Pt; stats: BoreStats; score: number } | null = null;
   const step = 2;
   for (let ax = Math.max(rect.x0 + 2, near[0] - reach); ax <= Math.min(rect.x1 - 2, near[0] + reach); ax += step) for (let az = Math.max(rect.z0 + 2, near[1] - reach); az <= Math.min(rect.z1 - 2, near[1] + reach); az += step) {
     const ha = h(ax, az);
-    for (let bx = rect.x0 + 2; bx <= rect.x1 - 2; bx += step) for (let bz = rect.z0 + 2; bz <= rect.z1 - 2; bz += step) {
+    const bs: Pt[] = ends ? [...ends] : [];
+    if (!ends) for (let bx = rect.x0 + 2; bx <= rect.x1 - 2; bx += step) for (let bz = rect.z0 + 2; bz <= rect.z1 - 2; bz += step) bs.push([bx, bz]);
+    for (const [bx, bz] of bs) {
       const L = Math.hypot(bx - ax, bz - az);
       if (L < BORE.MIN_LEN || L > BORE.MAX_LEN) continue;
       if (Math.abs(h(bx, bz) - ha) / L > BORE.MAX_GRADE) continue;
@@ -640,7 +643,8 @@ export function findBore(h: (x: number, z: number) => number, rect: Rect, near: 
       if (boreProblemOf(stats)) continue;
       // deep rock is good; short is good; a short cutting is good; stay near the camp
       const score = Math.min(stats.peakCover, 2) * 1.2 - stats.lenU * 0.12 - (stats.openA + stats.openB) * 0.25 - Math.hypot(ax - near[0], az - near[1]) * 0.03;
-      if (!best || score > best.score) best = { a: [ax, az], b: [bx, bz], stats, score };
+      // (the coarse grid's hill is a little off the real ground: `accept` re-checks the candidate that would win, on the real thing)
+      if ((!best || score > best.score) && (!accept || accept([ax, az], [bx, bz]))) best = { a: [ax, az], b: [bx, bz], stats, score };
     }
   }
   return best ? { a: best.a, b: best.b, stats: best.stats } : null;

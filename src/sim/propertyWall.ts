@@ -171,6 +171,8 @@ export interface PlanOptions {
   region?: Region;
   /** The gate gap is for a gatehouse garage (sim/garage.ts): the gate is marked so no leaves are drawn and the garage holds the line. */
   garage?: boolean;
+  /** False: no road gate at all (the way in is somewhere else: a rock tunnel's doorway, a bridge). Default true. */
+  gate?: boolean;
 }
 
 export interface WallPlan {
@@ -223,7 +225,7 @@ export function planPropertyWall(s: GameState, kind: PerimeterKind, geo: Propert
   // (else the middle of the eastmost side)
   let gateAt: { loop: Loop; s: number } | null = null;
   let gateS: number | undefined;
-  if (loops.length) {
+  if (loops.length && opts.gate !== false) {
     const entry = geo.drive && geo.drive.length > 1 ? firstEntry(loops.map(l => l.pts), geo.drive) : null;
     if (entry) {
       const l = loops[entry.loop];

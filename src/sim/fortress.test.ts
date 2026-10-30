@@ -434,6 +434,24 @@ describe('an irregular property line', () => {
   });
 });
 
+describe('Fortify my ring with no road gate', () => {
+  it('is a closed wall: no gate gap, no gate garage, no motor court, and says so', () => {
+    const g = game();
+    const plan = planFortress(g, geo(g), { scope: 'core', passage: false, motorCourt: true, gate: false });
+    expect(plan.wall.gateSpot).toBeNull();
+    expect(plan.garage).toBeNull();
+    expect(plan.court).toBeNull();
+    expect(plan.wall.runs.every(r => r.gates.length === 0)).toBe(true);
+    const laid = layFortress(g, plan);
+    expect(laid.runs).toBeGreaterThan(0);
+    expect(g.structures.some(st => st.kind === GATE_GARAGE)).toBe(false);
+    expect(g.perimeter.filter(r => r.kind === 'container_wall').every(r => r.gates.length === 0)).toBe(true);
+    // the default still has the road gate and the garage
+    const g2 = game();
+    expect(planFortress(g2, geo(g2), { scope: 'core', passage: false }).garage).not.toBeNull();
+  });
+});
+
 describe('Fortify my ring goes round what is already built', () => {
   const hits = (g: GameState, st: { kind: string; x: number; z: number; rot: number }) => {
     const r = footprint(KIT[st.kind], st.x, st.z, st.rot);

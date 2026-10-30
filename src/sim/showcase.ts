@@ -12,6 +12,10 @@ import type { Pt } from './perimeter';
 import { drainLineFor, undrained } from './drainage';
 import { terraceSite } from './terrace';
 import { orchardSiteNote } from './orchard';
+import { boreTo } from './terrainState';
+import { boreProblem } from './terrain';
+import { boreText } from './terrainFx';
+import { courtSpot } from './motorCourt';
 import type { FortressOptions } from './fortress';
 
 /** What the design drives. The browser and the tests each supply their own. */
@@ -26,8 +30,8 @@ export interface ShowcaseIO {
   /** Stake it (the click). False when the game refused. */
   stake: (kind: string, x: number, z: number, rot: number) => boolean;
   stakeTerraces: (spots: Array<[number, number]>) => string | null;
-  /** Fortify my ring with these options. */
-  fortify: (opts: Partial<FortressOptions>) => { runs: number; structures: number };
+  /** Fortify my ring with these options (round `center` when given, the ring is centred on the camp otherwise). */
+  fortify: (opts: Partial<FortressOptions>, center?: Pt) => { runs: number; structures: number };
   razor: (runId: string) => string | null;
   /** Draw a run of this kind through these points (the perimeter tool); the id of the run laid, or null (with a reason). */
   drawRun: (kind: string, pts: Pt[]) => string | { problem: string };
@@ -54,6 +58,8 @@ export function frameOf(camp: Pt, fall: number, ground: (x: number, z: number) =
 }
 
 export interface ShowcaseOptions {
+  /** Where the compound goes: on the shelf at the foot of the rock face (`shelf`, the default), or on the bench above the face with a rock tunnel up to it from the motor court on the shelf (`bench`: the north-star picture). */
+  layout?: 'shelf' | 'bench';
   /** Rings in all, the outer one included (1 = the plain wall of the picture; 2 adds a keep ring round the lodge). */
   rings?: number;
   /** The wall: the stone-and-timber one (default) or poured concrete with hexagonal towers (the black wall of the north-star picture). */
@@ -61,6 +67,7 @@ export interface ShowcaseOptions {
 }
 
 export function runMountainShowcase(io: ShowcaseIO, opts: ShowcaseOptions = {}): ShowcaseReport {
+  if (opts.layout === 'bench') return runBenchShowcase(io, opts);
   const steps: ShowcaseStep[] = [], notes: string[] = [];
   const { P, slopeAt } = frameOf(io.camp, io.fall, io.ground);
   // the rock face: the steepest ground uphill of the camp; the shelf's lower lip: where, downhill of the face's foot, the ground starts to fall away
@@ -124,6 +131,90 @@ export function runMountainShowcase(io: ShowcaseIO, opts: ShowcaseOptions = {}):
   for (const k of ['suv', 'suv', 'old_pickup', 'motorhome', 'atv', 'tractor']) { const e = io.buyVehicle(k); if (!e) bought.push(k); else refused.push(`${k}: ${e}`); }
   steps.push({ step: 'Fleet for the court', ok: bought.length > 0, note: `bought ${bought.join(', ') || 'nothing'}${refused.length ? '; refused ' + refused.join('; ') : ''}` });
   return { steps, frame: { phi: io.fall, dFace, dEdge }, notes };
+}
+
+/**
+ * The north-star layout: the compound on the bench above the rock face (the terraces, the lodge on its walkout, the solar bench), the motor court and
+ * the camp on the shelf below it at the foot of the face, and a rock tunnel bored up through the hill from the court's portal to the compound's gate.
+ * The tunnel is the only way a truck gets up: a person cannot cross the face.
+ */
+function runBenchShowcase(io: ShowcaseIO, opts: ShowcaseOptions): ShowcaseReport {
+  const steps: ShowcaseStep[] = [], notes: string[] = [];
+  const { P, slopeAt } = frameOf(io.camp, io.fall, io.ground);
+  let dFace = -4, steepest = 0;
+  for (let d = 0; d > -40; d -= 0.25) { const [x, z] = P(d, 0), sl = slopeAt(x, z); if (sl > steepest) { steepest = sl; dFace = d; } }
+  if (steepest < 0.9) notes.push(`no rock face found uphill of the camp (steepest ground ${steepest.toFixed(2)})`);
+  io.fund();
+  const why = io.road();
+  steps.push({ step: 'Access road (hookup)', ok: !why, note: why ?? undefined });
+
+  // the line the land allows from the shelf at the foot of the face up into the hill (the Next-step card's own search): its high end says where the compound goes
+  const bore = boreTo(io.game(), io.camp, 45);
+  if (!bore) { steps.push({ step: 'Rock tunnel', ok: false, note: 'no bore the land allows from the shelf up the face' }); return { steps, frame: { phi: io.fall, dFace, dEdge: dFace }, notes }; }
+  const lowFirst = bore.stats.ya <= bore.stats.yb, low = lowFirst ? bore.a : bore.b, high = lowFirst ? bore.b : bore.a;
+  // the compound: a core square (24 units) that fits on the home block, with the tunnel's high portal in its corner towards the way up
+  const home = io.game().site.home;
+  const C: Pt = [Math.min(home.x1 - 12, Math.max(home.x0 + 12, high[0] + 6)), Math.min(home.z1 - 12, Math.max(home.z0 + 12, high[1] - 6))];
+  notes.push(`rock tunnel: ${boreText(bore.stats)}, from (${low.map(v => v.toFixed(1)).join(', ')}) up to (${high.map(v => v.toFixed(1)).join(', ')}); the compound is centred on (${C.map(v => v.toFixed(1)).join(', ')})`);
+
+  const S = (kind: string, du: number, db: number, o: { rots?: number[]; radius?: number; label?: string } = {}): { x: number; z: number; rot: number } | null => {
+    // du: along the fall from the compound's centre (negative: up the mountain), db: across
+    const cf = Math.cos(io.fall), sf = Math.sin(io.fall), x = C[0] + du * cf - db * sf, z = C[1] + du * sf + db * cf, label = o.label ?? kind;
+    let best: { sp: Pt; rot: number; d: number } | null = null;
+    for (const rot of o.rots ?? [0]) { const sp = io.findSpot(kind, x, z, rot, o.radius ?? 12); if (sp) { const d = Math.hypot(sp[0] - x, sp[1] - z); if (!best || d < best.d) best = { sp, rot, d }; } }
+    if (!best) { steps.push({ step: label, ok: false, at: [x, z], note: 'no valid spot within reach (slope, water, another building, the road or the camp)' }); return null; }
+    if (!io.stake(kind, best.sp[0], best.sp[1], best.rot)) { steps.push({ step: label, ok: false, at: best.sp, note: 'the game refused the spot' }); return null; }
+    steps.push({ step: label, ok: true, at: best.sp, note: best.d > 0.5 ? `${best.d.toFixed(1)} units from the wanted spot` : undefined });
+    return { x: best.sp[0], z: best.sp[1], rot: best.rot };
+  };
+  S('lodge', -3, 0, { rots: [0, 1, 2, 3], radius: 8, label: 'Lodge (walkout basement)' });
+  S('greenhouse_heated', 3, -7, { label: 'Glass greenhouse' });
+  S('orchard', 4, 6, { label: 'Orchard' });
+  S('solar_farm', -3, 7, { label: 'Solar farm' });
+  S('battery_bank', -3, 11.5, { label: 'Battery container' });
+  S('bunker_hatch', 0, -3, { label: 'Bunker hatch' });
+  // terraced beds: each on its own graded pad held by a dry-stack wall, stepped down the bench's slope
+  S('garden', 5, -2, { radius: 3, label: 'Vegetable bed 1 (terrace)' });
+  S('garden', 8.5, -2, { radius: 3, label: 'Vegetable bed 2 (terrace)' });
+  const terr = terraceSite(io.game());
+  if (terr) {
+    const spots = terr.tiers.map(t => [t.x, t.z] as [number, number]);
+    const err = io.stakeTerraces(spots);
+    steps.push({ step: 'Terraced garden beds', ok: !err, at: spots[0], note: err ?? `${terr.tiers.length} beds on a ${terr.slopePct} % slope` });
+  } else steps.push({ step: 'Terraced garden beds', ok: false, note: 'terraceSite found no 10-26 % fall near the home' });
+
+  // the ring round the compound (not the camp): wall, towers, keep ring
+  const concrete = opts.wall === 'concrete';
+  const fr = io.fortify({ scope: 'core', shape: 'irregular', wall: concrete ? 'concrete_wall' : 'stone_wall', towers: 5, towerKind: concrete ? 'watchtower_hex' : 'watchtower_octagon', passage: false, rings: opts.rings ?? 1, ringWall: 'stone_wall', ringSally: true, motorCourt: false, gate: false }, C);
+  steps.push({ step: `Fortify my ring (${concrete ? 'concrete wall, hexagon towers' : 'stone wall, octagon towers'}, round the bench)`, ok: fr.runs + fr.structures > 0, note: `${fr.runs} runs, ${fr.structures} structures` });
+  io.finishAll();
+
+  // the tunnel: from the low portal on the shelf up to the compound's wall, where the high portal opens a doorway in it (the tunnel is the compound's gate, the ring has none)
+  const outerRun = io.game().perimeter.filter(r => r.kind === 'stone_wall' || r.kind === 'concrete_wall').sort((x, y) => y.pts.length - x.pts.length)[0];
+  const wallPts: Pt[] = [];
+  if (outerRun) for (let i = 1; i < outerRun.pts.length; i++) { const p0 = outerRun.pts[i - 1], p1 = outerRun.pts[i], n = Math.max(1, Math.ceil(Math.hypot(p1[0] - p0[0], p1[1] - p0[1]) * 2)); for (let k = 0; k < n; k++) wallPts.push([p0[0] + (p1[0] - p0[0]) * k / n, p0[1] + (p1[1] - p0[1]) * k / n]); }
+  const end: Pt = [...wallPts].sort((p, q) => Math.hypot(p[0] - high[0], p[1] - high[1]) - Math.hypot(q[0] - high[0], q[1] - high[1])).find(p => Math.hypot(p[0] - high[0], p[1] - high[1]) < 3 && boreProblem({ h: io.ground }, low, p) === null) ?? high;
+  const r = io.drawRun('rock_tunnel', [low, end]);
+  steps.push({ step: 'Rock tunnel (court portal to the compound wall)', ok: typeof r === 'string', at: low, note: typeof r === 'string' ? `${boreText(bore.stats)}${end === high ? '; the high portal is not on the wall' : ''}` : r.problem });
+  // the court outside the low portal, its back to the rock (the same placement the gate garage's court has: courtSpot)
+  const L = Math.hypot(end[0] - low[0], end[1] - low[1]), inx = (end[0] - low[0]) / L, inz = (end[1] - low[1]) / L;
+  const spot = courtSpot({ x: low[0], z: low[1], inx, inz });
+  let placed = false;
+  for (const dr of [0, 0.4, -0.4, 0.8, -0.8]) {
+    const sp = io.findSpot('motor_court', spot.x - dr * inz, spot.z + dr * inx, spot.rot, 3);
+    if (sp && io.stake('motor_court', sp[0], sp[1], spot.rot)) { steps.push({ step: 'Motor court at the portal', ok: true, at: sp, note: dr ? `${Math.abs(dr).toFixed(1)} units sideways` : undefined }); placed = true; break; }
+  }
+  if (!placed) steps.push({ step: 'Motor court at the portal', ok: false, at: [spot.x, spot.z], note: 'no valid spot outside the portal' });
+  io.finishAll();
+  const g2 = io.game();
+  const wet = undrained(g2).sort((x, y) => (y.grade ?? 0) - (x.grade ?? 0))[0];
+  const line = wet ? drainLineFor(g2, wet) : null;
+  if (line) { const d = io.drawRun('drain_channel', line as Pt[]); steps.push({ step: 'Drainage channel above the cut', ok: typeof d === 'string', at: line[0], note: typeof d === 'string' ? undefined : d.problem }); }
+  io.finishAll();
+  const bought: string[] = [], refused: string[] = [];
+  for (const k of ['suv', 'suv', 'old_pickup', 'motorhome', 'atv', 'tractor']) { const e = io.buyVehicle(k); if (!e) bought.push(k); else refused.push(`${k}: ${e}`); }
+  steps.push({ step: 'Fleet for the court', ok: bought.length > 0, note: `bought ${bought.join(', ') || 'nothing'}${refused.length ? '; refused ' + refused.join('; ') : ''}` });
+  return { steps, frame: { phi: io.fall, dFace, dEdge: dFace }, notes };
 }
 
 // ── integration checks: do the pieces fit together? (run on the finished scene, in the browser report and in the tests) ──
@@ -222,11 +313,11 @@ export function integrationProblems(g: GameState, drive: readonly Pt[], ground?:
     // the motor court stands outside the wall: nothing may cut across it
     for (const st of surface.filter(s => s.kind === 'motor_court')) for (const [a, b] of segs) if (segHitsRect(a, b, fp(st), 0.15)) { out.push({ what: 'wall runs through the motor court', detail: `${r.kind} ${r.id} through court ${st.id}` }); break; }
   }
-  // a wall set into the rock face: samples along it on ground steeper than a person can climb
+  // a wall set into the rock face: samples along it on cliff ground (a riser between benches is steeper than a person climbs, but a wall stands on it)
   if (ground) for (const r of walls) {
     let n = 0, at: Pt | null = null;
-    for (const [a, b] of solidSegments(r)) { const L = Math.hypot(b[0] - a[0], b[1] - a[1]), k = Math.max(1, Math.ceil(L / 0.25)); for (let q = 0; q <= k; q++) { const x = a[0] + (b[0] - a[0]) * q / k, z = a[1] + (b[1] - a[1]) * q / k; if (slopeOf(ground, x, z) > 1.0) { n++; at = at ?? [x, z]; } } }
-    if (n > 8) out.push({ what: 'wall stands on the rock face', detail: `${r.kind} ${r.id}: ${n} samples on ground steeper than 100 % near (${at![0].toFixed(1)}, ${at![1].toFixed(1)})` });
+    for (const [a, b] of solidSegments(r)) { const L = Math.hypot(b[0] - a[0], b[1] - a[1]), k = Math.max(1, Math.ceil(L / 0.25)); for (let q = 0; q <= k; q++) { const x = a[0] + (b[0] - a[0]) * q / k, z = a[1] + (b[1] - a[1]) * q / k; if (slopeOf(ground, x, z) > 2.0) { n++; at = at ?? [x, z]; } } }
+    if (n > 8) out.push({ what: 'wall stands on the rock face', detail: `${r.kind} ${r.id}: ${n} samples on ground steeper than 200 % (a cliff, not a riser) near (${at![0].toFixed(1)}, ${at![1].toFixed(1)})` });
   }
   // a wall that crosses the drive with no gate
   for (const u of ungatedCrossings(g, drive)) out.push({ what: 'the drive crosses a wall with no gate', detail: JSON.stringify(u) });
@@ -242,7 +333,7 @@ export interface Reach { post: string; at: Pt; ok: boolean; lenU?: number }
  * their stairs), and ground too steep to climb? The same hard things the world's walkers refuse (game/paths/walkRoute.ts), headless. Each post is the
  * free point nearest the thing's footprint (a door sits in its own clearance).
  */
-export function reachability(g: GameState, ground: (x: number, z: number) => number, from: Pt, extra: Array<{ post: string; at: Pt }> = []): Reach[] {
+export function reachability(g: GameState, ground: (x: number, z: number) => number, from: Pt, extra: Array<{ post: string; at: Pt }> = [], connectors: ReadonlyArray<readonly [Pt, Pt]> = []): Reach[] {
   const surface = g.structures.filter(st => !st.unplaced && KIT[st.kind] && KIT[st.kind].level !== 'underground' && st.kind !== 'bunker_hatch');
   const rects = surface.map(st => ({ st, r: footprint(KIT[st.kind], st.x, st.z, st.rot) }));
   const pads = surface.filter(st => (st.grade ?? 0) > 0).map(st => planPad(footprint(KIT[st.kind], st.x, st.z, st.rot), ground, rects.filter(o => o.st !== st).map(o => o.r)));
@@ -265,10 +356,21 @@ export function reachability(g: GameState, ground: (x: number, z: number) => num
   };
   const posts = [...surface.map(st => ({ post: `${st.kind} ${st.id}`, at: [st.x, st.z] as Pt })), ...extra];
   const start = freeNear(from);
+  const len = (r: Pt[]) => r.reduce((a, p, i) => i ? a + Math.hypot(p[0] - r[i - 1][0], p[1] - r[i - 1][1]) : 0, 0);
+  const walk = (p: Pt, q: Pt): Pt[] | null => findRoute(p, q, { blocked, margin: 14, step: 0.5, meander: 0 });
+  // a finished rock tunnel (or any walkway) is a way through: in at one end, out at the other (the sim joins the yards at its ends)
+  const doors = connectors.map(([a, b]) => [freeNear(a), freeNear(b)] as const);
   return posts.map(({ post, at }) => {
     const to = freeNear(at);
     if (!start || !to) return { post, at, ok: false };
-    const r = findRoute(start, to, { blocked, margin: 14, step: 0.5, meander: 0 });
-    return r ? { post, at, ok: true, lenU: r.reduce((a, p, i) => i ? a + Math.hypot(p[0] - r[i - 1][0], p[1] - r[i - 1][1]) : 0, 0) } : { post, at, ok: false };
+    const direct = walk(start, to);
+    if (direct) return { post, at, ok: true, lenU: len(direct) };
+    let best: number | null = null;
+    for (const [p, q] of doors) for (const [u, v] of [[p, q], [q, p]] as const) {
+      if (!u || !v) continue;
+      const r1 = walk(start, u), r2 = r1 ? walk(v, to) : null;
+      if (r1 && r2) { const l = len(r1) + Math.hypot(v[0] - u[0], v[1] - u[1]) + len(r2); if (best === null || l < best) best = l; }
+    }
+    return best === null ? { post, at, ok: false } : { post, at, ok: true, lenU: best };
   });
 }

@@ -47,7 +47,7 @@ function headless(): { io: ShowcaseIO; g: () => GameState; drive: Pt[]; camp: Pt
     },
     stake: (kind, x, z, rot) => { if (planProblem(g, kind)) return false; const st = planStructure(g, kind, x, z, rot); stampHighGround(st); applyForPermit(g, st); return true; },
     stakeTerraces: spots => { const why = planProblem(g, 'garden'); if (why) return why; for (const [x, z] of spots) applyForPermit(g, planStructure(g, 'garden', x, z, 0)); return null; },
-    fortify: opts => { const n = layFortress(g, planFortress(g, geo, opts as Partial<FortressOptions>)); cutRoadGates(g, geo.drive); return n; },
+    fortify: (opts, center) => { const gg = { ...geo, ...(center ? { center } : {}) }; const n = layFortress(g, planFortress(g, gg, opts as Partial<FortressOptions>)); cutRoadGates(g, geo.drive); return n; },
     razor: id => addRazor(g, id),
     drawRun: (kind, pts) => { const why = routeProblem(g, kind as PerimeterKind, pts); if (why) return { problem: why }; return planRun(g, kind as PerimeterKind, pts, []).id; },
     road: () => { const why = orderHookup(g, 'drive'); if (!why) { g = step(g, 200); g.structures = []; g.clock.speed = 0; } return why; },
@@ -60,6 +60,10 @@ function headless(): { io: ShowcaseIO; g: () => GameState; drive: Pt[]; camp: Pt
 
 import { parkingPlan } from './parking';
 import { fogNow, solarFogK, fogPlaceOf } from './fogFx';
+import { boreStats, BORE } from './terrain';
+import { corridorsOf, lanesOf } from './terrainState';
+import { insideRing } from './compounds';
+import { runFinished } from './perimeter';
 
 const env = (k: string): string | undefined => (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env[k];
 
@@ -126,7 +130,7 @@ export function asciiMap(g: GameState, drive: readonly Pt[], camp: Pt, ground: (
   for (let z = box.z0; z <= box.z1; z++) {
     let row = String(z).padStart(3) + ' ';
     for (let x = box.x0; x <= box.x1; x++) {
-      let c = ground(x, z) > 0 ? String(Math.min(9, Math.max(0, Math.floor(ground(x, z) - 6)))) : ' ';
+      let c = ground(x, z) > 0 ? String(Math.min(9, Math.max(0, Math.floor((ground(x, z) - 6) / 1.4)))) : ' ';
       c = c === ' ' ? ' ' : c;
       if (Math.hypot(x - camp[0], z - camp[1]) < 1.1) c = '+';
       if (distToPolyline(drive, x, z) < 0.5) c = '.';
@@ -139,3 +143,73 @@ export function asciiMap(g: GameState, drive: readonly Pt[], camp: Pt, ground: (
   return `x ${box.x0}..${box.x1}\n` + rows.join('\n');
 }
 import { distToPolyline, solidSegments } from './showcase';
+
+describe('the north-star layout: the compound on the bench above the rock face, a rock tunnel up to it from the court on the shelf', () => {
+  const h = headless();
+  const rep = runMountainShowcase(h.io, { layout: 'bench' });
+  const g = h.g();
+  if (env('SHOW') === 'bench') { console.log(JSON.stringify(rep.frame), JSON.stringify(rep.notes), JSON.stringify(rep.steps)); console.log(asciiMap(g, h.drive, h.camp, h.io.ground, { x0: 0, z0: 4, x1: 62, z1: 64 })); console.log(JSON.stringify(g.perimeter.filter(r => r.kind === 'rock_tunnel').map(r => r.pts))); }
+  const tunnel = g.perimeter.find(r => r.kind === 'rock_tunnel');
+
+  it('lays out: everything the land allows, the tunnel and the court at its portal included', () => {
+    // (the terraced beds are plain beds on their own pads here: the card's 10-26 % site is far up the bench)
+    const bad = rep.steps.filter(s => !s.ok && s.step !== 'Terraced garden beds');
+    expect(bad, JSON.stringify(bad)).toEqual([]);
+    expect(tunnel, 'the rock tunnel').toBeDefined();
+    expect(runFinished(tunnel!)).toBe(true);
+    expect(g.structures.some(st => st.kind === 'motor_court')).toBe(true);
+    expect(g.structures.filter(st => st.kind === 'garden').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('the tunnel is long and gentle: a bore the land allows, at most 15 %, its low portal on the shelf, its high portal in the compound', () => {
+    const [a, b] = [tunnel!.pts[0], tunnel!.pts[tunnel!.pts.length - 1]];
+    expect(routeProblem(g, 'rock_tunnel', tunnel!.pts)).toBeNull();
+    const s = boreStats(h.io.ground, a, b);
+    expect(s.grade).toBeLessThanOrEqual(BORE.MAX_GRADE);
+    expect(s.peakCover * 6).toBeGreaterThan(6);
+    expect(h.io.ground(a[0], a[1])).toBeLessThan(h.io.ground(b[0], b[1]));       // the court end is the low one
+    const ring = g.perimeter.filter(r => r.kind === 'stone_wall' || r.kind === 'concrete_wall').sort((x, y) => y.pts.length - x.pts.length)[0];
+    const nearest = (pts: Pt[], p: Pt) => Math.min(...pts.map((q, i) => i ? distToPolyline([pts[i - 1], q], p[0], p[1]) : Infinity));
+    expect(nearest(ring.pts, b), 'the high portal is on the compound wall').toBeLessThan(0.9);
+    expect(insideRing(ring.pts, a[0], a[1]), 'the low portal is outside it').toBe(false);
+    const court = g.structures.find(st => st.kind === 'motor_court')!;
+    expect(Math.hypot(court.x - a[0], court.z - a[1]), 'the court stands at the low portal').toBeLessThan(3.5);
+  });
+
+  it('it is the compound\'s only way in for a truck and the raid comes by its door; the ring has no other gate', () => {
+    expect(corridorsOf(g)).toHaveLength(1);
+    expect(lanesOf(g).some(l => l.via === tunnel!.id)).toBe(true);
+    const ring = g.perimeter.filter(r => r.kind === 'stone_wall' || r.kind === 'concrete_wall').sort((x, y) => y.pts.length - x.pts.length)[0];
+    console.log('GATES', JSON.stringify(ring.gates));
+    expect(ring.gates.filter(x => !x.sally), 'one doorway where the tunnel meets the wall, no other gate').toHaveLength(1);
+    expect(g.structures.some(st => st.kind === 'gate_garage')).toBe(false);
+  });
+
+  it('nothing clashes in the compound', () => {
+    expect(integrationProblems(g, h.drive, h.io.ground)).toEqual([]);
+  });
+
+  it('people walk from the lodge to every post in the compound, and to the court and the shelf only through the tunnel', { timeout: 60000 }, () => {
+    const lodge = g.structures.find(st => st.kind === 'lodge')!;
+    const ring = g.perimeter.filter(r => r.kind === 'stone_wall' || r.kind === 'concrete_wall').sort((x, y) => y.pts.length - x.pts.length)[0];
+    const inCompound = (st: { x: number; z: number }) => insideRing(ring.pts, st.x, st.z);
+    const posts = reachability(g, h.io.ground, [lodge.x, lodge.z + 2]);
+    const inside = g.structures.filter(st => !st.unplaced && KIT[st.kind] && KIT[st.kind].level !== 'underground' && st.kind !== 'bunker_hatch' && inCompound(st)).map(st => `${st.kind} ${st.id}`);
+    expect(posts.filter(r => inside.includes(r.post) && !r.ok), 'inside the compound').toEqual([]);
+    // the court on the shelf: not on foot (a face of rock between), but through the tunnel
+    const court = posts.find(r => r.post.startsWith('motor_court'))!;
+    expect(court.ok, 'the court is not reachable except through the tunnel').toBe(false);
+    const through = reachability(g, h.io.ground, [lodge.x, lodge.z + 2], [], [[tunnel!.pts[0], tunnel!.pts[tunnel!.pts.length - 1]]]);
+    expect(through.find(r => r.post.startsWith('motor_court'))!.ok, 'through the tunnel').toBe(true);
+  });
+
+  it('the fleet is in the court and a season runs on it', { timeout: 60000 }, () => {
+    const plan = parkingPlan(g);
+    expect(plan.yardSlots).toBeGreaterThanOrEqual(6);
+    console.log('PLAN', JSON.stringify({ slots: plan.slots, yard: plan.yardSlots, free: plan.yardFree, inYard: plan.inYard, outside: plan.outside, parked: plan.parked.map(p => [p.vehicle, !!p.bay, !!p.slot, !!p.yard]) }), JSON.stringify(g.vehicles?.map(v => [v.id, v.kind])));
+    expect(plan.inYard.length).toBeGreaterThan(3);
+    const run = step(structuredClone(g), 60);
+    for (const [k, v] of Object.entries(run.stock)) expect(Number.isFinite(v as number), k).toBe(true);
+    expect(run.personState.some(ps => ps.needs.died == null)).toBe(true);
+  });
+});
