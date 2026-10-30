@@ -268,7 +268,8 @@ if (only.includes('use') && L.tunnel) {
   const walkTo = (s, tol) => page.evaluate(async ([tx, tz, tol]) => {
     const cb = window.__cb, G = cb.game, w = cb.world;
     const setTasks = ts => { const g = structuredClone(G.getState().game); g.personState.forEach((ps, i) => { ps.task = ts[i % ts.length]; ps.target = null; }); G.setState({ game: g }); };
-    setTasks(['sleep', 'sleep', 'sleep', 'sleep']); for (let i = 0; i < 40; i++) w.updatePeople(0.05, G.getState().game, 14, 1);
+    setTasks(['sleep', 'sleep', 'sleep', 'sleep']);
+    { let still = 0, last = ''; for (let i = 0; i < 6000 && still < 30; i++) { w.updatePeople(0.1, G.getState().game, 14, 1); const k = w.family.positions().map(p => p.x.toFixed(2) + p.z.toFixed(2)).join(); still = k === last ? still + 1 : 0; last = k; } }      // (everyone to bed first, on the shelf)
     setTasks(['watch', 'watch', 'garden', 'garden']);
     let best = null;
     for (let i = 0; i < 6000; i++) {
