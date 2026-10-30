@@ -37,7 +37,7 @@ describe('ring radii and the ring delay', () => {
     for (const x of rs) expect(x.r).toBeLessThan(13);
     expect(ringRadii(lot(1), { x: 30, z: 30 }, 14)).toHaveLength(0);
   });
-  it('a ring delay shared out over the inner rings matches the old total, less the sally ports', () => {
+  it('a ring delay shared out over the inner rings matches the old total (sally ports no longer shorten it)', () => {
     const g = lot(3);
     expect(ringDelay(g, 2) * 2).toBeCloseTo(ringHoldSeconds(g), 5);
     expect(ringDelay(g, 0)).toBe(0);
