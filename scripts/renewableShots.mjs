@@ -165,7 +165,7 @@ try {
       const cb = window.__cb, w = cb.world, p = w.parcel, c = w.camp;
       // a point on the bank (dry, 0.3 above the lake) nearest the camp, found along the 16 bearings
       let best = null;
-      for (let q = 0; q < 16; q++) { const a = q * Math.PI / 8; for (let d = 1; d < 30; d += 0.5) { const x = c.x + Math.cos(a) * d, z = c.z + Math.sin(a) * d; if (p.isCreek(x, z)) { if (!best || d < best.d) best = { x: x - Math.cos(a) * 1.0, z: z - Math.sin(a) * 1.0, a, d }; break; } } }
+      for (let q = 0; q < 16; q++) { const a = q * Math.PI / 8; for (let d = 1; d < 70; d += 0.5) { const x = c.x + Math.cos(a) * d, z = c.z + Math.sin(a) * d; if (p.isCreek(x, z)) { if (!best || d < best.d) best = { x: x - Math.cos(a) * 1.0, z: z - Math.sin(a) * 1.0, a, d }; break; } } }
       return best;
     });
     console.log('shore', JSON.stringify(shore));
