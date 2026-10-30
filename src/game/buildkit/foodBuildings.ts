@@ -548,13 +548,13 @@ function forge(_def: KitPieceDef, seed = 1): THREE.Group {
   p.add('concrete', box(0.2, 0.012, 0.12, -0.26, 0.17, -D / 2 + 0.11), 'foundation');
   // frame: the posts and the hood over the fire (a tapering stone throat), the flue above it
   p.layer = 'frame';
-  for (const [x, z] of posts) p.add('wood_mid', post(x, z, 0.58), 'frame');
+  for (const [x, z] of posts) p.add('wood_mid', post(x, z, 0.48), 'frame');
   p.add('fieldstone', box(0.26, 0.1, 0.17, -0.26, 0.32, -D / 2 + 0.11), 'frame');
   p.add('fieldstone', box(0.18, 0.12, 0.12, -0.26, 0.42, -D / 2 + 0.11), 'frame');
   p.add('fieldstone', box(0.1, 0.16, 0.08, -0.26, 0.54, -D / 2 + 0.11), 'frame');
-  p.add('wood_dark', box(W - 0.02, 0.014, 0.014, 0, 0.58, D / 2 - 0.02), 'frame');
+  p.add('wood_dark', box(W - 0.02, 0.014, 0.014, 0, 0.48, D / 2 - 0.02), 'frame');
   // roof: a low metal roof over the working side, a back wall of stone to the hood
-  p.add('metal_roof', box(W + 0.1, 0.012, D + 0.1, 0, 0.6, 0.0).rotateX(0.06), 'roof');
+  p.add('metal_roof', box(W + 0.1, 0.012, D + 0.1, 0, 0.5, 0.0).rotateX(0.06), 'roof');
   p.add('fieldstone', box(W - 0.02, 0.4, 0.03, 0, 0.02, -D / 2 + 0.015), 'walls');
   p.add('iron', new THREE.CylinderGeometry(0.018, 0.02, 0.22, 8).translate(-0.26, 0.7, -D / 2 + 0.11), 'chimney');
   // the fire: coals in the hearth pot, a bellows on the side, a rack of tongs and hammers on the back wall (interior)
