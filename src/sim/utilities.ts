@@ -27,6 +27,7 @@ import { hasAll, type MaterialId, type Stock } from './materials';
 import { wellYield } from './effects';
 import { stormOutage } from './weatherThreats';
 import { greenhouseKwh } from './greenhouse';
+import { arrayStripped, GROUND_ARRAYS, solarCoolK } from './microclimate';
 import { intakeCare, renewablesDay, type RenewDay } from './renewables';
 import { bestLevel } from './skills';
 import { regionFor } from './climate';
@@ -352,7 +353,9 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
     : UTILITY[o.kind]?.water?.needsPower ? (u.broken.includes(o.id) || u.fried.includes(o.id) ? 0 : UTILITY[o.kind]!.water!.needsPower! * pumpFactor)
     : fitted(s, o.id, 'wire') ? (o.kind === 'greenhouse_heated' ? greenhouseKwh(s, built.get(o.id)!) : DRAW_KWH[o.kind] ?? 0) : 0;
   const isSource = (o: Node) => !!(UTILITY[o.kind]?.solarKw || UTILITY[o.kind]?.genKw || UTILITY[o.kind]?.batteryKwh || UTILITY[o.kind]?.renew);
-  const live = (o: Node) => !u.fried.includes(o.id);
+  // a gale strips an exposed ground array (sim/microclimate.ts): it makes nothing until a hardware kit and two panels put the panels back
+  for (const st of fin) if (arrayStripped(s, st) && !u.broken.includes(st.id)) { u.broken.push(st.id); log(s, `The gale tore panels off the ${st.kind.replace(/_/g, ' ')}. A hardware kit and two solar panels will put them back.`); }
+  const live = (o: Node) => !u.fried.includes(o.id) && !(GROUND_ARRAYS.includes(o.kind) && u.broken.includes(o.id));
   const groups = new Map<number | string, Node[]>();
   for (const o of p.nodes) {
     const n = p.power.get(o.id);
@@ -375,7 +378,7 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
     // grid-tied solar shuts off in a blackout unless a battery (hybrid inverter) is on the network
     const solarOk = gridUp || cap > 0 || !u.grid;
     // each array's ground faces the sun a little more or less (sim/terrainFx.ts: south-facing slope up to +25 %, north-facing down to -25 %)
-    const sol = solarOk ? members.filter(live).reduce((a, o) => a + (UTILITY[o.kind]?.solarKw ?? 0) * sunFactor(s, o), 0) * sunHours(doy) * fogK * 0.8 : 0;
+    const sol = solarOk ? members.filter(live).reduce((a, o) => a + (UTILITY[o.kind]?.solarKw ?? 0) * sunFactor(s, o) * (GROUND_ARRAYS.includes(o.kind) ? solarCoolK(s, o) : 1), 0) * sunHours(doy) * fogK * 0.8 : 0;
     // falling water and wind (sim/renewables.ts): their own day's energy, not the sun's; grid-tied they trip with the grid like the panels
     const ren = solarOk ? members.filter(live).reduce((a, o) => a + (renew.hydro.get(o.id)?.kwh ?? 0) + (renew.wind.get(o.id)?.kwh ?? 0), 0) : 0;
     draw += d; solar += sol + ren; capKwh += cap;
@@ -494,11 +497,13 @@ export function irrigationStore(s: GameState): { have: number; cap: number } {
 
 /** Repair a broken pump (hardware kit; a mechanic does it in an hour or two). */
 export function repairPump(s: GameState, id: string): boolean {
-  if (!s.utilities.broken.includes(id) || s.stock.hardware < 1) return false;
-  s.stock.hardware--;
+  const kind = s.structures.find(x => x.id === id)?.kind;
+  const panels = kind && GROUND_ARRAYS.includes(kind) ? 2 : 0;
+  if (!s.utilities.broken.includes(id) || s.stock.hardware < 1 || s.stock.solar_panel < panels) return false;
+  s.stock.hardware--; s.stock.solar_panel -= panels;
   s.utilities.broken = s.utilities.broken.filter(x => x !== id);
   const k = s.structures.find(x => x.id === id)?.kind;
-  log(s, k === 'micro_hydro' ? 'Intake weir and runner repaired: the turbine is back on line.' : k === 'wind_turbine' ? 'The turbine is repaired and turning again.' : 'Pump repaired.');
+  log(s, k === 'micro_hydro' ? 'Intake weir and runner repaired: the turbine is back on line.' : k === 'wind_turbine' ? 'The turbine is repaired and turning again.' : panels ? 'New panels on the racks: the array is back.' : 'Pump repaired.');
   return true;
 }
 
