@@ -4,6 +4,8 @@
  * what the bunker needs, what the plans still lack, and how the Perimeter
  * list groups by price. Pure (tested); the HUD only draws it.
  */
+import { partsOutlook, partsYears } from './parts';
+import { serviceRate } from './vehicles';
 import { sanitationLine, worstWell } from './sanitation';
 import { BUNKER_ENTRANCES } from './bunkerEntrances';
 import { KIT } from '../game/buildkit/kit';
@@ -272,6 +274,8 @@ export function suggestions(s: GameState): Suggestion[] {
     } }
 
   out.push(...landSuggestions(s));
+
+  { const c = sparePartsCard(s); if (c) out.push(c); }   // the machines are a year older every year and the kits do not come back (sim/parts.ts)
 
   // the woodpile: out in the cold, or too thin for the next two months
   { const w = firewoodOutlook(s);
@@ -575,4 +579,15 @@ export function upgradeChain(kind: PerimeterKind): PerimeterKind[] {
   const out: PerimeterKind[] = [start];
   for (let guard = 0; guard < 20; guard++) { const n = UPGRADE_NEXT[out[out.length - 1]]; if (!n) break; out.push(n); }
   return out;
+}
+
+/** The "spare parts running short" card, or null (sim/parts.ts). Exported for the test: the Next-step list shows only the top three. */
+export function sparePartsCard(s: GameState): Suggestion | null {
+  if (partsYears(s) < 0.3) return null;
+  const o = partsOutlook(s, serviceRate(s));
+  if (o.days === null || o.days >= 120) return null;
+  return { id: 'spare_parts', kind: '', title: o.kits < 1 ? 'No spare parts for the machines' : 'Spare parts are running short',
+    urgency: o.days < 30 ? 52 : 36,
+    why: `${o.kits < 1 ? 'there is no service kit left' : `${Math.floor(o.kits)} service kit${Math.floor(o.kits) === 1 ? '' : 's'}, about ${o.days} days at today's use`}, and every year the machines are older: they want service sooner. Send a team to the hardware stores and the interstate (Outside), or trade for kits`,
+    acts: [] };
 }
