@@ -16,6 +16,7 @@ export type MaterialId = 'lumber' | 'logs' | 'firewood' | 'fieldstone' | 'concre
   | 'mines' | 'greenhouse_kit' | 'fruit_trees' | 'ground_sensor' | 'passage_hatch' | 'vehicle_parts'
   | 'gun_mount' | 'turret_head' | 'ai_sensor_module'
   | 'tent' | 'sleeping_bag'
+  | 'hydro_set' | 'penstock' | 'wind_turbine' | 'tilt_tower'
   | 'greenhouse_pro_kit' | 'trout_fry' | 'crayfish_stock' | 'fish_feed' | 'sheep'
   // farm & kitchen (sim/crops.ts, sim/kitchen.ts)
   | 'seed_heirloom' | 'seed_saved' | 'seed_cover' | 'canner' | 'dehydrator' | 'crocks' | 'grain_mill' | 'manure' | 'compost'
@@ -182,6 +183,10 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   steer: { id: 'steer', name: 'Beef steer', unit: 'a weaned steer calf: beef after a summer on grass (hay in winter)', price: 1800 },
   rabbit: { id: 'rabbit', name: 'Meat rabbit', unit: 'a meat rabbit for the hutch: a buck and two does make a colony', price: 35 },
   sheep: { id: 'sheep', name: 'Sheep', unit: 'a ewe in lamb: wool each spring, a lamb or two, mutton in the fall (needs a sheep barn in winter)', price: 300 },
+  hydro_set: { id: 'hydro_set', name: 'Micro-hydro turbine set', unit: 'Turgo runner with two nozzles, 3 kW permanent-magnet alternator, controller and diversion load (Powerspout / Harris class)', price: 7800 },
+  penstock: { id: 'penstock', name: 'Penstock pipe', unit: '50 m of 150 mm HDPE, butt-fused, with intake screen fittings', price: 2100 },
+  wind_turbine: { id: 'wind_turbine', name: 'Wind turbine', unit: '5 kW three-blade turbine (5.5 m rotor), furling tail, controller and dump load (Bergey Excel class)', price: 14500 },
+  tilt_tower: { id: 'tilt_tower', name: 'Tilt-up tower kit', unit: '18 m guyed tilt-up tower with anchors, guy wire and a gin pole', price: 5200 },
   trout_fry: { id: 'trout_fry', name: 'Trout fingerlings', unit: 'a bag of 100 rainbow trout fingerlings, delivered live (cold water only)', price: 90 },
   crayfish_stock: { id: 'crayfish_stock', name: 'Crayfish breeders', unit: '50 red-swamp or signal crayfish breeders, delivered live', price: 120 },
   fish_feed: { id: 'fish_feed', name: 'Fish feed', unit: 'a 50 lb bag of floating trout pellets', price: 45 },

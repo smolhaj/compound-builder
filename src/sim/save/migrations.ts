@@ -12,6 +12,7 @@ import { generateNeighbors, newGate } from '../encounters';
 import { emptyStats } from '../report';
 import { newDigs } from '../tunnelers';
 import { newFarm } from '../farm';
+import { emptyStock } from '../materials';
 import { newLand } from '../land';
 import { CLASSIC, CLASSIC_IMPROVEMENTS } from '../site';
 import { newLights } from '../lights';
@@ -245,6 +246,8 @@ export function migrate(raw: unknown): GameState {
   for (const k of ['seed', 'clock', 'money', 'stock', 'orders', 'people', 'personState', 'structures', 'forestry', 'heat', 'perimeter', 'utilities', 'hardenJobs', 'disaster', 'food', 'neighbors', 'gate', 'stats', 'land', 'site', 'lifestyle', 'crews', 'siteJobs', 'roadside', 'paper', 'upkeep', 'shelf', 'pantry', 'body', 'fin', 'armory', 'wild', 'lineage', 'log', 'nextId'] as const) {
     if (!(k in s)) throw new SaveVersionError(`Save is missing "${k}"`);
   }
+  // goods added since the save was made start at zero (a new material needs no migration step)
+  s = { ...s, stock: { ...emptyStock(), ...(s.stock as object) } };
   return s as unknown as GameState;
 }
 

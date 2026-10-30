@@ -19,6 +19,7 @@ import { COMPOUND_BUILDERS } from './compoundBuildings';
 import { GATEHOUSE_BUILDERS } from './gatehouseBuildings';
 import { FOOD_BUILDERS } from './foodBuildings';
 import { FARM_BUILDERS } from './farmBuildings';
+import { RENEWABLE_BUILDERS } from './renewableBuildings';
 import { HERD_BUILDERS } from './herdBuildings';
 import { HOUSING_BUILDERS, HOUSING_SEATS } from './housingStyleBuildings';
 
@@ -507,6 +508,7 @@ const BUILDERS: Record<string, (def: KitPieceDef, seed?: number, opts?: BuildOpt
   ...FOOD_BUILDERS,
   ...HERD_BUILDERS,
   ...FARM_BUILDERS,
+  ...RENEWABLE_BUILDERS,
   ...HOUSING_BUILDERS,
 };
 

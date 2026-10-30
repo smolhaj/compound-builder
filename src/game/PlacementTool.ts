@@ -7,6 +7,7 @@ import { useWorldStore } from '../store/worldStore';
 import { buildGhost } from './buildkit/buildings';
 import type { HomesteadWorld } from './HomesteadWorld';
 import { useGameStore } from '../store/gameStore';
+import { hydroProblem } from '../sim/renewables';
 import { onJustPlaced, type Spot } from './buildkit/justPlaced';
 
 /**
@@ -43,6 +44,7 @@ export class PlacementTool {
       owned: (x, z) => ownsAt(useGameStore.getState().game, x, z),
       water: (x, z) => _world.parcel.isCreek(x, z) || _world.stream.depthAt(x, z) > 0,
       blocked: (x, z) => _world.onCamp(x, z) || _world.onAccess(x, z, 0.1),
+      rule: (kind, x, z) => (kind === 'micro_hydro' ? hydroProblem(useGameStore.getState().game, x, z) : null),
     };
     const on = <K extends keyof HTMLElementEventMap>(el: HTMLElement | Window, t: K, f: (e: HTMLElementEventMap[K]) => void) => {
       el.addEventListener(t, f as EventListener);
