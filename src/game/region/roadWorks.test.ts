@@ -4,7 +4,7 @@ import * as THREE from 'three';
 const used = new Set<string>();
 vi.mock('../buildkit/materials', () => ({ kitMaterial: (id: string) => { used.add(id); return new THREE.MeshStandardMaterial(); }, setWindowGlow: () => {} }));
 
-import { buildRoadWorks } from './roadWorks';
+import { bankExtent, buildRoadWorks, featherStrip, type Frame } from './roadWorks';
 import { planRoad, type RoadGround, type RoadInput } from '../../sim/roadPlan';
 import { roadBedOf } from '../../sim/roadPlan';
 import type { RegionId } from '../../sim/regions';
@@ -104,5 +104,36 @@ describe('the road, drawn', () => {
     expect(bed.apply(br.x, br.z, 0.5).h).toBeCloseTo(0.5, 5);   // under the deck the ground is left as it is
     const mid = p.pts[Math.floor(p.pts.length * 0.8)];
     expect(bed.apply(mid.x, mid.z, mid.y + 0.7).h).toBeCloseTo(mid.y, 1);
+  });
+
+  it('a bank facing reaches only as far as the bank does: nothing lies loose on level ground', () => {
+    // a cut 0.4 high at the bench edge dying away at 1:1.2: gone after 0.48 out
+    const bank = (o: number) => Math.max(0, 0.4 - o / 1.2);
+    const e = bankExtent(bank, 3);
+    expect(e).toBeGreaterThan(0.4); expect(e).toBeLessThan(0.6);
+    expect(bankExtent(() => 0, 3)).toBe(0);                      // level: no facing at all
+    expect(bankExtent(() => 0.005, 3)).toBe(0);                  // a hair of difference is not a bank
+    expect(bankExtent(() => 0.5, 1)).toBeLessThanOrEqual(1);     // never past the reach
+  });
+
+  it('a road that ends on open ground has soft edges: the shoulder fades across and along, and it is one mesh', () => {
+    const p = planRoad(input('mountain_west', hillG, TIGHT));
+    const g = buildRoadWorks(p, hillG.h, opts(hillG));
+    const soft = g.children.filter(o => (o as THREE.Mesh).isMesh && (o as THREE.Mesh).geometry.getAttribute('color')) as THREE.Mesh[];
+    expect(soft).toHaveLength(1);
+    const col = soft[0].geometry.getAttribute('color');
+    expect(col.itemSize).toBe(4);
+    let lo = 1, hi = 0; for (let i = 0; i < col.count; i++) { const a = col.getW(i); lo = Math.min(lo, a); hi = Math.max(hi, a); }
+    expect(lo).toBe(0); expect(hi).toBeGreaterThan(0.5); expect(hi).toBeLessThanOrEqual(0.85 + 1e-6);
+  });
+
+  it('featherStrip: alpha follows the callback, and every row stands on the ground', () => {
+    const fr: Frame[] = [0, 1, 2, 3].map(i => ({ x: 0, z: i, y: 0, rot: 0, fx: 0, fz: 1, nx: 1, nz: 0, bank: 0 }));
+    const gstrip = featherStrip(fr, 0, 3, 0.2, 0.5, (x, z) => x + z, 0.01, [1, 1, 1], (r, u) => (r === 0 ? 0 : u))!;
+    const pos = gstrip.getAttribute('position'), col = gstrip.getAttribute('color');
+    expect(pos.count).toBe(4 * 5);
+    expect(col.getW(0)).toBe(0); expect(col.getW(5 + 4)).toBeCloseTo(1, 6);
+    for (let i = 0; i < pos.count; i++) expect(pos.getY(i)).toBeCloseTo(pos.getX(i) + pos.getZ(i) + 0.01, 5);
+    expect(featherStrip(fr, 0, 0, 0, 1, () => 0, 0, [1, 1, 1], () => 1)).toBeNull();
   });
 });
