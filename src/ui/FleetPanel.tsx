@@ -7,7 +7,7 @@ import { useState } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { BUYABLE, buyVehicle, fleetOf, overdue, refuel, repairDays, serviceVehicle, SERVICE_MILES, SERVICE_USD, stripForParts, vehicleName, VEHICLES, runs, type Vehicle, type VehicleKind } from '../sim/vehicles';
 import { garageConnected, parkedText, parkingPlan } from '../sim/parking';
-import { bugOut, bugOutPlan } from '../sim/bugout';
+import { bugOut, bugOutPlan, type BugDest, type BugMode } from '../sim/bugout';
 import { litersText } from '../sim/format';
 import { Note, Row, Section } from './hud/common';
 import { btn, DIM, TONE, usd } from './hud/style';
@@ -25,11 +25,13 @@ export function FleetPanel() {
   const g = useGameStore();
   const game = g.game;
   const [confirm, setConfirm] = useState(false);
+  const [mode, setMode] = useState<BugMode>('vehicle');
+  const [dest, setDest] = useState<BugDest | undefined>(undefined);
   const vs = fleetOf(game);
   const plan = parkingPlan(game);
   const parts = Math.floor(game.stock.vehicle_parts * 10) / 10;
   const cansL = game.stock.fuel * 20;
-  const bo = bugOutPlan(game);
+  const bo = bugOutPlan(game, { mode, dest });
   const shopsOpen = game.disaster.tracks.stores >= 0.5 && game.disaster.tracks.fuel >= 0.5;
   const connected = garageConnected(game);
   return (
@@ -67,15 +69,31 @@ export function FleetPanel() {
       ))}
       {game.disaster.kind && <div style={{ marginTop: 6 }}>
         {!confirm
-          ? <button style={{ ...btn(), width: '100%', opacity: bo.ok ? 1 : 0.5 }} disabled={!bo.ok} title={bo.why ?? 'Load up and leave. This ends the run.'} onClick={() => setConfirm(true)}>Bug out…</button>
+          ? <button style={{ ...btn(), width: '100%', opacity: bo.ok ? 1 : 0.5 }} title={bo.why ?? 'Plan the way out: how, where to, what you can carry and how risky the road is.'} onClick={() => setConfirm(true)}>Bug out…</button>
           : <div style={{ border: '1px solid #c9564a', borderRadius: 6, padding: 6 }}>
-            <Note tone="bad">Bugging out ends this run. {bo.going.length} go ({bo.going.map(p => p.first).join(', ')}); {bo.left.length ? `${bo.left.map(p => p.first).join(', ')} stay behind. ` : ''}{bo.foodDays} days of food and water, fuel for about {bo.rangeKm} km, {bo.hours} h to load{bo.covered ? ', all of it under cover' : ', in plain view'}.{bo.fallback ? ` They head for ${bo.fallback}, ${bo.fallback ? game.weekend?.driveMiles : 0} miles off, kept for exactly this.` : ''}</Note>
+            <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
+              <button style={btn(mode === 'vehicle')} title="Load the running vehicles: more people and cargo, one road" onClick={() => setMode('vehicle')}>By vehicle</button>
+              <button style={btn(mode === 'foot')} title="On foot with packs: everyone goes, quick to leave, slow and exposed on the way" onClick={() => setMode('foot')}>On foot</button>
+            </div>
+            <select value={bo.dest} onChange={e => setDest(e.target.value as BugDest)} style={{ width: '100%', marginBottom: 4 }} aria-label="Where to">
+              {bo.options.map(o => <option key={o.dest} value={o.dest}>{o.name}{o.miles ? ` (${o.miles} miles)` : ''}</option>)}
+            </select>
+            <Row label="Carrying" value={`${bo.mode === 'foot' ? `${bo.carryKg} kg, ${bo.bags} bug-out bag${bo.bags === 1 ? '' : 's'}` : `${bo.carryKg} kg in ${bo.vehicles.length} vehicle${bo.vehicles.length === 1 ? '' : 's'}`}`} title="Weight the party can carry. A packed bug-out bag (Shop, Defense) is 18 kg of the right things; a snatched pack is 3-6 kg." />
+            <Row label="Food and water" value={`${bo.foodDays} days${bo.cacheDays ? ` + ${bo.cacheDays} in the cache` : ''}`} />
+            <Row label={bo.mode === 'foot' ? 'Walk' : 'Fuel'} value={`about ${bo.rangeKm} km`} />
+            <Row label="Time to leave" value={`${bo.hours} h${bo.covered ? ', under cover' : bo.mode === 'foot' ? '' : ', in plain view'}`} />
+            {bo.miles > 0 && <Row label="Time on the road" value={bo.route.travelHours >= 48 ? `${Math.round(bo.route.travelHours / 24)} days` : `${bo.route.travelHours} h`} />}
+            <Row label="Route risk" value={`${Math.round(bo.route.risk * 100)} % · ${bo.route.level}`} tone={bo.route.level === 'high' ? 'bad' : bo.route.level === 'moderate' ? 'warn' : 'good'} title="Chance something goes wrong on the way: a late arrival, a robbery, or worse" />
+            {bo.route.legs.filter(l => l.risk >= 0.03).map(l => <div key={l.id} style={{ fontSize: 11, color: DIM }} title={l.why}>{Math.round(l.risk * 100)} % {l.name}: {l.why}</div>)}
+            {bo.mode === 'vehicle' && bo.route.vehicleBlocked && <Note tone="bad">No vehicle gets out: {bo.route.vehicleBlocked}. {game.stock.bugout_bag ? 'Go on foot.' : 'A bug-out bag each would let the family walk.'}</Note>}
+            <Note tone="bad">Bugging out ends this run. {bo.going.length} go ({bo.going.map(p => p.first).join(', ')}); {bo.left.length ? `${bo.left.map(p => p.first).join(', ')} stay behind. ` : ''}{bo.dest === 'cache' ? 'Two weeks of food and water wait in the cache.' : bo.dest === 'town' ? 'The town house is kept for exactly this.' : 'With nowhere to go the road is the only plan.'}</Note>
             <div style={{ display: 'flex', gap: 6 }}>
-              <button style={btn(true)} onClick={() => { g.money(d => bugOut(d)); setConfirm(false); }}>Go now</button>
+              <button style={{ ...btn(true), opacity: bo.ok ? 1 : 0.5 }} disabled={!bo.ok} title={bo.why ?? undefined} onClick={() => { g.money(d => bugOut(d, { mode, dest })); setConfirm(false); }}>Go now</button>
               <button style={btn()} onClick={() => setConfirm(false)}>Stay</button>
             </div>
           </div>}
         {!bo.ok && <Note>{`Bug out: ${bo.why}.`}</Note>}
+        {!confirm && !game.stock.bugout_bag && !game.stock.bugout_cache && <Note>A packed bug-out bag each and a buried cache at a second site (Shop, Defense) make leaving faster and the arrival safer.</Note>}
       </div>}
     </Section>
   );

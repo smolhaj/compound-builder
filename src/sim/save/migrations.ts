@@ -42,6 +42,8 @@ type Raw = Record<string, unknown> & { version?: number };
 
 /** version n → n + 1 upgraders. */
 const STEPS: Record<number, (s: Raw) => Raw> = {
+  // 69 → 70: house hardening tiers and the bug-out goods (sim/houseHardening.ts, sim/bugout.ts): six new goods, none in stock
+  69: s => ({ ...s, version: 70, stock: { security_door: 0, window_shutters: 0, ballistic_panels: 0, safe_room_hardened: 0, bugout_bag: 0, bugout_cache: 0, ...(s.stock as object) } }),
   // 68 → 69: the bridge on the planned way in can be brought down (sim/roadFx.ts): standing in every old game
   68: s => ({ ...s, version: 69, roadBridge: { down: false, due: null } }),
   // 65 → 66: weekender cash pacing (sim/weekender.ts): the belt in town is off; a weekend game keeps its town house as it was (owned, with its mortgage), nobody rents

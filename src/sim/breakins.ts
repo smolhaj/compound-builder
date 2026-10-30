@@ -45,6 +45,7 @@ import { stealTools } from './tools';
 import { emptyMultiplier, emptyNow, isSplit, reportFound, weekendOf } from './weekender';
 import type { Battle } from './battleTypes';
 import { responseFactor } from './slope';
+import { hasSafeRoom } from './houseHardening';
 
 export interface Breakins {
   /** Break-ins so far (night and day). */
@@ -352,7 +353,7 @@ export function resolveBreakIn(s: GameState, e: Encounter, stance: Stance): Omit
   const mins = responseMinutes(s, r);
   const stay = 8 + Math.round(7 * r());
   const lines: string[] = [];
-  const safeRoom = n(s, 'safe_room') > 0;
+  const safeRoom = hasSafeRoom(s);
   if (stance === 'shout') {
     const homeArmed = s.armory.guns.length > 0;
     const p = 0.7 + (dogCount(s) ? 0.1 : 0) + (powered(s) && n(s, 'floodlights') ? 0.05 : 0) + (homeArmed ? 0.05 : 0) - (e.armed ? 0.15 : 0) - (e.size - 1) * 0.05;
