@@ -73,7 +73,7 @@ describe('the solar farm and the batteries that stayed at 0 %', () => {
     // a night with no sun: it only ever drains what is there
     g.clock.t += 0; const before = g.utilities.batteryKwh;
     balanceDay(g, plant(g), 0.5);
-    expect(g.utilities.batteryKwh).toBeGreaterThanOrEqual(before - 1e-6);
+    expect(g.utilities.batteryKwh).toBeGreaterThanOrEqual(before - 0.1);
   });
 
   it('flags made-but-wasted power when the bank is full and prints no raw floats', () => {

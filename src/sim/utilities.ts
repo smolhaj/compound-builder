@@ -215,14 +215,55 @@ export interface Plant {
   power: Map<string, number>;
 }
 
+/**
+ * Pipes and cable run themselves: any two buildings within about 70 m (edge to edge) share the
+ * water and power networks without a drawn line, so a player never has to lay utility lines
+ * (the trenching is in the price of the equipment). Drawn runs still join far-off outposts.
+ */
+export const AUTO_REACH = 12;
+
+export function autoJoin(nodes: readonly Node[], net: Map<string, number>): Map<string, number> {
+  const parent = new Map<number, number>();
+  const find = (a: number): number => { let p = parent.get(a) ?? a; while (p !== (parent.get(p) ?? p)) p = parent.get(p) ?? p; parent.set(a, p); return p; };
+  for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
+    const a = nodes[i], b = nodes[j];
+    if (Math.hypot(a.x - b.x, a.z - b.z) - a.r - b.r > AUTO_REACH) continue;
+    const ra = find(net.get(a.id)!), rb = find(net.get(b.id)!);
+    if (ra !== rb) parent.set(ra, rb);
+  }
+  const out = new Map<string, number>();
+  for (const [id, n] of net) out.set(id, find(n));
+  return out;
+}
+
 /** Network membership for the current compound (half-size from footprints passed in). */
 export function plant(s: GameState, halfSize: (kind: string) => number = k => NODE_R[k] ?? 0.4): Plant {
   const nodes = s.structures.filter(isFinished).map(st => ({ id: st.id, kind: st.kind, x: st.x, z: st.z, r: halfSize(st.kind) }));
   return {
     nodes,
-    water: networks(nodes, s.perimeter.filter(r => r.kind === 'water_pipe')),
-    power: joinBank(nodes, networks(nodes, s.perimeter.filter(r => r.kind === 'power_cable'))),
+    water: autoJoin(nodes, networks(nodes, s.perimeter.filter(r => r.kind === 'water_pipe'))),
+    power: joinBank(nodes, autoJoin(nodes, networks(nodes, s.perimeter.filter(r => r.kind === 'power_cable')))),
   };
+}
+
+/**
+ * Plumbing and wiring order themselves: a finished home, pump or cellar gets its wiring job
+ * (and a home its plumbing) as soon as service reaches it, the kit included in the price. Only
+ * the labor remains. Returns the log lines.
+ */
+export function autoFit(s: GameState, p: Plant): string[] {
+  const out: string[] = [];
+  for (const st of s.structures) {
+    if (!isFinished(st) || !(DRAW_KWH[st.kind] > 0) || (LOAD_PRIORITY[st.kind] ?? 9) > 2) continue;
+    for (const kind of ['wire', 'plumb'] as const) {
+      if (kind === 'plumb' && LOAD_PRIORITY[st.kind] !== 2) continue;
+      if (fitProblem(s, p, st, kind)) continue;
+      const f = orderFit(s, st.id, kind);
+      f.supplied = true; f.done = f.hours; f.finishedAt = s.clock.t;
+      out.push(`The ${st.kind.replace(/_/g, ' ')} is ${kind === 'plumb' ? 'plumbed: water on tap' : 'wired: lights on'}.`);
+    }
+  }
+  return out;
 }
 
 /** What a power bank is made of: panels, batteries, a generator. Equipment standing together is one bank (the bus bars and conduit are part of the kit). */
