@@ -25,7 +25,8 @@ describe('the tunnel-bridge', () => {
     expect(b.max.y).toBeGreaterThan(4 + 3.5 * M);                                       // the tube stands above the rim (a truck's headroom)
     expect(b.min.y).toBeLessThan(0.2);                                                  // the trusses reach the gorge bed
     expect([...used]).toEqual(expect.arrayContaining(['container_rust', 'steel', 'concrete']));
-    expect(g.children.length).toBeLessThanOrEqual(8);                                   // merged per material
+    expect(g.children.filter(c => !c.userData.door).length).toBeLessThanOrEqual(8);
+    expect(g.children.filter(c => c.userData.door).length).toBe(4);       // two swinging leaves at each end, each its own group so the world can open them                                   // merged per material
   });
   it('a bridge still being built is drawn only as far as it has got; a dropped one leaves its abutments', () => {
     const half = buildRun(run('tunnel_bridge', pts, { finishedAt: null, done: 0.5, hours: 1 }), gorge, 0);

@@ -30,6 +30,10 @@ import type { Mode } from './lived/livedPlan';
 import { lightsOutNow } from '../sim/blackout';
 import type { NetWorld } from './paths/pathNet';
 import { WALK_CLIFF, walkRoute } from './paths/walkRoute';
+import { CorridorNet } from './paths/CorridorNet';
+import type { Wp } from './paths/linkRoute';
+import { CorridorDoors } from './perimeter/CorridorDoors';
+import { locksNow, outerEnd } from '../sim/corridors';
 import type { PathExtras } from '../sim/paths';
 import { walkFactor } from '../sim/paths';
 import { useWorldStore } from '../store/worldStore';
@@ -66,7 +70,7 @@ import { treadHeight } from './buildkit/terraceProps';
 import { farHiddenLayers, isFar } from './buildkit/buildingLod';
 import { LIGHT_BUDGET, pickLights, type LightCandidate } from './lightPool';
 import { hashStr } from './buildkit/clutter';
-import { buildRun, solidSpans } from './perimeter/perimeterGeometry';
+import { along, buildRun, solidSpans } from './perimeter/perimeterGeometry';
 import { PERIMETER, hasSkirt, runGrowth, runProgress, underground, wallLength, type PerimeterRun } from '../sim/perimeter';
 import { closestOnLine, earthworkReach, type Earthwork } from './parcel/parcelTerrain';
 import { exposure, Sight, type Observer, type SightWorld } from './sightlines/visibility';
@@ -219,6 +223,11 @@ export class HomesteadWorld {
   readonly atmos: Atmosphere;
   /** The footpaths between the stops on the place, worn and laid (game/paths). */
   readonly paths: PathLayer;
+  /** The tunnel-bridges and rock tunnels as ways through (people, dogs and vehicles route through them) and their steel doors. */
+  readonly corridors = new CorridorNet();
+  private readonly _doors = new CorridorDoors();
+  /** Force the corridor doors locked (a raid is being played back) or open (QA); null: the clock and the alarm decide. */
+  doorLock: boolean | null = null;
   /** The dry-stack retaining walls round graded pads, with their stairs (game/terrain/RetainWalls). */
   readonly walls = new RetainWallLayer();
   private _wallVer = 0;
@@ -380,6 +389,7 @@ export class HomesteadWorld {
     this._buildRoads();
     this.truck.dispose();
     this.truck = new DeliveryTruck(this._ws.scene, this._truckRoute(), this.groundAt, this.county.x, (x, z) => this._driveY(x, z));
+    this._tailKey = '';
   }
 
   /**
@@ -466,6 +476,7 @@ export class HomesteadWorld {
       // orders already delivered when the world loads don't replay
       if (this._clock > 0.5) this.truck.enqueue(o.lines);
     }
+    this._syncTruckTail();
     this.truck.update(dt, speedK);
     // deliveries left at the road (no drive yet), by the gate
     const rs = emptyStock();
@@ -824,13 +835,14 @@ export class HomesteadWorld {
   /** Fences, hedges and walls drawn as built (hedges by growth); berms and ditches shape the terrain. */
   syncPerimeter(runs: readonly PerimeterRun[], t: number, opts: { lit?: boolean; sensors?: boolean } = {}): void {
     this._runs = runs;
+    this.corridors.sync(runs);
     const lit = opts.lit ?? true, sensors = opts.sensors ?? false;
     const hostOf = (r: PerimeterRun) => (PERIMETER[r.kind].wallTop ? runs.find(x => x.id === r.hostId)?.kind ?? '' : '');
     const ids = runs.map(r => r.id).join(',');
     for (const r of runs) {
       // old posts lean and rails sag (atmosphere/aging): rebuilt as the lean steps
       const lean = LEANS.has(r.kind) && r.finishedAt !== null ? Math.round(fenceLean((t - r.finishedAt) / 365) * 10) / 10 : 0;
-      const key = `${Math.round(runProgress(r) * 60)}:${Math.round(runGrowth(r, t) * 40)}:${r.finishedAt === null ? 0 : 1}:${r.gates.length}:${lean}:${hasSkirt(r, t) ? 1 : 0}:${lit ? 1 : 0}:${sensors ? 1 : 0}:${hostOf(r)}:${r.razor ? 1 : 0}`;
+      const key = `${Math.round(runProgress(r) * 60)}:${Math.round(runGrowth(r, t) * 40)}:${r.finishedAt === null ? 0 : 1}:${r.gates.length}:${lean}:${hasSkirt(r, t) ? 1 : 0}:${lit ? 1 : 0}:${sensors ? 1 : 0}:${hostOf(r)}:${r.razor ? 1 : 0}:${r.collapsed ? 1 : 0}`;
       const cur = this._runGroups.get(r.id);
       if (cur?.key === key) continue;
       if (cur) { this._root.remove(cur.group); cur.group.traverse(o => (o as THREE.Mesh).geometry?.dispose()); }
@@ -876,7 +888,7 @@ export class HomesteadWorld {
   /** Walk / people collision with built perimeter runs (gates and unbuilt stretches are open). */
   private _perimeterBlocked(x: number, z: number, r: number): boolean {
     for (const run of this._runs) {
-      if (underground(run.kind)) continue;
+      if (underground(run.kind) || PERIMETER[run.kind].vehicleWay) continue;      // (a tunnel-bridge is a way over the gap, not a wall: its doors are walked through)
       const th = run.kind === 'container_wall' || run.kind === 'container_stack' ? 0.21 : run.kind === 'stone_wall' ? 0.15 : run.kind === 'concrete_wall' ? 0.15 : run.kind === 'thorn_hedge' ? 0.15 * runGrowth(run, this._simT) : run.kind === 'log_palisade' ? 0.03 : run.kind === 'earth_berm' || run.kind === 'ditch' ? 0 : 0.01;
       if (th < 0.01) continue;
       const { d, s } = closestOnLine(run.pts, x, z);
@@ -1046,11 +1058,91 @@ export class HomesteadWorld {
     return this._walkCache.w;
   }
 
-  /** The way person `from` walks to `to`: the trails when they lead there, round buildings, the wall and cliffs when the straight line crosses them, else straight ([]). */
-  private _walkVia(fx: number, fz: number, tx: number, tz: number): Array<[number, number]> {
+  /** The way person `from` walks to `to`: through a tunnel when the goal is on the other side of the rock or the gorge; else the trails when they lead there, round buildings, the wall and cliffs when the straight line crosses them, else straight ([]). */
+  private _walkVia(fx: number, fz: number, tx: number, tz: number): Wp[] {
     const w = this._walkWorld();
-    if (!w.hard) return this.paths.via(fx, fz, tx, tz);
-    return walkRoute([fx, fz], [tx, tz], { blocked: w.blocked, hard: w.hard, cost: w.cost }, detour => this.paths.via(fx, fz, tx, tz, detour));
+    if (this.corridors.any || this.corridors.corridors.length) {
+      const r = this._viaCorridors(fx, fz, tx, tz, w, (a, b) => this._groundVia(a, b, w));
+      if (r) return r;
+    }
+    if (Math.hypot(tx - fx, tz - fz) > 25) return [];
+    return this._groundVia([fx, fz], [tx, tz], w);
+  }
+
+  private _groundVia(a: [number, number], b: [number, number], w: NetWorld): Wp[] {
+    if (!w.hard) return this.paths.via(a[0], a[1], b[0], b[1]);
+    return walkRoute(a, b, { blocked: w.blocked, hard: w.hard, cost: w.cost }, detour => this.paths.via(a[0], a[1], b[0], b[1], detour));
+  }
+
+  /** The route through corridors from a to b when they are on different pieces of ground (null: no corridor is needed or none leads there). */
+  private _viaCorridors(fx: number, fz: number, tx: number, tz: number, w: NetWorld, ordinary: (a: [number, number], b: [number, number]) => readonly Wp[]): Wp[] | null {
+    this.corridors.ensure(this.groundAt);
+    if (!this.corridors.any || !w.hard) return null;
+    const key = `${[...this._built.keys()].join()}|${this._runs.map(r => `${r.id}${r.finishedAt === null ? 0 : 1}`).join()}|${this.walls.version}`;
+    const box = { x0: Math.min(this.home.x0, this.camp.x - 4), z0: Math.min(this.home.z0, this.camp.z - 4), x1: Math.max(this.home.x1, this.camp.x + 4), z1: Math.max(this.home.z1, this.camp.z + 4) };
+    const reach = this.corridors.reach(key, box, w.hard, this._doorways());
+    return this.corridors.route([fx, fz], [tx, tz], reach, ordinary);
+  }
+
+  /** A raid at a tunnel door: while the crew works at it the door stands shut; when they are through it is forced open (null: let the clock decide again). */
+  forceDoor(open: boolean | null, x?: number, z?: number): void {
+    if (open === null || x === undefined || z === undefined) { this._doors.force(null); return; }
+    let best: { id: string; end: 0 | 1; d: number } | null = null;
+    for (const c of this.corridors.corridors) for (const end of [0, 1] as const) {
+      const p = end === 0 ? c.a : c.b, d = Math.hypot(p[0] - x, p[1] - z);
+      if (!best || d < best.d) best = { id: c.id, end, d };
+    }
+    if (best && best.d < 12) this._doors.force({ id: best.id, end: best.end, open });
+  }
+
+  /** Vehicles on the move and the delivery truck (they open a locked door like the family does). */
+  keyedVehicles(): Array<[number, number]> { return [...this.fleet.moving, ...(this.truck.at ? [this.truck.at] : [])]; }
+
+  /** A vehicle's way through the tunnels from one spot to another, or null when they are on the same side (vehicles drive straight within a piece of ground). */
+  vehicleRoute = (from: [number, number], to: [number, number]): Wp[] | null => {
+    if (!this.corridors.corridors.length) return null;
+    const w = this._walkWorld();
+    return this._viaCorridors(from[0], from[1], to[0], to[1], w, () => []);
+  };
+
+  private _tailKey = '';
+  /** The delivery truck drives on through a tunnel when the yard lies beyond one (re-found when the layout changes, between deliveries). */
+  private _syncTruckTail(): void {
+    const drive = this._truckRoute(), end = drive[drive.length - 1], y = this.access.yard;
+    const key = `${this.corridors.corridors.map(c => c.id + (c.collapsed ? 'x' : '')).join()}|${[...this._built.keys()].length}|${end}|${y.x},${y.z}|${this._drive}`;
+    if (key === this._tailKey || !end) return;
+    const tail = this.corridors.corridors.length ? this.vehicleRoute(end, [y.x, y.z]) ?? [] : [];
+    if (this.truck.setTail(tail)) this._tailKey = key;
+  }
+
+  /** The narrow ways through the walls: each finished gate and sally port (a point either side), and the stairs up the retaining walls. */
+  private _doorways(): Array<[[number, number], [number, number]]> {
+    const out: Array<[[number, number], [number, number]]> = [];
+    for (const r of this._runs) {
+      if (underground(r.kind) || r.finishedAt === null) continue;
+      for (const g of r.gates) {
+        const p = along(r.pts, g.at);
+        out.push([[p.x - p.dz * 0.9, p.z + p.dx * 0.9], [p.x + p.dz * 0.9, p.z - p.dx * 0.9]]);
+      }
+    }
+    for (const s of this.walls.stairs()) out.push([[s.x - s.dx * 0.9, s.z - s.dz * 0.9], [s.x + s.dx * 0.9, s.z + s.dz * 0.9]]);
+    return out;
+  }
+
+  /** Real seconds a keyholder waits at corridor door `tag`: nothing when it stands open. */
+  doorWait(tag: number): number {
+    const d = this.corridors.door(tag);
+    return d && this._doors.openness(d.corridor.id, d.end) < 0.85 ? 1.4 : 0;
+  }
+
+  /** Move the corridor doors: open by day, shut at night and on the alarm, opened by whoever has a key standing at one. */
+  updateDoors(dt: number, game: GameState): void {
+    if (!this.corridors.corridors.length) return;
+    const holders: Array<[number, number]> = [];
+    for (const p of this.family.positions()) holders.push([p.x, p.z]);
+    for (const p of this.dogPositions()) holders.push([p[0], p[1]]);
+    for (const p of this.keyedVehicles()) holders.push(p);
+    this._doors.update(dt, this.corridors.corridors, new Map([...this._runGroups].map(([id, g]) => [id, g.group])), this.doorLock ?? locksNow(game), holders);
   }
 
   /** What the world adds to the stops: the camp, the delivery yard, the compound's own gate (when the drive does not go through it), a landing on the creek bank. */
@@ -1823,12 +1915,39 @@ export class HomesteadWorld {
       yard: this.camp,
       drive: this.access.drive,
       ground: this.groundAt,
+      route: this.vehicleRoute,
+      park: this.qaPark,
+      stranded: n => this.strandedSpot(game, n),
     };
     this.fleet.update(dt, game, ctx, speedK);
     // the cars in the open yard are in the way of walks and yard props (re-found only when the fleet changes)
     const key = (game.vehicles ?? []).map(v => `${v.id}${v.kind}${v.away ? 'a' : ''}`).join() + `|${[...this._built.keys()].length}`;
     if (key !== this._carKey) { this._carKey = key; this._cars = this.fleet.openBoxes(game, ctx); this.paths.invalidate(); }
   }
+  /** Where the n-th vehicle cut off outside waits: on the road before the bridge that is down, or at the outer mouth of a fallen tunnel. */
+  strandedSpot(game: GameState, n: number): { x: number; z: number; rot: number } | null {
+    if (game.roadBridge?.down) {
+      const b = this.plan.structures.find(x => x.kind === 'bridge' || x.kind === 'bridge1');
+      if (b) {
+        const want = b.s0 - 2.6 - n * 0.95, pts = this.plan.pts;
+        let k = 0;
+        for (let i = 0; i < pts.length - 1; i++) if (pts[i].s <= want) k = i;
+        const a = pts[k], c = pts[Math.min(pts.length - 1, k + 1)], d = Math.hypot(c.x - a.x, c.z - a.z) || 1;
+        return { x: a.x - (c.z - a.z) / d * 0.2, z: a.z + (c.x - a.x) / d * 0.2, rot: Math.atan2(c.x - a.x, c.z - a.z) };
+      }
+    }
+    const lost = this._runs.find(r => PERIMETER[r.kind].vehicleWay && (r.dropped || r.collapsed) && r.pts.length > 1);
+    const c = lost ? { a: lost.pts[0], b: lost.pts[lost.pts.length - 1] } : null;
+    if (c) {
+      const end = outerEnd(c, [this.access.gate.x, this.access.gate.z]), p = end === 0 ? c.a : c.b, q = end === 0 ? c.b : c.a, d = Math.hypot(p[0] - q[0], p[1] - q[1]) || 1;
+      const ux = (p[0] - q[0]) / d, uz = (p[1] - q[1]) / d;
+      return { x: p[0] + ux * (1.8 + n * 0.95), z: p[1] + uz * (1.8 + n * 0.95), rot: Math.atan2(-ux, -uz) };
+    }
+    return null;
+  }
+
+  /** QA: vehicles parked somewhere other than the parking plan puts them (id -> spot). */
+  qaPark = new Map<string, { x: number; z: number; rot: number }>();
   private _cars: CarBox[] = [];
   private _carKey = '';
 
@@ -1895,7 +2014,7 @@ export class HomesteadWorld {
     this.paths.update(game, performance.now());
     const ctx: GoalCtx = {
       camp: this.camp, site, home: homeB ? site(homeB.placed.id) : null, tree, yard: this.access.yard, sleepAt: i => sleepSpotFor(game, i), tentAt: n => this._tentPos[n],
-      footing: (x, z) => walkFactor(this.paths.surfaceAt(x, z), this._underfoot), via: (fx, fz, tx, tz) => this._walkVia(fx, fz, tx, tz),
+      footing: (x, z) => walkFactor(this.paths.surfaceAt(x, z), this._underfoot), via: (fx, fz, tx, tz) => this._walkVia(fx, fz, tx, tz), doorWait: tag => this.doorWait(tag),
       ...dailyCtx(refs, game, this.access.yard, seasonState.params.cold < 0.35),
     };
     const fx = yardFx(game, hour);
@@ -1905,9 +2024,10 @@ export class HomesteadWorld {
     const dctx: DogCtx = {
       home: ctx.home, camp: this.camp, gate: this.access.gate, yard: this.access.yard, atGate: !!game.gate.pending,
       person: id => (this.family.shown.has(id) ? this.family.poseOf(id) : null),
-      via: (fx, fz, tx, tz) => this._walkVia(fx, fz, tx, tz),
+      via: (fx, fz, tx, tz) => this._walkVia(fx, fz, tx, tz), doorWait: tag => this.doorWait(tag),
     };
     this.dogs.update(dt, game, hour, game.clock.t, dctx, this.walkHeight, speedK);
+    this.updateDoors(dt, game);
     // crops stand in the ground from planting (mid-May) to the last of the harvest (late October); bare soil the rest of the year
     const doy = calendarOf(game.clock).doy, [c0, c1] = seasons(regionFor(game.site)).crops, growing = doy >= c0 && doy < c1;
     const cal = calendarOf(game.clock);

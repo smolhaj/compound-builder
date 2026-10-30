@@ -62,6 +62,50 @@ export const BRIDGE_SCENARIOS = [
   ] },
 ];
 
+/**
+ * Tunnel use on the tunnel-bridge: the family sent across the gorge (every walk is routed to the far end for the shot, the way the people's route finding goes
+ * through the bridge's doors), frozen with a person in the doorway and one inside the tube; and a car driven across, frozen in the open door. `use` runs in the page.
+ */
+const bridgeUseSetup = `Promise.all([import('/src/sim/terrainFx.ts')]).then(async ([m]) => {
+    const G = cb.game, g0 = G.getState().game, sp = m.gorgeSpan(g0);
+    if (!sp) { console.error('NO GORGE'); window.__done = 1; return; }
+    console.error('span', JSON.stringify(sp), 'problem', G.getState().planSpan('tunnel_bridge', sp.a, sp.b));
+    ${finish}
+    window.__span = sp;
+    const w = cb.world;
+    await new Promise(r => setTimeout(r, 1200));
+    const far = sp.b, near = sp.a;
+    const orig = w._walkVia.bind(w);
+    w._walkVia = (fx, fz, tx, tz) => orig(fx, fz, far[0], far[1]);
+    const g = structuredClone(G.getState().game); g.personState.forEach((ps, i) => { ps.task = i % 2 ? 'watch' : 'garden'; ps.target = null; }); G.setState({ game: g });
+    w.updatePeople(0.1, G.getState().game, 14, 1);
+    for (const [id, a] of w.family._agents) { a.x = near[0] - (near[0] - far[0]) * 0.02 + 0.3 * Math.random(); a.z = near[1] - (near[1] - far[1]) * 0.02; a.via = []; a.viaFor = null; }
+    const trace = [];
+    let door = null, mid = null;
+    const L = Math.hypot(far[0] - near[0], far[1] - near[1]);
+    for (let i = 0; i < 6000 && !(door && mid); i++) {
+      w.updatePeople(0.1, G.getState().game, 14, 1);
+      for (const p of w.family.positions()) {
+        if (p.y === null) continue;
+        const d = Math.hypot(p.x - near[0], p.z - near[1]);
+        if (!door && d > 0.8 && d < 1.6) door = { id: p.id, x: p.x, z: p.z, y: p.y };
+        if (!mid && Math.abs(d - L / 2) < 0.8) mid = { id: p.id, x: p.x, z: p.z, y: p.y };
+      }
+      if (door && !mid) { /* keep walking to the middle */ }
+      if (door && mid) break;
+    }
+    window.__use = { door, mid, steps: trace.length, span: sp, doors: w.corridors.corridors.map(c => c.id) };
+    console.error('use', JSON.stringify(window.__use));
+    window.__done = 1; });`;
+const useCam = (name, f) => ({ name, cam: `${pre} const sp = window.__span; if (!sp) return; const u = window.__use || {}; const dx = sp.b[0] - sp.a[0], dz = sp.b[1] - sp.a[1], l = Math.hypot(dx, dz), ux = dx / l, uz = dz / l; ${f}` });
+export const BRIDGE_USE_SCENARIOS = [
+  { name: 'bridge-use', setup: bridgeUseSetup, shots: [
+    useCam('eye-person-in-the-door', `const p = u.door; if (!p) return; const x = p.x - ux * 3.2 - uz * 0.8, z = p.z - uz * 3.2 + ux * 0.8; cb.qa.pose = { x, y: gr(x, z) + 0.32, z, lx: p.x, ly: p.y + 0.18, lz: p.z, fov: 58 };`),
+    useCam('aerial-bridge-doors-open', `cb.cam.target.set((sp.a[0] + sp.b[0]) / 2, 0, (sp.a[1] + sp.b[1]) / 2); cb.cam.radius = 22; cb.cam.pitch = 0.45; cb.cam.yaw = Math.atan2(ux, uz) + 1.2;`),
+    useCam('eye-through-the-door', `const x = sp.a[0] - ux * 3.2 - uz * 0.5, z = sp.a[1] - uz * 3.2 + ux * 0.5; cb.qa.pose = { x, y: gr(x, z) + 0.3, z, lx: sp.a[0] + ux * 3, ly: gr(sp.a[0], sp.a[1]) + 0.5, lz: sp.a[1] + uz * 3, fov: 60 };`),
+  ] },
+];
+
 /** Camera at a gate (the first matching `pick`) of a finished run: `back` units off its outside/inside, looking at the gate, a QA person beside it. */
 const gateCam = (name, pick, back, side, fov = 62) => ({ name, cam: `${pre} let G0 = null; for (const r of g0.perimeter) { if (!r.finishedAt && r.finishedAt !== 0) continue; for (const g of r.gates) if (${pick}) { G0 = { r, g }; break; } if (G0) break; } if (!G0) return; let s = 0, pt = r0pt(G0.r, G0.g.at); function r0pt(r, at) { let d = 0; for (let i = 1; i < r.pts.length; i++) { const a = r.pts[i - 1], b = r.pts[i], l = Math.hypot(b[0] - a[0], b[1] - a[1]); if (d + l >= at) { const f = (at - d) / l; return { x: a[0] + (b[0] - a[0]) * f, z: a[1] + (b[1] - a[1]) * f, dx: (b[0] - a[0]) / l, dz: (b[1] - a[1]) / l }; } d += l; } const a = r.pts[r.pts.length - 1]; return { x: a[0], z: a[1], dx: 1, dz: 0 }; } const nx = -pt.dz * ${side}, nz = pt.dx * ${side}; const x = pt.x + nx * ${back}, z = pt.z + nz * ${back}; ${figure('(pt.x + nx * 1.4 + pt.dx * 1.0)', '(pt.z + nz * 1.4 + pt.dz * 1.0)')} cb.qa.pose = { x, y: gr(x, z) + 0.3, z, lx: pt.x, ly: gr(pt.x, pt.z) + 0.3, lz: pt.z, fov: ${fov} };` });
 const towerCam = (name, kind, back, yawOff = 0.6) => ({ name, cam: `${pre} const t = g0.structures.find(s => s.kind === '${kind}'); if (!t) return; const x = t.x + Math.sin(${yawOff}) * ${back} * 0.3, z = t.z + Math.cos(${yawOff}) * ${back} * 0.3; ${figure('(t.x + Math.sin(' + yawOff + ' + 0.5) * 0.8)', '(t.z + Math.cos(' + yawOff + ' + 0.5) * 0.8)')} cb.qa.pose = { x, y: gr(x, z) + 0.3, z, lx: t.x, ly: gr(t.x, t.z) + 0.6, lz: t.z, fov: 62 };` });

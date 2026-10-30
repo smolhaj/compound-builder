@@ -12,6 +12,8 @@ import { ageYears, livingDogs, type Dog } from '../../sim/pets';
 import { dogShape, lookOf } from './dogModel';
 import { dayIndex, type GameState } from '../../sim/state';
 import { dogGoal, type DogCtx, type Stance } from './dogGoals';
+import { stepToward, isStop, type Mover } from '../paths/deckWalk';
+import type { Wp } from '../paths/linkRoute';
 
 const CAP = 24;
 /** Dog speeds (world units per real second at 1x). A dog trots faster than a person walks. */
@@ -21,7 +23,11 @@ const BLOBS = 48, BONES = 18;      // instances per dog
 interface Agent {
   x: number; z: number; rot: number; phase: number; stance: Stance; placed: boolean;
   lie: number; sit: number; up: number; bark: number; moving: boolean;
-  via?: Array<readonly [number, number]>; viaFor?: { x: number; z: number };
+  via?: Wp[]; viaFor?: { x: number; z: number };
+  /** Deck height inside a tunnel or on a tunnel-bridge (null: on the ground). */
+  y?: number | null;
+  wait?: number;
+  retry?: number;
 }
 
 const tmpA = new THREE.Matrix4(), tmpB = new THREE.Matrix4(), tmpV = new THREE.Vector3(), tmpS = new THREE.Vector3(), tmpQ = new THREE.Quaternion(), tmpE = new THREE.Euler(), tmpC = new THREE.Color(), UP = new THREE.Vector3(0, 1, 0), tmpD = new THREE.Vector3();
@@ -58,7 +64,7 @@ export class DogRenderer {
     const a = this._agents.get(id);
     return a ? { x: a.x, z: a.z, rot: a.rot, stance: a.stance } : null;
   }
-  positions(): Array<{ id: string; x: number; z: number }> { return [...this._agents.entries()].map(([id, a]) => ({ id, x: a.x, z: a.z })); }
+  positions(): Array<{ id: string; x: number; z: number; y: number | null }> { return [...this._agents.entries()].map(([id, a]) => ({ id, x: a.x, z: a.z, y: a.y ?? null })); }
 
   update(dt: number, game: GameState, hour: number, clock: number, ctx: DogCtx, ground: (x: number, z: number) => number, speedK: number): void {
     this._time += dt;
@@ -77,21 +83,34 @@ export class DogRenderer {
       if (!a) { a = { x: goal.x, z: goal.z, rot: goal.face ?? 0, phase: i * 1.3, stance: goal.stance, placed: true, lie: goal.stance === 'lie' ? 1 : 0, sit: 0, up: 0, bark: 0, moving: false }; this._agents.set(d.id, a); }
       // walk to the goal, round whatever is in the way (the same route finding as the people)
       if (!a.via) a.via = [];
-      if (ctx.via && (!a.viaFor || Math.hypot(a.viaFor.x - goal.x, a.viaFor.z - goal.z) > 0.5)) {
+      if (a.y === undefined) a.y = null;
+      if (isStop(a.via[0])) { a.retry = (a.retry ?? 0) - dt; if (a.retry <= 0) { a.viaFor = undefined; a.retry = 3; } }
+      if (ctx.via && a.y === null && (!a.viaFor || Math.hypot(a.viaFor.x - goal.x, a.viaFor.z - goal.z) > 0.5)) {
         a.viaFor = { x: goal.x, z: goal.z };
-        a.via = Math.hypot(goal.x - a.x, goal.z - a.z) > 25 ? [] : [...ctx.via(a.x, a.z, goal.x, goal.z)];
+        a.via = [...ctx.via(a.x, a.z, goal.x, goal.z)];
       }
-      while (a.via!.length && Math.hypot(a.via[0][0] - a.x, a.via[0][1] - a.z) < 0.12) a.via!.shift();
+      while (a.via!.length && a.via[0][2] === undefined && a.via[0][3] === undefined && Math.hypot(a.via[0][0] - a.x, a.via[0][1] - a.z) < 0.12) a.via!.shift();
       const leg = a.via![0], gx = leg ? leg[0] : goal.x, gz = leg ? leg[1] : goal.z;
       const dx = gx - a.x, dz = gz - a.z, dist = leg ? Math.hypot(goal.x - a.x, goal.z - a.z) : Math.hypot(dx, dz), legD = Math.hypot(dx, dz);
       let moving = false;
       const tol = goal.follow ? 0.1 : 0.04;
-      if (dist > tol) {
-        if (dist > 30 || jumped) { a.x = goal.x; a.z = goal.z; a.via = []; }
+      if ((a.wait ?? 0) > 0) { a.wait = Math.max(0, a.wait! - dt * Math.max(1, speedK)); if (a.wait === 0) a.via!.shift(); }
+      else if (dist > tol || (leg && a.via!.length > 1)) {
+        if ((dist > 30 && !a.via!.length) || jumped) { a.x = goal.x; a.z = goal.z; a.via = []; a.y = null; }
         else {
           const v = (dist > 0.5 ? RUN : TROT) * Math.max(1, Math.min(3, speedK)) * (goal.follow ? 1.25 : 1);
-          const step = Math.min(Math.max(legD - tol * 0.5, 0.001), v * dt);
-          a.x += dx / (legD || 1) * step; a.z += dz / (legD || 1) * step; moving = true;
+          if (leg && (leg[2] !== undefined || leg[3] !== undefined || a.y !== null)) {
+            // through a tunnel: along the deck, a dog with its person's key waits at a locked door
+            const st = stepToward(a as Mover, leg, v * dt, ground);
+            moving = st.moved > 1e-6;
+            if (st.arrived && !isStop(leg)) {
+              if (leg[3] && ctx.doorWait) { const w = ctx.doorWait(leg[3], a.x, a.z); if (w > 0) a.wait = w; }
+              if (!a.wait) a.via!.shift();
+            }
+          } else {
+            const step = Math.min(Math.max(legD - tol * 0.5, 0.001), v * dt);
+            a.x += dx / (legD || 1) * step; a.z += dz / (legD || 1) * step; moving = true;
+          }
           const want = Math.atan2(dx, dz);
           a.rot += Math.atan2(Math.sin(want - a.rot), Math.cos(want - a.rot)) * Math.min(1, dt * 9);
         }
@@ -141,7 +160,7 @@ export class DogRenderer {
     const happy = d.mood > 60 ? 1 : d.mood > 35 ? 0.4 : 0;
     const seed = (d.born * 0.37 + d.tone * 0.11) % 1;
     const shape = dogShape(look, { lie: a.lie, sit: a.sit, up: a.up, phase: a.phase, moving: a.moving, t: this._time, happy: d.mood < 35 ? 0 : happy, bark: a.stance === 'bark' ? Math.sin(a.bark * 3) * 0.2 : 0, seed: Math.abs(seed) });
-    const gy = ground(a.x, a.z);
+    const gy = a.y ?? ground(a.x, a.z);
     const world = tmpA.compose(tmpV.set(a.x, gy, a.z), tmpQ.setFromAxisAngle(UP, a.rot), tmpS.set(sc, sc, sc));
     const W = new THREE.Matrix4().copy(world);
     let i = n * BLOBS;

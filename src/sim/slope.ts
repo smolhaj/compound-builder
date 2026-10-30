@@ -12,6 +12,7 @@ import type { GameState, Structure } from './state';
 import { dayIndex } from './state';
 import { VEHICLES, fleetOf, runs } from './vehicles';
 import { roadResponse, roadWinter } from './roadFx';
+import { tunnelResponse } from './corridors';
 
 // ── the road and the line ──
 
@@ -167,6 +168,7 @@ export function responseFactor(s: GameState): number {
   // the planned road: its length, hairpins, grade and single-file structures (sim/roadFx.ts); a place with no lot keeps the old 1
   let k = s.site.lot ? roadResponse(s) : 1;
   if (roadClosedFor(s) > 0) k *= s.stock.plow >= 1 ? 1.5 : 2.5;
+  k += tunnelResponse(s);
   return k;
 }
 

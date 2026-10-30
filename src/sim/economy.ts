@@ -84,7 +84,7 @@ export function deliverOrders(s: GameState): void {
     o.status = 'delivered';
     const what = o.lines.map(l => l.food ? `${l.n} ${FOOD[l.food].name.toLowerCase()}` : `${l.qty} ${MATERIALS[l.material].name.toLowerCase()}`).join(', ');
     // no drive yet, or the bridge on it is down: the truck leaves it at the road (at the creek) and the family carries it in
-    if (!s.site.improvements.drive || s.roadBridge?.down) {
+    if (!s.site.improvements.drive || s.roadBridge?.down || s.perimeter.some(r => r.collapsed || r.dropped)) {      // (no drive, the bridge down, or a tunnel choked with rubble: the truck leaves it at the road)
       const hours = o.lines.reduce((a, l) => a + (CARRY_H[l.material] ?? 0.2) * l.qty, 0);
       if (hours > 0.5) {
         (s.roadside ??= []).push({ lines: o.lines.map(l => ({ ...l })), hours, done: 0 });

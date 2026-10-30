@@ -1,5 +1,6 @@
 import { planProblem } from '../sim/construction';
 import { dropBridge, routeProblem } from '../sim/terrainFx';
+import { clearCollapse } from '../sim/corridors';
 import { dropRoadBridge, rebuildRoadBridge } from '../sim/roadFx';
 import { AFTERMATH_TEXT, joinPrisoner, releasePrisoner, resolveAftermath, type AftermathChoice } from '../sim/aftermath';
 import { dismissCrew, hireCrew } from '../sim/crews';
@@ -134,6 +135,8 @@ export interface GameStore {
   planSpan: (kind: PerimeterKind, a: Pt, b: Pt) => string | null;
   /** Drop a standing tunnel-bridge or slope tunnel (it is a plan again until rebuilt). */
   dropBridge: (id: string) => string | null;
+  /** Hire a contractor to clear a tunnel choked by a fall (sim/corridors). */
+  clearCollapse: (id: string) => string | null;
   /** Bring the bridge on the way in down on purpose, or order its rebuilding (null on success, else why not). */
   dropRoadBridge: () => string | null;
   rebuildRoadBridge: () => string | null;
@@ -365,6 +368,13 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     if (locked()) return LOCKED_WHY;
     const g = structuredClone(get().game);
     const why = dropBridge(g, id);
+    if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); }
+    return why;
+  },
+  clearCollapse: (id) => {
+    if (locked()) return LOCKED_WHY;
+    const g = structuredClone(get().game);
+    const why = clearCollapse(g, id);
     if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); }
     return why;
   },

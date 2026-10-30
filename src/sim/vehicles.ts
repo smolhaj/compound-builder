@@ -58,6 +58,8 @@ export interface Vehicle {
   down?: { since: number; part: string; /** Days of work left once the parts are in. */ left?: number };
   /** Away on a run (the world does not draw it; it cannot be used). */
   away?: boolean;
+  /** Cut off outside by a lost bridge or a fallen tunnel: it waits at the outer end (the world draws it there) until the way is open again (sim/corridors `corridorDay`). */
+  stranded?: boolean;
 }
 
 export interface VehicleDef {
