@@ -39,6 +39,7 @@ import type { Rect } from './land';
 import { mulberry32 } from './rng';
 import { M_TO_FT, ROAD_DAYS, ROAD_PRICE, ROAD_STYLE, UNIT_M, type RoadStyle } from './roadStyle';
 import { BED, RoadBed } from './roadBed';
+import { findHairpins } from './roadHairpins';
 
 export type Pt = [number, number];
 
@@ -613,21 +614,11 @@ function finish(inp: RoadInput, style: RoadStyle, grid: GridData, found: Search 
   // hairpins from the heading change
   const head = new Float64Array(n);
   for (let i = 0; i < n; i++) head[i] = rotAt(i);
-  const turnOver = (i0: number, i1: number) => { let t = 0; for (let i = i0 + 1; i <= i1; i++) { let d = head[i] - head[i - 1]; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; t += d; } return t; };
   const hairpins: Hairpin[] = [];
-  {
-    const W = 12;   // twelve stations (6 units, 36 m) of road each way
-    let i = style.grid ? n : W;   // (the survey grid has right-angle jogs, no hairpins)
-    while (i < n - W) {
-      const t = turnOver(i - W, i + W);
-      if (Math.abs(t) >= (120 * Math.PI) / 180) {
-        let j = i; while (j + 1 < n - W && Math.abs(turnOver(j + 1 - W, j + 1 + W)) >= (120 * Math.PI) / 180) j++;
-        const mid = Math.round((i + j) / 2);
-        const turn = turnOver(Math.max(0, i - W), Math.min(n - 1, j + W));
-        // (the centre of the bend is on the left when the heading increases: the outside is the right)
-        hairpins.push({ s: s[mid], x: st[mid][0], z: st[mid][1], turnDeg: Math.round(Math.abs(turn) * 180 / Math.PI), out: turn > 0 ? 'R' : 'L' });
-        i = j + W;
-      } else i++;
+  if (!style.grid) {   // (the survey grid has right-angle jogs, no hairpins)
+    for (const h of findHairpins(head, s)) {
+      // (the centre of the bend is on the left when the heading increases: the outside is the right)
+      hairpins.push({ s: s[h.i], x: st[h.i][0], z: st[h.i][1], turnDeg: Math.round(Math.abs(h.turn) * 180 / Math.PI), out: h.turn > 0 ? 'R' : 'L' });
     }
   }
   // grade limit (the landing on a hairpin is eased)

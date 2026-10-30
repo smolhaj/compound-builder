@@ -9,7 +9,7 @@ Checked against GDS §10.4 to §10.6, `docs/DECISIONS.md` and `src/sim`. Status:
 | Chimney creosote, frozen pipes, seasoning wood | done | `sim/upkeep.ts` |
 | Pumps, inverters, batteries wear; spares | done | `sim/utilities.ts` (pump failure, `SPARE_FOR`), `sim/tools.ts` (tool wear) |
 | Vehicle wear, service, fuel | done | `sim/vehicles.ts`, `sim/garage.ts` |
-| Spare parts getting scarcer over the years | **missing** | hardware kits are a flat good; no long-run scarcity |
+| Spare parts getting scarcer over the years | done (follow-up PR) | `sim/parts.ts`; scavenged places already run dry |
 | Livestock: goats, pigs, rabbits, cow, bees, sheep, feed, shelter, illness | done | `sim/livestock.ts`, `sim/herd.ts`, `sim/bees.ts` |
 | Vehicles: pickup, trailer, tractor, ATV, 1970s truck, motorhome | done | `sim/vehicles.ts`, `sim/fleet.test.ts` |
 | Skills by doing; paid courses (first aid, ham, canning, welding, engines, wiring…) | done | `sim/skills.ts`, `sim/courses.ts` |
@@ -27,11 +27,13 @@ Checked against GDS §10.4 to §10.6, `docs/DECISIONS.md` and `src/sim`. Status:
 | Soap, hygiene supplies | partial | `sim/body.ts` (a bought good that runs out; cannot be made) |
 | Barter values, market day, prices by scarcity | done | `sim/barter.ts`, `sim/market.ts`, `sim/tradeGoods.ts` |
 | Mutual aid: pact, shared work day, shared watch | done | `sim/neighborLife.ts`, `sim/pact.ts` |
-| Shared harvest | partial | work days yes; no harvest split |
+| Shared harvest | done (follow-up PR) | `sim/sharedHarvest.ts` |
 | Scavenging trips with risk and depletion | done | `sim/scavenge.ts` |
 | Seed saving | done | `sim/crops.ts` |
 | Smokehouse, curing, canning | done | `sim/kitchen.ts` |
-| Forge, soap and candle making | missing | beeswax is a good only (`sim/materials.ts`) |
+| Soap making | done (follow-up PR) | `sim/soap.ts` |
+| Forge | done (follow-up PR) | `forge` building, `farm.hasForge` |
+| Candle making | skipped (user) | nothing needs light beyond power |
 
 ## People and world (§10.6, task #27)
 | Item | Status | Where |

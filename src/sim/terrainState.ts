@@ -6,6 +6,7 @@
  * (sim/terrainFx.ts) work headless, in tests and in the bot playtest.
  * Cached per place. Pure (no three.js).
  */
+import { pinSeed } from './lotSeed';
 import { ParcelTerrain } from '../game/parcel/parcelTerrain';
 import { analyzeTerrain, approachLanes, boreProblem, findBore, siteCandidates, type BoreStats, type Corridor, type GroundSource, type Lane, type SiteCandidate, type Terrain } from './terrain';
 import { PERIMETER, runFinished } from './perimeter';
@@ -20,7 +21,7 @@ const sources = new Map<string, GroundSource>();
 const terrains = new Map<string, Terrain>();
 const lanes = new Map<string, Lane[]>();
 
-const keyOf = (s: GameState) => `${s.seed}|${s.site.region}|${s.site.creek ? 1 : 0}|${s.site.timber}|${JSON.stringify(s.site.lot ?? null)}|${s.site.home.x0},${s.site.home.z0},${s.site.home.x1},${s.site.home.z1}`;
+const keyOf = (s: GameState) => `${pinSeed(s.site, s.seed)}|${s.site.region}|${s.site.creek ? 1 : 0}|${s.site.timber}|${JSON.stringify(s.site.lot ?? null)}|${s.site.home.x0},${s.site.home.z0},${s.site.home.x1},${s.site.home.z1}`;
 
 /** The ground of this game's lot (null: none known). */
 export function groundOf(s: GameState): GroundSource | null {
@@ -28,7 +29,7 @@ export function groundOf(s: GameState): GroundSource | null {
   const k = keyOf(s);
   let g = sources.get(k);
   if (!g) {
-    const pt = new ParcelTerrain(s.seed, { creek: s.site.creek, timber: s.site.timber, region: s.site.region, lot: s.site.lot ?? null, home: s.site.home });
+    const pt = new ParcelTerrain(pinSeed(s.site, s.seed), { creek: s.site.creek, timber: s.site.timber, region: s.site.region, lot: s.site.lot ?? null, home: s.site.home });
     g = { h: (x, z) => pt.natural(x, z).h, creek: pt.creek };
     sources.set(k, g);
   }

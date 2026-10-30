@@ -36,6 +36,10 @@ import { altitudeClimate } from '../sim/climate';
 import { LOT_NAME } from '../sim/lots';
 import { roadClosedFor, winterRoadLine } from '../sim/slope';
 import { roadLine } from '../sim/roadFx';
+import { crossingLine } from '../sim/roadWildlife';
+import { roadPlanOf } from '../sim/roadState';
+import { EntranceCard } from './hud/EntranceCard';
+import { PlowNote } from './hud/PlowNote';
 import { DRIVE_PER_FT, driveQuote, hookupProblem, POLE_PER_FT, powerQuote } from '../sim/improvements';
 import { KIT } from '../game/buildkit/kit';
 import { FUEL_UNIT_L, irrigationStore, storageCapacity } from '../sim/utilities';
@@ -396,6 +400,9 @@ export function Hud() {
                     </div>;
               })}
               <Note>The way in: {roadLine(game)}.</Note>
+              {game.site.lot && (() => { const cl = crossingLine(roadPlanOf(game)); return cl ? <Note>{cl}</Note> : null; })()}
+              <EntranceCard />
+              <PlowNote game={game} />
               {(game.roadside ?? []).length > 0 && <Note tone="warn">{game.roadside.length} deliver{game.roadside.length > 1 ? 'ies' : 'y'} at the road: about {Math.round(game.roadside.reduce((a, r) => a + r.hours - r.done, 0))} h of carrying before building goes on.</Note>}
               {!game.site.improvements.power && !game.utilities.grid && <Note>No power at the place: run the line, or go solar or a generator.</Note>}
               {game.land.parcels.some(p => p.owner === 'you') && <Row label="Bought since" value={`${game.land.parcels.filter(p => p.owner === 'you').reduce((a, p) => a + acresOf(p.rect), 0)} acres`} />}

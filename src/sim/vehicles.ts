@@ -26,6 +26,7 @@
  * mechanic (or a tow and a bill in peacetime). A dead or fried vehicle can be
  * stripped for parts. An EMP kills every vehicle with electronics.
  */
+import { wornFactor } from './parts';
 import type { GameState } from './state';
 import { dayIndex } from './state';
 import { log } from './economy';
@@ -35,6 +36,8 @@ import { addTool, kitOf } from './tools';
 import { enclosure } from './enclosure';
 import { COURT_THEFT_FACTOR, isCourt } from './motorCourt';
 import { runFinished } from './perimeter';
+import { STRIKE, crossingRelief, strikeChance } from './roadWildlife';
+import { roadPlanOf } from './roadState';
 
 export type VehicleKind = 'pickup' | 'suv' | 'motorhome' | 'tractor' | 'atv' | 'old_pickup' | 'trailer';
 
@@ -169,7 +172,8 @@ export function refuel(s: GameState, v: Vehicle): boolean {
 
 /** Miles on the clock since the last service. */
 export const sinceService = (v: Vehicle): number => v.mileage - (v.serviceAt ?? v.oilAt);
-export const overdue = (v: Vehicle): boolean => v.kind !== 'trailer' && sinceService(v) >= SERVICE_MILES;
+/** `worn` (sim/parts.ts wornFactor) shortens the interval: old machines want service sooner. */
+export const overdue = (v: Vehicle, worn = 1): boolean => v.kind !== 'trailer' && sinceService(v) >= SERVICE_MILES / worn;
 
 /** Service a vehicle now: the shop in peacetime, otherwise a parts kit and a mechanic of 2 or more. Null on success. */
 export function serviceVehicle(s: GameState, id: string): string | null {
@@ -229,6 +233,15 @@ function breakDown(s: GameState, v: Vehicle, salt: number): string {
   return `The ${VEHICLES[v.kind].name.toLowerCase()} broke down: the ${part}.`;
 }
 
+/** A deer or an elk on the road at dusk: the vehicle is hurt (sim/roadWildlife.ts: crossings under the road make it rarer). A log line, or null. */
+function deerStrike(s: GameState, v: Vehicle, km: number, salt: number): string | null {
+  if (v.kind === 'trailer') return null;
+  const p = strikeChance(s.site.region, km, s.site.lot ? roadPlanOf(s) : null);
+  if (!rollDown(s, v, p, 900 + salt)) return null;
+  v.condition = Math.max(0, v.condition - STRIKE.DAMAGE);
+  return `A deer came out of the timber at dusk and the ${VEHICLES[v.kind].name.toLowerCase()} hit it: a smashed grille and a long way home${s.site.lot && crossingRelief(roadPlanOf(s)) === 0 ? ' (the road has no crossing for the deer to use)' : ''}.`;
+}
+
 /**
  * The road: a run of `km` out and back. May strand the truck for a day or three
  * (a mechanic and a kit on board fix it on the roadside; otherwise it is towed
@@ -237,7 +250,7 @@ function breakDown(s: GameState, v: Vehicle, salt: number): string {
 export function roadTrouble(s: GameState, v: Vehicle, km: number, salt = 0): { extraDays: number; line: string | null } {
   const mech = mechanicOf(s);
   const p = breakdownChance(v, mech, Math.min(3, km / 60));
-  if (!rollDown(s, v, p * Math.min(3, 1 + km / 80), 700 + salt)) return { extraDays: 0, line: null };
+  if (!rollDown(s, v, p * Math.min(3, 1 + km / 80), 700 + salt)) return { extraDays: 0, line: deerStrike(s, v, km, salt) };
   if (mech >= 2 && s.stock.vehicle_parts >= 1) {
     s.stock.vehicle_parts -= 1; v.condition = Math.max(0, v.condition - 0.02);
     return { extraDays: 1, line: `The ${VEHICLES[v.kind].name.toLowerCase()} broke down on the road (${PARTS[0]}); they fixed it by the roadside with a parts kit. A day lost.` };
@@ -338,6 +351,7 @@ export function vehiclesDay(s: GameState): string[] {
   const commuting = peace && s.weekend?.mode !== 'split' && s.personState.some(ps => ps.employed);
   // (the living: a dead mechanic used to keep the trucks running)
   const mechanic = mechanicOf(s);
+  const worn = peace ? 1 : wornFactor(s);
   syncParking(s);
   const plan = parkingPlan(s);
   const day = dayIndex(s.clock.t);
@@ -375,10 +389,10 @@ export function vehiclesDay(s: GameState): string[] {
       if (Math.floor(v.mileage / 50_000) > Math.floor((v.mileage - miles) / 50_000) && s.money >= TIRES_USD) { s.money -= TIRES_USD; out.push(`New tires on the ${def.name.toLowerCase()}.`); }
     } else {
       // a service when it is due, if there is a kit and someone who can
-      if (overdue(v) && mechanic >= 2 && s.stock.vehicle_parts >= 1) { s.stock.vehicle_parts -= 1; v.serviceAt = v.mileage; v.oilAt = v.mileage; v.condition = Math.min(1, v.condition + 0.05); out.push(`Serviced the ${def.name.toLowerCase()}: a kit of filters, belts and plugs.`); }
-      const fixing = mechanic >= 3 && s.stock.hardware >= 0.01;
-      if (fixing) s.stock.hardware -= 0.01;
-      v.condition -= (fixing ? 0.0002 : 0.002 * (1 - mechanic / 10)) * (overdue(v) ? 1.5 : 1);
+      if (overdue(v, worn) && mechanic >= 2 && s.stock.vehicle_parts >= 1) { s.stock.vehicle_parts -= 1; v.serviceAt = v.mileage; v.oilAt = v.mileage; v.condition = Math.min(1, v.condition + 0.05); out.push(`Serviced the ${def.name.toLowerCase()}: a kit of filters, belts and plugs.`); }
+      const fixing = mechanic >= 3 && s.stock.hardware >= 0.01 * worn;
+      if (fixing) s.stock.hardware -= 0.01 * worn;
+      v.condition -= (fixing ? 0.0002 : 0.002 * (1 - mechanic / 10)) * (overdue(v, worn) ? 1.5 : 1) * (1 + 0.15 * (worn - 1));
       if (v.condition <= 0) { v.condition = 0; out.push(`The ${def.name.toLowerCase()} broke down for good.`); continue; }
     }
     // the odd breakdown (the miles they drive every day are not many, but the old ones go)
@@ -400,4 +414,13 @@ export function fleetCapacity(s: GameState): { seats: number; cargoKg: number; v
   const vs = roadVehicles(s).filter(v => v.fuel > 0 || s.stock.fuel > 0);
   const kg = vs.reduce((a, v) => a + cargoKg(s, v), 0);
   return { seats: vs.reduce((a, v) => a + VEHICLES[v.kind].seats, 0), cargoKg: kg, vehicles: vs.length };
+}
+
+/** Service kits a day the running machines will want at today's wear (sim/parts.ts): miles a day over the interval, shortened by age. */
+export function serviceRate(s: GameState): number {
+  const worn = wornFactor(s);
+  return fleetOf(s).filter(v => v.kind !== 'trailer' && v.condition > 0).reduce((a, v) => {
+    const miles = v.kind === 'pickup' || v.kind === 'old_pickup' || v.kind === 'suv' ? 3 : VEHICLES[v.kind].dailyMiles;
+    return a + miles * worn / SERVICE_MILES;
+  }, 0);
 }

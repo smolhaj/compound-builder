@@ -44,7 +44,7 @@ import type { Medical } from './medical';
 import type { Evenings } from './evenings';
 import type { Courses } from './courses';
 import { starterKit, type ToolKit } from './tools';
-export const SAVE_VERSION = 70;
+export const SAVE_VERSION = 71;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -129,6 +129,8 @@ export interface Structure {
   unplaced?: boolean;
   /** Repairs it needs (old roof, wiring, plumbing, septic field). */
   fixes?: Fix[];
+  /** A tunnel's poly was last put on at this time (sim/tunnels.ts; the build time if never re-covered). */
+  filmAt?: number;
   /** County permit (sim/paperwork.ts): under review, approved, built without one, or stopped by the inspector; when review / the stop ends. */
   permit?: 'review' | 'ok' | 'none' | 'stopped';
   permitAt?: number;

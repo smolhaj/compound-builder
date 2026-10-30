@@ -49,6 +49,8 @@ import { CELL, type KitPieceDef } from './buildkit/kit';
 import type { GameState } from '../sim/state';
 import type { WearSeason } from '../engine/world/people/crowdWear';
 import type { TourBuildingInfo } from '../engine/world/camera/TourController';
+import { hydroSiteAt, windDay, TURBINE } from '../sim/renewables';
+import { hydroLine, HYDRO_HOUSE } from './buildkit/renewableBuildings';
 import { climbOf, floorHatchHost, footprint, KIT, placementProblem, rotQ, type Placed, type SiteQuery } from './buildkit/kit';
 import { showStage, CUTAWAY_HIDE, XRAY_LAYERS, type BuildLayer as CabinLayer, type BuildOpts } from './buildkit/shell';
 import { bunkerRoots, datums, doorsOf, DEPTH, isEntry, isUnderground, tunnelDoorsOf, tunnelStart, type Side } from './buildkit/underground';
@@ -89,6 +91,8 @@ import { DRIVE_W, accessFromPlan, distToLine, type Access } from './region/acces
 import { ROAD_W, countyRoad, roadLine, type CountyRoad } from './region/countyRoad';
 import { buildRoadWorks } from './region/roadWorks';
 import { roadPlanFor } from '../sim/roadState';
+import { pinSeed } from '../sim/lotSeed';
+import { PlowRun } from './fx/PlowRun';
 import { roadBedOf, type RoadPlan } from '../sim/roadPlan';
 import { buildRibbon } from '../engine/world/roads/RoadRibbon';
 import { gravelMaterial, roadMaterial } from '../engine/world/roads/roadTextures';
@@ -233,10 +237,14 @@ export class HomesteadWorld {
   /** The county road past the place, the region's way (game/region/countyRoad.ts). */
   readonly county: CountyRoad;
   /** The planned way in: curves, switchbacks, crossings, a bore (sim/roadPlan.ts); the sim reads the very same plan. */
-  readonly plan: RoadPlan;
-  readonly access: Access;
+  plan: RoadPlan;
+  access: Access;
+  /** The seed the ground and the road are planned with (pinned to the lot for a listed lot, sim/lotSeed.ts). */
+  private readonly _seed: number;
   private readonly _roads = new THREE.Group();
   truck: DeliveryTruck;
+  /** The plow pickup and the berms it leaves (fx/PlowRun.ts). */
+  plow: PlowRun;
   private _stockpile: THREE.Group | null = null;
   private _stockKey = '';
   private readonly _seenOrders = new Set<string>();
@@ -257,8 +265,10 @@ export class HomesteadWorld {
   /** The place the family bought (its rect on the survey grid). */
   readonly home: { x0: number; z0: number; x1: number; z1: number };
 
-  constructor(ws: WorldScene, seed: number, site: LandSite = CLASSIC) {
+  constructor(ws: WorldScene, gameSeed: number, site: LandSite = CLASSIC) {
     this._ws = ws;
+    const seed = pinSeed(site, gameSeed);
+    this._seed = seed;   // a lot's ground is the lot's own: what the listing showed is what is built
     ws.setSite({ x0: 0, z0: 0, x1: PARCEL_SIZE, z1: PARCEL_SIZE });
     this.home = { ...site.home };
     this.parcel = new ParcelTerrain(seed, { creek: site.creek, timber: site.timber, region: site.region, lot: site.lot ?? null, home: site.home });
@@ -320,6 +330,7 @@ export class HomesteadWorld {
     // a built drive is benched into the ground (cut banks, fill slopes, banked curves): before the terrain mesh and the trees are made
     this.parcel.setRoadBed(this._drive ? roadBedOf(this.plan) : null);
     this.truck = new DeliveryTruck(ws.scene, this._truckRoute(), this.groundAt, this.county.x, (x, z) => this._driveY(x, z));
+    this.plow = new PlowRun(ws.scene, this.access.drive, this.groundAt, (x, z) => this._driveY(x, z));
   }
 
   private *_atmosBuildings(): Iterable<AtmosBuilding> {
@@ -369,6 +380,33 @@ export class HomesteadWorld {
     return y;
   }
 
+  /** The family chose another entrance (before the drive): plan the road from it, redraw it and send the truck the new way. */
+  replan(site: LandSite): void {
+    const plan = roadPlanFor(site, this._seed, this.parcel);
+    if (plan === this.plan) return;
+    this.plan = plan;
+    this.access = accessFromPlan(plan);
+    this.parcel.setRoadBed(this._drive ? roadBedOf(plan) : null);
+    this._buildRoads();
+    this.truck.dispose();
+    this.truck = new DeliveryTruck(this._ws.scene, this._truckRoute(), this.groundAt, this.county.x, (x, z) => this._driveY(x, z));
+    this.plow.setRoute(this.access.drive);
+    this._ws.invalidateShadows();
+  }
+
+  private _previewRoad: THREE.Mesh | null = null;
+  /** Draw the road from a candidate entrance (z on the property line) as an amber line, or take it away (null). */
+  previewEntrance(site: LandSite, z: number | null): void {
+    if (this._previewRoad) { this._root.remove(this._previewRoad); this._previewRoad.geometry.dispose(); this._previewRoad = null; }
+    if (z === null) return;
+    const plan = roadPlanFor({ ...site, entrance: z }, this._seed, this.parcel);
+    const line = plan.pts.map(p => [p.x, p.z] as [number, number]);
+    const m = new THREE.Mesh(buildRibbon(line, 0.2, this.groundAt, 0.06, 2), new THREE.MeshBasicMaterial({ color: 0xffb030, transparent: true, opacity: 0.85, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+    m.renderOrder = 5;
+    this._previewRoad = m;
+    this._root.add(m);
+  }
+
   /** The drive went in (or the place has none yet): redraw it and send the truck the new way. */
   setDrive(on: boolean): void {
     if (on === this._drive) return;
@@ -383,6 +421,7 @@ export class HomesteadWorld {
     this._buildRoads();
     this.truck.dispose();
     this.truck = new DeliveryTruck(this._ws.scene, this._truckRoute(), this.groundAt, this.county.x, (x, z) => this._driveY(x, z));
+    this.plow.setRoute(this.access.drive);
   }
 
   /**
@@ -470,6 +509,7 @@ export class HomesteadWorld {
       if (this._clock > 0.5) this.truck.enqueue(o.lines);
     }
     this.truck.update(dt, speedK);
+    this.plow.update(dt, this._drive && game.stock.plow >= 1, seasonState.params.snow, speedK);
     // deliveries left at the road (no drive yet), by the gate
     const rs = emptyStock();
     for (const r of game.roadside ?? []) for (const l of r.lines) rs[l.material] += l.qty * (1 - r.done / r.hours);
@@ -829,18 +869,21 @@ export class HomesteadWorld {
     this._runs = runs;
     const lit = opts.lit ?? true, sensors = opts.sensors ?? false;
     const hostOf = (r: PerimeterRun) => (PERIMETER[r.kind].wallTop ? runs.find(x => x.id === r.hostId)?.kind ?? '' : '');
+    // razor wire on a wall with a patrol deck is drawn on the deck's outer rail (perimeterGeometry 'wall_walk')
+    const hostRazor = (r: PerimeterRun) => PERIMETER[r.kind].wallTop && !!runs.find(x => x.id === r.hostId)?.razor;
+    const deckOn = (r: PerimeterRun) => !PERIMETER[r.kind].wallTop && runs.some(x => x.hostId === r.id);
     const ids = runs.map(r => r.id).join(',');
     for (const r of runs) {
       // old posts lean and rails sag (atmosphere/aging): rebuilt as the lean steps
       const lean = LEANS.has(r.kind) && r.finishedAt !== null ? Math.round(fenceLean((t - r.finishedAt) / 365) * 10) / 10 : 0;
-      const key = `${Math.round(runProgress(r) * 60)}:${Math.round(runGrowth(r, t) * 40)}:${r.finishedAt === null ? 0 : 1}:${r.gates.length}:${lean}:${hasSkirt(r, t) ? 1 : 0}:${lit ? 1 : 0}:${sensors ? 1 : 0}:${hostOf(r)}:${r.razor ? 1 : 0}`;
+      const key = `${Math.round(runProgress(r) * 60)}:${Math.round(runGrowth(r, t) * 40)}:${r.finishedAt === null ? 0 : 1}:${r.gates.length}:${lean}:${hasSkirt(r, t) ? 1 : 0}:${lit ? 1 : 0}:${sensors ? 1 : 0}:${hostOf(r)}:${r.razor ? 1 : 0}:${hostRazor(r) ? 1 : 0}:${deckOn(r) ? 1 : 0}`;
       const cur = this._runGroups.get(r.id);
       if (cur?.key === key) continue;
       if (cur) { this._root.remove(cur.group); cur.group.traverse(o => (o as THREE.Mesh).geometry?.dispose()); }
       const tunnel = r.kind === 'escape_tunnel' || r.kind === 'underground_passage';
       const group = tunnel
         ? buildTunnel(this._pathOf(r), this.groundAt, r.finishedAt !== null ? 1 : runProgress(r), this._exitWoods(r), r.kind === 'underground_passage' ? { woodsStart: this.tunnelExitWoods(r.pts[0][0], r.pts[0][1]) } : undefined)
-        : buildRun(r, this.groundAt, t, (x, z) => this.onBuilding(x, z, 0.02, false), { lit, sensors, hostKind: PERIMETER[r.kind].wallTop ? runs.find(x => x.id === r.hostId)?.kind : undefined });
+        : buildRun(r, this.groundAt, t, (x, z) => this.onBuilding(x, z, 0.02, false), { lit, sensors, hostKind: PERIMETER[r.kind].wallTop ? runs.find(x => x.id === r.hostId)?.kind : undefined, hostRazor: hostRazor(r), deck: deckOn(r) });
       if (tunnel) this._applyTunnelView(group);
       if (lean > 0) leanRun(group, lean, hashStr(r.id) % 997, this.groundAt);
       this._root.add(group);
@@ -1936,6 +1979,7 @@ export class HomesteadWorld {
         }
         continue;
       }
+      if (b.placed.kind === 'micro_hydro' || b.placed.kind === 'wind_turbine') { this._renewableLife(b, game, dt); continue; }
       if (b.placed.kind === 'pond') { this._pondLife(b, game); continue; }
       if (b.placed.kind === 'sheep_barn') { this._flock(b, game); continue; }
       if (b.placed.kind !== 'garden' && b.placed.kind !== 'field') continue;
@@ -1945,6 +1989,50 @@ export class HomesteadWorld {
       }
     }
     // the fire pit (camp cookfire, evenings sat out) is lit by the atmosphere (atmosphere/nightLife.firePitLit)
+  }
+
+  /**
+   * The micro-hydro line (penstock along the ground to the intake weir on the creek, from the sim's site) and the turbine's spin. The line is built
+   * once the plant is finished; the weir goes when a flood takes it (`utilities.broken`). The rotor turns with the day's output.
+   */
+  private _renewableLife(b: Built, game: GameState, dt: number): void {
+    const st = game.structures.find(x => x.id === b.placed.id);
+    if (!st) return;
+    const broken = game.utilities.broken.includes(st.id);
+    if (b.placed.kind === 'micro_hydro') {
+      let line = b.group.userData.hydroLine as THREE.Group | undefined;
+      if (b.finished && !line) {
+        const site = hydroSiteAt(game, st.x, st.z);
+        if (site && site.lenM >= 12) {
+          const c = Math.cos(-b.group.rotation.y), s = Math.sin(-b.group.rotation.y);
+          // world -> the group's frame (position and a turn about y)
+          const loc = (x: number, z: number, y: number): [number, number, number] => { const dx = x - b.group.position.x, dz = z - b.group.position.z; return [dx * c + dz * s, y - b.group.position.y, -dx * s + dz * c]; };
+          const back = new THREE.Vector3(0, 0, -(HYDRO_HOUSE.D / 2 + 3.2 * M)).applyAxisAngle(new THREE.Vector3(0, 1, 0), b.group.rotation.y).add(b.group.position);
+          const n = 14, pts: Array<[number, number, number]> = [];
+          for (let k = 0; k <= n; k++) { const f = k / n, x = back.x + (site.intake[0] - back.x) * f, z = back.z + (site.intake[1] - back.z) * f; pts.push(loc(x, z, this.groundAt(x, z))); }
+          const creek = this.parcel.creek, iy = creek.waterY(site.intake[0]);
+          const w = loc(site.intake[0], site.intake[1], iy);
+          line = hydroLine(pts, { x: w[0], y: w[1], z: w[2], half: creek.halfWidth, yaw: b.group.rotation.y ? -b.group.rotation.y : 0 });
+          b.group.add(line);
+          b.group.userData.hydroLine = line;
+        }
+      }
+      const weir = line?.userData.weir as THREE.Object3D | undefined;
+      if (weir) weir.visible = !broken;
+      return;
+    }
+    // the wind turbine: the rotor appears when the tower is up and turns with the output (a furled, calm or broken one stands still)
+    const rotor = b.group.userData.rotor as THREE.Object3D | undefined;
+    if (!rotor) return;
+    rotor.visible = b.finished;
+    const t = (b.group.userData.windT as number | undefined) ?? -1;
+    const tk = Math.floor(game.clock.t * 4);
+    if (tk !== t) {
+      const d = windDay(game, st, { broken });
+      b.group.userData.windOmega = d.state === 'running' ? 1 + 5 * d.kw / TURBINE.RATED_KW : d.state === 'iced' ? 0.6 : d.state === 'calm' ? 0.35 : 0;
+      b.group.userData.windT = tk;
+    }
+    rotor.rotation.z -= dt * ((b.group.userData.windOmega as number) ?? 0);
   }
 
   /** The pond's fish and crayfish: shown in proportion to the stock (the first meshes in each draw order show first). */
@@ -2225,6 +2313,7 @@ export class HomesteadWorld {
     }
     this._built.clear();
     this.truck.dispose();
+    this.plow.dispose();
     this._ws.scene.remove(this._roads);
     this._roads.traverse(o => (o as THREE.Mesh).geometry?.dispose());
     this.forest.dispose();

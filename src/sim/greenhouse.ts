@@ -31,6 +31,7 @@ import { farmOf, greenhouseCareOf } from './farm';
 import { orchardChoreRate } from './orchard';
 import { glassSound } from './improvements';
 import { regionFor } from './climate';
+import { filmLight, isTunnel, tunnelPestK, TUNNEL } from './tunnels';
 
 /** Days the greenhouse moves the garden's start earlier and its end later. */
 export const GREENHOUSE_EXTEND = 42;
@@ -42,10 +43,13 @@ export const GREENS_KCAL = 600;
 const finished = (s: GameState, ...kinds: string[]): Structure[] => s.structures.filter(st => kinds.includes(st.kind) && isFinished(st));
 
 /** The two glasshouse tiers: the 12 × 24 ft hobby kit and the 9 × 24 m production house. */
-export const GH_KINDS = ['greenhouse', 'greenhouse_heated'] as const;
+export const GH_KINDS = ['greenhouse', 'greenhouse_heated', 'polytunnel', 'high_tunnel'] as const;
 export const GH_TIER: Record<string, { name: string; kcal: number; extend: number; peak: number }> = {
   greenhouse: { name: 'Greenhouse', kcal: GREENS_KCAL, extend: GREENHOUSE_EXTEND, peak: GREENHOUSE_PEAK },
   greenhouse_heated: { name: 'Heated greenhouse', kcal: 4200, extend: 70, peak: 1.3 },
+  // film tunnels (sim/tunnels.ts): cheaper, cold-hardy greens only, and the film ages
+  polytunnel: { name: TUNNEL.polytunnel.name, kcal: TUNNEL.polytunnel.kcal, extend: TUNNEL.polytunnel.extend, peak: TUNNEL.polytunnel.peak },
+  high_tunnel: { name: TUNNEL.high_tunnel.name, kcal: TUNNEL.high_tunnel.kcal, extend: TUNNEL.high_tunnel.extend, peak: TUNNEL.high_tunnel.peak },
 };
 /** Wood a heated greenhouse burns at full demand (ricks a day), and the power it draws (kWh a day: base and per unit of demand). */
 export const GH_WOOD_RICKS = 0.09, GH_BASE_KWH = 4, GH_HEAT_KWH = 30;
@@ -87,6 +91,7 @@ export function greenhouseKwh(s: GameState, st: Structure): number {
 
 /** Is this greenhouse warm for the winter benches? (the hobby house: powered; the production house: its boiler or heater worked yesterday) */
 export function isHeated(s: GameState, st: Structure): boolean {
+  if (isTunnel(st.kind)) return false;
   return st.kind === 'greenhouse_heated' ? greenhouseCareOf(s, st.id).heated : s.utilities.lit.includes(st.id);
 }
 
@@ -95,7 +100,8 @@ export function greenhouseGreens(s: GameState): number {
   const doy = calendarOf(s.clock).doy;
   if (!inGreensSeason(doy)) return 0;
   const cold = regionFor(s.site).cold;
-  return greenhouses(s).reduce((a, st) => a + GH_TIER[st.kind].kcal * greensFactor(cold, isHeated(s, st)) * glassSound(st), 0);
+  const care = s.daily?.chores.levels.greenhouse ?? 0, pest = tunnelPestK(s, care);
+  return greenhouses(s).reduce((a, st) => a + GH_TIER[st.kind].kcal * greensFactor(cold, isHeated(s, st)) * glassSound(st) * (isTunnel(st.kind) ? filmLight(s, st) * pest : 1), 0);
 }
 
 /**
@@ -131,12 +137,12 @@ export { ORCHARD_KINDS, ORCHARD_TREES, orchardDay, orchardYield } from './orchar
 export function selfSufficiencyRates(s: GameState, doy: number): { orchard: number; greenhouse: number; pond: number } {
   const houses = greenhouses(s);
   const [g0, g1] = gardenSeason(s);
-  const gh = houses.reduce((a, st) => a + (st.kind === 'greenhouse_heated' ? 6 : 3), 0);
+  const gh = houses.reduce((a, st) => a + (st.kind === 'greenhouse_heated' ? 6 : st.kind === 'high_tunnel' ? 4 : st.kind === 'polytunnel' ? 2 : 3), 0);
   const growing = (doy >= g0 && doy <= g1) || inGreensSeason(doy);
   const stocked = finished(s, 'pond').filter(st => { const p = farmOf(s).ponds[st.id]; return !!p && p.trout + p.crayfish > 0; }).length;
   return {
     orchard: orchardChoreRate(s, doy),
     greenhouse: growing ? Math.min(30, gh) : 0,
-    pond: Math.min(24, 6 * stocked),
+    pond: Math.min(30, 6 * stocked + 6 * finished(s, 'aquaponics').filter(st => (s.farm?.aqua?.[st.id]?.fish ?? 0) > 0).length),
   };
 }

@@ -15,12 +15,12 @@ export const SHELF_TABS: ReadonlyArray<[ShelfTab, string]> = [
 ];
 
 export const SHELVES: Record<ShelfTab, MaterialId[]> = {
-  build: ['lumber', 'fieldstone', 'concrete', 'roofing', 'hardware', 'wire', 'seedlings', 'greenhouse_kit', 'greenhouse_pro_kit', 'fruit_trees'],
+  build: ['lumber', 'fieldstone', 'concrete', 'roofing', 'hardware', 'wire', 'seedlings', 'greenhouse_kit', 'greenhouse_pro_kit', 'tunnel_kit_small', 'tunnel_kit_high', 'poly_film', 'aqua_kit', 'fruit_trees'],
   fencing: ['wire', 'hardware', 'lumber', 'seedlings', 'container', 'rebar', 'concrete', 'cable', 'roofing'],
   bunker: ['rebar', 'membrane', 'container', 'blast_door', 'blast_valve', 'nbc_filter', 'filter_set', 'culvert', 'egress_hatch', 'passage_hatch', 'lead_sheet', 'faraday_mesh'],
   water: ['water_jugs', 'ibc_tote', 'water_trailer', 'water_filter', 'ro_system', 'softener', 'greywater', 'pipe', 'fixtures', 'pump', 'drilling', 'tank', 'septic_tank'],
-  power: ['solar_panel', 'battery', 'inverter', 'generator', 'cable'],
-  food: ['seed', 'seed_heirloom', 'seed_cover', 'manure', 'lids', 'canner', 'dehydrator', 'crocks', 'grain_mill', 'fishing_gear', 'snares', 'smoker', 'goat', 'cow', 'pig', 'steer', 'sheep', 'rabbit', 'hay', 'feed', 'vet_kit', 'cheese_kit', 'bee_nuc', 'hive_supplies', 'maple_taps', 'trout_fry', 'crayfish_stock', 'fish_feed'],
+  power: ['solar_panel', 'battery', 'inverter', 'generator', 'cable', 'hydro_set', 'penstock', 'wind_turbine', 'tilt_tower'],
+  food: ['seed', 'seed_heirloom', 'seed_cover', 'manure', 'lids', 'canner', 'dehydrator', 'crocks', 'grain_mill', 'fishing_gear', 'snares', 'smoker', 'goat', 'cow', 'pig', 'steer', 'sheep', 'rabbit', 'hay', 'feed', 'vet_kit', 'cheese_kit', 'bee_nuc', 'hive_supplies', 'maple_taps', 'trout_fry', 'crayfish_stock', 'fish_feed', 'tilapia_fry'],
   household: ['meds', 'antibiotics', 'splints', 'ors', 'dental_kit', 'midwife_kit', 'medical_books', 'hygiene', 'traps', 'tent', 'sleeping_bag', 'kibble', 'dogbed', 'doghouse'],
   learning: ['games', 'game_pieces', 'instrument', 'guitar_strings', 'music_player', 'batteries', 'novels', 'paperbacks_bag', 'toys', 'picture_books', 'manuals', 'course_firstaid', 'course_ham', 'course_engines', 'course_welding', 'course_carpentry', 'course_wiring', 'course_gardening', 'course_husbandry', 'course_canning'],
   fuel: ['fuel', 'vehicle_parts', 'stabilizer', 'firewood', 'excavator', 'plow', 'gun_safe', 'gun_cleaning'],

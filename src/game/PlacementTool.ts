@@ -7,6 +7,8 @@ import { useWorldStore } from '../store/worldStore';
 import { buildGhost } from './buildkit/buildings';
 import type { HomesteadWorld } from './HomesteadWorld';
 import { useGameStore } from '../store/gameStore';
+import { hydroProblem } from '../sim/renewables';
+import { siteNote } from '../sim/microclimate';
 import { onJustPlaced, type Spot } from './buildkit/justPlaced';
 import { clashText, padClash, padSnap } from './buildkit/padRules';
 
@@ -48,6 +50,7 @@ export class PlacementTool {
       owned: (x, z) => ownsAt(useGameStore.getState().game, x, z),
       water: (x, z) => _world.parcel.isCreek(x, z) || _world.stream.depthAt(x, z) > 0,
       blocked: (x, z) => _world.onCamp(x, z) || _world.onAccess(x, z, 0.1),
+      rule: (kind, x, z) => (kind === 'micro_hydro' ? hydroProblem(useGameStore.getState().game, x, z) : null),
     };
     const on = <K extends keyof HTMLElementEventMap>(el: HTMLElement | Window, t: K, f: (e: HTMLElementEventMap[K]) => void) => {
       el.addEventListener(t, f as EventListener);
@@ -110,7 +113,7 @@ export class PlacementTool {
     if (placed && !repeat) {
       this.setKind(null);
       // (an orchard planted in a cold-air pocket loses its blossom to the late frosts: say so while it can still be moved: sim/orchard.ts)
-      const note = isOrchard(kind) ? orchardSiteNote(useGameStore.getState().game, x, z) : null;
+      const gm = useGameStore.getState().game, note = isOrchard(kind) ? [orchardSiteNote(gm, x, z), siteNote(gm, kind, { x, z })].filter(Boolean).join(' ') || null : siteNote(gm, kind, { x, z });
       useGameStore.getState().flashStaked(`Staked out the ${kind.replace(/_/g, ' ')}. The family will start when the materials are in (Projects tab). Shift-click stakes several in a row.${note ? ' ' + note : ''}`);
       return;
     }

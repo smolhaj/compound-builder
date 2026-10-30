@@ -114,6 +114,14 @@ export const WOOD_OVEN: KitPieceDef = {
   maxSlope: 0.3, floorY: 0.0, porch: 0, sleeps: 0, light: null,
 };
 
+export const FORGE: KitPieceDef = {
+  id: 'forge', name: 'Forge', category: 'work',
+  blurb: 'An open-sided smithy: a stone hearth, bellows, an anvil on a stump and a quench trough. Mends tools from scrap iron with no hardware, and turns out better improvised steel tools.',
+  cellsX: 2, cellsZ: 1, frontCells: 1,
+  parts: { foundation: 'concrete', walls: 'fieldstone', roof: 'metal_roof' },
+  maxSlope: 0.25, floorY: 0.02, porch: 0, sleeps: 0, light: [0, 0.25, 0],
+};
+
 export const APIARY: KitPieceDef = {
   id: 'apiary', name: 'Apiary', category: 'food',
   blurb: 'Four hives behind an electric bear fence: honey, wax, and a better garden and orchard. Bees come in spring from the Shop.',
@@ -185,6 +193,31 @@ export const GREENHOUSE_HEATED: KitPieceDef = {
   cellsX: 3, cellsZ: 8, frontCells: 1,
   parts: { foundation: 'concrete', walls: 'glass', roof: 'glass' },
   maxSlope: 0.12, floorY: 0.0, porch: 0, sleeps: 0, light: null,
+};
+
+/** The polytunnel (sim/tunnels.ts): hoops and one skin of film, the cheap way to a longer season. */
+export const POLYTUNNEL: KitPieceDef = {
+  id: 'polytunnel', name: 'Polytunnel', category: 'food',
+  blurb: '6 × 12 m hoop house with one skin of poly: the garden three weeks earlier and later and cold-hardy greens through the winter (250 kcal a day), for a fraction of glass. The film lasts four years; wind and snow tear it. Drip line from the pond.',
+  cellsX: 2, cellsZ: 4, frontCells: 0,
+  parts: { foundation: 'wood_dark', walls: 'polycarb', roof: 'polycarb' },
+  maxSlope: 0.15, floorY: 0.0, porch: 0, sleeps: 0, light: null,
+};
+/** The high tunnel: nine metres of gothic frame with roll-up sides. */
+export const HIGH_TUNNEL: KitPieceDef = {
+  id: 'high_tunnel', name: 'High tunnel', category: 'food',
+  blurb: '9 × 30 m gothic frame with roll-up sides and a double door: the garden five weeks earlier and later and 520 kcal a day of winter greens, unheated. Sheds snow badly (knock it off), tears in a gale on a windy spot, and breeds whitefly and mould in damp air. Four-year film.',
+  cellsX: 3, cellsZ: 10, frontCells: 0,
+  parts: { foundation: 'concrete', walls: 'polycarb', roof: 'polycarb' },
+  maxSlope: 0.1, floorY: 0.0, porch: 0, sleeps: 0, light: null,
+};
+/** The aquaponics bay (sim/aquaponics.ts). */
+export const AQUAPONICS: KitPieceDef = {
+  id: 'aquaponics', name: 'Aquaponics bay', category: 'food',
+  blurb: 'A glazed 6 × 12 m bay with four 1,000 L tilapia tanks feeding 20 m² of media beds: fish (about 450 g in six months) and greens all year (≈ 420 kcal a day) on pellets and power. The heater and the air pump must never stop: a blackout in warm water is a fish kill. Wire it.',
+  cellsX: 2, cellsZ: 4, frontCells: 1,
+  parts: { foundation: 'concrete', walls: 'glass', roof: 'glass' },
+  maxSlope: 0.08, floorY: 0.0, porch: 0, sleeps: 0, light: [0, 0.6, 0],
 };
 
 /** Forty-eight trees: the orchard at farm scale. */
@@ -370,6 +403,8 @@ export const UTILITY_KIT: KitPieceDef[] = [
   util('filtration_shed', 'Water filtration shed', 'water', 1, 1, 'A 1.8 × 2.4 m shed by the pressure tank: sediment and carbon filters and a UV lamp. Well, rain and creek water treated for the house.', [0, 0.25, 0]),
   util('solar_farm', 'Solar farm (20 kW)', 'power', 4, 6, '50 × 400 W panels in five rows on steel racks with three inverters: 20 kW, ≈ 72 kWh on a summer day and 40 in December. Stand a battery container beside it.'),
   util('battery_bank', 'Battery container (60 kWh)', 'power', 2, 1, 'Twelve 5 kWh racks, an inverter and air conditioning in a 20 ft container. Put it beside the array: equipment standing together shares a bus.', [0, 0.28, 0]),
+  util('micro_hydro', 'Micro-hydro plant (3 kW)', 'power', 2, 2, 'A turbine house on the creek bank fed by 100 m of buried penstock from an intake weir upstream. Up to 3 kW day and night (14-36 kWh a day on a few metres of fall), most in the spring runoff, least in the August low and under winter ice. Needs the creek to fall 2.5 m or more over the pipe, a water right ($1,800 permit) and a clear intake screen.', [0, 0.28, 0]),
+  util('wind_turbine', 'Wind turbine (5 kW)', 'power', 1, 1, 'A 5 kW three-blade turbine on an 18 m guyed tilt-up tower. Output follows the wind your ground gives it: ridges and open benches pay, hollows and timber do not. It furls in a gale (and a derecho may take the tail), ices in freezing fog, can be heard from the road and seen for kilometers.'),
   util('septic', 'Septic system', 'sanitation', 2, 2, 'Septic tank and leach field. Lets plumbed houses have flush toilets.'),
 ];
 
@@ -430,11 +465,11 @@ export const BUNKER_KIT: KitPieceDef[] = [
 /** Underground menu order. */
 export const BUNKER_ORDER: readonly string[] = BUNKER_KIT.map(d => d.id);
 
-export const KIT: Record<string, KitPieceDef> = Object.fromEntries([LODGE, LODGE_PLINTH, LODGE_SOLAR, STONE_HOUSE, TIMBER_FRAME_HOUSE, CONTAINER_HOUSE, ADOBE_HOUSE, APIARY, SUGAR_SHACK, BARNYARD, WOOD_OVEN, GATE_GARAGE_KIT, MOTOR_COURT_KIT, TIMBER_CABIN, LOG_HOUSE, FARMHOUSE, TRAILER, BARN, COTTAGE, GUEST_HOUSE, MOMS_HOUSE, METAL_GARAGE, GARAGE_SOLAR, OUTHOUSE, WORKSHOP, ROOT_CELLAR, CHICKEN_COOP, GARDEN, FIELD, GREENHOUSE, GREENHOUSE_HEATED, ORCHARD, ORCHARD_GROVE, POND, RESERVOIR, SHEEP_BARN, EQUIPMENT_YARD, TERRACE_STAIR, TERRACE_RAMP, ...UTILITY_KIT, ...BUNKER_KIT, ...TOWER_KIT].map(d => [d.id, d]));
+export const KIT: Record<string, KitPieceDef> = Object.fromEntries([POLYTUNNEL, HIGH_TUNNEL, AQUAPONICS, LODGE, LODGE_PLINTH, LODGE_SOLAR, STONE_HOUSE, TIMBER_FRAME_HOUSE, CONTAINER_HOUSE, ADOBE_HOUSE, APIARY, FORGE, SUGAR_SHACK, BARNYARD, WOOD_OVEN, GATE_GARAGE_KIT, MOTOR_COURT_KIT, TIMBER_CABIN, LOG_HOUSE, FARMHOUSE, TRAILER, BARN, COTTAGE, GUEST_HOUSE, MOMS_HOUSE, METAL_GARAGE, GARAGE_SOLAR, OUTHOUSE, WORKSHOP, ROOT_CELLAR, CHICKEN_COOP, GARDEN, FIELD, GREENHOUSE, GREENHOUSE_HEATED, ORCHARD, ORCHARD_GROVE, POND, RESERVOIR, SHEEP_BARN, EQUIPMENT_YARD, TERRACE_STAIR, TERRACE_RAMP, ...UTILITY_KIT, ...BUNKER_KIT, ...TOWER_KIT].map(d => [d.id, d]));
 /** Build-menu order. */
-export const KIT_ORDER: readonly string[] = ['timber_cabin', 'log_house', 'lodge', 'lodge_plinth', 'lodge_solar', 'stone_house', 'timber_frame', 'container_house', 'adobe_house', 'cottage', 'guest_house', 'moms_house', 'outhouse', 'garden', 'greenhouse', 'greenhouse_heated', 'orchard', 'orchard_grove', 'field', 'chicken_coop', 'sheep_barn', 'pond', 'root_cellar', 'wood_oven', 'apiary', 'sugar_shack', 'barnyard', 'workshop', 'metal_garage', 'barn', 'equipment_yard'];
+export const KIT_ORDER: readonly string[] = ['timber_cabin', 'log_house', 'lodge', 'lodge_plinth', 'lodge_solar', 'stone_house', 'timber_frame', 'container_house', 'adobe_house', 'cottage', 'guest_house', 'moms_house', 'outhouse', 'garden', 'greenhouse', 'polytunnel', 'high_tunnel', 'greenhouse_heated', 'aquaponics', 'orchard', 'orchard_grove', 'field', 'chicken_coop', 'sheep_barn', 'pond', 'root_cellar', 'wood_oven', 'apiary', 'sugar_shack', 'barnyard', 'workshop', 'metal_garage', 'barn', 'equipment_yard'];
 /** Water & power menu order. */
-export const UTILITY_ORDER: readonly string[] = ['well_hand', 'well_drilled', 'cistern', 'water_tower', 'filtration_shed', 'septic', 'solar_array', 'solar_farm', 'garage_solar', 'battery_shed', 'battery_bank', 'generator_shed', 'reservoir'];
+export const UTILITY_ORDER: readonly string[] = ['well_hand', 'well_drilled', 'cistern', 'water_tower', 'filtration_shed', 'septic', 'solar_array', 'solar_farm', 'garage_solar', 'battery_shed', 'battery_bank', 'generator_shed', 'micro_hydro', 'wind_turbine', 'reservoir'];
 
 /** A placed structure (the game state record). */
 export interface Placed {
@@ -511,9 +546,11 @@ export interface SiteQuery {
   water(x: number, z: number): boolean;
   /** Something already there that isn't a kit piece (the camp). */
   blocked?(x: number, z: number): boolean;
+  /** Pieces that need a particular kind of ground (a creek bank with fall, a shore): why this one cannot go at (x, z), or null. */
+  rule?(kind: string, x: number, z: number): PlaceProblem | null;
 }
 
-export type PlaceProblem = 'off_parcel' | 'water' | 'too_steep' | 'overlaps' | 'not_connected' | 'thin_cover' | 'too_deep' | 'needs_house' | 'needs_slope' | 'no_climb' | 'too_much_climb' | 'cross_slope' | 'pad_clash';
+export type PlaceProblem = 'off_parcel' | 'water' | 'too_steep' | 'overlaps' | 'not_connected' | 'thin_cover' | 'too_deep' | 'needs_house' | 'needs_slope' | 'no_climb' | 'too_much_climb' | 'cross_slope' | 'pad_clash' | 'no_creek' | 'not_on_bank' | 'no_head';
 
 const levelOf = (d: KitPieceDef) => d.level ?? 'surface';
 /** Do pieces at these levels compete for the same ground? (Bunker rooms go under the yard and houses.) */
@@ -570,7 +607,7 @@ export function placementProblem(def: KitPieceDef, x: number, z: number, rot: nu
     const o = footprint(od, p.x, p.z, p.rot, levelOf(od) !== 'underground');
     if (r.x0 < o.x1 && r.x1 > o.x0 && r.z0 < o.z1 && r.z1 > o.z0) return 'overlaps';
   }
-  return null;
+  return site.rule?.(def.id, x, z) ?? null;
 }
 
 export const PROBLEM_TEXT: Record<PlaceProblem, string> = {
@@ -586,6 +623,9 @@ export const PROBLEM_TEXT: Record<PlaceProblem, string> = {
   too_much_climb: 'The ground climbs too much along it: a stair takes up to 3.6 m, a ramp 1.2 m. Terrace the slope or switch back',
   cross_slope: 'The ground falls away sideways across it: turn it (R) to run up the hill, not across',
   pad_clash: 'Its graded pad would cut into a neighbour\'s pad at another level',
+  no_creek: 'No creek runs through your land: a turbine needs falling water',
+  not_on_bank: 'Put the turbine house on the creek bank, within about 80 m of the water',
+  no_head: 'The creek does not fall far enough here: it needs 2.5 m of drop over the penstock (try further downstream)',
   needs_slope: 'The lodge needs a slope that falls away behind it: turn it (R) so the walkout side, the back with the big deck, faces downhill',
 };
 
