@@ -31,7 +31,8 @@ Checked against GDS §10.4 to §10.6, `docs/DECISIONS.md` and `src/sim`. Status:
 | Scavenging trips with risk and depletion | done | `sim/scavenge.ts` |
 | Seed saving | done | `sim/crops.ts` |
 | Smokehouse, curing, canning | done | `sim/kitchen.ts` |
-| Forge, soap and candle making | missing | beeswax is a good only (`sim/materials.ts`) |
+| Soap making | done (follow-up PR) | `sim/soap.ts` |
+| Candle making, forge | missing | needs a use for candles and a forge building; see DECISIONS |
 
 ## People and world (§10.6, task #27)
 | Item | Status | Where |
