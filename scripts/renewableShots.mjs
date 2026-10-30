@@ -128,7 +128,7 @@ try {
       const r = await put([['aquaponics', c[0] - 4, c[1] + 4, 0, 14]], { clear: true, stock: { fish_feed: 5 } });
       console.log('aqua', JSON.stringify(r));
       if (r[0].ok) {
-        await page.evaluate(id => { const G = window.__cb.game, g = structuredClone(G.getState().game); const st = g.structures.find(s => s.kind === 'aquaponics'); g.utilities.lit = [st.id]; (g.farm.aqua ??= {})[st.id] = { fish: 300, fishG: 260, tempC: 26, offDays: 0, fed: 1, lost: 0, dieOffAt: -999, harvestAt: -999 }; G.setState({ game: g }); }, 0);
+        await page.evaluate(id => { const G = window.__cb.game, g = structuredClone(G.getState().game); const st = g.structures.find(s => s.kind === 'aquaponics'); g.utilities.lit = [st.id]; ((g.farm ??= { greenhouses: {}, orchards: {}, ponds: {}, yard: {} }).aqua ??= {})[st.id] = { fish: 300, fishG: 260, tempC: 26, offDays: 0, fed: 1, lost: 0, dieOffAt: -999, harvestAt: -999 }; G.setState({ game: g }); }, 0);
         await orbit(r[0].at, 18, 0.55, 0.6, 0.3); await shot('aqua-1-aerial');
         await page.evaluate(() => window.__cb.store.getState().setBuildingView?.('cutaway'));
         await orbit(r[0].at, 9, 0.6, 0.3, 0.2); await shot('aqua-2-cutaway');
