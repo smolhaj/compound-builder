@@ -74,6 +74,7 @@ const bridgeUseSetup = `Promise.all([import('/src/sim/terrainFx.ts')]).then(asyn
     window.__span = sp;
     const w = cb.world;
     await new Promise(r => setTimeout(r, 1200));
+    w.corridors.sync(G.getState().game.perimeter); w.corridors.ensure(w.groundAt);
     const far = sp.b, near = sp.a;
     const orig = w._walkVia.bind(w);
     w._walkVia = (fx, fz, tx, tz) => orig(fx, fz, far[0], far[1]);
