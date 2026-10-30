@@ -27,7 +27,7 @@ Checked against GDS §10.4 to §10.6, `docs/DECISIONS.md` and `src/sim`. Status:
 | Soap, hygiene supplies | partial | `sim/body.ts` (a bought good that runs out; cannot be made) |
 | Barter values, market day, prices by scarcity | done | `sim/barter.ts`, `sim/market.ts`, `sim/tradeGoods.ts` |
 | Mutual aid: pact, shared work day, shared watch | done | `sim/neighborLife.ts`, `sim/pact.ts` |
-| Shared harvest | partial | work days yes; no harvest split |
+| Shared harvest | done (follow-up PR) | `sim/sharedHarvest.ts` |
 | Scavenging trips with risk and depletion | done | `sim/scavenge.ts` |
 | Seed saving | done | `sim/crops.ts` |
 | Smokehouse, curing, canning | done | `sim/kitchen.ts` |
