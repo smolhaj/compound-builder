@@ -73,7 +73,8 @@ function cabinVillage(def: KitPieceDef, seed = 1): THREE.Group {
     for (const sx of [-1, 1]) { p.add('wood_mid', yawed(box(0.9 * M, 0.35 * M, 2.0 * M, sx * (hw - 0.55 * M), y0, -hd + 1.2 * M), yaw, cx, cz)); p.add('quilt_red', yawed(box(0.8 * M, 0.1 * M, 1.8 * M, sx * (hw - 0.55 * M), y0 + 0.35 * M, -hd + 1.2 * M), yaw, cx, cz)); }
     p.add('iron', yawed(box(0.5 * M, 0.7 * M, 0.5 * M, hw - 0.5 * M, y0, -0.8 * M), yaw, cx, cz));
   }
-  p.collide({ x0: -0.9 * M, z0: -0.9 * M, x1: 0.9 * M, z1: 0.9 * M });
+  // the six cabins and the fire circle
+  p.collide({ x0: -0.9 * M, z0: -0.9 * M, x1: 0.9 * M, z1: 0.9 * M }, ...Array.from({ length: 6 }, (_, k) => { const [x, z] = at(k); return { x0: x - CW / 2, z0: z - CW / 2, x1: x + CW / 2, z1: z + CW / 2 }; }));
   const g = p.finish();
   g.userData.chimneyTop = null;
   g.userData.keep = [];
@@ -102,7 +103,7 @@ function helipad(def: KitPieceDef, seed = 1): THREE.Group {
   p.add('wood_dark', cylY(0.05 * M, 5.5 * M, hs + 1.2 * M, 0, -hs - 0.4 * M, 6));
   p.add('paint_red', new THREE.ConeGeometry(0.28 * M, 1.6 * M, 8).rotateZ(-Math.PI / 2).translate(hs + 1.2 * M + 0.8 * M, 5.2 * M, -hs - 0.4 * M));
   p.add('paint_red', box(0.1 * M, 0.9 * M, 0.5 * M, hs + 1.0 * M, 0, hs * 0.4));   // the extinguisher post
-  p.collide();
+  p.collide({ x0: -hs, z0: -hs, x1: hs, z1: -hs + 0.05 }, { x0: -hs, z0: hs - 0.05, x1: hs, z1: hs }, { x0: -hs, z0: -hs, x1: -hs + 0.05, z1: hs }, { x0: hs - 0.05, z0: -hs, x1: hs, z1: hs });
   const g = p.finish();
   g.userData.chimneyTop = null;
   g.userData.keep = ['foundation'];
