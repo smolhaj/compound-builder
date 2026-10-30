@@ -66,7 +66,7 @@ import { farHiddenLayers, isFar } from './buildkit/buildingLod';
 import { LIGHT_BUDGET, pickLights, type LightCandidate } from './lightPool';
 import { hashStr } from './buildkit/clutter';
 import { buildRun, solidSpans } from './perimeter/perimeterGeometry';
-import { PERIMETER, hasSkirt, runGrowth, runProgress, wallLength, type PerimeterRun } from '../sim/perimeter';
+import { PERIMETER, hasSkirt, runGrowth, runProgress, underground, wallLength, type PerimeterRun } from '../sim/perimeter';
 import { closestOnLine, earthworkReach, type Earthwork } from './parcel/parcelTerrain';
 import { exposure, Sight, type Observer, type SightWorld } from './sightlines/visibility';
 import { hitsColliders, M, type Collider } from './buildkit/interior';
@@ -721,7 +721,7 @@ export class HomesteadWorld {
   onPerimeterLine(x: number, z: number, pad = 0): boolean {
     for (const r of this._runs) {
       // a tunnel goes under the trees; only its exit hatch needs a clear spot
-      if (r.kind === 'escape_tunnel' || r.kind === 'underground_passage') { for (const e of r.kind === 'escape_tunnel' ? [r.pts[r.pts.length - 1]] : [r.pts[0], r.pts[r.pts.length - 1]]) if (Math.hypot(e[0] - x, e[1] - z) < 0.18 + pad) return true; continue; }
+      if (underground(r.kind)) { for (const e of r.kind === 'escape_tunnel' ? [r.pts[r.pts.length - 1]] : [r.pts[0], r.pts[r.pts.length - 1]]) if (Math.hypot(e[0] - x, e[1] - z) < (PERIMETER[r.kind].bore ? 0.9 : 0.18) + pad) return true; continue; }
       if (closestOnLine(r.pts, x, z).d < pad) return true;
     }
     return false;
@@ -867,7 +867,7 @@ export class HomesteadWorld {
   /** Walk / people collision with built perimeter runs (gates and unbuilt stretches are open). */
   private _perimeterBlocked(x: number, z: number, r: number): boolean {
     for (const run of this._runs) {
-      if (run.kind === 'escape_tunnel' || run.kind === 'underground_passage') continue;
+      if (underground(run.kind)) continue;
       const th = run.kind === 'container_wall' || run.kind === 'container_stack' ? 0.21 : run.kind === 'stone_wall' ? 0.15 : run.kind === 'concrete_wall' ? 0.15 : run.kind === 'thorn_hedge' ? 0.15 * runGrowth(run, this._simT) : run.kind === 'log_palisade' ? 0.03 : run.kind === 'earth_berm' || run.kind === 'ditch' ? 0 : 0.01;
       if (th < 0.01) continue;
       const { d, s } = closestOnLine(run.pts, x, z);

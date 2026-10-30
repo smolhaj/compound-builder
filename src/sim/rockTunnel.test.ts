@@ -10,6 +10,8 @@ import { planBattle } from './battle';
 import { makeLotSite } from './lotListing';
 import { terrainOf } from './terrainState';
 import { MATERIALS } from './materials';
+import { enclosure } from './enclosure';
+import { underground } from './perimeter';
 
 afterEach(() => setGroundOverride(null));
 
@@ -113,6 +115,26 @@ describe('the price table', () => {
     addRunWork(g, r, r.hours + 1);
     expect(runFinished(r)).toBe(true);
     expect(g.stock.spoil - before).toBe(Math.round(BORE.M3 * wallLength(r)));
+  });
+});
+
+describe('it is no wall on the surface', () => {
+  it('stops no walk, blocks no view, holds no line: the rock is its wall, only the two doors count', () => {
+    expect(underground('rock_tunnel')).toBe(true);
+    expect(underground('escape_tunnel') && underground('underground_passage')).toBe(true);
+    expect(underground('tunnel_bridge') || underground('slope_tunnel') || underground('stone_wall')).toBe(false);
+    const d = PERIMETER.rock_tunnel;
+    expect(d.blocks).toEqual({ people: 0, animals: 0, vehicles: 0 });
+    expect(d.sight).toBe(0);
+    expect(d.height).toBe(0);
+    // a finished bore 40 units long across the land changes nothing about the property line: not a wall, not a gap
+    setGroundOverride(SPUR);
+    const g = game();
+    const before = enclosure(g);
+    finish(planRun(g, 'rock_tunnel', THROUGH));
+    const after = enclosure(g);
+    expect(after.barrier).toBe(before.barrier);
+    expect(after.openShare).toBe(before.openShare);
   });
 });
 
