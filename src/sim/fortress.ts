@@ -134,12 +134,15 @@ const towerInset = (kind: TowerKind) => TOWERS[kind].cells * CELL / 2 + 0.2 + 0.
 
 /** Is a tower or garage footprint at (x, z) clear of what is already standing or staked (surface structures)? */
 function clearOf(s: GameState, x: number, z: number, half: number): boolean {
+  // on a lot with relief every building stands on its own graded pad (a flat apron and a skirt round it, up to 1.2 u): a piece set closer than that
+  // lands half on the neighbour's pad at a different level
+  const m = s.site.lot ? 1.5 : 0.8;
   return s.structures.every(o => {
     if (o.unplaced || o.kind.startsWith('bunker_')) return true;
     // a big building (the lodge is 15 x 18 m with its deck) is its footprint, not the point at its middle
     const def = KIT[o.kind];
-    if (def && def.level !== 'underground') { const r = footprint(def, o.x, o.z, o.rot); return x + half + 0.8 < r.x0 || x - half - 0.8 > r.x1 || z + half + 0.8 < r.z0 || z - half - 0.8 > r.z1; }
-    return Math.abs(o.x - x) > half + 0.8 || Math.abs(o.z - z) > half + 0.8;
+    if (def && def.level !== 'underground') { const r = footprint(def, o.x, o.z, o.rot); return x + half + m < r.x0 || x - half - m > r.x1 || z + half + m < r.z0 || z - half - m > r.z1; }
+    return Math.abs(o.x - x) > half + m || Math.abs(o.z - z) > half + m;
   });
 }
 

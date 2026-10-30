@@ -63,7 +63,15 @@ import { fogNow, solarFogK, fogPlaceOf } from './fogFx';
 import { boreStats, BORE } from './terrain';
 import { corridorsOf, lanesOf } from './terrainState';
 import { insideRing } from './compounds';
+import { polygonArea } from './ringShape';
 import { runFinished } from './perimeter';
+
+
+/** Every building of the compound is inside its wall (the court and the camp stand outside it by design). */
+const outsideWall = (g: GameState): string[] => {
+  const ring = g.perimeter.filter(r => r.kind === 'stone_wall' || r.kind === 'concrete_wall').sort((x, y) => polygonArea(y.pts) - polygonArea(x.pts))[0];
+  return g.structures.filter(st => ['lodge', 'greenhouse_heated', 'garden', 'orchard', 'solar_farm', 'battery_bank'].includes(st.kind) && !insideRing(ring.pts, st.x, st.z)).map(st => `${st.kind} ${st.id} at ${st.x.toFixed(1)}, ${st.z.toFixed(1)}`);
+};
 
 const env = (k: string): string | undefined => (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env[k];
 
@@ -83,6 +91,10 @@ for (const [rings, wall] of [[1, 'stone'], [2, 'stone'], [1, 'concrete']] as con
     expect(g.structures.some(st => st.kind === 'gate_garage')).toBe(true);
     expect(g.structures.some(st => st.kind === 'motor_court')).toBe(true);
     expect(g.perimeter.some(r => r.kind === 'drain_channel')).toBe(true);
+  });
+
+  it('the lodge, greenhouse, beds, orchard, solar farm and battery are all inside the wall', () => {
+    expect(outsideWall(g)).toEqual([]);
   });
 
   it('nothing clashes: no wall through a building, buildings on each other, wall on the rock face or ungated crossing of the drive', () => {
@@ -183,6 +195,10 @@ describe('the north-star layout: the compound on the bench above the rock face, 
     console.log('GATES', JSON.stringify(ring.gates));
     expect(ring.gates.filter(x => !x.sally), 'one doorway where the tunnel meets the wall, no other gate').toHaveLength(1);
     expect(g.structures.some(st => st.kind === 'gate_garage')).toBe(false);
+  });
+
+  it('the lodge, greenhouse, beds, orchard, solar farm and battery are all inside the wall', () => {
+    expect(outsideWall(g)).toEqual([]);
   });
 
   it('nothing clashes in the compound', () => {

@@ -16,6 +16,9 @@ import { boreTo } from './terrainState';
 import { boreProblem } from './terrain';
 import { boreText } from './terrainFx';
 import { courtSpot } from './motorCourt';
+import { polygonArea } from './ringShape';
+import { insideRing } from './compounds';
+import { KIT, footprint } from '../game/buildkit/kit';
 import type { FortressOptions } from './fortress';
 
 /** What the design drives. The browser and the tests each supply their own. */
@@ -66,6 +69,35 @@ export interface ShowcaseOptions {
   wall?: 'stone' | 'concrete';
 }
 
+
+/** Stake `kind` at the nearest valid spot to `want` whose whole footprint is inside the ring `poly` (with `pad` to spare), searching the ring's bounding box on a two-unit grid, nearest the wanted point first. */
+function stakeInside(io: ShowcaseIO, steps: ShowcaseStep[], label: string, kind: string, poly: readonly Pt[], want: Pt, rots: number[] = [0], gap = 1.0): boolean {
+  const def = KIT[kind];
+  const xs = poly.map(p => p[0]), zs = poly.map(p => p[1]);
+  const cand: Pt[] = [];
+  for (let x = Math.min(...xs); x <= Math.max(...xs); x += 1.5) for (let z = Math.min(...zs); z <= Math.max(...zs); z += 1.5) cand.push([x, z]);
+  cand.sort((a, b) => Math.hypot(a[0] - want[0], a[1] - want[1]) - Math.hypot(b[0] - want[0], b[1] - want[1]));
+  for (const [x, z] of cand) for (const rot of rots) {
+    const sp = io.findSpot(kind, x, z, rot, 0.6);
+    if (!sp) continue;
+    const r = footprint(def, sp[0], sp[1], rot);
+    if (![[r.x0, r.z0], [r.x1, r.z0], [r.x1, r.z1], [r.x0, r.z1]].every(([cx, cz]) => insideRing(poly, cx, cz))) continue;
+    // room for each building's graded pad (a flat apron and skirt, up to 1.2 u) beside its neighbours': closer than that the two pads overlap at different levels
+    if (io.game().structures.some(o => !o.unplaced && KIT[o.kind] && KIT[o.kind].level !== 'underground' && !o.kind.startsWith('bunker_') && (() => { const q = footprint(KIT[o.kind], o.x, o.z, o.rot); return r.x0 < q.x1 + gap && r.x1 > q.x0 - gap && r.z0 < q.z1 + gap && r.z1 > q.z0 - gap; })())) continue;
+    // not across a wall that is already standing (the keep ring, the drainage channel is no wall)
+    if (io.game().perimeter.some(w => PERIMETER[w.kind].blocks.people >= 0.5 && !PERIMETER[w.kind].walkway && !PERIMETER[w.kind].wallTop && solidSegments(w).some(([a, b]) => segHitsRect(a, b, r, 0)))) continue;
+    if (!io.stake(kind, sp[0], sp[1], rot)) continue;
+    steps.push({ step: label, ok: true, at: sp, note: Math.hypot(sp[0] - want[0], sp[1] - want[1]) > 0.5 ? `${Math.hypot(sp[0] - want[0], sp[1] - want[1]).toFixed(1)} units from the wanted spot` : undefined });
+    return true;
+  }
+  steps.push({ step: label, ok: false, at: want, note: 'no valid spot inside the wall' });
+  return false;
+}
+const outerRingOf = (g: GameState): Pt[] | null => {
+  const rs = g.perimeter.filter(r => r.kind === 'stone_wall' || r.kind === 'concrete_wall').sort((a, b) => polygonArea(b.pts) - polygonArea(a.pts));
+  return rs[0] ? rs[0].pts : null;
+};
+
 export function runMountainShowcase(io: ShowcaseIO, opts: ShowcaseOptions = {}): ShowcaseReport {
   if (opts.layout === 'bench') return runBenchShowcase(io, opts);
   const steps: ShowcaseStep[] = [], notes: string[] = [];
@@ -94,12 +126,6 @@ export function runMountainShowcase(io: ShowcaseIO, opts: ShowcaseOptions = {}):
   // the compound is compact (the north-star picture is about 60 x 50 m): the shelf between the rock face and its lip, round the camp
   S('lodge', dEdge - 2.5, 3, { rots: [0, 1, 2, 3], radius: 8, label: 'Lodge (walkout basement)' });
   S('greenhouse_heated', dFace + 3, -6, { label: 'Glass greenhouse' });
-  S('garden', dFace + 7, -7, { radius: 4, label: 'Vegetable bed 1' });
-  S('garden', dFace + 10.5, -7, { radius: 4, label: 'Vegetable bed 2' });
-  const orchard = S('orchard', dFace + 3, 3, { label: 'Orchard' });
-  if (orchard) { const n = orchardSiteNote(io.game(), orchard.x, orchard.z); if (n) notes.push(`Orchard: ${n}`); }
-  S('solar_farm', dFace + 2, 8, { label: 'Solar farm' });
-  S('battery_bank', dFace + 6.5, 9, { label: 'Battery container' });
   S('bunker_hatch', dEdge - 7, 0, { label: 'Bunker hatch' });
 
   // ── terraces (the Next-step card's own plan) ──
@@ -115,6 +141,17 @@ export function runMountainShowcase(io: ShowcaseIO, opts: ShowcaseOptions = {}):
   const fr = io.fortify({ scope: 'core', shape: 'irregular', wall: concrete ? 'concrete_wall' : 'stone_wall', towers: 5, towerKind: concrete ? 'watchtower_hex' : 'watchtower_octagon', passage: false, rings: opts.rings ?? 1, ringWall: 'stone_wall', ringSally: true, motorCourt: true });
   steps.push({ step: `Fortify my ring (${concrete ? 'concrete wall, hexagon towers' : 'stone wall, octagon towers'}, motor court, ${opts.rings ?? 1} ring${(opts.rings ?? 1) > 1 ? 's' : ''})`, ok: fr.runs + fr.structures > 0, note: `${fr.runs} runs, ${fr.structures} structures` });
   io.finishAll();
+
+  // ── the rest of the compound goes inside the wall that is now standing round the lodge and greenhouse ──
+  const ring0 = outerRingOf(io.game());
+  if (ring0) {
+    stakeInside(io, steps, 'Vegetable bed 1', 'garden', ring0, P(dFace + 7, -7));
+    stakeInside(io, steps, 'Vegetable bed 2', 'garden', ring0, P(dFace + 10.5, -7));
+    if (stakeInside(io, steps, 'Orchard', 'orchard', ring0, P(dFace + 3, 3))) { const o = io.game().structures.filter(st => st.kind === 'orchard').at(-1)!; const n = orchardSiteNote(io.game(), o.x, o.z); if (n) notes.push(`Orchard: ${n}`); }
+    stakeInside(io, steps, 'Solar farm', 'solar_farm', ring0, P(dFace + 7.5, 5));
+    stakeInside(io, steps, 'Battery container', 'battery_bank', ring0, P(dFace + 7.5, 1.5));
+    io.finishAll();
+  }
 
   // ── razor wire on the outer wall, drainage channel along the cut ──
   const g2 = io.game();
@@ -169,13 +206,7 @@ function runBenchShowcase(io: ShowcaseIO, opts: ShowcaseOptions): ShowcaseReport
   };
   S('lodge', -3, 0, { rots: [0, 1, 2, 3], radius: 8, label: 'Lodge (walkout basement)' });
   S('greenhouse_heated', 3, -7, { label: 'Glass greenhouse' });
-  S('orchard', 4, 6, { label: 'Orchard' });
-  S('solar_farm', -3, 7, { label: 'Solar farm' });
-  S('battery_bank', -3, 11.5, { label: 'Battery container' });
   S('bunker_hatch', 0, -3, { label: 'Bunker hatch' });
-  // terraced beds: each on its own graded pad held by a dry-stack wall, stepped down the bench's slope
-  S('garden', 5, -2, { radius: 3, label: 'Vegetable bed 1 (terrace)' });
-  S('garden', 8.5, -2, { radius: 3, label: 'Vegetable bed 2 (terrace)' });
   const terr = terraceSite(io.game());
   if (terr) {
     const spots = terr.tiers.map(t => [t.x, t.z] as [number, number]);
@@ -188,6 +219,17 @@ function runBenchShowcase(io: ShowcaseIO, opts: ShowcaseOptions): ShowcaseReport
   const fr = io.fortify({ scope: 'core', shape: 'irregular', wall: concrete ? 'concrete_wall' : 'stone_wall', towers: 5, towerKind: concrete ? 'watchtower_hex' : 'watchtower_octagon', passage: false, rings: opts.rings ?? 1, ringWall: 'stone_wall', ringSally: true, motorCourt: false, gate: false }, C);
   steps.push({ step: `Fortify my ring (${concrete ? 'concrete wall, hexagon towers' : 'stone wall, octagon towers'}, round the bench)`, ok: fr.runs + fr.structures > 0, note: `${fr.runs} runs, ${fr.structures} structures` });
   io.finishAll();
+  const ring1 = outerRingOf(io.game());
+  if (ring1) {
+    const cf = Math.cos(io.fall), sf = Math.sin(io.fall), at = (du: number, db: number): Pt => [C[0] + du * cf - db * sf, C[1] + du * sf + db * cf];
+    // terraced beds: each on its own graded pad held by a dry-stack wall, stepped down the bench's slope
+    stakeInside(io, steps, 'Vegetable bed 1 (terrace)', 'garden', ring1, at(2.5, -3), [0], 1.8);
+    stakeInside(io, steps, 'Vegetable bed 2 (terrace)', 'garden', ring1, at(6, -3), [0], 1.8);
+    stakeInside(io, steps, 'Orchard', 'orchard', ring1, at(4, 5), [0, 1], 1.2);
+    stakeInside(io, steps, 'Solar farm', 'solar_farm', ring1, at(-3, 5), [0], 1.8);
+    stakeInside(io, steps, 'Battery container', 'battery_bank', ring1, at(-3, 9), [0], 1.8);
+    io.finishAll();
+  }
 
   // the tunnel: from the low portal on the shelf up to the compound's wall, where the high portal opens a doorway in it (the tunnel is the compound's gate, the ring has none)
   const outerRun = io.game().perimeter.filter(r => r.kind === 'stone_wall' || r.kind === 'concrete_wall').sort((x, y) => y.pts.length - x.pts.length)[0];
@@ -219,7 +261,6 @@ function runBenchShowcase(io: ShowcaseIO, opts: ShowcaseOptions): ShowcaseReport
 
 // ── integration checks: do the pieces fit together? (run on the finished scene, in the browser report and in the tests) ──
 
-import { KIT, footprint } from '../game/buildkit/kit';
 import { PERIMETER } from './perimeter';
 import { ungatedCrossings } from './roadGate';
 import { findRoute } from './pathRoute';
