@@ -34,6 +34,7 @@ import { CLEAR_HOURS, dailyOf, type ChoreId } from './daily';
 import { fleetOf, refuel, roadTrouble, runs, VEHICLES, type Vehicle } from './vehicles';
 import { ROAD_CLOSED_TEXT, roadClosedFor } from './slope';
 import { syncParking } from './parking';
+import { wayCut } from './corridors';
 import { stealTools } from './tools';
 import { burgle } from './breakins';
 import type { Person } from './family';
@@ -361,6 +362,7 @@ const TRIP_KINDS = ['suv', 'pickup', 'old_pickup'] as const;
 export function tripVehicles(s: GameState): Vehicle[] {
   const w = s.weekend;
   if (!w) return [];
+  if (wayCut(s)) return [];     // every vehicle on the place is cut off from the road (a lost bridge, a fallen tunnel): they walk out to the town car
   const need = w.travelers.filter(id => { const i = s.people.findIndex(p => p.id === id); return i >= 0 && s.personState[i]?.needs.died == null; }).length;
   const cands = fleetOf(s).filter(v => (TRIP_KINDS as readonly string[]).includes(v.kind) && runs(v) && !v.away && v.condition > 0.1)
     .sort((a, b) => TRIP_KINDS.indexOf(a.kind as typeof TRIP_KINDS[number]) - TRIP_KINDS.indexOf(b.kind as typeof TRIP_KINDS[number]));
@@ -401,6 +403,8 @@ function travel(s: GameState, w: Weekend, arriving: boolean): string[] {
   const out: string[] = [];
   if (!arriving) {
     const cars = tripVehicles(s);
+    const cut = wayCut(s);
+    if (cut) out.push(`${cut[0].toUpperCase()}${cut.slice(1)}: nothing with wheels gets out. They walk to the road and take the town car; the vehicles stay where they are.`);
     w.cars = cars.map(v => v.id);
     for (const v of cars) { v.away = true; driveLeg(s, v, w.driveMiles); }
     const extra = townCars(s, cars);
@@ -426,6 +430,13 @@ function travel(s: GameState, w: Weekend, arriving: boolean): string[] {
   if (shut > 0) {
     out.push(`They got to the foot of the hill and ${ROAD_CLOSED_TEXT}. They wait it out${s.stock.plow >= 1 ? '' : ' (a plow blade on the truck would have had them up the hill)'}.`);
     w.lateUntil = Math.max(w.lateUntil ?? 0, s.clock.t + Math.min(1.5, shut * 0.5 + 0.25));
+  }
+  // the way in is cut (the bridge is down, the tunnel is choked): the cars are left outside, cut off, and the family carries its bags in on foot
+  const cut = wayCut(s);
+  if (cut) {
+    for (const v of cars) v.stranded = true;
+    out.push(`${cut[0].toUpperCase()}${cut.slice(1)}. They leave ${cars.length === 1 ? 'the car' : 'the cars'} at the outer end and walk in with the bags.`);
+    w.lateUntil = Math.max(w.lateUntil ?? 0, s.clock.t + 0.2);
   }
   const extra = townCars(s, cars);
   payTrip(s, w, extra * w.driveMiles * TOWN_CAR_USD_MILE);
@@ -457,7 +468,7 @@ export function presenceStep(s: GameState): string[] {
   if (w.lateUntil !== undefined && s.clock.t < w.lateUntil) return out;
   w.here = true;
   delete w.lateUntil;
-  for (const v of fleetOf(s)) if (w.cars.includes(v.id)) delete v.away;
+  for (const v of fleetOf(s)) if (w.cars.includes(v.id) && !v.stranded) delete v.away;
   syncParking(s);
   if (logGate(s, 'wk-first', 1e9)) out.push('The family drives up from the town house for the weekend: Friday night to Sunday afternoon, and the holidays.');
   if (w.found.length) { out.push(`Up for the weekend: ${w.found.join(' ')}`); w.found = []; }

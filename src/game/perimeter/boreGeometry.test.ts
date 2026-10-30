@@ -5,7 +5,7 @@ const used = new Set<string>();
 vi.mock('../buildkit/materials', () => ({ kitMaterial: (id: string) => { used.add(id); return new THREE.MeshStandardMaterial(); }, setWindowGlow: () => {} }));
 
 import { buildRun } from './perimeterGeometry';
-import { ARCH, MOUND, boreParts } from './boreGeometry';
+import { ARCH, MOUND, boreParts, rubbleHeap } from './boreGeometry';
 import { boreStats } from '../../sim/terrain';
 import { type PerimeterRun, type Pt } from '../../sim/perimeter';
 
@@ -35,7 +35,7 @@ describe('the rock tunnel is drawn as two portals and a mound, the rest is under
   it('the dark inside is a closed arch that fits the 4.4 m by 4.8 m bore, from deck to crown, at the grade of the line', () => {
     const slope = (x: number, z: number) => spur(x, z) + 0.05 * x;      // the ends stand at different heights: a rising deck
     const g = buildRun(run(pts), slope, 0);
-    const dark = g.children.filter(c => ((c as THREE.Mesh).material as THREE.MeshStandardMaterial).side === THREE.BackSide);
+    const dark = g.children.filter(c => (c as THREE.Mesh).isMesh && ((c as THREE.Mesh).material as THREE.MeshStandardMaterial).side === THREE.BackSide);
     expect(dark).toHaveLength(1);
     const b = box(dark[0]);
     expect(b.max.x - b.min.x).toBeGreaterThan(15.9);                                              // the whole length
@@ -70,7 +70,7 @@ describe('the rock tunnel is drawn as two portals and a mound, the rest is under
     expect(finite(part)).toBe(true);
     const b = box(part);
     expect(b.max.x).toBeLessThan(14);                                                             // the portal at the first end only
-    expect(part.children.every(c => ((c as THREE.Mesh).material as THREE.MeshStandardMaterial).side !== THREE.BackSide)).toBe(true);
+    expect(part.children.every(c => !(c as THREE.Mesh).isMesh || ((c as THREE.Mesh).material as THREE.MeshStandardMaterial).side !== THREE.BackSide)).toBe(true);
   });
 
   it('is merged per material (a few draw calls however long the bore) and finite on a steep rock face', () => {
@@ -78,5 +78,26 @@ describe('the rock tunnel is drawn as two portals and a mound, the rest is under
     const g = buildRun(run([[6, 20], [30, 20]]), face, 0);
     expect(finite(g)).toBe(true);
     expect(g.children.length).toBeLessThanOrEqual(10);
+  });
+});
+
+describe('a portal brought down by a charge', () => {
+  it('chokes both mouths with a heap of rubble no higher than the crown, and draws it only when it is down', () => {
+    const open = boreParts(pts, spur, 1, true, true), down = boreParts(pts, spur, 1, true, true, true);
+    expect(down.parts.length).toBeGreaterThan(open.parts.length + 60);              // ~44 blocks at each end
+    const heap = new THREE.Box3();
+    for (const [, g] of rubbleHeap(17)) heap.expandByObject(new THREE.Mesh(g));     // (in the portal's own frame: x across, y up from the deck, z into the hill)
+    expect(heap.max.y).toBeLessThanOrEqual(ARCH.crown);
+    expect(heap.max.y).toBeGreaterThan(ARCH.crown * 0.4);                           // it fills the arch, it is not a few pebbles
+    expect(heap.max.x - heap.min.x).toBeGreaterThan(ARCH.hw * 1.5);
+    for (const [, g] of down.parts) { const a = g.getAttribute('position'); for (let i = 0; i < a.count; i++) expect(Number.isFinite(a.getX(i) + a.getY(i) + a.getZ(i))).toBe(true); }
+    // the same every time
+    expect(boreParts(pts, spur, 1, true, true, true).parts.length).toBe(down.parts.length);
+  });
+  it('rubbleHeap is deterministic from its seed', () => {
+    expect(rubbleHeap(17).length).toBe(rubbleHeap(17).length);
+    const a = rubbleHeap(17)[3][1].getAttribute('position').array, b = rubbleHeap(17)[3][1].getAttribute('position').array;
+    expect(Array.from(a)).toEqual(Array.from(b));
+    expect(Array.from(rubbleHeap(18)[3][1].getAttribute('position').array)).not.toEqual(Array.from(a));
   });
 });

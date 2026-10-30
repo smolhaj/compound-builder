@@ -17,6 +17,7 @@ import { floodTowerIds, TOWERS, TOWER_NEXT, highBonus, highShare, isTower, tower
 import { ungatedCrossings } from '../../sim/roadGate';
 import { razorBill, razorHours, razorProblem } from '../../sim/razor';
 import { bridgeDown, rebuildQuote, roadBridgeOf, roadLine } from '../../sim/roadFx';
+import { clearQuote, corridorLines } from '../../sim/corridors';
 import { canHostWalkway, walkOn, walkwayBill, walkwayProblem } from '../../sim/walkway';
 import { adaptLevel, firstWinter, sinceHit } from '../../sim/adaptive';
 import { adaptOf } from '../../sim/encounters';
@@ -106,9 +107,11 @@ export function DefenseTab() {
       {drainageLines(game).map(l => <Note key={l}>{l}</Note>)}
       {retainingLines(game).map(l => <Note key={l}>{l}</Note>)}
       <Row label="The ground's share of the defense" value={`${Math.round(terrain.score * 100)}%`} tone={terrain.score >= 0.5 ? 'good' : terrain.score >= 0.25 ? 'warn' : undefined} title="Hard lanes, a held choke and towers on real high ground: one input to how hard a crew finds the place (never a second scaling)" />
+      {corridorLines(game).map(l => <Note key={l}>{l}</Note>)}
       {game.perimeter.filter(r => PERIMETER[r.kind].vehicleWay).map(r => <div key={r.id} style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '3px 0' }}>
-        <span style={{ flex: 1 }}>{PERIMETER[r.kind].name} <span style={{ color: DIM }}>({Math.round(wallLength(r) * 6)} m, {runFinished(r) ? 'standing' : r.dropped ? 'dropped: rebuild it from Projects' : 'being built'})</span></span>
-        {runFinished(r) && PERIMETER[r.kind].bore && <span style={{ color: DIM }} title="A bore is driven through solid rock: it cannot be brought down, only held. The steel doors lock at night and when the alarm goes.">rock: hold the doors</span>}
+        <span style={{ flex: 1 }}>{PERIMETER[r.kind].name} <span style={{ color: DIM }}>({Math.round(wallLength(r) * 6)} m, {r.collapsed ? 'choked with rubble' : runFinished(r) ? 'standing' : r.dropped ? 'dropped: rebuild it from Projects' : 'being built'})</span></span>
+        {r.collapsed && <button style={btn(game.money >= clearQuote(r).usd)} disabled={game.money < clearQuote(r).usd || r.collapsed.clearsAt !== null} title={`A contractor with an excavator hauls the fall out: about ${clearQuote(r).days} days`} onClick={() => { const w = useGameStore.getState().clearCollapse(r.id); if (w) alert(w); }}>{r.collapsed.clearsAt !== null ? `Clearing, ${Math.max(1, Math.ceil(r.collapsed.clearsAt - game.clock.t))} days` : `Clear the fall ${usd(clearQuote(r).usd)}`}</button>}
+        {runFinished(r) && !r.collapsed && PERIMETER[r.kind].bore && <span style={{ color: DIM }} title="A bore is driven through solid rock: it cannot be brought down, only held. The steel doors lock at night and when the alarm goes.">rock: hold the doors</span>}
         {runFinished(r) && !PERIMETER[r.kind].bore && <button style={btn(false)} title="Bring it down on purpose: nothing crosses there until it is rebuilt, and a crew has to ford and climb the gorge. Half the steel comes back." onClick={() => { if (window.confirm('Drop this tunnel? It has to be rebuilt to use it again.')) { const w = useGameStore.getState().dropBridge(r.id); if (w) alert(w); } }}>Drop it</button>}
       </div>)}
     </Section>
