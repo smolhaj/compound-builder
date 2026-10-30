@@ -6,6 +6,11 @@ import type { WeatherMode } from '../engine/world/weather/weatherState';
 import type { TourCaption, TourMode } from '../engine/world/camera/TourController';
 import type { PropertyGeometry } from '../sim/propertyWall';
 import type { PathSummary } from '../game/paths/pathNet';
+import { autoStartTier } from '../engine/perf/device';
+
+export type FrameCap = 0 | 30 | 60;
+/** Once-a-second readout of the running game (Settings -> Graphics). */
+export interface PerfStats { fps: number; ms: number; calls: number; tris: number; tier: Quality; budgetMs: number }
 
 export type CameraMode = 'diorama' | TourMode;
 /** How buildings are drawn: whole, cut to waist height with the roof off, or with see-through walls. */
@@ -35,6 +40,17 @@ export interface WorldState {
   quality: Quality;
   /** The loading screen: what the boot is doing and how far along (null once the world is up). */
   boot: { label: string; pct: number } | null;
+  /** Frame-rate cap (0 = uncapped). 60 by default: a 120 Hz display otherwise does twice the work for no visible gain. */
+  frameCap: FrameCap;
+  setFrameCap: (f: FrameCap) => void;
+  /** The FPS / budget readout (Settings -> Graphics). */
+  showPerf: boolean;
+  setShowPerf: (on: boolean) => void;
+  perfStats: PerfStats | null;
+  setPerfStats: (p: PerfStats | null) => void;
+  /** Shown once when the game stepped the graphics down by itself (dismissible); never set for a change the player made. */
+  perfNotice: string | null;
+  setPerfNotice: (n: string | null) => void;
   setBoot: (b: { label: string; pct: number } | null) => void;
   cameraMode: CameraMode;
   buildingView: BuildingView;
@@ -82,11 +98,17 @@ export interface WorldState {
 
 const wrapDoy = (d: number) => ((Math.floor(d) - 1) % 365 + 365) % 365 + 1;
 
-/** Medium unless the player chose otherwise (High adds SSAO and a 2× pixel ratio, which is laggy on retina screens). */
+/** The player's saved choice, else a guess from the device (engine/perf/qualityAuto.ts: only a known-strong GPU starts on High). */
 function savedQuality(): Quality {
   try { const q = localStorage.getItem('cb.quality'); if (q === 'high' || q === 'medium' || q === 'low') return q; } catch { /* no storage */ }
-  return 'medium';
+  try { return autoStartTier(); } catch { return 'medium'; }
 }
+function savedFrameCap(): FrameCap {
+  try { const v = Number(localStorage.getItem('cb.fpscap')); if (v === 0 || v === 30 || v === 60) return v; } catch { /* no storage */ }
+  return 60;
+}
+/** On unless the player turned it off: the next few builds ask for fps numbers. */
+function savedShowPerf(): boolean { try { return localStorage.getItem('cb.showperf') !== '0'; } catch { return true; } }
 
 export const useWorldStore = create<WorldState>()(subscribeWithSelector((set) => ({
   seed: initialSeed(),
@@ -98,6 +120,14 @@ export const useWorldStore = create<WorldState>()(subscribeWithSelector((set) =>
   weatherMode: 'auto',
   quality: savedQuality(),
   boot: { label: 'Starting', pct: 0.02 },
+  frameCap: savedFrameCap(),
+  setFrameCap: (frameCap) => { try { localStorage.setItem('cb.fpscap', String(frameCap)); } catch { /* private mode */ } set({ frameCap }); },
+  showPerf: savedShowPerf(),
+  setShowPerf: (showPerf) => { try { localStorage.setItem('cb.showperf', showPerf ? '1' : '0'); } catch { /* private mode */ } set({ showPerf }); },
+  perfStats: null,
+  setPerfStats: (perfStats) => set({ perfStats }),
+  perfNotice: null,
+  setPerfNotice: (perfNotice) => set({ perfNotice }),
   setBoot: (boot) => set({ boot }),
   cameraMode: 'diorama',
   buildingView: 'full',

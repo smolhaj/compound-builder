@@ -45,6 +45,7 @@ import { isMarked } from '../sim/forestry';
 import { KIT } from './buildkit/kit';
 import { isUnderground } from './buildkit/underground';
 import type { SiteQuery } from './buildkit/kit';
+import { FrameBudget, capGapMs, lowerTier } from '../engine/perf/qualityAuto';
 import { yieldToBrowser, warmShaders } from './bootStages';
 import { parseLowRender, RenderRequests, type QaQuality } from './qaRender';
 
@@ -60,7 +61,7 @@ export function GameCanvas() {
     const boot = (label: string, pct: number) => useWorldStore.getState().setBoot({ label, pct });
     void (async () => {
     const canvas = ref.current!;
-    const ws = new WorldScene(canvas);
+    const ws = new WorldScene(canvas, { antialias: useWorldStore.getState().quality === 'low' });
     const world = new HomesteadWorld(ws, useGameStore.getState().game.seed, useGameStore.getState().game.site);
     world.setBridgeDown(useGameStore.getState().game.roadBridge?.down ?? false);   // (the bridge on the way in, brought down on purpose or standing)
     const weather = new WeatherRenderer(ws.scene, useGameStore.getState().game.seed);
@@ -263,14 +264,26 @@ export function GameCanvas() {
     const qa: { frames: number; frameMs: number; lowrender?: boolean; weather?: boolean; renderNow?: () => Promise<void>; renderFull?: (q?: QaQuality) => Promise<void>; pose: null | { x: number; y: number; z: number; lx: number; ly: number; lz: number; fov?: number } } = { frames: 0, frameMs: 0, pose: null };
     // window.__cb.qa.renderNow(): draw one frame (a promise); renderFull('high'|'medium'): one slow full-quality, full-resolution shot
     if (lowRender.on) Object.assign(qa, { lowrender: true, renderNow: () => renderReq.request(), renderFull: (q: QaQuality = 'high') => renderReq.request(q) });
-    let slow = 0;
+    const budget = new FrameBudget(), loopStart = performance.now();
+    let statFrames = 0, statSince = performance.now(), statCalls = 0, statTris = 0;
+    ws.renderer.info.autoReset = false;
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
+      // frame-rate cap (60 by default): a 120 Hz display would otherwise do the whole frame twice as often
+      const gap = capGapMs(useWorldStore.getState().frameCap);
+      if (!lowRender.on && gap > 0 && now - last < gap) return;
       const t0 = performance.now();
       const dt = Math.min(0.1, (now - last) / 1000);
-      // a slow machine on High (SSAO, 2× pixels) steps down to Medium by itself after ~5 s under 40 fps
-      slow = dt > 0.025 ? slow + dt : Math.max(0, slow - dt * 2);
-      if (!lowRender.on && slow > 5 && useWorldStore.getState().quality === 'high') { useWorldStore.getState().setQuality('medium'); slow = 0; }
+      // a slow machine steps down by itself (never up) after 3 s over 40 ms a frame, with a notice the player can dismiss
+      if (now - loopStart < 6000) budget.reset();   // (the first seconds carry the first-draw hitches)
+      else if (!lowRender.on && !document.hidden && budget.push(dt * 1000)) {
+        const q = useWorldStore.getState().quality, lower = lowerTier(q);
+        if (lower) {
+          useWorldStore.getState().setQuality(lower);
+          useWorldStore.getState().setPerfNotice(`The game was running slowly on ${q.toUpperCase()}, so graphics were switched to ${lower.toUpperCase()}. You can change this in the Graphics control (bottom left); it will not switch up by itself.`);
+          budget.reset();
+        }
+      }
       last = now;
       // the sim advances in real time at its speed; the view clock follows it (outside photo mode)
       // the clock stands still while the new-game screen is up
@@ -439,7 +452,18 @@ export function GameCanvas() {
       }
       ws.tick(dt);
       ws.updateDayNight(t);
-      if (!lowRender.on) ws.renderFrame();
+      if (!lowRender.on) {
+        ws.renderer.info.reset();
+        ws.renderFrame();
+        statFrames++; statCalls += ws.renderer.info.render.calls; statTris += ws.renderer.info.render.triangles;
+        if (performance.now() - statSince >= 1000) {
+          if (useWorldStore.getState().showPerf) {
+            const secs = (performance.now() - statSince) / 1000;
+            useWorldStore.getState().setPerfStats({ fps: statFrames / secs, ms: budget.avgMs || (secs * 1000) / statFrames, calls: Math.round(statCalls / statFrames), tris: Math.round(statTris / statFrames), tier: useWorldStore.getState().quality, budgetMs: 40 });
+          }
+          statFrames = 0; statCalls = 0; statTris = 0; statSince = performance.now();
+        }
+      }
       else if (renderReq.pending) {
         // one on-demand draw; a full-quality shot lifts the look for this frame only
         const q = renderReq.quality;
