@@ -5,6 +5,7 @@ import type { SeasonMode } from '../engine/world/season/seasonState';
 import type { WeatherMode } from '../engine/world/weather/weatherState';
 import type { TourCaption, TourMode } from '../engine/world/camera/TourController';
 import type { PropertyGeometry } from '../sim/propertyWall';
+import type { BpReadout } from '../game/blueprint/blueprintPlan';
 import type { PathSummary } from '../game/paths/pathNet';
 import { autoStartTier } from '../engine/perf/device';
 
@@ -59,6 +60,11 @@ export interface WorldState {
   /** The terrain overlay (high ground, lanes, water, sun): game/terrain/TerrainOverlay.ts. */
   terrainMode: 'off' | 'high' | 'lanes' | 'water' | 'sun';
   setTerrainMode: (m: WorldState['terrainMode']) => void;
+  /** The blueprint view: names and roles of the buildings, rings, gates, towers and tunnels, with the defense readouts (game/blueprint). */
+  blueprint: boolean;
+  setBlueprint: (on: boolean) => void;
+  blueprintReadout: BpReadout | null;
+  setBlueprintReadout: (r: BpReadout | null) => void;
   /** The property line drawn on the ground (also shown while a fence or wall is being drawn). */
   showBoundary: boolean;
   setShowBoundary: (on: boolean) => void;
@@ -133,6 +139,10 @@ export const useWorldStore = create<WorldState>()(subscribeWithSelector((set) =>
   buildingView: 'full',
   sightMode: 'off',
   terrainMode: 'off',
+  blueprint: false,
+  setBlueprint: (blueprint) => set({ blueprint }),
+  blueprintReadout: null,
+  setBlueprintReadout: (blueprintReadout) => set({ blueprintReadout }),
   showBoundary: false,
   siteGeo: null,
   setSiteGeo: (siteGeo) => set({ siteGeo }),

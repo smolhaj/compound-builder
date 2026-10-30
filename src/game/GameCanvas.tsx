@@ -1,5 +1,7 @@
 import { litTowerIds } from '../sim/towers';
 import { TerrainOverlay } from './terrain/TerrainOverlay';
+import { BlueprintOverlay } from './blueprint/BlueprintOverlay';
+import { blueprintPlan } from './blueprint/blueprintPlan';
 import { campOf, lanesOf, terrainOf } from '../sim/terrainState';
 import { siteCandidates } from '../sim/terrain';
 import { goodsKey, houseGoods } from '../sim/evenings';
@@ -211,7 +213,21 @@ export function GameCanvas() {
       const lanes = lanesOf(g);
       terrainOv.set(m, t, lanes, siteCandidates(t, { lot: g.site.home, camp: campOf(g) }, lanes));
     };
+    // the blueprint view: names, rings, gates, towers and tunnels (game/blueprint)
+    const host = canvas.parentElement ?? document.body;
+    if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
+    const blueprintOv = new BlueprintOverlay(ws.scene, ws.camera, host, world.groundAt);
+    let bpTimer = 0;
+    const showBlueprint = () => {
+      const on = useWorldStore.getState().blueprint;
+      if (!on) { blueprintOv.set(null); useWorldStore.getState().setBlueprintReadout(null); return; }
+      const plan = blueprintPlan(useGameStore.getState().game);
+      blueprintOv.set(plan); useWorldStore.getState().setBlueprintReadout(plan.readout);
+    };
+    const refreshBlueprint = () => { if (useWorldStore.getState().blueprint) { clearTimeout(bpTimer); bpTimer = window.setTimeout(showBlueprint, 250); } };
     const unsub = [
+      useWorldStore.subscribe(s => s.blueprint, showBlueprint),
+      useGameStore.subscribe(s => `${s.game.structures.map(x => x.id + x.stage + x.kind).join()}|${s.game.perimeter.map(r => r.id + (r.finishedAt === null ? 'p' : 'f') + r.gates.length).join()}`, refreshBlueprint),
       // wildfire weather: measure the fuel round every building (what cleared ground there is decides what burns)
       useGameStore.subscribe(s => s.game.disaster.phase, ph => { const g = useGameStore.getState().game; if (g.disaster.kind === 'wildfire' && ph === 'warning' && !g.disaster.fuel) useGameStore.getState().setFuel(world.fuelNear(g.structures)); }),
       useGameStore.subscribe(s => s.game.land, () => { world.setOwnedLand(ownedRects(useGameStore.getState().game)); rebuildBoundary(); }),
@@ -453,6 +469,7 @@ export function GameCanvas() {
       }
       ws.tick(dt);
       ws.updateDayNight(t);
+      blueprintOv.update(performance.now());
       if (!lowRender.on) {
         ws.renderer.info.reset();
         ws.renderFrame();
@@ -526,6 +543,9 @@ export function GameCanvas() {
       fence.dispose();
       sight.dispose();
       terrainOv.dispose();
+      clearTimeout(bpTimer);
+      blueprintOv.dispose();
+      useWorldStore.getState().setBlueprintReadout(null);
       boundary.dispose();
       useWorldStore.getState().setSiteGeo(null);
       useWorldStore.getState().setMarkNearestTrees(null);
