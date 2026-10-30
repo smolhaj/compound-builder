@@ -543,6 +543,7 @@ export function Hud() {
           <option value={60}>60 fps</option><option value={30}>30 fps</option><option value={0}>uncapped</option>
         </select>
         <button style={btn(w.showPerf)} title="Show frames per second, frame time and draw calls" onClick={() => w.setShowPerf(!w.showPerf)}>FPS</button>
+        {w.showPerf && w.quality !== 'high' && <button style={btn(false)} title="Switch to High graphics (remembered). If it runs slowly the game steps back down by itself." onClick={() => { w.setQuality('high', true); w.setPerfNotice(null); }}>Try High</button>}
         {w.showPerf && w.perfStats && (
           <span data-testid="perf-readout" style={{ fontVariantNumeric: 'tabular-nums', color: w.perfStats.ms > w.perfStats.budgetMs ? '#f88' : w.perfStats.ms > 22 ? '#fd6' : '#8d8' }} title="frames per second, smoothed frame time against the 40 ms budget, draw calls, triangles">
             {w.perfStats.fps.toFixed(0)} fps · {w.perfStats.ms.toFixed(1)} / {w.perfStats.budgetMs} ms · {w.perfStats.calls} calls · {(w.perfStats.tris / 1000).toFixed(0)}k tris
