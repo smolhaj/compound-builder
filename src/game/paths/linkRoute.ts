@@ -193,10 +193,10 @@ export function routeLinked(from: Pt, to: Pt, w: LinkWorld): Wp[] | null {
   for (const h of hops) {
     const l = w.links[h.link], near = l.mouth[h.from], far = l.mouth[1 - h.from as 0 | 1];
     for (const p of w.ordinary(cur, near)) out.push(p);
-    out.push([near[0], near[1]]);
     const seq = h.from === 0 ? l.deck : [...l.deck].reverse();
+    out.push([near[0], near[1], seq[0][2]]);       // (at the deck's height from the mouth: the climb from the ground to the floor is spread over the approach, not one step)
     seq.forEach((p, k) => out.push([p[0], p[1], p[2], k === 0 ? doorId(h.link, h.from) : k === seq.length - 1 ? doorId(h.link, (1 - h.from) as 0 | 1) : undefined]));
-    out.push([far[0], far[1]]);
+    out.push([far[0], far[1], seq[seq.length - 1][2]]);
     cur = far;
   }
   for (const p of w.ordinary(cur, to)) out.push(p);

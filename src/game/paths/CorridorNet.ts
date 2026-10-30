@@ -49,6 +49,13 @@ export class CorridorNet {
   /** The pieces of ground (built on first use for this `key` of the layout). `box` is where people go (the home block, the camp, the yard). */
   reach(key: string, box: { x0: number; z0: number; x1: number; z1: number }, hard: (x: number, z: number) => boolean, joins: ReadonlyArray<readonly [Pt, Pt]> = []): Reach {
     if (!this._reach || this._reachKey !== key) {
+      // a doorway in a wall right at a portal (the compound's gate where the tunnel comes out) is where the mouth is: step out to its near side
+      for (const l of this.links) for (const e of [0, 1] as const) {
+        const d = e === 0 ? l.deck[0] : l.deck[l.deck.length - 1];
+        let best: Pt | null = null, bd = 1.7;
+        for (const [p, q] of joins) for (const c of [p, q]) { const dd = Math.hypot(c[0] - d[0], c[1] - d[1]); if (dd < bd) { bd = dd; best = c; } }
+        if (best) l.mouth[e] = [best[0], best[1]];
+      }
       const pad = 10;
       const xs = [box.x0, box.x1, ...this.links.flatMap(l => [l.mouth[0][0], l.mouth[1][0]])], zs = [box.z0, box.z1, ...this.links.flatMap(l => [l.mouth[0][1], l.mouth[1][1]])];
       this._reach = buildReach({ x0: Math.min(...xs) - pad, x1: Math.max(...xs) + pad, z0: Math.min(...zs) - pad, z1: Math.max(...zs) + pad }, hard, 0.6, joins);
