@@ -84,7 +84,7 @@ describe('the stilted house', () => {
     expect(RAISED_KINDS).toContain('stilted_house');
     // a creek at z = 30 and a low bench: a grounded house at (30, 32) floods, the stilted one does not
     const g = game(); g.site = { ...g.site, creek: true };
-    setGroundOverride({ h: (x, z) => 0.05 * Math.abs(z - 30), creek: { zAt: () => 30, waterY: () => -0.1, halfWidth: 0.7 } });
+    setGroundOverride({ h: (_x, z) => 0.05 * Math.abs(z - 30), creek: { zAt: () => 30, waterY: () => -0.1, halfWidth: 0.7 } });
     const house = built(g, 'a', 'timber_cabin', 30, 32), stilts = built(g, 'b', 'stilted_house', 40, 32);
     const hit = floodCandidates(g, [house, stilts]).map(x => x.id);
     expect(hit).toContain('a');

@@ -319,7 +319,7 @@ export function attractants(s: GameState): Attractants {
     kids: s.people.some((p, i) => p.kid && alive(i)),
     dog: Math.min(2, n('dog')),
     shooter: huntingRifle(s) && s.people.some((p, i) => !p.kid && alive(i) && p.skills.hunter >= 1),
-    fruit: fin.some(st => st.kind === 'orchard' || st.kind === 'orchard_grove') && doy >= 215 && doy <= 300,
+    fruit: fin.some(st => st.kind === 'orchard' || st.kind === 'orchard_grove' || st.kind === 'orchard_terraced') && doy >= 215 && doy <= 300,
     fish: fin.some(st => st.kind === 'pond') && (s.farm?.ponds ? Object.values(s.farm.ponds).some(p => p.trout > 20) : false),
   };
 }

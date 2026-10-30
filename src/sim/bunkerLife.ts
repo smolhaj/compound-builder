@@ -83,7 +83,7 @@ const hash = (str: string): number => { let h = 2166136261; for (let i = 0; i < 
 export function securityFeeds(s: GameState): Feeds {
   const c = cameraCount(s), pw = powered(s);
   const home = have(s, k => isHome(k));
-  const garden = have(s, k => ['garden', 'greenhouse', 'greenhouse_heated', 'field', 'orchard', 'orchard_grove'].includes(k));
+  const garden = have(s, k => ['garden', 'greenhouse', 'greenhouse_heated', 'field', 'orchard', 'orchard_grove', 'orchard_terraced'].includes(k));
   const solar = have(s, k => ['solar_array', 'solar_farm', 'garage_solar', 'lodge_solar'].includes(k));
   const someone = !!s.gate.pending;
   const sensor = n(s, 'driveway_alarm') > 0;

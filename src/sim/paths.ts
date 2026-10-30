@@ -73,7 +73,7 @@ const BY_KIND: Record<string, Role> = {
   workshop: 'work', metal_garage: 'work', garage_solar: 'work', gate_garage: 'gate',
   battery_shed: 'power', generator_shed: 'power', solar_array: 'power',
   // the self-sufficient interior: the production greenhouse, the grove, the farm-scale power, the water bodies (a bench on the bank), the sheep barn, the yard of bays
-  greenhouse_heated: 'greenhouse', orchard_grove: 'orchard', solar_farm: 'power', micro_hydro: 'power', cabin_village: 'guest', stilted_house: 'home', helipad: 'work', tower_pod: 'work', boat_dock: 'bank', marina: 'bank', polytunnel: 'greenhouse', high_tunnel: 'greenhouse', aquaponics: 'greenhouse', wind_turbine: 'power', battery_bank: 'power', pond: 'bank', reservoir: 'bank', sheep_barn: 'barn', equipment_yard: 'work',
+  greenhouse_heated: 'greenhouse', orchard_grove: 'orchard', orchard_terraced: 'orchard', solar_farm: 'power', micro_hydro: 'power', cabin_village: 'guest', stilted_house: 'home', helipad: 'work', tower_pod: 'work', boat_dock: 'bank', marina: 'bank', polytunnel: 'greenhouse', high_tunnel: 'greenhouse', aquaponics: 'greenhouse', wind_turbine: 'power', battery_bank: 'power', pond: 'bank', reservoir: 'bank', sheep_barn: 'barn', equipment_yard: 'work',
   // the extended family's houses
   guest_house: 'guest', moms_house: 'guest',
   bunker_hatch: 'hatch', bunker_stairs: 'hatch',

@@ -32,6 +32,7 @@ import { orchardCareOf } from './farm';
 import { groundOf } from './terrainState';
 import { logGate } from './nag';
 import { orchardWindK } from './microclimate';
+import { sunFactor } from './terrainFx';
 
 export type Fruit = 'apple' | 'pear' | 'cherry' | 'plum';
 export const FRUITS: readonly Fruit[] = ['apple', 'pear', 'cherry', 'plum'];
@@ -67,15 +68,22 @@ export const FRUIT: Record<Fruit, FruitDef> = {
 };
 
 /** The plots: the grid of trees (columns run front to back: one column, one row of trees, one kind of fruit). */
-export const ORCHARD_KINDS: readonly string[] = ['orchard', 'orchard_grove'];
-export type OrchardKind = 'orchard' | 'orchard_grove';
-export const ORCHARD_GRID: Record<OrchardKind, { cols: number; rows: number }> = { orchard: { cols: 4, rows: 3 }, orchard_grove: { cols: 8, rows: 6 } };
-export const ORCHARD_TREES: Record<string, number> = { orchard: 12, orchard_grove: 48 };
+export const ORCHARD_KINDS: readonly string[] = ['orchard', 'orchard_grove', 'orchard_terraced'];
+export type OrchardKind = 'orchard' | 'orchard_grove' | 'orchard_terraced';
+export const ORCHARD_GRID: Record<OrchardKind, { cols: number; rows: number }> = { orchard: { cols: 4, rows: 3 }, orchard_grove: { cols: 8, rows: 6 }, orchard_terraced: { cols: 8, rows: 6 } };
+export const ORCHARD_TREES: Record<string, number> = { orchard: 12, orchard_grove: 48, orchard_terraced: 48 };
+/**
+ * The terraced orchard (`orchard_terraced`, 48 trees on three dry-stack benches, two rows to a bench): the walls break up the cold-air pool
+ * (a pocket's late-frost shift is halved; a plot on no pocket counts as a draining slope), hold the soil and the water (drip use 30 % lower), and
+ * the benches face the sun the lot gives them (fruit set and sugar: 6 % either way for the slope's aspect).
+ */
+export const TERRACE = { POCKET_HALVED: 0.5, WATER_K: 0.7, SUN_K: 0.2, SUN_CAP: 0.06 } as const;
+export const isTerraced = (kind: string | undefined): boolean => kind === 'orchard_terraced';
 export const isOrchard = (kind: string): kind is OrchardKind => ORCHARD_KINDS.includes(kind);
 
 /** The fruit of each column of a plot, left to right. */
 export function orchardColumns(kind: OrchardKind): Fruit[] {
-  return kind === 'orchard_grove' ? ['apple', 'apple', 'pear', 'pear', 'cherry', 'cherry', 'plum', 'plum'] : ['apple', 'pear', 'cherry', 'plum'];
+  return kind !== 'orchard' ? ['apple', 'apple', 'pear', 'pear', 'cherry', 'cherry', 'plum', 'plum'] : ['apple', 'pear', 'cherry', 'plum'];
 }
 /** How many trees of a fruit a plot holds. */
 export function treesOf(kind: string, fruit: Fruit): number {
@@ -114,11 +122,11 @@ const siteCache = new Map<string, PlotSite>();
  * Cold air runs downhill and pools: a plot lower than the land round it (8 units ≈ 50 m out) on near-level ground is a
  * frost pocket (the same test as the Terrain overlay's white cells); a plot on a slope that lets it drain away is spared.
  */
-export function plotSite(s: GameState, st: Pick<Structure, 'x' | 'z'>): PlotSite {
+export function plotSite(s: GameState, st: Pick<Structure, 'x' | 'z'> & { kind?: string }): PlotSite {
   if (!s.site.lot) return NEUTRAL;
   const g = groundOf(s);
   if (!g) return NEUTRAL;
-  const key = `${s.seed}|${s.site.region}|${JSON.stringify(s.site.lot)}|${Math.round(st.x * 2)},${Math.round(st.z * 2)}`;
+  const key = `${s.seed}|${s.site.region}|${JSON.stringify(s.site.lot)}|${Math.round(st.x * 2)},${Math.round(st.z * 2)}|${isTerraced(st.kind) ? 't' : ''}`;
   const hit = siteCache.get(key);
   if (hit) return hit;
   const h0 = g.h(st.x, st.z), e = 0.5;
@@ -127,7 +135,9 @@ export function plotSite(s: GameState, st: Pick<Structure, 'x' | 'z'>): PlotSite
   for (let q = 0; q < 8; q++) ring += g.h(st.x + Math.cos(q * Math.PI / 4) * 8, st.z + Math.sin(q * Math.PI / 4) * 8);
   const pocket = slope < 0.12 && ring / 8 - h0 >= 0.3;
   const drained = !pocket && slope >= 0.08;
-  const out: PlotSite = { pocket, drained, shift: pocket ? POCKET_DAYS : drained ? DRAIN_DAYS : 0 };
+  // terraces: the walls let the cold air spill off each bench: a pocket's shift is halved, level ground counts as draining
+  const terr = isTerraced(st.kind);
+  const out: PlotSite = terr ? { pocket, drained: !pocket, shift: pocket ? Math.round(POCKET_DAYS * TERRACE.POCKET_HALVED) : DRAIN_DAYS } : { pocket, drained, shift: pocket ? POCKET_DAYS : drained ? DRAIN_DAYS : 0 };
   if (siteCache.size > 400) siteCache.clear();
   siteCache.set(key, out);
   return out;
@@ -229,7 +239,7 @@ export function fruitYear(s: GameState, st: Structure, fruit: Fruit, bees = 1, y
   if (bear <= 0) return 0;
   const pruneK = orchardCareOf(s, st.id).unprunedYear === year ? 0.8 : 1;
   const beeK = 1 + (bees - 1) * d.insects / 0.85;
-  return n * d.lb * KCAL_PER_LB * bear * (1 - frostLoss(s, st, fruit, year)) * pruneK * (1 - pestLoss(s, st, fruit, year)) * beeK * orchardWindK(s, st);
+  return n * d.lb * KCAL_PER_LB * bear * (1 - frostLoss(s, st, fruit, year)) * pruneK * (1 - pestLoss(s, st, fruit, year)) * beeK * orchardWindK(s, st) * terraceSunK(s, st);
 }
 
 /** Today's fruit from the orchards: kcal, and the share that goes to the cellar bins (apples, pears). */
@@ -322,6 +332,12 @@ export function orchardSiteNote(s: GameState, x: number, z: number): string | nu
   return null;
 }
 
+/** A terraced plot's aspect: the benches catch more of the sun on a south face, less on a north one (up to 6 %); other plots are as they were. */
+export function terraceSunK(s: GameState, st: Pick<Structure, 'x' | 'z' | 'kind'>): number {
+  if (!isTerraced(st.kind)) return 1;
+  return 1 + Math.max(-TERRACE.SUN_CAP, Math.min(TERRACE.SUN_CAP, TERRACE.SUN_K * (sunFactor(s, st) - 1)));
+}
+
 // ── water ──
 
 /** Days of the year the trees are watered (dry months) and what a tree drinks a day: a young one 7 L, one that bears 4, in a wet region half that. */
@@ -333,7 +349,7 @@ export function orchardWaterL(s: GameState): number {
   let l = 0;
   for (const st of finished(s)) {
     const age = ageOf(s, st);
-    l += ORCHARD_TREES[st.kind] * (age < 3 ? 7 : 4) * wet;
+    l += ORCHARD_TREES[st.kind] * (age < 3 ? 7 : 4) * wet * (isTerraced(st.kind) ? TERRACE.WATER_K : 1);
   }
   return l;
 }
