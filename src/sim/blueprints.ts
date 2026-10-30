@@ -535,6 +535,32 @@ export const WIND_TURBINE_BLUEPRINT: Blueprint = bp('wind_turbine', [
   ['finish', 'Bury the cable to the controller and set the dump load', 24, { cable: 3, hardware: 1 }],
 ]);
 
+// ── Tunnels and aquaponics (sim/tunnels.ts, sim/aquaponics.ts) ──
+/** A 6 x 12 m polytunnel: hoops in sleeves on baseboards, a roll of poly, door frames. About $2,400 and 70 person-hours. */
+export const POLYTUNNEL_BLUEPRINT: Blueprint = bp('polytunnel', [
+  ['site', 'Square the bed and stake the hoop line (ridge north-south)', 4, {}],
+  ['foundation', 'Sink the ground posts and lay the baseboards', 14, { lumber: 1, concrete: 1 }],
+  ['frame', 'Bend and bolt the hoops, purlins and door frames', 22, { tunnel_kit_small: 1 }],
+  ['roof', 'Pull the poly over on a still, warm day', 14, { poly_film: 1 }],
+  ['finish', 'Hang the doors, wire-lock the film, drip line and a path', 12, { pipe: 1, hardware: 1 }],
+]);
+/** A 9 x 30 m high tunnel: gothic frame, roll-up sides, a double door. About $11,000 and 260 person-hours. */
+export const HIGH_TUNNEL_BLUEPRINT: Blueprint = bp('high_tunnel', [
+  ['site', 'Survey and stake the bay, check the drainage and the snow side', 10, {}],
+  ['foundation', 'Drive the ground posts, set the bows\' feet and pour the end-wall footings', 50, { concrete: 4, rebar: 1 }],
+  ['frame', 'Raise the gothic bows, ridge and purlins, hang the roll-up hardware', 90, { tunnel_kit_high: 1, hardware: 1 }],
+  ['roof', 'Pull the double layer of film and inflate it', 60, { poly_film: 3 }],
+  ['finish', 'End walls, doors, roll-up sides, drip lines and a pad of gravel', 50, { pipe: 3, hardware: 2, lumber: 2 }],
+]);
+/** An aquaponics bay: a glazed 6 x 12 m house with four fish tanks and media beds in a row. About $13,000 and 230 person-hours. */
+export const AQUAPONICS_BLUEPRINT: Blueprint = bp('aquaponics', [
+  ['site', 'Stake the bay and the drain to the sump', 8, {}],
+  ['foundation', 'Pour the slab with its floor drains and a curb', 50, { concrete: 8, rebar: 1 }],
+  ['frame', 'Raise the greenhouse shell, insulate the north wall', 60, { greenhouse_kit: 1, lumber: 2 }],
+  ['roof', 'Set the tanks and the grow beds on their stands', 50, { aqua_kit: 1, lumber: 2 }],
+  ['finish', 'Plumb the loop, the pump, the air pump and the heater, and wire it', 62, { pipe: 3, cable: 2, hardware: 2 }],
+]);
+
 /** A stone stair between two terraces (game/buildkit/terraceProps.ts): dry-laid treads, cheek walls and a pipe rail; the bill is for a mid-height flight. */
 export const TERRACE_STAIR_BLUEPRINT: Blueprint = bp('terrace_stair', [
   ['site', 'Stake the flight and cut the treads into the hill', 10, {}],
@@ -554,7 +580,7 @@ export const TERRACE_RAMP_BLUEPRINT: Blueprint = bp('terrace_ramp', [
 ]);
 
 export const BLUEPRINTS: Record<string, Blueprint> = Object.fromEntries(
-  [MICRO_HYDRO_BLUEPRINT, WIND_TURBINE_BLUEPRINT, CABIN_BLUEPRINT, OUTHOUSE_BLUEPRINT, WORKSHOP_BLUEPRINT, ROOT_CELLAR_BLUEPRINT, WOOD_OVEN_BLUEPRINT, APIARY_BLUEPRINT, SUGAR_SHACK_BLUEPRINT, BARNYARD_BLUEPRINT, COOP_BLUEPRINT, GARDEN_BLUEPRINT, FIELD_BLUEPRINT, GREENHOUSE_BLUEPRINT, ORCHARD_BLUEPRINT, LOG_HOUSE_BLUEPRINT, FARMHOUSE_BLUEPRINT, TRAILER_BLUEPRINT, BARN_BLUEPRINT, COTTAGE_BLUEPRINT, GUEST_HOUSE_BLUEPRINT, MOMS_HOUSE_BLUEPRINT, LODGE_BLUEPRINT, LODGE_SOLAR_BLUEPRINT, STONE_HOUSE_BLUEPRINT, TIMBER_FRAME_BLUEPRINT, CONTAINER_HOUSE_BLUEPRINT, ADOBE_HOUSE_BLUEPRINT, METAL_GARAGE_BLUEPRINT, GARAGE_SOLAR_BLUEPRINT, ...UTILITY_BLUEPRINTS, GREENHOUSE_HEATED_BLUEPRINT, ORCHARD_GROVE_BLUEPRINT, SOLAR_FARM_BLUEPRINT, BATTERY_BANK_BLUEPRINT, POND_BLUEPRINT, RESERVOIR_BLUEPRINT, SHEEP_BARN_BLUEPRINT, EQUIPMENT_YARD_BLUEPRINT, ...BUNKER_BLUEPRINTS, ...TOWER_BLUEPRINTS, GATE_GARAGE_BLUEPRINT, MOTOR_COURT_BLUEPRINT, TERRACE_STAIR_BLUEPRINT, TERRACE_RAMP_BLUEPRINT].map(b => [b.kind, b]));
+  [POLYTUNNEL_BLUEPRINT, HIGH_TUNNEL_BLUEPRINT, AQUAPONICS_BLUEPRINT, MICRO_HYDRO_BLUEPRINT, WIND_TURBINE_BLUEPRINT, CABIN_BLUEPRINT, OUTHOUSE_BLUEPRINT, WORKSHOP_BLUEPRINT, ROOT_CELLAR_BLUEPRINT, WOOD_OVEN_BLUEPRINT, APIARY_BLUEPRINT, SUGAR_SHACK_BLUEPRINT, BARNYARD_BLUEPRINT, COOP_BLUEPRINT, GARDEN_BLUEPRINT, FIELD_BLUEPRINT, GREENHOUSE_BLUEPRINT, ORCHARD_BLUEPRINT, LOG_HOUSE_BLUEPRINT, FARMHOUSE_BLUEPRINT, TRAILER_BLUEPRINT, BARN_BLUEPRINT, COTTAGE_BLUEPRINT, GUEST_HOUSE_BLUEPRINT, MOMS_HOUSE_BLUEPRINT, LODGE_BLUEPRINT, LODGE_SOLAR_BLUEPRINT, STONE_HOUSE_BLUEPRINT, TIMBER_FRAME_BLUEPRINT, CONTAINER_HOUSE_BLUEPRINT, ADOBE_HOUSE_BLUEPRINT, METAL_GARAGE_BLUEPRINT, GARAGE_SOLAR_BLUEPRINT, ...UTILITY_BLUEPRINTS, GREENHOUSE_HEATED_BLUEPRINT, ORCHARD_GROVE_BLUEPRINT, SOLAR_FARM_BLUEPRINT, BATTERY_BANK_BLUEPRINT, POND_BLUEPRINT, RESERVOIR_BLUEPRINT, SHEEP_BARN_BLUEPRINT, EQUIPMENT_YARD_BLUEPRINT, ...BUNKER_BLUEPRINTS, ...TOWER_BLUEPRINTS, GATE_GARAGE_BLUEPRINT, MOTOR_COURT_BLUEPRINT, TERRACE_STAIR_BLUEPRINT, TERRACE_RAMP_BLUEPRINT].map(b => [b.kind, b]));
 
 /** Total bill of materials for a blueprint. */
 export function totalBill(bp: Blueprint): Partial<Stock> {

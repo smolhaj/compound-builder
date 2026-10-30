@@ -24,6 +24,7 @@ import { tractorBoost } from './vehicles';
 import { SOIL_YIELD } from './site';
 import { seasons } from './regions';
 import { gardenSeasonK } from './microclimate';
+import { aquaPlants, fertigationK } from './aquaponics';
 import { gardenSeason, greenhousePeak, greenhouseGreens } from './greenhouse';
 import { orchardPicking } from './orchard';
 import { careYield, cookRatio, lifeMorale, spoilFactor } from './daily';
@@ -150,7 +151,7 @@ export function produceParts(s: GameState): ProduceParts {
   // later sowings (successions, sim/crops.ts) run the end of the season on a little and raise the crop
   const [g0, g1a] = gardenSeason(s), g1 = g1a + successionDays(s);
   // each bed has its own frost dates and wind (sim/microclimate.ts): a cold-air pocket starts late and ends early, an open ridge dries the bed
-  const season = fin.filter(st => st.kind === 'garden').reduce((a, st) => a + gardenSeasonK(s, st, doy, g0, g1), 0);
+  const season = fin.filter(st => st.kind === 'garden').reduce((a, st) => a + gardenSeasonK(s, st, doy, g0, g1) * fertigationK(s, st), 0);
   const skill = bestGardener(s);
   // a month to come back after hail (replanted from saved seed), then a shorter season
   const hd = hailThisYear(s), hail = hd == null || doy < hd ? 1 : doy - hd < 30 ? 0 : 0.7;
@@ -160,7 +161,7 @@ export function produceParts(s: GameState): ProduceParts {
   return {
     eggs: Math.max(0, eggs) * Math.max(0.5, grow) * henSeason(s, doy),
     veg: Math.max(0, veg) * grow * pol.garden,
-    greens: greenhouseGreens(s) * careYield(s, 'greenhouse') * grow,
+    greens: (greenhouseGreens(s) * careYield(s, 'greenhouse') + aquaPlants(s)) * grow,
     orchard: pick.kcal * orchardK,
     orchardKeep: pick.keep * orchardK,
     field: fieldHarvestSplit(s),
