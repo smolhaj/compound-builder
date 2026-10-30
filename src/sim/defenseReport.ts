@@ -25,6 +25,7 @@ import { dayIndex, type GameState } from './state';
 import { bondOf, dogWatch, livingDogs, temperOf } from './pets';
 import { bestShelter } from './nuclear';
 import { HOUSING_STYLES, coverFactor, mainHome } from './housingStyles';
+import { hardenedSafeRoom, hasSafeRoom, layerTier } from './houseHardening';
 
 export type Tone = 'good' | 'warn' | 'bad';
 export interface Check { id: string; label: string; ok: boolean; tone: Tone; detail: string }
@@ -191,13 +192,13 @@ export function defenseReport(s: GameState, drive?: readonly Pt[]): DefenseRepor
     chk('adults', 'Adults who can fight', p.fighters >= 2, `${Math.round(p.fighters * 10) / 10} on the line`, p.fighters >= 1),
     chk('guns', 'Armed with ammo', p.armed, guns ? (p.armed ? `${guns} gun${guns > 1 ? 's' : ''}, loaded` : 'guns but no ammunition') : 'no firearms', false),
     chk('gear', 'Armor and night vision', n(s, 'plate_carrier') + n(s, 'soft_armor') + n(s, 'nvg') + n(s, 'thermal') > 0, 'plates, vests, NVG or thermal', true),
-    chk('cover', 'Cover on the line', n(s, 'sandbags') > 0 || n(s, 'steel_door') > 0 || n(s, 'window_bars') > 0, 'sandbags, a steel door, bars on the windows', true),
+    chk('cover', 'Cover on the line', n(s, 'sandbags') > 0 || layerTier(s, 'doors') > 0 || layerTier(s, 'windows') > 0, 'sandbags, a steel door, bars or shutters on the windows', true),
     ...houseWallsRow(s),
   ];
   const bunker = fin.some(st => BUNKER_ENTRANCES.includes(st.kind));
   const shelter: Check[] = [
     chk('bunker', 'Bunker', bunker, bunker ? 'the family can hide' : 'nowhere to hide if the line falls', true),
-    chk('safe', 'Safe room', n(s, 'safe_room') > 0, 'a hard room in the house', true),
+    chk('safe', 'Safe room', hasSafeRoom(s), hardenedSafeRoom(s) ? 'poured, ballistic-lined, vault door and filtered air' : 'a hard room in the house', true),
     chk('tunnel', 'Escape tunnel', s.perimeter.some(r => r.kind === 'escape_tunnel' && runFinished(r)), 'a way out that is not a way in', true),
   ];
 
@@ -221,7 +222,7 @@ export function defenseReport(s: GameState, drive?: readonly Pt[]): DefenseRepor
   for (const [k, c] of byKind) improvements.push(`${PERIMETER[k as keyof typeof PERIMETER].name}${c > 1 ? ` ×${c}` : ''}`);
   for (const st of fin) if (st.kind in TOWERS) improvements.push(TOWERS[st.kind as keyof typeof TOWERS].name); else if (st.kind.includes('tower') || st.kind.startsWith('bunker_')) improvements.push(st.kind.replace(/_/g, ' '));
   for (const d of livingDogs(s)) improvements.push(d.guard ? `${d.name} (dog on guard)` : `${d.name} (dog)`);
-  for (const [k, lbl] of [['cameras', 'cameras'], ['floodlights', 'floodlights'], ['steel_door', 'steel door'], ['window_bars', 'window bars'], ['sandbags', 'sandbags'], ['safe_room', 'safe room'], ['tripwire', 'tripwires'], ['driveway_alarm', 'driveway alarm']] as const) if (n(s, k) > 0) improvements.push(lbl);
+  for (const [k, lbl] of [['cameras', 'cameras'], ['floodlights', 'floodlights'], ['steel_door', 'steel door'], ['security_door', 'security door'], ['window_bars', 'window bars'], ['window_shutters', 'steel shutters'], ['ballistic_panels', 'ballistic panels'], ['sandbags', 'sandbags'], ['safe_room', 'safe room'], ['safe_room_hardened', 'hardened safe room'], ['tripwire', 'tripwires'], ['driveway_alarm', 'driveway alarm']] as const) if (n(s, k) > 0) improvements.push(lbl);
 
   // ── the score ──
   const score = Math.round(Math.min(100, 0.38 * p.barrier + 0.2 * p.detection + 0.14 * Math.min(100, p.fighters * 18) + 0.14 * Math.min(100, Math.max(0, ((p.firepower ?? 1) - 0.6) * 100)) + 0.08 * p.fortress + (bunker ? 4 : 0) + (p.safeRoom ? 2 : 0)));

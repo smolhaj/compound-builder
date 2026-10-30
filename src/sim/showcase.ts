@@ -98,8 +98,12 @@ const outerRingOf = (g: GameState): Pt[] | null => {
   return rs[0] ? rs[0].pts : null;
 };
 
-export function runMountainShowcase(io: ShowcaseIO, opts: ShowcaseOptions = {}): ShowcaseReport {
-  if (opts.layout === 'bench') return runBenchShowcase(io, opts);
+/**
+ * The showcase as steps: a generator that yields a label at each point where the live game can hand the main thread back to the browser
+ * (loading screen, input) and carry on. `runMountainShowcase` runs it straight through, so the tests see the same result as the live game.
+ */
+export function* mountainShowcaseSteps(io: ShowcaseIO, opts: ShowcaseOptions = {}): Generator<string, ShowcaseReport, void> {
+  if (opts.layout === 'bench') return yield* benchShowcaseSteps(io, opts);
   const steps: ShowcaseStep[] = [], notes: string[] = [];
   const { P, slopeAt } = frameOf(io.camp, io.fall, io.ground);
   // the rock face: the steepest ground uphill of the camp; the shelf's lower lip: where, downhill of the face's foot, the ground starts to fall away
@@ -110,8 +114,10 @@ export function runMountainShowcase(io: ShowcaseIO, opts: ShowcaseOptions = {}):
   notes.push(`camp ${io.camp.map(v => v.toFixed(1)).join(', ')}, fall ${io.fall.toFixed(3)}; ground by du: ` + [-14, -10, -6, -2, 2, 6, 10, 14].map(d => { const [x, z] = P(d, 0); return `${d}: ${io.ground(x, z).toFixed(1)} (slope ${slopeAt(x, z).toFixed(2)})`; }).join(', '));
   io.fund();
   // the way in: the winding access road (priced by the road planner), done by the contractor
+  yield 'Surveying';
   const why = io.road();
   steps.push({ step: 'Access road (hookup)', ok: !why, note: why ?? undefined });
+  yield 'Access road';
 
   // ── the buildings: the nearest valid spot to where the design wants each ──
   const S = (kind: string, du: number, db: number, o: { rots?: number[]; radius?: number; label?: string } = {}): { x: number; z: number; rot: number } | null => {
@@ -127,6 +133,7 @@ export function runMountainShowcase(io: ShowcaseIO, opts: ShowcaseOptions = {}):
   S('lodge', dEdge - 2.5, 3, { rots: [0, 1, 2, 3], radius: 8, label: 'Lodge (walkout basement)' });
   S('greenhouse_heated', dFace + 3, -6, { label: 'Glass greenhouse' });
   S('bunker_hatch', dEdge - 7, 0, { label: 'Bunker hatch' });
+  yield 'Buildings';
 
   // ── terraces (the Next-step card's own plan) ──
   const terr = terraceSite(io.game());
@@ -138,9 +145,11 @@ export function runMountainShowcase(io: ShowcaseIO, opts: ShowcaseOptions = {}):
 
   // ── the ring: wall, towers, gate garage, motor court, inner rings ──
   const concrete = opts.wall === 'concrete';
+  yield 'Terraces';
   const fr = io.fortify({ scope: 'core', shape: 'irregular', wall: concrete ? 'concrete_wall' : 'stone_wall', towers: 5, towerKind: concrete ? 'watchtower_hex' : 'watchtower_octagon', passage: false, rings: opts.rings ?? 1, ringWall: 'stone_wall', ringSally: true, motorCourt: true });
   steps.push({ step: `Fortify my ring (${concrete ? 'concrete wall, hexagon towers' : 'stone wall, octagon towers'}, motor court, ${opts.rings ?? 1} ring${(opts.rings ?? 1) > 1 ? 's' : ''})`, ok: fr.runs + fr.structures > 0, note: `${fr.runs} runs, ${fr.structures} structures` });
   io.finishAll();
+  yield 'Finishing';
 
   // ── the rest of the compound goes inside the wall that is now standing round the lodge and greenhouse ──
   const ring0 = outerRingOf(io.game());
@@ -151,6 +160,7 @@ export function runMountainShowcase(io: ShowcaseIO, opts: ShowcaseOptions = {}):
     stakeInside(io, steps, 'Solar farm', 'solar_farm', ring0, P(dFace + 7.5, 5));
     stakeInside(io, steps, 'Battery container', 'battery_bank', ring0, P(dFace + 7.5, 1.5));
     io.finishAll();
+    yield 'Finishing';
   }
 
   // ── razor wire on the outer wall, drainage channel along the cut ──
@@ -162,6 +172,7 @@ export function runMountainShowcase(io: ShowcaseIO, opts: ShowcaseOptions = {}):
   if (line) { const r = io.drawRun('drain_channel', line as Pt[]); steps.push({ step: 'Drainage channel above the cut', ok: typeof r === 'string', at: line[0], note: typeof r === 'string' ? undefined : r.problem }); }
   else steps.push({ step: 'Drainage channel', ok: false, note: wet ? 'no contour line for it' : 'no building on a cut slope to drain' });
   io.finishAll();
+  yield 'Finishing';
 
   // ── the fleet: the garage's four slots fill first, the rest stand in the court's bays ──
   const bought: string[] = [], refused: string[] = [];
@@ -170,20 +181,27 @@ export function runMountainShowcase(io: ShowcaseIO, opts: ShowcaseOptions = {}):
   return { steps, frame: { phi: io.fall, dFace, dEdge }, notes };
 }
 
+export function runMountainShowcase(io: ShowcaseIO, opts: ShowcaseOptions = {}): ShowcaseReport {
+  const g = mountainShowcaseSteps(io, opts);
+  for (;;) { const r = g.next(); if (r.done) return r.value; }
+}
+
 /**
  * The north-star layout: the compound on the bench above the rock face (the terraces, the lodge on its walkout, the solar bench), the motor court and
  * the camp on the shelf below it at the foot of the face, and a rock tunnel bored up through the hill from the court's portal to the compound's gate.
  * The tunnel is the only way a truck gets up: a person cannot cross the face.
  */
-function runBenchShowcase(io: ShowcaseIO, opts: ShowcaseOptions): ShowcaseReport {
+function* benchShowcaseSteps(io: ShowcaseIO, opts: ShowcaseOptions): Generator<string, ShowcaseReport, void> {
   const steps: ShowcaseStep[] = [], notes: string[] = [];
   const { P, slopeAt } = frameOf(io.camp, io.fall, io.ground);
   let dFace = -4, steepest = 0;
   for (let d = 0; d > -40; d -= 0.25) { const [x, z] = P(d, 0), sl = slopeAt(x, z); if (sl > steepest) { steepest = sl; dFace = d; } }
   if (steepest < 0.9) notes.push(`no rock face found uphill of the camp (steepest ground ${steepest.toFixed(2)})`);
   io.fund();
+  yield 'Surveying';
   const why = io.road();
   steps.push({ step: 'Access road (hookup)', ok: !why, note: why ?? undefined });
+  yield 'Access road';
 
   // the line the land allows from the shelf at the foot of the face up into the hill (the Next-step card's own search): its high end says where the compound goes
   const bore = boreTo(io.game(), io.camp, 45);
@@ -207,6 +225,7 @@ function runBenchShowcase(io: ShowcaseIO, opts: ShowcaseOptions): ShowcaseReport
   S('lodge', -3, 0, { rots: [0, 1, 2, 3], radius: 8, label: 'Lodge (walkout basement)' });
   S('greenhouse_heated', 3, -7, { label: 'Glass greenhouse' });
   S('bunker_hatch', 0, -3, { label: 'Bunker hatch' });
+  yield 'Buildings';
   const terr = terraceSite(io.game());
   if (terr) {
     const spots = terr.tiers.map(t => [t.x, t.z] as [number, number]);
@@ -216,9 +235,11 @@ function runBenchShowcase(io: ShowcaseIO, opts: ShowcaseOptions): ShowcaseReport
 
   // the ring round the compound (not the camp): wall, towers, keep ring
   const concrete = opts.wall === 'concrete';
+  yield 'Terraces';
   const fr = io.fortify({ scope: 'core', shape: 'irregular', wall: concrete ? 'concrete_wall' : 'stone_wall', towers: 5, towerKind: concrete ? 'watchtower_hex' : 'watchtower_octagon', passage: false, rings: opts.rings ?? 1, ringWall: 'stone_wall', ringSally: true, motorCourt: false, gate: false }, C);
   steps.push({ step: `Fortify my ring (${concrete ? 'concrete wall, hexagon towers' : 'stone wall, octagon towers'}, round the bench)`, ok: fr.runs + fr.structures > 0, note: `${fr.runs} runs, ${fr.structures} structures` });
   io.finishAll();
+  yield 'Finishing';
   const ring1 = outerRingOf(io.game());
   if (ring1) {
     const cf = Math.cos(io.fall), sf = Math.sin(io.fall), at = (du: number, db: number): Pt => [C[0] + du * cf - db * sf, C[1] + du * sf + db * cf];
@@ -229,6 +250,7 @@ function runBenchShowcase(io: ShowcaseIO, opts: ShowcaseOptions): ShowcaseReport
     stakeInside(io, steps, 'Solar farm', 'solar_farm', ring1, at(-3, 5), [0], 1.8);
     stakeInside(io, steps, 'Battery container', 'battery_bank', ring1, at(-3, 9), [0], 1.8);
     io.finishAll();
+    yield 'Finishing';
   }
 
   // the tunnel: from the low portal on the shelf up to the compound's wall, where the high portal opens a doorway in it (the tunnel is the compound's gate, the ring has none)
@@ -248,11 +270,13 @@ function runBenchShowcase(io: ShowcaseIO, opts: ShowcaseOptions): ShowcaseReport
   }
   if (!placed) steps.push({ step: 'Motor court at the portal', ok: false, at: [spot.x, spot.z], note: 'no valid spot outside the portal' });
   io.finishAll();
+  yield 'Finishing';
   const g2 = io.game();
   const wet = undrained(g2).sort((x, y) => (y.grade ?? 0) - (x.grade ?? 0))[0];
   const line = wet ? drainLineFor(g2, wet) : null;
   if (line) { const d = io.drawRun('drain_channel', line as Pt[]); steps.push({ step: 'Drainage channel above the cut', ok: typeof d === 'string', at: line[0], note: typeof d === 'string' ? undefined : d.problem }); }
   io.finishAll();
+  yield 'Finishing';
   const bought: string[] = [], refused: string[] = [];
   for (const k of ['suv', 'suv', 'old_pickup', 'motorhome', 'atv', 'tractor']) { const e = io.buyVehicle(k); if (!e) bought.push(k); else refused.push(`${k}: ${e}`); }
   steps.push({ step: 'Fleet for the court', ok: bought.length > 0, note: `bought ${bought.join(', ') || 'nothing'}${refused.length ? '; refused ' + refused.join('; ') : ''}` });

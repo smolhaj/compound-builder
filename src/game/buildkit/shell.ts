@@ -61,6 +61,8 @@ export function worldUV(g: THREE.BufferGeometry): THREE.BufferGeometry {
 
 /** Services fitted to a building. */
 export interface BuildOpts {
+  /** Stairs and ramps (terraceProps.ts): the height of the +z end over the -z end (u, signed): the ground they stand on climbs this much along their length. */
+  rise?: number;
   plumbed?: boolean; wired?: boolean; septic?: boolean;
   /** Underground pieces: doorways by local side (position along that wall) and the ground's height above the floor. */
   doors?: Partial<Record<'front' | 'back' | 'left' | 'right', number>>;

@@ -31,7 +31,14 @@ export interface RadioState {
   /** Counts of true news and false rumors heard. */
   truths: number;
   rumors: number;
+  /** What was heard lately and whether anyone has checked it (rumors.ts). */
+  heard?: Heard[];
+  /** Someone out checking a rumor, back on `back` (a day index). */
+  scout?: { pid: string; rumor: string; back: number };
 }
+
+export type RumorKind = 'raiders' | 'service' | 'relief' | 'city' | 'checkpoint' | 'poison';
+export interface Heard { id: string; day: number; text: string; kind: RumorKind; truth: boolean; status: 'open' | 'confirmed' | 'false' | 'unclear' }
 
 export type RadioSet = 'ham' | 'shortwave' | 'none';
 
@@ -84,9 +91,10 @@ export function radioDay(s: GameState): string[] {
   const set = radioSet(s), { hear, truth } = reception(s);
   if (r() > hear) return [];
   const src = pick(r, SOURCE[set]);
-  const say = (text: string, tone: 0 | 1 | 2 | 3) => {
+  const say = (text: string, tone: 0 | 1 | 2 | 3, meta?: { kind: RumorKind; truth: boolean }) => {
     d.news.push({ t, text, tone });
     if (d.news.length > 40) d.news.splice(0, d.news.length - 40);
+    if (meta) remember(st, { id: `h${day}`, day, text, ...meta, status: 'open' });
     return [text];
   };
   const warn = (days: number) => { st.warnedUntil = day + days; st.bonus = set === 'ham' ? 15 : set === 'shortwave' ? 10 : 5; };
@@ -97,28 +105,38 @@ export function radioDay(s: GameState): string[] {
   if (r() < truth) {
     st.truths++;
     // a raider warning, likelier the more the law has gone
-    if (r() < 0.15 + 0.4 * lawless) { warn(3); return say(`${src} a group raiding farms is working this side of the county. Keep a watch.`, 2); }
+    if (r() < 0.15 + 0.4 * lawless) { warn(3); return say(`${src} a group raiding farms is working this side of the county. Keep a watch.`, 2, { kind: 'raiders', truth: true }); }
     // the fate, before it shows: something coming back soon …
     const soon = (Object.entries(d.back) as Array<[Track, number]>).filter(([, b]) => b > since && b - since <= 14);
     if (d.fate !== 'never' && soon.length) {
       const [k] = pick(r, soon);
-      return say(`${src} crews are working on ${TRACK_NAME[k].toLowerCase()}; they say it'll be back within a couple of weeks.`, 0);
+      return say(`${src} crews are working on ${TRACK_NAME[k].toLowerCase()}; they say it'll be back within a couple of weeks.`, 0, { kind: 'service', truth: true });
     }
     // … or nobody coming
-    if (d.fate === 'never' && since >= 30) return say(`${src} there is no relief plan for this area. Nobody's coming.`, 2);
-    if (d.fate === 'partial' && since >= 30) return say(`${src} the state is rebuilding, but only the cities and main roads for now.`, 1);
+    if (d.fate === 'never' && since >= 30) return say(`${src} there is no relief plan for this area. Nobody's coming.`, 2, { kind: 'relief', truth: true });
+    if (d.fate === 'partial' && since >= 30) return say(`${src} the state is rebuilding, but only the cities and main roads for now.`, 1, { kind: 'relief', truth: true });
     const k = pick(r, TRACKS);
     const lvl = d.tracks[k];
-    return say(`${src} ${TRACK_NAME[k].toLowerCase()} ${lvl > 0.8 ? 'is working' : lvl > 0.3 ? 'is on and off' : 'is still out'} around here.`, lvl > 0.3 ? 0 : 1);
+    return say(`${src} ${TRACK_NAME[k].toLowerCase()} ${lvl > 0.8 ? 'is working' : lvl > 0.3 ? 'is on and off' : 'is still out'} around here.`, lvl > 0.3 ? 0 : 1, { kind: 'service', truth: true });
   }
   st.rumors++;
   const k = pick(r, TRACKS);
-  return say(pick(r, [
-    `${src} FEMA trucks are coming through on Tuesday with food and water.`,
-    `${src} ${TRACK_NAME[k].toLowerCase()} is back on next week, for sure this time.`,
-    `${src} the army is taking guns and food at checkpoints.`,
-    `${src} the city is open and handing out rations; folks are walking in.`,
-    `${src} raiders burned out a place near here last night.`,
-    `${src} the water's poisoned downstream; don't drink from the creek.`,
-  ]), 1);
+  const RUMORS: Array<[RumorKind, string]> = [
+    ['relief', `${src} FEMA trucks are coming through on Tuesday with food and water.`],
+    ['service', `${src} ${TRACK_NAME[k].toLowerCase()} is back on next week, for sure this time.`],
+    ['checkpoint', `${src} the army is taking guns and food at checkpoints.`],
+    ['city', `${src} the city is open and handing out rations; folks are walking in.`],
+    ['raiders', `${src} raiders burned out a place near here last night.`],
+    ['poison', `${src} the water's poisoned downstream; don't drink from the creek.`],
+  ];
+  const [kind, text] = pick(r, RUMORS);
+  return say(text, 1, { kind, truth: false });
+}
+
+/** Keep the last eight things heard (remember), newest last. */
+function remember(st: RadioState, h: Heard): void {
+  const list = (st.heard ??= []);
+  if (list.some(x => x.id === h.id)) return;
+  list.push(h);
+  if (list.length > 8) list.splice(0, list.length - 8);
 }

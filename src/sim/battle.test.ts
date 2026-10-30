@@ -107,7 +107,7 @@ describe('the battle at the compound', () => {
 
   it('a wounded fighter shoots worse and slower: the hurt start weaker', () => {
     let fitHits = 0, fitShots = 0, hurtHits = 0, hurtShots = 0, fitTime = 0, hurtTime = 0;
-    for (let seed = 1; seed <= 25; seed++) {
+    for (let seed = 1; seed <= 80; seed++) {
       const fit = planBattle(fortify(afterHit(seed)), 6, seed);
       const hurtG = fortify(afterHit(seed));
       for (const ps of hurtG.personState) ps.needs.health = 30;

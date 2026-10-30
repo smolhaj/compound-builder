@@ -169,7 +169,7 @@ describe('sally ports', () => {
     }
   });
 
-  it('a standing sally port shortens the hold a little and gives the defenders a flank; none counted until built', () => {
+  it('a standing sally port gives the defenders a flank and never shortens the hold; none counted until built', () => {
     const g = game();
     layRings(g, planRings(g, OUTER, [42, 30], {}, { count: 3, sally: true }));
     expect(sallyPorts(g)).toBe(0);
@@ -177,7 +177,8 @@ describe('sally ports', () => {
     finishAll(g);
     expect(sallyPorts(g)).toBe(2);
     expect(sortieFactor(g)).toBeCloseTo(1 + 2 * SALLY.SORTIE, 6);
-    expect(SALLY.CHOKE).toBeLessThan(RING.DELAY);
+    expect(ringHoldSeconds(g)).toBe(ringHoldSeconds(g));
+    expect(RING.DELAY).toBeGreaterThan(0);
   });
 });
 

@@ -5,6 +5,7 @@ import type { SeasonMode } from '../engine/world/season/seasonState';
 import type { WeatherMode } from '../engine/world/weather/weatherState';
 import type { TourCaption, TourMode } from '../engine/world/camera/TourController';
 import type { PropertyGeometry } from '../sim/propertyWall';
+import type { BpReadout } from '../game/blueprint/blueprintPlan';
 import type { PathSummary } from '../game/paths/pathNet';
 import { autoStartTier } from '../engine/perf/device';
 
@@ -39,7 +40,7 @@ export interface WorldState {
   weatherMode: WeatherMode;
   quality: Quality;
   /** The loading screen: what the boot is doing and how far along (null once the world is up). */
-  boot: { label: string; pct: number } | null;
+  boot: { label: string; pct: number; hold?: boolean } | null;
   /** Frame-rate cap (0 = uncapped). 60 by default: a 120 Hz display otherwise does twice the work for no visible gain. */
   frameCap: FrameCap;
   setFrameCap: (f: FrameCap) => void;
@@ -51,7 +52,7 @@ export interface WorldState {
   /** Shown once when the game stepped the graphics down by itself (dismissible); never set for a change the player made. */
   perfNotice: string | null;
   setPerfNotice: (n: string | null) => void;
-  setBoot: (b: { label: string; pct: number } | null) => void;
+  setBoot: (b: { label: string; pct: number; hold?: boolean } | null) => void;
   cameraMode: CameraMode;
   buildingView: BuildingView;
   /** Sightline overlay: off / exposure from the road / from the ridge / night lights / viewshed from a point. */
@@ -59,6 +60,11 @@ export interface WorldState {
   /** The terrain overlay (high ground, lanes, water, sun): game/terrain/TerrainOverlay.ts. */
   terrainMode: 'off' | 'high' | 'lanes' | 'water' | 'sun';
   setTerrainMode: (m: WorldState['terrainMode']) => void;
+  /** The blueprint view: names and roles of the buildings, rings, gates, towers and tunnels, with the defense readouts (game/blueprint). */
+  blueprint: boolean;
+  setBlueprint: (on: boolean) => void;
+  blueprintReadout: BpReadout | null;
+  setBlueprintReadout: (r: BpReadout | null) => void;
   /** The property line drawn on the ground (also shown while a fence or wall is being drawn). */
   showBoundary: boolean;
   setShowBoundary: (on: boolean) => void;
@@ -133,6 +139,10 @@ export const useWorldStore = create<WorldState>()(subscribeWithSelector((set) =>
   buildingView: 'full',
   sightMode: 'off',
   terrainMode: 'off',
+  blueprint: false,
+  setBlueprint: (blueprint) => set({ blueprint }),
+  blueprintReadout: null,
+  setBlueprintReadout: (blueprintReadout) => set({ blueprintReadout }),
   showBoundary: false,
   siteGeo: null,
   setSiteGeo: (siteGeo) => set({ siteGeo }),

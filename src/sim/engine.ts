@@ -3,6 +3,7 @@
  * quarter-hour sub-step (deterministic regardless of frame rate or speed).
  * Systems mutate a draft; `step` returns a fresh state object.
  */
+import { sharedHarvestDay } from './sharedHarvest';
 import { hasBasement } from './housingStyles';
 import { wildlifeDay, wildlifeNight } from './wildlife';
 import { LIFESTYLE } from './site';
@@ -38,6 +39,7 @@ import { vehiclesDay } from './vehicles';
 import { kinDay } from './kin';
 import { newcomersDay } from './newcomers';
 import { radioDay } from './radio';
+import { scoutDay } from './rumors';
 import { waterDay } from './water';
 import { addRunWork, nextRun } from './perimeter';
 import { pickWork } from './priority';
@@ -198,11 +200,13 @@ function subStep(s: GameState): void {
     for (const line of toolsDay(s)) log(s, line);
     for (const line of vehiclesDay(s)) log(s, line);
     for (const line of radioDay(s)) log(s, line);
+    for (const line of scoutDay(s)) log(s, line);
     // (the stove is going unless the woodpile is bare: burnFirewood leaves `burned` at 1 then)
     for (const line of upkeepDay(s, demandNow(s), s.heat.burned < 1)) log(s, line);
     for (const line of mutualAidDay(s)) log(s, line);
     // the world round the place: the neighbors' lives, the market, scavenging runs coming home
     for (const line of neighborLifeDay(s)) log(s, line);
+    for (const line of sharedHarvestDay(s)) log(s, line);
     for (const line of marketDay(s)) log(s, line);
     for (const line of scavengeDay(s)) log(s, line);
     for (const line of minesDay(s)) log(s, line);
