@@ -133,7 +133,7 @@ if (only.includes('checks')) {
     const setTasks = tasks => { const g = structuredClone(G.getState().game); g.personState.forEach((ps, i) => { ps.task = tasks[i % tasks.length]; ps.target = null; }); G.setState({ game: g }); };
     // what a walk may not cross: a building (the gate garage has its drive-through, the court its open bays), a cliff band; the wall, but at its gates
     const boxes = g0.structures.filter(st => K.KIT[st.kind].level !== 'underground' && !['bunker_hatch', 'gate_garage', 'motor_court'].includes(st.kind)).map(st => K.footprint(K.KIT[st.kind], st.x, st.z, st.rot, false));
-    const blockedAt = (x, z) => boxes.some(r => x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1) || slopeAt(x, z) > 1.0;
+    const blockedAt = (x, z) => boxes.some(r => x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1) || (slopeAt(x, z) > 1.0 && !w.walls.atStair(x, z));
     const wallAt = (x, z) => w._perimeterBlocked(x, z, 0.08) || w.walls.blocks(x, z);
     const step = dt => w.updatePeople(dt, G.getState().game, 14, 1);
     const results = [];
@@ -160,7 +160,7 @@ if (only.includes('checks')) {
           // a step inside a tunnel or on a tunnel-bridge deck (the figure rides the deck, under the hill): its own checks, not the ground's
           if (by !== null && ay !== null) { deckU += d; deckSteps++; deckDrop = Math.max(deckDrop, Math.abs(by - ay) / Math.max(d, 0.05)); continue; }
           maxGrade = Math.max(maxGrade, Math.abs(gr(bx, bz) - gr(ax, az)) / Math.max(d, 0.05));
-          if (slopeAt(bx, bz) > 1.0) cliffSteps++;
+          if (slopeAt(bx, bz) > 1.0 && !w.walls.atStair(bx, bz)) cliffSteps++;      // (a retaining wall's stair is the way over a riser)
           if (Math.hypot(bx - end[0], bz - end[1]) > 1.3 && Math.hypot(bx - tr[0][0], bz - tr[0][1]) > 1.3) { if (blockedAt(bx, bz)) blockedSteps++; if (wallAt(bx, bz)) wallSteps++; }
         }
         people.push({ person: p.id, task: ph.tasks[i % ph.tasks.length], lenM: Math.round(len * 6), tunnelM: Math.round(deckU * 6), deckGrade: +deckDrop.toFixed(2), maxStepGrade: +maxGrade.toFixed(2), blockedSteps, wallSteps, cliffSteps, from: tr[0].slice(0, 2).map(v => +v.toFixed(1)), to: end.slice(0, 2).map(v => +v.toFixed(1)) });
