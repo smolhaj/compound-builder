@@ -114,6 +114,7 @@ export function* mountainShowcaseSteps(io: ShowcaseIO, opts: ShowcaseOptions = {
   notes.push(`camp ${io.camp.map(v => v.toFixed(1)).join(', ')}, fall ${io.fall.toFixed(3)}; ground by du: ` + [-14, -10, -6, -2, 2, 6, 10, 14].map(d => { const [x, z] = P(d, 0); return `${d}: ${io.ground(x, z).toFixed(1)} (slope ${slopeAt(x, z).toFixed(2)})`; }).join(', '));
   io.fund();
   // the way in: the winding access road (priced by the road planner), done by the contractor
+  yield 'Surveying';
   const why = io.road();
   steps.push({ step: 'Access road (hookup)', ok: !why, note: why ?? undefined });
   yield 'Access road';
@@ -197,6 +198,7 @@ function* benchShowcaseSteps(io: ShowcaseIO, opts: ShowcaseOptions): Generator<s
   for (let d = 0; d > -40; d -= 0.25) { const [x, z] = P(d, 0), sl = slopeAt(x, z); if (sl > steepest) { steepest = sl; dFace = d; } }
   if (steepest < 0.9) notes.push(`no rock face found uphill of the camp (steepest ground ${steepest.toFixed(2)})`);
   io.fund();
+  yield 'Surveying';
   const why = io.road();
   steps.push({ step: 'Access road (hookup)', ok: !why, note: why ?? undefined });
   yield 'Access road';
