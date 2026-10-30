@@ -1,0 +1,34 @@
+{
+ "_doc": "Per-tier budgets for the mountain showcase census (scripts/perfBudget.mjs, docs/DECISIONS.md). Counts are the scene-graph census (visible meshes, upper bound, no frustum culling), set at about 10 % over what was measured on 2026-10-30. Lower these when a PR makes the scene lighter; raising one needs a reason in docs/DECISIONS.md. Shadow numbers are 0 at Low (no shadow pass). loadMsFail is JS-only boot time on a slow CI box (measured 12-20 s) and only catches a blow-up.",
+ "scenes": {
+  "mountain": {
+   "query": "clean&seed=7&region=pnw&lot=hillside&lotcut&relief=9&acres=40&lotseed=8&elev=600&showcase=mountain",
+   "tiers": {
+    "low": {
+     "drawCalls": 430,
+     "triangles": 620000,
+     "shadowTriangles": 0,
+     "shadowCasters": 0,
+     "heapMB": 110,
+     "loadMsFail": 60000
+    },
+    "medium": {
+     "drawCalls": 430,
+     "triangles": 940000,
+     "shadowTriangles": 240000,
+     "shadowCasters": 345,
+     "heapMB": 140,
+     "loadMsFail": 60000
+    },
+    "high": {
+     "drawCalls": 430,
+     "triangles": 1400000,
+     "shadowTriangles": 295000,
+     "shadowCasters": 350,
+     "heapMB": 180,
+     "loadMsFail": 60000
+    }
+   }
+  }
+ }
+}

@@ -46,6 +46,7 @@ import { KIT } from './buildkit/kit';
 import { isUnderground } from './buildkit/underground';
 import type { SiteQuery } from './buildkit/kit';
 import { FrameBudget, capGapMs, lowerTier } from '../engine/perf/qualityAuto';
+import { sceneCensus } from './perfCensus';
 import { yieldToBrowser, warmShaders } from './bootStages';
 import { parseLowRender, RenderRequests, type QaQuality } from './qaRender';
 
@@ -85,7 +86,7 @@ export function GameCanvas() {
       weather.setQuality(q);
       world.setQuality(q);
     };
-    const applyLook = () => setLook(lowRender.on ? 'low' : useWorldStore.getState().quality);
+    const applyLook = () => setLook(lowRender.on ? lowRender.tier : useWorldStore.getState().quality);
     boot('Raising the ground and the woods', 0.3); await yieldToBrowser();
     if (cancelled) { window.removeEventListener('resize', resize); world.dispose(); weather.dispose(); ws.dispose(); return; }
     applyLook();
@@ -480,7 +481,7 @@ export function GameCanvas() {
     if (!showcaseNext) requestAnimationFrame(() => requestAnimationFrame(() => { if (!cancelled) useWorldStore.getState().setBoot(null); }));
 
     // QA hook (screenshot harness, console poking).
-    (window as unknown as Record<string, unknown>).__cb = { terrainOv, player, ws, world, weather, valley, cam, tour, tool, marker, fence, sight, game: useGameStore, store: useWorldStore, THREE, qa, battle,
+    (window as unknown as Record<string, unknown>).__cb = { census: () => sceneCensus(ws.scene), terrainOv, player, ws, world, weather, valley, cam, tour, tool, marker, fence, sight, game: useGameStore, store: useWorldStore, THREE, qa, battle,
       demoBattle: () => {
         const g = useGameStore.getState().game;
         const b = demoBattle(g.structures, g.people, g.structures.length ? undefined : world.camp);

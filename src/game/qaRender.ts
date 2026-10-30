@@ -1,21 +1,25 @@
+export type QaQuality = 'low' | 'medium' | 'high';
+
 /** QA-only on-demand rendering (`?lowrender`). Pure parsing + the render-request bookkeeping; no THREE here. */
 export interface LowRenderFlags {
   /** Draw only when asked (`window.__cb.qa.renderNow()`), never on every frame. */
   on: boolean;
   /** Pixel ratio for the on-demand frames (default 0.5; `?lowrender=0.75` overrides). */
   scale: number;
+  /** `&looktier=medium|high`: build the world (shadows, woods, terrain) at that tier although nothing is drawn each frame; the perf-budget census reads it. Default low. */
+  tier: QaQuality;
 }
 
 /** `?lowrender` or `?lowrender=0.6`; absent means normal play (on: false). */
 export function parseLowRender(search: string): LowRenderFlags {
   const p = new URLSearchParams(search);
-  if (!p.has('lowrender')) return { on: false, scale: 1 };
+  if (!p.has('lowrender')) return { on: false, scale: 1, tier: 'low' };
   const raw = Number(p.get('lowrender'));
   const scale = Number.isFinite(raw) && raw >= 0.2 && raw <= 2 ? raw : 0.5;
-  return { on: true, scale };
+  const t = p.get('looktier');
+  return { on: true, scale, tier: t === 'medium' || t === 'high' ? t : 'low' };
 }
 
-export type QaQuality = 'low' | 'medium' | 'high';
 
 /** Pending draw requests: each `request` is answered by the next draw. */
 export class RenderRequests {

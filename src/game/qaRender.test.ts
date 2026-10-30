@@ -3,7 +3,8 @@ import { parseLowRender, RenderRequests } from './qaRender';
 
 describe('parseLowRender', () => {
   it('is off without the param', () => { expect(parseLowRender('').on).toBe(false); expect(parseLowRender('?x=1').on).toBe(false); });
-  it('is on with the bare param at half resolution', () => { expect(parseLowRender('?lowrender')).toEqual({ on: true, scale: 0.5 }); });
+  it('is on with the bare param at half resolution', () => { expect(parseLowRender('?lowrender')).toEqual({ on: true, scale: 0.5, tier: 'low' }); });
+  it('takes the tier to build the world at', () => { expect(parseLowRender('?lowrender&looktier=high').tier).toBe('high'); expect(parseLowRender('?lowrender&looktier=junk').tier).toBe('low'); });
   it('takes a sane scale and ignores junk', () => {
     expect(parseLowRender('?lowrender=0.75').scale).toBe(0.75);
     expect(parseLowRender('?lowrender=abc').scale).toBe(0.5);
