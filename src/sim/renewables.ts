@@ -176,6 +176,12 @@ export function windExposure(s: GameState, x: number, z: number): number {
   return ground * trees;
 }
 
+/** The ground's own exposure (0.6 hollow … 1.4 ridge), without the tree cover. */
+export function groundExposure(s: GameState, x: number, z: number): number {
+  const t = terrainOf(s);
+  return t ? 0.6 + 0.8 * windAt(t, x, z) : 1;
+}
+
 /** Mean wind at hub height (m/s) at a point for the year, and for a day of the year (windier in winter and spring). */
 export function hubMeanMs(s: GameState, x: number, z: number): number {
   return WIND_10M[s.site.region] * windExposure(s, x, z) * Math.pow(TURBINE.HUB_M / 10, TURBINE.SHEAR);
