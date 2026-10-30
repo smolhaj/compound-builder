@@ -10,9 +10,13 @@ import { kitMaterial, type KitMaterialId } from '../buildkit/materials';
 import { worldUV } from '../buildkit/shell';
 import { DECK_W, walkwayAccess } from '../../sim/walkway';
 import { insideRing } from '../../sim/compounds';
+import { boreParts } from './boreGeometry';
 import { PERIMETER, RAZOR, footingOf, hasSkirt, runGrowth, runProgress, wallLength, type PerimeterKind, type PerimeterRun, type Pt } from '../../sim/perimeter';
 
 const M = 1 / 6;
+/** The dark inside of a bore: one shared material (never disposed with a run's geometry). */
+let _boreDark: THREE.MeshStandardMaterial | null = null;
+const boreDark = (): THREE.MeshStandardMaterial => (_boreDark ??= new THREE.MeshStandardMaterial({ color: 0x2a2520, roughness: 1, side: THREE.BackSide }));
 type Ground = (x: number, z: number) => number;
 
 /** Point and unit direction at distance s along a polyline. */
@@ -82,6 +86,8 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
   // an upgrade of a finished run is drawn beside the old tier (not on top of it) until it is done and the old one comes down
   const run = run0.replaces ? { ...run0, pts: offsetPts(run0.pts, (run0.replacesKind === 'container_wall' || run0.replacesKind === 'container_stack') ? 0.36 : UPGRADE_OFFSET) } : run0;
   const bits = new Map<KitMaterialId, THREE.BufferGeometry[]>();
+  /** Geometry drawn with its own material (the dark inside of a bore, seen from inside). */
+  const tubes: THREE.BufferGeometry[] = [];
   const add = (m: KitMaterialId, g: THREE.BufferGeometry) => { let l = bits.get(m); if (!l) bits.set(m, l = []); l.push(worldUV(g)); };
   const def = PERIMETER[run.kind];
   const wl = wallLength(run);
@@ -555,6 +561,13 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
       }
       break;
     }
+    case 'rock_tunnel': {
+      // driven through the hill: only the two stone portals, the earth banked over the tube where the hill has not closed over it, and the dark inside show (game/perimeter/boreGeometry.ts)
+      const b = boreParts(run.pts, ground, run.finishedAt !== null ? 1 : runProgress(run), run.finishedAt !== null, lit);
+      for (const [m, g] of b.parts) add(m, g);
+      if (b.tube) tubes.push(b.tube);
+      break;
+    }
     case 'drain_channel': {
       // a 1 m stone-lined swale: a gravel bed between two fieldstone lips, a culvert stub and an iron grating at each end (a dug, spoil-lipped trench while it is being laid)
       const open = run.finishedAt === null, w = 0.9 * M;
@@ -755,6 +768,7 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
     mesh.receiveShadow = true;
     group.add(mesh);
   }
+  for (const g of tubes) group.add(new THREE.Mesh(g, boreDark()));
   group.userData = { type: 'perimeter', runId: run.id };
   return group;
 }
