@@ -18,7 +18,7 @@
  */
 import { dayIndex, type GameState, type Structure } from './state';
 import { plotSite, type PlotSite } from './orchard';
-import { windExposure } from './renewables';
+import { groundExposure, windExposure } from './renewables';
 import { weatherOf } from './weatherThreats';
 import { isFinished } from './construction';
 import { isHome } from './blueprints';
@@ -128,7 +128,8 @@ export function heatWindK(s: GameState): number {
   if (!homes.length) return 1;
   let sum = 0;
   for (const h of homes) {
-    const w = windExposure(s, h.x, h.z);
+    // (the ground only, and a dead band round level: an ordinary house on ordinary ground burns what it always did)
+    const g = groundExposure(s, h.x, h.z), w = Math.abs(g - 1) < 0.1 ? 1 : g;
     sum += w >= 1 ? MC.HEAT_EXPOSED * Math.min(1, (w - 1) / 0.4) : MC.HEAT_HOLLOW * Math.min(1, (1 - w) / 0.4);
   }
   return 1 + sum / homes.length;
