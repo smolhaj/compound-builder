@@ -83,11 +83,11 @@ for (const [rings, wall] of [[1, 'stone'], [2, 'stone'], [1, 'concrete']] as con
 
   it(`lays out on the lot ${SHOWCASE_LOT}`, () => {
     // what the land and the rules refuse is a finding, not a failure: this shelf is level, so no 10-26 % fall for terraced beds beside the compound
-    // (the only ones on the lot are far up above the face), and a patrol deck on the wall leaves no room for razor wire (docs/DECISIONS.md, #116)
-    const bad = rep.steps.filter(s => !s.ok && s.step !== 'Terraced garden beds' && !/Razor wire/.test(s.step));
+    // (the only ones on the lot are far up above the face)
+    const bad = rep.steps.filter(s => !s.ok && s.step !== 'Terraced garden beds');
     expect(bad, JSON.stringify(bad)).toEqual([]);
     const razor = rep.steps.find(s => /Razor wire/.test(s.step));
-    expect(razor?.ok || /patrol walkway/.test(razor?.note ?? '')).toBe(true);
+    expect(razor?.ok, razor?.note).toBe(true);   // (razor wire rides the patrol deck's outer rail now: docs/DECISIONS.md, roads polish)
     expect(g.structures.some(st => st.kind === 'gate_garage')).toBe(true);
     expect(g.structures.some(st => st.kind === 'motor_court')).toBe(true);
     expect(g.perimeter.some(r => r.kind === 'drain_channel')).toBe(true);

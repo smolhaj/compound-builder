@@ -10,6 +10,7 @@ import { COURT_CELLS_X, COURT_D, COURT_THEFT_FACTOR, MOTOR_COURT, courtSpot, cou
 import { YARD_BAYS, yardBays, yardCapacity } from './farm';
 import { buyVehicle, raidTakesVehicles } from './vehicles';
 import { parkingPlan } from './parking';
+import { layWalkway } from './walkway';
 import { addRazor, razorBill, razorMetres, razorProblem } from './razor';
 import { KIT } from '../game/buildkit/kit';
 
@@ -105,6 +106,17 @@ describe('razor wire', () => {
     expect(razorMetres(g)).toBeGreaterThan(0);
     expect(addRazor(g, w.id)).toMatch(/already/);
     expect(runFinished(w)).toBe(true);
+  });
+  it('goes on a wall that already has a patrol deck: the coils ride the deck\'s outer rail', () => {
+    const g = game(); g.stock.wire = 500; g.stock.hardware = 500; g.stock.rebar = 500; g.stock.roofing = 500;
+    const w = planRun(g, 'container_wall', sq());
+    w.finishedAt = 0;
+    g.perimeter.push(w);
+    layWalkway(g, w, true);
+    expect(g.perimeter.some(x => x.hostId === w.id)).toBe(true);
+    expect(razorProblem(g, w)).toBeNull();
+    expect(addRazor(g, w.id)).toBeNull();
+    expect(w.razor).toBe(true);
   });
   it('is refused on walls that carry their own wire, on hedges and on unknown runs', () => {
     const g = game(); g.stock.wire = 500; g.stock.hardware = 500;
