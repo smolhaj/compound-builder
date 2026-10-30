@@ -61,6 +61,12 @@ export const HOUSING_STYLES: Record<string, HousingStyle> = {
     heat: cold => 1.35 - 0.05 * clamp(cold - 0.6, 0, 1),
     ember: 0.85, keepsWalls: false, cover: 0.9, pf: 25, cellarKcal: 1_500_000, pantry: 5_000_000, permit: 6000,
   },
+  lodge_plinth: {
+    kind: 'lodge_plinth', base: 'lodge_plinth', name: 'Lodge on a stone plinth', walls: 'log walls on a raised fieldstone plinth, no basement', beds: 10,
+    // the same volume and glass gable, but no earth-sheltered floor under it: a vented crawl space loses a little more
+    heat: cold => 1.4 - 0.05 * clamp(cold - 0.6, 0, 1),
+    ember: 0.85, keepsWalls: false, cover: 0.9, pf: 6, cellarKcal: 0, pantry: 3_500_000, permit: 5500,
+  },
   lodge_solar: {
     kind: 'lodge_solar', base: 'lodge', name: 'Lodge with a solar roof', walls: 'log walls on a stone-faced walkout basement, panels on the south roof', beds: 10,
     heat: cold => 1.35 - 0.05 * clamp(cold - 0.6, 0, 1),
@@ -96,7 +102,7 @@ export const STYLE_KINDS: readonly string[] = Object.keys(HOUSING_STYLES);
 export const isStyleHome = (kind: string): boolean => kind in HOUSING_STYLES;
 export const styleOf = (kind: string): HousingStyle | undefined => HOUSING_STYLES[kind];
 /** The housing menu's order: the showcase first. */
-export const STYLE_ORDER: readonly string[] = ['lodge', 'lodge_solar', 'stone_house', 'timber_frame', 'container_house', 'adobe_house'];
+export const STYLE_ORDER: readonly string[] = ['lodge', 'lodge_plinth', 'lodge_solar', 'stone_house', 'timber_frame', 'container_house', 'adobe_house'];
 
 // ── where the materials are ──
 
@@ -129,6 +135,14 @@ export function fitOf(site: Pick<Site, 'region' | 'timber' | 'lot' | 'home'>, ki
         off: !woods ? `not enough standing timber on this land for a lodge (it takes about 90 saw logs; ${R.name} woods here run ${site.timber.toFixed(1)} against the usual 1.0)`
           : level ? 'this land is level: a walkout basement needs a slope to be cut into' : null,
         note: woods ? `logs from your own timber (about 90 saw logs) · built on a slope: the walkout basement is cut into the hill` : `${R.name}: too little timber for the logs`,
+        mat: null,
+      };
+    }
+    case 'lodge_plinth': {
+      const woods = site.timber >= LODGE_TIMBER;
+      return {
+        off: !woods ? `not enough standing timber on this land for a lodge (it takes about 90 saw logs; ${R.name} woods here run ${site.timber.toFixed(1)} against the usual 1.0)` : null,
+        note: woods ? 'logs from your own timber (about 90 saw logs) · for level ground: a raised stone plinth instead of a basement, so no cold cellar' : `${R.name}: too little timber for the logs`,
         mat: null,
       };
     }
