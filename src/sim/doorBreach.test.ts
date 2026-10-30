@@ -71,10 +71,10 @@ const GORGE: GroundSource = { h: (_x, z) => 4 - 4 * Math.exp(-((z - 40) ** 2) / 
 const built = (g: GameState, id: string, kind: string, x: number, z: number): Structure => { const st: Structure = { id, kind, x, z, rot: 0, stage: 9, done: 0, supplied: true, finishedAt: 0 }; g.structures.push(st); return st; };
 function bridged(): GameState {
   setGroundOverride(GORGE);
-  const g = newGame(3); g.site = { ...g.site, creek: true, home: { x0: 0, z0: 0, x1: 67, z1: 67 } };
+  const g = newGame(3, 105, 2027, { mode: 'scenario', peace: 'short', kind: 'grid_down' }); g.site = { ...g.site, creek: true, home: { x0: 0, z0: 0, x1: 67, z1: 67 } };
   built(g, 'h', 'timber_cabin', 33, 18);
   const b = planRun(g, 'tunnel_bridge', [[33, 28], [33, 52]]); b.finishedAt = 0; b.done = b.hours; b.supplied = true;
-  g.clock.t = 0.8;   // night
+  g.clock.t = Math.floor(g.disaster.hitAt + 60) + 0.8;   // night
   return g;
 }
 
@@ -102,5 +102,36 @@ describe('the door in a battle', () => {
       const alarm = b.events.find(e => e.kind === 'alarm');
       expect(alarm).toBeTruthy();
     }
+  });
+});
+
+describe('a stronger-defended lot is never an easier raid', () => {
+  const lot = (strong: boolean, bridge: boolean): GameState => {
+    const g = bridged();
+    g.disaster.tracks = { ...g.disaster.tracks, law: 0, stores: 0, deliveries: 0, banks: 0 };
+    for (const [i, p] of g.people.entries()) if (!p.kid || p.age >= 15) { g.armory.guns.push({ id: `g${i}`, model: 'sw_mp15', condition: 1, fired: 0, where: 'house', carrier: p.id }); g.armory.skill[p.id] = 5; }
+    g.armory.ammo['556'] = 2000;
+    if (!bridge) { g.perimeter.length = 0; }
+    if (strong) for (const [i, [x, z]] of ([[30, 26], [36, 26], [33, 22]] as Array<[number, number]>).entries()) built(g, `t${i}`, 'watchtower_wood', x, z);
+    g.clock.t = Math.floor(g.disaster.hitAt + 60) + 0.8;
+    return g;
+  };
+  const stats = (g: GameState) => {
+    let breached = 0, open = 0, n = 0, killed = 0;
+    for (let seed = 1; seed <= 40; seed++) {
+      const b = planBattle(g, 6, seed);
+      n++;
+      if (b.result === 'breached' || b.result === 'overrun') breached++;
+      const o = b.events.find(e => e.kind === 'door' && e.open);
+      open += o ? o.t : 0;
+      killed += b.events.filter(e => e.kind === 'death' && e.unit.startsWith('h_')).length;
+    }
+    return { breached, open: open / n, killed };
+  };
+  it('towers in view of the door hold the crew longer and lose the defenders no more', () => {
+    const weak = stats(lot(false, true)), strong = stats(lot(true, true));
+    expect(strong.open).toBeGreaterThanOrEqual(weak.open);
+    expect(strong.breached).toBeLessThanOrEqual(weak.breached);
+    expect(strong.killed).toBeLessThanOrEqual(weak.killed + 3);
   });
 });
