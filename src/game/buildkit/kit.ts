@@ -593,7 +593,12 @@ export function placementProblem(def: KitPieceDef, x: number, z: number, rot: nu
     if (Math.abs(c.rise) > def.climbs.max) return 'too_much_climb';
   }
   // a pier reaches from the bank out over the water: both must be under it (its grade is the bank's and the bed's, not a pad's)
-  if (def.waterside && (wet < 3 || dry < 3)) return wet < 3 ? 'not_shore' : 'not_shore';
+  if (def.waterside) {
+    if (wet < 3 || dry < 3) return 'not_shore';
+    // it must run out from the bank, not along it: one end on dry land, the other over the water
+    const h = def.cellsZ * CELL / 2 - 0.1, [ax, az] = rotQ(0, h, rot), [bx, bz] = rotQ(0, -h, rot);
+    if (site.water(x + ax, z + az) === site.water(x + bx, z + bz)) return 'not_shore';
+  }
   if (grade > def.maxSlope && !isFloorHatch && !def.waterside) return 'too_steep';
   // a walkout basement stands out of the hill: the ground must fall toward the back of the footprint (local -z)
   if (def.walkoutFall) {
