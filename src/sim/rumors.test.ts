@@ -22,7 +22,7 @@ describe('radio keeps what it heard', () => {
     const g = afterHit(); g.stock.ham_rig = 1; g.stock.sw_radio = 1;
     let t = 0, f = 0;
     for (let d = 0; d < 80; d++) { g.clock.t = 20 + d; radioDay(g); }
-    for (const h of g.radio!.heard!) h.truth ? t++ : f++;
+    for (const h of g.radio!.heard!) { if (h.truth) t++; else f++; }
     expect(g.radio!.heard!.length).toBeGreaterThan(0);
     expect(g.radio!.heard!.length).toBeLessThanOrEqual(8);
     expect(t + f).toBe(g.radio!.heard!.length);

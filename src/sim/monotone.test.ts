@@ -42,6 +42,7 @@ const ELEMENTS: Array<[string, (g: GameState) => void]> = [
   ['floodlights', g => { g.stock.floodlights = 3; }],
   ['sandbags', g => { g.stock.sandbags = 3; }],
   ['window bars', g => { g.stock.window_bars = 1; }],
+  ['house hardening (window bars and ballistic panels)', g => { g.stock.window_bars = 1; g.stock.ballistic_panels = 1; }],
   ['mines', g => { g.stock.mines = 6; }],
 ];
 
