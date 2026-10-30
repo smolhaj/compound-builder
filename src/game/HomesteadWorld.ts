@@ -180,6 +180,9 @@ const INDOOR_R = 0.04;
 /** One open bunker dig and what the crew has at it (see _buildDigs). */
 interface DigSite { pit: Pit; spoil: number; machine: boolean; stage: number; f: number; kind: string; rot: number; datum: number; x: number; z: number }
 
+/** Kinds with a basement under the main floor (their floorboards are see-through in the cutaway views). */
+const SEE_THROUGH_FLOOR: ReadonlySet<string> = new Set(['lodge', 'lodge_solar']);
+
 export class HomesteadWorld {
   readonly center = new THREE.Vector3(PARCEL_SIZE / 2, 0, PARCEL_SIZE / 2);
   readonly parcel: ParcelTerrain;
@@ -1776,7 +1779,9 @@ export class HomesteadWorld {
       const ud = m.userData as { baseMat?: THREE.Material };
       ud.baseMat ??= m.material as THREE.Material;
       // x-ray: the shell goes see-through, the furniture stays solid
-      const see = v === 'ghost' || (v === 'xray' && XRAY_LAYERS.includes(layer));
+      // a walkout lodge has a basement under its main floor: in the cutaway and x-ray views the floorboards go see-through so the cellar and the family room below show
+      const floorSee = (v === 'cutaway' || v === 'xray') && b.finished && SEE_THROUGH_FLOOR.has(b.placed.kind) && m.name === 'bldg_deck_floorboards';
+      const see = v === 'ghost' || (v === 'xray' && XRAY_LAYERS.includes(layer)) || floorSee;
       m.material = see ? xrayOf(ud.baseMat) : ud.baseMat;
       m.castShadow = !see && !['kit_glass', 'kit_string'].includes(ud.baseMat.name) && !ud.baseMat.name.startsWith('kit_glow');
       if (layer === 'cutwalls') m.visible = v === 'cutaway' && b.finished;
