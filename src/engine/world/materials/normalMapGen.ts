@@ -107,7 +107,7 @@ export function generateNormalMap(
   const nmCanvas = document.createElement('canvas');
   nmCanvas.width  = width;
   nmCanvas.height = height;
-  const nmCtx = nmCanvas.getContext('2d')!;
+  const nmCtx = nmCanvas.getContext('2d', { willReadFrequently: true })!;
   const nmImg = nmCtx.createImageData(width, height);
   const dst   = nmImg.data;
 

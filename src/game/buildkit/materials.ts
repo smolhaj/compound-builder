@@ -68,7 +68,7 @@ function lcg(seed: number): () => number {
 function canvas(n: number): [HTMLCanvasElement, CanvasRenderingContext2D] {
   const c = document.createElement('canvas');
   c.width = c.height = n;
-  return [c, c.getContext('2d')!];
+  return [c, c.getContext('2d', { willReadFrequently: true })!];
 }
 
 const rgb = (r: number, g: number, b: number) => `rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})`;

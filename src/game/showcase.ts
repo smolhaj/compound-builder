@@ -72,6 +72,6 @@ export function buildMountainShowcase(ctx: ShowcaseCtx, opts: ShowcaseOptions = 
       return { game: g };
     }),
   };
-  const rep = runMountainShowcase(io, opts);
+  const rep = w.bulk(() => runMountainShowcase(io, opts));   // (the forest is re-planted once at the end, not after every piece)
   return { ...rep, problems: integrationProblems(G.getState().game, w.access.drive, io.ground) };
 }

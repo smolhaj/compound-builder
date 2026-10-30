@@ -45,6 +45,7 @@ import { isMarked } from '../sim/forestry';
 import { KIT } from './buildkit/kit';
 import { isUnderground } from './buildkit/underground';
 import type { SiteQuery } from './buildkit/kit';
+import { yieldToBrowser, warmShaders } from './bootStages';
 import { parseLowRender, RenderRequests, type QaQuality } from './qaRender';
 
 /** Background damp of the season (ground darkens a little in the shoulder seasons). */
@@ -55,11 +56,60 @@ export function GameCanvas() {
   const ref = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
+    let cancelled = false, stop: () => void = () => {};
+    const boot = (label: string, pct: number) => useWorldStore.getState().setBoot({ label, pct });
+    void (async () => {
     const canvas = ref.current!;
     const ws = new WorldScene(canvas);
     const world = new HomesteadWorld(ws, useGameStore.getState().game.seed, useGameStore.getState().game.site);
     world.setBridgeDown(useGameStore.getState().game.roadBridge?.down ?? false);   // (the bridge on the way in, brought down on purpose or standing)
     const weather = new WeatherRenderer(ws.scene, useGameStore.getState().game.seed);
+    if (cancelled) { world.dispose(); weather.dispose(); ws.dispose(); return; }
+    boot('Surveying the land', 0.12); await yieldToBrowser();
+    if (cancelled) { world.dispose(); weather.dispose(); ws.dispose(); return; }
+    const resize = () => {
+      const w = canvas.clientWidth, h = canvas.clientHeight;
+      ws.resize(w, h);
+    };
+    ws.setupPostProcessing(canvas.clientWidth || 1280, canvas.clientHeight || 800);
+    resize();
+    window.addEventListener('resize', resize);
+
+    // QA-only on-demand rendering (?lowrender): Low quality, reduced pixel ratio, drawn only when asked
+    const lowRender = parseLowRender(window.location.search);
+    const renderReq = new RenderRequests();
+    const setLook = (q: QaQuality) => {
+      ws.qaPixelRatio = lowRender.on ? (q === 'low' ? lowRender.scale : 1) : null;
+      ws.setGraphicsQuality(q);
+      weather.setQuality(q);
+      world.setQuality(q);
+    };
+    const applyLook = () => setLook(lowRender.on ? 'low' : useWorldStore.getState().quality);
+    boot('Raising the ground and the woods', 0.3); await yieldToBrowser();
+    if (cancelled) { window.removeEventListener('resize', resize); world.dispose(); weather.dispose(); ws.dispose(); return; }
+    applyLook();
+    boot('Laying in the buildings', 0.65); await yieldToBrowser();
+    if (cancelled) { window.removeEventListener('resize', resize); world.dispose(); weather.dispose(); ws.dispose(); return; }
+    // what came with the land: the world picks its spots once, then it's laid in like anything built
+    const unplaced = useGameStore.getState().game.structures.filter(x => x.unplaced);
+    if (unplaced.length) {
+      const query: SiteQuery = {
+        height: (x, z) => world.parcel.natural(x, z).h,
+        owned: (x, z) => ownsAt(useGameStore.getState().game, x, z),
+        water: (x, z) => world.parcel.isCreek(x, z) || world.stream.depthAt(x, z) > 0,
+        blocked: (x, z) => world.onCamp(x, z, 0.4) || world.onAccess(x, z, 0.4),
+      };
+      useGameStore.getState().placeImprovements(world.siteImprovements(unplaced, query));
+    }
+    const placedOnly = (list: GameState['structures']) => list.filter(x => !x.unplaced);
+    world.syncStructures(placedOnly(useGameStore.getState().game.structures));
+    // the neighbor parcels: survey what each is once (timber, creek bottom, hay ground, dry grazing), and plant what's bought
+    const ownedRects = (g: GameState) => [...homeOutsideForty(g.site), ...g.land.parcels.filter(p => p.owner === 'you').map(p => p.rect)];
+    if (!useGameStore.getState().game.land.surveyed) useGameStore.getState().survey(world.surveyLand(useGameStore.getState().game.land.parcels));
+    world.setOwnedLand(ownedRects(useGameStore.getState().game));
+    // compile every shader the first view needs on the browser's parallel compile threads, behind the loading screen, not on the first frame
+    boot('Compiling shaders', 0.85); await warmShaders(ws);
+    if (cancelled) { window.removeEventListener('resize', resize); world.dispose(); weather.dispose(); ws.dispose(); return; }
     // valley fog and low cloud: the sim's fog (sim/fog.ts), eased and drawn as height fog (engine/world/fog)
     const valley = new ValleyFog();
     let fogPlace: ReturnType<typeof fogPlaceOf> | null = null, fogPlaceAt = -9, fogCampY = 0;
@@ -145,42 +195,6 @@ export function GameCanvas() {
     window.addEventListener('keydown', onShift);
     window.addEventListener('keyup', onShift);
 
-    const resize = () => {
-      const w = canvas.clientWidth, h = canvas.clientHeight;
-      ws.resize(w, h);
-    };
-    ws.setupPostProcessing(canvas.clientWidth || 1280, canvas.clientHeight || 800);
-    resize();
-    window.addEventListener('resize', resize);
-
-    // QA-only on-demand rendering (?lowrender): Low quality, reduced pixel ratio, drawn only when asked
-    const lowRender = parseLowRender(window.location.search);
-    const renderReq = new RenderRequests();
-    const setLook = (q: QaQuality) => {
-      ws.qaPixelRatio = lowRender.on ? (q === 'low' ? lowRender.scale : 1) : null;
-      ws.setGraphicsQuality(q);
-      weather.setQuality(q);
-      world.setQuality(q);
-    };
-    const applyLook = () => setLook(lowRender.on ? 'low' : useWorldStore.getState().quality);
-    applyLook();
-    // what came with the land: the world picks its spots once, then it's laid in like anything built
-    const unplaced = useGameStore.getState().game.structures.filter(x => x.unplaced);
-    if (unplaced.length) {
-      const query: SiteQuery = {
-        height: (x, z) => world.parcel.natural(x, z).h,
-        owned: (x, z) => ownsAt(useGameStore.getState().game, x, z),
-        water: (x, z) => world.parcel.isCreek(x, z) || world.stream.depthAt(x, z) > 0,
-        blocked: (x, z) => world.onCamp(x, z, 0.4) || world.onAccess(x, z, 0.4),
-      };
-      useGameStore.getState().placeImprovements(world.siteImprovements(unplaced, query));
-    }
-    const placedOnly = (list: GameState['structures']) => list.filter(x => !x.unplaced);
-    world.syncStructures(placedOnly(useGameStore.getState().game.structures));
-    // the neighbor parcels: survey what each is once (timber, creek bottom, hay ground, dry grazing), and plant what's bought
-    const ownedRects = (g: GameState) => [...homeOutsideForty(g.site), ...g.land.parcels.filter(p => p.owner === 'you').map(p => p.rect)];
-    if (!useGameStore.getState().game.land.surveyed) useGameStore.getState().survey(world.surveyLand(useGameStore.getState().game.land.parcels));
-    world.setOwnedLand(ownedRects(useGameStore.getState().game));
     // the property line: on by the Boundary button, and while a fence or wall is being drawn
     const boundary = new BoundaryOutline(ws.scene, world.groundAt);
     const rebuildBoundary = () => boundary.build([world.home, ...ownedRects(useGameStore.getState().game)]);
@@ -438,6 +452,8 @@ export function GameCanvas() {
       qa.frameMs = performance.now() - t0;
     };
     raf = requestAnimationFrame(frame);
+    const showcaseNext = new URLSearchParams(location.search).get('showcase') === 'mountain';
+    if (!showcaseNext) requestAnimationFrame(() => requestAnimationFrame(() => { if (!cancelled) useWorldStore.getState().setBoot(null); }));
 
     // QA hook (screenshot harness, console poking).
     (window as unknown as Record<string, unknown>).__cb = { terrainOv, player, ws, world, weather, valley, cam, tour, tool, marker, fence, sight, game: useGameStore, store: useWorldStore, THREE, qa, battle,
@@ -455,16 +471,22 @@ export function GameCanvas() {
       const qs = new URLSearchParams(location.search), rings = Number(qs.get('rings') ?? 1) || 1, wall = qs.get('wall') === 'concrete' ? 'concrete' as const : 'stone' as const, layout = qs.get('layout') === 'bench' ? 'bench' as const : 'shelf' as const;
       const w = window as unknown as Record<string, unknown>;
       void (async () => {
+        boot('Building the compound', 0.9);
         const m = await import('./showcase');
         for (let i = 0; i < 6; i++) { if (qa.renderNow) await qa.renderNow(); else await new Promise(r => requestAnimationFrame(r)); }
         await new Promise(r => setTimeout(r, 1200));
         if (w.__showcaseRan) return;
         w.__showcaseRan = true;
+        const t0 = performance.now();
         try { w.__showcase = m.buildMountainShowcase(w.__cb as Parameters<typeof m.buildMountainShowcase>[0], { rings, wall, layout }); } catch (e) { w.__showcase = { error: String((e as Error)?.stack ?? e) }; }
+        w.__showcaseMs = performance.now() - t0;
+        // the new pieces' shaders compile behind the loading screen too
+        boot('Compiling shaders', 0.97); await warmShaders(ws);
+        if (!cancelled) useWorldStore.getState().setBoot(null);
       })();
     }
 
-    return () => {
+    stop = () => {
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', resize);
       unsub.forEach(u => u());
@@ -490,6 +512,8 @@ export function GameCanvas() {
       world.dispose();
       ws.dispose();
     };
+    })();
+    return () => { cancelled = true; stop(); useWorldStore.getState().setBoot(null); };
   }, []);
 
   return <canvas ref={ref} style={{ width: '100%', height: '100%' }} />;
