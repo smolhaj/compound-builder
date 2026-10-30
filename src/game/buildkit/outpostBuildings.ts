@@ -77,7 +77,7 @@ function cabinVillage(def: KitPieceDef, seed = 1): THREE.Group {
   p.collide({ x0: -0.9 * M, z0: -0.9 * M, x1: 0.9 * M, z1: 0.9 * M }, ...Array.from({ length: 6 }, (_, k) => { const [x, z] = at(k); return { x0: x - CW / 2, z0: z - CW / 2, x1: x + CW / 2, z1: z + CW / 2 }; }));
   const g = p.finish();
   g.userData.chimneyTop = null;
-  g.userData.keep = [];
+  g.userData.keep = ['frame'];   // the cabins' walls are the frame layer: they stay when the village is finished
   return g;
 }
 
