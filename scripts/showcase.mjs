@@ -15,6 +15,21 @@ const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
 const port = Number(opt('--port', 5440)), outDir = resolve(opt('--out', 'shots/showcase')), only = opt('--only', 'checks,aerial,top,court,tunnel,terrace,mist,night').split(','), q = opt('--q', 'medium'), rings = Number(opt('--rings', 1)), wall = opt('--wall', 'stone'), layout = opt('--layout', 'shelf');
 mkdirSync(outDir, { recursive: true });
+/** Draw calls, triangles and the time of a frame at the aerial pose (a page with the scene up): the cost of what the showcase adds is the difference from the bare lot. */
+const perfOf = async pg => pg.evaluate(async () => {
+  const cb = window.__cb, r = cb.ws.renderer, w = cb.world, c = w.camp, f = w.parcel.lot.fall;
+  cb.cam.target.set(c.x, w.groundAt(c.x, c.z) + 1, c.z); cb.cam.radius = 40; cb.cam.pitch = 0.5; cb.cam.yaw = Math.atan2(Math.cos(f), Math.sin(f)) + 0.3;
+  for (let i = 0; i < 3; i++) await cb.qa.renderNow();
+  const times = [];
+  for (let i = 0; i < 7; i++) { const t0 = performance.now(); await cb.qa.renderNow(); times.push(performance.now() - t0); }
+  times.sort((a, b) => a - b);
+  let meshes = 0; cb.ws.scene.traverse(o => { if (o.isMesh && o.visible) meshes++; });
+  r.info.autoReset = false; r.info.reset(); r.render(cb.ws.scene, cb.ws.camera);
+  const info = { medianFrameMs: Math.round(times[3]), meshes, calls: r.info.render.calls, triangles: r.info.render.triangles, geometries: r.info.memory.geometries, textures: r.info.memory.textures };
+  r.info.autoReset = true;
+  return info;
+});
+
 let vite = null;
 if (args.includes('--serve')) {
   vite = spawn('node', ['node_modules/vite/bin/vite.js', '--config', 'scripts/vite.shots.config.ts', '--port', String(port), '--strictPort'], { stdio: ['ignore', 'pipe', 'inherit'] });
@@ -22,6 +37,18 @@ if (args.includes('--serve')) {
 }
 const LOT = 'region=pnw&lot=hillside&lotcut&relief=9&acres=40&lotseed=8&elev=600';
 const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+let baseline = null;
+if (only.includes('checks')) {
+  const bare = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  bare.setDefaultTimeout(900000);
+  await bare.goto(`http://localhost:${port}/?lowrender=0.75&clean&seed=7&${LOT}`);
+  await bare.waitForFunction(() => window.__cb?.qa?.renderNow);
+  await bare.evaluate(() => { const { game, store } = window.__cb; game.getState().setSpeed(0); store.getState().setQuality('low'); store.getState().setTimeOfDay(10); store.getState().setWeatherMode('clear'); store.getState().setSeasonMode('summer'); });
+  await bare.waitForTimeout(1500);
+  for (let i = 0; i < 14; i++) { await bare.evaluate(() => window.__cb.qa.renderNow()); await bare.waitForTimeout(100); }
+  baseline = await perfOf(bare);
+  await bare.close();
+}
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 page.setDefaultTimeout(900000);
 page.on('pageerror', e => console.error('PAGEERROR', e.message));
@@ -157,7 +184,10 @@ if (only.includes('checks')) {
     }
   }
   console.error(fails.length ? 'WALK CHECK FAILED\n' + fails.join('\n') : 'WALK CHECK PASSED: every post reached, no walk through a building, wall or cliff');
-  console.error('vehicles drawn: ' + JSON.stringify(walk.cars) + ` | draw calls ${walk.calls} triangles ${walk.triangles}`);
+  console.error('vehicles drawn: ' + JSON.stringify(walk.cars));
+  const withIt = await perfOf(page);
+  console.error('PERF bare lot ' + JSON.stringify(baseline) + ' | with the showcase ' + JSON.stringify(withIt));
+  writeFileSync(`${outDir}/perf.json`, JSON.stringify({ baseline, withShowcase: withIt }, null, 1));
 }
 
 // ── the pictures ────────────────────────────────────────────────────────────────────────────────
