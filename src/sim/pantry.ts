@@ -272,6 +272,17 @@ export function takeSalt(s: GameState, units: number): number {
   if (e.q < 1e-9) delete pantry(s).items.salt;
   return t;
 }
+/** Take up to `units` of an item (with its calories out of the aggregate too): returns what was taken. For soap and the like that use food that was never going to be eaten. */
+export function takeFood(s: GameState, id: FoodItemId, units: number): number {
+  syncPantry(s);
+  const e = pantry(s).items[id];
+  if (!e || e.q <= 0 || !(units > 0)) return 0;
+  const t = Math.min(e.q, units), it = FOOD[id];
+  e.q -= t;
+  if (e.q < 1e-9) delete pantry(s).items[id];
+  s.stock[it.cat] = Math.max(0, s.stock[it.cat] - t * it.kcal / CAT_KCAL[it.cat]);
+  return t;
+}
 /** The same, by kcal. */
 export const addFoodKcal = (s: GameState, id: FoodItemId, kcal: number) => addFood(s, id, kcal / FOOD[id].kcal);
 
