@@ -18,7 +18,7 @@ import { routeProblem } from './terrainFx';
 import { orderHookup } from './improvements';
 import { step } from './engine';
 import { buyVehicle, type VehicleKind } from './vehicles';
-import { runMountainShowcase, integrationProblems, reachability, SHOWCASE_LOT, type ShowcaseIO } from './showcase';
+import { runMountainShowcase, mountainShowcaseSteps, integrationProblems, reachability, SHOWCASE_LOT, type ShowcaseIO } from './showcase';
 
 /** The showcase headless: the same design the browser runs, driven through the sim functions the store actions call. */
 function headless(): { io: ShowcaseIO; g: () => GameState; drive: Pt[]; camp: Pt } {
@@ -227,5 +227,19 @@ describe('the north-star layout: the compound on the bench above the rock face, 
     const run = step(structuredClone(g), 60);
     for (const [k, v] of Object.entries(run.stock)) expect(Number.isFinite(v as number), k).toBe(true);
     expect(run.personState.some(ps => ps.needs.died == null)).toBe(true);
+  });
+});
+
+describe('the time-sliced showcase (the live game yields to the browser between steps)', () => {
+  const sig = (g: GameState) => JSON.stringify([g.structures.map(s => [s.kind, +s.x.toFixed(3), +s.z.toFixed(3), s.rot]), g.perimeter.map(r => [r.kind, r.pts.length]), g.vehicles?.length]);
+  it('yields at every phase and builds exactly what the straight-through run builds', () => {
+    const a = headless(), b = headless();
+    runMountainShowcase(a.io, {});
+    const labels: string[] = [], it = mountainShowcaseSteps(b.io, {});
+    for (;;) { const r = it.next(); if (r.done) break; labels.push(r.value); }
+    expect(labels.length).toBeGreaterThanOrEqual(5);
+    expect(labels).toContain('Access road');
+    expect(labels).toContain('Buildings');
+    expect(sig(b.g())).toBe(sig(a.g()));
   });
 });

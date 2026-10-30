@@ -22,6 +22,7 @@ import { FARM_BUILDERS } from './farmBuildings';
 import { RENEWABLE_BUILDERS } from './renewableBuildings';
 import { HERD_BUILDERS } from './herdBuildings';
 import { HOUSING_BUILDERS, HOUSING_SEATS } from './housingStyleBuildings';
+import { TERRACE_BUILDERS } from './terraceProps';
 
 /** Seats for evenings at home: local x, z and the point the sitter faces. */
 export type Seat = [number, number, number, number];
@@ -510,6 +511,7 @@ const BUILDERS: Record<string, (def: KitPieceDef, seed?: number, opts?: BuildOpt
   ...FARM_BUILDERS,
   ...RENEWABLE_BUILDERS,
   ...HOUSING_BUILDERS,
+  ...TERRACE_BUILDERS,
 };
 
 /** Every layer of a kit piece (construction shows them stage by stage). */

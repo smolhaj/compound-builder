@@ -6,7 +6,7 @@
  * fencing and building). Pure (tested).
  */
 import type { MaterialId } from './materials';
-import { HARDEN_GOODS, KIT_GOODS, WATCH_GOODS } from './gear';
+import { BUGOUT_GOODS, HARDEN_GOODS, KIT_GOODS, WATCH_GOODS } from './gear';
 
 export type ShelfTab = 'build' | 'fencing' | 'bunker' | 'water' | 'power' | 'food' | 'household' | 'learning' | 'fuel' | 'defense';
 
@@ -24,7 +24,7 @@ export const SHELVES: Record<ShelfTab, MaterialId[]> = {
   household: ['meds', 'antibiotics', 'splints', 'ors', 'dental_kit', 'midwife_kit', 'medical_books', 'hygiene', 'traps', 'tent', 'sleeping_bag', 'kibble', 'dogbed', 'doghouse'],
   learning: ['games', 'game_pieces', 'instrument', 'guitar_strings', 'music_player', 'batteries', 'novels', 'paperbacks_bag', 'toys', 'picture_books', 'manuals', 'course_firstaid', 'course_ham', 'course_engines', 'course_welding', 'course_carpentry', 'course_wiring', 'course_gardening', 'course_husbandry', 'course_canning'],
   fuel: ['fuel', 'vehicle_parts', 'stabilizer', 'firewood', 'excavator', 'plow', 'gun_safe', 'gun_cleaning'],
-  defense: [...KIT_GOODS, ...WATCH_GOODS, ...HARDEN_GOODS],
+  defense: [...KIT_GOODS, ...WATCH_GOODS, ...HARDEN_GOODS, ...BUGOUT_GOODS],
 };
 
 /** Shelves that hold something the plans still lack, with how many materials. */

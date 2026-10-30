@@ -19,7 +19,11 @@
  * Distances are world units (1 ≈ 6 m).
  */
 import { BUNKER_ENTRANCES } from './bunkerEntrances';
-import { ringHoldSeconds, sortieFactor } from './rings';
+import { sallyPorts, sortieFactor } from './rings';
+import { ANIMALS } from './livestock';
+import { guardDogs, lanePace, routeAt, spawnArc } from './laneWalk';
+import { livingDogs } from './pets';
+import { OUTSIDE_TAKE, exposure, ringDelay, ringRadii, lossesByRing, type RingLoss } from './ringFallback';
 import { wallHoldSeconds } from './retaining';
 import type { Battle, BattleEvent, BattleUnit } from './battleTypes';
 import { GUN, skillOf, type Caliber } from './armory';
@@ -30,10 +34,12 @@ import { fogSightK } from './fogFx';
 import { backgroundOf } from './family';
 import { isHome } from './blueprints';
 import { coverFactor } from './housingStyles';
+import { houseCoverK } from './houseHardening';
 import { isFinished } from './construction';
 import { PERIMETER, fenceLive, runFinished } from './perimeter';
 import { ARMORY_LIGHTS, floodlightLit } from './lights';
-import { DOOR_DELAY, doorDelay, raidAngle } from './terrainFx';
+import { DOOR_DELAY, doorsLocked, raidAngle } from './terrainFx';
+import { doorTierOf, planBreach, type DoorPlan } from './doorBreach';
 import { roadStart } from './roadFx';
 import { WALK_CLIMB_FACTOR, WALK_POST, deckSpots, walkLength, walkRuns } from './walkway';
 import { TURRET_JAM, highBonus, litTowerIds, isTower, mountReady, towerPosture, towerPosts, towerReach, turretsReady } from './towers';
@@ -148,11 +154,13 @@ export interface PlannedBattle extends Battle {
   result: 'repelled' | 'fled' | 'breached' | 'overrun';
   /** Raiders who went down and couldn't get away: wounded, dead. */
   leftBehind?: { wounded: number; dead: number };
+  /** The rings the defenders fell back through: how many inner rings there were, how many the crew took, who was hurt or killed while each was the line. */
+  rings?: { of: number; fell: number; losses: RingLoss[] };
 }
 
 interface Fighter {
   id: string; side: 'home' | 'raider'; pid?: string; x: number; z: number; y: number;
-  hp: number; out: boolean; dead: boolean; arm: Arm; skill: number; readyAt: number;
+  hp: number; out: boolean; dead: boolean; carried?: boolean; /** Distance back along the lane's path (sim/laneWalk.ts), while the crew still walks it. */ rd?: number; arm: Arm; skill: number; readyAt: number;
   post: PostSpot | null; cover: number; moving: boolean; nextMove: number; shelter: boolean;
   grenades: number; rockets: number; leader?: boolean; medic?: boolean; fled?: boolean; rescued?: boolean; escaped?: boolean; kid?: boolean;
   /** Body armor: rifle plates, a soft (pistol-rated) vest, a ballistic helmet. */
@@ -264,6 +272,10 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
   const ax = Math.cos(ang), az = Math.sin(ang);       // unit vector from the house toward the raiders
   const lx = -az, lz = ax;                            // lateral
   const at = (d: number, lat: number) => ({ x: C.x + ax * d + lx * lat, z: C.z + az * d + lz * lat });
+  // the crew walks the lane's own path (round the cliffs, water and walls the terrain pass found), at the pace of the going (sim/laneWalk.ts)
+  const route = lane && lane.lane.path.length > 1 && !lane.via ? lane.lane.path : null;
+  const pace = lane ? lanePace(lane.lane.hardness, lane.lane.cliff, lane.lane.fords) : 1;
+  const onRoute = (rd: number, lat: number) => { const q = routeAt(route!, rd); return { x: q.x - q.dz * lat, z: q.z + q.dx * lat }; };
   const alive = s.people.map((p, i) => ({ p, i })).filter(({ i }) => s.personState[i]?.needs.died == null && s.personState[i]?.task !== 'gone' && s.personState[i]?.task !== 'town' && !s.rescue?.raid?.team.includes(s.personState[i]?.id ?? ''));
   // the adults fight; kids hide (and get out through the tunnel if it comes to that); a teenager picks up a gun only if there aren't two adults who can
   const adultsN = alive.filter(({ p }) => !p.kid).length;
@@ -305,12 +317,16 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
     else for (let i = 0; i < 3; i++) { const p = at(wallR, (i - 1) * 4); posts.push({ kind: 'wall', ...p, y: 0, cover: 0.22, value: 2, cap: 1, wrecked: false, fire: 0 }); }
   }
   const bars = n('window_bars') > 0 ? 0.28 : 0.35;
-  for (const st of fin) if (!st.kind.startsWith('bunker_') && !isPostKind(st.kind) && dist(st, C) < 25) posts.push({ kind: 'building', x: st.x + ax * 0.5, z: st.z + az * 0.5, y: 0.3, cover: bars * coverFactor(st.kind), value: 1, cap: isHome(st.kind) ? 2 : 1, wrecked: false, fire: 0 });
+  for (const st of fin) if (!st.kind.startsWith('bunker_') && !isPostKind(st.kind) && dist(st, C) < 25) posts.push({ kind: 'building', x: st.x + ax * 0.5, z: st.z + az * 0.5, y: 0.3, cover: bars * coverFactor(st.kind) * houseCoverK(s), value: 1, cap: isHome(st.kind) ? 2 : 1, wrecked: false, fire: 0 });
   posts.push({ kind: 'open', x: C.x + ax * 1.5, z: C.z + az * 1.5, y: 0, cover: 1, value: 0, cap: 99, wrecked: false, fire: 0 });
   posts.sort((a, b) => b.value - a.value);
-  const lineR = wallR || 2;
-  // manned inner rings (sim/rings.ts): each makes the crew take another wall under fire before the line is breached
-  const ringHold = opts.insideBreach ? 0 : ringHoldSeconds(s) + wallHoldSeconds(s);   // the manned rings, and the tall retaining walls a crew has to climb or go round (sim/retaining.ts)
+  let lineR = wallR || 2;   // moves in as the defenders fall back ring by ring (sim/ringFallback.ts)
+  // manned inner rings (sim/rings.ts, sim/ringFallback.ts): the defenders fall back to each in turn; the crew has to take every wall under fire before the house is breached
+  const ringHold = opts.insideBreach ? 0 : wallHoldSeconds(s);   // the tall retaining walls a crew has to climb or go round at the outer line (sim/retaining.ts)
+  const ringRs = opts.insideBreach || opts.peacetime ? [] : ringRadii(s, C, lineR);
+  const ringStay = ringDelay(s, ringRs.length);
+  let ringK = 0;
+  const fallTimes: number[] = [];
   // a sally port lets the defenders catch a crew held at the wall from the flank
   const sortie = sortieFactor(s);
 
@@ -356,15 +372,17 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
   // they come up from out of sight, well beyond the line (round 4: they used to start 30–34 out whatever the wall, so a wide palisade had them at it before anyone was up)
   const start = Math.max(30, lineR + 22) + (opts.terrain === false || lane ? 0 : roadStart(s));   // up the road: single file at a bridge, a bore or a ford, they dismount further out (sim/roadFx.ts)
   for (let i = 0; i < raiders; i++) {
+    const arc0 = route && !peace && !opts.insideBreach && opts.ambush === undefined ? spawnArc(route, [C.x, C.z], start + r() * 4) : undefined;
     const p = peace ? at(1.5 + r() * 2, (r() - 0.5) * 3)
       : opts.insideBreach ? at(Math.max(1.5, lineR * 0.55) + r() * 1.5, (r() - 0.5) * 2.5)
       : opts.ambush !== undefined ? at(lineR + 0.8 + r() * 0.8, (r() - 0.5) * 1.2)
+      : arc0 !== undefined ? onRoute(arc0, (r() - 0.5) * 8)
       : at(start + r() * 4, (r() - 0.5) * 8);
     const autoR = armedR && late > 0.5 && r() < 0.3 + kit.auto;
     const arm: Arm = !armedR ? FISTS : peace ? { ...ARMS.pistol, cal: null } : { ...(autoR ? ARMS.auto_rifle : r() < 0.55 ? ARMS.semi_rifle : r() < 0.6 ? ARMS.pump : ARMS.pistol), cal: null };
     const gr = gLeft > 0 ? 1 : 0; gLeft -= gr;
     const rk = rLeft > 0 && i > 0 ? 1 : 0; rLeft -= rk;
-    const f: Fighter = { id: `r${i}`, side: 'raider', ...p, y: 0, hp: 100, out: false, dead: false, arm, skill: 3 + Math.floor(r() * 4), readyAt: opts.ambush ?? (lane?.via ? DOOR_DELAY : 0), post: null, cover: 1, moving: true, nextMove: 0, shelter: false, grenades: gr, rockets: rk, leader: i === 0, armor: { plate: armedR && !peace && r() < late * 0.35 + kit.plate, soft: armedR && !peace && r() < 0.15 + late * 0.2, helmet: armedR && !peace && r() < late * 0.3 }, inGun: arm.mag, spare: 2 + Math.round(late * 3), bleed: 0, supp: 0, nvg: armedR && !peace && late > 0.6 && r() < 0.25, wear: 0.5 + r() * 0.4 };
+    const f: Fighter = { id: `r${i}`, side: 'raider', ...p, ...(arc0 !== undefined ? { rd: arc0 } : {}), y: 0, hp: 100, out: false, dead: false, arm, skill: 3 + Math.floor(r() * 4), readyAt: opts.ambush ?? (lane?.via ? DOOR_DELAY : 0), post: null, cover: 1, moving: true, nextMove: 0, shelter: false, grenades: gr, rockets: rk, leader: i === 0, armor: { plate: armedR && !peace && r() < late * 0.35 + kit.plate, soft: armedR && !peace && r() < 0.15 + late * 0.2, helmet: armedR && !peace && r() < late * 0.3 }, inGun: arm.mag, spare: 2 + Math.round(late * 3), bleed: 0, supp: 0, nvg: armedR && !peace && late > 0.6 && r() < 0.25, wear: 0.5 + r() * 0.4 };
     F.push(f); units.push({ id: f.id, side: 'raider', x: r2(p.x), z: r2(p.z), post: 'open' });
   }
   const H = F.filter(f => f.side === 'home'), R = F.filter(f => f.side === 'raider');
@@ -404,7 +422,23 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
   // ── detection, alarm, lights ──
   const detection = Math.min(100, 25 + (s.gate.forewarned ? 20 : 0) + g.detection + tw.detection + watchDetection(s) + Math.max(0, ...fightersP.map(({ p }) => p.skills.hunter)) * 4);
   // the tunnel-bridge's doors lock at night and on the alarm (a watch good enough to call it before they arrive); by day, unwarned, they stand open
-  if (lane?.via && opts.ambush === undefined) { const d = doorDelay(night, detection); for (const f of F) if (f.side === 'raider') f.readyAt = d; }
+  // (sim/doorBreach.ts) a locked door is a job: tools, a ram, a torch, charges against its tier, slowed by the towers that see it and a sortie from the sally port
+  let door: DoorPlan | null = null;
+  if (lane?.via && opts.ambush === undefined) {
+    const run = s.perimeter.find(x => x.id === lane.via), chokeAt = lane.lane.choke?.at;
+    const overwatch = chokeAt ? towerPosts(s).filter(tp => Math.hypot(tp.st.x - chokeAt[0], tp.st.z - chokeAt[1]) <= 14).length : 0;
+    door = planBreach({ men: R.length, grenades: R.reduce((a, f) => a + f.grenades, 0), rockets: R.reduce((a, f) => a + f.rockets, 0), organized, late, adapt: opts.adapt ?? 0 },
+      { tier: doorTierOf(run?.kind, !!(run && PERIMETER[run.kind].bore)), locked: doorsLocked(night, detection), overwatch, sallyPorts: sallyPorts(s) }, r);
+    for (const f of R) f.readyAt = door.secs;
+    // what went into the door is not in the fight
+    for (let g = door.spent.grenades; g > 0;) { const f = R.find(x => x.grenades > 0); if (!f) break; f.grenades--; g--; }
+    if (door.spent.rockets) { const f = R.find(x => x.rockets > 0); if (f) f.rockets--; }
+    if (door.method !== 'an open door') ev.push({ t: 0, kind: 'door', what: door.method, open: false, ...(chokeAt ? { x: r2(chokeAt[0]), z: r2(chokeAt[1]) } : {}) });
+    if (!door.gaveUp && door.method !== 'an open door') {
+      ev.push({ t: r2(door.secs), kind: 'door', what: door.method, open: true, ...(chokeAt ? { x: r2(chokeAt[0]), z: r2(chokeAt[1]) } : {}) });
+      if (door.method === 'a charge' && chokeAt) ev.push({ t: r2(door.secs), kind: 'explosion', x: r2(chokeAt[0]), z: r2(chokeAt[1]), radius: 1, hits: [] });
+    }
+  }
   // by day, people on watch see a group coming up the drive a couple of hundred meters out; at night it's what the gear hears and sees
   const darkBlind = night && !lightsOn && !n('nvg') && !n('thermal') && !n('thermal_cam');
   // (round 4: measured from the line, where the watch stands and the sensors are, not from the house)
@@ -433,7 +467,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
     const p = posts.find(p => p !== exclude && !p.wrecked && used(p) < p.cap) ?? posts[posts.length - 1];
     f.post = p;
     armFor(f, p);
-    const tr = opts.ambush !== undefined ? 0.3 : Math.max(1, dist(f, p) / MOVE) / (0.4 + 0.6 * eff(f));   // an ambush is already waiting at its posts
+    const tr = opts.ambush !== undefined || p.kind === 'tower' || p.kind === 'sandbags' ? 0.3 : Math.max(1, dist(f, p) / MOVE) / (0.4 + 0.6 * eff(f));   // an ambush is already waiting at its posts, and so is the watch up a tower (it is what the tower's detection is), and so are sandbags (laid before the night, nobody runs to them)   // an ambush is already waiting at its posts
     f.x = p.x; f.z = p.z; f.y = p.y; f.cover = p.cover; f.readyAt = t + tr; f.movedAt = t;
     ev.push({ t: r2(t + 0.2), kind: 'move', unit: f.id, x: r2(p.x), z: r2(p.z), ...(p.y ? { y: p.y } : {}) });
   };
@@ -586,13 +620,38 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
     if (hit) strike(b, a, t);
   };
 
+  /** The crew has broken the line and there is another ring behind it: the defenders fall back, carrying the wounded in to the sickbay. */
+  const fallBack = (t: number) => {
+    const ring = ringRs[ringK]; ringK++; fallTimes.push(t);
+    lineR = ring.r; wallKind = ring.kind; wallDown = false; lineSince = -1;
+    const here = at(lineR, 0);
+    ev.push({ t, kind: 'fallback', ring: ringK, of: ringRs.length, x: r2(here.x), z: r2(here.z) });
+    say(t, v(lead(), ['Fall back! Fall back to the inner wall — go, go!', 'They\'re over the outer wall — back, BACK to the next gate!'], ['Outer line is gone. Fall back to the inner ring.']), lead());
+    for (const p of posts) if (p.kind === 'wall') p.wrecked = true;
+    for (let i = 0; i < 3; i++) { const p = at(Math.max(1.5, lineR - 0.4), (i - 1) * Math.min(3, lineR * 0.6)); posts.push({ kind: 'wall', ...p, y: 0, cover: 0.22, value: 2, cap: 1, wrecked: false, fire: 0 }); }
+    posts.sort((a, b) => b.value - a.value);
+    // the wounded are carried in to the sickbay (the shelter), by whoever is nearest and still on their feet; there someone holds pressure on it
+    for (const h of H) {
+      if (!h.out || h.dead || h.shelter || h.escaped || h.carried) continue;
+      const by = H.filter(x => !x.out && !x.shelter && x !== h).sort((a, b) => dist(a, h) - dist(b, h))[0];
+      h.carried = true; h.shelter = true; h.x = shelterAt.x; h.z = shelterAt.z; h.post = null;
+      ev.push({ t: r2(t + 1.2), kind: 'move', unit: h.id, x: r2(shelterAt.x), z: r2(shelterAt.z) });
+      ev.push({ t: r2(t + 1.2), kind: 'carry', unit: h.id, ...(by ? { by: by.id } : {}) });
+      if (by) { by.readyAt = Math.max(by.readyAt, t + 5); say(t + 0.5, v(by, [`Got you — I've got you, ${nameOf(h)}, hang on!`, `Come on — up — we're getting you inside!`], [`Moving ${nameOf(h)} to the sickbay.`]), by); }
+      if (h.bleed > 0 && by) stopBleed(h, by, t + 1.5, !!by.medic);
+    }
+    for (const f of H) if (!f.out && !f.shelter) assignPost(f, t + 1);
+  };
+
   for (let t = 0; t < 300 && !end; t++) {
     const hUp = H.filter(f => !f.out && !f.shelter), rUp = R.filter(f => !f.out && !f.fled);
     // alarm
     const nearest = Math.min(...rUp.map(f => dist(f, C)));
-    if (!alarmed && (nearest <= detectAt || t > 0 && rUp.length === 0)) {
+    const doorNoise = !!door && !door.gaveUp && t >= door.noiseAt && door.noiseAt < Infinity;   // the work on the door carries (a ram, a sledge, a charge going off)
+    if (!alarmed && (nearest <= detectAt || doorNoise || t > 0 && rUp.length === 0)) {
       alarmed = true;
       ev.push({ t, kind: 'alarm', what });
+      if (doorNoise && nearest > detectAt) say(t + 0.4, v(lead(), ['That noise — the door! Somebody\'s at the door!', 'Oh God, that banging — they\'re on the gate!'], ['Contact at the tunnel door. Everyone up.']), lead());
       if (lightsOn) {
         const masts = mast ? towerPosts(s).filter(x => x.def?.flood && mastIds.includes(x.st.id)).slice(0, 3).map(x => ({ x: r2(x.st.x), z: r2(x.st.z), y: x.post.y + 0.1 })) : [];
         const aimAt = at(lineR + 8, 0);
@@ -705,6 +764,13 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
       for (const f of rUp) { f.fled = true; const p = at(36, (r() - 0.5) * 10); ev.push({ t: r2(t + r()), kind: 'flee', unit: f.id }); ev.push({ t: r2(t + 1), kind: 'move', unit: f.id, x: r2(p.x), z: r2(p.z) }); }
       end = 'fled'; endT = t + 8; break;
     }
+    // a door that will not give: the crew has been at it as long as it will stay
+    if (door?.gaveUp && t >= door.secs && !breached && rUp.length) {
+      const l1 = lead();
+      say(t, v(l1, ['They\'re leaving — they couldn\'t get through the door!', 'They gave up on the door — oh thank God —'], ['They\'re pulling back from the door.']), l1);
+      for (const f of rUp) { f.fled = true; const p = at(36, (r() - 0.5) * 10); ev.push({ t: r2(t + r()), kind: 'flee', unit: f.id }); ev.push({ t: r2(t + 1), kind: 'move', unit: f.id, x: r2(p.x), z: r2(p.z) }); }
+      end = 'fled'; endT = t + 6; break;
+    }
     if (!rUp.length) { end = 'repelled'; endT = t + 3; break; }
     // they can't get over the wall and give up
     if (!breached && wallR && !wallDown && opts.ambush === undefined && lineSince >= 0 && t - lineSince > 40 && (lineClosed || !propLine.onLine.size)) { say(t, v(lead(), ['They can\'t get over the wall — they\'re giving up — oh my God —'], ['They can\'t breach. They\'re pulling out.']), lead()); for (const f of rUp) { f.fled = true; ev.push({ t: r2(t + r()), kind: 'flee', unit: f.id }); } end = 'fled'; endT = t + 6; break; }
@@ -787,7 +853,10 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
         f.moving = true; f.cover = 1.3;
         const step = Math.min(4, d - lineR);
         const lat = (r() - 0.5) * 2 + flank * 0.8;
-        f.x += (C.x - f.x) / d * step + lx * lat; f.z += (C.z - f.z) / d * step + lz * lat;
+        if (f.rd !== undefined && f.rd > 0 && d > lineR + 6) {   // still out on the lane: along its path at the pace of the going, the last stretch is straight
+          f.rd = Math.max(0, f.rd - step * pace);
+          const q = onRoute(f.rd, lat); f.x = q.x; f.z = q.z;
+        } else { f.x += (C.x - f.x) / d * step + lx * lat; f.z += (C.z - f.z) / d * step + lz * lat; }
         f.nextMove = t + 4;
         ev.push({ t, kind: 'move', unit: f.id, x: r2(f.x), z: r2(f.z) });
         const nd = dist(f, C);
@@ -833,10 +902,19 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
     // (round 4) clubs against rifles need far more of them to rush the line; going over a wall, every rifle at a post on it slows them
     const outnumber = armedR ? 2 : 4;
     const onWall = H.filter(f => !f.out && !f.shelter && f.arm !== FISTS && t >= f.readyAt && f.post?.kind !== 'open' && f.post?.kind !== 'building').length;
-    if (!breached && !peace && atLine.length && (wallDown || hNow === 0 || rUp.length > hNow * outnumber) && (opts.ambush === undefined || hNow === 0 || t - lineSince >= 12 + opts.ambush) && (hNow === 0 || t - lineSince >= ringHold) && (!climbing || (t - lineSince >= 10 && r() < 0.02 * atLine.length * (deck ? WALK_CLIMB_FACTOR : 1) / (1 + onWall)))) {
+    if (!breached && !peace && atLine.length && (wallDown || hNow === 0 || rUp.length > hNow * outnumber) && (opts.ambush === undefined || hNow === 0 || t - lineSince >= 12 + opts.ambush) && (hNow === 0 || t - lineSince >= (ringK === 0 ? ringHold : ringStay)) && (!climbing || (t - lineSince >= 10 && r() < 0.02 * atLine.length * (deck ? WALK_CLIMB_FACTOR : 1) / (1 + onWall)))) {
+      if (ringK < ringRs.length) fallBack(t);
+      else {
       breached = true; breachT = t;
       const p = at(lineR, 0);
       ev.push({ t, kind: 'breach', x: r2(p.x), z: r2(p.z) });
+      // the dogs posted inside at the inner gate go for the first men through (sim/laneWalk.ts)
+      const gd = guardDogs(livingDogs(s));
+      if (gd.n) for (const f of rUp.sort((a, b) => dist(a, C) - dist(b, C)).slice(0, gd.n)) {
+        f.readyAt = Math.max(f.readyAt, t) + gd.hold;
+        if (r() < 0.6) hurt(f, gd.bite + r() * 10, t + 1, undefined, 'arm');
+        if (r() < 0.5) say(t + 0.6, pick(['Dog! Get it off — GET IT OFF!', 'The dog — aah — shoot it, shoot the dog!']), f);
+      }
       say(t, v(lead(), ['They\'re inside the fence — fuck! Get to the house!', 'They\'re through — they\'re through! Oh God —'], ['They\'re through the line. Fall back to the house.']), lead());
       // the escape tunnel: whoever's sheltering gets out, away from the fighting
       const tunnel = s.perimeter.find(x => x.kind === 'escape_tunnel' && runFinished(x));
@@ -845,6 +923,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
       if (out && fleeing.length) {
         say(t + 1, v(lead(), ['Take the kids — the tunnel — go, go, GO! Don\'t look back!', 'Get them out through the tunnel — NOW!'], ['Shelter group: out through the tunnel. Go.']), lead());
         for (const h of fleeing) { h.escaped = true; h.x = out[0]; h.z = out[1]; ev.push({ t: r2(t + 2 + r()), kind: 'move', unit: h.id, x: r2(out[0]), z: r2(out[1]) }); }
+      }
       }
     }
     if (breached && t - breachT >= 20) {
@@ -860,7 +939,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
   ev.sort((a, b) => a.t - b.t);
   const dropped = { grenades: R.filter(f => f.out).reduce((a, f) => a + f.grenades, 0), rpg_rounds: R.filter(f => f.out).reduce((a, f) => a + f.rockets, 0) };
   const leftBehind = { wounded: R.filter(f => f.out && !f.dead).length, dead: R.filter(f => f.dead).length };
-  return { night, units, events: ev, duration, spent, minesUsed: mines - minesLeft, dropped, result: end, leftBehind };
+  return { night, units, events: ev, duration, spent, minesUsed: mines - minesLeft, dropped, result: end, leftBehind, ...(ringRs.length ? { rings: { of: ringRs.length, fell: ringK, losses: lossesByRing(ev, units, fallTimes) } } : {}) };
 }
 
 /** Write a fought battle into the game: wounds, deaths, ammo, mines, loot, the tallies. */
@@ -899,6 +978,13 @@ export function applyBattle(s: GameState, b: Battle): string[] {
     if (lost.length) out.push(`Lost: ${lost.join(', ')}`);
   } else {
     s.gate.raidsHeld++;
+    // the line fell and the crew was stopped at an inner ring: what stood outside that ring was theirs for the night (sim/ringFallback.ts)
+    if (pb.rings?.fell) {
+      const x = exposure(s, pb.rings.fell), took: string[] = [];
+      for (const a of ANIMALS) { const n = Math.floor((s.stock[a] ?? 0) * x.animals * OUTSIDE_TAKE); if (n > 0) { s.stock[a] -= n; took.push(`${n} ${a}${n > 1 ? 's' : ''}`); } }
+      for (const k of ['canned', 'staples', 'frozen'] as const) { const n = Math.floor((s.stock[k] ?? 0) * x.stores * 0.12); if (n > 0) { s.stock[k] -= n; took.push(`${n} ${k}`); } }
+      out.push(`The family fell back through ${pb.rings.fell} ring${pb.rings.fell > 1 ? 's' : ''} and held the next.${took.length ? ` What stood outside it was lost: ${took.join(', ')}.` : ' Nothing of yours stood outside it.'}`);
+    }
     if (pb.leftBehind) leaveAftermath(s, pb.leftBehind.wounded, pb.leftBehind.dead);
     const d = pb.dropped;
     if (d && (d.grenades || d.rpg_rounds)) {
@@ -916,13 +1002,14 @@ export function applyCasualties(s: GameState, b: Battle): string[] {
   const day = Math.floor(s.clock.t);
   const byUnit = new Map(b.units.filter(u => u.personId).map(u => [u.id, u.personId!]));
   const idx = (unit: string) => s.people.findIndex(p => p.id === byUnit.get(unit));
+  const carried = new Set(b.events.filter(e => e.kind === 'carry').map(e => (e as { unit: string }).unit));   // carried in to the sickbay: pressure held on it, cleaned and dressed sooner
   for (const e of b.events) {
     if (e.kind === 'wound' && byUnit.has(e.unit)) {
       const i = idx(e.unit); if (i < 0) continue;
       const nd = s.personState[i].needs;
       if (e.stopped) { if (nd.died == null) { nd.hurt.push({ what: 'bruised ribs (the armor stopped a round)', sev: 8 }); out.push(`${s.people[i].first}'s armor stopped a round.`); } continue; }
       // a tourniquet or chest seal from an IFAK on the spot
-      let sev = e.sev;
+      let sev = carried.has(e.unit) ? Math.round(e.sev * 0.8) : e.sev;
       if (s.stock.ifak >= 1) { s.stock.ifak -= 1; sev = Math.round(sev * 0.7); }
       if (nd.died != null) continue;
       nd.hurt.push({ what: !e.part ? 'hit by shrapnel' : e.part === 'head' ? 'head wound' : e.part === 'torso' ? 'shot in the body' : e.sev < 30 ? 'grazed by a bullet' : `shot in the ${e.part}`, sev, trauma: true });

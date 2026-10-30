@@ -33,7 +33,9 @@ export interface RunStats {
   grownYear: number;
   needYear: number;
   /** The bug-out that ended the run (sim/bugout.ts). */
-  bugOut?: { day: number; going: number; left: number; vehicles: string[]; foodDays: number; rangeKm: number; covered: boolean; /** The kept town house, as somewhere to go (sim/weekender.ts). */ fallback?: string };
+  bugOut?: { day: number; going: number; left: number; vehicles: string[]; foodDays: number; rangeKm: number; covered: boolean; /** The kept town house, as somewhere to go (sim/weekender.ts). */ fallback?: string;
+    /** The trip (sim/bugout.ts): on foot or by vehicle, where to, the route risk and how it went, who was lost on the way, and the food days on arrival. Optional: saves from before have none. */
+    mode?: 'vehicle' | 'foot'; dest?: 'cache' | 'town' | 'open'; destName?: string; miles?: number; risk?: number; outcome?: 'clean' | 'late' | 'robbed' | 'lost_one'; lost?: string; arrivedFoodDays?: number; bags?: number };
 }
 
 export const emptyStats = (): RunStats => ({ days: 0, hungryDays: 0, dryDays: 0, darkDays: 0, kcalNeed: 0, kcalGrown: 0, wounds: 0, maxDose: 0, peak: 0, okSince: -1, selfFed: 0, grownYear: 0, needYear: 0 });
@@ -109,15 +111,17 @@ export function reportCard(s: GameState): ReportCard {
     : end === 'recovered' ? `${family} family came through ${name.toLowerCase()}`
     : end === 'new_normal' ? `A thinner world: ${family} family settles in after ${name.toLowerCase()}`
     : `${family} homestead feeds itself a year on`;
-  const sub = end === 'bug_out' ? `They left on day ${bo?.day ?? 0} with ${bo?.going ?? 0} of ${(bo?.going ?? 0) + (bo?.left ?? 0)}. Where they went is the next chapter, and it is not written yet.`
+  const sub = end === 'bug_out' ? `They left on day ${bo?.day ?? 0} with ${bo?.going ?? 0} of ${(bo?.going ?? 0) + (bo?.left ?? 0)}. ${bo?.dest === 'cache' ? 'They made for the buried cache.' : bo?.dest === 'town' ? 'They made for the town house.' : 'They had nowhere particular to go.'} ${bo?.outcome === 'lost_one' ? `${bo.lost ?? 'One of them'} did not make the trip. ` : ''}The rest is the next chapter, and it is not written yet.`
     : end === 'wipe' ? `${days} days after it hit, the last of them was gone.`
     : end === 'recovered' ? `${days} days after it hit, the lights are back on in the valley. ${alive} of ${total} made it.`
     : end === 'new_normal' ? `${days} days on, the power runs some hours and the store opens some days. It won't be like before. ${alive} of ${total} made it.`
     : `A year without a store. ${alive} people live off what the place grows.`;
   const lines: string[] = [];
   if (bo) {
-    lines.push(`${bo.going} aboard ${bo.vehicles.length} vehicle${bo.vehicles.length === 1 ? '' : 's'} (${bo.vehicles.map(k => VEHICLES[k as keyof typeof VEHICLES]?.name.toLowerCase() ?? k).join(', ')}), loaded ${bo.covered ? 'under cover, by the passage from the house to the garage' : 'in the open, in plain view of the road'}.`);
-    lines.push(`${bo.foodDays} days of food and water aboard and fuel for about ${bo.rangeKm} km.`);
+    if (bo.mode === 'foot') lines.push(`${bo.going} left on foot${bo.bags ? `, ${bo.bags} with a packed bug-out bag` : ', with whatever they could snatch'}.`);
+    else lines.push(`${bo.going} aboard ${bo.vehicles.length} vehicle${bo.vehicles.length === 1 ? '' : 's'} (${bo.vehicles.map(k => VEHICLES[k as keyof typeof VEHICLES]?.name.toLowerCase() ?? k).join(', ')}), loaded ${bo.covered ? 'under cover, by the passage from the house to the garage' : 'in the open, in plain view of the road'}.`);
+    lines.push(`${bo.foodDays} days of food and water ${bo.mode === 'foot' ? 'on their backs' : 'aboard'} and ${bo.mode === 'foot' ? 'a walk of' : 'fuel for'} about ${bo.rangeKm} km.`);
+    if (bo.destName) lines.push(`Bound for ${bo.destName}${bo.miles ? `, ${bo.miles} miles; the way carried a ${Math.round((bo.risk ?? 0) * 100)} % chance of trouble` : ''}. ${bo.outcome === 'robbed' ? 'They were stopped on the road and lost half of what they carried.' : bo.outcome === 'late' ? 'It took longer than planned and some of the food was gone.' : bo.outcome === 'lost_one' ? 'The trip took one of them.' : 'The way was clear.'}${bo.arrivedFoodDays !== undefined ? ` They arrived with ${bo.arrivedFoodDays} days of food${bo.dest === 'cache' ? ' (the cache included)' : ''}.` : ''}`);
     if (bo.left) lines.push(`${bo.left} had no seat and stayed behind to hold the place.`);
     if (bo.fallback) lines.push(`They had somewhere to go: ${bo.fallback} was kept for this, with the lights still paid for.`);
   }
