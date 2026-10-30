@@ -90,6 +90,10 @@ export const finishedOf = (s: GameState, ...kinds: string[]): Structure[] => s.s
 
 /** A finished workshop: tools wear slower, edges come back faster, repairs hold better. */
 export const hasWorkshop = (s: GameState): boolean => finishedOf(s, 'workshop').length > 0;
+/** A forge on the place (sim/tools.ts: scrap-iron repairs and better improvised steel). */
+export const hasForge = (s: GameState): boolean => finishedOf(s, 'forge').length > 0;
+/** What a forge does to the repair toll (on top of the workshop's) and the condition of an improvised steel tool. */
+export const FORGE_REPAIR_TOLL = 0.75, FORGE_IMPROVISE_COND = 0.9;
 export const WORKSHOP_WEAR = 0.75, WORKSHOP_HONING = 0.5, WORKSHOP_REPAIR_TOLL = 0.5, WORKSHOP_REPAIR_BONUS = 0.1;
 
 // ─────────────────────────────────────────────────────────────────────────
