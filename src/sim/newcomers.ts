@@ -29,6 +29,7 @@
  *              carry for six months. Past what the stores can feed, the whole
  *              table feels it (morale), loyalty falls and people drift off.
  */
+import { vetting } from './ringFallback';
 import { mulberry32, pick } from './rng';
 import { log } from './economy';
 import { dayIndex, type GameState } from './state';
@@ -777,7 +778,7 @@ export function newcomersDay(s: GameState): string[] {
           lines.push(`${name} put the can of fuel back on the shelf and said it would not happen again. After the winter you have given them, you believe it.`);
         } else {
           const lost: string[] = [];
-          for (const [k, sh] of REVEAL_STEAL) { const t = Math.floor((s.stock[k] ?? 0) * sh); if (t > 0) { s.stock[k] -= t; lost.push(`${t} ${k}`); } }
+          for (const [k, sh] of REVEAL_STEAL) { const t = Math.floor((s.stock[k] ?? 0) * sh * vetting(s).reach); if (t > 0) { s.stock[k] -= t; lost.push(`${t} ${k}`); } }   // on probation they sleep in the outer ring (sim/ringFallback.ts)
           const gun = s.armory.guns.find(x => !x.carrier);
           if (gun && r() < 0.3) { s.armory.guns.splice(s.armory.guns.indexOf(gun), 1); lost.push(`a ${gun.model.replace(/_/g, ' ')}`); }
           moveOut(s, b.id, 'stole and left');
