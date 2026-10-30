@@ -298,6 +298,8 @@ export class BattleRenderer {
         break;
       }
       case 'breach': this._boom(e.x, this._ground(e.x, e.z), e.z, 0.5, true); break;
+      case 'fallback': this.shake = Math.max(this.shake, 0.15); break;
+      case 'carry': break;   // the wounded's own move event carries them in
       case 'wound': { const u = U_(e.unit); if (u && !e.stopped) { u.wound = Math.min(1, u.wound + Math.max(0.3, e.sev)); this._tint(u); } break; }
       case 'death': { const u = U_(e.unit); if (u) { u.dead = true; u.wound = 1; this._tint(u); u.y = 0; } break; }
       case 'taken':
