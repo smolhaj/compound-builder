@@ -23,6 +23,7 @@ import { climate } from './effects';
 import { tractorBoost } from './vehicles';
 import { SOIL_YIELD } from './site';
 import { seasons } from './regions';
+import { gardenSeasonK } from './microclimate';
 import { gardenSeason, greenhousePeak, greenhouseGreens } from './greenhouse';
 import { orchardPicking } from './orchard';
 import { careYield, cookRatio, lifeMorale, spoilFactor } from './daily';
@@ -142,18 +143,18 @@ export function produceParts(s: GameState): ProduceParts {
   const doy = calendarOf(s.clock).doy;
   const fin = s.structures.filter(isFinished);
   const coops = fin.filter(st => st.kind === 'chicken_coop').length;
-  const gardens = fin.filter(st => st.kind === 'garden').length;
   // a dozen hens: ~8 eggs a day in summer, ~3 in midwinter (≈ 70 kcal each)
   const eggs = coops * 70 * (5.5 + 2.5 * Math.cos(2 * Math.PI * (doy - 172) / 365)) * careYield(s, 'animals') * layFactor(s);
   // a kitchen garden: nothing until three weeks past the last frost, full by mid-summer, done a month past the first frost
   // a finished greenhouse starts the garden six weeks earlier, runs it six weeks later and raises the peak (greenhouse.ts);
   // later sowings (successions, sim/crops.ts) run the end of the season on a little and raise the crop
   const [g0, g1a] = gardenSeason(s), g1 = g1a + successionDays(s);
-  const season = doy < g0 || doy > g1 ? 0 : doy < g0 + 45 ? (doy - g0) / 45 : doy < g1 - 35 ? 1 : (g1 - doy) / 35;
+  // each bed has its own frost dates and wind (sim/microclimate.ts): a cold-air pocket starts late and ends early, an open ridge dries the bed
+  const season = fin.filter(st => st.kind === 'garden').reduce((a, st) => a + gardenSeasonK(s, st, doy, g0, g1), 0);
   const skill = bestGardener(s);
   // a month to come back after hail (replanted from saved seed), then a shorter season
   const hd = hailThisYear(s), hail = hd == null || doy < hd ? 1 : doy - hd < 30 ? 0 : 0.7;
-  const veg = gardens * 2500 * season * (0.6 + 0.08 * skill) * SOIL_YIELD[s.site.soil] * greenhousePeak(s) * hail * careYield(s, 'weeds') * gardenFactor(s);
+  const veg = 2500 * season * (0.6 + 0.08 * skill) * SOIL_YIELD[s.site.soil] * greenhousePeak(s) * hail * careYield(s, 'weeds') * gardenFactor(s);
   const grow = climate(s).grow, pol = pollination(s);
   const pick = orchardPicking(s, pol.orchard), orchardK = careYield(s, 'orchard') * grow;
   return {
