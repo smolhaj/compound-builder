@@ -17,6 +17,7 @@ jobs:
       - run: npm test
       - run: npm run build
   perf-budget:
+    timeout-minutes: 15
     # draw calls / triangles / shadow triangles / load time per quality tier on the mountain showcase, headless, no GPU (docs/DECISIONS.md)
     runs-on: ubuntu-latest
     steps:

@@ -20,13 +20,18 @@ const srv = spawn('node', ['node_modules/vite/bin/vite.js', 'preview', '--port',
 await new Promise((ok, no) => { srv.stdout.on('data', d => /localhost:\d+/.test(String(d)) && ok()); srv.on('exit', c => no(new Error('preview exited ' + c))); });
 const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--disable-accelerated-2d-canvas', '--enable-precise-memory-info'] });
 let failed = false; const rows = [];
+setTimeout(() => { console.error('perfBudget watchdog: over 9 minutes, giving up'); process.exit(2); }, 9 * 60 * 1000).unref();
+const step = m => console.error(`[${new Date().toISOString().slice(11, 19)}] ${m}`);
 try {
   for (const [sceneName, sc] of Object.entries(scenes)) for (const tier of tiers) {
     const ctx = await browser.newContext({ viewport: { width: 1000, height: 640 } });
-    const page = await ctx.newPage(); page.setDefaultTimeout(240000);
+    const page = await ctx.newPage(); page.setDefaultTimeout(150000);
     page.on('pageerror', e => { console.error('pageerror:', e.message); failed = true; });
+    page.on('console', c => { if (c.type() === 'error') step('console error: ' + c.text().slice(0, 200)); });
+    page.on('crash', () => { step('PAGE CRASHED'); failed = true; });
+    step(`${sceneName}/${tier}: loading`);
     const t0 = Date.now();
-    await page.goto(`http://localhost:${port}/?${sc.query}&lowrender&looktier=${tier}`);
+    await page.goto(`http://localhost:${port}/?${sc.query}&lowrender&looktier=${tier}`, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => window.__cb?.qa?.frames > 2, null, { polling: 100 });
     if (sc.query.includes('showcase=')) await page.waitForFunction(() => window.__showcase, null, { polling: 200 });
     const loadMs = Date.now() - t0;
