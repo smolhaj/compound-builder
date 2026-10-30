@@ -155,11 +155,27 @@ const trimRun = (r: WallRun): WallRun => ({ ...r, h: r.h.map(v => (Math.abs(v) <
  * them and a stair keeps off them). With no step of `RW.MIN_H` round the pad the plan has no runs and the old gentle skirt: the building simply sits
  * on graded ground. Pure (tested).
  */
-export function planPad(fp: Rect, h: Natural, others: readonly Rect[] = []): PadPlan {
+/** Kinds that stand on vehicle or lookout ground and take no retaining wall: a drive, a court or a ring wall must run through them (they keep the old gentle pad). */
+export const WALLLESS = /^(motor_court|gate_garage|equipment_yard|watchtower|rise_lookout|bunker|tunnel|escape|wall|gate|fence|hedge)/;
+
+/** Zero the wall where its slab would stand in another pad (that pad grades the ground there, so a wall drawn from the natural height would float or bury). */
+function maskRuns(runs: WallRun[], others: readonly Rect[]): WallRun[] {
+  if (!others.length) return runs;
+  return runs.map(r => {
+    const [nx, nz] = NORMALS[r.side];
+    return { ...r, h: r.h.map((v, i) => {
+      const x = r.pts[i][0] + nx * RW.SKIRT * 0.5, z = r.pts[i][1] + nz * RW.SKIRT * 0.5, m = RW.SKIRT + 0.05;
+      return others.some(o => x > o.x0 - m && x < o.x1 + m && z > o.z0 - m && z < o.z1 + m) ? 0 : v;
+    }) };
+  });
+}
+
+export function planPad(fp: Rect, h: Natural, others: readonly Rect[] = [], seen: Natural = h): PadPlan {
+  // (`h` is the natural ground the pad level is taken from; `seen` is the ground as it stands round the pad now, with the road bed and other pads in it)
   const y = meanHeight(fp, h);
   const base: Rect = { x0: fp.x0 - RW.EDGE, z0: fp.z0 - RW.EDGE, x1: fp.x1 + RW.EDGE, z1: fp.z1 + RW.EDGE };
   const bare: PadPlan = { rect: base, y, skirt: NO_WALL_SKIRT, runs: [], stairs: [], maxH: 0, lenU: 0, faceM2: 0, tall: false, barrier: false, bbox: base };
-  const need = sample(base, y, h).map(r => sideMid(r) >= RW.MIN_H);
+  const need = sample(base, y, seen).map(r => sideMid(r) >= RW.MIN_H);
   if (!need.some(Boolean)) return bare;
   // the flat apron on the sides that carry a wall (stopping short of what stands beside it)
   const rect: Rect = { ...base };
@@ -168,7 +184,7 @@ export function planPad(fp: Rect, h: Natural, others: readonly Rect[] = []): Pad
   if (need[1]) rect.x1 += clearance(base, 1, RW.APRON, near);
   if (need[2]) rect.z1 += clearance(base, 2, RW.APRON, near);
   if (need[3]) rect.x0 -= clearance(base, 3, RW.APRON, near);
-  const runs = sample(rect, y, h).map(trimRun);
+  const runs = maskRuns(sample(rect, y, seen).map(trimRun), near);
   let maxH = 0, lenU = 0, face = 0;
   for (const r of runs) for (const [i0, i1] of wallStretches(r)) for (let i = i0 + 1; i <= i1; i++) {
     const a = Math.abs(r.h[i - 1]), b = Math.abs(r.h[i]), seg = Math.hypot(r.pts[i][0] - r.pts[i - 1][0], r.pts[i][1] - r.pts[i - 1][1]);
