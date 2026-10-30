@@ -17,7 +17,7 @@ import type { GameState } from './state';
 import { openDoorways } from './compounds';
 import { COUNTY, PERMIT_FEE, countyWorks } from './paperwork';
 
-export type PerimeterKind = 'split_rail' | 'barbed_wire' | 'woven_wire' | 'thorn_hedge' | 'log_palisade' | 'container_wall' | 'earth_berm' | 'ditch' | 'creek_bars' | 'chain_link' | 'wrought_iron' | 'iron_barbed' | 'steel_wall' | 'electric_steel' | 'water_pipe' | 'power_cable' | 'escape_tunnel' | 'covered_walkway' | 'underground_passage' | 'concrete_wall' | 'wall_walk' | 'stone_wall' | 'container_stack' | 'tunnel_bridge' | 'slope_tunnel' | 'bar_fence' | 'drain_channel';
+export type PerimeterKind = 'split_rail' | 'barbed_wire' | 'woven_wire' | 'thorn_hedge' | 'log_palisade' | 'container_wall' | 'earth_berm' | 'ditch' | 'creek_bars' | 'chain_link' | 'wrought_iron' | 'iron_barbed' | 'steel_wall' | 'electric_steel' | 'water_pipe' | 'power_cable' | 'escape_tunnel' | 'covered_walkway' | 'underground_passage' | 'concrete_wall' | 'wall_walk' | 'stone_wall' | 'container_stack' | 'tunnel_bridge' | 'slope_tunnel' | 'rock_tunnel' | 'bar_fence' | 'drain_channel';
 
 export interface PerimeterDef {
   id: PerimeterKind;
@@ -56,6 +56,8 @@ export interface PerimeterDef {
   span?: boolean;
   /** Vehicles drive through it (the doors at each end open to the fleet). */
   vehicleWay?: boolean;
+  /** Driven through rock (sim/terrain.ts `BORE`): needs hill over it, is not drawn between its portals, and cannot be dropped. */
+  bore?: boolean;
   /** Footing poured deep enough that a tunnel can't go under it (concrete and steel tiers); cheaper fences need a buried skirt. */
   deepFooting?: boolean;
 }
@@ -85,12 +87,13 @@ export const PERIMETER: Record<PerimeterKind, PerimeterDef> = {
   container_stack: { id: 'container_stack', name: 'Stacked containers', blurb: 'Containers two high, end to end: a 5 m wall that no ladder from the yard reaches, and each box is still storage. It takes twice the boxes of a single row and a crane that can lift to the second tier. Take the colors you like; black reads as one dark wall.', hours: 6, materials: { container: 1 }, height: 0.86, blocks: { people: 0.95, animals: 1, vehicles: 1 }, sight: 1, growYears: 0 },
   tunnel_bridge: { id: 'tunnel_bridge', name: 'Tunnel-bridge (enclosed steel)', blurb: 'A rust-red steel tube on trusses across a gorge, ravine or creek bed, joining the outer road or motor court to the compound, with a steel door at each end. Vehicles drive through; on foot or by truck it is the one way over the gap. A crew has to come by it (door by door) or ford and climb the gorge, and you can drop it. Needs real low ground to span: 3 m or more under the deck, no longer than 200 m. The county wants a permit.', hours: 30, materials: { rebar: 2.4, roofing: 4, hardware: 0.6, concrete: 1.2, cable: 0.1 }, height: 0.55, blocks: { people: 0.9, animals: 1, vehicles: 0.9 }, sight: 0.9, growYears: 0, walkway: true, span: true, vehicleWay: true },
   slope_tunnel: { id: 'slope_tunnel', name: 'Slope tunnel (enclosed steel)', blurb: 'The same rust-red tube laid down a hillside, following the ground, with a steel door at each end: the secured way from the compound down to a lower yard or road on a slope of 20 % or more. Vehicles drive through.', hours: 22, materials: { rebar: 1.4, roofing: 2.6, hardware: 0.4, concrete: 0.8 }, height: 0.5, blocks: { people: 0.9, animals: 1, vehicles: 0.85 }, sight: 0.85, growYears: 0, walkway: true, vehicleWay: true },
+  rock_tunnel: { id: 'rock_tunnel', name: 'Rock tunnel (bored)', blurb: 'A vehicle tunnel driven through a rock face or spur: a lined concrete arch 4.4 m wide and 4.8 m under the crown, a stone portal at each end with wing walls, a steel blast door in each portal. The deck runs at one even grade (15 % at most) from the court at the foot of the face to the compound above it, so it is long (up to 240 m): the rock does the walls\' work, and only the two doors are a way in. It is no wall on the surface: the rock is its wall, and a crew must come by it, door by door, or climb the face; it cannot be dropped, only held. Needs real hill over it (2 m over the crown everywhere, 6 m somewhere); the ends may lie in an earth-sheltered cutting up to 24 m long. The county wants a permit.', hours: 90, materials: { rebar: 3, concrete: 24, hardware: 0.3, cable: 0.1, excavator: 1.2 }, height: 0, blocks: { people: 0, animals: 0, vehicles: 0 }, sight: 0, growYears: 0, walkway: true, vehicleWay: true, bore: true, deepFooting: true },
   bar_fence: { id: 'bar_fence', name: 'Black bar fence', blurb: 'Plain black steel bars, 2.4 m tall, welded to top and bottom rails and set in a low concrete curb, with no spear points to catch a coat: the fence of an embassy or a good estate. You can see through it, but it is hard to climb and cannot be cut with hand tools. Used for the motor court in front of the gate.', hours: 13, materials: { rebar: 0.95, hardware: 0.22, concrete: 0.3 }, height: 0.4, blocks: { people: 0.7, animals: 0.98, vehicles: 0.5 }, sight: 0.04, growYears: 0, deepFooting: true },
   drain_channel: { id: 'drain_channel', name: 'Drainage channel', blurb: 'A 1 m stone-lined swale with a perforated pipe under a gravel bed and a grating at each end, laid along the contour above a building cut into a slope, or along the foot of a wall on the downhill side. It takes the runoff of the cut away before it turns the pad to mud in the thaw and in storms. A truck crosses it at a culvert; it stops no one.', hours: 6, materials: { pipe: 0.25, concrete: 0.12 }, height: -0.05, blocks: { people: 0, animals: 0, vehicles: 0.2 }, sight: 0, growYears: 0 },
   ditch: { id: 'ditch', name: 'Ditch / dry moat', blurb: 'A 2 m deep, 3 m wide ditch. No vehicle crosses; the spoil can build a berm.', hours: 40, materials: {}, height: -0.33, blocks: { people: 0.45, animals: 0.3, vehicles: 1 }, sight: 0, growYears: 0 },
 };
 
-export const PERIMETER_ORDER: readonly PerimeterKind[] = ['split_rail', 'barbed_wire', 'woven_wire', 'thorn_hedge', 'log_palisade', 'container_wall', 'earth_berm', 'ditch', 'creek_bars', 'chain_link', 'wrought_iron', 'iron_barbed', 'steel_wall', 'electric_steel', 'concrete_wall', 'covered_walkway', 'stone_wall', 'container_stack', 'tunnel_bridge', 'slope_tunnel', 'bar_fence'];
+export const PERIMETER_ORDER: readonly PerimeterKind[] = ['split_rail', 'barbed_wire', 'woven_wire', 'thorn_hedge', 'log_palisade', 'container_wall', 'earth_berm', 'ditch', 'creek_bars', 'chain_link', 'wrought_iron', 'iron_barbed', 'steel_wall', 'electric_steel', 'concrete_wall', 'covered_walkway', 'stone_wall', 'container_stack', 'tunnel_bridge', 'slope_tunnel', 'rock_tunnel', 'bar_fence'];
 /** Lines that carry utilities (drawn with the same tool, under Water & power). */
 export const UTILITY_LINES: readonly PerimeterKind[] = ['water_pipe', 'power_cable', 'drain_channel'];
 
@@ -156,7 +159,7 @@ export interface PerimeterRun {
  */
 export const PREDATOR_BLOCK: Record<PerimeterKind, number> = {
   split_rail: 0.02, barbed_wire: 0.1, woven_wire: 0.35, thorn_hedge: 0.75, log_palisade: 0.97, container_wall: 1, earth_berm: 0.2, ditch: 0.2,
-  creek_bars: 0.95, chain_link: 0.9, wrought_iron: 0.97, iron_barbed: 0.98, steel_wall: 1, electric_steel: 1, water_pipe: 0, power_cable: 0, escape_tunnel: 0, covered_walkway: 1, underground_passage: 0, concrete_wall: 1, wall_walk: 0, stone_wall: 1, container_stack: 1, tunnel_bridge: 1, slope_tunnel: 1, bar_fence: 0.97, drain_channel: 0,
+  creek_bars: 0.95, chain_link: 0.9, wrought_iron: 0.97, iron_barbed: 0.98, steel_wall: 1, electric_steel: 1, water_pipe: 0, power_cable: 0, escape_tunnel: 0, covered_walkway: 1, underground_passage: 0, concrete_wall: 1, wall_walk: 0, stone_wall: 1, container_stack: 1, tunnel_bridge: 1, slope_tunnel: 1, rock_tunnel: 1, bar_fence: 0.97, drain_channel: 0,
 };
 
 /** The next tier up, where there is one (upgraded in place: sim `upgradeRun`). */
@@ -189,6 +192,9 @@ export function footingOf(kind: PerimeterKind): Footing | null {
 }
 /** Share of the old tier's materials that comes back when its upgrade is finished. */
 export const SALVAGE = 0.5;
+
+/** A run that goes under the ground (the escape tunnel, the underground passage, a rock bore): not a wall on the surface, so it stops no walk, blocks no view and clears no trees along its line (only its portals and hatches show). */
+export const underground = (kind: PerimeterKind): boolean => kind === 'escape_tunnel' || kind === 'underground_passage' || !!PERIMETER[kind].bore;
 
 /** Is there power for an energized wire or a walkway's lights? (a lit building, or the grid while it works) */
 export const fenceLive = (s: GameState): boolean => s.utilities.lit.length > 0 || (s.utilities.grid && s.disaster.tracks.grid > 0.5);
@@ -232,6 +238,8 @@ export function runBill(kind: PerimeterKind, len: number): Partial<Stock> {
   if (kind === 'underground_passage') Object.assign(out, { passage_hatch: 2, concrete: 3 });
   // the steel door at each end of a tunnel-bridge or slope tunnel
   if (kind === 'tunnel_bridge' || kind === 'slope_tunnel') out.blast_door = 2;
+  // a bore: the steel door in each portal, and the stone of the two portals and their wing walls (flat, whatever the length)
+  if (kind === 'rock_tunnel') Object.assign(out, { blast_door: 2, fieldstone: 12 });
   // the tunnel's two locks: a blast door at the bunker end, the egress hatch at the far end
   if (kind === 'escape_tunnel') Object.assign(out, { blast_door: 1, egress_hatch: 1, concrete: 4 });
   return out;
@@ -295,6 +303,8 @@ export function runHours(kind: PerimeterKind, len: number): number {
 export const BERM_M3 = 36, DITCH_M3 = 24;
 /** Net earth a tunnel's cut-and-cover leaves over, per unit length (the culvert's volume), m³. */
 export const TUNNEL_M3 = 12;
+/** The rock a finished bore leaves on the spoil pile per unit of length, m³ (sim/terrain.ts `BORE.M3`). */
+export const BORE_SPOIL_M3 = 100;
 /** Share of a berm's hours saved when its earth comes off the spoil pile (pushed up, not dug). */
 export const SPOIL_SAVES = 0.6;
 
@@ -385,6 +395,7 @@ export function addRunWork(s: GameState, r: PerimeterRun, hours: number): void {
     r.finishedAt = s.clock.t;
     if (r.kind === 'ditch') s.stock.spoil += Math.round(DITCH_M3 * wallLength(r));
     if (r.kind === 'escape_tunnel' || r.kind === 'underground_passage') s.stock.spoil += Math.round(TUNNEL_M3 * wallLength(r));
+    if (r.kind === 'rock_tunnel') s.stock.spoil += Math.round(BORE_SPOIL_M3 * wallLength(r));
     const d = PERIMETER[r.kind];
     // an upgrade replaces the old tier, and some of its materials come back
     if (r.replaces) {

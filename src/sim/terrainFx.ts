@@ -23,8 +23,8 @@
  * Pure.
  */
 import { calendarOf, type GameState, type Structure } from './state';
-import { bestLane, floodplainAt, hasHillside, localSun, riseAboveCreek, slopeTunnelProblem, spanProblem, type Choke, type Lane } from './terrain';
-import { campOf, groundOf, lanesOf, sitesOf, terrainOf } from './terrainState';
+import { BORE, bestLane, boreProblem, floodplainAt, hasHillside, hasRockFace, localSun, riseAboveCreek, slopeTunnelProblem, spanProblem, type BoreStats, type Choke, type Lane } from './terrain';
+import { boreOf, campOf, groundOf, lanesOf, sitesOf, terrainOf } from './terrainState';
 import { isFinished } from './construction';
 import { isHome } from './blueprints';
 import { highShare, isTower } from './towers';
@@ -121,6 +121,14 @@ export function chokeHeld(s: GameState, choke: Choke): boolean {
   return s.perimeter.some(r => runFinished(r) && r.pts.some(p => near(p[0], p[1])) && r.kind !== 'water_pipe' && r.kind !== 'power_cable');
 }
 
+/** The Defense tab's line when the easiest way in is one of your tunnels (the doors: how long a crew is held, when they lock, whether it can be dropped). */
+export function wayInLine(kind: PerimeterKind | undefined): string {
+  const bore = !!kind && !!PERIMETER[kind].bore;
+  return bore
+    ? `The easiest way in is your rock tunnel: the rock leaves a crew only its outer steel door, and they are held there ${DOOR_DELAY} s (in view of your towers) before it can act. The doors lock by themselves at night and when the alarm goes; by day, unwarned, they stand open and hold a crew only ${DOOR_OPEN_DELAY} s. A bore cannot be dropped: hold the door.`
+    : `The easiest way in is your ${kind ? PERIMETER[kind].name.split(' (')[0].toLowerCase() : 'tunnel-bridge'}: a crew comes to its outer steel door and is held there ${DOOR_DELAY} s (in view of your towers and deck) before it can act. The doors lock by themselves at night and when the alarm goes; by day, unwarned, they stand open and hold a crew only ${DOOR_OPEN_DELAY} s. Drop it and they must ford and climb the gorge.`;
+}
+
 export interface TerrainDefense { score: number; lines: string[]; lane: Lane | null; held: boolean; highShare: number }
 
 /** The ground's share of the defense, 0–1, with plain-language lines. 0 where nothing is known. */
@@ -142,14 +150,14 @@ export function terrainDefense(s: GameState): TerrainDefense {
   const held = !!best.choke && chokeHeld(s, best.choke);
   if (hard > 0.15) lines.push(`The easiest way in is ${best.hardness.toFixed(1)}× slower than open ground${best.fords ? ' (it fords the creek)' : ''}${best.cliff ? ' (it has a cliff to climb)' : ''}.`);
   else lines.push('The ground is open all round: nothing slows a crew.');
-  if (best.via) lines.push(`The easiest way in is your tunnel-bridge: a crew comes to its outer steel door and is held there ${DOOR_DELAY} s (in view of your towers and deck) before it can act. The doors lock by themselves at night and when the alarm goes; by day, unwarned, they stand open and hold a crew only ${DOOR_OPEN_DELAY} s. Drop it and they must ford and climb the gorge.`);
+  if (best.via) lines.push(wayInLine(s.perimeter.find(r => r.id === best.via)?.kind));
   else if (best.choke) lines.push(held ? `The easiest way in narrows to ${Math.round(best.choke.width * 6)} m and you hold it.` : `The easiest way in narrows to ${Math.round(best.choke.width * 6)} m at one place: a wall or tower there would matter.`);
   if (towers.length) lines.push(hs > 0.3 ? `Your towers stand on real high ground (${Math.round(hs * 100)} % of the full advantage).` : 'Your towers stand on the level: a hill would add range.');
   return { score: Math.max(0, Math.min(1, 0.5 * hard + 0.3 * hs + 0.2 * (held ? 1 : 0) + RFX.DEFENSE_SHARE * roadScore)), lines, lane: best, held, highShare: hs };
 }
 
 /** A card for the Next-step list that reads the ground (the guidance turns it into a Suggestion). Suggest, never impose. */
-export interface TerrainCard { id: string; title: string; why: string; urgency: number; mode: 'high' | 'lanes' | 'water'; /** For the gorge card: the span it invites. */ span?: { a: Pt; b: Pt; lengthM: number }; /** For the drainage card: the channel above the worst undrained cut. */ drain?: { a: Pt; b: Pt; count: number } }
+export interface TerrainCard { id: string; title: string; why: string; urgency: number; mode: 'high' | 'lanes' | 'water'; /** For the gorge card: the span it invites. */ span?: { a: Pt; b: Pt; lengthM: number }; /** For the drainage card: the channel above the worst undrained cut. */ drain?: { a: Pt; b: Pt; count: number }; /** For the rock-face card: the bore it invites, with its numbers in words. */ bore?: { a: Pt; b: Pt; lengthM: number; text: string } }
 
 /**
  * At most one card, and only once the family has a roof and is thinking about
@@ -171,6 +179,12 @@ export function terrainCards(s: GameState): TerrainCard[] {
   if (gorge) out.push({ id: 'land_gorge', title: 'The gorge is a natural choke point', why: gorge.reason, urgency: 26, mode: 'lanes', ...(gorge.span && !s.perimeter.some(r => PERIMETER[r.kind].span) ? { span: gorge.span } : {}) });
   const choke = sites.find(c => c.kind === 'choke');
   if (choke && !gorge) out.push({ id: 'land_choke', title: 'The way in narrows', why: choke.reason, urgency: 23, mode: 'lanes' });
+  // a rock face with hill enough over a gentle run: a vehicle tunnel from the foot of the face up to the compound (suggest, never impose)
+  const t0 = terrainOf(s);
+  if (t0 && hasRockFace(t0, s.site.home) && !s.perimeter.some(r => PERIMETER[r.kind].bore)) {
+    const b = boreSite(s);
+    if (b) out.push({ id: 'land_bore', title: 'The rock face can take a vehicle tunnel', why: `A bore through the hill: ${boreText(b.stats)}. It joins the court at the foot of the face to the compound above it, behind a steel door at each end, and a crew has to come by the doors or climb the face.`, urgency: 25, mode: 'high', bore: { a: b.a, b: b.b, lengthM: Math.round(b.stats.lenU * 6), text: boreText(b.stats) } });
+  }
   const res = sites.find(c => c.kind === 'reservoir');
   if (res && !s.structures.some(st => st.kind === 'reservoir') && s.structures.some(st => st.kind === 'well_drilled' && isFinished(st))) out.push({ id: 'land_reservoir', title: 'A bench above the camp for a reservoir', why: res.reason, urgency: 21, mode: 'water' });
   // a building cut into a slope with nothing to turn the runoff: the thaw and the storms bog it down (sim/drainage.ts)
@@ -202,16 +216,18 @@ export const doorDelay = (night: boolean, detection: number): number => doorsLoc
 /** Why a run of this kind can't be laid along `pts` on this ground (null = it can). Only the span kinds have a rule. */
 export function routeProblem(s: GameState, kind: PerimeterKind, pts: readonly Pt[]): string | null {
   const d = PERIMETER[kind];
-  if (!d.span && kind !== 'slope_tunnel') return null;
+  if (!d.span && !d.bore && kind !== 'slope_tunnel') return null;
   const g = groundOf(s);
   if (!g || pts.length < 2) return null;
   if (d.span) return spanProblem(g, pts[0], pts[pts.length - 1]);
+  if (d.bore) return boreProblem(g, pts[0], pts[pts.length - 1]);
   return slopeTunnelProblem(g, pts);
 }
 
 /** Build-menu grey-out: why this kind does not suit the land at all (null = it can go somewhere here). */
 export function terrainOff(s: GameState, kind: PerimeterKind): string | null {
   if (kind === 'tunnel_bridge') return sitesOf(s).some(c => c.kind === 'gorge') ? null : 'no gorge, ravine or deep creek bed on this land to span: a tunnel-bridge needs real low ground';
+  if (kind === 'rock_tunnel') return boreSite(s) ? null : 'no rock face or spur on this land that a vehicle tunnel could be driven through: a bore needs hill over it (2 m over the crown, 6 m somewhere) and a gentle enough way up (15 %)';
   if (kind === 'slope_tunnel') { const t = terrainOf(s); return t && hasHillside(t, s.site.home) ? null : 'no hillside steep enough (20 % or more) on this land: a slope tunnel needs a slope to go down'; }
   return null;
 }
@@ -227,9 +243,20 @@ export function dropBridge(s: GameState, id: string): string | null {
   const r = s.perimeter.find(x => x.id === id);
   if (!r) return 'no such tunnel';
   if (!PERIMETER[r.kind].vehicleWay) return 'only a tunnel-bridge or slope tunnel can be dropped';
+  if (PERIMETER[r.kind].bore) return 'a rock tunnel cannot be dropped: it is bored through solid rock. Hold its doors (the steel doors lock at night and on the alarm)';
   if (!runFinished(r)) return 'it is not standing';
   for (const [k, q] of Object.entries(runBill(r.kind, r.hours / PERIMETER[r.kind].hours)) as Array<[keyof typeof s.stock, number]>) if (k !== 'blast_door') s.stock[k] += Math.floor(q * SALVAGE * 0.5);
   r.finishedAt = null; r.done = 0; r.supplied = false; r.dropped = true;
   log(s, `The ${PERIMETER[r.kind].name.toLowerCase()} is down. Nothing crosses there until it is rebuilt, and a crew has to ford and climb.`);
   return null;
 }
+
+// ── the rock face's vehicle tunnel: where the land offers one ──
+
+export const boreSite = boreOf;
+
+/** Plain words for a bore's numbers: "190 m at 14 %, 12 m of rock over it at the deepest". */
+export function boreText(b: BoreStats): string {
+  return `${Math.round(b.lenU * 6)} m at ${Math.round(b.grade * 100)} %, ${Math.round(b.peakCover * 6)} m of rock over the crown at the deepest${b.openA + b.openB > 0.3 ? `, with a cutting of ${Math.round(Math.max(b.openA, b.openB) * 6)} m at one end` : ''}`;
+}
+export const BORE_CROWN_M = BORE.CROWN * 6;

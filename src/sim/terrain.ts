@@ -525,6 +525,17 @@ export function slopeTunnelProblem(src: GroundSource, pts: readonly Pt[]): strin
   return null;
 }
 
+/** Does the lot have a rock face or cliff band (a stretch of ground at the cliff slope or more, at least a dozen cells of it)? */
+export function hasRockFace(t: Terrain, lot: Rect): boolean {
+  let n = 0;
+  const { nx, nz, x0, z0, step } = t.grid;
+  for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+    const x = x0 + i * step, z = z0 + j * step;
+    if (x >= lot.x0 && x <= lot.x1 && z >= lot.z0 && z <= lot.z1 && t.slope[j * nx + i] >= T.CLIFF) n++;
+  }
+  return n >= 12;
+}
+
 /** Does the lot have a hillside steep enough for a slope tunnel (a stretch of ground at 25 % or more)? */
 export function hasHillside(t: Terrain, lot: Rect): boolean {
   let n = 0;
@@ -534,4 +545,107 @@ export function hasHillside(t: Terrain, lot: Rect): boolean {
     if (x >= lot.x0 && x <= lot.x1 && z >= lot.z0 && z <= lot.z1 && t.slope[j * nx + i] >= 0.25) n++;
   }
   return n >= 25;
+}
+
+// ── rock bores (vehicle tunnels through a rock face or hillside) ──
+
+/**
+ * A bored vehicle tunnel between two portals, straight in plan and at one even grade (the deck runs from the ground at one end to the ground at the
+ * other). It is a tunnel only where there is hill over it: the hill's height over the crown must stay at `MIN_COVER` all the way along, bar the
+ * ends, which may lie in an earth-sheltered cutting `MAX_OPEN` long (the tube is there, with earth banked over it, until the hill takes over), and
+ * somewhere it must be `MIN_PEAK` deep, or it is a trench, not a bore. Numbers: 15 % is the hill regions' road limit (sim/roadStyle.ts), a crown of
+ * 4.8 m clears a truck with its roof rack, 2 m of rock over a lined arch is the least a mine engineer leaves, 6 m somewhere makes it a bore.
+ */
+export const BORE = {
+  /** Shortest and longest bore (units): 36 m to 240 m. */
+  MIN_LEN: 6, MAX_LEN: 40,
+  /** The steepest deck (rise over run). */
+  MAX_GRADE: 0.15,
+  /** The crown stands this far over the deck (units, 4.8 m). */
+  CROWN: 0.8,
+  /** The least ground over the crown along the covered stretch, and the most it must reach somewhere (units). */
+  MIN_COVER: 0.35, MIN_PEAK: 1.0,
+  /** The longest earth-sheltered cutting at an end (units, 24 m). */
+  MAX_OPEN: 4,
+  /** Rock a unit of bore removes (m³: a lined arch about 17 m² over 6 m). */
+  M3: 100,
+} as const;
+
+export interface BoreStats {
+  lenU: number;
+  /** Deck grade, rise over run (0 to 1). */
+  grade: number;
+  /** Ground over the crown: the least along the covered stretch and the most anywhere (units). */
+  minCover: number; peakCover: number;
+  /** The earth-sheltered cutting at each end: how far (units) from that end the ground is not yet over the crown. */
+  openA: number; openB: number;
+  /** The deck's height at each end (the ground there). */
+  ya: number; yb: number;
+}
+
+/** Sample a straight bore at 0.5-unit spacing against `h` (the ground): the cover over its crown, the open cuttings, the grade. */
+export function boreStats(h: (x: number, z: number) => number, a: Pt, b: Pt): BoreStats {
+  const lenU = Math.hypot(b[0] - a[0], b[1] - a[1]), ya = h(a[0], a[1]), yb = h(b[0], b[1]);
+  const n = Math.max(2, Math.ceil(lenU / 0.5));
+  const cover: number[] = [];
+  for (let i = 0; i <= n; i++) { const f = i / n; cover.push(h(a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f) - (ya + (yb - ya) * f + BORE.CROWN)); }
+  const open = (from: 'a' | 'b'): number => {
+    let k = 0;
+    while (k <= n && (from === 'a' ? cover[k] : cover[n - k]) < 0.1) k++;
+    return Math.min(lenU, k * lenU / n);
+  };
+  const openA = open('a'), openB = open('b');
+  let minCover = Infinity, peakCover = -Infinity;
+  for (let i = 0; i <= n; i++) {
+    const s = i * lenU / n;
+    peakCover = Math.max(peakCover, cover[i]);
+    if (s > openA + 1e-9 && lenU - s > openB + 1e-9) minCover = Math.min(minCover, cover[i]);
+  }
+  return { lenU, grade: lenU > 0 ? Math.abs(yb - ya) / lenU : 0, minCover: Number.isFinite(minCover) ? minCover : 0, peakCover, openA, openB, ya, yb };
+}
+
+/** Why a bore with these numbers can't be driven (null = it can). */
+export function boreProblemOf(s: BoreStats): string | null {
+  const len = s.lenU;
+  if (len < BORE.MIN_LEN) return `too short for a bore: ${Math.round(len * 6)} m (a rock tunnel is at least ${BORE.MIN_LEN * 6} m: use a covered walkway or a gate)`;
+  if (len > BORE.MAX_LEN) return `too long: ${Math.round(len * 6)} m is more than a bore can be driven (${BORE.MAX_LEN * 6} m at the most)`;
+  if (s.grade > BORE.MAX_GRADE) return `too steep: the deck would climb ${Math.round(s.grade * 100)} % (a truck can take ${Math.round(BORE.MAX_GRADE * 100)} %). Run the bore along the hill so it gains height gently, or make it longer`;
+  if (s.peakCover < BORE.MIN_PEAK) return `no rock over it: at its deepest the ground is only ${Math.max(0, Math.round(s.peakCover * 6))} m over the crown. A bore goes through a rock face or a spur at least ${Math.round(BORE.MIN_PEAK * 6)} m deep; on a gentle slope use a slope tunnel`;
+  if (s.openA > BORE.MAX_OPEN || s.openB > BORE.MAX_OPEN) return `the ground does not close over it soon enough: the cutting at one end would be ${Math.round(Math.max(s.openA, s.openB) * 6)} m long (${BORE.MAX_OPEN * 6} m at the most)`;
+  if (s.minCover < BORE.MIN_COVER) return `daylight in the middle: the ground over the crown falls to ${Math.max(0, Math.round(s.minCover * 6))} m somewhere along it (it needs ${Math.round(BORE.MIN_COVER * 6)} m everywhere between the cuttings)`;
+  return null;
+}
+
+/** Why a bore can't be driven from `a` to `b` on this ground (null = it can). */
+export function boreProblem(src: GroundSource, a: Pt, b: Pt): string | null {
+  const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  if (len < BORE.MIN_LEN || len > BORE.MAX_LEN) return boreProblemOf({ lenU: len, grade: 0, minCover: 0, peakCover: 0, openA: 0, openB: 0, ya: 0, yb: 0 });
+  return boreProblemOf(boreStats(src.h, a, b));
+}
+
+/**
+ * The best bore the land offers near `near` (the camp): a straight run with one end within `reach` of it and the other anywhere in `rect`, scored
+ * by how much rock lies over it and how short it and its cuttings are. Coarse (two-unit grid) and pure: `h` is a cheap lookup (the analysed grid), `accept`
+ * re-checks a would-be winner against the real ground, and `ends` names the only places the far end may be (the ring wall, say).
+ */
+export function findBore(h: (x: number, z: number) => number, rect: Rect, near: Pt, reach = 22, accept?: (a: Pt, b: Pt) => boolean, ends?: readonly Pt[]): { a: Pt; b: Pt; stats: BoreStats } | null {
+  let best: { a: Pt; b: Pt; stats: BoreStats; score: number } | null = null;
+  const step = 2;
+  for (let ax = Math.max(rect.x0 + 2, near[0] - reach); ax <= Math.min(rect.x1 - 2, near[0] + reach); ax += step) for (let az = Math.max(rect.z0 + 2, near[1] - reach); az <= Math.min(rect.z1 - 2, near[1] + reach); az += step) {
+    const ha = h(ax, az);
+    const bs: Pt[] = ends ? [...ends] : [];
+    if (!ends) for (let bx = rect.x0 + 2; bx <= rect.x1 - 2; bx += step) for (let bz = rect.z0 + 2; bz <= rect.z1 - 2; bz += step) bs.push([bx, bz]);
+    for (const [bx, bz] of bs) {
+      const L = Math.hypot(bx - ax, bz - az);
+      if (L < BORE.MIN_LEN || L > BORE.MAX_LEN) continue;
+      if (Math.abs(h(bx, bz) - ha) / L > BORE.MAX_GRADE) continue;
+      const stats = boreStats(h, [ax, az], [bx, bz]);
+      if (boreProblemOf(stats)) continue;
+      // deep rock is good; short is good; a short cutting is good; stay near the camp
+      const score = Math.min(stats.peakCover, 2) * 1.2 - stats.lenU * 0.12 - (stats.openA + stats.openB) * 0.25 - Math.hypot(ax - near[0], az - near[1]) * 0.03;
+      // (the coarse grid's hill is a little off the real ground: `accept` re-checks the candidate that would win, on the real thing)
+      if ((!best || score > best.score) && (!accept || accept([ax, az], [bx, bz]))) best = { a: [ax, az], b: [bx, bz], stats, score };
+    }
+  }
+  return best ? { a: best.a, b: best.b, stats: best.stats } : null;
 }

@@ -41,7 +41,7 @@ export function buildMountainShowcase(ctx: ShowcaseCtx, opts: ShowcaseOptions = 
       return G.getState().game.structures.length > before;
     },
     stakeTerraces: spots => G.getState().stakeTerraces(spots),
-    fortify: opts => G.getState().fortifyRing(ctx.store.getState().siteGeo ?? {}, opts),
+    fortify: (opts, center) => G.getState().fortifyRing({ ...(ctx.store.getState().siteGeo ?? {}), ...(center ? { center } : {}) }, opts),
     razor: id => G.getState().addRazor(id),
     drawRun: (kind, pts: Pt[]) => {
       const before = G.getState().game.perimeter.length;

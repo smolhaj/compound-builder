@@ -197,6 +197,7 @@ export class PerimeterTool {
     const txt = tunnelWhy ? tunnelWhy
       : this._pts.length === 0 ? (this._kind === 'escape_tunnel' ? 'Escape tunnel: click a bunker room to start at its wall, then out to the exit'
         : this._kind === 'tunnel_bridge' ? 'Tunnel-bridge: click the rim on one side of the gorge (or the compound\'s motor court), then the rim on the other. It needs real low ground under it'
+        : this._kind === 'rock_tunnel' ? 'Rock tunnel: click at the portal at the foot of the rock face (the court side), then at the other portal inside the compound. It runs straight at one even grade and needs hill over it: the Next-step card marks a line the land allows'
         : this._kind === 'slope_tunnel' ? 'Slope tunnel: click at the top of the hillside, then down the slope to the lower yard or road'
         : this._kind === 'covered_walkway' ? 'Covered walkway: click against the wall of one walled yard, then against the wall of the next'
         : this._kind === 'underground_passage' ? 'Underground passage: click inside one yard (the hatch goes there), then inside the next, or out to a hatch in the woods'
