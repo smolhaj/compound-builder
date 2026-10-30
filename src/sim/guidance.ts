@@ -4,6 +4,9 @@
  * what the bunker needs, what the plans still lack, and how the Perimeter
  * list groups by price. Pure (tested); the HUD only draws it.
  */
+import { partsOutlook, partsYears } from './parts';
+import { serviceRate } from './vehicles';
+import { sanitationLine, worstWell } from './sanitation';
 import { BUNKER_ENTRANCES } from './bunkerEntrances';
 import { KIT } from '../game/buildkit/kit';
 import { homeBeds, isHome } from './blueprints';
@@ -253,6 +256,10 @@ export function suggestions(s: GameState): Suggestion[] {
   const growing = hasKind(s, 'garden', 'field', 'greenhouse', 'orchard');
   if (!growing) add('food', 'garden', daysOfFood(s) < 90 ? 'little food put by and nothing growing' : 'nothing growing yet', daysOfFood(s) < 90 ? 70 : 45);
   if (!hasKind(s, 'outhouse', 'septic')) add('toilet', 'outhouse', 'nowhere to go', 50);
+  { const ww = worstWell(s);   // a privy or a manure yard too near a well (sim/sanitation.ts)
+    if (ww) out.push({ id: 'well_close', kind: '', title: 'Your well is too close to the privy', urgency: ww.risk >= 0.8 ? 38 : 30,   // a slow hazard: below the cards that need doing now (plow 56, caretaker 44-66)
+      why: `${sanitationLine(ww)}. Move the ${ww.source!.kind.replace(/_/g, ' ')} (or drill a cased well, or keep a filter and fuel to boil)`,
+      acts: [{ label: 'Show me', act: { type: 'select', id: ww.source!.id } }] }); }
   if (!hasPower(s)) add('power', 'solar_array', 'no power for the pump, lights and the freezer', 40);
   if (growing && !hasKind(s, 'root_cellar')) add('cellar', 'root_cellar', 'nowhere cool to keep what you grow', 30);
   if (hasMaples(s) && woodsTaps(s) >= 60 && hasKind(s, 'timber_cabin', 'log_house', 'farmhouse', 'lodge', 'lodge_solar', 'stone_house', 'timber_frame') && !hasKind(s, 'sugar_shack')) add('sugar', 'sugar_shack', `the woods have maples for ${woodsTaps(s)} taps: late-winter syrup`, 14);
@@ -267,6 +274,8 @@ export function suggestions(s: GameState): Suggestion[] {
     } }
 
   out.push(...landSuggestions(s));
+
+  { const c = sparePartsCard(s); if (c) out.push(c); }   // the machines are a year older every year and the kits do not come back (sim/parts.ts)
 
   // the woodpile: out in the cold, or too thin for the next two months
   { const w = firewoodOutlook(s);
@@ -570,4 +579,15 @@ export function upgradeChain(kind: PerimeterKind): PerimeterKind[] {
   const out: PerimeterKind[] = [start];
   for (let guard = 0; guard < 20; guard++) { const n = UPGRADE_NEXT[out[out.length - 1]]; if (!n) break; out.push(n); }
   return out;
+}
+
+/** The "spare parts running short" card, or null (sim/parts.ts). Exported for the test: the Next-step list shows only the top three. */
+export function sparePartsCard(s: GameState): Suggestion | null {
+  if (partsYears(s) < 0.3) return null;
+  const o = partsOutlook(s, serviceRate(s));
+  if (o.days === null || o.days >= 120) return null;
+  return { id: 'spare_parts', kind: '', title: o.kits < 1 ? 'No spare parts for the machines' : 'Spare parts are running short',
+    urgency: o.days < 30 ? 52 : 36,
+    why: `${o.kits < 1 ? 'there is no service kit left' : `${Math.floor(o.kits)} service kit${Math.floor(o.kits) === 1 ? '' : 's'}, about ${o.days} days at today's use`}, and every year the machines are older: they want service sooner. Send a team to the hardware stores and the interstate (Outside), or trade for kits`,
+    acts: [] };
 }

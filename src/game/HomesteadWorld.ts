@@ -52,7 +52,7 @@ import type { TourBuildingInfo } from '../engine/world/camera/TourController';
 import { hydroSiteAt, windDay, TURBINE } from '../sim/renewables';
 import { boatsAtDock, isDock, lakeIce } from '../sim/waterfront';
 import { hydroLine, HYDRO_HOUSE } from './buildkit/renewableBuildings';
-import { floorHatchHost, footprint, KIT, placementProblem, rotQ, type Placed, type SiteQuery } from './buildkit/kit';
+import { climbOf, floorHatchHost, footprint, KIT, placementProblem, rotQ, type Placed, type SiteQuery } from './buildkit/kit';
 import { showStage, CUTAWAY_HIDE, XRAY_LAYERS, type BuildLayer as CabinLayer, type BuildOpts } from './buildkit/shell';
 import { bunkerRoots, datums, doorsOf, DEPTH, isEntry, isUnderground, tunnelDoorsOf, tunnelStart, type Side } from './buildkit/underground';
 import { updateScreens, updateSiteMap } from './buildkit/screenFeeds';
@@ -65,6 +65,7 @@ import { buildDumpTruck, buildExcavator, buildFormwork, buildTubeSegments, drape
 import { kitMaterial } from './buildkit/materials';
 import { FRUITS, fruitLook, isOrchard, type Fruit } from '../sim/orchard';
 import { buildLayers, type Seat } from './buildkit/buildings';
+import { treadHeight } from './buildkit/terraceProps';
 import { farHiddenLayers, isFar } from './buildkit/buildingLod';
 import { LIGHT_BUDGET, pickLights, type LightCandidate } from './lightPool';
 import { hashStr } from './buildkit/clutter';
@@ -1180,8 +1181,12 @@ export class HomesteadWorld {
       if (wall && wall.runs.length) pad = { x0: wall.rect.x0, z0: wall.rect.z0, x1: wall.rect.x1, z1: wall.rect.z1, y: wall.y, skirt: wall.skirt };
       else wall = null;
     }
+    // a stair or a ramp takes no pad: it stands on the hill from its low end and rises with it (game/buildkit/terraceProps.ts)
+    const climb = def.climbs ? climbOf(def, p.x, p.z, p.rot, this._naturalH) : null;
+    if (climb) { pad = null; wall = null; y = climb.low; }
     if (pad) this.parcel.setPads([...this.parcel.pads, pad]);
     const opts: BuildOpts = {};
+    if (climb) opts.rise = climb.rise;
     let under: Built['under'] = null;
     if (below) {
       const placed = [...[...this._built.values()].map(b => b.placed), p];
@@ -1232,11 +1237,14 @@ export class HomesteadWorld {
    * forest, the far woods, the shrubs and the farms after every piece: seconds of main thread for the same final picture).
    */
   bulk<T>(fn: () => T): T {
-    this._batchDepth++;
-    try { return fn(); } finally {
-      this._batchDepth--;
-      if (this._batchDepth === 0 && this._plantDirty) { this._plantDirty = false; if (this._quality) this._plant(this._quality); }
-    }
+    this.bulkBegin();
+    try { return fn(); } finally { this.bulkEnd(); }
+  }
+  /** The same across awaits (the time-sliced showcase): pair every `bulkBegin` with a `bulkEnd`. */
+  bulkBegin(): void { this._batchDepth++; }
+  bulkEnd(): void {
+    this._batchDepth = Math.max(0, this._batchDepth - 1);
+    if (this._batchDepth === 0 && this._plantDirty) { this._plantDirty = false; if (this._quality) this._plant(this._quality); }
   }
   private _plantDirty = false;
   private readonly _naturalH = (x: number, z: number) => this.parcel.natural(x, z).h;
@@ -2076,6 +2084,8 @@ export class HomesteadWorld {
       const def = KIT[b.placed.kind];
       const [lx, lz] = this._local(b, x, z);
       const hw = def.cellsX * CELL / 2, hd = def.cellsZ * CELL / 2;
+      // a stair or a ramp: up the steps (or the grade) from its low end
+      if (def.climbs) { if (Math.abs(lx) < hw && Math.abs(lz) < hd) return b.padY + treadHeight(b.placed.kind, b.opts.rise ?? 0, def.cellsZ * CELL, lz); continue; }
       if (Math.abs(lx) < hw && lz > -hd && lz < hd + def.porch && def.floorY > 0.02) return b.padY + def.floorY;
       // a building whose floor is its graded pad (greenhouse gravel, a garage slab): stand on the pad, not the raw slope under it
       if (Math.abs(lx) < hw && Math.abs(lz) < hd && def.category !== 'bunker' && (def.category !== 'food' || b.placed.kind === 'greenhouse' || b.placed.kind === 'greenhouse_heated' || b.placed.kind === 'sheep_barn')) return b.padY + Math.max(0, def.floorY);

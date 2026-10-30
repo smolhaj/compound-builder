@@ -107,6 +107,11 @@ function heatFor(s: GameState, rick: number): void {
   while (k.heat >= 1) { if (!burnRick(s)) { k.heat = 0; break; } k.heat -= 1; }
 }
 
+/** Put person-hours on today's kitchen work (other crafts that use the kitchen: soap). */
+export function addKitchenHours(s: GameState, hours: number): void {
+  roll(s).hours += hours;
+}
+
 /** Roll the day's tallies over. */
 function roll(s: GameState): Kitchen {
   const k = kitchenOf(s), day = Math.floor(s.clock.t + 0.25), { year } = calendarOf(s.clock);

@@ -41,6 +41,12 @@ export type BattleEvent =
   /** Carried off by the raiders (a ruthless crew takes the children). */
   | { t: number; kind: 'taken'; unit: string; by: string }
   | { t: number; kind: 'breach'; x: number; z: number }
+  /** The defenders fall back to the `ring`-th inner ring (of `of`): the crew has broken the line before it. */
+  | { t: number; kind: 'fallback'; ring: number; of: number; x: number; z: number }
+  /** A wounded defender carried in to the sickbay by `by`. */
+  | { t: number; kind: 'carry'; unit: string; by?: string }
+  /** A crew working the steel door of a tunnel (sim/doorBreach.ts): `open` is the moment it gives. */
+  | { t: number; kind: 'door'; what: 'hand tools' | 'a ram' | 'a cutting torch' | 'a charge' | 'an open door'; open: boolean; x?: number; z?: number }
   | { t: number; kind: 'flee'; unit: string }
   /** A line spoken in the fight: `who` is the unit speaking (a resident or a raider), absent for narration. */
   | { t: number; kind: 'say'; text: string; who?: string }

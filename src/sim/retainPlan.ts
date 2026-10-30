@@ -156,7 +156,7 @@ const trimRun = (r: WallRun): WallRun => ({ ...r, h: r.h.map(v => (Math.abs(v) <
  * on graded ground. Pure (tested).
  */
 /** Kinds that stand on vehicle or lookout ground and take no retaining wall: a drive, a court or a ring wall must run through them (they keep the old gentle pad). */
-export const WALLLESS = /^(motor_court|gate_garage|equipment_yard|watchtower|rise_lookout|bunker|tunnel|escape|wall|gate|fence|hedge)/;
+export const WALLLESS = /^(terrace_|motor_court|gate_garage|equipment_yard|watchtower|rise_lookout|bunker|tunnel|escape|wall|gate|fence|hedge)/;
 
 /** Zero the wall where its slab would stand in another pad (that pad grades the ground there, so a wall drawn from the natural height would float or bury). */
 function maskRuns(runs: WallRun[], others: readonly Rect[]): WallRun[] {

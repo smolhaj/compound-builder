@@ -8,6 +8,7 @@ import { useGameStore } from '../store/gameStore';
 import { calendarOf, type GameState } from '../sim/state';
 import { calendar, dateText, foodPlan, MONTH_NAMES, methodLines, monthOf, outlook, spoilageRisks, stores, thisSeason, type CalGroup } from '../sim/farmPlan';
 import { CROPS, fieldRows, gardensOf, plotFor, pinField, seedOnHand, seedsOf, seedTarget, seedWarning, setSeedFirst, setSuccession, sowWindow, type CropId, type StockLine } from '../sim/crops';
+import { makeSoap, SOAP, soapProblem } from '../sim/soap';
 import { dishLines, hasMill, hasOven, kitchenOf, toggleMethod } from '../sim/kitchen';
 import { cellarCapacity, cellarKcal, cellarTempC, overflow, pantryLoad, pantryRoom } from '../sim/storage';
 import { foodUnits } from '../sim/pantry';
@@ -173,6 +174,13 @@ function KitchenView({ game }: { game: GameState }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 86, color: DIM }}>Pantry shelves</span><Bar v={room ? Math.min(1.2, load / room) / 1.2 : 0} color={overflow(game) > 0.05 ? TONE.warn : '#9cc070'} title={`${k(load)} of ${k(room)} of shelf room`} /><span style={{ fontSize: 11, width: 70, textAlign: 'right' }}>{room ? `${Math.round(load / room * 100)} %` : '—'}</span></div>
       {cap > 0 && <Row label="Cellar temperature" value={`${Math.round(cellarTempC(game))} °C`} />}
       <Row label="Jars on the shelf" value={`${foodUnits(game, 'home_canned').toFixed(1)} cases`} />
+    </Section>
+    <Section title="Soap">
+      <Row label="Hygiene supplies" value={`${game.stock.hygiene.toFixed(1)} person-months`} title="Soap, paper, toothpaste. Out of soap the house gets sick" />
+      {(() => { const why = soapProblem(game); return <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 1 }}>
+        <button style={{ ...btn(!why), opacity: why ? 0.55 : 1 }} disabled={!!why} title={why ?? `A pail of lard and half a rick of firewood make ${SOAP.hygiene}+ person-months of soap`} onClick={() => g.money(d => makeSoap(d))}>Boil a batch of soap</button>
+        {why && <span style={{ fontSize: 10.5, color: DIM, maxWidth: 220, lineHeight: 1.25 }}>{why[0].toUpperCase() + why.slice(1)}</span>}
+      </span>; })()}
     </Section>
     <Section title="The table">
       <Row label="Quality" value={`${Math.round(kt.quality * 100)} %`} tone={kt.quality >= 0.55 ? 'good' : kt.quality < 0.4 ? 'warn' : undefined} title="Best three dishes the pantry can make, salt, herbs and bread" />

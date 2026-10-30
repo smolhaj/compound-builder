@@ -15,7 +15,7 @@ import type { useGameStore } from '../store/gameStore';
 import type { useWorldStore } from '../store/worldStore';
 import type { PerimeterKind, Pt } from '../sim/perimeter';
 import { buyVehicle, type VehicleKind } from '../sim/vehicles';
-import { integrationProblems, runMountainShowcase, type Problem, type ShowcaseIO, type ShowcaseOptions, type ShowcaseReport } from '../sim/showcase';
+import { integrationProblems, mountainShowcaseSteps, runMountainShowcase, type Problem, type ShowcaseIO, type ShowcaseOptions, type ShowcaseReport } from '../sim/showcase';
 
 /** The pieces of the running game the preset drives (what `window.__cb` holds). */
 export interface ShowcaseCtx {
@@ -26,9 +26,9 @@ export interface ShowcaseCtx {
   store: typeof useWorldStore;
 }
 
-export function buildMountainShowcase(ctx: ShowcaseCtx, opts: ShowcaseOptions = {}): ShowcaseReport & { problems: Problem[] } {
+function showcaseIO(ctx: ShowcaseCtx): ShowcaseIO {
   const G = ctx.game, w = ctx.world;
-  const io: ShowcaseIO = {
+  return {
     game: () => G.getState().game,
     ground: (x, z) => w.parcel.natural(x, z).h,   // (the natural ground: the terrain mesh may not be built yet when this runs)
     camp: [w.camp.x, w.camp.z],
@@ -72,6 +72,29 @@ export function buildMountainShowcase(ctx: ShowcaseCtx, opts: ShowcaseOptions = 
       return { game: g };
     }),
   };
+}
+
+export function buildMountainShowcase(ctx: ShowcaseCtx, opts: ShowcaseOptions = {}): ShowcaseReport & { problems: Problem[] } {
+  const io = showcaseIO(ctx), w = ctx.world;
   const rep = w.bulk(() => runMountainShowcase(io, opts));   // (the forest is re-planted once at the end, not after every piece)
-  return { ...rep, problems: integrationProblems(G.getState().game, w.access.drive, io.ground) };
+  return { ...rep, problems: integrationProblems(ctx.game.getState().game, w.access.drive, io.ground) };
+}
+
+/**
+ * The same script, time-sliced: it hands the main thread back to the browser (`pause`, which also moves the loading screen) at each step, so a
+ * slow machine paints and answers input instead of freezing for the seconds the script takes. Same result as the synchronous one (tested in sim/showcase.test.ts).
+ */
+export async function buildMountainShowcaseAsync(ctx: ShowcaseCtx, opts: ShowcaseOptions, pause: (label: string, done: number) => Promise<void>): Promise<ShowcaseReport & { problems: Problem[] }> {
+  const io = showcaseIO(ctx), w = ctx.world;
+  const gen = mountainShowcaseSteps(io, opts);
+  let n = 0, rep: ShowcaseReport;
+  w.bulkBegin();
+  try {
+    for (;;) {
+      const r = gen.next();
+      if (r.done) { rep = r.value; break; }
+      await pause(r.value, ++n);
+    }
+  } finally { w.bulkEnd(); }
+  return { ...rep, problems: integrationProblems(ctx.game.getState().game, w.access.drive, io.ground) };
 }
