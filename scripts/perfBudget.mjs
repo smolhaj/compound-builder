@@ -16,11 +16,11 @@ const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] :
 const tiers = opt('--tiers', 'low,medium,high').split(','), port = Number(opt('--port', 4195)), printOnly = args.includes('--print');
 const budget = JSON.parse(readFileSync(new URL('./perfBudget.json', import.meta.url), 'utf8'));
 const scenes = budget.scenes;
+setTimeout(() => { console.error('perfBudget watchdog: over 9 minutes, giving up'); process.exit(2); }, 9 * 60 * 1000).unref();
 const srv = spawn('node', ['node_modules/vite/bin/vite.js', 'preview', '--port', String(port), '--strictPort'], { stdio: ['ignore', 'pipe', 'inherit'] });
-await new Promise((ok, no) => { srv.stdout.on('data', d => /localhost:\d+/.test(String(d)) && ok()); srv.on('exit', c => no(new Error('preview exited ' + c))); });
+await new Promise((ok, no) => { srv.stdout.on('data', d => /localhost:\d+/.test(String(d).replace(/\x1b\[[0-9;]*m/g, '')) && ok()); srv.on('exit', c => no(new Error('preview exited ' + c))); });
 const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--disable-accelerated-2d-canvas', '--enable-precise-memory-info'] });
 let failed = false; const rows = [];
-setTimeout(() => { console.error('perfBudget watchdog: over 9 minutes, giving up'); process.exit(2); }, 9 * 60 * 1000).unref();
 const step = m => console.error(`[${new Date().toISOString().slice(11, 19)}] ${m}`);
 try {
   for (const [sceneName, sc] of Object.entries(scenes)) for (const tier of tiers) {
