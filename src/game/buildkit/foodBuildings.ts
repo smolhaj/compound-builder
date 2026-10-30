@@ -561,4 +561,58 @@ function woodOven(_def: KitPieceDef, seed = 1): THREE.Group {
   return g;
 }
 
-export const FOOD_BUILDERS: Record<string, (def: KitPieceDef, seed?: number) => THREE.Group> = { greenhouse, orchard, wood_oven: woodOven };
+// ────────────────────────────────────────────────────
+// Forge: an open-sided smithy (stone hearth with a hood and flue, bellows, anvil on a stump, quench trough)
+// ────────────────────────────────────────────────────
+
+function forge(_def: KitPieceDef, seed = 1): THREE.Group {
+  const p = new Parts(seed);
+  const W = 0.84, D = 0.4;
+  const post = (x: number, z: number, h: number) => box(0.016, h, 0.016, x, 0.02, z);
+  const posts: Array<[number, number]> = [[-W / 2 + 0.02, D / 2 - 0.02], [W / 2 - 0.02, D / 2 - 0.02], [W / 2 - 0.02, -D / 2 + 0.02]];
+  p.layer = 'stakes';
+  for (const [x, z] of [[-W / 2, -D / 2], [W / 2, -D / 2], [-W / 2, D / 2], [W / 2, D / 2]]) p.add('trim', box(0.012, 0.09, 0.012, x, -0.02, z));
+  // foundation: the slab and the hearth block against the back wall (waist-high: 0.15 ≈ 0.9 m)
+  p.add('concrete', box(W, 0.02, D, 0, 0, 0), 'foundation');
+  p.add('fieldstone', box(0.26, 0.15, 0.17, -0.26, 0.02, -D / 2 + 0.11), 'foundation');
+  p.add('concrete', box(0.2, 0.012, 0.12, -0.26, 0.17, -D / 2 + 0.11), 'foundation');
+  // frame: the posts and the hood over the fire (a tapering stone throat), the flue above it
+  p.layer = 'frame';
+  for (const [x, z] of posts) p.add('wood_mid', post(x, z, 0.48), 'frame');
+  p.add('fieldstone', box(0.26, 0.1, 0.17, -0.26, 0.32, -D / 2 + 0.11), 'frame');
+  p.add('fieldstone', box(0.18, 0.12, 0.12, -0.26, 0.42, -D / 2 + 0.11), 'frame');
+  p.add('fieldstone', box(0.1, 0.16, 0.08, -0.26, 0.54, -D / 2 + 0.11), 'frame');
+  p.add('wood_dark', box(W - 0.02, 0.014, 0.014, 0, 0.48, D / 2 - 0.02), 'frame');
+  // roof: a low metal roof over the working side, a back wall of stone to the hood
+  p.add('metal_roof', box(W + 0.1, 0.012, D + 0.1, 0, 0.5, 0.0).rotateX(0.06), 'roof');
+  p.add('fieldstone', box(W - 0.02, 0.4, 0.03, 0, 0.02, -D / 2 + 0.015), 'walls');
+  p.add('iron', new THREE.CylinderGeometry(0.018, 0.02, 0.22, 8).translate(-0.26, 0.7, -D / 2 + 0.11), 'chimney');
+  // the fire: coals in the hearth pot, a bellows on the side, a rack of tongs and hammers on the back wall (interior)
+  p.add('iron', new THREE.CylinderGeometry(0.05, 0.035, 0.03, 10).translate(-0.26, 0.182, -D / 2 + 0.11), 'interior');
+  p.add('paint_red', new THREE.CylinderGeometry(0.036, 0.036, 0.006, 8).translate(-0.26, 0.2, -D / 2 + 0.11), 'interior');
+  p.add('wood_dark', box(0.09, 0.03, 0.05, -0.12, 0.1, -D / 2 + 0.1).rotateZ(0.12), 'interior');
+  p.add('rubber', box(0.07, 0.04, 0.045, -0.12, 0.122, -D / 2 + 0.1).rotateZ(0.12), 'interior');
+  p.add('iron', new THREE.CylinderGeometry(0.006, 0.006, 0.1, 6).rotateZ(Math.PI / 2 - 0.12).translate(-0.17, 0.115, -D / 2 + 0.1), 'interior');
+  for (let i = 0; i < 4; i++) p.add('iron', box(0.006, 0.07 + (i % 2) * 0.02, 0.006, 0.0 + i * 0.045, 0.3, -D / 2 + 0.04).rotateZ(0.1 * (i - 1.5)), 'interior');
+  p.add('wood_mid', box(0.2, 0.01, 0.014, 0.07, 0.38, -D / 2 + 0.04), 'interior');
+  // the anvil on its stump, the quench trough, a pile of billets, a bucket (interior)
+  p.add('wood_mid', new THREE.CylinderGeometry(0.036, 0.042, 0.1, 10).translate(0.1, 0.02 + 0.05, 0.03), 'interior');
+  p.add('iron', box(0.09, 0.022, 0.034, 0.1, 0.122, 0.03), 'interior');
+  p.add('iron', box(0.04, 0.03, 0.026, 0.1, 0.136, 0.03), 'interior');
+  p.add('iron', new THREE.ConeGeometry(0.014, 0.05, 6).rotateZ(-Math.PI / 2).translate(0.168, 0.14, 0.03), 'interior');
+  p.add('wood_dark', box(0.15, 0.06, 0.06, 0.28, 0.02, 0.08), 'interior');
+  p.add('trim', box(0.13, 0.004, 0.04, 0.28, 0.078, 0.08), 'interior');
+  for (let i = 0; i < 5; i++) p.add('iron', box(0.1, 0.008, 0.008, -0.34, 0.025 + i * 0.009, 0.12), 'decor');
+  p.add('wood_mid', new THREE.CylinderGeometry(0.02, 0.018, 0.04, 8).translate(0.2, 0.04, 0.16), 'decor');
+  // colliders: the hearth, the anvil stump, the trough
+  p.collide({ x0: -0.39, z0: -D / 2, x1: -0.13, z1: -D / 2 + 0.19 });
+  p.collide({ x0: 0.06, z0: -0.01, x1: 0.14, z1: 0.07 });
+  p.collide({ x0: 0.205, z0: 0.05, x1: 0.355, z1: 0.11 });
+  for (const [x, z] of posts) p.collide({ x0: x - 0.008, z0: z - 0.008, x1: x + 0.008, z1: z + 0.008 });
+  const g = p.finish();
+  g.userData.chimneyTop = new THREE.Vector3(-0.26, 0.82, -D / 2 + 0.11);
+  g.userData.keep = ['frame', 'rafters'];
+  return g;
+}
+
+export const FOOD_BUILDERS: Record<string, (def: KitPieceDef, seed?: number) => THREE.Group> = { greenhouse, orchard, wood_oven: woodOven, forge };
