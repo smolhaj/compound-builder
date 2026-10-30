@@ -28,6 +28,7 @@ const DRILL_NAME = ['', 'weekly drills', 'drills twice a week', 'drills three ti
 import { TONE, DIM, btn, usd } from './style';
 import { WallProperty } from './WallProperty';
 import { FortifyRing } from './FortifyRing';
+import { HouseHardening } from './HouseHardening';
 
 /** One checklist line: a tick or a cross, what it is, and why. */
 function CheckRow({ c }: { c: Check }) {
@@ -187,6 +188,7 @@ export function DefenseTab() {
         </div>;
       })}
     </Section>
+    <HouseHardening />
     <Section title="The houses">
       {d.homes.length === 0 && <Note>No house finished yet.</Note>}
       {d.homes.map(h => <CheckRow key={h.id} c={{ id: h.id, label: h.name, ok: h.covered, tone: h.covered ? 'good' : 'bad', detail: h.how }} />)}

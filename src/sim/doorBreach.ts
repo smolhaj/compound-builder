@@ -125,6 +125,13 @@ export function planBreach(crew: DoorCrew, def: DoorDefense, r: () => number): D
   return { method, secs: gaveUp ? DOOR.GIVE_UP : secs, noiseAt: Math.min(noiseAt, gaveUp ? DOOR.GIVE_UP : secs), spent, gaveUp, tier: def.tier };
 }
 
+/** Typical seconds a door holds: four men with hand tools, and a crew with a ram, towers in view and sally ports counted. */
+export function holdSeconds(tier: DoorTier, overwatch = 0, sallyPorts = 0): { hand: number; ram: number } {
+  const f = 1 + DOOR.OVERWATCH * Math.min(DOOR.OVERWATCH_MAX, overwatch) + DOOR.SORTIE * Math.min(DOOR.SORTIE_MAX, sallyPorts);
+  const blast = tier === 'blast';
+  return { hand: DOOR.RESIST[tier] / (4 * (blast ? DOOR.HAND_BLAST : DOOR.HAND)) * f, ram: DOOR.RESIST[tier] / (blast ? DOOR.RAM_BLAST : DOOR.RAM) * f };
+}
+
 /** The Defense tab's words for how long a door holds: typical times for a plain crew (hand tools), a ram crew and the worst case (a torch or charges). */
 export function holdLine(tier: DoorTier, overwatch = 0, sallyPorts = 0): string {
   const f = 1 + DOOR.OVERWATCH * Math.min(DOOR.OVERWATCH_MAX, overwatch) + DOOR.SORTIE * Math.min(DOOR.SORTIE_MAX, sallyPorts);

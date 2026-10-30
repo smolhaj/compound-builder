@@ -32,7 +32,9 @@ import { PERIMETER, runFinished, runBill, SALVAGE, type PerimeterKind, type Pt }
 import { log } from './economy';
 import { DRAIN, cutSlopeAt, nearDrain, undrained, drainLineFor } from './drainage';
 import { wallHoldsAt } from './retaining';
-import { doorTierOf, holdLine } from './doorBreach';
+import { doorTierOf, holdLine, holdSeconds, DOOR } from './doorBreach';
+import { sallyPorts } from './rings';
+import { towerPosts } from './towers';
 import { DROPPED_SCORE, RFX, bridgeDown, roadBridgeOf, roadChokeLines, roadChokes, roadEase } from './roadFx';
 
 export const FX = {
@@ -260,3 +262,16 @@ export function boreText(b: BoreStats): string {
   return `${Math.round(b.lenU * 6)} m at ${Math.round(b.grade * 100)} %, ${Math.round(b.peakCover * 6)} m of rock over the crown at the deepest${b.openA + b.openB > 0.3 ? `, with a cutting of ${Math.round(Math.max(b.openA, b.openB) * 6)} m at one end` : ''}`;
 }
 export const BORE_CROWN_M = BORE.CROWN * 6;
+
+/** The gate card's line when the crew's way in is a locked tunnel door: "The door holds about N s". Null when the way in is not a door. */
+export function doorHoldLine(s: GameState): string | null {
+  const lanes = lanesOf(s);
+  const best = lanes.length ? bestLane(lanes, { ang: Math.PI / 2, bonus: roadEase(s, FX.ROAD_EASE) }) : null;
+  if (!best?.via) return null;
+  const run = s.perimeter.find(r => r.id === best.via);
+  const at = best.choke?.at;
+  const eyes = at ? towerPosts(s).filter(tp => Math.hypot(tp.st.x - at[0], tp.st.z - at[1]) <= 14).length : 0;
+  const t = holdSeconds(doorTierOf(run?.kind, !!(run && PERIMETER[run.kind].bore)), eyes, sallyPorts(s));
+  const sec = (x: number) => x > DOOR.GIVE_UP ? 'longer than they will stay' : `about ${Math.round(x)} s`;
+  return `They come by your tunnel door: it holds a few men with hand tools ${sec(t.hand)}, a crew with a ram ${sec(t.ram)}.`;
+}
