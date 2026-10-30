@@ -1205,12 +1205,23 @@ export class HomesteadWorld {
     this._built.set(p.id, { placed: p, group, smoke, key: '', finished: false, padY: y, light, services: '000', opts, under, lod: below ? [] : this._lodLayers(group), far: false, fpPorch: r, fpBody: footprint(def, p.x, p.z, p.rot, false), wall });
     if (pad) this.terrain.refresh(this._terrainSource, pad.x0 - pad.skirt - 1, pad.z0 - pad.skirt - 1, pad.x1 + pad.skirt + 1, pad.z1 + pad.skirt + 1);
     if (below) this._syncUnderground();
-    if (this._batchPlant) this._plantDirty = true; else if (this._quality) this._plant(this._quality);
+    if (this._batchDepth > 0) this._plantDirty = true; else if (this._quality) this._plant(this._quality);
     this._applyView(this._built.get(p.id)!);
     this._ws.invalidateShadows();
   }
 
-  private _batchPlant = false;
+  private _batchDepth = 0;
+  /**
+   * Hold the tree re-plant back while `fn` runs and do it once at the end (a bulk placement of a hundred pieces re-planted the whole
+   * forest, the far woods, the shrubs and the farms after every piece: seconds of main thread for the same final picture).
+   */
+  bulk<T>(fn: () => T): T {
+    this._batchDepth++;
+    try { return fn(); } finally {
+      this._batchDepth--;
+      if (this._batchDepth === 0 && this._plantDirty) { this._plantDirty = false; if (this._quality) this._plant(this._quality); }
+    }
+  }
   private _plantDirty = false;
   private readonly _naturalH = (x: number, z: number) => this.parcel.natural(x, z).h;
 
@@ -1558,11 +1569,7 @@ export class HomesteadWorld {
   /** Sync with the game's structures (adds new ones). */
   syncStructures(list: readonly Placed[]): void {
     // a batch of new buildings re-plants the trees once, not once each
-    this._batchPlant = true;
-    try { for (const p of list) this.addStructure(p); } finally {
-      this._batchPlant = false;
-      if (this._plantDirty) { this._plantDirty = false; if (this._quality) this._plant(this._quality); }
-    }
+    this.bulk(() => { for (const p of list) this.addStructure(p); });
     // one that is gone (an upgraded tower comes down when the new tier is up)
     if (this._built.size > list.length) {
       const keep = new Set(list.map(p => p.id));

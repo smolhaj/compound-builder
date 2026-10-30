@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { GameCanvas } from './game/GameCanvas';
 import { Hud } from './ui/Hud';
+import { LoadingScreen } from './ui/LoadingScreen';
 import { SetupScreen } from './ui/SetupScreen';
 import { ShopWindow } from './ui/ShopWindow';
 import { SchedulePanel } from './ui/SchedulePanel';
@@ -54,6 +55,7 @@ export default function App() {
   return (
     <>
       <GameCanvas key={worldKey} />
+      <LoadingScreen />
       {!raid && <Hud />}
       {!clean && !raid && <Ticker />}
       {!clean && !raid && <BattleOverlay />}

@@ -33,6 +33,9 @@ export interface WorldState {
   seasonMode: SeasonMode;
   weatherMode: WeatherMode;
   quality: Quality;
+  /** The loading screen: what the boot is doing and how far along (null once the world is up). */
+  boot: { label: string; pct: number } | null;
+  setBoot: (b: { label: string; pct: number } | null) => void;
   cameraMode: CameraMode;
   buildingView: BuildingView;
   /** Sightline overlay: off / exposure from the road / from the ridge / night lights / viewshed from a point. */
@@ -94,6 +97,8 @@ export const useWorldStore = create<WorldState>()(subscribeWithSelector((set) =>
   seasonMode: 'auto',
   weatherMode: 'auto',
   quality: savedQuality(),
+  boot: { label: 'Starting', pct: 0.02 },
+  setBoot: (boot) => set({ boot }),
   cameraMode: 'diorama',
   buildingView: 'full',
   sightMode: 'off',

@@ -29,7 +29,7 @@ export function roadMaterial(surface: RoadSurface, lengthRepeat = 2): THREE.Mesh
   const N = 256;
   const c = document.createElement('canvas');
   c.width = c.height = N;
-  const g = c.getContext('2d')!;
+  const g = c.getContext('2d', { willReadFrequently: true })!;
   const img = g.createImageData(N, N);
   const r = lcg(77);
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
