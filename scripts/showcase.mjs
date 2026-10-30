@@ -246,7 +246,9 @@ if (only.includes('tunnel') && L.tunnel) {
   console.error('portal eye', JSON.stringify(sp));
   if (sp) { await placePerson('p2', ax - ux * 2.2 - uz * 0.7, az - uz * 2.2 + ux * 0.7, ax, az); await shot('7-eye-rock-tunnel-portal-from-the-court'); }
   // the portal and court from the air, the face rising behind them
-  await orbit(22, 0.38, Math.atan2(-ux, -uz) + 0.5, ax - ux * 2, az - uz * 2, 0.9); await shot('7b-aerial-portal-court-and-face');
+  await orbit(24, 0.3, L.up + 0.5, ax - ux * 2, az - uz * 2, 1.2); await shot('7b-aerial-portal-court-and-face');
+  // the whole thing from the shelf: the court and the portal at the foot of the face, the compound's wall above it on the bench
+  await orbit(48, 0.3, L.up + 0.15, (ax + cx) / 2, (az + cz) / 2, 3); await shot('7f-aerial-from-the-shelf-face-portal-and-compound');
   await orbit(30, 0.45, L.up + 0.1, ax, az, 1.6); await shot('7c-aerial-portal-up-the-face');
   // the high portal inside the compound
   const sp2 = await eyeAt([bx, bz], Math.atan2(uz, ux) + 0.3, [3.6, 4.4, 3, 5], 0.3, 0.35);
