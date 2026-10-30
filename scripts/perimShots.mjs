@@ -7,8 +7,8 @@ const require = createRequire(import.meta.url);
 let chromium; try { ({ chromium } = require('playwright')); } catch { ({ chromium } = await import('/opt/node22/lib/node_modules/playwright/index.mjs')); }
 const out = process.argv[2], port = Number(process.argv[3] || 5961), only = process.argv[4] && process.argv[4] !== '-' ? process.argv[4] : null;
 mkdirSync(out, { recursive: true });
-const { SCENARIOS, BRIDGE_SCENARIOS = [], RING_SCENARIOS = [], GATE_SCENARIOS = [], COURT_SCENARIOS = [], DRAIN_SCENARIOS = [], BRIDGE_USE_SCENARIOS = [] } = await import('./perimSets.mjs');
-SCENARIOS.push(...BRIDGE_SCENARIOS, ...RING_SCENARIOS, ...GATE_SCENARIOS, ...COURT_SCENARIOS, ...DRAIN_SCENARIOS, ...BRIDGE_USE_SCENARIOS);
+const { SCENARIOS, BRIDGE_SCENARIOS = [], RING_SCENARIOS = [], GATE_SCENARIOS = [], COURT_SCENARIOS = [], DRAIN_SCENARIOS = [] } = await import('./perimSets.mjs');
+SCENARIOS.push(...BRIDGE_SCENARIOS, ...RING_SCENARIOS, ...GATE_SCENARIOS, ...COURT_SCENARIOS, ...DRAIN_SCENARIOS);
 const vite = spawn('node', ['node_modules/vite/bin/vite.js', '--config', 'scripts/vite.shots.config.ts', '--port', String(port), '--strictPort'], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise((ok, fail) => { vite.stdout.on('data', d => { if (/localhost:\d+/.test(String(d).replace(/\x1b\[[0-9;]*m/g, ''))) ok(); }); vite.on('exit', c => fail(new Error('vite ' + c))); });
 const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
