@@ -13,7 +13,8 @@ describe('blueprint plan', () => {
     ring(g, 'stone_wall', [[4, 4], [20, 4], [20, 20], [4, 20], [4, 4]], [{ at: 8, w: 0.6 }, { at: 40, w: 0.3, sally: true }]);
     const p = blueprintPlan(g);
     const labels = p.marks.map(m => m.label);
-    expect(labels).toContain('Wooden watchtower');
+    expect(labels).toContain('Tower 1');
+    expect(p.marks.find(m => m.id === 't')?.sub).toMatch(/wooden watchtower/);
     expect(labels.some(l => /ring wall/i.test(l))).toBe(true);
     expect(labels).toContain('Gate');
     expect(labels).toContain('Sally port');

@@ -498,7 +498,7 @@ export function GameCanvas() {
     if (!showcaseNext) requestAnimationFrame(() => requestAnimationFrame(() => { if (!cancelled) useWorldStore.getState().setBoot(null); }));
 
     // QA hook (screenshot harness, console poking).
-    (window as unknown as Record<string, unknown>).__cb = { census: () => sceneCensus(ws.scene), terrainOv, player, ws, world, weather, valley, cam, tour, tool, marker, fence, sight, game: useGameStore, store: useWorldStore, THREE, qa, battle,
+    (window as unknown as Record<string, unknown>).__cb = { census: () => sceneCensus(ws.scene), terrainOv, blueprintOv, player, ws, world, weather, valley, cam, tour, tool, marker, fence, sight, game: useGameStore, store: useWorldStore, THREE, qa, battle,
       demoBattle: () => {
         const g = useGameStore.getState().game;
         const b = demoBattle(g.structures, g.people, g.structures.length ? undefined : world.camp);

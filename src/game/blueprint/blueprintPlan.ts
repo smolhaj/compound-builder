@@ -83,6 +83,7 @@ const TUNNEL_NAME: Record<string, string> = { rock_tunnel: 'Rock tunnel', tunnel
 
 export function blueprintPlan(s: GameState): BlueprintPlan {
   const marks: BpMark[] = [], outlines: BpOutline[] = [];
+  let towerNo = 0;
 
   // buildings
   for (const st of s.structures) {
@@ -91,13 +92,14 @@ export function blueprintPlan(s: GameState): BlueprintPlan {
     if (!def) continue;
     if (isTower(st.kind)) {
       const t = TOWERS[st.kind];
-      marks.push({ id: st.id, cat: 'tower', x: st.x, z: st.z, label: t.name, sub: isFinished(st) ? `tier ${t.tier}${(st.high ?? 0) > 0.1 ? ' · high ground' : ''}` : 'being built', prio: PRIO.tower, lift: 2.2 });
+      towerNo++;
+      marks.push({ id: st.id, cat: 'tower', x: st.x, z: st.z, label: `Tower ${towerNo}`, sub: isFinished(st) ? `${t.name.toLowerCase()}${(st.high ?? 0) > 0.1 ? ' · high ground' : ''}` : 'being built', prio: PRIO.tower, lift: 2.2 });
       continue;
     }
     const cat = CAT_OF[def.category] ?? 'work';
     const fp = footprint(def, st.x, st.z, st.rot, false);
     outlines.push({ id: st.id, cat, pts: corners(fp), closed: true, under: def.level === 'underground' });
-    const role = def.sleeps > 0 ? `sleeps ${def.sleeps}` : def.shelters ? `shelters ${def.shelters}` : def.category;
+    const role = def.sleeps > 0 ? `sleeps ${def.sleeps}` : def.shelters ? `shelters ${def.shelters}` : def.category === 'defense' ? 'defense and vehicles' : def.category === 'work' ? 'work' : def.category;
     marks.push({ id: st.id, cat: def.level === 'underground' ? 'bunker' : cat, x: st.x, z: st.z, label: def.name, sub: isFinished(st) ? role : 'being built', prio: PRIO[cat] + (def.sleeps > 0 ? 1 : 0), lift: 1.2 });
   }
 
@@ -130,7 +132,7 @@ export function blueprintPlan(s: GameState): BlueprintPlan {
     if (fin) for (const [i, g] of r.gates.entries()) {
       const p = along(r.pts, g.at);
       gates++;
-      marks.push({ id: `${r.id}:g${i}`, cat: 'gate', x: p[0], z: p[1], label: g.sally ? 'Sally port' : g.garage ? 'Gate garage' : 'Gate', sub: g.sally ? `defenders sortie · ${SALLY.W * 6} m` : `${Math.round(g.w * 6)} m wide`, prio: PRIO.gate, lift: 1.1 });
+      marks.push({ id: `${r.id}:g${i}`, cat: 'gate', x: p[0], z: p[1], label: g.sally ? 'Sally port' : g.garage ? 'Gate garage' : 'Gate', sub: g.sally ? `defenders sortie · ${Math.round(SALLY.W * 6 * 10) / 10} m` : `${Math.round(g.w * 6)} m wide`, prio: PRIO.gate, lift: 1.1 });
     }
   }
 
