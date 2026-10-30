@@ -21,6 +21,8 @@
 import { BUNKER_ENTRANCES } from './bunkerEntrances';
 import { sallyPorts, sortieFactor } from './rings';
 import { ANIMALS } from './livestock';
+import { guardDogs, lanePace, routeAt, spawnArc } from './laneWalk';
+import { livingDogs } from './pets';
 import { OUTSIDE_TAKE, exposure, ringDelay, ringRadii, lossesByRing, type RingLoss } from './ringFallback';
 import { wallHoldSeconds } from './retaining';
 import type { Battle, BattleEvent, BattleUnit } from './battleTypes';
@@ -157,7 +159,7 @@ export interface PlannedBattle extends Battle {
 
 interface Fighter {
   id: string; side: 'home' | 'raider'; pid?: string; x: number; z: number; y: number;
-  hp: number; out: boolean; dead: boolean; carried?: boolean; arm: Arm; skill: number; readyAt: number;
+  hp: number; out: boolean; dead: boolean; carried?: boolean; /** Distance back along the lane's path (sim/laneWalk.ts), while the crew still walks it. */ rd?: number; arm: Arm; skill: number; readyAt: number;
   post: PostSpot | null; cover: number; moving: boolean; nextMove: number; shelter: boolean;
   grenades: number; rockets: number; leader?: boolean; medic?: boolean; fled?: boolean; rescued?: boolean; escaped?: boolean; kid?: boolean;
   /** Body armor: rifle plates, a soft (pistol-rated) vest, a ballistic helmet. */
@@ -269,6 +271,10 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
   const ax = Math.cos(ang), az = Math.sin(ang);       // unit vector from the house toward the raiders
   const lx = -az, lz = ax;                            // lateral
   const at = (d: number, lat: number) => ({ x: C.x + ax * d + lx * lat, z: C.z + az * d + lz * lat });
+  // the crew walks the lane's own path (round the cliffs, water and walls the terrain pass found), at the pace of the going (sim/laneWalk.ts)
+  const route = lane && lane.lane.path.length > 1 && !lane.via ? lane.lane.path : null;
+  const pace = lane ? lanePace(lane.lane.hardness, lane.lane.cliff, lane.lane.fords) : 1;
+  const onRoute = (rd: number, lat: number) => { const q = routeAt(route!, rd); return { x: q.x - q.dz * lat, z: q.z + q.dx * lat }; };
   const alive = s.people.map((p, i) => ({ p, i })).filter(({ i }) => s.personState[i]?.needs.died == null && s.personState[i]?.task !== 'gone' && s.personState[i]?.task !== 'town' && !s.rescue?.raid?.team.includes(s.personState[i]?.id ?? ''));
   // the adults fight; kids hide (and get out through the tunnel if it comes to that); a teenager picks up a gun only if there aren't two adults who can
   const adultsN = alive.filter(({ p }) => !p.kid).length;
@@ -365,15 +371,17 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
   // they come up from out of sight, well beyond the line (round 4: they used to start 30–34 out whatever the wall, so a wide palisade had them at it before anyone was up)
   const start = Math.max(30, lineR + 22) + (opts.terrain === false || lane ? 0 : roadStart(s));   // up the road: single file at a bridge, a bore or a ford, they dismount further out (sim/roadFx.ts)
   for (let i = 0; i < raiders; i++) {
+    const arc0 = route && !peace && !opts.insideBreach && opts.ambush === undefined ? spawnArc(route, [C.x, C.z], start + r() * 4) : undefined;
     const p = peace ? at(1.5 + r() * 2, (r() - 0.5) * 3)
       : opts.insideBreach ? at(Math.max(1.5, lineR * 0.55) + r() * 1.5, (r() - 0.5) * 2.5)
       : opts.ambush !== undefined ? at(lineR + 0.8 + r() * 0.8, (r() - 0.5) * 1.2)
+      : arc0 !== undefined ? onRoute(arc0, (r() - 0.5) * 8)
       : at(start + r() * 4, (r() - 0.5) * 8);
     const autoR = armedR && late > 0.5 && r() < 0.3 + kit.auto;
     const arm: Arm = !armedR ? FISTS : peace ? { ...ARMS.pistol, cal: null } : { ...(autoR ? ARMS.auto_rifle : r() < 0.55 ? ARMS.semi_rifle : r() < 0.6 ? ARMS.pump : ARMS.pistol), cal: null };
     const gr = gLeft > 0 ? 1 : 0; gLeft -= gr;
     const rk = rLeft > 0 && i > 0 ? 1 : 0; rLeft -= rk;
-    const f: Fighter = { id: `r${i}`, side: 'raider', ...p, y: 0, hp: 100, out: false, dead: false, arm, skill: 3 + Math.floor(r() * 4), readyAt: opts.ambush ?? (lane?.via ? DOOR_DELAY : 0), post: null, cover: 1, moving: true, nextMove: 0, shelter: false, grenades: gr, rockets: rk, leader: i === 0, armor: { plate: armedR && !peace && r() < late * 0.35 + kit.plate, soft: armedR && !peace && r() < 0.15 + late * 0.2, helmet: armedR && !peace && r() < late * 0.3 }, inGun: arm.mag, spare: 2 + Math.round(late * 3), bleed: 0, supp: 0, nvg: armedR && !peace && late > 0.6 && r() < 0.25, wear: 0.5 + r() * 0.4 };
+    const f: Fighter = { id: `r${i}`, side: 'raider', ...p, ...(arc0 !== undefined ? { rd: arc0 } : {}), y: 0, hp: 100, out: false, dead: false, arm, skill: 3 + Math.floor(r() * 4), readyAt: opts.ambush ?? (lane?.via ? DOOR_DELAY : 0), post: null, cover: 1, moving: true, nextMove: 0, shelter: false, grenades: gr, rockets: rk, leader: i === 0, armor: { plate: armedR && !peace && r() < late * 0.35 + kit.plate, soft: armedR && !peace && r() < 0.15 + late * 0.2, helmet: armedR && !peace && r() < late * 0.3 }, inGun: arm.mag, spare: 2 + Math.round(late * 3), bleed: 0, supp: 0, nvg: armedR && !peace && late > 0.6 && r() < 0.25, wear: 0.5 + r() * 0.4 };
     F.push(f); units.push({ id: f.id, side: 'raider', x: r2(p.x), z: r2(p.z), post: 'open' });
   }
   const H = F.filter(f => f.side === 'home'), R = F.filter(f => f.side === 'raider');
@@ -844,7 +852,10 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
         f.moving = true; f.cover = 1.3;
         const step = Math.min(4, d - lineR);
         const lat = (r() - 0.5) * 2 + flank * 0.8;
-        f.x += (C.x - f.x) / d * step + lx * lat; f.z += (C.z - f.z) / d * step + lz * lat;
+        if (f.rd !== undefined && f.rd > 0 && d > lineR + 6) {   // still out on the lane: along its path at the pace of the going, the last stretch is straight
+          f.rd = Math.max(0, f.rd - step * pace);
+          const q = onRoute(f.rd, lat); f.x = q.x; f.z = q.z;
+        } else { f.x += (C.x - f.x) / d * step + lx * lat; f.z += (C.z - f.z) / d * step + lz * lat; }
         f.nextMove = t + 4;
         ev.push({ t, kind: 'move', unit: f.id, x: r2(f.x), z: r2(f.z) });
         const nd = dist(f, C);
@@ -896,6 +907,13 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
       breached = true; breachT = t;
       const p = at(lineR, 0);
       ev.push({ t, kind: 'breach', x: r2(p.x), z: r2(p.z) });
+      // the dogs posted inside at the inner gate go for the first men through (sim/laneWalk.ts)
+      const gd = guardDogs(livingDogs(s));
+      if (gd.n) for (const f of rUp.sort((a, b) => dist(a, C) - dist(b, C)).slice(0, gd.n)) {
+        f.readyAt = Math.max(f.readyAt, t) + gd.hold;
+        if (r() < 0.6) hurt(f, gd.bite + r() * 10, t + 1, undefined, 'arm');
+        if (r() < 0.5) say(t + 0.6, pick(['Dog! Get it off — GET IT OFF!', 'The dog — aah — shoot it, shoot the dog!']), f);
+      }
       say(t, v(lead(), ['They\'re inside the fence — fuck! Get to the house!', 'They\'re through — they\'re through! Oh God —'], ['They\'re through the line. Fall back to the house.']), lead());
       // the escape tunnel: whoever's sheltering gets out, away from the fighting
       const tunnel = s.perimeter.find(x => x.kind === 'escape_tunnel' && runFinished(x));
