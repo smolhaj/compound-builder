@@ -1221,11 +1221,14 @@ export class HomesteadWorld {
    * forest, the far woods, the shrubs and the farms after every piece: seconds of main thread for the same final picture).
    */
   bulk<T>(fn: () => T): T {
-    this._batchDepth++;
-    try { return fn(); } finally {
-      this._batchDepth--;
-      if (this._batchDepth === 0 && this._plantDirty) { this._plantDirty = false; if (this._quality) this._plant(this._quality); }
-    }
+    this.bulkBegin();
+    try { return fn(); } finally { this.bulkEnd(); }
+  }
+  /** The same across awaits (the time-sliced showcase): pair every `bulkBegin` with a `bulkEnd`. */
+  bulkBegin(): void { this._batchDepth++; }
+  bulkEnd(): void {
+    this._batchDepth = Math.max(0, this._batchDepth - 1);
+    if (this._batchDepth === 0 && this._plantDirty) { this._plantDirty = false; if (this._quality) this._plant(this._quality); }
   }
   private _plantDirty = false;
   private readonly _naturalH = (x: number, z: number) => this.parcel.natural(x, z).h;
