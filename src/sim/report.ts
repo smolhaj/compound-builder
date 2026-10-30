@@ -7,6 +7,7 @@
  * actually mattered: the cistern, the bunker, first aid, who was turned away.
  * Pure.
  */
+import { VEHICLES } from './vehicles';
 import { isFinished } from './construction';
 import { isHome } from './blueprints';
 import { DISASTERS, TRACKS } from './disaster';
@@ -31,6 +32,10 @@ export interface RunStats {
   /** The last year of food grown and needed (kcal; sums that fade over a year, so a winter of eating the harvest counts). */
   grownYear: number;
   needYear: number;
+  /** The bug-out that ended the run (sim/bugout.ts). */
+  bugOut?: { day: number; going: number; left: number; vehicles: string[]; foodDays: number; rangeKm: number; covered: boolean; /** The kept town house, as somewhere to go (sim/weekender.ts). */ fallback?: string;
+    /** The trip (sim/bugout.ts): on foot or by vehicle, where to, the route risk and how it went, who was lost on the way, and the food days on arrival. Optional: saves from before have none. */
+    mode?: 'vehicle' | 'foot'; dest?: 'cache' | 'town' | 'open'; destName?: string; miles?: number; risk?: number; outcome?: 'clean' | 'late' | 'robbed' | 'lost_one'; lost?: string; arrivedFoodDays?: number; bags?: number };
 }
 
 export const emptyStats = (): RunStats => ({ days: 0, hungryDays: 0, dryDays: 0, darkDays: 0, kcalNeed: 0, kcalGrown: 0, wounds: 0, maxDose: 0, peak: 0, okSince: -1, selfFed: 0, grownYear: 0, needYear: 0 });
@@ -38,7 +43,7 @@ export const emptyStats = (): RunStats => ({ days: 0, hungryDays: 0, dryDays: 0,
 /** The place feeds everyone: over the last year (and at least 13 months in) it grew 95 % of what was eaten. */
 export const selfSufficient = (st: RunStats) => st.days >= 400 && st.grownYear >= 0.95 * st.needYear;
 
-export type EndKind = 'recovered' | 'new_normal' | 'equilibrium' | 'wipe';
+export type EndKind = 'recovered' | 'new_normal' | 'equilibrium' | 'wipe' | 'bug_out';
 export interface Ending { kind: EndKind; day: number; continued: boolean }
 
 const living = (s: GameState) => s.personState.filter(ps => ps.needs.died == null).length;
@@ -88,8 +93,8 @@ export function reportCard(s: GameState): ReportCard {
   const d = s.disaster, st = s.stats, g = s.gate;
   const fin = s.structures.filter(isFinished);
   const has = (k: string) => fin.some(x => x.kind === k);
-  const alive = living(s), total = s.personState.length;
-  const lost = s.people.filter((_, i) => s.personState[i]?.needs.died != null);
+  const alive = living(s), total = s.personState.filter(p => !p.needs.left).length;
+  const lost = s.people.filter((_, i) => s.personState[i]?.needs.died != null && !s.personState[i]?.needs.left);
   const def = d.kind ? DISASTERS[d.kind] : undefined;
   const name = def?.name ?? 'The collapse';
   const end = s.ending?.kind ?? 'recovered';
@@ -100,22 +105,33 @@ export function reportCard(s: GameState): ReportCard {
   const score = Math.round(100 * (0.5 * survival + 0.2 * fed + 0.15 * (g.humanity / 100) + 0.15 * (g.raidsHeld + g.raidsLost ? g.raidsHeld / (g.raidsHeld + g.raidsLost) : 1)));
   const grade = end === 'wipe' ? 'F' : score >= 90 ? 'A' : score >= 80 ? 'B' : score >= 65 ? 'C' : score >= 50 ? 'D' : 'F';
   const family = s.people[0]?.last ?? 'The family';
-  const headline = end === 'wipe' ? `No one left at the ${family} place`
+  const bo = st.bugOut;
+  const headline = end === 'bug_out' ? `The ${family} family bugged out`
+    : end === 'wipe' ? `No one left at the ${family} place`
     : end === 'recovered' ? `${family} family came through ${name.toLowerCase()}`
     : end === 'new_normal' ? `A thinner world: ${family} family settles in after ${name.toLowerCase()}`
     : `${family} homestead feeds itself a year on`;
-  const sub = end === 'wipe' ? `${days} days after it hit, the last of them was gone.`
+  const sub = end === 'bug_out' ? `They left on day ${bo?.day ?? 0} with ${bo?.going ?? 0} of ${(bo?.going ?? 0) + (bo?.left ?? 0)}. ${bo?.dest === 'cache' ? 'They made for the buried cache.' : bo?.dest === 'town' ? 'They made for the town house.' : 'They had nowhere particular to go.'} ${bo?.outcome === 'lost_one' ? `${bo.lost ?? 'One of them'} did not make the trip. ` : ''}The rest is the next chapter, and it is not written yet.`
+    : end === 'wipe' ? `${days} days after it hit, the last of them was gone.`
     : end === 'recovered' ? `${days} days after it hit, the lights are back on in the valley. ${alive} of ${total} made it.`
     : end === 'new_normal' ? `${days} days on, the power runs some hours and the store opens some days. It won't be like before. ${alive} of ${total} made it.`
     : `A year without a store. ${alive} people live off what the place grows.`;
   const lines: string[] = [];
+  if (bo) {
+    if (bo.mode === 'foot') lines.push(`${bo.going} left on foot${bo.bags ? `, ${bo.bags} with a packed bug-out bag` : ', with whatever they could snatch'}.`);
+    else lines.push(`${bo.going} aboard ${bo.vehicles.length} vehicle${bo.vehicles.length === 1 ? '' : 's'} (${bo.vehicles.map(k => VEHICLES[k as keyof typeof VEHICLES]?.name.toLowerCase() ?? k).join(', ')}), loaded ${bo.covered ? 'under cover, by the passage from the house to the garage' : 'in the open, in plain view of the road'}.`);
+    lines.push(`${bo.foodDays} days of food and water ${bo.mode === 'foot' ? 'on their backs' : 'aboard'} and ${bo.mode === 'foot' ? 'a walk of' : 'fuel for'} about ${bo.rangeKm} km.`);
+    if (bo.destName) lines.push(`Bound for ${bo.destName}${bo.miles ? `, ${bo.miles} miles; the way carried a ${Math.round((bo.risk ?? 0) * 100)} % chance of trouble` : ''}. ${bo.outcome === 'robbed' ? 'They were stopped on the road and lost half of what they carried.' : bo.outcome === 'late' ? 'It took longer than planned and some of the food was gone.' : bo.outcome === 'lost_one' ? 'The trip took one of them.' : 'The way was clear.'}${bo.arrivedFoodDays !== undefined ? ` They arrived with ${bo.arrivedFoodDays} days of food${bo.dest === 'cache' ? ' (the cache included)' : ''}.` : ''}`);
+    if (bo.left) lines.push(`${bo.left} had no seat and stayed behind to hold the place.`);
+    if (bo.fallback) lines.push(`They had somewhere to go: ${bo.fallback} was kept for this, with the lights still paid for.`);
+  }
   // water
   const water = has('well_drilled') || has('well_hand') || has('cistern') || has('water_tower');
   if (st.dryDays === 0 && water) lines.push(has('cistern') ? 'Your cistern kept the water coming every day.' : 'The well never went dry.');
   else if (!water) lines.push('No well, no cistern: water came by the bucket from the creek.');
   else if (st.dryDays > 7) lines.push(`${st.dryDays} days without enough water.`);
   // power
-  const solar = has('solar_array') || has('garage_solar'), battery = has('battery_shed');
+  const solar = has('solar_array') || has('garage_solar') || has('lodge_solar'), battery = has('battery_shed');
   if (d.kind === 'grid_down' || d.kind === 'nuclear') {
     if (solar && !battery && s.utilities.grid) lines.push('The solar was grid-tied: when the grid died, so did the panels.');
     else if (st.darkDays === 0 && solar && battery) lines.push('The batteries kept the lights and the freezer on.');
@@ -142,6 +158,12 @@ export function reportCard(s: GameState): ReportCard {
   else if (st.wounds > 0 && (medic >= 5 || has('bunker_medical'))) lines.push('Every wound was dressed and healed.');
   for (const p of lost) lines.push(s.personState.find(ps => ps.id === p.id)?.needs.taken ? `${p.first} ${p.last} was taken. Nobody knows where.` : `${p.first} ${p.last} did not make it.`);
   if (g.tookIn) lines.push(`You took in ${g.tookIn} ${g.tookIn === 1 ? 'person' : 'people'}.`);
+  {
+    // the neighbors and strangers who came to stay (sim/newcomers.ts)
+    const stayed = s.people.filter((p, i) => p.origin && p.origin.kind !== 'guest' && s.personState[i]?.needs.died == null).length;
+    const left = s.newcomers?.departed.filter(x => x.kind !== 'guest').length ?? 0;
+    if (g.tookIn && (stayed || left)) lines.push(`${stayed} ${stayed === 1 ? 'of them was' : 'of them were'} still at the table at the end${left ? `; ${left} had left` : ''}.`);
+  }
   if (g.turnedAway) lines.push(`You turned away ${g.turnedAway}.`);
   if (g.raidsHeld) lines.push(`The line held ${g.raidsHeld} ${g.raidsHeld === 1 ? 'time' : 'times'}${g.raidsLost ? `, and broke ${g.raidsLost}` : ''}.`);
   else if (g.raidsLost) lines.push(`They got in ${g.raidsLost} ${g.raidsLost === 1 ? 'time' : 'times'}.`);

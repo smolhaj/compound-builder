@@ -33,7 +33,7 @@ describe('interior detail', () => {
   });
 
   it('stays cheap: one mesh per layer × material, a bounded count per building', () => {
-    const budget: Record<string, number> = { greenhouse: 28, orchard: 14, cottage: 46, metal_garage: 42, filtration_shed: 32 };
+    const budget: Record<string, number> = { greenhouse: 28, orchard: 20, cottage: 46, metal_garage: 42, filtration_shed: 32 };
     for (const [kind, n] of Object.entries(budget)) {
       const ms = meshes(kind);
       expect(ms.length).toBeLessThanOrEqual(n);

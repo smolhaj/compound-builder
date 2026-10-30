@@ -107,7 +107,7 @@ describe('the battle at the compound', () => {
 
   it('a wounded fighter shoots worse and slower: the hurt start weaker', () => {
     let fitHits = 0, fitShots = 0, hurtHits = 0, hurtShots = 0, fitTime = 0, hurtTime = 0;
-    for (let seed = 1; seed <= 25; seed++) {
+    for (let seed = 1; seed <= 80; seed++) {
       const fit = planBattle(fortify(afterHit(seed)), 6, seed);
       const hurtG = fortify(afterHit(seed));
       for (const ps of hurtG.personState) ps.needs.health = 30;
@@ -356,5 +356,51 @@ describe('round 4: the fight answers to walls, guns, armor and numbers', () => {
     let over = 0;
     for (let i = 0; i < 20; i++) if (planBattle(rifles(palisade(cabin(i % 5 + 1))), 8, 700 + i, { armed: false }).result.match(/breached|overrun/)) over++;
     expect(over).toBeLessThanOrEqual(2);
+  });
+});
+
+describe('the wall bites', () => {
+  const walled = (kind: Parameters<typeof planRun>[1], seed: number) => {
+    const g = afterHit(seed);
+    const r = planRun(g, kind, [[-10, -10], [10, -10], [10, 10], [-10, 10], [-10, -10]]);
+    r.done = r.hours; r.supplied = true; r.finishedAt = 0;
+    return g;
+  };
+
+  it('raiders are cut up on barbed wire, some go down and are left behind, and some lose heart and turn back', () => {
+    let snags = 0, turned = 0, leftBehind = 0;
+    for (let seed = 1; seed <= 12; seed++) {
+      const b = planBattle(walled('barbed_wire', seed), 8, seed);
+      snags += b.events.filter(e => e.kind === 'snag').length;
+      turned += b.events.filter(e => e.kind === 'flee' && e.unit.startsWith('r')).length;
+      leftBehind += b.leftBehind?.wounded ?? 0;
+    }
+    expect(snags).toBeGreaterThan(0);
+    expect(turned).toBeGreaterThan(0);
+    expect(leftBehind).toBeGreaterThan(0);
+  });
+
+  it('a wall that does not hurt (container) draws no snags; an open place draws none either', () => {
+    let snags = 0;
+    for (let seed = 1; seed <= 6; seed++) {
+      snags += planBattle(walled('container_wall', seed), 8, seed).events.filter(e => e.kind === 'snag').length;
+      snags += planBattle(afterHit(seed), 8, seed).events.filter(e => e.kind === 'snag').length;
+    }
+    expect(snags).toBe(0);
+  });
+
+  it('a gap in the property line lets them walk round the wire: no snags where nothing has to be climbed', () => {
+    let closedSnags = 0, openSnags = 0;
+    for (let seed = 1; seed <= 12; seed++) {
+      const g = afterHit(seed), h = g.site.home;
+      g.site = { ...g.site, creek: false };   // (an open creek would let them in by itself)
+      const loop = (pts: Array<[number, number]>) => { const r = planRun(g, 'barbed_wire', pts); r.done = r.hours; r.supplied = true; r.finishedAt = 0; };
+      loop([[h.x0, h.z0], [h.x1, h.z0], [h.x1, h.z1], [h.x0, h.z1], [h.x0, h.z0]]);
+      closedSnags += planBattle(g, 8, seed).events.filter(e => e.kind === 'snag').length;
+      g.perimeter = [];
+      loop([[h.x1, h.z0], [h.x1, h.z1], [h.x0, h.z1], [h.x0, h.z0]]);   // the north side missing
+      openSnags += planBattle(g, 8, seed).events.filter(e => e.kind === 'snag').length;
+    }
+    expect(openSnags).toBeLessThan(closedSnags);
   });
 });

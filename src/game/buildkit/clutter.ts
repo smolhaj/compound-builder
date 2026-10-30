@@ -88,6 +88,40 @@ export const Clutter = {
     add('linen', box(0.3 * M, 0.003 * M, 0.21 * M, 0, 0, 0).rotateY(0.2));
     for (let i = 0; i < 5; i++) add(CLOTH[i], new THREE.CylinderGeometry(0.008 * M, 0.008 * M, 0.09 * M, 5).rotateZ(Math.PI / 2).rotateY(i * 0.7).translate(0.12 * M + i * 0.02 * M, 0.01 * M, 0.05 * M));
   },
+  /** A board game box with a red lid, a deck of cards (fanned, fewer when worn), a pair of dice. Table-sized: a bit bigger than life so it reads from the air. */
+  gameBox(add: Add, worn = false): void {
+    add('wood_dark', box(0.34 * M, 0.05 * M, 0.24 * M, 0, 0, 0));
+    add('paint_red', box(0.35 * M, 0.02 * M, 0.25 * M, 0, 0.05 * M, 0));
+    add('linen', box(0.2 * M, 0.004 * M, 0.1 * M, 0, 0.07 * M, 0));
+    if (worn) add('wood_dark', box(0.1 * M, 0.004 * M, 0.06 * M, 0.12 * M, 0.05 * M, -0.1 * M).rotateY(0.4));   // a corner torn
+  },
+  cards(add: Add, worn = false): void {
+    add('linen', box(0.075 * M, 0.02 * M, 0.11 * M, 0, 0, 0));
+    add('paint_red', box(0.077 * M, 0.004 * M, 0.113 * M, 0, 0.02 * M, 0));
+    const n = worn ? 2 : 5;
+    for (let i = 0; i < n; i++) add('linen', box(0.075 * M, 0.003 * M, 0.11 * M, (0.1 + 0.05 * i) * M, 0.0015 * M * (i + 1), (i % 2) * 0.012 * M).rotateY(-0.5 + 0.28 * i));
+    for (let i = 0; i < (worn ? 1 : 2); i++) add('linen', box(0.026 * M, 0.026 * M, 0.026 * M, (-0.12 - 0.045 * i) * M, 0.013 * M, (0.03 - i * 0.05) * M).rotateY(0.7 + i));
+  },
+  paperbacks(add: Add, worn = false): void {
+    const c: KitMaterialId[] = ['quilt_red', 'quilt_blue', 'paint_green', 'wood_dark', 'quilt_red'];
+    const n = worn ? 3 : 5;
+    for (let i = 0; i < n; i++) {
+      add(c[i], box(0.12 * M, 0.026 * M, 0.185 * M, (i % 2) * 0.015 * M, i * 0.027 * M, 0).rotateY(i * (worn ? 0.35 : 0.14) - 0.2));
+      add('linen', box(0.112 * M, 0.018 * M, 0.178 * M, (i % 2) * 0.015 * M, i * 0.027 * M + 0.004 * M, 0).rotateY(i * (worn ? 0.35 : 0.14) - 0.2));
+    }
+  },
+  pictureBooks(add: Add, worn = false): void {
+    const c: KitMaterialId[] = ['paint_red', 'quilt_blue', 'paint_green'];
+    for (let i = 0; i < (worn ? 2 : 3); i++) add(c[i], box(0.24 * M, 0.012 * M, 0.2 * M, i * 0.13 * M, i * 0.002 * M, (i % 2) * 0.06 * M).rotateY(0.5 - i * 0.7));
+  },
+  /** On a bedside stand: an enamel basin, brown bottles, a roll of bandage and a folded cloth. */
+  sickTray(add: Add): void {
+    add('enamel', cyl(0.14 * M, 0.06 * M, -0.08 * M, 0, 0.02 * M, 12));
+    add('wood_dark', cyl(0.025 * M, 0.11 * M, 0.08 * M, 0, -0.07 * M, 8));
+    add('wood_dark', cyl(0.02 * M, 0.08 * M, 0.08 * M, 0, 0.0 * M, 8));
+    add('linen', cyl(0.035 * M, 0.04 * M, 0.08 * M, 0, 0.06 * M, 10));
+    add('linen', box(0.12 * M, 0.02 * M, 0.09 * M, 0.02 * M, 0, -0.07 * M).rotateY(0.3));
+  },
   radio(add: Add): void { add('wood_dark', box(0.32 * M, 0.2 * M, 0.14 * M, 0, 0, 0)); add('linen', box(0.18 * M, 0.12 * M, 0.005 * M, -0.05 * M, 0.04 * M, 0.071 * M)); add('steel', cyl(0.02 * M, 0.02 * M, 0.1 * M, 0.08 * M, 0.072 * M, 8).rotateX(Math.PI / 2)); add('steel', box(0.005 * M, 0.45 * M, 0.005 * M, 0.12 * M, 0.2 * M, -0.04 * M).rotateZ(-0.3)); },
   dishes(add: Add): void { for (let i = 0; i < 4; i++) add('crockery', cyl(0.11 * M, 0.012 * M, 0, i * 0.014 * M, 0, 12).rotateX(0.15)); add('enamel', cyl(0.045 * M, 0.1 * M, 0.13 * M, 0, 0, 8)); },
   potOnStove(add: Add): void { add('iron', cyl(0.14 * M, 0.16 * M, 0, 0, 0, 12)); add('iron', box(0.18 * M, 0.02 * M, 0.025 * M, 0.2 * M, 0.12 * M, 0)); add('iron', cyl(0.145 * M, 0.015 * M, 0, 0.16 * M, 0, 12)); },

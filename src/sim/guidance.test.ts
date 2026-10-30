@@ -1,0 +1,232 @@
+import { describe, expect, it } from 'vitest';
+import { newGame } from './state';
+import { knockBack, planStructure } from './construction';
+import { MATERIAL_IDS, MATERIALS } from './materials';
+import { bunkerChecklist, bunkerNext, buildAdvice, longTerm, suggestions, perimeterOff, perimeterTiers, plansNeed, plansNeedLines, upgradeChain } from './guidance';
+import { PERIMETER_ORDER, UPGRADE_NEXT, planRun } from './perimeter';
+import { SHELVES, shelvesNeeding } from './shelves';
+import { BUNKER_ORDER } from '../game/buildkit/kit';
+import { sowWindow, plotsOf } from './crops';
+
+const built = (g: ReturnType<typeof newGame>, kind: string, x = 0, z = 0) => { const st = planStructure(g, kind, x, z, 0); st.stage = 99; st.finishedAt = 0; return st; };
+const fresh = () => { const g = newGame(11); g.structures = []; g.perimeter = []; g.stock = { ...g.stock }; return g; };
+
+describe('the bunker', () => {
+  it('greys every room until there is a hatch or a stairwell, but not the entrances', () => {
+    const g = fresh();
+    for (const k of BUNKER_ORDER) {
+      const a = buildAdvice(g, k);
+      if (k === 'bunker_hatch' || k === 'bunker_stairs' || k === 'bunker_floorhatch') expect(a.off).toBeNull(); else expect(a.off).toMatch(/hatch or stairwell/);
+    }
+    planStructure(g, 'bunker_hatch', 0, 0, 0);
+    expect(buildAdvice(g, 'bunker_dorm').off).toBeNull();
+  });
+
+  it('lists what the bunker needs, in order, and points at the first thing missing', () => {
+    const g = fresh();
+    expect(bunkerNext(g)!.id).toBe('entrance');
+    built(g, 'bunker_hatch');
+    expect(bunkerNext(g)!.id).toBe('beds');
+    built(g, 'bunker_dorm', 1, 0);
+    const people = g.people.length;
+    // a bunkroom sleeps eight: enough for any family the game starts with
+    expect(people).toBeLessThanOrEqual(8);
+    expect(bunkerNext(g)!.id).toBe('air');
+    for (const k of ['bunker_plant', 'bunker_stores', 'bunker_medical']) built(g, k, 5, 5);
+    expect(bunkerNext(g)).toBeNull();
+    expect(bunkerChecklist(g).every(c => c.done)).toBe(true);
+  });
+
+});
+
+describe('the Build list', () => {
+  it('greys the hand-dug well where the water is too deep, and suggests a drilled one', () => {
+    const g = fresh();
+    g.site = { ...g.site, gwDepth: 65 };
+    expect(buildAdvice(g, 'well_hand').off).toMatch(/65 m down/);
+    expect(buildAdvice(g, 'well_drilled').off).toBeNull();
+    expect(suggestions(g).map(x => x.kind)).toContain('well_drilled');
+  });
+
+  it('suggests what is pressing, at most three, and drops what is staked: no fixed route', () => {
+    const g = fresh();
+    g.site = { ...g.site, gwDepth: 5 };
+    const first = suggestions(g);
+    expect(first.length).toBeLessThanOrEqual(3);
+    expect(first[0].id).toBe('roof');
+    expect(first.map(x => x.id)).toContain('water');
+    planStructure(g, 'timber_cabin', 0, 0, 0);
+    planStructure(g, 'well_hand', 3, 0, 0);
+    const next = suggestions(g).map(x => x.id);
+    expect(next).not.toContain('roof');
+    expect(next).not.toContain('water');
+    // nothing is locked: every kit piece is still stakeable regardless of suggestions
+    expect(buildAdvice(g, 'barn').off).toBeNull();
+  });
+
+  it('reports the two endgame goals with progress', () => {
+    const g = fresh();
+    const [enclose, bunker] = longTerm(g);
+    expect(enclose.steps.map(x => x.done)).toEqual([false, false, false, false, false, false]);   // line, gate at the road, walls, towers, wall-top walkway, gate garage
+    expect(enclose.steps.map(x => x.label)).toContain('Wall-top walkway');
+    expect(enclose.steps.map(x => x.label)).toContain('Gate garage');
+    expect(enclose.steps.map(x => x.label)).toContain('Gate at the road');
+    expect(bunker.steps.every(x => !x.done)).toBe(true);
+    built(g, 'bunker_hatch');
+    expect(longTerm(g)[1].steps[0].done).toBe(true);
+  });
+
+  it('counts a bunker step only when the room is built, not when it is only staked out', () => {
+    const g = fresh();
+    for (const k of ['bunker_hatch', 'bunker_dorm', 'bunker_plant', 'bunker_stores', 'bunker_medical']) planStructure(g, k, 0, 0, 0);
+    expect(bunkerChecklist(g).every(c => !c.done)).toBe(true);
+    expect(bunkerChecklist(g).every(c => c.building)).toBe(true);
+    expect(longTerm(g)[1].steps.some(x => x.done)).toBe(false);
+    expect(bunkerChecklist(g)[0].detail).toMatch(/still being built/);
+    for (const st of g.structures) { st.stage = 99; st.finishedAt = 0; }
+    expect(bunkerChecklist(g).every(c => c.done && !c.building)).toBe(true);
+  });
+
+  it('suggests firewood (with an order and a mark-trees action) when the woodpile is bare or thin for the cold', () => {
+    const g = newGame(11, 330);
+    g.stock.firewood = 0;
+    const f = suggestions(g).find(x => x.id === 'firewood');
+    expect(f).toBeDefined();
+    expect(f!.acts!.map(a => a.act.type)).toEqual(['order', 'markTrees']);
+    expect(f!.acts![0].label).toMatch(/Order \d+ ricks? \(\$[\d,]+\)/);
+    g.stock.firewood = 40;
+    expect(suggestions(g).find(x => x.id === 'firewood')).toBeUndefined();
+    const summer = newGame(11, 190); summer.stock.firewood = 0;
+    expect(suggestions(summer).find(x => x.id === 'firewood')).toBeUndefined();
+  });
+
+  it('suggests finishing a house that is built but not wired', () => {
+    const g = fresh();
+    g.utilities.grid = false;
+    built(g, 'cottage', 10, 10);
+    const h = suggestions(g).find(x => x.id === 'hookup');
+    expect(h).toBeDefined();
+    expect(h!.title).toMatch(/cottage/);
+    expect(h!.acts!.some(a => a.act.type === 'select')).toBe(true);
+  });
+
+  it('greys the creek bars on land with no creek, and the tunnel until there is a bunker', () => {
+    const g = fresh();
+    g.site = { ...g.site, creek: false };
+    expect(perimeterOff(g, 'creek_bars')).toMatch(/no creek/);
+    expect(perimeterOff(g, 'escape_tunnel')).toMatch(/bunker/);
+    planStructure(g, 'bunker_hatch', 0, 0, 0);
+    expect(perimeterOff(g, 'escape_tunnel')).toBeNull();
+    g.site = { ...g.site, creek: true };
+    expect(perimeterOff(g, 'creek_bars')).toBeNull();
+  });
+
+  it('greys a permitted build the family cannot pay the permit for', () => {
+    const g = fresh();
+    g.paper.permits = true;
+    g.money = 0;
+    const a = buildAdvice(g, 'timber_cabin');
+    // only when the county works and the kind needs a permit
+    if (a.off) expect(a.off).toMatch(/permit/);
+  });
+});
+
+describe('what the plans need', () => {
+  it('is empty with nothing planned and grows with a staked cabin, less the stockpile', () => {
+    const g = fresh();
+    expect(plansNeedLines(g)).toHaveLength(0);
+    planStructure(g, 'timber_cabin', 0, 0, 0);
+    const need = plansNeed(g);
+    expect(Object.keys(need).length).toBeGreaterThan(0);
+    const [m] = Object.keys(need) as Array<keyof typeof need>;
+    g.stock[m!] += need[m]!;
+    expect(plansNeed(g)[m!] ?? 0).toBe(0);
+  });
+
+  it('counts fence runs laid out and not yet supplied', () => {
+    const g = fresh();
+    planRun(g, 'barbed_wire', [[0, 0], [30, 0]]);
+    expect(plansNeed(g).wire).toBeGreaterThan(0);
+    expect(plansNeedLines(g).some(l => l.material === 'wire')).toBe(true);
+  });
+});
+
+describe('the Shop shelves', () => {
+  it('hold every buyable material except groceries, which the pantry sells', () => {
+    const on = new Set(Object.values(SHELVES).flat());
+    const missing = MATERIAL_IDS.filter(m => MATERIALS[m].price !== null && !on.has(m));
+    expect(missing.sort()).toEqual(['canned', 'frozen', 'staples']);
+  });
+  it('flags the shelves that hold a needed material', () => {
+    expect(shelvesNeeding({ wire: 2, rebar: 1 })).toMatchObject({ build: 1, fencing: 2, bunker: 1 });
+  });
+});
+
+describe('the Perimeter list', () => {
+  it('puts every wall kind in exactly one price tier, cheapest tier first, with creek bars apart', () => {
+    const tiers = perimeterTiers();
+    const all = tiers.flatMap(t => t.kinds);
+    expect(new Set(all).size).toBe(all.length);
+    expect(all.sort()).toEqual([...PERIMETER_ORDER].sort());
+    expect(tiers.at(-1)!.kinds).toEqual(['creek_bars']);
+    expect(tiers[0].kinds).toContain('thorn_hedge');
+    expect(tiers[0].kinds).not.toContain('steel_wall');
+  });
+  it('knows the upgrade chain from any link', () => {
+    const chain = upgradeChain('chain_link');
+    expect(chain[0]).toBe('split_rail');
+    expect(chain.at(-1)).toBe('concrete_wall');
+    for (let i = 1; i < chain.length; i++) expect(UPGRADE_NEXT[chain[i - 1]]).toBe(chain[i]);
+  });
+});
+
+describe('a home that lost its roof', () => {
+  it('is the top suggestion, with the roof order one click away, until it is finished again', () => {
+    const g = fresh();
+    const cabin = built(g, 'timber_cabin');
+    expect(suggestions(g).map(x => x.id)).not.toContain('reroof');
+    cabin.stage = 5; cabin.finishedAt = 1;
+    knockBack(g, cabin, 3);                        // a chimney fire (sim/upkeep.ts)
+    g.stock.lumber = 0; g.stock.roofing = 0;
+    const sg = suggestions(g);
+    expect(sg[0].id).toBe('reroof');
+    expect(sg[0].title).toBe('Re-roof your home');
+    const order = sg[0].acts!.find(a => a.act.type === 'order')!.act as { type: 'order'; lines: Array<{ material: string; qty: number }> };
+    expect(order.lines.map(l => l.material).sort()).toEqual(['lumber', 'roofing']);
+    cabin.stage = 5; cabin.finishedAt = 9;
+    expect(suggestions(g).map(x => x.id)).not.toContain('reroof');
+  });
+});
+
+describe('seed for the fields', () => {
+  it('warns in the sowing season when there is not seed for every field, and the card links to the Farm tab', () => {
+    const g = fresh();
+    built(g, 'timber_cabin'); built(g, 'well_hand'); built(g, 'garden'); built(g, 'outhouse'); built(g, 'solar_array'); built(g, 'root_cellar');
+    const f1 = built(g, 'field', 10, 0), f2 = built(g, 'field', 20, 0);
+    plotsOf(g)[f1.id] = { kind: 'field', fert: 1, prev: null, prev2: null, crop: null, loads: 0, cover: false, settled: -1, planted: true };
+    plotsOf(g)[f2.id] = { ...plotsOf(g)[f1.id] };
+    g.stock.seed = 0; g.stock.seed_heirloom = 0; g.stock.seed_saved = 0;
+    g.clock.t = sowWindow(g)[0] + 2 - g.clock.startDoy + 0.3;
+    const card = suggestions(g).find(x => x.id === 'seed');
+    expect(card).toBeTruthy();
+    expect(card!.why).toMatch(/weeds at about 40 %/);
+    const open = card!.acts!.find(a => a.act.type === 'open')!.act;
+    expect(open).toEqual({ type: 'open', right: 'supplies', supplies: 'farm' });
+    const orders = card!.acts!.filter(a => a.act.type === 'order').map(a => (a.act as { lines: Array<{ material: string; qty: number }> }).lines[0].material);
+    expect(orders).toEqual(['seed', 'seed_heirloom']);
+    // seed in the barn: no card
+    g.stock.seed = 2;
+    expect(suggestions(g).find(x => x.id === 'seed')).toBeUndefined();
+  });
+});
+
+describe('the two field seeds in the Shop', () => {
+  it('the plain seed is the cheap hybrid and the heirloom costs more', () => {
+    expect(MATERIALS.seed.name).toMatch(/Hybrid/);
+    expect(MATERIALS.seed_heirloom.name).toMatch(/Heirloom/);
+    expect(MATERIALS.seed_heirloom.price!).toBeGreaterThan(MATERIALS.seed.price! * 2);
+    expect(SHELVES.food).toContain('seed');
+    expect(SHELVES.food).toContain('seed_heirloom');
+    expect(MATERIAL_IDS as readonly string[]).not.toContain('seed_hybrid');
+  });
+});

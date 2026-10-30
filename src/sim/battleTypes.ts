@@ -21,14 +21,19 @@ export interface BattleUnit {
   y?: number;
   /** What they're wearing (drawn: a plate carrier, a soft vest, a helmet). */
   armor?: { plate: boolean; soft: boolean; helmet: boolean };
+  /** Not a person: a remote turret on a tower (drawn as part of the tower, not as a figure). */
+  machine?: 'turret';
 }
 
 export type BattleEvent =
   | { t: number; kind: 'alarm'; what: 'dog' | 'sensor' | 'tripwire' | 'camera' | 'watch' }
-  | { t: number; kind: 'lights' }
+  /** `masts`: floodlights on towers (sim/towers.ts), aimed at `aim`; absent, the yard lights come on round the house. */
+  | { t: number; kind: 'lights'; masts?: Array<{ x: number; z: number; y: number }>; aim?: { x: number; z: number } }
   | { t: number; kind: 'move'; unit: string; x: number; z: number; y?: number }
   | { t: number; kind: 'shot'; from: string; to: string; hit: boolean; auto?: boolean }
   | { t: number; kind: 'mine'; x: number; z: number; hits: string[] }
+  /** A raider hurt getting over the wall (the wire, the thorns, the ditch, the sharpened logs): `what` is what caught him. */
+  | { t: number; kind: 'snag'; unit: string; x: number; z: number; what: string }
   /** `part`: where the round struck (shrapnel has none); `stopped`: armor caught it (a bruise, not a wound). */
   | { t: number; kind: 'wound'; unit: string; sev: number; part?: 'head' | 'torso' | 'arm' | 'leg'; stopped?: boolean }
   /** `executed`: killed on the ground after the fight was lost (a ruthless crew). */
@@ -36,6 +41,12 @@ export type BattleEvent =
   /** Carried off by the raiders (a ruthless crew takes the children). */
   | { t: number; kind: 'taken'; unit: string; by: string }
   | { t: number; kind: 'breach'; x: number; z: number }
+  /** The defenders fall back to the `ring`-th inner ring (of `of`): the crew has broken the line before it. */
+  | { t: number; kind: 'fallback'; ring: number; of: number; x: number; z: number }
+  /** A wounded defender carried in to the sickbay by `by`. */
+  | { t: number; kind: 'carry'; unit: string; by?: string }
+  /** A crew working the steel door of a tunnel (sim/doorBreach.ts): `open` is the moment it gives. */
+  | { t: number; kind: 'door'; what: 'hand tools' | 'a ram' | 'a cutting torch' | 'a charge' | 'an open door'; open: boolean; x?: number; z?: number }
   | { t: number; kind: 'flee'; unit: string }
   /** A line spoken in the fight: `who` is the unit speaking (a resident or a raider), absent for narration. */
   | { t: number; kind: 'say'; text: string; who?: string }

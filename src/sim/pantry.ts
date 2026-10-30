@@ -19,7 +19,9 @@
  * outside the kcal sums, and are used up by the day (a few grams of salt a
  * head, two cups of coffee an adult).
  */
+import { hasBasement } from './housingStyles';
 import type { GameState } from './state';
+import { logGate } from './nag';
 
 export type FoodCat = 'staples' | 'canned' | 'frozen';
 export const FOOD_CATS: readonly FoodCat[] = ['staples', 'canned', 'frozen'];
@@ -30,13 +32,16 @@ export type FoodGroup = 'grain' | 'legume' | 'fat' | 'sweet' | 'protein' | 'dair
 /** How it keeps: anywhere dry, cool (a cellar or a buried storeroom; it goes off sooner in a warm house), or frozen. */
 export type Storage = 'dry' | 'cool' | 'frozen';
 /** What it looks like on a shelf (game/props/foodShelves.ts). */
-export type PropKind = 'bucket' | 'can10' | 'mylar' | 'sack' | 'bag' | 'jug' | 'jar' | 'honey' | 'case' | 'can' | 'pack';
+export type PropKind = 'bucket' | 'can10' | 'mylar' | 'sack' | 'bag' | 'jug' | 'jar' | 'honey' | 'case' | 'can' | 'pack' | 'crate';
 
 export type FoodItemId =
   | 'rice_bucket' | 'rice_bag' | 'beans_bucket' | 'black_beans' | 'wheat_bucket' | 'flour' | 'oats' | 'cornmeal' | 'pasta'
   | 'sugar' | 'honey' | 'salt' | 'oil' | 'milk_powder' | 'peanut_butter' | 'freeze_dried' | 'coffee' | 'home_dry' | 'smoked_meat'
   | 'canned_veg' | 'canned_fruit' | 'canned_meat' | 'canned_soup' | 'home_canned' | 'snacks'
-  | 'freezer_meat' | 'game_meat';
+  | 'freezer_meat' | 'game_meat'
+  // the kitchen (sim/kitchen.ts): put by from the place's own harvest
+  | 'cellar_roots' | 'dried_produce' | 'ferments' | 'cured_meat' | 'lard'
+  | 'butter' | 'cheese' | 'maple_syrup';
 
 export interface FoodItem {
   id: FoodItemId;
@@ -93,8 +98,9 @@ const F = (id: FoodItemId, name: string, unit: string, cat: FoodCat, kcal: numbe
  *  rancid  flour, cornmeal, oats, oil, peanut butter, smoked meat: mostly lose quality, stomach upsets; out once badly rancid.
  *  frozen  freezer burn; out after a year past. (Thawed food is a real risk: needs.ts passes `thawed`.)
  *  snack   stale; out after a year past.
+ *  roots   potatoes, apples, squash and cabbage in the cellar bins: they shrink in the bin all along (sim/storage.ts) and rot fast past the date.
  */
-export type Decay = 'never' | 'sealed' | 'bag' | 'can' | 'homecan' | 'rancid' | 'frozen' | 'snack';
+export type Decay = 'never' | 'sealed' | 'bag' | 'can' | 'homecan' | 'rancid' | 'frozen' | 'snack' | 'roots';
 const DECAY_OF: Record<FoodItemId, Decay> = {
   rice_bucket: 'sealed', beans_bucket: 'sealed', wheat_bucket: 'sealed', freeze_dried: 'sealed', milk_powder: 'sealed',
   rice_bag: 'bag', black_beans: 'bag', home_dry: 'bag', pasta: 'bag',
@@ -102,6 +108,7 @@ const DECAY_OF: Record<FoodItemId, Decay> = {
   sugar: 'never', honey: 'never', salt: 'never',
   canned_veg: 'can', canned_fruit: 'can', canned_meat: 'can', canned_soup: 'can', home_canned: 'homecan',
   snacks: 'snack', coffee: 'snack', freezer_meat: 'frozen', game_meat: 'frozen',
+  cellar_roots: 'roots', dried_produce: 'bag', ferments: 'can', cured_meat: 'rancid', lard: 'rancid', butter: 'rancid', cheese: 'rancid', maple_syrup: 'never',
 };
 export const DECAY: Record<Decay, { maxLoss: number; tau: number; sick: number; sickCap: number; bot: number; toss: (over: number) => number; long: number }> = {
   never: { maxLoss: 0, tau: 1, sick: 0, sickCap: 0, bot: 0, toss: () => 0, long: Infinity },
@@ -112,6 +119,7 @@ export const DECAY: Record<Decay, { maxLoss: number; tau: number; sick: number; 
   rancid: { maxLoss: 0.3, tau: 365, sick: 0.006, sickCap: 0.02, bot: 0, toss: o => (o > 730 ? 0.004 : 0), long: 180 },
   frozen: { maxLoss: 0.3, tau: 365, sick: 0.002, sickCap: 0.01, bot: 0, toss: o => (o > 365 ? 0.002 : 0), long: 180 },
   snack: { maxLoss: 0.3, tau: 365, sick: 0.001, sickCap: 0.004, bot: 0, toss: o => (o > 365 ? 0.001 : 0), long: 180 },
+  roots: { maxLoss: 0.3, tau: 40, sick: 0.004, sickCap: 0.02, bot: 0, toss: o => Math.min(0.06, 0.01 + o / 1500), long: 60 },
 };
 /** Food poisoning a day from eating thawed freezer food (no power, nothing but that), and home-canned botulism in date and at most. */
 export const THAWED_SICK = 0.02, BOT_BASE = 0.00002, BOT_CAP = 0.001;
@@ -164,6 +172,14 @@ export const FOOD: Record<FoodItemId, FoodItem> = {
   home_canned: F('home_canned', 'Home-canned jars', 'case of 12 quarts put up in the kitchen (best within two years)', 'canned', 6000, 25, 0.05, 'fruitveg', 2, 'cool', null, 'jar', 12, 0xb84a30),
   snacks: F('snacks', 'Snacks, case', 'case of granola bars, crackers, trail mix', 'canned', 9000, 20, 0.35, 'snack', 1, 'dry', 38, 'case', 1, 0xc83a6a, { dietMax: 0.12 }),
   freezer_meat: F('freezer_meat', 'Freezer meat, 5 kg', 'box of beef, chicken and pork (a year frozen)', 'frozen', 10000, 150, 0.55, 'protein', 1, 'frozen', 70, 'pack', 3, 0xb04040),
+  cellar_roots: F('cellar_roots', 'Potatoes, apples & roots in the cellar', 'wooden bin, about 115 lb (potatoes, apples, squash, cabbage, carrots); keeps through the winter in a cold cellar', 'canned', 40000, 20, 0.01, 'fruitveg', 0.6, 'cool', null, 'crate', 1, 0xb8935a, { dietMax: 0.5 }),
+  dried_produce: F('dried_produce', 'Dried fruit & vegetables', 'case of 12 quart jars of dried apples, tomatoes, beans, greens and herbs', 'canned', 12000, 25, 0.02, 'fruitveg', 1.5, 'dry', null, 'jar', 12, 0xd9a24a, { dietMax: 0.3 }),
+  ferments: F('ferments', 'Sauerkraut, pickles & kimchi', 'case of 12 quarts of fermented cabbage, cucumbers and roots, kept cool', 'canned', 2400, 30, 0.02, 'fruitveg', 0.8, 'cool', null, 'jar', 12, 0x8aa84a, { dietMax: 0.12 }),
+  cured_meat: F('cured_meat', 'Cured ham, bacon & salt pork', '10 lb of salt-cured pork, hung or packed in salt', 'staples', 18000, 70, 0.55, 'protein', 1, 'cool', null, 'mylar', 1, 0xb8606a, { dietMax: 0.3 }),
+  lard: F('lard', 'Rendered lard', '1 gal pail of lard rendered from the fat (about 8 lb)', 'staples', 32000, 0, 1, 'fat', 1.5, 'cool', null, 'jug', 1, 0xf2ead2, { dietMax: 0.12 }),
+  butter: F('butter', 'Butter', '5 lb of butter, churned and salted, kept cool', 'staples', 16250, 3, 0.99, 'dairy', 0.6, 'cool', null, 'jar', 5, 0xf0d870, { dietMax: 0.12 }),
+  cheese: F('cheese', 'Hard cheese', 'a 5 lb wheel of cheese, waxed and kept cool', 'staples', 9000, 250, 0.7, 'dairy', 1, 'cool', null, 'case', 1, 0xe8b850, { dietMax: 0.2 }),
+  maple_syrup: F('maple_syrup', 'Maple syrup', '1 gal jug of syrup boiled down from the sugar bush (keeps for years sealed)', 'staples', 13000, 0, 0, 'sweet', Infinity, 'dry', null, 'honey', 1, 0xb8681c, { dietMax: 0.08 }),
   game_meat: F('game_meat', 'Game & home-raised meat', 'about 5 kg, wrapped and frozen', 'frozen', 10000, 160, 0.4, 'protein', 1, 'frozen', null, 'pack', 3, 0x8a3030),
 };
 export const FOOD_IDS = Object.keys(FOOD) as FoodItemId[];
@@ -210,6 +226,8 @@ export interface Pantry {
   coffeeDay?: number;
   /** Yesterday's eating: [item or 'fresh' / 'grocery', kcal]. */
   ate: Array<[string, number]>;
+  /** Share of the cool-kept food's shelf life lost to overfull shelves (sim/storage.ts). */
+  crowd?: number;
 }
 export const newPantry = (): Pantry => ({ items: {}, mix: { grocery: 1 }, protein: 40, fat: 0.33, noSalt: 0, noCoffee: 0, ate: [] });
 
@@ -243,6 +261,28 @@ export function addFood(s: GameState, id: FoodItemId, units: number, age = 0): v
   if (id === 'coffee') pantry(s).coffeeDay = Math.floor(s.clock.t);
   s.stock[it.cat] += units * it.kcal / CAT_KCAL[it.cat];
 }
+/** Units of an item on hand (the pantry as last synced; salt and coffee included). */
+export const foodUnits = (s: GameState, id: FoodItemId): number => s.pantry?.items[id]?.q ?? 0;
+/** Use up to `units` of an item that carries no calories (salt, coffee): returns what was taken. For food with calories, eat it (eatFrom) or lose it (syncPantry). */
+export function takeSalt(s: GameState, units: number): number {
+  const e = pantry(s).items.salt;
+  if (!e || e.q <= 0) return 0;
+  const t = Math.min(e.q, units);
+  e.q -= t;
+  if (e.q < 1e-9) delete pantry(s).items.salt;
+  return t;
+}
+/** Take up to `units` of an item (with its calories out of the aggregate too): returns what was taken. For soap and the like that use food that was never going to be eaten. */
+export function takeFood(s: GameState, id: FoodItemId, units: number): number {
+  syncPantry(s);
+  const e = pantry(s).items[id];
+  if (!e || e.q <= 0 || !(units > 0)) return 0;
+  const t = Math.min(e.q, units), it = FOOD[id];
+  e.q -= t;
+  if (e.q < 1e-9) delete pantry(s).items[id];
+  s.stock[it.cat] = Math.max(0, s.stock[it.cat] - t * it.kcal / CAT_KCAL[it.cat]);
+  return t;
+}
 /** The same, by kcal. */
 export const addFoodKcal = (s: GameState, id: FoodItemId, kcal: number) => addFood(s, id, kcal / FOOD[id].kcal);
 
@@ -258,13 +298,15 @@ export function lifeLeft(s: GameState, id: FoodItemId): number {
 }
 
 /** A cool store: a finished root cellar or bunker storeroom (oil, flour and nuts keep their full life there; about 70 % in a warm house). */
-export const hasCoolStore = (s: GameState) => s.structures.some(st => (st.kind === 'root_cellar' || st.kind === 'bunker_stores') && st.finishedAt !== null);
+export const hasCoolStore = (s: GameState) => s.structures.some(st => (st.kind === 'root_cellar' || st.kind === 'bunker_stores' || hasBasement(st.kind)) && st.finishedAt !== null);
 export function lifeDays(s: GameState, id: FoodItemId): number {
-  return lifeWith(id, hasCoolStore(s));
+  return lifeWith(id, coolK(s));
 }
-const lifeWith = (id: FoodItemId, cool: boolean) => {
+/** How well cool-kept food keeps: 1 in a cellar (or a bunker storeroom), 0.7 in a warm house, less when the shelves are overfull (sim/storage.ts sets `crowd`). */
+export const coolK = (s: GameState): number => (hasCoolStore(s) ? 1 : 0.7) * (1 - (s.pantry?.crowd ?? 0));
+const lifeWith = (id: FoodItemId, cool: number) => {
   const it = FOOD[id];
-  return it.life * 365 * (it.store === 'cool' && !cool ? 0.7 : 1);
+  return it.life * 365 * (it.store === 'cool' ? cool : 1);
 }
 
 /**
@@ -277,7 +319,7 @@ const lifeWith = (id: FoodItemId, cool: boolean) => {
 function draw(s: GameState, cat: FoodCat, kcal: number, how: 'eat' | 'loss', inDate = false): Array<[FoodItemId, number, number]> {
   const p = pantry(s);
   const ids: FoodItemId[] = [], avail: number[] = [], weight: number[] = [], taken: number[] = [], over: number[] = [];
-  const cool = hasCoolStore(s);
+  const cool = coolK(s);
   for (const id of CAT_KCAL_ITEMS[cat]) {
     const e = p.items[id];
     if (!e || e.q <= 0) continue;
@@ -348,7 +390,7 @@ export const noEaten = (): Eaten => ({ plate: [], eff: 0, sick: 0, bot: 0, old: 
 
 /** In-date kcal of a category on hand. */
 export function inDateKcal(s: GameState, cat: FoodCat): number {
-  const p = pantry(s), cool = hasCoolStore(s);
+  const p = pantry(s), cool = coolK(s);
   let k = 0;
   for (const id of CAT_KCAL_ITEMS[cat]) { const e = p.items[id]; if (e && e.age <= lifeWith(id, cool)) k += e.q * FOOD[id].kcal; }
   return k;
@@ -402,7 +444,7 @@ export function pantryDay(s: GameState, opts: { rotate: boolean; mice: boolean; 
   const p = pantry(s), out: string[] = [];
   let lostS = 0, lostC = 0, lostF = 0;
   const lose = (it: FoodItem, dq: number) => { const k = dq * it.kcal; if (it.cat === 'staples') lostS += k; else if (it.cat === 'canned') lostC += k; else lostF += k; };
-  const cool = hasCoolStore(s);
+  const cool = coolK(s);
   for (const key in p.items) {
     const id = key as FoodItemId, e = p.items[id], it = FOOD[id];
     if (!e || e.q <= 0) continue;
@@ -426,7 +468,7 @@ export function pantryDay(s: GameState, opts: { rotate: boolean; mice: boolean; 
       if (over > 0 && d.toss(over) > 0) {
         const before = e.tossed ?? 0;
         e.tossed = before + dq;
-        if (Math.floor(e.tossed) > Math.floor(before)) out.push(`Threw out ${TOSS_WHY[it.decay]} (${name(id)}).`);
+        if (Math.floor(e.tossed) > Math.floor(before) && logGate(s, `toss:${id}`, 21)) out.push(`Threw out ${TOSS_WHY[it.decay]} (${name(id)}).`);
       }
       if (e.q < 1e-9) delete p.items[id];
     }
@@ -440,7 +482,7 @@ const name = (id: FoodItemId) => FOOD[id].name.split(',')[0].toLowerCase();
 const unitsText = (q: number) => q >= 2 ? `${Math.round(q)} units` : 'what was left';
 const TOSS_WHY: Record<Decay, string> = {
   never: '', sealed: '', bag: 'a moldy, buggy sack', can: 'bulging cans', homecan: 'jars whose seals had failed',
-  rancid: 'stuff gone badly rancid', frozen: 'freezer-burned meat', snack: 'stale snacks',
+  rancid: 'stuff gone badly rancid', frozen: 'freezer-burned meat', snack: 'stale snacks', roots: 'soft, sprouted and rotten roots',
 };
 /** Mice in paper and woven sacks without traps: a share a day (buckets, cans, jars and jugs keep them out). */
 export const MICE_A_DAY = 0.0006;
@@ -449,7 +491,7 @@ export const MICE_A_DAY = 0.0006;
 export function catKeeping(s: GameState, cat: FoodCat): { age: number; life: number } {
   const p = pantry(s);
   let w = 0, age = 0, life = 0;
-  const cool = hasCoolStore(s);
+  const cool = coolK(s);
   for (const id of CAT_KCAL_ITEMS[cat]) {
     const e = p.items[id];
     if (!e || FOOD[id].kcal === 0) continue;
@@ -587,7 +629,7 @@ export function pantryRows(s: GameState, needKcal: number): PantryRow[] {
   const p = s.pantry ?? newPantry();
   const k: Record<FoodCat, number> = { staples: 1, canned: 1, frozen: 1 };
   for (const cat of FOOD_CATS) { const have = pantryKcal(p, cat); k[cat] = have > 0 ? Math.max(0, s.stock[cat]) * CAT_KCAL[cat] / have : 1; }
-  const cool = hasCoolStore(s);
+  const cool = coolK(s);
   const rows: PantryRow[] = [];
   for (const id of FOOD_IDS) {
     const e = p.items[id];

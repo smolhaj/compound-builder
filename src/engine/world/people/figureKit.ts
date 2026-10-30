@@ -11,13 +11,19 @@
  *   aShirt / aPants / aSkin / aHair / aPack  (vec3 sRGB→linear colors)
  *   aStyle  (pose, hasPack, longHair, shoeTone)
  *   aWear   (coat 0 none / 1 hip / 2 mid-thigh / 3 gown, shorts, hat code, idle phase)
- *   aAnim   (walkPhase, swingAmp)
+ *   aAnim   (walkPhase, swingAmp, tool)
  *
  * Poses (aStyle.x): 0 stand / walk, 1 bench / chair, 2 sitting on the lawn,
  * 3 bike, 4 scooter, 5 carrying a box in both arms (move-in), 6 one arm
  * raised forward (throwing a frisbee, pointing, busking), 7 kneeling with
  * both hands down (planting on Service Day), 8 sitting cross-legged on the
  * grass (outdoor class: shins tucked, knees out, hands on the knees).
+ *
+ * Work poses (homestead chores): 9 chopping (both arms up and down with an
+ * axe), 10 hoeing, 11 stirring a pot, 12 both arms up (hanging laundry),
+ * 13 a rifle at port arms (patrol), 14 a pail in hand (scattering feed when
+ * still). The tool in hand is aAnim.z (FIG_TOOL): axe, hoe, rifle, two
+ * buckets, hammer, spoon, one pail; collapsed unless set.
  *
  * Hat code (aWear.z): 0 none (hair), 1…HATS.length knit hat palette index + 1,
  * HAT_MORTARBOARD a graduation cap (black skull cap + square board).
@@ -46,7 +52,10 @@ export const SADDLE_Y   = 0.3;
 const DECK_Y     = 0.045;
 
 /** Figure poses (aStyle.x). */
-export const FIG_POSE = { STAND: 0, BENCH: 1, LAWN: 2, BIKE: 3, SCOOTER: 4, CARRY: 5, REACH: 6, KNEEL: 7, CROSS: 8 } as const;
+export const FIG_POSE = { STAND: 0, BENCH: 1, LAWN: 2, BIKE: 3, SCOOTER: 4, CARRY: 5, REACH: 6, KNEEL: 7, CROSS: 8, CHOP: 9, HOE: 10, STIR: 11, HANG: 12, RIFLE: 13, PAIL: 14 } as const;
+
+/** Tool in hand (aAnim.z). */
+export const FIG_TOOL = { NONE: 0, AXE: 1, HOE: 2, RIFLE: 3, BUCKETS: 4, HAMMER: 5, SPOON: 6, PAIL: 7 } as const;
 
 /** Hat code for a graduation mortarboard (aWear.z). */
 export const HAT_MORTARBOARD = 20;
@@ -59,8 +68,10 @@ const P_UMB_CANOPY = 7, P_UMB_SHAFT = 8;
 const P_BOARD = 9;
 /** Cardboard box held in both arms (collapsed unless the pose is CARRY). */
 const P_BOX = 10;
-/** Part / limb packing: aPL = part + (limb + 2) × PL_K. */
-const PL_K = 16;
+/** Tools (collapsed unless aAnim.z says so). */
+const P_AXE = 11, P_HOE = 12, P_RIFLE = 13, P_BUCKET = 14, P_HAMMER = 15;
+/** Part / limb packing: aPL = part + (limb + 2) × PL_K + metal × PL_METAL. */
+const PL_K = 16, PL_METAL = 128;
 /** Raised arm angle (rad) for walkers holding an umbrella. */
 const UMB_ARM = -0.75;
 const L_NONE = 0;
@@ -71,13 +82,13 @@ export const FIGURE_UNIFORMS = { uRain: { value: 0 }, uTime: { value: 0 } };
 /** Build the merged figure geometry with the aPL (part + limb) vertex attribute. */
 export function buildFigureGeometry(): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = [];
-  const add = (g: THREE.BufferGeometry, part: number, limb: number = L_NONE): void => {
+  const add = (g: THREE.BufferGeometry, part: number, limb: number = L_NONE, metal = false): void => {
     const ng = g.index ? g.toNonIndexed() : g;
     if (ng !== g) g.dispose();
     ng.deleteAttribute('uv');
     const n = ng.attributes.position.count;
     // part + limb packed into one attribute (vertex attribute slots are scarce: 16 max)
-    ng.setAttribute('aPL', new THREE.BufferAttribute(new Float32Array(n).fill(part + (limb + 2) * PL_K), 1));
+    ng.setAttribute('aPL', new THREE.BufferAttribute(new Float32Array(n).fill(part + (limb + 2) * PL_K + (metal ? PL_METAL : 0)), 1));
     parts.push(ng);
   };
   const box = (w: number, h: number, d: number, x: number, y: number, z: number): THREE.BufferGeometry => {
@@ -142,6 +153,32 @@ export function buildFigureGeometry(): THREE.BufferGeometry {
   add(board, P_BOARD);
   // Cardboard box held at the chest (arms reach forward round it)
   add(box(0.12, 0.085, 0.09, 0, SHOULDER_Y - 0.13, 0.105), P_BOX);
+  // Tools, authored with the arm hanging (hand at y = HAND_Y) and carried
+  // along the arm's line beyond the fist so they swing with it
+  const HAND_Y = SHOULDER_Y - 0.168, hx = 0.071;
+  const rod = (r: number, len: number, x: number, y0: number, y1: number) => { const g = new THREE.CylinderGeometry(r, r, len, 5); g.translate(x, (y0 + y1) / 2, 0); return g; };
+  // axe: an 80 cm haft, the head at its end (edge leading the strike, toward -z)
+  add(rod(0.008, 0.25, hx, HAND_Y + 0.02, HAND_Y - 0.23), P_AXE, 2);
+  add(box(0.012, 0.035, 0.055, hx, HAND_Y - 0.215, -0.012), P_AXE, 2, true);
+  // hoe: a long handle, the blade across the end
+  add(rod(0.007, 0.5, hx, HAND_Y + 0.05, HAND_Y - 0.45), P_HOE, 2);
+  add(box(0.06, 0.035, 0.008, hx, HAND_Y - 0.45, 0.012), P_HOE, 2, true);
+  // rifle at port arms, across the chest (torso), muzzle up and to the left
+  const rifle = new THREE.BoxGeometry(0.016, 0.42, 0.024);
+  rifle.rotateZ(0.95); rifle.translate(0, SHOULDER_Y - 0.1, 0.1);
+  add(rifle, P_RIFLE, L_NONE, true);
+  const stock = new THREE.BoxGeometry(0.02, 0.1, 0.032);
+  stock.rotateZ(0.95); stock.translate(0.11, SHOULDER_Y - 0.175, 0.1);
+  add(stock, P_RIFLE, L_NONE);
+  // buckets (one in each hand; a single pail keeps only the +x one)
+  for (const side of [1, -1]) {
+    const b = new THREE.CylinderGeometry(0.032, 0.026, 0.055, 8);
+    b.translate(side * hx, HAND_Y - 0.055, 0);
+    add(b, P_BUCKET, side * 2, true);
+  }
+  // hammer / spoon: a short handle and a head
+  add(rod(0.006, 0.11, hx, HAND_Y + 0.01, HAND_Y - 0.1), P_HAMMER, 2);
+  add(box(0.018, 0.018, 0.045, hx, HAND_Y - 0.1, 0), P_HAMMER, 2, true);
 
   const g = mergeGeometries(parts)!;
   parts.forEach(p => p.dispose());
@@ -152,7 +189,7 @@ export function buildFigureGeometry(): THREE.BufferGeometry {
 /** The figure's per-instance attribute names and sizes (source order). */
 export const FIGURE_ATTRS: ReadonlyArray<readonly [string, number]> = [
   ['aShirt', 3], ['aPants', 3], ['aSkin', 3], ['aHair', 3], ['aPack', 3],
-  ['aStyle', 4], ['aWear', 4], ['aAnim', 2],
+  ['aStyle', 4], ['aWear', 4], ['aAnim', 3],
 ];
 
 /**
@@ -179,7 +216,7 @@ export function injectFigureShader(mat: THREE.MeshStandardMaterial): void {
         attribute vec3 aPack;
         attribute vec4 aStyle;
         attribute vec4 aWear;
-        attribute vec2 aAnim;
+        attribute vec3 aAnim;
         varying vec3 vAgCol;
         varying vec3 vAgAlt;
         varying vec2 vAgCut;
@@ -197,8 +234,11 @@ export function injectFigureShader(mat: THREE.MeshStandardMaterial): void {
           return vec3(p.x * c + p.z * s, p.y, -p.x * s + p.z * c);
         }`)
       .replace('#include <beginnormal_vertex>', `#include <beginnormal_vertex>
-        float aLimb = floor(aPL / ${PL_K.toFixed(1)} + 0.001) - 2.0;
-        float aPart = aPL - (aLimb + 2.0) * ${PL_K.toFixed(1)};
+        float agMetal = step(${(PL_METAL - 0.5).toFixed(1)}, aPL);
+        float agPL = aPL - agMetal * ${PL_METAL.toFixed(1)};
+        float aLimb = floor(agPL / ${PL_K.toFixed(1)} + 0.001) - 2.0;
+        float aPart = agPL - (aLimb + 2.0) * ${PL_K.toFixed(1)};
+        float agTool = aAnim.z;
         float agPose = aStyle.x;
         float agBench = step(0.5, agPose) * step(agPose, 1.5);
         float agLawn = step(1.5, agPose) * step(agPose, 2.5);
@@ -207,7 +247,13 @@ export function injectFigureShader(mat: THREE.MeshStandardMaterial): void {
         float agCarry = step(4.5, agPose) * step(agPose, 5.5);
         float agReach = step(5.5, agPose) * step(agPose, 6.5);
         float agKneel = step(6.5, agPose) * step(agPose, 7.5);
-        float agCross = step(7.5, agPose);
+        float agCross = step(7.5, agPose) * step(agPose, 8.5);
+        float agChop = step(8.5, agPose) * step(agPose, 9.5);
+        float agHoe = step(9.5, agPose) * step(agPose, 10.5);
+        float agStir = step(10.5, agPose) * step(agPose, 11.5);
+        float agHang = step(11.5, agPose) * step(agPose, 12.5);
+        float agRifle = step(12.5, agPose) * step(agPose, 13.5);
+        float agPail = step(13.5, agPose);
         float agSit = agBench + agLawn + agCross;
         float agSide = sign(aLimb);
         float agIsArm = step(1.5, abs(aLimb));
@@ -240,9 +286,23 @@ export function injectFigureShader(mat: THREE.MeshStandardMaterial): void {
         agAng = mix(agAng, agIsLeg * 0.12 + agIsArm * (-0.7 + 0.25 * sin(agT * 2.1 + agSide)), agKneel);
         // Cross-legged: (tucked, splayed) legs forward along the grass, hands on the knees, a slight lean
         agAng = mix(agAng, agIsLeg * -1.52 + agIsArm * -0.45, agCross);
+        // Chopping: a slow lift overhead, a fast strike down to the block; feet apart
+        float agCp = fract(agT * 0.55);
+        float agChopA = agCp < 0.75 ? mix(-0.8, -2.9, smoothstep(0.0, 0.75, agCp)) : mix(-2.9, -0.8, (agCp - 0.75) / 0.25);
+        agAng = mix(agAng, agIsLeg * agSide * 0.16 + agIsArm * agChopA, agChop);
+        // Hoeing: both arms forward, the blade drawn back and lifted
+        agAng = mix(agAng, agIsLeg * agSide * 0.2 + agIsArm * (-0.72 + 0.28 * sin(agT * 2.2)), agHoe);
+        // Stirring: the +x arm in the pot, small circles; the other steadies it
+        agAng = mix(agAng, agIsArm * (aLimb > 0.0 ? -0.85 + 0.14 * sin(agT * 3.4) : -0.45), agStir);
+        // Hanging laundry: both arms up at the line
+        agAng = mix(agAng, agIsArm * (-2.7 + 0.12 * sin(agT * 1.3 + agSide)), agHang);
+        // Rifle at port arms: arms hold it across the chest, legs keep walking
+        agAng = mix(agAng, agIsLeg * agAng + agIsArm * -0.72, agRifle);
+        // A pail: carried low; standing still the +x hand scatters feed
+        agAng = mix(agAng, agIsLeg * agAng + agIsArm * (aLimb > 0.0 ? -0.12 - agStill * 0.75 * (0.5 + 0.5 * sin(agT * 2.4)) : -0.08), agPail);
         // Rain: most walkers put up an umbrella (+x arm raised, held still)
         float agUmbH = fract(dot(aShirt, vec3(7.13, 3.17, 1.71)) + dot(aPants, vec3(2.31, 5.93, 1.13)) + aWear.w * 3.7);
-        float agUmb = (1.0 - agSit) * (1.0 - agBike - agScoot - agCarry - agReach - agKneel) * step(0.02, uRain) * step(agUmbH, min(uRain * 1.6, 0.8));
+        float agUmb = (1.0 - agSit) * (1.0 - agBike - agScoot - agCarry - agReach - agKneel) * (1.0 - step(8.5, agPose)) * (1.0 - step(0.5, agTool)) * step(0.02, uRain) * step(agUmbH, min(uRain * 1.6, 0.8));
         agAng = mix(agAng, ${f(UMB_ARM)}, agUmb * step(1.5, aLimb));
         float agPivot = agIsArm > 0.5 ? ${f(SHOULDER_Y)} : ${f(HIP_Y)};
         // Head turns while standing / sitting (head = skin / hair above the neck)
@@ -265,6 +325,11 @@ export function injectFigureShader(mat: THREE.MeshStandardMaterial): void {
         if ((abs(aPart - ${P_UMB_CANOPY.toFixed(1)}) < 0.5 || abs(aPart - ${P_UMB_SHAFT.toFixed(1)}) < 0.5) && agUmb < 0.5) transformed = vec3(0.0, 0.45, 0.0);
         if (agBoardPart > 0.5 && aWear.z < ${(HAT_MORTARBOARD - 0.5).toFixed(1)}) transformed = vec3(0.0, 0.45, 0.0);
         if (abs(aPart - ${P_BOX.toFixed(1)}) < 0.5 && agCarry < 0.5) transformed = vec3(0.0, 0.35, 0.0);
+        if (abs(aPart - ${P_AXE.toFixed(1)}) < 0.5 && abs(agTool - 1.0) > 0.5) transformed = vec3(0.0, 0.35, 0.0);
+        if (abs(aPart - ${P_HOE.toFixed(1)}) < 0.5 && abs(agTool - 2.0) > 0.5) transformed = vec3(0.0, 0.35, 0.0);
+        if (abs(aPart - ${P_RIFLE.toFixed(1)}) < 0.5 && abs(agTool - 3.0) > 0.5) transformed = vec3(0.0, 0.35, 0.0);
+        if (abs(aPart - ${P_BUCKET.toFixed(1)}) < 0.5 && !(abs(agTool - 4.0) < 0.5 || (abs(agTool - 7.0) < 0.5 && aLimb > 0.0))) transformed = vec3(0.0, 0.35, 0.0);
+        if (abs(aPart - ${P_HAMMER.toFixed(1)}) < 0.5 && !(abs(agTool - 5.0) < 0.5 || abs(agTool - 6.0) < 0.5)) transformed = vec3(0.0, 0.35, 0.0);
         // Walking bob; seat drops; rider lifts
         transformed.y += abs(cos(aAnim.x)) * aAnim.y * 0.012 * (1.0 - agBike);
         transformed.y -= agBench * ${f(HIP_Y - SEAT_Y)};
@@ -295,7 +360,11 @@ export function injectFigureShader(mat: THREE.MeshStandardMaterial): void {
                               : vec3(0.75, 0.55, 0.06))
                : aPart < 8.5 ? vec3(0.06)
                : aPart < 9.5 ? vec3(0.02)
-               : vec3(0.52, 0.38, 0.22);
+               : aPart < 10.5 ? vec3(0.52, 0.38, 0.22)
+               : abs(aPart - ${P_RIFLE.toFixed(1)}) < 0.5 ? (agMetal > 0.5 ? vec3(0.06) : vec3(0.3, 0.18, 0.09))
+               : abs(aPart - ${P_BUCKET.toFixed(1)}) < 0.5 ? vec3(0.52, 0.54, 0.55)
+               : agMetal > 0.5 ? vec3(0.3, 0.31, 0.33)
+               : vec3(0.45, 0.3, 0.15);
         // Trousers: coat / gown hem (shirt color above) / shorts (skin below the knee)
         float agPants = step(2.5, aPart) * step(aPart, 3.5);
         vAgAlt = aWear.x > 0.5 ? aShirt : aSkin;
@@ -311,7 +380,7 @@ export function injectFigureShader(mat: THREE.MeshStandardMaterial): void {
       .replace('#include <color_fragment>', `#include <color_fragment>
         diffuseColor.rgb *= (vAgY > vAgCut.x || (vAgY < vAgCut.y && vAgY > 0.024)) ? vAgAlt : vAgCol;`);
   };
-  mat.customProgramCacheKey = () => 'agent-figure-v5';
+  mat.customProgramCacheKey = () => 'agent-figure-v6';
 }
 
 export function makeFigureMaterial(): THREE.MeshStandardMaterial {
@@ -330,6 +399,10 @@ export interface FigurePose {
   phase: number;
   /** Limb swing amplitude (0 still, 0.5 walking). */
   amp: number;
+  /** Tool in hand (FIG_TOOL; default none). */
+  tool?: number;
+  /** Pitch about the figure's own x axis, radians, applied before the turn: -PI / 2 lays it on its back (head toward -z). Default 0. */
+  pitch?: number;
 }
 
 /**
@@ -348,6 +421,8 @@ export class FigureLayer {
   private readonly _q = new THREE.Quaternion();
   private readonly _s = new THREE.Vector3();
   private readonly _up = new THREE.Vector3(0, 1, 0);
+  private readonly _right = new THREE.Vector3(1, 0, 0);
+  private readonly _pq = new THREE.Quaternion();
   private readonly _c = new THREE.Color();
   private _scene: THREE.Scene | null;
   readonly capacity: number;
@@ -391,12 +466,13 @@ export class FigureLayer {
   /** Place instance i. */
   setPose(i: number, p: FigurePose): void {
     this._q.setFromAxisAngle(this._up, p.rot);
+    if (p.pitch) this._q.multiply(this._pq.setFromAxisAngle(this._right, p.pitch));
     this._m.compose(this._p.set(p.x, p.y, p.z), this._q, this._s.setScalar(p.scale * FIG_SCALE));
     this._m.toArray(this.mesh.instanceMatrix.array as Float32Array, i * 16);
     const st = this._attrs.aStyle.array as Float32Array;
     st[i * 4] = p.pose;
     const an = this._attrs.aAnim.array as Float32Array;
-    an[i * 2] = p.phase; an[i * 2 + 1] = p.amp;
+    an[i * 3] = p.phase; an[i * 3 + 1] = p.amp; an[i * 3 + 2] = p.tool ?? 0;
   }
 
   /** Draw the first n instances; flag what changed for upload. */

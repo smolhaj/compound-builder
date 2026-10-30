@@ -22,8 +22,9 @@ import { log } from './economy';
 import { mulberry32 } from './rng';
 import type { GameState } from './state';
 import { SKILL_IDS, type Person, type SkillId } from './family';
-import { freshNeeds } from './needs';
+import { admitNewcomers } from './newcomers';
 import { prisonerLead } from './rescue';
+import { afterExecution, afterLeaving, afterMercy } from './mind';
 
 export type AftermathChoice = 'treat_release' | 'hold' | 'leave' | 'finish';
 export interface Aftermath { day: number; wounded: number; dead: number }
@@ -66,6 +67,7 @@ export function resolveAftermath(s: GameState, choice: AftermathChoice): string[
       // they know the place now: some come back with friends; word also gets around
       if (r() < 0.35) { g.next = Math.min(g.next, Math.floor(s.clock.t) + 5 + Math.floor(r() * 10)); out.push('One of them looked back at the walls a long time before he went.'); }
       g.mercy = (g.mercy ?? 0) + n;
+      afterMercy(s);
     } else if (choice === 'hold') {
       g.prisoners ??= [];
       for (let i = 0; i < n; i++) {
@@ -78,12 +80,14 @@ export function resolveAftermath(s: GameState, choice: AftermathChoice): string[
       g.humanity = Math.max(0, g.humanity - 2 - n);
       out.push(r() < 0.5 ? 'By morning the drive was empty. A blood trail went into the trees.' : 'By morning they had stopped calling for help.');
       lowerMorale(s, 4);
+      afterLeaving(s);
     } else {
       g.humanity = Math.max(0, g.humanity - 12 - 4 * n);
       lowerMorale(s, 15);
       const kids = s.people.some((p, i) => p.kid && s.personState[i]?.needs.died == null);
       out.push(`It was done. Nobody talked at supper.${kids ? ' The kids heard the shots.' : ''}`);
       g.executed = (g.executed ?? 0) + n;
+      afterExecution(s, n);
     }
   }
   if (a.dead > 0) {
@@ -162,9 +166,8 @@ export function joinPrisoner(s: GameState, id: string): string | null {
   const skills = Object.fromEntries(SKILL_IDS.map(k => [k, Math.floor(r() * 3)])) as Record<SkillId, number>;
   skills.hunter = 4 + Math.floor(r() * 3);
   const person: Person = { id: `p${s.nextId++}`, first: p.name, last: '', age: 20 + Math.floor(r() * 25), kid: false, body: 'm', skills, shirt: Math.floor(r() * 0xffffff) & 0x7f7f7f };
-  s.people.push(person);
-  s.personState.push({ id: person.id, task: 'idle', target: null, needs: freshNeeds() });
-  s.gate.tookIn++; s.gate.humanity = Math.min(100, s.gate.humanity + 5);
+  admitNewcomers(s, [person], { kind: 'stranger', arche: 'prisoner', secret: 'solid', known: true, tried: true });   // a bond, a bedroll (sim/newcomers.ts)
+  s.gate.humanity = Math.min(100, s.gate.humanity + 5);
   log(s, `${p.name} came to rob you and stayed to help. He's one of the family now.`);
   return null;
 }

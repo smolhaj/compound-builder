@@ -6,15 +6,26 @@
  */
 import * as THREE from 'three';
 import { CELL, KIT, type KitPieceDef } from './kit';
-import { foodSlot, Furniture, M, wallRun } from './interior';
+import { foodSlot, Furniture, M, wallRun, sickSlot } from './interior';
 import { buildCabinLayers } from './cabinGeometry';
 import { box, buildGabled, CUT_H, Parts, showStage, type BuildOpts, type FurnishCtx } from './shell';
 import { Clutter } from './clutter';
+import { dressEvenings } from './goodsDress';
 import { UTILITY_BUILDERS } from './utilityBuildings';
+import { TOWER_BUILDERS } from './towerBuildings';
 import { BUNKER_BUILDERS } from './bunkerBuildings';
 import { OLD_BUILDERS } from './oldBuildings';
 import { COMPOUND_BUILDERS } from './compoundBuildings';
+import { GATEHOUSE_BUILDERS } from './gatehouseBuildings';
 import { FOOD_BUILDERS } from './foodBuildings';
+import { FARM_BUILDERS } from './farmBuildings';
+import { RENEWABLE_BUILDERS } from './renewableBuildings';
+import { TUNNEL_BUILDERS } from './tunnelBuildings';
+import { DOCK_BUILDERS } from './dockBuildings';
+import { OUTPOST_BUILDERS } from './outpostBuildings';
+import { HERD_BUILDERS } from './herdBuildings';
+import { HOUSING_BUILDERS, HOUSING_SEATS } from './housingStyleBuildings';
+import { TERRACE_BUILDERS } from './terraceProps';
 
 /** Seats for evenings at home: local x, z and the point the sitter faces. */
 export type Seat = [number, number, number, number];
@@ -378,12 +389,13 @@ function logHouse(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group
     I({ x: left + 0.06, z: 0.22, rot: Math.PI / 2 }, a => Furniture.cookstove(a));
     I({ x: -0.32, z: 0.62, rot: Math.PI / 2 }, a => Furniture.island(a, 1.8));
     I({ x: 0.35, z: 0.78, rot: Math.PI / 2 }, a => Furniture.diningTable(a));
+    dressEvenings(c, { x: 0.35, z: 0.78, rot: Math.PI / 2 });
     I({ x: 0.62, z: front - 0.04, rot: Math.PI }, a => Furniture.shelfUnit(a, 1.0, 1.6, 'food'));
     I({ x: -0.15, z: front - 0.01, rot: Math.PI }, a => Furniture.coatPegs(a, 0.9), false);
     // stairs up to the loft, rising toward the back along the partition
     I({ x: 0.06, z: LH.loftZ + 0.3 }, a => Furniture.stairs(a, c.spec.wallH / M, 3.6, 0.85));
     // bedroom
-    I({ x: 0.45, z: back + 0.01 + 0.18 }, a => Furniture.bed(a, true, 'quilt_red'));
+    I({ x: 0.45, z: back + 0.01 + 0.18 }, a => { Furniture.bed(a, true, 'quilt_red'); sickSlot(a); });
     I({ x: right - 0.04, z: back + 0.05 }, a => Furniture.nightstand(a));
     I({ x: 0.22, z: back + 0.05 }, a => Furniture.nightstand(a));
     I({ x: right - 0.05, z: LH.bedZ - 0.1, rot: -Math.PI / 2 }, a => Furniture.dresser(a, 1.2));
@@ -479,6 +491,7 @@ function dressLogHouse(c: FurnishCtx): void {
 /** Evening seats per kind (local). */
 const SEATS: Record<string, Seat[]> = {
   log_house: [[-0.3, -0.45, -0.4, -1.1], [-0.5, -0.45, -0.4, -1.1], [0.35, 0.62, 0.35, 0.78], [0.35, 0.94, 0.35, 0.78]],
+  ...HOUSING_SEATS,
 };
 
 const BUILDERS: Record<string, (def: KitPieceDef, seed?: number, opts?: BuildOpts) => THREE.Group> = {
@@ -491,10 +504,20 @@ const BUILDERS: Record<string, (def: KitPieceDef, seed?: number, opts?: BuildOpt
   field,
   log_house: logHouse,
   ...UTILITY_BUILDERS,
+  ...TOWER_BUILDERS,
   ...BUNKER_BUILDERS,
   ...OLD_BUILDERS,
   ...COMPOUND_BUILDERS,
+  ...GATEHOUSE_BUILDERS,
   ...FOOD_BUILDERS,
+  ...HERD_BUILDERS,
+  ...FARM_BUILDERS,
+  ...RENEWABLE_BUILDERS,
+  ...TUNNEL_BUILDERS,
+  ...DOCK_BUILDERS,
+  ...OUTPOST_BUILDERS,
+  ...HOUSING_BUILDERS,
+  ...TERRACE_BUILDERS,
 };
 
 /** Every layer of a kit piece (construction shows them stage by stage). */

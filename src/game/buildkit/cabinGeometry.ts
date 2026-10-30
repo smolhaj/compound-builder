@@ -13,8 +13,9 @@
  */
 import * as THREE from 'three';
 import { CELL, type KitPieceDef } from './kit';
-import { Furniture, M } from './interior';
+import { Furniture, M, sickSlot } from './interior';
 import { Clutter } from './clutter';
+import { dressEvenings } from './goodsDress';
 import { box, buildGabled, Parts, layerFractions, showStage, BUILD_LAYERS, CUTAWAY_HIDE, CUT_H, XRAY_LAYERS, type BuildLayer, type BuildOpts, type FurnishCtx, type GabledSpec } from './shell';
 
 export { layerFractions, CUTAWAY_HIDE, XRAY_LAYERS, CUT_H };
@@ -86,7 +87,7 @@ function furnishCabin(c: FurnishCtx): void {
   I({ x: -0.38, z: front - 0.035, rot: Math.PI }, a => Furniture.bench(a, 0.9));
   I({ x: -0.38, z: front - 0.008, rot: Math.PI }, a => Furniture.coatPegs(a, 0.9), false);
   // bedroom: double bed against the partition, nightstand, dresser
-  I({ x: 0.29, z: PZ + 0.01 + 1.0 * M + 0.04 * M }, a => Furniture.bed(a, true, 'quilt_red'));
+  I({ x: 0.29, z: PZ + 0.01 + 1.0 * M + 0.04 * M }, a => { Furniture.bed(a, true, 'quilt_red'); sickSlot(a); });
   I({ x: right - 0.04, z: PZ + 0.05 }, a => Furniture.nightstand(a));
   I({ x: right - 0.045, z: 0.6, rot: -Math.PI / 2 }, a => Furniture.dresser(a, 1.0));
   I({ x: 0.22, z: 0.6 }, a => Furniture.rug(a, 1.2, 0.8), false);
@@ -105,6 +106,7 @@ function furnishCabin(c: FurnishCtx): void {
 /** Life in the cabin: dishes, books, boots, toys, the dog by the stove, pictures, the woodpile outside. */
 function dressCabin(c: FurnishCtx): void {
   const { C, y0, left, right, front, back } = c;
+  dressEvenings(c, { x: -0.25, z: 0.02 });
   const tableY = y0 + 0.004 + 0.76 * M, counterY = y0 + 0.004 + 0.9 * M, stoveY = y0 + 0.004 + 0.88 * M;
   const tx = -0.25, tz = 0.02;
   // table: supper things, a book, the mail, a game or the kids' drawing

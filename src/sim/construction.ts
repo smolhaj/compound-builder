@@ -4,19 +4,37 @@
  * then); builders add person-hours at their work rate; when the stage's
  * hours are done the next one begins.
  */
+import { mudFactor } from './terrainFx';
 import { drillExtra, siteProblem } from './site';
+import { gradedBlueprint, stampGrade } from './slope';
 import { permitHold } from './paperwork';
-import { BLUEPRINTS } from './blueprints';
-import { hasAll, MATERIALS, shortfall, type MaterialId, type Stock } from './materials';
+import { keepsWalls, stampStyle, styledBlueprint } from './housingStyles';
+import { BLUEPRINTS, totalBill } from './blueprints';
+import { hasAll, shortfall, waitingFor, type Stock } from './materials';
 import { log } from './economy';
+import { payUpkeep, toolHold, wearTools, workSpeed } from './tools';
 import type { GameState, Structure } from './state';
 
 export function blueprintOf(st: Structure) {
-  return BLUEPRINTS[st.kind];
+  const bp = BLUEPRINTS[st.kind];
+  return st.grade ? gradedBlueprint(styledBlueprint(bp, st.mat), st.grade) : styledBlueprint(bp, st.mat);
 }
 
 export function isFinished(st: Structure): boolean {
   return st.stage >= blueprintOf(st).stages.length;
+}
+
+/** Share of the old tier's materials that comes back when its upgrade is finished (same as the walls: sim/perimeter.ts SALVAGE). */
+export const STRUCTURE_SALVAGE = 0.5;
+
+/** An upgrade is done: the old tier goes, and half its materials come back to the stockpile. */
+function completeUpgrade(s: GameState, st: Structure): void {
+  const old = s.structures.find(x => x.id === st.replaces);
+  st.replaces = undefined;
+  if (!old) return;
+  for (const [k, n] of Object.entries(totalBill(blueprintOf(old))) as Array<[keyof Stock, number]>) s.stock[k] += Math.floor(n * STRUCTURE_SALVAGE);
+  s.structures = s.structures.filter(x => x.id !== old.id);
+  log(s, `The old ${old.kind.replace(/_/g, ' ')} comes down; half its materials are back in the stockpile.`);
 }
 
 /** Plan a structure at a placed spot (mutates the draft). */
@@ -27,6 +45,8 @@ export function planProblem(s: GameState, kind: string): string | null {
 
 export function planStructure(s: GameState, kind: string, x: number, z: number, rot: number): Structure {
   const st: Structure = { id: `s${s.nextId++}`, kind, x, z, rot, stage: 0, done: 0, supplied: false, finishedAt: null };
+  stampGrade(s, st);
+  stampStyle(s, st);
   s.structures.push(st);
   log(s, `Staked out a ${kind.replace('_', ' ')}.`);
   return st;
@@ -41,7 +61,21 @@ export function blockedReason(s: GameState, st: Structure): string | null {
   const need = blueprintOf(st).stages[st.stage].materials;
   if (hasAll(s.stock, need)) return null;
   const miss = shortfall(s.stock, need);
-  return 'Waiting for ' + (Object.entries(miss) as Array<[MaterialId, number]>).map(([k, n]) => `${n} ${MATERIALS[k].name.toLowerCase()}`).join(', ');
+  return waitingFor(miss);
+}
+
+/** `blockedReason(s, st) === null` without building the message (the engine asks this every quarter-hour). */
+export function canGoOn(s: GameState, st: Structure): boolean {
+  if (isFinished(st) || permitHold(s, st)) return false;
+  if (!(st.supplied || hasAll(s.stock, blueprintOf(st).stages[st.stage].materials))) return false;
+  return toolHold(s, { kind: 'build', stage: blueprintOf(st).stages[st.stage].id }) === null;   // (a tool it can't do without: sim/tools.ts)
+}
+
+/** Why the family can't go on with this structure now: the materials, or a tool it can't do without ("Needs a saw"). Null = it can. */
+export function holdReason(s: GameState, st: Structure): string | null {
+  const why = blockedReason(s, st);
+  if (why || isFinished(st)) return why;
+  return toolHold(s, { kind: 'build', stage: blueprintOf(st).stages[st.stage].id });
 }
 
 /** Take the current stage's materials from the stockpile if they are there. */
@@ -57,17 +91,24 @@ function supply(s: GameState, st: Structure): boolean {
 /**
  * Add `hours` of work at `rate` (person-hours × rate). Carries over into the
  * next stage while materials allow. Returns the person-hours actually used.
+ * `own`: the family's own hands, so its tools speed the work up (or are required) and wear;
+ * hired crews, neighbors and the like bring their own.
  */
-export function addWork(s: GameState, st: Structure, personHours: number): number {
-  let left = personHours;
+export function addWork(s: GameState, st: Structure, personHours: number, own = false): number {
+  let left = own ? payUpkeep(s, personHours) : personHours;
   const bp = blueprintOf(st);
   while (left > 1e-9 && !isFinished(st)) {
     if (!supply(s, st)) break;
     const stage = bp.stages[st.stage];
     const need = stage.hours - st.done;
-    const use = Math.min(need, left);
-    st.done += use;
+    const task = { kind: 'build', stage: stage.id } as const;
+    // spring-thaw mud on a floodplain slows the work (sim/terrainFx.ts)
+    const m = (own ? workSpeed(s, task) : 1) * mudFactor(s, st);
+    if (m <= 0) break;   // no tool for it (holdReason says which): the family makes do in a day or two
+    const use = Math.min(need / m, left);
+    st.done += use * m;
     left -= use;
+    if (own) wearTools(s, task, use);
     if (st.done >= stage.hours - 1e-9) {
       for (const [k, n] of Object.entries(stage.yields ?? {}) as Array<[keyof Stock, number]>) s.stock[k] += n;
       // a deep well: the driller bills the meters past the usual bore
@@ -79,8 +120,9 @@ export function addWork(s: GameState, st: Structure, personHours: number): numbe
       st.done = 0;
       st.supplied = false;
       if (isFinished(st)) {
-        st.finishedAt = s.clock.t;
+        st.finishedAt = s.clock.t; delete st.roofLost;
         log(s, `The ${st.kind.replace('_', ' ')} is finished!`);
+        if (st.replaces) completeUpgrade(s, st);
       } else log(s, `${stage.name} done — on to: ${bp.stages[st.stage].name.toLowerCase()}.`);
     }
   }
@@ -100,6 +142,7 @@ export function knockBack(s: GameState, st: Structure, stage: number): void {
   for (let i = stage + 1; i < from; i++) for (const [k, n] of Object.entries(stages[i].materials) as Array<[keyof Stock, number]>) s.stock[k] += n;
   // the current stage's own materials, if they were already taken in
   if (st.stage > stage && st.stage < stages.length && st.supplied) for (const [k, n] of Object.entries(stages[st.stage].materials) as Array<[keyof Stock, number]>) s.stock[k] += n;
+  if (stages[stage]?.id === 'roof' && from > stage) st.roofLost = true;
   st.stage = stage; st.done = 0; st.supplied = false; st.finishedAt = null;
 }
 
@@ -124,6 +167,11 @@ export function burnStructure(s: GameState, st: Structure): boolean {
     // (a hand well keeps its roof stage to redo, and gets the hand pump back from knockBack)
     if (st.kind === 'well_drilled') { s.stock.hardware = hw; s.stock.roofing = Math.max(0, s.stock.roofing - (stages[3]?.materials.roofing ?? 0)); }
     return true;
+  }
+  // stone, earth and steel walls come through a fire: the roof and everything inside burn, and it has to be re-roofed and refinished
+  if (keepsWalls(st.kind)) {
+    const roof = stages.findIndex(x => x.id === 'roof');
+    if (roof >= 0 && st.stage > roof) { st.stage = roof; st.done = 0; st.supplied = false; st.finishedAt = null; st.roofLost = true; return true; }
   }
   st.stage = 0; st.done = 0; st.supplied = false; st.finishedAt = null;
   return true;

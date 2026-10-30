@@ -5,7 +5,7 @@
  */
 import { Fragment, useState, type CSSProperties, type ReactNode } from 'react';
 import { useGameStore } from '../store/gameStore';
-import { MATERIALS, type MaterialId } from '../sim/materials';
+import { MATERIALS, billText, type MaterialId } from '../sim/materials';
 import { foodLine, orderCost, orderProblem, payWith, prices } from '../sim/economy';
 import { FOOD, KITS, kitUnits, lifeDays, pantryRows, SHOP_FOOD, type FoodItemId } from '../sim/pantry';
 import { needOf } from '../sim/needs';
@@ -15,20 +15,14 @@ import {
 } from '../sim/finance';
 import type { GameState, OrderLine } from '../sim/state';
 import { buyOffer, canTrade, findContact, heatNow, INTRO_CASH, lawless, offers, peekBm, priceOfOffer, risk } from '../sim/blackMarket';
-import { HARDEN_GOODS, KIT_GOODS, WATCH_GOODS } from '../sim/gear';
+import { ToolShop } from './ToolShop';
+import { kitNote } from '../sim/evenings';
+import { SHELF_TABS, SHELVES, shelvesNeeding, type ShelfTab } from '../sim/shelves';
+import { plansNeed, plansNeedLines } from '../sim/guidance';
 import { ammoLimit, buyAmmo, buyGun, CALIBER, CALIBERS, CLASS_USD, GUN, GUN_GROUP, GUNS, groupOf, gunPrices, issue, NFA_STAMP, practice, shopOpen, skillOf, stateBan, takeClass, type Caliber, type GunGroup, type GunModel } from '../sim/armory';
 
-type Tab = 'build' | 'bunker' | 'water' | 'food' | 'household' | 'fuel' | 'guns' | 'defense' | 'metals' | 'money';
-const TABS: Array<[Tab, string]> = [['build', 'Building'], ['bunker', 'Bunker'], ['water', 'Water & power'], ['food', 'Food'], ['household', 'Medical & household'], ['fuel', 'Fuel & tools'], ['guns', 'Guns & ammo'], ['defense', 'Kit & security'], ['metals', 'Gold & silver'], ['money', 'Money']];
-const SHELVES: Record<Exclude<Tab, 'metals' | 'money' | 'guns'>, MaterialId[]> = {
-  build: ['lumber', 'fieldstone', 'concrete', 'roofing', 'hardware', 'wire', 'seedlings', 'greenhouse_kit', 'fruit_trees'],
-  bunker: ['rebar', 'membrane', 'container', 'blast_door', 'blast_valve', 'nbc_filter', 'filter_set', 'culvert', 'egress_hatch', 'lead_sheet', 'faraday_mesh'],
-  water: ['water_jugs', 'ibc_tote', 'water_trailer', 'water_filter', 'ro_system', 'softener', 'greywater', 'pipe', 'cable', 'fixtures', 'pump', 'drilling', 'tank', 'septic_tank', 'solar_panel', 'battery', 'inverter', 'generator'],
-  food: ['seed', 'lids', 'fishing_gear', 'snares', 'smoker', 'goat', 'pig', 'steer', 'rabbit', 'hay', 'feed'],
-  household: ['meds', 'hygiene', 'traps'],
-  fuel: ['fuel', 'stabilizer', 'firewood', 'excavator', 'plow', 'gun_safe', 'gun_cleaning'],
-  defense: [...KIT_GOODS, ...WATCH_GOODS, ...HARDEN_GOODS],
-};
+type Tab = ShelfTab | 'tools' | 'guns' | 'metals' | 'money';
+const TABS: Array<[Tab, string]> = [...SHELF_TABS.filter(([id]) => id !== 'defense'), ['tools', 'Tools'], ['guns', 'Guns & ammo'], ['defense', 'Kit & security'], ['metals', 'Gold & silver'], ['money', 'Money']];
 
 const C = { bg: 'rgba(22,24,20,0.98)', card: 'rgba(255,255,255,0.045)', line: 'rgba(255,255,255,0.09)', gold: '#d8c9a0', dim: 'rgba(238,238,238,0.62)', good: '#a8d080', bad: '#f0a080' };
 const usd = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
@@ -52,6 +46,11 @@ function Icon({ id, tint }: { id: string; tint?: number }) {
     case 'roofing': return g(<>{[8, 16, 24, 32].map(x => <rect key={x} x={x} y="10" width="6" height="24" fill="#7a3428" stroke="#4a1a14" />)}</>);
     case 'hardware': return box('#5a6068', 'BOLTS');
     case 'wire': return g(<><circle cx="22" cy="22" r="11" fill="none" stroke="#a0a6aa" strokeWidth="3" /><circle cx="22" cy="22" r="6" fill="none" stroke="#a0a6aa" strokeWidth="2" /></>);
+    case 'greenhouse_pro_kit': return g(<><path d="M5 34 V22 L13.5 14 L22 22 L30.5 14 L39 22 V34 Z" fill="#cfe4ea" fillOpacity="0.5" stroke="#9aa4aa" strokeWidth="1.8" /><path d="M22 22 V34 M5 28 H39" stroke="#9aa4aa" strokeWidth="1.2" /><path d="M12 31 q2 -5 4 0 M26 31 q2 -5 4 0" stroke="#5a9a3a" strokeWidth="2" fill="none" /></>);
+    case 'trout_fry': return g(<><path d="M8 24 q8 -9 18 0 q-10 9 -18 0 z" fill="#a8b4ac" stroke="#5a6a62" /><path d="M26 24 l9 -6 v12 z" fill="#8a988e" /><circle cx="13" cy="22" r="1.3" fill="#222" /><path d="M10 31 q8 5 16 0" stroke="#4a8aa0" fill="none" /></>);
+    case 'crayfish_stock': return g(<><ellipse cx="22" cy="26" rx="6" ry="9" fill="#8a3a24" /><path d="M16 17 q-6 -6 -8 -1 q3 6 8 6 M28 17 q6 -6 8 -1 q-3 6 -8 6" fill="#a8452b" stroke="#5a2214" /><path d="M18 35 l-3 4 M26 35 l3 4" stroke="#5a2214" strokeWidth="2" /></>);
+    case 'fish_feed': return bag('#8a6a3a', 'FISH');
+    case 'sheep': return g(<><ellipse cx="21" cy="25" rx="11" ry="8" fill="#ece8da" stroke="#9a9684" /><circle cx="33" cy="22" r="4.5" fill="#3a3028" /><path d="M14 32 v5 M28 32 v5" stroke="#3a3028" strokeWidth="2.5" /></>);
     case 'greenhouse_kit': return g(<><path d="M8 34 V20 L22 10 L36 20 V34 Z" fill="#cfe4ea" fillOpacity="0.5" stroke="#9aa4aa" strokeWidth="2" /><path d="M22 10 V34 M8 24 H36" stroke="#9aa4aa" strokeWidth="1.5" /></>);
     case 'fruit_trees': return g(<><rect x="20" y="24" width="4" height="12" fill="#6a4a2a" /><circle cx="22" cy="18" r="10" fill="#4f8a34" /><circle cx="17" cy="20" r="2.2" fill="#c0392b" /><circle cx="26" cy="15" r="2.2" fill="#c0392b" /></>);
     case 'seedlings': return g(<><rect x="12" y="26" width="20" height="10" fill="#6a4a2a" /><path d="M16 26 v-8 M22 26 v-12 M28 26 v-7" stroke="#5a9a3a" strokeWidth="2.5" /></>);
@@ -68,10 +67,20 @@ function Icon({ id, tint }: { id: string; tint?: number }) {
     case 'f:pack': return box('#8ab0c8', 'MEAT');
     case 'canned': return can('#b04a30');
     case 'frozen': return box('#8ab0c8', 'MEAT');
-    case 'seed': return bag('#c8b070', 'SEED');
+    case 'seed': return bag('#9a8ac0', 'F1');
+    case 'seed_heirloom': return bag('#c8b070', 'HEIR');
+    case 'seed_saved': return bag('#b8a070', 'MINE');
+    case 'seed_cover': return bag('#7aa860', 'CLOVER');
+    case 'canner': return g(<><ellipse cx="22" cy="14" rx="12" ry="4" fill="#b8bcc0" /><path d="M10 14 v18 q12 6 24 0 v-18" fill="#9aa0a6" /><circle cx="22" cy="9" r="3.5" fill="#e8e4dc" stroke="#555" /><path d="M22 9 l2 -2" stroke="#c03030" /></>);
+    case 'dehydrator': return g(<>{[12, 18, 24, 30].map(y => <rect key={y} x="9" y={y - 3} width="26" height="4" rx="1.5" fill={y % 12 ? '#d8b060' : '#c89048'} />)}<rect x="8" y="9" width="28" height="3" fill="#4a4a4a" /></>);
+    case 'crocks': return g(<>{[12, 26].map(x => <g key={x}><path d={`M${x - 6} 16 h12 l1.5 16 q-7.5 3 -15 0 z`} fill="#b09060" stroke="#6a5030" /><ellipse cx={x} cy="16" rx="6" ry="2" fill="#8a7a50" /></g>)}</>);
+    case 'grain_mill': return g(<><rect x="12" y="28" width="20" height="5" fill="#6a5030" /><path d="M16 28 l3 -14 h6 l3 14 z" fill="#8a8e92" /><path d="M31 18 h7 v-4" stroke="#8a8e92" strokeWidth="2.5" fill="none" /><circle cx="38" cy="13" r="2.5" fill="#6a5030" /></>);
+    case 'manure': case 'compost': return g(<><path d="M8 34 q14 -22 28 0 z" fill={id === 'manure' ? '#6a4a2a' : '#4a3a24'} /><path d="M16 28 q6 -4 12 0" stroke="rgba(255,255,255,0.18)" fill="none" /></>);
     case 'lids': return g(<>{[0, 1, 2].map(i => <ellipse key={i} cx="22" cy={18 + i * 6} rx="11" ry="3" fill="#c8a040" stroke="#7a5a10" />)}</>);
     case 'meds': return g(<><rect x="8" y="12" width="28" height="22" rx="3" fill="#e8e4dc" /><path d="M22 16 v14 M15 23 h14" stroke="#c03030" strokeWidth="4" /></>);
     case 'hygiene': return g(<><rect x="9" y="14" width="12" height="20" rx="3" fill="#7ab0d8" /><circle cx="29" cy="24" r="8" fill="#f2f0ea" /><circle cx="29" cy="24" r="3" fill="#c8c4bc" /></>);
+    case 'tent': return g(<><path d="M6 34 L22 10 L38 34 Z" fill="#c9a24a" stroke="#6a5220" strokeWidth="1.5" /><path d="M22 10 L17 34 H27 Z" fill="#2a2418" /></>);
+    case 'sleeping_bag': return g(<><rect x="6" y="15" width="32" height="14" rx="7" fill="#3a6a5a" stroke="#1f3a30" /><path d="M12 15 v14 M20 15 v14 M28 15 v14" stroke="#1f3a30" /></>);
     case 'traps': return g(<><rect x="10" y="20" width="24" height="10" fill="#c8a070" /><path d="M12 20 q10 -10 20 0" fill="none" stroke="#9aa0a4" strokeWidth="2" /></>);
     case 'fuel': case 'stabilizer': return g(<><path d="M12 12 h16 l6 6 v18 h-22 z" fill={id === 'fuel' ? '#b83a2a' : '#3a7ab8'} /><rect x="26" y="8" width="5" height="6" fill="#333" /></>);
     case 'plow': return g(<path d="M6 30 q16 -16 32 0 v4 h-32 z" fill="#d8a020" stroke="#7a5a10" />);
@@ -84,7 +93,7 @@ function Icon({ id, tint }: { id: string; tint?: number }) {
     case 'solar_panel': return g(<><rect x="6" y="10" width="32" height="22" fill="#1a2a4a" stroke="#aab" />{[16, 26].map(x => <path key={x} d={`M${x} 10 v22`} stroke="#aab" strokeWidth="0.6" />)}<path d="M6 21 h32" stroke="#aab" strokeWidth="0.6" /></>);
     case 'battery': case 'inverter': case 'generator': return box(id === 'battery' ? '#3a4a3a' : id === 'inverter' ? '#4a4a5a' : '#c84020', id === 'battery' ? '48V' : id === 'inverter' ? 'AC' : 'GEN');
     case 'container': return box('#9a3a2a', '20 FT');
-    case 'blast_door': case 'egress_hatch': return g(<><rect x="10" y="6" width="24" height="32" rx="2" fill="#5a6058" stroke="#2a2e28" strokeWidth="2" /><circle cx="22" cy="22" r="5" fill="none" stroke="#c8c8c0" strokeWidth="2" /></>);
+    case 'blast_door': case 'egress_hatch': case 'passage_hatch': return g(<><rect x="10" y="6" width="24" height="32" rx="2" fill="#5a6058" stroke="#2a2e28" strokeWidth="2" /><circle cx="22" cy="22" r="5" fill="none" stroke="#c8c8c0" strokeWidth="2" /></>);
     case 'nbc_filter': case 'filter_set': case 'blast_valve': return g(<><circle cx="22" cy="22" r="13" fill="#5a6058" /><circle cx="22" cy="22" r="7" fill="#2a2e28" />{[0, 60, 120].map(a => <path key={a} d="M22 15 v14" stroke="#9aa" transform={`rotate(${a} 22 22)`} />)}</>);
     case 'rebar': return g(<>{[12, 18, 24, 30].map(x => <path key={x} d={`M${x} 6 v32`} stroke="#8a4a2a" strokeWidth="3" />)}</>);
     case 'membrane': case 'faraday_mesh': case 'lead_sheet': case 'culvert': return g(<rect x="8" y="10" width="28" height="24" rx={id === 'culvert' ? 12 : 1} fill={id === 'membrane' ? '#1a1a1a' : id === 'faraday_mesh' ? '#b87333' : id === 'lead_sheet' ? '#707880' : '#9aa0a4'} />);
@@ -100,8 +109,21 @@ function Icon({ id, tint }: { id: string; tint?: number }) {
     case 'radios': return g(<>{[14, 28].map(x => <g key={x}><rect x={x - 5} y="14" width="10" height="20" rx="2" fill="#2a2a2a" /><path d={`M${x + 3} 14 v-7`} stroke="#2a2a2a" strokeWidth="2" /></g>)}</>);
     case 'cameras': case 'thermal_cam': return g(<><rect x="8" y="16" width="22" height="10" rx="2" fill="#e0e0d8" /><circle cx="10" cy="21" r="3" fill={id === 'cameras' ? '#333' : '#d06a2a'} /><path d="M24 26 v10" stroke="#888" strokeWidth="2" /></>);
     case 'driveway_alarm': case 'tripwire': return g(<><path d="M6 30 h32" stroke="#888" strokeDasharray={id === 'tripwire' ? '2 2' : undefined} /><rect x="16" y="14" width="12" height="12" rx="2" fill="#3a6a9a" /></>);
+    case 'ai_sensor_module': return g(<><rect x="12" y="14" width="24" height="20" rx="3" fill="#2c3a4a" /><circle cx="24" cy="24" r="6" fill="#7fd0ff" /><circle cx="24" cy="24" r="2.5" fill="#102030" /><path d="M16 12 h4 M28 12 h4" stroke="#9cc070" strokeWidth="2" /></>);
     case 'floodlights': return g(<><path d="M14 14 l10 6 v6 l-10 6 z" fill="#555" /><path d="M24 20 l14 -6 v20 l-14 -6" fill="#ffe08a" opacity="0.8" /></>);
+    case 'gen_baffles': case 'gen_vault': return g(<><rect x="8" y="14" width="28" height="20" rx="2" fill={id === 'gen_vault' ? '#4a4e52' : '#8a7a5a'} />{[12, 18, 24, 30].map(x => <path key={x} d={`M${x} 17 v14`} stroke="#222" strokeWidth="2" />)}</>);
+    case 'blackout_curtains': return g(<><rect x="8" y="8" width="28" height="3" fill="#777" />{[10, 18, 26].map(x => <path key={x} d={`M${x} 11 q4 12 0 24 h8 q-4 -12 0 -24 z`} fill="#2a2a34" />)}</>);
+    case 'ground_sensor': return g(<><path d="M6 30 h32" stroke="#6a5a3a" strokeWidth="3" /><path d="M14 30 v-10 M22 30 v-14 M30 30 v-8" stroke="#9aa098" strokeWidth="3" /><circle cx="14" cy="18" r="2.5" fill="#6fbf6f" /><circle cx="22" cy="14" r="2.5" fill="#6fbf6f" /><circle cx="30" cy="20" r="2.5" fill="#6fbf6f" /></>);
+    case 'puppy': return g(<><ellipse cx="22" cy="28" rx="10" ry="6" fill="#d8b878" /><circle cx="14" cy="22" r="6" fill="#d8b878" /><ellipse cx="9" cy="18" rx="2.5" ry="4" fill="#9a7a48" /><circle cx="12" cy="21" r="1" fill="#222" /><circle cx="11" cy="25" r="1.4" fill="#222" /></>);
+    case 'dogbed': return g(<><ellipse cx="22" cy="28" rx="14" ry="7" fill="#7a6a9a" /><ellipse cx="22" cy="26" rx="10" ry="4" fill="#a898c8" /></>);
+    case 'kibble': return bag('#a86a3a', 'DOG');
+    case 'doghouse': return g(<><path d="M8 34 V22 L22 10 L36 22 V34 Z" fill="#a8774a" stroke="#4a3018" /><path d="M17 34 v-9 a5 5 0 0 1 10 0 v9 z" fill="#2a1e10" /></>);
     case 'dog': return g(<path d="M10 30 v-10 l6 -6 h4 l2 -4 l4 4 v6 h10 v10 h-4 v-6 h-14 v6 z" fill="#8a6a40" />);
+    case 'security_door': case 'safe_room_hardened': return g(<><rect x="10" y="5" width="24" height="34" fill="#4e5450" stroke="#222622" strokeWidth="2.5" /><rect x="14" y="10" width="16" height="24" fill="none" stroke="#2c302c" strokeWidth="1.5" />{[12, 22, 32].map(y => <rect key={y} x="8" y={y - 2} width="4" height="4" fill="#9a9e98" />)}<circle cx="29" cy="22" r="2.5" fill="#d0b060" /></>);
+    case 'window_shutters': return g(<><rect x="8" y="8" width="28" height="28" fill="#2a3a4a" />{[10, 14, 18, 22, 26, 30, 34].map(y => <rect key={y} x="8" y={y} width="28" height="3" fill="#7a8088" stroke="#3a3e44" strokeWidth="0.6" />)}</>);
+    case 'ballistic_panels': return g(<><rect x="8" y="8" width="28" height="28" fill="#3a5a6a" stroke="#202c34" strokeWidth="2" /><path d="M10 34 L34 10 M10 24 L24 10" stroke="#9fd0e0" strokeWidth="1.2" opacity="0.7" /><circle cx="26" cy="22" r="2" fill="#202c34" /></>);
+    case 'bugout_bag': return g(<><rect x="12" y="10" width="20" height="26" rx="5" fill="#5a6a3a" stroke="#2e3820" strokeWidth="2" /><rect x="15" y="20" width="14" height="9" rx="2" fill="#4a5a2e" /><path d="M16 10 q6 -7 12 0" fill="none" stroke="#2e3820" strokeWidth="2.5" /></>);
+    case 'bugout_cache': return g(<><path d="M4 32 h36" stroke="#5a4a30" strokeWidth="3" /><rect x="12" y="14" width="9" height="16" rx="2" fill="#3a5a8a" stroke="#1e3050" /><rect x="23" y="18" width="9" height="12" rx="2" fill="#3a5a8a" stroke="#1e3050" /><path d="M8 38 h28" stroke="#3a3020" strokeWidth="2" strokeDasharray="3 2" /></>);
     case 'steel_door': case 'safe_room': return g(<><rect x="12" y="6" width="20" height="32" fill="#6a7068" stroke="#3a3e38" strokeWidth="2" /><circle cx="28" cy="22" r="2" fill="#ccc" /></>);
     case 'window_bars': return g(<><rect x="8" y="8" width="28" height="28" fill="#2a3a4a" />{[14, 20, 26, 32].map(x => <path key={x} d={`M${x} 8 v28`} stroke="#9a9a9a" strokeWidth="2" />)}</>);
     case 'sandbags': return g(<>{[[12, 30], [24, 30], [18, 22], [30, 22]].map(([x, y]) => <ellipse key={x + '' + y} cx={x} cy={y} rx="7" ry="4" fill="#b8a070" stroke="#7a6a48" />)}</>);
@@ -121,6 +143,31 @@ function Icon({ id, tint }: { id: string; tint?: number }) {
     case 'gold_bar': return coin('#e0b030', 1, true);
     case 'silver_coin': case 'silver_round': return coin('#c8ccd0');
     case 'junk_silver': return g(<>{[[14, 18], [26, 16], [20, 26], [30, 28], [12, 30]].map(([x, y]) => <circle key={x + '' + y} cx={x} cy={y} r="6" fill="#c0c4c8" stroke="#808488" />)}</>);
+    case 'games': return g(<><rect x="8" y="12" width="20" height="24" rx="2" fill="#f2efe6" stroke="#6a6a60" /><text x="18" y="29" textAnchor="middle" fontSize="14" fill="#b03a3a">A</text><rect x="19" y="8" width="18" height="22" rx="2" fill="#f2efe6" stroke="#6a6a60" transform="rotate(12 28 19)" /><circle cx="29" cy="20" r="3" fill="#2a2a2a" transform="rotate(12 28 19)" /></>);
+    case 'instrument': return g(<><ellipse cx="17" cy="28" rx="9" ry="8" fill="#b57a3a" stroke="#6a4520" /><circle cx="17" cy="28" r="3" fill="#2a1a10" /><rect x="22" y="9" width="4" height="20" rx="1.5" fill="#6a4520" transform="rotate(35 24 19)" /><rect x="31" y="6" width="6" height="7" rx="1" fill="#3a2a1a" transform="rotate(35 34 9)" /></>);
+    case 'novels': return g(<>{[[9, '#6a8aa8'], [15, '#a8644a'], [21, '#7a9a5a'], [27, '#c8a85a']].map(([x, c]) => <rect key={String(x)} x={Number(x)} y={12} width="6" height="24" rx="1" fill={String(c)} stroke="rgba(0,0,0,0.3)" />)}<rect x="33" y="16" width="5" height="20" rx="1" fill="#8a6a9a" transform="rotate(10 35 26)" /></>);
+    case 'manuals': return g(<><rect x="9" y="9" width="26" height="28" rx="2" fill="#4a6a4a" stroke="#223" /><rect x="13" y="13" width="18" height="6" fill="#e8dfc0" /><path d="M13 24 h18 M13 28 h14 M13 32 h16" stroke="#e8dfc0" strokeWidth="1.4" /></>);
+    case 'game_pieces': return g(<><rect x="8" y="14" width="14" height="20" rx="2" fill="#f2efe6" stroke="#6a6a60" transform="rotate(-8 15 24)" /><text x="15" y="29" textAnchor="middle" fontSize="12" fill="#b03a3a" transform="rotate(-8 15 24)">K</text><rect x="26" y="22" width="12" height="12" rx="2" fill="#f2efe6" stroke="#6a6a60" /><circle cx="30" cy="26" r="1.3" fill="#222" /><circle cx="34" cy="30" r="1.3" fill="#222" /><circle cx="30" cy="30" r="1.3" fill="#222" /><circle cx="34" cy="26" r="1.3" fill="#222" /></>);
+    case 'guitar_strings': return g(<><rect x="6" y="12" width="32" height="20" rx="2" fill="#e8dfc0" stroke="#8a7a50" />{[16, 20, 24, 28].map(y => <path key={y} d={`M9 ${y} h26`} stroke="#8a6a3a" strokeWidth="1" />)}<circle cx="32" cy="22" r="3" fill="#c8a040" /></>);
+    case 'music_player': return g(<><rect x="9" y="12" width="26" height="22" rx="4" fill="#3a3c40" stroke="#6a6e72" /><circle cx="17" cy="26" r="5" fill="#222" stroke="#8a8e92" /><circle cx="28" cy="26" r="3" fill="#222" stroke="#8a8e92" /><rect x="13" y="15" width="18" height="4" rx="1" fill="#7fd08a" /><path d="M32 12 l4 -6" stroke="#8a8e92" strokeWidth="1.5" /></>);
+    case 'batteries': return g(<>{[11, 19, 27].map(x => <g key={x}><rect x={x} y="12" width="6" height="22" rx="1.5" fill="#c8a040" /><rect x={x} y="12" width="6" height="6" rx="1.5" fill="#2a2a2a" /><rect x={x + 1.5} y="9" width="3" height="3" fill="#aaa" /></g>)}</>);
+    case 'paperbacks_bag': return g(<><path d="M10 14 h24 l2 22 h-28 z" fill="#c8b890" stroke="#7a6a48" />{[[14, '#a8644a'], [20, '#6a8aa8'], [26, '#7a9a5a']].map(([x, c]) => <rect key={String(x)} x={Number(x)} y="8" width="5" height="12" rx="1" fill={String(c)} />)}</>);
+    case 'toys': return g(<><rect x="9" y="24" width="12" height="12" fill="#d8503a" stroke="#7a2a1a" /><rect x="23" y="24" width="12" height="12" fill="#3a78d8" stroke="#1a3a7a" /><rect x="16" y="12" width="12" height="12" fill="#e8c83a" stroke="#8a7210" /><circle cx="22" cy="18" r="2" fill="#7a5a10" /></>);
+    case 'picture_books': return g(<><rect x="8" y="14" width="18" height="22" rx="2" fill="#e8a8b8" stroke="#8a4a5a" /><circle cx="17" cy="23" r="4" fill="#f8e068" /><path d="M12 31 q5 -4 10 0" stroke="#4a8a4a" strokeWidth="2" fill="none" /><rect x="24" y="10" width="14" height="22" rx="2" fill="#8ac8e8" stroke="#3a6a8a" transform="rotate(8 31 21)" /></>);
+    case 'course_firstaid': case 'course_ham': case 'course_engines': case 'course_welding': case 'course_carpentry': case 'course_wiring': case 'course_gardening': case 'course_husbandry': case 'course_canning': {
+      const sym = ({
+        course_firstaid: <><path d="M22 14 v14 M15 21 h14" stroke="#c03030" strokeWidth="4" /></>,
+        course_ham: <><path d="M14 30 l8 -16 l8 16 z" fill="none" stroke="#e8dfc0" strokeWidth="2" /><path d="M22 14 v-4" stroke="#e8dfc0" strokeWidth="2" /></>,
+        course_engines: <><circle cx="22" cy="22" r="6" fill="none" stroke="#e8dfc0" strokeWidth="2.5" />{[0, 60, 120, 180, 240, 300].map(a => <path key={a} d="M22 12 v3" stroke="#e8dfc0" strokeWidth="2.5" transform={`rotate(${a} 22 22)`} />)}</>,
+        course_welding: <><path d="M14 30 l10 -10" stroke="#e8dfc0" strokeWidth="3" /><path d="M24 20 l6 -6 M26 24 l6 -2 M22 17 l2 -7" stroke="#ffb040" strokeWidth="2" /></>,
+        course_carpentry: <><path d="M13 30 l15 -15" stroke="#e8dfc0" strokeWidth="3" /><rect x="24" y="12" width="9" height="6" rx="1" fill="#c8a85a" transform="rotate(45 28 15)" /></>,
+        course_wiring: <><path d="M24 11 l-7 12 h6 l-3 10 l10 -14 h-6 l4 -8 z" fill="#f2d038" stroke="#8a7210" /></>,
+        course_gardening: <><path d="M22 32 v-12" stroke="#7ac060" strokeWidth="2.5" /><path d="M22 24 q-8 -2 -8 -10 q8 0 8 10 M22 20 q8 -2 8 -9 q-8 0 -8 9" fill="#5a9a3a" /></>,
+        course_husbandry: <><ellipse cx="22" cy="24" rx="9" ry="6" fill="#e8dfc0" /><circle cx="31" cy="20" r="3.5" fill="#e8dfc0" /><path d="M16 29 v5 M26 29 v5" stroke="#e8dfc0" strokeWidth="2" /></>,
+        course_canning: <><rect x="14" y="14" width="16" height="20" rx="3" fill="#e8dfc0" fillOpacity="0.3" stroke="#e8dfc0" strokeWidth="1.5" /><rect x="14" y="11" width="16" height="4" fill="#c8a040" /><circle cx="22" cy="25" r="4" fill="#c0392b" /></>,
+      } as Record<string, ReactNode>)[id];
+      return g(<><rect x="6" y="6" width="32" height="32" rx="3" fill="#3a4a6a" stroke="#1a2438" />{sym}<rect x="9" y="33" width="26" height="2" fill="#e8dfc0" opacity="0.6" /></>);
+    }
     default: return box('#555');
   }
 }
@@ -129,7 +176,9 @@ function Icon({ id, tint }: { id: string; tint?: number }) {
 export function ShopWindow() {
   const g = useGameStore();
   const game = g.game;
-  const [tab, setTab] = useState<Tab>('build');
+  const need = plansNeed(game), needTabs = shelvesNeeding(need);
+  const needLines = plansNeedLines(game);
+  const [tab, setTab] = useState<Tab>(() => (TABS.find(([id]) => id === g.shopTab)?.[0] ?? TABS.map(([id]) => id).find(id => id in needTabs) ?? 'build'));
   const [cart, setCart] = useState<Partial<Record<MaterialId, number>>>({});
   const [foodCart, setFoodCart] = useState<Partial<Record<FoodItemId, number>>>({});
   const [msg, setMsg] = useState<string | null>(null);
@@ -142,6 +191,7 @@ export function ShopWindow() {
   const total = lines.length ? orderCost(lines, k) : 0;
   const why = lines.length ? orderProblem(game, lines) : 'empty';
   const pay = payWith(game);
+  const onWay = game.orders.filter(o => o.status === 'ordered');
   const add = (m: MaterialId, d: number) => setCart({ ...cart, [m]: Math.max(0, (cart[m] ?? 0) + d) });
   const close = () => g.openShop(false);
   return (
@@ -155,18 +205,25 @@ export function ShopWindow() {
           <button style={btn()} onClick={close}>Close</button>
         </div>
         <div style={{ display: 'flex', gap: 4, padding: '8px 16px', borderBottom: `1px solid ${C.line}`, flexWrap: 'wrap' }}>
-          {TABS.map(([t, name]) => <button key={t} style={btn(tab === t)} onClick={() => { setTab(t); setMsg(null); }}>{name}</button>)}
+          {TABS.map(([t, name]) => <button key={t} style={btn(tab === t)} onClick={() => { setTab(t); setMsg(null); }}>{name}{(needTabs as Record<string, number>)[t] ? <span style={{ marginLeft: 5, fontSize: 10.5, color: '#1c1d18', background: C.gold, borderRadius: 8, padding: '0 5px' }} title="Things the plans still lack are on this shelf">{(needTabs as Record<string, number>)[t]} needed</span> : null}</button>)}
         </div>
+        {needLines.length > 0 && <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '7px 16px', borderBottom: `1px solid ${C.line}`, background: 'rgba(216,201,160,0.08)', flexWrap: 'wrap' }}>
+          <span style={{ flex: 1, minWidth: 240 }}>The plans still lack <b>{needLines.length}</b> material{needLines.length > 1 ? 's' : ''}: {billText(Object.fromEntries(needLines.slice(0, 4).map(l => [l.material, l.qty])))}{needLines.length > 4 ? '…' : ''}. Marked <i>needed</i> below.</span>
+          <button style={btn()} onClick={() => setCart(c => { const n = { ...c }; for (const l of needLines) n[l.material] = Math.max(n[l.material] ?? 0, l.qty); return n; })}>Add them to the order</button>
+          <button style={btn(true, !!orderProblem(game, needLines))} disabled={!!orderProblem(game, needLines)} onClick={() => { if (g.order(needLines)) setMsg(null); }}>Order what the plans need ({usd(orderCost(needLines, k))})</button>
+        </div>}
         <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
           <div style={{ flex: 1, overflowY: 'auto', padding: 14 }}>
-            {tab !== 'metals' && tab !== 'money' && tab !== 'guns' && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 8 }}>
+            {tab !== 'metals' && tab !== 'money' && tab !== 'guns' && tab !== 'tools' && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 8 }}>
               {tab === 'food' && <FoodShelves game={game} k={k} cart={foodCart} add={addFood} />}
-              {SHELVES[tab].filter(m => MATERIALS[m].price !== null).map(m => (
-                <div key={m} style={{ background: C.card, border: `1px solid ${cart[m] ? C.gold : C.line}`, borderRadius: 10, padding: 10, display: 'flex', gap: 10 }}>
+              {(SHELVES as Record<string, MaterialId[]>)[tab].filter(m => MATERIALS[m].price !== null).slice().sort((a, b) => Number((need[b] ?? 0) > 0) - Number((need[a] ?? 0) > 0)).map(m => (
+                <div key={m} style={{ background: C.card, border: `1px solid ${cart[m] || (need[m] ?? 0) > 0 ? C.gold : C.line}`, borderRadius: 10, padding: 10, display: 'flex', gap: 10 }}>
                   <Icon id={m} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}><b>{MATERIALS[m].name}</b><span style={{ color: C.gold }}>{usd((MATERIALS[m].price ?? 0) * k)}</span></div>
                     <div style={{ fontSize: 11.5, color: C.dim, lineHeight: 1.3, margin: '2px 0 6px' }}>{MATERIALS[m].unit}</div>
+                    {(() => { const kn = kitNote(game, m); return kn ? <div style={{ fontSize: 11.5, margin: '-2px 0 5px', color: kn.urgent ? '#e0b050' : C.good }}>{kn.text}</div> : null; })()}
+                    {(need[m] ?? 0) > 0 && <div style={{ fontSize: 11.5, margin: '-2px 0 5px' }}><span style={{ color: '#1c1d18', background: C.gold, borderRadius: 8, padding: '0 6px', fontWeight: 600 }}>needed now</span> <span style={{ color: C.gold }}>plans lack {need[m]}</span> <button style={{ ...btn(), padding: '0 6px', fontSize: 11 }} onClick={() => setCart(c => ({ ...c, [m]: Math.max(c[m] ?? 0, need[m]!) }))}>add {need[m]}</button></div>}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <button style={btn()} onClick={() => add(m, -1)}>−</button>
                       <span style={{ minWidth: 22, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{cart[m] ?? 0}</span>
@@ -177,18 +234,23 @@ export function ShopWindow() {
                 </div>
               ))}
             </div>}
+            {tab === 'tools' && <ToolShop onMsg={setMsg} />}
             {tab === 'guns' && <Guns onMsg={setMsg} />}
             {tab === 'metals' && <Metals onMsg={setMsg} />}
             {tab === 'money' && <Money onMsg={setMsg} />}
             {msg && <div style={{ color: C.bad, marginTop: 10 }}>{msg}</div>}
           </div>
-          {tab !== 'metals' && tab !== 'money' && tab !== 'guns' && <div style={{ width: 250, borderLeft: `1px solid ${C.line}`, padding: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {tab !== 'metals' && tab !== 'money' && tab !== 'guns' && tab !== 'tools' && <div style={{ width: 250, borderLeft: `1px solid ${C.line}`, padding: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
             <b>The order</b>
             {!lines.length && <div style={{ color: C.dim }}>Nothing yet.</div>}
             <div style={{ flex: 1, overflowY: 'auto' }}>
               {lines.map(l => <div key={l.food ?? l.material} style={{ display: 'flex', justifyContent: 'space-between', gap: 6, padding: '2px 0' }}><span>{l.food ? `${l.n} × ${FOOD[l.food].name}` : `${l.qty} × ${MATERIALS[l.material].name}`}</span><span style={{ color: C.dim }}>{usd((l.food ? (FOOD[l.food].price ?? 0) * (l.n ?? 0) : (MATERIALS[l.material].price ?? 0) * l.qty) * k)}</span></div>)}
             </div>
             {lines.length > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: `1px solid ${C.line}`, paddingTop: 6 }}><span>Total, delivered</span><b>{usd(total)}</b></div>}
+            {onWay.length > 0 && <div style={{ borderTop: `1px solid ${C.line}`, paddingTop: 6, fontSize: 12 }} title="Orders already paid for; they arrive on their own">
+              <b>On the way</b>
+              {onWay.map(o => <div key={o.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 6, color: C.dim }}><span>{o.lines.length} item{o.lines.length > 1 ? 's' : ''} · {usd(o.cost)}</span><span>{o.dueAt - game.clock.t < 1 ? 'today' : `in ${Math.ceil(o.dueAt - game.clock.t)} d`}</span></div>)}
+            </div>}
             <div style={{ fontSize: 11.5, color: C.dim }}>{pay === 'cash' ? 'The banks are shut: paying cash from the safe.' : pay === 'bank' ? `From checking. The truck comes in about ${2 + Math.floor(game.site.miles / 15)} days.` : 'Nobody is delivering now.'}</div>
             <button style={{ ...btn(true, !!why), padding: '7px 10px', fontWeight: 600 }} disabled={!!why} onClick={() => { if (g.order(lines)) { setCart({}); setFoodCart({}); } }}>
               {why === 'cannot_afford' ? 'Not enough money' : why === 'no_deliveries' ? 'No deliveries' : 'Place the order'}

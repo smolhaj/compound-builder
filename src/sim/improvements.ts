@@ -19,12 +19,19 @@
 import { log } from './economy';
 import { isFinished } from './construction';
 import type { Stock } from './materials';
-import { MATERIALS, hasAll, shortfall, type MaterialId } from './materials';
+import { hasAll, shortfall, waitingFor, type MaterialId } from './materials';
 import type { GameState, Structure } from './state';
+import type { Site } from './site';
+import { powerFactor, roadFactor } from './slope';
+import { ROAD_PRICE } from './roadStyle';
+import { listingSeed, roadPlanFor } from './roadState';
+import { planWords, type RoadPlan } from './roadPlan';
+import { roadBridgeDay } from './roadFx';
+import { corridorDay } from './corridors';
 
 export type HouseKind = 'farmhouse' | 'trailer' | 'timber_cabin' | 'log_house';
 export type Condition = 'good' | 'fair' | 'poor';
-export type FixPart = 'roof' | 'wiring' | 'plumbing' | 'septic';
+export type FixPart = 'roof' | 'wiring' | 'plumbing' | 'septic' | 'glass' | 'film';
 
 export interface Improvements {
   house: { kind: HouseKind; built: number; roof: Condition; wiring: Condition; plumbing: Condition } | null;
@@ -65,11 +72,23 @@ export function improvementValue(i: Improvements, gwDepth: number): number {
 
 export const POLE_PER_FT = 28;
 export const TRANSFORMER = 3_500;
-export const DRIVE_PER_FT = 20;
-export const CULVERT = 1_200;
+export const DRIVE_PER_FT: number = ROAD_PRICE.perFt;
+export const CULVERT: number = ROAD_PRICE.culvert;
 
-export const powerQuote = (i: Improvements) => ({ usd: Math.round((i.poleFt * POLE_PER_FT + TRANSFORMER) / 100) * 100, days: 35 + Math.round(i.poleFt / 150) });
-export const driveQuote = (i: Improvements) => ({ usd: Math.round((i.driveFt * DRIVE_PER_FT + CULVERT) / 100) * 100, days: 5 + Math.round(i.driveFt / 300) });
+/** The co-op's quote for the line, and the contractor's for the drive; on a lot with relief the poles and the road cost more (sim/slope.ts). */
+export const powerQuote = (i: Improvements, site?: Pick<Site, 'lot' | 'home'>) => {
+  const k = site ? powerFactor(site) : 1;
+  return { usd: Math.round((i.poleFt * POLE_PER_FT * k + TRANSFORMER) / 100) * 100, days: 35 + Math.round(i.poleFt * k / 150) };
+};
+export const driveQuote = (i: Improvements, site?: Site, seed?: number): { usd: number; days: number; plan?: RoadPlan } => {
+  // the road that follows the land (sim/roadPlan.ts): with a game (its seed), or a lot listing (the lot's own ground), the quote is the planned alignment's length, grade, cut and fill, structures and walls
+  if (site && (seed !== undefined || site.lot)) {
+    const plan = roadPlanFor(site, seed ?? listingSeed(site));
+    return { usd: plan.usd, days: plan.days, plan };
+  }
+  const f = site ? roadFactor(site) : { lenMul: 1, perFtMul: 1 };
+  return { usd: Math.round((i.driveFt * f.lenMul * DRIVE_PER_FT * f.perFtMul + CULVERT) / 100) * 100, days: 5 + Math.round(i.driveFt * f.lenMul / 300) };
+};
 
 /** Jobs the co-op or a contractor has on the books (due at game time). */
 export interface SiteJobs { power: number | null; drive: number | null }
@@ -80,7 +99,7 @@ export function hookupProblem(s: GameState, what: 'power' | 'drive'): string | n
   if (s.siteJobs[what] !== null) return 'on the books';
   const t = s.disaster.tracks;
   if (t.banks < 0.5 || t.law < 0.5 || (what === 'power' && t.grid < 0.5)) return 'nobody is taking jobs now';
-  const q = what === 'power' ? powerQuote(imp) : driveQuote(imp);
+  const q = what === 'power' ? powerQuote(imp, s.site) : driveQuote(imp, s.site, s.seed);
   if (s.money < q.usd) return 'not enough money';
   return null;
 }
@@ -88,17 +107,22 @@ export function hookupProblem(s: GameState, what: 'power' | 'drive'): string | n
 export function orderHookup(s: GameState, what: 'power' | 'drive'): string | null {
   const why = hookupProblem(s, what);
   if (why) return why;
-  const q = what === 'power' ? powerQuote(s.site.improvements) : driveQuote(s.site.improvements);
+  const dq = what === 'drive' ? driveQuote(s.site.improvements, s.site, s.seed) : null;
+  const q = dq ?? powerQuote(s.site.improvements, s.site);
   s.money -= q.usd;
   s.siteJobs[what] = s.clock.t + q.days;
-  log(s, what === 'power'
-    ? `Paid the co-op $${q.usd.toLocaleString('en-US')} for ${s.site.improvements.poleFt.toLocaleString('en-US')} ft of line: power in about ${Math.round(q.days / 7)} weeks.`
-    : `Hired a contractor to put in ${s.site.improvements.driveFt.toLocaleString('en-US')} ft of gravel drive ($${q.usd.toLocaleString('en-US')}), about ${q.days} days.`);
+  if (what === 'power') log(s, `Paid the co-op $${q.usd.toLocaleString('en-US')} for ${s.site.improvements.poleFt.toLocaleString('en-US')} ft of line: power in about ${Math.round(q.days / 7)} weeks.`);
+  else {
+    const plan = dq?.plan;
+    log(s, `Hired a contractor to put in ${(plan ? plan.lengthFt : s.site.improvements.driveFt).toLocaleString('en-US')} ft of gravel drive ($${q.usd.toLocaleString('en-US')}), about ${q.days} days.${plan && (plan.structures.length || plan.hairpins.length) ? ` It has ${planWords(plan).slice(1).join(', ')}.` : ''}`);
+  }
   return null;
 }
 
 /** Once a day: finished hookups come in (or stall when the outside world fails). */
 export function siteJobsDay(s: GameState): void {
+  roadBridgeDay(s);
+  corridorDay(s);
   const t = s.disaster.tracks;
   for (const what of ['power', 'drive'] as const) {
     const due = s.siteJobs[what];
@@ -123,7 +147,28 @@ const FIX: Record<FixPart, Record<'fair' | 'poor', { name: string; hours: number
   wiring: { fair: { name: 'Replace the old panel', hours: 24, materials: { cable: 1, hardware: 1 } }, poor: { name: 'Rewire the house', hours: 120, materials: { cable: 5, hardware: 2 } } },
   plumbing: { fair: { name: 'Fix the leaks, new water heater', hours: 20, materials: { pipe: 1, hardware: 1 } }, poor: { name: 'Replumb (PEX) and new fixtures', hours: 90, materials: { pipe: 5, fixtures: 1 } } },
   septic: { fair: { name: 'Pump the tank', hours: 4, materials: { excavator: 1 } }, poor: { name: 'New leach field', hours: 60, materials: { excavator: 2, pipe: 3, concrete: 2 } } },
+  // a greenhouse after hail or an ice storm: a few cracked panes, or the glazing stripped from a bay
+  // a tunnel's poly: torn by wind or a snow load, or four years in the sun
+  film: { fair: { name: 'Patch the torn poly', hours: 8, materials: { poly_film: 1, hardware: 1 } }, poor: { name: 'Re-cover the hoops', hours: 30, materials: { poly_film: 3, hardware: 1 } } },
+  glass: { fair: { name: 'Replace the cracked panes', hours: 12, materials: { hardware: 1 } }, poor: { name: 'Reglaze the broken bays', hours: 48, materials: { hardware: 3, lumber: 1 } } },
 };
+/** Crack a greenhouse's glass (hail, ice): a repair job on the structure, like the old house's. Returns false when it is already cracked. */
+export function crackGlass(st: Structure, cond: 'fair' | 'poor'): boolean {
+  if ((st.fixes ?? []).some(f => f.part === 'glass' && f.done < f.hours)) return false;
+  (st.fixes ??= []).push({ part: 'glass', cond, done: 0, hours: FIX.glass[cond].hours, supplied: false });
+  return true;
+}
+/** Tear a tunnel's poly (wind, snow load, age): a repair job like the glass. Returns false when it is already torn. */
+export function crackFilm(st: Structure, cond: 'fair' | 'poor'): boolean {
+  if ((st.fixes ?? []).some(f => f.part === 'film' && f.done < f.hours)) return false;
+  (st.fixes ??= []).push({ part: 'film', cond, done: 0, hours: FIX.film[cond].hours, supplied: false });
+  return true;
+}
+/** How much of its glass (or poly) is whole: 1 sound, 0.7 a few panes cracked, 0.4 bays broken (output and heat follow). */
+export function glassSound(st: Structure): number {
+  const f = (st.fixes ?? []).find(x => (x.part === 'glass' || x.part === 'film') && x.done < x.hours);
+  return !f ? 1 : f.cond === 'poor' ? 0.4 : 0.7;
+}
 export const fixDef = (f: Fix) => FIX[f.part][f.cond];
 export const fixBill = (f: Fix) => FIX[f.part][f.cond].materials;
 
@@ -139,7 +184,7 @@ export function fixBlocked(s: GameState, f: Fix): string | null {
   const need = fixBill(f);
   if (hasAll(s.stock, need)) return null;
   const miss = shortfall(s.stock, need);
-  return 'Waiting for ' + (Object.entries(miss) as Array<[MaterialId, number]>).map(([k, n]) => `${n} ${MATERIALS[k].name.toLowerCase()}`).join(', ');
+  return waitingFor(miss);
 }
 
 /** The next repair the family can work on (oldest first). */
@@ -161,6 +206,7 @@ export function addFixWork(s: GameState, st: Structure, f: Fix, hours: number): 
   if (f.done >= f.hours - 1e-9) {
     f.done = f.hours;
     log(s, `${fixDef(f).name}: done.`);
+    if (f.part === 'film') st.filmAt = s.clock.t;   // new poly: the four years start again (sim/tunnels.ts)
     if (f.part === 'wiring' || f.part === 'plumbing') {
       const kind = f.part === 'wiring' ? 'wire' : 'plumb';
       if (!s.utilities.fittings.some(x => x.building === st.id && x.kind === kind)) s.utilities.fittings.push({ building: st.id, kind, done: 1, hours: 1, supplied: true, finishedAt: s.clock.t });

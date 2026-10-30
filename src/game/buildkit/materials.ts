@@ -12,32 +12,50 @@
  */
 import * as THREE from 'three';
 import { generateNormalMap } from '../../engine/world/materials/normalMapGen';
+import { patchWear, WEAR_CLASS } from '../atmosphere/weathering';
+import { screenTexture, siteMapTexture } from './screenFeeds';
 
 export type KitMaterialId = 'timber_lap' | 'trim' | 'fieldstone' | 'metal_roof' | 'deck' | 'door' | 'glass' | 'chimney_cap' | 'frame' | 'scaffold' | 'string'
   // interior finishes and furnishings
   | 'pine_panel' | 'wood_dark' | 'wood_mid' | 'iron' | 'enamel' | 'quilt_red' | 'quilt_blue' | 'linen' | 'rug' | 'books' | 'lamp' | 'cutcap' | 'crockery'
   // more buildings
-  | 'concrete' | 'metal_siding' | 'log_wall' | 'log_end' | 'board_batten' | 'wire_mesh' | 'straw' | 'soil' | 'crop' | 'grain' | 'earth' | 'pegboard' | 'steel' | 'paint_red' | 'paint_green' | 'paint_yellow' | 'paint_bunker' | 'paint_dado' | 'bulkhead' | 'glow' | 'whitewash' | 'wet_concrete' | 'bulb' | 'copper' | 'lead' | 'rubber' | 'gauge'
+  | 'concrete' | 'metal_siding' | 'log_wall' | 'log_end' | 'board_batten' | 'wire_mesh' | 'straw' | 'soil' | 'crop' | 'grain' | 'earth' | 'pegboard' | 'steel' | 'paint_red' | 'paint_green' | 'paint_yellow' | 'paint_bunker' | 'paint_dado' | 'bulkhead' | 'glow' | 'glow_oil' | 'glow_electric' | 'glow_curtain' | 'glow_off' | 'whitewash' | 'wet_concrete' | 'bulb' | 'copper' | 'lead' | 'rubber' | 'gauge'
   // perimeter
-  | 'hedge' | 'hedge2' | 'hedge_berry' | 'container_red' | 'container_blue' | 'container_green' | 'container_tan'
+  | 'hedge' | 'hedge2' | 'hedge_berry' | 'container_red' | 'container_blue' | 'container_green' | 'container_tan' | 'container_black' | 'container_rust'
   // homey decor (procedural art)
   | 'solar_cell' | 'poly_tank' | 'blue_tank' |
   'lap_white' | 'vinyl' | 'shingle' |
   'art_mountains' | 'art_sunset' | 'art_lake' | 'photo_family' | 'photo_couple' | 'poster_map' | 'poster_seeds' | 'sampler' | 'curtain' | 'curtain_red' | 'flowers'
   // greenhouse and orchard
   | 'polycarb' | 'aluminum' | 'fruit'
+  // the orchard's other fruit and its blossom (sim/orchard.ts: each kind blooms and ripens in its own weeks)
+  | 'fruit_cherry' | 'fruit_plum' | 'blossom_apple' | 'blossom_pear' | 'blossom_cherry' | 'blossom_plum'
+  // the pond, its fish and crayfish, the flock
+  | 'pond_water' | 'fish' | 'crayfish' | 'sheepwool'
+  // the barnyard's animals and the apiary
+  | 'hide_tan' | 'hide_pink' | 'hide_black' | 'hive_white' | 'bee_gold'
   // interior floors (greenhouse gravel + paver aisle, cottage boards, the garage's oil drips)
   | 'gravel' | 'pavers' | 'floorboards' | 'oil_stain'
   // not drawn: marks a shelf board / pallet where the stored food goes (interior.ts foodSlot; Parts keeps it as a slot)
-  | 'food_slot';
+  | 'food_slot'
+  // the control room: the live screens (emissive atlas), the corkboard's paper site plan, panel lamps
+  | 'screens' | 'sitemap' | 'led_green' | 'led_red' | 'led_amber'
+  // not drawn: marks the mattress of a bed the sick are put in (interior.ts sickSlot; Parts keeps it as a slot)
+  | 'sick_slot'
+  // a dig site: rusted steel (rebar, a delivered culvert tube)
+  | 'rust'
+  // housing styles (sim/housingStyles.ts): painted standing-seam roofs, rammed earth, lime plaster
+  | 'metal_roof_green' | 'metal_roof_grey' | 'adobe' | 'plaster'
+  // a house's shipping container, painted (less metal sheen than the perimeter's)
+  | 'shell_blue' | 'shell_rust' | 'shell_tan' | 'shell_green';
 
 /** World units covered by one texture repeat. */
 const TEX_WORLD: Partial<Record<KitMaterialId, number>> = {
-  timber_lap: 0.5, fieldstone: 0.5, metal_roof: 0.5, deck: 0.5, door: 0.2,
+  timber_lap: 0.5, fieldstone: 0.5, metal_roof: 0.5, metal_roof_green: 0.5, metal_roof_grey: 0.5, adobe: 0.9, plaster: 0.5, deck: 0.5, door: 0.2,
   curtain: 0.15, curtain_red: 0.15, hedge: 0.25, hedge2: 0.25,
   pine_panel: 0.5, quilt_red: 0.12, quilt_blue: 0.12, rug: 0.3, books: 0.1,
   lap_white: 0.5, vinyl: 0.5, shingle: 0.5,
-  concrete: 0.6, whitewash: 0.5, wet_concrete: 0.6, metal_siding: 0.5, container_red: 0.4, container_blue: 0.4, container_green: 0.4, container_tan: 0.4, log_wall: 0.5, board_batten: 0.5, wire_mesh: 0.15, straw: 0.3, soil: 0.4, earth: 0.8, pegboard: 0.2,
+  concrete: 0.6, whitewash: 0.5, wet_concrete: 0.6, metal_siding: 0.5, container_red: 0.4, container_blue: 0.4, container_green: 0.4, container_tan: 0.4, container_black: 0.4, container_rust: 0.4, shell_blue: 0.4, shell_rust: 0.4, shell_tan: 0.4, shell_green: 0.4, log_wall: 0.5, board_batten: 0.5, wire_mesh: 0.15, straw: 0.3, soil: 0.4, earth: 0.8, pegboard: 0.2,
   // 1 repeat: a 1.5 × 1.5 m patch of pea gravel; 2 × 2 pavers of 45 cm; 1.8 m of 13 cm floorboards
   gravel: 0.25, pavers: 0.15, floorboards: 0.3,
 };
@@ -50,7 +68,7 @@ function lcg(seed: number): () => number {
 function canvas(n: number): [HTMLCanvasElement, CanvasRenderingContext2D] {
   const c = document.createElement('canvas');
   c.width = c.height = n;
-  return [c, c.getContext('2d')!];
+  return [c, c.getContext('2d', { willReadFrequently: true })!];
 }
 
 const rgb = (r: number, g: number, b: number) => `rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})`;
@@ -122,14 +140,14 @@ function paintFieldstone(): HTMLCanvasElement {
   return c;
 }
 
-/** Standing-seam metal roof: ribs every ~45 cm, faded barn red with streaks. */
-function paintMetalRoof(): HTMLCanvasElement {
+/** Standing-seam metal roof: ribs every ~45 cm, faded barn red (or a painted colour) with streaks. */
+function paintMetalRoof(base: [number, number, number] = [122, 52, 40]): HTMLCanvasElement {
   const N = 256, ribs = 7, pw = N / ribs;
   const [c, g] = canvas(N);
   const r = lcg(37);
   for (let i = 0; i < ribs; i++) {
     const t = 0.92 + r() * 0.12;
-    g.fillStyle = rgb(122 * t, 52 * t, 40 * t);
+    g.fillStyle = rgb(base[0] * t, base[1] * t, base[2] * t);
     g.fillRect(i * pw, 0, pw, N);
     for (let k = 0; k < 14; k++) {
       g.fillStyle = `rgba(${r() < 0.5 ? '90,60,50' : '170,120,100'},${0.08 + r() * 0.1})`;
@@ -140,6 +158,38 @@ function paintMetalRoof(): HTMLCanvasElement {
     g.fillStyle = 'rgba(40,15,10,0.6)';
     g.fillRect(i * pw + 2, 0, 3, N);
   }
+  return c;
+}
+
+/** Rammed earth / adobe: warm sandy plaster with faint horizontal lifts (about 30 cm), soft mottling, hairline cracks and chalky patches. */
+function paintAdobe(): HTMLCanvasElement {
+  const N = 512, lifts = 5, lh = N / lifts;
+  const [c, g] = canvas(N);
+  const r = lcg(149);
+  g.fillStyle = rgb(196, 166, 128); g.fillRect(0, 0, N, N);
+  for (let i = 0; i < lifts; i++) {
+    const t = 0.95 + r() * 0.1;
+    g.fillStyle = rgb(196 * t, 164 * t, 124 * t);
+    g.fillRect(0, i * lh, N, lh);
+    for (let k = 0; k < 60; k++) { g.fillStyle = `rgba(${r() < 0.5 ? '150,118,84' : '222,196,158'},${0.04 + r() * 0.08})`; g.fillRect(r() * N, i * lh + r() * lh, 10 + r() * 60, 1 + r() * 3); }
+    g.fillStyle = 'rgba(140,108,76,0.22)'; g.fillRect(0, i * lh, N, 2);           // the faint seam between lifts
+  }
+  for (let k = 0; k < 420; k++) { g.fillStyle = `rgba(${r() < 0.5 ? '160,126,92' : '228,204,168'},${0.04 + r() * 0.08})`; g.beginPath(); g.arc(r() * N, r() * N, 4 + r() * 18, 0, Math.PI * 2); g.fill(); }
+  for (let k = 0; k < 2200; k++) { g.fillStyle = `rgba(${r() < 0.5 ? '120,92,64' : '236,214,180'},${0.1 + r() * 0.15})`; g.fillRect(r() * N, r() * N, 1, 1); }   // sand grain
+  g.strokeStyle = 'rgba(110,84,58,0.3)';
+  for (let k = 0; k < 3; k++) { g.beginPath(); let x = r() * N, y = r() * N; g.moveTo(x, y); for (let i = 0; i < 5; i++) { x += (r() - 0.5) * 24; y += 10 + r() * 22; g.lineTo(x, y); } g.stroke(); }
+  return c;
+}
+
+/** Lime plaster between timbers: cream, with trowel sweeps and a little hairline crazing. */
+function paintPlaster(): HTMLCanvasElement {
+  const N = 256;
+  const [c, g] = canvas(N);
+  const r = lcg(151);
+  g.fillStyle = rgb(228, 220, 200); g.fillRect(0, 0, N, N);
+  for (let k = 0; k < 260; k++) { g.fillStyle = `rgba(${r() < 0.5 ? '190,178,150' : '244,238,222'},${0.06 + r() * 0.12})`; g.beginPath(); g.ellipse(r() * N, r() * N, 8 + r() * 26, 3 + r() * 9, (r() - 0.5) * 1.2, 0, Math.PI * 2); g.fill(); }
+  g.strokeStyle = 'rgba(120,108,84,0.3)';
+  for (let k = 0; k < 6; k++) { g.beginPath(); let x = r() * N, y = r() * N; g.moveTo(x, y); for (let i = 0; i < 5; i++) { x += (r() - 0.5) * 30; y += (r() - 0.5) * 30; g.lineTo(x, y); } g.stroke(); }
   return c;
 }
 
@@ -361,6 +411,21 @@ function paintMetalSiding(): HTMLCanvasElement {
     g.fillRect(i * pw, 0, pw, N);
   }
   for (let k = 0; k < 40; k++) { g.fillStyle = `rgba(120,90,60,${0.04 + r() * 0.08})`; g.fillRect(r() * N, r() * N * 0.5 + N * 0.5, 1 + r() * 3, 20 + r() * 60); }
+  return c;
+}
+
+/** Painted container steel for a house: pale ribbed paint (the tint multiplies it, so it stays the colour it names instead of going near-black). */
+function paintShellSteel(): HTMLCanvasElement {
+  const N = 256, ribs = 12, pw = N / ribs;
+  const [c, g] = canvas(N);
+  const r = lcg(97);
+  for (let i = 0; i < ribs; i++) {
+    const grd = g.createLinearGradient(i * pw, 0, (i + 1) * pw, 0);
+    grd.addColorStop(0, rgb(190, 190, 186)); grd.addColorStop(0.5, rgb(250, 250, 246)); grd.addColorStop(1, rgb(176, 176, 172));
+    g.fillStyle = grd;
+    g.fillRect(i * pw, 0, pw, N);
+  }
+  for (let k = 0; k < 40; k++) { g.fillStyle = `rgba(120,90,60,${0.03 + r() * 0.06})`; g.fillRect(r() * N, r() * N * 0.5 + N * 0.5, 1 + r() * 3, 20 + r() * 60); }
   return c;
 }
 
@@ -673,6 +738,10 @@ export function kitMaterial(id: KitMaterialId): THREE.MeshStandardMaterial {
     case 'timber_lap': m = texMat(id, paintLapSiding, 2.2, 0.86, 0, 0.8); break;
     case 'fieldstone': m = texMat(id, paintFieldstone, 3.5, 0.92, 0, 1.2); break;
     case 'metal_roof': m = texMat(id, paintMetalRoof, 2.0, 0.55, 0.35, 0.9); break;
+    case 'metal_roof_green': m = texMat(id, () => paintMetalRoof([46, 84, 62]), 2.0, 0.5, 0.4, 0.9); break;
+    case 'metal_roof_grey': m = texMat(id, () => paintMetalRoof([104, 110, 116]), 2.0, 0.5, 0.45, 0.9); break;
+    case 'adobe': m = texMat(id, paintAdobe, 1.2, 0.97, 0, 0.8); break;
+    case 'plaster': m = texMat(id, paintPlaster, 1.2, 0.9, 0, 0.8); break;
     case 'deck': m = texMat(id, paintDeck, 1.6, 0.85); break;
     case 'door': m = texMat(id, paintDoor, 1.5, 0.75); break;
     case 'trim': m = new THREE.MeshStandardMaterial({ color: 0xe9e2cf, roughness: 0.7 }); break;
@@ -684,6 +753,12 @@ export function kitMaterial(id: KitMaterialId): THREE.MeshStandardMaterial {
     case 'glass': m = new THREE.MeshStandardMaterial({ color: 0x9fb4c0, roughness: 0.05, metalness: 0.2, transparent: true, opacity: 0.28, depthWrite: false }); break;
     // lit windows from outside: one-sided (faces out), invisible by day
     case 'glow': m = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 1, transparent: true, opacity: 0, depthWrite: false, emissive: new THREE.Color(1.0, 0.72, 0.42), emissiveIntensity: 0, side: THREE.FrontSide }); m.visible = false; break;
+    // per-building window light (atmosphere/nightLife): oil lamp, electric light, blackout curtain, dark
+    case 'glow_oil': case 'glow_electric': case 'glow_curtain': case 'glow_off': {
+      const e = id === 'glow_oil' ? new THREE.Color(1.0, 0.6, 0.27) : id === 'glow_electric' ? new THREE.Color(1.0, 0.86, 0.66) : new THREE.Color(0.32, 0.12, 0.05);
+      m = new THREE.MeshStandardMaterial({ color: id === 'glow_curtain' ? 0x1a1512 : 0x000000, roughness: 1, transparent: true, opacity: 0, depthWrite: false, emissive: e, emissiveIntensity: 0, side: THREE.FrontSide });
+      m.visible = false; break;
+    }
     case 'pine_panel': m = texMat(id, paintPinePanel, 1.2, 0.7); break;
     case 'wood_dark': m = new THREE.MeshStandardMaterial({ color: 0x5a3b24, roughness: 0.6 }); break;
     case 'wood_mid': m = new THREE.MeshStandardMaterial({ color: 0x9a6a3e, roughness: 0.65 }); break;
@@ -751,29 +826,69 @@ export function kitMaterial(id: KitMaterialId): THREE.MeshStandardMaterial {
     case 'polycarb': m = new THREE.MeshStandardMaterial({ color: 0xdfeef0, roughness: 0.25, metalness: 0.05, transparent: true, opacity: 0.32, depthWrite: false, side: THREE.DoubleSide }); break;
     case 'aluminum': m = new THREE.MeshStandardMaterial({ color: 0xc4c8cc, roughness: 0.35, metalness: 0.7 }); break;
     case 'fruit': m = new THREE.MeshStandardMaterial({ color: 0xc23a22, roughness: 0.45 }); break;
+    case 'fruit_cherry': m = new THREE.MeshStandardMaterial({ color: 0x7a0f1c, roughness: 0.3 }); break;
+    case 'fruit_plum': m = new THREE.MeshStandardMaterial({ color: 0x4a2a5e, roughness: 0.4 }); break;
+    // blossom: soft, a little emissive so a spring morning's white reads against the leaf (pink-white apple, white pear and plum, the cherry's pinker white)
+    case 'blossom_apple': m = new THREE.MeshStandardMaterial({ color: 0xf6d6df, roughness: 0.85, emissive: new THREE.Color(0.16, 0.1, 0.12) }); break;
+    case 'blossom_pear': m = new THREE.MeshStandardMaterial({ color: 0xf8f6f0, roughness: 0.85, emissive: new THREE.Color(0.14, 0.14, 0.13) }); break;
+    case 'blossom_cherry': m = new THREE.MeshStandardMaterial({ color: 0xfbe9ee, roughness: 0.85, emissive: new THREE.Color(0.15, 0.11, 0.12) }); break;
+    case 'blossom_plum': m = new THREE.MeshStandardMaterial({ color: 0xf5f3ee, roughness: 0.85, emissive: new THREE.Color(0.13, 0.13, 0.12) }); break;
+    // a dark green-brown pond: glossy, a little clear so the fish show through, doubled-sided for the reservoir edge
+    case 'pond_water': m = new THREE.MeshStandardMaterial({ color: 0x2f5a52, roughness: 0.06, metalness: 0.25, transparent: true, opacity: 0.72, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }); break;
+    case 'fish': m = new THREE.MeshStandardMaterial({ color: 0x9aa8a0, roughness: 0.4, metalness: 0.3, side: THREE.DoubleSide }); break;
+    case 'crayfish': m = new THREE.MeshStandardMaterial({ color: 0x8a3a24, roughness: 0.6 }); break;
+    case 'sheepwool': m = new THREE.MeshStandardMaterial({ color: 0xe9e4d4, roughness: 0.95 }); break;
+    case 'hide_tan': m = new THREE.MeshStandardMaterial({ color: 0xb98a58, roughness: 0.9 }); break;
+    case 'hide_pink': m = new THREE.MeshStandardMaterial({ color: 0xe3b0a4, roughness: 0.85 }); break;
+    case 'hide_black': m = new THREE.MeshStandardMaterial({ color: 0x2a2624, roughness: 0.9 }); break;
+    case 'hive_white': m = new THREE.MeshStandardMaterial({ color: 0xece8dc, roughness: 0.7 }); break;
+    case 'bee_gold': m = new THREE.MeshStandardMaterial({ color: 0xd9a21c, roughness: 0.6 }); break;
     case 'gravel': m = texMat(id, paintGravel, 3.0, 0.95, 0, 1.3); break;
     case 'pavers': m = texMat(id, paintPavers, 2.0, 0.9); break;
     case 'floorboards': m = texMat(id, paintFloorboards, 1.4, 0.6); break;
     // an oil drip on the slab: dark, a little sheen, laid just above the floor
     case 'oil_stain': m = new THREE.MeshStandardMaterial({ color: 0x1d1a16, roughness: 0.3, metalness: 0.1, transparent: true, opacity: 0.55, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }); break;
     case 'hedge_berry': m = new THREE.MeshStandardMaterial({ color: 0xa3261e, roughness: 0.5 }); break;
-    case 'food_slot': m = new THREE.MeshStandardMaterial({ visible: false }); break;
-    case 'container_red': case 'container_blue': case 'container_green': case 'container_tan': {
-      const tint = { container_red: 0xb0473a, container_blue: 0x4a6f9a, container_green: 0x6f8f62, container_tan: 0xc7aa7c }[id];
+    case 'food_slot': case 'sick_slot': m = new THREE.MeshStandardMaterial({ visible: false }); break;
+    // the wall of screens: one shared atlas the painter redraws (buildkit/screenFeeds.ts); it glows in the dark bunker
+    case 'screens': { const tex = screenTexture(); m = new THREE.MeshStandardMaterial({ color: 0x000000, map: tex, emissive: new THREE.Color(1, 1, 1), emissiveMap: tex, emissiveIntensity: 0.95, roughness: 0.3, metalness: 0.1 }); break; }
+    case 'sitemap': m = new THREE.MeshStandardMaterial({ map: siteMapTexture(), roughness: 0.9 }); break;
+    case 'led_green': m = new THREE.MeshStandardMaterial({ color: 0x103a18, roughness: 0.4, emissive: new THREE.Color(0.2, 1, 0.3), emissiveIntensity: 1.6 }); break;
+    case 'led_red': m = new THREE.MeshStandardMaterial({ color: 0x3a1010, roughness: 0.4, emissive: new THREE.Color(1, 0.15, 0.1), emissiveIntensity: 1.6 }); break;
+    case 'rust': m = new THREE.MeshStandardMaterial({ color: 0x8a4a2a, roughness: 0.85, metalness: 0.45 }); break;
+    case 'led_amber': m = new THREE.MeshStandardMaterial({ color: 0x3a2a08, roughness: 0.4, emissive: new THREE.Color(1, 0.65, 0.1), emissiveIntensity: 1.4 }); break;
+    case 'shell_blue': case 'shell_rust': case 'shell_tan': case 'shell_green': {
+      const tint = { shell_blue: 0x4f78a8, shell_rust: 0xb0623a, shell_tan: 0xc9ad80, shell_green: 0x5f8a5a }[id];
+      const mm = texMat(id, paintShellSteel, 1.4, 0.55, 0.04);
+      mm.color.set(tint);
+      m = mm; break;
+    }
+    case 'container_red': case 'container_blue': case 'container_green': case 'container_tan': case 'container_black': case 'container_rust': {
+      const tint = { container_red: 0xb0473a, container_blue: 0x4a6f9a, container_green: 0x6f8f62, container_tan: 0xc7aa7c, container_black: 0x2a2c30, container_rust: 0xa8663c }[id];
       const mm = texMat(id, paintMetalSiding, 2.5, 0.6, 0.4);
       mm.color.set(tint).multiplyScalar(1.6);
       m = mm; break;
     }
   }
   m.name = `kit_${id}`;
+  const wc = WEAR_CLASS[id];
+  if (wc) patchWear(m, wc);
   _cache.set(id, m);
   return m;
 }
 
 /** Interior lights behind the glass (0 = off … 1 = a warm lit room at night). */
-export function setWindowGlow(k: number): void {
+export function setWindowGlow(k: number, time = 0): void {
   const g = _cache.get('glow');
   if (g) { g.emissiveIntensity = 1.1 * k; g.opacity = Math.min(0.9, k * 1.2); g.visible = k > 0.02; }
   const l = _cache.get('lamp');
   if (l) l.emissiveIntensity = 0.4 + 2.6 * k;
+  // an oil lamp's flame breathes; electric light holds steady; a blackout curtain lets a glimmer round its edges
+  const flick = 0.9 + 0.06 * Math.sin(time * 7.1) + 0.04 * Math.sin(time * 17.3 + 1.3);
+  const o = _cache.get('glow_oil');
+  if (o) { o.emissiveIntensity = 0.95 * k * flick; o.opacity = Math.min(0.88, k * 1.2); o.visible = k > 0.02; }
+  const e = _cache.get('glow_electric');
+  if (e) { e.emissiveIntensity = 1.5 * k; e.opacity = Math.min(0.92, k * 1.3); e.visible = k > 0.02; }
+  const c = _cache.get('glow_curtain');
+  if (c) { c.emissiveIntensity = 0.05 * k; c.opacity = Math.min(0.97, k * 2); c.visible = k > 0.02; }
 }

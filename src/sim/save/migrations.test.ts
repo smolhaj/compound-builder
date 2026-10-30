@@ -3,6 +3,7 @@ import { exportJson, importJson, migrate, SaveVersionError } from './migrations'
 import { newGame, SAVE_VERSION } from '../state';
 import { step } from '../engine';
 import { planStructure } from '../construction';
+import { makeLotSite } from '../lotListing';
 
 describe('save migrations', () => {
   it('round-trips the current version through JSON export / import', () => {
@@ -52,5 +53,85 @@ describe('save migrations', () => {
     g = step(g, 1.2);
     expect(g.money).toBeGreaterThanOrEqual(0);
     expect(g.fin.debt.owed).toBeGreaterThan(7000);
+  });
+
+  it('v60 → v61: fields count as sown, a season of saved seed in store, canners for canning families', () => {
+    const g = newGame(3);
+    g.structures.push({ id: 'f1', kind: 'field', x: 5, z: 5, rot: 0, stage: 5, done: 0, supplied: true, finishedAt: -10 });
+    g.stock.lids = 12;
+    const old = JSON.parse(JSON.stringify(g));
+    old.version = 60;
+    for (const k of ['seed_hybrid', 'seed_saved', 'canner', 'compost', 'manure']) delete old.stock[k];
+    delete old.farm;
+    const m = migrate(old);
+    expect(m.version).toBe(SAVE_VERSION);
+    expect(m.stock.canner).toBe(1);
+    expect(m.stock.seed_saved).toBe(2);
+    expect(m.farm?.plots?.f1.planted).toBe(true);
+  });
+  it('v64 → v65: the plain seed is the hybrid now, the old heirloom stock moves to its own good, fields keep the line they were sown with', () => {
+    const g = newGame(3);
+    g.structures.push({ id: 'f1', kind: 'field', x: 5, z: 5, rot: 0, stage: 5, done: 0, supplied: true, finishedAt: -10 });
+    const old = JSON.parse(JSON.stringify(g));
+    old.version = 64;
+    delete old.stock.seed_heirloom;
+    old.stock.seed = 5; old.stock.seed_hybrid = 2; old.stock.seed_saved = 3;
+    old.farm = { plots: { f1: { kind: 'field', fert: 1, prev: null, prev2: null, crop: 'beans', loads: 0, cover: false, settled: -1, planted: true, sown: { y: 2027, doy: 140, line: 'heirloom', v: 1, late: 1 } } } };
+    const m = migrate(old);
+    expect(m.version).toBe(SAVE_VERSION);
+    expect(m.stock.seed_heirloom).toBe(5);
+    expect(m.stock.seed).toBe(2);
+    expect((m.stock as unknown as Record<string, number>).seed_hybrid).toBeUndefined();
+    expect(m.stock.seed_saved).toBe(3);
+    expect(m.farm?.plots?.f1.sown?.line).toBe('heirloom');
+  });
+
+  it('v67 → v68: an old place has no lot (its ground is the classic benches), a lot place keeps its spec, and both run on', () => {
+    const old = JSON.parse(JSON.stringify(newGame(3)));
+    old.version = 67;
+    delete old.site.lot;
+    const m = migrate(old);
+    expect(m.version).toBe(SAVE_VERSION);
+    expect(m.site.lot).toBeNull();
+    const withLot = JSON.parse(JSON.stringify(newGame(3, 105, 2027, { site: makeLotSite({ kind: 'gorge', seed: 4 }) })));
+    withLot.version = 67;
+    const kept = migrate(withLot);
+    expect(kept.site.lot?.kind).toBe('gorge');
+    // and a day on a lot place runs (the climate, the road and the grade read the lot)
+    const g = step(structuredClone(kept), 3);
+    expect(g.site.lot?.kind).toBe('gorge');
+  });
+
+  it('v68 → v69: the bridge on the way in is standing in every old game, and the road runs on', () => {
+    const old = JSON.parse(JSON.stringify(newGame(3)));
+    old.version = 68;
+    delete old.roadBridge;
+    const m = migrate(old);
+    expect(m.version).toBe(SAVE_VERSION);
+    expect(m.roadBridge).toEqual({ down: false, due: null });
+    expect(() => step(structuredClone(m), 3)).not.toThrow();
+  });
+
+  it('v69 → v70: the new hardening and bug-out goods are in stock at zero, and what the family owned is kept', () => {
+    const old = JSON.parse(JSON.stringify(newGame(3)));
+    old.version = 69;
+    for (const k of ['security_door', 'window_shutters', 'ballistic_panels', 'safe_room_hardened', 'bugout_bag', 'bugout_cache']) delete old.stock[k];
+    old.stock.steel_door = 2;
+    const m = migrate(old);
+    expect(m.version).toBe(SAVE_VERSION);
+    expect(m.stock.window_shutters).toBe(0);
+    expect(m.stock.bugout_cache).toBe(0);
+    expect(m.stock.steel_door).toBe(2);
+    expect(() => step(structuredClone(m), 3)).not.toThrow();
+  });
+
+  it('v70 → v71: an old place has no chosen entrance (the habitual one) and keeps the game seed for its ground', () => {
+    const old = JSON.parse(JSON.stringify(newGame(3)));
+    old.version = 70;
+    const m = migrate(old);
+    expect(m.version).toBe(SAVE_VERSION);
+    expect(m.site.entrance ?? null).toBeNull();
+    expect(m.site.listed ?? false).toBe(false);
+    expect(() => step(structuredClone(m), 3)).not.toThrow();
   });
 });

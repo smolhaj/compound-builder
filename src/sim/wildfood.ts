@@ -16,12 +16,15 @@
  *              the creek, snares for rabbits; a smoker turns meat into jerky
  *              that keeps without a freezer.
  */
+import { huntFactor } from './daily';
 import { log } from './economy';
+import { boatFishK, lakeIce } from './waterfront';
 import { calendarOf, type GameState } from './state';
 import { REGIONS, type Game } from './regions';
 import { huntingRifle, smallGameGun } from './armory';
 import { mulberry32 } from './rng';
-import { addFoodKcal } from './pantry';
+import { MEAT_WHERE, putUpMeat } from './kitchen';
+import { gameCount, killShare, recoveryPerDay } from './wildlife';
 
 export type GameClass = 'big' | 'small' | 'fish';
 const BIG: Game[] = ['elk', 'deer', 'moose', 'antelope', 'javelina', 'turkey'];
@@ -90,28 +93,32 @@ export function wildDay(s: GameState, freezer: boolean): number {
   // everyone's out hunting once the stores are gone: the game thins, then slowly comes back
   for (const c of ['big', 'small', 'fish'] as GameClass[]) {
     if (after && d.tracks.stores < 0.5) w.abundance[c] = Math.max(0.05, w.abundance[c] - (c === 'big' ? 0.0012 : 0.0006));
-    w.abundance[c] = Math.min(1, w.abundance[c] + (c === 'small' ? 0.0008 : 0.0003));
+    // (a small place refills faster: its long edge lets neighbors' animals wander in; sim/wildlife.ts)
+    if (c !== 'fish') w.abundance[c] = Math.min(1, w.abundance[c] + recoveryPerDay(s, c));
+    else w.abundance[c] = Math.min(1, w.abundance[c] + 0.0003);
   }
   let meat = 0;
   const bring = (baskets: number, what: string, cls: GameClass) => {
-    meat += baskets * 2000;
-    // a freezer, a smoker (jerky keeps like staples), or eat it fresh
-    if (freezer) addFoodKcal(s, 'game_meat', baskets * 2000);
-    else if (s.stock.smoker >= 1 && baskets > 4) { addFoodKcal(s, 'smoked_meat', baskets * 2000 * 0.8); meat -= baskets * 2000 * 0.2; }
-    else s.stock.fresh += baskets;
-    w.abundance[cls] = Math.max(0.05, w.abundance[cls] - (cls === 'big' ? 0.02 : 0.004));
+    // the freezer, the smoker, the salt barrel or the canner (sim/kitchen.ts), else it is eaten fresh
+    const put = putUpMeat(s, baskets * 2000, { freezer });
+    meat += put.kept;
+    // one animal's share of what the land holds: on 5 acres a deer is half the deer; on 80 a sixteenth
+    w.abundance[cls] = Math.max(0.05, w.abundance[cls] - (cls === 'fish' ? 0.004 : killShare(s, cls)));
     if (day <= w.hotUntil) for (const ps of s.personState) if (ps.needs.died == null) ps.needs.dose += 0.004 * baskets / 4;
-    if (baskets >= 8) log(s, `${what} down: meat for weeks${s.stock.smoker >= 1 && !freezer ? ' (smoked into jerky)' : ''}.${day <= w.hotUntil ? ' It reads hot on the counter.' : ''}`);
+    if (baskets >= 8) log(s, `${what} down: meat for weeks${put.where === 'fresh' || put.where === 'freezer' ? '' : ` (${MEAT_WHERE[put.where]})`}.${day <= w.hotUntil ? ' It reads hot on the counter.' : ''}`);
   };
   const warden = () => { if (lawful(s) && r() < 0.15) { s.money -= POACH_FINE; log(s, `The game warden caught it: a $${POACH_FINE.toLocaleString('en-US')} fine and the meat taken.`); return true; } return false; };
   // big game: a hunter, a rifle, and (in peacetime) the season and a tag
+  const hf = huntFactor(s);   // yesterday's Hunt hours (sim/daily.ts)
   const timber = Math.min(1.4, 0.6 + s.site.timber * 0.5);
   const bigs = local(s, 'big');
   if (hunter >= 2 && bigs.length) {
     const elk = bigs.includes('elk') && (after || (inSeason(s, 'elk') && hasLicense(s, 'elk')));
     const deerOk = after || (inSeason(s, 'deer') && (hasLicense(s, 'deer') || w.poach)) || (inSeason(s, 'elk') && bigs.includes('elk') && w.poach);
     const winter = calendarOf(s.clock).doy < 60 || calendarOf(s.clock).doy > 340;
-    if ((elk || deerOk) && r() < 0.03 * hunter / 5 * w.abundance.big * timber * (winter ? 0.5 : 1) && huntingRifle(s, true)) {
+    // (few animals on a small place: the hunt finds fewer; the hunt's odds follow the animals that are there)
+    const herd = Math.max(0.25, Math.min(1.3, gameCount(s, 'big') / 6));
+    if ((elk || deerOk) && r() < 0.03 * hunter / 5 * hf * w.abundance.big * timber * herd * (winter ? 0.5 : 1) && huntingRifle(s, true)) {
       const kind: Game = elk && r() < 0.4 ? 'elk' : bigs.find(x => x !== 'elk') ?? bigs[0];
       const poached = !after && !(kind === 'elk' ? hasLicense(s, 'elk') : hasLicense(s, 'deer'));
       if (!(poached && warden())) bring(MEAT[kind] ?? 15, kind[0].toUpperCase() + kind.slice(1), 'big');
@@ -119,12 +126,19 @@ export function wildDay(s: GameState, freezer: boolean): number {
   }
   // small game: snares, or a .22 / shotgun
   const smallOk = after || (inSeason(s, 'small') && hasLicense(s, 'small'));
-  if (smallOk && (s.stock.snares >= 1 || (hunter >= 1 && smallGameGun(s))) && r() < 0.06 * w.abundance.small) {
+  if (smallOk && (s.stock.snares >= 1 || (hunter >= 1 && smallGameGun(s))) && r() < 0.06 * hf * w.abundance.small * Math.max(0.3, Math.min(1.2, gameCount(s, 'small') / 8))) {
     if (s.stock.snares < 1) s.armory.ammo['22lr'] = Math.max(0, (s.armory.ammo['22lr'] ?? 0) - 3);
     bring(1, 'A rabbit', 'small');
   }
   // fishing: the creek (yours, or the neighbor's down the road), gear, and a license in peacetime
   const fishOk = after || hasLicense(s, 'fishing') && inSeason(s, 'fishing');
-  if (fishOk && s.stock.fishing_gear >= 1 && local(s, 'fish').length && r() < (s.site.creek ? 0.15 : 0.06) * w.abundance.fish) bring(0.6, 'Fish', 'fish');
+  if (fishOk && s.stock.fishing_gear >= 1 && local(s, 'fish').length && r() < (s.site.creek ? 0.15 : 0.06) * hf * w.abundance.fish) bring(0.6, 'Fish', 'fish');
+  // a day on the water from the dock (sim/waterfront.ts): a boat reaches the fish the bank cannot; a skiff burns a little petrol; ice fishing at the creek's rate
+  const boatK = boatFishK(s);
+  if (boatK > 0 && fishOk && s.stock.fishing_gear >= 1 && r() < 0.15 * boatK * hf * Math.max(0.3, w.abundance.fish)) {
+    const skiff = boatK >= 4 && s.stock.fuel >= 0.3;
+    if (skiff) s.stock.fuel -= 0.3;
+    bring(skiff ? 1.6 : boatK >= 3 ? 1.1 : 0.6, lakeIce(s) === 'ice' ? 'Ice-fishing perch' : 'Lake fish', 'fish');
+  }
   return meat;
 }

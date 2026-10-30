@@ -3,6 +3,7 @@ import { newGame, type GameState, type Structure } from './state';
 import { planRun } from './perimeter';
 import { addFitWork, balanceDay, fitProblem, networks, orderFit, plant, serviceOf, sunHours } from './utilities';
 import { step } from './engine';
+import { solarFogK } from './fogFx';
 
 const built = (g: GameState, id: string, kind: string, x: number, z: number): Structure => {
   const st: Structure = { id, kind, x, z, rot: 0, stage: 5, done: 0, supplied: true, finishedAt: 0 };
@@ -21,12 +22,12 @@ describe('utilities', () => {
     expect(n.get('c')).not.toBe(n.get('a'));
   });
 
-  it('a house can only be plumbed once pressurised water reaches it, and wired once power does', () => {
+  it('a house can only be plumbed once pressurized water reaches it, and wired once power does', () => {
     const g = newGame(1);
     const home = built(g, 'h', 'timber_cabin', 10, 10);
     built(g, 'w', 'well_hand', 14, 10);
     let p = plant(g);
-    expect(fitProblem(g, p, home, 'plumb')).toMatch(/no pressurised/);
+    expect(fitProblem(g, p, home, 'plumb')).toMatch(/no pressurized/);
     built(g, 'd', 'well_drilled', 14, 12);
     line(g, 'water_pipe', [[14, 12], [10, 10]]);
     p = plant(g);
@@ -74,6 +75,8 @@ describe('utilities', () => {
     line(g, 'power_cable', [[12, 10], [10, 10]]);
     g.utilities.fittings.push({ building: 'h', kind: 'wire', done: 30, hours: 30, supplied: true, finishedAt: 0 });
     g.stock.fuel = 1;
+    // (a good hand at wiring and engines tunes the generator: sim/utilities.ts genTune; here nobody is)
+    for (const p of g.people) p.skills.mechanic = 0;
     balanceDay(g, plant(g), 0.5);
     expect(g.utilities.report.genKwh).toBeGreaterThan(0);
     for (let i = 0; i < 5; i++) balanceDay(g, plant(g), 0.5);
@@ -136,7 +139,9 @@ describe('the county grid and grid-down', () => {
   });
 
   it('short of power, the pump comes first and the workshop goes without', () => {
-    const g = newGame(1, 355);   // December: little sun, off the grid
+    // December: little sun, off the grid (a clear day: overcast and fog cut the sun further, sim/fog.ts)
+    let g = newGame(1, 355);
+    for (let seed = 2; solarFogK(g) < 1 && seed < 200; seed++) g = newGame(seed, 355);
     built(g, 'w', 'well_drilled', 14, 10); built(g, 'k', 'workshop', 10, 6); built(g, 's', 'solar_array', 10, 14);
     built(g, 'l', 'log_house', 6, 10);
     for (const b of ['k', 'l']) g.utilities.fittings.push({ building: b, kind: 'wire', done: 30, hours: 30, supplied: true, finishedAt: 0 });

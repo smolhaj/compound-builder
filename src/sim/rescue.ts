@@ -38,10 +38,11 @@ import { backgroundOf, fullName, type Person } from './family';
 import { chronicle } from './lineage';
 import { log } from './economy';
 import { radioSet, reception } from './radio';
-import { VEHICLES, startingVehicles, type Vehicle } from './vehicles';
+import { driveTrip, roadTrouble, tripPlan, type Vehicle } from './vehicles';
 import { mulberry32 } from './rng';
 import { calendarOf, dayIndex, type GameState } from './state';
 import type { Stock } from './materials';
+import { homeFromCaptivity } from './mind';
 import type { Encounter, Outcome, Stance } from './encounters';
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -134,10 +135,14 @@ export const latestLead = (c: Captive): Lead | undefined => c.leads.filter(l => 
 export const latestFarLead = (c: Captive): Lead | undefined => c.leads.filter(l => l.far).pop();
 export const openCaptives = (s: GameState) => (s.rescue?.captives ?? []).filter(c => !c.closed);
 
-/** Away on a rescue: off the line, off the work. */
+/** Away on a rescue (or a scavenging run, at the market, on the militia watch or a work day: sim/scavenge, market, neighborLife): off the line, off the work. */
 export const isAway = (s: GameState, pid: string) => {
   const r = s.rescue?.raid;
-  return !!r && r.team.includes(pid);
+  if (r && r.team.includes(pid)) return true;
+  const day = dayIndex(s.clock.t);
+  if (s.digs?.party && s.digs.party.day === day && s.digs.party.ids.includes(pid)) return true;   // out at a dig site (sim/tunnelers.ts)
+  if (s.radio?.scout?.pid === pid) return true;   // out checking a rumor (sim/rumors.ts)
+  return !!s.scavenge?.run?.team.includes(pid) || (s.market?.trip?.pid === pid && s.market.trip.day === day) || (s.locals?.duty?.pid === pid && s.locals.duty.day === day);
 };
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -453,6 +458,7 @@ export function bringHome(s: GameState, c: Captive, how: 'ransom' | 'rescue' | '
   n.hunger = Math.max(n.hunger, Math.min(12000, gone * 300));
   n.morale = Math.min(n.morale, 20);
   n.hurt.push({ what: 'home from captivity: nightmares, won\'t sleep alone', sev: Math.min(60, 20 + gone) });
+  homeFromCaptivity(s, p.id, gone);
   // the birthdays missed while gone
   for (let d = c.day + 1; d <= day; d++) if (calendarOf(s.clock, d).doy === (p.bday ?? -1)) p.age++;
   if (p.kid && p.age >= 18) p.kid = false;
@@ -543,12 +549,9 @@ export function startRescue(s: GameState, pid: string, team: string[], withAllie
 // Traded on: the long-shot trip
 // ─────────────────────────────────────────────────────────────────────────
 
-const CAN_L = 20, L_PER_GAL = 3.785;
 /** The truck for a long trip (running, not fried) and the liters there and back. */
-export function tripFuel(s: GameState, km: number): { truck: Vehicle | undefined; liters: number; have: number } {
-  const truck = (s.vehicles ?? startingVehicles()).filter(v => (v.kind === 'pickup' || v.kind === 'old_pickup') && !v.fried && v.condition > 0.1).sort((a, b) => b.condition - a.condition)[0];
-  const liters = truck ? Math.ceil(2 * km / 1.609 / VEHICLES[truck.kind].mpg * L_PER_GAL) : 0;
-  return { truck, liters, have: (truck?.fuel ?? 0) + s.stock.fuel * CAN_L };
+export function tripFuel(s: GameState, km: number, team = 2): { truck: Vehicle | undefined; liters: number; have: number; seats: number; cargoKg: number } {
+  return tripPlan(s, km, team);   // the fleet (sim/vehicles.ts): the right vehicle for the people, the fuel it burns, what it carries
 }
 const farLead = (c: Captive) => c.leads.filter(l => l.far).pop();
 
@@ -560,11 +563,11 @@ export function tripProblem(s: GameState, pid: string, team: string[]): string |
   const l = farLead(c);
   if (!l) return 'no word of where they were taken';
   if (leadAge(s, l) > FAR_COLD) return 'that rumor is months old: wait for another';
-  const { truck, liters, have } = tripFuel(s, l.km);
-  if (!truck) return 'no running truck';
+  const { truck, liters, have, seats } = tripFuel(s, l.km, Math.max(2, team.length));
+  if (!truck) return 'no running truck that seats them';
   if (have < liters) return `not enough fuel: ${liters} L there and back, ${Math.floor(have)} L on hand`;
   if (!team.length) return 'pick who goes';
-  if (team.length > 3) return 'the truck takes three';
+  if (team.length > seats) return `the ${truck.kind === 'motorhome' ? 'motorhome' : 'truck'} takes ${seats}`;
   if (team.some(id => { const p = person(s, id); return !p || !canGo(s, p); })) return 'someone picked can\'t go';
   return null;
 }
@@ -575,13 +578,12 @@ export function startTrip(s: GameState, pid: string, team: string[]): string | n
   if (why) return why;
   const c = openCaptives(s).find(x => x.pid === pid)!;
   const l = farLead(c)!;
-  const { truck, liters } = tripFuel(s, l.km);
-  const fromTank = Math.min(truck!.fuel, liters);
-  truck!.fuel -= fromTank;
-  s.stock.fuel = Math.max(0, s.stock.fuel - (liters - fromTank) / CAN_L);
-  truck!.mileage += 2 * l.km / 1.609; truck!.condition = Math.max(0, truck!.condition - 0.03);
+  const { truck, liters } = tripFuel(s, l.km, Math.max(2, team.length));
+  driveTrip(s, truck!, l.km, liters, 0.03);
+  const trouble = roadTrouble(s, truck!, l.km, 1);
+  if (trouble.line) log(s, trouble.line);
   const day = dayIndex(s.clock.t), leg = Math.ceil(l.km / 150);
-  rescueOf(s).raid = { kind: 'trip', captive: pid, team: [...team], left: day, hitDay: day + leg, backDay: day + 2 * leg, resolved: false };
+  rescueOf(s).raid = { kind: 'trip', captive: pid, team: [...team], left: day, hitDay: day + leg + trouble.extraDays, backDay: day + 2 * leg + trouble.extraDays, resolved: false };
   for (const id of team) { const ps = stateOf(s, id); if (ps) { ps.task = 'away'; ps.target = null; } }
   const child = person(s, pid)!;
   log(s, `${team.map(id => person(s, id)?.first).join(', ')} took the truck to ${l.where}, ${l.km} km off: ${liters} L of fuel and ${2 * leg} days, for a rumor.`);

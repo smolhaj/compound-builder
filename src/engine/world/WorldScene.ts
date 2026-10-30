@@ -28,6 +28,7 @@ import {
 import { godRayStrength, milkyWayVisibility, moonAngle, moonIllumination, starVisibility } from './sky/skyState';
 import { phaseWeights, type DayPhase } from './sky/dayPhase';
 import { installSeasonShaderPatch } from './season/seasonShader';
+import { NO_HEIGHT_FOG, installHeightFogPatch, setHeightFog as applyHeightFog, type HeightFogParams } from './fog/heightFog';
 
 export type Quality = 'high' | 'medium' | 'low';
 
@@ -48,18 +49,10 @@ export interface WorldSite {
 }
 
 /*
- * Aerial perspective for every material: exp² fog thins with distance past
- * ~80 units, so the far landscape keeps a light haze instead of a fog sheet.
+ * Aerial perspective for every material: exp² fog thins with distance past ~80 units, so the far landscape keeps a
+ * light haze instead of a fog sheet; on top of it the height fog (fog/heightFog.ts): valley banks and low cloud.
  */
-THREE.ShaderChunk.fog_fragment = /* glsl */`#ifdef USE_FOG
-  #ifdef FOG_EXP2
-    float fogThin = mix(1.0, 0.1, smoothstep(80.0, 420.0, vFogDepth));
-    float fogFactor = 1.0 - exp(- fogDensity * fogDensity * fogThin * vFogDepth * vFogDepth);
-  #else
-    float fogFactor = smoothstep(fogNear, fogFar, vFogDepth);
-  #endif
-  gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor, fogFactor);
-#endif`;
+installHeightFogPatch();
 
 /** Far plane: the regional landscape (mountain ranges) reaches ~2 km out. */
 export const CAMERA_FAR = 2600;
@@ -128,10 +121,19 @@ export class WorldScene {
   /** Floodlit-site glow over the haze (world position + strength). */
   private readonly _groundGlow = { x: 0, y: 0, z: 0, on: 0 };
 
+  /** Valley fog and low cloud (fog/heightFog.ts), set by the game each frame; ignored on Low. */
+  private _hfog: HeightFogParams = NO_HEIGHT_FOG;
+
   private _wetnessTarget = 0;
   private _wetnessCurrent = 0;
 
   private readonly _weather = {
+    cloud: 0, fog: 0, rain: 0, snow: 0, flash: 0,
+    cumulus: 0.12, cirrus: 0.2, storm: 0, distantStorm: 0, wind: 0.2, haze: 0.4,
+    skyFlash: 0, bolt: 0, boltAz: 0, boltSeed: 0, stormAz: 0.6,
+  };
+  /** What Low sees of the weather: nothing (clear, a fixed noon, no fog). */
+  private readonly _noWeather = {
     cloud: 0, fog: 0, rain: 0, snow: 0, flash: 0,
     cumulus: 0.12, cirrus: 0.2, storm: 0, distantStorm: 0, wind: 0.2, haze: 0.4,
     skyFlash: 0, bolt: 0, boltAz: 0, boltSeed: 0, stormAz: 0.6,
@@ -148,10 +150,16 @@ export class WorldScene {
   private readonly _c = { tmp: new THREE.Color(), v: new THREE.Vector3() };
   private readonly _gradeBase = { contrast: 0.5, saturation: 1.04, warm: 0.18, threshold: 0.55 };
 
-  constructor(canvas: HTMLCanvasElement) {
+  /**
+   * `antialias`: MSAA on the canvas itself. Medium and High draw the scene into float render targets and finish with FXAA, so MSAA on the
+   * final full-screen quad antialiases nothing and costs a multisampled backbuffer (4x memory and bandwidth at 2x DPR): only Low (no
+   * post-processing) wants it. Automation (the screenshot harness reads the canvas back) keeps the drawing buffer and MSAA as before.
+   */
+  constructor(canvas: HTMLCanvasElement, opts: { antialias?: boolean } = {}) {
     // Season surface patch must be in place before any standard material compiles.
     installSeasonShaderPatch();
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
+    const automated = typeof navigator !== 'undefined' && !!navigator.webdriver;
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: automated || (opts.antialias ?? true), preserveDrawingBuffer: automated });
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -235,16 +243,16 @@ export class WorldScene {
    */
   setWeather(w: SceneWeather, flash = 0, sky?: SkyLightning): void {
     const x = this._weather;
-    if (this._quality === 'low') {
-      x.cloud = x.fog = x.rain = x.snow = x.flash = x.storm = x.distantStorm = x.skyFlash = x.bolt = 0;
-      return;
-    }
+    // (Low draws none of it: updateDayNight reads the zeroed copy; the values are kept so a QA frame lifted to a higher tier still has them)
     x.cloud = w.cloud; x.fog = w.fog; x.rain = w.rain; x.snow = w.snow; x.flash = flash;
     x.cumulus = w.cumulus ?? 0.12; x.cirrus = w.cirrus ?? 0.2; x.storm = w.storm ?? 0;
     x.distantStorm = w.distantStorm ?? 0; x.wind = w.wind ?? 0.2; x.haze = w.haze ?? 0.4;
     x.skyFlash = sky?.flash ?? flash; x.bolt = sky?.bolt ?? 0; x.boltAz = sky?.boltAz ?? 0;
     x.boltSeed = sky?.boltSeed ?? 0; x.stormAz = sky?.stormAz ?? x.stormAz;
   }
+
+  /** Valley fog bank and low cloud for the next updateDayNight(). Low quality has no fog at all, so it ignores them. */
+  setHeightFog(p: HeightFogParams): void { this._hfog = p; }
 
   /**
    * Night sky inputs: moon phase (0 new … 0.5 full, skyState.moonPhase) and
@@ -442,7 +450,7 @@ export class WorldScene {
       [isMorning ? SKY_PALETTES.dawn : SKY_PALETTES.golden, wg],
       [SKY_PALETTES.night, wn],
     ]);
-    const wx = this._weather;
+    const wx = this._quality === 'low' ? this._noWeather : this._weather;
     const overcast = Math.min(1, wx.cloud);
     if (overcast > 0.001 || wx.fog > 0.001 || wx.flash > 0.001) this._applyWeatherToSky(sky, overcast, wx.fog, wx.flash);
     sky.glow.multiplyScalar(0.5 + 1.6 * (1 - this._skyDark));
@@ -513,6 +521,8 @@ export class WorldScene {
       fog.density = Math.min(fog.density, WorldScene.FOG_WEATHER_DEPTH / Math.max(1, r));
     }
 
+    applyHeightFog(this._quality === 'low' || !this.scene.fog ? NO_HEIGHT_FOG : this._hfog);
+
     this.scene.environmentIntensity = 0.10 + (1 - wn) * 0.24;
     if (this.outdoorLight < 0.999) {
       const k = this.outdoorLight;
@@ -521,6 +531,10 @@ export class WorldScene {
     }
     if (this._bloomPass) this._bloomPass.threshold = 0.85 + (1 - wn) * 0.75;
     this._applyGradeForTime();
+    // the rig as the clock and weather set it; renderFrame lifts it from there when the camera is high at night
+    const ab = this._aerialBase;
+    ab.hemi = this._hemiLight.intensity; ab.fill = this._fillLight.intensity; ab.sun = this._sunLight.intensity; ab.env = this.scene.environmentIntensity;
+    this._aerialLift = -1;
 
     if (this._particleSystem) this._particleSystem.visible = wn < 0.5 && this._quality !== 'low';
 
@@ -689,7 +703,6 @@ export class WorldScene {
         this.scene.background = null;
         break;
       case 'low':
-        this.setWeather({ cloud: 0, fog: 0, rain: 0, snow: 0 });
         this.updateDayNight(11);
         this.renderer.shadowMap.enabled = false;
         this.renderer.shadowMap.needsUpdate = true;
@@ -778,10 +791,44 @@ export class WorldScene {
     this._composer = composer;
     this._fxaaPass = fxaaPass;
     this._lastEnvUpdateHour = -999;
+    if (this.qaPixelRatio != null) this.renderer.setPixelRatio(this.qaPixelRatio);
+  }
+
+  /** QA only (`?lowrender`): a fixed pixel ratio that overrides the tier's, or null for the tier's own. */
+  qaPixelRatio: number | null = null;
+
+  /** Night readability from above (see _applyAerialLift). QA turns it off for the "before" shots. */
+  aerialLiftOn = true;
+  /** QA: scale the lift while tuning it (1 = as shipped). */
+  aerialLiftGain = 1;
+  private readonly _aerialBase = { hemi: 0, fill: 0, sun: 0, env: 0 };
+  private _aerialLift = 0;
+  private _gainSeen = 1;
+
+  /**
+   * Seen from high up at night the compound is near-black: the hemisphere and moon light are tuned for eye level, where lamps and
+   * windows do the work. Past about 14 units of camera height the sky fill, the moon and the environment ease up (full lift by 48),
+   * scaled by how dark it is, a little less under a bright moon. Four uniform multiplies, only when the lift moves: no extra
+   * passes, lights or draw calls. At eye level (or by day) the lift is 0 and the rig is exactly the one updateDayNight set.
+   */
+  private _applyAerialLift(): void {
+    const wn = this._phase.night;
+    const h = this.camera.position.y;
+    const t = Math.min(1, Math.max(0, (h - 14) / 34));
+    const lift = this.aerialLiftOn && wn > 0.001 ? t * t * (3 - 2 * t) * wn : 0;
+    if (Math.abs(lift - this._aerialLift) < 0.004 && this.aerialLiftGain === this._gainSeen && !(lift === 0 && this._aerialLift !== 0)) return;
+    this._aerialLift = lift; this._gainSeen = this.aerialLiftGain;
+    const b = this._aerialBase, dark = 1 - 0.4 * moonIllumination(this._moonPhase) * this._moonUp;
+    const k = lift * dark * this.aerialLiftGain;
+    this._hemiLight.intensity = b.hemi * (1 + 2.4 * k);
+    this._fillLight.intensity = b.fill * (1 + 4.5 * k);
+    this._sunLight.intensity = b.sun * (1 + 0.8 * k);
+    this.scene.environmentIntensity = b.env + 0.24 * k;
   }
 
   /** Render one frame (EffectComposer when available and enabled). */
   renderFrame(): void {
+    this._applyAerialLift();
     // Shadows every other frame (the sun moves slowly).
     if (this.renderer.shadowMap.enabled && !this.renderer.shadowMap.autoUpdate) {
       this._shadowFrame = (this._shadowFrame + 1) % 2;
@@ -825,10 +872,13 @@ export class WorldScene {
     const u = this._colorGradingPass.uniforms;
     const g = this._gradeBase;
     const { golden: wg, night: wn } = this._phase;
-    u['uContrast'].value = g.contrast + wg * 0.05 - wn * 0.08;
-    u['uSaturation'].value = g.saturation + wg * 0.10;
-    u['uWarmStrength'].value = g.warm + wg * 0.16;
+    // overcast (a gray, soft-lit day): flatter contrast, quieter colour, no amber on the highlights, a cool cast in the shadows
+    const oc = Math.min(1, (this._quality === 'low' ? this._noWeather : this._weather).cloud) * (1 - wn);
+    u['uContrast'].value = g.contrast + wg * 0.05 - wn * 0.08 - oc * 0.14;
+    u['uSaturation'].value = g.saturation + wg * 0.10 - oc * 0.16;
+    u['uWarmStrength'].value = (g.warm + wg * 0.16) * (1 - 0.8 * oc);
     u['uWarmThreshold'].value = g.threshold - wg * 0.22;
+    u['uShadowTintStrength'].value = 0.5 + 0.4 * oc;
     u['uNight'].value = wn;
   }
 

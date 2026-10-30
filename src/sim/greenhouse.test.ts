@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { calendarOf, newGame, type GameState, type Structure } from './state';
+import { newGame, type GameState, type Structure } from './state';
 import { produce } from './needs';
-import { gardenSeason, greenhouseGreens, GREENHOUSE_EXTEND, greensFactor, orchardBearing, orchardFrost, orchardHarvest, ORCHARD_KCAL, ORCHARD_PICK } from './greenhouse';
+import { gardenSeason, greenhouseGreens, GREENHOUSE_EXTEND, greensFactor } from './greenhouse';
 import { REGIONS, seasons } from './regions';
 import { BLUEPRINTS, totalBill } from './blueprints';
 import { billCost } from './materials';
@@ -70,50 +70,15 @@ describe('greenhouse', () => {
 });
 
 describe('orchard', () => {
-  /** A seed and year with (or without) a late frost. */
-  const yearOf = (g: GameState) => calendarOf(g.clock).year;
-  const findSeed = (frost: boolean, years: number) => {
-    for (let seed = 1; seed < 500; seed++) { const g = at(240, years, seed); if (orchardFrost(seed, yearOf(g)) === frost) return seed; }
-    throw new Error('no seed');
-  };
-
-  it('bears nothing for three years, then ramps to full by the sixth', () => {
-    expect(orchardBearing(0)).toBe(0);
-    expect(orchardBearing(2.9)).toBe(0);
-    expect(orchardBearing(3)).toBeCloseTo(0.25);
-    expect(orchardBearing(4.5)).toBeCloseTo(0.5);
-    expect(orchardBearing(6)).toBe(1);
-    expect(orchardBearing(20)).toBe(1);
-    for (const years of [1, 2]) { const seed = findSeed(false, years); const g = at(240, years, seed); built(g, 'o', 'orchard'); expect(orchardHarvest(g)).toBe(0); }
-    const seed = findSeed(false, 7), g = at(240, 7, seed);
-    built(g, 'o', 'orchard');
-    expect(orchardHarvest(g)).toBeCloseTo(ORCHARD_KCAL / (ORCHARD_PICK[1] - ORCHARD_PICK[0]));
-  });
-
-  it('is picked August to October only, ≈ 900,000 kcal a year at full', () => {
-    const seed = findSeed(false, 7);
+  it('needs no permit and the produce comes from the fruit seasons (sim/orchard.ts has the rest)', () => {
+    expect(needsPermit('orchard')).toBe(false);
+    // nothing in January; the plot planted 8 years ago bears in its summer and fall
+    const winter = at(20, 8); built(winter, 'o', 'orchard', 0);
+    expect(produce(winter)).toBe(0);
     let year = 0;
-    for (let d = 0; d < 365; d++) {
-      const g = at(1, 7, seed); g.clock.t += d;
-      built(g, 'o', 'orchard');
-      if (orchardFrost(seed, yearOf(g))) continue;
-      const k = orchardHarvest(g);
-      const doy = calendarOf(g.clock).doy;
-      if (doy < ORCHARD_PICK[0] || doy >= ORCHARD_PICK[1]) expect(k).toBe(0);
-      year += k;
-    }
-    expect(year).toBeGreaterThan(0);
-    expect(year).toBeLessThanOrEqual(ORCHARD_KCAL + 1);
-  });
-
-  it('a late frost takes a year\'s crop about one year in six', () => {
-    const seed = findSeed(true, 7), g = at(240, 7, seed);
-    built(g, 'o', 'orchard');
-    expect(orchardHarvest(g)).toBe(0);
-    let frosts = 0;
-    for (let s = 1; s <= 200; s++) for (let y = 2026; y < 2056; y++) if (orchardFrost(s, y)) frosts++;
-    expect(frosts / 6000).toBeGreaterThan(0.13);
-    expect(frosts / 6000).toBeLessThan(0.2);
+    for (let d = 0; d < 365; d++) { const g = at(1, 8); g.clock.t += d; built(g, 'o', 'orchard', 0); year += produce(g); }
+    expect(year).toBeGreaterThan(200_000);
+    expect(year).toBeLessThan(900_000);
   });
 
   it('costs ≈ $600 and ≈ 30 hours', () => {

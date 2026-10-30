@@ -9,7 +9,7 @@
 import { FOOD, type FoodItemId, type PropKind } from '../../sim/pantry';
 
 export type ShelfProp = PropKind;
-export const SHELF_PROPS: readonly ShelfProp[] = ['bucket', 'can10', 'mylar', 'sack', 'bag', 'jug', 'jar', 'honey', 'case', 'can', 'pack'];
+export const SHELF_PROPS: readonly ShelfProp[] = ['bucket', 'can10', 'mylar', 'sack', 'bag', 'jug', 'jar', 'honey', 'case', 'can', 'pack', 'crate'];
 
 /** Footprint along the board × depth × height (m), how high it stacks, where it can go. */
 export const PROP_SIZE: Record<ShelfProp, { w: number; d: number; h: number; stack: number; on: 'floor' | 'shelf' | 'any' | 'freezer' }> = {
@@ -24,6 +24,7 @@ export const PROP_SIZE: Record<ShelfProp, { w: number; d: number; h: number; sta
   case: { w: 0.4, d: 0.27, h: 0.25, stack: 2, on: 'any' },            // cardboard case
   can: { w: 0.085, d: 0.085, h: 0.115, stack: 1, on: 'shelf' },       // 15 oz can
   pack: { w: 0.24, d: 0.16, h: 0.08, stack: 4, on: 'freezer' },      // a butcher-paper package in the chest freezer
+  crate: { w: 0.5, d: 0.36, h: 0.3, stack: 3, on: 'any' },            // a slatted bin of potatoes, apples or roots
 };
 
 /** A board or a pallet a builder marked (m): its length, depth, the clear height above it, floor or shelf. */

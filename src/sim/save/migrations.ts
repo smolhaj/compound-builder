@@ -4,14 +4,18 @@
  * rule 5). Pure — tested in migrations.test.ts.
  */
 import { foundLineage, newLineage } from '../lineage';
-import { SAVE_VERSION, type GameState } from '../state';
+import { SAVE_VERSION, startingBedding, type GameState } from '../state';
 import { emptyUtilities } from '../utilities';
 import { newDisaster } from '../disaster';
 import { freshNeeds } from '../needs';
 import { generateNeighbors, newGate } from '../encounters';
 import { emptyStats } from '../report';
+import { newDigs } from '../tunnelers';
+import { newFarm } from '../farm';
+import { emptyStock } from '../materials';
 import { newLand } from '../land';
 import { CLASSIC, CLASSIC_IMPROVEMENTS } from '../site';
+import { newLights } from '../lights';
 import { newPaper } from '../paperwork';
 import { newUpkeep } from '../upkeep';
 import { newShelf } from '../shelf';
@@ -21,13 +25,97 @@ import { newDebt, newFin } from '../finance';
 import { newArmory } from '../armory';
 import { newBreakins } from '../breakins';
 import { newRescue } from '../rescue';
+import { newScavenge } from '../scavenge';
+import { newMarketState } from '../tradeGoods';
+import { newLocals } from '../neighborLife';
 import { newWild } from '../wildfood';
+import { newWildlife } from '../wildlife';
+import { newDaily } from '../daily';
 import { dayJob, type Person } from '../family';
+import { migrateDogs } from '../pets';
+import { starterKit } from '../tools';
+import { newPaths } from '../paths';
+import { newKin } from '../kin';
+import { newNewcomers } from '../newcomers';
+import { newWeekend } from '../weekender';
 
 type Raw = Record<string, unknown> & { version?: number };
 
 /** version n → n + 1 upgraders. */
 const STEPS: Record<number, (s: Raw) => Raw> = {
+  // 71 → 72: tunnel use (sim/corridors.ts): `PerimeterRun.collapsed` (a portal brought down by sappers) and `Vehicle.stranded` (cut off by a lost bridge or tunnel) are optional and absent in every old game: nothing to fill
+  71: s => ({ ...s, version: 72 }),
+  // 70 → 71: the family can choose where the road comes in (site.entrance, absent: the habitual entrance) and a listed lot's ground is pinned to the lot's seed (site.listed, absent on older saves: they keep the game's seed)
+  70: s => ({ ...s, version: 71 }),
+  // 69 → 70: house hardening tiers and the bug-out goods (sim/houseHardening.ts, sim/bugout.ts): six new goods, none in stock
+  69: s => ({ ...s, version: 70, stock: { security_door: 0, window_shutters: 0, ballistic_panels: 0, safe_room_hardened: 0, bugout_bag: 0, bugout_cache: 0, ...(s.stock as object) } }),
+  // 68 → 69: the bridge on the planned way in can be brought down (sim/roadFx.ts): standing in every old game
+  68: s => ({ ...s, version: 69, roadBridge: { down: false, due: null } }),
+  // 65 → 66: weekender cash pacing (sim/weekender.ts): the belt in town is off; a weekend game keeps its town house as it was (owned, with its mortgage), nobody rents
+  // 67 → 68 (provisional number, renumber at merge): the lot archetype of the land (sim/lots.ts): `site.lot`; old places have none (their ground is the classic benches)
+  67: s => ({ ...s, version: 68, site: { lot: null, ...(s.site as object) } }),
+  65: s => ({ ...s, version: 66, ...(s.weekend ? { weekend: { belt: false, ...(s.weekend as object) } } : {}) }),
+  // 64 → 65: farm choices (sim/crops.ts): the plain `seed` is now the cheap hybrid and the heirloom has its own good. Seed on the shelf keeps its kind: what was heirloom
+  // (`seed`) becomes `seed_heirloom`, what was hybrid (`seed_hybrid`) becomes the plain `seed`. Fields already sown keep the line they were sown with.
+  64: s => {
+    const st = { ...((s.stock ?? {}) as Record<string, number>) };
+    const heirloom = st.seed ?? 0, hybrid = st.seed_hybrid ?? 0;
+    delete st.seed_hybrid;
+    return { ...s, version: 65, stock: { ...st, seed: hybrid, seed_heirloom: (st.seed_heirloom ?? 0) + heirloom } };
+  },
+  // 61 → 62: the herd, the bees and the sugar bush (sim/herd.ts, sim/bees.ts, sim/maple.ts): new goods at zero, the cow's condition, the bees and sugaring chores at zero
+  // 66 → 67: classes, courses, drills and the evenings' wear goods (sim/courses.ts, sim/evenings.ts): the new goods at zero; the state is made when first needed
+  66: s => ({ ...s, version: 67, stock: { game_pieces: 0, guitar_strings: 0, music_player: 0, batteries: 0, paperbacks_bag: 0, toys: 0, picture_books: 0, course_firstaid: 0, course_ham: 0, course_engines: 0, course_welding: 0, course_carpentry: 0, course_wiring: 0, course_gardening: 0, course_husbandry: 0, course_canning: 0, ...(s.stock as object) } }),
+  // 63 → 64: medical depth (sim/medical.ts): the supplies at zero, no cases yet
+  63: s => ({ ...s, version: 64, stock: { antibiotics: 0, splints: 0, ors: 0, dental_kit: 0, midwife_kit: 0, medical_books: 0, ...(s.stock as object) } }),
+  // 62 → 63: people depth (sim/skills.ts, sim/mind.ts): practice and rust, mental health; the evenings' goods at zero
+  62: s => ({ ...s, version: 63, stock: { games: 0, instrument: 0, novels: 0, manuals: 0, ...(s.stock as object) } }),
+  61: s => {
+    const daily = s.daily as { chores: { levels: Record<string, number> } } | undefined;
+    const lv = s.livestock as { condition?: Record<string, number> } | undefined;
+    return {
+      ...s, version: 62,
+      stock: { cow: 0, cheese_kit: 0, vet_kit: 0, bee_nuc: 0, hive_supplies: 0, beeswax: 0, maple_taps: 0, ...(s.stock as object) },
+      livestock: lv ? { ...lv, condition: { cow: 1, ...(lv.condition ?? {}) } } : s.livestock,
+      daily: daily ? { ...daily, chores: { ...daily.chores, levels: { bees: 0, sugaring: 0, ...daily.chores.levels } } } : daily,
+    };
+  },
+  // 60 → 61: farm & kitchen (sim/crops.ts, sim/kitchen.ts, sim/storage.ts): new goods at zero; every field already on the place counts as sown this year (rotation starts fresh,
+  // fertility 1) with a season's saved seed in store; a family that had canning lids keeps its canning (a pressure canner); the spring sowing chore at zero
+  60: s => {
+    const st = (s.stock ?? {}) as Record<string, number>, clock = s.clock as { t: number; startDoy: number; startYear: number };
+    const day = Math.floor(clock.t + 0.25), year = clock.startYear + Math.floor((clock.startDoy - 1 + day) / 365);
+    const fields = ((s.structures as Array<{ id: string; kind: string }>) ?? []).filter(x => x.kind === 'field');
+    const farm = ((s.farm as Record<string, unknown> | undefined) ?? newFarm()) as Record<string, unknown>;
+    const plots: Record<string, unknown> = { ...((farm.plots as object | undefined) ?? {}) };
+    for (const f of fields) plots[f.id] ??= { kind: 'field', fert: 1, prev: null, prev2: null, crop: null, loads: 0, cover: false, settled: -1, planted: true, sown: { y: year, doy: 150, line: 'heirloom', v: 1, late: 1 } };
+    const daily = s.daily as { chores: { levels: Record<string, number> } } | undefined;
+    return {
+      ...s, version: 61,
+      stock: { seed_hybrid: 0, seed_cover: 0, canner: (st.lids ?? 0) > 0 ? 1 : 0, dehydrator: 0, crocks: 0, grain_mill: 0, manure: 0, compost: 0, ...st, seed_saved: st.seed_saved ?? Math.ceil(fields.length * 1.25) },
+      farm: { ...farm, plots },
+      daily: daily ? { ...daily, chores: { ...daily.chores, levels: { sowing: 0, ...daily.chores.levels } } } : daily,
+    };
+  },
+  // 59 → 60: neighbors and strangers who joined (`newcomers`, sim/newcomers.ts); everyone already on the place is the founding household or kin, so no bonds
+  59: s => ({ ...s, version: 60, newcomers: (s.newcomers as object | undefined) ?? newNewcomers() }),
+  // 58 → 59: the weekender (`weekend`, sim/weekender.ts): a game that was set up as a weekend getaway (it could not be played before) gets the town house; everyone else has none
+  58: s => ({ ...s, version: 59, ...(s.lifestyle === 'weekend' && !s.weekend ? { weekend: newWeekend(s.people as Person[], s.seed as number, ((s.site as { miles?: number } | undefined)?.miles) ?? 10) } : {}) }),
+  // 57 → 58: laid walks (`paths`, sim/paths.ts); worn tracks are derived, not saved
+  57: s => ({ ...s, version: 58, paths: (s.paths as object | undefined) ?? newPaths() }),
+  // 55 → 56: the fleet (sim/vehicles.ts): vehicle parts in the stock, a service reading on each vehicle
+  55: s => ({ ...s, version: 56, stock: { vehicle_parts: 0, ...(s.stock as object) }, vehicles: (s.vehicles as Array<Record<string, unknown>> | undefined)?.map(v => ({ serviceAt: v.oilAt, ...v })) }),
+  // 54 → 55: extended family (sim/kin.ts): nobody in town, no requests in a game already under way
+  54: s => ({ ...s, version: 55, kin: (s.kin as object | undefined) ?? newKin([], false) }),
+  // 53 → 54: the fortress ring (sim/walkway.ts, sim/garage.ts, sim/fortress.ts): runs may be a wall-top walkway (`kind: 'wall_walk'`, `hostId`), gates may be a garage's (`garage`),
+  // and a gatehouse garage carries its parked vehicles (`Structure.parked`). All optional: an old save has none, and no field needs a default.
+  53: s => ({ ...s, version: 54 }),
+  // 52 → 53: "work on this first" (`focus`, sim/priority.ts); dogs: no puppies unless the player allows them (`petLife.allowPups`)
+  52: s => ({ ...s, version: 53, focus: (s.focus as string | null | undefined) ?? null, petLife: s.petLife ? { allowPups: false, ...(s.petLife as object) } : s.petLife }),
+  // 50 → 51: tunnelers (the dig in progress, the party sent out, tallies), ground sensors and passage hatches in the stock; runs may carry a buried skirt / unlocked / revealed / permitAt (none yet)
+  50: s => ({ ...s, version: 51, digs: (s.digs as object | undefined) ?? newDigs(), stock: { ground_sensor: 0, passage_hatch: 0, ...(s.stock as object) } }),
+  // 46 → 47: the family's tools (sim/tools.ts): a starter kit from the trades, as if they had brought it
+  46: s => ({ ...s, version: 47, tools: (s.tools as object | undefined) ?? starterKit(s.people as Person[], s.seed as number) }),
   // 38 → 39: the pantry, item by item (the aggregate staples / canned / frozen split into a default breakdown at their shelf ages)
   38: s => {
     const st = s.stock as Record<string, number>, sh = s.shelf as { age?: Record<string, number> } | undefined;
@@ -50,6 +138,30 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   5: s => ({ ...s, version: 6, stock: { rebar: 0, membrane: 0, excavator: 0, blast_door: 0, nbc_filter: 0, spoil: 0, ...(s.stock as object) } }),
   // 6 → 7: the escape tunnel (culvert, egress hatch)
   6: s => ({ ...s, version: 7, stock: { culvert: 0, egress_hatch: 0, ...(s.stock as object) } }),
+  // 56 → 57: the self-sufficient interior (sim/farm.ts): greenhouse heat, orchard care, ponds, equipment-yard bays; new goods (production greenhouse kit, trout fry, crayfish, fish feed, sheep) join the stockpile at zero; a flock's condition and the three new chores (orchard, greenhouse, pond) at zero
+  56: s => ({ ...s, version: 57, farm: (s.farm as object | undefined) ?? newFarm(), stock: { greenhouse_pro_kit: 0, trout_fry: 0, crayfish_stock: 0, fish_feed: 0, sheep: 0, ...(s.stock as object) }, livestock: s.livestock ? { ...(s.livestock as object), condition: { sheep: 1, ...((s.livestock as { condition: object }).condition) } } : s.livestock, daily: s.daily ? { ...(s.daily as object), chores: { ...((s.daily as { chores: object }).chores), levels: { orchard: 0, greenhouse: 0, pond: 0, ...((s.daily as { chores: { levels: object } }).chores.levels) } } } : s.daily }),
+  // 51 → 52: light discipline: the family's lights-out routine (`opsec.auto`) and blackout curtains join the stockpile at zero (sim/blackout.ts)
+  51: s => ({ ...s, version: 52, stock: { blackout_curtains: 0, gen_baffles: 0, gen_vault: 0, ...(s.stock as object) }, opsec: s.opsec ? { auto: 'off', ...(s.opsec as object) } : s.opsec }),
+  // 45 → 46: daily life (sim/daily.ts): an Auto roster (the planner fills it on the first sub-step), no chores behind, nobody tired; the losses ledger (sim/grief.ts)
+  45: s => ({ ...s, version: 46, losses: (s.losses as unknown[] | undefined) ?? [], daily: (s.daily as object | undefined) ?? newDaily(), personState: (s.personState as Array<Record<string, unknown>>).map(ps => ({ fatigue: 0, ...ps })) }),
+  // 44 → 45: where the starting money came from (old saves: not recorded; they keep their jobs and the old flat passive income)
+  44: s => ({ ...s, version: 45, startFunds: null }),
+  // 49 → 50: dogs are named family pets (each old guard dog in the stockpile becomes a named adult dog), and the new dog goods start at zero
+  49: s => {
+    const { dogs, petLife } = migrateDogs(s as unknown as Parameters<typeof migrateDogs>[0]);
+    return { ...s, version: 50, dogs, petLife, stock: { puppy: 0, kibble: 0, dogbed: 0, doghouse: 0, ...(s.stock as object), dog: 0 } };
+  },
+  // 47 → 48: bedding for the housing model (sim/housing.ts): a bag each and a dome tent for anyone past the wall tent's four
+  47: s => ({ ...s, version: 48, stock: { ...startingBedding((s.people as unknown[]).length), ...(s.stock as object) } }),
+  // 43 → 44: structures may carry `replaces` (a watch-tower upgrade in place, sim/towers.ts; none yet) and the top towers' mount and turret goods join the stockpile at zero
+  48: s => ({ ...s, version: 49, wildlife: (s.wildlife as object | undefined) ?? newWildlife(), stock: { ai_sensor_module: 0, ...(s.stock as object) }, lights: s.lights ? { ai: {}, animalUntil: -1, animalNights: [], ...(s.lights as object) } : s.lights }),
+  43: s => ({ ...s, version: 44, stock: { gun_mount: 0, turret_head: 0, ...(s.stock as object) }, lights: (s.lights as object | undefined) ?? newLights() }),
+  // 42 → 43: a raid rolled for the day waits for its hour of arrival (`gate.incoming`, sim/siege.ts); none yet
+  42: s => ({ ...s, version: 43, gate: { incoming: null, ...(s.gate as object) } }),
+  // 41 → 42: perimeter runs may carry `replaces` (an upgrade of a finished run in place); none yet
+  41: s => ({ ...s, version: 42 }),
+  // 40 → 41: scavenging places and runs, the crossroads market and its trade-goods bag, the neighbors' lives (none yet: made on the first day after the hit)
+  40: s => ({ ...s, version: 41, scavenge: (s.scavenge as object | undefined) ?? newScavenge(), market: (s.market as object | undefined) ?? newMarketState(), locals: (s.locals as object | undefined) ?? newLocals() }),
   // 39 → 40 (encounter realism): what's owed on the
   // card (fin.debt: a negative checking balance moves onto it the first day it runs), trial camps outside the wall, a crew coming back
   39: s => ({ ...s, version: 40, fin: { debt: newDebt(), ...(s.fin as object) }, gate: { camps: [], comeBack: null, ...(s.gate as object) } }),
@@ -140,6 +252,8 @@ export function migrate(raw: unknown): GameState {
   for (const k of ['seed', 'clock', 'money', 'stock', 'orders', 'people', 'personState', 'structures', 'forestry', 'heat', 'perimeter', 'utilities', 'hardenJobs', 'disaster', 'food', 'neighbors', 'gate', 'stats', 'land', 'site', 'lifestyle', 'crews', 'siteJobs', 'roadside', 'paper', 'upkeep', 'shelf', 'pantry', 'body', 'fin', 'armory', 'wild', 'lineage', 'log', 'nextId'] as const) {
     if (!(k in s)) throw new SaveVersionError(`Save is missing "${k}"`);
   }
+  // goods added since the save was made start at zero (a new material needs no migration step)
+  s = { ...s, stock: { ...emptyStock(), ...(s.stock as object) } };
   return s as unknown as GameState;
 }
 

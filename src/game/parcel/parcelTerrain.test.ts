@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { PARCEL_SIZE, ParcelTerrain } from './parcelTerrain';
+import { REGION_IDS } from '../../sim/regions';
+import type { LotKind, LotSpec } from '../../sim/lots';
 
 describe('ParcelTerrain', () => {
   it('is deterministic per seed and differs between seeds', () => {
@@ -67,5 +69,112 @@ describe('ParcelTerrain', () => {
     expect(wooded / n).toBeLessThan(0.6);
     const x = PARCEL_SIZE / 2, zc = t.creek.zAt(x);
     expect(Math.max(t.sample(x, zc + 1.6).forest, t.sample(x, zc - 1.6).forest)).toBeGreaterThan(0.4);
+  });
+});
+
+describe('ParcelTerrain by region', () => {
+  const span = (t: ParcelTerrain) => {
+    let lo = Infinity, hi = -Infinity, flat = 0, n = 0, maxG = 0;
+    for (let x = 1; x < PARCEL_SIZE; x += 1) for (let z = 1; z < PARCEL_SIZE; z += 1) {
+      const h = t.height(x, z); lo = Math.min(lo, h); hi = Math.max(hi, h); n++;
+      const g = Math.hypot(t.height(x + 0.5, z) - t.height(x - 0.5, z), t.height(x, z + 0.5) - t.height(x, z - 0.5));
+      maxG = Math.max(maxG, g); if (g < 0.08) flat++;
+    }
+    return { relief: hi - lo, flat: flat / n, maxG };
+  };
+  it('every region: the creek runs in its channel, grades stay walkable, there is level ground to build on', () => {
+    for (const region of REGION_IDS) for (const creek of [true, false]) for (const seed of [3, 7]) {
+      const t = new ParcelTerrain(seed, { region, creek });
+      for (let x = -20; x <= PARCEL_SIZE + 20; x += 3) {
+        const zc = t.creek.zAt(x), wy = t.creek.waterY(x);
+        if (!creek && zc > -10 && zc < PARCEL_SIZE + 10) continue;
+        expect(t.height(x, zc)).toBeLessThan(wy);
+        expect(t.height(x, zc + 2.5)).toBeGreaterThan(wy);
+        expect(t.height(x, zc - 2.5)).toBeGreaterThan(wy);
+      }
+      const s = span(t);
+      expect(s.maxG).toBeLessThan(0.9);
+      expect(s.flat).toBeGreaterThan(0.1);
+    }
+  });
+  it('an Appalachian hollow is deep, the Plains flat, the desert has a dry wash', () => {
+    const ap = span(new ParcelTerrain(7, { region: 'appalachia' })), pl = span(new ParcelTerrain(7, { region: 'plains' }));
+    expect(ap.relief).toBeGreaterThan(6);       // > 36 m from the bottom to the ridge
+    expect(pl.relief).toBeLessThan(1.6);        // < 10 m across the quarter
+    const d = new ParcelTerrain(7, { region: 'desert', creek: false });
+    expect(d.wash).not.toBeNull();
+    const x = PARCEL_SIZE / 2, wz = d.wash!(x);
+    expect(d.height(x, wz)).toBeLessThan(d.height(x, wz + 4) - 0.12);
+    expect(new ParcelTerrain(7, { region: 'desert', creek: true }).wash).toBeNull();
+  });
+  it('the Mountain West parcel is the one it always was', () => {
+    const a = new ParcelTerrain(7), b = new ParcelTerrain(7, { region: 'mountain_west' });
+    for (let x = 0; x <= PARCEL_SIZE; x += 11) for (let z = 0; z <= PARCEL_SIZE; z += 11) expect(b.natural(x, z)).toEqual(a.natural(x, z));
+  });
+
+  describe('lot archetypes', () => {
+    const rect = { x0: 0, z0: 0, x1: PARCEL_SIZE, z1: PARCEL_SIZE };
+    const mk = (kind: LotKind, over: Partial<LotSpec> = {}, region: 'mountain_west' | 'pnw' = 'mountain_west') =>
+      new ParcelTerrain(5, { region, home: rect, lot: { kind, seed: 4, relief: 8, outlier: false, elevM: 2000, flip: 1, creek: kind === 'hillside', ...over } });
+
+    it('draws the lot field: the ground is the datum plus the lot relief', () => {
+      const t = mk('gorge');
+      for (const [x, z] of [[20, 10], [40, 30], [60, 50]]) expect(t.natural(x, z).h).toBeCloseTo(-0.1 + t.lot!.h(x, z), 1);
+    });
+
+    it('a gorge has water in its bed and none on the rim; the stream runs downhill', () => {
+      const t = mk('gorge'), c = t.creek;
+      expect(t.hasStream).toBe(true);
+      for (const x of [10, 30, 50]) {
+        expect(t.isCreek(x, c.zAt(x))).toBe(true);
+        expect(t.isCreek(x, c.zAt(x) + 30)).toBe(false);
+      }
+      expect(c.waterY(60)).toBeLessThanOrEqual(c.waterY(10));
+    });
+
+    it('a ridge has no stream to draw; the lake kinds flood their basins, not the pad or the road', () => {
+      expect(mk('ridge').hasStream).toBe(false);
+      for (const kind of ['bluff', 'island'] as const) {
+        const t = mk(kind), st = t.lot!, wet = [0, 0];
+        for (let x = 0; x <= 67; x += 3) for (let z = 0; z <= 67; z += 3) wet[t.isCreek(x, z) ? 1 : 0]++;
+        expect(wet[1], kind).toBeGreaterThan(20);
+        expect(t.lakeY).toBeCloseTo(-0.1 + st.lake!.y, 5);
+        for (let z = 0; z <= 67; z += 5) expect(t.isCreek(70, z), `${kind} road`).toBe(false);
+      }
+      expect(mk('ridge').lakeY).toBeNull();
+    });
+
+    it('nothing grows under the lake', () => {
+      for (const kind of ['bluff', 'island'] as const) {
+        const t = mk(kind);
+        let wet = 0, grows = 0;
+        for (let x = 0; x <= 67; x += 1.5) for (let z = 0; z <= 67; z += 1.5) if (t.isCreek(x, z)) { wet++; if (t.natural(x, z).forest > 0) grows++; }
+        expect(wet, kind).toBeGreaterThan(30);
+        expect(grows, kind).toBe(0);
+      }
+    });
+
+    it('no timber on cliffs or above the tree line; timber on gentle ground below it', () => {
+      const t = mk('gorge', { relief: 30, outlier: true });
+      let steep = 0, steepForest = 0;
+      for (let x = 0; x <= 67; x += 2) for (let z = 0; z <= 67; z += 2) if (t.lotSlope(x, z) > 1.2) { steep++; steepForest += t.natural(x, z).forest > 0.3 ? 1 : 0; }
+      expect(steep).toBeGreaterThan(20);
+      expect(steepForest / steep).toBeLessThan(0.05);
+      const high = mk('ridge', { elevM: 3400 }), low = mk('ridge', { elevM: 2000 });
+      let fh = 0, fl = 0;
+      for (let x = 5; x <= 62; x += 3) for (let z = 5; z <= 62; z += 3) { fh += high.natural(x, z).forest; fl += low.natural(x, z).forest; }
+      expect(fh).toBeLessThan(fl * 0.3);
+    });
+
+    it('is deterministic, and the old Mountain West parcel is untouched when there is no lot', () => {
+      const a = mk('bench'), b = mk('bench');
+      expect(a.natural(30, 30)).toEqual(b.natural(30, 30));
+      expect(new ParcelTerrain(7, { lot: null }).natural(30, 30)).toEqual(new ParcelTerrain(7).natural(30, 30));
+    });
+
+    it('works in the other hill regions', () => {
+      const t = mk('hillside', {}, 'pnw');
+      expect(Number.isFinite(t.height(30, 30))).toBe(true);
+    });
   });
 });

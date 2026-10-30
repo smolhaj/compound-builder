@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { newGame } from './state';
 import { step } from './engine';
 import { addRunWork, nextRun, planRun, runBill, runBlocked, runFinished, runGrowth, runStops, wallLength } from './perimeter';
+import { MATERIALS, type MaterialId } from './materials';
 
 describe('perimeter', () => {
   it('bills per length, rounded up, and leaves gates out', () => {
@@ -41,5 +42,85 @@ describe('perimeter', () => {
     g = step(g, 0.2);
     expect(g.perimeter[0].done).toBe(0);
     expect(g.structures[0].done + g.structures[0].stage).toBeGreaterThan(0);
+  });
+});
+
+import { UPGRADE_NEXT, SALVAGE, planRun as plan, peopleBlock, upgradeProblem, upgradeRun, PERIMETER, type PerimeterKind, type PerimeterRun } from './perimeter';
+
+describe('upgrading in place', () => {
+  const finished = (kind: Parameters<typeof plan>[1]) => {
+    const g = newGame(5);
+    const r = plan(g, kind, [[0, 0], [6, 0]]);
+    r.done = r.hours; r.supplied = true; r.finishedAt = 0;
+    return { g, r };
+  };
+
+  it('the chain runs from a split-rail fence to the poured-concrete wall, each tier stronger than the last', () => {
+    let k: keyof typeof PERIMETER | undefined = 'split_rail', last = -1, steps = 0;
+    while (k) {
+      const b = PERIMETER[k].blocks.people;
+      expect(b).toBeGreaterThanOrEqual(last);
+      last = b; k = UPGRADE_NEXT[k]; steps++;
+    }
+    expect(steps).toBe(9);
+    expect(last).toBeGreaterThan(0.95);
+  });
+
+  it('an upgrade is a new run over the same line; the old tier stands until it is done, then goes and half its materials come back', () => {
+    const { g, r } = finished('chain_link');
+    expect(upgradeProblem(g, r)).toBeNull();
+    expect(upgradeRun(g, r.id)).toBeNull();
+    const up = g.perimeter.find(x => x.replaces === r.id) as PerimeterRun;
+    expect(up.kind).toBe('wrought_iron');
+    expect(up.pts).toEqual(r.pts);
+    expect(upgradeProblem(g, r)).toMatch(/under way/);
+    // the old one is still the wall while the new one is built
+    expect(g.perimeter.some(x => x.id === r.id && runFinished(x))).toBe(true);
+    const bill = runBill('wrought_iron', wallLength(up)), before = { ...g.stock };
+    for (const [m, n] of Object.entries(bill)) (g.stock as unknown as Record<string, number>)[m] += n as number;
+    addRunWork(g, up, up.hours);
+    expect(runFinished(up)).toBe(true);
+    expect(g.perimeter.some(x => x.id === r.id)).toBe(false);
+    expect(up.replaces).toBeUndefined();
+    const back = runBill('chain_link', wallLength(r));
+    for (const [m, n] of Object.entries(back)) expect((g.stock as unknown as Record<string, number>)[m] - (before as unknown as Record<string, number>)[m]).toBeGreaterThanOrEqual(Math.floor((n as number) * SALVAGE));
+  });
+
+  it('the top tier has nothing to upgrade to, and an unfinished run cannot be upgraded', () => {
+    const { g, r } = finished('concrete_wall');
+    expect(upgradeProblem(g, r)).toMatch(/nothing better/);
+    const u = plan(g, 'chain_link', [[0, 0], [3, 0]]);
+    expect(upgradeProblem(g, u)).toMatch(/not finished/);
+  });
+
+  it('an electrified wall without power is only a steel wall', () => {
+    const { g, r } = finished('electric_steel');
+    g.utilities.lit = []; g.utilities.grid = false;
+    expect(peopleBlock(g, r)).toBe(PERIMETER.steel_wall.blocks.people);
+    g.utilities.lit = ['h'];
+    expect(peopleBlock(g, r)).toBe(PERIMETER.electric_steel.blocks.people);
+  });
+});
+
+describe('wall tier prices (one table: PERIMETER)', () => {
+  /** What a unit (≈ 6 m) of a kind costs in materials at base prices. */
+  const unit = (k: PerimeterKind) => (Object.entries(PERIMETER[k].materials) as Array<[MaterialId, number]>).reduce((a, [m, q]) => a + (MATERIALS[m].price ?? 0) * q, 0);
+  const edges = (Object.entries(UPGRADE_NEXT) as Array<[PerimeterKind, PerimeterKind]>);
+
+  it('a higher tier never costs less than the one it upgrades from', () => {
+    for (const [from, to] of edges) expect(unit(to), `${from} -> ${to}`).toBeGreaterThanOrEqual(unit(from));
+  });
+
+  it('every upgrade costs real money: the new tier minus the half salvaged from the old one is above zero, and at least half of the new tier', () => {
+    for (const [from, to] of edges) {
+      const net = unit(to) - SALVAGE * unit(from);
+      expect(net, `${from} -> ${to}`).toBeGreaterThan(0);
+      expect(net, `${from} -> ${to}`).toBeGreaterThanOrEqual(unit(to) * 0.5 - 1e-9);
+    }
+  });
+
+  it('containers (reused boxes on a plinth) do not out-cost the reinforced steel they upgrade to', () => {
+    expect(unit('steel_wall')).toBeGreaterThan(unit('container_wall'));
+    expect(unit('concrete_wall')).toBeGreaterThan(unit('electric_steel'));
   });
 });

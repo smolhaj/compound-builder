@@ -33,6 +33,7 @@ import { mulberry32 } from './rng';
 import { log } from './economy';
 import { raidPressure } from './opsec';
 import { powered } from './gear';
+import { dogCount } from './pets';
 import { backgroundOf } from './family';
 import { GUN, type Gun } from './armory';
 import { seize, LAWYERS } from './blackMarket';
@@ -40,7 +41,11 @@ import { applyBattle, planBattle } from './battle';
 import type { RegionId } from './regions';
 import type { GameState } from './state';
 import type { Encounter, Outcome, Stance } from './encounters';
+import { stealTools } from './tools';
+import { emptyMultiplier, emptyNow, isSplit, reportFound, weekendOf } from './weekender';
 import type { Battle } from './battleTypes';
+import { responseFactor } from './slope';
+import { hasSafeRoom } from './houseHardening';
 
 export interface Breakins {
   /** Break-ins so far (night and day). */
@@ -68,7 +73,11 @@ export const SHERIFF: Record<RegionId, { min: number; max: number; state: string
   mountain_west: { min: 20, max: 45, state: 'Idaho', castle: 0.96 },
   appalachia: { min: 20, max: 40, state: 'Tennessee', castle: 0.95 },
   desert: { min: 25, max: 45, state: 'Arizona', castle: 0.96 },
-  north_woods: { min: 25, max: 45, state: 'Maine', castle: 0.88 },
+  north_woods: { min: 25, max: 45, state: 'Minnesota', castle: 0.9 },
+  new_england: { min: 25, max: 45, state: 'Vermont', castle: 0.9 },
+  ozarks: { min: 20, max: 45, state: 'Missouri', castle: 0.96 },
+  hill_country: { min: 20, max: 40, state: 'Texas', castle: 0.97 },
+  rust_belt: { min: 15, max: 25, state: 'Ohio', castle: 0.95 },
   plains: { min: 20, max: 45, state: 'Kansas', castle: 0.96 },
   pnw: { min: 15, max: 30, state: 'Washington', castle: 0.9 },
   upper_midwest: { min: 15, max: 30, state: 'Wisconsin', castle: 0.95 },
@@ -83,12 +92,13 @@ export function breakInRate(s: GameState): number {
   if (!lawWorks(s)) return 0;
   const seen = (raidPressure(s) / 0.835) ** 2;   // 0.7 (nobody knows) · 1 (an ordinary place, exposure ≈ 15) · 3.7 (everybody does)
   let deter = 1;
-  if (n(s, 'dog')) deter *= 0.35;
+  if (dogCount(s) && !emptyNow(s)) deter *= 0.35;   // (the dogs go to town with the family: nothing to bark on a weekday)
   if (n(s, 'driveway_alarm')) deter *= 0.6;
   if (powered(s) && (n(s, 'cameras') || n(s, 'thermal_cam'))) deter *= 0.75;
   if (powered(s) && n(s, 'floodlights')) deter *= 0.9;
   const town = 1 + 0.3 * Math.max(0, 1 - s.site.miles / 10);   // close to town: more traffic past the drive
-  return BASE_PER_YEAR * seen * deter * town;
+  // a place nobody is at (the weekender's weekdays) is a mark; a caretaker and lights on timers take some of that back
+  return BASE_PER_YEAR * seen * deter * town * emptyMultiplier(s);
 }
 
 /** Minutes for a deputy to get there after the 911 call (region and miles to town). */
@@ -96,7 +106,8 @@ export function responseMinutes(s: GameState, r: () => number): number {
   const d = SHERIFF[s.site.region];
   const far = Math.max(0, Math.min(1, s.site.miles / 25));
   const m = d.min + (d.max - d.min) * (0.5 * far + 0.5 * r());
-  return Math.round(Math.max(d.min, Math.min(d.max, m)));
+  // up a steep road, or one the snow has shut, the deputy takes longer (sim/slope.ts)
+  return Math.round(Math.max(d.min, Math.min(d.max, m)) * responseFactor(s));
 }
 
 /** Charge a bill: checking, then savings, then cash; what's left is owed. */
@@ -124,11 +135,20 @@ export function breakInDay(s: GameState, day: number): Encounter | null {
   if (r() >= rate / 365) return null;
   const b = breakinsOf(s);
   b.count++; b.lastAt = s.clock.t;
-  if (r() < 0.33) {
+  // (a place that stands empty is always the daytime kind: nobody there to wake)
+  const empty = emptyNow(s);
+  if (empty || r() < 0.33) {
     // nobody home: the back door kicked in while everyone was in town
     const lines = burgle(s, r, 1);
     const mins = responseMinutes(s, r);
     lines.push(...plainView(s, r, 0.5));
+    if (empty && isSplit(s)) {
+      const w = weekendOf(s)!;
+      w.tally.breakIns++;
+      const l = reportFound(s, `The back door was kicked in while nobody was there. A deputy took a report (${mins} minutes out once it was called in).${lines.length ? ' ' + lines.join(' ') : ''}`);
+      if (l) log(s, l);
+      return null;
+    }
     log(s, `Came home to the back door kicked in. A deputy came out in ${mins} minutes and took a report.${lines.length ? ' ' + lines.join(' ') : ''}`);
     return null;
   }
@@ -136,7 +156,7 @@ export function breakInDay(s: GameState, day: number): Encounter | null {
   const size = u < 0.6 ? 1 : u < 0.88 ? 2 : 3;
   const armed = r() < 0.35;
   const d = SHERIFF[s.site.region];
-  const sound = n(s, 'dog') ? 'The dog is going crazy downstairs.' : n(s, 'driveway_alarm') ? 'The driveway alarm chimed, then glass broke downstairs.' : 'Glass breaking downstairs. Then footsteps.';
+  const sound = dogCount(s) ? 'The dog is going crazy downstairs.' : n(s, 'driveway_alarm') ? 'The driveway alarm chimed, then glass broke downstairs.' : 'Glass breaking downstairs. Then footsteps.';
   return {
     id: `e${s.nextId++}`, kind: 'break_in', day, title: 'Someone is in the house',
     dossier: [
@@ -153,7 +173,7 @@ export function breakInDay(s: GameState, day: number): Encounter | null {
 // ─────────────────────────────────────────────────────────────────────────
 
 /** What they take from a house they have to themselves for a while (share 0–1 of the time they'd like). */
-function burgle(s: GameState, r: () => number, share: number): string[] {
+export function burgle(s: GameState, r: () => number, share: number): string[] {
   const lost: string[] = [];
   let claim = 0;
   const safe = n(s, 'gun_safe') > 0;
@@ -171,7 +191,9 @@ function burgle(s: GameState, r: () => number, share: number): string[] {
     lost.push(`the ${m?.name ?? 'gun'}`);
     claim += m?.price ?? 0;
   }
-  if (r() < 0.6 * share) { const t = Math.round(300 + 1200 * r()); s.money -= t; lost.push(`tools from the shop (${money(t)} to replace)`); claim += t; }
+  // the tools in the shed (sim/tools.ts): a locked workshop, a metal garage or a safe keeps most of them
+  if (r() < 0.6 * share) r();   // (keeps the dice stream of the old money-for-tools line, so a burglary's other losses roll the same)
+  { const th = stealTools(s, 0.45 * share, Math.round(share * 10)); if (th.lines.length) { lost.push(th.lines[0].replace(/^Tools taken: /, 'tools from the shed: ').replace(/\.$/, '')); claim += th.value; } }
   if (s.stock.meds >= 1 && r() < 0.4 * share) { s.stock.meds -= 1; lost.push('the pills in the medicine cabinet'); }
   const out = lost.length ? [`Stolen: ${lost.join(', ')}.`] : ['They left with nothing worth much.'];
   if (taken) out.push('Stolen guns are reported to the sheriff and the ATF by serial number.');
@@ -331,10 +353,10 @@ export function resolveBreakIn(s: GameState, e: Encounter, stance: Stance): Omit
   const mins = responseMinutes(s, r);
   const stay = 8 + Math.round(7 * r());
   const lines: string[] = [];
-  const safeRoom = n(s, 'safe_room') > 0;
+  const safeRoom = hasSafeRoom(s);
   if (stance === 'shout') {
     const homeArmed = s.armory.guns.length > 0;
-    const p = 0.7 + (n(s, 'dog') ? 0.1 : 0) + (powered(s) && n(s, 'floodlights') ? 0.05 : 0) + (homeArmed ? 0.05 : 0) - (e.armed ? 0.15 : 0) - (e.size - 1) * 0.05;
+    const p = 0.7 + (dogCount(s) ? 0.1 : 0) + (powered(s) && n(s, 'floodlights') ? 0.05 : 0) + (homeArmed ? 0.05 : 0) - (e.armed ? 0.15 : 0) - (e.size - 1) * 0.05;
     if (r() < p) {
       lines.push(`The deputy got there in ${mins} minutes and took a report.`);
       lines.push(...plainView(s, r, 0.3));

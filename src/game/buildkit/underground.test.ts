@@ -122,7 +122,7 @@ describe('bunker rooms', () => {
       for (const m of g.children as THREE.Mesh[]) {
         if (!m.visible) continue;
         box.setFromObject(m);
-        const surface = ['chimney', 'stakes'].includes(m.userData.layer) || kind === 'bunker_hatch' || kind === 'bunker_stairs';
+        const surface = ['chimney', 'stakes'].includes(m.userData.layer) || kind === 'bunker_hatch' || kind === 'bunker_stairs' || kind === 'bunker_floorhatch';
         if (!surface) expect(box.max.y, `${kind} ${m.name}`).toBeLessThan(depth - MIN_COVER + 0.01);
       }
     }

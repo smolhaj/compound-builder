@@ -28,6 +28,8 @@ import { isFinished } from './construction';
 import { isHome } from './blueprints';
 import { mulberry32 } from './rng';
 import { log } from './economy';
+import { PRACTICED, isExtra, learningOf, levelFor } from './skills';
+import { afterBirth, birthRisk, duePregnancies, startPregnancy } from './medical';
 
 export type ChronicleKind = 'era' | 'birth' | 'death' | 'partner' | 'coming' | 'milestone' | 'retire' | 'home';
 export interface ChronicleEntry { t: number; year: number; kind: ChronicleKind; text: string }
@@ -99,6 +101,8 @@ function newPerson(s: GameState, p: Omit<Person, 'id' | 'shirt' | 'skills'> & { 
   const out: Person = { id: `b${s.nextId++}`, shirt: [0x8a3b2e, 0x3b5b8c, 0x5a6e3a, 0x7a5a2a, 0x6a3a6a, 0x2f6f6f, 0xa86a2a, 0x4a4a52][Math.floor(r() * 8)], ...p, skills };
   s.people.push(out);
   s.personState.push({ id: out.id, task: 'idle', target: null, needs: freshNeeds() });
+  // a weekender's baby goes back and forth with its parents (sim/weekender.ts)
+  if (s.weekend?.mode === 'split' && out.parents?.some(id => s.weekend!.travelers.includes(id))) s.weekend.travelers.push(out.id);
   return out;
 }
 const pickName = (s: GameState, body: 'f' | 'm', r: () => number) => {
@@ -137,11 +141,11 @@ export function lineageDay(s: GameState): string[] {
   const d = s.disaster, { doy, year } = calendarOf(s.clock);
   const town = d.tracks.stores >= 0.5 && d.tracks.banks >= 0.5;
   const doctor = d.tracks.medical >= 0.5;
-  const medic = s.people.some(p => alive(s, p) && !p.kid && p.skills.medic >= 5) || s.structures.some(x => isFinished(x) && x.kind === 'bunker_medical');
   const living = s.people.filter(p => alive(s, p));
   // deaths (any cause) go in the chronicle
   for (const p of s.people) if (!alive(s, p) && !L.mourned.includes(p.id)) {
     L.mourned.push(p.id);
+    passOn(s, p);
     const taken = s.personState.find(ps => ps.id === p.id)?.needs.taken;
     if (p.kin) chronicle(s, 'death', taken ? `${fullName(p)} was taken by raiders, aged ${p.age}.` : `${fullName(p)} died, aged ${p.age}.`);
   }
@@ -177,6 +181,7 @@ export function lineageDay(s: GameState): string[] {
     const ps = s.personState.find(x => x.id === p.id)!;
     ps.needs.died = Math.floor(s.clock.t);
     L.mourned.push(p.id);
+    passOn(s, p);
     const line = `${fullName(p)} died ${p.age >= 75 ? 'in their sleep' : 'suddenly'}, aged ${p.age}.`;
     log(s, line);
     if (p.kin) chronicle(s, 'death', line);
@@ -196,8 +201,20 @@ export function lineageDay(s: GameState): string[] {
     }, r);
     mate.kin = true; mate.gen ??= p.gen;
     p.partner = mate.id; mate.partner = p.id;
+    if (s.weekend?.mode === 'split' && s.weekend.travelers.includes(p.id)) s.weekend.travelers.push(mate.id);
     if (!here && town) { mate.job = dayJob(mate, s.seed + day); const ms = s.personState.find(x => x.id === mate.id); if (ms) ms.employed = true; }
     say('partner', here ? `${p.first} and ${mate.first} are together now.` : `${p.first} married ${fullName(mate)}, ${lawful ? 'from town' : 'who came up the road one spring and stayed'}.`);
+  }
+  // deliveries: a pregnancy comes due (sim/medical.ts: who is there and what they have decides the risk)
+  for (const { mother, father } of duePregnancies(s)) {
+    const risk = birthRisk(s, mother), mate = father ?? s.people.find(x => x.id === mother.partner) ?? mother;
+    const body: 'f' | 'm' = r() < 0.5 ? 'f' : 'm';
+    if (r() < risk.baby) { say('birth', `${mother.first}'s baby didn't live (${risk.how}).`); afterBirth(s, mother, r); continue; }
+    const kid = newPerson(s, { first: pickName(s, body, r), last: L.family, age: 0, kid: true, body, kin: true, bornHere: true, bday: doy, gen: Math.max(mother.gen ?? 1, mate.gen ?? 1) + 1, parents: [mother.id, mate.id] }, r);
+    L.points += 25;
+    say('birth', `${kid.first} ${kid.last} was born to ${mother.first} and ${mate.first}, ${risk.how}.`);
+    if (r() < risk.mother) { const ps = s.personState.find(x => x.id === mother.id)!; ps.needs.died = Math.floor(s.clock.t); L.mourned.push(mother.id); passOn(s, mother); say('death', `${fullName(mother)} died in childbirth, aged ${mother.age}.`); }
+    else afterBirth(s, mother, r);
   }
   // births (and, for couples who can't, adoption or a child with no one left)
   const doneP = new Set<string>();
@@ -211,14 +228,10 @@ export function lineageDay(s: GameState): string[] {
     const kidsNow = s.people.filter(k => k.kid && alive(s, k) && k.parents?.includes(p.id)).length;
     if (mother) {
       if (mother.age < 18 || mother.age > 43 || r() >= (town ? 0.1 : 0.07) * (kidsNow >= 4 ? 0.3 : 1) / 365) continue;
-      const body: 'f' | 'm' = r() < 0.5 ? 'f' : 'm';
-      const risky = !doctor && !medic;
       L.lastBirth[p.id] = L.lastBirth[mate.id] = day;
-      if (risky && r() < 0.04) { say('birth', `${mother.first}'s baby didn't live. There was no one to help.`); continue; }
-      const kid = newPerson(s, { first: pickName(s, body, r), last: L.family, age: 0, kid: true, body, kin: true, bornHere: true, bday: doy, gen: Math.max(p.gen ?? 1, mate.gen ?? 1) + 1, parents: [p.id, mate.id] }, r);
-      L.points += 25;
-      say('birth', `${kid.first} ${kid.last} was born to ${p.first} and ${mate.first}.`);
-      if (risky && r() < 0.015) { const ps = s.personState.find(x => x.id === mother.id)!; ps.needs.died = Math.floor(s.clock.t); L.mourned.push(mother.id); say('death', `${fullName(mother)} died in childbirth, aged ${mother.age}.`); }
+      r();   // (the draw the sex of the baby used to take, kept so a seeded game's other rolls do not move)
+      startPregnancy(s, mother, mother === p ? mate : p);
+      say('birth', `${mother.first} is expecting. The baby is due in about nine months.`);
     } else if (p.age <= 50 && kidsNow < 3 && r() < 0.04 / 365) {
       L.lastBirth[p.id] = L.lastBirth[mate.id] = day;
       const body: 'f' | 'm' = r() < 0.5 ? 'f' : 'm';
@@ -237,4 +250,35 @@ export function lineageDay(s: GameState): string[] {
     say('milestone', `${m.name}.`);
   }
   return out;
+}
+
+/**
+ * Heirs inherit everything (user, task #34): the compound, stores, tools and animals simply stay (the household is one
+ * stockpile), and a person's skills pass whole to their children: each living child's level in every skill rises to at
+ * least the parent's. With two parents gone a child holds the better of the two, so a trade is never lost between
+ * generations while a child is alive to carry it. Returns the names of the heirs who gained.
+ */
+export function inheritSkills(s: GameState, dead: Person): string[] {
+  const heirs = s.people.filter(k => k.id !== dead.id && alive(s, k) && k.parents?.includes(dead.id));
+  if (!heirs.length) return [];
+  const L = learningOf(s), gained: string[] = [];
+  for (const h of heirs) {
+    let up = false;
+    for (const k of PRACTICED) {
+      if (k === 'shooting') continue;
+      const from = levelFor(s, dead, k), now = levelFor(s, h, k);
+      if (from <= now) continue;
+      if (isExtra(k)) (L.extra[h.id] ??= {})[k] = from; else h.skills[k] = from;
+      ((L.peak[h.id] ??= {})[k]) = Math.max(L.peak[h.id]?.[k] ?? 0, Math.floor(from));
+      up = true;
+    }
+    if (up) gained.push(h.first);
+  }
+  return gained;
+}
+
+/** Death: the heirs take up the trade (and say so in the chronicle for the family's own). */
+function passOn(s: GameState, dead: Person): void {
+  const heirs = inheritSkills(s, dead);
+  if (heirs.length && dead.kin) chronicle(s, 'death', `${dead.first}'s trades pass to ${heirs.join(' and ')}.`);
 }

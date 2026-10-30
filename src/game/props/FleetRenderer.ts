@@ -1,0 +1,189 @@
+/**
+ * The fleet in the world (sim/vehicles.ts, sim/garage.ts): each vehicle stands
+ * in the bay the parking plan gives it (inside its garage, the roof cut away
+ * shows it) or in the yard; one that goes out on a run drives out the gate
+ * and back. Visual only; a vehicle that is away is not drawn.
+ */
+import * as THREE from 'three';
+import type { GameState } from '../../sim/state';
+import { GARAGES, parkingPlan, type Bay } from '../../sim/parking';
+import { KIT } from '../buildkit/kit';
+import { startingVehicles, type Vehicle } from '../../sim/vehicles';
+import { buildVehicle, paintFor, VEHICLE_SIZE } from './vehicleGeometry';
+import { lineLength, type Pt } from '../region/access';
+import { sampleRoute, inCorridorAt } from '../paths/deckWalk';
+import type { Wp } from '../paths/linkRoute';
+
+/** A placed building the bays are laid out in (world position, rotation about y, structure kind). */
+export interface BayHost { x: number; z: number; rot: number; kind: string }
+export interface FleetCtx {
+  host: (structureId: string) => BayHost | null;
+  /** The yard: where vehicles without a roof stand (camp center and rotation). */
+  yard: { x: number; z: number; rot: number };
+  /** The drive, gate end first (the delivery truck's). */
+  drive: readonly Pt[];
+  ground: (x: number, z: number) => number;
+  /** The way from one spot to another through the tunnels when they are on different sides of the rock or the gorge (null / empty: straight; game/paths/linkRoute). */
+  route?: (from: Pt, to: Pt) => Wp[] | null;
+  /** QA: park a vehicle somewhere (id -> spot) instead of where the parking plan puts it. */
+  park?: ReadonlyMap<string, { x: number; z: number; rot: number }>;
+  /** Where the n-th vehicle cut off outside a lost way waits (a bridge that is down, a fallen tunnel): null when there is no such place. */
+  stranded?: (n: number) => { x: number; z: number; rot: number } | null;
+}
+
+/** Bay spacing inside a garage (world units, ≈ 2.9 m): three across a 9 m building. */
+const BAY_DX = 0.48;
+
+/** A vehicle standing in the open yard, as an oriented box (center, heading, half width across and half length along the heading). */
+export interface CarBox { x: number; z: number; rot: number; hw: number; hl: number }
+
+/** Is (x, z) within `pad` of this box (a prop or a path keeps off the cars)? */
+export function inCarBox(b: CarBox, x: number, z: number, pad = 0): boolean {
+  const dx = x - b.x, dz = z - b.z, c = Math.cos(b.rot), s = Math.sin(b.rot);
+  // heading 0 faces +z: along = dot with (sin, cos), across = dot with (cos, -sin)
+  const along = dx * s + dz * c, across = dx * c - dz * s;
+  return Math.abs(along) < b.hl + pad && Math.abs(across) < b.hw + pad;
+}
+
+interface Item { v: Vehicle; group: THREE.Group; built: string; anim: { phase: 'out' | 'in'; d: number; path: Wp[] } | null; wasAway: boolean; spot: { x: number; z: number; rot: number } | null }
+
+export class FleetRenderer {
+  readonly group = new THREE.Group();
+  private readonly _items = new Map<string, Item>();
+  private _key = '';
+  /** Vehicles the last `spots` call left standing in the open yard (no garage slot, bay or yard bay). */
+  private readonly _open = new Set<string>();
+  /** Where the vehicles on the move are this frame (they carry the key: a locked door opens for them). */
+  moving: Array<[number, number]> = [];
+
+  constructor(scene: THREE.Scene) { scene.add(this.group); }
+
+  /** Where each vehicle stands: world x, z and heading (radians about y, front toward +z when 0). */
+  spots(game: GameState, ctx: FleetCtx): Map<string, { x: number; z: number; rot: number }> {
+    const plan = parkingPlan(game);
+    const out = new Map<string, { x: number; z: number; rot: number }>();
+    this._open.clear();
+    let yardX = 0, yardRow = 0;
+    const vs = game.vehicles ?? startingVehicles();
+    for (const p of plan.parked) {
+      const v = vs.find(x => x.id === p.vehicle);
+      if (!v) continue;
+      if (p.slot) {
+        // a real slot in the gatehouse garage (sim/garage.ts): nose out through the roll-up door
+        out.set(v.id, { x: p.slot.x, z: p.slot.z, rot: Math.atan2(p.slot.fx, p.slot.fz) });
+        continue;
+      }
+      if (p.bay && p.bays.length) {
+        const host = ctx.host(p.bay.structure);
+        if (host) {
+          const gd = GARAGES[host.kind];
+          const n = gd?.bays ?? 3;
+          const mid = p.bays.reduce((a, b: Bay) => a + b.index, 0) / p.bays.length;
+          const lx = (mid - (n - 1) / 2) * BAY_DX * (n === 1 ? 0 : 1);
+          const rot = host.rot * Math.PI / 2;
+          // local +z is the front (the doors); the vehicle noses toward them
+          const dz = v.kind === 'trailer' ? -0.3 : -0.02;
+          out.set(v.id, { x: host.x + Math.cos(rot) * lx + Math.sin(rot) * dz, z: host.z - Math.sin(rot) * lx + Math.cos(rot) * dz, rot });
+          continue;
+        }
+      }
+      if (p.yard) {
+        // a marked bay in the equipment yard (sim/farm.ts; farmBuildings.ts paints two rows of three): nose toward the gate side
+        const host = ctx.host(p.yard.yard);
+        if (host) {
+          const kd = KIT[host.kind], W = (kd?.cellsX ?? 4) * 0.5, D = (kd?.cellsZ ?? 4) * 0.5, bw = (W - 0.3) / 3, r = Math.floor(p.yard.bay / 3), k = p.yard.bay % 3;
+          const lx = -W / 2 + 0.15 + (k + 0.5) * bw, lz = -(D / 2 - 0.03) + 0.45 + r * 0.8;
+          const rot = host.rot * Math.PI / 2;
+          out.set(v.id, { x: host.x + Math.cos(rot) * lx + Math.sin(rot) * lz, z: host.z - Math.sin(rot) * lx + Math.cos(rot) * lz, rot });
+          continue;
+        }
+      }
+      // in the yard: side by side in rows beside the camp, noses out, a gap between (rows of four, the next row behind)
+      const y = ctx.yard;
+      const w = VEHICLE_SIZE[v.kind].w + 0.2;
+      if (yardX + w > 2.4 * 2.6) { yardX = 0; yardRow++; }
+      const lx = 2.6 + yardX + w / 2, lz = 1.7 + yardRow * 1.15;
+      yardX += w;
+      const c = Math.cos(y.rot), s = Math.sin(y.rot);
+      out.set(v.id, { x: y.x + c * lx + s * lz, z: y.z - s * lx + c * lz, rot: y.rot + Math.PI });
+      this._open.add(v.id);
+    }
+    if (ctx.park) for (const [id, sp] of ctx.park) if (out.has(id)) out.set(id, sp);
+    return out;
+  }
+
+  /** The vehicles standing in the open yard beside the camp, as boxes (paths route round them, props keep off them). Away ones are not there. */
+  openBoxes(game: GameState, ctx: FleetCtx): CarBox[] {
+    const spots = this.spots(game, ctx), out: CarBox[] = [];
+    for (const v of game.vehicles ?? startingVehicles()) {
+      const sp = spots.get(v.id);
+      if (!sp || !this._open.has(v.id) || v.away) continue;
+      const sz = VEHICLE_SIZE[v.kind];
+      out.push({ x: sp.x, z: sp.z, rot: sp.rot, hw: sz.w / 2, hl: sz.l / 2 });
+    }
+    return out;
+  }
+
+  /** Make, move and hide the vehicles for this frame. */
+  update(dt: number, game: GameState, ctx: FleetCtx, speedK: number): void {
+    const vs = game.vehicles ?? startingVehicles();
+    const key = vs.map(v => `${v.id}${v.kind}${v.fried ? 'f' : ''}`).join();
+    if (key !== this._key) {
+      this._key = key;
+      for (const [id, it] of this._items) if (!vs.some(v => v.id === id)) { this.group.remove(it.group); it.group.traverse(o => (o as THREE.Mesh).geometry?.dispose()); this._items.delete(id); }
+    }
+    const spots = this.spots(game, ctx);
+    this.moving = [];
+    let cutOff = 0;
+    for (const v of vs) {
+      let it = this._items.get(v.id);
+      if (!it) {
+        const g = buildVehicle(v.kind, paintFor(v.kind, v.id));
+        this.group.add(g);
+        it = { v, group: g, built: v.kind, anim: null, wasAway: !!v.away, spot: null };
+        this._items.set(v.id, it);
+      }
+      it.v = v;
+      const spot = spots.get(v.id) ?? it.spot;
+      if (spot) it.spot = spot;
+      // leaving and coming home: drive the road out the gate (through the tunnel first, when the vehicle stands on the far side of the rock or the gorge)
+      if (!!v.away !== it.wasAway && spot && ctx.drive.length > 1) {
+        const drive = [...ctx.drive].reverse() as Pt[];
+        const yardEnd = drive[0], through = ctx.route?.([spot.x, spot.z], yardEnd) ?? [];
+        const out: Wp[] = [[spot.x, spot.z], ...through, ...drive];
+        it.anim = v.away ? { phase: 'out', d: 0, path: out } : { phase: 'in', d: 0, path: [...out].reverse() as Wp[] };
+        it.wasAway = !!v.away;
+      } else if (!!v.away !== it.wasAway) it.wasAway = !!v.away;
+      if (it.anim) {
+        const len = lineLength(it.anim.path as unknown as Pt[]);
+        const inside = inCorridorAt(it.anim.path, it.anim.d);
+        it.anim.d += dt * Math.max(1, Math.min(4, speedK)) * (inside ? 1.5 : 3);       // (a lane in a tunnel: half the pace of the open drive)
+        const p = sampleRoute(it.anim.path, Math.min(it.anim.d, len));
+        it.group.position.set(p.x, p.y ?? ctx.ground(p.x, p.z), p.z);
+        it.group.rotation.order = 'YXZ';
+        it.group.rotation.set(-p.pitch, p.rot, 0);
+        it.group.visible = true;
+        this.moving.push([p.x, p.z]);
+        if (it.anim.d >= len) { it.anim = null; it.group.rotation.set(0, 0, 0); }
+        continue;
+      }
+      if (v.stranded && v.away) {
+        const sp = ctx.stranded?.(cutOff++);
+        if (sp) { it.group.visible = true; it.group.position.set(sp.x, ctx.ground(sp.x, sp.z), sp.z); it.group.rotation.set(0, sp.rot, 0); it.group.userData.status = 'stranded'; continue; }
+      }
+      if (v.away || !spot) { it.group.visible = false; continue; }
+      it.group.visible = true;
+      it.group.position.set(spot.x, ctx.ground(spot.x, spot.z), spot.z);
+      it.group.rotation.y = spot.rot;
+      // a vehicle that is dead sits a little low and grey
+      it.group.scale.setScalar(1);
+      it.group.userData.status = v.fried ? 'fried' : v.down ? 'down' : 'ok';
+    }
+  }
+
+  dispose(): void {
+    this.group.parent?.remove(this.group);
+    this.group.traverse(o => (o as THREE.Mesh).geometry?.dispose());
+    this._items.clear();
+  }
+}

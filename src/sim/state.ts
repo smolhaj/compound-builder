@@ -14,7 +14,8 @@ import { emptyUtilities, type Utilities } from './utilities';
 
 import type { HardenId, HardenJob, Tier } from './hardening';
 import { newLand, type LandState } from './land';
-import { CLASSIC, LIFESTYLE, type Lifestyle, type Site } from './site';
+import { CLASSIC, type Lifestyle, type Site } from './site';
+import { startFunds, type StartFunds } from './startFunds';
 import { REGIONS } from './regions';
 import type { Crew } from './crews';
 import { improvementStructures, type Fix, type SiteJobs } from './improvements';
@@ -26,17 +27,41 @@ import { conditionsFor, newBody, type Body } from './body';
 import { newFin, type Fin } from './finance';
 import { newArmory, type Armory } from './armory';
 import { newWild, type Wild } from './wildfood';
+import { newWildlife, type Wildlife } from './wildlife';
 import type { Livestock } from './livestock';
+import type { Farm } from './farm';
 import type { Vehicle } from './vehicles';
 import { emptyStats, type Ending, type RunStats } from './report';
 import { generateNeighbors, newGate, type GateState, type Neighbor } from './encounters';
 import { freshNeeds, type FoodReport, type Needs } from './needs';
 import type { WeatherState } from './weatherThreats';
+import { DIFFICULTY } from './difficulty';
 import { newDisaster, type Difficulty, type DisasterKind, type Mode, type PeaceLength, type DisasterState } from './disaster';
-export const SAVE_VERSION = 40;
+import type { LightsState } from './lights';
+import type { Learning } from './skills';
+import type { MindState } from './mind';
+import type { Medical } from './medical';
+import type { Evenings } from './evenings';
+import type { Courses } from './courses';
+import { starterKit, type ToolKit } from './tools';
+export const SAVE_VERSION = 72;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
+import { newScavenge, type ScavengeState } from './scavenge';
+import { newMarketState, type MarketState } from './tradeGoods';
+import { newLocals, type LocalsState } from './neighborLife';
+import { newDigs, type DigState } from './tunnelers';
+import type { Dog, PetLife } from './pets';
+import { newDaily, type Daily } from './daily';
+import { linkKin, newKin, type Kin } from './kin';
+import type { Loss } from './grief';
+import { newPaths, type PathsState } from './paths';
+import { newNewcomers, type NewcomerState } from './newcomers';
+import { newWeekend, type TownPlan, type Weekend } from './weekender';
+
+/** What the family packs to sleep in: a bag each and, past the wall tent's four, a dome tent for the rest (sim/housing.ts). */
+export const startingBedding = (n: number): { sleeping_bag: number; tent: number } => ({ sleeping_bag: n, tent: Math.max(0, Math.ceil((n - 4) / 3)) });
 
 /** Starting savings (GDS §1 peacetime money constraint). */
 export const STARTING_MONEY = 30000;
@@ -46,6 +71,9 @@ export const STARTING_FIREWOOD = 2;
 
 /** A delivery dropped at the road, and the person-hours to carry it in. */
 export interface Roadside { lines: OrderLine[]; hours: number; done: number }
+
+/** The bridge on the way in (sim/roadFx.ts): brought down on purpose, and the day its rebuilding is done (null: none under way). */
+export interface RoadBridgeState { down: boolean; due: number | null }
 
 export type Speed = 0 | 1 | 2 | 3 | 4;
 /** Real seconds per in-game day at each speed (docs/DECISIONS.md: 1× = 60 s … 1.5 s). */
@@ -101,12 +129,32 @@ export interface Structure {
   unplaced?: boolean;
   /** Repairs it needs (old roof, wiring, plumbing, septic field). */
   fixes?: Fix[];
+  /** A tunnel's poly was last put on at this time (sim/tunnels.ts; the build time if never re-covered). */
+  filmAt?: number;
   /** County permit (sim/paperwork.ts): under review, approved, built without one, or stopped by the inspector; when review / the stop ends. */
   permit?: 'review' | 'ok' | 'none' | 'stopped';
   permitAt?: number;
+  /** A fire, storm or looters took its roof off after it stood: the guidance suggests re-roofing it until it is finished again (optional, so no save bump). */
+  roofLost?: boolean;
+  /** An upgrade of this finished structure (sim/towers.ts): the old tier keeps working until this one is done, then goes (half its materials back). */
+  replaces?: string;
+  /** Towers: how far the ground at the site stands above the land round it (world units, ≥ 0; sim/towers.ts `stampHighGround`). */
+  high?: number;
+  /** Gatehouse garage (sim/garage.ts): the vehicle id in each parking slot (null = free). */
+  parked?: Array<string | null>;
+  /** Rise over run across its footprint when it was staked, on a lot with relief (sim/slope.ts): the pad takes longer and the foundation more stone. Absent: level. */
+  grade?: number;
+  /** Housing styles (sim/housingStyles.ts): how local the walls' material is where it was staked (stone gathered off the land, hauled in, a wet climate for earth walls); absent: the plain bill. Optional, so no save bump. */
+  mat?: 'local' | 'hauled' | 'wet';
+  /** Day a tall retaining wall behind its pad let go in a storm or the thaw (sim/retaining.ts); cleared when the family has restacked it (optional, so no save bump). */
+  slumpedAt?: number;
 }
 
-export type TaskKind = 'idle' | 'build' | 'forestry' | 'sleep' | 'chores' | 'school' | 'leisure' | 'job' | 'gone' | 'shelter' | 'away';
+export type TaskKind = 'idle' | 'build' | 'forestry' | 'sleep' | 'chores' | 'school' | 'leisure' | 'job' | 'gone' | 'shelter' | 'away'
+  // the weekender (sim/weekender.ts): at the town house, or at work in town, while the family is not on the place
+  | 'town'
+  // daily life (sim/daily.ts): the duty on the roster, and a gathering
+  | 'garden' | 'fields' | 'livestock' | 'pets' | 'cleaning' | 'wood' | 'water' | 'kitchen' | 'laundry' | 'repairs' | 'hunt' | 'medic' | 'teach' | 'radio' | 'watch' | 'meal' | 'party' | 'study' | 'drill';
 
 export interface PersonState {
   id: string;
@@ -119,6 +167,8 @@ export interface PersonState {
   laidOff?: boolean;
   /** Health, morale, hunger, dose, wounds. */
   needs: Needs;
+  /** 0–100: long days and night watch (sim/daily.ts). Save v43. */
+  fatigue?: number;
 }
 
 /** A tree marked for felling (GDS §2.1 "fell own timber"; docs/DECISIONS.md). */
@@ -179,12 +229,18 @@ export interface GameState {
   site: Site;
   /** How the family lives in peacetime (budget, jobs, passive income). */
   lifestyle: Lifestyle;
+  /** Where the starting money came from (null: old saves and the dev scene). */
+  startFunds: StartFunds | null;
   /** Hired crews at work on the place. */
   crews: Crew[];
+  /** "Work on this first": the id of the building or wall the family does before the rest of the queue (sim/priority.ts). */
+  focus: string | null;
   /** The co-op's line extension and the drive contractor, when due (null = not ordered). */
   siteJobs: SiteJobs;
   /** Deliveries left at the road (no drive yet): carried in by hand, oldest first. */
   roadside: Roadside[];
+  /** The bridge on the planned way in, if it has one: standing, or brought down (a crew's trucks stop at the creek, and so do yours). */
+  roadBridge: RoadBridgeState;
   /** Permits, property tax, insurance. */
   paper: Paper;
   /** Seasoning firewood, creosote in the flue. */
@@ -202,13 +258,21 @@ export interface GameState {
   /** Guns, ammo by caliber, who can shoot. */
   armory: Armory;
   /** OPSEC choices (sim/opsec.ts); made lazily. */
-  opsec?: { quietDeliveries: boolean; blackout: boolean };
+  opsec?: { quietDeliveries: boolean; blackout: boolean; auto?: 'off' | 'warned' | 'dusk' };
+  /** Hammers, saws, shovels and drills: condition, sharpness, what is missing (sim/tools.ts). Save v45; made lazily from the family's trades. */
+  tools?: ToolKit;
+  /** Floodlight modes: the default and per-light overrides (sim/lights.ts). Save v44; made lazily. */
+  lights?: LightsState;
   /** The game in the woods and the creek, licenses. */
   wild: Wild;
+  /** Native wildlife on the land: predators taken, sightings, raids (sim/wildlife.ts). Save v49; made lazily. */
+  wildlife?: Wildlife;
   /** The long game: eras, the chronicle, milestones, the dynasty score. */
   lineage: Lineage;
   /** Goats, pigs, the steer, rabbits (lazily made: `s.livestock ??= newLivestock()`). */
   livestock?: Livestock;
+  /** Heated greenhouses, orchards, ponds and equipment yards (sim/farm.ts; lazily made: `farmOf(s)`). */
+  farm?: Farm;
   /** The black market contact, deals and heat (lazily created by sim/blackMarket.ts; optional, no save bump). */
   blackMarket?: BlackMarket;
   /** Peacetime break-ins and their legal aftermath (sim/breakins.ts): the evidence locker, a felony record, the news. Save v34; `??=` for safety. */
@@ -219,6 +283,40 @@ export interface GameState {
   gate: GateState;
   /** The children taken by raiders, the leads, the rescue raid out (sim/rescue.ts). Save v38; `??=` for safety. */
   rescue?: RescueState;
+  /** Scavenging runs: the places, what's left in each, the run out (sim/scavenge.ts). Save v42; `??=` for safety. */
+  scavenge?: ScavengeState;
+  /** The crossroads market: the trade-goods bag, the family's name, today's stalls (sim/market.ts). Save v42. */
+  market?: MarketState;
+  /** The neighbors' lives: ages, history, news on its way, the co-op or militia, the pact (sim/neighborLife.ts). Save v42. */
+  locals?: LocalsState;
+  /** Tunnelers: the dig in progress, the party sent to a breakout, tallies (sim/tunnelers.ts). Save v47; `??=` for safety. */
+  digs?: DigState;
+  /** The family's dogs, each a named pet with its own health, bonds and moods (sim/pets.ts; save v43). Replaces the old `stock.dog` count. */
+  dogs: Dog[];
+  /** Extended family: relatives in town, asking to join, waiting for a place, turned away (sim/kin.ts). Save v53; `kinOf` makes it lazily. */
+  kin?: Kin;
+  /** Neighbors and strangers who joined: loyalty, hidden character, guests sheltering, who left (sim/newcomers.ts). Save v60; `newcomersOf` makes it lazily. */
+  newcomers?: NewcomerState;
+  /** Pet care settings, the family's grief for lost pets, yesterday's care (sim/pets.ts; save v43; `??=` for safety). */
+  petLife?: PetLife;
+  /** Daily life (sim/daily.ts): the roster, chores, gatherings. Save v49; `dailyOf` makes it lazily. */
+  daily?: Daily;
+  /** Skills from practice: hours toward the next level, when each was last used, the four skills kept here (sim/skills.ts). Save v63; `learningOf` makes it lazily. */
+  learning?: Learning;
+  /** Mental health: strain, trauma, low mood, breakdowns, the fight a household remembers (sim/mind.ts). Save v63; `mindOf` makes it lazily. */
+  mind?: MindState;
+  /** Medical depth: lasting effects, pregnancies, the epidemic, the antibiotics policy (sim/medical.ts). Save v64; `medicalOf` makes it lazily. */
+  medical?: Medical;
+  /** The evenings' goods and how worn they are: the cards, the guitar, the paperbacks, the kids' toys (sim/evenings.ts). Save v65; `eveningsOf` makes it lazily. */
+  evenings?: Evenings;
+  /** Classes and courses taken, the certificates, the defense drills and how drilled everyone is (sim/courses.ts). Save v65; `coursesOf` makes it lazily. */
+  courses?: Courses;
+  /** Deaths in the household and whether they were mourned (sim/grief.ts). Save v49; `lossesOf` makes it lazily. */
+  losses?: Loss[];
+  /** The weekender (sim/weekender.ts): the town house, the caretaker, the trips, the way home. Present while the family splits its week between town and the place, and after the move (the town house may be kept). Save v59. */
+  weekend?: Weekend;
+  /** Walks the family has laid (gravel, stepping stones, duckboards, concrete) between the stops on the place (sim/paths.ts). Save v56; `pathsOf` makes it lazily. Worn tracks are not saved: they follow from who lives here and for how long. */
+  paths?: PathsState;
   /** Radio and rumors after the collapse (radio.ts); made on first use. */
   radio?: RadioState;
   /** Tallies since the hit (the report card), and how the run ended (null while it goes on). */
@@ -230,27 +328,41 @@ export interface GameState {
   disaster: DisasterState;
   /** Recent events for the HUD log (newest last, capped). */
   log: LogEntry[];
+  /** When a repeating warning last went to the log, by subject (`logGate` in nag.ts; made lazily, so no save bump). */
+  nagged?: Record<string, number>;
   /** Next id counter. */
   nextId: number;
 }
 
 /** New-game choices (the setup screen). Defaults (tests, the dev scene): Free build, no day jobs. */
-export interface RunSetup { site?: Site; lifestyle?: Lifestyle; difficulty?: Difficulty; mode?: Mode; peace?: PeaceLength; kind?: DisasterKind | null; variant?: string; dayJobs?: boolean; grid?: boolean; family?: Person[] }
+export interface RunSetup { site?: Site; lifestyle?: Lifestyle; /** The weekender's town home: keep the house (default) or sell it before day one and rent. */ townPlan?: TownPlan; difficulty?: Difficulty; mode?: Mode; peace?: PeaceLength; kind?: DisasterKind | null; variant?: string; dayJobs?: boolean; grid?: boolean; family?: Person[]; funds?: StartFunds; /** Relatives left in town at setup (they may ask to come), and whether they may. */ kinAway?: Person[]; kinOpen?: boolean }
+
+/**
+ * Where a game started from the setup screen begins: Monday 12 April 2027. The weekender's week (sim/weekender.ts) and the market,
+ * crews and day jobs count day 0 as a Monday, so the real calendar has to say Monday there too (the old 15 April was a Thursday,
+ * and the panel announced "Fri 19:10" on a Friday that the HUD date called a different weekday).
+ */
+export const NEW_GAME_START = { doy: 102, year: 2027 } as const;
 
 export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: RunSetup = {}): GameState {
   const people = setup.family ? structuredClone(setup.family) : generateFamily(seed);
   for (const p of people) p.conditions ??= conditionsFor(p, seed);
+  linkKin(people);
   foundLineage(people, seed);
   const site = setup.site ?? CLASSIC;
+  const funds: StartFunds | null = setup.site ? setup.funds ?? startFunds(people, setup.lifestyle ?? 'fulltime', seed, 0, setup.townPlan) : null;
   const g: GameState = {
     version: SAVE_VERSION,
     seed,
     clock: { t: 0, ticks: 0, startDoy, startYear, speed: 1 },
-    money: setup.site ? LIFESTYLE[setup.lifestyle ?? 'fulltime'].budget - Math.round(setup.site.price * (1 + CLOSING_COSTS)) : STARTING_MONEY,
+    money: Math.round((funds ? funds.budget - Math.round(setup.site!.price * (1 + CLOSING_COSTS)) : STARTING_MONEY) * DIFFICULTY[setup.difficulty ?? 'standard'].money),
     lifestyle: setup.lifestyle ?? 'fulltime',
+    startFunds: funds,
     crews: [],
+    focus: null,
     siteJobs: { power: null, drive: null },
     roadside: [],
+    roadBridge: { down: false, due: null },
     paper: newPaper(),
     upkeep: newUpkeep(),
     shelf: newShelf(),
@@ -259,20 +371,32 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     fin: newFin(),
     armory: newArmory(),
     wild: newWild(),
+    wildlife: newWildlife(),
     lineage: newLineage(people[0].last),
     site,
-    stock: { ...emptyStock(), firewood: STARTING_FIREWOOD, canned: 2 },
+    stock: { ...emptyStock(), firewood: STARTING_FIREWOOD, canned: 2, canner: 1, ...startingBedding(people.length) },
     neighbors: generateNeighbors(seed),
     land: newLand(seed, generateNeighbors(seed).map(n => n.id), (setup.site ?? CLASSIC).home),
     gate: newGate(seed),
     breakins: newBreakins(),
+    tools: starterKit(people, seed),
     rescue: newRescue(),
+    dogs: [],
+    scavenge: newScavenge(),
+    market: newMarketState(),
+    locals: newLocals(),
+    digs: newDigs(),
+    kin: newKin(structuredClone(setup.kinAway ?? []), setup.kinOpen ?? true),
+    newcomers: newNewcomers(),
+    daily: newDaily(),
+    paths: newPaths(),
+    ...(setup.lifestyle === 'weekend' && setup.site ? { weekend: newWeekend(people, seed, setup.site.miles, setup.townPlan) } : {}),
     stats: emptyStats(),
     ending: null,
     food: { needKcal: 0, ateKcal: 0, producedKcal: 0, spoiledKcal: 0, fromStores: true, kinds: [], daysLeft: 0 },
     orders: [],
     people,
-    personState: people.map(p => ({ id: p.id, task: 'idle', target: null, needs: freshNeeds(), ...(setup.dayJobs && p.job ? { employed: true } : {}) })),
+    personState: people.map(p => ({ id: p.id, task: 'idle', target: null, needs: freshNeeds(), fatigue: 0, ...(setup.dayJobs && p.job ? { employed: true } : {}) })),
     structures: [],
     forestry: { jobs: [], cleared: [] },
     heat: { burned: 0, warned: -1 },

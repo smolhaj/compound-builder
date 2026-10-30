@@ -13,10 +13,20 @@
  * The escape tunnel is never a way in (perimeter.canEnter): no outcome here
  * ever reaches the family through it. Pure and seeded.
  */
+import { ringPoints } from './rings';
+import { terrainPoints } from './terrainFx';
 import { mulberry32, pick } from './rng';
+import { diffOf } from './difficulty';
+import { adaptation, adaptedHeads, adaptLevel, ADAPT, belowExtra, cadenceFactor, findBonus, followDays, probeHeads, probes, sinceHit, torchBonus, whyBigger } from './adaptive';
+import { logGate } from './nag';
+import { daysOfFood } from './needs';
 import { forewarned } from './radio';
 import { gearPosture } from './gear';
+import { fogSightK } from './fogFx';
+import { fenceHold, watchDetection } from './daily';
 import { armed, firepower } from './armory';
+import { towerPosture } from './towers';
+import { raiseAlert } from './lights';
 import { applyBattle, planBattle, type RaiderTemper } from './battle';
 import { breakInDay, resolveBreakIn } from './breakins';
 import type { Aftermath, Prisoner } from './aftermath';
@@ -24,15 +34,27 @@ import { isHome } from './blueprints';
 import { log } from './economy';
 import { burnStructure, isFinished } from './construction';
 import { raidPressure } from './opsec';
-import { PERIMETER, runFinished, runGrowth, wallLength } from './perimeter';
-import { freshNeeds } from './needs';
+import { PERIMETER, peopleBlock, runFinished, runGrowth, wallLength } from './perimeter';
+import { enclosure } from './enclosure';
 import { contagion, infect } from './effects';
-import { dayJob, type Person, type SkillId, SKILL_IDS } from './family';
+import type { Person, SkillId } from './family';
 import { dayIndex, type GameState } from './state';
 import type { Stock } from './materials';
 import type { Battle } from './battleTypes';
-import { gateLead, recordBattle, resolveRansom, type RansomTerms } from './rescue';
-import { resolveTrialEnd, startTrial, trialDay, type TrialCamp } from './trial';
+import { gateLead, isAway, recordBattle, resolveRansom, type RansomTerms } from './rescue';
+import { defenders } from './pact';
+import { genSound, glowFactor } from './blackout';
+import { boltPassages, passageEntry } from './compounds';
+import { resolveDigWarning } from './tunnelers';
+import { addTool, stealTools, SWAP_KINDS, TOOLS, type ToolKind } from './tools';
+import { resolveKin } from './kin';
+import { emptyLooting, emptyNow, resolveMoveIn, resolveStranded } from './weekender';
+import { raidTakesVehicles } from './vehicles';
+import { practice } from './skills';
+import { turbineNoise } from './renewables';
+import { villageWatch } from './outposts';
+import { resolveTrialEnd, startTrial, trialDay, type Character, type TrialCamp } from './trial';
+import { admitNewcomers, resolveShelter, strangerArrival, type Extras, type ShelterWhy } from './newcomers';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Neighbors
@@ -118,34 +140,44 @@ export function postureOf(s: GameState): Posture {
   const homes = fin.filter(st => isHome(st.kind));
   const lit = s.utilities.lit.some(id => homes.some(h => h.id === id));
   const surface = fin.filter(st => !st.kind.startsWith('bunker_')).length;
-  const visibility = Math.min(100, 12 + surface * 5 + (lit ? 18 : 0) + (s.utilities.report.genKwh > 0.1 ? 15 : 0) + (homes.length ? 8 : 0));
+  const visibility = Math.min(100, 12 + surface * 5 + (lit ? 18 * glowFactor(s) : 0) + (s.utilities.report.genKwh > 0.1 ? 15 * genSound(s) : 0) + (homes.length ? 8 : 0) + turbineNoise(s));
   // the line: barrier runs weighted by how much they stop people, against a ring of ≈ 240 m
-  let held = 0, look = 0;
+  const line = enclosure(s);
+  let held = 0, look = 0, wall = 0;
   for (const r of s.perimeter) {
     const d = PERIMETER[r.kind];
     if (!runFinished(r) || d.blocks.people <= 0) continue;
+    if (line.onLine.has(r.id)) { look += wallLength(r) * (d.height > 0.35 ? 1 : 0.3) * runGrowth(r, s.clock.t); continue; }   // the property line holds by whether it is closed (sim/enclosure.ts)
     const g = runGrowth(r, s.clock.t), len = wallLength(r);
-    held += len * d.blocks.people * g;
+    held += len * peopleBlock(s, r) * g;
+    wall += len * g;
     look += len * (d.height > 0.35 ? 1 : 0.3) * g;
   }
-  const barrier = Math.min(100, held / 40 * 100), fortress = Math.min(100, look / 40 * 100);
-  // anyone away on a rescue isn't on the line
-  const here = (i: number) => s.personState[i]?.needs.died == null && !s.rescue?.raid?.team.includes(s.people[i].id);
+  // a ring round the compound, or a closed line round the whole property (gaps, open gates and an unbarred creek let them in)
+  // (balance pass) the ring needs ≈ 40 units of wall to close, and how good it is decides the rest: a ring of woven wire holds 50, a steel one 93,
+  // so every tier up the chain raises the number (it used to be held / 40, which any 80 units of woven wire already maxed out)
+  const ringQuality = wall > 0 ? held / wall : 0;
+  const barrier = Math.max(Math.min(1, wall / 40) * ringQuality * 100, line.barrier) * fenceHold(s), fortress = Math.min(100, look / 40 * 100);
+  // anyone away (a rescue, a run, the market) isn't on the line
+  const here = (i: number) => s.personState[i]?.needs.died == null && !isAway(s, s.people[i].id);
   const adults = s.people.filter((p, i) => !p.kid && here(i));
   const fighters = adults.length + s.people.filter((p, i) => p.kid && p.age >= 15 && here(i)).length * 0.5;
   const watch = Math.max(0, ...adults.map(p => p.skills.hunter));
   const radioNet = s.neighbors.some(n => n.radio && n.status === 'home' && n.disposition > 30);
   const gear = gearPosture(s, fighters);
-  const detection = Math.min(100, 25 + watch * 5 + (radioNet ? 20 : 0) + (barrier > 50 ? 10 : 0) + gear.detection + forewarned(s));
-  return { visibility: Math.min(100, visibility + gear.visibility), fortress, barrier: Math.min(100, barrier + gear.barrier), detection, fighters, deter: gear.deter, safeRoom: gear.safeRoom, armed: armed(s), firepower: firepower(s) * gear.fight, bunker: fin.some(st => st.kind === 'bunker_hatch' || st.kind === 'bunker_stairs') };
+  const tw = towerPosture(s);
+  // fog (sim/fog.ts) takes what the eyes add: the watch's own score, the towers' view and the posted guard (the gear's share is already in gear.detection)
+  const kEye = fogSightK(s, 'eye');
+  const detection = Math.min(100, 25 + (watch * 5 + tw.detection + watchDetection(s)) * kEye + (radioNet ? 20 : 0) + (barrier > 50 ? 10 : 0) + gear.detection + forewarned(s) + villageWatch(s));
+  return { visibility: Math.min(100, visibility + gear.visibility + tw.visibility), fortress, barrier: Math.min(100, barrier + gear.barrier), detection, fighters, deter: gear.deter, safeRoom: gear.safeRoom, armed: armed(s), firepower: firepower(s) * gear.fight * tw.fire, bunker: fin.some(st => st.kind === 'bunker_hatch' || st.kind === 'bunker_stairs') };
 }
 
 // ─────────────────────────────────────────────────────────────────────────
 // Encounters
 // ─────────────────────────────────────────────────────────────────────────
 
-export type EncounterKind = 'arrival' | 'looters' | 'gang' | 'refugees' | 'requisition' | 'neighbor_help' | 'trader' | 'horde' | 'patrol' | 'militia' | 'break_in' | 'ransom' | 'trial_end';
-export type Stance = 'hide' | 'parley' | 'warn' | 'defend' | 'trade' | 'take_in' | 'trial' | 'turn_away' | 'call_911' | 'shout' | 'confront' | 'pay' | 'refuse';
+export type EncounterKind = 'arrival' | 'looters' | 'gang' | 'refugees' | 'requisition' | 'neighbor_help' | 'trader' | 'horde' | 'patrol' | 'militia' | 'break_in' | 'ransom' | 'trial_end' | 'tunnelers' | 'kin' | 'shelter' | 'move_in' | 'stranded';
+export type Stance = 'hide' | 'parley' | 'warn' | 'defend' | 'trade' | 'take_in' | 'trial' | 'turn_away' | 'call_911' | 'shout' | 'confront' | 'pay' | 'refuse' | 'ambush' | 'flood' | 'collapse' | 'ignore' | 'build_first' | 'move_sell' | 'move_keep' | 'move_lease' | 'hold_on' | 'drive_now' | 'back_roads' | 'resupply';
 
 export interface Encounter {
   id: string;
@@ -162,6 +194,8 @@ export interface Encounter {
   people?: Person[];
   /** What they bring (arrivals, traders) or want. */
   brings?: Partial<Stock>;
+  /** A trader with a used tool for sale (instead of stores). */
+  toolBrings?: ToolKind;
   wants?: Partial<Stock>;
   neighbor?: string;
   stances: Stance[];
@@ -173,12 +207,45 @@ export interface Encounter {
   trial?: string;
   /** A crew coming back to a place they found empty and stripped. */
   back?: boolean;
+  /** A crew a scout sent for (`scoutCrew`): more of them, and they look where the family hides and keeps things. */
+  scouted?: string;
+  /** Tunnelers (sim/tunnelers.ts): found digging under the wall (`warning`, the window to act), or up inside it (`inside`). */
+  /** A relative asking to join (sim/kin.ts): the savings they bring, and whether it is after the hit. */
+  kin?: { savings: number; late: boolean };
+  /** Strangers (sim/newcomers.ts): which kind of person, what they really are (hidden), what they say, the questions asked so far, what you noticed, a wound, tools and dogs they bring. */
+  arche?: string;
+  secret?: Character;
+  said?: string[];
+  asked?: number;
+  tells?: string[];
+  hurt?: { who: string; what: string; sev: number };
+  extras?: Extras;
+  /** A neighbor household asking to shelter (or, for `settle`, to stay for good). */
+  shelter?: { nid: string; why: ShelterWhy; days: number; settle?: boolean };
+  dig?: { phase: 'warning' | 'inside'; id: string; /** Days left in the dig when it was found. */ lead: number; by?: string };
+  /** Hardcore (sim/adaptive.ts): how far this crew has learned the place, 0-1 (set when they are rolled; the battle and the gate card's odds read it). */
+  adapt?: number;
+  /** Hardcore: two or three men sent to test the wire; the crew they report to is `probe` (it turns up within a week or so, knowing where the line is thin). */
+  probe?: { kind: EncounterKind; size: number; armed: boolean; temper?: RaiderTemper };
 }
 
 /** Crews that plan, carry more and might bring explosives (battle.ts `organized`). */
-export const ORGANIZED: ReadonlySet<EncounterKind> = new Set(['gang', 'militia', 'patrol', 'requisition']);
+export const ORGANIZED: ReadonlySet<EncounterKind> = new Set(['gang', 'militia', 'patrol', 'requisition', 'tunnelers']);
 /** A crew that found the place empty and stripped it: they know it's lived in and come back sooner. */
-export interface ComeBack { kind: EncounterKind; size: number; armed: boolean; temper?: RaiderTemper; until: number }
+export interface ComeBack { kind: EncounterKind; size: number; armed: boolean; temper?: RaiderTemper; until: number; /** A scout who walked out and told them how the place lies (sim/newcomers.ts). */ guide?: string; /** The crew the scout's report brought: bigger, and they know where the hides are. */ scouted?: boolean; /** The crew a probing raid reported to (sim/adaptive.ts). */ probed?: boolean }
+
+/** What a betraying scout's report is worth to the crew: more hands, and they know where to look for the hide, the hatch and the stores below. */
+export const SCOUT_CREW_BONUS = 2;
+export const SCOUT_HIDE_BONUS = 25;
+export const SCOUT_HATCH_FOUND = 3;
+export const SCOUT_BELOW_EXTRA = 0.3;
+/** A scout walked out: a crew is sent for the place, larger than a gang it would otherwise have met, knowing how it lies. */
+export function scoutCrew(s: GameState, guide: string, r: () => number): void {
+  const day = dayIndex(s.clock.t);
+  const size = 5 + Math.floor(r() * 5) + SCOUT_CREW_BONUS + Math.floor(r() * 2);
+  s.gate.comeBack = { kind: 'gang', size, armed: true, temper: 'hard', until: day + 40, guide, scouted: true };
+  s.gate.next = Math.min(s.gate.next < 0 ? day + 6 : s.gate.next, day + 3 + Math.floor(r() * 6));
+}
 
 /**
  * How ruthless a crew is. Most are desperate people after food; some will kill
@@ -238,58 +305,36 @@ export interface GateState {
   camps?: TrialCamp[];
   /** A crew that found nobody home and means to come back (they know someone lives here). */
   comeBack?: ComeBack | null;
+  /** A raid rolled for today that has not arrived yet: it reaches the gate at `at` (game days), at its hour of the night or day (sim/siege.ts). */
+  incoming?: { e: Encounter; at: number } | null;
+  /** Hardcore: the day of the last probing raid (sim/adaptive.ts). */
+  lastProbe?: number;
 }
 
 export function newGate(seed: number): GateState {
   const r = mulberry32(seed * 811 + 5);
-  return { pending: null, card: null, humanity: 70, tookIn: 0, turnedAway: 0, raidsHeld: 0, raidsLost: 0, government: r() < 0.5 ? 'help' : 'hindrance', day: -1, next: -1, history: [], aftermath: null, prisoners: [], camps: [], comeBack: null };
-}
-
-const FIRST = ['Alex', 'Jordan', 'Casey', 'Morgan', 'Riley', 'Jamie', 'Drew', 'Quinn', 'Avery', 'Rowan', 'Elena', 'Marcus', 'Dolores', 'Hector', 'Lena', 'Walt', 'Tomas', 'Bea'];
-const LAST = ['Reyes', 'Holt', 'Vance', 'Okafor', 'Brandt', 'Sato', 'Larkin', 'Moreau', 'Pruitt', 'Szabo'];
-const STORY = [
-  ['Your cousin', 'drove up from the city on back roads; the car died at the county line.'],
-  ['A family from town', 'walked out when the water stopped. The youngest has a fever.'],
-  ['A couple', 'from the subdivision by the highway. Their house was broken into last night.'],
-  ['A man alone', 'says he was a lineman for the co-op. Carries his own tools.'],
-  ['A nurse and her son', 'left the county hospital when the generators ran dry.'],
-  ['Two brothers', 'from a ranch to the south. Good shots; they want work and a roof.'],
-];
-
-function makeArrival(r: () => number, id: string, day: number, seed: number): Encounter {
-  const [who, story] = pick(r, STORY);
-  const n = who.startsWith('A man') ? 1 : who.startsWith('A couple') || who.startsWith('Two') || who.startsWith('A nurse') ? 2 : 3 + Math.floor(r() * 2);
-  const last = pick(r, LAST);
-  const people: Person[] = Array.from({ length: n }, (_, i) => {
-    const kid = n > 2 && i >= 2;
-    const skills = Object.fromEntries(SKILL_IDS.map(k => [k, Math.floor(r() * (kid ? 2 : 4))])) as Record<SkillId, number>;
-    if (!kid) skills[pick(r, SKILL_IDS)] = 5 + Math.floor(r() * 4);
-    if (story.includes('nurse') && i === 0) skills.medic = 8;
-    if (story.includes('lineman') && i === 0) skills.mechanic = 8;
-    if (story.includes('ranch')) skills.hunter = 6 + Math.floor(r() * 3);
-    const body: 'f' | 'm' = story.includes('nurse') && i === 0 ? 'f' : r() < 0.5 ? 'f' : 'm';
-    const p: Person = { id: `p${id}_${i}`, first: pick(r, FIRST), last, age: kid ? 5 + Math.floor(r() * 10) : 22 + Math.floor(r() * 40), kid, body, skills, shirt: Math.floor(r() * 0xffffff) & 0x7f7f7f };
-    if (!kid) p.job = dayJob(p, seed);
-    return p;
-  });
-  const best = people.filter(p => !p.kid).map(p => { const top = SKILL_IDS.reduce((a, b) => (p.skills[b] > p.skills[a] ? b : a)); return `${p.first} (${top} ${p.skills[top]})`; });
-  return {
-    id, kind: 'arrival', day, title: `${who} at the gate`,
-    dossier: [story, `${n} ${n === 1 ? 'person' : 'people'}${people.some(p => p.kid) ? `, ${people.filter(p => p.kid).length} kids` : ''}.`, `Good at: ${best.join(', ') || 'not much yet'}.`, `${n} more to feed: about ${n * 2200} kcal a day.`],
-    size: n, armed: false, strength: 0, people, brings: r() < 0.5 ? { canned: 1 + Math.floor(r() * 3) } : {},
-    stances: ['take_in', 'trial', 'trade', 'turn_away'],
-  };
+  return { pending: null, card: null, humanity: 70, tookIn: 0, turnedAway: 0, raidsHeld: 0, raidsLost: 0, government: r() < 0.5 ? 'help' : 'hindrance', day: -1, next: -1, history: [], aftermath: null, prisoners: [], camps: [], comeBack: null, incoming: null };
 }
 
 /** How often someone comes (days between), from law and order outside and how much the place shows. */
-function cadence(s: GameState, p: Posture): number {
+export function cadence(s: GameState, p: Posture): number {
   const law = s.disaster.tracks.law;
   // playtest: every 3–6 days was relentless; real accounts are weeks between visits, more as order fails
   // after the first year the desperate have died, moved on or settled somewhere: the visits thin out (up to half as often by year three)
   const since = s.disaster.kind ? s.clock.t - s.disaster.hitAt : 0;
   const base = (45 - 30 * (1 - law)) * (1 + Math.max(0, Math.min(1, (since - 365) / 730)));
-  return Math.max(10, base * (1.3 - p.visibility / 200) / raidPressure(s));
+  return Math.max(10, base * (1.3 - p.visibility / 200) / raidPressure(s) * diffOf(s.disaster).cadence * cadenceFactor(adaptOf(s, p)));
 }
+
+/** How far the crews have learned this place, 0-1 (Hardcore only; sim/adaptive.ts): time since the hit and how well it is defended. */
+export function adaptOf(s: GameState, p: Posture = postureOf(s), terrain?: number): number {
+  const lvl = adaptLevel(s);
+  // the ground's share of the defense (sim/terrainFx.ts) is one input to the shared strength, not a second scaling
+  return lvl > 0 ? adaptation(lvl, sinceHit(s), { defense: defenseOf(p), foodDays: daysOfFood(s), terrain: terrain ?? terrainPoints(s) + ringPoints(s) }) : 0;
+}
+
+/** What the battle sim is told about a crew: how they fight and how well they have learned this place. */
+const battleOpts = (e: Encounter, extra: { insideBreach?: boolean } = {}) => ({ armed: e.armed, temper: e.temper, organized: ORGANIZED.has(e.kind), ...(e.adapt ? { adapt: e.adapt } : {}), ...extra });
 
 /**
  * The threat matrix: who comes. Opportunists (looters) are put off by a
@@ -353,7 +398,10 @@ function makeThreat0(kind: EncounterKind, r: () => number, id: string, day: numb
     case 'trader': {
       const brings: Partial<Stock> = pick(r, [{ meds: 2 }, { fuel: 4 }, { staples: 1 }, { hardware: 2 }]);
       const wants: Partial<Stock> = pick(r, [{ canned: 4 }, { firewood: 3 }, { fresh: 10 }, { lumber: 3 }]);
-      return { id, kind, day, title: 'A trader with a loaded truck', dossier: ['An old man with a stock trailer full of odds and ends.', `Offers ${Object.entries(brings).map(([k, n]) => `${n} ${k}`).join(', ')} for ${Object.entries(wants).map(([k, n]) => `${n} ${k}`).join(', ')}.`], size: 1, armed: true, strength: 10, brings, wants, stances: ['trade', 'turn_away'] };
+      // now and then he has a used tool in the trailer instead (its own random stream: the rest is unchanged)
+      const rt = mulberry32(s.seed * 5051 + day * 13 + 3), tool = rt() < 0.3 && s.disaster.hitAt <= day ? pick(rt, SWAP_KINDS) : undefined;
+      const offer = tool ? `a used ${TOOLS[tool].name.toLowerCase()}` : Object.entries(brings).map(([k, n]) => `${n} ${k}`).join(', ');
+      return { id, kind, day, title: 'A trader with a loaded truck', dossier: ['An old man with a stock trailer full of odds and ends.', `Offers ${offer} for ${Object.entries(wants).map(([k, n]) => `${n} ${k}`).join(', ')}.`], size: 1, armed: true, strength: 10, brings: tool ? {} : brings, ...(tool ? { toolBrings: tool } : {}), wants, stances: ['trade', 'turn_away'] };
     }
     case 'neighbor_help': {
       const n = s.neighbors.filter(x => x.status === 'home').sort((a, b) => b.disposition - a.disposition)[0];
@@ -371,8 +419,41 @@ function makeThreat0(kind: EncounterKind, r: () => number, id: string, day: numb
       const size = 6 + Math.floor(r() * 8);
       return { id, kind, day, title: 'Militia at the gate', dossier: [`${size} armed men from the Plains Alliance, a recruiter with a list.`, 'They want food, fuel, and a fighting-age man or woman for the line.'], size, armed: true, strength: size * 11, wants: { canned: 5, fuel: 3 }, stances: ['parley', 'trade', 'hide', 'defend'] };
     }
-    default: return makeArrival(r, id, day, s.seed);
+    default: return strangerArrival(s, r, id, day);
   }
+}
+
+/**
+ * (Hardcore, sim/adaptive.ts) A crew that comes to a place it has learned: now
+ * and then two men first, to test the wire, with the real crew following
+ * within the week; otherwise more heads, and a kit to match (the battle reads
+ * `adapt`). The dossier says why. Seeded apart from the crew's own dice, so a
+ * level that does not adapt is untouched.
+ */
+function adaptCrew(s: GameState, e: Encounter, p: Posture, day: number): void {
+  const a = adaptOf(s, p);
+  if (a <= 0) return;
+  const g = s.gate, r = mulberry32(s.seed * 3571 + day * 17 + 9);
+  const probe = !e.back && probes(a, g.lastProbe, day, r());
+  if (probe) {
+    const n = probeHeads(r());
+    e.probe = { kind: e.kind, size: Math.max(1, Math.round(e.size / diffOf(s.disaster).raid)), armed: e.armed, temper: e.temper };
+    g.lastProbe = day;
+    e.size = n; e.strength = n * 9; e.armed = true; e.adapt = a;
+    e.title = 'Men testing your wire';
+    e.dossier = [`${n} men on foot along your fence line at dusk, looking at the posts, the lights and the windows. Rifles slung.`, 'They are not here for the stores yet. They are here to see what answers, and to go back and say.'];
+    log(s, 'Word has gone round that this place holds. Men are walking your fence line, testing it for whoever sent them.');
+    return;
+  }
+  const was = e.size, size = adaptedHeads(was, a);
+  e.adapt = a;
+  if (size !== was) {
+    e.strength = Math.round(e.strength * size / Math.max(1, was));
+    e.size = size; e.dossier = e.dossier.map((l, i) => i === 0 ? l.replace(String(was), String(size)) : l);
+  }
+  const why = whyBigger(a);
+  if (why) e.dossier.push(why);
+  if (logGate(s, 'adapt-word', 400)) log(s, 'Hardcore: the crews are learning. A place that holds draws bigger, better-armed crews than one that does not, and they come oftener. Walls and rifles buy time, not immunity.');
 }
 
 /** Once a day after the hit: maybe someone comes. Returns the encounter set as pending (the UI pauses), or null. */
@@ -389,6 +470,8 @@ export function gateDay(s: GameState): Encounter | null {
   // while the law works (before the collapse, or once it's back): now and then a break-in (sim/breakins.ts)
   if (d.tracks.law >= 0.5) { const b = breakInDay(s, day); if (b) { g.pending = b; return b; } }
   if (!d.kind || s.clock.t < d.hitAt + 1) return null;
+  // the family is in town and the place stands empty (sim/weekender.ts): nobody to answer the gate, only what the strangers take
+  if (emptyNow(s)) { const l = emptyLooting(s, mulberry32(s.seed * 7907 + day * 31 + 5)); if (l) log(s, l); return null; }
   // fallout keeps everyone indoors for the first two weeks of a nuclear war
   if (d.kind === 'nuclear' && s.clock.t < d.hitAt + 14) return null;
   const r = mulberry32(s.seed * 7907 + day * 31);
@@ -398,18 +481,28 @@ export function gateDay(s: GameState): Encounter | null {
   g.next = day + Math.round(cadence(s, p) * (0.6 + 0.8 * r()));
   // a crew that found the place empty last time, back for the rest
   const cb = g.comeBack;
-  const kind = cb && r() < 0.7 ? cb.kind : whoComes(s, p, r);
+  const kind = cb && (cb.probed || r() < 0.7) ? cb.kind : whoComes(s, p, r);
   const e = makeThreat(kind, r, `e${s.nextId++}`, day, s);
   if (cb && kind === cb.kind) {
     e.size = cb.size; e.armed = cb.armed; e.temper = cb.temper; e.back = true;
+    if (cb.scouted && cb.guide) e.scouted = cb.guide;
     e.strength = Math.round(cb.size * (kind === 'gang' ? 12 : kind === 'militia' ? 11 : 9));
     e.title = `Back again: ${e.title[0].toLowerCase()}${e.title.slice(1)}`;
-    e.dossier = [`${cb.size} of them: the same ones who went through the place. They know somebody lives here now, and they mean to find them.`, ...e.dossier.slice(1, 2)];
+    e.dossier = [cb.probed ? `${cb.size} of them. The men who walked your wire got back to the rest and told them where it is thin: where the posts are, where the lights do not reach, how many guns answered. They are not testing anything this time.` : cb.guide ? `${cb.size} of them. ${cb.guide} told them how the place lies: the posts, the guns, the hours of the watch. They come in knowing where to go: more of them than a crew would send blind, and they will look in the timber, the stores and the hatches.` : `${cb.size} of them: the same ones who went through the place. They know somebody lives here now, and they mean to find them.`, ...e.dossier.slice(1, 2)];
     g.comeBack = null;
   }
-  if (s.disaster.difficulty === 'hardcore' && e.strength) e.strength = Math.round(e.strength * 1.35);
-  if (s.disaster.difficulty === 'cozy' && e.strength) e.strength = Math.round(e.strength * 0.6);
+  // the difficulty's crew size (the battle counts heads: `strength` is only the dossier's figure for them)
+  if (e.strength) {
+    const k = diffOf(s.disaster).raid, was = e.size, size = Math.max(1, Math.round(was * k));
+    e.strength = Math.round(e.strength * size / Math.max(1, was));
+    if (size !== was) { e.size = size; e.dossier = e.dossier.map((l, i) => i === 0 ? l.replace(String(was), String(size)) : l); }
+  }
+  // (Hardcore) the world learns a defended place: a probing raid first, then bigger, better-equipped crews (sim/adaptive.ts)
+  if (e.strength && ['looters', 'gang', 'militia'].includes(e.kind)) adaptCrew(s, e, p, day);
+  // an alarm: the passage hatches bolt themselves
+  if (!['arrival', 'trader', 'neighbor_help'].includes(e.kind)) boltPassages(s);
   g.pending = e;
+  raiseAlert(s);
   return e;
 }
 
@@ -434,6 +527,7 @@ function wound(s: GameState, r: () => number, sev: number, what: string): string
   if (!idx.length) return '';
   const i = idx[Math.floor(r() * idx.length)];
   const n = s.personState[i].needs;
+  sev = Math.round(sev * diffOf(s.disaster).wound);
   n.hurt.push({ what, sev });
   n.health = Math.max(s.disaster.difficulty === 'cozy' ? 5 : 0, n.health - sev * 0.5);
   if (n.health <= 0) { n.died = Math.floor(s.clock.t); return `${s.people[i].first} was killed.`; }
@@ -445,15 +539,16 @@ export function defenseOf(p: Posture): number {
   return p.barrier * 0.45 + p.fighters * 9 * (p.firepower ?? (p.armed ? 1.4 : 1)) + p.detection * 0.15;
 }
 
-/** Allies on the radio net who ride over when there's shooting. */
-const alliesOf = (s: GameState) => s.neighbors.filter(n => n.status === 'home' && n.radio && n.disposition > 50);
+/** Who rides over when there's shooting: radio allies, pact members, the militia (sim/pact.ts). The gate card's odds count them too. */
+const alliesOf = defenders;
 /** How many come at the line once the allies are there (about one fewer per two of them). */
 const raidersAfterHelp = (e: Encounter, help: number) => Math.max(1, e.size - Math.floor(help / 12));
 
 /** The chance a crew finds the place lived in if the family hides (it shows; a savage crew looks hard; a crew come back knows). */
 export function hideFoundChance(s: GameState, e: Encounter, p: Posture = postureOf(s)): number {
+  const hunt = diffOf(s.disaster).hunt;
   if (e.kind === 'horde') return Math.min(0.95, p.visibility * 0.6 / 100);
-  return Math.min(0.95, (p.visibility * 0.6 + (e.temper === 'savage' ? 25 : 0) + (e.back ? 20 : 0)) / 100);
+  return Math.max(0, Math.min(0.95, (p.visibility * 0.6 + (e.temper === 'savage' ? 25 : 0) + (e.back ? 20 : 0) + (e.scouted ? SCOUT_HIDE_BONUS : 0) + (e.dig ? 40 : 0) + hunt + findBonus(e.adapt ?? 0)) / 100));
 }
 
 /**
@@ -469,7 +564,9 @@ function stripEmpty(s: GameState, e: Encounter, p: Posture, r: () => number, los
   if (e.kind === 'horde') { if (lost.length) out.push(`Lost: ${lost.join(', ')}`); return out; }
   const crew = e.kind === 'looters' || e.kind === 'gang' || e.kind === 'militia';
   // the bunker's stores room keeps most of it below with the family; refugees on foot carry little
-  const below = s.structures.some(st => st.kind === 'bunker_stores' && isFinished(st)) ? 0.3 : p.bunker ? 0.6 : 1;
+  const belowBase = s.structures.some(st => st.kind === 'bunker_stores' && isFinished(st)) ? 0.3 : p.bunker ? 0.6 : 1;
+  // a scout counted the doors: they know there is a stores room below, and dig for it
+  const below = Math.min(1, belowBase + (e.scouted ? SCOUT_BELOW_EXTRA : 0) + belowExtra(e.adapt ?? 0));
   const share = Math.min(0.3, 0.08 + 0.015 * e.size) * (e.temper === 'savage' || e.temper === 'hard' ? 1.3 : 1) * below * (crew ? 1 : e.kind === 'refugees' ? 0.3 : 0.5);
   for (const k of ['fresh', 'canned', 'staples', 'frozen', 'fuel', 'meds'] as const) {
     const t = Math.floor((s.stock[k] ?? 0) * share);
@@ -478,10 +575,12 @@ function stripEmpty(s: GameState, e: Encounter, p: Posture, r: () => number, los
   const merged = new Map<string, number>();
   for (const l of lost) { const [n, ...k] = l.split(' '); merged.set(k.join(' '), (merged.get(k.join(' ')) ?? 0) + Number(n)); }
   if (merged.size) out.push(`Lost: ${[...merged].map(([k, n]) => `${n} ${k}`).join(', ')}`);
+  // a crew that goes through the place takes the tools out of the shed (a locked workshop or a safe keeps most of them)
+  if (crew) out.push(...stealTools(s, e.temper === 'savage' || e.temper === 'hard' ? 0.35 : 0.2, 1).lines);
   if (!crew) return out;
   // a torch to the shed or the coop: spite, or to smoke out whoever's hiding
   const burnable = s.structures.filter(st => isFinished(st) && !isHome(st.kind) && !st.kind.startsWith('bunker_') && !st.kind.startsWith('well_') && !['root_cellar', 'field', 'garden', 'septic', 'cistern', 'solar_array'].includes(st.kind));
-  if (burnable.length && r() < (e.temper === 'savage' ? 0.4 : e.temper === 'hard' ? 0.2 : 0.08)) {
+  if (burnable.length && r() < (e.temper === 'savage' ? 0.4 : e.temper === 'hard' ? 0.2 : 0.08) + torchBonus(e.adapt ?? 0)) {
     const st = pick(r, burnable);
     if (burnStructure(s, st)) out.push(`They set fire to the ${st.kind.replace(/_/g, ' ')} on the way out. It burned to the ground.`);
   }
@@ -521,7 +620,7 @@ export function fightOdds(s: GameState, e: Encounter, tries = Math.max(10, Math.
   const help = alliesOf(s).reduce((a, n) => a + n.members * 6, 0);
   let win = 0, loseSomeone = 0, lost = 0;
   for (let i = 0; i < tries; i++) {
-    const b = planBattle(s, raidersAfterHelp(e, help), 7_919 + i * 104_729 + e.day, { armed: e.armed, temper: e.temper, organized: ORGANIZED.has(e.kind) });
+    const b = planBattle(s, raidersAfterHelp(e, help), 7_919 + i * 104_729 + e.day, battleOpts(e, e.dig ? { insideBreach: true } : {}));
     if (b.result === 'repelled' || b.result === 'fled') win++;
     const n = b.events.filter(x => (x.kind === 'death' || x.kind === 'taken') && x.unit.startsWith('h_')).length;
     if (n) loseSomeone++;
@@ -541,6 +640,9 @@ export function resolve(s: GameState, stance: Stance): Outcome {
   const p = postureOf(s);
   const g = s.gate;
   const negotiator = Math.max(0, ...s.people.filter((x, i) => !x.kid && s.personState[i]?.needs.died == null).map(x => x.skills.negotiator));
+  // every answer given at the gate is practice for whoever does the talking (sim/skills.ts)
+  { const talker = s.people.filter((x, i) => !x.kid && s.personState[i]?.needs.died == null).sort((a, b) => b.skills.negotiator - a.skills.negotiator)[0];
+    if (talker) { practice(s, talker.id, 'negotiator', 1.5); practice(s, talker.id, 'leadership', 0.5); } }
   const lines: string[] = [];
   let title = '', text = '', tone: Outcome['tone'] = 'mixed';
   if (e.kind === 'ransom') {
@@ -549,8 +651,24 @@ export function resolve(s: GameState, stance: Stance): Outcome {
   } else if (e.kind === 'break_in') {
     const o = resolveBreakIn(s, e, stance);
     title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines);
+  } else if (e.kind === 'tunnelers' && e.dig?.phase === 'warning') {
+    const o = resolveDigWarning(s, e, stance, r);
+    title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines);
   } else if (e.kind === 'trial_end') {
     const o = resolveTrialEnd(s, e, stance);
+    title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines);
+  } else if (e.kind === 'kin') {
+    const o = resolveKin(s, e, stance);
+    title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines);
+  } else if (e.kind === 'shelter') {
+    const o = resolveShelter(s, e, stance);
+
+    title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines);
+  } else if (e.kind === 'move_in') {
+    const o = resolveMoveIn(s, stance);
+    title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines);
+  } else if (e.kind === 'stranded') {
+    const o = resolveStranded(s, stance);
     title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines);
   } else if (e.kind === 'arrival') {
     if (stance === 'trial') {
@@ -558,10 +676,10 @@ export function resolve(s: GameState, stance: Stance): Outcome {
       const o = startTrial(s, e);
       title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines);
     } else if (stance === 'take_in') {
-      for (const person of e.people ?? []) { s.people.push(person); s.personState.push({ id: person.id, task: 'idle', target: null, needs: freshNeeds() }); }
-      give(s, e.brings ?? {});
-      g.tookIn += e.size; g.humanity = Math.min(100, g.humanity + 6);
-      title = 'They\'re family now';
+      // everyone who joins goes through sim/newcomers.ts: a bond (loyalty, hidden character), a bedroll, what they carry
+      lines.push(...admitNewcomers(s, e.people ?? [], { kind: e.neighbor ? 'neighbor' : 'stranger', neighbor: e.neighbor, arche: e.arche, secret: e.secret, brings: e.brings, extras: e.extras, hurt: e.hurt, tells: e.tells }));
+      g.humanity = Math.min(100, g.humanity + 6);
+      title = e.neighbor ? 'They\'re staying' : 'They\'re family now';
       text = `You open the gate. ${e.size} more at the table tonight.`;
       tone = 'good';
     } else if (stance === 'trade') {
@@ -574,7 +692,7 @@ export function resolve(s: GameState, stance: Stance): Outcome {
     }
   } else if (e.kind === 'trader' || e.kind === 'neighbor_help') {
     if (stance === 'trade' && e.wants && hasAllOf(s, e.wants)) {
-      lines.push(`Gave: ${take(s, e.wants).join(', ')}`); give(s, e.brings ?? {}); lines.push(`Got: ${Object.entries(e.brings ?? {}).map(([k, n]) => `${n} ${k}`).join(', ')}`);
+      lines.push(`Gave: ${take(s, e.wants).join(', ')}`); give(s, e.brings ?? {}); lines.push(`Got: ${e.toolBrings ? `a used ${TOOLS[addTool(s, e.toolBrings, 0.45 + 0.4 * r(), 0.4 + 0.4 * r(), r() < 0.3 ? 'pro' : 'cheap').kind].name.toLowerCase()}` : Object.entries(e.brings ?? {}).map(([k, n]) => `${n} ${k}`).join(', ')}`);
       title = 'A fair trade'; text = 'Handshakes at the gate.'; tone = 'good';
       { const l = gateLead(s, e.kind === 'trader' ? 'trader' : 'neighbor', e.kind === 'trader' ? 'The trader' : e.title.replace(/ come by$/, ''), r); if (l) lines.push(l); }
       if (e.neighbor) { const n = s.neighbors.find(x => x.id === e.neighbor); if (n) n.disposition = Math.min(100, n.disposition + 10); }
@@ -588,12 +706,13 @@ export function resolve(s: GameState, stance: Stance): Outcome {
     }
   } else {
     // a threat: looters, a gang, refugees, a requisition team
-    // allies on the radio net ride over to help when there's shooting
+    // allies on the radio net, pact members and the militia ride over to help when there's shooting (sim/pact.ts)
     const allies = alliesOf(s);
     const help = allies.reduce((a, n) => a + n.members * 6, 0);
     if (stance === 'hide') {
       // everyone underground (or in the timber); they take what's lying about. Nobody gets in by the tunnel: it only opens from inside.
       const found = r() < hideFoundChance(s, e, p);
+      if (e.scouted) lines.push(found ? `${e.scouted} had walked your fence line and told them where you would go to ground. They knew where to look.` : `${e.scouted} told them where you would hide. They looked, and did not find it.`);
       const hidden = p.bunker || p.safeRoom;
       // a savage crew doesn't stop at the stores: they hunt for whoever lives here; so does a crew come back for them
       // (a crew of hungry men back for more stores takes them; a hard one back for whoever lives here looks harder)
@@ -628,7 +747,14 @@ export function resolve(s: GameState, stance: Stance): Outcome {
     }
     if (stance === 'defend') {
       // the fight itself, second by second (sim/battle.ts); the world can play it back from g.battle
-      const b = planBattle(s, raidersAfterHelp(e, help), s.seed * 131 + e.day * 7 + 1, { armed: e.armed, temper: e.temper, organized: ORGANIZED.has(e.kind) });
+      // a crew up inside the wall (tunnelers), or one that finds a hatch outside it (an underground passage's way in): no wall to get over
+      boltPassages(s);
+      const via = e.dig ? null : passageEntry(s, r, ORGANIZED.has(e.kind), e.scouted ? SCOUT_HATCH_FOUND : 1);
+      if (via && e.scouted) lines.push(`${e.scouted} had marked the hatch on the way in.`);
+      if (via) lines.push(via.forced ? 'They found a steel hatch in the leaf litter out in the trees and blew the blast door. They are in the passage.' : 'They found a steel hatch out in the trees, left unbolted. They are in the passage.');
+      const raiders = via ? Math.min(raidersAfterHelp(e, help), 4 + Math.floor(e.size / 4)) : raidersAfterHelp(e, help);
+      const b = planBattle(s, raiders, s.seed * 131 + e.day * 7 + 1, battleOpts(e, e.dig || via ? { insideBreach: true } : {}));
+      if (via) { const run = s.perimeter.find(x => x.id === via.runId); if (run) run.revealed = true; }
       g.battle = b;
       lines.push(...applyBattle(s, b));
       recordBattle(s, b, e.size, e.temper);
@@ -641,6 +767,8 @@ export function resolve(s: GameState, stance: Stance): Outcome {
         g.next = Math.max(g.next, e.day + Math.round(15 + 35 * g.respect));
       } else {
         // (round 4: no second take of their wants here: applyBattle has already taken its 30–90 % share of the stores)
+        if (e.kind === 'looters' || e.kind === 'gang' || e.kind === 'militia') lines.push(...stealTools(s, 0.3, 2).lines);
+        lines.push(...raidTakesVehicles(s, ORGANIZED.has(e.kind)));
         title = 'They got in'; text = b.result === 'overrun' ? 'They overran the place and took what they came for.' : 'They broke through the line and took what they came for.'; tone = 'bad';
         // picked over: for a while there's not much left worth coming for; but the place is known to be soft
         g.respect = Math.max(0, (g.respect ?? 0) - 0.3);
@@ -653,6 +781,12 @@ export function resolve(s: GameState, stance: Stance): Outcome {
   const c = contagion(s);
   const close = (e.kind === 'arrival' && stance !== 'turn_away') || ((stance === 'trade' || stance === 'parley') && e.kind !== 'horde');
   if (c.contact > 0 && close && r() < c.contact) { const l = infect(s, r, e.kind === 'arrival' ? 'they brought it in' : 'from the trade at the gate'); if (l) lines.push(l); }
+  // (Hardcore) the men who tested the wire go back and say what they saw: the crew behind them follows within the week
+  if (e.probe) {
+    g.comeBack = { kind: e.probe.kind, size: e.probe.size + ADAPT.PROBE_FOLLOW_BONUS, armed: true, temper: e.probe.temper, until: e.day + 30, probed: true };
+    g.next = Math.min(g.next, e.day + followDays(r()));
+    lines.push('Whoever was out there will tell the rest. Expect them back, and more of them.');
+  }
   g.history.push({ day: e.day, kind: e.kind, stance, tone });
   g.pending = null;
   const out: Outcome = { title, text, tone, lines: lines.filter(Boolean) };

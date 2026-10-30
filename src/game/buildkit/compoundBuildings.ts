@@ -7,8 +7,9 @@
  */
 import * as THREE from 'three';
 import { CELL, type KitPieceDef } from './kit';
-import { Furniture, M, pipe, type Add } from './interior';
+import { Furniture, M, pipe, type Add, sickSlot } from './interior';
 import { Clutter } from './clutter';
+import { dressEvenings } from './goodsDress';
 import { Equipment } from './utilityBuildings';
 import { box, buildGabled, Parts, type BuildOpts, type FurnishCtx } from './shell';
 
@@ -17,14 +18,14 @@ const STOVE = { x: -0.22, z: 0.12 }, HEARTH = 0.05 * M, STOVE_PIPE = { x: -0.35 
 
 /** 6 × 8 m one-storey cottage: a kitchen-sitting room at the front, a bedroom behind, a small porch. */
 function cottage(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
-  const W = def.cellsX * CELL, D = 8 * M;
+  const W = def.cellsX * CELL, D = def.cellsZ * CELL - M, small = D < 6.5 * M;   // the cottage 6 × 8 m; the guest house 6 × 5; Mom's house 9 × 8
   const { group } = buildGabled({
     W, D, floor: 0.08, wallH: 0.43, wallT: 0.03, rise: 0.24, eave: 0.05, gableOver: 0.05, porch: 0.28,
     foundation: 'concrete', floorMat: 'floorboards', outer: 'timber_lap', inner: 'whitewash', roof: 'metal_roof', trim: 'trim',
     front: [{ kind: 'door', at: 0.12 }, { kind: 'window', at: -0.25 }],
     back: [{ kind: 'window', at: -0.2 }, { kind: 'window', at: 0.22 }],
-    left: [{ kind: 'window', at: -0.35 }, { kind: 'window', at: 0.3 }],
-    right: [{ kind: 'window', at: -0.35 }, { kind: 'door', at: 0.38 }],
+    left: small ? [{ kind: 'window', at: 0 }] : [{ kind: 'window', at: -0.35 }, { kind: 'window', at: 0.3 }],
+    right: small ? [{ kind: 'window', at: 0 }] : [{ kind: 'window', at: -0.35 }, { kind: 'door', at: 0.38 }],
     chimney: { kind: 'pipe', x: STOVE.x + STOVE_PIPE.x, z: STOVE.z + STOVE_PIPE.z },
     corners: 'boards', curtains: 'curtain',
   }, (c: FurnishCtx) => {
@@ -34,7 +35,7 @@ function cottage(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group 
     // bedroom (back): a double bed for the grandparents and a single for a grandchild
     c.partition(left, wallZ, right, wallZ, [{ at: 0.25, w: 0.14, sill: 0, h: 0.36 }], 'whitewash');
     I({ x: -0.2, z: back + 0.18 }, a => Furniture.bed(a, true, 'quilt_red'));
-    I({ x: 0.3, z: back + 0.18 }, a => Furniture.single(a, 'quilt_blue'));
+    I({ x: 0.3, z: back + 0.18 }, a => { Furniture.single(a, 'quilt_blue'); sickSlot(a); });
     I({ x: right - 0.05, z: wallZ - 0.12, rot: -Math.PI / 2 }, a => Furniture.dresser(a, 1.0));
     I({ x: left + 0.05, z: back + 0.05 }, a => Furniture.nightstand(a));
     // front room: counter and sink along the left wall, the wood cookstove on its hearth, a table with chairs
@@ -51,6 +52,7 @@ function cottage(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group 
     I({ x: STOVE.x + 0.165, z: STOVE.z - 0.005 }, a => Furniture.woodbox(a));
     if (o.wired) I({ x: left + 0.065, z: front - 0.1, rot: Math.PI / 2 }, a => Furniture.fridge(a));
     I({ x: 0.22, z: 0.35 }, a => { Furniture.table(a, 1.0, 0.8); Furniture.oilLamp(a, 0.25, 0.76, -0.15); });
+    dressEvenings(c, { x: 0.22, z: 0.35 });
     I({ x: 0.22, z: 0.35 - 0.1 }, a => Furniture.chair(a));
     I({ x: 0.22, z: 0.35 + 0.1, rot: Math.PI }, a => Furniture.chair(a));
     I({ x: 0.3, z: 0.05, rot: Math.PI }, a => Furniture.armchair(a, 'quilt_blue'));
@@ -211,4 +213,4 @@ function garageShell(def: KitPieceDef, seed: number, opts: BuildOpts, solar: boo
 const metalGarage = (def: KitPieceDef, seed = 1, opts: BuildOpts = {}) => garageShell(def, seed, opts, false);
 const garageSolar = (def: KitPieceDef, seed = 1, opts: BuildOpts = {}) => garageShell(def, seed, opts, true);
 
-export const COMPOUND_BUILDERS: Record<string, (def: KitPieceDef, seed?: number, opts?: BuildOpts) => THREE.Group> = { cottage, metal_garage: metalGarage, garage_solar: garageSolar };
+export const COMPOUND_BUILDERS: Record<string, (def: KitPieceDef, seed?: number, opts?: BuildOpts) => THREE.Group> = { cottage, guest_house: cottage, moms_house: cottage, metal_garage: metalGarage, garage_solar: garageSolar };

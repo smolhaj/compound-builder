@@ -1,3 +1,12 @@
+import { litTowerIds } from '../sim/towers';
+import { TerrainOverlay } from './terrain/TerrainOverlay';
+import { BlueprintOverlay } from './blueprint/BlueprintOverlay';
+import { blueprintPlan } from './blueprint/blueprintPlan';
+import { campOf, lanesOf, terrainOf } from '../sim/terrainState';
+import { siteCandidates } from '../sim/terrain';
+import { goodsKey, houseGoods } from '../sim/evenings';
+import { blackoutNow } from '../sim/lights';
+import { burnedFarms } from '../sim/neighborLife';
 import { useEffect, useRef } from 'react';
 import type { GameState } from '../sim/state';
 import { MushroomCloud } from './fx/MushroomCloud';
@@ -10,24 +19,39 @@ import { DioramaCamera } from './DioramaCamera';
 import { HomesteadWorld } from './HomesteadWorld';
 import { seasonState, type VisualSeason } from '../engine/world/season/seasonState';
 import { WeatherRenderer } from '../engine/world/weather/WeatherRenderer';
+import { ValleyFog, fogTarget, NO_FOG_TARGET } from '../engine/world/fog/ValleyFog';
+import { fogForView, fogPlaceOf } from '../sim/fogFx';
 import { TourController } from '../engine/world/camera/TourController';
 import { CameraOccluders } from '../engine/world/camera/cameraOcclusion';
 import { PARCEL_SIZE } from './HomesteadWorld';
 import { PlacementTool } from './PlacementTool';
 import { MarkTool } from './MarkTool';
+import { BoundaryOutline } from './BoundaryOutline';
 import { PerimeterTool } from './PerimeterTool';
 import { SightOverlay } from './sightlines/SightOverlay';
 import { PARCEL_SIZE as PS } from './parcel/parcelTerrain';
-import type { PerimeterKind } from '../sim/perimeter';
+import { fenceLive, type PerimeterKind } from '../sim/perimeter';
 import { useGameStore } from '../store/gameStore';
 import { useBattleStore } from '../store/battleStore';
 import { BattleRenderer } from './battle/BattleRenderer';
 import { demoBattle } from './battle/demoBattle';
+import { CutscenePlayer } from './battle/CutscenePlayer';
+import { useCutsceneView } from '../store/cutsceneStore';
+import { isFinished } from '../sim/construction';
+import { isHome } from '../sim/blueprints';
 import { calendarOf, hourOf, SECONDS_PER_DAY } from '../sim/state';
 import { setWindowGlow } from './buildkit/materials';
 import { homeOutsideForty } from '../sim/site';
 import { ownsAt } from '../sim/land';
+import { isMarked } from '../sim/forestry';
+import { KIT } from './buildkit/kit';
+import { isUnderground } from './buildkit/underground';
 import type { SiteQuery } from './buildkit/kit';
+import { FrameBudget, capGapMs, lowerTier } from '../engine/perf/qualityAuto';
+import { sceneCensus } from './perfCensus';
+import { yieldToBrowser, warmShaders } from './bootStages';
+import { parseLowRender, RenderRequests, type QaQuality } from './qaRender';
+import { onEntrancePreview } from './roadPreview';
 
 /** Background damp of the season (ground darkens a little in the shoulder seasons). */
 const SEASON_WETNESS: Record<VisualSeason, number> = { spring: 0.22, fall: 0.28, winter: 0.14, summer: 0 };
@@ -37,10 +61,63 @@ export function GameCanvas() {
   const ref = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
+    let cancelled = false, stop: () => void = () => {};
+    const boot = (label: string, pct: number, hold = false) => useWorldStore.getState().setBoot({ label, pct, hold });   // (hold: the loading screen covers the view, so frames are not drawn meanwhile)
+    void (async () => {
     const canvas = ref.current!;
-    const ws = new WorldScene(canvas);
+    const ws = new WorldScene(canvas, { antialias: useWorldStore.getState().quality === 'low' });
     const world = new HomesteadWorld(ws, useGameStore.getState().game.seed, useGameStore.getState().game.site);
+    world.setBridgeDown(useGameStore.getState().game.roadBridge?.down ?? false);   // (the bridge on the way in, brought down on purpose or standing)
     const weather = new WeatherRenderer(ws.scene, useGameStore.getState().game.seed);
+    if (cancelled) { world.dispose(); weather.dispose(); ws.dispose(); return; }
+    boot('Surveying the land', 0.12); await yieldToBrowser();
+    if (cancelled) { world.dispose(); weather.dispose(); ws.dispose(); return; }
+    const resize = () => {
+      const w = canvas.clientWidth, h = canvas.clientHeight;
+      ws.resize(w, h);
+    };
+    ws.setupPostProcessing(canvas.clientWidth || 1280, canvas.clientHeight || 800);
+    resize();
+    window.addEventListener('resize', resize);
+
+    // QA-only on-demand rendering (?lowrender): Low quality, reduced pixel ratio, drawn only when asked
+    const lowRender = parseLowRender(window.location.search);
+    const renderReq = new RenderRequests();
+    const setLook = (q: QaQuality) => {
+      ws.qaPixelRatio = lowRender.on ? (q === 'low' ? lowRender.scale : 1) : null;
+      ws.setGraphicsQuality(q);
+      weather.setQuality(q);
+      world.setQuality(q);
+    };
+    const applyLook = () => setLook(lowRender.on ? lowRender.tier : useWorldStore.getState().quality);
+    boot('Raising the ground and the woods', 0.3); await yieldToBrowser();
+    if (cancelled) { window.removeEventListener('resize', resize); world.dispose(); weather.dispose(); ws.dispose(); return; }
+    applyLook();
+    boot('Laying in the buildings', 0.65); await yieldToBrowser();
+    if (cancelled) { window.removeEventListener('resize', resize); world.dispose(); weather.dispose(); ws.dispose(); return; }
+    // what came with the land: the world picks its spots once, then it's laid in like anything built
+    const unplaced = useGameStore.getState().game.structures.filter(x => x.unplaced);
+    if (unplaced.length) {
+      const query: SiteQuery = {
+        height: (x, z) => world.parcel.natural(x, z).h,
+        owned: (x, z) => ownsAt(useGameStore.getState().game, x, z),
+        water: (x, z) => world.parcel.isCreek(x, z) || world.stream.depthAt(x, z) > 0,
+        blocked: (x, z) => world.onCamp(x, z, 0.4) || world.onAccess(x, z, 0.4),
+      };
+      useGameStore.getState().placeImprovements(world.siteImprovements(unplaced, query));
+    }
+    const placedOnly = (list: GameState['structures']) => list.filter(x => !x.unplaced);
+    world.syncStructures(placedOnly(useGameStore.getState().game.structures));
+    // the neighbor parcels: survey what each is once (timber, creek bottom, hay ground, dry grazing), and plant what's bought
+    const ownedRects = (g: GameState) => [...homeOutsideForty(g.site), ...g.land.parcels.filter(p => p.owner === 'you').map(p => p.rect)];
+    if (!useGameStore.getState().game.land.surveyed) useGameStore.getState().survey(world.surveyLand(useGameStore.getState().game.land.parcels));
+    world.setOwnedLand(ownedRects(useGameStore.getState().game));
+    // compile every shader the first view needs on the browser's parallel compile threads, behind the loading screen, not on the first frame
+    boot('Compiling shaders', 0.85); await warmShaders(ws);
+    if (cancelled) { window.removeEventListener('resize', resize); world.dispose(); weather.dispose(); ws.dispose(); return; }
+    // valley fog and low cloud: the sim's fog (sim/fog.ts), eased and drawn as height fog (engine/world/fog)
+    const valley = new ValleyFog();
+    let fogPlace: ReturnType<typeof fogPlaceOf> | null = null, fogPlaceAt = -9, fogCampY = 0;
     const cam = new DioramaCamera(canvas);
     cam.groundAt = world.groundAt;
     cam.solidAt = world.crownAt;
@@ -58,6 +135,15 @@ export function GameCanvas() {
     const tool = new PlacementTool(ws.scene, ws.camera, canvas, world);
     const marker = new MarkTool(ws.scene, ws.camera, canvas, world);
     const fence = new PerimeterTool(ws.scene, ws.camera, canvas, world);
+    // the HUD's "Mark 10 trees": the nearest standing trees on our land, nearest the yard first
+    useWorldStore.getState().setMarkNearestTrees(n => {
+      const st = useGameStore.getState(), g = st.game, y = world.access.yard;
+      const near = world.treeSpecs
+        .filter(t => t.x > -0.5 && t.z > -0.5 && t.x < PARCEL_SIZE + 0.5 && t.z < PARCEL_SIZE + 0.5 && t.scale >= 0.6 && ownsAt(g, t.x, t.z) && !isMarked(g, t.id) && !g.forestry.cleared.includes(t.id))
+        .map(t => ({ t, d: Math.hypot(t.x - y.x, t.z - y.z) }))
+        .sort((a, b) => a.d - b.d).slice(0, n);
+      return st.markTrees(near.map(({ t, d }) => ({ tree: { id: t.id, x: t.x, z: t.z, kind: t.kind as 'conifer' | 'oval' | 'broad', scale: t.scale }, haulDist: d })));
+    });
     const sight = new SightOverlay(ws.scene, {
       sightWorld: () => world.sightWorld(), bounds: { x0: -6, z0: -6, x1: PS + 6, z1: PS + 6 },
       observers: k => world.observers(k), lights: () => world.nightLights(),
@@ -94,6 +180,8 @@ export function GameCanvas() {
       if (tour.active) tour.setMode(m);
       else tour.enter(m, { x: cam.target.x, z: cam.target.z, theta: cam.yaw, phi: cam.pitch });
     };
+    // the underground view comes on by itself while a bunker room or tunnel is being staked; it goes off again when that tool is put down
+    let autoUnder = false;
     const onKey = (e: KeyboardEvent) => {
       if (e.code === 'Escape' && useWorldStore.getState().cameraMode !== 'diorama') useWorldStore.getState().setCameraMode('diorama');
       // V cycles the building view: full → cutaway → x-ray
@@ -102,54 +190,73 @@ export function GameCanvas() {
         w.setBuildingView(BUILDING_VIEWS[(BUILDING_VIEWS.indexOf(w.buildingView) + 1) % BUILDING_VIEWS.length]);
       }
       // U: the underground view (bunker rooms under see-through ground)
-      if (e.code === 'KeyU' && !(e.target instanceof HTMLInputElement)) useWorldStore.getState().setUnderground(!useWorldStore.getState().underground);
+      if (e.code === 'KeyU' && !(e.target instanceof HTMLInputElement)) { autoUnder = false; useWorldStore.getState().setUnderground(!useWorldStore.getState().underground); }
+      // H: hide / show the side panels so the map has the whole screen
+      if (e.code === 'KeyH' && !e.ctrlKey && !e.metaKey && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLSelectElement) && !(e.target instanceof HTMLTextAreaElement)) useWorldStore.getState().setHudHidden(!useWorldStore.getState().hudHidden);
     };
     window.addEventListener('keydown', onKey);
+    let shiftDown = false;
+    const onShift = (e: KeyboardEvent) => { shiftDown = e.shiftKey; };
+    window.addEventListener('keydown', onShift);
+    window.addEventListener('keyup', onShift);
 
-    const resize = () => {
-      const w = canvas.clientWidth, h = canvas.clientHeight;
-      ws.resize(w, h);
+    // the property line: on by the Boundary button, and while a fence or wall is being drawn
+    const boundary = new BoundaryOutline(ws.scene, world.groundAt);
+    const rebuildBoundary = () => boundary.build([world.home, ...ownedRects(useGameStore.getState().game)]);
+    const showBoundary = () => { boundary.visible = useWorldStore.getState().showBoundary || !!useGameStore.getState().tool?.startsWith('fence:'); };
+    rebuildBoundary(); showBoundary();
+    useWorldStore.getState().setSiteGeo({ creekZ: x => world.parcel.creek.zAt(x), creekHalf: world.parcel.creek.halfWidth, roadGate: [world.access.gate.x, world.access.gate.z], drive: world.access.drive.map(p => [p[0], p[1]] as [number, number]), center: [world.camp.x, world.camp.z], ground: (x, z) => world.parcel.natural(x, z).h });
+    world.setBurnedFarms(burnedFarms(useGameStore.getState().game));
+    const terrainOv = new TerrainOverlay(ws.scene, world.groundAt);
+    const showTerrain = () => {
+      const g = useGameStore.getState().game, m = useWorldStore.getState().terrainMode, t = terrainOf(g);
+      if (m === 'off' || !t) { terrainOv.set('off', null); return; }
+      const lanes = lanesOf(g);
+      terrainOv.set(m, t, lanes, siteCandidates(t, { lot: g.site.home, camp: campOf(g) }, lanes));
     };
-    ws.setupPostProcessing(canvas.clientWidth || 1280, canvas.clientHeight || 800);
-    resize();
-    window.addEventListener('resize', resize);
-
-    const applyLook = () => {
-      const s = useWorldStore.getState();
-      ws.setGraphicsQuality(s.quality);
-      weather.setQuality(s.quality);
-      world.setQuality(s.quality);
+    // the blueprint view: names, rings, gates, towers and tunnels (game/blueprint)
+    const host = canvas.parentElement ?? document.body;
+    if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
+    const blueprintOv = new BlueprintOverlay(ws.scene, ws.camera, host, world.groundAt);
+    let bpTimer = 0;
+    const showBlueprint = () => {
+      const on = useWorldStore.getState().blueprint;
+      if (!on) { blueprintOv.set(null); useWorldStore.getState().setBlueprintReadout(null); return; }
+      const plan = blueprintPlan(useGameStore.getState().game);
+      blueprintOv.set(plan); useWorldStore.getState().setBlueprintReadout(plan.readout);
     };
-    applyLook();
-    // what came with the land: the world picks its spots once, then it's laid in like anything built
-    const unplaced = useGameStore.getState().game.structures.filter(x => x.unplaced);
-    if (unplaced.length) {
-      const query: SiteQuery = {
-        height: (x, z) => world.parcel.natural(x, z).h,
-        owned: (x, z) => ownsAt(useGameStore.getState().game, x, z),
-        water: (x, z) => world.parcel.isCreek(x, z) || world.stream.depthAt(x, z) > 0,
-        blocked: (x, z) => world.onCamp(x, z, 0.4) || world.onAccess(x, z, 0.4),
-      };
-      useGameStore.getState().placeImprovements(world.siteImprovements(unplaced, query));
-    }
-    const placedOnly = (list: GameState['structures']) => list.filter(x => !x.unplaced);
-    world.syncStructures(placedOnly(useGameStore.getState().game.structures));
-    // the neighbor parcels: survey what each is once (timber, creek bottom, hay ground, dry grazing), and plant what's bought
-    const ownedRects = (g: GameState) => [...homeOutsideForty(g.site), ...g.land.parcels.filter(p => p.owner === 'you').map(p => p.rect)];
-    if (!useGameStore.getState().game.land.surveyed) useGameStore.getState().survey(world.surveyLand(useGameStore.getState().game.land.parcels));
-    world.setOwnedLand(ownedRects(useGameStore.getState().game));
+    const refreshBlueprint = () => { if (useWorldStore.getState().blueprint) { clearTimeout(bpTimer); bpTimer = window.setTimeout(showBlueprint, 250); } };
     const unsub = [
+      useWorldStore.subscribe(s => s.blueprint, showBlueprint),
+      useGameStore.subscribe(s => `${s.game.structures.map(x => x.id + x.stage + x.kind).join()}|${s.game.perimeter.map(r => r.id + (r.finishedAt === null ? 'p' : 'f') + r.gates.length).join()}`, refreshBlueprint),
       // wildfire weather: measure the fuel round every building (what cleared ground there is decides what burns)
       useGameStore.subscribe(s => s.game.disaster.phase, ph => { const g = useGameStore.getState().game; if (g.disaster.kind === 'wildfire' && ph === 'warning' && !g.disaster.fuel) useGameStore.getState().setFuel(world.fuelNear(g.structures)); }),
-      useGameStore.subscribe(s => s.game.land, () => world.setOwnedLand(ownedRects(useGameStore.getState().game))),
+      useGameStore.subscribe(s => s.game.land, () => { world.setOwnedLand(ownedRects(useGameStore.getState().game)); rebuildBoundary(); }),
+      useWorldStore.subscribe(s => s.showBoundary, showBoundary),
+      useGameStore.subscribe(s => s.tool, showBoundary),
       useWorldStore.subscribe(s => s.quality, applyLook),
       useWorldStore.subscribe(s => s.cameraMode, applyCameraMode),
       useGameStore.subscribe(s => s.game.structures, list => { world.syncStructures(placedOnly(list)); occluders.invalidate(); }),
       useGameStore.subscribe(s => s.game.site.improvements.drive, on => world.setDrive(on)),
-      useGameStore.subscribe(s => s.tool, k => { tool.setKind(k); marker.setOn(k === 'fell'); fence.setKind(k?.startsWith('fence:') ? k.slice(6) as PerimeterKind : null); if (k === 'fence:escape_tunnel') useWorldStore.getState().setUnderground(true); }),
+      useGameStore.subscribe(s => s.game.roadBridge?.down ?? false, on => world.setBridgeDown(on)),
+      useGameStore.subscribe(s => s.game.site.entrance ?? null, () => { world.replan(useGameStore.getState().game.site); world.previewEntrance(useGameStore.getState().game.site, null); }),
+      onEntrancePreview(z => world.previewEntrance(useGameStore.getState().game.site, z)),
+      // a neighbor's farm burned (sim/neighborLife.ts): drawn charred once the family knows
+      useGameStore.subscribe(s => burnedFarms(s.game).join(), () => world.setBurnedFarms(burnedFarms(useGameStore.getState().game))),
+      useGameStore.subscribe(s => s.tool, k => {
+        const w = useWorldStore.getState();
+        const below = !!k && (k === 'fence:escape_tunnel' || k === 'fence:underground_passage' || (!k.startsWith('fence:') && !!KIT[k] && isUnderground(KIT[k])));
+        if (below && !w.underground) autoUnder = true;
+        tool.setKind(k); marker.setOn(k === 'fell'); fence.setKind(k?.startsWith('fence:') ? k.slice(6) as PerimeterKind : null);
+        if (k === 'fence:escape_tunnel' || k === 'fence:underground_passage') w.setUnderground(true);
+        if (!below && autoUnder) { autoUnder = false; w.setUnderground(false); }
+      }),
       useWorldStore.subscribe(s => s.buildingView, v => world.setBuildingView(v)),
       useWorldStore.subscribe(s => s.underground, on => world.setUnderground(on)),
       useWorldStore.subscribe(s => s.sightMode, m => sight.set(m)),
+      // the terrain overlay (sim/terrain.ts): high ground, lanes, water, sun
+      useWorldStore.subscribe(s => s.terrainMode, showTerrain),
+      useGameStore.subscribe(s => s.game.structures.length + '|' + s.game.perimeter.length, () => { if (useWorldStore.getState().terrainMode === 'lanes') showTerrain(); }),
       // the compound changed: recompute the overlay
       useGameStore.subscribe(s => `${s.game.structures.map(x => x.id + x.stage).join()}|${s.game.perimeter.map(r => r.id + (r.finishedAt === null ? Math.round(r.done) : 'f')).join()}`, () => sight.refresh()),
     ];
@@ -162,37 +269,98 @@ export function GameCanvas() {
     let raf = 0;
     /** QA hooks: frame counter, and an exact camera pose (eye → look) for interior shots. */
     const battle = new BattleRenderer(ws.scene, world.groundAt, () => useGameStore.getState().game.people);
-    battle.onEnd = () => useBattleStore.getState().endBattle();
+    battle.onEnd = () => { useBattleStore.getState().endBattle(); world.forceDoor(null); };
+    battle.onDoor = (open, x, z) => world.forceDoor(open, x, z);
     let battleSkip = useBattleStore.getState().skipReq, battleSync = 0;
+    // the raid cutscene: plays a staged siege (sim/siege.ts), cutting between wall, house and raiders
+    const homeSpot = () => {
+      const g = useGameStore.getState().game;
+      const h = g.structures.find(x => isFinished(x) && isHome(x.kind)) ?? g.structures.find(isFinished);
+      return h ? { x: h.x, y: 0, z: h.z } : { x: world.camp.x, y: 0, z: world.camp.z };
+    };
+    const player = new CutscenePlayer({ battle, ground: world.groundAt, house: homeSpot, commit: () => useGameStore.getState().commitCutscene(), seed: useGameStore.getState().game.seed });
+    let cineSaved: { fov: number; near: number } | null = null;
+    let promptAt = -1, skipScene = useCutsceneView.getState().skipScene, skipAll = useCutsceneView.getState().skipAll;
     let battleView: { x: number; z: number; radius: number; pitch: number } | null = null;
-    const qa: { frames: number; frameMs: number; pose: null | { x: number; y: number; z: number; lx: number; ly: number; lz: number; fov?: number } } = { frames: 0, frameMs: 0, pose: null };
+    const qa: { frames: number; frameMs: number; lowrender?: boolean; weather?: boolean; renderNow?: () => Promise<void>; renderFull?: (q?: QaQuality) => Promise<void>; pose: null | { x: number; y: number; z: number; lx: number; ly: number; lz: number; fov?: number } } = { frames: 0, frameMs: 0, pose: null };
+    // window.__cb.qa.renderNow(): draw one frame (a promise); renderFull('high'|'medium'): one slow full-quality, full-resolution shot
+    if (lowRender.on) Object.assign(qa, { lowrender: true, renderNow: () => renderReq.request(), renderFull: (q: QaQuality = 'high') => renderReq.request(q) });
+    const budget = new FrameBudget(), loopStart = performance.now();
+    let statFrames = 0, statSince = performance.now(), statCalls = 0, statTris = 0;
+    ws.renderer.info.autoReset = false;
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
+      // frame-rate cap (60 by default): a 120 Hz display would otherwise do the whole frame twice as often
+      const gap = capGapMs(useWorldStore.getState().frameCap);
+      if (!lowRender.on && gap > 0 && now - last < gap) return;
       const t0 = performance.now();
       const dt = Math.min(0.1, (now - last) / 1000);
+      // a slow machine steps down by itself (never up) after 3 s over 40 ms a frame, with a notice the player can dismiss
+      if (now - loopStart < 6000) budget.reset();   // (the first seconds carry the first-draw hitches)
+      else if (!lowRender.on && !document.hidden && budget.push(dt * 1000)) {
+        const q = useWorldStore.getState().quality, lower = lowerTier(q);
+        if (lower) {
+          useWorldStore.getState().setQuality(lower);
+          useWorldStore.getState().setPerfNotice(`The game was running slowly on ${q.toUpperCase()}, so graphics were switched to ${lower.toUpperCase()}. You can change this in the Graphics control (bottom left); it will not switch up by itself.`);
+          budget.reset();
+        }
+      }
       last = now;
       // the sim advances in real time at its speed; the view clock follows it (outside photo mode)
       // the clock stands still while the new-game screen is up
       if (!useGameStore.getState().setupOpen) useGameStore.getState().tick(dt);
       const game = useGameStore.getState().game;
-      if (!useWorldStore.getState().photo) {
-        const cal = calendarOf(game.clock);
-        useWorldStore.getState().syncClock(hourOf(game.clock.t), cal.doy, game.clock.t);
+      // the raid cutscene: start / stop the player, and read the clock off its timeline while it plays
+      const cs = useGameStore.getState().cutscene;
+      if (cs?.phase === 'playing' && !player.active) {
+        cineSaved = { fov: ws.camera.fov, near: ws.camera.near };
+        cam.enabled = false;
+        player.start(cs);
+      } else if (cs?.phase !== 'playing' && player.active) {
+        player.stop();
+        cam.enabled = useWorldStore.getState().cameraMode === 'diorama';
+        if (cineSaved) { ws.camera.fov = cineSaved.fov; ws.camera.near = cineSaved.near; ws.camera.updateProjectionMatrix(); }
       }
+      world.powered = game.utilities.lit.length > 0 || (game.utilities.grid && game.disaster.tracks.grid > 0.5);
+      world.litTowers = new Set(litTowerIds(game));
+      const cv = useCutsceneView.getState();
+      if (cv.skipScene !== skipScene) { skipScene = cv.skipScene; player.skipScene(); }
+      if (cv.skipAll !== skipAll) { skipAll = cv.skipAll; player.skipAll(); }
+      const cine = player.active ? player.update(dt) : null;
+      if (!useWorldStore.getState().photo) {
+        const t = player.active && cs?.t0 != null ? cs.t0 + player.clockGame / 86400 : game.clock.t;
+        const cal = calendarOf(game.clock, t);
+        useWorldStore.getState().syncClock(hourOf(t), cal.doy, t);
+      }
+      // the prompt: the camera settles low in the yard, looking down the drive; you can still orbit
+      if (cs?.phase === 'prompt') {
+        if (promptAt < 0) promptAt = now;
+        if (now - promptAt < 2600) {
+          const h = homeSpot(), k = Math.min(1, dt * 2);
+          cam.target.x += (h.x + 0 - cam.target.x) * k; cam.target.z += (h.z + 7 - cam.target.z) * k;
+          cam.target.y += (world.groundAt(cam.target.x, cam.target.z) + 0.15 - cam.target.y) * k;
+          cam.radius += (6.5 - cam.radius) * k; cam.pitch += (0.16 - cam.pitch) * k;
+          let dy = Math.PI - cam.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); cam.yaw += dy * k;
+        }
+      } else promptAt = -1;
       world.syncProgress(game.structures);
       world.syncFood(game);
+      world.syncBunker(game, now / 1000, hourOf(game.clock.t));
+      world.syncTents(game);
       world.syncForestry(game.forestry);
       world.simTime = game.clock.t;
-      world.syncPerimeter(game.perimeter, game.clock.t);
-      const svKey = `${game.structures.filter(x => x.stage >= 5).length}|${game.perimeter.filter(r => r.finishedAt !== null).length}|${game.utilities.fittings.filter(f => f.finishedAt !== null).length}`;
+      world.syncPerimeter(game.perimeter, game.clock.t, { lit: fenceLive(game) && !blackoutNow(game), sensors: (game.stock.ground_sensor ?? 0) > 0 });
+      const svKey = `${game.structures.filter(x => x.stage >= 5).length}|${game.perimeter.filter(r => r.finishedAt !== null).length}|${game.utilities.fittings.filter(f => f.finishedAt !== null).length}|${goodsKey(houseGoods(game))}`;
       if (svKey !== servicesKey) { servicesKey = svKey; world.syncServices(game); }
       sight.update(6);
       const speedK = game.clock.speed === 0 ? 0 : 60 / SECONDS_PER_DAY[game.clock.speed];
       world.updatePeople(dt, game, hourOf(game.clock.t), speedK);
+      world.updateWildlife(dt, game, speedK);
+      world.updateFleet(dt, game, speedK);
       world.updateDeliveries(dt, game, speedK);
       const speed = game.clock.speed;
       const { timeOfDay: t, dayOfYear, totalDays, seasonMode, weatherMode } = useWorldStore.getState();
-      ws.setNightSky(moonPhase(dayOfYear + t / 24), skyDarkness('mountain_west', false));
+      ws.setNightSky(moonPhase(dayOfYear + t / 24), skyDarkness(world.climate, false));
       Object.assign(world.air, { hour: t, wind: weather.outputs.wind, daylight: 1 - ws.nightFactor * 0.85, viewportH: canvas.clientHeight || 800 });
       world.tick(dt, dayOfYear, totalDays, seasonMode);
       const sp = world.seasons.params;
@@ -202,16 +370,35 @@ export function GameCanvas() {
       const pKey = vis === 'fall' && sp.fall > 0.45 && sp.bare < 0.9 && seasonState.climate.blaze >= 0.5 ? 'fall'
         : vis === 'spring' && sp.bloom > 0.3 ? 'spring' : '';
       if (pKey !== lastParticles) { lastParticles = pKey; ws.setSeasonalParticles(pKey); }
-      const wetKey = Math.round((SEASON_WETNESS[vis] * (1 - sp.snow) + sp.wet * 0.45) * 50);
+      const wetKey = Math.round((Math.max(SEASON_WETNESS[vis], world.atmos.mud * 0.55) * (1 - sp.snow) + sp.wet * 0.45) * 50);
       if (wetKey !== lastWetKey) { lastWetKey = wetKey; ws.setWetness(wetKey / 50); }
       // Weather → sky / light / fog (next frame), wet + snowy surfaces.
       const wxSeason = vis === 'winter' && seasonState.weatherSnow <= 0 ? 'fall' : vis;
+      // the sim's fog at the view's day and hour (or the look Settings forces): the bank's top, the cloud base, the drizzle
+      const gsF = useGameStore.getState().game;
+      // (?lowrender draws no weather unless the QA script opts in with `__cb.qa.weather = true`: the sky, the fog and the weather layer then run as at Medium, for the frames lifted with renderFull)
+      const wxOn = lowRender.on ? !!qa.weather : ws.quality !== 'low';
+      if (lowRender.on) weather.setQuality(qa.weather ? 'medium' : 'low');
+      if (!wxOn || weatherMode === 'off') valley.update(dt, NO_FOG_TARGET);
+      else {
+        if (!fogPlace || now / 1000 - fogPlaceAt > 1.5) {
+          fogPlaceAt = now / 1000; fogPlace = fogPlaceOf(gsF);
+          const c = campOf(gsF); fogCampY = world.groundAt(c[0], c[1]);
+        }
+        const fn = fogForView(gsF, dayOfYear, t, weatherMode);
+        valley.update(dt, fogTarget(fn, { campY: fogCampY, floorY: fogCampY - fogPlace.campAboveFloorM / 6 }));
+      }
+      const vc = valley.cur;
       const wx = weather.update({
         dt, speed: speed === 0 ? 1 : 60 / SECONDS_PER_DAY[speed], season: wxSeason, hour: t,
         mode: weatherMode, eventWetness: ws.eventWetness, night: ws.nightFactor,
         camera: ws.camera, focus: cam.target,
         snowBase: sp.snow, snowAllow: seasonState.weatherSnow, region: seasonState.climate.id,
+        valleyBank: vc.bankDensity > 1e-4 ? { y: vc.bankTopY, amount: Math.min(1, vc.bankDensity * 2.5) } : null,
+        mist: valley.nearMist(ws.camera.position.y),
       });
+      valley.applyTo(wx, weatherMode === 'auto');
+      ws.setHeightFog(valley.params((renderReq.quality ?? ws.quality) === 'high' ? 0.8 : 0.4));
       // nuclear war: the flash, a mushroom cloud on the northern skyline, a sickly hazed sky, grey dust falling
       const gs = useGameStore.getState().game, nk = disasterSky(gs);
       if (gs.disaster.kind === 'nuclear' && gs.clock.t >= gs.disaster.hitAt && gs.disaster.variant !== 'exchange') {
@@ -226,14 +413,24 @@ export function GameCanvas() {
         wx.snow = Math.max(wx.snow, 0.6 * nk.dust);
       }
       ws.setWeather(wx, Math.max(weather.flash, nk.flash), weather.skyLightning);
-      // lamps on inside from dusk (a little after sunset, off by late night)
-      setWindowGlow(Math.max(0, Math.min(1, (ws.nightFactor - 0.25) / 0.4)) * (t > 23.5 || t < 5 ? 0.25 : 1));
+      // lamps on inside from dusk (which windows, and how, is the atmosphere's: who's up, power, blackout curtains)
+      setWindowGlow(Math.max(0, Math.min(1, (ws.nightFactor - 0.25) / 0.4)), now / 1000);
+      world.updateAtmosphere({
+        dt, time: now / 1000, hour: t, night: ws.nightFactor, daylight: 1 - ws.nightFactor * 0.85, wind: wx.wind, rain: wx.rain, cloud: wx.cloud,
+        snow: Math.max(sp.snow, wx.snowCover * seasonState.weatherSnow) * (wx.rain > 0.3 ? 0.4 : 1), viewportH: canvas.clientHeight || 800, battle: battle.playing,
+      }, gs, seasonState.doy);
       if (tour.active) {
         const f = tour.update(dt);
         // walking indoors: a near plane short enough that walls and furniture never clip
         const near = useWorldStore.getState().cameraMode === 'walk' ? 0.02 : 0.05;
         if (ws.camera.near !== near) { ws.camera.near = near; ws.camera.updateProjectionMatrix(); }
         ws.setShadowFocus(f.x, f.z, 30);
+      } else if (cine) {
+        ws.camera.position.set(cine.eye.x, cine.eye.y, cine.eye.z);
+        ws.camera.lookAt(cine.look.x, cine.look.y, cine.look.z);
+        ws.camera.near = 0.02; ws.camera.fov = cine.fov;
+        ws.camera.updateProjectionMatrix();
+        ws.setShadowFocus(cine.eye.x, cine.eye.z, 16);
       } else if (qa.pose) {
         const p = qa.pose;
         ws.camera.position.set(p.x, p.y, p.z);
@@ -243,6 +440,7 @@ export function GameCanvas() {
         ws.camera.updateProjectionMatrix();
         ws.setShadowFocus(p.x, p.z, 6);
       } else {
+        cam.step(dt, shiftDown);
         cam.apply(ws.camera);
         occluders.keepOut(ws.camera, cam.target.x, cam.target.z, cam.target.y);
         // looking down, fit the shadows to the ground actually on screen (the far edge of the view
@@ -257,7 +455,7 @@ export function GameCanvas() {
       else if (!bs.battle && battle.playing) battle.stop();
       // the camera follows the fight (eased), and goes back where it was afterwards
       const f = battle.playing ? battle.focus() : null;
-      if (f) {
+      if (f && !player.active) {
         const k = Math.min(1, dt * 1.5);
         cam.target.x += (f.x - cam.target.x) * k; cam.target.z += (f.z - cam.target.z) * k; cam.target.y += (world.groundAt(cam.target.x, cam.target.z) - cam.target.y) * k;
         cam.radius += (Math.min(26, Math.max(8, f.spread * 2.2 + 5)) - cam.radius) * k;
@@ -267,6 +465,7 @@ export function GameCanvas() {
         battleView = null;
       }
       if (bs.skipReq !== battleSkip) { battleSkip = bs.skipReq; battle.skip(); }
+      world.doorLock = battle.playing ? true : null;      // (the alarm is up: the tunnel doors are shut for the fight)
       if (battle.playing) {
         battle.update(dt);
         if (battle.shake > 0) ws.camera.position.add(new THREE.Vector3((Math.random() - 0.5) * battle.shake, (Math.random() - 0.5) * battle.shake, (Math.random() - 0.5) * battle.shake));
@@ -275,14 +474,36 @@ export function GameCanvas() {
       }
       ws.tick(dt);
       ws.updateDayNight(t);
-      ws.renderFrame();
+      blueprintOv.update(performance.now());
+      if (!lowRender.on) {
+        ws.renderer.info.reset();
+        if (!useWorldStore.getState().boot?.hold) ws.renderFrame();
+        statFrames++; statCalls += ws.renderer.info.render.calls; statTris += ws.renderer.info.render.triangles;
+        if (performance.now() - statSince >= 1000) {
+          if (useWorldStore.getState().showPerf) {
+            const secs = (performance.now() - statSince) / 1000;
+            useWorldStore.getState().setPerfStats({ fps: statFrames / secs, ms: budget.avgMs || (secs * 1000) / statFrames, calls: Math.round(statCalls / statFrames), tris: Math.round(statTris / statFrames), tier: useWorldStore.getState().quality, budgetMs: 40 });
+          }
+          statFrames = 0; statCalls = 0; statTris = 0; statSince = performance.now();
+        }
+      }
+      else if (renderReq.pending) {
+        // one on-demand draw; a full-quality shot lifts the look for this frame only
+        const q = renderReq.quality;
+        if (q) { setLook(q); ws.updateDayNight(t); }
+        ws.renderFrame();
+        if (q) { setLook('low'); }
+        renderReq.drawn();
+      }
       qa.frames++;
       qa.frameMs = performance.now() - t0;
     };
     raf = requestAnimationFrame(frame);
+    const showcaseNext = new URLSearchParams(location.search).get('showcase') === 'mountain';
+    if (!showcaseNext) requestAnimationFrame(() => requestAnimationFrame(() => { if (!cancelled) useWorldStore.getState().setBoot(null); }));
 
     // QA hook (screenshot harness, console poking).
-    (window as unknown as Record<string, unknown>).__cb = { ws, world, weather, cam, tour, tool, marker, fence, sight, game: useGameStore, store: useWorldStore, THREE, qa, battle,
+    (window as unknown as Record<string, unknown>).__cb = { census: () => sceneCensus(ws.scene), terrainOv, blueprintOv, player, ws, world, weather, valley, cam, tour, tool, marker, fence, sight, game: useGameStore, store: useWorldStore, THREE, qa, battle,
       demoBattle: () => {
         const g = useGameStore.getState().game;
         const b = demoBattle(g.structures, g.people, g.structures.length ? undefined : world.camp);
@@ -290,17 +511,57 @@ export function GameCanvas() {
         return b;
       } };
 
-    return () => {
+    // QA / dev preset: ?showcase=mountain assembles the north-star compound with the real build actions (game/showcase.ts). It runs once, on the world
+    // that is live when it runs (React's dev double-mount builds the canvas twice: the first world is already disposed by then), and only after the
+    // world has drawn a few frames: the terrain and the woods are built over the first of them, and building on top of a half-made ground leaves holes.
+    if (new URLSearchParams(location.search).get('showcase') === 'mountain') {
+      const qs = new URLSearchParams(location.search), rings = Number(qs.get('rings') ?? 1) || 1, wall = qs.get('wall') === 'concrete' ? 'concrete' as const : 'stone' as const, layout = qs.get('layout') === 'bench' ? 'bench' as const : 'shelf' as const;
+      const w = window as unknown as Record<string, unknown>;
+      void (async () => {
+        boot('Building the compound', 0.9);
+        const m = await import('./showcase');
+        for (let i = 0; i < 6; i++) { if (qa.renderNow) await qa.renderNow(); else await new Promise(r => requestAnimationFrame(r)); }
+        await new Promise(r => setTimeout(r, 1200));
+        if (w.__showcaseRan) return;
+        w.__showcaseRan = true;
+        const t0 = performance.now();
+        try {
+          // time-sliced: the browser paints the loading screen and answers input between the script's steps
+          w.__showcase = await m.buildMountainShowcaseAsync(w.__cb as Parameters<typeof m.buildMountainShowcaseAsync>[0], { rings, wall, layout }, async (label, n) => {
+            if (cancelled) throw new Error('cancelled');
+            boot(`Building the compound: ${label.toLowerCase()}`, Math.min(0.96, 0.9 + 0.006 * n), true);
+            await yieldToBrowser();
+          });
+        } catch (e) { w.__showcase = { error: String((e as Error)?.stack ?? e) }; }
+        w.__showcaseMs = performance.now() - t0;
+        // the new pieces' shaders compile behind the loading screen too
+        boot('Compiling shaders', 0.97, true); await warmShaders(ws);
+        if (!cancelled) useWorldStore.getState().setBoot(null);
+      })();
+    }
+
+    stop = () => {
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', resize);
       unsub.forEach(u => u());
       window.removeEventListener('keydown', onKey);
+      window.removeEventListener('keydown', onShift);
+      window.removeEventListener('keyup', onShift);
+      player.stop();
       battle.dispose();
       tour.dispose();
       tool.dispose();
       marker.dispose();
       fence.dispose();
       sight.dispose();
+      terrainOv.dispose();
+      clearTimeout(bpTimer);
+      blueprintOv.dispose();
+      useWorldStore.getState().setBlueprintReadout(null);
+      boundary.dispose();
+      useWorldStore.getState().setSiteGeo(null);
+      useWorldStore.getState().setMarkNearestTrees(null);
+      useWorldStore.getState().setUnderground(false);
       canvas.removeEventListener('pointerdown', onVsDown);
       canvas.removeEventListener('pointerup', onVsUp);
       cam.dispose();
@@ -308,6 +569,8 @@ export function GameCanvas() {
       world.dispose();
       ws.dispose();
     };
+    })();
+    return () => { cancelled = true; stop(); useWorldStore.getState().setBoot(null); };
   }, []);
 
   return <canvas ref={ref} style={{ width: '100%', height: '100%' }} />;

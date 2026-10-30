@@ -4,6 +4,9 @@ const aerial = { x: C, z: C, yaw: 0.8, pitch: 0.55, radius: 95 };
 const street = { x: C, z: C, yaw: 0.8, pitch: 0.12, radius: 2.2 };
 
 export const SETS = {
+  boundary: [
+    { name: 'aerial-boundary-on', time: 12, cam: { ...aerial, yaw: 0.4, pitch: 0.9, radius: 130 }, setup: 'cb.store.getState().setShowBoundary(true)' },
+  ],
   basic: [
     { name: 'aerial-noon', time: 12, cam: aerial },
     { name: 'aerial-golden', time: 18.5, cam: { ...aerial, yaw: -1.3, pitch: 0.35 } },
@@ -433,4 +436,406 @@ SETS.darkrect = [
   { name: 'aerial-camp', time: 6.2, season: 'spring', setup: "{ const c = cb.world.camp; cb.cam.target.set(c.x, 0, c.z); cb.cam.radius = 22; cb.cam.pitch = 1.1; cb.cam.yaw = 0; }", cam: D, frames: 16 },
   { name: 'aerial-timber', time: 10, season: 'summer', setup: "{ const c = cb.world.camp; cb.cam.target.set(c.x, 0, c.z - 30); cb.cam.radius = 26; cb.cam.pitch = 1.05; cb.cam.yaw = 0; }", cam: D, frames: 16 },
   { name: 'aerial-camp-noon', time: 12, season: 'spring', setup: "{ const c = cb.world.camp; cb.cam.target.set(c.x, 0, c.z); cb.cam.radius = 22; cb.cam.pitch = 1.1; cb.cam.yaw = 0; }", cam: D, frames: 16 },
+];
+
+// bathrooms in the houses that have plumbing (farmhouse, manufactured home), seen from above in cutaway
+const homes = `{ if (!window.__h) { window.__h = {};
+  const G = cb.game, W = cb.world, c = W.camp;
+  for (const [kind, dx, dz, rot] of [['farmhouse', -5, -2, 0], ['trailer', 5, -2, 0]]) {
+    const sp = cb.tool.findSpot(kind, c.x + dx, c.z + dz, rot);
+    if (!sp) continue;
+    G.getState().plan(kind, sp[0], sp[1], rot);
+    window.__h[kind] = G.getState().game.structures.at(-1);
+  }
+  G.setState(s => { const g = structuredClone(s.game); for (const st of g.structures) { st.stage = 5; st.done = 0; st.finishedAt = 0; } return { game: g }; });
+} }`;
+const top = kind => `{ const b = window.__h['${kind}']; if (b) { cb.cam.target.set(b.x, 0, b.z); cb.cam.radius = 3.4; cb.cam.pitch = 1.25; cb.cam.yaw = b.rot * Math.PI / 2; } }`;
+SETS.baths = [
+  { name: 'farmhouse-plan', time: 12, season: 'summer', setup: homes + cut + top('farmhouse'), cam: D, frames: 14 },
+  { name: 'trailer-plan', time: 12, season: 'summer', setup: homes + cut + top('trailer'), cam: D, frames: 14 },
+];
+
+// the fence and wall upgrade chain, side by side: split-rail > barbed > woven > chain-link > wrought iron > iron + barbed > steel > electrified
+const tiersSetup = `{ if (!window.__tiers) { window.__tiers = true;
+  const G = cb.game, kinds = ['split_rail', 'barbed_wire', 'woven_wire', 'chain_link', 'wrought_iron', 'iron_barbed', 'steel_wall', 'electric_steel'];
+  kinds.forEach((k, i) => G.getState().planRun(k, [[6 + i * 7, 54], [6 + i * 7 + 6, 54]], [], 0));
+  G.setState(s => { const g = structuredClone(s.game); for (const r of g.perimeter) { r.done = r.hours; r.supplied = true; r.finishedAt = 0; } return { game: g }; });
+} }`;
+SETS.tiers = [
+  { name: 'tiers-overview', time: 11, season: 'summer', setup: tiersSetup, cam: { x: 33, z: 54, yaw: 0.0, pitch: 0.3, radius: 42 }, frames: 16 },
+  { name: 'tiers-low-1', time: 11, season: 'summer', setup: tiersSetup, cam: { x: 17, z: 54, yaw: 0.35, pitch: 0.14, radius: 7.5 }, frames: 12 },
+  { name: 'tiers-low-2', time: 11, season: 'summer', setup: tiersSetup, cam: { x: 47, z: 54, yaw: 0.35, pitch: 0.14, radius: 7.5 }, frames: 12 },
+];
+
+// eye level (a person is ~0.28 tall): the fence tiers from the ground, and the creek barred
+const eye = (x, z, lx, lz, dy = 0.26, ly = 0.2, fov = 62) => `{ const g = cb.world.groundAt; cb.qa.pose = { x: ${x}, y: g(${x}, ${z}) + ${dy}, z: ${z}, lx: ${lx}, ly: g(${lx}, ${lz}) + ${ly}, lz: ${lz}, fov: ${fov} }; }`;
+SETS.defenses = [
+  { name: 'eye-tiers-1-split-to-chainlink', time: 11, season: 'summer', setup: tiersSetup + eye(4, 52.2, 30, 54.4), cam: { x: 33, z: 54, yaw: 0, pitch: 0.3, radius: 20 }, frames: 12 },
+  { name: 'eye-tiers-2-wrought-to-electric', time: 11, season: 'summer', setup: tiersSetup + eye(26, 52.2, 56, 54.4), cam: { x: 33, z: 54, yaw: 0, pitch: 0.3, radius: 20 }, frames: 12 },
+  { name: 'eye-steel-and-electric-close', time: 11, season: 'summer', setup: tiersSetup + eye(42, 52.6, 52, 54.2, 0.22, 0.25, 58), cam: { x: 33, z: 54, yaw: 0, pitch: 0.3, radius: 20 }, frames: 12 },
+  { name: 'eye-creek-bars', time: 11, season: 'summer', setup: `{ if (!window.__bars) { window.__bars = true; const G = cb.game, c = cb.world.parcel.creek, x = 20, z = c.zAt(x);
+      G.getState().planRun('creek_bars', [[x, z - 2.6], [x, z + 2.6]], [], 0);
+      G.setState(s => { const g = structuredClone(s.game); for (const r of g.perimeter) { r.done = r.hours; r.supplied = true; r.finishedAt = 0; } return { game: g }; }); } const g = cb.world.groundAt, c = cb.world.parcel.creek, z = c.zAt(20);
+      cb.qa.pose = { x: 15.5, y: g(15.5, z - 3.2) + 0.3, z: z - 3.2, lx: 20, ly: g(20, z) + 0.15, lz: z + 0.4, fov: 62 }; }`, cam: { x: 33, z: 54, yaw: 0, pitch: 0.3, radius: 20 }, frames: 14 },
+  { name: 'aerial-creek-bars', time: 11, season: 'summer', setup: `{ const c = cb.world.parcel.creek; cb.qa.pose = null; cb.cam.target.set(20, 0, c.zAt(20)); cb.cam.radius = 9; cb.cam.pitch = 0.7; cb.cam.yaw = 0.5; }`, cam: { x: 20, z: 40, yaw: 0.5, pitch: 0.7, radius: 9 }, frames: 12 },
+];
+
+// linked compounds: two walled yards joined by a covered steel walkway, an underground passage between them, a buried skirt and ground sensors
+const linkedSetup = `{ if (!window.__linked) { window.__linked = true;
+  const sq = (cx, cz, h) => [[cx - h, cz - h], [cx + h, cz - h], [cx + h, cz + h], [cx - h, cz + h], [cx - h, cz - h]];
+  cb.game.setState(s => { const g = structuredClone(s.game);
+    const done = (kind, pts) => { cb.__id = (cb.__id || 0) + 1; g.perimeter.push({ id: 'L' + cb.__id, kind, pts, gates: [], done: 1, hours: 1, supplied: true, finishedAt: 0 }); };
+    for (const [id, x, z] of [['h1', 22, 40], ['h2', 46, 40]]) g.structures.push({ id, kind: 'farmhouse', x, z, rot: 0, stage: 99, done: 0, supplied: true, finishedAt: 0 });
+    done('container_wall', sq(22, 40, 8)); done('container_wall', sq(46, 40, 8));
+    g.stock.ground_sensor = 2; g.utilities.lit = ['h1', 'h2'];
+    return { game: g }; });
+  // the walkway is planned through the sim, which cuts a doorway in each yard wall
+  cb.game.getState().planRun('covered_walkway', [[30, 44], [38, 44]], [], 0);
+  cb.game.getState().planRun('underground_passage', [[24, 37], [44, 37]], [], 0);
+  cb.game.setState(s => { const g = structuredClone(s.game);
+    for (const r of g.perimeter) { r.done = r.hours; r.supplied = true; r.finishedAt = 0; }
+    g.perimeter.find(r => r.kind === 'container_wall').skirtAt = 0;
+    return { game: g }; }); } cb.qa.pose = null; }`;
+SETS.linked = [
+  { name: 'linked-aerial-day', time: 12, season: 'summer', setup: linkedSetup + "cb.cam.target.set(34, 0, 41); cb.cam.yaw = 0.5; cb.cam.pitch = 0.6; cb.cam.radius = 34;", cam: { x: 34, z: 41, yaw: 0.5, pitch: 0.6, radius: 34 }, frames: 14 },
+  { name: 'linked-walkway-close', time: 11, season: 'summer', setup: linkedSetup + "cb.cam.target.set(34, 0, 44); cb.cam.yaw = 0.6; cb.cam.pitch = 0.2; cb.cam.radius = 7;", cam: { x: 34, z: 44, yaw: 0.6, pitch: 0.2, radius: 7 }, frames: 14 },
+  { name: 'linked-eye-inside-walkway', time: 21.5, season: 'summer', setup: linkedSetup + eye(31, 44, 38, 44, 0.22, 0.22, 70), cam: { x: 34, z: 44, yaw: 0, pitch: 0.2, radius: 7 }, frames: 14 },
+  { name: 'linked-night-aerial', time: 21, season: 'summer', setup: linkedSetup + "cb.cam.target.set(34, 0, 44); cb.cam.yaw = 0.5; cb.cam.pitch = 0.3; cb.cam.radius = 11;", cam: { x: 34, z: 42, yaw: 0.3, pitch: 0.45, radius: 28 }, frames: 14 },
+  { name: 'linked-underground-passage', time: 11, season: 'summer', setup: linkedSetup + under + "const gy = cb.world.groundAt(34, 37); cb.cam.target.set(30, 0, 37); cb.cam.yaw = 0.4; cb.cam.pitch = 0.85; cb.cam.radius = 8;", cam: { x: 34, z: 37, yaw: 0.4, pitch: 0.9, radius: 30 }, frames: 20 },
+  { name: 'linked-underground-hatch-close', time: 11, season: 'summer', setup: linkedSetup + under + "cb.cam.target.set(24, 0, 37); cb.cam.yaw = 0.5; cb.cam.pitch = 0.8; cb.cam.radius = 4;", cam: { x: 24, z: 37, yaw: 0.5, pitch: 0.8, radius: 4 }, frames: 20 },
+  { name: 'linked-skirt-and-sensor-close', time: 10, season: 'summer', setup: linkedSetup + eye(10, 36, 14, 40, 0.22, 0.1, 58), cam: { x: 14, z: 40, yaw: 0, pitch: 0.2, radius: 5 }, frames: 14 },
+  { name: 'linked-doorway-outside', time: 11, season: 'summer', setup: linkedSetup + eye(34, 52, 30, 44, 0.24, 0.22, 64), cam: { x: 34, z: 44, yaw: 0, pitch: 0.2, radius: 7 }, frames: 14 },
+  { name: 'linked-doorway-inside', time: 11, season: 'summer', setup: linkedSetup + eye(25, 44, 30, 44, 0.24, 0.22, 64), cam: { x: 30, z: 44, yaw: 0, pitch: 0.2, radius: 7 }, frames: 14 },
+];
+
+// a container wall on a slope near the camp, at eye level with the family in view: the plinth closes the gap under it
+const wallSlope = `{ if (window.__wslope !== window.__wallKind) { window.__wslope = window.__wallKind; const c = cb.world.camp, g = cb.world.groundAt; let best = null, bd = -1;
+    for (let k = 0; k < 8; k++) for (const sd of [-1, 1]) { const a = k * 0.39, cx = c.x + sd * 4 * Math.cos(a + 1.57), cz = c.z + sd * 4 * Math.sin(a + 1.57); const p0 = [cx - Math.cos(a) * 7, cz - Math.sin(a) * 7], p1 = [cx + Math.cos(a) * 7, cz + Math.sin(a) * 7]; let lo = 1e9, hi = -1e9; for (let i = 0; i <= 14; i++) { const h = g(p0[0] + (p1[0] - p0[0]) * i / 14, p0[1] + (p1[1] - p0[1]) * i / 14); lo = Math.min(lo, h); hi = Math.max(hi, h); } if (hi - lo > bd) { bd = hi - lo; best = [p0[0], p0[1], p1[0], p1[1], cx, cz]; } }
+    window.__ws = best;
+    cb.game.setState(s => { const gm = structuredClone(s.game); gm.perimeter = gm.perimeter.filter(r => !r.id.startsWith('W_')); gm.perimeter.push({ id: 'W_' + window.__wallKind, kind: window.__wallKind || 'container_wall', pts: [[best[0], best[1]], [best[2], best[3]]], gates: [], done: 1, hours: 1, supplied: true, finishedAt: 0 }); return { game: gm }; }); } }`;
+// eye level on the camp side of the wall, looking across the camp (the family is between) at the wall
+const wallEye = (kind) => `window.__wallKind = '${kind}'; ` + wallSlope + `{ const w = window.__ws, c = cb.world.camp, g = cb.world.groundAt; const dx = c.x - w[4], dz = c.z - w[5], d = Math.hypot(dx, dz) || 1; const ex = c.x + dx / d * 1.8, ez = c.z + dz / d * 1.8; cb.qa.pose = { x: ex, y: g(ex, ez) + 0.24, z: ez, lx: w[4], ly: g(w[4], w[5]) + 0.12, lz: w[5], fov: 66 }; }`;
+SETS.walls = [
+  { name: 'wall-slope-container-eye-person', time: 10, season: 'summer', setup: toHour(10) + wallEye('container_wall'), cam: { x: C, z: C, yaw: 0, pitch: 0.2, radius: 7 }, frames: 40 },
+  { name: 'wall-slope-concrete-eye-person', time: 10, season: 'summer', setup: toHour(10) + wallEye('concrete_wall'), cam: { x: C, z: C, yaw: 0, pitch: 0.2, radius: 7 }, frames: 40 },
+  { name: 'wall-slope-steel-eye-person', time: 10, season: 'summer', setup: toHour(10) + wallEye('steel_wall'), cam: { x: C, z: C, yaw: 0, pitch: 0.2, radius: 7 }, frames: 40 },
+];
+// a container wall being upgraded to steel: the steel rises beside the containers
+SETS.upgrade = [
+  { name: 'container-to-steel-upgrade', time: 11, season: 'summer', setup: `{ if (!window.__up) { window.__up = true; cb.game.setState(s => { const g = structuredClone(s.game); g.stock.rebar = 99; g.stock.concrete = 99; g.stock.hardware = 30; g.stock.wire = 30; g.perimeter.push({ id: 'C1', kind: 'container_wall', pts: [[20, 36], [48, 36]], gates: [], done: 1, hours: 1, supplied: true, finishedAt: 0 }); return { game: g }; }); cb.game.getState().upgradeRun('C1'); cb.game.setState(s => { const g = structuredClone(s.game); const u = g.perimeter.find(r => r.replaces); u.supplied = true; u.done = u.hours * 0.55; return { game: g }; }); } cb.qa.pose = null; cb.cam.target.set(34, cb.world.groundAt(34, 36), 36); cb.cam.yaw = 0.35; cb.cam.pitch = 0.4; cb.cam.radius = 9; }`, cam: { x: 30, z: 36, yaw: 0.5, pitch: 0.22, radius: 9 }, frames: 14 },
+];
+
+/**
+ * Dogs: named family pets. A compound with a log house, a cabin and a garden; three dogs
+ * come in on the truck (two trained adults, one puppy), their bonds are set, and the sim is
+ * run to the hour shown so the family and the dogs are where the day puts them.
+ * (A person is ~0.28 tall; a dog ~0.1 at the shoulder.)
+ */
+const dogsSetup = `{ if (!window.__dogs) { window.__dogs = true;
+  ${compound.slice(2, -2)}
+  const G2 = cb.game;
+  for (let i = 0; i < 3; i++) G2.getState().order([{ material: i === 2 ? 'puppy' : 'dog', qty: 1 }]);
+  G2.getState().advance(2.4);
+  G2.setState(s => { const g = structuredClone(s.game); const ps = g.people;
+    g.dogs.forEach((d, i) => { d.bonds = {}; d.bonds[ps[(i + 2) % ps.length].id] = 70 + i * 6; d.bonds[ps[i % 2].id] = 25; d.guard = i === 0; d.tone = i; d.training = 40 + i * 15; d.breed = ['shepherd', 'lab', 'collie'][i]; });
+    g.dogs[2].born = Math.floor(g.clock.t) - 100;
+    return { game: g }; });
+} }`;
+const dogHome = "const hb = window.__b['log_house']; ";
+const dogEye = (x, z, lx, lz, dy = 0.2, ly = 0.1, fov = 58) => `{ const g = cb.world.groundAt; cb.qa.pose = { x: ${x}, y: g(${x}, ${z}) + ${dy}, z: ${z}, lx: ${lx}, ly: g(${lx}, ${lz}) + ${ly}, lz: ${lz}, fov: ${fov} }; }`;
+const nearHome = (dist, ang, dy, ly) => `{ const b = window.__b['log_house'], th = b.rot * Math.PI / 2 + ${ang}; const [px, pz] = cb.world.openSpotNear(b.x + Math.sin(th) * ${dist}, b.z + Math.cos(th) * ${dist}, 0.4); const g = cb.world.groundAt; cb.qa.pose = { x: px, y: g(px, pz) + ${dy}, z: pz, lx: b.x, ly: g(b.x, b.z) + ${ly}, lz: b.z, fov: 58 }; }`;
+
+/** Eye level beside a following dog and its nearest person, both in frame (a person is ~0.28 tall, a dog ~0.14 at the shoulder). */
+const dogAndPerson = (back, dy, fov = 55) => `{ const W = cb.world, g = W.groundAt, ds = W.dogs.positions(), ps = W.family.positions();
+  if (!ds.length || !ps.length) return;   // (nothing drawn yet: lowrender draws on request; run the setup again after a frame)
+  const d = ds[Math.min(1, ds.length - 1)]; let p = ps[0]; for (const q of ps) if (Math.hypot(q.x - d.x, q.z - d.z) < Math.hypot(p.x - d.x, p.z - d.z)) p = q;
+  const mx = (d.x + p.x) / 2, mz = (d.z + p.z) / 2, ax = Math.atan2(p.x - d.x, p.z - d.z) + Math.PI / 2;
+  const [cx, cz] = W.openSpotNear(mx + Math.sin(ax) * ${back}, mz + Math.cos(ax) * ${back}, 0.2);
+  cb.qa.pose = { x: cx, y: g(cx, cz) + ${dy}, z: cz, lx: mx, ly: g(mx, mz) + 0.12, lz: mz, fov: ${fov} }; }`;
+SETS.dogs = [
+  { name: 'dogs-aerial-day', time: 16, season: 'summer', setup: dogsSetup + toHour(16) + "{ cb.qa.pose = null; const c = cb.world.camp; cb.cam.target.set(c.x, 0, c.z); cb.cam.radius = 9; cb.cam.pitch = 0.6; cb.cam.yaw = 0.7; }", cam: { x: C, z: C, yaw: 0, pitch: 0.5, radius: 9 }, frames: 24 },
+  { name: 'dogs-eye-level-yard', time: 17.5, season: 'summer', setup: dogsSetup + toHour(17.5) + dogAndPerson(1.5, 0.22, 58), cam: { x: C, z: C, yaw: 0, pitch: 0.3, radius: 3 }, frames: 24 },
+  { name: 'dogs-close-with-person', time: 17.5, season: 'summer', setup: dogsSetup + toHour(17.5) + dogAndPerson(1.3, 0.16, 50), cam: { x: C, z: C, yaw: 0, pitch: 0.2, radius: 1 }, frames: 24 },
+  { name: 'dog-on-guard-at-gate', time: 11, season: 'summer', setup: dogsSetup + toHour(11) + "{ const a = cb.world.access, g = a.gate, d = cb.world.dogs.positions()[0]; if (!d) return; cb.qa.pose = null; cb.cam.target.set(d.x, 0.06, d.z); cb.cam.radius = 1.4; cb.cam.pitch = 0.16; cb.cam.yaw = Math.atan2(g.x - d.x, g.z - d.z) + 2.4; }", cam: { x: C, z: C, yaw: 0, pitch: 0.2, radius: 1.4 }, frames: 24 },
+  { name: 'dog-at-gate-aerial', time: 11, season: 'summer', setup: dogsSetup + toHour(11) + "{ cb.qa.pose = null; const a = cb.world.access, g = a.gate; cb.cam.target.set(g.x - 1, 0, g.z); cb.cam.radius = 6; cb.cam.pitch = 0.5; cb.cam.yaw = 1.3; }", cam: { x: C, z: C, yaw: 0, pitch: 0.4, radius: 6 }, frames: 24 },
+  { name: 'dogs-night-at-the-gate', time: 23, season: 'summer', setup: dogsSetup + toHour(23) + "{ cb.qa.pose = null; const a = cb.world.access, g = a.gate, d = cb.world.dogs.positions()[0]; if (!d) return; cb.cam.target.set(d.x, 0.06, d.z); cb.cam.radius = 2.2; cb.cam.pitch = 0.2; cb.cam.yaw = Math.atan2(g.x - d.x, g.z - d.z) + 2.0; }", cam: { x: C, z: C, yaw: 0, pitch: 0.2, radius: 2 }, frames: 28 },
+  { name: 'dogs-night-by-the-house', time: 22.5, season: 'summer', setup: dogsSetup + toHour(22.5) + nearHome(3.2, 0.8, 0.22, 0.15), cam: { x: C, z: C, yaw: 0, pitch: 0.3, radius: 3 }, frames: 28 },
+  { name: 'dog-on-sofa-night', time: 22.5, season: 'summer', setup: dogsSetup + toHour(22.5) + "{ cb.store.getState().setBuildingView('cutaway'); cb.qa.pose = null; const d = cb.world.dogs.positions()[1]; if (d) { cb.cam.target.set(d.x, 0.1, d.z); cb.cam.radius = 1.1; cb.cam.pitch = 0.75; cb.cam.yaw = 0.6; } }", cam: { x: C, z: C, yaw: 0, pitch: 0.7, radius: 1.2 }, frames: 24 },
+  { name: 'dogs-winter', time: 12, season: 'winter', setup: dogsSetup + toHour(12) + "{ cb.qa.pose = null; const c = cb.world.camp; cb.cam.target.set(c.x, 0, c.z); cb.cam.radius = 6; cb.cam.pitch = 0.45; cb.cam.yaw = 0.4; }", cam: { x: C, z: C, yaw: 0, pitch: 0.4, radius: 6 }, frames: 24 },
+];
+
+// the watch tower upgrade chain, side by side along z = 54: rise + lookout > wooden > concrete & steel > floodlights > manned mount > turret.
+// A resident stands at the foot of each pair for scale (a person is ~0.28 tall); the upgrade in progress rises beside the old tier.
+const TW = ['rise_lookout', 'watchtower_wood', 'watchtower_concrete', 'watchtower_flood', 'watchtower_mount', 'watchtower_turret'];
+const towersSetup = (lit = false, mode = null, alert = false) => `{ if (!window.__tw) { window.__tw = true;
+  const G = cb.game, kinds = ${JSON.stringify(TW)};
+  G.setState(s => { const g = structuredClone(s.game);
+    kinds.forEach((k, i) => g.structures.push({ id: 'tw' + i, kind: k, x: 8 + i * 6, z: 54, rot: 0, stage: 5, done: 0, supplied: false, finishedAt: 0 }));
+    // the upgrade in progress: a wooden tower with the concrete one rising beside it, and a chain-link fence being upgraded
+    g.structures.push({ id: 'up0', kind: 'watchtower_wood', x: 46, z: 54, rot: 0, stage: 5, done: 0, supplied: false, finishedAt: 0 });
+    g.structures.push({ id: 'up1', kind: 'watchtower_concrete', x: 46.7, z: 54, rot: 0, stage: 3, done: 30, supplied: true, finishedAt: null, replaces: 'up0' });
+    ${lit ? "g.utilities.lit = ['tw0'];" : ''}
+    ${mode ? `g.lights = { mode: '${mode}', per: {}, alertUntil: ${alert ? 99999 : -1} };` : ''}
+    return { game: g }; });
+  G.getState().planRun('chain_link', [[40, 49], [52, 49]], [], 0);
+  G.getState().planRun('wrought_iron', [[40, 49], [52, 49]], [], 0);
+  G.setState(s => { const g = structuredClone(s.game); const [a, b] = g.perimeter.slice(-2); a.done = a.hours; a.supplied = true; a.finishedAt = 0; b.replaces = a.id; b.supplied = true; b.done = b.hours * 0.5; return { game: g }; });
+} }`;
+// someone standing at (x, z): a one-man playback through the battle store (no events), the scale reference
+const stander = (x, z) => `{ import('/src/store/battleStore.ts').then(m => m.useBattleStore.getState().playBattle({ night: false, duration: 99999, events: [], units: [{ id: 'h_a', side: 'home', x: ${x}, z: ${z}, post: 'open' }] })); }`;
+const noman = `{ import('/src/store/battleStore.ts').then(m => m.useBattleStore.getState().endBattle()); }`;
+const cam0 = { x: 33, z: 54, yaw: 0, pitch: 0.3, radius: 20 };
+const base = { season: 'summer', cam: cam0 };
+SETS.towers = [
+  { name: 'towers-aerial-chain', time: 11, ...base, setup: towersSetup() + `{ cb.qa.pose = null; cb.cam.target.set(26, 0, 54); cb.cam.radius = 34; cb.cam.pitch = 0.5; cb.cam.yaw = 0.15; }`, frames: 16 },
+  { name: 'towers-aerial-low-tiers', time: 11, ...base, setup: towersSetup() + `{ cb.qa.pose = null; cb.cam.target.set(14, 0, 54); cb.cam.radius = 12; cb.cam.pitch = 0.45; cb.cam.yaw = 0.5; }`, frames: 14 },
+  { name: 'towers-aerial-high-tiers', time: 11, ...base, setup: towersSetup() + `{ cb.qa.pose = null; cb.cam.target.set(32, 0, 54); cb.cam.radius = 12; cb.cam.pitch = 0.45; cb.cam.yaw = -0.5; }`, frames: 14 },
+  { name: 'towers-eye-row', time: 11, ...base, setup: towersSetup() + stander(6.3, 54.9) + eye(4.2, 55.6, 30, 54, 0.28, 0.5, 70), frames: 14 },
+  { name: 'towers-eye-rise-and-wood', time: 11, ...base, setup: towersSetup() + stander(9.3, 55.6) + eye(8.0, 58.2, 11.5, 54, 0.28, 0.45, 64), frames: 14 },
+  { name: 'towers-eye-concrete-and-flood', time: 11, ...base, setup: towersSetup() + stander(22.6, 55.6) + eye(21, 58.4, 24, 54, 0.28, 0.7, 64), frames: 14 },
+  { name: 'towers-eye-mount', time: 11, ...base, setup: towersSetup() + stander(33.1, 55.4) + eye(31.4, 57.4, 32, 54, 0.28, 1.0, 64), frames: 14 },
+  { name: 'towers-eye-turret', time: 11, ...base, setup: towersSetup() + stander(39.1, 55.4) + eye(37.4, 57.4, 38, 54, 0.28, 1.05, 64), frames: 14 },
+  { name: 'towers-night-floodlights', time: 22.5, ...base, setup: towersSetup(true) + noman + `{ cb.qa.pose = null; cb.cam.target.set(24, 0, 54); cb.cam.radius = 20; cb.cam.pitch = 0.22; cb.cam.yaw = 0.3; }`, frames: 18 },
+  { name: 'towers-night-unpowered', time: 22.5, ...base, setup: towersSetup(false) + noman + `{ cb.qa.pose = null; cb.cam.target.set(24, 0, 54); cb.cam.radius = 20; cb.cam.pitch = 0.22; cb.cam.yaw = 0.3; }`, frames: 18 },
+  { name: 'upgrade-beside-old', time: 11, ...base, setup: towersSetup() + noman + `{ cb.qa.pose = null; cb.cam.target.set(46, 0, 52); cb.cam.radius = 14; cb.cam.pitch = 0.5; cb.cam.yaw = 0.2; }`, frames: 14 },
+  { name: 'upgrade-beside-old-eye', time: 11, ...base, setup: towersSetup() + stander(45.0, 55.6) + eye(43.6, 58.2, 46.4, 53, 0.28, 0.7, 62), frames: 14 },
+];
+
+// floodlight discipline: the same row at night in each mode (the motion sensor dark until a threat trips it, then lit)
+const nightCam = `{ cb.qa.pose = null; cb.cam.target.set(34, 0, 54); cb.cam.radius = 14; cb.cam.pitch = 0.2; cb.cam.yaw = 0.3; }`;
+SETS.lights = [
+  { name: 'lights-day-sensor', time: 11, ...base, setup: towersSetup(true, 'sensor') + noman + nightCam, frames: 12 },
+  { name: 'lights-night-always-on', time: 22.5, ...base, setup: towersSetup(true, 'on') + noman + nightCam, frames: 16 },
+  { name: 'lights-night-sensor-idle', time: 22.5, ...base, setup: towersSetup(true, 'sensor', false) + noman + nightCam, frames: 16 },
+  { name: 'lights-night-sensor-alert', time: 22.5, ...base, setup: towersSetup(true, 'sensor', true) + noman + nightCam, frames: 16 },
+  { name: 'lights-night-off', time: 22.5, ...base, setup: towersSetup(true, 'off') + noman + nightCam, frames: 16 },
+];
+
+// the mounted gun and the turret: from above, and a staged fight (a gunner on the ring, the turret firing, raiders coming up from +z)
+const fight = `{ const units = [{ id: 'h_a', side: 'home', x: 32, z: 54, y: 1.32, post: 'tower' }, { id: 't_x', side: 'home', x: 38, z: 54, y: 1.37, post: 'tower', machine: 'turret' },
+  ...[0, 1, 2, 3, 4].map(i => ({ id: 'r' + i, side: 'raider', x: 29 + i * 3, z: 64 + (i % 2) * 2, post: 'open' }))];
+  const events = []; for (let t = 0.3; t < 90; t += 0.12) { const r = 'r' + (Math.floor(t * 7) % 5); events.push({ t, kind: 'shot', from: 'h_a', to: r, hit: false, auto: true }); events.push({ t: t + 0.05, kind: 'shot', from: 't_x', to: 'r' + (Math.floor(t * 5) % 5), hit: false, auto: true }); }
+  events.sort((a, b) => a.t - b.t);
+  import('/src/store/battleStore.ts').then(m => m.useBattleStore.getState().playBattle({ night: false, duration: 99999, units, events })); }`;
+SETS.mounts = [
+  { name: 'mount-from-above', time: 11, ...base, setup: towersSetup() + noman + eye(32.5, 55.9, 32, 54, 2.7, 1.35, 55), frames: 12 },
+  { name: 'turret-from-above', time: 11, ...base, setup: towersSetup() + noman + eye(38.5, 55.9, 38, 54, 2.7, 1.4, 55), frames: 12 },
+  { name: 'mount-turret-from-ground', time: 11, ...base, setup: towersSetup() + noman + eye(35, 58.5, 35, 54, 0.28, 1.1, 66), frames: 12 },
+  { name: 'mount-turret-fight', time: 11, ...base, setup: towersSetup() + fight + `{ cb.qa.pose = null; cb.cam.target.set(35, 0.6, 58); cb.cam.radius = 9; cb.cam.pitch = 0.3; cb.cam.yaw = 0.2; }`, frames: 20 },
+];
+
+// native wildlife (sim/wildlife.ts): animals staged by hand with the debug spawn, a person (stander) in frame for scale.
+// stage({ near, ang, animals: [[species, forward, sideways, heading, male, side]], camBack, camSide, look, fov, fence, person }):
+// finds an open spot near the camp (or a fence spot), stands the person there and the animals `forward` / `sideways` of them
+// toward heading `ang`, and puts the eye camera behind the person. `forward` / `sideways` may be JS expressions.
+const K = 1;
+const stage = ({ near = [9, -3], ang = 0, animals = [], camBack = 0.9, camSide = 0.3, look = 2, lookS = 0, fov = 46, fence = false, person = true, eyeH = 0.27, dy = 0.12 }) => `{ const w = cb.world.wildlife; w.clearDebug();
+  const c = cb.world.camp, h = cb.game.getState().game.site.home, g = cb.world.groundAt;
+  const ca = Math.cos(${ang}), sa = Math.sin(${ang});
+  // the flattest open ground near the spot (the animals must not hide behind a rise): the ground a few units about and ahead stays within a hand of the person's feet
+  const flat = (x, z) => { let m = 0; for (const [f, s] of [[-2, 0], [-2, 0.8], [2, 0], [4, 0], [6, 0], [4, 1.6], [4, -1.6], [7, 2]]) m = Math.max(m, Math.abs(g(x + ca * f - sa * s, z + sa * f + ca * s) - g(x, z))); return m; };
+  let best = null;
+  for (let ix = -24; ix <= 24; ix += 2) for (let iz = -24; iz <= 24; iz += 2) {
+    const x = ${fence ? `h.x1 - 1.7 + ix * 0.04` : `c.x + ${near[0]} + ix`}, z = ${fence ? `c.z + iz * 1.2` : `c.z + ${near[1]} + iz`};
+    if (x < h.x0 + 3 || x > h.x1 - ${fence ? 1 : 3} || z < h.z0 + 3 || z > h.z1 - 3) continue;
+    if (cb.world.onBuilding(x, z, 3) || cb.world.onBuilding(x + ca * 5, z + sa * 5, 2)) continue;
+    const cz = cb.world.parcel.creek.zAt(x); if (Math.abs(z - cz) < 6) continue;
+    const m = flat(x, z) + 0.002 * Math.hypot(ix, iz);
+    if (!best || m < best.m) best = { x, z, m };
+  }
+  const px = best.x, pz = best.z;
+  const at = (f, s) => [px + ca * f - sa * s, pz + sa * f + ca * s];
+  const fd = h.x1 - px;
+  ${animals.map(a => `{ const [x, z] = at(${typeof a[1] === 'number' ? a[1] * K : a[1]}, ${typeof a[2] === 'number' ? a[2] * K : a[2]}); w.spawnDebug('${a[0]}', x, z, ${a[3] ?? 0}, ${a[4] ?? true}, '${a[5] ?? 'free'}'); }`).join('\n  ')}
+  ${person ? `import('/src/store/battleStore.ts').then(m => m.useBattleStore.getState().playBattle({ night: false, duration: 99999, events: [], units: [{ id: 'h_a', side: 'home', x: px, z: pz, post: 'open' }] }));` : `import('/src/store/battleStore.ts').then(m => m.useBattleStore.getState().endBattle());`}
+  const [ex, ez] = at(-${camBack}, ${camSide}), [lx, lz] = at(${look}, ${lookS});
+  cb.qa.pose = { x: ex, y: g(ex, ez) + ${eyeH}, z: ez, lx, ly: g(lx, lz) + ${dy}, lz, fov: ${fov} };
+  console.error('wildlife stage', JSON.stringify({ person: [px, pz], flat: best.m, beasts: w.animals().filter(a => a.id.startsWith('qa:')).map(a => [a.sp, +a.x.toFixed(1), +a.z.toFixed(1), +g(a.x, a.z).toFixed(2)]), total: w.animals().length })); }`;
+/** A wall round the home square, finished 6 years ago (kind), or none. */
+const ringSetup = (kind) => `{ const G = cb.game; const h = G.getState().game.site.home;
+  G.setState(s => { const g = structuredClone(s.game); g.perimeter = [];
+    ${kind ? `g.perimeter.push({ id: 'wl_ring', kind: '${kind}', pts: [[h.x0, h.z0], [h.x1, h.z0], [h.x1, h.z1], [h.x0, h.z1], [h.x0, h.z0]], gates: [], done: 1, hours: 1, supplied: true, finishedAt: -2000 });` : ''}
+    return { game: g }; }); }`;
+const aerialAt = (r, pitch, yaw) => `{ const c = cb.world.camp; cb.qa.pose = null; cb.cam.target.set(c.x + 6, 0, c.z - 2); cb.cam.radius = ${r}; cb.cam.pitch = ${pitch}; cb.cam.yaw = ${yaw}; }`;
+/** Aerial of the west fence line: animals placed relative to the line (x forward into the place from the fence, z along it), person inside. */
+const fenceAerial = (animals) => `{ const w = cb.world.wildlife; w.clearDebug(); const c = cb.world.camp, h = cb.game.getState().game.site.home, z0 = c.z;
+  ${animals.map(a => `w.spawnDebug('${a[0]}', h.x1 - ${a[1]}, z0 + ${a[2]}, ${a[3]}, ${a[4]}, '${a[5]}');`).join(' ')}
+  import('/src/store/battleStore.ts').then(m => m.useBattleStore.getState().playBattle({ night: false, duration: 99999, events: [], units: [{ id: 'h_a', side: 'home', x: h.x1 - 3, z: z0 + 1.6, post: 'open' }] }));
+  cb.qa.pose = null; cb.cam.target.set(h.x1 - 1.5, 0.1, z0); cb.cam.radius = 5; cb.cam.pitch = 0.6; cb.cam.yaw = 0.0; }`;
+const wlBase = { season: 'summer', cam: cam0 };
+SETS.wildlife = [
+  // animals 6-10 m (1-1.7 units) from a person: a whitetail's shoulder is ~0.6 of a person
+  { name: 'eye-deer-grazing-8m', time: 9.5, ...wlBase,
+    setup: stage({ ang: 0.3, animals: [['deer', 1.5, 0.3, 1.2, false], ['deer', 1.9, 1.0, 0.9, false], ['deer', 1.3, -0.7, 1.4, true], ['rabbit', 0.8, -0.5, 0.5]] }), frames: 8 },
+  { name: 'eye-elk-herd', time: 9.5, ...wlBase,
+    setup: stage({ ang: 0.3, camBack: 1.4, animals: [['elk', 2.2, 0, 2, true], ['elk', 2.6, 0.9, 1.8, false], ['elk', 1.9, -0.9, 2.2, false], ['elk', 2.9, -0.2, 1.6, false]], look: 2.4 }), frames: 8 },
+  { name: 'eye-turkeys', time: 9.5, ...wlBase,
+    setup: stage({ ang: 0.3, animals: [['turkey', 1.2, 0.2, 0.8, true], ['turkey', 1.6, 0.8, 1.2, false], ['turkey', 1.3, -0.6, 0.4, false], ['turkey', 1.9, 0, 1.0, false]] }), frames: 8 },
+  { name: 'eye-bear-8m-from-person-no-wall', time: 9.5, ...wlBase,
+    setup: ringSetup('barbed_wire') + stage({ ang: 0.3, animals: [['bear', 1.5, 0.4, 1.0, true, 'free']], look: 1.6 }), frames: 8 },
+  // the fence line seen along its length: person inside, bear outside / inside
+  { name: 'eye-bear-outside-closed-chainlink', time: 9.5, ...wlBase,
+    setup: ringSetup('chain_link') + stage({ fence: true, ang: Math.PI / 2, camBack: 1.5, camSide: 0.3, look: 2.6, lookS: '-(fd * 0.9)', fov: 55, animals: [['bear', '2.4', '-(fd + 1.3)', Math.PI, true, 'out'], ['coyote', '3.6', '-(fd + 1.8)', Math.PI, true, 'out']] }), frames: 8 },
+  { name: 'eye-bear-inside-open-wire', time: 9.5, ...wlBase,
+    setup: ringSetup('barbed_wire') + stage({ fence: true, ang: Math.PI / 2, camBack: 1.5, camSide: 0.3, look: 2.6, lookS: '-(fd * 0.9)', fov: 55, animals: [['bear', '2.4', '-(fd - 0.9)', Math.PI, true, 'free']] }), frames: 8 },
+  { name: 'aerial-closed-wall-close', time: 9.5, ...wlBase,
+    setup: ringSetup('chain_link') + fenceAerial([['elk', 3.0, 0, 2, true, 'in'], ['elk', 3.5, 0.7, 1.8, false, 'in'], ['deer', 2.4, -0.8, 1, false, 'in'], ['bear', -1.4, 0.4, 1.5, true, 'out'], ['coyote', -1.8, -0.9, 1, true, 'out']]), frames: 8 },
+  { name: 'aerial-open-wire-close', time: 9.5, ...wlBase,
+    setup: ringSetup('barbed_wire') + fenceAerial([['elk', 3.0, 0, 2, true, 'free'], ['elk', 3.5, 0.7, 1.8, false, 'free'], ['deer', 2.4, -0.8, 1, false, 'free'], ['bear', 1.2, 0.4, 1.5, true, 'free'], ['coyote', 0.4, -0.9, 1, true, 'free']]), frames: 8 },
+  { name: 'eye-moose-wolf-cougar-javelina', time: 9.5, ...wlBase,
+    setup: stage({ ang: 0.3, camBack: 1.4, animals: [['moose', 2.4, 1.1, 1, true], ['wolf', 1.6, -1.0, 3, true], ['cougar', 2.2, 0, 0.2, true], ['javelina', 1.1, 0.8, 0.5], ['javelina', 1.4, 1.1, 0.9], ['squirrel', 0.7, -0.4, 0.3]], look: 1.8 }), frames: 8 },
+];
+
+/**
+ * The self-sufficient interior (docs/DECISIONS.md): the compound plus a 20 kW solar farm and its
+ * battery container, a heated greenhouse, an orchard grove, a stocked pond, a sheep barn with its
+ * flock, the equipment yard and a reservoir; all finished, the orchard eight years old.
+ */
+const farmSet = compound + `{ if (!window.__farm) { window.__farm = true;
+  const G = cb.game, c = cb.world.camp, B = window.__b;
+  const place = (key, kind, dx, dz, rot = 0, rad = 8) => { const sp = cb.tool.findSpot(kind, c.x + dx, c.z + dz, rot, rad); if (!sp) { console.error('no spot', key); return null; } G.getState().plan(kind, sp[0], sp[1], rot); const st = G.getState().game.structures.at(-1); B[key] = st; return st; };
+  // two rows south of the houses: food on the near row, power and stock behind
+  place('greenhouse_heated', 'greenhouse_heated', -15, 15, 0, 5);
+  place('orchard_grove', 'orchard_grove', -5, 15, 0, 5);
+  place('pond', 'pond', 8, 16, 0, 5);
+  const sf = place('solar_farm', 'solar_farm', -17, 25, 0, 5);
+  if (sf) place('battery_bank', 'battery_bank', sf.x - c.x + 1.8, sf.z - c.z, 0, 1);
+  place('sheep_barn', 'sheep_barn', -2, 24, 0, 5);
+  place('equipment_yard', 'equipment_yard', 7, 25, 0, 5);
+  place('reservoir', 'reservoir', 16, 25, 0, 5);
+  G.setState(s => { const g = structuredClone(s.game);
+    for (const st of g.structures) { st.stage = 5; st.done = 0; st.supplied = true; st.finishedAt = g.clock.t - 3000; }
+    const pond = B.pond, gh = B.greenhouse_heated;
+    g.farm = { greenhouses: gh ? { [gh.id]: { heat: 'electric', heated: true, by: 'electric', burned: 0, warned: -999 } } : {}, orchards: {}, yard: {}, ponds: pond ? { [pond.id]: { trout: 320, troutG: 380, crayfish: 900, health: 1, fed: 1, oxygen: 0.8, lost: 0, dieOffAt: -999, harvestAt: -999, poachedAt: -999 } } : {} };
+    g.stock.sheep = 14; g.stock.hay = 80;
+    return { game: g }; });
+} }`;
+const farmAt = (kind, r, pitch, yaw, dx = 0, dz = 0) => `{ const b = window.__b['${kind}']; if (b) { cb.cam.target.set(b.x + ${dx}, 0, b.z + ${dz}); cb.cam.radius = ${r}; cb.cam.pitch = ${pitch}; cb.cam.yaw = ${yaw}; } }`;
+/** The game's calendar day (a visual season: leaves and fruit on the orchard, greens in the greenhouse). */
+const farmDoy = (d, lit = false) => `{ cb.game.setState(s => { const g = structuredClone(s.game); g.clock.startDoy = ${d}; ${lit ? "if (window.__b.greenhouse_heated) g.utilities.lit = [window.__b.greenhouse_heated.id];" : ''} return { game: g }; }); }`;
+/** Stand the QA scale figure (a 1.7 m person) at a point offset from a building's center. */
+const figureAt = (kind, dx, dz) => `{ const b = window.__b['${kind}'], W = cb.world; const f = W._root.children.find(o => o.userData.type === 'scale_figure'); if (b && f) f.position.set(b.x + ${dx}, W.parcel.height(b.x + ${dx}, b.z + ${dz}), b.z + ${dz}); }`;
+/** Eye level a few steps from a building (or a point off it), looking at it: the person stands in frame for scale. */
+const eyeNear = (kind, ex, ez, lx = 0, lz = 0, eye = 0.26) => `{ const b = window.__b['${kind}']; if (b) cb.cam.placeEye(b.x + ${ex}, b.z + ${ez}, b.x + ${lx}, b.z + ${lz}, ${eye}); }`;
+SETS.farm = [
+  { name: 'aerial-whole-farm', time: 11, season: 'summer', setup: farmSet + farmDoy(190) + "{ const c = cb.world.camp; cb.cam.target.set(c.x, 0, c.z + 8); cb.cam.radius = 52; cb.cam.pitch = 0.95; cb.cam.yaw = 0.5; }", cam: D, frames: 20 },
+  { name: 'greenhouse-from-above', time: 12, season: 'summer', setup: farmSet + farmDoy(190) + farmAt('greenhouse_heated', 9, 0.75, 0.5), cam: D, frames: 14 },
+  { name: 'greenhouse-eye-level-person', time: 10, season: 'summer', setup: farmSet + farmDoy(190) + figureAt('greenhouse_heated', 2.6, 3.4) + eyeNear('greenhouse_heated', 3.6, 6.2, 1.2, 1.6, 0.3), cam: D, frames: 14 },
+  { name: 'greenhouse-inside', time: 11, season: 'summer', setup: farmSet + farmDoy(190) + "{ const b = window.__b.greenhouse_heated, W = cb.world; if (b) { const e = W.localToWorld(b.id, 0, 0.3, 1.5), l = W.localToWorld(b.id, 0, 0.2, -1.5); cb.qa.pose = { x: e.x, y: e.y, z: e.z, lx: l.x, ly: l.y, lz: l.z, fov: 70 }; } }", cam: D, frames: 14 },
+  { name: 'solar-farm-and-battery', time: 13, season: 'summer', setup: farmSet + farmDoy(190) + farmAt('solar_farm', 11, 0.5, 0.5, 1.0, 0), cam: D, frames: 14 },
+  { name: 'solar-farm-eye-level-person', time: 14, season: 'summer', setup: farmSet + farmDoy(190) + figureAt('solar_farm', -0.6, 2.4) + eyeNear('solar_farm', 1.5, 4.4, -0.8, 0.5, 0.26), cam: D, frames: 14 },
+  { name: 'pond-aerial-fish', time: 12, season: 'summer', setup: farmSet + farmDoy(190) + farmAt('pond', 8, 0.85, 0.4), cam: D, frames: 14 },
+  { name: 'pond-eye-level-person', time: 16, season: 'summer', setup: farmSet + farmDoy(190) + figureAt('pond', 3.0, -0.4) + eyeNear('pond', 4.6, 0.6, -1.0, -0.2, 0.26), cam: D, frames: 14 },
+  { name: 'orchard-grove-fruit', time: 15, season: 'fall', setup: farmSet + farmDoy(255) + farmAt('orchard_grove', 10, 0.45, 0.6), cam: D, frames: 14 },
+  { name: 'orchard-eye-level-person', time: 15, season: 'fall', setup: farmSet + farmDoy(255) + figureAt('orchard_grove', 0.4, 2.2) + eyeNear('orchard_grove', 0.4, 4.2, 0, -1, 0.26), cam: D, frames: 14 },
+  { name: 'sheep-barn-paddock', time: 15, season: 'summer', setup: farmSet + farmDoy(190) + farmAt('sheep_barn', 6, 0.4, 0.3, 0, 1.0), cam: D, frames: 14 },
+  { name: 'equipment-yard', time: 14, season: 'summer', setup: farmSet + farmDoy(190) + farmAt('equipment_yard', 7, 0.6, 0.4), cam: D, frames: 14 },
+  { name: 'reservoir', time: 14, season: 'summer', setup: farmSet + farmDoy(190) + farmAt('reservoir', 9, 0.6, 0.4), cam: D, frames: 14 },
+  { name: 'dusk-greenhouse-and-solar', time: 19.4, season: 'summer', setup: farmSet + farmDoy(300, true) + farmAt('greenhouse_heated', 14, 0.35, 0.9, -4, 5), cam: D, frames: 20 },
+];
+
+
+/**
+ * Farm & kitchen (docs/DECISIONS.md): the compound plus three fields, the garden, a wood-fired oven and a root cellar
+ * with its bins and shelves stocked (potatoes, jars, ferments, dried fruit, lard, cured meat).
+ */
+const kitchenSet = compound + `{ if (!window.__kit) { window.__kit = true;
+  const G = cb.game, c = cb.world.camp, B = window.__b;
+  const place = (key, kind, dx, dz, rot = 0, rad = 6) => { const sp = cb.tool.findSpot(kind, c.x + dx, c.z + dz, rot, rad); if (!sp) { console.error('no spot', key); return null; } G.getState().plan(kind, sp[0], sp[1], rot); const st = G.getState().game.structures.at(-1); B[key] = st; return st; };
+  place('wood_oven', 'wood_oven', 9, -4, 3, 3);
+  place('field2', 'field', -12, 15, 0, 6);
+  place('field3', 'field', -3, 15, 0, 6);
+  G.setState(s => { const g = structuredClone(s.game);
+    for (const st of g.structures) { st.stage = 5; st.done = 0; st.supplied = true; st.finishedAt = g.clock.t - 3000; }
+    const put = (id, q, age, kcal, agg) => { g.pantry.items[id] = { q, age }; g.stock[agg] += q * kcal / ({ canned: 6000, staples: 80000, frozen: 10000 })[agg]; };
+    put('cellar_roots', 40, 30, 40000, 'canned'); put('home_canned', 14, 60, 6000, 'canned'); put('ferments', 6, 40, 2400, 'canned'); put('dried_produce', 5, 90, 12000, 'canned');
+    put('lard', 3, 30, 32000, 'staples'); put('cured_meat', 6, 20, 18000, 'staples'); put('rice_bucket', 6, 100, 54000, 'staples'); put('beans_bucket', 5, 100, 50400, 'staples'); put('home_dry', 4, 30, 77500, 'staples'); put('flour', 3, 40, 41250, 'staples');
+    g.pantry.items.salt = { q: 3, age: 20 };
+    g.stock.lids = 40; g.stock.canner = 1; g.stock.crocks = 1; g.stock.seed_saved = 3; g.stock.manure = 5; g.stock.compost = 6;
+    g.disaster.tracks = { ...g.disaster.tracks, stores: 0 };
+    return { game: g }; });
+} }`;
+SETS.farmkitchen = [
+  { name: 'fields-and-oven-aerial', time: 11, season: 'summer', setup: kitchenSet + farmDoy(235) + "{ const c = cb.world.camp; cb.cam.target.set(c.x - 2, 0, c.z + 6); cb.cam.radius = 30; cb.cam.pitch = 0.9; cb.cam.yaw = 0.5; }", cam: D, frames: 20 },
+  { name: 'wood-oven-eye-level-person', time: 16, season: 'summer', setup: kitchenSet + farmDoy(235) + figureAt('wood_oven', 0.5, 2.0) + eyeNear('wood_oven', 2.4, 4.2, 0, 0.6, 0.26), cam: D, frames: 14 },
+  { name: 'wood-oven-from-above', time: 12, season: 'summer', setup: kitchenSet + farmDoy(235) + farmAt('wood_oven', 5, 0.8, 0.5), cam: D, frames: 14 },
+  { name: 'root-cellar-inside', time: 11, season: 'summer', setup: kitchenSet + farmDoy(235) + "{ const b = window.__b.root_cellar, W = cb.world; if (b) { const e = W.localToWorld(b.id, 0, 0.3, 0.3), l = W.localToWorld(b.id, 0, 0.2, -1.0); cb.qa.pose = { x: e.x, y: e.y, z: e.z, lx: l.x, ly: l.y, lz: l.z, fov: 80 }; } }", cam: D, frames: 14 },
+  { name: 'fields-eye-level-person', time: 10, season: 'summer', setup: kitchenSet + farmDoy(235) + figureAt('field', -1.5, 4) + eyeNear('field', -1.5, 8, 0, 0, 0.26), cam: D, frames: 14 },
+];
+
+
+/** The forge (docs/DECISIONS.md): the compound plus a finished forge, an eye-level shot with a person and one from above. */
+const forgeSet = compound + `{ if (!window.__forge) { window.__forge = true;
+  const G = cb.game, c = cb.world.camp;
+  window.__b = window.__b || {};
+  const sp = cb.tool.findSpot('forge', c.x + 9, c.z - 4, 3, 6); if (sp) { G.getState().plan('forge', sp[0], sp[1], 3); window.__b.forge = G.getState().game.structures.at(-1); } else console.error('no spot forge');
+  G.setState(s => { const g = structuredClone(s.game);
+    for (const st of g.structures) { st.stage = 5; st.done = 0; st.supplied = true; st.finishedAt = g.clock.t - 3000; }
+    return { game: g }; });
+} }`;
+SETS.forge = [
+  { name: 'forge-eye-level-person', time: 15, season: 'summer', setup: forgeSet + figureAt('forge', 0.1, 0.9) + eyeNear('forge', 1.6, 2.4, 0, 0.2, 0.26), cam: D, frames: 14 },
+  { name: 'forge-from-above', time: 12, season: 'summer', setup: forgeSet + farmAt('forge', 3.2, 0.8, 0.5), cam: D, frames: 14 },
+];
+
+
+/** Farm & kitchen part 2: the apiary, the sugar shack with its bush, and the barnyard with a cow, goats and pigs. */
+const herdSet = compound + `{ if (!window.__herd) { window.__herd = true;
+  const G = cb.game, c = cb.world.camp, B = window.__b;
+  const place = (key, kind, dx, dz, rot = 0, rad = 6) => { const sp = cb.tool.findSpot(kind, c.x + dx, c.z + dz, rot, rad); if (!sp) { console.error('no spot', key); return null; } G.getState().plan(kind, sp[0], sp[1], rot); const st = G.getState().game.structures.at(-1); B[key] = st; return st; };
+  place('apiary', 'apiary', 10, -3, 3, 4);
+  place('sugar_shack', 'sugar_shack', -12, 14, 0, 6);
+  place('barnyard', 'barnyard', 4, 14, 0, 6);
+  G.setState(s => { const g = structuredClone(s.game);
+    for (const st of g.structures) { st.stage = 5; st.done = 0; st.supplied = true; st.finishedAt = g.clock.t - 3000; }
+    return { game: g }; });
+} }`;
+SETS.farmherd = [
+  { name: 'herd-aerial', time: 11, season: 'summer', setup: herdSet + farmDoy(190) + "{ const c = cb.world.camp; cb.cam.target.set(c.x - 1, 0, c.z + 8); cb.cam.radius = 34; cb.cam.pitch = 0.9; cb.cam.yaw = 0.5; }", cam: D, frames: 20 },
+  { name: 'apiary-from-above', time: 12, season: 'summer', setup: herdSet + farmDoy(190) + farmAt('apiary', 4, 0.85, 0.4), cam: D, frames: 14 },
+  { name: 'apiary-eye-level-person', time: 15, season: 'summer', setup: herdSet + farmDoy(190) + figureAt('apiary', 0.5, 1.6) + eyeNear('apiary', 1.8, 3.4, 0, 0, 0.26), cam: D, frames: 14 },
+  { name: 'sugar-bush-from-above', time: 11, season: 'winter', setup: herdSet + farmDoy(60) + farmAt('sugar_shack', 7, 0.8, 0.5), cam: D, frames: 14 },
+  { name: 'sugar-shack-eye-level-person', time: 14, season: 'winter', setup: herdSet + farmDoy(60) + figureAt('sugar_shack', 0.9, 2.6) + eyeNear('sugar_shack', 1.8, 5.0, 0, -0.5, 0.26), cam: D, frames: 14 },
+  { name: 'barnyard-from-above', time: 12, season: 'summer', setup: herdSet + farmDoy(190) + farmAt('barnyard', 7, 0.8, 0.4), cam: D, frames: 14 },
+  { name: 'barnyard-eye-level-person', time: 16, season: 'summer', setup: herdSet + farmDoy(190) + figureAt('barnyard', 0.8, 2.6) + eyeNear('barnyard', 2.0, 5.2, 0, -0.4, 0.26), cam: D, frames: 14 },
+];
+
+// the fortress ring (sim/fortress.ts): container wall, patrol walkway, gatehouse garage, five towers. The whole 40-acre line is built in the setup; the cameras find the
+// garage, a corner tower and a guard on the deck (the family's watchers are posted by hand, then the clock jumps so they stand where the patrol puts them).
+const fortressSetup = `{ if (!window.__fort) { window.__fort = 1;
+  import('/src/store/worldStore.ts').then(m => {
+    const G = cb.game, geo = m.useWorldStore.getState().siteGeo ?? {};
+    G.getState().fortifyRing(geo, { towers: 5, towerKind: 'watchtower_wood', passage: false });
+    G.setState(s => { const g = structuredClone(s.game);
+      for (const r of g.perimeter) { r.done = r.hours; r.supplied = true; r.finishedAt = 0; }
+      for (const st of g.structures) if (st.kind === 'gate_garage' || st.kind.startsWith('watchtower')) { st.stage = 5; st.supplied = false; st.finishedAt = 0; st.permit = 'ok'; }
+      g.utilities.lit = ['x'];
+      g.personState.slice(0, 3).forEach(ps => { ps.task = 'watch'; ps.target = null; });
+      g.clock.t += 0.07;
+      return { game: g }; });
+    window.__fort = 2; }); } }`;
+const fortFind = `const g0 = cb.game.getState().game, gar = g0.structures.find(s => s.kind === 'gate_garage'); if (!gar) return;
+  const inw = [[0, 1], [1, 0], [0, -1], [-1, 0]][gar.rot], gr = cb.world.groundAt;`;
+const fortGuard = `const ps = cb.world.family.positions().filter(p => g0.personState.slice(1, 3).some(q => q.id === p.id)); const gd = ps[0];`;
+SETS.fortress = [
+  { name: 'fortress-aerial-gate', time: 11, season: 'summer', setup: fortressSetup + `{ ${fortFind} cb.qa.pose = null; cb.cam.target.set(gar.x, 0, gar.z); cb.cam.radius = 22; cb.cam.pitch = 0.55; cb.cam.yaw = 1.1; }`, cam: { x: C, z: C, yaw: 0, pitch: 0.5, radius: 20 }, frames: 14 },
+  { name: 'fortress-eye-garage-front', time: 11, season: 'summer', setup: fortressSetup + `{ ${fortFind} const x = gar.x + inw[0] * 4.5, z = gar.z + inw[1] * 4.5, lx = gar.x, lz = gar.z; cb.qa.pose = { x, y: gr(x, z) + 0.28, z, lx, ly: gr(lx, lz) + 0.28, lz, fov: 62 }; }`, cam: { x: C, z: C, yaw: 0, pitch: 0.3, radius: 5 }, frames: 14 },
+  { name: 'fortress-eye-road-gate', time: 11, season: 'summer', setup: fortressSetup + `{ ${fortFind} const x = gar.x - inw[0] * 6.5, z = gar.z - inw[1] * 6.5; cb.qa.pose = { x, y: gr(x, z) + 0.28, z, lx: gar.x, ly: gr(gar.x, gar.z) + 0.3, lz: gar.z, fov: 62 }; }`, cam: { x: C, z: C, yaw: 0, pitch: 0.3, radius: 5 }, frames: 14 },
+  { name: 'fortress-eye-guard-on-deck', time: 11, season: 'summer', setup: fortressSetup + `{ ${fortFind} ${fortGuard} if (!gd) return; const c = cb.world.camp, d = Math.hypot(c.x - gd.x, c.z - gd.z) || 1; const x = gd.x + (c.x - gd.x) / d * 5, z = gd.z + (c.z - gd.z) / d * 5; cb.qa.pose = { x, y: gr(x, z) + 0.3, z, lx: gd.x, ly: gr(gd.x, gd.z) + 0.55, lz: gd.z, fov: 60 }; }`, cam: { x: C, z: C, yaw: 0, pitch: 0.3, radius: 5 }, frames: 14 },
+  { name: 'fortress-eye-stairs', time: 11, season: 'summer', setup: fortressSetup + `{ ${fortFind} import('/src/sim/walkway.ts').then(m => { const run = g0.perimeter.find(r => r.kind === 'wall_walk'); if (!run) return; const q = m.walkwayAccess(run).find(a => Math.hypot(a.x - gar.x, a.z - gar.z) > 20); if (!q) return; const c = cb.world.camp, nx = -q.dz, nz = q.dx, sgn = ((c.x - q.x) * nx + (c.z - q.z) * nz) > 0 ? 1 : -1; const x = q.x + nx * sgn * 6, z = q.z + nz * sgn * 6; cb.qa.pose = { x, y: gr(x, z) + 0.3, z, lx: q.x, ly: gr(q.x, q.z) + 0.3, lz: q.z, fov: 60 }; }); }`, cam: { x: C, z: C, yaw: 0, pitch: 0.3, radius: 5 }, frames: 14 },
+  { name: 'fortress-aerial-deck-stairs', time: 11, season: 'summer', setup: fortressSetup + `{ ${fortFind} ${fortGuard} cb.qa.pose = null; const c = gd ?? gar; cb.cam.target.set(c.x, 0.4, c.z); cb.cam.radius = 6; cb.cam.pitch = 0.55; cb.cam.yaw = 0.9; }`, cam: { x: C, z: C, yaw: 0, pitch: 0.5, radius: 6 }, frames: 14 },
+  { name: 'fortress-aerial-corner-tower', time: 11, season: 'summer', setup: fortressSetup + `{ ${fortFind} const tw = g0.structures.filter(s => s.kind === 'watchtower_wood'); const t = tw[0]; if (!t) return; cb.qa.pose = null; cb.cam.target.set(t.x, 0.3, t.z); cb.cam.radius = 9; cb.cam.pitch = 0.5; cb.cam.yaw = 0.6; }`, cam: { x: C, z: C, yaw: 0, pitch: 0.5, radius: 9 }, frames: 14 },
+  { name: 'fortress-night-gate', time: 22, season: 'summer', setup: fortressSetup + `{ ${fortFind} cb.qa.pose = null; cb.cam.target.set(gar.x, 0, gar.z); cb.cam.radius = 9; cb.cam.pitch = 0.3; cb.cam.yaw = 1.1; }`, cam: { x: C, z: C, yaw: 0, pitch: 0.4, radius: 18 }, frames: 14 },
+];
+
+/** The fleet in the equipment yard: a tractor and an ATV bought through the real action with no garage, so they take yard bays. */
+const yardFleet = farmSet + farmDoy(190) + `{ if (!window.__yf) { window.__yf = 1; import('/src/sim/vehicles.ts').then(async m => { const G = cb.game;
+  G.setState(s => { const g = structuredClone(s.game); g.money = 500000; return { game: g }; });
+  for (const k of ['tractor', 'atv']) console.error('buy', k, G.getState().money(d => m.buyVehicle(d, k)));
+  const pk = await import('/src/sim/parking.ts'); const g = G.getState().game;
+  console.error('plan', JSON.stringify(pk.parkingPlan(g).parked.map(p => [p.vehicle, p.yard ?? null, !!p.bay])), 'yardbays', JSON.stringify(g.farm?.yard));
+}); } }`;
+SETS.fleetyard = [
+  { name: 'yard-vehicles-aerial', time: 14, season: 'summer', setup: yardFleet + farmAt('equipment_yard', 7, 0.7, 0.4), cam: D, frames: 14 },
+  { name: 'yard-vehicles-eye-level-person', time: 14, season: 'summer', setup: yardFleet + figureAt('equipment_yard', 0.2, 3.0) + eyeNear('equipment_yard', 1.6, 4.6, -0.3, 0.2, 0.3), cam: D, frames: 14 },
 ];

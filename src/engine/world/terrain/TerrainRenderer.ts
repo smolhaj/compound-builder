@@ -14,6 +14,7 @@ import * as THREE from 'three';
 import { regionLookFor, type RegionKind, type RegionLook } from './regionalLandscape';
 import { CROP_SLOTS, cropSlotsFor } from './cropCalendar';
 import { applyEdgeHaze } from './edgeHaze';
+import { HEIGHT_FOG_GLSL } from '../fog/heightFog';
 import { applyGroundSkyFill, ensureGroundTextures, groundUniforms } from '../materials/groundTextures';
 import { seasonState } from '../season/seasonState';
 import type { Quality } from '../WorldScene';
@@ -90,6 +91,7 @@ uniform vec3 uRiver;
 uniform float uRockSlope;
 uniform sampler2D uFarmTex;
 uniform vec4 uFarmRect;
+uniform vec4 uHoles[4];
 varying vec3 vRPos;
 varying vec3 vRNrm;
 varying float vForest;
@@ -155,11 +157,15 @@ export function makeTerrainMaterial(look: RegionLook, waterY: number | null): { 
     uRockSlope: { value: look.rockSlope },
     uFarmTex: { value: EMPTY_FARM },
     uFarmRect: { value: new THREE.Vector4(0, 0, 1, 0) },
+    // openings cut clean through the ground (a floor hatch's stairwell under a house): x0, z0, x1, z1 in world units, up to four
+    uHoles: { value: Array.from({ length: 4 }, () => new THREE.Vector4(0, 0, 0, 0)) },
     uCropC: { value: Array.from({ length: CROP_SLOTS }, () => new THREE.Vector3(0.3, 0.4, 0.15)) },
     uCropT: { value: Array.from({ length: CROP_SLOTS }, (_, i) => (i + 1) / CROP_SLOTS) },
   };
   ensureGroundTextures(); // r15: the shared grass-blade texture (sampled near the camera)
   const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.96, metalness: 0 });
+  // the thawed ground goes to mud in mud season (season patch, uSeaD.z)
+  mat.defines = { ...mat.defines, SEA_MUD: '' };
   mat.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, u);
     sh.uniforms.uGDetail = groundUniforms.uGDetail;
@@ -169,6 +175,7 @@ export function makeTerrainMaterial(look: RegionLook, waterY: number | null): { 
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', '#include <common>\n' + TERRAIN_PARS)
       .replace('#include <color_fragment>', /* glsl */`#include <color_fragment>
+        for (int hi = 0; hi < 4; hi++) { vec4 hh = uHoles[hi]; if (hh.z > hh.x && vRPos.x > hh.x && vRPos.x < hh.z && vRPos.z > hh.y && vRPos.z < hh.w) discard; }
         vec3 N = normalize(vRNrm);
         float slope = 1.0 - N.y;
         float alt = vRPos.y;
@@ -382,6 +389,7 @@ export function makeTerrainMaterial(look: RegionLook, waterY: number | null): { 
           rk2 *= mix(1.0, 0.45, smoothstep(60.0, 300.0, vRPos.y)); // thinner air up high
           float rFog = 1.0 - exp(- fogDensity * fogDensity * rk2 * vFogDepth * vFogDepth);
           gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor, rFog);
+          ${HEIGHT_FOG_GLSL}
         #endif`);
   };
   mat.customProgramCacheKey = () => 'regional_terrain_v4_' + look.evergreen + (look.kudzu ? 'k' : '');
@@ -407,6 +415,17 @@ export class TerrainRenderer {
   }
 
   get mesh(): THREE.Mesh | null { return this._mesh; }
+  private _holes: Array<[number, number, number, number]> = [];
+  /** Cut openings clean through the ground (world rects, at most four): you look down a floor hatch's stairwell through the house's floor. */
+  setHoles(rects: ReadonlyArray<readonly [number, number, number, number]>): void {
+    this._holes = rects.slice(0, 4).map(r => [r[0], r[1], r[2], r[3]]);
+    this._applyHoles();
+  }
+  private _applyHoles(): void {
+    const v = this._u?.['uHoles']?.value as THREE.Vector4[] | undefined;
+    if (!v) return;
+    v.forEach((q, i) => { const r = this._holes[i]; if (r) q.set(r[0], r[1], r[2], r[3]); else q.set(0, 0, 0, 0); });
+  }
   private _opacity = 1;
   /** See-through ground (1 = solid): the underground view looks down through it. */
   setOpacity(k: number): void {
@@ -468,6 +487,7 @@ export class TerrainRenderer {
     const [fox, foz] = o.fieldOrigin ?? [o.cx, o.cz];
     (u['uFieldOrigin'].value as THREE.Vector2).set(fox, foz);
     this._u = u;
+    this._applyHoles();
     const g = (u['uGrass'].value as THREE.Color).setHex(o.grass ?? look.grass ?? 0x557a3a);
     const gray = (g.r + g.g + g.b) / 3;
     g.lerp(new THREE.Color(gray, gray, gray), 0.18).multiplyScalar(0.8);

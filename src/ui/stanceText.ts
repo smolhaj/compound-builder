@@ -1,0 +1,30 @@
+import type { Stance } from '../sim/encounters';
+
+/** The gate card's words for each stance: [name, what it does]. */
+export const STANCE: Record<Stance, [string, string]> = {
+  hide: ['Hide', 'Lights out, everyone underground or into the timber. They may never know you\'re here, or they may take what they find.'],
+  parley: ['Parley', 'Talk at the gate. A good negotiator can send them off with little.'],
+  warn: ['Warn off', 'Show the walls and the rifles. Opportunists turn around; some don\'t.'],
+  defend: ['Defend', 'Hold the line. Walls, fighters, the armory and allies on the radio decide it.'],
+  trade: ['Trade', 'Offer something for peace, or for what they carry.'],
+  take_in: ['Take them in', 'They join the family: more hands, more mouths.'],
+  trial: ['A month\'s trial', 'They camp outside the wall for a month and work for their keep, fed from your stores. You\'ll see what they\'re made of.'],
+  turn_away: ['Turn them away', 'The gate stays shut.'],
+  call_911: ['Lock in and call 911', 'Everyone behind the safe-room or a locked bedroom door, on the phone with dispatch. They\'ll likely take something and be gone before the deputies come.'],
+  shout: ['Lights on and shout', 'Every light on, and a shout down the stairs that the police are coming. Most burglars run.'],
+  pay: ['Pay them', 'Hand it over at the gate and pray they keep their word.'],
+  refuse: ['Refuse', 'Send them off with nothing.'],
+  ambush: ['Send the party to the dig site', 'The armed family wait at the breakout point with rifles. Early warning and good guns win it; the house is thin while they are out, and someone may get hurt.'],
+  flood: ['Flood the tunnel', 'Let the ditch drain into the tunnel. The water table does the rest.'],
+  collapse: ['Collapse the tunnel', 'Hire the excavator and bring the roof of the dig down on them.'],
+  ignore: ['Ignore it', 'Leave them to it. They will be through in a few days, and inside the wall.'],
+  build_first: ['Build them a place first', 'Not a couch in the hall: tell them to wait until there is a house of their own for them. Beds in a guest house, a cottage or Mom\u2019s house end the wait; if the hit comes first, they come anyway.'],
+  move_sell: ['Sell the town house and move in', 'List it at today\'s price, pay off the mortgage, put the rest in the account and move everything up this weekend. There is no going back to it.'],
+  move_keep: ['Move in, and keep the town house', 'Lock it up and keep paying the mortgage and the bills while the banks work. Somewhere to go if the place falls, and a house you can still sell, if the market allows.'],
+  move_lease: ['Give notice and move in', 'End the lease this weekend, take the deposit back and move everything up. There is no house to sell and none to go back to.'],
+  hold_on: ['Hold on a while longer', 'Stay weekenders: the paychecks, the town house. The price will be lower next time, and the sale may not close at all.'],
+  drive_now: ['Drive straight home', 'The highway, now, with what is in the tank. Quickest if the road is clear; checkpoints and traffic are the risk.'],
+  back_roads: ['Take the back roads', 'Slower, and it uses more fuel, but fewer checkpoints and fewer people with the same idea.'],
+  resupply: ['Fill up and shop first', 'Fuel, food and a few things from the shelves before they empty. Adds a day, and a day in a city that is coming apart.'],
+  confront: ['Confront them', 'Gun in hand. They\'ll probably run, but a shooting means the sheriff\'s investigation, lawyers, and the guns held as evidence.'],
+};

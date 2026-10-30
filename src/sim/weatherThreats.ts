@@ -18,14 +18,36 @@
  *  Lightning fire  dry country in a dry summer: a red-flag warning, then a
  *              damage roll on an outbuilding unless the timber round the
  *              place has been cleared (20+ trees felled).
+ *  Ice storm   Appalachia, the Plains, the north, the Northwest, Dec–Feb:
+ *              2–4 days of glaze. Roads shut, the power is out, limbs and
+ *              whole trees come down (on a building if the timber is close).
+ *  Hurricane remnants  Appalachia, Aug–mid-Oct: two days' warning, then a
+ *              foot of rain on the ridges (Helene 2024). The creek floods
+ *              the bottom, trees come down, the power is out a day or two.
+ *  Flash flood the desert monsoon, July–Sept: a wash runs bank-full with
+ *              no warning. A low structure may go, and the drive is cut
+ *              for the day.
+ *  Windstorm   the Northwest, Nov–Feb: a Pacific low (Columbus Day 1962),
+ *              big firs down, the power out a day or two.
+ *
+ * Which storms come where and how often is region data (regions.ts
+ * `storms`); the seasons are here.
  */
 import { calendarOf, dayIndex, type GameState, type Structure } from './state';
-import { REGIONS, type RegionId } from './regions';
+import { type RegionId, type StormKind } from './regions';
 import { blueprintOf, isFinished, knockBack } from './construction';
 import { insuranceClaim } from './paperwork';
 import { mulberry32, pick } from './rng';
+import { DIFFICULTY } from './difficulty';
+import { crackFilm, crackGlass } from './improvements';
+import { isTunnel, tunnelStorm } from './tunnels';
+import { STILT_FIRE_K } from './outposts';
+import { floodCandidates } from './terrainFx';
+import { regionFor } from './climate';
+import { roadClosedFor } from './slope';
+import { hasSafeRoom } from './houseHardening';
 
-export type WeatherKind = 'blizzard' | 'tornado' | 'derecho' | 'hail' | 'heat_wave' | 'flood' | 'lightning_fire';
+export type WeatherKind = StormKind;
 
 export interface WeatherEvent { kind: WeatherKind; /** Day it hits. */ at: number; /** Last day it lasts. */ until: number }
 
@@ -36,6 +58,8 @@ export interface WeatherState {
   last: number;
   /** The last hail: year and day of year (it takes that season's crop, not the beds). */
   hail?: { year: number; doy: number };
+  /** The last day the snow-shut road was told of (sim/slope.ts roadClosedFor; so it is said once per closing). */
+  shutLogged?: number;
 }
 
 /** Days of quiet after a storm before another can come. */
@@ -43,34 +67,79 @@ export const GAP_DAYS = 45;
 /** Elderly: from this age the heat takes health without power for fans. */
 export const ELDER_AGE = 65;
 
-const PLAINS: readonly RegionId[] = ['plains', 'upper_midwest'];
 const LOW = ['root_cellar', 'garden', 'field', 'outhouse', 'well_hand'];
 const label = (k: string) => k.replace(/_/g, ' ');
 
+/** The order storms are rolled in (the first that comes wins the day). */
+const ORDER: readonly WeatherKind[] = ['blizzard', 'tornado', 'derecho', 'hail', 'heat_wave', 'flood', 'lightning_fire', 'ice_storm', 'hurricane_remnants', 'flash_flood', 'windstorm'];
+/** Each storm's season (day of year, from–to; from > to wraps the new year). */
+const SEASON: Record<WeatherKind, [number, number]> = {
+  blizzard: [335, 75], tornado: [100, 210], derecho: [100, 210], hail: [140, 240], heat_wave: [180, 240],
+  flood: [60, 170], lightning_fire: [180, 260], ice_storm: [335, 60], hurricane_remnants: [220, 290],
+  flash_flood: [185, 260], windstorm: [290, 50],
+};
+/** Where a region's season differs from the usual. */
+const REGION_SEASON: Partial<Record<RegionId, Partial<Record<WeatherKind, [number, number]>>>> = {
+  // the desert's heat comes in June, before the monsoon
+  desert: { heat_wave: [155, 215] },
+  // Appalachian woods burn in the dry leaf-fall (Gatlinburg, Nov 2016)
+  appalachia: { lightning_fire: [285, 330], flood: [30, 170] },
+  // Kansas / Nebraska grass fires run in the windy, brown early spring
+  plains: { lightning_fire: [60, 120] },
+  // Northwest floods are winter atmospheric rivers; fires in a dry September east wind
+  pnw: { flood: [305, 45], lightning_fire: [225, 270] },
+  // Hill Country floods come with the spring and fall storms and the odd stalled tropical system (May–Oct)
+  hill_country: { flash_flood: [120, 300], heat_wave: [165, 250], lightning_fire: [190, 250] },
+  // Ozark woods burn in the spring before green-up
+  ozarks: { lightning_fire: [60, 105] },
+};
+
+/**
+ * Difficulty (user): Cozy about half the severe storms and shorter outages,
+ * Standard realistic, Hardcore a bit more.
+ */
+export const STORM_SCALE = { cozy: DIFFICULTY.cozy.storms, standard: DIFFICULTY.standard.storms, hardcore: DIFFICULTY.hardcore.storms } as const;
+const inSeason = (doy: number, [a, b]: [number, number]) => a <= b ? doy >= a && doy <= b : doy >= a || doy <= b;
+
 export const weatherOf = (s: GameState): WeatherState => (s.weather ??= { active: null, last: -999 });
 
-/** Snowed in today (no deliveries, no day job). */
+/** Snowed in (or iced in, or the wash is up) today: no deliveries, no day job. */
 export function snowedIn(s: GameState, day = dayIndex(s.clock.t)): boolean {
   const a = s.weather?.active;
-  return !!a && a.kind === 'blizzard' && day >= a.at && day <= a.until;
+  return !!a && (a.kind === 'blizzard' || a.kind === 'ice_storm' || a.kind === 'flash_flood') && day >= a.at && day <= a.until;
+}
+
+/** A rain storm is on today (a flood, a flash flood, the remnants of a hurricane): the hillside runs with water (sim/retaining.ts). */
+export function rainStormOn(s: GameState, day = dayIndex(s.clock.t)): boolean {
+  const a = weatherOf(s).active;
+  return !!a && (a.kind === 'flood' || a.kind === 'flash_flood' || a.kind === 'hurricane_remnants') && day >= a.at && day <= a.until;
+}
+
+/** The power is out from the storm today (lines down: the grid is gone until the crews get round). */
+export function stormOutage(s: GameState, day = dayIndex(s.clock.t)): boolean {
+  const a = s.weather?.active;
+  return !!a && (a.kind === 'ice_storm' || a.kind === 'windstorm' || a.kind === 'hurricane_remnants') && day >= a.at && day <= a.until;
 }
 
 /** Chance a day of each storm here, today. */
 export function odds(s: GameState, doy: number): Partial<Record<WeatherKind, number>> {
-  const R = REGIONS[s.site.region];
+  const R = regionFor(s.site), seasons = REGION_SEASON[s.site.region] ?? {};
   const o: Partial<Record<WeatherKind, number>> = {};
-  if (R.cold >= 0.8 && (doy >= 335 || doy <= 75)) o.blizzard = 0.01 * R.cold;
-  if (PLAINS.includes(s.site.region) && doy >= 100 && doy <= 210) { const p = s.site.region === 'plains' ? 0.003 : 0.002; o.tornado = p * 0.6; o.derecho = p * 0.4; }
-  if (doy >= 140 && doy <= 240) o.hail = PLAINS.includes(s.site.region) ? 0.006 : s.site.region === 'mountain_west' ? 0.003 : 0.001;
-  if (doy >= 180 && doy <= 240) o.heat_wave = s.site.region === 'desert' || s.site.region === 'plains' ? 0.008 : R.cold <= 0.7 ? 0.005 : 0.003;
-  if (s.site.creek && doy >= 60 && doy <= 170) o.flood = 0.0015 * Math.min(2, R.rainMm / 700);
-  if (doy >= 180 && doy <= 260 && (R.rainMm < 600 || (R.odds.wildfire ?? 1) >= 1.5)) o.lightning_fire = 0.003 * (R.odds.wildfire ?? 1);
+  for (const k of ORDER) {
+    const p = R.storms[k];
+    if (!p || !inSeason(doy, seasons[k] ?? SEASON[k])) continue;
+    if (k === 'flood' && !s.site.creek) continue;        // a creek through the place (the desert's washes are flash floods)
+    o[k] = p * STORM_SCALE[s.disaster.difficulty ?? 'standard'];
+  }
   return o;
 }
 
 /** Warning a day ahead (watches and forecasts); hail and blizzards come with a same-day warning. */
-const AHEAD: Record<WeatherKind, number> = { blizzard: 1, tornado: 1, derecho: 1, hail: 0, heat_wave: 1, flood: 1, lightning_fire: 0 };
-const LASTS: Record<WeatherKind, [number, number]> = { blizzard: [2, 4], tornado: [0, 0], derecho: [0, 0], hail: [0, 0], heat_wave: [3, 5], flood: [1, 2], lightning_fire: [1, 1] };
+const AHEAD: Record<WeatherKind, number> = { blizzard: 1, tornado: 1, derecho: 1, hail: 0, heat_wave: 1, flood: 1, lightning_fire: 0, ice_storm: 1, hurricane_remnants: 2, flash_flood: 0, windstorm: 1 };
+const LASTS: Record<WeatherKind, [number, number]> = {
+  blizzard: [2, 4], tornado: [0, 0], derecho: [0, 0], hail: [0, 0], heat_wave: [3, 5], flood: [1, 2], lightning_fire: [1, 1],
+  ice_storm: [2, 4], hurricane_remnants: [1, 2], flash_flood: [0, 0], windstorm: [1, 2],
+};
 const WARN: Record<WeatherKind, string> = {
   blizzard: 'Blizzard warning for the county: heavy snow and drifting starting tomorrow.',
   tornado: 'Tornado watch for the county tomorrow afternoon.',
@@ -79,13 +148,27 @@ const WARN: Record<WeatherKind, string> = {
   heat_wave: 'Excessive heat warning starting tomorrow: highs over 100°F for days.',
   flood: 'Flood watch: the creek is running high and more rain is coming.',
   lightning_fire: 'Red flag warning: dry lightning tonight, and a fire was spotted on the ridge.',
+  ice_storm: 'Ice storm warning tomorrow: freezing rain, half an inch of ice or more. Expect power outages.',
+  hurricane_remnants: 'Flood watch: the remnants of the hurricane reach the mountains in two days, with a foot of rain on the ridges.',
+  flash_flood: 'Flash flood warning: a monsoon storm upstream. The washes are running.',
+  windstorm: 'High wind warning tomorrow: gusts to 70 mph. Big trees will come down.',
 };
 
 function sheltered(s: GameState): boolean {
-  return s.stock.safe_room > 0 || s.structures.some(st => isFinished(st) && (st.kind === 'root_cellar' || st.kind.startsWith('bunker_')));
+  return hasSafeRoom(s) || s.structures.some(st => isFinished(st) && (st.kind === 'root_cellar' || st.kind.startsWith('bunker_')));
 }
 
 /** Knock a structure back to its roof stage (or its last stage), with an insurance claim. */
+/** Hail and ice crack greenhouse glass: each glasshouse has a chance of a repair job (a few panes, or whole bays), output and heat follow until it is mended. */
+function cracksGlass(s: GameState, r: () => number, chance: number, by: string, out: string[]): void {
+  for (const st of s.structures) {
+    if (!isFinished(st) || (st.kind !== 'greenhouse' && st.kind !== 'greenhouse_heated' && st.kind !== 'aquaponics' && !isTunnel(st.kind)) || r() >= chance) continue;
+    const bad = r() < 0.3;
+    if (isTunnel(st.kind)) { if (crackFilm(st, bad ? 'poor' : 'fair')) out.push(`${by} ${bad ? 'shredded the film on' : 'holed the film on'} the ${label(st.kind).toLowerCase()}. ${bad ? 'Re-cover the hoops' : 'Patch the poly'} (Projects); it grows less until it is mended.`); continue; }
+    if (crackGlass(st, bad ? 'poor' : 'fair')) out.push(`${by} cracked the ${label(st.kind).toLowerCase()} glass: ${bad ? 'whole bays are broken' : 'a few panes'}. A repair job (hardware) is in Projects; it grows less, and loses heat, until it is mended.`);
+  }
+}
+
 function damage(s: GameState, st: Structure, share: number, what: string, out: string[]): void {
   const stages = blueprintOf(st).stages;
   const roof = stages.findIndex(x => x.id === 'roof');
@@ -104,6 +187,7 @@ function news(s: GameState, text: string, tone: 0 | 1 | 2 | 3): void {
 /** The storm's first day. */
 function hit(s: GameState, e: WeatherEvent, r: () => number, out: string[]): void {
   const fin = s.structures.filter(isFinished);
+  tunnelStorm(s, e.kind, r, out);
   if (e.kind === 'blizzard') {
     out.push('Blizzard: the roads are drifted shut and we are snowed in.');
     for (const st of fin) if ((st.fixes ?? []).some(f => f.part === 'roof' && f.done < f.hours) && r() < 0.5) { damage(s, st, 0.3, 'The snow load was too much for the old roof.', out); break; }
@@ -126,18 +210,38 @@ function hit(s: GameState, e: WeatherEvent, r: () => number, out: string[]): voi
     weatherOf(s).hail = { year: c.year, doy: c.doy };
     const lost = Math.floor(s.stock.fresh / 2);
     s.stock.fresh -= lost;
+    cracksGlass(s, r, 0.45, 'Hail', out);
     out.push(beds.length ? `Hail stripped the ${[...new Set(beds.map(b => label(b.kind)))].join(' and ')}. Replanting; this year's crop will be short.` : 'Hail the size of golf balls; nothing planted to lose.');
   } else if (e.kind === 'heat_wave') {
     out.push('The heat wave is here.');
   } else if (e.kind === 'flood') {
-    const low = fin.filter(st => LOW.includes(st.kind));
+    const low = floodCandidates(s, fin, LOW);
     if (low.length) damage(s, pick(r, low), 0.5, 'The creek came over its banks.', out);
     else out.push('The creek came over its banks, but nothing of ours was in the bottom.');
   } else if (e.kind === 'lightning_fire') {
     const cleared = s.forestry.cleared.length >= 20;
     const out_ = fin.filter(st => !st.kind.startsWith('bunker_') && st.kind !== 'garden' && st.kind !== 'field');
     if (!cleared && out_.length && r() < 0.35 * Math.min(1.5, s.site.timber)) damage(s, pick(r, out_), 0.6, 'The fire came through the timber to the buildings.', out);
+    else if (!cleared && fin.some(st => st.kind === 'stilted_house') && r() < 0.35 * 0.5 * Math.min(1.5, s.site.timber) * STILT_FIRE_K) damage(s, fin.find(st => st.kind === 'stilted_house')!, 0.6, 'The fire got under the stilted house: the open crawlspace burns from below.', out);
     else out.push(cleared ? 'The fire burned up the ridge and lay down at the cleared ground round the place.' : 'The fire burned along the ridge and passed us by.');
+  } else if (e.kind === 'ice_storm' || e.kind === 'windstorm' || e.kind === 'hurricane_remnants') {
+    out.push(e.kind === 'ice_storm' ? 'Ice storm: everything is glazed, limbs are cracking all night, and the power is out.'
+      : e.kind === 'windstorm' ? 'The windstorm hit: firs going over all down the valley, and the power is out.'
+      : 'The hurricane\'s remnants are here: rain in sheets, the creek roaring, the power out.');
+    if (e.kind === 'hurricane_remnants' && s.site.creek) {
+      const low = floodCandidates(s, fin, LOW);
+      if (low.length && r() < 0.6) damage(s, pick(r, low), 0.5, 'The creek came up over the bottom.', out);
+    }
+    if (e.kind === 'ice_storm') cracksGlass(s, r, 0.3, 'The ice', out);
+    // trees down: on a building if the timber stands close (the ground cleared round the place spares it)
+    const cleared = s.forestry.cleared.length >= 20;
+    const struck = fin.filter(st => !st.kind.startsWith('bunker_') && !['garden', 'field', 'root_cellar', 'well_hand'].includes(st.kind));
+    if (!cleared && struck.length && r() < 0.3 * Math.min(1.5, s.site.timber)) damage(s, pick(r, struck), 0.4, 'A tree came down across a roof.', out);
+    else out.push(cleared ? 'Trees are down in the woods, but none near the buildings.' : 'Trees are down all over, none on us.');
+  } else if (e.kind === 'flash_flood') {
+    const low = floodCandidates(s, fin, LOW);
+    if (low.length && r() < 0.5) damage(s, pick(r, low), 0.5, 'The wash came down in a brown wall.', out);
+    else out.push('The wash ran bank-full for an hour and cut the drive. Nothing of ours was in its way.');
   }
 }
 
@@ -148,13 +252,19 @@ export function weatherDay(s: GameState): string[] {
   const day = dayIndex(s.clock.t);
   const r = mulberry32(s.seed * 4099 + day * 13 + 7);
   const a = w.active;
+  // a steep or high road is shut by heavy snow (sim/slope.ts): the truck waits at the bottom of the hill, and the closing is told once
+  const shut = roadClosedFor(s, day);
+  if (shut > 0) {
+    for (const o of s.orders) if (o.status === 'ordered' && o.dueAt < s.clock.t + 1) o.dueAt += 1;
+    if (!w.shutLogged || w.shutLogged < day - 1) out.push(`Snow has shut the road up to the place (${shut} more day${shut === 1 ? '' : 's'}): deliveries wait at the bottom of the hill${s.stock.plow >= 1 ? '' : '. A plow blade on the truck would open it sooner'}.`);
+    w.shutLogged = day;
+  }
   if (a) {
     if (day === a.at) hit(s, a, r, out);
     if (day >= a.at && day <= a.until) {
-      if (a.kind === 'blizzard') {
-        if (s.stock.firewood >= 1) s.stock.firewood--;
-        for (const o of s.orders) if (o.status === 'ordered' && o.dueAt < s.clock.t + 1) o.dueAt += 1;
-      } else if (a.kind === 'heat_wave') {
+      if (a.kind === 'blizzard' || a.kind === 'ice_storm') if (s.stock.firewood >= 1) s.stock.firewood--;
+      if (snowedIn(s, day)) for (const o of s.orders) if (o.status === 'ordered' && o.dueAt < s.clock.t + 1) o.dueAt += 1;
+      if (a.kind === 'heat_wave') {
         s.utilities.storedL = Math.max(0, s.utilities.storedL - 40 * s.personState.filter(ps => ps.needs?.died == null).length);
         const powered = s.structures.some(st => s.utilities.lit.includes(st.id));
         if (!powered) for (const p of s.people) {
@@ -172,7 +282,10 @@ export function weatherDay(s: GameState): string[] {
     if (r() >= p) continue;
     const at = day + AHEAD[kind];
     const [lo, hi] = LASTS[kind];
-    w.active = { kind, at, until: at + lo + Math.floor(r() * (hi - lo + 1)) };
+    let until = at + lo + Math.floor(r() * (hi - lo + 1));
+    // Cozy: the crews get the lines back up sooner (outages and storm days are halved)
+    if (s.disaster.difficulty === 'cozy') until = at + Math.floor((until - at) / 2);
+    w.active = { kind, at, until };
     news(s, WARN[kind], kind === 'heat_wave' || kind === 'hail' ? 1 : 2);
     out.push(WARN[kind]);
     if (at === day) hit(s, w.active, r, out);

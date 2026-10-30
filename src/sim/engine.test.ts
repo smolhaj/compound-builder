@@ -57,7 +57,7 @@ describe('sim engine', () => {
     expect(done.finishedAt! - LEAD_TIME_DAYS).toBeGreaterThan(50);
     expect(done.finishedAt!).toBeLessThan(160);
     expect(progress(done)).toBe(1);
-    expect(Object.entries(g.stock).every(([k, v]) => ['firewood', 'canned'].includes(k) || v === 0)).toBe(true);
+    expect(Object.entries(g.stock).every(([k, v]) => ['firewood', 'canned', 'sleeping_bag', 'tent', 'compost', 'canner'].includes(k) || v === 0)).toBe(true);
   });
 
   it('keeps the routine: nobody builds at night, kids are in school in the morning', () => {

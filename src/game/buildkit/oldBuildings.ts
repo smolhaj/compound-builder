@@ -9,8 +9,9 @@
  */
 import * as THREE from 'three';
 import { CELL, type KitPieceDef } from './kit';
-import { Furniture, M } from './interior';
+import { Furniture, M, sickSlot } from './interior';
 import { Clutter } from './clutter';
+import { dressEvenings } from './goodsDress';
 import { box, buildGabled, Parts, type BuildOpts, type FurnishCtx } from './shell';
 
 /** 9 × 12 m two-storey farmhouse (1920s–70s): front porch, kitchen and parlor down, bedrooms up. */
@@ -35,7 +36,10 @@ function farmhouse(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Grou
     // parlor (front): a sofa, a chair, a rug, a bookcase
     I({ x: -0.25, z: 0.55 }, a => Furniture.rug(a, 2.4, 1.8), false);
     I({ x: -0.25, z: 0.3 }, a => Furniture.sofa(a, 'quilt_red'));
-    I({ x: 0.3, z: 0.7, rot: -Math.PI / 2 }, a => Furniture.armchair(a, 'quilt_blue'));
+    // the sickbay corner: an iron cot under the front window, head to the wall, a stand with the basin, the bottles and a roll of bandage
+    I({ x: 0.53, z: 0.66, rot: -Math.PI / 2 }, a => { Furniture.single(a, 'linen'); sickSlot(a); });
+    I({ x: 0.675, z: 0.53 }, a => Furniture.table(a, 0.5, 0.42));
+    I({ x: 0.675, z: 0.53, y: c.y0 + 0.004 + 0.76 * M }, a => Clutter.sickTray(a), false);
     I({ x: left + 0.04, z: 0.75, rot: Math.PI / 2 }, a => Furniture.shelfUnit(a, 1.2, 1.9, 'books'));
     // kitchen (back): counter, range, table, the fridge if it's wired
     const o = c.parts.opts;
@@ -43,8 +47,15 @@ function farmhouse(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Grou
     I({ x: left + 0.06, z: -0.05, rot: Math.PI / 2 }, a => Furniture.cookstove(a));
     if (o.wired) I({ x: left + 0.065, z: back + 0.12, rot: Math.PI / 2 }, a => Furniture.fridge(a));
     I({ x: 0.0, z: -0.55 }, a => Furniture.diningTable(a));
+    dressEvenings(c, { x: 0.0, z: -0.55 });
     // the stair up along the right wall
     I({ x: right - 0.1, z: 0.05 }, a => Furniture.stairs(a, up / M, 3.6, 0.85));
+    // the bathroom, a 1950s addition off the kitchen (back right): a tub along the right wall, a toilet and a washstand
+    c.partition(0.46, back, 0.46, -0.5, [], 'whitewash');
+    c.partition(0.46, -0.5, right, -0.5, [{ at: 0.0, w: 0.13, sill: 0, h: 0.36 }], 'whitewash');
+    if (o.plumbed) I({ x: right - 0.07, z: back + 0.3, rot: Math.PI / 2 }, a => Furniture.tub(a));
+    I({ x: 0.6, z: back + 0.04 }, a => (o.plumbed && o.septic ? Furniture.flushToilet(a) : Furniture.toilet(a)));
+    I({ x: 0.5, z: -0.62, rot: Math.PI / 2 }, a => Furniture.washstand(a));
     // upstairs: two bedrooms
     L({ x: -0.35, z: back + 0.2, y: yU }, a => Furniture.bed(a, true, 'quilt_red'));
     L({ x: 0.25, z: back + 0.2, y: yU }, a => Furniture.bed(a, false, 'quilt_blue'));
@@ -77,11 +88,17 @@ function trailer(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group 
     I({ x: left + 0.05, z: 0.1, rot: Math.PI / 2 }, a => Furniture.counter(a, 3.4, 0.4, !!o.plumbed));
     if (o.wired) I({ x: left + 0.065, z: -0.25, rot: Math.PI / 2 }, a => Furniture.fridge(a));
     I({ x: 0.1, z: 0.45 }, a => Furniture.table(a, 1.1, 0.8));
+    dressEvenings(c, { x: 0.1, z: 0.45 });
     I({ x: 0, z: front - 0.25, rot: Math.PI }, a => Furniture.sofa(a, 'quilt_blue'));
     I({ x: 0, z: back + 0.2 }, a => Furniture.bed(a, true, 'quilt_red'));
-    I({ x: 0.15, z: -0.75 }, a => Furniture.single(a, 'quilt_blue'));
+    I({ x: 0.15, z: -0.75 }, a => { Furniture.single(a, 'quilt_blue'); sickSlot(a); });
     c.partition(left, -0.5, right, -0.5, [{ at: 0.25, w: 0.14, sill: 0, h: 0.36 }], 'pine_panel');
     c.partition(left, -1.05, right, -1.05, [{ at: -0.25, w: 0.14, sill: 0, h: 0.36 }], 'pine_panel');
+    // the bath: the left half of the middle room, a toilet and a washstand against the back wall, a shower by the front one
+    c.partition(-0.1, -1.05, -0.1, -0.5, [{ at: 0.15, w: 0.14, sill: 0, h: 0.36 }], 'pine_panel');
+    I({ x: -0.38, z: -1.03 }, a => (o.plumbed && o.septic ? Furniture.flushToilet(a) : Furniture.toilet(a)));
+    I({ x: -0.22, z: -1.03 }, a => Furniture.washstand(a));
+    if (o.plumbed) I({ x: -0.4, z: -0.58, rot: Math.PI }, a => Furniture.shower(a));
     c.C({ x: right + 0.18, z: -1.0, y: 0.004 }, a => Clutter.bike(a), 0.5);
     c.C({ x: left - 0.15, z: 0.6, y: 0.004 }, a => Clutter.choppingBlock(a), 0.5);
     void y0;

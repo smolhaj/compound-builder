@@ -57,6 +57,8 @@ export class BattleRenderer {
   lines: Array<{ who?: string; text: string }> = [];
   /** Called once the battle (and its hold) is over. */
   onEnd: (() => void) | null = null;
+  /** The crew at a tunnel door: working at it (open false) or through it (open true), where (x, z) and how. */
+  onDoor: ((open: boolean, x: number | undefined, z: number | undefined, what: string) => void) | null = null;
   battle: Battle | null = null;
 
   private readonly _scene: THREE.Scene;
@@ -124,10 +126,22 @@ export class BattleRenderer {
 
   get playing(): boolean { return this.battle !== null; }
 
+  /** Everyone in the fight where they stand now (for the cutscene camera). */
+  actors(): Array<{ id: string; side: 'home' | 'raider'; post?: string; x: number; y: number; z: number; dead: boolean; gone: boolean }> {
+    return [...this._units.values()].map(u => ({ id: u.def.id, side: u.def.side, post: u.def.post, x: u.x, y: u.y, z: u.z, dead: u.dead, gone: u.gone }));
+  }
+
+  /** Events applied since the last call (the cutscene camera reacts to them). */
+  drainEvents(): BattleEvent[] {
+    const e = this._fed; this._fed = [];
+    return e;
+  }
+  private _fed: BattleEvent[] = [];
+
   /** Where the fight is: between the defenders and the nearest raiders still in it (for the camera), and how far apart they are. */
   focus(): { x: number; z: number; spread: number } | null {
     const live = [...this._units.values()].filter(u => !u.gone && !u.dead);
-    const home = live.filter(u => u.def.side === 'home'), raiders = live.filter(u => u.def.side === 'raider');
+    const home = live.filter(u => u.def.side === 'home' && !u.def.machine), raiders = live.filter(u => u.def.side === 'raider');
     if (!home.length && !raiders.length) return null;
     const pick = home.length ? home : raiders;
     const hx = pick.reduce((a, u) => a + u.x, 0) / pick.length, hz = pick.reduce((a, u) => a + u.z, 0) / pick.length;
@@ -189,6 +203,7 @@ export class BattleRenderer {
     for (const m of this._marks) { this._group.remove(m.sprite); m.sprite.material.dispose(); }
     this._marks.length = 0;
     this.battle = null;
+    this._fed = [];
     this._units.clear();
     this._pending = [];
     this._tracers.length = 0;
@@ -229,10 +244,11 @@ export class BattleRenderer {
   }
 
   private _apply(e: BattleEvent): void {
+    if (this._fed.length < 64) this._fed.push(e);
     const U_ = (id: string) => this._units.get(id);
     switch (e.kind) {
       case 'alarm': this._alarmOn = true; break;
-      case 'lights': this._lightsOn(); break;
+      case 'lights': this._lightsOn(e.masts, e.aim); break;
       case 'move': { const u = U_(e.unit); if (u && !u.dead) { u.tx = e.x; u.tz = e.z; u.ty = e.y ?? 0; u.crouch = false; } break; }
       case 'cover': { const u = U_(e.unit); if (u && !u.dead) { u.tx = e.x; u.tz = e.z; u.ty = 0; u.crouch = true; } break; }
       case 'shot': {
@@ -244,6 +260,13 @@ export class BattleRenderer {
         this._tracer(p0, p1);
         this._flash(p0, 3, 0xffc070);
         if (e.auto) for (let k = 1; k <= 3; k++) this._pending.push({ at: this.time + k * 0.09, ev: { ...e, t: e.t, auto: false, hit: false } });
+        break;
+      }
+      case 'snag': {
+        // caught on the wire / the thorns / in the ditch: he stops where he is and crouches, a small cloud of dust
+        const u = U_(e.unit); if (!u || u.dead) break;
+        u.tx = u.x; u.tz = u.z; u.crouch = true;
+        this._puff(new THREE.Vector3(u.x, this._ground(u.x, u.z) + 0.05, u.z), 0.04, 0.3, 0.6, 0.03, 0x8a7a5c, 0.5);
         break;
       }
       case 'mine': {
@@ -277,6 +300,9 @@ export class BattleRenderer {
         break;
       }
       case 'breach': this._boom(e.x, this._ground(e.x, e.z), e.z, 0.5, true); break;
+      case 'door': this.onDoor?.(e.open, e.x, e.z, e.what); break;      // the crew at the tunnel's steel door: shut while they work at it, forced when they are through
+      case 'fallback': this.shake = Math.max(this.shake, 0.15); break;
+      case 'carry': break;   // the wounded's own move event carries them in
       case 'wound': { const u = U_(e.unit); if (u && !e.stopped) { u.wound = Math.min(1, u.wound + Math.max(0.3, e.sev)); this._tint(u); } break; }
       case 'death': { const u = U_(e.unit); if (u) { u.dead = true; u.wound = 1; this._tint(u); u.y = 0; } break; }
       case 'taken':
@@ -309,9 +335,23 @@ export class BattleRenderer {
     u.wear = { ...u.wear, shirt: c.getHex() };
   }
 
-  private _lightsOn(): void {
+  private _lightsOn(masts?: Array<{ x: number; z: number; y: number }>, aim?: { x: number; z: number }): void {
     if (this._floods.length) return;
     const c = this._center;
+    // floodlights on the towers' masts (sim/towers.ts): hard white lamps up high, aimed down the approach
+    if (masts?.length) {
+      masts.forEach((m, i) => {
+        const a = aim ?? c;
+        const s = new THREE.SpotLight(0xfff6ea, this.battle?.night ? 90 : 12, 40, 0.75, 0.45, 1.2);
+        s.position.set(m.x, this._ground(m.x, m.z) + m.y, m.z);
+        s.target.position.set(a.x, this._ground(a.x, a.z), a.z);
+        s.castShadow = i === 0;
+        if (s.castShadow) s.shadow.mapSize.set(512, 512);
+        this._group.add(s); this._group.add(s.target);
+        this._floods.push(s);
+      });
+      return;
+    }
     for (let i = 0; i < 3; i++) {
       const a = i * (Math.PI * 2 / 3) + 0.4;
       const x = c.x + Math.cos(a) * 2.5, z = c.z + Math.sin(a) * 2.5;
@@ -397,7 +437,7 @@ export class BattleRenderer {
   private _moveUnits(dt: number): void {
     let n = 0;
     for (const u of this._units.values()) {
-      if (u.gone) continue;
+      if (u.gone || u.def.machine) continue;
       let moving = false;
       if (!u.dead) {
         const dx = u.tx - u.x, dz = u.tz - u.z, d = Math.hypot(dx, dz);
@@ -428,7 +468,7 @@ export class BattleRenderer {
     this._layer.commit(n, true);
     let ri = 0;
     for (const u of this._units.values()) {
-      if (u.gone || u.dead || ri >= 64) continue;
+      if (u.gone || u.dead || u.def.machine || ri >= 64) continue;
       this._m.makeTranslation(u.x, this._ground(u.x, u.z) + u.y + 0.02, u.z);
       this._rings.setMatrixAt(ri, this._m);
       this._rings.setColorAt(ri, this._c.setHex(u.def.side === 'raider' ? 0xff3b30 : 0x4aa8ff));

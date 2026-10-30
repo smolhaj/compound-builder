@@ -71,6 +71,66 @@ export const ROOT_CELLAR_BLUEPRINT: Blueprint = {
   ],
 };
 
+/** An outdoor wood-fired bread oven: a stone base, a cob dome, a flue and a little roof over the working side. */
+export const WOOD_OVEN_BLUEPRINT: Blueprint = {
+  kind: 'wood_oven',
+  stages: [
+    { id: 'site', name: 'Stake out', hours: 2, materials: {} },
+    { id: 'foundation', name: 'Footing and stone base', hours: 16, materials: { fieldstone: 2, concrete: 1 } },
+    { id: 'frame', name: 'Firebrick floor and cob dome', hours: 30, materials: { fieldstone: 1, concrete: 1 } },
+    { id: 'roof', name: 'Flue and a roof over the working side', hours: 8, materials: { lumber: 1, roofing: 1 } },
+    { id: 'finish', name: 'Lime wash, door and peel', hours: 4, materials: {} },
+  ],
+};
+
+/** An open-sided smithy: a stone hearth with a hood and flue, a bellows, an anvil on a stump and a quench trough under a little roof. */
+export const FORGE_BLUEPRINT: Blueprint = {
+  kind: 'forge',
+  stages: [
+    { id: 'site', name: 'Stake out', hours: 3, materials: {} },
+    { id: 'foundation', name: 'Slab and the stone hearth', hours: 24, materials: { concrete: 2, fieldstone: 3 } },
+    { id: 'frame', name: 'Hood, flue and roof posts', hours: 26, materials: { fieldstone: 2, lumber: 3 } },
+    { id: 'roof', name: 'Metal roof over the working side', hours: 10, materials: { roofing: 3, lumber: 1 } },
+    { id: 'finish', name: 'Bellows, anvil on its stump, quench trough, tongs on the rack', hours: 12, materials: { hardware: 2 } },
+  ],
+};
+
+/** Four hives on stands behind an electric bear fence. */
+export const APIARY_BLUEPRINT: Blueprint = {
+  kind: 'apiary',
+  stages: [
+    { id: 'site', name: 'Pick a sunny, sheltered spot and stake it', hours: 2, materials: {} },
+    { id: 'foundation', name: 'Gravel pad and hive stands', hours: 8, materials: { fieldstone: 1 } },
+    { id: 'frame', name: 'Build the hive bodies and frames', hours: 14, materials: { lumber: 2 } },
+    { id: 'roof', name: 'Bear fence and charger', hours: 10, materials: { wire: 2, hardware: 1 } },
+    { id: 'finish', name: 'Windbreak, water dish, a strip of flowers', hours: 4, materials: { seedlings: 1 } },
+  ],
+};
+
+/** A sugar house with an evaporator arch, a sap tank and a woodshed, at the edge of the maples. */
+export const SUGAR_SHACK_BLUEPRINT: Blueprint = {
+  kind: 'sugar_shack',
+  stages: [
+    { id: 'site', name: 'Stake out beside the maples', hours: 3, materials: {} },
+    { id: 'foundation', name: 'Footing and the firebox pad', hours: 22, materials: { concrete: 2, fieldstone: 2 } },
+    { id: 'frame', name: 'Post-and-beam sugar house', hours: 60, materials: { lumber: 8 } },
+    { id: 'roof', name: 'Roof with a steam cupola', hours: 26, materials: { roofing: 6, lumber: 2 } },
+    { id: 'finish', name: 'Evaporator arch, pans, tank and woodshed', hours: 34, materials: { hardware: 3 } },
+  ],
+};
+
+/** A loafing shed, a fenced yard, troughs and a hay rack for the cow, the goats and the pigs. */
+export const BARNYARD_BLUEPRINT: Blueprint = {
+  kind: 'barnyard',
+  stages: [
+    { id: 'site', name: 'Stake out the yard', hours: 4, materials: {} },
+    { id: 'foundation', name: 'Posts, a concrete slab and the apron', hours: 24, materials: { fieldstone: 2, concrete: 2 } },
+    { id: 'frame', name: 'Loafing shed and stalls', hours: 54, materials: { lumber: 12 } },
+    { id: 'roof', name: 'Roof and hay mow', hours: 32, materials: { roofing: 10, lumber: 3 } },
+    { id: 'finish', name: 'Rail fence, gates, troughs and a hay rack', hours: 42, materials: { wire: 4, hardware: 3, lumber: 4 } },
+  ],
+};
+
 export const COOP_BLUEPRINT: Blueprint = {
   kind: 'chicken_coop',
   stages: [
@@ -141,6 +201,85 @@ export const LOG_HOUSE_BLUEPRINT: Blueprint = {
   ],
 };
 
+// ── Housing styles (sim/housingStyles.ts): each priced from the one materials table; hours are person-hours for a competent owner-builder ──
+
+/**
+ * 12 × 15 m log lodge, two storeys over a stone-faced walkout basement, a wraparound deck and a glass gable (≈ 540 m² in all):
+ * ≈ 8,000 person-hours (a crew of four for two years, or the family for five); ≈ $215k of bought materials plus about 90 saw logs from
+ * your own timber. Only on a slope: the basement is cut into the hill (sim/slope.ts adds the retaining stone and the cut).
+ */
+export const LODGE_BLUEPRINT: Blueprint = {
+  kind: 'lodge',
+  stages: [
+    { id: 'site', name: 'Stake out, cut the pad into the slope (hired excavator)', hours: 140, materials: { excavator: 4 } },
+    { id: 'foundation', name: 'Footings, poured basement walls and slab, stone facing, waterproofing', hours: 1100, materials: { concrete: 100, rebar: 8, fieldstone: 40, membrane: 6 } },
+    { id: 'frame', name: 'Raise the two-storey log walls, floors, stone piers and the deck frame', hours: 3000, materials: { logs: 90, lumber: 45 } },
+    { id: 'roof', name: 'Ridge beam, rafters and the standing-seam roof', hours: 1100, materials: { lumber: 30, roofing: 40 } },
+    { id: 'finish', name: 'Glass gable, stone chimney, floors, stairs, kitchen, four baths, wraparound deck and rails', hours: 2700, materials: { lumber: 40, hardware: 70, fixtures: 6, cable: 10, pipe: 8, fieldstone: 6 } },
+  ],
+};
+/** The lodge on flat ground: the same log house on a raised fieldstone plinth with a crawl space and no basement (no excavator, far less concrete); the cold cellar and the family room below are gone. */
+export const LODGE_PLINTH_BLUEPRINT: Blueprint = {
+  kind: 'lodge_plinth',
+  stages: LODGE_BLUEPRINT.stages.map(st => st.id === 'site' ? { ...st, name: 'Stake out and level the pad', hours: 60, materials: {} }
+    : st.id === 'foundation' ? { ...st, name: 'Footings and a fieldstone plinth wall, vented crawl space', hours: 480, materials: { concrete: 30, rebar: 3, fieldstone: 55 } }
+    : st.id === 'finish' ? { ...st, hours: st.hours - 300, materials: { ...st.materials, hardware: Math.max(0, (st.materials.hardware ?? 0) - 6) } } : st),
+};
+/** The lodge with 25 × 400 W panels on its south roof (≈ 10 kW): the panels and an inverter on top of the lodge's bill. */
+export const LODGE_SOLAR_BLUEPRINT: Blueprint = {
+  kind: 'lodge_solar',
+  stages: LODGE_BLUEPRINT.stages.map(st => st.id === 'finish'
+    ? { ...st, name: st.name + ', 25 panels on the south roof', hours: st.hours + 120, materials: { ...st.materials, solar_panel: 25, inverter: 1, cable: (st.materials.cable ?? 0) + 3 } }
+    : st),
+};
+/** 9 × 12 m two-storey fieldstone house, 45 cm walls: ≈ 4,800 person-hours (stone is slow); ≈ $108k of materials. */
+export const STONE_HOUSE_BLUEPRINT: Blueprint = {
+  kind: 'stone_house',
+  stages: [
+    { id: 'site', name: 'Stake out & level the pad', hours: 60, materials: {} },
+    { id: 'foundation', name: 'Footings and a stone-faced stem wall', hours: 500, materials: { concrete: 30, rebar: 3, fieldstone: 12 } },
+    { id: 'frame', name: 'Lay the stone walls, two storeys, and the floor joists', hours: 2300, materials: { fieldstone: 48, concrete: 6, lumber: 24 } },
+    { id: 'roof', name: 'Rafters, sheathing and the metal roof', hours: 500, materials: { lumber: 14, roofing: 18 } },
+    { id: 'finish', name: 'Windows, doors, floors, stairs, kitchen and baths, the stone chimney', hours: 1440, materials: { lumber: 20, hardware: 40, fixtures: 3, cable: 5, pipe: 4, fieldstone: 4 } },
+  ],
+};
+/** 9 × 12 m two-storey post-and-beam house with insulated panels: ≈ 3,000 person-hours; ≈ $105k of materials. */
+export const TIMBER_FRAME_BLUEPRINT: Blueprint = {
+  kind: 'timber_frame',
+  stages: [
+    { id: 'site', name: 'Stake out & level the pad', hours: 50, materials: {} },
+    { id: 'foundation', name: 'Footings and a stem wall', hours: 280, materials: { concrete: 22, rebar: 2, fieldstone: 4 } },
+    { id: 'frame', name: 'Cut and raise the posts, beams and braces, then the insulated panels', hours: 1250, materials: { lumber: 48 } },
+    { id: 'roof', name: 'Panel roof, sheathing and the standing-seam roof', hours: 420, materials: { lumber: 14, roofing: 16 } },
+    { id: 'finish', name: 'Siding, windows, doors, floors, stairs, kitchen and baths', hours: 1000, materials: { lumber: 18, hardware: 38, fixtures: 3, cable: 5, pipe: 4 } },
+  ],
+};
+/** Three 40 ft containers (two below, one across the top), cut, welded, foamed and fitted: ≈ 1,500 person-hours; ≈ $65k. */
+export const CONTAINER_HOUSE_BLUEPRINT: Blueprint = {
+  kind: 'container_house',
+  stages: [
+    { id: 'site', name: 'Stake out & level the pad', hours: 30, materials: {} },
+    { id: 'foundation', name: 'Concrete piers and a steel grade beam', hours: 140, materials: { concrete: 12, rebar: 3 } },
+    { id: 'frame', name: 'Crane the containers, weld, cut the openings, frame them out', hours: 380, materials: { container: 3, hardware: 6, lumber: 8 } },
+    { id: 'roof', name: 'Insulated roof deck and membrane, shade roof over it', hours: 200, materials: { membrane: 4, roofing: 6, lumber: 4 } },
+    { id: 'finish', name: 'Spray foam, glazing, stair, deck, kitchen, bath and the wiring', hours: 750, materials: { lumber: 10, hardware: 22, fixtures: 2, cable: 4, pipe: 3 } },
+  ],
+};
+/**
+ * 9 × 12 m single-storey adobe house of rammed earth, 45 cm walls, a viga ceiling and a covered portal: ≈ 2,600 person-hours; ≈ $55k.
+ * The footings' borrow pit is where the wall earth comes from (the foundation stage yields the spoil the frame stage rams).
+ */
+export const ADOBE_HOUSE_BLUEPRINT: Blueprint = {
+  kind: 'adobe_house',
+  stages: [
+    { id: 'site', name: 'Stake out & level the pad', hours: 40, materials: {} },
+    { id: 'foundation', name: 'Dig the footings and the borrow pit (hired excavator), pour the stem wall', hours: 260, materials: { excavator: 3, concrete: 8 }, yields: { spoil: 70 } },
+    { id: 'frame', name: 'Ram the earth walls in forms, cement-stabilised, and set the vigas', hours: 1100, materials: { spoil: 60, concrete: 6, lumber: 12 } },
+    { id: 'roof', name: 'Viga and plank roof, membrane and the metal roof', hours: 360, materials: { lumber: 10, membrane: 6, roofing: 10 } },
+    { id: 'finish', name: 'Plaster, deep-set windows, slab floor, portal, kitchen and bath', hours: 840, materials: { concrete: 6, hardware: 24, fixtures: 2, cable: 4, pipe: 3 } },
+  ],
+};
+
 /** What came with the land (sim/improvements.ts): an old farmhouse, a manufactured home, a barn. Not in the build menu (the barn is). */
 export const FARMHOUSE_BLUEPRINT: Blueprint = {
   kind: 'farmhouse',
@@ -184,6 +323,28 @@ export const COTTAGE_BLUEPRINT: Blueprint = {
     { id: 'finish', name: 'Lap siding, porch, windows, kitchen and bath', hours: 300, materials: { lumber: 7, hardware: 13, fixtures: 2, cable: 3 } },
   ],
 };
+/** 6 × 5 m guest house: two beds, a bath and a kitchenette; ≈ 560 person-hours; ≈ $29k of materials. */
+export const GUEST_HOUSE_BLUEPRINT: Blueprint = {
+  kind: 'guest_house',
+  stages: [
+    { id: 'site', name: 'Stake out & level the pad', hours: 20, materials: {} },
+    { id: 'foundation', name: 'Footings and a stem wall', hours: 55, materials: { concrete: 5 } },
+    { id: 'frame', name: 'Floor, stud walls and sheathing', hours: 200, materials: { lumber: 13 } },
+    { id: 'roof', name: 'Rafters and metal roof', hours: 100, materials: { lumber: 3, roofing: 5 } },
+    { id: 'finish', name: 'Lap siding, porch, windows, bath and kitchenette', hours: 185, materials: { lumber: 5, hardware: 8, fixtures: 1, cable: 2 } },
+  ],
+};
+/** 9 × 8 m one-level house for Mom, the in-laws or the grandparents: step-free, two bedrooms, a full kitchen; ≈ 1,250 person-hours; ≈ $63k. */
+export const MOMS_HOUSE_BLUEPRINT: Blueprint = {
+  kind: 'moms_house',
+  stages: [
+    { id: 'site', name: 'Stake out & level the pad', hours: 40, materials: {} },
+    { id: 'foundation', name: 'Footings and a stem wall', hours: 110, materials: { concrete: 11 } },
+    { id: 'frame', name: 'Floor, stud walls and sheathing', hours: 470, materials: { lumber: 30 } },
+    { id: 'roof', name: 'Rafters and metal roof', hours: 220, materials: { lumber: 7, roofing: 12 } },
+    { id: 'finish', name: 'Lap siding, covered porch and ramp, kitchen, bath and grab bars', hours: 410, materials: { lumber: 10, hardware: 18, fixtures: 3, cable: 4 } },
+  ],
+};
 /** 9 × 12 m steel pole building kit on a slab: ≈ 250 person-hours; ≈ $28k. */
 const garageStages = (solar: boolean): StageDef[] => [
   { id: 'site', name: 'Stake out & grade the pad', hours: 20, materials: {} },
@@ -196,10 +357,11 @@ export const METAL_GARAGE_BLUEPRINT: Blueprint = { kind: 'metal_garage', stages:
 export const GARAGE_SOLAR_BLUEPRINT: Blueprint = { kind: 'garage_solar', stages: garageStages(true) };
 
 /** Kinds people live in (a kitchen, a roof over the family). */
-export const HOMES: readonly string[] = ['timber_cabin', 'log_house', 'farmhouse', 'trailer', 'cottage'];
-export const isHome = (kind: string) => HOMES.includes(kind);
+export const HOMES: readonly string[] = ['timber_cabin', 'log_house', 'farmhouse', 'trailer', 'cottage', 'guest_house', 'moms_house', 'lodge', 'lodge_plinth', 'lodge_solar', 'stone_house', 'timber_frame', 'container_house', 'adobe_house', 'stilted_house'];
+const HOME_SET: ReadonlySet<string> = new Set(HOMES);
+export const isHome = (kind: string) => HOME_SET.has(kind);
 /** People each home kind sleeps (matches the kit's `sleeps`). */
-export const HOME_BEDS: Record<string, number> = { timber_cabin: 4, log_house: 6, farmhouse: 6, trailer: 4, cottage: 3 };
+export const HOME_BEDS: Record<string, number> = { timber_cabin: 4, log_house: 6, farmhouse: 6, trailer: 4, cottage: 3, guest_house: 2, moms_house: 4, lodge: 10, lodge_plinth: 10, lodge_solar: 10, stone_house: 6, timber_frame: 6, container_house: 4, adobe_house: 4, stilted_house: 4 };
 /** Beds under a finished roof on the place (shelter for the household and anyone taken in). */
 export function homeBeds(s: { structures: ReadonlyArray<{ kind: string; stage: number }> }): number {
   return s.structures.reduce((a, st) => a + (BLUEPRINTS[st.kind] && st.stage >= BLUEPRINTS[st.kind].stages.length ? HOME_BEDS[st.kind] ?? 0 : 0), 0);
@@ -220,6 +382,94 @@ export const UTILITY_BLUEPRINTS: Blueprint[] = [
   bp('septic', [['site', 'Perc test and stake the field', 6, {}], ['foundation', 'Dig the tank hole and leach trenches (hired excavator)', 40, { excavator: 2 }], ['frame', 'Set the tank', 8, { septic_tank: 1 }], ['roof', 'Leach pipe in gravel', 30, { pipe: 3, concrete: 4 }], ['finish', 'Backfill, vent and lids', 16, { excavator: 1 }]]),
 ];
 
+// ── Self-sufficiency: bigger food and power tiers, the pond and the yard (docs/DECISIONS.md "Self-sufficient interior") ──
+/** A 9 × 24 m production greenhouse (gutter-connected hoops, twin-wall polycarbonate, a heater): ≈ 280 person-hours, ≈ $30,000 of materials. */
+export const GREENHOUSE_HEATED_BLUEPRINT: Blueprint = bp('greenhouse_heated', [
+  ['site', 'Square and level the bed (ridges run north-south)', 12, {}],
+  ['foundation', 'Gravel bed, a concrete curb and the heat-loop trench', 60, { concrete: 10, fieldstone: 2 }],
+  ['frame', 'Bolt up the hoops and purlins', 90, { greenhouse_pro_kit: 1 }],
+  ['roof', 'Glaze the roof, ridge vents and thermal curtain', 50, {}],
+  ['finish', 'Heater, benches, drip lines and the end walls', 70, { hardware: 2, pipe: 2, cable: 1 }],
+]);
+
+/** Forty-eight trees on a grid (apple, pear, cherry, plum), staked and guarded: ≈ 110 person-hours, ≈ $2,300. */
+export const ORCHARD_GROVE_BLUEPRINT: Blueprint = bp('orchard_grove', [
+  ['site', 'Stake the rows (4 m apart)', 8, {}],
+  ['foundation', 'Strip the sod, dig the planting holes', 40, {}],
+  ['frame', 'Plant the trees', 30, { fruit_trees: 48 }],
+  ['roof', 'Stakes, trunk guards and the deer fence', 24, { wire: 4, lumber: 1 }],
+  ['finish', 'Mulch rings and the first watering', 12, {}],
+]);
+
+/** The 20 kW solar farm: 50 × 400 W panels in five rows on ground racks, with three 6 kW inverters. */
+export const SOLAR_FARM_BLUEPRINT: Blueprint = bp('solar_farm', [
+  ['site', 'Stake the rows (facing south, 4 m apart)', 8, {}],
+  ['foundation', 'Post footings for five rows', 50, { concrete: 8 }],
+  ['frame', 'Steel racking', 90, { rebar: 2, hardware: 4 }],
+  ['roof', 'Mount 50 panels', 80, { solar_panel: 50 }],
+  ['finish', 'Combiner boxes, three inverters and the trench', 50, { inverter: 3, cable: 4, hardware: 1 }],
+]);
+
+/** The battery container: 60 kWh of lithium racks, an inverter and a fan, in a 20 ft shipping container. */
+export const BATTERY_BANK_BLUEPRINT: Blueprint = bp('battery_bank', [
+  ['site', 'Stake it out beside the array', 4, {}],
+  ['foundation', 'Gravel and a slab', 20, { concrete: 3 }],
+  ['frame', 'Set and insulate the container, cut the door', 30, { container: 1, lumber: 2 }],
+  ['roof', 'Vents and a sun roof', 10, { roofing: 1 }],
+  ['finish', 'Twelve battery racks, the inverter and the breaker panel', 40, { battery: 12, inverter: 1, cable: 2 }],
+]);
+
+/** A private trout and crayfish pond: dug with a hired excavator, lined, with a spillway and a standpipe. */
+export const POND_BLUEPRINT: Blueprint = {
+  kind: 'pond',
+  stages: [
+    { id: 'site', name: 'Stake the shore and the spillway', hours: 8, materials: {} },
+    { id: 'foundation', name: 'Dig the basin (hired excavator, 2 m deep at the standpipe)', hours: 60, materials: { excavator: 6 }, yields: { spoil: 320 } },
+    { id: 'frame', name: 'Line the basin and set the standpipe', hours: 40, materials: { membrane: 8, pipe: 2 } },
+    { id: 'roof', name: 'Dress the spillway in stone and shape the bank', hours: 30, materials: { fieldstone: 2 } },
+    { id: 'finish', name: 'Fill it, plant the margin, set the fish fence', hours: 30, materials: { wire: 2 } },
+  ],
+};
+
+/** A lined freshwater reservoir: 400,000 L of stored water for the fields and the fire hydrants, no fish. */
+export const RESERVOIR_BLUEPRINT: Blueprint = {
+  kind: 'reservoir',
+  stages: [
+    { id: 'site', name: 'Stake the basin and the intake', hours: 6, materials: {} },
+    { id: 'foundation', name: 'Dig the basin (hired excavator)', hours: 50, materials: { excavator: 5 }, yields: { spoil: 260 } },
+    { id: 'frame', name: 'Line it, pour the concrete edge and the intake', hours: 70, materials: { membrane: 10, concrete: 6 } },
+    { id: 'roof', name: 'Overflow, the pump pad and the fence', hours: 30, materials: { pipe: 3, wire: 2, hardware: 1 } },
+    { id: 'finish', name: 'Fill it and test the intake screen', hours: 20, materials: { cable: 1 } },
+  ],
+};
+
+/** A 9 × 12 m sheep barn: open-front stalls, a lambing pen and a hay mow. */
+export const SHEEP_BARN_BLUEPRINT: Blueprint = bp('sheep_barn', [
+  ['site', 'Stake out and level the pad', 12, {}],
+  ['foundation', 'Posts and a gravel floor', 40, { concrete: 3, fieldstone: 2 }],
+  ['frame', 'Pole frame and the stall rails', 100, { lumber: 14 }],
+  ['roof', 'Trusses and metal roof', 60, { lumber: 4, roofing: 8 }],
+  ['finish', 'Gates, lambing pen, hay racks and a water trough', 50, { hardware: 3, wire: 2, lumber: 2 }],
+]);
+
+/** The equipment yard: a graded gravel pad with a fence, a fuel tank and parking bays for the tractor and its implements. */
+export const EQUIPMENT_YARD_BLUEPRINT: Blueprint = bp('equipment_yard', [
+  ['site', 'Stake out and grade the yard', 8, {}],
+  ['foundation', 'Crushed rock, compacted', 40, { fieldstone: 8 }],
+  ['frame', 'Posts and a pipe-rail fence', 40, { lumber: 2, wire: 2 }],
+  ['roof', 'Paint the bays and set the fuel tank', 10, { hardware: 1 }],
+  ['finish', 'Hitch rails, a wash pad and a light pole', 16, { cable: 1, hardware: 1 }],
+]);
+
+/** The motor court (sim/motorCourt.ts): a graded gravel forecourt, black steel bar fence on three sides with a double gate, six marked bays and light poles. */
+export const MOTOR_COURT_BLUEPRINT: Blueprint = bp('motor_court', [
+  ['site', 'Stake out and grade the court', 10, {}],
+  ['foundation', 'Crushed rock, compacted, and a curb along the wall', 56, { fieldstone: 12, concrete: 3 }],
+  ['frame', 'Posts, rails and bars: the black fence on three sides', 70, { rebar: 7, hardware: 2, concrete: 3 }],
+  ['roof', 'Hang the drive gate, paint the bays and the stop line', 24, { rebar: 2, hardware: 2 }],
+  ['finish', 'Light poles, wiring and the call box', 20, { cable: 2, hardware: 2 }],
+]);
+
 // ── Underground: dug with a hired excavator; the net earth dug out becomes spoil for berms ──
 type Fit = Partial<Stock>;
 /** A poured room: dig + slab, walls, roof slab + waterproofing + backfill, fit-out. `spoil` m³ net. */
@@ -235,6 +485,7 @@ const vaultBp = (kind: string, spoil: number, conc: [number, number, number], re
 });
 export const BUNKER_BLUEPRINTS: Blueprint[] = [
   vaultBp('bunker_hatch', 45, [4, 10, 4], [1, 3, 1], 20, 70, 30, 24, { blast_door: 1, hardware: 2 }, 'Blast door, hatch lid and the ladder'),
+  vaultBp('bunker_floorhatch', 55, [5, 12, 5], [1, 4, 1], 24, 80, 34, 28, { blast_door: 1, hardware: 4, lumber: 3 }, 'Insulated hatch lid, frame, stairs and lamps'),
   vaultBp('bunker_stairs', 110, [8, 18, 8], [2, 5, 2], 30, 120, 60, 36, { blast_door: 1, hardware: 2, lumber: 3, roofing: 2 }, 'Blast door, handrail and the headhouse'),
   vaultBp('bunker_corridor', 50, [6, 10, 6], [2, 3, 2], 20, 70, 40, 16, { hardware: 1, cable: 1 }),
   vaultBp('bunker_dorm', 120, [14, 22, 16], [4, 8, 6], 40, 140, 90, 60, { lumber: 10, hardware: 3, cable: 1 }, 'Vents, bunks, lockers, wiring'),
@@ -255,8 +506,161 @@ export const BUNKER_BLUEPRINTS: Blueprint[] = [
   },
 ];
 
+// ── Watch towers: the upgrade chain (sim/towers.ts). Each tier is built whole; an upgrade pays the new tier's bill and gets half the old one's back. ──
+const concreteTower = (kind: string, mast: boolean, ring: boolean, turret: boolean): Blueprint => bp(kind, [
+  ['site', 'Stake out beside the old one', 8, {}],
+  ['foundation', 'Dig and pour the footing', ring ? 70 : 60, { concrete: ring ? 10 : 8, rebar: ring ? 4 : 3 }],
+  ['frame', 'Form and pour the shaft', ring ? 240 : 200, { concrete: ring ? 18 : 14, rebar: ring ? 10 : 8, lumber: 4 }],
+  ['roof', ring ? 'Armored cab, firing slits and roof' : 'Steel cab, firing slits and roof', ring ? 120 : 90, { rebar: ring ? 6 : 4, roofing: 4, hardware: ring ? 4 : 3, ...(mast ? { floodlights: 2 } : {}) }],
+  ['finish', turret ? 'Gun ring, ammunition locker, remote turret, cameras and the data line' : ring ? 'Gun ring, ammunition locker, armor plate and the stair' : mast ? 'Light mast, wiring, switch and the stair' : 'Steel stair, hatch door and parapet', turret ? 140 : ring ? 110 : mast ? 90 : 70,
+    turret ? { gun_mount: 1, turret_head: 1, cameras: 1, hardware: 4, rebar: 3, cable: 6 } : ring ? { gun_mount: 1, hardware: 4, rebar: 3, cable: 3 } : mast ? { hardware: 4, rebar: 3, cable: 3 } : { hardware: 4, rebar: 3 }],
+]);
+export const TOWER_BLUEPRINTS: Blueprint[] = [
+  bp('rise_lookout', [['site', 'Stake out the rise', 4, {}], ['foundation', 'Pile, tamp and face the earth rise', 30, {}], ['frame', 'Timber nest platform and ladder', 14, { lumber: 2 }], ['roof', 'Sandbag parapet and a plank roof', 10, { sandbags: 1, roofing: 1 }], ['finish', 'Firing slots, a bench, a rope rail', 6, { hardware: 1 }]]),
+  bp('watchtower_wood', [['site', 'Stake out beside the old one', 6, {}], ['foundation', 'Footings', 40, { concrete: 3 }], ['frame', 'Timber legs, bracing and the deck', 150, { lumber: 10 }], ['roof', 'Cab walls and a metal roof', 60, { lumber: 3, roofing: 3 }], ['finish', 'Ladder, trapdoor, rail and firing slots', 40, { lumber: 2, hardware: 2 }]]),
+  bp('watchtower_octagon', [['site', 'Stake out the eight corners', 6, {}], ['foundation', 'Footings and a course of fieldstone', 55, { concrete: 4 }], ['frame', 'Eight timber posts, girts and the deck', 190, { lumber: 13 }], ['roof', 'Eight-sided cab walls and a metal roof', 80, { lumber: 4, roofing: 4 }], ['finish', 'Ladder, trapdoor, rail and firing slots', 50, { lumber: 2, hardware: 3 }]]),
+  concreteTower('watchtower_concrete', false, false, false),
+  bp('watchtower_hex', [['site', 'Stake out beside the old one', 8, {}], ['foundation', 'Dig and pour the footing', 66, { concrete: 9, rebar: 3 }], ['frame', 'Form and pour the six-sided shaft', 230, { concrete: 16, rebar: 9, lumber: 5 }], ['roof', 'Steel cab, firing slits and roof', 100, { rebar: 4, roofing: 4, hardware: 3 }], ['finish', 'Steel stair, hatch and ladder', 54, { hardware: 4, rebar: 3 }]]),
+  concreteTower('watchtower_flood', true, false, false),
+  concreteTower('watchtower_mount', true, true, false),
+  concreteTower('watchtower_turret', true, true, true),
+];
+
+// ── The gatehouse garage (sim/garage.ts): containers stacked into the wall at the gate, a steel gate through the middle, two bays of two slots ──
+export const GATE_GARAGE_BLUEPRINT: Blueprint = bp('gate_garage', [
+  ['site', 'Stake out in the gate gap and grade the pad', 16, {}],
+  ['foundation', 'Pour the slab and the footings under the walls and the gate', 90, { concrete: 16, rebar: 5 }],
+  ['frame', 'Set the containers: two bays, the gate frame between them', 80, { container: 4, rebar: 3 }],
+  ['roof', 'Roof deck, parapet and the stairs up', 60, { roofing: 6, rebar: 2 }],
+  ['finish', 'Steel gates, two roll-up doors, lights and the vehicle apron', 110, { hardware: 8, roofing: 2, cable: 2 }],
+]);
+
+// ── Micro-hydro and the small wind turbine (sim/renewables.ts) ──
+/** A 3 kW micro-hydro plant on the creek bank: a concrete intake weir with a screen, 100 m of buried penstock, a turbine house on a slab. About $17,000 and 240 person-hours. */
+export const MICRO_HYDRO_BLUEPRINT: Blueprint = bp('micro_hydro', [
+  ['site', 'Walk the creek, stake the intake, the penstock line and the house', 8, {}],
+  ['foundation', 'Trench the penstock (hired excavator), pour the house slab and the tailrace', 70, { excavator: 3, concrete: 3 }],
+  ['frame', 'Lay and fuse the penstock, frame the turbine house', 70, { penstock: 2, lumber: 2 }],
+  ['roof', 'Pour the intake weir and screen box, roof the house', 40, { concrete: 3, roofing: 1, rebar: 1 }],
+  ['finish', 'Set the turbine and alternator, wire the controller and the diversion load, bury the line', 52, { hydro_set: 1, cable: 2, hardware: 1 }],
+]);
+
+/** A 5 kW wind turbine on an 18 m guyed tilt-up tower: footing and four guy anchors, the tower, the raise, the buried line. About $25,000. */
+export const WIND_TURBINE_BLUEPRINT: Blueprint = bp('wind_turbine', [
+  ['site', 'Stake the tower base and the four guy anchors (the guys reach 12 m out)', 4, {}],
+  ['foundation', 'Dig and pour the footing and the guy anchors', 34, { concrete: 4, rebar: 1 }],
+  ['frame', 'Assemble the tilt-up tower on the ground and set the guys', 40, { tilt_tower: 1, hardware: 1 }],
+  ['roof', 'Bolt on the turbine and raise the tower with the winch', 20, { wind_turbine: 1 }],
+  ['finish', 'Bury the cable to the controller and set the dump load', 24, { cable: 3, hardware: 1 }],
+]);
+
+// ── Tunnels and aquaponics (sim/tunnels.ts, sim/aquaponics.ts) ──
+/** A 6 x 12 m polytunnel: hoops in sleeves on baseboards, a roll of poly, door frames. About $2,400 and 70 person-hours. */
+export const POLYTUNNEL_BLUEPRINT: Blueprint = bp('polytunnel', [
+  ['site', 'Square the bed and stake the hoop line (ridge north-south)', 4, {}],
+  ['foundation', 'Sink the ground posts and lay the baseboards', 14, { lumber: 1, concrete: 1 }],
+  ['frame', 'Bend and bolt the hoops, purlins and door frames', 22, { tunnel_kit_small: 1 }],
+  ['roof', 'Pull the poly over on a still, warm day', 14, { poly_film: 1 }],
+  ['finish', 'Hang the doors, wire-lock the film, drip line and a path', 12, { pipe: 1, hardware: 1 }],
+]);
+/** A 9 x 30 m high tunnel: gothic frame, roll-up sides, a double door. About $11,000 and 260 person-hours. */
+export const HIGH_TUNNEL_BLUEPRINT: Blueprint = bp('high_tunnel', [
+  ['site', 'Survey and stake the bay, check the drainage and the snow side', 10, {}],
+  ['foundation', 'Drive the ground posts, set the bows\' feet and pour the end-wall footings', 50, { concrete: 4, rebar: 1 }],
+  ['frame', 'Raise the gothic bows, ridge and purlins, hang the roll-up hardware', 90, { tunnel_kit_high: 1, hardware: 1 }],
+  ['roof', 'Pull the double layer of film and inflate it', 60, { poly_film: 3 }],
+  ['finish', 'End walls, doors, roll-up sides, drip lines and a pad of gravel', 50, { pipe: 3, hardware: 2, lumber: 2 }],
+]);
+/** An aquaponics bay: a glazed 6 x 12 m house with four fish tanks and media beds in a row. About $13,000 and 230 person-hours. */
+export const AQUAPONICS_BLUEPRINT: Blueprint = bp('aquaponics', [
+  ['site', 'Stake the bay and the drain to the sump', 8, {}],
+  ['foundation', 'Pour the slab with its floor drains and a curb', 50, { concrete: 8, rebar: 1 }],
+  ['frame', 'Raise the greenhouse shell, insulate the north wall', 60, { greenhouse_kit: 1, lumber: 2 }],
+  ['roof', 'Set the tanks and the grow beds on their stands', 50, { aqua_kit: 1, lumber: 2 }],
+  ['finish', 'Plumb the loop, the pump, the air pump and the heater, and wire it', 62, { pipe: 3, cable: 2, hardware: 2 }],
+]);
+
+/** A stone stair between two terraces (game/buildkit/terraceProps.ts): dry-laid treads, cheek walls and a pipe rail; the bill is for a mid-height flight. */
+export const TERRACE_STAIR_BLUEPRINT: Blueprint = bp('terrace_stair', [
+  ['site', 'Stake the flight and cut the treads into the hill', 10, {}],
+  ['foundation', 'Lay the fieldstone treads', 40, { fieldstone: 4 }],
+  ['frame', 'Stack the cheek walls', 30, { fieldstone: 3 }],
+  ['roof', 'Set the pipe handrail', 8, { hardware: 1 }],
+  ['finish', 'Gravel the landings', 6, { fieldstone: 1 }],
+]);
+
+/** A gravel ramp between two terraces: curbs, a packed bed and a rail. */
+export const TERRACE_RAMP_BLUEPRINT: Blueprint = bp('terrace_ramp', [
+  ['site', 'Stake the ramp and cut the bed', 14, {}],
+  ['foundation', 'Compact the gravel bed', 36, { fieldstone: 6 }],
+  ['frame', 'Set the timber curbs', 20, { lumber: 4 }],
+  ['roof', 'Hang the rail', 8, { hardware: 1 }],
+  ['finish', 'Top dress and tamp', 8, {}],
+]);
+
+// ── Docks (sim/waterfront.ts) ──
+/** A 3 x 15 m timber dock on piles: two slips, cleats and bumpers, a ladder and a lamp. About $6,000 and 100 person-hours. */
+export const BOAT_DOCK_BLUEPRINT: Blueprint = bp('boat_dock', [
+  ['site', 'Walk the shore, stake the pier line and check the water depth at the end', 4, {}],
+  ['foundation', 'Drive the treated piles to the bed from a barge or a stage', 32, { lumber: 3, concrete: 1 }],
+  ['frame', 'Bolt the stringers and cross beams to the piles', 26, { lumber: 2, hardware: 1 }],
+  ['roof', 'Lay the decking', 22, { lumber: 3 }],
+  ['finish', 'Cleats, bumpers, the ladder and a lamp post', 16, { hardware: 2, cable: 1 }],
+]);
+/** The marina: a 4.5 x 21 m pier with a T-head, six slips, a fuel pump, a boat shed and a bubbler. About $22,000 and 330 person-hours. */
+export const MARINA_BLUEPRINT: Blueprint = bp('marina', [
+  ['site', 'Survey the shore and the bed, stake the pier, the T-head and the shed', 10, {}],
+  ['foundation', 'Drive the piles for the pier and the T-head', 90, { lumber: 8, concrete: 4, rebar: 1 }],
+  ['frame', 'Stringers, cross beams, the finger berths and the shed posts', 80, { lumber: 6, hardware: 2 }],
+  ['roof', 'Decking, the boat shed roof and its end wall', 70, { lumber: 6, roofing: 5 }],
+  ['finish', 'Fuel pump and tank, the bubbler and its compressor, bumpers, cleats and lamps', 80, { hardware: 4, pipe: 4, cable: 3, pump: 1 }],
+]);
+
+// ── Cabin village, helipad, tower pod, stilted house (sim/outposts.ts) ──
+/** Six sleeping cabins round a green: pier footings, frames, tin roofs, doors and windows facing in. About $27,000 and 670 person-hours. */
+export const CABIN_VILLAGE_BLUEPRINT: Blueprint = bp('cabin_village', [
+  ['site', 'Lay out the ring: the green, the fire circle and six cabin pads', 12, {}],
+  ['foundation', 'Pour the pier footings for six cabins and dig the paths', 120, { concrete: 6, fieldstone: 4 }],
+  ['frame', 'Frame and sheathe six 4 x 4.5 m cabins, bunks built in', 260, { lumber: 18, hardware: 2 }],
+  ['roof', 'Rafters and a tin roof on each', 120, { roofing: 8, lumber: 2 }],
+  ['finish', 'Doors and windows facing the green, stoves, wiring and the fire circle', 160, { hardware: 6, cable: 3, lumber: 3 }],
+]);
+/** A 12 x 12 m concrete helipad: gravel base, rebar, a double pour, edge lights and a windsock. About $9,000 and 130 person-hours. */
+export const HELIPAD_BLUEPRINT: Blueprint = bp('helipad', [
+  ['site', 'Clear and level the pad; check the approach for wires and trees', 6, {}],
+  ['foundation', 'Strip the sod and lay the compacted gravel base', 36, { excavator: 1, fieldstone: 6 }],
+  ['frame', 'Form the slab, tie the rebar mat', 30, { rebar: 4, lumber: 2 }],
+  ['roof', 'Pour and finish the 15 cm slab', 34, { concrete: 28 }],
+  ['finish', 'Paint the H and the ring, edge lights, a windsock and a fire extinguisher', 24, { cable: 2, hardware: 1, floodlights: 2 }],
+]);
+/** A tower pod: a 12 m steel mast with a spiral stair and a glazed observation pod. About $15,000 and 330 person-hours. */
+export const TOWER_POD_BLUEPRINT: Blueprint = bp('tower_pod', [
+  ['site', 'Stake the mast and check the sight lines', 8, {}],
+  ['foundation', 'Dig and pour the footing and the anchor bolts', 60, { concrete: 8, rebar: 3 }],
+  ['frame', 'Erect the steel mast and the spiral stair', 120, { rebar: 8, hardware: 2 }],
+  ['roof', 'Set the pod shell, glaze it and roof it', 80, { roofing: 2, hardware: 4 }],
+  ['finish', 'Wire the pod, a sweep light and the ladder hatch', 60, { cable: 2, hardware: 2, floodlights: 1 }],
+]);
+/** A two-room house on piles, its floor 2.4 m up, with a stair and a deck. About $24,000 and 590 person-hours. */
+export const STILTED_HOUSE_BLUEPRINT: Blueprint = bp('stilted_house', [
+  ['site', 'Stake the piles on the slope and string the level lines', 8, {}],
+  ['foundation', 'Dig and pour the piles and the pile caps', 90, { concrete: 6, lumber: 4 }],
+  ['frame', 'Beams, joists, the platform and the walls', 260, { lumber: 14, hardware: 2 }],
+  ['roof', 'Rafters and a metal roof', 90, { roofing: 5, lumber: 2 }],
+  ['finish', 'Stair and deck, doors and windows, wiring, a stove', 140, { hardware: 4, cable: 2, lumber: 3 }],
+]);
+
+/** Forty-eight trees on three dry-stack benches cut into a slope: the walls built from fieldstone, the benches filled and levelled, the trees planted, staked and guarded. About $17,000 and 770 person-hours. */
+export const ORCHARD_TERRACED_BLUEPRINT: Blueprint = bp('orchard_terraced', [
+  ['site', 'Walk the contour lines and stake the three benches', 12, {}],
+  ['foundation', 'Cut the benches into the slope (hired excavator) and set the wall footings', 90, { excavator: 4, fieldstone: 6 }],
+  ['frame', 'Lay the three dry-stack walls and the stair, course by course', 420, { fieldstone: 24 }],
+  ['roof', 'Fill and level the benches behind the walls, plant the 48 trees', 130, { fruit_trees: 48, manure: 2 }],
+  ['finish', 'Stakes, trunk guards, the drip lines and the first watering', 120, { wire: 4, pipe: 3, lumber: 1 }],
+]);
+
 export const BLUEPRINTS: Record<string, Blueprint> = Object.fromEntries(
-  [CABIN_BLUEPRINT, OUTHOUSE_BLUEPRINT, WORKSHOP_BLUEPRINT, ROOT_CELLAR_BLUEPRINT, COOP_BLUEPRINT, GARDEN_BLUEPRINT, FIELD_BLUEPRINT, GREENHOUSE_BLUEPRINT, ORCHARD_BLUEPRINT, LOG_HOUSE_BLUEPRINT, FARMHOUSE_BLUEPRINT, TRAILER_BLUEPRINT, BARN_BLUEPRINT, COTTAGE_BLUEPRINT, METAL_GARAGE_BLUEPRINT, GARAGE_SOLAR_BLUEPRINT, ...UTILITY_BLUEPRINTS, ...BUNKER_BLUEPRINTS].map(b => [b.kind, b]));
+  [ORCHARD_TERRACED_BLUEPRINT, CABIN_VILLAGE_BLUEPRINT, HELIPAD_BLUEPRINT, TOWER_POD_BLUEPRINT, STILTED_HOUSE_BLUEPRINT, BOAT_DOCK_BLUEPRINT, MARINA_BLUEPRINT, POLYTUNNEL_BLUEPRINT, HIGH_TUNNEL_BLUEPRINT, AQUAPONICS_BLUEPRINT, MICRO_HYDRO_BLUEPRINT, WIND_TURBINE_BLUEPRINT, CABIN_BLUEPRINT, OUTHOUSE_BLUEPRINT, WORKSHOP_BLUEPRINT, ROOT_CELLAR_BLUEPRINT, WOOD_OVEN_BLUEPRINT, FORGE_BLUEPRINT, APIARY_BLUEPRINT, SUGAR_SHACK_BLUEPRINT, BARNYARD_BLUEPRINT, COOP_BLUEPRINT, GARDEN_BLUEPRINT, FIELD_BLUEPRINT, GREENHOUSE_BLUEPRINT, ORCHARD_BLUEPRINT, LOG_HOUSE_BLUEPRINT, FARMHOUSE_BLUEPRINT, TRAILER_BLUEPRINT, BARN_BLUEPRINT, COTTAGE_BLUEPRINT, GUEST_HOUSE_BLUEPRINT, MOMS_HOUSE_BLUEPRINT, LODGE_BLUEPRINT, LODGE_PLINTH_BLUEPRINT, LODGE_SOLAR_BLUEPRINT, STONE_HOUSE_BLUEPRINT, TIMBER_FRAME_BLUEPRINT, CONTAINER_HOUSE_BLUEPRINT, ADOBE_HOUSE_BLUEPRINT, METAL_GARAGE_BLUEPRINT, GARAGE_SOLAR_BLUEPRINT, ...UTILITY_BLUEPRINTS, GREENHOUSE_HEATED_BLUEPRINT, ORCHARD_GROVE_BLUEPRINT, SOLAR_FARM_BLUEPRINT, BATTERY_BANK_BLUEPRINT, POND_BLUEPRINT, RESERVOIR_BLUEPRINT, SHEEP_BARN_BLUEPRINT, EQUIPMENT_YARD_BLUEPRINT, ...BUNKER_BLUEPRINTS, ...TOWER_BLUEPRINTS, GATE_GARAGE_BLUEPRINT, MOTOR_COURT_BLUEPRINT, TERRACE_STAIR_BLUEPRINT, TERRACE_RAMP_BLUEPRINT].map(b => [b.kind, b]));
 
 /** Total bill of materials for a blueprint. */
 export function totalBill(bp: Blueprint): Partial<Stock> {
