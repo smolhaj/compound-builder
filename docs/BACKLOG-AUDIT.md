@@ -38,7 +38,7 @@ Checked against GDS §10.4 to §10.6, `docs/DECISIONS.md` and `src/sim`. Status:
 |---|---|---|
 | Medical depth: chronic meds, infection, surgery, childbirth, dental | done | `sim/medical.ts`, `sim/body.ts` |
 | Radio and rumors (true tips, false rumors) | done | `sim/radio.ts` |
-| Rumors that scouting can confirm | missing | |
+| Rumors that scouting can confirm | done (follow-up PR) | `sim/rumors.ts` |
 | Weather: blizzard, tornado, hail, heat wave, flood, lightning fire | done | `sim/weatherThreats.ts` |
 | Drought on top of a disaster | done | `sim/effects.ts` |
 | Grief, stress, breakdowns, schooling | done | `sim/mind.ts`, `sim/grief.ts`, `sim/courses.ts` |
