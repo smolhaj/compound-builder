@@ -81,7 +81,7 @@ export function offsetPts(pts: readonly Pt[], d: number): Pt[] {
  * `under` says whether a point is under a building: pipe and cable trenches
  * stop at its wall and their marker posts stand outside it.
  */
-export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (x: number, z: number) => boolean = () => false, opts: { lit?: boolean; sensors?: boolean; hostKind?: PerimeterKind } = {}): THREE.Group {
+export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (x: number, z: number) => boolean = () => false, opts: { lit?: boolean; sensors?: boolean; hostKind?: PerimeterKind; /** The host wall carries razor wire (drawn on the deck's outer rail). */ hostRazor?: boolean; /** A patrol deck rides on this wall (its wire is drawn on the deck). */ deck?: boolean } = {}): THREE.Group {
   const lit = opts.lit ?? true;
   // an upgrade of a finished run is drawn beside the old tier (not on top of it) until it is done and the old one comes down
   const run = run0.replaces ? { ...run0, pts: offsetPts(run0.pts, (run0.replacesKind === 'container_wall' || run0.replacesKind === 'container_stack') ? 0.36 : UPGRADE_OFFSET) } : run0;
@@ -101,6 +101,25 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
     const ya = ground(ax, az), yb = ground(bx, bz);
     const g = new THREE.BoxGeometry(l, h, th).translate(0, h / 2, 0);
     g.rotateZ(Math.atan2(yb - ya, l)).rotateY(-Math.atan2(bz - az, bx - ax)).translate((ax + bx) / 2, (ya + yb) / 2 + y0 - sag, (az + bz) / 2);
+    add(m, g);
+  };
+  /**
+   * `beam` for a low earthwork laid on lumpy ground (a drain's bed and lips): the box is sunk into the ground wherever the terrain
+   * bulges or sags between its ends, so a piece never floats over a hollow nor pokes out of a rise as a loose strip.
+   */
+  const beamFit = (ax: number, az: number, bx: number, bz: number, y0: number, h: number, th: number, m: KitMaterialId) => {
+    const l = Math.hypot(bx - ax, bz - az);
+    if (l < 1e-4) return;
+    const ya = ground(ax, az), yb = ground(bx, bz), mean = (ya + yb) / 2;
+    let low = mean, high = mean;
+    for (const f of [0.25, 0.5, 0.75]) for (const sd of [-0.5, 0, 0.5]) {
+      const x = ax + (bx - ax) * f + (az - bz) / l * th * sd, z = az + (bz - az) * f + (bx - ax) / l * th * sd, y = ground(x, z), ly = ya + (yb - ya) * f;
+      low = Math.min(low, mean + (y - ly)); high = Math.max(high, mean + (y - ly));
+    }
+    const sink = 0.03 + (mean - low), rise = Math.max(0, high - mean);
+    const hh = h + sink + rise * 0.5;
+    const g = new THREE.BoxGeometry(l, hh, th).translate(0, hh / 2, 0);
+    g.rotateZ(Math.atan2(yb - ya, l)).rotateY(-Math.atan2(bz - az, bx - ax)).translate((ax + bx) / 2, mean + y0 - sink, (az + bz) / 2);
     add(m, g);
   };
   const post = (x: number, z: number, h: number, r: number, m: KitMaterialId, round = false) => {
@@ -363,6 +382,14 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
               if (!isInner) place(new THREE.BoxGeometry(l, RH * 0.5, 0.01 * M), u, RH * 0.25 + 0.2 * M, 'wire_mesh');   // the outer side is meshed
             }
           }
+          // the host's razor wire: loose coils laid along the outer rail, outside the guards' mesh
+          if (opts.hostRazor) {
+            const cl = Math.hypot(cb.x - ca.x, cb.z - ca.z), cn = Math.max(2, Math.round(cl / (0.26 * M))), th = Math.atan2(b.x - a.x, b.z - a.z), uo = off - DW / 2 - 0.02 * M;
+            for (let k = 0; k < cn; k++) {
+              const f = (k + 0.5) / cn, wx = a.x + (b.x - a.x) * f - a.dz * uo * inSign, wz = a.z + (b.z - a.z) * f + a.dx * uo * inSign;
+              add('steel', new THREE.TorusGeometry(0.17 * M, 0.012 * M, 4, 9).rotateY(th).translate(wx, yA + (yB - yA) * f + RH + 0.17 * M, wz));
+            }
+          }
           // posts at the bay end (a post every 3 m: containers get three more along their length)
           const posts = contLike ? 4 : 1;
           for (let k = 0; k <= posts; k++) {
@@ -575,10 +602,10 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
         const n = Math.max(1, Math.ceil((s1 - s0) / 0.3));
         for (let i = 0; i < n; i++) {
           const a = along(run.pts, s0 + (s1 - s0) * i / n), b = along(run.pts, s0 + (s1 - s0) * (i + 1) / n);
-          beam(a.x, a.z, b.x, b.z, -0.004, 0.012, w, open ? 'soil' : 'gravel');
+          beamFit(a.x, a.z, b.x, b.z, -0.004, 0.016, w, open ? 'soil' : 'gravel');
           for (const sg of [-1, 1]) {
             const o = (w / 2 + 0.11 * M) * sg;
-            beam(a.x + a.dz * o, a.z - a.dx * o, b.x + b.dz * o, b.z - b.dx * o, 0, open ? 0.08 * M : 0.16 * M, open ? 0.3 * M : 0.22 * M, open ? 'soil' : 'fieldstone');
+            beamFit(a.x + a.dz * o, a.z - a.dx * o, b.x + b.dz * o, b.z - b.dx * o, 0, open ? 0.08 * M : 0.11 * M, open ? 0.3 * M : 0.22 * M, open ? 'soil' : 'fieldstone');
           }
         }
       }
@@ -656,7 +683,7 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
     }
   }
   // razor wire: loose concertina coils on the top of the run (a ring every 0.26 m)
-  if (run.razor && built > 0.05 && RAZOR.HOSTS.includes(run.kind)) {
+  if (run.razor && !opts.deck && built > 0.05 && RAZOR.HOSTS.includes(run.kind)) {
     const top = Math.abs(def.height) + 0.06 * M;
     bays(2.4 * M, (a, b) => {
       const l = Math.hypot(b.x - a.x, b.z - a.z), n = Math.max(2, Math.round(l / (0.26 * M))), th = Math.atan2(b.x - a.x, b.z - a.z);

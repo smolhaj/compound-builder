@@ -49,6 +49,7 @@ import { FrameBudget, capGapMs, lowerTier } from '../engine/perf/qualityAuto';
 import { sceneCensus } from './perfCensus';
 import { yieldToBrowser, warmShaders } from './bootStages';
 import { parseLowRender, RenderRequests, type QaQuality } from './qaRender';
+import { onEntrancePreview } from './roadPreview';
 
 /** Background damp of the season (ground darkens a little in the shoulder seasons). */
 const SEASON_WETNESS: Record<VisualSeason, number> = { spring: 0.22, fall: 0.28, winter: 0.14, summer: 0 };
@@ -222,6 +223,8 @@ export function GameCanvas() {
       useGameStore.subscribe(s => s.game.structures, list => { world.syncStructures(placedOnly(list)); occluders.invalidate(); }),
       useGameStore.subscribe(s => s.game.site.improvements.drive, on => world.setDrive(on)),
       useGameStore.subscribe(s => s.game.roadBridge?.down ?? false, on => world.setBridgeDown(on)),
+      useGameStore.subscribe(s => s.game.site.entrance ?? null, () => { world.replan(useGameStore.getState().game.site); world.previewEntrance(useGameStore.getState().game.site, null); }),
+      onEntrancePreview(z => world.previewEntrance(useGameStore.getState().game.site, z)),
       // a neighbor's farm burned (sim/neighborLife.ts): drawn charred once the family knows
       useGameStore.subscribe(s => burnedFarms(s.game).join(), () => world.setBurnedFarms(burnedFarms(useGameStore.getState().game))),
       useGameStore.subscribe(s => s.tool, k => {

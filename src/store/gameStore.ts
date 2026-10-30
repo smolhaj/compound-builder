@@ -5,6 +5,7 @@ import { AFTERMATH_TEXT, joinPrisoner, releasePrisoner, resolveAftermath, type A
 import { dismissCrew, hireCrew } from '../sim/crews';
 import { setFocus } from '../sim/priority';
 import { orderHookup, placeImprovements } from '../sim/improvements';
+import { setEntrance as chooseEntrance } from '../sim/roadEntrance';
 import { applyForPermit } from '../sim/paperwork';
 import { sweepChimney } from '../sim/upkeep';
 import { stockUpRx } from '../sim/body';
@@ -210,6 +211,8 @@ export interface GameStore {
   placeImprovements: (spots: Record<string, { x: number; z: number; rot: number }>) => void;
   /** Pay the co-op for the line, or a contractor for the drive. */
   hookup: (what: 'power' | 'drive') => string | null;
+  /** Confirm where the road comes in on the property line (z), before the drive is ordered (sim/roadEntrance.ts). */
+  setEntrance: (z: number) => string | null;
   /** Paperwork switches: pull permits for new builds; keep the insurance. */
   setPaper: (k: 'permits' | 'insured', on: boolean) => void;
   /** Sweep the chimney. */
@@ -599,6 +602,13 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     if (locked()) return LOCKED_WHY;
     const g = structuredClone(get().game);
     const why = orderHookup(g, what);
+    if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); }
+    return why;
+  },
+  setEntrance: (z) => {
+    if (locked()) return LOCKED_WHY;
+    const g = structuredClone(get().game);
+    const why = chooseEntrance(g, z);
     if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); }
     return why;
   },
