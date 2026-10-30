@@ -32,7 +32,7 @@ import { HousingStyleCards } from './HousingStyles';
 /** The build menu's groups (kit pieces by what they are for). */
 const BUILD_GROUPS: Array<[string, string, readonly string[]]> = [
   ['home', 'Home & work', ['timber_cabin', 'log_house', 'cottage', 'guest_house', 'moms_house', 'outhouse', 'workshop', 'forge', 'metal_garage', 'barn', 'equipment_yard', ...TERRACE_ORDER]],
-  ['food', 'Food', ['garden', 'greenhouse', 'greenhouse_heated', 'orchard', 'orchard_grove', 'field', 'chicken_coop', 'sheep_barn', 'pond', 'root_cellar', 'wood_oven', 'apiary', 'sugar_shack', 'barnyard']],
+  ['food', 'Food', ['garden', 'greenhouse', 'polytunnel', 'high_tunnel', 'greenhouse_heated', 'aquaponics', 'orchard', 'orchard_grove', 'field', 'chicken_coop', 'sheep_barn', 'pond', 'root_cellar', 'wood_oven', 'apiary', 'sugar_shack', 'barnyard']],
   ['water', 'Water & power', UTILITY_ORDER],
   ['defense', 'Watch towers & gatehouse', [...TOWER_ORDER, ...GATEHOUSE_ORDER]],
 ];

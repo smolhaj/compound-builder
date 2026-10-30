@@ -195,6 +195,31 @@ export const GREENHOUSE_HEATED: KitPieceDef = {
   maxSlope: 0.12, floorY: 0.0, porch: 0, sleeps: 0, light: null,
 };
 
+/** The polytunnel (sim/tunnels.ts): hoops and one skin of film, the cheap way to a longer season. */
+export const POLYTUNNEL: KitPieceDef = {
+  id: 'polytunnel', name: 'Polytunnel', category: 'food',
+  blurb: '6 × 12 m hoop house with one skin of poly: the garden three weeks earlier and later and cold-hardy greens through the winter (250 kcal a day), for a fraction of glass. The film lasts four years; wind and snow tear it. Drip line from the pond.',
+  cellsX: 2, cellsZ: 4, frontCells: 0,
+  parts: { foundation: 'wood_dark', walls: 'polycarb', roof: 'polycarb' },
+  maxSlope: 0.15, floorY: 0.0, porch: 0, sleeps: 0, light: null,
+};
+/** The high tunnel: nine metres of gothic frame with roll-up sides. */
+export const HIGH_TUNNEL: KitPieceDef = {
+  id: 'high_tunnel', name: 'High tunnel', category: 'food',
+  blurb: '9 × 30 m gothic frame with roll-up sides and a double door: the garden five weeks earlier and later and 520 kcal a day of winter greens, unheated. Sheds snow badly (knock it off), tears in a gale on a windy spot, and breeds whitefly and mould in damp air. Four-year film.',
+  cellsX: 3, cellsZ: 10, frontCells: 0,
+  parts: { foundation: 'concrete', walls: 'polycarb', roof: 'polycarb' },
+  maxSlope: 0.1, floorY: 0.0, porch: 0, sleeps: 0, light: null,
+};
+/** The aquaponics bay (sim/aquaponics.ts). */
+export const AQUAPONICS: KitPieceDef = {
+  id: 'aquaponics', name: 'Aquaponics bay', category: 'food',
+  blurb: 'A glazed 6 × 12 m bay with four 1,000 L tilapia tanks feeding 20 m² of media beds: fish (about 450 g in six months) and greens all year (≈ 420 kcal a day) on pellets and power. The heater and the air pump must never stop: a blackout in warm water is a fish kill. Wire it.',
+  cellsX: 2, cellsZ: 4, frontCells: 1,
+  parts: { foundation: 'concrete', walls: 'glass', roof: 'glass' },
+  maxSlope: 0.08, floorY: 0.0, porch: 0, sleeps: 0, light: [0, 0.6, 0],
+};
+
 /** Forty-eight trees: the orchard at farm scale. */
 export const ORCHARD_GROVE: KitPieceDef = {
   id: 'orchard_grove', name: 'Orchard grove', category: 'food',
@@ -434,9 +459,9 @@ export const BUNKER_KIT: KitPieceDef[] = [
 /** Underground menu order. */
 export const BUNKER_ORDER: readonly string[] = BUNKER_KIT.map(d => d.id);
 
-export const KIT: Record<string, KitPieceDef> = Object.fromEntries([LODGE, LODGE_SOLAR, STONE_HOUSE, TIMBER_FRAME_HOUSE, CONTAINER_HOUSE, ADOBE_HOUSE, APIARY, FORGE, SUGAR_SHACK, BARNYARD, WOOD_OVEN, GATE_GARAGE_KIT, MOTOR_COURT_KIT, TIMBER_CABIN, LOG_HOUSE, FARMHOUSE, TRAILER, BARN, COTTAGE, GUEST_HOUSE, MOMS_HOUSE, METAL_GARAGE, GARAGE_SOLAR, OUTHOUSE, WORKSHOP, ROOT_CELLAR, CHICKEN_COOP, GARDEN, FIELD, GREENHOUSE, GREENHOUSE_HEATED, ORCHARD, ORCHARD_GROVE, POND, RESERVOIR, SHEEP_BARN, EQUIPMENT_YARD, TERRACE_STAIR, TERRACE_RAMP, ...UTILITY_KIT, ...BUNKER_KIT, ...TOWER_KIT].map(d => [d.id, d]));
+export const KIT: Record<string, KitPieceDef> = Object.fromEntries([POLYTUNNEL, HIGH_TUNNEL, AQUAPONICS, LODGE, LODGE_SOLAR, STONE_HOUSE, TIMBER_FRAME_HOUSE, CONTAINER_HOUSE, ADOBE_HOUSE, APIARY, FORGE, SUGAR_SHACK, BARNYARD, WOOD_OVEN, GATE_GARAGE_KIT, MOTOR_COURT_KIT, TIMBER_CABIN, LOG_HOUSE, FARMHOUSE, TRAILER, BARN, COTTAGE, GUEST_HOUSE, MOMS_HOUSE, METAL_GARAGE, GARAGE_SOLAR, OUTHOUSE, WORKSHOP, ROOT_CELLAR, CHICKEN_COOP, GARDEN, FIELD, GREENHOUSE, GREENHOUSE_HEATED, ORCHARD, ORCHARD_GROVE, POND, RESERVOIR, SHEEP_BARN, EQUIPMENT_YARD, TERRACE_STAIR, TERRACE_RAMP, ...UTILITY_KIT, ...BUNKER_KIT, ...TOWER_KIT].map(d => [d.id, d]));
 /** Build-menu order. */
-export const KIT_ORDER: readonly string[] = ['timber_cabin', 'log_house', 'lodge', 'lodge_solar', 'stone_house', 'timber_frame', 'container_house', 'adobe_house', 'cottage', 'guest_house', 'moms_house', 'outhouse', 'garden', 'greenhouse', 'greenhouse_heated', 'orchard', 'orchard_grove', 'field', 'chicken_coop', 'sheep_barn', 'pond', 'root_cellar', 'wood_oven', 'forge', 'apiary', 'sugar_shack', 'barnyard', 'workshop', 'metal_garage', 'barn', 'equipment_yard'];
+export const KIT_ORDER: readonly string[] = ['timber_cabin', 'log_house', 'lodge', 'lodge_solar', 'stone_house', 'timber_frame', 'container_house', 'adobe_house', 'cottage', 'guest_house', 'moms_house', 'outhouse', 'garden', 'greenhouse', 'polytunnel', 'high_tunnel', 'greenhouse_heated', 'aquaponics', 'orchard', 'orchard_grove', 'field', 'chicken_coop', 'sheep_barn', 'pond', 'root_cellar', 'wood_oven', 'apiary', 'sugar_shack', 'barnyard', 'workshop', 'metal_garage', 'barn', 'equipment_yard'];
 /** Water & power menu order. */
 export const UTILITY_ORDER: readonly string[] = ['well_hand', 'well_drilled', 'cistern', 'water_tower', 'filtration_shed', 'septic', 'solar_array', 'solar_farm', 'garage_solar', 'battery_shed', 'battery_bank', 'generator_shed', 'micro_hydro', 'wind_turbine', 'reservoir'];
 

@@ -15,6 +15,8 @@ import { harvestPond, harvestProblem, pondReport, stockPond, stockProblem, TABLE
 import { Note, Row, Section } from './hud/common';
 import { btn, DIM, TONE } from './hud/style';
 import { regionFor } from '../sim/climate';
+import { AQUA, aquaReport, harvestAqua, harvestProblem as aquaHarvestProblem, stockAqua, stockProblem as aquaStockProblem } from '../sim/aquaponics';
+import { isTunnel, tunnelNote, tunnelPestLoss } from '../sim/tunnels';
 
 const oxygenWord = (o: number): [string, 'good' | 'warn' | 'bad'] => (o >= 0.7 ? ['fresh', 'good'] : o >= 0.45 ? ['low', 'warn'] : ['gasping', 'bad']);
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], MONTH_START = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
@@ -24,7 +26,8 @@ const kcal = (n: number) => `${Math.round(n).toLocaleString('en-US')} kcal`;
 
 export function FarmPanel({ game }: { game: GameState }) {
   const g = useGameStore();
-  const houses = finishedOf(game, 'greenhouse', 'greenhouse_heated');
+  const houses = finishedOf(game, 'greenhouse', 'greenhouse_heated', 'polytunnel', 'high_tunnel');
+  const bays = finishedOf(game, 'aquaponics');
   const orchards = finishedOf(game, 'orchard', 'orchard_grove');
   const ponds = finishedOf(game, 'pond');
   const yards = finishedOf(game, 'equipment_yard');
@@ -46,6 +49,7 @@ export function FarmPanel({ game }: { game: GameState }) {
                   {(['electric', 'wood'] as const).map(m => <button key={m} style={btn(care.heat === m)} title={m === 'electric' ? 'Electric heat from the compound\'s power: up to about 34 kWh a day in a hard January. Falls back to wood when the power fails.' : `A wood boiler: about ${GH_WOOD_RICKS} rick a day at full demand`} onClick={() => g.money(d => { greenhouseCareOf(d, st.id).heat = m; return null; })}>{m === 'electric' ? 'Electric' : 'Wood'}</button>)}
                 </span>
               </div>
+            : isTunnel(st.kind) ? <Note>{tunnelNote(game, st)} {(() => { const p = tunnelPestLoss(game, year); return p.loss > 0 ? `${p.name[0].toUpperCase()}${p.name.slice(1)} this year: up to ${Math.round(p.loss * 100)} % of the greens (tend the vents to halve it).` : 'No outbreak this year.'; })()}</Note>
             : <Note>{warm ? 'Heated by the cabin\'s power.' : cold > 1 ? 'Unheated: the winter benches freeze back. Wire it for power.' : 'Unheated.'}</Note>}
         </div>;
       })}
@@ -67,6 +71,20 @@ export function FarmPanel({ game }: { game: GameState }) {
       })}
       {(() => { const p = orchardPest(game.seed, year); return <Note tone={p.loss > 0 ? 'warn' : undefined}>{p.loss > 0 ? `${p.name[0].toUpperCase()}${p.name.slice(1)} this year (up to ${Math.round(p.loss * 100)} % of the pome and stone fruit it hits); pruning and hens hold it down.` : 'No bad pests this year.'} Prune January to the buds breaking; water the young trees through the dry months: the Garden duty does both.</Note>; })()}
     </Section>}
+    {bays.map(st => {
+      const r = aquaReport(game, st);
+      return <Section key={st.id} title="Aquaponics">
+        <Row label="Tilapia" value={r.fish > 0 ? `${Math.floor(r.fish).toLocaleString('en-US')} · ${Math.round(r.fishG)} g each${r.table ? ' · table size' : ''} · ${r.kg.toFixed(0)} kg` : 'none'} title={`Table size is ${AQUA.TABLE_G} g; the tanks hold ${AQUA.TANK_KG} kg`} />
+        <Row label="Water" value={<span>{Math.round(r.tempC)} C · {r.powered ? 'pumps and heater on' : <span style={{ color: TONE.bad }}>no power</span>}</span>} />
+        <Row label="Greens" value={`${kcal(r.plantsKcal)} a day`} />
+        {r.fish > 0 && <Row label="Feed" value={Number.isFinite(r.feedDays) ? `${Math.floor(game.stock.fish_feed ?? 0)} bags · ${Math.floor(r.feedDays)} days` : '—'} tone={r.feedDays < 7 ? 'warn' : undefined} />}
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 3 }}>
+          {act('Stock tilapia', aquaStockProblem(game, st.id), () => g.money(d => stockAqua(d, st.id)), 'A bag of 100 fingerlings')}
+          {act('Harvest tilapia', aquaHarvestProblem(game, st.id), () => g.money(d => harvestAqua(d, st.id)), 'Up to 30 table-size tilapia')}
+        </div>
+        {r.notes.map(n => <Note key={n}>{n}</Note>)}
+      </Section>;
+    })}
     {ponds.map(st => {
       const r = pondReport(game, st), [ow, ot] = oxygenWord(r.oxygen);
       return <Section key={st.id} title="Pond">

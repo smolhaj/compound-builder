@@ -29,6 +29,8 @@ import { petsDay } from './pets';
 import { toolsDay } from './tools';
 import { greenhouseDay, orchardDay } from './greenhouse';
 import { pondDay } from './pond';
+import { aquaDay } from './aquaponics';
+import { tunnelDay } from './tunnels';
 import { cropsDay } from './crops';
 import { beesDay } from './bees';
 import { mapleDay } from './maple';
@@ -220,6 +222,8 @@ function subStep(s: GameState): void {
     for (const line of greenhouseDay(s)) log(s, line);
     for (const line of orchardDay(s, s.daily?.chores.levels.orchard ?? 0)) log(s, line);
     for (const line of pondDay(s)) log(s, line);
+    for (const line of aquaDay(s)) log(s, line);
+    for (const line of tunnelDay(s)) log(s, line);
     // the fields and the soil: sowing, the seed store, the season's close; the cellar bins and the crowded shelves (sim/crops.ts, sim/storage.ts)
     for (const line of cropsDay(s)) log(s, line);
     for (const line of beesDay(s)) log(s, line);

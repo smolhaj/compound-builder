@@ -31,6 +31,7 @@ import { mulberry32 } from './rng';
 import { orchardCareOf } from './farm';
 import { groundOf } from './terrainState';
 import { logGate } from './nag';
+import { orchardWindK } from './microclimate';
 
 export type Fruit = 'apple' | 'pear' | 'cherry' | 'plum';
 export const FRUITS: readonly Fruit[] = ['apple', 'pear', 'cherry', 'plum'];
@@ -228,7 +229,7 @@ export function fruitYear(s: GameState, st: Structure, fruit: Fruit, bees = 1, y
   if (bear <= 0) return 0;
   const pruneK = orchardCareOf(s, st.id).unprunedYear === year ? 0.8 : 1;
   const beeK = 1 + (bees - 1) * d.insects / 0.85;
-  return n * d.lb * KCAL_PER_LB * bear * (1 - frostLoss(s, st, fruit, year)) * pruneK * (1 - pestLoss(s, st, fruit, year)) * beeK;
+  return n * d.lb * KCAL_PER_LB * bear * (1 - frostLoss(s, st, fruit, year)) * pruneK * (1 - pestLoss(s, st, fruit, year)) * beeK * orchardWindK(s, st);
 }
 
 /** Today's fruit from the orchards: kcal, and the share that goes to the cellar bins (apples, pears). */
