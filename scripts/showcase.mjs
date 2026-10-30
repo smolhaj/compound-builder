@@ -264,6 +264,7 @@ if (only.includes('tunnel') && L.tunnel) {
 if (only.includes('use') && L.tunnel) {
   const [ax, az] = L.tunnel.a, [bx, bz] = L.tunnel.b, dl = Math.hypot(bx - ax, bz - az) || 1, ux = (bx - ax) / dl, uz = (bz - az) / dl;
   const at = (s) => [ax + ux * s, az + uz * s];
+  const axisEye = (back, side, lookS, lookH) => page.evaluate(([x, z, lx, lz, lh]) => { const cb = window.__cb, w = cb.world; cb.cam.placeEye(x, z, lx, lz, 0.32); cb.cam.target.y = w.groundAt(lx, lz) + lh; return true; }, [ax - ux * back - uz * side, az - uz * back + ux * side, ...at(lookS), lookH]);
   // a person walking up: freeze one just past the low door (in the arch), another in the middle of the bore, another at the high door
   const walkTo = (s, tol) => page.evaluate(async ([tx, tz, tol]) => {
     const cb = window.__cb, G = cb.game, w = cb.world;
@@ -282,15 +283,13 @@ if (only.includes('use') && L.tunnel) {
   const lowMouth = await walkTo(1.2, 0.5);
   console.error('person in the low mouth', JSON.stringify(lowMouth));
   if (lowMouth) {
-    const sp = await eyeAt([ax, az], Math.atan2(-uz, -ux) + 0.3, [3.4, 4, 3, 4.6], 0.3, 0.3);
-    console.error('mouth eye', JSON.stringify(sp));
-    if (sp) await shot('8-eye-person-in-the-tunnel-mouth');
+    await axisEye(4.4, 0.5, 1.0, 0.3); await shot('8-eye-person-in-the-tunnel-mouth');
   }
   const mid = await walkTo(dl / 2, 0.6);
   console.error('person mid-bore', JSON.stringify(mid));
   if (mid) {
     await page.evaluate(() => window.__cb.store.getState().setUnderground(true));
-    await orbit(34, 1.0, L.up + 0.4, ...at(dl / 2), 0.5); await shot('8b-aerial-cutaway-person-walking-the-bore');
+    await orbit(20, 1.15, L.up + 0.2, mid.x, mid.z, 0.2); await shot('8b-aerial-cutaway-person-walking-the-bore');
     await page.evaluate(() => window.__cb.store.getState().setUnderground(false));
   }
   // a car: parked in the compound, sent out; frozen as it comes out of the low door
@@ -312,14 +311,12 @@ if (only.includes('use') && L.tunnel) {
   }, [ax, az, bx, bz, ux, uz]);
   console.error('car at the low mouth', JSON.stringify(car));
   if (car && !car.fail) {
-    const sp = await eyeAt([car.x, car.z], Math.atan2(-uz, -ux) + 0.7, [3.4, 4, 3, 4.6], 0.3, 0.2);
-    console.error('car eye', JSON.stringify(sp));
-    if (sp) await shot('8c-eye-car-coming-out-of-the-tunnel');
-    await orbit(20, 0.5, L.up + 2.2, car.x, car.z, 0.4); await shot('8d-aerial-car-at-the-low-portal');
+    await axisEye(5.2, 0.9, 0.5, 0.25); await shot('8c-eye-car-coming-out-of-the-tunnel');
+    await orbit(13, 0.42, L.up + 0.15, car.x, car.z, 0.5); await shot('8d-aerial-car-at-the-low-portal');
   }
   // the doors: shut at night
   await page.evaluate(() => { window.__cb.world.doorLock = true; for (let i = 0; i < 60; i++) window.__cb.world.updateDoors(0.1, window.__cb.game.getState().game); });
-  { const sp = await eyeAt([ax, az], Math.atan2(-uz, -ux) + 0.3, [4.4, 5, 3.6], 0.3, 0.3); if (sp) await shot('8e-eye-low-portal-door-shut'); }
+  await axisEye(4.4, 0.5, 0.5, 0.3); await shot('8e-eye-low-portal-door-shut');
   await page.evaluate(() => { window.__cb.world.doorLock = false; });
 }
 if (only.includes('terrace')) {
