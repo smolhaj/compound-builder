@@ -226,7 +226,7 @@ export function terraceSuggestion(s: GameState): Suggestion | null {
     acts: [{ label: `Stake ${tp.tiers.length} terraced beds (~${usd(tp.usd)} of fieldstone for the walls)`, act: { type: 'terraces', tiers: tp.tiers.map(t => [t.x, t.z] as Pt) } }, { label: 'Show me on the map', act: { type: 'terrain', mode: 'high' } }] };
 }
 
-export function suggestions(s: GameState): Suggestion[] {
+export function suggestions(s: GameState, limit = 3, skip?: ReadonlySet<string>): Suggestion[] {
   const people = s.people.length;
   const homes = s.structures.filter(st => isHome(st.kind));
   const beds = homeBeds(s);
@@ -359,7 +359,7 @@ export function suggestions(s: GameState): Suggestion[] {
   { const t = terraceSuggestion(s); if (t) out.push(t); }   // a slope that suits terraced beds: offered, never staked unasked
   { const c = courseSuggestion(s); if (c) out.push(c); }
   { const d = drillsSuggestion(s); if (d) out.push(d); }
-  return out.sort((x, y) => y.urgency - x.urgency).slice(0, 3);
+  return out.filter(x => !skip?.has(x.id)).sort((x, y) => y.urgency - x.urgency).slice(0, limit);
 }
 
 /** A course worth taking (sim/courses.ts): a skill the place lacks that an evening class would give, with a one-click start when a way is open. Never required. */

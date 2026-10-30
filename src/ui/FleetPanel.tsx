@@ -9,7 +9,7 @@ import { BUYABLE, buyVehicle, fleetOf, overdue, refuel, repairDays, serviceVehic
 import { garageConnected, parkedText, parkingPlan } from '../sim/parking';
 import { bugOut, bugOutPlan, type BugDest, type BugMode } from '../sim/bugout';
 import { litersText } from '../sim/format';
-import { Note, Row, Section } from './hud/common';
+import { Group, Note, Row, Section } from './hud/common';
 import { btn, DIM, TONE, usd } from './hud/style';
 
 function statusOf(v: Vehicle, atTown = false): { text: string; tone: keyof typeof TONE | null } {
@@ -63,11 +63,13 @@ export function FleetPanel() {
       })}
       <Row label="Parts kits" value={`${parts}`} tone={parts < 1 ? 'warn' : undefined} title="Filters, belts, hoses, plugs, a pump: one kit mends a breakdown or services a vehicle. Bought in the Shop (Fuel & hire), or stripped from a dead one." />
       <Row label="Fuel in the cans" value={litersText(cansL)} />
+      <Group id="fleet-buy" title="Buy a vehicle" defaultOpen={false}>
       {BUYABLE.filter(k => vs.filter(v => v.kind === k).length < VEHICLES[k].max && (k !== 'pickup' || vs.some(v => v.kind === 'pickup'))).map((k: VehicleKind) => (
         <button key={k} style={{ ...btn(), width: '100%', marginTop: 3, textAlign: 'left' }} title={VEHICLES[k].blurb} disabled={game.money < VEHICLES[k].price || game.disaster.tracks.stores < 0.5} onClick={() => { const w = g.money(d => buyVehicle(d, k)); if (w) alert(w); }}>
           Buy {VEHICLES[k].name.toLowerCase()} ({usd(VEHICLES[k].price)}) · seats {VEHICLES[k].seats}
         </button>
       ))}
+      </Group>
       {game.disaster.kind && <div style={{ marginTop: 6 }}>
         {!confirm
           ? <button style={{ ...btn(), width: '100%', opacity: bo.ok ? 1 : 0.5 }} title={bo.why ?? 'Plan the way out: how, where to, what you can carry and how risky the road is.'} onClick={() => setConfirm(true)}>Bug out…</button>

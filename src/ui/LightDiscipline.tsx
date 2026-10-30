@@ -24,9 +24,9 @@ export function LightDiscipline() {
   const tone = vis === 'dark' ? '#8fc98f' : vis === 'faint' ? '#d8c9a0' : '#e0907a';
   return <div style={{ padding: '6px 0', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
     <div style={{ fontWeight: 600, padding: '4px 0' }}>Light discipline</div>
-    <div style={{ color: DIM, fontSize: 12, paddingBottom: 4 }}>Part of the night-time suite. A lit compound is seen from the road, by neighbors and by scouts; raids and visitors follow. A dark one is safer, but work, cooking and the kids' mood suffer in rooms with no curtains.</div>
+    <div style={{ color: DIM, fontSize: 12, paddingBottom: 4 }} title="Part of the night-time suite. A lit compound is seen from the road, by neighbors and by scouts; raids and visitors follow. A dark one is safer, but work, cooking and the kids' mood suffer in rooms with no curtains.">Lit means seen; dark is safer but harder to live in.</div>
     <div style={row}><span>Seen from the road</span><span style={{ color: tone }}>{VISIBILITY_NAME[vis]} · raids ×{raidPressure(game).toFixed(2)}</span></div>
-    {lines.map(l => <div key={l.id} style={row} title={l.note}><span style={{ color: DIM }}>{l.label} <i>({l.note})</i></span><span>{l.points > 0 ? `+${Math.round(l.points * 10) / 10}` : '0'}</span></div>)}
+    {lines.filter(l => l.points > 0).map(l => <div key={l.id} style={row} title={l.note}><span style={{ color: DIM }}>{l.label} <i>({l.note})</i></span><span>{l.points > 0 ? `+${Math.round(l.points * 10) / 10}` : '0'}</span></div>)}
     <div style={{ ...row, paddingTop: 4 }}><span>Lights out now</span><span>{why ? `Yes (${REASON[why]})` : nightNow(game) ? 'No' : 'No (day)'}</span></div>
     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', padding: '4px 0' }}>
       <button style={btn(!!game.opsec?.blackout)} title="Douse windows, fire pit, lamps and flashlights, and switch every floodlight off" onClick={() => st.setOpsec('blackout', !game.opsec?.blackout)}>{game.opsec?.blackout ? 'Lights out: on' : 'Lights out'}</button>
