@@ -51,7 +51,7 @@ import { canJoin } from '../sim/aftermath';
 import { MILESTONE_COUNT, MILESTONE_NAME } from '../sim/lineage';
 import { daysOfFood, KCAL, needOf } from '../sim/needs';
 import { barterPrices, moneyWorks, type Good } from '../sim/barter';
-import { MarketSection, NeighborsSection, ScavengeSection } from './WorldPanels';
+import { MarketSection, NeighborsSection, RumorsSection, ScavengeSection } from './WorldPanels';
 import { alliesFor, canGo, FAR_COLD, isAway, latestFarLead, latestLead, LEAD_COLD, LEAD_WARM, leadAge, openCaptives, raidProblem, rescueOdds, tripFuel, tripProblem } from '../sim/rescue';
 import { EXPOSURE_NAME, exposure, raidPressure, topExposure } from '../sim/opsec';
 import { acresOf, buyProblem, LAND_NAME, priceOf } from '../sim/land';
@@ -438,6 +438,7 @@ export function Hud() {
           {rightTab === 'outside' && <>
             <TakenSection />
             <ScavengeSection />
+            <RumorsSection />
             {game.disaster.mode === 'sandbox' && !game.disaster.kind && <FreeBuild />}
             {!(game.disaster.phase === 'warning' || (game.disaster.kind && game.clock.t >= game.disaster.warnAt)) && !(game.disaster.mode === 'sandbox' && !game.disaster.kind) && <Note>All quiet. Watch the news ticker, the prices and the neighbors.</Note>}
             {(game.disaster.phase === 'warning' || (game.disaster.kind && game.clock.t >= game.disaster.warnAt)) && (
