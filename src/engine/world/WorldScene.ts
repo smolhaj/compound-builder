@@ -150,10 +150,16 @@ export class WorldScene {
   private readonly _c = { tmp: new THREE.Color(), v: new THREE.Vector3() };
   private readonly _gradeBase = { contrast: 0.5, saturation: 1.04, warm: 0.18, threshold: 0.55 };
 
-  constructor(canvas: HTMLCanvasElement) {
+  /**
+   * `antialias`: MSAA on the canvas itself. Medium and High draw the scene into float render targets and finish with FXAA, so MSAA on the
+   * final full-screen quad antialiases nothing and costs a multisampled backbuffer (4x memory and bandwidth at 2x DPR): only Low (no
+   * post-processing) wants it. Automation (the screenshot harness reads the canvas back) keeps the drawing buffer and MSAA as before.
+   */
+  constructor(canvas: HTMLCanvasElement, opts: { antialias?: boolean } = {}) {
     // Season surface patch must be in place before any standard material compiles.
     installSeasonShaderPatch();
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
+    const automated = typeof navigator !== 'undefined' && !!navigator.webdriver;
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: automated || (opts.antialias ?? true), preserveDrawingBuffer: automated });
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));

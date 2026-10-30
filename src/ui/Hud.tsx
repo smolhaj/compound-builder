@@ -5,7 +5,7 @@ import { fogLineFor } from '../sim/fogFx';
 import { PersonInsight, PeopleSection, MedicalSection, ClassesSection } from './PeoplePanel';
 import { DailySection } from './SchedulePanel';
 import { DAILY_TASK_TEXT } from './dailyText';
-import { useWorldStore, type BuildingView, type CameraMode } from '../store/worldStore';
+import { useWorldStore, type BuildingView, type CameraMode, type FrameCap } from '../store/worldStore';
 import { useGameStore } from '../store/gameStore';
 import type { Quality } from '../engine/world/WorldScene';
 import { SEASON_MODES, type SeasonMode } from '../engine/world/season/seasonState';
@@ -536,9 +536,18 @@ export function Hud() {
         <select value={w.weatherMode} onChange={e => w.setWeatherMode(e.target.value as WeatherMode)} title="Weather">
           {WEATHER_MODES.map(x => <option key={x}>{x}</option>)}
         </select>
-        <select value={w.quality} onChange={e => w.setQuality(e.target.value as Quality, true)} title="Graphics quality">
+        <select value={w.quality} onChange={e => { w.setQuality(e.target.value as Quality, true); w.setPerfNotice(null); }} title="Graphics quality (Low: no shadows or post-processing; Medium: soft shadows; High: adds ambient occlusion and a sharper pixel ratio)" aria-label="Graphics quality">
           {QUALITIES.map(x => <option key={x}>{x}</option>)}
         </select>
+        <select value={w.frameCap} onChange={e => w.setFrameCap(Number(e.target.value) as FrameCap)} title="Frame-rate cap: 60 is smooth and halves the work on a 120 Hz display" aria-label="Frame-rate cap">
+          <option value={60}>60 fps</option><option value={30}>30 fps</option><option value={0}>uncapped</option>
+        </select>
+        <button style={btn(w.showPerf)} title="Show frames per second, frame time and draw calls" onClick={() => w.setShowPerf(!w.showPerf)}>FPS</button>
+        {w.showPerf && w.perfStats && (
+          <span data-testid="perf-readout" style={{ fontVariantNumeric: 'tabular-nums', color: w.perfStats.ms > w.perfStats.budgetMs ? '#f88' : w.perfStats.ms > 22 ? '#fd6' : '#8d8' }} title="frames per second, smoothed frame time against the 40 ms budget, draw calls, triangles">
+            {w.perfStats.fps.toFixed(0)} fps · {w.perfStats.ms.toFixed(1)} / {w.perfStats.budgetMs} ms · {w.perfStats.calls} calls · {(w.perfStats.tris / 1000).toFixed(0)}k tris
+          </span>
+        )}
         <span style={{ opacity: 0.7 }}>Sightlines</span>
         {SIGHTS.map(([m, label, tip]) => <button key={m} title={tip} style={btn(w.sightMode === m)} onClick={() => w.setSightMode(m)}>{label}</button>)}
         <span style={{ opacity: 0.7 }}>Terrain</span>

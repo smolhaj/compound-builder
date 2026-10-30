@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { GameCanvas } from './game/GameCanvas';
 import { Hud } from './ui/Hud';
 import { LoadingScreen } from './ui/LoadingScreen';
+import { PerfNotice } from './ui/PerfNotice';
 import { SetupScreen } from './ui/SetupScreen';
 import { ShopWindow } from './ui/ShopWindow';
 import { SchedulePanel } from './ui/SchedulePanel';
@@ -56,6 +57,7 @@ export default function App() {
     <>
       <GameCanvas key={worldKey} />
       <LoadingScreen />
+      <PerfNotice />
       {!raid && <Hud />}
       {!clean && !raid && <Ticker />}
       {!clean && !raid && <BattleOverlay />}
