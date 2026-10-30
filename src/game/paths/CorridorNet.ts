@@ -51,26 +51,10 @@ export class CorridorNet {
     if (!this._reach || this._reachKey !== key) {
       const pad = 10;
       const xs = [box.x0, box.x1, ...this.links.flatMap(l => [l.mouth[0][0], l.mouth[1][0]])], zs = [box.z0, box.z1, ...this.links.flatMap(l => [l.mouth[0][1], l.mouth[1][1]])];
-      this._reach = buildReach({ x0: Math.min(...xs) - pad, x1: Math.max(...xs) + pad, z0: Math.min(...zs) - pad, z1: Math.max(...zs) + pad }, hard, 0.6, [...joins, ...this.portalJoins()]);
+      this._reach = buildReach({ x0: Math.min(...xs) - pad, x1: Math.max(...xs) + pad, z0: Math.min(...zs) - pad, z1: Math.max(...zs) + pad }, hard, 0.6, joins);
       this._reachKey = key;
     }
     return this._reach;
-  }
-
-  /**
-   * A portal is a way in by design: the free ground just outside it, in a fan of about 100 degrees out to 2.6 units (a ledge, a cutting, the court's apron),
-   * is one piece with its mouth, and so with whatever doorway the wall opens there.
-   */
-  portalJoins(): Array<[Pt, Pt]> {
-    const out: Array<[Pt, Pt]> = [];
-    for (const l of this.links) {
-      const first = l.deck[0], last = l.deck[l.deck.length - 1];
-      [[l.mouth[0], first], [l.mouth[1], last]].forEach(([m, d]) => {
-        const ux = m[0] - d[0], uz = m[1] - d[1], ul = Math.hypot(ux, uz) || 1, base = Math.atan2(uz / ul, ux / ul);
-        for (const r of [1.3, 2.6]) for (let k = -2; k <= 2; k++) { const a = base + k * 0.42; out.push([[m[0], m[1]], [d[0] + Math.cos(a) * r, d[1] + Math.sin(a) * r]]); }
-      });
-    }
-    return out;
   }
 
   /** The route from `from` to `to` through corridors when the goal is on another piece of ground, else null. */
