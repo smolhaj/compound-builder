@@ -10,12 +10,15 @@ import { useGameStore } from '../store/gameStore';
 import { hydroProblem } from '../sim/renewables';
 import { siteNote } from '../sim/microclimate';
 import { onJustPlaced, type Spot } from './buildkit/justPlaced';
+import { clashText, padClash, padSnap } from './buildkit/padRules';
 
 /**
  * Build tool: a translucent ghost of the kit piece follows the cursor over
  * the terrain, snapped to the 3 m grid; green where it can go, red (with the
  * reason in the HUD) where it can't. Click to place, R to rotate, Esc /
- * right-click to stop.
+ * right-click to stop. On a slope a piece whose graded pad would cut into the
+ * pad of a neighbour at another level is refused with the neighbour named, and
+ * S snaps the ghost to the nearest spot where the pads clear (buildkit/padRules).
  */
 export class PlacementTool {
   private readonly _ray = new THREE.Raycaster();
@@ -25,6 +28,8 @@ export class PlacementTool {
   private _rot = 0;
   private _at: [number, number] | null = null;
   private _ok = false;
+  /** The nearest clear spot when the pad clashes with a neighbour's (S jumps there). */
+  private _snap: [number, number] | null = null;
   /** The spot just staked: the cursor is still over it, so say nothing about it. */
   private _just: Spot | null = null;
   private _down: { x: number; y: number } | null = null;
@@ -64,6 +69,7 @@ export class PlacementTool {
     on(window, 'keydown', e => {
       if (!this._kind) return;
       if (e.code === 'KeyR') { this._rot = (this._rot + 1) % 4; this._update(); }
+      if (e.code === 'KeyS' && !e.ctrlKey && !e.metaKey && this._snap) { this._at = [this._snap[0], this._snap[1]]; this._update(); }
       if (e.code === 'Escape') this.setKind(null);
     });
   }
@@ -126,7 +132,7 @@ export class PlacementTool {
       for (let i = 0; i < n; i++) {
         const a = (i / n) * Math.PI * 2;
         const [sx, sz] = snapCenter(def, x + Math.cos(a) * r, z + Math.sin(a) * r, rot);
-        if (siteProblem(def, sx, sz, rot, this._site, placed) === null) return [sx, sz];
+        if (siteProblem(def, sx, sz, rot, this._site, placed) === null && !padClash(def, sx, sz, rot, this._site.height, placed)) return [sx, sz];
       }
     }
     return null;
@@ -153,7 +159,15 @@ export class PlacementTool {
     this._just = null;
     const placed = useGameStore.getState().game.structures;
     const problem = siteProblem(def, x, z, this._rot, this._site, placed);
-    this._ok = problem === null;
+    // (a spot the plain rules allow can still grade a pad into a neighbour's, at another level)
+    const clash = problem === null ? padClash(def, x, z, this._rot, this._site.height, placed) : null;
+    this._snap = null;
+    let clashMsg: string | null = null;
+    if (clash) {
+      this._snap = padSnap(def, x, z, this._rot, this._site.height, placed, (px, pz) => snapCenter(def, px, pz, this._rot), (px, pz) => siteProblem(def, px, pz, this._rot, this._site, placed) === null);
+      clashMsg = clashText(clash, this._snap ? Math.hypot(this._snap[0] - x, this._snap[1] - z) * 6 : null);
+    }
+    this._ok = problem === null && !clash;
     const fp = footprint(def, x, z, this._rot);
     // a bunker room's ghost hangs at its bunker's floor level, under the see-through ground
     const y = isUnderground(def) ? previewDatum(def, x, z, this._rot, this._site.height, placed) ?? this._site.height(x, z) - DEPTH : this._world.parcel.padHeight(fp.x0, fp.z0, fp.x1, fp.z1);
@@ -162,7 +176,7 @@ export class PlacementTool {
     g.visible = true;
     const m = this._ok ? this._okMat : this._badMat;
     g.traverse(o => { if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).material = m; });
-    useGameStore.getState().setToolProblem(problem ? PROBLEM_TEXT[problem] : null);
+    useGameStore.getState().setToolProblem(problem ? PROBLEM_TEXT[problem] : clashMsg);
   }
 
   dispose(): void {

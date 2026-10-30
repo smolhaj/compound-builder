@@ -38,6 +38,8 @@
  * Chronic medicines (sim/body.ts) now have a shelf life, and supply
  * warnings go to the next-step card.
  */
+import { frostChance } from './cold';
+import { seepageChance } from './sanitation';
 import { dayIndex, calendarOf, type GameState } from './state';
 import { isFinished } from './construction';
 import { log } from './economy';
@@ -398,14 +400,17 @@ export function medicalDay(s: GameState): string[] {
     if (ps.task === 'kitchen' && r() < 0.0009 && !n.hurt.some(h => h.med?.kind === 'burn')) { n.hurt.push({ what: 'a burn from the stove', sev: 18 + Math.floor(r() * 20), med: { kind: 'burn', day, care: 'not treated yet' } }); out.push(`${p.first} burned a hand on the stove.`); M.seen++; }
     // frostbite on a long cold watch
     if (ps.task === 'watch' && winter && r() < 0.006 && !n.hurt.some(h => h.med?.kind === 'frostbite')) { n.hurt.push({ what: 'frostbite', sev: 24 + Math.floor(r() * 14), med: { kind: 'frostbite', day, care: 'not treated yet' } }); out.push(`${p.first} came in off the cold watch with white, numb fingers.`); M.seen++; }
+    // a cold house: the woodpile is bare on a hard-freeze night (sim/cold.ts)
+    if (frostChance(s, p) > 0 && !n.hurt.some(h => h.med?.kind === 'frostbite') && r() < frostChance(s, p)) { n.hurt.push({ what: 'frostbite', sev: 24 + Math.floor(r() * 14), med: { kind: 'frostbite', day, care: 'not treated yet' } }); out.push(`${p.first} has white, numb fingers and toes: the house is freezing and the woodpile is bare.`); M.seen++; }
     // a baby's fever
     if (p.kid && p.age < 1 && r() < 0.0035 && !n.hurt.some(h => h.med?.kind === 'infant')) { n.hurt.push({ what: 'a baby\'s fever', sev: 40, med: { kind: 'infant', day, care: 'not treated yet' } }); out.push(`${p.first}, the baby, has a fever and won't feed.`); M.seen++; }
   }
   // dysentery from bad water: no filter and no boiling, or a house with no soap
   { const noSoap = !hygieneOk(s), dirty = s.utilities.hauling && !s.structures.some(x => x.kind === 'filtration_shed' && x.stage >= 5) && s.stock.water_filter < 0.01 && s.stock.firewood < 0.05;
-    if ((noSoap || dirty) && r() < (dirty ? 0.006 : 0.0008) * (harsh(s) ? 1.6 : 1) && living.length && !M.epidemic) {
+    const seep = seepageChance(s);
+    if ((noSoap || dirty || seep > 0) && r() < Math.max(dirty ? 0.006 : noSoap ? 0.0008 : 0, seep) * (harsh(s) ? 1.6 : 1) && living.length && !M.epidemic) {
       const p = living[Math.floor(r() * living.length)];
-      if (startCase(s, p.id, 'dysentery', 38, { src: 'water' }, 'dysentery')) { out.push(`${p.first} has dysentery: cramps, a fever and the flux. ${dirty ? 'The water' : 'No soap in the house'} is the likely cause.`); M.epidemic = { kind: 'dysentery', since: day, quarantine: false, asked: false, cases: 1 }; }
+      if (startCase(s, p.id, 'dysentery', 38, { src: 'water' }, 'dysentery')) { out.push(`${p.first} has dysentery: cramps, a fever and the flux. ${dirty ? 'The water' : noSoap ? 'No soap in the house' : 'The well, too close to the privy,'} is the likely cause.`); M.epidemic = { kind: 'dysentery', since: day, quarantine: false, asked: false, cases: 1 }; }
     } }
   // flu going round in the winter: it needs someone coming in from outside
   { const outside = s.newcomers ? Object.keys(s.newcomers.guests ?? {}).length + (s.newcomers.bonds ? Object.keys(s.newcomers.bonds).length : 0) : 0;

@@ -41,6 +41,7 @@ import { newcomerMorale } from './newcomers';
 import { mindMorale } from './mind';
 import { bestLevel } from './skills';
 import { regionFor } from './climate';
+import { harvestShare } from './sharedHarvest';
 
 export type FoodId = 'fresh' | 'frozen' | 'canned' | 'staples';
 /** Food is kept in the stockpile in these units; kcal in one unit. */
@@ -115,7 +116,7 @@ export function fieldHarvestSplit(s: GameState): { total: number; potato: number
   const skill = bestGardener(s);
   // hail on the standing crop: replanted early in the summer it still makes 70 %; in late summer a quick catch crop, 30 %
   const hd = hailThisYear(s), hail = hd == null || hd >= HARVEST[1] ? 1 : hd < HARVEST[0] - 60 ? 0.7 : 0.3;
-  const per = FIELD_KCAL * GROSS / (HARVEST[1] - HARVEST[0]) * (0.6 + 0.08 * skill) * SOIL_YIELD[s.site.soil] * climate(s).grow * tractorBoost(s) * hail * careYield(s, 'harvest');
+  const per = FIELD_KCAL * GROSS / (HARVEST[1] - HARVEST[0]) * (0.6 + 0.08 * skill) * SOIL_YIELD[s.site.soil] * climate(s).grow * tractorBoost(s) * hail * careYield(s, 'harvest') * (1 - harvestShare(s));
   let potato = 0, dry = 0;
   for (const f of fields) {
     const ff = fieldFactor(s, f), kcal = per * ff.total;
