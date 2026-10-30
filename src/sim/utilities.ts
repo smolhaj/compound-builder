@@ -247,14 +247,14 @@ export function plant(s: GameState, halfSize: (kind: string) => number = k => NO
 }
 
 /**
- * Plumbing and wiring order themselves: a finished building that draws power gets its wiring job
- * (and a house its plumbing) as soon as service reaches it, the kit included in the price. Only
+ * Plumbing and wiring order themselves: a finished home, pump or cellar gets its wiring job
+ * (and a home its plumbing) as soon as service reaches it, the kit included in the price. Only
  * the labor remains. Returns the log lines.
  */
 export function autoFit(s: GameState, p: Plant): string[] {
   const out: string[] = [];
   for (const st of s.structures) {
-    if (!isFinished(st) || !(DRAW_KWH[st.kind] > 0)) continue;
+    if (!isFinished(st) || !(DRAW_KWH[st.kind] > 0) || (LOAD_PRIORITY[st.kind] ?? 9) > 2) continue;
     for (const kind of ['wire', 'plumb'] as const) {
       if (kind === 'plumb' && LOAD_PRIORITY[st.kind] !== 2) continue;
       if (fitProblem(s, p, st, kind)) continue;
