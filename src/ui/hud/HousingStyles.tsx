@@ -22,6 +22,7 @@ export function StylePreview({ kind, w = 84, h = 56 }: { kind: string; w?: numbe
   const ground = <rect y="54" width="100" height="10" fill="#6f7a4a" />;
   let art: ReactNode;
   switch (styleOf(kind)?.base) {
+    case 'lodge_plinth':
     case 'lodge':
       art = <>
         <rect x="14" y="43" width="72" height="11" fill="#7d786c" />

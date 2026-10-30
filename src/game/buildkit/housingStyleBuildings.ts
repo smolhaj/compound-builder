@@ -75,7 +75,7 @@ function deckStair(p: Parts, x: number, zTop: number, dir: 1 | -1, yTop: number,
 /** The lodge's frame: 12 × 15 m body, the deck takes the rest of the 15 × 18 m footprint. */
 const L = { W: 2.0, D: 2.5, T: 0.07, wallH: 0.98, rise: 0.62, eave: 0.1, deck: 0.25, storey: 0.5, chimX: -0.5 };
 
-function lodge(def: KitPieceDef, seed = 1, opts: BuildOpts = {}, solar = false): THREE.Group {
+function lodge(def: KitPieceDef, seed = 1, opts: BuildOpts = {}, solar = false, plinth = false): THREE.Group {
   const { W, D, T, wallH, rise, eave } = L, hw = W / 2, hd = D / 2;
   const y0 = def.floorY, yE = y0 + wallH, f2 = y0 + L.storey, bw = 0.07;
   // floor hatches (bunker_floorhatch) in a lodge open in its basement slab: the main floor stays whole
@@ -95,13 +95,13 @@ function lodge(def: KitPieceDef, seed = 1, opts: BuildOpts = {}, solar = false):
     gableWindow: { front: true, back: true, w: 1.3, h: 0.5, y: 0.04, rake: true },
     chimney: { kind: 'stone', x: L.chimX },
     tieBeams: [-0.75, -0.1, 0.55], ceiling: 'pine_panel', corners: 'logs', curtains: 'curtain_red',
-  }, (c: FurnishCtx) => furnishLodge(c, { y0, f2, clear }), parts, p => lodgeShell(p, { y0, yE, f2, bw, hw, hd, hatches, solar }));
+  }, (c: FurnishCtx) => furnishLodge(c, { y0, f2, clear, plinth }), parts, p => lodgeShell(p, { y0, yE, f2, bw, hw, hd, hatches, solar, plinth }));
   return group;
 }
 
-/** Everything the gabled shell does not make: the walkout basement, the piers, the wraparound deck, the stair, the posts, the panels. */
-function lodgeShell(p: Parts, o: { y0: number; yE: number; f2: number; bw: number; hw: number; hd: number; hatches: ReadonlyArray<Rect>; solar: boolean }): void {
-  const { y0, yE, bw, hw, hd } = o;
+/** The walkout basement of the lodge on a slope. */
+function lodgeBasement(p: Parts, o: LodgeShell): void {
+  const { y0, bw, hw, hd } = o;
   const top = y0 - 0.004;
   // ── the walkout basement: poured and stone-faced, the pad is its floor; the back (downhill) wall is mostly glass ──
   p.layer = 'foundation';
@@ -127,6 +127,31 @@ function lodgeShell(p: Parts, o: { y0: number; yE: number; f2: number; bw: numbe
   // the stone course above the basement wall and the log sill, a drip of fieldstone at each corner
   p.add('fieldstone', box(2 * hw + 0.04, 0.03, 0.04, 0, top - 0.005, hd + 0.005), 'foundation');
   p.add('fieldstone', box(2 * hw + 0.04, 0.03, 0.04, 0, top - 0.005, -hd - 0.005), 'foundation');
+
+}
+
+/** The lodge on level ground: a raised fieldstone plinth under the logs, a poured slab on grade inside it, two vented crawl-space grilles, a stone course at the sill. */
+function lodgePlinth(p: Parts, o: LodgeShell): void {
+  const { y0, hw, hd } = o;
+  p.layer = 'foundation';
+  for (const r of minusHoles({ x0: -hw, x1: hw, z0: -hd, z1: hd }, o.hatches)) p.add('concrete', box(r.x1 - r.x0, 0.04, r.z1 - r.z0, (r.x0 + r.x1) / 2, -0.04, (r.z0 + r.z1) / 2));
+  const courses = 5, ch = (y0 + 0.03) / courses;
+  for (let i = 0; i < courses; i++) {
+    const inset = i % 2 ? 0.004 : 0;
+    for (const sz of [-1, 1]) p.add('fieldstone', box(2 * hw + 0.03 - inset, ch - 0.002, 0.07, 0, -0.03 + i * ch, sz * (hd - 0.035)), 'foundation');
+    for (const sx of [-1, 1]) p.add('fieldstone', box(0.07, ch - 0.002, 2 * hd - 0.14, sx * (hw - 0.035), -0.03 + i * ch, 0), 'foundation');
+  }
+  for (const x of [-0.6, 0.6]) p.add('iron', box(0.14, 0.05, 0.012, x, 0.05, hd + 0.004), 'openings');   // the vents
+  p.add('fieldstone', box(2 * hw + 0.04, 0.03, 0.04, 0, y0 - 0.034, hd + 0.005), 'foundation');
+  p.add('fieldstone', box(2 * hw + 0.04, 0.03, 0.04, 0, y0 - 0.034, -hd - 0.005), 'foundation');
+}
+
+interface LodgeShell { y0: number; yE: number; f2: number; bw: number; hw: number; hd: number; hatches: ReadonlyArray<Rect>; solar: boolean; plinth: boolean }
+
+/** Everything the gabled shell does not make: the walkout basement, the piers, the wraparound deck, the stair, the posts, the panels. */
+function lodgeShell(p: Parts, o: LodgeShell): void {
+  const { y0, yE, hw, hd } = o;
+  if (o.plinth) lodgePlinth(p, o); else lodgeBasement(p, o);
 
   // ── stone piers under the deck and the beams on them ──
   const dx = hw + L.deck, dz = hd + L.deck;
@@ -220,7 +245,7 @@ function lodgePanels(p: Parts, yE: number): void {
 }
 
 /** The lodge's rooms. Main floor: the great room with the stone hearth, the kitchen by the glass gable, a master suite; the loft floor: four bedrooms, a bath, a study; the basement: a cold cellar, the mechanical room, a family room. */
-function furnishLodge(c: FurnishCtx, o: { y0: number; f2: number; clear: Collider[] }): void {
+function furnishLodge(c: FurnishCtx, o: { y0: number; f2: number; clear: Collider[]; plinth: boolean }): void {
   const { I, left, right, front, back, yE, parts } = c;
   const w = c.parts.opts;
   const bY = 0.004;                                                  // the basement floor (the pad)
@@ -306,6 +331,7 @@ function furnishLodge(c: FurnishCtx, o: { y0: number; f2: number; clear: Collide
   U({ x: 0, z: -0.05 }, a => Furniture.rug(a, 1.6, 1.0));
   U({ x: -0.76, z: -0.15 }, a => Furniture.chair(a));
 
+  if (!o.plinth) {
   // ── the basement: a cold cellar (food shelves, root bins, crocks, a chest freezer), the mechanical room, a family room on the walkout side ──
   const cold = { x0: left, x1: -0.2, z0: 0.55, z1: front };
   const stone = (ax: number, az: number, bx: number, bz: number, ops: Array<{ at: number; w: number; sill: number; h: number }> = []) => parts.collide(...wallRun(parts.sink, 'interior', 'concrete', { ax, az, bx, bz, y0: 0.0, h: 0.46, t: 0.025, openings: ops }));
@@ -337,6 +363,7 @@ function furnishLodge(c: FurnishCtx, o: { y0: number; f2: number; clear: Collide
   B({ x: 0.75, z: -0.2 }, a => Furniture.stool(a));
   // stairs up from the family room to the kitchen
   B({ x: right - 0.12, z: -0.1, rot: Math.PI }, a => Furniture.stairs(a, 3.0, 3.6, 0.9));
+  }
   void yE;
 }
 
@@ -347,7 +374,8 @@ const LODGE_SEATS: Array<[number, number, number, number]> = [[-0.8, -0.78, -0.5
 // The two-storey 9 × 12 m houses (stone, timber frame): one plan, two shells
 // ─────────────────────────────────────────────────────────────────────────
 
-interface TwoStorey { y0: number; f2: number; open: number | null; hearth: number; rug: KitMaterialId }
+/** `stone`: a centre-hall house of separate rooms (parlor and dining to the left, kitchen and bedroom to the right). `timber`: one open hall under the gallery with the kitchen along a wall and only the bath walled off. */
+interface TwoStorey { y0: number; f2: number; open: number | null; hearth: number; rug: KitMaterialId; plan: 'stone' | 'timber' }
 
 /** Rooms of a 9 × 12 m two-storey house: great room with a hearth, kitchen and dining, a bedroom and bath at the back; two bedrooms, a bath and a landing above. */
 function furnishTwoStorey(c: FurnishCtx, o: TwoStorey): void {
@@ -355,6 +383,53 @@ function furnishTwoStorey(c: FurnishCtx, o: TwoStorey): void {
   const w = parts.opts;
   const f2y = o.f2 + 0.004;
   const U = (p: { x: number; z: number; rot?: number }, fn: (a: Add) => void) => { piece(parts.sink, 'loft', { ...p, y: f2y }, fn, false); };
+  if (o.plan === 'stone') {
+  // centre hall: the stair, a rug and the coat pegs; the hearth warms the dining room beside it
+  const door = (at: number) => ({ at, w: 0.15, sill: 0, h: 0.38 });
+  const span = front - back;
+  c.partition(-0.2, back, -0.2, front - 0.04, [door(0.35), door(span - 0.45)], 'plaster', 0.44);
+  c.partition(0.2, back, 0.2, front - 0.04, [door(0.35), door(span - 0.45)], 'plaster', 0.44);
+  c.partition(left, 0.1, -0.2, 0.1, [door(0.3)], 'plaster', 0.44);
+  c.partition(0.2, 0.0, right, 0.0, [door(0.25)], 'plaster', 0.44);
+  c.partition(0.55, back, 0.55, -0.45, [door(0.2)], 'plaster', 0.44);
+  c.partition(0.55, -0.45, right, -0.45, [], 'plaster', 0.44);
+  // dining room (back left): the hearth, a table and chairs
+  I({ x: -0.3, z: back + 0.06 }, a => Furniture.fireplace(a, o.hearth));
+  I({ x: -0.55, z: -0.5 }, a => Furniture.diningTable(a));
+  dressEvenings(c, { x: -0.55, z: -0.5, rot: 0 });
+  I({ x: left + 0.03, z: -0.3, rot: Math.PI / 2 }, a => Furniture.shelfUnit(a, 1.2, 1.8, 'jars'));
+  // parlor (front left): sofa, two armchairs, a rug, books
+  I({ x: -0.62, z: 0.55 }, a => Furniture.rug(a, 2.4, 2.4), false);
+  I({ x: -0.62, z: 0.3, rot: Math.PI }, a => Furniture.sofa(a, 'quilt_blue'));
+  I({ x: -0.9, z: 0.6, rot: Math.PI / 2 }, a => Furniture.armchair(a, 'quilt_red'));
+  I({ x: -0.34, z: 0.6, rot: -Math.PI / 2 }, a => Furniture.armchair(a, 'quilt_red'));
+  I({ x: left + 0.03, z: 0.85, rot: Math.PI / 2 }, a => Furniture.shelfUnit(a, 1.2, 1.8, 'books'));
+  // hall
+  I({ x: 0.06, z: -0.2 }, a => Furniture.stairs(a, 2.8, 3.4, 0.9));
+  I({ x: 0.0, z: front - 0.04, rot: Math.PI }, a => Furniture.coatPegs(a, 1.0), false);
+  // kitchen (front right): the range, the counter, an island and a table
+  I({ x: right - 0.05, z: 0.5, rot: -Math.PI / 2 }, a => Furniture.counter(a, 3.2, 0.4, !!w.plumbed));
+  I({ x: right - 0.06, z: 0.9, rot: -Math.PI / 2 }, a => Furniture.cookstove(a));
+  if (w.wired) I({ x: right - 0.065, z: 0.2, rot: -Math.PI / 2 }, a => Furniture.fridge(a));
+  I({ x: 0.55, z: 0.55, rot: Math.PI / 2 }, a => Furniture.island(a, 1.6));
+  I({ x: 0.45, z: 0.95, rot: Math.PI / 2 }, a => Furniture.table(a, 1.2, 0.8));
+  I({ x: 0.5, z: front - 0.04, rot: Math.PI }, a => Furniture.shelfUnit(a, 1.0, 1.6, 'food'));
+  // bedroom (back, between the hall and the bath) and the bath (back right)
+  I({ x: 0.38, z: back + 0.22 }, a => { Furniture.bed(a, true, 'quilt_red'); sickSlot(a); });
+  I({ x: 0.24, z: back + 0.06 }, a => Furniture.nightstand(a));
+  I({ x: 0.5, z: -0.2, rot: -Math.PI / 2 }, a => Furniture.dresser(a, 0.9));
+  I({ x: 0.75, z: back + 0.2 }, a => Furniture.tub(a));
+  I({ x: right - 0.04, z: -0.6, rot: -Math.PI / 2 }, a => Furniture.washstand(a));
+  I({ x: 0.68, z: -0.55 }, a => (w.plumbed && w.septic ? Furniture.flushToilet(a) : Furniture.toilet(a)));
+  if (w.wired) for (const [x, z] of [[-0.55, -0.5], [-0.62, 0.45], [0.55, 0.6]] as const) I({ x, z, y: o.f2 - 0.05 }, a => Furniture.pendant(a, 0.5), false);
+  const tableY = c.y0 + 0.004 + 0.76 * M;
+  c.C({ x: 0.45, z: 0.95, y: tableY }, a => Clutter.fruitBowl(a), 0.8);
+  c.C({ x: -0.55, z: -0.5, y: tableY }, a => Clutter.plate(a), 0.7);
+  c.C({ x: -0.3, z: 0.62, y: c.y0 + 0.004 + 0.36 * M }, a => Clutter.cat(a), 0.5);
+  c.C({ x: left + 0.002, z: -0.65, y: c.y0 + 1.3 * M, rot: Math.PI / 2 }, a => Clutter.picture(a, 0.8, 0.6, c.rnd() < 0.5 ? 'art_mountains' : 'art_sunset'), 1);
+  c.C({ x: 0.1, z: front - 0.06, rot: 0.2 }, a => Clutter.boots(a), 0.95);
+  c.C({ x: c.hw + 0.12, z: -0.5, y: 0.004, rot: -Math.PI / 2 }, a => Clutter.woodpile(a, 5.0, 1.3), 1);
+  } else {
   // great room at the back, round the hearth
   I({ x: -0.3, z: back + 0.06 }, a => Furniture.fireplace(a, o.hearth));
   I({ x: -0.3, z: -0.55 }, a => Furniture.rug(a, 2.8, 2.0), false);
@@ -375,16 +450,15 @@ function furnishTwoStorey(c: FurnishCtx, o: TwoStorey): void {
   I({ x: -0.3, z: front - 0.01, rot: Math.PI }, a => Furniture.coatPegs(a, 1.0), false);
   if (w.wired) for (const [x, z] of [[-0.2, 0.5], [0.3, 0.62], [-0.3, -0.45]] as const) I({ x, z, y: o.f2 - 0.05 }, a => Furniture.pendant(a, 0.5), false);
   // the ground-floor bedroom and bath, back right
-  c.partition(0.28, back, 0.28, -0.4, [{ at: (-0.4 - back) - 0.22, w: 0.15, sill: 0, h: 0.38 }], 'pine_panel', 0.44);
-  c.partition(0.28, -0.4, right, -0.4, [], 'pine_panel', 0.44);
-  c.partition(0.28, 0.0, right, 0.0, [{ at: 0.28, w: 0.15, sill: 0, h: 0.38 }], 'pine_panel', 0.44);
-  I({ x: 0.5, z: back + 0.22 }, a => { Furniture.bed(a, true, 'quilt_red'); sickSlot(a); });
-  I({ x: 0.36, z: back + 0.06 }, a => Furniture.nightstand(a));
-  I({ x: right - 0.06, z: back + 0.06 }, a => Furniture.nightstand(a));
-  I({ x: right - 0.05, z: -0.6, rot: -Math.PI / 2 }, a => Furniture.dresser(a, 1.1));
-  I({ x: 0.5, z: -0.2 }, a => Furniture.tub(a));
-  I({ x: right - 0.04, z: -0.04, rot: -Math.PI / 2 }, a => Furniture.washstand(a));
-  I({ x: 0.36, z: -0.05 }, a => (w.plumbed && w.septic ? Furniture.flushToilet(a) : Furniture.toilet(a)));
+  // (open plan: no bedroom walls; the bed stands by the stove in the hall and only the bath is walled off, back right)
+  c.partition(0.5, back, 0.5, -0.4, [{ at: (-0.4 - back) - 0.22, w: 0.15, sill: 0, h: 0.38 }], 'pine_panel', 0.44);
+  c.partition(0.5, -0.4, right, -0.4, [], 'pine_panel', 0.44);
+  I({ x: 0.12, z: back + 0.22 }, a => { Furniture.bed(a, true, 'quilt_red'); sickSlot(a); });
+  I({ x: -0.04, z: back + 0.06 }, a => Furniture.nightstand(a));
+  I({ x: 0.7, z: back + 0.2 }, a => Furniture.tub(a));
+  I({ x: right - 0.04, z: -0.55, rot: -Math.PI / 2 }, a => Furniture.washstand(a));
+  I({ x: 0.62, z: -0.5 }, a => (w.plumbed && w.septic ? Furniture.flushToilet(a) : Furniture.toilet(a)));
+  I({ x: 0.3, z: -0.1 }, a => Furniture.workbench(a, 1.8));
   I({ x: 0.06, z: -0.2 }, a => Furniture.stairs(a, 2.8, 3.4, 0.9));
   // lived in
   const tableY = c.y0 + 0.004 + 0.76 * M, counterY = c.y0 + 0.004 + 0.9 * M;
@@ -401,6 +475,7 @@ function furnishTwoStorey(c: FurnishCtx, o: TwoStorey): void {
   c.C({ x: -0.15, z: front - 0.005, y: c.y0 + 2.1 * M, rot: Math.PI }, a => Clutter.riflePegs(a), 0.6);
   c.C({ x: -0.35, z: c.hd + 0.2, y: c.y0, rot: 0.25 }, a => Clutter.rocker(a), 0.9);
   c.C({ x: c.hw + 0.12, z: -0.5, y: 0.004, rot: -Math.PI / 2 }, a => Clutter.woodpile(a, 5.0, 1.3), 1);
+  }
   // the upper floor: boards over the plan, a hole for the stair, a landing between the rooms
   const top = o.open ?? front;
   const floor = minusHoles({ x0: left, x1: right, z0: back, z1: top }, [{ x0: -0.02, x1: 0.18, z0: -0.56, z1: 0.14 }]);
@@ -456,7 +531,7 @@ function stoneHouse(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Gro
     left: side, right: side,
     gableWindow: { front: true, back: true, w: 0.34, h: 0.22, y: 0.06 },
     chimney: { kind: 'stone', x: -0.3 }, tieBeams: [-0.5, 0.1, 0.7], ceiling: 'pine_panel', corners: 'none', curtains: 'curtain',
-  }, (c: FurnishCtx) => furnishTwoStorey(c, { y0, f2, open: null, hearth: 5.2, rug: 'rug' }), new Parts(seed, opts), p => {
+  }, (c: FurnishCtx) => furnishTwoStorey(c, { y0, f2, open: null, hearth: 5.2, rug: 'rug', plan: 'stone' }), new Parts(seed, opts), p => {
     // dressed quoins at the corners (long and short stones alternately), a stone lintel over every opening, shutters, a stone step at the porch
     p.layer = 'walls';
     const courses = 18, ch = wallH / courses;
@@ -491,7 +566,7 @@ function timberFrameHouse(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THR
     right: [tall(-0.62, 0.3), tall(0.05, 0.3), tall(0.62, 0.3)],
     gableWindow: { front: true, back: true, w: 1.0, h: 0.5, y: 0.04, rake: true },
     chimney: { kind: 'pipe', x: -0.3, z: -0.45 }, tieBeams: [-0.5, 0.1, 0.7], ceiling: 'pine_panel', corners: 'none', curtains: 'curtain',
-  }, (c: FurnishCtx) => furnishTwoStorey(c, { y0, f2, open: 0.2, hearth: 3.0, rug: 'rug' }), new Parts(seed, opts), p => {
+  }, (c: FurnishCtx) => furnishTwoStorey(c, { y0, f2, open: 0.2, hearth: 3.0, rug: 'rug', plan: 'timber' }), new Parts(seed, opts), p => {
     // the frame outside, standing proud of the plaster: corner and bay posts, a sill, the floor girt and the plate, knee braces at every post
     p.layer = 'deck';
     const tm: KitMaterialId = 'wood_dark', pr = 0.024;
@@ -745,6 +820,7 @@ const SEATS_ADOBE: Array<[number, number, number, number]> = [[-0.15, -0.2, -0.1
 
 export const HOUSING_BUILDERS: Record<string, Builder> = {
   lodge: (def, seed, opts) => lodge(def, seed, opts, false),
+  lodge_plinth: (def, seed, opts) => lodge(def, seed, opts, false, true),
   lodge_solar: (def, seed, opts) => lodge(def, seed, opts, true),
   stone_house: stoneHouse,
   timber_frame: timberFrameHouse,
@@ -752,7 +828,7 @@ export const HOUSING_BUILDERS: Record<string, Builder> = {
   adobe_house: adobeHouse,
 };
 export const HOUSING_SEATS: Record<string, Array<[number, number, number, number]>> = {
-  lodge: LODGE_SEATS, lodge_solar: LODGE_SEATS, stone_house: SEATS_2S, timber_frame: SEATS_2S, container_house: SEATS_CONTAINER, adobe_house: SEATS_ADOBE,
+  lodge: LODGE_SEATS, lodge_plinth: LODGE_SEATS, lodge_solar: LODGE_SEATS, stone_house: SEATS_2S, timber_frame: SEATS_2S, container_house: SEATS_CONTAINER, adobe_house: SEATS_ADOBE,
 };
 
 void pipe; void cyl;
