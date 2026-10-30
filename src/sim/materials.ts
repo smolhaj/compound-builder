@@ -14,6 +14,7 @@ export type MaterialId = 'lumber' | 'logs' | 'firewood' | 'fieldstone' | 'concre
   | 'plate_carrier' | 'ifak' | 'nvg' | 'thermal' | 'radios' | 'cameras' | 'thermal_cam' | 'driveway_alarm' | 'floodlights' | 'blackout_curtains' | 'gen_baffles' | 'gen_vault' | 'tripwire' | 'dog' | 'puppy' | 'kibble' | 'dogbed' | 'doghouse' | 'steel_door' | 'window_bars' | 'sandbags' | 'safe_room' | 'sw_radio' | 'ham_rig' | 'helmet' | 'soft_armor'
   | 'grenades' | 'rpg_launcher' | 'rpg_rounds' | 'suppressor'
   | 'mines' | 'greenhouse_kit' | 'fruit_trees' | 'ground_sensor' | 'passage_hatch' | 'vehicle_parts'
+  | 'bugout_bag' | 'bugout_cache' | 'security_door' | 'window_shutters' | 'ballistic_panels' | 'safe_room_hardened'
   | 'gun_mount' | 'turret_head' | 'ai_sensor_module'
   | 'tent' | 'sleeping_bag'
   | 'jon_boat' | 'skiff'
@@ -158,6 +159,12 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   steel_door: { id: 'steel_door', name: 'Steel entry door', unit: 'a steel door in a steel frame, installed', price: 1200 },
   window_bars: { id: 'window_bars', name: 'Window bars', unit: 'security bars for the house windows', price: 900 },
   sandbags: { id: 'sandbags', name: 'Sandbags', unit: '100 bags (fill them with your own dirt) for a fighting position', price: 300 },
+  security_door: { id: 'security_door', name: 'Security door', unit: 'a reinforced steel door: deadbolts into the frame, a welded strike plate and hinge pins that cannot be knocked out (replaces a steel entry door)', price: 2600 },
+  window_shutters: { id: 'window_shutters', name: 'Steel roll-down shutters', unit: 'steel roll-down shutters for every window, closed from inside; they also keep wildfire embers out (they go over the bars)', price: 3400 },
+  ballistic_panels: { id: 'ballistic_panels', name: 'Ballistic window panels', unit: 'level III ballistic panels behind the glass of the house, bolted into the studs (they go over shutters)', price: 7400 },
+  safe_room_hardened: { id: 'safe_room_hardened', name: 'Hardened safe room', unit: 'a poured safe room: ballistic lining, a vault door, a filtered air vent, a water drum and a bunk (replaces the safe room)', price: 24000 },
+  bugout_bag: { id: 'bugout_bag', name: 'Bug-out bag', unit: 'a packed 72-hour pack for one person: water filter, dried food, shelter, first aid, map and a light (about 18 kg)', price: 260 },
+  bugout_cache: { id: 'bugout_cache', name: 'Bug-out cache', unit: 'sealed drums buried at a second site, a day or two away: two weeks of food and water, fuel, a medical kit and tools for the family', price: 2200 },
   safe_room: { id: 'safe_room', name: 'Safe room', unit: 'a reinforced interior room: steel door, lined walls, supplies shelf', price: 8500 },
   // for the watch towers' top tiers (sim/towers.ts)
   gun_mount: { id: 'gun_mount', name: 'Ring mount & machine gun', unit: 'a pintle ring on a pedestal with a registered belt-fed 7.62 machine gun and a feed tray', price: 9500 },

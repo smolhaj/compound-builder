@@ -15,6 +15,7 @@ import { askPrice, CURRENCY, daysToMarket, goodName, goProblem, goToMarket, MARK
 import { BAG_BASE, BAG_GOODS } from '../sim/tradeGoods';
 import { answerCallout, askPact, joinGroup, joinGroupProblem, leaveGroup, leavePact, PACT_MIN, stateWord, surname } from '../sim/neighborLife';
 import { inPact } from '../sim/pact';
+import { clarity, openRumors, roadRisk, scoutProblem, sendScout } from '../sim/rumors';
 
 const DIM = 'rgba(238,238,238,0.6)', LINE = 'rgba(255,255,255,0.08)';
 const TONE = { good: '#a8d080', warn: '#f0c070', bad: '#f08060' } as const;
@@ -104,6 +105,33 @@ export function ScavengeSection() {
 // ─────────────────────────────────────────────────────────────────────────
 // Market
 // ─────────────────────────────────────────────────────────────────────────
+
+export function RumorsSection() {
+  const g = useGameStore();
+  const game = g.game;
+  const [who, setWho] = useState<string>('');
+  const open = openRumors(game);
+  const sc = game.radio?.scout;
+  if (!open.length && !sc) return null;
+  const can = goers(game);
+  const pid = who && can.some(p => p.id === who) ? who : can[0]?.id ?? '';
+  const hunter = game.people.find(p => p.id === pid)?.skills.hunter ?? 0;
+  return <Section title="Rumors">
+    {sc && <Note tone="warn">{game.people.find(p => p.id === sc.pid)?.first ?? 'Someone'} is out checking a rumor, back tomorrow.</Note>}
+    {can.length > 0 && !sc && <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 2 }}>
+      {can.map(p => <button key={p.id} style={btn(pid === p.id)} onClick={() => setWho(p.id)}>{p.first}</button>)}
+      <span style={{ color: DIM, fontSize: 11 }}>clear view {pct(clarity(hunter))} · road risk {pct(roadRisk(game, hunter))}</span>
+    </div>}
+    {open.slice().reverse().map(h => {
+      const why = scoutProblem(game, h.id, pid);
+      return <div key={h.id} style={{ borderTop: `1px solid ${LINE}`, padding: '3px 0' }}>
+        <Note>{h.text}{h.status === 'unclear' ? ' (nobody could tell)' : ''}</Note>
+        <button style={{ ...btn(), opacity: why ? 0.4 : 1 }} disabled={!!why} title={why ?? 'Go and see, on foot. Back tomorrow.'}
+          onClick={() => { const w = g.money(d => sendScout(d, h.id, pid)); if (w) alert(w); }}>Go and see</button>
+      </div>;
+    })}
+  </Section>;
+}
 
 const usd = (n: number) => '$' + Math.round(n).toLocaleString('en-US');
 const NAMES: Partial<Record<string, string>> = { canned: 'canned (case)', staples: 'staples (25 kg)', fuel: 'fuel (20 L can)', meds: 'meds / antibiotics (kit)', seed: 'seed (season)', fresh: 'fresh (basket)', hygiene: 'hygiene (month)', firewood: 'firewood (rick)' };

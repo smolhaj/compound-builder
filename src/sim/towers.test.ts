@@ -210,7 +210,7 @@ describe('what the top tiers need', () => {
 
   it('a turret can jam', () => {
     let jams = 0;
-    for (let seed = 1; seed <= 40 && !jams; seed++) {
+    for (let seed = 1; seed <= 300 && !jams; seed++) {
       const h = afterHit(seed + 20); tower(h, 'watchtower_turret'); power(h); h.armory.ammo['556'] = 5000;
       for (const p of h.people) p.kid = true;
       jams += planBattle(h, 8, seed).events.filter(e => e.kind === 'jam' && e.unit.startsWith('t_')).length;

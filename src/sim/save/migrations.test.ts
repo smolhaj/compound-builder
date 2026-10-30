@@ -111,4 +111,17 @@ describe('save migrations', () => {
     expect(m.roadBridge).toEqual({ down: false, due: null });
     expect(() => step(structuredClone(m), 3)).not.toThrow();
   });
+
+  it('v69 → v70: the new hardening and bug-out goods are in stock at zero, and what the family owned is kept', () => {
+    const old = JSON.parse(JSON.stringify(newGame(3)));
+    old.version = 69;
+    for (const k of ['security_door', 'window_shutters', 'ballistic_panels', 'safe_room_hardened', 'bugout_bag', 'bugout_cache']) delete old.stock[k];
+    old.stock.steel_door = 2;
+    const m = migrate(old);
+    expect(m.version).toBe(SAVE_VERSION);
+    expect(m.stock.window_shutters).toBe(0);
+    expect(m.stock.bugout_cache).toBe(0);
+    expect(m.stock.steel_door).toBe(2);
+    expect(() => step(structuredClone(m), 3)).not.toThrow();
+  });
 });
