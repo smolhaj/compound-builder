@@ -114,6 +114,14 @@ export const WOOD_OVEN: KitPieceDef = {
   maxSlope: 0.3, floorY: 0.0, porch: 0, sleeps: 0, light: null,
 };
 
+export const FORGE: KitPieceDef = {
+  id: 'forge', name: 'Forge', category: 'work',
+  blurb: 'An open-sided smithy: a stone hearth, bellows, an anvil on a stump and a quench trough. Mends tools from scrap iron with no hardware, and turns out better improvised steel tools.',
+  cellsX: 2, cellsZ: 1, frontCells: 1,
+  parts: { foundation: 'concrete', walls: 'fieldstone', roof: 'metal_roof' },
+  maxSlope: 0.25, floorY: 0.02, porch: 0, sleeps: 0, light: [0, 0.25, 0],
+};
+
 export const APIARY: KitPieceDef = {
   id: 'apiary', name: 'Apiary', category: 'food',
   blurb: 'Four hives behind an electric bear fence: honey, wax, and a better garden and orchard. Bees come in spring from the Shop.',
@@ -451,7 +459,7 @@ export const BUNKER_KIT: KitPieceDef[] = [
 /** Underground menu order. */
 export const BUNKER_ORDER: readonly string[] = BUNKER_KIT.map(d => d.id);
 
-export const KIT: Record<string, KitPieceDef> = Object.fromEntries([POLYTUNNEL, HIGH_TUNNEL, AQUAPONICS, LODGE, LODGE_SOLAR, STONE_HOUSE, TIMBER_FRAME_HOUSE, CONTAINER_HOUSE, ADOBE_HOUSE, APIARY, SUGAR_SHACK, BARNYARD, WOOD_OVEN, GATE_GARAGE_KIT, MOTOR_COURT_KIT, TIMBER_CABIN, LOG_HOUSE, FARMHOUSE, TRAILER, BARN, COTTAGE, GUEST_HOUSE, MOMS_HOUSE, METAL_GARAGE, GARAGE_SOLAR, OUTHOUSE, WORKSHOP, ROOT_CELLAR, CHICKEN_COOP, GARDEN, FIELD, GREENHOUSE, GREENHOUSE_HEATED, ORCHARD, ORCHARD_GROVE, POND, RESERVOIR, SHEEP_BARN, EQUIPMENT_YARD, TERRACE_STAIR, TERRACE_RAMP, ...UTILITY_KIT, ...BUNKER_KIT, ...TOWER_KIT].map(d => [d.id, d]));
+export const KIT: Record<string, KitPieceDef> = Object.fromEntries([POLYTUNNEL, HIGH_TUNNEL, AQUAPONICS, LODGE, LODGE_SOLAR, STONE_HOUSE, TIMBER_FRAME_HOUSE, CONTAINER_HOUSE, ADOBE_HOUSE, APIARY, FORGE, SUGAR_SHACK, BARNYARD, WOOD_OVEN, GATE_GARAGE_KIT, MOTOR_COURT_KIT, TIMBER_CABIN, LOG_HOUSE, FARMHOUSE, TRAILER, BARN, COTTAGE, GUEST_HOUSE, MOMS_HOUSE, METAL_GARAGE, GARAGE_SOLAR, OUTHOUSE, WORKSHOP, ROOT_CELLAR, CHICKEN_COOP, GARDEN, FIELD, GREENHOUSE, GREENHOUSE_HEATED, ORCHARD, ORCHARD_GROVE, POND, RESERVOIR, SHEEP_BARN, EQUIPMENT_YARD, TERRACE_STAIR, TERRACE_RAMP, ...UTILITY_KIT, ...BUNKER_KIT, ...TOWER_KIT].map(d => [d.id, d]));
 /** Build-menu order. */
 export const KIT_ORDER: readonly string[] = ['timber_cabin', 'log_house', 'lodge', 'lodge_solar', 'stone_house', 'timber_frame', 'container_house', 'adobe_house', 'cottage', 'guest_house', 'moms_house', 'outhouse', 'garden', 'greenhouse', 'polytunnel', 'high_tunnel', 'greenhouse_heated', 'aquaponics', 'orchard', 'orchard_grove', 'field', 'chicken_coop', 'sheep_barn', 'pond', 'root_cellar', 'wood_oven', 'apiary', 'sugar_shack', 'barnyard', 'workshop', 'metal_garage', 'barn', 'equipment_yard'];
 /** Water & power menu order. */
