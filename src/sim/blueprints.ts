@@ -206,6 +206,13 @@ export const LODGE_BLUEPRINT: Blueprint = {
     { id: 'finish', name: 'Glass gable, stone chimney, floors, stairs, kitchen, four baths, wraparound deck and rails', hours: 2700, materials: { lumber: 40, hardware: 70, fixtures: 6, cable: 10, pipe: 8, fieldstone: 6 } },
   ],
 };
+/** The lodge on flat ground: the same log house on a raised fieldstone plinth with a crawl space and no basement (no excavator, far less concrete); the cold cellar and the family room below are gone. */
+export const LODGE_PLINTH_BLUEPRINT: Blueprint = {
+  kind: 'lodge_plinth',
+  stages: LODGE_BLUEPRINT.stages.map(st => st.id === 'site' ? { ...st, name: 'Stake out and level the pad', hours: 60, materials: {} }
+    : st.id === 'foundation' ? { ...st, name: 'Footings and a fieldstone plinth wall, vented crawl space', hours: 480, materials: { concrete: 30, rebar: 3, fieldstone: 55 } }
+    : st.id === 'finish' ? { ...st, hours: st.hours - 300, materials: { ...st.materials, hardware: Math.max(0, (st.materials.hardware ?? 0) - 6) } } : st),
+};
 /** The lodge with 25 × 400 W panels on its south roof (≈ 10 kW): the panels and an inverter on top of the lodge's bill. */
 export const LODGE_SOLAR_BLUEPRINT: Blueprint = {
   kind: 'lodge_solar',
@@ -338,11 +345,11 @@ export const METAL_GARAGE_BLUEPRINT: Blueprint = { kind: 'metal_garage', stages:
 export const GARAGE_SOLAR_BLUEPRINT: Blueprint = { kind: 'garage_solar', stages: garageStages(true) };
 
 /** Kinds people live in (a kitchen, a roof over the family). */
-export const HOMES: readonly string[] = ['timber_cabin', 'log_house', 'farmhouse', 'trailer', 'cottage', 'guest_house', 'moms_house', 'lodge', 'lodge_solar', 'stone_house', 'timber_frame', 'container_house', 'adobe_house'];
+export const HOMES: readonly string[] = ['timber_cabin', 'log_house', 'farmhouse', 'trailer', 'cottage', 'guest_house', 'moms_house', 'lodge', 'lodge_plinth', 'lodge_solar', 'stone_house', 'timber_frame', 'container_house', 'adobe_house'];
 const HOME_SET: ReadonlySet<string> = new Set(HOMES);
 export const isHome = (kind: string) => HOME_SET.has(kind);
 /** People each home kind sleeps (matches the kit's `sleeps`). */
-export const HOME_BEDS: Record<string, number> = { timber_cabin: 4, log_house: 6, farmhouse: 6, trailer: 4, cottage: 3, guest_house: 2, moms_house: 4, lodge: 10, lodge_solar: 10, stone_house: 6, timber_frame: 6, container_house: 4, adobe_house: 4 };
+export const HOME_BEDS: Record<string, number> = { timber_cabin: 4, log_house: 6, farmhouse: 6, trailer: 4, cottage: 3, guest_house: 2, moms_house: 4, lodge: 10, lodge_plinth: 10, lodge_solar: 10, stone_house: 6, timber_frame: 6, container_house: 4, adobe_house: 4 };
 /** Beds under a finished roof on the place (shelter for the household and anyone taken in). */
 export function homeBeds(s: { structures: ReadonlyArray<{ kind: string; stage: number }> }): number {
   return s.structures.reduce((a, st) => a + (BLUEPRINTS[st.kind] && st.stage >= BLUEPRINTS[st.kind].stages.length ? HOME_BEDS[st.kind] ?? 0 : 0), 0);
@@ -517,7 +524,7 @@ export const GATE_GARAGE_BLUEPRINT: Blueprint = bp('gate_garage', [
 ]);
 
 export const BLUEPRINTS: Record<string, Blueprint> = Object.fromEntries(
-  [CABIN_BLUEPRINT, OUTHOUSE_BLUEPRINT, WORKSHOP_BLUEPRINT, ROOT_CELLAR_BLUEPRINT, WOOD_OVEN_BLUEPRINT, APIARY_BLUEPRINT, SUGAR_SHACK_BLUEPRINT, BARNYARD_BLUEPRINT, COOP_BLUEPRINT, GARDEN_BLUEPRINT, FIELD_BLUEPRINT, GREENHOUSE_BLUEPRINT, ORCHARD_BLUEPRINT, LOG_HOUSE_BLUEPRINT, FARMHOUSE_BLUEPRINT, TRAILER_BLUEPRINT, BARN_BLUEPRINT, COTTAGE_BLUEPRINT, GUEST_HOUSE_BLUEPRINT, MOMS_HOUSE_BLUEPRINT, LODGE_BLUEPRINT, LODGE_SOLAR_BLUEPRINT, STONE_HOUSE_BLUEPRINT, TIMBER_FRAME_BLUEPRINT, CONTAINER_HOUSE_BLUEPRINT, ADOBE_HOUSE_BLUEPRINT, METAL_GARAGE_BLUEPRINT, GARAGE_SOLAR_BLUEPRINT, ...UTILITY_BLUEPRINTS, GREENHOUSE_HEATED_BLUEPRINT, ORCHARD_GROVE_BLUEPRINT, SOLAR_FARM_BLUEPRINT, BATTERY_BANK_BLUEPRINT, POND_BLUEPRINT, RESERVOIR_BLUEPRINT, SHEEP_BARN_BLUEPRINT, EQUIPMENT_YARD_BLUEPRINT, ...BUNKER_BLUEPRINTS, ...TOWER_BLUEPRINTS, GATE_GARAGE_BLUEPRINT, MOTOR_COURT_BLUEPRINT].map(b => [b.kind, b]));
+  [CABIN_BLUEPRINT, OUTHOUSE_BLUEPRINT, WORKSHOP_BLUEPRINT, ROOT_CELLAR_BLUEPRINT, WOOD_OVEN_BLUEPRINT, APIARY_BLUEPRINT, SUGAR_SHACK_BLUEPRINT, BARNYARD_BLUEPRINT, COOP_BLUEPRINT, GARDEN_BLUEPRINT, FIELD_BLUEPRINT, GREENHOUSE_BLUEPRINT, ORCHARD_BLUEPRINT, LOG_HOUSE_BLUEPRINT, FARMHOUSE_BLUEPRINT, TRAILER_BLUEPRINT, BARN_BLUEPRINT, COTTAGE_BLUEPRINT, GUEST_HOUSE_BLUEPRINT, MOMS_HOUSE_BLUEPRINT, LODGE_BLUEPRINT, LODGE_PLINTH_BLUEPRINT, LODGE_SOLAR_BLUEPRINT, STONE_HOUSE_BLUEPRINT, TIMBER_FRAME_BLUEPRINT, CONTAINER_HOUSE_BLUEPRINT, ADOBE_HOUSE_BLUEPRINT, METAL_GARAGE_BLUEPRINT, GARAGE_SOLAR_BLUEPRINT, ...UTILITY_BLUEPRINTS, GREENHOUSE_HEATED_BLUEPRINT, ORCHARD_GROVE_BLUEPRINT, SOLAR_FARM_BLUEPRINT, BATTERY_BANK_BLUEPRINT, POND_BLUEPRINT, RESERVOIR_BLUEPRINT, SHEEP_BARN_BLUEPRINT, EQUIPMENT_YARD_BLUEPRINT, ...BUNKER_BLUEPRINTS, ...TOWER_BLUEPRINTS, GATE_GARAGE_BLUEPRINT, MOTOR_COURT_BLUEPRINT].map(b => [b.kind, b]));
 
 /** Total bill of materials for a blueprint. */
 export function totalBill(bp: Blueprint): Partial<Stock> {

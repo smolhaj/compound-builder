@@ -229,6 +229,12 @@ export const LODGE: KitPieceDef = {
   parts: { foundation: 'fieldstone', walls: 'log_wall', roof: 'metal_roof_green' },
   maxSlope: 0.45, floorY: 0.5, porch: 0, sleeps: 10, light: [0, 0.55, 0], walkoutFall: 0.07,
 };
+/** The lodge for level ground: the same 12 x 15 m log house on a raised fieldstone plinth (1.2 m, a vented crawl space), steps up to the wraparound deck, no basement. */
+export const LODGE_PLINTH: KitPieceDef = {
+  ...LODGE, id: 'lodge_plinth', name: 'Lodge on a stone plinth',
+  blurb: 'The lodge for level ground: the same log house, wraparound deck and glass gable on a raised fieldstone plinth with a vented crawl space instead of a basement. Cheaper and quicker; no cold cellar and no family room below.',
+  maxSlope: 0.2, floorY: 0.2, walkoutFall: undefined, light: [0, 0.4, 0],
+};
 /** The lodge with 25 × 400 W panels on its south roof slope (≈ 10 kW). */
 export const LODGE_SOLAR: KitPieceDef = {
   ...LODGE, id: 'lodge_solar', name: 'Lodge with a solar roof',
@@ -402,9 +408,9 @@ export const BUNKER_KIT: KitPieceDef[] = [
 /** Underground menu order. */
 export const BUNKER_ORDER: readonly string[] = BUNKER_KIT.map(d => d.id);
 
-export const KIT: Record<string, KitPieceDef> = Object.fromEntries([LODGE, LODGE_SOLAR, STONE_HOUSE, TIMBER_FRAME_HOUSE, CONTAINER_HOUSE, ADOBE_HOUSE, APIARY, SUGAR_SHACK, BARNYARD, WOOD_OVEN, GATE_GARAGE_KIT, MOTOR_COURT_KIT, TIMBER_CABIN, LOG_HOUSE, FARMHOUSE, TRAILER, BARN, COTTAGE, GUEST_HOUSE, MOMS_HOUSE, METAL_GARAGE, GARAGE_SOLAR, OUTHOUSE, WORKSHOP, ROOT_CELLAR, CHICKEN_COOP, GARDEN, FIELD, GREENHOUSE, GREENHOUSE_HEATED, ORCHARD, ORCHARD_GROVE, POND, RESERVOIR, SHEEP_BARN, EQUIPMENT_YARD, ...UTILITY_KIT, ...BUNKER_KIT, ...TOWER_KIT].map(d => [d.id, d]));
+export const KIT: Record<string, KitPieceDef> = Object.fromEntries([LODGE, LODGE_PLINTH, LODGE_SOLAR, STONE_HOUSE, TIMBER_FRAME_HOUSE, CONTAINER_HOUSE, ADOBE_HOUSE, APIARY, SUGAR_SHACK, BARNYARD, WOOD_OVEN, GATE_GARAGE_KIT, MOTOR_COURT_KIT, TIMBER_CABIN, LOG_HOUSE, FARMHOUSE, TRAILER, BARN, COTTAGE, GUEST_HOUSE, MOMS_HOUSE, METAL_GARAGE, GARAGE_SOLAR, OUTHOUSE, WORKSHOP, ROOT_CELLAR, CHICKEN_COOP, GARDEN, FIELD, GREENHOUSE, GREENHOUSE_HEATED, ORCHARD, ORCHARD_GROVE, POND, RESERVOIR, SHEEP_BARN, EQUIPMENT_YARD, ...UTILITY_KIT, ...BUNKER_KIT, ...TOWER_KIT].map(d => [d.id, d]));
 /** Build-menu order. */
-export const KIT_ORDER: readonly string[] = ['timber_cabin', 'log_house', 'lodge', 'lodge_solar', 'stone_house', 'timber_frame', 'container_house', 'adobe_house', 'cottage', 'guest_house', 'moms_house', 'outhouse', 'garden', 'greenhouse', 'greenhouse_heated', 'orchard', 'orchard_grove', 'field', 'chicken_coop', 'sheep_barn', 'pond', 'root_cellar', 'wood_oven', 'apiary', 'sugar_shack', 'barnyard', 'workshop', 'metal_garage', 'barn', 'equipment_yard'];
+export const KIT_ORDER: readonly string[] = ['timber_cabin', 'log_house', 'lodge', 'lodge_plinth', 'lodge_solar', 'stone_house', 'timber_frame', 'container_house', 'adobe_house', 'cottage', 'guest_house', 'moms_house', 'outhouse', 'garden', 'greenhouse', 'greenhouse_heated', 'orchard', 'orchard_grove', 'field', 'chicken_coop', 'sheep_barn', 'pond', 'root_cellar', 'wood_oven', 'apiary', 'sugar_shack', 'barnyard', 'workshop', 'metal_garage', 'barn', 'equipment_yard'];
 /** Water & power menu order. */
 export const UTILITY_ORDER: readonly string[] = ['well_hand', 'well_drilled', 'cistern', 'water_tower', 'filtration_shed', 'septic', 'solar_array', 'solar_farm', 'garage_solar', 'battery_shed', 'battery_bank', 'generator_shed', 'reservoir'];
 

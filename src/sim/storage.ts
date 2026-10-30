@@ -84,7 +84,7 @@ export function cellarDay(s: GameState): string[] {
 
 /** Dry-goods shelf room (kcal) by building kind; a home the list lacks gets a cabin's. */
 export const PANTRY_ROOM: Record<string, number> = {
-  timber_cabin: 1_400_000, lodge: 5_000_000, lodge_solar: 5_000_000, stone_house: 3_000_000, timber_frame: 3_000_000, container_house: 1_400_000, adobe_house: 2_000_000, log_house: 3_000_000, farmhouse: 3_000_000, trailer: 600_000, cottage: 1_000_000, guest_house: 500_000, moms_house: 1_000_000,
+  timber_cabin: 1_400_000, lodge: 5_000_000, lodge_plinth: 4_000_000, lodge_solar: 5_000_000, stone_house: 3_000_000, timber_frame: 3_000_000, container_house: 1_400_000, adobe_house: 2_000_000, log_house: 3_000_000, farmhouse: 3_000_000, trailer: 600_000, cottage: 1_000_000, guest_house: 500_000, moms_house: 1_000_000,
   barn: 1_000_000, workshop: 600_000, root_cellar: 4_000_000, bunker_stores: 15_000_000, bunker_dorm: 400_000,
 };
 export function pantryRoom(s: GameState): number {

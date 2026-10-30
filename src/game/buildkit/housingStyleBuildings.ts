@@ -75,7 +75,7 @@ function deckStair(p: Parts, x: number, zTop: number, dir: 1 | -1, yTop: number,
 /** The lodge's frame: 12 × 15 m body, the deck takes the rest of the 15 × 18 m footprint. */
 const L = { W: 2.0, D: 2.5, T: 0.07, wallH: 0.98, rise: 0.62, eave: 0.1, deck: 0.25, storey: 0.5, chimX: -0.5 };
 
-function lodge(def: KitPieceDef, seed = 1, opts: BuildOpts = {}, solar = false): THREE.Group {
+function lodge(def: KitPieceDef, seed = 1, opts: BuildOpts = {}, solar = false, plinth = false): THREE.Group {
   const { W, D, T, wallH, rise, eave } = L, hw = W / 2, hd = D / 2;
   const y0 = def.floorY, yE = y0 + wallH, f2 = y0 + L.storey, bw = 0.07;
   // floor hatches (bunker_floorhatch) in a lodge open in its basement slab: the main floor stays whole
@@ -95,13 +95,13 @@ function lodge(def: KitPieceDef, seed = 1, opts: BuildOpts = {}, solar = false):
     gableWindow: { front: true, back: true, w: 1.3, h: 0.5, y: 0.04, rake: true },
     chimney: { kind: 'stone', x: L.chimX },
     tieBeams: [-0.75, -0.1, 0.55], ceiling: 'pine_panel', corners: 'logs', curtains: 'curtain_red',
-  }, (c: FurnishCtx) => furnishLodge(c, { y0, f2, clear }), parts, p => lodgeShell(p, { y0, yE, f2, bw, hw, hd, hatches, solar }));
+  }, (c: FurnishCtx) => furnishLodge(c, { y0, f2, clear, plinth }), parts, p => lodgeShell(p, { y0, yE, f2, bw, hw, hd, hatches, solar, plinth }));
   return group;
 }
 
-/** Everything the gabled shell does not make: the walkout basement, the piers, the wraparound deck, the stair, the posts, the panels. */
-function lodgeShell(p: Parts, o: { y0: number; yE: number; f2: number; bw: number; hw: number; hd: number; hatches: ReadonlyArray<Rect>; solar: boolean }): void {
-  const { y0, yE, bw, hw, hd } = o;
+/** The walkout basement of the lodge on a slope. */
+function lodgeBasement(p: Parts, o: LodgeShell): void {
+  const { y0, bw, hw, hd } = o;
   const top = y0 - 0.004;
   // ── the walkout basement: poured and stone-faced, the pad is its floor; the back (downhill) wall is mostly glass ──
   p.layer = 'foundation';
@@ -127,6 +127,31 @@ function lodgeShell(p: Parts, o: { y0: number; yE: number; f2: number; bw: numbe
   // the stone course above the basement wall and the log sill, a drip of fieldstone at each corner
   p.add('fieldstone', box(2 * hw + 0.04, 0.03, 0.04, 0, top - 0.005, hd + 0.005), 'foundation');
   p.add('fieldstone', box(2 * hw + 0.04, 0.03, 0.04, 0, top - 0.005, -hd - 0.005), 'foundation');
+
+}
+
+/** The lodge on level ground: a raised fieldstone plinth under the logs, a poured slab on grade inside it, two vented crawl-space grilles, a stone course at the sill. */
+function lodgePlinth(p: Parts, o: LodgeShell): void {
+  const { y0, hw, hd } = o;
+  p.layer = 'foundation';
+  for (const r of minusHoles({ x0: -hw, x1: hw, z0: -hd, z1: hd }, o.hatches)) p.add('concrete', box(r.x1 - r.x0, 0.04, r.z1 - r.z0, (r.x0 + r.x1) / 2, -0.04, (r.z0 + r.z1) / 2));
+  const courses = 5, ch = (y0 + 0.03) / courses;
+  for (let i = 0; i < courses; i++) {
+    const inset = i % 2 ? 0.004 : 0;
+    for (const sz of [-1, 1]) p.add('fieldstone', box(2 * hw + 0.03 - inset, ch - 0.002, 0.07, 0, -0.03 + i * ch, sz * (hd - 0.035)), 'foundation');
+    for (const sx of [-1, 1]) p.add('fieldstone', box(0.07, ch - 0.002, 2 * hd - 0.14, sx * (hw - 0.035), -0.03 + i * ch, 0), 'foundation');
+  }
+  for (const x of [-0.6, 0.6]) p.add('iron', box(0.14, 0.05, 0.012, x, 0.05, hd + 0.004), 'openings');   // the vents
+  p.add('fieldstone', box(2 * hw + 0.04, 0.03, 0.04, 0, y0 - 0.034, hd + 0.005), 'foundation');
+  p.add('fieldstone', box(2 * hw + 0.04, 0.03, 0.04, 0, y0 - 0.034, -hd - 0.005), 'foundation');
+}
+
+interface LodgeShell { y0: number; yE: number; f2: number; bw: number; hw: number; hd: number; hatches: ReadonlyArray<Rect>; solar: boolean; plinth: boolean }
+
+/** Everything the gabled shell does not make: the walkout basement, the piers, the wraparound deck, the stair, the posts, the panels. */
+function lodgeShell(p: Parts, o: LodgeShell): void {
+  const { y0, yE, hw, hd } = o;
+  if (o.plinth) lodgePlinth(p, o); else lodgeBasement(p, o);
 
   // ── stone piers under the deck and the beams on them ──
   const dx = hw + L.deck, dz = hd + L.deck;
@@ -220,7 +245,7 @@ function lodgePanels(p: Parts, yE: number): void {
 }
 
 /** The lodge's rooms. Main floor: the great room with the stone hearth, the kitchen by the glass gable, a master suite; the loft floor: four bedrooms, a bath, a study; the basement: a cold cellar, the mechanical room, a family room. */
-function furnishLodge(c: FurnishCtx, o: { y0: number; f2: number; clear: Collider[] }): void {
+function furnishLodge(c: FurnishCtx, o: { y0: number; f2: number; clear: Collider[]; plinth: boolean }): void {
   const { I, left, right, front, back, yE, parts } = c;
   const w = c.parts.opts;
   const bY = 0.004;                                                  // the basement floor (the pad)
@@ -306,6 +331,7 @@ function furnishLodge(c: FurnishCtx, o: { y0: number; f2: number; clear: Collide
   U({ x: 0, z: -0.05 }, a => Furniture.rug(a, 1.6, 1.0));
   U({ x: -0.76, z: -0.15 }, a => Furniture.chair(a));
 
+  if (!o.plinth) {
   // ── the basement: a cold cellar (food shelves, root bins, crocks, a chest freezer), the mechanical room, a family room on the walkout side ──
   const cold = { x0: left, x1: -0.2, z0: 0.55, z1: front };
   const stone = (ax: number, az: number, bx: number, bz: number, ops: Array<{ at: number; w: number; sill: number; h: number }> = []) => parts.collide(...wallRun(parts.sink, 'interior', 'concrete', { ax, az, bx, bz, y0: 0.0, h: 0.46, t: 0.025, openings: ops }));
@@ -337,6 +363,7 @@ function furnishLodge(c: FurnishCtx, o: { y0: number; f2: number; clear: Collide
   B({ x: 0.75, z: -0.2 }, a => Furniture.stool(a));
   // stairs up from the family room to the kitchen
   B({ x: right - 0.12, z: -0.1, rot: Math.PI }, a => Furniture.stairs(a, 3.0, 3.6, 0.9));
+  }
   void yE;
 }
 
@@ -745,6 +772,7 @@ const SEATS_ADOBE: Array<[number, number, number, number]> = [[-0.15, -0.2, -0.1
 
 export const HOUSING_BUILDERS: Record<string, Builder> = {
   lodge: (def, seed, opts) => lodge(def, seed, opts, false),
+  lodge_plinth: (def, seed, opts) => lodge(def, seed, opts, false, true),
   lodge_solar: (def, seed, opts) => lodge(def, seed, opts, true),
   stone_house: stoneHouse,
   timber_frame: timberFrameHouse,
@@ -752,7 +780,7 @@ export const HOUSING_BUILDERS: Record<string, Builder> = {
   adobe_house: adobeHouse,
 };
 export const HOUSING_SEATS: Record<string, Array<[number, number, number, number]>> = {
-  lodge: LODGE_SEATS, lodge_solar: LODGE_SEATS, stone_house: SEATS_2S, timber_frame: SEATS_2S, container_house: SEATS_CONTAINER, adobe_house: SEATS_ADOBE,
+  lodge: LODGE_SEATS, lodge_plinth: LODGE_SEATS, lodge_solar: LODGE_SEATS, stone_house: SEATS_2S, timber_frame: SEATS_2S, container_house: SEATS_CONTAINER, adobe_house: SEATS_ADOBE,
 };
 
 void pipe; void cyl;
