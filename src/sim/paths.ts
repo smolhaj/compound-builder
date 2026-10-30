@@ -66,7 +66,7 @@ export type Role = 'home' | 'guest' | 'water' | 'privy' | 'garden' | 'field' | '
 
 const BY_KIND: Record<string, Role> = {
   timber_cabin: 'home', log_house: 'home', farmhouse: 'home', trailer: 'home', cottage: 'guest',
-  lodge: 'home', lodge_solar: 'home', stone_house: 'home', timber_frame: 'home', container_house: 'home', adobe_house: 'home',
+  lodge: 'home', lodge_plinth: 'home', lodge_solar: 'home', stone_house: 'home', timber_frame: 'home', container_house: 'home', adobe_house: 'home',
   outhouse: 'privy', septic: 'other',
   well_hand: 'water', well_drilled: 'water', cistern: 'water', water_tower: 'water', filtration_shed: 'water',
   garden: 'garden', field: 'field', orchard: 'orchard', greenhouse: 'greenhouse', chicken_coop: 'coop', barn: 'barn', root_cellar: 'store', wood_oven: 'work', forge: 'work', apiary: 'garden', sugar_shack: 'work', barnyard: 'barn',
