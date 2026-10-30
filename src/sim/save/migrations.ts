@@ -12,6 +12,7 @@ import { generateNeighbors, newGate } from '../encounters';
 import { emptyStats } from '../report';
 import { newDigs } from '../tunnelers';
 import { newFarm } from '../farm';
+import { emptyStock } from '../materials';
 import { newLand } from '../land';
 import { CLASSIC, CLASSIC_IMPROVEMENTS } from '../site';
 import { newLights } from '../lights';
@@ -44,7 +45,7 @@ type Raw = Record<string, unknown> & { version?: number };
 const STEPS: Record<number, (s: Raw) => Raw> = {
   // 71 → 72: tunnel use (sim/corridors.ts): `PerimeterRun.collapsed` (a portal brought down by sappers) and `Vehicle.stranded` (cut off by a lost bridge or tunnel) are optional and absent in every old game: nothing to fill
   71: s => ({ ...s, version: 72 }),
-  // 70 → 71: reserved for #142 (roads); until that merges nothing changes, so the step is the bare bump (replace it with theirs)
+  // 70 → 71: the family can choose where the road comes in (site.entrance, absent: the habitual entrance) and a listed lot's ground is pinned to the lot's seed (site.listed, absent on older saves: they keep the game's seed)
   70: s => ({ ...s, version: 71 }),
   // 69 → 70: house hardening tiers and the bug-out goods (sim/houseHardening.ts, sim/bugout.ts): six new goods, none in stock
   69: s => ({ ...s, version: 70, stock: { security_door: 0, window_shutters: 0, ballistic_panels: 0, safe_room_hardened: 0, bugout_bag: 0, bugout_cache: 0, ...(s.stock as object) } }),
@@ -251,6 +252,8 @@ export function migrate(raw: unknown): GameState {
   for (const k of ['seed', 'clock', 'money', 'stock', 'orders', 'people', 'personState', 'structures', 'forestry', 'heat', 'perimeter', 'utilities', 'hardenJobs', 'disaster', 'food', 'neighbors', 'gate', 'stats', 'land', 'site', 'lifestyle', 'crews', 'siteJobs', 'roadside', 'paper', 'upkeep', 'shelf', 'pantry', 'body', 'fin', 'armory', 'wild', 'lineage', 'log', 'nextId'] as const) {
     if (!(k in s)) throw new SaveVersionError(`Save is missing "${k}"`);
   }
+  // goods added since the save was made start at zero (a new material needs no migration step)
+  s = { ...s, stock: { ...emptyStock(), ...(s.stock as object) } };
   return s as unknown as GameState;
 }
 

@@ -26,9 +26,9 @@ export interface Hookup {
   tool: string | null;
 }
 
-export const POWER_SRC = (k: string) => !!(UTILITY[k]?.solarKw || UTILITY[k]?.genKw || UTILITY[k]?.batteryKwh);
+export const POWER_SRC = (k: string) => !!(UTILITY[k]?.solarKw || UTILITY[k]?.genKw || UTILITY[k]?.batteryKwh || UTILITY[k]?.renew);
 /** Buildings the player should wire without being told twice (the rest can be wired, but nothing is wrong without it). */
-const WANTS_WIRE = (k: string) => isHome(k) || k === 'root_cellar' || k === 'greenhouse' || k === 'greenhouse_heated' || k === 'pond' || k === 'workshop';
+const WANTS_WIRE = (k: string) => isHome(k) || k === 'root_cellar' || k === 'greenhouse' || k === 'greenhouse_heated' || k === 'aquaponics' || k === 'pond' || k === 'workshop';
 const WANTS_PLUMB = (k: string) => isHome(k);
 
 let cacheKey = '', cachePlant: Plant | null = null;

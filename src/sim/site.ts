@@ -56,6 +56,10 @@ export interface Site {
   improvements: Improvements;
   /** The shape of the ground (sim/lots.ts): a ridge, a gorge, a bench ...; null / absent on the classic ground. */
   lot?: LotSpec | null;
+  /** A listing rolled by the land market (not a QA lot): its ground is pinned to the lot's own seed, so the listing and the game show the same road and camp (sim/lotSeed.ts). */
+  listed?: boolean;
+  /** Where the family chose the entrance on the east property line (z); absent: the habitual one (sim/roadEntrance.ts). Chosen before the drive is ordered. */
+  entrance?: number | null;
   price: number;
 }
 
@@ -187,7 +191,7 @@ export function listings(seed: number, region: RegionId = 'mountain_west', wish:
     // the drive is as long as the run from the county road up to the best flat on this ground
     const driveFt = lr ? lotDriveFt({ lot: lr.spec, home: HOME_RECT[acres] }) : null;
     const improvements = driveFt ? { ...improved, driveFt } : improved;
-    const base = { region, acres, home: HOME_RECT[acres], creek: lr ? lr.creek : creek, spring: lr ? lr.spring : spring, gwDepth: gwLot, gwQuality, timber, soil, miles, improvements, lot: lr ? lr.spec : null };
+    const base = { region, acres, home: HOME_RECT[acres], creek: lr ? lr.creek : creek, spring: lr ? lr.spring : spring, gwDepth: gwLot, gwQuality, timber, soil, miles, improvements, lot: lr ? lr.spec : null, ...(lr ? { listed: true as const } : {}) };
     out.push({ id: `${region}-${k}`, name: `${ROADS[Math.floor(r() * ROADS.length)]} Road ${KIND[acres][Math.floor(r() * 2)]}`, ...base, price: sitePrice(base) });
   }
   // nothing in budget on an open search: the agent finds something that is (small, dry, way out)

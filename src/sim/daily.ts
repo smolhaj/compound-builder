@@ -43,6 +43,7 @@ import { bestLevel, levelFor, mentorSkill, practice, skillFactor, teach, type Pr
 import { ESSENTIAL, mindFit, mindStaysIn, resting } from './mind';
 import { classSlots, COURSES, courseHour, DRILL_HOUR, drillable, drillDay, drillHour, enrollmentOf, teachHour } from './courses';
 import { log } from './economy';
+import { plantChoreRate } from './renewables';
 import { regionFor } from './climate';
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -109,12 +110,12 @@ export function canDo(p: Person, d: Duty): boolean {
 // Chores
 // ─────────────────────────────────────────────────────────────────────────
 
-export type ChoreId = 'weeds' | 'sowing' | 'bees' | 'sugaring' | 'harvest' | 'animals' | 'pets' | 'hauling' | 'filters' | 'woodpile' | 'kitchen' | 'house' | 'laundry' | 'fences' | 'gear' | 'orchard' | 'greenhouse' | 'pond';
-export const CHORES: readonly ChoreId[] = ['weeds', 'sowing', 'bees', 'sugaring', 'harvest', 'animals', 'pets', 'hauling', 'filters', 'woodpile', 'kitchen', 'house', 'laundry', 'fences', 'gear', 'orchard', 'greenhouse', 'pond'];
+export type ChoreId = 'weeds' | 'sowing' | 'bees' | 'sugaring' | 'harvest' | 'animals' | 'pets' | 'hauling' | 'filters' | 'woodpile' | 'kitchen' | 'house' | 'laundry' | 'fences' | 'gear' | 'orchard' | 'greenhouse' | 'pond' | 'plant';
+export const CHORES: readonly ChoreId[] = ['weeds', 'sowing', 'bees', 'sugaring', 'harvest', 'animals', 'pets', 'hauling', 'filters', 'woodpile', 'kitchen', 'house', 'laundry', 'fences', 'gear', 'orchard', 'greenhouse', 'pond', 'plant'];
 
 export const CHORE_NAME: Record<ChoreId, string> = {
   weeds: 'Garden weeding', sowing: 'Spring sowing and soil work', bees: 'Looking after the bees', sugaring: 'Gathering sap and boiling syrup', harvest: 'Harvest in the fields', animals: 'Feeding the animals', pets: 'Caring for the dogs', hauling: 'Hauling water', filters: 'Water filters',
-  woodpile: 'Splitting and stacking', kitchen: 'Cooking and washing up', house: 'Cleaning the house', laundry: 'Laundry', fences: 'Fences and roofs', gear: 'Guns, tools, the generator', orchard: 'Pruning and picking the orchard', greenhouse: 'Tending the greenhouses', pond: 'Feeding the fish',
+  woodpile: 'Splitting and stacking', kitchen: 'Cooking and washing up', house: 'Cleaning the house', laundry: 'Laundry', fences: 'Fences and roofs', gear: 'Guns, tools, the generator', orchard: 'Pruning and picking the orchard', greenhouse: 'Tending the greenhouses', pond: 'Feeding the fish', plant: 'Intake screen, turbine and tower',
 };
 /** What happens when it falls behind (the UI's tooltip). */
 export const CHORE_WHY: Record<ChoreId, string> = {
@@ -136,14 +137,15 @@ export const CHORE_WHY: Record<ChoreId, string> = {
   orchard: 'Unpruned trees bear less and the pests get in; fruit left on the tree drops and rots.',
   greenhouse: 'Unvented, unwatered benches scorch and stall: the greenhouses grow less.',
   pond: 'Fish go unfed and the screens clog: they grow slowly and the pond sours.',
+  plant: 'Leaves and silt pack the intake screen and the turbine goes unchecked: the micro-hydro makes up to 40 % less, and bearings go sooner.',
 };
 /** Which duty works which chores (first one that needs it). */
 export const DUTY_CHORES: Partial<Record<Duty, ChoreId[]>> = {
   garden: ['weeds', 'greenhouse', 'orchard', 'bees'], fields: ['harvest', 'sowing', 'weeds', 'orchard'], livestock: ['animals', 'pond'], pets: ['pets'], water: ['hauling', 'filters'], wood: ['woodpile', 'sugaring'],
-  kitchen: ['kitchen'], cleaning: ['house'], laundry: ['laundry'], repairs: ['fences', 'gear'],
+  kitchen: ['kitchen'], cleaning: ['house'], laundry: ['laundry'], repairs: ['fences', 'gear', 'plant'],
 };
 /** Person-hours to clear a full backlog (100). */
-export const CLEAR_HOURS: Record<ChoreId, number> = { weeds: 10, sowing: 8, bees: 4, sugaring: 14, harvest: 8, animals: 2, pets: 2.5, hauling: 3, filters: 2, woodpile: 8, kitchen: 3, house: 4, laundry: 5, fences: 10, gear: 6, orchard: 12, greenhouse: 6, pond: 3 };
+export const CLEAR_HOURS: Record<ChoreId, number> = { weeds: 10, sowing: 8, bees: 4, sugaring: 14, harvest: 8, animals: 2, pets: 2.5, hauling: 3, filters: 2, woodpile: 8, kitchen: 3, house: 4, laundry: 5, fences: 10, gear: 6, orchard: 12, greenhouse: 6, pond: 3, plant: 4 };
 
 export interface ChoreState { levels: Record<ChoreId, number> }
 
@@ -184,6 +186,7 @@ export function choreRates(s: GameState): Record<ChoreId, number> {
     fences: runs > 0 ? 1.6 + 0.2 * Math.min(10, runs) : 0,
     gear: s.armory.guns.length > 0 || n('generator') > 0 ? 3 : 0,
     ...selfSufficiencyRates(s, doy),
+    plant: plantChoreRate(s, doy),
   };
 }
 
@@ -246,7 +249,13 @@ export function newDaily(): Daily {
 }
 
 /** The daily-life state (lazily made, so old saves and tests that build state by hand work). */
-export const dailyOf = (s: GameState): Daily => (s.daily ??= newDaily());
+export const dailyOf = (s: GameState): Daily => {
+  const d = (s.daily ??= newDaily());
+  // a chore added after the save was made starts at nothing
+  const last = CHORES[CHORES.length - 1];
+  if (d.chores.levels[last] === undefined) for (const c of CHORES) d.chores.levels[c] ??= 0;
+  return d;
+};
 
 // ─────────────────────────────────────────────────────────────────────────
 // Threat and the auto-planner
@@ -1060,6 +1069,7 @@ const BEHIND_LINE: Record<ChoreId, string> = {
   orchard: 'The orchard is going to seed: unpruned limbs, windfalls rotting under the trees. Somebody needs the loppers and a ladder.',
   greenhouse: 'The greenhouse benches are dry and the vents are shut: the seedlings are scorching.',
   pond: 'Nobody has fed the fish or cleared the screens. The pond is starting to smell.',
+  plant: 'The intake screen is packed with leaves and nobody has looked at the turbine. Output is falling.',
 };
 
 /** The chores most behind (the UI's "falling behind" list). */

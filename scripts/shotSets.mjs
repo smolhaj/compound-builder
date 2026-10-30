@@ -764,6 +764,21 @@ SETS.farmkitchen = [
 ];
 
 
+/** The forge (docs/DECISIONS.md): the compound plus a finished forge, an eye-level shot with a person and one from above. */
+const forgeSet = compound + `{ if (!window.__forge) { window.__forge = true;
+  const G = cb.game, c = cb.world.camp;
+  window.__b = window.__b || {};
+  const sp = cb.tool.findSpot('forge', c.x + 9, c.z - 4, 3, 6); if (sp) { G.getState().plan('forge', sp[0], sp[1], 3); window.__b.forge = G.getState().game.structures.at(-1); } else console.error('no spot forge');
+  G.setState(s => { const g = structuredClone(s.game);
+    for (const st of g.structures) { st.stage = 5; st.done = 0; st.supplied = true; st.finishedAt = g.clock.t - 3000; }
+    return { game: g }; });
+} }`;
+SETS.forge = [
+  { name: 'forge-eye-level-person', time: 15, season: 'summer', setup: forgeSet + figureAt('forge', 0.1, 0.9) + eyeNear('forge', 1.6, 2.4, 0, 0.2, 0.26), cam: D, frames: 14 },
+  { name: 'forge-from-above', time: 12, season: 'summer', setup: forgeSet + farmAt('forge', 3.2, 0.8, 0.5), cam: D, frames: 14 },
+];
+
+
 /** Farm & kitchen part 2: the apiary, the sugar shack with its bush, and the barnyard with a cow, goats and pigs. */
 const herdSet = compound + `{ if (!window.__herd) { window.__herd = true;
   const G = cb.game, c = cb.world.camp, B = window.__b;

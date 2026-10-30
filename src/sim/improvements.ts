@@ -31,7 +31,7 @@ import { corridorDay } from './corridors';
 
 export type HouseKind = 'farmhouse' | 'trailer' | 'timber_cabin' | 'log_house';
 export type Condition = 'good' | 'fair' | 'poor';
-export type FixPart = 'roof' | 'wiring' | 'plumbing' | 'septic' | 'glass';
+export type FixPart = 'roof' | 'wiring' | 'plumbing' | 'septic' | 'glass' | 'film';
 
 export interface Improvements {
   house: { kind: HouseKind; built: number; roof: Condition; wiring: Condition; plumbing: Condition } | null;
@@ -148,6 +148,8 @@ const FIX: Record<FixPart, Record<'fair' | 'poor', { name: string; hours: number
   plumbing: { fair: { name: 'Fix the leaks, new water heater', hours: 20, materials: { pipe: 1, hardware: 1 } }, poor: { name: 'Replumb (PEX) and new fixtures', hours: 90, materials: { pipe: 5, fixtures: 1 } } },
   septic: { fair: { name: 'Pump the tank', hours: 4, materials: { excavator: 1 } }, poor: { name: 'New leach field', hours: 60, materials: { excavator: 2, pipe: 3, concrete: 2 } } },
   // a greenhouse after hail or an ice storm: a few cracked panes, or the glazing stripped from a bay
+  // a tunnel's poly: torn by wind or a snow load, or four years in the sun
+  film: { fair: { name: 'Patch the torn poly', hours: 8, materials: { poly_film: 1, hardware: 1 } }, poor: { name: 'Re-cover the hoops', hours: 30, materials: { poly_film: 3, hardware: 1 } } },
   glass: { fair: { name: 'Replace the cracked panes', hours: 12, materials: { hardware: 1 } }, poor: { name: 'Reglaze the broken bays', hours: 48, materials: { hardware: 3, lumber: 1 } } },
 };
 /** Crack a greenhouse's glass (hail, ice): a repair job on the structure, like the old house's. Returns false when it is already cracked. */
@@ -156,9 +158,15 @@ export function crackGlass(st: Structure, cond: 'fair' | 'poor'): boolean {
   (st.fixes ??= []).push({ part: 'glass', cond, done: 0, hours: FIX.glass[cond].hours, supplied: false });
   return true;
 }
-/** How much of its glass is whole: 1 sound, 0.7 a few panes cracked, 0.4 bays broken (output and heat follow). */
+/** Tear a tunnel's poly (wind, snow load, age): a repair job like the glass. Returns false when it is already torn. */
+export function crackFilm(st: Structure, cond: 'fair' | 'poor'): boolean {
+  if ((st.fixes ?? []).some(f => f.part === 'film' && f.done < f.hours)) return false;
+  (st.fixes ??= []).push({ part: 'film', cond, done: 0, hours: FIX.film[cond].hours, supplied: false });
+  return true;
+}
+/** How much of its glass (or poly) is whole: 1 sound, 0.7 a few panes cracked, 0.4 bays broken (output and heat follow). */
 export function glassSound(st: Structure): number {
-  const f = (st.fixes ?? []).find(x => x.part === 'glass' && x.done < x.hours);
+  const f = (st.fixes ?? []).find(x => (x.part === 'glass' || x.part === 'film') && x.done < x.hours);
   return !f ? 1 : f.cond === 'poor' ? 0.4 : 0.7;
 }
 export const fixDef = (f: Fix) => FIX[f.part][f.cond];
@@ -198,6 +206,7 @@ export function addFixWork(s: GameState, st: Structure, f: Fix, hours: number): 
   if (f.done >= f.hours - 1e-9) {
     f.done = f.hours;
     log(s, `${fixDef(f).name}: done.`);
+    if (f.part === 'film') st.filmAt = s.clock.t;   // new poly: the four years start again (sim/tunnels.ts)
     if (f.part === 'wiring' || f.part === 'plumbing') {
       const kind = f.part === 'wiring' ? 'wire' : 'plumb';
       if (!s.utilities.fittings.some(x => x.building === st.id && x.kind === kind)) s.utilities.fittings.push({ building: st.id, kind, done: 1, hours: 1, supplied: true, finishedAt: s.clock.t });

@@ -39,7 +39,8 @@ import { blueprintOf, isFinished, knockBack } from './construction';
 import { insuranceClaim } from './paperwork';
 import { mulberry32, pick } from './rng';
 import { DIFFICULTY } from './difficulty';
-import { crackGlass } from './improvements';
+import { crackFilm, crackGlass } from './improvements';
+import { isTunnel, tunnelStorm } from './tunnels';
 import { floodCandidates } from './terrainFx';
 import { regionFor } from './climate';
 import { roadClosedFor } from './slope';
@@ -160,8 +161,9 @@ function sheltered(s: GameState): boolean {
 /** Hail and ice crack greenhouse glass: each glasshouse has a chance of a repair job (a few panes, or whole bays), output and heat follow until it is mended. */
 function cracksGlass(s: GameState, r: () => number, chance: number, by: string, out: string[]): void {
   for (const st of s.structures) {
-    if (!isFinished(st) || (st.kind !== 'greenhouse' && st.kind !== 'greenhouse_heated') || r() >= chance) continue;
+    if (!isFinished(st) || (st.kind !== 'greenhouse' && st.kind !== 'greenhouse_heated' && st.kind !== 'aquaponics' && !isTunnel(st.kind)) || r() >= chance) continue;
     const bad = r() < 0.3;
+    if (isTunnel(st.kind)) { if (crackFilm(st, bad ? 'poor' : 'fair')) out.push(`${by} ${bad ? 'shredded the film on' : 'holed the film on'} the ${label(st.kind).toLowerCase()}. ${bad ? 'Re-cover the hoops' : 'Patch the poly'} (Projects); it grows less until it is mended.`); continue; }
     if (crackGlass(st, bad ? 'poor' : 'fair')) out.push(`${by} cracked the ${label(st.kind).toLowerCase()} glass: ${bad ? 'whole bays are broken' : 'a few panes'}. A repair job (hardware) is in Projects; it grows less, and loses heat, until it is mended.`);
   }
 }
@@ -184,6 +186,7 @@ function news(s: GameState, text: string, tone: 0 | 1 | 2 | 3): void {
 /** The storm's first day. */
 function hit(s: GameState, e: WeatherEvent, r: () => number, out: string[]): void {
   const fin = s.structures.filter(isFinished);
+  tunnelStorm(s, e.kind, r, out);
   if (e.kind === 'blizzard') {
     out.push('Blizzard: the roads are drifted shut and we are snowed in.');
     for (const st of fin) if ((st.fixes ?? []).some(f => f.part === 'roof' && f.done < f.hours) && r() < 0.5) { damage(s, st, 0.3, 'The snow load was too much for the old roof.', out); break; }

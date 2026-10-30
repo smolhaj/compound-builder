@@ -2,7 +2,7 @@
  * Razor wire on a wall or fence (docs/DECISIONS.md, "Motor court, bar fence and razor wire"): concertina coils on brackets along the top of a finished
  * run. The price table is `RAZOR` in perimeter.ts (per 6 m: wire and hardware, a few hours' work). It is hung straight from the stockpile
  * (no run to build), makes the run stop people a little more (`peopleBlock`), and is drawn as coils on the top. A run that is upgraded sheds it
- * (the wire is not carried over to the new wall). Pure (tested).
+ * (the wire is not carried over to the new wall). On a wall with a patrol deck the coils ride the deck's outer rail (the guards walk inside them). Pure (tested).
  */
 import { hasAll, shortfall, waitingFor, type MaterialId, type Stock } from './materials';
 import { log } from './economy';
@@ -23,7 +23,6 @@ export function razorProblem(s: GameState, r: PerimeterRun): string | null {
   if (!runFinished(r)) return 'it is not finished yet';
   if (r.razor) return 'it already has razor wire';
   if (r.replaces) return 'this wall is an upgrade in progress';
-  if (s.perimeter.some(x => x.hostId === r.id)) return 'a patrol walkway runs along the top: no room for wire';
   const bill = razorBill(wallLength(r));
   if (!hasAll(s.stock, bill)) return `waiting for ${waitingFor(shortfall(s.stock, bill) as Partial<Record<MaterialId, number>>)}`;
   return null;

@@ -124,4 +124,14 @@ describe('save migrations', () => {
     expect(m.stock.steel_door).toBe(2);
     expect(() => step(structuredClone(m), 3)).not.toThrow();
   });
+
+  it('v70 → v71: an old place has no chosen entrance (the habitual one) and keeps the game seed for its ground', () => {
+    const old = JSON.parse(JSON.stringify(newGame(3)));
+    old.version = 70;
+    const m = migrate(old);
+    expect(m.version).toBe(SAVE_VERSION);
+    expect(m.site.entrance ?? null).toBeNull();
+    expect(m.site.listed ?? false).toBe(false);
+    expect(() => step(structuredClone(m), 3)).not.toThrow();
+  });
 });

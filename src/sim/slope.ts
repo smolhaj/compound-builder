@@ -122,11 +122,14 @@ export function roadDifficulty(site: Site, seed?: number): number {
   if (!lot) return 0;
   // with a game the road is the planned one (sim/roadFx.ts: switchbacks hold the grade down, but add hairpins and length); a listing reads the straight line
   const road = seed !== undefined ? roadWinter({ site, seed }) : Math.max(0, (lot.stats.accessMaxPct - 6) / 8);
-  return road + Math.max(0, (site.lot!.elevM - 1900) / 900) + (site.lot!.kind === 'gorge' ? 0.2 : 0);
+  return difficultyWith(site, road);
 }
 
+/** The altitude and the gorge on top of the road's own winter difficulty (`road`: sim/roadFx.ts winterOf). */
+export const difficultyWith = (site: Pick<Site, 'lot'>, road: number): number => (site.lot ? road + Math.max(0, (site.lot.elevM - 1900) / 900) + (site.lot.kind === 'gorge' ? 0.2 : 0) : 0);
+
 /** Best traction in the yard: the running road vehicle with the highest off-road rating (a pickup 0.6 ... the motorhome 0.85). */
-function traction(s: GameState): number {
+export function traction(s: GameState): number {
   let t = 0.5;
   for (const v of fleetOf(s)) if (runs(v) && !v.away && VEHICLES[v.kind].seats > 0) t = Math.max(t, VEHICLES[v.kind].offroad);
   return t;
@@ -140,11 +143,24 @@ function snowStartChance(s: GameState, day: number): number {
 }
 
 /** Days the road stays shut after a heavy snow starts: 1 at the threshold, more the harder the way in; a plow blade halves it. */
-function closureDays(s: GameState): number {
-  const d = roadDifficulty(s.site, s.seed) * (1.5 - traction(s));
+function closureDays(s: GameState): number { return closureFor(roadDifficulty(s.site, s.seed), traction(s), s.stock.plow >= 1); }
+
+/** Days a heavy snow shuts a road of difficulty `difficulty` for a truck of this traction, with or without a plow blade on it (the pure rule `closureDays` and the entrance choice both read). */
+export function closureFor(difficulty: number, trac: number, plow: boolean): number {
+  const d = difficulty * (1.5 - trac);
   if (d < 1) return 0;
   const days = Math.min(6, 1 + Math.floor(d * 1.5));
-  return s.stock.plow >= 1 ? (d < 1.8 ? 0 : Math.max(1, Math.ceil(days / 2))) : days;
+  return plow ? (d < 1.8 ? 0 : Math.max(1, Math.ceil(days / 2))) : days;
+}
+
+/** About how many days a winter that road is shut, from the closure length and the region's heavy snows (the line the Land card shows). */
+export const shutDaysPerWinter = (site: Pick<Site, 'region'>, daysEach: number): number => Math.round(Math.round(regionFor(site as Site).snowCm / 12) * daysEach * 0.6);
+
+/** The plow's difference on this place: days a winter the road is shut without and with the blade, and the response factor in a closure. */
+export function plowReport(s: GameState): { without: number; withBlade: number; heavy: number; eachWithout: number; eachWith: number; haveBlade: boolean; responseShut: [number, number] } | null {
+  if (!s.site.lot) return null;
+  const d = roadDifficulty(s.site, s.seed), t = traction(s), eachWithout = closureFor(d, t, false), eachWith = closureFor(d, t, true);
+  return { without: shutDaysPerWinter(s.site, eachWithout), withBlade: shutDaysPerWinter(s.site, eachWith), heavy: Math.round(regionFor(s.site).snowCm / 12), eachWithout, eachWith, haveBlade: s.stock.plow >= 1, responseShut: [2.5, 1.5] };
 }
 
 /** Days left that the way in is closed by snow on `day` (0: open). Pure in the seed and the day: nothing is stored. */

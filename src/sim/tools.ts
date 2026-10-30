@@ -26,7 +26,7 @@ import { mulberry32, pick } from './rng';
 import { jobTools, type Person, type SkillId } from './family';
 import type { StageId } from './blueprints';
 import type { GameState } from './state';
-import { hasWorkshop, WORKSHOP_HONING, WORKSHOP_REPAIR_BONUS, WORKSHOP_REPAIR_TOLL, WORKSHOP_WEAR } from './farm';
+import { FORGE_IMPROVISE_COND, FORGE_REPAIR_TOLL, hasForge, hasWorkshop, WORKSHOP_HONING, WORKSHOP_REPAIR_BONUS, WORKSHOP_REPAIR_TOLL, WORKSHOP_WEAR } from './farm';
 import { burnTractor, tractorRuns } from './vehicles';
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -483,7 +483,7 @@ export function sharpenAll(s: GameState, below = 0.75): number {
 export const REPAIR_HARDWARE = 0.15;
 /** What each repair costs the tool's best condition (half that on the workshop's bench, with its vise and grinder). */
 export const REPAIR_TOLL = 0.12;
-const tollOf = (s: GameState): number => REPAIR_TOLL * (hasWorkshop(s) ? WORKSHOP_REPAIR_TOLL : 1);
+const tollOf = (s: GameState): number => REPAIR_TOLL * (hasWorkshop(s) ? WORKSHOP_REPAIR_TOLL : 1) * (hasForge(s) ? FORGE_REPAIR_TOLL : 1);
 
 /** What a repair would use and give: parts from a broken tool, or hardware. */
 export function repairPlan(s: GameState, id: string): { ok: boolean; why: string | null; uses: string; to: number } {
@@ -492,6 +492,7 @@ export function repairPlan(s: GameState, id: string): { ok: boolean; why: string
   const skill = Math.max(0, ...s.people.filter(p => !p.kid).map(p => p.skills.mechanic));
   const toll = tollOf(s), to = Math.max(0.2, Math.min(t.max - toll, 0.5 + 0.04 * skill + (hasWorkshop(s) ? WORKSHOP_REPAIR_BONUS : 0)));
   if (t.cond >= t.max - toll - 0.02 && t.cond > 0) return { ok: false, why: 'It is as good as a repair would make it.', uses: '', to };
+  if (hasForge(s)) return { ok: true, why: null, uses: 'scrap iron at the forge', to };
   if (s.stock.hardware >= REPAIR_HARDWARE) return { ok: true, why: null, uses: 'some hardware', to };
   if (kit.items.some(x => x.id !== id && x.cond <= 0)) return { ok: true, why: null, uses: 'parts from a broken tool', to };
   return { ok: false, why: 'Needs a little hardware (nails, rivets, a bolt) or a broken tool to take parts from.', uses: '', to };
@@ -502,7 +503,8 @@ export function repair(s: GameState, id: string): string | null {
   const plan = repairPlan(s, id);
   if (!plan.ok) return plan.why;
   const kit = kitOf(s), t = toolById(kit, id)!;
-  if (s.stock.hardware >= REPAIR_HARDWARE) s.stock.hardware -= REPAIR_HARDWARE;
+  if (hasForge(s)) { /* forged from the scrap pile: nothing to buy */ }
+  else if (s.stock.hardware >= REPAIR_HARDWARE) s.stock.hardware -= REPAIR_HARDWARE;
   else {
     const donor = kit.items.find(x => x.id !== id && x.cond <= 0);
     if (donor) kit.items.splice(kit.items.indexOf(donor), 1);
@@ -524,7 +526,8 @@ export const IMPROVISE_HOURS = 4;
 export function improvise(s: GameState, role: ToolRole): Tool {
   const kit = kitOf(s), kind = CRUDE_FOR[role];
   let cond = 0.65;
-  if (CRUDE_STEEL.includes(kind) && s.stock.hardware >= 0.05) { s.stock.hardware -= 0.05; cond = 0.9; }
+  if (CRUDE_STEEL.includes(kind) && hasForge(s)) cond = FORGE_IMPROVISE_COND;   // drawn out and tempered from scrap bar
+  else if (CRUDE_STEEL.includes(kind) && s.stock.hardware >= 0.05) { s.stock.hardware -= 0.05; cond = 0.9; }
   const t = add(kit, kind, cond, 0.8);
   kit.made++;
   delete kit.missing[role];

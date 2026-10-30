@@ -53,7 +53,24 @@ export interface PondState {
   harvestAt: number;
   poachedAt: number;
 }
+/** An aquaponics bay: tilapia in four tanks, their water feeding the grow beds (sim/aquaponics.ts). */
+export interface AquaState {
+  fish: number;
+  /** Average weight, grams. */
+  fishG: number;
+  /** Water temperature (C) and days without the pump or the heater. */
+  tempC: number;
+  offDays: number;
+  /** Share of yesterday's feed that was given, 0-1; the plants' share of nutrients follows. */
+  fed: number;
+  /** Fish lost (for the report) and the day of the last die-off and harvest. */
+  lost: number;
+  dieOffAt: number;
+  harvestAt: number;
+}
 export interface Farm {
+  /** Aquaponics bays, by structure id (made lazily). */
+  aqua?: Record<string, AquaState>;
   greenhouses: Record<string, GreenhouseCare>;
   orchards: Record<string, OrchardCare>;
   ponds: Record<string, PondState>;
@@ -79,6 +96,8 @@ export const farmOf = (s: GameState): Farm => (s.farm ??= newFarm());
 export const newPond = (): PondState => ({ trout: 0, troutG: 0, crayfish: 0, health: 1, fed: 1, oxygen: 0.8, lost: 0, dieOffAt: -999, harvestAt: -999, poachedAt: -999 });
 export const pondOf = (s: GameState, id: string): PondState => (farmOf(s).ponds[id] ??= newPond());
 export const greenhouseCareOf = (s: GameState, id: string): GreenhouseCare => (farmOf(s).greenhouses[id] ??= { heat: 'electric', heated: false, by: 'none', burned: 0, warned: -999 });
+export const newAqua = (): AquaState => ({ fish: 0, fishG: 0, tempC: 24, offDays: 0, fed: 1, lost: 0, dieOffAt: -999, harvestAt: -999 });
+export const aquaOf = (s: GameState, id: string): AquaState => ((farmOf(s).aqua ??= {})[id] ??= newAqua());
 export const orchardCareOf = (s: GameState, id: string): OrchardCare => (farmOf(s).orchards[id] ??= { unprunedYear: -1 });
 
 /** Finished structures of a kind (or kinds). */
@@ -90,6 +109,10 @@ export const finishedOf = (s: GameState, ...kinds: string[]): Structure[] => s.s
 
 /** A finished workshop: tools wear slower, edges come back faster, repairs hold better. */
 export const hasWorkshop = (s: GameState): boolean => finishedOf(s, 'workshop').length > 0;
+/** A forge on the place (sim/tools.ts: scrap-iron repairs and better improvised steel). */
+export const hasForge = (s: GameState): boolean => finishedOf(s, 'forge').length > 0;
+/** What a forge does to the repair toll (on top of the workshop's) and the condition of an improvised steel tool. */
+export const FORGE_REPAIR_TOLL = 0.75, FORGE_IMPROVISE_COND = 0.9;
 export const WORKSHOP_WEAR = 0.75, WORKSHOP_HONING = 0.5, WORKSHOP_REPAIR_TOLL = 0.5, WORKSHOP_REPAIR_BONUS = 0.1;
 
 // ─────────────────────────────────────────────────────────────────────────

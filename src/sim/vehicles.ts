@@ -36,6 +36,8 @@ import { addTool, kitOf } from './tools';
 import { enclosure } from './enclosure';
 import { COURT_THEFT_FACTOR, isCourt } from './motorCourt';
 import { runFinished } from './perimeter';
+import { STRIKE, crossingRelief, strikeChance } from './roadWildlife';
+import { roadPlanOf } from './roadState';
 
 export type VehicleKind = 'pickup' | 'suv' | 'motorhome' | 'tractor' | 'atv' | 'old_pickup' | 'trailer';
 
@@ -233,6 +235,15 @@ function breakDown(s: GameState, v: Vehicle, salt: number): string {
   return `The ${VEHICLES[v.kind].name.toLowerCase()} broke down: the ${part}.`;
 }
 
+/** A deer or an elk on the road at dusk: the vehicle is hurt (sim/roadWildlife.ts: crossings under the road make it rarer). A log line, or null. */
+function deerStrike(s: GameState, v: Vehicle, km: number, salt: number): string | null {
+  if (v.kind === 'trailer') return null;
+  const p = strikeChance(s.site.region, km, s.site.lot ? roadPlanOf(s) : null);
+  if (!rollDown(s, v, p, 900 + salt)) return null;
+  v.condition = Math.max(0, v.condition - STRIKE.DAMAGE);
+  return `A deer came out of the timber at dusk and the ${VEHICLES[v.kind].name.toLowerCase()} hit it: a smashed grille and a long way home${s.site.lot && crossingRelief(roadPlanOf(s)) === 0 ? ' (the road has no crossing for the deer to use)' : ''}.`;
+}
+
 /**
  * The road: a run of `km` out and back. May strand the truck for a day or three
  * (a mechanic and a kit on board fix it on the roadside; otherwise it is towed
@@ -241,7 +252,7 @@ function breakDown(s: GameState, v: Vehicle, salt: number): string {
 export function roadTrouble(s: GameState, v: Vehicle, km: number, salt = 0): { extraDays: number; line: string | null } {
   const mech = mechanicOf(s);
   const p = breakdownChance(v, mech, Math.min(3, km / 60));
-  if (!rollDown(s, v, p * Math.min(3, 1 + km / 80), 700 + salt)) return { extraDays: 0, line: null };
+  if (!rollDown(s, v, p * Math.min(3, 1 + km / 80), 700 + salt)) return { extraDays: 0, line: deerStrike(s, v, km, salt) };
   if (mech >= 2 && s.stock.vehicle_parts >= 1) {
     s.stock.vehicle_parts -= 1; v.condition = Math.max(0, v.condition - 0.02);
     return { extraDays: 1, line: `The ${VEHICLES[v.kind].name.toLowerCase()} broke down on the road (${PARTS[0]}); they fixed it by the roadside with a parts kit. A day lost.` };
