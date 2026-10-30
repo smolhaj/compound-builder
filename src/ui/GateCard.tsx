@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { ambushOdds, ambushParty, chosenParty } from '../sim/tunnelers';
+import { doorHoldLine } from '../sim/terrainFx';
 import { fightOdds, hideFoundChance, postureOf, type Stance } from '../sim/encounters';
 import { askQuestion, carryLines, carryOf, MAX_QUESTIONS, QUESTIONS } from '../sim/newcomers';
 import { AFTERMATH_TEXT } from '../sim/aftermath';
@@ -8,6 +9,7 @@ import { canPay, DOUBLE_CROSS } from '../sim/rescue';
 import type { Caliber } from '../sim/armory';
 import { STANCE } from './stanceText';
 import { ArrivalHousing } from './HousingPanel';
+import { vetting } from '../sim/ringFallback';
 import { jobOutlook, setKeepJobs } from '../sim/weekender';
 
 
@@ -56,6 +58,7 @@ export function GateCard() {
         <div style={{ fontSize: 11, letterSpacing: 1, opacity: 0.6, textTransform: 'uppercase' }}>{e.kind === 'break_in' ? 'In the night' : e.kind === 'ransom' ? 'Word about your child' : e.kind === 'trial_end' ? 'The camp outside the wall' : e.kind === 'kin' ? 'Family' : e.kind === 'shelter' ? 'Neighbors at the door' : e.kind === 'move_in' ? (e.title.startsWith('Time') ? 'The warning signs' : 'A decision') : e.kind === 'stranded' ? 'Caught in town' : e.neighbor ? 'A neighbor at the gate' : 'At the gate'}</div>
         <div style={{ fontSize: 19, fontWeight: 700, margin: '2px 0 8px' }}>{e.title}</div>
         {e.dossier.filter(Boolean).map((l, i) => <div key={i} style={{ marginBottom: 4, opacity: 0.9 }}>{l}</div>)}
+        {e.kind === 'arrival' && (() => { const v = vetting(g.game).line; return v ? <div style={{ marginBottom: 4, opacity: 0.8, fontStyle: 'italic' }}>{v}</div> : null; })()}
         {(e.kind === 'arrival' || e.kind === 'trial_end' || e.kind === 'kin' || (e.kind === 'shelter' && !e.shelter?.settle)) && !!e.people?.length && <ArrivalHousing people={e.people} />}
         {(e.kind === 'arrival' || e.kind === 'kin' || e.kind === 'trial_end' || e.kind === 'shelter') && !!e.people?.length && !(e.shelter?.settle) && (() => {
           const c = carryOf(g.game, e.people!), lines = carryLines(c);
@@ -92,6 +95,7 @@ export function GateCard() {
         {e.strength > 0 && e.kind !== 'break_in' && <div style={{ margin: '8px 0', fontSize: 12, opacity: 0.75 }}>
           <div>{e.size} {e.armed ? 'armed' : 'unarmed'} · walls {Math.round(p.barrier)} % · seen early {Math.round(p.detection)} %{p.bunker ? ' · bunker to hide in' : p.safeRoom ? ' · safe room' : ''}</div>
           {odds && <div>If you fight: you hold {inTen(odds.win)} · someone of yours killed or taken {inTen(odds.loseSomeone)}</div>}
+          {odds && (() => { const d = doorHoldLine(g.game); return d ? <div style={{ opacity: 0.85 }}>{d}</div> : null; })()}
           {e.stances.includes('hide') && <div>If you hide: they find the place lived in {inTen(hideFoundChance(g.game, e, p))}, and strip it</div>}
         </div>}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>

@@ -48,8 +48,8 @@ export const RING = {
 export const SALLY = {
   /** Width of the door (units: 1.8 m, one person at a time). */
   W: 0.3,
-  /** Seconds off the manned rings' hold for each port, up to `MAX` of them: the crew finds the door and funnels to it. */
-  CHOKE: 6, MAX: 2,
+  /** Ports counted, at most (a port never shortens the rings' hold: a stronger lot is never an easier raid). */
+  MAX: 2,
   /** The defenders' share of extra hits on crews held at the line for each port (a sortie from the flank), up to `MAX` ports. */
   SORTIE: 0.06,
   /** What a port costs the family on top of the wall: a plank door, straps and a lock. */
@@ -333,10 +333,10 @@ export const sallyPorts = (s: GameState): number => s.perimeter.reduce((a, r) =>
 /** Extra hits the defenders get on crews held at the line: a sortie from the sally port's flank (1 = none). */
 export const sortieFactor = (s: GameState): number => 1 + Math.min(SALLY.MAX, sallyPorts(s)) * SALLY.SORTIE;
 
-/** Seconds a raid spends at the line for the manned inner rings (0 with one ring or none); a sally port is a weak door, so each takes a few seconds off. */
+/** Seconds a raid spends at the line for the manned inner rings (0 with one ring or none);  */
 export const ringHoldSeconds = (s: GameState): number => {
   const hold = Math.max(0, ringsHolding(s) - 1) * RING.DELAY;
-  return hold > 0 ? Math.max(0, hold - Math.min(SALLY.MAX, sallyPorts(s)) * SALLY.CHOKE) : 0;
+  return hold;
 };
 
 /** Defense-equivalent points the manned inner rings add to how hard crews find the place. */

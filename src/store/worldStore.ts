@@ -40,7 +40,7 @@ export interface WorldState {
   weatherMode: WeatherMode;
   quality: Quality;
   /** The loading screen: what the boot is doing and how far along (null once the world is up). */
-  boot: { label: string; pct: number } | null;
+  boot: { label: string; pct: number; hold?: boolean } | null;
   /** Frame-rate cap (0 = uncapped). 60 by default: a 120 Hz display otherwise does twice the work for no visible gain. */
   frameCap: FrameCap;
   setFrameCap: (f: FrameCap) => void;
@@ -52,7 +52,7 @@ export interface WorldState {
   /** Shown once when the game stepped the graphics down by itself (dismissible); never set for a change the player made. */
   perfNotice: string | null;
   setPerfNotice: (n: string | null) => void;
-  setBoot: (b: { label: string; pct: number } | null) => void;
+  setBoot: (b: { label: string; pct: number; hold?: boolean } | null) => void;
   cameraMode: CameraMode;
   buildingView: BuildingView;
   /** Sightline overlay: off / exposure from the road / from the ridge / night lights / viewshed from a point. */

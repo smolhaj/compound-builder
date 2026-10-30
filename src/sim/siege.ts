@@ -408,7 +408,7 @@ export function probeBattle(s: GameState, kind: SceneKind, size: number, seed: n
     if (!best || (b.result === 'repelled' || b.result === 'fled' ? b.duration : 1e9) < best.duration) best = b;
   }
   const b = best!;
-  const keep = new Set(['alarm', 'lights', 'move', 'shot', 'say', 'cover', 'reload', 'flee', 'snag']);
+  const keep = new Set(['alarm', 'lights', 'move', 'shot', 'say', 'cover', 'reload', 'flee', 'snag', 'door', 'fallback', 'carry']);
   const events: BattleEvent[] = b.events
     .filter(e => keep.has(e.kind))
     .map(e => (e.kind === 'shot' ? { ...e, hit: false } : e))

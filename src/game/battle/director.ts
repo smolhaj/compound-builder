@@ -55,7 +55,7 @@ export class Director {
     let want: { kind: ShotKind; subject?: string; hold: number } | null = null;
     for (const e of fresh) {
       if ((e.kind === 'wound' && !e.stopped) || e.kind === 'death' || e.kind === 'aid') { const u = byId.get(e.unit); if (u && (u.side === 'home' || this._r() < 0.5)) want = { kind: 'close', subject: e.unit, hold: 3.6 }; }
-      else if (e.kind === 'breach' || e.kind === 'explosion' || e.kind === 'mine') want = { kind: 'wide', hold: 4.2 };
+      else if (e.kind === 'breach' || e.kind === 'fallback' || e.kind === 'explosion' || e.kind === 'mine') want = { kind: 'wide', hold: 4.2 };
       else if (e.kind === 'alarm' && !this.shot) want = { kind: 'house', hold: 5 };
       else if (e.kind === 'say' && e.who && !want) {
         const u = byId.get(e.who); const lastSaid = this._last.get(e.who) ?? -99;
