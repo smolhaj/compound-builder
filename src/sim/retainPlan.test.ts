@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RW, blocksWalk, inStair, planPad, stairRect, wallAt, type Rect } from './retainPlan';
+import { RW, WALLLESS, blocksWalk, inStair, planPad, stairRect, wallAt, type Rect } from './retainPlan';
 
 const fp: Rect = { x0: -0.75, z0: -0.75, x1: 0.75, z1: 0.75 };
 /** Ground that rises toward the north (-z) at the given grade. */
@@ -87,5 +87,14 @@ describe('retaining wall plan', () => {
   it('a tall wall (2.4 m or more) is flagged', () => {
     expect(planPad(fp, slope(0.1)).tall).toBe(false);
     expect(planPad(fp, slope(0.4)).tall).toBe(true);
+  });
+
+  it('leaves no wall where another pad has graded the ground, and none for the kinds a way in must run through', () => {
+    const near: Rect = { x0: -0.75, z0: -3.2, x1: 0.75, z1: -1.3 };      // a neighbour's pad right up against the apron
+    const p = planPad(fp, slope(0.25), [near]);
+    const north = p.runs[0];
+    north.pts.forEach(([x], i) => { if (Math.abs(x) < 0.8) expect(north.h[i]).toBe(0); });   // (the wings past the neighbour's pad stay)
+    for (const k of ['motor_court', 'gate_garage', 'equipment_yard', 'watchtower_wood', 'rise_lookout', 'bunker_hatch']) expect(WALLLESS.test(k)).toBe(true);
+    for (const k of ['farmhouse', 'garden', 'greenhouse', 'timber_cabin']) expect(WALLLESS.test(k)).toBe(false);
   });
 });

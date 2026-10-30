@@ -69,9 +69,9 @@ function stairParts(parts: THREE.BufferGeometry[], s: WallStair, ground: Ground,
     const gy = Math.min(ground(cx, cz), ground(cx + px * W / 2, cz + pz * W / 2), ground(cx - px * W / 2, cz - pz * W / 2), ground(s.x + s.dx * d1, s.z + s.dz * d1));
     const low = Math.min(gy, T - 0.03) - 0.03;
     // riser block, the tread slab on it, a cheek stone at each side stepping up with the flight
-    box(parts, cx, (low + T - 0.016) / 2, cz, ld - 0.004, T - 0.016 - low, W - 0.012, yaw, stone(r, 0.6));
-    box(parts, cx, T - 0.008, cz, ld + 0.008, 0.016, W, yaw + (r() - 0.5) * 0.03, new THREE.Color().setHSL(0.09, 0.05, 0.19 + 0.05 * r()));
-    for (const sg of [-1, 1]) box(parts, cx + px * sg * (W / 2 + RW.CHEEK / 2), (low + T + 0.03) / 2, cz + pz * sg * (W / 2 + RW.CHEEK / 2), ld + 0.004, T + 0.03 - low, RW.CHEEK, yaw, stone(r, 0.3));
+    box(parts, cx, (low + T - 0.016) / 2, cz, ld, T - 0.016 - low, W - 0.012, yaw, stone(r, 0.6));
+    box(parts, cx, T - 0.008, cz, ld + 0.008, 0.016, W, yaw, new THREE.Color().setHSL(0.09, 0.05, 0.19 + 0.05 * r()));
+    for (const sg of [-1, 1]) box(parts, cx + px * sg * (W / 2 + RW.CHEEK / 2), (low + T + 0.03) / 2, cz + pz * sg * (W / 2 + RW.CHEEK / 2), ld, T + 0.03 - low, RW.CHEEK, yaw, stone(r, 0.3));
   }
 }
 
@@ -93,33 +93,34 @@ function stretchNear(parts: THREE.BufferGeometry[], plan: PadPlan, run: WallRun,
   let cur = sA;
   for (const [g0, g1] of gaps) { if (g0 - cur > 0.03) spans.push([cur, g0]); cur = Math.max(cur, g1); }
   if (sB - cur > 0.03) spans.push([cur, sB]);
+  // the courses sit on one grid for the whole stretch (from its lowest footing), so they run level however the ground falls
+  let ref = Infinity;
+  for (let i = i0; i <= i1; i++) ref = Math.min(ref, bottomAt(0, Math.abs(run.h[i])));
   for (const [a, b] of spans) {
     for (let j = 0, base = 0; j < 40; j++) {
-      const ch = COURSE * (0.85 + 0.3 * r());
+      const ch = COURSE;                       // every course the same height, so the courses run level along the wall
       // every stone of the course across the span, in a running bond (alternate courses start half a stone in)
       const n0 = Math.max(1, Math.round((b - a) / 0.15));
       const lens: number[] = [];
       let tot = 0;
-      for (let q = 0; q < n0; q++) { const l = 0.6 + 0.8 * r(); lens.push(l); tot += l; }
+      for (let q = 0; q < n0; q++) { const l = (q === 0 && j % 2 === 1 ? 0.5 : 0.85) + 0.4 * r(); lens.push(l); tot += l; }
       let s = a, any = false;
       for (let q = 0; q < n0; q++) {
         const L = (b - a) * lens[q] / tot, sc = s + L / 2;
         s += L;
         const H = Hat(sc), bot = bottomAt(sc, H), top = bot + (H + EMBED) * k;
-        const y0 = bot + base;
+        const y0 = ref + base;
+        if (y0 + ch <= bot + 0.01) { any = true; continue; }       // (this course is under the ground here: the next may not be)
         if (y0 > top - ch * 0.55) continue;
+        const yb = y0 - ch < bot ? bot - EMBED : y0, hh = Math.min(y0 + ch - 0.004, top) - yb;
+        if (hh < ch * 0.4) continue;
         any = true;
-        const hh = Math.min(ch * (0.9 + 0.2 * r()), top - y0);
-        const setback = base * BATTER, face = cut ? setback : RW.SKIRT - setback;
-        const jit = r() * 0.02, dep = DEPTH * (0.9 + 0.2 * r()), dc = cut ? face + dep / 2 - jit : face - dep / 2 + jit;
+        // the face leans back with the batter; a stone may sit a little in from it, never proud of it
+        const setback = (y0 - ref) * BATTER, face = cut ? setback : RW.SKIRT - setback;
+        const jit = r() * 0.008, dep = DEPTH, dc = cut ? face + jit + dep / 2 : face - jit - dep / 2;
         const wx = ox + tx * sc + nx * dc, wz = oz + tz * sc + nz * dc;
-        const low = Math.max(0, 1 - base / 0.12);
-        box(parts, wx, y0 + hh / 2, wz, L * 0.985, hh * 0.97, dep, yaw0 + (r() - 0.5) * 0.05, stone(r, low), (r() - 0.5) * 0.04);
-        // a through-stone now and then, standing a hand proud of the face
-        if (r() < 0.04 && base > 0.03) {
-          const pd = 0.018, pc = cut ? face - pd / 2 - jit : face + pd / 2 + jit;
-          box(parts, ox + tx * sc + nx * pc, y0 + hh / 2, oz + tz * sc + nz * pc, 0.05 + 0.03 * r(), hh * 0.8, pd * 2, yaw0, stone(r, low));
-        }
+        const low = Math.max(0, 1 - (y0 - bot) / 0.12);
+        box(parts, wx, yb + hh / 2, wz, L - 0.004, hh, dep, yaw0, stone(r, low));
       }
       base += ch;
       if (!any) break;
@@ -131,7 +132,7 @@ function stretchNear(parts: THREE.BufferGeometry[], plan: PadPlan, run: WallRun,
       const s0 = a + (b - a) * q / n1, s1 = a + (b - a) * (q + 1) / n1, sc = (s0 + s1) / 2, H = Hat(sc), bot = bottomAt(sc, H), top = bot + H + EMBED;
       const setback = (top - bot) * BATTER, face = cut ? setback : RW.SKIRT - setback, dd = DEPTH + 0.03;
       const dc = cut ? face + DEPTH / 2 : face - DEPTH / 2;
-      box(parts, ox + tx * sc + nx * dc, top + COPING_T / 2 - 0.002, oz + tz * sc + nz * dc, (s1 - s0) * 0.97, COPING_T, dd, yaw0 + (r() - 0.5) * 0.02, new THREE.Color().setHSL(0.1, 0.03, 0.17 + 0.06 * r()));
+      box(parts, ox + tx * sc + nx * dc, top + COPING_T / 2 - 0.002, oz + tz * sc + nz * dc, (s1 - s0) - 0.004, COPING_T, dd, yaw0, new THREE.Color().setHSL(0.1, 0.03, 0.17 + 0.06 * r()));
     }
     // weep holes: a dark square low in the face every couple of metres, with a lip of drain pipe
     const nh = Math.floor((b - a) / 0.4);
