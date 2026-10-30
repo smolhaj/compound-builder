@@ -27,6 +27,7 @@ import { ROAD_PRICE } from './roadStyle';
 import { listingSeed, roadPlanFor } from './roadState';
 import { planWords, type RoadPlan } from './roadPlan';
 import { roadBridgeDay } from './roadFx';
+import { corridorDay } from './corridors';
 
 export type HouseKind = 'farmhouse' | 'trailer' | 'timber_cabin' | 'log_house';
 export type Condition = 'good' | 'fair' | 'poor';
@@ -121,6 +122,7 @@ export function orderHookup(s: GameState, what: 'power' | 'drive'): string | nul
 /** Once a day: finished hookups come in (or stall when the outside world fails). */
 export function siteJobsDay(s: GameState): void {
   roadBridgeDay(s);
+  corridorDay(s);
   const t = s.disaster.tracks;
   for (const what of ['power', 'drive'] as const) {
     const due = s.siteJobs[what];

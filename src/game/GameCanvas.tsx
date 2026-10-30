@@ -269,7 +269,8 @@ export function GameCanvas() {
     let raf = 0;
     /** QA hooks: frame counter, and an exact camera pose (eye → look) for interior shots. */
     const battle = new BattleRenderer(ws.scene, world.groundAt, () => useGameStore.getState().game.people);
-    battle.onEnd = () => useBattleStore.getState().endBattle();
+    battle.onEnd = () => { useBattleStore.getState().endBattle(); world.forceDoor(null); };
+    battle.onDoor = (open, x, z) => world.forceDoor(open, x, z);
     let battleSkip = useBattleStore.getState().skipReq, battleSync = 0;
     // the raid cutscene: plays a staged siege (sim/siege.ts), cutting between wall, house and raiders
     const homeSpot = () => {
@@ -464,6 +465,7 @@ export function GameCanvas() {
         battleView = null;
       }
       if (bs.skipReq !== battleSkip) { battleSkip = bs.skipReq; battle.skip(); }
+      world.doorLock = battle.playing ? true : null;      // (the alarm is up: the tunnel doors are shut for the fight)
       if (battle.playing) {
         battle.update(dt);
         if (battle.shake > 0) ws.camera.position.add(new THREE.Vector3((Math.random() - 0.5) * battle.shake, (Math.random() - 0.5) * battle.shake, (Math.random() - 0.5) * battle.shake));

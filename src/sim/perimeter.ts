@@ -145,6 +145,8 @@ export interface PerimeterRun {
   replacesKind?: PerimeterKind;
   /** A tunnel-bridge that was dropped (collapsed on purpose or by a blast): it is a plan again until rebuilt. */
   dropped?: boolean;
+  /** A tunnel brought down at its portal (a sapper's charge, `collapseCorridor`): still standing, choked with rubble until a contractor clears it (`clearsAt`, game time). */
+  collapsed?: { at: number; rubbleM3: number; clearsAt: number | null };
   /** A wall-top walkway: the wall run it stands on (follows the wall through an upgrade; sim/walkway.ts). */
   hostId?: string;
   /** Razor wire coiled along the top (`addRazor`, sim/razor.ts): a little harder to get over. */

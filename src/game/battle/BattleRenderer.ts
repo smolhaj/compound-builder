@@ -57,6 +57,8 @@ export class BattleRenderer {
   lines: Array<{ who?: string; text: string }> = [];
   /** Called once the battle (and its hold) is over. */
   onEnd: (() => void) | null = null;
+  /** The crew at a tunnel door: working at it (open false) or through it (open true), where (x, z) and how. */
+  onDoor: ((open: boolean, x: number | undefined, z: number | undefined, what: string) => void) | null = null;
   battle: Battle | null = null;
 
   private readonly _scene: THREE.Scene;
@@ -298,6 +300,7 @@ export class BattleRenderer {
         break;
       }
       case 'breach': this._boom(e.x, this._ground(e.x, e.z), e.z, 0.5, true); break;
+      case 'door': this.onDoor?.(e.open, e.x, e.z, e.what); break;      // the crew at the tunnel's steel door: shut while they work at it, forced when they are through
       case 'fallback': this.shake = Math.max(this.shake, 0.15); break;
       case 'carry': break;   // the wounded's own move event carries them in
       case 'wound': { const u = U_(e.unit); if (u && !e.stopped) { u.wound = Math.min(1, u.wound + Math.max(0.3, e.sev)); this._tint(u); } break; }
