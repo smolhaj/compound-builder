@@ -40,6 +40,7 @@
  */
 import { frostChance } from './cold';
 import { seepageChance } from './sanitation';
+import { airliftBill, airliftCase, airliftReady } from './outposts';
 import { dayIndex, calendarOf, type GameState } from './state';
 import { isFinished } from './construction';
 import { log } from './economy';
@@ -189,6 +190,14 @@ function course(x: Ctx): boolean {
     if (cozy(s)) { n.health = Math.max(n.health, 5); h.sev = Math.min(h.sev, 60); return false; }
     n.health = 0; n.died = Math.floor(s.clock.t); out.push(`${nameOf} died of ${why}.`); return true;
   };
+  // the air ambulance, with a helipad on the place (sim/outposts.ts): the bad wounds, burns and broken legs and hips fly out
+  if (!c.hosp && airliftReady(s) && airliftCase(c.kind, h.sev, c.bone) && s.money >= airliftBill(s)) {
+    const bill = airliftBill(s);
+    s.money -= bill; c.hosp = true; h.sev = Math.min(h.sev, 25); c.care = 'flown to the trauma centre';
+    out.push(`${nameOf} was flown out from the pad to the trauma centre: $${bill.toLocaleString('en-US')}${s.paper.insured ? ' after insurance' : ''}.`);
+    if (c.kind === 'fracture') c.set = 'good';
+    if (c.kind !== 'fracture') return true;
+  }
   // the serious ones go to the hospital while it works (for a bill)
   if (care.hospital && !c.hosp && (c.kind === 'infection' && h.sev >= 75 || c.kind === 'fracture' && c.bone === 'hip' || c.kind === 'dysentery' && h.sev >= 70) && s.money >= HOSPITAL_USD) {
     s.money -= HOSPITAL_USD; c.hosp = true; h.sev = Math.min(h.sev, 25); c.care = 'at the county hospital';

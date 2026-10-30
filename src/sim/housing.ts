@@ -67,6 +67,9 @@ const HOMES: Record<string, Spec> = {
   farmhouse: { couches: 2, floorM2: 16 },
   trailer: { couches: 1, floorM2: 8 },
   cottage: { couches: 1, floorM2: 5 },
+  // the stilted house's two rooms, and the ring of six cabins (a bunk each side of each: twelve)
+  stilted_house: { couches: 1, floorM2: 6 },
+  cabin_village: { bunks: 12, floorM2: 12 },
   guest_house: { couches: 1, floorM2: 3 },
   moms_house: { couches: 1, floorM2: 8 },
   bunker_dorm: { bunks: 8, floorM2: 6, floorQ: 0.5 },

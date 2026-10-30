@@ -52,6 +52,7 @@ import { emptyLooting, emptyNow, resolveMoveIn, resolveStranded } from './weeken
 import { raidTakesVehicles } from './vehicles';
 import { practice } from './skills';
 import { turbineNoise } from './renewables';
+import { villageWatch } from './outposts';
 import { resolveTrialEnd, startTrial, trialDay, type Character, type TrialCamp } from './trial';
 import { admitNewcomers, resolveShelter, strangerArrival, type Extras, type ShelterWhy } from './newcomers';
 
@@ -167,7 +168,7 @@ export function postureOf(s: GameState): Posture {
   const tw = towerPosture(s);
   // fog (sim/fog.ts) takes what the eyes add: the watch's own score, the towers' view and the posted guard (the gear's share is already in gear.detection)
   const kEye = fogSightK(s, 'eye');
-  const detection = Math.min(100, 25 + (watch * 5 + tw.detection + watchDetection(s)) * kEye + (radioNet ? 20 : 0) + (barrier > 50 ? 10 : 0) + gear.detection + forewarned(s));
+  const detection = Math.min(100, 25 + (watch * 5 + tw.detection + watchDetection(s)) * kEye + (radioNet ? 20 : 0) + (barrier > 50 ? 10 : 0) + gear.detection + forewarned(s) + villageWatch(s));
   return { visibility: Math.min(100, visibility + gear.visibility + tw.visibility), fortress, barrier: Math.min(100, barrier + gear.barrier), detection, fighters, deter: gear.deter, safeRoom: gear.safeRoom, armed: armed(s), firepower: firepower(s) * gear.fight * tw.fire, bunker: fin.some(st => st.kind === 'bunker_hatch' || st.kind === 'bunker_stairs') };
 }
 

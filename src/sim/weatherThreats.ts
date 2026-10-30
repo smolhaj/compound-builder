@@ -41,6 +41,7 @@ import { mulberry32, pick } from './rng';
 import { DIFFICULTY } from './difficulty';
 import { crackFilm, crackGlass } from './improvements';
 import { isTunnel, tunnelStorm } from './tunnels';
+import { STILT_FIRE_K } from './outposts';
 import { floodCandidates } from './terrainFx';
 import { regionFor } from './climate';
 import { roadClosedFor } from './slope';
@@ -221,6 +222,7 @@ function hit(s: GameState, e: WeatherEvent, r: () => number, out: string[]): voi
     const cleared = s.forestry.cleared.length >= 20;
     const out_ = fin.filter(st => !st.kind.startsWith('bunker_') && st.kind !== 'garden' && st.kind !== 'field');
     if (!cleared && out_.length && r() < 0.35 * Math.min(1.5, s.site.timber)) damage(s, pick(r, out_), 0.6, 'The fire came through the timber to the buildings.', out);
+    else if (!cleared && fin.some(st => st.kind === 'stilted_house') && r() < 0.35 * 0.5 * Math.min(1.5, s.site.timber) * STILT_FIRE_K) damage(s, fin.find(st => st.kind === 'stilted_house')!, 0.6, 'The fire got under the stilted house: the open crawlspace burns from below.', out);
     else out.push(cleared ? 'The fire burned up the ridge and lay down at the cleared ground round the place.' : 'The fire burned along the ridge and passed us by.');
   } else if (e.kind === 'ice_storm' || e.kind === 'windstorm' || e.kind === 'hurricane_remnants') {
     out.push(e.kind === 'ice_storm' ? 'Ice storm: everything is glazed, limbs are cracking all night, and the power is out.'

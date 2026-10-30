@@ -30,6 +30,7 @@ import { isHome } from './blueprints';
 import { highShare, isTower } from './towers';
 import { PERIMETER, runFinished, runBill, SALVAGE, type PerimeterKind, type Pt } from './perimeter';
 import { log } from './economy';
+import { RAISED_KINDS } from './outposts';
 import { isDock, lakeIce, waterBearing, waterLaneCost } from './waterfront';
 import { DRAIN, cutSlopeAt, nearDrain, undrained, drainLineFor } from './drainage';
 import { wallHoldsAt } from './retaining';
@@ -70,7 +71,7 @@ export function floodCandidates(s: GameState, fin: readonly Structure[], lowKind
   return fin.filter(st => {
     const rise = riseAboveCreek(g, st.x, st.z);
     if (lowKinds.includes(st.kind)) return rise !== null && rise < FX.SAFE_RISE;   // beyond 84 m of the creek, or up on the bench, the water does not reach it
-    return !st.kind.startsWith('bunker_') && floodplainAt(g, st.x, st.z);          // a house in the floodplain floods too
+    return !st.kind.startsWith('bunker_') && !RAISED_KINDS.includes(st.kind) && floodplainAt(g, st.x, st.z);          // a house in the floodplain floods too (a stilted one stands above it)
   });
 }
 
