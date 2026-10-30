@@ -2,7 +2,7 @@
  * Automatic graphics quality (pure: no THREE, no DOM; the canvas feeds it).
  *
  * Start: `pickStartTier` guesses a tier from what the browser tells us about the device (cores, memory, the WebGL renderer string).
- * It is deliberately conservative: only a known-strong GPU starts on High, anything unknown starts on Medium, a software renderer on Low.
+ * It is deliberately conservative: nothing starts on High by itself while `AUTO_HIGH` is off, anything else starts on Medium, a software renderer on Low.
  * Run: `FrameBudget` watches the frame time and says "step down" when it stays over budget; it never says "step up" (the player does that,
  * from Settings), so the picture never gets better and worse again by itself.
  */
@@ -23,12 +23,18 @@ const SOFTWARE = /swiftshader|llvmpipe|softpipe|software|basic render|microsoft 
 const STRONG = /apple (m\d|gpu)|nvidia|geforce|rtx|radeon (rx|pro)|\bamd radeon rx|arc a\d/i;
 const WEAK = /intel.*(hd|uhd|iris(?! xe max))|mali|adreno|powervr|videocore|vivante|apple a\d/i;
 
-export function pickStartTier(d: DeviceInfo): Tier {
+/** A known-strong GPU (Apple M-series incl. Pro / Max / Ultra and the generic "Apple GPU" string Safari gives, discrete NVIDIA / Radeon RX, Arc). */
+export function isStrongGpu(gpu: string): boolean { return STRONG.test(gpu); }
+
+/** Until real frame times from an M1 Pro are in, nothing starts on High by itself; the player opts in (and it is remembered). Flip to allow it. */
+export const AUTO_HIGH = false;
+
+export function pickStartTier(d: DeviceInfo, autoHigh: boolean = AUTO_HIGH): Tier {
   const gpu = d.gpu ?? '';
   if (SOFTWARE.test(gpu)) return 'low';
   if ((d.memoryGB ?? 8) <= 2 || (d.cores ?? 8) <= 2) return 'low';
   if (WEAK.test(gpu) || (d.memoryGB ?? 8) <= 4 || (d.cores ?? 8) <= 4) return 'medium';
-  if (STRONG.test(gpu) && (d.cores ?? 0) >= 8) return 'high';
+  if (autoHigh && STRONG.test(gpu) && (d.cores ?? 0) >= 8) return 'high';
   return 'medium';
 }
 

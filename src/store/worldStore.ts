@@ -107,7 +107,8 @@ function savedFrameCap(): FrameCap {
   try { const v = Number(localStorage.getItem('cb.fpscap')); if (v === 0 || v === 30 || v === 60) return v; } catch { /* no storage */ }
   return 60;
 }
-function savedShowPerf(): boolean { try { return localStorage.getItem('cb.showperf') === '1'; } catch { return false; } }
+/** On unless the player turned it off: the next few builds ask for fps numbers. */
+function savedShowPerf(): boolean { try { return localStorage.getItem('cb.showperf') !== '0'; } catch { return true; } }
 
 export const useWorldStore = create<WorldState>()(subscribeWithSelector((set) => ({
   seed: initialSeed(),

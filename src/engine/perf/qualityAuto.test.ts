@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { capGapMs, FrameBudget, lowerTier, pickStartTier } from './qualityAuto';
+import { capGapMs, FrameBudget, isStrongGpu, lowerTier, pickStartTier } from './qualityAuto';
 
 describe('pickStartTier', () => {
   it('software GL starts on Low', () => { expect(pickStartTier({ gpu: 'ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device), SwiftShader driver)', cores: 16, memoryGB: 8 })).toBe('low'); });
@@ -8,9 +8,14 @@ describe('pickStartTier', () => {
     expect(pickStartTier({ gpu: 'ANGLE (Intel, Intel(R) UHD Graphics 630)', cores: 12, memoryGB: 8 })).toBe('medium');
     expect(pickStartTier({ gpu: 'Adreno (TM) 650', cores: 8, memoryGB: 8 })).toBe('medium');
   });
-  it('an M1 Pro (8+ cores) and a discrete GPU start on High', () => {
-    expect(pickStartTier({ gpu: 'ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)', cores: 10, memoryGB: 8 })).toBe('high');
-    expect(pickStartTier({ gpu: 'ANGLE (NVIDIA, NVIDIA GeForce RTX 3060)', cores: 12, memoryGB: 8 })).toBe('high');
+  it('recognises Apple M1 / M2 / M3 Pro / Max / Ultra (ANGLE Metal and Safari strings) and discrete GPUs as strong', () => {
+    for (const g of ['ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)', 'ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Max, Unspecified Version)', 'ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Ultra, Unspecified Version)', 'ANGLE (Apple, ANGLE Metal Renderer: Apple M3 Pro, Unspecified Version)', 'Apple GPU', 'ANGLE (NVIDIA, NVIDIA GeForce RTX 3060)']) expect(isStrongGpu(g)).toBe(true);
+    expect(isStrongGpu('ANGLE (Intel, Intel(R) UHD Graphics 630)')).toBe(false);
+  });
+  it('an M1 Pro (10 cores) starts on Medium, not Low; on High only when auto-High is on', () => {
+    const m1 = { gpu: 'ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)', cores: 10, memoryGB: 8 };
+    expect(pickStartTier(m1)).toBe('medium');
+    expect(pickStartTier(m1, true)).toBe('high');
   });
   it('a strong GPU on a 4-core machine, or an unknown GPU, is Medium', () => {
     expect(pickStartTier({ gpu: 'NVIDIA GeForce RTX 3060', cores: 4, memoryGB: 8 })).toBe('medium');
