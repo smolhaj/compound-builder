@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { newGame, type GameState, type Structure } from './state';
 import { planRun } from './perimeter';
-import { addFitWork, balanceDay, fitProblem, networks, orderFit, plant, serviceOf, sunHours } from './utilities';
+import { addFitWork, balanceDay, fitProblem, autoJoin, networks, orderFit, plant, serviceOf, sunHours } from './utilities';
 import { step } from './engine';
 import { solarFogK } from './fogFx';
 
@@ -170,5 +170,18 @@ describe('the county grid and grid-down', () => {
     g.utilities.off = ['h'];
     day(g);
     expect(g.utilities.lit).not.toContain('h');
+  });
+});
+
+describe('utilities run themselves', () => {
+  it('buildings close together share water and power without a drawn line; far outposts do not', () => {
+    const nodes = [
+      { id: 'a', kind: 'well_drilled', x: 0, z: 0, r: 0.3 },
+      { id: 'b', kind: 'lodge', x: 8, z: 0, r: 1.3 },
+      { id: 'far', kind: 'cabin_village', x: 200, z: 0, r: 2 },
+    ];
+    const net = autoJoin(nodes, networks(nodes, []));
+    expect(net.get('a')).toBe(net.get('b'));
+    expect(net.get('far')).not.toBe(net.get('a'));
   });
 });
