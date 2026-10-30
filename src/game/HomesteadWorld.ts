@@ -49,6 +49,8 @@ import { CELL, type KitPieceDef } from './buildkit/kit';
 import type { GameState } from '../sim/state';
 import type { WearSeason } from '../engine/world/people/crowdWear';
 import type { TourBuildingInfo } from '../engine/world/camera/TourController';
+import { hydroSiteAt, windDay, TURBINE } from '../sim/renewables';
+import { hydroLine, HYDRO_HOUSE } from './buildkit/renewableBuildings';
 import { climbOf, floorHatchHost, footprint, KIT, placementProblem, rotQ, type Placed, type SiteQuery } from './buildkit/kit';
 import { showStage, CUTAWAY_HIDE, XRAY_LAYERS, type BuildLayer as CabinLayer, type BuildOpts } from './buildkit/shell';
 import { bunkerRoots, datums, doorsOf, DEPTH, isEntry, isUnderground, tunnelDoorsOf, tunnelStart, type Side } from './buildkit/underground';
@@ -1931,6 +1933,7 @@ export class HomesteadWorld {
         }
         continue;
       }
+      if (b.placed.kind === 'micro_hydro' || b.placed.kind === 'wind_turbine') { this._renewableLife(b, game, dt); continue; }
       if (b.placed.kind === 'pond') { this._pondLife(b, game); continue; }
       if (b.placed.kind === 'sheep_barn') { this._flock(b, game); continue; }
       if (b.placed.kind !== 'garden' && b.placed.kind !== 'field') continue;
@@ -1940,6 +1943,50 @@ export class HomesteadWorld {
       }
     }
     // the fire pit (camp cookfire, evenings sat out) is lit by the atmosphere (atmosphere/nightLife.firePitLit)
+  }
+
+  /**
+   * The micro-hydro line (penstock along the ground to the intake weir on the creek, from the sim's site) and the turbine's spin. The line is built
+   * once the plant is finished; the weir goes when a flood takes it (`utilities.broken`). The rotor turns with the day's output.
+   */
+  private _renewableLife(b: Built, game: GameState, dt: number): void {
+    const st = game.structures.find(x => x.id === b.placed.id);
+    if (!st) return;
+    const broken = game.utilities.broken.includes(st.id);
+    if (b.placed.kind === 'micro_hydro') {
+      let line = b.group.userData.hydroLine as THREE.Group | undefined;
+      if (b.finished && !line) {
+        const site = hydroSiteAt(game, st.x, st.z);
+        if (site && site.lenM >= 12) {
+          const c = Math.cos(-b.group.rotation.y), s = Math.sin(-b.group.rotation.y);
+          // world -> the group's frame (position and a turn about y)
+          const loc = (x: number, z: number, y: number): [number, number, number] => { const dx = x - b.group.position.x, dz = z - b.group.position.z; return [dx * c + dz * s, y - b.group.position.y, -dx * s + dz * c]; };
+          const back = new THREE.Vector3(0, 0, -(HYDRO_HOUSE.D / 2 + 3.2 * M)).applyAxisAngle(new THREE.Vector3(0, 1, 0), b.group.rotation.y).add(b.group.position);
+          const n = 14, pts: Array<[number, number, number]> = [];
+          for (let k = 0; k <= n; k++) { const f = k / n, x = back.x + (site.intake[0] - back.x) * f, z = back.z + (site.intake[1] - back.z) * f; pts.push(loc(x, z, this.groundAt(x, z))); }
+          const creek = this.parcel.creek, iy = creek.waterY(site.intake[0]);
+          const w = loc(site.intake[0], site.intake[1], iy);
+          line = hydroLine(pts, { x: w[0], y: w[1], z: w[2], half: creek.halfWidth, yaw: b.group.rotation.y ? -b.group.rotation.y : 0 });
+          b.group.add(line);
+          b.group.userData.hydroLine = line;
+        }
+      }
+      const weir = line?.userData.weir as THREE.Object3D | undefined;
+      if (weir) weir.visible = !broken;
+      return;
+    }
+    // the wind turbine: the rotor appears when the tower is up and turns with the output (a furled, calm or broken one stands still)
+    const rotor = b.group.userData.rotor as THREE.Object3D | undefined;
+    if (!rotor) return;
+    rotor.visible = b.finished;
+    const t = (b.group.userData.windT as number | undefined) ?? -1;
+    const tk = Math.floor(game.clock.t * 4);
+    if (tk !== t) {
+      const d = windDay(game, st, { broken });
+      b.group.userData.windOmega = d.state === 'running' ? 1 + 5 * d.kw / TURBINE.RATED_KW : d.state === 'iced' ? 0.6 : d.state === 'calm' ? 0.35 : 0;
+      b.group.userData.windT = tk;
+    }
+    rotor.rotation.z -= dt * ((b.group.userData.windOmega as number) ?? 0);
   }
 
   /** The pond's fish and crayfish: shown in proportion to the stock (the first meshes in each draw order show first). */
