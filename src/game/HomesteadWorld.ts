@@ -50,6 +50,7 @@ import type { GameState } from '../sim/state';
 import type { WearSeason } from '../engine/world/people/crowdWear';
 import type { TourBuildingInfo } from '../engine/world/camera/TourController';
 import { hydroSiteAt, windDay, TURBINE } from '../sim/renewables';
+import { boatsAtDock, isDock, lakeIce } from '../sim/waterfront';
 import { hydroLine, HYDRO_HOUSE } from './buildkit/renewableBuildings';
 import { floorHatchHost, footprint, KIT, placementProblem, rotQ, type Placed, type SiteQuery } from './buildkit/kit';
 import { showStage, CUTAWAY_HIDE, XRAY_LAYERS, type BuildLayer as CabinLayer, type BuildOpts } from './buildkit/shell';
@@ -1164,8 +1165,10 @@ export class HomesteadWorld {
     const r = footprint(def, p.x, p.z, p.rot);
     const below = isUnderground(def);
     let y = this.parcel.padHeight(r.x0, r.z0, r.x1, r.z1);
+    // a pier stands on the water, not on a pad (the lake bed or the bank would be graded up to it)
+    if (def.waterside) y = (this.parcel.lakeY ?? this.parcel.creek.waterY(p.x)) + 0.02;
     // bunker rooms take no pad (the yard above stays as it is); an entrance's hatch or headhouse gets a small one
-    let pad: Pad | null = !below || (isEntry(def) && p.kind !== 'bunker_floorhatch') ? { x0: r.x0 - 0.05, z0: r.z0 - 0.05, x1: r.x1 + 0.05, z1: r.z1 + 0.05, y, skirt: below ? 0.4 : 0.9 } : null;
+    let pad: Pad | null = (!below || (isEntry(def) && p.kind !== 'bunker_floorhatch')) && !def.waterside ? { x0: r.x0 - 0.05, z0: r.z0 - 0.05, x1: r.x1 + 0.05, z1: r.z1 + 0.05, y, skirt: below ? 0.4 : 0.9 } : null;
     // a pad cut into a slope is held by a dry-stack wall (sim/retainPlan): a flat apron round the building on the walled sides, the terrain eased only over the wall
     let wall: PadPlan | null = null;
     if (!below && pad && this.parcel.lot && !WALLLESS.test(p.kind)) {
@@ -1192,6 +1195,12 @@ export class HomesteadWorld {
     showStage(group, 0, 0);
     group.position.set(p.x, y, p.z);
     group.rotation.y = p.rot * Math.PI / 2;
+    // a pier's water end is its -z end: turn it round if the +z end is the wet one
+    if (def.waterside) {
+      const hd = def.cellsZ * CELL / 2 - 0.1, c = Math.cos(group.rotation.y), sn = Math.sin(group.rotation.y);
+      const wetAt = (k: number) => this.parcel.isCreek(p.x + sn * k * hd, p.z + c * k * hd);
+      if (wetAt(1) && !wetAt(-1)) group.rotation.y += Math.PI;
+    }
     // keep the builder's userData (colliders, seats, chimney) and tag it for the tour camera
     Object.assign(group.userData, { type: 'building', buildingId: p.id });
     this._ws.scene.add(group);
@@ -1925,6 +1934,7 @@ export class HomesteadWorld {
         }
         continue;
       }
+      if (isDock(b.placed.kind)) { this._dockLife(b, game); continue; }
       if (b.placed.kind === 'micro_hydro' || b.placed.kind === 'wind_turbine') { this._renewableLife(b, game, dt); continue; }
       if (b.placed.kind === 'pond') { this._pondLife(b, game); continue; }
       if (b.placed.kind === 'sheep_barn') { this._flock(b, game); continue; }
@@ -1935,6 +1945,22 @@ export class HomesteadWorld {
       }
     }
     // the fire pit (camp cookfire, evenings sat out) is lit by the atmosphere (atmosphere/nightLife.firePitLit)
+  }
+
+  /** The boats at a dock: the stockpile's boats in the slips, nearest dock first, hidden when the water is skimmed over (the family hauls them out). */
+  private _dockLife(b: Built, game: GameState): void {
+    const boats = b.group.userData.boats as Array<{ g: THREE.Group; kind: 'jon_boat' | 'skiff' }> | undefined;
+    if (!boats) return;
+    const open = b.finished && lakeIce(game) === 'open', want = open ? boatsAtDock(game) : { jon_boat: 0, skiff: 0 };
+    // earlier docks take their slips first
+    let taken: Record<string, number> = { jon_boat: 0, skiff: 0 };
+    for (const o of this._built.values()) {
+      if (o === b) break;
+      if (isDock(o.placed.kind)) for (const bt of (o.group.userData.boats ?? []) as Array<{ g: THREE.Group; kind: string }>) if (bt.g.visible) taken[bt.kind]++;
+    }
+    const used: Record<string, number> = { jon_boat: 0, skiff: 0 };
+    for (const bt of boats) { used[bt.kind]++; bt.g.visible = taken[bt.kind] + used[bt.kind] <= want[bt.kind]; }
+    taken = { jon_boat: 0, skiff: 0 };
   }
 
   /**

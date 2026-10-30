@@ -79,7 +79,7 @@ export const UTILITY: Record<string, UtilityDef> = {
 };
 
 /** Daily power draw (kWh) of a wired building by kind, and water use (L/person/day) carried vs plumbed. */
-export const DRAW_KWH: Record<string, number> = { lodge: 16, lodge_solar: 16, stone_house: 8, timber_frame: 6, container_house: 5, adobe_house: 5, timber_cabin: 5, log_house: 8, farmhouse: 9, trailer: 6, cottage: 4, guest_house: 3, moms_house: 5, barn: 1, workshop: 4, metal_garage: 1, garage_solar: 1, filtration_shed: 0.3, root_cellar: 0.2, chicken_coop: 0.3, outhouse: 0, garden: 0, field: 0, greenhouse: 1, greenhouse_heated: 4, aquaponics: 4, high_tunnel: 0.5, orchard: 0, orchard_grove: 0, pond: 1.5, reservoir: 1, sheep_barn: 0.3, equipment_yard: 0.2, solar_farm: 0, battery_bank: 0 };
+export const DRAW_KWH: Record<string, number> = { lodge: 16, lodge_solar: 16, stone_house: 8, timber_frame: 6, container_house: 5, adobe_house: 5, timber_cabin: 5, log_house: 8, farmhouse: 9, trailer: 6, cottage: 4, guest_house: 3, moms_house: 5, barn: 1, workshop: 4, metal_garage: 1, garage_solar: 1, filtration_shed: 0.3, root_cellar: 0.2, chicken_coop: 0.3, outhouse: 0, garden: 0, field: 0, greenhouse: 1, greenhouse_heated: 4, aquaponics: 4, high_tunnel: 0.5, marina: 2, boat_dock: 0.1, orchard: 0, orchard_grove: 0, pond: 1.5, reservoir: 1, sheep_barn: 0.3, equipment_yard: 0.2, solar_farm: 0, battery_bank: 0 };
 export const WATER_CARRIED = 25, WATER_PLUMBED = 130;
 /** Fitting jobs: hours and materials (per building). */
 export const FIT = {
@@ -107,7 +107,7 @@ export const NET_METER_USD_PER_KWH = 0.05;
  * Who gets power first when there isn't enough (lower first): pumps, the
  * root cellar (freezer), homes, then the coop and the workshop.
  */
-export const LOAD_PRIORITY: Record<string, number> = { well_drilled: 0, root_cellar: 1, timber_cabin: 2, log_house: 2, lodge: 2, lodge_solar: 2, stone_house: 2, timber_frame: 2, container_house: 2, adobe_house: 2, farmhouse: 2, trailer: 2, cottage: 2, guest_house: 2, moms_house: 2, filtration_shed: 0, barn: 4, chicken_coop: 3, workshop: 4, metal_garage: 4, garage_solar: 4, greenhouse: 3, greenhouse_heated: 3, aquaponics: 1, pond: 1, reservoir: 3, sheep_barn: 4, equipment_yard: 5 };
+export const LOAD_PRIORITY: Record<string, number> = { well_drilled: 0, root_cellar: 1, timber_cabin: 2, log_house: 2, lodge: 2, lodge_solar: 2, stone_house: 2, timber_frame: 2, container_house: 2, adobe_house: 2, farmhouse: 2, trailer: 2, cottage: 2, guest_house: 2, moms_house: 2, filtration_shed: 0, barn: 4, chicken_coop: 3, workshop: 4, metal_garage: 4, garage_solar: 4, greenhouse: 3, greenhouse_heated: 3, aquaponics: 1, marina: 5, pond: 1, reservoir: 3, sheep_barn: 4, equipment_yard: 5 };
 
 export interface Fitting { building: string; kind: 'plumb' | 'wire'; done: number; hours: number; supplied: boolean; finishedAt: number | null }
 

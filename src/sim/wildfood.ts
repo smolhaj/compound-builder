@@ -18,6 +18,7 @@
  */
 import { huntFactor } from './daily';
 import { log } from './economy';
+import { boatFishK, lakeIce } from './waterfront';
 import { calendarOf, type GameState } from './state';
 import { REGIONS, type Game } from './regions';
 import { huntingRifle, smallGameGun } from './armory';
@@ -132,5 +133,12 @@ export function wildDay(s: GameState, freezer: boolean): number {
   // fishing: the creek (yours, or the neighbor's down the road), gear, and a license in peacetime
   const fishOk = after || hasLicense(s, 'fishing') && inSeason(s, 'fishing');
   if (fishOk && s.stock.fishing_gear >= 1 && local(s, 'fish').length && r() < (s.site.creek ? 0.15 : 0.06) * hf * w.abundance.fish) bring(0.6, 'Fish', 'fish');
+  // a day on the water from the dock (sim/waterfront.ts): a boat reaches the fish the bank cannot; a skiff burns a little petrol; ice fishing at the creek's rate
+  const boatK = boatFishK(s);
+  if (boatK > 0 && fishOk && s.stock.fishing_gear >= 1 && r() < 0.15 * boatK * hf * Math.max(0.3, w.abundance.fish)) {
+    const skiff = boatK >= 4 && s.stock.fuel >= 0.3;
+    if (skiff) s.stock.fuel -= 0.3;
+    bring(skiff ? 1.6 : boatK >= 3 ? 1.1 : 0.6, lakeIce(s) === 'ice' ? 'Ice-fishing perch' : 'Lake fish', 'fish');
+  }
   return meat;
 }
