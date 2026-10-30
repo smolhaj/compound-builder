@@ -16,7 +16,8 @@
  */
 import type { Gate, Pt, PerimeterKind, PerimeterRun } from './perimeter';
 import { PERIMETER, planRun, runBill, runFinished, runHours, wallLength } from './perimeter';
-import { flattenAt, polygonArea, regionFromPolygon, selfIntersects } from './ringShape';
+import { avoidRects, flattenAt, polygonArea, regionFromPolygon, selfIntersects } from './ringShape';
+import { buildingRects } from './obstacles';
 import { BLUEPRINTS, isHome, totalBill, totalHours } from './blueprints';
 import { MATERIALS, type MaterialId, type Stock } from './materials';
 import { log, orderCost } from './economy';
@@ -68,6 +69,8 @@ export interface RingOptions {
   towerKind: TowerKind;
   /** A sally port in each inner ring, on the far side from its main gate. */
   sally: boolean;
+  /** Tower sites already taken (the outer ring's towers, laid with the same plan): an inner tower keeps clear of them. */
+  taken?: readonly Pt[];
 }
 export const DEFAULT_RINGS: RingOptions = { count: 1, wall: 'stone_wall', gates: 'alternate', towers: 2, towerKind: 'watchtower_wood', sally: false };
 
@@ -197,7 +200,7 @@ function sallyOn(poly: readonly Pt[], gateAt: Pt): { closed: Pt[]; at: number; p
   return { closed, at, pt };
 }
 
-function towerSpots(poly: readonly Pt[], n: number, gate: Pt, taken: readonly Pt[], avoid: readonly Pt[] = []): Pt[] {
+function towerSpots(poly: readonly Pt[], n: number, gate: Pt, taken: readonly Pt[], avoid: readonly Pt[] = [], stands: ReadonlyArray<{ x0: number; z0: number; x1: number; z1: number }> = []): Pt[] {
   if (n <= 0) return [];
   const region = regionFromPolygon(poly), cands: Pt[] = [];
   const inset = TOWERS.watchtower_wood.cells * 0.5 / 2 + 0.3;
@@ -210,7 +213,10 @@ function towerSpots(poly: readonly Pt[], n: number, gate: Pt, taken: readonly Pt
     }
   }
   const out: Pt[] = [], ref: Pt[] = [gate, ...taken];
-  const pool = cands.filter(p => Math.hypot(p[0] - gate[0], p[1] - gate[1]) > 3 && avoid.every(a => Math.hypot(p[0] - a[0], p[1] - a[1]) > 2.4));
+  const half = TOWERS.watchtower_wood.cells * 0.5 / 2 + 0.3;   // (the footprint the sites above were pushed in by)
+  const pool = cands.filter(p => Math.hypot(p[0] - gate[0], p[1] - gate[1]) > 3 && avoid.every(a => Math.hypot(p[0] - a[0], p[1] - a[1]) > 2.4)
+    && taken.every(t => Math.hypot(p[0] - t[0], p[1] - t[1]) > 1.6)
+    && !stands.some(b => p[0] + half > b.x0 && p[0] - half < b.x1 && p[1] + half > b.z0 && p[1] - half < b.z1));
   while (out.length < n && pool.length) {
     let best = 0, bd = -1;
     pool.forEach((p, i) => { const d = ref.concat(out).reduce((a, q) => Math.min(a, Math.hypot(q[0] - p[0], q[1] - p[1])), Infinity); if (d > bd) { bd = d; best = i; } });
@@ -229,7 +235,9 @@ export function planRings(s: GameState, outer: readonly Pt[], outerGate: Pt | nu
   const ground = geo.ground ?? groundOf(s)?.h;
   const center = centroid(outer);
   const made = ringPolygons(outer, options.count, ground, center);
-  let polys = made.polys;
+  // an inner wall bends round a building that stands where it would run (the house is inside the ring, or outside it, never cut in two)
+  const stands = buildingRects(s);
+  let polys = made.polys.map(p => (stands.length ? avoidRects(p, stands) : p));
   const contour = made.contour;
   // too small a compound for this many rings, or a tangled outline: fewer rings, and say so
   const ok = (p: Pt[]) => !selfIntersects(p) && polygonArea(p) > 6;
@@ -237,11 +245,11 @@ export function planRings(s: GameState, outer: readonly Pt[], outerGate: Pt | nu
   if (good.length < options.count - 1) { notes.push(`The compound has room for ${good.length + 1} ring${good.length ? 's' : ''}, not ${options.count}.`); polys = good; }
   const baseAng = outerGate ? Math.atan2(outerGate[1] - center[1], outerGate[0] - center[0]) : Math.PI / 2;
   const rings: RingSpec[] = [];
-  const taken: Pt[] = [];
+  const taken: Pt[] = [...(options.taken ?? [])];
   polys.forEach((poly, i) => {
     const ang = baseAng + (options.gates === 'alternate' ? (i + 1) * Math.PI : 0);
     const g = gateOn(poly, center, ang);
-    const spots = towerSpots(g.poly, options.towers, g.at, taken, options.sally ? [sallyOn(g.poly, g.at).pt] : []);
+    const spots = towerSpots(g.poly, options.towers, g.at, taken, options.sally ? [sallyOn(g.poly, g.at).pt] : [], stands);
     spots.forEach(p => taken.push(p));
     if (spots.length < options.towers) notes.push(`Ring ${i + 2}: ${spots.length} of ${options.towers} tower sites found.`);
     const level = ground ? g.poly.reduce((a, p) => a + ground(p[0], p[1]), 0) / g.poly.length : 0;

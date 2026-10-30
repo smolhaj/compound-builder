@@ -28,9 +28,10 @@ import { GATE_GARAGE, GARAGE_CELLS_Z, GARAGE_W, garageRotFor } from './garage';
 import { canHostWalkway, layWalkway, walkOn, walkwayBill } from './walkway';
 import { TOWERS, stampHighGround, type TowerKind } from './towers';
 import { ownedRects } from './enclosure';
+import { buildingRects } from './obstacles';
 import { planPropertyWall, regionFromRects, type GateSpot, type PropertyGeometry, type WallPlan } from './propertyWall';
 import { cornersOf, regionFromPolygon, ringPolygon, type Region, type RingShape } from './ringShape';
-import { CELL } from '../game/buildkit/kit';
+import { CELL, KIT, footprint } from '../game/buildkit/kit';
 import type { Rect } from './land';
 import type { GameState } from './state';
 
@@ -104,8 +105,13 @@ const GARAGE_D = GARAGE_CELLS_Z * CELL;
 
 /** The area a ring of this shape encloses in the core compound (or in `rect`): the outline is cut flat at the gate. */
 export function compoundRegion(s: GameState, geo: PropertyGeometry, shape: RingShape, gateW: number, rect: Rect = coreRect(s, geo)): Region {
-  if (shape === 'square') return regionFromRects([rect]);
-  return regionFromPolygon(ringPolygon(shape, rect, { drive: geo.drive, roadGate: geo.roadGate, gateW, seed: s.seed, ground: geo.ground }));
+  const avoid = buildingRects(s).filter(b => b.x1 > rect.x0 - 1 && b.x0 < rect.x1 + 1 && b.z1 > rect.z0 - 1 && b.z0 < rect.z1 + 1);
+  // a square wall stays the plain rectangle (the fast path) unless it would cut a building: then it is an outline that bends round it
+  if (shape === 'square') {
+    const poly = ringPolygon('square', rect, { gateW, seed: s.seed, avoid });
+    return poly.length === 4 ? regionFromRects([rect]) : regionFromPolygon(poly);
+  }
+  return regionFromPolygon(ringPolygon(shape, rect, { drive: geo.drive, roadGate: geo.roadGate, gateW, seed: s.seed, ground: geo.ground, avoid }));
 }
 
 /**
@@ -126,7 +132,13 @@ const towerInset = (kind: TowerKind) => TOWERS[kind].cells * CELL / 2 + 0.2 + 0.
 
 /** Is a tower or garage footprint at (x, z) clear of what is already standing or staked (surface structures)? */
 function clearOf(s: GameState, x: number, z: number, half: number): boolean {
-  return s.structures.every(o => o.unplaced || o.kind.startsWith('bunker_') || Math.abs(o.x - x) > half + 0.8 || Math.abs(o.z - z) > half + 0.8);
+  return s.structures.every(o => {
+    if (o.unplaced || o.kind.startsWith('bunker_')) return true;
+    // a big building (the lodge is 15 x 18 m with its deck) is its footprint, not the point at its middle
+    const def = KIT[o.kind];
+    if (def && def.level !== 'underground') { const r = footprint(def, o.x, o.z, o.rot); return x + half + 0.8 < r.x0 || x - half - 0.8 > r.x1 || z + half + 0.8 < r.z0 || z - half - 0.8 > r.z1; }
+    return Math.abs(o.x - x) > half + 0.8 || Math.abs(o.z - z) > half + 0.8;
+  });
 }
 
 /** Is the whole footprint of a tower at (x, z) inside the region (its four corners), with a little room? */
@@ -220,7 +232,8 @@ export function planFortress(s: GameState, geo: PropertyGeometry = {}, opts: Par
   const coreIsFull = ownedRects(s).length === 1 && (core.x1 - core.x0) * (core.z1 - core.z0) >= 0.9 * (home.x1 - home.x0) * (home.z1 - home.z0);
   const rects: Rect[] = options.scope === 'core' && !coreIsFull ? [core] : ownedRects(s);
   // a shaped ring is cut inside the core rectangle; the whole property line follows the land, so it keeps its own outline
-  const shaped = options.shape !== 'square' && (options.scope === 'core' || coreIsFull);
+  // (a square ring is the plain rectangle unless it would cut a building: then it takes the same path and bends round it)
+  const shaped = (options.shape !== 'square' || rects.length === 1) && (options.scope === 'core' || coreIsFull);
   const region: Region = shaped ? compoundRegion(s, geo, options.shape, GARAGE_W, coreIsFull && options.scope === 'full' ? home : core) : regionFromRects(rects);
   if (options.shape !== 'square' && !shaped) notes.push('The whole-property wall follows the line of the land: a round or octagonal ring is for the core compound.');
   const wall = planPropertyWall(s, RING_WALLS.includes(options.wall) ? options.wall : 'container_wall', geo, { gateW: GARAGE_W, garage: true, region, look: options.look });
@@ -269,7 +282,7 @@ export function planFortress(s: GameState, geo: PropertyGeometry = {}, opts: Par
   if (options.rings > 1 && wall.runs.length) {
     const outerRun = wall.runs.filter(r => r.kind !== 'creek_bars').sort((a, b) => b.pts.length - a.pts.length)[0];
     const outerPoly = outerRun ? outerRun.pts.slice(0, -1) : region.loops[0];
-    ringPlan = planRings(s, outerPoly.length >= 3 ? outerPoly : region.loops[0], gs ? [gs.x, gs.z] : null, geo, { count: options.rings, wall: options.ringWall, gates: options.ringGates, sally: options.ringSally, towers: Math.min(3, options.towers), towerKind: options.towerKind });
+    ringPlan = planRings(s, outerPoly.length >= 3 ? outerPoly : region.loops[0], gs ? [gs.x, gs.z] : null, geo, { count: options.rings, wall: options.ringWall, gates: options.ringGates, sally: options.ringSally, towers: Math.min(3, options.towers), towerKind: options.towerKind, taken: towers.map((t): Pt => [t.x, t.z]) });
     notes.push(...ringPlan.notes);
   }
 

@@ -4,7 +4,7 @@ import { GARAGE_W, GATE_GARAGE } from './garage';
 import { DEFAULT_FORTRESS, MAX_TOWERS, coreRect, layFortress, planFortress } from './fortress';
 import { PERIMETER, type Pt } from './perimeter';
 import { yardRings, insideRing } from './compounds';
-import { cornersOf, fillOf, flattenAt, gatePoint, pointInPolygon, polygonArea, regionFromPolygon, ringPolygon, selfIntersects, STEEP, type RingShape } from './ringShape';
+import { avoidRects, cornersOf, fillOf, flattenAt, gatePoint, pointInPolygon, polygonArea, regionFromPolygon, ringPolygon, selfIntersects, STEEP, type RingShape } from './ringShape';
 import { BLUEPRINTS } from './blueprints';
 import { TOWERS } from './towers';
 import { CELL } from '../game/buildkit/kit';
@@ -127,5 +127,61 @@ describe('the fortress ring in each shape keeps the whole system', () => {
     const plan = planFortress(g, geoFor(g), { ...DEFAULT_FORTRESS, scope: 'full', shape: 'rounded' });
     expect(plan.notes.join(' ')).toMatch(/follows the line of the land|core compound/);
     void runLength; void addWalkway;
+  });
+});
+
+describe('a wall that goes round what is already built (avoidRects)', () => {
+  const sq = (): Pt[] => [[0, 0], [20, 0], [20, 20], [0, 20]];
+  const inside = (poly: readonly Pt[], b: { x0: number; z0: number; x1: number; z1: number }) => [[b.x0, b.z0], [b.x1, b.z0], [b.x1, b.z1], [b.x0, b.z1]].every(([x, z]) => pointInPolygon(poly, x, z));
+  const clear = (poly: readonly Pt[], b: { x0: number; z0: number; x1: number; z1: number }) => [[b.x0, b.z0], [b.x1, b.z0], [b.x1, b.z1], [b.x0, b.z1], [(b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2]].every(([x, z]) => !pointInPolygon(poly, x, z));
+  const cuts = (poly: readonly Pt[], b: { x0: number; z0: number; x1: number; z1: number }) => {
+    for (let i = 0; i < poly.length; i++) { const a = poly[i], c = poly[(i + 1) % poly.length]; for (let k = 0; k <= 50; k++) { const x = a[0] + (c[0] - a[0]) * k / 50, z = a[1] + (c[1] - a[1]) * k / 50; if (x > b.x0 + 1e-6 && x < b.x1 - 1e-6 && z > b.z0 + 1e-6 && z < b.z1 - 1e-6) return true; } }
+    return false;
+  };
+
+  it('is the same outline when nothing is in the way', () => {
+    expect(avoidRects(sq(), [{ x0: 8, z0: 8, x1: 12, z1: 12 }])).toEqual(sq());
+    expect(avoidRects(sq(), [])).toEqual(sq());
+  });
+
+  it('a building straddling the line, mostly inside, is enclosed: the wall bulges out round it', () => {
+    const b = { x0: 8, z0: -1, x1: 12, z1: 3 };
+    const out = avoidRects(sq(), [b]);
+    expect(cuts(out, b)).toBe(false);
+    expect(inside(out, b)).toBe(true);
+    expect(selfIntersects(out)).toBe(false);
+    expect(polygonArea(out)).toBeGreaterThan(polygonArea(sq()));
+  });
+
+  it('a building straddling the line, mostly outside, is left out: the wall bends in round it', () => {
+    const b = { x0: 8, z0: -3, x1: 12, z1: 1 };
+    const out = avoidRects(sq(), [b]);
+    expect(cuts(out, b)).toBe(false);
+    expect(clear(out, b)).toBe(true);
+    expect(polygonArea(out)).toBeLessThan(polygonArea(sq()));
+  });
+
+  it('works on a clockwise outline too, and at a corner, and with two buildings', () => {
+    const cw = sq().reverse();
+    const b1 = { x0: 18, z0: -2, x1: 22, z1: 2 }, b2 = { x0: 8, z0: 18, x1: 12, z1: 22 };
+    const out = avoidRects(cw, [b1, b2]);
+    expect(cuts(out, b1)).toBe(false);
+    expect(cuts(out, b2)).toBe(false);
+    expect(selfIntersects(out)).toBe(false);
+  });
+
+  it('keeps a pad of room round the building', () => {
+    const b = { x0: 8, z0: -1, x1: 12, z1: 3 };
+    const out = avoidRects(sq(), [b], 1);
+    expect(cuts(out, { x0: b.x0 - 1, z0: b.z0 - 1, x1: b.x1 + 1, z1: b.z1 + 1 })).toBe(false);
+  });
+
+  it('a shaped ring made with `avoid` never runs through the building', () => {
+    for (const sh of ['rounded', 'octagon', 'irregular'] as RingShape[]) {
+      const b = { x0: 3, z0: 9, x1: 7, z1: 13 };   // near the west edge of the ring
+      const p = ringPolygon(sh, R, { ...o, avoid: [b] });
+      expect(cuts(p, b), sh).toBe(false);
+      expect(selfIntersects(p), sh).toBe(false);
+    }
   });
 });
