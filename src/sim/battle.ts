@@ -73,8 +73,10 @@ export const ARMS: Record<string, Omit<Arm, 'cal'>> = {
   pistol: { range: 5, rate: 0.4, acc: 0.8, auto: false, mag: 15, feed: 'mag' },
   revolver: { range: 5, rate: 0.3, acc: 0.8, auto: false, mag: 6, feed: 'tube' },
 };
+/** The share of rounds at a tower's cab that still find it (the parapet and the angle), on top of the post's own cover. */
+export const TOWER_PARAPET = 0.7;
 /** The heavy gun on a tower's ring: belt-fed, full auto, long reach (sim/towers.ts mountReady). */
-export const MOUNT_GUN: Omit<Arm, 'cal'> = { range: 70, rate: 0.9, acc: 0.95, auto: true, mag: 100, feed: 'mag' };
+const MOUNT_GUN: Omit<Arm, 'cal'> = { range: 70, rate: 0.9, acc: 0.95, auto: true, mag: 100, feed: 'mag' };
 /** The remote turret: fast, steady, accurate, fed from a 200-round can. */
 export const TURRET_GUN: Omit<Arm, 'cal'> = { range: 60, rate: 0.75, acc: 1.0, auto: true, mag: 200, feed: 'mag' };
 export const FISTS: Arm = { range: 0.6, rate: 0.5, acc: 0.8, auto: false, cal: null, mag: 0, feed: 'mag' };
@@ -610,6 +612,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
     const steady = 1 / (1 + a.supp * (a.vet ? 0.07 : 0.16));
     let p = (0.06 + 0.025 * a.skill) * a.arm.acc * rangeF * tgtCover * see * steady * (a.side === 'home' ? a.post?.acc ?? 1 : 1);
     if (a.side === 'home' && a.moving) p *= 0.5;
+    if (b.side === 'home' && b.post?.kind === 'tower') p *= TOWER_PARAPET;   // up a tower behind the parapet, shot at from below at a steep angle: fewer rounds find the cab
     if (sortie > 1 && a.side === 'home' && b.side === 'raider' && dist(b, C) <= lineR + 2) p *= sortie;
     if (a.arm.auto) p *= 1.6;
     p *= eff(a);                                   // a wounded shooter shoots worse
