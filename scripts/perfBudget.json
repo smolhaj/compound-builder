@@ -1,5 +1,5 @@
 {
- "_doc": "Per-tier budgets for the mountain showcase census (scripts/perfBudget.mjs, docs/DECISIONS.md). Counts are the scene-graph census (visible meshes, upper bound, no frustum culling), set at about 10 % over what was measured on 2026-10-30. Lower these when a PR makes the scene lighter; raising one needs a reason in docs/DECISIONS.md. Shadow numbers are 0 at Low (no shadow pass). loadMsFail is JS-only boot time on a slow CI box (measured 12-20 s) and only catches a blow-up.",
+ "_doc": "Per-tier budgets for the mountain showcase census (scripts/perfBudget.mjs, docs/DECISIONS.md). Counts are the scene-graph census (visible meshes, upper bound, no frustum culling), set at about 10 % over what was measured on 2026-10-30. Lower these when a PR makes the scene lighter; raising one needs a reason in docs/DECISIONS.md. Shadow numbers are 0 at Low (no shadow pass). loadMsFail is JS-only boot time on a slow CI box (measured 12-20 s) and only catches a blow-up. Heap is measured after a forced GC (lowest of 4 samples) and set about 30 % over (65 / 79 / 91 MB), so it only catches a real leak.",
  "scenes": {
   "mountain": {
    "query": "clean&seed=7&region=pnw&lot=hillside&lotcut&relief=9&acres=40&lotseed=8&elev=600&showcase=mountain",
@@ -9,7 +9,7 @@
      "triangles": 620000,
      "shadowTriangles": 0,
      "shadowCasters": 0,
-     "heapMB": 110,
+     "heapMB": 85,
      "loadMsFail": 60000
     },
     "medium": {
@@ -17,7 +17,7 @@
      "triangles": 940000,
      "shadowTriangles": 240000,
      "shadowCasters": 345,
-     "heapMB": 140,
+     "heapMB": 105,
      "loadMsFail": 60000
     },
     "high": {
@@ -25,7 +25,7 @@
      "triangles": 1400000,
      "shadowTriangles": 295000,
      "shadowCasters": 350,
-     "heapMB": 180,
+     "heapMB": 120,
      "loadMsFail": 60000
     }
    }

@@ -19,7 +19,7 @@ const scenes = budget.scenes;
 setTimeout(() => { console.error('perfBudget watchdog: over 9 minutes, giving up'); process.exit(2); }, 9 * 60 * 1000).unref();
 const srv = spawn('node', ['node_modules/vite/bin/vite.js', 'preview', '--port', String(port), '--strictPort'], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise((ok, no) => { srv.stdout.on('data', d => /localhost:\d+/.test(String(d).replace(/\x1b\[[0-9;]*m/g, '')) && ok()); srv.on('exit', c => no(new Error('preview exited ' + c))); });
-const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--disable-accelerated-2d-canvas', '--enable-precise-memory-info'] });
+const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--disable-accelerated-2d-canvas', '--enable-precise-memory-info', '--js-flags=--expose-gc'] });
 let failed = false; const rows = [];
 const step = m => console.error(`[${new Date().toISOString().slice(11, 19)}] ${m}`);
 try {
@@ -38,7 +38,8 @@ try {
     // the camera the probe uses: aerial over the compound (building LOD reads the camera), a few update frames to settle
     await page.evaluate(() => { const cb = window.__cb, c = cb.world.camp; cb.qa.pose = null; cb.cam.target.set(c.x, 0, c.z + 4); cb.cam.yaw = 0.4; cb.cam.pitch = 0.75; cb.cam.radius = 34; });
     await page.evaluate(() => new Promise(ok => { const f0 = window.__cb.qa.frames; const w = () => (window.__cb.qa.frames >= f0 + 8 ? ok() : setTimeout(w, 30)); w(); }));
-    const m = await page.evaluate(() => { const c = window.__cb.census(); return { ...c, heapMB: performance.memory ? performance.memory.usedJSHeapSize / 1048576 : 0, showcaseMs: window.__showcaseMs ?? 0, problems: window.__showcase?.problems?.length ?? 0 }; });
+    // heap: force a GC and let it settle, then take the lowest of a few samples (a reading straight after boot swings by tens of MB with GC timing)
+    const m = await page.evaluate(async () => { const c = window.__cb.census(); let heap = Infinity; for (let i = 0; i < 4; i++) { if (window.gc) window.gc(); await new Promise(r => setTimeout(r, 150)); if (performance.memory) heap = Math.min(heap, performance.memory.usedJSHeapSize / 1048576); } return { ...c, heapMB: Number.isFinite(heap) ? heap : 0, showcaseMs: window.__showcaseMs ?? 0, problems: window.__showcase?.problems?.length ?? 0 }; });
     await ctx.close();
     if (tier === 'low') { m.shadowTriangles = 0; m.shadowCasters = 0; }   // (no shadow pass at Low)
     const lim = sc.tiers[tier] ?? {};
