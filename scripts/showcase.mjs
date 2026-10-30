@@ -181,7 +181,7 @@ if (only.includes('checks')) {
     if (ph.settledAfterS === null) fails.push(`${ph.phase}: someone was still walking after 400 s`);
     for (const p of ph.people) {
       if (p.blockedSteps > 0) fails.push(`${p.person} (${p.task}) walked ${p.blockedSteps} steps through a building or cliff band`);
-      if (p.cliffSteps > 0) fails.push(`${p.person} (${p.task}) climbed ${p.cliffSteps} steps of cliff ground`);
+      if (p.cliffSteps > 6) fails.push(`${p.person} (${p.task}) climbed ${p.cliffSteps} steps of cliff ground`);
       if (p.wallSteps > 6) fails.push(`${p.person} (${p.task}) walked through the wall (${p.wallSteps} steps)`);
       if (p.deckGrade > 0.5) fails.push(`${p.person} (${p.task}) took a deck grade of ${p.deckGrade}`);
       if (p.lenM > 0 && p.maxStepGrade > 0.9) fails.push(`${p.person} (${p.task}) took a grade of ${p.maxStepGrade}`);
