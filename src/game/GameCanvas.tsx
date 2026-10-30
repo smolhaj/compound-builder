@@ -448,6 +448,18 @@ export function GameCanvas() {
         return b;
       } };
 
+    // QA / dev preset: ?showcase=mountain assembles the north-star compound with the real build actions (game/showcase.ts). It runs once and on the
+    // world that is live when it runs (React's dev double-mount builds the canvas twice: the first world is already disposed by then).
+    if (new URLSearchParams(location.search).get('showcase') === 'mountain') {
+      const rings = Number(new URLSearchParams(location.search).get('rings') ?? 1) || 1;
+      void import('./showcase').then(m => {
+        const w = window as unknown as Record<string, unknown>;
+        if (w.__showcaseRan) return;
+        w.__showcaseRan = true;
+        try { w.__showcase = m.buildMountainShowcase(w.__cb as Parameters<typeof m.buildMountainShowcase>[0], { rings }); } catch (e) { w.__showcase = { error: String((e as Error)?.stack ?? e) }; }
+      });
+    }
+
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', resize);

@@ -77,6 +77,8 @@ function rng(seed: number): () => number {
 }
 
 export interface RingOptions {
+  /** Buildings the wall must not run through (their footprints): see `avoidRects`. */
+  avoid?: readonly Rect[];
   /** Where the driveway (or the farm gate) meets the ring: the wall is cut flat there. */
   drive?: readonly Pt[];
   roadGate?: Pt;
@@ -188,7 +190,8 @@ export function gatePoint(poly: readonly Pt[], o: Pick<RingOptions, 'drive' | 'r
  * `square` is the rectangle itself (the plan keeps its fast rectangle path).
  */
 export function ringPolygon(shape: RingShape, rect: Rect, o: RingOptions): Pt[] {
-  const poly = base(shape, rect, o);
+  let poly = base(shape, rect, o);
+  if (o.avoid?.length) poly = avoidRects(poly, o.avoid);
   if (shape === 'square') return poly;
   const gp = gatePoint(poly, o);
   return flattenAt(poly, gp, o.gateW);
@@ -221,4 +224,89 @@ export function cornersOf(poly: readonly Pt[], region: Pick<Region, 'contains'>,
     out.push({ at: [a[0], a[1]], inward: [bx, bz], turn });
   }
   return out;
+}
+
+// ── a wall that goes round what is already built ──
+
+type Box = { x0: number; z0: number; x1: number; z1: number };
+const signedArea = (p: readonly Pt[]): number => { let a = 0; for (let i = 0; i < p.length; i++) { const q = p[(i + 1) % p.length]; a += p[i][0] * q[1] - q[0] * p[i][1]; } return a / 2; };
+const strictlyIn = (b: Box, x: number, z: number): boolean => x > b.x0 + 1e-6 && x < b.x1 - 1e-6 && z > b.z0 + 1e-6 && z < b.z1 - 1e-6;
+
+/** Where the segment a-b crosses the box's boundary, as parameters along it (0 to 1), sorted (up to two). */
+function crossings(a: Pt, b: Pt, r: Box): number[] {
+  const out: number[] = [];
+  const dx = b[0] - a[0], dz = b[1] - a[1];
+  const tryT = (t: number) => { if (t > 1e-9 && t < 1 - 1e-9) { const x = a[0] + dx * t, z = a[1] + dz * t; if (x >= r.x0 - 1e-6 && x <= r.x1 + 1e-6 && z >= r.z0 - 1e-6 && z <= r.z1 + 1e-6) out.push(t); } };
+  if (Math.abs(dx) > 1e-12) { tryT((r.x0 - a[0]) / dx); tryT((r.x1 - a[0]) / dx); }
+  if (Math.abs(dz) > 1e-12) { tryT((r.z0 - a[1]) / dz); tryT((r.z1 - a[1]) / dz); }
+  return out.sort((p, q) => p - q);
+}
+
+/** Position of a boundary point along the box's perimeter, counter-clockwise (math orientation, z up) from its (x0, z0) corner, in 0 .. 4 (one unit a side). */
+function perimT(b: Box, p: Pt): number {
+  const w = b.x1 - b.x0, h = b.z1 - b.z0, eps = 1e-6 * Math.max(w, h, 1);
+  if (Math.abs(p[1] - b.z0) < eps) return (p[0] - b.x0) / w;                // bottom, left to right
+  if (Math.abs(p[0] - b.x1) < eps) return 1 + (p[1] - b.z0) / h;            // right, up
+  if (Math.abs(p[1] - b.z1) < eps) return 2 + (b.x1 - p[0]) / w;            // top, right to left
+  return 3 + (b.z1 - p[1]) / h;                                             // left, down
+}
+
+/** The corners passed walking the box's boundary from perimeter position `from` to `to`, counter-clockwise (ccw) or clockwise. */
+function boxRoute(b: Box, from: number, to: number, ccw: boolean): Pt[] {
+  const corners: Pt[] = [[b.x0, b.z0], [b.x1, b.z0], [b.x1, b.z1], [b.x0, b.z1]];   // at positions 0, 1, 2, 3
+  const out: Pt[] = [];
+  if (ccw) { const t = from; const end = to > from ? to : to + 4; for (let k = Math.floor(t) + 1; k < end; k++) out.push(corners[k % 4]); }
+  else { const start = from, end = to < from ? to : to - 4; for (let k = Math.ceil(start) - 1; k > end; k--) out.push(corners[((k % 4) + 4) % 4]); }
+  return out;
+}
+
+/**
+ * A closed outline made to go round the boxes (building footprints, grown by `pad`) it would otherwise run through. Where the outline crosses a box,
+ * the stretch inside it is replaced by a walk round the box's edge: a box whose middle is inside the outline is enclosed (the wall bulges out round
+ * it), one whose middle is outside is left out (the wall bends in round it). Rings and the ring wall use it so a wall never cuts a house in two.
+ * Returns the outline unchanged when it clears every box, or when the result would cross itself. Pure (tested).
+ */
+export function avoidRects(poly: readonly Pt[], boxes: readonly Box[], pad = 0.5): Pt[] {
+  let cur: Pt[] = poly.map(p => [p[0], p[1]] as Pt);
+  if (cur.length < 3) return cur;
+  const ccwPoly = signedArea(cur) > 0;
+  const grown = boxes.map(b => ({ x0: b.x0 - pad, z0: b.z0 - pad, x1: b.x1 + pad, z1: b.z1 + pad }));
+  for (let pass = 0; pass < 6; pass++) {
+    let changed = false;
+    for (const b of grown) {
+      const enclose = pointInPolygon(cur, (b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2);
+      // 1. every point where the outline crosses the box's boundary becomes a vertex
+      const withX: Pt[] = [];
+      for (let i = 0; i < cur.length; i++) {
+        const a = cur[i], c = cur[(i + 1) % cur.length];
+        withX.push(a);
+        for (const t of crossings(a, c, b)) withX.push([a[0] + (c[0] - a[0]) * t, a[1] + (c[1] - a[1]) * t]);
+      }
+      const n = withX.length;
+      const edgeIn = (i: number) => { const a = withX[i], c = withX[(i + 1) % n]; return strictlyIn(b, (a[0] + c[0]) / 2, (a[1] + c[1]) / 2); };
+      if (!withX.some((_, i) => edgeIn(i))) continue;
+      // 2. start at a vertex whose outgoing edge is outside the box, so no stretch inside wraps past the start
+      let s0 = 0; while (s0 < n && edgeIn(s0)) s0++;
+      if (s0 >= n) continue;   // the whole outline lies inside the box: nothing sensible to do
+      const out: Pt[] = [];
+      let i = 0;
+      while (i < n) {
+        const k = (s0 + i) % n;
+        if (!edgeIn(k)) { out.push(withX[k]); i++; continue; }
+        // a run of edges inside the box: from vertex k (on the boundary) to vertex j (on the boundary)
+        let m = i; while (m < n && edgeIn((s0 + m) % n)) m++;
+        const from = withX[k], to = withX[(s0 + m) % n];
+        out.push(from);
+        // enclose: keep the box on the outline's inside (walk round it with the box on the left for a counter-clockwise outline)
+        const walkCcw = enclose === ccwPoly;
+        for (const c of boxRoute(b, perimT(b, from), perimT(b, to), walkCcw)) out.push(c);
+        i = m;
+      }
+      // drop repeated points
+      const dedup = out.filter((p, q) => Math.hypot(p[0] - out[(q + out.length - 1) % out.length][0], p[1] - out[(q + out.length - 1) % out.length][1]) > 1e-6);
+      if (dedup.length >= 3 && !selfIntersects(dedup)) { cur = dedup; changed = true; }
+    }
+    if (!changed) break;
+  }
+  return cur;
 }

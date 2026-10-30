@@ -7,6 +7,9 @@ import { addWalkway, deckHeight, hasWalkway, walkOn, walkRuns, walkwayAccess, wa
 import { CORE_SIDE, DEFAULT_FORTRESS, MAX_TOWERS, coreRect, layFortress, planFortress, ringStatus } from './fortress';
 import { HOME_RECT } from './site';
 import { planBattle } from './battle';
+import { planStructure } from './construction';
+import { KIT, footprint } from '../game/buildkit/kit';
+import { rectsOverlap, segHitsRect, solidSegments } from './showcase';
 import { postureOf } from './encounters';
 import { watchNow } from './daily';
 import { defenseReport } from './defenseReport';
@@ -428,6 +431,48 @@ describe('an irregular property line', () => {
     const plan = planFortress(g, { roadGate: [h.x1 + 30, h.z0] }, { scope: 'full', passage: false });
     const gs = plan.wall.gateSpot!;
     expect(Math.abs(gs.z - h.z0)).toBeGreaterThanOrEqual(GARAGE_W / 2 + 0.19);
+  });
+});
+
+describe('Fortify my ring goes round what is already built', () => {
+  const hits = (g: GameState, st: { kind: string; x: number; z: number; rot: number }) => {
+    const r = footprint(KIT[st.kind], st.x, st.z, st.rot);
+    return g.perimeter.filter(w => w.kind === 'container_wall' || w.kind === 'stone_wall').some(w => solidSegments(w).some(([a, b]) => segHitsRect(a, b, r, 0.05)));
+  };
+
+  it('a greenhouse staked on the line is enclosed or left out, never cut in two, in every shape', () => {
+    for (const shape of ['square', 'rounded', 'octagon', 'irregular'] as const) {
+      const g = game(), c0 = coreRect(g, geo(g)), geoC = { ...geo(g), center: [(c0.x0 + c0.x1) / 2, (c0.z0 + c0.z1) / 2] as Pt };   // (the camp holds the core still)
+      // where the wall would run with nothing built: stake a greenhouse right on it
+      const bare = planFortress(g, geoC, { scope: 'core', shape, passage: false });
+      const at = bare.region.loops[0][Math.floor(bare.region.loops[0].length / 3)];
+      const st = planStructure(g, 'greenhouse_heated', at[0], at[1], 0);
+      const r = footprint(KIT[st.kind], st.x, st.z, st.rot);
+      const cuts = (loop: ReadonlyArray<Pt>) => loop.some((p, i) => segHitsRect(p, loop[(i + 1) % loop.length], r, 0.05));
+      expect(cuts(bare.region.loops[0]), `${shape}: the unaware outline cuts the greenhouse`).toBe(true);
+      const plan = planFortress(g, geoC, { scope: 'core', shape, passage: false });
+      expect(cuts(plan.region.loops[0]), `${shape}: the outline`).toBe(false);
+      for (const run of plan.wall.runs.filter(w => w.kind === 'container_wall')) expect(solidSegments(run).some(([a, b]) => segHitsRect(a, b, r, 0.05)), `${shape}: the wall run`).toBe(false);
+      layFortress(g, plan);
+      expect(hits(g, st), shape).toBe(false);
+    }
+  });
+
+  it('the inner rings go round a building in their way too, and no tower stands on a big building', () => {
+    const g = game(), core = coreRect(g, geo(g)), cx = (core.x0 + core.x1) / 2, cz = (core.z0 + core.z1) / 2;
+    const house = planStructure(g, 'farmhouse', cx + 3, cz - 2, 0), shop = planStructure(g, 'workshop', cx - 4, cz + 3, 0);
+    layFortress(g, planFortress(g, geo(g), { scope: 'core', shape: 'irregular', passage: false, rings: 3, towers: 5 }));
+    expect(hits(g, house)).toBe(false);
+    expect(hits(g, shop)).toBe(false);
+    const fp = (st: { kind: string; x: number; z: number; rot: number }) => footprint(KIT[st.kind], st.x, st.z, st.rot);
+    for (const t of g.structures.filter(x => x.kind.startsWith('watchtower'))) for (const b of [house, shop]) expect(rectsOverlap(fp(t), fp(b)), `${t.id} on ${b.kind}`).toBe(false);
+  });
+
+  it('a gate garage and a motor court stay clear of a building near the gate', () => {
+    const g = game(), core = coreRect(g, geo(g));
+    const near = planStructure(g, 'workshop', core.x1 - 2, (core.z0 + core.z1) / 2, 0);
+    layFortress(g, planFortress(g, geo(g), { scope: 'core', passage: false, motorCourt: true }));
+    for (const k of ['gate_garage', 'motor_court']) for (const st of g.structures.filter(x => x.kind === k)) expect(rectsOverlap(footprint(KIT[st.kind], st.x, st.z, st.rot), footprint(KIT[near.kind], near.x, near.z, near.rot)), k).toBe(false);
   });
 });
 
