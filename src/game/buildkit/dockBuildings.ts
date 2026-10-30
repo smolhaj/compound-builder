@@ -98,7 +98,8 @@ function pier(def: KitPieceDef, seed: number, marina: boolean): THREE.Group {
     p.add('rubber', pipe([-hw + 0.3 * M, DECK - 0.5 * M, hd - 6 * M], [-hw + 0.3 * M, -1.0 * M, -hd + 4 * M], 0.025 * M, 5));       // the bubbler's air line down to the diffusers
   }
   p.layer = 'interior';
-  p.collide({ x0: -hw, z0: -hd, x1: -hw + 0.04, z1: hd }, { x0: hw - 0.04, z0: -hd, x1: hw, z1: hd });
+  p.add('rubber', box(0.3 * M, 0.3 * M, 0.3 * M, -hw + 0.4 * M, DECK, hd - 1.2 * M));   // a coil of dock line by the lamp post
+  p.collide({ x0: -hw, z0: -hd, x1: -hw + 0.04, z1: hd }, { x0: hw - 0.04, z0: -hd, x1: hw, z1: hd }, { x0: -hw, z0: hd - 0.04, x1: hw, z1: hd }, { x0: -hw, z0: -hd, x1: hw, z1: -hd + 0.04 });
   const g = p.finish();
   g.userData.chimneyTop = null;
   g.userData.keep = ['frame', 'foundation', 'deck'];

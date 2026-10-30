@@ -90,7 +90,7 @@ function polytunnel(def: KitPieceDef, seed = 1): THREE.Group {
   p.layer = 'interior';
   beds(p, [-1.9 * M, 0, 1.9 * M].map(x => x * 0.8), D - 2.2 * M, 1.0 * M, 0, 3);
   p.add('pavers', box(0.6 * M, 0.01, D - 1 * M, 0, 0, 0));
-  p.collide({ x0: -hw, z0: -hd, x1: -hw + 0.05, z1: hd }, { x0: hw - 0.05, z0: -hd, x1: hw, z1: hd }, { x0: -hw, z0: -hd, x1: hw, z1: -hd + 0.05 });
+  p.collide({ x0: -hw, z0: -hd, x1: -hw + 0.05, z1: hd }, { x0: hw - 0.05, z0: -hd, x1: hw, z1: hd }, { x0: -hw, z0: -hd, x1: -0.45 * M, z1: -hd + 0.05 }, { x0: 0.45 * M, z0: -hd, x1: hw, z1: -hd + 0.05 }, { x0: -hw, z0: hd - 0.05, x1: -0.45 * M, z1: hd }, { x0: 0.45 * M, z0: hd - 0.05, x1: hw, z1: hd });
   const g = p.finish();
   g.userData.chimneyTop = null;
   g.userData.keep = ['frame', 'rafters'];
@@ -133,7 +133,7 @@ function highTunnel(def: KitPieceDef, seed = 1): THREE.Group {
   beds(p, [-3.1 * M, -1.05 * M, 1.05 * M, 3.1 * M], D - 3 * M, 1.5 * M, 0, 4);
   for (const x of [-3.1 * M, -1.05 * M, 1.05 * M, 3.1 * M]) p.add('rubber', pipe([x, 0.4 * M, -hd + 1.4 * M], [x, 0.4 * M, hd - 1.4 * M], 0.02 * M, 4));   // the drip header
   p.add('gravel', box(1.0 * M, 0.01, D - 0.6 * M, 0, 0, 0));
-  p.collide({ x0: -hw - 0.1, z0: -hd, x1: -hw, z1: hd }, { x0: hw, z0: -hd, x1: hw + 0.1, z1: hd });
+  p.collide({ x0: -hw - 0.1, z0: -hd, x1: -hw, z1: hd }, { x0: hw, z0: -hd, x1: hw + 0.1, z1: hd }, { x0: -hw, z0: -hd, x1: -1.2 * M, z1: -hd + 0.05 }, { x0: 1.2 * M, z0: -hd, x1: hw, z1: -hd + 0.05 }, { x0: -hw, z0: hd - 0.05, x1: -1.2 * M, z1: hd }, { x0: 1.2 * M, z0: hd - 0.05, x1: hw, z1: hd });
   const g = p.finish();
   g.userData.chimneyTop = null;
   g.userData.keep = ['frame', 'rafters'];
