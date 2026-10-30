@@ -516,8 +516,26 @@ export const GATE_GARAGE_BLUEPRINT: Blueprint = bp('gate_garage', [
   ['finish', 'Steel gates, two roll-up doors, lights and the vehicle apron', 110, { hardware: 8, roofing: 2, cable: 2 }],
 ]);
 
+/** A stone stair between two terraces (game/buildkit/terraceProps.ts): dry-laid treads, cheek walls and a pipe rail; the bill is for a mid-height flight. */
+export const TERRACE_STAIR_BLUEPRINT: Blueprint = bp('terrace_stair', [
+  ['site', 'Stake the flight and cut the treads into the hill', 10, {}],
+  ['foundation', 'Lay the fieldstone treads', 40, { fieldstone: 4 }],
+  ['frame', 'Stack the cheek walls', 30, { fieldstone: 3 }],
+  ['roof', 'Set the pipe handrail', 8, { hardware: 1 }],
+  ['finish', 'Gravel the landings', 6, { fieldstone: 1 }],
+]);
+
+/** A gravel ramp between two terraces: curbs, a packed bed and a rail. */
+export const TERRACE_RAMP_BLUEPRINT: Blueprint = bp('terrace_ramp', [
+  ['site', 'Stake the ramp and cut the bed', 14, {}],
+  ['foundation', 'Compact the gravel bed', 36, { fieldstone: 6 }],
+  ['frame', 'Set the timber curbs', 20, { lumber: 4 }],
+  ['roof', 'Hang the rail', 8, { hardware: 1 }],
+  ['finish', 'Top dress and tamp', 8, {}],
+]);
+
 export const BLUEPRINTS: Record<string, Blueprint> = Object.fromEntries(
-  [CABIN_BLUEPRINT, OUTHOUSE_BLUEPRINT, WORKSHOP_BLUEPRINT, ROOT_CELLAR_BLUEPRINT, WOOD_OVEN_BLUEPRINT, APIARY_BLUEPRINT, SUGAR_SHACK_BLUEPRINT, BARNYARD_BLUEPRINT, COOP_BLUEPRINT, GARDEN_BLUEPRINT, FIELD_BLUEPRINT, GREENHOUSE_BLUEPRINT, ORCHARD_BLUEPRINT, LOG_HOUSE_BLUEPRINT, FARMHOUSE_BLUEPRINT, TRAILER_BLUEPRINT, BARN_BLUEPRINT, COTTAGE_BLUEPRINT, GUEST_HOUSE_BLUEPRINT, MOMS_HOUSE_BLUEPRINT, LODGE_BLUEPRINT, LODGE_SOLAR_BLUEPRINT, STONE_HOUSE_BLUEPRINT, TIMBER_FRAME_BLUEPRINT, CONTAINER_HOUSE_BLUEPRINT, ADOBE_HOUSE_BLUEPRINT, METAL_GARAGE_BLUEPRINT, GARAGE_SOLAR_BLUEPRINT, ...UTILITY_BLUEPRINTS, GREENHOUSE_HEATED_BLUEPRINT, ORCHARD_GROVE_BLUEPRINT, SOLAR_FARM_BLUEPRINT, BATTERY_BANK_BLUEPRINT, POND_BLUEPRINT, RESERVOIR_BLUEPRINT, SHEEP_BARN_BLUEPRINT, EQUIPMENT_YARD_BLUEPRINT, ...BUNKER_BLUEPRINTS, ...TOWER_BLUEPRINTS, GATE_GARAGE_BLUEPRINT, MOTOR_COURT_BLUEPRINT].map(b => [b.kind, b]));
+  [CABIN_BLUEPRINT, OUTHOUSE_BLUEPRINT, WORKSHOP_BLUEPRINT, ROOT_CELLAR_BLUEPRINT, WOOD_OVEN_BLUEPRINT, APIARY_BLUEPRINT, SUGAR_SHACK_BLUEPRINT, BARNYARD_BLUEPRINT, COOP_BLUEPRINT, GARDEN_BLUEPRINT, FIELD_BLUEPRINT, GREENHOUSE_BLUEPRINT, ORCHARD_BLUEPRINT, LOG_HOUSE_BLUEPRINT, FARMHOUSE_BLUEPRINT, TRAILER_BLUEPRINT, BARN_BLUEPRINT, COTTAGE_BLUEPRINT, GUEST_HOUSE_BLUEPRINT, MOMS_HOUSE_BLUEPRINT, LODGE_BLUEPRINT, LODGE_SOLAR_BLUEPRINT, STONE_HOUSE_BLUEPRINT, TIMBER_FRAME_BLUEPRINT, CONTAINER_HOUSE_BLUEPRINT, ADOBE_HOUSE_BLUEPRINT, METAL_GARAGE_BLUEPRINT, GARAGE_SOLAR_BLUEPRINT, ...UTILITY_BLUEPRINTS, GREENHOUSE_HEATED_BLUEPRINT, ORCHARD_GROVE_BLUEPRINT, SOLAR_FARM_BLUEPRINT, BATTERY_BANK_BLUEPRINT, POND_BLUEPRINT, RESERVOIR_BLUEPRINT, SHEEP_BARN_BLUEPRINT, EQUIPMENT_YARD_BLUEPRINT, ...BUNKER_BLUEPRINTS, ...TOWER_BLUEPRINTS, GATE_GARAGE_BLUEPRINT, MOTOR_COURT_BLUEPRINT, TERRACE_STAIR_BLUEPRINT, TERRACE_RAMP_BLUEPRINT].map(b => [b.kind, b]));
 
 /** Total bill of materials for a blueprint. */
 export function totalBill(bp: Blueprint): Partial<Stock> {
