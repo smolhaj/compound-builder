@@ -338,11 +338,11 @@ export const METAL_GARAGE_BLUEPRINT: Blueprint = { kind: 'metal_garage', stages:
 export const GARAGE_SOLAR_BLUEPRINT: Blueprint = { kind: 'garage_solar', stages: garageStages(true) };
 
 /** Kinds people live in (a kitchen, a roof over the family). */
-export const HOMES: readonly string[] = ['timber_cabin', 'log_house', 'farmhouse', 'trailer', 'cottage', 'guest_house', 'moms_house', 'lodge', 'lodge_solar', 'stone_house', 'timber_frame', 'container_house', 'adobe_house'];
+export const HOMES: readonly string[] = ['timber_cabin', 'log_house', 'farmhouse', 'trailer', 'cottage', 'guest_house', 'moms_house', 'lodge', 'lodge_solar', 'stone_house', 'timber_frame', 'container_house', 'adobe_house', 'stilted_house'];
 const HOME_SET: ReadonlySet<string> = new Set(HOMES);
 export const isHome = (kind: string) => HOME_SET.has(kind);
 /** People each home kind sleeps (matches the kit's `sleeps`). */
-export const HOME_BEDS: Record<string, number> = { timber_cabin: 4, log_house: 6, farmhouse: 6, trailer: 4, cottage: 3, guest_house: 2, moms_house: 4, lodge: 10, lodge_solar: 10, stone_house: 6, timber_frame: 6, container_house: 4, adobe_house: 4 };
+export const HOME_BEDS: Record<string, number> = { timber_cabin: 4, log_house: 6, farmhouse: 6, trailer: 4, cottage: 3, guest_house: 2, moms_house: 4, lodge: 10, lodge_solar: 10, stone_house: 6, timber_frame: 6, container_house: 4, adobe_house: 4, stilted_house: 4 };
 /** Beds under a finished roof on the place (shelter for the household and anyone taken in). */
 export function homeBeds(s: { structures: ReadonlyArray<{ kind: string; stage: number }> }): number {
   return s.structures.reduce((a, st) => a + (BLUEPRINTS[st.kind] && st.stage >= BLUEPRINTS[st.kind].stages.length ? HOME_BEDS[st.kind] ?? 0 : 0), 0);
@@ -579,8 +579,42 @@ export const MARINA_BLUEPRINT: Blueprint = bp('marina', [
   ['finish', 'Fuel pump and tank, the bubbler and its compressor, bumpers, cleats and lamps', 80, { hardware: 4, pipe: 4, cable: 3, pump: 1 }],
 ]);
 
+// ── Cabin village, helipad, tower pod, stilted house (sim/outposts.ts) ──
+/** Six sleeping cabins round a green: pier footings, frames, tin roofs, doors and windows facing in. About $27,000 and 670 person-hours. */
+export const CABIN_VILLAGE_BLUEPRINT: Blueprint = bp('cabin_village', [
+  ['site', 'Lay out the ring: the green, the fire circle and six cabin pads', 12, {}],
+  ['foundation', 'Pour the pier footings for six cabins and dig the paths', 120, { concrete: 6, fieldstone: 4 }],
+  ['frame', 'Frame and sheathe six 4 x 4.5 m cabins, bunks built in', 260, { lumber: 18, hardware: 2 }],
+  ['roof', 'Rafters and a tin roof on each', 120, { roofing: 8, lumber: 2 }],
+  ['finish', 'Doors and windows facing the green, stoves, wiring and the fire circle', 160, { hardware: 6, cable: 3, lumber: 3 }],
+]);
+/** A 12 x 12 m concrete helipad: gravel base, rebar, a double pour, edge lights and a windsock. About $9,000 and 130 person-hours. */
+export const HELIPAD_BLUEPRINT: Blueprint = bp('helipad', [
+  ['site', 'Clear and level the pad; check the approach for wires and trees', 6, {}],
+  ['foundation', 'Strip the sod and lay the compacted gravel base', 36, { excavator: 1, fieldstone: 6 }],
+  ['frame', 'Form the slab, tie the rebar mat', 30, { rebar: 4, lumber: 2 }],
+  ['roof', 'Pour and finish the 15 cm slab', 34, { concrete: 28 }],
+  ['finish', 'Paint the H and the ring, edge lights, a windsock and a fire extinguisher', 24, { cable: 2, hardware: 1, floodlights: 2 }],
+]);
+/** A tower pod: a 12 m steel mast with a spiral stair and a glazed observation pod. About $15,000 and 330 person-hours. */
+export const TOWER_POD_BLUEPRINT: Blueprint = bp('tower_pod', [
+  ['site', 'Stake the mast and check the sight lines', 8, {}],
+  ['foundation', 'Dig and pour the footing and the anchor bolts', 60, { concrete: 8, rebar: 3 }],
+  ['frame', 'Erect the steel mast and the spiral stair', 120, { rebar: 8, hardware: 2 }],
+  ['roof', 'Set the pod shell, glaze it and roof it', 80, { roofing: 2, hardware: 4 }],
+  ['finish', 'Wire the pod, a sweep light and the ladder hatch', 60, { cable: 2, hardware: 2, floodlights: 1 }],
+]);
+/** A two-room house on piles, its floor 2.4 m up, with a stair and a deck. About $24,000 and 590 person-hours. */
+export const STILTED_HOUSE_BLUEPRINT: Blueprint = bp('stilted_house', [
+  ['site', 'Stake the piles on the slope and string the level lines', 8, {}],
+  ['foundation', 'Dig and pour the piles and the pile caps', 90, { concrete: 6, lumber: 4 }],
+  ['frame', 'Beams, joists, the platform and the walls', 260, { lumber: 14, hardware: 2 }],
+  ['roof', 'Rafters and a metal roof', 90, { roofing: 5, lumber: 2 }],
+  ['finish', 'Stair and deck, doors and windows, wiring, a stove', 140, { hardware: 4, cable: 2, lumber: 3 }],
+]);
+
 export const BLUEPRINTS: Record<string, Blueprint> = Object.fromEntries(
-  [BOAT_DOCK_BLUEPRINT, MARINA_BLUEPRINT, POLYTUNNEL_BLUEPRINT, HIGH_TUNNEL_BLUEPRINT, AQUAPONICS_BLUEPRINT, MICRO_HYDRO_BLUEPRINT, WIND_TURBINE_BLUEPRINT, CABIN_BLUEPRINT, OUTHOUSE_BLUEPRINT, WORKSHOP_BLUEPRINT, ROOT_CELLAR_BLUEPRINT, WOOD_OVEN_BLUEPRINT, APIARY_BLUEPRINT, SUGAR_SHACK_BLUEPRINT, BARNYARD_BLUEPRINT, COOP_BLUEPRINT, GARDEN_BLUEPRINT, FIELD_BLUEPRINT, GREENHOUSE_BLUEPRINT, ORCHARD_BLUEPRINT, LOG_HOUSE_BLUEPRINT, FARMHOUSE_BLUEPRINT, TRAILER_BLUEPRINT, BARN_BLUEPRINT, COTTAGE_BLUEPRINT, GUEST_HOUSE_BLUEPRINT, MOMS_HOUSE_BLUEPRINT, LODGE_BLUEPRINT, LODGE_SOLAR_BLUEPRINT, STONE_HOUSE_BLUEPRINT, TIMBER_FRAME_BLUEPRINT, CONTAINER_HOUSE_BLUEPRINT, ADOBE_HOUSE_BLUEPRINT, METAL_GARAGE_BLUEPRINT, GARAGE_SOLAR_BLUEPRINT, ...UTILITY_BLUEPRINTS, GREENHOUSE_HEATED_BLUEPRINT, ORCHARD_GROVE_BLUEPRINT, SOLAR_FARM_BLUEPRINT, BATTERY_BANK_BLUEPRINT, POND_BLUEPRINT, RESERVOIR_BLUEPRINT, SHEEP_BARN_BLUEPRINT, EQUIPMENT_YARD_BLUEPRINT, ...BUNKER_BLUEPRINTS, ...TOWER_BLUEPRINTS, GATE_GARAGE_BLUEPRINT, MOTOR_COURT_BLUEPRINT].map(b => [b.kind, b]));
+  [CABIN_VILLAGE_BLUEPRINT, HELIPAD_BLUEPRINT, TOWER_POD_BLUEPRINT, STILTED_HOUSE_BLUEPRINT, BOAT_DOCK_BLUEPRINT, MARINA_BLUEPRINT, POLYTUNNEL_BLUEPRINT, HIGH_TUNNEL_BLUEPRINT, AQUAPONICS_BLUEPRINT, MICRO_HYDRO_BLUEPRINT, WIND_TURBINE_BLUEPRINT, CABIN_BLUEPRINT, OUTHOUSE_BLUEPRINT, WORKSHOP_BLUEPRINT, ROOT_CELLAR_BLUEPRINT, WOOD_OVEN_BLUEPRINT, APIARY_BLUEPRINT, SUGAR_SHACK_BLUEPRINT, BARNYARD_BLUEPRINT, COOP_BLUEPRINT, GARDEN_BLUEPRINT, FIELD_BLUEPRINT, GREENHOUSE_BLUEPRINT, ORCHARD_BLUEPRINT, LOG_HOUSE_BLUEPRINT, FARMHOUSE_BLUEPRINT, TRAILER_BLUEPRINT, BARN_BLUEPRINT, COTTAGE_BLUEPRINT, GUEST_HOUSE_BLUEPRINT, MOMS_HOUSE_BLUEPRINT, LODGE_BLUEPRINT, LODGE_SOLAR_BLUEPRINT, STONE_HOUSE_BLUEPRINT, TIMBER_FRAME_BLUEPRINT, CONTAINER_HOUSE_BLUEPRINT, ADOBE_HOUSE_BLUEPRINT, METAL_GARAGE_BLUEPRINT, GARAGE_SOLAR_BLUEPRINT, ...UTILITY_BLUEPRINTS, GREENHOUSE_HEATED_BLUEPRINT, ORCHARD_GROVE_BLUEPRINT, SOLAR_FARM_BLUEPRINT, BATTERY_BANK_BLUEPRINT, POND_BLUEPRINT, RESERVOIR_BLUEPRINT, SHEEP_BARN_BLUEPRINT, EQUIPMENT_YARD_BLUEPRINT, ...BUNKER_BLUEPRINTS, ...TOWER_BLUEPRINTS, GATE_GARAGE_BLUEPRINT, MOTOR_COURT_BLUEPRINT].map(b => [b.kind, b]));
 
 /** Total bill of materials for a blueprint. */
 export function totalBill(bp: Blueprint): Partial<Stock> {

@@ -1167,8 +1167,10 @@ export class HomesteadWorld {
     let y = this.parcel.padHeight(r.x0, r.z0, r.x1, r.z1);
     // a pier stands on the water, not on a pad (the lake bed or the bank would be graded up to it)
     if (def.waterside) y = (this.parcel.lakeY ?? this.parcel.creek.waterY(p.x)) + 0.02;
+    // a house on piles: the floor clears the highest ground under it (the piles run down to the low side); no pad is graded, no wall is built
+    if (def.stilts) { let hi = -Infinity; for (let i = 0; i <= 4; i++) for (let j = 0; j <= 4; j++) hi = Math.max(hi, this.parcel.natural(r.x0 + (r.x1 - r.x0) * i / 4, r.z0 + (r.z1 - r.z0) * j / 4).h); y = hi + 0.03; }
     // bunker rooms take no pad (the yard above stays as it is); an entrance's hatch or headhouse gets a small one
-    let pad: Pad | null = (!below || (isEntry(def) && p.kind !== 'bunker_floorhatch')) && !def.waterside ? { x0: r.x0 - 0.05, z0: r.z0 - 0.05, x1: r.x1 + 0.05, z1: r.z1 + 0.05, y, skirt: below ? 0.4 : 0.9 } : null;
+    let pad: Pad | null = (!below || (isEntry(def) && p.kind !== 'bunker_floorhatch')) && !def.waterside && !def.stilts ? { x0: r.x0 - 0.05, z0: r.z0 - 0.05, x1: r.x1 + 0.05, z1: r.z1 + 0.05, y, skirt: below ? 0.4 : 0.9 } : null;
     // a pad cut into a slope is held by a dry-stack wall (sim/retainPlan): a flat apron round the building on the walled sides, the terrain eased only over the wall
     let wall: PadPlan | null = null;
     if (!below && pad && this.parcel.lot && !WALLLESS.test(p.kind)) {

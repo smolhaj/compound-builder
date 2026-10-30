@@ -29,6 +29,8 @@ export interface KitPieceDef {
   /** Floor height above the pad (walking height inside) and porch depth in front of the +z wall (world units). */
   floorY: number;
   porch: number;
+  /** On piles: no graded pad and no retaining wall; the floor stands above the highest ground under it, and the piles run down to the ground on the low side. */
+  stilts?: boolean;
   /** A pier: it must reach from dry land out over the water (and stands on the water, not on a graded pad). */
   waterside?: boolean;
   /** People it sleeps (0 = not a home). */
@@ -167,6 +169,37 @@ export const GREENHOUSE_HEATED: KitPieceDef = {
   maxSlope: 0.12, floorY: 0.0, porch: 0, sleeps: 0, light: null,
 };
 
+/** The cabin village (sim/outposts.ts): six sleeping cabins in a ring. */
+export const CABIN_VILLAGE: KitPieceDef = {
+  id: 'cabin_village', name: 'Cabin village', category: 'home',
+  blurb: 'Six little sleeping cabins in a ring round a green and a fire circle, 24 m across: twelve bunks for kin, workers and the people you take in, and the blank backs of the cabins make the ring a wall. The outer cabins hear the drive (+8 warning). Chimneys and lit windows show from the road.',
+  cellsX: 8, cellsZ: 8, frontCells: 0,
+  parts: { foundation: 'concrete', walls: 'board_batten', roof: 'metal_roof' },
+  maxSlope: 0.2, floorY: 0.08, porch: 0, sleeps: 0, light: [0, 0.3, 0],
+};
+/** The helipad. */
+export const HELIPAD: KitPieceDef = {
+  id: 'helipad', name: 'Helipad', category: 'work',
+  blurb: 'A 12 × 12 m concrete pad with edge lights and a windsock. While the county works, a bad wound, burn, or a broken leg or hip is flown to a trauma centre from it ($38,000, 15 % with insurance). No helicopter of your own. Loud, lit, and a landmark from the air.',
+  cellsX: 4, cellsZ: 4, frontCells: 0,
+  parts: { foundation: 'concrete', walls: 'concrete', roof: 'concrete' },
+  maxSlope: 0.08, floorY: 0.02, porch: 0, sleeps: 0, light: null,
+};
+/** The tower pod (a stand-alone tower: sim/towers.ts). */
+export const TOWER_POD: KitPieceDef = {
+  id: 'tower_pod', name: 'Tower pod', category: 'defense',
+  blurb: 'A glazed observation pod on a 10 m steel mast with a spiral stair: the longest sight of any tower, the worst cover. Two can sleep in it. A landmark for anyone on the road.',
+  cellsX: 1, cellsZ: 1, frontCells: 0,
+  parts: { foundation: 'concrete', walls: 'glass', roof: 'metal_roof' }, maxSlope: 0.6, floorY: 0.02, porch: 0, sleeps: 0, light: null,
+};
+/** The stilted house. */
+export const STILTED_HOUSE: KitPieceDef = {
+  id: 'stilted_house', name: 'Stilted house', category: 'home',
+  blurb: 'A two-room house on piles, its floor 2.4 m up, 6 × 5 m with a deck and a stair. Stands on a steep slope with no pad or wall, spared by a flood that passes under it; the space beneath holds firewood and a truck. A wildfire is worse for it, and snow and vermin do not reach the floor. Sleeps 4.',
+  cellsX: 2, cellsZ: 2, frontCells: 1,
+  parts: { foundation: 'wood_dark', walls: 'timber_lap', roof: 'metal_roof' },
+  maxSlope: 0.5, floorY: 0.48, porch: 0.28, sleeps: 4, light: [0, 0.78, -0.1], stilts: true,
+};
 /** The dock (sim/waterfront.ts): a timber pier with two slips. */
 export const BOAT_DOCK: KitPieceDef = {
   id: 'boat_dock', name: 'Boat dock', category: 'work',
@@ -421,7 +454,7 @@ export const MOTOR_COURT_KIT: KitPieceDef = {
   maxSlope: 0.15, floorY: 0.0, porch: 0, sleeps: 0, light: null,
 };
 /** Defense menu: only the first tier is built from scratch; the rest are upgrades from the Defense tab. */
-export const TOWER_ORDER: readonly string[] = ['rise_lookout'];
+export const TOWER_ORDER: readonly string[] = ['rise_lookout', 'tower_pod'];
 /** The gatehouse garage joins the Defense menu beside the first tower. */
 export const GATEHOUSE_ORDER: readonly string[] = ['gate_garage', 'motor_court'];
 
@@ -447,9 +480,9 @@ export const BUNKER_KIT: KitPieceDef[] = [
 /** Underground menu order. */
 export const BUNKER_ORDER: readonly string[] = BUNKER_KIT.map(d => d.id);
 
-export const KIT: Record<string, KitPieceDef> = Object.fromEntries([BOAT_DOCK, MARINA, POLYTUNNEL, HIGH_TUNNEL, AQUAPONICS, LODGE, LODGE_SOLAR, STONE_HOUSE, TIMBER_FRAME_HOUSE, CONTAINER_HOUSE, ADOBE_HOUSE, APIARY, SUGAR_SHACK, BARNYARD, WOOD_OVEN, GATE_GARAGE_KIT, MOTOR_COURT_KIT, TIMBER_CABIN, LOG_HOUSE, FARMHOUSE, TRAILER, BARN, COTTAGE, GUEST_HOUSE, MOMS_HOUSE, METAL_GARAGE, GARAGE_SOLAR, OUTHOUSE, WORKSHOP, ROOT_CELLAR, CHICKEN_COOP, GARDEN, FIELD, GREENHOUSE, GREENHOUSE_HEATED, ORCHARD, ORCHARD_GROVE, POND, RESERVOIR, SHEEP_BARN, EQUIPMENT_YARD, ...UTILITY_KIT, ...BUNKER_KIT, ...TOWER_KIT].map(d => [d.id, d]));
+export const KIT: Record<string, KitPieceDef> = Object.fromEntries([CABIN_VILLAGE, HELIPAD, TOWER_POD, STILTED_HOUSE, BOAT_DOCK, MARINA, POLYTUNNEL, HIGH_TUNNEL, AQUAPONICS, LODGE, LODGE_SOLAR, STONE_HOUSE, TIMBER_FRAME_HOUSE, CONTAINER_HOUSE, ADOBE_HOUSE, APIARY, SUGAR_SHACK, BARNYARD, WOOD_OVEN, GATE_GARAGE_KIT, MOTOR_COURT_KIT, TIMBER_CABIN, LOG_HOUSE, FARMHOUSE, TRAILER, BARN, COTTAGE, GUEST_HOUSE, MOMS_HOUSE, METAL_GARAGE, GARAGE_SOLAR, OUTHOUSE, WORKSHOP, ROOT_CELLAR, CHICKEN_COOP, GARDEN, FIELD, GREENHOUSE, GREENHOUSE_HEATED, ORCHARD, ORCHARD_GROVE, POND, RESERVOIR, SHEEP_BARN, EQUIPMENT_YARD, ...UTILITY_KIT, ...BUNKER_KIT, ...TOWER_KIT].map(d => [d.id, d]));
 /** Build-menu order. */
-export const KIT_ORDER: readonly string[] = ['timber_cabin', 'log_house', 'lodge', 'lodge_solar', 'stone_house', 'timber_frame', 'container_house', 'adobe_house', 'cottage', 'guest_house', 'moms_house', 'outhouse', 'garden', 'greenhouse', 'polytunnel', 'high_tunnel', 'greenhouse_heated', 'aquaponics', 'orchard', 'orchard_grove', 'field', 'chicken_coop', 'sheep_barn', 'pond', 'root_cellar', 'wood_oven', 'apiary', 'sugar_shack', 'barnyard', 'workshop', 'metal_garage', 'barn', 'equipment_yard', 'boat_dock', 'marina'];
+export const KIT_ORDER: readonly string[] = ['timber_cabin', 'log_house', 'lodge', 'lodge_solar', 'stone_house', 'timber_frame', 'container_house', 'adobe_house', 'cottage', 'guest_house', 'moms_house', 'stilted_house', 'cabin_village', 'outhouse', 'garden', 'greenhouse', 'polytunnel', 'high_tunnel', 'greenhouse_heated', 'aquaponics', 'orchard', 'orchard_grove', 'field', 'chicken_coop', 'sheep_barn', 'pond', 'root_cellar', 'wood_oven', 'apiary', 'sugar_shack', 'barnyard', 'workshop', 'metal_garage', 'barn', 'equipment_yard', 'helipad', 'boat_dock', 'marina'];
 /** Water & power menu order. */
 export const UTILITY_ORDER: readonly string[] = ['well_hand', 'well_drilled', 'cistern', 'water_tower', 'filtration_shed', 'septic', 'solar_array', 'solar_farm', 'garage_solar', 'battery_shed', 'battery_bank', 'generator_shed', 'micro_hydro', 'wind_turbine', 'reservoir'];
 

@@ -22,6 +22,7 @@ import { FARM_BUILDERS } from './farmBuildings';
 import { RENEWABLE_BUILDERS } from './renewableBuildings';
 import { TUNNEL_BUILDERS } from './tunnelBuildings';
 import { DOCK_BUILDERS } from './dockBuildings';
+import { OUTPOST_BUILDERS } from './outpostBuildings';
 import { HERD_BUILDERS } from './herdBuildings';
 import { HOUSING_BUILDERS, HOUSING_SEATS } from './housingStyleBuildings';
 
@@ -513,6 +514,7 @@ const BUILDERS: Record<string, (def: KitPieceDef, seed?: number, opts?: BuildOpt
   ...RENEWABLE_BUILDERS,
   ...TUNNEL_BUILDERS,
   ...DOCK_BUILDERS,
+  ...OUTPOST_BUILDERS,
   ...HOUSING_BUILDERS,
 };
 

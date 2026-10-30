@@ -43,7 +43,7 @@ export const COUNTY: Record<RegionId, { tax: number; strict: number }> = {
 export const PERMIT_FEE: Record<string, number> = {
   timber_cabin: 2500, log_house: 4000, lodge: 6000, lodge_solar: 7000, stone_house: 4000, timber_frame: 4000, container_house: 2500, adobe_house: 3000, cottage: 2000, guest_house: 1500, moms_house: 2500, workshop: 900, metal_garage: 700, garage_solar: 1000, barn: 800, root_cellar: 300, greenhouse: 150, well_drilled: 450, septic: 900, solar_array: 500, solar_farm: 1500, battery_bank: 600, greenhouse_heated: 600, pond: 700, reservoir: 700, sheep_barn: 500, equipment_yard: 200,
   watchtower_wood: 350, watchtower_octagon: 450, watchtower_concrete: 800, watchtower_hex: 900, watchtower_flood: 900, watchtower_mount: 1200, watchtower_turret: 1500,
-  concrete_wall: 1200, container_stack: 900, stone_wall: 800, tunnel_bridge: 2500, slope_tunnel: 1500, rock_tunnel: 3500, micro_hydro: 1800, boat_dock: 600, marina: 2500, high_tunnel: 300, aquaponics: 900, wind_turbine: 900, gate_garage: 1500, sugar_shack: 500, barnyard: 600,
+  concrete_wall: 1200, container_stack: 900, stone_wall: 800, tunnel_bridge: 2500, slope_tunnel: 1500, rock_tunnel: 3500, micro_hydro: 1800, cabin_village: 4000, helipad: 1800, tower_pod: 900, stilted_house: 3000, boat_dock: 600, marina: 2500, high_tunnel: 300, aquaponics: 900, wind_turbine: 900, gate_garage: 1500, sugar_shack: 500, barnyard: 600,
   bunker_hatch: 600, bunker_floorhatch: 600, bunker_stairs: 600, bunker_corridor: 300, bunker_container: 600, bunker_dorm: 600, bunker_galley: 600, bunker_stores: 600, bunker_plant: 600, bunker_medical: 600, bunker_comms: 300,
 };
 export const needsPermit = (kind: string) => (PERMIT_FEE[kind] ?? 0) > 0;
