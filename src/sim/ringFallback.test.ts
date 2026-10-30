@@ -60,7 +60,7 @@ describe('the defenders fall back through the rings in a raid', () => {
   it('a crew that breaks the outer line meets the next ring, with a fallback event, before any breach of the house', () => {
     const g = lot(3);
     let falls = 0, checked = 0;
-    for (let seed = 1; seed <= 24; seed++) {
+    for (let seed = 1; seed <= 120; seed++) {
       const b = planBattle(g, 7, seed);
       const fb = b.events.filter(e => e.kind === 'fallback');
       falls += fb.length;
