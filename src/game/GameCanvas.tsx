@@ -452,7 +452,7 @@ export function GameCanvas() {
     // that is live when it runs (React's dev double-mount builds the canvas twice: the first world is already disposed by then), and only after the
     // world has drawn a few frames: the terrain and the woods are built over the first of them, and building on top of a half-made ground leaves holes.
     if (new URLSearchParams(location.search).get('showcase') === 'mountain') {
-      const rings = Number(new URLSearchParams(location.search).get('rings') ?? 1) || 1;
+      const qs = new URLSearchParams(location.search), rings = Number(qs.get('rings') ?? 1) || 1, wall = qs.get('wall') === 'concrete' ? 'concrete' as const : 'stone' as const;
       const w = window as unknown as Record<string, unknown>;
       void (async () => {
         const m = await import('./showcase');
@@ -460,7 +460,7 @@ export function GameCanvas() {
         await new Promise(r => setTimeout(r, 1200));
         if (w.__showcaseRan) return;
         w.__showcaseRan = true;
-        try { w.__showcase = m.buildMountainShowcase(w.__cb as Parameters<typeof m.buildMountainShowcase>[0], { rings }); } catch (e) { w.__showcase = { error: String((e as Error)?.stack ?? e) }; }
+        try { w.__showcase = m.buildMountainShowcase(w.__cb as Parameters<typeof m.buildMountainShowcase>[0], { rings, wall }); } catch (e) { w.__showcase = { error: String((e as Error)?.stack ?? e) }; }
       })();
     }
 
