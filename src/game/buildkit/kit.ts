@@ -31,6 +31,8 @@ export interface KitPieceDef {
   porch: number;
   /** A stair or a ramp: it joins two levels along its length (local z); the ground must climb at least `min` and at most `max` (world units) from one end to the other, and it takes no pad of its own. */
   climbs?: { min: number; max: number };
+  /** A pier: it must reach from dry land out over the water (and stands on the water, not on a graded pad). */
+  waterside?: boolean;
   /** People it sleeps (0 = not a home). */
   sleeps: number;
   /** Interior lamp position (local, above the floor), or null for no lamplight. */
@@ -195,6 +197,22 @@ export const GREENHOUSE_HEATED: KitPieceDef = {
   maxSlope: 0.12, floorY: 0.0, porch: 0, sleeps: 0, light: null,
 };
 
+/** The dock (sim/waterfront.ts): a timber pier with two slips. */
+export const BOAT_DOCK: KitPieceDef = {
+  id: 'boat_dock', name: 'Boat dock', category: 'work',
+  blurb: 'A 3 × 15 m timber pier on piles, two slips and a ladder, running from the bank out over a lake or a river. Keep a jon boat or a skiff at it: lake fish at three times the creek\'s rate, a way off the place by water. It is also a landing for anyone with a boat, and the lake skims over in winter: haul the boats out first.',
+  cellsX: 1, cellsZ: 5, frontCells: 0,
+  parts: { foundation: 'wood_dark', walls: 'wood_mid', roof: 'wood_mid' },
+  maxSlope: 9, floorY: 0.0, porch: 0, sleeps: 0, light: null, waterside: true,
+};
+/** The marina: a T-head pier with six slips, a fuel dock, a boat shed and a bubbler that keeps the ice off the boats. */
+export const MARINA: KitPieceDef = {
+  id: 'marina', name: 'Marina', category: 'work',
+  blurb: 'A 4.5 × 21 m pier with a T-head, six slips, a fuel pump and a boat shed with a bubbler that keeps the ice off the hulls all winter (it runs on power). The way to keep a fleet on the water, and the biggest landing on the shore.',
+  cellsX: 2, cellsZ: 7, frontCells: 0,
+  parts: { foundation: 'wood_dark', walls: 'board_batten', roof: 'metal_roof' },
+  maxSlope: 9, floorY: 0.0, porch: 0, sleeps: 0, light: [0, 0.5, -0.3], waterside: true,
+};
 /** The polytunnel (sim/tunnels.ts): hoops and one skin of film, the cheap way to a longer season. */
 export const POLYTUNNEL: KitPieceDef = {
   id: 'polytunnel', name: 'Polytunnel', category: 'food',
@@ -465,9 +483,9 @@ export const BUNKER_KIT: KitPieceDef[] = [
 /** Underground menu order. */
 export const BUNKER_ORDER: readonly string[] = BUNKER_KIT.map(d => d.id);
 
-export const KIT: Record<string, KitPieceDef> = Object.fromEntries([POLYTUNNEL, HIGH_TUNNEL, AQUAPONICS, LODGE, LODGE_PLINTH, LODGE_SOLAR, STONE_HOUSE, TIMBER_FRAME_HOUSE, CONTAINER_HOUSE, ADOBE_HOUSE, APIARY, FORGE, SUGAR_SHACK, BARNYARD, WOOD_OVEN, GATE_GARAGE_KIT, MOTOR_COURT_KIT, TIMBER_CABIN, LOG_HOUSE, FARMHOUSE, TRAILER, BARN, COTTAGE, GUEST_HOUSE, MOMS_HOUSE, METAL_GARAGE, GARAGE_SOLAR, OUTHOUSE, WORKSHOP, ROOT_CELLAR, CHICKEN_COOP, GARDEN, FIELD, GREENHOUSE, GREENHOUSE_HEATED, ORCHARD, ORCHARD_GROVE, POND, RESERVOIR, SHEEP_BARN, EQUIPMENT_YARD, TERRACE_STAIR, TERRACE_RAMP, ...UTILITY_KIT, ...BUNKER_KIT, ...TOWER_KIT].map(d => [d.id, d]));
+export const KIT: Record<string, KitPieceDef> = Object.fromEntries([BOAT_DOCK, MARINA, POLYTUNNEL, HIGH_TUNNEL, AQUAPONICS, LODGE, LODGE_PLINTH, LODGE_SOLAR, STONE_HOUSE, TIMBER_FRAME_HOUSE, CONTAINER_HOUSE, ADOBE_HOUSE, APIARY, FORGE, SUGAR_SHACK, BARNYARD, WOOD_OVEN, GATE_GARAGE_KIT, MOTOR_COURT_KIT, TIMBER_CABIN, LOG_HOUSE, FARMHOUSE, TRAILER, BARN, COTTAGE, GUEST_HOUSE, MOMS_HOUSE, METAL_GARAGE, GARAGE_SOLAR, OUTHOUSE, WORKSHOP, ROOT_CELLAR, CHICKEN_COOP, GARDEN, FIELD, GREENHOUSE, GREENHOUSE_HEATED, ORCHARD, ORCHARD_GROVE, POND, RESERVOIR, SHEEP_BARN, EQUIPMENT_YARD, TERRACE_STAIR, TERRACE_RAMP, ...UTILITY_KIT, ...BUNKER_KIT, ...TOWER_KIT].map(d => [d.id, d]));
 /** Build-menu order. */
-export const KIT_ORDER: readonly string[] = ['timber_cabin', 'log_house', 'lodge', 'lodge_plinth', 'lodge_solar', 'stone_house', 'timber_frame', 'container_house', 'adobe_house', 'cottage', 'guest_house', 'moms_house', 'outhouse', 'garden', 'greenhouse', 'polytunnel', 'high_tunnel', 'greenhouse_heated', 'aquaponics', 'orchard', 'orchard_grove', 'field', 'chicken_coop', 'sheep_barn', 'pond', 'root_cellar', 'wood_oven', 'apiary', 'sugar_shack', 'barnyard', 'workshop', 'metal_garage', 'barn', 'equipment_yard'];
+export const KIT_ORDER: readonly string[] = ['timber_cabin', 'log_house', 'lodge', 'lodge_plinth', 'lodge_solar', 'stone_house', 'timber_frame', 'container_house', 'adobe_house', 'cottage', 'guest_house', 'moms_house', 'outhouse', 'garden', 'greenhouse', 'polytunnel', 'high_tunnel', 'greenhouse_heated', 'aquaponics', 'orchard', 'orchard_grove', 'field', 'chicken_coop', 'sheep_barn', 'pond', 'root_cellar', 'wood_oven', 'apiary', 'sugar_shack', 'barnyard', 'workshop', 'metal_garage', 'barn', 'equipment_yard', 'boat_dock', 'marina'];
 /** Water & power menu order. */
 export const UTILITY_ORDER: readonly string[] = ['well_hand', 'well_drilled', 'cistern', 'water_tower', 'filtration_shed', 'septic', 'solar_array', 'solar_farm', 'garage_solar', 'battery_shed', 'battery_bank', 'generator_shed', 'micro_hydro', 'wind_turbine', 'reservoir'];
 
@@ -550,7 +568,7 @@ export interface SiteQuery {
   rule?(kind: string, x: number, z: number): PlaceProblem | null;
 }
 
-export type PlaceProblem = 'off_parcel' | 'water' | 'too_steep' | 'overlaps' | 'not_connected' | 'thin_cover' | 'too_deep' | 'needs_house' | 'needs_slope' | 'no_climb' | 'too_much_climb' | 'cross_slope' | 'pad_clash' | 'no_creek' | 'not_on_bank' | 'no_head';
+export type PlaceProblem = 'cross_slope' | 'needs_house' | 'needs_slope' | 'no_climb' | 'no_creek' | 'no_head' | 'no_water' | 'not_connected' | 'not_on_bank' | 'not_shore' | 'off_parcel' | 'overlaps' | 'pad_clash' | 'thin_cover' | 'too_deep' | 'too_much_climb' | 'too_steep' | 'water';
 
 const levelOf = (d: KitPieceDef) => d.level ?? 'surface';
 /** Do pieces at these levels compete for the same ground? (Bunker rooms go under the yard and houses.) */
@@ -562,12 +580,14 @@ export function placementProblem(def: KitPieceDef, x: number, z: number, rot: nu
   const r = footprint(def, x, z, rot, !below);
   const N = 4;
   const hs: number[][] = [];
+  let wet = 0, dry = 0;
   for (let i = 0; i <= N; i++) {
     const row: number[] = [];
     for (let j = 0; j <= N; j++) {
       const px = r.x0 + (r.x1 - r.x0) * i / N, pz = r.z0 + (r.z1 - r.z0) * j / N;
       if (!site.owned(px, pz)) return 'off_parcel';
-      if (site.water(px, pz)) return 'water';
+      if (def.waterside) { if (site.water(px, pz)) wet++; else dry++; }
+      else if (site.water(px, pz)) return 'water';
       if (!below && site.blocked?.(px, pz)) return 'overlaps';
       row.push(site.height(px, pz));
     }
@@ -586,6 +606,14 @@ export function placementProblem(def: KitPieceDef, x: number, z: number, rot: nu
     if (Math.abs(c.rise) < def.climbs.min) return 'no_climb';
     if (Math.abs(c.rise) > def.climbs.max) return 'too_much_climb';
   }
+  // a pier reaches from the bank out over the water: both must be under it (its grade is the bank's and the bed's, not a pad's)
+  if (def.waterside) {
+    if (wet < 3 || dry < 3) return 'not_shore';
+    // it must run out from the bank, not along it: one end on dry land, the other over the water
+    const h = def.cellsZ * CELL / 2 - 0.1, [ax, az] = rotQ(0, h, rot), [bx, bz] = rotQ(0, -h, rot);
+    if (site.water(x + ax, z + az) === site.water(x + bx, z + bz)) return 'not_shore';
+  }
+  if (grade > def.maxSlope && !isFloorHatch && !def.waterside) return 'too_steep';
   // a walkout basement stands out of the hill: the ground must fall toward the back of the footprint (local -z)
   if (def.walkoutFall) {
     const q = ((rot % 4) + 4) % 4, cx = (r.x0 + r.x1) / 2, cz = (r.z0 + r.z1) / 2;
@@ -623,6 +651,8 @@ export const PROBLEM_TEXT: Record<PlaceProblem, string> = {
   too_much_climb: 'The ground climbs too much along it: a stair takes up to 3.6 m, a ramp 1.2 m. Terrace the slope or switch back',
   cross_slope: 'The ground falls away sideways across it: turn it (R) to run up the hill, not across',
   pad_clash: 'Its graded pad would cut into a neighbour\'s pad at another level',
+  no_water: 'Your land has no lake or river wide enough for a dock',
+  not_shore: 'A dock runs from dry land out over the water: put one end on the bank and the other in the lake (R turns it)',
   no_creek: 'No creek runs through your land: a turbine needs falling water',
   not_on_bank: 'Put the turbine house on the creek bank, within about 80 m of the water',
   no_head: 'The creek does not fall far enough here: it needs 2.5 m of drop over the penstock (try further downstream)',

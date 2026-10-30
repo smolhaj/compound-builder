@@ -33,6 +33,7 @@ import { weatherOf } from './weatherThreats';
 import { mulberry32 } from './rng';
 import type { RegionId } from './regions';
 import { isFinished } from './construction';
+const docksCount = (s: GameState): number => s.structures.filter(st => isFinished(st) && (st.kind === 'boat_dock' || st.kind === 'marina')).length;
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 const gauss = (d: number, mid: number, sd: number) => Math.exp(-((((d - mid + 182.5) % 365 + 365) % 365 - 182.5) ** 2) / (2 * sd * sd));
@@ -301,9 +302,12 @@ export const intakeCare = (level: number): number => 1 - 0.4 * Math.max(0, level
 export function plantChoreRate(s: GameState, doy: number): number {
   const fin = s.structures.filter(isFinished);
   const hydro = fin.filter(st => st.kind === 'micro_hydro').length, wind = fin.filter(st => st.kind === 'wind_turbine').length;
-  if (!hydro && !wind) return 0;
+  const dock = docksCount(s);
+  if (!hydro && !wind && !dock) return 0;
   const leaves = gauss(doy, 290, 18), runoff = gauss(doy, 140, 20), ice = intakeIce(s, doy);
-  return Math.min(60, hydro * (4 + 14 * leaves + 8 * runoff + 10 * ice) + wind * 2);
+  // hauling the boats out before the freeze, launching them in the spring, scraping the pilings: the dock's share of the chore
+  const haul = gauss(doy, 275, 20) + gauss(doy, 110, 14);
+  return Math.min(60, hydro * (4 + 14 * leaves + 8 * runoff + 10 * ice) + wind * 2 + dock * (1 + 9 * haul));
 }
 
 /** Noise a scout hears (0-15, added to the place's visibility): a running turbine whooshes and hums. */

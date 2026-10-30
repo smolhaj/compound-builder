@@ -30,6 +30,7 @@ import { isHome } from './blueprints';
 import { highShare, isTower } from './towers';
 import { PERIMETER, runFinished, runBill, SALVAGE, type PerimeterKind, type Pt } from './perimeter';
 import { log } from './economy';
+import { isDock, lakeIce, waterBearing, waterLaneCost } from './waterfront';
 import { DRAIN, cutSlopeAt, nearDrain, undrained, drainLineFor } from './drainage';
 import { wallHoldsAt } from './retaining';
 import { doorTierOf, holdLine, holdSeconds, DOOR } from './doorBreach';
@@ -109,12 +110,33 @@ export function raidAngle(s: GameState, rnd: () => number): { ang: number; lane:
   const road = lanes.reduce((a, l) => (Math.abs(l.ang - Math.PI / 2) < Math.abs(a.ang - Math.PI / 2) ? l : a), lanes[0]);
   const ease = roadEase(s, FX.ROAD_EASE);   // (a long, winding road with a ford is not the easy way in)
   const best = bestLane(lanes, { ang: Math.PI / 2, bonus: ease });
+  // a lake lot: crews with boats (or walking the ice) cross the water when the landing is easier than the land lanes (sim/waterfront.ts)
+  const wl = waterLaneOf(s);
+  if (wl && rnd() < wl.crews) {
+    const landCost = best && !(best === road && !best.via) ? best.cost : road.cost * ease;
+    if (wl.cost < landCost * FX.LANE_MARGIN) return { ang: wl.ang + (rnd() - 0.5) * 0.3, lane: { ...(best ?? road), ang: wl.ang, cost: wl.cost, dist: wl.dist, hardness: wl.cost / Math.max(1, wl.dist), choke: null, fords: true, cliff: wl.landing === 'cliff', path: [], via: undefined } };
+  }
   // the road side is a lane over a standing tunnel-bridge: they come to its door whatever the margins
   if (!best || (best === road && !best.via)) return null;
   if (!best.via && best.cost > road.cost * ease * FX.LANE_MARGIN) return null;
   // by a tunnel-bridge they gather at its outer door, so they come from the door's direction
   const c = campOf(s), toDoor = best.via && best.choke ? Math.atan2(best.choke.at[1] - c[1], best.choke.at[0] - c[0]) : null;
   return { ang: (toDoor ?? best.ang) + (rnd() - 0.5) * (toDoor !== null ? 0.12 : 0.5), lane: best, ...(best.via ? { via: best.via } : {}) };
+}
+
+/** The crossing a crew with boats (or on the ice) would make from the lake side, or null (no lake, thin ice, no open shore near the camp). `crews`: the share of crews that have the means. */
+export function waterLaneOf(s: GameState): { ang: number; cost: number; dist: number; landing: 'dock' | 'shore' | 'cliff'; crews: number; ice: string } | null {
+  const c = campOf(s), wb = waterBearing(s, c);
+  if (!wb) return null;
+  const ice = lakeIce(s);
+  if (ice === 'skim') return null;
+  const lx = c[0] + Math.cos(wb.ang) * wb.dist, lz = c[1] + Math.sin(wb.ang) * wb.dist;
+  const dock = s.structures.some(st => isFinished(st) && isDock(st.kind) && Math.hypot(st.x - lx, st.z - lz) <= 8);
+  const guarded = s.structures.some(st => isFinished(st) && isTower(st.kind) && Math.hypot(st.x - lx, st.z - lz) <= 6)
+    || s.perimeter.some(r => runFinished(r) && r.kind !== 'water_pipe' && r.kind !== 'power_cable' && r.pts.some(p => Math.hypot(p[0] - lx, p[1] - lz) <= 4));
+  const landing = dock ? 'dock' : s.site.lot?.kind === 'bluff' ? 'cliff' : 'shore';
+  if (ice === 'ice') return { ang: wb.ang, cost: wb.dist * 1.2 + (guarded ? 2 : 0), dist: wb.dist, landing: 'shore', crews: 0.9, ice };
+  return { ang: wb.ang, cost: waterLaneCost(wb.dist, landing, guarded), dist: wb.dist, landing, crews: 0.5, ice };
 }
 
 /** Is the choke of the easiest lane held (a finished tower or wall within 4 units of it)? */
@@ -138,6 +160,10 @@ export function terrainDefense(s: GameState): TerrainDefense {
   const lanes = lanesOf(s);
   const best = lanes.length ? bestLane(lanes, { ang: Math.PI / 2, bonus: roadEase(s, FX.ROAD_EASE) }) : null;
   const lines: string[] = [];
+  const wl = waterLaneOf(s);
+  if (wl) lines.push(wl.ice === 'ice' ? 'The lake is frozen hard: a crew can walk across it, and the shore is the front. Watch it until the thaw.'
+    : wl.landing === 'dock' ? 'Your dock is a landing: crews with boats can tie up and walk up the planks. A tower or a wall at the head of the dock holds it.'
+    : wl.landing === 'cliff' ? 'The bluff is a cliff to a crew in boats: the lake side is a hard way in unless you give them a dock.' : 'Crews with boats can land on the shore on the lake side. A tower or a wall there turns them off.');
   const towers = s.structures.filter(st => isFinished(st) && isTower(st.kind));
   const hs = towers.length ? towers.reduce((a, st) => a + highShare(st), 0) / towers.length : 0;
   // the road side: single file at a bridge, a bore, a ford or a chain of hairpins (sim/roadFx.ts); held when a tower or a wall stands on it

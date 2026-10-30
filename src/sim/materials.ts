@@ -17,6 +17,7 @@ export type MaterialId = 'lumber' | 'logs' | 'firewood' | 'fieldstone' | 'concre
   | 'bugout_bag' | 'bugout_cache' | 'security_door' | 'window_shutters' | 'ballistic_panels' | 'safe_room_hardened'
   | 'gun_mount' | 'turret_head' | 'ai_sensor_module'
   | 'tent' | 'sleeping_bag'
+  | 'jon_boat' | 'skiff'
   | 'poly_film' | 'tunnel_kit_small' | 'tunnel_kit_high' | 'aqua_kit' | 'tilapia_fry'
   | 'hydro_set' | 'penstock' | 'wind_turbine' | 'tilt_tower'
   | 'greenhouse_pro_kit' | 'trout_fry' | 'crayfish_stock' | 'fish_feed' | 'sheep'
@@ -191,6 +192,8 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   steer: { id: 'steer', name: 'Beef steer', unit: 'a weaned steer calf: beef after a summer on grass (hay in winter)', price: 1800 },
   rabbit: { id: 'rabbit', name: 'Meat rabbit', unit: 'a meat rabbit for the hutch: a buck and two does make a colony', price: 35 },
   sheep: { id: 'sheep', name: 'Sheep', unit: 'a ewe in lamb: wool each spring, a lamb or two, mutton in the fall (needs a sheep barn in winter)', price: 300 },
+  jon_boat: { id: 'jon_boat', name: 'Jon boat', unit: '12 ft welded aluminum jon boat with oars, delivered: three seats, stable for fishing', price: 1300 },
+  skiff: { id: 'skiff', name: 'Skiff with outboard', unit: '16 ft aluminum skiff with a 25 hp four-stroke outboard on a trailer, used: five seats, burns petrol', price: 9800 },
   poly_film: { id: 'poly_film', name: 'Greenhouse film', unit: '6 mil UV-stabilized four-year poly, 32 x 100 ft roll', price: 380 },
   tunnel_kit_small: { id: 'tunnel_kit_small', name: 'Polytunnel hoop kit', unit: '6 x 12 m galvanized hoop frame with purlins, baseboards, door frames and end walls', price: 1400 },
   tunnel_kit_high: { id: 'tunnel_kit_high', name: 'High tunnel frame kit', unit: '9 x 30 m gothic galvanized frame with roll-up side hardware, end walls and a double door', price: 7900 },

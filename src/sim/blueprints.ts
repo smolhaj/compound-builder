@@ -598,8 +598,26 @@ export const TERRACE_RAMP_BLUEPRINT: Blueprint = bp('terrace_ramp', [
   ['finish', 'Top dress and tamp', 8, {}],
 ]);
 
+// ── Docks (sim/waterfront.ts) ──
+/** A 3 x 15 m timber dock on piles: two slips, cleats and bumpers, a ladder and a lamp. About $6,000 and 100 person-hours. */
+export const BOAT_DOCK_BLUEPRINT: Blueprint = bp('boat_dock', [
+  ['site', 'Walk the shore, stake the pier line and check the water depth at the end', 4, {}],
+  ['foundation', 'Drive the treated piles to the bed from a barge or a stage', 32, { lumber: 3, concrete: 1 }],
+  ['frame', 'Bolt the stringers and cross beams to the piles', 26, { lumber: 2, hardware: 1 }],
+  ['roof', 'Lay the decking', 22, { lumber: 3 }],
+  ['finish', 'Cleats, bumpers, the ladder and a lamp post', 16, { hardware: 2, cable: 1 }],
+]);
+/** The marina: a 4.5 x 21 m pier with a T-head, six slips, a fuel pump, a boat shed and a bubbler. About $22,000 and 330 person-hours. */
+export const MARINA_BLUEPRINT: Blueprint = bp('marina', [
+  ['site', 'Survey the shore and the bed, stake the pier, the T-head and the shed', 10, {}],
+  ['foundation', 'Drive the piles for the pier and the T-head', 90, { lumber: 8, concrete: 4, rebar: 1 }],
+  ['frame', 'Stringers, cross beams, the finger berths and the shed posts', 80, { lumber: 6, hardware: 2 }],
+  ['roof', 'Decking, the boat shed roof and its end wall', 70, { lumber: 6, roofing: 5 }],
+  ['finish', 'Fuel pump and tank, the bubbler and its compressor, bumpers, cleats and lamps', 80, { hardware: 4, pipe: 4, cable: 3, pump: 1 }],
+]);
+
 export const BLUEPRINTS: Record<string, Blueprint> = Object.fromEntries(
-  [POLYTUNNEL_BLUEPRINT, HIGH_TUNNEL_BLUEPRINT, AQUAPONICS_BLUEPRINT, MICRO_HYDRO_BLUEPRINT, WIND_TURBINE_BLUEPRINT, CABIN_BLUEPRINT, OUTHOUSE_BLUEPRINT, WORKSHOP_BLUEPRINT, ROOT_CELLAR_BLUEPRINT, WOOD_OVEN_BLUEPRINT, FORGE_BLUEPRINT, APIARY_BLUEPRINT, SUGAR_SHACK_BLUEPRINT, BARNYARD_BLUEPRINT, COOP_BLUEPRINT, GARDEN_BLUEPRINT, FIELD_BLUEPRINT, GREENHOUSE_BLUEPRINT, ORCHARD_BLUEPRINT, LOG_HOUSE_BLUEPRINT, FARMHOUSE_BLUEPRINT, TRAILER_BLUEPRINT, BARN_BLUEPRINT, COTTAGE_BLUEPRINT, GUEST_HOUSE_BLUEPRINT, MOMS_HOUSE_BLUEPRINT, LODGE_BLUEPRINT, LODGE_PLINTH_BLUEPRINT, LODGE_SOLAR_BLUEPRINT, STONE_HOUSE_BLUEPRINT, TIMBER_FRAME_BLUEPRINT, CONTAINER_HOUSE_BLUEPRINT, ADOBE_HOUSE_BLUEPRINT, METAL_GARAGE_BLUEPRINT, GARAGE_SOLAR_BLUEPRINT, ...UTILITY_BLUEPRINTS, GREENHOUSE_HEATED_BLUEPRINT, ORCHARD_GROVE_BLUEPRINT, SOLAR_FARM_BLUEPRINT, BATTERY_BANK_BLUEPRINT, POND_BLUEPRINT, RESERVOIR_BLUEPRINT, SHEEP_BARN_BLUEPRINT, EQUIPMENT_YARD_BLUEPRINT, ...BUNKER_BLUEPRINTS, ...TOWER_BLUEPRINTS, GATE_GARAGE_BLUEPRINT, MOTOR_COURT_BLUEPRINT, TERRACE_STAIR_BLUEPRINT, TERRACE_RAMP_BLUEPRINT].map(b => [b.kind, b]));
+  [BOAT_DOCK_BLUEPRINT, MARINA_BLUEPRINT, POLYTUNNEL_BLUEPRINT, HIGH_TUNNEL_BLUEPRINT, AQUAPONICS_BLUEPRINT, MICRO_HYDRO_BLUEPRINT, WIND_TURBINE_BLUEPRINT, CABIN_BLUEPRINT, OUTHOUSE_BLUEPRINT, WORKSHOP_BLUEPRINT, ROOT_CELLAR_BLUEPRINT, WOOD_OVEN_BLUEPRINT, FORGE_BLUEPRINT, APIARY_BLUEPRINT, SUGAR_SHACK_BLUEPRINT, BARNYARD_BLUEPRINT, COOP_BLUEPRINT, GARDEN_BLUEPRINT, FIELD_BLUEPRINT, GREENHOUSE_BLUEPRINT, ORCHARD_BLUEPRINT, LOG_HOUSE_BLUEPRINT, FARMHOUSE_BLUEPRINT, TRAILER_BLUEPRINT, BARN_BLUEPRINT, COTTAGE_BLUEPRINT, GUEST_HOUSE_BLUEPRINT, MOMS_HOUSE_BLUEPRINT, LODGE_BLUEPRINT, LODGE_PLINTH_BLUEPRINT, LODGE_SOLAR_BLUEPRINT, STONE_HOUSE_BLUEPRINT, TIMBER_FRAME_BLUEPRINT, CONTAINER_HOUSE_BLUEPRINT, ADOBE_HOUSE_BLUEPRINT, METAL_GARAGE_BLUEPRINT, GARAGE_SOLAR_BLUEPRINT, ...UTILITY_BLUEPRINTS, GREENHOUSE_HEATED_BLUEPRINT, ORCHARD_GROVE_BLUEPRINT, SOLAR_FARM_BLUEPRINT, BATTERY_BANK_BLUEPRINT, POND_BLUEPRINT, RESERVOIR_BLUEPRINT, SHEEP_BARN_BLUEPRINT, EQUIPMENT_YARD_BLUEPRINT, ...BUNKER_BLUEPRINTS, ...TOWER_BLUEPRINTS, GATE_GARAGE_BLUEPRINT, MOTOR_COURT_BLUEPRINT, TERRACE_STAIR_BLUEPRINT, TERRACE_RAMP_BLUEPRINT].map(b => [b.kind, b]));
 
 /** Total bill of materials for a blueprint. */
 export function totalBill(bp: Blueprint): Partial<Stock> {

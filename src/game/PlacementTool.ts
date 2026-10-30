@@ -8,6 +8,7 @@ import { buildGhost } from './buildkit/buildings';
 import type { HomesteadWorld } from './HomesteadWorld';
 import { useGameStore } from '../store/gameStore';
 import { hydroProblem } from '../sim/renewables';
+import { dockProblem, isDock } from '../sim/waterfront';
 import { siteNote } from '../sim/microclimate';
 import { onJustPlaced, type Spot } from './buildkit/justPlaced';
 import { clashText, padClash, padSnap } from './buildkit/padRules';
@@ -50,7 +51,7 @@ export class PlacementTool {
       owned: (x, z) => ownsAt(useGameStore.getState().game, x, z),
       water: (x, z) => _world.parcel.isCreek(x, z) || _world.stream.depthAt(x, z) > 0,
       blocked: (x, z) => _world.onCamp(x, z) || _world.onAccess(x, z, 0.1),
-      rule: (kind, x, z) => (kind === 'micro_hydro' ? hydroProblem(useGameStore.getState().game, x, z) : null),
+      rule: (kind, x, z) => (kind === 'micro_hydro' ? hydroProblem(useGameStore.getState().game, x, z) : isDock(kind) ? dockProblem(useGameStore.getState().game) : null),
     };
     const on = <K extends keyof HTMLElementEventMap>(el: HTMLElement | Window, t: K, f: (e: HTMLElementEventMap[K]) => void) => {
       el.addEventListener(t, f as EventListener);
@@ -170,7 +171,7 @@ export class PlacementTool {
     this._ok = problem === null && !clash;
     const fp = footprint(def, x, z, this._rot);
     // a bunker room's ghost hangs at its bunker's floor level, under the see-through ground
-    const y = isUnderground(def) ? previewDatum(def, x, z, this._rot, this._site.height, placed) ?? this._site.height(x, z) - DEPTH : this._world.parcel.padHeight(fp.x0, fp.z0, fp.x1, fp.z1);
+    const y = isUnderground(def) ? previewDatum(def, x, z, this._rot, this._site.height, placed) ?? this._site.height(x, z) - DEPTH : def.waterside ? (this._world.parcel.lakeY ?? this._world.parcel.creek.waterY(x)) + 0.02 : this._world.parcel.padHeight(fp.x0, fp.z0, fp.x1, fp.z1);
     g.position.set(x, y, z);
     g.rotation.y = this._rot * Math.PI / 2;
     g.visible = true;
