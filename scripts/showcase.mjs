@@ -13,11 +13,7 @@ import { applyLook } from './lookPresets.mjs';
 const { chromium } = await import('/opt/node22/lib/node_modules/playwright/index.mjs');
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
-<<<<<<< HEAD
 const port = Number(opt('--port', 5440)), outDir = resolve(opt('--out', 'shots/showcase')), only = opt('--only', 'checks,aerial,top,court,tunnel,terrace,mist,night').split(','), q = opt('--q', 'medium'), rings = Number(opt('--rings', 1)), wall = opt('--wall', 'stone'), layout = opt('--layout', 'shelf');
-=======
-const port = Number(opt('--port', 5440)), outDir = resolve(opt('--out', 'shots/showcase')), only = opt('--only', 'checks,aerial,top,court,terrace,mist,night').split(','), q = opt('--q', 'medium'), rings = Number(opt('--rings', 1)), wall = opt('--wall', 'stone');
->>>>>>> origin/main
 mkdirSync(outDir, { recursive: true });
 /** Draw calls, triangles and the time of a frame at the aerial pose (a page with the scene up): the cost of what the showcase adds is the difference from the bare lot. */
 const perfOf = async pg => pg.evaluate(async () => {
@@ -57,11 +53,7 @@ const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 page.setDefaultTimeout(900000);
 page.on('pageerror', e => console.error('PAGEERROR', e.message));
 page.on('console', m => { if (m.type() === 'error') console.error('console', m.text().slice(0, 300)); });
-<<<<<<< HEAD
 await page.goto(`http://localhost:${port}/?lowrender=0.75&clean&seed=7&${LOT}&showcase=mountain&rings=${rings}&wall=${wall}&layout=${layout}`);
-=======
-await page.goto(`http://localhost:${port}/?lowrender=0.75&clean&seed=7&${LOT}&showcase=mountain&rings=${rings}&wall=${wall}`);
->>>>>>> origin/main
 await page.waitForFunction(() => window.__cb?.qa?.renderNow && window.__showcase, null, { timeout: 900000 });
 const report = await page.evaluate(() => window.__showcase);
 if (report.error) { console.error(report.error); process.exit(2); }
@@ -121,12 +113,8 @@ const L = await page.evaluate(() => {
   const ring = g.perimeter.filter(r => r.kind === 'stone_wall' || r.kind === 'concrete_wall').sort((a, b) => b.pts.length - a.pts.length)[0];
   const pts = ring ? ring.pts : [[w.camp.x, w.camp.z]];
   const cx = pts.reduce((a, p) => a + p[0], 0) / pts.length, cz = pts.reduce((a, p) => a + p[1], 0) / pts.length;
-<<<<<<< HEAD
   const tun = g.perimeter.find(r => r.kind === 'rock_tunnel');
   return { tunnel: tun ? { a: tun.pts[0], b: tun.pts[tun.pts.length - 1] } : null, fall: f, up: Math.atan2(Math.cos(f), Math.sin(f)), camp: [w.camp.x, w.camp.z], center: [cx, cz], lodge: of('lodge')[0], garage: of('gate_garage')[0], court: of('motor_court')[0], greenhouse: of('greenhouse_heated')[0], gardens: of('garden'), orchard: of('orchard')[0], solar: of('solar_farm')[0], battery: of('battery_bank')[0], hatch: of('bunker_hatch')[0], towers: g.structures.filter(s => s.kind.startsWith('watchtower')).map(s => ({ id: s.id, x: s.x, z: s.z })), vehicles: (g.vehicles ?? []).length };
-=======
-  return { fall: f, up: Math.atan2(Math.cos(f), Math.sin(f)), camp: [w.camp.x, w.camp.z], center: [cx, cz], lodge: of('lodge')[0], garage: of('gate_garage')[0], court: of('motor_court')[0], greenhouse: of('greenhouse_heated')[0], gardens: of('garden'), orchard: of('orchard')[0], solar: of('solar_farm')[0], battery: of('battery_bank')[0], hatch: of('bunker_hatch')[0], towers: g.structures.filter(s => s.kind.startsWith('watchtower')).map(s => ({ id: s.id, x: s.x, z: s.z })), vehicles: (g.vehicles ?? []).length };
->>>>>>> origin/main
 });
 console.error(JSON.stringify(L));
 
@@ -232,13 +220,8 @@ const posePerson = async (taskSet, near) => page.evaluate(async ([tasks, near]) 
 }, [taskSet, near]);
 if (only.includes('court')) {
   const c = L.court;
-<<<<<<< HEAD
   // what the court's open back is against: the gate garage, or (the bench layout) the tunnel's low portal
   const back = L.garage ? { x: L.garage.x, z: L.garage.z } : L.tunnel ? { x: L.tunnel.a[0], z: L.tunnel.a[1] } : null;
-=======
-  // what the court's open back is against: the gate garage
-  const back = L.garage ? { x: L.garage.x, z: L.garage.z } : null;
->>>>>>> origin/main
   if (c && back) {
     // the court: a person standing in it (a QA pose), the eye level camera at its road-side mouth looking at the garage face with the vehicles in their bays
     await posePerson(['garden', 'garden', 'garden', 'garden'], [c.x, c.z]);
@@ -254,7 +237,6 @@ if (only.includes('court')) {
     await orbit(14, 0.35, L.up + 0.1, c.x, c.z, 0.4); await shot('3c-court-from-the-road');
   }
 }
-<<<<<<< HEAD
 if (only.includes('tunnel') && L.tunnel) {
   const [ax, az] = L.tunnel.a, [bx, bz] = L.tunnel.b, dl = Math.hypot(bx - ax, bz - az) || 1, ux = (bx - ax) / dl, uz = (bz - az) / dl;
   // the low portal from the court: eye level, a person standing in the court, the portal and its steel door in the rock
@@ -273,8 +255,6 @@ if (only.includes('tunnel') && L.tunnel) {
   if (sp2) await shot('7d-eye-high-portal-in-the-compound');
   await orbit(18, 0.5, L.up + 2.4, bx, bz, 0.8); await shot('7e-aerial-high-portal-in-the-compound');
 }
-=======
->>>>>>> origin/main
 if (only.includes('terrace')) {
   const t = L.gardens[0] ?? L.greenhouse ?? L.lodge;
   const who = await posePerson(['garden', 'garden', 'garden', 'garden'], [t.x, t.z]);

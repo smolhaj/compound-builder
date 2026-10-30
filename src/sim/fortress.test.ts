@@ -434,7 +434,6 @@ describe('an irregular property line', () => {
   });
 });
 
-<<<<<<< HEAD
 describe('Fortify my ring with no road gate', () => {
   it('is a closed wall: no gate gap, no gate garage, no motor court, and says so', () => {
     const g = game();
@@ -453,8 +452,6 @@ describe('Fortify my ring with no road gate', () => {
   });
 });
 
-=======
->>>>>>> origin/main
 describe('Fortify my ring goes round what is already built', () => {
   const hits = (g: GameState, st: { kind: string; x: number; z: number; rot: number }) => {
     const r = footprint(KIT[st.kind], st.x, st.z, st.rot);
