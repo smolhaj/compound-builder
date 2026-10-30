@@ -208,7 +208,7 @@ export function ShopWindow() {
           {TABS.map(([t, name]) => <button key={t} style={btn(tab === t)} onClick={() => { setTab(t); setMsg(null); }}>{name}{(needTabs as Record<string, number>)[t] ? <span style={{ marginLeft: 5, fontSize: 10.5, color: '#1c1d18', background: C.gold, borderRadius: 8, padding: '0 5px' }} title="Things the plans still lack are on this shelf">{(needTabs as Record<string, number>)[t]} needed</span> : null}</button>)}
         </div>
         {needLines.length > 0 && <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '7px 16px', borderBottom: `1px solid ${C.line}`, background: 'rgba(216,201,160,0.08)', flexWrap: 'wrap' }}>
-          <span style={{ flex: 1, minWidth: 240 }}>The plans still lack <b>{needLines.length}</b> material{needLines.length > 1 ? 's' : ''}: {billText(Object.fromEntries(needLines.slice(0, 4).map(l => [l.material, l.qty])))}{needLines.length > 4 ? '…' : ''}. Marked <i>needed</i> below.</span>
+          <span style={{ flex: 1, minWidth: 200 }} title={`The plans still lack: ${billText(Object.fromEntries(needLines.map(l => [l.material, l.qty])))}. Marked "need" below.`}>Plans are short <b>{needLines.length}</b> material{needLines.length > 1 ? 's' : ''}</span>
           <button style={btn()} onClick={() => setCart(c => { const n = { ...c }; for (const l of needLines) n[l.material] = Math.max(n[l.material] ?? 0, l.qty); return n; })}>Add them to the order</button>
           <button style={btn(true, !!orderProblem(game, needLines))} disabled={!!orderProblem(game, needLines)} onClick={() => { if (g.order(needLines)) setMsg(null); }}>Order what the plans need ({usd(orderCost(needLines, k))})</button>
         </div>}
@@ -221,9 +221,9 @@ export function ShopWindow() {
                   <Icon id={m} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}><b>{MATERIALS[m].name}</b><span style={{ color: C.gold }}>{usd((MATERIALS[m].price ?? 0) * k)}</span></div>
-                    <div style={{ fontSize: 11.5, color: C.dim, lineHeight: 1.3, margin: '2px 0 6px' }}>{MATERIALS[m].unit}</div>
+                    <div title={MATERIALS[m].unit} style={{ fontSize: 11.5, color: C.dim, lineHeight: 1.3, margin: '2px 0 6px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{MATERIALS[m].unit}</div>
                     {(() => { const kn = kitNote(game, m); return kn ? <div style={{ fontSize: 11.5, margin: '-2px 0 5px', color: kn.urgent ? '#e0b050' : C.good }}>{kn.text}</div> : null; })()}
-                    {(need[m] ?? 0) > 0 && <div style={{ fontSize: 11.5, margin: '-2px 0 5px' }}><span style={{ color: '#1c1d18', background: C.gold, borderRadius: 8, padding: '0 6px', fontWeight: 600 }}>needed now</span> <span style={{ color: C.gold }}>plans lack {need[m]}</span> <button style={{ ...btn(), padding: '0 6px', fontSize: 11 }} onClick={() => setCart(c => ({ ...c, [m]: Math.max(c[m] ?? 0, need[m]!) }))}>add {need[m]}</button></div>}
+                    {(need[m] ?? 0) > 0 && <div style={{ fontSize: 11.5, margin: '-2px 0 5px' }}><span title={`The plans lack ${need[m]}`} style={{ color: '#1c1d18', background: C.gold, borderRadius: 8, padding: '0 6px', fontWeight: 600 }}>need {need[m]}</span> <button style={{ ...btn(), padding: '0 6px', fontSize: 11 }} onClick={() => setCart(c => ({ ...c, [m]: Math.max(c[m] ?? 0, need[m]!) }))}>add {need[m]}</button></div>}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <button style={btn()} onClick={() => add(m, -1)}>−</button>
                       <span style={{ minWidth: 22, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{cart[m] ?? 0}</span>

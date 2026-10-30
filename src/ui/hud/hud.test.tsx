@@ -25,14 +25,22 @@ const withGame = (mut: (g: ReturnType<typeof newGame>) => void) => {
   Object.assign(useGameStore.getInitialState(), { game: g, tool: null, selected: null });
 };
 
+/** Folded groups render closed by default; the tests that read their contents open them (the fold state is remembered in localStorage). */
+const withFoldsOpen = <T,>(fn: () => T): T => {
+  const prev = (globalThis as { localStorage?: unknown }).localStorage;
+  Object.defineProperty(globalThis, 'localStorage', { value: { getItem: () => '1', setItem: () => undefined }, configurable: true });
+  try { return fn(); } finally { Object.defineProperty(globalThis, 'localStorage', { value: prev, configurable: true }); }
+};
+
 describe('the guided HUD (server-rendered)', () => {
   it('greys the bunker rooms with a reason, highlights the next step and lists what the bunker needs', () => {
     withGame(() => undefined);
-    const t = text(renderToStaticMarkup(<BuildMenu />));
+    const t = text(withFoldsOpen(() => renderToStaticMarkup(<BuildMenu />)));
     expect(t).toContain('needs a hatch or stairwell first');
     expect(t).toContain('The bunker needs, in order');
-    expect(t).toContain('Most pressing now');
-    expect(t).toContain('Long-term');
+    expect(t).toContain('Get operational');
+    expect(t).toContain('Next steps');
+    expect(t).toContain('Long-term goals');
     expect(t).toContain('Enclose the compound');
     expect(t).toContain('A bunker underneath');
     expect(t).toMatch(/water is 65 m down/i);
@@ -60,14 +68,14 @@ describe('the guided HUD (server-rendered)', () => {
   it('the Shop marks what the plans lack as needed now and offers to order it', () => {
     withGame(g => { planStructure(g, 'timber_cabin', 0, 0, 0); });
     const t = text(renderToStaticMarkup(<ShopWindow />));
-    expect(t).toContain('needed now');
+    expect(t).toContain('need ');
     expect(t).toContain('Order what the plans need');
     expect(t).toContain('Fencing');
   });
 
   it('prompts for firewood with an order button and a mark-trees button when the woodpile is bare', () => {
     withGame(g => { g.clock.startDoy = 330; g.stock.firewood = 0; planStructure(g, 'cottage', 5, 5, 0).stage = 99; });
-    const t = text(renderToStaticMarkup(<BuildMenu />));
+    const t = text(withFoldsOpen(() => renderToStaticMarkup(<BuildMenu />)));
     expect(t).toContain('Firewood');
     expect(t).toMatch(/Order \d+ ricks? \(\$[\d,]+\)/);
     expect(t).toContain('Mark 10 trees');
@@ -93,7 +101,7 @@ describe('the guided HUD (server-rendered)', () => {
   it('warns a crew would stand idle when the materials are not on site', () => {
     withGame(g => { g.money = 200000; planStructure(g, 'cottage', 5, 5, 0).stage = 1; g.stock.lumber = 0; g.stock.hardware = 0; g.stock.concrete = 0; g.stock.roofing = 0; });
     const t = text(renderToStaticMarkup(<ProjectsTab />));
-    expect(t).toContain('materials are not on site yet');
+    expect(t).toContain('Still need 8 concrete');
     expect(t).toContain('Hire a crew anyway');
   });
 
@@ -133,7 +141,7 @@ describe('the guided HUD (server-rendered)', () => {
       pondOf(g, g.structures.find(s => s.kind === 'pond')!.id).trout = 120;
       g.stock.trout_fry = 1;
     });
-    const menu = text(renderToStaticMarkup(<BuildMenu />));
+    const menu = text(withFoldsOpen(() => renderToStaticMarkup(<BuildMenu />)));
     for (const name of ['Heated greenhouse', 'Orchard grove', 'Pond', 'Sheep barn', 'Equipment yard', 'Solar farm (20 kW)', 'Battery container (60 kWh)', 'Reservoir']) expect(menu).toContain(name);
     expect(menu).toContain('Feed and power the compound');
     const farm = text(renderToStaticMarkup(<FarmPanel game={useGameStore.getInitialState().game} />));

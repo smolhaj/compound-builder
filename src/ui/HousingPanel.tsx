@@ -41,10 +41,9 @@ export function HousingPanel() {
   return (
     <div style={{ marginBottom: 10 }} data-testid="housing">
       <div style={h3}>Housing</div>
-      <div style={{ ...small, color: DIM }}>
-        Beds {cap.beds + cap.bunks} · couches {cap.couches} · floor room for {cap.floorBags} bags · tents {cap.tents} + the wall tent ({cap.tentSeats} seats) · {cap.bags} {cap.bags === 1 ? 'bag' : 'bags'}
+      <div style={{ ...small, color: DIM }} title={`Beds ${cap.beds + cap.bunks}, couches ${cap.couches}, floor room for ${cap.floorBags} bags, tents ${cap.tents} plus the wall tent (${cap.tentSeats} seats), ${cap.bags} ${cap.bags === 1 ? 'bag' : 'bags'}`}>
+        Beds {cap.beds + cap.bunks} · couches {cap.couches} · tents {cap.tents} · low tonight {f}°F{plan.night.stormy ? ', storm' : plan.night.rainy ? ', rain' : plan.night.snowy ? ', snow' : ''}{plan.stove ? '' : ', no firewood'}
       </div>
-      <div style={{ ...small, color: DIM }}>Tonight: low about {f}°F{plan.night.stormy ? ', storm' : plan.night.rainy ? ', rain' : plan.night.snowy ? ', snow' : ''}{plan.stove ? '' : ', no firewood for the stove'}.</div>
       {SPOT_ORDER.filter(k => plan.counts[k] > 0).map(k => (
         <div key={k} style={{ ...small, display: 'flex', justifyContent: 'space-between', gap: 8 }}>
           <span style={{ color: DIM }}>{WHERE[k]}</span>
@@ -55,9 +54,9 @@ export function HousingPanel() {
         ? <div style={{ ...small, color: TONE.good }}>Everybody has a bed{plan.bedsFree > 0 ? `; ${plan.bedsFree} more could be taken in` : ''}.</div>
         : <>
           <div style={{ ...small, color: plan.outside > 0 ? TONE.bad : TONE.warn }}>
-            {plan.noBed} {plan.noBed === 1 ? 'person has' : 'people have'} no bed{plan.outside > 0 ? `, ${plan.outside} out in the weather` : ''}. Poor sleep wears on morale{plan.sleepers.some(x => x.harm > 0.05) ? ' and health' : ''}.
+            <span title={`Poor sleep wears on morale${plan.sleepers.some(x => x.harm > 0.05) ? ' and health' : ''}`}>{plan.noBed} {plan.noBed === 1 ? 'person has' : 'people have'} no bed{plan.outside > 0 ? `, ${plan.outside} out in the weather` : ''}.</span>
           </div>
-          {fixes.length > 0 && <div style={{ ...small, color: DIM }}>Fix: {fixes.map(x => x.text).join(', or ')}.</div>}
+          {fixes.length > 0 && <div style={{ ...small, color: DIM, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }} title={`Fix: ${fixes.map(x => x.text).join(', or ')}.`}>Fix: {fixes.map(x => x.text).join(', or ')}.</div>}
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 3 }}>
             {fixes.filter(x => x.action === 'buy').map(x => buy(x.item as 'tent' | 'sleeping_bag', x.qty))}
           </div>
