@@ -12,7 +12,7 @@
 import { siteLot } from './lotListing';
 import { KIT, footprint } from '../game/buildkit/kit';
 import { BLUEPRINTS } from './blueprints';
-import { RW, planPad, type PadPlan, type Rect } from './retainPlan';
+import { RW, WALLLESS, planPad, type PadPlan, type Rect } from './retainPlan';
 import { gradeBucket, gradedBlueprint } from './slope';
 import { nearDrain } from './drainage';
 import { diffOf } from './difficulty';
@@ -62,11 +62,11 @@ export function plansOf(s: GameState): Map<string, PadPlan | null> {
   for (const st of s.structures) {
     if (st.unplaced) continue;
     const def = KIT[st.kind];
-    if (!def || def.level === 'underground') continue;
+    if (!def || def.level === 'underground' || WALLLESS.test(st.kind)) continue;
     const r = footprint(def, st.x, st.z, st.rot);
     const plan = planPad(r, lot.field.h, others);
     plans.set(st.id, plan.runs.length ? plan : null);
-    others.push(r);
+    others.push(plan.runs.length ? plan.rect : r);
   }
   memo.set(s.structures, { sig, field: lot.field, plans });
   return plans;

@@ -175,3 +175,12 @@ describe('the cards', () => {
     expect(down?.acts?.[0].label).toMatch(/Order \d+ pallets? of fieldstone/);
   });
 });
+
+describe('a way in is never walled', () => {
+  it('the motor court, the gate garage and the yards take no retaining wall even on a steep hill, ', () => {
+    const { g, spot } = find(true);
+    const a = stake(g, ...spot, 'motor_court'), b = stake(g, spot[0] + 4, spot[1], 'gate_garage'), c = stake(g, spot[0] - 4, spot[1], 'equipment_yard');
+    for (const st of [a, b, c]) expect(wallOf(g, st)).toBeNull();
+    for (const st of [a, b, c]) expect(plansOf(g).get(st.id) ?? null).toBeNull();
+  });
+});

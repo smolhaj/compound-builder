@@ -1,6 +1,6 @@
 import { setGroundProbe } from '../sim/towers';
 import { RetainWallLayer } from './terrain/RetainWalls';
-import { planPad, type PadPlan } from '../sim/retainPlan';
+import { WALLLESS, planPad, type PadPlan } from '../sim/retainPlan';
 import * as THREE from 'three';
 import { mulberry32 } from '../sim/rng';
 import { ShrubField, SAGE, WILLOW, type ShrubSpec } from '../engine/world/trees/ShrubField';
@@ -118,6 +118,8 @@ export const PERSON_H = 0.28;
 export const CLIMATE_ID = 'mountain_west';
 /** Parcel trees are planted this far beyond the parcel; regional far trees beyond. */
 const TREE_MARGIN = 26;
+
+const RW_ACCESS_MARGIN = 0.5;
 
 interface Built {
   placed: Placed;
@@ -417,6 +419,12 @@ export class HomesteadWorld {
       if (!house && ['farmhouse', 'trailer', 'timber_cabin', 'log_house'].includes(it.kind)) house = best;
     }
     return out;
+  }
+
+  /** Does the access (county road, driveway, yard) come within `m` of this rectangle? */
+  private _touchesAccess(r: { x0: number; z0: number; x1: number; z1: number }, m: number): boolean {
+    for (let i = 0; i <= 8; i++) for (let j = 0; j <= 8; j++) if (this.onAccess(r.x0 + (r.x1 - r.x0) * i / 8, r.z0 + (r.z1 - r.z0) * j / 8, m)) return true;
+    return false;
   }
 
   /** Is (x, z) on the county road or the driveway (plus `pad`)? */
@@ -1158,17 +1166,14 @@ export class HomesteadWorld {
     let pad: Pad | null = !below || (isEntry(def) && p.kind !== 'bunker_floorhatch') ? { x0: r.x0 - 0.05, z0: r.z0 - 0.05, x1: r.x1 + 0.05, z1: r.z1 + 0.05, y, skirt: below ? 0.4 : 0.9 } : null;
     // a pad cut into a slope is held by a dry-stack wall (sim/retainPlan): a flat apron round the building on the walled sides, the terrain eased only over the wall
     let wall: PadPlan | null = null;
-    if (!below && pad && this.parcel.lot) {
-      const near = [...this._built.values()].filter(b => !b.under && b.placed.id !== p.id).map(b => b.fpPorch);
-      wall = planPad(r, this._naturalH, near);
-      if (wall.runs.length) pad = { x0: wall.rect.x0, z0: wall.rect.z0, x1: wall.rect.x1, z1: wall.rect.z1, y: wall.y, skirt: wall.skirt };
+    if (!below && pad && this.parcel.lot && !WALLLESS.test(p.kind)) {
+      const near = [...this._built.values()].filter(b => !b.under && b.placed.id !== p.id).map(b => b.wall?.rect ?? b.fpPorch);
+      // the ground as it is now (earlier pads and the road bed included), so a wall never floats over or sinks into what they graded
+      wall = planPad(r, this._naturalH, near, this.parcel.height);
+      // a drive or the county road crossing the pad leaves it with the old gentle skirt: no wall may stand across a way in
+      if (wall.runs.length && this._touchesAccess(wall.rect, RW_ACCESS_MARGIN)) wall = null;
+      if (wall && wall.runs.length) pad = { x0: wall.rect.x0, z0: wall.rect.z0, x1: wall.rect.x1, z1: wall.rect.z1, y: wall.y, skirt: wall.skirt };
       else wall = null;
-    }
-    if (below && p.kind === 'bunker_stairs') {
-      // the stairwell's headhouse is at its top (+z) end: grade only there
-      const [hx, hz] = rotQ(0, def.cellsZ * CELL / 2 - 0.25, p.rot);
-      const t = footprint({ ...def, cellsZ: 1 }, p.x + hx, p.z + hz, p.rot);
-      Object.assign(pad!, { x0: t.x0 - 0.05, z0: t.z0 - 0.05, x1: t.x1 + 0.05, z1: t.z1 + 0.05, y: y = this.parcel.padHeight(t.x0, t.z0, t.x1, t.z1) });
     }
     if (pad) this.parcel.setPads([...this.parcel.pads, pad]);
     const opts: BuildOpts = {};
