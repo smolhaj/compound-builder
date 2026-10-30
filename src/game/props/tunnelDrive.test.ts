@@ -85,9 +85,12 @@ describe('the family cars drive out through the tunnel and come home through it'
     fleet.dispose();
   });
 
-  it('a collapsed tunnel: no route, it drives straight (the old behaviour) rather than through rubble', () => {
+  it('a collapsed tunnel: the route ends at the mouth (tagged STOP), never through the rubble', () => {
     const w = net(true);
-    expect(w.route([72, 12], [8, 10])).toBeNull();
+    const r = w.route([72, 12], [8, 10]);
+    expect(r).not.toBeNull();
+    expect(r!.some(p => p[2] !== undefined)).toBe(false);
+    expect(r![r!.length - 1][3]).toBeGreaterThan(0x3000);
   });
 
   it('a vehicle cut off outside waits at the place the world gives it', () => {

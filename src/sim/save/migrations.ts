@@ -42,7 +42,9 @@ type Raw = Record<string, unknown> & { version?: number };
 
 /** version n → n + 1 upgraders. */
 const STEPS: Record<number, (s: Raw) => Raw> = {
-  // 70 → 71: tunnel use (sim/corridors.ts): `PerimeterRun.collapsed` (a portal brought down by sappers) and `Vehicle.stranded` (cut off by a lost bridge or tunnel) are optional and absent in every old game: nothing to fill
+  // 71 → 72: tunnel use (sim/corridors.ts): `PerimeterRun.collapsed` (a portal brought down by sappers) and `Vehicle.stranded` (cut off by a lost bridge or tunnel) are optional and absent in every old game: nothing to fill
+  71: s => ({ ...s, version: 72 }),
+  // 70 → 71: reserved for #142 (roads); until that merges nothing changes, so the step is the bare bump (replace it with theirs)
   70: s => ({ ...s, version: 71 }),
   // 69 → 70: house hardening tiers and the bug-out goods (sim/houseHardening.ts, sim/bugout.ts): six new goods, none in stock
   69: s => ({ ...s, version: 70, stock: { security_door: 0, window_shutters: 0, ballistic_panels: 0, safe_room_hardened: 0, bugout_bag: 0, bugout_cache: 0, ...(s.stock as object) } }),

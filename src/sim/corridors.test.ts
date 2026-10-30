@@ -130,9 +130,9 @@ describe('a tunnel brought down', () => {
     expect(dropBridge(g, 'b')).toBeNull();
     expect(wayCut(g)).toMatch(/down/);
   });
-  it('is the old save with nothing in it: migration 70 -> 71 needs no fill', () => {
+  it('is the old save with nothing in it: migration 71 -> 72 needs no fill', () => {
     const raw = JSON.parse(JSON.stringify(withBore())) as Record<string, unknown>;
-    raw.version = 70;
+    raw.version = 71;
     const up = migrate(raw);
     expect(up.version).toBe(SAVE_VERSION);
     expect(up.perimeter[0].collapsed).toBeUndefined();
