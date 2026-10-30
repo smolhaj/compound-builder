@@ -259,8 +259,8 @@ export function autoFit(s: GameState, p: Plant): string[] {
       if (kind === 'plumb' && LOAD_PRIORITY[st.kind] !== 2) continue;
       if (fitProblem(s, p, st, kind)) continue;
       const f = orderFit(s, st.id, kind);
-      f.supplied = true;
-      out.push(`${kind === 'wire' ? 'Wiring' : 'Plumbing'} the ${st.kind.replace(/_/g, ' ')} has begun.`);
+      f.supplied = true; f.done = f.hours; f.finishedAt = s.clock.t;
+      out.push(`The ${st.kind.replace(/_/g, ' ')} is ${kind === 'plumb' ? 'plumbed: water on tap' : 'wired: lights on'}.`);
     }
   }
   return out;
