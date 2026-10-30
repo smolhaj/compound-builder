@@ -1,5 +1,7 @@
 import { litTowerIds } from '../sim/towers';
 import { TerrainOverlay } from './terrain/TerrainOverlay';
+import { BlueprintOverlay } from './blueprint/BlueprintOverlay';
+import { blueprintPlan } from './blueprint/blueprintPlan';
 import { campOf, lanesOf, terrainOf } from '../sim/terrainState';
 import { siteCandidates } from '../sim/terrain';
 import { goodsKey, houseGoods } from '../sim/evenings';
@@ -59,7 +61,7 @@ export function GameCanvas() {
 
   useEffect(() => {
     let cancelled = false, stop: () => void = () => {};
-    const boot = (label: string, pct: number) => useWorldStore.getState().setBoot({ label, pct });
+    const boot = (label: string, pct: number, hold = false) => useWorldStore.getState().setBoot({ label, pct, hold });   // (hold: the loading screen covers the view, so frames are not drawn meanwhile)
     void (async () => {
     const canvas = ref.current!;
     const ws = new WorldScene(canvas, { antialias: useWorldStore.getState().quality === 'low' });
@@ -211,7 +213,21 @@ export function GameCanvas() {
       const lanes = lanesOf(g);
       terrainOv.set(m, t, lanes, siteCandidates(t, { lot: g.site.home, camp: campOf(g) }, lanes));
     };
+    // the blueprint view: names, rings, gates, towers and tunnels (game/blueprint)
+    const host = canvas.parentElement ?? document.body;
+    if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
+    const blueprintOv = new BlueprintOverlay(ws.scene, ws.camera, host, world.groundAt);
+    let bpTimer = 0;
+    const showBlueprint = () => {
+      const on = useWorldStore.getState().blueprint;
+      if (!on) { blueprintOv.set(null); useWorldStore.getState().setBlueprintReadout(null); return; }
+      const plan = blueprintPlan(useGameStore.getState().game);
+      blueprintOv.set(plan); useWorldStore.getState().setBlueprintReadout(plan.readout);
+    };
+    const refreshBlueprint = () => { if (useWorldStore.getState().blueprint) { clearTimeout(bpTimer); bpTimer = window.setTimeout(showBlueprint, 250); } };
     const unsub = [
+      useWorldStore.subscribe(s => s.blueprint, showBlueprint),
+      useGameStore.subscribe(s => `${s.game.structures.map(x => x.id + x.stage + x.kind).join()}|${s.game.perimeter.map(r => r.id + (r.finishedAt === null ? 'p' : 'f') + r.gates.length).join()}`, refreshBlueprint),
       // wildfire weather: measure the fuel round every building (what cleared ground there is decides what burns)
       useGameStore.subscribe(s => s.game.disaster.phase, ph => { const g = useGameStore.getState().game; if (g.disaster.kind === 'wildfire' && ph === 'warning' && !g.disaster.fuel) useGameStore.getState().setFuel(world.fuelNear(g.structures)); }),
       useGameStore.subscribe(s => s.game.land, () => { world.setOwnedLand(ownedRects(useGameStore.getState().game)); rebuildBoundary(); }),
@@ -453,9 +469,10 @@ export function GameCanvas() {
       }
       ws.tick(dt);
       ws.updateDayNight(t);
+      blueprintOv.update(performance.now());
       if (!lowRender.on) {
         ws.renderer.info.reset();
-        ws.renderFrame();
+        if (!useWorldStore.getState().boot?.hold) ws.renderFrame();
         statFrames++; statCalls += ws.renderer.info.render.calls; statTris += ws.renderer.info.render.triangles;
         if (performance.now() - statSince >= 1000) {
           if (useWorldStore.getState().showPerf) {
@@ -481,7 +498,7 @@ export function GameCanvas() {
     if (!showcaseNext) requestAnimationFrame(() => requestAnimationFrame(() => { if (!cancelled) useWorldStore.getState().setBoot(null); }));
 
     // QA hook (screenshot harness, console poking).
-    (window as unknown as Record<string, unknown>).__cb = { census: () => sceneCensus(ws.scene), terrainOv, player, ws, world, weather, valley, cam, tour, tool, marker, fence, sight, game: useGameStore, store: useWorldStore, THREE, qa, battle,
+    (window as unknown as Record<string, unknown>).__cb = { census: () => sceneCensus(ws.scene), terrainOv, blueprintOv, player, ws, world, weather, valley, cam, tour, tool, marker, fence, sight, game: useGameStore, store: useWorldStore, THREE, qa, battle,
       demoBattle: () => {
         const g = useGameStore.getState().game;
         const b = demoBattle(g.structures, g.people, g.structures.length ? undefined : world.camp);
@@ -503,10 +520,17 @@ export function GameCanvas() {
         if (w.__showcaseRan) return;
         w.__showcaseRan = true;
         const t0 = performance.now();
-        try { w.__showcase = m.buildMountainShowcase(w.__cb as Parameters<typeof m.buildMountainShowcase>[0], { rings, wall, layout }); } catch (e) { w.__showcase = { error: String((e as Error)?.stack ?? e) }; }
+        try {
+          // time-sliced: the browser paints the loading screen and answers input between the script's steps
+          w.__showcase = await m.buildMountainShowcaseAsync(w.__cb as Parameters<typeof m.buildMountainShowcaseAsync>[0], { rings, wall, layout }, async (label, n) => {
+            if (cancelled) throw new Error('cancelled');
+            boot(`Building the compound: ${label.toLowerCase()}`, Math.min(0.96, 0.9 + 0.006 * n), true);
+            await yieldToBrowser();
+          });
+        } catch (e) { w.__showcase = { error: String((e as Error)?.stack ?? e) }; }
         w.__showcaseMs = performance.now() - t0;
         // the new pieces' shaders compile behind the loading screen too
-        boot('Compiling shaders', 0.97); await warmShaders(ws);
+        boot('Compiling shaders', 0.97, true); await warmShaders(ws);
         if (!cancelled) useWorldStore.getState().setBoot(null);
       })();
     }
@@ -526,6 +550,9 @@ export function GameCanvas() {
       fence.dispose();
       sight.dispose();
       terrainOv.dispose();
+      clearTimeout(bpTimer);
+      blueprintOv.dispose();
+      useWorldStore.getState().setBlueprintReadout(null);
       boundary.dispose();
       useWorldStore.getState().setSiteGeo(null);
       useWorldStore.getState().setMarkNearestTrees(null);

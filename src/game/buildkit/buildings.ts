@@ -25,6 +25,7 @@ import { DOCK_BUILDERS } from './dockBuildings';
 import { OUTPOST_BUILDERS } from './outpostBuildings';
 import { HERD_BUILDERS } from './herdBuildings';
 import { HOUSING_BUILDERS, HOUSING_SEATS } from './housingStyleBuildings';
+import { TERRACE_BUILDERS } from './terraceProps';
 
 /** Seats for evenings at home: local x, z and the point the sitter faces. */
 export type Seat = [number, number, number, number];
@@ -516,6 +517,7 @@ const BUILDERS: Record<string, (def: KitPieceDef, seed?: number, opts?: BuildOpt
   ...DOCK_BUILDERS,
   ...OUTPOST_BUILDERS,
   ...HOUSING_BUILDERS,
+  ...TERRACE_BUILDERS,
 };
 
 /** Every layer of a kit piece (construction shows them stage by stage). */
