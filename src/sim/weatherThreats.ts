@@ -43,6 +43,7 @@ import { crackGlass } from './improvements';
 import { floodCandidates } from './terrainFx';
 import { regionFor } from './climate';
 import { roadClosedFor } from './slope';
+import { hasSafeRoom } from './houseHardening';
 
 export type WeatherKind = StormKind;
 
@@ -152,7 +153,7 @@ const WARN: Record<WeatherKind, string> = {
 };
 
 function sheltered(s: GameState): boolean {
-  return s.stock.safe_room > 0 || s.structures.some(st => isFinished(st) && (st.kind === 'root_cellar' || st.kind.startsWith('bunker_')));
+  return hasSafeRoom(s) || s.structures.some(st => isFinished(st) && (st.kind === 'root_cellar' || st.kind.startsWith('bunker_')));
 }
 
 /** Knock a structure back to its roof stage (or its last stage), with an insurance claim. */
