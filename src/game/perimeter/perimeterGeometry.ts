@@ -384,10 +384,11 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
           }
           // the host's razor wire: loose coils laid along the outer rail, outside the guards' mesh
           if (opts.hostRazor) {
-            const cl = Math.hypot(cb.x - ca.x, cb.z - ca.z), cn = Math.max(2, Math.round(cl / (0.26 * M))), th = Math.atan2(b.x - a.x, b.z - a.z), uo = off - DW / 2 - 0.02 * M;
+            // (low-poly: an open 8-sided drum per coil every half metre, 16 triangles, not a torus every 26 cm at 72: the wall is long)
+            const cl = Math.hypot(cb.x - ca.x, cb.z - ca.z), cn = Math.max(2, Math.round(cl / (0.5 * M))), th = Math.atan2(b.x - a.x, b.z - a.z), uo = off - DW / 2 - 0.02 * M;
             for (let k = 0; k < cn; k++) {
               const f = (k + 0.5) / cn, wx = a.x + (b.x - a.x) * f - a.dz * uo * inSign, wz = a.z + (b.z - a.z) * f + a.dx * uo * inSign;
-              add('steel', new THREE.TorusGeometry(0.17 * M, 0.012 * M, 4, 9).rotateY(th).translate(wx, yA + (yB - yA) * f + RH + 0.17 * M, wz));
+              add('steel', new THREE.CylinderGeometry(0.17 * M, 0.17 * M, 0.3 * M, 8, 1, true).rotateX(Math.PI / 2).rotateY(th).translate(wx, yA + (yB - yA) * f + RH + 0.17 * M, wz));
             }
           }
           // posts at the bay end (a post every 3 m: containers get three more along their length)

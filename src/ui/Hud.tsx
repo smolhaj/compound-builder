@@ -55,7 +55,7 @@ import { canJoin } from '../sim/aftermath';
 import { MILESTONE_COUNT, MILESTONE_NAME } from '../sim/lineage';
 import { daysOfFood, KCAL, needOf } from '../sim/needs';
 import { barterPrices, moneyWorks, type Good } from '../sim/barter';
-import { MarketSection, NeighborsSection, ScavengeSection } from './WorldPanels';
+import { MarketSection, NeighborsSection, RumorsSection, ScavengeSection } from './WorldPanels';
 import { alliesFor, canGo, FAR_COLD, isAway, latestFarLead, latestLead, LEAD_COLD, LEAD_WARM, leadAge, openCaptives, raidProblem, rescueOdds, tripFuel, tripProblem } from '../sim/rescue';
 import { EXPOSURE_NAME, exposure, raidPressure, topExposure } from '../sim/opsec';
 import { acresOf, buyProblem, LAND_NAME, priceOf } from '../sim/land';
@@ -445,6 +445,7 @@ export function Hud() {
           {rightTab === 'outside' && <>
             <TakenSection />
             <ScavengeSection />
+            <RumorsSection />
             {game.disaster.mode === 'sandbox' && !game.disaster.kind && <FreeBuild />}
             {!(game.disaster.phase === 'warning' || (game.disaster.kind && game.clock.t >= game.disaster.warnAt)) && !(game.disaster.mode === 'sandbox' && !game.disaster.kind) && <Note>All quiet. Watch the news ticker, the prices and the neighbors.</Note>}
             {(game.disaster.phase === 'warning' || (game.disaster.kind && game.clock.t >= game.disaster.warnAt)) && (
@@ -563,6 +564,15 @@ export function Hud() {
         {(Object.keys(TERRAIN_LEGEND) as Array<Exclude<TerrainMode, 'off'>>).map(m => <button key={m} title={TERRAIN_LEGEND[m].tip} style={btn(w.terrainMode === m)} onClick={() => w.setTerrainMode(m)}>{TERRAIN_LEGEND[m].label}</button>)}
         {w.terrainMode !== 'off' && <div style={{ flexBasis: '100%', fontSize: 11.5, opacity: 0.85 }}>{TERRAIN_LEGEND[w.terrainMode].legend}</div>}
         {(w.terrainMode !== 'off' || w.sightMode !== 'off') && (() => { const t = fogLineFor(g.game, w.dayOfYear, w.timeOfDay, w.weatherMode); return t ? <div data-testid="fog-readout" style={{ flexBasis: '100%', fontSize: 11.5, color: '#bcd' }} title="Valley fog and low cloud (sim/fog.ts): it cuts what a watch, a camera or a night-vision tube sees; thermal sees through it. The same fog is drawn in the valley.">{t}</div> : null; })()}
+        <button data-testid="blueprint-toggle" style={btn(w.blueprint)} title="Blueprint view: names and roles of the buildings, rings, gates, towers and tunnels, with the defense readouts" onClick={() => w.setBlueprint(!w.blueprint)}>Blueprint</button>
+        {w.blueprint && w.blueprintReadout && (() => { const r = w.blueprintReadout; return <div data-testid="blueprint-readout" style={{ flexBasis: '100%', fontSize: 11.5, color: '#bcd', display: 'flex', flexWrap: 'wrap', gap: '2px 14px' }}>
+          <span title="The Defense tab's score">Defense <b>{r.score}</b> {r.label}</span>
+          <span title="How hard the walls, gates and bars stop a crew">Line holds {r.barrierPct}%</span>
+          <span title="How early a crew is seen">Seen coming {r.detectionPct}%</span>
+          <span>{r.rings} ring{r.rings === 1 ? '' : 's'} · {r.gates} gate{r.gates === 1 ? '' : 's'} · {r.towers} tower{r.towers === 1 ? '' : 's'}</span>
+          <span title="Ways in by the lie of the land (Terrain: Lanes)">{r.lanes} lane{r.lanes === 1 ? '' : 's'}{r.laneHardness !== null ? ` · best going ×${r.laneHardness}` : ''}{r.chokeHeld ? ' · choke held' : ''}</span>
+          <span title="How far each kind of watch sees in today's fog; thermal sees through it">Sight: eye {r.sight.eye} m · camera {r.sight.camera} m · night vision {r.sight.nvg} m · thermal {r.sight.thermal} m</span>
+        </div>; })()}
         <button style={btn(w.showBoundary)} title="Draw the property line on the ground (it also shows while you draw a fence or wall)" onClick={() => w.setShowBoundary(!w.showBoundary)}>Boundary</button>
         <button style={btn(w.photo)} onClick={() => w.setPhoto(!w.photo)}>Photo</button>
         {w.photo && <>
