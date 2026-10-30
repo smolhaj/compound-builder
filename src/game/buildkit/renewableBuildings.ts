@@ -71,7 +71,8 @@ function microHydro(def: KitPieceDef, seed = 1): THREE.Group {
     { x0: -hw, z0: hd - t, x1: -doorW / 2, z1: hd }, { x0: doorW / 2, z0: hd - t, x1: hw, z1: hd });
   const g = p.finish();
   g.userData.chimneyTop = null;
-  g.userData.keep = [];
+  // the walls are the frame layer: they stay when the house is finished (the frame layer is otherwise the scaffold that comes down)
+  g.userData.keep = ['frame'];
   return g;
 }
 
