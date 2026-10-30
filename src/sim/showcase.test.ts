@@ -63,11 +63,11 @@ import { fogNow, solarFogK, fogPlaceOf } from './fogFx';
 
 const env = (k: string): string | undefined => (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env[k];
 
-for (const rings of [1, 2]) describe(`the mountain showcase, headless, ${rings} ring${rings > 1 ? 's' : ''}`, () => {
+for (const [rings, wall] of [[1, 'stone'], [2, 'stone'], [1, 'concrete']] as const) describe(`the mountain showcase, headless, ${rings} ring${rings > 1 ? 's' : ''}, ${wall} wall`, () => {
   const h = headless();
-  const rep = runMountainShowcase(h.io, { rings });
+  const rep = runMountainShowcase(h.io, { rings, wall });
   const g = h.g();
-  if (env('SHOW') && rings === (Number(env('SHOW')) || 1)) { console.log(JSON.stringify(rep.frame), JSON.stringify(rep.notes), JSON.stringify(rep.steps)); console.log(asciiMap(g, h.drive, h.camp, h.io.ground)); }
+  if (env('SHOW') && rings === (Number(env('SHOW')) || 1) && wall === 'stone') { console.log(JSON.stringify(rep.frame), JSON.stringify(rep.notes), JSON.stringify(rep.steps)); console.log(asciiMap(g, h.drive, h.camp, h.io.ground)); }
 
   it(`lays out on the lot ${SHOWCASE_LOT}`, () => {
     // what the land and the rules refuse is a finding, not a failure: this shelf is level, so no 10-26 % fall for terraced beds beside the compound

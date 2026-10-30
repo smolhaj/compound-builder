@@ -53,7 +53,12 @@ export function frameOf(camp: Pt, fall: number, ground: (x: number, z: number) =
   return { P: (du, db) => [camp[0] + du * cf - db * sf, camp[1] + du * sf + db * cf], slopeAt: (x, z) => (Math.abs(ground(x + 0.25, z) - ground(x - 0.25, z)) + Math.abs(ground(x, z + 0.25) - ground(x, z - 0.25))) / 0.5 };
 }
 
-export interface ShowcaseOptions { /** Rings in all, the outer one included (1 = the plain wall of the picture; 2 adds a keep ring round the lodge). */ rings?: number }
+export interface ShowcaseOptions {
+  /** Rings in all, the outer one included (1 = the plain wall of the picture; 2 adds a keep ring round the lodge). */
+  rings?: number;
+  /** The wall: the stone-and-timber one (default) or poured concrete with hexagonal towers (the black wall of the north-star picture). */
+  wall?: 'stone' | 'concrete';
+}
 
 export function runMountainShowcase(io: ShowcaseIO, opts: ShowcaseOptions = {}): ShowcaseReport {
   const steps: ShowcaseStep[] = [], notes: string[] = [];
@@ -99,13 +104,14 @@ export function runMountainShowcase(io: ShowcaseIO, opts: ShowcaseOptions = {}):
   } else steps.push({ step: 'Terraced garden beds', ok: false, note: 'terraceSite found no 10-26 % fall near the home on the home block' });
 
   // ── the ring: wall, towers, gate garage, motor court, inner rings ──
-  const fr = io.fortify({ scope: 'core', shape: 'irregular', wall: 'stone_wall', towers: 5, towerKind: 'watchtower_octagon', passage: false, rings: opts.rings ?? 1, ringWall: 'stone_wall', ringSally: true, motorCourt: true });
-  steps.push({ step: `Fortify my ring (stone wall, octagon towers, motor court, ${opts.rings ?? 1} ring${(opts.rings ?? 1) > 1 ? 's' : ''})`, ok: fr.runs + fr.structures > 0, note: `${fr.runs} runs, ${fr.structures} structures` });
+  const concrete = opts.wall === 'concrete';
+  const fr = io.fortify({ scope: 'core', shape: 'irregular', wall: concrete ? 'concrete_wall' : 'stone_wall', towers: 5, towerKind: concrete ? 'watchtower_hex' : 'watchtower_octagon', passage: false, rings: opts.rings ?? 1, ringWall: 'stone_wall', ringSally: true, motorCourt: true });
+  steps.push({ step: `Fortify my ring (${concrete ? 'concrete wall, hexagon towers' : 'stone wall, octagon towers'}, motor court, ${opts.rings ?? 1} ring${(opts.rings ?? 1) > 1 ? 's' : ''})`, ok: fr.runs + fr.structures > 0, note: `${fr.runs} runs, ${fr.structures} structures` });
   io.finishAll();
 
   // ── razor wire on the outer wall, drainage channel along the cut ──
   const g2 = io.game();
-  const outer = g2.perimeter.filter(r => r.kind === 'stone_wall').sort((a, b) => b.pts.length - a.pts.length)[0];
+  const outer = g2.perimeter.filter(r => r.kind === (concrete ? 'concrete_wall' : 'stone_wall')).sort((a, b) => b.pts.length - a.pts.length)[0];
   if (outer) { const e = io.razor(outer.id); steps.push({ step: 'Razor wire on the outer wall', ok: !e, note: e ?? undefined }); }
   const wet = undrained(g2).sort((a, b) => (b.grade ?? 0) - (a.grade ?? 0))[0];
   const line = wet ? drainLineFor(g2, wet) : null;

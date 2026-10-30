@@ -13,7 +13,7 @@ import { applyLook } from './lookPresets.mjs';
 const { chromium } = await import('/opt/node22/lib/node_modules/playwright/index.mjs');
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
-const port = Number(opt('--port', 5440)), outDir = resolve(opt('--out', 'shots/showcase')), only = opt('--only', 'checks,aerial,top,court,terrace,mist,night').split(','), q = opt('--q', 'medium'), rings = Number(opt('--rings', 1));
+const port = Number(opt('--port', 5440)), outDir = resolve(opt('--out', 'shots/showcase')), only = opt('--only', 'checks,aerial,top,court,terrace,mist,night').split(','), q = opt('--q', 'medium'), rings = Number(opt('--rings', 1)), wall = opt('--wall', 'stone');
 mkdirSync(outDir, { recursive: true });
 let vite = null;
 if (args.includes('--serve')) {
@@ -26,7 +26,7 @@ const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 page.setDefaultTimeout(900000);
 page.on('pageerror', e => console.error('PAGEERROR', e.message));
 page.on('console', m => { if (m.type() === 'error') console.error('console', m.text().slice(0, 300)); });
-await page.goto(`http://localhost:${port}/?lowrender=0.75&clean&seed=7&${LOT}&showcase=mountain&rings=${rings}`);
+await page.goto(`http://localhost:${port}/?lowrender=0.75&clean&seed=7&${LOT}&showcase=mountain&rings=${rings}&wall=${wall}`);
 await page.waitForFunction(() => window.__cb?.qa?.renderNow && window.__showcase, null, { timeout: 900000 });
 const report = await page.evaluate(() => window.__showcase);
 if (report.error) { console.error(report.error); process.exit(2); }
@@ -44,34 +44,46 @@ const orbit = (r, pitch, yaw, x, z, lift = 0.8) => page.evaluate(([r, pitch, yaw
 
 
 // an eye-level camera that is not inside anything: try spots round the thing looked at (nearest the wanted bearing first), keep the first with a clear view
-// (nothing within 0.35 of the eye, nothing between the eye and the target) and put the camera there. Returns the spot, or null.
+// (nothing within 0.35 of the eye, not inside a closed mesh, nothing between the eye and the target) and put the camera there. Returns the spot, or null.
 const eyeAt = (look, bearing, radii, eyeH, lookH = 0.25) => page.evaluate(([look, bearing, radii, eyeH, lookH]) => {
   const cb = window.__cb, T = cb.THREE, w = cb.world, scene = cb.ws.scene, rc = new T.Raycaster();
   const cands = [];
   for (const r of radii) for (let k = 0; k < 16; k++) { const a = bearing + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * (Math.PI / 9); cands.push([look[0] + Math.cos(a) * r, look[1] + Math.sin(a) * r]); }
   const meshes = [];
-  scene.traverse(o => { if (o.isMesh && o.visible && o.geometry) { if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere(); if (o.geometry.boundingSphere.radius * Math.max(o.scale.x, o.scale.y, o.scale.z) < 80) meshes.push(o); } });
-  const solid = h => h.object.material && !Array.isArray(h.object.material) ? h.object.material.opacity > 0.5 || h.object.material.opacity === undefined : true;
+  scene.traverse(o => { if (o.isMesh && o.visible && o.geometry && o.material && !Array.isArray(o.material) && o.material.opacity !== 0) { if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere(); if (o.geometry.boundingSphere.radius * Math.max(o.scale.x, o.scale.y, o.scale.z) < 80) meshes.push(o); } });
+  // every mesh counts from both sides while we look for walls the eye might be inside of
+  const sides = meshes.map(m => m.material.side); meshes.forEach(m => { m.material.side = T.DoubleSide; });
+  const solid = h => h.object.material.opacity > 0.5 || h.object.material.opacity === undefined;
+  const backFace = (h, dir) => { if (!h.face) return false; const n = h.face.normal.clone().transformDirection(h.object.matrixWorld); return n.dot(dir) > 0.02; };
+  let picked = null;
   for (const [x, z] of cands) {
     const eye = new T.Vector3(x, w.groundAt(x, z) + eyeH, z), tgt = new T.Vector3(look[0], w.groundAt(look[0], look[1]) + lookH, look[1]);
     const d = tgt.clone().sub(eye), dist = d.length(); d.normalize();
     let ok = true;
-    for (const [dx, dy, dz] of [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, 1, 0]]) { rc.set(eye, new T.Vector3(dx, dy, dz)); rc.far = 0.35; if (rc.intersectObjects(meshes, false).some(solid)) { ok = false; break; } }
+    for (const dir of [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, 1, 0], [0.7, 0.7, 0], [-0.7, 0.7, 0], [0, 0.7, 0.7], [0, 0.7, -0.7]]) {
+      const v = new T.Vector3(...dir).normalize(); rc.set(eye, v); rc.far = 3;
+      const hit = rc.intersectObjects(meshes, false).find(solid);
+      if (hit && (hit.distance < 0.35 || backFace(hit, v))) { ok = false; break; }
+    }
     if (!ok) continue;
     rc.set(eye, d); rc.far = dist;
     const hits = rc.intersectObjects(meshes, false).filter(solid);
     if (hits.length && hits[0].distance < dist * 0.8) continue;
-    cb.cam.placeEye(x, z, look[0], look[1], eyeH);
-    return [x, z];
+    picked = [x, z]; break;
   }
-  return null;
+  meshes.forEach((m, i) => { m.material.side = sides[i]; });
+  if (picked) cb.cam.placeEye(picked[0], picked[1], look[0], look[1], eyeH);
+  return picked;
 }, [look, bearing, radii, eyeH, lookH]);
+
+// stand a family member somewhere (the figure is drawn where the walker is: a QA pose, set just before a frame is drawn)
+const placePerson = (id, x, z, faceX, faceZ) => page.evaluate(([id, x, z, fx, fz]) => { const a = window.__cb.world.family._agents.get(id); if (!a) return false; a.x = x; a.z = z; a.rot = Math.atan2(fx - x, fz - z); a.via = []; a.viaFor = null; return true; }, [id, x, z, faceX, faceZ]);
 
 // ── where things are ────────────────────────────────────────────────────────────────────────────
 const L = await page.evaluate(() => {
   const cb = window.__cb, g = cb.game.getState().game, w = cb.world, f = w.parcel.lot.fall;
   const of = k => g.structures.filter(s => s.kind === k).map(s => ({ id: s.id, x: s.x, z: s.z, rot: s.rot }));
-  const ring = g.perimeter.filter(r => r.kind === 'stone_wall').sort((a, b) => b.pts.length - a.pts.length)[0];
+  const ring = g.perimeter.filter(r => r.kind === 'stone_wall' || r.kind === 'concrete_wall').sort((a, b) => b.pts.length - a.pts.length)[0];
   const pts = ring ? ring.pts : [[w.camp.x, w.camp.z]];
   const cx = pts.reduce((a, p) => a + p[0], 0) / pts.length, cz = pts.reduce((a, p) => a + p[1], 0) / pts.length;
   return { fall: f, up: Math.atan2(Math.cos(f), Math.sin(f)), camp: [w.camp.x, w.camp.z], center: [cx, cz], lodge: of('lodge')[0], garage: of('gate_garage')[0], court: of('motor_court')[0], greenhouse: of('greenhouse_heated')[0], gardens: of('garden'), orchard: of('orchard')[0], solar: of('solar_farm')[0], battery: of('battery_bank')[0], hatch: of('bunker_hatch')[0], towers: g.structures.filter(s => s.kind.startsWith('watchtower')).map(s => ({ id: s.id, x: s.x, z: s.z })), vehicles: (g.vehicles ?? []).length };
@@ -150,9 +162,10 @@ if (only.includes('checks')) {
 // ── the pictures ────────────────────────────────────────────────────────────────────────────────
 const [cx, cz] = L.center;
 if (only.includes('aerial')) {
-  // like image 28: from downhill, looking up the mountain at the whole compound
-  await orbit(46, 0.55, L.up + 0.3, cx, cz, 0.6); await shot('1-aerial-up-the-mountain');
-  await orbit(80, 0.42, L.up - 0.55, cx, cz, 0.6); await shot('1b-aerial-wide');
+  // like image 28: from downhill, looking up the mountain at the whole compound, the rock face behind it
+  await orbit(30, 0.42, L.up + 0.35, cx, cz, 1.2); await shot('1-aerial-up-the-mountain');
+  await orbit(24, 0.3, L.up - 0.55, cx, cz, 0.9); await shot('1b-aerial-low-from-the-road');
+  await orbit(80, 0.42, L.up - 0.55, cx, cz, 0.6); await shot('1c-aerial-wide');
 }
 if (only.includes('top')) {
   for (const [mode, name] of [['off', '2-top'], ['high', '2b-top-terrain-overlay-high-ground'], ['lanes', '2c-top-terrain-overlay-lanes'], ['water', '2d-top-terrain-overlay-water']]) {
@@ -177,14 +190,16 @@ const posePerson = async (taskSet, near) => page.evaluate(async ([tasks, near]) 
 if (only.includes('court')) {
   const c = L.court;
   if (c) {
-    const who = await posePerson(['watch', 'watch', 'watch', 'pets'], [c.x, c.z]);
-    console.error('court person', JSON.stringify(who));
-    // stand in the court, eye level, looking at the garage face with the vehicles in their bays (the bearing from the garage out over the court)
-    const out = Math.atan2(c.z - L.garage.z, c.x - L.garage.x);
-    const spot = await eyeAt([(c.x + L.garage.x) / 2 + (c.x - L.garage.x) * 0.3, (c.z + L.garage.z) / 2 + (c.z - L.garage.z) * 0.3], out + 0.4, [3.4, 2.8, 4.2], 0.3);
+    // the court: a person standing in it (a QA pose), the eye level camera at its road-side mouth looking at the garage face with the vehicles in their bays
+    await posePerson(['garden', 'garden', 'garden', 'garden'], [c.x, c.z]);
+    const out = Math.atan2(c.z - L.garage.z, c.x - L.garage.x), inx = Math.cos(out), inz = Math.sin(out);
+    const pp = [c.x - inz * 1.3, c.z + inx * 1.3];
+    await placePerson('p2', pp[0], pp[1], L.garage.x, L.garage.z);
+    const spot = await eyeAt([pp[0], pp[1]], out + 0.15, [2.6, 3.2, 2.1, 3.8], 0.3, 0.2);
     console.error('court eye', JSON.stringify(spot));
-    if (spot) await shot('3-eye-motor-court');
-    if (who) { const sp = await eyeAt([who.x, who.z], out + 1.6, [1.8, 2.4, 3], 0.3, 0.15); if (sp) await shot('3b-eye-person-at-the-gate'); }
+    if (spot) { await placePerson('p2', pp[0], pp[1], L.garage.x, L.garage.z); await shot('3-eye-motor-court-with-person'); }
+    const spot2 = await eyeAt([(c.x + L.garage.x) / 2, (c.z + L.garage.z) / 2], out - 0.5, [4.5, 5.5, 3.6], 0.3, 0.3);
+    if (spot2) await shot('3b-eye-court-and-garage');
     // from the road looking up at the gate, the court and the wall
     await orbit(14, 0.35, L.up + 0.1, c.x, c.z, 0.4); await shot('3c-court-from-the-road');
   }
@@ -198,15 +213,15 @@ if (only.includes('terrace')) {
   await orbit(18, 0.5, L.up + 2.4, L.lodge.x, L.lodge.z, 0.5); await shot('4c-lodge-and-terraces-from-above');
 }
 if (only.includes('mist')) {
-  await applyLook(page, 'misty'); await page.waitForTimeout(500);
-  await orbit(54, 0.5, L.up + 0.3, cx, cz, 0.6); await shot('5-misty-aerial-up-the-mountain');
+  await applyLook(page, 'misty', { season: 'summer', doy: 205 }); await page.waitForTimeout(500);
+  await orbit(34, 0.42, L.up + 0.35, cx, cz, 1.2); await shot('5-misty-aerial-up-the-mountain');
   // the valley fog bank from above the compound, looking down the fall line
   await orbit(70, 0.36, L.up + Math.PI + 0.25, cx, cz, 2.2); await shot('5b-misty-valley-from-the-mountain');
-  await applyLook(page, 'overcast'); await orbit(46, 0.55, L.up + 0.3, cx, cz, 0.6); await shot('5c-overcast-aerial');
+  await applyLook(page, 'overcast', { season: 'summer', doy: 205 }); await orbit(34, 0.42, L.up + 0.35, cx, cz, 1.2); await shot('5c-overcast-aerial');
 }
 if (only.includes('night')) {
-  await page.evaluate(() => { const s = window.__cb.store.getState(); s.setWeatherMode('clear'); s.setSeasonMode('summer'); s.setTimeOfDay(22); });
-  await orbit(46, 0.5, L.up + 0.3, cx, cz, 0.6); await shot('6-night-aerial');
+  await page.evaluate(() => { const s = window.__cb.store.getState(); s.setWeatherMode('clear'); s.setSeasonMode('summer'); s.setTimeOfDay(21); });
+  await orbit(30, 0.42, L.up + 0.35, cx, cz, 1.2); await shot('6-night-aerial');
   if (L.lodge) { const sp = await eyeAt([L.lodge.x, L.lodge.z], L.fall + 0.5, [5, 4, 6, 7], 0.4, 0.4); if (sp) await shot('6b-night-eye-lodge'); }
 }
 await browser.close(); vite?.kill();
