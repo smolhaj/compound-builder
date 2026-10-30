@@ -18,7 +18,7 @@ import type { PerimeterKind, Pt } from './perimeter';
 import { isFinished } from './construction';
 import { isHome } from './blueprints';
 import { enclosure } from './enclosure';
-import { SALLY, RING, ringsAround, ringsHolding, sallyPorts } from './rings';
+import { RING, ringsAround, ringsHolding } from './rings';
 import type { BattleEvent, BattleUnit } from './battleTypes';
 
 export interface RingLine { r: number; kind: PerimeterKind }
@@ -45,10 +45,10 @@ export function ringRadii(s: GameState, c: { x: number; z: number }, lineR: numb
   return out.slice(0, manned);
 }
 
-/** Seconds the crew spends at each inner ring before it gives (the sally ports take a few seconds off the whole, shared out). */
-export function ringDelay(s: GameState, inner: number): number {
+/** Seconds the crew spends at each inner ring before it gives (a sally port never shortens it; its worth is the sortie). */
+export function ringDelay(_s: GameState, inner: number): number {
   if (inner <= 0) return 0;
-  return Math.max(4, RING.DELAY - Math.min(SALLY.MAX, sallyPorts(s)) * SALLY.CHOKE / inner);
+  return RING.DELAY;
 }
 
 export interface RingLoss { ring: number; wounded: number; dead: number }

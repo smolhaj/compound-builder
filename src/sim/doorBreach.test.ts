@@ -135,3 +135,17 @@ describe('a stronger-defended lot is never an easier raid', () => {
     expect(strong.killed).toBeLessThanOrEqual(weak.killed + 3);
   });
 });
+
+describe('the gate card line', () => {
+  it('names the hold when the way in is a tunnel door, and says nothing otherwise', async () => {
+    const { doorHoldLine } = await import('./terrainFx');
+    const { holdSeconds } = await import('./doorBreach');
+    expect(holdSeconds('blast').ram).toBeGreaterThan(holdSeconds('steel').ram);
+    expect(holdSeconds('steel', 3, 1).hand).toBeGreaterThan(holdSeconds('steel').hand);
+    const g = bridged();
+    const line = doorHoldLine(g);
+    if (line) expect(line).toMatch(/tunnel door.*\bs\b/);
+    setGroundOverride(null);
+    expect(doorHoldLine(newGame(3))).toBeNull();
+  });
+});

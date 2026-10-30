@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { ambushOdds, ambushParty, chosenParty } from '../sim/tunnelers';
+import { doorHoldLine } from '../sim/terrainFx';
 import { fightOdds, hideFoundChance, postureOf, type Stance } from '../sim/encounters';
 import { askQuestion, carryLines, carryOf, MAX_QUESTIONS, QUESTIONS } from '../sim/newcomers';
 import { AFTERMATH_TEXT } from '../sim/aftermath';
@@ -94,6 +95,7 @@ export function GateCard() {
         {e.strength > 0 && e.kind !== 'break_in' && <div style={{ margin: '8px 0', fontSize: 12, opacity: 0.75 }}>
           <div>{e.size} {e.armed ? 'armed' : 'unarmed'} · walls {Math.round(p.barrier)} % · seen early {Math.round(p.detection)} %{p.bunker ? ' · bunker to hide in' : p.safeRoom ? ' · safe room' : ''}</div>
           {odds && <div>If you fight: you hold {inTen(odds.win)} · someone of yours killed or taken {inTen(odds.loseSomeone)}</div>}
+          {odds && (() => { const d = doorHoldLine(g.game); return d ? <div style={{ opacity: 0.85 }}>{d}</div> : null; })()}
           {e.stances.includes('hide') && <div>If you hide: they find the place lived in {inTen(hideFoundChance(g.game, e, p))}, and strip it</div>}
         </div>}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
