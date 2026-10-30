@@ -28,7 +28,7 @@ export function FarmPanel({ game }: { game: GameState }) {
   const g = useGameStore();
   const houses = finishedOf(game, 'greenhouse', 'greenhouse_heated', 'polytunnel', 'high_tunnel');
   const bays = finishedOf(game, 'aquaponics');
-  const orchards = finishedOf(game, 'orchard', 'orchard_grove');
+  const orchards = finishedOf(game, 'orchard', 'orchard_grove', 'orchard_terraced');
   const ponds = finishedOf(game, 'pond');
   const yards = finishedOf(game, 'equipment_yard');
   const { doy, year } = calendarOf(game.clock);

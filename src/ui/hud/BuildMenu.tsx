@@ -33,6 +33,8 @@ import { HousingStyleCards } from './HousingStyles';
 const BUILD_GROUPS: Array<[string, string, readonly string[]]> = [
   ['home', 'Home & work', ['timber_cabin', 'log_house', 'cottage', 'guest_house', 'moms_house', 'stilted_house', 'cabin_village', 'outhouse', 'workshop', 'forge', 'metal_garage', 'barn', 'equipment_yard', 'helipad', 'boat_dock', 'marina', ...TERRACE_ORDER]],
   ['food', 'Food', ['garden', 'greenhouse', 'polytunnel', 'high_tunnel', 'greenhouse_heated', 'aquaponics', 'orchard', 'orchard_grove', 'field', 'chicken_coop', 'sheep_barn', 'pond', 'root_cellar', 'wood_oven', 'apiary', 'sugar_shack', 'barnyard']],
+  ['home', 'Home & work', ['timber_cabin', 'log_house', 'cottage', 'guest_house', 'moms_house', 'stilted_house', 'cabin_village', 'outhouse', 'workshop', 'metal_garage', 'barn', 'equipment_yard', 'helipad', 'boat_dock', 'marina']],
+  ['food', 'Food', ['garden', 'greenhouse', 'polytunnel', 'high_tunnel', 'greenhouse_heated', 'aquaponics', 'orchard', 'orchard_grove', 'orchard_terraced', 'field', 'chicken_coop', 'sheep_barn', 'pond', 'root_cellar', 'wood_oven', 'apiary', 'sugar_shack', 'barnyard']],
   ['water', 'Water & power', UTILITY_ORDER],
   ['defense', 'Watch towers & gatehouse', [...TOWER_ORDER, ...POD_ORDER, ...GATEHOUSE_ORDER]],
 ];

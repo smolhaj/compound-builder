@@ -547,6 +547,7 @@ function equipmentYard(def: KitPieceDef, seed = 1): THREE.Group {
 export const FARM_BUILDERS: Record<string, (def: KitPieceDef, seed?: number, opts?: BuildOpts) => THREE.Group> = {
   greenhouse_heated: greenhouseHeated,
   orchard_grove: (def, seed) => orchardBuilder(def, seed),
+  orchard_terraced: (def, seed) => orchardBuilder(def, seed),
   solar_farm: solarFarm,
   battery_bank: batteryBank,
   pond,

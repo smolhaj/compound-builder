@@ -302,7 +302,7 @@ export function suggestions(s: GameState): Suggestion[] {
   const wk = s.weekend;
   if (wk?.mode === 'split') {
     const animals = ['goat', 'pig', 'steer', 'sheep', 'rabbit'].some(a => ((s.stock as unknown as Record<string, number>)[a] ?? 0) >= 1) || hasKind(s, 'chicken_coop');
-    const crops = hasKind(s, 'garden', 'field', 'greenhouse', 'greenhouse_heated', 'orchard', 'orchard_grove', 'pond');
+    const crops = hasKind(s, 'garden', 'field', 'greenhouse', 'greenhouse_heated', 'orchard', 'orchard_grove', 'orchard_terraced', 'pond');
     if (!wk.caretaker && (animals || crops || s.structures.some(isFinished))) {
       const acts = CARETAKER_KINDS.filter(k => !caretakerProblem(s, k)).map(k => ({ label: `${CARETAKER[k].name} (${usd(CARETAKER[k].perMonth)}/mo)`, act: { type: 'caretaker' as const, kind: k } }));
       out.push({ id: 'caretaker', kind: '', title: 'A caretaker for the weekdays', urgency: animals || crops ? 66 : 44,
@@ -497,7 +497,7 @@ export function selfSufficient(s: GameState): Goal {
     { label: '20 kW of solar', done: kw >= 20, detail: kw > 0 ? `${fmtKw(kw)} of 20 kW built` : 'a solar farm of 50 panels' },
     { label: 'Battery storage', done: kwh >= 40, detail: kwh > 0 ? `${Math.round(kwh)} kWh of 40 built` : 'a battery container beside the array' },
     { label: 'A heated greenhouse', done: has('greenhouse_heated'), detail: 'fresh greens all winter' },
-    { label: 'An orchard bearing fruit', done: bearing, detail: has('orchard', 'orchard_grove') ? 'planted: the plums first, from the third year' : 'fruit trees take years' },
+    { label: 'An orchard bearing fruit', done: bearing, detail: has('orchard', 'orchard_grove', 'orchard_terraced') ? 'planted: the plums first, from the third year' : 'fruit trees take years' },
     { label: 'A stocked pond', done: stocked, detail: has('pond') ? 'dug: add trout or crayfish' : 'trout and crayfish' },
     { label: 'Barn and sheep barn', done: has('barn') && has('sheep_barn'), detail: 'a roof for the stock in winter' },
     { label: 'Workshop and equipment yard', done: has('workshop') && has('equipment_yard'), detail: 'tools last longer; a yard for the tractor' },

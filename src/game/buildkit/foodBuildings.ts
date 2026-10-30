@@ -415,46 +415,76 @@ export function orchardBuilder(def: KitPieceDef, seed = 1): THREE.Group {
 }
 
 function orchard(def: KitPieceDef, seed = 1): THREE.Group {
-  const grove = def.id === 'orchard_grove';
+  const grove = def.id === 'orchard_grove' || def.id === 'orchard_terraced';
   const LW = def.cellsX * CELL, LD = def.cellsZ * CELL;
   const p = new Parts(seed);
   const x0 = -LW / 2 + 0.04, x1 = LW / 2 - 0.04, z0 = -LD / 2 + 0.04, z1 = LD / 2 - 0.04;
+  // the terraced plot: three benches of two rows, the back one highest, each held by a dry-stack wall (sim/orchard.ts TERRACE)
+  const terr = def.id === 'orchard_terraced', STEP = 0.8 * M, rowsN = isOrchard(def.id) ? ORCHARD_GRID[def.id].rows : 6, rowZ = LD / (rowsN + 0.3);
+  const benchOf = (z: number): number => Math.floor(Math.max(0, Math.min(rowsN - 1, Math.round(z / rowZ + (rowsN - 1) / 2))) / 2);
+  const benchY = (z: number): number => (2 - benchOf(z)) * STEP;
   p.layer = 'stakes';
   for (const [x, z] of [[x0, z0], [x1, z0], [x0, z1], [x1, z1]]) p.add('trim', box(0.012, 0.09, 0.012, x, -0.02, z));
+  if (terr) {
+    for (let b = 0; b < 3; b++) {
+      const top = (2 - b) * STEP, zb0 = z0 + b * (z1 - z0) / 3, zb1 = z0 + (b + 1) * (z1 - z0) / 3, depth = zb1 - zb0, W = x1 - x0, cx = (x0 + x1) / 2, cz = (zb0 + zb1) / 2;
+      if (top <= 0) { p.add('fieldstone', box(W, 0.06 * M, 0.5 * M, cx, 0, zb1 + 0.1 * M), 'foundation'); continue; }
+      p.add('fieldstone', box(W + 0.4 * M, 0.25 * M, depth + 0.5 * M, cx, -0.2 * M, cz), 'foundation');                       // the footing course
+      // the dry-stack wall at the front of the bench: courses of rough blocks, each laid half a block over the one below
+      const courses = Math.max(2, Math.round(top / (0.22 * M)));
+      for (let c = 0; c < courses; c++) {
+        const ch = top / courses, n = Math.round(W / (0.9 * M));
+        for (let k = 0; k < n; k++) {
+          const bw = W / n, off = (c % 2 ? 0.5 : 0) * bw * 0.8;
+          const x = x0 + bw * (k + 0.5) + off - (c % 2 ? bw * 0.4 : 0);
+          if (x - bw / 2 < x0 - 0.05 || x + bw / 2 > x1 + 0.05) continue;
+          p.add('fieldstone', box(bw * (0.92 + 0.08 * p.rnd()), ch * 0.96, 0.45 * M, x, c * ch, zb1 + (p.rnd() - 0.5) * 0.04 * M), 'frame');
+        }
+      }
+      p.add('fieldstone', box(W, 0.05 * M, 0.55 * M, cx, top, zb1), 'frame');                                                  // the cap course
+      // the bench: filled behind the wall, soil on top, a lip of stones at the back
+      p.add('earth', box(W, top, depth, cx, 0, cz - 0.2 * M), 'roof');
+      p.add('soil', box(W - 0.1 * M, 0.04 * M, depth - 0.3 * M, cx, top, cz - 0.05 * M), 'roof');
+    }
+    // a stair of flat stones at the left end, up the three benches
+    for (let i = 0; i < 6; i++) p.add('fieldstone', box(1.0 * M, 0.2 * M, 0.5 * M, x0 + 0.5 * M, i * 0.27 * M, z1 - 0.3 * M - i * (z1 - z0) / 3 * 0.42), 'frame');
+  }
   for (const t of orchardTrees(def)) {
     const T = TREE[t.kind];
+    const ty = terr ? benchY(t.z) : 0;
+    const put = (m: KitMaterialId, g: THREE.BufferGeometry, l?: Parameters<Parts['add']>[2]): void => p.add(m, ty ? g.translate(0, ty, 0) : g, l);
     const s = 0.85 + 0.3 * p.rnd(), j = (p.rnd() - 0.5) * 0.03;
     const x = t.x + j, z = t.z - j;
-    p.add('trim', box(0.01, 0.06, 0.01, x, -0.01, z), 'stakes');
+    put('trim', box(0.01, 0.06, 0.01, x, -0.01, z), 'stakes');
     // foundation: the planting hole and a mulch ring
-    p.add('soil', new THREE.CylinderGeometry(0.065, 0.07, 0.008, 12).translate(x, 0.0, z), 'foundation');
+    put('soil', new THREE.CylinderGeometry(0.065, 0.07, 0.008, 12).translate(x, 0.0, z), 'foundation');
     // frame: the trunk and scaffold limbs (bare in winter)
     const trunkH = T.trunk * M * s;
-    p.add('wood_dark', new THREE.CylinderGeometry(0.06 * M * s, 0.09 * M * s, trunkH, 6).translate(x, trunkH / 2, z), 'frame');
+    put('wood_dark', new THREE.CylinderGeometry(0.06 * M * s, 0.09 * M * s, trunkH, 6).translate(x, trunkH / 2, z), 'frame');
     for (let k = 0; k < T.limbs; k++) {
       const a = (k / T.limbs) * Math.PI * 2 + p.rnd(), len = 1.5 * M * s;
       const g = new THREE.CylinderGeometry(0.025 * M * s, 0.05 * M * s, len, 5).translate(0, len / 2, 0).rotateZ(T.lean).rotateY(a).translate(x, trunkH * 0.95, z);
-      p.add('wood_dark', g, 'frame');
+      put('wood_dark', g, 'frame');
     }
     // roof stage: a stake and a white trunk guard
-    p.add('wood_mid', box(0.008, 0.25, 0.008, x + 0.03, 0, z), 'rafters');
-    p.add('trim', new THREE.CylinderGeometry(0.1 * M, 0.1 * M, 0.45 * M, 8, 1, true).translate(x, 0.225 * M, z), 'rafters');
+    put('wood_mid', box(0.008, 0.25, 0.008, x + 0.03, 0, z), 'rafters');
+    put('trim', new THREE.CylinderGeometry(0.1 * M, 0.1 * M, 0.45 * M, 8, 1, true).translate(x, 0.225 * M, z), 'rafters');
     // finish: the canopy and the fruit
     const cr = T.crown * M * s;
     const [sx, sy, sz] = T.shape;
     const cy = trunkH + cr * sy * 0.85;
     const leaf = T.leaf;
-    p.add(leaf, new THREE.IcosahedronGeometry(cr, 2).scale(sx, sy, sz).translate(x, cy, z), 'interior');
+    put(leaf, new THREE.IcosahedronGeometry(cr, 2).scale(sx, sy, sz).translate(x, cy, z), 'interior');
     for (let k = 0; k < (grove ? 3 : 5); k++) {
       const a = p.rnd() * Math.PI * 2, r = cr * 0.6;
-      p.add(k % 2 ? 'hedge2' : leaf, new THREE.IcosahedronGeometry(cr * (0.45 + 0.15 * p.rnd()), 1).scale(sx, sy, sz).translate(x + Math.cos(a) * r * sx, cy + (p.rnd() - 0.6) * cr * 0.5, z + Math.sin(a) * r * sz), 'interior');
+      put(k % 2 ? 'hedge2' : leaf, new THREE.IcosahedronGeometry(cr * (0.45 + 0.15 * p.rnd()), 1).scale(sx, sy, sz).translate(x + Math.cos(a) * r * sx, cy + (p.rnd() - 0.6) * cr * 0.5, z + Math.sin(a) * r * sz), 'interior');
     }
     // fruit dots and blossom clusters on the outside of the canopy (the world shows each by the fruit's own season: HomesteadWorld, sim/orchard.ts `fruitLook`)
     const onCanopy = (rad: number, mat: KitMaterialId, n: number, lo: number): void => {
       for (let k = 0; k < n; k++) {
         const a = p.rnd() * Math.PI * 2, e = (p.rnd() - lo) * 1.1;
         const fx = Math.cos(a) * Math.cos(e) * cr * sx * 1.02, fy = Math.sin(e) * cr * sy * 1.02, fz = Math.sin(a) * Math.cos(e) * cr * sz * 1.02;
-        p.add(mat, new THREE.IcosahedronGeometry(rad * M, 0).translate(x + fx, cy + fy, z + fz), 'decor');
+        put(mat, new THREE.IcosahedronGeometry(rad * M, 0).translate(x + fx, cy + fy, z + fz), 'decor');
       }
     };
     onCanopy(T.fruitR, T.fruit, grove ? Math.round(T.fruitN * 0.4) : T.fruitN, 0.35);

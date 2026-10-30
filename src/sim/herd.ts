@@ -74,7 +74,7 @@ export const AU: Record<Animal, number> = { goat: 0.15, cow: 1, pig: 0, steer: 0
 /** Acres of open grass the animals can use. */
 export function pastureAcres(s: GameState): number {
   const woods = s.site.acres * Math.max(0.05, Math.min(0.8, 0.4 * s.site.timber));
-  const built = s.structures.filter(isFinished).reduce((a, st) => a + (st.kind === 'field' ? 0.25 : st.kind === 'garden' ? 0.1 : st.kind === 'orchard' ? 0.3 : st.kind === 'orchard_grove' ? 1.2 : 0.05), 0);
+  const built = s.structures.filter(isFinished).reduce((a, st) => a + (st.kind === 'field' ? 0.25 : st.kind === 'garden' ? 0.1 : st.kind === 'orchard' ? 0.3 : st.kind === 'orchard_grove' || st.kind === 'orchard_terraced' ? 1.2 : 0.05), 0);
   return Math.max(0, 0.6 * (s.site.acres - woods) - built);
 }
 /** Animal units the pasture carries at full grass. */
