@@ -14,7 +14,7 @@ import { MATERIALS, billText, type MaterialId } from '../../sim/materials';
 import { orderCost } from '../../sim/economy';
 import { drillExtra } from '../../sim/site';
 import { countyWorks, needsPermit, permitFee } from '../../sim/paperwork';
-import { BUNKER_ORDER, GATEHOUSE_ORDER, KIT, TOWER_ORDER, UTILITY_ORDER } from '../../game/buildkit/kit';
+import { BUNKER_ORDER, GATEHOUSE_ORDER, KIT, POD_ORDER, TOWER_ORDER, UTILITY_ORDER } from '../../game/buildkit/kit';
 import { PERIMETER, UTILITY_LINES, runBill, runHours, type PerimeterKind } from '../../sim/perimeter';
 import { bunkerChecklist, buildAdvice, longTerm, suggestions, type SuggestionAct, perimeterNote, perimeterOff, perimeterTiers, upgradeChain } from '../../sim/guidance';
 import { hireCaretaker, openMoveIn, setBelt } from '../../sim/weekender';
@@ -34,7 +34,7 @@ const BUILD_GROUPS: Array<[string, string, readonly string[]]> = [
   ['home', 'Home & work', ['timber_cabin', 'log_house', 'cottage', 'guest_house', 'moms_house', 'stilted_house', 'cabin_village', 'outhouse', 'workshop', 'metal_garage', 'barn', 'equipment_yard', 'helipad', 'boat_dock', 'marina']],
   ['food', 'Food', ['garden', 'greenhouse', 'polytunnel', 'high_tunnel', 'greenhouse_heated', 'aquaponics', 'orchard', 'orchard_grove', 'orchard_terraced', 'field', 'chicken_coop', 'sheep_barn', 'pond', 'root_cellar', 'wood_oven', 'apiary', 'sugar_shack', 'barnyard']],
   ['water', 'Water & power', UTILITY_ORDER],
-  ['defense', 'Watch towers & gatehouse', [...TOWER_ORDER, ...GATEHOUSE_ORDER]],
+  ['defense', 'Watch towers & gatehouse', [...TOWER_ORDER, ...POD_ORDER, ...GATEHOUSE_ORDER]],
 ];
 
 const toBuy = (bill: Partial<Record<MaterialId, number>>) => Object.entries(bill).filter(([m]) => MATERIALS[m as MaterialId].price !== null).map(([material, qty]) => ({ material: material as MaterialId, qty: qty as number }));

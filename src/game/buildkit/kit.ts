@@ -462,7 +462,9 @@ export const MOTOR_COURT_KIT: KitPieceDef = {
   maxSlope: 0.15, floorY: 0.0, porch: 0, sleeps: 0, light: null,
 };
 /** Defense menu: only the first tier is built from scratch; the rest are upgrades from the Defense tab. */
-export const TOWER_ORDER: readonly string[] = ['rise_lookout', 'tower_pod'];
+export const TOWER_ORDER: readonly string[] = ['rise_lookout'];
+/** The tower pod is a stand-alone tower (not an upgrade of the chain): it joins the Defense menu beside the first tier. */
+export const POD_ORDER: readonly string[] = ['tower_pod'];
 /** The gatehouse garage joins the Defense menu beside the first tower. */
 export const GATEHOUSE_ORDER: readonly string[] = ['gate_garage', 'motor_court'];
 
