@@ -17,6 +17,7 @@ import { FIG_POSE, FIG_TOOL } from '../../engine/world/people/figureKit';
 import { CAMP } from '../props/campGeometry';
 import { YARD } from '../props/yardGeometry';
 import type { TaskKind } from '../../sim/state';
+import type { Wp } from '../paths/linkRoute';
 
 export interface Site { x: number; z: number; rot: number; w: number; d: number; /** Evening seats (local x, z, face x, z). */ seats?: ReadonlyArray<readonly [number, number, number, number]> }
 
@@ -44,7 +45,9 @@ export interface GoalCtx {
   /** Pace multiplier at a point (game/paths: a little quicker on a path, slower in mud off one); 1 = open dry ground. */
   footing?: (x: number, z: number) => number;
   /** The points to pass through to keep to the paths between two points ([] = straight). */
-  via?: (fx: number, fz: number, tx: number, tz: number) => ReadonlyArray<readonly [number, number]>;
+  via?: (fx: number, fz: number, tx: number, tz: number) => ReadonlyArray<Wp>;
+  /** Real seconds someone with a key waits at a corridor's door point (`tag` from game/paths/linkRoute): 0 when it stands open. */
+  doorWait?: (tag: number, x: number, z: number) => number;
   /** The yard position of dome tent `n` (props/TentsRenderer). */
   tentAt?: (n: number) => { x: number; z: number } | undefined;
 }

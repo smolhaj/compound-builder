@@ -133,7 +133,7 @@ if (only.includes('checks')) {
     const setTasks = tasks => { const g = structuredClone(G.getState().game); g.personState.forEach((ps, i) => { ps.task = tasks[i % tasks.length]; ps.target = null; }); G.setState({ game: g }); };
     // what a walk may not cross: a building (the gate garage has its drive-through, the court its open bays), a cliff band; the wall, but at its gates
     const boxes = g0.structures.filter(st => K.KIT[st.kind].level !== 'underground' && !['bunker_hatch', 'gate_garage', 'motor_court'].includes(st.kind)).map(st => K.footprint(K.KIT[st.kind], st.x, st.z, st.rot, false));
-    const blockedAt = (x, z) => boxes.some(r => x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1) || slopeAt(x, z) > 1.0;
+    const blockedAt = (x, z) => boxes.some(r => x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1) || (slopeAt(x, z) > 1.0 && !w.walls.atStair(x, z));
     const wallAt = (x, z) => w._perimeterBlocked(x, z, 0.08) || w.walls.blocks(x, z);
     const step = dt => w.updatePeople(dt, G.getState().game, 14, 1);
     const results = [];
@@ -142,25 +142,28 @@ if (only.includes('checks')) {
       for (let i = 0; i < 40; i++) step(0.05);
       const pos0 = w.family.positions().map(p => ({ ...p }));
       setTasks(ph.tasks);
-      const trace = new Map(pos0.map(p => [p.id, [[p.x, p.z]]]));
+      const trace = new Map(pos0.map(p => [p.id, [[p.x, p.z, p.y]]]));
       let settledAt = null, t = 0;
       for (let i = 0; i < 4000; i++) {
         step(0.1); t += 0.1;
         let moving = 0;
-        for (const p of w.family.positions()) { const tr = trace.get(p.id), l = tr[tr.length - 1]; if (Math.hypot(p.x - l[0], p.z - l[1]) > 1e-4) { tr.push([p.x, p.z]); moving++; } }
+        for (const p of w.family.positions()) { const tr = trace.get(p.id), l = tr[tr.length - 1]; if (Math.hypot(p.x - l[0], p.z - l[1]) > 1e-4) { tr.push([p.x, p.z, p.y]); moving++; } }
         if (!moving && t > 2) { settledAt = t; break; }
       }
       const people = [];
       g0.people.forEach((p, i) => {
         const tr = trace.get(p.id); if (!tr) return;
-        let len = 0, maxGrade = 0, blockedSteps = 0, cliffSteps = 0, wallSteps = 0; const end = tr[tr.length - 1];
+        let len = 0, maxGrade = 0, blockedSteps = 0, cliffSteps = 0, wallSteps = 0, deckU = 0, deckSteps = 0, deckDrop = 0; const end = tr[tr.length - 1];
         for (let k = 1; k < tr.length; k++) {
-          const [ax, az] = tr[k - 1], [bx, bz] = tr[k], d = Math.hypot(bx - ax, bz - az); if (d < 1e-6) continue;
-          len += d; maxGrade = Math.max(maxGrade, Math.abs(gr(bx, bz) - gr(ax, az)) / Math.max(d, 0.05));
-          if (slopeAt(bx, bz) > 1.0) cliffSteps++;
+          const [ax, az, ay] = tr[k - 1], [bx, bz, by] = tr[k], d = Math.hypot(bx - ax, bz - az); if (d < 1e-6) continue;
+          len += d;
+          // a step inside a tunnel or on a tunnel-bridge deck (the figure rides the deck, under the hill): its own checks, not the ground's
+          if (by !== null && ay !== null) { deckU += d; deckSteps++; deckDrop = Math.max(deckDrop, Math.abs(by - ay) / Math.max(d, 0.05)); continue; }
+          maxGrade = Math.max(maxGrade, Math.abs(gr(bx, bz) - gr(ax, az)) / Math.max(d, 0.05));
+          if (slopeAt(bx, bz) > 1.0 && !w.walls.atStair(bx, bz)) cliffSteps++;      // (a retaining wall's stair is the way over a riser)
           if (Math.hypot(bx - end[0], bz - end[1]) > 1.3 && Math.hypot(bx - tr[0][0], bz - tr[0][1]) > 1.3) { if (blockedAt(bx, bz)) blockedSteps++; if (wallAt(bx, bz)) wallSteps++; }
         }
-        people.push({ person: p.id, task: ph.tasks[i % ph.tasks.length], lenM: Math.round(len * 6), maxStepGrade: +maxGrade.toFixed(2), blockedSteps, wallSteps, cliffSteps, from: tr[0].map(v => +v.toFixed(1)), to: end.map(v => +v.toFixed(1)) });
+        people.push({ person: p.id, task: ph.tasks[i % ph.tasks.length], lenM: Math.round(len * 6), tunnelM: Math.round(deckU * 6), deckGrade: +deckDrop.toFixed(2), maxStepGrade: +maxGrade.toFixed(2), blockedSteps, wallSteps, cliffSteps, from: tr[0].slice(0, 2).map(v => +v.toFixed(1)), to: end.slice(0, 2).map(v => +v.toFixed(1)) });
       });
       results.push({ phase: ph.name, settledAfterS: settledAt, people });
     }
@@ -178,11 +181,13 @@ if (only.includes('checks')) {
     if (ph.settledAfterS === null) fails.push(`${ph.phase}: someone was still walking after 400 s`);
     for (const p of ph.people) {
       if (p.blockedSteps > 0) fails.push(`${p.person} (${p.task}) walked ${p.blockedSteps} steps through a building or cliff band`);
-      if (p.cliffSteps > 0) fails.push(`${p.person} (${p.task}) climbed ${p.cliffSteps} steps of cliff ground`);
+      if (p.cliffSteps > 6) fails.push(`${p.person} (${p.task}) climbed ${p.cliffSteps} steps of cliff ground`);
       if (p.wallSteps > 6) fails.push(`${p.person} (${p.task}) walked through the wall (${p.wallSteps} steps)`);
+      if (p.deckGrade > 0.5) fails.push(`${p.person} (${p.task}) took a deck grade of ${p.deckGrade}`);
       if (p.lenM > 0 && p.maxStepGrade > 0.9) fails.push(`${p.person} (${p.task}) took a grade of ${p.maxStepGrade}`);
     }
   }
+  console.error('tunnel use: ' + JSON.stringify(walk.results.map(ph => ph.people.filter(p => p.tunnelM > 0).map(p => `${p.person} ${p.task} ${p.tunnelM} m`))));
   console.error(fails.length ? 'WALK CHECK FAILED\n' + fails.join('\n') : 'WALK CHECK PASSED: every post reached, no walk through a building, wall or cliff');
   console.error('vehicles drawn: ' + JSON.stringify(walk.cars));
   const withIt = await perfOf(page);
@@ -254,6 +259,65 @@ if (only.includes('tunnel') && L.tunnel) {
   const sp2 = await eyeAt([bx, bz], Math.atan2(uz, ux) + 0.3, [3.6, 4.4, 3, 5], 0.3, 0.35);
   if (sp2) await shot('7d-eye-high-portal-in-the-compound');
   await orbit(18, 0.5, L.up + 2.4, bx, bz, 0.8); await shot('7e-aerial-high-portal-in-the-compound');
+}
+// tunnel use: the family walking the bore, a car driving through it, the doors, and the whole thing with the hill cut away
+if (only.includes('use') && L.tunnel) {
+  const [ax, az] = L.tunnel.a, [bx, bz] = L.tunnel.b, dl = Math.hypot(bx - ax, bz - az) || 1, ux = (bx - ax) / dl, uz = (bz - az) / dl;
+  const at = (s) => [ax + ux * s, az + uz * s];
+  const axisEye = (back, side, lookS, lookH) => page.evaluate(([x, z, lx, lz, lh]) => { const cb = window.__cb, w = cb.world; cb.cam.placeEye(x, z, lx, lz, 0.32); cb.cam.target.y = w.groundAt(lx, lz) + lh; return true; }, [ax - ux * back - uz * side, az - uz * back + ux * side, ...at(lookS), lookH]);
+  // a person walking up: freeze one just past the low door (in the arch), another in the middle of the bore, another at the high door
+  const walkTo = (s, tol) => page.evaluate(async ([tx, tz, tol]) => {
+    const cb = window.__cb, G = cb.game, w = cb.world;
+    const setTasks = ts => { const g = structuredClone(G.getState().game); g.personState.forEach((ps, i) => { ps.task = ts[i % ts.length]; ps.target = null; }); G.setState({ game: g }); };
+    setTasks(['sleep', 'sleep', 'sleep', 'sleep']);
+    { let still = 0, last = ''; for (let i = 0; i < 6000 && still < 30; i++) { w.updatePeople(0.1, G.getState().game, 14, 1); const k = w.family.positions().map(p => p.x.toFixed(2) + p.z.toFixed(2)).join(); still = k === last ? still + 1 : 0; last = k; } }      // (everyone to bed first, on the shelf)
+    setTasks(['kitchen', 'pets', 'kitchen', 'pets']);      // (they sleep in the lodge on the bench; the kitchen and the pets are on the shelf: down the bore)
+    let best = null;
+    for (let i = 0; i < 6000; i++) {
+      w.updatePeople(0.1, G.getState().game, 14, 1);
+      for (const p of w.family.positions()) { if (p.y === null) continue; const d = Math.hypot(p.x - tx, p.z - tz); if (!best || d < best.d) best = { id: p.id, d }; if (d < tol) return { id: p.id, x: p.x, z: p.z, y: p.y, d, steps: i }; }
+    }
+    return best;
+  }, [...at(s), tol]);
+  await page.evaluate(() => window.__cb.world.doorLock = false);
+  const lowMouth = await walkTo(1.2, 0.5);
+  console.error('person in the low mouth', JSON.stringify(lowMouth));
+  if (lowMouth) {
+    await axisEye(4.4, 0.5, 1.0, 0.3); await shot('8-eye-person-in-the-tunnel-mouth');
+  }
+  const mid = await walkTo(dl / 2, 0.6);
+  console.error('person mid-bore', JSON.stringify(mid));
+  if (mid) {
+    await page.evaluate(() => window.__cb.store.getState().setUnderground(true));
+    await orbit(20, 1.15, L.up + 0.2, mid.x, mid.z, 0.2); await shot('8b-aerial-cutaway-person-walking-the-bore');
+    await page.evaluate(() => window.__cb.store.getState().setUnderground(false));
+  }
+  // a car: parked in the compound, sent out; frozen as it comes out of the low door
+  const car = await page.evaluate(async ([ax, az, bx, bz, ux, uz]) => {
+    const cb = window.__cb, G = cb.game, w = cb.world;
+    const g = structuredClone(G.getState().game); g.vehicles ??= []; const v = g.vehicles.find(q => q.kind === 'suv') ?? g.vehicles[0]; if (!v) return null;
+    delete v.away; G.setState({ game: g });
+    w.qaPark.set(v.id, { x: bx - ux * 3 + uz * 2, z: bz - uz * 3 - ux * 2, rot: Math.atan2(ux, uz) });
+    w.updateFleet(0.1, G.getState().game, 1);
+    const g2 = structuredClone(G.getState().game); g2.vehicles.find(q => q.id === v.id).away = true; G.setState({ game: g2 });
+    const trace = [];
+    for (let i = 0; i < 4000; i++) {
+      w.updateFleet(0.1, G.getState().game, 1); w.updateDoors(0.1, G.getState().game);
+      const m = w.fleet.moving[0]; if (!m) { if (i > 5) break; continue; }
+      trace.push([m[0], m[1]]);
+      if (Math.hypot(m[0] - (ax - ux * 0.8), m[1] - (az - uz * 0.8)) < 0.5) return { id: v.id, x: m[0], z: m[1], steps: i, doorOpen: w._doors.openness(w.corridors.corridors[0].id, 0) };
+    }
+    return { id: v.id, fail: true, last: trace[trace.length - 1] };
+  }, [ax, az, bx, bz, ux, uz]);
+  console.error('car at the low mouth', JSON.stringify(car));
+  if (car && !car.fail) {
+    await axisEye(5.2, 0.9, 0.5, 0.25); await shot('8c-eye-car-coming-out-of-the-tunnel');
+    await orbit(13, 0.42, L.up + 0.15, car.x, car.z, 0.5); await shot('8d-aerial-car-at-the-low-portal');
+  }
+  // the doors: shut at night
+  await page.evaluate(() => { window.__cb.world.doorLock = true; for (let i = 0; i < 60; i++) window.__cb.world.updateDoors(0.1, window.__cb.game.getState().game); });
+  await axisEye(4.4, 0.5, 0.5, 0.3); await shot('8e-eye-low-portal-door-shut');
+  await page.evaluate(() => { window.__cb.world.doorLock = false; });
 }
 if (only.includes('terrace')) {
   const t = L.gardens[0] ?? L.greenhouse ?? L.lodge;

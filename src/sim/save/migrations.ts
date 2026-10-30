@@ -43,6 +43,8 @@ type Raw = Record<string, unknown> & { version?: number };
 
 /** version n → n + 1 upgraders. */
 const STEPS: Record<number, (s: Raw) => Raw> = {
+  // 71 → 72: tunnel use (sim/corridors.ts): `PerimeterRun.collapsed` (a portal brought down by sappers) and `Vehicle.stranded` (cut off by a lost bridge or tunnel) are optional and absent in every old game: nothing to fill
+  71: s => ({ ...s, version: 72 }),
   // 70 → 71: the family can choose where the road comes in (site.entrance, absent: the habitual entrance) and a listed lot's ground is pinned to the lot's seed (site.listed, absent on older saves: they keep the game's seed)
   70: s => ({ ...s, version: 71 }),
   // 69 → 70: house hardening tiers and the bug-out goods (sim/houseHardening.ts, sim/bugout.ts): six new goods, none in stock

@@ -21,8 +21,13 @@ export const ARCH = { hw: 0.366, wall: BORE.CROWN - 0.366, crown: BORE.CROWN } a
 /** Earth banked over the crown where the hill has not closed over it (1.8 m), the half width of the mound's top, and its side slope (horizontal per vertical). */
 export const MOUND = { over: 0.3, halfTop: 0.62, slope: 1.5 } as const;
 
+/** A portal's blast door, apart from the merged parts so it can slide up into the lintel when it opens (game/perimeter/CorridorDoors): world-space geometry, drawn when closed. */
+export interface BoreDoor { end: 0 | 1; parts: Array<[KitMaterialId, THREE.BufferGeometry]>; /** How far it lifts when open (units). */ lift: number }
+
 export interface BoreParts {
   parts: Array<[KitMaterialId, THREE.BufferGeometry]>;
+  /** The blast door of each portal. */
+  doors: BoreDoor[];
   /** The dark inside of the arch (seen from inside: give it a BackSide material), or null before it is built. */
   tube: THREE.BufferGeometry | null;
 }
@@ -56,8 +61,8 @@ function frame(x: number, y: number, z: number, fwd: THREE.Vector3): THREE.Matri
  * `built`: how much of the tunnel is built, 0 to 1 (a portal stands from 5 %, the second, the mound and the tube when it is finished).
  * `lit`: the lamps are on. `pts`: the run (its first and last points are the two portals).
  */
-export function boreParts(pts: readonly Pt[], ground: Ground, built: number, finished: boolean, lit: boolean): BoreParts {
-  const out: BoreParts = { parts: [], tube: null };
+export function boreParts(pts: readonly Pt[], ground: Ground, built: number, finished: boolean, lit: boolean, collapsed = false): BoreParts {
+  const out: BoreParts = { parts: [], doors: [], tube: null };
   if (pts.length < 2 || built <= 0.05) return out;
   const add = (m: KitMaterialId, g: THREE.BufferGeometry) => out.parts.push([m, g]);
   const a = pts[0], b = pts[pts.length - 1];
@@ -114,7 +119,7 @@ export function boreParts(pts: readonly Pt[], ground: Ground, built: number, fin
   }
 
   // a portal at one end: its face outward, the arch, the voussoirs, wing walls, the door and the lamp. `into` points into the hill.
-  const portal = (s: number, into: 1 | -1, withDoor: boolean) => {
+  const portal = (s: number, into: 1 | -1, withDoor: boolean, end: 0 | 1) => {
     const [x, z] = at(s), y = deckAt(s), fx = dx * into, fz = dz * into;
     const fwd = new THREE.Vector3(fx, 0, fz), m = frame(x, y, z, fwd);
     const place = (g: THREE.BufferGeometry, ox = 0, oy = 0, oz = 0) => { g.translate(ox, oy, oz); g.applyMatrix4(m); return g; };
@@ -137,14 +142,41 @@ export function boreParts(pts: readonly Pt[], ground: Ground, built: number, fin
       add('fieldstone', place(new THREE.BoxGeometry(0.14, h, 0.46).rotateY(sg * 0.5), sg * lat, h / 2 - 0.05, back));
     }
     if (withDoor) {
-      // the steel blast door in the arch, set back, with its hazard band and seam, a lamp over it
-      add('steel', place(new THREE.ExtrudeGeometry(archShape(0.97), { depth: 0.05, bevelEnabled: false, curveSegments: 8 }), 0, 0.005, 0.2));
-      add('paint_yellow', place(new THREE.BoxGeometry(ARCH.hw * 1.9, 0.05, 0.02), 0, 0.28, 0.18));
-      add('iron', place(new THREE.BoxGeometry(0.012, ARCH.crown * 0.92, 0.02), 0, ARCH.crown * 0.46, 0.18));
+      // the steel blast door in the arch, set back, with its hazard band and seam: its own leaf (it lifts into the lintel when it opens); a lamp over it stays on the face
+      out.doors.push({
+        end, lift: ARCH.crown * 0.97, parts: [
+          ['steel', place(new THREE.ExtrudeGeometry(archShape(0.97), { depth: 0.05, bevelEnabled: false, curveSegments: 8 }), 0, 0.005, 0.2)],
+          ['paint_yellow', place(new THREE.BoxGeometry(ARCH.hw * 1.9, 0.05, 0.02), 0, 0.28, 0.18)],
+          ['iron', place(new THREE.BoxGeometry(0.012, ARCH.crown * 0.92, 0.02), 0, ARCH.crown * 0.46, 0.18)],
+        ],
+      });
       add(lit ? 'bulb' : 'enamel', place(new THREE.SphereGeometry(0.035, 8, 6), 0, ARCH.crown + 0.14, -0.05));
     }
+    // a portal brought down by a charge (sim/corridors `collapseCorridor`): a heap of broken rock and concrete choking the arch, spilling out over the road
+    if (collapsed) for (const [m, g] of rubbleHeap(end === 0 ? 17 : 91)) add(m, place(g));
   };
-  portal(0, 1, true);
-  if (finished) portal(L, -1, true);
+  portal(0, 1, true, 0);
+  if (finished) portal(L, -1, true, 1);
+  return out;
+}
+
+/**
+ * A fall of rock choking an arch (local frame: x across, y up, z into the hill; the face is at z = 0): about 40 broken blocks piled to the crown in the
+ * mouth, thinning to a spill of stones on the road outside. Deterministic from `seed`. Pure geometry.
+ */
+export function rubbleHeap(seed: number): Array<[KitMaterialId, THREE.BufferGeometry]> {
+  let h = seed >>> 0;
+  const rnd = () => { h = (Math.imul(h, 1664525) + 1013904223) >>> 0; return h / 4294967296; };
+  const out: Array<[KitMaterialId, THREE.BufferGeometry]> = [];
+  for (let i = 0; i < 44; i++) {
+    const depth = -0.55 + rnd() * 1.5, lat = (rnd() * 2 - 1) * (ARCH.hw * 1.15);
+    // a dome: highest on the axis and deep in the mouth, a scatter of low stones outside
+    const dome = Math.max(0, 1 - (lat / (ARCH.hw * 1.2)) ** 2) * Math.max(0.12, Math.min(1, 1 - Math.abs(depth - 0.35) / 1.1));
+    const size = 0.07 + rnd() * 0.12 * (0.6 + dome);
+    const y = Math.max(size * 0.4, dome * ARCH.crown * 0.8 * (0.55 + rnd() * 0.45));
+    const g = new THREE.BoxGeometry(size * (0.8 + rnd() * 0.8), size * (0.6 + rnd() * 0.7), size * (0.8 + rnd() * 0.8));
+    g.rotateY(rnd() * Math.PI).rotateZ((rnd() - 0.5) * 0.7).rotateX((rnd() - 0.5) * 0.7).translate(lat, y, depth);
+    out.push([rnd() < 0.2 ? 'concrete' : rnd() < 0.15 ? 'earth' : 'fieldstone', g]);
+  }
   return out;
 }

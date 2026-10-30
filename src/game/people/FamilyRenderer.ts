@@ -11,6 +11,8 @@ import type { Person } from '../../sim/family';
 import type { PersonState } from '../../sim/state';
 import { goalFor, type GoalCtx } from './peopleGoals';
 import { slopePace } from '../paths/walkRoute';
+import { stepToward, doorAt, isStop, type Mover } from '../paths/deckWalk';
+import type { Wp } from '../paths/linkRoute';
 import { figureScale, type SickPose } from './sickbayPlan';
 
 /** Walking speed (world units per real second at 1×; ≈ brisk walk scaled for the diorama). */
@@ -22,8 +24,14 @@ interface Agent {
   placed: boolean;
   wear: Wear | null;
   /** The way along the paths to the goal (game/paths), the goal it was found for. */
-  via: Array<readonly [number, number]>;
+  via: Wp[];
   viaFor: { x: number; z: number } | null;
+  /** The deck height when inside a tunnel or on a tunnel-bridge (game/paths/deckWalk); null on the ground. */
+  y: number | null;
+  /** Seconds left at a locked door (the keyholder's card and bolts). */
+  wait: number;
+  /** Seconds until a walker held at a fallen tunnel looks again whether the way is open. */
+  retry: number;
 }
 
 function hashRnd(seed: number): () => number {
@@ -52,8 +60,8 @@ export class FamilyRenderer {
   }
 
   /** World positions of the visible people (QA / camera). */
-  positions(): Array<{ id: string; x: number; z: number }> {
-    return [...this._agents.entries()].map(([id, a]) => ({ id, x: a.x, z: a.z }));
+  positions(): Array<{ id: string; x: number; z: number; /** Deck height when in a corridor (null: on the ground). */ y: number | null }> {
+    return [...this._agents.entries()].map(([id, a]) => ({ id, x: a.x, z: a.z, y: a.y }));
   }
 
   update(dt: number, people: readonly Person[], states: readonly PersonState[], hour: number, clock: number, ctx: GoalCtx,
@@ -72,7 +80,7 @@ export class FamilyRenderer {
       const goal = goalFor(i, p.kid, st.task, st.target, hour, ctx, clock);
       let a = this._agents.get(p.id);
       if (!a) {
-        a = { x: goal.x, z: goal.z, rot: 0, phase: i, placed: true, wear: null, via: [], viaFor: null };
+        a = { x: goal.x, z: goal.z, rot: 0, phase: i, placed: true, wear: null, via: [], viaFor: null, y: null, wait: 0, retry: 0 };
         this._agents.set(p.id, a);
       }
       if (redress || !a.wear) {
@@ -88,32 +96,45 @@ export class FamilyRenderer {
       // in the sickbay (sickbayPlan): the patient lying on the bed, the medic at the bedside; put there, not walked there
       const bed = sick?.get(p.id);
       if (bed) {
-        a.x = bed.x; a.z = bed.z; a.rot = bed.rot; a.via = []; a.viaFor = null;
+        a.x = bed.x; a.z = bed.z; a.rot = bed.rot; a.via = []; a.viaFor = null; a.y = null; a.wait = 0;
         if (!redress && a.wear) this._layer.setWear(n, a.wear);
         this._layer.setPose(n, { x: bed.x, y: bed.y, z: bed.z, rot: bed.rot, scale: bed.scale, pose: bed.pose, phase: 0, amp: 0, ...(bed.pitch ? { pitch: bed.pitch } : {}) });
         n++;
         return;
       }
-      // walk toward the goal, along the paths when they lead there (round the walls, not through them)
-      if (ctx.via && (!a.viaFor || Math.hypot(a.viaFor.x - goal.x, a.viaFor.z - goal.z) > 0.3)) {
+      // walk toward the goal, along the paths when they lead there (round the walls, not through them), through a tunnel when the goal is on the other side of the rock
+      // (a goal that changes inside a tunnel is followed once they are out of it)
+      if (isStop(a.via[0])) { a.retry -= dt; if (a.retry <= 0) { a.viaFor = null; a.retry = 3; } }       // (held at a fallen tunnel: look again for the way every few seconds)
+      if (ctx.via && a.y === null && (!a.viaFor || Math.hypot(a.viaFor.x - goal.x, a.viaFor.z - goal.z) > 0.3)) {
         a.viaFor = { x: goal.x, z: goal.z };
-        a.via = Math.hypot(goal.x - a.x, goal.z - a.z) > 25 ? [] : [...ctx.via(a.x, a.z, goal.x, goal.z)];
+        a.via = [...ctx.via(a.x, a.z, goal.x, goal.z)];
       }
-      while (a.via.length && Math.hypot(a.via[0][0] - a.x, a.via[0][1] - a.z) < 0.1) a.via.shift();
+      while (a.via.length && a.via[0][3] === undefined && a.via[0][2] === undefined && Math.hypot(a.via[0][0] - a.x, a.via[0][1] - a.z) < 0.1) a.via.shift();
       const leg = a.via[0], tx = leg ? leg[0] : goal.x, tz = leg ? leg[1] : goal.z;
       const dx = tx - a.x, dz = tz - a.z, dl = Math.hypot(dx, dz), d = leg ? Math.hypot(goal.x - a.x, goal.z - a.z) : dl;
-      // climbing steep ground is slow, picking down it a little slower than the flat (game/paths/walkRoute slopePace)
-      const pace = dl > 1e-6 ? slopePace((ground(a.x + dx / dl * 0.2, a.z + dz / dl * 0.2) - ground(a.x, a.z)) / 0.2) : 1;
+      // climbing steep ground is slow, picking down it a little slower than the flat (game/paths/walkRoute slopePace); a tunnel's deck is at its own grade
+      const ahead = leg && leg[2] !== undefined && a.y !== null ? (leg[2] - a.y) / Math.max(dl, 0.2) : null;
+      const pace = ahead !== null ? slopePace(ahead) : dl > 1e-6 ? slopePace((ground(a.x + dx / dl * 0.2, a.z + dz / dl * 0.2) - ground(a.x, a.z)) / 0.2) : 1;
       const v = WALK * Math.max(1, speedK) * (p.kid ? 1.1 : 1) * (ctx.footing ? ctx.footing(a.x, a.z) : 1) * pace;
       let moving = false;
-      if (d > 0.02) {
-        const stepLen = Math.min(dl, v * dt);
-        if (d > 25 || jumped) { a.x = goal.x; a.z = goal.z; a.via = []; }          // far: just be there (fast-forward / load)
-        else if (dl > 1e-6) { a.x += dx / dl * stepLen; a.z += dz / dl * stepLen; moving = true; }
-        const want = Math.atan2(dx, dz);
-        let dr = want - a.rot;
-        dr = Math.atan2(Math.sin(dr), Math.cos(dr));
-        a.rot += dr * Math.min(1, dt * 10);
+      if (a.wait > 0) { a.wait = Math.max(0, a.wait - dt * Math.max(1, speedK)); if (a.wait === 0 && leg) { a.via.shift(); } }
+      else if (d > 0.02 || (leg && a.via.length)) {
+        if ((d > 25 && !a.via.length) || (jumped && !isStop(leg))) { a.x = goal.x; a.z = goal.z; a.via = []; a.y = null; }          // far: just be there (fast-forward / load)
+        else if (dl > 1e-6 || (leg && leg[2] !== undefined)) {
+          const me: Mover = a;
+          const st = stepToward(me, leg ?? [goal.x, goal.z], v * dt, ground);
+          moving = st.moved > 1e-6;
+          // the door at a portal: open by day it is walked through; locked (dusk to dawn, the alarm) it costs the keyholder a few seconds
+          const door = leg && st.arrived ? doorAt(leg) : null;
+          if (door && ctx.doorWait) { const w = ctx.doorWait(leg[3]!, a.x, a.z); if (w > 0) a.wait = w; }
+          if (leg && st.arrived && !a.wait && !isStop(leg) && (leg[3] !== undefined || leg[2] !== undefined || a.via.length > 1)) a.via.shift();
+        }
+        if (dl > 1e-6) {
+          const want = Math.atan2(dx, dz);
+          let dr = want - a.rot;
+          dr = Math.atan2(Math.sin(dr), Math.cos(dr));
+          a.rot += dr * Math.min(1, dt * 10);
+        }
       } else if (goal.face !== null) {
         let dr = goal.face - a.rot;
         dr = Math.atan2(Math.sin(dr), Math.cos(dr));
@@ -126,7 +147,7 @@ export class FamilyRenderer {
       let pose = moving ? goal.walkPose ?? FIG_POSE.STAND : goal.pose;
       if (!moving && goal.work && goal.pose === FIG_POSE.REACH) pose = Math.sin(this._time * 6 + i * 1.7) > 0 ? FIG_POSE.REACH : FIG_POSE.STAND;
       const fp: FigurePose = {
-        x: a.x, y: ground(a.x, a.z) + (!moving || d < 0.3 ? goal.y ?? 0 : 0), z: a.z, rot: a.rot,
+        x: a.x, y: (a.y ?? ground(a.x, a.z)) + (a.y === null && (!moving || d < 0.3) ? goal.y ?? 0 : 0), z: a.z, rot: a.rot,
         scale: figureScale(p),
         pose, phase: a.phase, amp: moving ? 0.5 : 0,
         tool: goal.tool ?? 0,
