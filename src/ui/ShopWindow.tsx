@@ -3,7 +3,7 @@
  * item cards with a drawn icon, a cart and one order; "Accounts you
  * manage"; metals at spot plus dealer premiums).
  */
-import { Fragment, useState, type CSSProperties, type ReactNode } from 'react';
+import { Fragment, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { MATERIALS, billText, type MaterialId } from '../sim/materials';
 import { foodLine, orderCost, orderProblem, payWith, prices } from '../sim/economy';
@@ -176,6 +176,11 @@ function Icon({ id, tint }: { id: string; tint?: number }) {
 export function ShopWindow() {
   const g = useGameStore();
   const game = g.game;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') useGameStore.getState().openShop(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   const need = plansNeed(game), needTabs = shelvesNeeding(need);
   const needLines = plansNeedLines(game);
   const [tab, setTab] = useState<Tab>(() => (TABS.find(([id]) => id === g.shopTab)?.[0] ?? TABS.map(([id]) => id).find(id => id in needTabs) ?? 'build'));
