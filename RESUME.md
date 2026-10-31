@@ -1,6 +1,6 @@
 # Resume notes (updated at pause, main = 542b23f, save v72)
 
-State: all feature PRs merged; only this PR is open (notes, not for merging as code). `main` verified: tsc clean, vite build OK, 2324 vitest tests pass; bot playtests: Standard fair, Hardcore lethal (docs/OVERNIGHT-SUMMARY.md).
+State: all feature PRs merged (latest #160, main = 7bd239b, save v72); only this PR is open (notes, not for merging as code). Last round: #159 UI declutter ("Get operational" checklist), #158 auto utilities (within ~70 m, homes wired instantly; Hardcore 25 wipes/36 vs 23), #160 Escape closes Shop. Final headless playthroughs (4 regions, Standard/Hardcore/Relaxed): no crashes or console errors; main verified tsc, build, 2324 tests.
 
 Pick up here:
 1. Ask the user for real-browser load time + FPS on Medium and Try High (decides High default).
