@@ -18,7 +18,7 @@ import { litersText } from '../../sim/format';
 import { setBelt } from '../../sim/weekender';
 import { CREW_DAY_USD, crewIdea, nextLongStay, nextStageOrder, weekendBudget, weekendsFor } from '../../sim/weekendPlan';
 import { dayIndex } from '../../sim/state';
-import { Note, Row, Section } from './common';
+import { Clamp, Note, Row, Section } from './common';
 import { TONE, DIM, LINE, btn, usd } from './style';
 
 export function ProjectsTab() {
@@ -50,7 +50,7 @@ export function ProjectsTab() {
       <Row label="Work left" value={`${Math.round(left).toLocaleString('en-US')} h`} />
       <Row label="At the family's pace" value={eta(weeks)} tone={weeks !== null && weeks > 26 ? 'warn' : undefined} title={`${Math.round(pace.perWeek)} effective hours of building a week`} />
       {selWeeks !== null && sel && <Row label={`${KIT[sel.kind].name} done in`} value={eta(selWeeks)} title="Counting what the family finishes first, in the order of the list" />}
-      {hint && <Note tone="warn">{hint}</Note>}
+      {hint && <Clamp text={hint}><span style={{ color: TONE.warn }}>{hint}</span></Clamp>}
     </Section>}
       {rows.length > 1 && <Section title="Under way, in the order the family works">
         {rows.slice(0, 8).map((r, i) => <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 0', borderBottom: `1px solid ${LINE}` }}>
