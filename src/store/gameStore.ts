@@ -50,6 +50,7 @@ import { log } from '../sim/economy';
 import { opsecOf } from '../sim/opsec';
 import { hardenProblem, orderHarden, orderHardenAll, tierOf, type HardenId } from '../sim/hardening';
 import { saveGame, AUTOSAVE } from '../sim/save/saveSystem';
+import { decisionOpen, resumeSpeed } from '../sim/clockResume';
 
 /**
  * A raid played as a cutscene (sim/siege.ts, sim/raidCutscene.ts). While one is up, everything that
@@ -140,6 +141,8 @@ export interface GameStore {
   /** Stake starter-compound pieces (and the yard fence) in one go; each is an ordinary structure afterwards. Returns how many went in. */
   layStarter: (pieces: ReadonlyArray<{ kind: string; x: number; z: number; rot: number }>, yard: WallPlan | null, geo: PropertyGeometry) => number;
   load: (g: GameState) => void;
+  /** Speed to pick up again once the decision card that paused the clock is answered (null: stay paused). */
+  resumeTo: Speed | null;
   /** Lay out a fence / hedge / wall run for the family to build. */
   planRun: (kind: PerimeterKind, pts: Pt[], gates: Gate[], offLen?: number) => void;
   /** Lay a tunnel-bridge or slope tunnel along a line the ground allows. Null on success, else why not. */
@@ -312,17 +315,20 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
   },
   tick: (realDt) => {
     const g = get().game;
+    const back = resumeSpeed(get().resumeTo, g.clock.speed, decisionOpen(g, get().cutscene));
+    if (back) { set({ game: { ...g, clock: { ...g.clock, speed: back } }, resumeTo: null }); return; }
     if (get().cutscene || g.clock.speed === 0 || g.gate.pending || g.gate.aftermath || (g.ending && !g.ending.continued)) return;
     const days = Math.min(realDt, MAX_DT) / SECONDS_PER_DAY[g.clock.speed];
     const next = step(g, days);
     // someone at the gate: stop the clock until the player decides
     // (and when news of a rescue comes in: the card)
-    if ((next.gate.pending && !g.gate.pending) || (next.gate.card && !g.gate.card) || (next.ending && !g.ending)) next.clock = { ...next.clock, speed: 0 };
-    set({ game: next, ...(next.gate.pending && !g.gate.pending ? { cutscene: promptFor(next), tool: null } : {}) });
+    const paused = (next.gate.pending && !g.gate.pending) || (next.gate.card && !g.gate.card) || (next.ending && !g.ending);
+    if (paused) next.clock = { ...next.clock, speed: 0 };
+    set({ game: next, ...(paused ? { resumeTo: g.clock.speed } : {}), ...(next.gate.pending && !g.gate.pending ? { cutscene: promptFor(next), tool: null } : {}) });
     if (dayIndex(next.clock.t) !== dayIndex(g.clock.t)) void saveGame(AUTOSAVE, next);
   },
   advance: (days) => set(s => { const game = step(s.game, days); return { game, cutscene: s.cutscene ?? promptFor(game) }; }),
-  setSpeed: (speed) => locked() ? undefined : set(s => ({ game: { ...s.game, clock: { ...s.game.clock, speed } } })),
+  setSpeed: (speed) => locked() ? undefined : set(s => ({ resumeTo: null, game: { ...s.game, clock: { ...s.game.clock, speed } } })),
   order: (lines) => {
     if (locked()) return false;
     const g = structuredClone(get().game);
@@ -389,7 +395,8 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     if (n) { set({ game: g }); void saveGame(AUTOSAVE, g); }
     return n;
   },
-  load: (game) => set({ game, selected: null, tool: null, cutscene: promptFor(game) }),
+  resumeTo: null,
+  load: (game) => set({ game, selected: null, tool: null, cutscene: promptFor(game), resumeTo: null }),
   planRun: (kind, pts, gates, offLen = 0) => {
     if (locked()) return;
     if (routeProblem(get().game, kind, pts)) return;   // a tunnel-bridge needs real low ground, a slope tunnel a hillside (the tool says why)
