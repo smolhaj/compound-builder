@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { unscripted } from '../sim/godMode';
 import { TERRAIN_LEGEND, type TerrainMode } from '../game/terrain/TerrainOverlay';
 import { stormOutage } from '../sim/weatherThreats';
 import { fogLineFor } from '../sim/fogFx';
@@ -448,8 +449,8 @@ export function Hud() {
             <TakenSection />
             <ScavengeSection />
             <RumorsSection />
-            {game.disaster.mode === 'sandbox' && !game.disaster.kind && <FreeBuild />}
-            {!(game.disaster.phase === 'warning' || (game.disaster.kind && game.clock.t >= game.disaster.warnAt)) && !(game.disaster.mode === 'sandbox' && !game.disaster.kind) && <Hint more="Watch the news ticker, the prices and the neighbors: the warning signs show there first.">All quiet.</Hint>}
+            {unscripted(game.disaster.mode) && !game.disaster.kind && <FreeBuild />}
+            {!(game.disaster.phase === 'warning' || (game.disaster.kind && game.clock.t >= game.disaster.warnAt)) && !(unscripted(game.disaster.mode) && !game.disaster.kind) && <Hint more="Watch the news ticker, the prices and the neighbors: the warning signs show there first.">All quiet.</Hint>}
             {(game.disaster.phase === 'warning' || (game.disaster.kind && game.clock.t >= game.disaster.warnAt)) && (
               <Section title="Outside world">
                 {game.disaster.tracks.deliveries <= 0.25 ? <Note tone="bad">No deliveries: the yard and the stores are shut</Note>

@@ -46,6 +46,8 @@ export const selfSufficient = (st: RunStats) => st.days >= 400 && st.grownYear >
 export type EndKind = 'recovered' | 'new_normal' | 'equilibrium' | 'wipe' | 'bug_out';
 export interface Ending { kind: EndKind; day: number; continued: boolean }
 
+import { placeLine } from './settlement';
+import { isGod } from './godMode';
 const living = (s: GameState) => s.personState.filter(ps => ps.needs.died == null).length;
 /** The line goes on while anyone lives, at home or away with a neighbor (sim/orphans.ts). */
 const lineLives = (s: GameState) => living(s) + (s.lineage?.wards?.length ?? 0);
@@ -106,7 +108,8 @@ export function reportCard(s: GameState): ReportCard {
   const survival = total ? alive / total : 0;
   const fed = st.days ? 1 - st.hungryDays / st.days : 1;
   const score = Math.round(100 * (0.5 * survival + 0.2 * fed + 0.15 * (g.humanity / 100) + 0.15 * (g.raidsHeld + g.raidsLost ? g.raidsHeld / (g.raidsHeld + g.raidsLost) : 1)));
-  const grade = end === 'wipe' ? 'F' : score >= 90 ? 'A' : score >= 80 ? 'B' : score >= 65 ? 'C' : score >= 50 ? 'D' : 'F';
+  const sandbox = isGod(s);
+  const grade = sandbox ? 'S' : end === 'wipe' ? 'F' : score >= 90 ? 'A' : score >= 80 ? 'B' : score >= 65 ? 'C' : score >= 50 ? 'D' : 'F';
   const family = s.people[0]?.last ?? 'The family';
   const bo = st.bugOut;
   const headline = end === 'bug_out' ? `The ${family} family bugged out`
@@ -171,6 +174,8 @@ export function reportCard(s: GameState): ReportCard {
   if (g.raidsHeld) lines.push(`The line held ${g.raidsHeld} ${g.raidsHeld === 1 ? 'time' : 'times'}${g.raidsLost ? `, and broke ${g.raidsLost}` : ''}.`);
   else if (g.raidsLost) lines.push(`They got in ${g.raidsLost} ${g.raidsLost === 1 ? 'time' : 'times'}.`);
   if (s.perimeter.some(r => r.kind === 'escape_tunnel' && r.finishedAt !== null)) lines.push('The tunnel was never needed.');
+  lines.push(placeLine(s));
+  if (sandbox) lines.push('Sandbox run: unlimited money, so this card is not graded.');
   const allies = s.neighbors.filter(n => n.disposition > 50 && n.status === 'home');
   if (allies.length) lines.push(`${allies.map(n => n.name[0].toUpperCase() + n.name.slice(1)).join(' and ')} stood with you.`);
   return {

@@ -3,6 +3,7 @@
  * quarter-hour sub-step (deterministic regardless of frame rate or speed).
  * Systems mutate a draft; `step` returns a fresh state object.
  */
+import { topUp } from './godMode';
 import { sharedHarvestDay } from './sharedHarvest';
 import { hasBasement } from './housingStyles';
 import { wildlifeDay, wildlifeNight } from './wildlife';
@@ -251,6 +252,7 @@ function subStep(s: GameState): void {
       }
     }
   }
+  topUp(s);   // God Mode: unlimited money (sim/godMode.ts)
   // once a day (at midnight): balance water and power
   const day = dayIndex(s.clock.t);
   if (day !== s.utilities.lastDay && h < 0.3) {
