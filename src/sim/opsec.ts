@@ -15,6 +15,7 @@
  * blackout curtains).
  */
 import { eraPressure } from './eraPressure';
+import { threatOn } from './threatState';
 import type { GameState } from './state';
 import { isFinished } from './construction';
 import { noiseNow } from './gatherings';
@@ -83,5 +84,5 @@ export function topExposure(s: GameState, n = 3): Array<[ExposureSource, number]
 
 /** Multiplier on how often people come and how many of them come for what you have: 0.7 (nobody knows) … 1.6 (everyone does). */
 export function raidPressure(s: GameState): number {
-  return (0.7 + 0.9 * exposure(s) / 100) * eraPressure(s);
+  return (0.7 + 0.9 * exposure(s) / 100) * eraPressure(s) * (1 + 0.5 * threatOn(s, 'warlord'));   // a warlord scare (sim/threats.ts): up to half again
 }
