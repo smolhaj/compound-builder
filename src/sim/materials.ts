@@ -28,7 +28,7 @@ export type MaterialId = 'lumber' | 'logs' | 'firewood' | 'fieldstone' | 'concre
   // the evenings' wear and restock goods, kids' things (sim/evenings.ts)
   | 'game_pieces' | 'guitar_strings' | 'music_player' | 'batteries' | 'paperbacks_bag' | 'toys' | 'picture_books'
   // classes and courses (sim/courses.ts): a book set (with a DVD) for each
-  | 'course_firstaid' | 'course_ham' | 'course_engines' | 'course_welding' | 'course_carpentry' | 'course_wiring' | 'course_gardening' | 'course_husbandry' | 'course_canning'
+  | 'course_firstaid' | 'course_ham' | 'course_engines' | 'course_welding' | 'course_carpentry' | 'course_wiring' | 'course_gardening' | 'course_husbandry' | 'course_canning' | 'course_hunter'
   // medical depth (sim/medical.ts)
   | 'antibiotics' | 'splints' | 'ors' | 'dental_kit' | 'midwife_kit' | 'medical_books'
   // the herd, the bees and the sugar bush (sim/herd.ts, sim/bees.ts, sim/maple.ts)
@@ -123,6 +123,7 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   course_wiring: { id: 'course_wiring', name: 'Wiring and solar course', unit: 'a home-wiring and off-grid solar workbook set with a DVD course (about 30 hours)', price: 52 },
   course_gardening: { id: 'course_gardening', name: 'Gardening course', unit: 'a market-garden and seed-saving book set with a DVD course (about 24 hours)', price: 32 },
   course_husbandry: { id: 'course_husbandry', name: 'Animal husbandry course', unit: 'a homestead livestock handbook set with a DVD course: feeding, birthing, hooves, sickness (about 24 hours)', price: 38 },
+  course_hunter: { id: 'course_hunter', name: 'Hunter safety course', unit: 'a hunter-education book set with a DVD course (about 12 hours)', price: 25 },
   course_canning: { id: 'course_canning', name: 'Canning and cooking course', unit: 'a preserving and from-scratch cooking book set with a DVD course (about 20 hours)', price: 30 },
   manuals: { id: 'manuals', name: 'How-to manuals', unit: 'a shelf of repair, garden, building, cooking and field guides: skills come on faster', price: 180 },
   maple_taps: { id: 'maple_taps', name: 'Maple taps', unit: '25 spiles with buckets and lids for the sugar bush', price: 120 },
