@@ -52,3 +52,22 @@ Known small leftovers: apiary Stock button greyed w/o reason, cellar loss roundi
 - Standard: wipes 20->20/36, alive 52->56/149, hungry days 959->1034 (homestead rows). Fair.
 - Hardcore: wipes 23->23/36, alive 43->41, idle/homestead still wipe 15 of 18. Lethal. Fortress 11 alive (noise).
 - Area E (#148-#153) merged: no save bump after v72. Open: boatSeats not wired into bugout.ts, stilted-house floor pop, no lake ice visual, no eye shots of aquaponics/stilted house/tower pod.
+
+## Feedback round (UI clutter + auto utilities)
+- #159 merged: "Get operational" checklist, Next steps capped at 3, folded groups, Defense tab hints. No save bump. Open Qs (defaults kept): operational = defense >= 45; courses stay in Next steps; no auto-expand.
+- #158 merged: buildings within ~70 m share water + power; homes/pumps/cellar wired+plumbed automatically (instant, in the price). No save bump. Balance: Standard unchanged; Hardcore 25 wipes/36 (was 23), 38 alive (was 41) because wired homes now draw power.
+
+## Round 3 (agents before the reset)
+- #161 merged: long game. Audit: most already existed. Added dynasty score parts (2/stranger taken in, 1/5 buildings, 10/self-fed year; weights are guesses), self-fed streak + 2 milestones, richer chronicle, Years tab Generations. SAVE v73 (migration). No survival balance change.
+- Open questions from that agent (recommended first): orphans (neighbor takes the kids), yearly small threats for a never-recovered world (Cozy off), "first winter off-grid" milestone, confirm dynasty weights, log upgrades in chronicle.
+- #163 merged: bug-out boats, stilted-house walk-in ramp, lake ice, steep stair aprons, lodge cutaway floor. No save bump.
+- #162 merged: moat (creek counts as the moat, no ribbon over the river), covered bridge, vehicle yard. New raid mechanics + 8 monotone tests. No save bump (stays v73). Moat/bridge/yard numbers are first-pass (WATER, YARD_RULES). Open: fire on bridge not modeled.
+- In flight: long-game-2 (orphans, never-recovered threats, off-grid milestone, chronicle upgrades) and walkers-3d (animals/trucks on routes, dog post).
+- #164 merged: depth audit (docs/DEPTH_AUDIT.md: tasks 25-27 were almost all already built) + hunter-safety course. SAVE v74 (migration adds course_hunter stock). Open Qs defaulted: no tag requirement, no pickup trips.
+- #165 merged: UI declutter round 2 (decision cards, new-game step 3, raid report, Family/Supplies/etc folds). No save change.
+- #166 merged: animals/livestock/trucks on routes (livestock now drawn, paddock by day, shelter by ring in raids), guard dog inner post + kennel. No save change.
+- #167 merged: QA fixes (gate/report cards above the Shop, hookup text, Get-operational power line counts wind/hydro/solar farm/battery bank). QA open: winter lake ice looks blotchy from above; 4 of 88 region x lot combos rendered; frame times on real hardware unmeasured.
+- In flight: long-game-2 (orphans etc), joiners-bring-stuff (RV/modular/build/player-built housing), assigned-quarters (household quarters + morale/illness/security).
+- #168 merged: long game follow-ups. SAVE v75 (orphans fostered by neighbors with heir at 18, yearly threats in a never-recovered world [Cozy off, Standard half, Hardcore full], first-winter-off-grid milestone, chronicle upgrade lines). BALANCE FLAG: bot wipes drop (Standard 20->4/36, Hardcore 25->14/36) mostly because fostered orphans aren't a wipe; Hardcore still ends with nobody home in 26/36; Standard lost ~2 survivors-at-home runs (new threats). Decision (mine): keep fostering as a non-wipe.
+- #169 merged: assigned household quarters (src/sim/quarters.ts; Family > Quarters, Move-to per household, Sick bay + Guards' quarters roles; morale/sleep, illness spread, raid readiness delay). SAVE v76. Balance flags: crowding morale (cap -3), illness x1.25 shared room / x0.7 separate building, raid readiness only by quartering. Playtests unchanged (Standard fair, Hardcore lethal). Open qs defaulted: shelter delay cosmetic, tower guards dormant, no auto-fill guards, sick child goes alone.
+- Remaining in flight: joiners-bring-stuff (needs merge of main, renumber save > v76, register RV/modular in HOME_BEDS/HOMES).

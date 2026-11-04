@@ -1,10 +1,12 @@
-# Resume notes (updated at pause, main = 542b23f, save v72)
+# Resume notes (updated at pause 2026-11-04, main after #170, save v77)
 
-State: all feature PRs merged (latest #160, main = 7bd239b, save v72); only this PR is open (notes, not for merging as code). Last round: #159 UI declutter ("Get operational" checklist), #158 auto utilities (within ~70 m, homes wired instantly; Hardcore 25 wipes/36 vs 23), #160 Escape closes Shop. Final headless playthroughs (4 regions, Standard/Hardcore/Relaxed): no crashes or console errors; main verified tsc, build, 2324 tests.
+State: all feature PRs merged (latest #170 joiners bring things + choose where they stay). Only this notes PR (#55) is open. docs/OVERNIGHT-SUMMARY.md lists every merge, save bump and balance flag since the first overnight run.
+
+Landed this week: HUD declutter rounds 1+2, auto utilities, Escape closes Shop, long game (dynasty parts, orphans fostered, yearly threats, v73/v75), hunter course (v74), moat + covered bridge + vehicle yard, boats/lake ice/stairs/lodge cutaway, livestock + animals + trucks on routes + guard dog post, QA fixes, assigned household quarters (v76), joiners bring stuff + stay options (v77).
 
 Pick up here:
 1. Ask the user for real-browser load time + FPS on Medium and Try High (decides High default).
-2. Defense depth leftovers: 3D wildlife/livestock/trucks via walkRoute, guard dog inner post, moat, covered wooden bridge, vehicle yards.
-3. Small: boatSeats into bugout.ts, stilted-house floor pop, lake ice visual, eye shots of aquaponics / stilted house / tower pod, steep-slope stair shot (#136), housing leftovers (cutaway over lodge basement, split stone/timber-frame plans).
-4. Game-loop backlog (tasks 25, 26, 27, 34): long game (endless sandbox, heirs inherit everything, day-by-day).
-Workflow: feature branches, draft PRs, squash-merge when `check` and `perf-budget` are green; never raise perf budgets; DECISIONS.md rows conflict every time (keep both sides); bump save version + migration on state changes. docs/NEXT-ROUND.md has the agent brief template.
+2. Watch: fostered-orphan runs are not wipes (Standard wipes 20->4/36, Hardcore 25->14); if Hardcore feels soft, require orphans to be a few years old or add a 'line alive, nobody home' column to the bot report.
+3. Open: fire on the covered bridge not modeled; lake ice looks blotchy from above; modular-home eye shot unverified; only 4 of 88 region x lot combos rendered by QA; no real-hardware frame times; bots never pick a stay choice (add STAY env to scripts/playtest.test.ts); tower bunks dormant.
+4. Ideas queued: tunnel collapse as a raid outcome, per-ring gate vetting, per-person beds (user chose household level).
+Workflow: feature branches, draft PRs, squash-merge when `check` and `perf-budget` are green (CI does not run on conflicting PRs: merge main first); never raise perf budgets; DECISIONS.md rows conflict, keep both sides; bump save version + migration on state changes and renumber after merging main. docs/NEXT-ROUND.md has the agent brief template.
