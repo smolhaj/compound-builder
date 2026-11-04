@@ -29,7 +29,7 @@ import { LivedLayer } from './lived/LivedLayer';
 import type { Mode } from './lived/livedPlan';
 import { lightsOutNow } from '../sim/blackout';
 import type { NetWorld } from './paths/pathNet';
-import { WALK_CLIFF, walkRoute } from './paths/walkRoute';
+import { WALK_CLIFF, entryRampHeight, walkRoute } from './paths/walkRoute';
 import { CorridorNet } from './paths/CorridorNet';
 import type { Wp } from './paths/linkRoute';
 import { CorridorDoors } from './perimeter/CorridorDoors';
@@ -54,7 +54,7 @@ import type { GameState } from '../sim/state';
 import type { WearSeason } from '../engine/world/people/crowdWear';
 import type { TourBuildingInfo } from '../engine/world/camera/TourController';
 import { hydroSiteAt, windDay, TURBINE } from '../sim/renewables';
-import { boatsAtDock, isDock, lakeIce } from '../sim/waterfront';
+import { boatsAtDock, isDock, lakeIce, waterBody } from '../sim/waterfront';
 import { hydroLine, HYDRO_HOUSE } from './buildkit/renewableBuildings';
 import { climbOf, floorHatchHost, footprint, KIT, placementProblem, rotQ, type Placed, type SiteQuery } from './buildkit/kit';
 import { showStage, CUTAWAY_HIDE, XRAY_LAYERS, type BuildLayer as CabinLayer, type BuildOpts } from './buildkit/shell';
@@ -186,6 +186,9 @@ interface DigSite { pit: Pit; spoil: number; machine: boolean; stage: number; f:
 
 /** Kinds with a basement under the main floor (their floorboards are see-through in the cutaway views). */
 const SEE_THROUGH_FLOOR: ReadonlySet<string> = new Set(['lodge', 'lodge_solar']);
+
+/** How much of the lake shows ice for each sim state (a skim is thin and patchy). */
+const ICE_COVER = { open: 0, skim: 0.32, ice: 1 } as const;
 
 export class HomesteadWorld {
   readonly center = new THREE.Vector3(PARCEL_SIZE / 2, 0, PARCEL_SIZE / 2);
@@ -521,6 +524,8 @@ export class HomesteadWorld {
     }
     this._syncTruckTail();
     this.truck.update(dt, speedK);
+    // the lake skins over and freezes when the sim says so (sim/waterfront lakeIce), not by the calendar alone
+    this.lakes.setIce(waterBody(game) ? ICE_COVER[lakeIce(game)] : -1, dt);
     this.plow.update(dt, this._drive && game.stock.plow >= 1, seasonState.params.snow, speedK);
     // deliveries left at the road (no drive yet), by the gate
     const rs = emptyStock();
@@ -2255,6 +2260,8 @@ export class HomesteadWorld {
       // a stair or a ramp: up the steps (or the grade) from its low end
       if (def.climbs) { if (Math.abs(lx) < hw && Math.abs(lz) < hd) return b.padY + treadHeight(b.placed.kind, b.opts.rise ?? 0, def.cellsZ * CELL, lz); continue; }
       if (Math.abs(lx) < hw && lz > -hd && lz < hd + def.porch && def.floorY > 0.02) return b.padY + def.floorY;
+      // the steps down off the deck: ease from the floor to the ground instead of dropping the whole rise at the edge
+      if (def.floorY > 0.1 && Math.abs(lx) < hw && lz >= hd + def.porch && lz < hd + def.porch + 0.9) return entryRampHeight(b.padY + def.floorY, this.groundAt(x, z), lz - hd - def.porch);
       // a building whose floor is its graded pad (greenhouse gravel, a garage slab): stand on the pad, not the raw slope under it
       if (Math.abs(lx) < hw && Math.abs(lz) < hd && def.category !== 'bunker' && (def.category !== 'food' || b.placed.kind === 'greenhouse' || b.placed.kind === 'greenhouse_heated' || b.placed.kind === 'sheep_barn')) return b.padY + Math.max(0, def.floorY);
     }

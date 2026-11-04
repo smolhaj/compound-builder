@@ -5,6 +5,7 @@ import { makeLotSite } from './lotListing';
 import { BLUEPRINTS, totalBill } from './blueprints';
 import { MATERIALS, type MaterialId } from './materials';
 import { BOATS, boatFishK, boatSeats, boatsAtDock, dockProblem, docks, freezeDay, freezeDayBoats, hasBubbler, lakeIce, slipsOf, waterBearing, waterBody, waterLaneCost, waterLevelAt } from './waterfront';
+import { bugOutPlan } from './bugout';
 import { raidAngle, terrainDefense, waterLaneOf } from './terrainFx';
 import { campOf } from './terrainState';
 import { KIT, placementProblem, type SiteQuery } from '../game/buildkit/kit';
@@ -65,6 +66,19 @@ describe('boats', () => {
     at(g, 200);
     expect(boatSeats(g)).toBe(BOATS.skiff.seats + 3 * BOATS.jon_boat.seats);
     at(g, 20);
+    expect(boatSeats(g)).toBe(0);
+  });
+
+  it('a bug-out counts the boat seats at the dock, and none while the lake is iced', () => {
+    const g = lake();
+    g.disaster.kind = 'grid_down' as never;
+    built(g, 'd', 'boat_dock', 10, 10);
+    g.stock.skiff = 1;
+    at(g, 200);
+    const base = bugOutPlan(g).seats;
+    g.stock.skiff = 0;
+    expect(base - bugOutPlan(g).seats).toBe(BOATS.skiff.seats);
+    g.stock.skiff = 1; at(g, 20);
     expect(boatSeats(g)).toBe(0);
   });
 

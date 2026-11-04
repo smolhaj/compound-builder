@@ -54,10 +54,10 @@ export function terraceStair(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): 
   // a handrail on one side from a 1.2 m rise up, two when it is a high flight
   p.layer = 'roof';
   if (Math.abs(rise) >= RAIL_FROM) { railing(p, W, D, rise, up, 1); if (Math.abs(rise) >= 0.4) railing(p, W, D, rise, up, -1); }
-  // landings: a flat gravel apron at each end
+  // landings: a flat gravel apron at each end, thick enough to stand on the slope rather than float over it
   p.layer = 'walls';
-  p.add('gravel', box(W - cheek * 2, 0.012, 0.5 * M, 0, -0.002, zAt(0, D, up) - 0.25 * M));
-  p.add('gravel', box(W - cheek * 2, 0.012, 0.5 * M, 0, Math.abs(rise) - 0.006, zAt(1, D, up) + 0.25 * M));
+  p.add('gravel', box(W - cheek * 2, 0.14, 0.5 * M, 0, -0.066, zAt(0, D, up) - 0.25 * M));
+  p.add('gravel', box(W - cheek * 2, 0.14, 0.5 * M, 0, Math.abs(rise) - 0.064, zAt(1, D, up) + 0.25 * M));
   const g = p.finish();
   g.userData.chimneyTop = null;
   g.userData.keep = ['frame'];
