@@ -7,7 +7,7 @@
  */
 import { DISASTERS, nextEraDisaster } from './disaster';
 import { emptyStats, reportCard } from './report';
-import { chronicle } from './lineage';
+import { award, chronicle } from './lineage';
 import { dayJob } from './family';
 import { REGIONS } from './regions';
 import { dayIndex, type GameState } from './state';
@@ -36,10 +36,10 @@ export function erasDay(s: GameState): string[] {
   if (!e || !e.continued || e.kind === 'wipe') return out;
   if (!L.settling) {
     const card = reportCard(s);
-    L.eras.push({ n: L.era, kind: d.kind ?? '', name: DISASTERS[d.kind!]?.name ?? 'The collapse', fate: d.fate, hitDay: Math.floor(d.hitAt), endDay: day, ending: e.kind, grade: card.grade, score: card.score });
-    L.points += card.score;
+    L.eras.push({ n: L.era, kind: d.kind ?? '', name: DISASTERS[d.kind!]?.name ?? 'The collapse', fate: d.fate, hitDay: Math.floor(d.hitAt), endDay: day, ending: e.kind, grade: card.grade, score: card.score, headline: card.headline });
+    award(L, 'eras', card.score);
     L.settling = true;
-    chronicle(s, 'era', `Era ${roman(L.era)} closed (${card.grade}): ${FATE_TEXT[d.fate]}.`);
+    chronicle(s, 'era', `Era ${roman(L.era)} closed (${card.grade}): ${card.headline}; ${FATE_TEXT[d.fate]}.`);
   }
   // wait for the world to settle where it's going to: back, at its new level, or a year of nothing
   const since = t - d.hitAt;

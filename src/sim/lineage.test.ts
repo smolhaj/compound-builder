@@ -155,3 +155,75 @@ describe('save v30', () => {
     expect(alive(s)).toBe(s.people.length);
   });
 });
+
+import { generations, award } from './lineage';
+import { isFinished } from './construction';
+
+describe('the long game, v73', () => {
+  it('score parts add up to the points, and the places-scored-yearly parts accrue', () => {
+    const g = newGame(5);
+    live(g, 3 * 365);
+    const sum = Object.values(g.lineage.parts).reduce((a, b) => a + b, 0);
+    expect(sum).toBeCloseTo(g.lineage.points, 5);
+    const L = g.lineage;
+    award(L, 'births', 25);
+    expect(L.parts.births).toBeGreaterThanOrEqual(25);
+  });
+
+  it('strangers taken in score each year', () => {
+    const g = newGame(5);
+    g.people[0].kin = true;
+    const stranger = { ...g.people[3] ?? g.people[0], id: 'x1', first: 'Stray', kin: false };
+    g.people.push(stranger);
+    g.personState.push({ ...g.personState[0], id: 'x1', needs: { ...g.personState[0].needs, died: undefined as never } });
+    g.personState[g.personState.length - 1].needs.died = null as never;
+    live(g, 366);
+    expect(g.lineage.parts.takenIn ?? 0).toBeGreaterThanOrEqual(2);
+  });
+
+  it('a self-fed streak earns the milestone and breaks on a short harvest', () => {
+    const g = newGame(5);
+    g.food.needKcal = 1000; g.food.producedKcal = 1000;
+    live(g, 366);
+    expect(g.lineage.selfFedDays).toBeGreaterThanOrEqual(365);
+    expect(g.lineage.milestones).toContain('self_fed_year');
+    g.food.producedKcal = 100;
+    live(g, 1);
+    expect(g.lineage.selfFedDays).toBe(0);
+  });
+
+  it('finished notable buildings are written up once', () => {
+    const g = newGame(5);
+    const x = g.structures.find(st => isFinished(st)) ;
+    if (x) { x.pre = false; }
+    live(g, 2);
+    const n = g.lineage.chronicle.filter(e => e.kind === 'home').length;
+    live(g, 3);
+    expect(g.lineage.chronicle.filter(e => e.kind === 'home').length).toBe(n);
+  });
+
+  it('generations lists the family eldest first, with the dead marked and heirs named', () => {
+    const g = newGame(5);
+    const [a, , k] = g.people;
+    g.personState[0].needs.died = 5;
+    const rows = generations(g);
+    expect(rows[0].gen).toBeLessThanOrEqual(rows[rows.length - 1].gen);
+    const all = rows.flatMap(r => r.people);
+    expect(all.find(p => p.id === a.id)!.alive).toBe(false);
+    expect(all.find(p => p.id === k.id)!.parents.length).toBeGreaterThan(0);
+  });
+});
+
+describe('v72 -> v73 migration', () => {
+  it('adds parts, built and selfFedDays without re-announcing finished buildings', () => {
+    const g = newGame(2) as unknown as Record<string, unknown>;
+    const old = JSON.parse(JSON.stringify(g));
+    old.version = 72;
+    delete old.lineage.parts; delete old.lineage.built; delete old.lineage.selfFedDays;
+    old.lineage.points = 120;
+    const back = migrate(old);
+    expect(back.lineage.selfFedDays).toBe(0);
+    expect(back.lineage.built).toEqual(expect.any(Array));
+    expect(back.lineage.parts.years).toBe(120);
+  });
+});

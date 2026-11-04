@@ -35,7 +35,7 @@ export type ChronicleKind = 'era' | 'birth' | 'death' | 'partner' | 'coming' | '
 export interface ChronicleEntry { t: number; year: number; kind: ChronicleKind; text: string }
 
 /** One era: a disaster lived through (eras.ts fills these in). */
-export interface EraRecord { n: number; kind: string; name: string; fate: string; hitDay: number; endDay: number; ending: string; grade: string; score: number }
+export interface EraRecord { n: number; kind: string; name: string; fate: string; hitDay: number; endDay: number; ending: string; grade: string; score: number; /** The report card's front-page line (older saves have none). */ headline?: string }
 
 export interface Lineage {
   /** The family name (the founders'). */
@@ -56,9 +56,25 @@ export interface Lineage {
   day: number;
   /** The era whose hit is already in the chronicle. */
   hitEra: number;
+  /** Where the dynasty score came from (sums to `points`; save v73). */
+  parts: Record<string, number>;
+  /** Kinds of building already written up as "finished" in the chronicle. */
+  built: string[];
+  /** Days in a row the place has grown what it eats (across eras, quiet years included). */
+  selfFedDays: number;
 }
 
-export const newLineage = (family: string): Lineage => ({ family, era: 1, eras: [], settling: false, chronicle: [], milestones: [], points: 0, lastBirth: {}, mourned: [], day: -1, hitEra: 0 });
+export const PART_LABEL: Record<string, string> = { years: 'People kept on the place', eras: 'Eras weathered', births: 'Children', milestones: 'Milestones', takenIn: 'People taken in', place: 'Size of the place', selfFed: 'Years feeding itself' };
+/** Add to the dynasty score, filed under where it came from. */
+export function award(L: Lineage, part: string, n: number): void {
+  L.points += n;
+  L.parts[part] = (L.parts[part] ?? 0) + n;
+}
+
+export const newLineage = (family: string): Lineage => ({ family, era: 1, eras: [], settling: false, chronicle: [], milestones: [], points: 0, lastBirth: {}, mourned: [], day: -1, hitEra: 0, parts: {}, built: [], selfFedDays: 0 });
+
+const NOTABLE = /tower|bunker|wall|gate|greenhouse|barn|orchard|well|cistern|solar|workshop|forge|clinic|cellar/;
+const cap = (x: string) => x[0].toUpperCase() + x.slice(1);
 
 const hash = (s: string, seed: number) => { let h = seed * 2654435761 >>> 0; for (const c of s) h = Math.imul(h ^ c.charCodeAt(0), 2246822519) >>> 0; return h; };
 
@@ -125,6 +141,8 @@ const MILESTONES: Array<{ id: string; name: string; points: number; test: (s: Ga
   { id: 'quarter', name: 'Twenty-five years on the place', points: 60, test: (_, y) => y >= 25 },
   { id: 'half', name: 'Fifty years on the place', points: 120, test: (_, y) => y >= 50 },
   { id: 'century', name: 'A hundred years on the place', points: 250, test: (_, y) => y >= 100 },
+  { id: 'self_fed_year', name: 'A full year feeding yourselves', points: 30, test: s => s.lineage.selfFedDays >= 365 },
+  { id: 'self_fed_decade', name: 'Ten years self-fed', points: 100, test: s => s.lineage.selfFedDays >= 3650 },
   { id: 'long_dark', name: 'Five years in a world that never came back', points: 60, test: s => s.lineage.eras.some(e => e.fate === 'never') && s.disaster.tracks.stores < 0.3 && s.disaster.tracks.grid < 0.3 && s.lineage.eras.filter(e => e.fate === 'never').some(e => dayIndex(s.clock.t) - e.hitDay >= 5 * 365) },
 ];
 export const MILESTONE_NAME: Record<string, string> = Object.fromEntries(MILESTONES.map(m => [m.id, m.name]));
@@ -211,7 +229,7 @@ export function lineageDay(s: GameState): string[] {
     const body: 'f' | 'm' = r() < 0.5 ? 'f' : 'm';
     if (r() < risk.baby) { say('birth', `${mother.first}'s baby didn't live (${risk.how}).`); afterBirth(s, mother, r); continue; }
     const kid = newPerson(s, { first: pickName(s, body, r), last: L.family, age: 0, kid: true, body, kin: true, bornHere: true, bday: doy, gen: Math.max(mother.gen ?? 1, mate.gen ?? 1) + 1, parents: [mother.id, mate.id] }, r);
-    L.points += 25;
+    award(L, 'births', 25);
     say('birth', `${kid.first} ${kid.last} was born to ${mother.first} and ${mate.first}, ${risk.how}.`);
     if (r() < risk.mother) { const ps = s.personState.find(x => x.id === mother.id)!; ps.needs.died = Math.floor(s.clock.t); L.mourned.push(mother.id); passOn(s, mother); say('death', `${fullName(mother)} died in childbirth, aged ${mother.age}.`); }
     else afterBirth(s, mother, r);
@@ -236,17 +254,32 @@ export function lineageDay(s: GameState): string[] {
       L.lastBirth[p.id] = L.lastBirth[mate.id] = day;
       const body: 'f' | 'm' = r() < 0.5 ? 'f' : 'm';
       const kid = newPerson(s, { first: pickName(s, body, r), last: L.family, age: town ? Math.floor(r() * 4) : 3 + Math.floor(r() * 9), kid: true, body, kin: true, bday: 1 + Math.floor(r() * 365), gen: Math.max(p.gen ?? 1, mate.gen ?? 1) + 1, parents: [p.id, mate.id] }, r);
-      L.points += 25;
+      award(L, 'births', 25);
       say('birth', town ? `${p.first} and ${mate.first} adopted ${kid.first}.` : `${p.first} and ${mate.first} took in ${kid.first}, ${kid.age}, who had no one left.`);
     }
   }
+  // feeding yourselves (a streak, kept across eras)
+  const f = s.food;
+  L.selfFedDays = f.needKcal > 0 && f.producedKcal >= f.needKcal * 0.9 ? L.selfFedDays + 1 : 0;
+  // what was built goes in the chronicle: the first of each notable kind
+  for (const x of s.structures) if (!x.pre && isFinished(x) && !L.built.includes(x.kind) && (isHome(x.kind) || NOTABLE.test(x.kind))) {
+    L.built.push(x.kind);
+    chronicle(s, 'home', `${cap(x.kind.replace(/_/g, ' '))} finished.`);
+  }
+  // each year on the place, the dynasty is also scored on what it has become: strangers taken in, the size of the place, a place that feeds itself
+  if (day > 0 && day % 365 === 0) {
+    const takenIn = living.filter(p => !p.kin).length, place = s.structures.filter(x => !x.pre && isFinished(x)).length;
+    award(L, 'takenIn', 2 * takenIn);
+    award(L, 'place', Math.floor(place / 5));
+    if (L.selfFedDays >= 365) award(L, 'selfFed', 10);
+  }
   // the score: a person-year a year for everyone here
-  L.points += s.people.filter(p => alive(s, p)).length / 365;
+  award(L, 'years', s.people.filter(p => alive(s, p)).length / 365);
   // milestones
   const years = Math.floor(day / 365);
   for (const m of MILESTONES) if (!L.milestones.includes(m.id) && m.test(s, years)) {
     L.milestones.push(m.id);
-    L.points += m.points;
+    award(L, 'milestones', m.points);
     say('milestone', `${m.name}.`);
   }
   return out;
@@ -281,4 +314,20 @@ export function inheritSkills(s: GameState, dead: Person): string[] {
 function passOn(s: GameState, dead: Person): void {
   const heirs = inheritSkills(s, dead);
   if (heirs.length && dead.kin) chronicle(s, 'death', `${dead.first}'s trades pass to ${heirs.join(' and ')}.`);
+}
+
+
+export interface GenRow { gen: number; people: Array<{ id: string; name: string; age: number; alive: boolean; role: string; parents: string[] }> }
+/** The family by generation, eldest first: who is here, who has gone, whose child they are. The heirs are the grown, living children of the place. */
+export function generations(s: GameState): GenRow[] {
+  const byId = new Map(s.people.map(p => [p.id, p]));
+  const rows = new Map<number, GenRow>();
+  for (const p of s.people) {
+    if (!p.kin) continue;
+    const g = p.gen ?? 1, row = rows.get(g) ?? { gen: g, people: [] };
+    rows.set(g, row);
+    const a = alive(s, p);
+    row.people.push({ id: p.id, name: p.first, age: p.age, alive: a, parents: (p.parents ?? []).map(id => byId.get(id)?.first).filter((x): x is string => !!x), role: !a ? 'gone' : p.kid ? 'child' : p.elder ? 'elder' : p.bornHere ? 'heir' : 'adult' });
+  }
+  return [...rows.values()].sort((a, b) => a.gen - b.gen);
 }
