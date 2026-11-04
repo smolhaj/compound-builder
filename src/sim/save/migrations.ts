@@ -46,6 +46,11 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   // 71 → 72: tunnel use (sim/corridors.ts): `PerimeterRun.collapsed` (a portal brought down by sappers) and `Vehicle.stranded` (cut off by a lost bridge or tunnel) are optional and absent in every old game: nothing to fill
   71: s => ({ ...s, version: 72 }),
   // 70 → 71: the family can choose where the road comes in (site.entrance, absent: the habitual entrance) and a listed lot's ground is pinned to the lot's seed (site.listed, absent on older saves: they keep the game's seed)
+  // 73 → 74: orphans (wards), yearly threats, "first winter off-grid" and the capped upgrade notes. A place still on the grid counts as having started on it.
+  73: s => {
+    const L = s.lineage as Record<string, unknown>, u = s.utilities as { grid?: boolean };
+    return { ...s, version: 74, lineage: { wards: [], threat: null, threatYear: -1, startedOnGrid: !!u.grid, gridLeft: null, noteYear: -1, noteCount: 0, ...L } };
+  },
   // 72 → 73: the long game's score parts, built-list and self-fed streak (kinds already finished are not written up again)
   72: s => {
     const L = s.lineage as Record<string, unknown>;

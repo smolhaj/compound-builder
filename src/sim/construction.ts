@@ -12,6 +12,7 @@ import { keepsWalls, stampStyle, styledBlueprint } from './housingStyles';
 import { BLUEPRINTS, totalBill } from './blueprints';
 import { hasAll, shortfall, waitingFor, type Stock } from './materials';
 import { log } from './economy';
+import { chronicleUpkeep } from './lineage';
 import { payUpkeep, toolHold, wearTools, workSpeed } from './tools';
 import type { GameState, Structure } from './state';
 
@@ -35,6 +36,7 @@ function completeUpgrade(s: GameState, st: Structure): void {
   for (const [k, n] of Object.entries(totalBill(blueprintOf(old))) as Array<[keyof Stock, number]>) s.stock[k] += Math.floor(n * STRUCTURE_SALVAGE);
   s.structures = s.structures.filter(x => x.id !== old.id);
   log(s, `The old ${old.kind.replace(/_/g, ' ')} comes down; half its materials are back in the stockpile.`);
+  chronicleUpkeep(s, `The ${old.kind.replace(/_/g, ' ')} was upgraded to a ${st.kind.replace(/_/g, ' ')}.`);
 }
 
 /** Plan a structure at a placed spot (mutates the draft). */
@@ -123,6 +125,8 @@ export function addWork(s: GameState, st: Structure, personHours: number, own = 
         st.finishedAt = s.clock.t; delete st.roofLost;
         log(s, `The ${st.kind.replace('_', ' ')} is finished!`);
         if (st.replaces) completeUpgrade(s, st);
+        else if (st.lost) chronicleUpkeep(s, `The ${st.kind.replace(/_/g, ' ')} was rebuilt.`);
+        delete st.lost;
       } else log(s, `${stage.name} done — on to: ${bp.stages[st.stage].name.toLowerCase()}.`);
     }
   }
@@ -143,6 +147,7 @@ export function knockBack(s: GameState, st: Structure, stage: number): void {
   // the current stage's own materials, if they were already taken in
   if (st.stage > stage && st.stage < stages.length && st.supplied) for (const [k, n] of Object.entries(stages[st.stage].materials) as Array<[keyof Stock, number]>) s.stock[k] += n;
   if (stages[stage]?.id === 'roof' && from > stage) st.roofLost = true;
+  if (st.finishedAt != null) st.lost = true;   // it stood once: finishing it again is a rebuild (the chronicle)
   st.stage = stage; st.done = 0; st.supplied = false; st.finishedAt = null;
 }
 
@@ -171,8 +176,9 @@ export function burnStructure(s: GameState, st: Structure): boolean {
   // stone, earth and steel walls come through a fire: the roof and everything inside burn, and it has to be re-roofed and refinished
   if (keepsWalls(st.kind)) {
     const roof = stages.findIndex(x => x.id === 'roof');
-    if (roof >= 0 && st.stage > roof) { st.stage = roof; st.done = 0; st.supplied = false; st.finishedAt = null; st.roofLost = true; return true; }
+    if (roof >= 0 && st.stage > roof) { st.lost = true; st.stage = roof; st.done = 0; st.supplied = false; st.finishedAt = null; st.roofLost = true; return true; }
   }
+  if (st.finishedAt != null) st.lost = true;
   st.stage = 0; st.done = 0; st.supplied = false; st.finishedAt = null;
   return true;
 }

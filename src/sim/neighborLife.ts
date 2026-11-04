@@ -44,6 +44,7 @@ import { raiderTemper, type Encounter, type Neighbor, type NeighborKind } from '
 import type { Person, SkillId } from './family';
 import { calendarOf, dayIndex, type GameState } from './state';
 import { inPact } from './pact';
+import { threatOn } from './threatState';
 import { bringsLine, householdPeople, neighborBrings, neighborSecret, requestShelter, trustLine, trustMult } from './newcomers';
 import type { Caliber } from './armory';
 
@@ -430,7 +431,7 @@ export function neighborLifeDay(s: GameState): string[] {
   const aged = year > L.lastYear;
   L.lastYear = year;
   const hard = hardship(s);
-  const plague = hit && (s.disaster.kind === 'pandemic' || s.disaster.kind === 'bioweapon') ? 4 : 1;
+  const plague = hit && (s.disaster.kind === 'pandemic' || s.disaster.kind === 'bioweapon') ? 4 : 1 + 3 * threatOn(s, 'plague');   // (a yearly plague, sim/threats.ts, is a milder one)
   // an answer to a join request
   for (const n of s.neighbors) {
     const l = L.lives[n.id];

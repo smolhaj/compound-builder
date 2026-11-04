@@ -188,7 +188,9 @@ export function firstWinter(s: Pick<GameState, 'disaster' | 'clock' | 'seed'>): 
 }
 
 /** True on a day of the first hard winter's freeze. */
-export function inFreeze(s: Pick<GameState, 'disaster' | 'clock' | 'seed'>, day: number): boolean {
+export function inFreeze(s: Pick<GameState, 'disaster' | 'clock' | 'seed'> & { lineage?: GameState['lineage'] }, day: number): boolean {
+  const th = s.lineage?.threat;
+  if (th?.kind === 'hard_winter' && day >= th.from && day <= th.to - WINTER.THAW_AFTER) return true;   // a yearly hard winter (sim/threats.ts)
   if (diffOf(s.disaster).winter <= 0) return false;
   const w = firstWinter(s);
   return !!w && day >= w.from && day <= w.to;
@@ -198,13 +200,19 @@ export function inFreeze(s: Pick<GameState, 'disaster' | 'clock' | 'seed'>, day:
  * Once a day: the first hard winter. A deep freeze (the stove eats the
  * woodpile, the generator and the truck eat the fuel), then the thaw (a
  * power cut and a cellar that froze: fresh and frozen food spoils, a few
- * jars burst). Returns the log lines. Nothing at Cozy and Standard.
+ * jars burst). Returns the log lines. Nothing at Cozy and Standard, but for a yearly hard winter (sim/threats.ts).
  */
 export function winterDay(s: GameState, day: number): string[] {
-  const k = diffOf(s.disaster).winter;
-  if (k <= 0) return [];
-  const w = firstWinter(s);
-  if (!w || day < w.from || day > w.thaw) return [];
+  const k = diffOf(s.disaster).winter, w = firstWinter(s);
+  const out = k > 0 && w ? winterWindowDay(s, w, k, day, true) : [];
+  // a yearly hard winter (sim/threats.ts) runs the same freeze and thaw, at its own strength
+  const th = s.lineage?.threat;
+  if (th?.kind === 'hard_winter') out.push(...winterWindowDay(s, { from: th.from, to: th.to - WINTER.THAW_AFTER, thaw: th.to }, th.k, day, false));
+  return out;
+}
+
+function winterWindowDay(s: GameState, w: Winter, k: number, day: number, first: boolean): string[] {
+  if (day < w.from || day > w.thaw) return [];
   const out: string[] = [];
   if (day >= w.from && day <= w.to) {
     const i = day - w.from;
@@ -212,10 +220,10 @@ export function winterDay(s: GameState, day: number): string[] {
     const ricks = Math.floor((i + 1) * WINTER.RICKS_PER_DAY * k) - Math.floor(i * WINTER.RICKS_PER_DAY * k);
     let burned = 0;
     for (let n = 0; n < ricks; n++) { if (s.stock.firewood >= 1) { s.stock.firewood--; burned++; } else break; }
-    const first = day === w.from;
+    const opening = day === w.from;
     let fuel = 0;
-    if (first) { fuel = Math.floor(s.stock.fuel * WINTER.FUEL_SHARE * k); s.stock.fuel -= fuel; }
-    if (first) out.push(`A deep freeze has come down on the county and it will not lift for ${w.to - w.from + 1} days: the stove runs night and day${fuel ? `, and the generator and the truck burn ${fuel} gallons of fuel keeping ahead of it` : ''}. (The first hard winter: it takes wood, fuel and food, not people. Stock up before it.)`);
+    if (opening) { fuel = Math.floor(s.stock.fuel * WINTER.FUEL_SHARE * k); s.stock.fuel -= fuel; }
+    if (opening) out.push(`A deep freeze has come down on the county and it will not lift for ${w.to - w.from + 1} days: the stove runs night and day${fuel ? `, and the generator and the truck burn ${fuel} gallons of fuel keeping ahead of it` : ''}. (${first ? 'The first hard winter' : 'A hard winter'}: it takes wood, fuel and food, not people. Stock up before it.)`);
     else if (burned === 0 && ricks > 0 && s.stock.firewood < 1) out.push('The woodpile is bare in the middle of the freeze.');
   }
   if (day === w.thaw) {

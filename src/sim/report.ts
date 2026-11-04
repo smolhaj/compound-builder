@@ -47,12 +47,14 @@ export type EndKind = 'recovered' | 'new_normal' | 'equilibrium' | 'wipe' | 'bug
 export interface Ending { kind: EndKind; day: number; continued: boolean }
 
 const living = (s: GameState) => s.personState.filter(ps => ps.needs.died == null).length;
+/** The line goes on while anyone lives, at home or away with a neighbor (sim/orphans.ts). */
+const lineLives = (s: GameState) => living(s) + (s.lineage?.wards?.length ?? 0);
 
 /** Once a day after the hit: tally, then see whether the run is over. */
 export function tallyDay(s: GameState): Ending | null {
   const d = s.disaster;
   // the last of them gone ends the line whenever it happens: in the quiet years between eras, or after a card that was played on (playtest round 3: the run used to go on with nobody left)
-  if (s.personState.length && living(s) === 0 && s.ending?.kind !== 'wipe') {
+  if (s.personState.length && lineLives(s) === 0 && s.ending?.kind !== 'wipe') {
     s.ending = { kind: 'wipe', day: Math.floor(s.clock.t), continued: false };
     return s.ending;
   }
@@ -76,6 +78,7 @@ export function tallyDay(s: GameState): Ending | null {
   const ok = d.fate === 'never' ? false : TRACKS.every(k => d.tracks[k] >= Math.min(0.9, (d.ceiling?.[k] ?? 1) - 0.03));
   if (!ok) st.okSince = -1; else if (st.okSince < 0) st.okSince = day;
   if (s.ending) return null;          // playing on after the card
+  if (living(s) === 0) return null;   // the children are away with a neighbor and the place is held for them: no card until they are home
   // the run ends: everyone gone; the world back for a month (and at least three months in); a year and more feeding yourselves
   let kind: EndKind | null = null;
   if (living(s) === 0) kind = 'wipe';

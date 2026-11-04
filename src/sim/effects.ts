@@ -15,6 +15,7 @@ import { emberK } from './houseHardening';
 import { isHome } from './blueprints';
 import { mulberry32 } from './rng';
 import type { GameState } from './state';
+import { threatOn } from './threatState';
 
 /** Growing-season and warmth factor after a full exchange: 1–3 years of nuclear winter. */
 export function winterFactor(s: GameState): { grow: number; cold: number } {
@@ -46,6 +47,9 @@ export function climate(s: GameState): { grow: number; cold: number } {
     const stored = s.utilities.storedL > 2000;
     grow = Math.min(grow, stored ? 0.75 : 0.3);
   }
+  // a famine year (sim/threats.ts): a poor harvest across the county, up to a third off at full strength
+  const famine = threatOn(s, 'famine');
+  grow *= 1 - 0.35 * famine;
   return { grow, cold };
 }
 
