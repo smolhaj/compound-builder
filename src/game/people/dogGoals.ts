@@ -36,6 +36,10 @@ export interface DogCtx {
   person: (id: string) => { x: number; z: number; rot: number } | null;
   /** The points to pass through to get from one spot to another round walls, buildings and cliffs ([] = straight; game/paths/walkRoute). */
   via?: (fx: number, fz: number, tx: number, tz: number) => ReadonlyArray<Wp>;
+  /** The post inside the innermost ring's gate (game/people/guardPost): the second guard dog stands it, and every guard falls back to it when the place is raided. */
+  inner?: { x: number; z: number; face: number };
+  /** A crew that means harm is at the gate or the raid is being played back. */
+  raided?: boolean;
   /** Real seconds a keyholder's dog waits at a corridor door point (0: it stands open). */
   doorWait?: (tag: number, x: number, z: number) => number;
 }
@@ -68,6 +72,11 @@ export function dogGoal(d: Dog, index: number, hour: number, day: number, ctx: D
   const lazy = d.health < 40 || d.hunger > 70 || temper === 'withdrawn';
   const post = d.guard && !pup;
   if (post) {
+    // the second guard (and every guard in a raid) stands the inner post: just inside the innermost gate, facing it
+    if (ctx.inner && (index >= 1 || ctx.raided)) {
+      const q = ctx.inner, off = (index % 2 ? 1 : -1) * 0.12 * (ctx.raided ? Math.floor(index / 2) + 1 : 0);
+      return { x: q.x + Math.cos(q.face) * off, z: q.z - Math.sin(q.face) * off, stance: ctx.raided ? 'bark' : night ? 'alert' : 'stand', face: q.face, frisky: false, follow: false };
+    }
     const p = postSpot(ctx, index);
     if (ctx.atGate) return { x: p.x, z: p.z, stance: 'bark', face: p.face, frisky: false, follow: false };
     if (lazy && !night) return { x: p.x, z: p.z, stance: 'lie', face: p.face, frisky: false, follow: false };
