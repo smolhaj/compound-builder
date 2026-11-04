@@ -1,4 +1,5 @@
 import { planProblem } from '../sim/construction';
+import { unscripted } from '../sim/godMode';
 import { dropBridge, routeProblem } from '../sim/terrainFx';
 import { clearCollapse, strandAway } from '../sim/corridors';
 import { dropRoadBridge, rebuildRoadBridge } from '../sim/roadFx';
@@ -771,7 +772,7 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
   trigger: (kind, warnDays) => {
     if (locked()) return;
     const g = structuredClone(get().game);
-    if (g.disaster.mode !== 'sandbox' || (g.disaster.kind && g.disaster.phase !== 'peace')) return;
+    if (!unscripted(g.disaster.mode) || (g.disaster.kind && g.disaster.phase !== 'peace')) return;
     triggerDisaster(g.disaster, g.clock.t, kind, g.seed, warnDays);
     set({ game: g });
   },

@@ -60,7 +60,7 @@ export interface WorldState {
   /** Sightline overlay: off / exposure from the road / from the ridge / night lights / viewshed from a point. */
   sightMode: 'off' | 'road' | 'ridge' | 'night' | 'viewshed';
   /** The terrain overlay (high ground, lanes, water, sun): game/terrain/TerrainOverlay.ts. */
-  terrainMode: 'off' | 'high' | 'lanes' | 'water' | 'sun';
+  terrainMode: 'off' | 'high' | 'lanes' | 'water' | 'sun' | 'fire';
   setTerrainMode: (m: WorldState['terrainMode']) => void;
   /** The blueprint view: names and roles of the buildings, rings, gates, towers and tunnels, with the defense readouts (game/blueprint). */
   blueprint: boolean;

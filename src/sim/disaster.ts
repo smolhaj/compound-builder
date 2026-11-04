@@ -21,7 +21,8 @@ export const TRACK_NAME: Record<Track, string> = {
 
 export type DisasterKind = 'grid_down' | 'financial' | 'lawless' | 'drought' | 'pandemic' | 'nuclear' | 'solar_flare' | 'wildfire' | 'ash_winter' | 'cyberattack'
   | 'zombies' | 'invasion' | 'civil_war' | 'bioweapon' | 'asteroid' | 'unknown';
-export type Mode = 'surprise' | 'scenario' | 'sandbox';
+import { unscripted } from './godMode';
+export type Mode = 'surprise' | 'scenario' | 'sandbox' | 'god';
 /** GDS difficulty presets: Cozy (long warning, gentle raids), Standard, Hardcore (little warning, harsh raids, permadeath). */
 export type { Difficulty } from './difficulty';
 import { DIFFICULTY, type Difficulty } from './difficulty';
@@ -306,10 +307,10 @@ function rollBack(def: DisasterDef, variant: string, r: () => number): Partial<R
 /** Set up the disaster for a new run. */
 export function newDisaster(seed: number, mode: Mode, peace: PeaceLength = 'random', kind: DisasterKind | null = null, variant?: string, difficulty: Difficulty = 'standard', odds: Partial<Record<DisasterKind, number>> = {}): DisasterState {
   const r = rng(seed * 7919 + 13);
-  const k: DisasterKind | null = mode === 'sandbox' ? null : kind ?? surpriseKind(r(), odds);
+  const k: DisasterKind | null = unscripted(mode) ? null : kind ?? surpriseKind(r(), odds);
   const def = k ? DISASTERS[k] : undefined;
   const v = def ? (variant && def.variants.some(x => x.id === variant) ? variant : pick(def.variants, r()).id) : '';
-  const len = mode === 'sandbox' ? NEVER : peace === 'random' || mode === 'surprise' ? Math.round(3 * 365 + r() * 3 * 365) : PEACE_DAYS[peace];
+  const len = unscripted(mode) ? NEVER : peace === 'random' || mode === 'surprise' ? Math.round(3 * 365 + r() * 3 * 365) : PEACE_DAYS[peace];
   const warn = def ? Math.max(1, Math.round(roll(r, def.warn) * DIFFICULTY[difficulty].warn)) : 0;
   // the fate on its own stream (the rest of the run's rolls don't move)
   const rf = rng(seed * 6007 + 29);
@@ -383,7 +384,7 @@ export function nextEraDisaster(prev: DisasterState, now: number, seed: number, 
   for (const k of TRACKS) base[k] = Math.round(Math.min(prev.baseline?.[k] ?? 1, prev.tracks[k]) * 100) / 100;
   const allWell = TRACKS.every(k => (base[k] ?? 1) >= 0.97);
   const peaceOnly = { ...prev, kind: null, variant: '', phase: 'peace' as Phase, warnAt: NEVER, hitAt: NEVER, back: {}, chained: [], fate: 'full' as Fate, ceiling: {}, done: [], baseline: allWell ? undefined : base };
-  if (prev.mode === 'sandbox') return peaceOnly;
+  if (unscripted(prev.mode)) return peaceOnly;
   const gone = (k: Track) => (base[k] ?? 1) < 0.3;
   let pool = SURPRISE_POOL.filter(k => k !== prev.kind
     && !(gone('grid') && (k === 'grid_down' || k === 'cyberattack' || k === 'solar_flare'))

@@ -1,4 +1,5 @@
 import { moatStates } from '../sim/waterWorks';
+import { fireMarks } from '../sim/fireRisk';
 import { litTowerIds } from '../sim/towers';
 import { TerrainOverlay } from './terrain/TerrainOverlay';
 import { BlueprintOverlay } from './blueprint/BlueprintOverlay';
@@ -222,7 +223,7 @@ export function GameCanvas() {
       const g = useGameStore.getState().game, m = useWorldStore.getState().terrainMode, t = terrainOf(g);
       if (m === 'off' || !t) { terrainOv.set('off', null); return; }
       const lanes = lanesOf(g);
-      terrainOv.set(m, t, lanes, siteCandidates(t, { lot: g.site.home, camp: campOf(g) }, lanes));
+      terrainOv.set(m, t, lanes, siteCandidates(t, { lot: g.site.home, camp: campOf(g) }, lanes), m === 'fire' ? fireMarks(g, world.fuelNear(g.structures)) : []);
     };
     // the blueprint view: names, rings, gates, towers and tunnels (game/blueprint)
     const host = canvas.parentElement ?? document.body;
@@ -284,7 +285,7 @@ export function GameCanvas() {
       useWorldStore.subscribe(s => s.sightMode, m => sight.set(m)),
       // the terrain overlay (sim/terrain.ts): high ground, lanes, water, sun
       useWorldStore.subscribe(s => s.terrainMode, showTerrain),
-      useGameStore.subscribe(s => s.game.structures.length + '|' + s.game.perimeter.length, () => { if (useWorldStore.getState().terrainMode === 'lanes') showTerrain(); }),
+      useGameStore.subscribe(s => s.game.structures.length + '|' + s.game.perimeter.length, () => { if (['lanes', 'fire'].includes(useWorldStore.getState().terrainMode)) showTerrain(); }),
       // the compound changed: recompute the overlay
       useGameStore.subscribe(s => `${s.game.structures.map(x => x.id + x.stage).join()}|${s.game.perimeter.map(r => r.id + (r.finishedAt === null ? Math.round(r.done) : 'f')).join()}`, () => sight.refresh()),
     ];

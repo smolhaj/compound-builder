@@ -13,6 +13,7 @@ import { BLUEPRINTS } from './blueprints';
 import { emberFactor } from './housingStyles';
 import { emberK } from './houseHardening';
 import { isHome } from './blueprints';
+import { burnChance } from './fireRisk';
 import { mulberry32 } from './rng';
 import type { GameState } from './state';
 import { threatOn } from './threatState';
@@ -98,7 +99,7 @@ export function effectsDay(s: GameState): string[] {
     for (const st of s.structures.filter(isFinished)) {
       if (st.kind.startsWith('bunker_') || st.kind === 'root_cellar') continue;
       const near = fuel[st.id] ?? 6;
-      const p = Math.min(0.85, 0.05 + near * 0.06) * emberFactor(st.kind) * (isHome(st.kind) ? emberK(s) : 1);   // stone, earth and steel shed the embers (sim/housingStyles.ts)
+      const p = burnChance(near, emberFactor(st.kind), isHome(st.kind) ? emberK(s) : 1);   // stone, earth and steel shed the embers (sim/housingStyles.ts)
       if (r() > p) continue;
       if (!burnStructure(s, st)) continue;
       out.push(st.kind === 'well_drilled' ? 'The pump house over the drilled well burned. The bore and the pump down it came through; the pump house, pressure tank and controls have to be redone.'
