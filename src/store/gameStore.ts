@@ -33,7 +33,7 @@ import { AUTO_NAME, type AutoLightsOut } from '../sim/blackout';
 import { stampHighGround, upgradeTower } from '../sim/towers';
 import { cutRoadGates } from '../sim/roadGate';
 import { addSkirt, planRun, upgradeRun, type ContainerLook, type Gate, type PerimeterKind, type Pt } from '../sim/perimeter';
-import { ROAD_GATE_W, layPropertyWall, planPropertyWall, type PropertyGeometry } from '../sim/propertyWall';
+import { ROAD_GATE_W, layPropertyWall, planPropertyWall, type PropertyGeometry, type WallPlan } from '../sim/propertyWall';
 import { addWalkway } from '../sim/walkway';
 import { addRazor } from '../sim/razor';
 import { layPaths, pickUpPath, type LaidKind, type LayEdge } from '../sim/paths';
@@ -137,6 +137,8 @@ export interface GameStore {
   respotJoiners: (spots: Record<string, { x: number; z: number; rot: number }>) => void;
   /** Stake terraced garden beds, one per spot (the Next-step card's confirm; sim/terrace.ts). Returns why not, or null. */
   stakeTerraces: (spots: Array<[number, number]>) => string | null;
+  /** Stake starter-compound pieces (and the yard fence) in one go; each is an ordinary structure afterwards. Returns how many went in. */
+  layStarter: (pieces: ReadonlyArray<{ kind: string; x: number; z: number; rot: number }>, yard: WallPlan | null, geo: PropertyGeometry) => number;
   load: (g: GameState) => void;
   /** Lay out a fence / hedge / wall run for the family to build. */
   planRun: (kind: PerimeterKind, pts: Pt[], gates: Gate[], offLen?: number) => void;
@@ -371,6 +373,21 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     set({ game: g });
     void saveGame(AUTOSAVE, g);
     return null;
+  },
+  layStarter: (pieces, yard, geo) => {
+    if (locked()) return 0;
+    const g = structuredClone(get().game);
+    let n = 0;
+    for (const p of pieces) {
+      if (planProblem(g, p.kind)) continue;
+      const st = planStructure(g, p.kind, p.x, p.z, p.rot);
+      stampHighGround(st);
+      applyForPermit(g, st);
+      n++;
+    }
+    if (yard && layPropertyWall(g, yard, geo) > 0) n++;
+    if (n) { set({ game: g }); void saveGame(AUTOSAVE, g); }
+    return n;
   },
   load: (game) => set({ game, selected: null, tool: null, cutscene: promptFor(game) }),
   planRun: (kind, pts, gates, offLen = 0) => {
