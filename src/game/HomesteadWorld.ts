@@ -697,6 +697,11 @@ export class HomesteadWorld {
           const [r0, r1] = rw.rocks.size;
           rocks.push({ x: px, y: this.groundAt(px, pz), z: pz, s: r0 + (r1 - r0) * sR * sR, flat: (tone * 31.7) % 1 < rw.rocks.flat ? 1 : 0, rot, tone: (tone * 13.3) % 1 });
         }
+        // understory under the timber (laurel / fern / huckleberry, by region): in the sage field's instances
+        if (rw.understory && s.forest > 0.45 && dz > hw + 1.2 && roll / keep < 0.045 * rw.understory * Math.min(1, s.forest + 0.2) && !blocked(px, pz)) {
+          sage.push({ x: px, y: this.groundAt(px, pz) - 0.01, z: pz, s: 0.9 + sR * 0.9, rot, tone });
+          continue;
+        }
         // sage on the open benches, thinning into the timber's edge
         if (s.forest > 0.25 || dz < hw + 5) continue;
         if (roll / keep < 0.36 * rw.sage * (1 - s.forest / 0.25) && !blocked(px, pz)) sage.push({ x: px, y: this.groundAt(px, pz) - 0.01, z: pz, s: 0.8 + sR * 0.45, rot, tone });
