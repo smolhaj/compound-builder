@@ -422,19 +422,36 @@ describe('the family builds them a place (relatives)', () => {
   });
 });
 
-describe('save v76', () => {
+describe('save v77', () => {
   it('an older save gains the joiners ledger and the new goods start at zero', () => {
     const old = JSON.parse(JSON.stringify(newGame(2))) as Record<string, unknown>;
-    old.version = 75; delete old.joiners;
+    old.version = 76; delete old.joiners;
     delete (old.stock as Record<string, number>).modular_unit;
     const s = migrate(old);
     expect(s.version).toBe(SAVE_VERSION);
-    expect(SAVE_VERSION).toBe(76);
+    expect(SAVE_VERSION).toBe(77);
     expect(s.joiners).toEqual({ stays: [], waiting: [], rigsParked: 0, day: -1 });
     expect(s.stock.modular_unit).toBe(0);
   });
   it('rigs and modular homes are homes for every table that lists homes', () => {
     for (const k of ['travel_trailer', 'rv_camper', 'modular_home']) { expect(isHome(k)).toBe(true); expect(HOME_BEDS[k]).toBeGreaterThan(0); expect(BLUEPRINTS[k].stages).toHaveLength(5); }
     void newcomersDay; void admitNewcomers; void rollKit; void settleStay; void orderProblem;
+  });
+});
+
+describe('assigned quarters (sim/quarters.ts)', () => {
+  it('a joiner household is a household, lives in its own rig, and nobody else is auto-assigned to it', async () => {
+    const { householdsOf, quarterHomes } = await import('./quarters');
+    const g = peace(7);
+    fin(g, 'timber_cabin');
+    const e = at(g, 10, { rig: 'rv_camper' }); e.stay = 'rig';
+    resolve(g, 'take_in');
+    const rig = g.structures.find(x => x.kind === 'rv_camper')!;
+    const mine = e.people!.map(p => g.people.find(q => q.id === p.id)!);
+    expect(householdsOf(g.people).some(h => mine.every(m => h.members.some(x => x.id === m.id)))).toBe(true);
+    const beds = g.structures.filter(isFinished).map(st => ({ where: st.id, beds: HOME_BEDS[st.kind] ?? 0, kind: st.kind })).filter(b => b.beds > 0);
+    const q = quarterHomes(g, g.people, beds, new Set());
+    for (const p of g.people) if (!mine.some(m => m.id === p.id)) expect(q.get(p.id)).not.toBe(rig.id);
+    for (const p of mine.slice(0, HOME_BEDS.rv_camper)) expect(q.get(p.id)).toBe(rig.id);
   });
 });

@@ -34,6 +34,8 @@ import { fogSightK } from './fogFx';
 import { backgroundOf } from './family';
 import { isHome } from './blueprints';
 import { coverFactor } from './housingStyles';
+import { sleepSpotFor } from './housing';
+import { gatePoint, raidDelta } from './quarters';
 import { houseCoverK } from './houseHardening';
 import { isFinished } from './construction';
 import { PERIMETER, fenceLive, runFinished } from './perimeter';
@@ -689,7 +691,14 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
       }
       if (peace) say(t + 1.5, v(l0, ['I called 911! The police are on their way! GET OUT OF MY HOUSE!', 'The sheriff\'s coming — get out, GET OUT!'], ['Sheriff\'s on the way. Leave. Now.']), l0);
       if (peace) say(t + 2, pick(['Shit — somebody\'s home!', 'Go, go — he\'s got a gun!']), R[0]); else say(t + 2, pick(['Spread out! Hit the house!', 'Go, go — flank \'em!', 'Come out and nobody gets hurt! We just want the food!', 'Light \'em up!']), R[0]);
-      for (const f of H) if (f.shelter) toShelter(f, t); else { assignPost(f, t); if (!f.vet && opts.ambush === undefined) f.readyAt += 1 + r() * 3 + (f.pid ? fightNerves(s, s.people.find(q => q.id === f.pid)!).freeze : 0); }   // civilians freeze a moment; those who served go straight to it
+      // where each one sleeps (sim/quarters.ts): guards by the gate are up sooner, those housed far from the house are slower to a post or to the shelter
+      const gateAt = gatePoint(s);
+      const qDelta = (f: Fighter): number => {
+        if (!f.pid) return 0;
+        const sp = sleepSpotFor(s, f.pid), st = sp?.where ? fin.find(x => x.id === sp.where) : undefined;
+        return raidDelta({ at: st ? { x: st.x, z: st.z } : null, role: st ? (s.quarters?.roles[st.id] ?? null) : null, tower: false, house: C, gate: gateAt, night });
+      };
+      for (const f of H) if (f.shelter) toShelter(f, t + Math.max(0, qDelta(f))); else { assignPost(f, t); if (!f.vet && opts.ambush === undefined) f.readyAt += 1 + r() * 3 + (f.pid ? fightNerves(s, s.people.find(q => q.id === f.pid)!).freeze : 0); if (opts.ambush === undefined && f.readyAt < Infinity) f.readyAt = Math.max(t, f.readyAt + qDelta(f)); }   // civilians freeze a moment; those who served go straight to it
     }
     for (const p of posts) p.fire *= 0.7;
     for (const f of F) {
