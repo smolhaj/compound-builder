@@ -81,7 +81,7 @@ export function offsetPts(pts: readonly Pt[], d: number): Pt[] {
  * `under` says whether a point is under a building: pipe and cable trenches
  * stop at its wall and their marker posts stand outside it.
  */
-export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (x: number, z: number) => boolean = () => false, opts: { lit?: boolean; sensors?: boolean; hostKind?: PerimeterKind; /** The host wall carries razor wire (drawn on the deck's outer rail). */ hostRazor?: boolean; /** A patrol deck rides on this wall (its wire is drawn on the deck). */ deck?: boolean } = {}): THREE.Group {
+export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (x: number, z: number) => boolean = () => false, opts: { /** The creek: a moat's water stops at its banks. */ creek?: { zAt(x: number): number; halfWidth: number }; /** A moat's water: how full (0-1) and whether it is ice (sim/waterWorks). */ moat?: { level: number; frozen: boolean }; lit?: boolean; sensors?: boolean; hostKind?: PerimeterKind; /** The host wall carries razor wire (drawn on the deck's outer rail). */ hostRazor?: boolean; /** A patrol deck rides on this wall (its wire is drawn on the deck). */ deck?: boolean } = {}): THREE.Group {
   const lit = opts.lit ?? true;
   // an upgrade of a finished run is drawn beside the old tier (not on top of it) until it is done and the old one comes down
   const run = run0.replaces ? { ...run0, pts: offsetPts(run0.pts, (run0.replacesKind === 'container_wall' || run0.replacesKind === 'container_stack') ? 0.36 : UPGRADE_OFFSET) } : run0;
@@ -661,6 +661,87 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
           }
         }
       });
+      break;
+    }
+    case 'moat': {
+      // the water in the cut (the ditch itself is an earthwork in the terrain): a ribbon on the surface, lower in a rain-fed ditch, white when it is ice
+      const mo = opts.moat;
+      if (run.finishedAt === null || !mo || mo.level <= 0.05) break;
+      const lv = Math.min(1, mo.level), hw = 0.2 + 0.22 * lv, lift = 0.22 + 0.06 * lv, wm: KitMaterialId = mo.frozen ? 'whitewash' : 'pond_water';
+      for (const [s0, s1] of spans) {
+        const n = Math.max(1, Math.ceil((s1 - s0) / 0.35));
+        let pos: number[] = [];
+        const flush = () => {
+          const idx: number[] = [];
+          for (let k = 0; k + 1 < pos.length / 6; k++) idx.push(k * 2, k * 2 + 1, k * 2 + 2, k * 2 + 1, k * 2 + 3, k * 2 + 2);
+          if (idx.length) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); add(wm, g); }
+          pos = [];
+        };
+        for (let i = 0; i <= n; i++) {
+          const q = along(run.pts, s0 + (s1 - s0) * i / n), y = ground(q.x, q.z) + lift;
+          // where the line meets the creek, the creek is the moat: no second ribbon over its water or banks
+          if (opts.creek && Math.abs(q.z - opts.creek.zAt(q.x)) < opts.creek.halfWidth + 2.5) { flush(); continue; }
+          pos.push(q.x + q.dz * hw, y, q.z - q.dx * hw, q.x - q.dz * hw, y, q.z + q.dx * hw);
+        }
+        flush();
+      }
+      break;
+    }
+    case 'covered_bridge': {
+      // a roofed timber Howe truss: stone abutments, a plank deck 4 m wide, a truss each side (posts every 3 m, chords and X braces) boarded to the sill and open
+      // under the eaves, a gable roof, a timber portal and a pair of plank gate leaves at each end (standing open by day: the gate hold is sim/waterWorks)
+      const a0 = run.pts[0], b0 = run.pts[run.pts.length - 1];
+      const dx = b0[0] - a0[0], dz = b0[1] - a0[1], Lb = Math.hypot(dx, dz);
+      if (Lb < 1e-3) break;
+      const yaw = -Math.atan2(dz, dx), mx = (a0[0] + b0[0]) / 2, mz = (a0[1] + b0[1]) / 2;
+      const done = run.finishedAt !== null, frac = done ? 1 : Math.min(1, Math.max(0.05, built / Math.max(1e-6, wl)));
+      const Wd = 4 * M, H = 3.1 * M, deckY = Math.max(ground(a0[0], a0[1]), ground(b0[0], b0[1])) + 0.5 * M;
+      const place = (g: THREE.BufferGeometry) => g.rotateY(yaw).translate(mx, 0, mz);
+      const bx = (l: number, h: number, w: number, x: number, y: number, z: number, m: KitMaterialId) => add(m, place(new THREE.BoxGeometry(l, h, w).translate(x, y + h / 2, z)));
+      const Lw = Lb * frac, x0 = -Lb / 2;
+      // abutments: a stone block under each end, down to the ground on the lower bank
+      for (const sg of [-1, 1]) {
+        const e = sg < 0 ? a0 : b0, gy = ground(e[0], e[1]);
+        bx(1.6 * M, deckY - gy + 0.4 * M, Wd + 0.8 * M, sg * (Lb / 2 - 0.4 * M), gy - 0.4 * M, 0, 'fieldstone');
+      }
+      bx(Lw, 0.14 * M, Wd, x0 + Lw / 2, deckY - 0.14 * M, 0, 'deck');                                   // the deck
+      for (const z of [-Wd * 0.3, 0, Wd * 0.3]) bx(Lw, 0.3 * M, 0.2 * M, x0 + Lw / 2, deckY - 0.44 * M, z, 'wood_dark');   // stringers
+      const bays = Math.max(2, Math.round(Lb / (3 * M)));
+      const bw = Lb / bays;
+      for (const sg of [-1, 1]) {
+        const z = sg * (Wd / 2 - 0.1 * M);
+        bx(Lw, 0.22 * M, 0.2 * M, x0 + Lw / 2, deckY, z, 'wood_dark');                                  // sill
+        bx(Lw, 0.22 * M, 0.2 * M, x0 + Lw / 2, deckY + H - 0.22 * M, z, 'wood_dark');                   // plate
+        for (let i = 0; i <= bays; i++) {
+          const x = x0 + i * bw;
+          if (x - x0 > Lw + 1e-6) break;
+          bx(0.22 * M, H, 0.22 * M, x, deckY, z, 'wood_mid');                                            // post
+          if (i < bays && x - x0 + bw <= Lw + 1e-6) {
+            const ang = Math.atan2(H - 0.4 * M, bw);                                                       // Howe diagonals (a pair, crossed)
+            for (const k of [1, -1]) add('wood_mid', place(new THREE.BoxGeometry(Math.hypot(bw, H - 0.4 * M), 0.16 * M, 0.14 * M).rotateZ(k * ang).translate(x + bw / 2, deckY + H / 2, z)));
+            bx(bw, 1.1 * M, 0.1 * M, x + bw / 2, deckY + 0.22 * M, z + sg * 0.06 * M, 'board_batten');   // boarded to the sill, windows above
+          }
+        }
+      }
+      if (done) {
+        for (const sg of [-1, 1]) {
+          // gable roof: two slopes meeting at a ridge, overhanging the portals
+          const pitch = 0.5, run_ = Wd / 2 + 0.5 * M, slope = run_ / Math.cos(pitch);
+          add('shingle', place(new THREE.BoxGeometry(Lb + 1.4 * M, 0.1 * M, slope).rotateX(sg * pitch).translate(0, deckY + H + 0.28 * M + Math.sin(pitch) * slope / 2 - 0.02 * M, sg * run_ / 2)));
+        }
+        bx(Lb + 1.4 * M, 0.16 * M, 0.2 * M, 0, deckY + H + 0.28 * M + Math.sin(0.5) * (Wd / 2 + 0.5 * M) / Math.cos(0.5) - 0.02 * M, 0, 'wood_dark');   // ridge beam
+        for (const sg of [-1, 1]) {
+          const px = sg * (Lb / 2 - 0.05 * M);
+          bx(0.3 * M, H + 0.3 * M, 0.3 * M, px, deckY, -Wd / 2 + 0.1 * M, 'wood_dark');                    // portal posts
+          bx(0.3 * M, H + 0.3 * M, 0.3 * M, px, deckY, Wd / 2 - 0.1 * M, 'wood_dark');
+          bx(0.3 * M, 0.5 * M, Wd, px, deckY + H - 0.3 * M, 0, 'wood_dark');                              // portal header
+          for (const lz of [-1, 1]) {                                                                         // the gate leaves, swung back against the truss
+            const leafW = (Wd - 0.5 * M) / 2;
+            add('wood_mid', place(new THREE.BoxGeometry(0.07 * M, 2.4 * M, leafW).translate(px + sg * 0.1 * M, deckY + 1.2 * M, lz * (Wd / 2 - 0.25 * M - leafW / 2) * 0.5 + lz * leafW * 0.3)));
+            for (const f of [0.25, 0.75]) add('iron', place(new THREE.BoxGeometry(0.09 * M, 0.12 * M, leafW).translate(px + sg * 0.1 * M, deckY + 2.4 * M * f, lz * (Wd / 2 - 0.25 * M - leafW / 2) * 0.5 + lz * leafW * 0.3)));
+          }
+        }
+      }
       break;
     }
     default: break;  // berm, ditch: earthworks in the terrain

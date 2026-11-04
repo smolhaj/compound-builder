@@ -14,6 +14,7 @@
 import * as THREE from 'three';
 import { CELL, type KitPieceDef } from './kit';
 import { box, Parts } from './shell';
+import { vehicleYard } from './vehicleYardGen';
 import { GARAGE_GATE_W, GARAGE_H, SLOT_X_M } from '../../sim/garage';
 
 const M = 1 / 6;
@@ -187,4 +188,4 @@ function motorCourt(def: KitPieceDef, seed = 1): THREE.Group {
   return g;
 }
 
-export const GATEHOUSE_BUILDERS: Record<string, (def: KitPieceDef, seed?: number) => THREE.Group> = { gate_garage: gateGarage, motor_court: motorCourt };
+export const GATEHOUSE_BUILDERS: Record<string, (def: KitPieceDef, seed?: number) => THREE.Group> = { gate_garage: gateGarage, motor_court: motorCourt, vehicle_yard: vehicleYard };
