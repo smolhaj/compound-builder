@@ -27,7 +27,7 @@ import { createNoise2D } from 'simplex-noise';
 import { RegionalField, TOWN_Y } from '../../engine/world/terrain/regionalLandscape';
 import { regionWorld, type Relief, type RegionWorld } from '../region/regionWorld';
 import { REGIONS, type RegionId } from '../../sim/regions';
-import { lotField, treeLineM, type LotField, type LotSpec } from '../../sim/lots';
+import { lotField, lotStats, treeLineM, type LotField, type LotSpec } from '../../sim/lots';
 import type { RoadBed } from '../../sim/roadBed';
 
 /** Parcel side in world units (40 acres ≈ 402 m). */
@@ -148,6 +148,9 @@ const CREEK_HALF = 0.7;
 const FLOODPLAIN_HALF = 4.5;
 /** The creek valley-floor table (non-bench reliefs): x from FP_X0, one entry a unit. */
 const FP_X0 = -70, FP_N = 210;
+
+/** Peak timber cover of a lot archetype by region (0-1): dense woods in the green regions, sparse conifer in the mountain west (the default). */
+const LOT_WOODS: Partial<Record<RegionId, number>> = { appalachia: 0.95, pnw: 0.97, north_woods: 0.95 };
 
 export class ParcelTerrain {
   readonly seed: number;
@@ -327,14 +330,19 @@ export class ParcelTerrain {
    * nothing at the region's tree line (by altitude), open meadow on level
    * benches, denser on the north-facing and sheltered ground.
    */
+  private _pad: [number, number] | null = null;
   private _lotCover(x: number, z: number): number {
     const f = this.lot!, n = this._noise;
     const g = this.lotSlope(x, z), rock = f.rock(x, z), elev = f.spec.elevM + f.h(x, z) * 6;
     const line = treeLineM(this.regionId);
-    let c = 0.42 * (1 - sstep(line - 250, line, elev)) * (1 - 0.9 * sstep(0.3, 0.7, rock)) * (1 - sstep(0.55, 0.95, g));
+    // the lot's own cover: sparse conifer in the mountain west, the region's dense woods elsewhere (the hollows, the cedar and fir, the spruce and birch)
+    const dense = LOT_WOODS[this.regionId] ?? 0.42;
+    let c = dense * (1 - sstep(line - 250, line, elev)) * (1 - 0.9 * sstep(0.3, 0.7, rock)) * (1 - sstep(0.55, 0.95, g));
+    // a clearing round the camp's pad (about 150 m across, softly edged) so the camp always has open ground in dense woods
+    if (dense > 0.6) { this._pad ??= lotStats(f).pad; c *= sstep(7, 14, Math.hypot(x - this._pad[0], z - this._pad[1])); }
     // meadow: level ground is more often open, and a few glades everywhere
     const glade = sstep(0.15, 0.55, n(x * 0.035 + 2, z * 0.035 - 6));
-    c *= 1 - glade * (g < 0.1 ? 0.8 : 0.45);
+    c *= 1 - glade * (dense > 0.6 ? (g < 0.1 ? 0.75 : 0.3) : (g < 0.1 ? 0.8 : 0.45));
     // a south-facing slope is drier and more open
     const fall = f.fall, south = Math.sin(fall) * Math.min(1, g * 4);
     c *= 1 - 0.18 * Math.max(0, -south);

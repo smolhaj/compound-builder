@@ -14,6 +14,7 @@ const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
 const port = Number(opt('--port', 5321)), outDir = resolve(opt('--out', 'shots/vqa'));
 const combos = opt('--combos', '').split(',').filter(Boolean).map(c => c.split(':'));
+const ELEV = { mountain_west: 2000, appalachia: 600, pnw: 500, north_woods: 400 };   // each region's listings sit at their own altitude (sim/lots ALT_RANGE); the 2000 m default is above the tree line of the green regions
 const tod = Number(opt('--tod', 14)), look = opt('--look', 'clear'), season = opt('--season', null), relief = opt('--relief', '8'), acres = opt('--acres', '40');
 mkdirSync(outDir, { recursive: true });
 const vite = spawn('node', ['node_modules/vite/bin/vite.js', '--config', 'scripts/vite.shots.config.ts', '--port', String(port), '--strictPort'], { stdio: ['ignore', 'pipe', 'inherit'] });
@@ -25,7 +26,7 @@ page.on('pageerror', e => console.error('PAGEERROR', e.message));
 try {
   for (const [region, kind] of combos) {
     const name = `${region}-${kind === '-' ? 'classic' : kind}`;
-    const q = `lowrender&clean&seed=7&region=${region}` + (kind === '-' ? '' : `&lot=${kind}&relief=${relief}&acres=${acres}&lotseed=3${kind === 'hillside' ? '&lotcreek' : ''}`);
+    const q = `lowrender&clean&seed=7&region=${region}` + (kind === '-' ? '' : `&lot=${kind}&relief=${relief}&acres=${acres}&lotseed=3&elev=${opt('--elev', ELEV[region] ?? 2000)}${kind === 'hillside' ? '&lotcreek' : ''}`);
     await page.goto(`http://localhost:${port}/?${q}`);
     await page.waitForFunction(() => window.__cb?.qa?.renderNow, null, { timeout: 300000 });
     await page.evaluate(() => { const { game, store } = window.__cb; game.getState().setSpeed(0); store.getState().setQuality('medium'); });
