@@ -6,6 +6,8 @@
 import { Fragment, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { MATERIALS, billText, type MaterialId } from '../sim/materials';
+import { useSpendGuard } from './hud/SpendConfirm';
+import { usdShort } from '../sim/spendGuard';
 import { foodLine, orderCost, orderProblem, payWith, prices } from '../sim/economy';
 import { FOOD, KITS, kitUnits, lifeDays, pantryRows, SHOP_FOOD, type FoodItemId } from '../sim/pantry';
 import { needOf } from '../sim/needs';
@@ -188,6 +190,7 @@ export function ShopWindow() {
   const [cart, setCart] = useState<Partial<Record<MaterialId, number>>>({});
   const [foodCart, setFoodCart] = useState<Partial<Record<FoodItemId, number>>>({});
   const [msg, setMsg] = useState<string | null>(null);
+  const { guard, node: guardNode } = useSpendGuard();
   const k = prices(game);
   const lines: OrderLine[] = [
     ...(Object.entries(cart) as Array<[MaterialId, number]>).filter(([, q]) => q > 0).map(([material, qty]) => ({ material, qty })),
@@ -216,7 +219,7 @@ export function ShopWindow() {
         {needLines.length > 0 && <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '7px 16px', borderBottom: `1px solid ${C.line}`, background: 'rgba(216,201,160,0.08)', flexWrap: 'wrap' }}>
           <span style={{ flex: 1, minWidth: 200 }} title={`The plans still lack: ${billText(Object.fromEntries(needLines.map(l => [l.material, l.qty])))}. Marked "need" below.`}>Plans are short <b>{needLines.length}</b> material{needLines.length > 1 ? 's' : ''}</span>
           <button style={btn()} onClick={() => setCart(c => { const n = { ...c }; for (const l of needLines) n[l.material] = Math.max(n[l.material] ?? 0, l.qty); return n; })}>Add them to the order</button>
-          <button style={btn(true, !!orderProblem(game, needLines))} disabled={!!orderProblem(game, needLines)} onClick={() => { if (g.order(needLines)) setMsg(null); }}>Order what the plans need ({usd(orderCost(needLines, k))})</button>
+          <button style={btn(true, !!orderProblem(game, needLines))} disabled={!!orderProblem(game, needLines)} onClick={() => guard(orderCost(needLines, k), () => { if (g.order(needLines)) setMsg(null); })}>Order what the plans need (~{usdShort(orderCost(needLines, k))}, leaves {usdShort(game.money - orderCost(needLines, k))})</button>
         </div>}
         <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
           <div style={{ flex: 1, overflowY: 'auto', padding: 14 }}>
@@ -258,10 +261,11 @@ export function ShopWindow() {
               {onWay.map(o => <div key={o.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 6, color: C.dim }}><span>{o.lines.length} item{o.lines.length > 1 ? 's' : ''} · {usd(o.cost)}</span><span>{o.dueAt - game.clock.t < 1 ? 'today' : `in ${Math.ceil(o.dueAt - game.clock.t)} d`}</span></div>)}
             </div>}
             <div style={{ fontSize: 11.5, color: C.dim }}>{pay === 'cash' ? 'The banks are shut: paying cash from the safe.' : pay === 'bank' ? `From checking. The truck comes in about ${2 + Math.floor(game.site.miles / 15)} days.` : 'Nobody is delivering now.'}</div>
-            <button style={{ ...btn(true, !!why), padding: '7px 10px', fontWeight: 600 }} disabled={!!why} onClick={() => { if (g.order(lines)) { setCart({}); setFoodCart({}); } }}>
+            <button style={{ ...btn(true, !!why), padding: '7px 10px', fontWeight: 600 }} disabled={!!why} onClick={() => guard(total, () => { if (g.order(lines)) { setCart({}); setFoodCart({}); } })}>
               {why === 'cannot_afford' ? 'Not enough money' : why === 'no_deliveries' ? 'No deliveries' : 'Place the order'}
             </button>
             {lines.length > 0 && <button style={btn()} onClick={() => { setCart({}); setFoodCart({}); }}>Clear</button>}
+            {guardNode}
           </div>}
         </div>
       </div>
