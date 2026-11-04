@@ -386,7 +386,7 @@ export function makeTerrainMaterial(look: RegionLook, waterY: number | null): { 
         // far away the coarse grid exaggerates steepness: let snow hold on steeper faces there
         float sThr = mix(0.36, 0.62, smoothstep(500.0, 1300.0, camDc));
         float snow = smoothstep(sl - 30.0, sl + 30.0, alt) * (1.0 - smoothstep(sThr, sThr + 0.14, slope));
-        snow = max(snow, uSnowCover * (1.0 - smoothstep(0.25, 0.55, slope)) * (1.0 - 0.8 * fo));
+        snow = max(snow, uSnowCover * (1.0 - smoothstep(0.25, 0.55, slope)) * (1.0 - 0.8 * fo) * (1.0 - 0.45 * smoothstep(0.22, 0.55, vForest)));
         col = mix(col, uSnow * (0.9 + 0.1 * nb), snow);
         // Damp shore and wet mud just above the water line
         float shore = 1.0 - smoothstep(0.0, 0.7, alt - uWaterY);
@@ -594,7 +594,7 @@ export class TerrainRenderer {
     const hi = Math.min(look.snowLine, 2000);
     const lo = Math.min(look.snowLineWinter, 2000);
     u['uSnowLine'].value = hi + (lo - hi) * p.cold;
-    u['uSnowCover'].value = look.snowLineWinter < 20 ? Math.min(0.9, p.snow) : 0;
+    u['uSnowCover'].value = look.snowLineWinter < 60 ? Math.min(0.9, p.snow) : 0;
     const doy = Math.round(seasonState.doy);
     const cc = u['uCropC'].value as THREE.Vector3[], ct = u['uCropT'].value as number[];
     if (doy !== this._cropDoy || this._cropEase > 0) {
