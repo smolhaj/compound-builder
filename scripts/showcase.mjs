@@ -269,7 +269,17 @@ if (only.includes('tunnel') && L.tunnel) {
 // the portal close up (with --collapse: the rubble heap): low orbits round the court-side portal from the court, and one aerial
 if (only.includes('portal') && L.tunnel) {
   const [ax, az] = L.tunnel.a;
-  for (const [n, r, pitch, dy] of [['a', 6, 0.25, 0.5], ['b', 6, 0.25, -0.4], ['c', 10, 0.8, 0.2]]) { await orbit(r, pitch, L.up + dy, ax, az, 0.5); await shot(`9${n}-portal-${args.includes('--collapse') ? 'collapsed' : 'standing'}-${n}`); }
+  const [bx, bz] = L.tunnel.b, dl = Math.hypot(bx - ax, bz - az) || 1, ux = (bx - ax) / dl, uz = (bz - az) / dl, tag = args.includes('--collapse') ? 'collapsed' : 'standing';
+  await orbit(10, 0.8, L.up + 0.2, ax, az, 0.5); await shot(`9c-portal-${tag}-aerial`);
+  await orbit(6, 0.45, L.up + 0.2, ax, az, 0.5); await shot(`9d-portal-${tag}-aerial-close`);
+  // eye level, a clear spot out on the court side of the portal looking at it, a person standing between (explicit pose, so the camera is never in the ground or a tree)
+  for (const [k, d, side, fov] of [['e1', 4.2, 1.6, 62], ['e2', 3.4, -1.4, 66], ['e3', 5.0, 0.2, 58]]) {
+    const ox = -ux, oz = -uz, sx = -oz, sz = ox;
+    await placePerson('p2', ax + ox * 1.9 + sx * 0.5, az + oz * 1.9 + sz * 0.5, ax, az);
+    await page.evaluate(([x, z, ax, az, fov]) => { const { world } = window.__cb, gr = world.groundAt; window.__cb.qa.pose = { x, y: gr(x, z) + 0.3, z, lx: ax, ly: gr(ax, az) + 0.35, lz: az, fov }; }, [ax + ox * d + sx * side, az + oz * d + sz * side, ax, az, fov]);
+    await placePerson('p2', ax + ox * 1.9 + sx * 0.5, az + oz * 1.9 + sz * 0.5, ax, az);
+    await shot(`9${k}-portal-${tag}-eye-with-person`);
+  }
 }
 // tunnel use: the family walking the bore, a car driving through it, the doors, and the whole thing with the hill cut away
 if (only.includes('use') && L.tunnel) {
