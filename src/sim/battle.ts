@@ -39,6 +39,8 @@ import { isFinished } from './construction';
 import { PERIMETER, fenceLive, runFinished } from './perimeter';
 import { ARMORY_LIGHTS, floodlightLit } from './lights';
 import { DOOR_DELAY, doorsLocked, raidAngle } from './terrainFx';
+import { moatFx } from './waterWorks';
+import { lureOf, raidYardLosses } from './vehicleYard';
 import { doorTierOf, planBreach, type DoorPlan } from './doorBreach';
 import { sapperBreach } from './corridors';
 import { roadStart } from './roadFx';
@@ -162,6 +164,10 @@ export interface PlannedBattle extends Battle {
   /** The corridor (tunnel run id) the crew came by, and the charges they carried (a rocket counts two): a breach there can bring a portal down (sim/corridors `sapperBreach`). */
   via?: string;
   charges?: number;
+  /** Raiders who went for the vehicle yard instead of the house (sim/vehicleYard.ts `lureOf`). */
+  lure?: number;
+  /** Did the crew come with the organized kit (gangs, militia: sim/vehicleYard's take chance)? */
+  organized?: boolean;
 }
 
 interface Fighter {
@@ -307,14 +313,16 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
   // a wall only delays a crew that has to come over it: a gap, an open gate or an unbarred creek in the property line is the way round
   const propLine = enclosure(s);
   const lineClosed = propLine.openShare === 0 && propLine.creekOpen === 0;
-  let wallR = 0, wallKind = '';
+  let wallR = 0, wallKind = '', moatR = 0;
   for (const run of s.perimeter) {
     if (!runFinished(run) || PERIMETER[run.kind].blocks.people <= 0 || !run.pts.length) continue;
+    if (run.kind === 'moat') { moatR = Math.max(moatR, Math.max(4, Math.min(30, Math.min(...run.pts.map(([x, z]) => dist({ x, z }, C)))))); continue; }   // (a moat is crossed, not the line the defenders hold: its water is added below, sim/waterWorks.ts)
     const pts = run.pts.map(([x, z]) => ({ x, z })).sort((a, b) => ((b.x - C.x) * ax + (b.z - C.z) * az) - ((a.x - C.x) * ax + (a.z - C.z) * az));
     const rr = Math.max(4, Math.min(30, dist(pts[0], C)));
     if (rr >= wallR) wallKind = run.kind;   // the outermost wall is the one they meet first
     wallR = Math.max(wallR, rr);
   }
+  if (!wallR && moatR) { wallR = moatR; wallKind = 'moat'; }   // a moat with no wall behind it is the line itself
   // a patrol deck on the wall (sim/walkway.ts): the posts on it are on the real deck where the raid meets the wall, higher and better covered than a spot behind it
   const decks = walkRuns(s), deckPosts = decks.length ? deckSpots(s, wallR ? [at(wallR, 0).x, at(wallR, 0).z] : [C.x, C.z], 3 + Math.min(2, Math.floor(walkLength(s) / 20))) : [];
   const deck = deckPosts.length > 0;
@@ -370,6 +378,9 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
   // a few grenades and, late, a rocket; a pickup of desperate men a grenade now and then, never a rocket
   // (round 4: a rocket came with every other pair of looters after day 120 and one blast took a whole family in the house)
   const organized = opts.organized ?? raiders >= 5;
+  // a vehicle yard outside the walls draws part of a big crew away from the house (sim/vehicleYard.ts): fewer men at the wall, at the price of the trucks
+  const lure = peace || opts.insideBreach ? 0 : lureOf(s, raiders);
+  if (lure) raiders -= lure;
   let gLeft = opts.grenades ?? (armedR && !peace ? (organized ? Math.round(raiders * late * 0.4 * r()) : r() < late * 0.15 ? 1 : 0) : 0);
   let rLeft = opts.rockets ?? (armedR && !peace && organized && daysAfter > 120 && r() < late * 0.3 ? 1 : 0);
   // (Hardcore) a crew that has learned the place brings more of it (sim/adaptive.ts; nothing at adapt 0)
@@ -428,6 +439,8 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
 
   // ── detection, alarm, lights ──
   const detection = Math.min(100, 25 + (s.gate.forewarned ? 20 : 0) + g.detection + tw.detection + watchDetection(s) + Math.max(0, ...fightersP.map(({ p }) => p.skills.hunter)) * 4);
+  // a moat across the way they come (sim/waterWorks.ts): held at the water, or filed across the covered bridge; only ever adds time and hurt
+  const moat = opts.terrain === false || opts.insideBreach ? null : moatFx(s, [C.x, C.z], ang, night, detection);
   // the tunnel-bridge's doors lock at night and on the alarm (a watch good enough to call it before they arrive); by day, unwarned, they stand open
   // (sim/doorBreach.ts) a locked door is a job: tools, a ram, a torch, charges against its tier, slowed by the towers that see it and a sortie from the sally port
   let door: DoorPlan | null = null;
@@ -902,6 +915,12 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
         hurt(f, hz.min + r() * (hz.max - hz.min), t + 0.1, undefined, 'leg');
         if (!f.dead && r() < 0.7) say(t + 0.3, pick(hz.lines), f);
       }
+      if (moat?.hazard && ringK === 0) for (const f of atLine) if (r() < moat.hazard.p) {
+        bitten++;
+        ev.push({ t: r2(t + 0.1), kind: 'snag', unit: f.id, x: r2(f.x), z: r2(f.z), what: moat.hazard.what });
+        hurt(f, moat.hazard.min + r() * (moat.hazard.max - moat.hazard.min), t + 0.1, undefined, 'leg');
+        if (!f.dead && r() < 0.7) say(t + 0.3, pick(moat.frozen ? ['The ice — it went — it went under me —', 'It cracked — get me out — GET ME OUT —'] : ['Cold — Christ, it\'s cold — I can\'t feel my — ', 'It\'s over my head — I\'ve lost the rifle —', 'The bank is slick — I can\'t climb out —']), f);
+      }
       if (temper !== 'savage' && !peace && t - lineSince >= 6) for (const f of atLine) if (!f.fled && !f.out && r() < 0.03 + 0.05 * Math.min(1, losses / Math.max(1, raiders)) + 0.03 * bitten) {
         f.fled = true; ev.push({ t, kind: 'flee', unit: f.id });
         if (r() < 0.5) say(t + 0.2, pick(['Fuck this — I\'m not going over that.', 'It\'s not worth it — back, get BACK!', 'No way — I\'m out — I\'m out of here!']), f);
@@ -910,7 +929,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
     // (round 4) clubs against rifles need far more of them to rush the line; going over a wall, every rifle at a post on it slows them
     const outnumber = armedR ? 2 : 4;
     const onWall = H.filter(f => !f.out && !f.shelter && f.arm !== FISTS && t >= f.readyAt && f.post?.kind !== 'open' && f.post?.kind !== 'building').length;
-    if (!breached && !peace && atLine.length && (wallDown || hNow === 0 || rUp.length > hNow * outnumber) && (opts.ambush === undefined || hNow === 0 || t - lineSince >= 12 + opts.ambush) && (hNow === 0 || t - lineSince >= (ringK === 0 ? ringHold : ringStay)) && (!climbing || (t - lineSince >= 10 && r() < 0.02 * atLine.length * (deck ? WALK_CLIMB_FACTOR : 1) / (1 + onWall)))) {
+    if (!breached && !peace && atLine.length && (wallDown || hNow === 0 || rUp.length > hNow * outnumber) && (opts.ambush === undefined || hNow === 0 || t - lineSince >= 12 + opts.ambush) && (hNow === 0 || t - lineSince >= (ringK === 0 ? ringHold : ringStay)) && (!climbing || (t - lineSince >= 10 + (moat && ringK === 0 ? moat.holdS : 0) && r() < 0.02 * atLine.length * (deck ? WALK_CLIMB_FACTOR : 1) / (1 + onWall)))) {
       if (ringK < ringRs.length) fallBack(t);
       else {
       breached = true; breachT = t;
@@ -947,7 +966,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
   ev.sort((a, b) => a.t - b.t);
   const dropped = { grenades: R.filter(f => f.out).reduce((a, f) => a + f.grenades, 0), rpg_rounds: R.filter(f => f.out).reduce((a, f) => a + f.rockets, 0) };
   const leftBehind = { wounded: R.filter(f => f.out && !f.dead).length, dead: R.filter(f => f.dead).length };
-  return { night, units, events: ev, duration, spent, minesUsed: mines - minesLeft, dropped, result: end, leftBehind, ...(ringRs.length ? { rings: { of: ringRs.length, fell: ringK, losses: lossesByRing(ev, units, fallTimes) } } : {}), ...(lane?.via ? { via: lane.via, charges: charges0 } : {}) };
+  return { night, units, events: ev, duration, spent, minesUsed: mines - minesLeft, dropped, result: end, leftBehind, ...(ringRs.length ? { rings: { of: ringRs.length, fell: ringK, losses: lossesByRing(ev, units, fallTimes) } } : {}), ...(lane?.via ? { via: lane.via, charges: charges0 } : {}), ...(lure ? { lure } : {}), organized };
 }
 
 /** Write a fought battle into the game: wounds, deaths, ammo, mines, loot, the tallies. */
@@ -978,6 +997,8 @@ export function applyBattle(s: GameState, b: Battle): string[] {
   if (thrown) s.stock.grenades = Math.max(0, (s.stock.grenades ?? 0) - thrown);
   // a crew that came by a tunnel and got in may have brought its portal down behind it (sappers: sim/corridors)
   if (pb.via && (result === 'breached' || result === 'overrun')) out.push(...sapperBreach(s, pb.via, pb.charges ?? 0, result));
+  // what stands in a vehicle yard outside the walls is taken whether or not the line held (sim/vehicleYard.ts)
+  out.push(...raidYardLosses(s, result, !!pb.organized, pb.duration ? Math.round(pb.duration) : 0));
   if (result === 'breached' || result === 'overrun') {
     s.gate.raidsLost++;
     const kidOf = (unit: string) => s.people.find(p => p.id === b.units.find(u => u.id === unit)?.personId)?.kid;

@@ -354,11 +354,13 @@ export function installSeasonShaderPatch(): void {
  * a matte ice albedo with the water's own diffuse irradiance.
  * `worldPos` is the GLSL expression of the fragment's world position;
  * `openWater` (GLSL float 0..1) keeps e.g. a fast river channel open.
+ * `iceExpr` (GLSL float) replaces the season's ice amount where the game knows better (the sim's lake ice).
  */
-export function seasonIceGlsl(worldPos: string, openWater = '0.0'): string {
+export function seasonIceGlsl(worldPos: string, openWater = '0.0', iceExpr = 'uSeaC.x'): string {
   return /* glsl */`
   #ifdef STANDARD
-  if ( uSeaC.x > 0.002 ) {
+  float icAmt = ${iceExpr};
+  if ( icAmt > 0.002 ) {
     vec2 icXZ = (${worldPos}).xz;
     float icN = seaNoise( icXZ * 0.17 ) * 0.6 + seaNoise( icXZ * 1.3 + 2.1 ) * 0.4;
     float icCr = smoothstep( 0.035, 0.0, abs( seaNoise( icXZ * 2.3 ) - 0.5 ) );
@@ -370,7 +372,7 @@ export function seasonIceGlsl(worldPos: string, openWater = '0.0'): string {
     vec3 icIrr = ( reflectedLight.directDiffuse + reflectedLight.indirectDiffuse ) / max( diffuseColor.rgb, vec3( 1e-3 ) );
     vec3 icCol = icIrr * icAlb + reflectedLight.directSpecular * 0.05;
     float icOpen = clamp( ${openWater}, 0.0, 1.0 );
-    float icK = smoothstep( 0.0, 0.3, uSeaC.x ) * uSeaC.x * ( 1.0 - icOpen );
+    float icK = smoothstep( 0.0, 0.3, icAmt ) * icAmt * ( 1.0 - icOpen );
     outgoingLight = mix( outgoingLight, icCol, clamp( icK * 1.2, 0.0, 1.0 ) );
   }
   #endif

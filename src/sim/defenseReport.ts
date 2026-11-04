@@ -159,7 +159,7 @@ export function defenseReport(s: GameState, drive?: readonly Pt[]): DefenseRepor
   const skirted = wallRuns.filter(r => hasSkirt(r, s.clock.t)).length;
   const hunter = Math.max(0, ...s.people.filter((p, i) => !p.kid && s.personState[i]?.needs.died == null).map(p => p.skills.hunter));
   const per = combine(detectChances(dd, hunter));
-  const ditches = s.perimeter.filter(r => r.kind === 'ditch' && runFinished(r));
+  const ditches = s.perimeter.filter(r => (r.kind === 'ditch' || r.kind === 'moat') && runFinished(r));
   const dig: Check[] = [];
   if (wallRuns.length) {
     dig.push(chk('skirt', 'Deep footing or buried skirt', skirted === wallRuns.length, skirted === wallRuns.length ? 'every wall goes down below a tunnel' : `${skirted} of ${wallRuns.length} wall runs: a crew digs under the others`, skirted > 0));

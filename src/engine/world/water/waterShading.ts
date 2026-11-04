@@ -75,6 +75,8 @@ export interface WaterPatchOptions {
   depthGLSL: string;
   /** Extra fragment declarations (uniforms, functions). */
   pars?: string;
+  /** GLSL float expression for the ice amount (default: the season's `uSeaC.x`); the sim's lake ice drives it. */
+  iceExpr?: string;
   /** Extra vertex attribute(s) forwarded as varyings: name → GLSL type ('float'). */
   attributes?: Record<string, 'float'>;
   uniforms?: Record<string, THREE.IUniform>;
@@ -365,7 +367,7 @@ export function patchWaterMaterial(mat: THREE.MeshStandardMaterial, o: WaterPatc
       // Seasons: ponds / lakes / slow rivers freeze in cold winters; the
       // fast, deep river channel stays a dark open lead
       .replace('#include <opaque_fragment>', outGLSL()
-        + seasonIceGlsl('vWPos', 'smoothstep(0.12, 0.4, wSpeed) * smoothstep(0.3, 0.75, wDepth) * wRiver')
+        + seasonIceGlsl('vWPos', 'smoothstep(0.12, 0.4, wSpeed) * smoothstep(0.3, 0.75, wDepth) * wRiver', o.iceExpr)
         + '\n#include <opaque_fragment>');
   };
   mat.customProgramCacheKey = () => 'water-v2-' + o.key + (o.flow ? '-f' : '') + (o.reflection ? '-m' : '');

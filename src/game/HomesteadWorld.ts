@@ -29,7 +29,7 @@ import { LivedLayer } from './lived/LivedLayer';
 import type { Mode } from './lived/livedPlan';
 import { lightsOutNow } from '../sim/blackout';
 import type { NetWorld } from './paths/pathNet';
-import { WALK_CLIFF, walkRoute } from './paths/walkRoute';
+import { WALK_CLIFF, entryRampHeight, walkRoute } from './paths/walkRoute';
 import { CorridorNet } from './paths/CorridorNet';
 import { animalRoute, climbLimit } from './paths/groundMovers';
 import { LANE } from '../sim/laneWalk';
@@ -64,7 +64,7 @@ import type { GameState } from '../sim/state';
 import type { WearSeason } from '../engine/world/people/crowdWear';
 import type { TourBuildingInfo } from '../engine/world/camera/TourController';
 import { hydroSiteAt, windDay, TURBINE } from '../sim/renewables';
-import { boatsAtDock, isDock, lakeIce } from '../sim/waterfront';
+import { boatsAtDock, isDock, lakeIce, waterBody } from '../sim/waterfront';
 import { hydroLine, HYDRO_HOUSE } from './buildkit/renewableBuildings';
 import { climbOf, floorHatchHost, footprint, KIT, placementProblem, rotQ, type Placed, type SiteQuery } from './buildkit/kit';
 import { showStage, CUTAWAY_HIDE, XRAY_LAYERS, type BuildLayer as CabinLayer, type BuildOpts } from './buildkit/shell';
@@ -196,6 +196,9 @@ interface DigSite { pit: Pit; spoil: number; machine: boolean; stage: number; f:
 
 /** Kinds with a basement under the main floor (their floorboards are see-through in the cutaway views). */
 const SEE_THROUGH_FLOOR: ReadonlySet<string> = new Set(['lodge', 'lodge_solar']);
+
+/** How much of the lake shows ice for each sim state (a skim is thin and patchy). */
+const ICE_COVER = { open: 0, skim: 0.32, ice: 1 } as const;
 
 export class HomesteadWorld {
   readonly center = new THREE.Vector3(PARCEL_SIZE / 2, 0, PARCEL_SIZE / 2);
@@ -540,6 +543,8 @@ export class HomesteadWorld {
     this._syncTruckTail();
     this.truck.setWinter(seasonState.params.snow > 0.25);
     this.truck.update(dt, speedK);
+    // the lake skins over and freezes when the sim says so (sim/waterfront lakeIce), not by the calendar alone
+    this.lakes.setIce(waterBody(game) ? ICE_COVER[lakeIce(game)] : -1, dt);
     this.plow.update(dt, this._drive && game.stock.plow >= 1, seasonState.params.snow, speedK);
     // deliveries left at the road (no drive yet), by the gate
     const rs = emptyStock();
@@ -896,7 +901,7 @@ export class HomesteadWorld {
   }
 
   /** Fences, hedges and walls drawn as built (hedges by growth); berms and ditches shape the terrain. */
-  syncPerimeter(runs: readonly PerimeterRun[], t: number, opts: { lit?: boolean; sensors?: boolean } = {}): void {
+  syncPerimeter(runs: readonly PerimeterRun[], t: number, opts: { lit?: boolean; sensors?: boolean; /** Each moat's water (sim/waterWorks `moatStates`). */ moats?: Record<string, { level: number; frozen: boolean }> } = {}): void {
     this._runs = runs;
     this.corridors.sync(runs);
     const lit = opts.lit ?? true, sensors = opts.sensors ?? false;
@@ -908,14 +913,14 @@ export class HomesteadWorld {
     for (const r of runs) {
       // old posts lean and rails sag (atmosphere/aging): rebuilt as the lean steps
       const lean = LEANS.has(r.kind) && r.finishedAt !== null ? Math.round(fenceLean((t - r.finishedAt) / 365) * 10) / 10 : 0;
-      const key = `${Math.round(runProgress(r) * 60)}:${Math.round(runGrowth(r, t) * 40)}:${r.finishedAt === null ? 0 : 1}:${r.gates.length}:${lean}:${hasSkirt(r, t) ? 1 : 0}:${lit ? 1 : 0}:${sensors ? 1 : 0}:${hostOf(r)}:${r.razor ? 1 : 0}:${hostRazor(r) ? 1 : 0}:${deckOn(r) ? 1 : 0}:${r.collapsed ? 1 : 0}`;
+      const key = `${Math.round(runProgress(r) * 60)}:${Math.round(runGrowth(r, t) * 40)}:${r.finishedAt === null ? 0 : 1}:${r.gates.length}:${lean}:${hasSkirt(r, t) ? 1 : 0}:${lit ? 1 : 0}:${sensors ? 1 : 0}:${hostOf(r)}:${r.razor ? 1 : 0}:${hostRazor(r) ? 1 : 0}:${deckOn(r) ? 1 : 0}:${r.collapsed ? 1 : 0}:${opts.moats?.[r.id] ? Math.round(opts.moats[r.id].level * 4) + (opts.moats[r.id].frozen ? 9 : 0) : ''}`;
       const cur = this._runGroups.get(r.id);
       if (cur?.key === key) continue;
       if (cur) { this._root.remove(cur.group); cur.group.traverse(o => (o as THREE.Mesh).geometry?.dispose()); }
       const tunnel = r.kind === 'escape_tunnel' || r.kind === 'underground_passage';
       const group = tunnel
         ? buildTunnel(this._pathOf(r), this.groundAt, r.finishedAt !== null ? 1 : runProgress(r), this._exitWoods(r), r.kind === 'underground_passage' ? { woodsStart: this.tunnelExitWoods(r.pts[0][0], r.pts[0][1]) } : undefined)
-        : buildRun(r, this.groundAt, t, (x, z) => this.onBuilding(x, z, 0.02, false), { lit, sensors, hostKind: PERIMETER[r.kind].wallTop ? runs.find(x => x.id === r.hostId)?.kind : undefined, hostRazor: hostRazor(r), deck: deckOn(r) });
+        : buildRun(r, this.groundAt, t, (x, z) => this.onBuilding(x, z, 0.02, false), { lit, sensors, hostKind: PERIMETER[r.kind].wallTop ? runs.find(x => x.id === r.hostId)?.kind : undefined, hostRazor: hostRazor(r), deck: deckOn(r), moat: opts.moats?.[r.id], creek: this.parcel.creek });
       if (tunnel) this._applyTunnelView(group);
       if (lean > 0) leanRun(group, lean, hashStr(r.id) % 997, this.groundAt);
       this._root.add(group);
@@ -923,7 +928,7 @@ export class HomesteadWorld {
       this._ws.invalidateShadows();
     }
     // earthworks (berms raise, ditches cut) as they are dug
-    const works: Earthwork[] = runs.filter(r => r.kind === 'earth_berm' || r.kind === 'ditch').map(r => ({ pts: r.pts, gates: r.gates, height: PERIMETER[r.kind].height, k: r.finishedAt !== null ? 1 : runProgress(r) }));
+    const works: Earthwork[] = runs.filter(r => r.kind === 'earth_berm' || r.kind === 'ditch' || r.kind === 'moat').map(r => ({ pts: r.pts, gates: r.gates, height: PERIMETER[r.kind].height, ...(r.kind === 'moat' ? { wide: 2.2, creekSkip: true } : {}), k: r.finishedAt !== null ? 1 : runProgress(r) }));
     // a tunnel is cut and covered: an open trench along it while the culvert goes in
     for (const r of runs) if ((r.kind === 'escape_tunnel' || r.kind === 'underground_passage') && r.finishedAt === null && (r.supplied || r.done > 0)) works.push({ pts: r.pts.slice(), gates: [], height: -0.33, k: 1 });
     const wk = works.map(w => `${w.pts.length}:${Math.round(w.k * 20)}`).join('|');
@@ -976,7 +981,7 @@ export class HomesteadWorld {
       const box = new THREE.Box3().setFromObject(b.group);
       return { x0: box.min.x, z0: box.min.z, x1: box.max.x, z1: box.max.z, top: box.max.y };
     });
-    const walls = this._runs.filter(r => r.kind !== 'earth_berm' && r.kind !== 'ditch' && PERIMETER[r.kind].sight > 0).map(r => {
+    const walls = this._runs.filter(r => r.kind !== 'earth_berm' && r.kind !== 'ditch' && r.kind !== 'moat' && PERIMETER[r.kind].sight > 0).map(r => {
       const g = runGrowth(r, this._simT);
       return { pts: r.pts, top: PERIMETER[r.kind].height * (r.kind === 'thorn_hedge' ? g : 1), cut: PERIMETER[r.kind].sight * (r.kind === 'thorn_hedge' ? g : r.finishedAt !== null ? 1 : runProgress(r)), gates: r.gates };
     });
@@ -2342,6 +2347,8 @@ export class HomesteadWorld {
       // a stair or a ramp: up the steps (or the grade) from its low end
       if (def.climbs) { if (Math.abs(lx) < hw && Math.abs(lz) < hd) return b.padY + treadHeight(b.placed.kind, b.opts.rise ?? 0, def.cellsZ * CELL, lz); continue; }
       if (Math.abs(lx) < hw && lz > -hd && lz < hd + def.porch && def.floorY > 0.02) return b.padY + def.floorY;
+      // the steps down off the deck: ease from the floor to the ground instead of dropping the whole rise at the edge
+      if (def.floorY > 0.1 && Math.abs(lx) < hw && lz >= hd + def.porch && lz < hd + def.porch + 0.9) return entryRampHeight(b.padY + def.floorY, this.groundAt(x, z), lz - hd - def.porch);
       // a building whose floor is its graded pad (greenhouse gravel, a garage slab): stand on the pad, not the raw slope under it
       if (Math.abs(lx) < hw && Math.abs(lz) < hd && def.category !== 'bunker' && (def.category !== 'food' || b.placed.kind === 'greenhouse' || b.placed.kind === 'greenhouse_heated' || b.placed.kind === 'sheep_barn')) return b.padY + Math.max(0, def.floorY);
     }
