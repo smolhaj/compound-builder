@@ -1,3 +1,4 @@
+import { flowLine } from '../sim/flow';
 import { useState } from 'react';
 import { unscripted } from '../sim/godMode';
 import { TERRAIN_LEGEND, type TerrainMode } from '../game/terrain/TerrainOverlay';
@@ -370,6 +371,7 @@ export function Hud() {
                 <Row label="Well depth here" value={`${game.site.gwDepth} m`} />
                 {game.utilities.hauling && <Note tone="warn">{game.utilities.haulFar ? 'Hauling water a quarter mile from the creek on the neighbor\'s land: a well or cistern would end it.' : 'Hauling water from the creek by the bucket: a well or cistern would end it.'}</Note>}
                 {r.shortL > 0 && <Note tone="bad">Water ran short.</Note>}
+                {flowLine(game) && <Note>{flowLine(game)}</Note>}
                 {game.utilities.hauling && game.stock.water_filter < 0.01 && <Note tone="warn">{game.stock.firewood >= 0.05 ? 'Boiling the creek water (firewood): a filter would save the wood.' : 'Drinking the creek water untreated: giardia. Get a filter or boil it.'}</Note>}
                 {game.site.gwQuality === 'arsenic' && game.stock.ro_system < 1 && <Note tone="warn">Arsenic in the well water: get reverse osmosis for drinking water.</Note>}
                 {game.site.gwQuality === 'hard' && game.stock.softener < 1 && <Note>Hard water: scale wears the pump faster without a softener.</Note>}
