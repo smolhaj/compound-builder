@@ -30,6 +30,9 @@ export interface Beast {
   group: number;
   /** Per-animal random in [0,1) (tone, timing). */
   k: number;
+  /** The way to (tx, tz) round whatever is in between (a wall, a cliff, a building), and the target it was found for. */
+  via?: Array<[number, number]>;
+  viaFor?: string;
 }
 
 export interface StepCtx {
@@ -38,6 +41,11 @@ export interface StepCtx {
   rnd: () => number;
   /** Time scale (1 at 1×, up to 3 at fast-forward). */
   speedK: number;
+  /**
+   * The points to pass through to get from the beast to (tx, tz) without crossing a wall, a cliff, the creek or a building ([] = straight is fine;
+   * null = no way: stay put). Absent: straight lines (the tests).
+   */
+  route?: (b: Beast, tx: number, tz: number) => Array<[number, number]> | null;
 }
 
 /** Speeds in world units per second at 1×: a person walks 0.5, so a deer walks slowly and bolts fast. */
@@ -105,16 +113,26 @@ export function stepBeast(b: Beast, dt: number, ctx: StepCtx): void {
     // now and then the whole range drifts
     if (ctx.rnd() < 0.2) { const nx = b.hx + (ctx.rnd() - 0.5) * 6, nz = b.hz + (ctx.rnd() - 0.5) * 6; if (ctx.allowed(nx, nz, b)) { b.hx = nx; b.hz = nz; } }
   }
-  // move
+  // move: along the route round obstacles to the target, one waypoint at a time
   let v = 0;
   if (b.mood === 'walk' || b.mood === 'flee') {
-    const dx = b.tx - b.x, dz = b.tz - b.z, d = Math.hypot(dx, dz);
-    if (d > 0.02) {
-      v = (b.mood === 'flee' ? sp.run : sp.walk) * k;
-      const step = Math.min(d, v * dt), nx = b.x + dx / d * step, nz = b.z + dz / d * step;
-      if (ctx.allowed(nx, nz, b)) { b.x = nx; b.z = nz; }
-      else { v = 0; b.mood = b.mood === 'flee' ? 'alert' : 'graze'; b.t = 1.5; }
-      b.rot += wrap(Math.atan2(dx, dz) - b.rot) * Math.min(1, dt * (b.mood === 'flee' ? 10 : 4));
+    const key = `${b.tx.toFixed(2)},${b.tz.toFixed(2)}`;
+    if (ctx.route && b.viaFor !== key) {
+      const r = ctx.route(b, b.tx, b.tz);
+      if (r === null) { b.via = undefined; b.viaFor = undefined; b.mood = b.mood === 'flee' ? 'alert' : 'graze'; b.t = 1.5; }
+      else { b.via = [...r]; b.viaFor = key; }
+    }
+    if (b.mood === 'walk' || b.mood === 'flee') {
+      while (b.via && b.via.length && dist(b.x, b.z, b.via[0][0], b.via[0][1]) < 0.06) b.via.shift();
+      const gx = b.via && b.via.length ? b.via[0][0] : b.tx, gz = b.via && b.via.length ? b.via[0][1] : b.tz;
+      const dx = gx - b.x, dz = gz - b.z, d = Math.hypot(dx, dz);
+      if (d > 0.02) {
+        v = (b.mood === 'flee' ? sp.run : sp.walk) * k;
+        const step = Math.min(d, v * dt), nx = b.x + dx / d * step, nz = b.z + dz / d * step;
+        if (ctx.allowed(nx, nz, b)) { b.x = nx; b.z = nz; }
+        else { v = 0; b.mood = b.mood === 'flee' ? 'alert' : 'graze'; b.t = 1.5; b.via = undefined; b.viaFor = undefined; }
+        b.rot += wrap(Math.atan2(dx, dz) - b.rot) * Math.min(1, dt * (b.mood === 'flee' ? 10 : 4));
+      }
     }
   }
   b.v = v;

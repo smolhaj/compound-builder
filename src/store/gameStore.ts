@@ -19,6 +19,7 @@ import type { SiegePlan } from '../sim/siege';
 import type { Battle } from '../sim/battleTypes';
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
+import { gridChanged } from '../sim/lineage';
 import { newGame, SECONDS_PER_DAY, dayIndex, hourOf, type GameState, type OrderLine, type Speed } from '../sim/state';
 import { step } from '../sim/engine';
 import { placeOrder } from '../sim/economy';
@@ -732,6 +733,7 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
       log(g, `Back on the county grid ($${GRID_RECONNECT} to reconnect).`);
     } else log(g, 'The co-op pulled the meter: the place is off the grid.');
     g.utilities.grid = on;
+    gridChanged(g, on);
     set({ game: g });
   },
   setBreaker: (id, on) => {

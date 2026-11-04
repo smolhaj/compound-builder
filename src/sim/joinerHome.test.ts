@@ -422,14 +422,14 @@ describe('the family builds them a place (relatives)', () => {
   });
 });
 
-describe('save v75', () => {
+describe('save v76', () => {
   it('an older save gains the joiners ledger and the new goods start at zero', () => {
     const old = JSON.parse(JSON.stringify(newGame(2))) as Record<string, unknown>;
-    old.version = 74; delete old.joiners;
+    old.version = 75; delete old.joiners;
     delete (old.stock as Record<string, number>).modular_unit;
     const s = migrate(old);
     expect(s.version).toBe(SAVE_VERSION);
-    expect(SAVE_VERSION).toBe(75);
+    expect(SAVE_VERSION).toBe(76);
     expect(s.joiners).toEqual({ stays: [], waiting: [], rigsParked: 0, day: -1 });
     expect(s.stock.modular_unit).toBe(0);
   });

@@ -8,7 +8,7 @@
  */
 import { isHome } from './blueprints';
 import { isFinished } from './construction';
-import { DRAW_KWH, fitProblem, plant, serviceOf, UTILITY, type Plant } from './utilities';
+import { autoFits, DRAW_KWH, fitProblem, plant, serviceOf, UTILITY, type Plant } from './utilities';
 import type { GameState, Structure } from './state';
 
 export type HookKind = 'wire' | 'plumb' | 'power_link' | 'water_link' | 'pump_power';
@@ -54,14 +54,14 @@ export function hookupsFor(s: GameState, st: Structure, p: Plant = plantCached(s
     const j = job('wire');
     if (sv.wired) out.push({ kind: 'wire', state: 'done', label: 'Electric', text: 'wired', todo: null, tool: null });
     else if (j) out.push({ kind: 'wire', state: 'underway', label: 'Electric', text: `wiring ${Math.round(j.done / j.hours * 100)} %`, todo: null, tool: null });
-    else if (!fitProblem(s, p, st, 'wire')) out.push({ kind: 'wire', state: 'ready', label: 'Electric', text: 'Needs wiring', todo: 'It is wired at the next midnight.', tool: null });
+    else if (!fitProblem(s, p, st, 'wire')) out.push({ kind: 'wire', state: 'ready', label: 'Electric', text: 'Needs wiring', todo: autoFits(st.kind, 'wire') ? 'It is wired at the next midnight.' : 'Click Wire it: the family strings the wiring (30 h, 3 cable and a hardware kit).', tool: null });
     else out.push({ kind: 'wire', state: 'missing', label: 'Electric', text: 'No power reaches it', todo: s.utilities.grid ? fitProblem(s, p, st, 'wire') : 'Run a power cable from the solar array, battery or generator to it (Build: Pipes & cables), then wire it.', tool: 'fence:power_cable' });
   }
   if (WANTS_PLUMB(st.kind)) {
     const j = job('plumb');
     if (sv.plumbed) out.push({ kind: 'plumb', state: 'done', label: 'Running water', text: 'plumbed', todo: null, tool: null });
     else if (j) out.push({ kind: 'plumb', state: 'underway', label: 'Running water', text: `plumbing ${Math.round(j.done / j.hours * 100)} %`, todo: null, tool: null });
-    else if (!fitProblem(s, p, st, 'plumb')) out.push({ kind: 'plumb', state: 'ready', label: 'Running water', text: 'Needs plumbing', todo: 'It is plumbed at the next midnight.', tool: null });
+    else if (!fitProblem(s, p, st, 'plumb')) out.push({ kind: 'plumb', state: 'ready', label: 'Running water', text: 'Needs plumbing', todo: autoFits(st.kind, 'plumb') ? 'It is plumbed at the next midnight.' : 'Click Plumb it: the family runs the pipes (40 h, 2 PEX and fixtures).', tool: null });
     else {
       // pressure comes only from a drilled well or a water tower: a hand well or a cistern on the line is not enough
       const hasPressureSource = s.structures.some(x => isFinished(x) && (UTILITY[x.kind]?.water?.pressure || UTILITY[x.kind]?.gravity));

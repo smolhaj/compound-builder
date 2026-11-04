@@ -44,7 +44,7 @@ import type { Medical } from './medical';
 import type { Evenings } from './evenings';
 import type { Courses } from './courses';
 import { starterKit, type ToolKit } from './tools';
-export const SAVE_VERSION = 75;
+export const SAVE_VERSION = 76;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -137,6 +137,8 @@ export interface Structure {
   permitAt?: number;
   /** A fire, storm or looters took its roof off after it stood: the guidance suggests re-roofing it until it is finished again (optional, so no save bump). */
   roofLost?: boolean;
+  /** It stood finished once and was knocked back (a storm, a fire): finishing it again is a rebuild, one line in the chronicle (absent on older saves). */
+  lost?: boolean;
   /** An upgrade of this finished structure (sim/towers.ts): the old tier keeps working until this one is done, then goes (half its materials back). */
   replaces?: string;
   /** Towers: how far the ground at the site stands above the land round it (world units, ≥ 0; sim/towers.ts `stampHighGround`). */
@@ -302,7 +304,7 @@ export interface GameState {
   kin?: Kin;
   /** Neighbors and strangers who joined: loyalty, hidden character, guests sheltering, who left (sim/newcomers.ts). Save v60; `newcomersOf` makes it lazily. */
   newcomers?: NewcomerState;
-  /** Joiners' own homes: rigs, modular homes and cabins being built for them, rigs waiting for a pad (sim/joinerHome.ts). Save v75; `joinersOf` makes it lazily. */
+  /** Joiners' own homes: rigs, modular homes and cabins being built for them, rigs waiting for a pad (sim/joinerHome.ts). Save v76; `joinersOf` makes it lazily. */
   joiners?: JoinerState;
   /** Pet care settings, the family's grief for lost pets, yesterday's care (sim/pets.ts; save v43; `??=` for safety). */
   petLife?: PetLife;
@@ -416,6 +418,7 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     nextId: 1,
   };
   g.structures.push(...improvementStructures(g));
+  g.lineage.startedOnGrid = g.utilities.grid;
   return g;
 }
 

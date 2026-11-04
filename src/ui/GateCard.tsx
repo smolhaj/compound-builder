@@ -38,7 +38,7 @@ const RANSOM: Partial<Record<Stance, [string, string]>> = {
   refuse: ['Refuse', 'Pay once and they come back every month. They may not ask again.'],
 };
 
-const box: CSSProperties = { position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', width: 460, maxWidth: 'calc(100vw - 32px)', background: 'rgba(24,22,18,0.97)', color: '#eee', borderRadius: 12, padding: '18px 20px', zIndex: 9, boxShadow: '0 10px 40px rgba(0,0,0,0.5)', fontSize: 13.5 };
+const box: CSSProperties = { position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', width: 460, maxWidth: 'calc(100vw - 32px)', background: 'rgba(24,22,18,0.97)', color: '#eee', borderRadius: 12, padding: '18px 20px', zIndex: 12, boxShadow: '0 10px 40px rgba(0,0,0,0.5)', fontSize: 13.5 };
 /** The raid prompt: to the right, so the view down the drive stays open between the bars. */
 const raidBox: CSSProperties = { ...box, left: 'auto', right: 'clamp(12px, 3vw, 40px)', top: 'calc(clamp(54px, 12vh, 120px) + 12px)', transform: 'none', width: 'min(400px, calc(100vw - 24px))', maxHeight: 'calc(100vh - 2 * clamp(54px, 12vh, 120px) - 24px)', overflowY: 'auto', zIndex: 40, padding: '14px 16px' };
 const button = (primary: boolean): CSSProperties => ({ padding: '7px 12px', borderRadius: 7, border: 0, cursor: 'pointer', background: primary ? '#d8c9a0' : '#3a3d34', color: primary ? '#1c1d18' : '#eee', fontSize: 13, textAlign: 'left' });

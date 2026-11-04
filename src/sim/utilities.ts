@@ -246,6 +246,12 @@ export function plant(s: GameState, halfSize: (kind: string) => number = k => NO
   };
 }
 
+/** Whether this kind's wiring / plumbing orders itself at midnight (homes, pumps, the cellar); every other building is fitted by hand. */
+export function autoFits(kind: string, fit: Fitting['kind']): boolean {
+  if (!(DRAW_KWH[kind] > 0) || (LOAD_PRIORITY[kind] ?? 9) > 2) return false;
+  return fit === 'wire' || LOAD_PRIORITY[kind] === 2;
+}
+
 /**
  * Plumbing and wiring order themselves: a finished home, pump or cellar gets its wiring job
  * (and a home its plumbing) as soon as service reaches it, the kit included in the price. Only
@@ -254,9 +260,9 @@ export function plant(s: GameState, halfSize: (kind: string) => number = k => NO
 export function autoFit(s: GameState, p: Plant): string[] {
   const out: string[] = [];
   for (const st of s.structures) {
-    if (!isFinished(st) || !(DRAW_KWH[st.kind] > 0) || (LOAD_PRIORITY[st.kind] ?? 9) > 2) continue;
+    if (!isFinished(st)) continue;
     for (const kind of ['wire', 'plumb'] as const) {
-      if (kind === 'plumb' && LOAD_PRIORITY[st.kind] !== 2) continue;
+      if (!autoFits(st.kind, kind)) continue;
       if (fitProblem(s, p, st, kind)) continue;
       const f = orderFit(s, st.id, kind);
       f.supplied = true; f.done = f.hours; f.finishedAt = s.clock.t;

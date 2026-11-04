@@ -12,6 +12,7 @@ import { startingVehicles, type Vehicle } from '../../sim/vehicles';
 import { buildVehicle, paintFor, VEHICLE_SIZE } from './vehicleGeometry';
 import { lineLength, type Pt } from '../region/access';
 import { sampleRoute, inCorridorAt } from '../paths/deckWalk';
+import { drivablePrefix } from '../paths/groundMovers';
 import type { Wp } from '../paths/linkRoute';
 
 /** A placed building the bays are laid out in (world position, rotation about y, structure kind). */
@@ -25,6 +26,10 @@ export interface FleetCtx {
   ground: (x: number, z: number) => number;
   /** The way from one spot to another through the tunnels when they are on different sides of the rock or the gorge (null / empty: straight; game/paths/linkRoute). */
   route?: (from: Pt, to: Pt) => Wp[] | null;
+  /** The way round walls, buildings and ground too steep to drive from one spot to another on the same piece of ground ([] = straight; null = none; game/paths/groundMovers animalRoute). */
+  groundRoute?: (from: Pt, to: Pt) => Pt[] | null;
+  /** Snow has closed the steep roads (the limit drops from 12 % to 7 %; sim/laneWalk vehicleCan). */
+  hardWinter?: boolean;
   /** QA: park a vehicle somewhere (id -> spot) instead of where the parking plan puts it. */
   park?: ReadonlyMap<string, { x: number; z: number; rot: number }>;
   /** Where the n-th vehicle cut off outside a lost way waits (a bridge that is down, a fallen tunnel): null when there is no such place. */
@@ -150,7 +155,12 @@ export class FleetRenderer {
       if (!!v.away !== it.wasAway && spot && ctx.drive.length > 1) {
         const drive = [...ctx.drive].reverse() as Pt[];
         const yardEnd = drive[0], through = ctx.route?.([spot.x, spot.z], yardEnd) ?? [];
-        const out: Wp[] = [[spot.x, spot.z], ...through, ...drive];
+        // on the ground of the yard it goes round the wall and the buildings (a gate in the line, the lane), never through them
+        const toDrive = through.length ? [] : ctx.groundRoute?.([spot.x, spot.z], yardEnd) ?? [];
+        let out: Wp[] = [[spot.x, spot.z], ...toDrive, ...through, ...drive];
+        // and it stops at the foot of a pitch it cannot climb (12 %, 7 % in snow): the rest of the run is out of sight
+        const dr = drivablePrefix(out, ctx.ground, !!ctx.hardWinter);
+        if (!dr.ok && dr.route.length > 1) out = dr.route;
         it.anim = v.away ? { phase: 'out', d: 0, path: out } : { phase: 'in', d: 0, path: [...out].reverse() as Wp[] };
         it.wasAway = !!v.away;
       } else if (!!v.away !== it.wasAway) it.wasAway = !!v.away;

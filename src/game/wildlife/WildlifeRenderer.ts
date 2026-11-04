@@ -13,6 +13,8 @@ import { ownedRects } from '../../sim/enclosure';
 import type { Rect } from '../../sim/land';
 import { hourOf, type GameState } from '../../sim/state';
 import { stepBeast, type Beast, type StepCtx } from './wildlifeAI';
+import { animalRoute } from '../paths/groundMovers';
+import { crossesHard } from '../paths/walkRoute';
 
 const CAP = 120;
 const LEG_PER = 4, HORN_PER = 2;
@@ -48,6 +50,8 @@ export interface WildlifeCtx {
   blocked: (x: number, z: number) => boolean;
   /** The creek through the place, if any. */
   creek: { zAt: (x: number) => number; halfWidth: number; waterY: (x: number) => number } | null;
+  /** What this species cannot cross on foot: a wall, a building, the creek, ground steeper than it climbs (game/paths/groundMovers CLIMB). Absent: nothing. */
+  hard?: (x: number, z: number, sp: SpeciesId) => boolean;
   /** Where people and dogs are (animals bolt from them). */
   threats: ReadonlyArray<readonly [number, number]>;
   /** Camera position: animals farther than DRAW_RANGE are not drawn (a deer is 0.17 tall: a speck past that). */
@@ -71,6 +75,8 @@ export class WildlifeRenderer {
   private _viewAt = -99;
   private _time = 0;
   private _seed = -1;
+  /** Routes still to be searched this frame (a search is the costly part; the rest wait a moment and graze). */
+  private _budget = 0;
 
   constructor(scene: THREE.Scene) {
     const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, metalness: 0 });
@@ -122,6 +128,7 @@ export class WildlifeRenderer {
       const sd = SPECIES[b.sp];
       if (b.sp === 'waterfowl' && c.creek) return Math.abs(z - c.creek.zAt(x)) < c.creek.halfWidth * 0.8 && this._nearRects(x, z, 2);
       if (c.blocked(x, z)) return false;
+      if (c.hard && c.hard(x, z, b.sp)) return false;
       if (c.creek && sd.kind !== 'bird' && Math.abs(z - c.creek.zAt(x)) < c.creek.halfWidth * 0.9) return false;
       if (b.side === 'in') return this._inRects(x, z, 0.5);
       if (b.side === 'out') return !this._inRects(x, z, -0.4) && this._nearRects(x, z, 10);
@@ -167,7 +174,18 @@ export class WildlifeRenderer {
       }
     }
     // step everyone
-    const ctx: StepCtx = { threats: c.threats, allowed: this._allowed(c), rnd: this._rnd, speedK };
+    this._budget = 3;
+    const ctx: StepCtx = {
+      threats: c.threats, allowed: this._allowed(c), rnd: this._rnd, speedK,
+      // round a wall, a cliff or a building the way a person goes (the same search), never over it
+      route: c.hard ? (b, tx, tz) => {
+        const h = (x: number, z: number) => c.hard!(x, z, b.sp);
+        if (b.sp === 'waterfowl' || !crossesHard(h, [b.x, b.z], [tx, tz], 0.05, 0.25)) return [];
+        if (this._budget <= 0) return null;
+        this._budget--;
+        return animalRoute([b.x, b.z], [tx, tz], h);
+      } : undefined,
+    };
     for (const [id, b] of this._beasts) {
       // an animal the wall now keeps out (or in) is somewhere else: put it where it belongs
       if (!b.id.startsWith('qa:') && !ctx.allowed(b.x, b.z, b) && b.sp !== 'waterfowl') this._relocate(b, c);
