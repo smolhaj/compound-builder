@@ -251,7 +251,10 @@ export function GameCanvas() {
           blocked: (x, z) => world.onCamp(x, z, 0.4) || world.onAccess(x, z, 0.4),
         };
         const a = anchorOf(gm);
-        useGameStore.getState().respotJoiners(world.siteImprovements(todo, query, a));
+        const spots = world.siteImprovements(todo, query, a);
+        // the world drew them at the sim's first guess: take those down so the next sync raises them where the terrain allows
+        for (const st of todo) world.removeStructure(st.id);
+        useGameStore.getState().respotJoiners(spots);
       }),
       useGameStore.subscribe(s => s.game.site.improvements.drive, on => world.setDrive(on)),
       useGameStore.subscribe(s => s.game.roadBridge?.down ?? false, on => world.setBridgeDown(on)),

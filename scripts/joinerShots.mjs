@@ -125,9 +125,10 @@ try {
       let best = null, bd = Infinity;
       for (const p of all) { const d = Math.hypot(p.x - tx, p.z - tz); if (d < bd) { bd = d; best = p; } }
       if (!best) return { ok: false };
-      const dx = tx - best.x, dz = tz - best.z, L = Math.hypot(dx, dz) || 1;
-      const [ex, ez] = w.openSpotNear(best.x - dx / L * 1.2, best.z - dz / L * 1.2, 0.7);
-      cb.qa.pose = { x: ex, y: w.groundAt(ex, ez) + 0.28, z: ez, lx: tx, ly: w.groundAt(tx, tz) + 0.25, lz: tz, fov: 55 };
+      // stand 2.3 out from the structure on the side away from the camp, eye height, looking at its door side; the person nearest it is in frame when close enough
+      const c = w.camp, ux = tx - c.x, uz = tz - c.z, L = Math.hypot(ux, uz) || 1;
+      const [ex, ez] = w.openSpotNear(tx + ux / L * 2.3 + uz / L * 1.0, tz + uz / L * 2.3 - ux / L * 1.0, 0.7);
+      cb.qa.pose = { x: ex, y: w.groundAt(ex, ez) + 0.28, z: ez, lx: tx, ly: w.groundAt(tx, tz) + 0.2, lz: tz, fov: 58 };
       return { ok: true, d: bd };
     }, [s.x, s.z]);
     console.log('eye', s.k, JSON.stringify(r));
