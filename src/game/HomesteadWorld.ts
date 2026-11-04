@@ -703,7 +703,11 @@ export class HomesteadWorld {
     this.sage.build(sage, q);
     this.willow.build(willow, q);
     this.rocks.build(rocks, rw.rocks.color, q);
+    this._lowObstacles = [...rocks.map(r => ({ x: r.x, z: r.z, r: 0.7 * r.s })), ...sage.map(r => ({ x: r.x, z: r.z, r: 0.6 * r.s })), ...willow.map(r => ({ x: r.x, z: r.z, r: 0.6 * r.s }))];
   }
+
+  /** Rocks and shrubs (crown radius): an eye-level camera must not stand inside one. */
+  private _lowObstacles: Array<{ x: number; z: number; r: number }> = [];
   /** Neighbor parcels the family has bought (their trees are planted near and detailed, markable). */
   private _ownedLand: Array<{ x0: number; z0: number; x1: number; z1: number }> = [];
   private _inOwned(x: number, z: number): boolean { return this._ownedLand.some(r => x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1); }
@@ -2516,7 +2520,7 @@ export class HomesteadWorld {
       for (let a = 0; a < Math.PI * 2; a += 0.4) {
         const px = x + Math.cos(a) * r, pz = z + Math.sin(a) * r;
         if (this.parcel.isCreek(px, pz) || Math.abs(pz - this.parcel.creek.zAt(px)) < 1.5) continue;
-        if (this.treeClearance(px, pz) > clear) return [px, pz];
+        if (this.treeClearance(px, pz) > clear && !this._lowObstacles.some(o => Math.hypot(o.x - px, o.z - pz) < o.r + 0.45)) return [px, pz];
       }
     }
     return [x, z];
