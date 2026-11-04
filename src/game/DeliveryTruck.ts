@@ -13,6 +13,7 @@ import type { OrderLine } from '../sim/state';
 import { lineLength, type Pt } from './region/access';
 import { inCorridorAt, sampleRoute } from './paths/deckWalk';
 import type { Wp } from './paths/linkRoute';
+import { drivablePrefix } from './paths/groundMovers';
 
 type Phase = 'in' | 'unload' | 'out';
 
@@ -52,9 +53,24 @@ export class DeliveryTruck {
     this._lay();
   }
 
+  private _winter = false;
+  /** Snow has closed the steep roads: the limit drops from 12 % to 7 % (sim/laneWalk vehicleCan). Re-laid between deliveries. */
+  setWinter(w: boolean): void {
+    if (w === this._winter) return;
+    this._winter = w;
+    if (!this._cur && !this._held) this._lay();
+  }
+  /** The truck could not take the whole way (a pitch over the limit): it unloads at the foot and the goods are carried the rest. */
+  get stopsShort(): boolean { return this._short; }
+  private _short = false;
+
   private _lay(): void {
-    this._in = [...this._south, ...this._driveWay, ...this._tail];
-    this._out = [...[...this._driveWay, ...this._tail].reverse(), ...this._north];
+    const full: Wp[] = [...this._south, ...this._driveWay, ...this._tail];
+    const dp = drivablePrefix(full, this._ground, this._winter);
+    this._short = !dp.ok;
+    this._in = dp.route;
+    const onYard = dp.route.slice(this._south.length);
+    this._out = [...onYard.reverse(), ...this._north];
     this._inLen = lineLength(this._in as unknown as Pt[]);
     this._outLen = lineLength(this._out as unknown as Pt[]);
   }
