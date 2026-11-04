@@ -136,6 +136,13 @@ function priceOf(s: GameState, kind: string, x: number, z: number, rot: number, 
   return { usd: (lines.length ? orderCost(lines, 1) : 0) + extra, permit, hours: Math.round(bp.stages.reduce((a, g) => a + g.hours, 0)) };
 }
 
+/** Is there anything left for a starter compound to propose (a home, water, privy, power or food still missing)? Cheap: no siting. */
+export function starterWanted(s: GameState): boolean {
+  const k = s.structures.filter(st => !st.unplaced).map(st => st.kind), has = (l: string[]) => k.some(x => l.includes(x));
+  const beds = s.structures.reduce((a, st) => a + (HOME_BEDS[st.kind] ?? 0), 0);
+  return beds < s.people.length || !has(WATER) || !has(['outhouse', 'septic']) || !has(POWER) || !has(FOOD);
+}
+
 export function planStarter(s: GameState, o: StarterOpts): StarterPlan {
   const { query: site, geo } = o, skip = new Set(o.skip ?? []);
   const rnd = mulberry32(s.seed * 7919 + 17);

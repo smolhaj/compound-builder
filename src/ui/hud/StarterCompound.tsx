@@ -17,7 +17,7 @@ import { btn, DIM, FS, LINE, miniBtn, usd } from './style';
 
 const ownLogs = (kind: string) => !!BLUEPRINTS[kind] && Object.keys(totalBill(BLUEPRINTS[kind])).some(m => MATERIALS[m as MaterialId].price === null && m !== 'fieldstone');
 
-export function StarterCompound({ first }: { first: boolean }) {
+export function StarterCompound({ first, wanted }: { first: boolean; wanted: boolean }) {
   const g = useGameStore();
   const query = useWorldStore(w => w.siteQuery), geo = useWorldStore(w => w.siteGeo), markTrees = useWorldStore(w => w.markNearestTrees);
   const setPreview = useWorldStore(w => w.setStarterPreview);
@@ -56,9 +56,11 @@ export function StarterCompound({ first }: { first: boolean }) {
   const need = plansNeedLines(game);
 
   if (!open) {
+    // nothing left to propose: only the note about what was just staked (and its order button) stays, until the plans are supplied
+    if (!wanted && !(done && need.length > 0)) return null;
     return <div style={{ marginTop: 4 }}>
-      {first && <Note>New here? One click proposes a house, water, power, food and a fence for this lot.</Note>}
-      <button style={{ ...btn(first), width: '100%' }} title="A suggested layout for this lot: a ghost preview with the total cost, hours and permit fees first. Nothing is placed until you say so, and every piece stays editable." onClick={() => { setDone(null); setOpen(true); }}>Lay out a starter compound</button>
+      {first && wanted && <Note>New here? One click proposes a house, water, power, food and a fence for this lot.</Note>}
+      {wanted && <button style={{ ...btn(first), width: '100%' }} title="A suggested layout for this lot: a ghost preview with the total cost, hours and permit fees first. Nothing is placed until you say so, and every piece stays editable." onClick={() => { setDone(null); setOpen(true); }}>Lay out a starter compound</button>}
       {done && <Note tone="good">{done}</Note>}
       {done && need.length > 0 && <button style={{ ...btn(true), width: '100%', marginTop: 3 }} disabled={!!orderProblem(game, need)} onClick={() => g.order(need)}>Order what the plans need ({usd(orderCost(need, prices(game)))})</button>}
     </div>;
