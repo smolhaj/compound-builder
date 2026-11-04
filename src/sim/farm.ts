@@ -122,7 +122,7 @@ export const WORKSHOP_WEAR = 0.75, WORKSHOP_HONING = 0.5, WORKSHOP_REPAIR_TOLL =
 /** Parking bays in one yard (a 12 × 12 m gravel pad: a tractor and four implements, a truck). */
 export const YARD_BAYS = 6;
 /** Buildings with the yard's bays: the equipment yard, and the motor court in front of the gate (sim/motorCourt.ts). */
-export const YARD_KINDS: readonly string[] = ['motor_court', 'equipment_yard'];
+export const YARD_KINDS: readonly string[] = ['motor_court', 'equipment_yard', 'vehicle_yard'];
 
 export interface YardBay { yard: string; bay: number; occupant: string | null }
 

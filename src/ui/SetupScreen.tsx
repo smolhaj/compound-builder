@@ -15,11 +15,13 @@ import { LotTerrain } from './LotTerrain';
 import { PLAYABLE, REGION_IDS, REGIONS, type RegionDef, type RegionId, type StormKind } from '../sim/regions';
 
 const MODES: Array<[Mode, string, string]> = [
-  ['surprise', 'Surprise', 'Three to six years of peace, and you don\'t know what is coming. Watch the news, the prices, the neighbors.'],
-  ['scenario', 'Scenario', 'Pick the disaster and how long you have to get ready.'],
+  ['surprise', 'Surprise', '3 to 6 years of peace; you don\'t know what is coming. Watch the news, the prices, the neighbors.'],
+  ['scenario', 'Scenario', 'You pick the disaster and the time to prepare.'],
   ['sandbox', 'Free build', 'Nothing happens until you say so. Trigger any disaster from the side panel.'],
 ];
-const DIFFS: Array<[Difficulty, string, string]> = [['cozy', 'Cozy', 'Long warning, gentle raids, nobody dies for good'], ['standard', 'Standard', 'The intended game'], ['hardcore', 'Hardcore', 'Little warning, more and bigger raids, worse wounds, a slow recovery, permadeath. The world learns: after the first year, crews bring more against a place that holds, and the first winter is hard']];
+const DIFFS: Array<[Difficulty, string, string]> = [['cozy', 'Cozy', 'Long warning, gentle raids, nobody dies for good'], ['standard', 'Standard', 'The intended game'], ['hardcore', 'Hardcore', 'Little warning, bigger raids, permadeath, slow recovery']];
+/** What the one-line summary leaves out. */
+const DIFF_MORE: Partial<Record<Difficulty, string>> = { hardcore: 'The world learns: after the first year, crews bring more against a place that holds, and the first winter is hard.' };
 const PEACE: Array<[Exclude<PeaceLength, 'random'>, string]> = [['short', '18 months'], ['medium', '3 years'], ['long', '5 years']];
 
 const C = { bg: 'rgba(22,24,20,0.98)', card: 'rgba(255,255,255,0.045)', line: 'rgba(255,255,255,0.09)', gold: '#d8c9a0', dim: 'rgba(238,238,238,0.62)', good: '#a8d080', bad: '#f0a080' };
@@ -31,6 +33,7 @@ const tile = (on: boolean, off = false): CSSProperties => ({
   background: on ? 'rgba(216,201,160,0.12)' : C.card, color: '#eee', cursor: off ? 'not-allowed' : 'pointer', opacity: off ? 0.45 : 1,
 });
 const chip = (on: boolean): CSSProperties => ({ padding: '5px 11px', borderRadius: 999, border: `1px solid ${on ? C.gold : C.line}`, background: on ? 'rgba(216,201,160,0.18)' : 'transparent', color: '#eee', cursor: 'pointer', fontSize: 12.5 });
+const moreBtn: CSSProperties = { background: 'transparent', border: 0, padding: 0, color: C.gold, cursor: 'pointer', fontSize: 12 };
 const H = ({ children }: { children: ReactNode }) => <div style={{ fontSize: 11.5, textTransform: 'uppercase', letterSpacing: 0.8, color: C.dim, margin: '14px 0 8px' }}>{children}</div>;
 
 /** A row of choices (the land filters, difficulty, peacetime). */
@@ -118,6 +121,9 @@ export function SetupScreen() {
   const [kind, setKind] = useState<DisasterKind>('grid_down');
   const [peace, setPeace] = useState<Exclude<PeaceLength, 'random'>>('medium');
   const [diff, setDiff] = useState<Difficulty>('standard');
+  const [diffMore, setDiffMore] = useState(false);
+  const [moneyOpen, setMoneyOpen] = useState(false);
+  const [kinMore, setKinMore] = useState(false);
   const workers = baseFamily.filter(p => !p.kid && !p.elder);
   let unlocked = false;
   try { unlocked = localStorage.getItem('cb.unlocked') === '1'; } catch { /* storage blocked */ }
@@ -239,7 +245,8 @@ export function SetupScreen() {
                         <button style={{ ...chip(false), padding: '3px 8px' }} title="Random occupation for this one" aria-label={`Random occupation for ${p.first}`}
                           onClick={() => { setShuffles(shuffles + 1); setPicks(workers.map((_, i) => (i === slot ? randomJobId(seed, famRoll, i, shuffles + 1, i ? workers[0].job?.id : undefined) : picks[i]))); }}>{'\u21BB'}</button>
                       </div>
-                      <div style={{ fontSize: 12, color: C.dim }}>{def ? `${def.title}. ` : ''}{LIFESTYLE[life].jobs ? `Paid $${p.job.wage}/day` : 'Former career'}{def ? `: ${def.good}` : ''}</div>
+                      <div style={{ fontSize: 12, color: C.dim }}>{LIFESTYLE[life].jobs ? `Paid $${p.job.wage}/day` : 'Former career'}</div>
+                      {def && <div title={`${def.title}: ${def.good}`} style={{ fontSize: 11.5, color: C.dim, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{def.good}</div>}
                     </> : <div style={{ fontSize: 12, color: C.dim }}>{p.elder ? 'Grandparent, retired' : p.kid ? (p.age < 6 ? 'little one' : p.age < 13 ? 'kid' : 'teen') : 'at home'}</div>}
                     <div style={{ fontSize: 11.5, color: C.dim, marginTop: 2 }}>{(Object.entries(p.skills) as Array<[string, number]>).filter(([, v]) => v >= 4).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => `${k} ${v}`).join(' \u00B7 ') || 'learning'}</div>
                   </div>
@@ -248,17 +255,16 @@ export function SetupScreen() {
             </div>
             {pool.length > 0 && <>
               <H>Extended family <span style={{ textTransform: 'none', letterSpacing: 0 }}>(optional)</span></H>
-              <div style={{ fontSize: 12, color: C.dim, marginBottom: 6 }}>Parents, in-laws and grown kids can come with you or stay in town. Each who comes brings savings, medicine to refill, and a bed to find; the old bring Social Security and a pension while the banks work, and do best in a guest house or a cottage of their own.</div>
+              <div style={{ fontSize: 12, color: C.dim, marginBottom: 6 }}>Tap a relative to bring them along: savings in, a bed to find, medicine to refill. <button style={moreBtn} onClick={() => setKinMore(!kinMore)}>{kinMore ? 'less' : 'more'}</button>
+                {kinMore && <div style={{ marginTop: 2 }}>The old bring Social Security and a pension while the banks work, and do best in a guest house or a cottage of their own.</div>}</div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: 8 }}>
                 {pool.map(p => {
                   const on = kinWith.includes(p.id), inc = p.income ?? (p.elder ? retirementIncome(p, seed) : null);
                   return (
                     <button key={p.id} style={{ ...tile(on), padding: '8px 12px' }} onClick={() => setKinWith(on ? kinWith.filter(x => x !== p.id) : [...kinWith, p.id])} title={on ? 'Brings them along' : 'Stays in town'}>
-                      <div style={{ fontWeight: 600 }}>{fullName(p)}, {p.age}</div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}><span style={{ fontWeight: 600 }}>{fullName(p)}, {p.age}</span><span style={{ fontSize: 11.5, color: on ? C.good : C.dim, whiteSpace: 'nowrap' }}>{on ? '\u2713 comes' : 'in town'}</span></div>
                       <div style={{ fontSize: 12, color: C.gold }}>{kinTitle(p, baseFamily) || ROLE_NAME[p.rel!.role]}</div>
-                      <div style={{ fontSize: 12, color: C.dim }}>{p.elder ? `Retired${inc ? `: ${usd(inc.perDay * 30)} a month (${inc.label})` : ''}` : p.job ? `${p.job.title}, $${p.job.wage}/day` : 'at home'}</div>
-                      {(p.conditions?.length ?? 0) > 0 && <div style={{ fontSize: 11.5, color: C.dim }}>Needs: {p.conditions!.map(c => CONDITION[c].rx).join(', ')}</div>}
-                      <div style={{ fontSize: 12, marginTop: 3, color: on ? C.good : C.dim }}>{on ? 'Comes with you' : 'Stays in town'}</div>
+                      <div style={{ fontSize: 12, color: C.dim, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={`${p.elder ? `Retired${inc ? `: ${usd(inc.perDay * 30)} a month (${inc.label})` : ''}` : p.job ? `${p.job.title}, $${p.job.wage}/day` : 'at home'}${(p.conditions?.length ?? 0) > 0 ? `. Needs: ${p.conditions!.map(c => CONDITION[c].rx).join(', ')}` : ''}`}>{p.elder ? `Retired${inc ? `: ${usd(inc.perDay * 30)}/mo` : ''}` : p.job ? `${p.job.title}, $${p.job.wage}/day` : 'at home'}{(p.conditions?.length ?? 0) > 0 ? ` \u00B7 needs ${p.conditions!.map(c => CONDITION[c].rx).join(', ')}` : ''}</div>
                     </button>
                   );
                 })}
@@ -267,7 +273,8 @@ export function SetupScreen() {
             </>}
             <H>Where the money came from</H>
             <div style={{ ...tile(false), cursor: 'default', padding: '10px 14px' }}>
-              {funds.lines.map(l => (
+              <button style={{ ...moreBtn, marginBottom: 2, display: 'block', textAlign: 'left' }} onClick={() => setMoneyOpen(!moneyOpen)}>{moneyOpen ? '\u25BE' : '\u25B8'} {funds.lines.length} sources{moneyOpen ? '' : ': ' + funds.lines.slice(0, 2).map(l => l.label).join(', ') + (funds.lines.length > 2 ? '\u2026' : '')}</button>
+              {moneyOpen && funds.lines.map(l => (
                 <div key={l.label} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 12.5, padding: '1px 0' }}>
                   <span style={{ color: C.dim }}>{l.label}</span><span style={{ color: l.usd < 0 ? C.bad : '#eee' }}>{l.usd < 0 ? '\u2212' : ''}{usd(Math.abs(l.usd))}</span>
                 </div>
@@ -276,16 +283,16 @@ export function SetupScreen() {
                 <span>To spend on land and building</span><span style={{ color: C.gold }}>{usd(budget)}</span>
               </div>
               {funds.passive > 0 && <div style={{ fontSize: 12, color: C.dim, marginTop: 3 }}>Plus about {usd(funds.passive)} a year in investment income.</div>}
-              {life === 'weekend' && <div style={{ fontSize: 12, color: C.dim, marginTop: 3 }}>{plan === 'rent'
+              {moneyOpen && life === 'weekend' && <div style={{ fontSize: 12, color: C.dim, marginTop: 3 }}>{plan === 'rent'
                 ? `They rent in town: about ${usd(rentFor(town.value))} a month. Moving in later is giving notice; there is no house to sell.`
                 : `The town house stays theirs: about ${usd(town.value)} with ${usd(town.mortgage)} owed (about ${usd(mortgagePayment(town) + townUpkeep(town))} a month to keep, and the property tax twice a year). Selling it later, if the signs come, adds to the account.`}</div>}
-              <div style={{ fontSize: 11.5, color: C.dim, marginTop: 3 }}>{LIFESTYLE[life].name} families start with {usdK(FUNDS_RANGE[life][0])} to {usdK(FUNDS_RANGE[life][1])}; better jobs, age and a bit of luck raise it, debts take it down.</div>
+              {moneyOpen && <div style={{ fontSize: 11.5, color: C.dim, marginTop: 3 }}>{LIFESTYLE[life].name} families start with {usdK(FUNDS_RANGE[life][0])} to {usdK(FUNDS_RANGE[life][1])}; better jobs, age and a bit of luck raise it, debts take it down.</div>}
               {!lot && <div style={{ color: C.bad, fontSize: 12.5, marginTop: 6 }}>The place you picked is over this budget: go back to Land and pick another.</div>}
             </div>
             <H>How it plays</H>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8 }}>
               {MODES.map(([m, name, blurb]) => (
-                <button key={m} style={tile(mode === m)} onClick={() => setMode(m)}>
+                <button key={m} style={tile(mode === m)} onClick={() => setMode(m)} title={blurb}>
                   <div style={{ fontWeight: 700, marginBottom: 3 }}>{name}</div>
                   <div style={{ fontSize: 12, color: C.dim, lineHeight: 1.35 }}>{blurb}</div>
                 </button>
@@ -302,7 +309,8 @@ export function SetupScreen() {
                 <Chips label="Peace" value={peace} set={setPeace} opts={PEACE} />
               </>}
               <Chips label="Difficulty" value={diff} set={setDiff} opts={DIFFS.map(([d, l]) => [d, l] as [Difficulty, string])} />
-              <div style={{ marginLeft: 68, marginBottom: 6, fontSize: 12, color: C.dim }}>{DIFFS.find(x => x[0] === diff)![2]}.{diff === 'standard' ? '' : ` Against Standard: ${difficultySummary(diff).join(', ')}.`}</div>
+              <div style={{ marginLeft: 68, marginBottom: 6, fontSize: 12, color: C.dim }}>{DIFFS.find(x => x[0] === diff)![2]}.{diff === 'standard' ? '' : <> <button style={moreBtn} onClick={() => setDiffMore(!diffMore)}>{diffMore ? 'less' : 'what changes'}</button></>}
+                {diffMore && diff !== 'standard' && <div style={{ marginTop: 2 }}>Against Standard: {difficultySummary(diff).join(', ')}.{DIFF_MORE[diff] ? ` ${DIFF_MORE[diff]}` : ''}</div>}</div>
             </div>
           </>}
         </div>

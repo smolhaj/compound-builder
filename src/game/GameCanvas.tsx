@@ -1,3 +1,4 @@
+import { moatStates } from '../sim/waterWorks';
 import { litTowerIds } from '../sim/towers';
 import { TerrainOverlay } from './terrain/TerrainOverlay';
 import { BlueprintOverlay } from './blueprint/BlueprintOverlay';
@@ -349,7 +350,7 @@ export function GameCanvas() {
       world.syncTents(game);
       world.syncForestry(game.forestry);
       world.simTime = game.clock.t;
-      world.syncPerimeter(game.perimeter, game.clock.t, { lit: fenceLive(game) && !blackoutNow(game), sensors: (game.stock.ground_sensor ?? 0) > 0 });
+      world.syncPerimeter(game.perimeter, game.clock.t, { lit: fenceLive(game) && !blackoutNow(game), sensors: (game.stock.ground_sensor ?? 0) > 0, moats: Object.fromEntries(moatStates(game).map(m => [m.run.id, { level: m.level, frozen: m.frozen }])) });
       const svKey = `${game.structures.filter(x => x.stage >= 5).length}|${game.perimeter.filter(r => r.finishedAt !== null).length}|${game.utilities.fittings.filter(f => f.finishedAt !== null).length}|${goodsKey(houseGoods(game))}`;
       if (svKey !== servicesKey) { servicesKey = svKey; world.syncServices(game); }
       sight.update(6);

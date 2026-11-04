@@ -259,10 +259,10 @@ describe('the chronicle logs upgrades and rebuilds, capped', () => {
 });
 
 describe('save', () => {
-  it('migrates 73 to 74 with the new fields', () => {
+  it('migrates 74 to 75 with the new fields', () => {
     const g = newGame(1);
     const old = JSON.parse(JSON.stringify(g)) as { version: number; lineage: Record<string, unknown>; utilities: { grid: boolean } };
-    old.version = 73;
+    old.version = 74;
     for (const k of ['wards', 'threat', 'threatYear', 'startedOnGrid', 'gridLeft', 'noteYear', 'noteCount']) delete old.lineage[k];
     old.utilities.grid = true;
     const back = migrate(old);

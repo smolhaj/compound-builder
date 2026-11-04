@@ -65,12 +65,12 @@ export interface Lineage {
   built: string[];
   /** Days in a row the place has grown what it eats (across eras, quiet years included). */
   selfFedDays: number;
-  /** Children away with a neighbor household after the last adult died; the place is held for them (save v74; sim/orphans.ts). */
+  /** Children away with a neighbor household after the last adult died; the place is held for them (save v75; sim/orphans.ts). */
   wards: Ward[];
-  /** The yearly threat in force, and the year it was last rolled (save v74; sim/threats.ts). */
+  /** The yearly threat in force, and the year it was last rolled (save v75; sim/threats.ts). */
   threat: Threat | null;
   threatYear: number;
-  /** The place started on the county grid, and the day the family pulled the meter (null: still on it, or never was; save v74). */
+  /** The place started on the county grid, and the day the family pulled the meter (null: still on it, or never was; save v75). */
   startedOnGrid: boolean;
   gridLeft: number | null;
   /** Upgrade / rebuild lines written this year, to keep the chronicle from filling with them. */

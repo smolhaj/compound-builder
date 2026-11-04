@@ -10,6 +10,7 @@ import { MATERIALS, type MaterialId } from '../sim/materials';
 import { orderCost, orderProblem } from '../sim/economy';
 import { arrivalOutlook, BAG_PRICE, cachedPlan, housingFixes, SPOT_ORDER, TENT_PRICE, type SpotKind } from '../sim/housing';
 import type { Person } from '../sim/family';
+import { Hint } from './hud/common';
 
 const DIM = 'rgba(238,238,238,0.6)';
 const TONE = { good: '#a8d080', warn: '#f0c070', bad: '#f08060' } as const;
@@ -72,8 +73,8 @@ export function ArrivalHousing({ people }: { people: readonly Person[] }) {
   const o = arrivalOutlook(game, people);
   const bad = o.guests.nowhere > 0 || o.worst < -8;
   return (
-    <div style={{ margin: '8px 0', fontSize: 12, opacity: 0.85, color: bad ? TONE.bad : undefined }} data-testid="arrival-housing">
-      {o.lines.map((l, i) => <div key={i}>{l}</div>)}
+    <div data-testid="arrival-housing">
+      <Hint tone={bad ? 'bad' : undefined} more={o.lines.filter((_, i) => i !== 1).map((l, i) => <div key={i}>{l}</div>)}>{o.lines[1]}</Hint>
     </div>
   );
 }

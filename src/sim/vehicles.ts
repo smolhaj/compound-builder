@@ -38,6 +38,7 @@ import { COURT_THEFT_FACTOR, isCourt } from './motorCourt';
 import { runFinished } from './perimeter';
 import { STRIKE, crossingRelief, strikeChance } from './roadWildlife';
 import { roadPlanOf } from './roadState';
+import { exposed } from './vehicleYard';
 
 export type VehicleKind = 'pickup' | 'suv' | 'motorhome' | 'tractor' | 'atv' | 'old_pickup' | 'trailer';
 
@@ -326,7 +327,8 @@ export function yardOpen(s: GameState): boolean {
 export function raidTakesVehicles(s: GameState, organized: boolean): string[] {
   if (!yardOpen(s)) return [];
   const vs = fleetOf(s);
-  const outside = parkingPlan(s).outside.map(id => vs.find(v => v.id === id)).filter((v): v is Vehicle => !!v && !v.away);
+  const out_ = new Set(exposed(s).map(e => e.v.id));   // (what stands in an outside vehicle yard is the yard's own rule: sim/vehicleYard.ts)
+  const outside = parkingPlan(s).outside.filter(id => !out_.has(id)).map(id => vs.find(v => v.id === id)).filter((v): v is Vehicle => !!v && !v.away);
   const lines: string[] = [];
   const p = organized ? 0.6 : 0.4;
   const fenced = new Set(parkingPlan(s).inYard);

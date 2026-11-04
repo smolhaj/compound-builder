@@ -11,6 +11,7 @@ import { planRun, type Pt } from './perimeter';
 import { DEFAULT_FORTRESS, layFortress, planFortress } from './fortress';
 import { BLUEPRINTS } from './blueprints';
 import { adoptDog } from './pets';
+import { syncParking } from './parking';
 
 afterEach(() => setGroundOverride(null));
 const N = 150;
@@ -40,6 +41,16 @@ const notWorse = (without: number, withEl: number) => {
   expect(withEl).toBeLessThanOrEqual(without + 2 * sd + 1e-9);
 };
 
+/** A finished moat ring round the camp (half-width `h` from (30,30)), and a finished covered bridge across its south side. */
+function moat(g: GameState, h = 14): void {
+  const r = planRun(g, 'moat', [[30 - h, 30 - h], [30 + h, 30 - h], [30 + h, 30 + h], [30 - h, 30 + h], [30 - h, 30 - h]] as Pt[]);
+  r.finishedAt = 0; r.done = r.hours; r.supplied = true;
+}
+function bridge(g: GameState): void {
+  const r = planRun(g, 'covered_bridge', [[30, 47], [30, 41]] as Pt[]);
+  r.finishedAt = 0; r.done = r.hours; r.supplied = true;
+}
+
 const ELEMENTS: Array<[string, (g: GameState) => void]> = [
   ['three watchtowers', g => { [[27, 36], [33, 36], [30, 40]].forEach(([x, z], i) => built(g, `t${i}`, 'watchtower_wood', x, z)); finishAll(g); }],
   ['one watchtower', g => { built(g, 't0', 'watchtower_wood', 30, 38); finishAll(g); }],
@@ -51,6 +62,12 @@ const ELEMENTS: Array<[string, (g: GameState) => void]> = [
   ['window bars', g => { g.stock.window_bars = 1; }],
   ['house hardening (window bars and ballistic panels)', g => { g.stock.window_bars = 1; g.stock.ballistic_panels = 1; }],
   ['mines', g => { g.stock.mines = 6; }],
+  ['a moat (rain and seep only)', g => { moat(g); }],
+  ['a pond-fed moat', g => { built(g, 'pd', 'pond', 52, 30); moat(g); }],
+  ['a moat with a covered bridge', g => { built(g, 'pd', 'pond', 52, 30); moat(g); bridge(g); }],
+  ['a vehicle yard outside the walls', g => { built(g, 'vy', 'vehicle_yard', 56, 30); syncParking(g); }],
+  ['a vehicle yard, a moat and a stone wall', g => { built(g, 'vy', 'vehicle_yard', 56, 30); syncParking(g); moat(g, 12); const r = planRun(g, 'stone_wall', [[24, 24], [36, 24], [36, 36], [24, 36], [24, 24]] as Pt[]); r.finishedAt = 0; r.done = r.hours; r.supplied = true; finishAll(g); }],
+  ['a moat behind a stone wall and a tower', g => { moat(g, 12); const r = planRun(g, 'stone_wall', [[24, 24], [36, 24], [36, 36], [24, 36], [24, 24]] as Pt[]); r.finishedAt = 0; r.done = r.hours; r.supplied = true; built(g, 't0', 'watchtower_wood', 30, 38); finishAll(g); }],
 ];
 
 describe('every defensive element is monotone: a raid is never easier with it', () => {
