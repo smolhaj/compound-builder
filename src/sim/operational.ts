@@ -28,7 +28,7 @@ export interface OpItem {
 export const DEFENSE_OK = 45;
 
 const WATER = ['well_hand', 'well_drilled', 'cistern', 'water_tower'];
-const POWER = ['solar_array', 'garage_solar', 'lodge_solar', 'generator_shed', 'battery_shed'];
+const POWER = ['solar_array', 'solar_farm', 'garage_solar', 'lodge_solar', 'generator_shed', 'battery_shed', 'battery_bank', 'micro_hydro', 'wind_turbine'];
 const FOOD = ['garden', 'field', 'greenhouse', 'greenhouse_heated', 'polytunnel', 'high_tunnel', 'orchard', 'orchard_grove', 'orchard_terraced', 'aquaponics'];
 
 export function operational(s: GameState, drive?: readonly Pt[]): OpItem[] {

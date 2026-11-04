@@ -185,3 +185,19 @@ describe('utilities run themselves', () => {
     expect(net.get('far')).not.toBe(net.get('a'));
   });
 });
+
+describe('auto-fit honesty', () => {
+  it('only homes, pumps and the cellar are wired at midnight; the hookup text tells the player to wire the rest by hand', async () => {
+    const { autoFits } = await import('./utilities');
+    const { hookupsFor } = await import('./hookups');
+    expect(autoFits('timber_cabin', 'wire')).toBe(true);
+    expect(autoFits('timber_cabin', 'plumb')).toBe(true);
+    expect(autoFits('workshop', 'wire')).toBe(false);
+    const g = newGame(1);
+    g.utilities.grid = true;
+    const cabin = built(g, 'c', 'timber_cabin', 10, 10), shop = built(g, 'w', 'workshop', 14, 10);
+    const todo = (st: Structure) => hookupsFor(g, st, plant(g)).find(h => h.kind === 'wire')?.todo ?? '';
+    expect(todo(cabin)).toMatch(/next midnight/);
+    expect(todo(shop)).toMatch(/Click Wire it/);
+  });
+});

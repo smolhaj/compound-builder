@@ -14,7 +14,7 @@ export function ReportCard() {
   try { localStorage.setItem('cb.unlocked', '1'); } catch { /* storage blocked: stays locked */ }
   const gradeColor = r.grade === 'A' ? '#2f6b2a' : r.grade === 'B' ? '#4f6b2a' : r.grade === 'C' ? '#7a6a20' : '#8a2f22';
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(10,12,9,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 11, padding: 16 }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(10,12,9,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 12, padding: 16 }}>
       <div style={{ background: '#f2ecdc', color: '#1d1b16', width: 620, maxWidth: '100%', maxHeight: '100%', overflowY: 'auto', borderRadius: 4, padding: '18px 26px 20px', boxShadow: '0 12px 50px rgba(0,0,0,0.6)', fontFamily: serif }}>
         <div style={{ textAlign: 'center', borderBottom: '3px double #1d1b16', paddingBottom: 6 }}>
           <div style={{ fontSize: 34, fontWeight: 700, letterSpacing: 1 }}>{r.masthead}</div>
