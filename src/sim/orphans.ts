@@ -40,6 +40,10 @@ export function orphaned(s: GameState): Person[] {
   return living.some(p => !p.kid) ? [] : living.filter(p => p.kid);
 }
 
+/** The line is alive but nobody is home: every child is fostered with a neighbor. The gate stays quiet then (no cards, no one to take a stranger in). */
+export const nobodyHome = (s: GameState): boolean =>
+  (s.lineage?.wards?.length ?? 0) > 0 && !s.people.some(p => { const n = s.personState.find(x => x.id === p.id)?.needs; return !!n && n.died == null && !n.taken; });
+
 /** Children in the line who are away with a neighbor. */
 export const wardsOf = (s: Pick<GameState, 'lineage'>): Ward[] => s.lineage.wards ?? [];
 
