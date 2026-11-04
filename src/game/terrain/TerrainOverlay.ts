@@ -7,16 +7,18 @@
  * the terrain with per-vertex colors, plus a few lines and rings; no per-frame
  * cost once built.
  */
+import type { FireMark } from '../../sim/fireRisk';
 import * as THREE from 'three';
 import { T, type Lane, type SiteCandidate, type Terrain } from '../../sim/terrain';
 
-export type TerrainMode = 'off' | 'high' | 'lanes' | 'water' | 'sun';
+export type TerrainMode = 'off' | 'high' | 'lanes' | 'water' | 'sun' | 'fire';
 
 /** What each mode shows, in plain words (the legend). */
 export const TERRAIN_LEGEND: Record<Exclude<TerrainMode, 'off'>, { label: string; tip: string; legend: string }> = {
   high: { label: 'High ground', tip: 'Where the land stands above its surroundings', legend: 'Orange: ground above the land round it. A tower here sees farther and shoots farther (an extra 10 m of view at the best). Blue-grey: hollows that hide a watcher.' },
   lanes: { label: 'Lanes', tip: 'The ways a crew would come at you', legend: 'Green: easy going. Amber: a scramble. Red: cliff (ladders needed). Blue: the creek (a ford). The bright line is the way a crew takes: the cheapest; rings mark where it narrows to a choke. The road side counts as easy.' },
   water: { label: 'Water', tip: 'Floodplain, mud, frost pockets and reservoir sites', legend: 'Deep blue: the creek\'s floodplain (floods take what stands here; spring mud slows building). Light blue: wet flats and draws. White: frost pockets where cold air pools. Green ring: a bench that would feed the camp by gravity.' },
+  fire: { label: 'Fire', tip: 'How likely each building is to burn in a wildfire', legend: 'A ring round each building: green, cleared or fire-safe walls; amber, trees close in; red, trees hard against it. The ring grows with the chance (the same number the fire front rolls). Cut the trees nearest the red ones.' },
   sun: { label: 'Sun', tip: 'Which slopes catch the sun', legend: 'Yellow: south-facing ground (up to +25 % solar and warmer beds). Blue: north-facing ground (down to -25 %, frost lingers).' },
 };
 
@@ -31,14 +33,15 @@ export class TerrainOverlay {
   private _t: Terrain | null = null;
   private _lanes: Lane[] = [];
   private _sites: SiteCandidate[] = [];
+  private _fire: FireMark[] = [];
 
   constructor(scene: THREE.Scene, ground: (x: number, z: number) => number) { this._scene = scene; this._ground = ground; }
 
   get mode(): TerrainMode { return this._mode; }
 
   /** Show a mode with the analysis it reads. */
-  set(mode: TerrainMode, t: Terrain | null, lanes: Lane[] = [], sites: SiteCandidate[] = []): void {
-    this._mode = mode; this._t = t; this._lanes = lanes; this._sites = sites;
+  set(mode: TerrainMode, t: Terrain | null, lanes: Lane[] = [], sites: SiteCandidate[] = [], fire: FireMark[] = []): void {
+    this._mode = mode; this._t = t; this._lanes = lanes; this._sites = sites; this._fire = fire;
     this.refresh();
   }
 
@@ -67,6 +70,7 @@ export class TerrainOverlay {
     if (this._mode === 'lanes') this._laneMarks();
     if (this._mode === 'water') this._siteMarks(['reservoir', 'hydro']);
     if (this._mode === 'high') this._siteMarks(['tower_hill', 'keep_ridge']);
+    if (this._mode === 'fire') for (const f of this._fire) this._marks.add(this._ring(f.x, f.z, 1.0 + 1.6 * f.p, f.band === 'high' ? 0xe03020 : f.band === 'moderate' ? 0xf0a020 : 0x40c060));
   }
 
   /** RGBA for a cell. */
