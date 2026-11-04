@@ -154,7 +154,7 @@ function Icon({ id, tint }: { id: string; tint?: number }) {
     case 'paperbacks_bag': return g(<><path d="M10 14 h24 l2 22 h-28 z" fill="#c8b890" stroke="#7a6a48" />{[[14, '#a8644a'], [20, '#6a8aa8'], [26, '#7a9a5a']].map(([x, c]) => <rect key={String(x)} x={Number(x)} y="8" width="5" height="12" rx="1" fill={String(c)} />)}</>);
     case 'toys': return g(<><rect x="9" y="24" width="12" height="12" fill="#d8503a" stroke="#7a2a1a" /><rect x="23" y="24" width="12" height="12" fill="#3a78d8" stroke="#1a3a7a" /><rect x="16" y="12" width="12" height="12" fill="#e8c83a" stroke="#8a7210" /><circle cx="22" cy="18" r="2" fill="#7a5a10" /></>);
     case 'picture_books': return g(<><rect x="8" y="14" width="18" height="22" rx="2" fill="#e8a8b8" stroke="#8a4a5a" /><circle cx="17" cy="23" r="4" fill="#f8e068" /><path d="M12 31 q5 -4 10 0" stroke="#4a8a4a" strokeWidth="2" fill="none" /><rect x="24" y="10" width="14" height="22" rx="2" fill="#8ac8e8" stroke="#3a6a8a" transform="rotate(8 31 21)" /></>);
-    case 'course_firstaid': case 'course_ham': case 'course_engines': case 'course_welding': case 'course_carpentry': case 'course_wiring': case 'course_gardening': case 'course_husbandry': case 'course_canning': {
+    case 'course_firstaid': case 'course_ham': case 'course_engines': case 'course_welding': case 'course_carpentry': case 'course_wiring': case 'course_gardening': case 'course_husbandry': case 'course_canning': case 'course_hunter': {
       const sym = ({
         course_firstaid: <><path d="M22 14 v14 M15 21 h14" stroke="#c03030" strokeWidth="4" /></>,
         course_ham: <><path d="M14 30 l8 -16 l8 16 z" fill="none" stroke="#e8dfc0" strokeWidth="2" /><path d="M22 14 v-4" stroke="#e8dfc0" strokeWidth="2" /></>,
@@ -164,6 +164,7 @@ function Icon({ id, tint }: { id: string; tint?: number }) {
         course_wiring: <><path d="M24 11 l-7 12 h6 l-3 10 l10 -14 h-6 l4 -8 z" fill="#f2d038" stroke="#8a7210" /></>,
         course_gardening: <><path d="M22 32 v-12" stroke="#7ac060" strokeWidth="2.5" /><path d="M22 24 q-8 -2 -8 -10 q8 0 8 10 M22 20 q8 -2 8 -9 q-8 0 -8 9" fill="#5a9a3a" /></>,
         course_husbandry: <><ellipse cx="22" cy="24" rx="9" ry="6" fill="#e8dfc0" /><circle cx="31" cy="20" r="3.5" fill="#e8dfc0" /><path d="M16 29 v5 M26 29 v5" stroke="#e8dfc0" strokeWidth="2" /></>,
+        course_hunter: <><circle cx="22" cy="22" r="8" fill="none" stroke="#e8dfc0" strokeWidth="2" /><path d="M22 10 v6 M22 28 v6 M10 22 h6 M28 22 h6" stroke="#e8dfc0" strokeWidth="2" /></>,
         course_canning: <><rect x="14" y="14" width="16" height="20" rx="3" fill="#e8dfc0" fillOpacity="0.3" stroke="#e8dfc0" strokeWidth="1.5" /><rect x="14" y="11" width="16" height="4" fill="#c8a040" /><circle cx="22" cy="25" r="4" fill="#c0392b" /></>,
       } as Record<string, ReactNode>)[id];
       return g(<><rect x="6" y="6" width="32" height="32" rx="3" fill="#3a4a6a" stroke="#1a2438" />{sym}<rect x="9" y="33" width="26" height="2" fill="#e8dfc0" opacity="0.6" /></>);

@@ -51,7 +51,7 @@ import { bestLevel, learningOf, levelOf, practice, rangeWork, SKILL_NAME, type P
 import type { Person } from './family';
 import type { MaterialId } from './materials';
 
-export type CourseId = 'firstaid' | 'ham' | 'engines' | 'welding' | 'carpentry' | 'wiring' | 'gardening' | 'husbandry' | 'canning';
+export type CourseId = 'firstaid' | 'ham' | 'engines' | 'welding' | 'carpentry' | 'wiring' | 'gardening' | 'husbandry' | 'canning' | 'hunter';
 export type CourseMode = 'teacher' | 'book' | 'online';
 export const COURSE_MODE_NAME: Record<CourseMode, string> = { teacher: 'with a teacher at home', book: 'from the book set', online: 'online' };
 
@@ -90,6 +90,8 @@ export const COURSES: Record<CourseId, CourseDef> = {
     blurb: 'Soil, spacing, succession planting, saving seed. Better yields from the same beds.' },
   husbandry: { id: 'husbandry', name: 'Animal husbandry', skill: 'husbandry', hours: 24, book: 'course_husbandry', online: 85, floor: 2, minAge: 10, cert: 'Animal husbandry',
     blurb: 'Feed, water, hooves, birthing and when to call it. Healthier stock, more eggs and milk.' },
+  hunter: { id: 'hunter', name: 'Hunter safety', skill: 'hunter', hours: 12, book: 'course_hunter', online: 40, floor: 2, minAge: 10, cert: 'Hunter safety',
+    blurb: 'Firearm handling in the field, shot placement, tracking, game laws and field dressing. The hunter skill, and the game on the table, run on it.' },
   canning: { id: 'canning', name: 'Canning and cooking', skill: 'cooking', hours: 20, book: 'course_canning', online: 65, floor: 2, minAge: 10, cert: 'Canning and cooking',
     blurb: 'Putting food by safely and cooking from scratch with what the place gives.' },
 };
@@ -389,6 +391,7 @@ export function courseIdea(s: GameState): CourseIdea | null {
     ['ham', bestLevel(s, 'radio') < 2 && (has(s, 'ham_rig') >= 1 || has(s, 'sw_radio') >= 1), 'the radio sits unused: nobody has the licence'],
     ['gardening', bestLevel(s, 'gardener') < TEACH_LEVEL && built('garden', 'field', 'greenhouse'), 'the garden would give more with someone who has the training'],
     ['husbandry', bestLevel(s, 'husbandry') < TEACH_LEVEL && (built('chicken_coop', 'barn', 'sheep_barn') || ['goat', 'pig', 'steer', 'sheep', 'cow', 'rabbit'].some(a => has(s, a as MaterialId) >= 1)), 'the animals would do better with someone who has the training'],
+    ['hunter', bestLevel(s, 'hunter') < 2 && (s.armory.guns.length > 0 || s.stock.snares >= 1), 'the guns would put game on the table with someone who has the hunter-safety card'],
     ['carpentry', bestLevel(s, 'builder') < 2, 'the building goes slowly with no carpenter'],
   ];
   for (const [course, need, why] of wants) {
