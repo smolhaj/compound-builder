@@ -54,7 +54,7 @@ import type { GameState } from '../sim/state';
 import type { WearSeason } from '../engine/world/people/crowdWear';
 import type { TourBuildingInfo } from '../engine/world/camera/TourController';
 import { hydroSiteAt, windDay, TURBINE } from '../sim/renewables';
-import { boatsAtDock, isDock, lakeIce } from '../sim/waterfront';
+import { boatsAtDock, isDock, lakeIce, waterBody } from '../sim/waterfront';
 import { hydroLine, HYDRO_HOUSE } from './buildkit/renewableBuildings';
 import { climbOf, floorHatchHost, footprint, KIT, placementProblem, rotQ, type Placed, type SiteQuery } from './buildkit/kit';
 import { showStage, CUTAWAY_HIDE, XRAY_LAYERS, type BuildLayer as CabinLayer, type BuildOpts } from './buildkit/shell';
@@ -186,6 +186,9 @@ interface DigSite { pit: Pit; spoil: number; machine: boolean; stage: number; f:
 
 /** Kinds with a basement under the main floor (their floorboards are see-through in the cutaway views). */
 const SEE_THROUGH_FLOOR: ReadonlySet<string> = new Set(['lodge', 'lodge_solar']);
+
+/** How much of the lake shows ice for each sim state (a skim is thin and patchy). */
+const ICE_COVER = { open: 0, skim: 0.32, ice: 1 } as const;
 
 export class HomesteadWorld {
   readonly center = new THREE.Vector3(PARCEL_SIZE / 2, 0, PARCEL_SIZE / 2);
@@ -521,6 +524,8 @@ export class HomesteadWorld {
     }
     this._syncTruckTail();
     this.truck.update(dt, speedK);
+    // the lake skins over and freezes when the sim says so (sim/waterfront lakeIce), not by the calendar alone
+    this.lakes.setIce(waterBody(game) ? ICE_COVER[lakeIce(game)] : -1, dt);
     this.plow.update(dt, this._drive && game.stock.plow >= 1, seasonState.params.snow, speedK);
     // deliveries left at the road (no drive yet), by the gate
     const rs = emptyStock();
