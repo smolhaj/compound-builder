@@ -6,7 +6,7 @@
  *   PLAYTEST=1 npx vitest run scripts/playtest.test.ts
  * Report: playtest-report.md (repo root).
  * Default: each run stops at its first ending, about 400 days after the hit (the year-one measure). YEARS=6 plays on to about three years
- * after the hit (the horizon the Hardcore prepper target is measured at; docs/DECISIONS.md). Other env: STRATS, KINDS, DIFF, SEEDOFF, LIFESTYLE, WELCOME.
+ * after the hit (the horizon the Hardcore prepper target is measured at; docs/DECISIONS.md). Other env: STRATS, KINDS, DIFF, SEEDOFF, LIFESTYLE, WELCOME, STAY, ADMIT.
  */
 import { describe, expect, it } from 'vitest';
 import { appendFileSync, writeFileSync } from 'node:fs';
@@ -47,6 +47,15 @@ import { REGION_IDS, REGIONS, seasons, type RegionId } from '../src/sim/regions'
 import { MATERIAL_IDS, MATERIALS, type MaterialId } from '../src/sim/materials';
 import type { DisasterKind } from '../src/sim/disaster';
 import type { Difficulty } from '../src/sim/difficulty';
+import { joinersOf, stayOptions, type StayKind } from '../src/sim/joinerHome';
+import { householdsOf, livingPeople, moveHousehold, setRole } from '../src/sim/quarters';
+import { HOME_BEDS } from '../src/sim/blueprints';
+
+/** (STAY / ADMIT) bots that take joiners in. STAY: bed | rig | modular | build | tent | mixed (cycles); ADMIT: fraction 0-1 of arrivals / kin admitted (a deterministic roll). Same calls as the gate card + StayPicker. */
+const STAY_MODES: Record<string, StayKind[]> = { bed: ['bed'], rig: ['rig'], modular: ['modular'], build: ['own_build'], tent: ['tent'], mixed: ['bed', 'rig', 'modular', 'own_build', 'tent', 'player_build'] };
+const roll = (a: number, b: number, c: number) => { let h = (a * 73856093) ^ (b * 19349663) ^ (c * 83492791); h = Math.imul(h ^ (h >>> 13), 0x5bd1e995); return ((h ^ (h >>> 15)) >>> 0) / 4294967296; };
+interface JoinerTally { admitted: number; fellBack: number; quarters: number }
+
 
 /** (GATES=<file>) append a debug line to a file (vitest swallows console output). */
 const dbg = (m: string) => appendFileSync(process.env.GATES!, m + '\n');
@@ -258,7 +267,7 @@ const newcomerNote = (s: GameState): string => {
   const gone = N.departed.filter(d => d.kind !== 'guest');
   return came || stays ? `joined ${came} (${gone.length} left${gone.some(d => /stole|night/.test(d.why)) ? ', incl. thief/scout' : ''}), ${stays} shelter stays` : '';
 };
-interface RunResult { causes: string; often: Array<[string, number]>; minMoney: number; site: string; strat: Strategy; kind: DisasterKind; variant: string; ending: string; grade: string; alive: string; hungry: number; days: number; moneyAtHit: number; builtAtHit: number; bugs: string[]; lines: string[]; fights: string[]; prisoners: number; hides: number; hidFound: number; owed: number; debtStage: string; trials: string; stripped: number; burned: number }
+interface RunResult { causes: string; often: Array<[string, number]>; minMoney: number; site: string; strat: Strategy; kind: DisasterKind; variant: string; ending: string; grade: string; alive: string; hungry: number; days: number; moneyAtHit: number; builtAtHit: number; bugs: string[]; lines: string[]; fights: string[]; prisoners: number; hides: number; hidFound: number; owed: number; debtStage: string; trials: string; stripped: number; burned: number; joiners: string }
 
 function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' | 'medium', site: Site = CLASSIC, years = 0): RunResult & { s: GameState } {
   // (LIFESTYLE=weekend plays the weekender: the family in town on weekdays, the move-in card, the road home; TOWN=rent sells the town house at setup and rents; BELT=1 tightens the belt from day one)
@@ -297,6 +306,7 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
   const fights: string[] = [];
   let armed = false, planned = 0, moneyAtHit = 0, builtAtHit = 0, hitSeen = false, lastLog = -Infinity, minMoney = s.money, lastMoney = s.money, townSold = false;
   // (round 4) hiding, debt and the trial camps
+  const jt: JoinerTally = { admitted: 0, fellBack: 0, quarters: 0 };
   let hides = 0, hidFound = 0, owed = 0, debtStage = 'none', burned = 0, stripped = 0;
   const trial = { started: 0, in: 0, on: 0, stole: 0, left: 0 };
   const seen = new Map<string, number>();
@@ -445,7 +455,16 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
       // (the weekender's cards: the idle family holds on; the others move in as soon as it is asked, selling while the market is open; caught in town, they drive straight home)
       const weekender = e.kind === 'move_in' ? (strat === 'idle' ? 'hold_on' : e.stances.includes('move_sell') ? 'move_sell' : 'move_keep') : e.kind === 'stranded' ? 'drive_now' : null;
       const welcome = process.env.WELCOME && e.stances.includes('take_in') && ['arrival', 'kin', 'shelter', 'trial_end'].includes(e.kind) ? 'take_in' : null;
-      const stance = ransom ?? weekender ?? welcome ?? (e.kind === 'trial_end' ? trialEnd(strat, s, e.size) : e.kind === 'shelter' ? (MARGIN[strat] && foodCovers(s, e.size, MARGIN[strat]) ? 'take_in' : 'turn_away') : STANCE[strat](e.stances, e.kind, s, e.size));
+      // (STAY / ADMIT) admit a fraction of arrivals and kin and pick where they sleep: the StayPicker's setStay, then the same take_in
+      let admit: string | null = null;
+      const mode = process.env.STAY ? STAY_MODES[process.env.STAY] : undefined;
+      if (mode && e.people?.length && e.stances.includes('take_in') && ['arrival', 'kin', 'shelter'].includes(e.kind) && roll(seed, day, jt.admitted + guard) < Number(process.env.ADMIT ?? 0.5)) {
+        const want = mode[jt.admitted % mode.length], opts = stayOptions(s, e), o = opts.find(x => x.kind === want && !x.off);
+        e.stay = o ? want : 'bed'; e.placeRig = false;
+        if (!o) jt.fellBack++;
+        jt.admitted++; admit = 'take_in';
+      }
+      const stance = ransom ?? weekender ?? admit ?? welcome ?? (e.kind === 'trial_end' ? trialEnd(strat, s, e.size) : e.kind === 'shelter' ? (MARGIN[strat] && foodCovers(s, e.size, MARGIN[strat]) ? 'take_in' : 'turn_away') : STANCE[strat](e.stances, e.kind, s, e.size));
 
       const hidBefore = s.gate.history.length;
       const out = resolve(s, stance); s.gate.card = null;
@@ -461,6 +480,16 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
       if (s.gate.aftermath) resolveAftermath(s, AFTER[strat]);
     }
     tallyDeaths(true);
+    // (STAY) quarters: every 20 days move the first joined household into another home and mark a sick bay, as the Quarters panel does
+    if (process.env.STAY && jt.admitted && day % 20 === 10) {
+      const homes = s.structures.filter(x => isFinished(x) && HOME_BEDS[x.kind] > 0), hh = householdsOf(livingPeople(s));
+      if (homes.length >= 2 && hh.length >= 2) {
+        const h = hh[(day / 20 | 0) % hh.length], to = homes[(day / 20 | 0) % homes.length];
+        const why = moveHousehold(s, h.id, to.id, Object.fromEntries(homes.map(x => [x.kind, HOME_BEDS[x.kind]])));
+        setRole(s, homes[(homes.length - 1 - (day / 20 | 0) % homes.length)].id, day % 40 === 10 ? 'sickbay' : 'guards');
+        if (!why) jt.quarters++;
+      }
+    }
     if (s.gate.pending) bugs.push(`gate stuck on day ${day}`);
     // sanity
     if (!Number.isFinite(s.money)) bugs.push(`money is ${s.money} on day ${day}`);
@@ -474,7 +503,9 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
   const r = reportCard(s);
   const alive = s.personState.filter(ps => ps.needs.died == null).length;
   const often = [...seen].filter(([, n]) => n >= 40).sort((a, b) => b[1] - a[1]).slice(0, 6);
-  return { causes: [...causes].sort((a, b) => b[1] - a[1]).map(([k, n]) => `${n} ${k}`).join(', '), often, minMoney: Math.round(minMoney), site: `${s.site.lot ? s.site.lot.kind + ' ' + s.site.lot.elevM + ' m, ' : ''}${s.site.acres} ac ${s.site.creek ? 'creek' : s.site.spring ? 'spring' : 'dry'} ${s.site.gwDepth} m ${s.site.improvements.house ? s.site.improvements.house.kind + ' ' : 'raw '}$${Math.round(s.site.price / 1000)}k`, strat, kind, variant: s.disaster.variant, ending: s.ending?.kind ?? 'still going (2 yrs)', grade: r.grade, alive: `${alive}/${s.personState.filter(ps => !ps.needs.left).length}`, hungry: s.stats.hungryDays, days: s.stats.days, moneyAtHit, builtAtHit, bugs: [...new Set(bugs)].slice(0, 5), lines: r.lines, fights, prisoners: s.gate.prisoners?.length ?? 0, hides, hidFound, owed: Math.round(owed), debtStage, trials: [trial.started ? `${trial.started}: ${trial.in} in, ${trial.on} sent on, ${trial.stole} stole, ${trial.left} left` : '', newcomerNote(s)].filter(Boolean).join(' · ') || '-', stripped, burned, s };
+  const jk = (k: StayKind) => joinersOf(s).stays.filter(x => x.kind === k).length;
+  const joiners = process.env.STAY ? `${jt.admitted} adm, ${joinersOf(s).rigsParked} rigs, ${jk('modular')} mod, ${jk('own_build') + jk('player_build')} built, ${jt.quarters} qtr${jt.fellBack ? `, ${jt.fellBack} fell back` : ''}` : '-';
+  return { joiners, causes: [...causes].sort((a, b) => b[1] - a[1]).map(([k, n]) => `${n} ${k}`).join(', '), often, minMoney: Math.round(minMoney), site: `${s.site.lot ? s.site.lot.kind + ' ' + s.site.lot.elevM + ' m, ' : ''}${s.site.acres} ac ${s.site.creek ? 'creek' : s.site.spring ? 'spring' : 'dry'} ${s.site.gwDepth} m ${s.site.improvements.house ? s.site.improvements.house.kind + ' ' : 'raw '}$${Math.round(s.site.price / 1000)}k`, strat, kind, variant: s.disaster.variant, ending: s.ending?.kind ?? 'still going (2 yrs)', grade: r.grade, alive: `${alive}/${s.personState.filter(ps => !ps.needs.left).length}`, hungry: s.stats.hungryDays, days: s.stats.days, moneyAtHit, builtAtHit, bugs: [...new Set(bugs)].slice(0, 5), lines: r.lines, fights, prisoners: s.gate.prisoners?.length ?? 0, hides, hidFound, owed: Math.round(owed), debtStage, trials: [trial.started ? `${trial.started}: ${trial.in} in, ${trial.on} sent on, ${trial.stole} stole, ${trial.left} left` : '', newcomerNote(s)].filter(Boolean).join(' · ') || '-', stripped, burned, s };
 }
 
 describe.skipIf(process.env.PLAYTEST !== 'long')('the long game', () => {
@@ -510,8 +541,8 @@ describe.skipIf(!process.env.PLAYTEST || process.env.PLAYTEST === 'long')('playt
     // (the seed is fixed by the disaster's and the strategy's place in the full table, so a filtered run replays the same game)
     const ALL_KINDS = ['grid_down', 'nuclear', 'drought', 'pandemic', 'wildfire', 'ash_winter', 'financial', 'solar_flare', 'zombies'], ALL_STRATS: Strategy[] = ['idle', 'homestead', 'prepper', 'fortress'];
     for (const kind of kinds) for (const strat of strats) { const seed = 11 + ALL_KINDS.indexOf(kind) * 4 + ALL_STRATS.indexOf(strat) + Number(process.env.SEEDOFF ?? 0), site = siteFor(seed); const t0 = Date.now(); const yrs = Number(process.env.YEARS ?? 0); const r = play(strat, kind, seed, 'medium', site, yrs); results.push(r); if (process.env.TIMING) appendFileSync(process.env.TIMING, `${kind} ${strat} seed ${seed} ${yrs}y ${((Date.now() - t0) / 1000).toFixed(1)}s ${r.days} days ${(((Date.now() - t0) / Math.max(1, r.days))).toFixed(1)} ms/day ending ${r.ending} alive ${r.alive}\n`); }
-    const md = ['# Playtest report (scripted)', '', '| Site | Disaster | Strategy | Variant | Ending | Grade | Alive | Lost to | Hungry days | Days | $ at hit | Built at hit | Fights | Hid (found) | Trials | Bugs |', '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|',
-      ...results.map(r => `| ${r.site} | ${r.kind} | ${r.strat} | ${r.variant} | ${r.ending} | ${r.grade} | ${r.alive} | ${r.causes || '-'} | ${r.hungry} | ${r.days} | ${r.moneyAtHit.toLocaleString('en-US')} | ${r.builtAtHit} | ${r.fights.join(', ') || '-'}${r.prisoners ? ` · ${r.prisoners} held` : ''} | ${r.hides ? `${r.hides} (${r.hidFound})${r.burned ? `, ${r.burned} burned` : ''}` : '-'} | ${r.trials} | ${r.bugs.join('; ')} |`),
+    const md = ['# Playtest report (scripted)', '', '| Site | Disaster | Strategy | Variant | Ending | Grade | Alive | Lost to | Hungry days | Days | $ at hit | Built at hit | Fights | Hid (found) | Trials | Joiners | Bugs |', '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|',
+      ...results.map(r => `| ${r.site} | ${r.kind} | ${r.strat} | ${r.variant} | ${r.ending} | ${r.grade} | ${r.alive} | ${r.causes || '-'} | ${r.hungry} | ${r.days} | ${r.moneyAtHit.toLocaleString('en-US')} | ${r.builtAtHit} | ${r.fights.join(', ') || '-'}${r.prisoners ? ` · ${r.prisoners} held` : ''} | ${r.hides ? `${r.hides} (${r.hidFound})${r.burned ? `, ${r.burned} burned` : ''}` : '-'} | ${r.trials} | ${r.joiners} | ${r.bugs.join('; ')} |`),
       '', '## Report card lines', '', ...results.map(r => `- **${r.kind} / ${r.strat}:** ${r.lines.join(' ')}`),
       '', '## What keeps happening (log lines seen 40+ times in a run, numbers taken out)', '', ...results.filter(r => r.often.length).map(r => `- **${r.kind} / ${r.strat}:** ${r.often.map(([k, n]) => `${n}× "${k}"`).join('; ')}`),
       // (round 4: checking can dip a few dollars under zero within a day, until the next morning moves it onto the card)
