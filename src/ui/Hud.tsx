@@ -46,6 +46,7 @@ import { FUEL_UNIT_L, irrigationStore, storageCapacity } from '../sim/utilities'
 import { litersText } from '../sim/format';
 import { needsHookup } from '../sim/hookups';
 import { HousingPanel } from './HousingPanel';
+import { QuartersPanel } from './QuartersPanel';
 import { bestShelter, doseRate, isNuclear, SHELTER_DAYS } from '../sim/nuclear';
 import { DISASTERS, TRACKS, TRACK_NAME, type DisasterKind } from '../sim/disaster';
 import { livingPerDay } from '../sim/engine';
@@ -213,6 +214,7 @@ export function Hud() {
             <KinPanel />
             <NewcomersPanel />
             <HousingPanel />
+            <QuartersPanel />
             <PeopleSection />
             <MedicalSection />
             <ClassesSection />

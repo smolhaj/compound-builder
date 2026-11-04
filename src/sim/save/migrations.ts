@@ -47,6 +47,8 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   71: s => ({ ...s, version: 72 }),
   // 70 → 71: the family can choose where the road comes in (site.entrance, absent: the habitual entrance) and a listed lot's ground is pinned to the lot's seed (site.listed, absent on older saves: they keep the game's seed)
   // 73 → 74: the hunter-safety course book set (sim/courses.ts): the new good at zero
+  // 74 → 75: assigned quarters (roles for the sick bay and the guards' quarters)
+  74: s => ({ ...s, version: 75, quarters: { roles: {}, ...((s.quarters as object) ?? {}) } }),
   73: s => ({ ...s, version: 74, stock: { course_hunter: 0, ...(s.stock as object) } }),
   // 72 → 73: the long game's score parts, built-list and self-fed streak (kinds already finished are not written up again)
   72: s => {

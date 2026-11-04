@@ -8,6 +8,7 @@ import { blockedReason, holdReason, isFinished, progress } from '../../sim/const
 import { CREW_RATE, CREW_SIZE, crewProblem, crewQuote } from '../../sim/crews';
 import { fixBill, fixBlocked, fixDef, pendingFixes } from '../../sim/improvements';
 import { KIT } from '../../game/buildkit/kit';
+import { ResidentsLine } from '../QuartersPanel';
 import { FIT, FUEL_UNIT_L, fitProblem, plant, serviceOf, UTILITY, SPARE_FOR } from '../../sim/utilities';
 import { HARDEN, HARDEN_IDS, type TierDef, hardenCost, hardenProblem, isBunkerRoom, protectionOf, tierOf } from '../../sim/hardening';
 import { PERIMETER, runBlocked, runFinished, runGrowth, runProgress } from '../../sim/perimeter';
@@ -78,6 +79,7 @@ export function ProjectsTab() {
       {sel && (
         <Section title={KIT[sel.kind].name}>
           <Row label="Stage" value={sel.pre ? 'Came with the land' : isFinished(sel) ? 'Finished' : BLUEPRINTS[sel.kind].stages[sel.stage].name} />
+          {isFinished(sel) && <ResidentsLine id={sel.id} />}
           {(sel.fixes ?? []).length > 0 && <>
             {(sel.fixes ?? []).map(f => <div key={f.part} style={{ display: 'flex', justifyContent: 'space-between', gap: 6, marginTop: 3 }}>
               <span style={{ color: DIM }} title={billText(fixBill(f))}>{fixDef(f).name} <span style={{ fontSize: 11 }}>({f.cond}, {f.hours} h)</span></span>
