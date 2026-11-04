@@ -41,10 +41,11 @@ import type { LightsState } from './lights';
 import type { Learning } from './skills';
 import type { MindState } from './mind';
 import type { Medical } from './medical';
+import type { QuartersState } from './quarters';
 import type { Evenings } from './evenings';
 import type { Courses } from './courses';
 import { starterKit, type ToolKit } from './tools';
-export const SAVE_VERSION = 75;
+export const SAVE_VERSION = 76;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -309,6 +310,8 @@ export interface GameState {
   mind?: MindState;
   /** Medical depth: lasting effects, pregnancies, the epidemic, the antibiotics policy (sim/medical.ts). Save v64; `medicalOf` makes it lazily. */
   medical?: Medical;
+  /** Assigned quarters: the sick bay and guards' quarters roles (sim/quarters.ts). Save v76; `quartersOf` makes it lazily. */
+  quarters?: QuartersState;
   /** The evenings' goods and how worn they are: the cards, the guitar, the paperbacks, the kids' toys (sim/evenings.ts). Save v65; `eveningsOf` makes it lazily. */
   evenings?: Evenings;
   /** Classes and courses taken, the certificates, the defense drills and how drilled everyone is (sim/courses.ts). Save v65; `coursesOf` makes it lazily. */
