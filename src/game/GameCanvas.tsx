@@ -52,6 +52,7 @@ import type { SiteQuery } from './buildkit/kit';
 import { FrameBudget, capGapMs, lowerTier } from '../engine/perf/qualityAuto';
 import { sceneCensus } from './perfCensus';
 import { yieldToBrowser, warmShaders } from './bootStages';
+import { StarterPreview } from './StarterPreview';
 import { parseLowRender, RenderRequests, type QaQuality } from './qaRender';
 import { onEntrancePreview } from './roadPreview';
 
@@ -208,6 +209,13 @@ export function GameCanvas() {
     const showBoundary = () => { boundary.visible = useWorldStore.getState().showBoundary || !!useGameStore.getState().tool?.startsWith('fence:'); };
     rebuildBoundary(); showBoundary();
     useWorldStore.getState().setSiteGeo({ creekZ: x => world.parcel.creek.zAt(x), creekHalf: world.parcel.creek.halfWidth, roadGate: [world.access.gate.x, world.access.gate.z], drive: world.access.drive.map(p => [p[0], p[1]] as [number, number]), center: [world.camp.x, world.camp.z], ground: (x, z) => world.parcel.natural(x, z).h });
+    useWorldStore.getState().setSiteQuery({
+      height: (x, z) => world.parcel.natural(x, z).h,
+      owned: (x, z) => ownsAt(useGameStore.getState().game, x, z),
+      water: (x, z) => world.parcel.isCreek(x, z) || world.stream.depthAt(x, z) > 0,
+      blocked: (x, z) => world.onCamp(x, z) || world.onAccess(x, z, 0.1),
+    });
+    const starter = new StarterPreview(ws.scene, world);
     world.setBurnedFarms(burnedFarms(useGameStore.getState().game));
     const terrainOv = new TerrainOverlay(ws.scene, world.groundAt);
     const showTerrain = () => {
@@ -235,6 +243,7 @@ export function GameCanvas() {
       useGameStore.subscribe(s => s.game.disaster.phase, ph => { const g = useGameStore.getState().game; if (g.disaster.kind === 'wildfire' && ph === 'warning' && !g.disaster.fuel) useGameStore.getState().setFuel(world.fuelNear(g.structures)); }),
       useGameStore.subscribe(s => s.game.land, () => { world.setOwnedLand(ownedRects(useGameStore.getState().game)); rebuildBoundary(); }),
       useWorldStore.subscribe(s => s.showBoundary, showBoundary),
+      useWorldStore.subscribe(s => s.starterPreview, p => starter.set(p)),
       useGameStore.subscribe(s => s.tool, showBoundary),
       useWorldStore.subscribe(s => s.quality, applyLook),
       useWorldStore.subscribe(s => s.cameraMode, applyCameraMode),
@@ -580,6 +589,9 @@ export function GameCanvas() {
       useWorldStore.getState().setBlueprintReadout(null);
       boundary.dispose();
       useWorldStore.getState().setSiteGeo(null);
+      useWorldStore.getState().setSiteQuery(null);
+      useWorldStore.getState().setStarterPreview(null);
+      starter.dispose();
       useWorldStore.getState().setMarkNearestTrees(null);
       useWorldStore.getState().setUnderground(false);
       canvas.removeEventListener('pointerdown', onVsDown);
