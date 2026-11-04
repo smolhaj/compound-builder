@@ -29,7 +29,7 @@ export function tentSpots(camp: { x: number; z: number }, n: number, blocked: (x
   return out;
 }
 
-let shared: { sheet: THREE.MeshStandardMaterial; fly: THREE.MeshStandardMaterial[]; door: THREE.MeshStandardMaterial; pole: THREE.MeshStandardMaterial; dome: THREE.BufferGeometry; sheetG: THREE.BufferGeometry; doorG: THREE.BufferGeometry; poleG: THREE.BufferGeometry; pegG: THREE.BufferGeometry } | null = null;
+let shared: { sheet: THREE.MeshStandardMaterial; fly: THREE.MeshStandardMaterial[]; door: THREE.MeshStandardMaterial; pole: THREE.MeshStandardMaterial; rim: THREE.MeshStandardMaterial; dome: THREE.BufferGeometry; sheetG: THREE.BufferGeometry; doorG: THREE.BufferGeometry; poleG: THREE.BufferGeometry; pegG: THREE.BufferGeometry } | null = null;
 
 function parts() {
   if (shared) return shared;
@@ -44,6 +44,7 @@ function parts() {
     fly: FLY.map(c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.85, side: THREE.DoubleSide })),
     door: new THREE.MeshStandardMaterial({ color: 0x1d1e1a, roughness: 1, side: THREE.DoubleSide }),
     pole: new THREE.MeshStandardMaterial({ color: 0x8a8d8f, roughness: 0.4, metalness: 0.6 }),
+    rim: new THREE.MeshStandardMaterial({ color: 0x5f5b52, roughness: 0.95 }),
     dome, sheetG, doorG, poleG, pegG,
   };
   return shared;
@@ -78,8 +79,8 @@ export class TentsRenderer {
   constructor() { this.group.name = 'yard-tents'; }
 
   /** Pitch one tent per spot (idempotent: rebuilt only when the spots change). */
-  sync(spots: ReadonlyArray<{ x: number; z: number; rot: number }>, groundAt: (x: number, z: number) => number): void {
-    const key = spots.map(s => `${s.x.toFixed(2)},${s.z.toFixed(2)}`).join('|');
+  sync(spots: ReadonlyArray<{ x: number; z: number; rot: number }>, groundAt: (x: number, z: number) => number, platforms: ReadonlyArray<number | null> = []): void {
+    const key = spots.map((s, i) => `${s.x.toFixed(2)},${s.z.toFixed(2)},${platforms[i] === null || platforms[i] === undefined ? 0 : 1}`).join('|');
     if (key === this._key) return;
     this._key = key;
     this.group.clear();
@@ -88,6 +89,13 @@ export class TentsRenderer {
       t.position.set(s.x, groundAt(s.x, s.z), s.z);
       t.rotation.y = s.rot;
       this.group.add(t);
+      // on a graded platform: a low dry-stack edge round it (the downhill side is the one that shows)
+      if (platforms[i] !== null && platforms[i] !== undefined) {
+        const rim = new THREE.Mesh(new THREE.TorusGeometry(0.29, 0.016, 5, 20).rotateX(Math.PI / 2), parts().rim);
+        rim.position.set(s.x, groundAt(s.x, s.z) + 0.008, s.z);
+        rim.receiveShadow = true;
+        this.group.add(rim);
+      }
     });
   }
 }

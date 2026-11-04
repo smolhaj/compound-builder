@@ -1573,13 +1573,35 @@ export class HomesteadWorld {
   // ── Dome tents in the yard (sim/housing.ts) ───────────────────────────
   readonly tents = new TentsRenderer();
   private _tentPos: Array<{ x: number; z: number; rot: number }> = [];
+  private _tentPads: Pad[] = [];
+  private _tentPadKey = '';
+  private _tentOld: Array<{ x: number; z: number }> = [];
+  /** Per tent: the platform's level where one was graded on a slope (it gets a stone edge), else null. */
+  private _tentFlat: Array<number | null> = [];
   /** Pitch a dome tent round the camp for each one somebody sleeps in tonight. */
   syncTents(game: GameState): void {
     const n = tentsPitched(game);
     if (n === 0 && this.tents.group.children.length === 0) { this._tentPos = []; return; }
     if (!this.tents.group.parent) this._ws.scene.add(this.tents.group);
     this._tentPos = tentSpots(this.camp, n, (x, z) => this.onBuilding(x, z, 0.4, false) || this.onAccess(x, z, 0.3) || this.onPerimeterLine(x, z, 0.2));
-    this.tents.sync(this._tentPos, this.groundAt);
+    this._pitchTents();
+  }
+
+  private _pitchTents(): void {
+    // a tent on a slope stands on a small level platform (a graded pad like a building's, with a stone edge on the low side), not half sunk into the hill
+    const key = this._tentPos.map(t => `${t.x.toFixed(2)},${t.z.toFixed(2)}`).join('|');
+    if (key !== this._tentPadKey) {
+      this._tentPadKey = key;
+      const keep = this.parcel.pads.filter(q => !this._tentPads.includes(q));
+      const h = 0.27;
+      this._tentPads = this._tentPos.map(t => ({ x0: t.x - h, z0: t.z - h, x1: t.x + h, z1: t.z + h, y: this.parcel.padHeight(t.x - h, t.z - h, t.x + h, t.z + h), skirt: 0.22 }));
+      this.parcel.setPads([...keep, ...this._tentPads]);
+      const xs = [...this._tentPos.map(t => t.x), ...this._tentOld.map(t => t.x)], zs = [...this._tentPos.map(t => t.z), ...this._tentOld.map(t => t.z)];
+      if (xs.length) this.terrain.refresh(this._terrainSource, Math.min(...xs) - 1, Math.min(...zs) - 1, Math.max(...xs) + 1, Math.max(...zs) + 1);
+      this._tentOld = this._tentPos;
+      this._tentFlat = this._tentPos.map((t, i) => Math.abs(this.parcel.natural(t.x + 0.25, t.z).h - this.parcel.natural(t.x - 0.25, t.z).h) + Math.abs(this.parcel.natural(t.x, t.z + 0.25).h - this.parcel.natural(t.x, t.z - 0.25).h) > 0.03 ? this._tentPads[i].y : null);
+    }
+    this.tents.sync(this._tentPos, this.groundAt, this._tentFlat);
   }
 
   // ── Food on the shelves ───────────────────────────────────────────────
