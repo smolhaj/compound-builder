@@ -152,17 +152,24 @@ const FIX: Record<FixPart, Record<'fair' | 'poor', { name: string; hours: number
   film: { fair: { name: 'Patch the torn poly', hours: 8, materials: { poly_film: 1, hardware: 1 } }, poor: { name: 'Re-cover the hoops', hours: 30, materials: { poly_film: 3, hardware: 1 } } },
   glass: { fair: { name: 'Replace the cracked panes', hours: 12, materials: { hardware: 1 } }, poor: { name: 'Reglaze the broken bays', hours: 48, materials: { hardware: 3, lumber: 1 } } },
 };
+/**
+ * Add a repair job. A finished job of the same part stays on the list as a "done" row, so a second break (frozen pipes again, more pack rats, hail
+ * again) used to push a twin with the same part (duplicate React keys in the Projects tab, and two rows for one fault): the finished row is replaced
+ * instead. False when that part is already broken and unfixed: one fault at a time.
+ */
+export function addFix(st: Structure, fix: Fix): boolean {
+  const all = st.fixes ?? [];
+  if (all.some(f => f.part === fix.part && f.done < f.hours)) return false;
+  st.fixes = [...all.filter(f => f.part !== fix.part), fix];
+  return true;
+}
 /** Crack a greenhouse's glass (hail, ice): a repair job on the structure, like the old house's. Returns false when it is already cracked. */
 export function crackGlass(st: Structure, cond: 'fair' | 'poor'): boolean {
-  if ((st.fixes ?? []).some(f => f.part === 'glass' && f.done < f.hours)) return false;
-  (st.fixes ??= []).push({ part: 'glass', cond, done: 0, hours: FIX.glass[cond].hours, supplied: false });
-  return true;
+  return addFix(st, { part: 'glass', cond, done: 0, hours: FIX.glass[cond].hours, supplied: false });
 }
 /** Tear a tunnel's poly (wind, snow load, age): a repair job like the glass. Returns false when it is already torn. */
 export function crackFilm(st: Structure, cond: 'fair' | 'poor'): boolean {
-  if ((st.fixes ?? []).some(f => f.part === 'film' && f.done < f.hours)) return false;
-  (st.fixes ??= []).push({ part: 'film', cond, done: 0, hours: FIX.film[cond].hours, supplied: false });
-  return true;
+  return addFix(st, { part: 'film', cond, done: 0, hours: FIX.film[cond].hours, supplied: false });
 }
 /** How much of its glass (or poly) is whole: 1 sound, 0.7 a few panes cracked, 0.4 bays broken (output and heat follow). */
 export function glassSound(st: Structure): number {

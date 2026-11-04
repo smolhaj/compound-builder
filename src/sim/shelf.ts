@@ -22,7 +22,7 @@
 import type { GameState } from './state';
 import type { MaterialId } from './materials';
 import { mulberry32 } from './rng';
-import type { Fix } from './improvements';
+import { addFix, pendingFixes, type Fix } from './improvements';
 import { catKeeping, pantryDay, syncPantry, type FoodCat } from './pantry';
 
 const isFood = (k: Kept): k is FoodCat => k === 'canned' || k === 'staples' || k === 'frozen';
@@ -96,10 +96,10 @@ export function shelfDay(s: GameState): string[] {
       const wired = s.utilities.fittings.filter(f => f.kind === 'wire' && f.finishedAt !== null);
       const f = wired.length ? wired[Math.floor(r() * wired.length)] : null;
       const st = f ? s.structures.find(x => x.id === f.building) : null;
-      if (f && st) {
+      if (f && st && !pendingFixes(st).some(x => x.part === 'wiring')) {
         s.utilities.fittings = s.utilities.fittings.filter(x => x !== f);
         const fix: Fix = { part: 'wiring', cond: 'fair', done: 0, hours: 24, supplied: false };
-        (st.fixes ??= []).push(fix);
+        addFix(st, fix);
         out.push(`Pack rats chewed through the wiring in the ${st.kind.replace(/_/g, ' ')}: it's dead until it's fixed.`);
       }
     }
