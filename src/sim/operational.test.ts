@@ -28,4 +28,14 @@ describe('the operational checklist', () => {
     expect(o.find(i => i.id === 'power')!.act).toBeUndefined();
     expect(operationalCount(o).done).toBeGreaterThanOrEqual(1);
   });
+
+  it('a wind turbine or a micro-hydro plant counts as power', () => {
+    for (const kind of ['wind_turbine', 'micro_hydro', 'solar_farm']) {
+      const g = fresh();
+      g.site = { ...g.site, improvements: { ...g.site.improvements, power: false } };
+      expect(operational(g).find(i => i.id === 'power')!.done).toBe(false);
+      done(g, kind).stage = 99;
+      expect(operational(g).find(i => i.id === 'power')).toMatchObject({ done: true, line: 'Power on the place' });
+    }
+  });
 });
