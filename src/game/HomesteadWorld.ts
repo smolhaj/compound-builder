@@ -48,6 +48,7 @@ import { DogRenderer } from './people/DogRenderer';
 import { FleetRenderer, inCarBox, type CarBox, type FleetCtx } from './props/FleetRenderer';
 import type { DogCtx } from './people/dogGoals';
 import { WildlifeRenderer } from './wildlife/WildlifeRenderer';
+import { log } from '../sim/economy';
 import { livingDogs, ageYears } from '../sim/pets';
 import { dayIndex } from '../sim/state';
 import { GuardPostProp } from './people/GuardPostProp';
@@ -2107,7 +2108,12 @@ export class HomesteadWorld {
       { hour, raided: hostileAtGate(game.gate.pending) || this.doorLock === true || this.qaRaid, storm: seasonState.params.snow > 0.6, house, clock: game.clock.t },
       { ground: this.groundAt, via: (kind, a, b) => animalRoute(a, b, this._animalHard(kind), (x, z) => w.cost?.(x, z) ?? 1, 0.14, 1.3) },
       speedK, { x: this._ws.camera.position.x, z: this._ws.camera.position.z });
+    // a shelter the animals cannot get to (across the creek, behind a wall): one line in the log
+    const cut = this.livestock.takeNoWay().filter(k => !this._noWayLogged.has(k));
+    for (const k of cut) { this._noWayLogged.add(k); log(game, `The ${k === 'hen' ? 'hens' : k + 's'} have no way to a barn they can reach: a wall, the creek or the rock is in the road.`); }
+    if (!cut.length && !this.qaRaid && this.livestock.animals().every(a => a.moving === false)) this._noWayLogged.clear();
   }
+  private readonly _noWayLogged = new Set<string>();
 
   /** Where dogs are (animals bolt from them too); none until the dogs renderer exists. */
   dogPositions(): Array<[number, number]> { return this.dogs.positions().map(d => [d.x, d.z] as [number, number]); }

@@ -16,8 +16,8 @@ const LEGS = 4;
 interface Look { h: number; len: number; wid: number; col: number; head: number; speed: number; legK: number }
 /** Size (world units), colour and pace (units per second at 1x) of each kind. */
 export const LOOK: Record<StockKind, Look> = {
-  cow: { h: 0.23, len: 0.3, wid: 0.1, col: 0x2e2a26, head: 0.05, speed: 0.17, legK: 0.45 },
-  steer: { h: 0.21, len: 0.28, wid: 0.095, col: 0x7a4a2e, head: 0.048, speed: 0.17, legK: 0.45 },
+  cow: { h: 0.23, len: 0.3, wid: 0.075, col: 0x9a6a46, head: 0.05, speed: 0.17, legK: 0.45 },
+  steer: { h: 0.21, len: 0.28, wid: 0.07, col: 0x7a4a2e, head: 0.048, speed: 0.17, legK: 0.45 },
   goat: { h: 0.12, len: 0.15, wid: 0.045, col: 0xd9d2c2, head: 0.027, speed: 0.22, legK: 0.5 },
   sheep: { h: 0.12, len: 0.16, wid: 0.065, col: 0xe6e0d2, head: 0.027, speed: 0.2, legK: 0.35 },
   pig: { h: 0.11, len: 0.2, wid: 0.07, col: 0xe0a39a, head: 0.035, speed: 0.2, legK: 0.3 },
@@ -52,6 +52,9 @@ export class LivestockRenderer {
   private readonly _scene: THREE.Scene;
   private _budget = 0;
   private _age = 0;
+  /** Kinds that found no way to a shelter since the last `takeNoWay` (the world writes one log line for them). */
+  private readonly _noWay = new Set<StockKind>();
+  takeNoWay(): StockKind[] { const o = [...this._noWay]; this._noWay.clear(); return o; }
 
   constructor(scene: THREE.Scene) {
     this._scene = scene;
@@ -66,7 +69,7 @@ export class LivestockRenderer {
       return m;
     };
     const ball = new THREE.SphereGeometry(1, 10, 7);
-    this._body = mk('body', ball, 1);
+    this._body = mk('body', ball, 2);     // (body and neck: instances, not draws)
     this._head = mk('head', ball, 1);
     this._leg = mk('leg', new THREE.CylinderGeometry(1, 0.7, 1, 6).translate(0, -0.5, 0), LEGS);
   }
@@ -108,7 +111,7 @@ export class LivestockRenderer {
         this._budget--;
         const r = ctx.via(a.kind, [a.x, a.z], [goal.x, goal.z]);
         if (r === null) {                                    // no way there (across the creek, walled in): another home next time, or it waits and looks again
-          if (goal.home) a.noWay.add(goal.home);
+          if (goal.home) { a.noWay.add(goal.home); this._noWay.add(a.kind); }
           a.wait = 0.5; return;
         }
         a.via = [...r];
@@ -132,7 +135,7 @@ export class LivestockRenderer {
   }
 
   private _draw(herd: ReadonlyArray<{ id: string; kind: StockKind }>, ctx: LivestockCtx, cam?: { x: number; z: number }): void {
-    let nb = 0, nl = 0;
+    let nb = 0, nh = 0, nl = 0;
     const put = (m: THREE.InstancedMesh, i: number, col: number, tone: number) => {
       m.setMatrixAt(i, tmpM);
       tmpC.setHex(col).multiplyScalar(0.9 + tone * 0.2);
@@ -149,13 +152,18 @@ export class LivestockRenderer {
         tmpL.compose(tmpV.set(x, y, z), tmpQ.setFromEuler(tmpE.set(rx, 0, 0)), tmpS.set(sx, sy, sz));
         tmpM.multiplyMatrices(tmpB, tmpL);
       };
+      const bodyCol = a.kind === 'cow' ? [0xe6e0d4, 0x9a6a46, 0x5a4636, 0xc9b79a][Math.floor(hash(a.id, 1) * 4)] : L.col;
       loc(0, by, 0, 0, L.wid * 0.55, bh, L.len / 2);
-      put(this._body, nb, a.kind === 'cow' ? (hash(a.id, 1) < 0.5 ? 0x2e2a26 : 0xe8e4dc) : L.col, a.tone);
+      put(this._body, nb++, bodyCol, a.tone);
       const grazing = a.v < 0.01 && hash(a.id, 6) < 0.7 && Math.sin(a.phase * 0.1 + hash(a.id, 5) * 9 + performance.now() / 2600) > 0.1;
-      const hy = by + (grazing ? -bh * 0.5 : bh * 0.5), hz = L.len / 2 + L.head * (a.kind === 'hen' ? 0.4 : 0.9);
+      const bird = a.kind === 'hen';
+      const hy = by + (grazing ? -bh * 0.55 : bh * (bird ? 0.7 : 0.8)), hz = L.len / 2 + L.head * (bird ? 0.4 : 1.3);
+      // the neck: a short slab from the shoulder up (or down, grazing) to the head
+      const ny = (by + bh * 0.3 + hy) / 2, nz = L.len / 2 - L.head * 0.2, tilt = grazing ? 0.9 : -0.7;
+      loc(0, ny, nz, tilt, L.wid * 0.38, L.head * 1.0, L.head * 1.5);
+      put(this._body, nb++, bodyCol, a.tone);
       loc(0, hy, hz, 0, L.head, L.head * 0.9, L.head * 1.3);
-      put(this._head, nb, a.kind === 'cow' ? 0x3a3631 : a.kind === 'sheep' ? 0x4a4036 : L.col, a.tone);
-      nb++;
+      put(this._head, nh++, a.kind === 'cow' ? 0xb08a6a : a.kind === 'sheep' ? 0x4a4036 : L.col, a.tone);
       for (let i = 0; i < LEGS; i++) {
         const fz = (i < 2 ? 1 : -1) * L.len * 0.3, fx = (i % 2 ? 1 : -1) * L.wid * 0.6, sw = swing * ((i < 2) === (i % 2 === 0) ? 1 : -1), r = Math.max(0.007, L.h * 0.085);
         loc(fx, by - bh * 0.2, fz, sw, r, by - bh * 0.2, r);
@@ -163,7 +171,7 @@ export class LivestockRenderer {
         nl++;
       }
     }
-    for (const [m, n] of [[this._body, nb], [this._head, nb], [this._leg, nl]] as const) {
+    for (const [m, n] of [[this._body, nb], [this._head, nh], [this._leg, nl]] as const) {
       m.count = n; m.instanceMatrix.needsUpdate = true;
       if (m.instanceColor) m.instanceColor.needsUpdate = true;
     }
