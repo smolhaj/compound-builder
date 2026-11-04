@@ -87,6 +87,8 @@ export interface RegionWorld {
   /** Sagebrush on the open ground (density 0–1) and its colors; willow on the creek banks. */
   sage: number;
   sagePalette?: number[];
+  /** Understory shrubs and ferns in the timber (density 0–1) — they share the sage field's draw call; `sagePalette` gives their colors. */
+  understory?: number;
   willow: number;
   /** Loose rocks and ledges on the parcel: how many (a 40 gets ~ count × 40) and their color. */
   rocks: { count: number; color: number; size: [number, number]; flat: number };
@@ -134,6 +136,7 @@ export const REGION_WORLD: Record<RegionId, RegionWorld> = {
       palettes: { broad: HARDWOOD, oval: HARDWOOD, conifer: CONIFER_DARK },
     },
     sage: 0, willow: 0.5,
+    understory: 0.8, sagePalette: [0x2f4a22, 0x3a5a28, 0x4d6e32, 0x294226, 0x5a7a3a],      // mountain laurel and rhododendron thickets, fern drifts
     rocks: { count: 22, color: 0x8c8474, size: [0.1, 0.4], flat: 0.55 },             // sandstone ledges and slabs
     road: 'asphalt', fence: 'rail',
   },
@@ -161,6 +164,7 @@ export const REGION_WORLD: Record<RegionId, RegionWorld> = {
       palettes: { conifer: SPRUCE, oval: BIRCH },
     },
     sage: 0, willow: 1,
+    understory: 0.5, sagePalette: [0x3a5a30, 0x2f4a2a, 0x4a6638, 0x42603a, 0x56703e],      // blueberry, Labrador tea, bracken
     rocks: { count: 16, color: 0x7c7a74, size: [0.12, 0.5], flat: 0.85 },           // granite erratics
     road: 'gravel', fence: 'wire',
   },
@@ -188,6 +192,7 @@ export const REGION_WORLD: Record<RegionId, RegionWorld> = {
       palettes: { conifer: CONIFER_DARK, oval: HARDWOOD },
     },
     sage: 0, willow: 0.8,
+    understory: 1, sagePalette: [0x2c5a2a, 0x356a30, 0x274c26, 0x40743a, 0x1f4224],        // sword fern, salal, huckleberry
     rocks: { count: 10, color: 0x5e6a52, size: [0.1, 0.35], flat: 0.75 },            // mossy basalt
     road: 'asphalt', fence: 'woven',
   },
