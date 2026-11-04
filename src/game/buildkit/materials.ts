@@ -11,6 +11,7 @@
  * later layer on top of these.
  */
 import * as THREE from 'three';
+import { patchWaterMaterial, WATER_LOOKS } from '../../engine/world/water/waterShading';
 import { generateNormalMap } from '../../engine/world/materials/normalMapGen';
 import { patchWear, WEAR_CLASS } from '../atmosphere/weathering';
 import { screenTexture, siteMapTexture } from './screenFeeds';
@@ -31,7 +32,7 @@ export type KitMaterialId = 'timber_lap' | 'trim' | 'fieldstone' | 'metal_roof' 
   // the orchard's other fruit and its blossom (sim/orchard.ts: each kind blooms and ripens in its own weeks)
   | 'fruit_cherry' | 'fruit_plum' | 'blossom_apple' | 'blossom_pear' | 'blossom_cherry' | 'blossom_plum'
   // the pond, its fish and crayfish, the flock
-  | 'pond_water' | 'fish' | 'crayfish' | 'sheepwool'
+  | 'pond_water' | 'moat_water' | 'fish' | 'crayfish' | 'sheepwool'
   // the barnyard's animals and the apiary
   | 'hide_tan' | 'hide_pink' | 'hide_black' | 'hive_white' | 'bee_gold'
   // interior floors (greenhouse gravel + paver aisle, cottage boards, the garage's oil drips)
@@ -835,6 +836,16 @@ export function kitMaterial(id: KitMaterialId): THREE.MeshStandardMaterial {
     case 'blossom_plum': m = new THREE.MeshStandardMaterial({ color: 0xf5f3ee, roughness: 0.85, emissive: new THREE.Color(0.13, 0.13, 0.12) }); break;
     // a dark green-brown pond: glossy, a little clear so the fish show through, doubled-sided for the reservoir edge
     case 'pond_water': m = new THREE.MeshStandardMaterial({ color: 0x2f5a52, roughness: 0.06, metalness: 0.25, transparent: true, opacity: 0.72, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }); break;
+    // a moat: the shared still-water shader (dark, fresnel sky reflection, ripples) with a muddy bank and a faint foam line; the ribbon carries aSide (0..1 across)
+    case 'moat_water': {
+      const mm = new THREE.MeshStandardMaterial({ color: 0xffffff, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
+      patchWaterMaterial(mm, {
+        key: 'moat', look: WATER_LOOKS.moat, attributes: { aSide: 'float' },
+        depthGLSL: 'float mD = abs(v_aSide * 2.0 - 1.0); wDepth = 1.0 - smoothstep(0.3, 1.0, mD) * 0.85; wEdge = smoothstep(0.78, 1.0, mD);',
+        rippleScale: 0.5, detailFade: [20, 90],
+      });
+      m = mm; break;
+    }
     case 'fish': m = new THREE.MeshStandardMaterial({ color: 0x9aa8a0, roughness: 0.4, metalness: 0.3, side: THREE.DoubleSide }); break;
     case 'crayfish': m = new THREE.MeshStandardMaterial({ color: 0x8a3a24, roughness: 0.6 }); break;
     case 'sheepwool': m = new THREE.MeshStandardMaterial({ color: 0xe9e4d4, roughness: 0.95 }); break;

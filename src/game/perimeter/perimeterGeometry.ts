@@ -667,14 +667,14 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
       // the water in the cut (the ditch itself is an earthwork in the terrain): a ribbon on the surface, lower in a rain-fed ditch, white when it is ice
       const mo = opts.moat;
       if (run.finishedAt === null || !mo || mo.level <= 0.05) break;
-      const lv = Math.min(1, mo.level), hw = 0.2 + 0.22 * lv, lift = 0.22 + 0.06 * lv, wm: KitMaterialId = mo.frozen ? 'whitewash' : 'pond_water';
+      const lv = Math.min(1, mo.level), hw = 0.2 + 0.22 * lv, lift = 0.22 + 0.06 * lv, wm: KitMaterialId = mo.frozen ? 'whitewash' : 'moat_water';
       for (const [s0, s1] of spans) {
         const n = Math.max(1, Math.ceil((s1 - s0) / 0.35));
         let pos: number[] = [];
         const flush = () => {
           const idx: number[] = [];
           for (let k = 0; k + 1 < pos.length / 6; k++) idx.push(k * 2, k * 2 + 1, k * 2 + 2, k * 2 + 1, k * 2 + 3, k * 2 + 2);
-          if (idx.length) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); add(wm, g); }
+          if (idx.length) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); if (!mo.frozen) g.setAttribute('aSide', new THREE.Float32BufferAttribute(Array.from({ length: pos.length / 3 }, (_, k) => k % 2), 1)); g.setIndex(idx); g.computeVertexNormals(); add(wm, g); }
           pos = [];
         };
         for (let i = 0; i <= n; i++) {
