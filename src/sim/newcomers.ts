@@ -492,6 +492,10 @@ export function householdPeople(s: GameState, n: Neighbor, count: number, r: () 
   });
 }
 
+/** How much more a household thinks of the family when they go home, by how bad it was (on top of the 8 for the stay itself). */
+export const SHELTER_GRATITUDE: Record<ShelterWhy, number> = { warning: 4, storm: 6, hungry: 8, raided: 10, sick: 10, fire: 14, settle: 0 };
+export const homeGoodwill = (why: string): number => 8 + (SHELTER_GRATITUDE[why as ShelterWhy] ?? 0);
+
 /** Days between one household's requests for shelter. */
 const SHELTER_GAP = 150;
 const STORMS = new Set(['blizzard', 'ice_storm', 'flood', 'tornado', 'derecho', 'hurricane_remnants', 'flash_flood', 'windstorm']);
@@ -888,9 +892,10 @@ function guestsDay(s: GameState, N: NewcomerState, day: number): string[] {
     }
     for (const i of here) moveOut(s, s.people[i].id, 'went home');
     delete N.guests[party.nid];
-    n.disposition = Math.min(100, n.disposition + 8);
+    const goodwill = homeGoodwill(party.why);
+    n.disposition = Math.min(100, n.disposition + goodwill);
     s.stock.canned += 2;
-    const lines = [`${names} went home. They left two jars of preserves on the table.`];
+    const lines = [`${names} went home. They left two jars of preserves on the table.`, `The ${plural(surname(n))} go home. ${goodwill >= 16 ? 'They will not forget it.' : 'They are grateful.'}`];
     // a good guest repays the roof: a day's work on whatever is going up
     const st = s.structures.find(x => !isFinished(x) && blockedReason(s, x) === null);
     if (st && here.length >= 2) { addWork(s, st, here.length * 6); lines.push(`They lent a day on the ${st.kind.replace(/_/g, ' ')} before they went.`); }
