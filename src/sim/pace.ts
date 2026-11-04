@@ -91,7 +91,7 @@ export function slowHint(s: GameState, weeks: number | null, pace = paceOf(s), s
   if (weeks < slow) return null;
   const parts: string[] = [];
   if (pace.siteDays !== undefined) {
-    parts.push(`the family is on the place only about ${Math.round(pace.siteDays * 10) / 10} days a week`);
+    parts.push(`the family is on the place only about ${Math.round(pace.siteDays * 10) / 10} days a week (Friday night to Sunday afternoon)`);
     parts.push('hire a crew for the weekdays');
     parts.push('or move in full time (Family tab)');
     return `Slow going: ${parts.join('; ')}.`;
