@@ -13,6 +13,7 @@
  * The escape tunnel is never a way in (perimeter.canEnter): no outcome here
  * ever reaches the family through it. Pure and seeded.
  */
+import { nobodyHome } from './orphans';
 import { ringPoints } from './rings';
 import { terrainPoints } from './terrainFx';
 import { mulberry32, pick } from './rng';
@@ -475,6 +476,8 @@ export function gateDay(s: GameState): Encounter | null {
   for (const line of trialDay(s)) log(s, line);
   if (g.comeBack && day > g.comeBack.until) g.comeBack = null;
   if (g.pending) return null;
+  // the line is alive but the children are fostered: nobody home to answer the gate, so no cards queue until someone is back
+  if (nobodyHome(s)) return null;
   const d = s.disaster;
   // while the law works (before the collapse, or once it's back): now and then a break-in (sim/breakins.ts)
   if (d.tracks.law >= 0.5) { const b = breakInDay(s, day); if (b) { g.pending = b; return b; } }
@@ -644,6 +647,7 @@ export function fightOdds(s: GameState, e: Encounter, tries = Math.max(10, Math.
 /** Apply the player's stance. Returns the vignette card. */
 export function resolve(s: GameState, stance: Stance): Outcome {
   const e = s.gate.pending;
+  if (e && stance === 'take_in' && nobodyHome(s)) return { title: 'Nobody home', text: 'There is no one at the place to take anyone in.', tone: 'mixed', lines: [] };
   if (!e) return { title: '', text: '', tone: 'mixed', lines: [] };
   const r = mulberry32(s.seed * 92821 + e.day * 7 + stance.length);
   const p = postureOf(s);

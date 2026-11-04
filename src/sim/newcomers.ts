@@ -29,6 +29,7 @@
  *              carry for six months. Past what the stores can feed, the whole
  *              table feels it (morale), loyalty falls and people drift off.
  */
+import { nobodyHome } from './orphans';
 import { vetting } from './ringFallback';
 import { mulberry32, pick } from './rng';
 import { log } from './economy';
@@ -504,7 +505,7 @@ const STORM_TEXT: Record<string, string> = { blizzard: 'A blizzard is coming dow
 /** A household asks to shelter with the family for a while. Null if the gate is busy or they cannot. */
 export function requestShelter(s: GameState, n: Neighbor, why: ShelterWhy, r: () => number, days?: number): Encounter | null {
   const g = s.gate;
-  if (g.pending || n.status !== 'home' || n.members <= 0) return null;
+  if (g.pending || n.status !== 'home' || n.members <= 0 || nobodyHome(s)) return null;
   const N = newcomersOf(s);
   if (N.guests[n.id]) return null;
   const day = dayIndex(s.clock.t), d = s.disaster;
@@ -864,7 +865,7 @@ export function newcomersDay(s: GameState): string[] {
   }
 
   out.push(...guestsDay(s, N, day));
-  out.push(...shelterDay(s, N, day, r));
+  if (!nobodyHome(s)) out.push(...shelterDay(s, N, day, r));
   out.push(...joinersDay(s));
   return out.filter(Boolean);
 }
