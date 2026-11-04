@@ -52,7 +52,7 @@ import { livingPerDay } from '../sim/engine';
 import { roman } from '../sim/eras';
 import { canRigMines, rigMines } from '../sim/battle';
 import { canJoin } from '../sim/aftermath';
-import { MILESTONE_COUNT, MILESTONE_NAME } from '../sim/lineage';
+import { MILESTONE_COUNT, MILESTONE_NAME, PART_LABEL, generations } from '../sim/lineage';
 import { daysOfFood, KCAL, needOf } from '../sim/needs';
 import { barterPrices, moneyWorks, type Good } from '../sim/barter';
 import { MarketSection, NeighborsSection, RumorsSection, ScavengeSection } from './WorldPanels';
@@ -688,11 +688,18 @@ function Chronicle() {
       <Row label="Era" value={`${roman(L.era)} · ${now}`} />
       <Row label="Living here" value={`${living.length} · ${gens} generation${gens === 1 ? '' : 's'}`} />
       {born > 0 && <Row label="Born on the place" value={born} />}
-      <Row label="Dynasty score" value={Math.round(L.points).toLocaleString('en-US')} title="A point for each person-year on the place, each era's grade, 25 for each child, and the milestones" />
+      <Row label="Dynasty score" value={Math.round(L.points).toLocaleString('en-US')} title={Object.entries(L.parts ?? {}).filter(([, v]) => v >= 1).map(([k, v]) => `${PART_LABEL[k] ?? k}: ${Math.round(v)}`).join('\n') || "A point for each person-year on the place, each era's grade, 25 for each child, the milestones, strangers taken in, the size of the place and a place that feeds itself"} />
+    </Section>
+    <Section title="Generations">
+      {generations(game).map(g => <div key={g.gen} style={{ padding: '2px 0' }} title={g.people.map(p => `${p.name}${p.parents.length ? ` (child of ${p.parents.join(' and ')})` : ''}`).join('\n')}>
+        <span style={{ color: DIM }}>{roman(g.gen)}</span>{' '}
+        {g.people.map((p, i) => <span key={p.id} style={{ color: p.alive ? (p.role === 'heir' ? '#d8c08a' : undefined) : '#8a807a' }}>{i ? ', ' : ''}{p.alive ? '' : '✝ '}{p.name} {p.age}</span>)}
+      </div>)}
+      <Note>Gold are the place's own grown children: the heirs. Skills pass to the children when a parent dies; the house, land and stores stay one household's.</Note>
     </Section>
     {L.eras.length > 0 && <Section title="Eras">
       {L.eras.map(e => <div key={e.n} style={{ display: 'flex', justifyContent: 'space-between', gap: 6, padding: '2px 0' }}>
-        <span><span style={{ color: DIM }}>{roman(e.n)}</span> {e.name}</span>
+        <span title={e.headline}><span style={{ color: DIM }}>{roman(e.n)}</span> {e.name}</span>
         <span style={{ color: e.grade <= 'B' ? TONE.good : e.grade <= 'C' ? TONE.warn : TONE.bad }}>{e.grade} · {e.fate === 'full' ? 'came back' : e.fate === 'partial' ? 'thinner' : 'never back'}</span>
       </div>)}
     </Section>}
