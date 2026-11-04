@@ -18,3 +18,20 @@ Compound Builder must look at least as good as **University Empire** (`smolhaj/U
 4. **Keep systems modular and testable.** Put pure logic in plain TS modules with Vitest tests.
 5. **Save versioning:** bump the save version and add a migration whenever state fields change.
 6. **Eye-test visuals:** take screenshots at eye level and from above, with no camera inside geometry and no modals covering the view.
+
+## Standing rules (workflow)
+- **US spelling** in code, UI text and docs. **Procedural art only** and **real scale** (1 unit ≈ 6 m; check a street-level shot with a person).
+- **PR workflow:** one feature branch per change, open a **draft PR**, squash-merge when `check` and `perf-budget` are green. **Merge main into the branch first**: CI does not run on conflicting PRs. Never force-push; **never raise the perf budgets** (fix the cost instead).
+- **`docs/DECISIONS.md`**: add a dated row for every design decision. On a merge conflict in that file keep both sides.
+- Save version is `SAVE_VERSION` in `src/sim/state.ts` (now **78**). Bump it and migrate when state fields change; the per-version history is in the DECISIONS rows ("Save vNN").
+
+## What is built (since the first renderer port; details in `docs/DECISIONS.md`, gaps in `docs/DEPTH_AUDIT.md`, branch status in `docs/BRANCHES.md`)
+- **HUD declutter** (`src/ui/hud/common.tsx`: `Group` folds advanced sections, `Hint` shows a short line with "more", `Clamp` holds text to two lines). Build tab opens with the *Get operational* checklist (`sim/operational.ts`: shelter, water, power, food, defense) and at most three next steps; New Game wizard, decision cards (`GateCard`), supplies, family and report follow the same pattern. Esc closes the Shop.
+- **Utilities run themselves**: no drawn pipes or cables; auto-wiring within `AUTO_REACH` (`sim/utilities.ts`). Power sources include micro-hydro and the wind turbine; microclimate (frost pockets, wind) in `sim/microclimate.ts`.
+- **Long game**: orphans taken in by a neighbor (`sim/orphans.ts`), yearly threats (`sim/threats.ts`), dynasty score parts, self-fed milestones, built chronicle, era headlines, and a *Generations* view in the HUD (`sim/lineage.ts`, `sim/eras.ts`, `sim/eraPressure.ts`).
+- **Quarters** (`sim/quarters.ts`): households with auto-assigned homes plus a Move override; crowding, illness and raid effects.
+- **Joiners** (`sim/joinerHome.ts`): they bring cash, tools, a vehicle, food, a dog; they choose where to stay (spare bed, RV or trailer via `game/buildkit/rigBuildings.ts`, a modular home, or a place the player builds).
+- **Defense**: moat, covered bridge and vehicle yard (`sim/waterWorks.ts`, `sim/vehicleYard.ts`); door breach, ring-by-ring fallback; tunnel collapse as a raid outcome and per-ring gate vetting (`sim/gateVetting.ts`); every defensive element is monotone (property test).
+- **Movers on routes** (`game/paths/groundMovers.ts`): wildlife, livestock, trucks and guard dogs use the same route network as people, with a climb limit per kind; corridors (`sim/corridors.ts`) carry people and vehicles through tunnels.
+- **Terrain and region**: regional forests and parcel terrain (`game/parcel/parcelTerrain.ts`, `engine/world/trees/ForestRenderer.ts`), retaining walls and terraces, drainage, valley fog; area E buildings (docks and boats, cabin village, helipad, polytunnels, aquaponics, terraced orchards), forge, shared harvest, soap, hunter safety course.
+- **Performance**: staged boot with loading screen, starts on Medium, 60 fps cap, perf budget per tier enforced in CI.
