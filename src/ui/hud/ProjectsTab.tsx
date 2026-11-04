@@ -1,4 +1,5 @@
 /** The Projects tab: what is under way, how long it will take and why it is slow, crews, fittings, hardening, lines, woods. */
+import { useEffect, useRef } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { BLUEPRINTS } from '../../sim/blueprints';
 import { billText, type MaterialId } from '../../sim/materials';
@@ -24,6 +25,8 @@ import { TONE, DIM, LINE, btn, usd } from './style';
 
 export function ProjectsTab() {
   const g = useGameStore();
+  const selSeen = useRef<string | null>(null);
+  useEffect(() => { if (!g.selected) selSeen.current = null; }, [g.selected]);
   const game = g.game;
   const sel = game.structures.find(s => s.id === g.selected) ?? game.structures.find(s => !isFinished(s)) ?? null;
   const pace = paceOf(game), left = totalHoursLeft(game), weeks = weeksFor(left, pace);
@@ -78,6 +81,7 @@ export function ProjectsTab() {
       {!sel && !rows.length && !game.forestry.jobs.length && !todo.length && <Note>Nothing under way. Stake something out from the Build tab.</Note>}
       {sel && (
         <Section title={KIT[sel.kind].name}>
+          <div ref={el => { if (el && g.selected === sel.id && selSeen.current !== sel.id) { selSeen.current = sel.id; el.scrollIntoView?.({ block: 'start' }); } }} />
           <Row label="Stage" value={sel.pre ? 'Came with the land' : isFinished(sel) ? 'Finished' : BLUEPRINTS[sel.kind].stages[sel.stage].name} />
           {isFinished(sel) && <ResidentsLine id={sel.id} />}
           {(sel.fixes ?? []).length > 0 && <>
