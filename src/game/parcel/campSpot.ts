@@ -10,6 +10,12 @@ import { lotStatsOf } from '../../sim/lotListing';
 export interface CampSpot { x: number; z: number; rot: number }
 
 export function pickCamp(p: ParcelTerrain, h: { x0: number; z0: number; x1: number; z1: number }): CampSpot {
+  // the camp goes on open ground as if the lot were lightly wooded; the dense woods of the green regions are then cleared round it
+  p.sparseCover = true;
+  try { const c = pickCampOn(p, h); p.campClear = [c.x, c.z]; return c; } finally { p.sparseCover = false; }
+}
+
+function pickCampOn(p: ParcelTerrain, h: { x0: number; z0: number; x1: number; z1: number }): CampSpot {
   // inside the home forty part of the place (the 80's west forty is the back forty)
   let x0 = Math.max(h.x0, 0) + 6, x1 = h.x1 - 6, z0 = h.z0 + 6, z1 = h.z1 - 6;
   let cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;

@@ -27,7 +27,7 @@ import { createNoise2D } from 'simplex-noise';
 import { RegionalField, TOWN_Y } from '../../engine/world/terrain/regionalLandscape';
 import { regionWorld, type Relief, type RegionWorld } from '../region/regionWorld';
 import { REGIONS, type RegionId } from '../../sim/regions';
-import { lotField, lotStats, treeLineM, type LotField, type LotSpec } from '../../sim/lots';
+import { lotField, treeLineM, type LotField, type LotSpec } from '../../sim/lots';
 import type { RoadBed } from '../../sim/roadBed';
 
 /** Parcel side in world units (40 acres ≈ 402 m). */
@@ -330,16 +330,19 @@ export class ParcelTerrain {
    * nothing at the region's tree line (by altitude), open meadow on level
    * benches, denser on the north-facing and sheltered ground.
    */
-  private _pad: [number, number] | null = null;
+  /** Where the camp is (set by `pickCamp`): the dense woods of a green-region lot leave a clearing round it. */
+  campClear: [number, number] | null = null;
+  /** While true the lot's cover ignores the dense woods (pickCamp chooses the camp on the same open ground it always did, then the woods are cleared round it). */
+  sparseCover = false;
   private _lotCover(x: number, z: number): number {
     const f = this.lot!, n = this._noise;
     const g = this.lotSlope(x, z), rock = f.rock(x, z), elev = f.spec.elevM + f.h(x, z) * 6;
     const line = treeLineM(this.regionId);
     // the lot's own cover: sparse conifer in the mountain west, the region's dense woods elsewhere (the hollows, the cedar and fir, the spruce and birch)
-    const dense = LOT_WOODS[this.regionId] ?? 0.42;
+    const dense = this.sparseCover ? 0.42 : LOT_WOODS[this.regionId] ?? 0.42;
     let c = dense * (1 - sstep(line - 250, line, elev)) * (1 - 0.9 * sstep(0.3, 0.7, rock)) * (1 - sstep(0.55, 0.95, g));
     // a clearing round the camp's pad (about 150 m across, softly edged) so the camp always has open ground in dense woods
-    if (dense > 0.6) { this._pad ??= lotStats(f).pad; c *= sstep(7, 14, Math.hypot(x - this._pad[0], z - this._pad[1])); }
+    if (dense > 0.6 && this.campClear) c *= sstep(12, 22, Math.hypot(x - this.campClear[0], z - this.campClear[1]));
     // meadow: level ground is more often open, and a few glades everywhere
     const glade = sstep(0.15, 0.55, n(x * 0.035 + 2, z * 0.035 - 6));
     c *= 1 - glade * (dense > 0.6 ? (g < 0.1 ? 0.75 : 0.3) : (g < 0.1 ? 0.8 : 0.45));
