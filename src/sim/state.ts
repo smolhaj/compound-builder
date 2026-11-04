@@ -45,7 +45,7 @@ import type { QuartersState } from './quarters';
 import type { Evenings } from './evenings';
 import type { Courses } from './courses';
 import { starterKit, type ToolKit } from './tools';
-export const SAVE_VERSION = 75;
+export const SAVE_VERSION = 76;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -137,6 +137,8 @@ export interface Structure {
   permitAt?: number;
   /** A fire, storm or looters took its roof off after it stood: the guidance suggests re-roofing it until it is finished again (optional, so no save bump). */
   roofLost?: boolean;
+  /** It stood finished once and was knocked back (a storm, a fire): finishing it again is a rebuild, one line in the chronicle (absent on older saves). */
+  lost?: boolean;
   /** An upgrade of this finished structure (sim/towers.ts): the old tier keeps working until this one is done, then goes (half its materials back). */
   replaces?: string;
   /** Towers: how far the ground at the site stands above the land round it (world units, ≥ 0; sim/towers.ts `stampHighGround`). */
@@ -308,7 +310,7 @@ export interface GameState {
   mind?: MindState;
   /** Medical depth: lasting effects, pregnancies, the epidemic, the antibiotics policy (sim/medical.ts). Save v64; `medicalOf` makes it lazily. */
   medical?: Medical;
-  /** Assigned quarters: the sick bay and guards' quarters roles (sim/quarters.ts). Save v75; `quartersOf` makes it lazily. */
+  /** Assigned quarters: the sick bay and guards' quarters roles (sim/quarters.ts). Save v76; `quartersOf` makes it lazily. */
   quarters?: QuartersState;
   /** The evenings' goods and how worn they are: the cards, the guitar, the paperbacks, the kids' toys (sim/evenings.ts). Save v65; `eveningsOf` makes it lazily. */
   evenings?: Evenings;
@@ -411,6 +413,7 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     nextId: 1,
   };
   g.structures.push(...improvementStructures(g));
+  g.lineage.startedOnGrid = g.utilities.grid;
   return g;
 }
 

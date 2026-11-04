@@ -53,6 +53,7 @@ import { livingPerDay } from '../sim/engine';
 import { roman } from '../sim/eras';
 import { canRigMines, rigMines } from '../sim/battle';
 import { canJoin } from '../sim/aftermath';
+import { THREAT_NAME } from '../sim/threatState';
 import { MILESTONE_COUNT, MILESTONE_NAME, PART_LABEL, generations } from '../sim/lineage';
 import { daysOfFood, KCAL, needOf } from '../sim/needs';
 import { barterPrices, moneyWorks, type Good } from '../sim/barter';
@@ -671,7 +672,7 @@ function TakenSection() {
 }
 
 const cap = (x: string) => x[0].toUpperCase() + x.slice(1);
-const KIND_MARK: Record<string, string> = { era: '◆', birth: '✦', death: '✝', partner: '♥', coming: '▲', milestone: '★', retire: '·', home: '⌂' };
+const KIND_MARK: Record<string, string> = { era: '◆', birth: '✦', death: '✝', partner: '♥', coming: '▲', milestone: '★', retire: '·', home: '⌂', threat: '▼' };
 
 /** The long game: the family over the years, the eras, milestones and the dynasty score. */
 function Chronicle() {
@@ -688,6 +689,7 @@ function Chronicle() {
       <Row label="On the place" value={years < 1 ? 'the first year' : `${years} year${years === 1 ? '' : 's'}`} />
       <Row label="Era" value={`${roman(L.era)} · ${now}`} />
       <Row label="Living here" value={`${living.length} · ${gens} generation${gens === 1 ? '' : 's'}`} />
+      {L.threat && <Row label={THREAT_NAME[L.threat.kind]} value={L.threat.kind === 'hard_winter' ? 'coming' : 'this year'} title="A small yearly threat while the world has not come back (long game). Cozy has none." />}
       {born > 0 && <Row label="Born on the place" value={born} />}
       <Row label="Dynasty score" value={Math.round(L.points).toLocaleString('en-US')} title={Object.entries(L.parts ?? {}).filter(([, v]) => v >= 1).map(([k, v]) => `${PART_LABEL[k] ?? k}: ${Math.round(v)}`).join('\n') || "A point for each person-year on the place, each era's grade, 25 for each child, the milestones, strangers taken in, the size of the place and a place that feeds itself"} />
     </Section>
@@ -696,6 +698,7 @@ function Chronicle() {
         <span style={{ color: DIM }}>{roman(g.gen)}</span>{' '}
         {g.people.map((p, i) => <span key={p.id} style={{ color: p.alive ? (p.role === 'heir' ? '#d8c08a' : undefined) : '#8a807a' }}>{i ? ', ' : ''}{p.alive ? '' : '✝ '}{p.name} {p.age}</span>)}
       </div>)}
+      {(L.wards ?? []).length > 0 && <div style={{ padding: '2px 0', color: '#d8c08a' }} title="With no grown person left, a neighbor household took the children in. The place is held for them and comes to the eldest at 18.">Away with {game.neighbors.find(n => n.id === L.wards[0].by)?.name ?? 'a neighbor'}: {L.wards.map(w => `${w.person.first} ${w.person.age}`).join(', ')}</div>}
       <Hint more="Gold are the place's own grown children: the heirs. Skills pass to the children when a parent dies; the house, land and stores stay one household's.">Gold names are the heirs.</Hint>
     </Section>
     {L.eras.length > 0 && <Section title="Eras">

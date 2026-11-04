@@ -46,9 +46,14 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   // 71 → 72: tunnel use (sim/corridors.ts): `PerimeterRun.collapsed` (a portal brought down by sappers) and `Vehicle.stranded` (cut off by a lost bridge or tunnel) are optional and absent in every old game: nothing to fill
   71: s => ({ ...s, version: 72 }),
   // 70 → 71: the family can choose where the road comes in (site.entrance, absent: the habitual entrance) and a listed lot's ground is pinned to the lot's seed (site.listed, absent on older saves: they keep the game's seed)
+  // 75 → 76: assigned quarters (roles for the sick bay and the guards' quarters)
+  75: s => ({ ...s, version: 76, quarters: { roles: {}, ...((s.quarters as object) ?? {}) } }),
+  // 74 → 75: orphans (wards), yearly threats, "first winter off-grid" and the capped upgrade notes. A place still on the grid counts as having started on it.
+  74: s => {
+    const L = s.lineage as Record<string, unknown>, u = s.utilities as { grid?: boolean };
+    return { ...s, version: 75, lineage: { wards: [], threat: null, threatYear: -1, startedOnGrid: !!u.grid, gridLeft: null, noteYear: -1, noteCount: 0, ...L } };
+  },
   // 73 → 74: the hunter-safety course book set (sim/courses.ts): the new good at zero
-  // 74 → 75: assigned quarters (roles for the sick bay and the guards' quarters)
-  74: s => ({ ...s, version: 75, quarters: { roles: {}, ...((s.quarters as object) ?? {}) } }),
   73: s => ({ ...s, version: 74, stock: { course_hunter: 0, ...(s.stock as object) } }),
   // 72 → 73: the long game's score parts, built-list and self-fed streak (kinds already finished are not written up again)
   72: s => {

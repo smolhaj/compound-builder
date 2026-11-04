@@ -214,3 +214,19 @@ describe('the guided HUD (server-rendered)', () => {
     Object.assign(useGameStore.getInitialState(), { hudFocus: null });
   });
 });
+
+describe('modal layering', () => {
+  const z = (html: string) => Number(/z-index:(\d+)/.exec(html)?.[1] ?? 0);
+  it('a pending gate card and the report card sit above the Shop window (a decision must never hide behind a modal)', async () => {
+    const { GateCard } = await import('../GateCard');
+    const { ReportCard } = await import('../ReportCard');
+    withGame(g => { g.gate.pending = { id: 'e1', kind: 'break_in', day: 1, title: 'Someone is in the house', dossier: [], size: 2, armed: false, strength: 10, wants: {}, stances: ['call_911', 'shout', 'confront'] } as never; });
+    const gate = renderToStaticMarkup(<GateCard />);
+    expect(gate).toContain('Someone is in the house');
+    const shop = renderToStaticMarkup(<ShopWindow />);
+    expect(z(gate)).toBeGreaterThan(z(shop));
+    withGame(g => { g.ending = { kind: 'wipe', day: 400, continued: false } as never; });
+    const rep = renderToStaticMarkup(<ReportCard />);
+    if (rep) expect(z(rep)).toBeGreaterThan(z(shop));
+  });
+});

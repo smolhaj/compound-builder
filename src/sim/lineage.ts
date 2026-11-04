@@ -30,8 +30,11 @@ import { mulberry32 } from './rng';
 import { log } from './economy';
 import { PRACTICED, isExtra, learningOf, levelFor } from './skills';
 import { afterBirth, birthRisk, duePregnancies, startPregnancy } from './medical';
+import { fosterOut, wardsDay, type Ward } from './orphans';
+import { threatsDay } from './threats';
+import type { Threat } from './threatState';
 
-export type ChronicleKind = 'era' | 'birth' | 'death' | 'partner' | 'coming' | 'milestone' | 'retire' | 'home';
+export type ChronicleKind = 'era' | 'birth' | 'death' | 'partner' | 'coming' | 'milestone' | 'retire' | 'home' | 'threat';
 export interface ChronicleEntry { t: number; year: number; kind: ChronicleKind; text: string }
 
 /** One era: a disaster lived through (eras.ts fills these in). */
@@ -62,6 +65,17 @@ export interface Lineage {
   built: string[];
   /** Days in a row the place has grown what it eats (across eras, quiet years included). */
   selfFedDays: number;
+  /** Children away with a neighbor household after the last adult died; the place is held for them (save v75; sim/orphans.ts). */
+  wards: Ward[];
+  /** The yearly threat in force, and the year it was last rolled (save v75; sim/threats.ts). */
+  threat: Threat | null;
+  threatYear: number;
+  /** The place started on the county grid, and the day the family pulled the meter (null: still on it, or never was; save v75). */
+  startedOnGrid: boolean;
+  gridLeft: number | null;
+  /** Upgrade / rebuild lines written this year, to keep the chronicle from filling with them. */
+  noteYear: number;
+  noteCount: number;
 }
 
 export const PART_LABEL: Record<string, string> = { years: 'People kept on the place', eras: 'Eras weathered', births: 'Children', milestones: 'Milestones', takenIn: 'People taken in', place: 'Size of the place', selfFed: 'Years feeding itself' };
@@ -71,7 +85,7 @@ export function award(L: Lineage, part: string, n: number): void {
   L.parts[part] = (L.parts[part] ?? 0) + n;
 }
 
-export const newLineage = (family: string): Lineage => ({ family, era: 1, eras: [], settling: false, chronicle: [], milestones: [], points: 0, lastBirth: {}, mourned: [], day: -1, hitEra: 0, parts: {}, built: [], selfFedDays: 0 });
+export const newLineage = (family: string): Lineage => ({ family, era: 1, eras: [], settling: false, chronicle: [], milestones: [], points: 0, lastBirth: {}, mourned: [], day: -1, hitEra: 0, parts: {}, built: [], selfFedDays: 0, wards: [], threat: null, threatYear: -1, startedOnGrid: false, gridLeft: null, noteYear: -1, noteCount: 0 });
 
 const NOTABLE = /tower|bunker|wall|gate|greenhouse|barn|orchard|well|cistern|solar|workshop|forge|clinic|cellar/;
 const cap = (x: string) => x[0].toUpperCase() + x.slice(1);
@@ -101,6 +115,32 @@ export function chronicle(s: GameState, kind: ChronicleKind, text: string): void
   if (L.chronicle.length > 400) L.chronicle.splice(0, L.chronicle.length - 400);
 }
 
+/** Upgrades and rebuilds the chronicle will write up in a year; the rest still happen, they just are not recorded. */
+export const UPKEEP_NOTES_PER_YEAR = 3;
+/** One line for an upgrade or a rebuild, capped per year so a busy builder does not fill the chronicle. */
+export function chronicleUpkeep(s: GameState, text: string): boolean {
+  const L = s.lineage, year = calendarOf(s.clock).year;
+  if (L.noteYear !== year) { L.noteYear = year; L.noteCount = 0; }
+  if (L.noteCount >= UPKEEP_NOTES_PER_YEAR) return false;
+  L.noteCount++;
+  chronicle(s, 'home', text);
+  return true;
+}
+
+/** The family pulled the meter (or took the line again). Only a grid the place started on counts toward "first winter off-grid". */
+export function gridChanged(s: GameState, on: boolean): void {
+  const L = s.lineage;
+  L.gridLeft = on || !L.startedOnGrid ? null : dayIndex(s.clock.t);
+}
+/** Whole deep winters (the turn of the year) lived through since leaving the grid: the first one counts. */
+export function winterOffGrid(s: GameState): boolean {
+  const L = s.lineage;
+  if (!L.startedOnGrid || L.gridLeft == null || s.utilities.grid) return false;
+  const day = dayIndex(s.clock.t), doy = calendarOf(s.clock).doy;
+  const sinceThaw = (doy - 21 + 365) % 365;       // days since the 21st of January
+  const thawDay = day - sinceThaw;                // the end of the latest deep winter
+  return L.gridLeft <= thawDay - 36;              // ...and the family was off the grid when it began (day 350)
+}
 /** Yearly risk of dying of old age. */
 export function oldAgeRisk(age: number, doctor: boolean): number {
   return Math.min(0.6, 0.00003 * Math.exp(0.095 * age)) * (doctor ? 1 : 2);
@@ -130,6 +170,7 @@ const pickName = (s: GameState, body: 'f' | 'm', r: () => number) => {
 
 const MILESTONES: Array<{ id: string; name: string; points: number; test: (s: GameState, years: number) => boolean }> = [
   { id: 'first_winter', name: 'First winter on the place', points: 10, test: (_, y) => y >= 1 },
+  { id: 'off_grid_winter', name: 'First winter off-grid', points: 25, test: s => winterOffGrid(s) },
   { id: 'a_home', name: 'A home of your own making', points: 10, test: s => s.structures.some(x => isFinished(x) && isHome(x.kind) && !x.pre) },
   { id: 'first_era', name: 'Came through the first era', points: 25, test: s => s.lineage.eras.length >= 1 },
   { id: 'three_eras', name: 'Three eras weathered', points: 75, test: s => s.lineage.eras.length >= 3 },
@@ -206,6 +247,9 @@ export function lineageDay(s: GameState): string[] {
     const mate = s.people.find(x => x.id === p.partner);
     if (mate) delete mate.partner;
   }
+  // the last adult gone and only children left: a neighbor household takes them in; the place is held for them until the eldest is 18
+  fosterOut(s, say, day);
+  if (wardsDay(s, doy, day, town, r, say)) for (const p of s.people) if (p.job) { const ps = s.personState.find(x => x.id === p.id); if (ps) ps.employed = true; }
   // partners: meet someone (from town, or a neighbor; after, a survivor), or pair with someone here who isn't kin
   const lawful = d.tracks.law >= 0.5;
   for (const p of s.people.filter(x => alive(s, x) && !x.kid && !x.elder && !x.partner && x.kin && x.age >= 20 && x.age <= 45)) {
@@ -258,6 +302,8 @@ export function lineageDay(s: GameState): string[] {
       say('birth', town ? `${p.first} and ${mate.first} adopted ${kid.first}.` : `${p.first} and ${mate.first} took in ${kid.first}, ${kid.age}, who had no one left.`);
     }
   }
+  // the yearly small threats of a world that has not come back (sim/threats.ts)
+  out.push(...threatsDay(s, say));
   // feeding yourselves (a streak, kept across eras)
   const f = s.food;
   L.selfFedDays = f.needKcal > 0 && f.producedKcal >= f.needKcal * 0.9 ? L.selfFedDays + 1 : 0;
@@ -274,7 +320,7 @@ export function lineageDay(s: GameState): string[] {
     if (L.selfFedDays >= 365) award(L, 'selfFed', 10);
   }
   // the score: a person-year a year for everyone here
-  award(L, 'years', s.people.filter(p => alive(s, p)).length / 365);
+  award(L, 'years', (s.people.filter(p => alive(s, p)).length + L.wards.length) / 365);
   // milestones
   const years = Math.floor(day / 365);
   for (const m of MILESTONES) if (!L.milestones.includes(m.id) && m.test(s, years)) {

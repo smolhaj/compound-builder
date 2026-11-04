@@ -170,9 +170,9 @@ describe('raids', () => {
 });
 
 describe('save', () => {
-  it('migrates v74 saves with an empty roles table', () => {
+  it('migrates v75 saves with an empty roles table', () => {
     const old = JSON.parse(JSON.stringify(newGame(2)));
-    delete old.quarters; old.version = 74;
+    delete old.quarters; old.version = 75;
     const m = migrate(old);
     expect(m.version).toBe(SAVE_VERSION);
     expect(m.quarters).toEqual({ roles: {} });

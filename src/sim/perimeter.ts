@@ -12,6 +12,7 @@
  */
 import { hasAll, shortfall, waitingFor, type MaterialId, type Stock } from './materials';
 import { log } from './economy';
+import { chronicleUpkeep } from './lineage';
 import { payUpkeep, wearTools, workSpeed } from './tools';
 import type { GameState } from './state';
 import { openDoorways } from './compounds';
@@ -409,6 +410,7 @@ export function addRunWork(s: GameState, r: PerimeterRun, hours: number): void {
       if (old) {
         for (const [k, q] of Object.entries(runBill(old.kind, wallLength(old))) as Array<[MaterialId, number]>) s.stock[k] += Math.floor(q * SALVAGE);
         s.perimeter = s.perimeter.filter(x => x.id !== old.id);
+        chronicleUpkeep(s, `The ${PERIMETER[old.kind].name.toLowerCase()} was upgraded to a ${d.name.toLowerCase()}.`);
         // a wall-top walkway rides on the new wall (the deck is lifted and set back on the new tier)
         for (const w of s.perimeter) if (w.hostId === old.id) w.hostId = r.id;
       }
