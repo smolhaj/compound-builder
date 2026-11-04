@@ -27,6 +27,8 @@ export interface GapOptions {
   merge?: number;
   /** Units added past each end so the deck rests on the rim. */
   pad?: number;
+  /** A dry gap wider than this is a valley the road grades down into and out of, not a bridge (m; water is always bridged). */
+  maxDryM?: number;
 }
 
 const U = 6;
@@ -55,6 +57,7 @@ export function findCountyGaps(hAt: (z: number) => number, wetAt: (z: number) =>
     i = j + 1;
   }
   const padN = Math.round(pad / step);
+  const maxDryM = o.maxDryM ?? 72;
   return runs.map(([a0, b0]) => {
     // the deck rests on the rims: out along the walls to where the ground meets the closing again
     let a = a0, b = b0;
@@ -64,7 +67,7 @@ export function findCountyGaps(hAt: (z: number) => number, wetAt: (z: number) =>
     let depth = 0, isWet = false;
     for (let i = a; i <= b; i++) { depth = Math.max(depth, env[i] - h[i]); if (wet[i]) isWet = true; }
     return { z0: z(i0), z1: z(i1), y0: h[i0], y1: h[i1], depth, wet: isWet, lengthM: (z(i1) - z(i0)) * U };
-  });
+  }).filter(g => g.wet || g.lengthM <= maxDryM);
 }
 
 /** The deck height at `z` over a gap: level between the rims, lifted to `minY` (the water surface plus clearance) when it would sag below it. */

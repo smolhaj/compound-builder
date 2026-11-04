@@ -106,8 +106,8 @@ import { pickCamp } from './parcel/campSpot';
 import { DRIVE_W, accessFromPlan, distToLine, type Access } from './region/access';
 import { ROAD_W, countyRoad, roadLine, type CountyRoad } from './region/countyRoad';
 import { buildRoadWorks, buildCountyBridges } from './region/roadWorks';
-import { deckY, findCountyGaps, onGap, type CountyGap } from '../sim/countyCrossings';
-import { roadPlanFor } from '../sim/roadState';
+import { deckY, onGap, type CountyGap } from '../sim/countyCrossings';
+import { countyGapsFor, roadPlanFor } from '../sim/roadState';
 import { pinSeed } from '../sim/lotSeed';
 import { PlowRun } from './fx/PlowRun';
 import { roadBedOf, type RoadPlan } from '../sim/roadPlan';
@@ -519,12 +519,7 @@ export class HomesteadWorld {
   }
 
   /** The county road's own bridges: where it crosses water or a cut, found from the ground and the creek. */
-  private _findCountyGaps(): CountyGap[] {
-    const par = this.parcel, cz = par.hasStream ? par.creek : null, ly = this.parcel.lakeY, cx = this.county.x;
-    const h = (z: number) => this.parcel.natural(cx(z), z).h;
-    const wet = (z: number) => { const x = cx(z); return (!!cz && Math.abs(cz.zAt(x) - z) < cz.halfWidth + 0.5) || (ly !== null && h(z) < ly + 0.05); };
-    return findCountyGaps(h, wet, -250, PARCEL_SIZE + 250);
-  }
+  private _findCountyGaps(): CountyGap[] { return countyGapsFor(this.parcel, this.county); }
   private _deckY(g: CountyGap, z: number): number {
     const cz = this.parcel.hasStream ? this.parcel.creek : null, ly = this.parcel.lakeY;
     const water = Math.max(cz ? cz.waterY(this.county.x(z)) : -Infinity, ly ?? -Infinity);

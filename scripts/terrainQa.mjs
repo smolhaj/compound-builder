@@ -38,6 +38,7 @@ for (const c of cases) {
       return out;
     });
     console.log(tag, JSON.stringify(info));
+    if (args.includes('--profile')) console.log(tag, 'profile', JSON.stringify(await page.evaluate(() => { const w = window.__cb.world, g = w.countyGaps.find(g => g.wet); if (!g) return null; const o = []; for (let z = g.z0 - 3; z <= g.z1 + 3; z += 2) { const x = w.county.x(z); o.push([z, +w.groundAt(x, z).toFixed(2), +w.countyY(x, z).toFixed(2), +w.parcel.creek.waterY(x).toFixed(2)]); } return o; })));
     if (noshots) continue;
     const shot = async name => { await page.evaluate(() => window.__cb.qa.renderNow()); await page.waitForTimeout(300); const f = `${outDir}/${tag}-${name}.png`; await page.screenshot({ path: f }); console.log(f); };
     // wide aerial: county road and the way in
@@ -53,13 +54,13 @@ for (const c of cases) {
     const gaps = await page.evaluate(() => window.__cb.world.countyGaps?.map(g => ({ z0: g.z0, z1: g.z1, wet: g.wet, depth: +g.depth.toFixed(2), m: Math.round(g.lengthM) })) ?? null);
     console.log(tag, 'countyGaps', JSON.stringify(gaps));
     const wet = await page.evaluate(() => { const w = window.__cb.world, c = w.parcel.creek; if (!w.parcel.hasStream) return null; for (let z = -60; z < 200; z += 0.5) { if (Math.abs(c.zAt(w.county.x(z)) - z) < 0.6) return z; } return null; });
-    const cz = gaps && gaps[0] ? (gaps[0].z0 + gaps[0].z1) / 2 : wet;
+    const gp = gaps && (gaps.find(g => g.wet && g.z0 > -120 && g.z1 < 220) ?? gaps.filter(g => g.z0 > -60 && g.z1 < 190)[0]), cz = gp ? (gp.z0 + gp.z1) / 2 : wet;
     if (cz !== null && cz !== undefined) {
       await page.evaluate(z => { const { world, cam } = window.__cb, x = world.county.x(z); cam.target.set(x, world.countyY(x, z), z); cam.radius = 26; cam.pitch = 0.8; cam.yaw = 2.2; }, cz);
       await shot('cross');
       await page.evaluate(z => { const { world, cam } = window.__cb, x = world.county.x(z); cam.target.set(x, world.countyY(x, z), z); cam.radius = 9; cam.pitch = 0.3; cam.yaw = 1.2; }, cz);
       await shot('crossclose');
-      await page.evaluate(z => { const { world, cam } = window.__cb; const zz = z - 9, x = world.county.x(zz) - 1.5; cam.placeEye(x, zz, world.county.x(z), z, 0.5); }, cz);
+      await page.evaluate(z => { const { world, cam } = window.__cb; const g0 = world.countyGaps.find(g => z >= g.z0 && z <= g.z1), zz = (g0 ? g0.z0 : z) - 7, x = world.county.x(zz) - 0.3; cam.placeEye(x, zz, world.county.x(z), z, 0.5); }, cz);
       await shot('crosseye');
     }
     // each structure of the plan, close

@@ -545,7 +545,7 @@ export function buildCountyBridges(gaps: readonly CountyBridgeIn[], ground: Grou
     for (let k = 1; k <= piers; k++) {
       const i = Math.round((k / (piers + 1)) * b), f = fr[i], floor = Math.min(ground(f.x, f.z), ground(f.x + f.nx * W * 0.4, f.z + f.nz * W * 0.4), ground(f.x - f.nx * W * 0.4, f.z - f.nz * W * 0.4));
       const top = pts[i].y - 0.07 - gd, hgt = top - floor + 0.05;
-      if (hgt > 0.3) stone.box('concrete', f.x, floor + hgt / 2 - 0.05, f.z, W * 0.8, hgt, 0.16, f.rot);
+      if (hgt > 0.3) stone.box('concrete', f.x, floor + hgt / 2 - 0.05, f.z, W * 0.8, hgt, 0.3, f.rot);
     }
   }
   parts.build(group); stone.build(group);
