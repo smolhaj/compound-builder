@@ -12,6 +12,7 @@ import { trialCamps, trialDay } from './trial';
 import {
   admitNewcomers, askQuestion, carryLines, carryOf, carryStrain, givePlace, loyaltyDelta, MAX_QUESTIONS, moveOut, neighborBrings, newcomerMorale, newcomersDay,
   newcomersOf, placeOptions, requestShelter, sendAway, strangerArrival,
+  homeGoodwill,
 } from './newcomers';
 
 function afterHit(seed = 1): GameState {
@@ -343,6 +344,11 @@ describe('neighbors', () => {
     expect(g.stock.canned).toBe(cans + 2);
     expect(home.disposition).toBeGreaterThan(disp + 10);
     expect(newcomersOf(g).guests[home.id]).toBeUndefined();
+  });
+  it('going home is remembered more the worse it was, and the log line says so', () => {
+    expect(homeGoodwill('fire')).toBeGreaterThan(homeGoodwill('storm'));
+    expect(homeGoodwill('storm')).toBeGreaterThan(homeGoodwill('warning'));
+    expect(homeGoodwill('fire')).toBeGreaterThanOrEqual(16);
   });
   it('refusing costs the household and the word gets round', () => {
     const g = afterHit();

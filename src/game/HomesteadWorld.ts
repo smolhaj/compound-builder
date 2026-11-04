@@ -2172,6 +2172,7 @@ export class HomesteadWorld {
     this.paths.update(game, performance.now());
     const ctx: GoalCtx = {
       camp: this.camp, site, home: homeB ? site(homeB.placed.id) : null, tree, yard: this.access.yard, sleepAt: i => sleepSpotFor(game, i), tentAt: n => this._tentPos[n],
+      entry: this.access.drive.length ? { x: this.access.drive[0][0], z: this.access.drive[0][1] } : undefined, today: dayIndex(game.clock.t),
       footing: (x, z) => walkFactor(this.paths.surfaceAt(x, z), this._underfoot), via: (fx, fz, tx, tz) => this._walkVia(fx, fz, tx, tz), doorWait: tag => this.doorWait(tag),
       ...dailyCtx(refs, game, this.access.yard, seasonState.params.cold < 0.35),
     };
