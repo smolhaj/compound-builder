@@ -91,12 +91,12 @@ export function slowHint(s: GameState, weeks: number | null, pace = paceOf(s), s
   if (weeks < slow) return null;
   const parts: string[] = [];
   if (pace.siteDays !== undefined) {
-    parts.push(`the family is on the place only about ${Math.round(pace.siteDays * 10) / 10} days a week (Friday night to Sunday afternoon, the holidays and three vacation weeks); the rest of the week goes to the jobs and the town house`);
-    parts.push('a hired crew works the weekdays while you are away (Projects: Hire a crew)');
-    parts.push('moving in full time (Family tab) puts everyone on the site seven days a week');
+    parts.push(`the family is on the place only about ${Math.round(pace.siteDays * 10) / 10} days a week`);
+    parts.push('hire a crew for the weekdays');
+    parts.push('or move in full time (Family tab)');
     return `Slow going: ${parts.join('; ')}.`;
   }
-  if (pace.employed.length) parts.push(`${pace.employed.join(' and ')} ${pace.employed.length > 1 ? 'work' : 'works'} in town on weekdays and build${pace.employed.length > 1 ? '' : 's'} only on weekends: quitting the job (Family tab) puts them on the site five more days a week`);
-  parts.push('a hired crew works weekdays on one building (Projects: Hire a crew)');
+  if (pace.employed.length) parts.push(`${pace.employed.join(' and ')} ${pace.employed.length > 1 ? 'work' : 'works'} in town, so building waits for weekends (quit the job in the Family tab)`);
+  parts.push('or hire a crew');
   return `Slow going: ${parts.join('; ')}.`;
 }
