@@ -308,7 +308,8 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
   // (round 4) hiding, debt and the trial camps
   const jt: JoinerTally = { admitted: 0, fellBack: 0, quarters: 0 };
   let hides = 0, hidFound = 0, owed = 0, debtStage = 'none', burned = 0, stripped = 0;
-  const trial = { started: 0, in: 0, on: 0, stole: 0, left: 0 };
+  const trial: { started: number; in: number; on: number; stole: number; left: number; fostered?: number } = { started: 0, in: 0, on: 0, stole: 0, left: 0 };
+  let nobodyHome = false;
   const seen = new Map<string, number>();
   observed = []; season = 0;
   // how each one was lost (read off their state the day it happened)
@@ -430,7 +431,9 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
     watchHarvest(s);
     tallyDeaths(false);
     // (checked after the day's tally; a death at the gate is tallied the next midnight)
-    if (livingCount(s) === 0 && !s.ending) bugs.push(`everyone is gone but the run goes on (day ${day}, ${s.disaster.phase})`);
+    // (a line whose children were fostered by a neighbor (sim/orphans.ts) has an empty roster but is alive: that is an outcome, not a bug)
+    if (livingCount(s) === 0 && !s.ending && (s.lineage.wards?.length ?? 0) > 0) { if (!nobodyHome) { nobodyHome = true; trial.fostered = day; } }
+    else if (livingCount(s) === 0 && !s.ending) bugs.push(`everyone is gone but the run goes on (day ${day}, ${s.disaster.phase})`);
     if (s.money - lastMoney - insured > 100_000) bugs.push(`money jumped $${Math.round(s.money - lastMoney).toLocaleString('en-US')} on day ${day}`);
     lastMoney = s.money;
     if (process.env.YEARLY && years && day % Number(process.env.YEARLY_EVERY ?? 91) === 0 && (!process.env.SEED || seed === Number(process.env.SEED))) {
@@ -505,7 +508,7 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
   const often = [...seen].filter(([, n]) => n >= 40).sort((a, b) => b[1] - a[1]).slice(0, 6);
   const jk = (k: StayKind) => joinersOf(s).stays.filter(x => x.kind === k).length;
   const joiners = process.env.STAY ? `${jt.admitted} adm, ${joinersOf(s).rigsParked} rigs, ${jk('modular')} mod, ${jk('own_build') + jk('player_build')} built, ${jt.quarters} qtr${jt.fellBack ? `, ${jt.fellBack} fell back` : ''}` : '-';
-  return { joiners, causes: [...causes].sort((a, b) => b[1] - a[1]).map(([k, n]) => `${n} ${k}`).join(', '), often, minMoney: Math.round(minMoney), site: `${s.site.lot ? s.site.lot.kind + ' ' + s.site.lot.elevM + ' m, ' : ''}${s.site.acres} ac ${s.site.creek ? 'creek' : s.site.spring ? 'spring' : 'dry'} ${s.site.gwDepth} m ${s.site.improvements.house ? s.site.improvements.house.kind + ' ' : 'raw '}$${Math.round(s.site.price / 1000)}k`, strat, kind, variant: s.disaster.variant, ending: s.ending?.kind ?? 'still going (2 yrs)', grade: r.grade, alive: `${alive}/${s.personState.filter(ps => !ps.needs.left).length}`, hungry: s.stats.hungryDays, days: s.stats.days, moneyAtHit, builtAtHit, bugs: [...new Set(bugs)].slice(0, 5), lines: r.lines, fights, prisoners: s.gate.prisoners?.length ?? 0, hides, hidFound, owed: Math.round(owed), debtStage, trials: [trial.started ? `${trial.started}: ${trial.in} in, ${trial.on} sent on, ${trial.stole} stole, ${trial.left} left` : '', newcomerNote(s)].filter(Boolean).join(' · ') || '-', stripped, burned, s };
+  return { joiners, causes: [...causes].sort((a, b) => b[1] - a[1]).map(([k, n]) => `${n} ${k}`).join(', '), often, minMoney: Math.round(minMoney), site: `${s.site.lot ? s.site.lot.kind + ' ' + s.site.lot.elevM + ' m, ' : ''}${s.site.acres} ac ${s.site.creek ? 'creek' : s.site.spring ? 'spring' : 'dry'} ${s.site.gwDepth} m ${s.site.improvements.house ? s.site.improvements.house.kind + ' ' : 'raw '}$${Math.round(s.site.price / 1000)}k`, strat, kind, variant: s.disaster.variant, ending: s.ending?.kind ?? (nobodyHome && livingCount(s) === 0 ? 'line alive, nobody home (fostered)' : 'still going (2 yrs)'), grade: r.grade, alive: `${alive}/${s.personState.filter(ps => !ps.needs.left).length}`, hungry: s.stats.hungryDays, days: s.stats.days, moneyAtHit, builtAtHit, bugs: [...new Set(bugs)].slice(0, 5), lines: r.lines, fights, prisoners: s.gate.prisoners?.length ?? 0, hides, hidFound, owed: Math.round(owed), debtStage, trials: [trial.started ? `${trial.started}: ${trial.in} in, ${trial.on} sent on, ${trial.stole} stole, ${trial.left} left` : '', newcomerNote(s)].filter(Boolean).join(' · ') || '-', stripped, burned, s };
 }
 
 describe.skipIf(process.env.PLAYTEST !== 'long')('the long game', () => {
