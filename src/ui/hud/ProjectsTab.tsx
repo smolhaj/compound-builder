@@ -10,7 +10,7 @@ import { CREW_RATE, CREW_SIZE, crewProblem, crewQuote } from '../../sim/crews';
 import { fixBill, fixBlocked, fixDef, pendingFixes } from '../../sim/improvements';
 import { KIT } from '../../game/buildkit/kit';
 import { ResidentsLine } from '../QuartersPanel';
-import { useSpendGuard } from './SpendConfirm';
+import { useSpendGuard } from './useSpendGuard';
 import { FIT, FUEL_UNIT_L, fitProblem, plant, serviceOf, UTILITY, SPARE_FOR } from '../../sim/utilities';
 import { HARDEN, HARDEN_IDS, type TierDef, hardenCost, hardenProblem, isBunkerRoom, protectionOf, tierOf } from '../../sim/hardening';
 import { PERIMETER, runBlocked, runFinished, runGrowth, runProgress } from '../../sim/perimeter';

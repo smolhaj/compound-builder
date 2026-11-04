@@ -6,7 +6,7 @@
 import { Fragment, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { MATERIALS, billText, type MaterialId } from '../sim/materials';
-import { useSpendGuard } from './hud/SpendConfirm';
+import { useSpendGuard } from './hud/useSpendGuard';
 import { usdShort } from '../sim/spendGuard';
 import { foodLine, orderCost, orderProblem, payWith, prices } from '../sim/economy';
 import { FOOD, KITS, kitUnits, lifeDays, pantryRows, SHOP_FOOD, type FoodItemId } from '../sim/pantry';

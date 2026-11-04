@@ -13,7 +13,7 @@ import { BLUEPRINTS, totalBill, totalHours } from '../../sim/blueprints';
 import { MATERIALS, billText, type MaterialId } from '../../sim/materials';
 import { orderCost, prices } from '../../sim/economy';
 import { crewQuote, CREW_RATE } from '../../sim/crews';
-import { useSpendGuard } from './SpendConfirm';
+import { useSpendGuard } from './useSpendGuard';
 import { drillExtra } from '../../sim/site';
 import { countyWorks, needsPermit, permitFee } from '../../sim/paperwork';
 import { BUNKER_ORDER, GATEHOUSE_ORDER, KIT, POD_ORDER, RIG_ORDER, TERRACE_ORDER, TOWER_ORDER, UTILITY_ORDER } from '../../game/buildkit/kit';
