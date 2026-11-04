@@ -55,7 +55,11 @@ export function findCountyGaps(hAt: (z: number) => number, wetAt: (z: number) =>
     i = j + 1;
   }
   const padN = Math.round(pad / step);
-  return runs.map(([a, b]) => {
+  return runs.map(([a0, b0]) => {
+    // the deck rests on the rims: out along the walls to where the ground meets the closing again
+    let a = a0, b = b0;
+    while (a > 0 && env[a - 1] - h[a - 1] > 0.05) a--;
+    while (b < n - 1 && env[b + 1] - h[b + 1] > 0.05) b++;
     const i0 = Math.max(0, a - padN), i1 = Math.min(n - 1, b + padN);
     let depth = 0, isWet = false;
     for (let i = a; i <= b; i++) { depth = Math.max(depth, env[i] - h[i]); if (wet[i]) isWet = true; }
