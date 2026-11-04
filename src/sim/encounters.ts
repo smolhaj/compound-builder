@@ -55,6 +55,7 @@ import { practice } from './skills';
 import { turbineNoise } from './renewables';
 import { villageWatch } from './outposts';
 import { resolveTrialEnd, startTrial, trialDay, type Character, type TrialCamp } from './trial';
+import { vetArrival } from './gateVetting';
 import { admitNewcomers, resolveShelter, strangerArrival, type Extras, type ShelterWhy } from './newcomers';
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -294,6 +295,10 @@ export interface GateState {
   history: Array<{ day: number; kind: EncounterKind; stance: Stance; tone: Outcome['tone'] }>;
   /** The last fight at the compound, for playback (optional; not migrated). */
   battle?: Battle;
+  /** Where the guards look arrivals over when the household holds several rings (sim/gateVetting.ts); absent: nowhere. */
+  vet?: import('./gateVetting').VetPolicy;
+  /** The looks made on this day (they tie up the guards: sim/gateVetting `vetAttention`). */
+  vetBusy?: { day: number; n: number };
   /** Raiders left wounded / dead on the drive after a fight the family won: a decision is waiting (sim/aftermath.ts). */
   aftermath?: Aftermath | null;
   /** Raiders held prisoner. */
@@ -679,6 +684,8 @@ export function resolve(s: GameState, stance: Stance): Outcome {
       // (round 4) a real trial: a camp outside the wall for a month, fed from the family's stores (sim/trial.ts)
       const o = startTrial(s, e);
       title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines);
+    } else if (stance === 'take_in' && (() => { const v = vetArrival(s, e.secret, mulberry32(s.seed * 5171 + e.day * 13 + (e.people?.length ?? 0))); if (!v.caught) return false; lines.push(...v.lines); g.turnedAway++; title = 'Turned back at the gate'; text = 'The guards looked them over before they were let through.'; tone = 'good'; return true; })()) {
+      // (per-ring vetting, sim/gateVetting.ts: a bad one caught at the outer or the inner gate is never admitted)
     } else if (stance === 'take_in') {
       // everyone who joins goes through sim/newcomers.ts: a bond (loyalty, hidden character), a bedroll, what they carry
       lines.push(...admitNewcomers(s, e.people ?? [], { kind: e.neighbor ? 'neighbor' : 'stranger', neighbor: e.neighbor, arche: e.arche, secret: e.secret, brings: e.brings, extras: e.extras, hurt: e.hurt, tells: e.tells, stay: e.stay, placeRig: e.placeRig }));

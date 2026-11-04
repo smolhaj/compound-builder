@@ -10,6 +10,7 @@ import type { Caliber } from '../sim/armory';
 import { STANCE } from './stanceText';
 import { ArrivalHousing } from './HousingPanel';
 import { vetting } from '../sim/ringFallback';
+import { canChoose, catchChance, vetDetail, vetLine, VET_POLICIES, type VetPolicy } from '../sim/gateVetting';
 import { jobOutlook, setKeepJobs } from '../sim/weekender';
 import { incomeOf, kinSavings } from '../sim/kin';
 import { Clamp, Hint } from './hud/common';
@@ -93,6 +94,14 @@ export function GateCard() {
         <div style={{ fontSize: 19, fontWeight: 700, margin: '2px 0 8px' }}>{e.title}</div>
         <Dossier e={e} />
         {e.kind === 'arrival' && (() => { const v = vetting(g.game).line; return v ? <div style={{ marginBottom: 4, opacity: 0.8, fontStyle: 'italic' }}>{v}</div> : null; })()}
+        {e.kind === 'arrival' && canChoose(g.game) && (() => {
+          const cur = g.game.gate.vet ?? 'none';
+          return <div data-testid="vet-line" style={{ margin: '4px 0', fontSize: 12, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }} title={[vetLine(g.game, cur), ...vetDetail(g.game)].join(' ')}>
+            <span style={{ opacity: 0.8 }}>Vet at:</span>
+            {VET_POLICIES.map((pol: VetPolicy) => <button key={pol} style={{ ...button(false), padding: '2px 8px', fontSize: 12, background: pol === cur ? '#d8c9a0' : '#3a3d34', color: pol === cur ? '#1c1d18' : '#eee' }} onClick={() => g.money(d => { d.gate.vet = pol; return null; })}>{pol === 'none' ? 'nowhere' : pol}</button>)}
+            {cur !== 'none' && <span style={{ opacity: 0.7 }}>catches {Math.round(catchChance(g.game, cur, 'sick') * 10)} in 10 fevers, {Math.round(catchChance(g.game, cur, 'thief') * 10)} thieves</span>}
+          </div>;
+        })()}
         {(e.kind === 'arrival' || e.kind === 'trial_end' || e.kind === 'kin') && !!e.people?.length && <StayPicker e={e} />}
         {(e.kind === 'arrival' || e.kind === 'trial_end' || e.kind === 'kin' || (e.kind === 'shelter' && !e.shelter?.settle)) && !!e.people?.length && <ArrivalHousing people={e.people} />}
         {(e.kind === 'arrival' || e.kind === 'kin' || e.kind === 'trial_end' || e.kind === 'shelter') && !!e.people?.length && !(e.shelter?.settle) && (() => {

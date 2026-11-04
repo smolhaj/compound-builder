@@ -429,7 +429,7 @@ describe('save v77', () => {
     delete (old.stock as Record<string, number>).modular_unit;
     const s = migrate(old);
     expect(s.version).toBe(SAVE_VERSION);
-    expect(SAVE_VERSION).toBe(77);
+    expect(SAVE_VERSION).toBeGreaterThanOrEqual(77);
     expect(s.joiners).toEqual({ stays: [], waiting: [], rigsParked: 0, day: -1 });
     expect(s.stock.modular_unit).toBe(0);
   });

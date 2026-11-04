@@ -1,6 +1,6 @@
 import { planProblem } from '../sim/construction';
 import { dropBridge, routeProblem } from '../sim/terrainFx';
-import { clearCollapse } from '../sim/corridors';
+import { clearCollapse, strandAway } from '../sim/corridors';
 import { dropRoadBridge, rebuildRoadBridge } from '../sim/roadFx';
 import { AFTERMATH_TEXT, joinPrisoner, releasePrisoner, resolveAftermath, type AftermathChoice } from '../sim/aftermath';
 import { dismissCrew, hireCrew } from '../sim/crews';
@@ -401,7 +401,7 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     if (locked()) return LOCKED_WHY;
     const g = structuredClone(get().game);
     const why = dropBridge(g, id);
-    if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); }
+    if (!why) { strandAway(g); set({ game: g }); void saveGame(AUTOSAVE, g); }
     return why;
   },
   clearCollapse: (id) => {

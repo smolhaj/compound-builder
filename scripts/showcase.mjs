@@ -117,6 +117,12 @@ const L = await page.evaluate(() => {
   return { tunnel: tun ? { a: tun.pts[0], b: tun.pts[tun.pts.length - 1] } : null, fall: f, up: Math.atan2(Math.cos(f), Math.sin(f)), camp: [w.camp.x, w.camp.z], center: [cx, cz], lodge: of('lodge')[0], garage: of('gate_garage')[0], court: of('motor_court')[0], greenhouse: of('greenhouse_heated')[0], gardens: of('garden'), orchard: of('orchard')[0], solar: of('solar_farm')[0], battery: of('battery_bank')[0], hatch: of('bunker_hatch')[0], towers: g.structures.filter(s => s.kind.startsWith('watchtower')).map(s => ({ id: s.id, x: s.x, z: s.z })), vehicles: (g.vehicles ?? []).length };
 });
 console.error(JSON.stringify(L));
+// --collapse: a sapper crew has brought the rock tunnel's portals down (sim/corridors collapseCorridor): the same shots show the rubble
+if (args.includes('--collapse') && L.tunnel) {
+  const why = await page.evaluate(async () => { const cb = window.__cb, { collapseCorridor } = await import('/src/sim/corridors.ts'); const g = structuredClone(cb.game.getState().game), id = g.perimeter.find(r => r.kind === 'rock_tunnel').id; const w = collapseCorridor(g, id, 'sappers'); cb.game.setState({ game: g }); return w; });
+  console.error('collapse:', why);
+  for (let i = 0; i < 8; i++) { await page.evaluate(() => window.__cb.qa.renderNow()); await page.waitForTimeout(150); }
+}
 
 // ── checks: the family walks between the posts; vehicles are parked; the frame budget ──────────────
 if (only.includes('checks')) {
@@ -259,6 +265,11 @@ if (only.includes('tunnel') && L.tunnel) {
   const sp2 = await eyeAt([bx, bz], Math.atan2(uz, ux) + 0.3, [3.6, 4.4, 3, 5], 0.3, 0.35);
   if (sp2) await shot('7d-eye-high-portal-in-the-compound');
   await orbit(18, 0.5, L.up + 2.4, bx, bz, 0.8); await shot('7e-aerial-high-portal-in-the-compound');
+}
+// the portal close up (with --collapse: the rubble heap): low orbits round the court-side portal from the court, and one aerial
+if (only.includes('portal') && L.tunnel) {
+  const [ax, az] = L.tunnel.a;
+  for (const [n, r, pitch, dy] of [['a', 6, 0.25, 0.5], ['b', 6, 0.25, -0.4], ['c', 10, 0.8, 0.2]]) { await orbit(r, pitch, L.up + dy, ax, az, 0.5); await shot(`9${n}-portal-${args.includes('--collapse') ? 'collapsed' : 'standing'}-${n}`); }
 }
 // tunnel use: the family walking the bore, a car driving through it, the doors, and the whole thing with the hill cut away
 if (only.includes('use') && L.tunnel) {
