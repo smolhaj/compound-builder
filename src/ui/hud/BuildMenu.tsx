@@ -21,6 +21,8 @@ import { hireCaretaker, openMoveIn, setBelt } from '../../sim/weekender';
 import { Clamp, Group, Hint, Item, Note, Tick } from './common';
 import { btn, card, DIM, FS, miniBtn, usd } from './style';
 import { operational, operationalCount } from '../../sim/operational';
+import { StarterCompound } from './StarterCompound';
+import { starterWanted } from '../../sim/starterCompound';
 import { WallProperty } from './WallProperty';
 import { FortifyRing } from './FortifyRing';
 import { PathsPanel } from './PathsPanel';
@@ -114,6 +116,7 @@ export function BuildMenu({ showProjects = () => undefined }: { showProjects?: (
       {ops.map(o => <Tick key={o.id} done={o.done} label={o.label} line={o.line}
         act={o.act ? { label: o.act.label, run: () => run(o.act!.act), off: o.act.act.type === 'order' ? (orderProblem(g.game, o.act.act.lines) ? 'Cannot order that now' : null) : null } : undefined} />)}
       {note && <Note>{note}</Note>}
+      <StarterCompound wanted={starterWanted(game)} first={!game.structures.some(s => !s.unplaced)} />
     </div>}
     {sug.length > 0 && !g.tool && <div style={card()}>
       <div style={{ fontSize: FS.h, textTransform: 'uppercase', letterSpacing: 0.6, color: DIM, fontWeight: 600 }} title="Suggestions from what the place lacks; nothing is locked">Next steps</div>

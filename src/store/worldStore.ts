@@ -5,6 +5,8 @@ import type { SeasonMode } from '../engine/world/season/seasonState';
 import type { WeatherMode } from '../engine/world/weather/weatherState';
 import type { TourCaption, TourMode } from '../engine/world/camera/TourController';
 import type { PropertyGeometry } from '../sim/propertyWall';
+import type { SiteQuery } from '../game/buildkit/kit';
+import type { StarterPlan } from '../sim/starterCompound';
 import type { BpReadout } from '../game/blueprint/blueprintPlan';
 import type { PathSummary } from '../game/paths/pathNet';
 import { autoStartTier } from '../engine/perf/device';
@@ -82,6 +84,12 @@ export interface WorldState {
   setHudHidden: (on: boolean) => void;
   /** Marks the n nearest trees to the yard for felling (set by the canvas; returns how many were marked). */
   markNearestTrees: ((n: number) => number) | null;
+  /** What the placement rules ask of the ground (height, owned, water, camp and road): the starter-compound planner reads it. Set by the canvas. */
+  siteQuery: SiteQuery | null;
+  setSiteQuery: (q: SiteQuery | null) => void;
+  /** The starter compound shown as a ghost preview (null: none). */
+  starterPreview: StarterPlan | null;
+  setStarterPreview: (p: StarterPlan | null) => void;
   setMarkNearestTrees: (f: ((n: number) => number) | null) => void;
   setSightMode: (m: WorldState['sightMode']) => void;
   setBuildingView: (v: BuildingView) => void;
@@ -153,6 +161,10 @@ export const useWorldStore = create<WorldState>()(subscribeWithSelector((set) =>
   hudHidden: false,
   setHudHidden: (hudHidden) => set({ hudHidden }),
   markNearestTrees: null,
+  siteQuery: null,
+  setSiteQuery: (siteQuery) => set({ siteQuery }),
+  starterPreview: null,
+  setStarterPreview: (starterPreview) => set({ starterPreview }),
   setMarkNearestTrees: (markNearestTrees) => set({ markNearestTrees }),
   setSightMode: (sightMode) => set({ sightMode }),
   setTerrainMode: (terrainMode) => set({ terrainMode }),
