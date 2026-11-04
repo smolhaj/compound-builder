@@ -89,3 +89,16 @@ export function stairRuns(line: readonly Pt[], height: (x: number, z: number) =>
   close();
   return out;
 }
+
+/**
+ * Height of the walker on the stair or ramp that leads up to a raised floor (the stilted house's deck, a high porch): the floor itself at the
+ * porch edge (`d` = 0), the ground `run` units out (and beyond), eased between so nobody pops up the whole rise as they step in.
+ * The run grows with the rise (a stair of about 1:1.6 rise to run, at least 0.12 u, at most 0.9 u).
+ */
+export function entryRampHeight(floor: number, ground: number, d: number): number {
+  const rise = Math.abs(floor - ground);
+  if (rise < 0.03) return floor;
+  const run = Math.min(0.9, Math.max(0.12, rise * 1.6));
+  const t = Math.min(1, Math.max(0, 1 - d / run));
+  return ground + (floor - ground) * (t * t * (3 - 2 * t));
+}

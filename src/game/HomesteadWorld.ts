@@ -29,7 +29,7 @@ import { LivedLayer } from './lived/LivedLayer';
 import type { Mode } from './lived/livedPlan';
 import { lightsOutNow } from '../sim/blackout';
 import type { NetWorld } from './paths/pathNet';
-import { WALK_CLIFF, walkRoute } from './paths/walkRoute';
+import { WALK_CLIFF, entryRampHeight, walkRoute } from './paths/walkRoute';
 import { CorridorNet } from './paths/CorridorNet';
 import type { Wp } from './paths/linkRoute';
 import { CorridorDoors } from './perimeter/CorridorDoors';
@@ -2255,6 +2255,8 @@ export class HomesteadWorld {
       // a stair or a ramp: up the steps (or the grade) from its low end
       if (def.climbs) { if (Math.abs(lx) < hw && Math.abs(lz) < hd) return b.padY + treadHeight(b.placed.kind, b.opts.rise ?? 0, def.cellsZ * CELL, lz); continue; }
       if (Math.abs(lx) < hw && lz > -hd && lz < hd + def.porch && def.floorY > 0.02) return b.padY + def.floorY;
+      // the steps down off the deck: ease from the floor to the ground instead of dropping the whole rise at the edge
+      if (def.floorY > 0.1 && Math.abs(lx) < hw && lz >= hd + def.porch && lz < hd + def.porch + 0.9) return entryRampHeight(b.padY + def.floorY, this.groundAt(x, z), lz - hd - def.porch);
       // a building whose floor is its graded pad (greenhouse gravel, a garage slab): stand on the pad, not the raw slope under it
       if (Math.abs(lx) < hw && Math.abs(lz) < hd && def.category !== 'bunker' && (def.category !== 'food' || b.placed.kind === 'greenhouse' || b.placed.kind === 'greenhouse_heated' || b.placed.kind === 'sheep_barn')) return b.padY + Math.max(0, def.floorY);
     }
