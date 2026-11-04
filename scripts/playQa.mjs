@@ -51,7 +51,7 @@ const click = async (re, opts = {}) => { const b = page.getByRole('button', { na
 
 /** The charter, by its buttons. */
 async function wizard({ region, difficulty, lotPick = 'first', mode = 'Surprise', kin = 0, scenario: sc, extra }) {
-  await page.goto(`http://localhost:${port}/?lowrender`);
+  await page.goto(`http://localhost:${port}/?new&lowrender`);
   await page.getByText('1. Region').waitFor();
   await page.waitForFunction(() => window.__cb?.qa?.lowrender);
   await page.evaluate(() => { try { localStorage.clear(); } catch {} });

@@ -6,6 +6,7 @@ import { resolve } from './encounters';
 import { mastheadOf, MASTHEADS } from './report';
 import { slowHint, paceOf } from './pace';
 import { REGION_IDS } from './regions';
+import { step } from './engine';
 
 function awayGame() {
   const g = newGame(7, 105, 2027, { mode: 'scenario', peace: 'short', kind: 'grid_down' });
@@ -26,6 +27,16 @@ describe('nobody home (line alive, children fostered)', () => {
     const g = awayGame();
     for (let i = 0; i < 365; i++) { g.clock.t += 1; expect(gateDay(g)).toBeNull(); }
     expect(g.gate.pending).toBeNull();
+  });
+  it('queues no card of any kind (kin, neighbors asking to join) through four game years of the real engine', () => {
+    let g = awayGame();
+    g.clock.t = g.disaster.hitAt + 40;
+    for (let i = 0; i < 4 * 365 / 5; i++) {
+      g = step(g, 5);
+      if (!nobodyHome(g)) break;
+      expect(g.gate.pending?.kind ?? null).toBeNull();
+      expect(g.gate.card).toBeNull();
+    }
   });
   it('taking in a stranger is refused', () => {
     const g = awayGame();
