@@ -402,8 +402,8 @@ function slab(parts: Parts, fr: readonly Frame[], plan: RoadPlan, a: number, b: 
 
 // ── a one-lane bridge: plank deck on two steel girders, stone abutments, a rail each side ──
 
-function bridge(parts: Parts, stone: Parts, fr: readonly Frame[], plan: RoadPlan, a: number, b: number, ground: Ground, big: boolean, down: boolean): void {
-  const W = big ? 0.78 : 0.62;
+function bridge(parts: Parts, stone: Parts, fr: readonly Frame[], plan: RoadPlan, a: number, b: number, ground: Ground, big: boolean, down: boolean, deckW?: number): void {
+  const W = deckW ?? (big ? 0.78 : 0.62);
   for (let i = a; !down && i < b; i++) {
     const p = fr[i], q = fr[i + 1], len = Math.hypot(q.x - p.x, q.z - p.z), y = (plan.pts[i].y + plan.pts[i + 1].y) / 2, rot = Math.atan2(q.x - p.x, q.z - p.z);
     const mx = (p.x + q.x) / 2, mz = (p.z + q.z) / 2, nx = Math.cos(rot), nz = -Math.sin(rot);
@@ -520,3 +520,34 @@ function cairn(stone: Parts, f: Frame, ground: Ground): void {
   stone.box('fieldstone', x, y + 0.108, z, 0.04, 0.025, 0.04, f.rot);
 }
 
+
+// ── the county road over a creek, a ravine or a gorge: a two-lane deck on girders (deeper for a long span), stone abutments, piers where the floor is far below ──
+
+export interface CountyBridgeIn { z0: number; z1: number; deckY: (z: number) => number; x: (z: number) => number; width: number }
+
+export function buildCountyBridges(gaps: readonly CountyBridgeIn[], ground: Ground, step = 0.5): THREE.Group {
+  const group = new THREE.Group();
+  group.name = 'countybridges';
+  const parts = new Parts(), stone = new Parts();
+  for (const g of gaps) {
+    const pts: RoadPlan['pts'] = [];
+    for (let z = g.z0, s = 0; z <= g.z1 + 1e-6; z += step, s += step) pts.push({ x: g.x(z), z, y: g.deckY(z), s, bank: 0 });
+    if (pts.length < 3) continue;
+    const plan = { pts } as RoadPlan, fr = frames(plan), a = 0, b = pts.length - 1, W = g.width + 0.12;
+    bridge(parts, stone, fr, plan, a, b, ground, true, false, W);
+    // a deeper girder under a long span, and piers down to the floor every ~8 units where it is far below
+    const len = (g.z1 - g.z0), gd = Math.min(0.5, Math.max(0.1, len * 0.012));
+    if (gd > 0.12) for (const sd of [-1, 1]) for (let i = 0; i < b; i++) {
+      const p = fr[i], q = fr[i + 1], y = (pts[i].y + pts[i + 1].y) / 2, rot = Math.atan2(q.x - p.x, q.z - p.z);
+      parts.box('rust', (p.x + q.x) / 2 + Math.cos(rot) * sd * W * 0.34, y - 0.07 - gd / 2, (p.z + q.z) / 2 - Math.sin(rot) * sd * W * 0.34, 0.03, gd, Math.hypot(q.x - p.x, q.z - p.z) + 0.02, rot);
+    }
+    const piers = Math.max(0, Math.round(len / 8) - 1);
+    for (let k = 1; k <= piers; k++) {
+      const i = Math.round((k / (piers + 1)) * b), f = fr[i], floor = Math.min(ground(f.x, f.z), ground(f.x + f.nx * W * 0.4, f.z + f.nz * W * 0.4), ground(f.x - f.nx * W * 0.4, f.z - f.nz * W * 0.4));
+      const top = pts[i].y - 0.07 - gd, hgt = top - floor + 0.05;
+      if (hgt > 0.3) stone.box('concrete', f.x, floor + hgt / 2 - 0.05, f.z, W * 0.8, hgt, 0.16, f.rot);
+    }
+  }
+  parts.build(group); stone.build(group);
+  return group;
+}
