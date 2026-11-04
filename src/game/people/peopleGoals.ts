@@ -48,6 +48,10 @@ export interface GoalCtx {
   via?: (fx: number, fz: number, tx: number, tz: number) => ReadonlyArray<Wp>;
   /** Real seconds someone with a key waits at a corridor's door point (`tag` from game/paths/linkRoute): 0 when it stands open. */
   doorWait?: (tag: number, x: number, z: number) => number;
+  /** Where the drive meets the road: newcomers walk in from here, leavers walk out to it (game/people/gateWalk). */
+  entry?: { x: number; z: number };
+  /** The sim's day index (newcomers of today walk in). */
+  today?: number;
   /** The yard position of dome tent `n` (props/TentsRenderer). */
   tentAt?: (n: number) => { x: number; z: number } | undefined;
 }
