@@ -869,4 +869,6 @@ SETS.defenseExtras = [
   { name: 'yard-aerial-outside-moat', time: 13, season: 'summer', setup: yardOut + atCampV(40, 0.9, 0.3) + "{ const c = cb.world.camp; cb.cam.target.set(c.x - 2, 0, c.z + 12); }", cam: D, frames: 24 },
   { name: 'yard-close-aerial', time: 13, season: 'summer', setup: yardOut + atVYard(9, 0.7, 0.5), cam: D, frames: 24 },
   { name: 'yard-eye-level-person', time: 15, season: 'summer', setup: yardOut + personVYard(1.0, -5.0) + eyeVYard(3.2, -8.2, 0.2, -1.5), cam: D, frames: 24 },
+  { name: 'moat-meets-creek-aerial', time: 12, season: 'summer', setup: moatBridge + "{ const c = cb.world.camp; cb.cam.target.set(c.x + 6, 0, c.z - 12); cb.cam.radius = 12; cb.cam.pitch = 0.75; cb.cam.yaw = 0.3; }", cam: D, frames: 24 },
+  { name: 'moat-meets-creek-eye-level', time: 15, season: 'summer', setup: moatBridge + personAt(1.5, -9.5) + eyeAt(-3.5, -4.5, 6, -12.5, 0.3), cam: D, frames: 24 },
 ];

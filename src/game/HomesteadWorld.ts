@@ -896,7 +896,7 @@ export class HomesteadWorld {
       const tunnel = r.kind === 'escape_tunnel' || r.kind === 'underground_passage';
       const group = tunnel
         ? buildTunnel(this._pathOf(r), this.groundAt, r.finishedAt !== null ? 1 : runProgress(r), this._exitWoods(r), r.kind === 'underground_passage' ? { woodsStart: this.tunnelExitWoods(r.pts[0][0], r.pts[0][1]) } : undefined)
-        : buildRun(r, this.groundAt, t, (x, z) => this.onBuilding(x, z, 0.02, false), { lit, sensors, hostKind: PERIMETER[r.kind].wallTop ? runs.find(x => x.id === r.hostId)?.kind : undefined, hostRazor: hostRazor(r), deck: deckOn(r), moat: opts.moats?.[r.id] });
+        : buildRun(r, this.groundAt, t, (x, z) => this.onBuilding(x, z, 0.02, false), { lit, sensors, hostKind: PERIMETER[r.kind].wallTop ? runs.find(x => x.id === r.hostId)?.kind : undefined, hostRazor: hostRazor(r), deck: deckOn(r), moat: opts.moats?.[r.id], creek: this.parcel.creek });
       if (tunnel) this._applyTunnelView(group);
       if (lean > 0) leanRun(group, lean, hashStr(r.id) % 997, this.groundAt);
       this._root.add(group);
@@ -904,7 +904,7 @@ export class HomesteadWorld {
       this._ws.invalidateShadows();
     }
     // earthworks (berms raise, ditches cut) as they are dug
-    const works: Earthwork[] = runs.filter(r => r.kind === 'earth_berm' || r.kind === 'ditch' || r.kind === 'moat').map(r => ({ pts: r.pts, gates: r.gates, height: PERIMETER[r.kind].height, ...(r.kind === 'moat' ? { wide: 2.2 } : {}), k: r.finishedAt !== null ? 1 : runProgress(r) }));
+    const works: Earthwork[] = runs.filter(r => r.kind === 'earth_berm' || r.kind === 'ditch' || r.kind === 'moat').map(r => ({ pts: r.pts, gates: r.gates, height: PERIMETER[r.kind].height, ...(r.kind === 'moat' ? { wide: 2.2, creekSkip: true } : {}), k: r.finishedAt !== null ? 1 : runProgress(r) }));
     // a tunnel is cut and covered: an open trench along it while the culvert goes in
     for (const r of runs) if ((r.kind === 'escape_tunnel' || r.kind === 'underground_passage') && r.finishedAt === null && (r.supplied || r.done > 0)) works.push({ pts: r.pts.slice(), gates: [], height: -0.33, k: 1 });
     const wk = works.map(w => `${w.pts.length}:${Math.round(w.k * 20)}`).join('|');

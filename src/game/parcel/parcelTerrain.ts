@@ -65,6 +65,8 @@ export interface Earthwork {
   bbox?: [number, number, number, number];
   /** Widens a ditch's profile (a moat is about twice a ditch across). */
   wide?: number;
+  /** A moat: no cut where the creek is (the creek is the moat there). */
+  creekSkip?: boolean;
 }
 
 /**
@@ -78,6 +80,8 @@ export interface Pit { x0: number; z0: number; x1: number; z1: number; floor: nu
 export const pitReach = (depth: number) => depth * 1.0 + 0.05;
 
 const BERM_HALF_BASE = 0.34, BERM_HALF_TOP = 0.08, DITCH_HALF_TOP = 0.26, DITCH_HALF_BOT = 0.08;
+/** A moat's cut stops this far (world units) outside the creek's water line: the bank. */
+export const CREEK_MOAT_MARGIN = 2.5;
 export const earthworkReach = (w: Earthwork) => (w.height > 0 ? BERM_HALF_BASE : DITCH_HALF_TOP * (w.wide ?? 1)) + 0.02;
 
 function polyBox(pts: ReadonlyArray<[number, number]>, pad: number): [number, number, number, number] {
@@ -514,6 +518,7 @@ export class ParcelTerrain {
     for (const w of this._works) {
       const b = w.bbox!;
       if (x < b[0] || x > b[2] || z < b[1] || z > b[3]) continue;
+      if (w.creekSkip && Math.abs(z - this.creek.zAt(x)) < this.creek.halfWidth + CREEK_MOAT_MARGIN) continue;
       const dy = earthworkOffset(w, x, z);
       if (dy !== 0) { s.h += dy; s.forest = 0; }
     }

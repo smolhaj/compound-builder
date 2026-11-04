@@ -168,14 +168,17 @@ export function moatFx(s: GameState, c: Pt, ang: number, night: boolean, detecti
   }
   if (!best) return null;
   const { m, at } = best;
+  // where the line meets the creek the creek itself is the moat: full water, whatever the ditch holds
+  const cr = groundOf(s)?.creek;
+  const lvl = cr && Math.abs(at[1] - cr.zAt(at[0])) < cr.halfWidth + 2.5 ? 1 : m.level;
   const ice = m.frozen;
   // the ways over it: a bridge (single file, held at its plank gate) or a gap left in the ditch for the drive (a causeway: the walk and the file, no gate)
   const ways: Array<{ at: Pt; hold: number }> = standingBridges(s).filter(b => b.over === 'moat' && b.moat === m.run.id).map(b => ({ at: b.mid, hold: WATER.FUNNEL_S + doorDelay(night, detection) }));
   for (const g of m.run.gates) ways.push({ at: pointAt(m.run.pts, g.at), hold: WATER.FUNNEL_S });
   const way = ways.map(w => ({ ...w, total: Math.min(WATER.DETOUR_CAP_S, Math.hypot(w.at[0] - at[0], w.at[1] - at[1]) * 6 / WATER.WALK_MPS) + w.hold })).sort((x, y) => x.total - y.total)[0];
-  if (way) return { holdS: way.total, hazard: null, bridged: true, frozen: ice, level: m.level };
-  const k = m.level * (ice ? WATER.ICE_HOLD : 1);
-  return { holdS: WATER.CROSS_S * k, hazard: { p: WATER.WADE_P * m.level * (ice ? WATER.ICE_HAZ : 1), min: WATER.HAZ_MIN, max: WATER.HAZ_MAX, what: ice ? 'thin ice' : 'cold water' }, bridged: false, frozen: ice, level: m.level };
+  if (way) return { holdS: way.total, hazard: null, bridged: true, frozen: ice, level: lvl };
+  const k = lvl * (ice ? WATER.ICE_HOLD : 1);
+  return { holdS: WATER.CROSS_S * k, hazard: { p: WATER.WADE_P * lvl * (ice ? WATER.ICE_HAZ : 1), min: WATER.HAZ_MIN, max: WATER.HAZ_MAX, what: ice ? 'thin ice' : 'cold water' }, bridged: false, frozen: ice, level: lvl };
 }
 
 /** Plain words for the Defense tab: each moat's fill and each bridge's crossing. */

@@ -81,7 +81,7 @@ export function offsetPts(pts: readonly Pt[], d: number): Pt[] {
  * `under` says whether a point is under a building: pipe and cable trenches
  * stop at its wall and their marker posts stand outside it.
  */
-export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (x: number, z: number) => boolean = () => false, opts: { /** A moat's water: how full (0-1) and whether it is ice (sim/waterWorks). */ moat?: { level: number; frozen: boolean }; lit?: boolean; sensors?: boolean; hostKind?: PerimeterKind; /** The host wall carries razor wire (drawn on the deck's outer rail). */ hostRazor?: boolean; /** A patrol deck rides on this wall (its wire is drawn on the deck). */ deck?: boolean } = {}): THREE.Group {
+export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (x: number, z: number) => boolean = () => false, opts: { /** The creek: a moat's water stops at its banks. */ creek?: { zAt(x: number): number; halfWidth: number }; /** A moat's water: how full (0-1) and whether it is ice (sim/waterWorks). */ moat?: { level: number; frozen: boolean }; lit?: boolean; sensors?: boolean; hostKind?: PerimeterKind; /** The host wall carries razor wire (drawn on the deck's outer rail). */ hostRazor?: boolean; /** A patrol deck rides on this wall (its wire is drawn on the deck). */ deck?: boolean } = {}): THREE.Group {
   const lit = opts.lit ?? true;
   // an upgrade of a finished run is drawn beside the old tier (not on top of it) until it is done and the old one comes down
   const run = run0.replaces ? { ...run0, pts: offsetPts(run0.pts, (run0.replacesKind === 'container_wall' || run0.replacesKind === 'container_stack') ? 0.36 : UPGRADE_OFFSET) } : run0;
@@ -670,16 +670,20 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
       const lv = Math.min(1, mo.level), hw = 0.2 + 0.22 * lv, lift = 0.22 + 0.06 * lv, wm: KitMaterialId = mo.frozen ? 'whitewash' : 'pond_water';
       for (const [s0, s1] of spans) {
         const n = Math.max(1, Math.ceil((s1 - s0) / 0.35));
-        const pos: number[] = [], idx: number[] = [];
+        let pos: number[] = [];
+        const flush = () => {
+          const idx: number[] = [];
+          for (let k = 0; k + 1 < pos.length / 6; k++) idx.push(k * 2, k * 2 + 1, k * 2 + 2, k * 2 + 1, k * 2 + 3, k * 2 + 2);
+          if (idx.length) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); add(wm, g); }
+          pos = [];
+        };
         for (let i = 0; i <= n; i++) {
           const q = along(run.pts, s0 + (s1 - s0) * i / n), y = ground(q.x, q.z) + lift;
+          // where the line meets the creek, the creek is the moat: no second ribbon over its water or banks
+          if (opts.creek && Math.abs(q.z - opts.creek.zAt(q.x)) < opts.creek.halfWidth + 2.5) { flush(); continue; }
           pos.push(q.x + q.dz * hw, y, q.z - q.dx * hw, q.x - q.dz * hw, y, q.z + q.dx * hw);
-          if (i > 0) { const k = (i - 1) * 2; idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); }
         }
-        const g = new THREE.BufferGeometry();
-        g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-        g.setIndex(idx); g.computeVertexNormals();
-        add(wm, g);
+        flush();
       }
       break;
     }
