@@ -13,6 +13,8 @@ import { vetting } from '../sim/ringFallback';
 import { jobOutlook, setKeepJobs } from '../sim/weekender';
 import { incomeOf, kinSavings } from '../sim/kin';
 import { Clamp, Hint } from './hud/common';
+import { StayPicker } from './StayPicker';
+import { defaultStay, kitDetail, kitLine } from '../sim/joinerHome';
 
 
 /** The end of a month's trial. */
@@ -57,14 +59,18 @@ function Dossier({ e }: { e: NonNullable<ReturnType<typeof useGameStore.getState
     const meds = e.people.some(p => p.conditions?.length);
     const facts = [!e.kin?.late && month > 0 ? `${usd(month)}/mo coming in` : '', !e.kin?.late && savings > 0 ? `${usd(savings)} savings` : '', `${e.people.length} more to feed`, meds ? 'daily medicine' : ''].filter(Boolean).join(' · ');
     const money = (l: string) => /^Brings about|more to feed/.test(l);
-    const who = lines.filter((l, i) => i > 0 && !money(l));
+    const who = lines.filter((l, i) => i > 0 && !money(l) && !l.startsWith('Brings: '));
+    const kitEx = { ...(e.extras ?? {}), cash: e.kin?.late ? 0 : savings };
     return <>
       <div style={{ marginBottom: 6, opacity: 0.9 }}>{lines[0]}</div>
       <div data-testid="kin-facts" style={{ fontSize: 12.5, fontWeight: 600, color: '#d8c9a0' }} title={lines.filter(money).join(' ')}>{facts}</div>
+      <Hint more={kitDetail(e.brings, kitEx, e.people).map((l, i) => <div key={i}>{l}</div>)}>Brings: {kitLine(e.brings, kitEx, e.people)}.</Hint>
       {who.length > 0 && <Hint more={who.map((l, i) => <div key={i} style={{ marginBottom: 2 }}>{l}</div>)}>{e.people.map(p => p.first).join(' and ')}: who they are, what they can do.</Hint>}
     </>;
   }
-  return <>{lines.map((l, i) => i === 0 ? <div key={i} style={{ marginBottom: 4, opacity: 0.9 }}>{l}</div> : <div key={i} style={{ marginBottom: 3 }}><Clamp text={l}>{l}</Clamp></div>)}</>;
+  return <>{lines.map((l, i) => i === 0 ? <div key={i} style={{ marginBottom: 4, opacity: 0.9 }}>{l}</div>
+    : l.startsWith('Brings: ') && e.people?.length ? <div key={i} data-testid="brings"><Hint more={kitDetail(e.brings, e.extras, e.people).map((d, j) => <div key={j}>{d}</div>)}>{`Brings: ${kitLine(e.brings, e.extras, e.people)}.`}</Hint></div>
+    : <div key={i} style={{ marginBottom: 3 }}><Clamp text={l}>{l}</Clamp></div>)}</>;
 }
 
 /** Someone at the gate: the dossier and the stances (the game is paused); then what happened. */
@@ -79,7 +85,7 @@ export function GateCard() {
     const p = postureOf(g.game);
     // honest odds: the battle sim itself, a couple of dozen times (cached per encounter)
     const odds = e.strength > 0 && e.kind !== 'break_in' && e.stances.includes('defend') ? fightOdds(g.game, e) : null;
-    const label = (st: Stance) => (e.ransom && RANSOM[st]) || (e.kind === 'trial_end' && TRIAL_END[st]) || (e.kind === 'shelter' && SHELTER[st]) || STANCE[st];
+    const label = (st: Stance) => (e.kind === 'kin' && st === 'take_in' && defaultStay(g.game, e) === 'player_build' && STANCE.build_first) || (e.ransom && RANSOM[st]) || (e.kind === 'trial_end' && TRIAL_END[st]) || (e.kind === 'shelter' && SHELTER[st]) || STANCE[st];
     const picked = cut ? cut.stance ?? e.stances[0] : null;
     return (
       <div style={cut ? raidBox : box}>
@@ -87,6 +93,7 @@ export function GateCard() {
         <div style={{ fontSize: 19, fontWeight: 700, margin: '2px 0 8px' }}>{e.title}</div>
         <Dossier e={e} />
         {e.kind === 'arrival' && (() => { const v = vetting(g.game).line; return v ? <div style={{ marginBottom: 4, opacity: 0.8, fontStyle: 'italic' }}>{v}</div> : null; })()}
+        {(e.kind === 'arrival' || e.kind === 'trial_end' || e.kind === 'kin') && !!e.people?.length && <StayPicker e={e} />}
         {(e.kind === 'arrival' || e.kind === 'trial_end' || e.kind === 'kin' || (e.kind === 'shelter' && !e.shelter?.settle)) && !!e.people?.length && <ArrivalHousing people={e.people} />}
         {(e.kind === 'arrival' || e.kind === 'kin' || e.kind === 'trial_end' || e.kind === 'shelter') && !!e.people?.length && !(e.shelter?.settle) && (() => {
           const c = carryOf(g.game, e.people!), lines = carryLines(c);
@@ -126,7 +133,7 @@ export function GateCard() {
           {e.stances.includes('hide') && <div>If you hide: they find the place lived in {inTen(hideFoundChance(g.game, e, p))}, and strip it</div>}
         </div>}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
-          {e.stances.map((st, i) => (
+          {e.stances.filter(st => !(e.kind === 'kin' && st === 'build_first')).map((st, i) => (
             <button key={st} style={cut ? { ...button(st === picked), outline: st === picked ? '2px solid #d8c9a0' : undefined, background: st === picked ? '#4a4a3c' : '#2e302a', color: '#eee' } : button(i === 0)} title={label(st)[1]} onClick={() => (cut ? g.chooseStance(st) : g.answer(st))}>
               <div style={{ fontWeight: 600 }}>{label(st)[0]}</div>
               <div style={{ fontSize: 11.5, opacity: 0.75, ...CLAMP2 }}>{label(st)[1]}</div>
