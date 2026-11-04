@@ -40,6 +40,7 @@ import { roadClosedFor, winterRoadLine } from '../sim/slope';
 import { roadLine } from '../sim/roadFx';
 import { crossingLine } from '../sim/roadWildlife';
 import { roadPlanOf } from '../sim/roadState';
+import { SaveMenu } from './SaveMenu';
 import { EntranceCard } from './hud/EntranceCard';
 import { PlowNote } from './hud/PlowNote';
 import { DRIVE_PER_FT, driveQuote, hookupProblem, POLE_PER_FT, powerQuote } from '../sim/improvements';
@@ -164,6 +165,7 @@ export function Hud() {
         {(game.fin.debt?.owed ?? 0) > 0.5 && <span style={{ fontWeight: 600, color: game.fin.debt!.stage === 'card' ? TONE.warn : TONE.bad }} title={game.disaster.tracks.banks < 0.5 ? 'The banks are gone: nobody is collecting' : `Owed on the card at 24 %${game.fin.debt!.lien ? ', with a judgment lien on the land' : ''} (Shop & money → Accounts)`}>owe {usd(game.fin.debt!.owed)}</span>}
         <button style={btn()} title="Town, the catalog, your accounts, gold and silver" onClick={() => g.openShop(true)}>Shop & money</button>
         <button style={btn()} title="New game" onClick={() => g.openSetup(true, true)}>New</button>
+        <SaveMenu />
         <span style={{ display: 'flex', gap: 3 }}>
           {SPEEDS.map(([s, label]) => <button key={s} style={btn(game.clock.speed === s)} onClick={() => g.setSpeed(s)}>{label}</button>)}
         </span>
