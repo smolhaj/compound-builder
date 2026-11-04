@@ -19,6 +19,7 @@
  *             gate (`watchDetection`, read by encounters.ts / battle.ts) and
  *             the atmosphere layer's flashlights.
  */
+import { vetAttention } from './gateVetting';
 import { dogCount } from './pets';
 import { calendarOf, dayIndex, hourOf, type GameState, type PersonState, type TaskKind } from './state';
 import { isFinished } from './construction';
@@ -951,7 +952,7 @@ export function watchDetection(s: GameState): number {
   let sum = 0;
   const owl = w.length ? chronotypes(s) : {};
   w.forEach((x, k) => { sum += ((k === 0 ? 10 : k === 1 ? 6 : 2) + (owl[x.id] === 'owl' ? 1.5 : 0)) * x.alert * (x.post === 'tower' ? 1.2 : x.post === 'console' ? CONSOLE_EYES : x.walk ? 1.1 : 1); });
-  return Math.min(20, sum);
+  return Math.max(0, Math.min(20, sum) - vetAttention(s));
 }
 
 // ─────────────────────────────────────────────────────────────────────────

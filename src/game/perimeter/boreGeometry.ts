@@ -161,22 +161,40 @@ export function boreParts(pts: readonly Pt[], ground: Ground, built: number, fin
 }
 
 /**
- * A fall of rock choking an arch (local frame: x across, y up, z into the hill; the face is at z = 0): about 40 broken blocks piled to the crown in the
- * mouth, thinning to a spill of stones on the road outside. Deterministic from `seed`. Pure geometry.
+ * A fall of rock choking an arch (local frame: x across, y up, z into the hill; the face is at z = 0, outside is negative z): a dust-coloured fill that
+ * reaches the crown and spills a person's length onto the road, covered in broken blocks and slabs, with a few timbers from the door frame leaning out
+ * of it. Several times a person's height (arch crown 4.8 m, a person 0.28). Deterministic from `seed`. Pure geometry, merged by material like the rest
+ * of the portal, so it adds no draw calls.
  */
 export function rubbleHeap(seed: number): Array<[KitMaterialId, THREE.BufferGeometry]> {
   let h = seed >>> 0;
   const rnd = () => { h = (Math.imul(h, 1664525) + 1013904223) >>> 0; return h / 4294967296; };
   const out: Array<[KitMaterialId, THREE.BufferGeometry]> = [];
-  for (let i = 0; i < 44; i++) {
-    const depth = -0.55 + rnd() * 1.5, lat = (rnd() * 2 - 1) * (ARCH.hw * 1.15);
-    // a dome: highest on the axis and deep in the mouth, a scatter of low stones outside
-    const dome = Math.max(0, 1 - (lat / (ARCH.hw * 1.2)) ** 2) * Math.max(0.12, Math.min(1, 1 - Math.abs(depth - 0.35) / 1.1));
-    const size = 0.07 + rnd() * 0.12 * (0.6 + dome);
-    const y = Math.max(size * 0.4, dome * ARCH.crown * 0.8 * (0.55 + rnd() * 0.45));
-    const g = new THREE.BoxGeometry(size * (0.8 + rnd() * 0.8), size * (0.6 + rnd() * 0.7), size * (0.8 + rnd() * 0.8));
-    g.rotateY(rnd() * Math.PI).rotateZ((rnd() - 0.5) * 0.7).rotateX((rnd() - 0.5) * 0.7).translate(lat, y, depth);
-    out.push([rnd() < 0.2 ? 'concrete' : rnd() < 0.15 ? 'earth' : 'fieldstone', g]);
+  const W = ARCH.hw * 1.35, D = 1.1, H = ARCH.crown * 0.78;
+  /** The heap's surface height at (lat, depth): a ridge on the axis, highest against the face, falling away outward and sideways. */
+  const surf = (lat: number, depth: number): number => H * Math.max(0, 1 - (lat / W) ** 2) * Math.max(0, 1 - (Math.max(0, -depth) / D) ** 1.4);
+  // the fill: dust-grey cones packed into the mouth, so the arch is plainly shut
+  for (const [lx, dz, r, hh] of [[0, -0.12, 0.72, H], [-0.25, -0.4, 0.55, H * 0.75], [0.27, -0.45, 0.55, H * 0.68], [0, -0.8, 0.45, H * 0.4]] as const) {
+    out.push(['concrete', new THREE.ConeGeometry(r, hh, 7).translate(lx, hh / 2 - 0.03, dz)]);
+  }
+  // broken blocks over its surface, big ones low and on the slope, small ones scattered out on the road
+  for (let i = 0; i < 80; i++) {
+    const depth = -D * 1.15 * Math.pow(rnd(), 0.8) + 0.12, lat = (rnd() * 2 - 1) * W * 1.1;
+    const y = surf(lat, depth) * (0.35 + rnd() * 0.6);
+    const size = 0.07 + rnd() * 0.17 * (0.35 + y / H);
+    const g = new THREE.BoxGeometry(size * (0.9 + rnd() * 0.9), size * (0.6 + rnd() * 0.7), size * (0.9 + rnd() * 0.9));
+    g.rotateY(rnd() * Math.PI).rotateZ((rnd() - 0.5) * 0.9).rotateX((rnd() - 0.5) * 0.9).translate(lat, Math.max(size * 0.35, y), depth);
+    out.push([rnd() < 0.3 ? 'concrete' : 'fieldstone', g]);
+  }
+  // slabs of the facing and the lintel, tilted
+  for (let i = 0; i < 6; i++) {
+    const lat = (rnd() * 2 - 1) * W * 0.8, depth = -rnd() * D * 0.7;
+    out.push(['concrete', new THREE.BoxGeometry(0.28, 0.07, 0.2).rotateY(rnd() * 3).rotateZ((rnd() - 0.5) * 0.8).translate(lat, surf(lat, depth) * 0.8 + 0.04, depth)]);
+  }
+  // timbers from the door frame, leaning out of the fall
+  for (let i = 0; i < 4; i++) {
+    const lat = (rnd() * 2 - 1) * W * 0.6, depth = -0.2 - rnd() * 0.5, len = 0.45 + rnd() * 0.3;
+    out.push(['wood_dark', new THREE.BoxGeometry(0.035, len, 0.035).rotateZ((rnd() - 0.5) * 0.7).rotateX(0.5 + rnd() * 0.5).translate(lat, surf(lat, depth) * 0.75 + len * 0.3, depth)]);
   }
   return out;
 }

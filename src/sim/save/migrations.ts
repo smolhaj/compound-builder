@@ -44,6 +44,8 @@ type Raw = Record<string, unknown> & { version?: number };
 
 /** version n → n + 1 upgraders. */
 const STEPS: Record<number, (s: Raw) => Raw> = {
+  // 77 → 78: per-ring gate vetting (sim/gateVetting.ts): no one is checked at the gates until the household chooses
+  77: s => ({ ...s, version: 78, gate: { vet: 'none', ...((s.gate as object) ?? {}) } }),
   // 76 → 77: joiners bring their own things and choose where they stay (sim/joinerHome.ts): the ledger of homes being built for them and rigs waiting for a pad; the modular home unit is a new good at zero
   76: s => ({ ...s, version: 77, joiners: newJoiners() }),
   // 71 → 72: tunnel use (sim/corridors.ts): `PerimeterRun.collapsed` (a portal brought down by sappers) and `Vehicle.stranded` (cut off by a lost bridge or tunnel) are optional and absent in every old game: nothing to fill

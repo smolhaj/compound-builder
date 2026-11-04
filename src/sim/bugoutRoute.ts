@@ -11,6 +11,7 @@
  */
 import { dayIndex, hourOf, type GameState } from './state';
 import { roadBridgeOf, bridgeDown } from './roadFx';
+import { PERIMETER } from './perimeter';
 import { roadClosedFor, roadDifficulty } from './slope';
 import { fogNow } from './fogFx';
 import { lanesOf } from './terrainState';
@@ -50,10 +51,14 @@ export function routeRisk(s: GameState, mode: BugMode, miles: number, rangeKm: n
   let vehicleBlocked: string | null = null;
   if (closed > 0) vehicleBlocked = `the road is drifted shut for ${closed} more day${closed === 1 ? '' : 's'}`;
   if (s.site.lot && bridgeDown(s)) vehicleBlocked = 'the bridge on the way in is down';
+  const lost = s.perimeter.find(r => PERIMETER[r.kind].vehicleWay && (r.dropped || r.collapsed));
+  const tunnelCut = lost ? `the ${PERIMETER[lost.kind].name.toLowerCase()} is ${lost.collapsed ? 'choked with rubble' : 'down'}` : null;      // a tunnel choked with rubble or a span dropped (sim/corridors)
+  if (tunnelCut && !vehicleBlocked) vehicleBlocked = tunnelCut;
   const brg = roadBridgeOf(s);
   if (foot) {
     const lane = lanesOf(s), best = lane.length ? Math.min(...lane.map(l => l.hardness)) : 1;
     legs.push({ id: 'ground', name: 'The ground out', risk: clamp((best - 1) * 0.06, 0, 0.18), why: best > 1.6 ? 'rough going off the place: slow, with children and packs' : 'open ground off the place' });
+    if (tunnelCut) legs.push({ id: 'rubble', name: 'The fallen tunnel', risk: 0.15, why: `${tunnelCut}: a climb over the fall with children and packs` });
     if (s.site.lot && bridgeDown(s)) legs.push({ id: 'ford', name: 'The creek', risk: 0.12, why: 'the bridge is down: a wet crossing on foot' });
   } else {
     legs.push({ id: 'drive', name: 'The drive out', risk: clamp(diff * 0.12, 0, 0.3), why: diff > 0.5 ? 'a steep, winding way down with a loaded vehicle' : 'an easy road out' });

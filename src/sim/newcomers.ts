@@ -748,7 +748,7 @@ const HINT: Record<Character, string[]> = {
   scout: ['Walks the fence line at dusk "for the air", counting posts.', 'Asked again who stands watch at night, and when the dog sleeps.'],
   sick: ['Coughing in the night, and a fever that comes and goes.', 'Not eating. Flushed. Keeping to the corner of the room.'],
 };
-const REVEAL_STEAL: Array<[keyof Stock, number]> = [['canned', 0.12], ['fuel', 0.15], ['meds', 0.25], ['staples', 0.05]];
+export const REVEAL_STEAL: Array<[keyof Stock, number]> = [['canned', 0.12], ['fuel', 0.15], ['meds', 0.25], ['staples', 0.05]];
 
 /** Raiders told where to hit: a crew comes back for the place, knowing it (sim/encounters.ts `comeBack`, `guide`). */
 function sendCrew(s: GameState, guide: string, r: () => number): void {
