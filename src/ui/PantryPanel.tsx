@@ -7,6 +7,7 @@ import type { ReactNode } from 'react';
 import type { GameState } from '../sim/state';
 import { dietEffects, eatingLine, FOOD, pantryRows, type FoodItemId, type PantryRow } from '../sim/pantry';
 import { needOf } from '../sim/needs';
+import { Hint } from './hud/common';
 
 const DIM = 'rgba(238,238,238,0.6)';
 const TONE = { good: '#a8d080', warn: '#f0c070', bad: '#f08060' } as const;
@@ -35,10 +36,10 @@ export function PantryPanel({ game }: { game: GameState }): ReactNode {
       <span style={{ color: DIM }}>item</span><span style={{ color: DIM, textAlign: 'right' }}>have</span><span style={{ color: DIM, textAlign: 'right' }}>days</span><span style={{ color: DIM, textAlign: 'right' }}>keeps</span>
       {rows.map(r => <PantryLine key={r.id} r={r} />)}
     </div>}
-    {soon.length > 0 && <div style={{ fontSize: 11.5, margin: '3px 0', color: TONE[soon.some(r => r.tone === 'bad') ? 'bad' : 'warn'] }}>
-      {soon.slice(0, 3).map(r => `${FOOD[r.id].name.split(',')[0]} ${r.left <= 0 ? `is past its date (worth ${Math.round(r.value * 100)} %)` : `has ${span(r.left)} left`}`).join('; ')}. {game.disaster.tracks.stores >= 0.5 ? 'Long-expired food gets thrown out and bought fresh while the stores sell; rotating keeps it young.' : 'Old food is still food: it gives less, and now and then makes someone sick.'}</div>}
+    {soon.length > 0 && <Hint tone={soon.some(r => r.tone === 'bad') ? 'bad' : 'warn'} more={game.disaster.tracks.stores >= 0.5 ? 'Long-expired food gets thrown out and bought fresh while the stores sell; rotating keeps it young.' : 'Old food is still food: it gives less, and now and then makes someone sick.'}>
+      {soon.slice(0, 3).map(r => `${FOOD[r.id].name.split(',')[0]} ${r.left <= 0 ? `is past its date (worth ${Math.round(r.value * 100)} %)` : `has ${span(r.left)} left`}`).join('; ')}.</Hint>}
     {(() => { const old = rows.filter(r => r.left <= 0 && FOOD[r.id].kcal > 0); return old.length > 0 && <div style={{ fontSize: 11.5, color: DIM }}>Past date: {Math.round(old.reduce((a, r) => a + r.kcal, 0) / 1000)}k kcal, worth about {Math.round(old.reduce((a, r) => a + r.kcal * r.value, 0) / 1000)}k.</div>; })()}
-    {diet.notes.map((n, i) => <div key={i} style={{ fontSize: 11.5, lineHeight: 1.35, margin: '2px 0', color: n.tone === 'good' ? DIM : TONE[n.tone] }}>{n.text}</div>)}
+    {diet.notes.length > 0 && <Hint tone={diet.notes.some(n => n.tone === 'bad') ? 'bad' : diet.notes.some(n => n.tone === 'warn') ? 'warn' : undefined} more={diet.notes.map((n, i) => <div key={i} style={{ margin: '2px 0', color: n.tone === 'good' ? DIM : TONE[n.tone] }}>{n.text}</div>)}>{diet.notes[0].text.length > 80 ? diet.notes[0].text.slice(0, 78).replace(/[ ,;:]+\S*$/, '') + '…' : diet.notes[0].text}{diet.notes.length > 1 ? ` (+${diet.notes.length - 1})` : ''}</Hint>}
   </div>;
 }
 

@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { useBattleStore } from '../store/battleStore';
 import { useCutsceneView } from '../store/cutsceneStore';
@@ -114,6 +114,15 @@ function Offer() {
   );
 }
 
+/** The report's detail, folded: rounds fired and the stray lines. */
+function MoreLines({ rounds, lines }: { rounds: number; lines: string[] }) {
+  const [open, setOpen] = useState(false);
+  return <div style={{ marginTop: 5, fontSize: 12.5 }}>
+    <button onClick={() => setOpen(!open)} style={{ background: 'transparent', border: 0, padding: 0, color: '#d8c9a0', cursor: 'pointer', fontSize: 12.5, fontFamily: 'inherit' }}>{open ? '\u25BE less' : `\u25B8 more (${rounds} rounds fired${lines.length ? `, ${lines.length} notes` : ''})`}</button>
+    {open && <div style={{ opacity: 0.8 }}><div style={{ marginTop: 4 }}>Rounds fired: {rounds}</div>{lines.map((l, i) => <div key={i} style={{ marginTop: 4 }}>{l}</div>)}</div>}
+  </div>;
+}
+
 /** The short report after the scenes: who was hurt, what was lost, who is left on the drive. */
 function Report() {
   const c = useGameStore(s => s.cutscene)!;
@@ -127,14 +136,13 @@ function Report() {
       <div style={{ height: 3, background: tone, marginBottom: 12 }} />
       <div style={label}>The morning after</div>
       <div style={{ fontSize: 22, fontWeight: 600, margin: '2px 0 6px' }}>{r.title}</div>
-      <div style={{ opacity: 0.85, marginBottom: 10, fontSize: 14, lineHeight: 1.4 }}>{r.text}</div>
+      <div style={{ opacity: 0.85, marginBottom: 8, fontSize: 13.5, lineHeight: 1.35, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }} title={r.text}>{r.text}</div>
       {row('Killed', r.killed.length ? r.killed.join(', ') : none, r.killed.length > 0)}
       {row('Taken', r.taken.length ? r.taken.join(', ') : none, r.taken.length > 0)}
       {row('Hurt', r.wounded.length ? r.wounded.join(', ') : none)}
       {row('Lost from the stores', r.lost.length ? r.lost.map(([k, n]) => `${n} ${k}`).join(', ') : 'nothing')}
-      {row('Rounds fired', String(r.rounds))}
       {row('Raiders on the drive', r.raidersWounded + r.raidersDead ? `${r.raidersWounded} wounded, ${r.raidersDead} dead` : 'none left')}
-      {r.lines.filter(l => !/^Lost:|rounds fired\.$|more rounds went out/.test(l)).map((l, i) => <div key={i} style={{ fontSize: 12.5, opacity: 0.8, marginTop: 5 }}>{l}</div>)}
+      <MoreLines rounds={r.rounds} lines={r.lines.filter(l => !/^Lost:|rounds fired\.$|more rounds went out/.test(l))} />
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
         <button style={{ ...btn, background: '#d8c9a0', color: '#1c1d18', border: 0, padding: '8px 16px', fontSize: 14 }} onClick={end}>{r.aftermath ? 'See to the drive' : 'Pick up the pieces'}</button>
       </div>
