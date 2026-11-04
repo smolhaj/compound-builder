@@ -48,6 +48,7 @@ import { boltPassages, passageEntry } from './compounds';
 import { resolveDigWarning } from './tunnelers';
 import { addTool, stealTools, SWAP_KINDS, TOOLS, type ToolKind } from './tools';
 import { resolveKin } from './kin';
+import type { StayKind } from './joinerHome';
 import { emptyLooting, emptyNow, resolveMoveIn, resolveStranded } from './weekender';
 import { raidTakesVehicles } from './vehicles';
 import { practice } from './skills';
@@ -220,6 +221,9 @@ export interface Encounter {
   tells?: string[];
   hurt?: { who: string; what: string; sev: number };
   extras?: Extras;
+  /** Joiners (sim/joinerHome.ts): where they will sleep (the chosen option on the card; absent: the default), and whether the player will pick the pad for a rig. */
+  stay?: StayKind;
+  placeRig?: boolean;
   /** A neighbor household asking to shelter (or, for `settle`, to stay for good). */
   shelter?: { nid: string; why: ShelterWhy; days: number; settle?: boolean };
   dig?: { phase: 'warning' | 'inside'; id: string; /** Days left in the dig when it was found. */ lead: number; by?: string };
@@ -677,7 +681,7 @@ export function resolve(s: GameState, stance: Stance): Outcome {
       title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines);
     } else if (stance === 'take_in') {
       // everyone who joins goes through sim/newcomers.ts: a bond (loyalty, hidden character), a bedroll, what they carry
-      lines.push(...admitNewcomers(s, e.people ?? [], { kind: e.neighbor ? 'neighbor' : 'stranger', neighbor: e.neighbor, arche: e.arche, secret: e.secret, brings: e.brings, extras: e.extras, hurt: e.hurt, tells: e.tells }));
+      lines.push(...admitNewcomers(s, e.people ?? [], { kind: e.neighbor ? 'neighbor' : 'stranger', neighbor: e.neighbor, arche: e.arche, secret: e.secret, brings: e.brings, extras: e.extras, hurt: e.hurt, tells: e.tells, stay: e.stay, placeRig: e.placeRig }));
       g.humanity = Math.min(100, g.humanity + 6);
       title = e.neighbor ? 'They\'re staying' : 'They\'re family now';
       text = `You open the gate. ${e.size} more at the table tonight.`;

@@ -254,7 +254,9 @@ export const contagious = (s: GameState, id: string): boolean => !!s.personState
  */
 export function quarterHomes(s: GameState, people: readonly Person[], beds: ReadonlyArray<{ where: string; beds: number; kind: string }>, separate: ReadonlySet<string>): Map<string, string> {
   const homes: Home[] = beds.map(b => ({ id: b.where, kind: b.kind, beds: b.beds }));
-  const out = autoHomes(people, homes, separate);
+  // a joiner's own rig (sim/joinerHome.ts) is its owners' home, set when they park it: the auto-assignment never puts another household in it
+  const shared = homes.filter(h => !s.structures.find(x => x.id === h.id)?.rig);
+  const out = autoHomes(people, shared, separate);
   for (const p of people) if (p.home && homes.some(h => h.id === p.home)) out.set(p.id, p.home);
   const bay = roleHome(s, 'sickbay'), E = s.medical?.epidemic;
   if (bay && E?.quarantine) {

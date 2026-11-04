@@ -15,6 +15,7 @@ import { UTILITY_BUILDERS } from './utilityBuildings';
 import { TOWER_BUILDERS } from './towerBuildings';
 import { BUNKER_BUILDERS } from './bunkerBuildings';
 import { OLD_BUILDERS } from './oldBuildings';
+import { RIG_BUILDERS } from './rigBuildings';
 import { COMPOUND_BUILDERS } from './compoundBuildings';
 import { GATEHOUSE_BUILDERS } from './gatehouseBuildings';
 import { FOOD_BUILDERS } from './foodBuildings';
@@ -507,6 +508,7 @@ const BUILDERS: Record<string, (def: KitPieceDef, seed?: number, opts?: BuildOpt
   ...TOWER_BUILDERS,
   ...BUNKER_BUILDERS,
   ...OLD_BUILDERS,
+  ...RIG_BUILDERS,
   ...COMPOUND_BUILDERS,
   ...GATEHOUSE_BUILDERS,
   ...FOOD_BUILDERS,

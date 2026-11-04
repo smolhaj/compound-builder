@@ -6,6 +6,8 @@ import { AFTERMATH_TEXT, joinPrisoner, releasePrisoner, resolveAftermath, type A
 import { dismissCrew, hireCrew } from '../sim/crews';
 import { setFocus } from '../sim/priority';
 import { orderHookup, placeImprovements } from '../sim/improvements';
+import { claimForWaiting, claimWaitingRig, isRig, type StayKind } from '../sim/joinerHome';
+import { kinOf } from '../sim/kin';
 import { setEntrance as chooseEntrance } from '../sim/roadEntrance';
 import { applyForPermit } from '../sim/paperwork';
 import { sweepChimney } from '../sim/upkeep';
@@ -128,6 +130,10 @@ export interface GameStore {
   advance: (days: number) => void;
   order: (lines: OrderLine[]) => boolean;
   plan: (kind: string, x: number, z: number, rot: number) => void;
+  /** The gate card: where the joiners will sleep, and whether the player picks a rig's pad (sim/joinerHome.ts). */
+  setStay: (stay: StayKind, placeRig?: boolean) => void;
+  /** The world checked the sim's spots for joiners' homes against the terrain (sim/joinerHome.ts). */
+  respotJoiners: (spots: Record<string, { x: number; z: number; rot: number }>) => void;
   /** Stake terraced garden beds, one per spot (the Next-step card's confirm; sim/terrace.ts). Returns why not, or null. */
   stakeTerraces: (spots: Array<[number, number]>) => string | null;
   load: (g: GameState) => void;
@@ -324,12 +330,35 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
   plan: (kind, x, z, rot) => {
     if (locked()) return;
     if (planProblem(get().game, kind)) return;
+    if (isRig(kind) && !(get().game.joiners?.waiting.length)) return;   // a rig is parked only for a joiner who is waiting for a pad
     const g = structuredClone(get().game);
     const st = planStructure(g, kind, x, z, rot);
     stampHighGround(st);
-    applyForPermit(g, st);
+    if (isRig(kind)) claimWaitingRig(g, st);
+    else {
+      claimForWaiting(g, st, kinOf(g).waiting);
+      applyForPermit(g, st);
+    }
     set({ game: g, selected: st.id });
     void saveGame(AUTOSAVE, g);
+  },
+  setStay: (stay, placeRig = false) => {
+    const e = get().game.gate.pending;
+    if (!e) return;
+    const g = structuredClone(get().game);
+    g.gate.pending!.stay = stay;
+    g.gate.pending!.placeRig = stay === 'rig' && placeRig;
+    set({ game: g });
+  },
+  respotJoiners: (spots) => {
+    const g = structuredClone(get().game);
+    for (const st of g.structures) {
+      if (!st.joiner || st.joiner.spotted) continue;
+      const p = spots[st.id];
+      if (p) { st.x = p.x; st.z = p.z; st.rot = p.rot; }
+      st.joiner.spotted = true;
+    }
+    set({ game: g });
   },
   stakeTerraces: (spots) => {
     if (locked()) return LOCKED_WHY;

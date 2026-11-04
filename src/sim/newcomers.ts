@@ -47,6 +47,7 @@ import type { Stock } from './materials';
 import { scoutCrew, type Encounter, type Neighbor, type NeighborKind, type Outcome, type Stance } from './encounters';
 import type { Character } from './trial';
 import { lifeOf, plural, surname } from './neighborLife';
+import { joinersDay, kitLine, pool, rigLeaves, rollKit, settleStay, type StayKind } from './joinerHome';
 
 // ─────────────────────────────────────────────────────────────────────────
 // State
@@ -189,7 +190,17 @@ export function newcomerMorale(s: GameState, id: string): number {
 // Strangers
 // ─────────────────────────────────────────────────────────────────────────
 
-export interface Extras { tools?: ToolKind[]; dogs?: number; vehicle?: 'old_pickup' }
+export interface Extras {
+  tools?: ToolKind[]; dogs?: number;
+  /** A vehicle that joins the fleet (a pickup, or the mechanic's old one). */
+  vehicle?: 'old_pickup' | 'pickup';
+  /** Savings they carry, pooled the day they come in (sim/joinerHome.ts). */
+  cash?: number;
+  /** Their own travel trailer or RV: a place to sleep that can drive away. */
+  rig?: 'travel_trailer' | 'rv_camper';
+  /** Guns (armory model ids) they own: hunting rifles, shotguns and handguns the state allows. */
+  guns?: string[];
+}
 
 interface Spec {
   id: string;
@@ -269,6 +280,8 @@ export function strangerArrival(s: GameState, r: () => number, id: string, day: 
   if (spec.tool) extras.tools = [spec.tool];
   if (spec.vehicle && fleetOf(s).filter(v => v.kind === 'old_pickup').length < 1 && r() < 0.7) extras.vehicle = 'old_pickup';
   if (spec.dog) extras.dogs = 1;
+  // what else they own: cash, trade tools, a pickup or a rig, food, a legal gun (sim/joinerHome.ts)
+  { const k = rollKit(s, people, r, spec.id, { brings, extras }); Object.assign(brings, k.brings); Object.assign(extras, k.extras); }
   const n = people.length, kidsN = people.filter(p => p.kid).length;
   const best = people.filter(p => !p.kid || p.age >= 14).map(p => { const t = topSkill(p); return `${p.first} (${t} ${p.skills[t]})`; });
   const hurtWho = spec.hurt ? people[0] : null;
@@ -279,7 +292,7 @@ export function strangerArrival(s: GameState, r: () => number, id: string, day: 
       `${n} ${n === 1 ? 'person' : 'people'}${kidsN ? `, ${kidsN} ${kidsN === 1 ? 'kid' : 'kids'}` : ''}: ${people.map(p => `${p.first}, ${p.age}`).join('; ')}.`,
       `Say they’re good at: ${best.join(', ') || 'not much yet'}.`,
       ...(hurtWho ? [`${hurtWho.first} is hurt: ${spec.hurt!.what}.`] : []),
-      ...(Object.keys(brings).length || extras.tools || extras.vehicle ? [`They carry: ${bringsLine(brings, extras)}.`] : []),
+      `Brings: ${kitLine(brings, extras, people)}.`,
       `${n} more to feed: about ${people.reduce((a, p) => a + needOf(p), 0).toLocaleString('en-US')} kcal a day.`,
     ],
     size: n, armed: false, strength: 0, people, brings,
@@ -372,6 +385,9 @@ export interface AdmitOpts {
   fever?: string;
   /** What the gate already noticed. */
   tells?: string[];
+  /** Where they will sleep (sim/joinerHome.ts StayKind); absent: the default for what they carry. The player picks a rig's pad by hand. */
+  stay?: StayKind;
+  placeRig?: boolean;
 }
 
 /** Which of the group the secret belongs to: the first adult (the oldest kid if there are no adults); the sick one is the youngest. */
@@ -414,10 +430,17 @@ export function admitNewcomers(s: GameState, people: readonly Person[], o: Admit
   s.stock.sleeping_bag += people.length;
   for (const [k, v] of Object.entries(o.brings ?? {}) as Array<[keyof Stock, number]>) s.stock[k] += v;
   for (const t of o.extras?.tools ?? []) addTool(s, t, 0.5 + 0.4 * r(), 0.5 + 0.4 * r(), r() < 0.3 ? 'pro' : 'cheap');
+  lines.push(...pool(s, o.extras, r));
   for (let k = 0; k < (o.extras?.dogs ?? 0); k++) { const d = adoptDog(s, { ageYears: 1.5 + r() * 5, training: 35, guard: nb?.kind === 'ranch' || nb?.kind === 'prepper' }); lines.push(`${d.name}, their dog, comes in with them.`); }
-  if (o.extras?.vehicle) { const vs = fleetOf(s); vs.push({ id: `v${Math.max(0, ...vs.map(v => Number(v.id.slice(1)) || 0)) + 1}`, kind: 'old_pickup', mileage: 190_000, condition: 0.5, fuel: 6, oilAt: 188_000, serviceAt: 187_000 }); syncParking(s); lines.push('The old pickup comes in behind them, running on fumes.'); }
-  const bl = bringsLine(o.brings, { tools: o.extras?.tools });
+  if (o.extras?.vehicle === 'old_pickup') { const vs = fleetOf(s); vs.push({ id: `v${Math.max(0, ...vs.map(v => Number(v.id.slice(1)) || 0)) + 1}`, kind: 'old_pickup', mileage: 190_000, condition: 0.5, fuel: 6, oilAt: 188_000, serviceAt: 187_000 }); syncParking(s); lines.push('The old pickup comes in behind them, running on fumes.'); }
+  const bl = kitLine(o.brings, { ...o.extras, cash: undefined, vehicle: undefined, rig: undefined, guns: undefined, tools: o.extras?.tools }, people);
   if (Object.keys(o.brings ?? {}).length || o.extras?.tools?.length) lines.push(`They brought: ${bl}.`);
+  // where they sleep: the choice on the card (a spare bed by default; their own rig when the beds are short)
+  if (o.kind !== 'guest' && people.length) {
+    const here = people.map(p => s.people.find(x => x.id === p.id)).filter((p): p is Person => !!p);
+    const stay = o.stay ?? (o.extras?.rig && cachedPlan(s).bedsFree < here.length + 1 ? 'rig' : 'bed');
+    lines.push(...settleStay(s, here, stay, { extras: o.extras, kind: 'arrival', placeRig: o.placeRig }, o.extras?.cash ?? 0));
+  }
   if (secret === 'sick' && !o.known && r() < 0.35) { const l = infect(s, r, 'they brought it in'); if (l) lines.push(l); }
   g.tookIn += people.length;
   return lines;
@@ -609,6 +632,8 @@ export function moveOut(s: GameState, id: string, why: string): boolean {
   n.died = Math.floor(s.clock.t); n.left = true;
   s.personState[i].task = 'gone';
   delete p.home;
+  const rig = rigLeaves(s, id);
+  if (rig) log(s, rig);
   N.departed.push({ day: dayIndex(s.clock.t), name: p.first, why, kind: b?.kind ?? 'stranger' });
   if (N.departed.length > 12) N.departed.splice(0, N.departed.length - 12);
   return true;
@@ -836,6 +861,7 @@ export function newcomersDay(s: GameState): string[] {
 
   out.push(...guestsDay(s, N, day));
   out.push(...shelterDay(s, N, day, r));
+  out.push(...joinersDay(s));
   return out.filter(Boolean);
 }
 

@@ -14,7 +14,7 @@ import { MATERIALS, billText, type MaterialId } from '../../sim/materials';
 import { orderCost } from '../../sim/economy';
 import { drillExtra } from '../../sim/site';
 import { countyWorks, needsPermit, permitFee } from '../../sim/paperwork';
-import { BUNKER_ORDER, GATEHOUSE_ORDER, KIT, POD_ORDER, TERRACE_ORDER, TOWER_ORDER, UTILITY_ORDER } from '../../game/buildkit/kit';
+import { BUNKER_ORDER, GATEHOUSE_ORDER, KIT, POD_ORDER, RIG_ORDER, TERRACE_ORDER, TOWER_ORDER, UTILITY_ORDER } from '../../game/buildkit/kit';
 import { PERIMETER, UTILITY_LINES, runBill, runHours, type PerimeterKind } from '../../sim/perimeter';
 import { bunkerChecklist, buildAdvice, longTerm, suggestions, type SuggestionAct, perimeterNote, perimeterOff, perimeterTiers, upgradeChain } from '../../sim/guidance';
 import { hireCaretaker, openMoveIn, setBelt } from '../../sim/weekender';
@@ -35,7 +35,7 @@ import { HousingStyleCards } from './HousingStyles';
 const OP_COVERED: ReadonlySet<string> = new Set(['roof', 'beds', 'water', 'food', 'power']);
 
 const BUILD_GROUPS: Array<[string, string, readonly string[]]> = [
-  ['home', 'Home & work', ['timber_cabin', 'log_house', 'cottage', 'guest_house', 'moms_house', 'stilted_house', 'cabin_village', 'outhouse', 'workshop', 'forge', 'metal_garage', 'barn', 'equipment_yard', 'helipad', 'boat_dock', 'marina', ...TERRACE_ORDER]],
+  ['home', 'Home & work', ['timber_cabin', 'log_house', 'cottage', 'guest_house', 'moms_house', 'modular_home', 'stilted_house', 'cabin_village', 'outhouse', 'workshop', 'forge', 'metal_garage', 'barn', 'equipment_yard', 'helipad', 'boat_dock', 'marina', ...TERRACE_ORDER]],
   ['food', 'Food', ['garden', 'greenhouse', 'polytunnel', 'high_tunnel', 'greenhouse_heated', 'aquaponics', 'orchard', 'orchard_grove', 'orchard_terraced', 'field', 'chicken_coop', 'sheep_barn', 'pond', 'root_cellar', 'wood_oven', 'apiary', 'sugar_shack', 'barnyard']],
   ['water', 'Water & power', UTILITY_ORDER],
   ['defense', 'Watch towers & gatehouse', [...TOWER_ORDER, ...POD_ORDER, ...GATEHOUSE_ORDER]],
@@ -141,6 +141,10 @@ export function BuildMenu({ showProjects = () => undefined }: { showProjects?: (
         </div>;
       })}
     </Group>
+    {(game.joiners?.waiting.length ?? 0) > 0 && !g.tool && <Group id="rigs" title="Park a joiner's rig" extra={`${game.joiners!.waiting.length} waiting`} defaultOpen>
+      <Hint more="A newcomer's travel trailer or RV waits at the gate for a pad of your choosing. Place it within about 70 m of the house and the wells and it hooks up to the water and power on its own.">Their rig is waiting for a pad.</Hint>
+      {game.joiners!.waiting.map(w => <Fragment key={w.id}>{(RIG_ORDER.includes(w.kind) ? [w.kind] : []).map(k => <Item key={k} name={`${KIT[k].name} (theirs)`} cost="free" sub="arrives finished" on={g.tool === k} title={KIT[k].blurb} click={() => arm(k)} />)}</Fragment>)}
+    </Group>}
     {BUILD_GROUPS.map(([gid, title, kinds]) => (
       <Fragment key={gid}>
         <Group id={gid} title={title} extra={gid === 'home' ? housingSummary(game) : undefined} defaultOpen={gid !== 'defense'}>

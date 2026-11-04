@@ -19,6 +19,7 @@ import { mulberry32, pick } from './rng';
 import { addWork, isFinished } from './construction';
 import { KCAL, NEED_ADULT, NEED_KID } from './needs';
 import { admitNewcomers, type Extras } from './newcomers';
+import { kitLine } from './joinerHome';
 import { contagion } from './effects';
 import { SKILL_IDS, type Person, type SkillId } from './family';
 import { dayIndex, type GameState } from './state';
@@ -196,10 +197,11 @@ function trialEnd(s: GameState, c: TrialCamp): Encounter {
     id: `e${s.nextId++}`, kind: 'trial_end', day: dayIndex(s.clock.t), title: `${c.title}: the month is up`,
     dossier: [
       `${n} ${n === 1 ? 'person' : 'people'} in the camp${c.people.some(p => p.kid) ? `, ${c.people.filter(p => p.kid).length} kids` : ''}. They put in ${Math.round(c.worked)} hours on the place.`,
+      ...(c.extras || Object.keys(c.brings ?? {}).length ? [`Brings: ${kitLine(c.brings, c.extras, c.people)}.`] : []),
       ...(c.learned.length ? c.learned : ['Quiet, polite, kept to themselves. You don\'t know them much better than the day they came.']),
       c.hungry ? `The camp went short ${c.hungry} day${c.hungry > 1 ? 's' : ''} this month.` : `You fed them ${Math.round(c.fed / 1000)}k kcal this month.`,
     ],
-    size: n, armed: false, strength: 0, people: c.people, brings: c.brings, trial: c.id,
+    size: n, armed: false, strength: 0, people: c.people, brings: c.brings, trial: c.id, ...(c.extras ? { extras: c.extras } : {}),
     stances: ['take_in', 'turn_away'],
   };
 }
@@ -213,7 +215,7 @@ export function resolveTrialEnd(s: GameState, e: Encounter, stance: Stance): Out
   if (stance === 'take_in') {
     // a month in the camp has shown them: the wound has mended some, and what they are is known (sim/newcomers.ts)
     const hurt = c?.hurt ? { ...c.hurt, sev: Math.max(8, c.hurt.sev - (c ? c.until - c.from : 0) * 1.2) } : undefined;
-    const lines = admitNewcomers(s, people, { kind: c?.neighbor ? 'neighbor' : 'stranger', neighbor: c?.neighbor, arche: c?.arche, secret: c?.character, brings: c?.brings ?? e.brings, extras: c?.extras, known: true, tried: true, fever: c?.fever, hurt, tells: c?.tells });
+    const lines = admitNewcomers(s, people, { kind: c?.neighbor ? 'neighbor' : 'stranger', neighbor: c?.neighbor, arche: c?.arche, secret: c?.character, brings: c?.brings ?? e.brings, extras: c?.extras ?? e.extras, known: true, tried: true, fever: c?.fever, hurt, tells: c?.tells, stay: e.stay, placeRig: e.placeRig });
     s.gate.humanity = Math.min(100, s.gate.humanity + 4);
     return { title: 'Inside the wall', text: `They move their things in from the camp. ${people.length} more at the table tonight.`, tone: 'good', lines };
   }

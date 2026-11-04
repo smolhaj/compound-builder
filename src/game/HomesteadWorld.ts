@@ -462,9 +462,10 @@ export class HomesteadWorld {
    * by the camp facing the drive, the rest round it on open, level ground
    * that's the family's own and clear of the creek, the drive and each other.
    */
-  siteImprovements(list: ReadonlyArray<{ id: string; kind: string }>, query: SiteQuery): Record<string, { x: number; z: number; rot: number }> {
+  siteImprovements(list: ReadonlyArray<{ id: string; kind: string }>, query: SiteQuery, anchor?: { x: number; z: number }): Record<string, { x: number; z: number; rot: number }> {
     const out: Record<string, { x: number; z: number; rot: number }> = {};
-    const placed: Placed[] = [...this._built.values()].map(b => b.placed);
+    const mine = new Set(list.map(x => x.id));
+    const placed: Placed[] = [...this._built.values()].map(b => b.placed).filter(p => !mine.has(p.id));
     const order = ['farmhouse', 'trailer', 'timber_cabin', 'log_house', 'well_drilled', 'septic', 'barn'];
     const items = [...list].sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind));
     let house: { x: number; z: number } | null = null;
@@ -474,8 +475,8 @@ export class HomesteadWorld {
       // a cell (3 m) of yard all round, so nothing is built hard against anything else
       const def = { ...real, cellsX: real.cellsX + 2, cellsZ: real.cellsZ + 2 };
       // the house beside the camp; the well and septic near the house; the barn a little way off
-      const c: { x: number; z: number } = house ?? { x: this.camp.x - 1.5, z: this.camp.z - 2.5 };
-      const [r0, r1]: [number, number] = it.kind === 'barn' ? [6, 16] : house ? [2.5, 8] : [0, 8];
+      const c: { x: number; z: number } = house ?? anchor ?? { x: this.camp.x - 1.5, z: this.camp.z - 2.5 };
+      const [r0, r1]: [number, number] = it.kind === 'barn' ? [6, 16] : anchor ? [2.5, 14] : house ? [2.5, 8] : [0, 8];
       let best: { x: number; z: number; rot: number } | null = null, bestD = Infinity;
       for (let r: number = r0; r <= r1 && !best; r += 0.5) {
         for (let a = 0; a < 24; a++) {

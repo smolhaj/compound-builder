@@ -43,6 +43,7 @@ import { isHome } from '../sim/blueprints';
 import { calendarOf, hourOf, SECONDS_PER_DAY } from '../sim/state';
 import { setWindowGlow } from './buildkit/materials';
 import { homeOutsideForty } from '../sim/site';
+import { anchorOf } from '../sim/joinerHome';
 import { ownsAt } from '../sim/land';
 import { isMarked } from '../sim/forestry';
 import { KIT } from './buildkit/kit';
@@ -238,6 +239,23 @@ export function GameCanvas() {
       useWorldStore.subscribe(s => s.quality, applyLook),
       useWorldStore.subscribe(s => s.cameraMode, applyCameraMode),
       useGameStore.subscribe(s => s.game.structures, list => { world.syncStructures(placedOnly(list)); occluders.invalidate(); }),
+      // a joiner's rig, modular home or cabin was put near the house by the sim: the world checks the spot against the terrain, once (sim/joinerHome.ts)
+      useGameStore.subscribe(s => s.game.structures.some(x => x.joiner && !x.joiner.spotted), pending => {
+        if (!pending) return;
+        const gm = useGameStore.getState().game;
+        const todo = gm.structures.filter(x => x.joiner && !x.joiner.spotted);
+        const query: SiteQuery = {
+          height: (x, z) => world.parcel.natural(x, z).h,
+          owned: (x, z) => ownsAt(useGameStore.getState().game, x, z),
+          water: (x, z) => world.parcel.isCreek(x, z) || world.stream.depthAt(x, z) > 0,
+          blocked: (x, z) => world.onCamp(x, z, 0.4) || world.onAccess(x, z, 0.4),
+        };
+        const a = anchorOf(gm);
+        const spots = world.siteImprovements(todo, query, a);
+        // the world drew them at the sim's first guess: take those down so the next sync raises them where the terrain allows
+        for (const st of todo) world.removeStructure(st.id);
+        useGameStore.getState().respotJoiners(spots);
+      }),
       useGameStore.subscribe(s => s.game.site.improvements.drive, on => world.setDrive(on)),
       useGameStore.subscribe(s => s.game.roadBridge?.down ?? false, on => world.setBridgeDown(on)),
       useGameStore.subscribe(s => s.game.site.entrance ?? null, () => { world.replan(useGameStore.getState().game.site); world.previewEntrance(useGameStore.getState().game.site, null); }),
