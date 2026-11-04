@@ -15,6 +15,8 @@ await new Promise((ok, fail) => { vite.stdout.on('data', d => { if (/localhost:\
 const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 page.setDefaultTimeout(300000);
+page.on('crash', () => console.error('PAGE CRASHED'));
+page.on('console', m => { if (m.type() === 'error') console.error('console', m.text().slice(0, 300)); });
 page.on('pageerror', e => console.error('PAGEERROR', e.message));
 try {
   await page.goto(`http://localhost:${port}/?lowrender&clean&seed=7&lot=bluff&relief=8&acres=40&region=mountain_west&lotseed=4`);
@@ -38,10 +40,10 @@ try {
       game.setState({ game: g }); game.getState().setSpeed(0);
       store.getState().setQuality('low'); store.getState().setTimeOfDay(13); store.getState().setWeatherMode('clear'); store.getState().setSeasonMode(season);
     }, [doy, season]);
-    for (let i = 0; i < 40; i++) { await page.evaluate(() => window.__cb.qa.renderNow()); await page.waitForTimeout(120); }   // the ice eases in
+    for (let i = 0; i < 12; i++) { await page.evaluate(() => window.__cb.qa.renderNow()); await page.waitForTimeout(120); }   // the ice eases in
   };
   const w = spots.water ?? { x: spots.camp.x + 10, z: spots.camp.z + 10 };
-  for (const [name, doy, season] of [['summer', 200, 'summer'], ['winter', 20, 'winter']]) {
+  for (const [name, doy, season] of (opt('--only', '') ? [['winter', 20, 'winter']] : [['summer', 200, 'summer'], ['winter', 20, 'winter']])) {
     await set(doy, season);
     const ice = await page.evaluate(() => { const { world } = window.__cb; return world.lakes.ice; });
     console.error(name, 'ice uniform', ice);
