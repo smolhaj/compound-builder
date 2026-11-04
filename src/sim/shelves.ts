@@ -15,7 +15,7 @@ export const SHELF_TABS: ReadonlyArray<[ShelfTab, string]> = [
 ];
 
 export const SHELVES: Record<ShelfTab, MaterialId[]> = {
-  build: ['lumber', 'fieldstone', 'concrete', 'roofing', 'hardware', 'wire', 'seedlings', 'greenhouse_kit', 'greenhouse_pro_kit', 'tunnel_kit_small', 'tunnel_kit_high', 'poly_film', 'aqua_kit', 'fruit_trees'],
+  build: ['lumber', 'fieldstone', 'concrete', 'roofing', 'hardware', 'wire', 'seedlings', 'greenhouse_kit', 'greenhouse_pro_kit', 'tunnel_kit_small', 'tunnel_kit_high', 'poly_film', 'aqua_kit', 'fruit_trees', 'modular_unit'],
   fencing: ['wire', 'hardware', 'lumber', 'seedlings', 'container', 'rebar', 'concrete', 'cable', 'roofing'],
   bunker: ['rebar', 'membrane', 'container', 'blast_door', 'blast_valve', 'nbc_filter', 'filter_set', 'culvert', 'egress_hatch', 'passage_hatch', 'lead_sheet', 'faraday_mesh'],
   water: ['water_jugs', 'ibc_tote', 'water_trailer', 'water_filter', 'ro_system', 'softener', 'greywater', 'pipe', 'fixtures', 'pump', 'drilling', 'tank', 'septic_tank'],
