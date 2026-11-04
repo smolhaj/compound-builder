@@ -22,7 +22,7 @@ import { calendarOf, type GameState } from './state';
 import { isFinished, knockBack } from './construction';
 import { isHome } from './blueprints';
 import type { MaterialId } from './materials';
-import type { Fix } from './improvements';
+import { addFix, pendingFixes, type Fix } from './improvements';
 import { insuranceClaim } from './paperwork';
 import { mulberry32 } from './rng';
 import { regionFor } from './climate';
@@ -109,10 +109,10 @@ export function upkeepDay(s: GameState, demand: number, warm: boolean): string[]
   if (!warm && demand > 0.6) {
     for (const h of homes) {
       const plumbed = s.utilities.fittings.find(f => f.building === h.id && f.kind === 'plumb' && f.finishedAt !== null);
-      if (!plumbed || r() > 0.25) continue;
+      if (!plumbed || r() > 0.25 || pendingFixes(h).some(f => f.part === 'plumbing')) continue;
       s.utilities.fittings = s.utilities.fittings.filter(f => f !== plumbed);
       const fix: Fix = { part: 'plumbing', cond: 'fair', done: 0, hours: 20, supplied: false };
-      (h.fixes ??= []).push(fix);
+      addFix(h, fix);
       out.push(`The pipes froze and burst in the ${h.kind.replace(/_/g, ' ')}: no running water until they're fixed.`);
     }
   }
