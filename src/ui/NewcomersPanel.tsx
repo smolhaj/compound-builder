@@ -9,7 +9,7 @@ import { useGameStore } from '../store/gameStore';
 import { dayIndex } from '../sim/state';
 import { housingSummary } from '../sim/housing';
 import { carryLines, carryOf, givePlace, loyaltyWord, originLabel, placeOptions, sendAway, trustWord } from '../sim/newcomers';
-import { Note, Row, Section } from './hud/common';
+import { Hint, Note, Row, Section } from './hud/common';
 import { DIM } from './hud/style';
 import { whereText } from './kinText';
 
@@ -36,8 +36,8 @@ export function NewcomersPanel() {
         <Row label="Mouths" value={`${c.people} · ${c.days === Infinity ? 'the fields cover it' : `${Math.round(c.days)} days of food`}`} tone={tone} title="Days of food put by at this headcount, after what the fields and animals grow" />
         <Row label="Carries for six months" value={`${c.people + c.headroom} people${c.headroom > 0 ? ` (${c.headroom} more)` : ''}`} tone={c.headroom > 0 ? 'good' : 'warn'} />
         <Row label="Beds" value={housingSummary(game).replace('beds ', '')} />
-        {c.level === 'over' && !c.fromStores && <Note tone="bad">{lines[lines.length - 1]} The whole table feels it: morale falls, loyalty falls, and people start to leave.</Note>}
-        {c.fromStores && c.level !== 'ok' && <Note tone="warn">The grocery stores are open, but what you hold for the day they close would carry this table only {Math.round(c.days)} days.</Note>}
+        {c.level === 'over' && !c.fromStores && <Hint tone="bad" more="The whole table feels it: morale falls, loyalty falls, and people start to leave.">{lines[lines.length - 1]}</Hint>}
+        {c.fromStores && c.level !== 'ok' && <Hint tone="warn" more="The grocery stores are open, but what you hold for the day they close would carry this table only that long.">Held for the day the stores close: {Math.round(c.days)} days.</Hint>}
       </div>
       {bonds.map(b => {
         const i = game.people.findIndex(p => p.id === b.id);
@@ -71,8 +71,8 @@ export function NewcomersPanel() {
         </div>;
       })}
       {gone.map((d, k) => <Note key={k}>{d.name} {d.why} (day {d.day}).</Note>)}
-      {!bonds.length && <Note>Nobody from outside has joined yet. Neighbors in need and strangers at the gate can be taken in.</Note>}
-      {bonds.some(b => !b.revealed && b.kind === 'stranger') && <Note>Strangers taken in without a trial: you will know them better in a few weeks.</Note>}
+      {!bonds.length && <Hint more="Neighbors in need and strangers at the gate can be taken in.">Nobody from outside has joined yet.</Hint>}
+      {bonds.some(b => !b.revealed && b.kind === 'stranger') && <Note>Strangers: you will know them better in a few weeks.</Note>}
     </Section>
   );
 }

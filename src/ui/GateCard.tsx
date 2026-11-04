@@ -11,6 +11,8 @@ import { STANCE } from './stanceText';
 import { ArrivalHousing } from './HousingPanel';
 import { vetting } from '../sim/ringFallback';
 import { jobOutlook, setKeepJobs } from '../sim/weekender';
+import { incomeOf, kinSavings } from '../sim/kin';
+import { Clamp, Hint } from './hud/common';
 
 
 /** The end of a month's trial. */
@@ -39,6 +41,32 @@ const box: CSSProperties = { position: 'fixed', left: '50%', top: '50%', transfo
 const raidBox: CSSProperties = { ...box, left: 'auto', right: 'clamp(12px, 3vw, 40px)', top: 'calc(clamp(54px, 12vh, 120px) + 12px)', transform: 'none', width: 'min(400px, calc(100vw - 24px))', maxHeight: 'calc(100vh - 2 * clamp(54px, 12vh, 120px) - 24px)', overflowY: 'auto', zIndex: 40, padding: '14px 16px' };
 const button = (primary: boolean): CSSProperties => ({ padding: '7px 12px', borderRadius: 7, border: 0, cursor: 'pointer', background: primary ? '#d8c9a0' : '#3a3d34', color: primary ? '#1c1d18' : '#eee', fontSize: 13, textAlign: 'left' });
 
+const CLAMP2: CSSProperties = { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' };
+const usd = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
+
+/**
+ * The dossier: the story in full, then the rest held to two lines each (the whole line is the tooltip, a click opens it).
+ * A relative asking to join gets its key facts on one line (money in, savings, mouths) and who they are folded under it.
+ */
+function Dossier({ e }: { e: NonNullable<ReturnType<typeof useGameStore.getState>['game']['gate']['pending']> }) {
+  const game = useGameStore(s => s.game);
+  const lines = e.dossier.filter(Boolean);
+  if (e.kind === 'kin' && e.people?.length) {
+    const month = Math.round(e.people.reduce((a, p) => a + (incomeOf(p, game.seed)?.perDay ?? 0), 0) * 30 / 10) * 10;
+    const savings = e.people.reduce((a, p) => a + kinSavings(p, game.seed), 0);
+    const meds = e.people.some(p => p.conditions?.length);
+    const facts = [!e.kin?.late && month > 0 ? `${usd(month)}/mo coming in` : '', !e.kin?.late && savings > 0 ? `${usd(savings)} savings` : '', `${e.people.length} more to feed`, meds ? 'daily medicine' : ''].filter(Boolean).join(' · ');
+    const money = (l: string) => /^Brings about|more to feed/.test(l);
+    const who = lines.filter((l, i) => i > 0 && !money(l));
+    return <>
+      <div style={{ marginBottom: 6, opacity: 0.9 }}>{lines[0]}</div>
+      <div data-testid="kin-facts" style={{ fontSize: 12.5, fontWeight: 600, color: '#d8c9a0' }} title={lines.filter(money).join(' ')}>{facts}</div>
+      {who.length > 0 && <Hint more={who.map((l, i) => <div key={i} style={{ marginBottom: 2 }}>{l}</div>)}>{e.people.map(p => p.first).join(' and ')}: who they are, what they can do.</Hint>}
+    </>;
+  }
+  return <>{lines.map((l, i) => i === 0 ? <div key={i} style={{ marginBottom: 4, opacity: 0.9 }}>{l}</div> : <div key={i} style={{ marginBottom: 3 }}><Clamp text={l}>{l}</Clamp></div>)}</>;
+}
+
 /** Someone at the gate: the dossier and the stances (the game is paused); then what happened. */
 export function GateCard() {
   const g = useGameStore();
@@ -57,13 +85,12 @@ export function GateCard() {
       <div style={cut ? raidBox : box}>
         <div style={{ fontSize: 11, letterSpacing: 1, opacity: 0.6, textTransform: 'uppercase' }}>{e.kind === 'break_in' ? 'In the night' : e.kind === 'ransom' ? 'Word about your child' : e.kind === 'trial_end' ? 'The camp outside the wall' : e.kind === 'kin' ? 'Family' : e.kind === 'shelter' ? 'Neighbors at the door' : e.kind === 'move_in' ? (e.title.startsWith('Time') ? 'The warning signs' : 'A decision') : e.kind === 'stranded' ? 'Caught in town' : e.neighbor ? 'A neighbor at the gate' : 'At the gate'}</div>
         <div style={{ fontSize: 19, fontWeight: 700, margin: '2px 0 8px' }}>{e.title}</div>
-        {e.dossier.filter(Boolean).map((l, i) => <div key={i} style={{ marginBottom: 4, opacity: 0.9 }}>{l}</div>)}
+        <Dossier e={e} />
         {e.kind === 'arrival' && (() => { const v = vetting(g.game).line; return v ? <div style={{ marginBottom: 4, opacity: 0.8, fontStyle: 'italic' }}>{v}</div> : null; })()}
         {(e.kind === 'arrival' || e.kind === 'trial_end' || e.kind === 'kin' || (e.kind === 'shelter' && !e.shelter?.settle)) && !!e.people?.length && <ArrivalHousing people={e.people} />}
         {(e.kind === 'arrival' || e.kind === 'kin' || e.kind === 'trial_end' || e.kind === 'shelter') && !!e.people?.length && !(e.shelter?.settle) && (() => {
           const c = carryOf(g.game, e.people!), lines = carryLines(c);
-          const tone = c.levelWith === 'over' ? '#f08060' : c.levelWith === 'tight' ? '#f0c070' : undefined;
-          return <div data-testid="carry" style={{ margin: '8px 0', fontSize: 12, opacity: 0.9, color: tone }}>{lines.map((l, i) => <div key={i}>{l}</div>)}</div>;
+          return <div data-testid="carry"><Hint tone={c.levelWith === 'over' ? 'bad' : c.levelWith === 'tight' ? 'warn' : undefined} more={lines.slice(1).map((l, i) => <div key={i}>{l}</div>)}>{lines[0]}</Hint></div>;
         })()}
         {e.kind === 'arrival' && !!e.secret && (() => {
           const asked = e.asked ?? 0;
@@ -102,7 +129,7 @@ export function GateCard() {
           {e.stances.map((st, i) => (
             <button key={st} style={cut ? { ...button(st === picked), outline: st === picked ? '2px solid #d8c9a0' : undefined, background: st === picked ? '#4a4a3c' : '#2e302a', color: '#eee' } : button(i === 0)} title={label(st)[1]} onClick={() => (cut ? g.chooseStance(st) : g.answer(st))}>
               <div style={{ fontWeight: 600 }}>{label(st)[0]}</div>
-              <div style={{ fontSize: 11.5, opacity: 0.75 }}>{label(st)[1]}</div>
+              <div style={{ fontSize: 11.5, opacity: 0.75, ...CLAMP2 }}>{label(st)[1]}</div>
             </button>
           ))}
         </div>
