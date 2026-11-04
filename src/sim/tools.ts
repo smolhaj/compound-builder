@@ -177,7 +177,7 @@ const STAGE_NEEDS: Record<StageId, Need[]> = {
 
 /** Walls and the like by the kind of run. */
 function fenceNeeds(kind: string): Need[] {
-  if (kind === 'earth_berm' || kind === 'ditch' || kind === 'escape_tunnel') return [n('dig', 1, true)];
+  if (kind === 'earth_berm' || kind === 'ditch' || kind === 'moat' || kind === 'escape_tunnel') return [n('dig', 1, true)];
   if (kind === 'water_pipe') return [n('dig', 0.7, true), n('wrench', 0.3, true)];
   if (kind === 'power_cable') return [n('dig', 0.7, true), n('wire', 0.3)];
   if (kind === 'thorn_hedge') return [n('till', 0.7), n('dig', 0.3)];

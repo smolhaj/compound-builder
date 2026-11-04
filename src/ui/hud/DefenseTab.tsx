@@ -1,4 +1,6 @@
 /** The Defense tab: score, the property line (with "Wall my property"), upgrades, lights, towers, readiness checks. */
+import { waterLines } from '../../sim/waterWorks';
+import { yardLines } from '../../sim/vehicleYard';
 import { terrainDefense } from '../../sim/terrainFx';
 import { drainageLines } from '../../sim/drainage';
 import { retainingLines } from '../../sim/retaining';
@@ -108,6 +110,8 @@ export function DefenseTab() {
       {retainingLines(game).map(l => <Note key={l}>{l}</Note>)}
       <Row label="The ground's share of the defense" value={`${Math.round(terrain.score * 100)}%`} tone={terrain.score >= 0.5 ? 'good' : terrain.score >= 0.25 ? 'warn' : undefined} title="Hard lanes, a held choke and towers on real high ground: one input to how hard a crew finds the place (never a second scaling)" />
       {corridorLines(game).map(l => <Note key={l}>{l}</Note>)}
+      {waterLines(game).map(l => <Note key={l}>{l}</Note>)}
+      {yardLines(game).map(l => <Note key={l}>{l}</Note>)}
       {game.perimeter.filter(r => PERIMETER[r.kind].vehicleWay).map(r => <div key={r.id} style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '3px 0' }}>
         <span style={{ flex: 1 }}>{PERIMETER[r.kind].name} <span style={{ color: DIM }}>({Math.round(wallLength(r) * 6)} m, {r.collapsed ? 'choked with rubble' : runFinished(r) ? 'standing' : r.dropped ? 'dropped: rebuild it from Projects' : 'being built'})</span></span>
         {r.collapsed && <button style={btn(game.money >= clearQuote(r).usd)} disabled={game.money < clearQuote(r).usd || r.collapsed.clearsAt !== null} title={`A contractor with an excavator hauls the fall out: about ${clearQuote(r).days} days`} onClick={() => { const w = useGameStore.getState().clearCollapse(r.id); if (w) alert(w); }}>{r.collapsed.clearsAt !== null ? `Clearing, ${Math.max(1, Math.ceil(r.collapsed.clearsAt - game.clock.t))} days` : `Clear the fall ${usd(clearQuote(r).usd)}`}</button>}
