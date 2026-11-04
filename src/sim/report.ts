@@ -94,6 +94,13 @@ export function tallyDay(s: GameState): Ending | null {
 export interface ReportCard { masthead: string; date: string; headline: string; sub: string; grade: string; score: number; lines: string[]; facts: Array<[string, string]> }
 
 /** The report card: a grade and the lines that tell what this build did. */
+/** The local paper's name by region (procedural text; US spelling). Unknown regions keep the old default. */
+export const MASTHEADS: Record<string, string> = {
+  mountain_west: 'The Range Gazette', appalachia: 'The Hollow Herald', desert: 'The Mesa Dispatch', north_woods: 'The Northwoods Pioneer', plains: 'The Prairie Sentinel',
+  pnw: 'The Cascade Chronicle', upper_midwest: 'The Lakeland Ledger', new_england: 'The Granite Register', ozarks: 'The Ozark Mountaineer', hill_country: 'The Hill Country Bulletin', rust_belt: 'The Valley Courier',
+};
+export const mastheadOf = (region?: string): string => (region && MASTHEADS[region]) || 'The Valley Courier';
+
 export function reportCard(s: GameState): ReportCard {
   const d = s.disaster, st = s.stats, g = s.gate;
   const fin = s.structures.filter(isFinished);
@@ -179,7 +186,7 @@ export function reportCard(s: GameState): ReportCard {
   const allies = s.neighbors.filter(n => n.disposition > 50 && n.status === 'home');
   if (allies.length) lines.push(`${allies.map(n => n.name[0].toUpperCase() + n.name.slice(1)).join(' and ')} stood with you.`);
   return {
-    masthead: 'The Valley Courier', date: `Day ${days} after ${name.toLowerCase()}`,
+    masthead: mastheadOf(s.site?.region), date: `Day ${days} after ${name.toLowerCase()}`,
     headline, sub, grade, score, lines,
     facts: [['Survived', `${alive} of ${total}`], ['Humanity', `${Math.round(g.humanity)}`], ['Days of it', `${days}`], ['Hungry days', `${st.hungryDays}`]],
   };
