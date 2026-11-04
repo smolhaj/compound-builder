@@ -80,7 +80,7 @@ export const STARTER_REACH = 10;
 /** Pieces keep this much clear air between footprints (u, 4.5 m): room to walk and to carry. */
 const GAP = 0.75;
 /** Share of the cash kept for living costs while the family builds, and its floor. */
-const RESERVE_SHARE = 0.25, RESERVE_MIN = 15000;
+export const RESERVE_SHARE = 0.25, RESERVE_MIN = 15000;
 
 interface Spec {
   kind: string; key: string; role: StarterRole; why: string;

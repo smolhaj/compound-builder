@@ -10,6 +10,7 @@ import { CREW_RATE, CREW_SIZE, crewProblem, crewQuote } from '../../sim/crews';
 import { fixBill, fixBlocked, fixDef, pendingFixes } from '../../sim/improvements';
 import { KIT } from '../../game/buildkit/kit';
 import { ResidentsLine } from '../QuartersPanel';
+import { useSpendGuard } from './useSpendGuard';
 import { FIT, FUEL_UNIT_L, fitProblem, plant, serviceOf, UTILITY, SPARE_FOR } from '../../sim/utilities';
 import { HARDEN, HARDEN_IDS, type TierDef, hardenCost, hardenProblem, isBunkerRoom, protectionOf, tierOf } from '../../sim/hardening';
 import { PERIMETER, runBlocked, runFinished, runGrowth, runProgress } from '../../sim/perimeter';
@@ -25,6 +26,7 @@ import { TONE, DIM, LINE, btn, usd } from './style';
 
 export function ProjectsTab() {
   const g = useGameStore();
+  const { guard, node: guardNode } = useSpendGuard();
   const selSeen = useRef<string | null>(null);
   useEffect(() => { if (!g.selected) selSeen.current = null; }, [g.selected]);
   const game = g.game;
@@ -114,9 +116,10 @@ export function ProjectsTab() {
                 {!why && !isFinished(sel) && blockedReason(game, sel) && <Note tone="warn">{blockedReason(game, sel) === holdReason(game, sel) && /permit/i.test(blockedReason(game, sel)!)
                   ? 'A crew would stand idle (billing nothing) until the permit clears.'
                   : `Still need ${blockedReason(game, sel)!.replace(/^Waiting for /, '')}: order first, a crew would stand idle (billing nothing).`}</Note>}
-                <button style={{ ...btn(), width: '100%', marginTop: 4 }} disabled={!!why} title={why ?? `${CREW_SIZE} workers at $${CREW_RATE}/h, weekdays 8 to 5; you still buy the materials`} onClick={() => g.hire(sel.id)}>
+                <button style={{ ...btn(), width: '100%', marginTop: 4 }} disabled={!!why} title={why ?? `${CREW_SIZE} workers at $${CREW_RATE}/h, weekdays 8 to 5; you still buy the materials`} onClick={() => guard(q.usd, () => g.hire(sel.id))}>
                   Hire a crew{!why && !isFinished(sel) && blockedReason(game, sel) ? ' anyway' : ''}: ~{usd(q.usd)}, about {q.weeks} week{q.weeks > 1 ? 's' : ''}
                 </button>
+                {guardNode}
               </>;
           })()}
           {(!isFinished(sel) || pendingFixes(sel).length > 0) && !game.crews.some(c => c.target === sel.id) && game.money < crewQuote(sel).usd && !crewProblem(game, sel) && (() => {

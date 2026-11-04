@@ -1,4 +1,5 @@
 import { flowLine } from '../sim/flow';
+import { PlansOrderButton } from './hud/SpendConfirm';
 import { useState } from 'react';
 import { unscripted } from '../sim/godMode';
 import { TERRAIN_LEGEND, type TerrainMode } from '../game/terrain/TerrainOverlay';
@@ -321,7 +322,7 @@ export function Hud() {
               ))}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 6 }}>
                 {needLines.length > 0
-                  ? <button style={btn(true)} disabled={!!orderProblem(game, needLines)} title="Everything the plans still lack, in one order" onClick={() => g.order(needLines)}>Order what the plans need ({usd(orderCost(needLines, prices(game)))})</button>
+                  ? <PlansOrderButton lines={needLines} style={{ width: 'auto' }} />
                   : <Note>{game.structures.some(s => !isFinished(s)) || game.perimeter.some(r => !runFinished(r)) ? 'The plans have all they need.' : 'Nothing planned that needs materials.'}</Note>}
                 <button style={btn()} title="Everything else is bought here, grouped by use: building, fencing, water, power, food, and so on" onClick={() => g.openShop(true)}>Buy materials in the Shop…</button>
               </div>
