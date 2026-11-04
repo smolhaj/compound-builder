@@ -20,6 +20,7 @@
  *             the atmosphere layer's flashlights.
  */
 import { vetAttention } from './gateVetting';
+import { flowFactor } from './flow';
 import { dogCount } from './pets';
 import { calendarOf, dayIndex, hourOf, type GameState, type PersonState, type TaskKind } from './state';
 import { isFinished } from './construction';
@@ -743,6 +744,7 @@ export function tire(ps: PersonState, duty: Duty, hour: number, hours: number): 
 export function addChoreWork(s: GameState, duty: Duty, personHours: number): ChoreId | null {
   const cs = DUTY_CHORES[duty];
   if (!cs) return null;
+  personHours *= flowFactor(s, duty);   // long carries between home, water, cellar and yard cost a few percent (sim/flow.ts)
   const lv = dailyOf(s).chores.levels;
   const c = cs.reduce((a, b) => (lv[b] > lv[a] ? b : a));
   lv[c] = Math.max(0, lv[c] - personHours * 100 / CLEAR_HOURS[c]);
