@@ -10,6 +10,7 @@ import { daysOfFood } from './needs';
 import { isFinished } from './construction';
 import { defenseReport } from './defenseReport';
 import { buildOff, type SuggestionAct } from './guidance';
+import { POWER_BUILDINGS as POWER, powerOnPlace } from './hookups';
 import type { GameState } from './state';
 
 export type OpId = 'shelter' | 'water' | 'power' | 'food' | 'defense';
@@ -28,7 +29,6 @@ export interface OpItem {
 export const DEFENSE_OK = 45;
 
 const WATER = ['well_hand', 'well_drilled', 'cistern', 'water_tower'];
-const POWER = ['solar_array', 'solar_farm', 'garage_solar', 'lodge_solar', 'generator_shed', 'battery_shed', 'battery_bank', 'micro_hydro', 'wind_turbine'];
 const FOOD = ['garden', 'field', 'greenhouse', 'greenhouse_heated', 'polytunnel', 'high_tunnel', 'orchard', 'orchard_grove', 'orchard_terraced', 'aquaponics'];
 
 export function operational(s: GameState, drive?: readonly Pt[]): OpItem[] {
@@ -50,7 +50,7 @@ export function operational(s: GameState, drive?: readonly Pt[]): OpItem[] {
     ...(waterDone || staked(WATER) ? {} : { act: stake(s.site.gwDepth > 9 ? 'well_drilled' : 'well_hand', s.site.gwDepth > 9 ? 'Drill a well' : 'Dig a well') }) });
 
   // power
-  const powerDone = fin(POWER) || !!s.site.improvements?.power;
+  const powerDone = powerOnPlace(s);
   out.push({ id: 'power', label: 'Power', done: powerDone, line: powerDone ? 'Power on the place' : staked(POWER) ? 'Power going in' : 'No power',
     ...(powerDone || staked(POWER) ? {} : { act: stake('solar_array', 'Stake solar') }) });
 

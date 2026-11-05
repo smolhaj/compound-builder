@@ -21,7 +21,7 @@ import { firewoodOutlook } from './heating';
 import { UTILITY } from './utilities';
 import { fmtKw } from './powerReport';
 import { anyBearing } from './orchard';
-import { needsHookup, storageTip } from './hookups';
+import { hookupTone, needsHookup, storageTip } from './hookups';
 import { MATERIAL_IDS, MATERIALS, type MaterialId } from './materials';
 import { PERIMETER, PERIMETER_ORDER, UPGRADE_NEXT, fenceLive, runBill, runFinished, wallLength, type PerimeterKind, type Pt } from './perimeter';
 import { MAX_TOWERS, ringStatus } from './fortress';
@@ -297,7 +297,8 @@ export function suggestions(s: GameState, limit = 3, skip?: ReadonlySet<string>)
   { const todo = needsHookup(s);
     if (todo.length) {
       const first = todo[0], name = first.name.replace(/_/g, ' ');
-      out.push({ id: 'hookup', kind: '', title: `Finish the ${name}`, urgency: first.kind === 'wire' || first.kind === 'plumb' ? 75 : 62,
+      const o = hookupTone(s, todo);
+      out.push({ id: 'hookup', kind: '', title: o.optional ? `Run power to the ${name} (optional)` : `Finish the ${name}`, urgency: o.optional ? 30 : first.kind === 'wire' || first.kind === 'plumb' ? 75 : 62,
         why: `${first.text.toLowerCase()}${todo.length > 1 ? `; ${todo.length - 1} more building${todo.length > 2 ? 's' : ''} are not working yet either` : ''}`,
         acts: [{ label: 'Show me', act: { type: 'select', id: first.id } }, ...(first.tool ? [{ label: 'Draw the line', act: { type: 'tool' as const, tool: first.tool } }] : [])] });
     } }

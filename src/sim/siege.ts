@@ -21,6 +21,8 @@
  *            + the fight (played second for second, 1 playback s = 1 game s)
  *            + a tail (the lull, the raiders drawing off, the watch counting heads).
  */
+import { nobodyHome } from './orphans';
+import { log } from './economy';
 import type { Battle, BattleEvent, BattleUnit } from './battleTypes';
 import { planBattle, type RaiderTemper } from './battle';
 import { ORGANIZED, type Encounter, type EncounterKind, type Stance } from './encounters';
@@ -82,6 +84,9 @@ export function scheduleArrival(s: GameState, e: Encounter): boolean {
 export function arrivalCheck(s: GameState): Encounter | null {
   const inc = s.gate.incoming;
   if (!inc || s.clock.t < inc.at - 1e-9 || s.gate.pending) return null;
+  // nobody home (every adult gone, the children fostered): no cutscene with nobody to watch or defend it. The raid that was on its way finds the
+  // place held as it stands and moves on; the stores are untouched (the same rule as gateDay's quiet gate). DECISIONS.md
+  if (nobodyHome(s)) { s.gate.incoming = null; log(s, 'A crew that was headed for the place found nobody there and went on.'); return null; }
   s.gate.pending = inc.e;
   s.gate.incoming = null;
   return inc.e;
