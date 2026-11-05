@@ -475,7 +475,8 @@ export function gateDay(s: GameState): Encounter | null {
   g.respect = (g.respect ?? 0) * 0.995;   // a reputation fades (half in ~4½ months)
   for (const line of trialDay(s)) log(s, line);
   if (g.comeBack && day > g.comeBack.until) g.comeBack = null;
-  if (g.pending) return null;
+  // one card at a time: nothing new while one is up, or while a raid is on its way to the gate (it takes the gate at its hour)
+  if (g.pending || g.incoming) return null;
   // the line is alive but the children are fostered: nobody home to answer the gate, so no cards queue until someone is back
   if (nobodyHome(s)) return null;
   const d = s.disaster;

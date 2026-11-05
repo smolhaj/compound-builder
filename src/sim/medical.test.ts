@@ -227,6 +227,15 @@ describe('medicines have a shelf life; the medic is the best present', () => {
     expect(medReport(g).medic?.id).toBe(nurse.id);
   });
 
+  it('a person with two infections is one need line, not two identical ones (React keys, the next-step card)', () => {
+    const g = game(); g.stock.meds = 0;
+    const med = (): never => ({ kind: 'infection', day: 1, care: 'infected' } as never);
+    g.personState[0].needs.hurt.push({ what: 'a wound (infected)', sev: 60, med: med() }, { what: 'a scrape (infected)', sev: 70, med: med() });
+    const needs = medReport(g).needs;
+    expect(needs).toHaveLength(1);
+    expect(new Set(needs).size).toBe(needs.length);
+  });
+
   it('a v63 save gets the medical goods at zero and plays on', () => {
     const old = structuredClone(game(4)) as unknown as Record<string, unknown>;
     old.version = 63; delete old.medical;
