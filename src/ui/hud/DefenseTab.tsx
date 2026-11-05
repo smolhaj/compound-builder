@@ -23,7 +23,8 @@ import { bridgeDown, rebuildQuote, roadBridgeOf, roadLine } from '../../sim/road
 import { clearQuote, corridorLines } from '../../sim/corridors';
 import { canHostWalkway, walkOn, walkwayBill, walkwayProblem } from '../../sim/walkway';
 import { adaptLevel, firstWinter, sinceHit } from '../../sim/adaptive';
-import { adaptOf } from '../../sim/encounters';
+import { adaptOf, postureOf } from '../../sim/encounters';
+import { reputation } from '../../sim/reputation';
 import { dayIndex } from '../../sim/state';
 import { Group, Hint, Note, Row, Section } from './common';
 import { readiness } from '../../sim/courses';
@@ -101,6 +102,19 @@ function GuardsSection() {
   </Section>;
 }
 
+/** What the county road says about the place (sim/reputation.ts): how hard it looks, the neighbors' read of it, and the drivers. */
+function ReputationSection() {
+  const game = useGameStore(s => s.game);
+  const r = reputation(game, postureOf(game));
+  const tone = r.hard >= 0.4 ? TONE.good : DIM;
+  return <Section title="Reputation on the county road">
+    <Row label="The road says" value={`${r.label} · ${Math.round(r.hard * 100)}`} tone={r.hard >= 0.4 ? 'good' : undefined} title="How hard the place looks and is known to be. Opportunists (looters, burglars) weigh it; organized crews plan around it." />
+    {r.drivers.map(d => <div key={d.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12, padding: '1px 0' }} title={d.note}><span style={{ color: DIM }}>{d.label} <i>({d.note})</i></span><span style={{ color: tone }}>+{Math.round(d.points)}</span></div>)}
+    <Row label="The neighbors say" value={r.neighbors + (r.goodwill != null ? ` · goodwill ${r.goodwill}` : '')} title="A fortress look cools neighbors who do not know you yet (never allies); a good-neighbor record warms them." />
+    {r.lines.map((l, i) => <div key={i} style={{ color: DIM, fontSize: 12 }}>{l}</div>)}
+  </Section>;
+}
+
 export function DefenseTab() {
   const game = useGameStore(s => s.game);
   const w = useWorldStore();
@@ -123,6 +137,7 @@ export function DefenseTab() {
       {hardcore && <HardcoreNotes />}
     </Section>
     <GuardsSection />
+    <ReputationSection />
     <Section title="The property line">
       {d.walls.map(c => <CheckRow key={c.id} c={c} />)}
       {missingGate > 0 && <div style={{ border: '1px solid #c9a24a', borderRadius: 6, padding: 6, margin: '4px 0' }}>

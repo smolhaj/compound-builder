@@ -202,7 +202,7 @@ describe('real engine', () => {
       return kinds;
     };
     let a = 0, b = 0;
-    for (const seed of [3, 5]) {
+    for (const seed of [3, 5, 7]) {
       const old = run(false, seed), now = run(true, seed);
       for (const k of new Set([...Object.keys(old), ...Object.keys(now)])) {
         const o = old[k] ?? 0, n = now[k] ?? 0;
