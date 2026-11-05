@@ -196,7 +196,7 @@ export async function play(A) {
       for (let i = 0; i < 60; i++) {
         const c = await page.evaluate(() => { const gs = window.__cb.game.getState(), g = gs.game; return { p: !!g.gate.pending, cs: gs.cutscene?.phase ?? null, a: !!g.gate.aftermath, c: !!g.gate.card }; });
         if (!c.p && !c.cs && !c.a && !c.c) return;
-        const stance = [/^Open the house/, /^Hide/, /^Parley/, /^Trade/, /^Warn off/, /^Take them in/, /^Turn them away/, /^Defend/];
+        const stance = [/^Give notice and move in/, /^Open the house/, /^Hide/, /^Parley/, /^Trade/, /^Warn off/, /^Take them in/, /^Turn them away/, /^Defend/];
         let hit = false;
         if (c.cs === 'playing') { hit = await click(/^Skip( scene| all)?$/) || await click(/^(Continue|Stay the course)/); }
         else if (c.cs === 'aftermath') hit = await click(/Pick up the pieces|See to the drive/);
@@ -206,6 +206,7 @@ export async function play(A) {
         if (!hit) await click(/^(Continue|OK|Close|Okay|Got it)/);
         await page.waitForTimeout(250);
       }
+      { const info = await page.evaluate(() => { const gs = window.__cb.game.getState(), g = gs.game; return JSON.stringify({ day: Math.floor(g.clock.t), speed: g.clock.speed, kind: g.gate.pending?.kind ?? null, cs: gs.cutscene?.phase ?? null, aft: !!g.gate.aftermath, card: g.gate.card?.title ?? null, ending: g.ending?.kind ?? null, buttons: [...document.querySelectorAll('button')].map(b => (b.disabled ? '[x] ' : '') + (b.innerText || '').replace(/\s+/g, ' ').trim()).filter(Boolean).slice(0, 40) }); }); note(`[${cfg.label}] STUCK GATE ` + info.slice(0, 900)); await shotTo('stuck-gate'); }
       bug('flow', 'gate did not clear in 60 tries');
     };
     await advanceTo(Math.min(30, target));

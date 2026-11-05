@@ -26,7 +26,7 @@ try {
     return { bar: bar ? vis(bar) : null, panels: panels.map(vis).filter(Boolean), vw: innerWidth };
   });
   const hit = (a, b) => a.l < b.r - 1 && b.l < a.r - 1 && a.t < b.b - 1 && b.t < a.b - 1;
-  for (const [w, h] of [[1280, 800], [1024, 640], [420, 800]]) {
+  for (const [w, h] of [[1280, 800], [1024, 640], [420, 800], [390, 844]]) {
     await page.setViewportSize({ width: w, height: h });
     await page.waitForTimeout(600);
     await page.evaluate(() => window.__cb.qa.renderNow());

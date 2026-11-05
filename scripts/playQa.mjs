@@ -139,7 +139,7 @@ async function handleGate(s, policy) {
       const re = policy.stance(c);
       const labels = await page.getByRole('button').allInnerTexts();
       let hit = false; for (const r of [].concat(re)) { if (await click(r)) { hit = true; break; } }
-      if (!hit) hit = await click(/^(Open the house|Hide|Parley|Trade|Warn off|Defend|Take them in|Pay|Turn them away)/);
+      if (!hit) hit = await click(/^(Give notice and move in|Hold on|Open the house|Hide|Parley|Trade|Warn off|Defend|Take them in|Pay|Turn them away)/);
       if (!hit) { await shot(`gate-${raids}-nomatch`); issue(`gate ${raids}: no stance button matched ${re}; buttons: ${labels.join(' / ').slice(0, 250)}`); }
       stanceLog.push(`${s.day}:${s.pendKind}:${re}`);
       await click(/^Watch$/);
