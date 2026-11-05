@@ -17,7 +17,7 @@ import { isFinished } from './construction';
 import { hasBasement, stylePF } from './housingStyles';
 import { protectionOf } from './hardening';
 import { SPARE_FOR } from './utilities';
-import { winterFactor } from './effects';
+import { climate, winterFactor } from './effects';
 export { winterFactor };
 import { mulberry32 } from './rng';
 import { empVehicles } from './vehicles';
@@ -147,9 +147,13 @@ export function disasterSky(s: GameState): { haze: number; flash: number; dust: 
   const d = s.disaster, h = (s.clock.t - d.hitAt) * 24;
   if (d.kind === 'nuclear') return nuclearSky(s);
   if (!d.kind || s.clock.t < d.warnAt) return { haze: 0, flash: 0, dust: 0 };
-  const w = winterFactor(s);
   switch (d.kind) {
-    case 'ash_winter': return h < 0 ? { haze: 0, flash: 0, dust: 0 } : { haze: Math.max(0.5, 1 - w.grow), flash: 0, dust: h < 24 * 10 ? 1 - h / (24 * 10) : 0 };
+    case 'ash_winter': {
+      // the ash fall thickens over the first week, then holds as long as the cold does (climate(): a year at full, a year and a half fading)
+      if (h < 0) return { haze: 0, flash: 0, dust: 0 };
+      const cold = climate(s).grow < 1 ? (1 - climate(s).grow) / 0.75 : 0, ramp = Math.min(1, h / (24 * 7));
+      return { haze: ramp * (0.3 + 0.62 * Math.min(1, cold)), flash: 0, dust: h < 24 * 10 ? 1 - h / (24 * 10) : 0 };
+    }
     case 'asteroid': return h < 0 ? { haze: 0, flash: 0, dust: 0 } : { haze: Math.max(0.3, Math.min(1, 1 - (h / 24 - 730) / 400)), flash: h < 0.05 ? 1 - h / 0.05 : 0, dust: h < 72 ? 0.6 : 0 };
     case 'wildfire': return { haze: h < -48 ? 0.3 : h < 24 * 6 ? 0.85 : 0, flash: 0, dust: h > 0 && h < 48 ? 0.5 : 0 };
     default: return { haze: 0, flash: 0, dust: 0 };
