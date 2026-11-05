@@ -87,6 +87,8 @@ export interface RegionWorld {
   /** Sagebrush on the open ground (density 0–1) and its colors; willow on the creek banks. */
   sage: number;
   sagePalette?: number[];
+  /** Scrub form: 'desert' swaps the sagebrush clump for creosote with yucca and prickly pear (same draw call). */
+  scrub?: 'desert';
   /** Understory shrubs and ferns in the timber (density 0–1) — they share the sage field's draw call; `sagePalette` gives their colors. */
   understory?: number;
   willow: number;
@@ -103,6 +105,8 @@ export interface RegionWorld {
 const CONIFER_DARK: Palette = [[0x2c4a34, 3], [0x31503a, 2], [0x27432f, 2], [0x385a40, 1]];
 const SPRUCE: Palette = [[0x24402c, 3], [0x2a4631, 2], [0x203a29, 2], [0x31503a, 1]];
 const JUNIPER: Palette = [[0x55634a, 3], [0x4d5a44, 2], [0x606c50, 2], [0x46523e, 1]];
+/** Sun-bleached gray-olive junipers and pinyon (the dark forest green read as a conifer woodland on tan ground). */
+const DESERT_JUNIPER: Palette = [[0x6f7a58, 3], [0x788462, 2], [0x66724f, 2], [0x808a6a, 1]];
 const ASPEN: Palette = [[0x5f8a38, 3], [0x6a9040, 2], [0x557f36, 2]];
 const BIRCH: Palette = [[0x5f8a3e, 3], [0x67903f, 2], [0x587e3a, 2]];
 const HARDWOOD: Palette = [[0x3a6327, 3], [0x47702c, 3], [0x506f29, 2], [0x31582c, 2]];
@@ -144,11 +148,11 @@ export const REGION_WORLD: Record<RegionId, RegionWorld> = {
     kind: 'desert', climate: 'desert_southwest', relief: 'bajada', cover: 3.5,
     trees: {
       timber: [{ kind: 'conifer', w: 1, scale: [0.28, 0.45], sx: [1.25, 1.6], sy: [0.7, 0.9] }],   // one-seed juniper, pinyon
-      riparian: { kind: 'broad', scale: [0.9, 1.2] },                                 // Fremont cottonwood
+      riparian: { kind: 'conifer', scale: [0.34, 0.58] },                             // one-seed juniper by the wash (a cottonwood on every dry gully read as a green lollipop line on tan ground)
       under: { thick: null, edge: null },
-      palettes: { conifer: JUNIPER, broad: COTTONWOOD },
+      palettes: { conifer: DESERT_JUNIPER, broad: COTTONWOOD },
     },
-    sage: 0.55, sagePalette: [0x8a8c74, 0x94957c, 0x7f826a, 0x9c9a82, 0x878a70], willow: 0.3,
+    sage: 1, scrub: 'desert', sagePalette: [0x8a9460, 0x7d8a58, 0x9aa070, 0x868f62, 0x9a9468, 0x6f7d50], willow: 0.3,   // creosote, rabbitbrush, yucca, prickly pear
     rocks: { count: 30, color: 0x9a5c44, size: [0.1, 0.45], flat: 0.6 },              // red sandstone
     road: 'caliche', fence: 'wire',
   },

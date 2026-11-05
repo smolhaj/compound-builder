@@ -57,7 +57,7 @@ import { postSpot } from './people/dogGoals';
 import { LivestockRenderer } from './livestock/LivestockRenderer';
 import { hostileAtGate, type Home } from './livestock/livestockPlan';
 import { ringsAround } from '../sim/rings';
-import { buildYard, type Yard } from './props/yardGeometry';
+import { buildYard, yardBlockedLocal, yardSolidLocal, type Yard } from './props/yardGeometry';
 import { dailyCtx, wallGate, yardFx } from './people/dailyScene';
 import type { GoalCtx, Site } from './people/peopleGoals';
 import { CELL, type KitPieceDef } from './buildkit/kit';
@@ -316,7 +316,7 @@ export class HomesteadWorld {
     this.access = accessFromPlan(this.plan);
     this.terrain = new TerrainRenderer(ws.scene);
     this.forest = new ForestRenderer(ws.scene);
-    this.sage = new ShrubField(ws.scene, 'sagebrush', this.regionWorld.sagePalette ?? SAGE, 1);
+    this.sage = new ShrubField(ws.scene, this.regionWorld.scrub === 'desert' ? 'desert_scrub' : 'sagebrush', this.regionWorld.sagePalette ?? SAGE, 1);
     this.rocks = new RockField(ws.scene);
     this.willow = new ShrubField(ws.scene, 'willow', WILLOW, 1);
     this.farTrees = new FarTreeRenderer(ws.scene);
@@ -2534,6 +2534,7 @@ export class HomesteadWorld {
     if (this._buildingBlocked(x, z, r)) return true;
     if (this._perimeterBlocked(x, z, Math.min(r, INDOOR_R))) return true;
     if (Math.hypot(x - this.camp.x, z - this.camp.z) < 0.4 + r) return true;
+    if (this._yardAt(x, z, r)) return true;
     for (const t of this.treeSpecs) {
       const dx = t.x - x, dz = t.z - z;
       const tr = r + 0.07 * t.scale;
@@ -2542,8 +2543,18 @@ export class HomesteadWorld {
     return false;
   };
 
-  /** Is the point inside a parcel tree's crown (camera keep-out)? */
+  /** Is (x, z) within `pad` of a solid yard prop (woodpile, picnic table, grill, tub)? Camp-local test (the yard turns with the camp). */
+  private _yardAt(x: number, z: number, pad: number, y = 0): boolean {
+    const dx = x - this.camp.x, dz = z - this.camp.z;
+    if (dx * dx + dz * dz > 2.6 * 2.6) return false;
+    const c = Math.cos(this.camp.rot), s = Math.sin(this.camp.rot);
+    const lx = dx * c - dz * s, lz = dx * s + dz * c;
+    return y > 0 ? yardSolidLocal(lx, y - this._campGroup.position.y, lz, pad) : yardBlockedLocal(lx, lz, pad);
+  }
+
+  /** Is the point inside a parcel tree's crown or a solid yard prop (camera keep-out)? */
   crownAt = (x: number, y: number, z: number): boolean => {
+    if (this._yardAt(x, z, 0.04, Math.max(0.001, y))) return true;
     for (const t of this.treeSpecs) {
       const r = (t.kind === 'conifer' ? 0.78 : 0.9) * t.scale * t.sx + 0.12;
       const dx = t.x - x, dz = t.z - z;
@@ -2570,7 +2581,7 @@ export class HomesteadWorld {
       for (let a = 0; a < Math.PI * 2; a += 0.4) {
         const px = x + Math.cos(a) * r, pz = z + Math.sin(a) * r;
         if (this.parcel.isCreek(px, pz) || Math.abs(pz - this.parcel.creek.zAt(px)) < 1.5) continue;
-        if (this.treeClearance(px, pz) > clear && !this._lowObstacles.some(o => Math.hypot(o.x - px, o.z - pz) < o.r + 0.45)) return [px, pz];
+        if (this.treeClearance(px, pz) > clear && !this._lowObstacles.some(o => Math.hypot(o.x - px, o.z - pz) < o.r + 0.45) && !this._yardAt(px, pz, 0.45) && !this.onBuilding(px, pz, 0.3) && !this.onAccess(px, pz, 0.7) && !this.onCamp(px, pz, 0.35)) return [px, pz];
       }
     }
     return [x, z];

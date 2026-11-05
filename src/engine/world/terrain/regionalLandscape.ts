@@ -151,7 +151,7 @@ export function regionLookFor(kind: RegionKind): RegionLook {
       // oak-hickory leaf litter over brown duff, moss on the damp north sides and the ledges
       floor: { duff: 0x5e5038, litter: 0x7e6038, moss: 0x58803a, litterK: 0.65, mossK: 0.4, meadow: 0.9 } };
     // Colorado Plateau: tan grama grass and bare red-brown soil, pinyon–juniper on the mesas, red sandstone cliffs
-    case 'desert': return { ...base, dry: 0.92, rock: 0x9c5f45, forest: 0x46553a, evergreen: 0.97, grass: 0x8c8458, dryGrass: 0xb39a72, farm: 0, fieldSize: 60, rockSlope: 0.18 };
+    case 'desert': return { ...base, dry: 0.97, rock: 0x9c5f45, forest: 0x6a6c48, evergreen: 0.97, grass: 0xa8956a, dryGrass: 0xc2a678, farm: 0, fieldSize: 60, rockSlope: 0.18 };
     // spruce–fir and pine on the flats, birch and aspen in the burns, lakes and open bog
     case 'north_woods': return { ...base, snowLineWinter: -15, forest: 0x1d3424, evergreen: 0.75, rock: 0x6e6c66, grass: 0x5c6e40, farm: 0.05, fieldSize: 24, rockSlope: 0.45,
       // needle duff (rusty brown) with grey-green reindeer moss patches
