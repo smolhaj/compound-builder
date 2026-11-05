@@ -10,6 +10,7 @@ import { isHome } from './blueprints';
 import { isFinished } from './construction';
 import type { Person } from './family';
 import type { GameState } from './state';
+import { chillFrost } from './stealth';
 
 /** Heating demand below this is a mild night: no risk. */
 export const COLD_FLOOR = 0.45;
@@ -18,7 +19,7 @@ export const FROST_DAILY = 0.05;
 
 /** 0 (warm or mild) to 1 (the stove is cold on a hard-freeze night). */
 export function coldExposure(s: GameState): number {
-  if (s.heat.burned < 1) return 0;
+  if (s.heat.burned < 1) return chillFrost(s);   // a dusk-only stove (sim/stealth.ts) lets the house go cold by morning even with wood in hand
   const d = demandNow(s);
   if (d < COLD_FLOOR) return 0;
   return Math.min(1, (d - COLD_FLOOR) / 1.0);

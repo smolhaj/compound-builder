@@ -14,6 +14,7 @@ import { hasBasement } from './housingStyles';
 import { layFactor } from './wildlife';
 import { calendarOf, type GameState } from './state';
 import { darkMood, mishapChance } from './blackout';
+import { chillMorale } from './stealth';
 import { wildDay } from './wildfood';
 import { livestockDay } from './livestock';
 import { isHome } from './blueprints';
@@ -339,7 +340,7 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
     if (sl) dh -= sl.harm;
     n.health = Math.max(healthFloor(cozy, n.starved ?? 0, { kid: !!p.kid, age: p.age, sick: n.hurt.length > 0, id: p.id }), Math.min(100, n.health + dh));
     // morale: drifts to a baseline that variety, a home, light and safety raise; hunger and loss lower
-    const target = 45 + 6 * Math.min(variety, 4) + diet.morale + (home ? 8 : -6) + (dark ? -8 : 0) + darkMood(s, !!p.kid, (s.personState[i]?.task as string) === 'watch') + (s.utilities.hauling ? (s.utilities.haulFar ? -10 : -4) : 0) - Math.min(25, n.hunger / 1000) + social + lifeMorale(s, i) + newcomerMorale(s, p.id) + (fromStores ? 0 : table) + (sl?.morale ?? 0) + dogEffects(s, p.id).morale + mindMorale(s, p.id) - beltMorale(s, p.id);
+    const target = 45 + 6 * Math.min(variety, 4) + diet.morale + (home ? 8 : -6) + (dark ? -8 : 0) + darkMood(s, !!p.kid, (s.personState[i]?.task as string) === 'watch') + chillMorale(s) + (s.utilities.hauling ? (s.utilities.haulFar ? -10 : -4) : 0) - Math.min(25, n.hunger / 1000) + social + lifeMorale(s, i) + newcomerMorale(s, p.id) + (fromStores ? 0 : table) + (sl?.morale ?? 0) + dogEffects(s, p.id).morale + mindMorale(s, p.id) - beltMorale(s, p.id);
     n.morale += (Math.max(0, Math.min(100, target)) - n.morale) * 0.08;
     // stumbling about in dark rooms under lights-out without curtains (sim/blackout.ts)
     const stumble = ((rnd * 7919 + i * 211 + 5) % 1 + 1) % 1;

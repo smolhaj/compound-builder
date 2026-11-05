@@ -18,7 +18,7 @@ import { eraPressure } from './eraPressure';
 import { threatOn } from './threatState';
 import type { GameState } from './state';
 import { isFinished } from './construction';
-import { noiseNow } from './gatherings';
+import { chimneyPoints, giveAways, nightNoise, partyNoise, type GiveAway } from './stealth';
 import { lightLines, type AutoLightsOut, type LightLine } from './blackout';
 import { alwaysLit, animalGlow, lightList } from './lights';
 import { floodTowerIds } from './towers';
@@ -28,10 +28,10 @@ export interface Opsec { quietDeliveries: boolean; blackout: boolean; auto?: Aut
 
 export const opsecOf = (s: GameState): Opsec => (s.opsec ??= { quietDeliveries: false, blackout: false, auto: 'off' });
 
-export type ExposureSource = 'deliveries' | 'structures' | 'guns' | 'metals' | 'lights' | 'smoke' | 'talk' | 'news' | 'market' | 'gatherings';
+export type ExposureSource = 'deliveries' | 'structures' | 'guns' | 'metals' | 'lights' | 'smoke' | 'chimney' | 'noise' | 'talk' | 'news' | 'market' | 'gatherings';
 export const EXPOSURE_NAME: Record<ExposureSource, string> = {
   deliveries: 'Deliveries seen', structures: 'Visible structures', guns: 'Gun sales on record', metals: 'Metal & cash on the books',
-  lights: 'Lights after the grid', smoke: 'Smoke & cooking', talk: 'Talk in town', news: 'On the local news', market: 'Followed from the market', gatherings: 'Parties & cookouts',
+  lights: 'Lights after the grid', smoke: 'Smoke & cooking', chimney: 'Chimney smoke at night', noise: 'Stock and dogs at night', talk: 'Talk in town', news: 'On the local news', market: 'Followed from the market', gatherings: 'Parties & cookouts',
 };
 
 const STRUCTURE_WEIGHT: Record<string, number> = { bunker_hatch: 10, bunker_stairs: 8, bunker_floorhatch: 3, water_tower: 8, solar_array: 7, garage_solar: 5, lodge: 6, lodge_plinth: 6, lodge_solar: 8, gate_garage: 4, solar_farm: 10, micro_hydro: 2,orchard_terraced: 1,cabin_village: 8, helipad: 7, stilted_house: 5, tower_pod: 4,boat_dock: 3, marina: 6, polytunnel: 1, high_tunnel: 3, aquaponics: 2, wind_turbine: 9, battery_bank: 3, greenhouse_heated: 4, pond: 2, equipment_yard: 2 };
@@ -64,10 +64,13 @@ export function exposureParts(s: GameState): Record<ExposureSource, number> {
   const at = s.breakins?.newsAt ?? -1;
   const news = at >= 0 ? 15 * Math.exp(-Math.max(0, s.clock.t - at) / 365) : 0;
   // noise, light and smoke from a cookout or a party (sim/gatherings.ts), fading over a few days
-  const gatherings = Math.min(15, noiseNow(s));
+  const gatherings = Math.min(15, partyNoise(s));
+  // the stove's plume at night, and stock and dogs after dark (sim/stealth.ts): every stealth option only lowers these
+  const chimney = chimneyPoints(s);
+  const nn = nightNoise(s), noise = nn.animals + nn.dogs;
   // followed home from the crossroads market (sim/market.ts), fading over weeks
   const market = s.market?.heat ?? 0;
-  return { deliveries, structures, guns, metals, lights, smoke, talk, news, market, gatherings };
+  return { deliveries, structures, guns, metals, lights, smoke, chimney, noise, talk, news, market, gatherings };
 }
 
 /** 0–100: how much the county knows. */
@@ -85,4 +88,9 @@ export function topExposure(s: GameState, n = 3): Array<[ExposureSource, number]
 /** Multiplier on how often people come and how many of them come for what you have: 0.7 (nobody knows) … 1.6 (everyone does). */
 export function raidPressure(s: GameState): number {
   return (0.7 + 0.9 * exposure(s) / 100) * eraPressure(s) * (1 + 0.5 * threatOn(s, 'warlord'));   // a warlord scare (sim/threats.ts): up to half again
+}
+
+/** The give-aways as one inspectable list (light, smoke, noise, heat), each as a number (sim/stealth.ts). */
+export function giveAwayReadout(s: GameState): GiveAway[] {
+  return giveAways(s, lightLinesOf(s), exposureParts(s).smoke);
 }

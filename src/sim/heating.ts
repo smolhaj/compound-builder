@@ -15,6 +15,7 @@ import { isFinished } from './construction';
 import { regionFor } from './climate';
 import { heatFactor } from './housingStyles';
 import { heatWindK } from './microclimate';
+import { insulationHeat, woodK } from './stealthState';
 
 /** Heating demand 0–1 by day of year (peaks mid-January, nil June–August). */
 export function heatDemand(doy: number): number {
@@ -30,14 +31,14 @@ export const BURN_PER_DAY = 0.12;
 
 /** Today's heating demand (0 = none, ~1.6 = a bitter cold snap), with a leaky roof. */
 export function demandNow(s: GameState): number {
-  return Math.min(2, (heatDemand(calendarOf(s.clock).doy) * regionFor(s.site).cold + climate(s).cold) * roofLoss(s) * heatFactor(s) * heatWindK(s));
+  return Math.min(2, (heatDemand(calendarOf(s.clock).doy) * regionFor(s.site).cold + climate(s).cold) * roofLoss(s) * heatFactor(s) * heatWindK(s) * insulationHeat(s));
 }
 
 /** Burn `days` worth of firewood (called each sub-step). */
 export function burnFirewood(s: GameState, days: number): void {
   const d = demandNow(s);
   if (d <= 0) return;
-  s.heat.burned += d * BURN_PER_DAY * days;
+  s.heat.burned += d * BURN_PER_DAY * days * woodK(s);
   while (s.heat.burned >= 1) {
     if (!burnRick(s)) {
       s.heat.burned = 1;
