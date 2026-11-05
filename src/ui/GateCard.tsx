@@ -30,6 +30,12 @@ const GUARD_STAY: Partial<Record<Stance, [string, string]>> = {
   turn_away: ['Let him go', 'Thank him for the work and let him drive off. A small note on the household\'s morale; you are exactly where you would have been.'],
 };
 
+/** A guard or joiner working for someone else. */
+const INSIDER_CARD: Partial<Record<Stance, [string, string]>> = {
+  dismiss: ['Let him go', 'Pay him off and send him down the road. He cannot sell what he no longer sees.'],
+  ignore: ['Keep him', 'Say nothing and watch him. He may leak the layout, open the gate for a raid or steal, and no wall stops that.'],
+};
+
 /** A neighbor household at the door: the same two answers, in their words. */
 const SHELTER: Partial<Record<Stance, [string, string]>> = {
   take_in: ['Open the house', 'They come in out of it and stay until it has passed. Their own place stays theirs, and they will not forget it.'],
@@ -92,11 +98,11 @@ export function GateCard() {
     const p = postureOf(g.game);
     // honest odds: the battle sim itself, a couple of dozen times (cached per encounter)
     const odds = e.strength > 0 && e.kind !== 'break_in' && e.stances.includes('defend') ? fightOdds(g.game, e) : null;
-    const label = (st: Stance) => (e.kind === 'kin' && st === 'take_in' && defaultStay(g.game, e) === 'player_build' && STANCE.build_first) || (e.ransom && RANSOM[st]) || (e.kind === 'trial_end' && TRIAL_END[st]) || (e.kind === 'shelter' && SHELTER[st]) || (e.kind === 'guard_stay' && GUARD_STAY[st]) || STANCE[st];
+    const label = (st: Stance) => (e.kind === 'kin' && st === 'take_in' && defaultStay(g.game, e) === 'player_build' && STANCE.build_first) || (e.ransom && RANSOM[st]) || (e.kind === 'trial_end' && TRIAL_END[st]) || (e.kind === 'shelter' && SHELTER[st]) || (e.kind === 'guard_stay' && GUARD_STAY[st]) || (e.kind === 'insider' && INSIDER_CARD[st]) || STANCE[st];
     const picked = cut ? cut.stance ?? e.stances[0] : null;
     return (
       <div style={cut ? raidBox : box}>
-        <div style={{ fontSize: 11, letterSpacing: 1, opacity: 0.6, textTransform: 'uppercase' }}>{e.kind === 'break_in' ? 'In the night' : e.kind === 'ransom' ? 'Word about your child' : e.kind === 'trial_end' ? 'The camp outside the wall' : e.kind === 'guard_stay' ? 'The guard asks to stay' : e.kind === 'kin' ? 'Family' : e.kind === 'shelter' ? 'Neighbors at the door' : e.kind === 'move_in' ? (e.title.startsWith('Time') ? 'The warning signs' : 'A decision') : e.kind === 'stranded' ? 'Caught in town' : e.neighbor ? 'A neighbor at the gate' : 'At the gate'}</div>
+        <div style={{ fontSize: 11, letterSpacing: 1, opacity: 0.6, textTransform: 'uppercase' }}>{e.kind === 'break_in' ? 'In the night' : e.kind === 'ransom' ? 'Word about your child' : e.kind === 'trial_end' ? 'The camp outside the wall' : e.kind === 'guard_stay' ? 'The guard asks to stay' : e.kind === 'insider' ? 'Someone on the inside' : e.kind === 'kin' ? 'Family' : e.kind === 'shelter' ? 'Neighbors at the door' : e.kind === 'move_in' ? (e.title.startsWith('Time') ? 'The warning signs' : 'A decision') : e.kind === 'stranded' ? 'Caught in town' : e.neighbor ? 'A neighbor at the gate' : 'At the gate'}</div>
         <div style={{ fontSize: 19, fontWeight: 700, margin: '2px 0 8px' }}>{e.title}</div>
         <Dossier e={e} />
         {e.kind === 'arrival' && (() => { const v = vetting(g.game).line; return v ? <div style={{ marginBottom: 4, opacity: 0.8, fontStyle: 'italic' }}>{v}</div> : null; })()}

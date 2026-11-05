@@ -58,6 +58,7 @@ import { practice } from './skills';
 import { turbineNoise } from './renewables';
 import { villageWatch } from './outposts';
 import { guardPosture, resolveGuardStay } from './guards';
+import { resolveInsider } from './insider';
 import { resolveTrialEnd, startTrial, trialDay, type Character, type TrialCamp } from './trial';
 import { vetArrival } from './gateVetting';
 import { admitNewcomers, resolveShelter, strangerArrival, type Extras, type ShelterWhy } from './newcomers';
@@ -185,8 +186,8 @@ export function postureOf(s: GameState): Posture {
 // Encounters
 // ─────────────────────────────────────────────────────────────────────────
 
-export type EncounterKind = 'guard_stay' | 'arrival' | 'looters' | 'gang' | 'refugees' | 'requisition' | 'neighbor_help' | 'trader' | 'horde' | 'patrol' | 'militia' | 'break_in' | 'ransom' | 'trial_end' | 'tunnelers' | 'kin' | 'shelter' | 'move_in' | 'stranded';
-export type Stance = 'hide' | 'parley' | 'warn' | 'defend' | 'trade' | 'take_in' | 'trial' | 'turn_away' | 'call_911' | 'shout' | 'confront' | 'pay' | 'refuse' | 'ambush' | 'flood' | 'collapse' | 'ignore' | 'build_first' | 'move_sell' | 'move_keep' | 'move_lease' | 'hold_on' | 'drive_now' | 'back_roads' | 'resupply';
+export type EncounterKind = 'insider' | 'guard_stay' | 'arrival' | 'looters' | 'gang' | 'refugees' | 'requisition' | 'neighbor_help' | 'trader' | 'horde' | 'patrol' | 'militia' | 'break_in' | 'ransom' | 'trial_end' | 'tunnelers' | 'kin' | 'shelter' | 'move_in' | 'stranded';
+export type Stance = 'hide' | 'parley' | 'warn' | 'defend' | 'trade' | 'take_in' | 'trial' | 'turn_away' | 'call_911' | 'shout' | 'confront' | 'pay' | 'refuse' | 'ambush' | 'flood' | 'collapse' | 'ignore' | 'build_first' | 'move_sell' | 'move_keep' | 'move_lease' | 'hold_on' | 'drive_now' | 'back_roads' | 'resupply' | 'dismiss';
 
 export interface Encounter {
   id: string;
@@ -221,6 +222,10 @@ export interface Encounter {
   /** Tunnelers (sim/tunnelers.ts): found digging under the wall (`warning`, the window to act), or up inside it (`inside`). */
   /** A contract guard asking to stay on when the world ends (sim/guards.ts): his id on the payroll. */
   guardId?: string;
+  /** A guard or joiner working for someone else (sim/insider.ts): who. */
+  suspect?: { kind: 'guard' | 'joiner'; id: string; name: string };
+  /** A raid a bought guard opened the gate for: his name. The wall is already down when they come (sim/insider.ts). */
+  insiderHelp?: string;
   /** A relative asking to join (sim/kin.ts): the savings they bring, and whether it is after the hit. */
   kin?: { savings: number; late: boolean };
   /** Strangers (sim/newcomers.ts): which kind of person, what they really are (hidden), what they say, the questions asked so far, what you noticed, a wound, tools and dogs they bring. */
@@ -246,7 +251,7 @@ export interface Encounter {
 /** Crews that plan, carry more and might bring explosives (battle.ts `organized`). */
 export const ORGANIZED: ReadonlySet<EncounterKind> = new Set(['gang', 'militia', 'patrol', 'requisition', 'tunnelers']);
 /** A crew that found the place empty and stripped it: they know it's lived in and come back sooner. */
-export interface ComeBack { kind: EncounterKind; size: number; armed: boolean; temper?: RaiderTemper; until: number; /** A scout who walked out and told them how the place lies (sim/newcomers.ts). */ guide?: string; /** The crew the scout's report brought: bigger, and they know where the hides are. */ scouted?: boolean; /** The crew a probing raid reported to (sim/adaptive.ts). */ probed?: boolean }
+export interface ComeBack { kind: EncounterKind; size: number; armed: boolean; temper?: RaiderTemper; until: number; /** A scout who walked out and told them how the place lies (sim/newcomers.ts). */ guide?: string; /** A guard who sold the gate: the raid comes in with the wall down (sim/insider.ts). */ insider?: string; /** The crew the scout's report brought: bigger, and they know where the hides are. */ scouted?: boolean; /** The crew a probing raid reported to (sim/adaptive.ts). */ probed?: boolean }
 
 /** What a betraying scout's report is worth to the crew: more hands, and they know where to look for the hide, the hatch and the stores below. */
 export const SCOUT_CREW_BONUS = 2;
@@ -507,6 +512,7 @@ export function gateDay(s: GameState): Encounter | null {
   if (cb && kind === cb.kind) {
     e.size = cb.size; e.armed = cb.armed; e.temper = cb.temper; e.back = true;
     if (cb.scouted && cb.guide) e.scouted = cb.guide;
+    if (cb.insider) { e.insiderHelp = cb.insider; e.dossier = [...e.dossier, `${cb.insider}, who stood your gate, sold it to them. They know the hours of the watch and he left the latch off: there is no wall to get over.`]; }
     e.strength = Math.round(cb.size * (kind === 'gang' ? 12 : kind === 'militia' ? 11 : 9));
     e.title = `Back again: ${e.title[0].toLowerCase()}${e.title.slice(1)}`;
     e.dossier = [cb.probed ? `${cb.size} of them. The men who walked your wire got back to the rest and told them where it is thin: where the posts are, where the lights do not reach, how many guns answered. They are not testing anything this time.` : cb.guide ? `${cb.size} of them. ${cb.guide} told them how the place lies: the posts, the guns, the hours of the watch. They come in knowing where to go: more of them than a crew would send blind, and they will look in the timber, the stores and the hatches.` : `${cb.size} of them: the same ones who went through the place. They know somebody lives here now, and they mean to find them.`, ...e.dossier.slice(1, 2)];
@@ -641,7 +647,7 @@ export function fightOdds(s: GameState, e: Encounter, tries = Math.max(10, Math.
   const help = alliesOf(s).reduce((a, n) => a + n.members * 6, 0);
   let win = 0, loseSomeone = 0, lost = 0;
   for (let i = 0; i < tries; i++) {
-    const b = planBattle(s, raidersAfterHelp(e, help), 7_919 + i * 104_729 + e.day, battleOpts(e, e.dig ? { insideBreach: true } : {}));
+    const b = planBattle(s, raidersAfterHelp(e, help), 7_919 + i * 104_729 + e.day, battleOpts(e, e.dig || e.insiderHelp ? { insideBreach: true } : {}));
     if (b.result === 'repelled' || b.result === 'fled') win++;
     const n = b.events.filter(x => (x.kind === 'death' || x.kind === 'taken') && x.unit.startsWith('h_')).length;
     if (n) loseSomeone++;
@@ -678,6 +684,9 @@ export function resolve(s: GameState, stance: Stance): Outcome {
     title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines);
   } else if (e.kind === 'trial_end') {
     const o = resolveTrialEnd(s, e, stance);
+    title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines);
+  } else if (e.kind === 'insider') {
+    const o = resolveInsider(s, e, stance);
     title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines);
   } else if (e.kind === 'guard_stay') {
     const o = resolveGuardStay(s, e, stance);
@@ -780,7 +789,7 @@ export function resolve(s: GameState, stance: Stance): Outcome {
       if (via && e.scouted) lines.push(`${e.scouted} had marked the hatch on the way in.`);
       if (via) lines.push(via.forced ? 'They found a steel hatch in the leaf litter out in the trees and blew the blast door. They are in the passage.' : 'They found a steel hatch out in the trees, left unbolted. They are in the passage.');
       const raiders = via ? Math.min(raidersAfterHelp(e, help), 4 + Math.floor(e.size / 4)) : raidersAfterHelp(e, help);
-      const b = planBattle(s, raiders, s.seed * 131 + e.day * 7 + 1, battleOpts(e, e.dig || via ? { insideBreach: true } : {}));
+      const b = planBattle(s, raiders, s.seed * 131 + e.day * 7 + 1, battleOpts(e, e.dig || via || e.insiderHelp ? { insideBreach: true } : {}));
       if (via) { const run = s.perimeter.find(x => x.id === via.runId); if (run) run.revealed = true; }
       g.battle = b;
       const stockBefore = stockTotal(s);

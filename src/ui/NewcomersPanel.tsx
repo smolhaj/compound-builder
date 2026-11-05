@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { dayIndex } from '../sim/state';
 import { housingSummary } from '../sim/housing';
+import { INSIDER, startVetBond, vetBondProblem } from '../sim/insider';
 import { carryLines, carryOf, givePlace, loyaltyWord, originLabel, placeOptions, sendAway, trustWord } from '../sim/newcomers';
 import { Hint, Note, Row, Section } from './hud/common';
 import { DIM } from './hud/style';
@@ -63,6 +64,7 @@ export function NewcomersPanel() {
           <div style={{ display: 'flex', gap: 4, marginTop: 3, flexWrap: 'wrap' }}>
             {b.kind !== 'guest' && <button style={btn()} disabled={!opts.length} title={opts.length ? 'A building of their own: a door to close, and a better night' : 'No home with enough beds left (build a cottage or a guest house)'} onClick={() => setPick(pick === b.id ? null : b.id)}>Give {solo ? `${p.first} ` : mates.length > 1 ? 'them ' : ''}a place{opts.length ? '' : ' (none free)'}</button>}
             {b.neighbor && <button style={btn()} title="They go back to their own place, on good terms" onClick={() => g.money(d => sendAway(d, b.id, true))}>{b.kind === 'guest' ? 'Send them home' : 'Let them go home'}</button>}
+            {b.kind !== 'guest' && b.vet !== 'cleared' && <button style={btn()} disabled={!!vetBondProblem(game, b.id)} title={vetBondProblem(game, b.id) ?? `Background check: $${INSIDER.JOIN_COST} and ${INSIDER.JOIN_DAYS} days. A thief or a scout is found nine times in ten; a cleared newcomer is loyal for good.`} onClick={() => g.money(d => startVetBond(d, b.id))}>{b.vet === 'pending' ? 'Check under way' : `Vet · $${INSIDER.JOIN_COST}`}</button>}
             <button style={btn()} title="Thank them and point them down the road. It will be remembered." onClick={() => g.money(d => sendAway(d, b.id, false))}>Send away</button>
           </div>
           {pick === b.id && <div style={{ display: 'flex', gap: 4, marginTop: 3, flexWrap: 'wrap' }}>
