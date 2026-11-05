@@ -71,6 +71,7 @@ async function wizard({ region, difficulty, lotPick = 'first', mode = 'Surprise'
     for (let i = 0; i < nc; i++) { if (extra?.maxPrice && await priceOf(i) > extra.maxPrice) continue; const t = await cards.nth(i).innerText(); const m = t.match(/height ×([\d.]+)/); const mm = t.match(/(\d+) m\s*$/m); const sc2 = (m ? Number(m[1]) : 1) * 10 + (mm ? Number(mm[1]) / 100 : 0); if (sc2 > best) { best = sc2; bi = i; } }
     pickIdx = bi; note('steep pick card ' + bi + ' score ' + best);
   }
+  if (lotPick === 'farmhouse') { for (let i = 0; i < nc; i++) if (/farmhouse/i.test(await cards.nth(i).innerText())) { pickIdx = i; break; } }
   if (lotPick === 'poorest') { let bl = 1e18; for (let i = 0; i < nc; i++) { const t = await cards.nth(i).innerText(); const m = t.match(/Leaves \$([\d,]+)/); const v = m ? Number(m[1].replace(/,/g, '')) : 1e18; if (v < bl) { bl = v; pickIdx = i; } } note('poorest pick leaves $' + bl); }
   if (lotPick === 'priciest') { let bp = -1; for (let i = 0; i < nc; i++) { const pr = await priceOf(i); if (pr < 1e9 && pr > bp) { bp = pr; pickIdx = i; } } note('priciest pick ' + bp); }
   if (nc) { await cards.nth(pickIdx).click(); note('lot: ' + (await cards.nth(pickIdx).innerText()).replace(/\n+/g, ' | ').slice(0, 300)); }
