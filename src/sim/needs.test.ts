@@ -49,7 +49,7 @@ describe('food and needs', () => {
     expect(produce(s)).toBeGreaterThan(winter + 1500);
   });
 
-  it('going hungry costs health and morale, and with them work; Cozy never lets anyone die', () => {
+  it('going hungry costs health and morale, and with them work; Cozy only lets starvation kill after 120 days', () => {
     const g = newGame(1);
     noStores(g);
     for (let d = 0; d < 60; d++) liveDay(g, 0.5);
@@ -61,8 +61,10 @@ describe('food and needs', () => {
     const c = newGame(2);
     c.disaster.difficulty = 'cozy';
     noStores(c);
-    for (let d = 0; d < 400; d++) liveDay(c, 0.5);
+    for (let d = 0; d < 119; d++) liveDay(c, 0.5);
     expect(c.personState.every(ps => ps.needs.died == null)).toBe(true);
+    for (let d = 119; d < 400; d++) liveDay(c, 0.5);
+    expect(c.personState.some(ps => ps.needs.died != null)).toBe(true);
     const h = newGame(3);
     noStores(h);
     for (let d = 0; d < 400; d++) liveDay(h, 0.5);

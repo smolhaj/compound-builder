@@ -61,6 +61,7 @@ import { canJoin } from '../sim/aftermath';
 import { THREAT_NAME } from '../sim/threatState';
 import { MILESTONE_COUNT, MILESTONE_NAME, PART_LABEL, generations } from '../sim/lineage';
 import { daysOfFood, KCAL, needOf } from '../sim/needs';
+import { starveWarning } from '../sim/starvation';
 import { barterPrices, moneyWorks, type Good } from '../sim/barter';
 import { MarketSection, NeighborsSection, RumorsSection, ScavengeSection } from './WorldPanels';
 import { alliesFor, canGo, FAR_COLD, isAway, latestFarLead, latestLead, LEAD_COLD, LEAD_WARM, leadAge, openCaptives, raidProblem, rescueOdds, tripFuel, tripProblem } from '../sim/rescue';
@@ -225,6 +226,7 @@ export function Hud() {
                   <span style={{ color: DIM, width: 36 }}>morale</span>{bar(n.morale, '#7aa0d0', `Morale ${Math.round(n.morale)}`)}
                 </div>}
                 {notes && <Note tone="warn">{notes}</Note>}
+                {n && n.died == null && game.disaster.difficulty === 'cozy' && starveWarning(p.first, n.starved ?? 0) && <Note tone="bad">{starveWarning(p.first, n.starved ?? 0)}.</Note>}
                 <PersonInsight p={p} />
                 {n && n.died == null && (p.conditions?.length ?? 0) > 0 && (() => {
                   const days = Math.floor(game.body.rx[p.id] ?? 30);
