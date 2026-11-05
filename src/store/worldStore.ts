@@ -158,7 +158,8 @@ export const useWorldStore = create<WorldState>()(subscribeWithSelector((set) =>
   setPathNet: (pathNet) => set({ pathNet }),
   underground: false,
   setUnderground: (underground) => set({ underground }),
-  hudHidden: false,
+  // a phone-sized window starts with the side panels folded away (they would cover the whole map); "Show panels" brings them back
+  hudHidden: typeof window !== 'undefined' && window.innerWidth < 760,
   setHudHidden: (hudHidden) => set({ hudHidden }),
   markNearestTrees: null,
   siteQuery: null,
