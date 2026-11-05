@@ -135,6 +135,7 @@ export function GameCanvas() {
       camera: ws.camera, dom: canvas, scene: ws.scene,
       getBlocked: () => world.tourBlocked,
       heightAt: world.tourHeight,
+      solidAt: world.tourSolid,
       portal: world.tourPortal,
       describeBuildings: () => world.describeBuildings(),
       siteBounds: () => ({ w: PARCEL_SIZE, h: PARCEL_SIZE }),

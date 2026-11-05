@@ -144,8 +144,15 @@ describe('the sally port follows the drive', () => {
     expect(deg(lay.t, [1, 0])).toBeLessThan(0.01);
   });
 
+  it('a slanted crossing (wall at 30 degrees) still gets a port: longer, parallel to the road, long enough for a pickup', () => {
+    const sc = scene({ wallAngle: 30 }), lay = gateKitLayout(sc.gate, sc.crossing, sc.drive, sc.wall)!;
+    expect(lay).not.toBeNull();
+    expect(kitProblems(lay, sc.drive, sc.wall, sc.crossing.driveArc)).toEqual([]);
+    for (const sd of lay.sides) expect(Math.abs(sd[sd.length - 1][0] - sd[0][0])).toBeGreaterThanOrEqual(KIT.minLeg - 1e-6);
+  });
+
   it('a grazing crossing (a drive nearly along the wall) is not built square', () => {
-    const sc = scene({ wallAngle: 20 });
+    const sc = scene({ wallAngle: 10 });
     expect(gateKitLayout(sc.gate, sc.crossing, sc.drive, sc.wall)).toBeNull();
   });
 
@@ -198,10 +205,10 @@ describe('every entry gate of generated lots carries an aligned kit', () => {
     expect(lots).toBeGreaterThan(200);
     expect(kits).toBeGreaterThan(200);
     expect(stubs).toEqual([]);
-    expect(ringStubs.length).toBeLessThan(lots * 0.03);
+    expect(ringStubs).toEqual([]);   // a road that crosses a wall always has a gate, however slanted
     expect(problems).toEqual([]);
-    // the only crossings left unbuilt are drives running almost along a diagonal facet (sin < 0.5, a road within 30 degrees of a ring facet)
-    expect(grazing).toBeLessThan(lots * 0.08);
+    // the only crossings left without a sally port are drives running almost along a facet (sin < 0.2, within 12 degrees); they keep the plain gate
+    expect(grazing).toBeLessThan(lots * 0.02);
     expect(noEntry).toBeLessThan(lots);
   });
 });

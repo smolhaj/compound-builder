@@ -738,10 +738,12 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
           bx(0.3 * M, H + 0.3 * M, 0.3 * M, px, deckY, -Wd / 2 + 0.1 * M, 'wood_dark');                    // portal posts
           bx(0.3 * M, H + 0.3 * M, 0.3 * M, px, deckY, Wd / 2 - 0.1 * M, 'wood_dark');
           bx(0.3 * M, 0.5 * M, Wd, px, deckY + H - 0.3 * M, 0, 'wood_dark');                              // portal header
-          for (const lz of [-1, 1]) {                                                                         // the gate leaves, swung back against the truss
-            const leafW = (Wd - 0.5 * M) / 2;
-            add('wood_mid', place(new THREE.BoxGeometry(0.07 * M, 2.4 * M, leafW).translate(px + sg * 0.1 * M, deckY + 1.2 * M, lz * (Wd / 2 - 0.25 * M - leafW / 2) * 0.5 + lz * leafW * 0.3)));
-            for (const f of [0.25, 0.75]) add('iron', place(new THREE.BoxGeometry(0.09 * M, 0.12 * M, leafW).translate(px + sg * 0.1 * M, deckY + 2.4 * M * f, lz * (Wd / 2 - 0.25 * M - leafW / 2) * 0.5 + lz * leafW * 0.3)));
+          // the gate leaves, swung back against the truss: hinged on the portal posts, each lying along the inside of its truss (it was a flat board standing across the
+          // opening, so the bridge read as shut); 2.4 m high, half the deck wide, a pair of iron straps across each
+          for (const lz of [-1, 1]) {
+            const leafL = (Wd - 0.5 * M) / 2, lx = px - sg * (0.15 * M + leafL / 2), lzz = lz * (Wd / 2 - 0.1 * M - 0.28 * M);
+            add('wood_mid', place(new THREE.BoxGeometry(leafL, 2.4 * M, 0.07 * M).translate(lx, deckY + 1.2 * M, lzz)));
+            for (const f of [0.25, 0.75]) add('iron', place(new THREE.BoxGeometry(leafL, 0.12 * M, 0.09 * M).translate(lx, deckY + 2.4 * M * f, lzz)));
           }
         }
       }
