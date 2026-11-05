@@ -47,7 +47,7 @@ const scanText = async tag => {
   const m = t.match(/.{0,50}(\bNaN\b|\bundefined\b|\[object|Infinity).{0,50}/);
   if (m) issue(`bad text at ${tag}: "${m[0].replace(/\n/g, ' ')}"`);
 };
-const click = async (re, opts = {}) => { const b = page.getByRole('button', { name: re }).filter({ hasNotText: /^Hide panels/ }).filter(opts.filter ?? {}); if (await b.count()) { await b.first().click({ timeout: 5000 }).catch(() => {}); return true; } return false; };
+const click = async (re, opts = {}) => { const b = page.getByRole('button', { name: re }).filter({ hasNotText: /^Hide panels/ }).filter(opts.filter ?? {}); if (await b.count()) { if (!(await b.first().isEnabled())) return false; await b.first().click({ timeout: 5000 }).catch(() => {}); return true; } return false; };
 
 /** The charter, by its buttons. */
 async function wizard({ region, difficulty, lotPick = 'first', mode = 'Surprise', kin = 0, scenario: sc, extra }) {
@@ -124,9 +124,14 @@ async function handleGate(s, policy) {
   raids++; const tag = `gate-${raids}`;
   note(`GATE ${raids} day ${s.day} kind=${s.pendKind} ${s.dphase}: ` + JSON.stringify({ alive: s.alive, money: s.money }));
   if (!s.pendKind && !s.cutscene) { const lb = await page.getByRole('button').allInnerTexts(); note(`NULL-KIND GATE: aft=${s.aftermath} card=${s.card} labels=` + lb.join(' / ').slice(0, 400)); const bt = await page.evaluate(() => { const g = window.__cb.game.getState().game; return JSON.stringify({ card: g.gate.card, aftermath: g.gate.aftermath }).slice(0, 500); }); note('NULL-KIND STATE ' + bt); await shot(tag + '-nullkind'); }
-  let stage = 0;
+  let stage = 0, stuckShot = false;
   for (let i = 0; i < 80; i++) {
     const c = await st();
+    if (i === 6 && c.pending && !stuckShot) {   // still open after several answers: say which buttons are there (and which are disabled), and look at it
+      stuckShot = true;
+      const bt = await page.evaluate(() => [...document.querySelectorAll('button')].map(b => (b.disabled ? '[x] ' : '') + (b.innerText || '').replace(/\s+/g, ' ').trim()).filter(Boolean).join(' / '));
+      note(`STUCK GATE ${raids} kind=${c.pendKind}: buttons ` + bt.slice(0, 700)); await shot(`gate-${raids}-stuck`);
+    }
     if (c.ending && !c.continued) return;   // the report card is up: a prompt left behind it cannot be answered, nothing to wait for
     if (!c.pending && !c.cutscene && !c.aftermath && !c.card) break;
     if (c.cutscene === 'prompt' || (c.pending && !c.cutscene)) {
@@ -188,6 +193,6 @@ async function realTime(seconds, speed = 3) {
 
 export { page, st, shot, note, issue, wizard, stake, orderPlans, hireAll, handleGate, run, realTime, click, scanText, frameCamp, browser, vite, out, port, scenario, raids as _r };
 const _sc = await import(`./playQa.${scenario}.mjs`);
-try { await _sc.play({ page, st, shot, note, issue, wizard, stake, orderPlans, hireAll, handleGate, run, realTime, click, scanText, frameCamp, out, stanceLog }); }
+try { await _sc.play({ browser, port, page, st, shot, note, issue, wizard, stake, orderPlans, hireAll, handleGate, run, realTime, click, scanText, frameCamp, out, stanceLog }); }
 catch (e) { note('SCENARIO CRASH: ' + (e.stack ?? e).toString().slice(0, 800)); await shot('crash').catch(() => {}); }
 finally { await browser.close(); vite.kill(); setTimeout(() => process.exit(0), 200); }
