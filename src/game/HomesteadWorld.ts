@@ -956,7 +956,7 @@ export class HomesteadWorld {
     for (const r of runs) {
       // old posts lean and rails sag (atmosphere/aging): rebuilt as the lean steps
       const lean = LEANS.has(r.kind) && r.finishedAt !== null ? Math.round(fenceLean((t - r.finishedAt) / 365) * 10) / 10 : 0;
-      const key = `${Math.round(runProgress(r) * 60)}:${Math.round(runGrowth(r, t) * 40)}:${r.finishedAt === null ? 0 : 1}:${r.gates.length}:${lean}:${hasSkirt(r, t) ? 1 : 0}:${lit ? 1 : 0}:${sensors ? 1 : 0}:${hostOf(r)}:${r.razor ? 1 : 0}:${hostRazor(r) ? 1 : 0}:${deckOn(r) ? 1 : 0}:${r.collapsed ? 1 : 0}:${opts.moats?.[r.id] ? Math.round(opts.moats[r.id].level * 4) + (opts.moats[r.id].frozen ? 9 : 0) : ''}`;
+      const key = `${Math.round(runProgress(r) * 60)}:${Math.round(runGrowth(r, t) * 40)}:${r.finishedAt === null ? 0 : 1}:${r.gates.length}:${lean}:${hasSkirt(r, t) ? 1 : 0}:${lit ? 1 : 0}:${sensors ? 1 : 0}:${hostOf(r)}:${r.razor ? 1 : 0}:${r.electric ? 1 : 0}:${Math.round((r.brush ?? 0) * 5)}:${hostRazor(r) ? 1 : 0}:${deckOn(r) ? 1 : 0}:${r.collapsed ? 1 : 0}:${opts.moats?.[r.id] ? Math.round(opts.moats[r.id].level * 4) + (opts.moats[r.id].frozen ? 9 : 0) : ''}`;
       const cur = this._runGroups.get(r.id);
       if (cur?.key === key) continue;
       if (cur) { this._root.remove(cur.group); cur.group.traverse(o => (o as THREE.Mesh).geometry?.dispose()); }

@@ -156,3 +156,22 @@ describe('sappers and the portal: every counter only lowers the chance a tunnel 
     }
   });
 });
+
+describe('wall tops on a stone wall: every top only makes a raid harder than the bare wall', () => {
+  const stone = (g: GameState): void => { const r = planRun(g, 'stone_wall', [[20, 20], [40, 20], [40, 40], [20, 40], [20, 20]] as Pt[]); r.finishedAt = 0; r.done = r.hours; r.supplied = true; };
+  const lit = (g: GameState): void => { g.utilities.lit = ['h']; };
+  const ADD: Array<[string, (g: GameState) => void]> = [
+    ['razor coils', g => { g.perimeter[0].razor = true; }],
+    ['a live electric fence', g => { lit(g); g.perimeter[0].electric = true; }],
+    ['a live electric fence with a battery backup', g => { lit(g); g.perimeter[0].electric = true; g.perimeter[0].backup = true; }],
+    ['a dark electric fence (no power, no battery)', g => { g.perimeter[0].electric = true; }],
+    ['a live electric fence choked in brush', g => { lit(g); g.perimeter[0].electric = true; g.perimeter[0].brush = 1; }],
+  ];
+  for (const crew of [6, 10]) for (const [name, add] of ADD) it(`${name} (crew of ${crew})`, () => {
+    const a = base(), b = base();
+    lit(a); stone(a); stone(b); add(b);
+    notWorse(rate(a, crew), rate(b, crew));
+    const da = deaths(a, crew), db = deaths(b, crew);
+    expect(db.mean).toBeLessThanOrEqual(da.mean + 2 * Math.hypot(da.se, db.se) + 1e-9);
+  }, 120000);
+});

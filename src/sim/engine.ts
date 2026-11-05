@@ -17,6 +17,7 @@ import { paperworkDay } from './paperwork';
 import { addFellWork, nextFellJob } from './forestry';
 import { burnFirewood, demandNow } from './heating';
 import { upkeepDay } from './upkeep';
+import { wallTopsDay } from './wallTops';
 import { rainStormOn, snowedIn, weatherDay } from './weatherThreats';
 import { fogLog } from './fogFx';
 import { slumpDay } from './retaining';
@@ -209,6 +210,7 @@ function subStep(s: GameState): void {
     for (const line of scoutDay(s)) log(s, line);
     // (the stove is going unless the woodpile is bare: burnFirewood leaves `burned` at 1 then)
     for (const line of upkeepDay(s, demandNow(s), s.heat.burned < 1)) log(s, line);
+    for (const line of wallTopsDay(s)) log(s, line);
     for (const line of mutualAidDay(s)) log(s, line);
     // the world round the place: the neighbors' lives, the market, scavenging runs coming home
     for (const line of neighborLifeDay(s)) log(s, line);

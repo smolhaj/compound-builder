@@ -36,6 +36,7 @@ import { log } from './economy';
 import { burnStructure, isFinished } from './construction';
 import { raidPressure } from './opsec';
 import { PERIMETER, peopleBlock, runFinished, runGrowth, wallLength } from './perimeter';
+import { weakPenalty } from './wallTops';
 import { enclosure } from './enclosure';
 import { contagion, infect } from './effects';
 import type { Person, SkillId } from './family';
@@ -136,6 +137,8 @@ export interface Posture {
   bunker: boolean;
   /** A guard dog's bark (warns them off), a safe room to hide in. */
   deter?: number;
+  /** Signs of a live electric fence (and, later, of armed response): they deter opportunists only, never an organized crew (sim/wallTops.ts). */
+  signs?: number;
   safeRoom?: boolean;
 }
 
@@ -153,7 +156,7 @@ export function postureOf(s: GameState): Posture {
     if (!runFinished(r) || d.blocks.people <= 0) continue;
     if (line.onLine.has(r.id)) { look += wallLength(r) * (d.height > 0.35 ? 1 : 0.3) * runGrowth(r, s.clock.t); continue; }   // the property line holds by whether it is closed (sim/enclosure.ts)
     const g = runGrowth(r, s.clock.t), len = wallLength(r);
-    held += len * peopleBlock(s, r) * g;
+    held += len * Math.max(0, peopleBlock(s, r) - weakPenalty(s, r)) * g;
     wall += len * g;
     look += len * (d.height > 0.35 ? 1 : 0.3) * g;
   }
@@ -174,7 +177,7 @@ export function postureOf(s: GameState): Posture {
   // fog (sim/fog.ts) takes what the eyes add: the watch's own score, the towers' view and the posted guard (the gear's share is already in gear.detection)
   const kEye = fogSightK(s, 'eye');
   const detection = Math.min(100, 25 + (watch * 5 + tw.detection + watchDetection(s)) * kEye + (radioNet ? 20 : 0) + (barrier > 50 ? 10 : 0) + gear.detection + guards.detection + forewarned(s) + villageWatch(s));
-  return { visibility: Math.min(100, visibility + gear.visibility + tw.visibility), fortress, barrier: Math.min(100, barrier + gear.barrier), detection, fighters, deter: gear.deter, safeRoom: gear.safeRoom, armed: armed(s), firepower: firepower(s) * gear.fight * tw.fire, bunker: fin.some(st => st.kind === 'bunker_hatch' || st.kind === 'bunker_stairs') };
+  return { visibility: Math.min(100, visibility + gear.visibility + tw.visibility), fortress, barrier: Math.min(100, barrier + gear.barrier), detection, fighters, deter: gear.deter, signs: gear.signs, safeRoom: gear.safeRoom, armed: armed(s), firepower: firepower(s) * gear.fight * tw.fire, bunker: fin.some(st => st.kind === 'bunker_hatch' || st.kind === 'bunker_stairs') };
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -764,7 +767,7 @@ export function resolve(s: GameState, stance: Stance): Outcome {
       }
     }
     if (stance === 'warn') {
-      const deterred = r() * 100 < p.fortress * 0.6 + (p.deter ?? 0) + (p.armed ? 15 : -10) + (e.armed ? 0 : 25) + (e.kind === 'looters' ? 20 : 0) - (e.kind === 'gang' ? 25 : 0);
+      const deterred = r() * 100 < p.fortress * 0.6 + (p.deter ?? 0) + (ORGANIZED.has(e.kind) ? 0 : p.signs ?? 0) + (p.armed ? 15 : -10) + (e.armed ? 0 : 25) + (e.kind === 'looters' ? 20 : 0) - (e.kind === 'gang' ? 25 : 0);
       if (deterred) { title = 'They thought better of it'; text = 'A shot over the truck and the walls behind it. They turn around in the road.'; tone = 'good'; if (e.kind === 'refugees') g.humanity = Math.max(0, g.humanity - 5); }
       else stance = 'defend';
     }
