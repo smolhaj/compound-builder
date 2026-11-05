@@ -47,6 +47,8 @@ import { stealTools } from './tools';
 import { emptyMultiplier, emptyNow, isSplit, reportFound, weekendOf } from './weekender';
 import type { Battle } from './battleTypes';
 import { responseFactor } from './slope';
+import { postureOf } from './encounters';
+import { burglarK, hardness } from './reputation';
 import { hasSafeRoom } from './houseHardening';
 
 export interface Breakins {
@@ -133,11 +135,17 @@ function charge(s: GameState, amount: number): void {
  * one comes back as the pending encounter; a daytime one is logged here and
  * returns null.
  */
+/** The rate with the compound's name on the road (sim/reputation.ts): a hard-looking place is a worse bet for a burglar. Costs a posture pass, so only the UI and the roll that already hit ask for it. */
+export const breakInRateNamed = (s: GameState): number => breakInRate(s) * burglarK(hardness(s, postureOf(s)).hard);
+
 export function breakInDay(s: GameState, day: number): Encounter | null {
   const rate = breakInRate(s);
   if (rate <= 0) return null;
   const r = mulberry32(s.seed * 4441 + day * 53 + 7);
-  if (r() >= rate / 365) return null;
+  const roll = r();
+  if (roll >= rate / 365) return null;
+  // only now, on the rare day the dice say yes, does the name count (same draw, so the dice stream is unchanged): a hard look turns some of them away
+  if (roll * 365 / rate >= burglarK(hardness(s, postureOf(s)).hard)) return null;
   const b = breakinsOf(s);
   b.count++; b.lastAt = s.clock.t;
   // (a place that stands empty is always the daytime kind: nobody there to wake)

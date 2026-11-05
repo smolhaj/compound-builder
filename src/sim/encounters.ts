@@ -59,6 +59,7 @@ import { practice } from './skills';
 import { turbineNoise } from './renewables';
 import { villageWatch } from './outposts';
 import { guardPosture, resolveGuardStay } from './guards';
+import { hardness, opportunistK } from './reputation';
 import { resolveInsider } from './insider';
 import { resolveTrialEnd, startTrial, trialDay, type Character, type TrialCamp } from './trial';
 import { vetArrival } from './gateVetting';
@@ -370,7 +371,7 @@ export function whoComes(s: GameState, p: Posture, r: () => number): EncounterKi
   const w: Array<[EncounterKind, number]> = [
     ['arrival', 30],
     ['refugees', 12 * (p.visibility / 50)],
-    ['looters', 30 * (1 - law) * (1 - p.fortress / 130) * (1 - 0.5 * (s.gate.respect ?? 0))],
+    ['looters', 30 * (1 - law) * (1 - p.fortress / 130) * (1 - 0.5 * (s.gate.respect ?? 0)) * opportunistK(hardness(s, p).hard)],   // the compound's name on the county road (sim/reputation.ts): opportunists only
     ['gang', 18 * (1 - law) * (0.3 + p.fortress / 100 + p.visibility / 150) * (1 - 0.5 * (s.gate.respect ?? 0))],
     ['requisition', s.gate.government === 'hindrance' ? 10 * (0.5 + p.visibility / 100) : 0],
     ['trader', 10],
