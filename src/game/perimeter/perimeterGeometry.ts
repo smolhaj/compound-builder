@@ -83,7 +83,7 @@ export function offsetPts(pts: readonly Pt[], d: number): Pt[] {
  * `under` says whether a point is under a building: pipe and cable trenches
  * stop at its wall and their marker posts stand outside it.
  */
-export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (x: number, z: number) => boolean = () => false, opts: { /** The creek: a moat's water stops at its banks. */ creek?: { zAt(x: number): number; halfWidth: number }; /** A moat's water: how full (0-1) and whether it is ice (sim/waterWorks). */ moat?: { level: number; frozen: boolean }; lit?: boolean; sensors?: boolean; hostKind?: PerimeterKind; /** The host wall carries razor wire (drawn on the deck's outer rail). */ hostRazor?: boolean; /** A patrol deck rides on this wall (its wire is drawn on the deck). */ deck?: boolean; /** What the gate carries (sim/gateSecurity.ts): a double gate, an intercom pole, a caged motor; `inward` is a point inside the compound. */ gateKit?: { sally: boolean; intercom: boolean; motor: boolean; inward: Pt } } = {}): THREE.Group {
+export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (x: number, z: number) => boolean = () => false, opts: { /** The creek: a moat's water stops at its banks. */ creek?: { zAt(x: number): number; halfWidth: number }; /** A moat's water: how full (0-1) and whether it is ice (sim/waterWorks). */ moat?: { level: number; frozen: boolean }; lit?: boolean; sensors?: boolean; hostKind?: PerimeterKind; /** The host wall carries razor wire (drawn on the deck's outer rail). */ hostRazor?: boolean; /** A patrol deck rides on this wall (its wire is drawn on the deck). */ deck?: boolean; /** What the gate carries (sim/gateSecurity.ts): a double gate, an intercom pole, a caged motor; `inward` is a point inside the compound. */ gateKit?: { sally: boolean; intercom: boolean; motor: boolean; signs?: boolean; inward: Pt } } = {}): THREE.Group {
   const lit = opts.lit ?? true;
   // an upgrade of a finished run is drawn beside the old tier (not on top of it) until it is done and the old one comes down
   const run = run0.replaces ? { ...run0, pts: offsetPts(run0.pts, (run0.replacesKind === 'container_wall' || run0.replacesKind === 'container_stack') ? 0.36 : UPGRADE_OFFSET) } : run0;
@@ -900,6 +900,11 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
           add('iron', new THREE.BoxGeometry(0.2 * M, 0.14 * M, 0.2 * M).translate(ox, ground(ox, oz) + 1.34 * M, oz));        // the camera head
           add('glass', new THREE.SphereGeometry(0.04 * M, 6, 4).translate(ox - nx * 0.1 * M, ground(ox, oz) + 1.34 * M, oz - nz * 0.1 * M));   // its lens (toward the road)
           add('paint_yellow', new THREE.BoxGeometry(0.1 * M, 0.2 * M, 0.02 * M).rotateY(ang).translate(ox, ground(ox, oz) + 0.95 * M, oz));  // the speaker plate
+        }
+        if (K.signs) {   // the armed-response firm's sign on the gate post: a blue plate with a yellow band (sim/armedResponse.ts)
+          const sx = p0.x + nx * 0.05 * M, sz = p0.z + nz * 0.05 * M;
+          add('paint_yellow', new THREE.BoxGeometry(0.02 * M, 0.34 * M, 0.5 * M).rotateY(ang + Math.PI / 2).translate(sx, ground(sx, sz) + 1.9 * M, sz));
+          add('paint_dado', new THREE.BoxGeometry(0.022 * M, 0.2 * M, 0.46 * M).rotateY(ang + Math.PI / 2).translate(sx, ground(sx, sz) + 1.9 * M, sz));
         }
         if (K.motor) {
           const cx = p0.x - p0.dx * 0.4 * M + nx * 0.5 * M, cz = p0.z - p0.dz * 0.4 * M + nz * 0.5 * M;
