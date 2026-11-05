@@ -25,6 +25,13 @@ describe('the people panels (server-rendered)', () => {
     expect(t).toContain('Campfire tonight');
   });
 
+  it('with the whole household gone it does not claim everyone is holding up', () => {
+    withGame(g2 => { for (const ps of g2.personState) ps.needs.died = 1; });
+    const t = text(renderToStaticMarkup(<PeopleSection />));
+    expect(t).not.toContain('Everyone is holding up');
+    expect(t).toContain('Nobody is home');
+  });
+
   it('someone not coping shows by name, with the reason, and the next-step list offers help', () => {
     const g = withGame(g2 => {
       g2.disaster.kind = 'grid_down'; g2.disaster.hitAt = -50; g2.disaster.warnAt = -80;

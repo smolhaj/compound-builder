@@ -67,3 +67,16 @@ describe('engine: an idle family that never stocks food', () => {
     expect(r.first).toBeLessThan(120);
   }, 60000);
 });
+
+describe('engine: refeeding after a lean spell', () => {
+  it.each(['standard', 'cozy'] as const)('%s: a family fed again after 20 starving days recovers; nobody dies with a full pantry', difficulty => {
+    const g = newGame(3, 105, 2027, { difficulty, mode: 'scenario' });
+    g.disaster.tracks = { ...g.disaster.tracks, stores: 0, banks: 0 };
+    g.stock = { ...g.stock, fresh: 0, frozen: 0, canned: 0, staples: 0 };
+    for (let d = 0; d < 20; d++) { g.clock.t = d + 0.5; liveDay(g, 0.5); }
+    for (let d = 20; d < 140; d++) { g.stock = { ...g.stock, staples: 5000, canned: 500, fresh: 200 }; g.clock.t = d + 0.5; liveDay(g, 0.5); }
+    expect(g.personState.filter(p => p.needs.died != null).length).toBe(0);
+    expect(Math.max(...g.personState.map(p => p.needs.hunger))).toBeLessThan(1000);
+    expect(Math.min(...g.personState.map(p => p.needs.health))).toBeGreaterThan(80);
+  }, 60000);
+});

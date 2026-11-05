@@ -54,7 +54,7 @@ async function wizard({ region, difficulty, lotPick = 'first', mode = 'Surprise'
   await page.goto(`http://localhost:${port}/?new&lowrender`);
   await page.getByText('1. Region').waitFor();
   await page.waitForFunction(() => window.__cb?.qa?.lowrender);
-  await page.evaluate(() => { try { localStorage.clear(); } catch {} });
+  await page.evaluate(u => { try { localStorage.clear(); if (u) localStorage.setItem('cb.unlocked', '1'); } catch {} }, !!process.env.QA_UNLOCK);
   if (region) await page.getByRole('button', { name: new RegExp(region) }).first().click();
   await page.getByRole('button', { name: 'Next', exact: true }).click();
   // land step
@@ -71,6 +71,7 @@ async function wizard({ region, difficulty, lotPick = 'first', mode = 'Surprise'
     for (let i = 0; i < nc; i++) { if (extra?.maxPrice && await priceOf(i) > extra.maxPrice) continue; const t = await cards.nth(i).innerText(); const m = t.match(/height ×([\d.]+)/); const mm = t.match(/(\d+) m\s*$/m); const sc2 = (m ? Number(m[1]) : 1) * 10 + (mm ? Number(mm[1]) / 100 : 0); if (sc2 > best) { best = sc2; bi = i; } }
     pickIdx = bi; note('steep pick card ' + bi + ' score ' + best);
   }
+  if (lotPick === 'farmhouse') { for (let i = 0; i < nc; i++) if (/farmhouse/i.test(await cards.nth(i).innerText())) { pickIdx = i; break; } }
   if (lotPick === 'poorest') { let bl = 1e18; for (let i = 0; i < nc; i++) { const t = await cards.nth(i).innerText(); const m = t.match(/Leaves \$([\d,]+)/); const v = m ? Number(m[1].replace(/,/g, '')) : 1e18; if (v < bl) { bl = v; pickIdx = i; } } note('poorest pick leaves $' + bl); }
   if (lotPick === 'priciest') { let bp = -1; for (let i = 0; i < nc; i++) { const pr = await priceOf(i); if (pr < 1e9 && pr > bp) { bp = pr; pickIdx = i; } } note('priciest pick ' + bp); }
   if (nc) { await cards.nth(pickIdx).click(); note('lot: ' + (await cards.nth(pickIdx).innerText()).replace(/\n+/g, ' | ').slice(0, 300)); }
@@ -78,7 +79,7 @@ async function wizard({ region, difficulty, lotPick = 'first', mode = 'Surprise'
   for (let i = 0; i < kin; i++) { const rel = page.locator('button').filter({ hasText: /\b(Uncle|Aunt|Grandma|Grandpa|Cousin|Brother|Sister|Mother|Father|Mom|Dad|Grandmother|Grandfather|Niece|Nephew|Mother-in-law|Father-in-law|In-law)/i }); if (await rel.count() > i) await rel.nth(i).click().catch(() => {}); }
   if (mode === 'Scenario' && sc) {
     await page.getByRole('button', { name: /^Scenario/ }).click();
-    if (sc.kind && sc.kind !== 'grid_down') await page.locator('select').first().selectOption(sc.kind).catch(e => note('select kind fail ' + e.message.slice(0, 80)));
+    if (sc.kind && sc.kind !== 'grid_down') await page.locator(`select:has(option[value="${sc.kind}"])`).first().selectOption(sc.kind).catch(e => note('select kind fail ' + e.message.slice(0, 80)));
     if (sc.peace) await page.getByRole('button', { name: sc.peace, exact: true }).click();
   } else if (mode !== 'Surprise') await page.getByRole('button', { name: new RegExp('^' + mode) }).click();
   await page.getByRole('button', { name: difficulty, exact: true }).click();
