@@ -24,6 +24,33 @@ export const YARD = {
   poles: [{ x: -0.55, z: 0.86 }, { x: 0.98, z: 0.32 }, { x: 0.3, z: -0.12 }],
 } as const;
 
+/** A solid yard prop as a camp-local box (the camera and the walker keep out of it); `top` is its height above the ground. */
+export interface YardBox { x0: number; x1: number; z0: number; z1: number; top: number }
+
+/** The yard's solid props (woodpile, picnic table, grill, tub, chopping block, log stools). */
+export const YARD_BOXES: readonly YardBox[] = (() => {
+  const box = (x: number, z: number, hx: number, hz: number, top: number): YardBox => ({ x0: x - hx, x1: x + hx, z0: z - hz, z1: z + hz, top });
+  return [
+    box(YARD.woodpile.x, YARD.woodpile.z, 0.06, 0.26, 0.21),
+    box(YARD.picnic.x, YARD.picnic.z, 0.19, 0.16, 0.13),
+    box(YARD.grill.x, YARD.grill.z, 0.07, 0.07, 0.12),
+    box(YARD.tub.x - 0.03, YARD.tub.z, 0.09, 0.07, 0.11),
+    box(YARD.block.x, YARD.block.z, 0.05, 0.05, 0.08),
+    ...YARD.stools.map(st => box(st.x, st.z, 0.035, 0.035, 0.08)),
+  ];
+})();
+
+/** Is the camp-local point (lx, ly above the camp ground, lz) inside a yard prop, grown by `pad`? */
+export function yardSolidLocal(lx: number, ly: number, lz: number, pad = 0): boolean {
+  for (const b of YARD_BOXES) if (lx > b.x0 - pad && lx < b.x1 + pad && lz > b.z0 - pad && lz < b.z1 + pad && ly < b.top + pad) return true;
+  return false;
+}
+
+/** Does a body of radius r standing at the camp-local (lx, lz) overlap a yard prop? */
+export function yardBlockedLocal(lx: number, lz: number, r: number): boolean {
+  return yardSolidLocal(lx, 0, lz, r);
+}
+
 export interface Yard {
   group: THREE.Group;
   /** Lights 0–1 (evenings, gatherings), grill smoke 0–1. */
@@ -53,12 +80,18 @@ export function buildYard(): Yard {
   for (let i = 0; i < 4; i++) split.push(cyl(0.03, 0.03, 0.06, B.x - 0.12 + i * 0.05, 0.03, B.z + 0.12 + (i % 2) * 0.03, 8));
   // the woodpile: split wood stacked between end posts (≈ 1.2 m high, 3 m long)
   const W = YARD.woodpile;
-  for (let row = 0; row < 7; row++) for (let k = 0; k < 9; k++) {
-    const g = new THREE.CylinderGeometry(0.014, 0.014, 0.09, 3).rotateX(Math.PI / 2).rotateZ(((row * 9 + k) % 5) * 0.4).rotateY(Math.PI / 2);
-    split.push(g.translate(W.x, 0.016 + row * 0.027, W.z - 0.22 + k * 0.055 + (row % 2) * 0.012));
+  // logs lie across the pile (their ends face out along x), hex-packed row on row so each rests in the gap of the one below, the bottom row on the ground
+  for (const dz of [-0.2, 0.2]) wood.push(box(0.09, 0.006, 0.012, W.x, 0.003, W.z + dz));   // two skids keep the bottom row off the mud
+  for (let row = 0; row < 7; row++) {
+    const n = row % 2 ? 15 : 16;
+    for (let k = 0; k < n; k++) {
+      const h = (row * 31 + k * 17) % 7, r = 0.0125 + (h % 3) * 0.0012, len = 0.088 + (h % 2) * 0.004;
+      const g = new THREE.CylinderGeometry(r, r, len, 7).rotateZ(Math.PI / 2);
+      split.push(g.translate(W.x + (h - 3) * 0.0006, 0.006 + r + row * 0.0255, W.z - 0.225 + k * 0.03 + (row % 2) * 0.015));
+    }
   }
-  for (const dz of [-0.25, 0.25]) wood.push(box(0.012, 0.21, 0.012, W.x, 0.105, W.z + dz));
-  metal.push(box(0.11, 0.004, 0.52, W.x, 0.205, W.z));     // a sheet of tin over the top
+  for (const dz of [-0.25, 0.25]) wood.push(box(0.012, 0.2, 0.012, W.x, 0.1, W.z + dz));
+  metal.push(box(0.11, 0.004, 0.52, W.x, 0.2, W.z));     // a sheet of tin over the top
   // clothesline: two T posts and the line, a few things hanging
   const L = YARD.line;
   for (const x of [L.x0, L.x1]) { wood.push(box(0.012, L.h + 0.02, 0.012, x, (L.h + 0.02) / 2, L.z)); wood.push(box(0.012, 0.012, 0.08, x, L.h, L.z)); }
