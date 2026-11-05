@@ -18,7 +18,17 @@ page.setDefaultTimeout(120000);
 page.on('pageerror', e => console.log('PAGEERROR', e.message));
 page.on('console', m => { if (m.type() === 'error') console.log('CONSOLE ERROR', m.text().slice(0, 200)); });
 let n = 0;
-const shot = async name => { await page.evaluate(() => window.__cb.qa.renderNow()); await page.waitForTimeout(600); const f = `${out}/${String(++n).padStart(2, '0')}-${name}.png`; await page.screenshot({ path: f }); console.log(f); };
+const shot = async name => {
+  const f = `${out}/${String(++n).padStart(2, '0')}-${name}.png`;
+  await page.evaluate(() => window.__cb.qa.renderNow());
+  await page.waitForTimeout(400);
+  console.log('alive', await page.evaluate(() => performance.now() | 0));
+  // CDP capture: Playwright's page.screenshot waits for fonts / animations and can hang on this page while a card is up
+  const cdp = await page.context().newCDPSession(page);
+  const r = await Promise.race([cdp.send('Page.captureScreenshot', { format: 'png' }), new Promise((_, no) => setTimeout(() => no(new Error('cdp timeout')), 30000))]);
+  (await import('node:fs')).writeFileSync(f, Buffer.from(r.data, 'base64'));
+  console.log(f);
+};
 try {
   await page.goto(`http://localhost:${port}/?new&lowrender`);
   await page.getByText('1. Region').waitFor();

@@ -5,6 +5,8 @@
  */
 import { Fragment, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { useGameStore } from '../store/gameStore';
+import { Group } from './hud/common';
+import { foodRecommended, fundsOf, headroom, householdOf, ownedLabel, planPreset, planQuickBuy, PRESETS, ruleOf, shortfall, tabIds, type QuickPlan } from '../sim/shopQuickBuy';
 import { MATERIALS, billText, type MaterialId } from '../sim/materials';
 import { useSpendGuard } from './hud/useSpendGuard';
 import { usdShort } from '../sim/spendGuard';
@@ -178,6 +180,13 @@ function Icon({ id, tint }: { id: string; tint?: number }) {
   }
 }
 
+/** Under a phone-ish width the order panel drops below the shelves. */
+function useNarrow(): boolean {
+  const [n, setN] = useState(() => typeof window !== 'undefined' && window.innerWidth < 760);
+  useEffect(() => { const f = () => setN(window.innerWidth < 760); window.addEventListener('resize', f); return () => window.removeEventListener('resize', f); }, []);
+  return n;
+}
+
 /** The shop & money window. */
 export function ShopWindow() {
   const g = useGameStore();
@@ -193,6 +202,11 @@ export function ShopWindow() {
   const [cart, setCart] = useState<Partial<Record<MaterialId, number>>>({});
   const [foodCart, setFoodCart] = useState<Partial<Record<FoodItemId, number>>>({});
   const [msg, setMsg] = useState<string | null>(null);
+  const [stay, setStay] = useState(true);
+  const [missingOnly, setMissingOnly] = useState<Record<string, boolean>>({});
+  const [note, setNote] = useState<{ title: string; added: string[]; skipped: Array<{ id: string; name: string; reason: string }> } | null>(null);
+  const narrow = useNarrow();
+  const [orderOpen, setOrderOpen] = useState(false);
   const { guard, node: guardNode } = useSpendGuard();
   const k = prices(game);
   const lines: OrderLine[] = [
@@ -204,11 +218,23 @@ export function ShopWindow() {
   const why = lines.length ? orderProblem(game, lines) : 'empty';
   const pay = payWith(game);
   const onWay = game.orders.filter(o => o.status === 'ordered');
-  const add = (m: MaterialId, d: number) => setCart({ ...cart, [m]: Math.max(0, (cart[m] ?? 0) + d) });
+  const hh = householdOf(game);
+  // a single or a per-person good stops at the sensible maximum; the plans can still ask for more (a second greenhouse)
+  const room = (m: MaterialId) => Math.max(headroom(game, m, 0, hh), need[m] ?? 0);
+  const add = (m: MaterialId, d: number) => setCart(c => ({ ...c, [m]: Math.min(room(m), Math.max(0, (c[m] ?? 0) + d)) }));
+  const isShelf = tab in SHELVES;
+  const tabPlan: QuickPlan | null = isShelf ? planQuickBuy(game, cart, foodCart, { ids: tabIds(tab as ShelfTab), stayInBudget: stay, foodDays: tab === 'food' ? 30 : 0 }) : null;
+  const applyPlan = (plan: QuickPlan, title: string) => {
+    setCart(c => { const n = { ...c }; for (const [id, q] of Object.entries(plan.add) as Array<[MaterialId, number]>) n[id] = (n[id] ?? 0) + q; return n; });
+    setFoodCart(c => { const n = { ...c }; for (const [id, q] of Object.entries(plan.food) as Array<[FoodItemId, number]>) n[id] = (n[id] ?? 0) + q; return n; });
+    const added = [...(Object.entries(plan.add) as Array<[MaterialId, number]>).map(([id, q]) => `${q} × ${MATERIALS[id].name}`), ...(Object.entries(plan.food) as Array<[FoodItemId, number]>).map(([id, q]) => `${q} × ${FOOD[id].name}`)];
+    setNote({ title, added, skipped: plan.skipped });
+  };
+  const funds = fundsOf(game);
   const close = () => g.openShop(false);
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(10,12,9,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 11, padding: 16 }} onClick={close}>
-      <div onClick={e => e.stopPropagation()} style={{ background: C.bg, color: '#eee', borderRadius: 14, width: 1000, maxWidth: '100%', height: 640, maxHeight: '100%', display: 'flex', flexDirection: 'column', fontSize: 13, boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: C.bg, color: '#eee', borderRadius: 14, width: 1000, maxWidth: '100%', height: narrow ? '100%' : 640, maxHeight: '100%', display: 'flex', flexDirection: 'column', fontSize: 13, boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px 10px', borderBottom: `1px solid ${C.line}` }}>
           <div>
             <div style={{ fontSize: 19, fontWeight: 700 }}>Town & the mail-order catalog</div>
@@ -224,24 +250,29 @@ export function ShopWindow() {
           <button style={btn()} onClick={() => setCart(c => { const n = { ...c }; for (const l of needLines) n[l.material] = Math.max(n[l.material] ?? 0, l.qty); return n; })}>Add them to the order</button>
           <button style={btn(true, !!orderProblem(game, needLines))} disabled={!!orderProblem(game, needLines)} onClick={() => guard(orderCost(needLines, k), () => { if (g.order(needLines)) setMsg(null); })}>Order what the plans need (~{usdShort(orderCost(needLines, k))}, leaves {usdShort(game.money - orderCost(needLines, k))})</button>
         </div>}
-        <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
-          <div style={{ flex: 1, overflowY: 'auto', padding: 14 }}>
+        <div style={{ display: 'flex', flex: 1, minHeight: 0, flexDirection: narrow ? 'column' : 'row' }}>
+          <div style={{ flex: 1, overflowY: 'auto', padding: 14, minHeight: narrow ? 120 : undefined }}>
+            {tabPlan && <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
+              <button style={btn(tabPlan.addedCost > 0, tabPlan.addedCost <= 0)} disabled={tabPlan.addedCost <= 0} title="Adds only the shortfall: singles you lack, per-person goods up to the headcount, consumables up to a 30-day stock. Anything over your budget, not for sale or a choice for you to make is skipped and listed on the right." onClick={() => applyPlan(tabPlan, "Add everything I'm missing")}>{tabPlan.addedCost > 0 ? `Add everything I'm missing (~${usdShort(tabPlan.addedCost)})` : 'Nothing missing here'}</button>
+              <label style={{ display: 'flex', gap: 4, alignItems: 'center', color: C.dim, fontSize: 12 }}><input type="checkbox" checked={!!missingOnly[tab]} onChange={e => setMissingOnly(m => ({ ...m, [tab]: e.target.checked }))} />Show missing only</label>
+            </div>}
             {tab !== 'metals' && tab !== 'money' && tab !== 'guns' && tab !== 'tools' && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 8 }}>
               {tab === 'food' && <FoodShelves game={game} k={k} cart={foodCart} add={addFood} />}
-              {(SHELVES as Record<string, MaterialId[]>)[tab].filter(m => MATERIALS[m].price !== null).slice().sort((a, b) => Number((need[b] ?? 0) > 0) - Number((need[a] ?? 0) > 0)).map(m => (
+              {(SHELVES as Record<string, MaterialId[]>)[tab].filter(m => MATERIALS[m].price !== null && !(missingOnly[tab] && ruleOf(m).kind !== 'stack' && headroom(game, m, 0, hh) === 0 && !(need[m] ?? 0))).slice().sort((a, b) => Number((need[b] ?? 0) > 0) - Number((need[a] ?? 0) > 0)).map(m => (
                 <div key={m} style={{ background: C.card, border: `1px solid ${cart[m] || (need[m] ?? 0) > 0 ? C.gold : C.line}`, borderRadius: 10, padding: 10, display: 'flex', gap: 10 }}>
                   <Icon id={m} />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}><b>{MATERIALS[m].name}</b><span style={{ color: C.gold }}>{usd((MATERIALS[m].price ?? 0) * k)}</span></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}><b>{MATERIALS[m].name}{(() => { const ol = ownedLabel(game, m, hh); return ol ? <span title={ruleOf(m).kind === 'single' ? 'You have one already (in the stockpile, on order or built); you would never need a second.' : 'What the household needs: you have this many already, counting what is on order.'} style={{ marginLeft: 6, fontSize: 10.5, fontWeight: 600, color: ol.owned ? '#1c1d18' : C.dim, background: ol.owned ? C.good : 'rgba(255,255,255,0.1)', borderRadius: 8, padding: '0 6px' }}>{ol.text}</span> : null; })()}</b><span style={{ color: C.gold }}>{usd((MATERIALS[m].price ?? 0) * k)}</span></div>
                     <div title={MATERIALS[m].unit} style={{ fontSize: 11.5, color: C.dim, lineHeight: 1.3, margin: '2px 0 6px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{MATERIALS[m].unit}</div>
                     {(() => { const kn = kitNote(game, m); return kn ? <div style={{ fontSize: 11.5, margin: '-2px 0 5px', color: kn.urgent ? '#e0b050' : C.good }}>{kn.text}</div> : null; })()}
                     {(need[m] ?? 0) > 0 && <div style={{ fontSize: 11.5, margin: '-2px 0 5px' }}><span title={`The plans lack ${need[m]}`} style={{ color: '#1c1d18', background: C.gold, borderRadius: 8, padding: '0 6px', fontWeight: 600 }}>need {need[m]}</span> <button style={{ ...btn(), padding: '0 6px', fontSize: 11 }} onClick={() => setCart(c => ({ ...c, [m]: Math.max(c[m] ?? 0, need[m]!) }))}>add {need[m]}</button></div>}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <button style={btn()} onClick={() => add(m, -1)}>−</button>
                       <span style={{ minWidth: 22, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{cart[m] ?? 0}</span>
-                      <button style={btn()} onClick={() => add(m, 1)}>+</button>
+                      <button style={btn(false, (cart[m] ?? 0) >= room(m))} disabled={(cart[m] ?? 0) >= room(m)} title={(cart[m] ?? 0) >= room(m) ? (ruleOf(m).kind === 'single' ? 'You already have one.' : 'You have enough for everyone.') : undefined} onClick={() => add(m, 1)}>+</button>
                       <span style={{ fontSize: 11, color: C.dim, marginLeft: 'auto' }}>have {Math.floor(game.stock[m])}</span>
                     </div>
+                    {(() => { const f = shortfall(game, m, cart[m] ?? 0, 30, hh); return f > 0 && ruleOf(m).kind !== 'single' ? <button style={{ ...btn(), marginTop: 5, fontSize: 11.5, padding: '2px 8px' }} title="Top up to the recommended stock for this household (30 days)" onClick={() => setCart(c => ({ ...c, [m]: (c[m] ?? 0) + f }))}>Fill to recommended (+{f})</button> : null; })()}
                   </div>
                 </div>
               ))}
@@ -252,22 +283,35 @@ export function ShopWindow() {
             {tab === 'money' && <Money onMsg={setMsg} />}
             {msg && <div style={{ color: C.bad, marginTop: 10 }}>{msg}</div>}
           </div>
-          {tab !== 'metals' && tab !== 'money' && tab !== 'guns' && tab !== 'tools' && <div style={{ width: 250, borderLeft: `1px solid ${C.line}`, padding: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {narrow && !orderOpen && tab !== 'metals' && tab !== 'money' && tab !== 'guns' && tab !== 'tools' && <div style={{ borderTop: `1px solid ${C.line}`, padding: '8px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}><span>Order: {lines.length} line{lines.length === 1 ? '' : 's'}{lines.length > 0 ? ` · ${usd(total)}` : ''}</span><button style={btn(true)} onClick={() => setOrderOpen(true)}>Order &amp; kits</button></div>}
+          {(!narrow || orderOpen) && tab !== 'metals' && tab !== 'money' && tab !== 'guns' && tab !== 'tools' && <div style={{ width: narrow ? undefined : 250, maxHeight: narrow ? '70%' : undefined, overflowY: narrow ? 'auto' : undefined, borderLeft: narrow ? undefined : `1px solid ${C.line}`, borderTop: narrow ? `1px solid ${C.line}` : undefined, padding: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {narrow && <button style={{ ...btn(), alignSelf: 'flex-end' }} onClick={() => setOrderOpen(false)}>Hide order</button>}
+            <Group id="shop.kits" title="Complete kits" extra={stay ? 'within budget' : 'no budget cap'}>
+              <label style={{ display: 'flex', gap: 5, alignItems: 'center', color: C.dim, fontSize: 11.5 }} title="Leaves your living reserve (the same one the spend guard watches) untouched. Off: kits may spend down to the last dollar, and the spend guard still asks before you place the order."><input type="checkbox" checked={stay} onChange={e => setStay(e.target.checked)} />Stay within budget</label>
+              {PRESETS.map(pr => { const pl = planPreset(game, pr, cart, foodCart, stay); const nothing = pl.addedCost <= 0; return <button key={pr.id} style={{ ...btn(false, nothing), textAlign: 'left', fontSize: 12, padding: '3px 8px', display: 'flex', justifyContent: 'space-between', gap: 6 }} disabled={nothing} title={pr.text} onClick={() => applyPlan(pl, pr.name)}><span>{pr.name}</span><span style={{ color: C.dim }}>{nothing ? 'have it' : `~${usdShort(pl.addedCost)}`}</span></button>; })}
+              {note && <div style={{ fontSize: 11, color: C.dim, lineHeight: 1.35, borderTop: `1px solid ${C.line}`, paddingTop: 4 }}>
+                <div><b style={{ color: '#eee' }}>{note.title}:</b> {note.added.length ? `added ${note.added.length} line${note.added.length > 1 ? 's' : ''}.` : 'nothing to add.'}</div>
+                {note.skipped.length > 0 && <details><summary style={{ cursor: 'pointer' }}>Skipped {note.skipped.length}</summary>{note.skipped.slice(0, 12).map(s => <div key={s.id}>{s.name}: {s.reason}</div>)}{note.skipped.length > 12 && <div>and {note.skipped.length - 12} more</div>}</details>}
+              </div>}
+            </Group>
             <b>The order</b>
             {!lines.length && <div style={{ color: C.dim }}>Nothing yet.</div>}
-            <div style={{ flex: 1, overflowY: 'auto' }}>
+            <div style={{ flex: 1, overflowY: 'auto', minHeight: narrow ? undefined : 40 }}>
               {lines.map(l => <div key={l.food ?? l.material} style={{ display: 'flex', justifyContent: 'space-between', gap: 6, padding: '2px 0' }}><span>{l.food ? `${l.n} × ${FOOD[l.food].name}` : `${l.qty} × ${MATERIALS[l.material].name}`}</span><span style={{ color: C.dim }}>{usd((l.food ? (FOOD[l.food].price ?? 0) * (l.n ?? 0) : (MATERIALS[l.material].price ?? 0) * l.qty) * k)}</span></div>)}
             </div>
-            {lines.length > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: `1px solid ${C.line}`, paddingTop: 6 }}><span>Total, delivered</span><b>{usd(total)}</b></div>}
+            {lines.length > 0 && <div style={{ borderTop: `1px solid ${C.line}`, paddingTop: 6 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Total, delivered</span><b>{usd(total)}</b></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: funds - total < 0 ? C.bad : C.dim }}><span>Left after the order</span><span>{usd(funds - total)}</span></div>
+            </div>}
             {onWay.length > 0 && <div style={{ borderTop: `1px solid ${C.line}`, paddingTop: 6, fontSize: 12 }} title="Orders already paid for; they arrive on their own">
               <b>On the way</b>
               {onWay.map(o => <div key={o.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 6, color: C.dim }}><span>{o.lines.length} item{o.lines.length > 1 ? 's' : ''} · {usd(o.cost)}</span><span>{o.dueAt - game.clock.t < 1 ? 'today' : `in ${Math.ceil(o.dueAt - game.clock.t)} d`}</span></div>)}
             </div>}
             <div style={{ fontSize: 11.5, color: C.dim }}>{pay === 'cash' ? 'The banks are shut: paying cash from the safe.' : pay === 'bank' ? `From checking. The truck comes in about ${2 + Math.floor(game.site.miles / 15)} days.` : 'Nobody is delivering now.'}</div>
-            <button style={{ ...btn(true, !!why), padding: '7px 10px', fontWeight: 600 }} disabled={!!why} onClick={() => guard(total, () => { if (g.order(lines)) { setCart({}); setFoodCart({}); } })}>
+            <button style={{ ...btn(true, !!why), padding: '7px 10px', fontWeight: 600 }} disabled={!!why} onClick={() => guard(total, () => { if (g.order(lines)) { setCart({}); setFoodCart({}); setNote(null); } })}>
               {why === 'cannot_afford' ? 'Not enough money' : why === 'no_deliveries' ? 'No deliveries' : 'Place the order'}
             </button>
-            {lines.length > 0 && <button style={btn()} onClick={() => { setCart({}); setFoodCart({}); }}>Clear</button>}
+            {lines.length > 0 && <button style={btn()} onClick={() => { setCart({}); setFoodCart({}); setNote(null); }}>Clear order</button>}
             {guardNode}
           </div>}
         </div>
@@ -464,6 +508,7 @@ function FoodShelves({ game, k, cart, add }: { game: GameState; k: number; cart:
           <button style={btn()} onClick={() => add(id, 1)}>+</button>
           <span style={{ fontSize: 11, color: C.dim, marginLeft: 'auto' }}>have {Math.floor((have.get(id) ?? 0) + 1e-6)}</span>
         </div>
+        {(() => { const f = foodRecommended(id, need, 30) - Math.floor((have.get(id) ?? 0) + 1e-6) - (cart[id] ?? 0); return f > 0 ? <button style={{ ...btn(), marginTop: 5, fontSize: 11.5, padding: '2px 8px' }} title="Top up to about 30 days of this in the basic pantry" onClick={() => add(id, f)}>Fill to recommended (+{f})</button> : null; })()}
       </div>
     </div>;
   };
