@@ -120,6 +120,7 @@ import type { RegionWorld } from './region/regionWorld';
 import { buildGate } from './props/gateGeometry';
 import { buildStockpile } from './props/stockpileGeometry';
 import { DeliveryTruck } from './DeliveryTruck';
+import { RoadTraffic } from './RoadTraffic';
 import { MATERIAL_IDS, emptyStock } from '../sim/materials';
 import { pantryRows } from '../sim/pantry';
 import { needOf } from '../sim/needs';
@@ -276,6 +277,8 @@ export class HomesteadWorld {
   private readonly _seed: number;
   private readonly _roads = new THREE.Group();
   truck: DeliveryTruck;
+  /** Cars, trucks, wanderers and the parties that stand for real encounters, on the county road (game/RoadTraffic.ts). */
+  readonly roadLife: RoadTraffic;
   /** The plow pickup and the berms it leaves (fx/PlowRun.ts). */
   plow: PlowRun;
   private _stockpile: THREE.Group | null = null;
@@ -368,6 +371,7 @@ export class HomesteadWorld {
     // a built drive is benched into the ground (cut banks, fill slopes, banked curves): before the terrain mesh and the trees are made
     this.parcel.setRoadBed(this._drive ? roadBedOf(this.plan) : null);
     this.truck = new DeliveryTruck(ws.scene, this._truckRoute(), (x, z) => (Math.abs(x - this.county.x(z)) < ROAD_W ? this.countyY(x, z) : this.groundAt(x, z)), this.county.x, (x, z) => this._driveY(x, z));
+    this.roadLife = new RoadTraffic(ws.scene, this.county, (x, z) => this.countyY(x, z));
     this.plow = new PlowRun(ws.scene, this.access.drive, this.groundAt, (x, z) => this._driveY(x, z));
   }
 
@@ -602,6 +606,7 @@ export class HomesteadWorld {
   setQuality(q: Quality): void {
     if (q === this._quality) return;
     this._quality = q;
+    this.roadLife.setQuality(q);
     this.terrain.build({
       source: this._terrainSource,
       kind: this.regionWorld.kind, cx: this.center.x, cz: this.center.z,
@@ -2098,6 +2103,12 @@ export class HomesteadWorld {
   private _cars: CarBox[] = [];
   private _carKey = '';
 
+  /** Life on the county road: ambient traffic by the collapse clock, and the parties that are real encounters on their way (game/RoadTraffic.ts). */
+  updateRoadLife(dt: number, game: GameState, speedK: number): void {
+    this.roadLife.setGate(this._truckRoute()[0][1]);
+    this.roadLife.update(dt, game, speedK, { x: this._ws.camera.position.x, z: this._ws.camera.position.z }, Math.max(0, Math.min(1, (1 - this.air.daylight) / 0.85)));
+  }
+
   /** Wildlife: the animals the sim says live here, grazing, wandering and bolting from people (and dogs). */
   updateWildlife(dt: number, game: GameState, speedK: number): void {
     const threats: Array<[number, number]> = this.family.positions().filter(p => this.family.shown.has(p.id)).map(p => [p.x, p.z] as [number, number]);
@@ -2627,6 +2638,7 @@ export class HomesteadWorld {
     }
     this._built.clear();
     this.truck.dispose();
+    this.roadLife.dispose();
     this.plow.dispose();
     this._ws.scene.remove(this._roads);
     this._roads.traverse(o => (o as THREE.Mesh).geometry?.dispose());
