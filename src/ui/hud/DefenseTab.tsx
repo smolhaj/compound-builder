@@ -1,4 +1,5 @@
 /** The Defense tab: score, the property line (with "Wall my property"), upgrades, lights, towers, readiness checks. */
+import { useState } from 'react';
 import { waterLines } from '../../sim/waterWorks';
 import { yardLines } from '../../sim/vehicleYard';
 import { terrainDefense } from '../../sim/terrainFx';
@@ -26,6 +27,7 @@ import { adaptOf } from '../../sim/encounters';
 import { dayIndex } from '../../sim/state';
 import { Group, Hint, Note, Row, Section } from './common';
 import { readiness } from '../../sim/courses';
+import { GUARD_MONTH, MAX_GUARDS, guardCount, guardPosture, guardProblem } from '../../sim/guards';
 
 const DRILL_NAME = ['', 'weekly drills', 'drills twice a week', 'drills three times a week'] as const;
 import { TONE, DIM, btn, usd } from './style';
@@ -61,6 +63,24 @@ function HardcoreNotes() {
 }
 
 /** Defense and preparedness: a score, whether the place is walled in, what's built, and how ready it is for other trouble. */
+function GuardsSection() {
+  const game = useGameStore(s => s.game);
+  const [msg, setMsg] = useState<string | null>(null);
+  const n = guardCount(game), why = guardProblem(game), p = guardPosture(game), last = game.guards?.lastQuit;
+  const month = GUARD_MONTH.toLocaleString('en-US');
+  return <Section title="Security staff">
+    <Row label="Guards at the gate" value={n + ' of ' + MAX_GUARDS + (n ? ' · $' + (n * GUARD_MONTH).toLocaleString('en-US') + ' a month' : '')} title="Contract guards from an agency: each adds a fighter at the gate and warning on the road. They go home when the money runs out or the agency cannot get anyone here." />
+    {n > 0 && <Hint more="Each guard works one 8-hour shift; only the one on shift counts. With a hardened gate house they bunk in it, otherwise they park their cars at the drive. In a permanent collapse (banks and law gone for a week) they leave one by one.">{p.fighters ? '+' + p.fighters + ' fighter, +' + p.detection + ' warning at the gate now' : 'nobody on shift this hour'}</Hint>}
+    {last && n === 0 && <Note tone="warn">{last.name} was the last to quit (day {last.day}). The guards are gone for good.</Note>}
+    {last && n > 0 && <Note tone="warn">{last.name} quit on day {last.day}; {n} left.</Note>}
+    <div style={{ display: 'flex', gap: 6 }}>
+      <button style={{ ...btn(!why), flex: 1 }} disabled={!!why} title={why ?? 'Hire one: $' + month + ' a month'} onClick={() => setMsg(useGameStore.getState().hireGuard())}>Hire a guard · ${month}/mo</button>
+      {n > 0 && <button style={btn(true)} onClick={() => useGameStore.getState().dismissGuard()}>Let one go</button>}
+    </div>
+    {(msg || (why && n === 0)) && <Note tone="warn">{msg ?? why}</Note>}
+  </Section>;
+}
+
 export function DefenseTab() {
   const game = useGameStore(s => s.game);
   const w = useWorldStore();
@@ -82,6 +102,7 @@ export function DefenseTab() {
       <button style={{ ...btn(w.showBoundary), marginTop: 4 }} onClick={() => w.setShowBoundary(!w.showBoundary)} title="Draw the property line on the ground">{w.showBoundary ? 'Hide' : 'Show'} property line</button>
       {hardcore && <HardcoreNotes />}
     </Section>
+    <GuardsSection />
     <Section title="The property line">
       {d.walls.map(c => <CheckRow key={c.id} c={c} />)}
       {missingGate > 0 && <div style={{ border: '1px solid #c9a24a', borderRadius: 6, padding: 6, margin: '4px 0' }}>

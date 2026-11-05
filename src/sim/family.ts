@@ -27,6 +27,8 @@ export interface Person {
   elder?: boolean;
   /** Chronic conditions that need a daily medicine (sim/body.ts). */
   conditions?: Condition[];
+  /** A contract guard who stayed on when the world ended (sim/guards.ts): armed, trained, and sharper on watch. */
+  guard?: boolean;
   /** Household family (born or married in), not someone taken in. */
   kin?: boolean;
   /** Birthday (day of year); ages tick over on it (sim/lineage.ts). */
