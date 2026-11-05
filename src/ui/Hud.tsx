@@ -196,10 +196,12 @@ export function Hud() {
           {leftTab === 'log' && game.log.slice(-14).reverse().map((e, i) => <div key={i} style={{ padding: '3px 0', borderBottom: `1px solid ${LINE}`, opacity: 1 - i * 0.04 }}><Clamp text={e.text}><span style={{ color: i === 0 ? '#eee' : undefined }}>{e.text}</span></Clamp></div>)}
         </div>
         {g.spendAsk && <div style={{ border: `1px solid ${TONE.warn}`, borderRadius: 6, padding: '4px 6px', marginTop: 6, fontSize: FS.small }}>
-          <div>The {g.spendAsk.kind.replace(/_/g, ' ')} books a {usd(g.spendAsk.cost)} county permit fee. That leaves {usd(Math.max(0, g.spendAsk.after))}, under the {usd(g.spendAsk.reserve)} to live on{g.spendAsk.after < 0 ? ' (cash would go negative)' : ''}.</div>
+          {g.spendAsk.cannot
+            ? <div>{g.spendAsk.cannot}</div>
+            : <div>The {g.spendAsk.kind.replace(/_/g, ' ')} books a {usd(g.spendAsk.cost)} county permit fee. That leaves {usd(Math.max(0, g.spendAsk.after))}, under the {usd(g.spendAsk.reserve)} to live on.</div>}
           <div style={{ display: 'flex', gap: 4, marginTop: 3 }}>
-            <button style={btn(true)} onClick={() => g.answerSpend(true)}>Do it anyway</button>
-            <button style={btn()} onClick={() => g.answerSpend(false)}>Keep a reserve</button>
+            {!g.spendAsk.cannot && <button style={btn(true)} onClick={() => g.answerSpend(true)}>Do it anyway</button>}
+            <button style={btn()} onClick={() => g.answerSpend(false)}>{g.spendAsk.cannot ? 'OK' : 'Keep a reserve'}</button>
           </div>
         </div>}
         {!g.tool && g.stakedNote && <div style={{ borderTop: `1px solid ${LINE}`, marginTop: 6, paddingTop: 6 }}><Note tone="good">{g.stakedNote}</Note></div>}

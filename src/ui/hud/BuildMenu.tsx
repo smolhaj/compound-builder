@@ -18,6 +18,7 @@ import { drillExtra } from '../../sim/site';
 import { countyWorks, needsPermit, permitFee } from '../../sim/paperwork';
 import { BUNKER_ORDER, GATEHOUSE_ORDER, KIT, POD_ORDER, RIG_ORDER, TERRACE_ORDER, TOWER_ORDER, UTILITY_ORDER } from '../../game/buildkit/kit';
 import { PERIMETER, UTILITY_LINES, runBill, runHours, type PerimeterKind } from '../../sim/perimeter';
+import { fosterNote } from '../../sim/orphans';
 import { bunkerChecklist, buildAdvice, longTerm, suggestions, type SuggestionAct, perimeterNote, perimeterOff, perimeterTiers, upgradeChain } from '../../sim/guidance';
 import { hireCaretaker, openMoveIn, setBelt } from '../../sim/weekender';
 import { Clamp, Group, Hint, Item, Note, Tick } from './common';
@@ -110,8 +111,14 @@ export function BuildMenu({ showProjects = () => undefined }: { showProjects?: (
 
   const chain = upgradeChain('split_rail').map(k => PERIMETER[k].name.replace(/ \(.*\)/, '').toLowerCase()).join(' → ');
 
+  // every adult is gone and the children are fostered: say so in place of the checklist and the next steps (sim/orphans.ts)
+  const foster = fosterNote(game);
   return <>
-    {!g.tool && <div style={card(opn.done < opn.total)}>
+    {foster && !g.tool && <div style={card(true)}>
+      <div style={{ fontSize: FS.h, textTransform: 'uppercase', letterSpacing: 0.6, color: DIM, fontWeight: 600 }}>The place is held</div>
+      <Note tone="warn">{foster.text}</Note>
+    </div>}
+    {!g.tool && !foster && <div style={card(opn.done < opn.total)}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }} title="What a place needs to run: a suggestion list, nothing is locked">
         <span style={{ fontSize: FS.h, textTransform: 'uppercase', letterSpacing: 0.6, color: DIM, fontWeight: 600 }}>Get operational</span>
         <span style={{ color: opn.done === opn.total ? '#a8d080' : DIM, fontWeight: 600 }}>{opn.done === opn.total ? 'Operational' : `${opn.done} of ${opn.total}`}</span>
