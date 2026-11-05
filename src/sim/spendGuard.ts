@@ -9,6 +9,7 @@ import { daysOfFood, KCAL, needOf } from './needs';
 import { orderCost, prices } from './economy';
 import { CREW_RATE, hoursLeft } from './crews';
 import type { GameState } from './state';
+import { countyWorks, needsPermit, permitFee } from './paperwork';
 
 /** The cash a household keeps for living costs while it builds. */
 export const livingReserve = (money: number): number => Math.max(RESERVE_MIN, Math.round(Math.max(0, money) * RESERVE_SHARE));
@@ -41,6 +42,17 @@ export function spendCheckCommitted(money: number, cost: number, committed: numb
   return { after, reserve, below: cost > 0 && after < reserve, committed: owed };
 }
 
+/** The county permit fee that planning `kind` books now (0 = none: no permit needed, permits skipped, or nobody at the counter). */
+export const permitSpend = (s: GameState, kind: string): number => (needsPermit(kind) && s.paper.permits && countyWorks(s) ? permitFee(s, kind) : 0);
+
+/** The question to ask before staking `kind` (null = just do it): the permit fee would leave less than the reserve (or take cash negative). Advice only; the player can always go ahead. */
+export function stakeSpendAsk(s: GameState, kind: string): { cost: number; check: SpendCheck } | null {
+  const cost = permitSpend(s, kind);
+  if (cost <= 0) return null;
+  const check = spendCheck(s.money, cost);
+  return check.below ? { cost, check } : null;
+}
+
 /** "$141k" for the short button labels; "$950" under ten thousand. */
 export const usdShort = (n: number): string => { const v = Math.round(n); return Math.abs(v) >= 10_000 ? `$${Math.round(v / 1000).toLocaleString('en-US')}k` : '$' + v.toLocaleString('en-US'); };
 
@@ -48,6 +60,20 @@ export const usdShort = (n: number): string => { const v = Math.round(n); return
 export const FOOD_NUDGE_DAYS = 14;
 /** A month of staples is the nudge's suggested first step. */
 export const FOOD_NUDGE_TARGET_DAYS = 30;
+
+/** Base urgency of the nudge card; the retaining-wall (58) and plow (56) cards outrank it unless the hit is near (see foodUrgency). */
+export const FOOD_URGENCY = 52;
+
+/**
+ * How loudly to nudge: 52 normally, 54 with the shelves bare (still under the plow 56 and retaining wall 58 cards),
+ * and 60 to 63 once a disaster's warning signs are up and under a week of food is put by (above those cards, below
+ * a stripped roof or the seed card). One card either way, never a stream of them.
+ */
+export function foodUrgency(s: GameState, days: number): number {
+  const warned = !!s.disaster.kind && s.clock.t >= s.disaster.warnAt && s.clock.t < s.disaster.hitAt;
+  if (warned && days < 7) return days < 1 ? 63 : 60;
+  return days < 1 ? 54 : FOOD_URGENCY;
+}
 
 export interface FoodNudge { days: number; cost: number }
 

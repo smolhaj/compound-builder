@@ -71,3 +71,36 @@ describe('spend guard counts crew wages already hired', () => {
     expect(counted[3]).toBe(true);
   });
 });
+
+describe('stake spend ask', () => {
+  it('asks before a permit fee that dips under the reserve, even at $0, and not when cash is plentiful', async () => {
+    const { stakeSpendAsk, permitSpend } = await import('./spendGuard');
+    const g = newGame(7); g.paper.permits = true;
+    const kind = 'timber_cabin';
+    expect(permitSpend(g, kind)).toBeGreaterThan(0);
+    g.money = 0;
+    const a = stakeSpendAsk(g, kind);
+    expect(a).not.toBeNull();
+    expect(a!.check.after).toBeLessThan(0);
+    g.money = 400_000;
+    expect(stakeSpendAsk(g, kind)).toBeNull();
+    g.paper.permits = false;
+    g.money = 0;
+    expect(stakeSpendAsk(g, kind)).toBeNull();
+  });
+});
+
+describe('food nudge urgency', () => {
+  it('stays under the plow and retaining wall cards until the warning signs are up', async () => {
+    const { foodUrgency } = await import('./spendGuard');
+    const g = bare(300_000);
+    expect(foodUrgency(g, 0)).toBe(54);
+    expect(foodUrgency(g, 10)).toBe(52);
+    g.disaster.kind = 'grid_down'; g.disaster.warnAt = 10; g.disaster.hitAt = 100; g.clock.t = 50;
+    expect(foodUrgency(g, 0)).toBe(63);
+    expect(foodUrgency(g, 5)).toBe(60);
+    expect(foodUrgency(g, 12)).toBe(52);
+    g.clock.t = 5;
+    expect(foodUrgency(g, 0)).toBe(54);
+  });
+});

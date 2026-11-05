@@ -7,6 +7,7 @@
 import type { Pt } from './perimeter';
 import { homeBeds, isHome } from './blueprints';
 import { daysOfFood } from './needs';
+import { foodNudge } from './spendGuard';
 import { isFinished } from './construction';
 import { defenseReport } from './defenseReport';
 import { buildOff, type SuggestionAct } from './guidance';
@@ -58,7 +59,7 @@ export function operational(s: GameState, drive?: readonly Pt[]): OpItem[] {
   const days = Math.round(Math.min(daysOfFood(s), 999)), put = `${days} ${days === 1 ? 'day' : 'days'} put by`;
   const foodDone = fin(FOOD) || days >= 90;
   out.push({ id: 'food', label: 'Food', done: foodDone, line: foodDone ? (fin(FOOD) ? 'Growing' : put) : staked(FOOD) ? `Planting; ${put}` : `Nothing growing; ${put}`,
-    ...(foodDone || staked(FOOD) ? {} : { act: stake('garden', 'Stake a garden') }) });
+    ...(foodDone ? {} : days < 1 && foodNudge(s) ? { act: { label: 'Stock some food', act: { type: 'shop' as const, tab: 'food' as const } } } : staked(FOOD) ? {} : { act: stake('garden', 'Stake a garden') }) });
 
   // defense: guarded or better
   const d = defenseReport(s, drive);

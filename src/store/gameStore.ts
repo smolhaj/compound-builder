@@ -108,6 +108,11 @@ export interface GameStore {
   toolProblem: string | null;
   /** A short confirmation after a building is staked and the tool put away (clears itself). */
   stakedNote: string | null;
+  /** A staking the player is being asked to confirm because its county permit fee would dip under the living reserve (sim/spendGuard.stakeSpendAsk). */
+  spendAsk: { kind: string; x: number; z: number; rot: number; cost: number; after: number; reserve: number } | null;
+  askSpend: (a: NonNullable<GameStore['spendAsk']>) => void;
+  /** Answer the question: true stakes it anyway, false drops it (the tool stays armed). */
+  answerSpend: (yes: boolean) => void;
   /** Selected structure (construction panel). */
   selected: string | null;
   /** A request for the HUD to open a panel (a Next-step card or a link in the text): the right-hand tab and its sub-tab. The HUD takes it and clears it. */
@@ -280,6 +285,16 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
   tool: null,
   toolProblem: null,
   stakedNote: null,
+  spendAsk: null,
+  askSpend: (spendAsk) => set({ spendAsk }),
+  answerSpend: (yes) => {
+    const a = get().spendAsk;
+    set({ spendAsk: null });
+    if (!a || !yes) return;
+    get().plan(a.kind, a.x, a.z, a.rot);
+    set({ tool: null });
+    get().flashStaked(`Staked out the ${a.kind.replace(/_/g, ' ')}. The family will start when the materials are in (Projects tab).`);
+  },
   selected: null,
   hudFocus: null,
   cutscene: null,
@@ -560,7 +575,7 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     const changed = isMarked(g, t.id) ? unmarkTree(g, t.id) : markTree(g, t, haulDist) !== null;
     if (changed) set({ game: g });
   },
-  setTool: (tool) => { if (!locked()) set({ tool, toolProblem: null, ...(tool ? { stakedNote: null } : {}) }); },
+  setTool: (tool) => { if (!locked()) set({ tool, toolProblem: null, spendAsk: null, ...(tool ? { stakedNote: null } : {}) }); },
   setToolProblem: (toolProblem) => set({ toolProblem }),
   flashStaked: (text) => {
     set({ stakedNote: text });
