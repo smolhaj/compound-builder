@@ -22,7 +22,7 @@ import { bunkerChecklist, buildAdvice, longTerm, suggestions, type SuggestionAct
 import { hireCaretaker, openMoveIn, setBelt } from '../../sim/weekender';
 import { Clamp, Group, Hint, Item, Note, Tick } from './common';
 import { btn, card, DIM, FS, miniBtn, usd } from './style';
-import { operational, operationalCount } from '../../sim/operational';
+import { OP_COVERED, operational, operationalCount } from '../../sim/operational';
 import { StarterCompound } from './StarterCompound';
 import { starterWanted } from '../../sim/starterCompound';
 import { WallProperty } from './WallProperty';
@@ -36,7 +36,6 @@ import { HousingStyleCards } from './HousingStyles';
 
 /** The build menu's groups (kit pieces by what they are for). */
 /** Suggestions the operational checklist already shows as its own lines. */
-const OP_COVERED: ReadonlySet<string> = new Set(['roof', 'beds', 'water', 'food', 'power']);
 
 const BUILD_GROUPS: Array<[string, string, readonly string[]]> = [
   ['home', 'Home & work', ['timber_cabin', 'log_house', 'cottage', 'guest_house', 'moms_house', 'modular_home', 'stilted_house', 'cabin_village', 'outhouse', 'workshop', 'forge', 'metal_garage', 'barn', 'equipment_yard', 'helipad', 'boat_dock', 'marina', ...TERRACE_ORDER]],

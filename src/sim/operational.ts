@@ -9,7 +9,7 @@ import { homeBeds, isHome } from './blueprints';
 import { daysOfFood } from './needs';
 import { foodNudge } from './spendGuard';
 import { isFinished } from './construction';
-import { defenseReport } from './defenseReport';
+import { defenseReport, type DefenseReport } from './defenseReport';
 import { buildOff, type SuggestionAct } from './guidance';
 import { POWER_BUILDINGS as POWER, powerOnPlace } from './hookups';
 import type { GameState } from './state';
@@ -32,7 +32,11 @@ export const DEFENSE_OK = 45;
 const WATER = ['well_hand', 'well_drilled', 'cistern', 'water_tower'];
 const FOOD = ['garden', 'field', 'greenhouse', 'greenhouse_heated', 'polytunnel', 'high_tunnel', 'orchard', 'orchard_grove', 'orchard_terraced', 'aquaponics'];
 
-export function operational(s: GameState, drive?: readonly Pt[]): OpItem[] {
+/** The Next-steps ids the checklist already covers (the Build tab and the compound board skip them). */
+export const OP_COVERED: ReadonlySet<string> = new Set(['roof', 'beds', 'water', 'food', 'power']);
+
+/** `report`: a defense report already worked out for this state (the board shares one instead of computing two). */
+export function operational(s: GameState, drive?: readonly Pt[], report?: DefenseReport): OpItem[] {
   const fin = (kinds: string[]) => s.structures.some(st => kinds.includes(st.kind) && isFinished(st));
   const staked = (kinds: string[]) => s.structures.some(st => kinds.includes(st.kind));
   const stake = (kind: string, label: string): OpItem['act'] => (buildOff(s, kind) ? undefined : { label, act: { type: 'stake', kind } });
@@ -62,7 +66,7 @@ export function operational(s: GameState, drive?: readonly Pt[]): OpItem[] {
     ...(foodDone ? {} : days < 1 && foodNudge(s) ? { act: { label: 'Stock some food', act: { type: 'shop' as const, tab: 'food' as const } } } : staked(FOOD) ? {} : { act: stake('garden', 'Stake a garden') }) });
 
   // defense: guarded or better
-  const d = defenseReport(s, drive);
+  const d = report ?? defenseReport(s, drive);
   const defDone = d.score >= DEFENSE_OK;
   out.push({ id: 'defense', label: 'Defense', done: defDone, line: `${d.label}, ${d.score} of 100`,
     ...(defDone ? {} : { act: { label: 'Defense', act: { type: 'open' as const, right: 'defense' as const } } }) });
