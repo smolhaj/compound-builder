@@ -33,6 +33,7 @@ import { PerimeterTool } from './PerimeterTool';
 import { SightOverlay } from './sightlines/SightOverlay';
 import { WeakSpotOverlay } from './WeakSpotOverlay';
 import { weakSpots } from '../sim/wallTops';
+import { hasGateMotor, hasIntercom, hasSallyGate } from '../sim/gateSecurity';
 import { PARCEL_SIZE as PS } from './parcel/parcelTerrain';
 import { fenceLive, type PerimeterKind } from '../sim/perimeter';
 import { useGameStore } from '../store/gameStore';
@@ -392,7 +393,7 @@ export function GameCanvas() {
       world.syncTents(game);
       world.syncForestry(game.forestry);
       world.simTime = game.clock.t;
-      world.syncPerimeter(game.perimeter, game.clock.t, { lit: fenceLive(game) && !blackoutNow(game), sensors: (game.stock.ground_sensor ?? 0) > 0, moats: Object.fromEntries(moatStates(game).map(m => [m.run.id, { level: m.level, frozen: m.frozen }])) });
+      world.syncPerimeter(game.perimeter, game.clock.t, { lit: fenceLive(game) && !blackoutNow(game), sensors: (game.stock.ground_sensor ?? 0) > 0, gateKit: { sally: hasSallyGate(game), intercom: hasIntercom(game), motor: hasGateMotor(game) }, moats: Object.fromEntries(moatStates(game).map(m => [m.run.id, { level: m.level, frozen: m.frozen }])) });
       const svKey = `${game.structures.filter(x => x.stage >= 5).length}|${game.perimeter.filter(r => r.finishedAt !== null).length}|${game.utilities.fittings.filter(f => f.finishedAt !== null).length}|${goodsKey(houseGoods(game))}`;
       if (svKey !== servicesKey) { servicesKey = svKey; world.syncServices(game); }
       sight.update(6);

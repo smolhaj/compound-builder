@@ -37,6 +37,7 @@ import { burnStructure, isFinished } from './construction';
 import { raidPressure } from './opsec';
 import { PERIMETER, peopleBlock, runFinished, runGrowth, wallLength } from './perimeter';
 import { weakPenalty } from './wallTops';
+import { gatePosture } from './gateSecurity';
 import { enclosure } from './enclosure';
 import { contagion, infect } from './effects';
 import type { Person, SkillId } from './family';
@@ -755,7 +756,7 @@ export function resolve(s: GameState, stance: Stance): Outcome {
         if (!p.bunker && p.safeRoom) lines.push('Everyone sat it out behind the safe-room door.');
       }
     } else if (stance === 'parley' || stance === 'trade') {
-      const calm = r() * 100 < 35 + negotiator * 7 + (e.kind === 'refugees' ? 30 : 0) + (e.kind === 'requisition' ? 15 : 0) - (e.kind === 'gang' ? 15 : 0) - (e.temper === 'savage' ? 45 : e.temper === 'hard' ? 10 : 0);
+      const calm = r() * 100 < 35 + negotiator * 7 + gatePosture(s).parley + (e.kind === 'refugees' ? 30 : 0) + (e.kind === 'requisition' ? 15 : 0) - (e.kind === 'gang' ? 15 : 0) - (e.temper === 'savage' ? 45 : e.temper === 'hard' ? 10 : 0);
       if (calm) {
         const paid = take(s, e.wants ?? {}, stance === 'trade' ? 0.5 : 0.3);
         title = 'Talked down'; text = `${negotiator >= 5 ? 'A good talker at the gate. ' : ''}They leave with something, and nobody fired a shot.`; tone = 'mixed';
