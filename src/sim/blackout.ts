@@ -19,6 +19,7 @@ import { isHome } from './blueprints';
 import { isFinished } from './construction';
 import { dayIndex, hourOf, type GameState } from './state';
 import { emptyNow } from './weekender';
+import { fullStealth, quietHours } from './stealthState';
 
 export type AutoLightsOut = 'off' | 'warned' | 'dusk';
 export const AUTO_MODES: readonly AutoLightsOut[] = ['off', 'warned', 'dusk'];
@@ -43,8 +44,9 @@ export function warningSigns(s: GameState): boolean {
 }
 
 /** Why the lights are out now ('manual' | 'dusk' | 'warned'), or null. */
-export function lightsOutReason(s: GameState): 'manual' | 'dusk' | 'warned' | 'away' | null {
+export function lightsOutReason(s: GameState): 'manual' | 'stealth' | 'dusk' | 'warned' | 'away' | null {
   if (op(s).blackout) return 'manual';
+  if (fullStealth(s)) return 'stealth';   // the single full-stealth posture (sim/stealth.ts): lights out every night
   const a = autoMode(s);
   if (a === 'dusk') return 'dusk';
   if (a === 'warned' && warningSigns(s)) return 'warned';
@@ -55,7 +57,7 @@ export function lightsOutReason(s: GameState): 'manual' | 'dusk' | 'warned' | 'a
 /** Household lights out (windows, fire pit, lamps, flashlights); the hour is the renderer's (`night`). */
 export const lightsOutNow = (s: GameState): boolean => lightsOutReason(s) !== null;
 /** Floodlights forced off too: manual or every-dusk discipline (a warning keeps the sensor lights). */
-export const floodsOut = (s: GameState): boolean => { const r = lightsOutReason(s); return r === 'manual' || r === 'dusk' || r === 'away'; };
+export const floodsOut = (s: GameState): boolean => { const r = lightsOutReason(s); return r === 'manual' || r === 'stealth' || r === 'dusk' || r === 'away'; };
 
 /** Sets of blackout curtains in the stockpile, and houses that need one. */
 export const curtainSets = (s: GameState): number => Math.floor(s.stock[CURTAIN_GOOD] ?? 0);
@@ -73,7 +75,7 @@ export const darkness = (s: GameState): number => (lightsOutNow(s) ? 1 - curtain
 /** Mood drift target shift for someone who is up in the dark (on watch; kids feel it more). Sleepers are not affected. */
 export const darkMood = (s: GameState, kid: boolean, upAtNight: boolean): number => (upAtNight ? -(kid ? 9 : 6) * darkness(s) : 0);
 /** Night work rate for people who are awake and working after dark (1 = unaffected): slower in unlit rooms. Not a reason to work at night: sleepers sleep. */
-export const nightWork = (s: GameState, hour: number): number => (isNightHour(hour) ? 1 - 0.2 * darkness(s) : 1);
+export const nightWork = (s: GameState, hour: number): number => (isNightHour(hour) ? 1 - 0.2 * darkness(s) : 1) * (quietHours(s) && (hour >= 21 || hour < 5) ? 0.5 : 1);
 /** Chance in a day that someone who is up at night (on watch, an emergency) stumbles in the dark (a sprain). Sleepers are not affected. */
 export const mishapChance = (s: GameState): number => 0.012 * darkness(s);
 

@@ -18,7 +18,8 @@
  * through `blackoutNow` without touching a call site. Pure (tested).
  */
 import { powered } from './gear';
-import { floodsOut } from './blackout';
+import { floodsOut, lightsOutReason } from './blackout';
+import { fullStealth } from './stealthState';
 import { isFinished } from './construction';
 import type { GameState } from './state';
 
@@ -60,6 +61,17 @@ export const lightMode = (s: GameState, id: string): LightMode => lightsOf(s).pe
 /** Lights-out discipline: a blackout turns every floodlight off whatever its mode (opsec curtains today; a fuller blackout can set this later). */
 export const blackoutNow = (s: GameState): boolean => floodsOut(s);
 
+/**
+ * Stealth plus a lit response: under lights out a sensor light stays armed (dark until a PERSON is near) when it carries an AI sensor
+ * module (it ignores animals, so nothing it does gives the place away), or when the full-stealth posture is on (every light that is not
+ * off acts as a sensor light). Nobody home ('away') keeps everything dark. A plain light under a plain lights-out stays forced off.
+ */
+export function respondsInBlackout(s: GameState, id: string): boolean {
+  if (lightsOutReason(s) === 'away' || lightMode(s, id) === 'off') return false;
+  if (fullStealth(s)) return true;
+  return lightMode(s, id) === 'sensor' && hasAiSensor(s, id);
+}
+
 /** A threat is near: someone at the gate, or a raid (battle.ts passes true), or the sensors tripped in the last SENSOR_HOLD. */
 export const threatNearby = (s: GameState): boolean => !!s.gate.pending || s.clock.t < lightsOf(s).alertUntil;
 /** Trip the sensors (a crew reaches the gate, a raid starts). */
@@ -88,7 +100,8 @@ export const aiModulesUsed = (s: GameState): number => Object.values(lightsOf(s)
  * A sensor light with an AI module ignores animals entirely; a basic one comes on for anything that moves.
  */
 export function floodlightLit(s: GameState, id: string, threat: ThreatKind | boolean | null = currentThreat(s)): boolean {
-  if (!powered(s) || blackoutNow(s)) return false;
+  if (!powered(s)) return false;
+  if (blackoutNow(s)) return respondsInBlackout(s, id) && (threat === true || threat === 'human');
   const m = lightMode(s, id);
   if (m === 'on') return true;
   if (m !== 'sensor') return false;
@@ -127,7 +140,7 @@ export function animalGlow(s: GameState, ids: readonly string[]): number {
 }
 
 /** Could this light ever come on (not off, power, no blackout)? Used by what the lights add to warning. */
-export const floodlightArmed = (s: GameState, id: string): boolean => powered(s) && !blackoutNow(s) && lightMode(s, id) !== 'off';
+export const floodlightArmed = (s: GameState, id: string): boolean => powered(s) && lightMode(s, id) !== 'off' && (!blackoutNow(s) || respondsInBlackout(s, id));
 
 /** Every light the player has: the armory's yard lights (if bought) and each finished tower with a mast. */
 export function lightList(s: GameState, floodTowerIds: readonly string[]): Array<{ id: string; name: string }> {

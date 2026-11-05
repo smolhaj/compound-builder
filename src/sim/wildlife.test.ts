@@ -342,7 +342,9 @@ describe('motion lights and animals', () => {
     expect(floodlightLit(g, 'c', 'animal')).toBe(true);
     expect(floodlightLit(g, 'd', 'human')).toBe(false);
     g.opsec = { quietDeliveries: false, blackout: true };
-    expect([floodlightLit(g, 'a', 'animal'), floodlightLit(g, 'b', 'human'), floodlightLit(g, 'c', 'human')]).toEqual([false, false, false]);
+    // lights out forces a plain light off; a light with an AI module stays armed and still answers a person (stealth plus a lit response), never an animal
+    expect([floodlightLit(g, 'a', 'animal'), floodlightLit(g, 'b', 'human'), floodlightLit(g, 'c', 'human')]).toEqual([false, true, false]);
+    expect([floodlightLit(g, 'b', 'animal'), floodlightLit(g, 'b', null), floodlightLit(g, 'a', 'human')]).toEqual([false, false, false]);
   });
   it('the sensor reads what is nearby: an animal alert lights basic sensors for a while; a person beats an animal', () => {
     const g = lit();
