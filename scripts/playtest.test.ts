@@ -6,7 +6,7 @@
  *   PLAYTEST=1 npx vitest run scripts/playtest.test.ts
  * Report: playtest-report.md (repo root).
  * Default: each run stops at its first ending, about 400 days after the hit (the year-one measure). YEARS=6 plays on to about three years
- * after the hit (the horizon the Hardcore prepper target is measured at; docs/DECISIONS.md). Other env: STRATS, KINDS, DIFF, SEEDOFF, LIFESTYLE, WELCOME, STAY, ADMIT.
+ * after the hit (the horizon the Hardcore prepper target is measured at; docs/DECISIONS.md). Other env: SEEDS (long mode: only these seeds), STRATS, KINDS, DIFF, SEEDOFF, LIFESTYLE, WELCOME, STAY, ADMIT.
  */
 import { describe, expect, it } from 'vitest';
 import { appendFileSync, writeFileSync } from 'node:fs';
@@ -310,6 +310,7 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
   let hides = 0, hidFound = 0, owed = 0, debtStage = 'none', burned = 0, stripped = 0;
   const trial: { started: number; in: number; on: number; stole: number; left: number; fostered?: number } = { started: 0, in: 0, on: 0, stole: 0, left: 0 };
   let nobodyHome = false;
+  let goneDay: number | null = null;
   const seen = new Map<string, number>();
   observed = []; season = 0;
   // how each one was lost (read off their state the day it happened)
@@ -433,7 +434,9 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
     // (checked after the day's tally; a death at the gate is tallied the next midnight)
     // (a line whose children were fostered by a neighbor (sim/orphans.ts) has an empty roster but is alive: that is an outcome, not a bug)
     if (livingCount(s) === 0 && !s.ending && (s.lineage.wards?.length ?? 0) > 0) { if (!nobodyHome) { nobodyHome = true; trial.fostered = day; } }
-    else if (livingCount(s) === 0 && !s.ending) bugs.push(`everyone is gone but the run goes on (day ${day}, ${s.disaster.phase})`);
+    // (a last death at the gate is tallied at the next midnight, so the empty roster is only a stuck run if it is still empty and unended a full day later)
+    else if (livingCount(s) === 0 && !s.ending) { if (goneDay === null) goneDay = day; else if (day > goneDay) bugs.push(`everyone is gone but the run goes on (day ${day}, ${s.disaster.phase})`); }
+    else goneDay = null;
     if (s.money - lastMoney - insured > 100_000) bugs.push(`money jumped $${Math.round(s.money - lastMoney).toLocaleString('en-US')} on day ${day}`);
     lastMoney = s.money;
     if (process.env.YEARLY && years && day % Number(process.env.YEARLY_EVERY ?? 91) === 0 && (!process.env.SEED || seed === Number(process.env.SEED))) {
@@ -520,6 +523,7 @@ describe.skipIf(process.env.PLAYTEST !== 'long')('the long game', () => {
     // (round 3: every region, a homestead and a prepper in each, then the idle and fortress baselines)
     const runs: Array<[Strategy, RegionId]> = [...REGION_IDS.flatMap(g => [['homestead', g], ['prepper', g]] as Array<[Strategy, RegionId]>), ['idle', 'mountain_west'], ['fortress', 'mountain_west']];
     for (const [strat, region] of runs) {
+      if (process.env.SEEDS && !process.env.SEEDS.split(',').includes(String(seed))) { seed++; continue; }
       const kind = (['grid_down', 'pandemic', 'financial', 'drought', 'wildfire', 'cyberattack'] as DisasterKind[])[seed % 6];
       const r = play(strat, kind, seed, 'short', siteFor(seed, region), 40);
       const s = r.s, L = s.lineage;
