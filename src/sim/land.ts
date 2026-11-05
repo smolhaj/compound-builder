@@ -116,10 +116,18 @@ export function ownedBounds(s: GameState): Rect {
   return b;
 }
 
+/** A cash offer well over the asking price (x1.6) buys land from an owner who would not sell. Not from one you are feuding with. */
+export const PREMIUM_OFFER = 1.6;
+/** Is this parcel one an owner will sell only for a premium: a neighbor at home, not on bad terms, who has not put it up for sale and does not like you enough to sell at the going rate. */
+export function premiumOffer(s: GameState, p: Parcel): boolean {
+  const n = s.neighbors.find(x => x.id === p.owner);
+  return p.owner !== 'you' && !p.forSale && !!n && n.status === 'home' && n.disposition >= -20 && n.disposition < 30;
+}
+
 /** The asking price today. */
 export function priceOf(s: GameState, p: Parcel): number {
   const n = s.neighbors.find(x => x.id === p.owner);
-  const mood = !n ? 1 : n.disposition > 50 ? 0.9 : n.disposition < -20 ? 1.35 : 1;
+  const mood = (!n ? 1 : n.disposition > 50 ? 0.9 : n.disposition < -20 ? 1.35 : 1) * (premiumOffer(s, p) ? PREMIUM_OFFER : 1);
   const panic = 1 + 1.2 * tension(s.disaster, s.clock.t);
   return Math.round(acresOf(p.rect) * perAcre(s, p) * mood * panic / 500) * 500;
 }
@@ -132,7 +140,7 @@ export function buyProblem(s: GameState, p: Parcel): string | null {
   const adjacent = shareEdge(s.site.home, p.rect) || s.land.parcels.some(q => q.owner === 'you' && shareEdge(q.rect, p.rect));
   if (!adjacent) return 'buy the land between first';
   if (s.disaster.kind && s.clock.t >= s.disaster.hitAt && s.disaster.tracks.banks < 0.5) return 'nobody sells land for cash now';
-  if (!p.forSale && (!n || n.disposition < 30)) return `${n ? n.name[0].toUpperCase() + n.name.slice(1) : 'The owner'} won't sell`;
+  if (!p.forSale && !(n && n.disposition >= 30) && !premiumOffer(s, p)) return `${n ? n.name[0].toUpperCase() + n.name.slice(1) : 'The owner'} won't sell`;
   if (s.money < priceOf(s, p)) return 'not enough money';
   // (round 4) a judgment lien on the place: no title company will close until it's paid
   if (s.fin.debt?.lien && s.disaster.tracks.banks >= 0.5) return 'there\'s a judgment lien on your land';

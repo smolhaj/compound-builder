@@ -42,6 +42,7 @@ import { frostChance } from './cold';
 import { seepageChance } from './sanitation';
 import { airliftBill, airliftCase, airliftReady } from './outposts';
 import { dayIndex, calendarOf, type GameState } from './state';
+import { medicalBay } from './richSinks';
 import { isFinished } from './construction';
 import { log } from './economy';
 import { mulberry32 } from './rng';
@@ -125,7 +126,7 @@ export function careFor(s: GameState, patientId: string): Care {
   const able = s.people.filter(p => p.id !== patientId && here(s, p) && (!p.kid || p.age >= 14) && (s.personState.find(x => x.id === p.id)?.needs.health ?? 0) >= 30);
   const medic = [...able].sort((a, b) => b.skills.medic - a.skills.medic)[0] ?? null;
   const books = (s.stock.medical_books ?? 0) >= 1;
-  return { medic, books, skill: medic ? Math.min(10, medic.skills.medic + (books ? 1 : 0)) : 0, bay: s.structures.some(x => x.kind === 'bunker_medical' && isFinished(x)), hospital: hospitalOpen(s) };
+  return { medic, books, skill: medic ? Math.min(10, medic.skills.medic + (books ? 1 : 0)) : 0, bay: medicalBay(s), hospital: hospitalOpen(s) };
 }
 /** Antibiotic courses on hand (loose courses plus the kit's). */
 export const courses = (s: GameState): number => Math.floor((s.stock.antibiotics ?? 0) + 1e-6) + Math.floor(s.stock.meds / KIT_PER_COURSE + 1e-6);
@@ -137,7 +138,7 @@ export function takeCourse(s: GameState): boolean {
 }
 const takeDressings = (s: GameState): boolean => { if (s.stock.meds >= 0.1 - 1e-9) { s.stock.meds -= 0.1; return true; } return false; };
 const hygieneOk = (s: GameState) => s.disaster.tracks.stores >= 0.5 || s.stock.hygiene >= 0.5;
-const bayOn = (s: GameState) => s.structures.some(x => x.kind === 'bunker_medical' && isFinished(x));
+const bayOn = medicalBay;
 
 /** Is a course worth spending here under the policy: everything on `all`, only the serious ones (sepsis, the old and the little, deep infections) on `serious`. */
 function worthCourse(s: GameState, p: Person, sev: number): boolean {

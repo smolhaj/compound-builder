@@ -19,6 +19,7 @@
 import type { GameState } from './state';
 import { TRACK_NAME, TRACKS, type Track } from './disaster';
 import { powered } from './gear';
+import { MAST, hasMast } from './richSinks';
 import { mulberry32 as rng } from './rng';
 import { dayIndex } from './state';
 import { fogRadioLine } from './fogFx';
@@ -61,8 +62,9 @@ export function radioSet(s: GameState): RadioSet {
 /** Chance a day of hearing something, and of it being true. */
 export function reception(s: GameState): { hear: number; truth: number } {
   const set = radioSet(s), k = radioSkill(s);
-  if (set === 'ham') return { hear: 0.6, truth: Math.min(0.95, 0.65 + 0.04 * k) };
-  if (set === 'shortwave') return { hear: 0.35, truth: Math.min(0.8, 0.5 + 0.03 * k) };
+  const m = hasMast(s);   // a mast and a repeater (sim/richSinks.ts) lift a real set; they do nothing for no radio
+  if (set === 'ham') return { hear: 0.6 + (m ? MAST.hear : 0), truth: Math.min(MAST.truthCap, 0.65 + 0.04 * k + (m ? MAST.truthHam : 0)) };
+  if (set === 'shortwave') return { hear: 0.35 + (m ? MAST.hear : 0), truth: Math.min(0.8 + (m ? 0.1 : 0), 0.5 + 0.03 * k + (m ? MAST.truthSw : 0)) };
   return { hear: s.neighbors.some(n => n.status === 'home') ? 0.15 : 0.04, truth: 0.3 };
 }
 

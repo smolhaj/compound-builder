@@ -62,6 +62,8 @@ const ELEMENTS: Array<[string, (g: GameState) => void]> = [
   ['sandbags', g => { g.stock.sandbags = 3; }],
   ['window bars', g => { g.stock.window_bars = 1; }],
   ['house hardening (window bars and ballistic panels)', g => { g.stock.window_bars = 1; g.stock.ballistic_panels = 1; }],
+  ['a hardened gate house', g => { g.stock.gate_house = 1; }],
+  ['a clinic suite and a radio mast', g => { g.stock.clinic_suite = 1; g.stock.radio_mast = 1; g.stock.sw_radio = 1; }],
   ['mines', g => { g.stock.mines = 6; }],
   ['a moat (rain and seep only)', g => { moat(g); }],
   ['a pond-fed moat', g => { built(g, 'pd', 'pond', 52, 30); moat(g); }],

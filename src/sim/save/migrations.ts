@@ -60,6 +60,8 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
     const L = s.lineage as Record<string, unknown>, u = s.utilities as { grid?: boolean };
     return { ...s, version: 75, lineage: { wards: [], threat: null, threatYear: -1, startedOnGrid: !!u.grid, gridLeft: null, noteYear: -1, noteCount: 0, ...L } };
   },
+  // 79 → 80: the money sinks (sim/richSinks.ts): three new goods at zero (clinic suite, radio mast, hardened gate house)
+  79: s => ({ ...s, version: 80, stock: { clinic_suite: 0, radio_mast: 0, gate_house: 0, ...(s.stock as object) } }),
   // 73 → 74: the hunter-safety course book set (sim/courses.ts): the new good at zero
   73: s => ({ ...s, version: 74, stock: { course_hunter: 0, ...(s.stock as object) } }),
   // 72 → 73: the long game's score parts, built-list and self-fed streak (kinds already finished are not written up again)
