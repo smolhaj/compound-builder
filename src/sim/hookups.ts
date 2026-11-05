@@ -142,3 +142,21 @@ export function backupPower(s: GameState): { ok: boolean; detail: string } {
   const fuelOut = gen && !solar && !battery && s.stock.fuel < 1;
   return { ok: !fuelOut, detail: parts.join(' + ') + (solarOnly ? ' (by day only)' : '') };
 }
+
+export const POWER_BUILDINGS = ['solar_array', 'solar_farm', 'garage_solar', 'lodge_solar', 'generator_shed', 'battery_shed', 'battery_bank', 'micro_hydro', 'wind_turbine'];
+/** "Power on the place" (the Get operational Power tick): a power source stands, or the grid is in. */
+export function powerOnPlace(s: GameState): boolean {
+  return s.structures.some(st => POWER_BUILDINGS.includes(st.kind) && isFinished(st)) || !!s.site.improvements?.power;
+}
+
+/**
+ * One source of truth with "Get operational": when Power is already green there and another home on the place is wired,
+ * a still-unwired extra home (the trailer) is optional, not "no power reaches it".
+ */
+export function hookupTone(s: GameState, todo: ReadonlyArray<{ id: string; kind: string }>): { optional: boolean } {
+  const first = todo[0];
+  if (!first || first.kind !== 'wire') return { optional: false };
+  const p = plantCached(s);
+  const otherWired = s.structures.some(st => st.id !== first.id && isHome(st.kind) && isFinished(st) && !todo.some(x => x.id === st.id && x.kind === 'wire') && serviceOf(s, p, st.id).wired);
+  return { optional: powerOnPlace(s) && otherWired };
+}

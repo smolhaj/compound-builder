@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { newGame, type GameState } from './state';
-import { fightOdds, generateNeighbors, gateDay, hideFoundChance, postureOf, raiderTemper, resolve, whoComes, type Encounter, type EncounterKind } from './encounters';
+import { fightOdds, generateNeighbors, gateDay, hideFoundChance, breachText, postureOf, raiderTemper, resolve, whoComes, type Encounter, type EncounterKind } from './encounters';
 import { planRun, canEnter } from './perimeter';
 import { mulberry32 } from './rng';
 
@@ -178,5 +178,21 @@ describe('round 4: honest odds, hiding has a cost, no double take', () => {
     }
     expect(found).toBeGreaterThan(5);
     expect(backs).toBeGreaterThan(0);
+  });
+});
+
+describe('raid aftermath copy matches what happened', () => {
+  it('says nothing was taken when nothing was, with or without a fight', () => {
+    const none = breachText(false, { lostStock: false, harmed: false, fought: false });
+    expect(none).toMatch(/found nothing worth taking/);
+    expect(none).not.toMatch(/took what they came for/);
+    expect(breachText(true, { lostStock: false, harmed: false, fought: true })).toMatch(/but found nothing worth taking and left/);
+    expect(breachText(true, { lostStock: false, harmed: false, fought: true })).not.toMatch(/without a fight/);
+    expect(none).toMatch(/without a fight/);
+  });
+  it('names what did happen', () => {
+    expect(breachText(false, { lostStock: true, harmed: false, fought: true })).toMatch(/took what they came for/);
+    expect(breachText(true, { lostStock: false, harmed: true, fought: true })).toMatch(/hurt people, but found nothing/);
+    expect(breachText(true, { lostStock: true, harmed: true, fought: true })).toMatch(/took what they could carry/);
   });
 });
