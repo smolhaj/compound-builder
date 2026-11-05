@@ -307,7 +307,7 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
     if (!n || n.died != null) return;
     const sl = slept.get(i);
     const mine = needOf(p) / Math.max(1, need);
-    n.hunger = Math.min(HUNGER_MAX, Math.max(0, n.hunger + short * mine - (short === 0 ? 600 : 0)));
+    n.hunger = Math.min(HUNGER_MAX, Math.max(0, n.hunger + short * mine - (short === 0 ? Math.max(600, n.hunger * 0.08) : 0)));
     n.starved = nextStarved(n.starved ?? 0, n.hunger, short / Math.max(1, need));
     if (n.starved === STARVE_WARN || n.starved === STARVE_GRACE - 10) log(s, `${starveWarning(p.first, n.starved)}.`);
     // health: hunger, wounds and radiation take it; rest and food bring it back
