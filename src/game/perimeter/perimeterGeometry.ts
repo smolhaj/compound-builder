@@ -4,7 +4,7 @@
  * ditches are earthworks in the terrain itself (ParcelTerrain.setEarthworks);
  * here they get only their gate posts. Sizes follow scale.test.ts (1 m = 1/6).
  */
-import { moatPools, weirTop } from './moatLevel';
+import { moatPools } from './moatLevel';
 import { deckGrade } from './bridgeDeck';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -695,11 +695,16 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
         for (let i = 0; i <= n; i++) {
           const q = qs[i], y = pools.level[i];
           if (i > 0 && pools.pool[i] !== pools.pool[i - 1]) {
-            // the weir: between the two samples, across the cut (a stone sill up to the higher surface), and both pools end at it
+            // the step: between the two samples both pools end at one line, and the water falls the difference as a short sheet (no free-standing stone: on a slope the
+            // downhill bank is lower than the bed's rim and a sill stood out of the grass like a fence panel)
             const p0 = qs[i - 1], mx = (p0.x + q.x) / 2, mz = (p0.z + q.z) / 2, y0 = pools.level[i - 1];
-            const ang = -Math.atan2(q.z - p0.z, q.x - p0.x), bedLo = Math.min(ground(p0.x, p0.z), ground(q.x, q.z));
-            const top = weirTop(y0, y), h = top - bedLo + 0.04;
-            add('fieldstone', new THREE.BoxGeometry(0.07, h, hw * 2 + 0.16).translate(0, bedLo - 0.04 + h / 2, 0).rotateY(ang).translate(mx, 0, mz));
+            if (Math.abs(y0 - y) > 0.01) {
+              const [la, ra] = reach(mx, mz, q.dx, q.dz, Math.min(y0, y)), fp = [mx + q.dz * la, mz - q.dx * la, mx - q.dz * ra, mz + q.dx * ra];
+              const g = new THREE.BufferGeometry();
+              g.setAttribute('position', new THREE.Float32BufferAttribute([fp[0], y0, fp[1], fp[2], y0, fp[3], fp[0], y, fp[1], fp[2], y, fp[3]], 3));
+              if (!mo.frozen) g.setAttribute('aSide', new THREE.Float32BufferAttribute([0, 1, 0, 1], 1));
+              g.setIndex([0, 1, 2, 1, 3, 2, 2, 1, 0, 2, 3, 1]); g.computeVertexNormals(); add(wm, g);
+            }
             if (pos.length) { const [l0, r0] = reach(mx, mz, q.dx, q.dz, y0); pos.push(mx + q.dz * l0, y0, mz - q.dx * l0, mx - q.dz * r0, y0, mz + q.dx * r0); flush(); }
             const [l1, r1] = reach(mx, mz, q.dx, q.dz, y);
             pos.push(mx + q.dz * l1, y, mz - q.dx * l1, mx - q.dz * r1, y, mz + q.dx * r1);
