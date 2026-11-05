@@ -3,6 +3,7 @@
  * tiers the family can climb. Like the rest of the armory (sim/gear.ts) it is goods: what is in the stockpile is fitted. Pure.
  *
  *   doors    steel entry door (+5 each) -> security door (+9 each); the two best doors count.
+ *   gates    a steel trellis (security) gate in front of every access door, welded and fixed on the outside, with a sturdy lock: +6, a second door to get through.
  *   windows  bars (+8) -> steel roll-down shutters (+14, and wildfire embers stay out) -> ballistic panels (+22, rounds lose their punch through the glass).
  *   safe     safe room -> hardened safe room (ballistic lining, a vault door, filtered air, water and a bunk).
  *
@@ -13,7 +14,7 @@
 import type { GameState } from './state';
 import { MATERIALS, type MaterialId } from './materials';
 
-export type HardenLayer = 'doors' | 'windows' | 'safe';
+export type HardenLayer = 'doors' | 'gates' | 'windows' | 'safe';
 
 export interface HardenTier {
   good: MaterialId;
@@ -34,8 +35,11 @@ export const LAYERS: Record<HardenLayer, { name: string; max: number; tiers: Har
     { good: 'steel_door', barrier: 5, ember: 1, cover: 1, does: 'a steel door in a steel frame: +5 wall strength each (the two best doors count)', over: false },
     { good: 'security_door', barrier: 9, ember: 1, cover: 1, does: 'deadbolts into the frame, welded strike plate, pinned hinges: +9 wall strength each', over: false },
   ] },
+  gates: { name: 'Security gates', max: 1, tiers: [
+    { good: 'trellis_gates', barrier: 6, ember: 1, cover: 1, does: 'a steel trellis gate with a sturdy lock in front of every access door, welded to the frame and fixed on the outside: +6 wall strength, a second door to get through', over: false },
+  ] },
   windows: { name: 'Windows', max: 1, tiers: [
-    { good: 'window_bars', barrier: 8, ember: 1, cover: 0.8, does: 'bars on every window: +8 wall strength, the house is a better firing position', over: false },
+    { good: 'window_bars', barrier: 8, ember: 1, cover: 0.8, does: 'welded steel bars fixed on the outside of every window (bars inside the glass are the cheap kind that fail): +8 wall strength, the house is a better firing position', over: false },
     { good: 'window_shutters', barrier: 14, ember: 0.55, cover: 0.74, does: 'roll-down steel shutters over the bars: +14 wall strength, and wildfire embers stay out of the house', over: true },
     { good: 'ballistic_panels', barrier: 22, ember: 0.5, cover: 0.6, does: 'level III panels behind the glass: +22 wall strength, rifle rounds lose most of their punch through a window', over: true },
   ] },
@@ -45,7 +49,7 @@ export const LAYERS: Record<HardenLayer, { name: string; max: number; tiers: Har
   ] },
 };
 
-export const HARDEN_LAYERS: readonly HardenLayer[] = ['doors', 'windows', 'safe'];
+export const HARDEN_LAYERS: readonly HardenLayer[] = ['doors', 'gates', 'windows', 'safe'];
 
 const n = (s: GameState, m: MaterialId): number => Math.floor(s.stock[m] ?? 0);
 
@@ -63,8 +67,8 @@ export function houseBarrier(s: GameState): number {
   for (const t of d.tiers) for (let i = 0; i < n(s, t.good); i++) doors.push(t.barrier);
   doors.sort((a, b) => b - a);
   const door = doors.slice(0, d.max).reduce((a, b) => a + b, 0);
-  const w = layerTier(s, 'windows');
-  return door + (w ? LAYERS.windows.tiers[w - 1].barrier : 0);
+  const w = layerTier(s, 'windows'), gt = layerTier(s, 'gates');
+  return door + (gt ? LAYERS.gates.tiers[gt - 1].barrier : 0) + (w ? LAYERS.windows.tiers[w - 1].barrier : 0);
 }
 
 /** Share of wildfire embers that still reach a house (shutters and panels keep them out). */

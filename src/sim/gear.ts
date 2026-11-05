@@ -24,10 +24,11 @@ import { ARMORY_LIGHTS, floodlightArmed, floodlightLit } from './lights';
 import { hasSafeRoom, houseBarrier } from './houseHardening';
 import { GATE_HOUSE, hasGateHouse } from './richSinks';
 import { wallTopPosture } from './wallTops';
+import { gatePosture } from './gateSecurity';
 
 export const KIT_GOODS: MaterialId[] = ['plate_carrier', 'soft_armor', 'helmet', 'ifak', 'nvg', 'thermal', 'radios', 'sw_radio', 'ham_rig', 'radio_mast'];
 export const WATCH_GOODS: MaterialId[] = ['cameras', 'thermal_cam', 'driveway_alarm', 'floodlights', 'blackout_curtains', 'gen_baffles', 'gen_vault', 'ai_sensor_module', 'tripwire', 'dog', 'puppy', 'ground_sensor'];
-export const HARDEN_GOODS: MaterialId[] = ['steel_door', 'security_door', 'window_bars', 'window_shutters', 'ballistic_panels', 'sandbags', 'safe_room', 'safe_room_hardened', 'gun_mount', 'turret_head', 'gate_house'];
+export const HARDEN_GOODS: MaterialId[] = ['steel_door', 'security_door', 'window_bars', 'window_shutters', 'ballistic_panels', 'sandbags', 'safe_room', 'safe_room_hardened', 'trellis_gates', 'gate_intercom', 'gate_motor', 'sally_gate', 'gun_mount', 'turret_head', 'gate_house'];
 /** What the family packs to leave (sim/bugout.ts). */
 export const BUGOUT_GOODS: MaterialId[] = ['bugout_bag', 'bugout_cache'];
 
@@ -43,8 +44,9 @@ export function gearPosture(s: GameState, fighters: number): { detection: number
   const detection0 = Math.round((p && n(s, 'cameras') ? 15 * kCam : 0) + (p && n(s, 'thermal_cam') ? 15 * kIr : 0) + (n(s, 'driveway_alarm') ? 10 : 0) + (n(s, 'floodlights') && floodlightArmed(s, ARMORY_LIGHTS) ? 5 * kEye : 0)
     + (n(s, 'tripwire') ? 5 : 0) + dogs.detection * petCare(s) + (hasGateHouse(s) ? GATE_HOUSE.detection : 0) + (n(s, 'radios') ? 5 : 0) + Math.min(10, n(s, 'nvg') * 5 * kNvg + n(s, 'thermal') * 5 * kIr));
   // the tops of the walls (sim/wallTops.ts): a live electric fence is an alarm; brush against the walls shades the cameras
-  const wt = wallTopPosture(s), detection = Math.max(0, Math.round(detection0 + wt.detection - wt.cameraLoss * ((p && n(s, 'cameras') ? 15 * kCam : 0) + (p && n(s, 'thermal_cam') ? 7.5 * kIr : 0))));
-  const barrier = houseBarrier(s) + Math.min(15, n(s, 'sandbags') * 5) + (hasGateHouse(s) ? GATE_HOUSE.barrier : 0);
+  const gs = gatePosture(s);
+  const wt = wallTopPosture(s), detection = Math.max(0, Math.round(detection0 + wt.detection + gs.detection - wt.cameraLoss * ((p && n(s, 'cameras') ? 15 * kCam : 0) + (p && n(s, 'thermal_cam') ? 7.5 * kIr : 0))));
+  const barrier = houseBarrier(s) + gs.barrier + Math.min(15, n(s, 'sandbags') * 5) + (hasGateHouse(s) ? GATE_HOUSE.barrier : 0);
   const f = Math.max(1, fighters);
   const fight = 1 + 0.08 * Math.min(1, n(s, 'plate_carrier') / f) + 0.04 * Math.min(1, n(s, 'radios') * 2 / f) + 0.05 * Math.min(1, (n(s, 'nvg') + n(s, 'thermal')) / f);
   return { detection, barrier, fight, visibility: (n(s, 'floodlights') && floodlightLit(s, ARMORY_LIGHTS, false) ? 5 : 0), deter: dogs.deter * petCare(s), signs: wt.signsDeter, safeRoom: hasSafeRoom(s) };
