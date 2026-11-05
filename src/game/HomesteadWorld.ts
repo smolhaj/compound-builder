@@ -105,8 +105,9 @@ import { CLASSIC, type Site as LandSite } from '../sim/site';
 import { pickCamp } from './parcel/campSpot';
 import { DRIVE_W, accessFromPlan, distToLine, type Access } from './region/access';
 import { ROAD_W, countyRoad, roadLine, type CountyRoad } from './region/countyRoad';
-import { buildRoadWorks } from './region/roadWorks';
-import { roadPlanFor } from '../sim/roadState';
+import { buildRoadWorks, buildCountyBridges } from './region/roadWorks';
+import { deckY, onGap, type CountyGap } from '../sim/countyCrossings';
+import { countyGapsFor, roadPlanFor } from '../sim/roadState';
 import { pinSeed } from '../sim/lotSeed';
 import { PlowRun } from './fx/PlowRun';
 import { roadBedOf, type RoadPlan } from '../sim/roadPlan';
@@ -266,6 +267,8 @@ export class HomesteadWorld {
   /** County road, driveway, gate and stockpile yard. */
   /** The county road past the place, the region's way (game/region/countyRoad.ts). */
   readonly county: CountyRoad;
+  /** Where the county road bridges a creek, a ravine or a gorge (sim/countyCrossings.ts). */
+  readonly countyGaps: CountyGap[];
   /** The planned way in: curves, switchbacks, crossings, a bore (sim/roadPlan.ts); the sim reads the very same plan. */
   plan: RoadPlan;
   access: Access;
@@ -308,6 +311,7 @@ export class HomesteadWorld {
     this.farms = planNeighbors(this.parcel);
     this.camp = this._pickCamp();
     this.county = countyRoad(site.region, seed);
+    this.countyGaps = this._findCountyGaps();
     this.plan = roadPlanFor(site, seed, this.parcel);
     this.access = accessFromPlan(this.plan);
     this.terrain = new TerrainRenderer(ws.scene);
@@ -363,7 +367,7 @@ export class HomesteadWorld {
     this._drive = site.improvements?.drive ?? true;
     // a built drive is benched into the ground (cut banks, fill slopes, banked curves): before the terrain mesh and the trees are made
     this.parcel.setRoadBed(this._drive ? roadBedOf(this.plan) : null);
-    this.truck = new DeliveryTruck(ws.scene, this._truckRoute(), this.groundAt, this.county.x, (x, z) => this._driveY(x, z));
+    this.truck = new DeliveryTruck(ws.scene, this._truckRoute(), (x, z) => (Math.abs(x - this.county.x(z)) < ROAD_W ? this.countyY(x, z) : this.groundAt(x, z)), this.county.x, (x, z) => this._driveY(x, z));
     this.plow = new PlowRun(ws.scene, this.access.drive, this.groundAt, (x, z) => this._driveY(x, z));
   }
 
@@ -423,7 +427,7 @@ export class HomesteadWorld {
     this.parcel.setRoadBed(this._drive ? roadBedOf(plan) : null);
     this._buildRoads();
     this.truck.dispose();
-    this.truck = new DeliveryTruck(this._ws.scene, this._truckRoute(), this.groundAt, this.county.x, (x, z) => this._driveY(x, z));
+    this.truck = new DeliveryTruck(this._ws.scene, this._truckRoute(), (x, z) => (Math.abs(x - this.county.x(z)) < ROAD_W ? this.countyY(x, z) : this.groundAt(x, z)), this.county.x, (x, z) => this._driveY(x, z));
     this.plow.setRoute(this.access.drive);
     this._ws.invalidateShadows();
   }
@@ -454,7 +458,7 @@ export class HomesteadWorld {
     }
     this._buildRoads();
     this.truck.dispose();
-    this.truck = new DeliveryTruck(this._ws.scene, this._truckRoute(), this.groundAt, this.county.x, (x, z) => this._driveY(x, z));
+    this.truck = new DeliveryTruck(this._ws.scene, this._truckRoute(), (x, z) => (Math.abs(x - this.county.x(z)) < ROAD_W ? this.countyY(x, z) : this.groundAt(x, z)), this.county.x, (x, z) => this._driveY(x, z));
     this._tailKey = '';
     this.plow.setRoute(this.access.drive);
   }
@@ -514,6 +518,19 @@ export class HomesteadWorld {
     return Math.hypot(x - a.yard.x, z - a.yard.z) < 0.8 + pad;
   }
 
+  /** The county road's own bridges: where it crosses water or a cut, found from the ground and the creek. */
+  private _findCountyGaps(): CountyGap[] { return countyGapsFor(this.parcel, this.county); }
+  private _deckY(g: CountyGap, z: number): number {
+    const cz = this.parcel.hasStream ? this.parcel.creek : null, ly = this.parcel.lakeY;
+    const water = Math.max(cz ? cz.waterY(this.county.x(z)) : -Infinity, ly ?? -Infinity);
+    return deckY(g, z, g.wet ? water + 0.35 : -Infinity);
+  }
+  /** Height of the county road's surface at (x, z): the deck over a gap, else the ground. */
+  countyY(x: number, z: number): number {
+    const g = this.countyGaps.length ? onGap(this.countyGaps, z) : null;
+    return g ? this._deckY(g, z) : this.groundAt(x, z);
+  }
+
   /** Road + driveway ribbons draped on the rendered terrain, and the gate. */
   private _buildRoads(): void {
     this._roads.traverse(o => { if (o !== this._roads) (o as THREE.Mesh).geometry?.dispose(); });
@@ -521,9 +538,10 @@ export class HomesteadWorld {
     // the county road the region's way (gravel, blacktop, caliche); the drive is gravel (caliche in the desert)
     const mud = <M extends THREE.Material>(m: M): M => { m.defines = { ...m.defines, SEA_MUD: '', SEA_MUD_UV: '' }; return m; };   // mud season: the surface goes soft and the tire tracks hold water (season patch)
     const mat = mud((this.regionWorld.drive ?? (this.regionWorld.road === 'caliche' ? 'caliche' : 'gravel')) === 'caliche' ? roadMaterial('caliche') : gravelMaterial());
-    const road = new THREE.Mesh(buildRibbon(roadLine(this.county, 1), ROAD_W, this.groundAt, 0.02, 6), mud(roadMaterial(this.regionWorld.road)));
+    const road = new THREE.Mesh(buildRibbon(roadLine(this.county, 1), ROAD_W, (x, z) => this.countyY(x, z), 0.02, 6), mud(roadMaterial(this.regionWorld.road)));
     const track = this._drive ? mat : (() => { const m = mat.clone(); m.color = new THREE.Color(0x8a7a5c); return mud(m); })();
     road.receiveShadow = true; this._roads.add(road);
+    if (this.countyGaps.length) this._roads.add(buildCountyBridges(this.countyGaps.map(g => ({ z0: g.z0, z1: g.z1, deckY: (z: number) => this._deckY(g, z), x: this.county.x, width: ROAD_W })), this.groundAt));
     // the way in: a curved ribbon on the benched ground, with its banks, rails, culverts, crossings and portals (game/region/roadWorks.ts)
     this._roads.add(buildRoadWorks(this.plan, this.groundAt, { built: this._drive, bridgeDown: this._bridgeDown, surface: mat, track, driveW: DRIVE_W, natural: (x, z) => this.parcel.natural(x, z).h }));
     const gate = buildGate(DRIVE_W);
@@ -647,8 +665,10 @@ export class HomesteadWorld {
     for (const f of this.farms) buildFarmstead(f, kind, props, this.groundAt, slope, tree);
     // the neighbors' line fences, the region's way (wire on T-posts, split rail, stone walls, woven wire)
     const creek = this.parcel.creek;
+    // (no fence or pole stands on the county road's bridges or down the cut it spans)
+    const overGap = (x: number, z: number) => this.countyGaps.length > 0 && Math.abs(x - this.county.x(z)) < 8 && onGap(this.countyGaps, z) !== null;
     buildLineFences(planLineFences(this.county.x, ROAD_W / 2, -330, PARCEL_SIZE + 330), this.regionWorld.fence, props, this.groundAt,
-      (x, z) => onFarmstead(this.farms, x, z, 1.5) || Math.abs(z - creek.zAt(x)) < 2.2 || (wy !== null && this.parcel.region.height(x, z) < wy + 0.15) || insideHome(x, z),
+      (x, z) => onFarmstead(this.farms, x, z, 1.5) || overGap(x, z) || Math.abs(z - creek.zAt(x)) < 2.2 || (wy !== null && this.parcel.region.height(x, z) < wy + 0.15) || insideHome(x, z),
       (a, b) => { const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return s - Math.floor(s); });
     if (this.regionWorld.powerline) buildPowerline(props, this.groundAt, (x, z) => onFarmstead(this.farms, x, z, 4) || (wy !== null && this.parcel.region.height(x, z) < wy + 0.3) || insideHome(x, z));
     props.finish();
