@@ -8,7 +8,7 @@ export async function play(A) {
   note('fortify ' + JSON.stringify(r).slice(0, 200));
   await page.evaluate(() => { window.__cb.game.setState(s => { const g = structuredClone(s.game); g.structures.forEach(x => { if (x.finishedAt === null) x.finishedAt = g.clock.t; }); g.perimeter.forEach(p => { if (p.finishedAt === null || p.finishedAt === undefined) p.finishedAt = g.clock.t; }); return { game: g }; }); });
   await shot('walls');
-  await page.evaluate(() => window.__cb.game.setState(s => { const g = structuredClone(s.game); g.clock.speed = 0; g.gate.pending = { id: 'qaR', kind: 'gang', day: Math.floor(g.clock.t), title: 'QA armed gang', dossier: ['Armed men at the gate.'], size: 8, armed: true, strength: 20, wants: { canned: 2 }, stances: ['hide', 'parley', 'warn', 'defend', 'pay'] }; return { game: g, cutscene: null }; }));
+  await page.evaluate(() => window.__cb.game.setState(s => { const g = structuredClone(s.game); g.clock.speed = 0; g.gate.pending = { id: 'qaR', kind: 'gang', day: Math.floor(g.clock.t), title: 'QA armed gang', dossier: ['Armed men at the gate.'], size: 3, armed: true, strength: 8, wants: { canned: 2 }, stances: ['hide', 'parley', 'warn', 'defend', 'pay'] }; return { game: g, cutscene: null }; }));
   await page.evaluate(() => window.__cb.game.getState().advance(0.001));
   const before = await st(); note('before raid ' + JSON.stringify({ alive: before.alive, money: before.money, cut: before.cutscene }));
   await shot('prompt');
