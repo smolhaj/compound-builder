@@ -3,6 +3,10 @@ on:
   pull_request:
   push:
     branches: [main]
+# a newer push to the same branch supersedes the older run (cancelled runs are not failures, so no failure mail)
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
   check:
     runs-on: ubuntu-latest
