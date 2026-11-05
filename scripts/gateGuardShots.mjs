@@ -63,4 +63,26 @@ try {
   await page.waitForTimeout(800);
   await look(3.2, 0.95, 0.6); await page.waitForTimeout(600); await shot('aerial-guard-cars');
   await look(1.4, 0.2, 0.9); await page.waitForTimeout(400); await shot('eye-level-guard-cars');
+  // the collapse comes; the guard with nobody to go to asks to stay (the decision card), is taken in, and takes the night watch
+  await page.evaluate(async () => {
+    const G = window.__cb.game, g = structuredClone(G.getState().game);
+    const gd = await import('/src/sim/guards.ts');
+    g.disaster.tracks = { ...g.disaster.tracks, banks: 0, law: 0 };
+    for (const x of g.guards.staff) { x.alone = true; x.local = false; x.holds = 0; }
+    for (let d = 0; d < 80 && !g.gate.pending; d++) gd.guardDay(g);
+    G.setState({ game: g });
+  });
+  await page.getByRole('button', { name: /^Hide panels|Show panels/ }).first().click().catch(() => {});
+  await page.waitForTimeout(800); await shot('guard-asks-to-stay-card');
+  await page.evaluate(async () => {
+    const G = window.__cb.game, g = structuredClone(G.getState().game);
+    const en = await import('/src/sim/encounters.ts');
+    en.resolve(g, 'take_in'); g.gate.pending = null; g.gate.card = null;
+    g.clock.t = Math.floor(g.clock.t) + 23 / 24;
+    const him = g.people[g.people.length - 1]; const ps = g.personState.find(q => q.id === him.id); if (ps) ps.task = 'watch';
+    G.setState({ game: g });
+  });
+  await page.waitForTimeout(1500);
+  await look(2.2, 0.4, 0.9); await shot('guard-at-his-post-aerial');
+  await look(0.9, 0.08, 0.9, 0, 0.0, 0.14); await shot('guard-at-his-post-eye-level');
 } finally { await browser.close(); vite.kill(); }

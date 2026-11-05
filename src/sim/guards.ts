@@ -19,6 +19,9 @@ import { isHome } from './blueprints';
 import { isFinished } from './construction';
 import { mulberry32 } from './rng';
 import { hourOf, type GameState } from './state';
+import type { Person } from './family';
+import type { Encounter, Outcome, Stance } from './encounters';
+import { admitNewcomers } from './newcomers';
 
 export interface Guard {
   id: string;
@@ -31,6 +34,12 @@ export interface Guard {
   local: boolean;
   /** Days of permanent collapse this one holds out before leaving (the stagger). */
   holds: number;
+  /** No family or friends to go to (deterministic from the seed and his id): in a true collapse he asks to stay instead of quitting. Never true for a local. */
+  alone: boolean;
+  /** The man himself, made when he was hired: who he becomes if he is taken in. */
+  person: Person;
+  /** He has asked (the card is out or was answered). */
+  asked?: boolean;
 }
 export interface Guards {
   staff: Guard[];
@@ -52,6 +61,10 @@ export const GUARD = { fighters: 1, detection: 4, detectionCap: 12 };
 /** A permanent collapse: banks and law below this, for this many days running. */
 export const COLLAPSE = { track: 0.25, days: 7 };
 export const SHIFTS: ReadonlyArray<6 | 14 | 22> = [6, 14, 22];
+const SURNAMES = ['Brandt', 'Okafor', 'Reyes', 'Lindgren', 'Pruitt', 'Haas', 'Moreau', 'Dunne'];
+const hash = (str: string): number => { let h = 2166136261; for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 16777619); return (h >>> 0) / 4294967296; };
+/** Has this guard nobody to go to? A fixed trait of the man: the seed and his id decide (about 45 %), and a local never is. */
+export const guardAlone = (seed: number, id: string, local: boolean): boolean => !local && hash(`${seed}:${id}:alone`) < 0.45;
 const NAMES = ['Dale', 'Marcus', 'Ray', 'Luis', 'Greg', 'Tony', 'Walt', 'Hector', 'Nate', 'Boyd'];
 
 export const guardsOf = (s: GameState): Guards => (s.guards ??= newGuards());
@@ -97,7 +110,10 @@ export function hireGuard(s: GameState): string | null {
   const shift = SHIFTS.find(x => !used.has(x)) ?? SHIFTS[g.staff.length % 3];
   const name = NAMES[Math.floor(r() * NAMES.length)];
   const local = r() < 0.3;
-  g.staff.push({ id: `g${s.nextId++}`, name, hiredAt: s.clock.t, shift, local, holds: 2 + Math.floor(r() * 9) });
+  const id = `g${s.nextId++}`;
+  const skills = { builder: 1, gardener: 0, medic: 1, mechanic: 2, hunter: 6, negotiator: 1, teacher: 0, radio: 1 };
+  const person: Person = { id: `p${id}`, first: name, last: SURNAMES[Math.floor(r() * SURNAMES.length)], age: 27 + Math.floor(r() * 26), kid: false, body: 'm', skills, shirt: 0x39475a };
+  g.staff.push({ id, name, hiredAt: s.clock.t, shift, local, holds: 2 + Math.floor(r() * 9), alone: guardAlone(s.seed, id, local), person });
   const where = bunk(s) === 'gate_house' ? 'He will have the gate house.' : 'He will park at the drive.';
   log(s, `Hired ${name} as a contract guard (${String(shift).padStart(2, '0')}:00 to ${String((shift + 8) % 24).padStart(2, '0')}:00): $${GUARD_MONTH.toLocaleString('en-US')} a month. ${where}`);
   return null;
@@ -126,6 +142,12 @@ export function guardDay(s: GameState): string[] {
     const sinceWeek = g.collapseDays - COLLAPSE.days;
     for (const x of [...g.staff]) {
       if (sinceWeek >= holdDays(s, x)) {
+        if (x.alone && !x.asked) {
+          // nobody to go to: he asks to stay (a decision card). If another card is up, he asks tomorrow.
+          if (!s.gate.pending) { x.asked = true; s.gate.pending = stayCard(s, x); out.push(`${x.name} has nobody to go to. He is at the door.`); }
+          continue;
+        }
+        if (x.asked && s.gate.pending?.guardId === x.id) continue;   // the card is still out
         g.staff = g.staff.filter(y => y.id !== x.id);
         g.lastQuit = { name: x.name, day: Math.floor(s.clock.t), left: g.staff.length };
         out.push(g.staff.length ? `${x.name} quit: he is going to his family. ${g.staff.length} guard${g.staff.length > 1 ? 's' : ''} still on the place.` : `${x.name}, the last guard, quit and drove off. Nobody is coming back.`);
@@ -137,4 +159,42 @@ export function guardDay(s: GameState): string[] {
   if (s.money < bill) { const n = g.staff.length; g.staff = []; out.push(`The ${n > 1 ? `${n} guards` : 'guard'} went home: there was no money to pay them.`); return out; }
   s.money -= bill; g.paid += bill; g.days += 1;
   return out;
+}
+
+/** The card: a guard whose contract is over with the world asks to stay. */
+export function stayCard(s: GameState, x: Guard): Encounter {
+  const kcal = 2400;
+  return {
+    id: `gs${x.id}`, kind: 'guard_stay', day: Math.floor(s.clock.t), guardId: x.id,
+    title: `${x.name} asks to stay`,
+    dossier: [
+      `${x.name} ${x.person.last}, ${x.person.age}, has stood a shift at your gate since ${Math.max(1, Math.round((s.clock.t - x.hiredAt)))} days ago. The agency is gone; so is everyone he knew.`,
+      'He has no family or friends to go to. He asks to stay on, unpaid, for a bed and a place at the table.',
+      `Hunting and tracking ${x.person.skills.hunter}; trained for the gate. He brings his own sidearm and watches the night.`,
+      `One more to feed: about ${kcal.toLocaleString('en-US')} kcal a day.`,
+    ],
+    size: 1, armed: true, strength: 0, people: [x.person], stances: ['take_in', 'turn_away'],
+  };
+}
+
+/** Take him in (a household member: bed, table, a gun, the night watch; the wage stops) or let him go like the others (a small note on morale). */
+export function resolveGuardStay(s: GameState, e: Encounter, stance: Stance): Outcome {
+  const g = guardsOf(s);
+  const x = g.staff.find(y => y.id === e.guardId);
+  if (!x) return { title: 'He has gone', text: 'He did not wait.', tone: 'mixed', lines: [] };
+  g.staff = g.staff.filter(y => y.id !== x.id);
+  if (stance === 'take_in') {
+    const person: Person = { ...x.person, guard: true };
+    const lines = admitNewcomers(s, [person], { kind: 'stranger', arche: 'guard' });
+    // his own sidearm and a few boxes, and he is trained
+    const gun = { id: `gun_${person.id}`, model: 'glock_19', condition: 0.9, fired: 0, where: 'house' as const, carrier: person.id };
+    s.armory.guns.push(gun); s.armory.ammo['9mm'] = (s.armory.ammo['9mm'] ?? 0) + 100; s.armory.skill[person.id] = 4;
+    s.gate.humanity = Math.min(100, s.gate.humanity + 4); s.gate.tookIn++;
+    log(s, `${x.name} stayed on. He is one of the household now.`);
+    return { title: `${x.name} stays`, text: `${x.name} puts his bag down inside the wall. The wage stops; he has a bed, a place at the table and the night watch.`, tone: 'good', lines };
+  }
+  g.lastQuit = { name: x.name, day: Math.floor(s.clock.t), left: g.staff.length };
+  s.gate.humanity = Math.max(0, s.gate.humanity - 2);
+  log(s, `${x.name} drove off. Nobody said much at supper.`);
+  return { title: `${x.name} goes`, text: `${x.name} shakes hands at the gate and drives off down the road.`, tone: 'mixed', lines: [] };
 }

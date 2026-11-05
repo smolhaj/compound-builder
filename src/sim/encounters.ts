@@ -55,7 +55,7 @@ import { raidTakesVehicles } from './vehicles';
 import { practice } from './skills';
 import { turbineNoise } from './renewables';
 import { villageWatch } from './outposts';
-import { guardPosture } from './guards';
+import { guardPosture, resolveGuardStay } from './guards';
 import { resolveTrialEnd, startTrial, trialDay, type Character, type TrialCamp } from './trial';
 import { vetArrival } from './gateVetting';
 import { admitNewcomers, resolveShelter, strangerArrival, type Extras, type ShelterWhy } from './newcomers';
@@ -181,7 +181,7 @@ export function postureOf(s: GameState): Posture {
 // Encounters
 // ─────────────────────────────────────────────────────────────────────────
 
-export type EncounterKind = 'arrival' | 'looters' | 'gang' | 'refugees' | 'requisition' | 'neighbor_help' | 'trader' | 'horde' | 'patrol' | 'militia' | 'break_in' | 'ransom' | 'trial_end' | 'tunnelers' | 'kin' | 'shelter' | 'move_in' | 'stranded';
+export type EncounterKind = 'guard_stay' | 'arrival' | 'looters' | 'gang' | 'refugees' | 'requisition' | 'neighbor_help' | 'trader' | 'horde' | 'patrol' | 'militia' | 'break_in' | 'ransom' | 'trial_end' | 'tunnelers' | 'kin' | 'shelter' | 'move_in' | 'stranded';
 export type Stance = 'hide' | 'parley' | 'warn' | 'defend' | 'trade' | 'take_in' | 'trial' | 'turn_away' | 'call_911' | 'shout' | 'confront' | 'pay' | 'refuse' | 'ambush' | 'flood' | 'collapse' | 'ignore' | 'build_first' | 'move_sell' | 'move_keep' | 'move_lease' | 'hold_on' | 'drive_now' | 'back_roads' | 'resupply';
 
 export interface Encounter {
@@ -215,6 +215,8 @@ export interface Encounter {
   /** A crew a scout sent for (`scoutCrew`): more of them, and they look where the family hides and keeps things. */
   scouted?: string;
   /** Tunnelers (sim/tunnelers.ts): found digging under the wall (`warning`, the window to act), or up inside it (`inside`). */
+  /** A contract guard asking to stay on when the world ends (sim/guards.ts): his id on the payroll. */
+  guardId?: string;
   /** A relative asking to join (sim/kin.ts): the savings they bring, and whether it is after the hit. */
   kin?: { savings: number; late: boolean };
   /** Strangers (sim/newcomers.ts): which kind of person, what they really are (hidden), what they say, the questions asked so far, what you noticed, a wound, tools and dogs they bring. */
@@ -672,6 +674,9 @@ export function resolve(s: GameState, stance: Stance): Outcome {
     title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines);
   } else if (e.kind === 'trial_end') {
     const o = resolveTrialEnd(s, e, stance);
+    title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines);
+  } else if (e.kind === 'guard_stay') {
+    const o = resolveGuardStay(s, e, stance);
     title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines);
   } else if (e.kind === 'kin') {
     const o = resolveKin(s, e, stance);
