@@ -22,6 +22,7 @@
  *            + a tail (the lull, the raiders drawing off, the watch counting heads).
  */
 import { nobodyHome } from './orphans';
+import { emptyNow } from './weekender';
 import { log } from './economy';
 import type { Battle, BattleEvent, BattleUnit } from './battleTypes';
 import { planBattle, type RaiderTemper } from './battle';
@@ -87,6 +88,8 @@ export function arrivalCheck(s: GameState): Encounter | null {
   // nobody home (every adult gone, the children fostered): no cutscene with nobody to watch or defend it. The raid that was on its way finds the
   // place held as it stands and moves on; the stores are untouched (the same rule as gateDay's quiet gate). DECISIONS.md
   if (nobodyHome(s)) { s.gate.incoming = null; log(s, 'A crew that was headed for the place found nobody there and went on.'); return null; }
+  // the others (sim/roadLead.ts) are not an alarm; if the family left for town on the way, they find a quiet gate and go on
+  if (inc.from !== undefined && emptyNow(s)) { s.gate.incoming = null; return null; }
   s.gate.pending = inc.e;
   s.gate.incoming = null;
   return inc.e;

@@ -316,7 +316,7 @@ export interface GateState {
   /** A crew that found nobody home and means to come back (they know someone lives here). */
   comeBack?: ComeBack | null;
   /** A raid rolled for today that has not arrived yet: it reaches the gate at `at` (game days), at its hour of the night or day (sim/siege.ts). */
-  incoming?: { e: Encounter; at: number } | null;
+  incoming?: { e: Encounter; at: number; /** When it was sighted (game days): the road draws the approach from here (sim/roadLead.ts). Absent on a raid, which is seen over the last LEAD days. */ from?: number } | null;
   /** Hardcore: the day of the last probing raid (sim/adaptive.ts). */
   lastProbe?: number;
 }
