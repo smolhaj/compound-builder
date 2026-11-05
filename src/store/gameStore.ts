@@ -38,6 +38,8 @@ import { ROAD_GATE_W, layPropertyWall, planPropertyWall, type PropertyGeometry, 
 import { addWalkway } from '../sim/walkway';
 import { addRazor } from '../sim/razor';
 import { addElectric, addBackup, trimAll, trimRun } from '../sim/wallTops';
+import { cancelResponse, subscribe as subscribeResponse } from '../sim/armedResponse';
+import { foundWatch, leaveWatch } from '../sim/watch';
 import { layPaths, pickUpPath, type LaidKind, type LayEdge } from '../sim/paths';
 import { compoundRegion, layFortress, planFortress, type FortressOptions } from '../sim/fortress';
 import type { RingShape } from '../sim/ringShape';
@@ -171,6 +173,11 @@ export interface GameStore {
   addWalkway: (id: string) => string | null;
   /** Hang razor wire along the top of a finished wall or fence (sim/razor.ts). */
   addRazor: (id: string) => string | null;
+  /** Armed-response subscription and the road watch (sim/armedResponse.ts, sim/watch.ts): null = done, else why not. */
+  subscribeArmedResponse: () => string | null;
+  cancelArmedResponse: () => string | null;
+  foundRoadWatch: () => string | null;
+  leaveRoadWatch: () => string | null;
   /** Fit an electric fence on outriggers along a finished wall (sim/wallTops.ts); `backup` adds the sealed battery. */
   addElectric: (id: string, backup: boolean) => string | null;
   /** Add the battery backup to an electric fence. */
@@ -516,6 +523,10 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); }
     return why;
   },
+  subscribeArmedResponse: () => { if (locked()) return LOCKED_WHY; const g = structuredClone(get().game); const why = subscribeResponse(g); if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); } return why; },
+  cancelArmedResponse: () => { if (locked()) return LOCKED_WHY; const g = structuredClone(get().game); const why = cancelResponse(g); if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); } return why; },
+  foundRoadWatch: () => { if (locked()) return LOCKED_WHY; const g = structuredClone(get().game); const why = foundWatch(g); if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); } return why; },
+  leaveRoadWatch: () => { if (locked()) return LOCKED_WHY; const g = structuredClone(get().game); const why = leaveWatch(g); if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); } return why; },
   addElectric: (id, backup) => {
     if (locked()) return LOCKED_WHY;
     const g = structuredClone(get().game);
