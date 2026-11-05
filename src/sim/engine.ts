@@ -10,6 +10,7 @@ import { wildlifeDay, wildlifeNight } from './wildlife';
 import { LIFESTYLE } from './site';
 import { crewStep } from './crews';
 import { guardDay } from './guards';
+import { insiderDay } from './insider';
 import { addWork, canGoOn, isFinished } from './construction';
 import { addCarryWork, deliverOrders } from './economy';
 import { addFixWork, nextFix, siteJobsDay } from './improvements';
@@ -209,6 +210,7 @@ function subStep(s: GameState): void {
     for (const line of vehiclesDay(s)) log(s, line);
     for (const line of radioDay(s)) log(s, line);
     for (const line of guardDay(s)) log(s, line);
+    for (const line of insiderDay(s)) log(s, line);
     for (const line of scoutDay(s)) log(s, line);
     // (the stove is going unless the woodpile is bare: burnFirewood leaves `burned` at 1 then)
     for (const line of upkeepDay(s, demandNow(s), s.heat.burned < 1)) log(s, line);

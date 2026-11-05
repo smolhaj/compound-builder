@@ -26,5 +26,6 @@ export const STANCE: Record<Stance, [string, string]> = {
   drive_now: ['Drive straight home', 'The highway, now, with what is in the tank. Quickest if the road is clear; checkpoints and traffic are the risk.'],
   back_roads: ['Take the back roads', 'Slower, and it uses more fuel, but fewer checkpoints and fewer people with the same idea.'],
   resupply: ['Fill up and shop first', 'Fuel, food and a few things from the shelves before they empty. Adds a day, and a day in a city that is coming apart.'],
+  dismiss: ['Let him go', 'Pay him off and send him down the road. He cannot sell what he no longer sees.'],
   confront: ['Confront them', 'Gun in hand. They\'ll probably run, but a shooting means the sheriff\'s investigation, lawyers, and the guns held as evidence.'],
 };
