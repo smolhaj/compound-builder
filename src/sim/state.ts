@@ -320,6 +320,8 @@ export interface GameState {
   learning?: Learning;
   /** Mental health: strain, trauma, low mood, breakdowns, the fight a household remembers (sim/mind.ts). Save v63; `mindOf` makes it lazily. */
   mind?: MindState;
+  /** Friends, rivals and mentors, from time shared and dangers lived through (sim/bonds.ts). Optional, made lazily: an old save has none and plays as before (no save bump). */
+  bonds?: import('./bonds').Bonds;
   /** Medical depth: lasting effects, pregnancies, the epidemic, the antibiotics policy (sim/medical.ts). Save v64; `medicalOf` makes it lazily. */
   medical?: Medical;
   /** Assigned quarters: the sick bay and guards' quarters roles (sim/quarters.ts). Save v76; `quartersOf` makes it lazily. */

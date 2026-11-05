@@ -47,6 +47,7 @@ import { classSlots, COURSES, courseHour, DRILL_HOUR, drillable, drillDay, drill
 import { log } from './economy';
 import { plantChoreRate } from './renewables';
 import { regionFor } from './climate';
+import { pairNudge } from './bonds';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Duties
@@ -479,10 +480,12 @@ export function autoPlan(s: GameState, ctx: { build: boolean; fell: boolean }, r
   const cropsBehind = (duty: Duty) => (duty === 'fields' || duty === 'garden') && (DUTY_CHORES[duty] ?? []).some(c => dailyOf(s).chores.levels[c] >= CROP_BACKLOG);
   for (const { p } of free) keep.set(p.id, ctx.build ? Math.floor(hoursLeft.get(p.id)!.filter(h => rows.get(p.id)![h] === 'build').length * BUILD_KEEP) : 0);
   const want = new Map(dutyWants(s, rates));
+  const holders = new Map<Duty, string[]>();   // who has been given each duty so far (the bonds' nudge: friends side by side, rivals apart)
   const give = (p: Person, i: number, duty: Duty, n: number): number => {
     const open = hoursLeft.get(p.id)!, row = rows.get(p.id)!;
     let used = 0;
     while (used < n && open.length) { row[open.shift()!] = duty; used++; }
+    if (used) { const hs = holders.get(duty); if (hs) { if (!hs.includes(p.id)) hs.push(p.id); } else holders.set(duty, [p.id]); }
     want.set(duty, (want.get(duty) ?? 0) - used * choreRate(p) * Math.max(0.3, restFactor(s.personState[i])));
     return used;
   };
@@ -525,7 +528,7 @@ export function autoPlan(s: GameState, ctx: { build: boolean; fell: boolean }, r
       if (open.length <= (cropsBehind(top) ? 0 : keep.get(x.p.id)!)) continue;
       const f = fitness(s, x.i, top);
       if (f <= 0) continue;
-      const score = f * (1 + 0.05 * open.length);
+      const score = f * (1 + 0.05 * open.length) * (1 + pairNudge(s, x.p.id, holders.get(top) ?? []));
       if (score > bestScore) { best = x; bestScore = score; }
     }
     if (!best) { want.set(top, 0); continue; }

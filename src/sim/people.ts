@@ -12,6 +12,7 @@ import type { Battle } from './battleTypes';
 import { afterFight, mindDay } from './mind';
 import { practice, skillsDay } from './skills';
 import { coursesDay } from './courses';
+import { bondsAfterFight, bondsDay } from './bonds';
 import type { GameState } from './state';
 
 export { practice, teach } from './skills';
@@ -19,12 +20,13 @@ export { shock } from './mind';
 
 /** Once a day, at midnight after eating: the mind (strain, grief, breakdowns), then practice and rust. Returns log lines. */
 export function peopleDay(s: GameState): string[] {
-  return [...mindDay(s), ...skillsDay(s), ...coursesDay(s)];
+  return [...mindDay(s), ...skillsDay(s), ...coursesDay(s), ...bondsDay(s)];
 }
 
 /** After a fight (battle.ts, rescue.ts): the mind's toll, and shooting practice for those who fired. */
 export function peopleAfterFight(s: GameState, b: Battle): void {
   afterFight(s, b);
+  bondsAfterFight(s, b);
   const pidOf = new Map(b.units.filter(u => u.personId).map(u => [u.id, u.personId!]));
   const shots = new Map<string, number>();
   for (const e of b.events) if (e.kind === 'shot' && pidOf.has(e.from)) shots.set(pidOf.get(e.from)!, (shots.get(pidOf.get(e.from)!) ?? 0) + 1);

@@ -34,7 +34,7 @@ import { fosterOut, wardsDay, type Ward } from './orphans';
 import { threatsDay } from './threats';
 import type { Threat } from './threatState';
 
-export type ChronicleKind = 'era' | 'birth' | 'death' | 'partner' | 'coming' | 'milestone' | 'retire' | 'home' | 'threat';
+export type ChronicleKind = 'era' | 'birth' | 'death' | 'partner' | 'coming' | 'milestone' | 'retire' | 'home' | 'threat' | 'bond';
 export interface ChronicleEntry { t: number; year: number; kind: ChronicleKind; text: string }
 
 /** One era: a disaster lived through (eras.ts fills these in). */

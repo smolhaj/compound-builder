@@ -56,6 +56,7 @@ import { tension } from './disaster';
 import { eveningHelps, sharedPoints, wearKits, type KitId } from './evenings';
 import { drilledOf } from './courses';
 import { comfortPoints } from './comfort';
+import { bondHelp, bondsRift } from './bonds';
 
 export type TraumaKind = 'raid' | 'wounded' | 'killed' | 'execution' | 'captivity' | 'witness' | 'disaster';
 export type BreakKind = 'irritable' | 'withdrawn' | 'panic' | 'burnout' | 'reckless';
@@ -423,6 +424,7 @@ export function reading(s: GameState, p: Person, sleeping: ReturnType<typeof sle
   h('a dog', dogEffects(s, p.id).morale > 0 ? (p.kid ? 3 : 2) : 0);
   const mate = p.partner ? person(s, p.partner) : undefined;
   h('someone close', mate && here(s, mate) ? 2 : living.some(q => q !== p && closeness(p, q) >= 0.8) ? 1.5 : 0);
+  h('friends in the house', bondHelp(s, p.id));
   h('a place worth living in', comfortPoints(s, p.kid));
   h('a roof of their own', s.structures.some(x => isFinished(x) && isHome(x.kind)) ? 2 : 0);
   const lead = bestLevel(s, 'leadership');
@@ -515,7 +517,7 @@ export function mindDay(s: GameState): string[] {
       ps.said = day;
       const close = living.filter(x => x !== p && !x.kid).sort((a, b) => closeness(p, b) - closeness(p, a))[0];
       out.push(breakLine(p, kind, close));
-      if (kind === 'irritable' && close && !M.rift) M.rift = { a: p.id, b: close.id, day, until: day + len + 2, over: 'something small that was not about anything' };
+      if (kind === 'irritable' && close && !M.rift) { M.rift = { a: p.id, b: close.id, day, until: day + len + 2, over: 'something small that was not about anything' }; bondsRift(s, p.id, close.id); }
     }
   }
   // consequences while a break lasts
@@ -541,6 +543,7 @@ export function mindDay(s: GameState): string[] {
       const a = strained[0], b = strained[1 + Math.floor(r() * (strained.length - 1))];
       const over = pickL(r, ['the rationing', 'who stands the night watch', 'the kids', 'whether to take in strangers', 'the last of the fuel', 'something small that was not about anything']);
       M.rift = { a: a.id, b: b.id, day, until: day + 4 + Math.floor(r() * 7), over };
+      bondsRift(s, a.id, b.id);
       out.push(`${a.first} and ${b.first} had words over ${over}. Nobody said much at supper.`);
     }
   }
