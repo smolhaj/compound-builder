@@ -300,6 +300,8 @@ export interface GameState {
   market?: MarketState;
   /** The neighbors' lives: ages, history, news on its way, the co-op or militia, the pact (sim/neighborLife.ts). Save v42. */
   locals?: LocalsState;
+  /** An armed-response subscription and a neighborhood watch (sim/armedResponse.ts, sim/watch.ts). Absent: neither. */
+  security?: import('./securityState').Security;
   /** Tunnelers: the dig in progress, the party sent to a breakout, tallies (sim/tunnelers.ts). Save v47; `??=` for safety. */
   digs?: DigState;
   /** The family's dogs, each a named pet with its own health, bonds and moods (sim/pets.ts; save v43). Replaces the old `stock.dog` count. */

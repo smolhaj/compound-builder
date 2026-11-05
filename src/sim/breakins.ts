@@ -30,6 +30,7 @@
  * or mines are a felony.
  */
 import { wallTopPosture } from './wallTops';
+import { breakinK, emptyShare, patrolMinutes, responseActive } from './armedResponse';
 import { mulberry32 } from './rng';
 import { log } from './economy';
 import { raidPressure } from './opsec';
@@ -100,7 +101,7 @@ export function breakInRate(s: GameState): number {
   if (wallTopPosture(s).signsDeter > 0) deter *= 0.85;   // yellow signs on a live electric fence (opportunists only; sim/wallTops.ts)
   const town = 1 + 0.3 * Math.max(0, 1 - s.site.miles / 10);   // close to town: more traffic past the drive
   // a place nobody is at (the weekender's weekdays) is a mark; a caretaker and lights on timers take some of that back
-  return BASE_PER_YEAR * seen * deter * town * emptyMultiplier(s);
+  return BASE_PER_YEAR * seen * deter * town * emptyMultiplier(s) * breakinK(s);
 }
 
 /** Minutes for a deputy to get there after the 911 call (region and miles to town). */
@@ -109,7 +110,9 @@ export function responseMinutes(s: GameState, r: () => number): number {
   const far = Math.max(0, Math.min(1, s.site.miles / 25));
   const m = d.min + (d.max - d.min) * (0.5 * far + 0.5 * r());
   // up a steep road, or one the snow has shut, the deputy takes longer (sim/slope.ts)
-  return Math.round(Math.max(d.min, Math.min(d.max, m)) * responseFactor(s));
+  const sheriff = Math.round(Math.max(d.min, Math.min(d.max, m)) * responseFactor(s));
+  // the panic button calls the patrol too (sim/armedResponse.ts): whoever is nearer
+  return responseActive(s) ? Math.min(sheriff, patrolMinutes(s)) : sheriff;
 }
 
 /** Charge a bill: checking, then savings, then cash; what's left is owed. */
@@ -141,7 +144,7 @@ export function breakInDay(s: GameState, day: number): Encounter | null {
   const empty = emptyNow(s);
   if (empty || r() < 0.33) {
     // nobody home: the back door kicked in while everyone was in town
-    const lines = burgle(s, r, 1);
+    const lines = burgle(s, r, emptyShare(s));
     const mins = responseMinutes(s, r);
     lines.push(...plainView(s, r, 0.5));
     if (empty && isSplit(s)) {
@@ -151,7 +154,7 @@ export function breakInDay(s: GameState, day: number): Encounter | null {
       if (l) log(s, l);
       return null;
     }
-    log(s, `Came home to the back door kicked in. A deputy came out in ${mins} minutes and took a report.${lines.length ? ' ' + lines.join(' ') : ''}`);
+    log(s, `Came home to the back door kicked in. ${responseActive(s) ? `The alarm had called the armed-response patrol: it was there in ${mins} minutes, and a deputy came out to take the report.` : `A deputy came out in ${mins} minutes and took a report.`}${lines.length ? ' ' + lines.join(' ') : ''}`);
     return null;
   }
   const u = r();
@@ -369,7 +372,7 @@ export function resolveBreakIn(s: GameState, e: Encounter, stance: Stance): Omit
   }
   if (stance === 'call_911') {
     if (mins <= stay + 2 && r() < 0.5) {
-      lines.push(`The deputies were there in ${mins} minutes and caught ${e.size === 1 ? 'him' : 'them'} loading the car.`);
+      lines.push(`${responseActive(s) ? 'The panic button called the armed-response patrol: they' : 'The deputies'} were there in ${mins} minutes and caught ${e.size === 1 ? 'him' : 'them'} loading the car.`);
       lines.push(...plainView(s, r, 0.4));
       return { title: 'Caught in the drive', text: `Behind the ${safeRoom ? 'safe-room' : 'bedroom'} door, on the phone with dispatch, you hear the sirens come up the road.`, tone: 'good', lines };
     }
