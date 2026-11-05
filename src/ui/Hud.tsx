@@ -15,6 +15,7 @@ import type { Quality } from '../engine/world/WorldScene';
 import { SEASON_MODES, type SeasonMode } from '../engine/world/season/seasonState';
 import { WEATHER_MODES, type WeatherMode } from '../engine/world/weather/weatherState';
 import { DogsPanel } from './DogsPanel';
+import { CompoundBoardPanel } from './CompoundBoard';
 import { KinPanel } from './KinPanel';
 import { NewcomersPanel } from './NewcomersPanel';
 import { originLabel } from '../sim/newcomers';
@@ -133,6 +134,7 @@ export function Hud() {
   // layout: the top bar's size and the window's width decide where the panels sit (hudLayout)
   const barRef = useRef<HTMLDivElement>(null), brRef = useRef<HTMLDivElement>(null), blRef = useRef<HTMLDivElement>(null);
   const [side, setSide] = useState<'left' | 'right'>('left');
+  const [boardOpen, setBoardOpen] = useState(false);
   const bar = useBox(barRef), br = useBox(brRef), bl = useBox(blRef);
   const lay = hudLayout(bar.vw, bar.w, bar.h, br, bl);
   const [lastSel, setLastSel] = useState<string | null>(null);
@@ -541,8 +543,11 @@ export function Hud() {
       {/* the tool hint stays up while the panels are hidden */}
       {w.hudHidden && g.tool && <div style={{ ...panel, position: 'fixed', left: 10, top: 10, maxWidth: 300, fontSize: 12 }}>{g.toolProblem ?? (g.tool === 'fell' ? 'Point at a tree · click marks or unmarks · Esc stops' : 'Click to place · R rotates · Esc cancels')}</div>}
 
+      {boardOpen && <CompoundBoardPanel top={Math.max(lay.panelTop, lay.switchTop)} bottom={lay.bottomReserve} narrow={lay.narrow} onClose={() => setBoardOpen(false)} onSide={setSide} />}
+
       {/* Bottom right: cameras, building view */}
       <div ref={brRef} style={{ ...panel, position: 'fixed', right: EDGE, bottom: 34, padding: 4, display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end', maxWidth: 'calc(100vw - 20px)', boxSizing: 'border-box' }}>
+        <button title="The clipboard in the safe room: power, water, food, defense, morale, threats and what waits on you, one page" style={btn(boardOpen)} onClick={() => setBoardOpen(!boardOpen)}>Board</button>
         {VIEWS.map(([v, label, tip]) => <button key={v} title={tip} style={btn(w.buildingView === v)} onClick={() => w.setBuildingView(v)}>{label}</button>)}
         <button title="Underground: see-through ground, bunker rooms cut open (U). It switches itself off when you put the bunker tool down." style={btn(w.underground)} onClick={() => w.setUnderground(!w.underground)}>Underground</button>
         <button title="Hide or show the side panels to see the whole map (H)" style={btn(w.hudHidden)} onClick={() => w.setHudHidden(!w.hudHidden)}>{w.hudHidden ? 'Show panels' : 'Hide panels'} (H)</button>
