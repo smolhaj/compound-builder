@@ -68,7 +68,7 @@ describe('save sanitising', () => {
       expect(bad.warnings[0]).toMatch(/corrected/);
     }
     const nul = JSON.parse(exportJson(newGame(5)));
-    nul.state ? (nul.state.money = null) : (nul.money = null);
+    if (nul.state) nul.state.money = null; else nul.money = null;
     const r = readSaveFile(JSON.stringify(nul));
     expect(r.ok && r.state.money).toBe(0);
   });
