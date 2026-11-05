@@ -94,12 +94,18 @@ export function reputation(s: GameState, p: Look): Reputation {
 }
 
 /** Once a day: the neighbors' goodwill drifts with the look of the place and the record behind it. Returns log lines (none: it is slow). */
-export function reputationDay(s: GameState, p: Look): string[] {
-  const record = goodRecord(s), closed = closedLook(p);
-  for (const n of s.neighbors) {
-    if (n.status !== 'home' || n.members <= 0) continue;
-    if (record > 0 && n.disposition < REP.WARM_CAP) n.disposition = Math.min(REP.WARM_CAP, n.disposition + REP.WARM * record * (1 - 0.6 * closed));
-    if (closed > 0 && record < REP.GOOD_RECORD && n.disposition < REP.COOL_BELOW && n.disposition > REP.COOL_FLOOR) n.disposition = Math.max(REP.COOL_FLOOR, n.disposition - REP.COOL * closed);
+export function reputationDay(s: GameState, look: () => Look, step = 1): string[] {
+  const record = goodRecord(s);
+  const near = s.neighbors.filter(n => n.status === 'home' && n.members > 0);
+  if (!near.length) return [];
+  // the look costs a posture pass: ask for it only when a neighbor could be cooled (a good record outweighs the cooling)
+  const cools = record < REP.GOOD_RECORD && near.some(n => n.disposition < REP.COOL_BELOW && n.disposition > REP.COOL_FLOOR);
+  const warms = record > 0 && near.some(n => n.disposition < REP.WARM_CAP);
+  if (!cools && !warms) return [];
+  const closed = closedLook(look());
+  for (const n of near) {
+    if (record > 0 && n.disposition < REP.WARM_CAP) n.disposition = Math.min(REP.WARM_CAP, n.disposition + step * REP.WARM * record * (1 - 0.6 * closed));
+    if (closed > 0 && record < REP.GOOD_RECORD && n.disposition < REP.COOL_BELOW && n.disposition > REP.COOL_FLOOR) n.disposition = Math.max(REP.COOL_FLOOR, n.disposition - step * REP.COOL * closed);
   }
   return [];
 }

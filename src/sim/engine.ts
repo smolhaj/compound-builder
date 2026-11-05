@@ -221,7 +221,8 @@ function subStep(s: GameState): void {
     for (const line of mutualAidDay(s)) log(s, line);
     // the world round the place: the neighbors' lives, the market, scavenging runs coming home
     for (const line of neighborLifeDay(s)) log(s, line);
-    for (const line of reputationDay(s, postureOf(s))) log(s, line);
+    // monthly, thirty days a step: the look costs a posture pass (sim/reputation.ts)
+    if (dayIndex(s.clock.t) % 30 === 0) for (const line of reputationDay(s, () => (s.perimeter.length ? postureOf(s) : { fortress: 0 }), 30)   /* no wall laid: no fortress look, and no posture pass to learn it */) log(s, line);
     for (const line of sharedHarvestDay(s)) log(s, line);
     for (const line of marketDay(s)) log(s, line);
     for (const line of scavengeDay(s)) log(s, line);

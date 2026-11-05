@@ -103,7 +103,7 @@ export function breakInRate(s: GameState): number {
   if (wallTopPosture(s).signsDeter > 0) deter *= 0.85;   // yellow signs on a live electric fence (opportunists only; sim/wallTops.ts)
   const town = 1 + 0.3 * Math.max(0, 1 - s.site.miles / 10);   // close to town: more traffic past the drive
   // a place nobody is at (the weekender's weekdays) is a mark; a caretaker and lights on timers take some of that back
-  return BASE_PER_YEAR * seen * deter * town * emptyMultiplier(s) * breakinK(s) * burglarK(hardness(s, postureOf(s)).hard);   // a hard-looking place is a worse bet for a burglar (sim/reputation.ts)
+  return BASE_PER_YEAR * seen * deter * town * emptyMultiplier(s) * breakinK(s);
 }
 
 /** Minutes for a deputy to get there after the 911 call (region and miles to town). */
@@ -135,11 +135,17 @@ function charge(s: GameState, amount: number): void {
  * one comes back as the pending encounter; a daytime one is logged here and
  * returns null.
  */
+/** The rate with the compound's name on the road (sim/reputation.ts): a hard-looking place is a worse bet for a burglar. Costs a posture pass, so only the UI and the roll that already hit ask for it. */
+export const breakInRateNamed = (s: GameState): number => breakInRate(s) * burglarK(hardness(s, postureOf(s)).hard);
+
 export function breakInDay(s: GameState, day: number): Encounter | null {
   const rate = breakInRate(s);
   if (rate <= 0) return null;
   const r = mulberry32(s.seed * 4441 + day * 53 + 7);
-  if (r() >= rate / 365) return null;
+  const roll = r();
+  if (roll >= rate / 365) return null;
+  // only now, on the rare day the dice say yes, does the name count (same draw, so the dice stream is unchanged): a hard look turns some of them away
+  if (roll * 365 / rate >= burglarK(hardness(s, postureOf(s)).hard)) return null;
   const b = breakinsOf(s);
   b.count++; b.lastAt = s.clock.t;
   // (a place that stands empty is always the daytime kind: nobody there to wake)

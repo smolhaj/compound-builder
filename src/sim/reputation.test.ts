@@ -7,7 +7,7 @@ import { BLUEPRINTS } from './blueprints';
 import { postureOf, whoComes, type EncounterKind } from './encounters';
 import { mulberry32 } from './rng';
 import { hireGuard } from './guards';
-import { breakInRate } from './breakins';
+import { breakInRate, breakInRateNamed } from './breakins';
 import { defenders } from './pact';
 import { REP, burglarK, closedLook, goodRecord, hardness, labelOf, opportunistK, reputation, reputationDay } from './reputation';
 
@@ -66,13 +66,13 @@ describe('who it puts off: opportunists, not organized crews', () => {
   it('a hard-looking place is a worse bet for a peacetime burglar', () => {
     const a = lot(), b = lot(); for (const g of [a, b]) g.disaster.tracks = { ...g.disaster.tracks, law: 1, banks: 1, stores: 1 };
     walls(b); b.gate.respect = 1; peaceHire(b, 2);
-    expect(breakInRate(b)).toBeLessThan(breakInRate(a));
+    expect(breakInRateNamed(b)).toBeLessThan(breakInRateNamed(a)); expect(breakInRate(b)).toBeLessThanOrEqual(breakInRate(a) + 1e-12);
   });
 });
 
 describe('the neighbors', () => {
   const withNeighbors = (disp: number[]): GameState => { const g = lot(); g.neighbors = g.neighbors.slice(0, disp.length); g.neighbors.forEach((n, i) => { n.disposition = disp[i]; n.status = 'home'; n.members = 3; }); return g; };
-  const run = (g: GameState, look: number, days: number) => { for (let i = 0; i < days; i++) reputationDay(g, { fortress: look }); };
+  const run = (g: GameState, look: number, days: number) => { for (let i = 0; i < days; i++) reputationDay(g, () => ({ fortress: look })); };
   it('a fortress look cools a neighbor who does not know you yet, to a floor, and never an ally', () => {
     const g = withNeighbors([0, 10, 40, 80]);
     run(g, 100, 3 * 365);
@@ -112,7 +112,7 @@ describe('a raid is never easier, and the allies are never fewer, because of the
   for (const crew of [6, 10]) it(`a year of the fortress look on the neighbors, and the name (crew of ${crew})`, () => {
     const a = lot(), b = lot(); walls(a); walls(b); b.gate.respect = 1;
     for (const g of [a, b]) { g.neighbors.forEach((n, i) => { n.status = 'home'; n.members = 3; n.radio = true; n.disposition = i % 2 ? 40 : 5; }); }
-    for (let d = 0; d < 365; d++) reputationDay(b, postureOf(b));
+    for (let d = 0; d < 365; d++) reputationDay(b, () => postureOf(b));
     expect(defenders(b).length).toBeGreaterThanOrEqual(defenders(a).length);
     notWorse(rate(a, crew), rate(b, crew));
   }, 120000);

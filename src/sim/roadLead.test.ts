@@ -202,7 +202,7 @@ describe('real engine', () => {
       return kinds;
     };
     let a = 0, b = 0;
-    for (const seed of [3, 5]) {
+    for (const seed of [3, 5, 7]) {
       const old = run(false, seed), now = run(true, seed);
       for (const k of new Set([...Object.keys(old), ...Object.keys(now)])) {
         const o = old[k] ?? 0, n = now[k] ?? 0;
@@ -210,7 +210,7 @@ describe('real engine', () => {
         expect(Math.abs(n - o)).toBeLessThanOrEqual(Math.max(3, Math.ceil(o * 0.3)));
       }
     }
-    expect(a).toBeGreaterThanOrEqual(15);   // (was > 20: the good-neighbor record (sim/reputation.ts) shifts the neighbor dice, and the totals sit near the old line)
+    expect(a).toBeGreaterThan(20);
     expect(Math.abs(b - a) / a).toBeLessThan(0.15);
   }, 900_000);
 });
