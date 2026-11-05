@@ -187,6 +187,6 @@ async function realTime(seconds, speed = 3) {
 
 export { page, st, shot, note, issue, wizard, stake, orderPlans, hireAll, handleGate, run, realTime, click, scanText, frameCamp, browser, vite, out, port, scenario, raids as _r };
 const _sc = await import(`./playQa.${scenario}.mjs`);
-try { await _sc.play({ page, st, shot, note, issue, wizard, stake, orderPlans, hireAll, handleGate, run, realTime, click, scanText, frameCamp, out, stanceLog }); }
+try { await _sc.play({ browser, port, page, st, shot, note, issue, wizard, stake, orderPlans, hireAll, handleGate, run, realTime, click, scanText, frameCamp, out, stanceLog }); }
 catch (e) { note('SCENARIO CRASH: ' + (e.stack ?? e).toString().slice(0, 800)); await shot('crash').catch(() => {}); }
 finally { await browser.close(); vite.kill(); setTimeout(() => process.exit(0), 200); }

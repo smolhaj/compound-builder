@@ -158,7 +158,7 @@ export function Hud() {
   return (
     <>
       {/* Top bar: date, time, money, speed */}
-      <div style={{ ...panel, position: 'fixed', top: 10, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 12, alignItems: 'center', fontSize: 13.5, whiteSpace: 'nowrap' }}>
+      <div style={{ ...panel, position: 'fixed', top: 10, left: 10, right: 10, margin: '0 auto', width: 'fit-content', maxWidth: 'calc(100vw - 20px)', display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '4px 12px', alignItems: 'center', fontSize: 13.5 }}>
         <span>{dateLabel(cal.doy)}, {cal.year}</span>
         <span style={{ fontVariantNumeric: 'tabular-nums' }}>{clock(hourOf(game.clock.t))}</span>
         {game.lineage.era > 1 && <span style={{ color: '#d8c08a' }} title={`The ${game.lineage.family} family: era ${game.lineage.era}`}>Era {roman(game.lineage.era)}</span>}
@@ -523,7 +523,7 @@ export function Hud() {
       {w.hudHidden && g.tool && <div style={{ ...panel, position: 'fixed', left: 10, top: 10, maxWidth: 300, fontSize: 12 }}>{g.toolProblem ?? (g.tool === 'fell' ? 'Point at a tree · click marks or unmarks · Esc stops' : 'Click to place · R rotates · Esc cancels')}</div>}
 
       {/* Bottom right: cameras, building view */}
-      <div style={{ ...panel, position: 'fixed', right: 10, bottom: 34, padding: 4, display: 'flex', gap: 4, alignItems: 'center' }}>
+      <div style={{ ...panel, position: 'fixed', right: 10, bottom: 34, padding: 4, display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', maxWidth: 'calc(100vw - 20px)', gap: 4, alignItems: 'center' }}>
         {VIEWS.map(([v, label, tip]) => <button key={v} title={tip} style={btn(w.buildingView === v)} onClick={() => w.setBuildingView(v)}>{label}</button>)}
         <button title="Underground: see-through ground, bunker rooms cut open (U). It switches itself off when you put the bunker tool down." style={btn(w.underground)} onClick={() => w.setUnderground(!w.underground)}>Underground</button>
         <button title="Hide or show the side panels to see the whole map (H)" style={btn(w.hudHidden)} onClick={() => w.setHudHidden(!w.hudHidden)}>{w.hudHidden ? 'Show panels' : 'Hide panels'} (H)</button>
