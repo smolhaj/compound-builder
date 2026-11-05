@@ -118,6 +118,9 @@ import { regionFor } from '../sim/climate';
 import { buildLineFences, buildPowerline, planLineFences } from './region/lineFences';
 import type { RegionWorld } from './region/regionWorld';
 import { buildGate } from './props/gateGeometry';
+import { buildGateHouse } from './props/gateHouseGeometry';
+import { buildVehicle } from './props/vehicleGeometry';
+import { parkedCars } from '../sim/guards';
 import { buildStockpile } from './props/stockpileGeometry';
 import { DeliveryTruck } from './DeliveryTruck';
 import { RoadTraffic } from './RoadTraffic';
@@ -572,6 +575,8 @@ export class HomesteadWorld {
     // the lake skins over and freezes when the sim says so (sim/waterfront lakeIce), not by the calendar alone
     this.lakes.setIce(waterBody(game) ? ICE_COVER[lakeIce(game)] : -1, dt);
     this.plow.update(dt, this._drive && game.stock.plow >= 1, seasonState.params.snow, speedK);
+    this._syncGateHouse(game.stock.gate_house >= 1);
+    this._syncGuardCars(parkedCars(game), dt);
     // deliveries left at the road (no drive yet), by the gate
     const rs = emptyStock();
     for (const r of game.roadside ?? []) for (const l of r.lines) rs[l.material] += l.qty * (1 - r.done / r.hours);
@@ -1330,6 +1335,50 @@ export class HomesteadWorld {
       mail: { x: this.county.x(gz) - ROAD_W / 2 - 0.2, z: gz + DRIVE_W / 2 + 0.24, rot: Math.PI / 2 },
       sign: { x: PARCEL_SIZE - 0.8, z: gz - DRIVE_W / 2 - 0.45, rot: Math.PI / 2 },
     };
+  }
+
+  /**
+   * The hardened gate house (sim/richSinks.ts) beside the drive at the gate while the good is in stock, and the guards' own cars parked at
+   * the drive (sim/guards.ts, no gate house to sleep in): one frame at the gate, local +x along the drive toward the road, so the barrier
+   * arm spans the drive whichever way it runs. A car no longer needed (let go, quit) drives off toward the road.
+   */
+  private _gateFrame: THREE.Group | null = null;
+  private _gateHouse: THREE.Group | null = null;
+  private _guardCars: THREE.Group[] = [];
+  private _guardLeaving: Array<{ g: THREE.Group; t: number }> = [];
+  private _syncGateHouse(on: boolean): void {
+    if (!on) { if (this._gateHouse) this._gateHouse.visible = false; return; }
+    this._frame();
+    if (!this._gateHouse) { this._gateHouse = buildGateHouse(DRIVE_W); this._gateFrame!.add(this._gateHouse); }
+    this._gateHouse.visible = true;
+  }
+  private _frame(): THREE.Group {
+    if (!this._gateFrame) { this._gateFrame = new THREE.Group(); this._ws.scene.add(this._gateFrame); }
+    const d = this.access.drive, gp = this.access.gate;
+    let k = 0, best = Infinity;
+    d.forEach((q, i) => { const e = Math.hypot(q[0] - gp.x, q[1] - gp.z); if (e < best) { best = e; k = i; } });
+    const a = d[Math.max(0, k - 2)], b = d[Math.min(d.length - 1, k + 2)];
+    let dx = a[0] - b[0], dz = a[1] - b[1];
+    const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l;                       // toward the road
+    const ox = d[k][0] - dx * 0.5, oz = d[k][1] - dz * 0.5;                    // half a unit inside the line
+    this._gateFrame.position.set(ox, this.groundAt(ox, oz), oz);
+    this._gateFrame.rotation.y = Math.atan2(-dz, dx);
+    return this._gateFrame;
+  }
+  private _syncGuardCars(n: number, dt: number): void {
+    if (n === 0 && !this._guardCars.length && !this._guardLeaving.length) return;
+    const frame = this._frame();
+    const colors = [0x6a7a8a, 0x8a3a30, 0x3e5a46];
+    while (this._guardCars.length < n) {
+      const car = buildVehicle('suv', colors[this._guardCars.length % colors.length]);
+      frame.add(car); this._guardCars.push(car);
+    }
+    while (this._guardCars.length > n) this._guardLeaving.push({ g: this._guardCars.pop()!, t: 0 });
+    this._guardCars.forEach((c, i) => { c.position.set(-0.45 - i * 0.5, 0, DRIVE_W / 2 + 0.3); c.rotation.y = 0; });
+    for (const l of [...this._guardLeaving]) {
+      l.t += dt; l.g.position.x += dt * 0.5;
+      if (l.t > 6) { frame.remove(l.g); this._guardLeaving.splice(this._guardLeaving.indexOf(l), 1); }
+    }
   }
 
   /** A flared gravel apron where the drive leaves the road (the truck's turn, the wheel-worn mouth). */

@@ -55,6 +55,7 @@ import { raidTakesVehicles } from './vehicles';
 import { practice } from './skills';
 import { turbineNoise } from './renewables';
 import { villageWatch } from './outposts';
+import { guardPosture, resolveGuardStay } from './guards';
 import { resolveTrialEnd, startTrial, trialDay, type Character, type TrialCamp } from './trial';
 import { vetArrival } from './gateVetting';
 import { admitNewcomers, resolveShelter, strangerArrival, type Extras, type ShelterWhy } from './newcomers';
@@ -164,14 +165,15 @@ export function postureOf(s: GameState): Posture {
   // anyone away (a rescue, a run, the market) isn't on the line
   const here = (i: number) => s.personState[i]?.needs.died == null && !isAway(s, s.people[i].id);
   const adults = s.people.filter((p, i) => !p.kid && here(i));
-  const fighters = adults.length + s.people.filter((p, i) => p.kid && p.age >= 15 && here(i)).length * 0.5;
+  const guards = guardPosture(s);   // contract guards at the gate (sim/guards.ts)
+  const fighters = adults.length + s.people.filter((p, i) => p.kid && p.age >= 15 && here(i)).length * 0.5 + guards.fighters;
   const watch = Math.max(0, ...adults.map(p => p.skills.hunter));
   const radioNet = s.neighbors.some(n => n.radio && n.status === 'home' && n.disposition > 30);
   const gear = gearPosture(s, fighters);
   const tw = towerPosture(s);
   // fog (sim/fog.ts) takes what the eyes add: the watch's own score, the towers' view and the posted guard (the gear's share is already in gear.detection)
   const kEye = fogSightK(s, 'eye');
-  const detection = Math.min(100, 25 + (watch * 5 + tw.detection + watchDetection(s)) * kEye + (radioNet ? 20 : 0) + (barrier > 50 ? 10 : 0) + gear.detection + forewarned(s) + villageWatch(s));
+  const detection = Math.min(100, 25 + (watch * 5 + tw.detection + watchDetection(s)) * kEye + (radioNet ? 20 : 0) + (barrier > 50 ? 10 : 0) + gear.detection + guards.detection + forewarned(s) + villageWatch(s));
   return { visibility: Math.min(100, visibility + gear.visibility + tw.visibility), fortress, barrier: Math.min(100, barrier + gear.barrier), detection, fighters, deter: gear.deter, safeRoom: gear.safeRoom, armed: armed(s), firepower: firepower(s) * gear.fight * tw.fire, bunker: fin.some(st => st.kind === 'bunker_hatch' || st.kind === 'bunker_stairs') };
 }
 
@@ -179,7 +181,7 @@ export function postureOf(s: GameState): Posture {
 // Encounters
 // ─────────────────────────────────────────────────────────────────────────
 
-export type EncounterKind = 'arrival' | 'looters' | 'gang' | 'refugees' | 'requisition' | 'neighbor_help' | 'trader' | 'horde' | 'patrol' | 'militia' | 'break_in' | 'ransom' | 'trial_end' | 'tunnelers' | 'kin' | 'shelter' | 'move_in' | 'stranded';
+export type EncounterKind = 'guard_stay' | 'arrival' | 'looters' | 'gang' | 'refugees' | 'requisition' | 'neighbor_help' | 'trader' | 'horde' | 'patrol' | 'militia' | 'break_in' | 'ransom' | 'trial_end' | 'tunnelers' | 'kin' | 'shelter' | 'move_in' | 'stranded';
 export type Stance = 'hide' | 'parley' | 'warn' | 'defend' | 'trade' | 'take_in' | 'trial' | 'turn_away' | 'call_911' | 'shout' | 'confront' | 'pay' | 'refuse' | 'ambush' | 'flood' | 'collapse' | 'ignore' | 'build_first' | 'move_sell' | 'move_keep' | 'move_lease' | 'hold_on' | 'drive_now' | 'back_roads' | 'resupply';
 
 export interface Encounter {
@@ -213,6 +215,8 @@ export interface Encounter {
   /** A crew a scout sent for (`scoutCrew`): more of them, and they look where the family hides and keeps things. */
   scouted?: string;
   /** Tunnelers (sim/tunnelers.ts): found digging under the wall (`warning`, the window to act), or up inside it (`inside`). */
+  /** A contract guard asking to stay on when the world ends (sim/guards.ts): his id on the payroll. */
+  guardId?: string;
   /** A relative asking to join (sim/kin.ts): the savings they bring, and whether it is after the hit. */
   kin?: { savings: number; late: boolean };
   /** Strangers (sim/newcomers.ts): which kind of person, what they really are (hidden), what they say, the questions asked so far, what you noticed, a wound, tools and dogs they bring. */
@@ -670,6 +674,9 @@ export function resolve(s: GameState, stance: Stance): Outcome {
     title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines);
   } else if (e.kind === 'trial_end') {
     const o = resolveTrialEnd(s, e, stance);
+    title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines);
+  } else if (e.kind === 'guard_stay') {
+    const o = resolveGuardStay(s, e, stance);
     title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines);
   } else if (e.kind === 'kin') {
     const o = resolveKin(s, e, stance);

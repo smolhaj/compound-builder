@@ -13,7 +13,7 @@ import { emptyStats } from '../report';
 import { newDigs } from '../tunnelers';
 import { newFarm } from '../farm';
 import { emptyStock } from '../materials';
-import { newLand } from '../land';
+import { newLand, newRing2 } from '../land';
 import { CLASSIC, CLASSIC_IMPROVEMENTS } from '../site';
 import { newLights } from '../lights';
 import { newPaper } from '../paperwork';
@@ -59,6 +59,17 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   74: s => {
     const L = s.lineage as Record<string, unknown>, u = s.utilities as { grid?: boolean };
     return { ...s, version: 75, lineage: { wards: [], threat: null, threatYear: -1, startedOnGrid: !!u.grid, gridLeft: null, noteYear: -1, noteCount: 0, ...L } };
+  },
+  // 80 → 81 (land): the second ring of parcels (sim/land.ts), appended after the old ones and surveyed again
+  // 80 → 81: hired security staff (sim/guards.ts): nobody on the payroll
+  80: s => {
+    const land = s.land as { parcels: Array<{ id: string; ring?: number }>; surveyed?: boolean };
+    const home = (s.site as { home: { x0: number; z0: number; x1: number; z1: number } }).home;
+    const ids = (s.neighbors as Array<{ id: string }>).map(n => n.id);
+    const have = land.parcels.filter(p => !p.ring).length;
+    const ring2 = land.parcels.some(p => p.ring === 2) ? [] : newRing2(s.seed as number, ids, home, have);
+    return { ...s, version: 81, land: { ...land, parcels: [...land.parcels, ...ring2], surveyed: ring2.length ? false : land.surveyed },
+      guards: { staff: [], days: 0, paid: 0, collapseDays: 0, lastQuit: null, ...((s.guards as object) ?? {}) } };
   },
   // 79 → 80: the money sinks (sim/richSinks.ts): three new goods at zero (clinic suite, radio mast, hardened gate house)
   79: s => ({ ...s, version: 80, stock: { clinic_suite: 0, radio_mast: 0, gate_house: 0, ...(s.stock as object) } }),

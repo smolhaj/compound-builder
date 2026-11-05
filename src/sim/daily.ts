@@ -605,7 +605,7 @@ export function autoPlan(s: GameState, ctx: { build: boolean; fell: boolean }, r
   if (c.threat >= 1) {
     const guards = free.filter(({ p, i }) => fitness(s, i, 'watch') > 0 && (!p.kid || p.age >= 15));
     // volunteers (a standing watch assignment) and night owls first, then the least tired; two nights running and you are off
-    const klass = (x: { p: Person }) => (focus[x.p.id] === 'watch' ? 0 : chrono[x.p.id] === 'owl' ? 1 : 2);
+    const klass = (x: { p: Person }) => (x.p.guard ? -1 : focus[x.p.id] === 'watch' ? 0 : chrono[x.p.id] === 'owl' ? 1 : 2);   // a taken-in guard (sim/guards.ts) keeps the night watch
     guards.sort((a, b) => (nights[a.p.id] ?? 0) >= 2 === ((nights[b.p.id] ?? 0) >= 2) ? klass(a) - klass(b) || (s.personState[a.i].fatigue ?? 0) - (s.personState[b.i].fatigue ?? 0) || b.p.skills.hunter - a.p.skills.hunter : (nights[a.p.id] ?? 0) >= 2 ? 1 : -1);
     // rotate who takes which shift by day among those of the same standing
     const head = guards.length ? guards.filter(x => klass(x) === klass(guards[0]) && ((nights[x.p.id] ?? 0) >= 2) === ((nights[guards[0].p.id] ?? 0) >= 2)) : [];
@@ -924,7 +924,7 @@ export function dutyWork(s: GameState, p: Person, ps: PersonState, duty: Duty, p
 // ─────────────────────────────────────────────────────────────────────────
 
 export type WatchPost = 'tower' | 'wall' | 'gate' | 'console';
-export interface Watcher { id: string; post: WatchPost; night: boolean; alert: number; /** On the patrol deck of the wall (sim/walkway.ts): the people renderer puts them on top of it. */ walk?: boolean }
+export interface Watcher { id: string; /** A trained guard taken in (sim/guards.ts): sharper on watch, sharpest at night. */ guard?: boolean; post: WatchPost; night: boolean; alert: number; /** On the patrol deck of the wall (sim/walkway.ts): the people renderer puts them on top of it. */ walk?: boolean }
 
 /**
  * Who is on watch right now (reads the tasks the last sub-step set). For the
@@ -944,7 +944,7 @@ export function watchNow(s: GameState): Watcher[] {
     const k = out.length;
     // at night the first watcher sits at the control room's screens when there are cameras and power (sim/bunkerLife.ts); the tower keeps the second
     const post: WatchPost = k === 0 && night && consoleManned(s) ? 'console' : (k === 0 || (k === 1 && night && consoleManned(s))) && tower ? 'tower' : wall && k <= (deck ? 2 : 1) ? 'wall' : 'gate';
-    out.push({ id: ps.id, post, night, alert: Math.max(0.3, 1 - (ps.fatigue ?? 0) / 140), ...(post === 'wall' && deck ? { walk: true } : {}) });
+    out.push({ id: ps.id, post, night, ...(s.people.find(q => q.id === ps.id)?.guard ? { guard: true } : {}), alert: Math.max(0.3, 1 - (ps.fatigue ?? 0) / 140), ...(post === 'wall' && deck ? { walk: true } : {}) });
   }
   return out;
 }
@@ -954,7 +954,7 @@ export function watchDetection(s: GameState): number {
   const w = watchNow(s).sort((a, b) => b.alert - a.alert);
   let sum = 0;
   const owl = w.length ? chronotypes(s) : {};
-  w.forEach((x, k) => { sum += ((k === 0 ? 10 : k === 1 ? 6 : 2) + (owl[x.id] === 'owl' ? 1.5 : 0)) * x.alert * (x.post === 'tower' ? 1.2 : x.post === 'console' ? CONSOLE_EYES : x.walk ? 1.1 : 1); });
+  w.forEach((x, k) => { sum += ((k === 0 ? 10 : k === 1 ? 6 : 2) + (owl[x.id] === 'owl' ? 1.5 : 0)) * x.alert * (x.post === 'tower' ? 1.2 : x.post === 'console' ? CONSOLE_EYES : x.walk ? 1.1 : 1) * (x.guard ? (x.night ? 1.5 : 1.3) : 1); });
   return Math.max(0, Math.min(20, sum) - vetAttention(s));
 }
 
