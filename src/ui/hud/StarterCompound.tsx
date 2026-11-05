@@ -4,12 +4,12 @@
  * ordinary structure once staked. What the cash cannot cover waits as "later".
  */
 import { useEffect, useMemo, useState } from 'react';
+import { PlansOrderButton } from './SpendConfirm';
 import { useGameStore } from '../../store/gameStore';
 import { useWorldStore } from '../../store/worldStore';
 import { planStarter } from '../../sim/starterCompound';
 import { BLUEPRINTS, totalBill } from '../../sim/blueprints';
 import { MATERIALS, type MaterialId } from '../../sim/materials';
-import { orderCost, orderProblem, prices } from '../../sim/economy';
 import { plansNeedLines } from '../../sim/guidance';
 import { PERIMETER } from '../../sim/perimeter';
 import { Note } from './common';
@@ -62,7 +62,7 @@ export function StarterCompound({ first, wanted }: { first: boolean; wanted: boo
       {first && wanted && <Note>New here? One click proposes a house, water, power, food and a fence for this lot.</Note>}
       {wanted && <button style={{ ...btn(first), width: '100%' }} title="A suggested layout for this lot: a ghost preview with the total cost, hours and permit fees first. Nothing is placed until you say so, and every piece stays editable." onClick={() => { setDone(null); setOpen(true); }}>Lay out a starter compound</button>}
       {done && <Note tone="good">{done}</Note>}
-      {done && need.length > 0 && <button style={{ ...btn(true), width: '100%', marginTop: 3 }} disabled={!!orderProblem(game, need)} onClick={() => g.order(need)}>Order what the plans need ({usd(orderCost(need, prices(game)))})</button>}
+      {done && need.length > 0 && <PlansOrderButton lines={need} style={{ marginTop: 3 }} />}
     </div>;
   }
   return <div style={{ borderTop: `1px solid ${LINE}`, marginTop: 6, paddingTop: 6 }}>

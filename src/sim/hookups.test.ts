@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { newGame, type GameState } from './state';
 import { planStructure } from './construction';
 import { planRun, type Pt } from './perimeter';
-import { backupPower, fitRows, hookupsFor, needsHookup, storageTip } from './hookups';
+import { hookupTone, powerOnPlace, backupPower, fitRows, hookupsFor, needsHookup, storageTip } from './hookups';
 import { defenseReport } from './defenseReport';
 import { addFitWork, orderFit } from './utilities';
 
-const fresh = () => { const g = newGame(11); g.structures = []; g.perimeter = []; g.utilities.grid = false; return g; };
+const fresh = () => { const g = newGame(11); g.structures = []; g.perimeter = []; g.utilities.grid = false; if (g.site.improvements) g.site.improvements.power = false; return g; };
 const built = (g: GameState, kind: string, x: number, z: number) => { const st = planStructure(g, kind, x, z, 0); st.stage = 99; st.finishedAt = 0; return st; };
 const line = (g: GameState, kind: 'power_cable' | 'water_pipe', a: Pt, b: Pt) => { const r = planRun(g, kind, [a, b], []); r.done = r.hours; r.finishedAt = 0; r.supplied = true; return r; };
 
@@ -96,5 +96,29 @@ describe('finished is not working (sim/hookups.ts)', () => {
   it('a fresh game with the family house pre-fitted has nothing to finish', () => {
     const g = newGame(11);
     expect(needsHookup(g).filter(x => x.kind === 'wire' || x.kind === 'plumb')).toHaveLength(0);
+  });
+});
+
+describe('one source of truth for power: Get operational vs Next steps', () => {
+  it('an unwired extra home is optional once a source stands and another home is wired', () => {
+    const g = fresh();
+    const h = built(g, 'cottage', 10, 10), sol = built(g, 'solar_array', 14, 10), tr = built(g, 'trailer', 60, 60);
+    line(g, 'power_cable', [sol.x, sol.z], [h.x, h.z]);
+    // the house is wired, the trailer is not reached
+    const f = orderFit(g, h.id, 'wire');
+    g.stock.cable += 3; g.stock.hardware += 1;
+    addFitWork(g, f, 100, 5);
+    expect(powerOnPlace(g)).toBe(true);
+    const todo = needsHookup(g).filter(x => x.id === tr.id);
+    expect(todo.length).toBeGreaterThan(0);
+    expect(hookupTone(g, todo).optional).toBe(true);
+  });
+  it('is not optional when no home is wired yet, or no source stands', () => {
+    const g = fresh();
+    const tr = built(g, 'trailer', 60, 60);
+    expect(powerOnPlace(g)).toBe(false);
+    expect(hookupTone(g, needsHookup(g).filter(x => x.id === tr.id)).optional).toBe(false);
+    built(g, 'solar_array', 14, 10);
+    expect(hookupTone(g, needsHookup(g).filter(x => x.id === tr.id)).optional).toBe(false);   // the only home is the unwired one
   });
 });

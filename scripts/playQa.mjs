@@ -47,17 +47,18 @@ const scanText = async tag => {
   const m = t.match(/.{0,50}(\bNaN\b|\bundefined\b|\[object|Infinity).{0,50}/);
   if (m) issue(`bad text at ${tag}: "${m[0].replace(/\n/g, ' ')}"`);
 };
-const click = async (re, opts = {}) => { const b = page.getByRole('button', { name: re }).filter(opts.filter ?? {}); if (await b.count()) { await b.first().click({ timeout: 5000 }).catch(() => {}); return true; } return false; };
+const click = async (re, opts = {}) => { const b = page.getByRole('button', { name: re }).filter({ hasNotText: /^Hide panels/ }).filter(opts.filter ?? {}); if (await b.count()) { await b.first().click({ timeout: 5000 }).catch(() => {}); return true; } return false; };
 
 /** The charter, by its buttons. */
 async function wizard({ region, difficulty, lotPick = 'first', mode = 'Surprise', kin = 0, scenario: sc, extra }) {
-  await page.goto(`http://localhost:${port}/?lowrender`);
+  await page.goto(`http://localhost:${port}/?new&lowrender`);
   await page.getByText('1. Region').waitFor();
   await page.waitForFunction(() => window.__cb?.qa?.lowrender);
   await page.evaluate(() => { try { localStorage.clear(); } catch {} });
   if (region) await page.getByRole('button', { name: new RegExp(region) }).first().click();
   await page.getByRole('button', { name: 'Next', exact: true }).click();
   // land step
+  if (extra?.lifestyle) await page.getByRole('button', { name: new RegExp(extra.lifestyle) }).first().click().catch(() => note('lifestyle tile not found ' + extra.lifestyle));
   if (extra?.wish) for (const w of extra.wish) await page.getByRole('button', { name: w, exact: true }).first().click().catch(() => note('wish chip not found ' + w));
   await shotWizard('land');
   const cards = page.locator('button', { hasText: /acres/ }).filter({ hasText: /Leaves \$/ });
@@ -70,6 +71,7 @@ async function wizard({ region, difficulty, lotPick = 'first', mode = 'Surprise'
     for (let i = 0; i < nc; i++) { if (extra?.maxPrice && await priceOf(i) > extra.maxPrice) continue; const t = await cards.nth(i).innerText(); const m = t.match(/height ×([\d.]+)/); const mm = t.match(/(\d+) m\s*$/m); const sc2 = (m ? Number(m[1]) : 1) * 10 + (mm ? Number(mm[1]) / 100 : 0); if (sc2 > best) { best = sc2; bi = i; } }
     pickIdx = bi; note('steep pick card ' + bi + ' score ' + best);
   }
+  if (lotPick === 'priciest') { let bp = -1; for (let i = 0; i < nc; i++) { const pr = await priceOf(i); if (pr < 1e9 && pr > bp) { bp = pr; pickIdx = i; } } note('priciest pick ' + bp); }
   if (nc) { await cards.nth(pickIdx).click(); note('lot: ' + (await cards.nth(pickIdx).innerText()).replace(/\n+/g, ' | ').slice(0, 300)); }
   await page.getByRole('button', { name: 'Next', exact: true }).click();
   for (let i = 0; i < kin; i++) { const rel = page.locator('button').filter({ hasText: /\b(Uncle|Aunt|Grandma|Grandpa|Cousin|Brother|Sister|Mother|Father|Mom|Dad|Grandmother|Grandfather|Niece|Nephew|Mother-in-law|Father-in-law|In-law)/i }); if (await rel.count() > i) await rel.nth(i).click().catch(() => {}); }
@@ -120,6 +122,7 @@ let raids = 0, stanceLog = [];
 async function handleGate(s, policy) {
   raids++; const tag = `gate-${raids}`;
   note(`GATE ${raids} day ${s.day} kind=${s.pendKind} ${s.dphase}: ` + JSON.stringify({ alive: s.alive, money: s.money }));
+  if (!s.pendKind && !s.cutscene) { const lb = await page.getByRole('button').allInnerTexts(); note(`NULL-KIND GATE: aft=${s.aftermath} card=${s.card} labels=` + lb.join(' / ').slice(0, 400)); const bt = await page.evaluate(() => { const g = window.__cb.game.getState().game; return JSON.stringify({ card: g.gate.card, aftermath: g.gate.aftermath }).slice(0, 500); }); note('NULL-KIND STATE ' + bt); await shot(tag + '-nullkind'); }
   let stage = 0;
   for (let i = 0; i < 80; i++) {
     const c = await st();

@@ -26,6 +26,7 @@ import { conditionsFor } from './body';
 import { dayIndex, type GameState } from './state';
 import { dayJob, JOB_POOL, skills as rollSkills, SKILL_IDS, type KinRole, type Person } from './family';
 import { freshNeeds } from './needs';
+import { nobodyHome } from './orphans';
 import { tension } from './disaster';
 import { arrivalOutlook } from './housing';
 import type { Encounter, Outcome, Stance } from './encounters';
@@ -465,7 +466,7 @@ export function kinDay(s: GameState): string[] {
 
   // the ones who were refused: after the hit, what became of them
   for (const rf of k.refused) {
-    if (rf.fate || !hit || day < rf.due || gate.pending) continue;
+    if (rf.fate || !hit || day < rf.due || gate.pending || nobodyHome(s)) continue;
     const r = mulberry32(s.seed * 4723 + rf.day * 31 + rf.people[0].age);
     const u = r();
     const names = joinList(rf.people.map(p => p.first));
@@ -491,7 +492,7 @@ export function kinDay(s: GameState): string[] {
   }
 
   // a new request
-  if (k.open && k.away.length && !gate.pending && !gate.card && day >= k.next && !(hit && day >= hitDay + 45) && (hit ? (k.post ?? 0) < POST_CAP : (k.pre ?? 0) < PRE_CAP)) {
+  if (k.open && k.away.length && !gate.pending && !gate.card && !nobodyHome(s) && day >= k.next && !(hit && day >= hitDay + 45) && (hit ? (k.post ?? 0) < POST_CAP : (k.pre ?? 0) < PRE_CAP)) {
     const r = mulberry32(s.seed * 6131 + day * 17 + 3);
     if (r() < requestChance(s)) {
       const first = k.away[Math.floor(r() * k.away.length)];

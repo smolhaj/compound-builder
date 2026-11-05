@@ -4,6 +4,7 @@
  * confirm, and the family has the lot on their list (sim/propertyWall.ts).
  */
 import { useEffect, useMemo, useState } from 'react';
+import { PlansOrderButton } from './SpendConfirm';
 import { useGameStore } from '../../store/gameStore';
 import { useWorldStore } from '../../store/worldStore';
 import { CONTAINER_LOOKS, PERIMETER, isContainerKind, type ContainerLook, type PerimeterKind } from '../../sim/perimeter';
@@ -13,7 +14,6 @@ import { RING_SHAPES, type RingShape } from '../../sim/ringShape';
 import { costPer100m, perimeterNote, perimeterTiers, plansNeedLines } from '../../sim/guidance';
 import { eta, paceOf, slowHint, totalHoursLeft, weeksFor } from '../../sim/pace';
 import { billText } from '../../sim/materials';
-import { orderCost, orderProblem, prices } from '../../sim/economy';
 import { Note } from './common';
 import { btn, DIM, LINE, usd } from './style';
 
@@ -52,7 +52,7 @@ export function WallProperty() {
     </div>
     {laid ? <>
       <Note tone="good">Laid out. The family builds it as the materials come in; the Defense tab's "Property line closed" check turns green when it is done.</Note>
-      {need.length > 0 && <button style={{ ...btn(true), width: '100%' }} disabled={!!orderProblem(game, need)} onClick={() => g.order(need)}>Order what the plans need ({usd(orderCost(need, prices(game)))})</button>}
+      {need.length > 0 && <PlansOrderButton lines={need} />}
     </> : <>
       <Note>One wall type for the whole line, or round a compound of the shape you pick. Pick it; the plan below updates.</Note>
       <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'center', padding: '2px 0 4px' }}>

@@ -3,9 +3,12 @@ import { newGame } from './state';
 import { gateDay } from './encounters';
 import { nobodyHome } from './orphans';
 import { resolve } from './encounters';
-import { mastheadOf, MASTHEADS } from './report';
+import { mastheadOf, MASTHEADS, tallyDay } from './report';
 import { slowHint, paceOf } from './pace';
 import { REGION_IDS } from './regions';
+import { step } from './engine';
+import { arrivalCheck } from './siege';
+import type { Encounter } from './encounters';
 
 function awayGame() {
   const g = newGame(7, 105, 2027, { mode: 'scenario', peace: 'short', kind: 'grid_down' });
@@ -27,12 +30,35 @@ describe('nobody home (line alive, children fostered)', () => {
     for (let i = 0; i < 365; i++) { g.clock.t += 1; expect(gateDay(g)).toBeNull(); }
     expect(g.gate.pending).toBeNull();
   });
+  it('queues no card of any kind (kin, neighbors asking to join) through four game years of the real engine', () => {
+    let g = awayGame();
+    g.clock.t = g.disaster.hitAt + 40;
+    for (let i = 0; i < 4 * 365 / 5; i++) {
+      g = step(g, 5);
+      if (!nobodyHome(g)) break;
+      expect(g.gate.pending?.kind ?? null).toBeNull();
+      expect(g.gate.card).toBeNull();
+    }
+  });
   it('taking in a stranger is refused', () => {
     const g = awayGame();
     g.gate.pending = { id: 'e1', kind: 'arrival', day: 1, title: 'x', dossier: [], size: 1, armed: false, strength: 0 } as never;
     const o = resolve(g, 'take_in');
     expect(o.title).toBe('Nobody home');
     expect(g.gate.tookIn).toBe(0);
+  });
+});
+
+describe('a real wipe is still a wipe', () => {
+  it('everyone dead and nobody fostered ends the run; with a ward away it does not', () => {
+    const g = newGame(7, 105, 2027, { mode: 'scenario', peace: 'short', kind: 'grid_down' });
+    g.clock.t = g.disaster.hitAt + 40;
+    for (const ps of g.personState) ps.needs.died = 1;
+    expect(nobodyHome(g)).toBe(false);
+    expect(tallyDay(g)?.kind).toBe('wipe');
+    const f = awayGame();
+    expect(tallyDay(f)).toBeNull();
+    expect(f.ending).toBeFalsy();
   });
 });
 
@@ -47,5 +73,26 @@ describe('polish', () => {
     const h = slowHint(g, 30, { ...paceOf(g), employed: ['Luis'], siteDays: undefined }, 6)!;
     expect(h).toMatch(/^Slow going: Luis works in town/);
     expect(h.length).toBeLessThan(150);
+  });
+});
+
+describe('a scheduled raid when nobody is home', () => {
+  it('is dropped at its hour: no cutscene, no card, stores untouched', () => {
+    const g = awayGame();
+    const e = { id: 'e1', kind: 'gang', day: 1, title: 'Gang', dossier: [], size: 4, armed: true, strength: 40, stances: [] } as unknown as Encounter;
+    g.gate.incoming = { e, at: g.clock.t + 0.1 };
+    const canned = g.stock.canned;
+    g.clock.t += 0.2;
+    expect(arrivalCheck(g)).toBeNull();
+    expect(g.gate.incoming).toBeNull();
+    expect(g.gate.pending).toBeNull();
+    expect(g.stock.canned).toBe(canned);
+  });
+  it('still arrives when someone is home', () => {
+    const g = newGame(7, 105, 2027, { mode: 'scenario', peace: 'short', kind: 'grid_down' });
+    const e = { id: 'e1', kind: 'gang', day: 1, title: 'Gang', dossier: [], size: 4, armed: true, strength: 40, stances: [] } as unknown as Encounter;
+    g.gate.incoming = { e, at: g.clock.t + 0.1 };
+    g.clock.t += 0.2;
+    expect(arrivalCheck(g)).toBe(e);
   });
 });
