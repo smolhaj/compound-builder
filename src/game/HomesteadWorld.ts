@@ -944,15 +944,15 @@ export class HomesteadWorld {
   }
 
   /** Fences, hedges and walls drawn as built (hedges by growth); berms and ditches shape the terrain. */
-  syncPerimeter(runs: readonly PerimeterRun[], t: number, opts: { lit?: boolean; sensors?: boolean; /** The gate kit on the drive (sim/gateSecurity.ts). */ gateKit?: { sally: boolean; intercom: boolean; motor: boolean }; /** Each moat's water (sim/waterWorks `moatStates`). */ moats?: Record<string, { level: number; frozen: boolean }> } = {}): void {
+  syncPerimeter(runs: readonly PerimeterRun[], t: number, opts: { lit?: boolean; sensors?: boolean; /** The gate kit on the drive (sim/gateSecurity.ts). */ gateKit?: { sally: boolean; intercom: boolean; motor: boolean; signs?: boolean }; /** Each moat's water (sim/waterWorks `moatStates`). */ moats?: Record<string, { level: number; frozen: boolean }> } = {}): void {
     this._runs = runs;
     this.corridors.sync(runs);
     const lit = opts.lit ?? true, sensors = opts.sensors ?? false;
     const hostOf = (r: PerimeterRun) => (PERIMETER[r.kind].wallTop ? runs.find(x => x.id === r.hostId)?.kind ?? '' : '');
     // razor wire on a wall with a patrol deck is drawn on the deck's outer rail (perimeterGeometry 'wall_walk')
     const hostRazor = (r: PerimeterRun) => PERIMETER[r.kind].wallTop && !!runs.find(x => x.id === r.hostId)?.razor;
-    const kit = opts.gateKit && (opts.gateKit.sally || opts.gateKit.intercom || opts.gateKit.motor) ? { ...opts.gateKit, inward: [this.camp.x, this.camp.z] as [number, number] } : undefined;
-    const kitKey = kit ? `${kit.sally ? 1 : 0}${kit.intercom ? 1 : 0}${kit.motor ? 1 : 0}` : '';
+    const kit = opts.gateKit && (opts.gateKit.sally || opts.gateKit.intercom || opts.gateKit.motor || opts.gateKit.signs) ? { ...opts.gateKit, inward: [this.camp.x, this.camp.z] as [number, number] } : undefined;
+    const kitKey = kit ? `${kit.sally ? 1 : 0}${kit.intercom ? 1 : 0}${kit.motor ? 1 : 0}${kit.signs ? 1 : 0}` : '';
     const deckOn = (r: PerimeterRun) => !PERIMETER[r.kind].wallTop && runs.some(x => x.hostId === r.id);
     const ids = runs.map(r => r.id).join(',');
     for (const r of runs) {

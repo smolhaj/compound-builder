@@ -37,6 +37,7 @@ import { FortifyRing } from './FortifyRing';
 import { HouseHardening } from './HouseHardening';
 import { WallTopsPanel } from './WallTopsPanel';
 import { GateSecurityPanel } from './GateSecurityPanel';
+import { CommunityPanel } from './CommunityPanel';
 
 /** One checklist line: a tick or a cross, what it is, and why. */
 function CheckRow({ c }: { c: Check }) {
@@ -197,6 +198,7 @@ export function DefenseTab() {
     </Group>
     <WallTopsPanel />
     <GateSecurityPanel />
+    <CommunityPanel />
     <LightDiscipline />
     <Group id="def-lights" title="Floodlights" defaultOpen={false}>
       <Hint more="Part of the night-time suite: lights that stay on draw the road's eyes to the camp. Always on costs power and is seen from the road; a motion sensor lights up when a threat is detected near and for a little after; off keeps the place dark. Light discipline (above) can turn every light off.">Lights that stay on draw eyes to the camp.</Hint>
