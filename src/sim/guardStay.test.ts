@@ -16,12 +16,12 @@ const game = (seed = 2): GameState => {
 const collapse = (g: GameState) => { g.disaster.tracks = { ...g.disaster.tracks, banks: 0, law: 0 }; };
 /** Hire guards until one has nobody to go to; returns that guard's id. */
 const aloneGame = (): { g: GameState; id: string } => {
-  for (let seed = 1; seed < 60; seed++) {
+  for (let seed = 1; seed < 200; seed++) {
     const g = game(seed); hireGuard(g);
     const x = g.guards.staff[0];
     if (x.alone) return { g, id: x.id };
   }
-  throw new Error('no lone guard in 60 seeds');
+  throw new Error('no lone guard in 200 seeds');
 };
 const runUntilCard = (g: GameState): void => { collapse(g); for (let d = 0; d < 80 && !g.gate.pending; d++) guardDay(g); };
 
@@ -30,7 +30,7 @@ describe('a guard with nobody to go to', () => {
     expect(guardAlone(5, 'g7', false)).toBe(guardAlone(5, 'g7', false));
     expect(guardAlone(5, 'g7', true)).toBe(false);
     const n = Array.from({ length: 200 }, (_, i) => guardAlone(9, `g${i}`, false)).filter(Boolean).length;
-    expect(n).toBeGreaterThan(50); expect(n).toBeLessThan(130);
+    expect(n).toBeGreaterThan(12); expect(n).toBeLessThan(55);
   });
 
   it('a guard with people leaves as designed (no card); one without gets a decision card instead of quitting', () => {

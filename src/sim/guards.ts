@@ -63,8 +63,8 @@ export const COLLAPSE = { track: 0.25, days: 7 };
 export const SHIFTS: ReadonlyArray<6 | 14 | 22> = [6, 14, 22];
 const SURNAMES = ['Brandt', 'Okafor', 'Reyes', 'Lindgren', 'Pruitt', 'Haas', 'Moreau', 'Dunne'];
 const hash = (str: string): number => { let h = 2166136261; for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 16777619); return (h >>> 0) / 4294967296; };
-/** Has this guard nobody to go to? A fixed trait of the man: the seed and his id decide (about 45 %), and a local never is. */
-export const guardAlone = (seed: number, id: string, local: boolean): boolean => !local && hash(`${seed}:${id}:alone`) < 0.45;
+/** Has this guard nobody to go to? A fixed trait of the man: the seed and his id decide (about 15 %), and a local never is. */
+export const guardAlone = (seed: number, id: string, local: boolean): boolean => !local && hash(`${seed}:${id}:alone`) < 0.15;
 const NAMES = ['Dale', 'Marcus', 'Ray', 'Luis', 'Greg', 'Tony', 'Walt', 'Hector', 'Nate', 'Boyd'];
 
 export const guardsOf = (s: GameState): Guards => (s.guards ??= newGuards());
