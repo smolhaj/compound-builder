@@ -388,6 +388,7 @@ export function GameCanvas() {
       world.updateLivestock(dt, game, hourOf(game.clock.t), speedK);
       world.updateFleet(dt, game, speedK);
       world.updateDeliveries(dt, game, speedK);
+      world.updateRoadLife(dt, game, speedK);
       const speed = game.clock.speed;
       const { timeOfDay: t, dayOfYear, totalDays, seasonMode, weatherMode } = useWorldStore.getState();
       ws.setNightSky(moonPhase(dayOfYear + t / 24), skyDarkness(world.climate, false));
