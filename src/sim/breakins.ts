@@ -47,6 +47,8 @@ import { stealTools } from './tools';
 import { emptyMultiplier, emptyNow, isSplit, reportFound, weekendOf } from './weekender';
 import type { Battle } from './battleTypes';
 import { responseFactor } from './slope';
+import { postureOf } from './encounters';
+import { burglarK, hardness } from './reputation';
 import { hasSafeRoom } from './houseHardening';
 
 export interface Breakins {
@@ -101,7 +103,7 @@ export function breakInRate(s: GameState): number {
   if (wallTopPosture(s).signsDeter > 0) deter *= 0.85;   // yellow signs on a live electric fence (opportunists only; sim/wallTops.ts)
   const town = 1 + 0.3 * Math.max(0, 1 - s.site.miles / 10);   // close to town: more traffic past the drive
   // a place nobody is at (the weekender's weekdays) is a mark; a caretaker and lights on timers take some of that back
-  return BASE_PER_YEAR * seen * deter * town * emptyMultiplier(s) * breakinK(s);
+  return BASE_PER_YEAR * seen * deter * town * emptyMultiplier(s) * breakinK(s) * burglarK(hardness(s, postureOf(s)).hard);   // a hard-looking place is a worse bet for a burglar (sim/reputation.ts)
 }
 
 /** Minutes for a deputy to get there after the 911 call (region and miles to town). */

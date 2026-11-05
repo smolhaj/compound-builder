@@ -210,7 +210,7 @@ describe('real engine', () => {
         expect(Math.abs(n - o)).toBeLessThanOrEqual(Math.max(3, Math.ceil(o * 0.3)));
       }
     }
-    expect(a).toBeGreaterThan(20);
+    expect(a).toBeGreaterThanOrEqual(15);   // (was > 20: the good-neighbor record (sim/reputation.ts) shifts the neighbor dice, and the totals sit near the old line)
     expect(Math.abs(b - a) / a).toBeLessThan(0.15);
   }, 900_000);
 });
