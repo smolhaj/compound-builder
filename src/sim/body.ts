@@ -23,6 +23,7 @@
 import type { GameState } from './state';
 import type { Person } from './family';
 import { mulberry32 } from './rng';
+import { healthFloor } from './starvation';
 import { logGate } from './nag';
 import { isStyleHome } from './housingStyles';
 
@@ -129,7 +130,7 @@ export function bodyDay(s: GameState): string[] {
       n.morale -= 0.4;
       if (r() < 0.004) n.hurt.push({ what: 'stomach bug', sev: 20 });
     }
-    n.health = Math.max(s.disaster.difficulty === 'cozy' ? 5 : 0, n.health);
+    n.health = Math.max(healthFloor(s.disaster.difficulty === 'cozy', n.starved ?? 0, { kid: !!p.kid, age: p.age, sick: n.hurt.length > 0, id: p.id }), n.health);
     n.morale = Math.max(0, Math.min(100, n.morale));
   });
   if (!hygiene && logGate(s, 'soap', 60)) out.push('Out of soap and toilet paper. It\'s getting grim.');
