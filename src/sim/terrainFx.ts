@@ -22,6 +22,7 @@
  *    defensive-strength figure, never a second scaling system.
  * Pure.
  */
+import { bridgeOff, bridgeProblem } from './waterWorks';
 import { calendarOf, type GameState, type Structure } from './state';
 import { BORE, bestLane, boreProblem, floodplainAt, hasHillside, hasRockFace, localSun, riseAboveCreek, slopeTunnelProblem, spanProblem, type BoreStats, type Choke, type Lane } from './terrain';
 import { boreOf, campOf, groundOf, lanesOf, sitesOf, terrainOf } from './terrainState';
@@ -30,6 +31,7 @@ import { isHome } from './blueprints';
 import { highShare, isTower } from './towers';
 import { PERIMETER, runFinished, runBill, SALVAGE, type PerimeterKind, type Pt } from './perimeter';
 import { log } from './economy';
+import { offLotProblem } from './land';
 import { RAISED_KINDS } from './outposts';
 import { isDock, lakeIce, waterBearing, waterLaneCost } from './waterfront';
 import { DRAIN, cutSlopeAt, nearDrain, undrained, drainLineFor } from './drainage';
@@ -244,7 +246,9 @@ export const doorDelay = (night: boolean, detection: number): number => doorsLoc
 
 /** Why a run of this kind can't be laid along `pts` on this ground (null = it can). Only the span kinds have a rule. */
 export function routeProblem(s: GameState, kind: PerimeterKind, pts: readonly Pt[]): string | null {
+  if (kind !== 'escape_tunnel') { const off = offLotProblem(s, pts); if (off) return off; }   // (an escape tunnel may run on under the neighbors' land: its own reach rule)
   const d = PERIMETER[kind];
+  if (d.bridge) return bridgeProblem(s, pts);
   if (!d.span && !d.bore && kind !== 'slope_tunnel') return null;
   const g = groundOf(s);
   if (!g || pts.length < 2) return null;
@@ -255,6 +259,7 @@ export function routeProblem(s: GameState, kind: PerimeterKind, pts: readonly Pt
 
 /** Build-menu grey-out: why this kind does not suit the land at all (null = it can go somewhere here). */
 export function terrainOff(s: GameState, kind: PerimeterKind): string | null {
+  if (kind === 'covered_bridge') return bridgeOff(s);
   if (kind === 'tunnel_bridge') return sitesOf(s).some(c => c.kind === 'gorge') ? null : 'no gorge, ravine or deep creek bed on this land to span: a tunnel-bridge needs real low ground';
   if (kind === 'rock_tunnel') return boreSite(s) ? null : 'no rock face or spur on this land that a vehicle tunnel could be driven through: a bore needs hill over it (2 m over the crown, 6 m somewhere) and a gentle enough way up (15 %)';
   if (kind === 'slope_tunnel') { const t = terrainOf(s); return t && hasHillside(t, s.site.home) ? null : 'no hillside steep enough (20 % or more) on this land: a slope tunnel needs a slope to go down'; }

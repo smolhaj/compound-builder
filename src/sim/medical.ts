@@ -48,6 +48,8 @@ import { mulberry32 } from './rng';
 import { practice } from './skills';
 import { psyOf } from './mind';
 import type { Person } from './family';
+import { cachedPlan } from './housing';
+import { contactFactor, Q as QUARTERS, roleHome } from './quarters';
 
 export type MedKind = 'wound' | 'burn' | 'fracture' | 'frostbite' | 'abscess' | 'infection' | 'dysentery' | 'flu' | 'postpartum' | 'infant';
 export type Bone = 'wrist' | 'arm' | 'collarbone' | 'ribs' | 'ankle' | 'leg' | 'hip';
@@ -335,13 +337,16 @@ function course(x: Ctx): boolean {
 function spread(x: Ctx, rate: number): void {
   const { s, p, c, r, out } = x;
   const E = medicalOf(s).epidemic;
-  const iso = E?.quarantine ? (bayOn(s) ? 0.15 : 0.3) : 1;
+  // quarters (sim/quarters.ts): a sick bay building holds the sick as well as the medical bay; a shared room spreads it, another building slows it
+  const bay = roleHome(s, 'sickbay');
+  const iso = E?.quarantine ? (bayOn(s) ? 0.15 : bay ? QUARTERS.sickbayIso : 0.3) : 1;
+  const places = new Map(cachedPlan(s).sleepers.map(z => [z.id, { id: z.id, where: z.spot.where, kind: z.spot.kind }] as const));
   for (const q of s.people) {
     if (q.id === p.id || !here(s, q)) continue;
     const qs = s.personState.find(z => z.id === q.id)!;
     if (qs.needs.hurt.some(z => z.med?.kind === c.kind)) continue;
     const carer = x.care.medic?.id === q.id ? 1.6 : 1;
-    if (r() < rate * iso * carer * (qs.needs.health < 50 ? 1.4 : 1)) {
+    if (r() < rate * iso * contactFactor(places.get(p.id), places.get(q.id)) * carer * (qs.needs.health < 50 ? 1.4 : 1)) {
       qs.needs.hurt.push({ what: c.kind === 'flu' ? 'flu' : 'dysentery (caught at home)', sev: c.kind === 'flu' ? 38 : 32, med: { kind: c.kind, day: dayIndex(s.clock.t), care: 'just started', src: 'house' } });
       out.push(`${q.first} has caught it too.`);
       if (E) E.cases++;
@@ -490,5 +495,7 @@ export function medReport(s: GameState): MedReport {
     else if (c.kind === 'dysentery' && (s.stock.ors ?? 0) < 0.1) needs.push(`${p.first} needs rehydration salts`);
     else if ((c.kind === 'wound' || c.kind === 'burn') && !c.clean && h.sev >= 15) needs.push(`${p.first}'s ${c.kind} needs dressings`);
   }
-  return { courses: courses(s), kit: s.stock.meds, splints: s.stock.splints ?? 0, salts: s.stock.ors ?? 0, medic: best && best.skills.medic >= 2 ? best : null, skill: best?.skills.medic ?? 0, bay: bayOn(s), hospital: hospitalOpen(s), needs, lasting: Object.entries(M.lasting).filter(([id]) => living.some(p => p.id === id)), pregnant: Object.entries(M.pregnancies).map(([id, pr]) => [person(s, id)?.first ?? '?', pr.due - day] as [string, number]), epidemic: M.epidemic, policy: M.policy };
+  // a person with two infections (or wounds) is one line, not two identical ones
+  const uniq = [...new Set(needs)];
+  return { courses: courses(s), kit: s.stock.meds, splints: s.stock.splints ?? 0, salts: s.stock.ors ?? 0, medic: best && best.skills.medic >= 2 ? best : null, skill: best?.skills.medic ?? 0, bay: bayOn(s), hospital: hospitalOpen(s), needs: uniq, lasting: Object.entries(M.lasting).filter(([id]) => living.some(p => p.id === id)), pregnant: Object.entries(M.pregnancies).map(([id, pr]) => [person(s, id)?.first ?? '?', pr.due - day] as [string, number]), epidemic: M.epidemic, policy: M.policy };
 }

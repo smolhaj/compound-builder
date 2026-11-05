@@ -13,6 +13,7 @@
  * The escape tunnel is never a way in (perimeter.canEnter): no outcome here
  * ever reaches the family through it. Pure and seeded.
  */
+import { nobodyHome } from './orphans';
 import { ringPoints } from './rings';
 import { terrainPoints } from './terrainFx';
 import { mulberry32, pick } from './rng';
@@ -48,12 +49,14 @@ import { boltPassages, passageEntry } from './compounds';
 import { resolveDigWarning } from './tunnelers';
 import { addTool, stealTools, SWAP_KINDS, TOOLS, type ToolKind } from './tools';
 import { resolveKin } from './kin';
+import type { StayKind } from './joinerHome';
 import { emptyLooting, emptyNow, resolveMoveIn, resolveStranded } from './weekender';
 import { raidTakesVehicles } from './vehicles';
 import { practice } from './skills';
 import { turbineNoise } from './renewables';
 import { villageWatch } from './outposts';
 import { resolveTrialEnd, startTrial, trialDay, type Character, type TrialCamp } from './trial';
+import { vetArrival } from './gateVetting';
 import { admitNewcomers, resolveShelter, strangerArrival, type Extras, type ShelterWhy } from './newcomers';
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -220,6 +223,9 @@ export interface Encounter {
   tells?: string[];
   hurt?: { who: string; what: string; sev: number };
   extras?: Extras;
+  /** Joiners (sim/joinerHome.ts): where they will sleep (the chosen option on the card; absent: the default), and whether the player will pick the pad for a rig. */
+  stay?: StayKind;
+  placeRig?: boolean;
   /** A neighbor household asking to shelter (or, for `settle`, to stay for good). */
   shelter?: { nid: string; why: ShelterWhy; days: number; settle?: boolean };
   dig?: { phase: 'warning' | 'inside'; id: string; /** Days left in the dig when it was found. */ lead: number; by?: string };
@@ -290,6 +296,10 @@ export interface GateState {
   history: Array<{ day: number; kind: EncounterKind; stance: Stance; tone: Outcome['tone'] }>;
   /** The last fight at the compound, for playback (optional; not migrated). */
   battle?: Battle;
+  /** Where the guards look arrivals over when the household holds several rings (sim/gateVetting.ts); absent: nowhere. */
+  vet?: import('./gateVetting').VetPolicy;
+  /** The looks made on this day (they tie up the guards: sim/gateVetting `vetAttention`). */
+  vetBusy?: { day: number; n: number };
   /** Raiders left wounded / dead on the drive after a fight the family won: a decision is waiting (sim/aftermath.ts). */
   aftermath?: Aftermath | null;
   /** Raiders held prisoner. */
@@ -465,7 +475,10 @@ export function gateDay(s: GameState): Encounter | null {
   g.respect = (g.respect ?? 0) * 0.995;   // a reputation fades (half in ~4½ months)
   for (const line of trialDay(s)) log(s, line);
   if (g.comeBack && day > g.comeBack.until) g.comeBack = null;
-  if (g.pending) return null;
+  // one card at a time: nothing new while one is up, or while a raid is on its way to the gate (it takes the gate at its hour)
+  if (g.pending || g.incoming) return null;
+  // the line is alive but the children are fostered: nobody home to answer the gate, so no cards queue until someone is back
+  if (nobodyHome(s)) return null;
   const d = s.disaster;
   // while the law works (before the collapse, or once it's back): now and then a break-in (sim/breakins.ts)
   if (d.tracks.law >= 0.5) { const b = breakInDay(s, day); if (b) { g.pending = b; return b; } }
@@ -635,6 +648,7 @@ export function fightOdds(s: GameState, e: Encounter, tries = Math.max(10, Math.
 /** Apply the player's stance. Returns the vignette card. */
 export function resolve(s: GameState, stance: Stance): Outcome {
   const e = s.gate.pending;
+  if (e && stance === 'take_in' && nobodyHome(s)) return { title: 'Nobody home', text: 'There is no one at the place to take anyone in.', tone: 'mixed', lines: [] };
   if (!e) return { title: '', text: '', tone: 'mixed', lines: [] };
   const r = mulberry32(s.seed * 92821 + e.day * 7 + stance.length);
   const p = postureOf(s);
@@ -675,9 +689,11 @@ export function resolve(s: GameState, stance: Stance): Outcome {
       // (round 4) a real trial: a camp outside the wall for a month, fed from the family's stores (sim/trial.ts)
       const o = startTrial(s, e);
       title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines);
+    } else if (stance === 'take_in' && (() => { const v = vetArrival(s, e.secret, mulberry32(s.seed * 5171 + e.day * 13 + (e.people?.length ?? 0))); if (!v.caught) return false; lines.push(...v.lines); g.turnedAway++; title = 'Turned back at the gate'; text = 'The guards looked them over before they were let through.'; tone = 'good'; return true; })()) {
+      // (per-ring vetting, sim/gateVetting.ts: a bad one caught at the outer or the inner gate is never admitted)
     } else if (stance === 'take_in') {
       // everyone who joins goes through sim/newcomers.ts: a bond (loyalty, hidden character), a bedroll, what they carry
-      lines.push(...admitNewcomers(s, e.people ?? [], { kind: e.neighbor ? 'neighbor' : 'stranger', neighbor: e.neighbor, arche: e.arche, secret: e.secret, brings: e.brings, extras: e.extras, hurt: e.hurt, tells: e.tells }));
+      lines.push(...admitNewcomers(s, e.people ?? [], { kind: e.neighbor ? 'neighbor' : 'stranger', neighbor: e.neighbor, arche: e.arche, secret: e.secret, brings: e.brings, extras: e.extras, hurt: e.hurt, tells: e.tells, stay: e.stay, placeRig: e.placeRig }));
       g.humanity = Math.min(100, g.humanity + 6);
       title = e.neighbor ? 'They\'re staying' : 'They\'re family now';
       text = `You open the gate. ${e.size} more at the table tonight.`;
@@ -756,7 +772,9 @@ export function resolve(s: GameState, stance: Stance): Outcome {
       const b = planBattle(s, raiders, s.seed * 131 + e.day * 7 + 1, battleOpts(e, e.dig || via ? { insideBreach: true } : {}));
       if (via) { const run = s.perimeter.find(x => x.id === via.runId); if (run) run.revealed = true; }
       g.battle = b;
-      lines.push(...applyBattle(s, b));
+      const stockBefore = stockTotal(s);
+      const battleLines = applyBattle(s, b);
+      lines.push(...battleLines);
       recordBattle(s, b, e.size, e.temper);
       if (b.result === 'repelled' || b.result === 'fled') {
         title = 'The line held'; text = `${help ? `${allies.map(a => a.name).join(' and ')} came over the ridge when they heard the shooting. ` : ''}${b.result === 'fled' ? 'They broke off and ran.' : 'None of them got past the line.'}`; tone = 'good';
@@ -767,9 +785,13 @@ export function resolve(s: GameState, stance: Stance): Outcome {
         g.next = Math.max(g.next, e.day + Math.round(15 + 35 * g.respect));
       } else {
         // (round 4: no second take of their wants here: applyBattle has already taken its 30–90 % share of the stores)
-        if (e.kind === 'looters' || e.kind === 'gang' || e.kind === 'militia') lines.push(...stealTools(s, 0.3, 2).lines);
-        lines.push(...raidTakesVehicles(s, ORGANIZED.has(e.kind)));
-        title = 'They got in'; text = b.result === 'overrun' ? 'They overran the place and took what they came for.' : 'They broke through the line and took what they came for.'; tone = 'bad';
+        const extra: string[] = [];
+        if (e.kind === 'looters' || e.kind === 'gang' || e.kind === 'militia') extra.push(...stealTools(s, 0.3, 2).lines);
+        extra.push(...raidTakesVehicles(s, ORGANIZED.has(e.kind)));
+        lines.push(...extra);
+        title = 'They got in';
+        text = breachText(b.result === 'overrun', { lostStock: stockBefore - stockTotal(s) > 0 || extra.length > 0, harmed: b.events.some(x => x.kind === 'wound' || x.kind === 'death' || x.kind === 'taken'), fought: battleLines.some(l => /rounds fired/.test(l)) });
+        tone = 'bad';
         // picked over: for a while there's not much left worth coming for; but the place is known to be soft
         g.respect = Math.max(0, (g.respect ?? 0) - 0.3);
         g.next = Math.max(g.next, e.day + 30);
@@ -793,6 +815,17 @@ export function resolve(s: GameState, stance: Stance): Outcome {
   g.card = out;
   log(s, `${e.title}: ${title}.`);
   return out;
+}
+
+const stockTotal = (s: GameState): number => Object.values(s.stock).reduce((a: number, v) => a + (typeof v === 'number' ? v : 0), 0);
+
+/** The aftermath line of a raid that got in, tied to what actually happened (stores / tools / vehicles gone, people hurt or taken). */
+export function breachText(overrun: boolean, o: { lostStock: boolean; harmed: boolean; fought: boolean }): string {
+  const how = overrun ? 'They overran the place' : 'They broke through the line';
+  if (o.lostStock && o.harmed) return `${how}, took what they could carry and left people hurt behind them.`;
+  if (o.lostStock) return `${how} and took what they came for.`;
+  if (o.harmed) return `${how} and hurt people, but found nothing they could carry off.`;
+  return o.fought ? `${how}, but found nothing worth taking and left.` : `${how}, looked the place over, found nothing worth taking and left without a fight.`;
 }
 
 /** Warning-phase gossip from the neighbors (a line for the ticker/log), sometimes. */

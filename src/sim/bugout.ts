@@ -30,6 +30,7 @@ import { roadVehicles, VEHICLES, cargoKg, type Vehicle } from './vehicles';
 import { garageConnected } from './parking';
 import type { Person } from './family';
 import { fallbackHouse } from './weekender';
+import { boatSeats } from './waterfront';
 import { cacheMiles, rollJourney, routeRisk, FOOT_KM_DAY, MILE_KM, type BugDest, type BugMode, type JourneyOutcome, type RouteRisk } from './bugoutRoute';
 
 export type { BugDest, BugMode, JourneyOutcome } from './bugoutRoute';
@@ -70,6 +71,8 @@ const FOOT_KG = 3.5, BAG_KG = 18, SNATCH_KG = [6, 3] as const;
 /** Two weeks of food for the family waiting in a cache. */
 export const CACHE_DAYS = 14;
 
+/** Cargo a boat carries per seat (kg). */
+const BOAT_KG_SEAT = 40;
 const FOOD_KG = 2, WATER_KG = 3, CAN_L = 20;
 
 const living = (s: GameState): Person[] => s.people.filter((_, i) => s.personState[i]?.needs.died == null && !s.personState[i]?.needs.taken);
@@ -84,12 +87,14 @@ export function bugOutPlan(s: GameState, opts: { mode?: BugMode; dest?: BugDest 
   const people = living(s);
   const foot = opts.mode === 'foot';
   const vs = foot ? [] : roadVehicles(s).filter(v => v.fuel > 0 || s.stock.fuel >= 1);
-  const seats = foot ? people.length : vs.reduce((a, v) => a + VEHICLES[v.kind].seats, 0);
+  // boats at the dock carry their seats off by water, past a blocked road (sim/waterfront.ts: none while the lake is iced)
+  const boats = foot ? 0 : boatSeats(s);
+  const seats = foot ? people.length : vs.reduce((a, v) => a + VEHICLES[v.kind].seats, 0) + boats;
   const order = seatOrder(people);
   const going = order.slice(0, seats);
   const left = order.slice(seats);
   const bags = foot ? Math.min(going.length, Math.floor(s.stock.bugout_bag ?? 0)) : 0;
-  const kg = foot ? bags * BAG_KG + going.slice(bags).reduce((a, p) => a + SNATCH_KG[p.kid && p.age < 12 ? 1 : 0], 0) : vs.reduce((a, v) => a + cargoKg(s, v), 0);
+  const kg = foot ? bags * BAG_KG + going.slice(bags).reduce((a, p) => a + SNATCH_KG[p.kid && p.age < 12 ? 1 : 0], 0) : vs.reduce((a, v) => a + cargoKg(s, v), 0) + boats * BOAT_KG_SEAT;
   // the cargo: food and water for those aboard, then the rest is tools and bags
   const perDay = going.length * (foot ? FOOT_KG : FOOD_KG + WATER_KG);
   const foodDays = going.length ? Math.min(Math.floor(kg * 0.7 / perDay), Math.floor(daysOfFood(s))) : 0;
@@ -113,8 +118,8 @@ export function bugOutPlan(s: GameState, opts: { mode?: BugMode; dest?: BugDest 
   if (s.ending && !s.ending.continued) why = 'the run is over';
   else if (!people.length) why = 'nobody is left';
   else if (s.weekend?.mode === 'split' && !s.weekend.here) why = 'the family is in town, away from the place';
-  else if (!foot && !vs.length) why = 'no running vehicle with fuel';
-  else if (!foot && route.vehicleBlocked) why = `${route.vehicleBlocked}: only on foot`;
+  else if (!foot && !vs.length && !boats) why = 'no running vehicle with fuel';
+  else if (!foot && route.vehicleBlocked && !boats) why = `${route.vehicleBlocked}: only on foot`;
   else if (!s.disaster.kind) why = 'nothing is wrong yet: this is a free-build game';
   return { ok: !why, why, going, left, vehicles: vs, foodDays, rangeKm, hours, covered, seats, fallback, mode: foot ? 'foot' : 'vehicle', dest, destName: pick.name, miles: pick.miles, options, carryKg: Math.round(kg), bags, cacheDays: dest === 'cache' ? CACHE_DAYS : 0, route };
 }

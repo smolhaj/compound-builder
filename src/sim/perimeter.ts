@@ -12,12 +12,13 @@
  */
 import { hasAll, shortfall, waitingFor, type MaterialId, type Stock } from './materials';
 import { log } from './economy';
+import { chronicleUpkeep } from './lineage';
 import { payUpkeep, wearTools, workSpeed } from './tools';
 import type { GameState } from './state';
 import { openDoorways } from './compounds';
 import { COUNTY, PERMIT_FEE, countyWorks } from './paperwork';
 
-export type PerimeterKind = 'split_rail' | 'barbed_wire' | 'woven_wire' | 'thorn_hedge' | 'log_palisade' | 'container_wall' | 'earth_berm' | 'ditch' | 'creek_bars' | 'chain_link' | 'wrought_iron' | 'iron_barbed' | 'steel_wall' | 'electric_steel' | 'water_pipe' | 'power_cable' | 'escape_tunnel' | 'covered_walkway' | 'underground_passage' | 'concrete_wall' | 'wall_walk' | 'stone_wall' | 'container_stack' | 'tunnel_bridge' | 'slope_tunnel' | 'rock_tunnel' | 'bar_fence' | 'drain_channel';
+export type PerimeterKind = 'split_rail' | 'barbed_wire' | 'woven_wire' | 'thorn_hedge' | 'log_palisade' | 'container_wall' | 'earth_berm' | 'ditch' | 'creek_bars' | 'chain_link' | 'wrought_iron' | 'iron_barbed' | 'steel_wall' | 'electric_steel' | 'water_pipe' | 'power_cable' | 'escape_tunnel' | 'covered_walkway' | 'underground_passage' | 'concrete_wall' | 'wall_walk' | 'stone_wall' | 'container_stack' | 'tunnel_bridge' | 'slope_tunnel' | 'rock_tunnel' | 'bar_fence' | 'drain_channel' | 'moat' | 'covered_bridge';
 
 export interface PerimeterDef {
   id: PerimeterKind;
@@ -58,6 +59,8 @@ export interface PerimeterDef {
   vehicleWay?: boolean;
   /** Driven through rock (sim/terrain.ts `BORE`): needs hill over it, is not drawn between its portals, and cannot be dropped. */
   bore?: boolean;
+  /** A timber bridge over water (a creek or a moat): a gated way across, not a wall (sim/waterWorks.ts). */
+  bridge?: boolean;
   /** Footing poured deep enough that a tunnel can't go under it (concrete and steel tiers); cheaper fences need a buried skirt. */
   deepFooting?: boolean;
 }
@@ -90,10 +93,12 @@ export const PERIMETER: Record<PerimeterKind, PerimeterDef> = {
   rock_tunnel: { id: 'rock_tunnel', name: 'Rock tunnel (bored)', blurb: 'A vehicle tunnel driven through a rock face or spur: a lined concrete arch 4.4 m wide and 4.8 m under the crown, a stone portal at each end with wing walls, a steel blast door in each portal. The deck runs at one even grade (15 % at most) from the court at the foot of the face to the compound above it, so it is long (up to 240 m): the rock does the walls\' work, and only the two doors are a way in. It is no wall on the surface: the rock is its wall, and a crew must come by it, door by door, or climb the face; it cannot be dropped, only held. Needs real hill over it (2 m over the crown everywhere, 6 m somewhere); the ends may lie in an earth-sheltered cutting up to 24 m long. The county wants a permit.', hours: 90, materials: { rebar: 3, concrete: 24, hardware: 0.3, cable: 0.1, excavator: 1.2 }, height: 0, blocks: { people: 0, animals: 0, vehicles: 0 }, sight: 0, growYears: 0, walkway: true, vehicleWay: true, bore: true, deepFooting: true },
   bar_fence: { id: 'bar_fence', name: 'Black bar fence', blurb: 'Plain black steel bars, 2.4 m tall, welded to top and bottom rails and set in a low concrete curb, with no spear points to catch a coat: the fence of an embassy or a good estate. You can see through it, but it is hard to climb and cannot be cut with hand tools. Used for the motor court in front of the gate.', hours: 13, materials: { rebar: 0.95, hardware: 0.22, concrete: 0.3 }, height: 0.4, blocks: { people: 0.7, animals: 0.98, vehicles: 0.5 }, sight: 0.04, growYears: 0, deepFooting: true },
   drain_channel: { id: 'drain_channel', name: 'Drainage channel', blurb: 'A 1 m stone-lined swale with a perforated pipe under a gravel bed and a grating at each end, laid along the contour above a building cut into a slope, or along the foot of a wall on the downhill side. It takes the runoff of the cut away before it turns the pad to mud in the thaw and in storms. A truck crosses it at a culvert; it stops no one.', hours: 6, materials: { pipe: 0.25, concrete: 0.12 }, height: -0.05, blocks: { people: 0, animals: 0, vehicles: 0.2 }, sight: 0, growYears: 0 },
+  moat: { id: 'moat', name: 'Moat (water ditch)', blurb: 'A dug ditch 3 m deep and 6 m wide, filled from the creek or a pond through a leat. No truck crosses; a man wades or swims it in the cold, under fire.', hours: 56, materials: { fieldstone: 0.15 }, height: -0.4, blocks: { people: 0.45, animals: 0.85, vehicles: 1 }, sight: 0, growYears: 0 },
+  covered_bridge: { id: 'covered_bridge', name: 'Covered bridge (timber)', blurb: 'A roofed timber truss bridge over a creek or your moat, with a plank gate at each end: the one way across. Wood burns and gives to a ram sooner than steel, but it is cheap, and a crew has to come single file.', hours: 24, materials: { lumber: 2.4, roofing: 1.2, hardware: 0.5 }, height: 0.4, blocks: { people: 0, animals: 0, vehicles: 0 }, sight: 0, growYears: 0, bridge: true },
   ditch: { id: 'ditch', name: 'Ditch / dry moat', blurb: 'A 2 m deep, 3 m wide ditch. No vehicle crosses; the spoil can build a berm.', hours: 40, materials: {}, height: -0.33, blocks: { people: 0.45, animals: 0.3, vehicles: 1 }, sight: 0, growYears: 0 },
 };
 
-export const PERIMETER_ORDER: readonly PerimeterKind[] = ['split_rail', 'barbed_wire', 'woven_wire', 'thorn_hedge', 'log_palisade', 'container_wall', 'earth_berm', 'ditch', 'creek_bars', 'chain_link', 'wrought_iron', 'iron_barbed', 'steel_wall', 'electric_steel', 'concrete_wall', 'covered_walkway', 'stone_wall', 'container_stack', 'tunnel_bridge', 'slope_tunnel', 'rock_tunnel', 'bar_fence'];
+export const PERIMETER_ORDER: readonly PerimeterKind[] = ['split_rail', 'barbed_wire', 'woven_wire', 'thorn_hedge', 'log_palisade', 'container_wall', 'earth_berm', 'ditch', 'creek_bars', 'chain_link', 'wrought_iron', 'iron_barbed', 'steel_wall', 'electric_steel', 'concrete_wall', 'covered_walkway', 'stone_wall', 'container_stack', 'tunnel_bridge', 'slope_tunnel', 'rock_tunnel', 'bar_fence', 'moat', 'covered_bridge'];
 /** Lines that carry utilities (drawn with the same tool, under Water & power). */
 export const UTILITY_LINES: readonly PerimeterKind[] = ['water_pipe', 'power_cable', 'drain_channel'];
 
@@ -161,7 +166,7 @@ export interface PerimeterRun {
  */
 export const PREDATOR_BLOCK: Record<PerimeterKind, number> = {
   split_rail: 0.02, barbed_wire: 0.1, woven_wire: 0.35, thorn_hedge: 0.75, log_palisade: 0.97, container_wall: 1, earth_berm: 0.2, ditch: 0.2,
-  creek_bars: 0.95, chain_link: 0.9, wrought_iron: 0.97, iron_barbed: 0.98, steel_wall: 1, electric_steel: 1, water_pipe: 0, power_cable: 0, escape_tunnel: 0, covered_walkway: 1, underground_passage: 0, concrete_wall: 1, wall_walk: 0, stone_wall: 1, container_stack: 1, tunnel_bridge: 1, slope_tunnel: 1, rock_tunnel: 1, bar_fence: 0.97, drain_channel: 0,
+  creek_bars: 0.95, chain_link: 0.9, wrought_iron: 0.97, iron_barbed: 0.98, steel_wall: 1, electric_steel: 1, water_pipe: 0, power_cable: 0, escape_tunnel: 0, covered_walkway: 1, underground_passage: 0, concrete_wall: 1, wall_walk: 0, stone_wall: 1, container_stack: 1, tunnel_bridge: 1, slope_tunnel: 1, rock_tunnel: 1, bar_fence: 0.97, drain_channel: 0, moat: 0.5, covered_bridge: 0,
 };
 
 /** The next tier up, where there is one (upgraded in place: sim `upgradeRun`). */
@@ -405,6 +410,7 @@ export function addRunWork(s: GameState, r: PerimeterRun, hours: number): void {
       if (old) {
         for (const [k, q] of Object.entries(runBill(old.kind, wallLength(old))) as Array<[MaterialId, number]>) s.stock[k] += Math.floor(q * SALVAGE);
         s.perimeter = s.perimeter.filter(x => x.id !== old.id);
+        chronicleUpkeep(s, `The ${PERIMETER[old.kind].name.toLowerCase()} was upgraded to a ${d.name.toLowerCase()}.`);
         // a wall-top walkway rides on the new wall (the deck is lifted and set back on the new tier)
         for (const w of s.perimeter) if (w.hostId === old.id) w.hostId = r.id;
       }

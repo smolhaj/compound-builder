@@ -1,3 +1,5 @@
+import { moatStates } from '../sim/waterWorks';
+import { fireMarks } from '../sim/fireRisk';
 import { litTowerIds } from '../sim/towers';
 import { TerrainOverlay } from './terrain/TerrainOverlay';
 import { BlueprintOverlay } from './blueprint/BlueprintOverlay';
@@ -42,6 +44,7 @@ import { isHome } from '../sim/blueprints';
 import { calendarOf, hourOf, SECONDS_PER_DAY } from '../sim/state';
 import { setWindowGlow } from './buildkit/materials';
 import { homeOutsideForty } from '../sim/site';
+import { anchorOf } from '../sim/joinerHome';
 import { ownsAt } from '../sim/land';
 import { isMarked } from '../sim/forestry';
 import { KIT } from './buildkit/kit';
@@ -50,6 +53,7 @@ import type { SiteQuery } from './buildkit/kit';
 import { FrameBudget, capGapMs, lowerTier } from '../engine/perf/qualityAuto';
 import { sceneCensus } from './perfCensus';
 import { yieldToBrowser, warmShaders } from './bootStages';
+import { StarterPreview } from './StarterPreview';
 import { parseLowRender, RenderRequests, type QaQuality } from './qaRender';
 import { onEntrancePreview } from './roadPreview';
 
@@ -206,13 +210,20 @@ export function GameCanvas() {
     const showBoundary = () => { boundary.visible = useWorldStore.getState().showBoundary || !!useGameStore.getState().tool?.startsWith('fence:'); };
     rebuildBoundary(); showBoundary();
     useWorldStore.getState().setSiteGeo({ creekZ: x => world.parcel.creek.zAt(x), creekHalf: world.parcel.creek.halfWidth, roadGate: [world.access.gate.x, world.access.gate.z], drive: world.access.drive.map(p => [p[0], p[1]] as [number, number]), center: [world.camp.x, world.camp.z], ground: (x, z) => world.parcel.natural(x, z).h });
+    useWorldStore.getState().setSiteQuery({
+      height: (x, z) => world.parcel.natural(x, z).h,
+      owned: (x, z) => ownsAt(useGameStore.getState().game, x, z),
+      water: (x, z) => world.parcel.isCreek(x, z) || world.stream.depthAt(x, z) > 0,
+      blocked: (x, z) => world.onCamp(x, z) || world.onAccess(x, z, 0.1),
+    });
+    const starter = new StarterPreview(ws.scene, world);
     world.setBurnedFarms(burnedFarms(useGameStore.getState().game));
     const terrainOv = new TerrainOverlay(ws.scene, world.groundAt);
     const showTerrain = () => {
       const g = useGameStore.getState().game, m = useWorldStore.getState().terrainMode, t = terrainOf(g);
       if (m === 'off' || !t) { terrainOv.set('off', null); return; }
       const lanes = lanesOf(g);
-      terrainOv.set(m, t, lanes, siteCandidates(t, { lot: g.site.home, camp: campOf(g) }, lanes));
+      terrainOv.set(m, t, lanes, siteCandidates(t, { lot: g.site.home, camp: campOf(g) }, lanes), m === 'fire' ? fireMarks(g, world.fuelNear(g.structures)) : []);
     };
     // the blueprint view: names, rings, gates, towers and tunnels (game/blueprint)
     const host = canvas.parentElement ?? document.body;
@@ -233,10 +244,28 @@ export function GameCanvas() {
       useGameStore.subscribe(s => s.game.disaster.phase, ph => { const g = useGameStore.getState().game; if (g.disaster.kind === 'wildfire' && ph === 'warning' && !g.disaster.fuel) useGameStore.getState().setFuel(world.fuelNear(g.structures)); }),
       useGameStore.subscribe(s => s.game.land, () => { world.setOwnedLand(ownedRects(useGameStore.getState().game)); rebuildBoundary(); }),
       useWorldStore.subscribe(s => s.showBoundary, showBoundary),
+      useWorldStore.subscribe(s => s.starterPreview, p => starter.set(p)),
       useGameStore.subscribe(s => s.tool, showBoundary),
       useWorldStore.subscribe(s => s.quality, applyLook),
       useWorldStore.subscribe(s => s.cameraMode, applyCameraMode),
       useGameStore.subscribe(s => s.game.structures, list => { world.syncStructures(placedOnly(list)); occluders.invalidate(); }),
+      // a joiner's rig, modular home or cabin was put near the house by the sim: the world checks the spot against the terrain, once (sim/joinerHome.ts)
+      useGameStore.subscribe(s => s.game.structures.some(x => x.joiner && !x.joiner.spotted), pending => {
+        if (!pending) return;
+        const gm = useGameStore.getState().game;
+        const todo = gm.structures.filter(x => x.joiner && !x.joiner.spotted);
+        const query: SiteQuery = {
+          height: (x, z) => world.parcel.natural(x, z).h,
+          owned: (x, z) => ownsAt(useGameStore.getState().game, x, z),
+          water: (x, z) => world.parcel.isCreek(x, z) || world.stream.depthAt(x, z) > 0,
+          blocked: (x, z) => world.onCamp(x, z, 0.4) || world.onAccess(x, z, 0.4),
+        };
+        const a = anchorOf(gm);
+        const spots = world.siteImprovements(todo, query, a);
+        // the world drew them at the sim's first guess: take those down so the next sync raises them where the terrain allows
+        for (const st of todo) world.removeStructure(st.id);
+        useGameStore.getState().respotJoiners(spots);
+      }),
       useGameStore.subscribe(s => s.game.site.improvements.drive, on => world.setDrive(on)),
       useGameStore.subscribe(s => s.game.roadBridge?.down ?? false, on => world.setBridgeDown(on)),
       useGameStore.subscribe(s => s.game.site.entrance ?? null, () => { world.replan(useGameStore.getState().game.site); world.previewEntrance(useGameStore.getState().game.site, null); }),
@@ -256,7 +285,7 @@ export function GameCanvas() {
       useWorldStore.subscribe(s => s.sightMode, m => sight.set(m)),
       // the terrain overlay (sim/terrain.ts): high ground, lanes, water, sun
       useWorldStore.subscribe(s => s.terrainMode, showTerrain),
-      useGameStore.subscribe(s => s.game.structures.length + '|' + s.game.perimeter.length, () => { if (useWorldStore.getState().terrainMode === 'lanes') showTerrain(); }),
+      useGameStore.subscribe(s => s.game.structures.length + '|' + s.game.perimeter.length, () => { if (['lanes', 'fire'].includes(useWorldStore.getState().terrainMode)) showTerrain(); }),
       // the compound changed: recompute the overlay
       useGameStore.subscribe(s => `${s.game.structures.map(x => x.id + x.stage).join()}|${s.game.perimeter.map(r => r.id + (r.finishedAt === null ? Math.round(r.done) : 'f')).join()}`, () => sight.refresh()),
     ];
@@ -349,15 +378,17 @@ export function GameCanvas() {
       world.syncTents(game);
       world.syncForestry(game.forestry);
       world.simTime = game.clock.t;
-      world.syncPerimeter(game.perimeter, game.clock.t, { lit: fenceLive(game) && !blackoutNow(game), sensors: (game.stock.ground_sensor ?? 0) > 0 });
+      world.syncPerimeter(game.perimeter, game.clock.t, { lit: fenceLive(game) && !blackoutNow(game), sensors: (game.stock.ground_sensor ?? 0) > 0, moats: Object.fromEntries(moatStates(game).map(m => [m.run.id, { level: m.level, frozen: m.frozen }])) });
       const svKey = `${game.structures.filter(x => x.stage >= 5).length}|${game.perimeter.filter(r => r.finishedAt !== null).length}|${game.utilities.fittings.filter(f => f.finishedAt !== null).length}|${goodsKey(houseGoods(game))}`;
       if (svKey !== servicesKey) { servicesKey = svKey; world.syncServices(game); }
       sight.update(6);
       const speedK = game.clock.speed === 0 ? 0 : 60 / SECONDS_PER_DAY[game.clock.speed];
       world.updatePeople(dt, game, hourOf(game.clock.t), speedK);
       world.updateWildlife(dt, game, speedK);
+      world.updateLivestock(dt, game, hourOf(game.clock.t), speedK);
       world.updateFleet(dt, game, speedK);
       world.updateDeliveries(dt, game, speedK);
+      world.updateRoadLife(dt, game, speedK);
       const speed = game.clock.speed;
       const { timeOfDay: t, dayOfYear, totalDays, seasonMode, weatherMode } = useWorldStore.getState();
       ws.setNightSky(moonPhase(dayOfYear + t / 24), skyDarkness(world.climate, false));
@@ -560,6 +591,9 @@ export function GameCanvas() {
       useWorldStore.getState().setBlueprintReadout(null);
       boundary.dispose();
       useWorldStore.getState().setSiteGeo(null);
+      useWorldStore.getState().setSiteQuery(null);
+      useWorldStore.getState().setStarterPreview(null);
+      starter.dispose();
       useWorldStore.getState().setMarkNearestTrees(null);
       useWorldStore.getState().setUnderground(false);
       canvas.removeEventListener('pointerdown', onVsDown);

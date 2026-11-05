@@ -151,7 +151,8 @@ describe('progress only when present', () => {
     const hint = slowHint(w, 40, pw)!;
     expect(hint).toMatch(/days a week/);
     expect(hint).toMatch(/Friday night to Sunday afternoon/);
-    expect(hint).toMatch(/moving in/);
+    expect(hint).toMatch(/move in full time/);
+    expect(hint).toMatch(/crew/);
   });
   it('puts a building up only on the weekends in a real run', () => {
     let g = game(3, { mode: 'sandbox' });

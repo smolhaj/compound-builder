@@ -1,4 +1,5 @@
 /** The Projects tab: what is under way, how long it will take and why it is slow, crews, fittings, hardening, lines, woods. */
+import { useEffect, useRef } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { BLUEPRINTS } from '../../sim/blueprints';
 import { billText, type MaterialId } from '../../sim/materials';
@@ -8,6 +9,8 @@ import { blockedReason, holdReason, isFinished, progress } from '../../sim/const
 import { CREW_RATE, CREW_SIZE, crewProblem, crewQuote } from '../../sim/crews';
 import { fixBill, fixBlocked, fixDef, pendingFixes } from '../../sim/improvements';
 import { KIT } from '../../game/buildkit/kit';
+import { ResidentsLine } from '../QuartersPanel';
+import { useSpendGuard } from './useSpendGuard';
 import { FIT, FUEL_UNIT_L, fitProblem, plant, serviceOf, UTILITY, SPARE_FOR } from '../../sim/utilities';
 import { HARDEN, HARDEN_IDS, type TierDef, hardenCost, hardenProblem, isBunkerRoom, protectionOf, tierOf } from '../../sim/hardening';
 import { PERIMETER, runBlocked, runFinished, runGrowth, runProgress } from '../../sim/perimeter';
@@ -18,11 +21,14 @@ import { litersText } from '../../sim/format';
 import { setBelt } from '../../sim/weekender';
 import { CREW_DAY_USD, crewIdea, nextLongStay, nextStageOrder, weekendBudget, weekendsFor } from '../../sim/weekendPlan';
 import { dayIndex } from '../../sim/state';
-import { Note, Row, Section } from './common';
+import { Clamp, Note, Row, Section } from './common';
 import { TONE, DIM, LINE, btn, usd } from './style';
 
 export function ProjectsTab() {
   const g = useGameStore();
+  const { guard, node: guardNode } = useSpendGuard();
+  const selSeen = useRef<string | null>(null);
+  useEffect(() => { if (!g.selected) selSeen.current = null; }, [g.selected]);
   const game = g.game;
   const sel = game.structures.find(s => s.id === g.selected) ?? game.structures.find(s => !isFinished(s)) ?? null;
   const pace = paceOf(game), left = totalHoursLeft(game), weeks = weeksFor(left, pace);
@@ -50,7 +56,7 @@ export function ProjectsTab() {
       <Row label="Work left" value={`${Math.round(left).toLocaleString('en-US')} h`} />
       <Row label="At the family's pace" value={eta(weeks)} tone={weeks !== null && weeks > 26 ? 'warn' : undefined} title={`${Math.round(pace.perWeek)} effective hours of building a week`} />
       {selWeeks !== null && sel && <Row label={`${KIT[sel.kind].name} done in`} value={eta(selWeeks)} title="Counting what the family finishes first, in the order of the list" />}
-      {hint && <Note tone="warn">{hint}</Note>}
+      {hint && <Clamp text={hint}><span style={{ color: TONE.warn }}>{hint}</span></Clamp>}
     </Section>}
       {rows.length > 1 && <Section title="Under way, in the order the family works">
         {rows.slice(0, 8).map((r, i) => <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 0', borderBottom: `1px solid ${LINE}` }}>
@@ -77,7 +83,9 @@ export function ProjectsTab() {
       {!sel && !rows.length && !game.forestry.jobs.length && !todo.length && <Note>Nothing under way. Stake something out from the Build tab.</Note>}
       {sel && (
         <Section title={KIT[sel.kind].name}>
+          <div ref={el => { if (el && g.selected === sel.id && selSeen.current !== sel.id) { selSeen.current = sel.id; el.scrollIntoView?.({ block: 'start' }); } }} />
           <Row label="Stage" value={sel.pre ? 'Came with the land' : isFinished(sel) ? 'Finished' : BLUEPRINTS[sel.kind].stages[sel.stage].name} />
+          {isFinished(sel) && <ResidentsLine id={sel.id} />}
           {(sel.fixes ?? []).length > 0 && <>
             {(sel.fixes ?? []).map(f => <div key={f.part} style={{ display: 'flex', justifyContent: 'space-between', gap: 6, marginTop: 3 }}>
               <span style={{ color: DIM }} title={billText(fixBill(f))}>{fixDef(f).name} <span style={{ fontSize: 11 }}>({f.cond}, {f.hours} h)</span></span>
@@ -106,11 +114,12 @@ export function ProjectsTab() {
                 </div>
               : <>
                 {!why && !isFinished(sel) && blockedReason(game, sel) && <Note tone="warn">{blockedReason(game, sel) === holdReason(game, sel) && /permit/i.test(blockedReason(game, sel)!)
-                  ? 'A crew hired now stands idle (and bills nothing) until the permit clears.'
-                  : `The materials are not on site yet (${blockedReason(game, sel)!.replace(/^Waiting for /, 'still need ')}). A crew hired now stands idle (and bills nothing) until they arrive: order them first.`}</Note>}
-                <button style={{ ...btn(), width: '100%', marginTop: 4 }} disabled={!!why} title={why ?? `${CREW_SIZE} workers at $${CREW_RATE}/h, weekdays 8 to 5; you still buy the materials`} onClick={() => g.hire(sel.id)}>
+                  ? 'A crew would stand idle (billing nothing) until the permit clears.'
+                  : `Still need ${blockedReason(game, sel)!.replace(/^Waiting for /, '')}: order first, a crew would stand idle (billing nothing).`}</Note>}
+                <button style={{ ...btn(), width: '100%', marginTop: 4 }} disabled={!!why} title={why ?? `${CREW_SIZE} workers at $${CREW_RATE}/h, weekdays 8 to 5; you still buy the materials`} onClick={() => guard(q.usd, () => g.hire(sel.id))}>
                   Hire a crew{!why && !isFinished(sel) && blockedReason(game, sel) ? ' anyway' : ''}: ~{usd(q.usd)}, about {q.weeks} week{q.weeks > 1 ? 's' : ''}
                 </button>
+                {guardNode}
               </>;
           })()}
           {(!isFinished(sel) || pendingFixes(sel).length > 0) && !game.crews.some(c => c.target === sel.id) && game.money < crewQuote(sel).usd && !crewProblem(game, sel) && (() => {

@@ -29,6 +29,7 @@
  *              carry for six months. Past what the stores can feed, the whole
  *              table feels it (morale), loyalty falls and people drift off.
  */
+import { nobodyHome } from './orphans';
 import { vetting } from './ringFallback';
 import { mulberry32, pick } from './rng';
 import { log } from './economy';
@@ -47,6 +48,7 @@ import type { Stock } from './materials';
 import { scoutCrew, type Encounter, type Neighbor, type NeighborKind, type Outcome, type Stance } from './encounters';
 import type { Character } from './trial';
 import { lifeOf, plural, surname } from './neighborLife';
+import { joinersDay, kitLine, pool, rigLeaves, rollKit, settleStay, type StayKind } from './joinerHome';
 
 // ─────────────────────────────────────────────────────────────────────────
 // State
@@ -189,7 +191,17 @@ export function newcomerMorale(s: GameState, id: string): number {
 // Strangers
 // ─────────────────────────────────────────────────────────────────────────
 
-export interface Extras { tools?: ToolKind[]; dogs?: number; vehicle?: 'old_pickup' }
+export interface Extras {
+  tools?: ToolKind[]; dogs?: number;
+  /** A vehicle that joins the fleet (a pickup, or the mechanic's old one). */
+  vehicle?: 'old_pickup' | 'pickup';
+  /** Savings they carry, pooled the day they come in (sim/joinerHome.ts). */
+  cash?: number;
+  /** Their own travel trailer or RV: a place to sleep that can drive away. */
+  rig?: 'travel_trailer' | 'rv_camper';
+  /** Guns (armory model ids) they own: hunting rifles, shotguns and handguns the state allows. */
+  guns?: string[];
+}
 
 interface Spec {
   id: string;
@@ -269,6 +281,8 @@ export function strangerArrival(s: GameState, r: () => number, id: string, day: 
   if (spec.tool) extras.tools = [spec.tool];
   if (spec.vehicle && fleetOf(s).filter(v => v.kind === 'old_pickup').length < 1 && r() < 0.7) extras.vehicle = 'old_pickup';
   if (spec.dog) extras.dogs = 1;
+  // what else they own: cash, trade tools, a pickup or a rig, food, a legal gun (sim/joinerHome.ts)
+  { const k = rollKit(s, people, r, spec.id, { brings, extras }); Object.assign(brings, k.brings); Object.assign(extras, k.extras); }
   const n = people.length, kidsN = people.filter(p => p.kid).length;
   const best = people.filter(p => !p.kid || p.age >= 14).map(p => { const t = topSkill(p); return `${p.first} (${t} ${p.skills[t]})`; });
   const hurtWho = spec.hurt ? people[0] : null;
@@ -279,7 +293,7 @@ export function strangerArrival(s: GameState, r: () => number, id: string, day: 
       `${n} ${n === 1 ? 'person' : 'people'}${kidsN ? `, ${kidsN} ${kidsN === 1 ? 'kid' : 'kids'}` : ''}: ${people.map(p => `${p.first}, ${p.age}`).join('; ')}.`,
       `Say they’re good at: ${best.join(', ') || 'not much yet'}.`,
       ...(hurtWho ? [`${hurtWho.first} is hurt: ${spec.hurt!.what}.`] : []),
-      ...(Object.keys(brings).length || extras.tools || extras.vehicle ? [`They carry: ${bringsLine(brings, extras)}.`] : []),
+      `Brings: ${kitLine(brings, extras, people)}.`,
       `${n} more to feed: about ${people.reduce((a, p) => a + needOf(p), 0).toLocaleString('en-US')} kcal a day.`,
     ],
     size: n, armed: false, strength: 0, people, brings,
@@ -372,6 +386,9 @@ export interface AdmitOpts {
   fever?: string;
   /** What the gate already noticed. */
   tells?: string[];
+  /** Where they will sleep (sim/joinerHome.ts StayKind); absent: the default for what they carry. The player picks a rig's pad by hand. */
+  stay?: StayKind;
+  placeRig?: boolean;
 }
 
 /** Which of the group the secret belongs to: the first adult (the oldest kid if there are no adults); the sick one is the youngest. */
@@ -414,10 +431,17 @@ export function admitNewcomers(s: GameState, people: readonly Person[], o: Admit
   s.stock.sleeping_bag += people.length;
   for (const [k, v] of Object.entries(o.brings ?? {}) as Array<[keyof Stock, number]>) s.stock[k] += v;
   for (const t of o.extras?.tools ?? []) addTool(s, t, 0.5 + 0.4 * r(), 0.5 + 0.4 * r(), r() < 0.3 ? 'pro' : 'cheap');
+  lines.push(...pool(s, o.extras, r));
   for (let k = 0; k < (o.extras?.dogs ?? 0); k++) { const d = adoptDog(s, { ageYears: 1.5 + r() * 5, training: 35, guard: nb?.kind === 'ranch' || nb?.kind === 'prepper' }); lines.push(`${d.name}, their dog, comes in with them.`); }
-  if (o.extras?.vehicle) { const vs = fleetOf(s); vs.push({ id: `v${Math.max(0, ...vs.map(v => Number(v.id.slice(1)) || 0)) + 1}`, kind: 'old_pickup', mileage: 190_000, condition: 0.5, fuel: 6, oilAt: 188_000, serviceAt: 187_000 }); syncParking(s); lines.push('The old pickup comes in behind them, running on fumes.'); }
-  const bl = bringsLine(o.brings, { tools: o.extras?.tools });
+  if (o.extras?.vehicle === 'old_pickup') { const vs = fleetOf(s); vs.push({ id: `v${Math.max(0, ...vs.map(v => Number(v.id.slice(1)) || 0)) + 1}`, kind: 'old_pickup', mileage: 190_000, condition: 0.5, fuel: 6, oilAt: 188_000, serviceAt: 187_000 }); syncParking(s); lines.push('The old pickup comes in behind them, running on fumes.'); }
+  const bl = kitLine(o.brings, { ...o.extras, cash: undefined, vehicle: undefined, rig: undefined, guns: undefined, tools: o.extras?.tools }, people);
   if (Object.keys(o.brings ?? {}).length || o.extras?.tools?.length) lines.push(`They brought: ${bl}.`);
+  // where they sleep: the choice on the card (a spare bed by default; their own rig when the beds are short)
+  if (o.kind !== 'guest' && people.length) {
+    const here = people.map(p => s.people.find(x => x.id === p.id)).filter((p): p is Person => !!p);
+    const stay = o.stay ?? (o.extras?.rig && cachedPlan(s).bedsFree < here.length + 1 ? 'rig' : 'bed');
+    lines.push(...settleStay(s, here, stay, { extras: o.extras, kind: 'arrival', placeRig: o.placeRig }, o.extras?.cash ?? 0));
+  }
   if (secret === 'sick' && !o.known && r() < 0.35) { const l = infect(s, r, 'they brought it in'); if (l) lines.push(l); }
   g.tookIn += people.length;
   return lines;
@@ -469,6 +493,10 @@ export function householdPeople(s: GameState, n: Neighbor, count: number, r: () 
   });
 }
 
+/** How much more a household thinks of the family when they go home, by how bad it was (on top of the 8 for the stay itself). */
+export const SHELTER_GRATITUDE: Record<ShelterWhy, number> = { warning: 4, storm: 6, hungry: 8, raided: 10, sick: 10, fire: 14, settle: 0 };
+export const homeGoodwill = (why: string): number => 8 + (SHELTER_GRATITUDE[why as ShelterWhy] ?? 0);
+
 /** Days between one household's requests for shelter. */
 const SHELTER_GAP = 150;
 const STORMS = new Set(['blizzard', 'ice_storm', 'flood', 'tornado', 'derecho', 'hurricane_remnants', 'flash_flood', 'windstorm']);
@@ -477,7 +505,7 @@ const STORM_TEXT: Record<string, string> = { blizzard: 'A blizzard is coming dow
 /** A household asks to shelter with the family for a while. Null if the gate is busy or they cannot. */
 export function requestShelter(s: GameState, n: Neighbor, why: ShelterWhy, r: () => number, days?: number): Encounter | null {
   const g = s.gate;
-  if (g.pending || n.status !== 'home' || n.members <= 0) return null;
+  if (g.pending || n.status !== 'home' || n.members <= 0 || nobodyHome(s)) return null;
   const N = newcomersOf(s);
   if (N.guests[n.id]) return null;
   const day = dayIndex(s.clock.t), d = s.disaster;
@@ -609,6 +637,8 @@ export function moveOut(s: GameState, id: string, why: string): boolean {
   n.died = Math.floor(s.clock.t); n.left = true;
   s.personState[i].task = 'gone';
   delete p.home;
+  const rig = rigLeaves(s, id);
+  if (rig) log(s, rig);
   N.departed.push({ day: dayIndex(s.clock.t), name: p.first, why, kind: b?.kind ?? 'stranger' });
   if (N.departed.length > 12) N.departed.splice(0, N.departed.length - 12);
   return true;
@@ -723,7 +753,7 @@ const HINT: Record<Character, string[]> = {
   scout: ['Walks the fence line at dusk "for the air", counting posts.', 'Asked again who stands watch at night, and when the dog sleeps.'],
   sick: ['Coughing in the night, and a fever that comes and goes.', 'Not eating. Flushed. Keeping to the corner of the room.'],
 };
-const REVEAL_STEAL: Array<[keyof Stock, number]> = [['canned', 0.12], ['fuel', 0.15], ['meds', 0.25], ['staples', 0.05]];
+export const REVEAL_STEAL: Array<[keyof Stock, number]> = [['canned', 0.12], ['fuel', 0.15], ['meds', 0.25], ['staples', 0.05]];
 
 /** Raiders told where to hit: a crew comes back for the place, knowing it (sim/encounters.ts `comeBack`, `guide`). */
 function sendCrew(s: GameState, guide: string, r: () => number): void {
@@ -835,7 +865,8 @@ export function newcomersDay(s: GameState): string[] {
   }
 
   out.push(...guestsDay(s, N, day));
-  out.push(...shelterDay(s, N, day, r));
+  if (!nobodyHome(s)) out.push(...shelterDay(s, N, day, r));
+  out.push(...joinersDay(s));
   return out.filter(Boolean);
 }
 
@@ -862,9 +893,10 @@ function guestsDay(s: GameState, N: NewcomerState, day: number): string[] {
     }
     for (const i of here) moveOut(s, s.people[i].id, 'went home');
     delete N.guests[party.nid];
-    n.disposition = Math.min(100, n.disposition + 8);
+    const goodwill = homeGoodwill(party.why);
+    n.disposition = Math.min(100, n.disposition + goodwill);
     s.stock.canned += 2;
-    const lines = [`${names} went home. They left two jars of preserves on the table.`];
+    const lines = [`${names} went home. They left two jars of preserves on the table.`, `The ${plural(surname(n))} go home. ${goodwill >= 16 ? 'They will not forget it.' : 'They are grateful.'}`];
     // a good guest repays the roof: a day's work on whatever is going up
     const st = s.structures.find(x => !isFinished(x) && blockedReason(s, x) === null);
     if (st && here.length >= 2) { addWork(s, st, here.length * 6); lines.push(`They lent a day on the ${st.kind.replace(/_/g, ' ')} before they went.`); }

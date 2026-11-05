@@ -3,6 +3,7 @@
  * quarter-hour sub-step (deterministic regardless of frame rate or speed).
  * Systems mutate a draft; `step` returns a fresh state object.
  */
+import { topUp } from './godMode';
 import { sharedHarvestDay } from './sharedHarvest';
 import { hasBasement } from './housingStyles';
 import { wildlifeDay, wildlifeNight } from './wildlife';
@@ -44,7 +45,7 @@ import { scoutDay } from './rumors';
 import { waterDay } from './water';
 import { addRunWork, nextRun } from './perimeter';
 import { pickWork } from './priority';
-import { addFitWork, balanceDay, nextFit, plant } from './utilities';
+import { addFitWork, autoFit, balanceDay, nextFit, plant } from './utilities';
 import { addHardenWork, nextHardenJob } from './hardening';
 import { updateDisaster } from './disaster';
 import { isSeasonStart, seasonReviewLine } from './newsPool';
@@ -251,10 +252,12 @@ function subStep(s: GameState): void {
       }
     }
   }
+  topUp(s);   // God Mode: unlimited money (sim/godMode.ts)
   // once a day (at midnight): balance water and power
   const day = dayIndex(s.clock.t);
   if (day !== s.utilities.lastDay && h < 0.3) {
     const x = Math.sin(day * 78.233 + s.seed) * 43758.5453;
+    for (const line of autoFit(s, plant(s))) log(s, line);
     balanceDay(s, plant(s), x - Math.floor(x));
     const y = Math.sin(day * 12.9898 + s.seed * 3.1) * 43758.5453;
     for (const line of waterDay(s)) log(s, line);

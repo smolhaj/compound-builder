@@ -7,12 +7,13 @@ import { step, SUBSTEP } from './engine';
 import type { PerimeterRun, Pt } from './perimeter';
 import { dropBridge, DOOR_DELAY, DOOR_OPEN_DELAY } from './terrainFx';
 import { startingVehicles } from './vehicles';
+import { routeRisk } from './bugoutRoute';
 import { tripVehicles } from './weekender';
 import { responseFactor } from './slope';
 import { deliverOrders } from './economy';
 import { applyBattle, type PlannedBattle } from './battle';
 import {
-  CLEAR_DAYS, DRIVE_MPS, KEY_S, RUBBLE_M3, SAPPER_P_CAP, WALK_MPS, clearCollapse, clearQuote, collapseCorridor, corridorDay, crossing, crossingMinutes, driveSeconds,
+  CLEAR_DAYS, DRIVE_MPS, KEY_S, RUBBLE_M3, SAPPER_BRIDGE_K, SAPPER_P_CAP, WALK_MPS, collapseGuard, corridorLines, sapperChance, clearCollapse, clearQuote, collapseCorridor, corridorDay, crossing, crossingMinutes, driveSeconds,
   endNearest, isNightHour, locksNow, outerEnd, sapperBreach, standingCorridors, strandedVehicles, tunnelResponse, walkSeconds, wayCut, wayInBlocked, wayInMinutes,
 } from './corridors';
 
@@ -143,13 +144,53 @@ describe('a crew that came by the tunnel', () => {
   it('may blow the portal behind them: more likely with more charges, never past the cap, never a tunnel-bridge', () => {
     const lo = withBore(), hi = withBore();
     expect(sapperBreach(lo, 't1', 0, 'breached', () => 0)).toEqual([]);
-    expect(sapperBreach(lo, 't1', 1, 'breached', () => 0.5)).toEqual([]);            // one grenade: a 10 % chance
-    expect(sapperBreach(hi, 't1', 3, 'breached', () => 0.2)).toHaveLength(1);        // three: 30 %
+    expect(sapperBreach(lo, 't1', 1, 'breached', () => 0.5)).toEqual([]);            // one grenade: a 10 % chance, 6 % with the blast door
+    expect(sapperBreach(hi, 't1', 3, 'breached', () => 0.1)).toHaveLength(1);        // three: 30 %, 18 % with the blast door
     expect(hi.perimeter[0].collapsed).toBeTruthy();
     const capped = withBore();
     expect(sapperBreach(capped, 't1', 99, 'overrun', () => SAPPER_P_CAP + 0.01)).toEqual([]);
+  });
+  it('a tunnel-bridge is dropped into the gorge instead, a little less readily, and the vehicles out on a run are cut off', () => {
     const br = game(); br.perimeter.push(run('b', 'tunnel_bridge', [[0, 5], [12, 5]]));
-    expect(sapperBreach(br, 'b', 9, 'overrun', () => 0)).toEqual([]);
+    br.vehicles = startingVehicles(); br.vehicles[0].away = true;
+    expect(sapperChance(br, 'b', 3, 'breached')).toBeCloseTo(0.3 * SAPPER_BRIDGE_K, 5);
+    expect(sapperBreach(br, 'b', 3, 'breached', () => 0.5)).toEqual([]);
+    const lines = sapperBreach(br, 'b', 3, 'breached', () => 0);
+    expect(lines.join(' ')).toMatch(/dropped/);
+    expect(br.perimeter[0].dropped).toBe(true);
+    expect(br.vehicles[0].stranded).toBe(true);
+    expect(wayCut(br)).toMatch(/down/);
+    expect(br.lineage.chronicle.some(c => /dropped the tunnel-bridge/i.test(c.text))).toBe(true);
+  });
+  it('a collapse cuts off the vehicles that are out, writes a chronicle line, and they drive home when it is cleared', () => {
+    const g = withBore(); g.money = 1e6;
+    g.vehicles = startingVehicles(); g.vehicles[0].away = true;
+    collapseCorridor(g, 't1', 'sappers');
+    expect(g.vehicles[0].stranded).toBe(true);
+    expect(g.lineage.chronicle.at(-1)?.text).toMatch(/Raiders brought the .* down at the portal, and a vehicle was cut off/);
+    clearCollapse(g, 't1'); g.clock.t += CLEAR_DAYS + 1; corridorDay(g);
+    expect(g.vehicles[0].stranded).toBeUndefined();
+    expect(g.vehicles[0].away).toBeUndefined();
+  });
+  it('the bug-out route reads a fallen tunnel: no vehicles, and a climb on foot', () => {
+    const g = withBore({ collapsed: { at: 1, rubbleM3: 100, clearsAt: null } });
+    expect(routeRisk(g, 'vehicle', 30, 100).vehicleBlocked).toMatch(/rubble/);
+    expect(routeRisk(g, 'foot', 30, 100).legs.some(l => l.id === 'rubble')).toBe(true);
+    const ok = withBore();
+    expect(routeRisk(ok, 'vehicle', 30, 100).vehicleBlocked).toBeNull();
+  });
+  it('counters: a blast door, listening posts and guard posts each cut the chance, and never raise it', () => {
+    const bridge = (): GameState => { const g = game(); g.perimeter.push(run('b', 'tunnel_bridge', [[0, 5], [12, 5]])); return g; };
+    const bare = sapperChance(bridge(), 'b', 3, 'breached');
+    const sensed = bridge(); sensed.stock.ground_sensor = 4; sensed.structures.push({ id: 'g', kind: 'generator', x: 1, z: 1, rot: 0, stage: 9, done: 0, supplied: true, finishedAt: 0 });
+    const towered = bridge(); towered.structures.push({ id: 'tw', kind: 'watchtower_wood', x: 6, z: 8, rot: 0, stage: 9, done: 0, supplied: true, finishedAt: 0 });
+    const far = bridge(); far.structures.push({ id: 'tw', kind: 'watchtower_wood', x: 80, z: 80, rot: 0, stage: 9, done: 0, supplied: true, finishedAt: 0 });
+    expect(sapperChance(towered, 'b', 3, 'breached')).toBeLessThan(bare);
+    expect(sapperChance(far, 'b', 3, 'breached')).toBe(bare);
+    expect(sapperChance(sensed, 'b', 3, 'breached')).toBeLessThanOrEqual(bare);
+    expect(collapseGuard(towered, towered.perimeter[0]).parts.join()).toMatch(/guard post/);
+    expect(sapperChance(withBore(), 't1', 3, 'breached')).toBeLessThan(sapperChance(Object.assign(withBore(), { perimeter: [run('t1', 'tunnel_bridge', BORE)] }), 't1', 3, 'breached') / SAPPER_BRIDGE_K);
+    expect(corridorLines(towered).join(' ')).toMatch(/held down by 1 guard post/);
   });
   it('applyBattle reads it from a breached raid by the tunnel, and from nothing else', () => {
     const base = { night: false, units: [], events: [{ t: 1, kind: 'end', result: 'breached' }], duration: 1, spent: {}, minesUsed: 0, dropped: { grenades: 0, rpg_rounds: 0 }, result: 'breached' } as unknown as PlannedBattle;

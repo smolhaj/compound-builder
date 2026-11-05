@@ -55,6 +55,7 @@ import { isHome } from './blueprints';
 import { tension } from './disaster';
 import { eveningHelps, sharedPoints, wearKits, type KitId } from './evenings';
 import { drilledOf } from './courses';
+import { comfortPoints } from './comfort';
 
 export type TraumaKind = 'raid' | 'wounded' | 'killed' | 'execution' | 'captivity' | 'witness' | 'disaster';
 export type BreakKind = 'irritable' | 'withdrawn' | 'panic' | 'burnout' | 'reckless';
@@ -422,6 +423,7 @@ export function reading(s: GameState, p: Person, sleeping: ReturnType<typeof sle
   h('a dog', dogEffects(s, p.id).morale > 0 ? (p.kid ? 3 : 2) : 0);
   const mate = p.partner ? person(s, p.partner) : undefined;
   h('someone close', mate && here(s, mate) ? 2 : living.some(q => q !== p && closeness(p, q) >= 0.8) ? 1.5 : 0);
+  h('a place worth living in', comfortPoints(s, p.kid));
   h('a roof of their own', s.structures.some(x => isFinished(x) && isHome(x.kind)) ? 2 : 0);
   const lead = bestLevel(s, 'leadership');
   h('someone steady in charge', lead >= 4 ? Math.min(4, lead - 2) : 0);

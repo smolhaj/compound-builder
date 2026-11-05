@@ -10,6 +10,7 @@ import { pickCamp } from '../game/parcel/campSpot';
 import { countyRoad, ROAD_W } from '../game/region/countyRoad';
 import { mulberry32 } from './rng';
 import { pinSeed } from './lotSeed';
+import { findCountyGaps, type CountyGap } from './countyCrossings';
 import { planRoad, type RoadGround, type RoadPlan } from './roadPlan';
 import type { Site } from './site';
 import type { GameState } from './state';
@@ -107,3 +108,11 @@ export const listingRoad = (site: SiteKey): RoadPlan => roadPlanFor(site, listin
 
 /** Tests and QA. */
 export function clearRoadCaches(): void { parcels.clear(); plans.clear(); }
+
+/** Where the county road bridges a creek, a ravine or a gorge on this ground (the world and the headless audit read the same). */
+export function countyGapsFor(p: ParcelTerrain, county: { x(z: number): number }): CountyGap[] {
+  const cz = p.hasStream ? p.creek : null, ly = p.lakeY;
+  const h = (z: number) => p.natural(county.x(z), z).h;
+  const wet = (z: number) => (!!cz && Math.abs(cz.zAt(county.x(z)) - z) < cz.halfWidth + 0.5) || (ly !== null && h(z) < ly + 0.05);
+  return findCountyGaps(h, wet, -250, PARCEL_SIZE + 250);
+}

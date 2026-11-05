@@ -11,6 +11,8 @@ import { planRun, type Pt } from './perimeter';
 import { DEFAULT_FORTRESS, layFortress, planFortress } from './fortress';
 import { BLUEPRINTS } from './blueprints';
 import { adoptDog } from './pets';
+import { syncParking } from './parking';
+import { sapperChance } from './corridors';
 
 afterEach(() => setGroundOverride(null));
 const N = 150;
@@ -40,6 +42,16 @@ const notWorse = (without: number, withEl: number) => {
   expect(withEl).toBeLessThanOrEqual(without + 2 * sd + 1e-9);
 };
 
+/** A finished moat ring round the camp (half-width `h` from (30,30)), and a finished covered bridge across its south side. */
+function moat(g: GameState, h = 14): void {
+  const r = planRun(g, 'moat', [[30 - h, 30 - h], [30 + h, 30 - h], [30 + h, 30 + h], [30 - h, 30 + h], [30 - h, 30 - h]] as Pt[]);
+  r.finishedAt = 0; r.done = r.hours; r.supplied = true;
+}
+function bridge(g: GameState): void {
+  const r = planRun(g, 'covered_bridge', [[30, 47], [30, 41]] as Pt[]);
+  r.finishedAt = 0; r.done = r.hours; r.supplied = true;
+}
+
 const ELEMENTS: Array<[string, (g: GameState) => void]> = [
   ['three watchtowers', g => { [[27, 36], [33, 36], [30, 40]].forEach(([x, z], i) => built(g, `t${i}`, 'watchtower_wood', x, z)); finishAll(g); }],
   ['one watchtower', g => { built(g, 't0', 'watchtower_wood', 30, 38); finishAll(g); }],
@@ -51,6 +63,14 @@ const ELEMENTS: Array<[string, (g: GameState) => void]> = [
   ['window bars', g => { g.stock.window_bars = 1; }],
   ['house hardening (window bars and ballistic panels)', g => { g.stock.window_bars = 1; g.stock.ballistic_panels = 1; }],
   ['mines', g => { g.stock.mines = 6; }],
+  ['a moat (rain and seep only)', g => { moat(g); }],
+  ['a pond-fed moat', g => { built(g, 'pd', 'pond', 52, 30); moat(g); }],
+  ['a moat with a covered bridge', g => { built(g, 'pd', 'pond', 52, 30); moat(g); bridge(g); }],
+  ['a vehicle yard outside the walls', g => { built(g, 'vy', 'vehicle_yard', 56, 30); syncParking(g); }],
+  ['a vehicle yard, a moat and a stone wall', g => { built(g, 'vy', 'vehicle_yard', 56, 30); syncParking(g); moat(g, 12); const r = planRun(g, 'stone_wall', [[24, 24], [36, 24], [36, 36], [24, 36], [24, 24]] as Pt[]); r.finishedAt = 0; r.done = r.hours; r.supplied = true; finishAll(g); }],
+  ['a moat behind a stone wall and a tower', g => { moat(g, 12); const r = planRun(g, 'stone_wall', [[24, 24], [36, 24], [36, 36], [24, 36], [24, 24]] as Pt[]); r.finishedAt = 0; r.done = r.hours; r.supplied = true; built(g, 't0', 'watchtower_wood', 30, 38); finishAll(g); }],
+  // raid depth: the tunnel itself is a way in (see the sappers block below, which compares against a lot that already has the tunnel)
+  ['per-ring vetting chosen at the gates (nobody is at the gate that day)', g => { g.gate.vet = 'both'; }],
 ];
 
 describe('every defensive element is monotone: a raid is never easier with it', () => {
@@ -98,4 +118,39 @@ describe('the campaign: a fortress is never worse for the family than a bare lot
     for (let seed = 1; seed <= 30; seed++) { fort += campaign(true, seed); bare += campaign(false, seed); }
     expect(fort).toBeGreaterThan(bare);
   }, 240000);
+});
+
+describe('a tunnel-bridge on the lot: the counters at its portal only make a raid harder than the bare tunnel', () => {
+  const tunnel = (g: GameState): void => { const r = planRun(g, 'tunnel_bridge', [[60, 24], [60, 36]] as Pt[]); r.finishedAt = 0; r.done = r.hours; r.supplied = true; };
+  const ADD: Array<[string, (g: GameState) => void]> = [
+    ['guard posts at the portal', g => { built(g, 't0', 'watchtower_wood', 58, 30); built(g, 't1', 'watchtower_wood', 62, 30); finishAll(g); }],
+    ['listening posts', g => { g.stock.ground_sensor = 4; }],
+    ['a collapsed portal (rubble in the way)', g => { g.perimeter[0].collapsed = { at: 0, rubbleM3: 640, clearsAt: null }; }],
+  ];
+  for (const crew of [6, 10]) for (const [name, add] of ADD) it(`${name} (crew of ${crew})`, () => {
+    const a = base(), b = base();
+    tunnel(a); tunnel(b); add(b);
+    notWorse(rate(a, crew), rate(b, crew));
+  }, 120000);
+});
+
+describe('sappers and the portal: every counter only lowers the chance a tunnel is brought down', () => {
+  it('a blast door, guard posts and listening posts never raise it, in any combination', () => {
+    const mk = (kind: 'tunnel_bridge' | 'rock_tunnel', towers: number, sensors: number): GameState => {
+      const g = base();
+      const r = planRun(g, kind, [[60, 24], [60, 36]] as Pt[]); r.finishedAt = 0; r.done = r.hours; r.supplied = true;
+      for (let i = 0; i < towers; i++) built(g, `tw${i}`, 'watchtower_wood', 58 + 2 * i, 30);
+      g.stock.ground_sensor = sensors;
+      return g;
+    };
+    for (const kind of ['tunnel_bridge', 'rock_tunnel'] as const) for (const charges of [1, 3, 9]) for (const result of ['breached', 'overrun'] as const) {
+      let prev = Infinity;
+      for (const [tw, se] of [[0, 0], [1, 0], [2, 0], [3, 0], [3, 4]] as const) {
+        const g = mk(kind, tw, se), id = g.perimeter[0].id;
+        const p = sapperChance(g, id, charges, result);
+        expect(p).toBeLessThanOrEqual(prev + 1e-12);
+        prev = p;
+      }
+    }
+  });
 });

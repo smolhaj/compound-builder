@@ -10,6 +10,7 @@ import { sanitationLine, worstWell } from './sanitation';
 import { BUNKER_ENTRANCES } from './bunkerEntrances';
 import { KIT } from '../game/buildkit/kit';
 import { homeBeds, isHome } from './blueprints';
+import { foodNudge, foodUrgency } from './spendGuard';
 import { daysOfFood } from './needs';
 import { enclosure } from './enclosure';
 import { hardenCost } from './hardening';
@@ -20,7 +21,7 @@ import { firewoodOutlook } from './heating';
 import { UTILITY } from './utilities';
 import { fmtKw } from './powerReport';
 import { anyBearing } from './orchard';
-import { needsHookup, storageTip } from './hookups';
+import { hookupTone, needsHookup, storageTip } from './hookups';
 import { MATERIAL_IDS, MATERIALS, type MaterialId } from './materials';
 import { PERIMETER, PERIMETER_ORDER, UPGRADE_NEXT, fenceLive, runBill, runFinished, wallLength, type PerimeterKind, type Pt } from './perimeter';
 import { MAX_TOWERS, ringStatus } from './fortress';
@@ -153,6 +154,8 @@ export type SuggestionAct =
   | { type: 'crew'; id: string }
   | { type: 'open'; right: 'family' | 'supplies' | 'utilities' | 'land' | 'defense' | 'outside' | 'chronicle'; supplies?: 'stores' | 'farm' }
   | { type: 'moveIn' }
+  /** Open the Shop on a shelf (never buys). */
+  | { type: 'shop'; tab: string }
   | { type: 'restDay' }
   | { type: 'quarantine'; on: boolean }
   | { type: 'rx' }
@@ -226,7 +229,7 @@ export function terraceSuggestion(s: GameState): Suggestion | null {
     acts: [{ label: `Stake ${tp.tiers.length} terraced beds (~${usd(tp.usd)} of fieldstone for the walls)`, act: { type: 'terraces', tiers: tp.tiers.map(t => [t.x, t.z] as Pt) } }, { label: 'Show me on the map', act: { type: 'terrain', mode: 'high' } }] };
 }
 
-export function suggestions(s: GameState): Suggestion[] {
+export function suggestions(s: GameState, limit = 3, skip?: ReadonlySet<string>): Suggestion[] {
   const people = s.people.length;
   const homes = s.structures.filter(st => isHome(st.kind));
   const beds = homeBeds(s);
@@ -260,6 +263,8 @@ export function suggestions(s: GameState): Suggestion[] {
     if (ww) out.push({ id: 'well_close', kind: '', title: 'Your well is too close to the privy', urgency: ww.risk >= 0.8 ? 38 : 30,   // a slow hazard: below the cards that need doing now (plow 56, caretaker 44-66)
       why: `${sanitationLine(ww)}. Move the ${ww.source!.kind.replace(/_/g, ' ')} (or drill a cased well, or keep a filter and fuel to boil)`,
       acts: [{ label: 'Show me', act: { type: 'select', id: ww.source!.id } }] }); }
+  { const f = foodNudge(s);   // a prompt before the warning signs, while there is cash and the trucks run
+    if (f) out.push({ id: 'stock_food', kind: '', title: f.days < 1 ? 'No food put by: stock some' : 'Stock some food', urgency: foodUrgency(s, f.days), why: `${f.days < 1 ? 'No food' : Math.floor(f.days) + ' days'} put by for ${s.people.length}${foodUrgency(s, f.days) >= 60 ? ', and the warning signs are up' : ''}. A month of staples is about ${usd(f.cost)}.`, acts: [{ label: 'Open the food shelf', act: { type: 'shop', tab: 'food' } }] }); }
   if (!hasPower(s)) add('power', 'solar_array', 'no power for the pump, lights and the freezer', 40);
   if (growing && !hasKind(s, 'root_cellar')) add('cellar', 'root_cellar', 'nowhere cool to keep what you grow', 30);
   if (hasMaples(s) && woodsTaps(s) >= 60 && hasKind(s, 'timber_cabin', 'log_house', 'farmhouse', 'lodge', 'lodge_plinth', 'lodge_solar', 'stone_house', 'timber_frame') && !hasKind(s, 'sugar_shack')) add('sugar', 'sugar_shack', `the woods have maples for ${woodsTaps(s)} taps: late-winter syrup`, 14);
@@ -292,7 +297,8 @@ export function suggestions(s: GameState): Suggestion[] {
   { const todo = needsHookup(s);
     if (todo.length) {
       const first = todo[0], name = first.name.replace(/_/g, ' ');
-      out.push({ id: 'hookup', kind: '', title: `Finish the ${name}`, urgency: first.kind === 'wire' || first.kind === 'plumb' ? 75 : 62,
+      const o = hookupTone(s, todo);
+      out.push({ id: 'hookup', kind: '', title: o.optional ? `Run power to the ${name} (optional)` : `Finish the ${name}`, urgency: o.optional ? 30 : first.kind === 'wire' || first.kind === 'plumb' ? 75 : 62,
         why: `${first.text.toLowerCase()}${todo.length > 1 ? `; ${todo.length - 1} more building${todo.length > 2 ? 's' : ''} are not working yet either` : ''}`,
         acts: [{ label: 'Show me', act: { type: 'select', id: first.id } }, ...(first.tool ? [{ label: 'Draw the line', act: { type: 'tool' as const, tool: first.tool } }] : [])] });
     } }
@@ -359,7 +365,7 @@ export function suggestions(s: GameState): Suggestion[] {
   { const t = terraceSuggestion(s); if (t) out.push(t); }   // a slope that suits terraced beds: offered, never staked unasked
   { const c = courseSuggestion(s); if (c) out.push(c); }
   { const d = drillsSuggestion(s); if (d) out.push(d); }
-  return out.sort((x, y) => y.urgency - x.urgency).slice(0, 3);
+  return out.filter(x => !skip?.has(x.id)).sort((x, y) => y.urgency - x.urgency).slice(0, limit);
 }
 
 /** A course worth taking (sim/courses.ts): a skill the place lacks that an evening class would give, with a one-click start when a way is open. Never required. */

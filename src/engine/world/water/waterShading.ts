@@ -60,6 +60,8 @@ export const WATER_LOOKS = {
   pond:   { shallow: new THREE.Color(0.055, 0.092, 0.070), deep: new THREE.Color(0.014, 0.046, 0.058), clarity: 0.75, bed: new THREE.Color(0.27, 0.23, 0.16) },
   river:  { shallow: new THREE.Color(0.075, 0.092, 0.070), deep: new THREE.Color(0.016, 0.046, 0.060), clarity: 0.45, bed: new THREE.Color(0.32, 0.29, 0.22) },
   bayou:  { shallow: new THREE.Color(0.075, 0.080, 0.045), deep: new THREE.Color(0.030, 0.042, 0.030), clarity: 0.15, bed: new THREE.Color(0.22, 0.19, 0.12) },
+  // a still, dug ditch: dark peaty water, a muddy bank showing at the edges
+  moat:   { shallow: new THREE.Color(0.040, 0.050, 0.034), deep: new THREE.Color(0.008, 0.020, 0.026), clarity: 0.6, bed: new THREE.Color(0.20, 0.16, 0.11) },
   sound:  { shallow: new THREE.Color(0.050, 0.090, 0.090), deep: new THREE.Color(0.010, 0.036, 0.060), clarity: 0.4, bed: new THREE.Color(0.30, 0.28, 0.22) },
 } satisfies Record<string, WaterLook>;
 
@@ -75,6 +77,8 @@ export interface WaterPatchOptions {
   depthGLSL: string;
   /** Extra fragment declarations (uniforms, functions). */
   pars?: string;
+  /** GLSL float expression for the ice amount (default: the season's `uSeaC.x`); the sim's lake ice drives it. */
+  iceExpr?: string;
   /** Extra vertex attribute(s) forwarded as varyings: name → GLSL type ('float'). */
   attributes?: Record<string, 'float'>;
   uniforms?: Record<string, THREE.IUniform>;
@@ -365,7 +369,7 @@ export function patchWaterMaterial(mat: THREE.MeshStandardMaterial, o: WaterPatc
       // Seasons: ponds / lakes / slow rivers freeze in cold winters; the
       // fast, deep river channel stays a dark open lead
       .replace('#include <opaque_fragment>', outGLSL()
-        + seasonIceGlsl('vWPos', 'smoothstep(0.12, 0.4, wSpeed) * smoothstep(0.3, 0.75, wDepth) * wRiver')
+        + seasonIceGlsl('vWPos', 'smoothstep(0.12, 0.4, wSpeed) * smoothstep(0.3, 0.75, wDepth) * wRiver', o.iceExpr)
         + '\n#include <opaque_fragment>');
   };
   mat.customProgramCacheKey = () => 'water-v2-' + o.key + (o.flow ? '-f' : '') + (o.reflection ? '-m' : '');

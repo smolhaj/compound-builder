@@ -123,7 +123,7 @@ export function MedicalSection() {
       <button style={btn(r.policy === 'all')} onClick={() => g.daily(d => { setPolicy(d, 'all'); return null; })} title="Every infection">everything</button>
     </div>
     {sick.map(p => casesOf(game, p.id).map((h, i) => <Row key={p.id + i} label={p.first} value={<span style={{ fontSize: 11 }}>{h.what}: {h.med!.care}</span>} tone={h.sev >= 60 ? 'bad' : 'warn'} />))}
-    {r.needs.map(x => <Note key={x} tone="warn">{x}</Note>)}
+    {r.needs.map((x, i) => <Note key={`${i}-${x}`} tone="warn">{x}</Note>)}
     {r.epidemic && <div style={{ marginTop: 3 }}>
       <Note tone="warn">{r.epidemic.kind === 'flu' ? 'The flu is going round' : 'Dysentery is going round'} ({r.epidemic.cases} so far).{r.epidemic.quarantine ? ' The sick are being kept apart.' : ''}</Note>
       <div style={{ display: 'flex', gap: 4 }}>

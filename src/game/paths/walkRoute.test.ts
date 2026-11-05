@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { crossesHard, slopePace, stairRuns, walkRoute, type WalkWorld } from './walkRoute';
+import { entryRampHeight, crossesHard, slopePace, stairRuns, walkRoute, type WalkWorld } from './walkRoute';
 import { routeLength, type Pt } from '../../sim/pathRoute';
 
 /** A wall across x = 5 for z in [-30, 30] with an optional gap, and a house box. */
@@ -45,6 +45,16 @@ describe('walking across ground with things in the way', () => {
     expect(slopePace(-0.5)).toBeGreaterThan(slopePace(0.5));
     expect(slopePace(5)).toBeGreaterThanOrEqual(0.35);
   });
+});
+
+describe('entry ramp to a raised floor', () => {
+  it('is the floor at the porch edge, eases to the ground, and never jumps', () => {
+    expect(entryRampHeight(0.48, 0, 0)).toBeCloseTo(0.48);
+    expect(entryRampHeight(0.48, 0, 5)).toBe(0);
+    let prev = entryRampHeight(0.48, 0, 0);
+    for (let d = 0.01; d < 1; d += 0.01) { const y = entryRampHeight(0.48, 0, d); expect(prev - y).toBeLessThan(0.02); expect(y).toBeLessThanOrEqual(prev + 1e-9); prev = y; }
+  });
+  it('is flat for a floor at ground level', () => { expect(entryRampHeight(0.02, 0.01, 0.2)).toBe(0.02); });
 });
 
 describe('stairs up a riser', () => {

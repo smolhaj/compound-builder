@@ -13,6 +13,7 @@ import { goalFor, type GoalCtx } from './peopleGoals';
 import { slopePace } from '../paths/walkRoute';
 import { stepToward, doorAt, isStop, type Mover } from '../paths/deckWalk';
 import type { Wp } from '../paths/linkRoute';
+import { gateRole, leaveGoal } from './gateWalk';
 import { figureScale, type SickPose } from './sickbayPlan';
 
 /** Walking speed (world units per real second at 1×; ≈ brisk walk scaled for the diorama). */
@@ -68,6 +69,7 @@ export class FamilyRenderer {
     ground: (x: number, z: number) => number, season: WearSeason, speedK: number, sick?: ReadonlyMap<string, SickPose>): void {
     this._time += dt;
     // the sim clock jumped (load, debug advance): everyone is simply where they should be
+    const first = this._lastClock < 0;
     const jumped = this._lastClock >= 0 && Math.abs(clock - this._lastClock) > 0.05;
     this._lastClock = clock;
     const redress = season !== this._season;
@@ -77,10 +79,13 @@ export class FamilyRenderer {
     people.forEach((p, i) => {
       const st = states.find(s => s.id === p.id);
       if (!st) return;
-      const goal = goalFor(i, p.kid, st.task, st.target, hour, ctx, clock);
+      const role = ctx.entry && ctx.today !== undefined ? gateRole(p, st, ctx.today) : null;
+      const goal = role === 'leaving' && ctx.entry ? leaveGoal(ctx.entry) : goalFor(i, p.kid, st.task, st.target, hour, ctx, clock);
       let a = this._agents.get(p.id);
       if (!a) {
-        a = { x: goal.x, z: goal.z, rot: 0, phase: i, placed: true, wear: null, via: [], viaFor: null, y: null, wait: 0, retry: 0 };
+        // taken in just now (not a load): they walk up the drive from the road
+        const walkIn = role === 'arriving' && ctx.entry && !first && !jumped;
+        a = { x: walkIn ? ctx.entry!.x : goal.x, z: walkIn ? ctx.entry!.z : goal.z, rot: 0, phase: i, placed: true, wear: null, via: [], viaFor: null, y: null, wait: 0, retry: 0 };
         this._agents.set(p.id, a);
       }
       if (redress || !a.wear) {
@@ -119,7 +124,7 @@ export class FamilyRenderer {
       let moving = false;
       if (a.wait > 0) { a.wait = Math.max(0, a.wait - dt * Math.max(1, speedK)); if (a.wait === 0 && leg) { a.via.shift(); } }
       else if (d > 0.02 || (leg && a.via.length)) {
-        if ((d > 25 && !a.via.length) || (jumped && !isStop(leg))) { a.x = goal.x; a.z = goal.z; a.via = []; a.y = null; }          // far: just be there (fast-forward / load)
+        if ((d > 25 && !a.via.length && !role) || (jumped && !isStop(leg))) { a.x = goal.x; a.z = goal.z; a.via = []; a.y = null; }          // far: just be there (fast-forward / load)
         else if (dl > 1e-6 || (leg && leg[2] !== undefined)) {
           const me: Mover = a;
           const st = stepToward(me, leg ?? [goal.x, goal.z], v * dt, ground);

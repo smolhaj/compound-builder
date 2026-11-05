@@ -5,6 +5,8 @@ import type { SeasonMode } from '../engine/world/season/seasonState';
 import type { WeatherMode } from '../engine/world/weather/weatherState';
 import type { TourCaption, TourMode } from '../engine/world/camera/TourController';
 import type { PropertyGeometry } from '../sim/propertyWall';
+import type { SiteQuery } from '../game/buildkit/kit';
+import type { StarterPlan } from '../sim/starterCompound';
 import type { BpReadout } from '../game/blueprint/blueprintPlan';
 import type { PathSummary } from '../game/paths/pathNet';
 import { autoStartTier } from '../engine/perf/device';
@@ -58,7 +60,7 @@ export interface WorldState {
   /** Sightline overlay: off / exposure from the road / from the ridge / night lights / viewshed from a point. */
   sightMode: 'off' | 'road' | 'ridge' | 'night' | 'viewshed';
   /** The terrain overlay (high ground, lanes, water, sun): game/terrain/TerrainOverlay.ts. */
-  terrainMode: 'off' | 'high' | 'lanes' | 'water' | 'sun';
+  terrainMode: 'off' | 'high' | 'lanes' | 'water' | 'sun' | 'fire';
   setTerrainMode: (m: WorldState['terrainMode']) => void;
   /** The blueprint view: names and roles of the buildings, rings, gates, towers and tunnels, with the defense readouts (game/blueprint). */
   blueprint: boolean;
@@ -82,6 +84,12 @@ export interface WorldState {
   setHudHidden: (on: boolean) => void;
   /** Marks the n nearest trees to the yard for felling (set by the canvas; returns how many were marked). */
   markNearestTrees: ((n: number) => number) | null;
+  /** What the placement rules ask of the ground (height, owned, water, camp and road): the starter-compound planner reads it. Set by the canvas. */
+  siteQuery: SiteQuery | null;
+  setSiteQuery: (q: SiteQuery | null) => void;
+  /** The starter compound shown as a ghost preview (null: none). */
+  starterPreview: StarterPlan | null;
+  setStarterPreview: (p: StarterPlan | null) => void;
   setMarkNearestTrees: (f: ((n: number) => number) | null) => void;
   setSightMode: (m: WorldState['sightMode']) => void;
   setBuildingView: (v: BuildingView) => void;
@@ -150,9 +158,14 @@ export const useWorldStore = create<WorldState>()(subscribeWithSelector((set) =>
   setPathNet: (pathNet) => set({ pathNet }),
   underground: false,
   setUnderground: (underground) => set({ underground }),
-  hudHidden: false,
+  // a phone-sized window starts with the side panels folded away (they would cover the whole map); "Show panels" brings them back
+  hudHidden: typeof window !== 'undefined' && window.innerWidth < 760,
   setHudHidden: (hudHidden) => set({ hudHidden }),
   markNearestTrees: null,
+  siteQuery: null,
+  setSiteQuery: (siteQuery) => set({ siteQuery }),
+  starterPreview: null,
+  setStarterPreview: (starterPreview) => set({ starterPreview }),
   setMarkNearestTrees: (markNearestTrees) => set({ markNearestTrees }),
   setSightMode: (sightMode) => set({ sightMode }),
   setTerrainMode: (terrainMode) => set({ terrainMode }),
@@ -172,3 +185,13 @@ export const useWorldStore = create<WorldState>()(subscribeWithSelector((set) =>
     set({ quality });
   },
 })));
+
+// narrowing the window (rotating a phone, snapping a browser) folds the side panels away once, as a phone-sized start does
+if (typeof window !== 'undefined') {
+  let narrow = window.innerWidth < 760;
+  window.addEventListener('resize', () => {
+    const n = window.innerWidth < 760;
+    if (n && !narrow) useWorldStore.getState().setHudHidden(true);
+    narrow = n;
+  });
+}

@@ -23,6 +23,7 @@ import { powered } from './gear';
 import { dogCount } from './pets';
 import { armed } from './armory';
 import { enclosure, nearest } from './enclosure';
+import { moatState } from './waterWorks';
 import { PERIMETER, hasSkirt, runFinished, wallLength, type PerimeterRun, type Pt } from './perimeter';
 import { applyBattle, planBattle, type RaiderTemper } from './battle';
 import { recordBattle } from './rescue';
@@ -104,7 +105,7 @@ export function wallMetres(s: GameState): number {
 }
 
 export function ditchNear(s: GameState, at: Pt): boolean {
-  return s.perimeter.some(r => r.kind === 'ditch' && runFinished(r) && r.pts.length > 1 && nearest(r.pts, at[0], at[1]).d <= DITCH_REACH);
+  return s.perimeter.some(r => (r.kind === 'ditch' || (r.kind === 'moat' && (moatState(s, r)?.level ?? 0) >= 0.5)) && runFinished(r) && r.pts.length > 1 && nearest(r.pts, at[0], at[1]).d <= DITCH_REACH);
 }
 
 export function digDefense(s: GameState, run: Pick<PerimeterRun, 'kind' | 'skirtAt' | 'finishedAt'>, at: Pt): DigDefense {

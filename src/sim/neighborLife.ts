@@ -36,6 +36,7 @@
  */
 import { mulberry32, pick } from './rng';
 import { log } from './economy';
+import { nobodyHome } from './orphans';
 import { radioSet } from './radio';
 import { addWork, blockedReason, isFinished } from './construction';
 import { canGo, fightAtCamp } from './rescue';
@@ -44,6 +45,7 @@ import { raiderTemper, type Encounter, type Neighbor, type NeighborKind } from '
 import type { Person, SkillId } from './family';
 import { calendarOf, dayIndex, type GameState } from './state';
 import { inPact } from './pact';
+import { threatOn } from './threatState';
 import { bringsLine, householdPeople, neighborBrings, neighborSecret, requestShelter, trustLine, trustMult } from './newcomers';
 import type { Caliber } from './armory';
 
@@ -243,7 +245,7 @@ export function raidHousehold(s: GameState, n: Neighbor, raiders: number, temper
 
 /** A household alone asks to come and live with the family: an arrival at the gate. */
 function askToJoin(s: GameState, n: Neighbor, why: string, r: () => number): boolean {
-  if (s.gate.pending || n.members <= 0) return false;
+  if (s.gate.pending || n.members <= 0 || nobodyHome(s)) return false;
   const l = lifeOf(s, n), day = dayIndex(s.clock.t);
   const people = householdPeople(s, n, Math.min(3, n.members), r, i => `pn_${n.id}_${i}`);
   const carried = neighborBrings(n, r);
@@ -430,7 +432,7 @@ export function neighborLifeDay(s: GameState): string[] {
   const aged = year > L.lastYear;
   L.lastYear = year;
   const hard = hardship(s);
-  const plague = hit && (s.disaster.kind === 'pandemic' || s.disaster.kind === 'bioweapon') ? 4 : 1;
+  const plague = hit && (s.disaster.kind === 'pandemic' || s.disaster.kind === 'bioweapon') ? 4 : 1 + 3 * threatOn(s, 'plague');   // (a yearly plague, sim/threats.ts, is a milder one)
   // an answer to a join request
   for (const n of s.neighbors) {
     const l = L.lives[n.id];

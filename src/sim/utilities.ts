@@ -79,7 +79,7 @@ export const UTILITY: Record<string, UtilityDef> = {
 };
 
 /** Daily power draw (kWh) of a wired building by kind, and water use (L/person/day) carried vs plumbed. */
-export const DRAW_KWH: Record<string, number> = { lodge: 16, lodge_plinth: 15, lodge_solar: 16, stone_house: 8, timber_frame: 6, container_house: 5, adobe_house: 5, timber_cabin: 5, log_house: 8, farmhouse: 9, trailer: 6, cottage: 4, guest_house: 3, moms_house: 5, barn: 1, workshop: 4, metal_garage: 1, garage_solar: 1, filtration_shed: 0.3, root_cellar: 0.2, chicken_coop: 0.3, outhouse: 0, garden: 0, field: 0, greenhouse: 1, greenhouse_heated: 4, aquaponics: 4, high_tunnel: 0.5,marina: 2, boat_dock: 0.1,stilted_house: 4, cabin_village: 3, helipad: 0.3, tower_pod: 0.4, orchard: 0, orchard_grove: 0, pond: 1.5, reservoir: 1, sheep_barn: 0.3, equipment_yard: 0.2, solar_farm: 0, battery_bank: 0 };
+export const DRAW_KWH: Record<string, number> = { lodge: 16, lodge_plinth: 15, lodge_solar: 16, stone_house: 8, timber_frame: 6, container_house: 5, adobe_house: 5, timber_cabin: 5, log_house: 8, farmhouse: 9, trailer: 6, travel_trailer: 2, rv_camper: 3, modular_home: 4, cottage: 4, guest_house: 3, moms_house: 5, barn: 1, workshop: 4, metal_garage: 1, garage_solar: 1, filtration_shed: 0.3, root_cellar: 0.2, chicken_coop: 0.3, outhouse: 0, garden: 0, field: 0, greenhouse: 1, greenhouse_heated: 4, aquaponics: 4, high_tunnel: 0.5,marina: 2, boat_dock: 0.1,stilted_house: 4, cabin_village: 3, helipad: 0.3, tower_pod: 0.4, orchard: 0, orchard_grove: 0, pond: 1.5, reservoir: 1, sheep_barn: 0.3, equipment_yard: 0.2, solar_farm: 0, battery_bank: 0 };
 export const WATER_CARRIED = 25, WATER_PLUMBED = 130;
 /** Fitting jobs: hours and materials (per building). */
 export const FIT = {
@@ -107,7 +107,7 @@ export const NET_METER_USD_PER_KWH = 0.05;
  * Who gets power first when there isn't enough (lower first): pumps, the
  * root cellar (freezer), homes, then the coop and the workshop.
  */
-export const LOAD_PRIORITY: Record<string, number> = { well_drilled: 0, root_cellar: 1, timber_cabin: 2, log_house: 2, lodge: 2, lodge_plinth: 2, lodge_solar: 2, stone_house: 2, timber_frame: 2, container_house: 2, adobe_house: 2, farmhouse: 2, trailer: 2, cottage: 2, guest_house: 2, moms_house: 2, filtration_shed: 0, barn: 4, chicken_coop: 3, workshop: 4, metal_garage: 4, garage_solar: 4, greenhouse: 3, greenhouse_heated: 3, aquaponics: 1,marina: 5,stilted_house: 2, cabin_village: 3, pond: 1, reservoir: 3, sheep_barn: 4, equipment_yard: 5 };
+export const LOAD_PRIORITY: Record<string, number> = { well_drilled: 0, root_cellar: 1, timber_cabin: 2, log_house: 2, lodge: 2, lodge_plinth: 2, lodge_solar: 2, stone_house: 2, timber_frame: 2, container_house: 2, adobe_house: 2, farmhouse: 2, trailer: 2, travel_trailer: 2, rv_camper: 2, modular_home: 2, cottage: 2, guest_house: 2, moms_house: 2, filtration_shed: 0, barn: 4, chicken_coop: 3, workshop: 4, metal_garage: 4, garage_solar: 4, greenhouse: 3, greenhouse_heated: 3, aquaponics: 1,marina: 5,stilted_house: 2, cabin_village: 3, pond: 1, reservoir: 3, sheep_barn: 4, equipment_yard: 5 };
 
 export interface Fitting { building: string; kind: 'plumb' | 'wire'; done: number; hours: number; supplied: boolean; finishedAt: number | null }
 
@@ -215,14 +215,61 @@ export interface Plant {
   power: Map<string, number>;
 }
 
+/**
+ * Pipes and cable run themselves: any two buildings within about 70 m (edge to edge) share the
+ * water and power networks without a drawn line, so a player never has to lay utility lines
+ * (the trenching is in the price of the equipment). Drawn runs still join far-off outposts.
+ */
+export const AUTO_REACH = 12;
+
+export function autoJoin(nodes: readonly Node[], net: Map<string, number>): Map<string, number> {
+  const parent = new Map<number, number>();
+  const find = (a: number): number => { let p = parent.get(a) ?? a; while (p !== (parent.get(p) ?? p)) p = parent.get(p) ?? p; parent.set(a, p); return p; };
+  for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
+    const a = nodes[i], b = nodes[j];
+    if (Math.hypot(a.x - b.x, a.z - b.z) - a.r - b.r > AUTO_REACH) continue;
+    const ra = find(net.get(a.id)!), rb = find(net.get(b.id)!);
+    if (ra !== rb) parent.set(ra, rb);
+  }
+  const out = new Map<string, number>();
+  for (const [id, n] of net) out.set(id, find(n));
+  return out;
+}
+
 /** Network membership for the current compound (half-size from footprints passed in). */
 export function plant(s: GameState, halfSize: (kind: string) => number = k => NODE_R[k] ?? 0.4): Plant {
   const nodes = s.structures.filter(isFinished).map(st => ({ id: st.id, kind: st.kind, x: st.x, z: st.z, r: halfSize(st.kind) }));
   return {
     nodes,
-    water: networks(nodes, s.perimeter.filter(r => r.kind === 'water_pipe')),
-    power: joinBank(nodes, networks(nodes, s.perimeter.filter(r => r.kind === 'power_cable'))),
+    water: autoJoin(nodes, networks(nodes, s.perimeter.filter(r => r.kind === 'water_pipe'))),
+    power: joinBank(nodes, autoJoin(nodes, networks(nodes, s.perimeter.filter(r => r.kind === 'power_cable')))),
   };
+}
+
+/** Whether this kind's wiring / plumbing orders itself at midnight (homes, pumps, the cellar); every other building is fitted by hand. */
+export function autoFits(kind: string, fit: Fitting['kind']): boolean {
+  if (!(DRAW_KWH[kind] > 0) || (LOAD_PRIORITY[kind] ?? 9) > 2) return false;
+  return fit === 'wire' || LOAD_PRIORITY[kind] === 2;
+}
+
+/**
+ * Plumbing and wiring order themselves: a finished home, pump or cellar gets its wiring job
+ * (and a home its plumbing) as soon as service reaches it, the kit included in the price. Only
+ * the labor remains. Returns the log lines.
+ */
+export function autoFit(s: GameState, p: Plant): string[] {
+  const out: string[] = [];
+  for (const st of s.structures) {
+    if (!isFinished(st)) continue;
+    for (const kind of ['wire', 'plumb'] as const) {
+      if (!autoFits(st.kind, kind)) continue;
+      if (fitProblem(s, p, st, kind)) continue;
+      const f = orderFit(s, st.id, kind);
+      f.supplied = true; f.done = f.hours; f.finishedAt = s.clock.t;
+      out.push(`The ${st.kind.replace(/_/g, ' ')} is ${kind === 'plumb' ? 'plumbed: water on tap' : 'wired: lights on'}.`);
+    }
+  }
+  return out;
 }
 
 /** What a power bank is made of: panels, batteries, a generator. Equipment standing together is one bank (the bus bars and conduit are part of the kit). */
@@ -319,8 +366,8 @@ export function sunHours(doy: number): number {
 }
 
 /** Half-size (world units) a line must reach to touch a building, and its roof area (m²) for rain catchment, by kind. */
-export const NODE_R: Record<string, number> = { orchard_terraced: 2, stilted_house: 0.6, cabin_village: 2, helipad: 0.8, tower_pod: 0.3, aquaponics: 2, high_tunnel: 2, polytunnel: 1.2, micro_hydro: 0.7, wind_turbine: 0.4, solar_farm: 1.5, battery_bank: 0.5, greenhouse_heated: 1.5, orchard_grove: 2, pond: 1.5, reservoir: 1.2, sheep_barn: 1, equipment_yard: 1, timber_cabin: 0.5, lodge: 1.3, lodge_plinth: 1.3, lodge_solar: 1.3, stone_house: 0.8, timber_frame: 0.8, container_house: 0.6, adobe_house: 0.8, log_house: 0.75, farmhouse: 0.75, trailer: 0.6, cottage: 0.55, guest_house: 0.45, moms_house: 0.75, barn: 1.0, workshop: 0.75, metal_garage: 0.8, garage_solar: 0.8, filtration_shed: 0.2, root_cellar: 0.4, chicken_coop: 0.4, garden: 0.7, field: 2.2, outhouse: 0.2, well_hand: 0.25, well_drilled: 0.3, cistern: 0.3, water_tower: 0.35, solar_array: 0.6, battery_shed: 0.3, generator_shed: 0.3, septic: 0.4, greenhouse: 0.6, orchard: 1.3 };
-export const ROOF_M2: Record<string, number> = { stilted_house: 70, cabin_village: 120, timber_cabin: 70, lodge: 330, lodge_plinth: 330, lodge_solar: 330, stone_house: 140, timber_frame: 150, container_house: 90, adobe_house: 120, log_house: 160, farmhouse: 140, trailer: 90, cottage: 60, guest_house: 40, moms_house: 80, barn: 220, workshop: 120, metal_garage: 120, garage_solar: 120, filtration_shed: 5, chicken_coop: 6, outhouse: 2, battery_shed: 8, generator_shed: 8, well_drilled: 6, well_hand: 3, greenhouse: 26, greenhouse_heated: 216, sheep_barn: 110, battery_bank: 18 };
+export const NODE_R: Record<string, number> = { orchard_terraced: 2, stilted_house: 0.6, cabin_village: 2, helipad: 0.8, tower_pod: 0.3, aquaponics: 2, high_tunnel: 2, polytunnel: 1.2, micro_hydro: 0.7, wind_turbine: 0.4, solar_farm: 1.5, battery_bank: 0.5, greenhouse_heated: 1.5, orchard_grove: 2, pond: 1.5, reservoir: 1.2, sheep_barn: 1, equipment_yard: 1, timber_cabin: 0.5, lodge: 1.3, lodge_plinth: 1.3, lodge_solar: 1.3, stone_house: 0.8, timber_frame: 0.8, container_house: 0.6, adobe_house: 0.8, log_house: 0.75, farmhouse: 0.75, trailer: 0.6, travel_trailer: 0.5, rv_camper: 0.5, modular_home: 0.55, cottage: 0.55, guest_house: 0.45, moms_house: 0.75, barn: 1.0, workshop: 0.75, metal_garage: 0.8, garage_solar: 0.8, filtration_shed: 0.2, root_cellar: 0.4, chicken_coop: 0.4, garden: 0.7, field: 2.2, outhouse: 0.2, well_hand: 0.25, well_drilled: 0.3, cistern: 0.3, water_tower: 0.35, solar_array: 0.6, battery_shed: 0.3, generator_shed: 0.3, septic: 0.4, greenhouse: 0.6, orchard: 1.3 };
+export const ROOF_M2: Record<string, number> = { stilted_house: 70, cabin_village: 120, timber_cabin: 70, lodge: 330, lodge_plinth: 330, lodge_solar: 330, stone_house: 140, timber_frame: 150, container_house: 90, adobe_house: 120, log_house: 160, farmhouse: 140, trailer: 90, travel_trailer: 25, rv_camper: 30, modular_home: 45, cottage: 60, guest_house: 40, moms_house: 80, barn: 220, workshop: 120, metal_garage: 120, garage_solar: 120, filtration_shed: 5, chicken_coop: 6, outhouse: 2, battery_shed: 8, generator_shed: 8, well_drilled: 6, well_hand: 3, greenhouse: 26, greenhouse_heated: 216, sheep_barn: 110, battery_bank: 18 };
 
 /** Rain and snowmelt (mm a day, averaged by month): wet spring, dry late summer. */
 export function rainMm(doy: number): number {

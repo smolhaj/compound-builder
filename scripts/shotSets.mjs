@@ -839,3 +839,36 @@ SETS.fleetyard = [
   { name: 'yard-vehicles-aerial', time: 14, season: 'summer', setup: yardFleet + farmAt('equipment_yard', 7, 0.7, 0.4), cam: D, frames: 14 },
   { name: 'yard-vehicles-eye-level-person', time: 14, season: 'summer', setup: yardFleet + figureAt('equipment_yard', 0.2, 3.0) + eyeNear('equipment_yard', 1.6, 4.6, -0.3, 0.2, 0.3), cam: D, frames: 14 },
 ];
+
+/** Moat and covered bridge round the sample compound (a pond beside it feeds the moat); the 1.7 m scale figure stands at the bridge. */
+const moatBridge = compound + `{ if (!window.__moat) { window.__moat = true;
+  const G = cb.game, c = cb.world.camp, R = 13;
+  const sp = cb.tool.findSpot('pond', c.x + R + 7, c.z + 2, 0);
+  if (sp) { G.getState().plan('pond', sp[0], sp[1], 0); }
+  G.getState().planRun('moat', [[c.x - R, c.z - R], [c.x + R, c.z - R], [c.x + R, c.z + R], [c.x - R, c.z + R], [c.x - R, c.z - R]], []);
+  G.getState().planRun('covered_bridge', [[c.x - 2, c.z + R + 1], [c.x - 2, c.z + R - 1]], []);
+  G.setState(s => { const g = structuredClone(s.game); for (const st of g.structures) { st.stage = 9; st.done = 0; st.finishedAt = 0; } for (const r of g.perimeter) { r.done = r.hours; r.supplied = true; r.finishedAt = g.clock.t - 10; } return { game: g }; });
+} }`;
+const personAt = (dx, dz) => `{ const c = cb.world.camp, W = cb.world; const f = W._root.children.find(o => o.userData.type === 'scale_figure'); if (f) f.position.set(c.x + ${dx}, W.parcel.height(c.x + ${dx}, c.z + ${dz}), c.z + ${dz}); }`;
+/** A vehicle yard past the bridge, outside the moat, with a tractor and an ATV (bought through the real action: no garage, so they take its bays). */
+const yardOut = moatBridge + `{ if (!window.__vy) { window.__vy = 1; const G = cb.game, c = cb.world.camp;
+  const sp = cb.tool.findSpot('vehicle_yard', c.x - 2, c.z + 24, 2);
+  if (sp) { G.getState().plan('vehicle_yard', sp[0], sp[1], 2); const st = G.getState().game.structures.at(-1); window.__vyard = st;
+    G.setState(s => { const g = structuredClone(s.game); const y = g.structures.find(q => q.id === st.id); y.stage = 9; y.done = 0; y.finishedAt = 0; g.money = 500000; return { game: g }; }); window.__vyard = G.getState().game.structures.find(q => q.id === st.id); }
+  import('/src/sim/vehicles.ts').then(m => { for (const k of ['tractor', 'atv']) G.getState().money(d => m.buyVehicle(d, k)); });
+} }`;
+const atVYard = (r, pitch, yaw) => `{ const y = window.__vyard; if (y) { cb.cam.target.set(y.x, 0, y.z); cb.cam.radius = ${r}; cb.cam.pitch = ${pitch}; cb.cam.yaw = ${yaw}; } }`;
+const eyeVYard = (ex, ez, lx, lz, eye = 0.28) => `{ const y = window.__vyard; if (y) cb.cam.placeEye(y.x + ${ex}, y.z + ${ez}, y.x + ${lx}, y.z + ${lz}, ${eye}); }`;
+const personVYard = (dx, dz) => `{ const y = window.__vyard, W = cb.world; const f = W._root.children.find(o => o.userData.type === 'scale_figure'); if (y && f) f.position.set(y.x + ${dx}, W.parcel.height(y.x + ${dx}, y.z + ${dz}), y.z + ${dz}); }`;
+SETS.defenseExtras = [
+  { name: 'moat-aerial', time: 11, season: 'summer', setup: moatBridge + "{ const c = cb.world.camp, W = cb.world; const hs = []; for (let dz = -1.5; dz <= 1.5; dz += 0.25) hs.push(W.parcel.height(c.x + 5, c.z + 13 + dz).toFixed(3)); console.error('moatprofile', hs.join(' ')); }" + atCampV(34, 0.95, 0.35), cam: D, frames: 24 },
+  { name: 'bridge-eye-level-person', time: 15, season: 'summer', setup: moatBridge + personAt(-3.0, 15.4) + eyeAt(0.4, 17.6, -2.6, 14.0, 0.3), cam: D, frames: 24 },
+  { name: 'bridge-close-aerial', time: 14, season: 'summer', setup: moatBridge + "{ const c = cb.world.camp; cb.cam.target.set(c.x - 2, 0, c.z + 13); cb.cam.radius = 7; cb.cam.pitch = 0.55; cb.cam.yaw = 0.9; }", cam: D, frames: 24 },
+  { name: 'moat-water-low-angle', time: 15, season: 'summer', setup: moatBridge + personAt(6.5, 14.4) + "{ const c = cb.world.camp, W = cb.world; const hs = [], ms = []; for (let dz = -1.5; dz <= 1.5; dz += 0.25) { hs.push(W.parcel.height(c.x + 5, c.z + 13 + dz).toFixed(2)); ms.push(W.terrain.surfaceAt(c.x + 5, c.z + 13 + dz).toFixed(2)); } console.error('PROFILE parcel', hs.join(' '), '| mesh', ms.join(' ')); }" + "{ const c = cb.world.camp; cb.cam.target.set(c.x + 4.5, 0, c.z + 13); cb.cam.radius = 4.6; cb.cam.pitch = 0.28; cb.cam.yaw = 1.45; }", cam: D, frames: 24 },
+  { name: 'moat-eye-level-bank', time: 16, season: 'summer', setup: moatBridge + personAt(3.4, 14.6) + eyeAt(1.2, 17.2, 4.0, 13.4, 0.26), cam: D, frames: 24 },
+  { name: 'yard-aerial-outside-moat', time: 13, season: 'summer', setup: yardOut + atCampV(40, 0.9, 0.3) + "{ const c = cb.world.camp; cb.cam.target.set(c.x - 2, 0, c.z + 12); }", cam: D, frames: 24 },
+  { name: 'yard-close-aerial', time: 13, season: 'summer', setup: yardOut + atVYard(9, 0.7, 0.5), cam: D, frames: 24 },
+  { name: 'yard-eye-level-person', time: 15, season: 'summer', setup: yardOut + personVYard(1.0, -5.0) + eyeVYard(3.2, -8.2, 0.2, -1.5), cam: D, frames: 24 },
+  { name: 'moat-meets-creek-aerial', time: 12, season: 'summer', setup: moatBridge + "{ const c = cb.world.camp; cb.cam.target.set(c.x + 6, 0, c.z - 12); cb.cam.radius = 12; cb.cam.pitch = 0.75; cb.cam.yaw = 0.3; }", cam: D, frames: 24 },
+  { name: 'moat-meets-creek-eye-level', time: 15, season: 'summer', setup: moatBridge + personAt(1.5, -9.5) + eyeAt(-3.5, -4.5, 6, -12.5, 0.3), cam: D, frames: 24 },
+];

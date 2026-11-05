@@ -27,6 +27,7 @@
  *               while they are in town, a second card ('stranded') asks how
  *               they get home, and the road decides the rest.
  */
+import { unscripted } from './godMode';
 import { dayIndex, type GameState } from './state';
 import { mulberry32 } from './rng';
 import { tension, type Phase } from './disaster';
@@ -576,7 +577,7 @@ function emptyEvents(s: GameState, w: Weekend, r: () => number): string[] {
 /** Price level of the town market, 1 in a normal market, down to 0.55 at the hit: panic sales as the signs grow. */
 export function marketFactor(s: GameState): number {
   const d = s.disaster;
-  if (!d.kind || d.mode === 'sandbox') return 1;
+  if (!d.kind || unscripted(d.mode)) return 1;
   const w = tension(d, s.clock.t);
   return 1 - 0.45 * Math.pow(w, 1.15);
 }
@@ -598,7 +599,7 @@ export function saleBlock(s: GameState): string | null {
   const d = s.disaster, tr = d.tracks;
   if (tr.banks < 0.5) return 'the banks are closed: no sale can close and no mortgage can be paid off';
   if (d.kind && (d.phase === 'impact' || d.phase === 'survival') && (tr.banks < 0.8 || tr.stores < 0.5 || tr.law < 0.5)) return 'the market is frozen: there are no buyers';
-  if (d.kind && d.mode !== 'sandbox' && tension(d, s.clock.t) >= 0.93) return 'buyers have walked away: the market has frozen';
+  if (d.kind && !unscripted(d.mode) && tension(d, s.clock.t) >= 0.93) return 'buyers have walked away: the market has frozen';
   if (q.net < 0 && s.money < -q.net) return `the sale would leave ${money(-q.net)} owed on the mortgage and you cannot cover it`;
   return null;
 }
@@ -716,7 +717,7 @@ export function sellTown(s: GameState): string | null {
 /** The move-in card is due: the signs are out, the family splits its week, and nothing else is waiting on the player. */
 export function moveInDue(s: GameState): boolean {
   const w = s.weekend, d = s.disaster;
-  if (!w || w.mode !== 'split' || w.stranded || !d.kind || d.mode === 'sandbox') return false;
+  if (!w || w.mode !== 'split' || w.stranded || !d.kind || unscripted(d.mode)) return false;
   if (s.gate.pending || s.gate.card || s.gate.aftermath || s.ending) return false;
   if (d.phase !== 'warning' || w.asked >= 6) return false;
   const t = tension(d, s.clock.t);

@@ -124,6 +124,12 @@ export interface RegionLook {
   longLots?: boolean;
   /** Slope (1 - n.y) where bare rock starts showing: high for rounded, soil-mantled hills. */
   rockSlope: number;
+  /**
+   * The ground under and between the trees (forest regions only): duff (the dark
+   * base), leaf litter / needles, moss (patches), and how much of each shows
+   * (`litter`, `moss` 0..1; `meadow` dulls and patches the open grass with litter).
+   */
+  floor?: { duff: number; litter: number; moss: number; litterK: number; mossK: number; meadow: number };
 }
 
 export function regionLookFor(kind: RegionKind): RegionLook {
@@ -132,18 +138,24 @@ export function regionLookFor(kind: RegionKind): RegionLook {
     case 'mountain': return { ...base, treeLine: 205, snowLine: 265, snowLineWinter: 8, rock: 0x7f6b5a, forest: 0x1f3320, evergreen: 0.95, dry: 0.22, grass: 0x6c7550, dryGrass: 0x928866, farm: 0.7, fieldSize: 44, fieldMode: 'plss', pivots: true };
     // rounded chaparral-mantled ranges: rock only on the steepest sandstone faces
     case 'coast': return { ...base, dry: 0.75, rock: 0x8a7a62, forest: 0x343c22, evergreen: 0.15, grass: 0x7d7a48, dryGrass: 0xa58c5c, farm: 0.75, fieldSize: 36, fieldMode: 'orchard', rockSlope: 0.6 };
-    case 'sound': return { ...base, treeLine: 260, snowLine: 210, snowLineWinter: 120, rock: 0x6a665f, forest: 0x203a26, evergreen: 0.9, farm: 0.15, fieldSize: 22 };
+    case 'sound': return { ...base, treeLine: 260, snowLine: 210, snowLineWinter: 120, rock: 0x6a665f, forest: 0x203a26, evergreen: 0.9, farm: 0.15, fieldSize: 22,
+      // dark wet duff under fir and cedar, moss over everything
+      floor: { duff: 0x44412a, litter: 0x62503a, moss: 0x437a34, litterK: 0.3, mossK: 0.75, meadow: 0.8 } };
     case 'drumlin': return { ...base, snowLine: 1e9, snowLineWinter: -8, forest: 0x34492a, farm: 0.6, fieldSize: 26, stoneWalls: true, evergreen: 0.35, rockSlope: 0.62 };
     // Great Plains: wheat, sorghum and native grass on the section grid, cottonwoods only on the creeks; center pivots
     case 'plains': return { ...base, snowLineWinter: -15, forest: 0x34502c, farm: 1, fieldSize: 52, evergreen: 0.05, fieldMode: 'plss', pivots: true, dry: 0.3, grass: 0x6f7a44, dryGrass: 0xa39a68 };
     case 'bayou': return { ...base, forest: 0x2f4426, farm: 0.45, fieldSize: 40, evergreen: 0.35, longLots: true, kudzu: true };
     case 'city': return { ...base, farm: 0.2, fieldSize: 40, fieldMode: 'plss' };
     // oak–hickory / tulip-poplar cove forest, hay in the bottoms, sandstone ledges on the steep faces
-    case 'appalachia': return { ...base, snowLineWinter: 30, forest: 0x2d4a26, evergreen: 0.2, rock: 0x8a8070, grass: 0x557a36, farm: 0.4, fieldSize: 18, rockSlope: 0.55 };
+    case 'appalachia': return { ...base, snowLineWinter: 30, forest: 0x2d4a26, evergreen: 0.2, rock: 0x8a8070, grass: 0x557a36, farm: 0.4, fieldSize: 18, rockSlope: 0.55,
+      // oak-hickory leaf litter over brown duff, moss on the damp north sides and the ledges
+      floor: { duff: 0x5e5038, litter: 0x7e6038, moss: 0x58803a, litterK: 0.65, mossK: 0.4, meadow: 0.9 } };
     // Colorado Plateau: tan grama grass and bare red-brown soil, pinyon–juniper on the mesas, red sandstone cliffs
-    case 'desert': return { ...base, dry: 0.92, rock: 0x9c5f45, forest: 0x46553a, evergreen: 0.97, grass: 0x8c8458, dryGrass: 0xb39a72, farm: 0, fieldSize: 60, rockSlope: 0.18 };
+    case 'desert': return { ...base, dry: 0.97, rock: 0x9c5f45, forest: 0x6a6c48, evergreen: 0.97, grass: 0xa8956a, dryGrass: 0xc2a678, farm: 0, fieldSize: 60, rockSlope: 0.18 };
     // spruce–fir and pine on the flats, birch and aspen in the burns, lakes and open bog
-    case 'north_woods': return { ...base, snowLineWinter: -15, forest: 0x1d3424, evergreen: 0.75, rock: 0x6e6c66, grass: 0x5c6e40, farm: 0.05, fieldSize: 24, rockSlope: 0.45 };
+    case 'north_woods': return { ...base, snowLineWinter: -15, forest: 0x1d3424, evergreen: 0.75, rock: 0x6e6c66, grass: 0x5c6e40, farm: 0.05, fieldSize: 24, rockSlope: 0.45,
+      // needle duff (rusty brown) with grey-green reindeer moss patches
+      floor: { duff: 0x6a553a, litter: 0x866a46, moss: 0x7f8f64, litterK: 0.55, mossK: 0.3, meadow: 0.8 } };
     // dairy country: 40-acre fields on the survey grid, hardwood woodlots, kettle lakes
     case 'upper_midwest': return { ...base, snowLineWinter: -15, forest: 0x2f4a28, evergreen: 0.2, grass: 0x5f7a3c, farm: 0.9, fieldSize: 34, fieldMode: 'plss', rockSlope: 0.6 };
     // oak–hickory and shortleaf pine, fescue pasture on the ridgetops, gray chert and limestone bluffs

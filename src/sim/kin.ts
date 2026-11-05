@@ -26,9 +26,14 @@ import { conditionsFor } from './body';
 import { dayIndex, type GameState } from './state';
 import { dayJob, JOB_POOL, skills as rollSkills, SKILL_IDS, type KinRole, type Person } from './family';
 import { freshNeeds } from './needs';
+import { nobodyHome } from './orphans';
 import { tension } from './disaster';
 import { arrivalOutlook } from './housing';
 import type { Encounter, Outcome, Stance } from './encounters';
+import type { Extras } from './newcomers';
+import { defaultStay, kitLine, moveInto, pool, rollKit, settleStay } from './joinerHome';
+import { addTool } from './tools';
+import { isFinished } from './construction';
 
 // ── Who they are ───────────────────────────────────────────────────────────
 
@@ -173,7 +178,7 @@ export function linkKin(people: Person[]): void {
 
 // ── State ──────────────────────────────────────────────────────────────────
 
-export interface KinWait { ids: string[]; people: Person[]; since: number; until: number; savings: number }
+export interface KinWait { ids: string[]; people: Person[]; since: number; until: number; savings: number; /** What they will bring when they come (sim/joinerHome.ts). */ extras?: Extras; /** The structure the family staked for them (sim/joinerHome.ts claimForWaiting): they move in when it is finished. */ build?: string }
 export interface KinRefusal { people: Person[]; day: number; fate: 'fine' | 'came' | 'died' | null; /** The day the follow-up is due after the hit. */ due: number }
 export interface Strain { at: number; points: number; why: string; of: string[] }
 export interface Kin {
@@ -284,18 +289,21 @@ export function makeKinRequest(s: GameState, group: Person[], late: boolean, r: 
   const meds = group.filter(p => p.conditions?.length);
   const savings = group.reduce((a, p) => a + kinSavings(p, s.seed), 0);
   const best = group.map(p => { const top = SKILL_IDS.reduce((a, b) => (p.skills[b] > p.skills[a] ? b : a)); return `${p.first} (${top} ${p.skills[top]})`; });
+  const kit = rollKit(s, group, r, 'kin', { extras: { cash: 0 } });
+  delete kit.extras.cash;
   const dossier = [
     story(s, group, late, r),
     group.map(p => `${p.first} ${p.last}, ${p.age} — ${kinTitle(p, s.people)}`).join(' · '),
     `Good at: ${best.join(', ')}.`,
     meds.length ? `${joinList(meds.map(p => p.first))} take${meds.length === 1 ? 's' : ''} daily medicine (${meds.flatMap(p => p.conditions ?? []).join(', ').replace(/_/g, ' ')}); they would bring a couple of months of it.` : '',
     month > 0 && !late ? `Brings about $${month.toLocaleString('en-US')} a month in ${incomeLine[0].label}, until the banks close, and about $${savings.toLocaleString('en-US')} in savings.` : savings > 0 && !late ? `Brings about $${savings.toLocaleString('en-US')} in savings.` : '',
+    `Brings: ${kitLine(kit.brings, { ...kit.extras, cash: late ? 0 : savings }, group)}.`,
     `${n} more to feed: about ${n * 2000} kcal a day.`,
   ];
   return {
     id, kind: 'kin', day,
     title: `${cap(call)} ${n > 1 ? 'ask' : 'asks'} to ${late ? 'come in' : 'join you'}`,
-    dossier, size: n, armed: false, strength: 0, people: group, brings: {},
+    dossier, size: n, armed: false, strength: 0, people: group, brings: kit.brings, extras: kit.extras,
     stances: late ? ['take_in', 'turn_away'] : ['take_in', 'build_first', 'turn_away'],
     kin: { savings, late },
   };
@@ -322,7 +330,7 @@ export function requestChance(s: GameState): number {
 // ── Taking them in ─────────────────────────────────────────────────────────
 
 /** Bring relatives into the household: bedroll each, medicine on hand, savings in the pot, their old jobs still going before the hit. */
-export function admitKin(s: GameState, people: readonly Person[], savings: number): void {
+export function admitKin(s: GameState, people: readonly Person[], savings: number, extras?: Extras, brings?: Partial<Record<string, number>>): string[] {
   const k = kinOf(s);
   const peaceJobs = (s.disaster.phase === 'peace' || s.disaster.phase === 'warning') && s.personState.some(ps => ps.employed);
   for (const raw of people) {
@@ -338,10 +346,16 @@ export function admitKin(s: GameState, people: readonly Person[], savings: numbe
   k.joined += people.length;
   s.stock.sleeping_bag += people.length;
   if (banksOpen(s)) s.money += savings;
+  // what else they carry pools with the family's (sim/joinerHome.ts)
+  const r = mulberry32(s.seed * 5683 + dayIndex(s.clock.t) * 7 + people.length);
+  for (const t of extras?.tools ?? []) addTool(s, t, 0.5 + 0.4 * r(), 0.5 + 0.4 * r(), r() < 0.3 ? 'pro' : 'cheap');
+  for (const [m, n] of Object.entries(brings ?? {})) (s.stock as Record<string, number>)[m] += n as number;
+  return pool(s, extras, r);
 }
 
 /** Resolve a kin decision. */
-export function resolveKin(s: GameState, e: Encounter, stance: Stance): Outcome {
+export function resolveKin(s: GameState, e: Encounter, stance0: Stance): Outcome {
+  let stance = stance0;
   const k = kinOf(s), g = s.gate;
   const people = e.people ?? [];
   const names = joinList(people.map(p => p.first));
@@ -351,10 +365,15 @@ export function resolveKin(s: GameState, e: Encounter, stance: Stance): Outcome 
   const lines: string[] = [];
   const old = people.some(p => p.elder);
   k.asked += 1;
+  // the card's "You build them a place first" is the old wait-list
+  if (stance === 'take_in' && e.stay === 'player_build') stance = 'build_first';
   if (stance === 'take_in') {
     const outlook = arrivalOutlook(s, people);
     const { savings } = e.kin ?? { savings: 0 };
-    admitKin(s, people, savings);
+    const stay = defaultStay(s, e);
+    const carried = admitKin(s, people, savings, e.extras, e.brings);
+    lines.push(...carried);
+    lines.push(...settleStay(s, people, stay, { extras: e.extras, kin: e.kin, kind: 'kin', placeRig: e.placeRig }, savings));
     g.humanity = Math.min(100, g.humanity + (e.kin?.late ? 6 : 4));
     lines.push(...outlook.lines.slice(1));
     if (savings > 0 && banksOpen(s)) lines.push(`${names} put $${savings.toLocaleString('en-US')} into the family account.`);
@@ -366,8 +385,8 @@ export function resolveKin(s: GameState, e: Encounter, stance: Stance): Outcome 
   if (stance === 'build_first') {
     const since = day, until = day + (s.disaster.phase === 'warning' ? 75 : 150);
     k.away = k.away.filter(x => !people.some(p => p.id === x.id));
-    k.waiting.push({ ids: people.map(p => p.id), people: structuredClone(people), since, until, savings: e.kin?.savings ?? 0 });
-    lines.push(`They will wait ${until - since} days. Beds in a house of their own (a guest house, a cottage, Mom’s house) end the wait; so does the hit, and they would come anyway.`);
+    k.waiting.push({ ids: people.map(p => p.id), people: structuredClone(people), since, until, savings: e.kin?.savings ?? 0, ...(e.extras ? { extras: e.extras } : {}) });
+    lines.push(`They will wait ${until - since} days. Stake a guest house, a cottage or Mom’s house for them (Build → Home & work): they move in the day it is finished. If the hit comes first, they would come anyway.`);
     return { title: 'Build them a place first', text: `You tell ${names} to hold on until there is a roof ready for them: not a couch in the hall. ${cap(call)} says that is fair, and will keep the car packed.`, tone: 'mixed', lines };
   }
   // refuse
@@ -419,17 +438,21 @@ export function kinDay(s: GameState): string[] {
   // the ones who are waiting for a place of their own
   for (const w of [...k.waiting]) {
     const out2 = arrivalOutlook(s, w.people);
+    const built = w.build ? s.structures.find(x => x.id === w.build) : undefined;
+    if (w.build && !built) w.build = undefined;                        // the family pulled the plan: the wait goes on
     const bedded = out2.guests.bed + out2.guests.bunk >= w.people.length && out2.guests.nowhere === 0;
     const own = out2.own >= w.people.filter(p => p.elder || p.rel).length;
     const names = joinList(w.people.map(p => p.first));
-    if (bedded && (own || hit)) {
-      admitKin(s, w.people, w.savings);
+    const readyHome = !!built && isFinished(built);
+    if ((bedded && (own || hit) && !(built && !readyHome && !hit)) || readyHome) {
+      admitKin(s, w.people, w.savings, w.extras);
+      if (readyHome && built) moveInto(s, built, w.ids);
       gate.humanity = Math.min(100, gate.humanity + 4);
       k.strain.push({ at: s.clock.t, points: 4, why: `${names} arrived to a place of their own`, of: w.people.map(p => p.rel?.of ?? '') });
       out.push(`${names} arrive: the place you built is ready, and they have a front door of their own.`);
       if (!gate.pending && !gate.card) gate.card = { title: w.people.length > 1 ? 'They are home' : 'Home at last', text: `${names} ${w.people.length > 1 ? 'move' : 'moves'} into the place you built. The kettle is on before the bags are down.`, tone: 'good', lines: out2.lines.slice(1) };
     } else if (hit && day >= hitDay) {
-      admitKin(s, w.people, 0);
+      admitKin(s, w.people, 0, w.extras);
       out.push(`${names} came anyway: the roads are closing and they would not wait. They are sleeping wherever there is room.`);
       k.strain.push({ at: s.clock.t, points: -2, why: 'came before the house was ready', of: w.people.map(p => p.rel?.of ?? '') });
     } else if (day >= w.until) {
@@ -443,7 +466,7 @@ export function kinDay(s: GameState): string[] {
 
   // the ones who were refused: after the hit, what became of them
   for (const rf of k.refused) {
-    if (rf.fate || !hit || day < rf.due || gate.pending) continue;
+    if (rf.fate || !hit || day < rf.due || gate.pending || nobodyHome(s)) continue;
     const r = mulberry32(s.seed * 4723 + rf.day * 31 + rf.people[0].age);
     const u = r();
     const names = joinList(rf.people.map(p => p.first));
@@ -469,7 +492,7 @@ export function kinDay(s: GameState): string[] {
   }
 
   // a new request
-  if (k.open && k.away.length && !gate.pending && !gate.card && day >= k.next && !(hit && day >= hitDay + 45) && (hit ? (k.post ?? 0) < POST_CAP : (k.pre ?? 0) < PRE_CAP)) {
+  if (k.open && k.away.length && !gate.pending && !gate.card && !nobodyHome(s) && day >= k.next && !(hit && day >= hitDay + 45) && (hit ? (k.post ?? 0) < POST_CAP : (k.pre ?? 0) < PRE_CAP)) {
     const r = mulberry32(s.seed * 6131 + day * 17 + 3);
     if (r() < requestChance(s)) {
       const first = k.away[Math.floor(r() * k.away.length)];

@@ -65,7 +65,7 @@ export const LAID_BLURB: Record<LaidKind, string> = {
 export type Role = 'home' | 'guest' | 'water' | 'privy' | 'garden' | 'field' | 'orchard' | 'greenhouse' | 'bank' | 'coop' | 'barn' | 'work' | 'power' | 'store' | 'tower' | 'hatch' | 'camp' | 'yard' | 'gate' | 'creek' | 'other';
 
 const BY_KIND: Record<string, Role> = {
-  timber_cabin: 'home', log_house: 'home', farmhouse: 'home', trailer: 'home', cottage: 'guest',
+  timber_cabin: 'home', log_house: 'home', farmhouse: 'home', trailer: 'home', modular_home: 'home', travel_trailer: 'guest', rv_camper: 'guest', cottage: 'guest',
   lodge: 'home', lodge_plinth: 'home', lodge_solar: 'home', stone_house: 'home', timber_frame: 'home', container_house: 'home', adobe_house: 'home',
   outhouse: 'privy', septic: 'other',
   well_hand: 'water', well_drilled: 'water', cistern: 'water', water_tower: 'water', filtration_shed: 'water',

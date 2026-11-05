@@ -55,7 +55,7 @@ export function bestShelter(s: GameState): [number, string] {
     else if (stylePF(st.kind)) consider(stylePF(st.kind), hasBasement(st.kind) ? 'the lodge basement' : `the ${st.kind.replace(/_/g, ' ')}`);
     else if (st.kind === 'farmhouse') consider(10, 'the farmhouse basement');
     else if (st.kind === 'log_house') consider(8, 'the log house');
-    else if (st.kind === 'trailer') consider(1.5, 'the trailer');
+    else if (st.kind === 'trailer' || st.kind === 'travel_trailer' || st.kind === 'rv_camper' || st.kind === 'modular_home') consider(1.5, 'the trailer');
     else if (st.kind === 'barn') consider(2, 'the barn');
     else if (st.kind === 'timber_cabin') consider(3, 'the cabin');
     else if (st.kind === 'workshop') consider(2, 'the shop');

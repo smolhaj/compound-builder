@@ -402,6 +402,30 @@ export const TRAILER: KitPieceDef = {
   parts: { foundation: 'concrete', walls: 'metal_siding', roof: 'metal_roof' },
   maxSlope: 0.3, floorY: 0.13, porch: 0, sleeps: 4, light: [0, 0.3, 0],
 };
+/** A joiner's travel trailer (sim/joinerHome.ts): 2.5 × 8.5 m, hitch at the front, a door on the side. Arrives finished; leaves with its owners. */
+export const TRAVEL_TRAILER: KitPieceDef = {
+  id: 'travel_trailer', name: 'Travel trailer', category: 'home',
+  blurb: 'A 28-foot travel trailer on its own wheels: a bunk end, a dinette and a galley. It hooks up to the water and power within about 70 m and drives away when its owners do. Sleeps 3.',
+  cellsX: 1, cellsZ: 3, frontCells: 1,
+  parts: { foundation: 'concrete', walls: 'metal_siding', roof: 'metal_roof_grey' },
+  maxSlope: 0.12, floorY: 0.1, porch: 0, sleeps: 3, light: [0, 0.25, 0],
+};
+/** A joiner's Class C motorhome (sim/joinerHome.ts): 2.6 × 8 m with a cab-over bunk. Arrives finished; leaves with its owners. */
+export const RV_CAMPER: KitPieceDef = {
+  id: 'rv_camper', name: 'RV (Class C)', category: 'home',
+  blurb: 'A 26-foot Class C motorhome: cab-over bunk, dinette, galley and a rear bed. It plugs into the water and power within about 70 m and drives off when its owners go. Sleeps 4.',
+  cellsX: 1, cellsZ: 3, frontCells: 0,
+  parts: { foundation: 'concrete', walls: 'metal_siding', roof: 'metal_roof_grey' },
+  maxSlope: 0.12, floorY: 0.1, porch: 0, sleeps: 4, light: [0, 0.25, 0],
+};
+/** A factory-built home: 4.3 × 9.8 m on piers, delivered on a flatbed and set by a crane. */
+export const MODULAR_HOME: KitPieceDef = {
+  id: 'modular_home', name: 'Modular home', category: 'home',
+  blurb: 'A factory-built one-bedroom home with a sofa bed (14 × 32 ft), delivered whole and set on piers by a crane crew: roughly three weeks from a bare pad to a front door. Sleeps 3.',
+  cellsX: 2, cellsZ: 4, frontCells: 1,
+  parts: { foundation: 'concrete', walls: 'lap_white', roof: 'metal_roof_grey' },
+  maxSlope: 0.25, floorY: 0.12, porch: 0.3, sleeps: 3, light: [0, 0.3, 0],
+};
 export const BARN: KitPieceDef = {
   id: 'barn', name: 'Barn', category: 'work',
   blurb: '12 × 18 m board-and-batten barn: big doors at both ends, stalls for stock, a hay loft under a steep metal roof.',
@@ -497,12 +521,20 @@ export const MOTOR_COURT_KIT: KitPieceDef = {
   parts: { foundation: 'fieldstone', walls: 'metal_siding', roof: 'metal_roof' },
   maxSlope: 0.15, floorY: 0.0, porch: 0, sleeps: 0, light: null,
 };
+/** The vehicle yard (sim/vehicleYard.ts): a fenced gravel lot for the fleet OUTSIDE the walls, past the motor court. */
+export const VEHICLE_YARD_KIT: KitPieceDef = {
+  id: 'vehicle_yard', name: 'Vehicle yard', category: 'defense',
+  blurb: 'A fenced gravel lot, 12 x 12 m, six bays, floodlights and a padlocked drive gate, outside the walls. Trucks park here when the garages are full. What stands in it is not behind the wall: a raid can drive it off or burn it, and a big crew sends men for it first.',
+  cellsX: 4, cellsZ: 4, frontCells: 0,
+  parts: { foundation: 'fieldstone', walls: 'metal_siding', roof: 'metal_roof' },
+  maxSlope: 0.15, floorY: 0.0, porch: 0, sleeps: 0, light: null,
+};
 /** Defense menu: only the first tier is built from scratch; the rest are upgrades from the Defense tab. */
 export const TOWER_ORDER: readonly string[] = ['rise_lookout'];
 /** The tower pod is a stand-alone tower (not an upgrade of the chain): it joins the Defense menu beside the first tier. */
 export const POD_ORDER: readonly string[] = ['tower_pod'];
 /** The gatehouse garage joins the Defense menu beside the first tower. */
-export const GATEHOUSE_ORDER: readonly string[] = ['gate_garage', 'motor_court'];
+export const GATEHOUSE_ORDER: readonly string[] = ['gate_garage', 'motor_court', 'vehicle_yard'];
 
 // ── Underground (GDS §2.2; underground.ts) ──
 const room = (id: string, name: string, cx: number, cz: number, blurb: string, shelters = 0, level: 'underground' | 'both' = 'underground'): KitPieceDef => ({
@@ -526,9 +558,11 @@ export const BUNKER_KIT: KitPieceDef[] = [
 /** Underground menu order. */
 export const BUNKER_ORDER: readonly string[] = BUNKER_KIT.map(d => d.id);
 
-export const KIT: Record<string, KitPieceDef> = Object.fromEntries([ORCHARD_TERRACED, CABIN_VILLAGE, HELIPAD, TOWER_POD, STILTED_HOUSE, BOAT_DOCK, MARINA, POLYTUNNEL, HIGH_TUNNEL, AQUAPONICS, LODGE, LODGE_PLINTH, LODGE_SOLAR, STONE_HOUSE, TIMBER_FRAME_HOUSE, CONTAINER_HOUSE, ADOBE_HOUSE, APIARY, FORGE, SUGAR_SHACK, BARNYARD, WOOD_OVEN, GATE_GARAGE_KIT, MOTOR_COURT_KIT, TIMBER_CABIN, LOG_HOUSE, FARMHOUSE, TRAILER, BARN, COTTAGE, GUEST_HOUSE, MOMS_HOUSE, METAL_GARAGE, GARAGE_SOLAR, OUTHOUSE, WORKSHOP, ROOT_CELLAR, CHICKEN_COOP, GARDEN, FIELD, GREENHOUSE, GREENHOUSE_HEATED, ORCHARD, ORCHARD_GROVE, POND, RESERVOIR, SHEEP_BARN, EQUIPMENT_YARD, TERRACE_STAIR, TERRACE_RAMP, ...UTILITY_KIT, ...BUNKER_KIT, ...TOWER_KIT].map(d => [d.id, d]));
+export const KIT: Record<string, KitPieceDef> = Object.fromEntries([ORCHARD_TERRACED, CABIN_VILLAGE, HELIPAD, TOWER_POD, STILTED_HOUSE, BOAT_DOCK, MARINA, POLYTUNNEL, HIGH_TUNNEL, AQUAPONICS, LODGE, LODGE_PLINTH, LODGE_SOLAR, STONE_HOUSE, TIMBER_FRAME_HOUSE, CONTAINER_HOUSE, ADOBE_HOUSE, APIARY, FORGE, SUGAR_SHACK, BARNYARD, WOOD_OVEN, GATE_GARAGE_KIT, MOTOR_COURT_KIT, VEHICLE_YARD_KIT, TIMBER_CABIN, LOG_HOUSE, FARMHOUSE, TRAILER, TRAVEL_TRAILER, RV_CAMPER, MODULAR_HOME, BARN, COTTAGE, GUEST_HOUSE, MOMS_HOUSE, METAL_GARAGE, GARAGE_SOLAR, OUTHOUSE, WORKSHOP, ROOT_CELLAR, CHICKEN_COOP, GARDEN, FIELD, GREENHOUSE, GREENHOUSE_HEATED, ORCHARD, ORCHARD_GROVE, POND, RESERVOIR, SHEEP_BARN, EQUIPMENT_YARD, TERRACE_STAIR, TERRACE_RAMP, ...UTILITY_KIT, ...BUNKER_KIT, ...TOWER_KIT].map(d => [d.id, d]));
 /** Build-menu order. */
-export const KIT_ORDER: readonly string[] = ['timber_cabin', 'log_house', 'lodge', 'lodge_plinth', 'lodge_solar', 'stone_house', 'timber_frame', 'container_house', 'adobe_house', 'cottage', 'guest_house', 'moms_house', 'stilted_house', 'cabin_village', 'outhouse', 'garden', 'greenhouse', 'polytunnel', 'high_tunnel', 'greenhouse_heated', 'aquaponics', 'orchard', 'orchard_grove', 'orchard_terraced', 'field', 'chicken_coop', 'sheep_barn', 'pond', 'root_cellar', 'wood_oven', 'apiary', 'sugar_shack', 'barnyard', 'workshop', 'metal_garage', 'barn', 'equipment_yard', 'helipad', 'boat_dock', 'marina'];
+/** Rigs a joiner brought (sim/joinerHome.ts): in the build menu only while one is waiting for a pad. */
+export const RIG_ORDER: readonly string[] = ['travel_trailer', 'rv_camper'];
+export const KIT_ORDER: readonly string[] = ['timber_cabin', 'log_house', 'lodge', 'lodge_plinth', 'lodge_solar', 'stone_house', 'timber_frame', 'container_house', 'adobe_house', 'cottage', 'guest_house', 'moms_house', 'modular_home', 'stilted_house', 'cabin_village', 'outhouse', 'garden', 'greenhouse', 'polytunnel', 'high_tunnel', 'greenhouse_heated', 'aquaponics', 'orchard', 'orchard_grove', 'orchard_terraced', 'field', 'chicken_coop', 'sheep_barn', 'pond', 'root_cellar', 'wood_oven', 'apiary', 'sugar_shack', 'barnyard', 'workshop', 'metal_garage', 'barn', 'equipment_yard', 'helipad', 'boat_dock', 'marina'];
 /** Water & power menu order. */
 export const UTILITY_ORDER: readonly string[] = ['well_hand', 'well_drilled', 'cistern', 'water_tower', 'filtration_shed', 'septic', 'solar_array', 'solar_farm', 'garage_solar', 'battery_shed', 'battery_bank', 'generator_shed', 'micro_hydro', 'wind_turbine', 'reservoir'];
 

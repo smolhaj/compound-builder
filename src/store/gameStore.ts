@@ -1,11 +1,14 @@
 import { planProblem } from '../sim/construction';
+import { unscripted } from '../sim/godMode';
 import { dropBridge, routeProblem } from '../sim/terrainFx';
-import { clearCollapse } from '../sim/corridors';
+import { clearCollapse, strandAway } from '../sim/corridors';
 import { dropRoadBridge, rebuildRoadBridge } from '../sim/roadFx';
 import { AFTERMATH_TEXT, joinPrisoner, releasePrisoner, resolveAftermath, type AftermathChoice } from '../sim/aftermath';
 import { dismissCrew, hireCrew } from '../sim/crews';
 import { setFocus } from '../sim/priority';
 import { orderHookup, placeImprovements } from '../sim/improvements';
+import { claimForWaiting, claimWaitingRig, isRig, type StayKind } from '../sim/joinerHome';
+import { kinOf } from '../sim/kin';
 import { setEntrance as chooseEntrance } from '../sim/roadEntrance';
 import { applyForPermit } from '../sim/paperwork';
 import { sweepChimney } from '../sim/upkeep';
@@ -17,6 +20,7 @@ import type { SiegePlan } from '../sim/siege';
 import type { Battle } from '../sim/battleTypes';
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
+import { gridChanged } from '../sim/lineage';
 import { newGame, SECONDS_PER_DAY, dayIndex, hourOf, type GameState, type OrderLine, type Speed } from '../sim/state';
 import { step } from '../sim/engine';
 import { placeOrder } from '../sim/economy';
@@ -29,7 +33,7 @@ import { AUTO_NAME, type AutoLightsOut } from '../sim/blackout';
 import { stampHighGround, upgradeTower } from '../sim/towers';
 import { cutRoadGates } from '../sim/roadGate';
 import { addSkirt, planRun, upgradeRun, type ContainerLook, type Gate, type PerimeterKind, type Pt } from '../sim/perimeter';
-import { ROAD_GATE_W, layPropertyWall, planPropertyWall, type PropertyGeometry } from '../sim/propertyWall';
+import { ROAD_GATE_W, layPropertyWall, planPropertyWall, type PropertyGeometry, type WallPlan } from '../sim/propertyWall';
 import { addWalkway } from '../sim/walkway';
 import { addRazor } from '../sim/razor';
 import { layPaths, pickUpPath, type LaidKind, type LayEdge } from '../sim/paths';
@@ -46,6 +50,7 @@ import { log } from '../sim/economy';
 import { opsecOf } from '../sim/opsec';
 import { hardenProblem, orderHarden, orderHardenAll, tierOf, type HardenId } from '../sim/hardening';
 import { saveGame, AUTOSAVE } from '../sim/save/saveSystem';
+import { decisionOpen, resumeSpeed } from '../sim/clockResume';
 
 /**
  * A raid played as a cutscene (sim/siege.ts, sim/raidCutscene.ts). While one is up, everything that
@@ -103,6 +108,11 @@ export interface GameStore {
   toolProblem: string | null;
   /** A short confirmation after a building is staked and the tool put away (clears itself). */
   stakedNote: string | null;
+  /** A staking the player is being asked to confirm because its county permit fee would dip under the living reserve (sim/spendGuard.stakeSpendAsk). */
+  spendAsk: { kind: string; x: number; z: number; rot: number; cost: number; after: number; reserve: number } | null;
+  askSpend: (a: NonNullable<GameStore['spendAsk']>) => void;
+  /** Answer the question: true stakes it anyway, false drops it (the tool stays armed). */
+  answerSpend: (yes: boolean) => void;
   /** Selected structure (construction panel). */
   selected: string | null;
   /** A request for the HUD to open a panel (a Next-step card or a link in the text): the right-hand tab and its sub-tab. The HUD takes it and clears it. */
@@ -127,9 +137,17 @@ export interface GameStore {
   advance: (days: number) => void;
   order: (lines: OrderLine[]) => boolean;
   plan: (kind: string, x: number, z: number, rot: number) => void;
+  /** The gate card: where the joiners will sleep, and whether the player picks a rig's pad (sim/joinerHome.ts). */
+  setStay: (stay: StayKind, placeRig?: boolean) => void;
+  /** The world checked the sim's spots for joiners' homes against the terrain (sim/joinerHome.ts). */
+  respotJoiners: (spots: Record<string, { x: number; z: number; rot: number }>) => void;
   /** Stake terraced garden beds, one per spot (the Next-step card's confirm; sim/terrace.ts). Returns why not, or null. */
   stakeTerraces: (spots: Array<[number, number]>) => string | null;
+  /** Stake starter-compound pieces (and the yard fence) in one go; each is an ordinary structure afterwards. Returns how many went in. */
+  layStarter: (pieces: ReadonlyArray<{ kind: string; x: number; z: number; rot: number }>, yard: WallPlan | null, geo: PropertyGeometry) => number;
   load: (g: GameState) => void;
+  /** Speed to pick up again once the decision card that paused the clock is answered (null: stay paused). */
+  resumeTo: Speed | null;
   /** Lay out a fence / hedge / wall run for the family to build. */
   planRun: (kind: PerimeterKind, pts: Pt[], gates: Gate[], offLen?: number) => void;
   /** Lay a tunnel-bridge or slope tunnel along a line the ground allows. Null on success, else why not. */
@@ -267,6 +285,16 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
   tool: null,
   toolProblem: null,
   stakedNote: null,
+  spendAsk: null,
+  askSpend: (spendAsk) => set({ spendAsk }),
+  answerSpend: (yes) => {
+    const a = get().spendAsk;
+    set({ spendAsk: null });
+    if (!a || !yes) return;
+    get().plan(a.kind, a.x, a.z, a.rot);
+    set({ tool: null });
+    get().flashStaked(`Staked out the ${a.kind.replace(/_/g, ' ')}. The family will start when the materials are in (Projects tab).`);
+  },
   selected: null,
   hudFocus: null,
   cutscene: null,
@@ -302,17 +330,20 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
   },
   tick: (realDt) => {
     const g = get().game;
+    const back = resumeSpeed(get().resumeTo, g.clock.speed, decisionOpen(g, get().cutscene));
+    if (back) { set({ game: { ...g, clock: { ...g.clock, speed: back } }, resumeTo: null }); return; }
     if (get().cutscene || g.clock.speed === 0 || g.gate.pending || g.gate.aftermath || (g.ending && !g.ending.continued)) return;
     const days = Math.min(realDt, MAX_DT) / SECONDS_PER_DAY[g.clock.speed];
     const next = step(g, days);
     // someone at the gate: stop the clock until the player decides
     // (and when news of a rescue comes in: the card)
-    if ((next.gate.pending && !g.gate.pending) || (next.gate.card && !g.gate.card) || (next.ending && !g.ending)) next.clock = { ...next.clock, speed: 0 };
-    set({ game: next, ...(next.gate.pending && !g.gate.pending ? { cutscene: promptFor(next), tool: null } : {}) });
+    const paused = (next.gate.pending && !g.gate.pending) || (next.gate.card && !g.gate.card) || (next.ending && !g.ending);
+    if (paused) next.clock = { ...next.clock, speed: 0 };
+    set({ game: next, ...(paused ? { resumeTo: g.clock.speed } : {}), ...(next.gate.pending && !g.gate.pending ? { cutscene: promptFor(next), tool: null } : {}) });
     if (dayIndex(next.clock.t) !== dayIndex(g.clock.t)) void saveGame(AUTOSAVE, next);
   },
   advance: (days) => set(s => { const game = step(s.game, days); return { game, cutscene: s.cutscene ?? promptFor(game) }; }),
-  setSpeed: (speed) => locked() ? undefined : set(s => ({ game: { ...s.game, clock: { ...s.game.clock, speed } } })),
+  setSpeed: (speed) => locked() ? undefined : set(s => ({ resumeTo: null, game: { ...s.game, clock: { ...s.game.clock, speed } } })),
   order: (lines) => {
     if (locked()) return false;
     const g = structuredClone(get().game);
@@ -323,12 +354,35 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
   plan: (kind, x, z, rot) => {
     if (locked()) return;
     if (planProblem(get().game, kind)) return;
+    if (isRig(kind) && !(get().game.joiners?.waiting.length)) return;   // a rig is parked only for a joiner who is waiting for a pad
     const g = structuredClone(get().game);
     const st = planStructure(g, kind, x, z, rot);
     stampHighGround(st);
-    applyForPermit(g, st);
+    if (isRig(kind)) claimWaitingRig(g, st);
+    else {
+      claimForWaiting(g, st, kinOf(g).waiting);
+      applyForPermit(g, st);
+    }
     set({ game: g, selected: st.id });
     void saveGame(AUTOSAVE, g);
+  },
+  setStay: (stay, placeRig = false) => {
+    const e = get().game.gate.pending;
+    if (!e) return;
+    const g = structuredClone(get().game);
+    g.gate.pending!.stay = stay;
+    g.gate.pending!.placeRig = stay === 'rig' && placeRig;
+    set({ game: g });
+  },
+  respotJoiners: (spots) => {
+    const g = structuredClone(get().game);
+    for (const st of g.structures) {
+      if (!st.joiner || st.joiner.spotted) continue;
+      const p = spots[st.id];
+      if (p) { st.x = p.x; st.z = p.z; st.rot = p.rot; }
+      st.joiner.spotted = true;
+    }
+    set({ game: g });
   },
   stakeTerraces: (spots) => {
     if (locked()) return LOCKED_WHY;
@@ -341,7 +395,23 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     void saveGame(AUTOSAVE, g);
     return null;
   },
-  load: (game) => set({ game, selected: null, tool: null, cutscene: promptFor(game) }),
+  layStarter: (pieces, yard, geo) => {
+    if (locked()) return 0;
+    const g = structuredClone(get().game);
+    let n = 0;
+    for (const p of pieces) {
+      if (planProblem(g, p.kind)) continue;
+      const st = planStructure(g, p.kind, p.x, p.z, p.rot);
+      stampHighGround(st);
+      applyForPermit(g, st);
+      n++;
+    }
+    if (yard && layPropertyWall(g, yard, geo) > 0) n++;
+    if (n) { set({ game: g }); void saveGame(AUTOSAVE, g); }
+    return n;
+  },
+  resumeTo: null,
+  load: (game) => set({ game, selected: null, tool: null, cutscene: promptFor(game), resumeTo: null }),
   planRun: (kind, pts, gates, offLen = 0) => {
     if (locked()) return;
     if (routeProblem(get().game, kind, pts)) return;   // a tunnel-bridge needs real low ground, a slope tunnel a hillside (the tool says why)
@@ -371,7 +441,7 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     if (locked()) return LOCKED_WHY;
     const g = structuredClone(get().game);
     const why = dropBridge(g, id);
-    if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); }
+    if (!why) { strandAway(g); set({ game: g }); void saveGame(AUTOSAVE, g); }
     return why;
   },
   clearCollapse: (id) => {
@@ -505,7 +575,7 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     const changed = isMarked(g, t.id) ? unmarkTree(g, t.id) : markTree(g, t, haulDist) !== null;
     if (changed) set({ game: g });
   },
-  setTool: (tool) => { if (!locked()) set({ tool, toolProblem: null, ...(tool ? { stakedNote: null } : {}) }); },
+  setTool: (tool) => { if (!locked()) set({ tool, toolProblem: null, spendAsk: null, ...(tool ? { stakedNote: null } : {}) }); },
   setToolProblem: (toolProblem) => set({ toolProblem }),
   flashStaked: (text) => {
     set({ stakedNote: text });
@@ -703,6 +773,7 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
       log(g, `Back on the county grid ($${GRID_RECONNECT} to reconnect).`);
     } else log(g, 'The co-op pulled the meter: the place is off the grid.');
     g.utilities.grid = on;
+    gridChanged(g, on);
     set({ game: g });
   },
   setBreaker: (id, on) => {
@@ -723,7 +794,7 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
   trigger: (kind, warnDays) => {
     if (locked()) return;
     const g = structuredClone(get().game);
-    if (g.disaster.mode !== 'sandbox' || (g.disaster.kind && g.disaster.phase !== 'peace')) return;
+    if (!unscripted(g.disaster.mode) || (g.disaster.kind && g.disaster.phase !== 'peace')) return;
     triggerDisaster(g.disaster, g.clock.t, kind, g.seed, warnDays);
     set({ game: g });
   },

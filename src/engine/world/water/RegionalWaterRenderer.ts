@@ -31,6 +31,9 @@ export class RegionalWaterRenderer {
   private readonly _objs: THREE.Object3D[] = [];
   private readonly _disposables: Array<{ dispose(): void }> = [];
   private readonly _edges: WaterEdgeRenderer;
+  /** Ice cover 0 (open) … 1 (hard ice); negative: follow the season. */
+  private readonly _iceU = { value: -1 };
+  private _iceNow = -1;
   private _flow: FlowField | null = null;
   private _flowOrigin: [number, number] = [0, 0];
 
@@ -106,8 +109,9 @@ export class RegionalWaterRenderer {
     patchWaterMaterial(mat, {
       key: 'regional',
       look: looks[field.kind],
-      pars: 'uniform sampler2D uDepthFar;\nuniform vec4 uFarRect;\nuniform sampler2D uDepthNear;',
-      uniforms: { uDepthFar: { value: tex }, uFarRect: { value: new THREE.Vector4(cx - half, cz - half, 1 / (half * 2), 1 / (half * 2)) }, uDepthNear: { value: ntex } },
+      pars: 'uniform sampler2D uDepthFar;\nuniform vec4 uFarRect;\nuniform sampler2D uDepthNear;\nuniform float uLakeIce;',
+      iceExpr: '(uLakeIce < 0.0 ? uSeaC.x : uLakeIce)',
+      uniforms: { uDepthFar: { value: tex }, uFarRect: { value: new THREE.Vector4(cx - half, cz - half, 1 / (half * 2), 1 / (half * 2)) }, uDepthNear: { value: ntex }, uLakeIce: this._iceU },
       depthGLSL: /* glsl */`
         vec2 nUv = (vWPos.xz - uFlowRect.xy) * uFlowRect.zw;
         float inN = step(0.0, nUv.x) * step(nUv.x, 1.0) * step(0.0, nUv.y) * step(nUv.y, 1.0);
@@ -158,6 +162,19 @@ export class RegionalWaterRenderer {
     if (!f) return 0;
     return flowSpeedAt(f, (x - this._flowOrigin[0]) / f.texel, (z - this._flowOrigin[1]) / f.texel);
   }
+
+  /**
+   * The lake's ice from the sim (sim/waterfront `lakeIce`): 0 open, ~0.3 skim, 1 hard ice, eased `dt` seconds at a time so the
+   * surface skins over rather than flicks. Pass a negative target to follow the season again.
+   */
+  setIce(target: number, dt = 1): void {
+    if (target < 0 || this._iceNow < 0) this._iceNow = target;
+    else this._iceNow += (target - this._iceNow) * Math.min(1, dt * 0.6);
+    this._iceU.value = this._iceNow;
+  }
+
+  /** The ice cover now drawn (negative: following the season). */
+  get ice(): number { return this._iceU.value; }
 
   setSeason(season: string): void { this._edges.setSeason(season); }
 

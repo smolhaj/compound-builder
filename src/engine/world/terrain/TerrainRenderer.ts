@@ -74,6 +74,10 @@ uniform vec3 uForest;
 uniform vec3 uRock;
 uniform vec3 uScree;
 uniform vec3 uSnow;
+uniform vec3 uFloorDuff;
+uniform vec3 uFloorLitter;
+uniform vec3 uFloorMoss;
+uniform vec3 uFloorK;
 uniform float uTreeLine;
 uniform float uSnowLine;
 uniform float uDry;
@@ -140,6 +144,11 @@ export function makeTerrainMaterial(look: RegionLook, waterY: number | null): { 
     uRock: { value: lin(look.rock) },
     uScree: { value: lin(0x9a948a) },
     uSnow: { value: new THREE.Color(0.86, 0.89, 0.93) },
+    // forest floor (regionalLandscape RegionLook.floor): x litter share, y moss share, z open-meadow dulling; all 0 = this region has none
+    uFloorDuff: { value: lin(look.floor?.duff ?? 0x3a3020) },
+    uFloorLitter: { value: lin(look.floor?.litter ?? 0x5a4630) },
+    uFloorMoss: { value: lin(look.floor?.moss ?? 0x4a6030) },
+    uFloorK: { value: new THREE.Vector3(look.floor?.litterK ?? 0, look.floor?.mossK ?? 0, look.floor?.meadow ?? 0) },
     uTreeLine: { value: look.treeLine },
     uSnowLine: { value: look.snowLine },
     uDry: { value: look.dry },
@@ -189,6 +198,15 @@ export function makeTerrainMaterial(look: RegionLook, waterY: number | null): { 
         vec3 col = uGrass * (0.78 + 0.4 * na) * (0.92 + 0.16 * nb);
         float dry = uDry * smoothstep(0.25, 0.75, na * 0.8 + slope * 1.4 + 0.15 * nb);
         col = mix(col, uDryGrass * (0.85 + 0.25 * nb), dry);
+        // Wooded regions: the open ground is not a clean lawn either. Dull the green
+        // toward the olive of old grass, and let leaf litter, duff and moss patch it.
+        if (uFloorK.z > 0.0) {
+          float mp = rTri(vRPos, tw, 0.3), mq = rTri(vRPos, tw, 1.1);
+          float lg = dot(col, vec3(0.3, 0.55, 0.15));
+          col = mix(col, vec3(lg) * vec3(1.14, 1.0, 0.7), 0.5 * uFloorK.z);
+          col = mix(col, uFloorLitter * (0.8 + 0.4 * mq), smoothstep(0.46, 0.62, mp + (mq - 0.5) * 0.3) * 0.4 * uFloorK.z * uFloorK.x);
+          col = mix(col, uFloorMoss * (0.8 + 0.4 * nb), smoothstep(0.6, 0.74, mq * 0.6 + mp * 0.5) * 0.4 * uFloorK.z * uFloorK.y);
+        }
         // Close-range ground texture (the town ground is this surface too, so
         // no flat untextured sheet shows near the camera): grass clumps, bare
         // soil patches and — on semi-arid ground — dark scrub / chaparral dots
@@ -313,11 +331,13 @@ export function makeTerrainMaterial(look: RegionLook, waterY: number | null): { 
         {
           float camB = length(vRPos - cameraPosition);
           float nearB = (1.0 - smoothstep(18.0, 70.0, camB)) * (1.0 - smoothstep(0.3, 0.5, slope));
+          if (uFloorK.z > 0.0) nearB *= 1.0 - 0.9 * smoothstep(0.22, 0.55, vForest);   // under the trees it is duff and litter, not lawn
           if (nearB > 0.0) {
             vec4 bd1 = texture2D(uGDetail, xz * 0.23);
             vec4 bd2 = texture2D(uGDetail, vec2(xz.x * 0.8 - xz.y * 0.6, xz.x * 0.6 + xz.y * 0.8) * 0.089 + 0.5);
             vec3 bdet = mix(bd1.rgb, bd2.rgb, 0.5) * 2.0;
-            col *= mix(vec3(1.0), bdet, 0.75 * nearB);
+            // sweep-gfx: 0.75 read as diagonal brushed streaks on dry ground at eye level; 0.5 keeps the blade grain without the swirl
+            col *= mix(vec3(1.0), bdet, 0.5 * nearB);
           }
         }
         // Forest canopy as seen from afar (the instanced trees stand on it nearer in)
@@ -328,6 +348,15 @@ export function makeTerrainMaterial(look: RegionLook, waterY: number | null): { 
         // blotches across the hillside (QA, Mega Campus by the station)
         float nearFo = 1.0 - smoothstep(110.0, 340.0, length(vRPos - cameraPosition));
         col = mix(col, uForest * mix((0.7 + 0.55 * nc) * (0.85 + 0.3 * na), 0.8 + 0.12 * nb, nearFo), fo);
+        // Forest floor under the near canopy (Appalachia / PNW / north woods): brown duff with
+        // drifts of leaf litter and needles, moss on the damp patches and over stones, fine speckle up close
+        if (uFloorK.z > 0.0) {
+          float f1 = rTri(vRPos, tw, 0.75), f2 = rTri(vRPos, tw, 2.3), f3 = mix(rTri(vRPos, tw, 9.0), 0.5, smoothstep(25.0, 90.0, length(vRPos - cameraPosition)));
+          vec3 fl = mix(uFloorDuff * (0.6 + 0.9 * f2), col * 0.8, 0.3);
+          fl = mix(fl, uFloorLitter * (0.55 + 0.9 * f3), smoothstep(0.34, 0.58, f1 + (f2 - 0.5) * 0.35) * uFloorK.x * (0.55 + 0.45 * f3));
+          fl = mix(fl, uFloorMoss * (0.6 + 0.8 * f2), smoothstep(0.5, 0.68, f2 * 0.55 + f1 * 0.5 + slope * 0.4) * uFloorK.y);
+          col = mix(col, fl, smoothstep(0.22, 0.55, vForest + (nb - 0.5) * 0.2) * 0.9 * (0.3 + 0.7 * nearFo));
+        }
         // Seasons: the deciduous share of the far canopy turns, then goes bare
         float decidFo = fo * ${(1 - look.evergreen).toFixed(3)};
         ${o_kudzu(look)}
@@ -358,7 +387,7 @@ export function makeTerrainMaterial(look: RegionLook, waterY: number | null): { 
         // far away the coarse grid exaggerates steepness: let snow hold on steeper faces there
         float sThr = mix(0.36, 0.62, smoothstep(500.0, 1300.0, camDc));
         float snow = smoothstep(sl - 30.0, sl + 30.0, alt) * (1.0 - smoothstep(sThr, sThr + 0.14, slope));
-        snow = max(snow, uSnowCover * (1.0 - smoothstep(0.25, 0.55, slope)) * (1.0 - 0.8 * fo));
+        snow = max(snow, uSnowCover * (1.0 - smoothstep(0.25, 0.55, slope)) * (1.0 - 0.8 * fo) * (1.0 - 0.45 * smoothstep(0.22, 0.55, vForest)));
         col = mix(col, uSnow * (0.9 + 0.1 * nb), snow);
         // Damp shore and wet mud just above the water line
         float shore = 1.0 - smoothstep(0.0, 0.7, alt - uWaterY);
@@ -392,7 +421,7 @@ export function makeTerrainMaterial(look: RegionLook, waterY: number | null): { 
           ${HEIGHT_FOG_GLSL}
         #endif`);
   };
-  mat.customProgramCacheKey = () => 'regional_terrain_v4_' + look.evergreen + (look.kudzu ? 'k' : '');
+  mat.customProgramCacheKey = () => 'regional_terrain_v5_' + look.evergreen + (look.floor ? 'f' : '') + (look.kudzu ? 'k' : '');
   applyGroundSkyFill(mat); // r15 dusk
   return { mat, u };
 }
@@ -566,7 +595,7 @@ export class TerrainRenderer {
     const hi = Math.min(look.snowLine, 2000);
     const lo = Math.min(look.snowLineWinter, 2000);
     u['uSnowLine'].value = hi + (lo - hi) * p.cold;
-    u['uSnowCover'].value = look.snowLineWinter < 20 ? Math.min(0.9, p.snow) : 0;
+    u['uSnowCover'].value = look.snowLineWinter < 60 ? Math.min(0.9, p.snow) : 0;
     const doy = Math.round(seasonState.doy);
     const cc = u['uCropC'].value as THREE.Vector3[], ct = u['uCropT'].value as number[];
     if (doy !== this._cropDoy || this._cropEase > 0) {

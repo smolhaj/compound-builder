@@ -34,6 +34,7 @@ import { climate } from './effects';
 import { mulberry32 } from './rng';
 import type { Person } from './family';
 import { regionFor } from './climate';
+import { crowdingFx, quarterHomes, quartersKey } from './quarters';
 
 export type SpotKind = 'bed' | 'bunk' | 'couch' | 'floor' | 'tent' | 'outbuilding' | 'nowhere';
 export const SPOT_ORDER: readonly SpotKind[] = ['bed', 'bunk', 'couch', 'floor', 'tent', 'outbuilding', 'nowhere'];
@@ -66,6 +67,9 @@ const HOMES: Record<string, Spec> = {
   adobe_house: { couches: 2, floorM2: 14 },
   farmhouse: { couches: 2, floorM2: 16 },
   trailer: { couches: 1, floorM2: 8 },
+  travel_trailer: { couches: 1, floorM2: 2 },
+  rv_camper: { couches: 1, floorM2: 3 },
+  modular_home: { couches: 1, floorM2: 5 },
   cottage: { couches: 1, floorM2: 5 },
   // the stilted house's two rooms, and the ring of six cabins (a bunk each side of each: twelve)
   stilted_house: { couches: 1, floorM2: 6 },
@@ -309,9 +313,12 @@ export function housingPlan(s: GameState, guests: readonly Person[] = []): Housi
   const ownBeds = all.filter(q => q.kind === 'bed' && SEPARATE_DWELLINGS.has(kindOf.get(q.where) ?? ''));
   const choices = (p: Person): Pool[] => (wantsOwnPlace(p) && ownBeds.length ? [...ownBeds, ...all] : all);
   // someone the family gave a home to (sim/newcomers.ts givePlace) has a bed there first
+  // quarters (sim/quarters.ts): each household has a home, chosen or assigned; the sick go to the sick bay
+  const qHome = quarterHomes(s, list.map(x => x.p), all.filter(q => q.kind === 'bed' && q.where).map(q => ({ where: q.where, beds: q.left, kind: kindOf.get(q.where) ?? '' })), SEPARATE_DWELLINGS);
   for (const x of list) {
-    if (!x.p.home) continue;
-    const pool = all.find(q => q.kind === 'bed' && q.where === x.p.home && q.left + 1e-9 >= cost(x.p, 'bed'));
+    const home = qHome.get(x.p.id);
+    if (!home) continue;
+    const pool = all.find(q => q.kind === 'bed' && q.where === home && q.left + 1e-9 >= cost(x.p, 'bed'));
     if (pool) give(x.p, pool);
   }
 
@@ -356,7 +363,7 @@ let memo: { key: string; plan: HousingPlan } | null = null;
 /** The plan, reused while nothing it depends on has changed (the world asks every frame). */
 export function cachedPlan(s: GameState): HousingPlan {
   const fin = finished(s).length;
-  const key = `${s.seed}|${s.clock.startDoy}|${dayIndex(s.clock.t)}|${s.site.region}|${s.people.length}|${s.personState.map(p => (p.needs.died != null || p.needs.taken ? 1 : 0)).join('')}|${s.structures.length}|${fin}|${s.people.map(p => p.home ?? '').join(',')}|${s.stock.tent}|${s.stock.sleeping_bag}|${heatOn(s) ? 1 : 0}|${s.weather?.active?.kind ?? ''}`;
+  const key = `${s.seed}|${s.clock.startDoy}|${dayIndex(s.clock.t)}|${s.site.region}|${s.people.length}|${s.personState.map(p => (p.needs.died != null || p.needs.taken ? 1 : 0)).join('')}|${s.structures.length}|${fin}|${s.people.map(p => p.home ?? '').join(',')}|${s.stock.tent}|${s.stock.sleeping_bag}|${heatOn(s) ? 1 : 0}|${s.weather?.active?.kind ?? ''}|${quartersKey(s)}`;
   if (memo?.key === key) return memo.plan;
   const plan = housingPlan(s);
   memo = { key, plan };
@@ -382,7 +389,9 @@ export function tentsPitched(s: GameState): number {
 /** Tonight's effect on each person by index in `s.people` (absent = no effect). */
 export function sleepEffects(s: GameState): Map<number, { morale: number; harm: number; tired: number }> {
   const out = new Map<number, { morale: number; harm: number; tired: number }>();
-  for (const sl of housingPlan(s).sleepers) if (sl.index >= 0) out.set(sl.index, { morale: sl.morale, harm: sl.harm, tired: sl.tired });
+  const plan = housingPlan(s);
+  for (const sl of plan.sleepers) if (sl.index >= 0) out.set(sl.index, { morale: sl.morale, harm: sl.harm, tired: sl.tired });
+  for (const [id, fx] of quartersFx(s, plan)) { const i = s.people.findIndex(p => p.id === id); const o = i >= 0 ? out.get(i) : undefined; if (o) { o.morale += fx.morale; o.tired += fx.tired; } }
   return out;
 }
 
@@ -505,3 +514,11 @@ function tentNote(night: Night, stove: boolean, n: number): string {
   return stove ? `Below freezing (lows around ${f}°F): only the wall tent's stove keeps a tent livable.` : `Below freezing (lows around ${f}°F) and no firewood: a night in a tent costs health.`;
 }
 
+
+/** What crowding and sharing with other households cost each person tonight (sim/quarters.ts); empty in an ordinary house. */
+export function quartersFx(s: GameState, plan: HousingPlan = cachedPlan(s)) {
+  const beds = new Map<string, number>();
+  for (const st of finished(s)) { const b = (HOME_BEDS[st.kind] ?? 0) + (HOMES[st.kind]?.bunks ?? 0); if (b > 0) beds.set(st.id, b); }
+  const live = plan.sleepers.filter(x => x.index >= 0);
+  return crowdingFx(live.map(x => ({ id: x.id, where: x.spot.where, kind: x.spot.kind })), live.map(x => s.people[x.index]), beds);
+}

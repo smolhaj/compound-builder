@@ -10,6 +10,7 @@ import { MATERIALS, type MaterialId } from '../sim/materials';
 import { orderCost, orderProblem } from '../sim/economy';
 import { arrivalOutlook, BAG_PRICE, cachedPlan, housingFixes, SPOT_ORDER, TENT_PRICE, type SpotKind } from '../sim/housing';
 import type { Person } from '../sim/family';
+import { Hint } from './hud/common';
 
 const DIM = 'rgba(238,238,238,0.6)';
 const TONE = { good: '#a8d080', warn: '#f0c070', bad: '#f08060' } as const;
@@ -41,10 +42,9 @@ export function HousingPanel() {
   return (
     <div style={{ marginBottom: 10 }} data-testid="housing">
       <div style={h3}>Housing</div>
-      <div style={{ ...small, color: DIM }}>
-        Beds {cap.beds + cap.bunks} · couches {cap.couches} · floor room for {cap.floorBags} bags · tents {cap.tents} + the wall tent ({cap.tentSeats} seats) · {cap.bags} {cap.bags === 1 ? 'bag' : 'bags'}
+      <div style={{ ...small, color: DIM }} title={`Beds ${cap.beds + cap.bunks}, couches ${cap.couches}, floor room for ${cap.floorBags} bags, tents ${cap.tents} plus the wall tent (${cap.tentSeats} seats), ${cap.bags} ${cap.bags === 1 ? 'bag' : 'bags'}`}>
+        Beds {cap.beds + cap.bunks} · couches {cap.couches} · tents {cap.tents} · low tonight {f}°F{plan.night.stormy ? ', storm' : plan.night.rainy ? ', rain' : plan.night.snowy ? ', snow' : ''}{plan.stove ? '' : ', no firewood'}
       </div>
-      <div style={{ ...small, color: DIM }}>Tonight: low about {f}°F{plan.night.stormy ? ', storm' : plan.night.rainy ? ', rain' : plan.night.snowy ? ', snow' : ''}{plan.stove ? '' : ', no firewood for the stove'}.</div>
       {SPOT_ORDER.filter(k => plan.counts[k] > 0).map(k => (
         <div key={k} style={{ ...small, display: 'flex', justifyContent: 'space-between', gap: 8 }}>
           <span style={{ color: DIM }}>{WHERE[k]}</span>
@@ -55,9 +55,9 @@ export function HousingPanel() {
         ? <div style={{ ...small, color: TONE.good }}>Everybody has a bed{plan.bedsFree > 0 ? `; ${plan.bedsFree} more could be taken in` : ''}.</div>
         : <>
           <div style={{ ...small, color: plan.outside > 0 ? TONE.bad : TONE.warn }}>
-            {plan.noBed} {plan.noBed === 1 ? 'person has' : 'people have'} no bed{plan.outside > 0 ? `, ${plan.outside} out in the weather` : ''}. Poor sleep wears on morale{plan.sleepers.some(x => x.harm > 0.05) ? ' and health' : ''}.
+            <span title={`Poor sleep wears on morale${plan.sleepers.some(x => x.harm > 0.05) ? ' and health' : ''}`}>{plan.noBed} {plan.noBed === 1 ? 'person has' : 'people have'} no bed{plan.outside > 0 ? `, ${plan.outside} out in the weather` : ''}.</span>
           </div>
-          {fixes.length > 0 && <div style={{ ...small, color: DIM }}>Fix: {fixes.map(x => x.text).join(', or ')}.</div>}
+          {fixes.length > 0 && <div style={{ ...small, color: DIM, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }} title={`Fix: ${fixes.map(x => x.text).join(', or ')}.`}>Fix: {fixes.map(x => x.text).join(', or ')}.</div>}
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 3 }}>
             {fixes.filter(x => x.action === 'buy').map(x => buy(x.item as 'tent' | 'sleeping_bag', x.qty))}
           </div>
@@ -73,8 +73,8 @@ export function ArrivalHousing({ people }: { people: readonly Person[] }) {
   const o = arrivalOutlook(game, people);
   const bad = o.guests.nowhere > 0 || o.worst < -8;
   return (
-    <div style={{ margin: '8px 0', fontSize: 12, opacity: 0.85, color: bad ? TONE.bad : undefined }} data-testid="arrival-housing">
-      {o.lines.map((l, i) => <div key={i}>{l}</div>)}
+    <div data-testid="arrival-housing">
+      <Hint tone={bad ? 'bad' : undefined} more={o.lines.filter((_, i) => i !== 1).map((l, i) => <div key={i}>{l}</div>)}>{o.lines[1]}</Hint>
     </div>
   );
 }

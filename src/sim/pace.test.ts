@@ -35,7 +35,8 @@ describe('the family pace', () => {
     g.personState[i].employed = true;
     expect(slowHint(g, 2)).toBeNull();
     const h = slowHint(g, 20)!;
-    expect(h).toMatch(/quitting the job/);
+    expect(h).toMatch(/weekends/);
+    expect(h).toMatch(/quit the job/);
     expect(h).toMatch(/crew/);
   });
 

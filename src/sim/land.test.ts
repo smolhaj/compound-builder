@@ -47,3 +47,18 @@ describe('buying land', () => {
     expect(up).toBeLessThan(10);
   });
 });
+
+describe('off-lot runs', () => {
+  it('refuses a wall plan far off the parcel, accepts one on it, ignores nothing finite-wise', async () => {
+    const { offLotProblem } = await import('./land');
+    const { routeProblem } = await import('./terrainFx');
+    const g = newGame(11);
+    const h = g.site.home;
+    const mid: [number, number] = [(h.x0 + h.x1) / 2, (h.z0 + h.z1) / 2];
+    expect(offLotProblem(g, [mid, [mid[0] + 5, mid[1]]])).toBeNull();
+    expect(offLotProblem(g, [mid, [mid[0] + 400, mid[1]]])).toMatch(/off your land/);
+    expect(offLotProblem(g, [mid, [NaN, 0]])).toMatch(/not on the map/);
+    expect(routeProblem(g, 'moat', [mid, [mid[0] + 400, mid[1]]])).toMatch(/off your land/);
+    expect(routeProblem(g, 'moat', [mid, [mid[0] + 5, mid[1]]])).toBeNull();
+  });
+});

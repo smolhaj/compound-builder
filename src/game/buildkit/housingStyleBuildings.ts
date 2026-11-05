@@ -106,7 +106,7 @@ function lodgeBasement(p: Parts, o: LodgeShell): void {
   // ── the walkout basement: poured and stone-faced, the pad is its floor; the back (downhill) wall is mostly glass ──
   p.layer = 'foundation';
   const slabRects = minusHoles({ x0: -hw, x1: hw, z0: -hd, z1: hd }, o.hatches);
-  for (const r of slabRects) p.add('concrete', box(r.x1 - r.x0, 0.04, r.z1 - r.z0, (r.x0 + r.x1) / 2, -0.04, (r.z0 + r.z1) / 2));
+  for (const r of slabRects) p.add('concrete', box(r.x1 - r.x0, 0.04, r.z1 - r.z0, (r.x0 + r.x1) / 2, -0.016, (r.z0 + r.z1) / 2));   // top at the furniture's floor (0.004), above the graded pad: the cutaway shows a slab, not grass
   const wallH = top + 0.03;
   const sink = p.sink;
   // (no colliders: the body's walls above stand on the same line and have the doorways in them)

@@ -301,6 +301,33 @@ export const TRAILER_BLUEPRINT: Blueprint = {
     { id: 'finish', name: 'Skirting, steps, hookups', hours: 40, materials: { lumber: 4, hardware: 2 } },
   ],
 };
+/**
+ * A joiner's own rig (sim/joinerHome.ts): a travel trailer or a Class C RV parked on a pad. It arrives finished (a vehicle, not a build) and
+ * leaves with its owners; the kit piece is in the build menu only while a rig is waiting for a pad.
+ */
+const rigStages = (what: string): StageDef[] => [
+  { id: 'site', name: `Pick the spot for the ${what}`, hours: 1, materials: {} },
+  { id: 'foundation', name: 'Chock the wheels, set the jacks', hours: 1, materials: {} },
+  { id: 'frame', name: `Back the ${what} onto the pad`, hours: 1, materials: {} },
+  { id: 'roof', name: 'Level it, extend the awning', hours: 1, materials: {} },
+  { id: 'finish', name: 'Hook up the water and power', hours: 1, materials: {} },
+];
+export const TRAVEL_TRAILER_BLUEPRINT: Blueprint = { kind: 'travel_trailer', stages: rigStages('trailer') };
+export const RV_BLUEPRINT: Blueprint = { kind: 'rv_camper', stages: rigStages('RV') };
+/**
+ * A factory-built home (2025: a one-bedroom 14 × 32 ft modular unit about $58k delivered and set; the pad, piers, crane day and hookups on top):
+ * fast to finish because the walls and roof arrive done. Not in the build menu's cheap list, but anyone can order one.
+ */
+export const MODULAR_HOME_BLUEPRINT: Blueprint = {
+  kind: 'modular_home',
+  stages: [
+    { id: 'site', name: 'Grade and gravel the pad', hours: 24, materials: {} },
+    { id: 'foundation', name: 'Piers and tie-downs', hours: 36, materials: { concrete: 4, hardware: 1 } },
+    { id: 'frame', name: 'The unit arrives; a crane crew sets it', hours: 10, materials: { modular_unit: 1 } },
+    { id: 'roof', name: 'Seal the marriage line, ridge cap', hours: 14, materials: { roofing: 1 } },
+    { id: 'finish', name: 'Skirting, steps, porch, hookups', hours: 44, materials: { lumber: 4, hardware: 2 } },
+  ],
+};
 /** 12 × 18 m pole barn with a hay loft: ≈ 900 person-hours; ≈ $36k of materials. */
 export const BARN_BLUEPRINT: Blueprint = {
   kind: 'barn',
@@ -357,11 +384,11 @@ export const METAL_GARAGE_BLUEPRINT: Blueprint = { kind: 'metal_garage', stages:
 export const GARAGE_SOLAR_BLUEPRINT: Blueprint = { kind: 'garage_solar', stages: garageStages(true) };
 
 /** Kinds people live in (a kitchen, a roof over the family). */
-export const HOMES: readonly string[] = ['timber_cabin', 'log_house', 'farmhouse', 'trailer', 'cottage', 'guest_house', 'moms_house', 'lodge', 'lodge_plinth', 'lodge_solar', 'stone_house', 'timber_frame', 'container_house', 'adobe_house', 'stilted_house'];
+export const HOMES: readonly string[] = ['timber_cabin', 'log_house', 'farmhouse', 'trailer', 'travel_trailer', 'rv_camper', 'modular_home', 'cottage', 'guest_house', 'moms_house', 'lodge', 'lodge_plinth', 'lodge_solar', 'stone_house', 'timber_frame', 'container_house', 'adobe_house', 'stilted_house'];
 const HOME_SET: ReadonlySet<string> = new Set(HOMES);
 export const isHome = (kind: string) => HOME_SET.has(kind);
 /** People each home kind sleeps (matches the kit's `sleeps`). */
-export const HOME_BEDS: Record<string, number> = { timber_cabin: 4, log_house: 6, farmhouse: 6, trailer: 4, cottage: 3, guest_house: 2, moms_house: 4, lodge: 10, lodge_plinth: 10, lodge_solar: 10, stone_house: 6, timber_frame: 6, container_house: 4, adobe_house: 4, stilted_house: 4 };
+export const HOME_BEDS: Record<string, number> = { timber_cabin: 4, log_house: 6, farmhouse: 6, trailer: 4, travel_trailer: 3, rv_camper: 4, modular_home: 3, cottage: 3, guest_house: 2, moms_house: 4, lodge: 10, lodge_plinth: 10, lodge_solar: 10, stone_house: 6, timber_frame: 6, container_house: 4, adobe_house: 4, stilted_house: 4 };
 /** Beds under a finished roof on the place (shelter for the household and anyone taken in). */
 export function homeBeds(s: { structures: ReadonlyArray<{ kind: string; stage: number }> }): number {
   return s.structures.reduce((a, st) => a + (BLUEPRINTS[st.kind] && st.stage >= BLUEPRINTS[st.kind].stages.length ? HOME_BEDS[st.kind] ?? 0 : 0), 0);
@@ -468,6 +495,15 @@ export const MOTOR_COURT_BLUEPRINT: Blueprint = bp('motor_court', [
   ['frame', 'Posts, rails and bars: the black fence on three sides', 70, { rebar: 7, hardware: 2, concrete: 3 }],
   ['roof', 'Hang the drive gate, paint the bays and the stop line', 24, { rebar: 2, hardware: 2 }],
   ['finish', 'Light poles, wiring and the call box', 20, { cable: 2, hardware: 2 }],
+]);
+
+/** The vehicle yard (sim/vehicleYard.ts): a graded gravel lot, chain-link on four sides, a padlocked double drive gate, six painted bays, two floodlight poles. */
+export const VEHICLE_YARD_BLUEPRINT: Blueprint = bp('vehicle_yard', [
+  ['site', 'Stake out and grade the lot', 10, {}],
+  ['foundation', 'Crushed rock, compacted', 44, { fieldstone: 10 }],
+  ['frame', 'Posts, rails and chain-link on four sides', 50, { wire: 4, hardware: 2, lumber: 1 }],
+  ['roof', 'Hang the drive gate, paint the bays', 16, { hardware: 2, wire: 1 }],
+  ['finish', 'Light poles, wiring and a padlock', 14, { cable: 1, hardware: 1 }],
 ]);
 
 // ── Underground: dug with a hired excavator; the net earth dug out becomes spoil for berms ──
@@ -660,7 +696,7 @@ export const ORCHARD_TERRACED_BLUEPRINT: Blueprint = bp('orchard_terraced', [
 ]);
 
 export const BLUEPRINTS: Record<string, Blueprint> = Object.fromEntries(
-  [ORCHARD_TERRACED_BLUEPRINT, CABIN_VILLAGE_BLUEPRINT, HELIPAD_BLUEPRINT, TOWER_POD_BLUEPRINT, STILTED_HOUSE_BLUEPRINT, BOAT_DOCK_BLUEPRINT, MARINA_BLUEPRINT, POLYTUNNEL_BLUEPRINT, HIGH_TUNNEL_BLUEPRINT, AQUAPONICS_BLUEPRINT, MICRO_HYDRO_BLUEPRINT, WIND_TURBINE_BLUEPRINT, CABIN_BLUEPRINT, OUTHOUSE_BLUEPRINT, WORKSHOP_BLUEPRINT, ROOT_CELLAR_BLUEPRINT, WOOD_OVEN_BLUEPRINT, FORGE_BLUEPRINT, APIARY_BLUEPRINT, SUGAR_SHACK_BLUEPRINT, BARNYARD_BLUEPRINT, COOP_BLUEPRINT, GARDEN_BLUEPRINT, FIELD_BLUEPRINT, GREENHOUSE_BLUEPRINT, ORCHARD_BLUEPRINT, LOG_HOUSE_BLUEPRINT, FARMHOUSE_BLUEPRINT, TRAILER_BLUEPRINT, BARN_BLUEPRINT, COTTAGE_BLUEPRINT, GUEST_HOUSE_BLUEPRINT, MOMS_HOUSE_BLUEPRINT, LODGE_BLUEPRINT, LODGE_PLINTH_BLUEPRINT, LODGE_SOLAR_BLUEPRINT, STONE_HOUSE_BLUEPRINT, TIMBER_FRAME_BLUEPRINT, CONTAINER_HOUSE_BLUEPRINT, ADOBE_HOUSE_BLUEPRINT, METAL_GARAGE_BLUEPRINT, GARAGE_SOLAR_BLUEPRINT, ...UTILITY_BLUEPRINTS, GREENHOUSE_HEATED_BLUEPRINT, ORCHARD_GROVE_BLUEPRINT, SOLAR_FARM_BLUEPRINT, BATTERY_BANK_BLUEPRINT, POND_BLUEPRINT, RESERVOIR_BLUEPRINT, SHEEP_BARN_BLUEPRINT, EQUIPMENT_YARD_BLUEPRINT, ...BUNKER_BLUEPRINTS, ...TOWER_BLUEPRINTS, GATE_GARAGE_BLUEPRINT, MOTOR_COURT_BLUEPRINT, TERRACE_STAIR_BLUEPRINT, TERRACE_RAMP_BLUEPRINT].map(b => [b.kind, b]));
+  [VEHICLE_YARD_BLUEPRINT, ORCHARD_TERRACED_BLUEPRINT, CABIN_VILLAGE_BLUEPRINT, HELIPAD_BLUEPRINT, TOWER_POD_BLUEPRINT, STILTED_HOUSE_BLUEPRINT, BOAT_DOCK_BLUEPRINT, MARINA_BLUEPRINT, POLYTUNNEL_BLUEPRINT, HIGH_TUNNEL_BLUEPRINT, AQUAPONICS_BLUEPRINT, MICRO_HYDRO_BLUEPRINT, WIND_TURBINE_BLUEPRINT, CABIN_BLUEPRINT, OUTHOUSE_BLUEPRINT, WORKSHOP_BLUEPRINT, ROOT_CELLAR_BLUEPRINT, WOOD_OVEN_BLUEPRINT, FORGE_BLUEPRINT, APIARY_BLUEPRINT, SUGAR_SHACK_BLUEPRINT, BARNYARD_BLUEPRINT, COOP_BLUEPRINT, GARDEN_BLUEPRINT, FIELD_BLUEPRINT, GREENHOUSE_BLUEPRINT, ORCHARD_BLUEPRINT, LOG_HOUSE_BLUEPRINT, FARMHOUSE_BLUEPRINT, TRAILER_BLUEPRINT, TRAVEL_TRAILER_BLUEPRINT, RV_BLUEPRINT, MODULAR_HOME_BLUEPRINT, BARN_BLUEPRINT, COTTAGE_BLUEPRINT, GUEST_HOUSE_BLUEPRINT, MOMS_HOUSE_BLUEPRINT, LODGE_BLUEPRINT, LODGE_PLINTH_BLUEPRINT, LODGE_SOLAR_BLUEPRINT, STONE_HOUSE_BLUEPRINT, TIMBER_FRAME_BLUEPRINT, CONTAINER_HOUSE_BLUEPRINT, ADOBE_HOUSE_BLUEPRINT, METAL_GARAGE_BLUEPRINT, GARAGE_SOLAR_BLUEPRINT, ...UTILITY_BLUEPRINTS, GREENHOUSE_HEATED_BLUEPRINT, ORCHARD_GROVE_BLUEPRINT, SOLAR_FARM_BLUEPRINT, BATTERY_BANK_BLUEPRINT, POND_BLUEPRINT, RESERVOIR_BLUEPRINT, SHEEP_BARN_BLUEPRINT, EQUIPMENT_YARD_BLUEPRINT, ...BUNKER_BLUEPRINTS, ...TOWER_BLUEPRINTS, GATE_GARAGE_BLUEPRINT, MOTOR_COURT_BLUEPRINT, TERRACE_STAIR_BLUEPRINT, TERRACE_RAMP_BLUEPRINT].map(b => [b.kind, b]));
 
 /** Total bill of materials for a blueprint. */
 export function totalBill(bp: Blueprint): Partial<Stock> {

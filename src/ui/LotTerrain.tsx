@@ -15,7 +15,8 @@ export function ProfileSvg({ site }: { site: Site }) {
   const line = ch.pts.map((p, i) => `${i ? 'L' : 'M'}${X(p.d).toFixed(1)},${Y(p.yM).toFixed(1)}`).join(' ');
   const area = `${line} L${X(L)},${bot + 6} L${X(0)},${bot + 6} Z`;
   const exag = ((bot - top) / range) / ((W - 8) / L);
-  const lake = ch.waterM !== null ? Y(ch.waterM) : null;
+  // (a water level under the chart's floor draws as no water, not a rect of negative height)
+  const lake = ch.waterM !== null ? Math.min(bot + 6, Math.max(top, Y(ch.waterM))) : null;
   return (
     <svg viewBox={`0 0 ${W} ${Hh}`} width="100%" role="img" aria-label="Cross-section of the land" style={{ display: 'block', background: 'rgba(0,0,0,0.18)', borderRadius: 6 }}>
       {lake !== null && <rect x={X(0)} y={lake} width={X(L) - X(0)} height={bot + 6 - lake} fill={C.water} opacity={0.55} />}

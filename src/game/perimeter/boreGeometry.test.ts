@@ -84,7 +84,7 @@ describe('the rock tunnel is drawn as two portals and a mound, the rest is under
 describe('a portal brought down by a charge', () => {
   it('chokes both mouths with a heap of rubble no higher than the crown, and draws it only when it is down', () => {
     const open = boreParts(pts, spur, 1, true, true), down = boreParts(pts, spur, 1, true, true, true);
-    expect(down.parts.length).toBeGreaterThan(open.parts.length + 60);              // ~44 blocks at each end
+    expect(down.parts.length).toBeGreaterThan(open.parts.length + 60);              // ~90 pieces at each end
     const heap = new THREE.Box3();
     for (const [, g] of rubbleHeap(17)) heap.expandByObject(new THREE.Mesh(g));     // (in the portal's own frame: x across, y up from the deck, z into the hill)
     expect(heap.max.y).toBeLessThanOrEqual(ARCH.crown);
@@ -96,8 +96,8 @@ describe('a portal brought down by a charge', () => {
   });
   it('rubbleHeap is deterministic from its seed', () => {
     expect(rubbleHeap(17).length).toBe(rubbleHeap(17).length);
-    const a = rubbleHeap(17)[3][1].getAttribute('position').array, b = rubbleHeap(17)[3][1].getAttribute('position').array;
+    const a = rubbleHeap(17)[10][1].getAttribute('position').array, b = rubbleHeap(17)[10][1].getAttribute('position').array;
     expect(Array.from(a)).toEqual(Array.from(b));
-    expect(Array.from(rubbleHeap(18)[3][1].getAttribute('position').array)).not.toEqual(Array.from(a));
+    expect(Array.from(rubbleHeap(18)[10][1].getAttribute('position').array)).not.toEqual(Array.from(a));
   });
 });

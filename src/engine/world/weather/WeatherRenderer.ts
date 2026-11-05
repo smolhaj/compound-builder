@@ -124,7 +124,14 @@ if ( uWx.x + uWx.y > 0.002 ) {
   wxS *= 1.0 - 0.6 * ( 1.0 - smoothstep( 0.03, 0.08, wxSat ) ) * ( 1.0 - smoothstep( 0.1, 0.2, wxLum ) );
   if ( wxS > 0.001 ) {
     float wxT = 1.0 - wxS * 1.12;
-    float wxM = smoothstep( wxT - 0.07, wxT + 0.07, wxNz * 0.8 + wxUp * 0.2 );
+    // Partial cover (light snow, sheltered ground) is a soft, low-frequency blanket: the fine noise
+    // octave fades out where a pixel spans more than its wavelength (it aliased into a pixel mosaic
+    // from the air), and the threshold edge widens as cover thins
+    float wxFwS = length( fwidth( wxP.xz ) );
+    float wxHiK = 1.0 - smoothstep( 0.08, 0.45, wxFwS * 1.9 );
+    float wxNzS = wxNoise( wxP.xz * 0.32 ) * 0.62 + mix( 0.5, wxNoise( wxP.xz * 1.9 + 17.3 ), wxHiK ) * 0.38;
+    float wxWd = 0.07 + 0.2 * ( 1.0 - smoothstep( 0.55, 1.0, wxS ) );
+    float wxM = smoothstep( wxT - wxWd, wxT + wxWd, wxNzS * 0.8 + wxUp * 0.2 );
 #ifdef SEA_VEG
     // Foliage: crown-sized clumps with a soft edge (not whole tiers of flat
     // white card), never quite covering the green

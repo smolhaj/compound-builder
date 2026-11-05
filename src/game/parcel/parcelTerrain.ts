@@ -63,6 +63,10 @@ export interface Earthwork {
   k: number;
   gates: Array<{ at: number; w: number }>;
   bbox?: [number, number, number, number];
+  /** Widens a ditch's profile (a moat is about twice a ditch across). */
+  wide?: number;
+  /** A moat: no cut where the creek is (the creek is the moat there). */
+  creekSkip?: boolean;
 }
 
 /**
@@ -76,7 +80,9 @@ export interface Pit { x0: number; z0: number; x1: number; z1: number; floor: nu
 export const pitReach = (depth: number) => depth * 1.0 + 0.05;
 
 const BERM_HALF_BASE = 0.34, BERM_HALF_TOP = 0.08, DITCH_HALF_TOP = 0.26, DITCH_HALF_BOT = 0.08;
-export const earthworkReach = (w: Earthwork) => (w.height > 0 ? BERM_HALF_BASE : DITCH_HALF_TOP) + 0.02;
+/** A moat's cut stops this far (world units) outside the creek's water line: the bank. */
+export const CREEK_MOAT_MARGIN = 2.5;
+export const earthworkReach = (w: Earthwork) => (w.height > 0 ? BERM_HALF_BASE : DITCH_HALF_TOP * (w.wide ?? 1)) + 0.02;
 
 function polyBox(pts: ReadonlyArray<[number, number]>, pad: number): [number, number, number, number] {
   let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
@@ -102,7 +108,7 @@ export function closestOnLine(pts: ReadonlyArray<[number, number]>, x: number, z
 export function earthworkOffset(w: Earthwork, x: number, z: number): number {
   const { d, s } = closestOnLine(w.pts, x, z);
   for (const g of w.gates) if (Math.abs(s - g.at) < g.w / 2) return 0;
-  const [top, base] = w.height > 0 ? [BERM_HALF_TOP, BERM_HALF_BASE] : [DITCH_HALF_BOT, DITCH_HALF_TOP];
+  const [top, base] = w.height > 0 ? [BERM_HALF_TOP, BERM_HALF_BASE] : [DITCH_HALF_BOT * (w.wide ?? 1), DITCH_HALF_TOP * (w.wide ?? 1)];
   if (d >= base) return 0;
   const f = d <= top ? 1 : 1 - sstep(top, base, d);
   return w.height * w.k * f;
@@ -142,6 +148,9 @@ const CREEK_HALF = 0.7;
 const FLOODPLAIN_HALF = 4.5;
 /** The creek valley-floor table (non-bench reliefs): x from FP_X0, one entry a unit. */
 const FP_X0 = -70, FP_N = 210;
+
+/** Peak timber cover of a lot archetype by region (0-1): dense woods in the green regions, sparse conifer in the mountain west (the default). */
+const LOT_WOODS: Partial<Record<RegionId, number>> = { appalachia: 0.95, pnw: 0.97, north_woods: 0.95 };
 
 export class ParcelTerrain {
   readonly seed: number;
@@ -321,18 +330,29 @@ export class ParcelTerrain {
    * nothing at the region's tree line (by altitude), open meadow on level
    * benches, denser on the north-facing and sheltered ground.
    */
+  /** Where the camp is (set by `pickCamp`): the dense woods of a green-region lot leave a clearing round it. */
+  campClear: [number, number] | null = null;
+  /** While true the lot's cover ignores the dense woods (pickCamp chooses the camp on the same open ground it always did, then the woods are cleared round it). */
+  sparseCover = false;
   private _lotCover(x: number, z: number): number {
     const f = this.lot!, n = this._noise;
-    const g = this.lotSlope(x, z), rock = f.rock(x, z), elev = f.spec.elevM + f.h(x, z) * 6;
+    // the stand's edge is warped by about 70 m of noise (a contour or a clearing line is never a ruler line), then dithered by a finer one so
+    // the last trees straggle out into the field and saplings (planUnderstory) fill the fringe
+    const wx = x + 11 * n(x * 0.045 + 9, z * 0.045), wz = z + 11 * n(x * 0.045 - 4, z * 0.045 + 13);
+    const g = this.lotSlope(x, z), rock = f.rock(x, z), elev = f.spec.elevM + f.h(wx, wz) * 6;   // (cliffs and ledges stay exact: only the tree line wanders)
     const line = treeLineM(this.regionId);
-    let c = 0.42 * (1 - sstep(line - 250, line, elev)) * (1 - 0.9 * sstep(0.3, 0.7, rock)) * (1 - sstep(0.55, 0.95, g));
+    // the lot's own cover: sparse conifer in the mountain west, the region's dense woods elsewhere (the hollows, the cedar and fir, the spruce and birch)
+    const dense = this.sparseCover ? 0.42 : LOT_WOODS[this.regionId] ?? 0.42;
+    let c = dense * (1 - sstep(line - 250, line, elev)) * (1 - 0.9 * sstep(0.3, 0.7, rock)) * (1 - sstep(0.55, 0.95, g));
+    // a clearing round the camp's pad (about 150 m across, softly edged) so the camp always has open ground in dense woods
+    if (dense > 0.6 && this.campClear) c *= sstep(12, 22, Math.hypot(x - this.campClear[0], z - this.campClear[1]));
     // meadow: level ground is more often open, and a few glades everywhere
     const glade = sstep(0.15, 0.55, n(x * 0.035 + 2, z * 0.035 - 6));
-    c *= 1 - glade * (g < 0.1 ? 0.8 : 0.45);
+    c *= 1 - glade * (dense > 0.6 ? (g < 0.1 ? 0.75 : 0.3) : (g < 0.1 ? 0.8 : 0.45));
     // a south-facing slope is drier and more open
     const fall = f.fall, south = Math.sin(fall) * Math.min(1, g * 4);
     c *= 1 - 0.18 * Math.max(0, -south);
-    return c;
+    return c * (0.8 + 0.4 * sstep(-0.5, 0.5, n(x * 0.22 + 3, z * 0.22 - 8)));
   }
 
   /** North Woods: an open sphagnum bog in a low spot (0–1). */
@@ -457,7 +477,11 @@ export class ParcelTerrain {
       // the region's cover, thinned or thickened by the listing's timber
       // the region's cover, thinned or thickened by the listing's timber; the land round the place
       // carries the same woods (at the region's usual timber), out to where the regional field takes over
-      const near = 1 - sstep(60, 240, out), k = w * this._timber + (1 - w) * near * this._regionTimber;
+      const near = 1 - sstep(60, 240, out);
+      // where the listing's own timber hands over to the region's woods the line is ragged and wide, not the parcel's ruler edge:
+      // the handover distance is warped by noise (growing with the distance out), and a finer noise leaves tongues and clearings
+      const wt = 1 - sstep(4, 34, out + sstep(0, 12, out) * (13 * this._noise(x * 0.045 + 6, z * 0.045 - 3) + 6 * this._noise(x * 0.16 - 2, z * 0.16 + 5)));
+      const k = wt * this._timber + (1 - wt) * near * this._regionTimber;
       timber = Math.min(1, this._cover(x, z) * k * this.world.cover);
     }
     const riparian = (1 - sstep(1.5, 6 + 3 * this._noise(x * 0.05, 3.3), dz)) * sstep(CREEK_HALF + 0.2, CREEK_HALF + 0.8, dz) * along
@@ -512,6 +536,7 @@ export class ParcelTerrain {
     for (const w of this._works) {
       const b = w.bbox!;
       if (x < b[0] || x > b[2] || z < b[1] || z > b[3]) continue;
+      if (w.creekSkip && Math.abs(z - this.creek.zAt(x)) < this.creek.halfWidth + CREEK_MOAT_MARGIN) continue;
       const dy = earthworkOffset(w, x, z);
       if (dy !== 0) { s.h += dy; s.forest = 0; }
     }

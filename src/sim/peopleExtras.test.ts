@@ -372,3 +372,18 @@ describe('the save', () => {
     expect(() => step(up, 2)).not.toThrow();
   });
 });
+
+describe('hunter safety course (GDS 10.4)', () => {
+  it('is a paid online course that certifies a competent hunter, and is suggested once there is a gun and no hunter', () => {
+    const g = game(); afterTheHit(g);
+    expect(COURSES.hunter.skill).toBe('hunter');
+    g.utilities.lit = ['x']; g.disaster.tracks.phone = 1; g.money = 500;
+    const student = g.people[1];
+    student.skills.hunter = 0;
+    enroll(g, 'hunter', student.id, 'online');
+    expect(g.money).toBe(500 - COURSES.hunter.online);
+    for (const p of g.people) p.skills.medic = 5;
+    g.armory.guns.length = 0; g.stock.snares = 0;
+    expect(courseIdea(g)?.course).not.toBe('hunter');
+  });
+});

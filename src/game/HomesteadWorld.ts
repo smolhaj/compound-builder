@@ -29,8 +29,10 @@ import { LivedLayer } from './lived/LivedLayer';
 import type { Mode } from './lived/livedPlan';
 import { lightsOutNow } from '../sim/blackout';
 import type { NetWorld } from './paths/pathNet';
-import { WALK_CLIFF, walkRoute } from './paths/walkRoute';
+import { WALK_CLIFF, entryRampHeight, walkRoute } from './paths/walkRoute';
 import { CorridorNet } from './paths/CorridorNet';
+import { animalRoute, climbLimit } from './paths/groundMovers';
+import { LANE } from '../sim/laneWalk';
 import type { Wp } from './paths/linkRoute';
 import { CorridorDoors } from './perimeter/CorridorDoors';
 import { locksNow, outerEnd } from '../sim/corridors';
@@ -46,7 +48,16 @@ import { DogRenderer } from './people/DogRenderer';
 import { FleetRenderer, inCarBox, type CarBox, type FleetCtx } from './props/FleetRenderer';
 import type { DogCtx } from './people/dogGoals';
 import { WildlifeRenderer } from './wildlife/WildlifeRenderer';
-import { buildYard, type Yard } from './props/yardGeometry';
+import { log } from '../sim/economy';
+import { livingDogs, ageYears } from '../sim/pets';
+import { dayIndex } from '../sim/state';
+import { GuardPostProp } from './people/GuardPostProp';
+import { innerPost } from './people/guardPost';
+import { postSpot } from './people/dogGoals';
+import { LivestockRenderer } from './livestock/LivestockRenderer';
+import { hostileAtGate, type Home } from './livestock/livestockPlan';
+import { ringsAround } from '../sim/rings';
+import { buildYard, yardBlockedLocal, yardSolidLocal, type Yard } from './props/yardGeometry';
 import { dailyCtx, wallGate, yardFx } from './people/dailyScene';
 import type { GoalCtx, Site } from './people/peopleGoals';
 import { CELL, type KitPieceDef } from './buildkit/kit';
@@ -54,7 +65,7 @@ import type { GameState } from '../sim/state';
 import type { WearSeason } from '../engine/world/people/crowdWear';
 import type { TourBuildingInfo } from '../engine/world/camera/TourController';
 import { hydroSiteAt, windDay, TURBINE } from '../sim/renewables';
-import { boatsAtDock, isDock, lakeIce } from '../sim/waterfront';
+import { boatsAtDock, isDock, lakeIce, waterBody } from '../sim/waterfront';
 import { hydroLine, HYDRO_HOUSE } from './buildkit/renewableBuildings';
 import { climbOf, floorHatchHost, footprint, KIT, placementProblem, rotQ, type Placed, type SiteQuery } from './buildkit/kit';
 import { showStage, CUTAWAY_HIDE, XRAY_LAYERS, type BuildLayer as CabinLayer, type BuildOpts } from './buildkit/shell';
@@ -94,8 +105,9 @@ import { CLASSIC, type Site as LandSite } from '../sim/site';
 import { pickCamp } from './parcel/campSpot';
 import { DRIVE_W, accessFromPlan, distToLine, type Access } from './region/access';
 import { ROAD_W, countyRoad, roadLine, type CountyRoad } from './region/countyRoad';
-import { buildRoadWorks } from './region/roadWorks';
-import { roadPlanFor } from '../sim/roadState';
+import { buildRoadWorks, buildCountyBridges } from './region/roadWorks';
+import { deckY, onGap, type CountyGap } from '../sim/countyCrossings';
+import { countyGapsFor, roadPlanFor } from '../sim/roadState';
 import { pinSeed } from '../sim/lotSeed';
 import { PlowRun } from './fx/PlowRun';
 import { roadBedOf, type RoadPlan } from '../sim/roadPlan';
@@ -108,6 +120,7 @@ import type { RegionWorld } from './region/regionWorld';
 import { buildGate } from './props/gateGeometry';
 import { buildStockpile } from './props/stockpileGeometry';
 import { DeliveryTruck } from './DeliveryTruck';
+import { RoadTraffic } from './RoadTraffic';
 import { MATERIAL_IDS, emptyStock } from '../sim/materials';
 import { pantryRows } from '../sim/pantry';
 import { needOf } from '../sim/needs';
@@ -187,6 +200,9 @@ interface DigSite { pit: Pit; spoil: number; machine: boolean; stage: number; f:
 /** Kinds with a basement under the main floor (their floorboards are see-through in the cutaway views). */
 const SEE_THROUGH_FLOOR: ReadonlySet<string> = new Set(['lodge', 'lodge_solar']);
 
+/** How much of the lake shows ice for each sim state (a skim is thin and patchy). */
+const ICE_COVER = { open: 0, skim: 0.32, ice: 1 } as const;
+
 export class HomesteadWorld {
   readonly center = new THREE.Vector3(PARCEL_SIZE / 2, 0, PARCEL_SIZE / 2);
   readonly parcel: ParcelTerrain;
@@ -223,10 +239,14 @@ export class HomesteadWorld {
   /** The people down in the bunker (seats, bunks, the console): game/people/BunkerFolk. */
   readonly bunkerFolk: BunkerFolk;
   readonly dogs: DogRenderer;
+  /** The kennels at the guard dogs' posts: the gate and the inner gate. */
+  readonly guardPosts: GuardPostProp;
   /** The fleet (sim/vehicles.ts): parked in the garages and the yard, driving out on runs. */
   readonly fleet: FleetRenderer;
   /** Native wildlife (sim/wildlife.ts): deer, turkeys, bears and the rest, drawn as instanced animals. */
   readonly wildlife: WildlifeRenderer;
+  /** The farm animals (goats, sheep, cows, pigs, rabbits, hens) between the paddock and their shelter, on the same route network. */
+  readonly livestock: LivestockRenderer;
   /** Night life, weathering and the deeper seasons (atmosphere/). */
   readonly atmos: Atmosphere;
   /** The footpaths between the stops on the place, worn and laid (game/paths). */
@@ -236,6 +256,8 @@ export class HomesteadWorld {
   private readonly _doors = new CorridorDoors();
   /** Force the corridor doors locked (a raid is being played back) or open (QA); null: the clock and the alarm decide. */
   doorLock: boolean | null = null;
+  /** QA: the animals and guard dogs act as if a hostile crew were at the gate. */
+  qaRaid = false;
   /** The dry-stack retaining walls round graded pads, with their stairs (game/terrain/RetainWalls). */
   readonly walls = new RetainWallLayer();
   private _wallVer = 0;
@@ -246,6 +268,8 @@ export class HomesteadWorld {
   /** County road, driveway, gate and stockpile yard. */
   /** The county road past the place, the region's way (game/region/countyRoad.ts). */
   readonly county: CountyRoad;
+  /** Where the county road bridges a creek, a ravine or a gorge (sim/countyCrossings.ts). */
+  readonly countyGaps: CountyGap[];
   /** The planned way in: curves, switchbacks, crossings, a bore (sim/roadPlan.ts); the sim reads the very same plan. */
   plan: RoadPlan;
   access: Access;
@@ -253,6 +277,8 @@ export class HomesteadWorld {
   private readonly _seed: number;
   private readonly _roads = new THREE.Group();
   truck: DeliveryTruck;
+  /** Cars, trucks, wanderers and the parties that stand for real encounters, on the county road (game/RoadTraffic.ts). */
+  readonly roadLife: RoadTraffic;
   /** The plow pickup and the berms it leaves (fx/PlowRun.ts). */
   plow: PlowRun;
   private _stockpile: THREE.Group | null = null;
@@ -288,11 +314,12 @@ export class HomesteadWorld {
     this.farms = planNeighbors(this.parcel);
     this.camp = this._pickCamp();
     this.county = countyRoad(site.region, seed);
+    this.countyGaps = this._findCountyGaps();
     this.plan = roadPlanFor(site, seed, this.parcel);
     this.access = accessFromPlan(this.plan);
     this.terrain = new TerrainRenderer(ws.scene);
     this.forest = new ForestRenderer(ws.scene);
-    this.sage = new ShrubField(ws.scene, 'sagebrush', this.regionWorld.sagePalette ?? SAGE, 1);
+    this.sage = new ShrubField(ws.scene, this.regionWorld.scrub === 'desert' ? 'desert_scrub' : 'sagebrush', this.regionWorld.sagePalette ?? SAGE, 1);
     this.rocks = new RockField(ws.scene);
     this.willow = new ShrubField(ws.scene, 'willow', WILLOW, 1);
     this.farTrees = new FarTreeRenderer(ws.scene);
@@ -301,10 +328,14 @@ export class HomesteadWorld {
     this.family = new FamilyRenderer(ws.scene);
     this.bunkerFolk = new BunkerFolk(ws.scene);
     this.dogs = new DogRenderer(ws.scene);
+    this.guardPosts = new GuardPostProp(ws.scene);
     this.fleet = new FleetRenderer(ws.scene);
     this.wildlife = new WildlifeRenderer(ws.scene);
+    this.livestock = new LivestockRenderer(ws.scene);
     this._campGroup = buildCamp({ fire: false });
     this._campGroup.position.set(this.camp.x, this.parcel.height(this.camp.x, this.camp.z), this.camp.z);
+    // on a slope (a hillside or the island's knoll) the tent's uphill wall and the woodpile's tin sheet sink into the ground: raise the camp (and its yard) toward the highest ground under it, by at most about 40 cm (more would float the downhill side)
+    { const y0 = this._campGroup.position.y; let up = 0; for (let k = 0; k < 8; k++) up = Math.max(up, this.parcel.height(this.camp.x + Math.cos(k * Math.PI / 4) * 0.9, this.camp.z + Math.sin(k * Math.PI / 4) * 0.9) - y0); this._campGroup.position.y = y0 + Math.min(up, 0.07); }
     this._campGroup.rotation.y = this.camp.rot;
     this._root.add(this._campGroup);
     this._yard = buildYard();
@@ -339,7 +370,8 @@ export class HomesteadWorld {
     this._drive = site.improvements?.drive ?? true;
     // a built drive is benched into the ground (cut banks, fill slopes, banked curves): before the terrain mesh and the trees are made
     this.parcel.setRoadBed(this._drive ? roadBedOf(this.plan) : null);
-    this.truck = new DeliveryTruck(ws.scene, this._truckRoute(), this.groundAt, this.county.x, (x, z) => this._driveY(x, z));
+    this.truck = new DeliveryTruck(ws.scene, this._truckRoute(), (x, z) => (Math.abs(x - this.county.x(z)) < ROAD_W ? this.countyY(x, z) : this.groundAt(x, z)), this.county.x, (x, z) => this._driveY(x, z));
+    this.roadLife = new RoadTraffic(ws.scene, this.county, (x, z) => this.countyY(x, z));
     this.plow = new PlowRun(ws.scene, this.access.drive, this.groundAt, (x, z) => this._driveY(x, z));
   }
 
@@ -399,7 +431,7 @@ export class HomesteadWorld {
     this.parcel.setRoadBed(this._drive ? roadBedOf(plan) : null);
     this._buildRoads();
     this.truck.dispose();
-    this.truck = new DeliveryTruck(this._ws.scene, this._truckRoute(), this.groundAt, this.county.x, (x, z) => this._driveY(x, z));
+    this.truck = new DeliveryTruck(this._ws.scene, this._truckRoute(), (x, z) => (Math.abs(x - this.county.x(z)) < ROAD_W ? this.countyY(x, z) : this.groundAt(x, z)), this.county.x, (x, z) => this._driveY(x, z));
     this.plow.setRoute(this.access.drive);
     this._ws.invalidateShadows();
   }
@@ -430,7 +462,7 @@ export class HomesteadWorld {
     }
     this._buildRoads();
     this.truck.dispose();
-    this.truck = new DeliveryTruck(this._ws.scene, this._truckRoute(), this.groundAt, this.county.x, (x, z) => this._driveY(x, z));
+    this.truck = new DeliveryTruck(this._ws.scene, this._truckRoute(), (x, z) => (Math.abs(x - this.county.x(z)) < ROAD_W ? this.countyY(x, z) : this.groundAt(x, z)), this.county.x, (x, z) => this._driveY(x, z));
     this._tailKey = '';
     this.plow.setRoute(this.access.drive);
   }
@@ -440,9 +472,10 @@ export class HomesteadWorld {
    * by the camp facing the drive, the rest round it on open, level ground
    * that's the family's own and clear of the creek, the drive and each other.
    */
-  siteImprovements(list: ReadonlyArray<{ id: string; kind: string }>, query: SiteQuery): Record<string, { x: number; z: number; rot: number }> {
+  siteImprovements(list: ReadonlyArray<{ id: string; kind: string }>, query: SiteQuery, anchor?: { x: number; z: number }): Record<string, { x: number; z: number; rot: number }> {
     const out: Record<string, { x: number; z: number; rot: number }> = {};
-    const placed: Placed[] = [...this._built.values()].map(b => b.placed);
+    const mine = new Set(list.map(x => x.id));
+    const placed: Placed[] = [...this._built.values()].map(b => b.placed).filter(p => !mine.has(p.id));
     const order = ['farmhouse', 'trailer', 'timber_cabin', 'log_house', 'well_drilled', 'septic', 'barn'];
     const items = [...list].sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind));
     let house: { x: number; z: number } | null = null;
@@ -452,8 +485,8 @@ export class HomesteadWorld {
       // a cell (3 m) of yard all round, so nothing is built hard against anything else
       const def = { ...real, cellsX: real.cellsX + 2, cellsZ: real.cellsZ + 2 };
       // the house beside the camp; the well and septic near the house; the barn a little way off
-      const c: { x: number; z: number } = house ?? { x: this.camp.x - 1.5, z: this.camp.z - 2.5 };
-      const [r0, r1]: [number, number] = it.kind === 'barn' ? [6, 16] : house ? [2.5, 8] : [0, 8];
+      const c: { x: number; z: number } = house ?? anchor ?? { x: this.camp.x - 1.5, z: this.camp.z - 2.5 };
+      const [r0, r1]: [number, number] = it.kind === 'barn' ? [6, 16] : anchor ? [2.5, 14] : house ? [2.5, 8] : [0, 8];
       let best: { x: number; z: number; rot: number } | null = null, bestD = Infinity;
       for (let r: number = r0; r <= r1 && !best; r += 0.5) {
         for (let a = 0; a < 24; a++) {
@@ -489,6 +522,19 @@ export class HomesteadWorld {
     return Math.hypot(x - a.yard.x, z - a.yard.z) < 0.8 + pad;
   }
 
+  /** The county road's own bridges: where it crosses water or a cut, found from the ground and the creek. */
+  private _findCountyGaps(): CountyGap[] { return countyGapsFor(this.parcel, this.county); }
+  private _deckY(g: CountyGap, z: number): number {
+    const cz = this.parcel.hasStream ? this.parcel.creek : null, ly = this.parcel.lakeY;
+    const water = Math.max(cz ? cz.waterY(this.county.x(z)) : -Infinity, ly ?? -Infinity);
+    return deckY(g, z, g.wet ? water + 0.35 : -Infinity);
+  }
+  /** Height of the county road's surface at (x, z): the deck over a gap, else the ground. */
+  countyY(x: number, z: number): number {
+    const g = this.countyGaps.length ? onGap(this.countyGaps, z) : null;
+    return g ? this._deckY(g, z) : this.groundAt(x, z);
+  }
+
   /** Road + driveway ribbons draped on the rendered terrain, and the gate. */
   private _buildRoads(): void {
     this._roads.traverse(o => { if (o !== this._roads) (o as THREE.Mesh).geometry?.dispose(); });
@@ -496,9 +542,10 @@ export class HomesteadWorld {
     // the county road the region's way (gravel, blacktop, caliche); the drive is gravel (caliche in the desert)
     const mud = <M extends THREE.Material>(m: M): M => { m.defines = { ...m.defines, SEA_MUD: '', SEA_MUD_UV: '' }; return m; };   // mud season: the surface goes soft and the tire tracks hold water (season patch)
     const mat = mud((this.regionWorld.drive ?? (this.regionWorld.road === 'caliche' ? 'caliche' : 'gravel')) === 'caliche' ? roadMaterial('caliche') : gravelMaterial());
-    const road = new THREE.Mesh(buildRibbon(roadLine(this.county, 1), ROAD_W, this.groundAt, 0.02, 6), mud(roadMaterial(this.regionWorld.road)));
+    const road = new THREE.Mesh(buildRibbon(roadLine(this.county, 1), ROAD_W, (x, z) => this.countyY(x, z), 0.02, 6), mud(roadMaterial(this.regionWorld.road)));
     const track = this._drive ? mat : (() => { const m = mat.clone(); m.color = new THREE.Color(0x8a7a5c); return mud(m); })();
     road.receiveShadow = true; this._roads.add(road);
+    if (this.countyGaps.length) this._roads.add(buildCountyBridges(this.countyGaps.map(g => ({ z0: g.z0, z1: g.z1, deckY: (z: number) => this._deckY(g, z), x: this.county.x, width: ROAD_W })), this.groundAt));
     // the way in: a curved ribbon on the benched ground, with its banks, rails, culverts, crossings and portals (game/region/roadWorks.ts)
     this._roads.add(buildRoadWorks(this.plan, this.groundAt, { built: this._drive, bridgeDown: this._bridgeDown, surface: mat, track, driveW: DRIVE_W, natural: (x, z) => this.parcel.natural(x, z).h }));
     const gate = buildGate(DRIVE_W);
@@ -520,7 +567,10 @@ export class HomesteadWorld {
       if (this._clock > 0.5) this.truck.enqueue(o.lines);
     }
     this._syncTruckTail();
+    this.truck.setWinter(seasonState.params.snow > 0.25);
     this.truck.update(dt, speedK);
+    // the lake skins over and freezes when the sim says so (sim/waterfront lakeIce), not by the calendar alone
+    this.lakes.setIce(waterBody(game) ? ICE_COVER[lakeIce(game)] : -1, dt);
     this.plow.update(dt, this._drive && game.stock.plow >= 1, seasonState.params.snow, speedK);
     // deliveries left at the road (no drive yet), by the gate
     const rs = emptyStock();
@@ -556,6 +606,7 @@ export class HomesteadWorld {
   setQuality(q: Quality): void {
     if (q === this._quality) return;
     this._quality = q;
+    this.roadLife.setQuality(q);
     this.terrain.build({
       source: this._terrainSource,
       kind: this.regionWorld.kind, cx: this.center.x, cz: this.center.z,
@@ -619,8 +670,10 @@ export class HomesteadWorld {
     for (const f of this.farms) buildFarmstead(f, kind, props, this.groundAt, slope, tree);
     // the neighbors' line fences, the region's way (wire on T-posts, split rail, stone walls, woven wire)
     const creek = this.parcel.creek;
+    // (no fence or pole stands on the county road's bridges or down the cut it spans)
+    const overGap = (x: number, z: number) => this.countyGaps.length > 0 && Math.abs(x - this.county.x(z)) < 8 && onGap(this.countyGaps, z) !== null;
     buildLineFences(planLineFences(this.county.x, ROAD_W / 2, -330, PARCEL_SIZE + 330), this.regionWorld.fence, props, this.groundAt,
-      (x, z) => onFarmstead(this.farms, x, z, 1.5) || Math.abs(z - creek.zAt(x)) < 2.2 || (wy !== null && this.parcel.region.height(x, z) < wy + 0.15) || insideHome(x, z),
+      (x, z) => onFarmstead(this.farms, x, z, 1.5) || overGap(x, z) || Math.abs(z - creek.zAt(x)) < 2.2 || (wy !== null && this.parcel.region.height(x, z) < wy + 0.15) || insideHome(x, z),
       (a, b) => { const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return s - Math.floor(s); });
     if (this.regionWorld.powerline) buildPowerline(props, this.groundAt, (x, z) => onFarmstead(this.farms, x, z, 4) || (wy !== null && this.parcel.region.height(x, z) < wy + 0.3) || insideHome(x, z));
     props.finish();
@@ -669,6 +722,11 @@ export class HomesteadWorld {
           const [r0, r1] = rw.rocks.size;
           rocks.push({ x: px, y: this.groundAt(px, pz), z: pz, s: r0 + (r1 - r0) * sR * sR, flat: (tone * 31.7) % 1 < rw.rocks.flat ? 1 : 0, rot, tone: (tone * 13.3) % 1 });
         }
+        // understory under the timber (laurel / fern / huckleberry, by region): in the sage field's instances
+        if (rw.understory && s.forest > 0.45 && dz > hw + 1.2 && roll / keep < 0.045 * rw.understory * Math.min(1, s.forest + 0.2) && !blocked(px, pz)) {
+          sage.push({ x: px, y: this.groundAt(px, pz) - 0.01, z: pz, s: 0.9 + sR * 0.9, rot, tone });
+          continue;
+        }
         // sage on the open benches, thinning into the timber's edge
         if (s.forest > 0.25 || dz < hw + 5) continue;
         if (roll / keep < 0.36 * rw.sage * (1 - s.forest / 0.25) && !blocked(px, pz)) sage.push({ x: px, y: this.groundAt(px, pz) - 0.01, z: pz, s: 0.8 + sR * 0.45, rot, tone });
@@ -677,7 +735,11 @@ export class HomesteadWorld {
     this.sage.build(sage, q);
     this.willow.build(willow, q);
     this.rocks.build(rocks, rw.rocks.color, q);
+    this._lowObstacles = [...rocks.map(r => ({ x: r.x, z: r.z, r: 0.7 * r.s })), ...sage.map(r => ({ x: r.x, z: r.z, r: 0.6 * r.s })), ...willow.map(r => ({ x: r.x, z: r.z, r: 0.6 * r.s }))];
   }
+
+  /** Rocks and shrubs (crown radius): an eye-level camera must not stand inside one. */
+  private _lowObstacles: Array<{ x: number; z: number; r: number }> = [];
   /** Neighbor parcels the family has bought (their trees are planted near and detailed, markable). */
   private _ownedLand: Array<{ x0: number; z0: number; x1: number; z1: number }> = [];
   private _inOwned(x: number, z: number): boolean { return this._ownedLand.some(r => x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1); }
@@ -877,7 +939,7 @@ export class HomesteadWorld {
   }
 
   /** Fences, hedges and walls drawn as built (hedges by growth); berms and ditches shape the terrain. */
-  syncPerimeter(runs: readonly PerimeterRun[], t: number, opts: { lit?: boolean; sensors?: boolean } = {}): void {
+  syncPerimeter(runs: readonly PerimeterRun[], t: number, opts: { lit?: boolean; sensors?: boolean; /** Each moat's water (sim/waterWorks `moatStates`). */ moats?: Record<string, { level: number; frozen: boolean }> } = {}): void {
     this._runs = runs;
     this.corridors.sync(runs);
     const lit = opts.lit ?? true, sensors = opts.sensors ?? false;
@@ -889,14 +951,14 @@ export class HomesteadWorld {
     for (const r of runs) {
       // old posts lean and rails sag (atmosphere/aging): rebuilt as the lean steps
       const lean = LEANS.has(r.kind) && r.finishedAt !== null ? Math.round(fenceLean((t - r.finishedAt) / 365) * 10) / 10 : 0;
-      const key = `${Math.round(runProgress(r) * 60)}:${Math.round(runGrowth(r, t) * 40)}:${r.finishedAt === null ? 0 : 1}:${r.gates.length}:${lean}:${hasSkirt(r, t) ? 1 : 0}:${lit ? 1 : 0}:${sensors ? 1 : 0}:${hostOf(r)}:${r.razor ? 1 : 0}:${hostRazor(r) ? 1 : 0}:${deckOn(r) ? 1 : 0}:${r.collapsed ? 1 : 0}`;
+      const key = `${Math.round(runProgress(r) * 60)}:${Math.round(runGrowth(r, t) * 40)}:${r.finishedAt === null ? 0 : 1}:${r.gates.length}:${lean}:${hasSkirt(r, t) ? 1 : 0}:${lit ? 1 : 0}:${sensors ? 1 : 0}:${hostOf(r)}:${r.razor ? 1 : 0}:${hostRazor(r) ? 1 : 0}:${deckOn(r) ? 1 : 0}:${r.collapsed ? 1 : 0}:${opts.moats?.[r.id] ? Math.round(opts.moats[r.id].level * 4) + (opts.moats[r.id].frozen ? 9 : 0) : ''}`;
       const cur = this._runGroups.get(r.id);
       if (cur?.key === key) continue;
       if (cur) { this._root.remove(cur.group); cur.group.traverse(o => (o as THREE.Mesh).geometry?.dispose()); }
       const tunnel = r.kind === 'escape_tunnel' || r.kind === 'underground_passage';
       const group = tunnel
         ? buildTunnel(this._pathOf(r), this.groundAt, r.finishedAt !== null ? 1 : runProgress(r), this._exitWoods(r), r.kind === 'underground_passage' ? { woodsStart: this.tunnelExitWoods(r.pts[0][0], r.pts[0][1]) } : undefined)
-        : buildRun(r, this.groundAt, t, (x, z) => this.onBuilding(x, z, 0.02, false), { lit, sensors, hostKind: PERIMETER[r.kind].wallTop ? runs.find(x => x.id === r.hostId)?.kind : undefined, hostRazor: hostRazor(r), deck: deckOn(r) });
+        : buildRun(r, this.groundAt, t, (x, z) => this.onBuilding(x, z, 0.02, false), { lit, sensors, hostKind: PERIMETER[r.kind].wallTop ? runs.find(x => x.id === r.hostId)?.kind : undefined, hostRazor: hostRazor(r), deck: deckOn(r), moat: opts.moats?.[r.id], creek: this.parcel.creek });
       if (tunnel) this._applyTunnelView(group);
       if (lean > 0) leanRun(group, lean, hashStr(r.id) % 997, this.groundAt);
       this._root.add(group);
@@ -904,7 +966,7 @@ export class HomesteadWorld {
       this._ws.invalidateShadows();
     }
     // earthworks (berms raise, ditches cut) as they are dug
-    const works: Earthwork[] = runs.filter(r => r.kind === 'earth_berm' || r.kind === 'ditch').map(r => ({ pts: r.pts, gates: r.gates, height: PERIMETER[r.kind].height, k: r.finishedAt !== null ? 1 : runProgress(r) }));
+    const works: Earthwork[] = runs.filter(r => r.kind === 'earth_berm' || r.kind === 'ditch' || r.kind === 'moat').map(r => ({ pts: r.pts, gates: r.gates, height: PERIMETER[r.kind].height, ...(r.kind === 'moat' ? { wide: 2.2, creekSkip: true } : {}), k: r.finishedAt !== null ? 1 : runProgress(r) }));
     // a tunnel is cut and covered: an open trench along it while the culvert goes in
     for (const r of runs) if ((r.kind === 'escape_tunnel' || r.kind === 'underground_passage') && r.finishedAt === null && (r.supplied || r.done > 0)) works.push({ pts: r.pts.slice(), gates: [], height: -0.33, k: 1 });
     const wk = works.map(w => `${w.pts.length}:${Math.round(w.k * 20)}`).join('|');
@@ -957,7 +1019,7 @@ export class HomesteadWorld {
       const box = new THREE.Box3().setFromObject(b.group);
       return { x0: box.min.x, z0: box.min.z, x1: box.max.x, z1: box.max.z, top: box.max.y };
     });
-    const walls = this._runs.filter(r => r.kind !== 'earth_berm' && r.kind !== 'ditch' && PERIMETER[r.kind].sight > 0).map(r => {
+    const walls = this._runs.filter(r => r.kind !== 'earth_berm' && r.kind !== 'ditch' && r.kind !== 'moat' && PERIMETER[r.kind].sight > 0).map(r => {
       const g = runGrowth(r, this._simT);
       return { pts: r.pts, top: PERIMETER[r.kind].height * (r.kind === 'thorn_hedge' ? g : 1), cut: PERIMETER[r.kind].sight * (r.kind === 'thorn_hedge' ? g : r.finishedAt !== null ? 1 : runProgress(r)), gates: r.gates };
     });
@@ -1064,7 +1126,7 @@ export class HomesteadWorld {
 
   // ── Footpaths (game/paths) ────────────────────────────────────────────
   /** The tests the path router uses now: buildings (padded, not below ground), the creek and its banks, the camp, the delivery yard, walls, trunks, land that is not ours. */
-  private _pathWorld(): NetWorld {
+  private _pathWorld(): NetWorld & { hardFor: (limit: number) => (x: number, z: number) => boolean } {
     const trees = new Map<number, Array<[number, number, number]>>();
     for (const t of this.treeSpecs) {
       const k = Math.floor(t.x) * 4099 + Math.floor(t.z);
@@ -1076,13 +1138,14 @@ export class HomesteadWorld {
     const g = this.groundAt;
     const slope = (x: number, z: number): number => (Math.abs(g(x + 0.25, z) - g(x - 0.25, z)) + Math.abs(g(x, z + 0.25) - g(x, z - 0.25))) / 0.5;
     // what a straight walk cannot cross: a building, the built wall, the creek, and cliff ground (a rock face, a cutbank)
-    const hard = (x: number, z: number): boolean => {
+    const hardFor = (limit: number) => (x: number, z: number): boolean => {
       for (const r of boxes) if (x > r.x0 - 0.14 && x < r.x1 + 0.14 && z > r.z0 - 0.14 && z < r.z1 + 0.14) return true;
       if (hasCreek && Math.abs(z - this.parcel.creek.zAt(x)) < half + 0.25) return true;
       if (this._perimeterBlocked(x, z, 0.08)) return true;
       if (this.walls.blocks(x, z)) return true;     // a retaining wall: over only at its stairs
-      return slope(x, z) > WALK_CLIFF && !this.walls.atStair(x, z);
+      return slope(x, z) > limit && !this.walls.atStair(x, z);
     };
+    const hard = hardFor(WALK_CLIFF);
     const blocked = (x: number, z: number): boolean => {
       if (!own(x, z)) return true;
       if (hard(x, z)) return true;
@@ -1094,12 +1157,12 @@ export class HomesteadWorld {
     };
     // steep ground and the unlevel: a path takes the easy way round
     const cost = (x: number, z: number): number => (this.walls.atStair(x, z) ? 1.4 : 1 + 6 * Math.max(0, slope(x, z) - 0.1));
-    return { blocked, cost, hard };
+    return { blocked, cost, hard, hardFor };
   }
 
   /** The people's route finding world, rebuilt when the paths are (the layout, the cars, the wear). */
-  private _walkCache: { key: string; w: NetWorld } | null = null;
-  private _walkWorld(): NetWorld {
+  private _walkCache: { key: string; w: NetWorld & { hardFor: (limit: number) => (x: number, z: number) => boolean } } | null = null;
+  private _walkWorld(): NetWorld & { hardFor: (limit: number) => (x: number, z: number) => boolean } {
     const key = `${this.paths.version}|${this._carKey}|${this.treeSpecs.length}|${this._runs.length}|${this.walls.version}`;
     if (this._walkCache?.key !== key) this._walkCache = { key, w: this._pathWorld() };
     return this._walkCache.w;
@@ -1151,6 +1214,12 @@ export class HomesteadWorld {
     const w = this._walkWorld();
     return this._viaCorridors(from[0], from[1], to[0], to[1], w, () => []);
   };
+
+  /** A vehicle's way on the ground of the yard: round the wall, the buildings and the ground a truck cannot climb (12 %; 0.14 u of clearance each side; game/paths/groundMovers). */
+  vehicleGroundRoute(from: [number, number], to: [number, number]): Array<[number, number]> | null {
+    const w = this._walkWorld(), hard = w.hardFor(LANE.TRUCK_MAX_GRADE);
+    return animalRoute(from, to, hard, (x, z) => w.cost?.(x, z) ?? 1, 0.2, 1.6);
+  }
 
   private _tailKey = '';
   /** The delivery truck drives on through a tunnel when the yard lies beyond one (re-found when the layout changes, between deliveries). */
@@ -1529,13 +1598,35 @@ export class HomesteadWorld {
   // ── Dome tents in the yard (sim/housing.ts) ───────────────────────────
   readonly tents = new TentsRenderer();
   private _tentPos: Array<{ x: number; z: number; rot: number }> = [];
+  private _tentPads: Pad[] = [];
+  private _tentPadKey = '';
+  private _tentOld: Array<{ x: number; z: number }> = [];
+  /** Per tent: the platform's level where one was graded on a slope (it gets a stone edge), else null. */
+  private _tentFlat: Array<number | null> = [];
   /** Pitch a dome tent round the camp for each one somebody sleeps in tonight. */
   syncTents(game: GameState): void {
     const n = tentsPitched(game);
     if (n === 0 && this.tents.group.children.length === 0) { this._tentPos = []; return; }
     if (!this.tents.group.parent) this._ws.scene.add(this.tents.group);
     this._tentPos = tentSpots(this.camp, n, (x, z) => this.onBuilding(x, z, 0.4, false) || this.onAccess(x, z, 0.3) || this.onPerimeterLine(x, z, 0.2));
-    this.tents.sync(this._tentPos, this.groundAt);
+    this._pitchTents();
+  }
+
+  private _pitchTents(): void {
+    // a tent on a slope stands on a small level platform (a graded pad like a building's, with a stone edge on the low side), not half sunk into the hill
+    const key = this._tentPos.map(t => `${t.x.toFixed(2)},${t.z.toFixed(2)}`).join('|');
+    if (key !== this._tentPadKey) {
+      this._tentPadKey = key;
+      const keep = this.parcel.pads.filter(q => !this._tentPads.includes(q));
+      const h = 0.27;
+      this._tentPads = this._tentPos.map(t => ({ x0: t.x - h, z0: t.z - h, x1: t.x + h, z1: t.z + h, y: this.parcel.padHeight(t.x - h, t.z - h, t.x + h, t.z + h), skirt: 0.22 }));
+      this.parcel.setPads([...keep, ...this._tentPads]);
+      const xs = [...this._tentPos.map(t => t.x), ...this._tentOld.map(t => t.x)], zs = [...this._tentPos.map(t => t.z), ...this._tentOld.map(t => t.z)];
+      if (xs.length) this.terrain.refresh(this._terrainSource, Math.min(...xs) - 1, Math.min(...zs) - 1, Math.max(...xs) + 1, Math.max(...zs) + 1);
+      this._tentOld = this._tentPos;
+      this._tentFlat = this._tentPos.map((t, i) => Math.abs(this.parcel.natural(t.x + 0.25, t.z).h - this.parcel.natural(t.x - 0.25, t.z).h) + Math.abs(this.parcel.natural(t.x, t.z + 0.25).h - this.parcel.natural(t.x, t.z - 0.25).h) > 0.03 ? this._tentPads[i].y : null);
+    }
+    this.tents.sync(this._tentPos, this.groundAt, this._tentFlat);
   }
 
   // ── Food on the shelves ───────────────────────────────────────────────
@@ -1975,6 +2066,8 @@ export class HomesteadWorld {
       drive: this.access.drive,
       ground: this.groundAt,
       route: this.vehicleRoute,
+      groundRoute: (a, b) => this.vehicleGroundRoute(a, b),
+      hardWinter: seasonState.params.snow > 0.25,
       park: this.qaPark,
       stranded: n => this.strandedSpot(game, n),
     };
@@ -2010,6 +2103,12 @@ export class HomesteadWorld {
   private _cars: CarBox[] = [];
   private _carKey = '';
 
+  /** Life on the county road: ambient traffic by the collapse clock, and the parties that are real encounters on their way (game/RoadTraffic.ts). */
+  updateRoadLife(dt: number, game: GameState, speedK: number): void {
+    this.roadLife.setGate(this._truckRoute()[0][1]);
+    this.roadLife.update(dt, game, speedK, { x: this._ws.camera.position.x, z: this._ws.camera.position.z }, Math.max(0, Math.min(1, (1 - this.air.daylight) / 0.85)));
+  }
+
   /** Wildlife: the animals the sim says live here, grazing, wandering and bolting from people (and dogs). */
   updateWildlife(dt: number, game: GameState, speedK: number): void {
     const threats: Array<[number, number]> = this.family.positions().filter(p => this.family.shown.has(p.id)).map(p => [p.x, p.z] as [number, number]);
@@ -2018,11 +2117,69 @@ export class HomesteadWorld {
     this.wildlife.update(dt, game, game.clock.t, {
       ground: this.groundAt,
       blocked: (x, z) => this.onBuilding(x, z, 0.25) || this.onCamp(x, z, 0.5) || this.onAccess(x, z, 0.3),
+      hard: (x, z, sp) => this._animalHard(sp)(x, z),
       creek,
       threats,
       cam: { x: this._ws.camera.position.x, z: this._ws.camera.position.z },
     }, speedK);
   }
+  private _hardBy = new Map<string, (x: number, z: number) => boolean>();
+  private _hardWorld: object | null = null;
+  /** What a walker of this kind cannot cross (buildings, built walls, the creek, ground steeper than it climbs; game/paths/groundMovers CLIMB), cached with the walk world. */
+  private _animalHard(kind: string): (x: number, z: number) => boolean {
+    const w = this._walkWorld();
+    if (this._hardWorld !== w) { this._hardWorld = w; this._hardBy.clear(); }
+    let f = this._hardBy.get(kind);
+    if (!f) { f = w.hardFor(climbLimit(kind)); this._hardBy.set(kind, f); }
+    return f;
+  }
+  private _innerKey = '';
+  private _inner: { x: number; z: number; face: number } | null = null;
+  /** The inside post of the guard dogs: just inside the innermost finished ring's gate (worked out again when a ring is finished). */
+  private _innerPost(game: GameState): { x: number; z: number; face: number } {
+    const homeB = [...this._built.values()].filter(b => b.finished && KIT[b.placed.kind].sleeps > 0).sort((a, b) => KIT[b.placed.kind].sleeps - KIT[a.placed.kind].sleeps)[0];
+    const house: [number, number] = homeB ? [homeB.placed.x, homeB.placed.z] : [this.camp.x, this.camp.z];
+    const key = `${game.perimeter.filter(r => r.finishedAt !== null).length}|${house[0].toFixed(1)},${house[1].toFixed(1)}`;
+    if (key !== this._innerKey || !this._inner) {
+      this._innerKey = key;
+      const p = innerPost(ringsAround(game, house), house, [this.access.gate.x, this.access.gate.z]);
+      this._inner = { x: p.x, z: p.z, face: p.face };
+    }
+    return this._inner;
+  }
+
+  private _homesKey = '';
+  private _homes: Home[] = [];
+  /** The buildings that house animals, with how many rings stand round each (worked out again when a building or a ring is finished). */
+  private _animalHomes(game: GameState): Home[] {
+    const key = `${game.structures.filter(x => x.finishedAt !== null).length}|${game.perimeter.filter(r => r.finishedAt !== null).length}|${[...this._built.keys()].length}`;
+    if (key === this._homesKey) return this._homes;
+    this._homesKey = key;
+    this._homes = game.structures.filter(st => st.finishedAt !== null && ['barn', 'barnyard', 'sheep_barn', 'chicken_coop'].includes(st.kind) && KIT[st.kind]).map(st => {
+      const def = KIT[st.kind];
+      return { id: st.id, kind: st.kind, x: st.x, z: st.z, rot: st.rot, w: def.cellsX * CELL, d: def.cellsZ * CELL, depth: ringsAround(game, [st.x, st.z]).length };
+    });
+    return this._homes;
+  }
+
+  /** Livestock: out in the paddock by day, in the barn, coop or barnyard at night, in a storm and when the place is raided (the innermost shelter). */
+  updateLivestock(dt: number, game: GameState, hour: number, speedK: number): void {
+    const homes = this._animalHomes(game);
+    const homeB = [...this._built.values()].filter(b => b.finished && KIT[b.placed.kind].sleeps > 0).sort((a, b) => KIT[b.placed.kind].sleeps - KIT[a.placed.kind].sleeps)[0];
+    const house: [number, number] = homeB ? [homeB.placed.x, homeB.placed.z] : [this.camp.x, this.camp.z];
+    const coops = homes.filter(h => h.kind === 'chicken_coop').length;
+    const w = this._walkWorld();
+    this.livestock.update(dt, game.stock as unknown as Record<string, number>, coops, homes,
+      { hour, raided: hostileAtGate(game.gate.pending) || this.doorLock === true || this.qaRaid, storm: seasonState.params.snow > 0.6, house, clock: game.clock.t },
+      { ground: this.groundAt, via: (kind, a, b) => animalRoute(a, b, this._animalHard(kind), (x, z) => w.cost?.(x, z) ?? 1, 0.14, 1.3) },
+      speedK, { x: this._ws.camera.position.x, z: this._ws.camera.position.z });
+    // a shelter the animals cannot get to (across the creek, behind a wall): one line in the log
+    const cut = this.livestock.takeNoWay().filter(k => !this._noWayLogged.has(k));
+    for (const k of cut) { this._noWayLogged.add(k); log(game, `The ${k === 'hen' ? 'hens' : k + 's'} have no way to a barn they can reach: a wall, the creek or the rock is in the road.`); }
+    if (!cut.length && !this.qaRaid && this.livestock.animals().every(a => a.moving === false)) this._noWayLogged.clear();
+  }
+  private readonly _noWayLogged = new Set<string>();
+
   /** Where dogs are (animals bolt from them too); none until the dogs renderer exists. */
   dogPositions(): Array<[number, number]> { return this.dogs.positions().map(d => [d.x, d.z] as [number, number]); }
 
@@ -2073,6 +2230,7 @@ export class HomesteadWorld {
     this.paths.update(game, performance.now());
     const ctx: GoalCtx = {
       camp: this.camp, site, home: homeB ? site(homeB.placed.id) : null, tree, yard: this.access.yard, sleepAt: i => sleepSpotFor(game, i), tentAt: n => this._tentPos[n],
+      entry: this.access.drive.length ? { x: this.access.drive[0][0], z: this.access.drive[0][1] } : undefined, today: dayIndex(game.clock.t),
       footing: (x, z) => walkFactor(this.paths.surfaceAt(x, z), this._underfoot), via: (fx, fz, tx, tz) => this._walkVia(fx, fz, tx, tz), doorWait: tag => this.doorWait(tag),
       ...dailyCtx(refs, game, this.access.yard, seasonState.params.cold < 0.35),
     };
@@ -2084,7 +2242,13 @@ export class HomesteadWorld {
       home: ctx.home, camp: this.camp, gate: this.access.gate, yard: this.access.yard, atGate: !!game.gate.pending,
       person: id => (this.family.shown.has(id) ? this.family.poseOf(id) : null),
       via: (fx, fz, tx, tz) => this._walkVia(fx, fz, tx, tz), doorWait: tag => this.doorWait(tag),
+      inner: this._innerPost(game), raided: hostileAtGate(game.gate.pending) || this.doorLock === true || this.qaRaid,
     };
+    const guards = livingDogs(game).filter(d => d.guard && ageYears(d, dayIndex(game.clock.t)) >= 0.5);
+    if (guards.length) {
+      const outer = guards.slice(0, 2).map((_, i) => postSpot(dctx, i)).slice(0, 1);
+      this.guardPosts.sync([...outer, ...(guards.length > 1 && dctx.inner ? [dctx.inner] : [])], this.groundAt);
+    } else this.guardPosts.sync([], this.groundAt);
     this.dogs.update(dt, game, hour, game.clock.t, dctx, this.walkHeight, speedK);
     this.updateDoors(dt, game);
     // crops stand in the ground from planting (mid-May) to the last of the harvest (late October); bare soil the rest of the year
@@ -2255,6 +2419,8 @@ export class HomesteadWorld {
       // a stair or a ramp: up the steps (or the grade) from its low end
       if (def.climbs) { if (Math.abs(lx) < hw && Math.abs(lz) < hd) return b.padY + treadHeight(b.placed.kind, b.opts.rise ?? 0, def.cellsZ * CELL, lz); continue; }
       if (Math.abs(lx) < hw && lz > -hd && lz < hd + def.porch && def.floorY > 0.02) return b.padY + def.floorY;
+      // the steps down off the deck: ease from the floor to the ground instead of dropping the whole rise at the edge
+      if (def.floorY > 0.1 && Math.abs(lx) < hw && lz >= hd + def.porch && lz < hd + def.porch + 0.9) return entryRampHeight(b.padY + def.floorY, this.groundAt(x, z), lz - hd - def.porch);
       // a building whose floor is its graded pad (greenhouse gravel, a garage slab): stand on the pad, not the raw slope under it
       if (Math.abs(lx) < hw && Math.abs(lz) < hd && def.category !== 'bunker' && (def.category !== 'food' || b.placed.kind === 'greenhouse' || b.placed.kind === 'greenhouse_heated' || b.placed.kind === 'sheep_barn')) return b.padY + Math.max(0, def.floorY);
     }
@@ -2379,6 +2545,7 @@ export class HomesteadWorld {
     if (this._buildingBlocked(x, z, r)) return true;
     if (this._perimeterBlocked(x, z, Math.min(r, INDOOR_R))) return true;
     if (Math.hypot(x - this.camp.x, z - this.camp.z) < 0.4 + r) return true;
+    if (this._yardAt(x, z, r)) return true;
     for (const t of this.treeSpecs) {
       const dx = t.x - x, dz = t.z - z;
       const tr = r + 0.07 * t.scale;
@@ -2387,8 +2554,18 @@ export class HomesteadWorld {
     return false;
   };
 
-  /** Is the point inside a parcel tree's crown (camera keep-out)? */
+  /** Is (x, z) within `pad` of a solid yard prop (woodpile, picnic table, grill, tub)? Camp-local test (the yard turns with the camp). */
+  private _yardAt(x: number, z: number, pad: number, y = 0): boolean {
+    const dx = x - this.camp.x, dz = z - this.camp.z;
+    if (dx * dx + dz * dz > 2.6 * 2.6) return false;
+    const c = Math.cos(this.camp.rot), s = Math.sin(this.camp.rot);
+    const lx = dx * c - dz * s, lz = dx * s + dz * c;
+    return y > 0 ? yardSolidLocal(lx, y - this._campGroup.position.y, lz, pad) : yardBlockedLocal(lx, lz, pad);
+  }
+
+  /** Is the point inside a parcel tree's crown or a solid yard prop (camera keep-out)? */
   crownAt = (x: number, y: number, z: number): boolean => {
+    if (this._yardAt(x, z, 0.04, Math.max(0.001, y))) return true;
     for (const t of this.treeSpecs) {
       const r = (t.kind === 'conifer' ? 0.78 : 0.9) * t.scale * t.sx + 0.12;
       const dx = t.x - x, dz = t.z - z;
@@ -2415,7 +2592,7 @@ export class HomesteadWorld {
       for (let a = 0; a < Math.PI * 2; a += 0.4) {
         const px = x + Math.cos(a) * r, pz = z + Math.sin(a) * r;
         if (this.parcel.isCreek(px, pz) || Math.abs(pz - this.parcel.creek.zAt(px)) < 1.5) continue;
-        if (this.treeClearance(px, pz) > clear) return [px, pz];
+        if (this.treeClearance(px, pz) > clear && !this._lowObstacles.some(o => Math.hypot(o.x - px, o.z - pz) < o.r + 0.45) && !this._yardAt(px, pz, 0.45) && !this.onBuilding(px, pz, 0.3) && !this.onAccess(px, pz, 0.7) && !this.onCamp(px, pz, 0.35)) return [px, pz];
       }
     }
     return [x, z];
@@ -2461,6 +2638,7 @@ export class HomesteadWorld {
     }
     this._built.clear();
     this.truck.dispose();
+    this.roadLife.dispose();
     this.plow.dispose();
     this._ws.scene.remove(this._roads);
     this._roads.traverse(o => (o as THREE.Mesh).geometry?.dispose());
@@ -2474,6 +2652,8 @@ export class HomesteadWorld {
     this.dogs.dispose();
     this.fleet.dispose();
     this.wildlife.dispose();
+    this.livestock.dispose();
+    this.guardPosts.dispose();
     this._yard.dispose();
     this.atmos.dispose();
     this.paths.dispose();

@@ -117,6 +117,12 @@ const L = await page.evaluate(() => {
   return { tunnel: tun ? { a: tun.pts[0], b: tun.pts[tun.pts.length - 1] } : null, fall: f, up: Math.atan2(Math.cos(f), Math.sin(f)), camp: [w.camp.x, w.camp.z], center: [cx, cz], lodge: of('lodge')[0], garage: of('gate_garage')[0], court: of('motor_court')[0], greenhouse: of('greenhouse_heated')[0], gardens: of('garden'), orchard: of('orchard')[0], solar: of('solar_farm')[0], battery: of('battery_bank')[0], hatch: of('bunker_hatch')[0], towers: g.structures.filter(s => s.kind.startsWith('watchtower')).map(s => ({ id: s.id, x: s.x, z: s.z })), vehicles: (g.vehicles ?? []).length };
 });
 console.error(JSON.stringify(L));
+// --collapse: a sapper crew has brought the rock tunnel's portals down (sim/corridors collapseCorridor): the same shots show the rubble
+if (args.includes('--collapse') && L.tunnel) {
+  const why = await page.evaluate(async () => { const cb = window.__cb, { collapseCorridor } = await import('/src/sim/corridors.ts'); const g = structuredClone(cb.game.getState().game), id = g.perimeter.find(r => r.kind === 'rock_tunnel').id; const w = collapseCorridor(g, id, 'sappers'); cb.game.setState({ game: g }); return w; });
+  console.error('collapse:', why);
+  for (let i = 0; i < 8; i++) { await page.evaluate(() => window.__cb.qa.renderNow()); await page.waitForTimeout(150); }
+}
 
 // ── checks: the family walks between the posts; vehicles are parked; the frame budget ──────────────
 if (only.includes('checks')) {
@@ -259,6 +265,21 @@ if (only.includes('tunnel') && L.tunnel) {
   const sp2 = await eyeAt([bx, bz], Math.atan2(uz, ux) + 0.3, [3.6, 4.4, 3, 5], 0.3, 0.35);
   if (sp2) await shot('7d-eye-high-portal-in-the-compound');
   await orbit(18, 0.5, L.up + 2.4, bx, bz, 0.8); await shot('7e-aerial-high-portal-in-the-compound');
+}
+// the portal close up (with --collapse: the rubble heap): low orbits round the court-side portal from the court, and one aerial
+if (only.includes('portal') && L.tunnel) {
+  const [ax, az] = L.tunnel.a;
+  const [bx, bz] = L.tunnel.b, dl = Math.hypot(bx - ax, bz - az) || 1, ux = (bx - ax) / dl, uz = (bz - az) / dl, tag = args.includes('--collapse') ? 'collapsed' : 'standing';
+  await orbit(10, 0.8, L.up + 0.2, ax, az, 0.5); await shot(`9c-portal-${tag}-aerial`);
+  await orbit(6, 0.45, L.up + 0.2, ax, az, 0.5); await shot(`9d-portal-${tag}-aerial-close`);
+  // eye level, a clear spot out on the court side of the portal looking at it, a person standing between (explicit pose, so the camera is never in the ground or a tree)
+  for (const [k, d, side, fov] of [['e1', 4.2, 1.6, 62], ['e2', 3.4, -1.4, 66], ['e3', 5.0, 0.2, 58]]) {
+    const ox = -ux, oz = -uz, sx = -oz, sz = ox;
+    await placePerson('p2', ax + ox * 1.9 + sx * 0.5, az + oz * 1.9 + sz * 0.5, ax, az);
+    await page.evaluate(([x, z, ax, az, fov]) => { const { world } = window.__cb, gr = world.groundAt; window.__cb.qa.pose = { x, y: gr(x, z) + 0.3, z, lx: ax, ly: gr(ax, az) + 0.35, lz: az, fov }; }, [ax + ox * d + sx * side, az + oz * d + sz * side, ax, az, fov]);
+    await placePerson('p2', ax + ox * 1.9 + sx * 0.5, az + oz * 1.9 + sz * 0.5, ax, az);
+    await shot(`9${k}-portal-${tag}-eye-with-person`);
+  }
 }
 // tunnel use: the family walking the bore, a car driving through it, the doors, and the whole thing with the hill cut away
 if (only.includes('use') && L.tunnel) {

@@ -84,7 +84,7 @@ export function DogsPanel({ game }: { game: GameState }): ReactNode {
   const h3: CSSProperties = { margin: '0 0 4px', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.6, opacity: 0.65, fontWeight: 600 };
   if (!allDogs(game).length) return <div style={{ marginBottom: 10 }}>
     <div style={h3}>Dogs</div>
-    <div style={{ color: DIM, fontSize: 11.5, lineHeight: 1.5 }}>No dogs. A dog is family: it needs feeding, walking, vet care and love, and it warns you of trouble at the gate.</div>
+    <div style={{ color: DIM, fontSize: 11.5, lineHeight: 1.5 }} title="A dog is family: it needs feeding, walking, vet care and love, and it warns you of trouble at the gate.">No dogs yet. They warn you of trouble at the gate.</div>
     <button style={{ ...btn(), marginTop: 4 }} onClick={() => openShop(true, 'defense')}>Find a dog in the shop (Kit & security)</button>
   </div>;
   return <div style={{ marginBottom: 10 }}>

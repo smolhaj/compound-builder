@@ -1,6 +1,6 @@
 /** Shared HUD pieces: panel styling, sections, rows, notes, tabs, folding groups and build items. */
 import { useState, type ReactNode } from 'react';
-import { DIM, LINE, TONE, h3, type Tone } from './style';
+import { DIM, FS, LINE, TONE, btn, h3, miniBtn, type Tone } from './style';
 
 
 
@@ -34,13 +34,13 @@ export function Tabs<T extends string>({ tabs, value, set }: { tabs: Array<[T, s
 }
 
 /** A group of build items that folds away (remembered per browser). */
-export function Group({ id, title, extra, children }: { id: string; title: string; extra?: string; children: ReactNode }) {
+export function Group({ id, title, extra, defaultOpen = true, children }: { id: string; title: string; extra?: string; /** Advanced groups start folded. */ defaultOpen?: boolean; children: ReactNode }) {
   const key = `cb.fold.${id}`;
-  const [open, setOpen] = useState(() => { try { return localStorage.getItem(key) !== '0'; } catch { return true; } });
+  const [open, setOpen] = useState(() => { try { const v = localStorage.getItem(key); return v === null ? defaultOpen : v !== '0'; } catch { return defaultOpen; } });
   const toggle = () => { setOpen(!open); try { localStorage.setItem(key, open ? '0' : '1'); } catch { /* storage blocked */ } };
   return <div style={{ marginBottom: 4 }}>
     <button onClick={toggle} style={{ ...h3, display: 'flex', width: '100%', justifyContent: 'space-between', background: 'transparent', border: 0, color: '#eee', cursor: 'pointer', padding: '5px 2px', margin: 0 }}>
-      <span>{open ? '▾' : '▸'} {title}</span>{extra && <span style={{ textTransform: 'none', letterSpacing: 0 }}>{extra}</span>}
+      <span style={{ flex: 'none' }}>{open ? '▾' : '▸'} {title}</span>{extra && <span title={extra} style={{ textTransform: 'none', letterSpacing: 0, fontSize: FS.fine, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginLeft: 8 }}>{extra}</span>}
     </button>
     {open && <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>{children}</div>}
   </div>;
@@ -59,4 +59,30 @@ export function Item({ name, cost, sub, on, off, next, title, click }: { name: s
         {next && !on && <div style={{ fontSize: 11, color: '#d8c9a0', fontWeight: 600 }}>▸ {next}</div>}
       </>}
   </button>;
+}
+
+
+/** A one-line note with its detail one tap away: the "more" pattern for explanations (the line stays, the paragraph hides). */
+export function Hint({ children, more, tone }: { children: ReactNode; more: ReactNode; tone?: Tone }) {
+  const [open, setOpen] = useState(false);
+  return <div style={{ fontSize: FS.small, lineHeight: 1.35, margin: '3px 0', color: tone ? TONE[tone] : DIM }}>
+    <span>{children}</span>{' '}
+    <button onClick={() => setOpen(!open)} title={open ? 'Hide the details' : 'Show the details'} style={{ background: 'transparent', border: 0, padding: 0, color: '#d8c9a0', cursor: 'pointer', fontSize: FS.small }}>{open ? 'less' : 'more'}</button>
+    {open && <div style={{ marginTop: 2, color: DIM }}>{more}</div>}
+  </div>;
+}
+
+/** Text held to two lines; the whole text is the tooltip and a click opens it. */
+export function Clamp({ children, text }: { children: ReactNode; /** The full text, for the tooltip. */ text?: string }) {
+  const [open, setOpen] = useState(false);
+  return <div title={open ? undefined : text} onClick={() => setOpen(!open)} style={{ color: DIM, fontSize: FS.small, lineHeight: 1.35, cursor: 'pointer', ...(open ? {} : { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }) }}>{children}</div>;
+}
+
+/** A checklist line: a green tick or an open dot, a short label, one line of status, and one button when something is left to do. */
+export function Tick({ done, label, line, act, title }: { done: boolean; label: string; line: string; act?: { label: string; run: () => void; off?: string | null }; title?: string }) {
+  return <div title={title} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0' }}>
+    <span aria-label={done ? 'done' : 'to do'} style={{ width: 14, textAlign: 'center', color: done ? TONE.good : DIM, fontWeight: 700 }}>{done ? '✓' : '○'}</span>
+    <span style={{ flex: 1, minWidth: 0, lineHeight: 1.25 }}><b style={{ opacity: done ? 0.7 : 1 }}>{label}</b> <span style={{ color: done ? DIM : '#ddd', fontSize: FS.small }}>{line}</span></span>
+    {!done && act && <button style={{ ...btn(true), ...miniBtn }} disabled={!!act.off} title={act.off ?? undefined} onClick={act.run}>{act.label}</button>}
+  </div>;
 }

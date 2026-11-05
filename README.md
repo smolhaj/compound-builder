@@ -22,5 +22,11 @@ build tool: click to place, **R** rotates, **Esc** cancels. Camera buttons (bott
 mouse, Shift to run), Fly (WASD + Space / C, wheel = speed), Tour. Bottom left: clock, speed, date, season, weather,
 quality.
 
+## Status
+
+Playable end to end: build in peacetime, a chosen disaster, raids and defense by rings, a multi-generation long game with a Generations view, households and assigned quarters, joiners who bring their own things, auto-wired utilities, and a decluttered HUD (Get operational checklist, folded advanced groups). Save version is 78 (`SAVE_VERSION` in `src/sim/state.ts`). What landed and why: [`docs/DECISIONS.md`](docs/DECISIONS.md); open gaps: [`docs/DEPTH_AUDIT.md`](docs/DEPTH_AUDIT.md), [`docs/ROADMAP.md`](docs/ROADMAP.md); branch inventory: [`docs/BRANCHES.md`](docs/BRANCHES.md).
+
+**Workflow:** feature branch, draft PR, squash-merge when `check` and `perf-budget` pass (merge main first; never raise the perf budgets). US spelling, procedural art only, real scale. See `CLAUDE.md`.
+
 Rendering is ported from University Empire's world renderer — see [`docs/PORTING.md`](docs/PORTING.md).
 Design decisions made along the way are in [`docs/DECISIONS.md`](docs/DECISIONS.md).

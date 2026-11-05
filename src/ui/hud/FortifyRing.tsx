@@ -6,6 +6,7 @@
  * the cost, the hours and when it would be done before anything is laid out.
  */
 import { useEffect, useMemo, useState } from 'react';
+import { PlansOrderButton } from './SpendConfirm';
 import { useGameStore } from '../../store/gameStore';
 import { useWorldStore } from '../../store/worldStore';
 import { MAX_TOWERS, RING_TOWER_KINDS, RING_WALLS, DEFAULT_FORTRESS, planFortress, type FortressOptions } from '../../sim/fortress';
@@ -15,7 +16,6 @@ import { RING_SHAPES } from '../../sim/ringShape';
 import { plansNeedLines } from '../../sim/guidance';
 import { eta, paceOf, slowHint, totalHoursLeft, weeksFor } from '../../sim/pace';
 import { billText } from '../../sim/materials';
-import { orderCost, orderProblem, prices } from '../../sim/economy';
 import { Note } from './common';
 import { btn, DIM, LINE, usd } from './style';
 
@@ -54,7 +54,7 @@ export function FortifyRing() {
     </div>
     {laid ? <>
       <Note tone="good">Laid out. The family builds the wall first, then the deck on top, the garage and the towers, as the materials come in. The Defense tab shows each piece as it goes up.</Note>
-      {need.length > 0 && <button style={{ ...btn(true), width: '100%' }} disabled={!!orderProblem(game, need)} onClick={() => g.order(need)}>Order what the plans need ({usd(orderCost(need, prices(game)))})</button>}
+      {need.length > 0 && <PlansOrderButton lines={need} />}
     </> : <>
       <Note>A container-wall ring with a walkway along the top, a gatehouse garage at the gate and towers on the corners. It starts as a compound round the family's buildings (about 5 acres); expand it to the whole property line when you can pay for it. Walls you already have are kept; a container, steel or concrete wall gets a deck.</Note>
       {priced && (priced.core.coreIsFull
