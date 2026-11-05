@@ -21,7 +21,8 @@ import { mulberry32 } from './rng';
 import { hourOf, type GameState } from './state';
 import type { Person } from './family';
 import type { Encounter, Outcome, Stance } from './encounters';
-import { admitNewcomers } from './newcomers';
+import { admitNewcomers, newcomersOf } from './newcomers';
+import { INSIDER, startVet, isPlant } from './insider';
 
 export interface Guard {
   id: string;
@@ -40,7 +41,24 @@ export interface Guard {
   person: Person;
   /** He has asked (the card is out or was answered). */
   asked?: boolean;
+  /** Insider threat (sim/insider.ts; all optional, absent = the old guard: loyal, unscreened, nothing hidden). Loyalty 0-100 (absent: INSIDER.START). */
+  loyalty?: number;
+  /** Background check: pending (due `vetDue`), cleared (loyal for good, never rolled again) or flagged (it found something). */
+  vet?: 'pending' | 'cleared' | 'flagged';
+  vetDue?: number;
+  /** Hidden: planted by a crew at hiring, or bought since (low wage and loyalty). Only an unvetted guard can be one. */
+  plant?: boolean;
+  turned?: boolean;
+  /** The day the player was told (and chose to keep him): the card does not come again for a month. */
+  ignoredAt?: number;
 }
+export type WageTier = 'low' | 'fair' | 'high';
+/** Pay against the agency rate, and what it does to a guard's loyalty target. */
+export const WAGE: Record<WageTier, { pay: number; loyal: number; name: string }> = {
+  low: { pay: 0.8, loyal: -25, name: 'Below rate' },
+  fair: { pay: 1, loyal: 0, name: 'Agency rate' },
+  high: { pay: 1.25, loyal: 18, name: 'Above rate' },
+};
 export interface Guards {
   staff: Guard[];
   /** Days on the payroll in all, and dollars paid. */
@@ -49,6 +67,9 @@ export interface Guards {
   collapseDays: number;
   /** The last one to leave, and when (for the card). */
   lastQuit: { name: string; day: number; left: number } | null;
+  /** Wage tier for the whole detail (absent: fair) and whether new hires are screened as they are hired (absent: no). */
+  wage?: WageTier;
+  vetNew?: boolean;
 }
 export const newGuards = (): Guards => ({ staff: [], days: 0, paid: 0, collapseDays: 0, lastQuit: null });
 
@@ -56,6 +77,8 @@ export const MAX_GUARDS = 3;
 export const GUARD_MONTH = 5200;
 /** $ per guard per day. */
 export const GUARD_DAY = Math.round(GUARD_MONTH * 12 / 365);
+/** What one guard costs a day at the chosen wage. */
+export const wageDay = (s: GameState): number => Math.round(GUARD_DAY * WAGE[s.guards?.wage ?? 'fair'].pay);
 /** What each guard on shift adds at the gate: a fighter and warning points (capped in total). */
 export const GUARD = { fighters: 1, detection: 4, detectionCap: 12 };
 /** A permanent collapse: banks and law below this, for this many days running. */
@@ -97,7 +120,7 @@ export function guardProblem(s: GameState): string | null {
   if (guardCount(s) >= MAX_GUARDS) return `${MAX_GUARDS} guards is the most the contract covers`;
   if (permanentCollapse(s) || failed(s)) return 'no agency is sending guards now';
   if (!s.structures.some(st => isHome(st.kind) && isFinished(st))) return 'there is nothing to guard yet: build a home first';
-  if (s.money < GUARD_MONTH) return 'not enough money for the first month';
+  if (s.money < GUARD_MONTH + (s.guards?.vetNew ? INSIDER.VET_COST : 0)) return 'not enough money for the first month' + (s.guards?.vetNew ? ' and the background check' : '');
   return null;
 }
 
@@ -113,16 +136,19 @@ export function hireGuard(s: GameState): string | null {
   const id = `g${s.nextId++}`;
   const skills = { builder: 1, gardener: 0, medic: 1, mechanic: 2, hunter: 6, negotiator: 1, teacher: 0, radio: 1 };
   const person: Person = { id: `p${id}`, first: name, last: SURNAMES[Math.floor(r() * SURNAMES.length)], age: 27 + Math.floor(r() * 26), kid: false, body: 'm', skills, shirt: 0x39475a };
-  g.staff.push({ id, name, hiredAt: s.clock.t, shift, local, holds: 2 + Math.floor(r() * 9), alone: guardAlone(s.seed, id, local), person });
+  g.staff.push({ id, name, hiredAt: s.clock.t, shift, local, holds: 2 + Math.floor(r() * 9), alone: guardAlone(s.seed, id, local), person, loyalty: INSIDER.START, ...(isPlant(s.seed, id) ? { plant: true } : {}) });
+  if (g.vetNew) startVet(s, id);
   const where = bunk(s) === 'gate_house' ? 'He will have the gate house.' : 'He will park at the drive.';
   log(s, `Hired ${name} as a contract guard (${String(shift).padStart(2, '0')}:00 to ${String((shift + 8) % 24).padStart(2, '0')}:00): $${GUARD_MONTH.toLocaleString('en-US')} a month. ${where}`);
   return null;
 }
 
-export function dismissGuard(s: GameState): void {
+export function dismissGuard(s: GameState, id?: string): void {
   const g = guardsOf(s);
-  const out = g.staff.pop();
-  if (out) log(s, `${out.name} was let go (${g.staff.length} left).`);
+  const at = id ? g.staff.findIndex(x => x.id === id) : g.staff.length - 1;
+  if (at < 0) return;
+  const [out] = g.staff.splice(at, 1);
+  log(s, `${out.name} was let go (${g.staff.length} left).`);
 }
 
 /** Days a guard holds out in a permanent collapse: his own draw, plus tenure, a decent wage and family nearby. */
@@ -155,7 +181,7 @@ export function guardDay(s: GameState): string[] {
     }
   }
   if (!g.staff.length) return out;
-  const bill = g.staff.length * GUARD_DAY;
+  const bill = g.staff.length * wageDay(s);
   if (s.money < bill) { const n = g.staff.length; g.staff = []; out.push(`The ${n > 1 ? `${n} guards` : 'guard'} went home: there was no money to pay them.`); return out; }
   s.money -= bill; g.paid += bill; g.days += 1;
   return out;
@@ -186,6 +212,9 @@ export function resolveGuardStay(s: GameState, e: Encounter, stance: Stance): Ou
   if (stance === 'take_in') {
     const person: Person = { ...x.person, guard: true };
     const lines = admitNewcomers(s, [person], { kind: 'stranger', arche: 'guard' });
+    // loyal for good (user rule): a loner taken in is cleared, so the insider roll never touches him (sim/insider.ts)
+    const bond = newcomersOf(s).bonds[person.id];
+    if (bond) { bond.vet = 'cleared'; bond.secret = 'solid'; }
     // his own sidearm and a few boxes, and he is trained
     const gun = { id: `gun_${person.id}`, model: 'glock_19', condition: 0.9, fired: 0, where: 'house' as const, carrier: person.id };
     s.armory.guns.push(gun); s.armory.ammo['9mm'] = (s.armory.ammo['9mm'] ?? 0) + 100; s.armory.skill[person.id] = 4;

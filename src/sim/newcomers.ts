@@ -81,6 +81,10 @@ export interface Bond {
   low: number;
   /** Pre-reveal hints given so far (0-2). */
   hints: number;
+  /** Background check (sim/insider.ts): pending (due `vetDue`), cleared (loyal for good) or flagged (the dismissal card is owed / shown: `carded`). */
+  vet?: 'pending' | 'cleared' | 'flagged';
+  vetDue?: number;
+  carded?: boolean;
 }
 export interface Departure { day: number; name: string; why: string; kind: BondKind }
 export interface GuestParty { nid: string; ids: string[]; from: number; until: number; why: ShelterWhy }
