@@ -171,9 +171,10 @@ export const CLIMATES: Record<string, SeasonClimate> = {
   great_plains: {
     // native grass cures tan by late July; cottonwood yellow on the creeks; snow blows off the open ground
     ...BASE, id: 'great_plains', blaze: 0.6, palette: [0.05, 0.2, 0.65, 0.1],
-    turnStart: 275, peak: 292, dropEnd: 312, leafOut: 112, bloomDay: 105,
+    turnStart: 275, peak: 292, dropEnd: 312, leafOut: 103, bloomDay: 98,   // cottonwoods are in leaf by mid-April on the southern plains (a game that starts mid-April no longer opens on bare trunks)
     snow: 0.6, snowOn: 342, snowFull: 352, snowMelt: 50, snowGone: 72,
     dry: 0.6, dryStart: 195, dryFull: 225, dryEnd: 300,
+    greenUp: 96,   // the prairie is greening by the second week of April (it opened a mid-April game as dark winter-brown mud with green flecks)
   },
   upper_midwest: {
     // sugar maple and red oak, peak in early October; deep snow December to March

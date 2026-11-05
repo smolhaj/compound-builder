@@ -1168,6 +1168,42 @@ export function buildSagePatch(seed: number, cards = true): THREE.BufferGeometry
 }
 
 /**
+ * A clump of high-desert scrub in world units (one merged geometry, so the
+ * desert needs no extra draw call): airy creosote / rabbitbrush lobes with
+ * a yucca rosette (a fan of stiff blades and a flower stalk) on one side and
+ * a prickly-pear stack of pads on the other.
+ */
+export function buildDesertScrub(seed: number, cards = true): THREE.BufferGeometry {
+  const rng = makeRng(seed + 7373);
+  const parts: THREE.BufferGeometry[] = [];
+  for (let i = 0; i < 4; i++) {
+    const a = rng() * Math.PI * 2, d = Math.sqrt(rng()) * 0.3;
+    const cx = Math.cos(a) * d, cz = Math.sin(a) * d, r = 0.05 + rng() * 0.04;
+    const lobes: LobeSpec[] = [
+      { c: new THREE.Vector3(cx, r * 1.0, cz), r, tint: (rng() - 0.5) * 0.12 },
+      { c: new THREE.Vector3(cx + (rng() - 0.5) * r, r * 0.7, cz + (rng() - 0.5) * r), r: r * 0.8, tint: (rng() - 0.5) * 0.1 },
+    ];
+    parts.push(makeCrownShell(lobes, new THREE.Vector3(cx, r * 0.6, cz), cards ? 6 : 5, cards ? 4 : 3, seed + i, 0.6, true, cards ? { shrink: 0.7, holey: true } : {}));
+  }
+  // yucca: a rosette of stiff blades fanned up and out (~ 60 cm), a flower stalk
+  const yx = -0.3, yz = 0.12, n = cards ? 12 : 8, pale: [number, number, number] = [1.05, 1.1, 0.9];
+  for (let i = 0; i < n; i++) {
+    const g = new THREE.ConeGeometry(0.011, 0.14, 3, 1, true).translate(0, 0.07, 0).rotateZ(0.35 + rng() * 0.9).rotateY(i / n * Math.PI * 2 + rng() * 0.4).translate(yx, 0.01, yz);
+    parts.push(finalize(g, 1, new THREE.Vector3(yx, 0.04, yz), () => pale));
+  }
+  parts.push(finalize(new THREE.CylinderGeometry(0.004, 0.007, 0.3, 4, 1, true).translate(yx, 0.15, yz), 0, new THREE.Vector3(yx, 0.1, yz), () => [1.1, 1.0, 0.8]));
+  // prickly pear: flattened pads stacked and leaning, each the size of a hand
+  let x = 0.3, y = 0.035, z = -0.1;
+  for (let i = 0; i < 5; i++) {
+    const g = new THREE.SphereGeometry(1, 7, 5).scale(0.05, 0.062, 0.011).rotateZ((rng() - 0.5) * 1.1).rotateY(rng() * 3).translate(x, y, z);
+    parts.push(finalize(g, 1, new THREE.Vector3(x, y, z), () => [0.85, 1.05, 0.85]));
+    x += (rng() - 0.5) * 0.07; z += (rng() - 0.5) * 0.07; y += 0.03 + rng() * 0.03;
+    if (y > 0.18) { y = 0.04 + rng() * 0.03; x += (rng() - 0.5) * 0.1; }
+  }
+  return mergeVeg(parts, 'desert scrub');
+}
+
+/**
  * A creek-bank willow thicket (sandbar / Geyer willow) in world units:
  * a dense clump of upright lobes 2–4 m tall, leafy to the ground.
  */
