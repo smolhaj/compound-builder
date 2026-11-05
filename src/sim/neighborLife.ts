@@ -36,6 +36,7 @@
  */
 import { mulberry32, pick } from './rng';
 import { log } from './economy';
+import { nobodyHome } from './orphans';
 import { radioSet } from './radio';
 import { addWork, blockedReason, isFinished } from './construction';
 import { canGo, fightAtCamp } from './rescue';
@@ -244,7 +245,7 @@ export function raidHousehold(s: GameState, n: Neighbor, raiders: number, temper
 
 /** A household alone asks to come and live with the family: an arrival at the gate. */
 function askToJoin(s: GameState, n: Neighbor, why: string, r: () => number): boolean {
-  if (s.gate.pending || n.members <= 0) return false;
+  if (s.gate.pending || n.members <= 0 || nobodyHome(s)) return false;
   const l = lifeOf(s, n), day = dayIndex(s.clock.t);
   const people = householdPeople(s, n, Math.min(3, n.members), r, i => `pn_${n.id}_${i}`);
   const carried = neighborBrings(n, r);
