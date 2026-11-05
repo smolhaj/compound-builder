@@ -18,6 +18,7 @@ import { wildDay } from './wildfood';
 import { livestockDay } from './livestock';
 import { isHome } from './blueprints';
 import { log } from './economy';
+import { medicalBay } from './richSinks';
 import { isFinished } from './construction';
 import { climate } from './effects';
 import { tractorBoost } from './vehicles';
@@ -42,6 +43,7 @@ import { newcomerMorale } from './newcomers';
 import { mindMorale } from './mind';
 import { bestLevel } from './skills';
 import { regionFor } from './climate';
+import { healthFloor, HUNGER_MAX, nextStarved, starveWarning, STARVE_WARN, STARVE_GRACE } from './starvation';
 import { harvestShare } from './sharedHarvest';
 
 export type FoodId = 'fresh' | 'frozen' | 'canned' | 'staples';
@@ -61,6 +63,8 @@ export interface Needs {
   morale: number;
   /** Calories short, accumulated (kcal; recovers when fed). */
   hunger: number;
+  /** Consecutive days starving (hungry past STARVE_LEVEL and eating under half the need); Cozy lets this kill slowly (sim/starvation.ts). Absent = 0. */
+  starved?: number;
   /** Radiation dose (sieverts). */
   dose: number;
   /** Wounds / illness being treated: severity 0–100, what it is. */
@@ -293,7 +297,7 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
   const home = fin.some(st => isHome(st.kind));
   const dark = s.utilities.fittings.some(f => f.kind === 'wire' && f.finishedAt !== null) && !s.utilities.lit.some(id => isHome(s.structures.find(x => x.id === id)?.kind ?? ''));
   const medic = Math.max(...s.people.filter((p, i) => !p.kid && alive(s, i)).map(p => p.skills.medic), 0);
-  const bay = fin.some(st => st.kind === 'bunker_medical');
+  const bay = medicalBay(s);
   // where everybody slept and how well (sim/housing.ts): bed, couch, floor, tent, nowhere
   const slept = sleepEffects(s);
   // gatherings' afterglow and grief (sim/gatherings.ts: a funeral eases it)
@@ -303,7 +307,9 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
     if (!n || n.died != null) return;
     const sl = slept.get(i);
     const mine = needOf(p) / Math.max(1, need);
-    n.hunger = Math.max(0, n.hunger + short * mine - (short === 0 ? 600 : 0));
+    n.hunger = Math.min(HUNGER_MAX, Math.max(0, n.hunger + short * mine - (short === 0 ? 600 : 0)));
+    n.starved = nextStarved(n.starved ?? 0, n.hunger, short / Math.max(1, need));
+    if (n.starved === STARVE_WARN || n.starved === STARVE_GRACE - 10) log(s, `${starveWarning(p.first, n.starved)}.`);
     // health: hunger, wounds and radiation take it; rest and food bring it back
     let dh = n.hunger > 15000 ? -1.5 : n.hunger > 5000 ? -0.5 : 0.6;
     n.hurt.forEach((h, k) => {
@@ -331,7 +337,7 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
     // a diet short of fat or protein (or salt, working hard) keeps health from coming all the way back
     if (n.health + dh > diet.healthCap) dh = Math.min(dh, n.health > diet.healthCap ? -0.2 : diet.healthCap - n.health);
     if (sl) dh -= sl.harm;
-    n.health = Math.max(cozy ? 5 : 0, Math.min(100, n.health + dh));
+    n.health = Math.max(healthFloor(cozy, n.starved ?? 0, { kid: !!p.kid, age: p.age, sick: n.hurt.length > 0, id: p.id }), Math.min(100, n.health + dh));
     // morale: drifts to a baseline that variety, a home, light and safety raise; hunger and loss lower
     const target = 45 + 6 * Math.min(variety, 4) + diet.morale + (home ? 8 : -6) + (dark ? -8 : 0) + darkMood(s, !!p.kid, (s.personState[i]?.task as string) === 'watch') + (s.utilities.hauling ? (s.utilities.haulFar ? -10 : -4) : 0) - Math.min(25, n.hunger / 1000) + social + lifeMorale(s, i) + newcomerMorale(s, p.id) + (fromStores ? 0 : table) + (sl?.morale ?? 0) + dogEffects(s, p.id).morale + mindMorale(s, p.id) - beltMorale(s, p.id);
     n.morale += (Math.max(0, Math.min(100, target)) - n.morale) * 0.08;

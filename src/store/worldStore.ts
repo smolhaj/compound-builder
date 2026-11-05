@@ -185,3 +185,13 @@ export const useWorldStore = create<WorldState>()(subscribeWithSelector((set) =>
     set({ quality });
   },
 })));
+
+// narrowing the window (rotating a phone, snapping a browser) folds the side panels away once, as a phone-sized start does
+if (typeof window !== 'undefined') {
+  let narrow = window.innerWidth < 760;
+  window.addEventListener('resize', () => {
+    const n = window.innerWidth < 760;
+    if (n && !narrow) useWorldStore.getState().setHudHidden(true);
+    narrow = n;
+  });
+}

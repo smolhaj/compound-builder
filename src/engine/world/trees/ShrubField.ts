@@ -10,7 +10,7 @@
  */
 import * as THREE from 'three';
 import type { Quality } from '../WorldScene';
-import { applyVegetationDepth, buildSagePatch, buildWillowClump, createVegetationMaterial } from './treeGeometry';
+import { applyVegetationDepth, buildDesertScrub, buildSagePatch, buildWillowClump, createVegetationMaterial } from './treeGeometry';
 import { InstancedLodSet } from './instancedLod';
 
 export interface ShrubSpec { x: number; y: number; z: number; s: number; rot: number; tone: number }
@@ -42,8 +42,8 @@ export class ShrubField {
     this.clear();
     if (!list.length) return;
     if (!this._geos.length) {
-      const make = this._name === 'willow' ? buildWillowClump : buildSagePatch;
-      this._geos = [make(907, true), make(907, false)];
+      this._geos = this._name === 'desert_scrub' ? [buildDesertScrub(907, true), buildDesertScrub(907, false)]
+        : (this._name === 'willow' ? [buildWillowClump(907, true), buildWillowClump(907, false)] : [buildSagePatch(907, true), buildSagePatch(907, false)]);
     }
     this._mat = createVegetationMaterial({ detail: quality, leafFill: { value: 1 }, barkColor: this._bark, evergreen: true });
     const d = new THREE.Object3D();

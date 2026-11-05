@@ -336,7 +336,10 @@ export class ParcelTerrain {
   sparseCover = false;
   private _lotCover(x: number, z: number): number {
     const f = this.lot!, n = this._noise;
-    const g = this.lotSlope(x, z), rock = f.rock(x, z), elev = f.spec.elevM + f.h(x, z) * 6;
+    // the stand's edge is warped by about 70 m of noise (a contour or a clearing line is never a ruler line), then dithered by a finer one so
+    // the last trees straggle out into the field and saplings (planUnderstory) fill the fringe
+    const wx = x + 11 * n(x * 0.045 + 9, z * 0.045), wz = z + 11 * n(x * 0.045 - 4, z * 0.045 + 13);
+    const g = this.lotSlope(x, z), rock = f.rock(x, z), elev = f.spec.elevM + f.h(wx, wz) * 6;   // (cliffs and ledges stay exact: only the tree line wanders)
     const line = treeLineM(this.regionId);
     // the lot's own cover: sparse conifer in the mountain west, the region's dense woods elsewhere (the hollows, the cedar and fir, the spruce and birch)
     const dense = this.sparseCover ? 0.42 : LOT_WOODS[this.regionId] ?? 0.42;
@@ -349,7 +352,7 @@ export class ParcelTerrain {
     // a south-facing slope is drier and more open
     const fall = f.fall, south = Math.sin(fall) * Math.min(1, g * 4);
     c *= 1 - 0.18 * Math.max(0, -south);
-    return c;
+    return c * (0.8 + 0.4 * sstep(-0.5, 0.5, n(x * 0.22 + 3, z * 0.22 - 8)));
   }
 
   /** North Woods: an open sphagnum bog in a low spot (0–1). */
@@ -474,7 +477,11 @@ export class ParcelTerrain {
       // the region's cover, thinned or thickened by the listing's timber
       // the region's cover, thinned or thickened by the listing's timber; the land round the place
       // carries the same woods (at the region's usual timber), out to where the regional field takes over
-      const near = 1 - sstep(60, 240, out), k = w * this._timber + (1 - w) * near * this._regionTimber;
+      const near = 1 - sstep(60, 240, out);
+      // where the listing's own timber hands over to the region's woods the line is ragged and wide, not the parcel's ruler edge:
+      // the handover distance is warped by noise (growing with the distance out), and a finer noise leaves tongues and clearings
+      const wt = 1 - sstep(4, 34, out + sstep(0, 12, out) * (13 * this._noise(x * 0.045 + 6, z * 0.045 - 3) + 6 * this._noise(x * 0.16 - 2, z * 0.16 + 5)));
+      const k = wt * this._timber + (1 - wt) * near * this._regionTimber;
       timber = Math.min(1, this._cover(x, z) * k * this.world.cover);
     }
     const riparian = (1 - sstep(1.5, 6 + 3 * this._noise(x * 0.05, 3.3), dz)) * sstep(CREEK_HALF + 0.2, CREEK_HALF + 0.8, dz) * along
