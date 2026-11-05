@@ -1,6 +1,7 @@
 import { flowLine } from '../sim/flow';
 import { PlansOrderButton } from './hud/SpendConfirm';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { EDGE, hudLayout } from './hudLayout';
 import { unscripted } from '../sim/godMode';
 import { TERRAIN_LEGEND, type TerrainMode } from '../game/terrain/TerrainOverlay';
 import { stormOutage } from '../sim/weatherThreats';
@@ -74,7 +75,7 @@ import { farmAlert } from '../sim/farmPlan';
 import { fmtKw, powerSummary } from '../sim/powerReport';
 import { ToolsPanel } from './ToolsPanel';
 import { Clamp, Group, Hint, Note, Row, Section, Tabs } from './hud/common';
-import { DIM, LINE, TONE, btn, panel, usd, type Tone } from './hud/style';
+import { DIM, FS, LINE, TONE, btn, panel, usd, type Tone } from './hud/style';
 import { BuildMenu } from './hud/BuildMenu';
 import { ProjectsTab } from './hud/ProjectsTab';
 import { DefenseTab } from './hud/DefenseTab';
@@ -128,6 +129,19 @@ export function Hud() {
   const [suppliesTab, setSuppliesTab] = useState<'stores' | 'farm'>(() => g.hudFocus?.supplies ?? 'stores');
   // picking a building on the map opens its project card (not while a build tool is armed: placing a row of things keeps the Build list up)
   const [quitAsk, setQuitAsk] = useState<string | null>(null);
+  // layout: the top bar's size and the window's width decide where the panels sit (hudLayout)
+  const barRef = useRef<HTMLDivElement>(null);
+  const [box, setBox] = useState({ vw: typeof window === 'undefined' ? 1280 : window.innerWidth, w: 700, h: 40 });
+  const [side, setSide] = useState<'left' | 'right'>('left');
+  useEffect(() => {
+    const read = () => { const r = barRef.current?.getBoundingClientRect(); setBox(b => { const n = { vw: window.innerWidth, w: Math.round(r?.width ?? b.w), h: Math.round(r?.height ?? b.h) }; return n.vw === b.vw && n.w === b.w && n.h === b.h ? b : n; }); };
+    read();
+    window.addEventListener('resize', read);
+    const ro = typeof ResizeObserver !== 'undefined' && barRef.current ? new ResizeObserver(read) : null;
+    if (ro && barRef.current) ro.observe(barRef.current);
+    return () => { window.removeEventListener('resize', read); ro?.disconnect(); };
+  }, []);
+  const lay = hudLayout(box.vw, box.w, box.h);
   const [lastSel, setLastSel] = useState<string | null>(null);
   if (g.selected !== lastSel) { setLastSel(g.selected); if (g.selected && !g.tool) setLeftTab('projects'); }
   // a link elsewhere asked for a panel: each request is a new object, so a changed one is taken once (state adjusted while rendering, as for the selection above)
@@ -158,7 +172,7 @@ export function Hud() {
   return (
     <>
       {/* Top bar: date, time, money, speed */}
-      <div style={{ ...panel, position: 'fixed', top: 10, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 12, alignItems: 'center', fontSize: 13.5, whiteSpace: 'nowrap' }}>
+      <div ref={barRef} style={{ ...panel, position: 'fixed', top: 10, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '4px 12px', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', fontSize: 13.5, maxWidth: 'calc(100vw - 20px)', boxSizing: 'border-box', zIndex: 3 }}>
         <span>{dateLabel(cal.doy)}, {cal.year}</span>
         <span style={{ fontVariantNumeric: 'tabular-nums' }}>{clock(hourOf(game.clock.t))}</span>
         {game.lineage.era > 1 && <span style={{ color: '#d8c08a' }} title={`The ${game.lineage.family} family: era ${game.lineage.era}`}>Era {roman(game.lineage.era)}</span>}
@@ -173,7 +187,11 @@ export function Hud() {
       </div>
 
       {/* Left: build menu (groups) · projects under way · the log */}
-      <div style={{ ...panel, position: 'fixed', left: 10, top: 10, width: 244, maxHeight: 'calc(100vh - 140px)', display: w.hudHidden ? 'none' : 'flex', flexDirection: 'column' }}>
+      {lay.narrow && !w.hudHidden && <div style={{ position: 'fixed', left: EDGE, top: lay.switchTop, display: 'flex', gap: 4, zIndex: 2 }}>
+        <button style={btn(side === 'left')} onClick={() => setSide('left')}>Build</button>
+        <button style={btn(side === 'right')} onClick={() => setSide('right')}>Family</button>
+      </div>}
+      <div style={{ ...panel, position: 'fixed', left: EDGE, top: lay.panelTop, width: lay.leftW, boxSizing: 'border-box', maxHeight: `calc(100vh - ${lay.panelTop + 130}px)`, display: w.hudHidden || (lay.narrow && side !== 'left') ? 'none' : 'flex', flexDirection: 'column' }}>
         <Tabs tabs={[['build', 'Build'], ['projects', 'Projects', projectsAlert], ['log', 'Log']]} value={leftTab} set={setLeftTab} />
         <div style={{ overflowY: 'auto', flex: 1, paddingRight: 2 }}>
           {leftTab === 'build' && <BuildMenu showProjects={() => setLeftTab('projects')} />}
@@ -182,6 +200,13 @@ export function Hud() {
 
           {leftTab === 'log' && game.log.slice(-14).reverse().map((e, i) => <div key={i} style={{ padding: '3px 0', borderBottom: `1px solid ${LINE}`, opacity: 1 - i * 0.04 }}><Clamp text={e.text}><span style={{ color: i === 0 ? '#eee' : undefined }}>{e.text}</span></Clamp></div>)}
         </div>
+        {g.spendAsk && <div style={{ border: `1px solid ${TONE.warn}`, borderRadius: 6, padding: '4px 6px', marginTop: 6, fontSize: FS.small }}>
+          <div>The {g.spendAsk.kind.replace(/_/g, ' ')} books a {usd(g.spendAsk.cost)} county permit fee. That leaves {usd(Math.max(0, g.spendAsk.after))}, under the {usd(g.spendAsk.reserve)} to live on{g.spendAsk.after < 0 ? ' (cash would go negative)' : ''}.</div>
+          <div style={{ display: 'flex', gap: 4, marginTop: 3 }}>
+            <button style={btn(true)} onClick={() => g.answerSpend(true)}>Do it anyway</button>
+            <button style={btn()} onClick={() => g.answerSpend(false)}>Keep a reserve</button>
+          </div>
+        </div>}
         {!g.tool && g.stakedNote && <div style={{ borderTop: `1px solid ${LINE}`, marginTop: 6, paddingTop: 6 }}><Note tone="good">{g.stakedNote}</Note></div>}
         {g.tool && <div style={{ borderTop: `1px solid ${LINE}`, marginTop: 6, paddingTop: 6 }}>
           <Note tone={g.toolProblem ? 'warn' : undefined}>{g.toolProblem ?? (g.tool === 'fell' ? 'Point at a tree · click marks or unmarks · Esc stops' : g.tool.startsWith('fence:') ? 'Click corners · Shift-click the line for a vehicle gate (Shift+Alt: a pedestrian gate) · Enter lays it out · Backspace undoes · Esc cancels' : 'Click to stake it out (Shift-click to keep going) · R rotates · Esc cancels')}</Note>
@@ -189,7 +214,7 @@ export function Hud() {
       </div>
 
       {/* Right: the family, supplies, water & power, land, the outside world */}
-      <div style={{ ...panel, position: 'fixed', right: 10, top: 10, width: 320, maxHeight: 'calc(100vh - 90px)', display: w.hudHidden ? 'none' : 'flex', flexDirection: 'column' }}>
+      <div style={{ ...panel, position: 'fixed', right: lay.narrow ? 'auto' : EDGE, left: lay.narrow ? EDGE : 'auto', top: lay.panelTop, width: lay.rightW, boxSizing: 'border-box', maxHeight: `calc(100vh - ${lay.panelTop + 80}px)`, display: w.hudHidden || (lay.narrow && side !== 'right') ? 'none' : 'flex', flexDirection: 'column' }}>
         <Tabs tabs={[['family', 'Family', familyAlert], ['supplies', 'Supplies', worstTone(foodAlert, farmAlert(game))], ['utilities', 'Utilities', utilAlert], ['land', 'Land'], ['defense', 'Defense', defenseAlert], ['outside', 'Outside', outsideAlert], ['chronicle', 'Years']]} value={rightTab} set={setRightTab} />
         <div style={{ overflowY: 'auto', flex: 1, paddingRight: 2 }}>
           {rightTab === 'family' && <>
