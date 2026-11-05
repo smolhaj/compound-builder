@@ -32,8 +32,14 @@ try {
   await page.waitForTimeout(1500);
   await page.evaluate(() => window.__cb.game.getState().openShop(true, 'household'));
   await page.waitForTimeout(600); await shot('shop-medical');
+  // the modal keeps its tab while open: close it, then open on the Kit & security shelf (two pages: the second one holds the new cards)
+  await page.evaluate(() => window.__cb.game.getState().openShop(false));
+  await page.waitForTimeout(400);
   await page.evaluate(() => window.__cb.game.getState().openShop(true, 'defense'));
   await page.waitForTimeout(600); await shot('shop-kit-security');
+  await page.getByRole('button', { name: 'Kit & security' }).click(); await page.waitForTimeout(400);
+  await page.evaluate(() => { const els = [...document.querySelectorAll('*')].filter(e => e.scrollHeight > e.clientHeight + 40 && getComputedStyle(e).overflowY !== 'visible'); els.forEach(e => { e.scrollTop = e.scrollHeight; }); });
+  await page.waitForTimeout(400); await shot('shop-kit-security-bottom');
   await page.evaluate(() => window.__cb.game.getState().openShop(false));
   // fit the gate house and the clinic, make the west neighbor neutral
   await page.evaluate(() => {

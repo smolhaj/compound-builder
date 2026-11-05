@@ -388,9 +388,11 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
     }
     // the prescriptions, three months ahead, once the news turns
     if (strat !== 'idle' && s.disaster.phase === 'warning' && day % 30 === 0) stockUpRx(s);
+    // (SINKS=noop: a control that buys one $25 hygiene pack at the same moment, to show a purchase alone moves a run)
+    if (process.env.SINKS === 'noop' && strat !== 'idle' && s.disaster.phase === 'warning' && day % 30 === 15 && s.structures.some(x => isHome(x.kind) && isFinished(x)) && !s.stock.__noop) { (s.stock as Record<string, number>).__noop = 1; placeOrder(s, [{ material: 'hygiene', qty: 1 }]); }
     // (money sinks, optional: SINKS=1) a family with spare money fits the clinic, the radio mast and the gate house once the warning is out (sim/richSinks.ts)
     if (process.env.SINKS && strat !== 'idle' && s.disaster.phase === 'warning' && day % 30 === 15 && s.structures.some(x => isHome(x.kind) && isFinished(x))) {
-      for (const m of ['clinic_suite', 'radio_mast', 'gate_house'] as const) if ((s.stock[m] ?? 0) < 1 && s.money > MATERIALS[m].price! + 120_000) placeOrder(s, [{ material: m, qty: 1 }]);
+      for (const m of ['clinic_suite', 'radio_mast', 'gate_house'] as const) if ((process.env.SINKS === '1' || (process.env.SINKS === 'noop' ? [] : process.env.SINKS!.split(',')).some(w => m.startsWith(w))) && (s.stock[m] ?? 0) < 1 && s.money > MATERIALS[m].price! + 120_000) placeOrder(s, [{ material: m, qty: 1 }]);
     }
     // the armory, bought early (a deer rifle and a .22; more for the preppers and the fortress)
     // (weekender, round 5) the guns wait for the roof: bought on day 10 they took the cash the cabin's first stages needed. Bought when the house is up and
@@ -426,6 +428,7 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
       const m = /The insurance paid \$([\d,]+)/.exec(l.text);
       if (m) insured += Number(m[1].replace(/,/g, ''));
       const k = l.text.replace(/[\d,.$]+/g, '#'); seen.set(k, (seen.get(k) ?? 0) + 1);
+      if (process.env.LOGDUMP) appendFileSync(process.env.LOGDUMP, `d${day} ${l.text}\n`);
       if (l.text.includes('gone in the night')) trial.stole++;
       if (l.text.includes('they moved on. There wasn')) trial.left++;
     }
