@@ -336,7 +336,8 @@ export function makeTerrainMaterial(look: RegionLook, waterY: number | null): { 
             vec4 bd1 = texture2D(uGDetail, xz * 0.23);
             vec4 bd2 = texture2D(uGDetail, vec2(xz.x * 0.8 - xz.y * 0.6, xz.x * 0.6 + xz.y * 0.8) * 0.089 + 0.5);
             vec3 bdet = mix(bd1.rgb, bd2.rgb, 0.5) * 2.0;
-            col *= mix(vec3(1.0), bdet, 0.75 * nearB);
+            // sweep-gfx: 0.75 read as diagonal brushed streaks on dry ground at eye level; 0.5 keeps the blade grain without the swirl
+            col *= mix(vec3(1.0), bdet, 0.5 * nearB);
           }
         }
         // Forest canopy as seen from afar (the instanced trees stand on it nearer in)
