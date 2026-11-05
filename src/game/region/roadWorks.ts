@@ -123,17 +123,23 @@ export function bankExtent(diffAt: (o: number) => number, reach: number, step = 
 function bankStrip(fr: readonly Frame[], i0: number, i1: number, sg: number, reachMax: number, ground: Ground, natural: Ground, lift: number): THREE.BufferGeometry | null {
   const rows = i1 - i0 + 1, across = 4, pos = new Float32Array(rows * (across + 1) * 3), uv = new Float32Array(rows * (across + 1) * 2), idx: number[] = [];
   let sAcc = 0, any = false;
+  const at = (r: number, o: number): [number, number] => { const f = fr[i0 + r]; return [f.x + f.nx * sg * (BED.halfW + o), f.z + f.nz * sg * (BED.halfW + o)]; };
+  // how far the bank reaches at each row, smoothed along the road: the top edge of the facing is the line of the bank's crest, one clean line, not the jagged outline of a
+  // per-row measurement (bankExtent flickers where the cut's slope and the terrain mesh disagree)
+  const raw = Array.from({ length: rows }, (_, r) => bankExtent(o => { const [x, z] = at(r, o); return ground(x, z) - natural(x, z); }, reachMax));
+  let ext = raw.slice();
+  for (let pass = 0; pass < 3; pass++) ext = ext.map((_, r) => { let t = 0, w = 0; for (let d = -4; d <= 4; d++) { const q = r + d; if (q < 0 || q >= rows) continue; const k = 5 - Math.abs(d); t += ext[q] * k; w += k; } return t / w; });
   for (let r = 0; r < rows; r++) {
     const f = fr[i0 + r];
     if (r > 0) sAcc += Math.hypot(f.x - fr[i0 + r - 1].x, f.z - fr[i0 + r - 1].z);
-    const at = (o: number): [number, number] => [f.x + f.nx * sg * (BED.halfW + o), f.z + f.nz * sg * (BED.halfW + o)];
-    const ext = bankExtent(o => { const [x, z] = at(o); return ground(x, z) - natural(x, z); }, reachMax);
     // the facing starts a hair out from the bench edge and ends before the toe: it never lies on level ground
-    const reach = Math.max(0, ext - 0.04);
+    const reach = Math.max(0, ext[r] - 0.04);
     if (reach > 0.06) any = true;
     for (let k = 0; k <= across; k++) {
-      const o = reach * k / across, [x, z] = at(o), q = r * (across + 1) + k;
-      pos[q * 3] = x; pos[q * 3 + 1] = ground(x, z) + lift; pos[q * 3 + 2] = z;
+      const o = reach * k / across, [x, z] = at(r, o), q = r * (across + 1) + k;
+      // laid on the highest ground within a terrain cell across the bank: the terrain mesh is coarser than the ground is sampled, and on a steep cut it rose through the stone
+      const [x2, z2] = at(r, o + 0.18), [x3, z3] = at(r, Math.max(0, o - 0.18));
+      pos[q * 3] = x; pos[q * 3 + 1] = Math.max(ground(x, z), ground(x2, z2), ground(x3, z3)) + lift; pos[q * 3 + 2] = z;
       uv[q * 2] = sAcc; uv[q * 2 + 1] = o;
     }
   }

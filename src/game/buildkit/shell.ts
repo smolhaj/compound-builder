@@ -64,6 +64,10 @@ export interface BuildOpts {
   /** Stairs and ramps (terraceProps.ts): the height of the +z end over the -z end (u, signed): the ground they stand on climbs this much along their length. */
   rise?: number;
   plumbed?: boolean; wired?: boolean; septic?: boolean;
+  /** A vehicle yard: length of its gravel spur from the gate to the drive's edge (buildkit/yardSite `yardSpur`). */
+  spur?: number;
+  /** ... and the ground's height over the yard's pad at a point of the yard's own frame (x across, z toward the road): the spur is laid draped on it. */
+  spurH?: (lx: number, lz: number) => number;
   /** Underground pieces: doorways by local side (position along that wall) and the ground's height above the floor. */
   doors?: Partial<Record<'front' | 'back' | 'left' | 'right', number>>;
   depth?: number;

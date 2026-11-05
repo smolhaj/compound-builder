@@ -4,6 +4,8 @@
  * ditches are earthworks in the terrain itself (ParcelTerrain.setEarthworks);
  * here they get only their gate posts. Sizes follow scale.test.ts (1 m = 1/6).
  */
+import { moatPools } from './moatLevel';
+import { deckGrade } from './bridgeDeck';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { kitMaterial, type KitMaterialId } from '../buildkit/materials';
@@ -680,11 +682,37 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
           if (idx.length) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); if (!mo.frozen) g.setAttribute('aSide', new THREE.Float32BufferAttribute(Array.from({ length: pos.length / 3 }, (_, k) => k % 2), 1)); g.setIndex(idx); g.computeVertexNormals(); add(wm, g); }
           pos = [];
         };
+        // each edge of the water stops where the bank does: a level surface over a cross-slope would hang out over the hillside as a plane in the air
+        const reach = (x: number, z: number, dx: number, dz: number, y: number): [number, number] => {
+          let l = hw, r = hw;
+          while (l > 0.1 && ground(x + dz * l, z - dx * l) < y - 0.03) l -= 0.04;
+          while (r > 0.1 && ground(x - dz * r, z + dx * r) < y - 0.03) r -= 0.04;
+          return [l, r];
+        };
+        // the water is level: a chain of flat pools down the slope, a small stone weir between them (game/perimeter/moatLevel)
+        const qs = Array.from({ length: n + 1 }, (_, i) => along(run.pts, s0 + (s1 - s0) * i / n));
+        const pools = moatPools(qs.map(q => ground(q.x, q.z)), lift, 0.75 * lift);
         for (let i = 0; i <= n; i++) {
-          const q = along(run.pts, s0 + (s1 - s0) * i / n), y = ground(q.x, q.z) + lift;
+          const q = qs[i], y = pools.level[i];
+          if (i > 0 && pools.pool[i] !== pools.pool[i - 1]) {
+            // the step: between the two samples both pools end at one line, and the water falls the difference as a short sheet (no free-standing stone: on a slope the
+            // downhill bank is lower than the bed's rim and a sill stood out of the grass like a fence panel)
+            const p0 = qs[i - 1], mx = (p0.x + q.x) / 2, mz = (p0.z + q.z) / 2, y0 = pools.level[i - 1];
+            if (Math.abs(y0 - y) > 0.01) {
+              const [la, ra] = reach(mx, mz, q.dx, q.dz, Math.min(y0, y)), fp = [mx + q.dz * la, mz - q.dx * la, mx - q.dz * ra, mz + q.dx * ra];
+              const g = new THREE.BufferGeometry();
+              g.setAttribute('position', new THREE.Float32BufferAttribute([fp[0], y0, fp[1], fp[2], y0, fp[3], fp[0], y, fp[1], fp[2], y, fp[3]], 3));
+              if (!mo.frozen) g.setAttribute('aSide', new THREE.Float32BufferAttribute([0, 1, 0, 1], 1));
+              g.setIndex([0, 1, 2, 1, 3, 2, 2, 1, 0, 2, 3, 1]); g.computeVertexNormals(); add(wm, g);
+            }
+            if (pos.length) { const [l0, r0] = reach(mx, mz, q.dx, q.dz, y0); pos.push(mx + q.dz * l0, y0, mz - q.dx * l0, mx - q.dz * r0, y0, mz + q.dx * r0); flush(); }
+            const [l1, r1] = reach(mx, mz, q.dx, q.dz, y);
+            pos.push(mx + q.dz * l1, y, mz - q.dx * l1, mx - q.dz * r1, y, mz + q.dx * r1);
+          }
           // where the line meets the creek, the creek is the moat: no second ribbon over its water or banks
           if (opts.creek && Math.abs(q.z - opts.creek.zAt(q.x)) < opts.creek.halfWidth + 2.5) { flush(); continue; }
-          pos.push(q.x + q.dz * hw, y, q.z - q.dx * hw, q.x - q.dz * hw, y, q.z + q.dx * hw);
+          const [lw, rw] = reach(q.x, q.z, q.dx, q.dz, y);
+          pos.push(q.x + q.dz * lw, y, q.z - q.dx * lw, q.x - q.dz * rw, y, q.z + q.dx * rw);
         }
         flush();
       }
@@ -698,14 +726,26 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
       if (Lb < 1e-3) break;
       const yaw = -Math.atan2(dz, dx), mx = (a0[0] + b0[0]) / 2, mz = (a0[1] + b0[1]) / 2;
       const done = run.finishedAt !== null, frac = done ? 1 : Math.min(1, Math.max(0.05, built / Math.max(1e-6, wl)));
-      const Wd = 4 * M, H = 3.1 * M, deckY = Math.max(ground(a0[0], a0[1]), ground(b0[0], b0[1])) + 0.5 * M;
-      const place = (g: THREE.BufferGeometry) => g.rotateY(yaw).translate(mx, 0, mz);
+      // the deck follows the road: it rests 0.5 m over the ground at each end and pitches between them (a flat deck at the higher end's level left a gap under the
+      // lower end and a stone pit at the higher one); the grade is held to `BRIDGE_GRADE` (bridgeDeck.ts) so a steep bank lifts the lower end instead
+      const Wd = 4 * M, H = 3.1 * M, ya0 = ground(a0[0], a0[1]) + 0.5 * M, yb0 = ground(b0[0], b0[1]) + 0.5 * M;
+      const grade = deckGrade(ya0, yb0, Lb), ya = grade.ya, yb = grade.yb, deckY = (ya + yb) / 2, pitch = Math.atan2(yb - ya, Lb);
+      // local frame: x along the bridge from its first end, y up from the deck's middle height, z across; pitched about the middle, then turned to the line
+      const place = (g: THREE.BufferGeometry) => g.translate(0, -deckY, 0).rotateZ(pitch).translate(0, deckY, 0).rotateY(yaw).translate(mx, 0, mz);
       const bx = (l: number, h: number, w: number, x: number, y: number, z: number, m: KitMaterialId) => add(m, place(new THREE.BoxGeometry(l, h, w).translate(x, y + h / 2, z)));
       const Lw = Lb * frac, x0 = -Lb / 2;
-      // abutments: a stone block under each end, down to the ground on the lower bank
+      // abutments: a stone block under each end of the deck, down below the lowest ground round its footprint and up to just under the deck there, so it stands in the bank
+      // (the road is benched to the deck's end) and shows no pit: tall enough to meet the highest ground across the width
+      const ux = dx / Lb, uz = dz / Lb, nx = -uz, nz = ux;
       for (const sg of [-1, 1]) {
-        const e = sg < 0 ? a0 : b0, gy = ground(e[0], e[1]);
-        bx(1.6 * M, deckY - gy + 0.4 * M, Wd + 0.8 * M, sg * (Lb / 2 - 0.4 * M), gy - 0.4 * M, 0, 'fieldstone');
+        const e = sg < 0 ? a0 : b0, yEnd = sg < 0 ? ya : yb, cx = e[0] - sg * ux * 0.4 * M, cz = e[1] - sg * uz * 0.4 * M;
+        let lo = Infinity, hi = -Infinity;
+        for (const u of [-0.8 * M, 0, 0.8 * M]) for (const v of [-Wd / 2 - 0.4 * M, 0, Wd / 2 + 0.4 * M]) {
+          const gy = ground(cx + ux * u + nx * v, cz + uz * u + nz * v);
+          lo = Math.min(lo, gy); hi = Math.max(hi, gy);
+        }
+        const top = Math.max(yEnd - 0.16 * M, Math.min(hi + 0.02, yEnd - 0.02)), h = top - lo + 0.4 * M;
+        add('fieldstone', new THREE.BoxGeometry(1.6 * M, h, Wd + 0.8 * M).translate(0, lo - 0.4 * M + h / 2, 0).rotateY(yaw).translate(cx, 0, cz));
       }
       bx(Lw, 0.14 * M, Wd, x0 + Lw / 2, deckY - 0.14 * M, 0, 'deck');                                   // the deck
       for (const z of [-Wd * 0.3, 0, Wd * 0.3]) bx(Lw, 0.3 * M, 0.2 * M, x0 + Lw / 2, deckY - 0.44 * M, z, 'wood_dark');   // stringers

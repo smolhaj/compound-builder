@@ -28,6 +28,8 @@ const SCENARIOS = [
   { name: 'plains-bench-moat-bridge', q: 'region=plains&lot=bench&lotseed=1', wall: 'container_wall', shape: null, kind: 'bridge' },
   { name: 'ne-hillside-moat-bridge', q: 'region=new_england&lot=hillside&lotseed=1', wall: 'stone_wall', shape: 'rounded', kind: 'bridge' },
   { name: 'plains-bench-yard', q: 'region=plains&lot=bench&lotseed=1', wall: 'container_wall', shape: null, kind: 'yard' },
+  { name: 'plains-mesa-yard', q: 'region=plains&lot=mesa&lotseed=1', wall: 'stone_wall', shape: 'octagon', kind: 'yard' },
+  { name: 'ne-hillside-yard', q: 'region=new_england&lot=hillside&lotseed=1', wall: 'stone_wall', shape: 'rounded', kind: 'yard' },
   { name: 'mw-hillside-yard', q: 'region=mountain_west&lot=hillside&lotseed=2', wall: 'container_wall', shape: null, kind: 'yard' },
 ].filter(s => !only || s.name.includes(only));
 
@@ -116,6 +118,12 @@ const FRAME_VIEWS = [
   { name: 'frame-eye-camp-side-person', time: 15, n: 9, setup: fveh('pickup', 1.6, 0, 1) + ffig(0.9, -0.15) + feye(-3.4, 0.0, 0.3, 0.1) },
   { name: 'frame-eye-cross-lane-person', time: 16, n: 9, setup: ffig(-0.2, 0.0) + feye(-0.5, -1.5, -0.7, 0.5) },
 ];
+/** The guard cars wherever they park (on a slope they park well inside the entry): an aerial over the middle car and an eye view with a person by the first. */
+const CAR_VIEWS = [
+  { name: 'cars-aerial', time: 11, setup: `{ const cs = cb.world._guardCars; if (!cs.length) return; const p = cs[Math.floor(cs.length / 2)].getWorldPosition(new cb.THREE.Vector3()); cb.cam.target.set(p.x, 0, p.z); cb.cam.radius = 3.4; cb.cam.pitch = 0.95; cb.cam.yaw = 0.7; }` },
+  { name: 'cars-aerial-top', time: 11, setup: `{ const cs = cb.world._guardCars; if (!cs.length) return; const p = cs[Math.floor(cs.length / 2)].getWorldPosition(new cb.THREE.Vector3()); cb.cam.target.set(p.x, 0, p.z); cb.cam.radius = 3.4; cb.cam.pitch = 1.5; cb.cam.yaw = 0; }` },
+  { name: 'cars-eye-person', time: 10, n: 9, setup: `{ const { F } = window.__FR(), cs = cb.world._guardCars; if (!cs.length) return; const c = cs[0], f = ${FIG}; const [px, pz] = F(c.position.x + 0.55, c.position.z * 0.9), [ex, ez] = F(c.position.x + 1.7, c.position.z + 0.8), [lx, lz] = F(c.position.x, c.position.z); if (f) { f.userData.__mine = true; f.position.set(px, cb.world.walkHeight(px, pz), pz); } window.__eyeK(k, ex, ez, lx, lz, 0.28); }` },
+];
 const BRIDGE_VIEWS = [
   { name: 'bridge-aerial', time: 11, setup: bair(6.5, 0.95, 0.5) },
   { name: 'bridge-aerial-top', time: 11, setup: bair(5, 1.5, 0) },
@@ -124,16 +132,19 @@ const BRIDGE_VIEWS = [
   { name: 'bridge-eye-bank-side', time: 12, n: 9, setup: bfig(-0.2, 0.7) + beye(-0.1, 2.3, 0.0, 0.0) },
   { name: 'bridge-eye-far-side-person', time: 16, n: 9, setup: bfig(-1.5, 0.35) + beye(3.4, -0.3, -1.2, 0.0) },
 ];
+/** Yard views: origin the yard's center, v < 0 toward the drive (the gate is at v = -1, the road's center line at about -1.58), du along the drive. */
 const YARD_VIEWS = [
   { name: 'yard-aerial', time: 11, setup: bair(8, 0.95, 0.5) },
   { name: 'yard-aerial-top', time: 11, setup: bair(7, 1.5, 0) },
-  { name: 'yard-eye-front-person-pickup', time: 10, n: 9, setup: bveh('pickup', -0.2, 0.0, 1) + bfig(-0.2, 0.55) + beye(-1.6, -0.1, 0.4, 2.2) },
-  { name: 'yard-eye-gate-person', time: 14, n: 9, setup: bfig(0.0, 1.5) + beye(0.0, 0.0, 0.0, 2.1) },
-  { name: 'yard-eye-from-road', time: 12, n: 9, setup: bfig(-0.4, 0.5) + beye(-3.0, 0.2, 0.2, 1.8) },
+  { name: 'yard-eye-front-person-pickup', time: 10, n: 9, setup: bveh('pickup', -1.1, -1.58, 1) + bfig(0.5, -1.3) + beye(0.2, -3.0, 0.0, -1.0) },
+  { name: 'yard-eye-gate-person', time: 14, n: 9, setup: bfig(0.0, -0.75) + beye(0.0, -1.9, 0.0, -0.9) },
+  { name: 'yard-eye-from-road', time: 12, n: 9, setup: bveh('pickup', -3.2, -1.58, 1) + bfig(-0.6, -1.3) + beye(-5.0, -1.58, 0.0, -1.2) },
+  { name: 'yard-eye-inside-person', time: 15, n: 9, setup: bfig(0.2, -0.1) + beye(-0.4, 0.7, 0.0, -1.5) },
 ];
 
 /** The base walls and the entry gate; bridge: a moat across the drive outside the wall and a covered bridge laid along the drive over it, then one over the creek; yard: a vehicle yard beside the drive. */
 const extra = `async (s) => { const cb = window.__cb, G = cb.game, W = cb.world, q = window.__ent, m = window.__m; if (!q) return 'no entry';
+  if (s.cars) { const pc = (await import('/src/sim/guards.ts')).parkedCars?.(G.getState().game); return 'guard cars parked per sim: ' + pc + ', drawn: ' + cb.world._guardCars?.length + ' at ' + cb.world._guardCars.map(c => { const p = c.getWorldPosition(new cb.THREE.Vector3()); return p.x.toFixed(1) + ',' + p.y.toFixed(1) + ',' + p.z.toFixed(1) + (c.visible ? '' : ' hidden'); }).join(' ; ') + ' frame ' + cb.world._gateFrame.position.toArray().map(v => v.toFixed(1)) + ', clock h ' + (G.getState().game.clock.t % 1) * 24; }
   const drive = W.access.drive, lerpAt = (a, d, v) => m.offsetAt(drive, a + d, v);
   if (s.kind === 'bridge' && !window.__brDone) { window.__brDone = true;
     const A = q.arc > 5 ? q.arc - 3.4 : q.arc + 3.8, c = m.pointAtArc(drive, A), t = m.headingAt(drive, A), n = [t[1], -t[0]], HL = 1.1;
@@ -144,19 +155,34 @@ const extra = `async (s) => { const cb = window.__cb, G = cb.game, W = cb.world,
     window.__bridge = inwards ? { c, t: [-t[0], -t[1]], n: [-n[0], -n[1]] } : { c, t, n };
     return 'moat+bridge at arc ' + A.toFixed(2) + ' runs ' + G.getState().game.perimeter.map(r => r.kind + ':' + r.gates.length).join(','); }
   if (s.kind === 'yard' && !window.__yDone) { window.__yDone = true;
-    const A = q.arc > 6 ? q.arc - 4.2 : q.arc + 4.6, c = m.pointAtArc(drive, A), t = m.headingAt(drive, A), n = [t[1], -t[0]], side = s.side ?? 1;
-    const tx = c[0] + n[0] * 2.4 * side, tz = c[1] + n[1] * 2.4 * side;
-    // the yard's front (+z local) faces the drive: world dir of rot r is (sin(r pi/2), cos(r pi/2))
-    const want = [-n[0] * side, -n[1] * side]; let rot = 0, bd = -9; for (let r = 0; r < 4; r++) { const d = Math.sin(r * Math.PI / 2) * want[0] + Math.cos(r * Math.PI / 2) * want[1]; if (d > bd) { bd = d; rot = r; } }
-    const sp = cb.tool.findSpot('vehicle_yard', tx, tz, rot, 6);
-    if (!sp) return 'no spot for the yard';
-    G.getState().plan('vehicle_yard', sp[0], sp[1], rot);
+    // sited by the placement tool itself: the cursor near the drive snaps the yard beside it (game/buildkit/yardSite), turned to the drive's heading, gate toward it
+    const A0 = q.arc > 6 ? q.arc - 4.2 : q.arc + 4.6, total = (await import('/src/game/perimeter/gateKitLayout.ts')).lineLen(drive), cands = [];
+    for (let k = 0; k < 60; k++) for (const sg of [1, -1]) for (const A of [A0 + k * 1.2, A0 - k * 1.2]) if (A > 0.5 && A < total - 0.5) cands.push([A, sg]);
+    cb.tool.setKind('vehicle_yard');
+    let A = A0, side = 1, c, t, n, at, prob = 'none tried';
+    for (const [a, sg] of cands) {
+      c = m.pointAtArc(drive, a); t = m.headingAt(drive, a); n = [t[1], -t[0]]; at = [c[0] + n[0] * 2.2 * sg, c[1] + n[1] * 2.2 * sg];
+      cb.tool.hoverAt(at[0], at[1]);
+      prob = G.getState().toolProblem || (cb.tool._yardRot === null ? 'no spot beside the drive snapped (grade, wall or slope)' : null);
+      if (!prob && cb.tool._yardRot !== null) { A = a; side = sg; break; }
+    }
+    const ym = await import('/src/game/buildkit/yardSite.ts');
+    const ys = ym.yardBesideDrive(drive, at, 1, 0.55, side);
+    if (prob) { cb.tool.setKind(null); return 'tool refused the yard beside the drive everywhere: ' + prob; }
+    const nb = G.getState().game.structures.length; cb.tool.placeHere(); cb.tool.setKind(null);
+    if (G.getState().game.structures.length === nb) return 'yard not placed: ok=' + cb.tool._ok + ' problem=' + G.getState().toolProblem + ' at ' + at.map(v => v.toFixed(2)) + ' site ' + [ys.x, ys.z, ys.rot].map(v => v.toFixed(2));
     G.setState(st => { const g = structuredClone(st.game); const y = g.structures.at(-1); y.stage = 9; y.done = 0; y.finishedAt = 0; g.money = 500000; return { game: g }; });
     const vm = await import('/src/sim/vehicles.ts'); for (const k of ['tractor', 'atv']) G.getState().money(d => vm.buyVehicle(d, k));
-    // views anchor on the yard's front gate: center = the gate's mid, t = the drive direction toward the camp, n = left of it
-    const inw = q.arc <= 5;
-    window.__bridge = { c: [sp[0], sp[1]], t: inw ? [-t[0], -t[1]] : t, n: inw ? [-n[0], -n[1]] : n, rot };
-    return 'yard at ' + sp.map(v => v.toFixed(2)).join(',') + ' rot ' + rot + ' (arc ' + A.toFixed(2) + ')'; }
+    const y = G.getState().game.structures.at(-1);
+    await cb.qa.renderNow();
+    let lo = 9, hi = -9; const pads = W.parcel.pads.filter(pd => Math.abs((pd.x0 + pd.x1) / 2 - y.x) < 0.2 && Math.abs((pd.z0 + pd.z1) / 2 - y.z) < 0.2), py = pads[0]?.y ?? 0;
+    const thh = y.rot * Math.PI / 2; let rows = '';
+    for (let j = -4; j <= 4; j++) { for (let i = -4; i <= 4; i++) { const lx = i * 0.25, lz = j * 0.25, wx = y.x + lx * Math.cos(thh) + lz * Math.sin(thh), wz = y.z - lx * Math.sin(thh) + lz * Math.cos(thh); const d = W.parcel.height(wx, wz) - py, d2 = W.groundAt(wx, wz) - py; lo = Math.min(lo, d); hi = Math.max(hi, d); rows += (Math.abs(d2) < 0.005 ? ' .' : (d2 * 100).toFixed(0).padStart(3)) ; } rows += ' | '; }
+        const dbg = ' PAD ' + JSON.stringify(pads[0]) + ' ROWS ' + rows + ' ground-pad inside ' + lo.toFixed(3) + ' .. ' + hi.toFixed(3);
+    // views anchor on the yard's center: n points from the gate into the yard, t is along the drive toward the camp (v < 0 is the road side)
+    const inw = q.arc <= 5, th = y.rot * Math.PI / 2, nn = [-Math.sin(th), -Math.cos(th)];
+    window.__bridge = { c: [y.x, y.z], t: inw ? [-ys.heading[0], -ys.heading[1]] : ys.heading, n: nn, rot: y.rot };
+    return dbg + ' yard at ' + [y.x, y.z].map(v => v.toFixed(2)).join(',') + ' rot ' + y.rot.toFixed(3) + ' road heading ' + (Math.atan2(t[1], t[0]) * 180 / Math.PI).toFixed(0) + ' deg (arc ' + A.toFixed(2) + ')'; }
   return ''; }`;
 
 const vite = spawn('node', ['node_modules/vite/bin/vite.js', '--config', 'scripts/vite.shots.config.ts', '--port', String(port), '--strictPort'], { stdio: ['ignore', 'pipe', 'inherit'] });
@@ -181,7 +207,7 @@ try {
     await page.evaluate(async () => { await window.__cb.qa.renderNow(); await window.__cb.qa.renderNow(); });
     const vk = s.kind === 'bridge' ? 'bridge' : s.kind === 'yard' ? 'yard' : null;
     await page.evaluate(async ks => { window.__vh = {}; const m = await import('/src/game/props/vehicleGeometry.ts'); for (const k of ks) { const o = m.buildVehicle(k); o.userData.__mine = true; o.visible = false; window.__cb.ws.scene.add(o); window.__vh[k] = o; } }, ['pickup']);
-    const views = vk === 'bridge' ? BRIDGE_VIEWS : vk === 'yard' ? YARD_VIEWS : s.kind === 'frame' ? [...COMMON, ...FRAME_VIEWS] : COMMON;
+    const views = vk === 'bridge' ? BRIDGE_VIEWS : vk === 'yard' ? YARD_VIEWS : s.kind === 'frame' ? [...COMMON, ...FRAME_VIEWS, ...(s.cars ? CAR_VIEWS : [])] : COMMON;
     for (const v of views) {
       if (process.env.VIEWONLY && !v.name.includes(process.env.VIEWONLY)) continue;
       await page.evaluate(v => {

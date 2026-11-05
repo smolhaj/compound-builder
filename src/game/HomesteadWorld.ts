@@ -61,6 +61,7 @@ import { buildYard, yardBlockedLocal, yardSolidLocal, type Yard } from './props/
 import { dailyCtx, wallGate, yardFx } from './people/dailyScene';
 import type { GoalCtx, Site } from './people/peopleGoals';
 import { CELL, type KitPieceDef } from './buildkit/kit';
+import { YARD_SITE, yardPadHalf, yardSpur } from './buildkit/yardSite';
 import type { GameState } from '../sim/state';
 import type { WearSeason } from '../engine/world/people/crowdWear';
 import type { TourBuildingInfo } from '../engine/world/camera/TourController';
@@ -86,6 +87,7 @@ import { LIGHT_BUDGET, pickLights, type LightCandidate } from './lightPool';
 import { hashStr } from './buildkit/clutter';
 import { along, buildRun, solidSpans } from './perimeter/perimeterGeometry';
 import { arcNear, entryGate, gateHouseFrame, headingAt } from './perimeter/gateKitLayout';
+import { carSlot } from './perimeter/guardCarSlots';
 import { PERIMETER, hasSkirt, runGrowth, runProgress, underground, wallLength, type PerimeterRun } from '../sim/perimeter';
 import { closestOnLine, earthworkReach, type Earthwork } from './parcel/parcelTerrain';
 import { exposure, Sight, type Observer, type SightWorld } from './sightlines/visibility';
@@ -1394,39 +1396,45 @@ export class HomesteadWorld {
     const key = `${frame.position.x.toFixed(2)},${frame.position.z.toFixed(2)},${frame.rotation.y.toFixed(3)},${this._runs.length},${this.walls.version},${this._built.size},${n},${this._gateHouse?.visible ? 1 : 0}`;
     if (key === this._parkKey) return this._parkSlots;
     this._parkKey = key;
-    const a = frame.rotation.y, F = (x: number, z: number): [number, number] => [frame.position.x + Math.cos(a) * x + Math.sin(a) * z, frame.position.z - Math.sin(a) * x + Math.cos(a) * z];
-    const L = 0.4, Wh = 0.168, hw = DRIVE_W / 2;
+    const drive = this.access.drive, a = frame.rotation.y, ca = Math.cos(a), sa = Math.sin(a);
+    const L = 0.4, Wh = 0.168, hw = DRIVE_W / 2, arc0 = arcNear(drive, [frame.position.x, frame.position.z]);
     type Cand = { x: number; z: number; y: number; rough: number; q: THREE.Quaternion };
-    const probe = (x: number, z: number): Cand | null => {
+    const up = new THREE.Vector3(0, 1, 0), fix = new THREE.Quaternion().setFromAxisAngle(up, Math.PI / 2);   // (a vehicle's front is +z: turn it to +x)
+    // a slot on the drive's own offset line: `d` inside the entry, `side` of the lane, nose to the road; the four wheels and the plane through them are taken along the car
+    const probe = (d: number, side: 1 | -1, off: number): (Cand & { lx: number }) | null => {
+      const sl = carSlot(drive, arc0, d, side, off, hw), f = sl.nose, n = sl.left, [cx, cz] = sl.c;
       const h: number[] = [];
-      for (const [dx, dz] of [[L, Wh], [L, -Wh], [-L, Wh], [-L, -Wh]] as const) {
-        const [wx, wz] = F(x + dx, z + dz);
+      for (const [df, dn] of [[L, Wh], [L, -Wh], [-L, Wh], [-L, -Wh]] as const) {
+        const wx = cx + f[0] * df + n[0] * dn, wz = cz + f[1] * df + n[1] * dn;
         if (this.walkBlocked(wx, wz, 0.03)) return null;
-        if (this._drive && closestOnLine(this.access.drive, wx, wz).d < hw + 0.02) return null;   // not on the lane
+        if (this._drive && closestOnLine(drive, wx, wz).d < hw + 0.02) return null;   // not on the lane
         h.push(this.groundAt(wx, wz));
       }
-      const [wx, wz] = F(x, z);
-      if (this.walkBlocked(wx, wz, 0.03)) return null;
-      // plane through the four wheels: front/rear along local x, left (+z)/right across it
-      const dhdx = ((h[0] + h[1]) - (h[2] + h[3])) / (4 * L), dhdz = ((h[0] + h[2]) - (h[1] + h[3])) / (4 * Wh);
-      const y = (h[0] + h[1] + h[2] + h[3]) / 4 - frame.position.y;
-      const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(-dhdx, 1, -dhdz).normalize());
-      return { x, z, y, rough: Math.max(...h) - Math.min(...h), q };
+      if (this.walkBlocked(cx, cz, 0.03)) return null;
+      // plane through the four wheels: along the car (nose) and across it (left)
+      const dhdf = ((h[0] + h[1]) - (h[2] + h[3])) / (4 * L), dhdn = ((h[0] + h[2]) - (h[1] + h[3])) / (4 * Wh);
+      const nw = new THREE.Vector3(-dhdf * f[0] - dhdn * n[0], 1, -dhdf * f[1] - dhdn * n[1]).normalize();
+      // into the guard frame (local x = (cos a, -sin a), local z = (sin a, cos a) in the world)
+      const nl = new THREE.Vector3(nw.x * ca - nw.z * sa, nw.y, nw.x * sa + nw.z * ca).normalize();
+      const dx = cx - frame.position.x, dz = cz - frame.position.z, lx = dx * ca - dz * sa, lz = dx * sa + dz * ca;
+      const fl = [f[0] * ca - f[1] * sa, f[0] * sa + f[1] * ca] as const;
+      const q = new THREE.Quaternion().setFromUnitVectors(up, nl).multiply(new THREE.Quaternion().setFromAxisAngle(up, Math.atan2(-fl[1], fl[0]))).multiply(fix);
+      return { x: lx, z: lz, lx, y: (h[0] + h[1] + h[2] + h[3]) / 4 - frame.position.y, rough: Math.max(...h) - Math.min(...h), q };
     };
-    const houseClear = (x: number, side: number): boolean => side > 0 || !this._gateHouse?.visible || x + L < -0.45 || x - L > 0.45;
+    // (the guard house stands on the frame's -z side at x within 0.45 of the gate: a candidate at the same arc on that side is not clear of it)
+    const houseClear = (c: { x: number; z: number }): boolean => c.z > 0 || !this._gateHouse?.visible || c.x + L < -0.45 || c.x - L > 0.45;
     const cands: Cand[] = [];
-    for (let x = -0.5; x > -19; x -= 0.95) for (const side of [1, -1]) for (const off of [0.3, 0.45]) {
-      if (!houseClear(x, side)) continue;
-      const c = probe(x, side * (hw + off));
-      if (c) cands.push(c);
+    for (let d = 0.5; d < 19; d += 0.95) for (const side of [1, -1] as const) for (const off of [0.3, 0.45]) {
+      const c = probe(d, side, off);
+      if (c && houseClear(c)) cands.push(c);
     }
     const out: Cand[] = [], used = new Set<Cand>();
-    const taken = (c: Cand): boolean => out.some(o => Math.abs(o.x - c.x) < 0.9 && Math.abs(o.z - c.z) < 0.4);
+    const taken = (c: Cand): boolean => out.some(o => Math.hypot(o.x - c.x, o.z - c.z) < 0.9);
     const take = (list: Cand[]): boolean => { const c = list.find(k => !used.has(k) && !taken(k)); if (!c) return false; used.add(c); out.push(c); return true; };
     const flat = cands.filter(c => c.rough <= 0.05), rough = cands.filter(c => c.rough <= 0.3 * 2 * Wh).sort((p, q) => p.rough - q.rough);
     for (let i = 0; i < n; i++) if (!take(flat) && !take(rough)) break;
     // nowhere at all: beside the drive just inside, as before
-    for (let i = out.length; i < n; i++) { const c = probe(-0.5 - i * 0.95, hw + 0.3); out.push(c ?? { x: -0.5 - i * 0.95, z: hw + 0.3, y: 0, rough: 9, q: new THREE.Quaternion() }); }
+    for (let i = out.length; i < n; i++) { const c = probe(0.5 + i * 0.95, 1, 0.3); out.push(c ?? { x: -0.5 - i * 0.95, z: hw + 0.3, y: 0, rough: 9, q: new THREE.Quaternion().setFromAxisAngle(up, 0) }); }
     return (this._parkSlots = out);
   }
   private _syncGuardCars(n: number, dt: number): void {
@@ -1439,11 +1447,11 @@ export class HomesteadWorld {
     }
     while (this._guardCars.length > n) this._guardLeaving.push({ g: this._guardCars.pop()!, t: 0 });
     // parked beside the drive inside the entry, nose out, nose to tail, each on level ground (see `_guardSlots`)
-    const slots = this._guardSlots(frame, this._guardCars.length), yaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
+    const slots = this._guardSlots(frame, this._guardCars.length);
     this._guardCars.forEach((c, i) => {
       const sl = slots[i];
       c.position.set(sl.x, sl.y, sl.z);
-      c.quaternion.copy(sl.q).multiply(yaw);   // a vehicle's front is +z: turn it to +x so it stands along the drive, nose out to the road (it lay across the lane), then tilt it to the ground under it
+      c.quaternion.copy(sl.q);   // along the drive, nose out to the road, tilted to the ground under it (the slot's own quaternion)
     });
     for (const l of [...this._guardLeaving]) {
       l.t += dt; l.g.position.x += dt * 0.5;
@@ -1495,7 +1503,9 @@ export class HomesteadWorld {
     // a house on piles: the floor clears the highest ground under it (the piles run down to the low side); no pad is graded, no wall is built
     if (def.stilts) { let hi = -Infinity; for (let i = 0; i <= 4; i++) for (let j = 0; j <= 4; j++) hi = Math.max(hi, this.parcel.natural(r.x0 + (r.x1 - r.x0) * i / 4, r.z0 + (r.z1 - r.z0) * j / 4).h); y = hi + 0.03; }
     // bunker rooms take no pad (the yard above stays as it is); an entrance's hatch or headhouse gets a small one
-    let pad: Pad | null = (!below || (isEntry(def) && p.kind !== 'bunker_floorhatch')) && !def.waterside && !def.stilts ? { x0: r.x0 - 0.05, z0: r.z0 - 0.05, x1: r.x1 + 0.05, z1: r.z1 + 0.05, y, skirt: below ? 0.4 : 0.9 } : null;
+    let pad: Pad | null = (!below || (isEntry(def) && p.kind !== 'bunker_floorhatch')) && !def.waterside && !def.stilts ? { x0: r.x0 - 0.05, z0: r.z0 - 0.05, x1: r.x1 + 0.05, z1: r.z1 + 0.05, y, skirt: below ? 0.4 : p.kind === 'vehicle_yard' ? YARD_SITE.skirt : 0.9 } : null;
+    // a yard turned to a diagonal drive is graded on a pad between its own size and the box round it (game/buildkit/yardSite), so the road's bed is left alone
+    if (pad && p.kind === 'vehicle_yard' && !Number.isInteger(p.rot)) { const hp = yardPadHalf(p.rot, def.cellsX * CELL / 2) + 0.05; pad = { ...pad, x0: p.x - hp, z0: p.z - hp, x1: p.x + hp, z1: p.z + hp }; }
     // a pad cut into a slope is held by a dry-stack wall (sim/retainPlan): a flat apron round the building on the walled sides, the terrain eased only over the wall
     let wall: PadPlan | null = null;
     if (!below && pad && this.parcel.lot && !WALLLESS.test(p.kind)) {
@@ -1513,6 +1523,13 @@ export class HomesteadWorld {
     if (pad) this.parcel.setPads([...this.parcel.pads, pad]);
     const opts: BuildOpts = {};
     if (climb) opts.rise = climb.rise;
+    if (p.kind === 'vehicle_yard') {
+      const half = def.cellsX * CELL / 2;
+      opts.spur = yardSpur(this.access.drive, p.x, p.z, p.rot, half, DRIVE_W);
+      // the spur is laid on the ground between the gate and the road's edge, whatever it does there (the pad stands at `y`)
+      const x0 = p.x, z0 = p.z;
+      opts.spurH = (lx, lz) => { const [wx, wz] = rotQ(lx, lz, p.rot); return this.groundAt(x0 + wx, z0 + wz) - y; };
+    }
     let under: Built['under'] = null;
     if (below) {
       const placed = [...[...this._built.values()].map(b => b.placed), p];
