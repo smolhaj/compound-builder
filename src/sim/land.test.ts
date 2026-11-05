@@ -5,8 +5,8 @@ import { acresOf, buyLand, buyProblem, HOME, landMarketDay, ownsAt, priceOf } fr
 describe('buying land', () => {
   it('five neighboring forties on the survey grid, each owned by a neighbor; east is the road', () => {
     const g = newGame(1);
-    expect(g.land.parcels.length).toBe(5);
-    for (const p of g.land.parcels) {
+    expect(g.land.parcels.filter(p => !p.ring).length).toBe(5);
+    for (const p of g.land.parcels.filter(q => !q.ring)) {
       expect(acresOf(p.rect)).toBe(40);
       expect(g.neighbors.some(n => n.id === p.owner)).toBe(true);
       expect(p.rect.x0).toBeLessThan(HOME);                 // nothing east of the road
@@ -60,5 +60,23 @@ describe('off-lot runs', () => {
     expect(offLotProblem(g, [mid, [NaN, 0]])).toMatch(/not on the map/);
     expect(routeProblem(g, 'moat', [mid, [mid[0] + 400, mid[1]]])).toMatch(/off your land/);
     expect(routeProblem(g, 'moat', [mid, [mid[0] + 5, mid[1]]])).toBeNull();
+  });
+});
+
+describe('the second ring of land', () => {
+  it('sits beyond the first ring, costs 1.5x per acre, and is bought one forty at a time from the edge in', async () => {
+    const { RING2_PRICE } = await import('./land');
+    const g = newGame(4);
+    const ring1 = g.land.parcels.filter(p => !p.ring), ring2 = g.land.parcels.filter(p => p.ring === 2);
+    expect(ring1.length).toBe(5); expect(ring2.length).toBeGreaterThan(3);
+    expect(new Set(g.land.parcels.map(p => p.id)).size).toBe(g.land.parcels.length);
+    g.money = 50_000_000;
+    for (const p of g.land.parcels) { p.forSale = true; const o = g.neighbors.find(n => n.id === p.owner); if (o) o.status = 'home'; }
+    const far = ring2.find(p => p.name === 'the far north forty')!, near = ring1.find(p => p.name === 'the north forty')!;
+    expect(buyProblem(g, far)).toMatch(/between first/);
+    near.kind = 'grazing'; far.kind = 'grazing';
+    const ratio = priceOf(g, far) / priceOf(g, near);
+    expect(ratio).toBeGreaterThan(RING2_PRICE * 0.9); expect(ratio).toBeLessThan(RING2_PRICE * 1.1);
+    buyLand(g, near.id); expect(buyProblem(g, far)).toBeNull();
   });
 });

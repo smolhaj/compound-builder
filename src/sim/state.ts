@@ -18,6 +18,7 @@ import { CLASSIC, type Lifestyle, type Site } from './site';
 import { startFunds, type StartFunds } from './startFunds';
 import { REGIONS } from './regions';
 import type { Crew } from './crews';
+import { newGuards, type Guards } from './guards';
 import { improvementStructures, type Fix, type SiteJobs } from './improvements';
 import { CLOSING_COSTS, newPaper, type Paper } from './paperwork';
 import { newUpkeep, type Upkeep } from './upkeep';
@@ -45,7 +46,7 @@ import type { QuartersState } from './quarters';
 import type { Evenings } from './evenings';
 import type { Courses } from './courses';
 import { starterKit, type ToolKit } from './tools';
-export const SAVE_VERSION = 80;
+export const SAVE_VERSION = 81;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -241,6 +242,8 @@ export interface GameState {
   startFunds: StartFunds | null;
   /** Hired crews at work on the place. */
   crews: Crew[];
+  /** Hired security staff at the gate (sim/guards.ts). */
+  guards: Guards;
   /** "Work on this first": the id of the building or wall the family does before the rest of the queue (sim/priority.ts). */
   focus: string | null;
   /** The co-op's line extension and the drive contractor, when due (null = not ordered). */
@@ -371,6 +374,7 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     lifestyle: setup.lifestyle ?? 'fulltime',
     startFunds: funds,
     crews: [],
+    guards: newGuards(),
     focus: null,
     siteJobs: { power: null, drive: null },
     roadside: [],
