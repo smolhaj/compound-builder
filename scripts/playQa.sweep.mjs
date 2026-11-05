@@ -36,6 +36,17 @@ export const CONFIGS = LOTS.map(([region, lot], i) => {
   };
 });
 
+// Pass 3: one short-peace (18 months) Scenario start per disaster kind, on lots the earlier passes skipped, spread over Cozy / Standard / Hardcore.
+// Run: SWEEP_SET=36,37,... SWEEP_HIT=1 SWEEP_DAYS=20 (the 'hit' stage runs through the hit and ~100 days after, see SWEEP_AFTER).
+const HITS = [['appalachia', 'bench', 'grid_down', 'Cozy'], ['pnw', 'saddle', 'nuclear', 'Standard'], ['mountain_west', 'mesa', 'pandemic', 'Hardcore'], ['appalachia', 'saddle', 'financial', 'Standard'],
+  ['mountain_west', 'saddle', 'drought', 'Cozy'], ['mountain_west', 'island', 'wildfire', 'Hardcore'], ['north_woods', 'island', 'cyberattack', 'Standard'], ['pnw', 'island', 'ash_winter', 'Cozy'],
+  ['pnw', 'bluff', 'asteroid', 'Hardcore'], ['mountain_west', 'bluff', 'civil_war', 'Standard'], ['appalachia', 'bench', 'unknown', 'Hardcore'], ['pnw', 'bench', 'lawless', 'Cozy'], ['pnw', 'gorge', 'invasion', 'Standard'],
+  ['appalachia', 'hillside', 'zombies', 'Hardcore'], ['mountain_west', 'hillside', 'solar_flare', 'Standard']];
+HITS.forEach(([region, lot, kind, diff], j) => {
+  const i = 36 + j;
+  CONFIGS.push({ i, region, lot, label: `${i}-${region}-${lot}-${kind}`, seed: 7 + i * 3, life: j % 4 === 3 ? 'independent' : 'fulltime', diff, mode: 'Scenario', kind, peace: '18 months', reroll: j % 3, kin: [0, 2, 1][j % 3], starter: j % 2 === 0, quality: QUAL[j % QUAL.length], acres: ACRES[j % ACRES.length], wish: [], townPlan: 'Keep the house' });
+});
+
 const BAD = /\bNaN\b|\bundefined\b|\[object|Infinity|\$-?NaN|\bnull\b/;
 const SUBSET = (process.env.SWEEP_SET ?? '0,1,2,3,4,5,6,7,9,11,12,13,15,16,17,19,20,21,22,23,25,26,28,29').split(',').map(Number);
 const FULL = new Set((process.env.SWEEP_FULL ?? '0,6,12,20,26').split(',').map(Number));
@@ -140,9 +151,15 @@ export async function play(A) {
     const frame = async () => { await page.evaluate(async () => { for (let i = 0; i < 3; i++) await window.__cb.qa.renderNow(); }); };
     await frame();
     const bare = async on => page.evaluate(o => window.__cb.store.getState().setHudHidden(o), on);
-    const aerial = async name => {
+    const aerial = async (name, tod = 11) => {
       await bare(true);
-      await page.evaluate(() => { const { cam, world } = window.__cb; cam.target.set(world.camp.x, 0, world.camp.z); cam.radius = 70; cam.pitch = 0.95; cam.yaw = 0.5; window.__cb.store.getState().setTimeOfDay(11); });
+      await page.evaluate(t => { const { cam, world } = window.__cb; cam.target.set(world.camp.x, 0, world.camp.z); cam.radius = 70; cam.pitch = 0.95; cam.yaw = 0.5; window.__cb.store.getState().setTimeOfDay(t); }, tod);
+      await frame(); const f = await shotTo(name); await bare(false); return f;
+    };
+    // a low view toward the horizon with the sim's own sky (photo mode off): disaster sky, fire, smoke, mushroom cloud
+    const horizon = async name => {
+      await bare(true);
+      await page.evaluate(() => { const { cam, world } = window.__cb; cam.target.set(world.camp.x, 0.5, world.camp.z); cam.radius = 55; cam.pitch = 0.32; cam.yaw = 2.4; window.__cb.store.getState().setPhoto(false); });
       await frame(); const f = await shotTo(name); await bare(false); return f;
     };
     await aerial('0-start-aerial');
@@ -201,7 +218,7 @@ export async function play(A) {
         if (c.cs === 'playing') { hit = await click(/^Skip( scene| all)?$/) || await click(/^(Continue|Stay the course)/); }
         else if (c.cs === 'aftermath') hit = await click(/Pick up the pieces|See to the drive/);
         else if (c.a) hit = await click(/Treat|Bury|Leave/);
-        else if (c.c) hit = await click(/Carry on/);
+        else if (c.c) hit = await page.evaluate(() => { const gs = window.__cb.game.getState(); if (!gs.game.gate.card) return false; gs.dismissCard(); return true; }); // not the Family tab's own 'Carry on'
         else { for (const r of stance) if (await click(r)) { hit = true; break; } if (hit) await click(/^Watch$/); }
         if (!hit) await click(/^(Continue|OK|Close|Okay|Got it)/);
         await page.waitForTimeout(250);
@@ -330,13 +347,30 @@ export async function play(A) {
     await page.setViewportSize({ width: 1280, height: 800 });
 
     stage('viewports');
+    const postHit = async () => {
+      const r = await page.evaluate(() => {
+        const g = window.__cb.game.getState().game, st = g.stocks ?? g.stock ?? {}, neg = Object.entries(st).filter(([, v]) => typeof v === 'number' && v < 0 || (typeof v === 'number' && !Number.isFinite(v))).map(([k, v]) => k + '=' + v);
+        const ppl = g.personState.filter(p => p.needs.died == null);
+        return { day: Math.floor(g.clock.t), money: Math.round(g.money), neg, phase: g.disaster.phase, alive: ppl.length + '/' + g.personState.length, wards: g.lineage?.wards?.length ?? 0, gone: g.personState.filter(p => p.needs.left || p.needs.taken).length, died: g.personState.filter(p => p.needs.died != null).length, ending: g.ending?.kind ?? null, stocksKeys: Object.keys(st).length,
+          canned: st.canned, structs: g.structures.length };
+      });
+      if (r.neg.length) bug('numbers', 'negative / non-finite stocks after the hit: ' + r.neg.join(','));
+      if (!Number.isFinite(r.money) || Math.abs(r.money) > 5e7) bug('numbers', 'absurd money ' + r.money);
+      return JSON.stringify(r);
+    };
     // ---- scenario starts: run through the hit so the disaster itself is exercised (short peace only)
     if (cfg.mode === 'Scenario' && process.env.SWEEP_HIT !== '0') {
       const s = await state(); const hit = s.hit;
       if (hit != null && hit < 760) {
         const t1 = Date.now();
+        await advanceTo(hit + 3, 1); await gate(); await aerial('a-hit03'); await horizon('a-hit03-horizon');
         await advanceTo(hit + 12, 3); await gate();
         await advanceTo(hit + 40, 3); await gate();
+        await scan('hit+40'); await aerial('a-hit40'); await horizon('a-hit40-horizon');
+        const mid = await postHit(); if (mid) res.facts.postHit40 = mid;
+        await advanceTo(hit + Number(process.env.SWEEP_AFTER ?? 100), 5); await gate();
+        const end = await postHit(); if (end) res.facts.postHitEnd = end;
+        await aerial('a-hit-night', 22);
         const s2 = await state(); res.facts.afterHit = `day ${s2.day} alive ${s2.alive}/${s2.total} ending=${s2.ending} (${Math.round((Date.now() - t1) / 1000)}s)`;
         await scan('after the hit'); await aerial('a-after-hit');
         if (s2.day < hit + 30 && !s2.ending) bug('stuck', `stalled at day ${s2.day} after the hit on day ${hit}`);
