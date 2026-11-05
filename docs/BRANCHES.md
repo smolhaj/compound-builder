@@ -1,4 +1,6 @@
-# Branch inventory (2026-11-04)
+# Branch inventory (2026-11-04; update 2026-11-05 below)
+
+> Update 2026-11-05: claude/starter-compound (#173) and claude/visual-polish (#180) have merged and are now safe to delete, as are all branches of PRs #174-#198 (see RESUME.md section 6). Still KEEP: claude/resume-notes (open PR #55), claude/survival-realism, claude/farm-kitchen. Only PR #55 is open.
 
 Audit of the 192 `origin/claude/*` branches against `origin/main` (save v78). Method: a branch is **merged** when a merged PR has its head ref and its tip equals that PR head; otherwise every added line of `merge-base..tip` was looked up in main's version of the same file. Squash merges mean `git branch --merged` shows nothing, so the PR list is the evidence.
 
