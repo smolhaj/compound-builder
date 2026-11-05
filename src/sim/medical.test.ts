@@ -164,6 +164,18 @@ describe('water, flu and quarantine', () => {
     expect(free).toBeGreaterThan(kept);
   });
 
+  it('a person whose flu has turned to pneumonia does not catch the flu again on top of it', () => {
+    for (let seed = 1; seed <= 12; seed++) {
+      const g = game(seed); g.disaster.tracks.stores = 1;
+      for (let k = 0; k < 3; k++) addPerson(g, { id: 'y' + k });
+      startCase(g, g.people[0].id, 'flu', 40, {}, 'flu');
+      g.personState[1].needs.hurt.push({ what: 'pneumonia', sev: 55, med: { kind: 'infection', day: dayIndex(g.clock.t), care: 'waiting', src: 'flu' } });
+      medicalOf(g).epidemic = { kind: 'flu', since: 0, quarantine: false, asked: false, cases: 1 };
+      days(g, 20);
+      expect(g.personState[1].needs.hurt.filter(h => h.what === 'pneumonia' || h.what === 'flu').length).toBeLessThanOrEqual(1);
+    }
+  });
+
   it('an epidemic asks for a decision on the next-step card, and answering it stops the question', () => {
     const g = game();
     startCase(g, g.people[1].id, 'flu', 40, {}, 'flu');
