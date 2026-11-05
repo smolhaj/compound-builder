@@ -771,7 +771,9 @@ export function resolve(s: GameState, stance: Stance): Outcome {
       const b = planBattle(s, raiders, s.seed * 131 + e.day * 7 + 1, battleOpts(e, e.dig || via ? { insideBreach: true } : {}));
       if (via) { const run = s.perimeter.find(x => x.id === via.runId); if (run) run.revealed = true; }
       g.battle = b;
-      lines.push(...applyBattle(s, b));
+      const stockBefore = stockTotal(s);
+      const battleLines = applyBattle(s, b);
+      lines.push(...battleLines);
       recordBattle(s, b, e.size, e.temper);
       if (b.result === 'repelled' || b.result === 'fled') {
         title = 'The line held'; text = `${help ? `${allies.map(a => a.name).join(' and ')} came over the ridge when they heard the shooting. ` : ''}${b.result === 'fled' ? 'They broke off and ran.' : 'None of them got past the line.'}`; tone = 'good';
@@ -782,9 +784,13 @@ export function resolve(s: GameState, stance: Stance): Outcome {
         g.next = Math.max(g.next, e.day + Math.round(15 + 35 * g.respect));
       } else {
         // (round 4: no second take of their wants here: applyBattle has already taken its 30–90 % share of the stores)
-        if (e.kind === 'looters' || e.kind === 'gang' || e.kind === 'militia') lines.push(...stealTools(s, 0.3, 2).lines);
-        lines.push(...raidTakesVehicles(s, ORGANIZED.has(e.kind)));
-        title = 'They got in'; text = b.result === 'overrun' ? 'They overran the place and took what they came for.' : 'They broke through the line and took what they came for.'; tone = 'bad';
+        const extra: string[] = [];
+        if (e.kind === 'looters' || e.kind === 'gang' || e.kind === 'militia') extra.push(...stealTools(s, 0.3, 2).lines);
+        extra.push(...raidTakesVehicles(s, ORGANIZED.has(e.kind)));
+        lines.push(...extra);
+        title = 'They got in';
+        text = breachText(b.result === 'overrun', { lostStock: stockBefore - stockTotal(s) > 0 || extra.length > 0, harmed: b.events.some(x => x.kind === 'wound' || x.kind === 'death' || x.kind === 'taken'), fought: battleLines.some(l => /rounds fired/.test(l)) });
+        tone = 'bad';
         // picked over: for a while there's not much left worth coming for; but the place is known to be soft
         g.respect = Math.max(0, (g.respect ?? 0) - 0.3);
         g.next = Math.max(g.next, e.day + 30);
@@ -808,6 +814,17 @@ export function resolve(s: GameState, stance: Stance): Outcome {
   g.card = out;
   log(s, `${e.title}: ${title}.`);
   return out;
+}
+
+const stockTotal = (s: GameState): number => Object.values(s.stock).reduce((a: number, v) => a + (typeof v === 'number' ? v : 0), 0);
+
+/** The aftermath line of a raid that got in, tied to what actually happened (stores / tools / vehicles gone, people hurt or taken). */
+export function breachText(overrun: boolean, o: { lostStock: boolean; harmed: boolean; fought: boolean }): string {
+  const how = overrun ? 'They overran the place' : 'They broke through the line';
+  if (o.lostStock && o.harmed) return `${how}, took what they could carry and left people hurt behind them.`;
+  if (o.lostStock) return `${how} and took what they came for.`;
+  if (o.harmed) return `${how} and hurt people, but found nothing they could carry off.`;
+  return o.fought ? `${how}, but found nothing worth taking and left.` : `${how}, looked the place over, found nothing worth taking and left without a fight.`;
 }
 
 /** Warning-phase gossip from the neighbors (a line for the ticker/log), sometimes. */
