@@ -25,7 +25,8 @@ const air = (r, pitch, yaw) => `{ const q = window.__gate; if (q) { cb.cam.targe
 const SHOTS = [
   { name: 'eye-level-gate-kit-person', time: 10, season: 'summer', setup: yard + fig(2.2, 0.6) + eye(5.5, -2.2, -1, 0) },
   { name: 'eye-level-gate-from-inside', time: 15, season: 'summer', setup: yard + fig(-3.2, 0.4) + eye(-6.5, -1.2, 1, 0.2) },
-  { name: 'eye-level-armed-response-sign-person', time: 11, season: 'summer', setup: yard + fig(-2.2, -0.9) + eye(-4.2, -2.4, 0, -0.5, 0.3) },
+  { name: 'eye-level-sign-close-day', time: 11, season: 'summer', setup: yard + fig(1.6, 0.9) + eye(2.6, 0.9, 0.35, 0.3, 0.28) },
+  { name: 'eye-level-sign-close-night', time: 21.5, season: 'summer', setup: yard + fig(1.6, 0.9) + eye(2.6, 0.9, 0.35, 0.3, 0.28) },
   { name: 'aerial-gate-kit', time: 11, season: 'summer', setup: yard + air(14, 0.9, 0.5) },
 ].filter(s => !only || s.name.includes(only));
 const vite = spawn('node', ['node_modules/vite/bin/vite.js', '--config', 'scripts/vite.shots.config.ts', '--port', String(port), '--strictPort'], { stdio: ['ignore', 'pipe', 'inherit'] });
