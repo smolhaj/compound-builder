@@ -346,6 +346,8 @@ function spread(x: Ctx, rate: number): void {
     if (q.id === p.id || !here(s, q)) continue;
     const qs = s.personState.find(z => z.id === q.id)!;
     if (qs.needs.hurt.some(z => z.med?.kind === c.kind)) continue;
+    // a flu that has turned to pneumonia is still that illness: no second flu on top of it (QA matrix 4: one person carried four pneumonias)
+    if (c.kind === 'flu' && qs.needs.hurt.some(z => z.what === 'pneumonia')) continue;
     const carer = x.care.medic?.id === q.id ? 1.6 : 1;
     if (r() < rate * iso * contactFactor(places.get(p.id), places.get(q.id)) * carer * (qs.needs.health < 50 ? 1.4 : 1)) {
       qs.needs.hurt.push({ what: c.kind === 'flu' ? 'flu' : 'dysentery (caught at home)', sev: c.kind === 'flu' ? 38 : 32, med: { kind: c.kind, day: dayIndex(s.clock.t), care: 'just started', src: 'house' } });

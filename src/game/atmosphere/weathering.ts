@@ -80,11 +80,14 @@ const FRAG = /* glsl */`
 #endif
 #if defined( WEAR_PAINT ) || defined( WEAR_CONTAINER )
     {
-      float wPn = wearNoise( vec2( wAlong * 14.0, wLy * 26.0 + wP.y * 3.0 ) ) * 0.6 + wearNoise( vec2( wAlong * 47.0, wLy * 80.0 ) ) * 0.4;
+      // flakes lie along the boards (long and thin, not round blobs); a few boards lose far more paint than their neighbors
+      float wPn = wearNoise( vec2( wAlong * 5.0, wLy * 34.0 + wP.y * 2.0 ) ) * 0.6 + wearNoise( vec2( wAlong * 23.0, wLy * 110.0 ) ) * 0.4;
+      wPn += ( wearHash( wBoard + 5.3 ) - 0.5 ) * 0.22;
       float wFade = wPeel * ( 1.0 - wFresh );
       wC = mix( wC, mix( vec3( wLum ), wC, 0.5 ) * 1.05 + 0.012, wFade * 0.65 );
 #ifdef WEAR_PAINT
-      float wPeelM = smoothstep( 0.8 - wPeel * 0.4, 0.84 - wPeel * 0.4, wPn ) * smoothstep( 0.2, 0.4, wPeel ) * ( 1.0 - wFresh );
+      // a fully weathered wall still keeps most of its paint: peeling tops out near a fifth of the surface
+      float wPeelM = smoothstep( 0.8 - wPeel * 0.22, 0.86 - wPeel * 0.22, wPn ) * smoothstep( 0.2, 0.4, wPeel ) * ( 1.0 - wFresh ) * 0.85;
       wC = mix( wC, vec3( 0.2, 0.19, 0.17 ) * ( 0.8 + 0.4 * wPn ), wPeelM );
 #endif
       wC = mix( wC, wC * vec3( 1.08, 1.08, 1.12 ), wFresh * 0.5 );
