@@ -78,8 +78,11 @@ export function PeopleSection() {
   const rest = resting(game);
   const camp = gatheringProblem(game, 'campfire'), service = gatheringProblem(game, 'service');
   const struggling = sum.struggling.slice(0, 4);
+  // (QA matrix 4: with the whole household dead and the children fostered, the panel still said "Everyone is holding up")
+  const nobodyHome = !game.personState.some(ps => ps.needs.died == null && !ps.needs.left);
   return <Section title="How everyone is">
-    {struggling.length === 0 && <Note tone="good">Everyone is holding up.{game.stock.games >= 1 || game.stock.instrument >= 1 ? ' The evenings help.' : ''}</Note>}
+    {nobodyHome && <Note tone="warn">Nobody is home.{(game.lineage?.wards ?? []).length > 0 ? ' The children are with a neighbor household; the place is held for them.' : ''}</Note>}
+    {!nobodyHome && struggling.length === 0 && <Note tone="good">Everyone is holding up.{game.stock.games >= 1 || game.stock.instrument >= 1 ? ' The evenings help.' : ''}</Note>}
     {struggling.map(x => <Row key={x.p.id} label={x.p.first} value={<span style={{ color: x.kind === 'break' ? TONE.bad : TONE.warn }}>{x.why}</span>} title={(game.mind?.psyche[x.p.id]?.weighs ?? []).slice(0, 3).map(w => `${w[0]} ${w[1]}`).join(', ')} />)}
     {M?.rift && <Note tone="warn">{game.people.find(p => p.id === M.rift!.a)?.first} and {game.people.find(p => p.id === M.rift!.b)?.first} are not speaking.</Note>}
     {hardened(game) && <Note tone="warn">The house has gone hard since what was done at the gate. The kids feel it.</Note>}

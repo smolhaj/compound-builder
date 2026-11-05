@@ -16,7 +16,7 @@ const yard = `{ if (!window.__gk) { window.__gk = true;
   for (const pts of sides) { const gs = near(pts); G.getState().planRun('container_wall', pts, gs.map(g => ({ at: g.at, w: g.w }))); if (gs.length && !window.__gate) { const g = gs[0]; const dx = c.x - g.x, dz = c.z - g.z, d = Math.hypot(dx, dz) || 1; window.__gate = { x: g.x, z: g.z, ix: dx / d, iz: dz / d }; } }
   G.setState(s => { const g = structuredClone(s.game);
     for (const r of g.perimeter) { r.done = r.hours; r.supplied = true; r.finishedAt = g.clock.t - 400; }
-    g.stock.sally_gate = 1; g.stock.gate_intercom = 1; g.stock.gate_motor = 1; g.utilities.lit = ['x'];
+    g.stock.sally_gate = 1; g.stock.gate_intercom = 1; g.stock.gate_motor = 1; g.utilities.lit = ['x']; g.security = { response: { since: 0, paidDay: 0, missed: 0, downDays: 0, ended: null, calls: 0 } };
     return { game: g }; });
 } }`;
 const fig = (o, l) => `{ const W = cb.world, q = window.__gate, f = W._root.children.find(o => o.userData.type === 'scale_figure'); if (q && f) { const x = q.x - q.ix * ${o} - q.iz * ${l}, z = q.z - q.iz * ${o} + q.ix * ${l}; f.position.set(x, W.parcel.height(x, z), z); } }`;
@@ -25,6 +25,8 @@ const air = (r, pitch, yaw) => `{ const q = window.__gate; if (q) { cb.cam.targe
 const SHOTS = [
   { name: 'eye-level-gate-kit-person', time: 10, season: 'summer', setup: yard + fig(2.2, 0.6) + eye(5.5, -2.2, -1, 0) },
   { name: 'eye-level-gate-from-inside', time: 15, season: 'summer', setup: yard + fig(-3.2, 0.4) + eye(-6.5, -1.2, 1, 0.2) },
+  { name: 'eye-level-sign-close-day', time: 11, season: 'summer', setup: yard + fig(1.6, 0.9) + eye(2.6, 0.9, 0.35, 0.3, 0.28) },
+  { name: 'eye-level-sign-close-night', time: 21.5, season: 'summer', setup: yard + fig(1.6, 0.9) + eye(2.6, 0.9, 0.35, 0.3, 0.28) },
   { name: 'aerial-gate-kit', time: 11, season: 'summer', setup: yard + air(14, 0.9, 0.5) },
 ].filter(s => !only || s.name.includes(only));
 const vite = spawn('node', ['node_modules/vite/bin/vite.js', '--config', 'scripts/vite.shots.config.ts', '--port', String(port), '--strictPort'], { stdio: ['ignore', 'pipe', 'inherit'] });

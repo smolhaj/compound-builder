@@ -13,6 +13,8 @@ import { BLUEPRINTS } from './blueprints';
 import { adoptDog } from './pets';
 import { syncParking } from './parking';
 import { sapperChance } from './corridors';
+import { subscribe } from './armedResponse';
+import { foundWatch } from './watch';
 
 afterEach(() => setGroundOverride(null));
 const N = 150;
@@ -69,6 +71,8 @@ const ELEMENTS: Array<[string, (g: GameState) => void]> = [
   ['a caged gate motor', g => { g.stock.gate_motor = 1; }],
   ['a double gate (vehicle sally port)', g => { g.stock.sally_gate = 1; }],
   ['the whole gate kit with a gate house, lit', g => { g.utilities.lit = ['h']; g.stock.gate_intercom = 1; g.stock.gate_motor = 1; g.stock.sally_gate = 1; g.stock.trellis_gates = 1; g.stock.gate_house = 1; }],
+  ['an armed-response subscription (the law is gone: nothing answers)', g => { g.money = 9999; g.disaster.tracks.banks = 1; g.disaster.tracks.law = 1; subscribe(g); g.disaster.tracks.banks = 0; g.disaster.tracks.law = 0; }],
+  ['a road watch with the neighbors', g => { g.money = 9999; for (const n of g.neighbors) { n.disposition = 40; n.status = 'home'; n.members = Math.max(1, n.members); n.km = 1.5; } foundWatch(g); }],
   ['mines', g => { g.stock.mines = 6; }],
   ['a moat (rain and seep only)', g => { moat(g); }],
   ['a pond-fed moat', g => { built(g, 'pd', 'pond', 52, 30); moat(g); }],
