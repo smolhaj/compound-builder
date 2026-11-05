@@ -58,6 +58,8 @@ export function tallyDay(s: GameState): Ending | null {
   // the last of them gone ends the line whenever it happens: in the quiet years between eras, or after a card that was played on (playtest round 3: the run used to go on with nobody left)
   if (s.personState.length && lineLives(s) === 0 && s.ending?.kind !== 'wipe') {
     s.ending = { kind: 'wipe', day: Math.floor(s.clock.t), continued: false };
+    // nobody is left to answer: a card or a raid on its way would sit on top of the report card (QA matrix 4)
+    s.gate.pending = null; s.gate.incoming = undefined;
     return s.ending;
   }
   if (!d.kind || s.clock.t < d.hitAt || (s.ending && !s.ending.continued)) return null;

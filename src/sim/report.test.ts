@@ -31,6 +31,17 @@ describe('endings and the report card', () => {
     expect(reportCard(g).grade).toBe('F');
   });
 
+  it('a wipe leaves no gate card or incoming raid behind the report card', () => {
+    const g = newGame(1, 105, 2027, { mode: 'scenario', peace: 'short', kind: 'nuclear' });
+    g.clock.t = g.disaster.hitAt + 5;
+    for (const ps of g.personState) ps.needs.died = 1;
+    g.gate.incoming = { e: { kind: 'looters' } as never, at: g.clock.t + 0.1 } as never;
+    g.gate.pending = { kind: 'looters' } as never;
+    expect(tallyDay(g)?.kind).toBe('wipe');
+    expect(g.gate.pending).toBeNull();
+    expect(g.gate.incoming).toBeUndefined();
+  });
+
   it('everyone gone is a wipe in the quiet years before the next hit too, and after a card that was played on', () => {
     const g = newGame(1, 105, 2027, { mode: 'scenario', peace: 'short', kind: 'nuclear' });
     g.clock.t = g.disaster.hitAt - 30;

@@ -54,7 +54,7 @@ async function wizard({ region, difficulty, lotPick = 'first', mode = 'Surprise'
   await page.goto(`http://localhost:${port}/?new&lowrender`);
   await page.getByText('1. Region').waitFor();
   await page.waitForFunction(() => window.__cb?.qa?.lowrender);
-  await page.evaluate(() => { try { localStorage.clear(); } catch {} });
+  await page.evaluate(u => { try { localStorage.clear(); if (u) localStorage.setItem('cb.unlocked', '1'); } catch {} }, !!process.env.QA_UNLOCK);
   if (region) await page.getByRole('button', { name: new RegExp(region) }).first().click();
   await page.getByRole('button', { name: 'Next', exact: true }).click();
   // land step
@@ -79,7 +79,7 @@ async function wizard({ region, difficulty, lotPick = 'first', mode = 'Surprise'
   for (let i = 0; i < kin; i++) { const rel = page.locator('button').filter({ hasText: /\b(Uncle|Aunt|Grandma|Grandpa|Cousin|Brother|Sister|Mother|Father|Mom|Dad|Grandmother|Grandfather|Niece|Nephew|Mother-in-law|Father-in-law|In-law)/i }); if (await rel.count() > i) await rel.nth(i).click().catch(() => {}); }
   if (mode === 'Scenario' && sc) {
     await page.getByRole('button', { name: /^Scenario/ }).click();
-    if (sc.kind && sc.kind !== 'grid_down') await page.locator('select').first().selectOption(sc.kind).catch(e => note('select kind fail ' + e.message.slice(0, 80)));
+    if (sc.kind && sc.kind !== 'grid_down') await page.locator(`select:has(option[value="${sc.kind}"])`).first().selectOption(sc.kind).catch(e => note('select kind fail ' + e.message.slice(0, 80)));
     if (sc.peace) await page.getByRole('button', { name: sc.peace, exact: true }).click();
   } else if (mode !== 'Surprise') await page.getByRole('button', { name: new RegExp('^' + mode) }).click();
   await page.getByRole('button', { name: difficulty, exact: true }).click();
