@@ -70,7 +70,7 @@ describe('the defenders fall back through the rings in a raid', () => {
     }
     expect(falls).toBeGreaterThan(0);
     void checked;
-  });
+  }, 30_000);   // 120 planned raids: close to the 5 s default on a loaded CI runner (timed out twice on unrelated PRs)
   it('a lot with more rings is never an easier raid (same crews, same seeds)', () => {
     const count = (g: GameState) => { let n = 0; for (let seed = 1; seed <= 40; seed++) { const r = planBattle(g, 7, seed).result; if (r === 'breached' || r === 'overrun') n++; } return n; };
     const one = count(lot(1)), three = count(lot(3));
