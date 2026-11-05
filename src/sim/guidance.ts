@@ -46,6 +46,7 @@ import { terrainCards, terrainOff } from './terrainFx';
 import { gradeBucket, roadDifficulty, winterRoadLine } from './slope';
 import { terraceSite, terraceText } from './terrace';
 import { restackPallets, slumped, wallOf } from './retaining';
+import { nobodyHome } from './orphans';
 
 const usd = (n: number) => '$' + Math.round(n).toLocaleString('en-US');
 
@@ -230,6 +231,7 @@ export function terraceSuggestion(s: GameState): Suggestion | null {
 }
 
 export function suggestions(s: GameState, limit = 3, skip?: ReadonlySet<string>): Suggestion[] {
+  if (nobodyHome(s)) return [];   // children fostered, nobody on the place: nothing to suggest (the HUD says so: orphans.fosterNote)
   const people = s.people.length;
   const homes = s.structures.filter(st => isHome(st.kind));
   const beds = homeBeds(s);
@@ -385,6 +387,7 @@ export function courseSuggestion(s: GameState): Suggestion | null {
 /** Drills for the defense: the household has guns and has never run a drill. */
 export function drillsSuggestion(s: GameState): Suggestion | null {
   const D = s.courses?.drills;
+  if (nobodyHome(s)) return null;
   const armed = s.armory.guns.length > 0, danger = s.disaster.phase === 'warning' || s.disaster.phase === 'impact' || s.disaster.phase === 'survival';
   if (!armed || !danger || (D && (D.perWeek > 0 || D.last != null || Object.keys(D.ready).length > 0))) return null;
   return { id: 'drills', kind: '', title: 'Run drills', urgency: 38, why: 'the family has guns and has never practiced together; a weekly hour at the range steadies the aim and cuts the seconds frozen at the alarm (it spends about 15 rounds a person)',

@@ -9,6 +9,7 @@ import { daysOfFood, KCAL, needOf } from './needs';
 import { orderCost, prices } from './economy';
 import { CREW_RATE, hoursLeft } from './crews';
 import type { GameState } from './state';
+import { isGod } from './godMode';
 import { countyWorks, needsPermit, permitFee } from './paperwork';
 
 /** The cash a household keeps for living costs while it builds. */
@@ -45,11 +46,23 @@ export function spendCheckCommitted(money: number, cost: number, committed: numb
 /** The county permit fee that planning `kind` books now (0 = none: no permit needed, permits skipped, or nobody at the counter). */
 export const permitSpend = (s: GameState, kind: string): number => (needsPermit(kind) && s.paper.permits && countyWorks(s) ? permitFee(s, kind) : 0);
 
-/** The question to ask before staking `kind` (null = just do it): the permit fee would leave less than the reserve (or take cash negative). Advice only; the player can always go ahead. */
-export function stakeSpendAsk(s: GameState, kind: string): { cost: number; check: SpendCheck } | null {
+/**
+ * Can the cash on hand pay the permit fee that staking `kind` books? Staking never takes cash below zero (God Mode
+ * tops the account up, so it is exempt). `short` is how much is missing (0 = affordable).
+ */
+export function permitAffordable(s: GameState, kind: string): { ok: boolean; cost: number; short: number; why: string | null } {
+  const cost = permitSpend(s, kind);
+  const short = isGod(s) ? 0 : Math.max(0, cost - Math.max(0, s.money));
+  return { ok: short <= 0, cost, short, why: short > 0 ? `The county permit fee is $${cost.toLocaleString('en-US')} and you have $${Math.max(0, Math.round(s.money)).toLocaleString('en-US')}. Staking waits until the cash is there.` : null };
+}
+
+/** The question to ask before staking `kind` (null = just do it): the permit fee would leave less than the reserve. Advice only, except when the fee is more than the cash on hand: then `cannot` is set and the stake is refused (cash never goes negative). */
+export function stakeSpendAsk(s: GameState, kind: string): { cost: number; check: SpendCheck; cannot?: string } | null {
   const cost = permitSpend(s, kind);
   if (cost <= 0) return null;
   const check = spendCheck(s.money, cost);
+  const aff = permitAffordable(s, kind);
+  if (!aff.ok) return { cost, check, cannot: aff.why! };
   return check.below ? { cost, check } : null;
 }
 

@@ -83,17 +83,20 @@ describe('the insider threat applies only to the unvetted', () => {
       expect(x.turned).toBeFalsy(); expect(g.gate.comeBack).toBeFalsy(); expect(lines).toEqual([]); expect(g.guards.staff.length).toBe(1);
     }
   });
-  it('an unvetted guard on a below-rate wage is bought within a couple of years; on a high wage rarely', () => {
-    let low = 0, high = 0;
-    for (let seed = 1; seed <= 80; seed++) {
-      for (const wage of ['low', 'high'] as const) {
+  it('an unvetted guard on a below-rate wage is bought in about 3 cases in 10 within a year (4 in 10 in two); at the agency rate or above rarely', () => {
+    let low = 0, high = 0, fair = 0, low1 = 0;
+    for (let seed = 1; seed <= 300; seed++) {
+      for (const wage of ['low', 'fair', 'high'] as const) {
         const g = game(seed); g.guards.wage = wage; hireGuard(g); const x = g.guards.staff[0]; x.plant = false;
-        let t = false;
-        for (let d = 0; d < 730 && !t; d++) { g.clock.t += 1; insiderDay(g); g.gate.pending = null; g.gate.comeBack = null; t = !!x.turned; }
-        if (t) { if (wage === 'low') low++; else high++; }
+        let t = false, at = -1;
+        for (let d = 0; d < 730 && !t; d++) { g.clock.t += 1; insiderDay(g); g.gate.pending = null; g.gate.comeBack = null; t = !!x.turned; if (t) at = d; }
+        if (t) { if (wage === 'low') { low++; if (at < 365) low1++; } else if (wage === 'fair') fair++; else high++; }
       }
     }
-    expect(low).toBeGreaterThan(50); expect(high).toBeLessThan(25);
+    // measured over 300 seeds: low 28 % / 42 %, fair 5 % / 7 %, high 3 % / 4 % (within 1 / 2 years)
+    expect(low1 / 300).toBeGreaterThan(0.2); expect(low1 / 300).toBeLessThan(0.36);
+    expect(low / 300).toBeGreaterThan(0.33); expect(low / 300).toBeLessThan(0.55);
+    expect(fair / 300).toBeLessThan(0.12); expect(high / 300).toBeLessThan(0.08); expect(high).toBeLessThan(low / 4);
   });
   it('a compromised guard leaks, opens the gate or steals, and sometimes is noticed (a dismissal card)', () => {
     let crew = 0, open = 0, stole = 0, cards = 0;

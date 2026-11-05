@@ -12,6 +12,7 @@ import { claimForWaiting, claimWaitingRig, isRig, type StayKind } from '../sim/j
 import { kinOf } from '../sim/kin';
 import { setEntrance as chooseEntrance } from '../sim/roadEntrance';
 import { applyForPermit } from '../sim/paperwork';
+import { permitAffordable } from '../sim/spendGuard';
 import { sweepChimney } from '../sim/upkeep';
 import { stockUpRx } from '../sim/body';
 import { askRansom, giveUp, startRescue, startTrip } from '../sim/rescue';
@@ -113,7 +114,7 @@ export interface GameStore {
   /** A short confirmation after a building is staked and the tool put away (clears itself). */
   stakedNote: string | null;
   /** A staking the player is being asked to confirm because its county permit fee would dip under the living reserve (sim/spendGuard.stakeSpendAsk). */
-  spendAsk: { kind: string; x: number; z: number; rot: number; cost: number; after: number; reserve: number } | null;
+  spendAsk: { kind: string; x: number; z: number; rot: number; cost: number; after: number; reserve: number; cannot?: string } | null;
   askSpend: (a: NonNullable<GameStore['spendAsk']>) => void;
   /** Answer the question: true stakes it anyway, false drops it (the tool stays armed). */
   answerSpend: (yes: boolean) => void;
@@ -308,8 +309,10 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     const a = get().spendAsk;
     set({ spendAsk: null });
     if (!a || !yes) return;
+    const before = get().game.structures.length;
     get().plan(a.kind, a.x, a.z, a.rot);
     set({ tool: null });
+    if (get().game.structures.length <= before) return;
     get().flashStaked(`Staked out the ${a.kind.replace(/_/g, ' ')}. The family will start when the materials are in (Projects tab).`);
   },
   selected: null,
@@ -371,6 +374,8 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
   plan: (kind, x, z, rot) => {
     if (locked()) return;
     if (planProblem(get().game, kind)) return;
+    const aff = permitAffordable(get().game, kind);
+    if (!aff.ok) { set({ spendAsk: null, toolProblem: aff.why }); return; }   // the permit fee would take cash below zero
     if (isRig(kind) && !(get().game.joiners?.waiting.length)) return;   // a rig is parked only for a joiner who is waiting for a pad
     const g = structuredClone(get().game);
     const st = planStructure(g, kind, x, z, rot);
@@ -407,7 +412,7 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     const why = planProblem(get().game, 'garden');
     if (why) return why;
     const g = structuredClone(get().game);
-    for (const [x, z] of spots) { const st = planStructure(g, 'garden', x, z, 0); applyForPermit(g, st); }
+    for (const [x, z] of spots) { if (!permitAffordable(g, 'garden').ok) break; const st = planStructure(g, 'garden', x, z, 0); applyForPermit(g, st); }
     set({ game: g });
     void saveGame(AUTOSAVE, g);
     return null;
@@ -417,7 +422,7 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     const g = structuredClone(get().game);
     let n = 0;
     for (const p of pieces) {
-      if (planProblem(g, p.kind)) continue;
+      if (planProblem(g, p.kind) || !permitAffordable(g, p.kind).ok) continue;
       const st = planStructure(g, p.kind, p.x, p.z, p.rot);
       stampHighGround(st);
       applyForPermit(g, st);

@@ -90,6 +90,43 @@ describe('stake spend ask', () => {
   });
 });
 
+describe('staking never takes cash below zero', () => {
+  it('refuses a stake whose permit fee is more than the cash, and the ask says so with no go-ahead', async () => {
+    const { stakeSpendAsk, permitAffordable } = await import('./spendGuard');
+    const g = newGame(7); g.paper.permits = true;
+    g.money = 0;
+    const a = stakeSpendAsk(g, 'timber_cabin');
+    expect(a?.cannot).toMatch(/permit fee/);
+    expect(permitAffordable(g, 'timber_cabin').ok).toBe(false);
+    g.money = 400_000;
+    expect(permitAffordable(g, 'timber_cabin').ok).toBe(true);
+    expect(stakeSpendAsk(g, 'timber_cabin')).toBeNull();
+  });
+  it('the store refuses to stake at $0 and leaves cash at exactly $0; applyForPermit never goes under zero', async () => {
+    const { useGameStore } = await import('../store/gameStore');
+    const { applyForPermit } = await import('./paperwork');
+    const { planStructure } = await import('./construction');
+    const g = newGame(7); g.paper.permits = true; g.money = 0;
+    useGameStore.setState({ game: g });
+    const before = useGameStore.getState().game.structures.length;
+    useGameStore.getState().plan('timber_cabin', 30, 30, 0);
+    const after = useGameStore.getState().game;
+    expect(after.structures.length).toBe(before);
+    expect(after.money).toBe(0);
+    expect(useGameStore.getState().toolProblem).toMatch(/permit fee/);
+    // the backstop
+    const h = newGame(7); h.paper.permits = true; h.money = 40;
+    const st = planStructure(h, 'timber_cabin', 30, 30, 0);
+    applyForPermit(h, st);
+    expect(h.money).toBeGreaterThanOrEqual(0);
+  });
+  it('God Mode keeps its bottomless account (exempt)', async () => {
+    const { permitAffordable } = await import('./spendGuard');
+    const g = newGame(7, 105, 2027, { mode: 'god' }); g.paper.permits = true; g.money = 0;
+    expect(permitAffordable(g, 'timber_cabin').ok).toBe(true);
+  });
+});
+
 describe('food nudge urgency', () => {
   it('stays under the plow and retaining wall cards until the warning signs are up', async () => {
     const { foodUrgency } = await import('./spendGuard');
