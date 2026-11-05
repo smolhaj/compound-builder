@@ -70,6 +70,12 @@ export interface WorldState {
   /** The property line drawn on the ground (also shown while a fence or wall is being drawn). */
   showBoundary: boolean;
   setShowBoundary: (on: boolean) => void;
+  /** The Weak-spots overlay (houses, trees and brush a climber uses to bypass a wall: sim/wallTops.ts). */
+  weakView: boolean;
+  setWeakView: (on: boolean) => void;
+  /** The standing trees on our land (set by the canvas): the weak-spot scan and the felling read them. */
+  wallTrees: (() => Array<{ id: number; x: number; z: number; scale: number; kind: 'conifer' | 'oval' | 'broad'; haulDist: number }>) | null;
+  setWallTrees: (f: WorldState['wallTrees']) => void;
   /** What the world knows of the land that the sim does not (the creek's line, the road gate): the "Wall my property" planner reads it. Set by the canvas. */
   siteGeo: PropertyGeometry | null;
   setSiteGeo: (g: PropertyGeometry | null) => void;
@@ -152,6 +158,8 @@ export const useWorldStore = create<WorldState>()(subscribeWithSelector((set) =>
   blueprintReadout: null,
   setBlueprintReadout: (blueprintReadout) => set({ blueprintReadout }),
   showBoundary: false,
+  weakView: false,
+  wallTrees: null,
   siteGeo: null,
   setSiteGeo: (siteGeo) => set({ siteGeo }),
   pathNet: null,
@@ -170,6 +178,8 @@ export const useWorldStore = create<WorldState>()(subscribeWithSelector((set) =>
   setSightMode: (sightMode) => set({ sightMode }),
   setTerrainMode: (terrainMode) => set({ terrainMode }),
   setShowBoundary: (showBoundary) => set({ showBoundary }),
+  setWeakView: (weakView) => set({ weakView }),
+  setWallTrees: (wallTrees) => set({ wallTrees }),
   setBuildingView: (buildingView) => set({ buildingView }),
   tourCaption: null,
   setCameraMode: (cameraMode) => set({ cameraMode }),

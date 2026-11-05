@@ -17,6 +17,7 @@ import { payUpkeep, wearTools, workSpeed } from './tools';
 import type { GameState } from './state';
 import { openDoorways } from './compounds';
 import { COUNTY, PERMIT_FEE, countyWorks } from './paperwork';
+import { topBonus } from './wallTops';
 
 export type PerimeterKind = 'split_rail' | 'barbed_wire' | 'woven_wire' | 'thorn_hedge' | 'log_palisade' | 'container_wall' | 'earth_berm' | 'ditch' | 'creek_bars' | 'chain_link' | 'wrought_iron' | 'iron_barbed' | 'steel_wall' | 'electric_steel' | 'water_pipe' | 'power_cable' | 'escape_tunnel' | 'covered_walkway' | 'underground_passage' | 'concrete_wall' | 'wall_walk' | 'stone_wall' | 'container_stack' | 'tunnel_bridge' | 'slope_tunnel' | 'rock_tunnel' | 'bar_fence' | 'drain_channel' | 'moat' | 'covered_bridge';
 
@@ -156,6 +157,18 @@ export interface PerimeterRun {
   hostId?: string;
   /** Razor wire coiled along the top (`addRazor`, sim/razor.ts): a little harder to get over. */
   razor?: boolean;
+  /** An electric fence on outriggers along the top (`addElectric`, sim/wallTops.ts): live while there is power; never with razor. */
+  electric?: boolean;
+  /** …with a sealed battery that keeps it live for a few days of mains outage. */
+  backup?: boolean;
+  /** Game time the mains went out (set by the daily tick while it is out; drives the backup battery). */
+  darkSince?: number;
+  /** Home-installed with no certificate (nobody to certify it): the inspector may fine it. */
+  noCert?: boolean;
+  /** Brush grown up against the wall, 0–1 (sim/wallTops.ts): hides climbers, shades cameras, shorts the fence. */
+  brush?: number;
+  /** The county ordered the razor coils down once (peacetime zoning). */
+  razorOrdered?: boolean;
 }
 
 /**
@@ -210,6 +223,7 @@ export const fenceLive = (s: GameState): boolean => s.utilities.lit.length > 0 |
 export function peopleBlock(s: GameState, r: Pick<PerimeterRun, 'kind'>): number {
   if (r.kind === 'electric_steel' && !fenceLive(s)) return PERIMETER.steel_wall.blocks.people;
   const base = PERIMETER[r.kind].blocks.people;
+  if ((r as PerimeterRun).electric) return base + topBonus(s, r as PerimeterRun, base);
   return (r as { razor?: boolean }).razor && base >= RAZOR.MIN_BLOCK ? Math.min(RAZOR.CAP, base + RAZOR.PEOPLE) : base;
 }
 

@@ -8,6 +8,7 @@ import { hasAll, shortfall, waitingFor, type MaterialId, type Stock } from './ma
 import { log } from './economy';
 import { PERIMETER, RAZOR, runFinished, wallLength, type PerimeterRun } from './perimeter';
 import type { GameState } from './state';
+import { countyWorks } from './paperwork';
 
 /** The wire's bill for `len` world units of run (the price table, so the Defense tab can show it before it is hung). */
 export function razorBill(len: number): Partial<Stock> {
@@ -22,6 +23,8 @@ export function razorProblem(s: GameState, r: PerimeterRun): string | null {
   if (!RAZOR.HOSTS.includes(r.kind)) return PERIMETER[r.kind].blocks.people < RAZOR.MIN_BLOCK ? 'nothing to hang it on: it stops nobody' : 'this wall already carries its own wire (or is not a wall)';
   if (!runFinished(r)) return 'it is not finished yet';
   if (r.razor) return 'it already has razor wire';
+  if (r.electric) return 'an electric fence is on this run: razor wire cannot be electrified, so it is one or the other';
+  if (r.razorOrdered && countyWorks(s)) return 'the county ordered the coils down: not while the law works';
   if (r.replaces) return 'this wall is an upgrade in progress';
   const bill = razorBill(wallLength(r));
   if (!hasAll(s.stock, bill)) return `waiting for ${waitingFor(shortfall(s.stock, bill) as Partial<Record<MaterialId, number>>)}`;

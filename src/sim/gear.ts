@@ -23,6 +23,7 @@ import { dogWatch } from './pets';
 import { ARMORY_LIGHTS, floodlightArmed, floodlightLit } from './lights';
 import { hasSafeRoom, houseBarrier } from './houseHardening';
 import { GATE_HOUSE, hasGateHouse } from './richSinks';
+import { wallTopPosture } from './wallTops';
 
 export const KIT_GOODS: MaterialId[] = ['plate_carrier', 'soft_armor', 'helmet', 'ifak', 'nvg', 'thermal', 'radios', 'sw_radio', 'ham_rig', 'radio_mast'];
 export const WATCH_GOODS: MaterialId[] = ['cameras', 'thermal_cam', 'driveway_alarm', 'floodlights', 'blackout_curtains', 'gen_baffles', 'gen_vault', 'ai_sensor_module', 'tripwire', 'dog', 'puppy', 'ground_sensor'];
@@ -34,17 +35,19 @@ const n = (s: GameState, m: MaterialId) => Math.floor(s.stock[m] ?? 0);
 export const powered = (s: GameState) => s.utilities.lit.length > 0 || (s.utilities.grid && s.disaster.tracks.grid > 0.5);
 
 /** What the gear adds at the gate. */
-export function gearPosture(s: GameState, fighters: number): { detection: number; barrier: number; fight: number; visibility: number; deter: number; safeRoom: boolean } {
+export function gearPosture(s: GameState, fighters: number): { detection: number; barrier: number; fight: number; visibility: number; deter: number; signs: number; safeRoom: boolean } {
   const p = powered(s), dogs = dogWatch(s);
   // fog (sim/fog.ts): a visible-light camera, the floodlights and a night-vision tube lose most of their reach in dense fog; thermal (the
   // camera and the handheld) mostly ignores it; the alarm, the trip wire, the dogs and the radios do not care
   const fog = fogNow(s), kCam = fogSightFactor(fog, 'camera'), kEye = fogSightFactor(fog, 'eye'), kNvg = fogSightFactor(fog, 'nvg'), kIr = fogSightFactor(fog, 'thermal');
-  const detection = Math.round((p && n(s, 'cameras') ? 15 * kCam : 0) + (p && n(s, 'thermal_cam') ? 15 * kIr : 0) + (n(s, 'driveway_alarm') ? 10 : 0) + (n(s, 'floodlights') && floodlightArmed(s, ARMORY_LIGHTS) ? 5 * kEye : 0)
+  const detection0 = Math.round((p && n(s, 'cameras') ? 15 * kCam : 0) + (p && n(s, 'thermal_cam') ? 15 * kIr : 0) + (n(s, 'driveway_alarm') ? 10 : 0) + (n(s, 'floodlights') && floodlightArmed(s, ARMORY_LIGHTS) ? 5 * kEye : 0)
     + (n(s, 'tripwire') ? 5 : 0) + dogs.detection * petCare(s) + (hasGateHouse(s) ? GATE_HOUSE.detection : 0) + (n(s, 'radios') ? 5 : 0) + Math.min(10, n(s, 'nvg') * 5 * kNvg + n(s, 'thermal') * 5 * kIr));
+  // the tops of the walls (sim/wallTops.ts): a live electric fence is an alarm; brush against the walls shades the cameras
+  const wt = wallTopPosture(s), detection = Math.max(0, Math.round(detection0 + wt.detection - wt.cameraLoss * ((p && n(s, 'cameras') ? 15 * kCam : 0) + (p && n(s, 'thermal_cam') ? 7.5 * kIr : 0))));
   const barrier = houseBarrier(s) + Math.min(15, n(s, 'sandbags') * 5) + (hasGateHouse(s) ? GATE_HOUSE.barrier : 0);
   const f = Math.max(1, fighters);
   const fight = 1 + 0.08 * Math.min(1, n(s, 'plate_carrier') / f) + 0.04 * Math.min(1, n(s, 'radios') * 2 / f) + 0.05 * Math.min(1, (n(s, 'nvg') + n(s, 'thermal')) / f);
-  return { detection, barrier, fight, visibility: (n(s, 'floodlights') && floodlightLit(s, ARMORY_LIGHTS, false) ? 5 : 0), deter: dogs.deter * petCare(s), safeRoom: hasSafeRoom(s) };
+  return { detection, barrier, fight, visibility: (n(s, 'floodlights') && floodlightLit(s, ARMORY_LIGHTS, false) ? 5 : 0), deter: dogs.deter * petCare(s), signs: wt.signsDeter, safeRoom: hasSafeRoom(s) };
 }
 
 /** A wound in a fight: plates take some of it, and an IFAK on the spot takes more (one is used up). */

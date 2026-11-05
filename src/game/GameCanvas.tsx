@@ -31,6 +31,8 @@ import { MarkTool } from './MarkTool';
 import { BoundaryOutline } from './BoundaryOutline';
 import { PerimeterTool } from './PerimeterTool';
 import { SightOverlay } from './sightlines/SightOverlay';
+import { WeakSpotOverlay } from './WeakSpotOverlay';
+import { weakSpots } from '../sim/wallTops';
 import { PARCEL_SIZE as PS } from './parcel/parcelTerrain';
 import { fenceLive, type PerimeterKind } from '../sim/perimeter';
 import { useGameStore } from '../store/gameStore';
@@ -148,6 +150,16 @@ export function GameCanvas() {
         .sort((a, b) => a.d - b.d).slice(0, n);
       return st.markTrees(near.map(({ t, d }) => ({ tree: { id: t.id, x: t.x, z: t.z, kind: t.kind as 'conifer' | 'oval' | 'broad', scale: t.scale }, haulDist: d })));
     });
+    // the weak-spots overlay (sim/wallTops.ts): trees on our land feed the scan, the markers show where a climber bypasses a wall
+    const ownedTrees = () => {
+      const g = useGameStore.getState().game, y = world.access.yard;
+      return world.treeSpecs
+        .filter(t => t.x > -0.5 && t.z > -0.5 && t.x < PARCEL_SIZE + 0.5 && t.z < PARCEL_SIZE + 0.5 && t.scale >= 0.6 && ownsAt(g, t.x, t.z) && !isMarked(g, t.id) && !g.forestry.cleared.includes(t.id))
+        .map(t => ({ id: t.id, x: t.x, z: t.z, scale: t.scale, kind: t.kind as 'conifer' | 'oval' | 'broad', haulDist: Math.hypot(t.x - y.x, t.z - y.z) }));
+    };
+    useWorldStore.getState().setWallTrees(ownedTrees);
+    const weakOv = new WeakSpotOverlay(ws.scene, world.groundAt);
+    const showWeak = () => weakOv.set(useWorldStore.getState().weakView ? weakSpots(useGameStore.getState().game, ownedTrees()) : []);
     const sight = new SightOverlay(ws.scene, {
       sightWorld: () => world.sightWorld(), bounds: { x0: -6, z0: -6, x1: PS + 6, z1: PS + 6 },
       observers: k => world.observers(k), lights: () => world.nightLights(),
@@ -238,6 +250,8 @@ export function GameCanvas() {
     };
     const refreshBlueprint = () => { if (useWorldStore.getState().blueprint) { clearTimeout(bpTimer); bpTimer = window.setTimeout(showBlueprint, 250); } };
     const unsub = [
+      useWorldStore.subscribe(s => s.weakView, showWeak),
+      useGameStore.subscribe(s => `${s.game.structures.length}|${s.game.forestry.cleared.length}|${s.game.forestry.jobs.length}|${s.game.perimeter.map(r => r.id + (r.finishedAt === null ? 'p' : 'f') + Math.round((r.brush ?? 0) * 4)).join()}`, () => { if (useWorldStore.getState().weakView) showWeak(); }),
       useWorldStore.subscribe(s => s.blueprint, showBlueprint),
       useGameStore.subscribe(s => `${s.game.structures.map(x => x.id + x.stage + x.kind).join()}|${s.game.perimeter.map(r => r.id + (r.finishedAt === null ? 'p' : 'f') + r.gates.length).join()}`, refreshBlueprint),
       // wildfire weather: measure the fuel round every building (what cleared ground there is decides what burns)
@@ -588,6 +602,7 @@ export function GameCanvas() {
       terrainOv.dispose();
       clearTimeout(bpTimer);
       blueprintOv.dispose();
+      weakOv.dispose();
       useWorldStore.getState().setBlueprintReadout(null);
       boundary.dispose();
       useWorldStore.getState().setSiteGeo(null);

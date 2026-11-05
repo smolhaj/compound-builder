@@ -36,6 +36,7 @@ import { addSkirt, planRun, upgradeRun, type ContainerLook, type Gate, type Peri
 import { ROAD_GATE_W, layPropertyWall, planPropertyWall, type PropertyGeometry, type WallPlan } from '../sim/propertyWall';
 import { addWalkway } from '../sim/walkway';
 import { addRazor } from '../sim/razor';
+import { addElectric, addBackup, trimAll, trimRun } from '../sim/wallTops';
 import { layPaths, pickUpPath, type LaidKind, type LayEdge } from '../sim/paths';
 import { compoundRegion, layFortress, planFortress, type FortressOptions } from '../sim/fortress';
 import type { RingShape } from '../sim/ringShape';
@@ -169,6 +170,12 @@ export interface GameStore {
   addWalkway: (id: string) => string | null;
   /** Hang razor wire along the top of a finished wall or fence (sim/razor.ts). */
   addRazor: (id: string) => string | null;
+  /** Fit an electric fence on outriggers along a finished wall (sim/wallTops.ts); `backup` adds the sealed battery. */
+  addElectric: (id: string, backup: boolean) => string | null;
+  /** Add the battery backup to an electric fence. */
+  addFenceBackup: (id: string) => string | null;
+  /** Cut the brush back along a wall (one run, or every run when `id` is null). Returns how many runs were cleared, or why not. */
+  trimBrush: (id: string | null) => string | null;
   /** Lay a walk (gravel, stepping stones, duckboards, concrete) along these door-to-door walks, from the stock (null = laid; else why not). */
   layPaths: (edges: LayEdge[], kind: LaidKind) => string | null;
   /** Take a laid walk up again (back to a worn track). */
@@ -503,6 +510,27 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     if (locked()) return LOCKED_WHY;
     const g = structuredClone(get().game);
     const why = addRazor(g, id);
+    if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); }
+    return why;
+  },
+  addElectric: (id, backup) => {
+    if (locked()) return LOCKED_WHY;
+    const g = structuredClone(get().game);
+    const why = addElectric(g, id, backup);
+    if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); }
+    return why;
+  },
+  addFenceBackup: (id) => {
+    if (locked()) return LOCKED_WHY;
+    const g = structuredClone(get().game);
+    const why = addBackup(g, id);
+    if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); }
+    return why;
+  },
+  trimBrush: (id) => {
+    if (locked()) return LOCKED_WHY;
+    const g = structuredClone(get().game);
+    const why = id ? trimRun(g, id) : (trimAll(g) ? null : 'nothing to cut back');
     if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); }
     return why;
   },

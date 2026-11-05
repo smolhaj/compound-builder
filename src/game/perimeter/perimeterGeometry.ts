@@ -11,7 +11,9 @@ import { worldUV } from '../buildkit/shell';
 import { DECK_W, walkwayAccess } from '../../sim/walkway';
 import { insideRing } from '../../sim/compounds';
 import { boreParts } from './boreGeometry';
-import { PERIMETER, RAZOR, footingOf, hasSkirt, runGrowth, runProgress, wallLength, type PerimeterKind, type PerimeterRun, type Pt } from '../../sim/perimeter';
+import { WALL_TOP } from '../../sim/wallTops';
+import { hashStr } from '../buildkit/clutter';
+import { PERIMETER, RAZOR, isContainerKind, footingOf, hasSkirt, runGrowth, runProgress, wallLength, type PerimeterKind, type PerimeterRun, type Pt } from '../../sim/perimeter';
 
 const M = 1 / 6;
 /** The dark inside of a bore: one shared material (never disposed with a run's geometry). */
@@ -791,6 +793,34 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
         add('steel', new THREE.TorusGeometry(0.17 * M, 0.012 * M, 4, 9).rotateY(th).translate(x, ground(x, z) + top + 0.17 * M, z));
       }
     });
+  }
+  // electric fence on outriggers (sim/wallTops.ts): a steel arm angled outward every 2.4 m, three live wires on white insulators, a yellow warning sign every fourth post
+  if (run.electric && !opts.deck && built > 0.05 && WALL_TOP.ELECTRIC.HOSTS.includes(run.kind)) {
+    const top = Math.abs(def.height), L = 0.62 * M, tilt = 0.6, out = Math.sin(tilt), up = Math.cos(tilt), tiers = [0.4, 0.7, 1];
+    bays(2.4 * M, (a, _b, i) => {
+      const nx = -a.dz, nz = a.dx, y0 = ground(a.x, a.z) + top, ang = -Math.atan2(a.dz, a.dx);
+      add('steel', new THREE.BoxGeometry(0.035 * M, L, 0.035 * M).translate(0, L / 2, 0).rotateX(tilt).rotateY(ang).translate(a.x, y0, a.z));
+      add('steel', new THREE.BoxGeometry(0.08 * M, 0.05 * M, 0.08 * M).translate(a.x, y0 + 0.025 * M, a.z));   // the clamp on the wall top
+      for (const f of tiers) add('enamel', new THREE.CylinderGeometry(0.022 * M, 0.022 * M, 0.06 * M, 5).rotateX(Math.PI / 2).rotateY(ang).translate(a.x + nx * L * f * out, y0 + L * f * up, a.z + nz * L * f * out));
+      if (i % 4 === 0) add('paint_yellow', new THREE.BoxGeometry(0.34 * M, 0.2 * M, 0.012 * M).translate(0, 0, 0).rotateY(ang).translate(a.x + nx * (L * out + 0.03 * M), y0 + L * up * 0.55, a.z + nz * (L * out + 0.03 * M)));
+    });
+    for (const f of tiers) {
+      const o = L * f * out, y = top + L * f * up;
+      bays(2.4 * M, (a, b) => {
+        const nxa = -a.dz, nza = a.dx, nxb = -b.dz, nzb = b.dx;
+        beam(a.x + nxa * o, a.z + nza * o, b.x + nxb * o, b.z + nzb * o, y, 0.012 * M, 0.012 * M, 'copper', 0.015 * M);
+      });
+    }
+  }
+  // brush grown up against a wall (sim/wallTops.ts): rough low clumps along both faces, thicker and taller as it grows
+  if ((run.brush ?? 0) >= 0.15 && built > 0.05 && def.blocks.people >= 0.5 && def.height >= WALL_TOP.WEAK.MIN_HEIGHT && !def.walkway && !def.wallTop && run.kind !== 'thorn_hedge') {
+    const k = Math.min(1, run.brush ?? 0), off = (isContainerKind(run.kind) ? 1.5 : 0.5) * M, h0 = hashStr(run.id);
+    for (const [s0, s1] of spans) for (let s = s0 + 0.3 * M, j = 0; s < s1; s += (1.6 - k) * M * 0.9, j++) for (const side of [-1, 1]) {
+      const q = along(run.pts, s), jit = ((h0 + j * 7919 + (side + 1) * 104729) % 1000) / 1000;
+      if (jit > 0.35 + 0.65 * k) continue;
+      const x = q.x - q.dz * off * side + (jit - 0.5) * 0.3 * M, z = q.z + q.dx * off * side, r = (0.22 + 0.3 * k * (0.6 + jit * 0.8)) * M;
+      add(j % 3 === 0 ? 'hedge2' : 'hedge', new THREE.IcosahedronGeometry(r, 0).scale(1.3, 0.7 + 0.9 * k * (0.5 + jit), 1).rotateY(jit * 6).translate(x, ground(x, z) + r * 0.5, z));
+    }
   }
   /** Plank leaf hinged at (hx, hz), `w` wide and `h` tall, swung by `open` radians (mirror -1 hinges on the far side): vertical boards, iron straps and a Z brace. */
   const plankLeaf = (hx: number, hz: number, w: number, h: number, open: number, mirror: number, ang: number) => {
