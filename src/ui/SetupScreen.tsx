@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { useWorldStore } from '../store/worldStore';
 import { newGame, NEW_GAME_START } from '../sim/state';
@@ -92,6 +92,12 @@ function stormList(r: RegionDef): string {
 export function SetupScreen() {
   const g = useGameStore();
   const seed = useWorldStore(s => s.seed);
+  // Esc goes back to the running game when the screen was opened from the HUD (sweep QA); the first-run screen has nothing to go back to
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { const st = useGameStore.getState(); if (e.key === 'Escape' && st.setupOpen && st.setupCanClose) st.openSetup(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   const [step, setStep] = useState(0);
   const [region, setRegion] = useState<RegionId>('mountain_west');
   const [wish, setWish] = useState<LandWish>(ANY_WISH);
