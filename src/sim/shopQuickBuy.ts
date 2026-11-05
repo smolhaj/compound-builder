@@ -80,7 +80,7 @@ export const RULES: Partial<Record<MaterialId, Rule>> = {
   nvg: person(3, { of: 'fighters', alt: ALT_UPGRADE }), thermal: person(3, { of: 'fighters', alt: ALT_UPGRADE }),
   radios: person(1, { of: 'fighters', per: 2 }), sw_radio: single(2), ham_rig: single(3), radio_mast: single(3),
   cameras: { kind: 'capped', max: 2, prio: 3 }, thermal_cam: single(3), driveway_alarm: single(2), floodlights: single(2), ai_sensor_module: single(3, { alt: ALT_UPGRADE }),
-  blackout_curtains: single(3), gen_baffles: single(3), gen_vault: single(3, { alt: ALT_UPGRADE }), tripwire: stack(3, { flat: 2, fixed: true }), ground_sensor: single(3),
+  blackout_curtains: single(3), wall_insulation: single(3), gen_baffles: single(3), gen_vault: single(3, { alt: ALT_UPGRADE }), tripwire: stack(3, { flat: 2, fixed: true }), ground_sensor: single(3),
   dog: single(3, { alt: 'a family member; adopt on purpose' }), puppy: single(3, { alt: 'a family member; adopt on purpose' }),
   steel_door: single(2), security_door: single(3, { alt: ALT_UPGRADE }), window_bars: single(2), window_shutters: single(3, { alt: ALT_UPGRADE }), ballistic_panels: single(3, { alt: ALT_UPGRADE }),
   safe_room: single(3), safe_room_hardened: single(3, { alt: ALT_UPGRADE }), gun_mount: single(3, { alt: 'a weapon system; choose it on purpose' }), turret_head: single(3, { alt: 'a weapon system; choose it on purpose' }),

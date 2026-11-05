@@ -29,7 +29,7 @@ import { responseSigns } from './armedResponse';
 import { communityPosture } from './watch';
 
 export const KIT_GOODS: MaterialId[] = ['plate_carrier', 'soft_armor', 'helmet', 'ifak', 'nvg', 'thermal', 'radios', 'sw_radio', 'ham_rig', 'radio_mast'];
-export const WATCH_GOODS: MaterialId[] = ['cameras', 'thermal_cam', 'driveway_alarm', 'floodlights', 'blackout_curtains', 'gen_baffles', 'gen_vault', 'ai_sensor_module', 'tripwire', 'dog', 'puppy', 'ground_sensor'];
+export const WATCH_GOODS: MaterialId[] = ['cameras', 'thermal_cam', 'driveway_alarm', 'floodlights', 'blackout_curtains', 'wall_insulation', 'gen_baffles', 'gen_vault', 'ai_sensor_module', 'tripwire', 'dog', 'puppy', 'ground_sensor'];
 export const HARDEN_GOODS: MaterialId[] = ['steel_door', 'security_door', 'window_bars', 'window_shutters', 'ballistic_panels', 'sandbags', 'safe_room', 'safe_room_hardened', 'trellis_gates', 'gate_intercom', 'gate_motor', 'sally_gate', 'gun_mount', 'turret_head', 'gate_house'];
 /** What the family packs to leave (sim/bugout.ts). */
 export const BUGOUT_GOODS: MaterialId[] = ['bugout_bag', 'bugout_cache'];
