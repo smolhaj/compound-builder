@@ -13,6 +13,7 @@ import { insideRing } from '../../sim/compounds';
 import { boreParts } from './boreGeometry';
 import { WALL_TOP } from '../../sim/wallTops';
 import { hashStr } from '../buildkit/clutter';
+import { KIT, driveCrossing, gateKitLayout } from './gateKitLayout';
 import { PERIMETER, RAZOR, isContainerKind, footingOf, hasSkirt, runGrowth, runProgress, wallLength, type PerimeterKind, type PerimeterRun, type Pt } from '../../sim/perimeter';
 
 const M = 1 / 6;
@@ -83,7 +84,7 @@ export function offsetPts(pts: readonly Pt[], d: number): Pt[] {
  * `under` says whether a point is under a building: pipe and cable trenches
  * stop at its wall and their marker posts stand outside it.
  */
-export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (x: number, z: number) => boolean = () => false, opts: { /** The creek: a moat's water stops at its banks. */ creek?: { zAt(x: number): number; halfWidth: number }; /** A moat's water: how full (0-1) and whether it is ice (sim/waterWorks). */ moat?: { level: number; frozen: boolean }; lit?: boolean; sensors?: boolean; hostKind?: PerimeterKind; /** The host wall carries razor wire (drawn on the deck's outer rail). */ hostRazor?: boolean; /** A patrol deck rides on this wall (its wire is drawn on the deck). */ deck?: boolean; /** What the gate carries (sim/gateSecurity.ts): a double gate, an intercom pole, a caged motor; `inward` is a point inside the compound. */ gateKit?: { sally: boolean; intercom: boolean; motor: boolean; signs?: boolean; inward: Pt } } = {}): THREE.Group {
+export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (x: number, z: number) => boolean = () => false, opts: { /** The creek: a moat's water stops at its banks. */ creek?: { zAt(x: number): number; halfWidth: number }; /** A moat's water: how full (0-1) and whether it is ice (sim/waterWorks). */ moat?: { level: number; frozen: boolean }; lit?: boolean; sensors?: boolean; hostKind?: PerimeterKind; /** The host wall carries razor wire (drawn on the deck's outer rail). */ hostRazor?: boolean; /** A patrol deck rides on this wall (its wire is drawn on the deck). */ deck?: boolean; /** What the entry gate carries (sim/gateSecurity.ts): a double gate, an intercom pole, a caged motor, the response sign; set only on the run with the first way in. */ gateKit?: { sally: boolean; intercom: boolean; motor: boolean; signs?: boolean; /** The gate on this run that carries it (its `at`). */ at: number }; /** The driveway, road end first: every gate the drive passes through is built along its heading (game/perimeter/gateKitLayout.ts). */ drive?: readonly Pt[] } = {}): THREE.Group {
   const lit = opts.lit ?? true;
   // an upgrade of a finished run is drawn beside the old tier (not on top of it) until it is done and the old one comes down
   const run = run0.replaces ? { ...run0, pts: offsetPts(run0.pts, (run0.replacesKind === 'container_wall' || run0.replacesKind === 'container_stack') ? 0.36 : UPGRADE_OFFSET) } : run0;
@@ -822,6 +823,11 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
       add(j % 3 === 0 ? 'hedge2' : 'hedge', new THREE.IcosahedronGeometry(r, 0).scale(1.3, 0.7 + 0.9 * k * (0.5 + jit), 1).rotateY(jit * 6).translate(x, ground(x, z) + r * 0.5, z));
     }
   }
+  /**
+   * The swing (radians) that lays a leaf along the drive on the road side: a leaf hinged at a pier, drawn rotateY(ang + mirror * open) with its x scaled by
+   * `mirror`, points along (mirror * cos(ang + mirror * open), -mirror * sin(...)). Null `outYaw` (no drive through the gate) keeps the leaf's own swing.
+   */
+  const openFor = (outYaw: number | null, ang: number, own: number, mirror: number): number => outYaw === null ? own : mirror > 0 ? outYaw - ang : ang + Math.PI - outYaw;
   /** Plank leaf hinged at (hx, hz), `w` wide and `h` tall, swung by `open` radians (mirror -1 hinges on the far side): vertical boards, iron straps and a Z brace. */
   const plankLeaf = (hx: number, hz: number, w: number, h: number, open: number, mirror: number, ang: number) => {
     const parts: Array<[KitMaterialId, THREE.BufferGeometry]> = [];
@@ -833,7 +839,7 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
     for (const [m, g] of parts) add(m, g.scale(mirror, 1, 1).rotateY(ang + mirror * open).translate(hx, gy, hz));
   };
   /** The stone gatehouse leaf (a gate gap in a stone wall) and the sally port (g.sally): see docs/DECISIONS.md, "Gatehouse leaf and sally port". */
-  const stoneGate = (r: Pick<PerimeterRun, 'kind'>, g: { at: number; w: number; sally?: boolean }, p0: ReturnType<typeof along>, p1: ReturnType<typeof along>) => {
+  const stoneGate = (r: Pick<PerimeterRun, 'kind'>, g: { at: number; w: number; sally?: boolean }, p0: ReturnType<typeof along>, p1: ReturnType<typeof along>, outYaw: number | null) => {
     const ang = -Math.atan2(p0.dz, p0.dx), mx = (p0.x + p1.x) / 2, mz = (p0.z + p1.z) / 2, gy = ground(mx, mz);
     const wallH = Math.abs(def.height), mat: KitMaterialId = r.kind === 'stone_wall' ? 'fieldstone' : r.kind === 'concrete_wall' ? 'concrete' : 'steel';
     /** Put a box in the gate's frame: x along the run, centered at the gap, z across it; y up from the ground at the gate. */
@@ -863,61 +869,71 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
     gb(g.w + 0.8 * M, pierH - doorH - 0.38 * M, 0.66 * M, 0, doorH + 0.38 * M, 0, 'fieldstone');       // stone over it
     const roofL = g.w + 2.1 * M;
     for (const sg of [-1, 1]) add('metal_roof', new THREE.BoxGeometry(roofL, 0.08 * M, 0.72 * M).rotateX(sg * 0.42).translate(0, pierH + 0.36 * M, sg * 0.3 * M).rotateY(ang).translate(mx, gy, mz));
-    plankLeaf(p0.x, p0.z, g.w / 2 - 0.01, doorH, 1.25, 1, ang);
-    plankLeaf(p1.x, p1.z, g.w / 2 - 0.01, doorH, 1.25, -1, ang);
+    plankLeaf(p0.x, p0.z, g.w / 2 - 0.01, doorH, openFor(outYaw, ang, 1.25, 1), 1, ang);
+    plankLeaf(p1.x, p1.z, g.w / 2 - 0.01, doorH, openFor(outYaw, ang, 1.25, -1), -1, ang);
   };
   // gates: posts each side and a leaf swung open (wire / rail fences: tube gate; walls: plank or steel gates)
   if (run.finishedAt !== null && run.kind !== 'ditch') {
     for (const g of run.gates) {
       if (g.garage) continue;   // a gatehouse garage fills this gap
       const p0 = along(run.pts, g.at - g.w / 2), p1 = along(run.pts, g.at + g.w / 2);
-      // the gate kit on a vehicle gate (sim/gateSecurity.ts): the double gate's lock, the intercom pole and the caged motor
-      if (opts.gateKit && g.w >= 0.5 && !g.sally) {
-        const K = opts.gateKit, mx = (p0.x + p1.x) / 2, mz = (p0.z + p1.z) / 2;
-        let nx = -p0.dz, nz = p0.dx;
-        if (nx * (K.inward[0] - mx) + nz * (K.inward[1] - mz) < 0) { nx = -nx; nz = -nz; }
-        const ang = -Math.atan2(p0.dz, p0.dx), wallH = Math.max(1.8 * M, Math.abs(def.height));
+      // the drive through this gate: the leaves open along it, and the entry gate's kit (sim/gateSecurity.ts) is laid out in its frame (gateKitLayout.ts)
+      const dc = driveCrossing(run, g, opts.drive);
+      const lay = dc && opts.drive ? gateKitLayout(g, dc, opts.drive, run.pts, run.kind === 'stone_wall' && g.w >= 0.35 ? 0.16 : 0.04) : null;
+      if (opts.gateKit && lay && Math.abs(g.at - opts.gateKit.at) < 1e-6) {
+        const K = opts.gateKit, T = lay.t, N = lay.n;
+        /** The yaw that puts a box's local x along direction d (so its local z is across d). */
+        const yawOf = (d: Pt) => -Math.atan2(d[1], d[0]);
+        /** A steel panel from a to b, sunk into the ground where it rolls (a side wall never floats over a hollow nor stands on a rise). */
+        const panel = (a: Pt, b: Pt, h: number, th: number, m: KitMaterialId) => beamFit(a[0], a[1], b[0], b[1], 0, h, th, m);
         if (K.sally) {
-          // two steel side walls run inward from the gate piers; a second gate frame closes the far end, its leaves open against the walls
-          const D = 1.15, q0 = [p0.x + nx * D, p0.z + nz * D], q1 = [p1.x + nx * D, p1.z + nz * D];
-          beam(p0.x, p0.z, q0[0], q0[1], 0, 2.3 * M, 0.14 * M, 'steel');
-          beam(p1.x, p1.z, q1[0], q1[1], 0, 2.3 * M, 0.14 * M, 'steel');
-          beam(p0.x, p0.z, q0[0], q0[1], 2.3 * M, 0.08 * M, 0.2 * M, 'iron');
-          beam(p1.x, p1.z, q1[0], q1[1], 2.3 * M, 0.08 * M, 0.2 * M, 'iron');
-          for (const q of [q0, q1]) post(q[0], q[1], 2.5 * M, 0.1 * M, 'steel');
-          beam(q0[0], q0[1], q1[0], q1[1], 2.35 * M, 0.12 * M, 0.2 * M, 'steel');
-          add('paint_yellow', new THREE.BoxGeometry(g.w * 0.6, 0.18 * M, 0.02 * M).rotateY(ang).translate(mx + nx * (D + 0.12), ground(mx, mz) + 2.45 * M, mz + nz * (D + 0.12)));   // the inner gate's warning plate
-          for (const [a, b] of [[q0, p0], [q1, p1]] as const) {   // the inner leaves, open against the side walls: a frame and two rails
-            const lx = 0;
-            beam(a[0] + lx, a[1], b.x + lx, b.z, 0.08 * M, 1.9 * M, 0.03 * M, 'iron');
-            beam(a[0] + lx, a[1], b.x + lx, b.z, 0.5 * M, 0.05 * M, 0.05 * M, 'steel');
-            beam(a[0] + lx, a[1], b.x + lx, b.z, 1.3 * M, 0.05 * M, 0.05 * M, 'steel');
+          // two steel side walls run in from the wall line parallel to the drive, flush with it (a wing closes any gap to the pier); a second gate frame closes the far end,
+          // square to the drive and centered on it, its leaves open against the walls
+          const runs: Array<[Pt, Pt]> = [];
+          for (const sd of lay.sides) for (let i = 1; i < sd.length; i++) runs.push([sd[i - 1], sd[i]]);
+          for (const w of lay.wings) runs.push([w.a, w.b]);
+          for (const [a, b] of runs) {
+            panel(a, b, KIT.height, KIT.thick, 'steel');
+            beam(a[0], a[1], b[0], b[1], KIT.height, 0.08 * M, 0.2 * M, 'iron');
+          }
+          for (const q of lay.inner) post(q[0], q[1], 2.5 * M, 0.1 * M, 'steel');
+          beam(lay.inner[0][0], lay.inner[0][1], lay.inner[1][0], lay.inner[1][1], 2.35 * M, 0.12 * M, 0.2 * M, 'steel');
+          const NE: Pt = [lay.tEnd[1], -lay.tEnd[0]], mid: Pt = [(lay.inner[0][0] + lay.inner[1][0]) / 2 - lay.tEnd[0] * 0.012, (lay.inner[0][1] + lay.inner[1][1]) / 2 - lay.tEnd[1] * 0.012];
+          add('paint_yellow', new THREE.BoxGeometry(KIT.clearHalf * 1.2, 0.18 * M, 0.02 * M).rotateY(yawOf(NE)).translate(mid[0], ground(mid[0], mid[1]) + 2.45 * M, mid[1]));   // the inner gate's warning plate, facing the approach
+          for (const lf of lay.innerLeaves) for (let i = 1; i < lf.length; i++) {   // the inner leaves, open against the side walls: a frame and two rails
+            beam(lf[i - 1][0], lf[i - 1][1], lf[i][0], lf[i][1], 0.08 * M, 1.9 * M, 0.012, 'iron');
+            beam(lf[i - 1][0], lf[i - 1][1], lf[i][0], lf[i][1], 0.5 * M, 0.05 * M, 0.02, 'steel');
+            beam(lf[i - 1][0], lf[i - 1][1], lf[i][0], lf[i][1], 1.3 * M, 0.05 * M, 0.02, 'steel');
           }
         }
         if (K.intercom) {
-          const ox = p1.x + p0.dx * 0.35 * M - nx * 0.45 * M, oz = p1.z + p0.dz * 0.35 * M - nz * 0.45 * M;
+          // a pole on the driver's side, outside the gate, abreast of the window of a vehicle waiting at it; the camera and the speaker plate face the approach (-t)
+          const [ox, oz] = lay.intercom, gy = ground(ox, oz);
           post(ox, oz, 1.25 * M, 0.07 * M, 'steel');
-          add('iron', new THREE.BoxGeometry(0.2 * M, 0.14 * M, 0.2 * M).translate(ox, ground(ox, oz) + 1.34 * M, oz));        // the camera head
-          add('glass', new THREE.SphereGeometry(0.04 * M, 6, 4).translate(ox - nx * 0.1 * M, ground(ox, oz) + 1.34 * M, oz - nz * 0.1 * M));   // its lens (toward the road)
-          add('paint_yellow', new THREE.BoxGeometry(0.1 * M, 0.2 * M, 0.02 * M).rotateY(ang).translate(ox, ground(ox, oz) + 0.95 * M, oz));  // the speaker plate
+          add('iron', new THREE.BoxGeometry(0.2 * M, 0.14 * M, 0.2 * M).rotateY(yawOf(N)).translate(ox, gy + 1.34 * M, oz));        // the camera head
+          add('glass', new THREE.SphereGeometry(0.04 * M, 6, 4).translate(ox - T[0] * 0.11 * M, gy + 1.34 * M, oz - T[1] * 0.11 * M));   // its lens, toward the approach
+          add('paint_yellow', new THREE.BoxGeometry(0.1 * M, 0.2 * M, 0.02 * M).rotateY(yawOf(N)).translate(ox - T[0] * 0.08 * M, gy + 0.95 * M, oz - T[1] * 0.08 * M));  // the speaker plate
         }
         if (K.signs) {
-          // the armed-response firm's sign (sim/armedResponse.ts): a 1.3 x 0.8 m blue board with a yellow band on two steel legs, standing on the road side beside the drive, facing it, so it reads from the road at eye level
-          const dx = p0.dx, dz = p0.dz, sx = p0.x - nx * 2.2 * M - dx * 0.9 * M, sz = p0.z - nz * 2.2 * M - dz * 0.9 * M, gy = ground(sx, sz), by = gy + 1.55 * M;
-          for (const side of [-1, 1]) add('steel', new THREE.BoxGeometry(0.06 * M, 1.9 * M, 0.06 * M).translate(sx + dx * 0.5 * M * side, gy + 0.95 * M, sz + dz * 0.5 * M * side));
-          add('container_blue', new THREE.BoxGeometry(1.3 * M, 0.8 * M, 0.05 * M).rotateY(ang).translate(sx, by, sz));
-          add('paint_yellow', new THREE.BoxGeometry(1.3 * M, 0.2 * M, 0.056 * M).rotateY(ang).translate(sx, by - 0.2 * M, sz));
-          add('paint_yellow', new THREE.BoxGeometry(0.5 * M, 0.14 * M, 0.056 * M).rotateY(ang).translate(sx, by + 0.18 * M, sz));
+          // the armed-response firm's sign (sim/armedResponse.ts): a 1.3 x 0.8 m blue board with a yellow band on two steel legs, outside the gate beside the drive, square to it
+          // and facing the approach, so it reads from the road at eye level
+          const [sx, sz] = lay.sign, gy = ground(sx, sz), by = gy + 1.55 * M, yaw = yawOf(N);
+          for (const side of [-1, 1]) add('steel', new THREE.BoxGeometry(0.06 * M, 1.9 * M, 0.06 * M).translate(sx + N[0] * 0.5 * M * side, gy + 0.95 * M - 0.01, sz + N[1] * 0.5 * M * side));
+          add('container_blue', new THREE.BoxGeometry(1.3 * M, 0.8 * M, 0.05 * M).rotateY(yaw).translate(sx, by, sz));
+          add('paint_yellow', new THREE.BoxGeometry(1.3 * M, 0.2 * M, 0.056 * M).rotateY(yaw).translate(sx, by - 0.2 * M, sz));
+          add('paint_yellow', new THREE.BoxGeometry(0.5 * M, 0.14 * M, 0.056 * M).rotateY(yaw).translate(sx, by + 0.18 * M, sz));
         }
         if (K.motor) {
-          const cx = p0.x - p0.dx * 0.4 * M + nx * 0.5 * M, cz = p0.z - p0.dz * 0.4 * M + nz * 0.5 * M;
-          add('steel', new THREE.BoxGeometry(0.62 * M, 0.5 * M, 0.34 * M).rotateY(ang).translate(cx, ground(cx, cz) + 0.25 * M, cz));        // the cage round the motor
-          add('paint_yellow', new THREE.BoxGeometry(0.64 * M, 0.06 * M, 0.36 * M).rotateY(ang).translate(cx, ground(cx, cz) + 0.5 * M, cz));  // its hazard stripe
+          // the cage round the motor, on the hinge side just inside the wall, long side along the drive, sunk into the ground where it slopes
+          const [cx, cz] = lay.motor, gy = ground(cx, cz);
+          add('steel', new THREE.BoxGeometry(0.62 * M, 0.5 * M + 0.03, 0.34 * M).rotateY(yawOf(T)).translate(cx, gy + 0.25 * M - 0.015, cz));
+          add('paint_yellow', new THREE.BoxGeometry(0.64 * M, 0.06 * M, 0.36 * M).rotateY(yawOf(T)).translate(cx, gy + 0.5 * M, cz));  // its hazard stripe
         }
-        void wallH;
       }
+      /** Yaw of the drive's outward direction: the leaves of a drive gate stand open along it, on the road side of the piers, clear of the road and the kit. */
+      const outYaw = lay ? Math.atan2(-lay.out[1], lay.out[0]) : null;
       // a stone gatehouse (wide gate in a stone wall) and the sally port (a small side door in any ring wall) have their own piers, lintel and plank leaves
-      if (g.sally || (run.kind === 'stone_wall' && g.w >= 0.35)) { stoneGate(run, g, p0, p1); continue; }
+      if (g.sally || (run.kind === 'stone_wall' && g.w >= 0.35)) { stoneGate(run, g, p0, p1, outYaw); continue; }
       const tall = Math.max(1.4 * M, Math.abs(def.height) + 0.05 * M);
       for (const p of [p0, p1]) post(p.x, p.z, tall, 0.1 * M, 'wood_dark', true);
       // a framed doorway: a steel lintel across the posts (the opening where a walkway meets a yard wall reads as a real door, from both sides)
@@ -953,9 +969,9 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
         for (const [m, g] of parts) add(m, g.scale(mirror, 1, 1).rotateY(ang + mirror * open).translate(hx, gy, hz));
       };
       // a narrow gate is a pedestrian man-door: one leaf, even in a wall; wide ones are a double vehicle gate
-      if (wall && g.w >= 0.35) { leaf(p0.x, p0.z, g.w / 2 - 0.01, 1.3, 1); leaf(p1.x, p1.z, g.w / 2 - 0.01, -1.3, -1); }
-      else if (wall) leaf(p0.x, p0.z, g.w - 0.01, 1.4, 1);
-      else leaf(p0.x, p0.z, g.w * 0.96, 1.35, 1);
+      if (wall && g.w >= 0.35) { leaf(p0.x, p0.z, g.w / 2 - 0.01, openFor(outYaw, ang, 1.3, 1), 1); leaf(p1.x, p1.z, g.w / 2 - 0.01, openFor(outYaw, ang, -1.3, -1), -1); }
+      else if (wall) leaf(p0.x, p0.z, g.w - 0.01, openFor(outYaw, ang, 1.4, 1), 1);
+      else leaf(p0.x, p0.z, g.w * 0.96, openFor(outYaw, ang, 1.35, 1), 1);
     }
   }
 

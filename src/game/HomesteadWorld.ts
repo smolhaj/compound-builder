@@ -85,6 +85,7 @@ import { farHiddenLayers, isFar } from './buildkit/buildingLod';
 import { LIGHT_BUDGET, pickLights, type LightCandidate } from './lightPool';
 import { hashStr } from './buildkit/clutter';
 import { along, buildRun, solidSpans } from './perimeter/perimeterGeometry';
+import { arcNear, entryGate, gateHouseFrame, headingAt } from './perimeter/gateKitLayout';
 import { PERIMETER, hasSkirt, runGrowth, runProgress, underground, wallLength, type PerimeterRun } from '../sim/perimeter';
 import { closestOnLine, earthworkReach, type Earthwork } from './parcel/parcelTerrain';
 import { exposure, Sight, type Observer, type SightWorld } from './sightlines/visibility';
@@ -551,9 +552,14 @@ export class HomesteadWorld {
     if (this.countyGaps.length) this._roads.add(buildCountyBridges(this.countyGaps.map(g => ({ z0: g.z0, z1: g.z1, deckY: (z: number) => this._deckY(g, z), x: this.county.x, width: ROAD_W })), this.groundAt));
     // the way in: a curved ribbon on the benched ground, with its banks, rails, culverts, crossings and portals (game/region/roadWorks.ts)
     this._roads.add(buildRoadWorks(this.plan, this.groundAt, { built: this._drive, bridgeDown: this._bridgeDown, surface: mat, track, driveW: DRIVE_W, natural: (x, z) => this.parcel.natural(x, z).h }));
+    // the ranch gate on the property line stands square to the drive there (the drive leaves the line at an angle, and bends), and gives way to a wall's own gate once there is one
     const gate = buildGate(DRIVE_W);
     const { gate: gp } = this.access;
+    const gh = headingAt(this.access.drive, arcNear(this.access.drive, [gp.x, gp.z]));
     gate.position.set(gp.x, this.groundAt(gp.x, gp.z), gp.z);
+    gate.rotation.y = Math.atan2(-gh[1], gh[0]);
+    gate.visible = !this._wallGateAtEntry;
+    this._ranchGate = gate;
     this._roads.add(gate);
     if (!this._roads.parent) this._ws.scene.add(this._roads);
   }
@@ -951,21 +957,28 @@ export class HomesteadWorld {
     const hostOf = (r: PerimeterRun) => (PERIMETER[r.kind].wallTop ? runs.find(x => x.id === r.hostId)?.kind ?? '' : '');
     // razor wire on a wall with a patrol deck is drawn on the deck's outer rail (perimeterGeometry 'wall_walk')
     const hostRazor = (r: PerimeterRun) => PERIMETER[r.kind].wallTop && !!runs.find(x => x.id === r.hostId)?.razor;
-    const kit = opts.gateKit && (opts.gateKit.sally || opts.gateKit.intercom || opts.gateKit.motor || opts.gateKit.signs) ? { ...opts.gateKit, inward: [this.camp.x, this.camp.z] as [number, number] } : undefined;
-    const kitKey = kit ? `${kit.sally ? 1 : 0}${kit.intercom ? 1 : 0}${kit.motor ? 1 : 0}${kit.signs ? 1 : 0}` : '';
+    // the gate kit belongs to the first way in (the first finished vehicle gate the drive meets), and every gate on the drive is built along the drive (gateKitLayout.ts)
+    const drive = this.access.drive, entry = entryGate(runs, drive);
+    const wantKit = !!opts.gateKit && (opts.gateKit.sally || opts.gateKit.intercom || opts.gateKit.motor || opts.gateKit.signs);
+    const driveKey = `${drive.length}:${drive[0]?.[0].toFixed(2)}:${drive[drive.length - 1]?.[1].toFixed(2)}`;
+    const kitOf = (r: PerimeterRun) => wantKit && entry?.runId === r.id ? { ...opts.gateKit!, at: entry.gate.at } : undefined;
+    const kitKeyOf = (r: PerimeterRun) => { const k = kitOf(r); return k ? `${k.sally ? 1 : 0}${k.intercom ? 1 : 0}${k.motor ? 1 : 0}${k.signs ? 1 : 0}@${k.at.toFixed(2)}` : ''; };
+    this._entry = entry; this._entrySally = !!opts.gateKit?.sally;
+    this._wallGateAtEntry = !!entry && Math.hypot(entry.crossing.x - this.access.gate.x, entry.crossing.z - this.access.gate.z) < 1.5;
+    if (this._ranchGate) this._ranchGate.visible = !this._wallGateAtEntry;
     const deckOn = (r: PerimeterRun) => !PERIMETER[r.kind].wallTop && runs.some(x => x.hostId === r.id);
     const ids = runs.map(r => r.id).join(',');
     for (const r of runs) {
       // old posts lean and rails sag (atmosphere/aging): rebuilt as the lean steps
       const lean = LEANS.has(r.kind) && r.finishedAt !== null ? Math.round(fenceLean((t - r.finishedAt) / 365) * 10) / 10 : 0;
-      const key = `${Math.round(runProgress(r) * 60)}:${Math.round(runGrowth(r, t) * 40)}:${r.finishedAt === null ? 0 : 1}:${r.gates.length}:${lean}:${hasSkirt(r, t) ? 1 : 0}:${lit ? 1 : 0}:${sensors ? 1 : 0}:${kitKey}:${hostOf(r)}:${r.razor ? 1 : 0}:${r.electric ? 1 : 0}:${Math.round((r.brush ?? 0) * 5)}:${hostRazor(r) ? 1 : 0}:${deckOn(r) ? 1 : 0}:${r.collapsed ? 1 : 0}:${opts.moats?.[r.id] ? Math.round(opts.moats[r.id].level * 4) + (opts.moats[r.id].frozen ? 9 : 0) : ''}`;
+      const key = `${Math.round(runProgress(r) * 60)}:${Math.round(runGrowth(r, t) * 40)}:${r.finishedAt === null ? 0 : 1}:${r.gates.length}:${lean}:${hasSkirt(r, t) ? 1 : 0}:${lit ? 1 : 0}:${sensors ? 1 : 0}:${kitKeyOf(r)}:${driveKey}:${hostOf(r)}:${r.razor ? 1 : 0}:${r.electric ? 1 : 0}:${Math.round((r.brush ?? 0) * 5)}:${hostRazor(r) ? 1 : 0}:${deckOn(r) ? 1 : 0}:${r.collapsed ? 1 : 0}:${opts.moats?.[r.id] ? Math.round(opts.moats[r.id].level * 4) + (opts.moats[r.id].frozen ? 9 : 0) : ''}`;
       const cur = this._runGroups.get(r.id);
       if (cur?.key === key) continue;
       if (cur) { this._root.remove(cur.group); cur.group.traverse(o => (o as THREE.Mesh).geometry?.dispose()); }
       const tunnel = r.kind === 'escape_tunnel' || r.kind === 'underground_passage';
       const group = tunnel
         ? buildTunnel(this._pathOf(r), this.groundAt, r.finishedAt !== null ? 1 : runProgress(r), this._exitWoods(r), r.kind === 'underground_passage' ? { woodsStart: this.tunnelExitWoods(r.pts[0][0], r.pts[0][1]) } : undefined)
-        : buildRun(r, this.groundAt, t, (x, z) => this.onBuilding(x, z, 0.02, false), { lit, sensors, hostKind: PERIMETER[r.kind].wallTop ? runs.find(x => x.id === r.hostId)?.kind : undefined, hostRazor: hostRazor(r), deck: deckOn(r), gateKit: kit, moat: opts.moats?.[r.id], creek: this.parcel.creek });
+        : buildRun(r, this.groundAt, t, (x, z) => this.onBuilding(x, z, 0.02, false), { lit, sensors, hostKind: PERIMETER[r.kind].wallTop ? runs.find(x => x.id === r.hostId)?.kind : undefined, hostRazor: hostRazor(r), deck: deckOn(r), gateKit: kitOf(r), drive, moat: opts.moats?.[r.id], creek: this.parcel.creek });
       if (tunnel) this._applyTunnelView(group);
       if (lean > 0) leanRun(group, lean, hashStr(r.id) % 997, this.groundAt);
       this._root.add(group);
@@ -1354,17 +1367,18 @@ export class HomesteadWorld {
     if (!this._gateHouse) { this._gateHouse = buildGateHouse(DRIVE_W); this._gateFrame!.add(this._gateHouse); }
     this._gateHouse.visible = true;
   }
+  private _ranchGate: THREE.Group | null = null;
+  /** A finished wall's vehicle gate stands within reach of the property gate: the ranch gate is not drawn inside it. */
+  private _wallGateAtEntry = false;
+  /** The first way in and whether it has a double gate: the guard house stands inside it, clear of the sally port. */
+  private _entry: ReturnType<typeof entryGate> = null;
+  private _entrySally = false;
+  /** The guard house's frame: local +x points along the drive out to the road, origin on the drive just inside the entry wall (gateKitLayout `gateHouseFrame`). */
   private _frame(): THREE.Group {
     if (!this._gateFrame) { this._gateFrame = new THREE.Group(); this._ws.scene.add(this._gateFrame); }
-    const d = this.access.drive, gp = this.access.gate;
-    let k = 0, best = Infinity;
-    d.forEach((q, i) => { const e = Math.hypot(q[0] - gp.x, q[1] - gp.z); if (e < best) { best = e; k = i; } });
-    const a = d[Math.max(0, k - 2)], b = d[Math.min(d.length - 1, k + 2)];
-    let dx = a[0] - b[0], dz = a[1] - b[1];
-    const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l;                       // toward the road
-    const ox = d[k][0] - dx * 0.5, oz = d[k][1] - dz * 0.5;                    // half a unit inside the line
-    this._gateFrame.position.set(ox, this.groundAt(ox, oz), oz);
-    this._gateFrame.rotation.y = Math.atan2(-dz, dx);
+    const gp = this.access.gate, { origin, t } = gateHouseFrame(this.access.drive, this._entry, this._entrySally, [gp.x, gp.z]);
+    this._gateFrame.position.set(origin[0], this.groundAt(origin[0], origin[1]), origin[1]);
+    this._gateFrame.rotation.y = Math.atan2(t[1], -t[0]);                      // local +x = -t, toward the road
     return this._gateFrame;
   }
   private _syncGuardCars(n: number, dt: number): void {
@@ -1376,7 +1390,11 @@ export class HomesteadWorld {
       frame.add(car); this._guardCars.push(car);
     }
     while (this._guardCars.length > n) this._guardLeaving.push({ g: this._guardCars.pop()!, t: 0 });
-    this._guardCars.forEach((c, i) => { c.position.set(-0.45 - i * 0.5, 0, DRIVE_W / 2 + 0.3); c.rotation.y = 0; });
+    // parked inside the entry, on the side away from the guard house, nose to tail (a car is 0.8 long: they were 0.5 apart and overlapped), each on the ground under it
+    this._guardCars.forEach((c, i) => {
+      const x = -0.5 - i * 0.95, z = DRIVE_W / 2 + 0.3, a = frame.rotation.y, wx = frame.position.x + Math.cos(a) * x + Math.sin(a) * z, wz = frame.position.z - Math.sin(a) * x + Math.cos(a) * z;
+      c.position.set(x, this.groundAt(wx, wz) - frame.position.y, z); c.rotation.y = 0;
+    });
     for (const l of [...this._guardLeaving]) {
       l.t += dt; l.g.position.x += dt * 0.5;
       if (l.t > 6) { frame.remove(l.g); this._guardLeaving.splice(this._guardLeaving.indexOf(l), 1); }
