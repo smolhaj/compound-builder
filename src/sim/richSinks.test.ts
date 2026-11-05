@@ -78,9 +78,9 @@ describe('a cash offer for land that is not for sale', () => {
   });
 });
 
-describe('save v79', () => {
-  it('a v78 save gets the three goods at zero', () => {
-    const g = game(); const raw = JSON.parse(JSON.stringify(g)); raw.version = 78;
+describe('save v80', () => {
+  it('a v79 save gets the three goods at zero', () => {
+    const g = game(); const raw = JSON.parse(JSON.stringify(g)); raw.version = 79;
     for (const k of ['clinic_suite', 'radio_mast', 'gate_house']) delete raw.stock[k];
     const m = migrate(raw) as unknown as GameState;
     expect(m.stock.clinic_suite).toBe(0); expect(m.stock.radio_mast).toBe(0); expect(m.stock.gate_house).toBe(0);

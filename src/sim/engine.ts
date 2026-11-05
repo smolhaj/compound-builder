@@ -56,6 +56,7 @@ import { digDay } from './tunnelers';
 import { winterDay } from './adaptive';
 import { mutualAidDay } from './barter';
 import { arrivalCheck, hasCutscene, scheduleArrival } from './siege';
+import { scheduleLead } from './roadLead';
 import { scavengeDay } from './scavenge';
 import { marketDay } from './market';
 import { neighborLifeDay } from './neighborLife';
@@ -183,6 +184,7 @@ function subStep(s: GameState): void {
   // the collapse clock, once a day: warning signs, the hit, the outside world's services
   if (dayIndex(s.clock.t) !== s.disaster.day) {
     const before = s.disaster.phase;
+    const dayStartCard = s.gate.pending?.id ?? null;
     for (const line of updateDisaster(s.disaster, s.clock.t, s.seed, { region: s.site.region, doy: calendarOf(s.clock).doy })) log(s, line);
     // two homes: the town house's bills, the caretaker, an empty place's troubles, the move-in card, the hit while away
     for (const line of weekenderDay(s, before)) log(s, line);
@@ -237,7 +239,9 @@ function subStep(s: GameState): void {
     for (const line of kinDay(s)) log(s, line);
     for (const line of newcomersDay(s)) log(s, line);   // neighbors and strangers who joined; neighbors asking for shelter (after the gate: a card waits its turn)
     // a raid has an hour of arrival (a gang at 2:15 AM); it waits for it and the game runs on until then
-    if (e && !(hasCutscene(e) && scheduleArrival(s, e))) log(s, `${e.title}.`);
+    if (e && !(hasCutscene(e) && scheduleArrival(s, e)) && !scheduleLead(s, e)) log(s, `${e.title}.`);
+    // kin, a neighbor asking to stay and the rest that set a card themselves walk up the road too
+    if (!e && s.gate.pending && s.gate.pending.id !== dayStartCard) scheduleLead(s, s.gate.pending);
     rescueDay(s);   // the taken: their fate, leads, word from the crew, a rescue out (logs its own lines)
     if (before !== 'impact' && s.disaster.phase === 'impact' && s.disaster.kind === 'nuclear') for (const line of strike(s)) log(s, line);
     for (const line of falloutDay(s)) log(s, line);

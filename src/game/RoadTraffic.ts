@@ -219,7 +219,7 @@ export class RoadTraffic {
     const inc = g.incoming;
     if (inc && !g.pending) {
       if (this._incomingId !== inc.e.id || !this._incoming) { this._incomingId = inc.e.id; this._incoming = { spec: partyForEncounter(inc.e, game.seed), z: 0, speed: 0, t: 0, fixed: true, fade: 0 }; }
-      const d = approachDistance(t, inc.e.day - 0.25, inc.at);
+      const d = approachDistance(t, inc.from ?? inc.e.day - 0.25, inc.at);
       const s = this._incoming.spec;
       this._incoming.z = this._gateZ - s.dir * Math.min(d, APPROACH);
       this._incoming.fade = Number.isFinite(d) ? 1 : 0;

@@ -829,7 +829,8 @@ export const isNightHour = (h: number): boolean => h >= 22 || h < 6;
 /** What breaks the night's sleep: someone at the gate, or someone badly hurt or sick (a child with any illness counts). */
 export interface Emergency { gate: boolean; /** Index of the person who tends the sick, or -1. */ medic: number }
 export function emergencyOf(s: GameState): Emergency | null {
-  const gate = !!s.gate.pending || !!s.gate.incoming;
+  // (a raid on its way raises the alarm; strangers walking up the road are not known until they are at the gate: sim/roadLead.ts)
+  const gate = !!s.gate.pending || (!!s.gate.incoming && s.gate.incoming.from === undefined);
   let sick = false;
   s.people.forEach((p, i) => { const ps = s.personState[i]; if (ps && ps.needs.died == null && ps.needs.hurt.some(h => h.sev >= 40 || (p.kid && h.sev >= 10))) sick = true; });
   if (!gate && !sick) return null;
