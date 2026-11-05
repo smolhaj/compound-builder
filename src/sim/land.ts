@@ -26,7 +26,7 @@ export const KIND_FACTOR: Record<LandKind, number> = { grazing: 0.75, timber: 1,
 /** $ per acre for this land in this region (smaller pieces dearer per acre). */
 export function perAcre(s: GameState, p: Parcel): number {
   const a = acresOf(p.rect), size = a <= 8 ? 3.2 : a <= 25 ? 1.4 : a <= 50 ? 1 : 0.85;
-  return REGIONS[s.site.region].perAcre * size * KIND_FACTOR[p.kind];
+  return REGIONS[s.site.region].perAcre * size * KIND_FACTOR[p.kind] * (p.ring === 2 ? RING2_PRICE : 1);
 }
 
 import type { Rect } from './site';
@@ -39,6 +39,8 @@ export interface Parcel {
   kind: LandKind;
   /** Up for sale (estate, retirement, or they'd sell to you). */
   forSale: boolean;
+  /** 2 = the second ring out, beyond the neighbors next door (dearer: it is farther from anything and you buy it from strangers). */
+  ring?: 2;
   /** What you paid for it (assessed value). */
   paid?: number;
 }
@@ -65,19 +67,37 @@ function blocksFor(home: Rect): Array<[string, Rect]> {
   return out;
 }
 
+/** The second ring: the fortys one step farther out, bought at RING2_PRICE x the going rate. Skips any that the first ring already holds. */
+export const RING2_PRICE = 1.5;
+function ring2Blocks(home: Rect): Array<[string, Rect]> {
+  const forty = (i: number, j: number): Rect => ({ x0: i * F, z0: j * F, x1: (i + 1) * F, z1: (j + 1) * F });
+  const want: Array<[string, Rect]> = [['the far north forty', forty(0, -2)], ['the far south forty', forty(0, 2)], ['the far northwest forty', forty(-1, -2)], ['the far southwest forty', forty(-1, 2)],
+    ['the far west forty', forty(-2, 0)], ['the far west forty, north', forty(-2, -1)], ['the far west forty, south', forty(-2, 1)], ['the farthest west forty', forty(-3, 0)]];
+  const have = new Set(blocksFor(home).map(([, r]) => `${r.x0},${r.z0},${r.x1},${r.z1}`));
+  return want.filter(([, r]) => !have.has(`${r.x0},${r.z0},${r.x1},${r.z1}`));
+}
+
+/** The second ring's parcels, ids continuing after `after` (new games and the v80 to v81 migration). */
+export function newRing2(seed: number, neighborIds: string[], home: Rect, after: number): Parcel[] {
+  const r = mulberry32(seed * 6151 + 3);
+  return ring2Blocks(home).map(([name, rect], k) => ({
+    id: `l${after + k + 1}`, name, rect, ring: 2 as const,
+    owner: neighborIds[(k + Math.floor(r() * 7)) % Math.max(1, neighborIds.length)] ?? 'n1',
+    kind: 'grazing' as LandKind, forSale: false,
+  }));
+}
+
 /** The neighboring land on the survey grid round the place. */
 export function newLand(seed: number, neighborIds: string[], home: Rect = { x0: 0, z0: 0, x1: HOME, z1: HOME }): LandState {
   const r = mulberry32(seed * 2711 + 1);
-  return {
-    surveyed: false,
-    parcels: blocksFor(home).map(([name, rect], k) => ({
-      id: `l${k + 1}`, name,
-      rect,
-      owner: neighborIds[(k + Math.floor(r() * 7)) % Math.max(1, neighborIds.length)] ?? 'n1',
-      kind: 'grazing' as LandKind,
-      forSale: false,
-    })),
-  };
+  const ring1 = blocksFor(home).map(([name, rect], k) => ({
+    id: `l${k + 1}`, name,
+    rect,
+    owner: neighborIds[(k + Math.floor(r() * 7)) % Math.max(1, neighborIds.length)] ?? 'n1',
+    kind: 'grazing' as LandKind,
+    forSale: false,
+  }));
+  return { surveyed: false, parcels: [...ring1, ...newRing2(seed, neighborIds, home, ring1.length)] };
 }
 
 export const acresOf = (p: Rect) => Math.round((p.x1 - p.x0) * (p.z1 - p.z0) * ACRES_PER_UNIT2);
@@ -169,7 +189,7 @@ export function landMarketDay(s: GameState, day: number): string | null {
   if (s.disaster.kind && s.clock.t >= s.disaster.warnAt) return null;
   const r = mulberry32(s.seed * 389 + day * 13);
   if (r() > 1 / 300) return null;
-  const open = s.land.parcels.filter(p => p.owner !== 'you' && !p.forSale);
+  const open = s.land.parcels.filter(p => p.owner !== 'you' && !p.forSale && !p.ring);   // (the second ring never comes up by itself: it is bought on a cash offer, and the draw stays as it was)
   if (!open.length) return null;
   const p = open[Math.floor(r() * open.length)];
   p.forSale = true;

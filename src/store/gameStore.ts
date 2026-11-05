@@ -5,6 +5,7 @@ import { clearCollapse, strandAway } from '../sim/corridors';
 import { dropRoadBridge, rebuildRoadBridge } from '../sim/roadFx';
 import { AFTERMATH_TEXT, joinPrisoner, releasePrisoner, resolveAftermath, type AftermathChoice } from '../sim/aftermath';
 import { dismissCrew, hireCrew } from '../sim/crews';
+import { dismissGuard, hireGuard } from '../sim/guards';
 import { setFocus } from '../sim/priority';
 import { orderHookup, placeImprovements } from '../sim/improvements';
 import { claimForWaiting, claimWaitingRig, isRig, type StayKind } from '../sim/joinerHome';
@@ -196,6 +197,8 @@ export interface GameStore {
   /** Hire a crew for a building, or send one home. */
   hire: (buildingId: string) => string | null;
   dismiss: (crewId: string) => void;
+  hireGuard: () => string | null;
+  dismissGuard: () => void;
   /** "Work on this first" for a building or wall (null clears it). */
   setFocus: (id: string | null) => string | null;
   /** Mark a batch of trees to fell in one click (the nearest to the yard). */
@@ -604,6 +607,19 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     for (const { tree, haulDist } of trees) if (!isMarked(g, tree.id) && markTree(g, tree, haulDist)) n++;
     if (n) set({ game: g });
     return n;
+  },
+  hireGuard: () => {
+    if (locked()) return LOCKED_WHY;
+    const g = structuredClone(get().game);
+    const why = hireGuard(g);
+    if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); }
+    return why;
+  },
+  dismissGuard: () => {
+    if (locked()) return;
+    const g = structuredClone(get().game);
+    dismissGuard(g);
+    set({ game: g });
   },
   dismiss: (crewId) => {
     if (locked()) return;
