@@ -47,4 +47,34 @@ try {
   }));
   await page.waitForTimeout(500);
   await shot('02-dismissal-card');
+  await page.evaluate(() => window.__cb.game.setState(s => { const g = structuredClone(s.game); g.gate.pending = null; return { game: g }; }));
+  // joiners: two newcomers, one with a check under way
+  await page.evaluate(async () => {
+    const nc = await import('/src/sim/newcomers.ts'), ins = await import('/src/sim/insider.ts');
+    const G = window.__cb.game, g = structuredClone(G.getState().game);
+    const mk = (id, first, age) => ({ id, first, last: 'Vance', age, kid: false, body: 'm', skills: { builder: 2, gardener: 3, medic: 1, mechanic: 4, hunter: 2, negotiator: 1, teacher: 0, radio: 0 }, shirt: 0x556b3a });
+    nc.admitNewcomers(g, [mk('qa1', 'Joel', 34)], { kind: 'stranger' });
+    nc.admitNewcomers(g, [mk('qa2', 'Mina', 29)], { kind: 'stranger' });
+    ins.startVetBond(g, 'qa2');
+    G.setState({ game: g });
+  });
+  await page.getByText('Family', { exact: true }).last().click();
+  await page.waitForTimeout(400);
+  await page.getByRole('button', { name: /Vet · \$300/ }).first().scrollIntoViewIfNeeded();
+  await page.waitForTimeout(300);
+  await shot('03-newcomers-vet');
+  // phone width
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.waitForTimeout(600);
+  await page.getByRole('button', { name: /Show panels/ }).click().catch(() => {});
+  await page.waitForTimeout(500);
+  await page.getByRole('button', { name: 'Family', exact: true }).first().click().catch(() => {});
+  await page.waitForTimeout(400);
+  await page.getByRole('button', { name: /Vet · \$300/ }).first().scrollIntoViewIfNeeded().catch(() => {});
+  await page.waitForTimeout(300);
+  await shot('04-newcomers-vet-phone');
+  await page.getByText('Defense', { exact: true }).last().click().catch(() => {});
+  await page.waitForTimeout(400);
+  await page.getByText('Security staff').first().scrollIntoViewIfNeeded().catch(() => {});
+  await shot('05-security-staff-phone');
 } finally { await browser.close(); vite.kill(); setTimeout(() => process.exit(0), 200); }
