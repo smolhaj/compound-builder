@@ -495,5 +495,7 @@ export function medReport(s: GameState): MedReport {
     else if (c.kind === 'dysentery' && (s.stock.ors ?? 0) < 0.1) needs.push(`${p.first} needs rehydration salts`);
     else if ((c.kind === 'wound' || c.kind === 'burn') && !c.clean && h.sev >= 15) needs.push(`${p.first}'s ${c.kind} needs dressings`);
   }
-  return { courses: courses(s), kit: s.stock.meds, splints: s.stock.splints ?? 0, salts: s.stock.ors ?? 0, medic: best && best.skills.medic >= 2 ? best : null, skill: best?.skills.medic ?? 0, bay: bayOn(s), hospital: hospitalOpen(s), needs, lasting: Object.entries(M.lasting).filter(([id]) => living.some(p => p.id === id)), pregnant: Object.entries(M.pregnancies).map(([id, pr]) => [person(s, id)?.first ?? '?', pr.due - day] as [string, number]), epidemic: M.epidemic, policy: M.policy };
+  // a person with two infections (or wounds) is one line, not two identical ones
+  const uniq = [...new Set(needs)];
+  return { courses: courses(s), kit: s.stock.meds, splints: s.stock.splints ?? 0, salts: s.stock.ors ?? 0, medic: best && best.skills.medic >= 2 ? best : null, skill: best?.skills.medic ?? 0, bay: bayOn(s), hospital: hospitalOpen(s), needs: uniq, lasting: Object.entries(M.lasting).filter(([id]) => living.some(p => p.id === id)), pregnant: Object.entries(M.pregnancies).map(([id, pr]) => [person(s, id)?.first ?? '?', pr.due - day] as [string, number]), epidemic: M.epidemic, policy: M.policy };
 }

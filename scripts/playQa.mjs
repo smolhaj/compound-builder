@@ -122,7 +122,7 @@ let raids = 0, stanceLog = [];
 async function handleGate(s, policy) {
   raids++; const tag = `gate-${raids}`;
   note(`GATE ${raids} day ${s.day} kind=${s.pendKind} ${s.dphase}: ` + JSON.stringify({ alive: s.alive, money: s.money }));
-  if (!s.pendKind && !s.cutscene) { const lb = await page.getByRole('button').allInnerTexts(); note(`NULL-KIND GATE: aft=${s.aftermath} card=${s.card} labels=` + lb.join(' / ').slice(0, 400)); const bt = await page.evaluate(() => { const g = window.__cb.game.getState().game; return JSON.stringify({ card: g.gate.card, aftermath: g.gate.aftermath }).slice(0, 500); }); note('NULL-KIND STATE ' + bt); await shot(tag + '-nullkind'); }
+  if (!s.pendKind && !s.cutscene) { /* kind=null is not a gate: nothing is pending, only a result card ("X is gone", an outcome) or the aftermath report waits for Carry on; the loop below clears it */ const lb = await page.getByRole('button').allInnerTexts(); note(`NULL-KIND GATE: aft=${s.aftermath} card=${s.card} labels=` + lb.join(' / ').slice(0, 400)); const bt = await page.evaluate(() => { const g = window.__cb.game.getState().game; return JSON.stringify({ card: g.gate.card, aftermath: g.gate.aftermath }).slice(0, 500); }); note('NULL-KIND STATE ' + bt); await shot(tag + '-nullkind'); }
   let stage = 0;
   for (let i = 0; i < 80; i++) {
     const c = await st();

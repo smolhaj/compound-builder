@@ -7,17 +7,38 @@
 import { RESERVE_MIN, RESERVE_SHARE } from './starterCompound';
 import { daysOfFood, KCAL, needOf } from './needs';
 import { orderCost, prices } from './economy';
+import { CREW_RATE, hoursLeft } from './crews';
 import type { GameState } from './state';
 
 /** The cash a household keeps for living costs while it builds. */
 export const livingReserve = (money: number): number => Math.max(RESERVE_MIN, Math.round(Math.max(0, money) * RESERVE_SHARE));
 
-export interface SpendCheck { after: number; reserve: number; below: boolean }
+export interface SpendCheck { after: number; reserve: number; below: boolean; /** Crew wages already hired and still to be paid (spendCheckCommitted). */ committed?: number }
 
 /** What `cost` leaves, and whether that is under the reserve held against the cash on hand now. */
 export function spendCheck(money: number, cost: number): SpendCheck {
   const reserve = livingReserve(money), after = money - cost;
   return { after, reserve, below: cost > 0 && after < reserve };
+}
+
+/**
+ * What crews already hired will still bill: the person-hours left on each one's building at the crew rate. A crew
+ * bills by the hour as it works and goes home when the money runs out, so a second hire has to be judged against
+ * the cash the first has already claimed, not against the whole balance.
+ */
+export function committedCrewWages(s: Pick<GameState, 'crews' | 'structures'>): number {
+  let usd = 0;
+  for (const c of s.crews ?? []) {
+    const st = s.structures.find(x => x.id === c.target);
+    if (st) usd += hoursLeft(st) * CREW_RATE;
+  }
+  return Math.round(usd);
+}
+
+/** `spendCheck` that also counts `committed` (crew wages still to come) as already spent. Advice only. */
+export function spendCheckCommitted(money: number, cost: number, committed: number): SpendCheck {
+  const owed = Math.max(0, committed), reserve = livingReserve(money), after = money - owed - cost;
+  return { after, reserve, below: cost > 0 && after < reserve, committed: owed };
 }
 
 /** "$141k" for the short button labels; "$950" under ten thousand. */
