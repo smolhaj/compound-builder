@@ -388,6 +388,10 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
     }
     // the prescriptions, three months ahead, once the news turns
     if (strat !== 'idle' && s.disaster.phase === 'warning' && day % 30 === 0) stockUpRx(s);
+    // (money sinks, optional: SINKS=1) a family with spare money fits the clinic, the radio mast and the gate house once the warning is out (sim/richSinks.ts)
+    if (process.env.SINKS && strat !== 'idle' && s.disaster.phase === 'warning' && day % 30 === 15 && s.structures.some(x => isHome(x.kind) && isFinished(x))) {
+      for (const m of ['clinic_suite', 'radio_mast', 'gate_house'] as const) if ((s.stock[m] ?? 0) < 1 && s.money > MATERIALS[m].price! + 120_000) placeOrder(s, [{ material: m, qty: 1 }]);
+    }
     // the armory, bought early (a deer rifle and a .22; more for the preppers and the fortress)
     // (weekender, round 5) the guns wait for the roof: bought on day 10 they took the cash the cabin's first stages needed. Bought when the house is up and
     // there is money, or once the warning is out

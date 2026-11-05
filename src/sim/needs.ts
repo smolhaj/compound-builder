@@ -18,6 +18,7 @@ import { wildDay } from './wildfood';
 import { livestockDay } from './livestock';
 import { isHome } from './blueprints';
 import { log } from './economy';
+import { medicalBay } from './richSinks';
 import { isFinished } from './construction';
 import { climate } from './effects';
 import { tractorBoost } from './vehicles';
@@ -293,7 +294,7 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
   const home = fin.some(st => isHome(st.kind));
   const dark = s.utilities.fittings.some(f => f.kind === 'wire' && f.finishedAt !== null) && !s.utilities.lit.some(id => isHome(s.structures.find(x => x.id === id)?.kind ?? ''));
   const medic = Math.max(...s.people.filter((p, i) => !p.kid && alive(s, i)).map(p => p.skills.medic), 0);
-  const bay = fin.some(st => st.kind === 'bunker_medical');
+  const bay = medicalBay(s);
   // where everybody slept and how well (sim/housing.ts): bed, couch, floor, tent, nowhere
   const slept = sleepEffects(s);
   // gatherings' afterglow and grief (sim/gatherings.ts: a funeral eases it)

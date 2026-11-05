@@ -65,7 +65,7 @@ import { barterPrices, moneyWorks, type Good } from '../sim/barter';
 import { MarketSection, NeighborsSection, RumorsSection, ScavengeSection } from './WorldPanels';
 import { alliesFor, canGo, FAR_COLD, isAway, latestFarLead, latestLead, LEAD_COLD, LEAD_WARM, leadAge, openCaptives, raidProblem, rescueOdds, tripFuel, tripProblem } from '../sim/rescue';
 import { EXPOSURE_NAME, exposure, raidPressure, topExposure } from '../sim/opsec';
-import { acresOf, buyProblem, LAND_NAME, priceOf } from '../sim/land';
+import { acresOf, buyProblem, LAND_NAME, premiumOffer, priceOf } from '../sim/land';
 import { runFinished } from '../sim/perimeter';
 import { plansNeed, plansNeedLines } from '../sim/guidance';
 import { populations, predatorLine } from '../sim/wildlife';
@@ -457,7 +457,7 @@ export function Hud() {
                       : why === 'nobody sells land for cash now' ? <span style={{ color: DIM }}>no cash sales</span>
                       : <button style={btn(!why)} disabled={!!why} title={why ?? `Buy ${acresOf(p.rect)} acres`} onClick={() => g.buy(p.id)}>{usd(priceOf(game, p))}</button>}
                   </div>
-                  <div style={{ fontSize: 11, color: DIM }}>{acresOf(p.rect)} acres of {LAND_NAME[p.kind]}{p.owner === 'you' ? '' : ` · ${n ? n.name : '?'}`}{p.forSale && p.owner !== 'you' ? <span style={{ color: TONE.warn }}> · for sale</span> : null}</div>
+                  <div style={{ fontSize: 11, color: DIM }}>{acresOf(p.rect)} acres of {LAND_NAME[p.kind]}{p.owner === 'you' ? '' : ` · ${n ? n.name : '?'}`}{p.forSale && p.owner !== 'you' ? <span style={{ color: TONE.warn }}> · for sale</span> : null}{premiumOffer(game, p) ? <span style={{ color: TONE.warn }} title="Not for sale. A cash offer 60% over the asking price would tempt him.">{' · cash offer, +60%'}</span> : null}</div>
                 </div>;
               })}
             </Section>
