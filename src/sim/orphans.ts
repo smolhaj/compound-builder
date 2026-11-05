@@ -83,7 +83,7 @@ export function wardsDay(s: GameState, doy: number, day: number, town: boolean, 
       if (!next) {
         L.wards = (L.wards ?? []).filter(x => x !== w);
         say('death', `${w.person.first} was lost when there was no household left to keep them.`);
-        if (!L.wards.length && !s.people.some(p => alive(s, p.id))) s.ending = { kind: 'wipe', day, continued: false };
+        if (!L.wards.length && !s.people.some(p => alive(s, p.id))) { s.ending = { kind: 'wipe', day, continued: false }; s.gate.pending = null; s.gate.incoming = null; s.gate.aftermath = null; }
         continue;
       }
       w.by = next.id; next.members++;

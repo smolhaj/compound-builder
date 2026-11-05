@@ -358,6 +358,12 @@ function levelsOf(kind: DisasterKind, variant: string, back: Partial<Record<Trac
   return out;
 }
 
+/** The day (after the hit) the last track of the main disaster has finished falling: before it the world is still getting worse, so it cannot have "settled". */
+export function fallDoneDay(d: Pick<DisasterState, 'kind' | 'variant'>): number {
+  const v = d.kind ? DISASTERS[d.kind]?.variants.find(x => x.id === d.variant) : undefined;
+  return v ? Math.max(0, ...Object.values(v.curves).map(c => (c ? c.at + c.fall : 0))) : 0;
+}
+
 /** All tracks at game day t (the main disaster and its follow-ons; the worse wins). */
 export function tracksAt(d: DisasterState, t: number): Record<Track, number> {
   if (!d.kind) return { ...FULL };
