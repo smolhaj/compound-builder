@@ -127,7 +127,7 @@ async function handleGate(s, policy) {
   let stage = 0;
   for (let i = 0; i < 80; i++) {
     const c = await st();
-    if (c.ending && !c.pending && !c.cutscene && !c.card && !c.aftermath) return;
+    if (c.ending && !c.continued) return;   // the report card is up: a prompt left behind it cannot be answered, nothing to wait for
     if (!c.pending && !c.cutscene && !c.aftermath && !c.card) break;
     if (c.cutscene === 'prompt' || (c.pending && !c.cutscene)) {
       if (stage < 1) { await scanText(tag + ' prompt'); if (policy.shotGate && policy.shotGate(raids)) await shot(tag + '-prompt'); stage = 1; }
