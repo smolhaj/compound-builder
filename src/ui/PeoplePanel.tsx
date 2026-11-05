@@ -20,6 +20,7 @@ import { DIM, LINE, TONE, btn, usd } from './hud/style';
 import { MATERIALS } from '../sim/materials';
 import { prices } from '../sim/economy';
 import { Note, Row, Section } from './hud/common';
+import { closeRows } from '../sim/bonds';
 
 const strainColor = (v: number) => (v >= 65 ? TONE.bad : v >= 40 ? TONE.warn : '#9cc070');
 const bar = (v: number, c: string, t: string) => <div title={t} style={{ flex: 1, height: 4, background: '#333', borderRadius: 2 }}><div style={{ width: `${Math.max(0, Math.min(100, v))}%`, height: '100%', background: c, borderRadius: 2 }} /></div>;
@@ -70,6 +71,19 @@ export function PersonInsight({ p }: { p: Person }) {
 const KEY_SKILLS: Practiced[] = ['builder', 'gardener', 'cooking', 'husbandry', 'mechanic', 'electrical', 'medic', 'hunter', 'shooting', 'teacher', 'leadership', 'negotiator', 'radio'];
 
 /** The household block: how everyone is, what to do about it, who is best at what. */
+const CLOSE_WORD: Record<string, string> = { couple: 'together', friend: 'friends', rival: 'at odds', mentor: 'mentor' };
+/** Who is close to whom: couples, friends, mentors and the ones who rub (read-only; sim/bonds.ts). */
+function CloseRows() {
+  const game = useGameStore(s => s.game);
+  const rows = closeRows(game);
+  if (!rows.length) return null;
+  return <div style={{ marginTop: 4 }}>
+    <div style={{ fontSize: 11, color: DIM, marginBottom: 1 }}>Close to each other</div>
+    {rows.slice(0, 6).map(r => <Row key={`${r.a.id}|${r.b.id}`} label={`${r.a.first} and ${r.b.first}`} value={<span style={{ color: r.tag === 'rival' ? TONE.warn : DIM }}>{r.tag === 'mentor' && r.guide ? `${r.guide.first} teaches` : CLOSE_WORD[r.tag]}</span>} />)}
+    {rows.length > 6 && <div style={{ fontSize: 11, color: DIM }}>and {rows.length - 6} more</div>}
+  </div>;
+}
+
 export function PeopleSection() {
   const game = useGameStore(s => s.game), g = useGameStore();
   const [skillsOpen, setSkillsOpen] = useState(false);
@@ -91,6 +105,7 @@ export function PeopleSection() {
       <button style={btn()} disabled={!!camp} title={camp ?? 'A fire and stories tonight: lifts spirits (and costs a little firewood)'} onClick={() => g.daily(d => callGathering(d, 'campfire'))}>Campfire tonight</button>
       <button style={btn()} disabled={!!service} title={service ?? 'A reading, a hymn or two and a few words about the week, at six. Lifts people of faith a lot and the rest a little for a week; costs nothing.'} onClick={() => g.daily(d => callGathering(d, 'service'))}>Hold a service</button>
     </div>
+    <CloseRows />
     <Evenings />
     <div style={{ fontSize: 11, color: DIM, marginTop: 4 }}>A rest day, a gathering or a service, faith and someone close lift the strain too. Strain costs morale and work only once it is real.</div>
     <div style={{ marginTop: 5 }}>
