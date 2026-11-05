@@ -115,3 +115,21 @@ export function wardsDay(s: GameState, doy: number, day: number, town: boolean, 
   say('coming', `${heir.person.first} turned 18 and came home to the place${rest.length ? `, with ${names(rest)}` : ''}. It is theirs now: the house, the land, the stores and what the family built.`);
   return true;
 }
+
+export interface FosterNote { host: string; children: string[]; years: number; text: string }
+
+/**
+ * What to tell the player while nobody is home: who the children live with and how long until the eldest comes of age
+ * (null when the place is not in that state). Messaging only: the by-design rule (the place is held, nothing to do) is unchanged.
+ */
+export function fosterNote(s: GameState): FosterNote | null {
+  if (!nobodyHome(s)) return null;
+  const wards = wardsOf(s);
+  const host = s.neighbors.find(n => n.id === wards[0].by);
+  const hostName = host ? house(host) : 'neighbor household';
+  const children = wards.map(w => w.person.first);
+  const years = Math.max(0, 18 - Math.max(...wards.map(w => w.person.age)));
+  const who = names(wards.map(w => w.person));
+  const text = `Nobody is home. ${who} ${wards.length === 1 ? 'lives' : 'live'} with the ${hostName} and the place is held for them. ${years > 0 ? `Nothing needs doing until the ${wards.length === 1 ? 'child' : 'eldest'} turns 18, in about ${years} year${years === 1 ? '' : 's'}: then they come home and the house, the land and the stores are theirs.` : 'They come home any day now.'}`;
+  return { host: hostName, children, years, text };
+}

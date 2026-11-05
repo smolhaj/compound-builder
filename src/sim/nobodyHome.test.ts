@@ -96,3 +96,20 @@ describe('a scheduled raid when nobody is home', () => {
     expect(arrivalCheck(g)).toBe(e);
   });
 });
+
+describe('the fostered-ward stretch says what is happening', () => {
+  it('names the host, the child and the years to 18, and hides suggestions and drills', async () => {
+    const { fosterNote } = await import('./orphans');
+    const { suggestions, drillsSuggestion } = await import('./guidance');
+    const g = awayGame();
+    g.lineage.wards![0].person.age = 9;
+    const n = fosterNote(g)!;
+    expect(n.years).toBe(9);
+    expect(n.text).toMatch(/Nobody is home/);
+    expect(n.text).toMatch(/about 9 years/);
+    expect(n.text).toContain(g.lineage.wards![0].person.first);
+    expect(suggestions(g)).toEqual([]);
+    expect(drillsSuggestion(g)).toBeNull();
+    expect(fosterNote(newGame(7))).toBeNull();
+  });
+});

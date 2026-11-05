@@ -23,6 +23,7 @@ import { ToolShop } from './ToolShop';
 import { kitNote } from '../sim/evenings';
 import { SHELF_TABS, SHELVES, shelvesNeeding, type ShelfTab } from '../sim/shelves';
 import { plansNeed, plansNeedLines } from '../sim/guidance';
+import { shopIconArt } from './shopIcons';
 import { ammoLimit, buyAmmo, buyGun, CALIBER, CALIBERS, CLASS_USD, GUN, GUN_GROUP, GUNS, groupOf, gunPrices, issue, NFA_STAMP, practice, shopOpen, skillOf, stateBan, takeClass, type Caliber, type GunGroup, type GunModel } from '../sim/armory';
 
 type Tab = ShelfTab | 'tools' | 'guns' | 'metals' | 'money';
@@ -33,7 +34,7 @@ const usd = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
 const btn = (on = false, off = false): CSSProperties => ({ padding: '4px 10px', borderRadius: 6, border: `1px solid ${on ? C.gold : C.line}`, background: on ? 'rgba(216,201,160,0.18)' : 'rgba(255,255,255,0.06)', color: '#eee', cursor: off ? 'not-allowed' : 'pointer', opacity: off ? 0.45 : 1, fontSize: 12.5 });
 
 /** A small drawn icon per item (procedural: shapes and colors, no image files). */
-function Icon({ id, tint }: { id: string; tint?: number }) {
+export function Icon({ id, tint }: { id: string; tint?: number }) {
   const c2 = tint === undefined ? '#888' : `#${tint.toString(16).padStart(6, '0')}`;
   const s = 44;
   const g = (children: ReactNode, bg = '#2c2f28') => <svg width={s} height={s} viewBox="0 0 44 44" style={{ flex: 'none', borderRadius: 8, background: bg }}>{children}</svg>;
@@ -110,7 +111,7 @@ function Icon({ id, tint }: { id: string; tint?: number }) {
     case 'plate_carrier': return g(<path d="M12 8 h20 v6 l4 4 v18 h-28 v-18 l4 -4 z" fill="#4a5a3a" stroke="#2a3020" />);
     case 'ifak': return g(<><rect x="10" y="12" width="24" height="20" rx="3" fill="#3a3a30" /><path d="M22 16 v12 M16 22 h12" stroke="#c03030" strokeWidth="3" /></>);
     case 'nvg': case 'thermal': return g(<><rect x="8" y="16" width="24" height="12" rx="4" fill="#333" /><circle cx="34" cy="22" r="5" fill={id === 'nvg' ? '#3a9a4a' : '#d06a2a'} /></>);
-    case 'radios': return g(<>{[14, 28].map(x => <g key={x}><rect x={x - 5} y="14" width="10" height="20" rx="2" fill="#2a2a2a" /><path d={`M${x + 3} 14 v-7`} stroke="#2a2a2a" strokeWidth="2" /></g>)}</>);
+    case 'radios': return g(<>{[13, 29].map((x, i) => <g key={x}><rect x={x - 6} y="13" width="12" height="23" rx="2.5" fill={i ? '#d8a020' : '#6a7078'} stroke="#14161a" strokeWidth="1.2" /><path d={`M${x + 4} 13 v-7`} stroke="#aab0b6" strokeWidth="2" strokeLinecap="round" /><rect x={x - 4} y="16" width="8" height="5" rx="1" fill="#7ac090" /><circle cx={x} cy="27" r="2.2" fill="#14161a" /><path d={`M${x - 3} 32 h6`} stroke="#14161a" strokeWidth="1.2" /></g>)}</>);
     case 'cameras': case 'thermal_cam': return g(<><rect x="8" y="16" width="22" height="10" rx="2" fill="#e0e0d8" /><circle cx="10" cy="21" r="3" fill={id === 'cameras' ? '#333' : '#d06a2a'} /><path d="M24 26 v10" stroke="#888" strokeWidth="2" /></>);
     case 'driveway_alarm': case 'tripwire': return g(<><path d="M6 30 h32" stroke="#888" strokeDasharray={id === 'tripwire' ? '2 2' : undefined} /><rect x="16" y="14" width="12" height="12" rx="2" fill="#3a6a9a" /></>);
     case 'ai_sensor_module': return g(<><rect x="12" y="14" width="24" height="20" rx="3" fill="#2c3a4a" /><circle cx="24" cy="24" r="6" fill="#7fd0ff" /><circle cx="24" cy="24" r="2.5" fill="#102030" /><path d="M16 12 h4 M28 12 h4" stroke="#9cc070" strokeWidth="2" /></>);
@@ -181,7 +182,7 @@ function Icon({ id, tint }: { id: string; tint?: number }) {
       } as Record<string, ReactNode>)[id];
       return g(<><rect x="6" y="6" width="32" height="32" rx="3" fill="#3a4a6a" stroke="#1a2438" />{sym}<rect x="9" y="33" width="26" height="2" fill="#e8dfc0" opacity="0.6" /></>);
     }
-    default: return box('#555');
+    default: { const art = shopIconArt(id); return art ? g(art) : box('#555'); }
   }
 }
 
