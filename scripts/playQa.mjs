@@ -47,7 +47,7 @@ const scanText = async tag => {
   const m = t.match(/.{0,50}(\bNaN\b|\bundefined\b|\[object|Infinity).{0,50}/);
   if (m) issue(`bad text at ${tag}: "${m[0].replace(/\n/g, ' ')}"`);
 };
-const click = async (re, opts = {}) => { const b = page.getByRole('button', { name: re }).filter({ hasNotText: /^Hide panels/ }).filter(opts.filter ?? {}); if (await b.count()) { await b.first().click({ timeout: 5000 }).catch(() => {}); return true; } return false; };
+const click = async (re, opts = {}) => { const b = page.getByRole('button', { name: re }).filter({ hasNotText: /^Hide panels/ }).filter(opts.filter ?? {}); if (await b.count()) { if (!(await b.first().isEnabled())) return false; await b.first().click({ timeout: 5000 }).catch(() => {}); return true; } return false; };
 
 /** The charter, by its buttons. */
 async function wizard({ region, difficulty, lotPick = 'first', mode = 'Surprise', kin = 0, scenario: sc, extra }) {
@@ -71,6 +71,7 @@ async function wizard({ region, difficulty, lotPick = 'first', mode = 'Surprise'
     for (let i = 0; i < nc; i++) { if (extra?.maxPrice && await priceOf(i) > extra.maxPrice) continue; const t = await cards.nth(i).innerText(); const m = t.match(/height ×([\d.]+)/); const mm = t.match(/(\d+) m\s*$/m); const sc2 = (m ? Number(m[1]) : 1) * 10 + (mm ? Number(mm[1]) / 100 : 0); if (sc2 > best) { best = sc2; bi = i; } }
     pickIdx = bi; note('steep pick card ' + bi + ' score ' + best);
   }
+  if (lotPick === 'poorest') { let bl = 1e18; for (let i = 0; i < nc; i++) { const t = await cards.nth(i).innerText(); const m = t.match(/Leaves \$([\d,]+)/); const v = m ? Number(m[1].replace(/,/g, '')) : 1e18; if (v < bl) { bl = v; pickIdx = i; } } note('poorest pick leaves $' + bl); }
   if (lotPick === 'priciest') { let bp = -1; for (let i = 0; i < nc; i++) { const pr = await priceOf(i); if (pr < 1e9 && pr > bp) { bp = pr; pickIdx = i; } } note('priciest pick ' + bp); }
   if (nc) { await cards.nth(pickIdx).click(); note('lot: ' + (await cards.nth(pickIdx).innerText()).replace(/\n+/g, ' | ').slice(0, 300)); }
   await page.getByRole('button', { name: 'Next', exact: true }).click();
@@ -123,17 +124,22 @@ async function handleGate(s, policy) {
   raids++; const tag = `gate-${raids}`;
   note(`GATE ${raids} day ${s.day} kind=${s.pendKind} ${s.dphase}: ` + JSON.stringify({ alive: s.alive, money: s.money }));
   if (!s.pendKind && !s.cutscene) { const lb = await page.getByRole('button').allInnerTexts(); note(`NULL-KIND GATE: aft=${s.aftermath} card=${s.card} labels=` + lb.join(' / ').slice(0, 400)); const bt = await page.evaluate(() => { const g = window.__cb.game.getState().game; return JSON.stringify({ card: g.gate.card, aftermath: g.gate.aftermath }).slice(0, 500); }); note('NULL-KIND STATE ' + bt); await shot(tag + '-nullkind'); }
-  let stage = 0;
+  let stage = 0, stuckShot = false;
   for (let i = 0; i < 80; i++) {
     const c = await st();
-    if (c.ending && !c.pending && !c.cutscene && !c.card && !c.aftermath) return;
+    if (i === 6 && c.pending && !stuckShot) {   // still open after several answers: say which buttons are there (and which are disabled), and look at it
+      stuckShot = true;
+      const bt = await page.evaluate(() => [...document.querySelectorAll('button')].map(b => (b.disabled ? '[x] ' : '') + (b.innerText || '').replace(/\s+/g, ' ').trim()).filter(Boolean).join(' / '));
+      note(`STUCK GATE ${raids} kind=${c.pendKind}: buttons ` + bt.slice(0, 700)); await shot(`gate-${raids}-stuck`);
+    }
+    if (c.ending && !c.continued) return;   // the report card is up: a prompt left behind it cannot be answered, nothing to wait for
     if (!c.pending && !c.cutscene && !c.aftermath && !c.card) break;
     if (c.cutscene === 'prompt' || (c.pending && !c.cutscene)) {
       if (stage < 1) { await scanText(tag + ' prompt'); if (policy.shotGate && policy.shotGate(raids)) await shot(tag + '-prompt'); stage = 1; }
       const re = policy.stance(c);
       const labels = await page.getByRole('button').allInnerTexts();
       let hit = false; for (const r of [].concat(re)) { if (await click(r)) { hit = true; break; } }
-      if (!hit) hit = await click(/^(Open the house|Hide|Parley|Trade|Warn off|Defend|Take them in|Pay|Turn them away)/);
+      if (!hit) hit = await click(/^(Give notice and move in|Hold on|Open the house|Hide|Parley|Trade|Warn off|Defend|Take them in|Pay|Turn them away)/);
       if (!hit) { await shot(`gate-${raids}-nomatch`); issue(`gate ${raids}: no stance button matched ${re}; buttons: ${labels.join(' / ').slice(0, 250)}`); }
       stanceLog.push(`${s.day}:${s.pendKind}:${re}`);
       await click(/^Watch$/);

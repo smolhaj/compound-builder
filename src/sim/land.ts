@@ -89,6 +89,26 @@ export function ownsAt(s: GameState, x: number, z: number): boolean {
   return s.land.parcels.some(p => p.owner === 'you' && x >= p.rect.x0 && x <= p.rect.x1 && z >= p.rect.z0 && z <= p.rect.z1);
 }
 
+/** How far past the land you hold a wall, moat or run may reach (4 units of 6 m = 24 m); the tool clamps to the parcel, this guards a plan sent any other way. */
+export const OFF_LOT_SLACK = 4;
+
+/** Distance from (x, z) to the nearest bit of land you hold (0 inside it). */
+export function distToOwned(s: GameState, x: number, z: number): number {
+  const rects = [s.site.home, ...s.land.parcels.filter(p => p.owner === 'you').map(p => p.rect)];
+  let best = Infinity;
+  for (const r of rects) best = Math.min(best, Math.hypot(Math.max(r.x0 - x, 0, x - r.x1), Math.max(r.z0 - z, 0, z - r.z1)));
+  return best;
+}
+
+/** Why a run (wall, moat, fence...) with these points cannot be planned: a point far off the parcel (null = fine). */
+export function offLotProblem(s: GameState, pts: ReadonlyArray<readonly [number, number]>): string | null {
+  for (const p of pts) {
+    if (!Number.isFinite(p[0]) || !Number.isFinite(p[1])) return 'that line has a point that is not on the map';
+    if (distToOwned(s, p[0], p[1]) > OFF_LOT_SLACK) return 'that line runs off your land: keep it on the parcel (or land you have bought)';
+  }
+  return null;
+}
+
 /** Everything you own as one bounding box (planting, the site). */
 export function ownedBounds(s: GameState): Rect {
   const b = { ...s.site.home };

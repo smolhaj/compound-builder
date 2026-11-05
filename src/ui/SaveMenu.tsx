@@ -9,10 +9,11 @@ import { DIM, LINE, TONE, btn, panel } from './hud/style';
 /** Top-bar "Save" button: a small menu with Export save / Import save (a one-line message on a bad file, a confirm before replacing). */
 export function SaveMenu() {
   const [open, setOpen] = useState(false);
+  const [warn, setWarn] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [incoming, setIncoming] = useState<GameState | null>(null);
   const file = useRef<HTMLInputElement>(null);
-  const close = () => { setOpen(false); setMsg(null); setIncoming(null); };
+  const close = () => { setOpen(false); setMsg(null); setWarn(null); setIncoming(null); };
 
   const doExport = () => {
     const game = useGameStore.getState().game;
@@ -25,7 +26,7 @@ export function SaveMenu() {
   const onFile = async (f: File | undefined) => {
     if (!f) return;
     const r = readSaveFile(await f.text(), f.size);
-    if (r.ok) { setMsg(null); setIncoming(r.state); } else { setIncoming(null); setMsg(r.message); }
+    if (r.ok) { setMsg(null); setWarn(r.warnings[0] ?? null); setIncoming(r.state); } else { setIncoming(null); setMsg(r.message); }
   };
   const replace = () => {
     if (!incoming) return;
@@ -42,6 +43,7 @@ export function SaveMenu() {
       {open && <div style={{ ...panel, position: 'absolute', top: 'calc(100% + 8px)', left: 0, width: 190, display: 'flex', flexDirection: 'column', gap: 6, whiteSpace: 'normal', background: 'rgba(20,22,18,0.95)', border: `1px solid ${LINE}` }}>
         {incoming ? <>
           <span>Replace this game with the {incoming.lineage.family} save?</span>
+          {warn && <span style={{ color: TONE.warn, fontSize: 11.5 }}>{warn}</span>}
           <span style={{ display: 'flex', gap: 6 }}><button style={btn(true)} onClick={replace}>Replace</button><button style={btn()} onClick={close}>Cancel</button></span>
         </> : <>
           <button style={btn()} onClick={doExport}>Export save</button>

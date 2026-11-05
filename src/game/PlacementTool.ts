@@ -11,6 +11,7 @@ import { hydroProblem } from '../sim/renewables';
 import { dockProblem, isDock } from '../sim/waterfront';
 import { siteNote } from '../sim/microclimate';
 import { onJustPlaced, type Spot } from './buildkit/justPlaced';
+import { stakeSpendAsk } from '../sim/spendGuard';
 import { clashText, padClash, padSnap } from './buildkit/padRules';
 
 /**
@@ -103,10 +104,14 @@ export class PlacementTool {
   }
 
   /** QA / click: place at the current hover point if allowed. */
-  private _place(repeat = false): void {
+  private _place(repeat = false, force = false): void {
     if (!this._kind || !this._at || !this._ok) return;
     const [x, z] = this._at, kind = this._kind;
-    const store = useGameStore.getState(), before = store.game.structures.length;
+    const store = useGameStore.getState();
+    // the county permit fee would take the cash under the living reserve (or negative): ask first, never block (sim/spendGuard)
+    const ask = force ? null : stakeSpendAsk(store.game, kind);
+    if (ask) { store.askSpend({ kind, x, z, rot: this._rot, cost: ask.cost, after: ask.check.after, reserve: ask.check.reserve }); return; }
+    const before = store.game.structures.length;
     store.plan(kind, x, z, this._rot);
     const placed = useGameStore.getState().game.structures.length > before;
     this._just = { x, z, rot: this._rot };
@@ -122,7 +127,7 @@ export class PlacementTool {
   }
 
   /** QA: place at the hover point and keep the tool armed (screenshot scripts stake several pieces in a row). */
-  placeHere(): void { this._place(true); }
+  placeHere(): void { this._place(true, true); }
 
   /** QA: the nearest valid spot for a piece to (x, z) (searched in a growing ring on the build grid), or null. */
   findSpot(kind: string, x: number, z: number, rot = 0, maxR = 30): [number, number] | null {
