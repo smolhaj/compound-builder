@@ -10,7 +10,7 @@
 import { VEHICLES } from './vehicles';
 import { isFinished } from './construction';
 import { isHome } from './blueprints';
-import { DISASTERS, TRACKS } from './disaster';
+import { DISASTERS, TRACKS, fallDoneDay } from './disaster';
 import type { GameState } from './state';
 
 export interface RunStats {
@@ -52,14 +52,18 @@ const living = (s: GameState) => s.personState.filter(ps => ps.needs.died == nul
 /** The line goes on while anyone lives, at home or away with a neighbor (sim/orphans.ts). */
 const lineLives = (s: GameState) => living(s) + (s.lineage?.wards?.length ?? 0);
 
+/** The line is over: nobody is left to answer a knock, so no gate card, approach or aftermath stays pending. */
+export function clearPendingAtWipe(s: GameState): void {
+  s.gate.pending = null; s.gate.incoming = null; s.gate.aftermath = null;
+}
+
 /** Once a day after the hit: tally, then see whether the run is over. */
 export function tallyDay(s: GameState): Ending | null {
   const d = s.disaster;
   // the last of them gone ends the line whenever it happens: in the quiet years between eras, or after a card that was played on (playtest round 3: the run used to go on with nobody left)
   if (s.personState.length && lineLives(s) === 0 && s.ending?.kind !== 'wipe') {
     s.ending = { kind: 'wipe', day: Math.floor(s.clock.t), continued: false };
-    // nobody is left to answer: a card or a raid on its way would sit on top of the report card (QA matrix 4)
-    s.gate.pending = null; s.gate.incoming = undefined;
+    clearPendingAtWipe(s);
     return s.ending;
   }
   if (!d.kind || s.clock.t < d.hitAt || (s.ending && !s.ending.continued)) return null;
@@ -79,7 +83,8 @@ export function tallyDay(s: GameState): Ending | null {
   st.grownYear = st.grownYear * (1 - 1 / 365) + f.producedKcal;
   st.needYear = st.needYear * (1 - 1 / 365) + f.needKcal;
   // back as far as it's coming: all the way, or (a partial recovery) where it settles
-  const ok = d.fate === 'never' ? false : TRACKS.every(k => d.tracks[k] >= Math.min(0.9, (d.ceiling?.[k] ?? 1) - 0.03));
+  // (and not before the last track has stopped falling: a mild drought dip sits above a partial ceiling from day 0, and must not read as "settled" at day 90)
+  const ok = d.fate === 'never' || day < fallDoneDay(d) ? false : TRACKS.every(k => d.tracks[k] >= Math.min(0.9, (d.ceiling?.[k] ?? 1) - 0.03));
   if (!ok) st.okSince = -1; else if (st.okSince < 0) st.okSince = day;
   if (s.ending) return null;          // playing on after the card
   if (living(s) === 0) return null;   // the children are away with a neighbor and the place is held for them: no card until they are home
@@ -90,6 +95,7 @@ export function tallyDay(s: GameState): Ending | null {
   else if (selfSufficient(st)) kind = 'equilibrium';
   if (!kind) return null;
   s.ending = { kind, day: Math.floor(s.clock.t), continued: false };
+  if (kind === 'wipe') clearPendingAtWipe(s);
   return s.ending;
 }
 
@@ -183,7 +189,7 @@ export function reportCard(s: GameState): ReportCard {
   if (g.raidsHeld) lines.push(`The line held ${g.raidsHeld} ${g.raidsHeld === 1 ? 'time' : 'times'}${g.raidsLost ? `, and broke ${g.raidsLost}` : ''}.`);
   else if (g.raidsLost) lines.push(`They got in ${g.raidsLost} ${g.raidsLost === 1 ? 'time' : 'times'}.`);
   if (s.perimeter.some(r => r.kind === 'escape_tunnel' && r.finishedAt !== null)) lines.push('The tunnel was never needed.');
-  lines.push(placeLine(s));
+  lines.push(placeLine(s, end === 'wipe'));
   if (sandbox) lines.push('Sandbox run: unlimited money, so this card is not graded.');
   const allies = s.neighbors.filter(n => n.disposition > 50 && n.status === 'home');
   if (allies.length) lines.push(`${allies.map(n => n.name[0].toUpperCase() + n.name.slice(1)).join(' and ')} stood with you.`);

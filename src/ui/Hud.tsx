@@ -459,7 +459,7 @@ export function Hud() {
                       : why === 'nobody sells land for cash now' ? <span style={{ color: DIM }}>no cash sales</span>
                       : <button style={btn(!why)} disabled={!!why} title={why ?? `Buy ${acresOf(p.rect)} acres`} onClick={() => g.buy(p.id)}>{usd(priceOf(game, p))}</button>}
                   </div>
-                  <div style={{ fontSize: 11, color: DIM }}>{acresOf(p.rect)} acres of {LAND_NAME[p.kind]}{p.owner === 'you' ? '' : ` · ${n ? n.name : '?'}`}{p.forSale && p.owner !== 'you' ? <span style={{ color: TONE.warn }}> · for sale</span> : null}{premiumOffer(game, p) ? <span style={{ color: TONE.warn }} title="Not for sale. A cash offer 60% over the asking price would tempt him.">{' · cash offer, +60%'}</span> : null}</div>
+                  <div style={{ fontSize: 11, color: DIM }}>{acresOf(p.rect)} acres of {LAND_NAME[p.kind]}{p.owner === 'you' ? '' : ` · ${n ? n.name : '?'}`}{p.forSale && p.owner !== 'you' ? <span style={{ color: TONE.warn }}> · for sale</span> : null}{p.ring === 2 && p.owner !== 'you' ? <span style={{ color: DIM }}> · farther out, dearer</span> : null}{premiumOffer(game, p) ? <span style={{ color: TONE.warn }} title="Not for sale. A cash offer 60% over the asking price would tempt him.">{' · cash offer, +60%'}</span> : null}</div>
                 </div>;
               })}
             </Section>

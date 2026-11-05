@@ -29,6 +29,7 @@
  * the place see what's in plain view: contraband (sim/blackMarket.ts seize)
  * or mines are a felony.
  */
+import { wallTopPosture } from './wallTops';
 import { mulberry32 } from './rng';
 import { log } from './economy';
 import { raidPressure } from './opsec';
@@ -96,6 +97,7 @@ export function breakInRate(s: GameState): number {
   if (n(s, 'driveway_alarm')) deter *= 0.6;
   if (powered(s) && (n(s, 'cameras') || n(s, 'thermal_cam'))) deter *= 0.75;
   if (powered(s) && n(s, 'floodlights')) deter *= 0.9;
+  if (wallTopPosture(s).signsDeter > 0) deter *= 0.85;   // yellow signs on a live electric fence (opportunists only; sim/wallTops.ts)
   const town = 1 + 0.3 * Math.max(0, 1 - s.site.miles / 10);   // close to town: more traffic past the drive
   // a place nobody is at (the weekender's weekdays) is a mark; a caretaker and lights on timers take some of that back
   return BASE_PER_YEAR * seen * deter * town * emptyMultiplier(s);

@@ -38,7 +38,8 @@ import { sleepSpotFor } from './housing';
 import { gatePoint, raidDelta } from './quarters';
 import { houseCoverK } from './houseHardening';
 import { isFinished } from './construction';
-import { PERIMETER, fenceLive, runFinished } from './perimeter';
+import { PERIMETER, fenceLive, runFinished, type PerimeterRun } from './perimeter';
+import { climbPenaltyK, topClimb } from './wallTops';
 import { ARMORY_LIGHTS, floodlightLit } from './lights';
 import { DOOR_DELAY, doorsLocked, raidAngle } from './terrainFx';
 import { moatFx } from './waterWorks';
@@ -315,16 +316,18 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
   // a wall only delays a crew that has to come over it: a gap, an open gate or an unbarred creek in the property line is the way round
   const propLine = enclosure(s);
   const lineClosed = propLine.openShare === 0 && propLine.creekOpen === 0;
-  let wallR = 0, wallKind = '', moatR = 0;
+  let wallR = 0, wallKind = '', moatR = 0, wallRun: PerimeterRun | undefined;
   for (const run of s.perimeter) {
     if (!runFinished(run) || PERIMETER[run.kind].blocks.people <= 0 || !run.pts.length) continue;
     if (run.kind === 'moat') { moatR = Math.max(moatR, Math.max(4, Math.min(30, Math.min(...run.pts.map(([x, z]) => dist({ x, z }, C)))))); continue; }   // (a moat is crossed, not the line the defenders hold: its water is added below, sim/waterWorks.ts)
     const pts = run.pts.map(([x, z]) => ({ x, z })).sort((a, b) => ((b.x - C.x) * ax + (b.z - C.z) * az) - ((a.x - C.x) * ax + (a.z - C.z) * az));
     const rr = Math.max(4, Math.min(30, dist(pts[0], C)));
-    if (rr >= wallR) wallKind = run.kind;   // the outermost wall is the one they meet first
+    if (rr >= wallR) { wallKind = run.kind; wallRun = run; }   // the outermost wall is the one they meet first
     wallR = Math.max(wallR, rr);
   }
-  if (!wallR && moatR) { wallR = moatR; wallKind = 'moat'; }   // a moat with no wall behind it is the line itself
+  if (!wallR && moatR) { wallR = moatR; wallKind = 'moat'; wallRun = undefined; }
+  // the top of the outermost wall (electric outriggers, razor coils) and any step-over beside it (sim/wallTops.ts)
+  const wallTop = topClimb(s, wallRun), climbWeak = climbPenaltyK(s, wallRun);   // a moat with no wall behind it is the line itself
   // a patrol deck on the wall (sim/walkway.ts): the posts on it are on the real deck where the raid meets the wall, higher and better covered than a spot behind it
   const decks = walkRuns(s), deckPosts = decks.length ? deckSpots(s, wallR ? [at(wallR, 0).x, at(wallR, 0).z] : [C.x, C.z], 3 + Math.min(2, Math.floor(walkLength(s) / 20))) : [];
   const deck = deckPosts.length > 0;
@@ -918,11 +921,11 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
     if (climbing && atLine.length && !breached) {
       const hz = wallKind === 'electric_steel' && !fenceLive(s) ? WALL_HAZARD.steel_wall : WALL_HAZARD[wallKind];
       let bitten = 0;
-      if (hz) for (const f of atLine) if (r() < hz.p) {
+      for (const h of [hz, ...wallTop.hazards]) if (h) for (const f of atLine) if (r() < h.p) {
         bitten++;
-        ev.push({ t: r2(t + 0.1), kind: 'snag', unit: f.id, x: r2(f.x), z: r2(f.z), what: hz.what });
-        hurt(f, hz.min + r() * (hz.max - hz.min), t + 0.1, undefined, 'leg');
-        if (!f.dead && r() < 0.7) say(t + 0.3, pick(hz.lines), f);
+        ev.push({ t: r2(t + 0.1), kind: 'snag', unit: f.id, x: r2(f.x), z: r2(f.z), what: h.what });
+        hurt(f, h.min + r() * (h.max - h.min), t + 0.1, undefined, 'leg');
+        if (!f.dead && r() < 0.7) say(t + 0.3, pick(h.lines), f);
       }
       if (moat?.hazard && ringK === 0) for (const f of atLine) if (r() < moat.hazard.p) {
         bitten++;
@@ -938,7 +941,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
     // (round 4) clubs against rifles need far more of them to rush the line; going over a wall, every rifle at a post on it slows them
     const outnumber = armedR ? 2 : 4;
     const onWall = H.filter(f => !f.out && !f.shelter && f.arm !== FISTS && t >= f.readyAt && f.post?.kind !== 'open' && f.post?.kind !== 'building').length;
-    if (!breached && !peace && atLine.length && (wallDown || hNow === 0 || rUp.length > hNow * outnumber) && (opts.ambush === undefined || hNow === 0 || t - lineSince >= 12 + opts.ambush) && (hNow === 0 || t - lineSince >= (ringK === 0 ? ringHold : ringStay)) && (!climbing || (t - lineSince >= 10 + (moat && ringK === 0 ? moat.holdS : 0) && r() < 0.02 * atLine.length * (deck ? WALK_CLIMB_FACTOR : 1) / (1 + onWall)))) {
+    if (!breached && !peace && atLine.length && (wallDown || hNow === 0 || rUp.length > hNow * outnumber) && (opts.ambush === undefined || hNow === 0 || t - lineSince >= 12 + opts.ambush) && (hNow === 0 || t - lineSince >= (ringK === 0 ? ringHold : ringStay)) && (!climbing || (t - lineSince >= 10 + (moat && ringK === 0 ? moat.holdS : 0) && r() < 0.02 * atLine.length * (deck ? WALK_CLIMB_FACTOR : 1) * wallTop.climb * climbWeak / (1 + onWall)))) {
       if (ringK < ringRs.length) fallBack(t);
       else {
       breached = true; breachT = t;

@@ -36,6 +36,8 @@ import { log } from './economy';
 import { burnStructure, isFinished } from './construction';
 import { raidPressure } from './opsec';
 import { PERIMETER, peopleBlock, runFinished, runGrowth, wallLength } from './perimeter';
+import { weakPenalty } from './wallTops';
+import { gatePosture } from './gateSecurity';
 import { enclosure } from './enclosure';
 import { contagion, infect } from './effects';
 import type { Person, SkillId } from './family';
@@ -55,6 +57,7 @@ import { raidTakesVehicles } from './vehicles';
 import { practice } from './skills';
 import { turbineNoise } from './renewables';
 import { villageWatch } from './outposts';
+import { guardPosture, resolveGuardStay } from './guards';
 import { resolveTrialEnd, startTrial, trialDay, type Character, type TrialCamp } from './trial';
 import { vetArrival } from './gateVetting';
 import { admitNewcomers, resolveShelter, strangerArrival, type Extras, type ShelterWhy } from './newcomers';
@@ -135,6 +138,8 @@ export interface Posture {
   bunker: boolean;
   /** A guard dog's bark (warns them off), a safe room to hide in. */
   deter?: number;
+  /** Signs of a live electric fence (and, later, of armed response): they deter opportunists only, never an organized crew (sim/wallTops.ts). */
+  signs?: number;
   safeRoom?: boolean;
 }
 
@@ -152,7 +157,7 @@ export function postureOf(s: GameState): Posture {
     if (!runFinished(r) || d.blocks.people <= 0) continue;
     if (line.onLine.has(r.id)) { look += wallLength(r) * (d.height > 0.35 ? 1 : 0.3) * runGrowth(r, s.clock.t); continue; }   // the property line holds by whether it is closed (sim/enclosure.ts)
     const g = runGrowth(r, s.clock.t), len = wallLength(r);
-    held += len * peopleBlock(s, r) * g;
+    held += len * Math.max(0, peopleBlock(s, r) - weakPenalty(s, r)) * g;
     wall += len * g;
     look += len * (d.height > 0.35 ? 1 : 0.3) * g;
   }
@@ -164,22 +169,23 @@ export function postureOf(s: GameState): Posture {
   // anyone away (a rescue, a run, the market) isn't on the line
   const here = (i: number) => s.personState[i]?.needs.died == null && !isAway(s, s.people[i].id);
   const adults = s.people.filter((p, i) => !p.kid && here(i));
-  const fighters = adults.length + s.people.filter((p, i) => p.kid && p.age >= 15 && here(i)).length * 0.5;
+  const guards = guardPosture(s);   // contract guards at the gate (sim/guards.ts)
+  const fighters = adults.length + s.people.filter((p, i) => p.kid && p.age >= 15 && here(i)).length * 0.5 + guards.fighters;
   const watch = Math.max(0, ...adults.map(p => p.skills.hunter));
   const radioNet = s.neighbors.some(n => n.radio && n.status === 'home' && n.disposition > 30);
   const gear = gearPosture(s, fighters);
   const tw = towerPosture(s);
   // fog (sim/fog.ts) takes what the eyes add: the watch's own score, the towers' view and the posted guard (the gear's share is already in gear.detection)
   const kEye = fogSightK(s, 'eye');
-  const detection = Math.min(100, 25 + (watch * 5 + tw.detection + watchDetection(s)) * kEye + (radioNet ? 20 : 0) + (barrier > 50 ? 10 : 0) + gear.detection + forewarned(s) + villageWatch(s));
-  return { visibility: Math.min(100, visibility + gear.visibility + tw.visibility), fortress, barrier: Math.min(100, barrier + gear.barrier), detection, fighters, deter: gear.deter, safeRoom: gear.safeRoom, armed: armed(s), firepower: firepower(s) * gear.fight * tw.fire, bunker: fin.some(st => st.kind === 'bunker_hatch' || st.kind === 'bunker_stairs') };
+  const detection = Math.min(100, 25 + (watch * 5 + tw.detection + watchDetection(s)) * kEye + (radioNet ? 20 : 0) + (barrier > 50 ? 10 : 0) + gear.detection + guards.detection + forewarned(s) + villageWatch(s));
+  return { visibility: Math.min(100, visibility + gear.visibility + tw.visibility), fortress, barrier: Math.min(100, barrier + gear.barrier), detection, fighters, deter: gear.deter, signs: gear.signs, safeRoom: gear.safeRoom, armed: armed(s), firepower: firepower(s) * gear.fight * tw.fire, bunker: fin.some(st => st.kind === 'bunker_hatch' || st.kind === 'bunker_stairs') };
 }
 
 // ─────────────────────────────────────────────────────────────────────────
 // Encounters
 // ─────────────────────────────────────────────────────────────────────────
 
-export type EncounterKind = 'arrival' | 'looters' | 'gang' | 'refugees' | 'requisition' | 'neighbor_help' | 'trader' | 'horde' | 'patrol' | 'militia' | 'break_in' | 'ransom' | 'trial_end' | 'tunnelers' | 'kin' | 'shelter' | 'move_in' | 'stranded';
+export type EncounterKind = 'guard_stay' | 'arrival' | 'looters' | 'gang' | 'refugees' | 'requisition' | 'neighbor_help' | 'trader' | 'horde' | 'patrol' | 'militia' | 'break_in' | 'ransom' | 'trial_end' | 'tunnelers' | 'kin' | 'shelter' | 'move_in' | 'stranded';
 export type Stance = 'hide' | 'parley' | 'warn' | 'defend' | 'trade' | 'take_in' | 'trial' | 'turn_away' | 'call_911' | 'shout' | 'confront' | 'pay' | 'refuse' | 'ambush' | 'flood' | 'collapse' | 'ignore' | 'build_first' | 'move_sell' | 'move_keep' | 'move_lease' | 'hold_on' | 'drive_now' | 'back_roads' | 'resupply';
 
 export interface Encounter {
@@ -213,6 +219,8 @@ export interface Encounter {
   /** A crew a scout sent for (`scoutCrew`): more of them, and they look where the family hides and keeps things. */
   scouted?: string;
   /** Tunnelers (sim/tunnelers.ts): found digging under the wall (`warning`, the window to act), or up inside it (`inside`). */
+  /** A contract guard asking to stay on when the world ends (sim/guards.ts): his id on the payroll. */
+  guardId?: string;
   /** A relative asking to join (sim/kin.ts): the savings they bring, and whether it is after the hit. */
   kin?: { savings: number; late: boolean };
   /** Strangers (sim/newcomers.ts): which kind of person, what they really are (hidden), what they say, the questions asked so far, what you noticed, a wound, tools and dogs they bring. */
@@ -671,6 +679,9 @@ export function resolve(s: GameState, stance: Stance): Outcome {
   } else if (e.kind === 'trial_end') {
     const o = resolveTrialEnd(s, e, stance);
     title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines);
+  } else if (e.kind === 'guard_stay') {
+    const o = resolveGuardStay(s, e, stance);
+    title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines);
   } else if (e.kind === 'kin') {
     const o = resolveKin(s, e, stance);
     title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines);
@@ -745,7 +756,7 @@ export function resolve(s: GameState, stance: Stance): Outcome {
         if (!p.bunker && p.safeRoom) lines.push('Everyone sat it out behind the safe-room door.');
       }
     } else if (stance === 'parley' || stance === 'trade') {
-      const calm = r() * 100 < 35 + negotiator * 7 + (e.kind === 'refugees' ? 30 : 0) + (e.kind === 'requisition' ? 15 : 0) - (e.kind === 'gang' ? 15 : 0) - (e.temper === 'savage' ? 45 : e.temper === 'hard' ? 10 : 0);
+      const calm = r() * 100 < 35 + negotiator * 7 + gatePosture(s).parley + (e.kind === 'refugees' ? 30 : 0) + (e.kind === 'requisition' ? 15 : 0) - (e.kind === 'gang' ? 15 : 0) - (e.temper === 'savage' ? 45 : e.temper === 'hard' ? 10 : 0);
       if (calm) {
         const paid = take(s, e.wants ?? {}, stance === 'trade' ? 0.5 : 0.3);
         title = 'Talked down'; text = `${negotiator >= 5 ? 'A good talker at the gate. ' : ''}They leave with something, and nobody fired a shot.`; tone = 'mixed';
@@ -757,7 +768,7 @@ export function resolve(s: GameState, stance: Stance): Outcome {
       }
     }
     if (stance === 'warn') {
-      const deterred = r() * 100 < p.fortress * 0.6 + (p.deter ?? 0) + (p.armed ? 15 : -10) + (e.armed ? 0 : 25) + (e.kind === 'looters' ? 20 : 0) - (e.kind === 'gang' ? 25 : 0);
+      const deterred = r() * 100 < p.fortress * 0.6 + (p.deter ?? 0) + (ORGANIZED.has(e.kind) ? 0 : p.signs ?? 0) + (p.armed ? 15 : -10) + (e.armed ? 0 : 25) + (e.kind === 'looters' ? 20 : 0) - (e.kind === 'gang' ? 25 : 0);
       if (deterred) { title = 'They thought better of it'; text = 'A shot over the truck and the walls behind it. They turn around in the road.'; tone = 'good'; if (e.kind === 'refugees') g.humanity = Math.max(0, g.humanity - 5); }
       else stance = 'defend';
     }

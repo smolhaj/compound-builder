@@ -34,6 +34,7 @@ import { pickedOver } from './scavenge';
 import { mulberry32, pick } from './rng';
 import { log } from './economy';
 import { driveTrip, tripPlan } from './vehicles';
+import { arrivalRoll, hasSallyGate, intercomLive } from './gateSecurity';
 
 /** The crossroads market: kilometers from the place (a drive there and back). */
 export const MARKET_KM = 12;
@@ -305,6 +306,18 @@ export function roadHome(s: GameState, r: () => number): string[] {
     if (!t.armed && r() < 0.3) { ps.needs.hurt.push({ what: 'beaten and robbed on the road', sev: 25, trauma: true }); ps.needs.health = Math.max(1, ps.needs.health - 10); }
     out.push(`${p.first} was robbed on the road home from the market${lost.length ? ' and lost everything the day bought' : ''}.`);
     return out;
+  }
+  // the drive (sim/gateSecurity.ts): a vehicle coming home is at its most exposed with the gate open. Its own roll: nothing else moves.
+  if (t.vehicle) {
+    const roll = arrivalRoll(s, { carried: t.carried, armed: !!t.armed }, 1);
+    if (roll === 'foiled') out.push(`A second car turned in behind ${p.first}'s at the drive. ${hasSallyGate(s) ? 'The outer gate had already shut before the inner one opened' : intercomLive(s) ? 'The camera showed it in time, and the gate stayed shut' : 'The guard held the gate until it had gone'}: they turned round at the road.`);
+    if (roll === 'ambush') {
+      const lost = t.bought ?? [];
+      for (const l of lost) mmove(s, l.good as MarketGood, -Math.min(l.qty, mhave(s, l.good as MarketGood)));
+      if (!t.armed) { ps.needs.hurt.push({ what: 'ambushed at the gate', sev: 20, trauma: true }); ps.needs.health = Math.max(1, ps.needs.health - 8); }
+      out.push(`${p.first} slowed for the gate and two men came out of the ditch before it was open${lost.length ? ": the day's buys are gone" : ''}${t.armed ? '. A shot over their heads and they ran, but not before they had what was on the seat' : ''}. A second gate, a camera or a guard at the drive would have stopped it.`);
+      return out;
+    }
   }
   // followed home: somebody wants to know where those goods came from
   const neg = p.skills.negotiator, hunter = p.skills.hunter;

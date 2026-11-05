@@ -71,7 +71,9 @@ export function styleFacts(s: GameState): StyleFacts {
 export const styleNow = (s: GameState): PlayStyle | null => styleOf(styleFacts(s));
 
 /** The report card line: what kind of place this turned out to be. */
-export function placeLine(s: GameState): string {
+export function placeLine(s: GameState, wiped = false): string {
   const st = stageNow(s), pl = styleNow(s);
+  // after a wipe nobody is left to have "grown into a town": only how the place was run
+  if (wiped) return pl ? `They had run the place as a ${STYLE_NAME[pl]}.` : 'The place never grew beyond one household.';
   return `${STAGE_NAME[st]}${pl ? `, run as a ${STYLE_NAME[pl]}: ${STYLE_BLURB[pl].toLowerCase()}` : '.'}`;
 }

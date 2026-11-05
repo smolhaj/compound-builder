@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { newGame, type GameState, type Structure } from './state';
 import { step } from './engine';
 import { reportCard, tallyDay } from './report';
+import { disasterSky } from './nuclear';
+import { fallDoneDay } from './disaster';
 
 const built = (g: GameState, id: string, kind: string): Structure => {
   const st: Structure = { id, kind, x: 10, z: 10, rot: 0, stage: 5, done: 0, supplied: true, finishedAt: 0 };
@@ -29,17 +31,6 @@ describe('endings and the report card', () => {
     for (const ps of g.personState) ps.needs.died = 1;
     expect(tallyDay(g)?.kind).toBe('wipe');
     expect(reportCard(g).grade).toBe('F');
-  });
-
-  it('a wipe leaves no gate card or incoming raid behind the report card', () => {
-    const g = newGame(1, 105, 2027, { mode: 'scenario', peace: 'short', kind: 'nuclear' });
-    g.clock.t = g.disaster.hitAt + 5;
-    for (const ps of g.personState) ps.needs.died = 1;
-    g.gate.incoming = { e: { kind: 'looters' } as never, at: g.clock.t + 0.1 } as never;
-    g.gate.pending = { kind: 'looters' } as never;
-    expect(tallyDay(g)?.kind).toBe('wipe');
-    expect(g.gate.pending).toBeNull();
-    expect(g.gate.incoming).toBeUndefined();
   });
 
   it('everyone gone is a wipe in the quiet years before the next hit too, and after a card that was played on', () => {
@@ -97,5 +88,46 @@ describe('endings and the report card', () => {
     expect(lines).toMatch(/turned away 7/);
     expect(lines).toMatch(/took in 3/);
     expect(lines).toMatch(/shelter held/);
+  });
+
+  it('a wipe clears a pending gate card and an arrival on the road, and the card does not say the place grew into a town', () => {
+    const g = newGame(1, 105, 2027, { mode: 'scenario', peace: 'short', kind: 'asteroid' });
+    g.clock.t = g.disaster.hitAt + 76;
+    g.gate.tookIn = 13;
+    g.gate.pending = { id: 'e1', kind: 'trader', day: 1, title: 'A trader', dossier: [], size: 1, armed: false, strength: 0, stances: ['trade', 'turn_away'] } as never;
+    g.gate.incoming = { e: g.gate.pending as never, at: g.clock.t + 0.1 };
+    for (const ps of g.personState) ps.needs.died = 1;
+    expect(tallyDay(g)?.kind).toBe('wipe');
+    expect(g.gate.pending).toBeNull();
+    expect(g.gate.incoming).toBeNull();
+    const r = reportCard(g);
+    expect(r.lines.join(' ')).not.toMatch(/grew into a town/);
+    expect(r.facts[0][1]).toMatch(/^0 of \d+$/);
+  });
+
+  it('a drought is not "settled" before its tracks have finished falling (no new_normal at day 90)', () => {
+    const g = newGame(5, 105, 2027, { mode: 'scenario', peace: 'short', kind: 'drought' });
+    expect(fallDoneDay(g.disaster)).toBeGreaterThan(200);
+    g.disaster.fate = 'partial';
+    g.disaster.ceiling = { stores: 0.4, deliveries: 0.4, law: 0.4 };
+    g.clock.t = g.disaster.hitAt + 92;
+    g.stats.days = 91; g.stats.okSince = 0;
+    g.food.ateKcal = g.food.needKcal = 1;
+    expect(tallyDay(g)).toBeNull();
+    expect(g.stats.okSince).toBe(-1);
+  });
+
+  it('the ash-winter sky thickens over the first week after the hit and holds while the cold does', () => {
+    const g = newGame(2, 105, 2027, { mode: 'scenario', peace: 'short', kind: 'ash_winter' });
+    g.clock.t = g.disaster.hitAt - 0.5;
+    expect(disasterSky(g).haze).toBe(0);
+    g.clock.t = g.disaster.hitAt + 0.5;
+    const a = disasterSky(g).haze;
+    g.clock.t = g.disaster.hitAt + 40;
+    const b = disasterSky(g).haze;
+    expect(a).toBeGreaterThan(0);
+    expect(b).toBeGreaterThan(0.8);
+    g.clock.t = g.disaster.hitAt + 800;   // the cold is over (a year and a half after the first year)
+    expect(disasterSky(g).haze).toBeLessThan(0.35);
   });
 });

@@ -17,6 +17,7 @@ export type MaterialId = 'lumber' | 'logs' | 'firewood' | 'fieldstone' | 'concre
   | 'mines' | 'greenhouse_kit' | 'fruit_trees' | 'ground_sensor' | 'passage_hatch' | 'vehicle_parts'
   | 'bugout_bag' | 'bugout_cache' | 'security_door' | 'window_shutters' | 'ballistic_panels' | 'safe_room_hardened'
   | 'gun_mount' | 'turret_head' | 'ai_sensor_module' | 'clinic_suite' | 'radio_mast' | 'gate_house'
+  | 'gate_intercom' | 'gate_motor' | 'sally_gate' | 'trellis_gates'
   | 'tent' | 'sleeping_bag'
   | 'jon_boat' | 'skiff'
   | 'poly_film' | 'tunnel_kit_small' | 'tunnel_kit_high' | 'aqua_kit' | 'tilapia_fry'
@@ -167,6 +168,10 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   clinic_suite: { id: 'clinic_suite', name: 'Clinic suite', unit: 'an exam room fitted in the house: exam table, autoclave, oxygen concentrator, suction, an AED, IV and suture stock, locked cabinets, a sink (works as a medical bay)', price: 42000 },
   radio_mast: { id: 'radio_mast', name: 'Radio mast & repeater', unit: 'a 20 m guyed mast, a beam antenna, a VHF/UHF repeater and a battery cabinet: the net reaches farther (needs a radio)', price: 11500 },
   gate_house: { id: 'gate_house', name: 'Hardened gate house', unit: 'a prefab steel guard house at the drive: ballistic glass, a rising vehicle barrier, an intercom and a camera pole', price: 68000 },
+  gate_intercom: { id: 'gate_intercom', name: 'Gate intercom and camera', unit: 'a weatherproof intercom with a camera on the gate post: you see and speak to whoever is at the gate before it opens (needs power)', price: 1800 },
+  gate_motor: { id: 'gate_motor', name: 'Caged gate motor', unit: 'a sliding-gate motor inside a welded steel cage with anti-lift brackets, so it cannot be lifted off its rack (needs power to run; a manual release opens the gate by hand without it)', price: 3500 },
+  sally_gate: { id: 'sally_gate', name: 'Double gate (vehicle sally port)', unit: 'a second gate and two steel side walls inside the first: the outer gate shuts behind a vehicle before the inner one opens, so it is never exposed to the road with a gate open', price: 16000 },
+  trellis_gates: { id: 'trellis_gates', name: 'Security (trellis) gates', unit: 'a steel trellis gate with a sturdy lock in front of every access door of the house, welded to the frame, fixed on the outside (a second door to get through)', price: 3200 },
   safe_room_hardened: { id: 'safe_room_hardened', name: 'Hardened safe room', unit: 'a poured safe room: ballistic lining, a vault door, a filtered air vent, a water drum and a bunk (replaces the safe room)', price: 24000 },
   bugout_bag: { id: 'bugout_bag', name: 'Bug-out bag', unit: 'a packed 72-hour pack for one person: water filter, dried food, shelter, first aid, map and a light (about 18 kg)', price: 260 },
   bugout_cache: { id: 'bugout_cache', name: 'Bug-out cache', unit: 'sealed drums buried at a second site, a day or two away: two weeks of food and water, fuel, a medical kit and tools for the family', price: 2200 },
