@@ -12,6 +12,9 @@ import { dockProblem, isDock } from '../sim/waterfront';
 import { siteNote } from '../sim/microclimate';
 import { onJustPlaced, type Spot } from './buildkit/justPlaced';
 import { stakeSpendAsk } from '../sim/spendGuard';
+import { DRIVE_W } from './region/access';
+import { YARD_GAPS, YARD_SITE, YARD_SLIDES, spurGradeOk, yardBesideDrive, yardSpur } from './buildkit/yardSite';
+import { arcNear, distToPolyline, pointAtArc } from './perimeter/gateKitLayout';
 import { clashText, padClash, padSnap } from './buildkit/padRules';
 
 /**
@@ -28,6 +31,10 @@ export class PlacementTool {
   private _ghost: THREE.Group | null = null;
   private _kind: string | null = null;
   private _rot = 0;
+  /** A vehicle yard near the drive sits beside it, turned to its heading with the gate toward it (buildkit/yardSite); R flips it to the other side. */
+  private _yardRot: number | null = null;
+  private _yardFlip = false;
+  private get _turn(): number { return this._yardRot ?? this._rot; }
   private _at: [number, number] | null = null;
   private _ok = false;
   /** The nearest clear spot when the pad clashes with a neighbour's (S jumps there). */
@@ -70,7 +77,7 @@ export class PlacementTool {
     });
     on(window, 'keydown', e => {
       if (!this._kind) return;
-      if (e.code === 'KeyR') { this._rot = (this._rot + 1) % 4; this._update(); }
+      if (e.code === 'KeyR') { if (this._yardRot !== null) this._yardFlip = !this._yardFlip; else this._rot = (this._rot + 1) % 4; this._update(); }
       if (e.code === 'KeyS' && !e.ctrlKey && !e.metaKey && this._snap) { this._at = [this._snap[0], this._snap[1]]; this._update(); }
       if (e.code === 'Escape') this.setKind(null);
     });
@@ -84,6 +91,7 @@ export class PlacementTool {
     const wasPlacing = this._kind !== null;
     this._kind = kind;
     this._just = null;
+    this._yardRot = null; this._yardFlip = false;
     if (this._ghost) { this._scene.remove(this._ghost); this._ghost.traverse(o => (o as THREE.Mesh).geometry?.dispose()); this._ghost = null; }
     if (kind) {
       if (isUnderground(KIT[kind])) useWorldStore.getState().setUnderground(true);
@@ -110,11 +118,11 @@ export class PlacementTool {
     const store = useGameStore.getState();
     // the county permit fee would take the cash under the living reserve (or negative): ask first, never block (sim/spendGuard)
     const ask = force ? null : stakeSpendAsk(store.game, kind);
-    if (ask) { store.askSpend({ kind, x, z, rot: this._rot, cost: ask.cost, after: ask.check.after, reserve: ask.check.reserve, cannot: ask.cannot }); return; }
+    if (ask) { store.askSpend({ kind, x, z, rot: this._turn, cost: ask.cost, after: ask.check.after, reserve: ask.check.reserve, cannot: ask.cannot }); return; }
     const before = store.game.structures.length;
-    store.plan(kind, x, z, this._rot);
+    store.plan(kind, x, z, this._turn);
     const placed = useGameStore.getState().game.structures.length > before;
-    this._just = { x, z, rot: this._rot };
+    this._just = { x, z, rot: this._turn };
     // one click stakes one building and puts the tool away (Shift-click keeps it armed to stake several), with a line saying so
     if (placed && !repeat) {
       this.setKind(null);
@@ -152,6 +160,7 @@ export class PlacementTool {
     const hit = this._ray.intersectObject(this._world.terrain.mesh, false)[0];
     if (!hit) return;
     this._at = [hit.point.x, hit.point.z];
+    this._yardFlip = false;
     this._update();
   }
 
@@ -159,30 +168,59 @@ export class PlacementTool {
     const g = this._ghost, kind = this._kind;
     if (!g || !kind || !this._at) return;
     const def = KIT[kind];
-    const [x, z] = snapCenter(def, this._at[0], this._at[1], this._rot);
+    let [x, z] = snapCenter(def, this._at[0], this._at[1], this._rot);
+    // beside the drive: the yard's own site (a diagonal drive turns it a fractional quarter)
+    this._yardRot = null;
+    const drive = kind === 'vehicle_yard' ? this._world.access.drive : undefined;
+    if (drive && distToPolyline(drive, this._at) < YARD_SITE.snapR) {
+      // nearest setback whose ground will take a yard (the road's own cut bank or fill can be too steep right at its edge)
+      const placed0 = useGameStore.getState().game.structures;
+      let ys = null as ReturnType<typeof yardBesideDrive>;
+      const nat = yardBesideDrive(drive, this._at, 1, DRIVE_W)?.side ?? 1, sd: 1 | -1 = this._yardFlip ? (nat === 1 ? -1 : 1) : nat;
+      search: for (const gap of YARD_GAPS) for (const along of YARD_SLIDES) {
+        const c = yardBesideDrive(drive, this._at, def.cellsX * 0.25, DRIVE_W, sd, gap, along);
+        if (!c) break search;
+        if (siteProblem(def, c.x, c.z, c.rot, this._site, placed0) === null && !padClash(def, c.x, c.z, c.rot, this._site.height, placed0) && this._spurOk(def, c)) { ys = c; break search; }
+      }
+      if (ys) { x = ys.x; z = ys.z; this._yardRot = ys.rot; }
+    }
     this._at = [x, z];
-    if (onJustPlaced(this._just, x, z, this._rot)) { this._ok = false; g.visible = false; useGameStore.getState().setToolProblem(null); return; }
+    if (onJustPlaced(this._just, x, z, this._turn)) { this._ok = false; g.visible = false; useGameStore.getState().setToolProblem(null); return; }
     this._just = null;
     const placed = useGameStore.getState().game.structures;
-    const problem = siteProblem(def, x, z, this._rot, this._site, placed);
+    const problem = siteProblem(def, x, z, this._turn, this._site, placed);
     // (a spot the plain rules allow can still grade a pad into a neighbour's, at another level)
-    const clash = problem === null ? padClash(def, x, z, this._rot, this._site.height, placed) : null;
+    const clash = problem === null ? padClash(def, x, z, this._turn, this._site.height, placed) : null;
     this._snap = null;
     let clashMsg: string | null = null;
     if (clash) {
-      this._snap = padSnap(def, x, z, this._rot, this._site.height, placed, (px, pz) => snapCenter(def, px, pz, this._rot), (px, pz) => siteProblem(def, px, pz, this._rot, this._site, placed) === null);
+      this._snap = padSnap(def, x, z, this._turn, this._site.height, placed, (px, pz) => snapCenter(def, px, pz, this._turn), (px, pz) => siteProblem(def, px, pz, this._turn, this._site, placed) === null);
       clashMsg = clashText(clash, this._snap ? Math.hypot(this._snap[0] - x, this._snap[1] - z) * 6 : null);
     }
     this._ok = problem === null && !clash;
-    const fp = footprint(def, x, z, this._rot);
+    const fp = footprint(def, x, z, this._turn);
     // a bunker room's ghost hangs at its bunker's floor level, under the see-through ground
-    const y = isUnderground(def) ? previewDatum(def, x, z, this._rot, this._site.height, placed) ?? this._site.height(x, z) - DEPTH : def.waterside ? (this._world.parcel.lakeY ?? this._world.parcel.creek.waterY(x)) + 0.02 : this._world.parcel.padHeight(fp.x0, fp.z0, fp.x1, fp.z1);
+    const y = isUnderground(def) ? previewDatum(def, x, z, this._turn, this._site.height, placed) ?? this._site.height(x, z) - DEPTH : def.waterside ? (this._world.parcel.lakeY ?? this._world.parcel.creek.waterY(x)) + 0.02 : this._world.parcel.padHeight(fp.x0, fp.z0, fp.x1, fp.z1);
     g.position.set(x, y, z);
-    g.rotation.y = this._rot * Math.PI / 2;
+    g.rotation.y = this._turn * Math.PI / 2;
     g.visible = true;
     const m = this._ok ? this._okMat : this._badMat;
     g.traverse(o => { if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).material = m; });
     useGameStore.getState().setToolProblem(problem ? PROBLEM_TEXT[problem] : clashMsg);
+  }
+
+  /** The gravel spur from the yard's gate must meet the road's edge at a drivable grade: not a yard on a bench above a road cut. */
+  private _spurOk(def: (typeof KIT)[string], c: { x: number; z: number; rot: number }): boolean {
+    const half = def.cellsX * 0.25, drive = this._world.access.drive, th = c.rot * Math.PI / 2, fx = Math.sin(th), fz = Math.cos(th);
+    const spur = yardSpur(drive, c.x, c.z, c.rot, half, DRIVE_W), fp = footprint(def, c.x, c.z, c.rot);
+    const pad = this._world.parcel.padHeight(fp.x0, fp.z0, fp.x1, fp.z1), road = this._world.groundAt(c.x + fx * (half + spur), c.z + fz * (half + spur));
+    // and no retaining wall (a road cut's stone face) across the way from the gate to the road
+    for (let k = 0; k <= 4; k++) { const d = half + (spur + 0.25) * k / 4; if (this._world.walls.blocks(c.x + fx * d, c.z + fz * d)) return false; }
+    // the road itself must be at the spur's end: not in a cut below it or on a fill above it (the road bed's bank starts at its edge)
+    const g: [number, number] = [c.x + fx * half, c.z + fz * half], rc = pointAtArc(drive, arcNear(drive, g)), roadY = this._world.groundAt(rc[0], rc[1]);
+    if (Math.abs(road - roadY) > 0.08) return false;
+    for (const k of [-0.5, 0.5]) { const ex = c.x + fx * (half + spur) - fz * k, ez = c.z + fz * (half + spur) + fx * k; if (Math.abs(this._world.groundAt(ex, ez) - roadY) > 0.1 + 0.15 * Math.abs(k)) return false; }
+    return spurGradeOk(spur, roadY - pad);
   }
 
   dispose(): void {

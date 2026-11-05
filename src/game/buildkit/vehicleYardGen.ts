@@ -7,12 +7,12 @@
 import * as THREE from 'three';
 import type { KitPieceDef } from './kit';
 import { CELL } from './kit';
-import { box, Parts } from './shell';
+import { box, Parts, type BuildOpts } from './shell';
 
 const M = 1 / 6;
 const cylY = (r: number, h: number, x: number, y: number, z: number, seg = 8) => new THREE.CylinderGeometry(r, r, h, seg).translate(x, y + h / 2, z);
 
-export function vehicleYard(def: KitPieceDef, seed = 1): THREE.Group {
+export function vehicleYard(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
   const p = new Parts(seed);
   const W = def.cellsX * CELL, D = def.cellsZ * CELL, hw = W / 2 - 0.03, hd = D / 2 - 0.03;
   p.layer = 'stakes';
@@ -20,6 +20,21 @@ export function vehicleYard(def: KitPieceDef, seed = 1): THREE.Group {
   p.layer = 'foundation';
   p.add('gravel', box(W - 0.04, 0.012, D - 0.04, 0, -0.005, 0));
   p.add('concrete', box(W - 0.04, 0.02, 0.05, 0, -0.004, hd - 0.02));                                    // the apron at the gate
+  // the spur: a gravel apron from the gate across the strip of ground to the drive (a yard sited beside the road, game/buildkit/yardSite, stands YARD_SITE.gap
+  // or more from its edge; `opts.spur` is that distance); it flares to the road and sinks 0.2 into the ground so it never floats over the skirt of the pad
+  const spurL = opts.spur ?? 0.4, spurW = 4.2 * M + 0.1;
+  {
+    // gravel laid on the ground from the gate to the road's edge, flaring to meet the road: draped on the ground's own height (opts.spurH), with a 0.25 skirt so it never floats
+    const NX = 6, NZ = 12, g = new THREE.BoxGeometry(1, 1, 1, NX, 1, NZ), pos = g.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const t = pos.getZ(i) + 0.5, lx = pos.getX(i) * spurW * (1 + 0.2 * t), lz = hd + t * spurL;
+      // the highest ground within a terrain cell of the point (the terrain mesh is triangulated coarser than the ground is sampled), so the gravel never sinks into a triangle
+      const h = opts.spurH ? Math.max(opts.spurH(lx, lz), opts.spurH(lx + 0.4, lz), opts.spurH(lx - 0.4, lz), opts.spurH(lx, lz + 0.4), opts.spurH(lx, lz - 0.4)) : 0;
+      const yt = Math.max(-0.5, Math.min(0.5, h)) + 0.04;
+      pos.setXYZ(i, lx, pos.getY(i) > 0 ? yt : yt - 0.25, lz);
+    }
+    p.add('gravel', g);
+  }
   p.layer = 'frame';
   const H = 2.4 * M, gate = 4.2 * M;
   // the fence: steel posts every 3 m, a top and a bottom rail, wire mesh between, on all four sides; the front is split by the drive gate

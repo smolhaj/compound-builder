@@ -595,6 +595,8 @@ export function footprint(def: KitPieceDef, x: number, z: number, rot: number, w
 
 /** Rotate a local offset by q quarter turns (counter-clockwise seen from above, +x → −z). */
 export function rotQ(lx: number, lz: number, q: number): [number, number] {
+  // a yard sited along a diagonal drive stands at a fractional turn (rot * pi / 2, the way three turns the group)
+  if (!Number.isInteger(q)) { const th = q * Math.PI / 2, c = Math.cos(th), s = Math.sin(th); return [lx * c + lz * s, -lx * s + lz * c]; }
   switch (((q % 4) + 4) % 4) {
     case 0: return [lx, lz];
     case 1: return [lz, -lx];
@@ -658,10 +660,18 @@ export function placementProblem(def: KitPieceDef, x: number, z: number, rot: nu
   const N = 4;
   const hs: number[][] = [];
   let wet = 0, dry = 0;
+  // a piece at a fractional turn (a yard along a diagonal drive) is tested on its own rotated rectangle, not on the box round it
+  const turned = !Number.isInteger(rot);
+  const hx = def.cellsX * CELL / 2, hz = def.cellsZ * CELL / 2, f0 = !below ? def.frontCells * CELL : 0;
+  const spot = (i: number, j: number): [number, number] => {
+    if (!turned) return [r.x0 + (r.x1 - r.x0) * i / N, r.z0 + (r.z1 - r.z0) * j / N];
+    const [wx, wz] = rotQ(-hx + 2 * hx * i / N, -hz + (2 * hz + f0) * j / N, rot);
+    return [x + wx, z + wz];
+  };
   for (let i = 0; i <= N; i++) {
     const row: number[] = [];
     for (let j = 0; j <= N; j++) {
-      const px = r.x0 + (r.x1 - r.x0) * i / N, pz = r.z0 + (r.z1 - r.z0) * j / N;
+      const [px, pz] = spot(i, j);
       if (!site.owned(px, pz)) return 'off_parcel';
       if (def.waterside) { if (site.water(px, pz)) wet++; else dry++; }
       else if (site.water(px, pz)) return 'water';
@@ -672,8 +682,9 @@ export function placementProblem(def: KitPieceDef, x: number, z: number, rot: nu
   }
   // steepest grade across the footprint along either axis
   let grade = 0;
-  for (let j = 0; j <= N; j++) grade = Math.max(grade, Math.abs(hs[N][j] - hs[0][j]) / (r.x1 - r.x0));
-  for (let i = 0; i <= N; i++) grade = Math.max(grade, Math.abs(hs[i][N] - hs[i][0]) / (r.z1 - r.z0));
+  const runX = turned ? 2 * hx : r.x1 - r.x0, runZ = turned ? 2 * hz + f0 : r.z1 - r.z0;
+  for (let j = 0; j <= N; j++) grade = Math.max(grade, Math.abs(hs[N][j] - hs[0][j]) / runX);
+  for (let i = 0; i <= N; i++) grade = Math.max(grade, Math.abs(hs[i][N] - hs[i][0]) / runZ);
   // (a floor hatch stands on its house's graded pad, whatever the natural ground does)
   const isFloorHatch = def.id === 'bunker_floorhatch';
   if (grade > def.maxSlope && !isFloorHatch) return 'too_steep';
