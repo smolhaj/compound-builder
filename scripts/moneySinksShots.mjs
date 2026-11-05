@@ -37,7 +37,6 @@ try {
   await page.waitForTimeout(400);
   await page.evaluate(() => window.__cb.game.getState().openShop(true, 'defense'));
   await page.waitForTimeout(600); await shot('shop-kit-security');
-  await page.getByRole('button', { name: 'Kit & security' }).click(); await page.waitForTimeout(400);
   await page.evaluate(() => { const els = [...document.querySelectorAll('*')].filter(e => e.scrollHeight > e.clientHeight + 40 && getComputedStyle(e).overflowY !== 'visible'); els.forEach(e => { e.scrollTop = e.scrollHeight; }); });
   await page.waitForTimeout(400); await shot('shop-kit-security-bottom');
   await page.evaluate(() => window.__cb.game.getState().openShop(false));
