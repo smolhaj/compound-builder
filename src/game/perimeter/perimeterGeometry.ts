@@ -903,8 +903,8 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
         }
         if (K.signs) {   // the armed-response firm's sign on the gate post (sim/armedResponse.ts)
           const sx = p0.x + nx * 0.05 * M, sz = p0.z + nz * 0.05 * M;
-          add('paint_yellow', new THREE.BoxGeometry(0.02 * M, 0.34 * M, 0.5 * M).rotateY(ang + Math.PI / 2).translate(sx, ground(sx, sz) + 1.9 * M, sz));
-          add('paint_dado', new THREE.BoxGeometry(0.022 * M, 0.2 * M, 0.46 * M).rotateY(ang + Math.PI / 2).translate(sx, ground(sx, sz) + 1.9 * M, sz));
+          add('paint_yellow', new THREE.BoxGeometry(0.5 * M, 0.34 * M, 0.02 * M).rotateY(ang).translate(sx, ground(sx, sz) + 1.9 * M, sz));
+          add('paint_dado', new THREE.BoxGeometry(0.46 * M, 0.2 * M, 0.024 * M).rotateY(ang).translate(sx + nx * 0.012 * M, ground(sx, sz) + 1.9 * M, sz + nz * 0.012 * M));
         }
         if (K.motor) {
           const cx = p0.x - p0.dx * 0.4 * M + nx * 0.5 * M, cz = p0.z - p0.dz * 0.4 * M + nz * 0.5 * M;
