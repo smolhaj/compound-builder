@@ -36,8 +36,8 @@ export const INSIDER = {
   PLANT: 0.05,
   /** Loyalty (0-100) a new guard starts at, and the line below which he can be bought. */
   START: 55, LOW_LINE: 50,
-  /** Chance a day an unvetted guard is turned: the floor, plus this much at loyalty 0 (linear up to LOW_LINE). */
-  BASE: 0.0002, LOW: 0.006,
+  /** Chance a day an unvetted guard is turned: the floor (x 2.2 - loyalty/40), plus this much at loyalty 0 (linear up to LOW_LINE). */
+  BASE: 0.00014, LOW: 0.0017,
   /** Chance a day a compromised guard does something, and what (leak, open the gate, steal; sums to 1). */
   ACT: 0.01, ACTS: { leak: 0.4, open: 0.3, steal: 0.3 },
   /** Chance a day a compromised guard is noticed, plus powered cameras. */
@@ -66,7 +66,7 @@ export const isVetted = (g: Pick<Guard, 'vet'>): boolean => g.vet === 'cleared';
 /** Can this guard betray you? Only an unvetted one who is a plant or has been bought. */
 export const isThreat = (g: Guard): boolean => !isVetted(g) && !!(g.plant || g.turned);
 /** The chance a day an unvetted, honest guard is bought, from his loyalty. */
-export const turnChance = (loyalty: number): number => INSIDER.BASE * Math.max(0.25, 1.5 - loyalty / 100) + INSIDER.LOW * Math.max(0, (INSIDER.LOW_LINE - loyalty) / INSIDER.LOW_LINE);
+export const turnChance = (loyalty: number): number => INSIDER.BASE * Math.max(0.05, 2.2 - loyalty / 40) + INSIDER.LOW * Math.max(0, (INSIDER.LOW_LINE - loyalty) / INSIDER.LOW_LINE);
 
 /** Why a check cannot be ordered now (null: it can). */
 export function vetProblem(s: GameState, id: string): string | null {

@@ -95,7 +95,8 @@ export function applyForPermit(s: GameState, st: Structure): void {
   if (!needsPermit(st.kind) || st.pre) return;
   if (!countyWorks(s)) { st.permit = 'none'; return; }   // nobody at the counter
   if (!s.paper.permits) { st.permit = 'none'; return; }
-  const fee = permitFee(s, st.kind);
+  // (callers refuse a staking they cannot pay for: spendGuard.permitAffordable; this is the backstop, so cash never goes below zero)
+  const fee = s.disaster.mode === 'god' ? permitFee(s, st.kind) : Math.min(permitFee(s, st.kind), Math.max(0, Math.floor(s.money)));
   s.money -= fee;
   st.permit = 'review';
   st.permitAt = s.clock.t + reviewDays(s, st.kind);

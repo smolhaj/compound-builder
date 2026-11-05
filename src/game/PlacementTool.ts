@@ -110,7 +110,7 @@ export class PlacementTool {
     const store = useGameStore.getState();
     // the county permit fee would take the cash under the living reserve (or negative): ask first, never block (sim/spendGuard)
     const ask = force ? null : stakeSpendAsk(store.game, kind);
-    if (ask) { store.askSpend({ kind, x, z, rot: this._rot, cost: ask.cost, after: ask.check.after, reserve: ask.check.reserve }); return; }
+    if (ask) { store.askSpend({ kind, x, z, rot: this._rot, cost: ask.cost, after: ask.check.after, reserve: ask.check.reserve, cannot: ask.cannot }); return; }
     const before = store.game.structures.length;
     store.plan(kind, x, z, this._rot);
     const placed = useGameStore.getState().game.structures.length > before;
