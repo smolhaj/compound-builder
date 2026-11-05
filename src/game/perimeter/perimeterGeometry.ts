@@ -901,7 +901,7 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
           add('glass', new THREE.SphereGeometry(0.04 * M, 6, 4).translate(ox - nx * 0.1 * M, ground(ox, oz) + 1.34 * M, oz - nz * 0.1 * M));   // its lens (toward the road)
           add('paint_yellow', new THREE.BoxGeometry(0.1 * M, 0.2 * M, 0.02 * M).rotateY(ang).translate(ox, ground(ox, oz) + 0.95 * M, oz));  // the speaker plate
         }
-        if (K.signs) {   // the armed-response firm's sign on the gate post: a blue plate with a yellow band (sim/armedResponse.ts)
+        if (K.signs) {   // the armed-response firm's sign on the gate post (sim/armedResponse.ts)
           const sx = p0.x + nx * 0.05 * M, sz = p0.z + nz * 0.05 * M;
           add('paint_yellow', new THREE.BoxGeometry(0.02 * M, 0.34 * M, 0.5 * M).rotateY(ang + Math.PI / 2).translate(sx, ground(sx, sz) + 1.9 * M, sz));
           add('paint_dado', new THREE.BoxGeometry(0.022 * M, 0.2 * M, 0.46 * M).rotateY(ang + Math.PI / 2).translate(sx, ground(sx, sz) + 1.9 * M, sz));
