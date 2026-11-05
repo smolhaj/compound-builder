@@ -29,14 +29,16 @@ export const KIT = {
   /** The port's length along the drive, wall line to inner gate (6.9 m: room for a pickup, 0.92 long, with both gates shut), and the least it is built (a pickup and a little). */
   depth: 1.15,
   minDepth: 1.0,
+  /** The least length of the side wall that starts later on a slanted crossing (6.9 m minus nothing: it still holds a pickup with both gates shut). */
+  minLeg: 1.0,
   /** An open inner leaf lies against a side wall's inner face: how far it stands into the clear width (leaf thickness). */
   leafInset: 0.012,
   /** Drive length either side of a point that sets the heading there. */
   headingSpan: 0.5,
   /** Side walls are built in straight pieces at most this long (a piece's heading is within a degree or two of the road's). */
   piece: 0.15,
-  /** The crossing must be at least this square (sine of the angle between wall and drive; roadGate cuts gates for slants down to 0.5 and no further, `gateWidthFor`). */
-  minSin: 0.5,
+  /** The crossing must be at least this square (sine of the angle between wall and drive). A road nearer the wall line than ~12 degrees gets the plain gate; a slanted one gets a longer port (the later side wall starts further along the road, so the port is stretched to still hold a vehicle: `minLeg`). */
+  minSin: 0.2,
 } as const;
 
 export interface Layout {
@@ -206,10 +208,11 @@ export function gateKitLayout(g: Gate, c: Crossing, drive: readonly Pt[], wall: 
   // the port runs `KIT.depth` in along the drive; where the drive turns to run along the wall just inside it (a short facet, a road that hugs the line) the side walls
   // would stand in the wall, so the port is shortened to what clears it, and there is no port at all if it cannot hold a vehicle (`KIT.minDepth`)
   const sL = startArc(L), sR = startArc(-L);
+  const far = Math.max(sL, sR);
   let arc1 = c.driveArc + KIT.depth, sides: [Pt[], Pt[]] = [[], []];
   for (let depth = KIT.depth; ; depth -= 0.05) {
     if (depth < KIT.minDepth - 1e-9) return null;
-    arc1 = c.driveArc + depth;
+    arc1 = Math.max(c.driveArc + depth, far + KIT.minLeg);
     sides = [offsetLine(drive, sL, arc1, L), offsetLine(drive, sR, arc1, -L)];
     const clear = sides.every(sd => sd.every((q, i) => i === 0 || Math.hypot(q[0] - sd[0][0], q[1] - sd[0][1]) < 0.35 || distToPolyline(wall, q) >= 0.07));
     if (clear) break;
@@ -267,6 +270,9 @@ export function gateHouseFrame(drive: readonly Pt[], entry: { crossing: Crossing
   const dn = dot(wd, n) || 1e-6, dt = dot(wd, t);
   let u = 0.5;
   for (const v of [-0.85, -0.35, 0.35, 0.8]) u = Math.max(u, v / dn * dt + 0.5);
-  if (sally) u = Math.max(u, KIT.depth + 0.5);
+  if (sally) {
+    const Lh = KIT.clearHalf + KIT.thick / 2;
+    u = Math.max(u, KIT.depth + 0.5, Math.max(Lh / dn * dt, -Lh / dn * dt) + KIT.minLeg + 0.5);
+  }
   return { origin: pointAtArc(drive, c.driveArc + u), t: headingAt(drive, c.driveArc + u) };
 }

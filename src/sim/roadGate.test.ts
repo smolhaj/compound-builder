@@ -4,7 +4,7 @@ import { enclosure } from './enclosure';
 import { GARAGE_W, GATE_GARAGE } from './garage';
 import { layPropertyWall, planPropertyWall, type PropertyGeometry } from './propertyWall';
 import { coreRect, layFortress, planFortress } from './fortress';
-import { PERIMETER, planRun, upgradeRun, wallLength, type PerimeterKind, type Pt } from './perimeter';
+import { PERIMETER, planRun, runLength, upgradeRun, wallLength, type PerimeterKind, type Pt } from './perimeter';
 import { DRIVE_HALF, MIN_VEHICLE_GATE, ROAD_GATE_W, VEHICLE_HALF, autoRoadGates, crossings, cutRoadGates, gateTakesDrive, isBarrierKind, roadGateStatus, ungatedCrossings } from './roadGate';
 import { defenseReport } from './defenseReport';
 import { longTerm } from './guidance';
@@ -193,6 +193,31 @@ describe('(d) walls and fences drawn by hand', () => {
     const b = autoRoadGates('chain_link', bent, [], d);
     const c = crossings(bent, d)[0];
     expect(gateTakesDrive(b.gates[0], c.at, c.sin)).toBe(true);
+  });
+  it('a very slanted crossing beside a gate the wall already has: the opening takes over that gate\'s span, so the road is gated (no second gate on top)', () => {
+    const d: Pt[] = [[70, 30], [40, 30]];
+    // a wall at about 25 degrees to the drive (sin 0.42), with a short ring gate just beside where the drive meets it
+    const pts: Pt[] = [[40, 22], [75, 38.3]];
+    const c = crossings(pts, d)[0];
+    expect(c.sin).toBeLessThan(0.5);
+    const r = autoRoadGates('stone_wall', pts, [{ at: c.at + 0.9, w: 0.6 }], d);
+    expect(r.gates).toHaveLength(1);
+    expect(gateTakesDrive(r.gates[0], c.at, c.sin)).toBe(true);
+  });
+  it('a closed ring whose seam is where the road crosses is turned so the gate can be centered on the road (the wall is the same wall)', () => {
+    const g = game(), d: Pt[] = [[70, 30], [55, 30]];
+    // a square ring that starts exactly on the drive: a gate cannot straddle the seam
+    const ring: Pt[] = [[60, 30], [60, 40], [50, 40], [50, 20], [60, 20], [60, 30]];
+    const run = planRun(g, 'stone_wall', ring);
+    run.finishedAt = 0;
+    const before = runLength(run.pts);
+    run.gates = [];
+    expect(ungatedCrossings(g, d).length).toBeGreaterThan(0);
+    expect(cutRoadGates(g, d, true)).toBeGreaterThan(0);
+    expect(ungatedCrossings(g, d)).toHaveLength(0);
+    expect(runLength(run.pts)).toBeCloseTo(before, 6);
+    expect(roadGateStatus(g, d).missing).toBe(0);
+    expect(run.pts[0]).toEqual(run.pts[run.pts.length - 1]);
   });
   it('finds and fixes a wall laid out earlier that crosses the driveway with no gate (one click)', () => {
     const g = game(), d = geo(g).drive!, gz = d[0][1];

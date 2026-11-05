@@ -125,10 +125,15 @@ export function autoRoadGates(kind: PerimeterKind, pts: readonly Pt[], gates: re
     if (out.some(g => gateTakesDrive(g, c.at, c.sin))) continue;
     const g = gateAtCrossing(pts, c);
     if (!g) continue;
-    // a man-door the player put there is widened into the vehicle gate rather than doubled
-    const clash = out.findIndex(o => Math.abs(o.at - g.at) < (o.w + g.w) / 2 && !o.garage);
-    if (clash >= 0) out.splice(clash, 1);
-    if (out.some(o => Math.abs(o.at - g.at) < (o.w + g.w) / 2)) continue;
+    // a gate or man-door already there (the player's, or a ring's own) is not doubled: the new gate takes over its span, so the opening still covers it
+    // (a very slanted crossing falls right beside a ring's own gate); if that would be wider than a gate should be, the old one is simply replaced
+    const clashes = out.filter(o => Math.abs(o.at - g.at) < (o.w + g.w) / 2 && !o.garage);
+    if (clashes.length) {
+      const lo = Math.min(g.at - g.w / 2, ...clashes.map(o => o.at - o.w / 2)), hi = Math.max(g.at + g.w / 2, ...clashes.map(o => o.at + o.w / 2));
+      const rl = runLength(pts);
+      if (hi - lo <= MAX_GATE_W + 0.6 && lo >= 0.02 && hi <= rl - 0.02) { g.at = (lo + hi) / 2; g.w = hi - lo; }
+      for (const o of clashes) out.splice(out.indexOf(o), 1);
+    }
     out.push(g);
     added.push(g);
   }
@@ -149,11 +154,39 @@ export function ungatedCrossings(s: Pick<GameState, 'perimeter'>, drive: readonl
   return out;
 }
 
+/**
+ * A closed ring is a run that starts and ends at the same point, and a gate cannot straddle that seam: a road that crosses within half a gate of it cannot
+ * be given a centered gate. Move the seam to the vertex farthest from the crossing that is clear of every gate (pts rotated, gates re-measured; the wall is
+ * the same wall). Returns true if it moved.
+ */
+function moveSeamFrom(run: PerimeterRun, drive: readonly Pt[]): boolean {
+  const p = run.pts, n = p.length;
+  if (n < 5 || Math.hypot(p[0][0] - p[n - 1][0], p[0][1] - p[n - 1][1]) > 1e-6) return false;
+  const L = runLength(p), bad = crossings(p, drive).filter(c => !run.gates.some(g => gateTakesDrive(g, c.at, c.sin)) && gateWidthFor(c.sin) / 2 + 0.05 > Math.min(c.at, L - c.at));
+  if (!bad.length) return false;
+  const cum: number[] = [0];
+  for (let i = 1; i < n; i++) cum.push(cum[i - 1] + Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]));
+  const circ = (a: number, b: number): number => { const d = Math.abs(a - b) % L; return Math.min(d, L - d); };
+  let best = -1, bestD = 0;
+  for (let k = 1; k < n - 1; k++) {
+    if (run.gates.some(g => circ(cum[k], g.at) < g.w / 2 + 0.1)) continue;
+    const d = Math.min(...bad.map(c => circ(cum[k], c.at)));
+    if (d > bestD) { bestD = d; best = k; }
+  }
+  if (best < 0 || bestD < 1.5) return false;
+  const open = p.slice(0, n - 1), rot = [...open.slice(best), ...open.slice(0, best)];
+  run.pts = [...rot, [rot[0][0], rot[0][1]]];
+  for (const g of run.gates) g.at = ((g.at - cum[best]) % L + L) % L;
+  run.gates.sort((a, b) => a.at - b.at);
+  return true;
+}
+
 /** Cut the missing gates through every wall that crosses the driveway. Returns how many. */
 export function cutRoadGates(s: GameState, drive: readonly Pt[] | undefined, quiet = false): number {
   let n = 0;
   for (const run of s.perimeter) {
     if (!isBarrierKind(run.kind) || run.pts.length < 2) continue;
+    if (drive && drive.length > 1 && !run.hostId) moveSeamFrom(run, drive);
     const r = autoRoadGates(run.kind, run.pts, run.gates, drive);
     if (r.added.length) { run.gates = r.gates; n += r.added.length; }
   }

@@ -1381,6 +1381,54 @@ export class HomesteadWorld {
     this._gateFrame.rotation.y = Math.atan2(t[1], -t[0]);                      // local +x = -t, toward the road
     return this._gateFrame;
   }
+  private _parkKey = '';
+  private _parkSlots: Array<{ x: number; z: number; y: number; q: THREE.Quaternion }> = [];
+  /**
+   * Where the guards' cars stand, in the guard frame (local +x out to the road): beside the drive inside the entry, nose out, one behind the other, on level
+   * ground (a 5 cm rise over the car's length and width at most), clear of walls, retaining walls, trees, buildings and water, off the lane and clear of the
+   * guard house. On a hillside where the road runs in a cutting between steep banks there is none near the gate, so they park further in, up to 19 units
+   * (about 110 m) from it; a car stands on a slope only if there is no level place at all, and then tilted to the ground (never more than 0.3, 17 degrees).
+   * Each slot carries the car's height and its tilt. Cached until the layout changes.
+   */
+  private _guardSlots(frame: THREE.Group, n: number): Array<{ x: number; z: number; y: number; q: THREE.Quaternion }> {
+    const key = `${frame.position.x.toFixed(2)},${frame.position.z.toFixed(2)},${frame.rotation.y.toFixed(3)},${this._runs.length},${this.walls.version},${this._built.size},${n},${this._gateHouse?.visible ? 1 : 0}`;
+    if (key === this._parkKey) return this._parkSlots;
+    this._parkKey = key;
+    const a = frame.rotation.y, F = (x: number, z: number): [number, number] => [frame.position.x + Math.cos(a) * x + Math.sin(a) * z, frame.position.z - Math.sin(a) * x + Math.cos(a) * z];
+    const L = 0.4, Wh = 0.168, hw = DRIVE_W / 2;
+    type Cand = { x: number; z: number; y: number; rough: number; q: THREE.Quaternion };
+    const probe = (x: number, z: number): Cand | null => {
+      const h: number[] = [];
+      for (const [dx, dz] of [[L, Wh], [L, -Wh], [-L, Wh], [-L, -Wh]] as const) {
+        const [wx, wz] = F(x + dx, z + dz);
+        if (this.walkBlocked(wx, wz, 0.03)) return null;
+        if (this._drive && closestOnLine(this.access.drive, wx, wz).d < hw + 0.02) return null;   // not on the lane
+        h.push(this.groundAt(wx, wz));
+      }
+      const [wx, wz] = F(x, z);
+      if (this.walkBlocked(wx, wz, 0.03)) return null;
+      // plane through the four wheels: front/rear along local x, left (+z)/right across it
+      const dhdx = ((h[0] + h[1]) - (h[2] + h[3])) / (4 * L), dhdz = ((h[0] + h[2]) - (h[1] + h[3])) / (4 * Wh);
+      const y = (h[0] + h[1] + h[2] + h[3]) / 4 - frame.position.y;
+      const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(-dhdx, 1, -dhdz).normalize());
+      return { x, z, y, rough: Math.max(...h) - Math.min(...h), q };
+    };
+    const houseClear = (x: number, side: number): boolean => side > 0 || !this._gateHouse?.visible || x + L < -0.45 || x - L > 0.45;
+    const cands: Cand[] = [];
+    for (let x = -0.5; x > -19; x -= 0.95) for (const side of [1, -1]) for (const off of [0.3, 0.45]) {
+      if (!houseClear(x, side)) continue;
+      const c = probe(x, side * (hw + off));
+      if (c) cands.push(c);
+    }
+    const out: Cand[] = [], used = new Set<Cand>();
+    const taken = (c: Cand): boolean => out.some(o => Math.abs(o.x - c.x) < 0.9 && Math.abs(o.z - c.z) < 0.4);
+    const take = (list: Cand[]): boolean => { const c = list.find(k => !used.has(k) && !taken(k)); if (!c) return false; used.add(c); out.push(c); return true; };
+    const flat = cands.filter(c => c.rough <= 0.05), rough = cands.filter(c => c.rough <= 0.3 * 2 * Wh).sort((p, q) => p.rough - q.rough);
+    for (let i = 0; i < n; i++) if (!take(flat) && !take(rough)) break;
+    // nowhere at all: beside the drive just inside, as before
+    for (let i = out.length; i < n; i++) { const c = probe(-0.5 - i * 0.95, hw + 0.3); out.push(c ?? { x: -0.5 - i * 0.95, z: hw + 0.3, y: 0, rough: 9, q: new THREE.Quaternion() }); }
+    return (this._parkSlots = out);
+  }
   private _syncGuardCars(n: number, dt: number): void {
     if (n === 0 && !this._guardCars.length && !this._guardLeaving.length) return;
     const frame = this._frame();
@@ -1390,10 +1438,12 @@ export class HomesteadWorld {
       frame.add(car); this._guardCars.push(car);
     }
     while (this._guardCars.length > n) this._guardLeaving.push({ g: this._guardCars.pop()!, t: 0 });
-    // parked inside the entry, on the side away from the guard house, nose to tail (a car is 0.8 long: they were 0.5 apart and overlapped), each on the ground under it
+    // parked beside the drive inside the entry, nose out, nose to tail, each on level ground (see `_guardSlots`)
+    const slots = this._guardSlots(frame, this._guardCars.length), yaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
     this._guardCars.forEach((c, i) => {
-      const x = -0.5 - i * 0.95, z = DRIVE_W / 2 + 0.3, a = frame.rotation.y, wx = frame.position.x + Math.cos(a) * x + Math.sin(a) * z, wz = frame.position.z - Math.sin(a) * x + Math.cos(a) * z;
-      c.position.set(x, this.groundAt(wx, wz) - frame.position.y, z); c.rotation.y = 0;
+      const sl = slots[i];
+      c.position.set(sl.x, sl.y, sl.z);
+      c.quaternion.copy(sl.q).multiply(yaw);   // a vehicle's front is +z: turn it to +x so it stands along the drive, nose out to the road (it lay across the lane), then tilt it to the ground under it
     });
     for (const l of [...this._guardLeaving]) {
       l.t += dt; l.g.position.x += dt * 0.5;
@@ -2613,12 +2663,32 @@ export class HomesteadWorld {
     if (this.stream.depthAt(x, z) > 0.04) return true;
     if (this._buildingBlocked(x, z, r)) return true;
     if (this._perimeterBlocked(x, z, Math.min(r, INDOOR_R))) return true;
+    if (this.walls.blocks(x, z)) return true;     // a retaining wall (the cut a road runs in): over only at its stairs
     if (Math.hypot(x - this.camp.x, z - this.camp.z) < 0.4 + r) return true;
     if (this._yardAt(x, z, r)) return true;
     for (const t of this.treeSpecs) {
       const dx = t.x - x, dz = t.z - z;
       const tr = r + 0.07 * t.scale;
       if (dx * dx + dz * dz < tr * tr) return true;
+    }
+    return false;
+  };
+
+  /**
+   * The drone's keep-out (fly mode): is the point inside a standing wall, a gate pier or a retaining wall? (The walker is stopped by `walkBlocked`; the
+   * drone only ever tested buildings, so it could fly through the walls beside the gate and the cut the road runs in.) Above a wall's top it is free.
+   */
+  tourSolid = (x: number, y: number, z: number): boolean => {
+    const g = this.groundAt(x, z);
+    if (this.walls.blocks(x, z) && y < g + 0.9) return true;
+    for (const run of this._runs) {
+      if (underground(run.kind) || PERIMETER[run.kind].vehicleWay) continue;
+      const th = run.kind === 'container_wall' || run.kind === 'container_stack' ? 0.21 : run.kind === 'stone_wall' || run.kind === 'concrete_wall' ? 0.15 : 0;
+      if (th <= 0) continue;
+      const { d, s } = closestOnLine(run.pts, x, z);
+      if (d > th + 0.08 || y > g + PERIMETER[run.kind].height + 0.05) continue;
+      const built = run.finishedAt !== null ? wallLength(run) : wallLength(run) * runProgress(run);
+      if (solidSpans(run, built).some(([a, b]) => s >= a - 0.01 && s <= b + 0.01)) return true;
     }
     return false;
   };

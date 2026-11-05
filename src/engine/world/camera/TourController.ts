@@ -347,6 +347,8 @@ export interface TourContext {
   /** The site's walk test (null = nothing blocks). */
   getBlocked: () => SiteBlockedFn | null;
   heightAt: HeightFn;
+  /** The drone's keep-out: is this point inside a wall or a retaining wall? (Buildings are boxes from the scene.) */
+  solidAt?: (x: number, y: number, z: number) => boolean;
   /**
    * After each walk step: a place the walker is carried to instead (a ladder
    * down a hatch, back up), or null. Lets the site keep levels (a bunker).
@@ -606,8 +608,17 @@ export class TourController {
       (fwd.z * f + rz * r) * speed,
     );
     this._vel.lerp(target, 1 - Math.exp(-FLY_ACCEL * dt));
+    const px = this._pos.x, py = this._pos.y, pz = this._pos.z;
     this._pos.addScaledVector(this._vel, dt);
     this._clampFly(this._pos);
+    // not through a wall: slide along it (keep the axis that is clear), else stay
+    const solid = this._ctx.solidAt;
+    if (solid && solid(this._pos.x, this._pos.y, this._pos.z)) {
+      const nx = this._pos.x, ny = this._pos.y, nz = this._pos.z;
+      if (!solid(nx, ny, pz)) { this._pos.z = pz; this._vel.z = 0; }
+      else if (!solid(px, ny, nz)) { this._pos.x = px; this._vel.x = 0; }
+      else { this._pos.set(px, py, pz); this._vel.set(0, 0, 0); }
+    }
   }
 
   private _clampFly(p: THREE.Vector3): void {
