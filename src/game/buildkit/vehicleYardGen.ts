@@ -12,6 +12,28 @@ import { box, Parts, type BuildOpts } from './shell';
 const M = 1 / 6;
 const cylY = (r: number, h: number, x: number, y: number, z: number, seg = 8) => new THREE.CylinderGeometry(r, r, h, seg).translate(x, y + h / 2, z);
 
+/** The gravel spur's mesh: see below (exported for its test). */
+export function spurGeometry(hd: number, spurL: number, spurW: number, sh?: (lx: number, lz: number) => number): THREE.BoxGeometry {
+  // gravel laid on the ground from the gate to the road's edge, flaring to meet the road. Like a driveway apron it is graded into the ground: the crown is draped on the highest
+  // ground within a terrain cell (the terrain mesh is coarser than the ground is sampled, so the gravel never sinks into a triangle) and 2 cm over it, the two outer columns
+  // are tucked into the ground's own height at the edge (flush, no skirt standing proud) and the far end lies exactly on the road's level, 6 mm over it
+  const NX = 8, NZ = 12, g = new THREE.BoxGeometry(1, 1, 1, NX, 1, NZ), pos = g.attributes.position;
+  const lo = (v: number) => Math.max(-0.5, Math.min(0.5, v));
+  for (let i = 0; i < pos.count; i++) {
+    const t = pos.getZ(i) + 0.5, ix = Math.round((pos.getX(i) + 0.5) * NX), edge = ix === 0 || ix === NX, shoulder = ix === 1 || ix === NX - 1;
+    // the outer column is a shoulder 0.06 wider than the apron, running out into the ground
+    const lx = (pos.getX(i) * spurW + (edge ? Math.sign(pos.getX(i)) * 0.06 : 0)) * (1 + 0.2 * t), lz = hd + t * spurL;
+    let yt = 0;
+    if (sh) {
+      const exact = sh(lx, lz), reach = Math.max(exact, sh(lx, lz + 0.4), sh(lx, lz - 0.4), sh(lx + 0.4, lz), sh(lx - 0.4, lz));
+      const nearEnd = t > 0.995;
+      yt = nearEnd ? lo(exact) + 0.006 : edge ? lo(exact) - 0.02 : shoulder ? lo(Math.max(exact, 0.5 * (exact + reach))) + 0.004 : lo(reach) + 0.02;
+    } else yt = 0.02;
+    pos.setXYZ(i, lx, pos.getY(i) > 0 ? yt : yt - 0.25, lz);
+  }
+  return g;
+}
+
 export function vehicleYard(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
   const p = new Parts(seed);
   const W = def.cellsX * CELL, D = def.cellsZ * CELL, hw = W / 2 - 0.03, hd = D / 2 - 0.03;
@@ -24,16 +46,7 @@ export function vehicleYard(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): T
   // or more from its edge; `opts.spur` is that distance); it flares to the road and sinks 0.2 into the ground so it never floats over the skirt of the pad
   const spurL = opts.spur ?? 0.4, spurW = 4.2 * M + 0.1;
   {
-    // gravel laid on the ground from the gate to the road's edge, flaring to meet the road: draped on the ground's own height (opts.spurH), with a 0.25 skirt so it never floats
-    const NX = 6, NZ = 12, g = new THREE.BoxGeometry(1, 1, 1, NX, 1, NZ), pos = g.attributes.position;
-    for (let i = 0; i < pos.count; i++) {
-      const t = pos.getZ(i) + 0.5, lx = pos.getX(i) * spurW * (1 + 0.2 * t), lz = hd + t * spurL;
-      // the highest ground within a terrain cell of the point (the terrain mesh is triangulated coarser than the ground is sampled), so the gravel never sinks into a triangle
-      const h = opts.spurH ? Math.max(opts.spurH(lx, lz), opts.spurH(lx + 0.4, lz), opts.spurH(lx - 0.4, lz), opts.spurH(lx, lz + 0.4), opts.spurH(lx, lz - 0.4)) : 0;
-      const yt = Math.max(-0.5, Math.min(0.5, h)) + 0.04;
-      pos.setXYZ(i, lx, pos.getY(i) > 0 ? yt : yt - 0.25, lz);
-    }
-    p.add('gravel', g);
+    p.add('gravel', spurGeometry(hd, spurL, spurW, opts.spurH));
   }
   p.layer = 'frame';
   const H = 2.4 * M, gate = 4.2 * M;

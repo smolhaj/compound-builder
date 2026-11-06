@@ -4,7 +4,7 @@ import * as THREE from 'three';
 const used = new Set<string>();
 vi.mock('../buildkit/materials', () => ({ kitMaterial: (id: string) => { used.add(id); return new THREE.MeshStandardMaterial(); }, setWindowGlow: () => {} }));
 
-import { bankExtent, buildRoadWorks, facingReach, featherStrip, insideRoom, type Frame } from './roadWorks';
+import { bankExtent, buildRoadWorks, facingReach, facingReaches, facingWindingUp, featherStrip, insideRoom, type Frame } from './roadWorks';
 import { planRoad, type RoadGround, type RoadInput } from '../../sim/roadPlan';
 import { roadBedOf } from '../../sim/roadPlan';
 import type { RegionId } from '../../sim/regions';
@@ -197,5 +197,28 @@ describe('facingReach: no sliver of facing where a bend pinches the bank', () =>
     const bendG: RoadGround = { h: (x, z) => 1 + 0.45 * Math.max(0, 30 - Math.hypot(x - 20, z - 36)) / 10 + (z > 36 ? 0.3 : 0) };
     const p = planRoad(input('plains', bendG, TIGHT));
     expect(finite(buildRoadWorks(p, bendG.h, opts(bendG)))).toBe(true);
+  });
+});
+
+describe('facingWindingUp', () => {
+  const fr = (fx: number, fz: number) => ({ x: 0, z: 0, nx: fz, nz: -fx });
+  it('faces up on the left side (sg +1) and is flipped for the right side, whatever the heading', () => {
+    for (let a = 0; a < 360; a += 30) {
+      const fx = Math.cos(a * Math.PI / 180), fz = Math.sin(a * Math.PI / 180), f0 = fr(fx, fz);
+      expect(facingWindingUp(f0, { x: fx, z: fz }, 1)).toBe(true);
+      expect(facingWindingUp(f0, { x: fx, z: fz }, -1)).toBe(false);
+    }
+  });
+});
+
+describe('facingReaches', () => {
+  it('drops short runs and runs that never near the full reach, tapers the ends of the rest, never raises a reach', () => {
+    const full = 0.7;
+    expect(facingReaches([0, 0.6, 0.65, 0.6, 0], full).every(v => v === 0)).toBe(true);            // 3 stations: a sliver
+    expect(facingReaches([0, 0.35, 0.36, 0.35, 0.36, 0.35, 0], full).every(v => v === 0)).toBe(true); // never reaches 60 % of the full reach
+    const ext = [0, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0];
+    const r = facingReaches(ext, full);
+    expect(r[1]).toBeCloseTo(0.7 / 3); expect(r[7]).toBeCloseTo(0.7 / 3); expect(r[4]).toBeCloseTo(0.7);
+    r.forEach((v, i) => expect(v).toBeLessThanOrEqual(ext[i]));
   });
 });
