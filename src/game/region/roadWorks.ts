@@ -127,6 +127,39 @@ export function facingReach(ext: number, full: number): number {
   return ext < Math.max(0.12, FACING_MIN_SHARE * full) ? 0 : ext;
 }
 
+/** A drawn run of facing shorter than this many stations, or one that never gets near the bank's full reach, is a sliver (a thin diagonal band up the slope): not drawn. */
+export const FACING_MIN_RUN = 4;
+export const FACING_RUN_SHARE = 0.6;
+
+/**
+ * The reach drawn at each station: `facingReach` per station, then each run of drawn stations must be at least `FACING_MIN_RUN` long and reach `FACING_RUN_SHARE` of the
+ * full reach somewhere (else it is a sliver and is dropped), and each kept run tapers to nothing over its first and last two stations, so a band never starts or ends square.
+ * Only ever lowers a reach (it cannot bring the fold back). Pure, tested.
+ */
+export function facingReaches(ext: readonly number[], full: number): number[] {
+  const out = ext.map(e => facingReach(e, full));
+  let i = 0;
+  while (i < out.length) {
+    if (out[i] === 0) { i++; continue; }
+    let j = i; while (j + 1 < out.length && out[j + 1] > 0) j++;
+    const len = j - i + 1, peak = Math.max(...out.slice(i, j + 1));
+    if (len < FACING_MIN_RUN || peak < FACING_RUN_SHARE * full) for (let k = i; k <= j; k++) out[k] = 0;
+    else for (let k = i; k <= j; k++) out[k] *= Math.min(1, (k - i + 1) / 3, (j - k + 1) / 3);
+    i = j + 1;
+  }
+  return out;
+}
+
+/**
+ * Does the winding a, c, b (row r then r+1, offset k then k+1) of a bank strip face up? Rows run along the road (direction t), offsets run out along sg * n (n the road's
+ * normal): the triangle's normal is (c - a) x (b - a) = t x (sg * n), whose y component has the sign of sg * (t x n).y. Pure, tested.
+ */
+export function facingWindingUp(f0: { x: number; z: number; nx: number; nz: number }, f1: { x: number; z: number }, sg: number): boolean {
+  const tx = f1.x - f0.x, tz = f1.z - f0.z, ox = f0.nx * sg, oz = f0.nz * sg;
+  // y of t x o (t = along the road, o = out), with x right, z toward the viewer: (t x o).y = tz * ox - tx * oz
+  return tz * ox - tx * oz > 0;
+}
+
 /**
  * A strip following the ground at signed offsets from the bench edge of stations i0..i1 (the stone facing on a bank), UVs in world
  * units. Each row reaches only as far as the bank does (`bankExtent`) and the rows past the flagged span are included so the facing
@@ -145,22 +178,25 @@ function bankStrip(fr: readonly Frame[], i0: number, i1: number, sg: number, rea
   // (insideRoom, tested), so it follows the bend as one clean band and never doubles back
   const room = insideRoom(fr.slice(i0, i1 + 1), sg, BED.halfW);
   ext = ext.map((e, r) => Math.min(e, room[r]));
+  const drawn = facingReaches(ext, reachMax);
   for (let r = 0; r < rows; r++) {
     const f = fr[i0 + r];
     if (r > 0) sAcc += Math.hypot(f.x - fr[i0 + r - 1].x, f.z - fr[i0 + r - 1].z);
     // the facing starts a hair out from the bench edge and ends before the toe: it never lies on level ground
-    const reach = facingReach(ext[r], reachMax) === 0 ? 0 : Math.max(0, ext[r] - 0.04);   // (a bank that is only a sliver wide is no facing: no thin strip of stone lying up the slope)
+    const reach = drawn[r] === 0 ? 0 : Math.max(0, drawn[r] - 0.04);   // (a bank that is only a sliver wide is no facing: no thin strip of stone lying up the slope)
     if (reach > 0.06) any = true;
     for (let k = 0; k <= across; k++) {
       const o = reach * k / across, [x, z] = at(r, o), q = r * (across + 1) + k;
       // laid on the highest ground within a terrain cell across the bank: the terrain mesh is coarser than the ground is sampled, and on a steep cut it rose through the stone
-      const [x2, z2] = at(r, o + 0.18), [x3, z3] = at(r, Math.max(0, o - 0.18));
+      const [x2, z2] = at(r, o + 0.09), [x3, z3] = at(r, Math.max(0, o - 0.09));
       pos[q * 3] = x; pos[q * 3 + 1] = Math.max(ground(x, z), ground(x2, z2), ground(x3, z3)) + lift; pos[q * 3 + 2] = z;
       uv[q * 2] = sAcc; uv[q * 2 + 1] = o;
     }
   }
   if (!any) return null;
-  for (let r = 0; r < rows - 1; r++) for (let k = 0; k < across; k++) { const a = r * (across + 1) + k, b = a + 1, c = a + across + 1, d = c + 1; idx.push(a, c, b, b, c, d); }
+  // wound so the face looks up on whichever side of the road the strip is on (the side flips the strip's handedness: a facing wound the wrong way was lit from below, i.e. black)
+  const up = facingWindingUp(fr[i0], fr[Math.min(fr.length - 1, i0 + 1)], sg);
+  for (let r = 0; r < rows - 1; r++) for (let k = 0; k < across; k++) { const a = r * (across + 1) + k, b = a + 1, c = a + across + 1, d = c + 1; if (up) idx.push(a, c, b, b, c, d); else idx.push(a, b, c, b, d, c); }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
