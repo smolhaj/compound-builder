@@ -83,6 +83,31 @@ describe('the wipe ending: nobody alive on the property', () => {
     expect(wipeSummary(g).text).toMatch(/^Nobody is left on the place\. This run is over\.$/);
   });
 
+  it('a wipe before the collapse says so, and a starved wipe never says nobody went hungry', () => {
+    const g = game();
+    g.clock.t = g.disaster.hitAt - 30;
+    killAll(g, 'starvation');
+    tallyDay(g);
+    const r = reportCard(g);
+    expect(r.date).toBe('Before the collapse');
+    expect(r.sub).toMatch(/^Before the collapse came/);
+    expect(r.lines.join(' ')).not.toMatch(/Nobody went hungry/);
+    expect(r.lines.join(' ')).toMatch(/died for lack of food or water/);
+  });
+
+  it('natural play, no staged deaths: a no-food start runs to a wipe whose day counts, hungry days and causes agree', () => {
+    let g = newGame(3, 105, 2027, { mode: 'scenario', peace: 'short', kind: 'grid_down', difficulty: 'hardcore' } as never);
+    for (const f of ['staples', 'canned', 'frozen', 'fresh'] as const) g.stock[f] = 0;
+    for (let i = 0; i < 400 && !g.ending; i++) { g = step(g, 5); g.gate.pending = null; }
+    expect(g.ending?.kind).toBe('wipe');
+    const r = reportCard(g), w = wipeSummary(g);
+    expect(r.date).toBe(`Day ${g.stats.days} after grid-down`);
+    expect(g.stats.hungryDays).toBeGreaterThan(0);
+    expect(r.lines.join(' ')).toMatch(new RegExp(`${g.stats.hungryDays} hungry days`));
+    expect(w.roll.every(x => x.cause === 'starvation' || x.cause === 'wild animal' || x.cause === 'radiation')).toBe(true);
+    expect(w.roll.every(x => x.day <= g.ending!.day)).toBe(true);
+  }, 120_000);
+
   it('step never moves the clock for an empty place, whether or not the ending was filed', () => {
     const g = game();
     killAll(g);

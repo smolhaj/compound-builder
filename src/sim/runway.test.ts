@@ -69,15 +69,28 @@ describe('the runway: days with no resupply', () => {
     const g = game();
     g.utilities.storedL = 50000; g.stock.water_jugs = 0;
     expect(row(runway(g), 'water').tone).toBe('good');
-    g.utilities.storedL = 20;
+    g.utilities.storedL = 20; g.clock.t = 5;
     expect(row(runway(g), 'water').tone).toBe('bad');
     g.structures.push({ id: 'w1', kind: 'well_drilled', x: 0, z: 0, rot: 0, stage: 5, done: 0, supplied: true, finishedAt: 0 });
     expect(row(runway(g), 'water').value).toMatch(/plus the well/);
   });
 
+  it('on the first day an empty water or medicine shelf is amber "none yet", later it is red, with the same fix', () => {
+    const g = game();
+    g.utilities.storedL = 0; g.stock.water_jugs = 0; g.stock.meds = 0;
+    const a = runway(g);
+    expect(row(a, 'water')).toMatchObject({ tone: 'warn', value: 'none yet' });
+    expect(row(a, 'medicine')).toMatchObject({ tone: 'warn', value: 'none yet' });
+    g.clock.t = 5;
+    const b = runway(g);
+    expect(row(b, 'water').tone).toBe('bad');
+    expect(row(b, 'medicine').tone).toBe('bad');
+    expect(row(b, 'water').fix).toEqual(row(a, 'water').fix);
+  });
+
   it('medicine: ten days a kit, divided among the cases being treated', () => {
     const g = game();
-    g.stock.meds = 0;
+    g.clock.t = 5; g.stock.meds = 0;
     expect(row(runway(g), 'medicine')).toMatchObject({ days: 0, tone: 'bad' });
     g.stock.meds = 2;
     expect(row(runway(g), 'medicine').days).toBe(20);

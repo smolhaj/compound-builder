@@ -116,6 +116,9 @@ export function reportCard(s: GameState): ReportCard {
   const grade = sandbox ? 'S' : end === 'wipe' ? 'F' : score >= 90 ? 'A' : score >= 80 ? 'B' : score >= 65 ? 'C' : score >= 50 ? 'D' : 'F';
   const family = s.people[0]?.last ?? 'The family';
   const wipe = wipeSummary(s), away = wipe.elsewhere;
+  /** The run ended before the collapse hit: no days are tallied after it. */
+  const hit = !!d.kind && s.clock.t >= d.hitAt;
+  const starved = wipe.roll.filter(x => x.cause === 'starvation' || x.cause === 'thirst').length;
   const bo = st.bugOut;
   const headline = end === 'bug_out' ? `The ${family} family bugged out`
     : end === 'wipe' ? (away.length ? `The ${family} place is empty; the family lives on elsewhere` : `No one left at the ${family} place`)
@@ -123,7 +126,7 @@ export function reportCard(s: GameState): ReportCard {
     : end === 'new_normal' ? `A thinner world: ${family} family settles in after ${name.toLowerCase()}`
     : `${family} homestead feeds itself a year on`;
   const sub = end === 'bug_out' ? `They left on day ${bo?.day ?? 0} with ${bo?.going ?? 0} of ${(bo?.going ?? 0) + (bo?.left ?? 0)}. ${bo?.dest === 'cache' ? 'They made for the buried cache.' : bo?.dest === 'town' ? 'They made for the town house.' : 'They had nowhere particular to go.'} ${bo?.outcome === 'lost_one' ? `${bo.lost ?? 'One of them'} did not make the trip. ` : ''}The rest is the next chapter, and it is not written yet.`
-    : end === 'wipe' ? `${days} days after it hit, the last person on the place was gone.${away.length ? ` ${wipe.text}` : ''}`
+    : end === 'wipe' ? `${hit ? `${days} days after it hit` : 'Before the collapse came'}, the last person on the place was gone.${away.length ? ` ${wipe.text}` : ''}`
     : end === 'recovered' ? `${days} days after it hit, the lights are back on in the valley. ${alive} of ${total} made it.`
     : end === 'new_normal' ? `${days} days on, the power runs some hours and the store opens some days. It won't be like before. ${alive} of ${total} made it.`
     : `A year without a store. ${alive} people live off what the place grows.`;
@@ -156,7 +159,8 @@ export function reportCard(s: GameState): ReportCard {
   }
   // food
   const grown = st.kcalNeed ? st.kcalGrown / st.kcalNeed : 0;
-  if (st.hungryDays === 0) lines.push('Nobody went hungry.');
+  if (end === 'wipe' && starved > 0 && st.hungryDays === 0) lines.push(`${starved} ${starved === 1 ? 'person' : 'people'} died for lack of food or water.`);
+  else if (st.hungryDays === 0) lines.push('Nobody went hungry.');
   else lines.push(`${st.hungryDays} hungry days.`);
   if (grown > 0.05) {
     const src = [has('field') && 'the fields', has('garden') && 'the garden', has('chicken_coop') && 'the hens'].filter(Boolean) as string[];
@@ -185,7 +189,7 @@ export function reportCard(s: GameState): ReportCard {
   const allies = s.neighbors.filter(n => n.disposition > 50 && n.status === 'home');
   if (allies.length) lines.push(`${allies.map(n => n.name[0].toUpperCase() + n.name.slice(1)).join(' and ')} stood with you.`);
   return {
-    masthead: mastheadOf(s.site?.region), date: `Day ${days} after ${name.toLowerCase()}`,
+    masthead: mastheadOf(s.site?.region), date: end === 'wipe' && !hit ? 'Before the collapse' : `Day ${days} after ${name.toLowerCase()}`,
     headline, sub, grade, score, lines,
     facts: [[end === 'wipe' ? 'Alive on the place' : 'Survived', `${alive} of ${total}`], ['Humanity', `${Math.round(g.humanity)}`], ['Days of it', `${days}`], end === 'wipe' && away.length ? ['Alive elsewhere', `${away.length}`] : ['Hungry days', `${st.hungryDays}`]],
   };

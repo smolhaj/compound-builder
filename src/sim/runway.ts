@@ -28,6 +28,7 @@ import { WAVE } from './waves';
 import { diffOf } from './difficulty';
 import { VEHICLES, startingVehicles } from './vehicles';
 import { isFinished } from './construction';
+import { dayIndex } from './state';
 import { regionFor } from './climate';
 import type { SuggestionAct } from './guidance';
 
@@ -128,9 +129,18 @@ function fuelRow(s: GameState): RunwayRow {
   return { id: 'fuel', label: 'Fuel', days: Math.floor(d), value: daysText(d), tone: toneOf(d, RUNWAY.fuel), detail: `${Math.round(liters)} liters in cans and tanks at ${ps.genKw > 0 ? "the generator's burn" : "a day's driving"} (${Math.round(burn)} L a day).`, fix: { label: 'Fuel shelf', act: shop('fuel') } };
 }
 
+/** The first days of a new game: nothing has been asked of the place yet, so an empty shelf is not an alarm. */
+export const FIRST_DAYS = 2;
+
+/** On the first days a red water or medicine row reads as an amber "none yet" with the same fix (a start with nothing stocked is not a failure). */
+function softenFirstDay(s: GameState, r: RunwayRow): RunwayRow {
+  if (dayIndex(s.clock.t) >= FIRST_DAYS || r.tone !== 'bad' || (r.id !== 'water' && r.id !== 'medicine')) return r;
+  return { ...r, tone: 'warn', value: 'none yet' };
+}
+
 /** The runway for this state: seven rows, always in this order. */
 export function runway(s: GameState): RunwayRow[] {
-  return [foodRow(s), waterRow(s), powerRow(s), heatRow(s), medicineRow(s), defenseRow(s), fuelRow(s)];
+  return [foodRow(s), waterRow(s), powerRow(s), heatRow(s), medicineRow(s), defenseRow(s), fuelRow(s)].map(r => softenFirstDay(s, r));
 }
 
 /** The row that runs out first, among those that apply (null if none do). */
