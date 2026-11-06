@@ -15,6 +15,7 @@ import { DayCard } from './ui/DayCard';
 import { TitleScreen } from './ui/feel/TitleScreen';
 import { RecapCard } from './ui/feel/RecapCard';
 import { PurchaseToast, MilestoneCard } from './ui/feel/PurchaseToast';
+import { useOverlayPlan } from './ui/feel/useOverlayPlan';
 import { startFeedback } from './ui/feel/feedbackWatcher';
 import { useFeelStore } from './store/feelStore';
 import { useGameStore } from './store/gameStore';
@@ -63,6 +64,7 @@ export default function App() {
   const schedule = useGameStore(s => s.scheduleOpen);
   const raid = useGameStore(s => s.cutscene !== null);
   const title = useFeelStore(s => s.title);
+  const plan = useOverlayPlan();
   // a new place (another seed or listing) is a new world
   const worldKey = useGameStore(s => `${s.game.seed}:${s.game.site.id}:${s.game.site.creek}:${s.game.site.lot?.kind ?? ''}${s.game.site.lot?.seed ?? ''}`);
   const clean = new URLSearchParams(location.search).has('clean');
@@ -74,17 +76,17 @@ export default function App() {
       <PerfNotice />
       {!raid && !title && <Hud />}
       {!clean && !raid && <PurchaseToast />}
-      {!clean && !raid && <MilestoneCard />}
+      {!clean && !raid && plan.milestone && <MilestoneCard />}
       {!clean && !raid && <Ticker />}
       {!clean && !raid && <BattleOverlay />}
       {!clean && <CutsceneOverlay />}
-      {!clean && <GateCard />}
-      {!clean && <ReportCard />}
-      {!clean && <DayCard />}
+      {!clean && plan.gate && <GateCard />}
+      {!clean && plan.ending && <ReportCard />}
+      {!clean && plan.dayCard && <DayCard />}
       {shop && !clean && !raid && <ShopWindow />}
       {schedule && !clean && <SchedulePanel />}
       {setup && !clean && <SetupScreen />}
-      {!clean && <RecapCard />}
+      {!clean && plan.recap && <RecapCard />}
       {!clean && <TitleScreen />}
     </>
   );

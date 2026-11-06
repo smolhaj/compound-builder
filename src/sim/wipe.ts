@@ -20,6 +20,9 @@ export function aliveOnPlace(s: Pick<GameState, 'personState'>): number {
 /** Nobody left alive on the property, in a game that has had people. */
 export const isWiped = (s: Pick<GameState, 'personState'>): boolean => s.personState.length > 0 && aliveOnPlace(s) === 0;
 
+/** The family is gone for good (the ending is a wipe, answered or not): the HUD stops asking for decisions and shows a calm "This run is over" state. */
+export const runOver = (s: Pick<GameState, 'ending'>): boolean => s.ending?.kind === 'wipe';
+
 /** The run has already ended in a wipe and is waiting on the player. */
 export const wipeEnded = (s: Pick<GameState, 'ending'>): boolean => s.ending?.kind === 'wipe' && !s.ending.continued;
 

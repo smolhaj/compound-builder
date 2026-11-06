@@ -526,6 +526,7 @@ export function GameCanvas() {
       if (bs.skipReq !== battleSkip) { battleSkip = bs.skipReq; battle.skip(); }
       world.doorLock = battle.playing ? true : null;      // (the alarm is up: the tunnel doors are shut for the fight)
       if (battle.playing) {
+        battle.viewer = ws.camera.position;
         battle.update(dt);
         if (battle.shake > 0) ws.camera.position.add(new THREE.Vector3((Math.random() - 0.5) * battle.shake, (Math.random() - 0.5) * battle.shake, (Math.random() - 0.5) * battle.shake));
         battleSync += dt;

@@ -76,6 +76,10 @@ export class BattleRenderer {
   private readonly _rods: THREE.InstancedMesh;
   /** A ring at each fighter's feet: red raiders, blue residents (readable from the diorama camera). */
   private readonly _rings: THREE.InstancedMesh;
+  /** A small bright pip over each head: the ring is a sliver from far away and at a low angle, the pip is not. */
+  private readonly _pips: THREE.InstancedMesh;
+  /** Where the camera is (set by the canvas): rings and pips grow with the distance so a crew at the far end of the drive still reads. */
+  viewer: THREE.Vector3 | null = null;
   private readonly _trGeo = new THREE.BufferGeometry();
   private readonly _trPos = new Float32Array(MAX_TRACERS * 6);
   private readonly _trLines: THREE.LineSegments;
@@ -117,6 +121,9 @@ export class BattleRenderer {
     this._rings = new THREE.InstancedMesh(new THREE.RingGeometry(0.16, 0.22, 20).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.85, depthWrite: false, toneMapped: false }), 64);
     this._rings.count = 0; this._rings.frustumCulled = false; this._rings.userData = { noSSAO: true };
     this._group.add(this._rings);
+    this._pips = new THREE.InstancedMesh(new THREE.OctahedronGeometry(0.05), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.95, depthWrite: false, toneMapped: false }), 64);
+    this._pips.count = 0; this._pips.frustumCulled = false; this._pips.userData = { noSSAO: true };
+    this._group.add(this._pips);
     for (let i = 0; i < 4; i++) {
       const l = new THREE.PointLight(0xffc070, 0, 4, 2);
       l.castShadow = false;
@@ -211,7 +218,7 @@ export class BattleRenderer {
     this._pending = [];
     this._tracers.length = 0;
     this._trGeo.setDrawRange(0, 0);
-    this._rods.count = 0; this._rings.count = 0;
+    this._rods.count = 0; this._rings.count = 0; this._pips.count = 0;
     for (const p of this._puffs) { this._group.remove(p.mesh); p.mat.dispose(); }
     this._puffs.length = 0;
     for (const p of this._projs) { this._group.remove(p.mesh); (p.mesh.material as THREE.Material).dispose(); }
@@ -473,14 +480,24 @@ export class BattleRenderer {
     let ri = 0;
     for (const u of this._units.values()) {
       if (u.gone || u.dead || u.def.machine || ri >= 64) continue;
-      this._m.makeTranslation(u.x, this._ground(u.x, u.z) + u.y + 0.02, u.z);
+      const gy = this._ground(u.x, u.z) + u.y;
+      // from afar the markers grow with the distance (a ring 0.22 wide is under a pixel at 30 units, and a sliver at a low angle)
+      const d = this.viewer ? Math.hypot(u.x - this.viewer.x, gy - this.viewer.y, u.z - this.viewer.z) : 0;
+      const k = Math.max(1, d / 5);
+      const hex = u.def.side === 'raider' ? 0xff3b30 : 0x4aa8ff;
+      this._m.compose(this._v.set(u.x, gy + 0.02, u.z), this._q.identity(), this._s.set(k, 1, k));
       this._rings.setMatrixAt(ri, this._m);
-      this._rings.setColorAt(ri, this._c.setHex(u.def.side === 'raider' ? 0xff3b30 : 0x4aa8ff));
+      this._rings.setColorAt(ri, this._c.setHex(hex));
+      this._m.compose(this._v.set(u.x, gy + 0.36 + 0.03 * k, u.z), this._q.identity(), this._s.setScalar(k > 1.4 ? k : 0));
+      this._pips.setMatrixAt(ri, this._m);
+      this._pips.setColorAt(ri, this._c.setHex(hex));
       ri++;
     }
-    this._rings.count = ri;
-    this._rings.instanceMatrix.needsUpdate = true;
-    if (this._rings.instanceColor) this._rings.instanceColor.needsUpdate = true;
+    this._rings.count = ri; this._pips.count = ri;
+    for (const m of [this._rings, this._pips]) {
+      m.instanceMatrix.needsUpdate = true;
+      if (m.instanceColor) m.instanceColor.needsUpdate = true;
+    }
   }
 
   private _tickFx(dt: number): void {
@@ -552,6 +569,7 @@ export class BattleRenderer {
     this._trGeo.dispose(); (this._trLines.material as THREE.Material).dispose();
     this._rods.geometry.dispose(); (this._rods.material as THREE.Material).dispose();
     this._rings.geometry.dispose(); (this._rings.material as THREE.Material).dispose();
+    this._pips.geometry.dispose(); (this._pips.material as THREE.Material).dispose();
     this._puffGeo.dispose();
     this._scene.remove(this._group);
   }
