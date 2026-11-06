@@ -279,7 +279,7 @@ export interface CaretakerDef {
 }
 export const CARETAKER: Record<CaretakerKind, CaretakerDef> = {
   neighbor: { name: 'A neighbor looks in', blurb: 'Someone down the road feeds the animals and checks the doors each day. Gas money and a case of beer; they have their own troubles, and miss a day now and then.', perMonth: 150, hours: 1.2, reliability: 0.88, chores: ['animals', 'pond'], watch: 0.6 },
-  visiting: { name: 'A hired caretaker', blurb: 'A property caretaker comes every day for a couple of hours: the animals, the greenhouse, the garden beds, a walk round the doors and a light left on.', perMonth: 1400, hours: 3, reliability: 0.96, chores: ['animals', 'greenhouse', 'pond', 'weeds', 'orchard', 'filters'], watch: 0.35 },
+  visiting: { name: 'A hired caretaker', blurb: 'A property caretaker comes every day for a couple of hours: the animals, the greenhouse, the garden beds, a walk around the doors and a light left on.', perMonth: 1400, hours: 3, reliability: 0.96, chores: ['animals', 'greenhouse', 'pond', 'weeds', 'orchard', 'filters'], watch: 0.35 },
   live_in: { name: 'A live-in caretaker', blurb: 'A couple who live in the guest house and run the place while you are away: everything the visiting one does, the fences and the woodpile, and someone is always home.', perMonth: 4200, hours: 7, reliability: 0.99, chores: ['animals', 'greenhouse', 'pond', 'weeds', 'harvest', 'orchard', 'fences', 'woodpile', 'filters'], watch: 0.1 },
 };
 export const CARETAKER_KINDS: readonly CaretakerKind[] = ['neighbor', 'visiting', 'live_in'];
@@ -556,7 +556,7 @@ function emptyEvents(s: GameState, w: Weekend, r: () => number): string[] {
     s.money -= cost;
     for (const k of ['canned', 'staples', 'firewood'] as const) s.stock[k] = Math.max(0, s.stock[k] - (k === 'firewood' ? 1 : 2 * r()));
     for (const ps of s.personState) ps.needs.morale = Math.max(0, ps.needs.morale - 6);
-    say(`Squatters had been living in the place: the sheriff cleared them out, and the eviction, the lawyer and the cleaning came to ${money(cost)}. They ate through some of the food and burned a rick of wood.`);
+    say(`Squatters had been living in the place: the sheriff cleared them out, and the eviction, the lawyer and the cleaning came to ${money(cost)}. They ate through some of the food and burned a face cord of wood.`);
   }
   if (r() < risk.pipes) {
     w.tally.pipes++;
@@ -664,7 +664,7 @@ export function moveIn(s: GameState, opts: MoveOpts): string[] {
   const moveCost = opts.reason === 'hit' || s.disaster.tracks.banks < 0.5 ? 0 : 1800 + 350 * s.people.length;
   if (moveCost) { s.money -= moveCost; out.push(`The movers and a rented truck: ${money(moveCost)}.`); }
   s.stock.canned += 3; s.stock.staples += 2; s.stock.hygiene = (s.stock.hygiene ?? 0) + 1;
-  out.push('The kitchen, the clothes, the books and the good tools come up with them; the pantry from town is added to the stores.');
+  out.push('The kitchen, the clothes, the books and the good tools come up with them; the pantry from town is added to your supplies.');
   // the jobs
   const jobs: string[] = [];
   s.people.forEach((p, i) => {

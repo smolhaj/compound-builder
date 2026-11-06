@@ -6,12 +6,12 @@
  * hours the family would otherwise spend idle, with a certificate-like note
  * on the Family tab when it is done.
  *
- *  Courses    first aid and first responder, the ham radio licence, small
+ *  Courses    first aid and first responder, the ham radio license, small
  *             engines, welding, carpentry, wiring and solar, gardening,
  *             animal husbandry, canning and cooking. Each has a total of
  *             study hours (an American Red Cross first-aid class is a few
  *             hours; an emergency responder course about 50; a Technician
- *             licence takes 10 to 20 hours of study) and a skill it feeds.
+ *             license takes 10 to 20 hours of study) and a skill it feeds.
  *  Ways       with a teacher, a book set, or online:
  *               teacher  a household adult who has the skill at 3 or more
  *                        sits down with the student on the same hours (they
@@ -76,7 +76,7 @@ export interface CourseDef {
 export const COURSES: Record<CourseId, CourseDef> = {
   firstaid: { id: 'firstaid', name: 'First aid and first responder', skill: 'medic', hours: 20, book: 'course_firstaid', online: 90, floor: 2, minAge: 12, cert: 'First aid and first responder',
     blurb: 'Bleeding, breathing, bones, burns and when it is beyond you. Casualty care (dressings, splints, who lives) runs on this skill.' },
-  ham: { id: 'ham', name: 'Ham radio licence', skill: 'radio', hours: 20, book: 'course_ham', online: 70, floor: 2, minAge: 12, cert: 'Amateur radio licence (Technician)',
+  ham: { id: 'ham', name: 'Ham radio license', skill: 'radio', hours: 20, book: 'course_ham', online: 70, floor: 2, minAge: 12, cert: 'Amateur radio license (Technician)',
     blurb: 'Radio theory, rules and operating practice. The radio duty and the net run on this skill.' },
   engines: { id: 'engines', name: 'Small engines', skill: 'mechanic', hours: 30, book: 'course_engines', online: 110, floor: 2, minAge: 14, cert: 'Small engines and generators',
     blurb: 'Chainsaws, mowers, pumps and the generator: carburetors, plugs, filters, starting. Tools and vehicles last longer in these hands.' },
@@ -388,7 +388,7 @@ export function courseIdea(s: GameState): CourseIdea | null {
     ['firstaid', bestLevel(s, 'medic') < TEACH_LEVEL, 'nobody here is trained in first aid'],
     ['wiring', bestLevel(s, 'electrical') < 2 && built('solar_array', 'solar_farm', 'garage_solar', 'lodge_solar', 'battery_shed', 'battery_bank', 'generator_shed'), 'the solar and the generator need someone who can read a wiring diagram'],
     ['engines', bestLevel(s, 'mechanic') < TEACH_LEVEL && (has(s, 'generator') >= 1 || s.structures.some(st => st.kind === 'generator_shed')), 'the generator and the saws need someone who knows engines'],
-    ['ham', bestLevel(s, 'radio') < 2 && (has(s, 'ham_rig') >= 1 || has(s, 'sw_radio') >= 1), 'the radio sits unused: nobody has the licence'],
+    ['ham', bestLevel(s, 'radio') < 2 && (has(s, 'ham_rig') >= 1 || has(s, 'sw_radio') >= 1), 'the radio sits unused: nobody has the license'],
     ['gardening', bestLevel(s, 'gardener') < TEACH_LEVEL && built('garden', 'field', 'greenhouse'), 'the garden would give more with someone who has the training'],
     ['husbandry', bestLevel(s, 'husbandry') < TEACH_LEVEL && (built('chicken_coop', 'barn', 'sheep_barn') || ['goat', 'pig', 'steer', 'sheep', 'cow', 'rabbit'].some(a => has(s, a as MaterialId) >= 1)), 'the animals would do better with someone who has the training'],
     ['hunter', bestLevel(s, 'hunter') < 2 && (s.armory.guns.length > 0 || s.stock.snares >= 1), 'the guns would put game on the table with someone who has the hunter-safety card'],
@@ -410,7 +410,7 @@ export function skillsGoalSteps(s: GameState): Array<{ label: string; done: bool
   const D = s.courses?.drills;
   return [
     { label: 'Someone who knows first aid', done: bestLevel(s, 'medic') >= TEACH_LEVEL, detail: bestLevel(s, 'medic') >= TEACH_LEVEL ? `${hand('medic')} (medicine ${Math.floor(bestLevel(s, 'medic'))})` : 'a first-aid course takes about twenty hours; casualties live or die on it' },
-    { label: 'A licensed radio operator', done: bestLevel(s, 'radio') >= 2 || (s.courses?.certs ?? []).some(c => c.course === 'ham'), detail: 'the ham radio licence guide; the net and the news run on it' },
+    { label: 'A licensed radio operator', done: bestLevel(s, 'radio') >= 2 || (s.courses?.certs ?? []).some(c => c.course === 'ham'), detail: 'the ham radio license guide; the net and the news run on it' },
     { label: 'Hands for engines and metal', done: bestLevel(s, 'mechanic') >= TEACH_LEVEL, detail: bestLevel(s, 'mechanic') >= TEACH_LEVEL ? `${hand('mechanic')} (mechanics ${Math.floor(bestLevel(s, 'mechanic'))})` : 'small engines and welding courses; tools and vehicles last longer' },
     { label: 'Someone who can fix the wiring', done: bestLevel(s, 'electrical') >= TEACH_LEVEL, detail: bestLevel(s, 'electrical') >= TEACH_LEVEL ? `${hand('electrical')} (electrical ${Math.floor(bestLevel(s, 'electrical'))})` : 'the wiring and solar course; fewer faults on the pump and the panels' },
     { label: 'Run drills for the defense', done: !!D && (D.perWeek > 0 || readiness(s) >= 0.3), detail: s.armory.guns.length ? 'a weekly drill keeps the household from freezing at the alarm' : 'needs a gun first' },

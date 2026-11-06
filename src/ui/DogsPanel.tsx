@@ -95,7 +95,7 @@ export function DogsPanel({ game }: { game: GameState }): ReactNode {
     </div>}
     {careWarning(game) && <div style={{ fontSize: 11, color: TONE.warn, margin: '3px 0' }}>{careWarning(game)}</div>}
     {dogs.some(d => !d.fixed && ageYears(d, dayIndex(game.clock.t)) >= 0.8) && <div style={{ fontSize: 11, color: DIM, display: 'flex', justifyContent: 'space-between', gap: 6, alignItems: 'center', margin: '3px 0' }}>
-      <span title="Dogs that are not fixed only have puppies while this is on. A litter is four to six mouths and months of care; fixing a dog (the Fix button on its card) ends it for good.">Puppies: {L?.allowPups ? <span style={{ color: TONE.warn }}>allowed (unfixed dogs will breed)</span> : 'not wanted'}</span>
+      <span title="Dogs that are not fixed only have puppies while this is on. A litter is four to six puppies to feed and months of care; fixing a dog (the Fix button on its card) ends it for good.">Puppies: {L?.allowPups ? <span style={{ color: TONE.warn }}>allowed (unfixed dogs will breed)</span> : 'not wanted'}</span>
       <button style={btn(!!L?.allowPups)} onClick={() => money(g => { setAllowPups(g, !(g.petLife?.allowPups)); return null; })}>{L?.allowPups ? 'Stop puppies' : 'Allow puppies'}</button>
     </div>}
     {dogs.length > 0 && <div style={{ fontSize: 11, color: kibbleDays < 10 && game.disaster.tracks.stores < 0.5 ? TONE.warn : DIM }}>Dog food: {game.disaster.tracks.stores >= 0.5 ? 'comes with the groceries' : `${game.stock.kibble > 0.01 ? `${kibbleDays} days of kibble, then ` : ''}the family's own food`}</div>}

@@ -93,7 +93,7 @@ export const GUNS: GunModel[] = [
 ];
 export const GUN = Object.fromEntries(GUNS.map(g => [g.id, g])) as Record<string, GunModel>;
 export const groupOf = (m: GunModel): GunGroup => (m.nfa ? 'nfa' : m.type === 'pistol' || m.type === 'revolver' ? 'handgun' : m.look || m.type === 'semi_rifle' || m.type === 'pcc' ? 'semi' : 'hunting');
-export const GUN_GROUP: Record<GunGroup, string> = { hunting: 'Hunting rifles & shotguns', handgun: 'Handguns', semi: 'Semi-auto: AR, AK, MP5-style', nfa: 'Machine guns (NFA)' };
+export const GUN_GROUP: Record<GunGroup, string> = { hunting: 'Hunting rifles & shotguns', handgun: 'Handguns', semi: 'Semi-auto: AR, AK, MP5-style', nfa: 'Machine guns (federally regulated)' };
 /** The ATF tax stamp on a machine gun transfer, and the Form 4 wait (days). */
 export const NFA_STAMP = 200, FORM4_DAYS: [number, number] = [120, 270];
 /** Full auto: harder-hitting at the gate, and how many times the rounds. */

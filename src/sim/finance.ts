@@ -139,7 +139,7 @@ export function buyMetal(s: GameState, kind: MetalKind, units: number, where: Wh
 export function sellMetal(s: GameState, kind: MetalKind, units: number): string | null {
   if (!dealerOpen(s)) return 'no dealer is buying now';
   const have = s.fin.holdings.filter(h => h.kind === kind && h.where !== 'buried' && (h.where !== 'bank' || banksOpen(s)));
-  if (have.reduce((a, h) => a + h.units, 0) < units) return 'not that much to hand (dig up what is buried first)';
+  if (have.reduce((a, h) => a + h.units, 0) < units) return 'not that much on hand (dig up what is buried first)';
   let left = units;
   for (const h of have) { const t = Math.min(h.units, left); h.units -= t; left -= t; if (left <= 0) break; }
   s.fin.holdings = s.fin.holdings.filter(h => h.units > 1e-9);

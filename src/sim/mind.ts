@@ -335,7 +335,7 @@ export function moodText(s: GameState, p: Person): string {
   else if (insomnia(ps)) out.push('not sleeping');
   else if (nightmares(ps)) out.push('bad dreams');
   if (ps.low >= 65) out.push('depressed'); else if (ps.low >= 40 && b?.kind !== 'withdrawn') out.push('low, quiet');
-  if (!b) { if (ps.stress >= 70) out.push('badly strained'); else if (ps.stress >= 50) out.push('strained'); }
+  if (!b) { if (ps.stress >= 70) out.push('badly stressed'); else if (ps.stress >= 50) out.push('stressed'); }
   const R = s.mind?.rift;
   if (R && (R.a === p.id || R.b === p.id)) out.push(`not speaking to ${person(s, R.a === p.id ? R.b : R.a)?.first ?? 'someone'}`);
   return out.join(', ');
@@ -395,7 +395,7 @@ export function reading(s: GameState, p: Person, sleeping: ReturnType<typeof sle
   w('a bad place to sleep', sl ? Math.min(8, Math.max(0, -sl.morale) * 0.8 + sl.harm * 2) : 0);
   if (p.kid) {
     const grown = living.filter(q => !q.kid && closeness(p, q) >= 0.7);
-    if (grown.length) w('picking up the grown-ups\' strain', 0.35 * Math.max(0, grown.reduce((a, q) => a + psyOf(s, q.id).stress, 0) / grown.length - 15));
+    if (grown.length) w('picking up the grown-ups\' stress', 0.35 * Math.max(0, grown.reduce((a, q) => a + psyOf(s, q.id).stress, 0) / grown.length - 15));
     const sch = row.filter(d => d === 'school').length;
     if (p.age >= 6 && p.age < 15 && !sch && after && s.disaster.tracks.stores < 0.5) w('no school, no routine', 3);
     if (hardened(s)) w('the way things are done now', 4);
@@ -443,7 +443,7 @@ const LINES = {
   nightmare: (p: string) => [`${p} woke the house in the night.`, `${p} was up at three checking the locks again.`],
   vigil: (p: string) => [`${p} won't sit with their back to the door since the fight.`, `A branch cracked in the woods and ${p} was on the floor before anyone else moved.`],
   killed: (p: string) => [`${p} keeps going back over the night of the fight. "He was somebody's son."`, `${p} doesn't talk about the drive. Works until dark instead.`],
-  sleep: (p: string) => [`${p} hasn't slept a full night in a week.`, `${p} is grey with tiredness.`],
+  sleep: (p: string) => [`${p} hasn't slept a full night in a week.`, `${p} is gray with tiredness.`],
   kidFear: (p: string, age: number) => age < 9 ? [`${p} won't sleep without the lamp on.`, `${p} asks every night if the bad men are coming back.`] : [`${p} has stopped talking much and spends hours with the animals.`, `${p} jumps at every sound on the road.`],
   low: (p: string) => [`${p} sat on the porch most of the afternoon. Says it's nothing.`, `${p} skipped supper again.`, `${p} has gone quiet. Does the work, says little.`],
   stressed: (p: string) => [`${p} is short with everyone today.`, `${p} lay awake doing the sums on the food again.`],
@@ -581,7 +581,7 @@ export function moodSummary(s: GameState): MoodSummary {
     if (!ps) { calm++; continue; }
     const b = breaking(s, ps);
     if (b) rows.push({ p, why: BREAK_NAME[b.kind], kind: 'break' });
-    else if (ps.stress >= 60) rows.push({ p, why: 'badly strained', kind: 'strain' });
+    else if (ps.stress >= 60) rows.push({ p, why: 'badly stressed', kind: 'strain' });
     else if (griefFor(s, p) >= 15) rows.push({ p, why: 'grieving', kind: 'grief' });
     else if (ps.trauma >= 40) rows.push({ p, why: 'still shaken', kind: 'trauma' });
     else calm++;

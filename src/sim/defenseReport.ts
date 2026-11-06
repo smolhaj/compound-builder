@@ -101,7 +101,7 @@ export function defenseReport(s: GameState, drive?: readonly Pt[]): DefenseRepor
   // ── the line ──
   const gates = lineRuns.reduce((a, r) => a + r.gates.length, 0);
   const walls: Check[] = [
-    chk('line', 'Property line closed', line.openShare === 0, line.openShare === 0 ? `held all round (${Math.round(line.barrier)}% strength)` : `${Math.round(line.openShare * 100)}% of the line is open: they walk in there`, line.openShare < 0.15),
+    chk('line', 'Property line closed', line.openShare === 0, line.openShare === 0 ? `held all the way around (${Math.round(line.barrier)}% strength)` : `${Math.round(line.openShare * 100)}% of the line is open: they walk in there`, line.openShare < 0.15),
   ];
   if (s.site.creek) walls.push(chk('creek', 'Creek barred where it crosses the line', line.creekOpen === 0, line.creekOpen === 0 ? 'steel bars at both crossings' : `${line.creekOpen} crossing${line.creekOpen > 1 ? 's' : ''} open: the creek is the way round every wall and gate`));
   // bears, cougars, wolves and coyotes: kept out only by a line that holds them (solid fence, chain link, wrought iron, steel, container, palisade), gates shut, creek barred
@@ -207,7 +207,7 @@ export function defenseReport(s: GameState, drive?: readonly Pt[]): DefenseRepor
   const waterDays = s.utilities.storedL / (people * 10);
   const well = fin.some(st => st.kind.startsWith('well'));
   const catastrophes: Check[] = [
-    chk('food', 'Food put by', days >= 90, `${Number.isFinite(days) ? Math.floor(days) : '∞'} days`, days >= 30),
+    chk('food', 'Food stored', days >= 90, `${Number.isFinite(days) ? Math.floor(days) : '∞'} days`, days >= 30),
     chk('water', 'Water', well || waterDays >= 14, well ? 'a well' : `${Math.floor(waterDays)} days stored`, waterDays >= 3),
     (() => { const bp = backupPower(s); return chk('power', 'Power if the grid goes', bp.ok, bp.detail, true); })(),
     chk('heat', 'Winter heat', n(s, 'firewood') >= 8, `${n(s, 'firewood')} cords of firewood`, n(s, 'firewood') >= 3),

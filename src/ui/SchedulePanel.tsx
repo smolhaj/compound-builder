@@ -18,7 +18,7 @@ import { whoShouldDo } from '../sim/roster';
 
 const C = { bg: 'rgba(22,24,20,0.98)', line: 'rgba(255,255,255,0.09)', gold: '#d8c9a0', dim: 'rgba(238,238,238,0.62)', warn: '#e0b050', bad: '#f0a080', good: '#a8d080' };
 const btn = (on = false, off = false): CSSProperties => ({ padding: '4px 9px', borderRadius: 6, border: `1px solid ${on ? C.gold : C.line}`, background: on ? 'rgba(216,201,160,0.18)' : 'rgba(255,255,255,0.06)', color: '#eee', cursor: off ? 'not-allowed' : 'pointer', opacity: off ? 0.45 : 1, fontSize: 12 });
-const THREAT = ['Calm: the law still works', 'Guarded: no law out here now', 'High: raided lately, or everyone knows you have stores'];
+const THREAT = ['Calm: the law still works', 'Guarded: no law out here now', 'High: raided lately, or everyone knows you have supplies'];
 
 /** What the planner needs to know about the projects (build / fell). */
 const planCtx = (s: GameState) => ({ build: nextBuildTarget(s) !== null || s.perimeter.some(r => r.finishedAt === null) || s.roadside.length > 0, fell: nextFellJob(s) !== null });

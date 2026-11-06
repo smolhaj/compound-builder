@@ -86,7 +86,7 @@ export const DISASTERS: Partial<Record<DisasterKind, DisasterDef>> = {
     ],
     hints: [
       ['Talks collapse; both sides recall ambassadors.', 'Markets slide on war fears; gold hits a record.', 'Military convoys seen on the county road heading north.'],
-      ['DEFCON raised; embassies told to evacuate dependants.', 'Jets overhead at all hours; the base is on lockdown.', 'Neighbors say the Hendersons left for her sister\'s in Idaho.'],
+      ['DEFCON raised; embassies told to evacuate staff families.', 'Jets overhead at all hours; the base is on lockdown.', 'Neighbors say the Hendersons left for her sister\'s in Idaho.'],
       ['Emergency session at the UN breaks up without a vote.', 'Potassium iodide sold out statewide.', 'Gas lines at every station in town; some pumps empty.'],
     ],
     hit: ['EMERGENCY ALERT: BALLISTIC MISSILE THREAT INBOUND. SEEK IMMEDIATE SHELTER. THIS IS NOT A DRILL.'],
@@ -102,7 +102,7 @@ export const DISASTERS: Partial<Record<DisasterKind, DisasterDef>> = {
   financial: {
     kind: 'financial', name: 'Financial collapse', pulpy: false, warn: [30, 90],
     variants: [
-      { id: 'bank_holiday', name: 'a bank holiday that never ends', weight: 3, curves: { banks: C(0, 1, 0.05, [90, 300], 60), stores: C(3, 20, 0.3, [60, 200], 60), deliveries: C(5, 25, 0.4, [60, 200], 60), fuel: C(10, 30, 0.4, [60, 220], 60), medical: C(20, 40, 0.4, [90, 300], 60), law: C(20, 40, 0.35, [100, 330], 60) } },
+      { id: 'bank_holiday', name: 'a bank shutdown that never ends', weight: 3, curves: { banks: C(0, 1, 0.05, [90, 300], 60), stores: C(3, 20, 0.3, [60, 200], 60), deliveries: C(5, 25, 0.4, [60, 200], 60), fuel: C(10, 30, 0.4, [60, 220], 60), medical: C(20, 40, 0.4, [90, 300], 60), law: C(20, 40, 0.35, [100, 330], 60) } },
       { id: 'hyperinflation', name: 'hyperinflation', weight: 2, curves: { banks: C(0, 20, 0, [200, 500], 90), stores: C(10, 40, 0.25, [150, 450], 90), deliveries: C(10, 40, 0.3, [150, 450], 90), fuel: C(15, 30, 0.3, [150, 450], 90), medical: C(20, 50, 0.3, [150, 450], 90), law: C(30, 60, 0.3, [150, 450], 90), grid: C(60, 60, 0.5, [150, 450], 60) } },
     ],
     hints: [['Two regional banks fail in a week; lines outside a branch in the city.', 'Groceries up 4 % again this month.', 'The mill in town lays off a shift.'], ['"Temporary" withdrawal limits at every bank.', 'Gold hits a record; the pawn shop is buying.', 'Eggs and formula rationed at the store.'], ['ATMs read "temporarily unavailable".', 'The governor asks for calm.', 'Neighbors are swapping eggs for diesel.']],

@@ -195,7 +195,7 @@ export function holdGathering(s: GameState, g: Gathering): string[] {
   so.last[g.kind] = s.clock.t; so.held++;
   if (g.kind === 'funeral') mourn(s, g.who);
   if (g.kind === 'neighbors') { const n = s.neighbors.find(x => x.id === g.guests); if (n) n.disposition = Math.min(100, n.disposition + 8); }
-  if (covered < 0.5) out.push('There wasn\'t much to go round, but we were together.');
+  if (covered < 0.5) out.push('There wasn\'t much to go around, but we were together.');
   else if (quality >= 1.1) out.push(RICH_LINE[g.kind]);
   if (music && g.kind !== 'birthday' && g.kind !== 'service') out.push('Somebody got the guitar out and we sang until the fire burned down.');
   else if (kit.used.length >= 2) out.push(kit.used.includes('games') ? 'The cards came out after supper, and somebody put the music on. Nobody went to bed early.' : 'The evening ran long over the music.');
@@ -211,7 +211,7 @@ const RICH_LINE: Record<GatheringKind, string> = {
   july4: 'Hot dogs and a fire in the pit. We even had a few sparklers.',
   harvest: 'The harvest supper: new potatoes, roast, pie. We earned it.',
   movie: 'Popcorn and a movie on the wall. For two hours it felt like before.',
-  campfire: 'Stories round the fire until the kids fell asleep on our laps.',
+  campfire: 'Stories around the fire until the kids fell asleep on our laps.',
   wedding: 'A wedding under the string lights. There wasn\'t a dry eye.',
   funeral: 'We said what needed saying, and then we ate together.',
   neighbors: 'The neighbors came over. It was good to hear other voices at the table.',

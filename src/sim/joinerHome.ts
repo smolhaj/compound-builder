@@ -306,7 +306,7 @@ export function stayOptions(s: GameState, e: Pick<Encounter, 'people' | 'extras'
     else {
       const q = ownBuildQuote(s, k, handsFor(s, people)), builder = Math.max(0, ...adultsOf(people).map(p => p.skills.builder));
       out.push({ kind: 'own_build', label: `They build a ${kindName(k)}`, off: null,
-        line: `${usd(q.cost + q.permit)} of materials${cash >= q.cost ? ', paid from their money' : cash > 0 ? `, ${usd(cash)} from theirs` : ', from your stores'} · about ${Math.max(1, Math.round(q.days / 7))} weeks · tents till then`,
+        line: `${usd(q.cost + q.permit)} of materials${cash >= q.cost ? ', paid from their money' : cash > 0 ? `, ${usd(cash)} from theirs` : ', from your supplies'} · about ${Math.max(1, Math.round(q.days / 7))} weeks · tents till then`,
         tip: `A ${kindName(k)} (sleeps ${HOME_BEDS[k]}): ${Math.round(q.hours)} person-hours through the usual stages, with everyone pitching in. Their own hands count${builder >= 5 ? ` (the best builder of them is at ${builder})` : ''}. Their savings buy the materials where they can; the stockpile covers the rest. Until it is finished they sleep in tents.` });
     }
   }

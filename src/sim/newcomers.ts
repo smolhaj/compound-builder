@@ -156,13 +156,13 @@ export function carryOf(s: GameState, extra: readonly Pick<Person, 'kid' | 'age'
 
 /** The readout lines (gate card and Family tab). */
 export function carryLines(c: Carry): string[] {
-  const d = (x: number) => (x === Infinity ? 'the fields cover them' : `${Math.round(x)} days`);
+  const d = (x: number) => (x === Infinity ? 'the fields cover them' : `${Math.round(x)} ${Math.round(x) === 1 ? 'day' : 'days'}`);
   const out: string[] = [];
-  const base = `Put by: ${d(c.days)} of food for ${c.people}`;
+  const base = `Food on hand for ${c.people}: ${d(c.days)}`;
   out.push(c.extra > 0 ? `${base}; with ${c.extra === 1 ? 'them' : `the ${c.extra} of them`}, ${c.daysWith === Infinity ? 'still covered by the fields' : `${Math.round(c.daysWith)} days`}.` : `${base}.`);
-  out.push(`The stores and fields carry ${c.people + c.headroom} people for six months${c.headroom > 0 ? ` (${c.headroom} more than now)` : ' (no more than now)'}${c.fromStores ? '; the grocery stores are still open, this is what you hold for the day they close' : ''}.`);
-  if (c.extra > 0 && c.levelWith === 'over' && c.level !== 'over') out.push(`That is more than you can feed: ${c.extra === 1 ? 'one more mouth takes' : `${c.extra} more mouths take`} the stores below ${Math.round(c.daysWith)} days.`);
-  else if (c.level === 'over') out.push('The table is already past what the stores can feed.');
+  out.push(`Your food on hand and the fields carry ${c.people + c.headroom} people for six months${c.headroom > 0 ? ` (${c.headroom} more than now)` : ' (no more than now)'}${c.fromStores ? '; the grocery stores are still open, what you hold is for the day they close' : ''}.`);
+  if (c.extra > 0 && c.levelWith === 'over' && c.level !== 'over') out.push(`That is more than you can feed: ${c.extra === 1 ? 'one more mouth takes' : `${c.extra} more mouths take`} your food supply below ${Math.round(c.daysWith)} days.`);
+  else if (c.level === 'over') out.push('The table is already past what your food supply can feed.');
   return out;
 }
 
@@ -504,7 +504,7 @@ export const homeGoodwill = (why: string): number => 8 + (SHELTER_GRATITUDE[why 
 /** Days between one household's requests for shelter. */
 const SHELTER_GAP = 150;
 const STORMS = new Set(['blizzard', 'ice_storm', 'flood', 'tornado', 'derecho', 'hurricane_remnants', 'flash_flood', 'windstorm']);
-const STORM_TEXT: Record<string, string> = { blizzard: 'A blizzard is coming down the valley', ice_storm: 'An ice storm is forecast', flood: 'The creek is rising and the flood watch is up', tornado: 'A tornado watch is up', derecho: 'A derecho is bearing down', hurricane_remnants: 'The remnants of a hurricane are coming up the ridges', flash_flood: 'The wash is running', windstorm: 'A windstorm is coming off the Pacific' };
+const STORM_TEXT: Record<string, string> = { blizzard: 'A blizzard is coming down the valley', ice_storm: 'An ice storm is forecast', flood: 'The creek is rising and the flood watch is up', tornado: 'A tornado watch is up', derecho: 'A severe windstorm is bearing down', hurricane_remnants: 'The remnants of a hurricane are coming up the ridges', flash_flood: 'The dry creek bed is running', windstorm: 'A windstorm is coming off the Pacific' };
 
 /** A household asks to shelter with the family for a while. Null if the gate is busy or they cannot. */
 export function requestShelter(s: GameState, n: Neighbor, why: ShelterWhy, r: () => number, days?: number): Encounter | null {
@@ -526,7 +526,7 @@ export function requestShelter(s: GameState, n: Neighbor, why: ShelterWhy, r: ()
   const reason: Record<ShelterWhy, string> = {
     storm: `${STORM_TEXT[w?.kind ?? ''] ?? 'A bad storm is coming'}. Their place sits out on the open ground and the roof is not what it was. They would like to sit it out behind your walls.`,
     fire: 'Their house burned in the night. They are standing in your drive with what they could carry.',
-    warning: 'They have been watching the same news you have. They would sooner be behind your walls when it comes than alone out there.',
+    warning: 'They have been watching the same news you have. They would rather be behind your walls when it comes than alone out there.',
     raided: 'Raiders went through their place. They held, but nobody can sleep there tonight.',
     sick: 'Somebody at their place is sick and the stove is cold. They have no one else to turn to.',
     hungry: 'Their cellar is nearly empty. They are not begging; they are asking to share a table until the garden comes in.',
@@ -843,7 +843,7 @@ export function newcomersDay(s: GameState): string[] {
         b.loyalty = Math.min(100, b.loyalty + 10);
         lines.push(`${name} is a fair hand at ${hidden} (${p.skills[hidden]}) and never mentioned it. Up before anyone, every day.`);
       } else if (b.secret === 'sick') {
-        lines.push(`${name} is over the fever. It could have gone round the house.`);
+        lines.push(`${name} is over the fever. It could have gone around the house.`);
       } else {
         b.loyalty = Math.min(100, b.loyalty + 6);
         lines.push(`${name} pulls their weight. You stopped counting spoons the day they fixed the pump.`);

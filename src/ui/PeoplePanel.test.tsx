@@ -48,7 +48,7 @@ describe('the people panels (server-rendered)', () => {
     expect(sug?.title).toContain('not coping');
     expect(sug?.acts?.map(a => a.label)).toEqual(expect.arrayContaining(['Take a rest day']));
     const row = text(renderToStaticMarkup(<PersonInsight p={g.people[0]} />));
-    expect(row).toContain('strain');
+    expect(row).toContain('stress');
     expect(row).toContain('withdrawn');
   });
 

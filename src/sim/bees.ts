@@ -139,7 +139,7 @@ export function harvestHoney(s: GameState, id: string): string | null {
   p.surplus = 0; p.honeyYear += lb; p.taken = calendarOf(s.clock).year;
   addFood(s, 'honey', lb / 12);
   (s.stock as unknown as Record<string, number>).beeswax = stock(s, 'beeswax') + lb / 40;
-  log(s, `Took ${Math.round(lb)} lb of honey from the hives (${Math.floor(lb / 12 * 10) / 10} gallons) and ${Math.round(lb / 40 * 10) / 10} lb of wax. The bees keep their winter stores.`);
+  log(s, `Took ${Math.round(lb)} lb of honey from the hives (${Math.floor(lb / 12 * 10) / 10} gallons) and ${Math.round(lb / 40 * 10) / 10} lb of wax. The bees keep what they need for winter.`);
   return null;
 }
 
@@ -150,7 +150,7 @@ export function apiaryReport(s: GameState, id: string): ApiaryReport {
   const need = winterNeed(s) * p.colonies;
   if (p.colonies > 0 && p.mites > 0.5 && p.treated !== year) notes.push('The mite load is high. Treat in the fall (a year of hive supplies) or lose the colonies this winter.');
   if (p.colonies > 0 && stock(s, 'hive_supplies') < 1 && p.treated !== year) notes.push('No hive supplies: no mite strips for the fall.');
-  if (p.colonies > 0 && p.stores * p.colonies < need * 0.7 && !flying(s)) notes.push('Light on winter stores: they may starve before spring.');
+  if (p.colonies > 0 && p.stores * p.colonies < need * 0.7 && !flying(s)) notes.push('Short on winter honey: they may starve before spring.');
   if (!proof(s, 'predators').closed && predatorSpecies(s).includes('bear')) notes.push('Bears live here and the line is open: a bear can wipe out the hives.');
   return { colonies: p.colonies, strength: p.strength, stores: p.stores * p.colonies, need, surplus: p.surplus, mites: p.mites, honeyYear: p.honeyYear, treated: p.treated === year, forage: forage(s), flying: flying(s), lostWinter: p.lostWinter, notes };
 }

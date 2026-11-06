@@ -106,5 +106,5 @@ export function vetting(s: GameState): Vetting {
   const inner = stores.filter(st => depthAt(s, [st.x, st.z]) >= 2).length;
   const outerShare = stores.length ? 1 - inner / stores.length : (homes.length ? 0.5 : 1);
   const reach = Math.max(0.2, Math.min(1, outerShare));
-  return { rings, reach, line: `You hold ${rings} rings: strangers on probation sleep in the outer ring and are searched at its gate. A thief among them could reach about ${Math.round(reach * 100)} % of your stores.` };
+  return { rings, reach, line: `You hold ${rings} rings: strangers on probation sleep in the outer ring and are searched at its gate. A thief among them could reach about ${Math.round(reach * 100)} % of your supplies.` };
 }

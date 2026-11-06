@@ -112,7 +112,7 @@ export function wardsDay(s: GameState, doy: number, day: number, town: boolean, 
   }
   L.wards = [];
   const rest = home.filter(p => p !== heir.person);
-  say('coming', `${heir.person.first} turned 18 and came home to the place${rest.length ? `, with ${names(rest)}` : ''}. It is theirs now: the house, the land, the stores and what the family built.`);
+  say('coming', `${heir.person.first} turned 18 and came home to the place${rest.length ? `, with ${names(rest)}` : ''}. It is theirs now: the house, the land, the supplies and what the family built.`);
   return true;
 }
 

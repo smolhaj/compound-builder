@@ -88,7 +88,7 @@ export function upkeepDay(s: GameState, demand: number, warm: boolean): string[]
     const frac = n - Math.floor(n);
     s.upkeep.green = s.upkeep.green.filter(g => !ready.includes(g));
     if (frac > 1e-6) s.upkeep.green.push({ ricks: frac, at: s.clock.t - SEASON_DAYS - 1 });
-    if (n >= 1) out.push(`${Math.floor(n)} rick${n >= 2 ? 's' : ''} of firewood seasoned and ready to burn.`);
+    if (n >= 1) out.push(`${Math.floor(n)} face cord${n >= 2 ? 's' : ''} of firewood seasoned and ready to burn.`);
   }
   const homes = s.structures.filter(x => isFinished(x) && isHome(x.kind));
   // chimney fire: only when the stove is going hard and the flue is dirty

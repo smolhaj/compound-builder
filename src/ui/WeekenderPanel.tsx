@@ -62,7 +62,7 @@ export function WeekenderPanel() {
       </div>
       : residents(game).length > 0
         ? <Note>{residents(game).map(p => p.first).join(' and ')} live on the place and are here on weekdays, so it is not empty. A caretaker would still take the heavy work off them.</Note>
-        : <Note tone="warn">Nobody is looking after the place Monday to Friday. The animals go unfed, the garden unwatered, and an empty place is far likelier to be broken into.</Note>}
+        : <Note tone="warn">Nobody is looking after the place Monday to Friday. The animals go unfed, the garden unwatered, and an empty place is far more likely to be broken into.</Note>}
     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', margin: '3px 0' }}>
       {CARETAKER_KINDS.filter(k => w.caretaker?.kind !== k).map(k => {
         const why = caretakerProblem(game, k);
@@ -86,7 +86,7 @@ export function WeekenderPanel() {
     {!rented && q && <>
       <Row label="Worth" value={`${usd(q.value)}`} title={`${Math.round(marketFactor(game) * 100)} % of what it would fetch in a normal market (${usd(w.town.value)}); it falls as the signs grow`} tone={marketFactor(game) < 0.9 ? 'warn' : undefined} />
       <Row label="Owed" value={usd(q.mortgage)} />
-      <Row label="Costs" value={`${usd(cost)} a month`} title={`Mortgage ${usd(mortgagePayment(w.town))} + upkeep ${usd(townUpkeepNow(w))}${w.belt ? ' (belt tight)' : ''} + property tax ${usd(townTaxHalf(w.town))} twice a year`} />
+      <Row label="Costs" value={`${usd(cost)} a month`} title={`Mortgage ${usd(mortgagePayment(w.town))} + upkeep ${usd(townUpkeepNow(w))}${w.belt ? ' (tight budget)' : ''} + property tax ${usd(townTaxHalf(w.town))} twice a year`} />
       <Row label="Sells for" value={block ? 'no buyers' : q.net >= 0 ? `${usd(q.net)} clear` : `${usd(-q.net)} short`} tone={block ? 'bad' : q.net < 0 ? 'warn' : undefined} title={block ?? 'After the agent and closing (6 %) and the mortgage'} />
     </>}
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginTop: 4 }}>

@@ -261,15 +261,15 @@ export function Hud() {
             {trialCamps(game).map(c => <Section key={c.id} title={`Camp outside the wall: ${c.title}`}>
               <Row label="On trial" value={`day ${Math.max(0, dayIndex(game.clock.t) - c.from)} of ${c.until - c.from}`} />
               <Row label="People" value={c.people.map(p => `${p.first}${p.kid ? ` (${p.age})` : ''}`).join(', ')} />
-              <Row label="Their ration" value={`${campNeed(c).toLocaleString('en-US')} kcal/day from your stores${c.hungry ? ` · short ${c.hungry} days` : ''}`} />
+              <Row label="Their ration" value={`${campNeed(c).toLocaleString('en-US')} kcal/day from your supplies${c.hungry ? ` · short ${c.hungry} days` : ''}`} />
               <Row label="Work put in" value={`${Math.round(c.worked)} h`} />
               {c.learned.map((l, k) => <Note key={k} tone="warn">{l}</Note>)}
               {!c.learned.length && <div style={{ fontSize: 11, color: DIM }}>Not family yet. You'll know them better by the end of the month.</div>}
             </Section>)}
             {game.people.some(p => p.conditions?.length) && <Section title="Medicine & household">
-              {pharmacyOpen(game) ? <button style={{ ...btn(), width: '100%' }} title="Fill everyone's prescriptions three months past the month in hand (as far ahead as insurance covers)" onClick={() => g.stockUpRx()}>Fill prescriptions 90 days ahead</button>
+              {pharmacyOpen(game) ? <button style={{ ...btn(), width: '100%' }} title="Fill everyone's prescriptions three months beyond the current month (as far ahead as insurance covers)" onClick={() => g.stockUpRx()}>Fill prescriptions 90 days ahead</button>
                 : <Note tone="warn">The pharmacy is shut: what's on hand is all there is.</Note>}
-              <Row label="Hygiene supplies" value={game.disaster.tracks.stores >= 0.5 ? `bought with groceries · ${Math.floor(game.stock.hygiene)} put by` : `${Math.floor(game.stock.hygiene)} person-months left`} />
+              <Row label="Hygiene supplies" value={game.disaster.tracks.stores >= 0.5 ? `bought with groceries · ${Math.floor(game.stock.hygiene)} on hand` : `${Math.floor(game.stock.hygiene)} person-months left`} />
             </Section>}
             <Section title="Work and money">
               {game.disaster.tracks.banks > 0.5 && game.disaster.tracks.stores > 0.5 && <Row label="Household costs" value={`$${livingPerDay(game)}/day`} />}
@@ -302,9 +302,9 @@ export function Hud() {
               })}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginTop: 3 }}>
                 <span style={{ color: DIM }}>Rotate the pantry: {game.shelf.rotate ? 'yes' : 'no'}</span>
-                <button style={btn()} title="Eat what you store: the oldest comes off the shelf, the grocery run replaces it (keeps the stores young while town is open)" onClick={() => g.setRotate(!game.shelf.rotate)}>{game.shelf.rotate ? 'Stop' : 'Rotate'}</button>
+                <button style={btn()} title="Eat what you store: the oldest comes off the shelf, the grocery run replaces it (keeps your food fresh while town is open)" onClick={() => g.setRotate(!game.shelf.rotate)}>{game.shelf.rotate ? 'Stop' : 'Rotate'}</button>
               </div>
-              <Row label="Mouse traps" value={game.shelf.traps > 0 ? `set (${game.shelf.traps} days)` : game.stock.traps >= 1 ? 'a box in the shed' : <span style={{ color: TONE.warn }}>none: mice in the stores</span>} />
+              <Row label="Mouse traps" value={game.shelf.traps > 0 ? `set (${game.shelf.traps} days)` : game.stock.traps >= 1 ? 'a box in the shed' : <span style={{ color: TONE.warn }}>none: mice in the pantry</span>} />
               {game.stock.fuel > 0 && game.stock.stabilizer < Math.ceil(game.stock.fuel / 10) && <Note tone="warn">The gas has no stabilizer: it goes stale in about six months.</Note>}
             </Group>
             <Group id="sup-hunt" title="Hunting & fishing" defaultOpen={false} extra={`${(['big', 'small', 'fish'] as const).filter(c => game.wild.abundance[c] < 0.4).length ? 'game is thin' : 'game is plentiful'}`}>
@@ -333,7 +333,7 @@ export function Hud() {
                 const lines = [{ material: 'staples' as MaterialId, qty: Math.max(1, Math.ceil(90 * perDay / KCAL.staples)) }];
                 const why = orderProblem(game, lines);
                 return <>
-                  <Row label="Put by" value={d === Infinity ? '—' : d >= 365 ? `${(d / 365).toFixed(1)} years` : `${Math.floor(d)} ${Math.floor(d) === 1 ? 'day' : 'days'}`} tone={short ? 'warn' : undefined} />
+                  <Row label="Food on hand" value={d === Infinity ? '—' : d >= 365 ? `${(d / 365).toFixed(1)} years` : `${Math.floor(d)} ${Math.floor(d) === 1 ? 'day' : 'days'}`} tone={short ? 'warn' : undefined} />
                   {f.producedKcal > 0 && <Row label="Grown yesterday" value={`${Math.round(f.producedKcal).toLocaleString('en-US')} kcal`} />}
                   {!f.fromStores && <Row label="Ate / needed" value={`${Math.round(f.ateKcal).toLocaleString('en-US')} / ${Math.round(f.needKcal).toLocaleString('en-US')}`} tone={f.ateKcal < f.needKcal * 0.95 ? 'bad' : undefined} />}
                   {f.fromStores && <Hint more="Stock canned food and bulk staples for when the stores close.">Groceries come from town for now.</Hint>}
@@ -369,11 +369,11 @@ export function Hud() {
             const ch = chimneyState(game);
             return <>
               <Section title="Heat">
-                <Row label="Firewood, seasoned" value={`${Math.floor(game.stock.firewood)} rick${Math.floor(game.stock.firewood) === 1 ? '' : 's'}`} />
-                {gr > 0 && <Row label="Green, seasoning" value={`${Math.round(gr * 10) / 10} ricks · next ready in ${next} days`} />}
+                <Row label="Firewood, seasoned" value={`${Math.floor(game.stock.firewood)} face cord${Math.floor(game.stock.firewood) === 1 ? '' : 's'}`} />
+                {gr > 0 && <Row label="Green, seasoning" value={`${Math.round(gr * 10) / 10} face cords · next ready in ${next} days`} />}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginTop: 3 }}>
                   <span style={{ color: DIM }}>Chimney: <span style={{ color: ch === 'dirty' ? TONE.bad : ch === 'building up' ? TONE.warn : TONE.good }}>{ch}</span></span>
-                  {ch !== 'clean' && <button style={btn(ch === 'dirty')} title="Creosote builds up with every rick burned (green wood three times as fast); a dirty flue can catch fire" onClick={() => g.sweep()}>{game.disaster.tracks.stores >= 0.5 && game.disaster.tracks.banks >= 0.5 ? `Sweep it ($${SWEEP_USD})` : 'Sweep it ourselves'}</button>}
+                  {ch !== 'clean' && <button style={btn(ch === 'dirty')} title="Creosote builds up with every face cord burned (green wood three times as fast); a dirty flue can catch fire" onClick={() => g.sweep()}>{game.disaster.tracks.stores >= 0.5 && game.disaster.tracks.banks >= 0.5 ? `Sweep it ($${SWEEP_USD})` : 'Sweep it ourselves'}</button>}
                 </div>
                 {game.stock.firewood < 1 && gr >= 1.5 && <Note tone="warn">Burning green wood: half again as much, and the flue fouls fast.</Note>}
               </Section>
@@ -402,7 +402,7 @@ export function Hud() {
                 <Row label="In / used" value={`${Math.round(r.waterL)} / ${Math.round(r.useL)} L`} />
                 <Row label="Stored" value={`${Math.round(r.storedL)} of ${storageCapacity(game).toLocaleString('en-US')} L`} />
                 {irrigationStore(game).cap > 0 && <Row label="Pond (garden, fire)" value={`${Math.round(irrigationStore(game).have).toLocaleString('en-US')} of ${irrigationStore(game).cap.toLocaleString('en-US')} L`} title="Pond water waters the garden and fills the fire line; it is not drinking water. A reservoir counts as drinking water once the filtration shed or a filter is on the place." />}
-                {game.stock.water_jugs >= 1 && <Row label="Drinking water put by" value={`${Math.floor(game.stock.water_jugs)} jugs (${Math.round(game.stock.water_jugs * JUG_L)} L)`} />}
+                {game.stock.water_jugs >= 1 && <Row label="Drinking water stored" value={`${Math.floor(game.stock.water_jugs)} jugs (${Math.round(game.stock.water_jugs * JUG_L)} L)`} />}
                 {storageCapacity(game) - r.storedL > 1000 && game.disaster.tracks.deliveries >= 0.5 && game.disaster.tracks.banks >= 0.5 && <button style={{ ...btn(), width: '100%', marginTop: 3 }} title="A tanker load from town: 15,000 L" onClick={() => g.money(d => orderTanker(d, storageCapacity(d)))}>Order a tanker load ($450)</button>}
                 <Row label="Well depth here" value={`${game.site.gwDepth} m`} />
                 {game.utilities.hauling && <Note tone="warn">{game.utilities.haulFar ? 'Hauling water a quarter mile from the creek on the neighbor\'s land: a well or cistern would end it.' : 'Hauling water from the creek by the bucket: a well or cistern would end it.'}</Note>}
@@ -473,7 +473,7 @@ export function Hud() {
                       : why === 'nobody sells land for cash now' ? <span style={{ color: DIM }}>no cash sales</span>
                       : <button style={btn(!why)} disabled={!!why} title={why ?? `Buy ${acresOf(p.rect)} acres`} onClick={() => g.buy(p.id)}>{usd(priceOf(game, p))}</button>}
                   </div>
-                  <div style={{ fontSize: 11, color: DIM }}>{acresOf(p.rect)} acres of {LAND_NAME[p.kind]}{p.owner === 'you' ? '' : ` · ${n ? n.name : '?'}`}{p.forSale && p.owner !== 'you' ? <span style={{ color: TONE.warn }}> · for sale</span> : null}{p.ring === 2 && p.owner !== 'you' ? <span style={{ color: DIM }}> · farther out, dearer</span> : null}{premiumOffer(game, p) ? <span style={{ color: TONE.warn }} title="Not for sale. A cash offer 60% over the asking price would tempt him.">{' · cash offer, +60%'}</span> : null}</div>
+                  <div style={{ fontSize: 11, color: DIM }}>{acresOf(p.rect)} acres of {LAND_NAME[p.kind]}{p.owner === 'you' ? '' : ` · ${n ? n.name : '?'}`}{p.forSale && p.owner !== 'you' ? <span style={{ color: TONE.warn }}> · for sale</span> : null}{p.ring === 2 && p.owner !== 'you' ? <span style={{ color: DIM }}> · farther out, more expensive</span> : null}{premiumOffer(game, p) ? <span style={{ color: TONE.warn }} title="Not for sale. A cash offer 60% over the asking price would tempt him.">{' · cash offer, +60%'}</span> : null}</div>
                 </div>;
               })}
             </Section>
@@ -521,7 +521,7 @@ export function Hud() {
                   </div>
                 </div>
               ))}
-              <Hint more="Fewer adults to watch them, likelier they slip away.">Each eats about 2,200 kcal a day.</Hint>
+              <Hint more="Fewer adults to watch them, more likely they slip away.">Each eats about 2,200 kcal a day.</Hint>
             </Section>}
             {canRigMines(game) && <Section title="Mines">
               <Row label="Rigged on the approaches" value={Math.floor(game.stock.mines ?? 0)} title="They go off as raiders cross the band outside the line" />
@@ -542,7 +542,7 @@ export function Hud() {
             <MarketSection />
             {game.clock.t >= game.disaster.hitAt && !moneyWorks(game) && (() => {
               const p = barterPrices(game);
-              const rows: Array<[string, Good]> = [['Canned food (case)', 'canned'], ['Staples (25 kg)', 'staples'], ['Fuel (20 L)', 'fuel'], ['Meds (kit)', 'meds'], ['Firewood (rick)', 'firewood'], ['Seed (season)', 'seed'], ['Hygiene (month)', 'hygiene'], ['Silver coin', 'metal:silver_coin'], ['A day\'s labor', 'labor']];
+              const rows: Array<[string, Good]> = [['Canned food (case)', 'canned'], ['Staples (25 kg)', 'staples'], ['Fuel (20 L)', 'fuel'], ['Meds (kit)', 'meds'], ['Firewood (face cord)', 'firewood'], ['Seed (season)', 'seed'], ['Hygiene (month)', 'hygiene'], ['Silver coin', 'metal:silver_coin'], ['A day\'s labor', 'labor']];
               return <Section title="Trade with neighbors">
                 <Hint more="Goods change hands at what they're worth now (2025 dollars-equivalent). Friendly neighbors (allies) trade at par.">Money is gone: trade is goods for goods.</Hint>
                 {rows.map(([label, k]) => <Row key={k} label={label} value={`$${Math.round(p[k]).toLocaleString('en-US')}`} />)}
@@ -615,7 +615,7 @@ export function Hud() {
           <span title="How hard the walls, gates and bars stop a crew">Line holds {r.barrierPct}%</span>
           <span title="How early a crew is seen">Seen coming {r.detectionPct}%</span>
           <span>{r.rings} ring{r.rings === 1 ? '' : 's'} · {r.gates} gate{r.gates === 1 ? '' : 's'} · {r.towers} tower{r.towers === 1 ? '' : 's'}</span>
-          <span title="Ways in by the lie of the land (Terrain: Lanes)">{r.lanes} lane{r.lanes === 1 ? '' : 's'}{r.laneHardness !== null ? ` · best going ×${r.laneHardness}` : ''}{r.chokeHeld ? ' · choke held' : ''}</span>
+          <span title="Ways in, from the lay of the land (Terrain: Lanes)">{r.lanes} lane{r.lanes === 1 ? '' : 's'}{r.laneHardness !== null ? ` · best going ×${r.laneHardness}` : ''}{r.chokeHeld ? ' · choke held' : ''}</span>
           <span title="How far each kind of watch sees in today's fog; thermal sees through it">Sight: eye {r.sight.eye} m · camera {r.sight.camera} m · night vision {r.sight.nvg} m · thermal {r.sight.thermal} m</span>
         </div>; })()}
         <button style={btn(w.showBoundary)} title="Draw the property line on the ground (it also shows while you draw a fence or wall)" onClick={() => w.setShowBoundary(!w.showBoundary)}>Boundary</button>
@@ -678,7 +678,7 @@ function TakenSection() {
             <div style={{ fontSize: 11.5, color: DIM, marginBottom: 2 }}>Who goes to {lead.where}:</div>
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
               {can.map(p => <button key={p.id} style={btn(pickd.includes(p.id))} title={`Health ${Math.round(game.personState.find(x => x.id === p.id)?.needs.health ?? 0)}`} onClick={() => { setTeam({ ...team, [c.pid]: pickd.includes(p.id) ? pickd.filter(x => x !== p.id) : [...pickd, p.id] }); setOdds({ ...odds, [c.pid]: -1 }); }}>{p.first}</button>)}
-              {!can.length && <Note tone="warn">Nobody is fit to go.</Note>}
+              {!can.length && <Note tone="warn">Nobody is well enough to go.</Note>}
             </div>
             {allyN > 0 && <button style={{ ...btn(askAllies), width: '100%', marginTop: 4 }} title="Neighbors on the radio net who like you. Their men can be hurt or killed, and they'll hold it against you if it goes badly." onClick={() => { setAskAllies(!askAllies); setOdds({ ...odds, [c.pid]: -1 }); }}>{askAllies ? '✓ ' : ''}Ask the neighbors: {allies.map(a => `${a.name} (${a.n})`).join(', ')}</button>}
             {pickd.length > 0 && <Note tone="warn">Staying: {staying.map(p => p.first).join(', ') || 'nobody'} ({staying.filter(p => !p.kid || p.age >= 15).length} who can shoot). The place is lightly held for {lead.km > 25 ? 'four' : 'two'} days.</Note>}
@@ -742,7 +742,7 @@ function Chronicle() {
         {g.people.map((p, i) => <span key={p.id} style={{ color: p.alive ? (p.role === 'heir' ? '#d8c08a' : undefined) : '#8a807a' }}>{i ? ', ' : ''}{p.alive ? '' : '✝ '}{p.name} {p.age}</span>)}
       </div>)}
       {(L.wards ?? []).length > 0 && <div style={{ padding: '2px 0', color: '#d8c08a' }} title="With no grown person left, a neighbor household took the children in. The place is held for them and comes to the eldest at 18.">Away with {game.neighbors.find(n => n.id === L.wards[0].by)?.name ?? 'a neighbor'}: {L.wards.map(w => `${w.person.first} ${w.person.age}`).join(', ')}</div>}
-      <Hint more="Gold are the place's own grown children: the heirs. Skills pass to the children when a parent dies; the house, land and stores stay one household's.">Gold names are the heirs.</Hint>
+      <Hint more="Gold are the place's own grown children: the heirs. Skills pass to the children when a parent dies; the house, land and supplies stay one household's.">Gold names are the heirs.</Hint>
     </Section>
     {L.eras.length > 0 && <Section title="Eras">
       {L.eras.map(e => <div key={e.n} style={{ display: 'flex', justifyContent: 'space-between', gap: 6, padding: '2px 0' }}>

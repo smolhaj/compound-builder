@@ -40,7 +40,7 @@ export function PersonInsight({ p }: { p: Person }) {
   const shown = ps ? Math.round(ps.stress) : 0;
   return <div style={{ marginTop: 3, fontSize: 11 }}>
     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-      <span style={{ color: DIM, width: 34 }}>strain</span>{bar(shown, strainColor(shown), `Strain ${shown}${ps && ps.trauma >= 20 ? `, trauma ${Math.round(ps.trauma)}` : ''}${ps && ps.low >= 40 ? `, low mood ${Math.round(ps.low)}` : ''}`)}
+      <span style={{ color: DIM, width: 34 }}>stress</span>{bar(shown, strainColor(shown), `Stress ${shown}${ps && ps.trauma >= 20 ? `, trauma ${Math.round(ps.trauma)}` : ''}${ps && ps.low >= 40 ? `, low mood ${Math.round(ps.low)}` : ''}`)}
       <button style={{ ...btn(open), padding: '0 6px', fontSize: 10.5 }} title="What weighs on them, what lifts it, and what they are good at" onClick={() => setOpen(!open)}>{open ? 'less' : 'how they are'}</button>
     </div>
     {(mood || skills.length > 0) && <div style={{ color: b ? TONE.bad : mood ? TONE.warn : DIM, marginTop: 1 }}>
@@ -101,13 +101,13 @@ export function PeopleSection() {
     {M?.rift && <Note tone="warn">{game.people.find(p => p.id === M.rift!.a)?.first} and {game.people.find(p => p.id === M.rift!.b)?.first} are not speaking.</Note>}
     {hardened(game) && <Note tone="warn">The house has gone hard since what was done at the gate. The kids feel it.</Note>}
     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
-      <button style={btn(rest)} disabled={rest} title="Everyone off everything that can wait until midnight: the animals, the kitchen, the dogs, the watch and the sick are still tended. Lifts strain; the backlog grows." onClick={() => g.daily(d => takeRestDay(d))}>{rest ? 'Resting today' : 'Take a rest day'}</button>
+      <button style={btn(rest)} disabled={rest} title="Everyone off everything that can wait until midnight: the animals, the kitchen, the dogs, the watch and the sick are still tended. Lowers stress; the backlog grows." onClick={() => g.daily(d => takeRestDay(d))}>{rest ? 'Resting today' : 'Take a rest day'}</button>
       <button style={btn()} disabled={!!camp} title={camp ?? 'A fire and stories tonight: lifts spirits (and costs a little firewood)'} onClick={() => g.daily(d => callGathering(d, 'campfire'))}>Campfire tonight</button>
       <button style={btn()} disabled={!!service} title={service ?? 'A reading, a hymn or two and a few words about the week, at six. Lifts people of faith a lot and the rest a little for a week; costs nothing.'} onClick={() => g.daily(d => callGathering(d, 'service'))}>Hold a service</button>
     </div>
     <CloseRows />
     <Evenings />
-    <div style={{ fontSize: 11, color: DIM, marginTop: 4 }}>A rest day, a gathering or a service, faith and someone close lift the strain too. Strain costs morale and work only once it is real.</div>
+    <div style={{ fontSize: 11, color: DIM, marginTop: 4 }}>A rest day, a gathering or a service, faith and someone close lower stress too. Stress costs morale and work only once it is real.</div>
     <div style={{ marginTop: 5 }}>
       <button style={{ ...btn(skillsOpen), padding: '1px 8px', fontSize: 11 }} onClick={() => setSkillsOpen(!skillsOpen)}>{skillsOpen ? 'Hide skills' : 'Who is best at what'}</button>
       {skillsOpen && <div style={{ marginTop: 4 }}>
@@ -143,15 +143,15 @@ export function MedicalSection() {
     {sick.map(p => casesOf(game, p.id).map((h, i) => <Row key={p.id + i} label={p.first} value={<span style={{ fontSize: 11 }}>{h.what}: {h.med!.care}</span>} tone={h.sev >= 60 ? 'bad' : 'warn'} />))}
     {r.needs.map((x, i) => <Note key={`${i}-${x}`} tone="warn">{x}</Note>)}
     {r.epidemic && <div style={{ marginTop: 3 }}>
-      <Note tone="warn">{r.epidemic.kind === 'flu' ? 'The flu is going round' : 'Dysentery is going round'} ({r.epidemic.cases} so far).{r.epidemic.quarantine ? ' The sick are being kept apart.' : ''}</Note>
+      <Note tone="warn">{r.epidemic.kind === 'flu' ? 'The flu is going around' : 'Dysentery is going around'} ({r.epidemic.cases} so far).{r.epidemic.quarantine ? ' The sick are being kept apart.' : ''}</Note>
       <div style={{ display: 'flex', gap: 4 }}>
         <button style={btn(r.epidemic.quarantine)} onClick={() => g.daily(d => setQuarantine(d, true))}>Keep the sick apart</button>
-        <button style={btn(!r.epidemic.quarantine && r.epidemic.asked)} onClick={() => g.daily(d => setQuarantine(d, false))}>Carry on</button>
+        <button style={btn(!r.epidemic.quarantine && r.epidemic.asked)} onClick={() => g.daily(d => setQuarantine(d, false))}>Continue</button>
       </div>
     </div>}
     {lasting.map(([id]) => <Row key={id} label={game.people.find(p => p.id === id)?.first ?? ''} value={<span style={{ fontSize: 11 }}>{lastingOf(game, id).join(', ')}</span>} />)}
     {r.pregnant.map(([name, days]) => <Row key={name} label={name} value={`expecting: about ${Math.max(0, Math.round(days / 30))} month${Math.round(days / 30) === 1 ? '' : 's'} to go`} title="A medic and a birthing kit (or the hospital) make the delivery much safer." />)}
-    {!hasBits && <Note>Nobody is sick or hurt. A splint set, rehydration salts and a course or two of antibiotics are worth having put by (Shop → Medical & household).</Note>}
+    {!hasBits && <Note>Nobody is sick or hurt. A splint set, rehydration salts and a course or two of antibiotics are worth keeping on hand (Shop → Medical & household).</Note>}
   </Section>;
 }
 

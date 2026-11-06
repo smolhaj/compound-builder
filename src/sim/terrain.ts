@@ -429,7 +429,7 @@ export function siteCandidates(t: Terrain, ctx: SiteContext, lanes?: readonly La
     if (!inLot(lot, x, z)) continue;
     if (t.high[k] >= 0.5 && t.slope[k] < 0.15 && t.wet[k] === 0) {
       const sc = clamp(t.high[k] / 1.5, 0, 1) * 0.6 + t.sight[k] * 0.4 - 0.1 * Math.min(1, Math.hypot(x - camp[0], z - camp[1]) / 40);
-      if (!keep || sc > keep.score) keep = { kind: 'keep_ridge', x, z, score: clamp(sc, 0, 1), reason: `This rise stands ${Math.round(t.high[k] * 6)} m above the land round it and sees ${Math.round(t.sight[k] * T.SIGHT * 6)} m on average: it suits a terraced keep.` };
+      if (!keep || sc > keep.score) keep = { kind: 'keep_ridge', x, z, score: clamp(sc, 0, 1), reason: `This rise stands ${Math.round(t.high[k] * 6)} m above the land around it and sees ${Math.round(t.sight[k] * T.SIGHT * 6)} m on average: it suits a terraced keep.` };
     }
     if (t.high[k] >= 0.35) {
       const sc = clamp(t.high[k] / 1.2, 0, 1) * 0.5 + t.sight[k] * 0.5;

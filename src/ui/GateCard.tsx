@@ -196,7 +196,7 @@ export function GateCard() {
       <div style={{ marginBottom: 8, opacity: 0.9 }}>{c.text}</div>
       {c.lines.map((l, i) => <div key={i} style={{ fontSize: 12.5, opacity: 0.85 }}>{l}</div>)}
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
-        <button style={button(true)} onClick={() => g.dismissCard()}>Carry on</button>
+        <button style={button(true)} onClick={() => g.dismissCard()}>Continue</button>
       </div>
     </div>
   );
