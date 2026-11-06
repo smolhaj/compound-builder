@@ -13,7 +13,7 @@ import { siteNote } from '../sim/microclimate';
 import { onJustPlaced, type Spot } from './buildkit/justPlaced';
 import { stakeSpendAsk } from '../sim/spendGuard';
 import { DRIVE_W } from './region/access';
-import { YARD_GAPS, YARD_SITE, YARD_SLIDES, spurGradeOk, yardBesideDrive, yardSpur } from './buildkit/yardSite';
+import { YARD_GAPS, YARD_SITE, YARD_SLIDES, spurGradeOk, spurProfileOk, yardBesideDrive, yardSpur } from './buildkit/yardSite';
 import { arcNear, distToPolyline, pointAtArc } from './perimeter/gateKitLayout';
 import { clashText, padClash, padSnap } from './buildkit/padRules';
 
@@ -220,6 +220,10 @@ export class PlacementTool {
     const g: [number, number] = [c.x + fx * half, c.z + fz * half], rc = pointAtArc(drive, arcNear(drive, g)), roadY = this._world.groundAt(rc[0], rc[1]);
     if (Math.abs(road - roadY) > 0.08) return false;
     for (const k of [-0.5, 0.5]) { const ex = c.x + fx * (half + spur) - fz * k, ez = c.z + fz * (half + spur) + fx * k; if (Math.abs(this._world.groundAt(ex, ez) - roadY) > 0.1 + 0.15 * Math.abs(k)) return false; }
+    // and the ground across the whole way is one plain slope from the pad to the road: a bank beside or across the spur (a road cut's slope, a bench edge) refuses the site
+    const hs: number[][] = [];
+    for (let i = 0; i <= 4; i++) { const d = half + spur * i / 4, row: number[] = []; for (const k of [-0.35, 0, 0.35]) row.push(this._world.groundAt(c.x + fx * d - fz * k, c.z + fz * d + fx * k)); hs.push(row); }
+    if (!spurProfileOk(pad, roadY, hs, 0.1 + 0.05 * Math.abs(roadY - pad))) return false;
     return spurGradeOk(spur, roadY - pad);
   }
 

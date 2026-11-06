@@ -129,11 +129,15 @@ function bankStrip(fr: readonly Frame[], i0: number, i1: number, sg: number, rea
   const raw = Array.from({ length: rows }, (_, r) => bankExtent(o => { const [x, z] = at(r, o); return ground(x, z) - natural(x, z); }, reachMax));
   let ext = raw.slice();
   for (let pass = 0; pass < 3; pass++) ext = ext.map((_, r) => { let t = 0, w = 0; for (let d = -4; d <= 4; d++) { const q = r + d; if (q < 0 || q >= rows) continue; const k = 5 - Math.abs(d); t += ext[q] * k; w += k; } return t / w; });
+  // on the inside of a bend the offset line is shorter than the road's and folds over itself once the offset passes the bend's radius: the facing stops short of that
+  // (insideRoom, tested), so it follows the bend as one clean band and never doubles back
+  const room = insideRoom(fr.slice(i0, i1 + 1), sg, BED.halfW);
+  ext = ext.map((e, r) => Math.min(e, room[r]));
   for (let r = 0; r < rows; r++) {
     const f = fr[i0 + r];
     if (r > 0) sAcc += Math.hypot(f.x - fr[i0 + r - 1].x, f.z - fr[i0 + r - 1].z);
     // the facing starts a hair out from the bench edge and ends before the toe: it never lies on level ground
-    const reach = Math.max(0, ext[r] - 0.04);
+    const reach = ext[r] < 0.12 ? 0 : Math.max(0, ext[r] - 0.04);   // (a bank narrower than a hand's width is no facing: no sliver of stone lying up the slope)
     if (reach > 0.06) any = true;
     for (let k = 0; k <= across; k++) {
       const o = reach * k / across, [x, z] = at(r, o), q = r * (across + 1) + k;
@@ -151,6 +155,32 @@ function bankStrip(fr: readonly Frame[], i0: number, i1: number, sg: number, rea
   g.setIndex(idx);
   g.computeVertexNormals();
   return g;
+}
+
+/**
+ * How far out from the road's edge (beyond `halfW` from the center line) an offset line on side `sg` can run before it folds, at each station: on the inside of a
+ * bend the offset curve has radius R - offset, so it must stay under ~80 % of R. Outside a bend, or on a straight, there is no limit (Infinity). The turn rate is
+ * taken over a window of stations so a one-station kink does not pinch the strip, and the limit is smoothed so the facing edge is a clean line.
+ */
+export function insideRoom(fr: readonly Frame[], sg: number, halfW: number): number[] {
+  const n = fr.length, lim = new Array<number>(n).fill(Infinity);
+  for (let r = 0; r < n; r++) {
+    // the turn rate over several windows: a kink inside one station pinches hard over a short window, a long sweeping bend only shows over a long one
+    for (const win of [1, 2, 3, 5]) {
+      const a = fr[Math.max(0, r - win)], b = fr[Math.min(n - 1, r + win)];
+      const ds = Math.hypot(b.x - a.x, b.z - a.z);
+      if (ds < 1e-6) continue;
+      // heading change a -> b, and whether it turns toward the offset side (then this is the inside)
+      const dfx = b.fx - a.fx, dfz = b.fz - a.fz, toward = (dfx * fr[r].nx + dfz * fr[r].nz) * sg;
+      if (toward <= 0) continue;
+      const kappa = Math.hypot(dfx, dfz) / ds;
+      if (kappa < 1e-6) continue;
+      lim[r] = Math.min(lim[r], Math.max(0, 0.8 / kappa - halfW));
+    }
+  }
+  // smooth the limit along the road (min over a short window, then a taper) so the edge of the facing is one clean line
+  const mn = lim.map((_, r) => { let m = Infinity; for (let d = -2; d <= 2; d++) { const q = r + d; if (q >= 0 && q < n) m = Math.min(m, lim[q]); } return m; });
+  return mn.map((_, r) => { if (!Number.isFinite(mn[r])) { let m = Infinity; for (let d = -3; d <= 3; d++) { const q = r + d; if (q >= 0 && q < n && Number.isFinite(mn[q])) m = Math.min(m, mn[q] + Math.abs(d) * 0.05); } return m; } return mn[r]; });
 }
 
 const smooth01 = (t: number) => { const x = Math.max(0, Math.min(1, t)); return x * x * (3 - 2 * x); };

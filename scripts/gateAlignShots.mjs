@@ -129,16 +129,16 @@ const BRIDGE_VIEWS = [
   { name: 'bridge-aerial-top', time: 11, setup: bair(5, 1.5, 0) },
   { name: 'bridge-eye-approach-person-pickup', time: 10, n: 9, setup: bveh('pickup', -1.9, 0.0, 1) + bfig(-0.6, 0.34) + beye(-4.2, 0.45, 0.4, 0) },
   { name: 'bridge-eye-on-deck-person', time: 15, n: 9, setup: bfig(0.3, 0.0) + beye(-0.9, 0.0, 1.1, 0.0) },
-  { name: 'bridge-eye-bank-side', time: 12, n: 9, setup: bfig(-0.2, 0.7) + beye(-0.1, 2.3, 0.0, 0.0) },
+  { name: 'bridge-eye-bank-side', time: 12, n: 9, setup: bfig(-1.25, 0.75) + beye(-2.4, 2.1, -0.4, 0.3) },
   { name: 'bridge-eye-far-side-person', time: 16, n: 9, setup: bfig(-1.5, 0.35) + beye(3.4, -0.3, -1.2, 0.0) },
 ];
-/** Yard views: origin the yard's center, v < 0 toward the drive (the gate is at v = -1, the road's center line at about -1.58), du along the drive. */
+/** Yard views: origin the yard's center, v < 0 toward the drive (the gate is at v = -1; the road's center line is `b.road` away, measured from the placed yard, since the setback varies), du along the drive. */
 const YARD_VIEWS = [
   { name: 'yard-aerial', time: 11, setup: bair(8, 0.95, 0.5) },
   { name: 'yard-aerial-top', time: 11, setup: bair(7, 1.5, 0) },
-  { name: 'yard-eye-front-person-pickup', time: 10, n: 9, setup: bveh('pickup', -1.1, -1.58, 1) + bfig(0.5, -1.3) + beye(0.2, -3.0, 0.0, -1.0) },
+  { name: 'yard-eye-front-person-pickup', time: 10, n: 9, setup: bveh('pickup', -1.1, '-b.road', 1) + bfig(0.5, '-(b.road - 0.28)') + beye(0.2, '-(b.road + 1.42)', 0.0, -1.0) },
   { name: 'yard-eye-gate-person', time: 14, n: 9, setup: bfig(0.0, -0.75) + beye(0.0, -1.9, 0.0, -0.9) },
-  { name: 'yard-eye-from-road', time: 12, n: 9, setup: bveh('pickup', -3.2, -1.58, 1) + bfig(-0.6, -1.3) + beye(-5.0, -1.58, 0.0, -1.2) },
+  { name: 'yard-eye-from-road', time: 12, n: 9, setup: bveh('pickup', -3.2, '-b.road', 1) + bfig(-0.6, '-(b.road - 0.28)') + beye(-5.0, '-b.road', 0.0, -1.2) },
   { name: 'yard-eye-inside-person', time: 15, n: 9, setup: bfig(0.2, -0.1) + beye(-0.4, 0.7, 0.0, -1.5) },
 ];
 
@@ -181,7 +181,8 @@ const extra = `async (s) => { const cb = window.__cb, G = cb.game, W = cb.world,
         const dbg = ' PAD ' + JSON.stringify(pads[0]) + ' ROWS ' + rows + ' ground-pad inside ' + lo.toFixed(3) + ' .. ' + hi.toFixed(3);
     // views anchor on the yard's center: n points from the gate into the yard, t is along the drive toward the camp (v < 0 is the road side)
     const inw = q.arc <= 5, th = y.rot * Math.PI / 2, nn = [-Math.sin(th), -Math.cos(th)];
-    window.__bridge = { c: [y.x, y.z], t: inw ? [-ys.heading[0], -ys.heading[1]] : ys.heading, n: nn, rot: y.rot };
+    const rc = m.pointAtArc(drive, m.arcNear ? m.arcNear(drive, [y.x, y.z]) : A), road = Math.hypot(rc[0] - y.x, rc[1] - y.z);
+    window.__bridge = { c: [y.x, y.z], t: inw ? [-ys.heading[0], -ys.heading[1]] : ys.heading, n: nn, rot: y.rot, road };
     return dbg + ' yard at ' + [y.x, y.z].map(v => v.toFixed(2)).join(',') + ' rot ' + y.rot.toFixed(3) + ' road heading ' + (Math.atan2(t[1], t[0]) * 180 / Math.PI).toFixed(0) + ' deg (arc ' + A.toFixed(2) + ')'; }
   return ''; }`;
 

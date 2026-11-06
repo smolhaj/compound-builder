@@ -90,6 +90,7 @@ import { arcNear, entryGate, gateHouseFrame, headingAt } from './perimeter/gateK
 import { carSlot } from './perimeter/guardCarSlots';
 import { PERIMETER, hasSkirt, runGrowth, runProgress, underground, wallLength, type PerimeterRun } from '../sim/perimeter';
 import { closestOnLine, earthworkReach, type Earthwork } from './parcel/parcelTerrain';
+import { planMoatChannel, type MoatChannel } from './perimeter/moatChannel';
 import { exposure, Sight, type Observer, type SightWorld } from './sightlines/visibility';
 import { hitsColliders, M, type Collider } from './buildkit/interior';
 import type { BuildingView } from '../store/worldStore';
@@ -951,6 +952,7 @@ export class HomesteadWorld {
     for (const o of g.children) { if (g.userData.passage && o.userData.part !== 'surface') o.visible = this._under; else if (o.userData.part === 'upper') o.visible = !this._under; }
   }
 
+  private _channels = new Map<string, { key: string; ch: MoatChannel }>();
   /** Fences, hedges and walls drawn as built (hedges by growth); berms and ditches shape the terrain. */
   syncPerimeter(runs: readonly PerimeterRun[], t: number, opts: { lit?: boolean; sensors?: boolean; /** The gate kit on the drive (sim/gateSecurity.ts). */ gateKit?: { sally: boolean; intercom: boolean; motor: boolean; signs?: boolean }; /** Each moat's water (sim/waterWorks `moatStates`). */ moats?: Record<string, { level: number; frozen: boolean }> } = {}): void {
     this._runs = runs;
@@ -970,6 +972,14 @@ export class HomesteadWorld {
     if (this._ranchGate) this._ranchGate.visible = !this._wallGateAtEntry;
     const deckOn = (r: PerimeterRun) => !PERIMETER[r.kind].wallTop && runs.some(x => x.hostId === r.id);
     const ids = runs.map(r => r.id).join(',');
+    const channelOf = (r: PerimeterRun): MoatChannel | undefined => {
+      if (r.kind !== 'moat') return undefined;
+      const key = JSON.stringify(r.pts), hit = this._channels.get(r.id);
+      if (hit?.key === key) return hit.ch;
+      const ch = planMoatChannel(r.pts, (x, z) => this.parcel.natural(x, z).h);
+      this._channels.set(r.id, { key, ch });
+      return ch;
+    };
     for (const r of runs) {
       // old posts lean and rails sag (atmosphere/aging): rebuilt as the lean steps
       const lean = LEANS.has(r.kind) && r.finishedAt !== null ? Math.round(fenceLean((t - r.finishedAt) / 365) * 10) / 10 : 0;
@@ -980,7 +990,7 @@ export class HomesteadWorld {
       const tunnel = r.kind === 'escape_tunnel' || r.kind === 'underground_passage';
       const group = tunnel
         ? buildTunnel(this._pathOf(r), this.groundAt, r.finishedAt !== null ? 1 : runProgress(r), this._exitWoods(r), r.kind === 'underground_passage' ? { woodsStart: this.tunnelExitWoods(r.pts[0][0], r.pts[0][1]) } : undefined)
-        : buildRun(r, this.groundAt, t, (x, z) => this.onBuilding(x, z, 0.02, false), { lit, sensors, hostKind: PERIMETER[r.kind].wallTop ? runs.find(x => x.id === r.hostId)?.kind : undefined, hostRazor: hostRazor(r), deck: deckOn(r), gateKit: kitOf(r), drive, moat: opts.moats?.[r.id], creek: this.parcel.creek });
+        : buildRun(r, this.groundAt, t, (x, z) => this.onBuilding(x, z, 0.02, false), { lit, sensors, hostKind: PERIMETER[r.kind].wallTop ? runs.find(x => x.id === r.hostId)?.kind : undefined, hostRazor: hostRazor(r), deck: deckOn(r), gateKit: kitOf(r), drive, moat: opts.moats?.[r.id], channel: channelOf(r), creek: this.parcel.creek });
       if (tunnel) this._applyTunnelView(group);
       if (lean > 0) leanRun(group, lean, hashStr(r.id) % 997, this.groundAt);
       this._root.add(group);
@@ -988,7 +998,7 @@ export class HomesteadWorld {
       this._ws.invalidateShadows();
     }
     // earthworks (berms raise, ditches cut) as they are dug
-    const works: Earthwork[] = runs.filter(r => r.kind === 'earth_berm' || r.kind === 'ditch' || r.kind === 'moat').map(r => ({ pts: r.pts, gates: r.gates, height: PERIMETER[r.kind].height, ...(r.kind === 'moat' ? { wide: 2.2, creekSkip: true } : {}), k: r.finishedAt !== null ? 1 : runProgress(r) }));
+    const works: Earthwork[] = runs.filter(r => r.kind === 'earth_berm' || r.kind === 'ditch' || r.kind === 'moat').map(r => ({ pts: r.pts, gates: r.gates, height: PERIMETER[r.kind].height, ...(r.kind === 'moat' ? { wide: 2.2, creekSkip: true, channel: channelOf(r) } : {}), k: r.finishedAt !== null ? 1 : runProgress(r) }));
     // a tunnel is cut and covered: an open trench along it while the culvert goes in
     for (const r of runs) if ((r.kind === 'escape_tunnel' || r.kind === 'underground_passage') && r.finishedAt === null && (r.supplied || r.done > 0)) works.push({ pts: r.pts.slice(), gates: [], height: -0.33, k: 1 });
     const wk = works.map(w => `${w.pts.length}:${Math.round(w.k * 20)}`).join('|');
