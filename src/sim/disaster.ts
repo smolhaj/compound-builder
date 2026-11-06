@@ -150,7 +150,7 @@ export const DISASTERS: Partial<Record<DisasterKind, DisasterDef>> = {
     variants: [
       { id: 'yellowstone', name: 'the Yellowstone eruption', weight: 1, curves: { grid: C(0, 2, 0.1, [60, 300], 60), fuel: C(0, 3, 0.1, [90, 400], 60), stores: C(1, 7, 0.1, [120, 500], 60), deliveries: C(0, 3, 0, [120, 500], 60), medical: C(3, 14, 0.3, [120, 500], 60), phone: C(1, 5, 0.3, [30, 200], 30), banks: C(10, 30, 0.3, [120, 500], 60), law: C(20, 60, 0.2, [150, 550], 60) } },
     ],
-    hints: [['A swarm of earthquakes under Yellowstone.', 'The park closes its roads "for safety".'], ['The ground at Norris has risen a meter.', 'USGS raises the alert level to WARNING.'], ['Steam and ash from the caldera; flights grounded.', 'Ash forecast for the whole Mountain West.']],
+    hints: [['A swarm of earthquakes under Yellowstone.', 'The park closes its roads "for safety".'], ['The ground at Norris has risen three feet.', 'USGS raises the alert level to WARNING.'], ['Steam and ash from the caldera; flights grounded.', 'Ash forecast for the whole Mountain West.']],
     hit: ['Yellowstone erupts. Gray ash is falling like snow and the sun is a dim disc.'],
     chain: [{ kind: 'lawless', p: 0.4, after: [30, 90] }],
   },

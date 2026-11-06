@@ -21,6 +21,7 @@ import { hasAll, shortfall, waitingFor, type MaterialId } from './materials';
 import { log } from './economy';
 import { PERIMETER, planRun, runBill, runFinished, wallLength, type PerimeterKind, type PerimeterRun, type Pt } from './perimeter';
 import type { GameState } from './state';
+import { lengthText } from './units';
 
 /** The wall tiers a patrol deck can be added to (a deck needs a solid wall under it). */
 export const WALKWAY_HOSTS: readonly PerimeterKind[] = ['container_wall', 'container_stack', 'stone_wall', 'steel_wall', 'electric_steel', 'concrete_wall'];
@@ -84,7 +85,7 @@ export function addWalkway(s: GameState, hostId: string, quiet = false): string 
 export function layWalkway(s: GameState, host: PerimeterRun, quiet = false): PerimeterRun {
   const run = planRun(s, 'wall_walk', host.pts.map(p => [p[0], p[1]] as Pt), host.gates.filter(g => g.garage).map(g => ({ ...g })), 0, true);
   run.hostId = host.id;
-  if (!quiet) log(s, `Laying a patrol walkway along the top of the ${PERIMETER[host.kind].name.toLowerCase()} (${Math.round(wallLength(host) * 6)} m).`);
+  if (!quiet) log(s, `Laying a patrol walkway along the top of the ${PERIMETER[host.kind].name.toLowerCase()} (${lengthText(wallLength(host) * 6)}).`);
   return run;
 }
 

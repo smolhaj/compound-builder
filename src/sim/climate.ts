@@ -16,6 +16,7 @@
 import { REGIONS, type RegionDef, type RegionId } from './regions';
 import { siteLot } from './lotListing';
 import type { Site } from './site';
+import { lengthText } from './units';
 
 /** The altitude (m) a region's climate numbers are quoted for. */
 export const REF_ALT_M: Partial<Record<RegionId, number>> = { mountain_west: 1600, appalachia: 450, pnw: 200, north_woods: 350 };
@@ -48,7 +49,7 @@ export function altitudeClimate(site: Pick<Site, 'region' | 'lot' | 'home'>): Al
   let last = 3 * dM / 100, first = -3 * dM / 100, cold = 1 + 0.06 * dM / 100, lowF = -1.17 * dM / 100;
   const highF = -1.17 * dM / 100;
   const notes: string[] = [];
-  if (Math.abs(dM) >= 100) notes.push(`${dM > 0 ? 'Higher' : 'Lower'} than the region's usual ${Math.abs(Math.round(dM / 10) * 10)} m: ${dM > 0 ? 'colder, with a shorter growing season and more snow' : 'milder, with a longer growing season'}`);
+  if (Math.abs(dM) >= 100) notes.push(`${dM > 0 ? 'Higher' : 'Lower'} than the region's usual ${lengthText(Math.abs(Math.round(dM / 10) * 10))}: ${dM > 0 ? 'colder, with a shorter growing season and more snow' : 'milder, with a longer growing season'}`);
   if (st.standM <= -4) { last += 5; first -= 5; lowF -= 4; notes.push('Cold air pools here on clear nights: late frosts hit the garden and orchard (an inversion in winter)'); }
   else if (st.standM >= 6) { last -= 2; first += 2; cold *= 1.05; notes.push('Up in the thermal belt, above the frost, but open to the wind'); }
   if (st.sun >= 1.08) { last -= 2; first += 2; cold *= 0.94; notes.push('A south-facing pad: warmer, earlier spring, less wood to burn'); }

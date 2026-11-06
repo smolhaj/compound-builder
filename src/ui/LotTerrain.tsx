@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { profileChart, siteLot, terrainFacts } from '../sim/lotListing';
 
 import type { Site } from '../sim/site';
+import { feetText, lengthText } from '../sim/units';
 
 const C = { line: 'rgba(255,255,255,0.09)', dim: 'rgba(238,238,238,0.62)', gold: '#d8c9a0', good: '#a8d080', bad: '#f0a080', ground: '#7c6a4c', groundTop: '#a89868', water: '#4d86b8' };
 
@@ -29,8 +30,8 @@ export function ProfileSvg({ site }: { site: Site }) {
       </g>
       <text x={4} y={Hh - 4} fontSize={9.5} fill={C.dim}>{ch.axis === 'W-E' ? 'back of the place' : 'south'}</text>
       <text x={W - 4} y={Hh - 4} fontSize={9.5} fill={C.dim} textAnchor="end">{ch.axis === 'W-E' ? 'county road' : 'north'}</text>
-      <text x={W / 2} y={Hh - 4} fontSize={9.5} fill={C.dim} textAnchor="middle">{Math.round(L)} m{exag > 1.25 ? ` · height ×${exag.toFixed(1)}` : ''}</text>
-      <text x={4} y={11} fontSize={9.5} fill={C.gold}>{Math.round(ch.maxM)} m</text>
+      <text x={W / 2} y={Hh - 4} fontSize={9.5} fill={C.dim} textAnchor="middle">{lengthText(L)}{exag > 1.25 ? ` · height ×${exag.toFixed(1)}` : ''}</text>
+      <text x={4} y={11} fontSize={9.5} fill={C.gold}>{feetText(ch.maxM)}</text>
     </svg>
   );
 }

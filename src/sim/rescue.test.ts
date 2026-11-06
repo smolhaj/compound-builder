@@ -86,7 +86,7 @@ describe('the taken', () => {
     const g = afterHit(1), c = takeKid(g);
     arm(g);
     const line = addLead(g, c, 'prisoner', mulberry32(4));
-    expect(line).toMatch(/km/);
+    expect(line).toMatch(/mi|ft/);
     const l = c.leads[0];
     expect(l.count).toBeGreaterThan(1);
     expect(raidProblem(g, c.pid, [adults(g)[0].id])).toBeNull();

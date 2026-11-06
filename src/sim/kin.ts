@@ -35,6 +35,7 @@ import { defaultStay, kitLine, moveInto, pool, rollKit, settleStay } from './joi
 import { addTool } from './tools';
 import { isFinished } from './construction';
 import { pluralize } from './words';
+import { caloriesText } from './units';
 
 // ── Who they are ───────────────────────────────────────────────────────────
 
@@ -299,7 +300,7 @@ export function makeKinRequest(s: GameState, group: Person[], late: boolean, r: 
     meds.length ? `${joinList(meds.map(p => p.first))} take${meds.length === 1 ? 's' : ''} daily medicine (${meds.flatMap(p => p.conditions ?? []).join(', ').replace(/_/g, ' ')}); they would bring a couple of months of it.` : '',
     month > 0 && !late ? `Brings about $${month.toLocaleString('en-US')} a month in ${incomeLine[0].label}, until the banks close, and about $${savings.toLocaleString('en-US')} in savings.` : savings > 0 && !late ? `Brings about $${savings.toLocaleString('en-US')} in savings.` : '',
     `Brings: ${kitLine(kit.brings, { ...kit.extras, cash: late ? 0 : savings }, group)}.`,
-    `${n} more to feed: about ${n * 2000} kcal a day.`,
+    `${n} more to feed: about ${caloriesText(n * 2000)} a day.`,
   ];
   return {
     id, kind: 'kin', day,

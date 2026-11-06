@@ -247,7 +247,7 @@ function drawStatus(g: Ctx, f: Feeds, game: GameState): void {
     g.fillStyle = ok ? '#30d060' : '#d04030'; g.beginPath(); g.arc(x + 14, y + 36 + i * 22, 5, 0, 7); g.fill();
     font(g, 10); g.fillStyle = '#cfe0d4'; g.fillText(label, x + 28, y + 40 + i * 22); g.fillStyle = ok ? '#7ae89a' : '#e88a7a'; g.fillText(txt, x + w - 78, y + 40 + i * 22);
   };
-  row(0, 'AIR', plant, plant ? 'FILTERED' : 'NO PLANT'); row(1, 'POWER', f.powered, f.powered ? 'ON' : 'OFF'); row(2, 'WATER', plant, plant ? '2,000 L' : 'NO TANK');
+  row(0, 'AIR', plant, plant ? 'FILTERED' : 'NO PLANT'); row(1, 'POWER', f.powered, f.powered ? 'ON' : 'OFF'); row(2, 'WATER', plant, plant ? '528 gal' : 'NO TANK');
 }
 
 /** The bunkroom's TV: a game night (a paddle game) when the family has games and power, a quiet test card otherwise. */

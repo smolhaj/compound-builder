@@ -40,6 +40,7 @@ import { WallTopsPanel } from './WallTopsPanel';
 import { GateSecurityPanel } from './GateSecurityPanel';
 import { CommunityPanel } from './CommunityPanel';
 import { pluralize } from '../../sim/words';
+import { lengthText } from '../../sim/units';
 
 /** One checklist line: a tick or a cross, what it is, and why. */
 function CheckRow({ c }: { c: Check }) {
@@ -157,7 +158,7 @@ export function DefenseTab() {
         const net = Math.max(0, price(next, 1) - price(r.kind, SALVAGE));
         const why = upgradeProblem(game, r);
         return <div key={r.id} style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '3px 0' }}>
-          <span style={{ flex: 1 }}>{PERIMETER[r.kind].name} <span style={{ color: DIM }}>({Math.round(len * 6)} m)</span> <span style={{ color: DIM }}>→</span> {PERIMETER[next].name}</span>
+          <span style={{ flex: 1 }}>{PERIMETER[r.kind].name} <span style={{ color: DIM }}>({lengthText(len * 6)})</span> <span style={{ color: DIM }}>→</span> {PERIMETER[next].name}</span>
           <button style={btn(false)} disabled={!!why} title={why ?? `${Math.round(runHours(next, len))} h of work; about ${usd(net)} after the salvage of the old one (${Math.round(SALVAGE * 100)}% of its materials back)`} onClick={() => { const w = useGameStore.getState().upgradeRun(r.id); if (w) alert(w); }}>{why ? 'Under way' : `Upgrade ~${usd(net)}`}</button>
         </div>;
       })}
@@ -171,7 +172,7 @@ export function DefenseTab() {
       {waterLines(game).map(l => <Note key={l}>{l}</Note>)}
       {yardLines(game).map(l => <Note key={l}>{l}</Note>)}
       {game.perimeter.filter(r => PERIMETER[r.kind].vehicleWay).map(r => <div key={r.id} style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '3px 0' }}>
-        <span style={{ flex: 1 }}>{PERIMETER[r.kind].name} <span style={{ color: DIM }}>({Math.round(wallLength(r) * 6)} m, {r.collapsed ? 'choked with rubble' : runFinished(r) ? 'standing' : r.dropped ? 'dropped: rebuild it from Projects' : 'being built'})</span></span>
+        <span style={{ flex: 1 }}>{PERIMETER[r.kind].name} <span style={{ color: DIM }}>({lengthText(wallLength(r) * 6)}, {r.collapsed ? 'choked with rubble' : runFinished(r) ? 'standing' : r.dropped ? 'dropped: rebuild it from Projects' : 'being built'})</span></span>
         {r.collapsed && <button style={btn(game.money >= clearQuote(r).usd)} disabled={game.money < clearQuote(r).usd || r.collapsed.clearsAt !== null} title={`A contractor with an excavator hauls the fall out: about ${pluralize(clearQuote(r).days, 'day')}`} onClick={() => { const w = useGameStore.getState().clearCollapse(r.id); if (w) alert(w); }}>{r.collapsed.clearsAt !== null ? `Clearing, ${pluralize(Math.max(1, Math.ceil(r.collapsed.clearsAt - game.clock.t)), 'day')}` : `Clear the fall ${usd(clearQuote(r).usd)}`}</button>}
         {runFinished(r) && !r.collapsed && PERIMETER[r.kind].bore && <span style={{ color: DIM }} title="A bore is driven through solid rock: it cannot be brought down, only held. The steel doors lock at night and when the alarm goes.">rock: hold the doors</span>}
         {runFinished(r) && !PERIMETER[r.kind].bore && <button style={btn(false)} title="Bring it down on purpose: nothing crosses there until it is rebuilt, and a crew has to ford and climb the gorge. Half the steel comes back." onClick={() => { if (window.confirm('Drop this tunnel? It has to be rebuilt to use it again.')) { const w = useGameStore.getState().dropBridge(r.id); if (w) alert(w); } }}>Drop it</button>}
@@ -189,13 +190,13 @@ export function DefenseTab() {
       </Section>;
     })()}
     <Group id="def-walkway" title="Wall-top walkway" defaultOpen={false}>
-      <Hint more="A steel patrol deck along the top of a container, steel or concrete wall (1.2 m wide, a handrail, stairs at the gates and about every 80 m). Guards on watch walk it and see farther; a post on it fights from above and fewer crews get over. It stays on through a wall upgrade.">Guards see farther from the wall top.</Hint>
+      <Hint more="A steel patrol deck along the top of a container, steel or concrete wall (4 ft wide, a handrail, stairs at the gates and about every 260 ft). Guards on watch walk it and see farther; a post on it fights from above and fewer crews get over. It stays on through a wall upgrade.">Guards see farther from the wall top.</Hint>
       {game.perimeter.filter(r => canHostWalkway(r.kind) && !r.replaces).length === 0 && <Note>No wall that can take one yet: container, steel or concrete.</Note>}
       {game.perimeter.filter(r => canHostWalkway(r.kind) && !r.replaces).slice(0, 8).map(r => {
         const len = wallLength(r), deck = walkOn(game, r.id), why = walkwayProblem(game, r.id);
         const price = orderCost(Object.entries(walkwayBill(len)).filter(([m]) => MATERIALS[m as MaterialId].price !== null).map(([material, qty]) => ({ material: material as MaterialId, qty: qty as number })));
         return <div key={r.id} style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '3px 0' }}>
-          <span style={{ flex: 1 }}>{PERIMETER[r.kind].name} <span style={{ color: DIM }}>({Math.round(len * 6)} m)</span></span>
+          <span style={{ flex: 1 }}>{PERIMETER[r.kind].name} <span style={{ color: DIM }}>({lengthText(len * 6)})</span></span>
           <button style={btn(!!deck && runFinished(deck))} disabled={!!why} title={why ?? `${Math.round(runHours('wall_walk', len))} h of work; about ${usd(price)} of materials (rebar, roofing sheet, hardware: Shop, Fencing)`} onClick={() => { const w = useGameStore.getState().addWalkway(r.id); if (w) alert(w); }}>{deck ? (runFinished(deck) ? 'Walkway built' : 'Walkway under way') : why ? 'Not yet' : `Add walkway ~${usd(price)}`}</button>
         </div>;
       })}
@@ -207,7 +208,7 @@ export function DefenseTab() {
         const len = wallLength(r), why = razorProblem(game, r);
         const price = orderCost(Object.entries(razorBill(len)).filter(([m]) => MATERIALS[m as MaterialId].price !== null).map(([material, qty]) => ({ material: material as MaterialId, qty: qty as number })));
         return <div key={r.id} style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '3px 0' }}>
-          <span style={{ flex: 1 }}>{PERIMETER[r.kind].name} <span style={{ color: DIM }}>({Math.round(len * 6)} m)</span></span>
+          <span style={{ flex: 1 }}>{PERIMETER[r.kind].name} <span style={{ color: DIM }}>({lengthText(len * 6)})</span></span>
           <button style={btn(!!r.razor)} disabled={!!why} title={why ?? `${Math.round(razorHours(len))} h of work; about ${usd(price)} of wire and hardware`} onClick={() => { const w = useGameStore.getState().addRazor(r.id); if (w) alert(w); }}>{r.razor ? 'Wired' : 'Hang razor wire'}</button>
         </div>;
       })}
@@ -245,7 +246,7 @@ export function DefenseTab() {
       {game.structures.filter(st => isTower(st.kind) && structFinished(st)).map(st => {
         const def = TOWERS[st.kind as keyof typeof TOWERS], nk = TOWER_NEXT[st.kind];
         const hb = highBonus(st, st.kind as keyof typeof TOWERS);
-        const hg = highShare(st) > 0.05 ? <span style={{ color: TONE.good }} title="The ground under it stands above the land around it: the watch sees farther and earlier (capped)."> · high ground +{Math.round((st.high ?? 0) * 6)} m: sees {Math.round(hb.viewR * 6)} m farther, +{Math.round(hb.view)} warning</span> : null;
+        const hg = highShare(st) > 0.05 ? <span style={{ color: TONE.good }} title="The ground under it stands above the land around it: the watch sees farther and earlier (capped)."> · high ground +{lengthText((st.high ?? 0) * 6)}: sees {lengthText(hb.viewR * 6)} farther, +{Math.round(hb.view)} warning</span> : null;
         if (!nk) return <div key={st.id} style={{ padding: '3px 0' }}>{def.name} <span style={{ color: DIM }}>(tier {def.tier} of 6, the last)</span>{hg}</div>;
         const price = (bill: ReturnType<typeof towerBill>, f: number) => orderCost(Object.entries(bill).filter(([m]) => MATERIALS[m as MaterialId].price !== null).map(([material, qty]) => ({ material: material as MaterialId, qty: Math.ceil((qty as number) * f) })));
         const net = Math.max(0, price(towerBill(nk), 1) - price(towerBill(st.kind as keyof typeof TOWERS), STRUCTURE_SALVAGE));
@@ -278,7 +279,7 @@ export function DefenseTab() {
       {d.digging.map(c => <CheckRow key={c.id} c={c} />)}
       {d.skirtable.map(r => <div key={r.id} style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '3px 0' }}>
         <span style={{ flex: 1 }}>{r.label}</span>
-        <button style={btn(false)} disabled={!!r.problem} title={r.problem ?? 'Sink a steel-and-concrete skirt 4 m down under the wall; the crew has it in the ground in a few days'} onClick={() => { const w = useGameStore.getState().addSkirt(r.id); if (w) alert(w); }}>{r.has ? 'Skirt buried' : r.problem && !/Waiting/.test(r.problem) ? r.problem : 'Add a buried skirt'}</button>
+        <button style={btn(false)} disabled={!!r.problem} title={r.problem ?? 'Sink a steel-and-concrete skirt 13 ft down under the wall; the crew has it in the ground in a few days'} onClick={() => { const w = useGameStore.getState().addSkirt(r.id); if (w) alert(w); }}>{r.has ? 'Skirt buried' : r.problem && !/Waiting/.test(r.problem) ? r.problem : 'Add a buried skirt'}</button>
       </div>)}
       <Hint more={<>Organized crews dig under walls over a week or more, late in the collapse. A skirt stops them; a ditch floods the tunnel; sensors, dogs and a watch give you days of warning. Then you can wait for them at the breakout with the party.</>}>A skirt stops diggers.</Hint>
     </Section>}

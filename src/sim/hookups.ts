@@ -10,6 +10,7 @@ import { isHome } from './blueprints';
 import { isFinished } from './construction';
 import { autoFits, DRAW_KWH, fitProblem, plant, serviceOf, UTILITY, type Plant } from './utilities';
 import type { GameState, Structure } from './state';
+import { gallonsText } from './units';
 
 export type HookKind = 'wire' | 'plumb' | 'power_link' | 'water_link' | 'pump_power';
 export interface Hookup {
@@ -85,12 +86,12 @@ export function hookupsFor(s: GameState, st: Structure, p: Plant = plantCached(s
       const source = s.structures.some(x => POWER_SRC(x.kind) && !x.unplaced), live = s.structures.some(x => POWER_SRC(x.kind) && isFinished(x)), grid = s.utilities.grid && s.disaster.tracks.grid > 0.5;
       if (!live && !grid) {
         if (source) out.push({ kind: 'pump_power', state: 'underway', label: 'Pump power', text: 'waiting on the power source', todo: null, tool: null });
-        else out.push({ kind: 'pump_power', state: 'missing', label: 'Pump power', text: 'Pump has no power', todo: s.utilities.grid ? 'The grid is down and nothing else makes power here: stake a solar array with a battery (it joins the pump by itself within about 70 m).' : 'Nothing here makes power yet: stake a solar array (it joins the pump by itself within about 70 m).', tool: null, stake: 'solar_array' });
+        else out.push({ kind: 'pump_power', state: 'missing', label: 'Pump power', text: 'Pump has no power', todo: s.utilities.grid ? 'The grid is down and nothing else makes power here: stake a solar array with a battery (it joins the pump by itself within about 230 ft).' : 'Nothing here makes power yet: stake a solar array (it joins the pump by itself within about 230 ft).', tool: null, stake: 'solar_array' });
       } else out.push({ kind: 'pump_power', state: 'missing', label: 'Pump power', text: 'Pump has no power', todo: 'The pump needs a power cable to the solar array, battery or generator (or the grid).', tool: 'fence:power_cable' });
     }
   }
   if ((def?.water?.pressure || def?.store || def?.gravity) && !others(p.water, () => true) && s.structures.some(x => isFinished(x) && x.id !== st.id && isHome(x.kind))) {
-    out.push({ kind: 'water_link', state: 'missing', label: 'On the water line', text: 'No pipe from it', todo: 'It stands too far from the house: build it within about 70 m, or draw a pipe (Build: Pipes & cables).', tool: 'fence:water_pipe' });
+    out.push({ kind: 'water_link', state: 'missing', label: 'On the water line', text: 'No pipe from it', todo: 'It stands too far from the house: build it within about 230 ft, or draw a pipe (Build: Pipes & cables).', tool: 'fence:water_pipe' });
   }
   return out;
 }
@@ -144,7 +145,7 @@ export function backupPower(s: GameState): { ok: boolean; detail: string } {
   const parts: string[] = [];
   if (solar) parts.push('solar');
   if (battery) parts.push(`battery bank ${Math.round(s.utilities.report.batteryPct * 100)} %`);
-  if (gen) parts.push(`generator, ${Math.floor(s.stock.fuel * 20)} L of fuel`);
+  if (gen) parts.push(`generator, ${gallonsText(Math.floor(s.stock.fuel * 20))} of fuel`);
   // grid-tied solar shuts off in an outage unless a battery sits on the line
   const solarOnly = solar && !battery && !gen;
   if (solarOnly && s.utilities.grid) return { ok: false, detail: 'solar only: it shuts off with the grid. Add a battery' };

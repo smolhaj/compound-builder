@@ -47,6 +47,7 @@ import { bestLevel } from './skills';
 import { regionFor } from './climate';
 import { healthFloor, HUNGER_MAX, nextStarved, starveWarning, STARVE_WARN, STARVE_GRACE } from './starvation';
 import { harvestShare } from './sharedHarvest';
+import { caloriesText } from './units';
 
 export type FoodId = 'fresh' | 'frozen' | 'canned' | 'staples';
 /** Food is kept in the stockpile in these units; kcal in one unit. */
@@ -273,7 +274,7 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
   putByDay(s, need, cookR);
   const table = kitchenDay(s, cookR);
   // (playtest 3: the daily line filled the log through every lean winter; the first day, then every third)
-  if (short > need * 0.25 && !fromStores && (Math.floor(s.clock.t) % 3 === 0 || !s.log.some(l => l.text.startsWith('Short of food') && s.clock.t - l.t < 3))) log(s, `Short of food: ${Math.round(short)} kcal less than the family needs today.`);
+  if (short > need * 0.25 && !fromStores && (Math.floor(s.clock.t) % 3 === 0 || !s.log.some(l => l.text.startsWith('Short of food') && s.clock.t - l.t < 3))) log(s, `Short of food: ${caloriesText(short)} less than the family needs today.`);
   // needs, person by person
   const cozy = s.disaster.difficulty === 'cozy';
   // the diet: a month's mix of foods (monotony), protein, fat, salt, sweets, coffee (sim/pantry.ts)

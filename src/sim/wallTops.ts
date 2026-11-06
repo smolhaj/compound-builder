@@ -22,6 +22,7 @@ import { isTower } from './towers';
 import { NODE_R } from './utilities';
 import { COUNTY, countyWorks } from './paperwork';
 import { mulberry32 } from './rng';
+import { lengthText } from './units';
 
 export const WALL_TOP = {
   ELECTRIC: {
@@ -146,7 +147,7 @@ export function addElectric(s: GameState, runId: string, backup = false): string
   r.electric = true;
   if (backup) r.backup = true;
   if (!countyWorks(s)) r.noCert = true;   // nobody to certify it: it is a home install
-  log(s, `The family hung an electric fence on outriggers along the top of the ${PERIMETER[r.kind].name.toLowerCase()} (${Math.round(len * 6)} m, about ${Math.round(electricHours(len))} h)${r.noCert ? '' : ', with the installer\'s certificate'}. Yellow warning signs go on every post.`);
+  log(s, `The family hung an electric fence on outriggers along the top of the ${PERIMETER[r.kind].name.toLowerCase()} (${lengthText(len * 6)}, about ${Math.round(electricHours(len))} h)${r.noCert ? '' : ', with the installer\'s certificate'}. Yellow warning signs go on every post.`);
   return null;
 }
 
@@ -274,7 +275,7 @@ export function trimRun(s: GameState, runId: string): string | null {
   if (brushOf(r) < 0.05) return 'it is clear already';
   const len = wallLength(r);
   r.brush = 0;
-  log(s, `The family cut back the brush along the ${PERIMETER[r.kind].name.toLowerCase()} (${Math.round(len * 6)} m, about ${Math.round(WALL_TOP.BRUSH.TRIM_HOURS * len)} h).`);
+  log(s, `The family cut back the brush along the ${PERIMETER[r.kind].name.toLowerCase()} (${lengthText(len * 6)}, about ${Math.round(WALL_TOP.BRUSH.TRIM_HOURS * len)} h).`);
   return null;
 }
 export const trimAll = (s: GameState): number => { let n = 0; for (const r of s.perimeter) if (climbable(r) && brushOf(r) >= 0.05 && !trimRun(s, r.id)) n++; return n; };

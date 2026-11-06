@@ -40,6 +40,7 @@ import { mulberry32 } from './rng';
 import { M_TO_FT, ROAD_DAYS, ROAD_PRICE, ROAD_STYLE, UNIT_M, type RoadStyle } from './roadStyle';
 import { BED, RoadBed } from './roadBed';
 import { findHairpins } from './roadHairpins';
+import { lengthText } from './units';
 
 export type Pt = [number, number];
 
@@ -725,7 +726,7 @@ function finish(inp: RoadInput, style: RoadStyle, grid: GridData, found: Search 
     if (g > style.gradeDesign) surcharge += dft * (g - style.gradeDesign) * 100 * P.gradeSurchargePerFtPct;
   }
   const earthM3 = earthU2 * UNIT_M ** 3;
-  lines.push({ label: `${Math.round(lengthM).toLocaleString('en-US')} m of ${style.noun}`, usd: base });
+  lines.push({ label: `${lengthText(lengthM)} of ${style.noun}`, usd: base });
   if (surcharge > 0) lines.push({ label: 'heavier base on the grade', usd: surcharge });
   lines.push({ label: 'cut and fill', usd: earthM3 * P.earthM3 });
   const kindWord: Record<StructureKind, string> = { culvert: 'culvert', arch_culvert: 'arch culvert', ford: 'ford', low_water: 'low-water crossing', bridge1: 'one-lane bridge', bridge: 'bridge', tunnel: 'rock bore', cattle_guard: 'cattle guard', pass: 'pass' };
@@ -774,7 +775,7 @@ export const driveLine = (p: RoadPlan): Pt[] => p.pts.map(q => [q.x, q.z] as Pt)
 /** Plain words for the card and the log. */
 export function planWords(p: RoadPlan): string[] {
   const out: string[] = [];
-  const km = p.lengthM >= 1000 ? `${(p.lengthM / 1000).toFixed(1)} km` : `${p.lengthM} m`;
+  const km = lengthText(p.lengthM);
   const winding = p.lengthM > p.straightM * 1.35;
   out.push(`${km} of ${p.style}${winding ? `, ${Math.round((p.lengthM / Math.max(1, p.straightM) - 1) * 100)} % longer than a straight line` : ''}, steepest ${Math.round(p.maxGradePct)} %`);
   if (p.hairpins.length) out.push(`${p.hairpins.length} hairpin${p.hairpins.length === 1 ? '' : 's'}`);
@@ -783,7 +784,7 @@ export function planWords(p: RoadPlan): string[] {
   for (const sx of p.structures) counts.set(sx.kind, (counts.get(sx.kind) ?? 0) + 1);
   for (const k of ['bridge', 'bridge1', 'tunnel', 'low_water', 'ford', 'arch_culvert', 'culvert', 'cattle_guard', 'pass'] as StructureKind[]) {
     const c = counts.get(k); if (!c) continue;
-    if (k === 'tunnel') out.push(`a ${p.structures.find(x => x.kind === 'tunnel')!.lengthM} m rock bore through the spur`);
+    if (k === 'tunnel') out.push(`a ${lengthText(p.structures.find(x => x.kind === 'tunnel')!.lengthM)} rock bore through the spur`);
     else if (k === 'pass') out.push('crosses the pass');
     else out.push(c === 1 ? `a ${label[k]}` : `${c} ${label[k]}s`);
   }

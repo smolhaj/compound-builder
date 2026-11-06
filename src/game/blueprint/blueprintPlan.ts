@@ -15,6 +15,7 @@ import { fogNow } from '../../sim/fogFx';
 import { sensorSightM, fogReadout } from '../../sim/fog';
 import { SALLY } from '../../sim/rings';
 import type { GameState } from '../../sim/state';
+import { lengthText } from '../../sim/units';
 
 export type MarkCat = 'home' | 'work' | 'food' | 'water' | 'power' | 'bunker' | 'tower' | 'gate' | 'ring' | 'tunnel' | 'bridge' | 'wall';
 
@@ -132,7 +133,7 @@ export function blueprintPlan(s: GameState): BlueprintPlan {
     if (fin) for (const [i, g] of r.gates.entries()) {
       const p = along(r.pts, g.at);
       gates++;
-      marks.push({ id: `${r.id}:g${i}`, cat: 'gate', x: p[0], z: p[1], label: g.sally ? 'Sally port' : g.garage ? 'Gate garage' : 'Gate', sub: g.sally ? `defenders sortie · ${Math.round(SALLY.W * 6 * 10) / 10} m` : `${Math.round(g.w * 6)} m wide`, prio: PRIO.gate, lift: 1.1 });
+      marks.push({ id: `${r.id}:g${i}`, cat: 'gate', x: p[0], z: p[1], label: g.sally ? 'Sally port' : g.garage ? 'Gate garage' : 'Gate', sub: g.sally ? `defenders sortie · ${lengthText(Math.round(SALLY.W * 6 * 10) / 10)}` : `${lengthText(g.w * 6)} wide`, prio: PRIO.gate, lift: 1.1 });
     }
   }
 

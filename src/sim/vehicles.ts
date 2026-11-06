@@ -90,7 +90,7 @@ export const VEHICLES: Record<VehicleKind, VehicleDef> = {
   tractor: { name: 'Compact diesel tractor', price: 18_000, tankL: 40, mpg: 4, emp: true, dailyMiles: 2, seats: 1, cargoKg: 400, towKg: 4000, bays: 1, offroad: 1, fuelType: 'diesel', max: 1, blurb: 'Plows, discs, hauls logs and digs with the loader: fields yield more and soil work runs 2 to 3 times faster.' },
   atv: { name: 'Utility ATV', price: 9_500, tankL: 15, mpg: 30, emp: true, dailyMiles: 4, seats: 2, cargoKg: 120, towKg: 450, bays: 1, offroad: 1, fuelType: 'gasoline', max: 1, blurb: 'Runs the property on a trickle of gas: checks the fence, hauls firewood, pulls a small trailer.' },
   old_pickup: { name: '1970s pickup (no electronics)', price: 12_000, tankL: 76, mpg: 12, emp: false, dailyMiles: 30, seats: 3, cargoKg: 650, towKg: 2500, bays: 1, offroad: 0.6, fuelType: 'gasoline', max: 1, blurb: 'Carbureted, points ignition: an EMP does not touch it, and anyone with a wrench can fix it. Thirsty.' },
-  trailer: { name: 'Utility trailer', price: 2_200, tankL: 0, mpg: 0, emp: false, dailyMiles: 0, seats: 0, cargoKg: 700, towKg: 0, bays: 0, offroad: 0.5, fuelType: 'gasoline', max: 1, blurb: 'A 6 x 12 ft flatbed: hauls, never breaks down. A truck that can pull it carries 700 kg more.' },
+  trailer: { name: 'Utility trailer', price: 2_200, tankL: 0, mpg: 0, emp: false, dailyMiles: 0, seats: 0, cargoKg: 700, towKg: 0, bays: 0, offroad: 0.5, fuelType: 'gasoline', max: 1, blurb: 'A 6 x 12 ft flatbed: hauls, never breaks down. A truck that can pull it carries 1,540 lb more.' },
 };
 export const VEHICLE_KINDS = Object.keys(VEHICLES) as VehicleKind[];
 /** What a dealer sells (the family truck is only the one they start with, and a second). */

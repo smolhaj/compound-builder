@@ -15,6 +15,7 @@ import {
 } from '../sim/daily';
 import { GATHERING, gatheringProblem, callGathering, type GatheringKind } from '../sim/gatherings';
 import { whoShouldDo } from '../sim/roster';
+import { caloriesText } from '../sim/units';
 
 const C = { bg: 'rgba(22,24,20,0.98)', line: 'rgba(255,255,255,0.09)', gold: '#d8c9a0', dim: 'rgba(238,238,238,0.62)', warn: '#e0b050', bad: '#f0a080', good: '#a8d080' };
 const btn = (on = false, off = false): CSSProperties => ({ padding: '4px 9px', borderRadius: 6, border: `1px solid ${on ? C.gold : C.line}`, background: on ? 'rgba(216,201,160,0.18)' : 'rgba(255,255,255,0.06)', color: '#eee', cursor: off ? 'not-allowed' : 'pointer', opacity: off ? 0.45 : 1, fontSize: 12 });
@@ -148,7 +149,7 @@ export function SchedulePanel() {
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
               {CALLABLE.map(k => {
                 const why = gatheringProblem(game, k);
-                return <button key={k} style={btn(false, !!why)} title={why ?? `Morale lift, costs about ${GATHERING[k].kcal.toLocaleString('en-US')} kcal a head${GATHERING[k].noise >= 5 ? '; noise, light and smoke carry once others go hungry' : ''}`}
+                return <button key={k} style={btn(false, !!why)} title={why ?? `Morale lift, costs about ${caloriesText(GATHERING[k].kcal)} a head${GATHERING[k].noise >= 5 ? '; noise, light and smoke carry once others go hungry' : ''}`}
                   onClick={() => { if (!why) setMsg(g.daily(s => callGathering(s, k))); }}>{GATHERING[k].name}</button>;
               })}
             </div>

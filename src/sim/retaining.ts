@@ -18,6 +18,7 @@ import { nearDrain } from './drainage';
 import { diffOf } from './difficulty';
 import { mulberry32 } from './rng';
 import { calendarOf, dayIndex, type GameState, type Structure } from './state';
+import { lengthText } from './units';
 
 export const WALL = {
   /** Chance a day in the spring thaw (days 60-150) that a tall, undrained wall lets go (before the height factor). */
@@ -142,7 +143,7 @@ export function slumpDay(s: GameState, rain: boolean): string[] {
     const p = ((thaw ? WALL.SLUMP_THAW : 0) + (rain ? WALL.SLUMP_STORM : 0)) * Math.min(2, w.heightM / RW.TALL_M) * scale;
     if (mulberry32(s.seed * 7919 + day * 131 + i * 17 + 3)() >= p) return;
     st.slumpedAt = day;
-    out.push(`The retaining wall behind the ${label(st.kind)} let go in the ${rain ? 'rain' : 'thaw'}: ${Math.round(w.heightM * 10) / 10} m of stone is down across the pad. It needs ${restackPallets(w)} pallet${restackPallets(w) > 1 ? 's' : ''} of fieldstone to restack, and a drainage channel above it so it does not happen again.`);
+    out.push(`The retaining wall behind the ${label(st.kind)} let go in the ${rain ? 'rain' : 'thaw'}: ${lengthText(Math.round(w.heightM * 10) / 10)} of stone is down across the pad. It needs ${restackPallets(w)} pallet${restackPallets(w) > 1 ? 's' : ''} of fieldstone to restack, and a drainage channel above it so it does not happen again.`);
   });
   return out;
 }
@@ -160,7 +161,7 @@ export function retainingLines(s: GameState): string[] {
   if (!all.length) return [];
   const out: string[] = [];
   const stand = all.filter(({ w }) => w.state === 'standing'), tallest = Math.max(0, ...stand.map(({ w }) => w.heightM)), metres = stand.reduce((a, { w }) => a + w.lenM, 0);
-  if (stand.length) out.push(`${stand.length} dry-stack retaining wall${stand.length > 1 ? 's' : ''} standing (${Math.round(metres)} m, the tallest ${Math.round(tallest * 10) / 10} m): the slope behind ${stand.length > 1 ? 'them is' : 'it is'} held, and a crew has to go around to the stairs${wallHoldSeconds(s) ? ` or climb (a tall wall holds a raid ${wallHoldSeconds(s)} s)` : ''}.`);
+  if (stand.length) out.push(`${stand.length} dry-stack retaining wall${stand.length > 1 ? 's' : ''} standing (${lengthText(metres)}, the tallest ${lengthText(Math.round(tallest * 10) / 10)}): the slope behind ${stand.length > 1 ? 'them is' : 'it is'} held, and a crew has to go around to the stairs${wallHoldSeconds(s) ? ` or climb (a tall wall holds a raid ${wallHoldSeconds(s)} s)` : ''}.`);
   const risk = slumpRisks(s);
   if (risk.length) out.push(`${risk.length} tall wall${risk.length > 1 ? 's have' : ' has'} no drainage channel above ${risk.length > 1 ? 'them' : 'it'}: in the thaw and in rain storms ${risk.length > 1 ? 'they' : 'it'} can let go.`);
   for (const { st, w } of slumped(s)) out.push(`The wall behind the ${label(st.kind)} is down: ${restackPallets(w)} pallet${restackPallets(w) > 1 ? 's' : ''} of fieldstone to restack it.`);

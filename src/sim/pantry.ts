@@ -148,7 +148,7 @@ export function sickness(id: FoodItemId, over: number): { sick: number; bot: num
  */
 export const FOOD: Record<FoodItemId, FoodItem> = {
   rice_bucket: F('rice_bucket', 'White rice, sealed bucket', '5-gal bucket, Mylar + O₂ absorbers (≈ 33 lb)', 'staples', 54000, 19, 0.02, 'grain', 30, 'dry', 55, 'bucket', 1, 0xb83a2a),
-  rice_bag: F('rice_bag', 'White rice, 50 lb bag', '50 lb bag (≈ 82,000 kcal)', 'staples', 82500, 19, 0.02, 'grain', 4, 'dry', 38, 'sack', 1, 0xece6d4, { mice: true }),
+  rice_bag: F('rice_bag', 'White rice, 50 lb bag', '50 lb bag (≈ 82,000 Calories)', 'staples', 82500, 19, 0.02, 'grain', 4, 'dry', 38, 'sack', 1, 0xece6d4, { mice: true }),
   beans_bucket: F('beans_bucket', 'Pinto beans, sealed bucket', '5-gal bucket, Mylar + O₂ absorbers (≈ 32 lb)', 'staples', 50400, 60, 0.03, 'legume', 30, 'dry', 70, 'bucket', 1, 0x2a5ab0),
   black_beans: F('black_beans', 'Black beans, 25 lb bag', '25 lb bag', 'staples', 38500, 63, 0.04, 'legume', 3, 'dry', 42, 'sack', 1, 0xa08860, { mice: true }),
   wheat_bucket: F('wheat_bucket', 'Hard red wheat, sealed bucket', '5-gal bucket of wheat berries (≈ 37 lb; grind or boil)', 'staples', 55500, 37, 0.05, 'grain', 30, 'dry', 60, 'bucket', 1, 0xd8a020),
@@ -172,7 +172,7 @@ export const FOOD: Record<FoodItemId, FoodItem> = {
   canned_soup: F('canned_soup', 'Canned soup & chili, case of 12', 'case of 12 × 19 oz', 'canned', 5400, 45, 0.35, 'meal', 3, 'dry', 30, 'can', 6, 0xc8b040),
   home_canned: F('home_canned', 'Home-canned jars', 'case of 12 quarts canned at home (best within two years)', 'canned', 6000, 25, 0.05, 'fruitveg', 2, 'cool', null, 'jar', 12, 0xb84a30),
   snacks: F('snacks', 'Snacks, case', 'case of granola bars, crackers, trail mix', 'canned', 9000, 20, 0.35, 'snack', 1, 'dry', 38, 'case', 1, 0xc83a6a, { dietMax: 0.12 }),
-  freezer_meat: F('freezer_meat', 'Freezer meat, 5 kg', 'box of beef, chicken and pork (a year frozen)', 'frozen', 10000, 150, 0.55, 'protein', 1, 'frozen', 70, 'pack', 3, 0xb04040),
+  freezer_meat: F('freezer_meat', 'Freezer meat, 11 lb', 'box of beef, chicken and pork (a year frozen)', 'frozen', 10000, 150, 0.55, 'protein', 1, 'frozen', 70, 'pack', 3, 0xb04040),
   cellar_roots: F('cellar_roots', 'Potatoes, apples & roots in the cellar', 'wooden bin, about 115 lb (potatoes, apples, squash, cabbage, carrots); keeps through the winter in a cold cellar', 'canned', 40000, 20, 0.01, 'fruitveg', 0.6, 'cool', null, 'crate', 1, 0xb8935a, { dietMax: 0.5 }),
   dried_produce: F('dried_produce', 'Dried fruit & vegetables', 'case of 12 quart jars of dried apples, tomatoes, beans, greens and herbs', 'canned', 12000, 25, 0.02, 'fruitveg', 1.5, 'dry', null, 'jar', 12, 0xd9a24a, { dietMax: 0.3 }),
   ferments: F('ferments', 'Sauerkraut, pickles & kimchi', 'case of 12 quarts of fermented cabbage, cucumbers and roots, kept cool', 'canned', 2400, 30, 0.02, 'fruitveg', 0.8, 'cool', null, 'jar', 12, 0x8aa84a, { dietMax: 0.12 }),
@@ -181,7 +181,7 @@ export const FOOD: Record<FoodItemId, FoodItem> = {
   butter: F('butter', 'Butter', '5 lb of butter, churned and salted, kept cool', 'staples', 16250, 3, 0.99, 'dairy', 0.6, 'cool', null, 'jar', 5, 0xf0d870, { dietMax: 0.12 }),
   cheese: F('cheese', 'Hard cheese', 'a 5 lb wheel of cheese, waxed and kept cool', 'staples', 9000, 250, 0.7, 'dairy', 1, 'cool', null, 'case', 1, 0xe8b850, { dietMax: 0.2 }),
   maple_syrup: F('maple_syrup', 'Maple syrup', '1 gal jug of syrup boiled down from the sugar bush (keeps for years sealed)', 'staples', 13000, 0, 0, 'sweet', Infinity, 'dry', null, 'honey', 1, 0xb8681c, { dietMax: 0.08 }),
-  game_meat: F('game_meat', 'Game & home-raised meat', 'about 5 kg, wrapped and frozen', 'frozen', 10000, 160, 0.4, 'protein', 1, 'frozen', null, 'pack', 3, 0x8a3030),
+  game_meat: F('game_meat', 'Game & home-raised meat', 'about 11 lb, wrapped and frozen', 'frozen', 10000, 160, 0.4, 'protein', 1, 'frozen', null, 'pack', 3, 0x8a3030),
 };
 export const FOOD_IDS = Object.keys(FOOD) as FoodItemId[];
 /** What the shop sells, by shelf. */

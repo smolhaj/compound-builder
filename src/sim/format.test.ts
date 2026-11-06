@@ -9,19 +9,19 @@ import { sunHours } from './utilities';
 const HOME = { x0: 0, z0: 0, x1: 67, z1: 67 };
 
 describe('player-facing numbers', () => {
-  it('liters are rounded, never a raw float', () => {
-    expect(litersText(0.7967046720730114 * 20)).toBe('16 L');
-    expect(litersText(0.7967046720730114)).toBe('0.8 L');
-    expect(litersText(12.34)).toBe('12 L');
-    expect(litersText(1234.5)).toBe('1,235 L');
-    expect(litersText(0)).toBe('0 L');
-    expect(litersText(0.001)).toBe('0 L');
+  it('volumes show in gallons, rounded, never a raw float', () => {
+    expect(litersText(0.7967046720730114 * 20)).toBe('4.2 gal');
+    expect(litersText(0.7967046720730114)).toBe('0.2 gal');
+    expect(litersText(12.34)).toBe('3.3 gal');
+    expect(litersText(1234.5)).toBe('326 gal');
+    expect(litersText(0)).toBe('0 gal');
+    expect(litersText(0.001)).toBe('0 gal');
   });
 
   it('fuel in a shortfall is liters, not "1.1 fuel"', () => {
-    expect(billText({ fuel: 1.1 })).toBe('22 L of fuel');
+    expect(billText({ fuel: 1.1 })).toBe('5.8 gal of fuel');
     expect(billText({ fuel: 0.0001, lumber: 3 })).toBe('3 lumber');
-    expect(waitingFor({ fuel: 1.1, concrete: 8 })).toBe('Waiting for 22 L of fuel, 8 concrete');
+    expect(waitingFor({ fuel: 1.1, concrete: 8 })).toBe('Waiting for 5.8 gal of fuel, 8 concrete');
     expect(waitingFor({ fuel: 0.7967046720730114 })).not.toMatch(/\d\.\d{3}/);
   });
 

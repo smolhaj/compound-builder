@@ -51,6 +51,7 @@ import { gradeBucket, roadDifficulty, winterRoadLine } from './slope';
 import { terraceSite, terraceText } from './terrace';
 import { restackPallets, slumped, wallOf } from './retaining';
 import { nobodyHome } from './orphans';
+import { lengthText } from './units';
 
 const usd = (n: number) => '$' + Math.round(n).toLocaleString('en-US');
 
@@ -113,7 +114,7 @@ export function bunkerChecklist(s: GameState): BunkerCheck[] {
   return [
     { id: 'entrance', label: 'A way down', done: has(...BUNKER_ENTRANCES), building: going(...BUNKER_ENTRANCES), kind: 'bunker_hatch', detail: note(going(...BUNKER_ENTRANCES), 'a hatch, a stairwell, or a hatch in the house floor; every room grows from it') },
     { id: 'beds', label: `Beds for ${people}`, done: beds >= people, building: beds < people && bedsStaked > beds, kind: people <= 4 ? 'bunker_container' : 'bunker_dorm', detail: `${beds} of ${people} places built${bedsStaked > beds ? `, ${bedsStaked - beds} more staked out` : ''}` },
-    { id: 'air', label: 'Clean air and power', done: has('bunker_plant'), building: going('bunker_plant'), kind: 'bunker_plant', detail: note(going('bunker_plant'), 'the plant room: fallout and gas filter, batteries, a 2,000 L water tank') },
+    { id: 'air', label: 'Clean air and power', done: has('bunker_plant'), building: going('bunker_plant'), kind: 'bunker_plant', detail: note(going('bunker_plant'), 'the plant room: fallout and gas filter, batteries, a 528 gal water tank') },
     { id: 'food', label: 'Food and water stored', done: has('bunker_stores', 'bunker_galley'), building: going('bunker_stores', 'bunker_galley'), kind: 'bunker_stores', detail: note(going('bunker_stores', 'bunker_galley'), 'a storeroom (or a galley)') },
     { id: 'medical', label: 'A medic\'s corner', done: has('bunker_medical'), building: going('bunker_medical'), kind: 'bunker_medical', detail: note(going('bunker_medical'), 'a medical bay, for wounds in a long stay') },
   ];
@@ -254,7 +255,7 @@ export function suggestions(s: GameState, limit = 3, skip?: ReadonlySet<string>)
     const n = wait.reduce((a, w) => a + w.people.length, 0);
     add('kin_home', n > 2 ? 'moms_house' : 'guest_house', `${joinNames(wait.flatMap(w => w.people.map(p => p.first)))} ${n === 1 ? 'is' : 'are'} waiting for a place of their own`, 85);
   }
-  if (!hasKind(s, 'well_hand', 'well_drilled', 'cistern', 'water_tower')) add('water', s.site.gwDepth > 9 ? 'well_drilled' : 'well_hand', s.site.gwDepth > 9 ? `no water on the place (it is ${s.site.gwDepth} m down: drill)` : 'no water on the place', 90);
+  if (!hasKind(s, 'well_hand', 'well_drilled', 'cistern', 'water_tower')) add('water', s.site.gwDepth > 9 ? 'well_drilled' : 'well_hand', s.site.gwDepth > 9 ? `no water on the place (it is ${lengthText(s.site.gwDepth)} down: drill)` : 'no water on the place', 90);
   // a project that has waited days for materials we could pay for: the loudest card on the list (sim/stalls.ts)
   const stuck = stuckProject(s);
   if (stuck) out.push({ id: 'stalled', kind: '', title: stuck.escalated ? `Stuck for ${pluralize(stuck.days, 'day')}: waiting on ${linesText(stuck.lines)}` : `Stuck: waiting on ${linesText(stuck.lines)}`, urgency: stuck.escalated ? 100 : 99, ...(stuck.escalated ? { tone: 'alarm' as const } : {}),
@@ -382,7 +383,7 @@ export function suggestions(s: GameState, limit = 3, skip?: ReadonlySet<string>)
         ...(acts.length ? { acts } : {}) });
     } }
   // the land: a ridge that suits a keep, a gorge that is a choke, a bench for a reservoir (sim/terrainFx.ts): a card to look at, never a requirement
-  for (const c of terrainCards(s)) out.push({ id: c.id, kind: '', title: c.title, urgency: c.urgency, why: c.why, acts: [{ label: 'Show me on the map', act: { type: 'terrain', mode: c.mode } }, ...(c.span ? [{ label: `Plan a tunnel-bridge across it (~${usd(costPer100m('tunnel_bridge') * c.span.lengthM / 100)})`, act: { type: 'span' as const, a: c.span.a, b: c.span.b } }] : []), ...(c.bore ? [{ label: `Plan a rock tunnel (${c.bore.lengthM} m, ~${usd(costPer100m('rock_tunnel') * c.bore.lengthM / 100)})`, act: { type: 'span' as const, kind: 'rock_tunnel' as const, a: c.bore.a, b: c.bore.b } }] : []), ...(c.drain ? [{ label: `Plan a drainage channel (~${usd(costPer100m('drain_channel') * Math.hypot(c.drain.b[0] - c.drain.a[0], c.drain.b[1] - c.drain.a[1]) * 6 / 100)})`, act: { type: 'drain' as const, a: c.drain.a, b: c.drain.b } }] : [])] });
+  for (const c of terrainCards(s)) out.push({ id: c.id, kind: '', title: c.title, urgency: c.urgency, why: c.why, acts: [{ label: 'Show me on the map', act: { type: 'terrain', mode: c.mode } }, ...(c.span ? [{ label: `Plan a tunnel-bridge across it (~${usd(costPer100m('tunnel_bridge') * c.span.lengthM / 100)})`, act: { type: 'span' as const, a: c.span.a, b: c.span.b } }] : []), ...(c.bore ? [{ label: `Plan a rock tunnel (${lengthText(c.bore.lengthM)}, ~${usd(costPer100m('rock_tunnel') * c.bore.lengthM / 100)})`, act: { type: 'span' as const, kind: 'rock_tunnel' as const, a: c.bore.a, b: c.bore.b } }] : []), ...(c.drain ? [{ label: `Plan a drainage channel (~${usd(costPer100m('drain_channel') * Math.hypot(c.drain.b[0] - c.drain.a[0], c.drain.b[1] - c.drain.a[1]) * 6 / 100)})`, act: { type: 'drain' as const, a: c.drain.a, b: c.drain.b } }] : [])] });
   { const t = terraceSuggestion(s); if (t) out.push(t); }   // a slope that suits terraced beds: offered, never staked unasked
   { const c = courseSuggestion(s); if (c) out.push(c); }
   { const d = drillsSuggestion(s); if (d) out.push(d); }
@@ -574,7 +575,7 @@ export function perimeterNote(s: GameState, kind: PerimeterKind): string | null 
 export interface PerimeterTier { id: string; title: string; hint: string; kinds: PerimeterKind[] }
 const WALL_KINDS: readonly PerimeterKind[] = PERIMETER_ORDER.filter(k => k !== 'creek_bars');
 
-/** Dollars per 100 m of a kind (the buyable materials; your own labor and logs cost nothing here). */
+/** Dollars per 100 m of a kind (shown per 100 ft with `perHundredFeet`) (the buyable materials; your own labor and logs cost nothing here). */
 export function costPer100m(kind: PerimeterKind): number {
   const len = 100 / 6, bill = runBill(kind, len);
   return orderCost(Object.entries(bill).map(([material, qty]) => ({ material: material as MaterialId, qty: qty as number })).filter(l => MATERIALS[l.material].price !== null));
@@ -586,10 +587,10 @@ export function perimeterTiers(): PerimeterTier[] {
   const cuts = [1000, 5000, 20000];
   const bucket = (k: PerimeterKind) => cuts.filter(c => cost.get(k)! >= c).length;
   const meta = [
-    { id: 'cheap', title: 'Cheap in cash', hint: 'under $1,000 per 100 m: hedges and your own labor' },
-    { id: 'fence', title: 'Fences', hint: '$1,000 to $5,000 per 100 m: they turn people around' },
-    { id: 'hard', title: 'Hard walls', hint: '$5,000 to $20,000 per 100 m: hard to climb or cut' },
-    { id: 'premium', title: 'Premium', hint: 'over $20,000 per 100 m' },
+    { id: 'cheap', title: 'Cheap in cash', hint: 'under $300 per 100 ft: hedges and your own labor' },
+    { id: 'fence', title: 'Fences', hint: '$300 to $1,500 per 100 ft: they turn people around' },
+    { id: 'hard', title: 'Hard walls', hint: '$1,500 to $6,000 per 100 ft: hard to climb or cut' },
+    { id: 'premium', title: 'Premium', hint: 'over $6,000 per 100 ft' },
   ];
   const tiers: PerimeterTier[] = meta.map((m, i) => ({ ...m, kinds: WALL_KINDS.filter(k => bucket(k) === i).sort((a, b) => cost.get(a)! - cost.get(b)!) }));
   const bars: PerimeterTier = { id: 'creek', title: 'Creek', hint: 'bars where the creek crosses your line', kinds: ['creek_bars'] };

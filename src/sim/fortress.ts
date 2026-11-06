@@ -34,6 +34,7 @@ import { cornersOf, regionFromPolygon, ringPolygon, type Region, type RingShape 
 import { CELL, KIT, footprint } from '../game/buildkit/kit';
 import type { Rect } from './land';
 import type { GameState } from './state';
+import { lengthText } from './units';
 
 /** How many towers a ring carries: up to five (the user's description: "five observation towers"). */
 export const MAX_TOWERS = 5;
@@ -260,7 +261,7 @@ export function planFortress(s: GameState, geo: PropertyGeometry = {}, opts: Par
       const sp = courtSpot(gs), hx = COURT_CELLS_X * CELL / 2, owned = ownedRects(s);
       const fits = owned.some(r => [[-1, -1], [1, -1], [1, 1], [-1, 1]].every(([sx, sz]) => sp.x + sx * hx > r.x0 && sp.x + sx * hx < r.x1 && sp.z + sz * hx > r.z0 && sp.z + sz * hx < r.z1));
       if (fits && clearOf(s, sp.x, sp.z, hx - 0.5)) court = { kind: MOTOR_COURT, ...sp };
-      else notes.push('No room for the motor court outside the gate: it needs 18 m of your land across and 12 m out, clear of other buildings.');
+      else notes.push('No room for the motor court outside the gate: it needs 60 ft of your land across and 39 ft out, clear of other buildings.');
     } else notes.push('No motor court: it goes in front of a gate garage, and there is none planned.');
   }
   if (!garage && gs) { wall.runs.forEach(r => r.gates.forEach(g => { delete g.garage; })); }
@@ -333,7 +334,7 @@ export function layFortress(s: GameState, plan: FortressPlan): { runs: number; s
   let runs = made.length;
   if (plan.ringPlan) { const r = layRings(s, plan.ringPlan); runs += r.runs; structures += r.structures; }
   if (plan.passage) { planRun(s, 'underground_passage', plan.passage.map(p => [p[0], p[1]] as Pt), [], 0, true); runs++; }
-  log(s, `Laid out the fortress ring: ${plan.wall.wallM} m of ${PERIMETER[plan.wall.kind].name.toLowerCase()}${plan.walkwayLen > 0 ? ' with a patrol walkway on top' : ''}${plan.garage ? ', a gatehouse garage at the gate' : ''}${plan.towers.length ? `, ${plan.towers.length} tower${plan.towers.length > 1 ? 's' : ''}` : ''}${plan.passage ? ' and an underground passage to the house' : ''}.`);
+  log(s, `Laid out the fortress ring: ${lengthText(plan.wall.wallM)} of ${PERIMETER[plan.wall.kind].name.toLowerCase()}${plan.walkwayLen > 0 ? ' with a patrol walkway on top' : ''}${plan.garage ? ', a gatehouse garage at the gate' : ''}${plan.towers.length ? `, ${plan.towers.length} tower${plan.towers.length > 1 ? 's' : ''}` : ''}${plan.passage ? ' and an underground passage to the house' : ''}.`);
   return { runs, structures };
 }
 

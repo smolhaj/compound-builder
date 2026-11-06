@@ -17,6 +17,7 @@ import { autoRoadGates } from '../sim/roadGate';
 import { OFF_PARCEL_HOURS, PERIMETER, runBill, runHours, wallLength, type Gate, type PerimeterKind, type Pt } from '../sim/perimeter';
 import { orderCost } from '../sim/economy';
 import { MATERIALS, billText, type MaterialId } from '../sim/materials';
+import { lengthText } from '../sim/units';
 
 const SNAP = 0.25;
 /** How far beyond the parcel a tunnel may run (≈ 360 m). */
@@ -199,12 +200,12 @@ export class PerimeterTool {
         : this._kind === 'tunnel_bridge' ? 'Tunnel-bridge: click the rim on one side of the gorge (or the compound\'s motor court), then the rim on the other. It needs real low ground under it'
         : this._kind === 'rock_tunnel' ? 'Rock tunnel: click at the portal at the foot of the rock face (the court side), then at the other portal inside the compound. It runs straight at one even grade and needs hill over it: the Next-step card marks a line the land allows'
         : this._kind === 'slope_tunnel' ? 'Slope tunnel: click at the top of the hillside, then down the slope to the lower yard or road'
-        : this._kind === 'moat' ? 'Moat: click the line to dig; it fills from the creek or a pond if one is within 80 m'
+        : this._kind === 'moat' ? 'Moat: click the line to dig; it fills from the creek or a pond if one is within 260 ft'
         : this._kind === 'covered_bridge' ? 'Covered bridge: click one bank, then the other, straight across the water (a moat of yours or the creek)'
         : this._kind === 'covered_walkway' ? 'Covered walkway: click against the wall of one walled yard, then against the wall of the next'
         : this._kind === 'underground_passage' ? 'Underground passage: click inside one yard (the hatch goes there), then inside the next, or out to a hatch in the woods'
         : `${PERIMETER[this._kind].name}: click to start the line`)
-      : `${Math.round(len * 6)} m${this._kind === 'escape_tunnel' && offParcel(pts as Pt[]) > 0 ? ` (${Math.round(offParcel(pts as Pt[]) * 6)} m under neighbors' land)` : ''} · ~$${orderCost(buyable).toLocaleString('en-US')}${own.length ? ' + ' + own.join(', ') : ''} · ${Math.round(runHours(this._kind, len) + (this._kind === 'escape_tunnel' ? OFF_PARCEL_HOURS * offParcel(pts as Pt[]) : 0))} h${auto.gates.length ? ` · ${auto.gates.length} gate${auto.gates.length > 1 ? 's' : ''}` : ''}${auto.added ? ' · a gate where the road comes through' : ''}`;
+      : `${lengthText(len * 6)}${this._kind === 'escape_tunnel' && offParcel(pts as Pt[]) > 0 ? ` (${lengthText(offParcel(pts as Pt[]) * 6)} under neighbors' land)` : ''} · ~$${orderCost(buyable).toLocaleString('en-US')}${own.length ? ' + ' + own.join(', ') : ''} · ${Math.round(runHours(this._kind, len) + (this._kind === 'escape_tunnel' ? OFF_PARCEL_HOURS * offParcel(pts as Pt[]) : 0))} h${auto.gates.length ? ` · ${auto.gates.length} gate${auto.gates.length > 1 ? 's' : ''}` : ''}${auto.added ? ' · a gate where the road comes through' : ''}`;
     const e = pts[pts.length - 1] as Pt | undefined;
     const hide = !tunnelWhy && this._kind === 'escape_tunnel' && this._pts.length > 0 && e
       ? (this._world.tunnelExitWoods(e[0], e[1]) >= 0.3 ? ' · exit hidden under leaf litter in the trees' : ' · exit in the open: hidden under turf (the trees hide it better)') : '';

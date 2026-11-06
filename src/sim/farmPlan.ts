@@ -20,6 +20,7 @@ import { hasMaples, sapSeason, tapsOut, woodsTaps } from './maple';
 import { herdOf } from './herd';
 import { regionFor } from './climate';
 import { pluralize } from './words';
+import { caloriesShort, tempText } from './units';
 
 export type Tone = 'good' | 'warn' | 'bad';
 export const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -57,7 +58,7 @@ export function calendar(s: GameState): CalItem[] {
     { id: 'harvest', group: 'fields', label: 'Harvest: potatoes, beans, wheat', from: se.harvest[0], to: se.harvest[1], note: 'The Fields duty digs and threshes; the first of it is next spring\'s seed. Potatoes go to the cellar bins.', here: has('field') },
     { id: 'prune', group: 'garden', label: 'Prune the orchard', from: PRUNE_FROM, to: pruneDay(s), note: 'Before the buds break; an unpruned orchard bears a fifth less.', here: orchards },
     { id: 'bloom', group: 'garden', label: 'Orchard in blossom', from: calendarOfFruit(medianFrost(s), 'cherry').bloom[0], to: calendarOfFruit(medianFrost(s), 'apple').bloom[1], note: 'A hard frost now takes the open blossom: cherries and plums first. Bees on the blossom set more fruit.', here: orchards },
-    { id: 'water-trees', group: 'garden', label: 'Water the young trees', from: WATER_DAYS[0], to: WATER_DAYS[1], note: 'About 7 L a day for each tree under three years; the drip line does it, the Garden duty keeps it running.', here: orchards },
+    { id: 'water-trees', group: 'garden', label: 'Water the young trees', from: WATER_DAYS[0], to: WATER_DAYS[1], note: 'About 1.8 gal a day for each tree under three years; the drip line does it, the Garden duty keeps it running.', here: orchards },
     ...FRUITS.map(f => ({ id: `pick-${f}`, group: 'garden' as const, label: `Pick the ${FRUIT[f].name.toLowerCase()}s`, from: calendarOfFruit(medianFrost(s), f).pick[0], to: calendarOfFruit(medianFrost(s), f).pick[1], note: FRUIT[f].keeps >= 0.5 ? 'They keep in the cellar bins.' : 'Soft fruit: eaten fresh, then jars and the dryer within days.', here: orchards })),
     { id: 'greens', group: 'garden', label: 'Winter greens in the greenhouse', from: 274, to: 120, note: 'Benches of greens and starts through the cold months.', here: hasGreenhouse(s) },
     { id: 'canning', group: 'preserve', label: 'Jars, dryer and crocks', from: g0 + 30, to: se.harvest[1], note: 'Anything beyond five days\' eating is preserved the day it comes in, while the cook has time.', here: hasKitchen(s) },
@@ -147,8 +148,8 @@ export function spoilageRisks(s: GameState): Risk[] {
   const fresh = s.stock.fresh * KCAL.fresh;
   if (fresh > 6 * need && need > 0) out.push({ text: `${pluralize(Math.round(fresh / need), 'day')} of fresh food on hand and ${Math.round(freshSpoilRate(s) * 100)} % of it rotting a day${hasCellar(s) ? ' (cellar)' : ': a root cellar would cut that to a fifth'}. Can, dry or ferment it.`, tone: 'warn' });
   const o = overflow(s);
-  if (o > 0.1) out.push({ text: `Supplies ${Math.round(o * 100)} % past the shelves (${Math.round(pantryLoad(s) / 1000).toLocaleString('en-US')}k kcal in ${Math.round(pantryRoom(s) / 1000).toLocaleString('en-US')}k of room): cool-kept goods keep worse.`, tone: 'warn' });
-  if (cellarKcal(s) > 100_000 && cellarTempC(s) > 9) out.push({ text: `The cellar is ${Math.round(cellarTempC(s))} °C: the bins lose ${shrinkText(cellarTempC(s))} a day. Eat the potatoes first.`, tone: 'warn' });
+  if (o > 0.1) out.push({ text: `Supplies ${Math.round(o * 100)} % past the shelves (${caloriesShort(pantryLoad(s))} stored, room for ${caloriesShort(pantryRoom(s))}): cool-kept goods keep worse.`, tone: 'warn' });
+  if (cellarKcal(s) > 100_000 && cellarTempC(s) > 9) out.push({ text: `The cellar is ${tempText(cellarTempC(s))}: the bins lose ${shrinkText(cellarTempC(s))} a day. Eat the potatoes first.`, tone: 'warn' });
   for (const r of pantryRows(s, need).filter(x => FOOD[x.id].kcal > 0 && x.left < 90).slice(0, 3)) out.push({ text: `${FOOD[r.id].name.split(',')[0]} ${r.left <= 0 ? 'is past its date' : `keeps ${Math.max(0, Math.round(r.left))} more days`}.`, tone: r.left <= 0 ? 'bad' : 'warn' });
   if (s.stock.frozen > 0.05 && !freezerOn(s)) out.push({ text: 'Frozen meat with no power to the cellar freezer: it thaws and spoils.', tone: 'bad' });
   return out;

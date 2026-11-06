@@ -31,7 +31,7 @@ describe('fog in the game', () => {
     const { seed, doy } = findDay('pnw', d => d.valley > 0.8 && d.overcast < 0.5 && !d.inversion);
     const g = lotGame(seed, doy);
     const t = fogLineFor(g, doy, 6.5);
-    expect(t).toMatch(/^(Fog down to \d+ m below camp|Camp in fog, \d+ m under its top), sight range/);
+    expect(t).toMatch(/^(Fog down to [\d,]+ ft below camp|Camp in fog, [\d,]+ ft under its top), sight range/);
     expect(fogLineFor(g, doy, 14)).not.toMatch(/Fog down|Camp in fog/);   // burned off by the afternoon
   });
 

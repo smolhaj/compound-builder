@@ -32,6 +32,7 @@ import { attractants, predatorSpecies, proof } from './wildlife';
 import { careYield } from './daily';
 import { logGate } from './nag';
 import { regionFor } from './climate';
+import { caloriesText, gramsText } from './units';
 
 export const TROUT_FRY = 100, TROUT_FRY_G = 8, TABLE_G = 350, CRAY_BAG = 50;
 export const TROUT_CAP = 450, TROUT_CAP_AERATED = 800, CRAY_CAP = 2400;
@@ -185,7 +186,7 @@ export function harvestProblem(s: GameState, id: string, species: 'trout' | 'cra
   if ((s.stock.fishing_gear ?? 0) < 1) return 'needs fishing gear (a net and pots): buy it in the Shop';
   if (species === 'trout') {
     if (p.trout < 1) return 'no trout in the pond';
-    if (p.troutG < TABLE_G) return `not table size yet: they average ${Math.round(p.troutG)} g and need ${TABLE_G} g`;
+    if (p.troutG < TABLE_G) return `not table size yet: they average ${gramsText(p.troutG)} and need ${gramsText(TABLE_G)}`;
     return null;
   }
   if (p.crayfish < 60) return 'too few crayfish to take any: let them breed';
@@ -209,7 +210,7 @@ export function harvestPond(s: GameState, id: string, species: 'trout' | 'crayfi
   }
   p.harvestAt = day;
   const where = putUp(s, kcal);
-  log(s, `Took ${what} from the pond: ${Math.round(kcal).toLocaleString('en-US')} kcal ${where}.`);
+  log(s, `Took ${what} from the pond: ${caloriesText(kcal)} ${where}.`);
   return null;
 }
 
@@ -226,7 +227,7 @@ export function pondReport(s: GameState, st: Structure): PondReport {
   const daily = p.trout * p.troutG * FEED_RATE / FEED_BAG_G;
   const notes: string[] = [];
   if (!troutSuited(s)) notes.push('July is too hot here for trout: crayfish only.');
-  if (p.trout > 0 && p.troutG < TABLE_G) notes.push(`Trout average ${Math.round(p.troutG)} g; table size is ${TABLE_G} g.`);
+  if (p.trout > 0 && p.troutG < TABLE_G) notes.push(`Trout average ${gramsText(p.troutG)}; table size is ${gramsText(TABLE_G)}.`);
   if (daily > 0 && (s.stock.fish_feed ?? 0) < daily * 5) notes.push('Feed is nearly out.');
   if (!aerated(s, st) && p.trout > 200) notes.push('An aerator (wire the pond for power) lifts the cap and keeps them alive in a heat wave.');
   return {

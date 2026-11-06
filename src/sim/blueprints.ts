@@ -169,7 +169,7 @@ export const GREENHOUSE_BLUEPRINT: Blueprint = {
 export const ORCHARD_BLUEPRINT: Blueprint = {
   kind: 'orchard',
   stages: [
-    { id: 'site', name: 'Stake the rows (4 m apart)', hours: 3, materials: {} },
+    { id: 'site', name: 'Stake the rows (13 ft apart)', hours: 3, materials: {} },
     { id: 'foundation', name: 'Strip the sod, dig the planting holes', hours: 12, materials: {} },
     { id: 'frame', name: 'Plant the trees', hours: 8, materials: { fruit_trees: 12 } },
     { id: 'roof', name: 'Stakes and trunk guards', hours: 4, materials: { wire: 1 } },
@@ -398,8 +398,8 @@ export function homeBeds(s: { structures: ReadonlyArray<{ kind: string; stage: n
 const bp = (kind: string, stages: Array<[StageId, string, number, Partial<Stock>]>): Blueprint => ({ kind, stages: stages.map(([id, name, hours, materials]) => ({ id, name, hours, materials })) });
 
 export const UTILITY_BLUEPRINTS: Blueprint[] = [
-  bp('well_hand', [['site', 'Witch the spot, stake it', 2, {}], ['foundation', 'Dig the well by hand (≈ 7 m)', 120, {}], ['frame', 'Stone the shaft', 50, { fieldstone: 3 }], ['roof', 'Well-house roof', 10, { lumber: 1, roofing: 1 }], ['finish', 'Hand pump and cover', 8, { hardware: 1 }]]),
-  bp('well_drilled', [['site', 'Stake the bore', 2, {}], ['foundation', 'Drill the well (contractor, ≈ 60 m)', 8, { drilling: 1 }], ['frame', 'Pump-house frame', 16, { lumber: 2 }], ['roof', 'Roof', 4, { roofing: 1 }], ['finish', 'Pump, pressure tank and controls', 16, { pump: 1, hardware: 1 }]]),
+  bp('well_hand', [['site', 'Witch the spot, stake it', 2, {}], ['foundation', 'Dig the well by hand (≈ 23 ft)', 120, {}], ['frame', 'Stone the shaft', 50, { fieldstone: 3 }], ['roof', 'Well-house roof', 10, { lumber: 1, roofing: 1 }], ['finish', 'Hand pump and cover', 8, { hardware: 1 }]]),
+  bp('well_drilled', [['site', 'Stake the bore', 2, {}], ['foundation', 'Drill the well (contractor, ≈ 200 ft)', 8, { drilling: 1 }], ['frame', 'Pump-house frame', 16, { lumber: 2 }], ['roof', 'Roof', 4, { roofing: 1 }], ['finish', 'Pump, pressure tank and controls', 16, { pump: 1, hardware: 1 }]]),
   bp('cistern', [['site', 'Stake it out', 2, {}], ['foundation', 'Level a gravel pad', 10, { concrete: 1 }], ['frame', 'Set the tank', 6, { tank: 1 }], ['roof', 'Gutters and downspouts', 10, { pipe: 1, hardware: 1 }], ['finish', 'First-flush filter and overflow', 6, { hardware: 1 }]]),
   bp('water_tower', [['site', 'Stake it out', 4, {}], ['foundation', 'Footings', 40, { concrete: 3 }], ['frame', 'Timber stand', 140, { lumber: 8 }], ['roof', 'Hoist the tank', 24, { tank: 1 }], ['finish', 'Plumbing, ladder and the lookout deck', 50, { pipe: 2, lumber: 2 }]]),
   bp('filtration_shed', [['site', 'Stake it out by the pressure tank', 1, {}], ['foundation', 'Gravel and a small slab', 4, { concrete: 1 }], ['frame', 'Frame the shed', 6, { lumber: 1 }], ['roof', 'Roof', 3, { roofing: 1 }], ['finish', 'Sediment and carbon filters, UV lamp, plumb it in', 6, { hardware: 2, pipe: 1 }]]),
@@ -421,7 +421,7 @@ export const GREENHOUSE_HEATED_BLUEPRINT: Blueprint = bp('greenhouse_heated', [
 
 /** Forty-eight trees on a grid (apple, pear, cherry, plum), staked and guarded: ≈ 110 person-hours, ≈ $2,300. */
 export const ORCHARD_GROVE_BLUEPRINT: Blueprint = bp('orchard_grove', [
-  ['site', 'Stake the rows (4 m apart)', 8, {}],
+  ['site', 'Stake the rows (13 ft apart)', 8, {}],
   ['foundation', 'Strip the sod, dig the planting holes', 40, {}],
   ['frame', 'Plant the trees', 30, { fruit_trees: 48 }],
   ['roof', 'Stakes, trunk guards and the deer fence', 24, { wire: 4, lumber: 1 }],
@@ -430,7 +430,7 @@ export const ORCHARD_GROVE_BLUEPRINT: Blueprint = bp('orchard_grove', [
 
 /** The 20 kW solar farm: 50 × 400 W panels in five rows on ground racks, with three 6 kW inverters. */
 export const SOLAR_FARM_BLUEPRINT: Blueprint = bp('solar_farm', [
-  ['site', 'Stake the rows (facing south, 4 m apart)', 8, {}],
+  ['site', 'Stake the rows (facing south, 13 ft apart)', 8, {}],
   ['foundation', 'Post footings for five rows', 50, { concrete: 8 }],
   ['frame', 'Steel racking', 90, { rebar: 2, hardware: 4 }],
   ['roof', 'Mount 50 panels', 80, { solar_panel: 50 }],
@@ -451,7 +451,7 @@ export const POND_BLUEPRINT: Blueprint = {
   kind: 'pond',
   stages: [
     { id: 'site', name: 'Stake the shore and the spillway', hours: 8, materials: {} },
-    { id: 'foundation', name: 'Dig the basin (hired excavator, 2 m deep at the standpipe)', hours: 60, materials: { excavator: 6 }, yields: { spoil: 320 } },
+    { id: 'foundation', name: 'Dig the basin (hired excavator, 6.5 ft deep at the standpipe)', hours: 60, materials: { excavator: 6 }, yields: { spoil: 320 } },
     { id: 'frame', name: 'Line the basin and set the standpipe', hours: 40, materials: { membrane: 8, pipe: 2 } },
     { id: 'roof', name: 'Dress the spillway in stone and shape the bank', hours: 30, materials: { fieldstone: 2 } },
     { id: 'finish', name: 'Fill it, plant the margin, set the fish fence', hours: 30, materials: { wire: 2 } },
@@ -583,7 +583,7 @@ export const MICRO_HYDRO_BLUEPRINT: Blueprint = bp('micro_hydro', [
 
 /** A 5 kW wind turbine on an 18 m guyed tilt-up tower: footing and four guy anchors, the tower, the raise, the buried line. About $25,000. */
 export const WIND_TURBINE_BLUEPRINT: Blueprint = bp('wind_turbine', [
-  ['site', 'Stake the tower base and the four guy anchors (the guys reach 12 m out)', 4, {}],
+  ['site', 'Stake the tower base and the four guy anchors (the guys reach 39 ft out)', 4, {}],
   ['foundation', 'Dig and pour the footing and the guy anchors', 34, { concrete: 4, rebar: 1 }],
   ['frame', 'Assemble the tilt-up tower on the ground and set the guys', 40, { tilt_tower: 1, hardware: 1 }],
   ['roof', 'Bolt on the turbine and raise the tower with the winch', 20, { wind_turbine: 1 }],
@@ -657,7 +657,7 @@ export const MARINA_BLUEPRINT: Blueprint = bp('marina', [
 export const CABIN_VILLAGE_BLUEPRINT: Blueprint = bp('cabin_village', [
   ['site', 'Lay out the ring: the green, the fire circle and six cabin pads', 12, {}],
   ['foundation', 'Pour the pier footings for six cabins and dig the paths', 120, { concrete: 6, fieldstone: 4 }],
-  ['frame', 'Frame and sheathe six 4 x 4.5 m cabins, bunks built in', 260, { lumber: 18, hardware: 2 }],
+  ['frame', 'Frame and sheathe six 13 × 15 ft cabins, bunks built in', 260, { lumber: 18, hardware: 2 }],
   ['roof', 'Rafters and a metal roof on each', 120, { roofing: 8, lumber: 2 }],
   ['finish', 'Doors and windows facing the green, stoves, wiring and the fire circle', 160, { hardware: 6, cable: 3, lumber: 3 }],
 ]);
@@ -666,7 +666,7 @@ export const HELIPAD_BLUEPRINT: Blueprint = bp('helipad', [
   ['site', 'Clear and level the pad; check the approach for wires and trees', 6, {}],
   ['foundation', 'Strip the sod and lay the compacted gravel base', 36, { excavator: 1, fieldstone: 6 }],
   ['frame', 'Form the slab, tie the rebar mat', 30, { rebar: 4, lumber: 2 }],
-  ['roof', 'Pour and finish the 15 cm slab', 34, { concrete: 28 }],
+  ['roof', 'Pour and finish the 6 in slab', 34, { concrete: 28 }],
   ['finish', 'Paint the H and the ring, edge lights, a windsock and a fire extinguisher', 24, { cable: 2, hardware: 1, floodlights: 2 }],
 ]);
 /** A tower pod: a 12 m steel mast with a spiral stair and a glazed observation pod. About $15,000 and 330 person-hours. */

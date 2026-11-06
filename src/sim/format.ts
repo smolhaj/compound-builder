@@ -1,12 +1,10 @@
 /** Player-facing number and place formatters (pure). Never put a raw float in a UI string. */
 import type { Rect } from './site';
+import { gallonsText } from './units';
 
-/** "12 L", "0.8 L": liters, rounded for reading. */
+/** "3 gal", "0.2 gal": a volume held in liters, shown in U.S. gallons. */
 export function litersText(l: number): string {
-  if (!(l > 0.04)) return '0 L';
-  if (l >= 100) return `${Math.round(l).toLocaleString('en-US')} L`;
-  if (l >= 10) return `${Math.round(l)} L`;
-  return `${Math.round(l * 10) / 10} L`;
+  return gallonsText(l);
 }
 
 /** A spot on the property as a compass word relative to the home place: "north edge", "south-east corner", "middle". */

@@ -45,6 +45,7 @@ import type { Stock } from './materials';
 import { homeFromCaptivity } from './mind';
 import type { Encounter, Outcome, Stance } from './encounters';
 import { pluralize } from './words';
+import { gallonsText, kmText } from './units';
 
 // ─────────────────────────────────────────────────────────────────────────
 // State
@@ -282,7 +283,7 @@ export function addLead(s: GameState, c: Captive, source: LeadSource, r: () => n
   const about = said === 'traded' ? `They don't have ${child.kid ? callIt(child) : child.first} any more: traded ${child.body === 'f' ? 'her' : 'him'} to a convoy going south.`
     : said === 'dead' ? `There's a fresh grave behind the place.${child.kid ? ' Small.' : ''}`
     : seenAlive ? (child.kid ? `There's a ${child.age < 13 ? 'child' : 'kid'} with them, ${child.age} or so. Alive.` : `Somebody matching ${child.first} is working their camp under guard. Alive.`) : child.kid ? 'Nobody saw a child.' : `Nobody saw ${child.first}.`;
-  const camp = `${c.crew[0].toUpperCase() + c.crew.slice(1)} camp at ${where}, about ${km} km ${dir}. ${count} of them.`;
+  const camp = `${c.crew[0].toUpperCase() + c.crew.slice(1)} camp at ${where}, about ${kmText(km)} ${dir}. ${count} of them.`;
   const lead0 = source === 'radio' ? `${pick(r, RADIO_SRC)}: ${camp} ${about}`
     : source === 'prisoner' ? `The prisoner knows them. ${camp} ${about}`
     : source === 'neighbor' ? `${from || 'A neighbor'} rode over: ${camp} ${about}`
@@ -566,7 +567,7 @@ export function tripProblem(s: GameState, pid: string, team: string[]): string |
   if (leadAge(s, l) > FAR_COLD) return 'that rumor is months old: wait for another';
   const { truck, liters, have, seats } = tripFuel(s, l.km, Math.max(2, team.length));
   if (!truck) return 'no running truck that seats them';
-  if (have < liters) return `not enough fuel: ${liters} L there and back, ${Math.floor(have)} L on hand`;
+  if (have < liters) return `not enough fuel: ${gallonsText(liters)} there and back, ${gallonsText(Math.floor(have))} on hand`;
   if (!team.length) return 'pick who goes';
   if (team.length > seats) return `the ${truck.kind === 'motorhome' ? 'motorhome' : 'truck'} takes ${seats}`;
   if (team.some(id => { const p = person(s, id); return !p || !canGo(s, p); })) return 'someone picked can\'t go';
@@ -587,7 +588,7 @@ export function startTrip(s: GameState, pid: string, team: string[]): string | n
   rescueOf(s).raid = { kind: 'trip', captive: pid, team: [...team], left: day, hitDay: day + leg + trouble.extraDays, backDay: day + 2 * leg + trouble.extraDays, resolved: false };
   for (const id of team) { const ps = stateOf(s, id); if (ps) { ps.task = 'away'; ps.target = null; } }
   const child = person(s, pid)!;
-  log(s, `${team.map(id => person(s, id)?.first).join(', ')} took the truck to ${l.where}, ${l.km} km off: ${liters} L of fuel and ${pluralize(2 * leg, 'day')}, for a rumor.`);
+  log(s, `${team.map(id => person(s, id)?.first).join(', ')} took the truck to ${l.where}, ${kmText(l.km)} off: ${gallonsText(liters)} of fuel and ${pluralize(2 * leg, 'day')}, for a rumor.`);
   log(s, voice(s, child, mulberry32(s.seed + day + 1), ['Even if it\'s nothing. Even if it\'s nothing, go.', 'Bring a picture. Show everyone the picture.'], ['If there\'s any chance at all.', 'Take the good rifle. And the trade goods. All of them.']));
   return null;
 }
@@ -622,7 +623,7 @@ function tripArrive(s: GameState, raid: RescueRaid): Outcome {
     if (paid) { pay(s, t, 1); lines.push(`Paid: ${termsText(t)}.`); } else lines.push('They had nothing like the price; they talked, and then they ran with ' + him + '.');
     raid.freed = true;
     lines.push(voice(s, child, r, ['Is it — is it really — oh God. Oh God, it is.', 'You found ' + him + '. You actually found ' + him + '.'], ['All that way. All that way, and there ' + they(child)[0] + ' was.', 'I never stopped. I never stopped looking.'], ['I never stopped looking. Not one day.', 'You\'re thin. You\'re so thin. Come on. Home.']));
-    return { title: `Found at ${l.where}`, text: `${child.first} was there, ${c.farKm} km from home, working for a man who'd bought ${him} off a convoy. They're bringing ${him} home.`, tone: 'good', lines: lines.filter(Boolean) };
+    return { title: `Found at ${l.where}`, text: `${child.first} was there, ${kmText(c.farKm ?? 0)} from home, working for a man who'd bought ${him} off a convoy. They're bringing ${him} home.`, tone: 'good', lines: lines.filter(Boolean) };
   }
   setFar(c, r);
   return { title: 'So close', text: `${child.first} was there. The man who has ${him} wouldn't sell, and moved ${him} on that night. ${names} are on the long road home.`, tone: 'bad', lines };
@@ -639,12 +640,12 @@ function farRumorDay(s: GameState, c: Captive, day: number, r: () => number): vo
   if (!c.farWhere) setFar(c, r);
   const tru = c.status === 'traded' && r() < reception(s).truth;
   const where = tru ? c.farWhere! : pick(r, FAR_PLACES), km = tru ? c.farKm! : 80 + Math.round(r() * 320);
-  const text = `${pick(r, RADIO_SRC)}: someone at ${where}, ${km} km off, has a ${child.kid ? (child.age < 13 ? 'child' : 'kid') : 'worker'} who says ${child.body === 'f' ? 'her' : 'his'} name is ${child.first}.`;
+  const text = `${pick(r, RADIO_SRC)}: someone at ${where}, ${kmText(km)} off, has a ${child.kid ? (child.age < 13 ? 'child' : 'kid') : 'worker'} who says ${child.body === 'f' ? 'her' : 'his'} name is ${child.first}.`;
   c.leads.push({ day, source: 'radio', where, km, count: 0, seenAlive: true, far: true, text, true: tru });
   if (c.leads.length > 8) c.leads.splice(0, c.leads.length - 8);
   c.known = 'traded';
   log(s, text);
-  log(s, voice(s, child, r, [`${km} kilometers. I'd walk it. I'd walk it barefoot.`, 'It\'s a rumor. It\'s a rumor. But it\'s ' + child.first + '\'s name.'], ['The truck would make it. If we had the fuel. We have the fuel.', 'People say things on the radio. But ' + child.first + '.']));
+  log(s, voice(s, child, r, [`${kmText(km)}. I'd walk it. I'd walk it barefoot.`, 'It\'s a rumor. It\'s a rumor. But it\'s ' + child.first + '\'s name.'], ['The truck would make it. If we had the fuel. We have the fuel.', 'People say things on the radio. But ' + child.first + '.']));
   news(s, text, 2);
 }
 

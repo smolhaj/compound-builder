@@ -32,6 +32,7 @@ import { isFinished } from './construction';
 import { seasons } from './regions';
 import { calendarOf, type GameState, type Structure } from './state';
 import { regionFor } from './climate';
+import { lengthText } from './units';
 
 export type LaidKind = 'gravel' | 'stones' | 'boards' | 'paved';
 export type PathSurface = 'desire' | 'dirt' | LaidKind;
@@ -345,7 +346,7 @@ export function layPaths(s: GameState, edges: readonly LayEdge[], kind: LaidKind
     p.laid = p.laid.filter(l => edgeKey(l.a, l.b) !== k);
     p.laid.push({ a: e.a, b: e.b, kind, at: s.clock.t });
   }
-  log(s, `Laid ${Math.round(plan.lenM)} m of ${LAID_NAME[kind].toLowerCase()} (${billText(plan.bill)}).`);
+  log(s, `Laid ${lengthText(plan.lenM)} of ${LAID_NAME[kind].toLowerCase()} (${billText(plan.bill)}).`);
   return null;
 }
 

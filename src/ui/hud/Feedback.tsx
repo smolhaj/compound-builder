@@ -23,6 +23,17 @@ export function CursorHint() {
   return <div data-testid="cursor-hint" style={{ position: 'fixed', left: right ? undefined : at.x + 16, right: right ? window.innerWidth - at.x + 16 : undefined, top: at.y + 18, maxWidth: 300, pointerEvents: 'none', zIndex: 20, background: 'rgba(120,30,24,0.92)', color: '#fff', borderRadius: 6, padding: '4px 8px', fontSize: 12.5, boxShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>{why}</div>;
 }
 
+/** What to do while a line tool (wall, fence, pipe, tunnel) is armed: one clear bar, big enough to read, with the live length and cost under it. */
+export const LINE_TOOL_HELP = 'Click points along the line. Double-click to finish. Esc to cancel';
+export function LineToolBar() {
+  const tool = useGameStore(g => g.tool), live = useGameStore(g => g.toolProblem), welcome = useGameStore(g => g.welcome);
+  if (!tool || !tool.startsWith('fence:')) return null;
+  return <div data-testid="line-tool-bar" role="status" style={{ ...panel, position: 'fixed', top: welcome ? 168 : 100, left: '50%', transform: 'translateX(-50%)', zIndex: 16, pointerEvents: 'none', border: '2px solid #ffd27a', padding: '10px 18px', maxWidth: 'min(640px, calc(100vw - 40px))', textAlign: 'center', boxShadow: '0 4px 18px rgba(0,0,0,0.5)' }}>
+    <div style={{ fontSize: 17, fontWeight: 700, color: '#ffe3a3' }}>{LINE_TOOL_HELP}</div>
+    {live && <div style={{ fontSize: 13, marginTop: 4, color: '#e8dcc0' }}>{live}</div>}
+  </div>;
+}
+
 /** A one-line notice under the top bar that fades by itself. */
 export function ToastLine() {
   const t = useGameStore(g => g.toast), welcome = useGameStore(g => g.welcome);

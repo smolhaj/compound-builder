@@ -19,6 +19,7 @@ import { calendarOf } from './state';
 import { doorDelay } from './terrainFx';
 import { nearest } from './enclosure';
 import { isFinished } from './construction';
+import { lengthText } from './units';
 
 export const WATER = {
   /** A leat can bring water from this far (world units; 14 = 84 m). */
@@ -120,8 +121,8 @@ export function bridgeOver(s: GameState, pts: readonly Pt[], moats: readonly Per
 export function bridgeProblem(s: GameState, pts: readonly Pt[]): string | null {
   if (pts.length < 2) return null;
   const a = pts[0], b = pts[pts.length - 1], lenM = Math.hypot(b[0] - a[0], b[1] - a[1]) * 6;
-  if (lenM < WATER.BRIDGE_MIN_M) return `too short: a bridge spans at least ${WATER.BRIDGE_MIN_M} m of water`;
-  if (lenM > WATER.BRIDGE_MAX_M) return `too long: ${Math.round(lenM)} m is more than a timber truss spans (${WATER.BRIDGE_MAX_M} m at the most)`;
+  if (lenM < WATER.BRIDGE_MIN_M) return `too short: a bridge spans at least ${lengthText(WATER.BRIDGE_MIN_M)} of water`;
+  if (lenM > WATER.BRIDGE_MAX_M) return `too long: ${lengthText(lenM)} is more than a timber truss spans (${lengthText(WATER.BRIDGE_MAX_M)} at the most)`;
   if (!bridgeOver(s, pts).over) return 'nothing to cross: lay the bridge right across your moat (lay the moat first) or across the creek, bank to bank';
   return null;
 }
@@ -186,8 +187,8 @@ export function waterLines(s: GameState): string[] {
   const out: string[] = [];
   for (const m of moatStates(s)) {
     const src = m.source === 'creek' ? 'fed from the creek' : m.source === 'pond' ? 'fed from the pond' : 'rain and seep only (no creek or pond within reach)';
-    out.push(`Moat, ${Math.round(wallLength(m.run) * 6)} m: ${Math.round(m.level * 100)}% full, ${src}${m.frozen ? '; frozen, a crew walks it' : ''}.`);
+    out.push(`Moat, ${lengthText(wallLength(m.run) * 6)}: ${Math.round(m.level * 100)}% full, ${src}${m.frozen ? '; frozen, a crew walks it' : ''}.`);
   }
-  for (const b of standingBridges(s)) out.push(`Covered bridge over ${b.over === 'moat' ? 'the moat' : b.over === 'creek' ? 'the creek' : 'nothing'}, ${b.lenM} m: a crew files over it behind a plank gate.`);
+  for (const b of standingBridges(s)) out.push(`Covered bridge over ${b.over === 'moat' ? 'the moat' : b.over === 'creek' ? 'the creek' : 'nothing'}, ${lengthText(b.lenM)}: a crew files over it behind a plank gate.`);
   return out;
 }
