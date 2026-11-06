@@ -11,6 +11,8 @@ import type { Pt } from './perimeter';
 import { isFinished, holdReason } from './construction';
 import { defenseReport, type Check } from './defenseReport';
 import { daysOfFood } from './needs';
+import { waterDaysStored } from './water';
+import { RUNWAY, runway, type RunwayRow } from './runway';
 import { moodSummary } from './mind';
 import { OP_COVERED, operational, operationalCount, type OpItem } from './operational';
 import { powerSummary, fmtKw } from './powerReport';
@@ -42,6 +44,8 @@ export interface CompoundBoard {
   vitals: BoardLine[];
   /** Defense checks that are failing, worst first. */
   gaps: BoardItem[];
+  /** Days the place could last with no resupply, per thing it runs on (sim/runway.ts). */
+  runway: RunwayRow[];
   threats: BoardItem[];
   decisions: BoardItem[];
   /** Nothing in threats, no gap, nothing waiting. */
@@ -49,9 +53,8 @@ export interface CompoundBoard {
 }
 
 /** How many of each list the page shows (the rest is one tap away in its own tab). */
-export const BOARD = { gaps: 3, threats: 4, decisions: 4, waterDaysOk: 7, foodWarn: 30, foodBad: 7, moraleWarn: 55, moraleBad: 40 } as const;
+export const BOARD = { gaps: 3, threats: 4, decisions: 4, waterDaysOk: 7, foodWarn: RUNWAY.food.warn, foodBad: RUNWAY.food.bad, moraleWarn: 55, moraleBad: 40 } as const;
 
-const WATER_L_PER_DAY = 10;
 const open = (right: Extract<BoardAct, { type: 'open' }>['right'], supplies?: 'stores' | 'farm'): BoardAct => ({ type: 'open', right, ...(supplies ? { supplies } : {}) });
 const asAct = (a: SuggestionAct): BoardAct | undefined => (a.type === 'open' || a.type === 'select' || a.type === 'stake' || a.type === 'shop' ? a : undefined);
 const fixOf = (o: OpItem | undefined): BoardLine['fix'] => { const a = o?.act && asAct(o.act.act); return a && o?.act ? { label: o.act.label, act: a } : undefined; };
@@ -70,7 +73,7 @@ export function compoundBoard(s: GameState, drive?: readonly Pt[]): CompoundBoar
   const dr = defenseReport(s, drive);
   const ops = operational(s, drive, dr);
   const op = (id: OpItem['id']) => ops.find(o => o.id === id);
-  const alive = living(s), people = Math.max(1, alive.length);
+  const alive = living(s);
   const vitals: BoardLine[] = [];
 
   // power
@@ -82,7 +85,7 @@ export function compoundBoard(s: GameState, drive?: readonly Pt[]): CompoundBoar
 
   // water
   { const r = s.utilities.report, o = op('water');
-    const stored = Math.floor(s.utilities.storedL / (people * WATER_L_PER_DAY));
+    const stored = Math.floor(waterDaysStored(s));
     const value = r.shortL > 0 ? 'ran short yesterday' : o?.done ? (stored >= 1 ? `a source, ${days(stored)} stored` : 'a working source') : o?.line ?? 'No water';
     const tone: BoardTone = r.shortL > 0 ? 'bad' : !o?.done || s.utilities.hauling ? 'warn' : 'good';
     vitals.push({ id: 'water', label: 'Water', value, tone, open: open('utilities'), fix: fixOf(o) }); }
@@ -139,7 +142,7 @@ export function compoundBoard(s: GameState, drive?: readonly Pt[]): CompoundBoar
   }
 
   const count = operationalCount(ops);
-  const out: CompoundBoard = { day, operational: count, vitals, gaps, threats: threats.slice(0, BOARD.threats), decisions: decisions.slice(0, BOARD.decisions), allClear: false };
+  const out: CompoundBoard = { day, operational: count, vitals, gaps, runway: runway(s), threats: threats.slice(0, BOARD.threats), decisions: decisions.slice(0, BOARD.decisions), allClear: false };
   out.allClear = !out.threats.length && !out.gaps.length && !out.decisions.length && out.vitals.every(v => v.tone === 'good');
   return out;
 }

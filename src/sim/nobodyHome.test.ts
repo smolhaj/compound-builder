@@ -7,6 +7,7 @@ import { mastheadOf, MASTHEADS, tallyDay } from './report';
 import { slowHint, paceOf } from './pace';
 import { REGION_IDS } from './regions';
 import { step } from './engine';
+import { wipeSummary } from './wipe';
 import { arrivalCheck } from './siege';
 import type { Encounter } from './encounters';
 
@@ -50,15 +51,17 @@ describe('nobody home (line alive, children fostered)', () => {
 });
 
 describe('a real wipe is still a wipe', () => {
-  it('everyone dead and nobody fostered ends the run; with a ward away it does not', () => {
+  it('everyone dead ends the run whether or not a ward is away; with one away the ending says the family lives on', () => {
     const g = newGame(7, 105, 2027, { mode: 'scenario', peace: 'short', kind: 'grid_down' });
     g.clock.t = g.disaster.hitAt + 40;
     for (const ps of g.personState) ps.needs.died = 1;
     expect(nobodyHome(g)).toBe(false);
     expect(tallyDay(g)?.kind).toBe('wipe');
     const f = awayGame();
-    expect(tallyDay(f)).toBeNull();
-    expect(f.ending).toBeFalsy();
+    expect(tallyDay(f)?.kind).toBe('wipe');
+    expect(f.ending?.kind).toBe('wipe');
+    expect(wipeSummary(f).elsewhere).toHaveLength(1);
+    expect(wipeSummary(g).elsewhere).toHaveLength(0);
   });
 });
 

@@ -30,6 +30,13 @@ export const TOTE_L = 1000;
 export const TANKER_L = 15000, TANKER_USD = 450;
 /** Liters a person needs to drink and cook, at the least. */
 export const DRINK_L = 4;
+/** Liters one person uses in a day for the stored-water days on the board, the defense report and the runway. */
+export const WATER_L_PER_DAY = 10;
+/** Days the water in the tanks and the stored jugs would last the people alive, with nothing more coming in. */
+export function waterDaysStored(s: GameState): number {
+  const people = Math.max(1, s.personState.filter(ps => ps.needs.died == null && !ps.needs.left && !ps.needs.taken).length);
+  return (s.utilities.storedL + (s.stock.water_jugs ?? 0) * JUG_L) / (people * WATER_L_PER_DAY);
+}
 
 /** Extra storage the goods add (IBC totes). */
 export const toteStorage = (s: GameState) => Math.floor(s.stock.ibc_tote ?? 0) * TOTE_L;

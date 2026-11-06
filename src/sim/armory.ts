@@ -240,13 +240,27 @@ export function firepower(s: GameState): number {
 }
 export const armed = (s: GameState) => s.armory.guns.some(g => (s.armory.ammo[GUN[g.model].cal] ?? 0) >= 10);
 
+/** Rounds one gun of this type fires in an average fight (spendInFight varies it between half and one and a half times this). */
+export const fightRounds = (t: GunType): number => t === 'semi_rifle' || t === 'pcc' ? 60 : isAuto(t) ? 60 * AUTO_BURN : 15;
+
+/**
+ * How many average fights the ammunition on hand would last, or null with no guns. Every gun fires in a fight, so the
+ * caliber that runs out first sets the number (same burn as `spendInFight`).
+ */
+export function fightsOfAmmo(s: Pick<GameState, 'armory'>): number | null {
+  if (!s.armory.guns.length) return null;
+  const burn = new Map<Caliber, number>();
+  for (const g of s.armory.guns) { const m = GUN[g.model]; burn.set(m.cal, (burn.get(m.cal) ?? 0) + fightRounds(m.type)); }
+  return Math.min(...[...burn].map(([cal, per]) => (s.armory.ammo[cal] ?? 0) / per));
+}
+
 /** A fight at the gate: rounds fired, guns worked hard. */
 export function spendInFight(s: GameState, r: () => number): string | null {
   let used = 0;
   for (const g of s.armory.guns) {
     const cal = GUN[g.model].cal, have = s.armory.ammo[cal] ?? 0;
     if (have < 1) continue;
-    const t = GUN[g.model].type, n = Math.min(have, Math.round((t === 'semi_rifle' || t === 'pcc' ? 60 : isAuto(t) ? 60 * AUTO_BURN : 15) * (0.5 + r())));
+    const t = GUN[g.model].type, n = Math.min(have, Math.round(fightRounds(t) * (0.5 + r())));
     s.armory.ammo[cal] = have - n; g.fired += n; g.condition = Math.max(0, g.condition - n * 0.0004);
     used += n;
   }
