@@ -88,7 +88,7 @@ export function BuildMenu({ showProjects = () => undefined }: { showProjects?: (
     else if (a.type === 'span') { const k = a.kind ?? 'tunnel_bridge', why = g.planSpan(k, a.a, a.b); setNote(why ? `Cannot lay it there: ${why}.` : k === 'rock_tunnel' ? 'Planned the rock tunnel: the family drives it as the materials and the excavator come in (Projects).' : 'Planned the tunnel-bridge across the gorge: the family builds it as the materials come in (Projects).'); }
     else if (a.type === 'gather') { const why = g.daily(d => callGathering(d, a.kind)); if (why) setNote(why); }
     else if (a.type === 'moveIn') { const why = g.money(d => openMoveIn(d)); if (why) setNote(why[0].toUpperCase() + why.slice(1) + '.'); }
-    else { g.select(a.id); showProjects(); }
+    else { g.select(a.id); showProjects(); const st = game.structures.find(x => x.id === a.id); if (st && !st.unplaced) useWorldStore.getState().frameCamera([st]); }
   };
 
   /** One kit piece as a menu item. */

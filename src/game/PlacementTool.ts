@@ -114,7 +114,14 @@ export class PlacementTool {
 
   /** QA / click: place at the current hover point if allowed. */
   private _place(repeat = false, force = false): void {
-    if (!this._kind || !this._at || !this._ok) return;
+    if (!this._kind) return;
+    // a refused click says why (a line under the top bar, and the same words beside the pointer), never nothing
+    if (!this._at || !this._ok) {
+      if (this._just && this._at) return;   // the cursor is still over the piece just staked
+      const why = useGameStore.getState().toolProblem;
+      useGameStore.getState().showToast(!this._at ? 'Click on the ground to place it. Esc puts the tool away.' : why ? `Cannot place it there: ${why[0].toLowerCase()}${why.slice(1)}.` : 'Cannot place it there.');
+      return;
+    }
     const [x, z] = this._at, kind = this._kind;
     const store = useGameStore.getState();
     // the county permit fee would take the cash under the living reserve (or negative): ask first, never block (sim/spendGuard)
@@ -159,7 +166,7 @@ export class PlacementTool {
     this._ndc.set(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1);
     this._ray.setFromCamera(this._ndc, this._camera);
     const hit = this._ray.intersectObject(this._world.terrain.mesh, false)[0];
-    if (!hit) return;
+    if (!hit) { this._at = null; this._ok = false; if (this._ghost) this._ghost.visible = false; useGameStore.getState().setToolProblem(null); return; }
     this._at = [hit.point.x, hit.point.z];
     this._yardFlip = false;
     this._update();

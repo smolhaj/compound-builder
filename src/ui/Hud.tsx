@@ -84,13 +84,15 @@ import { BuildMenu } from './hud/BuildMenu';
 import { ProjectsTab } from './hud/ProjectsTab';
 import { DefenseTab } from './hud/DefenseTab';
 import { defenseTabAlert } from './hud/defenseAlert';
+import { CursorHint, ToastLine, WelcomeCard } from './hud/Feedback';
 
 const QUALITIES: Quality[] = ['high', 'medium', 'low'];
 const SIGHTS: Array<['off' | 'road' | 'ridge' | 'night' | 'viewshed', string, string]> = [
   ['off', 'Off', 'No sightline overlay'], ['road', 'Road', 'How exposed each spot is to people on the county road'], ['ridge', 'Ridge', 'Seen from the high ground to the west'],
   ['night', 'Night', 'Where your lit windows give you away after dark'], ['viewshed', 'View from…', 'Click a spot to see what can be seen from there (Shift-click: from a 10 m tower)']];
 const CAMERAS: Array<[CameraMode, string]> = [['diorama', 'Diorama'], ['walk', 'Walk'], ['fly', 'Fly'], ['cinematic', 'Tour']];
-const VIEWS: Array<[BuildingView, string, string]> = [['full', 'Walls', 'Whole buildings'], ['cutaway', 'Cutaway', 'Walls cut at waist height, roof and loft off (V)'], ['xray', 'X-ray', 'See-through walls and roof (V)']];
+const CAMERA_TIP: Record<CameraMode, string> = { diorama: 'Orbit view from above: drag to turn, wheel to zoom, right-drag to pan', walk: 'Walk the place at eye level (WASD)', fly: 'Fly over it (WASD, Space / C for up and down)', cinematic: 'A slow tour of the buildings' };
+const VIEWS: Array<[BuildingView, string, string]> = [['full', 'Walls', 'Show buildings whole, roofs on (V cycles the three views)'], ['cutaway', 'Cutaway', 'Cut the walls at waist height and lift the roofs to see the rooms inside (V)'], ['xray', 'X-ray', 'See-through walls and roof: rooms, pipes and wiring (V)']];
 const SPEEDS: Array<[Speed, string]> = [[0, '❚❚'], [1, '▶'], [2, '▶▶'], [3, '▶▶▶'], [4, '⏩']];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const MONTH_START = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
@@ -137,7 +139,8 @@ export function Hud() {
   const barRef = useRef<HTMLDivElement>(null), brRef = useRef<HTMLDivElement>(null), blRef = useRef<HTMLDivElement>(null);
   const [side, setSide] = useState<'left' | 'right'>('left');
   const [boardOpen, setBoardOpen] = useState(false);
-  const bar = useBox(barRef), br = useBox(brRef), bl = useBox(blRef);
+  const bar = useBox(barRef), br = useBox(brRef), blBox = useBox(blRef, w.viewOpen);
+  const bl = w.viewOpen ? blBox : { w: 0, h: 0 };
   const lay = hudLayout(bar.vw, bar.w, bar.h, br, bl);
   const [lastSel, setLastSel] = useState<string | null>(null);
   if (g.selected !== lastSel) { setLastSel(g.selected); if (g.selected && !g.tool) setLeftTab('projects'); }
@@ -168,6 +171,9 @@ export function Hud() {
 
   return (
     <>
+      <ToastLine />
+      <CursorHint />
+      <WelcomeCard />
       {/* Top bar: date, time, money, speed */}
       <div ref={barRef} style={{ ...panel, position: 'fixed', top: 10, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '4px 12px', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', fontSize: 13.5, width: 'max-content', maxWidth: 'calc(100vw - 20px)', boxSizing: 'border-box', zIndex: 3 }}>
         <span>{dateLabel(cal.doy)}, {cal.year}</span>
@@ -554,11 +560,12 @@ export function Hud() {
       {/* Bottom right: cameras, building view */}
       <div ref={brRef} style={{ ...panel, position: 'fixed', right: EDGE, bottom: 34, padding: 4, display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end', maxWidth: 'calc(100vw - 20px)', boxSizing: 'border-box' }}>
         <button title="The clipboard in the safe room: power, water, food, defense, morale, threats and what waits on you, one page" style={btn(boardOpen)} onClick={() => setBoardOpen(!boardOpen)}>Board</button>
+        <button data-testid="view-toggle" title="View options: season and weather look, graphics quality, frame rate, sightline and terrain overlays, blueprint, property line, photo mode" style={btn(w.viewOpen)} onClick={() => w.setViewOpen(!w.viewOpen)}>View{w.viewOpen ? ' ▾' : ' ▸'}</button>
         {VIEWS.map(([v, label, tip]) => <button key={v} title={tip} style={btn(w.buildingView === v)} onClick={() => w.setBuildingView(v)}>{label}</button>)}
         <button title="Underground: see-through ground, bunker rooms cut open (U). It switches itself off when you put the bunker tool down." style={btn(w.underground)} onClick={() => w.setUnderground(!w.underground)}>Underground</button>
         <button title="Hide or show the side panels to see the whole map (H)" style={btn(w.hudHidden)} onClick={() => w.setHudHidden(!w.hudHidden)}>{w.hudHidden ? 'Show panels' : 'Hide panels'} (H)</button>
         <span style={{ width: 1, height: 18, background: '#555', margin: '0 3px' }} />
-        {CAMERAS.map(([m, label]) => <button key={m} style={btn(w.cameraMode === m)} onClick={() => w.setCameraMode(m)}>{label}</button>)}
+        {CAMERAS.map(([m, label]) => <button key={m} title={CAMERA_TIP[m]} style={btn(w.cameraMode === m)} onClick={() => w.setCameraMode(m)}>{label}</button>)}
       </div>
       {w.cameraMode !== 'diorama' && (
         <div style={{ ...panel, position: 'fixed', top: 54, left: '50%', transform: 'translateX(-50%)', fontSize: 12 }}>
@@ -574,8 +581,8 @@ export function Hud() {
         </div>
       )}
 
-      {/* Bottom left: view (season / weather / quality / photo mode) */}
-      <div ref={blRef} style={{ ...panel, position: 'fixed', left: EDGE, bottom: lay.viewBottom, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', maxWidth: 'min(560px, calc(100vw - 20px))', boxSizing: 'border-box' }}>
+      {/* Bottom left: view (season / weather / quality / photo mode); opened from the View button below */}
+      {w.viewOpen && <div ref={blRef} style={{ ...panel, position: 'fixed', left: EDGE, bottom: lay.viewBottom, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', maxWidth: 'min(560px, calc(100vw - 20px))', boxSizing: 'border-box' }}>
         <select value={w.seasonMode} onChange={e => w.setSeasonMode(e.target.value as SeasonMode)} title="Season look">
           {SEASON_MODES.map(x => <option key={x}>{x}</option>)}
         </select>
@@ -619,7 +626,7 @@ export function Hud() {
           <span>{dateLabel(w.dayOfYear)}</span>
           <input type="range" min={1} max={365} step={1} value={w.dayOfYear} onChange={e => w.setDayOfYear(+e.target.value)} />
         </>}
-      </div>
+      </div>}
     </>
   );
 }

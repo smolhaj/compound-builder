@@ -111,6 +111,12 @@ export interface GameStore {
   tool: string | null;
   /** Placement feedback for the HUD (null = valid or no tool). */
   toolProblem: string | null;
+  /** A one-line notice that fades by itself (a refused click: why). Not saved. */
+  toast: { text: string; id: number } | null;
+  showToast: (text: string) => void;
+  /** The new-game welcome card (the clock starts paused): shown until dismissed or the clock runs. Not saved. */
+  welcome: boolean;
+  setWelcome: (on: boolean) => void;
   /** A short confirmation after a building is staked and the tool put away (clears itself). */
   stakedNote: string | null;
   /** A staking the player is being asked to confirm because its county permit fee would dip under the living reserve (sim/spendGuard.stakeSpendAsk). */
@@ -306,6 +312,14 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
   game: newGame(1),
   tool: null,
   toolProblem: null,
+  toast: null,
+  showToast: (text) => {
+    const id = (get().toast?.id ?? 0) + 1;
+    set({ toast: { text, id } });
+    setTimeout(() => { if (useGameStore.getState().toast?.id === id) useGameStore.setState({ toast: null }); }, 4200);
+  },
+  welcome: false,
+  setWelcome: (welcome) => set({ welcome }),
   stakedNote: null,
   spendAsk: null,
   askSpend: (spendAsk) => set({ spendAsk }),
@@ -371,7 +385,7 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     if (dayIndex(next.clock.t) !== dayIndex(g.clock.t)) void saveGame(AUTOSAVE, next);
   },
   advance: (days) => set(s => { const game = step(s.game, days); return { game, cutscene: s.cutscene ?? promptFor(game) }; }),
-  setSpeed: (speed) => locked() ? undefined : set(s => ({ resumeTo: null, game: { ...s.game, clock: { ...s.game.clock, speed } } })),
+  setSpeed: (speed) => locked() ? undefined : set(s => ({ resumeTo: null, ...(speed > 0 ? { welcome: false } : {}), game: { ...s.game, clock: { ...s.game.clock, speed } } })),
   order: (lines) => {
     if (locked()) return false;
     const g = structuredClone(get().game);
@@ -381,9 +395,10 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
   },
   plan: (kind, x, z, rot) => {
     if (locked()) return;
-    if (planProblem(get().game, kind)) return;
+    const why0 = planProblem(get().game, kind);
+    if (why0) { get().showToast(why0[0].toUpperCase() + why0.slice(1) + '.'); return; }
     const aff = permitAffordable(get().game, kind);
-    if (!aff.ok) { set({ spendAsk: null, toolProblem: aff.why }); return; }   // the permit fee would take cash below zero
+    if (!aff.ok) { set({ spendAsk: null, toolProblem: aff.why }); get().showToast(aff.why ?? 'That is not affordable now.'); return; }   // the permit fee would take cash below zero
     if (isRig(kind) && !(get().game.joiners?.waiting.length)) return;   // a rig is parked only for a joiner who is waiting for a pad
     const g = structuredClone(get().game);
     const st = planStructure(g, kind, x, z, rot);
@@ -441,7 +456,7 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     return n;
   },
   resumeTo: null,
-  load: (game) => set({ game, selected: null, tool: null, cutscene: promptFor(game), resumeTo: null, dayCard: null }),
+  load: (game) => set({ game, welcome: false, selected: null, tool: null, cutscene: promptFor(game), resumeTo: null, dayCard: null }),
   planRun: (kind, pts, gates, offLen = 0) => {
     if (locked()) return;
     if (routeProblem(get().game, kind, pts)) return;   // a tunnel-bridge needs real low ground, a slope tunnel a hillside (the tool says why)

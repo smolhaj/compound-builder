@@ -21,6 +21,8 @@ export class DioramaCamera {
   solidAt: ((x: number, y: number, z: number) => boolean) | null = null;
   /** Input is ignored while another controller (the tour) drives the camera. */
   enabled = true;
+  /** A glide to a new view (set by `glideTo`, advanced by `stepGlide`; the player's own drag or wheel cancels it). */
+  private _glide: { x: number; z: number; radius: number; pitch: number; t: number; dur: number; from: { x: number; z: number; radius: number; pitch: number } } | null = null;
   private _drag: { x: number; y: number; pan: boolean } | null = null;
   private readonly _off: Array<() => void> = [];
   /** Arrow keys held (pan the view; Shift = faster). */
@@ -34,6 +36,7 @@ export class DioramaCamera {
     on('contextmenu', e => e.preventDefault());
     on('pointerdown', e => {
       if (!this.enabled) return;
+      this._glide = null;
       this._drag = { x: e.clientX, y: e.clientY, pan: e.button === 2 || e.shiftKey };
       el.setPointerCapture(e.pointerId);
     });
@@ -67,9 +70,30 @@ export class DioramaCamera {
     this._off.push(() => { window.removeEventListener('keydown', onDown); window.removeEventListener('keyup', onUp); window.removeEventListener('blur', onBlur); });
     on('wheel', e => {
       if (!this.enabled) return;
+      this._glide = null;
       e.preventDefault();
       this.radius = Math.min(this.maxRadius, Math.max(this.minRadius, this.radius * Math.exp(e.deltaY * 0.0012)));
     }, { passive: false });
+  }
+
+  /** Ease to a view over `dur` seconds (0: at once). */
+  glideTo(x: number, z: number, radius: number, pitch: number, dur = 0.9): void {
+    if (dur <= 0) { this.target.set(x, 0, z); this.radius = radius; this.pitch = pitch; this._glide = null; return; }
+    this._glide = { x, z, radius, pitch, t: 0, dur, from: { x: this.target.x, z: this.target.z, radius: this.radius, pitch: this.pitch } };
+  }
+
+  get gliding(): boolean { return this._glide !== null; }
+
+  stepGlide(dt: number): void {
+    const g = this._glide;
+    if (!g) return;
+    g.t += Math.min(dt, 0.1);
+    const k = Math.min(1, g.t / g.dur), e = k * k * (3 - 2 * k);
+    this.target.x = g.from.x + (g.x - g.from.x) * e;
+    this.target.z = g.from.z + (g.z - g.from.z) * e;
+    this.radius = g.from.radius + (g.radius - g.from.radius) * e;
+    this.pitch = g.from.pitch + (g.pitch - g.from.pitch) * e;
+    if (k >= 1) this._glide = null;
   }
 
   /** Pan with the arrow keys, relative to where the camera looks (call once a frame). Shift is faster. */

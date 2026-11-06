@@ -24,6 +24,8 @@ export interface Hookup {
   todo: string | null;
   /** The build tool that fixes it, when it is a line to draw. */
   tool: string | null;
+  /** A kit piece that fixes it by being staked (nothing on the place makes power yet). */
+  stake?: string;
 }
 
 export const POWER_SRC = (k: string) => !!(UTILITY[k]?.solarKw || UTILITY[k]?.genKw || UTILITY[k]?.batteryKwh || UTILITY[k]?.renew);
@@ -78,7 +80,14 @@ export function hookupsFor(s: GameState, st: Structure, p: Plant = plantCached(s
   }
   if (def?.water?.needsPower) {
     const lit = s.utilities.lit.includes(st.id);
-    if (!lit && !s.utilities.broken.includes(st.id) && !s.utilities.fried.includes(st.id) && !s.utilities.off.includes(st.id)) out.push({ kind: 'pump_power', state: 'missing', label: 'Pump power', text: 'Pump has no power', todo: 'The pump needs a power cable to the solar array, battery or generator (or the grid).', tool: 'fence:power_cable' });
+    if (!lit && !s.utilities.broken.includes(st.id) && !s.utilities.fried.includes(st.id) && !s.utilities.off.includes(st.id)) {
+      // nothing on the place makes power (and the grid is out or was never in): a cable has nowhere to go, so the fix is a power source (it joins the pump by itself within about 70 m)
+      const source = s.structures.some(x => POWER_SRC(x.kind) && !x.unplaced), live = s.structures.some(x => POWER_SRC(x.kind) && isFinished(x)), grid = s.utilities.grid && s.disaster.tracks.grid > 0.5;
+      if (!live && !grid) {
+        if (source) out.push({ kind: 'pump_power', state: 'underway', label: 'Pump power', text: 'waiting on the power source', todo: null, tool: null });
+        else out.push({ kind: 'pump_power', state: 'missing', label: 'Pump power', text: 'Pump has no power', todo: s.utilities.grid ? 'The grid is down and nothing else makes power here: stake a solar array with a battery (it joins the pump by itself within about 70 m).' : 'Nothing here makes power yet: stake a solar array (it joins the pump by itself within about 70 m).', tool: null, stake: 'solar_array' });
+      } else out.push({ kind: 'pump_power', state: 'missing', label: 'Pump power', text: 'Pump has no power', todo: 'The pump needs a power cable to the solar array, battery or generator (or the grid).', tool: 'fence:power_cable' });
+    }
   }
   if ((def?.water?.pressure || def?.store || def?.gravity) && !others(p.water, () => true) && s.structures.some(x => isFinished(x) && x.id !== st.id && isHome(x.kind))) {
     out.push({ kind: 'water_link', state: 'missing', label: 'On the water line', text: 'No pipe from it', todo: 'It stands too far from the house: build it within about 70 m, or draw a pipe (Build: Pipes & cables).', tool: 'fence:water_pipe' });
@@ -86,14 +95,14 @@ export function hookupsFor(s: GameState, st: Structure, p: Plant = plantCached(s
   return out;
 }
 
-export interface NeedsWork { id: string; name: string; kind: HookKind; text: string; todo: string; tool: string | null }
+export interface NeedsWork { id: string; name: string; kind: HookKind; text: string; todo: string; tool: string | null; stake?: string }
 
 /** Finished buildings that are not doing their job yet, most basic first (homes, then pumps and sources). */
 export function needsHookup(s: GameState): NeedsWork[] {
   const p = plantCached(s);
   const out: NeedsWork[] = [];
   for (const st of s.structures) {
-    for (const h of hookupsFor(s, st, p)) if (h.state !== 'done' && h.state !== 'underway' && h.todo) out.push({ id: st.id, name: st.kind, kind: h.kind, text: h.text, todo: h.todo, tool: h.tool });
+    for (const h of hookupsFor(s, st, p)) if (h.state !== 'done' && h.state !== 'underway' && h.todo) out.push({ id: st.id, name: st.kind, kind: h.kind, text: h.text, todo: h.todo, tool: h.tool, ...(h.stake ? { stake: h.stake } : {}) });
   }
   const rank: Record<HookKind, number> = { wire: 0, plumb: 1, pump_power: 2, power_link: 3, water_link: 4 };
   return out.sort((a, b) => rank[a.kind] - rank[b.kind]);
@@ -146,7 +155,8 @@ export function backupPower(s: GameState): { ok: boolean; detail: string } {
 export const POWER_BUILDINGS = ['solar_array', 'solar_farm', 'garage_solar', 'lodge_solar', 'generator_shed', 'battery_shed', 'battery_bank', 'micro_hydro', 'wind_turbine'];
 /** "Power on the place" (the Get operational Power tick): a power source stands, or the grid is in. */
 export function powerOnPlace(s: GameState): boolean {
-  return s.structures.some(st => POWER_BUILDINGS.includes(st.kind) && isFinished(st)) || !!s.site.improvements?.power;
+  // (a grid the disaster has taken down is not power on the place)
+  return s.structures.some(st => POWER_BUILDINGS.includes(st.kind) && isFinished(st)) || (!!s.site.improvements?.power && s.disaster.tracks.grid > 0.5);
 }
 
 /**

@@ -18,6 +18,7 @@ import { WorldScene } from '../engine/world/WorldScene';
 import { moonPhase, skyDarkness } from '../engine/world/sky/skyState';
 import { BUILDING_VIEWS, useWorldStore } from '../store/worldStore';
 import { DioramaCamera } from './DioramaCamera';
+import { startFrame } from './cameraFraming';
 import { HomesteadWorld } from './HomesteadWorld';
 import { seasonState, type VisualSeason } from '../engine/world/season/seasonState';
 import { WeatherRenderer } from '../engine/world/weather/WeatherRenderer';
@@ -131,6 +132,10 @@ export function GameCanvas() {
     cam.solidAt = world.crownAt;
     const occluders = new CameraOccluders(ws.scene, () => []);   // the diorama camera keeps its own ground clearance
     cam.target.set(world.camp.x, 0, world.camp.z);
+    // the first view: over the house (or the camp), not the whole parcel (from there the house is a speck and staked pads cannot be seen)
+    { const f = startFrame(useGameStore.getState().game.structures, world.camp); cam.glideTo(f.x, f.z, f.radius, f.pitch, 0); }
+    // "Place all" / "Show me": glide to what was just staked or picked (at once under ?lowrender, where frames are drawn on request)
+    const unCamReq = useWorldStore.subscribe(w => w.cameraRequest, r => { if (r && cam.enabled) cam.glideTo(r.frame.x, r.frame.z, r.frame.radius, r.frame.pitch, lowRender.on ? 0 : 0.9); });
     const tour = new TourController({
       camera: ws.camera, dom: canvas, scene: ws.scene,
       getBlocked: () => world.tourBlocked,
@@ -492,6 +497,7 @@ export function GameCanvas() {
         ws.setShadowFocus(p.x, p.z, 6);
       } else {
         cam.step(dt, shiftDown);
+        cam.stepGlide(dt);
         cam.apply(ws.camera);
         occluders.keepOut(ws.camera, cam.target.x, cam.target.z, cam.target.y);
         // looking down, fit the shadows to the ground actually on screen (the far edge of the view
@@ -599,6 +605,7 @@ export function GameCanvas() {
       window.removeEventListener('keydown', onShift);
       window.removeEventListener('keyup', onShift);
       player.stop();
+      unCamReq();
       battle.dispose();
       tour.dispose();
       tool.dispose();
