@@ -28,6 +28,7 @@ import { glassSound } from './improvements';
 import { heatNeed } from './greenhouse';
 import { waterTempC } from './pond';
 import { logGate } from './nag';
+import { caloriesText, gramsText, poundsText } from './units';
 
 export const AQUA = {
   FRY: 100, FRY_G: 5, TABLE_G: 450, TANK_KG: 60,
@@ -75,7 +76,7 @@ export function stockProblem(s: GameState, id: string): string | null {
   if (s.stock.tilapia_fry < 1) return 'no fingerlings: buy a bag in the Shop (Food & farm)';
   if (!powered(s, st)) return 'the pump and the heater have no power: wire the bay first';
   if (a.tempC < AQUA.STOCK_MIN_C) return `the water is ${Math.round(a.tempC)} C: tilapia go in at ${AQUA.STOCK_MIN_C} C or over (let the heater bring it up)`;
-  if (biomassKg(a) + AQUA.FRY * AQUA.FRY_G / 1000 > AQUA.TANK_KG) return `the tanks hold ${AQUA.TANK_KG} kg of fish`;
+  if (biomassKg(a) + AQUA.FRY * AQUA.FRY_G / 1000 > AQUA.TANK_KG) return `the tanks hold ${poundsText(AQUA.TANK_KG)} of fish`;
   return null;
 }
 export function stockAqua(s: GameState, id: string): string | null {
@@ -85,7 +86,7 @@ export function stockAqua(s: GameState, id: string): string | null {
   s.stock.tilapia_fry--;
   a.fishG = (a.fishG * a.fish + AQUA.FRY_G * AQUA.FRY) / (a.fish + AQUA.FRY);
   a.fish += AQUA.FRY;
-  log(s, `Stocked ${AQUA.FRY} tilapia fingerlings. They reach ${AQUA.TABLE_G} g in about six months in 26 C water with feed.`);
+  log(s, `Stocked ${AQUA.FRY} tilapia fingerlings. They reach ${gramsText(AQUA.TABLE_G)} in about six months in 79 °F water with feed.`);
   return null;
 }
 
@@ -93,7 +94,7 @@ export function harvestProblem(s: GameState, id: string): string | null {
   if (!aquas(s).some(x => x.id === id)) return 'the bay is not finished';
   const a = aquaOf(s, id);
   if (a.fish < 1) return 'no fish in the tanks';
-  if (a.fishG < AQUA.TABLE_G) return `not table size yet: they average ${Math.round(a.fishG)} g and need ${AQUA.TABLE_G} g`;
+  if (a.fishG < AQUA.TABLE_G) return `not table size yet: they average ${gramsText(a.fishG)} and need ${gramsText(AQUA.TABLE_G)}`;
   return null;
 }
 export function harvestAqua(s: GameState, id: string): string | null {
@@ -104,7 +105,7 @@ export function harvestAqua(s: GameState, id: string): string | null {
   a.fish -= n; a.harvestAt = Math.floor(s.clock.t);
   if (a.fish === 0) a.fishG = 0;
   const put = putUpMeat(s, kcal);
-  log(s, `Took ${n} tilapia from the tanks: ${Math.round(kcal).toLocaleString('en-US')} kcal ${put.where === 'fresh' ? 'on the table (it will not keep without a freezer, a smoker or salt)' : MEAT_WHERE[put.where]}.`);
+  log(s, `Took ${n} tilapia from the tanks: ${caloriesText(kcal)} ${put.where === 'fresh' ? 'on the table (it will not keep without a freezer, a smoker or salt)' : MEAT_WHERE[put.where]}.`);
   return null;
 }
 
@@ -182,7 +183,7 @@ export function aquaReport(s: GameState, st: Structure): AquaReport {
   const a = aquaOf(s, st.id), on = powered(s, st), daily = biomassKg(a) * 1000 * AQUA.FEED_RATE / AQUA.FEED_BAG_G;
   const notes: string[] = [];
   if (!on) notes.push('No power: the pump, the air pump and the heater are off. Fish in warm water die within a day.');
-  if (a.fish > 0 && a.fishG < AQUA.TABLE_G) notes.push(`Tilapia average ${Math.round(a.fishG)} g; table size is ${AQUA.TABLE_G} g.`);
+  if (a.fish > 0 && a.fishG < AQUA.TABLE_G) notes.push(`Tilapia average ${gramsText(a.fishG)}; table size is ${gramsText(AQUA.TABLE_G)}.`);
   if (daily > 0 && (s.stock.fish_feed ?? 0) < daily * 5) notes.push('Feed is nearly out.');
   return { fish: a.fish, fishG: a.fishG, table: a.fishG >= AQUA.TABLE_G, kg: biomassKg(a), tempC: a.tempC, fed: a.fed, powered: on, feedDays: daily > 0 ? (s.stock.fish_feed ?? 0) / daily : Infinity, plantsKcal: aquaPlants(s), notes };
 }

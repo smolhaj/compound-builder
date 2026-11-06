@@ -15,6 +15,7 @@ import type { RegionId } from './regions';
 import { siteLot } from './lotListing';
 import { campOf, groundOf } from './terrainState';
 import { logGate } from './nag';
+import { lengthText } from './units';
 
 /** Mountain regions: the valleys hold fog banks. */
 export const MOUNTAIN_REGIONS: ReadonlySet<RegionId> = new Set<RegionId>(['pnw', 'mountain_west', 'appalachia']);
@@ -86,7 +87,7 @@ export function fogLog(s: GameState): string[] {
   const place = fogPlaceOf(s);
   if (day.valley >= 0.5 && logGate(s, 'fog-today', 3)) {
     const now = fogOn(s.seed, doy, 6.5, s.site.region, place, { storm: stormToday(s) });
-    out.push(now.inFog ? `Fog this morning: the camp is in it, sight ${Math.round(now.sightM / 10) * 10} m. The watch cannot see the drive until it lifts.` : `Valley fog this morning, ${Math.max(0, Math.round(now.belowCampM))} m below the camp: a white sea down the hollow, clear air up here.`);
+    out.push(now.inFog ? `Fog this morning: the camp is in it, sight ${lengthText(Math.round(now.sightM / 10) * 10)}. The watch cannot see the drive until it lifts.` : `Valley fog this morning, ${lengthText(Math.max(0, Math.round(now.belowCampM)))} below the camp: a white sea down the hollow, clear air up here.`);
   }
   const f = fogForecast(s.seed, doy, s.site.region, place);
   if (f && logGate(s, 'fog-forecast', 4)) out.push(f);

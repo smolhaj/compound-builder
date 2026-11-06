@@ -21,6 +21,7 @@ import { addFoodKcal, foodUnits, FOOD, pantryKcal, syncPantry } from './pantry';
 import { logGate } from './nag';
 import { regionFor } from './climate';
 import { cellarHouses, cellarKcalOf } from './housingStyles';
+import { tempText } from './units';
 
 export const CELLAR_KCAL = 2_500_000, BUNKER_ROOTS_KCAL = 1_000_000;
 /** Fresh food in the kitchen. */
@@ -74,7 +75,7 @@ export function cellarDay(s: GameState): string[] {
   s.stock.canned = Math.max(0, s.stock.canned - lost * FOOD.cellar_roots.kcal / 6000);
   if (e2.q < 1e-6) delete s.pantry.items.cellar_roots;
   const { doy } = calendarOf(s.clock);
-  if (t > 11 && doy > 100 && doy < 240 && e2.q * FOOD.cellar_roots.kcal > 40_000 && logGate(s, 'cellar-warm', 40)) out.push(`The cellar is warming up (${Math.round(t)} °C): the potatoes are sprouting and going soft. Eat or preserve what is left.`);
+  if (t > 11 && doy > 100 && doy < 240 && e2.q * FOOD.cellar_roots.kcal > 40_000 && logGate(s, 'cellar-warm', 40)) out.push(`The cellar is warming up (${tempText(t)}): the potatoes are sprouting and going soft. Eat or preserve what is left.`);
   return out;
 }
 

@@ -85,14 +85,15 @@ import { BuildMenu } from './hud/BuildMenu';
 import { ProjectsTab } from './hud/ProjectsTab';
 import { DefenseTab } from './hud/DefenseTab';
 import { defenseTabAlert } from './hud/defenseAlert';
-import { CursorHint, ToastLine, WelcomeCard } from './hud/Feedback';
+import { CursorHint, LineToolBar, ToastLine, WelcomeCard } from './hud/Feedback';
 import { useFeelStore, saveRevealed, worldId } from '../store/feelStore';
 import { visibleTabs, type RightTab } from '../sim/tabReveal';
+import { caloriesText, feetText, gallonsText, kmText, lengthText } from '../sim/units';
 
 const QUALITIES: Quality[] = ['high', 'medium', 'low'];
 const SIGHTS: Array<['off' | 'road' | 'ridge' | 'night' | 'viewshed', string, string]> = [
   ['off', 'Off', 'No sightline overlay'], ['road', 'Road', 'How exposed each spot is to people on the county road'], ['ridge', 'Ridge', 'Seen from the high ground to the west'],
-  ['night', 'Night', 'Where your lit windows give you away after dark'], ['viewshed', 'View from…', 'Click a spot to see what can be seen from there (Shift-click: from a 10 m tower)']];
+  ['night', 'Night', 'Where your lit windows give you away after dark'], ['viewshed', 'View from…', 'Click a spot to see what can be seen from there (Shift-click: from a 33 ft tower)']];
 const CAMERAS: Array<[CameraMode, string]> = [['diorama', 'Diorama'], ['walk', 'Walk'], ['fly', 'Fly'], ['cinematic', 'Tour']];
 const CAMERA_TIP: Record<CameraMode, string> = { diorama: 'Orbit view from above: drag to turn, wheel to zoom, right-drag to pan', walk: 'Walk the place at eye level (WASD)', fly: 'Fly over it (WASD, Space / C for up and down)', cinematic: 'A slow tour of the buildings' };
 const VIEWS: Array<[BuildingView, string, string]> = [['full', 'Walls', 'Show buildings whole, roofs on (V cycles the three views)'], ['cutaway', 'Cutaway', 'Cut the walls at waist height and lift the roofs to see the rooms inside (V)'], ['xray', 'X-ray', 'See-through walls and roof: rooms, pipes and wiring (V)']];
@@ -191,6 +192,7 @@ export function Hud() {
     <>
       <ToastLine />
       <CursorHint />
+      <LineToolBar />
       <WelcomeCard />
       {/* Top bar: date, time, money, speed */}
       <div ref={barRef} style={{ ...panel, position: 'fixed', top: 10, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '4px 12px', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', fontSize: 13.5, width: 'max-content', maxWidth: 'calc(100vw - 20px)', boxSizing: 'border-box', zIndex: 3 }}>
@@ -281,7 +283,7 @@ export function Hud() {
             {trialCamps(game).map(c => <Section key={c.id} title={`Camp outside the wall: ${c.title}`}>
               <Row label="On trial" value={`day ${Math.max(0, dayIndex(game.clock.t) - c.from)} of ${c.until - c.from}`} />
               <Row label="People" value={c.people.map(p => `${p.first}${p.kid ? ` (${p.age})` : ''}`).join(', ')} />
-              <Row label="Their ration" value={`${campNeed(c).toLocaleString('en-US')} kcal/day from your supplies${c.hungry ? ` · short ${pluralize(c.hungry, 'day')}` : ''}`} />
+              <Row label="Their ration" value={`${caloriesText(campNeed(c))} a day from your supplies${c.hungry ? ` · short ${pluralize(c.hungry, 'day')}` : ''}`} />
               <Row label="Work put in" value={`${Math.round(c.worked)} h`} />
               {c.learned.map((l, k) => <Note key={k} tone="warn">{l}</Note>)}
               {!c.learned.length && <div style={{ fontSize: 11, color: DIM }}>Not family yet. You'll know them better by the end of the month.</div>}
@@ -354,7 +356,7 @@ export function Hud() {
                 const why = orderProblem(game, lines);
                 return <>
                   <Row label="Food on hand" value={d === Infinity ? '—' : d >= 365 ? `${pluralize((d / 365).toFixed(1), 'year')}` : `${Math.floor(d)} ${Math.floor(d) === 1 ? 'day' : 'days'}`} tone={short ? 'warn' : undefined} />
-                  {f.producedKcal > 0 && <Row label="Grown yesterday" value={`${Math.round(f.producedKcal).toLocaleString('en-US')} kcal`} />}
+                  {f.producedKcal > 0 && <Row label="Grown yesterday" value={`${caloriesText(f.producedKcal)}`} />}
                   {!f.fromStores && <Row label="Ate / needed" value={`${Math.round(f.ateKcal).toLocaleString('en-US')} / ${Math.round(f.needKcal).toLocaleString('en-US')}`} tone={f.ateKcal < f.needKcal * 0.95 ? 'bad' : undefined} />}
                   {f.fromStores && <Hint more="Stock canned food and bulk staples for when the stores close.">Groceries come from town for now.</Hint>}
                   {short && <>
@@ -414,17 +416,17 @@ export function Hud() {
                   {pw.headline && <Note tone="warn">{pw.headline}</Note>}
                 </>; })()}
                 <Row label="Generator fuel" value={litersText(game.stock.fuel * FUEL_UNIT_L)} />
-                {r.genKwh > 0.1 && <Note>The generator ran {Math.round(r.genKwh / 7 * 10) / 10} h: it carries about 1 km on a still night.</Note>}
+                {r.genKwh > 0.1 && <Note>The generator ran {Math.round(r.genKwh / 7 * 10) / 10} h: it carries about half a mile on a still night.</Note>}
                 {r.shed.length > 0 && <Note tone="warn">Went without: {r.shed.map(id => KIT[game.structures.find(x => x.id === id)?.kind ?? '']?.name ?? '?').join(', ')}</Note>}
                 {r.shortKwh > 0.5 && <Note tone="warn">Power ran short.</Note>}
               </Section>
               <Section title="Water (yesterday)">
-                <Row label="In / used" value={`${Math.round(r.waterL)} / ${Math.round(r.useL)} L`} />
-                <Row label="Stored" value={`${Math.round(r.storedL)} of ${storageCapacity(game).toLocaleString('en-US')} L`} />
-                {irrigationStore(game).cap > 0 && <Row label="Pond (garden, fire)" value={`${Math.round(irrigationStore(game).have).toLocaleString('en-US')} of ${irrigationStore(game).cap.toLocaleString('en-US')} L`} title="Pond water waters the garden and fills the fire line; it is not drinking water. A reservoir counts as drinking water once the filtration shed or a filter is on the place." />}
-                {game.stock.water_jugs >= 1 && <Row label="Drinking water stored" value={`${Math.floor(game.stock.water_jugs)} jugs (${Math.round(game.stock.water_jugs * JUG_L)} L)`} />}
-                {storageCapacity(game) - r.storedL > 1000 && game.disaster.tracks.deliveries >= 0.5 && game.disaster.tracks.banks >= 0.5 && <button style={{ ...btn(), width: '100%', marginTop: 3 }} title="A tanker load from town: 15,000 L" onClick={() => g.money(d => orderTanker(d, storageCapacity(d)))}>Order a tanker load ($450)</button>}
-                <Row label="Well depth here" value={`${game.site.gwDepth} m`} />
+                <Row label="In / used" value={`${gallonsText(r.waterL)} / ${gallonsText(r.useL)}`} />
+                <Row label="Stored" value={`${gallonsText(r.storedL)} of ${gallonsText(storageCapacity(game))}`} />
+                {irrigationStore(game).cap > 0 && <Row label="Pond (garden, fire)" value={`${gallonsText(irrigationStore(game).have)} of ${gallonsText(irrigationStore(game).cap)}`} title="Pond water waters the garden and fills the fire line; it is not drinking water. A reservoir counts as drinking water once the filtration shed or a filter is on the place." />}
+                {game.stock.water_jugs >= 1 && <Row label="Drinking water stored" value={`${Math.floor(game.stock.water_jugs)} jugs (${gallonsText(game.stock.water_jugs * JUG_L)})`} />}
+                {storageCapacity(game) - r.storedL > 1000 && game.disaster.tracks.deliveries >= 0.5 && game.disaster.tracks.banks >= 0.5 && <button style={{ ...btn(), width: '100%', marginTop: 3 }} title="A tanker load from town: 3,960 gal" onClick={() => g.money(d => orderTanker(d, storageCapacity(d)))}>Order a tanker load ($450)</button>}
+                <Row label="Well depth here" value={`${feetText(game.site.gwDepth)}`} />
                 {game.utilities.hauling && <Note tone="warn">{game.utilities.haulFar ? 'Hauling water a quarter mile from the creek on the neighbor\'s land: a well or cistern would end it.' : 'Hauling water from the creek by the bucket: a well or cistern would end it.'}</Note>}
                 {r.shortL > 0 && <Note tone="bad">Water ran short.</Note>}
                 {flowLine(game) && <Note>{flowLine(game)}</Note>}
@@ -443,7 +445,7 @@ export function Hud() {
               {game.site.lot && (() => {
                 const a = altitudeClimate(game.site), wr = winterRoadLine(game);
                 return <>
-                  <Row label="Ground" value={`${LOT_NAME[game.site.lot.kind]}, ${game.site.lot.elevM.toLocaleString('en-US')} m`} />
+                  <Row label="Ground" value={`${LOT_NAME[game.site.lot.kind]}, ${feetText(game.site.lot.elevM)}`} />
                   {a && <Row label="Frost-free" value={`${pluralize(a.season, 'day')}${a.season !== a.seasonRegion ? ` (the region's usual: ${a.seasonRegion})` : ''}`} />}
                   {a && a.notes.length > 0 && <Hint more={a.notes.map(t => <div key={t} style={{ marginBottom: 2 }}>{t}</div>)}>{a.notes[0].length > 70 ? `${a.notes[0].slice(0, 68).replace(/[ ,;:]+\S*$/, '')}…` : a.notes[0]}{a.notes.length > 1 ? ` (+${a.notes.length - 1} more notes)` : ''}</Hint>}
                   {wr && <Clamp text={wr}><span style={{ color: roadClosedFor(game) > 0 ? TONE.warn : undefined }}>{roadClosedFor(game) > 0 ? `Road closed by snow for ${roadClosedFor(game)} more day${roadClosedFor(game) === 1 ? '' : 's'}. ` : ''}{wr}</span></Clamp>}
@@ -555,7 +557,7 @@ export function Hud() {
                   </div>
                 </div>
               ))}
-              <Hint more="Fewer adults to watch them, more likely they slip away.">Each eats about 2,200 kcal a day.</Hint>
+              <Hint more="Fewer adults to watch them, more likely they slip away.">Each eats about 2,200 Calories a day.</Hint>
             </Section>}
             {canRigMines(game) && <Section title="Mines">
               <Row label="Rigged on the approaches" value={Math.floor(game.stock.mines ?? 0)} title="They go off as raiders cross the band outside the line" />
@@ -576,7 +578,7 @@ export function Hud() {
             <MarketSection />
             {game.clock.t >= game.disaster.hitAt && !moneyWorks(game) && (() => {
               const p = barterPrices(game);
-              const rows: Array<[string, Good]> = [['Canned food (case)', 'canned'], ['Staples (25 kg)', 'staples'], ['Fuel (20 L)', 'fuel'], ['Meds (kit)', 'meds'], ['Firewood (face cord)', 'firewood'], ['Seed (season)', 'seed'], ['Hygiene (month)', 'hygiene'], ['Silver coin', 'metal:silver_coin'], ['A day\'s labor', 'labor']];
+              const rows: Array<[string, Good]> = [['Canned food (case)', 'canned'], ['Staples (55 lb)', 'staples'], ['Fuel (5.3 gal)', 'fuel'], ['Meds (kit)', 'meds'], ['Firewood (face cord)', 'firewood'], ['Seed (season)', 'seed'], ['Hygiene (month)', 'hygiene'], ['Silver coin', 'metal:silver_coin'], ['A day\'s labor', 'labor']];
               return <Section title="Trade with neighbors">
                 <Hint more="Goods change hands at what they're worth now (2025 dollars-equivalent). Friendly neighbors (allies) trade at par.">Money is gone: trade is goods for goods.</Hint>
                 {rows.map(([label, k]) => <Row key={k} label={label} value={`$${Math.round(p[k]).toLocaleString('en-US')}`} />)}
@@ -650,7 +652,7 @@ export function Hud() {
           <span title="How early a crew is seen">Seen coming {r.detectionPct}%</span>
           <span>{r.rings} ring{r.rings === 1 ? '' : 's'} · {r.gates} gate{r.gates === 1 ? '' : 's'} · {r.towers} tower{r.towers === 1 ? '' : 's'}</span>
           <span title="Ways in, from the lay of the land (Terrain: Lanes)">{r.lanes} lane{r.lanes === 1 ? '' : 's'}{r.laneHardness !== null ? ` · best going ×${r.laneHardness}` : ''}{r.chokeHeld ? ' · choke held' : ''}</span>
-          <span title="How far each kind of watch sees in today's fog; thermal sees through it">Sight: eye {r.sight.eye} m · camera {r.sight.camera} m · night vision {r.sight.nvg} m · thermal {r.sight.thermal} m</span>
+          <span title="How far each kind of watch sees in today's fog; thermal sees through it">Sight: eye {lengthText(r.sight.eye)} · camera {lengthText(r.sight.camera)} · night vision {lengthText(r.sight.nvg)} · thermal {lengthText(r.sight.thermal)}</span>
         </div>; })()}
         <button style={btn(w.showBoundary)} title="Draw the property line on the ground (it also shows while you draw a fence or wall)" onClick={() => w.setShowBoundary(!w.showBoundary)}>Boundary</button>
         <button style={btn(w.photo)} onClick={() => w.setPhoto(!w.photo)}>Photo</button>
@@ -702,8 +704,8 @@ function TakenSection() {
         {c.leads.slice(-3).reverse().map((l, i) => {
           const a = leadAge(game, l);
           return <div key={i} style={{ fontSize: 11.5, margin: '3px 0', opacity: i ? 0.6 : 1 }}>
-            {l.far ? <><span style={{ color: a <= FAR_COLD ? TONE.warn : DIM }}>Far rumor, {a === 0 ? 'today' : `${pluralize(a, 'day')} ago`}{a > FAR_COLD ? ' · cold' : ''}:</span> {l.where}, {l.km} km</>
-              : <><span style={{ color: a <= LEAD_WARM ? TONE.good : a <= LEAD_COLD ? TONE.warn : DIM }}>{SOURCE_NAME[l.source]}, {a === 0 ? 'today' : `${pluralize(a, 'day')} ago`}{a > LEAD_COLD ? ' · cold' : a > LEAD_WARM ? ' · cooling' : ''}:</span> {l.where}, {l.km} km · {l.count} of them{l.seenAlive ? ' · seen alive' : ''}</>}
+            {l.far ? <><span style={{ color: a <= FAR_COLD ? TONE.warn : DIM }}>Far rumor, {a === 0 ? 'today' : `${pluralize(a, 'day')} ago`}{a > FAR_COLD ? ' · cold' : ''}:</span> {l.where}, {kmText(l.km)}</>
+              : <><span style={{ color: a <= LEAD_WARM ? TONE.good : a <= LEAD_COLD ? TONE.warn : DIM }}>{SOURCE_NAME[l.source]}, {a === 0 ? 'today' : `${pluralize(a, 'day')} ago`}{a > LEAD_COLD ? ' · cold' : a > LEAD_WARM ? ' · cooling' : ''}:</span> {l.where}, {kmText(l.km)} · {l.count} of them{l.seenAlive ? ' · seen alive' : ''}</>}
           </div>;
         })}
         {!c.leads.length && <Note>No lead yet. A radio, the neighbors, a prisoner who talks: someone may hear something.</Note>}
@@ -732,7 +734,7 @@ function TakenSection() {
           return <div style={{ marginTop: 4 }}>
             {!warm && <Note>Traded on, far off. Now and then a rumor comes over the radio, months apart.</Note>}
             {warm && fl && fuel && <>
-              <div style={{ fontSize: 11.5, color: DIM, marginBottom: 2 }}>Drive to {fl.where} ({fl.km} km, {fuel.liters} L of fuel there and back, {pluralize(2 * Math.ceil(fl.km / 150), 'day')}{fuel.truck ? '' : ', no running truck'}). Who goes (up to 3):</div>
+              <div style={{ fontSize: 11.5, color: DIM, marginBottom: 2 }}>Drive to {fl.where} ({kmText(fl.km)}, {gallonsText(fuel.liters)} of fuel there and back, {pluralize(2 * Math.ceil(fl.km / 150), 'day')}{fuel.truck ? '' : ', no running truck'}). Who goes (up to 3):</div>
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                 {can.map(p => <button key={p.id} style={btn(pickd.includes(p.id))} onClick={() => setTeam({ ...team, [c.pid]: pickd.includes(p.id) ? pickd.filter(x => x !== p.id) : [...pickd, p.id] })}>{p.first}</button>)}
               </div>

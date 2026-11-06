@@ -43,7 +43,7 @@ describe('the Build list', () => {
   it('greys the hand-dug well where the water is too deep, and suggests a drilled one', () => {
     const g = fresh();
     g.site = { ...g.site, gwDepth: 65 };
-    expect(buildAdvice(g, 'well_hand').off).toMatch(/65 m down/);
+    expect(buildAdvice(g, 'well_hand').off).toMatch(/213 ft down/);
     expect(buildAdvice(g, 'well_drilled').off).toBeNull();
     expect(suggestions(g).map(x => x.kind)).toContain('well_drilled');
   });

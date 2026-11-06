@@ -26,6 +26,7 @@ import { plansNeed, plansNeedLines } from '../sim/guidance';
 import { shopIconArt } from './shopIcons';
 import { ammoLimit, buyAmmo, buyGun, CALIBER, CALIBERS, CLASS_USD, GUN, GUN_GROUP, GUNS, groupOf, gunPrices, issue, NFA_STAMP, practice, shopOpen, skillOf, stateBan, takeClass, type Caliber, type GunGroup, type GunModel } from '../sim/armory';
 import { pluralize } from '../sim/words';
+import { caloriesShort } from '../sim/units';
 
 type Tab = ShelfTab | 'tools' | 'guns' | 'metals' | 'money';
 const TABS: Array<[Tab, string]> = [...SHELF_TABS.filter(([id]) => id !== 'defense'), ['tools', 'Tools'], ['guns', 'Guns & ammo'], ['defense', 'Kit & security'], ['metals', 'Gold & silver'], ['money', 'Money']];
@@ -508,7 +509,7 @@ function FoodShelves({ game, k, cart, add }: { game: GameState; k: number; cart:
       <Icon id={`f:${it.prop}`} tint={it.color} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}><b>{it.name}</b><span style={{ color: C.gold }}>{usd((it.price ?? 0) * k)}</span></div>
-        <div style={{ fontSize: 11.5, color: C.dim, lineHeight: 1.3, margin: '2px 0 6px' }}>{it.unit} · {it.kcal > 0 ? `${Math.round(it.kcal / 1000)}k kcal${need > 0 ? `, ${pluralize((it.kcal / need).toFixed(it.kcal / need >= 10 ? 0 : 1), 'day')}` : ''}` : 'no calories'} · {keepsFor(lifeDays(game, id))}</div>
+        <div style={{ fontSize: 11.5, color: C.dim, lineHeight: 1.3, margin: '2px 0 6px' }}>{it.unit} · {it.kcal > 0 ? `${caloriesShort(it.kcal)}${need > 0 ? `, ${pluralize((it.kcal / need).toFixed(it.kcal / need >= 10 ? 0 : 1), 'day')}` : ''}` : 'no calories'} · {keepsFor(lifeDays(game, id))}</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <button style={btn()} onClick={() => add(id, -1)}>−</button>
           <span style={{ minWidth: 22, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{cart[id] ?? 0}</span>

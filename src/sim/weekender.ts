@@ -184,6 +184,7 @@ export const isSplit = (s: GameState): boolean => s.weekend?.mode === 'split';
 export const hourNow = (s: GameState): number => (s.clock.ticks * 0.25 + 6) % 24;
 
 import { equityNet, mortgagePayment, rentFor, SALE_FEES, townHouseFor, townTaxHalf, townUpkeep, type TownPlan } from './townHouse';
+import { gallonsText } from './units';
 export { townHouseFor, mortgagePayment, townUpkeep, townTaxHalf, SALE_FEES, rentFor, equityNet, RENT_DEPOSIT_MONTHS, type TownPlan } from './townHouse';
 
 /** Tightening the belt in town: the share of the upkeep that is left (thermostat down, the streaming and the yard service dropped, the second car parked). */
@@ -791,7 +792,7 @@ function strandedCard(s: GameState, id: string): Encounter {
     id, kind: 'stranded', day, title: 'Caught in town',
     dossier: [
       `${s.disaster.phase === 'impact' ? 'It has happened' : 'It has hit'} and the family is at the town house, ${w.driveMiles} miles from the place, with the kids at school and two jobs to leave. The compound stands empty${w.caretaker ? `, except for the ${CARETAKER[w.caretaker.kind].name.toLowerCase().replace(/^a /, '')}` : ''}.`,
-      running ? `${running} vehicle${running === 1 ? '' : 's'} ${running === 1 ? 'runs' : 'run'} with ${Math.round(cars.reduce((a, v) => a + (runs(v) ? v.fuel : 0), 0))} L between them. Traffic out of the city is ${jam > 0.65 ? 'at a standstill' : jam > 0.4 ? 'heavy, with checkpoints reported' : 'thick but moving'}.` : 'Nothing runs. The place is a long walk up the road.',
+      running ? `${running} vehicle${running === 1 ? '' : 's'} ${running === 1 ? 'runs' : 'run'} with ${gallonsText(cars.reduce((a, v) => a + (runs(v) ? v.fuel : 0), 0))} between them. Traffic out of the city is ${jam > 0.65 ? 'at a standstill' : jam > 0.4 ? 'heavy, with checkpoints reported' : 'thick but moving'}.` : 'Nothing runs. The place is a long walk up the road.',
       'Behind them the place keeps going without anybody: the animals, the garden, the doors. Every hour you lose it is open.',
     ],
     size: 0, armed: false, strength: 0,

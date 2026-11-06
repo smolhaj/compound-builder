@@ -37,6 +37,7 @@ import { bagOf, BAG_BASE, type BagGood } from './tradeGoods';
 import { findTool, TOOLS } from './tools';
 import { diffOf } from './difficulty';
 import { cargoKg, driveTrip, roadTrouble } from './vehicles';
+import { gallonsText } from './units';
 
 // ─────────────────────────────────────────────────────────────────────────
 // State
@@ -248,7 +249,7 @@ export function runProblem(s: GameState, placeId: string, team: string[], mode: 
     const f = tripFuel(s, p.km, Math.max(2, team.length));
     if (!f.truck) return 'no running truck that seats them';
     if (team.length > f.seats) return `the ${f.truck.kind === 'motorhome' ? 'motorhome' : 'truck'} takes ${f.seats}`;
-    if (f.have < f.liters) return `not enough fuel: ${f.liters} L there and back`;
+    if (f.have < f.liters) return `not enough fuel: ${gallonsText(f.liters)} there and back`;
   }
   return null;
 }

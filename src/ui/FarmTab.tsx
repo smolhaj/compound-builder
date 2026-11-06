@@ -23,9 +23,10 @@ import { Note, Row, Section, Tabs } from './hud/common';
 import { btn, DIM, TONE, type Tone } from './hud/style';
 import { regionFor } from '../sim/climate';
 import { pluralize } from '../sim/words';
+import { caloriesShort, caloriesText, tempText } from '../sim/units';
 
 type Sub = 'season' | 'fields' | 'kitchen' | 'animals' | 'plan';
-const k = (n: number) => `${Math.round(n / 1000).toLocaleString('en-US')}k kcal`;
+const k = (n: number) => caloriesShort(n);
 const days = (d: number) => (!isFinite(d) ? '—' : d >= 365 ? `${(d / 365).toFixed(1)} yr` : d >= 60 ? `${Math.round(d / 30)} mo` : `${Math.round(d)} d`);
 const GROUP_COLOR: Record<CalGroup, string> = { fields: '#c8b060', garden: '#78b060', preserve: '#d08a58', animals: '#b08ad0', wild: '#6aa8c8' };
 const GROUP_NAME: Record<CalGroup, string> = { fields: 'Fields', garden: 'Garden & orchard', preserve: 'Kitchen', animals: 'Animals', wild: 'Wild' };
@@ -173,7 +174,7 @@ function KitchenView({ game }: { game: GameState }) {
     <Section title="Storage">
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 86, color: DIM }}>Cellar bins</span><Bar v={cap ? cellarKcal(game) / cap : 0} color="#c8a060" title={`${k(cellarKcal(game))} of ${k(cap)}`} /><span style={{ fontSize: 11, width: 70, textAlign: 'right' }}>{cap ? `${Math.round(cellarKcal(game) / cap * 100)} %` : 'no cellar'}</span></div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 86, color: DIM }}>Pantry shelves</span><Bar v={room ? Math.min(1.2, load / room) / 1.2 : 0} color={overflow(game) > 0.05 ? TONE.warn : '#9cc070'} title={`${k(load)} of ${k(room)} of shelf room`} /><span style={{ fontSize: 11, width: 70, textAlign: 'right' }}>{room ? `${Math.round(load / room * 100)} %` : '—'}</span></div>
-      {cap > 0 && <Row label="Cellar temperature" value={`${Math.round(cellarTempC(game))} °C`} />}
+      {cap > 0 && <Row label="Cellar temperature" value={`${tempText(cellarTempC(game))}`} />}
       <Row label="Jars on the shelf" value={`${foodUnits(game, 'home_canned').toFixed(1)} cases`} />
     </Section>
     <Section title="Soap">
@@ -271,7 +272,7 @@ function PlanView({ game }: { game: GameState }) {
   const st = stores(game), o = outlook(game), risks = spoilageRisks(game), plan = foodPlan(game);
   return <>
     <Section title="Stores">
-      <Row label="Eating" value={`${Math.round(st.needPerDay).toLocaleString('en-US')} kcal a day`} />
+      <Row label="Eating" value={`${caloriesText(st.needPerDay)} a day`} />
       {st.lines.map(l => <Row key={l.id} label={l.label} value={<span style={{ color: l.tone === 'good' ? undefined : TONE[l.tone] }}>{days(l.days)} <span style={{ color: DIM }}>· {k(l.kcal)}</span></span>} title={l.note ?? undefined} />)}
       <Row label="All food stored" value={<b>{days(st.totalDays)}</b>} />
       {st.lines.filter(l => l.note).map(l => <Note key={l.id} tone={l.tone === 'good' ? undefined : l.tone}>{l.label}: {l.note}.</Note>)}

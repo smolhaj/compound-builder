@@ -15,7 +15,7 @@ export type TerrainMode = 'off' | 'high' | 'lanes' | 'water' | 'sun' | 'fire';
 
 /** What each mode shows, in plain words (the legend). */
 export const TERRAIN_LEGEND: Record<Exclude<TerrainMode, 'off'>, { label: string; tip: string; legend: string }> = {
-  high: { label: 'High ground', tip: 'Where the land stands above its surroundings', legend: 'Orange: ground above the land around it. A tower here sees farther and shoots farther (an extra 10 m of view at the best). Blue-gray: hollows that hide a watcher.' },
+  high: { label: 'High ground', tip: 'Where the land stands above its surroundings', legend: 'Orange: ground above the land around it. A tower here sees farther and shoots farther (an extra 33 ft of view at the best). Blue-gray: hollows that hide a watcher.' },
   lanes: { label: 'Lanes', tip: 'The ways a crew would come at you', legend: 'Green: easy going. Amber: a scramble. Red: cliff (ladders needed). Blue: the creek (a ford). The bright line is the way a crew takes: the cheapest; rings mark where it narrows to a choke. The road side counts as easy.' },
   water: { label: 'Water', tip: 'Floodplain, mud, frost pockets and reservoir sites', legend: 'Deep blue: the creek\'s floodplain (floods take what stands here; spring mud slows building). Light blue: wet flats and gullies. White: frost pockets where cold air pools. Green ring: a bench that would feed the camp by gravity.' },
   fire: { label: 'Fire', tip: 'How likely each building is to burn in a wildfire', legend: 'A ring around each building: green, cleared or fire-safe walls; amber, trees close in; red, trees hard against it. The ring grows with the chance (the same number the fire front rolls). Cut the trees nearest the red ones.' },

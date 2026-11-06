@@ -132,7 +132,7 @@ export function livestockDay(s: GameState, freezer: boolean): number {
   const meat = (k: number, what: string, pork = false) => {
     const put = putUpMeat(s, k, { freezer, pork });
     kcal += put.kept;
-    if (k >= 20000) log(s, `${what}: ${Math.round(k / 1000).toLocaleString('en-US')},000 kcal of meat ${MEAT_WHERE[put.where]}.`);
+    if (k >= 20000) log(s, `${what}: ${Math.round(k / 1000).toLocaleString('en-US')},000 Calories of meat ${MEAT_WHERE[put.where]}.`);
   };
   // milk: dry from Dec to mid-February
   const goats = head(s, 'goat'), cows = head(s, 'cow');

@@ -84,8 +84,8 @@ export function tunnelProblem(pts: readonly Pt[], datum: number, height: (x: num
 export const TUNNEL_PROBLEM_TEXT: Record<TunnelProblem | 'no_room' | 'no_wall', string> = {
   no_room: 'Start the tunnel in a bunker room',
   no_wall: 'Every wall of that room already has a doorway',
-  too_short: 'Run it at least 60 m: it should come up far from any fighting',
-  too_close: 'Bring the exit up at least 50 m from every building',
+  too_short: 'Run it at least 200 ft: it should come up far from any fighting',
+  too_close: 'Bring the exit up at least 160 ft from every building',
   start_too_shallow: 'The ground right outside the room is too low to tunnel under',
   exit_too_deep: 'The exit would be too deep to climb out',
   water: 'Under the creek',

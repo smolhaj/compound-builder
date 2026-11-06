@@ -17,6 +17,7 @@ import { answerCallout, askPact, joinGroup, joinGroupProblem, leaveGroup, leaveP
 import { inPact } from '../sim/pact';
 import { clarity, openRumors, roadRisk, scoutProblem, sendScout } from '../sim/rumors';
 import { pluralize } from '../sim/words';
+import { gallonsText, kmText } from '../sim/units';
 
 const DIM = 'rgba(238,238,238,0.6)', LINE = 'rgba(255,255,255,0.08)';
 const TONE = { good: '#a8d080', warn: '#f0c070', bad: '#f08060' } as const;
@@ -78,7 +79,7 @@ export function ScavengeSection() {
       const tip = [`Someone else there ${pct(r.people)}`, x.claim?.known ? `${cap(x.claim.crew)} hold it` : '', `dogs ${pct(r.dogs)}`, `a fall or a nail ${pct(r.hurt)}`, r.fallout > 0 ? `fallout ≈ ${Math.round(r.fallout * 1000)} mSv each` : '', r.sickness > 0 ? `sickness ${pct(r.sickness)}` : ''].filter(Boolean).join(' · ');
       return <button key={x.id} onClick={() => setSel(x.id === sel ? null : x.id)} title={tip}
         style={{ display: 'block', width: '100%', textAlign: 'left', padding: '4px 6px', marginBottom: 2, borderRadius: 6, border: 0, cursor: 'pointer', background: x.id === sel ? 'rgba(216,201,160,0.22)' : 'rgba(255,255,255,0.04)', color: '#eee', fontSize: 12 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}><span>{cap(x.name)}</span><span style={{ color: DIM }}>{x.km} km</span></div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}><span>{cap(x.name)}</span><span style={{ color: DIM }}>{kmText(x.km)}</span></div>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6, fontSize: 11 }}>
           <span style={{ color: DIM }}>{PLACE_KIND_NAME[x.kind]} · {picked >= 0.97 ? 'stripped' : `${Math.round(picked * 100)} % picked over`} · {ago(day, x.visited)}</span>
           <span style={{ color: RISK_TONE[w] ? TONE[RISK_TONE[w]!] : undefined }}>{x.claim?.known ? 'held by a crew' : `risk: ${w}`}</span>
@@ -89,8 +90,8 @@ export function ScavengeSection() {
       <div style={{ fontSize: 11.5, color: DIM, marginBottom: 2 }}>Who goes to {p.name}:</div>
       <Picker game={game} picked={team} set={setTeam} />
       <div style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
-        <button style={btn(mode === 'foot')} onClick={() => setMode('foot')} title="A pack each, about 25 kg">On foot · {runDays(p, 'foot')} d</button>
-        <button style={btn(mode === 'truck')} onClick={() => setMode('truck')} title="A bed full, but it's heard for miles">Truck · {runDays(p, 'truck')} d · {tripFuel(game, p.km).liters} L</button>
+        <button style={btn(mode === 'foot')} onClick={() => setMode('foot')} title="A pack each, about 55 lb">On foot · {runDays(p, 'foot')} d</button>
+        <button style={btn(mode === 'truck')} onClick={() => setMode('truck')} title="A bed full, but it's heard for miles">Truck · {runDays(p, 'truck')} d · {gallonsText(tripFuel(game, p.km).liters)}</button>
       </div>
       <div style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
         {ROE.map(([k, l, t]) => <button key={k} style={btn(roe === k)} title={t} onClick={() => setRoe(k)}>{l}</button>)}
@@ -135,7 +136,7 @@ export function RumorsSection() {
 }
 
 const usd = (n: number) => '$' + Math.round(n).toLocaleString('en-US');
-const NAMES: Partial<Record<string, string>> = { canned: 'canned (case)', staples: 'staples (25 kg)', fuel: 'fuel (20 L can)', meds: 'meds / antibiotics (kit)', seed: 'seed (season)', fresh: 'fresh (basket)', hygiene: 'hygiene (month)', firewood: 'firewood (rick)' };
+const NAMES: Partial<Record<string, string>> = { canned: 'canned (case)', staples: 'staples (55 lb)', fuel: 'fuel (5-gal can)', meds: 'meds / antibiotics (kit)', seed: 'seed (season)', fresh: 'fresh (basket)', hygiene: 'hygiene (month)', firewood: 'firewood (rick)' };
 const gname = (k: MarketGood) => k.startsWith('bag:') ? BAG_BASE[k.slice(4) as keyof typeof BAG_BASE].name.toLowerCase() : k.startsWith('ammo:') ? `${k.slice(5)} (round)` : NAMES[k] ?? goodName(k);
 
 export function MarketSection() {
@@ -208,7 +209,7 @@ export function MarketSection() {
     </>}
     <details style={{ marginTop: 4 }}>
       <summary style={{ fontSize: 11.5, color: DIM, cursor: 'pointer' }}>What things fetch now (2025 dollars-equivalent)</summary>
-      {([['ammo:22lr', '.22 LR, 100 rounds', 100], ['ammo:9mm', '9mm, 50 rounds', 50], ['ammo:12ga', '12 gauge, 25 shells', 25], ['meds', 'Meds / antibiotics kit', 1], ['fuel', 'Fuel, 20 L', 1], ['seed', 'Seed, a season', 1], ['bag:salt', 'Salt, kg', 1], ['bag:coffee', 'Coffee, lb', 1], ['bag:batteries', 'AA four-pack', 1], ['bag:tobacco', 'Cigarettes, pack', 1], ['metal:silver_coin', 'Silver eagle', 1], ['metal:gold_coin', 'Gold eagle', 1]] as Array<[MarketGood, string, number]>).map(([k, l, n]) => <Row key={k} label={l} value={usd((prices[k] ?? 0) * n)} />)}
+      {([['ammo:22lr', '.22 LR, 100 rounds', 100], ['ammo:9mm', '9mm, 50 rounds', 50], ['ammo:12ga', '12 gauge, 25 shells', 25], ['meds', 'Meds / antibiotics kit', 1], ['fuel', 'Fuel, 5-gal can', 1], ['seed', 'Seed, a season', 1], ['bag:salt', 'Salt, 2 lb bag', 1], ['bag:coffee', 'Coffee, lb', 1], ['bag:batteries', 'AA four-pack', 1], ['bag:tobacco', 'Cigarettes, pack', 1], ['metal:silver_coin', 'Silver eagle', 1], ['metal:gold_coin', 'Gold eagle', 1]] as Array<[MarketGood, string, number]>).map(([k, l, n]) => <Row key={k} label={l} value={usd((prices[k] ?? 0) * n)} />)}
     </details>
   </Section>;
 }
@@ -250,7 +251,7 @@ export function NeighborsSection() {
         </button>
         {open === n.id && <div style={{ paddingLeft: 12, paddingBottom: 4 }}>
           <Note>{l?.blurb ?? NEIGHBOR_BLURB[n.kind]}</Note>
-          {home && <Row label="Household" value={`${n.members} · head ${l?.head ?? '?'} · ${n.km} km ${n.dir}`} />}
+          {home && <Row label="Household" value={`${n.members} · head ${l?.head ?? '?'} · ${kmText(n.km)} ${n.dir}`} />}
           {home && <Row label="Good at" value={n.skill} />}
           {known.slice(-5).reverse().map((h, i) => <Note key={i}>{day - h.day === 0 ? 'Today' : `${day - h.day} d ago`}{h.how && HOW[h.how] ? ` (${HOW[h.how]})` : ''}: {h.text}</Note>)}
           {!known.length && <Note>Nothing new you've heard.</Note>}

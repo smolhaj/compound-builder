@@ -24,6 +24,7 @@
  */
 import type { GameState } from './state';
 import { mulberry32 } from './rng';
+import { gallonsText } from './units';
 
 export const JUG_L = 19;
 export const TOTE_L = 1000;
@@ -69,7 +70,7 @@ export function waterDay(s: GameState): string[] {
     const take = Math.min(drink / JUG_L, s.stock.water_jugs);
     s.stock.water_jugs -= take;
     u.report.shortL = take * JUG_L >= drink - 1e-6 ? 0 : u.report.shortL - take * JUG_L;
-    out.push(`Drank from the stored jugs (${Math.round(take * JUG_L)} L).`);
+    out.push(`Drank from the stored jugs (${gallonsText(take * JUG_L)}).`);
   }
   // hauling with a trailer is one trip a day, not buckets all day
   if (u.hauling && s.stock.water_trailer >= 1) u.haulFar = false;

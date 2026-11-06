@@ -23,6 +23,7 @@ import type { Site } from './site';
 import type { GameState, Structure } from './state';
 import { siteLot } from './lotListing';
 import { pluralize } from './words';
+import { rainText } from './units';
 
 /** How the place stands to a style's material: sawn / gathered on the land, hauled in, or (earth walls) a wet climate. */
 export type MatFit = 'local' | 'hauled' | 'wet';
@@ -74,7 +75,7 @@ export const HOUSING_STYLES: Record<string, HousingStyle> = {
     ember: 0.85, keepsWalls: false, cover: 0.9, pf: 25, cellarKcal: 1_500_000, pantry: 5_000_000, permit: 7000,
   },
   stone_house: {
-    kind: 'stone_house', base: 'stone_house', name: 'Stone house', walls: '45 cm fieldstone walls, a slate-gray metal roof', beds: 6,
+    kind: 'stone_house', base: 'stone_house', name: 'Stone house', walls: '18 in fieldstone walls, a slate-gray metal roof', beds: 6,
     // thermal mass evens out the day and night, and a stone house is slow to chill
     heat: () => 0.85,
     ember: 0.25, keepsWalls: true, cover: 0.7, pf: 10, cellarKcal: 0, pantry: 3_000_000, permit: 4000,
@@ -92,7 +93,7 @@ export const HOUSING_STYLES: Record<string, HousingStyle> = {
     ember: 0.3, keepsWalls: true, cover: 0.8, pf: 2, cellarKcal: 0, pantry: 1_400_000, permit: 2500,
   },
   adobe_house: {
-    kind: 'adobe_house', base: 'adobe_house', name: 'Adobe house', walls: '45 cm rammed earth, a viga ceiling', beds: 4,
+    kind: 'adobe_house', base: 'adobe_house', name: 'Adobe house', walls: '18 in rammed earth, a viga ceiling', beds: 4,
     // mass swings with the day: very good where the nights are cold and the days warm, merely fair in a long hard winter
     heat: cold => 0.65 + 0.5 * clamp(cold - 0.6, 0, 1),
     ember: 0.2, keepsWalls: true, cover: 0.7, pf: 12, cellarKcal: 0, pantry: 2_000_000, permit: 3000,
@@ -158,8 +159,8 @@ export function fitOf(site: Pick<Site, 'region' | 'timber' | 'lot' | 'home'>, ki
     case 'container_house':
       return { off: null, mat: null, note: R.rainMm > 1000 ? `${R.name} is wet: the steel rusts, keep the paint up` : R.julyHighF >= 90 ? 'hot country: needs a shade roof and heavy insulation' : 'used 40 ft containers, delivered: the quickest house in the kit' };
     case 'adobe_house': {
-      if (R.rainMm > RAIN_MAX) return { off: `${R.rainMm} mm of rain a year would wash an earth wall: adobe is for dry country (under ${RAIN_MAX} mm)`, note: 'earth walls need a dry climate', mat: 'wet' };
-      if (R.rainMm > DRY_MM) return { off: null, mat: 'wet', note: `${R.rainMm} mm of rain a year: the rammed earth needs extra cement and deep eaves` };
+      if (R.rainMm > RAIN_MAX) return { off: `${rainText(R.rainMm)} of rain a year would wash an earth wall: adobe is for dry country (under ${rainText(RAIN_MAX)})`, note: 'earth walls need a dry climate', mat: 'wet' };
+      if (R.rainMm > DRY_MM) return { off: null, mat: 'wet', note: `${rainText(R.rainMm)} of rain a year: the rammed earth needs extra cement and deep eaves` };
       return { off: null, mat: 'local', note: `dry country: the walls are rammed from the earth you dig for the footings` };
     }
     default:

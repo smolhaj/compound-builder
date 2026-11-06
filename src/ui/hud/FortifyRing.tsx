@@ -18,6 +18,7 @@ import { eta, paceOf, slowHint, totalHoursLeft, weeksFor } from '../../sim/pace'
 import { billText } from '../../sim/materials';
 import { Note } from './common';
 import { btn, DIM, LINE, usd } from './style';
+import { lengthText } from '../../sim/units';
 
 export function FortifyRing() {
   const g = useGameStore();
@@ -60,7 +61,7 @@ export function FortifyRing() {
       {priced && (priced.core.coreIsFull
         ? <Note>Your lot is small: the core compound is the whole lot.</Note>
         : <div style={{ display: 'flex', gap: 4, alignItems: 'stretch', flexWrap: 'wrap', padding: '3px 0' }}>
-          {([['core', 'Core compound', 'about 5 acres around the family', priced.core], ['full', 'Expand to the full property line', `${priced.full.wall.lineM.toLocaleString('en-US')} m of line`, priced.full]] as const).map(([k, label, sub, p]) =>
+          {([['core', 'Core compound', 'about 5 acres around the family', priced.core], ['full', 'Expand to the full property line', `${lengthText(priced.full.wall.lineM)} of line`, priced.full]] as const).map(([k, label, sub, p]) =>
             <button key={k} style={{ ...btn(opts.scope === k), flex: 1, textAlign: 'left', padding: '4px 7px' }} title={sub} onClick={() => setOpts({ ...opts, scope: k })}>
               <div>{label}</div><div style={{ fontSize: 11, opacity: 0.75 }}>{usd(p.cost)} · {p.hours.toLocaleString('en-US')} h</div>
             </button>)}
@@ -102,7 +103,7 @@ export function FortifyRing() {
         <span style={{ flex: 1, color: DIM }}>A gate and gate garage on the road side</span>
         <button style={{ ...btn(opts.gate), padding: '2px 7px' }} onClick={() => setOpts({ ...opts, gate: !opts.gate, ...(opts.gate ? { motorCourt: false } : {}) })}>{opts.gate ? 'Yes' : 'No'}</button>
       </div>
-      <div style={{ display: 'flex', gap: 4, alignItems: 'center', padding: '3px 0' }} title="A gravel forecourt in front of the gate garage, 18 x 12 m, fenced in black steel bars with a drive gate and six bays: the fleet parks here before the open yard, and a vehicle behind the bars is far harder for a crew to drive off. Needs your land outside the gate.">
+      <div style={{ display: 'flex', gap: 4, alignItems: 'center', padding: '3px 0' }} title="A gravel forecourt in front of the gate garage, 60 × 40 ft, fenced in black steel bars with a drive gate and six bays: the fleet parks here before the open yard, and a vehicle behind the bars is far harder for a crew to drive off. Needs your land outside the gate.">
         <span style={{ flex: 1, color: DIM }}>Motor court in front of the gate</span>
         <button style={{ ...btn(opts.motorCourt), padding: '2px 7px' }} onClick={() => setOpts({ ...opts, motorCourt: !opts.motorCourt })}>{opts.motorCourt ? 'Yes' : 'No'}</button>
       </div>
@@ -112,9 +113,9 @@ export function FortifyRing() {
       </div>
       {plan && <div style={{ borderTop: `1px solid ${LINE}`, borderBottom: `1px solid ${LINE}`, margin: '6px 0', padding: '6px 0' }}>
         {nothing ? <Note tone="good">Nothing to add: the line is already held and has what this plan would give it.</Note> : <>
-          <div>{PERIMETER[opts.wall].name} <b>{plan.wall.wallM.toLocaleString('en-US')} m</b>{opts.scope === 'core' && !plan.coreIsFull && <span style={{ color: DIM }}> around the compound</span>}{plan.wall.heldM > 0 && <span style={{ color: DIM }}> · {plan.wall.heldM.toLocaleString('en-US')} m already held</span>}</div>
+          <div>{PERIMETER[opts.wall].name} <b>{lengthText(plan.wall.wallM)}</b>{opts.scope === 'core' && !plan.coreIsFull && <span style={{ color: DIM }}> around the compound</span>}{plan.wall.heldM > 0 && <span style={{ color: DIM }}> · {lengthText(plan.wall.heldM)} already held</span>}</div>
           {plan.wall.creekCrossings > 0 && <div>Creek bars at <b>{plan.wall.creekCrossings}</b> crossing{plan.wall.creekCrossings > 1 ? 's' : ''}</div>}
-          <div>Patrol walkway on top <b>{Math.round(plan.walkwayLen * 6).toLocaleString('en-US')} m</b>{plan.walkwayRuns > 0 && <span style={{ color: DIM }}> · stairs at the gate and every ~80 m</span>}</div>
+          <div>Patrol walkway on top <b>{lengthText(plan.walkwayLen * 6)}</b>{plan.walkwayRuns > 0 && <span style={{ color: DIM }}> · stairs at the gate and every ~260 ft</span>}</div>
           <div>{plan.garage ? <>Gate at the road: a gatehouse garage where the driveway crosses the wall <span style={{ color: DIM }}>· 4 bays, a steel drive-through gate</span></> : <span style={{ color: DIM }}>{plan.wall.gateSpot ? 'Gate at the road: an ordinary gate where the driveway crosses (no gate garage)' : 'No gate garage'}</span>}</div>
           {plan.ringPlan && plan.ringPlan.rings.length > 0 && <div>Inner rings <b>{plan.ringPlan.rings.length}</b> <span style={{ color: DIM }}>· {plan.ringPlan.contour ? 'along the contour of the hill' : 'stepped in from the outer wall'} · {plan.ringPlan.rings.reduce((a, r) => a + r.towers.length, 0)} towers · two armed adults man each</span></div>}
           <div>Towers <b>{plan.towers.length}</b> <span style={{ color: DIM }}>· {TOWERS[opts.towerKind].name.toLowerCase()}, upgradeable in place</span></div>

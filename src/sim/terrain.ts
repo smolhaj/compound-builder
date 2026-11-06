@@ -20,6 +20,7 @@
  */
 import type { Pt } from './perimeter';
 import type { Rect } from './land';
+import { lengthText } from './units';
 
 /** What the analysis reads of the world: ground height, and the creek if there is one. */
 export interface GroundSource {
@@ -408,7 +409,7 @@ export function findGorge(t: Terrain, lot: Rect, minDepthM = 6, maxSpanM = 200):
     if (!inLot(lot, pa[0], pa[1]) && !inLot(lot, pb[0], pb[1])) continue;
     // a narrower, deeper cut is a better choke; both rims should be level enough to land a portal on
     const score = clamp(0.35 + 0.35 * clamp((depth - minDepthM) / 14, 0, 1) + 0.3 * clamp(1 - (span - 24) / (maxSpanM - 24), 0, 1), 0, 1);
-    if (!best || score > best.score) best = { kind: 'gorge', x, z: zc, score, reason: `The creek runs in a gorge ${Math.round(depth)} m deep and ${Math.round(span)} m across at the rims: a natural choke point, and a place a tunnel-bridge could span.`, span: { a: pa, b: pb, lengthM: Math.round(span), depthM: Math.round(depth) } };
+    if (!best || score > best.score) best = { kind: 'gorge', x, z: zc, score, reason: `The creek runs in a gorge ${lengthText(depth)} deep and ${lengthText(span)} across at the rims: a natural choke point, and a place a tunnel-bridge could span.`, span: { a: pa, b: pb, lengthM: Math.round(span), depthM: Math.round(depth) } };
   }
   return best;
 }
@@ -429,11 +430,11 @@ export function siteCandidates(t: Terrain, ctx: SiteContext, lanes?: readonly La
     if (!inLot(lot, x, z)) continue;
     if (t.high[k] >= 0.5 && t.slope[k] < 0.15 && t.wet[k] === 0) {
       const sc = clamp(t.high[k] / 1.5, 0, 1) * 0.6 + t.sight[k] * 0.4 - 0.1 * Math.min(1, Math.hypot(x - camp[0], z - camp[1]) / 40);
-      if (!keep || sc > keep.score) keep = { kind: 'keep_ridge', x, z, score: clamp(sc, 0, 1), reason: `This rise stands ${Math.round(t.high[k] * 6)} m above the land around it and sees ${Math.round(t.sight[k] * T.SIGHT * 6)} m on average: it suits a terraced keep.` };
+      if (!keep || sc > keep.score) keep = { kind: 'keep_ridge', x, z, score: clamp(sc, 0, 1), reason: `This rise stands ${lengthText(t.high[k] * 6)} above the land around it and sees ${lengthText(t.sight[k] * T.SIGHT * 6)} on average: it suits a terraced keep.` };
     }
     if (t.high[k] >= 0.35) {
       const sc = clamp(t.high[k] / 1.2, 0, 1) * 0.5 + t.sight[k] * 0.5;
-      if (!tower || sc > tower.score) tower = { kind: 'tower_hill', x, z, score: clamp(sc, 0, 1), reason: `High ground, ${Math.round(t.high[k] * 6)} m above its surroundings: a tower here sees and shoots farther.` };
+      if (!tower || sc > tower.score) tower = { kind: 'tower_hill', x, z, score: clamp(sc, 0, 1), reason: `High ground, ${lengthText(t.high[k] * 6)} above its surroundings: a tower here sees and shoots farther.` };
     }
     if (t.frost[k] && Math.hypot(x - camp[0], z - camp[1]) < 25) {
       if (!frost) frost = { kind: 'frost_pocket', x, z, score: 0.5, reason: 'Cold air pools in this hollow: late frosts hit gardens and orchards planted here.' };
@@ -453,20 +454,20 @@ export function siteCandidates(t: Terrain, ctx: SiteContext, lanes?: readonly La
     const head = (t.h[k] - campH) * 6, d = Math.hypot(x - camp[0], z - camp[1]);
     if (head < GRAVITY_MIN_HEAD_M || d > 35) continue;
     const sc = clamp(0.4 + 0.4 * clamp((head - GRAVITY_MIN_HEAD_M) / 12, 0, 1) + 0.2 * (1 - d / 35), 0, 1);
-    if (!res || sc > res.score) res = { kind: 'reservoir', x, z, score: sc, headM: Math.round(head), reason: `A level bench ${Math.round(head)} m above the camp: a reservoir here feeds the houses by gravity, no pump or power.` };
+    if (!res || sc > res.score) res = { kind: 'reservoir', x, z, score: sc, headM: Math.round(head), reason: `A level bench ${lengthText(head)} above the camp: a reservoir here feeds the houses by gravity, no pump or power.` };
   }
   if (res) out.push(res);
   if (t.creek) {
     let hy: SiteCandidate | null = null;
     for (let x = lot.x0 + 12; x <= lot.x1; x += 2) {
       const drop = creekDropM(t, x, 10);
-      if (drop >= 1.2 && (!hy || drop > (hy.dropM ?? 0))) hy = { kind: 'hydro', x, z: t.creek.zAt(x), score: clamp(drop / 4, 0.3, 1), dropM: Math.round(drop * 10) / 10, reason: `The creek falls ${(Math.round(drop * 10) / 10)} m over 60 m here: enough for a small micro-hydro intake.` };
+      if (drop >= 1.2 && (!hy || drop > (hy.dropM ?? 0))) hy = { kind: 'hydro', x, z: t.creek.zAt(x), score: clamp(drop / 4, 0.3, 1), dropM: Math.round(drop * 10) / 10, reason: `The creek falls ${lengthText((Math.round(drop * 10) / 10))} over 200 ft here: enough for a small micro-hydro intake.` };
     }
     if (hy) out.push(hy);
   }
   if (lanes) {
     const lane = bestLane(lanes);
-    if (lane?.choke && lane.choke.width <= T.CHOKE && inLot(lot, lane.choke.at[0], lane.choke.at[1])) out.push({ kind: 'choke', x: lane.choke.at[0], z: lane.choke.at[1], score: clamp(0.5 + (T.CHOKE - lane.choke.width) * 0.08, 0, 1), reason: `The easiest way in narrows to ${Math.round(lane.choke.width * 6)} m here: wall and watch this and a crew has little room to spread.` });
+    if (lane?.choke && lane.choke.width <= T.CHOKE && inLot(lot, lane.choke.at[0], lane.choke.at[1])) out.push({ kind: 'choke', x: lane.choke.at[0], z: lane.choke.at[1], score: clamp(0.5 + (T.CHOKE - lane.choke.width) * 0.08, 0, 1), reason: `The easiest way in narrows to ${lengthText(lane.choke.width * 6)} here: wall and watch this and a crew has little room to spread.` });
   }
   return out.sort((a, b) => b.score - a.score);
 }
@@ -507,12 +508,12 @@ export const SPAN = {
 /** Why a tunnel-bridge can't be laid from `a` to `b` on this ground (null = it can): a real dip under it, and a length a span can bear. */
 export function spanProblem(src: GroundSource, a: Pt, b: Pt): string | null {
   const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
-  if (len < SPAN.MIN_LEN) return 'too short: a tunnel-bridge spans a gap of at least 18 m (use a covered walkway between yards)';
-  if (len > SPAN.MAX_LEN) return `too long: ${Math.round(len * 6)} m is more than a span can bear (200 m at the most)`;
+  if (len < SPAN.MIN_LEN) return 'too short: a tunnel-bridge spans a gap of at least 60 ft (use a covered walkway between yards)';
+  if (len > SPAN.MAX_LEN) return `too long: ${lengthText(len * 6)} is more than a span can bear (660 ft at the most)`;
   const ha = src.h(a[0], a[1]), hb = src.h(b[0], b[1]);
   let sag = 0;
   for (let i = 1; i < 24; i++) { const f = i / 24; sag = Math.max(sag, (ha + (hb - ha) * f) - src.h(a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f)); }
-  if (sag < SPAN.MIN_SAG) return `nothing to span: the ground between is only ${Math.round(sag * 6)} m below the deck. A tunnel-bridge crosses a gorge, ravine or creek bed at least 3 m deep; on a hillside lay a slope tunnel`;
+  if (sag < SPAN.MIN_SAG) return `nothing to span: the ground between is only ${lengthText(sag * 6)} below the deck. A tunnel-bridge crosses a gorge, ravine or creek bed at least 10 ft deep; on a hillside lay a slope tunnel`;
   return null;
 }
 
@@ -607,12 +608,12 @@ export function boreStats(h: (x: number, z: number) => number, a: Pt, b: Pt): Bo
 /** Why a bore with these numbers can't be driven (null = it can). */
 export function boreProblemOf(s: BoreStats): string | null {
   const len = s.lenU;
-  if (len < BORE.MIN_LEN) return `too short for a bore: ${Math.round(len * 6)} m (a rock tunnel is at least ${BORE.MIN_LEN * 6} m: use a covered walkway or a gate)`;
-  if (len > BORE.MAX_LEN) return `too long: ${Math.round(len * 6)} m is more than a bore can be driven (${BORE.MAX_LEN * 6} m at the most)`;
+  if (len < BORE.MIN_LEN) return `too short for a bore: ${lengthText(len * 6)} (a rock tunnel is at least ${lengthText(BORE.MIN_LEN * 6)}: use a covered walkway or a gate)`;
+  if (len > BORE.MAX_LEN) return `too long: ${lengthText(len * 6)} is more than a bore can be driven (${lengthText(BORE.MAX_LEN * 6)} at the most)`;
   if (s.grade > BORE.MAX_GRADE) return `too steep: the deck would climb ${Math.round(s.grade * 100)} % (a truck can take ${Math.round(BORE.MAX_GRADE * 100)} %). Run the bore along the hill so it gains height gently, or make it longer`;
-  if (s.peakCover < BORE.MIN_PEAK) return `no rock over it: at its deepest the ground is only ${Math.max(0, Math.round(s.peakCover * 6))} m over the crown. A bore goes through a rock face or a spur at least ${Math.round(BORE.MIN_PEAK * 6)} m deep; on a gentle slope use a slope tunnel`;
-  if (s.openA > BORE.MAX_OPEN || s.openB > BORE.MAX_OPEN) return `the ground does not close over it soon enough: the cutting at one end would be ${Math.round(Math.max(s.openA, s.openB) * 6)} m long (${BORE.MAX_OPEN * 6} m at the most)`;
-  if (s.minCover < BORE.MIN_COVER) return `daylight in the middle: the ground over the crown falls to ${Math.max(0, Math.round(s.minCover * 6))} m somewhere along it (it needs ${Math.round(BORE.MIN_COVER * 6)} m everywhere between the cuttings)`;
+  if (s.peakCover < BORE.MIN_PEAK) return `no rock over it: at its deepest the ground is only ${lengthText(Math.max(0, Math.round(s.peakCover * 6)))} over the crown. A bore goes through a rock face or a spur at least ${lengthText(BORE.MIN_PEAK * 6)} deep; on a gentle slope use a slope tunnel`;
+  if (s.openA > BORE.MAX_OPEN || s.openB > BORE.MAX_OPEN) return `the ground does not close over it soon enough: the cutting at one end would be ${lengthText(Math.max(s.openA, s.openB) * 6)} long (${lengthText(BORE.MAX_OPEN * 6)} at the most)`;
+  if (s.minCover < BORE.MIN_COVER) return `daylight in the middle: the ground over the crown falls to ${lengthText(Math.max(0, Math.round(s.minCover * 6)))} somewhere along it (it needs ${lengthText(BORE.MIN_COVER * 6)} everywhere between the cuttings)`;
   return null;
 }
 

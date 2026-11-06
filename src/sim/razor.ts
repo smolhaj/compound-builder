@@ -9,6 +9,7 @@ import { log } from './economy';
 import { PERIMETER, RAZOR, runFinished, wallLength, type PerimeterRun } from './perimeter';
 import type { GameState } from './state';
 import { countyWorks } from './paperwork';
+import { lengthText } from './units';
 
 /** The wire's bill for `len` world units of run (the price table, so the Defense tab can show it before it is hung). */
 export function razorBill(len: number): Partial<Stock> {
@@ -40,7 +41,7 @@ export function addRazor(s: GameState, runId: string): string | null {
   const len = wallLength(r);
   for (const [k, v] of Object.entries(razorBill(len)) as Array<[MaterialId, number]>) s.stock[k] -= v;
   r.razor = true;
-  log(s, `The family hung razor wire along the top of the ${PERIMETER[r.kind].name.toLowerCase()} (${Math.round(len * 6)} m, about ${Math.round(razorHours(len))} h).`);
+  log(s, `The family hung razor wire along the top of the ${PERIMETER[r.kind].name.toLowerCase()} (${lengthText(len * 6)}, about ${Math.round(razorHours(len))} h).`);
   return null;
 }
 

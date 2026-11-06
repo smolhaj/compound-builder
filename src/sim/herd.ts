@@ -30,6 +30,7 @@ import { isFinished } from './construction';
 import { kitchenOf, putUpMeat, renderLard, MEAT_WHERE } from './kitchen';
 import type { Animal, Livestock } from './livestock';
 import { regionFor } from './climate';
+import { caloriesShort } from './units';
 
 export interface Herd {
   /** Sick animals by kind. */
@@ -225,7 +226,7 @@ export function butcher(s: GameState, a: Animal, n: number): string | null {
   if (a === 'pig') renderLard(s, total * LARD);
   kitchenOf(s).hours += BUTCHER_HOURS * n;
   h.butchered += n;
-  log(s, `Butchering day: ${n} ${a}${n === 1 ? '' : 's'}, ${Math.round(total / 1000).toLocaleString('en-US')}k kcal of meat ${MEAT_WHERE[put.where]}${a === 'pig' ? ' and a pail of lard' : ''}.`);
+  log(s, `Butchering day: ${n} ${a}${n === 1 ? '' : 's'}, ${caloriesShort(total)} of meat ${MEAT_WHERE[put.where]}${a === 'pig' ? ' and a pail of lard' : ''}.`);
   return null;
 }
 /** Raise-for-meat kids go in the November butchering (kcal). */

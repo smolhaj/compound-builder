@@ -26,6 +26,7 @@ import { dayIndex, type GameState } from './state';
 import type { Stock } from './materials';
 import { scoutCrew, type Encounter, type Outcome, type Stance } from './encounters';
 import { pluralize } from './words';
+import { caloriesShort, caloriesText } from './units';
 
 /** What they turn out to be (hidden until the month shows it). */
 export type Character = 'solid' | 'gem' | 'lazy' | 'thief' | 'sick' | 'scout';
@@ -84,7 +85,7 @@ export function startTrial(s: GameState, e: Encounter): Outcome {
   const camp: TrialCamp = { id: e.id, title: e.title.replace(/ at the gate$/, ''), people: e.people ?? [], brings: { ...(e.brings ?? {}) }, from: day, until: day + TRIAL_DAYS, character, learned: [], hungry: 0, fed: 0, worked: 0, ...(e.hurt ? { hurt: e.hurt } : {}), ...(e.arche ? { arche: e.arche } : {}), ...(e.neighbor ? { neighbor: e.neighbor } : {}), ...(e.extras ? { extras: e.extras } : {}), ...(e.tells ? { tells: e.tells } : {}) };
   campsOf(s).push(camp);
   s.gate.humanity = Math.min(100, s.gate.humanity + 3);
-  return { title: 'On trial', text: `They can camp outside the wall for a month and work for their keep. You'll feed them from your own supplies. Then you'll see.`, tone: 'good', lines: [`${camp.people.length} in the camp: about ${campNeed(camp).toLocaleString('en-US')} kcal a day from the pantry.`] };
+  return { title: 'On trial', text: `They can camp outside the wall for a month and work for their keep. You'll feed them from your own supplies. Then you'll see.`, tone: 'good', lines: [`${camp.people.length} in the camp: about ${caloriesText(campNeed(camp))} a day from the pantry.`] };
 }
 
 /** Hand out the camp's ration from the stores (fresh first, then staples, cans, the freezer). Returns kcal short. */
@@ -200,7 +201,7 @@ function trialEnd(s: GameState, c: TrialCamp): Encounter {
       `${n} ${n === 1 ? 'person' : 'people'} in the camp${c.people.some(p => p.kid) ? `, ${c.people.filter(p => p.kid).length} kids` : ''}. They put in ${pluralize(Math.round(c.worked), 'hour')} on the place.`,
       ...(c.extras || Object.keys(c.brings ?? {}).length ? [`Brings: ${kitLine(c.brings, c.extras, c.people)}.`] : []),
       ...(c.learned.length ? c.learned : ['Quiet, polite, kept to themselves. You don\'t know them much better than the day they came.']),
-      c.hungry ? `The camp went short ${c.hungry} day${c.hungry > 1 ? 's' : ''} this month.` : `You fed them ${Math.round(c.fed / 1000)}k kcal this month.`,
+      c.hungry ? `The camp went short ${c.hungry} day${c.hungry > 1 ? 's' : ''} this month.` : `You fed them ${caloriesShort(c.fed)} this month.`,
     ],
     size: n, armed: false, strength: 0, people: c.people, brings: c.brings, trial: c.id, ...(c.extras ? { extras: c.extras } : {}),
     stances: ['take_in', 'turn_away'],

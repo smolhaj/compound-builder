@@ -24,6 +24,7 @@ import type { Encounter, Outcome, Stance } from './encounters';
 import { admitNewcomers, newcomersOf } from './newcomers';
 import { INSIDER, startVet, isPlant } from './insider';
 import { pluralize } from './words';
+import { caloriesText } from './units';
 
 export interface Guard {
   id: string;
@@ -198,7 +199,7 @@ export function stayCard(s: GameState, x: Guard): Encounter {
       `${x.name} ${x.person.last}, ${x.person.age}, has stood a shift at your gate for ${Math.max(1, Math.round(s.clock.t - x.hiredAt))} day${Math.round(s.clock.t - x.hiredAt) > 1 ? 's' : ''}. The agency is gone; so is everyone he knew.`,
       'He has no family or friends to go to. He asks to stay on, unpaid, for a bed and a place at the table.',
       `Hunting and tracking ${x.person.skills.hunter}; trained for the gate. He brings his own sidearm and watches the night.`,
-      `One more to feed: about ${kcal.toLocaleString('en-US')} kcal a day.`,
+      `One more to feed: about ${caloriesText(kcal)} a day.`,
     ],
     size: 1, armed: true, strength: 0, people: [x.person], stances: ['take_in', 'turn_away'],
   };

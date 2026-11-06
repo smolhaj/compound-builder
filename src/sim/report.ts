@@ -51,6 +51,7 @@ import { isGod } from './godMode';
 import { declareWipe, wipeSummary } from './wipe';
 import { CAUSE_TEXT, inferCause } from './deaths';
 import { pluralize } from './words';
+import { kmText } from './units';
 const living = (s: GameState) => s.personState.filter(ps => ps.needs.died == null).length;
 
 /** Once a day after the hit: tally, then see whether the run is over. */
@@ -135,7 +136,7 @@ export function reportCard(s: GameState): ReportCard {
   if (bo) {
     if (bo.mode === 'foot') lines.push(`${bo.going} left on foot${bo.bags ? `, ${bo.bags} with a packed bug-out bag` : ', with whatever they could snatch'}.`);
     else lines.push(`${bo.going} aboard ${bo.vehicles.length} vehicle${bo.vehicles.length === 1 ? '' : 's'} (${bo.vehicles.map(k => VEHICLES[k as keyof typeof VEHICLES]?.name.toLowerCase() ?? k).join(', ')}), loaded ${bo.covered ? 'under cover, by the passage from the house to the garage' : 'in the open, in plain view of the road'}.`);
-    lines.push(`${pluralize(bo.foodDays, 'day')} of food and water ${bo.mode === 'foot' ? 'on their backs' : 'aboard'} and ${bo.mode === 'foot' ? 'a walk of' : 'fuel for'} about ${bo.rangeKm} km.`);
+    lines.push(`${pluralize(bo.foodDays, 'day')} of food and water ${bo.mode === 'foot' ? 'on their backs' : 'aboard'} and ${bo.mode === 'foot' ? 'a walk of' : 'fuel for'} about ${kmText(bo.rangeKm)}.`);
     if (bo.destName) lines.push(`Bound for ${bo.destName}${bo.miles ? `, ${bo.miles} miles; the way carried a ${Math.round((bo.risk ?? 0) * 100)} % chance of trouble` : ''}. ${bo.outcome === 'robbed' ? 'They were stopped on the road and lost half of what they carried.' : bo.outcome === 'late' ? 'It took longer than planned and some of the food was gone.' : bo.outcome === 'lost_one' ? 'The trip took one of them.' : 'The way was clear.'}${bo.arrivedFoodDays !== undefined ? ` They arrived with ${pluralize(bo.arrivedFoodDays, 'day')} of food${bo.dest === 'cache' ? ' (the cache included)' : ''}.` : ''}`);
     if (bo.left) lines.push(`${bo.left} had no seat and stayed behind to hold the place.`);
     if (bo.fallback) lines.push(`They had somewhere to go: ${bo.fallback} was kept for this, with the lights still paid for.`);

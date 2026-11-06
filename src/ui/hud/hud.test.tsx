@@ -44,7 +44,7 @@ describe('the guided HUD (server-rendered)', () => {
     expect(t).toContain('Long-term goals');
     expect(t).toContain('Enclose the compound');
     expect(t).toContain('A bunker underneath');
-    expect(t).toMatch(/water is 65 m down/i);
+    expect(t).toMatch(/water is 213 ft down/i);
     expect(t).toContain('Wall my property');
     expect(t).toContain('Cheap in cash');
   });
@@ -130,7 +130,7 @@ describe('the guided HUD (server-rendered)', () => {
     expect(t).toContain('Old farmhouse ↔ barn');
     expect(t).toContain('bare earth');
     // one walk is worth laying (the busy one); the hatch is never offered
-    expect(t).toMatch(/Lay paths between my buildings: 1 walk, 40 m of new gravel walk/);
+    expect(t).toMatch(/Lay paths between my buildings: 1 walk, 131 ft of new gravel walk/);
     expect(t).toMatch(/All 1/);
     expect(t).not.toContain('bunker hatch');
     expect(t).toMatch(/Short: .*fieldstone/i);

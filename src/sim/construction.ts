@@ -15,6 +15,7 @@ import { log } from './economy';
 import { chronicleUpkeep } from './lineage';
 import { payUpkeep, toolHold, wearTools, workSpeed } from './tools';
 import type { GameState, Structure } from './state';
+import { lengthText } from './units';
 
 export function blueprintOf(st: Structure) {
   const bp = BLUEPRINTS[st.kind];
@@ -116,7 +117,7 @@ export function addWork(s: GameState, st: Structure, personHours: number, own = 
       // a deep well: the driller bills the meters past the usual bore
       if (st.kind === 'well_drilled' && stage.id === 'foundation' && drillExtra(s.site) > 0) {
         s.money -= drillExtra(s.site);
-        log(s, `The driller went to ${s.site.gwDepth} m for water: $${drillExtra(s.site).toLocaleString('en-US')} more for the extra footage.`);
+        log(s, `The driller went to ${lengthText(s.site.gwDepth)} for water: $${drillExtra(s.site).toLocaleString('en-US')} more for the extra footage.`);
       }
       st.stage++;
       st.done = 0;

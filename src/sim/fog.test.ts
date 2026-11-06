@@ -134,7 +134,7 @@ describe('readout and forecast', () => {
   it('says how far the fog is below the camp and the sight range', () => {
     const d = (() => { for (let s = 1; s < 60; s++) for (let n = 244; n < 334; n++) { const x = fogDay(s, n, 'pnw'); if (x.valley > 0.6) return x; } throw new Error('none'); })();
     const t = fogReadout(fogAt(d, 6.5, { campAboveFloorM: 400, ridgeAboveCampM: 100, mountain: true }));
-    expect(t).toMatch(/Fog down to \d+ m below camp, sight range/);
+    expect(t).toMatch(/Fog down to [\d,]+ ft below camp, sight range/);
     const t2 = fogReadout(fogAt(d, 6.5, { campAboveFloorM: 5, ridgeAboveCampM: 100, mountain: true }));
     expect(t2).toMatch(/Camp in fog/);
     expect(fogReadout(fogAt(fogDay(1, 200, 'desert'), 12, HILL))).toBe('');
@@ -162,6 +162,6 @@ describe('low cloud', () => {
   });
   it('the readout names the cloud when it is low', () => {
     const rainy = fogAt({ ...fogDay(1, 200, 'desert'), overcast: 1, drizzle: 0.9, valley: 0, depth: 0 }, 10, place);
-    expect(fogReadout(rainy)).toMatch(/^Cloud \d+ m over the camp, sight range/);
+    expect(fogReadout(rainy)).toMatch(/^Cloud [\d,]+ ft over the camp, sight range/);
   });
 });

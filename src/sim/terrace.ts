@@ -13,6 +13,7 @@ import { RW, planPad, type Rect } from './retainPlan';
 import { gradeAt, gradeBucket, gradedBlueprint } from './slope';
 
 import type { GameState } from './state';
+import { lengthText } from './units';
 
 export const TERRACE = {
   /** A slope this gentle needs no terrace; one steeper makes each wall taller than a stair can serve. */
@@ -73,7 +74,7 @@ export function planTerraces(s: GameState, rect: Rect, maxTiers: number = TERRAC
   gx /= n; gz /= n;
   const slope = Math.hypot(gx, gz);
   if (slope < TERRACE.MIN_SLOPE) return none('the ground is too gentle to need terraces', slope);
-  if (slope > TERRACE.MAX_SLOPE) return none('the ground is too steep for a bed on each step: the walls would be over three meters', slope);
+  if (slope > TERRACE.MAX_SLOPE) return none('the ground is too steep for a bed on each step: the walls would be over ten feet', slope);
   const axis: 'x' | 'z' = Math.abs(gx) >= Math.abs(gz) ? 'x' : 'z', dir: 1 | -1 = (axis === 'x' ? gx : gz) > 0 ? -1 : 1;   // downhill
   const S = tierSpacing(), L = axis === 'x' ? rect.x1 - rect.x0 : rect.z1 - rect.z0, depth = Math.max(def.cellsX, def.cellsZ) * CELL;
   const count = Math.min(maxTiers, Math.floor((L - depth) / S) + 1);
@@ -96,7 +97,7 @@ export function planTerraces(s: GameState, rect: Rect, maxTiers: number = TERRAC
     tiers.push({ x, z, rot: 0, grade, wallHm: Math.round(plan.maxH * RW.M * 10) / 10, wallLenM: Math.round(plan.lenU * RW.M), pallets: stone, stairs: plan.stairs.length });
     others.push(fp);
   }
-  if (tiers.some(t => t.wallHm > RW.STAIR_MAX_H * RW.M)) return none('the walls would be over three meters', slope);
+  if (tiers.some(t => t.wallHm > RW.STAIR_MAX_H * RW.M)) return none('the walls would be over ten feet', slope);
   if (tiers.some(t => t.wallHm < TERRACE.MIN_WALL_M)) return none('the slope is too gentle for terraces to show', slope);
   return { tiers, axis, dir, slopePct: Math.round(slope * 100), pallets, usd: pallets * (MATERIALS.fieldstone.price ?? 0), hours: Math.round(hours), wallM: Math.round(wallM), problem: null };
 }
@@ -135,6 +136,6 @@ export function terraceSite(s: GameState): TerracePlan | null {
 
 /** Plain words for the plan, for the Next-step card. */
 export function terraceText(p: TerracePlan): string {
-  const walls = p.tiers.map(t => `${t.wallHm} m`).join(', ');
-  return `a ${p.slopePct} % slope: ${p.tiers.length} garden beds stepped down it, each on its own flat terrace held by a dry-stack wall (${p.wallM} m of wall in all, up to ${Math.max(...p.tiers.map(t => t.wallHm))} m high, a stair set in each) instead of one bed on the hill. The walls are the foundation's fieldstone: about ${p.pallets} pallets over the price of level ground, and ${p.hours} more hours on the pads (wall heights ${walls}).`;
+  const walls = p.tiers.map(t => `${lengthText(t.wallHm)}`).join(', ');
+  return `a ${p.slopePct} % slope: ${p.tiers.length} garden beds stepped down it, each on its own flat terrace held by a dry-stack wall (${lengthText(p.wallM)} of wall in all, up to ${lengthText(Math.max(...p.tiers.map(t => t.wallHm)))} high, a stair set in each) instead of one bed on the hill. The walls are the foundation's fieldstone: about ${p.pallets} pallets over the price of level ground, and ${p.hours} more hours on the pads (wall heights ${walls}).`;
 }

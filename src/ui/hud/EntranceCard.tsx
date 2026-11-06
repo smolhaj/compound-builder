@@ -10,6 +10,7 @@ import { entranceChoiceFor } from '../../sim/roadEntrance';
 import { setEntrancePreview } from '../../game/roadPreview';
 import { DIM, TONE, btn, usd } from './style';
 import { pluralize } from '../../sim/words';
+import { lengthText } from '../../sim/units';
 
 export function EntranceCard() {
   const game = useGameStore(s => s.game), setEntrance = useGameStore(s => s.setEntrance);
@@ -28,7 +29,7 @@ export function EntranceCard() {
           {choice.options.map((o, i) => (
             <div key={o.z} onMouseEnter={() => setEntrancePreview(o.z)} style={{ padding: '5px 7px', borderRadius: 6, background: o.current ? 'rgba(216,201,160,0.16)' : 'rgba(255,255,255,0.05)', border: i === choice.suggested ? `1px solid ${TONE.good}` : '1px solid transparent' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6, alignItems: 'center' }}>
-                <span><b>{usd(o.usd)}</b> <span style={{ color: DIM }}>· {pluralize(o.days, 'day')} · {Math.round(o.gateZ * 6)} m along the line</span></span>
+                <span><b>{usd(o.usd)}</b> <span style={{ color: DIM }}>· {pluralize(o.days, 'day')} · {lengthText(o.gateZ * 6)} along the line</span></span>
                 <span style={{ color: TONE.good, fontSize: 11.5 }}>{i === choice.suggested ? 'Suggested' : ''}{o.current ? (i === choice.suggested ? ' · in use' : 'In use') : ''}</span>
               </div>
               <div style={{ color: DIM, fontSize: 11.5, lineHeight: 1.35, marginTop: 2 }}>{o.notes.join('. ')}.</div>

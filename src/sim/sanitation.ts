@@ -9,6 +9,7 @@
  */
 import { isFinished } from './construction';
 import type { GameState, Structure } from './state';
+import { lengthText } from './units';
 
 /** 1 world unit is about 6 m. */
 export const M_PER_UNIT = 6;
@@ -74,4 +75,4 @@ export function worstWell(s: GameState): WellRisk | null {
 }
 
 export const sanitationLine = (w: WellRisk): string =>
-  `the ${w.well.kind.replace(/_/g, ' ')} is only ${Math.round(w.metres)} m from the ${w.source!.kind.replace(/_/g, ' ')} (keep ${SAFE_M} m): seepage makes people sick`;
+  `the ${w.well.kind.replace(/_/g, ' ')} is only ${lengthText(w.metres)} from the ${w.source!.kind.replace(/_/g, ' ')} (keep ${lengthText(SAFE_M)}): seepage makes people sick`;

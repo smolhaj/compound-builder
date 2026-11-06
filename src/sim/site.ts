@@ -14,6 +14,7 @@ import { REGION_IDS, REGIONS, SIZE_FACTOR, type RegionId } from './regions';
 import type { LotSpec } from './lots';
 import { GW_FACTOR, lotDriveFt, lotPriceFactor, rollLot } from './lotListing';
 import { driveQuote, HOUSE_NAME, improvementValue, powerQuote, type Condition, type HouseKind, type Improvements } from './improvements';
+import { lengthText } from './units';
 
 /** The home square on the survey grid (world units; 67 = a quarter-quarter section, 40 acres). */
 export const FORTY = 67;
@@ -224,8 +225,8 @@ export interface Fact { label: string; value: string; tone?: 'good' | 'bad' }
 /** The listing card's rows. */
 export function siteFacts(s: Site): Fact[] {
   return [
-    { label: 'Water', value: !s.creek && !s.spring && s.lot && (s.lot.kind === 'ridge' || s.lot.kind === 'mesa' || s.lot.kind === 'saddle') ? `Dry heights: the well is ${s.gwDepth} m down, haul or catch the rest` : s.creek ? 'Creek runs through' : s.spring ? 'Spring, no creek' : s.region === 'desert' ? 'Dry: a wash runs only after storms' : 'Dry (creek on the neighbor\'s)', tone: s.creek || s.spring ? 'good' : 'bad' },
-    { label: 'Well', value: `${s.gwDepth} m${s.gwDepth <= 9 ? ' (hand-dug OK)' : ''}`, tone: s.gwDepth <= 20 ? 'good' : s.gwDepth > 90 ? 'bad' : undefined },
+    { label: 'Water', value: !s.creek && !s.spring && s.lot && (s.lot.kind === 'ridge' || s.lot.kind === 'mesa' || s.lot.kind === 'saddle') ? `Dry heights: the well is ${lengthText(s.gwDepth)} down, haul or catch the rest` : s.creek ? 'Creek runs through' : s.spring ? 'Spring, no creek' : s.region === 'desert' ? 'Dry: a wash runs only after storms' : 'Dry (creek on the neighbor\'s)', tone: s.creek || s.spring ? 'good' : 'bad' },
+    { label: 'Well', value: `${lengthText(s.gwDepth)}${s.gwDepth <= 9 ? ' (hand-dug OK)' : ''}`, tone: s.gwDepth <= 20 ? 'good' : s.gwDepth > 90 ? 'bad' : undefined },
     { label: 'Groundwater', value: GW_SHORT[s.gwQuality], tone: s.gwQuality === 'good' ? 'good' : s.gwQuality === 'arsenic' ? 'bad' : undefined },
     { label: 'Timber', value: s.timber > 1.1 ? 'Heavy' : s.timber < 0.5 ? 'Open ground' : 'Some' },
     { label: 'Soil', value: s.soil === 'deep' ? 'Deep' : s.soil === 'thin' ? 'Thin, rocky' : 'Fair', tone: s.soil === 'deep' ? 'good' : s.soil === 'thin' ? 'bad' : undefined },
@@ -261,7 +262,7 @@ export function homeOutsideForty(s: Site): Rect[] {
 
 /** Why a piece can't go on this land (null = it can): a hand-dug well needs water within about 9 m. */
 export function siteProblem(s: Site, kind: string): string | null {
-  if (kind === 'well_hand' && s.gwDepth > 9) return `Water is ${s.gwDepth} m down here: too deep to dig by hand (drill a well)`;
+  if (kind === 'well_hand' && s.gwDepth > 9) return `Water is ${lengthText(s.gwDepth)} down here: too deep to dig by hand (drill a well)`;
   return styleOff(s, kind);   // the housing styles: logs need timber, adobe a dry climate, the lodge a slope (sim/housingStyles.ts)
 }
 

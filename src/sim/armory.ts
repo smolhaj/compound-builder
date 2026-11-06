@@ -63,7 +63,7 @@ export interface GunModel {
 export const GUNS: GunModel[] = [
   { id: 'ruger_1022', name: 'Ruger 10/22', type: 'rimfire', cal: '22lr', price: 300, capacity: 10, blurb: 'The classic .22 for rabbits, grouse and teaching the kids.' },
   { id: 'henry_h001', name: 'Henry Classic Lever .22', type: 'rimfire', cal: '22lr', price: 380, capacity: 15, blurb: 'Lever-action .22: small game and plinking.' },
-  { id: 'rem_700', name: 'Remington 700 SPS', type: 'bolt', cal: '308', price: 650, capacity: 4, blurb: 'Bolt-action .308 deer and elk rifle; accurate to 400 m with a scope.' },
+  { id: 'rem_700', name: 'Remington 700 SPS', type: 'bolt', cal: '308', price: 650, capacity: 4, blurb: 'Bolt-action .308 deer and elk rifle; accurate to 450 yards with a scope.' },
   { id: 'savage_axis', name: 'Savage Axis II', type: 'bolt', cal: '3006', price: 450, capacity: 4, blurb: 'Budget bolt-action .30-06, big enough for elk.' },
   { id: 'ruger_american', name: 'Ruger American Gen II', type: 'bolt', cal: '65cm', price: 600, capacity: 3, blurb: 'Light, flat-shooting 6.5 Creedmoor for deer and antelope.' },
   { id: 'marlin_336', name: 'Marlin 336', type: 'lever', cal: '3030', price: 900, capacity: 6, blurb: 'Lever-action .30-30: the timber deer rifle.' },

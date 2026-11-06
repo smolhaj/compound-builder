@@ -28,6 +28,7 @@ import { waterDaysStored } from './water';
 import { HOUSING_STYLES, coverFactor, mainHome } from './housingStyles';
 import { hardenedSafeRoom, hasSafeRoom, layerTier } from './houseHardening';
 import { pluralize } from './words';
+import { lengthText } from './units';
 
 export type Tone = 'good' | 'warn' | 'bad';
 export interface Check { id: string; label: string; ok: boolean; tone: Tone; detail: string }
@@ -116,7 +117,7 @@ export function defenseReport(s: GameState, drive?: readonly Pt[]): DefenseRepor
   if (hosts.length) {
     const decked = hosts.filter(r => { const w = walkOn(s, r.id); return !!w && runFinished(w); });
     const len = walkLength(s), ww = walkwayWatch(s);
-    walls.push(chk('walkway', 'Wall-top walkway', decked.length === hosts.length, decked.length ? `${Math.round(len * 6)} m of patrol deck on ${decked.length} of ${hosts.length} wall run${hosts.length > 1 ? 's' : ''}: ${ww.manned ? 'a guard is up there' : 'nobody on watch up there now'}` : 'guards stand inside the wall; a deck on top sees farther and fights from above', true));
+    walls.push(chk('walkway', 'Wall-top walkway', decked.length === hosts.length, decked.length ? `${lengthText(len * 6)} of patrol deck on ${decked.length} of ${hosts.length} wall run${hosts.length > 1 ? 's' : ''}: ${ww.manned ? 'a guard is up there' : 'nobody on watch up there now'}` : 'guards stand inside the wall; a deck on top sees farther and fights from above', true));
   }
   const garagesStaked = s.structures.filter(st => st.kind === GATE_GARAGE);
   if (garagesStaked.length) {
@@ -170,7 +171,7 @@ export function defenseReport(s: GameState, drive?: readonly Pt[]): DefenseRepor
     dig.push(chk('dogwatch', 'Dogs and a watch', dd.dogs + dd.watchers + (dd.tower ? 1 : 0) > 0, dogCount(s) || dd.watchers ? `${dogCount(s)} dog${dogCount(s) === 1 ? '' : 's'}, ${dd.watchers} on the watch${dd.tower ? ', a tower' : ''}` : 'nobody to bark or to see fresh spoil', true));
     dig.push(chk('notice', 'Chance a dig is noticed', per >= 0.2, `${Math.round(per * 100)}% a day, about ${Math.round(noticeOverDig(per, 9) * 100)}% over a nine-day dig`, per > 0.05));
   }
-  const skirtable = wallRuns.filter(r => !PERIMETER[r.kind].deepFooting).map(r => ({ id: r.id, label: `${PERIMETER[r.kind].name}, ${Math.round(wallLength(r) * 6)} m`, has: hasSkirt(r, s.clock.t), problem: hasSkirt(r, s.clock.t) ? 'already has one' : skirtProblem(s, r) }));
+  const skirtable = wallRuns.filter(r => !PERIMETER[r.kind].deepFooting).map(r => ({ id: r.id, label: `${PERIMETER[r.kind].name}, ${lengthText(wallLength(r) * 6)}`, has: hasSkirt(r, s.clock.t), problem: hasSkirt(r, s.clock.t) ? 'already has one' : skirtProblem(s, r) }));
 
   // ── watching, fighting, sheltering ──
   const posts = towerPosts(s), built = towersBuilt(s);

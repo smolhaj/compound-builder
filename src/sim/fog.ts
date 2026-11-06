@@ -21,6 +21,7 @@
  *  Forecast  `fogForecast`: the line the radio and the daily log give the evening before.
  */
 import type { RegionId } from './regions';
+import { kmText, lengthText } from './units';
 
 /** What a person watches with: it changes how much fog costs them. */
 export type FogSensor = 'eye' | 'camera' | 'nvg' | 'thermal';
@@ -231,14 +232,14 @@ export function solarFogFactor(day: FogDay, place: FogPlace = DEFAULT_PLACE): nu
 
 /** The readout line for the terrain overlay / sightlines: "Fog down to 38 m below camp, sight range 5 km". */
 export function fogReadout(now: FogNow): string {
-  const range = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(m >= 4950 ? 0 : 1)} km` : `${Math.round(m / 10) * 10} m`);
+  const range = (m: number) => (m >= 1000 ? kmText(m / 1000) : lengthText(Math.round(m / 10) * 10));
   if (now.bankM > 0 && now.density > 0.04) {
     const lead = now.inFog
-      ? `Camp in fog, ${Math.round(-now.belowCampM)} m under its top`
-      : `Fog down to ${Math.round(now.belowCampM)} m below camp`;
+      ? `Camp in fog, ${lengthText(-now.belowCampM)} under its top`
+      : `Fog down to ${lengthText(now.belowCampM)} below camp`;
     return `${lead}, sight range ${range(now.sightM)} (thermal ${range(sensorSightM(now, 'thermal'))})`;
   }
-  if (now.cloudBaseM < 400) return `Cloud ${Math.max(0, Math.round(now.cloudBaseM / 10) * 10)} m over the camp, sight range ${range(now.sightM)}`;
+  if (now.cloudBaseM < 400) return `Cloud ${lengthText(Math.max(0, Math.round(now.cloudBaseM / 10) * 10))} over the camp, sight range ${range(now.sightM)}`;
   if (now.sightM < 4500) return `Hazy, sight range ${range(now.sightM)}`;
   return '';
 }
@@ -249,7 +250,7 @@ export function fogForecast(seed: number, doy: number, region: RegionId, place: 
   if (d.valley < 0.4 && d.drizzle < 0.5 && d.overcast < 0.7) return null;
   const dawn = fogAt(d, 6.5, place), lift = Math.round(Math.min(d.burnOffH, 23));
   if (d.valley >= 0.4) {
-    const where = dawn.inFog ? `the camp will be in it (sight ${Math.round(dawn.sightM / 10) * 10} m at first light)` : `down to ${Math.max(0, Math.round(dawn.belowCampM))} m below the camp`;
+    const where = dawn.inFog ? `the camp will be in it (sight ${lengthText(Math.round(dawn.sightM / 10) * 10)} at first light)` : `down to ${lengthText(Math.max(0, Math.round(dawn.belowCampM)))} below the camp`;
     return d.inversion
       ? `Forecast: a winter inversion sets in tonight. Valley fog ${where}; it will not burn off tomorrow.`
       : `Forecast: valley fog by dawn, ${where}; it should lift about ${lift}:00.`;

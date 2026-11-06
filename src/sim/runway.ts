@@ -32,6 +32,7 @@ import { dayIndex } from './state';
 import { regionFor } from './climate';
 import type { SuggestionAct } from './guidance';
 import { pluralize } from './words';
+import { gallonsText } from './units';
 
 export type RunwayId = 'food' | 'water' | 'power' | 'heat' | 'medicine' | 'defense' | 'fuel';
 export type RunwayAct = Extract<SuggestionAct, { type: 'open' | 'shop' }>;
@@ -78,7 +79,7 @@ function foodRow(s: GameState): RunwayRow {
 function waterRow(s: GameState): RunwayRow {
   const d = waterDaysStored(s), well = fin(s).some(st => st.kind.startsWith('well'));
   const tone: RunwayTone = well ? (d >= RUNWAY.water.bad ? 'good' : 'warn') : toneOf(d, RUNWAY.water);
-  return { id: 'water', label: 'Water', days: Math.floor(d), value: daysText(d) + (well ? ', plus the well' : ''), tone, detail: `Water in the tanks and jugs at ${WATER_L_PER_DAY} liters a person a day${well ? '; the well keeps filling the tanks while its pump has power' : ''}.`, fix: tone === 'good' ? { label: 'Utilities', act: { type: 'open', right: 'utilities' } } : { label: 'Water shelf', act: shop('water') } };
+  return { id: 'water', label: 'Water', days: Math.floor(d), value: daysText(d) + (well ? ', plus the well' : ''), tone, detail: `Water in the tanks and jugs at ${gallonsText(WATER_L_PER_DAY)} a person a day${well ? '; the well keeps filling the tanks while its pump has power' : ''}.`, fix: tone === 'good' ? { label: 'Utilities', act: { type: 'open', right: 'utilities' } } : { label: 'Water shelf', act: shop('water') } };
 }
 
 function powerRow(s: GameState): RunwayRow {
@@ -125,9 +126,9 @@ function fuelRow(s: GameState): RunwayRow {
   const car = fleet.find(v => v.condition > 0.1 && !v.fried);
   const burnCar = car ? VEHICLES[car.kind].dailyMiles / VEHICLES[car.kind].mpg * 3.785 : 0;
   const burn = ps.genKw > 0 ? burnGen : burnCar;
-  if (burn <= 0.01) return { id: 'fuel', label: 'Fuel', days: null, value: liters > 0 ? `${Math.round(liters)} L on hand` : 'none needed', tone: 'good', detail: 'No generator and no vehicle to burn it yet.', fix: { label: 'Fuel shelf', act: shop('fuel') } };
+  if (burn <= 0.01) return { id: 'fuel', label: 'Fuel', days: null, value: liters > 0 ? `${gallonsText(liters)} on hand` : 'none needed', tone: 'good', detail: 'No generator and no vehicle to burn it yet.', fix: { label: 'Fuel shelf', act: shop('fuel') } };
   const d = liters / burn;
-  return { id: 'fuel', label: 'Fuel', days: Math.floor(d), value: daysText(d), tone: toneOf(d, RUNWAY.fuel), detail: `${Math.round(liters)} liters in cans and tanks at ${ps.genKw > 0 ? "the generator's burn" : "a day's driving"} (${Math.round(burn)} L a day).`, fix: { label: 'Fuel shelf', act: shop('fuel') } };
+  return { id: 'fuel', label: 'Fuel', days: Math.floor(d), value: daysText(d), tone: toneOf(d, RUNWAY.fuel), detail: `${gallonsText(liters)} in cans and tanks at ${ps.genKw > 0 ? "the generator's burn" : "a day's driving"} (${gallonsText(burn)} a day).`, fix: { label: 'Fuel shelf', act: shop('fuel') } };
 }
 
 /** The first days of a new game: nothing has been asked of the place yet, so an empty shelf is not an alarm. */

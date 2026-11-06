@@ -287,8 +287,8 @@ export function stayOptions(s: GameState, e: Pick<Encounter, 'people' | 'extras'
   if (e.extras?.rig) {
     const rig = e.extras.rig, beds = HOME_BEDS[rig];
     out.push({ kind: 'rig', label: `Their ${RIG_NAME[rig]}`, off: null,
-      line: `Free, today · parked on a pad${beds < n ? `, sleeps ${beds} (the rest in tents)` : ''}; hooks up within ~70 m; drives off with them`,
-      tip: `Their ${RIG_NAME[rig]} sleeps ${beds}. It is parked on a gravel pad near the house (or where you put it, from the build menu), joins the water and power lines on its own if they are within about 70 m, and leaves with its owners if they go. ${beds < n ? `${n - beds} would sleep in tents.` : 'It frees a bed in the house.'} No permit: it is a vehicle, not a building.` });
+      line: `Free, today · parked on a pad${beds < n ? `, sleeps ${beds} (the rest in tents)` : ''}; hooks up within ~230 ft; drives off with them`,
+      tip: `Their ${RIG_NAME[rig]} sleeps ${beds}. It is parked on a gravel pad near the house (or where you put it, from the build menu), joins the water and power lines on its own if they are within about 230 ft, and leaves with its owners if they go. ${beds < n ? `${n - beds} would sleep in tents.` : 'It frees a bed in the house.'} No permit: it is a vehicle, not a building.` });
   }
 
   // 3. a modular home they buy

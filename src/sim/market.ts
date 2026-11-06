@@ -42,6 +42,7 @@ import { calendarOf, dayIndex, type GameState } from './state';
 import { BAG_BASE, BAG_GOODS, bagOf, newMarketState, type BagGood, type MarketGood, type MarketState, type Stall } from './tradeGoods';
 import type { Caliber } from './armory';
 import { pluralize } from './words';
+import { gallonsText } from './units';
 
 export type { MarketGood };
 export interface MLot { good: MarketGood; qty: number }
@@ -172,7 +173,7 @@ export function goToMarket(s: GameState, pid: string, armed: boolean, byVehicle 
   if (byVehicle) {
     const plan = tripPlan(s, MARKET_KM, 1);
     if (!plan.truck) return 'no running vehicle';
-    if (plan.have < plan.liters) return `not enough fuel: ${plan.liters} L there and back`;
+    if (plan.have < plan.liters) return `not enough fuel: ${gallonsText(plan.liters)} there and back`;
     driveTrip(s, plan.truck, MARKET_KM, plan.liters, 0.004);
     vehicle = plan.truck.id;
   }

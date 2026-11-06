@@ -127,8 +127,8 @@ export function hydroProblem(s: GameState, x: number, z: number): 'no_creek' | '
 
 export const HYDRO_PROBLEM_TEXT = {
   no_creek: 'No creek runs through your land: a turbine needs falling water',
-  not_on_bank: 'Put the turbine house on the creek bank, within about 80 m of the water',
-  no_head: 'The creek does not fall far enough here: it needs 2.5 m of drop over the penstock (try further downstream, or a steeper reach)',
+  not_on_bank: 'Put the turbine house on the creek bank, within about 260 ft of the water',
+  no_head: 'The creek does not fall far enough here: it needs 8 ft of drop over the penstock (try further downstream, or a steeper reach)',
 } as const;
 
 export type HydroState = 'running' | 'dry' | 'frozen' | 'flood' | 'broken' | 'choked';

@@ -12,7 +12,7 @@ export type BagGood = typeof BAG_GOODS[number];
 
 /** 2025 shelf price and unit. */
 export const BAG_BASE: Record<BagGood, { name: string; unit: string; price: number }> = {
-  salt: { name: 'Salt', unit: 'kg of salt', price: 2 },
+  salt: { name: 'Salt', unit: '2 lb bags of salt', price: 2 },
   coffee: { name: 'Coffee', unit: 'lb of coffee', price: 9 },
   batteries: { name: 'Batteries', unit: 'four-packs of AA', price: 6 },
   tobacco: { name: 'Tobacco', unit: 'packs of cigarettes', price: 9 },

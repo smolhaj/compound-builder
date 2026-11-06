@@ -50,6 +50,7 @@ import type { Character } from './trial';
 import { lifeOf, plural, surname } from './neighborLife';
 import { joinersDay, kitLine, pool, rigLeaves, rollKit, settleStay, type StayKind } from './joinerHome';
 import { pluralize } from './words';
+import { caloriesText } from './units';
 
 // ─────────────────────────────────────────────────────────────────────────
 // State
@@ -299,7 +300,7 @@ export function strangerArrival(s: GameState, r: () => number, id: string, day: 
       `Say they’re good at: ${best.join(', ') || 'not much yet'}.`,
       ...(hurtWho ? [`${hurtWho.first} is hurt: ${spec.hurt!.what}.`] : []),
       `Brings: ${kitLine(brings, extras, people)}.`,
-      `${n} more to feed: about ${people.reduce((a, p) => a + needOf(p), 0).toLocaleString('en-US')} kcal a day.`,
+      `${n} more to feed: about ${caloriesText(people.reduce((a, p) => a + needOf(p), 0))} a day.`,
     ],
     size: n, armed: false, strength: 0, people, brings,
     stances: ['take_in', 'trial', 'trade', 'turn_away'],
@@ -541,7 +542,7 @@ export function requestShelter(s: GameState, n: Neighbor, why: ShelterWhy, r: ()
       trustLine(n),
       `They carry: ${bringsLine(brings, extras)}.`,
       why === 'settle' ? 'Their place stays theirs if it comes right; until then they would live here.' : `They would stay about ${pluralize(stayDays, 'day')}. Their farm stays theirs.`,
-      `${count} more to feed: about ${people.reduce((a, p) => a + needOf(p), 0).toLocaleString('en-US')} kcal a day.`,
+      `${count} more to feed: about ${caloriesText(people.reduce((a, p) => a + needOf(p), 0))} a day.`,
     ],
     size: count, armed: false, strength: 0, people, brings, extras, neighbor: n.id,
     stances: ['take_in', 'turn_away'],

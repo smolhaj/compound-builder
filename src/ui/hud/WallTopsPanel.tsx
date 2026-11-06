@@ -10,6 +10,7 @@ import {
 import { Group, Hint, Note, Row } from './common';
 import { DIM, btn, usd } from './style';
 import { pluralize } from '../../sim/words';
+import { lengthText } from '../../sim/units';
 
 export function WallTopsPanel() {
   const game = useGameStore(s => s.game);
@@ -30,21 +31,21 @@ export function WallTopsPanel() {
       const price = orderCost(Object.entries(electricBill(len)).filter(([m]) => MATERIALS[m as MaterialId].price !== null).map(([material, qty]) => ({ material: material as MaterialId, qty: qty as number })));
       const on = topLive(game, r);
       return <div key={r.id} style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '3px 0', flexWrap: 'wrap' }}>
-        <span style={{ flex: 1 }}>{PERIMETER[r.kind].name} <span style={{ color: DIM }}>({Math.round(len * 6)} m{r.razor ? ', razor' : ''}{r.electric ? (on ? ', live' : ', DARK') : ''}{r.electric && r.noCert ? ', no certificate' : ''}{brushOf(r) >= 0.5 ? ', overgrown' : ''})</span></span>
+        <span style={{ flex: 1 }}>{PERIMETER[r.kind].name} <span style={{ color: DIM }}>({lengthText(len * 6)}{r.razor ? ', razor' : ''}{r.electric ? (on ? ', live' : ', DARK') : ''}{r.electric && r.noCert ? ', no certificate' : ''}{brushOf(r) >= 0.5 ? ', overgrown' : ''})</span></span>
         {!r.electric && <button style={btn(false)} disabled={!!why} title={why ?? `${Math.round(electricHours(len))} h of work; about ${usd(price)} of wire, cable and hardware plus ${usd(electricCash(game, false))} for the energizer${electricCash(game, false) > E.ENERGIZER_USD ? ' and the certificate' : ''}`} onClick={() => { const w = useGameStore.getState().addElectric(r.id, false); if (w) alert(w); }}>{why ? 'Not yet' : 'Fit electric fence'}</button>}
         {!r.electric && !why && <button style={btn(false)} title={`The same with a sealed battery: ${usd(electricCash(game, true))} for the installer and the battery`} onClick={() => { const w = useGameStore.getState().addElectric(r.id, true); if (w) alert(w); }}>With battery</button>}
         {r.electric && !r.backup && <button style={btn(false)} title={`A sealed battery for ${usd(E.BACKUP_USD)}: keeps it live for ${pluralize(E.BACKUP_DAYS, 'day')} of outage`} onClick={() => { const w = useGameStore.getState().addFenceBackup(r.id); if (w) alert(w); }}>Add battery</button>}
         {r.electric && r.backup && <span style={{ color: DIM }}>battery backup</span>}
       </div>;
     })}
-    {live > 0 ? <Row label="Live electric fence" value={`${live} m`} tone="good" title="At 30 m or more it is an alarm too" /> : game.perimeter.some(r => r.electric) && <Note tone="warn">The electric fence is dark: no power and no battery. It is only wires on the wall.</Note>}
+    {live > 0 ? <Row label="Live electric fence" value={`${lengthText(live)}`} tone="good" title="At 100 ft or more it is an alarm too" /> : game.perimeter.some(r => r.electric) && <Note tone="warn">The electric fence is dark: no power and no battery. It is only wires on the wall.</Note>}
     <div style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '4px 0' }}>
       <span style={{ flex: 1 }}>Weak spots <span style={{ color: DIM }}>({spots.length}: {spots.filter(s => s.kind === 'building').length} buildings, {treeSpots.length} trees, {spots.filter(s => s.kind === 'brush').length} brush)</span></span>
       <button style={btn(weakView)} title="Mark every place a climber can bypass a wall: red = a building to step from, orange = a tree over the wall, green = brush" onClick={() => setWeakView(!weakView)}>{weakView ? 'Hide overlay' : 'Show overlay'}</button>
     </div>
     {walls.slice(0, 8).map(r => {
       const p = weakPenalty(game, r);
-      return p > 0 ? <Row key={r.id} label={`${PERIMETER[r.kind].name} (${Math.round(wallLength(r) * 6)} m)`} value={`−${Math.round(p * 100)} points`} tone="warn" title="What the weak spots cost what this wall stops" /> : null;
+      return p > 0 ? <Row key={r.id} label={`${PERIMETER[r.kind].name} (${lengthText(wallLength(r) * 6)})`} value={`−${Math.round(p * 100)} points`} tone="warn" title="What the weak spots cost what this wall stops" /> : null;
     })}
     {treeSpots.length > 0 && <div style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '3px 0' }}>
       <span style={{ flex: 1, color: DIM }}>{treeSpots.length} tree{treeSpots.length > 1 ? 's' : ''} reach over a wall</span>

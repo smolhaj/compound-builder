@@ -16,6 +16,7 @@ import { orderCost, orderProblem, prices } from '../../sim/economy';
 import { billText, type MaterialId } from '../../sim/materials';
 import { Note } from './common';
 import { btn, DIM, LINE, usd } from './style';
+import { FT_PER_M, lengthText } from '../../sim/units';
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const WORN_TEXT = { none: 'not yet a track', desire: 'trampled', dirt: 'bare earth' } as const;
@@ -45,7 +46,7 @@ export function PathsPanel({ startOpen = false }: { startOpen?: boolean }) {
 
   if (!open) {
     return <button style={{ ...btn(true), width: '100%', margin: '2px 0 6px' }} title="The tracks the family has worn between the buildings, and what you can lay on them: gravel, stepping stones, duckboards, concrete" onClick={() => setOpen(true)}>
-      Footpaths…{edges.length > 0 && <span style={{ opacity: 0.7 }}> · {tracks} worn{laidM > 0 ? `, ${laidM} m laid` : ''}</span>}
+      Footpaths…{edges.length > 0 && <span style={{ opacity: 0.7 }}> · {tracks} worn{laidM > 0 ? `, ${lengthText(laidM)} laid` : ''}</span>}
     </button>;
   }
   return <div style={{ border: '1px solid #d8c9a0', borderRadius: 8, padding: 8, margin: '2px 0 8px', background: 'rgba(216,201,160,0.07)' }}>
@@ -57,7 +58,7 @@ export function PathsPanel({ startOpen = false }: { startOpen?: boolean }) {
     {edges.length === 0 && <Note>Nothing to link yet: paths appear between buildings once there are two.</Note>}
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, margin: '4px 0' }}>
       {LAID_KINDS.map(k => <button key={k} style={{ ...btn(k === kind), padding: '2px 7px', fontSize: 11.5 }} title={LAID_BLURB[k]} onClick={() => { setKind(k); setNote(null); }}>
-        {LAID_NAME[k].replace(' walk', '')} <span style={{ opacity: 0.7 }}>{usd(billPrice(laidBill(k, 100)))}/100 m</span>
+        {LAID_NAME[k].replace(' walk', '')} <span style={{ opacity: 0.7 }}>{usd(billPrice(laidBill(k, 100 / FT_PER_M)))}/100 ft</span>
       </button>)}
     </div>
     <div style={{ color: DIM, fontSize: 11.5 }}>{LAID_BLURB[kind]}</div>
@@ -65,7 +66,7 @@ export function PathsPanel({ startOpen = false }: { startOpen?: boolean }) {
       {todo.length === 0
         ? <Note tone="good">{kind === 'paved' ? 'Every busy walk between the main buildings has concrete on it, or there are none yet.' : 'Every busy walk already has this laid.'}</Note>
         : <>
-          <div>Lay paths between my buildings: <b>{todo.length}</b> walk{todo.length > 1 ? 's' : ''}, <b>{Math.round(plan.lenM)} m</b> of new {LAID_NAME[kind].toLowerCase()}</div>
+          <div>Lay paths between my buildings: <b>{todo.length}</b> walk{todo.length > 1 ? 's' : ''}, <b>{lengthText(plan.lenM)}</b> of new {LAID_NAME[kind].toLowerCase()}</div>
           <div style={{ color: DIM, fontSize: 11.5 }}>Needs {billText(plan.bill)} (about {usd(plan.cost)} at the yard); the family lays it in an afternoon.</div>
           {lines.length > 0 && <Note tone="warn">Short: {billText(plan.short)}. <button style={{ ...btn(), padding: '0 6px', fontSize: 11 }} disabled={!!orderWhy} title={orderWhy ? 'Cannot order that now (money, or nobody delivering)' : undefined} onClick={() => { g.order(lines); }}>Order it ({usd(orderCost(lines, prices(game)))})</button></Note>}
           <button style={{ ...btn(true), width: '100%', marginTop: 4 }} disabled={lines.length > 0} onClick={() => lay(todo, kind)}>Lay paths between my buildings: {usd(plan.cost)}</button>
@@ -81,9 +82,9 @@ export function PathsPanel({ startOpen = false }: { startOpen?: boolean }) {
         const one = planLay(game, net ? layShares(net, [e], kind) : [], kind);
         const can = e.can[kind], why = e.hidden ? 'a track to the hatch stays unmarked' : !can ? 'concrete only joins the main buildings' : null;
         return <div key={e.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, padding: '2px 0', borderBottom: `1px solid ${LINE}` }}>
-          <span style={{ minWidth: 0 }} title={`${e.lenM} m, ${e.trips} trips a day`}>
+          <span style={{ minWidth: 0 }} title={`${lengthText(e.lenM)}, ${e.trips} trips a day`}>
             {cap(e.aName)} ↔ {e.bName}
-            <span style={{ color: DIM, fontSize: 11 }}> · {e.lenM} m · {e.laid ? <span style={{ color: '#a8d080' }}>{LAID_NAME[e.laid].toLowerCase()}</span> : WORN_TEXT[e.worn]}</span>
+            <span style={{ color: DIM, fontSize: 11 }}> · {lengthText(e.lenM)} · {e.laid ? <span style={{ color: '#a8d080' }}>{LAID_NAME[e.laid].toLowerCase()}</span> : WORN_TEXT[e.worn]}</span>
           </span>
           {e.laid
             ? <button style={{ ...btn(), padding: '1px 6px', fontSize: 11 }} title="Take it up: back to a worn track" onClick={() => g.pickUpPath(e.a, e.b)}>Take up</button>

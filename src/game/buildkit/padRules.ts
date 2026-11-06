@@ -7,6 +7,7 @@
 import { KIT, footprint, type KitPieceDef, type Placed } from './kit';
 import { isUnderground } from './underground';
 import { RW, WALLLESS, planPad, type Natural, type Rect } from '../../sim/retainPlan';
+import { lengthText } from '../../sim/units';
 
 /** Pads that stand at levels this far apart (u, 45 cm) cannot share ground. */
 export const LEVEL_APART = RW.MIN_H;
@@ -52,7 +53,7 @@ export function padClash(def: KitPieceDef, x: number, z: number, rot: number, h:
 export function clashText(c: PadClash, snapM: number | null): string {
   const name = (KIT[c.other.kind]?.name ?? c.other.kind).toLowerCase();
   const m = Math.round(Math.abs(c.dy) * RW.M * 10) / 10;
-  return `Its graded pad would cut into the pad of the ${name}, which stands ${m} m ${c.dy > 0 ? 'higher' : 'lower'}.${snapM === null ? ' Move it clear, up or down the slope.' : ` Press S to snap to the nearest clear spot (${Math.round(snapM)} m away).`}`;
+  return `Its graded pad would cut into the pad of the ${name}, which stands ${lengthText(m)} ${c.dy > 0 ? 'higher' : 'lower'}.${snapM === null ? ' Move it clear, up or down the slope.' : ` Press S to snap to the nearest clear spot (${Math.round(snapM)} m away).`}`;
 }
 
 /**

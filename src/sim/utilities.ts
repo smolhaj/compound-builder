@@ -33,6 +33,7 @@ import { arrayStripped, GROUND_ARRAYS, solarCoolK } from './microclimate';
 import { intakeCare, renewablesDay, type RenewDay } from './renewables';
 import { bestLevel } from './skills';
 import { regionFor } from './climate';
+import { gallonsText } from './units';
 
 /** What utility buildings provide. */
 export interface UtilityDef {
@@ -519,10 +520,10 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
   const creekDry = s.disaster.kind === 'drought' && s.clock.t >= s.disaster.hitAt;
   if (left < 0 && (supply + store > 0 || creekDry)) {
     // while the town works, what's short is bought (bottled water, the county water truck) instead of going without
-    if (townOpen) { const cost = Math.round(-left * waterPrice(s)); s.money -= cost; if (cost > 30) log(s, `Bought ${Math.round(-left)} L of water in town ($${cost}).`); }
+    if (townOpen) { const cost = Math.round(-left * waterPrice(s)); s.money -= cost; if (cost > 30) log(s, `Bought ${gallonsText(-left)} of water in town ($${cost}).`); }
     // the pump's dead or the tank's dry: back to buckets from the creek (playtest: families died of thirst beside a running creek)
     else if (!creekDry) { u.hauling = true; if (!s.site.creek) u.haulFar = true; }
-    else { shortL = -left; log(s, `Water ran short by ${Math.round(shortL)} L.`); }
+    else { shortL = -left; log(s, `Water ran short by ${gallonsText(shortL)}.`); }
   }
   const nameplate = fin.reduce((a, st) => a + (u.fried.includes(st.id) ? 0 : UTILITY[st.kind]?.solarKw ?? 0), 0);
   u.report = { hydroKwh: renew.hydroKwh, windKwh: renew.windKwh, exportKwh: exported, creditUsd: credit, wastedKwh: wasted, solarKw: nameplate, storedKwh: u.batteryKwh, capKwh, solarKwh: solar, drawKwh: draw, genKwh: gen, shortKwh: short, batteryPct: capKwh > 0 ? u.batteryKwh / capKwh : 0, gridKwh, billUsd: bill, shed, waterL: supply + Math.max(0, rainL), useL: use, shortL, storedL: u.storedL };

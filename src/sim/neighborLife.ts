@@ -48,6 +48,7 @@ import { inPact } from './pact';
 import { threatOn } from './threatState';
 import { bringsLine, householdPeople, neighborBrings, neighborSecret, requestShelter, trustLine, trustMult } from './newcomers';
 import type { Caliber } from './armory';
+import { caloriesText, kmText } from './units';
 
 // ─────────────────────────────────────────────────────────────────────────
 // State
@@ -252,7 +253,7 @@ function askToJoin(s: GameState, n: Neighbor, why: string, r: () => number): boo
   const brings = { canned: 2 + Math.floor(r() * 4), staples: 1, ...carried.brings };
   const e: Encounter = {
     id: `e${s.nextId++}`, kind: 'arrival', day, title: `The ${plural(surname(n))} at the gate`,
-    dossier: [why, `${people.length} of them: ${people.map(p => `${p.first}, ${p.age}`).join('; ')}.`, `Good at: ${n.skill}.`, trustLine(n), `They carry: ${bringsLine(brings, carried.extras)}.`, `${people.length} more to feed: about ${people.length * 2200} kcal a day.`],
+    dossier: [why, `${people.length} of them: ${people.map(p => `${p.first}, ${p.age}`).join('; ')}.`, `Good at: ${n.skill}.`, trustLine(n), `They carry: ${bringsLine(brings, carried.extras)}.`, `${people.length} more to feed: about ${caloriesText(people.length * 2200)} a day.`],
     size: people.length, armed: false, strength: 0, people, brings, extras: carried.extras, arche: 'neighbor', neighbor: n.id,
     secret: neighborSecret(n.disposition, mulberry32(s.seed * 3169 + hashId(n.id) + 1)),
     stances: ['take_in', 'trial', 'turn_away'],
@@ -276,7 +277,7 @@ function settleRefugees(s: GameState, r: () => number): string | null {
   const l = lifeOf(s, n);
   l.origin = 'refugees'; l.blurb = blurb; l.head = 28 + Math.floor(r() * 18);
   L.refugees++;
-  const text = `Refugees have settled ${n.km} km ${n.dir}: the ${last}s. ${blurb}`;
+  const text = `Refugees have settled ${kmText(n.km)} ${n.dir}: the ${last}s. ${blurb}`;
   l.history.push({ day: dayIndex(s.clock.t), text: 'Settled here after the collapse.', known: true, how: 'seen' });
   return text;
 }
@@ -476,7 +477,7 @@ export function neighborLifeDay(s: GameState): string[] {
       if (inPact(s, n.id) && !L.callout) {
         L.callout = { neighbor: n.id, day, raiders, temper };
         out.push(`Three shots from the ${surname(n)} place, then three more: the signal. ${n.radio ? `On the net: "${raiders} of them, maybe more. We need you."` : 'They need help.'}`);
-        s.gate.card ??= { title: `The ${plural(surname(n))} are calling`, text: `Raiders at the ${surname(n)} place, ${n.km} km ${n.dir}. Answer on the Neighbors panel: send people, or stay home.`, tone: 'bad', lines: [] };
+        s.gate.card ??= { title: `The ${plural(surname(n))} are calling`, text: `Raiders at the ${surname(n)} place, ${kmText(n.km)} ${n.dir}. Answer on the Neighbors panel: send people, or stay home.`, tone: 'bad', lines: [] };
         continue;
       }
       const res = raidHousehold(s, n, raiders, temper, nr);

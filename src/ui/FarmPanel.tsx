@@ -18,12 +18,13 @@ import { regionFor } from '../sim/climate';
 import { AQUA, aquaReport, harvestAqua, harvestProblem as aquaHarvestProblem, stockAqua, stockProblem as aquaStockProblem } from '../sim/aquaponics';
 import { isTunnel, tunnelNote, tunnelPestLoss } from '../sim/tunnels';
 import { pluralize } from '../sim/words';
+import { caloriesText, gramsText, poundsText } from '../sim/units';
 
 const oxygenWord = (o: number): [string, 'good' | 'warn' | 'bad'] => (o >= 0.7 ? ['fresh', 'good'] : o >= 0.45 ? ['low', 'warn'] : ['gasping', 'bad']);
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], MONTH_START = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
 /** A day of the year as 'May 12'. */
 const dayText = (doy: number): string => { const d = ((Math.round(doy) - 1) % 365 + 365) % 365; let m = 11; while (m > 0 && d < MONTH_START[m]) m--; return `${MONTHS[m]} ${d - MONTH_START[m] + 1}`; };
-const kcal = (n: number) => `${Math.round(n).toLocaleString('en-US')} kcal`;
+const kcal = (n: number) => caloriesText(n);
 
 export function FarmPanel({ game }: { game: GameState }) {
   const g = useGameStore();
@@ -75,7 +76,7 @@ export function FarmPanel({ game }: { game: GameState }) {
     {bays.map(st => {
       const r = aquaReport(game, st);
       return <Section key={st.id} title="Aquaponics">
-        <Row label="Tilapia" value={r.fish > 0 ? `${Math.floor(r.fish).toLocaleString('en-US')} · ${Math.round(r.fishG)} g each${r.table ? ' · table size' : ''} · ${r.kg.toFixed(0)} kg` : 'none'} title={`Table size is ${AQUA.TABLE_G} g; the tanks hold ${AQUA.TANK_KG} kg`} />
+        <Row label="Tilapia" value={r.fish > 0 ? `${Math.floor(r.fish).toLocaleString('en-US')} · ${gramsText(r.fishG)} each${r.table ? ' · table size' : ''} · ${poundsText(r.kg)}` : 'none'} title={`Table size is ${gramsText(AQUA.TABLE_G)}; the tanks hold ${poundsText(AQUA.TANK_KG)}`} />
         <Row label="Water" value={<span>{Math.round(r.tempC)} C · {r.powered ? 'pumps and heater on' : <span style={{ color: TONE.bad }}>no power</span>}</span>} />
         <Row label="Greens" value={`${kcal(r.plantsKcal)} a day`} />
         {r.fish > 0 && <Row label="Feed" value={Number.isFinite(r.feedDays) ? `${Math.floor(game.stock.fish_feed ?? 0)} bags · ${pluralize(Math.floor(r.feedDays), 'day')}` : '—'} tone={r.feedDays < 7 ? 'warn' : undefined} />}
@@ -89,7 +90,7 @@ export function FarmPanel({ game }: { game: GameState }) {
     {ponds.map(st => {
       const r = pondReport(game, st), [ow, ot] = oxygenWord(r.oxygen);
       return <Section key={st.id} title="Pond">
-        <Row label="Trout" value={r.trout > 0 ? `${r.trout.toLocaleString('en-US')} · ${Math.round(r.troutG)} g each${r.table ? ' · table size' : ''}` : 'none'} title={`Table size is ${TABLE_G} g`} />
+        <Row label="Trout" value={r.trout > 0 ? `${r.trout.toLocaleString('en-US')} · ${gramsText(r.troutG)} each${r.table ? ' · table size' : ''}` : 'none'} title={`Table size is ${gramsText(TABLE_G)}`} />
         <Row label="Crayfish" value={r.crayfish > 0 ? r.crayfish.toLocaleString('en-US') : 'none'} />
         <Row label="Water" value={<span>{Math.round(r.tempC)} C · oxygen <span style={{ color: TONE[ot] }}>{ow}</span>{r.aerated ? ' · aerator on' : ''}</span>} />
         {r.trout > 0 && <Row label="Feed" value={Number.isFinite(r.feedDays) ? `${Math.floor(game.stock.fish_feed ?? 0)} bags · ${pluralize(Math.floor(r.feedDays), 'day')}` : '—'} tone={r.feedDays < 7 ? 'warn' : undefined} />}

@@ -15,6 +15,7 @@ import { orderCost, prices } from '../../sim/economy';
 import { crewQuote, CREW_RATE } from '../../sim/crews';
 import { useSpendGuard } from './useSpendGuard';
 import { drillExtra } from '../../sim/site';
+import { FT_PER_M } from '../../sim/units';
 import { countyWorks, needsPermit, permitFee } from '../../sim/paperwork';
 import { BUNKER_ORDER, GATEHOUSE_ORDER, KIT, POD_ORDER, RIG_ORDER, TERRACE_ORDER, TOWER_ORDER, UTILITY_ORDER } from '../../game/buildkit/kit';
 import { PERIMETER, UTILITY_LINES, runBill, runHours, type PerimeterKind } from '../../sim/perimeter';
@@ -163,7 +164,7 @@ export function BuildMenu({ showProjects = () => undefined }: { showProjects?: (
       })}
     </Group>
     {(game.joiners?.waiting.length ?? 0) > 0 && !g.tool && <Group id="rigs" title="Park a joiner's rig" extra={`${game.joiners!.waiting.length} waiting`} defaultOpen>
-      <Hint more="A newcomer's travel trailer or RV waits at the gate for a pad of your choosing. Place it within about 70 m of the house and the wells and it hooks up to the water and power on its own.">Their rig is waiting for a pad.</Hint>
+      <Hint more="A newcomer's travel trailer or RV waits at the gate for a pad of your choosing. Place it within about 230 ft of the house and the wells and it hooks up to the water and power on its own.">Their rig is waiting for a pad.</Hint>
       {game.joiners!.waiting.map(w => <Fragment key={w.id}>{(RIG_ORDER.includes(w.kind) ? [w.kind] : []).map(k => <Item key={k} name={`${KIT[k].name} (theirs)`} cost="free" sub="arrives finished" on={g.tool === k} title={KIT[k].blurb} click={() => arm(k)} />)}</Fragment>)}
     </Group>}
     {BUILD_GROUPS.map(([gid, title, kinds]) => (
@@ -182,7 +183,7 @@ export function BuildMenu({ showProjects = () => undefined }: { showProjects?: (
     </Group>
     <Group id="lines" title="Advanced: pipes & cables" extra="far outposts" defaultOpen={false}>
       <Hint more="Buildings join the water and power lines on their own. Draw a line by hand only to reach a far outpost or to choose the route.">Hooked up automatically.</Hint>
-      {UTILITY_LINES.map(kind => lineItem(kind, 100, '100 m'))}
+      {UTILITY_LINES.map(kind => lineItem(kind, 100 / FT_PER_M, '100 ft'))}
     </Group>
     <Group id="under" title="Underground" extra={shelters > 0 ? `shelters ${shelters}` : undefined} defaultOpen={false}>
       <div style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '5px 8px', marginBottom: 3 }}>
@@ -198,8 +199,8 @@ export function BuildMenu({ showProjects = () => undefined }: { showProjects?: (
         {!bunkerStarted && <Note>Start with a hatch or stairwell.</Note>}
       </div>
       {BUNKER_ORDER.map(kit)}
-      {lineItem('escape_tunnel', 50, '50 m')}
-      {lineItem('underground_passage', 50, '50 m')}
+      {lineItem('escape_tunnel', 150 / FT_PER_M, '150 ft')}
+      {lineItem('underground_passage', 150 / FT_PER_M, '150 ft')}
     </Group>
     <Group id="perimeter" title="Perimeter" defaultOpen={false}>
       <WallProperty />
@@ -207,7 +208,7 @@ export function BuildMenu({ showProjects = () => undefined }: { showProjects?: (
       <Hint more={`Fences upgrade in place, tier to tier (Defense tab, Upgrade the walls): ${chain}.`}>Fences upgrade in place.</Hint>
       {perimeterTiers().map(t => <div key={t.id}>
         <div style={{ fontSize: 11, color: DIM, margin: '4px 2px 2px' }} title={t.hint}>{t.title} <span style={{ opacity: 0.7 }}>· {t.hint}</span></div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>{t.kinds.map(k => lineItem(k, 100, '100 m'))}</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>{t.kinds.map(k => lineItem(k, 100 / FT_PER_M, '100 ft'))}</div>
       </div>)}
     </Group>
     <Group id="woods" title="Woods" defaultOpen={false}>

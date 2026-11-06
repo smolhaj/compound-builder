@@ -25,6 +25,7 @@ import { mulberry32 } from './rng';
 import type { Rect } from './land';
 import type { GameState, Structure } from './state';
 import { pluralize } from './words';
+import { lengthText } from './units';
 
 export type StarterRole = 'shelter' | 'water' | 'power' | 'sanitation' | 'food' | 'defense';
 
@@ -225,7 +226,7 @@ export function planStarter(s: GameState, o: StarterOpts): StarterPlan {
 
   // 2. water: a drilled well where the water is deep, a hand-dug one where it is near
   const deep = s.site.gwDepth > 9;
-  put({ ...SPECS.well, kind: deep ? 'well_drilled' : 'well_hand', why: deep ? `water is ${s.site.gwDepth} m down: drilled and cased` : 'water is near: dug by hand, with a pump' }, deep ? 'well_drilled' : 'well_hand', !has(WATER),
+  put({ ...SPECS.well, kind: deep ? 'well_drilled' : 'well_hand', why: deep ? `water is ${lengthText(s.site.gwDepth)} down: drilled and cased` : 'water is near: dug by hand, with a pump' }, deep ? 'well_drilled' : 'well_hand', !has(WATER),
     (x, z) => (site.height(x, z) - site.height(home.x, home.z)) * -0.5);
   // 3. the privy, uphill-of-nothing: downhill of the well and 30 m from it
   const wells = () => [...standing.filter(st => st.kind.startsWith('well_')).map(st => ({ x: st.x, z: st.z })), ...(['well'].map(k => spots.get(k)).filter(Boolean) as Array<{ x: number; z: number }>)];

@@ -374,11 +374,11 @@ describe('supply runs, trade trips and towing', () => {
     expect(scavengeOf(g).run!.vehicle).toBe(v.id);
     expect(runs(v)).toBe(true);
   });
-  it('no fuel, no run: it says how many liters it needs', () => {
+  it('no fuel, no run: it says how many gallons it needs', () => {
     const g = after(); g.stock.fuel = 0; fleetOf(g)[0].fuel = 1;
     ensurePlaces(g);
     const team = g.people.filter(p => !p.kid).map(p => p.id).slice(0, 2);
-    expect(runProblem(g, 'pl_hardware', team, 'truck')).toMatch(/not enough fuel: \d+ L/);
+    expect(runProblem(g, 'pl_hardware', team, 'truck')).toMatch(/not enough fuel: [\d.]+ gal/);
   });
   it('a vehicle that is away is not available for a second run', () => {
     const g = after(); g.stock.fuel = 5;
