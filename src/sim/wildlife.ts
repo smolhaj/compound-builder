@@ -353,6 +353,7 @@ export function hurtKid(s: GameState, sev: number, what: string): { name: string
   const kid = kids[0], ps = s.personState.find(x => x.id === kid.id)!;
   if (s.disaster.difficulty === 'hardcore') {
     ps.needs.died = Math.floor(s.clock.t);
+    ps.needs.cause = 'wild animal';
     ps.needs.health = 0;
     return { name: kid.first, died: true };
   }

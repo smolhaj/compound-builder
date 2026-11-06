@@ -11,8 +11,9 @@ import { foodNudge } from './spendGuard';
 import { isFinished } from './construction';
 import { defenseReport, type DefenseReport } from './defenseReport';
 import { buildOff, type SuggestionAct } from './guidance';
-import { POWER_BUILDINGS as POWER, powerOnPlace } from './hookups';
+import { POWER_BUILDINGS as POWER, needsHookup, powerOnPlace } from './hookups';
 import type { GameState } from './state';
+import { stuckAction, stuckProject } from './stalls';
 
 export type OpId = 'shelter' | 'water' | 'power' | 'food' | 'defense';
 export interface OpItem {
@@ -44,15 +45,19 @@ export function operational(s: GameState, drive?: readonly Pt[], report?: Defens
 
   // shelter: a finished home with a bed for everyone
   const people = s.people.length, beds = homeBeds(s), homes = s.structures.filter(st => isHome(st.kind));
+  const stuck = stuckProject(s);
   const shelterDone = homes.some(isFinished) && beds >= people;
   out.push({ id: 'shelter', label: 'Shelter', done: shelterDone,
     line: shelterDone ? `${beds} beds for ${people}` : homes.length === 0 ? 'No roof yet' : !homes.some(isFinished) ? 'Home going up' : `${people - beds} without a bed`,
-    ...(shelterDone ? {} : homes.length === 0 ? { act: stake('timber_cabin', 'Stake a cabin') } : homes.some(isFinished) ? { act: stake('cottage', 'Add a cottage') } : { act: { label: 'Projects', act: { type: 'select' as const, id: homes[0].id } } }) });
+    ...(shelterDone ? {} : homes.length === 0 ? { act: stake('timber_cabin', 'Stake a cabin') } : homes.some(isFinished) ? { act: stake('cottage', 'Add a cottage') } : stuck?.at && homes.some(h => h.id === stuck.at) ? { act: { label: stuckAction(stuck), act: { type: 'order' as const, lines: stuck.lines } } } : { act: { label: 'Projects', act: { type: 'select' as const, id: homes[0].id } } }) });
 
   // water
-  const waterDone = fin(WATER);
-  out.push({ id: 'water', label: 'Water', done: waterDone, line: waterDone ? 'A working source' : staked(WATER) ? 'Well going in' : 'No water on the place',
-    ...(waterDone || staked(WATER) ? {} : { act: stake(s.site.gwDepth > 9 ? 'well_drilled' : 'well_hand', s.site.gwDepth > 9 ? 'Drill a well' : 'Dig a well') }) });
+  // a source standing is not water in the house when it was meant to reach it: a pump with no power, or a home with no running water, keeps the tick off (QA run 4: the tick lied)
+  const wet = fin(WATER) ? needsHookup(s).find(h => ((h.kind === 'plumb' && h.tool !== null) || h.kind === 'pump_power') &&   // (a hand well or a cistern is water without a pipe: only a drilled well or tower promises running water)
+     s.structures.find(x => x.id === h.id && (h.kind === 'pump_power' || isHome(x.kind)))) : undefined;
+  const waterDone = fin(WATER) && !wet;
+  out.push({ id: 'water', label: 'Water', done: waterDone, line: waterDone ? 'A working source' : wet ? `${wet.kind === 'plumb' ? 'The home has no running water' : 'Pump has no power'}` : staked(WATER) ? 'Well going in' : 'No water on the place',
+    ...(waterDone ? {} : wet ? { act: { label: 'Show me', act: { type: 'select' as const, id: wet.id } } } : staked(WATER) ? {} : { act: stake(s.site.gwDepth > 9 ? 'well_drilled' : 'well_hand', s.site.gwDepth > 9 ? 'Drill a well' : 'Dig a well') }) });
 
   // power
   const powerDone = powerOnPlace(s);
@@ -60,7 +65,7 @@ export function operational(s: GameState, drive?: readonly Pt[], report?: Defens
     ...(powerDone || staked(POWER) ? {} : { act: stake('solar_array', 'Stake solar') }) });
 
   // food: something growing, or ninety days put by
-  const days = Math.round(Math.min(daysOfFood(s), 999)), put = `${days} ${days === 1 ? 'day' : 'days'} of food on hand`;
+  const left = daysOfFood(s), days = Math.round(Math.min(left, 999)), put = Number.isFinite(left) ? `${days} ${days === 1 ? 'day' : 'days'} of food on hand` : 'nobody left to feed';
   const foodDone = fin(FOOD) || days >= 90;
   out.push({ id: 'food', label: 'Food', done: foodDone, line: foodDone ? (fin(FOOD) ? 'Growing' : put) : staked(FOOD) ? `Planting; ${put}` : `Nothing growing; ${put}`,
     ...(foodDone ? {} : days < 1 && foodNudge(s) ? { act: { label: 'Stock some food', act: { type: 'shop' as const, tab: 'food' as const } } } : staked(FOOD) ? {} : { act: stake('garden', 'Stake a garden') }) });

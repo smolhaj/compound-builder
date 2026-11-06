@@ -59,6 +59,25 @@ export function burnFirewood(s: GameState, days: number): void {
   }
 }
 
+/** Ricks the stove burns `k` days after day-of-year `doy` in a region with this cold factor. */
+const burnOnDay = (doy: number, k: number, cold: number): number => heatDemand(((doy - 1 + k) % 365) + 1) * cold * BURN_PER_DAY;
+
+/**
+ * How many calendar days the seasoned wood in hand would keep the stove going with no more cut or bought, burning at
+ * the season's pace (the same curve `firewoodOutlook` uses). `endless`: it lasts the whole year ahead, or the region
+ * never needs a fire.
+ */
+export function firewoodDays(s: GameState, horizon = 365): { days: number; endless: boolean } {
+  const doy = calendarOf(s.clock).doy, cold = regionFor(s.site).cold;
+  let left = Math.max(0, s.stock.firewood);
+  for (let k = 0; k < horizon; k++) {
+    const b = burnOnDay(doy, k, cold);
+    if (b >= left && b > 0) return { days: k + left / b, endless: false };
+    left -= b;
+  }
+  return { days: horizon, endless: true };
+}
+
 /**
  * Where the woodpile stands against the next two months of cold: ricks in
  * hand (seasoned only: green wood is not ready for months), ricks the stove
@@ -67,7 +86,7 @@ export function burnFirewood(s: GameState, days: number): void {
 export function firewoodOutlook(s: GameState, horizon = 60): { have: number; need: number; short: number; coldNow: boolean } {
   const doy = calendarOf(s.clock).doy, cold = regionFor(s.site).cold;
   let need = 0;
-  for (let k = 0; k < horizon; k++) need += heatDemand(((doy - 1 + k) % 365) + 1) * cold * BURN_PER_DAY;
+  for (let k = 0; k < horizon; k++) need += burnOnDay(doy, k, cold);
   const have = s.stock.firewood;
   return { have, need, short: Math.max(0, need - have), coldNow: demandNow(s) > 0 };
 }

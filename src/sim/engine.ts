@@ -13,6 +13,7 @@ import { guardDay } from './guards';
 import { insiderDay } from './insider';
 import { addWork, canGoOn, isFinished } from './construction';
 import { addCarryWork, deliverOrders } from './economy';
+import { stallsDay } from './stalls';
 import { addFixWork, nextFix, siteJobsDay } from './improvements';
 import { paperworkDay } from './paperwork';
 import { addFellWork, nextFellJob } from './forestry';
@@ -72,6 +73,7 @@ import { prisonersDay } from './aftermath';
 import { isAway, rescueDay } from './rescue';
 import { falloutDay, isNuclear, SHELTER_DAYS, strike } from './nuclear';
 import { tallyDay } from './report';
+import { declareWipe, isWiped, wipeEnded } from './wipe';
 import { lineageDay } from './lineage';
 import { erasDay } from './eras';
 import { landMarketDay } from './land';
@@ -204,6 +206,7 @@ function subStep(s: GameState): void {
     siteJobsDay(s);
     for (const line of paperworkDay(s)) log(s, line);
     for (const line of shelfDay(s)) log(s, line);
+    for (const line of stallsDay(s)) { log(s, line); s.disaster.news.push({ t: s.clock.t, text: line, tone: 2 }); }   // a project stuck for want of materials we could buy (sim/stalls.ts)
     for (const line of financeDay(s)) log(s, line);
     for (const line of armoryDay(s)) log(s, line);
     for (const line of petsDay(s)) log(s, line);
@@ -283,7 +286,7 @@ function subStep(s: GameState): void {
     for (const line of medicalDay(s)) log(s, line);
     for (const line of peopleDay(s)) log(s, line);
     const end = tallyDay(s);
-    if (end) log(s, end.kind === 'wipe' ? 'The last of the family is gone.' : end.kind === 'recovered' ? 'The outside world is coming back.' : end.kind === 'new_normal' ? 'The outside world has come back as far as it will.' : 'A full year the place has fed itself.');
+    if (end && end.kind !== 'wipe') log(s, end.kind === 'recovered' ? 'The outside world is coming back.' : end.kind === 'new_normal' ? 'The outside world has come back as far as it will.' : 'A full year the place has fed itself.');
     for (const line of lineageDay(s)) log(s, line);
     for (const line of erasDay(s)) log(s, line);
   }
@@ -292,6 +295,9 @@ function subStep(s: GameState): void {
 /** Advance `days` of game time. Returns a new state (the input is not mutated). */
 export function step(state: GameState, days: number): GameState {
   if (days <= 0) return state;
+  // nobody alive on the property: the run is over and the clock does not move (sim/wipe.ts). A state that had its last person die outside a step (a load, a test) is ended here.
+  if (wipeEnded(state)) return state;
+  if (isWiped(state)) { const w = structuredClone(state); declareWipe(w); return w; }
   // whole sub-steps on an integer counter, so chopping time up differently gives the same result
   const end = state.clock.t + days;
   const target = Math.floor(end / SUBSTEP + 1e-6);
@@ -303,6 +309,9 @@ export function step(state: GameState, days: number): GameState {
     s.clock.ticks++;
     s.clock.t = s.clock.ticks * SUBSTEP;
     subStep(s);
+    // the last person on the place died in this sub-step: end it now, on this tick, and stop the clock here
+    declareWipe(s);
+    if (wipeEnded(s)) return s;
     // a raid has reached the gate: stop on the very quarter-hour (the cutscene reads the hour off the clock)
     if (hasCutscene(s.gate.pending) && !hasCutscene(state.gate.pending)) return s;
   }

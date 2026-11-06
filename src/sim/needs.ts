@@ -27,6 +27,7 @@ import { SOIL_YIELD } from './site';
 import { seasons } from './regions';
 import { gardenSeasonK } from './microclimate';
 import { aquaPlants, fertigationK } from './aquaponics';
+import { inferCause } from './deaths';
 import { gardenSeason, greenhousePeak, greenhouseGreens } from './greenhouse';
 import { orchardPicking } from './orchard';
 import { careYield, cookRatio, lifeMorale, spoilFactor } from './daily';
@@ -73,6 +74,8 @@ export interface Needs {
   hurt: Array<{ what: string; sev: number; trauma?: boolean; /** A case in a treatment chain (sim/medical.ts runs its course). */ med?: import('./medical').MedCase }>;
   /** Dead (day), or null. Also set when someone was taken by raiders (`taken`): gone from the place either way. */
   died: number | null;
+  /** What killed them (sim/deaths.ts); absent on a death from before v84 or one that did not say. */
+  cause?: import('./deaths').DeathCause;
   taken?: boolean;
   /** Moved away (a guest gone home, someone sent on or walked out): `died` is the day they left, but they did not die (sim/newcomers.ts moveOut). */
   left?: boolean;
@@ -350,6 +353,7 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
     if (sl?.tired) n.tired = Math.min(Math.max(n.tired ?? 0, 5), (n.tired ?? 0) + sl.tired);
     if (n.health <= 0) {
       n.died = Math.floor(s.clock.t);
+      n.cause = inferCause(n, s.utilities.report.shortL > s.utilities.report.useL * 0.5);
       log(s, `${p.first} ${p.last} has died.`);
     }
   });

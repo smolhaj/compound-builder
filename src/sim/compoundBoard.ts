@@ -11,6 +11,8 @@ import type { Pt } from './perimeter';
 import { isFinished, holdReason } from './construction';
 import { defenseReport, type Check } from './defenseReport';
 import { daysOfFood } from './needs';
+import { waterDaysStored } from './water';
+import { RUNWAY, runway, type RunwayRow } from './runway';
 import { moodSummary } from './mind';
 import { OP_COVERED, operational, operationalCount, type OpItem } from './operational';
 import { powerSummary, fmtKw } from './powerReport';
@@ -18,12 +20,13 @@ import { suggestions, type SuggestionAct } from './guidance';
 import { needsHookup, powerOnPlace } from './hookups';
 import { THREAT_NAME, threatOn } from './threatState';
 import { DISASTERS } from './disaster';
+import { stuckAction, stuckProject } from './stalls';
 import { KIT } from '../game/buildkit/kit';
 import { dayIndex, type GameState } from './state';
 
 export type BoardTone = 'good' | 'warn' | 'bad';
 /** What a board button does (the HUD handles these four): open a right-hand tab, select a building, arm a kit piece, open the Shop. */
-export type BoardAct = Extract<SuggestionAct, { type: 'open' | 'select' | 'stake' | 'shop' }>;
+export type BoardAct = Extract<SuggestionAct, { type: 'open' | 'select' | 'stake' | 'shop' | 'order' }>;
 export interface BoardLine {
   id: 'power' | 'water' | 'food' | 'defense' | 'morale';
   label: string;
@@ -42,6 +45,8 @@ export interface CompoundBoard {
   vitals: BoardLine[];
   /** Defense checks that are failing, worst first. */
   gaps: BoardItem[];
+  /** Days the place could last with no resupply, per thing it runs on (sim/runway.ts). */
+  runway: RunwayRow[];
   threats: BoardItem[];
   decisions: BoardItem[];
   /** Nothing in threats, no gap, nothing waiting. */
@@ -49,9 +54,8 @@ export interface CompoundBoard {
 }
 
 /** How many of each list the page shows (the rest is one tap away in its own tab). */
-export const BOARD = { gaps: 3, threats: 4, decisions: 4, waterDaysOk: 7, foodWarn: 30, foodBad: 7, moraleWarn: 55, moraleBad: 40 } as const;
+export const BOARD = { gaps: 3, threats: 4, decisions: 4, waterDaysOk: 7, foodWarn: RUNWAY.food.warn, foodBad: RUNWAY.food.bad, moraleWarn: 55, moraleBad: 40 } as const;
 
-const WATER_L_PER_DAY = 10;
 const open = (right: Extract<BoardAct, { type: 'open' }>['right'], supplies?: 'stores' | 'farm'): BoardAct => ({ type: 'open', right, ...(supplies ? { supplies } : {}) });
 const asAct = (a: SuggestionAct): BoardAct | undefined => (a.type === 'open' || a.type === 'select' || a.type === 'stake' || a.type === 'shop' ? a : undefined);
 const fixOf = (o: OpItem | undefined): BoardLine['fix'] => { const a = o?.act && asAct(o.act.act); return a && o?.act ? { label: o.act.label, act: a } : undefined; };
@@ -70,7 +74,7 @@ export function compoundBoard(s: GameState, drive?: readonly Pt[]): CompoundBoar
   const dr = defenseReport(s, drive);
   const ops = operational(s, drive, dr);
   const op = (id: OpItem['id']) => ops.find(o => o.id === id);
-  const alive = living(s), people = Math.max(1, alive.length);
+  const alive = living(s);
   const vitals: BoardLine[] = [];
 
   // power
@@ -82,7 +86,7 @@ export function compoundBoard(s: GameState, drive?: readonly Pt[]): CompoundBoar
 
   // water
   { const r = s.utilities.report, o = op('water');
-    const stored = Math.floor(s.utilities.storedL / (people * WATER_L_PER_DAY));
+    const stored = Math.floor(waterDaysStored(s));
     const value = r.shortL > 0 ? 'ran short yesterday' : o?.done ? (stored >= 1 ? `a source, ${days(stored)} stored` : 'a working source') : o?.line ?? 'No water';
     const tone: BoardTone = r.shortL > 0 ? 'bad' : !o?.done || s.utilities.hauling ? 'warn' : 'good';
     vitals.push({ id: 'water', label: 'Water', value, tone, open: open('utilities'), fix: fixOf(o) }); }
@@ -129,17 +133,20 @@ export function compoundBoard(s: GameState, drive?: readonly Pt[]): CompoundBoar
   if (shelter && !shelter.done) decisions.push({ id: 'op:shelter', text: `Shelter: ${shelter.line}`, tone: 'warn', act: shelter.act && asAct(shelter.act.act) ? { label: shelter.act.label, act: asAct(shelter.act.act)! } : undefined });
   if (s.gate.pending) decisions.push({ id: 'gate', text: `Someone is at the gate: ${s.gate.pending.title}`, tone: 'warn' });
   if (s.gate.aftermath) decisions.push({ id: 'aftermath', text: 'Raiders lie wounded on the drive: say what happens to them', tone: 'warn' });
+  { const stuck = stuckProject(s);   // days of waiting with the cash in hand: first on the list, one click to fix
+    if (stuck) decisions.unshift({ id: 'stalled', text: `${stuckAction(stuck)}: the ${stuck.label} has been stuck ${stuck.days} days${stuck.others > 0 ? ` (+${stuck.others} more stuck)` : ''}`, tone: 'bad', act: { label: 'Order', act: { type: 'order', lines: stuck.lines } } }); }
   { const held = s.structures.filter(st => !isFinished(st) && holdReason(s, st));
-    if (held.length) decisions.push({ id: 'held', text: `${held.length} ${held.length === 1 ? 'project is' : 'projects are'} stuck: ${holdReason(s, held[0])}`, tone: 'warn', act: { label: 'Projects', act: { type: 'select', id: held[0].id } } }); }
+    if (held.length && !decisions.some(d => d.id === 'stalled')) decisions.push({ id: 'held', text: `${held.length} ${held.length === 1 ? 'project is' : 'projects are'} stuck: ${holdReason(s, held[0])}`, tone: 'warn', act: { label: 'Projects', act: { type: 'select', id: held[0].id } } }); }
   { const hook = needsHookup(s);
     if (hook.length) decisions.push({ id: 'hookups', text: `${cap(hook[0].name.replace(/_/g, ' '))}: ${hook[0].todo}${hook.length > 1 ? ` (+${hook.length - 1} more)` : ''}`, tone: 'warn', act: { label: 'Utilities', act: open('utilities') } }); }
   for (const x of suggestions(s, 2, OP_COVERED)) {
+    if (x.id === 'stalled') continue;   // (it is the first line above)
     const a = x.acts?.map(y => ({ label: y.label, act: asAct(y.act) })).find(y => y.act) as { label: string; act: BoardAct } | undefined;
     decisions.push({ id: `sug:${x.id}`, text: `${x.title ?? KIT[x.kind]?.name ?? x.kind}: ${x.why}`, tone: 'good', act: a ?? (x.kind ? { label: 'Stake it', act: { type: 'stake', kind: x.kind } } : undefined) });
   }
 
   const count = operationalCount(ops);
-  const out: CompoundBoard = { day, operational: count, vitals, gaps, threats: threats.slice(0, BOARD.threats), decisions: decisions.slice(0, BOARD.decisions), allClear: false };
+  const out: CompoundBoard = { day, operational: count, vitals, gaps, runway: runway(s), threats: threats.slice(0, BOARD.threats), decisions: decisions.slice(0, BOARD.decisions), allClear: false };
   out.allClear = !out.threats.length && !out.gaps.length && !out.decisions.length && out.vitals.every(v => v.tone === 'good');
   return out;
 }

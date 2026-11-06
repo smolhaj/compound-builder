@@ -241,6 +241,7 @@ export function lineageDay(s: GameState): string[] {
     if (p.age < 45 || r() >= oldAgeRisk(p.age, doctor) / 365) continue;
     const ps = s.personState.find(x => x.id === p.id)!;
     ps.needs.died = Math.floor(s.clock.t);
+    ps.needs.cause = 'old age';
     L.mourned.push(p.id);
     passOn(s, p);
     const line = `${fullName(p)} died ${p.age >= 75 ? 'in their sleep' : 'suddenly'}, aged ${p.age}.`;
@@ -277,7 +278,7 @@ export function lineageDay(s: GameState): string[] {
     const kid = newPerson(s, { first: pickName(s, body, r), last: L.family, age: 0, kid: true, body, kin: true, bornHere: true, bday: doy, gen: Math.max(mother.gen ?? 1, mate.gen ?? 1) + 1, parents: [mother.id, mate.id] }, r);
     award(L, 'births', 25);
     say('birth', `${kid.first} ${kid.last} was born to ${mother.first} and ${mate.first}, ${risk.how}.`);
-    if (r() < risk.mother) { const ps = s.personState.find(x => x.id === mother.id)!; ps.needs.died = Math.floor(s.clock.t); L.mourned.push(mother.id); passOn(s, mother); say('death', `${fullName(mother)} died in childbirth, aged ${mother.age}.`); }
+    if (r() < risk.mother) { const ps = s.personState.find(x => x.id === mother.id)!; ps.needs.died = Math.floor(s.clock.t); ps.needs.cause = 'childbirth'; L.mourned.push(mother.id); passOn(s, mother); say('death', `${fullName(mother)} died in childbirth, aged ${mother.age}.`); }
     else afterBirth(s, mother, r);
   }
   // births (and, for couples who can't, adoption or a child with no one left)

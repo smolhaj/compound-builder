@@ -48,24 +48,16 @@ export interface Ending { kind: EndKind; day: number; continued: boolean }
 
 import { placeLine } from './settlement';
 import { isGod } from './godMode';
+import { declareWipe, wipeSummary } from './wipe';
+import { CAUSE_TEXT, inferCause } from './deaths';
 const living = (s: GameState) => s.personState.filter(ps => ps.needs.died == null).length;
-/** The line goes on while anyone lives, at home or away with a neighbor (sim/orphans.ts). */
-const lineLives = (s: GameState) => living(s) + (s.lineage?.wards?.length ?? 0);
-
-/** The line is over: nobody is left to answer a knock, so no gate card, approach or aftermath stays pending. */
-export function clearPendingAtWipe(s: GameState): void {
-  s.gate.pending = null; s.gate.incoming = null; s.gate.aftermath = null;
-}
 
 /** Once a day after the hit: tally, then see whether the run is over. */
 export function tallyDay(s: GameState): Ending | null {
   const d = s.disaster;
-  // the last of them gone ends the line whenever it happens: in the quiet years between eras, or after a card that was played on (playtest round 3: the run used to go on with nobody left)
-  if (s.personState.length && lineLives(s) === 0 && s.ending?.kind !== 'wipe') {
-    s.ending = { kind: 'wipe', day: Math.floor(s.clock.t), continued: false };
-    clearPendingAtWipe(s);
-    return s.ending;
-  }
+  // the last of them gone ends the run whenever it happens: in the quiet years between eras, or after a card that was played on (sim/wipe.ts: nobody alive on the property)
+  const wiped = declareWipe(s);
+  if (wiped) return wiped;
   if (!d.kind || s.clock.t < d.hitAt || (s.ending && !s.ending.continued)) return null;
   const st = s.stats, day = Math.floor(s.clock.t - d.hitAt);
   if (day <= st.days - 1) return null;
@@ -87,15 +79,12 @@ export function tallyDay(s: GameState): Ending | null {
   const ok = d.fate === 'never' || day < fallDoneDay(d) ? false : TRACKS.every(k => d.tracks[k] >= Math.min(0.9, (d.ceiling?.[k] ?? 1) - 0.03));
   if (!ok) st.okSince = -1; else if (st.okSince < 0) st.okSince = day;
   if (s.ending) return null;          // playing on after the card
-  if (living(s) === 0) return null;   // the children are away with a neighbor and the place is held for them: no card until they are home
-  // the run ends: everyone gone; the world back for a month (and at least three months in); a year and more feeding yourselves
+  // the run ends: the world back for a month (and at least three months in); a year and more feeding yourselves
   let kind: EndKind | null = null;
-  if (living(s) === 0) kind = 'wipe';
-  else if (ok && st.okSince >= 0 && day - st.okSince >= 30 && day >= 90) kind = d.fate === 'partial' ? 'new_normal' : 'recovered';
+  if (ok && st.okSince >= 0 && day - st.okSince >= 30 && day >= 90) kind = d.fate === 'partial' ? 'new_normal' : 'recovered';
   else if (selfSufficient(st)) kind = 'equilibrium';
   if (!kind) return null;
   s.ending = { kind, day: Math.floor(s.clock.t), continued: false };
-  if (kind === 'wipe') clearPendingAtWipe(s);
   return s.ending;
 }
 
@@ -126,14 +115,18 @@ export function reportCard(s: GameState): ReportCard {
   const sandbox = isGod(s);
   const grade = sandbox ? 'S' : end === 'wipe' ? 'F' : score >= 90 ? 'A' : score >= 80 ? 'B' : score >= 65 ? 'C' : score >= 50 ? 'D' : 'F';
   const family = s.people[0]?.last ?? 'The family';
+  const wipe = wipeSummary(s), away = wipe.elsewhere;
+  /** The run ended before the collapse hit: no days are tallied after it. */
+  const hit = !!d.kind && s.clock.t >= d.hitAt;
+  const starved = wipe.roll.filter(x => x.cause === 'starvation' || x.cause === 'thirst').length;
   const bo = st.bugOut;
   const headline = end === 'bug_out' ? `The ${family} family bugged out`
-    : end === 'wipe' ? `No one left at the ${family} place`
+    : end === 'wipe' ? (away.length ? `The ${family} place is empty; the family lives on elsewhere` : `No one left at the ${family} place`)
     : end === 'recovered' ? `${family} family came through ${name.toLowerCase()}`
     : end === 'new_normal' ? `A thinner world: ${family} family settles in after ${name.toLowerCase()}`
     : `${family} homestead feeds itself a year on`;
   const sub = end === 'bug_out' ? `They left on day ${bo?.day ?? 0} with ${bo?.going ?? 0} of ${(bo?.going ?? 0) + (bo?.left ?? 0)}. ${bo?.dest === 'cache' ? 'They made for the buried cache.' : bo?.dest === 'town' ? 'They made for the town house.' : 'They had nowhere particular to go.'} ${bo?.outcome === 'lost_one' ? `${bo.lost ?? 'One of them'} did not make the trip. ` : ''}The rest is the next chapter, and it is not written yet.`
-    : end === 'wipe' ? `${days} days after it hit, the last of them was gone.`
+    : end === 'wipe' ? `${hit ? `${days} days after it hit` : 'Before the collapse came'}, the last person on the place was gone.${away.length ? ` ${wipe.text}` : ''}`
     : end === 'recovered' ? `${days} days after it hit, the lights are back on in the valley. ${alive} of ${total} made it.`
     : end === 'new_normal' ? `${days} days on, the power runs some hours and the store opens some days. It won't be like before. ${alive} of ${total} made it.`
     : `A year without a store. ${alive} people live off what the place grows.`;
@@ -166,7 +159,8 @@ export function reportCard(s: GameState): ReportCard {
   }
   // food
   const grown = st.kcalNeed ? st.kcalGrown / st.kcalNeed : 0;
-  if (st.hungryDays === 0) lines.push('Nobody went hungry.');
+  if (end === 'wipe' && starved > 0 && st.hungryDays === 0) lines.push(`${starved} ${starved === 1 ? 'person' : 'people'} died for lack of food or water.`);
+  else if (st.hungryDays === 0) lines.push('Nobody went hungry.');
   else lines.push(`${st.hungryDays} hungry days.`);
   if (grown > 0.05) {
     const src = [has('field') && 'the fields', has('garden') && 'the garden', has('chicken_coop') && 'the hens'].filter(Boolean) as string[];
@@ -177,7 +171,8 @@ export function reportCard(s: GameState): ReportCard {
   const medic = Math.max(0, ...s.people.filter((_, i) => s.personState[i]?.needs.died == null).map(p => p.skills.medic));
   if (st.wounds > 0 && medic < 3 && !has('bunker_medical')) lines.push('No one knew first aid.');
   else if (st.wounds > 0 && (medic >= 5 || has('bunker_medical'))) lines.push('Every wound was dressed and healed.');
-  for (const p of lost) lines.push(s.personState.find(ps => ps.id === p.id)?.needs.taken ? `${p.first} ${p.last} was taken. Nobody knows where.` : `${p.first} ${p.last} did not make it.`);
+  // (a wipe lists everyone, with day and cause, under "Who we lost" on the ending screen)
+  if (end !== 'wipe') for (const p of lost) lines.push(s.personState.find(ps => ps.id === p.id)?.needs.taken ? `${p.first} ${p.last} was taken. Nobody knows where.` : `${p.first} ${p.last} ${CAUSE_TEXT[inferCause(s.personState.find(ps => ps.id === p.id)!.needs)]}.`);
   if (g.tookIn) lines.push(`You took in ${g.tookIn} ${g.tookIn === 1 ? 'person' : 'people'}.`);
   {
     // the neighbors and strangers who came to stay (sim/newcomers.ts)
@@ -194,8 +189,8 @@ export function reportCard(s: GameState): ReportCard {
   const allies = s.neighbors.filter(n => n.disposition > 50 && n.status === 'home');
   if (allies.length) lines.push(`${allies.map(n => n.name[0].toUpperCase() + n.name.slice(1)).join(' and ')} stood with you.`);
   return {
-    masthead: mastheadOf(s.site?.region), date: `Day ${days} after ${name.toLowerCase()}`,
+    masthead: mastheadOf(s.site?.region), date: end === 'wipe' && !hit ? 'Before the collapse' : `Day ${days} after ${name.toLowerCase()}`,
     headline, sub, grade, score, lines,
-    facts: [['Survived', `${alive} of ${total}`], ['Humanity', `${Math.round(g.humanity)}`], ['Days of it', `${days}`], ['Hungry days', `${st.hungryDays}`]],
+    facts: [[end === 'wipe' ? 'Alive on the place' : 'Survived', `${alive} of ${total}`], ['Humanity', `${Math.round(g.humanity)}`], ['Days of it', `${days}`], end === 'wipe' && away.length ? ['Alive elsewhere', `${away.length}`] : ['Hungry days', `${st.hungryDays}`]],
   };
 }

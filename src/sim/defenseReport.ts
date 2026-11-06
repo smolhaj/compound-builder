@@ -24,6 +24,7 @@ import { HEAVY_CALIBERS, MOUNT_ROUNDS, TURRET_ROUNDS, TOWERS, floodReady, mountR
 import { dayIndex, type GameState } from './state';
 import { bondOf, dogWatch, livingDogs, temperOf } from './pets';
 import { bestShelter } from './nuclear';
+import { waterDaysStored } from './water';
 import { HOUSING_STYLES, coverFactor, mainHome } from './housingStyles';
 import { hardenedSafeRoom, hasSafeRoom, layerTier } from './houseHardening';
 
@@ -203,8 +204,8 @@ export function defenseReport(s: GameState, drive?: readonly Pt[]): DefenseRepor
   ];
 
   // ── other catastrophes ──
-  const days = daysOfFood(s), people = Math.max(1, s.people.length);
-  const waterDays = s.utilities.storedL / (people * 10);
+  const days = daysOfFood(s);
+  const waterDays = waterDaysStored(s);
   const well = fin.some(st => st.kind.startsWith('well'));
   const catastrophes: Check[] = [
     chk('food', 'Food stored', days >= 90, `${Number.isFinite(days) ? Math.floor(days) : '∞'} days`, days >= 30),

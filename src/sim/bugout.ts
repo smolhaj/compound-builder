@@ -138,7 +138,7 @@ export function bugOut(s: GameState, opts: { mode?: BugMode; dest?: BugDest } = 
   if (outcome === 'lost_one' && plan.going.length > 1) {
     const weak = plan.going.find(p => p.elder || (p.kid && p.age < 8)) ?? plan.going[plan.going.length - 1];
     const ps = s.personState.find(x => x.id === weak.id);
-    if (ps) { ps.needs.died = day; lost = weak.first; }
+    if (ps) { ps.needs.died = day; ps.needs.cause = 'the road'; lost = weak.first; }
   }
   const foodAtArrival = Math.max(0, Math.round(plan.foodDays * (outcome === 'robbed' ? 0.5 : outcome === 'late' ? 0.75 : 1) - plan.route.travelHours / 24));
   const stocked = plan.dest === 'cache' ? plan.cacheDays : 0;

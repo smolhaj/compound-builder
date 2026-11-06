@@ -597,7 +597,7 @@ function wound(s: GameState, r: () => number, sev: number, what: string): string
   sev = Math.round(sev * diffOf(s.disaster).wound);
   n.hurt.push({ what, sev });
   n.health = Math.max(s.disaster.difficulty === 'cozy' ? 5 : 0, n.health - sev * 0.5);
-  if (n.health <= 0) { n.died = Math.floor(s.clock.t); return `${s.people[i].first} was killed.`; }
+  if (n.health <= 0) { n.died = Math.floor(s.clock.t); n.cause = 'raid'; return `${s.people[i].first} was killed.`; }
   return `${s.people[i].first}: ${what}.`;
 }
 
