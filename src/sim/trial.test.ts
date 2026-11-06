@@ -10,6 +10,7 @@ function afterHit(seed = 1): GameState {
   g.disaster.tracks = { ...g.disaster.tracks, law: 0, stores: 0, deliveries: 0, banks: 0 };
   g.stock.canned = 40; g.stock.staples = 10; g.stock.fuel = 10; g.stock.meds = 4;
   g.gate.next = 1e9;   // no other visitors in these tests
+  delete g.gate.waves;   // nor siege waves (sim/waves.ts has its own tests)
   return g;
 }
 const adult = (id: string, first: string): Person => ({ id, first, last: 'Holt', age: 34, kid: false, body: 'm', skills: { builder: 2, gardener: 1, medic: 1, mechanic: 6, hunter: 2, negotiator: 1, teacher: 0, radio: 0 }, shirt: 0x334455 });

@@ -15,6 +15,7 @@
  *  permits    days the county takes to review a permit (paperwork.reviewDays)
  *  money      the savings left after buying the land (state.newGame)
  *  adapt      0.1 / 0.3 / 1: the world learns (crews grow and come oftener against a defended place after year one; Hardcore also probes, equips, digs)
+ *  wave/lull  how hard the siege waves climb (0.35 / 1 / 1.4) and the quiet between them (x1.5 / 1 / x0.75; sim/waves.ts)
  *  winter     1 on Hardcore: the first hard winter after the hit takes wood, fuel and fresh stores
  *
  * (Hardcore is harder once it hits, never harder with money: price, permits and
@@ -33,12 +34,16 @@ export interface DifficultyDef {
   adapt: number;
   /** 0 or 1, not a multiplier: the first hard winter after the hit (sim/adaptive.ts: a deep freeze that burns wood and fuel, and a thaw that spoils fresh and frozen stores). */
   winter: number;
+  /** Weight 0.35 / 1 / 1.4, not a multiplier: how hard the siege waves climb (sim/waves.ts crewFactor, kitLevel). */
+  wave: number;
+  /** Multiplier on the quiet days between waves (sim/waves.ts): longer is gentler. */
+  lull: number;
 }
 
 export const DIFFICULTY: Record<Difficulty, DifficultyDef> = {
-  cozy: { hunt: -8, warn: 1.6, raid: 0.7, cadence: 1.35, wound: 0.7, storms: 0.5, price: 0.6, recovery: 0.75, permits: 0.5, money: 1.15, adapt: 0.1, winter: 0 },
-  standard: { hunt: 0, warn: 1, raid: 1, cadence: 1, wound: 1, storms: 1, price: 1, recovery: 1, permits: 1, money: 1, adapt: 0.3, winter: 0 },
-  hardcore: { hunt: 12, warn: 0.4, raid: 1.3, cadence: 0.65, wound: 1.5, storms: 1.5, price: 1, recovery: 1.6, permits: 1, money: 1, adapt: 1, winter: 1 },
+  cozy: { hunt: -8, warn: 1.6, raid: 0.7, cadence: 1.35, wound: 0.7, storms: 0.5, price: 0.6, recovery: 0.75, permits: 0.5, money: 1.15, adapt: 0.1, winter: 0, wave: 0.35, lull: 1.5 },
+  standard: { hunt: 0, warn: 1, raid: 1, cadence: 1, wound: 1, storms: 1, price: 1, recovery: 1, permits: 1, money: 1, adapt: 0.3, winter: 0, wave: 1, lull: 1 },
+  hardcore: { hunt: 12, warn: 0.4, raid: 1.3, cadence: 0.65, wound: 1.5, storms: 1.5, price: 1, recovery: 1.6, permits: 1, money: 1, adapt: 1, winter: 1, wave: 1.4, lull: 0.75 },
 };
 
 /** The table row for a run (a save from before the table has none: Standard). */
@@ -63,6 +68,7 @@ export function difficultySummary(d: Difficulty): string[] {
   add('savings after the land', pct(k.money));
   if (k.adapt >= 1) out.push('after the first year the crews that come for a well-defended place are bigger, better armed and come oftener, and probe the wire first');
   else if (k.adapt > 0 && d === 'standard') out.push('after the first year crews are a little bigger against a well-defended place');
+  out.push(d === 'cozy' ? 'raiders come in a few small waves, weeks apart' : d === 'hardcore' ? 'raiders come in waves that climb fast, with short quiet between' : 'raiders come in waves that grow over the collapse, with quiet weeks between');
   if (k.winter) out.push('the first winter after the hit brings a deep freeze that burns the woodpile and fuel, then a thaw that spoils fresh and frozen food');
   if (d === 'cozy') out.push('nobody dies for good');
   if (d === 'hardcore') out.push('permadeath');

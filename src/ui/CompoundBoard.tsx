@@ -4,6 +4,7 @@ import { useGameStore } from '../store/gameStore';
 import { useWorldStore } from '../store/worldStore';
 import { boardCache, type BoardAct, type BoardItem, type BoardLine } from '../sim/compoundBoard';
 import { Clamp, Group, Hint } from './hud/common';
+import { WaveCard } from './WaveClock';
 import { DIM, FS, LINE, TONE, btn, miniBtn } from './hud/style';
 
 const PAPER = 'rgba(32,29,22,0.97)';
@@ -48,6 +49,7 @@ export function CompoundBoardPanel({ top, bottom, narrow, onClose, onSide }: { t
       </span>
     </div>
     {b.vitals.map(vital)}
+    <WaveCard />
     {b.allClear && <Hint more="Power, water, food, defense and morale are all fine, nothing threatens the place and nothing waits on you. The board looks again each day.">Nothing needs you today.</Hint>}
     {b.threats.length > 0 && <Group id="board.threats" title="Threats" extra={String(b.threats.length)}>{b.threats.map(item)}</Group>}
     {b.decisions.length > 0 && <Group id="board.decisions" title="Waiting on you" extra={String(b.decisions.length)}>{b.decisions.map(item)}</Group>}

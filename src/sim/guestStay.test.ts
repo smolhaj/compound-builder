@@ -9,6 +9,7 @@ import { mulberry32 } from './rng';
 /** The real engine, a household sheltered under the roof for its promised days. The farm is pinned standing or burned (random neighbor events must not decide the test). */
 function sheltered(why: 'sick' | 'fire', farm: 'standing' | 'burned') {
   let g: GameState = newGame(1, 105, 2027, { mode: 'scenario', peace: 'short', kind: 'grid_down' });
+  delete g.gate.waves;   // these tests pin the gate quiet; the siege-wave clock (sim/waves.ts) is tested in waves.test.ts
   g = step(g, g.disaster.hitAt - g.clock.t + 20);
   g.disaster.tracks = { ...g.disaster.tracks, law: 1 };   // no raids to muddy the card queue
   g.gate.next = 1e9; g.gate.pending = null; g.gate.incoming = null; g.gate.card = null;

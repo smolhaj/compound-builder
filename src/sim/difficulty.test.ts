@@ -75,7 +75,7 @@ describe('what the knobs do', () => {
 
 describe('the menu text', () => {
   it('Standard is the intended game; the others list what changes against it', () => {
-    expect(difficultySummary('standard')).toEqual(['after the first year crews are a little bigger against a well-defended place']);
+    expect(difficultySummary('standard')).toEqual(['after the first year crews are a little bigger against a well-defended place', 'raiders come in waves that grow over the collapse, with quiet weeks between']);
     const hc = difficultySummary('hardcore').join('; ');
     expect(hc).toContain('size of raiding crews +30%');
     expect(hc).toContain('raids at the gate +54%');

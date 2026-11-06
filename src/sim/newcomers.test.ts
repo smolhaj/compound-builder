@@ -21,6 +21,7 @@ function afterHit(seed = 1): GameState {
   g.disaster.tracks = { ...g.disaster.tracks, law: 0, stores: 0, deliveries: 0, banks: 0 };
   g.stock.canned = 40; g.stock.staples = 10; g.stock.fuel = 10; g.stock.meds = 4;
   g.gate.next = 1e9;
+  delete g.gate.waves;   // no siege waves here (sim/waves.ts has its own tests)
   return g;
 }
 const finish = (s: GameState, kind: string) => {

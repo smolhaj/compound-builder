@@ -18,7 +18,8 @@ import { ringPoints } from './rings';
 import { terrainPoints } from './terrainFx';
 import { mulberry32, pick } from './rng';
 import { diffOf } from './difficulty';
-import { adaptation, adaptedHeads, adaptLevel, ADAPT, belowExtra, cadenceFactor, findBonus, followDays, probeHeads, probes, sinceHit, torchBonus, whyBigger } from './adaptive';
+import { HOSTILE, WAVE, crewFactor, kitLevel, nextWaveDay, phaseOf, waveDossier, warningSign, type WaveState } from './waves';
+import { adaptation, adaptedHeads, defensiveStrength, adaptLevel, ADAPT, belowExtra, cadenceFactor, findBonus, followDays, probeHeads, probes, sinceHit, torchBonus, whyBigger } from './adaptive';
 import { logGate } from './nag';
 import { daysOfFood } from './needs';
 import { forewarned } from './radio';
@@ -248,6 +249,8 @@ export interface Encounter {
   adapt?: number;
   /** Hardcore: two or three men sent to test the wire; the crew they report to is `probe` (it turns up within a week or so, knowing where the line is thin). */
   probe?: { kind: EncounterKind; size: number; armed: boolean; temper?: RaiderTemper };
+  /** The siege-wave clock (sim/waves.ts): which wave this crew is (1-based). */
+  wave?: number;
 }
 
 /** Crews that plan, carry more and might bring explosives (battle.ts `organized`). */
@@ -334,11 +337,13 @@ export interface GateState {
   incoming?: { e: Encounter; at: number; /** When it was sighted (game days): the road draws the approach from here (sim/roadLead.ts). Absent on a raid, which is seen over the last LEAD days. */ from?: number } | null;
   /** Hardcore: the day of the last probing raid (sim/adaptive.ts). */
   lastProbe?: number;
+  /** The siege-wave clock (sim/waves.ts): waves so far. Absent on a save from before v82: raids stay random. */
+  waves?: WaveState;
 }
 
 export function newGate(seed: number): GateState {
   const r = mulberry32(seed * 811 + 5);
-  return { pending: null, card: null, humanity: 70, tookIn: 0, turnedAway: 0, raidsHeld: 0, raidsLost: 0, government: r() < 0.5 ? 'help' : 'hindrance', day: -1, next: -1, history: [], aftermath: null, prisoners: [], camps: [], comeBack: null, incoming: null };
+  return { pending: null, card: null, humanity: 70, tookIn: 0, turnedAway: 0, raidsHeld: 0, raidsLost: 0, government: r() < 0.5 ? 'help' : 'hindrance', day: -1, next: -1, history: [], aftermath: null, prisoners: [], camps: [], comeBack: null, incoming: null, waves: { n: 0 } };
 }
 
 /** How often someone comes (days between), from law and order outside and how much the place shows. */
@@ -356,6 +361,11 @@ export function adaptOf(s: GameState, p: Posture = postureOf(s), terrain?: numbe
   const lvl = adaptLevel(s);
   // the ground's share of the defense (sim/terrainFx.ts) is one input to the shared strength, not a second scaling
   return lvl > 0 ? adaptation(lvl, sinceHit(s), { defense: defenseOf(p), foodDays: daysOfFood(s), terrain: terrain ?? terrainPoints(s) + ringPoints(s) }) : 0;
+}
+
+/** The shared defensive strength of this place, 0-1 (sim/adaptive.ts `defensiveStrength`): what the siege waves read. */
+export function strengthOf(s: GameState, p: Posture = postureOf(s)): number {
+  return defensiveStrength({ defense: defenseOf(p), foodDays: daysOfFood(s), terrain: terrainPoints(s) + ringPoints(s) });
 }
 
 /** What the battle sim is told about a crew: how they fight and how well they have learned this place. */
@@ -504,12 +514,29 @@ export function gateDay(s: GameState): Encounter | null {
   if (d.kind === 'nuclear' && s.clock.t < d.hitAt + 14) return null;
   const r = mulberry32(s.seed * 7907 + day * 31);
   const p = postureOf(s);
-  if (g.next < 0) g.next = day + Math.round(cadence(s, p) * (0.4 + 0.6 * r()));
-  if (day < g.next) return null;
-  g.next = day + Math.round(cadence(s, p) * (0.6 + 0.8 * r()));
+  // the siege-wave clock (sim/waves.ts): signs on the road before a wave, and the wave itself on its day
+  const wv = g.waves, lawOff = d.tracks.law < WAVE.LAW_END;
+  const due = wv && lawOff ? nextWaveDay(s.seed, Math.floor(d.hitAt), wv, diffOf(d).lull) : Infinity;
+  const left = due - day;
+  if (wv && left >= 1 && left <= WAVE.WARN) { const sign = warningSign(left, s.neighbors.some(n => n.radio && n.status === 'home') || (s.stock.sw_radio ?? 0) > 0); if (sign) log(s, sign); }
+  let waveKind: EncounterKind | null = null;
+  if (wv && phaseOf(day, due) === 'arriving') {
+    const rw = mulberry32(s.seed * 4231 + day * 29 + 3);
+    for (let i = 0; i < 16 && !waveKind; i++) { const k = whoComes(s, p, rw); if (HOSTILE.has(k)) waveKind = k; }
+  }
+  if (!waveKind) {
+    if (g.next < 0) g.next = day + Math.round(cadence(s, p) * (0.4 + 0.6 * r()));
+    if (day < g.next) return null;
+    g.next = day + Math.round(cadence(s, p) * (0.6 + 0.8 * r()));
+  }
   // a crew that found the place empty last time, back for the rest
-  const cb = g.comeBack;
-  const kind = cb && (cb.probed || r() < 0.7) ? cb.kind : whoComes(s, p, r);
+  const cb = waveKind ? null : g.comeBack;
+  const kind = waveKind ?? (cb && (cb.probed || r() < 0.7) ? cb.kind : whoComes(s, p, r));
+  // with the clock on, the waves are the hostile visits (a crew coming back to a place it stripped excepted); travelers stay away in the days before one
+  if (wv && !waveKind && !(cb && kind === cb.kind)) {
+    if (HOSTILE.has(kind)) return null;
+    if (left >= 1 && left <= WAVE.WARN) return null;
+  }
   const e = makeThreat(kind, r, `e${s.nextId++}`, day, s);
   if (cb && kind === cb.kind) {
     e.size = cb.size; e.armed = cb.armed; e.temper = cb.temper; e.back = true;
@@ -526,8 +553,19 @@ export function gateDay(s: GameState): Encounter | null {
     e.strength = Math.round(e.strength * size / Math.max(1, was));
     if (size !== was) { e.size = size; e.dossier = e.dossier.map((l, i) => i === 0 ? l.replace(String(was), String(size)) : l); }
   }
+  if (waveKind && wv) {
+    // a wave: bigger and better kitted with each one, a little more against a defended place (sim/waves.ts); it replaces the Hardcore adaptation of the same crew
+    const n = wv.n + 1, w = diffOf(d).wave, ds = strengthOf(s, p);
+    const was = e.size, size = Math.max(1, Math.round(was * crewFactor(n, ds, w)));
+    e.strength = Math.round(e.strength * size / Math.max(1, was));
+    e.size = size; e.armed = true; e.wave = n;
+    e.dossier = [e.dossier[0]?.replace(String(was), String(size)) ?? '', waveDossier(n), ...e.dossier.slice(1)].filter(Boolean);
+    e.adapt = Math.max(e.adapt ?? 0, kitLevel(n, ds, w)) || undefined;
+    e.title = `Wave ${n}: ${e.title[0].toLowerCase()}${e.title.slice(1)}`;
+    wv.n = n; wv.last = day;
+  }
   // (Hardcore) the world learns a defended place: a probing raid first, then bigger, better-equipped crews (sim/adaptive.ts)
-  if (e.strength && ['looters', 'gang', 'militia'].includes(e.kind)) adaptCrew(s, e, p, day);
+  else if (e.strength && ['looters', 'gang', 'militia'].includes(e.kind)) adaptCrew(s, e, p, day);
   // an alarm: the passage hatches bolt themselves
   if (!['arrival', 'trader', 'neighbor_help'].includes(e.kind)) boltPassages(s);
   g.pending = e;
