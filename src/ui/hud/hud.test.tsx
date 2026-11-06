@@ -16,6 +16,7 @@ import { FarmTab } from '../FarmTab';
 import { WeekenderPanel } from '../WeekenderPanel';
 import { newWeekend } from '../../sim/weekender';
 import { pondOf } from '../../sim/farm';
+import { useFeelStore } from '../../store/feelStore';
 
 const text = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
 const withGame = (mut: (g: ReturnType<typeof newGame>) => void) => {
@@ -196,6 +197,7 @@ describe('the guided HUD (server-rendered)', () => {
     const { Hud } = await import('../Hud');
     (globalThis as unknown as { location: { search: string } }).location = { search: '' };
     withGame(g => { const st = planStructure(g, 'field', 10, 10, 0); st.stage = 5; st.finishedAt = -300; });
+    Object.assign(useFeelStore.getInitialState(), { firstHourHud: false });   // (the first-hour tab hiding has its own test below)
     // the default: Family, with no tab called Farm beside Supplies
     Object.assign(useGameStore.getInitialState(), { hudFocus: null });
     const plain = text(renderToStaticMarkup(<Hud />));
@@ -228,5 +230,37 @@ describe('modal layering', () => {
     withGame(g => { g.ending = { kind: 'wipe', day: 400, continued: false } as never; });
     const rep = renderToStaticMarkup(<ReportCard />);
     if (rep) expect(z(rep)).toBeGreaterThan(z(shop));
+  });
+});
+
+describe('the first-hour HUD', () => {
+  it('shows Family only to begin with, with a Show all tabs switch; the switch brings every tab back', async () => {
+    const { Hud } = await import('../Hud');
+    (globalThis as unknown as { location: { search: string } }).location = { search: '' };
+    withGame(() => undefined);
+    Object.assign(useGameStore.getInitialState(), { hudFocus: null });
+    Object.assign(useFeelStore.getInitialState(), { firstHourHud: true, showAll: false, revealed: ['family'], fresh: [] });
+    const first = renderToStaticMarkup(<Hud />);
+    expect(first).toContain('data-tab="family"');
+    expect(text(first)).toContain('Show all tabs');
+    for (const t of ['supplies', 'utilities', 'land', 'defense', 'outside', 'chronicle']) expect(first).not.toContain(`data-tab="${t}"`);
+    // a revealed tab carries a "new" dot; everything shows with the switch on
+    Object.assign(useFeelStore.getInitialState(), { revealed: ['family', 'defense'], fresh: ['defense'] });
+    const withNew = renderToStaticMarkup(<Hud />);
+    expect(withNew).toContain('data-tab="defense"');
+    expect(withNew).toContain('data-testid="new-defense"');
+    Object.assign(useFeelStore.getInitialState(), { showAll: true });
+    const all = renderToStaticMarkup(<Hud />);
+    for (const t of ['family', 'supplies', 'utilities', 'land', 'defense', 'outside', 'chronicle']) expect(all).toContain(`data-tab="${t}"`);
+    expect(text(all)).toContain('Hide unused tabs');
+    Object.assign(useFeelStore.getInitialState(), { firstHourHud: false, showAll: false, revealed: ['family'], fresh: [] });
+  });
+
+  it('opens Long-term goals in the first hour and folds them after', () => {
+    withGame(() => undefined);
+    const open = text(renderToStaticMarkup(<BuildMenu />));
+    expect(open).toMatch(/▾ Long-term goals/);
+    withGame(g => { g.clock.t = 200; });
+    expect(text(renderToStaticMarkup(<BuildMenu />))).toMatch(/▸ Long-term goals/);
   });
 });

@@ -1,3 +1,14 @@
 html, body, #root { margin: 0; height: 100%; overflow: hidden; background: #111; }
 body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; color: #eee; }
 canvas { display: block; }
+
+/* "Feel" pass: a row or tab the player just touched glows briefly; toasts and cards slide in. Reduced motion keeps the highlight (a still outline) and drops the movement. */
+[data-flash="1"] { outline: 2px solid #e8d48a; outline-offset: -2px; background-color: rgba(232, 212, 138, 0.16); animation: cb-flash 1.2s ease-out 2; }
+@keyframes cb-flash { 0% { background-color: rgba(232, 212, 138, 0.5); } 100% { background-color: rgba(232, 212, 138, 0.12); } }
+.cb-rise { animation: cb-rise 0.28s ease-out; }
+@keyframes cb-rise { from { transform: translate(-50%, 10px); } to { transform: translate(-50%, 0); } }
+.cb-slide { animation: cb-slide 0.32s ease-out; }
+@keyframes cb-slide { from { transform: translateX(16px); } to { transform: translateX(0); } }
+@media (prefers-reduced-motion: reduce) {
+  [data-flash="1"], .cb-rise, .cb-slide { animation: none; }
+}

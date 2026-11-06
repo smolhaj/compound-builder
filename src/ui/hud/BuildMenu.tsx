@@ -21,6 +21,7 @@ import { PERIMETER, UTILITY_LINES, runBill, runHours, type PerimeterKind } from 
 import { fosterNote } from '../../sim/orphans';
 import { bunkerChecklist, buildAdvice, longTerm, suggestions, type SuggestionAct, perimeterNote, perimeterOff, perimeterTiers, upgradeChain } from '../../sim/guidance';
 import { hireCaretaker, openMoveIn, setBelt } from '../../sim/weekender';
+import { inFirstHour } from '../../sim/tabReveal';
 import { Clamp, Group, Hint, Item, Note, Tick } from './common';
 import { btn, card, DIM, FS, miniBtn, usd } from './style';
 import { OP_COVERED, operational, operationalCount } from '../../sim/operational';
@@ -95,7 +96,7 @@ export function BuildMenu({ showProjects = () => undefined }: { showProjects?: (
   const kit = (kind: string) => {
     const a = buildAdvice(game, kind), own = ownNeeds(kind), extra = kind === 'well_drilled' ? drillExtra(game.site) : 0;
     const permit = needsPermit(kind) && game.paper.permits && countyWorks(game) ? ` · permit ${usd(permitFee(game, kind))}` : '';
-    return <Item key={kind} name={KIT[kind].name} cost={`~${usd(costOf(kind) + extra)}`}
+    return <Item key={kind} flashKey={`kit:${kind}`} name={KIT[kind].name} cost={`~${usd(costOf(kind) + extra)}`}
       sub={`${totalHours(BLUEPRINTS[kind])} h · crew adds ~${usd(Math.round(totalHours(BLUEPRINTS[kind]) * CREW_RATE / 100) * 100)}${kind === 'well_drilled' ? ` · water at ${game.site.gwDepth} m` : ''}${permit}`}
       on={g.tool === kind} off={a.off} next={a.next ? a.note : null} title={`${KIT[kind].blurb}${own ? ` Needs from your own land: ${own}.` : ''}`} click={() => arm(kind)} />;
   };
@@ -142,7 +143,7 @@ export function BuildMenu({ showProjects = () => undefined }: { showProjects?: (
         </div>}
       </div>)}
     </div>}
-    <Group id="longterm" title="Long-term goals" defaultOpen={false} extra={goals.map(x => `${x.steps.filter(y => y.done).length}/${x.steps.length}`).join(' · ')}>
+    <Group id="longterm" title="Long-term goals" defaultOpen={inFirstHour(game)} extra={goals.map(x => `${x.steps.filter(y => y.done).length}/${x.steps.length}`).join(' · ')}>
       {goals.map(goal => {
         const done = goal.steps.filter(x => x.done).length;
         return <div key={goal.id} style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '5px 8px', marginBottom: 4 }}>
