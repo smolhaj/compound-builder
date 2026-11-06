@@ -29,6 +29,7 @@ import { regionWorld, type Relief, type RegionWorld } from '../region/regionWorl
 import { REGIONS, type RegionId } from '../../sim/regions';
 import { lotField, treeLineM, type LotField, type LotSpec } from '../../sim/lots';
 import type { RoadBed } from '../../sim/roadBed';
+import { MOAT, closestOnPolyline, moatHeight, type MoatChannel } from '../perimeter/moatChannel';
 
 /** Parcel side in world units (40 acres ≈ 402 m). */
 export const PARCEL_SIZE = 67;
@@ -67,6 +68,8 @@ export interface Earthwork {
   wide?: number;
   /** A moat: no cut where the creek is (the creek is the moat there). */
   creekSkip?: boolean;
+  /** A moat: the graded channel (perimeter/moatChannel), banks on both sides; replaces the fixed-depth profile. */
+  channel?: MoatChannel;
 }
 
 /**
@@ -82,7 +85,7 @@ export const pitReach = (depth: number) => depth * 1.0 + 0.05;
 const BERM_HALF_BASE = 0.34, BERM_HALF_TOP = 0.08, DITCH_HALF_TOP = 0.26, DITCH_HALF_BOT = 0.08;
 /** A moat's cut stops this far (world units) outside the creek's water line: the bank. */
 export const CREEK_MOAT_MARGIN = 2.5;
-export const earthworkReach = (w: Earthwork) => (w.height > 0 ? BERM_HALF_BASE : DITCH_HALF_TOP * (w.wide ?? 1)) + 0.02;
+export const earthworkReach = (w: Earthwork) => w.channel ? MOAT.reach + 0.02 : (w.height > 0 ? BERM_HALF_BASE : DITCH_HALF_TOP * (w.wide ?? 1)) + 0.02;
 
 function polyBox(pts: ReadonlyArray<[number, number]>, pad: number): [number, number, number, number] {
   let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
@@ -91,18 +94,7 @@ function polyBox(pts: ReadonlyArray<[number, number]>, pad: number): [number, nu
 }
 
 /** Distance to a polyline and the distance along it of the closest point. */
-export function closestOnLine(pts: ReadonlyArray<[number, number]>, x: number, z: number): { d: number; s: number } {
-  let best = Infinity, bestS = 0, acc = 0;
-  for (let i = 1; i < pts.length; i++) {
-    const [ax, az] = pts[i - 1], [bx, bz] = pts[i];
-    const dx = bx - ax, dz = bz - az, l2 = dx * dx + dz * dz, l = Math.sqrt(l2);
-    const t = l2 > 0 ? Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / l2)) : 0;
-    const d = Math.hypot(x - (ax + dx * t), z - (az + dz * t));
-    if (d < best) { best = d; bestS = acc + t * l; }
-    acc += l;
-  }
-  return { d: best, s: bestS };
-}
+export const closestOnLine: (pts: ReadonlyArray<[number, number]>, x: number, z: number) => { d: number; s: number } = closestOnPolyline;
 
 /** Height change an earthwork makes at (x, z). */
 export function earthworkOffset(w: Earthwork, x: number, z: number): number {
@@ -537,6 +529,11 @@ export class ParcelTerrain {
       const b = w.bbox!;
       if (x < b[0] || x > b[2] || z < b[1] || z > b[3]) continue;
       if (w.creekSkip && Math.abs(z - this.creek.zAt(x)) < this.creek.halfWidth + CREEK_MOAT_MARGIN) continue;
+      if (w.channel) {
+        const h1 = moatHeight(w.channel, x, z, s.h, w.k, w.gates);
+        if (h1 !== s.h) { s.h = h1; s.forest = 0; }
+        continue;
+      }
       const dy = earthworkOffset(w, x, z);
       if (dy !== 0) { s.h += dy; s.forest = 0; }
     }

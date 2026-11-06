@@ -4,7 +4,7 @@
  * ditches are earthworks in the terrain itself (ParcelTerrain.setEarthworks);
  * here they get only their gate posts. Sizes follow scale.test.ts (1 m = 1/6).
  */
-import { moatPools } from './moatLevel';
+import { MOAT, poolAt, waterHalf, type MoatChannel } from './moatChannel';
 import { deckGrade } from './bridgeDeck';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -86,7 +86,7 @@ export function offsetPts(pts: readonly Pt[], d: number): Pt[] {
  * `under` says whether a point is under a building: pipe and cable trenches
  * stop at its wall and their marker posts stand outside it.
  */
-export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (x: number, z: number) => boolean = () => false, opts: { /** The creek: a moat's water stops at its banks. */ creek?: { zAt(x: number): number; halfWidth: number }; /** A moat's water: how full (0-1) and whether it is ice (sim/waterWorks). */ moat?: { level: number; frozen: boolean }; lit?: boolean; sensors?: boolean; hostKind?: PerimeterKind; /** The host wall carries razor wire (drawn on the deck's outer rail). */ hostRazor?: boolean; /** A patrol deck rides on this wall (its wire is drawn on the deck). */ deck?: boolean; /** What the entry gate carries (sim/gateSecurity.ts): a double gate, an intercom pole, a caged motor, the response sign; set only on the run with the first way in. */ gateKit?: { sally: boolean; intercom: boolean; motor: boolean; signs?: boolean; /** The gate on this run that carries it (its `at`). */ at: number }; /** The driveway, road end first: every gate the drive passes through is built along its heading (game/perimeter/gateKitLayout.ts). */ drive?: readonly Pt[] } = {}): THREE.Group {
+export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (x: number, z: number) => boolean = () => false, opts: { /** The creek: a moat's water stops at its banks. */ creek?: { zAt(x: number): number; halfWidth: number }; /** A moat's water: how full (0-1) and whether it is ice (sim/waterWorks). */ moat?: { level: number; frozen: boolean }; /** A moat's graded channel (game/perimeter/moatChannel): its pools set the water levels. */ channel?: MoatChannel; lit?: boolean; sensors?: boolean; hostKind?: PerimeterKind; /** The host wall carries razor wire (drawn on the deck's outer rail). */ hostRazor?: boolean; /** A patrol deck rides on this wall (its wire is drawn on the deck). */ deck?: boolean; /** What the entry gate carries (sim/gateSecurity.ts): a double gate, an intercom pole, a caged motor, the response sign; set only on the run with the first way in. */ gateKit?: { sally: boolean; intercom: boolean; motor: boolean; signs?: boolean; /** The gate on this run that carries it (its `at`). */ at: number }; /** The driveway, road end first: every gate the drive passes through is built along its heading (game/perimeter/gateKitLayout.ts). */ drive?: readonly Pt[] } = {}): THREE.Group {
   const lit = opts.lit ?? true;
   // an upgrade of a finished run is drawn beside the old tier (not on top of it) until it is done and the old one comes down
   const run = run0.replaces ? { ...run0, pts: offsetPts(run0.pts, (run0.replacesKind === 'container_wall' || run0.replacesKind === 'container_stack') ? 0.36 : UPGRADE_OFFSET) } : run0;
@@ -672,9 +672,9 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
       // the water in the cut (the ditch itself is an earthwork in the terrain): a ribbon on the surface, lower in a rain-fed ditch, white when it is ice
       const mo = opts.moat;
       if (run.finishedAt === null || !mo || mo.level <= 0.05) break;
-      const lv = Math.min(1, mo.level), hw = 0.2 + 0.22 * lv, lift = 0.22 + 0.06 * lv, wm: KitMaterialId = mo.frozen ? 'whitewash' : 'moat_water';
+      const lv = Math.min(1, mo.level), lift = 0.30 + 0.06 * lv, hw = waterHalf(lift), wm: KitMaterialId = mo.frozen ? 'whitewash' : 'moat_water', ch = opts.channel;
+      if (!ch) break;
       for (const [s0, s1] of spans) {
-        const n = Math.max(1, Math.ceil((s1 - s0) / 0.35));
         let pos: number[] = [];
         const flush = () => {
           const idx: number[] = [];
@@ -682,37 +682,21 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
           if (idx.length) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); if (!mo.frozen) g.setAttribute('aSide', new THREE.Float32BufferAttribute(Array.from({ length: pos.length / 3 }, (_, k) => k % 2), 1)); g.setIndex(idx); g.computeVertexNormals(); add(wm, g); }
           pos = [];
         };
-        // each edge of the water stops where the bank does: a level surface over a cross-slope would hang out over the hillside as a plane in the air
-        const reach = (x: number, z: number, dx: number, dz: number, y: number): [number, number] => {
-          let l = hw, r = hw;
-          while (l > 0.1 && ground(x + dz * l, z - dx * l) < y - 0.03) l -= 0.04;
-          while (r > 0.1 && ground(x - dz * r, z + dx * r) < y - 0.03) r -= 0.04;
-          return [l, r];
-        };
-        // the water is level: a chain of flat pools down the slope, a small stone weir between them (game/perimeter/moatLevel)
-        const qs = Array.from({ length: n + 1 }, (_, i) => along(run.pts, s0 + (s1 - s0) * i / n));
-        const pools = moatPools(qs.map(q => ground(q.x, q.z)), lift, 0.75 * lift);
-        for (let i = 0; i <= n; i++) {
-          const q = qs[i], y = pools.level[i];
-          if (i > 0 && pools.pool[i] !== pools.pool[i - 1]) {
-            // the step: between the two samples both pools end at one line, and the water falls the difference as a short sheet (no free-standing stone: on a slope the
-            // downhill bank is lower than the bed's rim and a sill stood out of the grass like a fence panel)
-            const p0 = qs[i - 1], mx = (p0.x + q.x) / 2, mz = (p0.z + q.z) / 2, y0 = pools.level[i - 1];
-            if (Math.abs(y0 - y) > 0.01) {
-              const [la, ra] = reach(mx, mz, q.dx, q.dz, Math.min(y0, y)), fp = [mx + q.dz * la, mz - q.dx * la, mx - q.dz * ra, mz + q.dx * ra];
-              const g = new THREE.BufferGeometry();
-              g.setAttribute('position', new THREE.Float32BufferAttribute([fp[0], y0, fp[1], fp[2], y0, fp[3], fp[0], y, fp[1], fp[2], y, fp[3]], 3));
-              if (!mo.frozen) g.setAttribute('aSide', new THREE.Float32BufferAttribute([0, 1, 0, 1], 1));
-              g.setIndex([0, 1, 2, 1, 3, 2, 2, 1, 0, 2, 3, 1]); g.computeVertexNormals(); add(wm, g);
-            }
-            if (pos.length) { const [l0, r0] = reach(mx, mz, q.dx, q.dz, y0); pos.push(mx + q.dz * l0, y0, mz - q.dx * l0, mx - q.dz * r0, y0, mz + q.dx * r0); flush(); }
-            const [l1, r1] = reach(mx, mz, q.dx, q.dz, y);
-            pos.push(mx + q.dz * l1, y, mz - q.dx * l1, mx - q.dz * r1, y, mz + q.dx * r1);
-          }
+        // the water is drawn a hair wider than its own waterline: the graded bank (game/perimeter/moatChannel) rises past the waterline on both sides, so the terrain hides
+        // the excess and the visible edge is the surface meeting the bank, a clean line instead of per-station clipping
+        // the water is level: each pool is flat from its upstream drop to its downstream one (game/perimeter/moatChannel)
+        const n = Math.max(1, Math.ceil((s1 - s0) / 0.3));
+        const stations: number[] = [];
+        for (let i = 0; i <= n; i++) { const sv = s0 + (s1 - s0) * i / n; if (!ch.breaks.some(b => Math.abs(sv - b) < MOAT.dropHalf)) stations.push(sv); }
+        for (const b of ch.breaks) if (b > s0 + 0.05 && b < s1 - 0.05) stations.push(b - MOAT.dropHalf, b + MOAT.dropHalf);
+        stations.sort((a, b) => a - b);
+        const yAt = (s: number) => ch.bed[poolAt(ch, s)] + lift;   // (the water falls a step over 2 x dropHalf: a steep ramp of the surface, not a vertical sheet that reflects the whole sky)
+        for (const s of stations) {
+          const q = along(run.pts, s), y = yAt(s);
           // where the line meets the creek, the creek is the moat: no second ribbon over its water or banks
           if (opts.creek && Math.abs(q.z - opts.creek.zAt(q.x)) < opts.creek.halfWidth + 2.5) { flush(); continue; }
-          const [lw, rw] = reach(q.x, q.z, q.dx, q.dz, y);
-          pos.push(q.x + q.dz * lw, y, q.z - q.dx * lw, q.x - q.dz * rw, y, q.z + q.dx * rw);
+          const lw = hw + 0.06;
+          pos.push(q.x + q.dz * lw, y, q.z - q.dx * lw, q.x - q.dz * lw, y, q.z + q.dx * lw);
         }
         flush();
       }

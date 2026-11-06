@@ -91,3 +91,15 @@ export function yardSpur(drive: readonly Pt[] | undefined, x: number, z: number,
 
 /** Can a gravel spur of length `spur` rise or fall `drop` from the yard's pad to the road's edge? A farm drive grades to ~15 % (plus a little for the crown); steeper means the yard sits above a road cut. */
 export const spurGradeOk = (spur: number, drop: number): boolean => Math.abs(drop) <= 0.15 * spur + 0.04;
+
+/**
+ * Does the ground between a yard's gate and the road lie as a plain slope? `heights[i][j]` is the ground at station i (0 at the gate, last at the road's edge) and
+ * lateral offset j across the spur; the spur is laid draped on the ground, so it is only a drive when the ground is within `tol` of the straight line from the pad's
+ * level `pad` to the road's level `roadY`. A bank (a road cut's slope or a bench edge) beside or across the way breaks that and the site is refused.
+ */
+export function spurProfileOk(pad: number, roadY: number, heights: ReadonlyArray<ReadonlyArray<number>>, tol = 0.1): boolean {
+  const n = heights.length;
+  if (n < 2) return true;
+  for (let i = 0; i < n; i++) for (const h of heights[i]) if (Math.abs(h - (pad + (roadY - pad) * i / (n - 1))) > tol) return false;
+  return true;
+}

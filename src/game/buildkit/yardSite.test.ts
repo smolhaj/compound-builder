@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { yardPadHalf, spurGradeOk, YARD_GAPS, YARD_SITE, yardBesideDrive, yardCorners, yardSpur } from './yardSite';
+import { yardPadHalf, spurGradeOk, YARD_GAPS, YARD_SITE, yardBesideDrive, yardCorners, yardSpur, spurProfileOk } from './yardSite';
 import { distToPolyline, pointAtArc } from '../perimeter/gateKitLayout';
 import type { Pt } from '../../sim/perimeter';
 
@@ -64,4 +64,19 @@ describe('yard beside the drive', () => {
     for (const c of yardCorners(0, 0, 0.37, 1)) expect(Math.max(Math.abs(c[0]), Math.abs(c[1]))).toBeLessThanOrEqual(yardPadHalf(0.37, 1) + 1e-9);
   });
   it('no drive, no site', () => { expect(yardBesideDrive(undefined, [0, 0], HALF, W)).toBeNull(); });
+});
+
+describe('spurProfileOk: the way from the gate to the road is one plain slope', () => {
+  const rows = (f: (t: number) => number, n = 5) => Array.from({ length: n }, (_, i) => [f(i / (n - 1)), f(i / (n - 1)), f(i / (n - 1))]);
+  it('accepts level ground and an even fall', () => {
+    expect(spurProfileOk(5, 5, rows(() => 5))).toBe(true);
+    expect(spurProfileOk(5, 4.9, rows(t => 5 - 0.1 * t))).toBe(true);
+  });
+  it('refuses a bank across the way (a road cut below a bench)', () => {
+    expect(spurProfileOk(5, 4.5, rows(t => (t < 0.7 ? 5 : 4.5)))).toBe(false);
+  });
+  it('refuses a bank beside the spur', () => {
+    const h = rows(() => 5); h[3][2] = 5.4;
+    expect(spurProfileOk(5, 5, h)).toBe(false);
+  });
 });

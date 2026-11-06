@@ -4,7 +4,7 @@ import * as THREE from 'three';
 const used = new Set<string>();
 vi.mock('../buildkit/materials', () => ({ kitMaterial: (id: string) => { used.add(id); return new THREE.MeshStandardMaterial(); }, setWindowGlow: () => {} }));
 
-import { bankExtent, buildRoadWorks, featherStrip, type Frame } from './roadWorks';
+import { bankExtent, buildRoadWorks, featherStrip, insideRoom, type Frame } from './roadWorks';
 import { planRoad, type RoadGround, type RoadInput } from '../../sim/roadPlan';
 import { roadBedOf } from '../../sim/roadPlan';
 import type { RegionId } from '../../sim/regions';
@@ -135,5 +135,46 @@ describe('the road, drawn', () => {
     expect(col.getW(0)).toBe(0); expect(col.getW(5 + 4)).toBeCloseTo(1, 6);
     for (let i = 0; i < pos.count; i++) expect(pos.getY(i)).toBeCloseTo(pos.getX(i) + pos.getZ(i) + 0.01, 5);
     expect(featherStrip(fr, 0, 0, 0, 1, () => 0, 0, [1, 1, 1], () => 1)).toBeNull();
+  });
+});
+
+describe('bank facing on the inside of a bend', () => {
+  /** Stations round a circular arc of radius R (turning left when `left`), 0.1 apart. */
+  const arc = (R: number, left: boolean, n = 40): Frame[] => Array.from({ length: n }, (_, i) => {
+    const a = (left ? 1 : -1) * i * 0.1 / R, rot = a, fx = Math.sin(rot), fz = Math.cos(rot);
+    const cx = left ? R : -R;
+    return { x: cx - Math.cos(a) * cx, z: Math.sin(a) * R * (left ? 1 : 1), y: 0, rot, fx, fz, nx: fz, nz: -fx, bank: 0 };
+  });
+  it('has no limit on a straight road and on the outside of a bend', () => {
+    const straight = Array.from({ length: 20 }, (_, i) => ({ x: 0, z: i * 0.1, y: 0, rot: 0, fx: 0, fz: 1, nx: 1, nz: 0, bank: 0 } as Frame));
+    for (const sg of [1, -1]) expect(insideRoom(straight, sg, 0.45).every(v => v === Infinity)).toBe(true);
+    const fr = arc(3, true);
+    const lim = [insideRoom(fr, 1, 0.45), insideRoom(fr, -1, 0.45)];
+    expect(lim.some(l => l.every(v => v === Infinity))).toBe(true);     // one side is the outside
+  });
+  it('stops short of the radius on the inside of a tight bend, so the offset line cannot fold', () => {
+    const R = 1.5, fr = arc(R, true);
+    const l1 = insideRoom(fr, 1, 0.45), l2 = insideRoom(fr, -1, 0.45), lim = l1.every(v => v === Infinity) ? l2 : l1;
+    const mid = lim[20];
+    expect(Number.isFinite(mid)).toBe(true);
+    expect(0.45 + mid).toBeLessThan(R);
+    expect(mid).toBeGreaterThanOrEqual(0);
+  });
+  it('a gentle bend leaves the whole bank room', () => {
+    const lim = [...insideRoom(arc(30, true), 1, 0.45), ...insideRoom(arc(30, true), -1, 0.45)].filter(Number.isFinite);
+    for (const v of lim) expect(v).toBeGreaterThan(5);
+  });
+  it('pinches the inside of a sharp kink, where the station headings turn inside one step', () => {
+    // a straight road with a 70 degree left kink at station 10, stations 0.3 apart (frames as the road works build them: heading from the neighbours)
+    const pts: Array<[number, number]> = [];
+    for (let i = 0; i < 20; i++) pts.push(i <= 10 ? [i * 0.3, 0] : [3 + (i - 10) * 0.3 * Math.cos(1.22), (i - 10) * 0.3 * Math.sin(1.22)]);
+    const fr: Frame[] = pts.map((q, i) => {
+      const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)], rot = Math.atan2(b[0] - a[0], b[1] - a[1]), fx = Math.sin(rot), fz = Math.cos(rot);
+      return { x: q[0], z: q[1], y: 0, rot, fx, fz, nx: fz, nz: -fx, bank: 0 };
+    });
+    const l1 = insideRoom(fr, 1, 0.45), l2 = insideRoom(fr, -1, 0.45), inner = l1.some(Number.isFinite) && Math.min(...l1) < Math.min(...l2) ? l1 : l2;
+    expect(Math.min(...inner)).toBeLessThan(0.3);                      // nothing past the road's own edge pile-up
+    expect(Math.min(...(inner === l1 ? l2 : l1))).toBe(Infinity);      // the outside has no limit
+    expect(inner[0]).toBeGreaterThan(3);                               // far from the kink the facing has room again
   });
 });
