@@ -188,6 +188,8 @@ const MILESTONES: Array<{ id: string; name: string; points: number; test: (s: Ga
 ];
 export const MILESTONE_NAME: Record<string, string> = Object.fromEntries(MILESTONES.map(m => [m.id, m.name]));
 export const MILESTONE_COUNT = MILESTONES.length;
+/** Points each milestone is worth (the celebration card reads these). */
+export const MILESTONE_POINTS: Record<string, number> = Object.fromEntries(MILESTONES.map(m => [m.id, m.points]));
 
 /** Once a day: birthdays, old age, partners, births, the chronicle and the score. Returns lines for the log. */
 export function lineageDay(s: GameState): string[] {

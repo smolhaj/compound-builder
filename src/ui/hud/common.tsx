@@ -1,11 +1,13 @@
 /** Shared HUD pieces: panel styling, sections, rows, notes, tabs, folding groups and build items. */
 import { useState, type ReactNode } from 'react';
 import { DIM, FS, LINE, TONE, btn, h3, miniBtn, type Tone } from './style';
+import { useFlash } from '../feel/flash';
 
 
 
-export function Section({ title, children }: { title: string; children: ReactNode }) {
-  return <div style={{ marginBottom: 10 }}><div style={h3}>{title}</div>{children}</div>;
+export function Section({ title, children, flashKey }: { title: string; children: ReactNode; flashKey?: string }) {
+  const flash = useFlash(flashKey);
+  return <div data-flash={flash} style={{ marginBottom: 10 }}><div style={h3}>{title}</div>{children}</div>;
 }
 
 
@@ -22,15 +24,19 @@ export function Note({ tone, children }: { tone?: Tone; children: ReactNode }) {
   return <div style={{ fontSize: 11.5, lineHeight: 1.35, margin: '3px 0', color: tone ? TONE[tone] : DIM }}>{children}</div>;
 }
 
-/** Tabs across the top of a panel (one row: the labels shrink to fit); a dot marks a tab that wants attention. */
-export function Tabs<T extends string>({ tabs, value, set }: { tabs: Array<[T, string, Tone?]>; value: T; set: (t: T) => void }) {
+/** Tabs across the top of a panel (one row: the labels shrink to fit); a dot marks a tab that wants attention, a blue dot one that has just appeared, and a tab the player just touched glows briefly. */
+export function Tabs<T extends string>({ tabs, value, set }: { tabs: Array<[T, string, Tone?, boolean?]>; value: T; set: (t: T) => void }) {
   return <div style={{ display: 'flex', gap: 0, borderBottom: `1px solid ${LINE}`, margin: '-2px -4px 8px' }}>
-    {tabs.map(([id, label, alert]) => (
-      <button key={id} onClick={() => set(id)} style={{ flex: '1 1 auto', padding: '5px 3px', border: 0, borderBottom: `2px solid ${value === id ? '#d8c9a0' : 'transparent'}`, background: 'transparent', color: value === id ? '#fff' : DIM, cursor: 'pointer', fontSize: 11, fontWeight: value === id ? 600 : 400, whiteSpace: 'nowrap' }}>
-        {label}{alert && <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: 3, background: TONE[alert], marginLeft: 3, verticalAlign: 'middle' }} />}
-      </button>
-    ))}
+    {tabs.map(([id, label, alert, fresh]) => <TabButton key={id} id={id} label={label} alert={alert} fresh={fresh} on={value === id} set={() => set(id)} />)}
   </div>;
+}
+
+function TabButton({ id, label, alert, fresh, on, set }: { id: string; label: string; alert?: Tone; fresh?: boolean; on: boolean; set: () => void }) {
+  const flash = useFlash(`tab:${id}`);
+  return <button onClick={set} data-flash={flash} data-tab={id} style={{ flex: '1 1 auto', padding: '5px 3px', border: 0, borderBottom: `2px solid ${on ? '#d8c9a0' : 'transparent'}`, background: 'transparent', color: on ? '#fff' : DIM, cursor: 'pointer', fontSize: 11, fontWeight: on ? 600 : 400, whiteSpace: 'nowrap' }}>
+    {label}{alert && <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: 3, background: TONE[alert], marginLeft: 3, verticalAlign: 'middle' }} />}
+    {fresh && <span data-testid={`new-${id}`} title="New: this just became useful" aria-label="new" style={{ display: 'inline-block', width: 7, height: 7, borderRadius: 4, background: '#6fb7ff', marginLeft: 3, verticalAlign: 'middle', boxShadow: '0 0 0 2px rgba(111,183,255,0.3)' }} />}
+  </button>;
 }
 
 /** A group of build items that folds away (remembered per browser). */
@@ -50,8 +56,9 @@ export function Group({ id, title, extra, defaultOpen = true, children }: { id: 
  * One thing to build: the name and cost on a line, the time and notes under it.
  * `off` greys it out and says why; `next` marks the sensible next step (gold edge and a note).
  */
-export function Item({ name, cost, sub, on, off, next, title, click }: { name: string; cost: string; sub?: string; on: boolean; off?: string | null; next?: string | null; title?: string; click: () => void }) {
-  return <button disabled={!!off} title={off ?? title} onClick={click} style={{ textAlign: 'left', padding: '5px 8px', borderRadius: 6, border: next && !on ? '1px solid #d8c9a0' : '1px solid transparent', cursor: off ? 'not-allowed' : 'pointer', background: on ? '#d8c9a0' : next ? 'rgba(216,201,160,0.14)' : 'rgba(255,255,255,0.05)', color: on ? '#1c1d18' : '#eee' }}>
+export function Item({ name, cost, sub, on, off, next, title, click, flashKey }: { /** Lit briefly after a purchase (store/feelStore.ts). */ flashKey?: string; name: string; cost: string; sub?: string; on: boolean; off?: string | null; next?: string | null; title?: string; click: () => void }) {
+  const flash = useFlash(flashKey);
+  return <button disabled={!!off} data-flash={flash} title={off ?? title} onClick={click} style={{ textAlign: 'left', padding: '5px 8px', borderRadius: 6, border: next && !on ? '1px solid #d8c9a0' : '1px solid transparent', cursor: off ? 'not-allowed' : 'pointer', background: on ? '#d8c9a0' : next ? 'rgba(216,201,160,0.14)' : 'rgba(255,255,255,0.05)', color: on ? '#1c1d18' : '#eee' }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6, opacity: off ? 0.4 : 1 }}><span>{name}</span><span style={{ fontVariantNumeric: 'tabular-nums' }}>{cost}</span></div>
     {off ? <div style={{ fontSize: 11, color: '#e8b070' }}>{off}</div>
       : <>

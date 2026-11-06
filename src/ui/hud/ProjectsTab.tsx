@@ -82,7 +82,7 @@ export function ProjectsTab() {
       </Section>}
       {!sel && !rows.length && !game.forestry.jobs.length && !todo.length && <Note>Nothing under way. Stake something out from the Build tab.</Note>}
       {sel && (
-        <Section title={KIT[sel.kind].name}>
+        <Section title={KIT[sel.kind].name} flashKey={`struct:${sel.id}`}>
           <div ref={el => { if (el && g.selected === sel.id && selSeen.current !== sel.id) { selSeen.current = sel.id; el.scrollIntoView?.({ block: 'start' }); } }} />
           <Row label="Stage" value={sel.pre ? 'Came with the land' : isFinished(sel) ? 'Finished' : BLUEPRINTS[sel.kind].stages[sel.stage].name} />
           {isFinished(sel) && <ResidentsLine id={sel.id} />}

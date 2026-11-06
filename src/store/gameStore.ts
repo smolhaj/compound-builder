@@ -57,6 +57,8 @@ import { opsecOf } from '../sim/opsec';
 import { hardenProblem, orderHarden, orderHardenAll, tierOf, type HardenId } from '../sim/hardening';
 import { saveGame, AUTOSAVE } from '../sim/save/saveSystem';
 import { decisionOpen, resumeSpeed } from '../sim/clockResume';
+import { useFeelStore } from './feelStore';
+import { muteFeedback } from '../ui/feel/quiet';
 
 /**
  * A raid played as a cutscene (sim/siege.ts, sim/raidCutscene.ts). While one is up, everything that
@@ -373,6 +375,9 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     const g = get().game;
     const back = resumeSpeed(get().resumeTo, g.clock.speed, decisionOpen(g, get().cutscene ?? get().dayCard));
     if (back) { set({ game: { ...g, clock: { ...g.clock, speed: back } }, resumeTo: null }); return; }
+    // the title screen and the "where we left off" card hold the clock until they are answered
+    const feel = useFeelStore.getState();
+    if (feel.title || feel.recap) return;
     if (get().cutscene || get().dayCard !== null || g.clock.speed === 0 || g.gate.pending || g.gate.aftermath || (g.ending && !g.ending.continued)) return;
     const days = Math.min(realDt, MAX_DT) / SECONDS_PER_DAY[g.clock.speed];
     const next = step(g, days);
@@ -457,7 +462,7 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     return n;
   },
   resumeTo: null,
-  load: (game) => set({ game, welcome: false, selected: null, tool: null, cutscene: promptFor(game), resumeTo: null, dayCard: null }),
+  load: (game) => { muteFeedback(); set({ game, welcome: false, selected: null, tool: null, cutscene: promptFor(game), resumeTo: null, dayCard: null }); },
   planRun: (kind, pts, gates, offLen = 0) => {
     if (locked()) return;
     if (routeProblem(get().game, kind, pts)) return;   // a tunnel-bridge needs real low ground, a slope tunnel a hillside (the tool says why)

@@ -1,6 +1,6 @@
 import { flowLine } from '../sim/flow';
 import { PlansOrderButton } from './hud/SpendConfirm';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { EDGE, hudLayout, useBox } from './hudLayout';
 import { unscripted } from '../sim/godMode';
 import { TERRAIN_LEGEND, type TerrainMode } from '../game/terrain/TerrainOverlay';
@@ -85,6 +85,8 @@ import { ProjectsTab } from './hud/ProjectsTab';
 import { DefenseTab } from './hud/DefenseTab';
 import { defenseTabAlert } from './hud/defenseAlert';
 import { CursorHint, ToastLine, WelcomeCard } from './hud/Feedback';
+import { useFeelStore, saveRevealed, worldId } from '../store/feelStore';
+import { visibleTabs, type RightTab } from '../sim/tabReveal';
 
 const QUALITIES: Quality[] = ['high', 'medium', 'low'];
 const SIGHTS: Array<['off' | 'road' | 'ridge' | 'night' | 'viewshed', string, string]> = [
@@ -152,6 +154,19 @@ export function Hud() {
     setLastFocus(g.hudFocus);
     if (g.hudFocus) { setRightTab(g.hudFocus.right); if (g.hudFocus.supplies) setSuppliesTab(g.hudFocus.supplies); }
   }
+  // First-hour HUD (sim/tabReveal.ts): right-hand tabs appear as they become relevant; "Show all tabs" brings them all back
+  const feel = useFeelStore();
+  const revealedSet = new Set<RightTab>(feel.revealed);
+  const shownTabs = new Set(visibleTabs(revealedSet, !feel.firstHourHud || feel.showAll));
+  // a tab that was asked for (a link, a Next-step card) is shown and stays shown
+  const missingKey = revealedSet.has(rightTab) ? '' : rightTab;
+  useEffect(() => {
+    if (!missingKey) return;
+    const f = useFeelStore.getState(), all = [...new Set([...f.revealed, missingKey as RightTab])];
+    saveRevealed(worldId(useGameStore.getState().game), all);
+    useFeelStore.setState({ revealed: all });
+  }, [missingKey]);
+  useEffect(() => { useFeelStore.getState().seeTab(rightTab); }, [rightTab]);
   if (new URLSearchParams(location.search).has('clean')) return null;
   const game = g.game;
   const cal = calendarOf(game.clock);
@@ -224,7 +239,9 @@ export function Hud() {
 
       {/* Right: the family, supplies, water & power, land, the outside world */}
       <div style={{ ...panel, position: 'fixed', right: lay.narrow ? 'auto' : EDGE, left: lay.narrow ? EDGE : 'auto', top: lay.panelTop, width: lay.rightW, boxSizing: 'border-box', maxHeight: `calc(100vh - ${lay.panelTop + lay.bottomReserve}px)`, display: w.hudHidden || (lay.narrow && side !== 'right') ? 'none' : 'flex', flexDirection: 'column' }}>
-        <Tabs tabs={[['family', 'Family', familyAlert], ['supplies', 'Supplies', worstTone(foodAlert, farmAlert(game))], ['utilities', 'Utilities', utilAlert], ['land', 'Land'], ['defense', 'Defense', defenseAlert], ['outside', 'Outside', outsideAlert], ['chronicle', 'Years']]} value={rightTab} set={setRightTab} />
+        <Tabs tabs={(([['family', 'Family', familyAlert], ['supplies', 'Supplies', worstTone(foodAlert, farmAlert(game))], ['utilities', 'Utilities', utilAlert], ['land', 'Land'], ['defense', 'Defense', defenseAlert], ['outside', 'Outside', outsideAlert], ['chronicle', 'Years']]) as Array<[RightTab, string, Tone?]>)
+          .filter(([id]) => shownTabs.has(id) || id === rightTab).map(([id, label, alert]): [RightTab, string, Tone?, boolean?] => [id, label, alert, feel.fresh.includes(id) && id !== rightTab])} value={rightTab} set={setRightTab} />
+        {feel.firstHourHud && <button data-testid="show-all-tabs" onClick={() => feel.setShowAll(!feel.showAll)} title={feel.showAll ? 'Hide the tabs that have nothing to show yet' : 'Tabs appear as they become useful. Show every tab now.'} style={{ alignSelf: 'flex-end', background: 'transparent', border: 0, color: DIM, cursor: 'pointer', fontSize: FS.fine, padding: '0 2px 4px', marginTop: -4, textDecoration: 'underline' }}>{feel.showAll ? 'Hide unused tabs' : 'Show all tabs'}</button>}
         <div style={{ overflowY: 'auto', flex: 1, paddingRight: 2 }}>
           {rightTab === 'family' && <>
             {game.people.map((p, i) => {
