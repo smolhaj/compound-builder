@@ -46,7 +46,7 @@ import type { QuartersState } from './quarters';
 import type { Evenings } from './evenings';
 import type { Courses } from './courses';
 import { starterKit, type ToolKit } from './tools';
-export const SAVE_VERSION = 82;
+export const SAVE_VERSION = 84;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -219,6 +219,8 @@ export interface GameState {
   money: number;
   stock: Stock;
   orders: Order[];
+  /** Projects waiting on materials: key (sim/stalls.ts) -> the day first seen waiting, and whether the stuck line was already said. Absent on a save from before v83. */
+  stalls?: Record<string, { since: number; said?: boolean }>;
   people: Person[];
   personState: PersonState[];
   structures: Structure[];
@@ -416,6 +418,7 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     ending: null,
     food: { needKcal: 0, ateKcal: 0, producedKcal: 0, spoiledKcal: 0, fromStores: true, kinds: [], daysLeft: 0 },
     orders: [],
+    stalls: {},
     people,
     personState: people.map(p => ({ id: p.id, task: 'idle', target: null, needs: freshNeeds(), fatigue: 0, ...(setup.dayJobs && p.job ? { employed: true } : {}) })),
     structures: [],

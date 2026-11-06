@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FRAME_MAX_R, FRAME_MIN_R, frameOn, startFrame } from './cameraFraming';
+import { FRAME_MAX_R, FRAME_MIN_R, frameOn, frameRect, startFrame } from './cameraFraming';
 
 describe('camera framing', () => {
   it('nothing to frame gives nothing', () => expect(frameOn([])).toBeNull());
@@ -19,5 +19,15 @@ describe('camera framing', () => {
     const f = startFrame([{ x: 52, z: 30 }, { x: 54, z: 33 }, { x: 5, z: 5 }, { x: 0, z: 0, unplaced: true }], camp);
     expect(f.radius).toBeLessThan(45);
     expect(Math.hypot(f.x - 53, f.z - 31.5)).toBeLessThan(1);
+  });
+});
+
+describe('frameRect', () => {
+  it('centres on the rectangle and stands high enough to hold a forty', () => {
+    const f = frameRect({ x0: 0, z0: 0, x1: 100, z1: 100 });
+    expect([f.x, f.z]).toEqual([50, 50]);
+    expect(f.radius).toBeGreaterThan(90);
+    expect(f.radius).toBeLessThanOrEqual(230);
+    expect(frameRect({ x0: 0, z0: 0, x1: 4, z1: 4 }).radius).toBeGreaterThanOrEqual(40);
   });
 });

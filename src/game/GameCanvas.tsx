@@ -267,6 +267,7 @@ export function GameCanvas() {
       useGameStore.subscribe(s => s.game.disaster.phase, ph => { const g = useGameStore.getState().game; if (g.disaster.kind === 'wildfire' && ph === 'warning' && !g.disaster.fuel) useGameStore.getState().setFuel(world.fuelNear(g.structures)); }),
       useGameStore.subscribe(s => s.game.land, () => { world.setOwnedLand(ownedRects(useGameStore.getState().game)); rebuildBoundary(); }),
       useWorldStore.subscribe(s => s.showBoundary, showBoundary),
+      useWorldStore.subscribe(s => s.landFlash, f => { if (f) { boundary.flash(f.rect); } }),
       useWorldStore.subscribe(s => s.starterPreview, p => starter.set(p)),
       useGameStore.subscribe(s => s.tool, showBoundary),
       useWorldStore.subscribe(s => s.quality, applyLook),

@@ -15,6 +15,11 @@ export class BoundaryOutline {
     polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
   });
 
+  /** The edge of a parcel just bought: bright green, over everything else, for a few seconds. */
+  private readonly _flash = new THREE.Group();
+  private readonly _flashMat = new THREE.MeshBasicMaterial({ color: 0x7dff5a, transparent: true, opacity: 0.95, depthWrite: false, depthTest: false });
+  private _flashTimer = 0;
+
   private readonly _ground: (x: number, z: number) => number;
 
   constructor(scene: THREE.Scene, ground: (x: number, z: number) => number) {
@@ -22,6 +27,28 @@ export class BoundaryOutline {
     this._group.visible = false;
     this._group.renderOrder = 5;
     scene.add(this._group);
+    this._flash.renderOrder = 6;
+    scene.add(this._flash);
+  }
+
+  /** Outline all four sides of `r` for `secs` seconds (shown whether or not the Boundary toggle is on). */
+  flash(r: Rect, secs = 6): void {
+    this.clearFlash();
+    const loop: Pt[] = [[r.x0, r.z0], [r.x1, r.z0], [r.x1, r.z1], [r.x0, r.z1], [r.x0, r.z0]];
+    for (let k = 0; k < 4; k++) {
+      const a = loop[k], b = loop[k + 1], len = Math.hypot(b[0] - a[0], b[1] - a[1]), n = Math.max(2, Math.ceil(len / 2));
+      const run: Pt[] = [];
+      for (let i = 0; i <= n; i++) run.push([a[0] + (b[0] - a[0]) * i / n, a[1] + (b[1] - a[1]) * i / n]);
+      const m = new THREE.Mesh(buildRibbon(run, 0.6, this._ground, 0.08, 1), this._flashMat);
+      m.renderOrder = 6;
+      this._flash.add(m);
+    }
+    this._flashTimer = window.setTimeout(() => this.clearFlash(), secs * 1000);
+  }
+
+  clearFlash(): void {
+    clearTimeout(this._flashTimer);
+    for (const c of [...this._flash.children]) { this._flash.remove(c); (c as THREE.Mesh).geometry.dispose(); }
   }
 
   set visible(on: boolean) { this._group.visible = on; }
@@ -46,6 +73,7 @@ export class BoundaryOutline {
   }
 
   dispose(): void {
+    this.clearFlash(); this._flash.parent?.remove(this._flash); this._flashMat.dispose();
     for (const c of this._group.children) (c as THREE.Mesh).geometry.dispose();
     this._group.parent?.remove(this._group);
     this._mat.dispose();

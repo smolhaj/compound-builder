@@ -6,6 +6,8 @@ import { boardCache, type BoardAct, type BoardItem, type BoardLine } from '../si
 import { shortestRunway, type RunwayRow } from '../sim/runway';
 import { Clamp, Group, Hint } from './hud/common';
 import { WaveCard } from './WaveClock';
+import { useSpendGuard } from './hud/useSpendGuard';
+import { orderCost, prices } from '../sim/economy';
 import { DIM, FS, LINE, TONE, btn, miniBtn } from './hud/style';
 
 const PAPER = 'rgba(32,29,22,0.97)';
@@ -17,12 +19,14 @@ export function CompoundBoardPanel({ top, bottom, narrow, onClose, onSide }: { t
   useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, [onClose]);
   const b = cache(g.game, drive);
   const tightest = shortestRunway(b.runway);
+  const { guard, node: guardNode } = useSpendGuard();
 
   /** The four things a board button can do; then the clipboard goes down so the tab is in view. */
   const go = (a: BoardAct) => {
     if (a.type === 'open') { g.focusHud({ right: a.right, ...(a.supplies ? { supplies: a.supplies } : {}) }); onSide('right'); }
     else if (a.type === 'select') { g.select(a.id); onSide('left'); }
     else if (a.type === 'stake') { g.setTool(a.kind); onSide('left'); }
+    else if (a.type === 'order') { const lines = a.lines; guard(orderCost(lines, prices(g.game)), () => { g.order(lines); onClose(); }); return; }
     else g.openShop(true, a.tab);
     onClose();
   };
@@ -56,6 +60,7 @@ export function CompoundBoardPanel({ top, bottom, narrow, onClose, onSide }: { t
         <button aria-label="Put the clipboard down" title="Close (Esc)" style={{ ...btn(), ...miniBtn }} onClick={onClose}>Close</button>
       </span>
     </div>
+    {guardNode}
     {b.vitals.map(vital)}
     <WaveCard />
     <Group id="board.runway" title="Days with no resupply" extra={tightest && tightest.tone !== 'good' ? `${tightest.label}: ${tightest.value}` : undefined}>

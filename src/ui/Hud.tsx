@@ -135,6 +135,8 @@ export function Hud() {
   const [suppliesTab, setSuppliesTab] = useState<'stores' | 'farm'>(() => g.hudFocus?.supplies ?? 'stores');
   // picking a building on the map opens its project card (not while a build tool is armed: placing a row of things keeps the Build list up)
   const [quitAsk, setQuitAsk] = useState<string | null>(null);
+  /** The parcel whose purchase is waiting for a second click (acreage, price and what is left are shown first). */
+  const [landAsk, setLandAsk] = useState<string | null>(null);
   // layout: the top bar's size and the window's width decide where the panels sit (hudLayout)
   const barRef = useRef<HTMLDivElement>(null), brRef = useRef<HTMLDivElement>(null), blRef = useRef<HTMLDivElement>(null);
   const [side, setSide] = useState<'left' | 'right'>('left');
@@ -179,7 +181,7 @@ export function Hud() {
         <span>{dateLabel(cal.doy)}, {cal.year}</span>
         <span style={{ fontVariantNumeric: 'tabular-nums' }}>{clock(hourOf(game.clock.t))}</span>
         {game.lineage.era > 1 && <span style={{ color: '#d8c08a' }} title={`The ${game.lineage.family} family: era ${game.lineage.era}`}>Era {roman(game.lineage.era)}</span>}
-        <CollapseChip />
+        <CollapseChip onOpen={() => setBoardOpen(true)} />
         <WaveChip onClick={() => setBoardOpen(true)} />
         <span style={{ fontWeight: 600, color: '#cfe0a8' }} title={`Checking. Net worth ${usd(netWorth(game))}`}>{usd(game.money)}</span>
         {(game.fin.debt?.owed ?? 0) >= 25 && <span style={{ fontWeight: 600, color: game.fin.debt!.stage === 'card' ? TONE.warn : TONE.bad }} title={game.disaster.tracks.banks < 0.5 ? 'The banks are gone: nobody is collecting' : `Owed on the card at 24 %${game.fin.debt!.lien ? ', with a judgment lien on the land' : ''} (Shop & money → Accounts)`}>owe {usd(game.fin.debt!.owed)}</span>}
@@ -438,7 +440,7 @@ export function Hud() {
                   : due !== null ? <Row key={what} label={label} value={`coming in ${Math.max(1, Math.ceil(due - game.clock.t))} days`} />
                   : <div key={what} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginTop: 3 }}>
                       <span style={{ color: DIM }}>{label}: <span style={{ color: TONE.warn }}>{what === 'power' ? `${imp.poleFt.toLocaleString('en-US')} ft to the pole` : `none (${(plan ? plan.lengthFt : imp.driveFt).toLocaleString('en-US')} ft)`}</span></span>
-                      <button style={btn(!why)} disabled={!!why} title={why ?? (what === 'power' ? `The co-op runs the line ($${POLE_PER_FT}/ft + transformer), about ${Math.round(q.days / 7)} weeks` : plan ? `${plan.lines.map(l => `${l.label}: ${usd(l.usd)}`).join('; ')}. About ${q.days} days` : `12 ft gravel and a culvert ($${DRIVE_PER_FT}/ft), about ${q.days} days`)} onClick={() => g.hookup(what)}>{usd(q.usd)}</button>
+                      <button style={btn(!why)} disabled={!!why} title={why ?? (what === 'power' ? `The co-op runs the line ($${POLE_PER_FT}/ft + transformer), about ${Math.round(q.days / 7)} weeks` : plan ? `${plan.lines.map(l => `${l.label}: ${usd(l.usd)}`).join('; ')}. About ${q.days} days` : `12 ft gravel and a culvert ($${DRIVE_PER_FT}/ft), about ${q.days} days`)} onClick={() => g.hookup(what)}>{what === 'power' ? 'Run the line' : 'Lay the drive'} · {usd(q.usd)}</button>
                     </div>;
               })}
               <Clamp text={`The way in: ${roadLine(game)}.`}>The way in: {roadLine(game)}.{game.site.lot && (() => { const cl = crossingLine(roadPlanOf(game)); return cl ? ` ${cl}` : ''; })()}</Clamp>
@@ -471,8 +473,22 @@ export function Hud() {
                     <span>{p.name[4].toUpperCase() + p.name.slice(5)}</span>
                     {p.owner === 'you' ? <span style={{ color: TONE.good }}>yours</span>
                       : why === 'nobody sells land for cash now' ? <span style={{ color: DIM }}>no cash sales</span>
-                      : <button style={btn(!why)} disabled={!!why} title={why ?? `Buy ${acresOf(p.rect)} acres`} onClick={() => g.buy(p.id)}>{usd(priceOf(game, p))}</button>}
+                      : <button style={btn(!why)} disabled={!!why} title={why ?? `Buy ${acresOf(p.rect)} acres of land next door`} onClick={() => setLandAsk(landAsk === p.id ? null : p.id)}>Buy {acresOf(p.rect)} acres · {usd(priceOf(game, p))}</button>}
                   </div>
+                  {landAsk === p.id && p.owner !== 'you' && !why && <div role="alertdialog" aria-label="Confirm the land purchase" style={{ border: `1px solid ${TONE.warn}`, borderRadius: 6, padding: '5px 7px', margin: '4px 0', fontSize: FS.small }}>
+                    <div><b>Buy {acresOf(p.rect)} acres of {LAND_NAME[p.kind]}</b> from {n ? n.name : 'the owner'} for <b>{usd(priceOf(game, p))}</b>?</div>
+                    <div style={{ color: DIM, marginTop: 2 }}>You have {usd(game.money)}; that leaves {usd(game.money - priceOf(game, p))}. Land cannot be sold back.</div>
+                    <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+                      <button style={btn(true)} onClick={() => {
+                        const price = priceOf(game, p), acres = acresOf(p.rect), rect = p.rect, left = game.money - price;
+                        const bad = g.buy(p.id); setLandAsk(null);
+                        if (bad) { g.showToast(`Could not buy the land: ${bad}.`); return; }
+                        g.showToast(`Bought ${acres} acres of ${LAND_NAME[p.kind]} for ${usd(price)}. ${usd(left)} left.`);
+                        w.flashLand(rect);
+                      }}>Buy it for {usd(priceOf(game, p))}</button>
+                      <button style={btn()} onClick={() => setLandAsk(null)}>Not now</button>
+                    </div>
+                  </div>}
                   <div style={{ fontSize: 11, color: DIM }}>{acresOf(p.rect)} acres of {LAND_NAME[p.kind]}{p.owner === 'you' ? '' : ` · ${n ? n.name : '?'}`}{p.forSale && p.owner !== 'you' ? <span style={{ color: TONE.warn }}> · for sale</span> : null}{p.ring === 2 && p.owner !== 'you' ? <span style={{ color: DIM }}> · farther out, more expensive</span> : null}{premiumOffer(game, p) ? <span style={{ color: TONE.warn }} title="Not for sale. A cash offer 60% over the asking price would tempt him.">{' · cash offer, +60%'}</span> : null}</div>
                 </div>;
               })}
