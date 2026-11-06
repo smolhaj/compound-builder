@@ -26,6 +26,7 @@
  */
 import { diffOf } from './difficulty';
 import type { GameState } from './state';
+import { pluralize } from './words';
 
 export const ADAPT = {
   /** Days after the hit when crews start to read the place, and when they know it. */
@@ -223,7 +224,7 @@ function winterWindowDay(s: GameState, w: Winter, k: number, day: number, first:
     const opening = day === w.from;
     let fuel = 0;
     if (opening) { fuel = Math.floor(s.stock.fuel * WINTER.FUEL_SHARE * k); s.stock.fuel -= fuel; }
-    if (opening) out.push(`A deep freeze has come down on the county and it will not lift for ${w.to - w.from + 1} days: the stove runs night and day${fuel ? `, and the generator and the truck burn ${fuel} gallons of fuel keeping ahead of it` : ''}. (${first ? 'The first hard winter' : 'A hard winter'}: it takes wood, fuel and food, not people. Stock up before it.)`);
+    if (opening) out.push(`A deep freeze has come down on the county and it will not lift for ${pluralize(w.to - w.from + 1, 'day')}: the stove runs night and day${fuel ? `, and the generator and the truck burn ${fuel} gallons of fuel keeping ahead of it` : ''}. (${first ? 'The first hard winter' : 'A hard winter'}: it takes wood, fuel and food, not people. Stock up before it.)`);
     else if (burned === 0 && ricks > 0 && s.stock.firewood < 1) out.push('The woodpile is bare in the middle of the freeze.');
   }
   if (day === w.thaw) {

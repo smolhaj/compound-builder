@@ -13,6 +13,7 @@ import { dayIndex } from './state';
 import { VEHICLES, fleetOf, runs } from './vehicles';
 import { roadResponse, roadWinter } from './roadFx';
 import { tunnelResponse } from './corridors';
+import { pluralize } from './words';
 
 // ── the road and the line ──
 
@@ -194,6 +195,6 @@ export function winterRoadLine(s: GameState): string | null {
   const n = closureDays(s), R = regionFor(s.site);
   if (n <= 0) return roadDifficulty(s.site, s.seed) > 0.5 ? 'The way in is steep, but a truck gets up it in snow.' : null;
   const heavy = Math.round(R.snowCm / 12);
-  return `The road closes about ${Math.round(heavy * n * 0.6)} days a winter (${heavy} heavy snows, ${n} day${n === 1 ? '' : 's'} each)${s.stock.plow >= 1 ? ', fewer with the plow blade on the truck' : ': a plow blade would cut that in half'}.`;
+  return `The road closes about ${pluralize(Math.round(heavy * n * 0.6), 'day')} a winter (${heavy} heavy snows, ${n} day${n === 1 ? '' : 's'} each)${s.stock.plow >= 1 ? ', fewer with the plow blade on the truck' : ': a plow blade would cut that in half'}.`;
 }
 

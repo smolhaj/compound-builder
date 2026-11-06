@@ -50,6 +50,7 @@ import { placeLine } from './settlement';
 import { isGod } from './godMode';
 import { declareWipe, wipeSummary } from './wipe';
 import { CAUSE_TEXT, inferCause } from './deaths';
+import { pluralize } from './words';
 const living = (s: GameState) => s.personState.filter(ps => ps.needs.died == null).length;
 
 /** Once a day after the hit: tally, then see whether the run is over. */
@@ -126,16 +127,16 @@ export function reportCard(s: GameState): ReportCard {
     : end === 'new_normal' ? `A thinner world: ${family} family settles in after ${name.toLowerCase()}`
     : `${family} homestead feeds itself a year on`;
   const sub = end === 'bug_out' ? `They left on day ${bo?.day ?? 0} with ${bo?.going ?? 0} of ${(bo?.going ?? 0) + (bo?.left ?? 0)}. ${bo?.dest === 'cache' ? 'They made for the buried cache.' : bo?.dest === 'town' ? 'They made for the town house.' : 'They had nowhere particular to go.'} ${bo?.outcome === 'lost_one' ? `${bo.lost ?? 'One of them'} did not make the trip. ` : ''}The rest is the next chapter, and it is not written yet.`
-    : end === 'wipe' ? `${hit ? `${days} days after it hit` : 'Before the collapse came'}, the last person on the place was gone.${away.length ? ` ${wipe.text}` : ''}`
-    : end === 'recovered' ? `${days} days after it hit, the lights are back on in the valley. ${alive} of ${total} made it.`
-    : end === 'new_normal' ? `${days} days on, the power runs some hours and the store opens some days. It won't be like before. ${alive} of ${total} made it.`
-    : `A year without a store. ${alive} people live off what the place grows.`;
+    : end === 'wipe' ? `${hit ? `${pluralize(days, 'day')} after it hit` : 'Before the collapse came'}, the last person on the place was gone.${away.length ? ` ${wipe.text}` : ''}`
+    : end === 'recovered' ? `${pluralize(days, 'day')} after it hit, the lights are back on in the valley. ${alive} of ${total} made it.`
+    : end === 'new_normal' ? `${pluralize(days, 'day')} on, the power runs some hours and the store opens some days. It won't be like before. ${alive} of ${total} made it.`
+    : `A year without a store. ${pluralize(alive, 'person')} live off what the place grows.`;
   const lines: string[] = [];
   if (bo) {
     if (bo.mode === 'foot') lines.push(`${bo.going} left on foot${bo.bags ? `, ${bo.bags} with a packed bug-out bag` : ', with whatever they could snatch'}.`);
     else lines.push(`${bo.going} aboard ${bo.vehicles.length} vehicle${bo.vehicles.length === 1 ? '' : 's'} (${bo.vehicles.map(k => VEHICLES[k as keyof typeof VEHICLES]?.name.toLowerCase() ?? k).join(', ')}), loaded ${bo.covered ? 'under cover, by the passage from the house to the garage' : 'in the open, in plain view of the road'}.`);
-    lines.push(`${bo.foodDays} days of food and water ${bo.mode === 'foot' ? 'on their backs' : 'aboard'} and ${bo.mode === 'foot' ? 'a walk of' : 'fuel for'} about ${bo.rangeKm} km.`);
-    if (bo.destName) lines.push(`Bound for ${bo.destName}${bo.miles ? `, ${bo.miles} miles; the way carried a ${Math.round((bo.risk ?? 0) * 100)} % chance of trouble` : ''}. ${bo.outcome === 'robbed' ? 'They were stopped on the road and lost half of what they carried.' : bo.outcome === 'late' ? 'It took longer than planned and some of the food was gone.' : bo.outcome === 'lost_one' ? 'The trip took one of them.' : 'The way was clear.'}${bo.arrivedFoodDays !== undefined ? ` They arrived with ${bo.arrivedFoodDays} days of food${bo.dest === 'cache' ? ' (the cache included)' : ''}.` : ''}`);
+    lines.push(`${pluralize(bo.foodDays, 'day')} of food and water ${bo.mode === 'foot' ? 'on their backs' : 'aboard'} and ${bo.mode === 'foot' ? 'a walk of' : 'fuel for'} about ${bo.rangeKm} km.`);
+    if (bo.destName) lines.push(`Bound for ${bo.destName}${bo.miles ? `, ${bo.miles} miles; the way carried a ${Math.round((bo.risk ?? 0) * 100)} % chance of trouble` : ''}. ${bo.outcome === 'robbed' ? 'They were stopped on the road and lost half of what they carried.' : bo.outcome === 'late' ? 'It took longer than planned and some of the food was gone.' : bo.outcome === 'lost_one' ? 'The trip took one of them.' : 'The way was clear.'}${bo.arrivedFoodDays !== undefined ? ` They arrived with ${pluralize(bo.arrivedFoodDays, 'day')} of food${bo.dest === 'cache' ? ' (the cache included)' : ''}.` : ''}`);
     if (bo.left) lines.push(`${bo.left} had no seat and stayed behind to hold the place.`);
     if (bo.fallback) lines.push(`They had somewhere to go: ${bo.fallback} was kept for this, with the lights still paid for.`);
   }
@@ -143,7 +144,7 @@ export function reportCard(s: GameState): ReportCard {
   const water = has('well_drilled') || has('well_hand') || has('cistern') || has('water_tower');
   if (st.dryDays === 0 && water) lines.push(has('cistern') ? 'Your cistern kept the water coming every day.' : 'The well never went dry.');
   else if (!water) lines.push('No well, no cistern: water came by the bucket from the creek.');
-  else if (st.dryDays > 7) lines.push(`${st.dryDays} days without enough water.`);
+  else if (st.dryDays > 7) lines.push(`${pluralize(st.dryDays, 'day')} without enough water.`);
   // power
   const solar = has('solar_array') || has('garage_solar') || has('lodge_solar'), battery = has('battery_shed');
   if (d.kind === 'grid_down' || d.kind === 'nuclear') {

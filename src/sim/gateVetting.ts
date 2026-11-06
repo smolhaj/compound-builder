@@ -17,6 +17,7 @@ import { vetting } from './ringFallback';
 import { REVEAL_STEAL } from './newcomers';
 import type { Character } from './trial';
 import type { Stock } from './materials';
+import { pluralize } from './words';
 
 export type VetPolicy = 'none' | 'outer' | 'inner' | 'both';
 export const VET_POLICIES: readonly VetPolicy[] = ['none', 'outer', 'inner', 'both'];
@@ -83,7 +84,7 @@ export function vetLine(s: GameState, policy: VetPolicy = s.gate.vet ?? 'none'):
 export function vetDetail(s: GameState): string[] {
   const g = s.gate.vet ?? 'none';
   return [
-    `Each gate that looks them over ties up the guards ${VET.HOURS} hours and costs ${VET.ATTENTION} points of the watch's detection that day (at most ${VET.ATTENTION_MAX}).`,
+    `Each gate that looks them over ties up the guards ${pluralize(VET.HOURS, 'hour')} and costs ${VET.ATTENTION} points of the watch's detection that day (at most ${VET.ATTENTION_MAX}).`,
     'Outer gate: a bad one is turned back before they are inside anything. Inner gate: days under watch show more, but a thief has had the outer ring\'s supplies.',
     ...(g === 'none' ? [] : ['A fever caught is nursed outside the wall; a thief or scout caught is sent on (a scout\'s crew is then expected).']),
   ];

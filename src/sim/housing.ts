@@ -35,6 +35,7 @@ import { mulberry32 } from './rng';
 import type { Person } from './family';
 import { regionFor } from './climate';
 import { crowdingFx, quarterHomes, quartersKey } from './quarters';
+import { pluralize } from './words';
 
 export type SpotKind = 'bed' | 'bunk' | 'couch' | 'floor' | 'tent' | 'outbuilding' | 'nowhere';
 export const SPOT_ORDER: readonly SpotKind[] = ['bed', 'bunk', 'couch', 'floor', 'tent', 'outbuilding', 'nowhere'];
@@ -430,7 +431,7 @@ export function housingFixes(s: GameState, homeCost: (kind: string) => number): 
   const cands = BUILDABLE_HOMES.map(k => ({ k, beds: fixes(k), cost: homeCost(k) }));
   const enough = cands.filter(c => c.beds >= plan.noBed).sort((a, b) => a.cost - b.cost)[0];
   const best = enough ?? [...cands].sort((a, b) => b.beds - a.beds)[0];
-  out.push({ action: 'build', item: best.k, qty: 1, cost: best.cost, helps: Math.min(plan.noBed, best.beds), text: `build ${HOME_NAME[best.k]} (~$${Math.round(best.cost).toLocaleString('en-US')}, ${best.beds} beds)` });
+  out.push({ action: 'build', item: best.k, qty: 1, cost: best.cost, helps: Math.min(plan.noBed, best.beds), text: `build ${HOME_NAME[best.k]} (~$${Math.round(best.cost).toLocaleString('en-US')}, ${pluralize(best.beds, 'bed')})` });
   if (plan.outside > 0) {
     const have = plan.cap.tents * TENT_SEATS + WALL_TENT_SEATS;
     const seated = plan.sleepers.filter(x => x.spot.kind === 'tent').length;
@@ -459,7 +460,7 @@ export function recommendation(s: GameState, homeCost: (kind: string) => number)
 /** "beds 4 · 6 people · 2 without" for the Build list's Home header. */
 export function housingSummary(s: GameState): string {
   const p = cachedPlan(s);
-  return `beds ${p.cap.beds + p.cap.bunks} · ${p.sleepers.length} people${p.noBed > 0 ? ` · ${p.noBed} without` : ''}`;
+  return `beds ${p.cap.beds + p.cap.bunks} · ${pluralize(p.sleepers.length, 'person')}${p.noBed > 0 ? ` · ${p.noBed} without` : ''}`;
 }
 
 // ── Arrivals ───────────────────────────────────────────────────────────────

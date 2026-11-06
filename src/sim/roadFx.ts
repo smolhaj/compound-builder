@@ -31,6 +31,7 @@ import { dayIndex } from './state';
 import type { Pt } from './perimeter';
 import type { RoadPlan, RoadStructure } from './roadPlan';
 import { roadPlanOf } from './roadState';
+import { pluralize } from './words';
 
 export const RFX = {
   /** Winter difficulty. */
@@ -175,7 +176,7 @@ export function rebuildRoadBridge(s: GameState): string | null {
   if (s.money < q.usd) return 'not enough money';
   s.money -= q.usd;
   s.roadBridge = { down: true, due: s.clock.t + q.days };
-  log(s, `A crew is rebuilding the bridge on the way in ($${q.usd.toLocaleString('en-US')}, about ${q.days} days).`);
+  log(s, `A crew is rebuilding the bridge on the way in ($${q.usd.toLocaleString('en-US')}, about ${pluralize(q.days, 'day')}).`);
   return null;
 }
 

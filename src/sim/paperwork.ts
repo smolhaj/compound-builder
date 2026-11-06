@@ -27,6 +27,7 @@ import type { RegionId } from './regions';
 import { townTaxHalf } from './weekender';
 import { mulberry32 } from './rng';
 import { diffOf } from './difficulty';
+import { pluralize } from './words';
 
 export const CLOSING_COSTS = 0.03;
 
@@ -100,13 +101,13 @@ export function applyForPermit(s: GameState, st: Structure): void {
   s.money -= fee;
   st.permit = 'review';
   st.permitAt = s.clock.t + reviewDays(s, st.kind);
-  log(s, `Applied for a permit for the ${st.kind.replace(/_/g, ' ')}: $${fee.toLocaleString('en-US')}, about ${reviewDays(s, st.kind)} days for the county to review it.`);
+  log(s, `Applied for a permit for the ${st.kind.replace(/_/g, ' ')}: $${fee.toLocaleString('en-US')}, about ${pluralize(reviewDays(s, st.kind), 'day')} for the county to review it.`);
 }
 
 /** Why a permit holds up work (null = it doesn't). */
 export function permitHold(s: GameState, st: Structure): string | null {
-  if (st.permit === 'review' && s.clock.t < (st.permitAt ?? 0)) return `Waiting on the county permit (${Math.ceil((st.permitAt ?? 0) - s.clock.t)} days)`;
-  if (st.permit === 'stopped' && s.clock.t < (st.permitAt ?? 0)) return `Stop-work order: the permit comes through in ${Math.ceil((st.permitAt ?? 0) - s.clock.t)} days`;
+  if (st.permit === 'review' && s.clock.t < (st.permitAt ?? 0)) return `Waiting on the county permit (${pluralize(Math.ceil((st.permitAt ?? 0) - s.clock.t), 'day')})`;
+  if (st.permit === 'stopped' && s.clock.t < (st.permitAt ?? 0)) return `Stop-work order: the permit comes through in ${pluralize(Math.ceil((st.permitAt ?? 0) - s.clock.t), 'day')}`;
   return null;
 }
 

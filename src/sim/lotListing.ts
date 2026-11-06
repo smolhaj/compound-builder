@@ -9,6 +9,7 @@ import { HOME_RECT, sitePrice, RAW, type Acres, type Fact, type Site } from './s
 import type { RegionId } from './regions';
 import { listingRoad } from './roadState';
 import { planWords } from './roadPlan';
+import { pluralize } from './words';
 
 const statsCache = new WeakMap<LotField, LotStats>();
 /** The stats of a lot's ground (computed once per field). */
@@ -187,7 +188,7 @@ export function terrainFacts(site: Pick<Site, 'lot' | 'home'> & Partial<Pick<Sit
   // the road in is the planned one (sim/roadPlan.ts): where it winds, switchbacks, bridges and bores
   const rp = listingRoad({ region: site.region ?? 'mountain_west', creek: site.creek ?? false, timber: site.timber ?? 1, home: site.home, lot: site.lot }), words = planWords(rp);
   out.push({ label: 'Road in', value: `${words[0]}${words.length > 1 ? ': ' + words.slice(1).filter(w => !/cattle guard|^\d* ?culverts?$|^a culvert$/.test(w)).join(', ') : ''}`.replace(/: $/, ''), tone: rp.engineer || rp.hairpins.length >= 3 || rp.structures.some(x => x.kind === 'bridge' || x.kind === 'bridge1' || x.kind === 'tunnel') ? 'bad' : rp.maxGradePct <= 8 && !rp.hairpins.length ? 'good' : undefined });
-  out.push({ label: 'Road cost', value: `about $${Math.round(rp.usd / 1000).toLocaleString('en-US')}k to put in, ${rp.days} days`, tone: rp.usd > 150_000 ? 'bad' : rp.usd < 30_000 ? 'good' : undefined });
+  out.push({ label: 'Road cost', value: `about $${Math.round(rp.usd / 1000).toLocaleString('en-US')}k to put in, ${pluralize(rp.days, 'day')}`, tone: rp.usd > 150_000 ? 'bad' : rp.usd < 30_000 ? 'good' : undefined });
   out.push({ label: 'Sun', value: s.sun >= 1.08 ? `Faces ${aspectWord(s.aspect)}: warm, good for solar and gardens` : s.sun <= 0.93 ? `Faces ${aspectWord(s.aspect)}: cool, slow to thaw` : 'Even sun', tone: s.sun >= 1.08 ? 'good' : s.sun <= 0.93 ? 'bad' : undefined });
   const head = s.reservoirM;
   out.push({ label: 'Water head', value: head >= 7 ? `A bench ${n0(head)} m above the camp: a tank there feeds the house by gravity` : head > 0 ? `Highest bench is ${n0(head)} m above the camp: pump it` : 'Nothing above the camp: pump everything', tone: head >= 7 ? 'good' : undefined });

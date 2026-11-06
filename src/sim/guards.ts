@@ -23,6 +23,7 @@ import type { Person } from './family';
 import type { Encounter, Outcome, Stance } from './encounters';
 import { admitNewcomers, newcomersOf } from './newcomers';
 import { INSIDER, startVet, isPlant } from './insider';
+import { pluralize } from './words';
 
 export interface Guard {
   id: string;
@@ -117,7 +118,7 @@ export const parkedCars = (s: GameState): number => (bunk(s) === 'cars' ? guardC
 
 /** Why a guard cannot be hired now (null: one can). */
 export function guardProblem(s: GameState): string | null {
-  if (guardCount(s) >= MAX_GUARDS) return `${MAX_GUARDS} guards is the most the contract covers`;
+  if (guardCount(s) >= MAX_GUARDS) return `${pluralize(MAX_GUARDS, 'guard')} is the most the contract covers`;
   if (permanentCollapse(s) || failed(s)) return 'no agency is sending guards now';
   if (!s.structures.some(st => isHome(st.kind) && isFinished(st))) return 'there is nothing to guard yet: build a home first';
   if (s.money < GUARD_MONTH + (s.guards?.vetNew ? INSIDER.VET_COST : 0)) return 'not enough money for the first month' + (s.guards?.vetNew ? ' and the background check' : '');
@@ -182,7 +183,7 @@ export function guardDay(s: GameState): string[] {
   }
   if (!g.staff.length) return out;
   const bill = g.staff.length * wageDay(s);
-  if (s.money < bill) { const n = g.staff.length; g.staff = []; out.push(`The ${n > 1 ? `${n} guards` : 'guard'} went home: there was no money to pay them.`); return out; }
+  if (s.money < bill) { const n = g.staff.length; g.staff = []; out.push(`The ${n > 1 ? `${pluralize(n, 'guard')}` : 'guard'} went home: there was no money to pay them.`); return out; }
   s.money -= bill; g.paid += bill; g.days += 1;
   return out;
 }

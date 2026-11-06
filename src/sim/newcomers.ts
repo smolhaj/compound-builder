@@ -49,6 +49,7 @@ import { scoutCrew, type Encounter, type Neighbor, type NeighborKind, type Outco
 import type { Character } from './trial';
 import { lifeOf, plural, surname } from './neighborLife';
 import { joinersDay, kitLine, pool, rigLeaves, rollKit, settleStay, type StayKind } from './joinerHome';
+import { pluralize } from './words';
 
 // ─────────────────────────────────────────────────────────────────────────
 // State
@@ -159,9 +160,9 @@ export function carryLines(c: Carry): string[] {
   const d = (x: number) => (x === Infinity ? 'the fields cover them' : `${Math.round(x)} ${Math.round(x) === 1 ? 'day' : 'days'}`);
   const out: string[] = [];
   const base = `Food on hand for ${c.people}: ${d(c.days)}`;
-  out.push(c.extra > 0 ? `${base}; with ${c.extra === 1 ? 'them' : `the ${c.extra} of them`}, ${c.daysWith === Infinity ? 'still covered by the fields' : `${Math.round(c.daysWith)} days`}.` : `${base}.`);
-  out.push(`Your food on hand and the fields carry ${c.people + c.headroom} people for six months${c.headroom > 0 ? ` (${c.headroom} more than now)` : ' (no more than now)'}${c.fromStores ? '; the grocery stores are still open, what you hold is for the day they close' : ''}.`);
-  if (c.extra > 0 && c.levelWith === 'over' && c.level !== 'over') out.push(`That is more than you can feed: ${c.extra === 1 ? 'one more mouth takes' : `${c.extra} more mouths take`} your food supply below ${Math.round(c.daysWith)} days.`);
+  out.push(c.extra > 0 ? `${base}; with ${c.extra === 1 ? 'them' : `the ${c.extra} of them`}, ${c.daysWith === Infinity ? 'still covered by the fields' : `${pluralize(Math.round(c.daysWith), 'day')}`}.` : `${base}.`);
+  out.push(`Your food on hand and the fields carry ${pluralize(c.people + c.headroom, 'person')} for six months${c.headroom > 0 ? ` (${c.headroom} more than now)` : ' (no more than now)'}${c.fromStores ? '; the grocery stores are still open, what you hold is for the day they close' : ''}.`);
+  if (c.extra > 0 && c.levelWith === 'over' && c.level !== 'over') out.push(`That is more than you can feed: ${c.extra === 1 ? 'one more mouth takes' : `${c.extra} more mouths take`} your food supply below ${pluralize(Math.round(c.daysWith), 'day')}.`);
   else if (c.level === 'over') out.push('The table is already past what your food supply can feed.');
   return out;
 }
@@ -539,7 +540,7 @@ export function requestShelter(s: GameState, n: Neighbor, why: ShelterWhy, r: ()
       `${count} of them: ${people.map(p => `${p.first}, ${p.age}`).join('; ')}. ${NEIGHBOR_GOOD[n.kind] ?? ''}`.trim(),
       trustLine(n),
       `They carry: ${bringsLine(brings, extras)}.`,
-      why === 'settle' ? 'Their place stays theirs if it comes right; until then they would live here.' : `They would stay about ${stayDays} days. Their farm stays theirs.`,
+      why === 'settle' ? 'Their place stays theirs if it comes right; until then they would live here.' : `They would stay about ${pluralize(stayDays, 'day')}. Their farm stays theirs.`,
       `${count} more to feed: about ${people.reduce((a, p) => a + needOf(p), 0).toLocaleString('en-US')} kcal a day.`,
     ],
     size: count, armed: false, strength: 0, people, brings, extras, neighbor: n.id,
@@ -564,7 +565,7 @@ function requestSettle(s: GameState, n: Neighbor, party: GuestParty, people: Per
     id: `e${s.nextId++}`, kind: 'shelter', day, title: `${who} ask to stay`,
     dossier: [
       'Their place is not fit to live in, and the days you gave them are up. They are asking to stay.',
-      `${people.length} of them: ${people.map(p => `${p.first}, ${p.age}`).join('; ')}. They have been at your table ${day - party.from} days.`,
+      `${people.length} of them: ${people.map(p => `${p.first}, ${p.age}`).join('; ')}. They have been at your table ${pluralize(day - party.from, 'day')}.`,
       trustLine(n),
       'If they stay, they keep nothing but what they carry: the farmstead is ash.',
     ],
@@ -615,7 +616,7 @@ export function resolveShelter(s: GameState, e: Encounter, stance: Stance): Outc
     g.humanity = Math.min(100, g.humanity + (sh.why === 'fire' || sh.why === 'hungry' || sh.why === 'sick' ? 6 : 4));
     lifeOf(s, n).history.push({ day, text: `Sheltered with the family (${sh.why}).`, known: true, how: 'seen' });
     const where = r() < 0.5 ? 'the kids drag in the quilts' : 'a pot goes on the stove';
-    return { title: 'The door is open', text: `${who} come in out of the weather: ${where}. About ${sh.days} days.`, tone: 'good', lines };
+    return { title: 'The door is open', text: `${who} come in out of the weather: ${where}. About ${pluralize(sh.days, 'day')}.`, tone: 'good', lines };
   }
   // turned away
   if (sh.settle) { for (const p of people) moveOut(s, p.id, 'sent on'); delete N.guests[n.id]; }
@@ -707,7 +708,7 @@ export function givePlace(s: GameState, id: string, structureId: string, solo = 
   const members = party.length ? party.map(x => s.people[idx(s, x.id)]) : [s.people[i]];
   const taken = s.people.filter((p, k) => p.home === st.id && present(s, k) && !members.includes(p)).length;
   const beds = HOME_BEDS[st.kind];
-  if (taken + members.length > beds) return `the ${st.kind.replace(/_/g, ' ')} has ${Math.max(0, beds - taken)} beds left`;
+  if (taken + members.length > beds) return `the ${st.kind.replace(/_/g, ' ')} has ${pluralize(Math.max(0, beds - taken), 'bed')} left`;
   for (const m of members) m.home = st.id;
   log(s, `${list(members.map(m => m.first))} ${members.length > 1 ? 'move' : 'moves'} into the ${st.kind.replace(/_/g, ' ')}: a door of their own.`);
   return null;
@@ -864,7 +865,7 @@ export function newcomersDay(s: GameState): string[] {
     // a hungry crowded table: say so now and then
     if (strain && said < 1 && day % 6 === 0) {
       said++;
-      out.push(`${p.first} counted the cans again. ${Math.round(c.days)} days at this table${over ? ' and people are asking who gets cut first' : ''}.`);
+      out.push(`${p.first} counted the cans again. ${pluralize(Math.round(c.days), 'day')} at this table${over ? ' and people are asking who gets cut first' : ''}.`);
     }
   }
 

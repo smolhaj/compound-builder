@@ -15,6 +15,7 @@ import { resolve, type Outcome, type Stance } from './encounters';
 import { breakInScene, commitDays, finishPlan, gateScene, planSiege, probeBattle, siegeStrain, type Scene, type SiegePlan } from './siege';
 import { step } from './engine';
 import { hourOf, type GameState } from './state';
+import { pluralize } from './words';
 
 export interface StagedRaid {
   /** The game with the stance resolved but the clock still at the arrival. */
@@ -107,7 +108,7 @@ export function stageRaid(game: GameState, stance: Stance, keep?: Keep): StagedR
     ps.needs.tired = (ps.needs.tired ?? 0) + strain.sleep;
     strained = true;
   }
-  if (strained && (plan.scenes.length > 1 || strain.morale >= 3)) outcome.lines.push(plan.scenes.length > 1 ? `Nobody slept: about ${strain.sleep} hours owed, and the family is shaken (morale -${strain.morale}).` : `Nobody will sleep after that (morale -${strain.morale}).`);
+  if (strained && (plan.scenes.length > 1 || strain.morale >= 3)) outcome.lines.push(plan.scenes.length > 1 ? `Nobody slept: about ${pluralize(strain.sleep, 'hour')} owed, and the family is shaken (morale -${strain.morale}).` : `Nobody will sleep after that (morale -${strain.morale}).`);
   g.gate.card = outcome;
   return { staged: g, plan, battles, spent, outcome, played, report: raidReport(game, g, outcome, rounds), t0 };
 }

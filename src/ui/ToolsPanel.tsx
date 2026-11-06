@@ -15,6 +15,7 @@ import {
   TOOLS, toolShopOpen, bestTool, type Tool, type ToolKind, type ToolRole,
 } from '../sim/tools';
 import { ToolIcon } from './ToolIcon';
+import { pluralize } from '../sim/words';
 
 const DIM = 'rgba(238,238,238,0.6)';
 const TONE = { good: '#a8d080', warn: '#f0c070', bad: '#f08060' } as const;
@@ -108,7 +109,7 @@ export function ToolsPanel({ game }: { game: GameState }): ReactNode {
       </label>
     </div>
     {bare.filter(c => hard.includes(c.role) || c.role === 'till').length > 0 && <div style={{ marginTop: 6, fontSize: 11.5 }}>
-      <div style={{ color: TONE.warn, marginBottom: 3 }}>{bare.some(c => hard.includes(c.role)) ? 'Work is held up because a tool is missing. ' : ''}Make a crude one from stone and scrap (about {IMPROVISE_HOURS} hours; better with a little hardware):</div>
+      <div style={{ color: TONE.warn, marginBottom: 3 }}>{bare.some(c => hard.includes(c.role)) ? 'Work is held up because a tool is missing. ' : ''}Make a crude one from stone and scrap (about {pluralize(IMPROVISE_HOURS, 'hour')}; better with a little hardware):</div>
       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
         {bare.filter(c => hard.includes(c.role) || c.role === 'till').map(c => <button key={c.role} style={btn()} onClick={() => { setM(null); g.money(x => { improvise(x, c.role); return null; }); }}>{TOOLS[CRUDE_FOR[c.role]].name}</button>)}
       </div>

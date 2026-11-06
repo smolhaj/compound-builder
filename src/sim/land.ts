@@ -30,6 +30,7 @@ export function perAcre(s: GameState, p: Parcel): number {
 }
 
 import type { Rect } from './site';
+import { pluralize } from './words';
 export type { Rect };
 export interface Parcel {
   id: string;
@@ -180,7 +181,7 @@ export function buyLand(s: GameState, id: string): string | null {
   const price = priceOf(s, p), seller = s.neighbors.find(x => x.id === p.owner);
   s.money -= price;
   p.owner = 'you'; p.forSale = false; p.paid = price;
-  log(s, `Bought ${p.name} (${acresOf(p.rect)} acres of ${LAND_NAME[p.kind]}) from ${seller?.name ?? 'the owner'} for $${price.toLocaleString('en-US')}.`);
+  log(s, `Bought ${p.name} (${pluralize(acresOf(p.rect), 'acre')} of ${LAND_NAME[p.kind]}) from ${seller?.name ?? 'the owner'} for $${price.toLocaleString('en-US')}.`);
   return null;
 }
 
@@ -195,7 +196,7 @@ export function landMarketDay(s: GameState, day: number): string | null {
   p.forSale = true;
   const n = s.neighbors.find(x => x.id === p.owner);
   const why = n?.kind === 'old_farmer' ? 'is retiring' : n?.kind === 'widow' ? 'is moving in with her daughter' : 'needs the money';
-  const line = `For sale: ${p.name} — ${n ? n.name[0].toUpperCase() + n.name.slice(1) : 'the owner'} ${why}. ${acresOf(p.rect)} acres of ${LAND_NAME[p.kind]}.`;
+  const line = `For sale: ${p.name} — ${n ? n.name[0].toUpperCase() + n.name.slice(1) : 'the owner'} ${why}. ${pluralize(acresOf(p.rect), 'acre')} of ${LAND_NAME[p.kind]}.`;
   log(s, line);
   return line;
 }

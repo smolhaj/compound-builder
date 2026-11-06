@@ -39,6 +39,7 @@ import { HouseHardening } from './HouseHardening';
 import { WallTopsPanel } from './WallTopsPanel';
 import { GateSecurityPanel } from './GateSecurityPanel';
 import { CommunityPanel } from './CommunityPanel';
+import { pluralize } from '../../sim/words';
 
 /** One checklist line: a tick or a cross, what it is, and why. */
 function CheckRow({ c }: { c: Check }) {
@@ -83,7 +84,7 @@ function GuardsSection() {
       const state = isVetted(g) ? 'cleared: loyal for good' : g.vet === 'pending' ? `check back in ${Math.max(1, Math.ceil((g.vetDue ?? 0) - game.clock.t))} d` : g.vet === 'flagged' ? 'check found something' : 'not vetted';
       return <div key={g.id} data-testid="guard-row" style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12, padding: '2px 0' }}>
         <span style={{ flex: 1 }} title={`Loyalty ${l}: ${loyaltyWord(l)}. Low pay and low loyalty make an unvetted man easy to buy; a cleared man cannot be.`}>{g.name} · {String(g.shift).padStart(2, '0')}:00 · <span style={{ color: l >= 55 ? TONE.good : l >= 40 ? TONE.warn : TONE.bad }}>{loyaltyWord(l)} ({l})</span> · <span style={{ color: isVetted(g) ? TONE.good : g.vet === 'flagged' ? TONE.bad : DIM }}>{state}</span></span>
-        <button style={{ ...btn(!vp), padding: '1px 6px', fontSize: 11 }} disabled={!!vp} title={vp ?? `Background check: $${INSIDER.VET_COST} and ${INSIDER.VET_DAYS} days. It finds a man working for someone else nine times in ten; a cleared man is loyal for good.`} onClick={() => setMsg(money(d => startVet(d, g.id)))}>Vet · ${INSIDER.VET_COST}</button>
+        <button style={{ ...btn(!vp), padding: '1px 6px', fontSize: 11 }} disabled={!!vp} title={vp ?? `Background check: $${INSIDER.VET_COST} and ${pluralize(INSIDER.VET_DAYS, 'day')}. It finds a man working for someone else nine times in ten; a cleared man is loyal for good.`} onClick={() => setMsg(money(d => startVet(d, g.id)))}>Vet · ${INSIDER.VET_COST}</button>
         <button style={{ ...btn(true), padding: '1px 6px', fontSize: 11 }} onClick={() => money(d => { dismissGuard(d, g.id); return null; })}>Let go</button>
       </div>;
     })}
@@ -92,7 +93,7 @@ function GuardsSection() {
     <div style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12 }} title="Pay against the agency rate. Below it, loyalty falls and an unvetted guard can be bought; above it, loyalty rises. Cleared guards are loyal either way.">
       <span style={{ color: DIM }}>Wage</span>
       {(Object.keys(WAGE) as WageTier[]).map(w => <button key={w} style={{ ...btn(wage === w), padding: '1px 6px', fontSize: 11 }} onClick={() => setG(G => { G.wage = w; })}>{WAGE[w].name}</button>)}
-      <label style={{ marginLeft: 'auto' }} title={`Order a background check on every new hire (+$${INSIDER.VET_COST}, ${INSIDER.VET_DAYS} days)`}><input type="checkbox" checked={vetNew} onChange={e => setG(G => { G.vetNew = e.target.checked; })} /> Vet new hires</label>
+      <label style={{ marginLeft: 'auto' }} title={`Order a background check on every new hire (+$${INSIDER.VET_COST}, ${pluralize(INSIDER.VET_DAYS, 'day')})`}><input type="checkbox" checked={vetNew} onChange={e => setG(G => { G.vetNew = e.target.checked; })} /> Vet new hires</label>
     </div>
     <div style={{ display: 'flex', gap: 6 }}>
       <button style={{ ...btn(!why), flex: 1 }} disabled={!!why} title={why ?? 'Hire one: $' + month + ' a month' + (vetNew ? ' plus the background check' : '')} onClick={() => setMsg(useGameStore.getState().hireGuard())}>Hire a guard · ${month}/mo{vetNew ? ` + $${INSIDER.VET_COST} check` : ''}</button>
@@ -171,7 +172,7 @@ export function DefenseTab() {
       {yardLines(game).map(l => <Note key={l}>{l}</Note>)}
       {game.perimeter.filter(r => PERIMETER[r.kind].vehicleWay).map(r => <div key={r.id} style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '3px 0' }}>
         <span style={{ flex: 1 }}>{PERIMETER[r.kind].name} <span style={{ color: DIM }}>({Math.round(wallLength(r) * 6)} m, {r.collapsed ? 'choked with rubble' : runFinished(r) ? 'standing' : r.dropped ? 'dropped: rebuild it from Projects' : 'being built'})</span></span>
-        {r.collapsed && <button style={btn(game.money >= clearQuote(r).usd)} disabled={game.money < clearQuote(r).usd || r.collapsed.clearsAt !== null} title={`A contractor with an excavator hauls the fall out: about ${clearQuote(r).days} days`} onClick={() => { const w = useGameStore.getState().clearCollapse(r.id); if (w) alert(w); }}>{r.collapsed.clearsAt !== null ? `Clearing, ${Math.max(1, Math.ceil(r.collapsed.clearsAt - game.clock.t))} days` : `Clear the fall ${usd(clearQuote(r).usd)}`}</button>}
+        {r.collapsed && <button style={btn(game.money >= clearQuote(r).usd)} disabled={game.money < clearQuote(r).usd || r.collapsed.clearsAt !== null} title={`A contractor with an excavator hauls the fall out: about ${pluralize(clearQuote(r).days, 'day')}`} onClick={() => { const w = useGameStore.getState().clearCollapse(r.id); if (w) alert(w); }}>{r.collapsed.clearsAt !== null ? `Clearing, ${pluralize(Math.max(1, Math.ceil(r.collapsed.clearsAt - game.clock.t)), 'day')}` : `Clear the fall ${usd(clearQuote(r).usd)}`}</button>}
         {runFinished(r) && !r.collapsed && PERIMETER[r.kind].bore && <span style={{ color: DIM }} title="A bore is driven through solid rock: it cannot be brought down, only held. The steel doors lock at night and when the alarm goes.">rock: hold the doors</span>}
         {runFinished(r) && !PERIMETER[r.kind].bore && <button style={btn(false)} title="Bring it down on purpose: nothing crosses there until it is rebuilt, and a crew has to ford and climb the gorge. Half the steel comes back." onClick={() => { if (window.confirm('Drop this tunnel? It has to be rebuilt to use it again.')) { const w = useGameStore.getState().dropBridge(r.id); if (w) alert(w); } }}>Drop it</button>}
       </div>)}
@@ -181,9 +182,9 @@ export function DefenseTab() {
       return <Section title="The way in">
         <Note>{roadLine(game)}.</Note>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '3px 0' }}>
-          <span style={{ flex: 1 }}>The bridge on the way in <span style={{ color: DIM }}>({down ? (due !== null ? `being rebuilt, ${Math.max(1, Math.ceil(due - game.clock.t))} days` : 'down') : 'standing'})</span></span>
+          <span style={{ flex: 1 }}>The bridge on the way in <span style={{ color: DIM }}>({down ? (due !== null ? `being rebuilt, ${pluralize(Math.max(1, Math.ceil(due - game.clock.t)), 'day')}` : 'down') : 'standing'})</span></span>
           {!down && <button style={btn(false)} title="Bring it down on purpose: nothing with wheels crosses the creek until it is rebuilt. A crew's trucks stop there and they have to ford it on foot, but your own deliveries stop there too and get carried in by hand." onClick={() => { if (window.confirm('Drop the bridge on the way in? Trucks, yours and theirs, stop at the creek until it is rebuilt.')) { const w = useGameStore.getState().dropRoadBridge(); if (w) alert(w); } }}>Drop it</button>}
-          {down && due === null && <button style={btn(game.money >= q.usd)} disabled={game.money < q.usd} title={`A crew rebuilds it: about ${q.days} days`} onClick={() => { const w = useGameStore.getState().rebuildRoadBridge(); if (w) alert(w); }}>Rebuild {usd(q.usd)}</button>}
+          {down && due === null && <button style={btn(game.money >= q.usd)} disabled={game.money < q.usd} title={`A crew rebuilds it: about ${pluralize(q.days, 'day')}`} onClick={() => { const w = useGameStore.getState().rebuildRoadBridge(); if (w) alert(w); }}>Rebuild {usd(q.usd)}</button>}
         </div>
       </Section>;
     })()}

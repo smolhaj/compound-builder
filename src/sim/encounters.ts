@@ -65,6 +65,7 @@ import { resolveInsider } from './insider';
 import { resolveTrialEnd, startTrial, trialDay, type Character, type TrialCamp } from './trial';
 import { vetArrival } from './gateVetting';
 import { admitNewcomers, resolveShelter, strangerArrival, type Extras, type ShelterWhy } from './newcomers';
+import { pluralize } from './words';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Neighbors
@@ -425,7 +426,7 @@ function makeThreat0(kind: EncounterKind, r: () => number, id: string, day: numb
     }
     case 'refugees': {
       const size = 6 + Math.floor(r() * 10);
-      return { id, kind, day, title: 'A column of refugees', dossier: [`${size} people walking out of the city, families, a few carts.`, 'Hungry and desperate. Most just want water and to keep moving.'], size, armed: r() < 0.2, strength: size * 3, wants: { canned: 2 }, stances: ['hide', 'parley', 'trade', 'warn'] };
+      return { id, kind, day, title: 'A column of refugees', dossier: [`${pluralize(size, 'person')} walking out of the city, families, a few carts.`, 'Hungry and desperate. Most just want water and to keep moving.'], size, armed: r() < 0.2, strength: size * 3, wants: { canned: 2 }, stances: ['hide', 'parley', 'trade', 'warn'] };
     }
     case 'requisition': {
       return { id, kind, day, title: 'A county requisition team', dossier: ['A deputy and four National Guard in a Humvee, with a clipboard.', 'Emergency order: fuel, food and medical supplies "for the common good". They say they\'ll be back.'], size: 5, armed: true, strength: 70, wants: { fuel: 4, canned: 6, meds: 2 }, stances: ['hide', 'parley', 'trade', 'defend'] };

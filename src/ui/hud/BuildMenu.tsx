@@ -24,7 +24,7 @@ import { bunkerChecklist, buildAdvice, longTerm, suggestions, type SuggestionAct
 import { hireCaretaker, openMoveIn, setBelt } from '../../sim/weekender';
 import { inFirstHour } from '../../sim/tabReveal';
 import { Clamp, Group, Hint, Item, Note, Tick } from './common';
-import { btn, card, DIM, FS, miniBtn, usd } from './style';
+import { btn, card, DIM, FS, miniBtn, TONE, usd } from './style';
 import { OP_COVERED, operational, operationalCount } from '../../sim/operational';
 import { StarterCompound } from './StarterCompound';
 import { starterWanted } from '../../sim/starterCompound';
@@ -138,14 +138,14 @@ export function BuildMenu({ showProjects = () => undefined }: { showProjects?: (
     </div>}
     {sug.length > 0 && !g.tool && <div style={card()}>
       <div style={{ fontSize: FS.h, textTransform: 'uppercase', letterSpacing: 0.6, color: DIM, fontWeight: 600 }} title="Suggestions from what the place lacks; nothing is locked">Next steps</div>
-      {sug.map(x => <div key={x.id} style={{ padding: '4px 0', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+      {sug.map(x => <div key={x.id} data-tone={x.tone} style={{ padding: '4px 0', borderTop: '1px solid rgba(255,255,255,0.06)', ...(x.tone === 'alarm' ? { borderLeft: `3px solid ${TONE.bad}`, paddingLeft: 6, background: 'rgba(160,40,30,0.18)', borderRadius: 4 } : {}) }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
-          <b>{x.title ?? KIT[x.kind].name}</b>
+          <b style={x.tone === 'alarm' ? { color: TONE.bad } : undefined}>{x.title ?? KIT[x.kind].name}</b>
           {!x.acts && <button style={{ ...btn(true), ...miniBtn }} onClick={() => run({ type: 'stake', kind: x.kind })}>Stake it</button>}
         </div>
         <Clamp text={x.why}>{x.why}</Clamp>
         {x.acts && <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 3 }}>
-          {x.acts.slice(0, 2).map(a => { const why = a.act.type === 'order' ? orderProblem(g.game, a.act.lines) : null; return <button key={a.label} style={{ ...btn(true), ...miniBtn, whiteSpace: 'normal', textAlign: 'left' }} disabled={!!why} title={why ? 'Cannot order that now (money, or nobody delivering)' : a.label} onClick={() => run(a.act)}>{a.label}</button>; })}
+          {x.acts.slice(0, 2).map(a => { const why = a.act.type === 'order' ? orderProblem(g.game, a.act.lines) : null; return <button key={a.label} style={{ ...btn(true), ...miniBtn, whiteSpace: 'normal', textAlign: 'left', maxWidth: '100%', lineHeight: 1.2 }} disabled={!!why} title={why ? 'Cannot order that now (money, or nobody delivering)' : a.label} onClick={() => run(a.act)}>{a.label}</button>; })}
         </div>}
       </div>)}
     </div>}

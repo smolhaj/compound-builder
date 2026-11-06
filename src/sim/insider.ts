@@ -25,6 +25,7 @@ import { WAGE, guardsOf, type Guard } from './guards';
 import { scoutCrew, type Encounter, type Outcome, type Stance } from './encounters';
 import { moveOut, newcomersOf, type Bond } from './newcomers';
 import { powered } from './gear';
+import { pluralize } from './words';
 
 /** Every number here is tunable (no real data exists for any of it). */
 export const INSIDER = {
@@ -84,7 +85,7 @@ export function startVet(s: GameState, id: string): string | null {
   const g = guardsOf(s).staff.find(x => x.id === id)!;
   s.money -= INSIDER.VET_COST;
   g.vet = 'pending'; g.vetDue = s.clock.t + INSIDER.VET_DAYS;
-  log(s, `Background check ordered on ${g.name}: $${INSIDER.VET_COST}, ${INSIDER.VET_DAYS} days.`);
+  log(s, `Background check ordered on ${g.name}: $${INSIDER.VET_COST}, ${pluralize(INSIDER.VET_DAYS, 'day')}.`);
   return null;
 }
 
@@ -135,7 +136,7 @@ export function startVetBond(s: GameState, id: string): string | null {
   const b = newcomersOf(s).bonds[id];
   s.money -= INSIDER.JOIN_COST;
   b.vet = 'pending'; b.vetDue = s.clock.t + INSIDER.JOIN_DAYS;
-  log(s, `Background check ordered on ${s.people.find(p => p.id === id)?.first ?? 'a newcomer'}: $${INSIDER.JOIN_COST}, ${INSIDER.JOIN_DAYS} days.`);
+  log(s, `Background check ordered on ${s.people.find(p => p.id === id)?.first ?? 'a newcomer'}: $${INSIDER.JOIN_COST}, ${pluralize(INSIDER.JOIN_DAYS, 'day')}.`);
   return null;
 }
 

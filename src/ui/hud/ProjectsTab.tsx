@@ -23,6 +23,7 @@ import { CREW_DAY_USD, crewIdea, nextLongStay, nextStageOrder, weekendBudget, we
 import { dayIndex } from '../../sim/state';
 import { Clamp, Note, Row, Section } from './common';
 import { TONE, DIM, LINE, btn, usd } from './style';
+import { pluralize } from '../../sim/words';
 
 export function ProjectsTab() {
   const g = useGameStore();
@@ -49,7 +50,7 @@ export function ProjectsTab() {
         <div style={{ fontSize: 11, color: DIM }}>{wkNext.stages.map(x => x.name).join(', then ')} · {wkNext.hours} h{weekendsFor(game, wkNext.hours) ? `, about ${weekendsFor(game, wkNext.hours)} weekends` : ''}</div>
         <button style={{ ...btn(), width: '100%', marginTop: 3 }} disabled={!!orderProblem(game, wkNext.lines)} title={orderProblem(game, wkNext.lines) ? 'Cannot order that now (money, or nobody delivering)' : 'A stage at a time keeps cash for the next one'} onClick={() => g.order(wkNext.lines)}>Order this stage ({usd(wkNext.cost)})</button>
       </>}
-      {wkStay && <Row label="Next long stay" value={`${wkStay.name}, ${wkStay.days} days from ${wkStay.label}`} title="More building than three ordinary weekends: have the next stage on site before it" />}
+      {wkStay && <Row label="Next long stay" value={`${wkStay.name}, ${pluralize(wkStay.days, 'day')} from ${wkStay.label}`} title="More building than three ordinary weekends: have the next stage on site before it" />}
       {wkCrew && <button style={{ ...btn(), width: '100%', marginTop: 3 }} title={`${usd(CREW_DAY_USD)} a day for four, billed only for the hours they work; they build the weekdays while you are at the jobs`} onClick={() => g.hire(wkCrew.st.id)}>Hire a crew for the weekdays: ~{usd(wkCrew.usd)}, {wkCrew.weeks} week{wkCrew.weeks === 1 ? '' : 's'}</button>}
     </Section>}
     {left > 0 && <Section title="Pace">

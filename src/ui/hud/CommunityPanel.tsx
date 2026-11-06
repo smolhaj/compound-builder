@@ -4,13 +4,14 @@ import { RESPONSE, patrolMinutes, responseActive, subOf, subscribeProblem } from
 import { WATCH, communityPosture, watchOf, watchProblem } from '../../sim/watch';
 import { Group, Hint, Note, Row } from './common';
 import { DIM, btn, usd } from './style';
+import { pluralize } from '../../sim/words';
 
 export function CommunityPanel() {
   const game = useGameStore(s => s.game);
   const sub = subOf(game), active = responseActive(game), why = subscribeProblem(game);
   const watch = watchOf(game), wwhy = watchProblem(game), cp = communityPosture(game);
   return <Group id="def-community" title="Armed response and the road watch" defaultOpen={false}>
-    <Hint more={<>Time is security: every measure buys minutes until someone answers. An armed-response firm ({usd(RESPONSE.SETUP_USD)} to install, {usd(RESPONSE.MONTHLY_USD)} a month) puts a panic button by the bed and a sign on the gate; a patrol is about {patrolMinutes(game)} minutes out (a guess, not a measured figure). It answers only while the banks and the law hold: after a permanent collapse nobody comes. The road watch is the neighbors: a chat group, radios, a sign. It costs a little and gives warning, goodwill and men within earshot, and it keeps working when the firm is gone. Armed-response signs deter opportunists, never an organized crew.</>}>Buy minutes: a patrol while the law holds, neighbors when it does not.</Hint>
+    <Hint more={<>Time is security: every measure buys minutes until someone answers. An armed-response firm ({usd(RESPONSE.SETUP_USD)} to install, {usd(RESPONSE.MONTHLY_USD)} a month) puts a panic button by the bed and a sign on the gate; a patrol is about {pluralize(patrolMinutes(game), 'minute')} out (a guess, not a measured figure). It answers only while the banks and the law hold: after a permanent collapse nobody comes. The road watch is the neighbors: a chat group, radios, a sign. It costs a little and gives warning, goodwill and men within earshot, and it keeps working when the firm is gone. Armed-response signs deter opportunists, never an organized crew.</>}>Buy minutes: a patrol while the law holds, neighbors when it does not.</Hint>
     <Row label="Armed response" value={!sub ? 'none' : sub.ended !== null ? 'ended' : active ? `answering, about ${patrolMinutes(game)} min` : 'not answering'} tone={active ? 'good' : sub && sub.ended === null ? 'warn' : undefined} />
     {active
       ? <button style={btn(false)} onClick={() => { const w = useGameStore.getState().cancelArmedResponse(); if (w) alert(w); }}>Cancel the subscription</button>

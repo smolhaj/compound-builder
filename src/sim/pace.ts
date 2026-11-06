@@ -13,6 +13,7 @@ import { isAway } from './rescue';
 import { runFinished, type PerimeterRun } from './perimeter';
 import type { GameState } from './state';
 import { siteDaysPerWeek } from './weekender';
+import { pluralize } from './words';
 
 export interface Pace {
   /** Rate-weighted person-hours the family puts in per week. */
@@ -80,9 +81,9 @@ export function eta(weeks: number | null): string {
   if (weeks === null) return 'no one is free to build';
   if (weeks < 0.15) return 'a day or so';
   if (weeks < 1.5) return 'about a week';
-  if (weeks < 9) return `about ${Math.round(weeks)} weeks`;
-  if (weeks < 52) return `about ${Math.round(weeks / 4.35)} months`;
-  return weeks < 78 ? 'about a year' : `about ${(weeks / 52).toFixed(1)} years`;
+  if (weeks < 9) return `about ${pluralize(Math.round(weeks), 'week')}`;
+  if (weeks < 52) return `about ${pluralize(Math.round(weeks / 4.35), 'month')}`;
+  return weeks < 78 ? 'about a year' : `about ${pluralize((weeks / 52).toFixed(1), 'year')}`;
 }
 
 /** Why it is slow and what would help, when the whole queue takes more than `slow` weeks. */
@@ -91,7 +92,7 @@ export function slowHint(s: GameState, weeks: number | null, pace = paceOf(s), s
   if (weeks < slow) return null;
   const parts: string[] = [];
   if (pace.siteDays !== undefined) {
-    parts.push(`the family is on the place only about ${Math.round(pace.siteDays * 10) / 10} days a week (Friday night to Sunday afternoon)`);
+    parts.push(`the family is on the place only about ${pluralize(Math.round(pace.siteDays * 10) / 10, 'day')} a week (Friday night to Sunday afternoon)`);
     parts.push('hire a crew for the weekdays');
     parts.push('or move in full time (Family tab)');
     return `Slow going: ${parts.join('; ')}.`;

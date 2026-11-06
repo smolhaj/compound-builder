@@ -4,6 +4,7 @@
  * ~2 days; docs/DECISIONS.md: deliveries come by truck on the county road).
  */
 import { MATERIALS, type Stock } from './materials';
+import { materialCount, pluralize } from './words';
 import { weatherDelay } from './upkeep';
 import type { GameState, OrderLine } from './state';
 import { canOrder, priceFactor } from './disaster';
@@ -15,7 +16,7 @@ import { addFood, CAT_KCAL, FOOD, type FoodItemId } from './pantry';
 const linePrice = (l: OrderLine) => l.food ? (FOOD[l.food].price ?? 0) * (l.n ?? 0) : (MATERIALS[l.material].price ?? 0) * l.qty;
 const isReal = (l: OrderLine) => l.qty > 0 || (l.food !== undefined && (l.n ?? 0) > 0);
 /** A line's name in the log. */
-const lineName = (l: OrderLine) => l.food ? `${l.n} × ${FOOD[l.food].name.toLowerCase()}` : `${l.qty} × ${MATERIALS[l.material].name.toLowerCase()}`;
+const lineName = (l: OrderLine) => l.food ? `${l.n} × ${FOOD[l.food].name.toLowerCase()}` : materialCount(l.material, l.qty, MATERIALS[l.material].name, String(l.qty));
 
 /** An order line for `n` units of a named food. */
 export function foodLine(id: FoodItemId, n: number): OrderLine {
@@ -73,7 +74,7 @@ export function placeOrder(s: GameState, lines: readonly OrderLine[]): string | 
   if (payWith(s) === 'cash') s.fin.cash -= cost; else s.money -= cost;
   const wx = weatherDelay(s, real.map(l => l.material));
   s.orders.push({ id, lines: real, cost, placedAt: s.clock.t, dueAt: s.clock.t + LEAD_TIME_DAYS + Math.floor(s.site.miles / 15) + wx.days, status: 'ordered' });
-  log(s, `Ordered ${real.map(lineName).join(', ')} — $${cost.toLocaleString('en-US')}.${wx.why ? ` It'll be ${wx.days} days late (${wx.why}).` : ''}`);
+  log(s, `Ordered ${real.map(lineName).join(', ')} — $${cost.toLocaleString('en-US')}.${wx.why ? ` It'll be ${pluralize(wx.days, 'day')} late (${wx.why}).` : ''}`);
   return id;
 }
 
@@ -82,13 +83,13 @@ export function deliverOrders(s: GameState): void {
   for (const o of s.orders) {
     if (o.status !== 'ordered' || s.clock.t < o.dueAt) continue;
     o.status = 'delivered';
-    const what = o.lines.map(l => l.food ? `${l.n} ${FOOD[l.food].name.toLowerCase()}` : `${l.qty} ${MATERIALS[l.material].name.toLowerCase()}`).join(', ');
+    const what = o.lines.map(l => l.food ? `${l.n} ${FOOD[l.food].name.toLowerCase()}` : materialCount(l.material, l.qty, MATERIALS[l.material].name, String(l.qty))).join(', ');
     // no drive yet, or the bridge on it is down: the truck leaves it at the road (at the creek) and the family carries it in
     if (!s.site.improvements.drive || s.roadBridge?.down || s.perimeter.some(r => r.collapsed || r.dropped)) {      // (no drive, the bridge down, or a tunnel choked with rubble: the truck leaves it at the road)
       const hours = o.lines.reduce((a, l) => a + (CARRY_H[l.material] ?? 0.2) * l.qty, 0);
       if (hours > 0.5) {
         (s.roadside ??= []).push({ lines: o.lines.map(l => ({ ...l })), hours, done: 0 });
-        log(s, `The truck left ${what} at the road: about ${Math.round(hours)} hours of carrying to get it in.`);
+        log(s, `The truck left ${what} at the road: about ${pluralize(Math.round(hours), 'hour')} of carrying to get it in.`);
         continue;
       }
     }
@@ -97,10 +98,15 @@ export function deliverOrders(s: GameState): void {
   }
 }
 
-/** Materials on order and not yet delivered. */
+/**
+ * Materials on the way to the stockpile: on order and not yet delivered, plus what the truck left at the road
+ * (no drive, a downed bridge) until the family has carried it in. Counting the road pile matters: without it
+ * "Order what the plans need" and the stuck card asked for the same bill a second time while it sat at the gate.
+ */
 export function onOrder(s: GameState): Partial<Stock> {
   const out: Partial<Stock> = {};
   for (const o of s.orders) if (o.status === 'ordered') for (const l of o.lines) out[l.material] = (out[l.material] ?? 0) + l.qty;
+  for (const r of s.roadside ?? []) for (const l of r.lines) if (!l.food) out[l.material] = (out[l.material] ?? 0) + l.qty;
   return out;
 }
 

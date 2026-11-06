@@ -39,6 +39,7 @@ import { runFinished } from './perimeter';
 import { STRIKE, crossingRelief, strikeChance } from './roadWildlife';
 import { roadPlanOf } from './roadState';
 import { exposed } from './vehicleYard';
+import { pluralize } from './words';
 
 export type VehicleKind = 'pickup' | 'suv' | 'motorhome' | 'tractor' | 'atv' | 'old_pickup' | 'trailer';
 
@@ -371,7 +372,7 @@ export function vehiclesDay(s: GameState): string[] {
     if (v.down && alive(v)) {
       if (v.down.left === undefined) {
         if (peace && s.money >= TOW_USD + SERVICE_USD) { s.money -= TOW_USD + SERVICE_USD; v.down.left = 2; out.push(`The ${def.name.toLowerCase()} is at the shop: $${TOW_USD + SERVICE_USD} for the tow and the ${v.down.part}.`); }
-        else if (mechanic >= 1 && s.stock.vehicle_parts >= 1) { s.stock.vehicle_parts -= 1; v.down.left = repairDays(mechanic); out.push(`The family started on the ${def.name.toLowerCase()}'s ${v.down.part}: about ${v.down.left} days.`); }
+        else if (mechanic >= 1 && s.stock.vehicle_parts >= 1) { s.stock.vehicle_parts -= 1; v.down.left = repairDays(mechanic); out.push(`The family started on the ${def.name.toLowerCase()}'s ${v.down.part}: about ${pluralize(v.down.left, 'day')}.`); }
       }
       if (v.down.left !== undefined) {
         v.down.left -= 1;

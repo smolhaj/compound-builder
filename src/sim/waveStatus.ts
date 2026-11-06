@@ -6,6 +6,7 @@ import { diffOf } from './difficulty';
 import { strengthOf } from './encounters';
 import { WAVE, crewFactor, intensity, nextWaveDay, phaseOf, type WavePhase } from './waves';
 import { dayIndex, type GameState } from './state';
+import { pluralize } from './words';
 
 export interface WaveStatus {
   phase: WavePhase | 'over';
@@ -38,7 +39,7 @@ export function waveStatus(s: GameState): WaveStatus | null {
   }
   const due = nextWaveDay(s.seed, Math.floor(d.hitAt), w, wt.lull), phase = phaseOf(day, due), daysTo = Math.max(0, due - day), next = w.n + 1;
   const f = crewFactor(next, strengthOf(s), wt.wave);
-  const when = daysTo === 0 ? 'today' : daysTo === 1 ? 'tomorrow' : `in ${daysTo} days`;
+  const when = daysTo === 0 ? 'today' : daysTo === 1 ? 'tomorrow' : `in ${pluralize(daysTo, 'day')}`;
   const chip = phase === 'arriving' ? `Wave ${next}: today` : `Wave ${next} ${when}`;
   const expect = `Wave ${next} of ${WAVE.PEAK}: expect ${crewWord(f)}${intensity(next) >= 1 ? ' (waves stop growing here)' : next > 1 ? ', larger than the last' : ', the smallest you will see'}.`;
   return { phase, next, done: w.n, peak: WAVE.PEAK, daysTo, threat: intensity(next), chip, tone: phase === 'quiet' ? (daysTo > 14 ? 'good' : 'warn') : 'bad', explain: WAVE_EXPLAIN, expect };

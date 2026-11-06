@@ -19,6 +19,7 @@ import { apiaries, apiaryOf, colonyCount, flightDays, winterNeed } from './bees'
 import { hasMaples, sapSeason, tapsOut, woodsTaps } from './maple';
 import { herdOf } from './herd';
 import { regionFor } from './climate';
+import { pluralize } from './words';
 
 export type Tone = 'good' | 'warn' | 'bad';
 export const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -144,7 +145,7 @@ export function spoilageRisks(s: GameState): Risk[] {
   const out: Risk[] = [];
   const need = s.people.reduce((a, p, i) => a + (s.personState[i]?.needs?.died == null ? needOf(p) : 0), 0);
   const fresh = s.stock.fresh * KCAL.fresh;
-  if (fresh > 6 * need && need > 0) out.push({ text: `${Math.round(fresh / need)} days of fresh food on hand and ${Math.round(freshSpoilRate(s) * 100)} % of it rotting a day${hasCellar(s) ? ' (cellar)' : ': a root cellar would cut that to a fifth'}. Can, dry or ferment it.`, tone: 'warn' });
+  if (fresh > 6 * need && need > 0) out.push({ text: `${pluralize(Math.round(fresh / need), 'day')} of fresh food on hand and ${Math.round(freshSpoilRate(s) * 100)} % of it rotting a day${hasCellar(s) ? ' (cellar)' : ': a root cellar would cut that to a fifth'}. Can, dry or ferment it.`, tone: 'warn' });
   const o = overflow(s);
   if (o > 0.1) out.push({ text: `Supplies ${Math.round(o * 100)} % past the shelves (${Math.round(pantryLoad(s) / 1000).toLocaleString('en-US')}k kcal in ${Math.round(pantryRoom(s) / 1000).toLocaleString('en-US')}k of room): cool-kept goods keep worse.`, tone: 'warn' });
   if (cellarKcal(s) > 100_000 && cellarTempC(s) > 9) out.push({ text: `The cellar is ${Math.round(cellarTempC(s))} °C: the bins lose ${shrinkText(cellarTempC(s))} a day. Eat the potatoes first.`, tone: 'warn' });

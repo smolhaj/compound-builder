@@ -16,6 +16,7 @@ import { BAG_BASE, BAG_GOODS } from '../sim/tradeGoods';
 import { answerCallout, askPact, joinGroup, joinGroupProblem, leaveGroup, leavePact, PACT_MIN, stateWord, surname } from '../sim/neighborLife';
 import { inPact } from '../sim/pact';
 import { clarity, openRumors, roadRisk, scoutProblem, sendScout } from '../sim/rumors';
+import { pluralize } from '../sim/words';
 
 const DIM = 'rgba(238,238,238,0.6)', LINE = 'rgba(255,255,255,0.08)';
 const TONE = { good: '#a8d080', warn: '#f0c070', bad: '#f08060' } as const;
@@ -166,7 +167,7 @@ export function MarketSection() {
   return <Section title="Crossroads market">
     <Row label="The family's name" value={`${m.rep > 40 ? 'well thought of' : m.rep > 10 ? 'decent' : m.rep < -40 ? 'cheats, they say' : m.rep < -10 ? 'not trusted' : 'nobody knows you'} (${Math.round(m.rep)})`} tone={m.rep > 10 ? 'good' : m.rep < -10 ? 'bad' : undefined} title="Honest dealing and generosity raise it (better prices, an invitation); cheating that comes out sinks it (stalls refuse you)" />
     {bag.length > 0 && <Row label="Trade goods" value={bag.map(b => `${m.bag[b]} ${BAG_BASE[b].unit}`).join(', ')} />}
-    {!today && <Note>Saturdays by the old Grange hall. Next one in {daysToMarket(game)} days.</Note>}
+    {!today && <Note>Saturdays by the old Grange hall. Next one in {pluralize(daysToMarket(game), 'day')}.</Note>}
     {today && !there && <div>
       <div style={{ fontSize: 11.5, color: DIM, marginBottom: 2 }}>Market day. Who goes:</div>
       <Picker game={game} picked={who} set={x => setWho(x.slice(-1))} max={2} />

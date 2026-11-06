@@ -32,6 +32,7 @@ import { isFinished } from './construction';
 import { dayIndex, type GameState } from './state';
 import { daysOfFood } from './needs';
 import { adaptation, adaptedHeads, adaptLevel, digFactor, sinceHit } from './adaptive';
+import { pluralize } from './words';
 
 export type Counter = 'sensors' | 'dogs' | 'watch' | 'tower';
 
@@ -230,7 +231,7 @@ export function warningEncounter(s: GameState, d: Dig, day: number, r: () => num
   const sign = (SIGN[d.by ?? 'watch'][Math.floor(r() * SIGN[d.by ?? 'watch'].length) % SIGN[d.by ?? 'watch'].length]).replace('{side}', sideOf(s, d.at));
   return {
     id: `e${s.nextId++}`, kind: 'tunnelers', day, title: `Someone is digging under the ${sideOf(s, d.at)} wall`,
-    dossier: [sign, `About ${d.size} of them, by the spoil. They are ${left <= 1 ? 'almost through' : `${left} days from coming up`}${party.length ? ', and you have time to be waiting where they surface' : ''}.`, 'Organized crews dig under a wall when they can\'t get over it. Where they come up is inside it.'],
+    dossier: [sign, `About ${d.size} of them, by the spoil. They are ${left <= 1 ? 'almost through' : `${pluralize(left, 'day')} from coming up`}${party.length ? ', and you have time to be waiting where they surface' : ''}.`, 'Organized crews dig under a wall when they can\'t get over it. Where they come up is inside it.'],
     size: d.size, armed: true, strength: 0, temper: d.temper, stances,
     dig: { phase: 'warning', id: d.id, lead: left, by: d.by ?? undefined },
   };

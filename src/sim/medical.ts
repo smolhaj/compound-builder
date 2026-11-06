@@ -51,6 +51,7 @@ import { psyOf } from './mind';
 import type { Person } from './family';
 import { cachedPlan } from './housing';
 import { contactFactor, Q as QUARTERS, roleHome } from './quarters';
+import { pluralize } from './words';
 
 export type MedKind = 'wound' | 'burn' | 'fracture' | 'frostbite' | 'abscess' | 'infection' | 'dysentery' | 'flu' | 'postpartum' | 'infant';
 export type Bone = 'wrist' | 'arm' | 'collarbone' | 'ribs' | 'ankle' | 'leg' | 'hip';
@@ -485,7 +486,7 @@ export function afterBirth(s: GameState, mother: Person, r: () => number): void 
 }
 
 /** The household's medical picture for the Family tab and the next-step card. */
-export interface MedReport { courses: number; kit: number; splints: number; salts: number; medic: Person | null; skill: number; bay: boolean; hospital: boolean; needs: string[]; lasting: Array<[string, string[]]>; pregnant: Array<[string, number]>; epidemic: Epidemic | null; policy: Medical['policy'] }
+export interface MedReport { courses: number; kit: number; splints: number; salts: number; medic: Person | null; skill: number; bay: boolean; hospital: boolean; needs: string[]; lasting: Array<[string, string[]]>; pregnant: Array<[string, number]>; epidemic: Epidemic | null; /** People on the place sick with the going-round illness right now (distinct; `epidemic.cases` counts every case since it began, a repeat included). */ sickNow: number; policy: Medical['policy'] }
 export function medReport(s: GameState): MedReport {
   const M = medicalOf(s), day = dayIndex(s.clock.t);
   const living = s.people.filter(p => here(s, p));
@@ -500,5 +501,11 @@ export function medReport(s: GameState): MedReport {
   }
   // a person with two infections (or wounds) is one line, not two identical ones
   const uniq = [...new Set(needs)];
-  return { courses: courses(s), kit: s.stock.meds, splints: s.stock.splints ?? 0, salts: s.stock.ors ?? 0, medic: best && best.skills.medic >= 2 ? best : null, skill: best?.skills.medic ?? 0, bay: bayOn(s), hospital: hospitalOpen(s), needs: uniq, lasting: Object.entries(M.lasting).filter(([id]) => living.some(p => p.id === id)), pregnant: Object.entries(M.pregnancies).map(([id, pr]) => [person(s, id)?.first ?? '?', pr.due - day] as [string, number]), epidemic: M.epidemic, policy: M.policy };
+  return { courses: courses(s), kit: s.stock.meds, splints: s.stock.splints ?? 0, salts: s.stock.ors ?? 0, medic: best && best.skills.medic >= 2 ? best : null, skill: best?.skills.medic ?? 0, bay: bayOn(s), hospital: hospitalOpen(s), needs: uniq, lasting: Object.entries(M.lasting).filter(([id]) => living.some(p => p.id === id)), pregnant: Object.entries(M.pregnancies).map(([id, pr]) => [person(s, id)?.first ?? '?', pr.due - day] as [string, number]), epidemic: M.epidemic, sickNow: M.epidemic ? living.filter(p => casesOf(s, p.id).some(h => h.med!.kind === M.epidemic!.kind)).length : 0, policy: M.policy };
+}
+
+/** "2 sick now (5 cases since it started)": distinct people first, the running tally only when it says more. */
+export function epidemicCountText(sickNow: number, cases: number): string {
+  const now = sickNow === 0 ? 'nobody sick right now' : `${sickNow} sick now`;
+  return cases > sickNow ? `${now} (${pluralize(cases, 'case')} since it started)` : now;
 }

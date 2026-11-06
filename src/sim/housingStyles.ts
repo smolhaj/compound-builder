@@ -22,6 +22,7 @@ import { REGIONS, type RegionId } from './regions';
 import type { Site } from './site';
 import type { GameState, Structure } from './state';
 import { siteLot } from './lotListing';
+import { pluralize } from './words';
 
 /** How the place stands to a style's material: sawn / gathered on the land, hauled in, or (earth walls) a wet climate. */
 export type MatFit = 'local' | 'hauled' | 'wet';
@@ -249,7 +250,7 @@ export function styleFacts(kind: string, cold = 1): string[] {
   const st = HOUSING_STYLES[kind];
   if (!st) return [];
   const heat = st.heat(cold);
-  const out = [`${st.beds} beds`, heat <= 0.8 ? `burns ${Math.round((1 - heat) * 100)}% less wood than a cabin` : heat >= 1.15 ? `burns ${Math.round((heat - 1) * 100)}% more wood than a cabin` : 'heats like a cabin'];
+  const out = [`${pluralize(st.beds, 'bed')}`, heat <= 0.8 ? `burns ${Math.round((1 - heat) * 100)}% less wood than a cabin` : heat >= 1.15 ? `burns ${Math.round((heat - 1) * 100)}% more wood than a cabin` : 'heats like a cabin'];
   out.push(st.ember <= 0.35 ? 'sheds wildfire embers' : st.ember < 1 ? 'a little fire-resistant' : 'burns like any wood house');
   out.push(st.cover <= 0.75 ? 'thick walls stop rifle rounds' : st.cover < 1 ? 'solid walls, decent cover' : st.cover > 1 ? 'thin walls: little cover' : 'wall cover like a cabin');
   if (st.cellarKcal > 0) out.push('stone basement is a cold cellar');

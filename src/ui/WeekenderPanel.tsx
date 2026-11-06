@@ -13,6 +13,7 @@ import {
 import { weekendBudget } from '../sim/weekendPlan';
 import { Note, Row, Section } from './hud/common';
 import { btn, DIM, TONE, usd } from './hud/style';
+import { pluralize } from '../sim/words';
 
 const WEEKDAY = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const clockText = (h: number) => `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.floor((h % 1) * 60)).padStart(2, '0')}`;
@@ -50,7 +51,7 @@ export function WeekenderPanel() {
   return <Section title="Two homes">
     <Row label="Right now" value={w.stranded ? <span style={{ color: TONE.bad }}>caught in town</span> : w.here ? 'on the place' : 'in town'} />
     {when && days !== null && <Row label={next!.arriving ? 'Next up the road' : 'Next back to town'} value={`${when}${days >= 1 ? ` (${Math.round(days * 10) / 10} d)` : ` (${Math.max(1, Math.round(days * 24))} h)`}`} />}
-    <Row label="On the place" value={`about ${Math.round(siteDaysPerWeek(game.clock.startDoy) * 10) / 10} days a week`} title="Friday night to Sunday afternoon, the holidays, and three vacation weeks a year" />
+    <Row label="On the place" value={`about ${pluralize(Math.round(siteDaysPerWeek(game.clock.startDoy) * 10) / 10, 'day')} a week`} title="Friday night to Sunday afternoon, the holidays, and three vacation weeks a year" />
     <Row label="The drive" value={`${w.driveMiles} miles · ${hours} h each way`} title={`${cars.length ? cars.length + ' of the fleet' : 'the town car'} makes the trip; fuel, miles and wear are counted`} />
     <Row label="Trips so far" value={`${w.tally.trips} · ${w.tally.miles.toLocaleString('en-US')} mi · ${usd(w.tally.spent)} spent`} title="Fuel, the town car, the caretaker, the mortgage and the town house's bills, since the start" />
 

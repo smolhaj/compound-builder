@@ -22,6 +22,7 @@
 import { hasBasement } from './housingStyles';
 import type { GameState } from './state';
 import { logGate } from './nag';
+import { pluralize } from './words';
 
 export type FoodCat = 'staples' | 'canned' | 'frozen';
 export const FOOD_CATS: readonly FoodCat[] = ['staples', 'canned', 'frozen'];
@@ -455,8 +456,8 @@ export function pantryDay(s: GameState, opts: { rotate: boolean; mice: boolean; 
     // the stores still sell: long-expired food goes out and fresh comes in (in the grocery money; home-canned just goes)
     if (opts.townOpen && over > d.long) {
       const cost = (it.price ?? 0) * e.q;
-      if (it.price !== null && s.money >= cost) { s.money -= cost; e.age = 0; out.push(`Threw out the old ${name(id)} (${unitsText(e.q)}, ${Math.round(over / 30)} months past date) and bought fresh: $${Math.round(cost).toLocaleString('en-US')}.`); }
-      else { lose(it, e.q); out.push(`Threw out the old ${name(id)} (${unitsText(e.q)}, ${Math.round(over / 30)} months past date).`); delete p.items[id]; }
+      if (it.price !== null && s.money >= cost) { s.money -= cost; e.age = 0; out.push(`Threw out the old ${name(id)} (${unitsText(e.q)}, ${pluralize(Math.round(over / 30), 'month')} past date) and bought fresh: $${Math.round(cost).toLocaleString('en-US')}.`); }
+      else { lose(it, e.q); out.push(`Threw out the old ${name(id)} (${unitsText(e.q)}, ${pluralize(Math.round(over / 30), 'month')} past date).`); delete p.items[id]; }
       continue;
     }
     let rate = over > 0 ? d.toss(over) : 0;

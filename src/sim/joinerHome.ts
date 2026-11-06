@@ -41,6 +41,7 @@ import { ownsAt } from './land';
 import { CELL, KIT, footprint } from '../game/buildkit/kit';
 import type { Encounter } from './encounters';
 import type { Extras } from './newcomers';
+import { pluralize } from './words';
 
 // ─────────────────────────────────────────────────────────────────────────
 // State
@@ -141,7 +142,7 @@ export function foodDays(brings: Partial<Stock> | undefined, people: readonly Pi
   const need = people.reduce((a, p) => a + needOf(p), 0);
   return need > 0 ? kcal / need : 0;
 }
-const foodWords = (d: number) => (d >= 10 ? `${Math.round(d / 7)} weeks of food` : `${Math.max(1, Math.round(d))} days of food`);
+const foodWords = (d: number) => (d >= 10 ? `${pluralize(Math.round(d / 7), 'week')} of food` : `${pluralize(Math.max(1, Math.round(d)), 'day')} of food`);
 
 const VEH_WORD: Partial<Record<string, string>> = { pickup: 'a pickup', old_pickup: 'an old pickup', suv: 'an SUV' };
 
@@ -295,7 +296,7 @@ export function stayOptions(s: GameState, e: Pick<Encounter, 'people' | 'extras'
     const q = modularQuote(s), p = orderProblem(s, q.lines);
     const short = q.total - cash;
     out.push({ kind: 'modular', label: 'A modular home they buy', off: kin && !banks ? 'the banks are closed: no dealer will deliver' : p === 'no_deliveries' ? 'nobody is delivering now' : short > 0 ? `needs ${usd(q.total)}; they have ${usd(cash)}` : null,
-      line: `${usd(q.total)} from their money · about ${q.days} days · tents till it is set`,
+      line: `${usd(q.total)} from their money · about ${pluralize(q.days, 'day')} · tents till it is set`,
       tip: `A factory-built one-bedroom home (14 × 32 ft, sleeps 3): the unit ${usd(MATERIALS.modular_unit.price ?? 0)} delivered and set, plus the pad and piers${q.permit ? `, plus the county permit ${usd(q.permit)}` : ''}. Their savings pay for it; the family does the pad and hookups. The crane day is the only wait. Until it is set they sleep in tents.` });
   }
 
@@ -306,7 +307,7 @@ export function stayOptions(s: GameState, e: Pick<Encounter, 'people' | 'extras'
     else {
       const q = ownBuildQuote(s, k, handsFor(s, people)), builder = Math.max(0, ...adultsOf(people).map(p => p.skills.builder));
       out.push({ kind: 'own_build', label: `They build a ${kindName(k)}`, off: null,
-        line: `${usd(q.cost + q.permit)} of materials${cash >= q.cost ? ', paid from their money' : cash > 0 ? `, ${usd(cash)} from theirs` : ', from your supplies'} · about ${Math.max(1, Math.round(q.days / 7))} weeks · tents till then`,
+        line: `${usd(q.cost + q.permit)} of materials${cash >= q.cost ? ', paid from their money' : cash > 0 ? `, ${usd(cash)} from theirs` : ', from your supplies'} · about ${pluralize(Math.max(1, Math.round(q.days / 7)), 'week')} · tents till then`,
         tip: `A ${kindName(k)} (sleeps ${HOME_BEDS[k]}): ${Math.round(q.hours)} person-hours through the usual stages, with everyone pitching in. Their own hands count${builder >= 5 ? ` (the best builder of them is at ${builder})` : ''}. Their savings buy the materials where they can; the stockpile covers the rest. Until it is finished they sleep in tents.` });
     }
   }
@@ -315,7 +316,7 @@ export function stayOptions(s: GameState, e: Pick<Encounter, 'people' | 'extras'
   if (kin) {
     const waitDays = s.disaster.phase === 'warning' ? 75 : 150;
     out.push({ kind: 'player_build', label: 'You build them a place first', off: null,
-      line: `Your materials and crew · they wait up to ${waitDays} days in town · they come anyway if it hits first`,
+      line: `Your materials and crew · they wait up to ${pluralize(waitDays, 'day')} in town · they come anyway if it hits first`,
       tip: `Stake a guest house, a cottage or Mom’s house (Build → Home & work) and the family builds it from the stockpile. They are tagged as waiting for it, move in the day it is finished, and give up and make other plans if it takes too long. If the heat comes first, they come anyway and take whatever room there is.` });
   }
 
@@ -452,7 +453,7 @@ export function settleStay(s: GameState, people: readonly Person[], stay: StayKi
     if (st) {
       placeOrder(s, q.lines);
       // the permit fee was charged by the family's account when it was staked: it is theirs to pay
-      lines.push(`They buy a modular home with their own money (${usd(q.total)}) and the dealer sets a delivery date. About ${q.days} days; tents till then.`);
+      lines.push(`They buy a modular home with their own money (${usd(q.total)}) and the dealer sets a delivery date. About ${pluralize(q.days, 'day')}; tents till then.`);
     } else lines.push('They could not manage a modular home after all; they stay in tents for now.');
     tents(people.length);
     return lines;

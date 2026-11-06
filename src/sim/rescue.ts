@@ -44,6 +44,7 @@ import { calendarOf, dayIndex, type GameState } from './state';
 import type { Stock } from './materials';
 import { homeFromCaptivity } from './mind';
 import type { Encounter, Outcome, Stance } from './encounters';
+import { pluralize } from './words';
 
 // ─────────────────────────────────────────────────────────────────────────
 // State
@@ -586,7 +587,7 @@ export function startTrip(s: GameState, pid: string, team: string[]): string | n
   rescueOf(s).raid = { kind: 'trip', captive: pid, team: [...team], left: day, hitDay: day + leg + trouble.extraDays, backDay: day + 2 * leg + trouble.extraDays, resolved: false };
   for (const id of team) { const ps = stateOf(s, id); if (ps) { ps.task = 'away'; ps.target = null; } }
   const child = person(s, pid)!;
-  log(s, `${team.map(id => person(s, id)?.first).join(', ')} took the truck to ${l.where}, ${l.km} km off: ${liters} L of fuel and ${2 * leg} days, for a rumor.`);
+  log(s, `${team.map(id => person(s, id)?.first).join(', ')} took the truck to ${l.where}, ${l.km} km off: ${liters} L of fuel and ${pluralize(2 * leg, 'day')}, for a rumor.`);
   log(s, voice(s, child, mulberry32(s.seed + day + 1), ['Even if it\'s nothing. Even if it\'s nothing, go.', 'Bring a picture. Show everyone the picture.'], ['If there\'s any chance at all.', 'Take the good rifle. And the trade goods. All of them.']));
   return null;
 }

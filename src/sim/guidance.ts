@@ -25,6 +25,8 @@ import { fmtKw } from './powerReport';
 import { anyBearing } from './orchard';
 import { hookupTone, needsHookup, storageTip } from './hookups';
 import { MATERIAL_IDS, MATERIALS, type MaterialId } from './materials';
+import { materialCount, pluralize } from './words';
+import { crewNudge } from './crewNudge';
 import { PERIMETER, PERIMETER_ORDER, UPGRADE_NEXT, fenceLive, runBill, runFinished, wallLength, type PerimeterKind, type Pt } from './perimeter';
 import { MAX_TOWERS, ringStatus } from './fortress';
 import { canHostWalkway } from './walkway';
@@ -41,7 +43,7 @@ import { tension } from './disaster';
 import { faithOf, moodSummary, resting } from './mind';
 import { COURSES, COURSE_MODE_NAME, bestMode, courseIdea, skillsGoalSteps, type CourseId, type CourseMode } from './courses';
 import { eveningGaps, restockNeeds } from './evenings';
-import { medReport } from './medical';
+import { epidemicCountText, medReport } from './medical';
 import { pharmacyOpen } from './body';
 import { gatheringProblem, type GatheringKind } from './gatherings';
 import { terrainCards, terrainOff } from './terrainFx';
@@ -182,6 +184,8 @@ export interface Suggestion {
   kind: string;
   why: string;
   urgency: number;
+  /** 'alarm': drawn red (a problem that has gone on too long). */
+  tone?: 'alarm';
   /** Headline when it is not a kit piece. */
   title?: string;
   /** One-click buttons. When absent, a kit suggestion has "Stake it". */
@@ -204,7 +208,7 @@ export function landSuggestions(s: GameState): Suggestion[] {
       const extra = 2 * bucket(cut) ** 2, name = cut.kind.replace(/_/g, ' '), pending = onOrder(s), wall = wallOf(s, cut);
       const short = Math.max(0, Math.ceil(extra - Math.max(0, s.stock.fieldstone - 0) - (pending.fieldstone ?? 0)));
       const lines: OrderLine[] = short > 0 ? [{ material: 'fieldstone', qty: short }] : [];
-      out.push({ id: 'retaining', kind: '', title: 'This slope needs a retaining wall', urgency: 58,
+      out.push({ id: 'retaining', kind: '', title: 'This slope needs a retaining wall', urgency: 94,
         why: `the ${name} is staked on a ${Math.round((cut.grade ?? 0) * 100)} % slope: the pad is cut into the hill and held by a dry-stack wall${wall ? ` (up to ${Math.round(wall.heightM * 10) / 10} m high and ${Math.round(wall.lenM)} m long, with ${wall.stairs ? 'a stair' : 'no stair'} set in it${wall.tall ? '; a wall that tall needs a drainage channel above it' : ''})` : ''}, about ${extra} pallets of fieldstone more than level ground${short > 0 ? '' : ' (you have them)'}. The wall goes up with the foundation and is paid for by those pallets`,
         acts: [...(lines.length ? [{ label: `Order ${short} pallet${short > 1 ? 's' : ''} of fieldstone (${usd(orderCost(lines, prices(s)))})`, act: { type: 'order' as const, lines } }] : []), { label: 'Show me', act: { type: 'select', id: cut.id } }] });
     }
@@ -253,9 +257,14 @@ export function suggestions(s: GameState, limit = 3, skip?: ReadonlySet<string>)
   if (!hasKind(s, 'well_hand', 'well_drilled', 'cistern', 'water_tower')) add('water', s.site.gwDepth > 9 ? 'well_drilled' : 'well_hand', s.site.gwDepth > 9 ? `no water on the place (it is ${s.site.gwDepth} m down: drill)` : 'no water on the place', 90);
   // a project that has waited days for materials we could pay for: the loudest card on the list (sim/stalls.ts)
   const stuck = stuckProject(s);
-  if (stuck) out.push({ id: 'stalled', kind: '', title: `Stuck: waiting on ${linesText(stuck.lines)}`, urgency: 99,
-    why: `The ${stuck.label} has waited ${stuck.days} days for materials, and you have the money (${usd(s.money)}). Work cannot continue until they are ordered${stuck.others > 0 ? `; ${stuck.others} more project${stuck.others > 1 ? 's wait' : ' waits'} too` : ''}.`,
+  if (stuck) out.push({ id: 'stalled', kind: '', title: stuck.escalated ? `Stuck for ${pluralize(stuck.days, 'day')}: waiting on ${linesText(stuck.lines)}` : `Stuck: waiting on ${linesText(stuck.lines)}`, urgency: stuck.escalated ? 100 : 99, ...(stuck.escalated ? { tone: 'alarm' as const } : {}),
+    why: `The ${stuck.label} has waited ${pluralize(stuck.days, 'day')} for materials, and you have the money (${usd(s.money)}). Work cannot continue until they are ordered${stuck.others > 0 ? `; ${stuck.others} more project${stuck.others > 1 ? 's wait' : ' waits'} too` : ''}.`,
     acts: [{ label: stuckAction(stuck), act: { type: 'order', lines: stuck.lines } }, { label: 'Show me', act: stuck.at ? { type: 'select', id: stuck.at } : { type: 'open', right: 'defense' } }] });
+  // the family's own hands would take weeks on the house and the cash covers a crew: say so, with the price and a one-click hire (sim/crewNudge.ts)
+  { const n = crewNudge(s);
+    if (n) out.push({ id: 'house_crew', kind: '', title: n.title, urgency: 93, why: n.why,
+      acts: [{ label: `Hire the crew (~${usd(n.usd)})`, act: { type: 'crew', id: n.id } },
+        ...(n.tents > 0 ? [{ label: `Or buy ${pluralize(n.tents, 'tent')} for now (${usd(n.tentUsd)})`, act: { type: 'order' as const, lines: [{ material: 'tent' as const, qty: n.tents }] } }] : [{ label: 'Show me', act: { type: 'select' as const, id: n.id } }])] }); }
   // a home that lost its roof (chimney fire, storm, looters): re-roof it before anything else, the family should not winter in tents
   { const bare = homes.find(h => h.roofLost && !isFinished(h));
     if (bare && stuck?.key !== `s:${bare.id}`) {
@@ -265,7 +274,7 @@ export function suggestions(s: GameState, limit = 3, skip?: ReadonlySet<string>)
         .filter(l => l.qty > 0 && MATERIALS[l.material].price !== null);
       const name = bare.kind.replace(/_/g, ' ');
       out.push({ id: 'reroof', kind: '', title: 'Re-roof your home', urgency: 97,
-        why: lines.length ? `the ${name} lost its roof and the family cannot live in it; the roof needs ${lines.map(l => `${l.qty} ${MATERIALS[l.material].name.toLowerCase()}`).join(' and ')} more` : `the ${name} lost its roof; the crew is on it, and it is the first thing to finish`,
+        why: lines.length ? `the ${name} lost its roof and the family cannot live in it; the roof needs ${lines.map(l => materialCount(l.material, l.qty, MATERIALS[l.material].name, String(l.qty))).join(' and ')} more` : `the ${name} lost its roof; the crew is on it, and it is the first thing to finish`,
         acts: [...(lines.length ? [{ label: `Order the roof materials (${usd(orderCost(lines, prices(s)))})`, act: { type: 'order' as const, lines } }] : []), { label: 'Show me', act: { type: 'select', id: bare.id } }] });
     } }
   const growing = hasKind(s, 'garden', 'field', 'greenhouse', 'orchard');
@@ -342,7 +351,7 @@ export function suggestions(s: GameState, limit = 3, skip?: ReadonlySet<string>)
   { const med = medReport(s);
     if (med.epidemic && !med.epidemic.asked && med.epidemic.cases >= 1) {
       out.push({ id: 'epidemic', kind: '', title: med.epidemic.kind === 'flu' ? 'The flu is going around' : 'Dysentery in the house', urgency: 79,
-        why: `${med.epidemic.cases} sick so far. Keeping the sick apart${med.bay ? ' in the medical bay' : ' in a spare room'} slows it a lot, at the cost of the one who nurses them and a lonely few days`,
+        why: `${epidemicCountText(med.sickNow, med.epidemic.cases)}. Keeping the sick apart${med.bay ? ' in the medical bay' : ' in a spare room'} slows it a lot, at the cost of the one who nurses them and a lonely few days`,
         acts: [{ label: 'Keep the sick apart', act: { type: 'quarantine', on: true } }, { label: 'Continue as we are', act: { type: 'quarantine', on: false } }] });
     }
     if (med.needs.length) {
@@ -433,8 +442,8 @@ export function weekenderPlan(s: GameState): Suggestion[] {
   }
   // 2. the long stays are the weekender's best building days
   if (soon) {
-    out.push({ id: 'wk_stay', kind: '', title: `${soon.name}: ${soon.days} days on the place`, urgency: 58,
-      why: `from ${soon.label} (${soon.startDay - day <= 0 ? 'now' : `in ${soon.startDay - day} days`}). That is more building than three ordinary weekends: have the next stage on site before then (an order takes a few days to arrive), and keep the chores light so the hours go to the walls.`,
+    out.push({ id: 'wk_stay', kind: '', title: `${soon.name}: ${pluralize(soon.days, 'day')} on the place`, urgency: 58,
+      why: `from ${soon.label} (${soon.startDay - day <= 0 ? 'now' : `in ${pluralize(soon.startDay - day, 'day')}`}). That is more building than three ordinary weekends: have the next stage on site before then (an order takes a few days to arrive), and keep the chores light so the hours go to the walls.`,
       ...(next ? { acts: [{ label: `Order the next stage (${usd(next.cost)})`, act: { type: 'order' as const, lines: next.lines } }] } : {}) });
   }
   // 3. a crew works the weekdays while the family is at its jobs
@@ -498,8 +507,8 @@ export function movingIn(s: GameState): Goal {
   const homes = s.structures.filter(st => isHome(st.kind) && isFinished(st)).length;
   return { id: 'moving', title: 'Move in full time', steps: [
     { label: 'A caretaker for the weekdays', done: !!w.caretaker, detail: w.caretaker ? CARETAKER[w.caretaker.kind].name.toLowerCase() : 'the animals, the garden and the doors, five days a week' },
-    { label: 'A finished home with a bed for everyone', done: homes > 0 && homeBeds(s) >= s.people.length, detail: homes ? `${homeBeds(s)} of ${s.people.length} beds` : 'a roof you can live under all week' },
-    { label: 'Food stored for 90 days', done: daysOfFood(s) >= 90, detail: `${Math.round(Math.min(daysOfFood(s), 999))} days of food on hand` },
+    { label: 'A finished home with a bed for everyone', done: homes > 0 && homeBeds(s) >= s.people.length, detail: homes ? `${homeBeds(s)} of ${pluralize(s.people.length, 'bed')}` : 'a roof you can live under all week' },
+    { label: 'Food stored for 90 days', done: daysOfFood(s) >= 90, detail: `${pluralize(Math.round(Math.min(daysOfFood(s), 999)), 'day')} of food on hand` },
     { label: 'Water and power that run themselves', done: hasKind(s, 'well_drilled', 'well_hand', 'cistern', 'water_tower') && hasPower(s), detail: 'the pump and the freezers keep running while you are away' },
     { label: 'Decide about the town house', done: w.town.status === 'sold', detail: w.town.status === 'sold' ? 'sold' : `worth ${usd(w.town.value * marketFactor(s))} now, with ${usd(w.town.mortgage)} owed; it sells for less every week the signs grow` },
   ] };
@@ -539,7 +548,7 @@ export function buildAdvice(s: GameState, kind: string): BuildAdvice {
   const next = !off && !!sug;
   let note: string | null = null;
   if (next) note = `suggested: ${sug!.why}`;
-  else if (!off && needsPermit(kind) && s.paper.permits && countyWorks(s)) note = `county permit ${usd(permitFee(s, kind))}, about ${reviewDays(s, kind)} days`;
+  else if (!off && needsPermit(kind) && s.paper.permits && countyWorks(s)) note = `county permit ${usd(permitFee(s, kind))}, about ${pluralize(reviewDays(s, kind), 'day')}`;
   return { off, next, note };
 }
 
@@ -554,7 +563,7 @@ export function perimeterOff(s: GameState, kind: PerimeterKind): string | null {
 export function perimeterNote(s: GameState, kind: PerimeterKind): string | null {
   if (kind === 'escape_tunnel') return 'opens only from inside';
   if (kind === 'electric_steel' && !fenceLive(s)) return 'needs power running, or it is only a steel wall';
-  if (PERIMETER[kind].growYears) return `takes ${PERIMETER[kind].growYears} years to grow into a wall`;
+  if (PERIMETER[kind].growYears) return `takes ${pluralize(PERIMETER[kind].growYears, 'year')} to grow into a wall`;
   const up = UPGRADE_NEXT[kind];
   const deck = canHostWalkway(kind) ? ' · takes a patrol walkway on top' : '';
   return up ? `upgrades to ${PERIMETER[up].name.toLowerCase()}${deck}` : deck ? deck.slice(3) : null;
@@ -607,6 +616,6 @@ export function sparePartsCard(s: GameState): Suggestion | null {
   if (o.days === null || o.days >= 120) return null;
   return { id: 'spare_parts', kind: '', title: o.kits < 1 ? 'No spare parts for the machines' : 'Spare parts are running short',
     urgency: o.days < 30 ? 52 : 36,
-    why: `${o.kits < 1 ? 'there is no service kit left' : `${Math.floor(o.kits)} service kit${Math.floor(o.kits) === 1 ? '' : 's'}, about ${o.days} days at today's use`}, and every year the machines are older: they need service sooner. Send a team to the hardware stores and the interstate (Outside), or trade for kits`,
+    why: `${o.kits < 1 ? 'there is no service kit left' : `${Math.floor(o.kits)} service kit${Math.floor(o.kits) === 1 ? '' : 's'}, about ${pluralize(o.days, 'day')} at today's use`}, and every year the machines are older: they need service sooner. Send a team to the hardware stores and the interstate (Outside), or trade for kits`,
     acts: [] };
 }
