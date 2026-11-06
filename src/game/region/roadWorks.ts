@@ -115,6 +115,18 @@ export function bankExtent(diffAt: (o: number) => number, reach: number, step = 
   return end === 0 ? 0 : Math.min(reach, end + step);
 }
 
+/** The narrowest a bank facing may be, as a share of the full reach the bank would have: a narrower band is a sliver (a thin diagonal strip of stone up the slope) and is not drawn. */
+export const FACING_MIN_SHARE = 0.45;
+
+/**
+ * The reach a station's facing is drawn at: its measured reach `ext` (already limited by the bend's room), or nothing when that is under `FACING_MIN_SHARE` of the bank's
+ * full reach `full` (and never under a hand's width, 0.12). Where a bend pinches the bank, the room limit leaves long runs of stations a few tenths wide: drawn, they are
+ * a thin diagonal strip of stone running up the slope; left bare, the cut reads as a plain bank. Never raises a reach, so it cannot bring the fold back.
+ */
+export function facingReach(ext: number, full: number): number {
+  return ext < Math.max(0.12, FACING_MIN_SHARE * full) ? 0 : ext;
+}
+
 /**
  * A strip following the ground at signed offsets from the bench edge of stations i0..i1 (the stone facing on a bank), UVs in world
  * units. Each row reaches only as far as the bank does (`bankExtent`) and the rows past the flagged span are included so the facing
@@ -137,7 +149,7 @@ function bankStrip(fr: readonly Frame[], i0: number, i1: number, sg: number, rea
     const f = fr[i0 + r];
     if (r > 0) sAcc += Math.hypot(f.x - fr[i0 + r - 1].x, f.z - fr[i0 + r - 1].z);
     // the facing starts a hair out from the bench edge and ends before the toe: it never lies on level ground
-    const reach = ext[r] < 0.12 ? 0 : Math.max(0, ext[r] - 0.04);   // (a bank narrower than a hand's width is no facing: no sliver of stone lying up the slope)
+    const reach = facingReach(ext[r], reachMax) === 0 ? 0 : Math.max(0, ext[r] - 0.04);   // (a bank that is only a sliver wide is no facing: no thin strip of stone lying up the slope)
     if (reach > 0.06) any = true;
     for (let k = 0; k <= across; k++) {
       const o = reach * k / across, [x, z] = at(r, o), q = r * (across + 1) + k;

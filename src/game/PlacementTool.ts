@@ -13,7 +13,7 @@ import { siteNote } from '../sim/microclimate';
 import { onJustPlaced, type Spot } from './buildkit/justPlaced';
 import { stakeSpendAsk } from '../sim/spendGuard';
 import { DRIVE_W } from './region/access';
-import { YARD_GAPS, YARD_SITE, YARD_SLIDES, spurGradeOk, spurProfileOk, yardBesideDrive, yardSpur } from './buildkit/yardSite';
+import { YARD_GAPS, YARD_SITE, YARD_SLIDES, NO_LEVEL_SITE, spurGradeOk, spurProfileOk, spurReachesRoad, yardBesideDrive, yardSpur } from './buildkit/yardSite';
 import { arcNear, distToPolyline, pointAtArc } from './perimeter/gateKitLayout';
 import { clashText, padClash, padSnap } from './buildkit/padRules';
 
@@ -33,6 +33,7 @@ export class PlacementTool {
   private _rot = 0;
   /** A vehicle yard near the drive sits beside it, turned to its heading with the gate toward it (buildkit/yardSite); R flips it to the other side. */
   private _yardRot: number | null = null;
+  private _yardRefused = false;
   private _yardFlip = false;
   private get _turn(): number { return this._yardRot ?? this._rot; }
   private _at: [number, number] | null = null;
@@ -170,7 +171,7 @@ export class PlacementTool {
     const def = KIT[kind];
     let [x, z] = snapCenter(def, this._at[0], this._at[1], this._rot);
     // beside the drive: the yard's own site (a diagonal drive turns it a fractional quarter)
-    this._yardRot = null;
+    this._yardRot = null; this._yardRefused = false;
     const drive = kind === 'vehicle_yard' ? this._world.access.drive : undefined;
     if (drive && distToPolyline(drive, this._at) < YARD_SITE.snapR) {
       // nearest setback whose ground will take a yard (the road's own cut bank or fill can be too steep right at its edge)
@@ -183,6 +184,7 @@ export class PlacementTool {
         if (siteProblem(def, c.x, c.z, c.rot, this._site, placed0) === null && !padClash(def, c.x, c.z, c.rot, this._site.height, placed0) && this._spurOk(def, c)) { ys = c; break search; }
       }
       if (ys) { x = ys.x; z = ys.z; this._yardRot = ys.rot; }
+      else { this._yardRefused = true; }
     }
     this._at = [x, z];
     if (onJustPlaced(this._just, x, z, this._turn)) { this._ok = false; g.visible = false; useGameStore.getState().setToolProblem(null); return; }
@@ -197,7 +199,7 @@ export class PlacementTool {
       this._snap = padSnap(def, x, z, this._turn, this._site.height, placed, (px, pz) => snapCenter(def, px, pz, this._turn), (px, pz) => siteProblem(def, px, pz, this._turn, this._site, placed) === null);
       clashMsg = clashText(clash, this._snap ? Math.hypot(this._snap[0] - x, this._snap[1] - z) * 6 : null);
     }
-    this._ok = problem === null && !clash;
+    this._ok = problem === null && !clash && !this._yardRefused;
     const fp = footprint(def, x, z, this._turn);
     // a bunker room's ghost hangs at its bunker's floor level, under the see-through ground
     const y = isUnderground(def) ? previewDatum(def, x, z, this._turn, this._site.height, placed) ?? this._site.height(x, z) - DEPTH : def.waterside ? (this._world.parcel.lakeY ?? this._world.parcel.creek.waterY(x)) + 0.02 : this._world.parcel.padHeight(fp.x0, fp.z0, fp.x1, fp.z1);
@@ -206,7 +208,7 @@ export class PlacementTool {
     g.visible = true;
     const m = this._ok ? this._okMat : this._badMat;
     g.traverse(o => { if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).material = m; });
-    useGameStore.getState().setToolProblem(problem ? PROBLEM_TEXT[problem] : clashMsg);
+    useGameStore.getState().setToolProblem(problem ? PROBLEM_TEXT[problem] : clashMsg ?? (this._yardRefused ? NO_LEVEL_SITE : null));
   }
 
   /** The gravel spur from the yard's gate must meet the road's edge at a drivable grade: not a yard on a bench above a road cut. */
@@ -224,6 +226,7 @@ export class PlacementTool {
     const hs: number[][] = [];
     for (let i = 0; i <= 4; i++) { const d = half + spur * i / 4, row: number[] = []; for (const k of [-0.35, 0, 0.35]) row.push(this._world.groundAt(c.x + fx * d - fz * k, c.z + fz * d + fx * k)); hs.push(row); }
     if (!spurProfileOk(pad, roadY, hs, 0.1 + 0.05 * Math.abs(roadY - pad))) return false;
+    if (spurReachesRoad(drive, c.x, c.z, c.rot, half, DRIVE_W, this._world.groundAt, pad) !== null) return false;
     return spurGradeOk(spur, roadY - pad);
   }
 

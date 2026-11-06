@@ -4,7 +4,7 @@ import * as THREE from 'three';
 const used = new Set<string>();
 vi.mock('../buildkit/materials', () => ({ kitMaterial: (id: string) => { used.add(id); return new THREE.MeshStandardMaterial(); }, setWindowGlow: () => {} }));
 
-import { bankExtent, buildRoadWorks, featherStrip, insideRoom, type Frame } from './roadWorks';
+import { bankExtent, buildRoadWorks, facingReach, featherStrip, insideRoom, type Frame } from './roadWorks';
 import { planRoad, type RoadGround, type RoadInput } from '../../sim/roadPlan';
 import { roadBedOf } from '../../sim/roadPlan';
 import type { RegionId } from '../../sim/regions';
@@ -176,5 +176,26 @@ describe('bank facing on the inside of a bend', () => {
     expect(Math.min(...inner)).toBeLessThan(0.3);                      // nothing past the road's own edge pile-up
     expect(Math.min(...(inner === l1 ? l2 : l1))).toBe(Infinity);      // the outside has no limit
     expect(inner[0]).toBeGreaterThan(3);                               // far from the kink the facing has room again
+  });
+});
+
+describe('facingReach: no sliver of facing where a bend pinches the bank', () => {
+  it('drops a band under the minimum share of the full reach, keeps a wide one unchanged', () => {
+    expect(facingReach(0.2, 0.7)).toBe(0);
+    expect(facingReach(0.3, 0.7)).toBe(0);
+    expect(facingReach(0.32, 0.7)).toBeCloseTo(0.32, 9);
+    expect(facingReach(0.7, 0.7)).toBe(0.7);
+  });
+  it('a bank that is small everywhere still loses a hand-width sliver but keeps its body', () => {
+    expect(facingReach(0.1, 0.2)).toBe(0);
+    expect(facingReach(0.15, 0.2)).toBeCloseTo(0.15, 9);
+  });
+  it('never raises a reach (it cannot reintroduce the fold)', () => {
+    for (const e of [0, 0.05, 0.2, 0.5, 0.9]) for (const f of [0.1, 0.4, 0.8]) expect(facingReach(e, f)).toBeLessThanOrEqual(e);
+  });
+  it('a drawn bend stays finite', () => {
+    const bendG: RoadGround = { h: (x, z) => 1 + 0.45 * Math.max(0, 30 - Math.hypot(x - 20, z - 36)) / 10 + (z > 36 ? 0.3 : 0) };
+    const p = planRoad(input('plains', bendG, TIGHT));
+    expect(finite(buildRoadWorks(p, bendG.h, opts(bendG)))).toBe(true);
   });
 });
