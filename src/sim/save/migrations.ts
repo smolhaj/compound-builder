@@ -62,6 +62,8 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   },
   // 80 → 81 (land): the second ring of parcels (sim/land.ts), appended after the old ones and surveyed again
   // 80 → 81: hired security staff (sim/guards.ts): nobody on the payroll
+  // 81 → 82: the siege-wave clock (sim/waves.ts). An old run has none: raids stay random, as before
+  81: s => { const g = { ...(s.gate as object) } as Record<string, unknown>; delete g.waves; return { ...s, version: 82, gate: g }; },
   80: s => {
     const land = s.land as { parcels: Array<{ id: string; ring?: number }>; surveyed?: boolean };
     const home = (s.site as { home: { x0: number; z0: number; x1: number; z1: number } }).home;
