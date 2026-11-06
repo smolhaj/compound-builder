@@ -86,7 +86,7 @@ function threatOf(s: GameState): Recap['threat'] {
 export const short = (t: string, words = 12): string => {
   const first = t.split(/(?<=[.!?])\s/)[0].replace(/[.!?]$/, '');
   const w = first.split(/\s+/);
-  return w.length <= words ? first : w.slice(0, words).join(' ').replace(/[,;:(\-]+$/, '') + '…';
+  return w.length <= words ? first : w.slice(0, words).join(' ').replace(/[,;:(-]+$/, '') + '…';
 };
 
 export function resumeRecap(s: GameState): Recap {
