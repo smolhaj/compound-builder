@@ -11,6 +11,7 @@ import { BattleOverlay } from './ui/BattleOverlay';
 import { GateCard } from './ui/GateCard';
 import { CutsceneOverlay } from './ui/CutsceneOverlay';
 import { ReportCard } from './ui/ReportCard';
+import { DayCard } from './ui/DayCard';
 import { useGameStore } from './store/gameStore';
 import { useWorldStore } from './store/worldStore';
 import { loadGame, AUTOSAVE } from './sim/save/saveSystem';
@@ -64,6 +65,7 @@ export default function App() {
       {!clean && <CutsceneOverlay />}
       {!clean && <GateCard />}
       {!clean && <ReportCard />}
+      {!clean && <DayCard />}
       {shop && !clean && !raid && <ShopWindow />}
       {schedule && !clean && <SchedulePanel />}
       {setup && !clean && <SetupScreen />}

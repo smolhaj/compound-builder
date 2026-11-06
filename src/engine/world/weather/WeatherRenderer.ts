@@ -32,11 +32,14 @@ import { installSeasonShaderPatch } from '../season/seasonShader';
  * the reference — every standard material sees the same live values.
  */
 const WX_VALUE = { x: 0, y: 0, z: 0, w: 0 };
+/** Shared: how much of the lying cover is ash, not snow (0-1; sim/collapseLook.ts). A plain object, like the above. */
+const WX_ASH = { value: 0 };
 let _patched = false;
 
 const PARS = /* glsl */`
 #ifdef STANDARD
 uniform vec4 uWx;
+uniform float uAsh;
 float wxHash( vec2 p ) {
   vec3 p3 = fract( vec3( p.xyx ) * 0.1031 );
   p3 += dot( p3, p3.yzx + 33.33 );
@@ -147,6 +150,8 @@ if ( uWx.x + uWx.y > 0.002 ) {
     float wxDr = wxLo * 0.55 + wxSa * 0.25 + wxNoise( wxP.xz * 4.0 ) * 0.2;
     float wxCool = clamp( ( 1.0 - smoothstep( 0.35, 0.8, wxDr ) ) * 0.7 + ( 1.0 - smoothstep( 0.9, 0.995, wxN.y ) ) * 0.6, 0.0, 1.0 );
     vec3 wxSnow = mix( vec3( 0.80, 0.82, 0.84 ), vec3( 0.62, 0.69, 0.80 ), wxCool ) * ( 0.94 + 0.08 * wxSa ) * seaSnowTint;
+    // ash, not snow: a grey-brown, matte blanket (an eruption, a fire)
+    wxSnow = mix( wxSnow, vec3( 0.2, 0.185, 0.17 ) * ( 0.8 + 0.4 * wxSa ), uAsh );
     // Drift relief: tilt the normal along the drift field so low sun shades it
     if ( wxM > 0.5 ) {
       float wxE = 0.6;
@@ -183,6 +188,7 @@ export function installWeatherShaderPatch(): void {
   for (const id of ['standard', 'physical'] as const) {
     const lib = THREE.ShaderLib[id];
     (lib.uniforms as Record<string, THREE.IUniform>).uWx = { value: WX_VALUE };
+    (lib.uniforms as Record<string, THREE.IUniform>).uAsh = WX_ASH;
   }
 }
 
@@ -332,6 +338,11 @@ export interface WeatherFrameInput {
   camera: THREE.PerspectiveCamera;
   /** Point the camera orbits (precipitation box sits between it and the camera). */
   focus: { x: number; z: number };
+  /** Falling ash or dust over the sky (0-1) and its colour: drawn as grey flakes, whatever the weather (sim/collapseLook.ts). */
+  ash?: number;
+  ashColor?: readonly number[];
+  /** Ash lying on the ground (0-1): the surface patch lays a grey blanket in place of snow. */
+  ashCover?: number;
   /** Seasonal lying snow (season/seasonState) — the floor under the weather's own cover. */
   snowBase?: number;
   /** Share of the weather's own snow cover that lies (region climate; 0 = never). */
@@ -490,7 +501,11 @@ export class WeatherRenderer {
     // ── Surface uniform ──────────────────────────────────────────────────────
     WX_VALUE.x = Math.min(1, Math.max(o.wetness, f.eventWetness * 0.75));
     // Rain washes lying snow off: a rainy scene never shows snow
-    WX_VALUE.y = snowShownUnderRain(Math.max(o.snowCover * (f.snowAllow ?? 1), f.snowBase ?? 0), o.rain, mode);
+    const cover = low ? 0 : f.ashCover ?? 0;
+    const snowCover = snowShownUnderRain(Math.max(o.snowCover * (f.snowAllow ?? 1), f.snowBase ?? 0), o.rain, mode);
+    WX_VALUE.y = Math.max(snowCover, cover);
+    // (ash wins where it lies thicker than the snow; a winter's snow under it still shows as grey ash)
+    WX_ASH.value = cover > 0 ? cover / Math.max(cover, snowCover, 1e-3) : 0;
     WX_VALUE.z = o.rain;
     WX_VALUE.w = this._time;
 
@@ -540,7 +555,8 @@ export class WeatherRenderer {
     }
 
     // ── Precipitation particles ──────────────────────────────────────────────
-    const precip = mode === 'snow' ? o.snow : mode === 'rain' ? o.rain : Math.max(o.rain, o.snow);
+    const ash = low ? 0 : f.ash ?? 0;
+    const precip = Math.max(mode === 'snow' ? o.snow : mode === 'rain' ? o.rain : Math.max(o.rain, o.snow), ash);
     // mist: where there is no rain or snow, a fog the camera stands in sends fine droplets drifting past (the snow-flake draw, a third the size, hardly falling)
     const mist = low ? 0 : (f.mist ?? 0), misty = mist > 0.05 && precip < 0.05;
     const amount = misty ? mist * 0.3 : precip;
@@ -553,19 +569,20 @@ export class WeatherRenderer {
     // A forced Settings mode decides the particle type outright: while the
     // sim eases from a previous rain spell into forced snow (or the season
     // isn't winter) the lingering rain must not win and draw rain streaks.
-    const snowy = misty ? true : mode === 'snow' ? true : mode === 'rain' ? false : o.snow > o.rain;
+    const snowy = misty || ash > Math.max(o.rain, o.snow) ? true : mode === 'snow' ? true : mode === 'rain' ? false : o.snow > o.rain;
     const u = this._mat.uniforms;
     u.uTime.value = this._time;
     u.uSnow.value = snowy ? 1 : 0;
-    u.uSize.value = misty ? 0.4 : 1;
+    const ac = ash > Math.max(o.rain, o.snow) ? f.ashColor ?? [0.52, 0.5, 0.48] : null;
+    u.uSize.value = misty ? 0.4 : ac ? 1.7 : 1;
     u.uDrift.value = misty ? 0.25 : 1;
     u.uOpacity.value = misty ? 0.35 : snowy ? 0.9 : 0.3 + 0.2 * o.rain;
     // Light level: precipitation is lit by the (dim, overcast) sky
     const lit = 1 - 0.8 * f.night;
     (u.uColor.value as THREE.Color).setRGB(
-      (snowy ? 0.95 : 0.70) * lit + this._flash * 0.6,
-      (snowy ? 0.96 : 0.75) * lit + this._flash * 0.6,
-      (snowy ? 1.0 : 0.84) * lit + this._flash * 0.6,
+      (ac ? ac[0] : snowy ? 0.95 : 0.70) * lit + this._flash * 0.6,
+      (ac ? ac[1] : snowy ? 0.96 : 0.75) * lit + this._flash * 0.6,
+      (ac ? ac[2] : snowy ? 1.0 : 0.84) * lit + this._flash * 0.6,
     );
     // Wind: rain slants in a gust front; snow squalls drive the flakes sideways
     (u.uWind.value as THREE.Vector2).set(snowy ? 0.3 + o.wind * 2.6 : 1.1 + o.rain * 1.2 + o.wind * 1.6, snowy ? 0.15 + o.wind * 0.8 : 0.5 + o.wind * 0.5);
@@ -594,6 +611,6 @@ export class WeatherRenderer {
     this._scene.remove(this._mesh);
     this._geo.dispose();
     this._mat.dispose();
-    WX_VALUE.x = WX_VALUE.y = WX_VALUE.z = 0;
+    WX_VALUE.x = WX_VALUE.y = WX_VALUE.z = 0; WX_ASH.value = 0;
   }
 }

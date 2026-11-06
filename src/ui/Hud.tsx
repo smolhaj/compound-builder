@@ -17,6 +17,7 @@ import { WEATHER_MODES, type WeatherMode } from '../engine/world/weather/weather
 import { DogsPanel } from './DogsPanel';
 import { CompoundBoardPanel } from './CompoundBoard';
 import { WaveChip } from './WaveClock';
+import { CollapseChip } from './CollapseChip';
 import { KinPanel } from './KinPanel';
 import { NewcomersPanel } from './NewcomersPanel';
 import { originLabel } from '../sim/newcomers';
@@ -178,6 +179,7 @@ export function Hud() {
         <span>{dateLabel(cal.doy)}, {cal.year}</span>
         <span style={{ fontVariantNumeric: 'tabular-nums' }}>{clock(hourOf(game.clock.t))}</span>
         {game.lineage.era > 1 && <span style={{ color: '#d8c08a' }} title={`The ${game.lineage.family} family: era ${game.lineage.era}`}>Era {roman(game.lineage.era)}</span>}
+        <CollapseChip />
         <WaveChip onClick={() => setBoardOpen(true)} />
         <span style={{ fontWeight: 600, color: '#cfe0a8' }} title={`Checking. Net worth ${usd(netWorth(game))}`}>{usd(game.money)}</span>
         {(game.fin.debt?.owed ?? 0) >= 25 && <span style={{ fontWeight: 600, color: game.fin.debt!.stage === 'card' ? TONE.warn : TONE.bad }} title={game.disaster.tracks.banks < 0.5 ? 'The banks are gone: nobody is collecting' : `Owed on the card at 24 %${game.fin.debt!.lien ? ', with a judgment lien on the land' : ''} (Shop & money → Accounts)`}>owe {usd(game.fin.debt!.owed)}</span>}

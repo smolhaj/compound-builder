@@ -71,6 +71,9 @@ export const ColorGradingShader: {
 
     /** Vignette strength [0, 1]: corner darkening fraction. */
     uVignette: { value: 0.22 },
+
+    /** Whole-frame colour cast (linear multiplier; 1,1,1 = none). The collapse's look (sim/collapseLook.ts). */
+    uCast: { value: { r: 1, g: 1, b: 1 } },
   },
 
   vertexShader: /* glsl */`
@@ -92,6 +95,7 @@ export const ColorGradingShader: {
     uniform float uShadowTintStrength;
     uniform float uNight;
     uniform float uVignette;
+    uniform vec3 uCast;
 
     varying vec2 vUv;
 
@@ -150,6 +154,7 @@ export const ColorGradingShader: {
 
       // 2. Saturation boost (luma-preserving)
       color = adjustSaturation(color, uSaturation);
+      color *= uCast;
 
       // 3. Warm highlight tint (amber on bright sun-lit surfaces)
       color = warmHighlights(color, uWarmColor, uWarmStrength, uWarmThreshold);
