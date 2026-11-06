@@ -18,12 +18,13 @@ import { suggestions, type SuggestionAct } from './guidance';
 import { needsHookup, powerOnPlace } from './hookups';
 import { THREAT_NAME, threatOn } from './threatState';
 import { DISASTERS } from './disaster';
+import { stuckAction, stuckProject } from './stalls';
 import { KIT } from '../game/buildkit/kit';
 import { dayIndex, type GameState } from './state';
 
 export type BoardTone = 'good' | 'warn' | 'bad';
 /** What a board button does (the HUD handles these four): open a right-hand tab, select a building, arm a kit piece, open the Shop. */
-export type BoardAct = Extract<SuggestionAct, { type: 'open' | 'select' | 'stake' | 'shop' }>;
+export type BoardAct = Extract<SuggestionAct, { type: 'open' | 'select' | 'stake' | 'shop' | 'order' }>;
 export interface BoardLine {
   id: 'power' | 'water' | 'food' | 'defense' | 'morale';
   label: string;
@@ -129,11 +130,14 @@ export function compoundBoard(s: GameState, drive?: readonly Pt[]): CompoundBoar
   if (shelter && !shelter.done) decisions.push({ id: 'op:shelter', text: `Shelter: ${shelter.line}`, tone: 'warn', act: shelter.act && asAct(shelter.act.act) ? { label: shelter.act.label, act: asAct(shelter.act.act)! } : undefined });
   if (s.gate.pending) decisions.push({ id: 'gate', text: `Someone is at the gate: ${s.gate.pending.title}`, tone: 'warn' });
   if (s.gate.aftermath) decisions.push({ id: 'aftermath', text: 'Raiders lie wounded on the drive: say what happens to them', tone: 'warn' });
+  { const stuck = stuckProject(s);   // days of waiting with the cash in hand: first on the list, one click to fix
+    if (stuck) decisions.unshift({ id: 'stalled', text: `${stuckAction(stuck)}: the ${stuck.label} has stood still ${stuck.days} days${stuck.others > 0 ? ` (+${stuck.others} more stuck)` : ''}`, tone: 'bad', act: { label: 'Order', act: { type: 'order', lines: stuck.lines } } }); }
   { const held = s.structures.filter(st => !isFinished(st) && holdReason(s, st));
-    if (held.length) decisions.push({ id: 'held', text: `${held.length} ${held.length === 1 ? 'project is' : 'projects are'} stuck: ${holdReason(s, held[0])}`, tone: 'warn', act: { label: 'Projects', act: { type: 'select', id: held[0].id } } }); }
+    if (held.length && !decisions.some(d => d.id === 'stalled')) decisions.push({ id: 'held', text: `${held.length} ${held.length === 1 ? 'project is' : 'projects are'} stuck: ${holdReason(s, held[0])}`, tone: 'warn', act: { label: 'Projects', act: { type: 'select', id: held[0].id } } }); }
   { const hook = needsHookup(s);
     if (hook.length) decisions.push({ id: 'hookups', text: `${cap(hook[0].name.replace(/_/g, ' '))}: ${hook[0].todo}${hook.length > 1 ? ` (+${hook.length - 1} more)` : ''}`, tone: 'warn', act: { label: 'Utilities', act: open('utilities') } }); }
   for (const x of suggestions(s, 2, OP_COVERED)) {
+    if (x.id === 'stalled') continue;   // (it is the first line above)
     const a = x.acts?.map(y => ({ label: y.label, act: asAct(y.act) })).find(y => y.act) as { label: string; act: BoardAct } | undefined;
     decisions.push({ id: `sug:${x.id}`, text: `${x.title ?? KIT[x.kind]?.name ?? x.kind}: ${x.why}`, tone: 'good', act: a ?? (x.kind ? { label: 'Stake it', act: { type: 'stake', kind: x.kind } } : undefined) });
   }

@@ -35,7 +35,7 @@ describe('the compound board', () => {
     for (const g of [fresh(), midGame()]) {
       const b = compoundBoard(g);
       const acts = [...b.vitals.flatMap(v => [v.open, v.fix?.act]), ...[...b.gaps, ...b.threats, ...b.decisions].map(i => i.act?.act)].filter(Boolean);
-      for (const a of acts) expect(['open', 'select', 'stake', 'shop']).toContain(a!.type);
+      for (const a of acts) expect(['open', 'select', 'stake', 'shop', 'order']).toContain(a!.type);
       for (const v of b.vitals) expect(v.open.type).toBe('open');
     }
   });

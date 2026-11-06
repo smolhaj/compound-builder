@@ -6,7 +6,7 @@ import type { WeatherMode } from '../engine/world/weather/weatherState';
 import type { TourCaption, TourMode } from '../engine/world/camera/TourController';
 import type { PropertyGeometry } from '../sim/propertyWall';
 import type { SiteQuery } from '../game/buildkit/kit';
-import { frameOn, type Frame, type Pt as CamPt } from '../game/cameraFraming';
+import { frameOn, frameRect, type Frame, type Pt as CamPt } from '../game/cameraFraming';
 import type { StarterPlan } from '../sim/starterCompound';
 import type { BpReadout } from '../game/blueprint/blueprintPlan';
 import type { PathSummary } from '../game/paths/pathNet';
@@ -101,6 +101,9 @@ export interface WorldState {
   cameraRequest: { frame: Frame; seq: number } | null;
   /** Frame these points (no-op when empty). */
   frameCamera: (points: readonly CamPt[]) => void;
+  /** Show a rectangle of land (a parcel just bought): the camera glides to it and its edge is outlined for a few seconds. `seq` makes a repeat count. */
+  landFlash: { rect: { x0: number; z0: number; x1: number; z1: number }; seq: number } | null;
+  flashLand: (rect: { x0: number; z0: number; x1: number; z1: number }) => void;
   /** The starter compound shown as a ghost preview (null: none). */
   starterPreview: StarterPlan | null;
   setStarterPreview: (p: StarterPlan | null) => void;
@@ -184,6 +187,8 @@ export const useWorldStore = create<WorldState>()(subscribeWithSelector((set) =>
   setSiteQuery: (siteQuery) => set({ siteQuery }),
   cameraRequest: null,
   frameCamera: points => { const frame = frameOn(points); if (frame) set(w => ({ cameraRequest: { frame, seq: (w.cameraRequest?.seq ?? 0) + 1 } })); },
+  landFlash: null,
+  flashLand: rect => set(w => ({ landFlash: { rect, seq: (w.landFlash?.seq ?? 0) + 1 }, cameraRequest: { frame: frameRect(rect), seq: (w.cameraRequest?.seq ?? 0) + 1 } })),
   starterPreview: null,
   setStarterPreview: (starterPreview) => set({ starterPreview }),
   setMarkNearestTrees: (markNearestTrees) => set({ markNearestTrees }),

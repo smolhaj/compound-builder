@@ -28,3 +28,10 @@ export function startFrame(structures: ReadonlyArray<{ x: number; z: number; unp
   const f = frameOn(near.length ? near : [camp], near.length ? 6 : 10)!;
   return { ...f, radius: near.length ? f.radius : 40 };
 }
+
+/** A bought parcel (or any rectangle): high enough to see the whole of it, centred on it. Bigger than `frameOn` allows: a forty is some 200 m across. */
+export const FRAME_RECT_MAX_R = 230;
+export function frameRect(r: { x0: number; z0: number; x1: number; z1: number }): Frame {
+  const w = r.x1 - r.x0, d = r.z1 - r.z0, ext = Math.hypot(w, d);
+  return { x: (r.x0 + r.x1) / 2, z: (r.z0 + r.z1) / 2, radius: Math.max(FRAME_MIN_R * 1.6, Math.min(FRAME_RECT_MAX_R, ext * 0.8 + 12)), pitch: 0.95 };
+}

@@ -18,7 +18,9 @@ import { blueprintOf, isFinished, planProblem } from './construction';
 import { countyWorks, needsPermit, permitFee, reviewDays } from './paperwork';
 import { onOrder, orderCost, prices } from './economy';
 import { firewoodOutlook } from './heating';
-import { UTILITY } from './utilities';
+import { FIT, UTILITY } from './utilities';
+import { stuckProject, stuckAction, linesText } from './stalls';
+import { fixBill, pendingFixes } from './improvements';
 import { fmtKw } from './powerReport';
 import { anyBearing } from './orchard';
 import { hookupTone, needsHookup, storageTip } from './hookups';
@@ -69,10 +71,13 @@ export function plansNeed(s: GameState): Partial<Record<MaterialId, number>> {
     if (j.finishedAt !== null || j.supplied || !st) continue;
     add(hardenCost(st.kind, j.upgrade, j.tier).materials);
   }
+  // repair jobs on a building (glass, plumbing, wiring, a roof patch) and the plumbing / wiring kits: the family waits on these too
+  for (const st of s.structures) for (const f of pendingFixes(st)) if (!f.supplied) add(fixBill(f));
+  for (const f of s.utilities.fittings) if (f.finishedAt === null && !f.supplied) add(FIT[f.kind].materials);
   const pending = onOrder(s);
   const out: Partial<Record<MaterialId, number>> = {};
   for (const k of MATERIAL_IDS) {
-    const n = Math.ceil((need[k] ?? 0) - s.stock[k] - (pending[k] ?? 0) - 1e-6);
+    const n = Math.ceil((need[k] ?? 0) - s.stock[k] - (pending[k] ?? 0) - 1e-9);   // (any real shortfall blocks the crew, so no looser slack than that)
     if (n > 0) out[k] = n;
   }
   return out;
@@ -246,9 +251,14 @@ export function suggestions(s: GameState, limit = 3, skip?: ReadonlySet<string>)
     add('kin_home', n > 2 ? 'moms_house' : 'guest_house', `${joinNames(wait.flatMap(w => w.people.map(p => p.first)))} ${n === 1 ? 'is' : 'are'} waiting for a place of their own`, 85);
   }
   if (!hasKind(s, 'well_hand', 'well_drilled', 'cistern', 'water_tower')) add('water', s.site.gwDepth > 9 ? 'well_drilled' : 'well_hand', s.site.gwDepth > 9 ? `no water on the place (it is ${s.site.gwDepth} m down: drill)` : 'no water on the place', 90);
+  // a project that has waited days for materials we could pay for: the loudest card on the list (sim/stalls.ts)
+  const stuck = stuckProject(s);
+  if (stuck) out.push({ id: 'stalled', kind: '', title: `Stuck for want of ${linesText(stuck.lines)}`, urgency: 99,
+    why: `The ${stuck.label} has waited ${stuck.days} days for materials, and you have the money (${usd(s.money)}). Nothing moves until they are ordered${stuck.others > 0 ? `; ${stuck.others} more project${stuck.others > 1 ? 's wait' : ' waits'} too` : ''}.`,
+    acts: [{ label: stuckAction(stuck), act: { type: 'order', lines: stuck.lines } }, { label: 'Show me', act: stuck.at ? { type: 'select', id: stuck.at } : { type: 'open', right: 'defense' } }] });
   // a home that lost its roof (chimney fire, storm, looters): re-roof it before anything else, the family should not winter in tents
   { const bare = homes.find(h => h.roofLost && !isFinished(h));
-    if (bare) {
+    if (bare && stuck?.key !== `s:${bare.id}`) {
       const need = blueprintOf(bare).stages[bare.stage]?.materials ?? {}, pending = onOrder(s);
       const lines: OrderLine[] = (Object.entries(need) as Array<[MaterialId, number]>)
         .map(([material, n]) => ({ material, qty: Math.ceil(n - (bare.supplied ? n : s.stock[material]) - (pending[material] ?? 0) - 1e-6) }))
