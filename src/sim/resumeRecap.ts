@@ -82,11 +82,11 @@ function threatOf(s: GameState): Recap['threat'] {
   return null;
 }
 
-/** A line of reason cut at a sentence or about 110 characters, so a long explanation does not fill the card. */
-export const short = (t: string, max = 110): string => {
-  const first = t.split(/(?<=[.!?])\s/)[0];
-  const cut = first.length <= max ? first : first.slice(0, max).replace(/\s+\S*$/, '') + '…';
-  return cut;
+/** A reason cut at the first sentence and at most `words` words, ending cleanly (an ellipsis only when something was cut). */
+export const short = (t: string, words = 12): string => {
+  const first = t.split(/(?<=[.!?])\s/)[0].replace(/[.!?]$/, '');
+  const w = first.split(/\s+/);
+  return w.length <= words ? first : w.slice(0, words).join(' ').replace(/[,;:(\-]+$/, '') + '…';
 };
 
 export function resumeRecap(s: GameState): Recap {

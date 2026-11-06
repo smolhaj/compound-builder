@@ -24,7 +24,7 @@ export function RecapCard() {
       </div>
       <div style={{ color: DIM, fontSize: 12, margin: '2px 0 6px' }}>The clock is paused until you decide.</div>
       {row('Date', <span>{r.date} <span style={{ color: DIM }}>(day {r.dayNumber})</span></span>)}
-      {row('Checking', <b style={{ color: '#cfe0a8' }}>{usd(r.money)}</b>)}
+      {row('Cash', <b style={{ color: '#cfe0a8' }}>{usd(r.money)}</b>)}
       {row('Family', <span style={{ color: TONE[r.familyTone] }}>{r.family}</span>)}
       {row('In progress', r.inProgress.length ? <div>{r.inProgress.map(x => <div key={x}>{x}</div>)}</div> : <span style={{ color: DIM }}>Nothing under way</span>)}
       {row('Next steps', r.nextSteps.length ? <ol style={{ margin: 0, paddingLeft: 18 }}>{r.nextSteps.map(x => <li key={x.title}><b>{x.title}</b>{x.why ? <span style={{ color: DIM }}>: {x.why}</span> : null}</li>)}</ol> : <span style={{ color: DIM }}>Nothing pressing</span>)}

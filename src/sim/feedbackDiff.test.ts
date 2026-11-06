@@ -19,7 +19,7 @@ describe('purchases answer back', () => {
     expect(evs[0].kind).toBe('order');
     const text = messageText(evs[0], Math.round(b.money));
     expect(text).toMatch(/^Ordered 30 lumber/);
-    expect(text).toContain('Checking left: $');
+    expect(text).toContain('Cash left: $');
     expect(text).toMatch(/Arrives in about \d+ days?\./);
     expect(evs[0].flash).toContain('tab:supplies');
   });
@@ -82,7 +82,7 @@ describe('purchases answer back', () => {
     const t2 = coalesce(t1, [ev(2)], 800, 1000 + COALESCE_MS - 1, 2);
     expect(t2.id).toBe(t1.id);
     expect(t2.events).toHaveLength(2);
-    expect(toastText(t2)).toMatch(/^2 orders placed: .* for \$200\. Checking left: \$800\.$/);
+    expect(toastText(t2)).toMatch(/^2 orders placed: .* for \$200\. Cash left: \$800\.$/);
     const t3 = coalesce(t2, [ev(3)], 700, 1000 + COALESCE_MS * 3, 3);
     expect(t3.id).toBe(3);
     expect(t3.events).toHaveLength(1);

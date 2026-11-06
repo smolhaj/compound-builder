@@ -98,10 +98,10 @@ export function diffAction(prev: GameState, next: GameState): FeedbackEvent[] {
   return out;
 }
 
-/** The one-line text of a message: "Ordered 30 lumber for $1,240. Checking left: $8,760. Arrives in about 5 days." */
+/** The one-line text of a message: "Ordered 30 lumber for $1,240. Cash left: $8,760. Arrives in about 5 days." */
 export function messageText(e: FeedbackEvent, cashLeft: number): string {
   const money = e.cost > 0 ? ` for ${usd(e.cost)}` : e.cost < 0 ? `: ${usd(-e.cost)} in` : '';
-  return `${e.title}${money}. Checking left: ${usd(cashLeft)}.${e.note ? ' ' + e.note : ''}`;
+  return `${e.title}${money}. Cash left: ${usd(cashLeft)}.${e.note ? ' ' + e.note : ''}`;
 }
 
 export interface ToastModel { id: number; at: number; events: FeedbackEvent[]; cashLeft: number; flash: string[] }
@@ -122,7 +122,7 @@ export function toastText(t: ToastModel): string {
   const titles = t.events.map(e => e.title);
   const same = t.events.every(e => e.kind === t.events[0].kind);
   const head = same && t.events[0].kind === 'order' ? `${plural(t.events.length, 'order')} placed` : same && t.events[0].kind === 'build' ? `${plural(t.events.length, 'thing')} staked out` : `${plural(t.events.length, 'purchase')}`;
-  return `${head}: ${listNames(titles.map(lower))}${cost > 0 ? ` for ${usd(cost)}` : ''}. Checking left: ${usd(t.cashLeft)}.`;
+  return `${head}: ${listNames(titles.map(lower))}${cost > 0 ? ` for ${usd(cost)}` : ''}. Cash left: ${usd(t.cashLeft)}.`;
 }
 
 // ---- celebrations ------------------------------------------------------------------------------------------------------
