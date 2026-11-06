@@ -103,3 +103,41 @@ export function spurProfileOk(pad: number, roadY: number, heights: ReadonlyArray
   for (let i = 0; i < n; i++) for (const h of heights[i]) if (Math.abs(h - (pad + (roadY - pad) * i / (n - 1))) > tol) return false;
   return true;
 }
+
+/** The gravel spur as the yard builder lays it (vehicleYardGen): half width at the gate, half width where it meets the road (it flares 20 %), and how far the draped height reaches round a point. */
+export const SPUR = { halfStart: 0.4, halfEnd: 0.48, drapeReach: 0.4 };
+
+export const NO_LEVEL_SITE = 'No level site beside the drive here: the ground between the yard and the road is a bank or a ledge, or the road ends. Try another stretch of the drive.';
+
+/**
+ * The height the spur is laid at over a world point: the highest ground within a terrain cell round it (what vehicleYardGen drapes the gravel on).
+ */
+export function spurDraped(ground: (x: number, z: number) => number, x: number, z: number): number {
+  const r = SPUR.drapeReach;
+  return Math.max(ground(x, z), ground(x + r, z), ground(x - r, z), ground(x, z + r), ground(x, z - r));
+}
+
+/**
+ * Does the gravel spur from a yard's gate really reach the road's edge as one plain slope? A spur that stops at a ledge (a cut shoulder, a bench edge, past the end
+ * of the road) is never a site. Checked on the surface the gravel is laid on (`ground` is the world's height; the draped height round each point is taken as the builder
+ * does): (1) the whole width of the spur's far end lies on the roadway (the drive exists there, it is not beyond its end), (2) that end is level with the road (within
+ * `endTol`), (3) every row between is within a tolerance of the straight line from the pad's level to the road's. Returns null when it is good, else the reason.
+ */
+export function spurReachesRoad(drive: readonly Pt[] | undefined, x: number, z: number, rot: number, half: number, driveW: number, ground: (x: number, z: number) => number, pad: number, endTol = 0.1): string | null {
+  if (!drive || drive.length < 2) return null;
+  const th = rot * Math.PI / 2, f: Pt = [Math.sin(th), Math.cos(th)], lat: Pt = [Math.cos(th), -Math.sin(th)], spur = yardSpur(drive, x, z, rot, half, driveW);
+  const g: Pt = [x + f[0] * half, z + f[1] * half], e: Pt = [g[0] + f[0] * spur, g[1] + f[1] * spur];
+  const at = (t: number, k: number): Pt => { const hw = SPUR.halfStart + (SPUR.halfEnd - SPUR.halfStart) * t; return [g[0] + f[0] * spur * t + lat[0] * hw * k, g[1] + f[1] * spur * t + lat[1] * hw * k]; };
+  const ks = [-1, -0.5, 0, 0.5, 1];
+  // (1) the spur's far end meets the roadway across its whole width: just inside the edge every point is on the road (a bend or a diagonal gets a little slack)
+  for (const k of ks) { const p = at(1, k); const q: Pt = [p[0] + f[0] * 0.12, p[1] + f[1] * 0.12]; if (distToPolyline(drive, q) > driveW / 2 + 0.1) return 'the spur does not reach the road';
+  }
+  // the road's own level at the spur's end
+  const rc = pointAtArc(drive, arcNear(drive, e)), roadY = ground(rc[0], rc[1]);
+  // (2) the end is level with the road
+  for (const k of ks) { const p = at(1, k); if (Math.abs(spurDraped(ground, p[0], p[1]) - roadY) > endTol) return 'the spur ends at a ledge above or below the road'; }
+  // (3) one plain slope from the pad to the road
+  const tol = 0.12 + 0.05 * Math.abs(roadY - pad), n = 4;
+  for (let i = 0; i <= n; i++) for (const k of ks) { const p = at(i / n, k); if (Math.abs(spurDraped(ground, p[0], p[1]) - (pad + (roadY - pad) * i / n)) > tol) return 'a bank lies across the spur'; }
+  return null;
+}

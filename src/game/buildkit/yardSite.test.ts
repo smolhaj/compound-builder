@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { yardPadHalf, spurGradeOk, YARD_GAPS, YARD_SITE, yardBesideDrive, yardCorners, yardSpur, spurProfileOk } from './yardSite';
+import { yardPadHalf, spurGradeOk, YARD_GAPS, YARD_SITE, yardBesideDrive, yardCorners, yardSpur, spurProfileOk, spurReachesRoad } from './yardSite';
 import { distToPolyline, pointAtArc } from '../perimeter/gateKitLayout';
 import type { Pt } from '../../sim/perimeter';
 
@@ -78,5 +78,38 @@ describe('spurProfileOk: the way from the gate to the road is one plain slope', 
   it('refuses a bank beside the spur', () => {
     const h = rows(() => 5); h[3][2] = 5.4;
     expect(spurProfileOk(5, 5, h)).toBe(false);
+  });
+});
+
+describe('spurReachesRoad: the mesa case (a yard beside the end of a road in a shallow cut)', () => {
+  // the drive runs east to west along z = 0 and stops at x = 0; its bed is cut 0.25 below the natural ground (5.5) with 0.5-wide banks
+  const road: Pt[] = [[0, 0], [10, 0]], Y = 5.25, N = 5.5;
+  const ground = (x: number, z: number): number => {
+    const d = Math.abs(z) - W / 2; // distance from the road edge
+    const onRoad = x >= -0.001 && d <= 0;
+    if (onRoad) return Y;
+    if (x >= 0 && d < 0.5) return Y + (N - Y) * (d / 0.5);
+    return N;
+  };
+  it('a yard mid-drive, pad level with the road, is good', () => {
+    const flat = () => 5.25;
+    expect(spurReachesRoad(road, 5, 1.8, 2, HALF, W, flat, 5.25)).toBeNull();
+  });
+  it('refuses a yard whose spur ends at the end of the road (beyond it)', () => {
+    expect(spurReachesRoad(road, 0.1, 1.8, 2, HALF, W, ground, 5.5)).not.toBeNull();
+  });
+  it('refuses a spur that stops on the cut shoulder above the road', () => {
+    // the pad is on the natural ground (5.5) and the gravel ends on the shoulder, 0.25 above the road bed
+    const shelf = (_x: number, z: number): number => (Math.abs(z) < 0.9 ? 5.5 : 5.5) - (Math.abs(z) < W / 2 + 0.02 ? 0.25 : 0);
+    expect(spurReachesRoad(road, 5, 1.8, 2, HALF, W, shelf, 5.5)).not.toBeNull();
+  });
+  it('refuses a bank across the way, and accepts a plain even fall', () => {
+    const bank = (_x: number, z: number): number => (z > 0.9 ? 5.5 : 5.0);
+    expect(spurReachesRoad(road, 5, 1.8, 2, HALF, W, bank, 5.5)).not.toBeNull();
+    const fall = (_x: number, z: number): number => 5.25 + Math.min(0.1, 0.05 * Math.max(0, z - W / 2));
+    expect(spurReachesRoad(road, 5, 1.8, 2, HALF, W, fall, fall(5, 1.8 - 0))).toBeNull();
+  });
+  it('the real mesa yard (drive end, 0.25 cut) is refused', () => {
+    expect(spurReachesRoad(road, 1.1, 1.6, 2, HALF, W, ground, 5.45)).not.toBeNull();
   });
 });
