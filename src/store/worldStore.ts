@@ -6,6 +6,7 @@ import type { WeatherMode } from '../engine/world/weather/weatherState';
 import type { TourCaption, TourMode } from '../engine/world/camera/TourController';
 import type { PropertyGeometry } from '../sim/propertyWall';
 import type { SiteQuery } from '../game/buildkit/kit';
+import { frameOn, type Frame, type Pt as CamPt } from '../game/cameraFraming';
 import type { StarterPlan } from '../sim/starterCompound';
 import type { BpReadout } from '../game/blueprint/blueprintPlan';
 import type { PathSummary } from '../game/paths/pathNet';
@@ -48,6 +49,9 @@ export interface WorldState {
   setFrameCap: (f: FrameCap) => void;
   /** The FPS / budget readout (Settings -> Graphics). */
   showPerf: boolean;
+  /** The View panel (season, weather, graphics, overlays, photo) is open. Closed by default: those are tools, not the game. */
+  viewOpen: boolean;
+  setViewOpen: (on: boolean) => void;
   setShowPerf: (on: boolean) => void;
   perfStats: PerfStats | null;
   setPerfStats: (p: PerfStats | null) => void;
@@ -93,6 +97,10 @@ export interface WorldState {
   /** What the placement rules ask of the ground (height, owned, water, camp and road): the starter-compound planner reads it. Set by the canvas. */
   siteQuery: SiteQuery | null;
   setSiteQuery: (q: SiteQuery | null) => void;
+  /** The HUD asks the camera to show something (the staked pieces, a building): the canvas glides there. `seq` makes a repeat request count. */
+  cameraRequest: { frame: Frame; seq: number } | null;
+  /** Frame these points (no-op when empty). */
+  frameCamera: (points: readonly CamPt[]) => void;
   /** The starter compound shown as a ghost preview (null: none). */
   starterPreview: StarterPlan | null;
   setStarterPreview: (p: StarterPlan | null) => void;
@@ -127,8 +135,8 @@ function savedFrameCap(): FrameCap {
   try { const v = Number(localStorage.getItem('cb.fpscap')); if (v === 0 || v === 30 || v === 60) return v; } catch { /* no storage */ }
   return 60;
 }
-/** On unless the player turned it off: the next few builds ask for fps numbers. */
-function savedShowPerf(): boolean { try { return localStorage.getItem('cb.showperf') !== '0'; } catch { return true; } }
+/** Off unless the player turned it on (View menu): a first-time player does not need frame-time numbers. */
+function savedShowPerf(): boolean { try { return localStorage.getItem('cb.showperf') === '1'; } catch { return false; } }
 
 export const useWorldStore = create<WorldState>()(subscribeWithSelector((set) => ({
   seed: initialSeed(),
@@ -143,6 +151,8 @@ export const useWorldStore = create<WorldState>()(subscribeWithSelector((set) =>
   frameCap: savedFrameCap(),
   setFrameCap: (frameCap) => { try { localStorage.setItem('cb.fpscap', String(frameCap)); } catch { /* private mode */ } set({ frameCap }); },
   showPerf: savedShowPerf(),
+  viewOpen: false,
+  setViewOpen: (viewOpen) => set({ viewOpen }),
   setShowPerf: (showPerf) => { try { localStorage.setItem('cb.showperf', showPerf ? '1' : '0'); } catch { /* private mode */ } set({ showPerf }); },
   perfStats: null,
   setPerfStats: (perfStats) => set({ perfStats }),
@@ -172,6 +182,8 @@ export const useWorldStore = create<WorldState>()(subscribeWithSelector((set) =>
   markNearestTrees: null,
   siteQuery: null,
   setSiteQuery: (siteQuery) => set({ siteQuery }),
+  cameraRequest: null,
+  frameCamera: points => { const frame = frameOn(points); if (frame) set(w => ({ cameraRequest: { frame, seq: (w.cameraRequest?.seq ?? 0) + 1 } })); },
   starterPreview: null,
   setStarterPreview: (starterPreview) => set({ starterPreview }),
   setMarkNearestTrees: (markNearestTrees) => set({ markNearestTrees }),

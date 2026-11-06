@@ -147,6 +147,7 @@ export async function play(A) {
 
     stage('charter done');
     // ---- quality
+    await page.evaluate(() => window.__cb.store.getState().setViewOpen(true));   // the View panel (graphics, overlays, FPS, photo) is closed by default
     await page.locator('select[title^="Graphics quality"]').selectOption(cfg.quality).catch(() => bug('setup', 'quality select'));
     const frame = async () => { await page.evaluate(async () => { for (let i = 0; i < 3; i++) await window.__cb.qa.renderNow(); }); };
     await frame();

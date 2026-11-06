@@ -25,7 +25,7 @@ export function hudLayout(vw: number, barW: number, barH: number, br = { w: 570,
 }
 
 /** A box's size, kept current (window resize and the element's own changes) along with the window width. */
-export function useBox(ref: RefObject<HTMLElement | null>): { vw: number; w: number; h: number } {
+export function useBox(ref: RefObject<HTMLElement | null>, mounted: unknown = true): { vw: number; w: number; h: number } {
   const [b, setB] = useState({ vw: typeof window === 'undefined' ? 1280 : window.innerWidth, w: 700, h: 40 });
   useEffect(() => {
     const read = () => { const r = ref.current?.getBoundingClientRect(); setB(o => { const n = { vw: window.innerWidth, w: Math.round(r?.width ?? o.w), h: Math.round(r?.height ?? o.h) }; return n.vw === o.vw && n.w === o.w && n.h === o.h ? o : n; }); };
@@ -34,6 +34,6 @@ export function useBox(ref: RefObject<HTMLElement | null>): { vw: number; w: num
     const ro = typeof ResizeObserver !== 'undefined' && ref.current ? new ResizeObserver(read) : null;
     if (ro && ref.current) ro.observe(ref.current);
     return () => { window.removeEventListener('resize', read); ro?.disconnect(); };
-  }, [ref]);
+  }, [ref, mounted]);
   return b;
 }
