@@ -70,12 +70,18 @@ function norm3(a: V3): V3 { const l = Math.hypot(a.x, a.y, a.z) || 1; return { x
 
 /** Does something solid stand between the eye and the point? Boxes the point stands in or on (a tower, a wall walk) are skipped. */
 export function blockedBetween(eye: V3, p: V3, boxes: readonly Box[], ground: Ground): boolean {
-  // (a subject standing in a box, on a tower or a wall walk, is not hidden by it; one beside a wall is)
-  const own = boxes.filter(b => flatDist(p.x, p.z, b) <= 0.02);
-  const N = 24;
-  for (let i = 1; i < N - 1; i++) {
-    const t = i / N, q = { x: eye.x + (p.x - eye.x) * t, y: eye.y + (p.y - eye.y) * t, z: eye.z + (p.z - eye.z) * t };
-    for (const b of boxes) if (!own.includes(b) && insideBox(q, b, ground)) return true;
+  // (a subject standing on top of a box, on a tower or a wall walk, is not hidden by it; one in its footprint or beside a wall is)
+  const up = p.y - ground(p.x, p.z);
+  const own = boxes.filter(b => flatDist(p.x, p.z, b) <= 0.02 && up >= b.h - 0.4);
+  const len = Math.hypot(p.x - eye.x, p.y - eye.y, p.z - eye.z) || 1;
+  const N = 28;
+  for (let i = 1; i < N; i++) {
+    const t = i / N;
+    // the last stretch beside the subject is not tested: a figure at a wall is seen against it, not through it
+    if ((1 - t) * len < 0.35) break;
+    const q = { x: eye.x + (p.x - eye.x) * t, y: eye.y + (p.y - eye.y) * t, z: eye.z + (p.z - eye.z) * t };
+    // a hand's breadth and a half of margin: eaves, foundation courses, posts and rails stand proud of the box
+    for (const b of boxes) if (!own.includes(b) && insideBox(q, b, ground, 0.2)) return true;
   }
   return false;
 }
@@ -171,10 +177,13 @@ export class Director {
   private _boxes: readonly Box[] = [];
   private _lastCheck = -99;
   private _t = 0;
+  private _g: Ground = () => 0;
   /** The lead-in (the approach, time-lapsed): the camera shows the raiders coming, whatever the caption says is out there. */
   leadIn = false;
   /** Shots that could not be made clean (should stay 0; the tests and the harness read it). */
   fallbacks = 0;
+  /** What the last few fallbacks looked like (QA). */
+  fallbackLog: string[] = [];
 
   constructor(seed: number) { this._r = mulberry32(seed * 3119 + 11); }
 
@@ -199,9 +208,15 @@ export class Director {
     return s;
   }
 
+  /** Standing inside a building's walls (not on top of it, not on its porch). */
+  private _indoors(a: Actor, _ground: Ground): boolean {
+    return this._boxes.some(b => flatDist(a.x, a.z, b) <= 0.02 && a.y < b.h - 0.4 - 0.17 && b.h > 0.5);
+  }
+
   /** Pick the shot for `time`. `fresh` are the events applied since the last call. */
   update(time: number, actors: Actor[], fresh: BattleEvent[], house: V3, ground: Ground): Shot {
-    const live = actors.filter(a => !a.dead && !a.gone);
+    // someone inside a building cannot be shown: the camera picks from those out of doors
+    const live = actors.filter(a => !a.dead && !a.gone && !this._indoors(a, ground));
     const home = live.filter(a => a.side === 'home'), raiders = live.filter(a => a.side === 'raider');
     const hc = home.length ? centroid(home) : house, rc = raiders.length ? centroid(raiders) : { x: house.x, y: 0, z: house.z + 20 };
     const road = (() => { const d = sub(rc, house); const l = len2(d); return { x: d.x / l, z: d.z / l }; })();
@@ -255,20 +270,27 @@ export class Director {
    * Try the shot as designed, then the same shot swung round its subject, then pulled back, then raised, and take the first that
    * passes. When nothing does, the least bad is used and `fallbacks` counts it.
    */
-  private _search(mk: (rot: number, k: number, hb: number) => Shot, ctx: ShotCtx): Shot | null {
+  private _search(mk: (rot: number, k: number, hb: number) => Shot, ctx: ShotCtx, strict = false): Shot | null {
     let best: Shot | null = null, bestN = Infinity;
-    for (const hb of [0, 0.3, 0.8, 1.6, 2.6]) for (const k of [1, 1.4, 2, 2.8]) for (const rot of SWING) {
-      const s = mk(rot, k, hb);
-      const n = shotProblems(s, ctx).length;
-      if (n === 0) return s;
-      if (n < bestN) { best = s; bestN = n; }
+    // first the whole group in frame, then (when the crowd cannot all be framed) at least the one the shot is about
+    for (const relax of [false, true]) {
+      for (const hb of [0, 0.3, 0.8, 1.6, 2.6]) for (const k of [1, 1.4, 2, 2.8]) for (const rot of SWING) {
+        const s = mk(rot, k, hb);
+        if (relax) { if ((s.subjects?.length ?? 0) < 2) continue; s.need = 0; }
+        const n = shotProblems(s, ctx).length;
+        if (n === 0) return s;
+        if (n < bestN) { best = s; bestN = n; }
+      }
     }
+    if (strict) return null;
     this.fallbacks++;
+    if (best) this.fallbackLog.push(`${best.kind}@${best.since.toFixed(1)}: ${shotProblems(best, ctx).join('; ')}`.slice(0, 300));
     return best;
   }
 
   private _cut(time: number, kind: ShotKind, subject: string | undefined, hold: number, home: Actor[], raiders: Actor[], hc: V3, rc: V3, road: { x: number; z: number }, house: V3, ground: Ground): Shot {
     const px = -road.z, pz = road.x, r = this._r;
+    this._g = ground;
     const everyone = [...home, ...raiders];
     const ctx: ShotCtx = { boxes: this._boxes, ground, actors: new Map(everyone.map(a => [a.id, a])) };
     const at = (x: number, z: number, h: number): V3 => ({ x, y: ground(x, z) + h, z });
@@ -290,16 +312,14 @@ export class Director {
     if (kind === 'wall' && home.length) {
       const posted = home.filter(h => h.post && h.post !== 'open');
       const pool = posted.length ? posted : home;
-      const u = pool[Math.floor(r() * pool.length)];
-      const near = raiders.length ? raiders.reduce((a, b) => (Math.hypot(b.x - u.x, b.z - u.z) < Math.hypot(a.x - u.x, a.z - u.z) ? b : a)) : null;
-      const dx = near ? near.x - u.x : road.x, dz = near ? near.z - u.z : road.z, l = len2({ x: dx, z: dz });
-      const tower = u.post === 'tower';
-      // the defender in the shoulder of the frame, the threat beyond: a metre behind and a little to the side
-      const look = near ? { x: near.x, y: ground(near.x, near.z) + near.y + (tower ? 0.2 : 0.17), z: near.z } : at(u.x + road.x * 14, u.z + road.z * 14, tower ? 0.2 : 0.17);
-      return this._set(this._search((rot, k, hb) => {
-        const o = rotate({ x: -dx / l * 1.0 + px * 0.25, z: -dz / l * 1.0 + pz * 0.25 }, rot, k);
-        return { ...base, kind: 'wall', subject: u.id, subjects: [u.id], need: 1, eye: at(u.x + o.x, u.z + o.z, u.y + 0.27 + (tower ? 0.1 : 0) + hb), look, fov: 50, drift: { x: px * 0.03, y: 0, z: pz * 0.03 } };
-      }, ctx));
+      const first = Math.floor(r() * pool.length);
+      // the defender the shot is about: the one drawn, or (when no angle shows that one) the next, and so on
+      let shot: Shot | null = null;
+      for (let i = 0; i < Math.min(pool.length, 5) && !shot; i++) {
+        const u = pool[(first + i) % pool.length];
+        shot = this._search(this._wallShot(u, raiders, road, base, at), ctx, true);
+      }
+      return this._set(shot ?? this._search(this._wallShot(pool[first], raiders, road, base, at), ctx));
     }
     if (kind === 'raiders' && raiders.length) {
       // from the side of the approach, low: the crew coming on with the compound beyond
@@ -332,6 +352,20 @@ export class Director {
       const o = rotate({ x: -road.x * back + px * 1.5, z: -road.z * back + pz * 1.5 }, rot, k);
       return { ...base, kind: 'wide', subjects, need: 0.5, eye: at(hc.x + o.x, hc.z + o.z, 1.5 + Math.min(4, span * 0.1) + hb), look, fov: 52, drift: { x: px * 0.04, y: 0, z: pz * 0.04 } };
     }, ctx));
+  }
+
+  /** A wall shot over a defender's shoulder toward the nearest raider, as a candidate maker for `_search`. */
+  private _wallShot(u: Actor, raiders: Actor[], road: { x: number; z: number }, base: { since: number; hold: number }, at: (x: number, z: number, h: number) => V3): (rot: number, k: number, hb: number) => Shot {
+    const px = -road.z, pz = road.x;
+    const near = raiders.length ? raiders.reduce((a, b) => (Math.hypot(b.x - u.x, b.z - u.z) < Math.hypot(a.x - u.x, a.z - u.z) ? b : a)) : null;
+    const dx = near ? near.x - u.x : road.x, dz = near ? near.z - u.z : road.z, l = len2({ x: dx, z: dz });
+    const tower = u.post === 'tower';
+    // the defender in the shoulder of the frame, the threat beyond: a metre behind and a little to the side
+    const look = near ? { x: near.x, y: this._g(near.x, near.z) + near.y + (tower ? 0.2 : 0.17), z: near.z } : at(u.x + road.x * 14, u.z + road.z * 14, tower ? 0.2 : 0.17);
+    return (rot, k, hb) => {
+      const o = rotate({ x: -dx / l * 1.0 + px * 0.25, z: -dz / l * 1.0 + pz * 0.25 }, rot, k);
+      return { ...base, kind: 'wall', subject: u.id, subjects: [u.id], need: 1, eye: at(u.x + o.x, u.z + o.z, u.y + 0.27 + (tower ? 0.1 : 0) + hb), look, fov: 50, drift: { x: px * 0.03, y: 0, z: pz * 0.03 } };
+    };
   }
 
   private _set(s: Shot | null): Shot {

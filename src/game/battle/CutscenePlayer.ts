@@ -162,10 +162,10 @@ export class CutscenePlayer {
   }
 
   /** QA: where the camera is and what is in front of it right now (independent of how the shot was picked). */
-  audit(): (PoseAudit & { kind: string; eye: V3; look: V3; fallbacks: number }) | null {
+  audit(): (PoseAudit & { kind: string; eye: V3; look: V3; fallbacks: number; fallbackLog: string[] }) | null {
     const shot = this._dir.shot; if (!shot) return null;
     const p = poseAt(shot, this._time);
-    return { ...auditPose(p.eye, p.look, p.fov, this._boxes, this.d.battle.actors(), this.d.ground), kind: shot.kind, eye: p.eye, look: p.look, fallbacks: this._dir.fallbacks };
+    return { ...auditPose(p.eye, p.look, p.fov, this._boxes, this.d.battle.actors(), this.d.ground), kind: shot.kind, eye: p.eye, look: p.look, fallbacks: this._dir.fallbacks, fallbackLog: this._dir.fallbackLog.slice(-4) };
   }
 
   private _publish(force: boolean): void {

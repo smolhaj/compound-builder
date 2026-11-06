@@ -12,6 +12,7 @@ export interface Box { x0: number; z0: number; x1: number; z1: number; h: number
 /** Roof line above the pad for a building (storey 0.65 plus the roof); towers are 1 unit (6 m) and a bit. */
 const buildingHeight = (id: string, floorY: number): number => id.startsWith('watchtower') ? 1.25 : floorY + 1.3;
 const WALL_THICK = 0.1;
+const PORCH_HEIGHT = 0.3;
 const MAX_BOXES = 700;
 
 export function obstaclesOf(g: GameState): Box[] {
@@ -21,8 +22,9 @@ export function obstaclesOf(g: GameState): Box[] {
     if (!def || st.unplaced || def.level === 'underground') continue;
     // (fields, gardens, ponds and the like are flat: no box to hit)
     if (['field', 'garden', 'pond', 'reservoir', 'orchard', 'orchard_grove', 'terrace_stair', 'terrace_ramp', 'equipment_yard', 'vehicle_yard', 'motor_court'].includes(st.kind)) continue;
-    const r = footprint(def, st.x, st.z, st.rot, true);   // (with the porch and steps in front of the door)
-    out.push({ ...r, h: buildingHeight(st.kind, def.floorY), kind: 'building' });
+    // the body to the roof line; the porch and steps in front of the door as a low deck only (open above: posts and rails do not hide a person)
+    out.push({ ...footprint(def, st.x, st.z, st.rot, false), h: buildingHeight(st.kind, def.floorY), kind: 'building' });
+    if (def.frontCells > 0) out.push({ ...footprint(def, st.x, st.z, st.rot, true), h: PORCH_HEIGHT, kind: 'building' });
   }
   for (const run of g.perimeter) {
     const def = PERIMETER[run.kind];

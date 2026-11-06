@@ -180,8 +180,9 @@ describe('obstaclesOf reads the buildings and the walls off a game', () => {
     g.structures.push({ id: 's1', kind: 'timber_cabin', x: 4, z: 4, rot: 0, stage: 5, done: 0, supplied: true, finishedAt: 0 }, { id: 's2', kind: 'field', x: 0, z: 0, rot: 0, stage: 5, done: 0, supplied: true, finishedAt: 0 });
     g.perimeter.push({ id: 'p1', kind: 'log_palisade', pts: [[0, 0], [6, 0]], gates: [], done: 1, hours: 1, supplied: true, finishedAt: 0 } as never);
     const bxs = obstaclesOf(g);
-    const cabin = bxs.filter(b => b.kind === 'building');
+    const cabin = bxs.filter(b => b.kind === 'building' && b.h > 1);
     expect(cabin.length).toBe(1);
+    expect(bxs.some(b => b.kind === 'building' && b.h < 0.5)).toBe(true);   // (the porch deck)
     expect(cabin[0].x0 < 4 && cabin[0].x1 > 4 && cabin[0].z0 < 4 && cabin[0].z1 > 4).toBe(true);
     expect(cabin[0].h).toBeGreaterThan(1);
     const walls = bxs.filter(b => b.kind === 'wall');

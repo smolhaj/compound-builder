@@ -126,7 +126,7 @@ try {
     if (a.nearest < 0.3 && a.aboveGround < 1.4) why.push(`camera ${a.nearest} from a solid`);
     if (a.ahead < 0.6) why.push(`solid ${a.ahead} dead ahead`);
     if (a.live > 0 && a.visible === 0 && r.view?.seg !== 'gap') why.push(`no actor visible (${a.live} live, ${a.inPicture} in picture)`);
-    if (a.fallbacks > 0) why.push(`${a.fallbacks} fallback cuts`);
+    if (a.fallbacks > 0) why.push(`${a.fallbacks} fallback cuts: ${(a.fallbackLog ?? []).join(' | ')}`);
     return why;
   };
   // the scenes worth a look: the first probe, the first fire scene, the assault. Earlier scenes are skipped past (Skip scene), the card between them answered.
