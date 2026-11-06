@@ -19,6 +19,7 @@ import { countyWorks, needsPermit, permitFee } from '../../sim/paperwork';
 import { BUNKER_ORDER, GATEHOUSE_ORDER, KIT, POD_ORDER, RIG_ORDER, TERRACE_ORDER, TOWER_ORDER, UTILITY_ORDER } from '../../game/buildkit/kit';
 import { PERIMETER, UTILITY_LINES, runBill, runHours, type PerimeterKind } from '../../sim/perimeter';
 import { fosterNote } from '../../sim/orphans';
+import { runOver } from '../../sim/wipe';
 import { bunkerChecklist, buildAdvice, longTerm, suggestions, type SuggestionAct, perimeterNote, perimeterOff, perimeterTiers, upgradeChain } from '../../sim/guidance';
 import { hireCaretaker, openMoveIn, setBelt } from '../../sim/weekender';
 import { inFirstHour } from '../../sim/tabReveal';
@@ -114,6 +115,11 @@ export function BuildMenu({ showProjects = () => undefined }: { showProjects?: (
 
   // every adult is gone and the children are fostered: say so in place of the checklist and the next steps (sim/orphans.ts)
   const foster = fosterNote(game);
+  const over = runOver(game);
+  if (over) return <div style={card(false)} data-testid="run-over">
+    <div style={{ fontSize: FS.h, textTransform: 'uppercase', letterSpacing: 0.6, color: DIM, fontWeight: 600 }}>This run is over</div>
+    <Note>No one is left on the place, so there is nothing more to build or order. Use the report card to load a save or start a new game.</Note>
+  </div>;
   return <>
     {foster && !g.tool && <div style={card(true)}>
       <div style={{ fontSize: FS.h, textTransform: 'uppercase', letterSpacing: 0.6, color: DIM, fontWeight: 600 }}>The place is held</div>

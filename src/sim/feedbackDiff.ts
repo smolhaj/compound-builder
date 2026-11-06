@@ -145,7 +145,12 @@ const MILESTONE_LINE: Record<string, string> = {
 /** First-of-a-kind moments the lineage list does not have, read from the state (each fires once, on the change). */
 const FIRSTS: Array<{ id: string; title: string; line: string; test: (s: GameState) => boolean }> = [
   { id: 'first_roof', title: 'First night under a roof', line: 'The home you built kept the family dry through the night.',
-    test: s => s.structures.some(x => !x.pre && isFinished(x) && isHome(x.kind) && x.finishedAt !== null && dayIndex(s.clock.t) > dayIndex(x.finishedAt)) },
+    // the first night after the roof went on: one or two days after it was finished, never later (a stale or reloaded home is not "the first night")
+    test: s => s.structures.some(x => {
+      if (x.pre || !isFinished(x) || !isHome(x.kind) || x.finishedAt === null) return false;
+      const nights = dayIndex(s.clock.t) - dayIndex(x.finishedAt);
+      return nights >= 1 && nights <= 2;
+    }) },
   { id: 'first_harvest', title: 'First harvest', line: 'Food from your own ground is on the table.',
     test: s => s.food.producedKcal >= 500 && s.structures.some(x => isFinished(x) && /garden|field|orchard|greenhouse|tunnel|coop/.test(x.kind)) },
   { id: 'first_wave', title: 'First wave survived', line: 'They came, and the place held. The next wave will be bigger.',
