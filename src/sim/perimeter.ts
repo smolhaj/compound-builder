@@ -18,6 +18,7 @@ import type { GameState } from './state';
 import { openDoorways } from './compounds';
 import { COUNTY, PERMIT_FEE, countyWorks } from './paperwork';
 import { topBonus } from './wallTops';
+import { pluralize } from './words';
 
 export type PerimeterKind = 'split_rail' | 'barbed_wire' | 'woven_wire' | 'thorn_hedge' | 'log_palisade' | 'container_wall' | 'earth_berm' | 'ditch' | 'creek_bars' | 'chain_link' | 'wrought_iron' | 'iron_barbed' | 'steel_wall' | 'electric_steel' | 'water_pipe' | 'power_cable' | 'escape_tunnel' | 'covered_walkway' | 'underground_passage' | 'concrete_wall' | 'wall_walk' | 'stone_wall' | 'container_stack' | 'tunnel_bridge' | 'slope_tunnel' | 'rock_tunnel' | 'bar_fence' | 'drain_channel' | 'moat' | 'covered_bridge';
 
@@ -312,7 +313,7 @@ export function addSkirt(s: GameState, id: string): string | null {
   if (why) return why;
   for (const [k, n] of Object.entries(skirtBill(wallLength(r))) as Array<[MaterialId, number]>) s.stock[k] -= n;
   r.skirtAt = s.clock.t + SKIRT_DAYS;
-  log(s, `Burying a steel-and-concrete skirt under the ${PERIMETER[r.kind].name.toLowerCase()} (${Math.round(wallLength(r) * 6)} m). Done in ${SKIRT_DAYS} days.`);
+  log(s, `Burying a steel-and-concrete skirt under the ${PERIMETER[r.kind].name.toLowerCase()} (${Math.round(wallLength(r) * 6)} m). Done in ${pluralize(SKIRT_DAYS, 'day')}.`);
   return null;
 }
 
@@ -344,7 +345,7 @@ export function planRun(s: GameState, kind: PerimeterKind, pts: Pt[], gates: Gat
   if ((PERMIT_FEE[kind] ?? 0) > 0 && countyWorks(s) && s.paper.permits) {
     const fee = Math.round(PERMIT_FEE[kind] * (0.6 + 0.4 * COUNTY[s.site.region].strict) / 10) * 10, days = Math.round(7 * COUNTY[s.site.region].strict);
     s.money -= fee; run.permitAt = s.clock.t + days;
-    log(s, `Applied for a county permit for the ${PERIMETER[kind].name.toLowerCase()}: $${fee.toLocaleString('en-US')}, about ${days} days to review.`);
+    log(s, `Applied for a county permit for the ${PERIMETER[kind].name.toLowerCase()}: $${fee.toLocaleString('en-US')}, about ${pluralize(days, 'day')} to review.`);
   }
   return run;
 }
@@ -382,7 +383,7 @@ export function runBlocked(s: GameState, r: PerimeterRun): string | null {
     if (!host) return 'The wall it stands on is gone';
     if (!runFinished(host)) return 'Waiting for the wall to be finished';
   }
-  if (r.permitAt !== undefined && s.clock.t < r.permitAt) return `Waiting on the county permit (${Math.ceil(r.permitAt - s.clock.t)} days)`;
+  if (r.permitAt !== undefined && s.clock.t < r.permitAt) return `Waiting on the county permit (${pluralize(Math.ceil(r.permitAt - s.clock.t), 'day')})`;
   if (r.supplied) return null;
   const bill = runBill(r.kind, wallLength(r));
   if (hasAll(s.stock, bill)) return null;
@@ -430,7 +431,7 @@ export function addRunWork(s: GameState, r: PerimeterRun, hours: number): void {
       }
       r.replaces = undefined;
     }
-    log(s, d.growYears ? `${d.name} planted. Give it ${d.growYears} years.` : `${d.name} ${r.kind === 'water_pipe' || r.kind === 'power_cable' || r.kind === 'drain_channel' ? 'laid' : 'finished'}.`);
+    log(s, d.growYears ? `${d.name} planted. Give it ${pluralize(d.growYears, 'year')}.` : `${d.name} ${r.kind === 'water_pipe' || r.kind === 'power_cable' || r.kind === 'drain_channel' ? 'laid' : 'finished'}.`);
   }
 }
 

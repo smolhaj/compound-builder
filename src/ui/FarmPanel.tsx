@@ -17,6 +17,7 @@ import { btn, DIM, TONE } from './hud/style';
 import { regionFor } from '../sim/climate';
 import { AQUA, aquaReport, harvestAqua, harvestProblem as aquaHarvestProblem, stockAqua, stockProblem as aquaStockProblem } from '../sim/aquaponics';
 import { isTunnel, tunnelNote, tunnelPestLoss } from '../sim/tunnels';
+import { pluralize } from '../sim/words';
 
 const oxygenWord = (o: number): [string, 'good' | 'warn' | 'bad'] => (o >= 0.7 ? ['fresh', 'good'] : o >= 0.45 ? ['low', 'warn'] : ['gasping', 'bad']);
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], MONTH_START = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
@@ -77,7 +78,7 @@ export function FarmPanel({ game }: { game: GameState }) {
         <Row label="Tilapia" value={r.fish > 0 ? `${Math.floor(r.fish).toLocaleString('en-US')} · ${Math.round(r.fishG)} g each${r.table ? ' · table size' : ''} · ${r.kg.toFixed(0)} kg` : 'none'} title={`Table size is ${AQUA.TABLE_G} g; the tanks hold ${AQUA.TANK_KG} kg`} />
         <Row label="Water" value={<span>{Math.round(r.tempC)} C · {r.powered ? 'pumps and heater on' : <span style={{ color: TONE.bad }}>no power</span>}</span>} />
         <Row label="Greens" value={`${kcal(r.plantsKcal)} a day`} />
-        {r.fish > 0 && <Row label="Feed" value={Number.isFinite(r.feedDays) ? `${Math.floor(game.stock.fish_feed ?? 0)} bags · ${Math.floor(r.feedDays)} days` : '—'} tone={r.feedDays < 7 ? 'warn' : undefined} />}
+        {r.fish > 0 && <Row label="Feed" value={Number.isFinite(r.feedDays) ? `${Math.floor(game.stock.fish_feed ?? 0)} bags · ${pluralize(Math.floor(r.feedDays), 'day')}` : '—'} tone={r.feedDays < 7 ? 'warn' : undefined} />}
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 3 }}>
           {act('Stock tilapia', aquaStockProblem(game, st.id), () => g.money(d => stockAqua(d, st.id)), 'A bag of 100 fingerlings')}
           {act('Harvest tilapia', aquaHarvestProblem(game, st.id), () => g.money(d => harvestAqua(d, st.id)), 'Up to 30 table-size tilapia')}
@@ -91,7 +92,7 @@ export function FarmPanel({ game }: { game: GameState }) {
         <Row label="Trout" value={r.trout > 0 ? `${r.trout.toLocaleString('en-US')} · ${Math.round(r.troutG)} g each${r.table ? ' · table size' : ''}` : 'none'} title={`Table size is ${TABLE_G} g`} />
         <Row label="Crayfish" value={r.crayfish > 0 ? r.crayfish.toLocaleString('en-US') : 'none'} />
         <Row label="Water" value={<span>{Math.round(r.tempC)} C · oxygen <span style={{ color: TONE[ot] }}>{ow}</span>{r.aerated ? ' · aerator on' : ''}</span>} />
-        {r.trout > 0 && <Row label="Feed" value={Number.isFinite(r.feedDays) ? `${Math.floor(game.stock.fish_feed ?? 0)} bags · ${Math.floor(r.feedDays)} days` : '—'} tone={r.feedDays < 7 ? 'warn' : undefined} />}
+        {r.trout > 0 && <Row label="Feed" value={Number.isFinite(r.feedDays) ? `${Math.floor(game.stock.fish_feed ?? 0)} bags · ${pluralize(Math.floor(r.feedDays), 'day')}` : '—'} tone={r.feedDays < 7 ? 'warn' : undefined} />}
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 3 }}>
           {act('Stock trout', stockProblem(game, st.id, 'trout'), () => g.money(d => stockPond(d, st.id, 'trout')), 'A bag of 100 fingerlings')}
           {act('Stock crayfish', stockProblem(game, st.id, 'crayfish'), () => g.money(d => stockPond(d, st.id, 'crayfish')), 'A pack of 50 breeders')}

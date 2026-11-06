@@ -50,6 +50,7 @@ import { responseFactor } from './slope';
 import { postureOf } from './encounters';
 import { burglarK, hardness } from './reputation';
 import { hasSafeRoom } from './houseHardening';
+import { pluralize } from './words';
 
 export interface Breakins {
   /** Break-ins so far (night and day). */
@@ -158,11 +159,11 @@ export function breakInDay(s: GameState, day: number): Encounter | null {
     if (empty && isSplit(s)) {
       const w = weekendOf(s)!;
       w.tally.breakIns++;
-      const l = reportFound(s, `The back door was kicked in while nobody was there. A deputy took a report (${mins} minutes out once it was called in).${lines.length ? ' ' + lines.join(' ') : ''}`);
+      const l = reportFound(s, `The back door was kicked in while nobody was there. A deputy took a report (${pluralize(mins, 'minute')} out once it was called in).${lines.length ? ' ' + lines.join(' ') : ''}`);
       if (l) log(s, l);
       return null;
     }
-    log(s, `Came home to the back door kicked in. ${responseActive(s) ? `The alarm had called the armed-response patrol: it was there in ${mins} minutes, and a deputy came out to take the report.` : `A deputy came out in ${mins} minutes and took a report.`}${lines.length ? ' ' + lines.join(' ') : ''}`);
+    log(s, `Came home to the back door kicked in. ${responseActive(s) ? `The alarm had called the armed-response patrol: it was there in ${pluralize(mins, 'minute')}, and a deputy came out to take the report.` : `A deputy came out in ${pluralize(mins, 'minute')} and took a report.`}${lines.length ? ' ' + lines.join(' ') : ''}`);
     return null;
   }
   const u = r();
@@ -174,8 +175,8 @@ export function breakInDay(s: GameState, day: number): Encounter | null {
     id: `e${s.nextId++}`, kind: 'break_in', day, title: 'Someone is in the house',
     dossier: [
       `Two in the morning. ${sound}`,
-      `${size === 1 ? 'One person' : `${size} people`}, by the voices; ${armed ? 'one has a pistol, from what you saw on the stairs' : 'no gun that you can see'}. They want something to sell, not a fight.`,
-      `The law still works: the ${d.state} sheriff's office is ${d.min}–${d.max} minutes out on the county road.`,
+      `${size === 1 ? 'One person' : `${pluralize(size, 'person')}`}, by the voices; ${armed ? 'one has a pistol, from what you saw on the stairs' : 'no gun that you can see'}. They want something to sell, not a fight.`,
+      `The law still works: the ${d.state} sheriff's office is ${d.min}–${pluralize(d.max, 'minute')} out on the county road.`,
     ],
     size, armed, strength: size * 5, wants: {}, stances: ['call_911', 'shout', 'confront'],
   };
@@ -271,7 +272,7 @@ function hold(s: GameState, shooters: string[], days: number): string | null {
   s.armory.guns = s.armory.guns.filter(g => !held.includes(g));
   for (const g of held) b.evidence.push({ gun: g, until: s.clock.t + days });
   const names = held.map(g => GUN[g.model]?.name ?? 'gun');
-  return `The ${names.join(' and the ')} ${held.length === 1 ? 'is' : 'are'} held as evidence${Number.isFinite(days) ? ` for about ${Math.round(days)} days` : ' until the case is over'}.`;
+  return `The ${names.join(' and the ')} ${held.length === 1 ? 'is' : 'are'} held as evidence${Number.isFinite(days) ? ` for about ${pluralize(Math.round(days), 'day')}` : ' until the case is over'}.`;
 }
 
 export interface Shooting {
@@ -371,7 +372,7 @@ export function resolveBreakIn(s: GameState, e: Encounter, stance: Stance): Omit
     const homeArmed = s.armory.guns.length > 0;
     const p = 0.7 + (dogCount(s) ? 0.1 : 0) + (powered(s) && n(s, 'floodlights') ? 0.05 : 0) + (homeArmed ? 0.05 : 0) - (e.armed ? 0.15 : 0) - (e.size - 1) * 0.05;
     if (r() < p) {
-      lines.push(`The deputy got there in ${mins} minutes and took a report.`);
+      lines.push(`The deputy got there in ${pluralize(mins, 'minute')} and took a report.`);
       lines.push(...plainView(s, r, 0.3));
       return { title: 'They ran', text: `Every light on, and a shout down the stairs that the sheriff is on the way. A door bangs, a car with no lights pulls out onto the county road.`, tone: 'good', lines };
     }
@@ -380,12 +381,12 @@ export function resolveBreakIn(s: GameState, e: Encounter, stance: Stance): Omit
   }
   if (stance === 'call_911') {
     if (mins <= stay + 2 && r() < 0.5) {
-      lines.push(`${responseActive(s) ? 'The panic button called the armed-response patrol: they' : 'The deputies'} were there in ${mins} minutes and caught ${e.size === 1 ? 'him' : 'them'} loading the car.`);
+      lines.push(`${responseActive(s) ? 'The panic button called the armed-response patrol: they' : 'The deputies'} were there in ${pluralize(mins, 'minute')} and caught ${e.size === 1 ? 'him' : 'them'} loading the car.`);
       lines.push(...plainView(s, r, 0.4));
       return { title: 'Caught in the drive', text: `Behind the ${safeRoom ? 'safe-room' : 'bedroom'} door, on the phone with dispatch, you hear the sirens come up the road.`, tone: 'good', lines };
     }
     lines.push(...burgle(s, r, 0.6));
-    lines.push(`The deputy got there ${mins} minutes after the call; they'd been gone ${Math.max(1, mins - stay)}.`);
+    lines.push(`The deputy got there ${pluralize(mins, 'minute')} after the call; they'd been gone ${Math.max(1, mins - stay)}.`);
     lines.push(...plainView(s, r, 0.4));
     return { title: 'Gone before the deputies came', text: `Everyone behind the ${safeRoom ? 'safe-room' : 'locked bedroom'} door with the phone, the dispatcher's voice, things being pulled out of drawers downstairs. Then the car.`, tone: 'mixed', lines };
   }
@@ -408,7 +409,7 @@ export function resolveBreakIn(s: GameState, e: Encounter, stance: Stance): Omit
       if (r() < 0.35) { sh.fleeing++; lines.push('One of them went down by the car.'); }
     }
   }
-  lines.push(`The deputies were there ${mins} minutes after the call.`);
+  lines.push(`The deputies were there ${pluralize(mins, 'minute')} after the call.`);
   const legal = investigate(s, sh, r);
   if (!sh.shooters.length && !sh.mine) lines.push(...plainView(s, r, 0.4));
   lines.push(...legal);

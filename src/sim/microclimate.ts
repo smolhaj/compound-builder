@@ -25,6 +25,7 @@ import { isHome } from './blueprints';
 import { sunFactor } from './terrainFx';
 import { mulberry32 } from './rng';
 import type { PerimeterRun } from './perimeter';
+import { pluralize } from './words';
 
 export const MC = {
   /** Wind exposure (renewables.windExposure: 0.6 hollow … 1.4 ridge) at and above which a place counts as exposed, and below which as sheltered. */
@@ -141,8 +142,8 @@ export function siteNote(s: GameState, kind: string, at: Pick<Structure, 'x' | '
   const wind = c.windy === 'exposed' ? 'open to the wind' : c.windy === 'sheltered' ? 'sheltered from the wind' : '';
   switch (kind) {
     case 'garden': case 'greenhouse': case 'greenhouse_heated': case 'polytunnel': case 'high_tunnel': {
-      if (c.site.pocket) return `A cold-air pocket: this bed starts ${MC.GARDEN_POCKET_DAYS} days later and ends ${MC.GARDEN_POCKET_DAYS} sooner than the region's season (a tunnel or greenhouse gets most of it back).`;
-      if (c.site.drained) return `A slope that drains the cold air: this bed starts ${MC.GARDEN_DRAIN_DAYS} days early.`;
+      if (c.site.pocket) return `A cold-air pocket: this bed starts ${pluralize(MC.GARDEN_POCKET_DAYS, 'day')} later and ends ${MC.GARDEN_POCKET_DAYS} sooner than the region's season (a tunnel or greenhouse gets most of it back).`;
+      if (c.site.drained) return `A slope that drains the cold air: this bed starts ${pluralize(MC.GARDEN_DRAIN_DAYS, 'day')} early.`;
       return c.windy === 'exposed' ? 'Open to the wind: the bed dries and lodges (5 % less); a hedge or a fence on the windward side halves that.' : null;
     }
     case 'field': return c.site.pocket ? 'A cold-air pocket: frost in the grain-fill costs this field 8 %.' : c.windy === 'exposed' ? 'Open to the wind: 4 % less; a windbreak halves it.' : null;

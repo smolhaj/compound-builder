@@ -78,6 +78,7 @@ import { FarmTab } from './FarmTab';
 import { farmAlert } from '../sim/farmPlan';
 import { fmtKw, powerSummary } from '../sim/powerReport';
 import { ToolsPanel } from './ToolsPanel';
+import { pluralize } from '../sim/words';
 import { Clamp, Group, Hint, Note, Row, Section, Tabs } from './hud/common';
 import { DIM, FS, LINE, TONE, btn, panel, usd, type Tone } from './hud/style';
 import { BuildMenu } from './hud/BuildMenu';
@@ -263,7 +264,7 @@ export function Hud() {
                 <PersonInsight p={p} />
                 {n && n.died == null && (p.conditions?.length ?? 0) > 0 && (() => {
                   const days = Math.floor(game.body.rx[p.id] ?? 30);
-                  return <div style={{ fontSize: 11, color: days < 14 ? TONE.bad : days < 45 ? TONE.warn : DIM, marginTop: 2 }}>{p.conditions!.map(c => CONDITION[c].name).join(', ')}: {days > 0 ? `${days} days of ${p.conditions!.map(c => CONDITION[c].rx).join(' and ')}` : 'out of medicine'}</div>;
+                  return <div style={{ fontSize: 11, color: days < 14 ? TONE.bad : days < 45 ? TONE.warn : DIM, marginTop: 2 }}>{p.conditions!.map(c => CONDITION[c].name).join(', ')}: {days > 0 ? `${pluralize(days, 'day')} of ${p.conditions!.map(c => CONDITION[c].rx).join(' and ')}` : 'out of medicine'}</div>;
                 })()}
               </div>;
             })}
@@ -280,7 +281,7 @@ export function Hud() {
             {trialCamps(game).map(c => <Section key={c.id} title={`Camp outside the wall: ${c.title}`}>
               <Row label="On trial" value={`day ${Math.max(0, dayIndex(game.clock.t) - c.from)} of ${c.until - c.from}`} />
               <Row label="People" value={c.people.map(p => `${p.first}${p.kid ? ` (${p.age})` : ''}`).join(', ')} />
-              <Row label="Their ration" value={`${campNeed(c).toLocaleString('en-US')} kcal/day from your supplies${c.hungry ? ` · short ${c.hungry} days` : ''}`} />
+              <Row label="Their ration" value={`${campNeed(c).toLocaleString('en-US')} kcal/day from your supplies${c.hungry ? ` · short ${pluralize(c.hungry, 'day')}` : ''}`} />
               <Row label="Work put in" value={`${Math.round(c.worked)} h`} />
               {c.learned.map((l, k) => <Note key={k} tone="warn">{l}</Note>)}
               {!c.learned.length && <div style={{ fontSize: 11, color: DIM }}>Not family yet. You'll know them better by the end of the month.</div>}
@@ -323,7 +324,7 @@ export function Hud() {
                 <span style={{ color: DIM }}>Rotate the pantry: {game.shelf.rotate ? 'yes' : 'no'}</span>
                 <button style={btn()} title="Eat what you store: the oldest comes off the shelf, the grocery run replaces it (keeps your food fresh while town is open)" onClick={() => g.setRotate(!game.shelf.rotate)}>{game.shelf.rotate ? 'Stop' : 'Rotate'}</button>
               </div>
-              <Row label="Mouse traps" value={game.shelf.traps > 0 ? `set (${game.shelf.traps} days)` : game.stock.traps >= 1 ? 'a box in the shed' : <span style={{ color: TONE.warn }}>none: mice in the pantry</span>} />
+              <Row label="Mouse traps" value={game.shelf.traps > 0 ? `set (${pluralize(game.shelf.traps, 'day')})` : game.stock.traps >= 1 ? 'a box in the shed' : <span style={{ color: TONE.warn }}>none: mice in the pantry</span>} />
               {game.stock.fuel > 0 && game.stock.stabilizer < Math.ceil(game.stock.fuel / 10) && <Note tone="warn">The gas has no stabilizer: it goes stale in about six months.</Note>}
             </Group>
             <Group id="sup-hunt" title="Hunting & fishing" defaultOpen={false} extra={`${(['big', 'small', 'fish'] as const).filter(c => game.wild.abundance[c] < 0.4).length ? 'game is thin' : 'game is plentiful'}`}>
@@ -352,7 +353,7 @@ export function Hud() {
                 const lines = [{ material: 'staples' as MaterialId, qty: Math.max(1, Math.ceil(90 * perDay / KCAL.staples)) }];
                 const why = orderProblem(game, lines);
                 return <>
-                  <Row label="Food on hand" value={d === Infinity ? '—' : d >= 365 ? `${(d / 365).toFixed(1)} years` : `${Math.floor(d)} ${Math.floor(d) === 1 ? 'day' : 'days'}`} tone={short ? 'warn' : undefined} />
+                  <Row label="Food on hand" value={d === Infinity ? '—' : d >= 365 ? `${pluralize((d / 365).toFixed(1), 'year')}` : `${Math.floor(d)} ${Math.floor(d) === 1 ? 'day' : 'days'}`} tone={short ? 'warn' : undefined} />
                   {f.producedKcal > 0 && <Row label="Grown yesterday" value={`${Math.round(f.producedKcal).toLocaleString('en-US')} kcal`} />}
                   {!f.fromStores && <Row label="Ate / needed" value={`${Math.round(f.ateKcal).toLocaleString('en-US')} / ${Math.round(f.needKcal).toLocaleString('en-US')}`} tone={f.ateKcal < f.needKcal * 0.95 ? 'bad' : undefined} />}
                   {f.fromStores && <Hint more="Stock canned food and bulk staples for when the stores close.">Groceries come from town for now.</Hint>}
@@ -389,7 +390,7 @@ export function Hud() {
             return <>
               <Section title="Heat">
                 <Row label="Firewood, seasoned" value={`${Math.floor(game.stock.firewood)} face cord${Math.floor(game.stock.firewood) === 1 ? '' : 's'}`} />
-                {gr > 0 && <Row label="Green, seasoning" value={`${Math.round(gr * 10) / 10} face cords · next ready in ${next} days`} />}
+                {gr > 0 && <Row label="Green, seasoning" value={`${Math.round(gr * 10) / 10} face cords · next ready in ${pluralize(next, 'day')}`} />}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginTop: 3 }}>
                   <span style={{ color: DIM }}>Chimney: <span style={{ color: ch === 'dirty' ? TONE.bad : ch === 'building up' ? TONE.warn : TONE.good }}>{ch}</span></span>
                   {ch !== 'clean' && <button style={btn(ch === 'dirty')} title="Creosote builds up with every face cord burned (green wood three times as fast); a dirty flue can catch fire" onClick={() => g.sweep()}>{game.disaster.tracks.stores >= 0.5 && game.disaster.tracks.banks >= 0.5 ? `Sweep it ($${SWEEP_USD})` : 'Sweep it ourselves'}</button>}
@@ -437,13 +438,13 @@ export function Hud() {
 
           {rightTab === 'land' && <>
             <Section title="The place">
-              <Row label="Home place" value={`${game.site.acres} acres`} />
+              <Row label="Home place" value={`${pluralize(game.site.acres, 'acre')}`} />
               <Row label="Region" value={REGIONS[game.site.region].name} />
               {game.site.lot && (() => {
                 const a = altitudeClimate(game.site), wr = winterRoadLine(game);
                 return <>
                   <Row label="Ground" value={`${LOT_NAME[game.site.lot.kind]}, ${game.site.lot.elevM.toLocaleString('en-US')} m`} />
-                  {a && <Row label="Frost-free" value={`${a.season} days${a.season !== a.seasonRegion ? ` (the region's usual: ${a.seasonRegion})` : ''}`} />}
+                  {a && <Row label="Frost-free" value={`${pluralize(a.season, 'day')}${a.season !== a.seasonRegion ? ` (the region's usual: ${a.seasonRegion})` : ''}`} />}
                   {a && a.notes.length > 0 && <Hint more={a.notes.map(t => <div key={t} style={{ marginBottom: 2 }}>{t}</div>)}>{a.notes[0].length > 70 ? `${a.notes[0].slice(0, 68).replace(/[ ,;:]+\S*$/, '')}…` : a.notes[0]}{a.notes.length > 1 ? ` (+${a.notes.length - 1} more notes)` : ''}</Hint>}
                   {wr && <Clamp text={wr}><span style={{ color: roadClosedFor(game) > 0 ? TONE.warn : undefined }}>{roadClosedFor(game) > 0 ? `Road closed by snow for ${roadClosedFor(game)} more day${roadClosedFor(game) === 1 ? '' : 's'}. ` : ''}{wr}</span></Clamp>}
                 </>;
@@ -454,10 +455,10 @@ export function Hud() {
                 const plan = dq?.plan;
                 const label = what === 'power' ? 'Power' : 'Drive';
                 return have ? <Row key={what} label={label} value={what === 'power' ? 'On the grid' : 'Gravel'} />
-                  : due !== null ? <Row key={what} label={label} value={`coming in ${Math.max(1, Math.ceil(due - game.clock.t))} days`} />
+                  : due !== null ? <Row key={what} label={label} value={`coming in ${pluralize(Math.max(1, Math.ceil(due - game.clock.t)), 'day')}`} />
                   : <div key={what} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginTop: 3 }}>
                       <span style={{ color: DIM }}>{label}: <span style={{ color: TONE.warn }}>{what === 'power' ? `${imp.poleFt.toLocaleString('en-US')} ft to the pole` : `none (${(plan ? plan.lengthFt : imp.driveFt).toLocaleString('en-US')} ft)`}</span></span>
-                      <button style={btn(!why)} disabled={!!why} title={why ?? (what === 'power' ? `The co-op runs the line ($${POLE_PER_FT}/ft + transformer), about ${Math.round(q.days / 7)} weeks` : plan ? `${plan.lines.map(l => `${l.label}: ${usd(l.usd)}`).join('; ')}. About ${q.days} days` : `12 ft gravel and a culvert ($${DRIVE_PER_FT}/ft), about ${q.days} days`)} onClick={() => g.hookup(what)}>{what === 'power' ? 'Run the line' : 'Lay the drive'} · {usd(q.usd)}</button>
+                      <button style={btn(!why)} disabled={!!why} title={why ?? (what === 'power' ? `The co-op runs the line ($${POLE_PER_FT}/ft + transformer), about ${pluralize(Math.round(q.days / 7), 'week')}` : plan ? `${plan.lines.map(l => `${l.label}: ${usd(l.usd)}`).join('; ')}. About ${pluralize(q.days, 'day')}` : `12 ft gravel and a culvert ($${DRIVE_PER_FT}/ft), about ${pluralize(q.days, 'day')}`)} onClick={() => g.hookup(what)}>{what === 'power' ? 'Run the line' : 'Lay the drive'} · {usd(q.usd)}</button>
                     </div>;
               })}
               <Clamp text={`The way in: ${roadLine(game)}.`}>The way in: {roadLine(game)}.{game.site.lot && (() => { const cl = crossingLine(roadPlanOf(game)); return cl ? ` ${cl}` : ''; })()}</Clamp>
@@ -465,7 +466,7 @@ export function Hud() {
               <PlowNote game={game} />
               {(game.roadside ?? []).length > 0 && <Note tone="warn">{game.roadside.length} deliver{game.roadside.length > 1 ? 'ies' : 'y'} at the road: about {Math.round(game.roadside.reduce((a, r) => a + r.hours - r.done, 0))} h of carrying before building goes on.</Note>}
               {!game.site.improvements.power && !game.utilities.grid && <Note>No power at the place: run the line, or go solar or a generator.</Note>}
-              {game.land.parcels.some(p => p.owner === 'you') && <Row label="Bought since" value={`${game.land.parcels.filter(p => p.owner === 'you').reduce((a, p) => a + acresOf(p.rect), 0)} acres`} />}
+              {game.land.parcels.some(p => p.owner === 'you') && <Row label="Bought since" value={`${pluralize(game.land.parcels.filter(p => p.owner === 'you').reduce((a, p) => a + acresOf(p.rect), 0), 'acre')}`} />}
             </Section>
             <Section title="Paperwork">
               {countyWorks(game) ? <>
@@ -490,23 +491,23 @@ export function Hud() {
                     <span>{p.name[4].toUpperCase() + p.name.slice(5)}</span>
                     {p.owner === 'you' ? <span style={{ color: TONE.good }}>yours</span>
                       : why === 'nobody sells land for cash now' ? <span style={{ color: DIM }}>no cash sales</span>
-                      : <button style={btn(!why)} disabled={!!why} title={why ?? `Buy ${acresOf(p.rect)} acres of land next door`} onClick={() => setLandAsk(landAsk === p.id ? null : p.id)}>Buy {acresOf(p.rect)} acres · {usd(priceOf(game, p))}</button>}
+                      : <button style={btn(!why)} disabled={!!why} title={why ?? `Buy ${pluralize(acresOf(p.rect), 'acre')} of land next door`} onClick={() => setLandAsk(landAsk === p.id ? null : p.id)}>Buy {pluralize(acresOf(p.rect), 'acre')} · {usd(priceOf(game, p))}</button>}
                   </div>
                   {landAsk === p.id && p.owner !== 'you' && !why && <div role="alertdialog" aria-label="Confirm the land purchase" style={{ border: `1px solid ${TONE.warn}`, borderRadius: 6, padding: '5px 7px', margin: '4px 0', fontSize: FS.small }}>
-                    <div><b>Buy {acresOf(p.rect)} acres of {LAND_NAME[p.kind]}</b> from {n ? n.name : 'the owner'} for <b>{usd(priceOf(game, p))}</b>?</div>
+                    <div><b>Buy {pluralize(acresOf(p.rect), 'acre')} of {LAND_NAME[p.kind]}</b> from {n ? n.name : 'the owner'} for <b>{usd(priceOf(game, p))}</b>?</div>
                     <div style={{ color: DIM, marginTop: 2 }}>You have {usd(game.money)}; that leaves {usd(game.money - priceOf(game, p))}. Land cannot be sold back.</div>
                     <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
                       <button style={btn(true)} onClick={() => {
                         const price = priceOf(game, p), acres = acresOf(p.rect), rect = p.rect, left = game.money - price;
                         const bad = g.buy(p.id); setLandAsk(null);
                         if (bad) { g.showToast(`Could not buy the land: ${bad}.`); return; }
-                        g.showToast(`Bought ${acres} acres of ${LAND_NAME[p.kind]} for ${usd(price)}. ${usd(left)} left.`);
+                        g.showToast(`Bought ${pluralize(acres, 'acre')} of ${LAND_NAME[p.kind]} for ${usd(price)}. ${usd(left)} left.`);
                         w.flashLand(rect);
                       }}>Buy it for {usd(priceOf(game, p))}</button>
                       <button style={btn()} onClick={() => setLandAsk(null)}>Not now</button>
                     </div>
                   </div>}
-                  <div style={{ fontSize: 11, color: DIM }}>{acresOf(p.rect)} acres of {LAND_NAME[p.kind]}{p.owner === 'you' ? '' : ` · ${n ? n.name : '?'}`}{p.forSale && p.owner !== 'you' ? <span style={{ color: TONE.warn }}> · for sale</span> : null}{p.ring === 2 && p.owner !== 'you' ? <span style={{ color: DIM }}> · farther out, more expensive</span> : null}{premiumOffer(game, p) ? <span style={{ color: TONE.warn }} title="Not for sale. A cash offer 60% over the asking price would tempt him.">{' · cash offer, +60%'}</span> : null}</div>
+                  <div style={{ fontSize: 11, color: DIM }}>{pluralize(acresOf(p.rect), 'acre')} of {LAND_NAME[p.kind]}{p.owner === 'you' ? '' : ` · ${n ? n.name : '?'}`}{p.forSale && p.owner !== 'you' ? <span style={{ color: TONE.warn }}> · for sale</span> : null}{p.ring === 2 && p.owner !== 'you' ? <span style={{ color: DIM }}> · farther out, more expensive</span> : null}{premiumOffer(game, p) ? <span style={{ color: TONE.warn }} title="Not for sale. A cash offer 60% over the asking price would tempt him.">{' · cash offer, +60%'}</span> : null}</div>
                 </div>;
               })}
             </Section>
@@ -531,7 +532,7 @@ export function Hud() {
                   return <>
                     <Row label="Outside" value={`${rate >= 10 ? Math.round(rate) : rate.toFixed(1)} mSv/h`} tone={rate > 10 ? 'bad' : rate > 1 ? 'warn' : 'good'} />
                     {h < SHELTER_DAYS * 24 && <Row label="Sheltering" value={`${where} (PF ${Math.round(pf).toLocaleString('en-US')})`} />}
-                    {h < SHELTER_DAYS * 24 && <Note>Out to work in {Math.ceil(SHELTER_DAYS - h / 24)} days (by then it's a hundredth of day one)</Note>}
+                    {h < SHELTER_DAYS * 24 && <Note>Out to work in {pluralize(Math.ceil(SHELTER_DAYS - h / 24), 'day')} (by then it's a hundredth of day one)</Note>}
                   </>;
                 })()}
                 {game.clock.t >= game.disaster.hitAt && TRACKS.map(k => (
@@ -547,7 +548,7 @@ export function Hud() {
             {(game.gate.prisoners?.length ?? 0) > 0 && <Section title="Prisoners">
               {game.gate.prisoners!.map(p => (
                 <div key={p.id} style={{ marginBottom: 6 }}>
-                  <Row label={p.name} value={`${Math.floor(game.clock.t) - p.since} days`} title={`Wound ${Math.round(p.sev)} · trust ${Math.round(p.trust)}${p.talked ? ' · has talked' : ''}`} />
+                  <Row label={p.name} value={`${pluralize(Math.floor(game.clock.t) - p.since, 'day')}`} title={`Wound ${Math.round(p.sev)} · trust ${Math.round(p.trust)}${p.talked ? ' · has talked' : ''}`} />
                   <div style={{ display: 'flex', gap: 6 }}>
                     <button style={{ ...btn(), flex: 1 }} onClick={() => g.releasePrisoner(p.id)}>Let him go</button>
                     <button style={{ ...btn(), flex: 1, opacity: canJoin(game, p) ? 1 : 0.4 }} disabled={!canJoin(game, p)} title="After a month, healed, and once he trusts you (70+)" onClick={() => g.joinPrisoner(p.id)}>Let him join</button>
@@ -696,13 +697,13 @@ function TakenSection() {
       const staying = game.people.filter((p, i) => game.personState[i]?.needs.died == null && !pickd.includes(p.id) && !isAway(game, p.id));
       const out = raid?.captive === c.pid;
       return <div key={c.pid} style={{ marginBottom: 10, paddingBottom: 6, borderBottom: `1px solid ${LINE}` }}>
-        <Row label={<b style={{ color: '#eee' }}>{fullName(child)}, {child.age}</b>} value={`${day - c.day} days`} tone="bad" />
+        <Row label={<b style={{ color: '#eee' }}>{fullName(child)}, {child.age}</b>} value={`${pluralize(day - c.day, 'day')}`} tone="bad" />
         <Note>Taken by {c.crew} · {KNOWN_TEXT[c.known]}</Note>
         {c.leads.slice(-3).reverse().map((l, i) => {
           const a = leadAge(game, l);
           return <div key={i} style={{ fontSize: 11.5, margin: '3px 0', opacity: i ? 0.6 : 1 }}>
-            {l.far ? <><span style={{ color: a <= FAR_COLD ? TONE.warn : DIM }}>Far rumor, {a === 0 ? 'today' : `${a} days ago`}{a > FAR_COLD ? ' · cold' : ''}:</span> {l.where}, {l.km} km</>
-              : <><span style={{ color: a <= LEAD_WARM ? TONE.good : a <= LEAD_COLD ? TONE.warn : DIM }}>{SOURCE_NAME[l.source]}, {a === 0 ? 'today' : `${a} days ago`}{a > LEAD_COLD ? ' · cold' : a > LEAD_WARM ? ' · cooling' : ''}:</span> {l.where}, {l.km} km · {l.count} of them{l.seenAlive ? ' · seen alive' : ''}</>}
+            {l.far ? <><span style={{ color: a <= FAR_COLD ? TONE.warn : DIM }}>Far rumor, {a === 0 ? 'today' : `${pluralize(a, 'day')} ago`}{a > FAR_COLD ? ' · cold' : ''}:</span> {l.where}, {l.km} km</>
+              : <><span style={{ color: a <= LEAD_WARM ? TONE.good : a <= LEAD_COLD ? TONE.warn : DIM }}>{SOURCE_NAME[l.source]}, {a === 0 ? 'today' : `${pluralize(a, 'day')} ago`}{a > LEAD_COLD ? ' · cold' : a > LEAD_WARM ? ' · cooling' : ''}:</span> {l.where}, {l.km} km · {l.count} of them{l.seenAlive ? ' · seen alive' : ''}</>}
           </div>;
         })}
         {!c.leads.length && <Note>No lead yet. A radio, the neighbors, a prisoner who talks: someone may hear something.</Note>}
@@ -714,7 +715,7 @@ function TakenSection() {
               {!can.length && <Note tone="warn">Nobody is well enough to go.</Note>}
             </div>
             {allyN > 0 && <button style={{ ...btn(askAllies), width: '100%', marginTop: 4 }} title="Neighbors on the radio net who like you. Their men can be hurt or killed, and they'll hold it against you if it goes badly." onClick={() => { setAskAllies(!askAllies); setOdds({ ...odds, [c.pid]: -1 }); }}>{askAllies ? '✓ ' : ''}Ask the neighbors: {allies.map(a => `${a.name} (${a.n})`).join(', ')}</button>}
-            {pickd.length > 0 && <Note tone="warn">Staying: {staying.map(p => p.first).join(', ') || 'nobody'} ({staying.filter(p => !p.kid || p.age >= 15).length} who can shoot). The place is lightly held for {lead.km > 25 ? 'four' : 'two'} days.</Note>}
+            {pickd.length > 0 && <Note tone="warn">Staying: {staying.map(p => p.first).join(', ') || 'nobody'} ({staying.filter(p => !p.kid || p.age >= 15).length} who can shoot). The place is lightly held for {pluralize(lead.km > 25 ? 'four' : 'two', 'day')}.</Note>}
             {pickd.length > 0 && <div style={{ display: 'flex', gap: 4, marginTop: 3 }}>
               <button style={{ ...btn(), flex: 1 }} title="A guess from what the lead says: how many, and who you send" onClick={() => setOdds({ ...odds, [c.pid]: rescueOdds(game, c.pid, pickd, 40, askAllies) })}>{(odds[c.pid] ?? -1) >= 0 ? `Odds: about ${Math.round(odds[c.pid] * 10)} in 10` : 'Weigh the odds'}</button>
               <button style={{ ...btn(true), flex: 1, opacity: why ? 0.4 : 1 }} disabled={!!why} title={why ?? `They go tonight and hit the camp before dawn`} onClick={() => { const w = g.rescue(c.pid, pickd, askAllies); if (w) alert(w); else setTeam({ ...team, [c.pid]: [] }); }}>Go get {child.body === 'f' ? 'her' : 'him'}</button>
@@ -731,7 +732,7 @@ function TakenSection() {
           return <div style={{ marginTop: 4 }}>
             {!warm && <Note>Traded on, far off. Now and then a rumor comes over the radio, months apart.</Note>}
             {warm && fl && fuel && <>
-              <div style={{ fontSize: 11.5, color: DIM, marginBottom: 2 }}>Drive to {fl.where} ({fl.km} km, {fuel.liters} L of fuel there and back, {2 * Math.ceil(fl.km / 150)} days{fuel.truck ? '' : ', no running truck'}). Who goes (up to 3):</div>
+              <div style={{ fontSize: 11.5, color: DIM, marginBottom: 2 }}>Drive to {fl.where} ({fl.km} km, {fuel.liters} L of fuel there and back, {pluralize(2 * Math.ceil(fl.km / 150), 'day')}{fuel.truck ? '' : ', no running truck'}). Who goes (up to 3):</div>
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                 {can.map(p => <button key={p.id} style={btn(pickd.includes(p.id))} onClick={() => setTeam({ ...team, [c.pid]: pickd.includes(p.id) ? pickd.filter(x => x !== p.id) : [...pickd, p.id] })}>{p.first}</button>)}
               </div>

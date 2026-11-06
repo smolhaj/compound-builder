@@ -15,6 +15,7 @@ import { log } from './economy';
 import { dayIndex, type GameState } from './state';
 import { securityOf, type ResponseSub } from './securityState';
 import { COLLAPSE } from './guards';
+import { pluralize } from './words';
 
 export const RESPONSE = {
   /** The panic button, the keypad and the install, once; then monthly while the banks work. */
@@ -59,7 +60,7 @@ export function subscribe(s: GameState): string | null {
   const day = dayIndex(s.clock.t);
   s.money -= RESPONSE.SETUP_USD;
   securityOf(s).response = { since: day, paidDay: day, missed: 0, downDays: 0, ended: null, calls: 0 };
-  log(s, `The family signed up with an armed-response firm: a panic button by the bed and a sign on the gate. $${RESPONSE.SETUP_USD} to install, $${RESPONSE.MONTHLY_USD} a month, a patrol about ${patrolMinutes(s)} minutes out.`);
+  log(s, `The family signed up with an armed-response firm: a panic button by the bed and a sign on the gate. $${RESPONSE.SETUP_USD} to install, $${RESPONSE.MONTHLY_USD} a month, a patrol about ${pluralize(patrolMinutes(s), 'minute')} out.`);
   return null;
 }
 export function cancelResponse(s: GameState): string | null {

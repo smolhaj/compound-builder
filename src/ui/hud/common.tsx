@@ -90,6 +90,6 @@ export function Tick({ done, label, line, act, title }: { done: boolean; label: 
   return <div title={title} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0' }}>
     <span aria-label={done ? 'done' : 'to do'} style={{ width: 14, textAlign: 'center', color: done ? TONE.good : DIM, fontWeight: 700 }}>{done ? '✓' : '○'}</span>
     <span style={{ flex: 1, minWidth: 0, lineHeight: 1.25 }}><b style={{ opacity: done ? 0.7 : 1 }}>{label}</b> <span style={{ color: done ? DIM : '#ddd', fontSize: FS.small }}>{line}</span></span>
-    {!done && act && <button style={{ ...btn(true), ...miniBtn }} disabled={!!act.off} title={act.off ?? undefined} onClick={act.run}>{act.label}</button>}
+    {!done && act && <button style={{ ...btn(true), ...miniBtn, whiteSpace: 'normal', textAlign: 'left', maxWidth: '55%', lineHeight: 1.2 }} disabled={!!act.off} title={act.off ?? act.label} onClick={act.run}>{act.label}</button>}
   </div>;
 }

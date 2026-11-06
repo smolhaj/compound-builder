@@ -6,6 +6,7 @@
  * well ~$11,000, a steel blast door ~$14,000.
  */
 import { litersText } from './format';
+import { materialCount } from './words';
 export type MaterialId = 'lumber' | 'logs' | 'firewood' | 'fieldstone' | 'concrete' | 'roofing' | 'hardware' | 'wire' | 'seedlings' | 'container'
   | 'pipe' | 'cable' | 'fixtures' | 'pump' | 'drilling' | 'solar_panel' | 'battery' | 'inverter' | 'generator' | 'fuel' | 'tank' | 'septic_tank'
   | 'rebar' | 'membrane' | 'excavator' | 'blast_door' | 'nbc_filter' | 'spoil' | 'culvert' | 'egress_hatch'
@@ -274,7 +275,7 @@ export function billText(bill: Partial<Stock>): string {
       if (q === null) return null;
       // fuel is stocked in 20 L cans: say liters, not "1.1 fuel"
       if (k === 'fuel') return `${litersText(n * 20)} of fuel`;
-      return `${q} ${MATERIALS[k].name.toLowerCase()}`;
+      return materialCount(k, n, MATERIALS[k].name, q);
     })
     .filter(Boolean).join(', ');
 }

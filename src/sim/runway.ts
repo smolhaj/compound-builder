@@ -31,6 +31,7 @@ import { isFinished } from './construction';
 import { dayIndex } from './state';
 import { regionFor } from './climate';
 import type { SuggestionAct } from './guidance';
+import { pluralize } from './words';
 
 export type RunwayId = 'food' | 'water' | 'power' | 'heat' | 'medicine' | 'defense' | 'fuel';
 export type RunwayAct = Extract<SuggestionAct, { type: 'open' | 'shop' }>;
@@ -104,7 +105,7 @@ function heatRow(s: GameState): RunwayRow {
 function medicineRow(s: GameState): RunwayRow {
   const cases = s.personState.reduce((a, ps) => a + (ps.needs.died == null ? ps.needs.hurt.length : 0), 0);
   const d = (Math.max(0, s.stock.meds) * RUNWAY.kitDays) / Math.max(1, cases);
-  return { id: 'medicine', label: 'Medicine', days: Math.floor(d), value: daysText(d), tone: toneOf(d, RUNWAY.medicine), detail: `Medical kits: one lasts about ${RUNWAY.kitDays} days for one person who is hurt or ill${cases > 1 ? `; ${cases} are being treated now` : ''}. Antibiotics and first-aid kits are extra.`, fix: { label: 'Medical shelf', act: shop('household') } };
+  return { id: 'medicine', label: 'Medicine', days: Math.floor(d), value: daysText(d), tone: toneOf(d, RUNWAY.medicine), detail: `Medical kits: one lasts about ${pluralize(RUNWAY.kitDays, 'day')} for one person who is hurt or ill${cases > 1 ? `; ${cases} are being treated now` : ''}. Antibiotics and first-aid kits are extra.`, fix: { label: 'Medical shelf', act: shop('household') } };
 }
 
 function defenseRow(s: GameState): RunwayRow {
@@ -113,7 +114,7 @@ function defenseRow(s: GameState): RunwayRow {
   // fights -> days at the quiet between waves (sim/waves.ts): the gap a place that fights each one has to make the ammunition last
   const gap = Math.max(WAVE.LULL_MIN, Math.round(WAVE.LULL * diffOf(s.disaster).lull));
   const d = fights * gap;
-  return { id: 'defense', label: 'Defense', days: Math.floor(d), value: `${daysText(d)} (${fights >= 100 ? '100+' : Math.floor(fights)} ${Math.floor(fights) === 1 ? 'fight' : 'fights'})`, tone: toneOf(fights, RUNWAY.fights), detail: `Ammunition for an average fight at the gate, one every ${gap} days.`, fix: { label: 'Guns & ammo', act: shop('guns') } };
+  return { id: 'defense', label: 'Defense', days: Math.floor(d), value: `${daysText(d)} (${fights >= 100 ? '100+' : Math.floor(fights)} ${Math.floor(fights) === 1 ? 'fight' : 'fights'})`, tone: toneOf(fights, RUNWAY.fights), detail: `Ammunition for an average fight at the gate, one every ${pluralize(gap, 'day')}.`, fix: { label: 'Guns & ammo', act: shop('guns') } };
 }
 
 function fuelRow(s: GameState): RunwayRow {

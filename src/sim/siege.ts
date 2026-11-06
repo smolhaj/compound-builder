@@ -31,6 +31,7 @@ import { isFinished } from './construction';
 import { isHome } from './blueprints';
 import { mulberry32 } from './rng';
 import { dayIndex, hourOf, type GameState } from './state';
+import { pluralize } from './words';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Which encounters are raids, and when they come
@@ -109,9 +110,9 @@ export function clockLabel(hour: number): string {
 /** "40 minutes later", "an hour and 10 minutes later". */
 export function gapLabel(seconds: number): string {
   const min = Math.max(1, Math.round(seconds / 60));
-  if (min < 60) return `${min} minutes later`;
+  if (min < 60) return `${pluralize(min, 'minute')} later`;
   const h = Math.floor(min / 60), m = min % 60;
-  return `${h === 1 ? 'An hour' : `${h} hours`}${m ? ` and ${m} minutes` : ''} later`;
+  return `${h === 1 ? 'An hour' : `${pluralize(h, 'hour')}`}${m ? ` and ${pluralize(m, 'minute')}` : ''} later`;
 }
 
 /** Night is when it is dark enough to need lamps: 8 PM to 6 AM (the same line battle.ts draws). */

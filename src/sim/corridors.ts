@@ -22,6 +22,7 @@ import { dropBridge } from './terrainFx';
 import { towerPosts } from './towers';
 import { powered } from './gear';
 import { wallMetres } from './tunnelers';
+import { pluralize } from './words';
 
 /** World units per metre. */
 export const U_PER_M = 1 / 6;
@@ -166,7 +167,7 @@ export function collapseCorridor(s: GameState, id: string, why: 'sappers' | 'own
     ? `Raiders brought the ${PERIMETER[r.kind].name.toLowerCase()} down at the portal${out ? `, and ${out === 1 ? 'a vehicle was' : `${out} vehicles were`} cut off outside` : ''}.`
     : `We brought the ${PERIMETER[r.kind].name.toLowerCase()} down ourselves.`);
   log(s, why === 'sappers'
-    ? `Raiders set a charge in the ${PERIMETER[r.kind].name.toLowerCase()} and brought the portal down. It is choked with rubble: nothing crosses until a contractor clears it ($${clearQuote(r).usd.toLocaleString('en-US')}, about ${CLEAR_DAYS} days).`
+    ? `Raiders set a charge in the ${PERIMETER[r.kind].name.toLowerCase()} and brought the portal down. It is choked with rubble: nothing crosses until a contractor clears it ($${clearQuote(r).usd.toLocaleString('en-US')}, about ${pluralize(CLEAR_DAYS, 'day')}).`
     : `The ${PERIMETER[r.kind].name.toLowerCase()} is down on your own charge. Nothing crosses until a contractor clears it.`);
   return null;
 }
@@ -194,7 +195,7 @@ export function clearCollapse(s: GameState, id: string): string | null {
   s.money -= q.usd;
   r.collapsed.clearsAt = s.clock.t + q.days;
   s.stock.spoil += Math.round(r.collapsed.rubbleM3 * 0.6);
-  log(s, `A contractor is clearing the fall in the ${PERIMETER[r.kind].name.toLowerCase()} ($${q.usd.toLocaleString('en-US')}, about ${q.days} days).`);
+  log(s, `A contractor is clearing the fall in the ${PERIMETER[r.kind].name.toLowerCase()} ($${q.usd.toLocaleString('en-US')}, about ${pluralize(q.days, 'day')}).`);
   return null;
 }
 
@@ -320,7 +321,7 @@ export function corridorLines(s: GameState): string[] {
     const name = PERIMETER[c.kind].name.toLowerCase();
     if (c.collapsed) { out.push(`The ${name} is choked with rubble: nothing crosses, on foot or on wheels, until a contractor clears it.`); continue; }
     const f = crossing(c, 'family', false, 0), v = crossing(c, 'vehicle', false, 0);
-    out.push(`The ${name} is ${c.lenM} m: about ${(Math.round(f.seconds / 6) / 10).toFixed(1)} minutes on foot, ${Math.round(v.seconds)} seconds by vehicle. The doors stand open by day and lock from dusk to dawn and on the alarm; the family has keys (${KEY_S} s a door), a crew is held ${DOOR_DELAY} s at the outer one.`);
+    out.push(`The ${name} is ${c.lenM} m: about ${pluralize((Math.round(f.seconds / 6) / 10).toFixed(1), 'minute')} on foot, ${Math.round(v.seconds)} seconds by vehicle. The doors stand open by day and lock from dusk to dawn and on the alarm; the family has keys (${KEY_S} s a door), a crew is held ${DOOR_DELAY} s at the outer one.`);
     const gd = collapseGuard(s, s.perimeter.find(r => r.id === c.id)!);
     out.push(`If a crew with explosives gets in this way, each charge has about a ${Math.round(SAPPER_P_PER_CHARGE * (c.kind === 'tunnel_bridge' ? SAPPER_BRIDGE_K : 1) * gd.factor * 1000) / 10} % chance to bring it down${gd.parts.length ? `; held down by ${gd.parts.join(', ')}` : '; nothing watches the portal'}.`);
   }

@@ -41,6 +41,7 @@ export const MARKET_KM = 12;
 import { calendarOf, dayIndex, type GameState } from './state';
 import { BAG_BASE, BAG_GOODS, bagOf, newMarketState, type BagGood, type MarketGood, type MarketState, type Stall } from './tradeGoods';
 import type { Caliber } from './armory';
+import { pluralize } from './words';
 
 export type { MarketGood };
 export interface MLot { good: MarketGood; qty: number }
@@ -155,7 +156,7 @@ const negotiatorOf = (s: GameState, pid: string) => s.people.find(p => p.id === 
 
 export function goProblem(s: GameState, pid: string): string | null {
   if (!marketOpen(s)) return 'there\'s no market yet';
-  if (!isMarketDay(s)) return `the next market is in ${daysToMarket(s)} days`;
+  if (!isMarketDay(s)) return `the next market is in ${pluralize(daysToMarket(s), 'day')}`;
   const m = marketOf(s);
   if (m.trip?.day === dayIndex(s.clock.t)) return 'someone is already at the market';
   const p = s.people.find(x => x.id === pid);

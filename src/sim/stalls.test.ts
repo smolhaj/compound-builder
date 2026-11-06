@@ -8,7 +8,7 @@ import { plansNeedLines } from './guidance';
 import { suggestions } from './guidance';
 import { compoundBoard } from './compoundBoard';
 import { operational } from './operational';
-import { missLines, noteStalls, stallsDay, stuckProject, waiters, STALL_DAYS } from './stalls';
+import { missLines, noteStalls, stallsDay, stuckProject, stuckShort, waiters, STALL_DAYS, ESCALATE_DAYS } from './stalls';
 import { migrate } from './save/migrations';
 import type { Fix } from './improvements';
 
@@ -121,5 +121,61 @@ describe('the Water tick is honest', () => {
     const row = operational(g).find(o => o.id === 'water')!;
     expect(row.done).toBe(false);
     expect(row.line).toMatch(/no running water|no power/i);
+  });
+});
+
+describe('stalls: roadside piles, pre-built repairs, escalation', () => {
+  it('a delivery left at the road counts as on the way: no second bill, no false stuck card', () => {
+    const g = fresh(), st = planStructure(g, 'trailer', 0, 0, 0);
+    st.stage = BLUEPRINTS.trailer.stages.findIndex(x => x.id === 'roof'); st.roofLost = true; g.money = 300000;
+    const lines = plansNeedLines(g);
+    expect(lines.length).toBeGreaterThan(0);
+    g.roadside = [{ lines: lines.map(l => ({ ...l })), hours: 12, done: 3 }];
+    expect(plansNeedLines(g)).toEqual([]);
+    noteStalls(g); g.clock.t += 10;
+    expect(stuckProject(g)).toBeNull();
+  });
+  it('property: a pre-built farmhouse with repair jobs, roadside piles and orders on the way: the plans order covers every wait', () => {
+    for (let seed = 1; seed <= 300; seed++) {
+      const r = rng(seed * 7 + 1), g = fresh(seed % 50 + 1);
+      const parts = ['roof', 'wiring', 'plumbing', 'glass', 'film'] as const;
+      const house = planStructure(g, 'farmhouse', 0, 0, 0);
+      house.pre = true; house.finishedAt = 0; house.stage = BLUEPRINTS.farmhouse.stages.length; house.supplied = true;
+      house.fixes = parts.filter(() => r() < 0.6).map(p => ({ part: p, cond: r() < 0.5 ? 'fair' as const : 'poor' as const, done: 0, hours: 20, supplied: r() < 0.2 }));
+      if (r() < 0.5) planStructure(g, 'log_house', 12, 0, 0);
+      for (const k of MATERIAL_IDS) if (r() < 0.2) g.stock[k] = Math.floor(r() * 4);
+      if (r() < 0.5) g.roadside = [{ lines: [{ material: 'roofing', qty: 5 }, { material: 'hardware', qty: 2 }], hours: 6, done: 0 }];
+      if (r() < 0.4) g.orders.push({ id: 'o1', lines: [{ material: 'cable', qty: 3 }], cost: 0, placedAt: 0, dueAt: 9, status: 'ordered' });
+      for (const l of plansNeedLines(g)) g.stock[l.material] += l.qty;
+      for (const x of g.roadside) for (const l of x.lines) g.stock[l.material] += l.qty;
+      for (const o of g.orders) for (const l of o.lines) g.stock[l.material] += l.qty;
+      for (const w of waiters(g)) {
+        const buyable = Object.keys(w.miss).filter(k => MATERIALS[k as keyof typeof MATERIALS].price !== null);
+        expect(buyable, `seed ${seed}: ${w.key}`).toEqual([]);
+      }
+    }
+  });
+  it('a stall older than two weeks with cash escalates: alarm card first, STUCK board line, a second log line', () => {
+    const g = fresh(), st = planStructure(g, 'trailer', 0, 0, 0);
+    st.stage = BLUEPRINTS.trailer.stages.findIndex(x => x.id === 'roof'); st.roofLost = true; g.money = 300000;
+    noteStalls(g); g.clock.t += STALL_DAYS + 0.5;
+    expect(stuckProject(g)!.escalated).toBe(false);
+    expect(suggestions(g, 3)[0].tone).toBeUndefined();
+    g.clock.t += ESCALATE_DAYS;
+    const s = stuckProject(g)!;
+    expect(s.escalated).toBe(true);
+    const top = suggestions(g, 3)[0];
+    expect(top.id).toBe('stalled'); expect(top.tone).toBe('alarm'); expect(top.title).toMatch(/^Stuck for \d+ days/);
+    expect(compoundBoard(g).decisions[0].text).toMatch(/^STUCK:/);
+    expect(stuckShort(s)).toMatch(/^Order it, \$[\d,]+$/);
+  });
+  it('the day it crosses two weeks the log says so once', () => {
+    const g = fresh(), st = planStructure(g, 'trailer', 0, 0, 0);
+    st.stage = BLUEPRINTS.trailer.stages.findIndex(x => x.id === 'roof'); st.roofLost = true; g.money = 300000;
+    noteStalls(g);
+    g.clock.t = ESCALATE_DAYS + 0.2;
+    expect(stallsDay(g).some(l => l.startsWith('STILL STUCK'))).toBe(true);
+    g.clock.t = ESCALATE_DAYS + 1.2;
+    expect(stallsDay(g).some(l => l.startsWith('STILL STUCK'))).toBe(false);
   });
 });

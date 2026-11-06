@@ -27,6 +27,7 @@ import { bestShelter } from './nuclear';
 import { waterDaysStored } from './water';
 import { HOUSING_STYLES, coverFactor, mainHome } from './housingStyles';
 import { hardenedSafeRoom, hasSafeRoom, layerTier } from './houseHardening';
+import { pluralize } from './words';
 
 export type Tone = 'good' | 'warn' | 'bad';
 export interface Check { id: string; label: string; ok: boolean; tone: Tone; detail: string }
@@ -208,8 +209,8 @@ export function defenseReport(s: GameState, drive?: readonly Pt[]): DefenseRepor
   const waterDays = waterDaysStored(s);
   const well = fin.some(st => st.kind.startsWith('well'));
   const catastrophes: Check[] = [
-    chk('food', 'Food stored', days >= 90, `${Number.isFinite(days) ? Math.floor(days) : '∞'} days`, days >= 30),
-    chk('water', 'Water', well || waterDays >= 14, well ? 'a well' : `${Math.floor(waterDays)} days stored`, waterDays >= 3),
+    chk('food', 'Food stored', days >= 90, `${pluralize(Number.isFinite(days) ? Math.floor(days) : '∞', 'day')}`, days >= 30),
+    chk('water', 'Water', well || waterDays >= 14, well ? 'a well' : `${pluralize(Math.floor(waterDays), 'day')} stored`, waterDays >= 3),
     (() => { const bp = backupPower(s); return chk('power', 'Power if the grid goes', bp.ok, bp.detail, true); })(),
     chk('heat', 'Winter heat', n(s, 'firewood') >= 8, `${n(s, 'firewood')} cords of firewood`, n(s, 'firewood') >= 3),
     chk('meds', 'Medical supplies', n(s, 'meds') + n(s, 'ifak') >= 3, `${n(s, 'meds')} meds, ${n(s, 'ifak')} first-aid kits`, n(s, 'meds') + n(s, 'ifak') >= 1),

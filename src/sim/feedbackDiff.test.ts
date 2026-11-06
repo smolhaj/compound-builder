@@ -126,3 +126,20 @@ describe('celebrations', () => {
     expect(c.map(x => x.id)).toContain('first_harvest');
   });
 });
+
+describe('toasts say what was bought', () => {
+  it('a big plans order names the first items and counts the rest; singular wording', () => {
+    const a = base(), b = clone(a);
+    placeOrder(b, [{ material: 'lumber', qty: 30 }, { material: 'hardware', qty: 1 }, { material: 'snares', qty: 1 }, { material: 'pipe', qty: 1 }, { material: 'cable', qty: 2 }]);
+    const t = messageText(diffAction(a, b)[0], Math.round(b.money));
+    expect(t).toMatch(/^Ordered 30 lumber, 1 door and window kit, 1 dozen snares and 2 more kinds of supplies for \$[\d,]+\. Cash left: \$[\d,]+\./);
+  });
+  it('a course sign-up says who and which course', () => {
+    const a = base(), b = clone(a);
+    b.money -= 90;
+    b.courses = { ...(b.courses ?? { certs: [], drills: undefined as never, day: -1, next: 1, enrolled: [] }), enrolled: [{ id: 'c1', course: 'firstaid', pid: b.people[0].id, mode: 'book', done: 0, start: 0 }] } as never;
+    const ev = diffAction(a, b)[0];
+    expect(ev.title).toMatch(new RegExp(`^Signed ${b.people[0].first} up for the first aid and first responder`));
+    expect(messageText(ev, Math.round(b.money))).toContain('for $90');
+  });
+});

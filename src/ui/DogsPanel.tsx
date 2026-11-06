@@ -11,6 +11,7 @@ import {
   ageText, ageYears, allDogs, bondOf, careHours, careNow, careWarning, setAllowPups, COATS, coatName, dogWatch, findHomes, giveTreat, livingDogs, neuterDog, rehomeDog, setAutoCare, setCaretaker, setGuard, stageOf, temperOf,
   TRAIT_TEXT, vetNeed, type Dog, type PetDuty, type Temper,
 } from '../sim/pets';
+import { pluralize } from '../sim/words';
 
 const DIM = 'rgba(238,238,238,0.6)', LINE = 'rgba(255,255,255,0.08)';
 const TONE = { good: '#a8d080', warn: '#f0c070', bad: '#f08060' } as const;
@@ -98,7 +99,7 @@ export function DogsPanel({ game }: { game: GameState }): ReactNode {
       <span title="Dogs that are not fixed only have puppies while this is on. A litter is four to six puppies to feed and months of care; fixing a dog (the Fix button on its card) ends it for good.">Puppies: {L?.allowPups ? <span style={{ color: TONE.warn }}>allowed (unfixed dogs will breed)</span> : 'not wanted'}</span>
       <button style={btn(!!L?.allowPups)} onClick={() => money(g => { setAllowPups(g, !(g.petLife?.allowPups)); return null; })}>{L?.allowPups ? 'Stop puppies' : 'Allow puppies'}</button>
     </div>}
-    {dogs.length > 0 && <div style={{ fontSize: 11, color: kibbleDays < 10 && game.disaster.tracks.stores < 0.5 ? TONE.warn : DIM }}>Dog food: {game.disaster.tracks.stores >= 0.5 ? 'comes with the groceries' : `${game.stock.kibble > 0.01 ? `${kibbleDays} days of kibble, then ` : ''}the family's own food`}</div>}
+    {dogs.length > 0 && <div style={{ fontSize: 11, color: kibbleDays < 10 && game.disaster.tracks.stores < 0.5 ? TONE.warn : DIM }}>Dog food: {game.disaster.tracks.stores >= 0.5 ? 'comes with the groceries' : `${game.stock.kibble > 0.01 ? `${pluralize(kibbleDays, 'day')} of kibble, then ` : ''}the family's own food`}</div>}
     {L?.report && L.report.tasks.some(t => !t.who) && <div style={{ fontSize: 11, color: TONE.warn }}>Left undone yesterday: {[...new Set(L.report.tasks.filter(t => !t.who).map(t => `${game.dogs.find(d => d.id === t.dog)?.name ?? '?'} (${t.duty})`))].slice(0, 4).join(', ')}. Not enough hours in the day.</div>}
     {dogs.map(d => <DogCard key={d.id} game={game} d={d} />)}
     {grieving.length > 0 && <div style={{ fontSize: 11, color: TONE.warn, marginTop: 4 }}>Grieving for {L!.lost[0]?.name ?? 'a lost dog'}: {grieving.map(([id]) => game.people.find(p => p.id === id)?.first).filter(Boolean).join(', ')}.</div>}

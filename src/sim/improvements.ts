@@ -28,6 +28,7 @@ import { listingSeed, roadPlanFor } from './roadState';
 import { planWords, type RoadPlan } from './roadPlan';
 import { roadBridgeDay } from './roadFx';
 import { corridorDay } from './corridors';
+import { pluralize } from './words';
 
 export type HouseKind = 'farmhouse' | 'trailer' | 'timber_cabin' | 'log_house';
 export type Condition = 'good' | 'fair' | 'poor';
@@ -111,10 +112,10 @@ export function orderHookup(s: GameState, what: 'power' | 'drive'): string | nul
   const q = dq ?? powerQuote(s.site.improvements, s.site);
   s.money -= q.usd;
   s.siteJobs[what] = s.clock.t + q.days;
-  if (what === 'power') log(s, `Paid the co-op $${q.usd.toLocaleString('en-US')} for ${s.site.improvements.poleFt.toLocaleString('en-US')} ft of line: power in about ${Math.round(q.days / 7)} weeks.`);
+  if (what === 'power') log(s, `Paid the co-op $${q.usd.toLocaleString('en-US')} for ${s.site.improvements.poleFt.toLocaleString('en-US')} ft of line: power in about ${pluralize(Math.round(q.days / 7), 'week')}.`);
   else {
     const plan = dq?.plan;
-    log(s, `Hired a contractor to put in ${(plan ? plan.lengthFt : s.site.improvements.driveFt).toLocaleString('en-US')} ft of gravel drive ($${q.usd.toLocaleString('en-US')}), about ${q.days} days.${plan && (plan.structures.length || plan.hairpins.length) ? ` It has ${planWords(plan).slice(1).join(', ')}.` : ''}`);
+    log(s, `Hired a contractor to put in ${(plan ? plan.lengthFt : s.site.improvements.driveFt).toLocaleString('en-US')} ft of gravel drive ($${q.usd.toLocaleString('en-US')}), about ${pluralize(q.days, 'day')}.${plan && (plan.structures.length || plan.hairpins.length) ? ` It has ${planWords(plan).slice(1).join(', ')}.` : ''}`);
   }
   return null;
 }

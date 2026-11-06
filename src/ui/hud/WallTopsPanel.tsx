@@ -9,6 +9,7 @@ import {
 } from '../../sim/wallTops';
 import { Group, Hint, Note, Row } from './common';
 import { DIM, btn, usd } from './style';
+import { pluralize } from '../../sim/words';
 
 export function WallTopsPanel() {
   const game = useGameStore(s => s.game);
@@ -22,7 +23,7 @@ export function WallTopsPanel() {
   const brushy = walls.filter(r => brushOf(r) >= 0.05);
   const live = liveMetres(game);
   return <Group id="def-walltop" title="Wall tops and weak spots" defaultOpen={false}>
-    <Hint more={<>An electric fence on outriggers along the top of a wall shocks and slows a climber, and a cut or a climb raises the alarm (+{E.DETECT} warning at the gate). It needs power: the grid or your own supply. A sealed battery backup (${E.BACKUP_USD}) keeps it live for {E.BACKUP_DAYS} days of outage; without it a power cut leaves only wires. It cannot share a run with razor wire. While the county works a certified installer fits it (${E.ENERGIZER_USD} plus a ${E.CERT_USD} certificate); on your own it risks the inspector. Yellow signs go on every post and put off opportunists, never an organized crew.</>}>Live wire on the wall top; weak spots let a climber go around.</Hint>
+    <Hint more={<>An electric fence on outriggers along the top of a wall shocks and slows a climber, and a cut or a climb raises the alarm (+{E.DETECT} warning at the gate). It needs power: the grid or your own supply. A sealed battery backup (${E.BACKUP_USD}) keeps it live for {pluralize(E.BACKUP_DAYS, 'day')} of outage; without it a power cut leaves only wires. It cannot share a run with razor wire. While the county works a certified installer fits it (${E.ENERGIZER_USD} plus a ${E.CERT_USD} certificate); on your own it risks the inspector. Yellow signs go on every post and put off opportunists, never an organized crew.</>}>Live wire on the wall top; weak spots let a climber go around.</Hint>
     {hosts.length === 0 && <Note>No finished wall or fence that can take outriggers yet.</Note>}
     {hosts.slice(0, 8).map(r => {
       const len = wallLength(r), why = electricProblem(game, r, false);
@@ -32,7 +33,7 @@ export function WallTopsPanel() {
         <span style={{ flex: 1 }}>{PERIMETER[r.kind].name} <span style={{ color: DIM }}>({Math.round(len * 6)} m{r.razor ? ', razor' : ''}{r.electric ? (on ? ', live' : ', DARK') : ''}{r.electric && r.noCert ? ', no certificate' : ''}{brushOf(r) >= 0.5 ? ', overgrown' : ''})</span></span>
         {!r.electric && <button style={btn(false)} disabled={!!why} title={why ?? `${Math.round(electricHours(len))} h of work; about ${usd(price)} of wire, cable and hardware plus ${usd(electricCash(game, false))} for the energizer${electricCash(game, false) > E.ENERGIZER_USD ? ' and the certificate' : ''}`} onClick={() => { const w = useGameStore.getState().addElectric(r.id, false); if (w) alert(w); }}>{why ? 'Not yet' : 'Fit electric fence'}</button>}
         {!r.electric && !why && <button style={btn(false)} title={`The same with a sealed battery: ${usd(electricCash(game, true))} for the installer and the battery`} onClick={() => { const w = useGameStore.getState().addElectric(r.id, true); if (w) alert(w); }}>With battery</button>}
-        {r.electric && !r.backup && <button style={btn(false)} title={`A sealed battery for ${usd(E.BACKUP_USD)}: keeps it live for ${E.BACKUP_DAYS} days of outage`} onClick={() => { const w = useGameStore.getState().addFenceBackup(r.id); if (w) alert(w); }}>Add battery</button>}
+        {r.electric && !r.backup && <button style={btn(false)} title={`A sealed battery for ${usd(E.BACKUP_USD)}: keeps it live for ${pluralize(E.BACKUP_DAYS, 'day')} of outage`} onClick={() => { const w = useGameStore.getState().addFenceBackup(r.id); if (w) alert(w); }}>Add battery</button>}
         {r.electric && r.backup && <span style={{ color: DIM }}>battery backup</span>}
       </div>;
     })}

@@ -13,6 +13,7 @@ import { saveGame, AUTOSAVE } from '../sim/save/saveSystem';
 import { affordable, ANY_WISH, builtFacts, LIFESTYLE, landPriceRange, listings, siteFacts, type Acres, type LandWish, type Lifestyle, type Site } from '../sim/site';
 import { LotTerrain } from './LotTerrain';
 import { PLAYABLE, REGION_IDS, REGIONS, type RegionDef, type RegionId, type StormKind } from '../sim/regions';
+import { pluralize } from '../sim/words';
 
 const MODES: Array<[Mode, string, string]> = [
   ['surprise', 'Surprise', '3 to 6 years of peace; you don\'t know what is coming. Watch the news, the prices, the neighbors.'],
@@ -52,7 +53,7 @@ function ListingCard({ l, on, pick, budget }: { l: Site; on: boolean; pick: () =
   return (
     <button style={{ ...tile(on, !ok), display: 'flex', flexDirection: 'column', gap: 8 }} onClick={() => ok && pick()} title={ok ? undefined : 'Over budget'}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
-        <span style={{ fontSize: 16, fontWeight: 700 }}>{l.acres} acres</span>
+        <span style={{ fontSize: 16, fontWeight: 700 }}>{pluralize(l.acres, 'acre')}</span>
         <span style={{ fontSize: 16, fontWeight: 700, color: ok ? C.gold : C.bad }}>{usd(l.price)}</span>
       </div>
       <div style={{ fontSize: 12, color: C.dim, marginTop: -6 }}>{l.name} · {usd(Math.round(l.price / l.acres))}/acre</div>
@@ -179,7 +180,7 @@ export function SetupScreen() {
                     <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', columnGap: 10, rowGap: 2, fontSize: 12 }}>
                       <span style={{ color: C.dim }}>Raw land</span><span>{(() => { const [lo, hi] = landPriceRange(id); return `${usd(lo)} to ${usd(hi)}/acre`; })()}</span>
                       <span style={{ color: C.dim }}>Frost-free</span><span>{month(r.frost[0])} to {month(r.frost[1])}</span>
-                      <span style={{ color: C.dim }}>Zone</span><span>{r.zone} · {r.frost[1] - r.frost[0]} days</span>
+                      <span style={{ color: C.dim }}>Zone</span><span>{r.zone} · {pluralize(r.frost[1] - r.frost[0], 'day')}</span>
                       <span style={{ color: C.dim }}>Winter</span><span>{r.cold >= 1.25 ? 'Bitter' : r.cold >= 0.9 ? 'Cold' : r.cold >= 0.5 ? 'Mild' : 'Short, mild'} · lows {r.janLowF}°F · {Math.round(r.snowCm / 2.54)} in of snow</span>
                       <span style={{ color: C.dim }}>Summer</span><span>highs {r.julyHighF}°F · {Math.round(r.rainMm / 25.4)} in of rain a year</span>
                       <span style={{ color: C.dim }}>Storms</span><span>{stormList(r)}</span>
@@ -327,7 +328,7 @@ export function SetupScreen() {
         {/* footer: the choice so far and the way on */}
         <div style={{ padding: '12px 24px', borderTop: `1px solid ${C.line}`, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <div style={{ flex: 1, color: C.dim, fontSize: 12.5, minWidth: 200 }}>
-            {R.name} · {LIFESTYLE[life].name}{lot ? ` · ${lot.acres} acres for ${usd(lot.price)} · ${usd(budget - lot.price)} left` : ''}
+            {R.name} · {LIFESTYLE[life].name}{lot ? ` · ${pluralize(lot.acres, 'acre')} for ${usd(lot.price)} · ${usd(budget - lot.price)} left` : ''}
           </div>
           {g.setupCanClose && <button style={chip(false)} onClick={() => g.openSetup(false)}>Back to my game</button>}
           {step > 0 && <button style={chip(false)} onClick={() => setStep(step - 1)}>Back</button>}

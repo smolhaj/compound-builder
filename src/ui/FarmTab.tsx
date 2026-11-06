@@ -22,6 +22,7 @@ import { FarmPanel } from './FarmPanel';
 import { Note, Row, Section, Tabs } from './hud/common';
 import { btn, DIM, TONE, type Tone } from './hud/style';
 import { regionFor } from '../sim/climate';
+import { pluralize } from '../sim/words';
 
 type Sub = 'season' | 'fields' | 'kitchen' | 'animals' | 'plan';
 const k = (n: number) => `${Math.round(n / 1000).toLocaleString('en-US')}k kcal`;
@@ -65,7 +66,7 @@ function SeasonView({ game }: { game: GameState }) {
       {now.length === 0 && <Note>A quiet stretch. Nothing on the calendar for the next three weeks.</Note>}
       {now.map(d => <div key={d.item.id} style={{ fontSize: 12, padding: '2px 0', display: 'flex', gap: 6 }}>
         <span style={{ width: 8, height: 8, borderRadius: 4, background: GROUP_COLOR[d.item.group], marginTop: 4, flex: 'none', opacity: d.state === 'now' ? 1 : 0.45 }} />
-        <span><b style={{ fontWeight: 600 }}>{d.item.label}</b> <span style={{ color: d.state === 'now' ? TONE.good : DIM }}>{d.state === 'now' ? 'on now' : `starts in ${d.days} days`}</span><br /><span style={{ color: DIM, fontSize: 11 }}>{d.item.note}</span></span>
+        <span><b style={{ fontWeight: 600 }}>{d.item.label}</b> <span style={{ color: d.state === 'now' ? TONE.good : DIM }}>{d.state === 'now' ? 'on now' : `starts in ${pluralize(d.days, 'day')}`}</span><br /><span style={{ color: DIM, fontSize: 11 }}>{d.item.note}</span></span>
       </div>)}
     </Section>
     <Section title="The year">
@@ -222,9 +223,9 @@ function AnimalsView({ game }: { game: GameState }) {
         </div>;
       })}
       <Row label="Roof for the herd" value={`${Math.round(sheltered(game) * 100)} %`} tone={sheltered(game) < 0.6 ? 'warn' : 'good'} title="Animal units under a barn, barnyard or sheep barn: fewer sick animals, no winter wasting" />
-      <Row label="Pasture" value={fb.pastureAcres < 0.1 ? 'none' : `${fb.units.toFixed(1)} of ${fb.carries.toFixed(1)} animal units`} tone={fb.stocking > 1.3 ? 'bad' : fb.stocking > 1 ? 'warn' : undefined} title={`${fb.pastureAcres.toFixed(1)} acres of open grass; the grass is at ${Math.round(fb.pasture * 100)} %`} />
-      <Row label="Hay" value={<span style={{ color: fb.hayBales < fb.hayNeed ? TONE.warn : undefined }}>{fb.hayBales} bales{hayWinterDays > 0 && isFinite(hayWinterDays) ? ` · ${hayWinterDays > 999 ? 'plenty' : `${Math.floor(hayWinterDays)} days`}` : ''} <span style={{ color: DIM }}>/ {fb.hayNeed} for winter</span></span>} title="Days of hay at the winter feeding rate (in summer the herd grazes and eats little, so the bales would seem to last forever)" />
-      <Row label="Feed" value={<span style={{ color: fb.feedDays < 14 ? TONE.warn : undefined }}>{fb.feedBags} bags{isFinite(fb.feedDays) ? ` · ${fb.feedDays > 999 ? 'plenty' : `${Math.floor(fb.feedDays)} days`}` : ''}</span>} />
+      <Row label="Pasture" value={fb.pastureAcres < 0.1 ? 'none' : `${fb.units.toFixed(1)} of ${fb.carries.toFixed(1)} animal units`} tone={fb.stocking > 1.3 ? 'bad' : fb.stocking > 1 ? 'warn' : undefined} title={`${pluralize(fb.pastureAcres.toFixed(1), 'acre')} of open grass; the grass is at ${Math.round(fb.pasture * 100)} %`} />
+      <Row label="Hay" value={<span style={{ color: fb.hayBales < fb.hayNeed ? TONE.warn : undefined }}>{fb.hayBales} bales{hayWinterDays > 0 && isFinite(hayWinterDays) ? ` · ${hayWinterDays > 999 ? 'plenty' : `${pluralize(Math.floor(hayWinterDays), 'day')}`}` : ''} <span style={{ color: DIM }}>/ {fb.hayNeed} for winter</span></span>} title="Days of hay at the winter feeding rate (in summer the herd grazes and eats little, so the bales would seem to last forever)" />
+      <Row label="Feed" value={<span style={{ color: fb.feedDays < 14 ? TONE.warn : undefined }}>{fb.feedBags} bags{isFinite(fb.feedDays) ? ` · ${fb.feedDays > 999 ? 'plenty' : `${pluralize(Math.floor(fb.feedDays), 'day')}`}` : ''}</span>} />
       {(game.stock.sheep ?? 0) >= 1 && <Note tone={sheepSheltered(game) < 1 ? 'warn' : 'good'}>{sheepSheltered(game) < 1 ? `Roof for ${sheepRoom(game)} of ${Math.floor(game.stock.sheep)} sheep: build a sheep barn (30) before winter.` : 'All the sheep have a roof for the winter.'}</Note>}
       <Row label="Manure pile" value={`${(game.stock.manure ?? 0).toFixed(1)} loads`} title="Goes on the fields at spring sowing" />
       {(h.butterLb > 0 || h.cheeseLb > 0 || h.milk > 0) && <Row label="Dairy this year" value={`${Math.round(h.milk / 2350)} gal milk${h.butterLb > 0 ? ` · ${Math.round(h.butterLb)} lb butter` : ''}${h.cheeseLb > 0 ? ` · ${Math.round(h.cheeseLb)} lb cheese` : ''}`} />}

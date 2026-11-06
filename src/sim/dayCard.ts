@@ -5,6 +5,7 @@
 import { DISASTERS, TRACKS, TRACK_NAME, tracksAt, type DisasterKind } from './disaster';
 import { daysOfFood } from './needs';
 import { calendarOf, type GameState } from './state';
+import { pluralize } from './words';
 
 export interface DayCard {
   masthead: string;
@@ -48,7 +49,7 @@ export function dayCard(s: GameState): DayCard | null {
   const gone = TRACKS.filter(k => t3[k] < 0.5).map(k => TRACK_NAME[k].toLowerCase());
   const lines = gone.length ? [`Within three days: ${gone.slice(0, 5).join(', ')}${gone.length > 5 ? ' and more' : ''} are gone or going.`] : ['The services are straining but still running.'];
   const back = Math.min(...Object.values(d.back).map(Number), Infinity);
-  lines.push(Number.isFinite(back) ? `Nobody says when it comes back. The earliest hope is about ${back < 14 ? 'a couple of weeks' : back < 60 ? `${Math.round(back / 7)} weeks` : `${Math.round(back / 30)} months`}.` : 'Nobody says when it comes back, or if.');
+  lines.push(Number.isFinite(back) ? `Nobody says when it comes back. The earliest hope is about ${back < 14 ? 'a couple of weeks' : back < 60 ? `${pluralize(Math.round(back / 7), 'week')}` : `${pluralize(Math.round(back / 30), 'month')}`}.` : 'Nobody says when it comes back, or if.');
   const alive = s.personState.filter(p => p.needs.died == null).length;
   const food = daysOfFood(s);
   const stand = [

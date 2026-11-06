@@ -34,6 +34,7 @@ import type { Extras } from './newcomers';
 import { defaultStay, kitLine, moveInto, pool, rollKit, settleStay } from './joinerHome';
 import { addTool } from './tools';
 import { isFinished } from './construction';
+import { pluralize } from './words';
 
 // ── Who they are ───────────────────────────────────────────────────────────
 
@@ -386,7 +387,7 @@ export function resolveKin(s: GameState, e: Encounter, stance0: Stance): Outcome
     const since = day, until = day + (s.disaster.phase === 'warning' ? 75 : 150);
     k.away = k.away.filter(x => !people.some(p => p.id === x.id));
     k.waiting.push({ ids: people.map(p => p.id), people: structuredClone(people), since, until, savings: e.kin?.savings ?? 0, ...(e.extras ? { extras: e.extras } : {}) });
-    lines.push(`They will wait ${until - since} days. Stake a guest house, a cottage or Mom’s house for them (Build → Home & work): they move in the day it is finished. If the hit comes first, they would come anyway.`);
+    lines.push(`They will wait ${pluralize(until - since, 'day')}. Stake a guest house, a cottage or Mom’s house for them (Build → Home & work): they move in the day it is finished. If the hit comes first, they would come anyway.`);
     return { title: 'Build them a place first', text: `You tell ${names} to hold on until there is a roof ready for them: not a couch in the hall. ${cap(call)} says that is fair, and will keep the car packed.`, tone: 'mixed', lines };
   }
   // refuse

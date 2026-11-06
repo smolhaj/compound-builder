@@ -39,6 +39,7 @@ import { isHome } from './blueprints';
 
 import type { SkillId } from './family';
 import { regionFor } from './climate';
+import { pluralize } from './words';
 
 // ─────────────────────────────────────────────────────────────────────────
 // The dog
@@ -156,7 +157,7 @@ export function stageOf(d: Dog, day: number): Stage {
 }
 export const ageText = (d: Dog, day: number): string => {
   const a = ageYears(d, day);
-  return a < 1 ? `${Math.max(1, Math.round(a * 12))} months` : `${Math.floor(a)} ${Math.floor(a) === 1 ? 'year' : 'years'}`;
+  return a < 1 ? `${pluralize(Math.max(1, Math.round(a * 12)), 'month')}` : `${Math.floor(a)} ${Math.floor(a) === 1 ? 'year' : 'years'}`;
 };
 export const coatName = (d: Dog): string => COATS[d.breed][d.tone % 3].name;
 

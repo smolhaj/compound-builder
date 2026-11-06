@@ -14,13 +14,14 @@ import { callGathering, gatheringProblem } from '../sim/gatherings';
 import { kitRows } from '../sim/evenings';
 import { COURSES, COURSE_IDS, COURSE_MODE_NAME, TEACH_LEVEL, newCourses, bestMode, certNote, certsOf, coursesOf, drillAmmo, drillCost, dropCourse, enroll, enrollmentOf, hasCert, modeProblem, readiness, setDrills, teachersFor, type CourseId, type CourseMode } from '../sim/courses';
 import { faithOf } from '../sim/mind';
-import { casesOf, lastingOf, medReport, setPolicy, setQuarantine } from '../sim/medical';
+import { casesOf, epidemicCountText, lastingOf, medReport, setPolicy, setQuarantine } from '../sim/medical';
 import { dayIndex } from '../sim/state';
 import { DIM, LINE, TONE, btn, usd } from './hud/style';
 import { MATERIALS } from '../sim/materials';
 import { prices } from '../sim/economy';
 import { Note, Row, Section } from './hud/common';
 import { closeRows } from '../sim/bonds';
+import { pluralize } from '../sim/words';
 
 const strainColor = (v: number) => (v >= 65 ? TONE.bad : v >= 40 ? TONE.warn : '#9cc070');
 const bar = (v: number, c: string, t: string) => <div title={t} style={{ flex: 1, height: 4, background: '#333', borderRadius: 2 }}><div style={{ width: `${Math.max(0, Math.min(100, v))}%`, height: '100%', background: c, borderRadius: 2 }} /></div>;
@@ -143,7 +144,7 @@ export function MedicalSection() {
     {sick.map(p => casesOf(game, p.id).map((h, i) => <Row key={p.id + i} label={p.first} value={<span style={{ fontSize: 11 }}>{h.what}: {h.med!.care}</span>} tone={h.sev >= 60 ? 'bad' : 'warn'} />))}
     {r.needs.map((x, i) => <Note key={`${i}-${x}`} tone="warn">{x}</Note>)}
     {r.epidemic && <div style={{ marginTop: 3 }}>
-      <Note tone="warn">{r.epidemic.kind === 'flu' ? 'The flu is going around' : 'Dysentery is going around'} ({r.epidemic.cases} so far).{r.epidemic.quarantine ? ' The sick are being kept apart.' : ''}</Note>
+      <Note tone="warn">{r.epidemic.kind === 'flu' ? 'The flu is going around' : 'Dysentery is going around'} ({epidemicCountText(r.sickNow, r.epidemic.cases)}).{r.epidemic.quarantine ? ' The sick are being kept apart.' : ''}</Note>
       <div style={{ display: 'flex', gap: 4 }}>
         <button style={btn(r.epidemic.quarantine)} onClick={() => g.daily(d => setQuarantine(d, true))}>Keep the sick apart</button>
         <button style={btn(!r.epidemic.quarantine && r.epidemic.asked)} onClick={() => g.daily(d => setQuarantine(d, false))}>Continue</button>
@@ -199,7 +200,7 @@ export function ClassesSection() {
           <span><b>{p?.first}</b>: {d.name.toLowerCase()}</span>
           <button style={{ ...btn(), padding: '0 6px', fontSize: 10.5 }} title="Give the course up (nothing is refunded)" onClick={() => g.daily(x => { dropCourse(x, e.id); return null; })}>drop</button>
         </div>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>{bar(100 * e.done / d.hours, '#8a7ab8', `${e.done.toFixed(1)} of ${d.hours} hours`)}<span style={{ color: e.stalled ? TONE.warn : DIM, minWidth: 140, textAlign: 'right' }}>{e.stalled ? `stalled: ${e.stalled}` : `${COURSE_MODE_NAME[e.mode]}${t ? ` (${t.first})` : ''}`}</span></div>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>{bar(100 * e.done / d.hours, '#8a7ab8', `${e.done.toFixed(1)} of ${pluralize(d.hours, 'hour')}`)}<span style={{ color: e.stalled ? TONE.warn : DIM, minWidth: 140, textAlign: 'right' }}>{e.stalled ? `stalled: ${e.stalled}` : `${COURSE_MODE_NAME[e.mode]}${t ? ` (${t.first})` : ''}`}</span></div>
       </div>;
     })}
     {C.enrolled.length === 0 && <div style={{ fontSize: 11.5, color: DIM }}>No one is taking a course. Evenings are free for one: two hours a night, on the Class duty.</div>}
@@ -212,7 +213,7 @@ export function ClassesSection() {
     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 3 }}>
       {modes.map(m => { const why = who ? modeProblem(game, course, who, m, m === 'teacher' ? teachersFor(game, course, who)[0]?.id : undefined) : 'nobody'; return <button key={m} style={{ ...btn(use === m), padding: '2px 7px', fontSize: 11 }} title={why ?? (m === 'teacher' ? 'A household adult with the skill at 3+ teaches on the same hours: the best way' : m === 'online' ? `Tuition $${def.online}; needs power and the phone lines` : 'The book set alone: slow')} onClick={() => { setMode(m); setNote(null); }}>{m === 'teacher' ? 'With a teacher' : m === 'online' ? `Online ($${def.online})` : 'Book set'}</button>; })}
     </div>
-    <div style={{ fontSize: 11, color: DIM, margin: '3px 0' }}>{def.blurb} {def.hours} hours; teachers need the skill at {TEACH_LEVEL}+. {game.stock[def.book] >= 1 ? 'The book set is on the shelf.' : <>The book set ({usd((MATERIALS[def.book].price ?? 0) * prices(game))}) is in the Shop. <button style={{ ...btn(), padding: '0 6px', fontSize: 10.5 }} onClick={() => g.openShop(true, 'learning')}>Shop</button></>}</div>
+    <div style={{ fontSize: 11, color: DIM, margin: '3px 0' }}>{def.blurb} {pluralize(def.hours, 'hour')}; teachers need the skill at {TEACH_LEVEL}+. {game.stock[def.book] >= 1 ? 'The book set is on the shelf.' : <>The book set ({usd((MATERIALS[def.book].price ?? 0) * prices(game))}) is in the Shop. <button style={{ ...btn(), padding: '0 6px', fontSize: 10.5 }} onClick={() => g.openShop(true, 'learning')}>Shop</button></>}</div>
     <button style={btn(!problem)} disabled={!!problem || !use} title={problem ?? 'Start the course'} onClick={() => { const why = use ? g.money(d => enroll(d, course, who, use, teacher?.id)) : 'pick a way'; setNote(why); }}>Start the course</button>
     {(problem && who) && <span style={{ fontSize: 11, color: TONE.warn, marginLeft: 6 }}>{problem}</span>}
     {note && <Note tone="warn">{note}</Note>}

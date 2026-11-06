@@ -1,3 +1,4 @@
+import { pluralize } from './words';
 /**
  * Starvation on Cozy: warn, then kill slowly. (Standard / Hardcore: unchanged,
  * hunger takes health down and nothing holds it at the floor.)
@@ -47,5 +48,5 @@ export function healthFloor(cozy: boolean, starved: number, f: Frailty): number 
 
 /** Warning text once someone has been starving a while (Cozy), else null. */
 export function starveWarning(name: string, starved: number): string | null {
-  return starved >= STARVE_WARN ? `${name} has been starving for ${starved} days; they will begin to die if this goes on` : null;
+  return starved >= STARVE_WARN ? `${name} has been starving for ${pluralize(starved, 'day')}; they will begin to die if this goes on` : null;
 }

@@ -14,6 +14,8 @@ import { buildOff, type SuggestionAct } from './guidance';
 import { POWER_BUILDINGS as POWER, needsHookup, powerOnPlace } from './hookups';
 import type { GameState } from './state';
 import { stuckAction, stuckProject } from './stalls';
+import { pluralize } from './words';
+import { crewNudge } from './crewNudge';
 
 export type OpId = 'shelter' | 'water' | 'power' | 'food' | 'defense';
 export interface OpItem {
@@ -45,11 +47,11 @@ export function operational(s: GameState, drive?: readonly Pt[], report?: Defens
 
   // shelter: a finished home with a bed for everyone
   const people = s.people.length, beds = homeBeds(s), homes = s.structures.filter(st => isHome(st.kind));
-  const stuck = stuckProject(s);
+  const stuck = stuckProject(s), nudge = crewNudge(s);
   const shelterDone = homes.some(isFinished) && beds >= people;
   out.push({ id: 'shelter', label: 'Shelter', done: shelterDone,
-    line: shelterDone ? `${beds} beds for ${people}` : homes.length === 0 ? 'No roof yet' : !homes.some(isFinished) ? 'Home going up' : `${people - beds} without a bed`,
-    ...(shelterDone ? {} : homes.length === 0 ? { act: stake('timber_cabin', 'Stake a cabin') } : homes.some(isFinished) ? { act: stake('cottage', 'Add a cottage') } : stuck?.at && homes.some(h => h.id === stuck.at) ? { act: { label: stuckAction(stuck), act: { type: 'order' as const, lines: stuck.lines } } } : { act: { label: 'Projects', act: { type: 'select' as const, id: homes[0].id } } }) });
+    line: shelterDone ? `${pluralize(beds, 'bed')} for ${people}` : homes.length === 0 ? 'No roof yet' : !homes.some(isFinished) ? 'Home going up' : `${people - beds} without a bed`,
+    ...(shelterDone ? {} : homes.length === 0 ? { act: stake('timber_cabin', 'Stake a cabin') } : homes.some(isFinished) ? { act: stake('cottage', 'Add a cottage') } : stuck?.at && homes.some(h => h.id === stuck.at) ? { act: { label: stuckAction(stuck), act: { type: 'order' as const, lines: stuck.lines } } } : nudge && homes.some(h => h.id === nudge.id) ? { act: { label: `Hire a crew (~$${nudge.usd.toLocaleString('en-US')})`, act: { type: 'crew' as const, id: nudge.id } } } : { act: { label: 'Projects', act: { type: 'select' as const, id: homes[0].id } } }) });
 
   // water
   // a source standing is not water in the house when it was meant to reach it: a pump with no power, or a home with no running water, keeps the tick off (QA run 4: the tick lied)

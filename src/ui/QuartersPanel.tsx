@@ -12,6 +12,7 @@ import { householdsOf, livingPeople, moveHousehold, residentsOfStructure, ROLE_H
 import { KIT } from '../game/buildkit/kit';
 import { Group, Hint, Note } from './hud/common';
 import { DIM } from './hud/style';
+import { pluralize } from '../sim/words';
 
 const sel: CSSProperties = { background: '#3a3d34', color: '#eee', border: 0, borderRadius: 6, fontSize: 12, padding: '2px 4px', maxWidth: 150 };
 
@@ -57,7 +58,7 @@ export function QuartersPanel() {
             </span>
             <select style={sel} value={chosen} aria-label={`Move ${h.name}`} onChange={e => g.money(d => moveHousehold(d, h.id, e.target.value || null, moves))}>
               <option value="">Auto</option>
-              {homes.map(x => <option key={x.id} value={x.id}>Move to {label(x.id)} ({HOME_BEDS[x.kind]} beds)</option>)}
+              {homes.map(x => <option key={x.id} value={x.id}>Move to {label(x.id)} ({pluralize(HOME_BEDS[x.kind], 'bed')})</option>)}
             </select>
           </div>;
         })}

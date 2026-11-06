@@ -45,6 +45,7 @@ import { raidPressure } from './opsec';
 import { demandNow } from './heating';
 import { logGate } from './nag';
 import type { Encounter, Outcome, Stance } from './encounters';
+import { pluralize } from './words';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -738,7 +739,7 @@ export function moveInCard(s: GameState, id: string, voluntary = false): Encount
       ? `The place in town is rented, ${money(w.town.rent!)} a month. Nothing to sell and no market to fall: give notice and the deposit comes back. The rent is the cost of every week they wait.`
       : q ? `The town house: worth about ${money(w.town.value)} in a normal market, ${money(q.value)} now (${Math.round(q.factor * 100)} %) with ${money(q.mortgage)} still owed. ${block ? `You cannot sell: ${block}.` : q.net >= 0 ? `Sold today it would clear ${money(q.net)} after the agent and the mortgage. Next month it will be worth less, and soon it will not sell at all.` : `Sold today it would leave ${money(-q.net)} owed on the mortgage, which you would have to cover. Next month it will be worth less, and soon it will not sell at all.`}` : 'The town house is already sold.',
     jobs.length ? `Jobs: ${jobs.map(j => `${j.person.first} (${j.person.job!.title.toLowerCase()}) ${j.remote ? (w.keepJobs ? 'can keep working from the place' : 'would quit (you chose to quit them all)') : 'would have to quit: the drive is ' + Math.round(w.driveMiles / 55 * 60) + ' minutes each way'}`).join('; ')}.` : 'Nobody has a job left to give up.',
-    `The place is ${w.driveMiles} miles up the road: about ${Math.round(w.driveMiles / 55 * 10) / 10} hours each way. Every week in town is a week not building, and the day the roads close they are on the wrong end.`,
+    `The place is ${w.driveMiles} miles up the road: about ${pluralize(Math.round(w.driveMiles / 55 * 10) / 10, 'hour')} each way. Every week in town is a week not building, and the day the roads close they are on the wrong end.`,
   ];
   return {
     id, kind: 'move_in', day,
@@ -891,9 +892,9 @@ function strandedDay(s: GameState, w: Weekend): string[] {
   w.stranded = null;
   const reasonHome = moveIn(s, { sell: false, reason: 'hit' });
   void reasonHome;
-  const text = `The family reaches the place after ${Math.max(1, Math.round(s.clock.t - st.since))} days. ${lines.length > 1 ? lines.slice(1).join(' ') : ''}`.trim();
+  const text = `The family reaches the place after ${pluralize(Math.max(1, Math.round(s.clock.t - st.since)), 'day')}. ${lines.length > 1 ? lines.slice(1).join(' ') : ''}`.trim();
   s.gate.card = { title: 'Home at last', text, tone: 'mixed', lines: ['The town house is locked up behind them.', ...reasonHome.slice(0, 1)] };
-  out.push(`The family is home, after ${Math.max(1, Math.round(s.clock.t - st.since))} days on the road from town.`);
+  out.push(`The family is home, after ${pluralize(Math.max(1, Math.round(s.clock.t - st.since)), 'day')} on the road from town.`);
   return out;
 }
 

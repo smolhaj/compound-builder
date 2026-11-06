@@ -13,6 +13,7 @@ import { carryLines, carryOf, givePlace, loyaltyWord, originLabel, placeOptions,
 import { Hint, Note, Row, Section } from './hud/common';
 import { DIM } from './hud/style';
 import { whereText } from './kinText';
+import { pluralize } from '../sim/words';
 
 const btn = (primary = false) => ({ padding: '2px 7px', borderRadius: 6, border: 0, cursor: 'pointer', background: primary ? '#d8c9a0' : '#3a3d34', color: primary ? '#1c1d18' : '#eee', fontSize: 11.5 } as const);
 
@@ -34,11 +35,11 @@ export function NewcomersPanel() {
   return (
     <Section title="Newcomers and carrying capacity">
       <div data-testid="carry-panel">
-        <Row label="People to feed" value={`${c.people} · ${c.days === Infinity ? 'the fields cover it' : `${Math.round(c.days)} days of food`}`} tone={tone} title="Days of food on hand at this headcount, after what the fields and animals grow" />
-        <Row label="Carries for six months" value={`${c.people + c.headroom} people${c.headroom > 0 ? ` (${c.headroom} more)` : ''}`} tone={c.headroom > 0 ? 'good' : 'warn'} />
+        <Row label="People to feed" value={`${c.people} · ${c.days === Infinity ? 'the fields cover it' : `${pluralize(Math.round(c.days), 'day')} of food`}`} tone={tone} title="Days of food on hand at this headcount, after what the fields and animals grow" />
+        <Row label="Carries for six months" value={`${pluralize(c.people + c.headroom, 'person')}${c.headroom > 0 ? ` (${c.headroom} more)` : ''}`} tone={c.headroom > 0 ? 'good' : 'warn'} />
         <Row label="Beds" value={housingSummary(game).replace('beds ', '')} />
         {c.level === 'over' && !c.fromStores && <Hint tone="bad" more="The whole table feels it: morale falls, loyalty falls, and people start to leave.">{lines[lines.length - 1]}</Hint>}
-        {c.fromStores && c.level !== 'ok' && <Hint tone="warn" more="The grocery stores are open, but the food you hold for the day they close would feed this table only that long.">Held for the day the stores close: {Math.round(c.days)} days.</Hint>}
+        {c.fromStores && c.level !== 'ok' && <Hint tone="warn" more="The grocery stores are open, but the food you hold for the day they close would feed this table only that long.">Held for the day the stores close: {pluralize(Math.round(c.days), 'day')}.</Hint>}
       </div>
       {bonds.map(b => {
         const i = game.people.findIndex(p => p.id === b.id);
@@ -64,11 +65,11 @@ export function NewcomersPanel() {
           <div style={{ display: 'flex', gap: 4, marginTop: 3, flexWrap: 'wrap' }}>
             {b.kind !== 'guest' && <button style={btn()} disabled={!opts.length} title={opts.length ? 'A building of their own: a door to close, and a better night' : 'No home with enough beds left (build a cottage or a guest house)'} onClick={() => setPick(pick === b.id ? null : b.id)}>Give {solo ? `${p.first} ` : mates.length > 1 ? 'them ' : ''}a place{opts.length ? '' : ' (none free)'}</button>}
             {b.neighbor && <button style={btn()} title="They go back to their own place, on good terms" onClick={() => g.money(d => sendAway(d, b.id, true))}>{b.kind === 'guest' ? 'Send them home' : 'Let them go home'}</button>}
-            {b.kind !== 'guest' && b.vet !== 'cleared' && <button style={btn()} disabled={!!vetBondProblem(game, b.id)} title={vetBondProblem(game, b.id) ?? `Background check: $${INSIDER.JOIN_COST} and ${INSIDER.JOIN_DAYS} days. A thief or a scout is found nine times in ten; a cleared newcomer is loyal for good.`} onClick={() => g.money(d => startVetBond(d, b.id))}>{b.vet === 'pending' ? 'Check under way' : `Vet · $${INSIDER.JOIN_COST}`}</button>}
+            {b.kind !== 'guest' && b.vet !== 'cleared' && <button style={btn()} disabled={!!vetBondProblem(game, b.id)} title={vetBondProblem(game, b.id) ?? `Background check: $${INSIDER.JOIN_COST} and ${pluralize(INSIDER.JOIN_DAYS, 'day')}. A thief or a scout is found nine times in ten; a cleared newcomer is loyal for good.`} onClick={() => g.money(d => startVetBond(d, b.id))}>{b.vet === 'pending' ? 'Check under way' : `Vet · $${INSIDER.JOIN_COST}`}</button>}
             <button style={btn()} title="Thank them and point them down the road. It will be remembered." onClick={() => g.money(d => sendAway(d, b.id, false))}>Send away</button>
           </div>
           {pick === b.id && <div style={{ display: 'flex', gap: 4, marginTop: 3, flexWrap: 'wrap' }}>
-            {opts.map(o => <button key={o.id} style={btn(true)} onClick={() => { const w = g.money(d => givePlace(d, b.id, o.id, solo)); if (!w) setPick(null); }}>{o.label} ({o.left} beds)</button>)}
+            {opts.map(o => <button key={o.id} style={btn(true)} onClick={() => { const w = g.money(d => givePlace(d, b.id, o.id, solo)); if (!w) setPick(null); }}>{o.label} ({pluralize(o.left, 'bed')})</button>)}
           </div>}
         </div>;
       })}

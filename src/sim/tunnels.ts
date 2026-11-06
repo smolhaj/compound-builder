@@ -23,6 +23,7 @@ import { regionFor } from './climate';
 import { windExposure } from './renewables';
 import { windbreakNear } from './microclimate';
 import { crackFilm, pendingFixes } from './improvements';
+import { pluralize } from './words';
 
 export const TUNNEL_KINDS = ['polytunnel', 'high_tunnel'] as const;
 export const isTunnel = (kind: string): boolean => (TUNNEL_KINDS as readonly string[]).includes(kind);
@@ -102,5 +103,5 @@ export function tunnelDay(s: GameState): string[] {
 /** Plain words for a tunnel's card. */
 export function tunnelNote(s: GameState, st: Structure): string {
   const age = filmYears(s, st);
-  return age >= FILM_YEARS ? `Film ${age.toFixed(1)} years old: chalky, ${Math.round((1 - filmLight(s, st)) * 100)} % less light.` : `Film ${age.toFixed(1)} years old; good for ${(FILM_YEARS - age).toFixed(1)} more.`;
+  return age >= FILM_YEARS ? `Film ${pluralize(age.toFixed(1), 'year')} old: chalky, ${Math.round((1 - filmLight(s, st)) * 100)} % less light.` : `Film ${pluralize(age.toFixed(1), 'year')} old; good for ${(FILM_YEARS - age).toFixed(1)} more.`;
 }

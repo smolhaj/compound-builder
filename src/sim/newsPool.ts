@@ -7,6 +7,7 @@
  * hundred days of fresh news. Pure (tested).
  */
 import type { RegionId } from './regions';
+import { pluralize } from './words';
 
 export type Season = 'spring' | 'summer' | 'fall' | 'winter';
 export const seasonOf = (doy: number): Season => (doy >= 60 && doy < 152 ? 'spring' : doy >= 152 && doy < 244 ? 'summer' : doy >= 244 && doy < 335 ? 'fall' : 'winter');
@@ -88,7 +89,7 @@ export interface ReviewFacts {
 }
 
 const usd = (n: number) => '$' + Math.round(Math.abs(n)).toLocaleString('en-US');
-const days = (d: number) => (Number.isFinite(d) ? (d >= 365 ? `${(d / 365).toFixed(1)} years` : `${Math.round(d)} days`) : 'plenty');
+const days = (d: number) => (Number.isFinite(d) ? (d >= 365 ? `${pluralize((d / 365).toFixed(1), 'year')}` : `${pluralize(Math.round(d), 'day')}`) : 'plenty');
 
 /**
  * One line for the log at the start of each season: where the place stands,

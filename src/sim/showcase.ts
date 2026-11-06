@@ -20,6 +20,7 @@ import { polygonArea } from './ringShape';
 import { insideRing } from './compounds';
 import { KIT, footprint } from '../game/buildkit/kit';
 import type { FortressOptions } from './fortress';
+import { pluralize } from './words';
 
 /** What the design drives. The browser and the tests each supply their own. */
 export interface ShowcaseIO {
@@ -140,7 +141,7 @@ export function* mountainShowcaseSteps(io: ShowcaseIO, opts: ShowcaseOptions = {
   if (terr) {
     const spots = terr.tiers.map(t => [t.x, t.z] as [number, number]);
     const err = io.stakeTerraces(spots);
-    steps.push({ step: 'Terraced garden beds', ok: !err, at: spots[0], note: err ?? `${terr.tiers.length} beds on a ${terr.slopePct} % slope` });
+    steps.push({ step: 'Terraced garden beds', ok: !err, at: spots[0], note: err ?? `${pluralize(terr.tiers.length, 'bed')} on a ${terr.slopePct} % slope` });
   } else steps.push({ step: 'Terraced garden beds', ok: false, note: 'terraceSite found no 10-26 % fall near the home on the home block' });
 
   // ── the ring: wall, towers, gate garage, motor court, inner rings ──
@@ -230,7 +231,7 @@ function* benchShowcaseSteps(io: ShowcaseIO, opts: ShowcaseOptions): Generator<s
   if (terr) {
     const spots = terr.tiers.map(t => [t.x, t.z] as [number, number]);
     const err = io.stakeTerraces(spots);
-    steps.push({ step: 'Terraced garden beds', ok: !err, at: spots[0], note: err ?? `${terr.tiers.length} beds on a ${terr.slopePct} % slope` });
+    steps.push({ step: 'Terraced garden beds', ok: !err, at: spots[0], note: err ?? `${pluralize(terr.tiers.length, 'bed')} on a ${terr.slopePct} % slope` });
   } else steps.push({ step: 'Terraced garden beds', ok: false, note: 'terraceSite found no 10-26 % fall near the home' });
 
   // the ring round the compound (not the camp): wall, towers, keep ring

@@ -25,6 +25,7 @@ import { SHELF_TABS, SHELVES, shelvesNeeding, type ShelfTab } from '../sim/shelv
 import { plansNeed, plansNeedLines } from '../sim/guidance';
 import { shopIconArt } from './shopIcons';
 import { ammoLimit, buyAmmo, buyGun, CALIBER, CALIBERS, CLASS_USD, GUN, GUN_GROUP, GUNS, groupOf, gunPrices, issue, NFA_STAMP, practice, shopOpen, skillOf, stateBan, takeClass, type Caliber, type GunGroup, type GunModel } from '../sim/armory';
+import { pluralize } from '../sim/words';
 
 type Tab = ShelfTab | 'tools' | 'guns' | 'metals' | 'money';
 const TABS: Array<[Tab, string]> = [...SHELF_TABS.filter(([id]) => id !== 'defense'), ['tools', 'Tools'], ['guns', 'Guns & ammo'], ['defense', 'Kit & security'], ['metals', 'Gold & silver'], ['money', 'Money']];
@@ -313,7 +314,7 @@ export function ShopWindow() {
               <b>On the way</b>
               {onWay.map(o => <div key={o.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 6, color: C.dim }}><span>{o.lines.length} item{o.lines.length > 1 ? 's' : ''} · {usd(o.cost)}</span><span>{o.dueAt - game.clock.t < 1 ? 'today' : `in ${Math.ceil(o.dueAt - game.clock.t)} d`}</span></div>)}
             </div>}
-            <div style={{ fontSize: 11.5, color: C.dim }}>{pay === 'cash' ? 'The banks are shut: paying cash from the safe.' : pay === 'bank' ? `From checking. The truck comes in about ${2 + Math.floor(game.site.miles / 15)} days.` : 'Nobody is delivering now.'}</div>
+            <div style={{ fontSize: 11.5, color: C.dim }}>{pay === 'cash' ? 'The banks are shut: paying cash from the safe.' : pay === 'bank' ? `From checking. The truck comes in about ${pluralize(2 + Math.floor(game.site.miles / 15), 'day')}.` : 'Nobody is delivering now.'}</div>
             <button style={{ ...btn(true, !!why), padding: '7px 10px', fontWeight: 600 }} disabled={!!why} onClick={() => guard(total, () => { if (g.order(lines)) { setCart({}); setFoodCart({}); setNote(null); } })}>
               {why === 'cannot_afford' ? 'Not enough money' : why === 'no_deliveries' ? 'No deliveries' : 'Place the order'}
             </button>
@@ -438,7 +439,7 @@ function Guns({ onMsg }: { onMsg: (m: string | null) => void }) {
       </div>; })}
       </div>
     </div>)}
-    {a.pending.length > 0 && <div style={{ marginTop: 10 }}>{a.pending.map((p, i) => <div key={i} style={{ fontSize: 12, color: C.dim }}>{GUN[p.model].name}: {p.form4 ? (wait(p.readyAt) > 0 ? `Form 4 pending at the ATF, about ${Math.ceil(wait(p.readyAt) / 30)} month${wait(p.readyAt) > 45 ? 's' : ''} more` : 'approved: waiting at the dealer for the shop to open') : `ready in ${wait(p.readyAt)} days`}</div>)}</div>}
+    {a.pending.length > 0 && <div style={{ marginTop: 10 }}>{a.pending.map((p, i) => <div key={i} style={{ fontSize: 12, color: C.dim }}>{GUN[p.model].name}: {p.form4 ? (wait(p.readyAt) > 0 ? `Form 4 pending at the ATF, about ${Math.ceil(wait(p.readyAt) / 30)} month${wait(p.readyAt) > 45 ? 's' : ''} more` : 'approved: waiting at the dealer for the shop to open') : `ready in ${pluralize(wait(p.readyAt), 'day')}`}</div>)}</div>}
     <div style={{ fontWeight: 600, margin: '14px 0 6px' }}>Ammunition</div>
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8 }}>
       {CALIBERS.map((c: Caliber) => <div key={c} style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -507,7 +508,7 @@ function FoodShelves({ game, k, cart, add }: { game: GameState; k: number; cart:
       <Icon id={`f:${it.prop}`} tint={it.color} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}><b>{it.name}</b><span style={{ color: C.gold }}>{usd((it.price ?? 0) * k)}</span></div>
-        <div style={{ fontSize: 11.5, color: C.dim, lineHeight: 1.3, margin: '2px 0 6px' }}>{it.unit} · {it.kcal > 0 ? `${Math.round(it.kcal / 1000)}k kcal${need > 0 ? `, ${(it.kcal / need).toFixed(it.kcal / need >= 10 ? 0 : 1)} days` : ''}` : 'no calories'} · {keepsFor(lifeDays(game, id))}</div>
+        <div style={{ fontSize: 11.5, color: C.dim, lineHeight: 1.3, margin: '2px 0 6px' }}>{it.unit} · {it.kcal > 0 ? `${Math.round(it.kcal / 1000)}k kcal${need > 0 ? `, ${pluralize((it.kcal / need).toFixed(it.kcal / need >= 10 ? 0 : 1), 'day')}` : ''}` : 'no calories'} · {keepsFor(lifeDays(game, id))}</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <button style={btn()} onClick={() => add(id, -1)}>−</button>
           <span style={{ minWidth: 22, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{cart[id] ?? 0}</span>
@@ -527,7 +528,7 @@ function FoodShelves({ game, k, cart, add }: { game: GameState; k: number; cart:
         <Icon id="f:bucket" tint={0xb83a2a} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}><b>{kit.name}</b><span style={{ color: C.gold }}>{usd(cost * k)}</span></div>
-          <div style={{ fontSize: 11.5, color: C.dim, lineHeight: 1.3, margin: '2px 0 6px' }}>{kit.text} {kit.days} days for {game.people.length}.</div>
+          <div style={{ fontSize: 11.5, color: C.dim, lineHeight: 1.3, margin: '2px 0 6px' }}>{kit.text} {pluralize(kit.days, 'day')} for {game.people.length}.</div>
           <button style={btn()} onClick={() => { for (const [id, n] of units) add(id, n); }}>Add to the order</button>
         </div>
       </div>;

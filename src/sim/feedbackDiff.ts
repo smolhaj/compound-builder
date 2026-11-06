@@ -14,6 +14,9 @@ import { CREW_SIZE } from './crews';
 import { isFinished } from './construction';
 import { isHome } from './blueprints';
 import { dayIndex, type GameState } from './state';
+import { listText, materialCount, pluralize } from './words';
+import { FOOD, type FoodItemId } from './pantry';
+import { COURSES } from './courses';
 
 const usd = (n: number) => '$' + Math.round(n).toLocaleString('en-US');
 
@@ -30,7 +33,7 @@ export interface FeedbackEvent {
   flash: string[];
 }
 
-const plural = (n: number, one: string, many = one + 's') => `${n} ${n === 1 ? one : many}`;
+const plural = pluralize;
 const lower = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
 const kitName = (kind: string) => lower(KIT[kind]?.name ?? kind.replace(/_/g, ' '));
 
@@ -39,10 +42,15 @@ function listNames(names: string[]): string {
   return `${names.slice(0, 2).join(', ')} and ${names.length - 2} more`;
 }
 
-/** Quantities for an order or a purchase: "30 lumber, 4 nails and 2 more". */
-function linesText(lines: ReadonlyArray<{ material: MaterialId; qty: number }>): string {
-  const bits = lines.map(l => { const q = qtyText(l.qty); return q === null ? null : `${q} ${(MATERIALS[l.material]?.name ?? l.material).toLowerCase()}`; }).filter((x): x is string => !!x);
-  return listNames(bits);
+/** Quantities for an order or a purchase: "30 lumber, 4 hardware and 2 more kinds of supplies". Up to three items by name. */
+function linesText(lines: ReadonlyArray<{ material: MaterialId; qty: number; food?: FoodItemId; n?: number }>): string {
+  const bits = lines.map(l => {
+    if (l.food && FOOD[l.food]) return `${l.n ?? l.qty} ${FOOD[l.food].name.toLowerCase()}`;
+    const q = qtyText(l.qty);
+    return q === null ? null : materialCount(l.material, l.qty, MATERIALS[l.material]?.name ?? l.material, q);
+  }).filter((x): x is string => !!x);
+  if (bits.length <= 3) return listText(bits);
+  return `${bits.slice(0, 3).join(', ')} and ${bits.length - 3} more kinds of supplies`;
 }
 
 /**
@@ -57,7 +65,7 @@ export function diffAction(prev: GameState, next: GameState): FeedbackEvent[] {
   const seenOrders = new Set(prev.orders.map(o => o.id));
   const fresh = next.orders.filter(o => !seenOrders.has(o.id));
   if (fresh.length) {
-    const lines = fresh.flatMap(o => o.lines.map(l => ({ material: l.material, qty: l.qty })));
+    const lines = fresh.flatMap(o => o.lines.map(l => ({ material: l.material, qty: l.qty, food: l.food, n: l.n })));
     const due = Math.max(...fresh.map(o => o.dueAt)) - next.clock.t;
     out.push({ kind: 'order', title: `Ordered ${linesText(lines)}`, cost: fresh.reduce((a, o) => a + o.cost, 0), note: due >= 1 ? `Arrives in about ${plural(Math.round(due), 'day')}.` : 'Arrives today.', flash: ['tab:supplies'] });
   }
@@ -88,6 +96,13 @@ export function diffAction(prev: GameState, next: GameState): FeedbackEvent[] {
   }
   const guardsBefore = prev.guards?.staff.length ?? 0, guardsNow = next.guards?.staff.length ?? 0;
   if (guardsNow > guardsBefore) out.push({ kind: 'hire', title: `Hired a guard (${plural(guardsNow, 'guard')} on staff)`, cost: Math.max(0, spent), note: 'Paid by the month.', flash: ['tab:defense'] });
+  // a course signed up for
+  const seenCourses = new Set((prev.courses?.enrolled ?? []).map(e => e.id));
+  const signed = (next.courses?.enrolled ?? []).filter(e => !seenCourses.has(e.id));
+  if (signed.length) {
+    const who = (pid: string) => next.people.find(p => p.id === pid)?.first ?? 'Someone';
+    out.push({ kind: 'spend', title: `Signed ${listText(signed.map(e => who(e.pid)))} up for the ${listText([...new Set(signed.map(e => COURSES[e.course].name.toLowerCase()))])}`, cost: Math.max(0, spent), note: '', flash: ['tab:family'] });
+  }
   // anything else that cost or brought money: say what came in
   if (!out.length && Math.abs(spent) >= 1) {
     const got = (Object.keys(next.stock) as MaterialId[]).map(k => ({ material: k, qty: (next.stock[k] ?? 0) - (prev.stock[k] ?? 0) })).filter(l => l.qty > 0.005 && MATERIALS[l.material]);

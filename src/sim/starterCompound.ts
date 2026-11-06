@@ -24,6 +24,7 @@ import { SAFE_M } from './sanitation';
 import { mulberry32 } from './rng';
 import type { Rect } from './land';
 import type { GameState, Structure } from './state';
+import { pluralize } from './words';
 
 export type StarterRole = 'shelter' | 'water' | 'power' | 'sanitation' | 'food' | 'defense';
 
@@ -207,7 +208,7 @@ export function planStarter(s: GameState, o: StarterOpts): StarterPlan {
     const c = i === 0 ? (spots.get('home') ?? { x: camp[0], z: camp[1] }) : spots.get('home')!;
     // a first home goes beside the camp; it is flat ground first, then near the drive
     const spot = find(kind, c, i === 0 && !existingHome ? [0, 8] : [2, 8], i === 0 && !existingHome ? 2 : 4, 18, undefined, Infinity);
-    add(key, kind, 'shelter', `${HOME_BEDS[kind]} beds for the family of ${people}`, spot);
+    add(key, kind, 'shelter', `${pluralize(HOME_BEDS[kind], 'bed')} for the family of ${people}`, spot);
     if (i === 0 && spot && !existingHome) spots.set('home', spot);
   });
   const home = spots.get('home');

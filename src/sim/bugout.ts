@@ -32,6 +32,7 @@ import type { Person } from './family';
 import { fallbackHouse } from './weekender';
 import { boatSeats } from './waterfront';
 import { cacheMiles, rollJourney, routeRisk, FOOT_KM_DAY, MILE_KM, type BugDest, type BugMode, type JourneyOutcome, type RouteRisk } from './bugoutRoute';
+import { pluralize } from './words';
 
 export type { BugDest, BugMode, JourneyOutcome } from './bugoutRoute';
 
@@ -149,7 +150,7 @@ export function bugOut(s: GameState, opts: { mode?: BugMode; dest?: BugDest } = 
   s.ending = { kind: 'bug_out', day, continued: false };
   s.clock.speed = 0;
   const how = plan.mode === 'foot' ? 'on foot' : `in ${plan.vehicles.length} vehicle${plan.vehicles.length === 1 ? '' : 's'}`;
-  log(s, `The ${s.people[0]?.last ?? ''} family bugged out ${how}: ${plan.going.length} of ${plan.going.length + plan.left.length}, ${plan.foodDays} days of food, bound for ${plan.destName}${plan.miles ? ` (${plan.miles} miles)` : ''}.`);
+  log(s, `The ${s.people[0]?.last ?? ''} family bugged out ${how}: ${plan.going.length} of ${plan.going.length + plan.left.length}, ${pluralize(plan.foodDays, 'day')} of food, bound for ${plan.destName}${plan.miles ? ` (${plan.miles} miles)` : ''}.`);
   return null;
 }
 
