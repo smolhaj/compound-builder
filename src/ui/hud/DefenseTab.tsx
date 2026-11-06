@@ -22,7 +22,7 @@ import { razorBill, razorHours, razorProblem } from '../../sim/razor';
 import { bridgeDown, rebuildQuote, roadBridgeOf, roadLine } from '../../sim/roadFx';
 import { clearQuote, corridorLines } from '../../sim/corridors';
 import { canHostWalkway, walkOn, walkwayBill, walkwayProblem } from '../../sim/walkway';
-import { adaptLevel, firstWinter, sinceHit } from '../../sim/adaptive';
+import { firstWinter, sinceHit } from '../../sim/adaptive';
 import { adaptOf, postureOf } from '../../sim/encounters';
 import { reputation } from '../../sim/reputation';
 import { dayIndex } from '../../sim/state';
@@ -47,7 +47,7 @@ function CheckRow({ c }: { c: Check }) {
   return <div title={c.detail} style={{ display: 'flex', gap: 6, padding: '2px 0', alignItems: 'baseline' }}>
     <span style={{ color: TONE[c.tone], width: 14, textAlign: 'center' }}>{c.ok ? '✓' : '✕'}</span>
     <span style={{ flex: 1 }}>{c.label}</span>
-    <span style={{ color: DIM, fontSize: 11.5, textAlign: 'right', maxWidth: '50%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={c.detail}>{c.detail}</span>
+    <span style={{ color: DIM, fontSize: 11.5, textAlign: 'right', maxWidth: '55%', overflowWrap: 'anywhere' }} title={c.detail}>{c.detail}</span>
     {dog && <button style={{ ...btn(), padding: '1px 6px', fontSize: 11 }} title="Put this dog on a post at the line, or keep it inside with the family" onClick={() => money(g => { const d = g.dogs.find(x => x.id === dog); return d ? setGuard(g, dog, !d.guard) : null; })}>{c.detail.startsWith('on the post') ? 'bring in' : 'post'}</button>}
   </div>;
 }
@@ -121,7 +121,7 @@ export function DefenseTab() {
   const d = defenseReport(game, w.siteGeo?.drive);
   const missingGate = ungatedCrossings(game, w.siteGeo?.drive).length;
   const exposed = d.homes.filter(h => !h.covered);
-  const hardcore = adaptLevel(game) > 0;
+  const hardcore = game.disaster.difficulty === 'hardcore';   // (the crews adapt a little on every difficulty; the notes about it are Hardcore's)
   const terrain = terrainDefense(game);
   return <>
     <Section title="Defense">

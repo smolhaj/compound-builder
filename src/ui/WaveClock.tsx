@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { waveStatus, type WaveStatus } from '../sim/waveStatus';
 import { dayIndex } from '../sim/state';
+import { runOver } from '../sim/wipe';
 import { DIM, FS, TONE } from './hud/style';
 
 /** Ten small steps, one per wave on the ladder: waves behind you filled, the coming one lit, the rest dark. */
@@ -20,7 +21,7 @@ function useWave(): WaveStatus | null {
   const day = dayIndex(game.clock.t);
   // worked out once a day (and when a card changes), not every frame
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  return useMemo(() => waveStatus(game), [day, game.gate.waves?.n, game.gate.pending, game.gate.incoming, game.disaster.phase]);
+  return useMemo(() => (runOver(game) ? null : waveStatus(game)), [day, game.gate.waves?.n, game.gate.pending, game.gate.incoming, game.disaster.phase, game.ending?.kind]);
 }
 
 export function WaveChip({ onClick }: { onClick?: () => void }) {

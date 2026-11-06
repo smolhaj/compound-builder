@@ -125,4 +125,14 @@ describe('celebrations', () => {
     const c = celebrations(a, b);
     expect(c.map(x => x.id)).toContain('first_harvest');
   });
+
+  it('first night under a roof fires the night after the roof went on, and not years later', () => {
+    const a = base();
+    const st = planStructure(a, 'timber_cabin', 0, 0, 0); st.stage = 99; st.finishedAt = 10.0; a.clock.t = 10.5;
+    const b = clone(a); b.clock.t = 11.0;
+    expect(celebrations(a, b).map(x => x.id)).toContain('first_roof');
+    const late = clone(a); late.clock.t = 400.2;
+    const later = clone(a); later.clock.t = 400.9;
+    expect(celebrations(late, later).map(x => x.id)).not.toContain('first_roof');
+  });
 });

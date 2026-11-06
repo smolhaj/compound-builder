@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { collapseChip } from '../sim/collapseChip';
 import { dayIndex } from '../sim/state';
+import { runOver } from '../sim/wipe';
 import { DIM, TONE } from './hud/style';
 
 /** `onOpen`: where a click goes (the compound board, which carries the warning, the readiness lines and the next steps). */
@@ -11,7 +12,7 @@ export function CollapseChip({ onOpen }: { onOpen?: () => void }) {
   const day = dayIndex(game.clock.t);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const c = useMemo(() => collapseChip(game), [day, game.disaster.phase, game.disaster.hitAt]);
-  if (!c) return null;
+  if (!c || runOver(game)) return null;
   const col = c.tone === 'dim' ? DIM : TONE[c.tone];
   return <button type="button" onClick={onOpen} title={`${c.title}${onOpen ? ' (click: open the compound board)' : ''}`} aria-label={`Collapse clock: ${c.chip}`}
     style={{ cursor: onOpen ? 'pointer' : 'default', font: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(0,0,0,0.25)', border: `1px solid ${col}`, borderRadius: 6, padding: '2px 8px', color: col, fontSize: 13 }}>

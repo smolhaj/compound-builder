@@ -3,6 +3,7 @@ import { useGameStore } from '../store/gameStore';
 import { useBattleStore } from '../store/battleStore';
 import { useCutsceneView } from '../store/cutsceneStore';
 import { clockLabel, gapLabel } from '../sim/siege';
+import { afterLabel } from '../sim/aftermathLabel';
 import type { Battle } from '../sim/battleTypes';
 import { STANCE } from './stanceText';
 
@@ -126,6 +127,7 @@ function MoreLines({ rounds, lines }: { rounds: number; lines: string[] }) {
 /** The short report after the scenes: who was hurt, what was lost, who is left on the drive. */
 function Report() {
   const c = useGameStore(s => s.cutscene)!;
+  const hour = c.plan ? (c.hour + c.plan.totalGame / 3600) % 24 : c.hour;   // the clock the top bar reads in the aftermath
   const end = useGameStore(s => s.endCutscene);
   const r = c.report!;
   const tone = r.tone === 'good' ? '#a8d080' : r.tone === 'bad' ? '#f08070' : '#e8c880';
@@ -134,7 +136,7 @@ function Report() {
   return (
     <div style={card}>
       <div style={{ height: 3, background: tone, marginBottom: 12 }} />
-      <div style={label}>The morning after</div>
+      <div style={label}>{afterLabel(hour)}</div>
       <div style={{ fontSize: 22, fontWeight: 600, margin: '2px 0 6px' }}>{r.title}</div>
       <div style={{ opacity: 0.85, marginBottom: 8, fontSize: 13.5, lineHeight: 1.35, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }} title={r.text}>{r.text}</div>
       {row('Killed', r.killed.length ? r.killed.join(', ') : none, r.killed.length > 0)}
