@@ -127,7 +127,7 @@ export interface BuildAdvice {
 }
 
 const hasKind = (s: GameState, ...kinds: string[]) => s.structures.some(st => kinds.includes(st.kind));
-const hasPower = (s: GameState) => !!s.site.improvements?.power || hasKind(s, 'solar_array', 'garage_solar', 'lodge_solar', 'generator_shed', 'battery_shed');
+const hasPower = (s: GameState) => (!!s.site.improvements?.power && s.disaster.tracks.grid > 0.5) || hasKind(s, 'solar_array', 'garage_solar', 'lodge_solar', 'generator_shed', 'battery_shed');
 
 /** What to order for people who are strained: wearing-thin restocks first, then the evenings' missing goods (a strained child wants toys and picture books). At most three lines. */
 export function moodOrderLines(s: GameState, mood: ReturnType<typeof moodSummary>): OrderLine[] {
@@ -302,7 +302,7 @@ export function suggestions(s: GameState, limit = 3, skip?: ReadonlySet<string>)
       const o = hookupTone(s, todo);
       out.push({ id: 'hookup', kind: '', title: o.optional ? `Run power to the ${name} (optional)` : `Finish the ${name}`, urgency: o.optional ? 30 : first.kind === 'wire' || first.kind === 'plumb' ? 75 : 62,
         why: `${first.text.toLowerCase()}${todo.length > 1 ? `; ${todo.length - 1} more building${todo.length > 2 ? 's' : ''} are not working yet either` : ''}`,
-        acts: [{ label: 'Show me', act: { type: 'select', id: first.id } }, ...(first.tool ? [{ label: 'Draw the line', act: { type: 'tool' as const, tool: first.tool } }] : [])] });
+        acts: [{ label: 'Show me', act: { type: 'select', id: first.id } }, ...(first.tool ? [{ label: 'Draw the line', act: { type: 'tool' as const, tool: first.tool } }] : first.stake && !buildOff(s, first.stake) ? [{ label: 'Stake solar', act: { type: 'stake' as const, kind: first.stake } }] : [])] });
     } }
   { const tip = storageTip(s);
     if (tip && !buildOff(s, tip.kind)) add('storage', tip.kind, tip.why, 58); }

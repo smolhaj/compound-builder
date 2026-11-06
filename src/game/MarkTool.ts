@@ -79,7 +79,8 @@ export class MarkTool {
   /** Mark / unmark the hovered tree (also QA). */
   markHover(): void {
     const t = this._hover;
-    if (!t || !ownsAt(useGameStore.getState().game, t.x, t.z)) return;
+    if (!t) { useGameStore.getState().showToast('Point at a tree on your land and click to mark it for felling.'); return; }
+    if (!ownsAt(useGameStore.getState().game, t.x, t.z)) { useGameStore.getState().showToast('That tree is on a neighbor\'s land.'); return; }
     const y = this._world.access.yard;
     useGameStore.getState().toggleMark({ id: t.id, x: t.x, z: t.z, kind: t.kind as 'conifer' | 'oval' | 'broad', scale: t.scale }, Math.hypot(t.x - y.x, t.z - y.z));
     this._setHover(t);

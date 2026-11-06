@@ -328,6 +328,9 @@ function outGLSL(): string {
     sky = min(sky, vec3(1.25));
     outgoingLight = body * (1.0 - Fr) + sky * Fr + spec + lamps + totalEmissiveRadiance;
     outgoingLight += mix(uSkyHor, uSkyTop, 0.5) * wRing * 0.22;
+    // never a hole: in the half-light of dawn, dusk and night (and under snow, where a lake sits in a white field) the light rig gives the
+    // water almost nothing, and it drew pure black. A lake keeps a dusky slate-blue floor, deeper in the middle; day light is far above it.
+    outgoingLight = max(outgoingLight, mix(vec3(0.034, 0.058, 0.080), vec3(0.018, 0.034, 0.052), smoothstep(0.1, 0.7, wDepth)) * (1.0 - wFoam * 0.5));
   }
   `;
 }
@@ -372,7 +375,7 @@ export function patchWaterMaterial(mat: THREE.MeshStandardMaterial, o: WaterPatc
         + seasonIceGlsl('vWPos', 'smoothstep(0.12, 0.4, wSpeed) * smoothstep(0.3, 0.75, wDepth) * wRiver', o.iceExpr)
         + '\n#include <opaque_fragment>');
   };
-  mat.customProgramCacheKey = () => 'water-v2-' + o.key + (o.flow ? '-f' : '') + (o.reflection ? '-m' : '');
+  mat.customProgramCacheKey = () => 'water-v3-' + o.key + (o.flow ? '-f' : '') + (o.reflection ? '-m' : '');
 }
 
 // ── Per-frame globals ────────────────────────────────────────────────────────

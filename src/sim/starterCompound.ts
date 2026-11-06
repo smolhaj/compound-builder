@@ -73,12 +73,14 @@ export interface StarterOpts {
   skip?: readonly string[];
 }
 
+/** The reason a piece has no spot (it is not a cash matter). */
+export const NO_ROOM = 'no clear, level enough ground near the house';
 const usd = (n: number) => '$' + Math.round(n).toLocaleString('en-US');
 
 /** The 70 m the utilities reach by themselves, in world units, less the room the pieces take: nothing stands farther than this from the house. */
 export const STARTER_REACH = 10;
 /** Pieces keep this much clear air between footprints (u, 4.5 m): room to walk and to carry. */
-const GAP = 0.75;
+const GAP = 0.75, GAP_TIGHT = 0.5;
 /** Share of the cash kept for living costs while the family builds, and its floor. */
 export const RESERVE_SHARE = 0.25, RESERVE_MIN = 15000;
 
@@ -159,20 +161,21 @@ export function planStarter(s: GameState, o: StarterOpts): StarterPlan {
   if (existingHome) spots.set('home', { x: existingHome.x, z: existingHome.z });
 
   /** The best clear spot for a kind around a center (null: none). Lower score wins; the seeded jitter breaks ties the same way every time. */
-  const find = (kind: string, c: { x: number; z: number }, r: readonly [number, number], ideal: number, slopeW: number, extra?: (x: number, z: number) => number | null, maxD = Infinity, from: { x: number; z: number } = c): { x: number; z: number; rot: number } | null => {
+  const findPass = (relaxed: boolean, kind: string, c: { x: number; z: number }, r: readonly [number, number], ideal: number, slopeW: number, extra?: (x: number, z: number) => number | null, maxD = Infinity, from: { x: number; z: number } = c): { x: number; z: number; rot: number } | null => {
     const def = KIT[kind];
     let best: { x: number; z: number; rot: number; sc: number } | null = null;
-    const R = r[1], step = CELL * 2;
+    // (a crowded lot, a farmstead with its barn and yard: the second pass looks a little farther, within what the utilities still reach, and keeps 3 m of air instead of 4.5)
+    const R = relaxed ? Math.max(r[1], Math.min(maxD, STARTER_REACH + 1)) : r[1], step = CELL * 2, gap = relaxed ? GAP_TIGHT : GAP, edge = relaxed ? 0.5 : 1;
     for (let dx = -R; dx <= R; dx += step) for (let dz = -R; dz <= R; dz += step) {
       const d = Math.hypot(dx, dz);
       if (d < r[0] || d > R) continue;
       for (const rot of [rotBias, 1 - rotBias]) {
         const [x, z] = snapCenter(def, c.x + dx, c.z + dz, rot);
-        if (Math.hypot(x - from.x, z - from.z) > maxD) continue;
+        if (Math.hypot(x - from.x, z - from.z) > (relaxed ? Math.min(maxD, STARTER_REACH + 1) : maxD)) continue;
         const fp = footprint(def, x, z, rot);
-        if (fp.x0 < h.x0 + 1 || fp.z0 < h.z0 + 1 || fp.x1 > h.x1 - 1 || fp.z1 > h.z1 - 1) continue;
+        if (fp.x0 < h.x0 + edge || fp.z0 < h.z0 + edge || fp.x1 > h.x1 - edge || fp.z1 > h.z1 - edge) continue;
         // clear air round every other footprint (the new piece's whole footprint, front included)
-        if (placed.some(p => KIT[p.kind] && KIT[p.kind].level !== 'underground' && rectOverlap(footprint(def, x, z, rot), footprint(KIT[p.kind], p.x, p.z, p.rot), GAP))) continue;
+        if (placed.some(p => KIT[p.kind] && KIT[p.kind].level !== 'underground' && rectOverlap(footprint(def, x, z, rot), footprint(KIT[p.kind], p.x, p.z, p.rot), gap))) continue;
         if (siteProblem(def, x, z, rot, site, placed as never) !== null) continue;
         if (padClash(def, x, z, rot, site.height, placed as never)) continue;
         const ex = extra ? extra(x, z) : 0;
@@ -183,12 +186,13 @@ export function planStarter(s: GameState, o: StarterOpts): StarterPlan {
     }
     return best;
   };
+  const find = (...a: Parameters<typeof findPass> extends [boolean, ...infer A] ? A : never) => findPass(false, ...a) ?? findPass(true, ...a);
 
   const pieces: StarterPiece[] = [];
   const left: Record<string, number> = { ...s.stock };
   const add = (key: string, kind: string, role: StarterRole, why: string, spot: { x: number; z: number; rot: number } | null) => {
     const base = { key, kind, role, name: KIT[kind].name, why };
-    if (!spot) { pieces.push({ ...base, x: 0, z: 0, rot: 0, usd: 0, permit: 0, hours: 0, later: true, laterWhy: 'no clear, level enough ground near the house' }); return; }
+    if (!spot) { pieces.push({ ...base, x: 0, z: 0, rot: 0, usd: 0, permit: 0, hours: 0, later: true, laterWhy: NO_ROOM }); return; }
     const p = priceOf(s, kind, spot.x, spot.z, spot.rot, left);
     placed.push({ id: `starter_${key}`, kind, x: spot.x, z: spot.z, rot: spot.rot });
     spots.set(key, { x: spot.x, z: spot.z });
@@ -286,6 +290,8 @@ function finish(s: GameState, pieces: StarterPiece[], yard: StarterYard | null, 
   const hours = now.reduce((a, p) => a + p.hours, 0) + (yard && !yard.later ? yard.hours : 0);
   const permits = now.reduce((a, p) => a + p.permit, 0);
   const count = now.length + (yard && !yard.later ? 1 : 0), later = pieces.length - now.length + (yard?.later ? 1 : 0);
-  const line = problem ?? (count === 0 ? 'Nothing fits the cash yet: see the list below.' : `${count} ${count === 1 ? 'piece' : 'pieces'} · ~${usd(total)} · ${hours.toLocaleString('en-US')} h${permits ? ` · permits ${usd(permits)}` : ''}${later ? ` · ${later} later` : ''}`);
-  return { pieces, yard, usd: total, hours, permits, cash, reserve, line, problem: problem ?? (count === 0 ? 'nothing fits the cash yet' : null) };
+  const noRoom = pieces.filter(p => p.laterWhy === NO_ROOM).length, cashLater = pieces.filter(p => p.later && p.laterWhy !== NO_ROOM && p.laterWhy !== 'left out by you').length + (yard?.later ? 1 : 0);
+  const none = count === 0 ? (noRoom > 0 && cashLater === 0 ? 'there is no clear, level ground left by the house for what is missing. Place it by hand from the Build list' : cashLater === 0 && noRoom === 0 ? 'everything is left out' : 'nothing fits the cash yet') : null;
+  const line = problem ?? (none ? `${none[0].toUpperCase()}${none.slice(1)}${noRoom > 0 && cashLater === 0 ? '.' : ': see the list below.'}` : `${count} ${count === 1 ? 'piece' : 'pieces'} · ~${usd(total)} · ${hours.toLocaleString('en-US')} h${permits ? ` · permits ${usd(permits)}` : ''}${later ? ` · ${later} later` : ''}`);
+  return { pieces, yard, usd: total, hours, permits, cash, reserve, line, problem: problem ?? none };
 }
