@@ -90,7 +90,7 @@ export function shelfDay(s: GameState): string[] {
   else {
     // mice in the stores (the sacks of staples above; buckets keep them out, and a concrete storeroom underground)
     s.stock.seed *= 0.999; s.stock.fresh *= 0.995;
-    if (before > 1 && r() < 1 / 30) out.push('Mice in the stores: chewed sacks and droppings in the staples. Set some traps.');
+    if (before > 1 && r() < 1 / 30) out.push('Mice in the pantry: chewed sacks and droppings in the staples. Set some traps.');
     // pack rats chew the wiring in a wired building, now and then
     if (r() < 1 / 120) {
       const wired = s.utilities.fittings.filter(f => f.kind === 'wire' && f.finishedAt !== null);

@@ -124,7 +124,7 @@ export function livestockDay(s: GameState, freezer: boolean): number {
     l.condition[a] = Math.min(1, Math.max(0, before + (fed >= 0.95 ? 0.02 : -0.06 * (1 - fed)) - exposed));
     if (exposed > 0.008 && logGate(s, 'sheep-cold', 20)) log(s, 'The sheep are standing in the snow with no barn: they are losing condition.');
     if (before >= 0.5 && l.condition[a] < 0.5) log(s, `The ${a === 'steer' ? 'steer is' : a + 's are'} short of feed and losing condition.`);
-    if (l.condition[a] <= 0) { s.stock[a] = head(s, a) - 1; l.condition[a] = 0.4; log(s, `A ${a} died: starved for want of ${EAT[a].hay > 0 ? 'hay' : 'feed'}.`); }
+    if (l.condition[a] <= 0) { s.stock[a] = head(s, a) - 1; l.condition[a] = 0.4; log(s, `A ${a} died: starved for lack of ${EAT[a].hay > 0 ? 'hay' : 'feed'}.`); }
   }
   // the barn pile: what the animals leave in the stalls (less on pasture) for the fields (sim/crops.ts)
   { const pile = ANIMALS.reduce((a, an) => a + head(s, an) * (MANURE[an] ?? 0), 0) * (grazing(s) ? 0.55 : 1); s.stock.manure = Math.min(PILE_MAX, (s.stock.manure ?? 0) + pile); }

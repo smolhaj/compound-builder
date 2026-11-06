@@ -19,7 +19,7 @@ export type RingShape = 'square' | 'rounded' | 'octagon' | 'irregular';
 
 export const RING_SHAPES: ReadonlyArray<{ id: RingShape; name: string; blurb: string }> = [
   { id: 'square', name: 'Square', blurb: 'Four straight walls and four corners: the cheapest to plan and the easiest to watch.' },
-  { id: 'rounded', name: 'Round', blurb: 'A rounded oval: no corners to hide behind, towers spread evenly round it. A little less ground inside for the same box.' },
+  { id: 'rounded', name: 'Round', blurb: 'A rounded oval: no corners to hide behind, towers spread evenly around it. A little less ground inside for the same box.' },
   { id: 'octagon', name: 'Octagon', blurb: 'Eight straight walls: corners cut off, so a tower on each looks along two walls at a gentler angle.' },
   { id: 'irregular', name: 'Follow the land', blurb: 'Pulls in where the ground drops away and runs out along the level, the way a wall hugs an outcrop. Every land is different.' },
 ];

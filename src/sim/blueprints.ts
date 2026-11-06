@@ -213,7 +213,7 @@ export const LODGE_BLUEPRINT: Blueprint = {
   stages: [
     { id: 'site', name: 'Stake out, cut the pad into the slope (hired excavator)', hours: 140, materials: { excavator: 4 } },
     { id: 'foundation', name: 'Footings, poured basement walls and slab, stone facing, waterproofing', hours: 1100, materials: { concrete: 100, rebar: 8, fieldstone: 40, membrane: 6 } },
-    { id: 'frame', name: 'Raise the two-storey log walls, floors, stone piers and the deck frame', hours: 3000, materials: { logs: 90, lumber: 45 } },
+    { id: 'frame', name: 'Raise the two-story log walls, floors, stone piers and the deck frame', hours: 3000, materials: { logs: 90, lumber: 45 } },
     { id: 'roof', name: 'Ridge beam, rafters and the standing-seam roof', hours: 1100, materials: { lumber: 30, roofing: 40 } },
     { id: 'finish', name: 'Glass gable, stone chimney, floors, stairs, kitchen, four baths, wraparound deck and rails', hours: 2700, materials: { lumber: 40, hardware: 70, fixtures: 6, cable: 10, pipe: 8, fieldstone: 6 } },
   ],
@@ -238,7 +238,7 @@ export const STONE_HOUSE_BLUEPRINT: Blueprint = {
   stages: [
     { id: 'site', name: 'Stake out & level the pad', hours: 60, materials: {} },
     { id: 'foundation', name: 'Footings and a stone-faced stem wall', hours: 500, materials: { concrete: 30, rebar: 3, fieldstone: 12 } },
-    { id: 'frame', name: 'Lay the stone walls, two storeys, and the floor joists', hours: 2300, materials: { fieldstone: 48, concrete: 6, lumber: 24 } },
+    { id: 'frame', name: 'Lay the stone walls, two stories, and the floor joists', hours: 2300, materials: { fieldstone: 48, concrete: 6, lumber: 24 } },
     { id: 'roof', name: 'Rafters, sheathing and the metal roof', hours: 500, materials: { lumber: 14, roofing: 18 } },
     { id: 'finish', name: 'Windows, doors, floors, stairs, kitchen and baths, the stone chimney', hours: 1440, materials: { lumber: 20, hardware: 40, fixtures: 3, cable: 5, pipe: 4, fieldstone: 4 } },
   ],
@@ -274,7 +274,7 @@ export const ADOBE_HOUSE_BLUEPRINT: Blueprint = {
   stages: [
     { id: 'site', name: 'Stake out & level the pad', hours: 40, materials: {} },
     { id: 'foundation', name: 'Dig the footings and the borrow pit (hired excavator), pour the stem wall', hours: 260, materials: { excavator: 3, concrete: 8 }, yields: { spoil: 70 } },
-    { id: 'frame', name: 'Ram the earth walls in forms, cement-stabilised, and set the vigas', hours: 1100, materials: { spoil: 60, concrete: 6, lumber: 12 } },
+    { id: 'frame', name: 'Ram the earth walls in forms, cement-stabilized, and set the roof beams (vigas)', hours: 1100, materials: { spoil: 60, concrete: 6, lumber: 12 } },
     { id: 'roof', name: 'Viga and plank roof, membrane and the metal roof', hours: 360, materials: { lumber: 10, membrane: 6, roofing: 10 } },
     { id: 'finish', name: 'Plaster, deep-set windows, slab floor, portal, kitchen and bath', hours: 840, materials: { concrete: 6, hardware: 24, fixtures: 2, cable: 4, pipe: 3 } },
   ],
@@ -286,7 +286,7 @@ export const FARMHOUSE_BLUEPRINT: Blueprint = {
   stages: [
     { id: 'site', name: 'Stake out', hours: 60, materials: {} },
     { id: 'foundation', name: 'Basement and footings', hours: 400, materials: { concrete: 30 } },
-    { id: 'frame', name: 'Two-storey frame', hours: 1400, materials: { lumber: 60 } },
+    { id: 'frame', name: 'Two-story frame', hours: 1400, materials: { lumber: 60 } },
     { id: 'roof', name: 'Roof', hours: 400, materials: { lumber: 12, roofing: 20 } },
     { id: 'finish', name: 'Siding, kitchen, baths, finish', hours: 1600, materials: { lumber: 30, hardware: 30, fixtures: 2, cable: 6 } },
   ],
@@ -527,7 +527,7 @@ export const BUNKER_BLUEPRINTS: Blueprint[] = [
   vaultBp('bunker_dorm', 120, [14, 22, 16], [4, 8, 6], 40, 140, 90, 60, { lumber: 10, hardware: 3, cable: 1 }, 'Vents, bunks, lockers, wiring'),
   vaultBp('bunker_galley', 120, [14, 22, 16], [4, 8, 6], 40, 140, 90, 70, { lumber: 6, hardware: 3, fixtures: 1, cable: 1 }, 'Vents, counter, sink, stove, wiring'),
   vaultBp('bunker_stores', 120, [14, 22, 16], [4, 8, 6], 40, 140, 90, 40, { lumber: 8, hardware: 2, cable: 1 }, 'Vents, shelving, wiring'),
-  vaultBp('bunker_plant', 120, [14, 22, 16], [4, 8, 6], 40, 140, 90, 80, { nbc_filter: 1, battery: 2, generator: 1, tank: 1, cable: 2, hardware: 2 }, 'NBC filter, batteries, generator, water tank'),
+  vaultBp('bunker_plant', 120, [14, 22, 16], [4, 8, 6], 40, 140, 90, 80, { nbc_filter: 1, battery: 2, generator: 1, tank: 1, cable: 2, hardware: 2 }, 'Fallout and gas filter, batteries, generator, water tank'),
   vaultBp('bunker_medical', 120, [14, 22, 16], [4, 8, 6], 40, 140, 90, 60, { fixtures: 1, lumber: 4, hardware: 3, cable: 1 }, 'Vents, sink, beds, cabinets, wiring'),
   vaultBp('bunker_comms', 50, [6, 10, 6], [2, 3, 2], 20, 70, 40, 40, { hardware: 4, cable: 2, lumber: 2 }, 'Radios, antenna lead, gun safe, wiring'),
   {
@@ -575,7 +575,7 @@ export const GATE_GARAGE_BLUEPRINT: Blueprint = bp('gate_garage', [
 /** A 3 kW micro-hydro plant on the creek bank: a concrete intake weir with a screen, 100 m of buried penstock, a turbine house on a slab. About $17,000 and 240 person-hours. */
 export const MICRO_HYDRO_BLUEPRINT: Blueprint = bp('micro_hydro', [
   ['site', 'Walk the creek, stake the intake, the penstock line and the house', 8, {}],
-  ['foundation', 'Trench the penstock (hired excavator), pour the house slab and the tailrace', 70, { excavator: 3, concrete: 3 }],
+  ['foundation', 'Trench the penstock (hired excavator), pour the house slab and the outflow channel', 70, { excavator: 3, concrete: 3 }],
   ['frame', 'Lay and fuse the penstock, frame the turbine house', 70, { penstock: 2, lumber: 2 }],
   ['roof', 'Pour the intake weir and screen box, roof the house', 40, { concrete: 3, roofing: 1, rebar: 1 }],
   ['finish', 'Set the turbine and alternator, wire the controller and the diversion load, bury the line', 52, { hydro_set: 1, cable: 2, hardware: 1 }],
@@ -658,7 +658,7 @@ export const CABIN_VILLAGE_BLUEPRINT: Blueprint = bp('cabin_village', [
   ['site', 'Lay out the ring: the green, the fire circle and six cabin pads', 12, {}],
   ['foundation', 'Pour the pier footings for six cabins and dig the paths', 120, { concrete: 6, fieldstone: 4 }],
   ['frame', 'Frame and sheathe six 4 x 4.5 m cabins, bunks built in', 260, { lumber: 18, hardware: 2 }],
-  ['roof', 'Rafters and a tin roof on each', 120, { roofing: 8, lumber: 2 }],
+  ['roof', 'Rafters and a metal roof on each', 120, { roofing: 8, lumber: 2 }],
   ['finish', 'Doors and windows facing the green, stoves, wiring and the fire circle', 160, { hardware: 6, cable: 3, lumber: 3 }],
 ]);
 /** A 12 x 12 m concrete helipad: gravel base, rebar, a double pour, edge lights and a windsock. About $9,000 and 130 person-hours. */

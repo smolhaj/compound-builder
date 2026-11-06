@@ -41,13 +41,13 @@ describe('Classes and drills (server-rendered)', () => {
     const t = text(renderToStaticMarkup(<ClassesSection />));
     expect(t).toMatch(new RegExp(`${g.people[1].first}\\s*: first aid and first responder`));
     expect(t).toContain('with a teacher at home');
-    expect(t).toContain('Amateur radio licence (Technician)');
+    expect(t).toContain('Amateur radio license (Technician)');
     expect(t).toContain('Twice a week');
     expect(t).toContain('Ready at the alarm');
     const row = text(renderToStaticMarkup(<PersonInsight p={g.people[1]} />));
     expect(row).toContain('Taking: first aid and first responder, 40 %');
     const row0 = text(renderToStaticMarkup(<PersonInsight p={g.people[0]} />));
-    expect(row0).toContain('Amateur radio licence');
+    expect(row0).toContain('Amateur radio license');
   });
 
   it('the household block shows the evenings\' goods and how worn they are', () => {

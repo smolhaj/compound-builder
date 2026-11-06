@@ -19,7 +19,7 @@ export const SOAP = { lard: 1, firewood: 0.5, hours: 4, hygiene: 3 } as const;
 /** Why no soap can be made now, or null. */
 export function soapProblem(s: GameState): string | null {
   if (foodUnits(s, 'lard') < SOAP.lard) return 'needs a pail of rendered lard (butcher a pig)';
-  if (s.stock.firewood < SOAP.firewood) return 'needs half a rick of firewood for the lye';
+  if (s.stock.firewood < SOAP.firewood) return 'needs half a face cord of firewood for the lye';
   const cook = Math.max(0, ...s.people.filter((p, i) => !p.kid && s.personState[i]?.needs.died == null).map(p => levelFor(s, p, 'cooking')));
   if (cook < 1) return 'needs a grown-up who can cook';
   return null;

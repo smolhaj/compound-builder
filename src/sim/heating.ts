@@ -51,7 +51,7 @@ export function burnFirewood(s: GameState, days: number): void {
       if (s.heat.warned !== day && (s.heat.warned < 0 || day - s.heat.warned >= OUT_REMINDER_DAYS || !prev || !prev.text.includes(place))) {
         const again = s.heat.warned >= 0 && !!prev && prev.text.includes(place);
         s.heat.warned = day;
-        log(s, `${again ? 'Out of firewood still' : 'Out of firewood'}: a cold night ${place}. Order a few ricks in the Shop (Heat), or mark trees to fell: green wood needs about nine months to season.`);
+        log(s, `${again ? 'Out of firewood still' : 'Out of firewood'}: a cold night ${place}. Order a few face cords in the Shop (Heat), or mark trees to fell: green wood needs about nine months to season.`);
       }
       return;
     }

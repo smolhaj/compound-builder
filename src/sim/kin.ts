@@ -474,7 +474,7 @@ export function kinDay(s: GameState): string[] {
     const cozy = d.difficulty === 'cozy';
     if (u < 0.5 || (cozy && u < 0.72)) {
       rf.fate = 'fine';
-      k.strain.push({ at: s.clock.t, points: 5, why: `word that ${names} are alright`, of: anchors });
+      k.strain.push({ at: s.clock.t, points: 5, why: `word that ${names} are all right`, of: anchors });
       out.push(`Word over the radio: ${names} ${rf.people.length > 1 ? 'are' : 'is'} alive and staying with a neighbor in town. Nobody mentions the day you said no, but the whole house breathes out.`);
     } else if (u < 0.78 || cozy) {
       rf.fate = 'came';

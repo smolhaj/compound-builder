@@ -54,11 +54,11 @@ export function WallProperty() {
       <Note tone="good">Laid out. The family builds it as the materials come in; the Defense tab's "Property line closed" check turns green when it is done.</Note>
       {need.length > 0 && <PlansOrderButton lines={need} />}
     </> : <>
-      <Note>One wall type for the whole line, or round a compound of the shape you pick. Pick it; the plan below updates.</Note>
+      <Note>One wall type for the whole line, or around a compound of the shape you pick. Pick it; the plan below updates.</Note>
       <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'center', padding: '2px 0 4px' }}>
         <span style={{ flex: 1, color: DIM }}>Around</span>
         <button style={{ ...btn(around === 'line'), padding: '2px 7px' }} title="The whole property line (the Defense tab's line check reads it)" onClick={() => setAround('line')}>Property line</button>
-        {RING_SHAPES.map(sh => <button key={sh.id} style={{ ...btn(around === sh.id), padding: '2px 7px' }} title={`A ${sh.name.toLowerCase()} compound round the family's buildings: ${sh.blurb}`} onClick={() => setAround(sh.id)}>{sh.name}</button>)}
+        {RING_SHAPES.map(sh => <button key={sh.id} style={{ ...btn(around === sh.id), padding: '2px 7px' }} title={`A ${sh.name.toLowerCase()} compound around the family's buildings: ${sh.blurb}`} onClick={() => setAround(sh.id)}>{sh.name}</button>)}
       </div>
       {plan && <div style={{ borderTop: `1px solid ${LINE}`, borderBottom: `1px solid ${LINE}`, margin: '6px 0', padding: '6px 0' }}>
         <div style={{ color: DIM, fontSize: 11.5, marginBottom: 2 }}>The plan for {PERIMETER[kind].name.toLowerCase()} (chips below show $ per 100 m):</div>

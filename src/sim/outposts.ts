@@ -9,7 +9,7 @@
  *                 the drive (+8 warning once there are people to sleep in them, +4 for a sleeper in only a few of them). Twelve beds' worth of
  *                 chimneys and lit windows show: opsec weight 8. A second roof if the main house burns.
  *  Helipad        a 12 x 12 m concrete pad with edge lights and a windsock. While the county works a hurt person who is bad enough (a deep
- *                 wound or burn, a broken leg or hip) is flown to a trauma centre instead of waiting on a drive: it is billed $38,000
+ *                 wound or burn, a broken leg or hip) is flown to a trauma center instead of waiting on a drive: it is billed $38,000
  *                 (15 % of that with insurance) and the case is closed (severity down to a recovering 25). No helicopter of your own.
  *                 It is loud and bright when used, and a landing zone shows from the air: opsec weight 7.
  *  Tower pod      a glazed observation pod on a 12 m mast (sim/towers.ts `tower_pod`): the longest sight of any tower, the worst cover.

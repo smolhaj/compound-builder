@@ -210,7 +210,7 @@ function* benchShowcaseSteps(io: ShowcaseIO, opts: ShowcaseOptions): Generator<s
   // the compound: a core square (24 units) that fits on the home block, with the tunnel's high portal in its corner towards the way up
   const home = io.game().site.home;
   const C: Pt = [Math.min(home.x1 - 12, Math.max(home.x0 + 12, high[0] + 6)), Math.min(home.z1 - 12, Math.max(home.z0 + 12, high[1] - 6))];
-  notes.push(`rock tunnel: ${boreText(bore.stats)}, from (${low.map(v => v.toFixed(1)).join(', ')}) up to (${high.map(v => v.toFixed(1)).join(', ')}); the compound is centred on (${C.map(v => v.toFixed(1)).join(', ')})`);
+  notes.push(`rock tunnel: ${boreText(bore.stats)}, from (${low.map(v => v.toFixed(1)).join(', ')}) up to (${high.map(v => v.toFixed(1)).join(', ')}); the compound is centered on (${C.map(v => v.toFixed(1)).join(', ')})`);
 
   const S = (kind: string, du: number, db: number, o: { rots?: number[]; radius?: number; label?: string } = {}): { x: number; z: number; rot: number } | null => {
     // du: along the fall from the compound's centre (negative: up the mountain), db: across
@@ -237,7 +237,7 @@ function* benchShowcaseSteps(io: ShowcaseIO, opts: ShowcaseOptions): Generator<s
   const concrete = opts.wall === 'concrete';
   yield 'Terraces';
   const fr = io.fortify({ scope: 'core', shape: 'irregular', wall: concrete ? 'concrete_wall' : 'stone_wall', towers: 5, towerKind: concrete ? 'watchtower_hex' : 'watchtower_octagon', passage: false, rings: opts.rings ?? 1, ringWall: 'stone_wall', ringSally: true, motorCourt: false, gate: false }, C);
-  steps.push({ step: `Fortify my ring (${concrete ? 'concrete wall, hexagon towers' : 'stone wall, octagon towers'}, round the bench)`, ok: fr.runs + fr.structures > 0, note: `${fr.runs} runs, ${fr.structures} structures` });
+  steps.push({ step: `Fortify my ring (${concrete ? 'concrete wall, hexagon towers' : 'stone wall, octagon towers'}, around the bench)`, ok: fr.runs + fr.structures > 0, note: `${fr.runs} runs, ${fr.structures} structures` });
   io.finishAll();
   yield 'Finishing';
   const ring1 = outerRingOf(io.game());

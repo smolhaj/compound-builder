@@ -74,7 +74,7 @@ export function cellarDay(s: GameState): string[] {
   s.stock.canned = Math.max(0, s.stock.canned - lost * FOOD.cellar_roots.kcal / 6000);
   if (e2.q < 1e-6) delete s.pantry.items.cellar_roots;
   const { doy } = calendarOf(s.clock);
-  if (t > 11 && doy > 100 && doy < 240 && e2.q * FOOD.cellar_roots.kcal > 40_000 && logGate(s, 'cellar-warm', 40)) out.push(`The cellar is warming up (${Math.round(t)} °C): the potatoes are sprouting and going soft. Eat or put up what is left.`);
+  if (t > 11 && doy > 100 && doy < 240 && e2.q * FOOD.cellar_roots.kcal > 40_000 && logGate(s, 'cellar-warm', 40)) out.push(`The cellar is warming up (${Math.round(t)} °C): the potatoes are sprouting and going soft. Eat or preserve what is left.`);
   return out;
 }
 
@@ -109,7 +109,7 @@ export function crowdDay(s: GameState): string[] {
   if (!s.pantry) return [];
   const o = overflow(s);
   s.pantry.crowd = 0.25 * o;
-  if (o > 0.25 && logGate(s, 'pantry-crowded', 120)) return [`The stores are stacked in every spare corner (${Math.round(o * 100)} % past the shelves): flour, oil and meal keep worse in a warm loft. A root cellar or a storeroom would give them room.`];
+  if (o > 0.25 && logGate(s, 'pantry-crowded', 120)) return [`Supplies are stacked in every spare corner (${Math.round(o * 100)} % past the shelves): flour, oil and meal keep worse in a warm loft. A root cellar or a storeroom would give them room.`];
   return [];
 }
 

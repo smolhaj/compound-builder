@@ -210,7 +210,7 @@ export const ORCHARD_TERRACED: KitPieceDef = {
 /** The cabin village (sim/outposts.ts): six sleeping cabins in a ring. */
 export const CABIN_VILLAGE: KitPieceDef = {
   id: 'cabin_village', name: 'Cabin village', category: 'home',
-  blurb: 'Six little sleeping cabins in a ring round a green and a fire circle, 24 m across: twelve bunks for kin, workers and the people you take in, and the blank backs of the cabins make the ring a wall. The outer cabins hear the drive (+8 warning). Chimneys and lit windows show from the road.',
+  blurb: 'Six little sleeping cabins in a ring around a green and a fire circle, 24 m across: twelve bunks for relatives, workers and the people you take in, and the blank backs of the cabins make the ring a wall. The outer cabins hear the drive (+8 warning). Chimneys and lit windows show from the road.',
   cellsX: 8, cellsZ: 8, frontCells: 0,
   parts: { foundation: 'concrete', walls: 'board_batten', roof: 'metal_roof' },
   maxSlope: 0.2, floorY: 0.08, porch: 0, sleeps: 0, light: [0, 0.3, 0],
@@ -218,7 +218,7 @@ export const CABIN_VILLAGE: KitPieceDef = {
 /** The helipad. */
 export const HELIPAD: KitPieceDef = {
   id: 'helipad', name: 'Helipad', category: 'work',
-  blurb: 'A 12 × 12 m concrete pad with edge lights and a windsock. While the county works, a bad wound, burn, or a broken leg or hip is flown to a trauma centre from it ($38,000, 15 % with insurance). No helicopter of your own. Loud, lit, and a landmark from the air.',
+  blurb: 'A 12 × 12 m concrete pad with edge lights and a windsock. While the county works, a bad wound, burn, or a broken leg or hip is flown to a trauma center from it ($38,000, 15 % with insurance). No helicopter of your own. Loud, lit, and a landmark from the air.',
   cellsX: 4, cellsZ: 4, frontCells: 0,
   parts: { foundation: 'concrete', walls: 'concrete', roof: 'concrete' },
   maxSlope: 0.08, floorY: 0.02, porch: 0, sleeps: 0, light: null,
@@ -265,7 +265,7 @@ export const POLYTUNNEL: KitPieceDef = {
 /** The high tunnel: nine metres of gothic frame with roll-up sides. */
 export const HIGH_TUNNEL: KitPieceDef = {
   id: 'high_tunnel', name: 'High tunnel', category: 'food',
-  blurb: '9 × 30 m gothic frame with roll-up sides and a double door: the garden five weeks earlier and later and 520 kcal a day of winter greens, unheated. Sheds snow badly (knock it off), tears in a gale on a windy spot, and breeds whitefly and mould in damp air. Four-year film.',
+  blurb: '9 × 30 m gothic frame with roll-up sides and a double door: the garden five weeks earlier and later and 520 kcal a day of winter greens, unheated. Sheds snow badly (knock it off), tears in a gale on a windy spot, and breeds whitefly and mold in damp air. Four-year film.',
   cellsX: 3, cellsZ: 10, frontCells: 0,
   parts: { foundation: 'concrete', walls: 'polycarb', roof: 'polycarb' },
   maxSlope: 0.1, floorY: 0.0, porch: 0, sleeps: 0, light: null,
@@ -338,7 +338,7 @@ export const LOG_HOUSE: KitPieceDef = {
  */
 export const LODGE: KitPieceDef = {
   id: 'lodge', name: 'Lodge', category: 'home',
-  blurb: 'A 12 × 15 m log lodge on a stone-faced walkout basement: two storeys under a green standing-seam roof, a wraparound deck on stone piers, a glass gable and a stone chimney. The basement (cellar, storage, mechanical room) is cut into the slope; its walkout side faces downhill.',
+  blurb: 'A 12 × 15 m log lodge on a stone-faced walkout basement: two stories under a green standing-seam roof, a wraparound deck on stone piers, a glass gable and a stone chimney. The basement (cellar, storage, mechanical room) is cut into the slope; its walkout side faces downhill.',
   cellsX: 5, cellsZ: 6, frontCells: 0,
   parts: { foundation: 'fieldstone', walls: 'log_wall', roof: 'metal_roof_green' },
   maxSlope: 0.45, floorY: 0.5, porch: 0, sleeps: 10, light: [0, 0.55, 0], walkoutFall: 0.07,
@@ -354,18 +354,18 @@ export const LODGE_SOLAR: KitPieceDef = {
   ...LODGE, id: 'lodge_solar', name: 'Lodge with a solar roof',
   blurb: 'The same lodge with 25 × 400 W panels on its south roof slope: about 10 kW, 36 kWh on a summer day. Wire it to a battery shed beside it.',
 };
-/** The stone house: 9 × 12 m, two storeys of 45 cm fieldstone walls. */
+/** The stone house: 9 × 12 m, two stories of 45 cm fieldstone walls. */
 export const STONE_HOUSE: KitPieceDef = {
   id: 'stone_house', name: 'Stone house', category: 'home',
-  blurb: 'A two-storey 9 × 12 m house of 45 cm fieldstone walls under a slate-grey metal roof: warm in winter, cool in summer, slow to burn and hard to shoot through. Stone is slow to lay.',
+  blurb: 'A two-story 9 × 12 m house of 45 cm fieldstone walls under a slate-gray metal roof: warm in winter, cool in summer, slow to burn and hard to shoot through. Stone is slow to lay.',
   cellsX: 3, cellsZ: 4, frontCells: 1,
   parts: { foundation: 'fieldstone', walls: 'fieldstone', roof: 'metal_roof_grey' },
   maxSlope: 0.3, floorY: 0.12, porch: 0.3, sleeps: 6, light: [0, 0.4, 0],
 };
-/** The timber-frame house: 9 × 12 m, two storeys of pegged posts and beams with insulated panel walls. */
+/** The timber-frame house: 9 × 12 m, two stories of pegged posts and beams with insulated panel walls. */
 export const TIMBER_FRAME_HOUSE: KitPieceDef = {
   id: 'timber_frame', name: 'Timber-frame house', category: 'home',
-  blurb: 'A two-storey 9 × 12 m post-and-beam house: pegged timbers showing outside, plaster-faced insulated panels between them, a glass gable. The best-insulated wall in the kit.',
+  blurb: 'A two-story 9 × 12 m post-and-beam house: pegged timbers showing outside, plaster-faced insulated panels between them, a glass gable. The best-insulated wall in the kit.',
   cellsX: 3, cellsZ: 4, frontCells: 1,
   parts: { foundation: 'concrete', walls: 'plaster', roof: 'metal_roof_green' },
   maxSlope: 0.3, floorY: 0.1, porch: 0.3, sleeps: 6, light: [0, 0.4, 0],
@@ -381,7 +381,7 @@ export const CONTAINER_HOUSE: KitPieceDef = {
 /** The adobe house: 9 × 12 m, one storey, 45 cm rammed earth with vigas and a covered portal. */
 export const ADOBE_HOUSE: KitPieceDef = {
   id: 'adobe_house', name: 'Adobe house', category: 'home',
-  blurb: 'A one-storey 9 × 12 m rammed-earth house, 45 cm walls, log vigas, deep-set windows, a covered portal and a corner fireplace. Dry country only; the walls are rammed from the earth you dig for the footings.',
+  blurb: 'A one-story 9 × 12 m rammed-earth house, 45 cm walls, log roof beams (vigas), deep-set windows, a covered portal and a corner fireplace. Dry country only; the walls are rammed from the earth you dig for the footings.',
   cellsX: 3, cellsZ: 4, frontCells: 1,
   parts: { foundation: 'concrete', walls: 'adobe', roof: 'metal_roof_grey' },
   maxSlope: 0.2, floorY: 0.08, porch: 0.34, sleeps: 4, light: [0, 0.3, 0],
@@ -390,7 +390,7 @@ export const ADOBE_HOUSE: KitPieceDef = {
 /** What comes with improved land (sim/improvements.ts); the barn is also in the build menu. */
 export const FARMHOUSE: KitPieceDef = {
   id: 'farmhouse', name: 'Old farmhouse', category: 'home',
-  blurb: 'A two-storey 9 × 12 m farmhouse from the last century: front porch, kitchen and parlor, bedrooms up, a basement.',
+  blurb: 'A two-story 9 × 12 m farmhouse from the last century: front porch, kitchen and parlor, bedrooms up, a basement.',
   cellsX: 3, cellsZ: 4, frontCells: 1,
   parts: { foundation: 'concrete', walls: 'timber_lap', roof: 'metal_roof' },
   maxSlope: 0.3, floorY: 0.12, porch: 0.4, sleeps: 6, light: [0, 0.32, 0],
@@ -437,7 +437,7 @@ export const BARN: KitPieceDef = {
 /** A grandparents' / guest cottage: 6 × 8 m on a 2 × 3-cell lot (the porch takes the front cell). */
 export const COTTAGE: KitPieceDef = {
   id: 'cottage', name: 'Cottage', category: 'home',
-  blurb: 'A one-storey 6 × 8 m cottage for the grandparents or a family taken in: lap siding, metal roof, a small porch. Sleeps 3.',
+  blurb: 'A one-story 6 × 8 m cottage for the grandparents or a family taken in: lap siding, metal roof, a small porch. Sleeps 3.',
   cellsX: 2, cellsZ: 3, frontCells: 1,
   parts: { foundation: 'concrete', walls: 'timber_lap', roof: 'metal_roof' },
   maxSlope: 0.3, floorY: 0.08, porch: 0.28, sleeps: 3, light: [0, 0.3, -0.1],
@@ -445,7 +445,7 @@ export const COTTAGE: KitPieceDef = {
 /** A small guest house for a relative: 6 × 5 m on a 2 × 2-cell lot. Keeps visiting family happy with a front door of their own. */
 export const GUEST_HOUSE: KitPieceDef = {
   id: 'guest_house', name: 'Guest house', category: 'home',
-  blurb: 'A small one-storey 6 × 5 m guest house with a porch, a bath and a kitchenette. Sleeps 2: a relative with a front door of their own is a happier relative.',
+  blurb: 'A small one-story 6 × 5 m guest house with a porch, a bath and a kitchenette. Sleeps 2: a relative with a front door of their own is a happier relative.',
   cellsX: 2, cellsZ: 2, frontCells: 1,
   parts: { foundation: 'concrete', walls: 'timber_lap', roof: 'metal_roof' },
   maxSlope: 0.3, floorY: 0.08, porch: 0.28, sleeps: 2, light: [0, 0.3, -0.1],
@@ -486,8 +486,8 @@ export const UTILITY_KIT: KitPieceDef[] = [
   util('filtration_shed', 'Water filtration shed', 'water', 1, 1, 'A 1.8 × 2.4 m shed by the pressure tank: sediment and carbon filters and a UV lamp. Well, rain and creek water treated for the house.', [0, 0.25, 0]),
   util('solar_farm', 'Solar farm (20 kW)', 'power', 4, 6, '50 × 400 W panels in five rows on steel racks with three inverters: 20 kW, ≈ 72 kWh on a summer day and 40 in December. Stand a battery container beside it.'),
   util('battery_bank', 'Battery container (60 kWh)', 'power', 2, 1, 'Twelve 5 kWh racks, an inverter and air conditioning in a 20 ft container. Put it beside the array: equipment standing together shares a bus.', [0, 0.28, 0]),
-  util('micro_hydro', 'Micro-hydro plant (3 kW)', 'power', 2, 2, 'A turbine house on the creek bank fed by 100 m of buried penstock from an intake weir upstream. Up to 3 kW day and night (14-36 kWh a day on a few metres of fall), most in the spring runoff, least in the August low and under winter ice. Needs the creek to fall 2.5 m or more over the pipe, a water right ($1,800 permit) and a clear intake screen.', [0, 0.28, 0]),
-  util('wind_turbine', 'Wind turbine (5 kW)', 'power', 1, 1, 'A 5 kW three-blade turbine on an 18 m guyed tilt-up tower. Output follows the wind your ground gives it: ridges and open benches pay, hollows and timber do not. It furls in a gale (and a derecho may take the tail), ices in freezing fog, can be heard from the road and seen for kilometers.'),
+  util('micro_hydro', 'Micro-hydro plant (3 kW)', 'power', 2, 2, 'A turbine house on the creek bank fed by 100 m of buried pipe (the penstock) from an intake weir upstream. Up to 3 kW day and night (14-36 kWh a day on a few meters of fall), most in the spring runoff, least in the August low and under winter ice. Needs the creek to fall 2.5 m or more over the pipe, a water right ($1,800 permit) and a clear intake screen.', [0, 0.28, 0]),
+  util('wind_turbine', 'Wind turbine (5 kW)', 'power', 1, 1, 'A 5 kW three-blade turbine on an 18 m guyed tilt-up tower. Output follows the wind your ground gives it: ridges and open benches pay, hollows and timber do not. It furls in a gale (and a severe windstorm may take the tail), ices in freezing fog, can be heard from the road and seen for kilometers.'),
   util('septic', 'Septic system', 'sanitation', 2, 2, 'Septic tank and leach field. Lets plumbed houses have flush toilets.'),
 ];
 
@@ -545,13 +545,13 @@ const room = (id: string, name: string, cx: number, cz: number, blurb: string, s
 export const BUNKER_KIT: KitPieceDef[] = [
   room('bunker_hatch', 'Bunker hatch', 1, 1, 'The way down: a steel hatch in a concrete collar, a ladder down a 5 m shaft, a blast door at the bottom. Easy to hide under a woodpile.', 0, 'both'),
   room('bunker_floorhatch', 'Floor hatch', 1, 1, 'A hatch in the floor of a house, hidden under a rug: an insulated lid over a switchback stair down to the bunker, lit warm. Opens when the family goes down. Build it inside a house.', 0, 'both'),
-  room('bunker_stairs', 'Bunker stairwell', 1, 3, 'A stair down from a little headhouse on the surface to a blast door 5 m below. Carries stores and the old and young.', 0, 'both'),
+  room('bunker_stairs', 'Bunker stairwell', 1, 3, 'A stair down from a little headhouse on the surface to a blast door 5 m below. Carries supplies, and people young and old.', 0, 'both'),
   room('bunker_corridor', 'Tunnel', 1, 2, 'A 3 × 6 m concrete passage between rooms.'),
   room('bunker_container', 'Buried container', 1, 4, 'A 40 ft shipping container in a gravel bed, braced and waterproofed: the cheap first bunker. Bunks, a table, a pantry.', 4),
   room('bunker_dorm', 'Bunkroom', 2, 2, 'Bunks for eight, lockers, a rug and the family pictures: somewhere to sleep through a bad week.', 8),
   room('bunker_galley', 'Galley', 2, 2, 'Kitchen counter, two-burner stove, a table for eight and shelves of food.', 2),
   room('bunker_stores', 'Storeroom', 2, 2, 'Rows of shelving: cans, rice and beans in buckets, water drums, medicine, seed.', 0),
-  room('bunker_plant', 'Plant room', 2, 2, 'Air: an NBC filter and blast valves. Power: a battery bank and a vented generator. Water: a 2,000 L tank.', 0),
+  room('bunker_plant', 'Plant room', 2, 2, 'Air: a fallout and gas filter and blast valves. Power: a battery bank and a vented generator. Water: a 2,000 L tank.', 0),
   room('bunker_medical', 'Medical bay', 2, 2, 'An exam table, a cot, a sink, cabinets of supplies and an oxygen bottle.', 1),
   room('bunker_comms', 'Control room & armory', 1, 2, 'A desk under a wall of screens (camera feeds, radar, weather, the radio net), a laptop, a cot and a rifle rack, the site plan on a corkboard, a gun safe and ammunition. The night watch sits here when there are cameras and power.', 1),
 ];
@@ -738,7 +738,7 @@ export const PROBLEM_TEXT: Record<PlaceProblem, string> = {
   no_climb: 'Nothing to climb here: a stair or ramp goes where the ground steps up between two terraces (turn it with R to run along the slope)',
   too_much_climb: 'The ground climbs too much along it: a stair takes up to 3.6 m, a ramp 1.2 m. Terrace the slope or switch back',
   cross_slope: 'The ground falls away sideways across it: turn it (R) to run up the hill, not across',
-  pad_clash: 'Its graded pad would cut into a neighbour\'s pad at another level',
+  pad_clash: 'Its graded pad would cut into a neighbor\'s pad at another level',
   no_water: 'Your land has no lake or river wide enough for a dock',
   not_shore: 'A dock runs from dry land out over the water: put one end on the bank and the other in the lake (R turns it)',
   no_creek: 'No creek runs through your land: a turbine needs falling water',

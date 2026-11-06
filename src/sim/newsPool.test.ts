@@ -51,7 +51,7 @@ describe('years in review', () => {
       expect(t.length).toBeLessThan(220);
     }
     expect(seasonReviewLine(facts)).toContain('the wall is 54% closed');
-    expect(seasonReviewLine(facts)).toContain('6 ricks');
+    expect(seasonReviewLine(facts)).toContain('6 face cords');
   });
 
   it('lands in the log at each season start', () => {

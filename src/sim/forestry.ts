@@ -79,7 +79,7 @@ export function addFellWork(s: GameState, j: FellJob, hours: number): void {
       s.forestry.jobs.splice(s.forestry.jobs.indexOf(j), 1);
       s.forestry.cleared.push(j.treeId);
       const name = j.kind === 'conifer' ? 'pine' : j.kind === 'oval' ? 'aspen' : 'cottonwood';
-      log(s, `Felled a ${name}: ${y.logs ? `${y.logs} log${y.logs > 1 ? 's' : ''} and ` : ''}${y.firewood} rick${y.firewood > 1 ? 's' : ''} of green firewood (it burns well once it's seasoned, in about nine months).`);
+      log(s, `Felled a ${name}: ${y.logs ? `${y.logs} log${y.logs > 1 ? 's' : ''} and ` : ''}${y.firewood} face cord${y.firewood > 1 ? 's' : ''} of green firewood (it burns well once it's seasoned, in about nine months).`);
     }
   }
 }

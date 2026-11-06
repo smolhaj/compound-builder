@@ -839,7 +839,7 @@ function hitCamp(s: GameState, raid: RescueRaid): Outcome {
   const [sh, him] = they(child);
   let title = '', text = '', tone: Outcome['tone'] = 'mixed';
   if (f.result === 'wiped' || f.result === 'routed') {
-    // what's in the camp is theirs now; word gets round that this family comes for its own
+    // what's in the camp is theirs now; word gets around that this family comes for its own
     const canned = 4 + Math.floor(r() * 10), fuel = 1 + Math.floor(r() * 4);
     s.stock.canned += canned; s.stock.fuel += fuel;
     lines.push(`Brought back from the camp: ${canned} canned, ${fuel} fuel.`);

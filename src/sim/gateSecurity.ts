@@ -81,7 +81,7 @@ export function gateLines(s: GameState): string[] {
   const G = GATE_SEC, out: string[] = [];
   if (hasSallyGate(s)) out.push(`Double gate: a vehicle is never exposed to the road while the outer gate is open (+${G.SALLY.barrier} wall strength, arrival ambushes x${G.SALLY.ambush}).`);
   if (hasGateMotor(s)) out.push(motorLive(s) ? `Caged gate motor: +${G.MOTOR.barrier} wall strength, the gate is open for less time (arrival ambushes x${G.MOTOR.ambush}).` : `Caged gate motor: +${G.MOTOR.barrier} wall strength; no power, so the gate is opened by hand (the manual release) and the motor saves no time.`);
-  if (hasIntercom(s)) out.push(intercomLive(s) ? `Intercom and gate camera: +${G.INTERCOM.detection} warning, parleys through the gate go ${G.INTERCOM.parley} points calmer, arrival ambushes x${G.INTERCOM.ambush}.` : 'Intercom and gate camera: no power, so no picture and no voice (it needs the grid or your own supply).');
+  if (hasIntercom(s)) out.push(intercomLive(s) ? `Intercom and gate camera: +${G.INTERCOM.detection} warning, talks through the gate go ${G.INTERCOM.parley} points calmer, arrival ambushes x${G.INTERCOM.ambush}.` : 'Intercom and gate camera: no power, so no picture and no voice (it needs the grid or your own supply).');
   if (hasGateHouse(s)) out.push(`Gate house: a guard at the drive (arrival ambushes x${G.GUARD_AMBUSH}).`);
   return out;
 }

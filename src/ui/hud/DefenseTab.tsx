@@ -58,11 +58,11 @@ function HardcoreNotes() {
   const a = adaptOf(game), since = sinceHit(game), w = firstWinter(game);
   const winterOver = !w || dayIndex(game.clock.t) > w.thaw;
   return <>
-    {!!game.disaster.kind && <Row label="What the crews have learned" value={a <= 0 ? 'nothing yet' : `${Math.round(a * 100)}%`} tone={a >= 0.67 ? 'bad' : a > 0 ? 'warn' : 'good'} title="Hardcore: after the first year, the better a place is defended, the more the crews that come for it have prepared" />}
+    {!!game.disaster.kind && <Row label="How the crews have adapted" value={a <= 0 ? 'nothing yet' : `${Math.round(a * 100)}%`} tone={a >= 0.67 ? 'bad' : a > 0 ? 'warn' : 'good'} title="Hardcore: after the first year, the better a place is defended, the more the crews that come for it have prepared" />}
     <Hint more={since <= 365 || a <= 0
-      ? 'From the second year on, the crews that come for a well-defended place come bigger, better armed and oftener, and may test the wire with a pair of men first. A weak place draws no such attention.'
-      : 'The crews that still come have learned from the ones who failed: more of them, better armed, oftener. Walls and rifles buy time, not immunity: keep adding to them.'}>{since <= 365 || a <= 0 ? 'Hardcore: the world learns.' : 'Word has gone round that this place holds.'}</Hint>
-    {!winterOver && <Hint tone="warn" more="The first winter after the hit brings a deep freeze that burns the woodpile and the fuel, then a thaw that spoils fresh and frozen food. Put wood and fuel by, and eat the fresh food first.">Hardcore: a hard first winter is coming.</Hint>}
+      ? 'From the second year on, the crews that come for a well-defended place come bigger, better armed and more often, and may test the wire with a pair of men first. A weak place draws no such attention.'
+      : 'The crews that still come have learned from the ones who failed: more of them, better armed, more often. Walls and rifles buy time, not immunity: keep adding to them.'}>{since <= 365 || a <= 0 ? 'Hardcore: raiders adapt.' : 'Word has spread that this place is hard to take.'}</Hint>
+    {!winterOver && <Hint tone="warn" more="The first winter after the hit brings a deep freeze that burns the woodpile and the fuel, then a thaw that spoils fresh and frozen food. Stock up on wood and fuel, and eat the fresh food first.">Hardcore: a hard first winter is coming.</Hint>}
   </>;
 }
 
@@ -130,8 +130,8 @@ export function DefenseTab() {
         <span style={{ fontSize: 15, color: TONE[d.tone] }}>{d.label}</span>
         <span style={{ color: DIM, fontSize: 11.5 }}>of 100</span>
       </div>
-      <Row label="Line holds people out" value={`${Math.round(d.barrier)}%`} tone={d.barrier >= 65 ? 'good' : d.barrier >= 35 ? 'warn' : 'bad'} title="How hard the walls, gates and bars stop a crew, as the gate card and the battle read it" />
-      <Row label="Seen coming" value={`${Math.round(d.detection)}%`} tone={d.detection >= 60 ? 'good' : d.detection >= 35 ? 'warn' : 'bad'} />
+      <Row label="Keeps people out" value={`${Math.round(d.barrier)}%`} tone={d.barrier >= 65 ? 'good' : d.barrier >= 35 ? 'warn' : 'bad'} title="How hard the walls, gates and bars stop a crew, as the gate card and the battle read it" />
+      <Row label="Early warning" title="How early you would notice a crew coming: watch posts, towers, cameras, dogs and a clear view of the road" value={`${Math.round(d.detection)}%`} tone={d.detection >= 60 ? 'good' : d.detection >= 35 ? 'warn' : 'bad'} />
       {game.armory.guns.length > 0 && <Row label="Drilled for the alarm" value={`${Math.round(100 * readiness(game))}%${game.courses?.drills.perWeek ? ` · ${DRILL_NAME[game.courses.drills.perWeek]}` : ' · no drills'}`} tone={readiness(game) >= 0.5 ? 'good' : readiness(game) >= 0.2 ? 'warn' : undefined} title="How practiced the household is at the alarm: fewer seconds frozen when it sounds. Set the drill schedule on the Family tab (Classes and drills)." />}
       <button style={{ ...btn(w.showBoundary), marginTop: 4 }} onClick={() => w.setShowBoundary(!w.showBoundary)} title="Draw the property line on the ground">{w.showBoundary ? 'Hide' : 'Show'} property line</button>
       {hardcore && <HardcoreNotes />}
@@ -244,7 +244,7 @@ export function DefenseTab() {
       {game.structures.filter(st => isTower(st.kind) && structFinished(st)).map(st => {
         const def = TOWERS[st.kind as keyof typeof TOWERS], nk = TOWER_NEXT[st.kind];
         const hb = highBonus(st, st.kind as keyof typeof TOWERS);
-        const hg = highShare(st) > 0.05 ? <span style={{ color: TONE.good }} title="The ground under it stands above the land round it: the watch sees farther and earlier (capped)."> · high ground +{Math.round((st.high ?? 0) * 6)} m: sees {Math.round(hb.viewR * 6)} m farther, +{Math.round(hb.view)} warning</span> : null;
+        const hg = highShare(st) > 0.05 ? <span style={{ color: TONE.good }} title="The ground under it stands above the land around it: the watch sees farther and earlier (capped)."> · high ground +{Math.round((st.high ?? 0) * 6)} m: sees {Math.round(hb.viewR * 6)} m farther, +{Math.round(hb.view)} warning</span> : null;
         if (!nk) return <div key={st.id} style={{ padding: '3px 0' }}>{def.name} <span style={{ color: DIM }}>(tier {def.tier} of 6, the last)</span>{hg}</div>;
         const price = (bill: ReturnType<typeof towerBill>, f: number) => orderCost(Object.entries(bill).filter(([m]) => MATERIALS[m as MaterialId].price !== null).map(([material, qty]) => ({ material: material as MaterialId, qty: Math.ceil((qty as number) * f) })));
         const net = Math.max(0, price(towerBill(nk), 1) - price(towerBill(st.kind as keyof typeof TOWERS), STRUCTURE_SALVAGE));

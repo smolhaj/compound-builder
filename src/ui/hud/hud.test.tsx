@@ -77,7 +77,7 @@ describe('the guided HUD (server-rendered)', () => {
     withGame(g => { g.clock.startDoy = 330; g.stock.firewood = 0; planStructure(g, 'cottage', 5, 5, 0).stage = 99; });
     const t = text(withFoldsOpen(() => renderToStaticMarkup(<BuildMenu />)));
     expect(t).toContain('Firewood');
-    expect(t).toMatch(/Order \d+ ricks? \(\$[\d,]+\)/);
+    expect(t).toMatch(/Order \d+ face cords? \(\$[\d,]+\)/);
     expect(t).toContain('Mark 10 trees');
     expect(t).toContain('Mark the 10 nearest trees');
   });

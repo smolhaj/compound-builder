@@ -83,7 +83,7 @@ export function startTrial(s: GameState, e: Encounter): Outcome {
   const camp: TrialCamp = { id: e.id, title: e.title.replace(/ at the gate$/, ''), people: e.people ?? [], brings: { ...(e.brings ?? {}) }, from: day, until: day + TRIAL_DAYS, character, learned: [], hungry: 0, fed: 0, worked: 0, ...(e.hurt ? { hurt: e.hurt } : {}), ...(e.arche ? { arche: e.arche } : {}), ...(e.neighbor ? { neighbor: e.neighbor } : {}), ...(e.extras ? { extras: e.extras } : {}), ...(e.tells ? { tells: e.tells } : {}) };
   campsOf(s).push(camp);
   s.gate.humanity = Math.min(100, s.gate.humanity + 3);
-  return { title: 'On trial', text: `They can camp outside the wall for a month and work for their keep. You'll feed them from your own stores. Then you'll see.`, tone: 'good', lines: [`${camp.people.length} in the camp: about ${campNeed(camp).toLocaleString('en-US')} kcal a day from the pantry.`] };
+  return { title: 'On trial', text: `They can camp outside the wall for a month and work for their keep. You'll feed them from your own supplies. Then you'll see.`, tone: 'good', lines: [`${camp.people.length} in the camp: about ${campNeed(camp).toLocaleString('en-US')} kcal a day from the pantry.`] };
 }
 
 /** Hand out the camp's ration from the stores (fresh first, then staples, cans, the freezer). Returns kcal short. */
@@ -151,7 +151,7 @@ export function trialDay(s: GameState): string[] {
     // a hungry camp drifts off on its own
     if (c.hungry >= 4 && r() < 0.1) {
       camps.splice(camps.indexOf(c), 1);
-      out.push(`${c.title}: they moved on. There wasn't enough to go round.`);
+      out.push(`${c.title}: they moved on. There wasn't enough to go around.`);
       continue;
     }
     // what the month shows (somewhere in the second week)
@@ -172,7 +172,7 @@ export function trialDay(s: GameState): string[] {
         c.fever = p.id;
         // a sickness abroad: being near the camp is a risk too (less than at the table)
         const k = contagion(s).contact;
-        if (k > 0) c.learned.push('With what\'s going round, nobody from the house goes near the camp now.');
+        if (k > 0) c.learned.push('With what\'s going around, nobody from the house goes near the camp now.');
       } else if (c.character === 'thief') {
         c.learned.push('Things go missing: a box of shells, a can of fuel from the shed. Nobody saw anything.');
       } else if (c.character === 'scout') {

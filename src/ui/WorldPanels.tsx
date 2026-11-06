@@ -39,7 +39,7 @@ const goers = (g: GameState) => g.people.filter(p => canGo(g, p) && p.age >= 16)
 
 function Picker({ game, picked, set, max = 4 }: { game: GameState; picked: string[]; set: (x: string[]) => void; max?: number }) {
   const can = goers(game);
-  if (!can.length) return <Note tone="warn">Nobody is fit to go.</Note>;
+  if (!can.length) return <Note tone="warn">Nobody is well enough to go.</Note>;
   return <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
     {can.map(p => <button key={p.id} style={btn(picked.includes(p.id))} title={`Health ${Math.round(game.personState.find(x => x.id === p.id)?.needs.health ?? 0)} · hunter ${p.skills.hunter} · negotiator ${p.skills.negotiator}`}
       onClick={() => set(picked.includes(p.id) ? picked.filter(x => x !== p.id) : picked.length < max ? [...picked, p.id] : picked)}>{p.first}</button>)}

@@ -52,7 +52,7 @@ export function tunnelPestLoss(s: GameState, year = calendarOf(s.clock).year): {
   const r = mulberry32(s.seed * 6007 + year * 131 + 17);
   const damp = Math.min(1, regionFor(s.site).rainMm / 1100);
   const hit = r() < 0.3 + 0.3 * damp, sev = 0.06 + 0.14 * r();
-  const names = ['whitefly', 'aphids', 'botrytis (grey mould)', 'leaf miner'];
+  const names = ['whitefly', 'aphids', 'botrytis (gray mold)', 'leaf miner'];
   return { loss: hit ? sev : 0, name: names[Math.floor(r() * names.length) % names.length] };
 }
 /** What the outbreak costs this tunnel: halved when the vents and sides are tended. */
