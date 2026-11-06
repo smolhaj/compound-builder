@@ -82,7 +82,7 @@ describe('a stuck project is loud', () => {
     g.clock.t += STALL_DAYS + 0.5;
     const lines = stallsDay(g);
     expect(lines).toHaveLength(1);
-    expect(lines[0]).toMatch(/days for want of/);
+    expect(lines[0]).toMatch(/days waiting on/);
     expect(stallsDay(g)).toEqual([]);   // said once
     const stuck = stuckProject(g)!;
     expect(stuck).not.toBeNull();

@@ -131,7 +131,7 @@ export function compoundBoard(s: GameState, drive?: readonly Pt[]): CompoundBoar
   if (s.gate.pending) decisions.push({ id: 'gate', text: `Someone is at the gate: ${s.gate.pending.title}`, tone: 'warn' });
   if (s.gate.aftermath) decisions.push({ id: 'aftermath', text: 'Raiders lie wounded on the drive: say what happens to them', tone: 'warn' });
   { const stuck = stuckProject(s);   // days of waiting with the cash in hand: first on the list, one click to fix
-    if (stuck) decisions.unshift({ id: 'stalled', text: `${stuckAction(stuck)}: the ${stuck.label} has stood still ${stuck.days} days${stuck.others > 0 ? ` (+${stuck.others} more stuck)` : ''}`, tone: 'bad', act: { label: 'Order', act: { type: 'order', lines: stuck.lines } } }); }
+    if (stuck) decisions.unshift({ id: 'stalled', text: `${stuckAction(stuck)}: the ${stuck.label} has been stuck ${stuck.days} days${stuck.others > 0 ? ` (+${stuck.others} more stuck)` : ''}`, tone: 'bad', act: { label: 'Order', act: { type: 'order', lines: stuck.lines } } }); }
   { const held = s.structures.filter(st => !isFinished(st) && holdReason(s, st));
     if (held.length && !decisions.some(d => d.id === 'stalled')) decisions.push({ id: 'held', text: `${held.length} ${held.length === 1 ? 'project is' : 'projects are'} stuck: ${holdReason(s, held[0])}`, tone: 'warn', act: { label: 'Projects', act: { type: 'select', id: held[0].id } } }); }
   { const hook = needsHookup(s);

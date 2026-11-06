@@ -253,8 +253,8 @@ export function suggestions(s: GameState, limit = 3, skip?: ReadonlySet<string>)
   if (!hasKind(s, 'well_hand', 'well_drilled', 'cistern', 'water_tower')) add('water', s.site.gwDepth > 9 ? 'well_drilled' : 'well_hand', s.site.gwDepth > 9 ? `no water on the place (it is ${s.site.gwDepth} m down: drill)` : 'no water on the place', 90);
   // a project that has waited days for materials we could pay for: the loudest card on the list (sim/stalls.ts)
   const stuck = stuckProject(s);
-  if (stuck) out.push({ id: 'stalled', kind: '', title: `Stuck for want of ${linesText(stuck.lines)}`, urgency: 99,
-    why: `The ${stuck.label} has waited ${stuck.days} days for materials, and you have the money (${usd(s.money)}). Nothing moves until they are ordered${stuck.others > 0 ? `; ${stuck.others} more project${stuck.others > 1 ? 's wait' : ' waits'} too` : ''}.`,
+  if (stuck) out.push({ id: 'stalled', kind: '', title: `Stuck: waiting on ${linesText(stuck.lines)}`, urgency: 99,
+    why: `The ${stuck.label} has waited ${stuck.days} days for materials, and you have the money (${usd(s.money)}). Work cannot continue until they are ordered${stuck.others > 0 ? `; ${stuck.others} more project${stuck.others > 1 ? 's wait' : ' waits'} too` : ''}.`,
     acts: [{ label: stuckAction(stuck), act: { type: 'order', lines: stuck.lines } }, { label: 'Show me', act: stuck.at ? { type: 'select', id: stuck.at } : { type: 'open', right: 'defense' } }] });
   // a home that lost its roof (chimney fire, storm, looters): re-roof it before anything else, the family should not winter in tents
   { const bare = homes.find(h => h.roofLost && !isFinished(h));
