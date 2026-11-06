@@ -26,7 +26,7 @@ import { FUEL_L_PER_KWH, FUEL_UNIT_L, genTune } from './utilities';
 import { fightsOfAmmo } from './armory';
 import { WAVE } from './waves';
 import { diffOf } from './difficulty';
-import { VEHICLES } from './vehicles';
+import { VEHICLES, startingVehicles } from './vehicles';
 import { isFinished } from './construction';
 import { regionFor } from './climate';
 import type { SuggestionAct } from './guidance';
@@ -116,7 +116,7 @@ function defenseRow(s: GameState): RunwayRow {
 }
 
 function fuelRow(s: GameState): RunwayRow {
-  const u = s.utilities, ps = powerSummary(s), fleet = s.vehicles ?? [];
+  const u = s.utilities, ps = powerSummary(s), fleet = s.vehicles ?? startingVehicles();   // (not fleetOf: a read must not change the state)
   const tanks = fleet.reduce((a, v) => a + v.fuel, 0);
   const liters = Math.max(0, s.stock.fuel * FUEL_UNIT_L - u.fuelL) + tanks;
   const burnGen = ps.genKw > 0 ? Math.max(u.report.drawKwh, 0) * FUEL_L_PER_KWH * genTune(s) : 0;

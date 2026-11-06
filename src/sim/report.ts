@@ -167,7 +167,8 @@ export function reportCard(s: GameState): ReportCard {
   const medic = Math.max(0, ...s.people.filter((_, i) => s.personState[i]?.needs.died == null).map(p => p.skills.medic));
   if (st.wounds > 0 && medic < 3 && !has('bunker_medical')) lines.push('No one knew first aid.');
   else if (st.wounds > 0 && (medic >= 5 || has('bunker_medical'))) lines.push('Every wound was dressed and healed.');
-  for (const p of lost) lines.push(s.personState.find(ps => ps.id === p.id)?.needs.taken ? `${p.first} ${p.last} was taken. Nobody knows where.` : `${p.first} ${p.last} ${CAUSE_TEXT[inferCause(s.personState.find(ps => ps.id === p.id)!.needs)]}.`);
+  // (a wipe lists everyone, with day and cause, under "Who we lost" on the ending screen)
+  if (end !== 'wipe') for (const p of lost) lines.push(s.personState.find(ps => ps.id === p.id)?.needs.taken ? `${p.first} ${p.last} was taken. Nobody knows where.` : `${p.first} ${p.last} ${CAUSE_TEXT[inferCause(s.personState.find(ps => ps.id === p.id)!.needs)]}.`);
   if (g.tookIn) lines.push(`You took in ${g.tookIn} ${g.tookIn === 1 ? 'person' : 'people'}.`);
   {
     // the neighbors and strangers who came to stay (sim/newcomers.ts)
