@@ -160,7 +160,7 @@ export function retainingLines(s: GameState): string[] {
   if (!all.length) return [];
   const out: string[] = [];
   const stand = all.filter(({ w }) => w.state === 'standing'), tallest = Math.max(0, ...stand.map(({ w }) => w.heightM)), metres = stand.reduce((a, { w }) => a + w.lenM, 0);
-  if (stand.length) out.push(`${stand.length} dry-stack retaining wall${stand.length > 1 ? 's' : ''} standing (${Math.round(metres)} m, the tallest ${Math.round(tallest * 10) / 10} m): the slope behind ${stand.length > 1 ? 'them is' : 'it is'} held, and a crew has to go round to the stairs${wallHoldSeconds(s) ? ` or climb (a tall wall holds a raid ${wallHoldSeconds(s)} s)` : ''}.`);
+  if (stand.length) out.push(`${stand.length} dry-stack retaining wall${stand.length > 1 ? 's' : ''} standing (${Math.round(metres)} m, the tallest ${Math.round(tallest * 10) / 10} m): the slope behind ${stand.length > 1 ? 'them is' : 'it is'} held, and a crew has to go around to the stairs${wallHoldSeconds(s) ? ` or climb (a tall wall holds a raid ${wallHoldSeconds(s)} s)` : ''}.`);
   const risk = slumpRisks(s);
   if (risk.length) out.push(`${risk.length} tall wall${risk.length > 1 ? 's have' : ' has'} no drainage channel above ${risk.length > 1 ? 'them' : 'it'}: in the thaw and in rain storms ${risk.length > 1 ? 'they' : 'it'} can let go.`);
   for (const { st, w } of slumped(s)) out.push(`The wall behind the ${label(st.kind)} is down: ${restackPallets(w)} pallet${restackPallets(w) > 1 ? 's' : ''} of fieldstone to restack it.`);

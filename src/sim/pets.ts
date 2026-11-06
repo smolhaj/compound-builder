@@ -251,7 +251,7 @@ export const PET_DUTY: Record<PetDuty, PetDutyDef> = {
   feed: { name: 'Feed', skill: null, minAge: 6, hint: 'A meal from the pantry.' },
   water: { name: 'Water', skill: null, minAge: 5, hint: 'Fresh water in the bowl.' },
   vet: { name: 'Vet care', skill: 'medic', minAge: 15, hint: 'Vaccines, worming, treating sickness and injury (uses medical supplies).' },
-  walk: { name: 'Walk', skill: null, minAge: 9, hint: 'A walk round the place: exercise, and the best way to bond.' },
+  walk: { name: 'Walk', skill: null, minAge: 9, hint: 'A walk around the place: exercise, and the best way to bond.' },
   play: { name: 'Play', skill: null, minAge: 3, hint: 'Fetch and tug.' },
   train: { name: 'Train', skill: 'hunter', minAge: 11, hint: 'Sit, stay, come, and to bark at the gate: makes a better guard and a happier dog.' },
 };

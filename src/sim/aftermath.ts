@@ -127,7 +127,7 @@ export function prisonersDay(s: GameState): string[] {
         out.push('The prisoner told you where his crew cached what they took. You brought back canned food and a can of 5.56.');
       } else {
         s.gate.forewarned = true;
-        out.push('The prisoner told you where his crew camps and how they come in. You\'ll see them sooner.');
+        out.push('The prisoner told you where his crew camps and how they come in. You\'ll see them coming earlier.');
       }
     }
     // slipping away: likelier with fewer people to watch, less once he's healed and come round

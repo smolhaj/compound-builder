@@ -101,7 +101,7 @@ function Offer() {
         {next ? `${gapLabel(next.gap).replace(/ later$/, '')} of quiet, and then it will start again. ` : ''}You can change what the family does, once. Building and the shop stay locked.
       </div>
       <button style={{ ...btn, width: '100%', textAlign: 'left', background: '#d8c9a0', color: '#1c1d18', border: 0, padding: '9px 12px', marginBottom: 6 }} onClick={() => mid(null)}>
-        <div style={{ fontWeight: 700 }}>Carry on as you are</div>
+        <div style={{ fontWeight: 700 }}>Continue as you are</div>
         <div style={{ fontSize: 11.5, opacity: 0.75 }}>{STANCE[c.stance ?? 'defend'][0]}: {STANCE[c.stance ?? 'defend'][1]}</div>
       </button>
       {others.map(st => (
@@ -140,11 +140,11 @@ function Report() {
       {row('Killed', r.killed.length ? r.killed.join(', ') : none, r.killed.length > 0)}
       {row('Taken', r.taken.length ? r.taken.join(', ') : none, r.taken.length > 0)}
       {row('Hurt', r.wounded.length ? r.wounded.join(', ') : none)}
-      {row('Lost from the stores', r.lost.length ? r.lost.map(([k, n]) => `${n} ${k}`).join(', ') : 'nothing')}
+      {row('Lost from your supplies', r.lost.length ? r.lost.map(([k, n]) => `${n} ${k}`).join(', ') : 'nothing')}
       {row('Raiders on the drive', r.raidersWounded + r.raidersDead ? `${r.raidersWounded} wounded, ${r.raidersDead} dead` : 'none left')}
       <MoreLines rounds={r.rounds} lines={r.lines.filter(l => !/^Lost:|rounds fired\.$|more rounds went out/.test(l))} />
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
-        <button style={{ ...btn, background: '#d8c9a0', color: '#1c1d18', border: 0, padding: '8px 16px', fontSize: 14 }} onClick={end}>{r.aftermath ? 'See to the drive' : 'Pick up the pieces'}</button>
+        <button style={{ ...btn, background: '#d8c9a0', color: '#1c1d18', border: 0, padding: '8px 16px', fontSize: 14 }} onClick={end}>{r.aftermath ? 'Check the drive' : 'Pick up the pieces'}</button>
       </div>
     </div>
   );

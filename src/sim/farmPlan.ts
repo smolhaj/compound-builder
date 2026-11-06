@@ -59,16 +59,16 @@ export function calendar(s: GameState): CalItem[] {
     { id: 'water-trees', group: 'garden', label: 'Water the young trees', from: WATER_DAYS[0], to: WATER_DAYS[1], note: 'About 7 L a day for each tree under three years; the drip line does it, the Garden duty keeps it running.', here: orchards },
     ...FRUITS.map(f => ({ id: `pick-${f}`, group: 'garden' as const, label: `Pick the ${FRUIT[f].name.toLowerCase()}s`, from: calendarOfFruit(medianFrost(s), f).pick[0], to: calendarOfFruit(medianFrost(s), f).pick[1], note: FRUIT[f].keeps >= 0.5 ? 'They keep in the cellar bins.' : 'Soft fruit: eaten fresh, then jars and the dryer within days.', here: orchards })),
     { id: 'greens', group: 'garden', label: 'Winter greens in the greenhouse', from: 274, to: 120, note: 'Benches of greens and starts through the cold months.', here: hasGreenhouse(s) },
-    { id: 'canning', group: 'preserve', label: 'Jars, dryer and crocks', from: g0 + 30, to: se.harvest[1], note: 'Anything beyond five days\' eating is put by the day it comes in, while the cook has time.', here: hasKitchen(s) },
+    { id: 'canning', group: 'preserve', label: 'Jars, dryer and crocks', from: g0 + 30, to: se.harvest[1], note: 'Anything beyond five days\' eating is preserved the day it comes in, while the cook has time.', here: hasKitchen(s) },
     { id: 'sun', group: 'preserve', label: 'Sun-drying weather', from: 140, to: 270, note: 'Screens in the sun on dry days, in jars by evening.', here: hasKitchen(s) },
     { id: 'cure', group: 'preserve', label: 'Curing weather', from: 285, to: 80, note: 'Cold enough to salt-cure pork and game safely (or any time in a cool cellar).', here: cure },
     { id: 'shear', group: 'animals', label: 'Shearing and lambing', from: 100, to: 130, note: 'A wool check, and about 1.3 lambs a ewe.', here: n('sheep') > 0 },
-    { id: 'hay', group: 'animals', label: 'Put up hay', from: 150, to: 260, note: 'Buy the winter\'s hay at the fall cutting.', here: animals },
+    { id: 'hay', group: 'animals', label: 'Make and store hay', from: 150, to: 260, note: 'Buy the winter\'s hay at the fall cutting.', here: animals },
     { id: 'butcher', group: 'animals', label: 'Butchering', from: 305, to: 334, note: 'Pigs, surplus lambs and the steer go to the butcher; fat is rendered into lard.', here: n('pig') + n('steer') + n('sheep') > 0 },
     { id: 'eggs', group: 'animals', label: 'Hens lay best', from: 90, to: 250, note: 'About eight eggs a day from a dozen hens; three in midwinter.', here: has('chicken_coop') },
     { id: 'sap', group: 'garden', label: 'Sap runs: tap, gather, boil', from: sapSeason(s)[0], to: sapSeason(s)[1], note: 'Freeze-thaw days: gather the buckets and boil the same day, 40 gallons of sap to one of syrup.', here: hasMaples(s) && (has('sugar_shack') || n('maple_taps') > 0) },
     { id: 'bees', group: 'garden', label: 'Bees flying', from: flightDays(s)[0], to: flightDays(s)[1], note: 'Inspect weekly; a strong colony in May may swarm. The nectar flow is June to August.', here: apiaries(s).length > 0 },
-    { id: 'honey', group: 'preserve', label: 'Honey off, hives treated for mites', from: 245, to: 258, note: 'Take the surplus (the bees keep their winter stores) and treat for mites before the cold.', here: colonyCount(s) > 0 },
+    { id: 'honey', group: 'preserve', label: 'Honey off, hives treated for mites', from: 245, to: 258, note: 'Take the surplus (the bees keep what they need for winter) and treat for mites before the cold.', here: colonyCount(s) > 0 },
     { id: 'kid', group: 'animals', label: 'Kidding and calving', from: 65, to: 100, note: 'Kids on the does, a calf on the cow; milk comes in. Keep the vet kit on the shelf.', here: n('goat') + n('cow') > 0 },
     { id: 'deer', group: 'wild', label: 'Deer season', from: 280, to: 330, note: 'In peacetime a tag; after the collapse, no seasons.', here: r.game.includes('deer') || r.game.includes('elk') },
     { id: 'fish', group: 'wild', label: 'Fishing season', from: 130, to: 300, note: 'A license in peacetime; the pond\'s crayfish are trapped May to October.', here: r.game.some(g => ['trout', 'bass', 'catfish', 'salmon', 'panfish'].includes(g)) || has('pond') },
@@ -146,7 +146,7 @@ export function spoilageRisks(s: GameState): Risk[] {
   const fresh = s.stock.fresh * KCAL.fresh;
   if (fresh > 6 * need && need > 0) out.push({ text: `${Math.round(fresh / need)} days of fresh food on hand and ${Math.round(freshSpoilRate(s) * 100)} % of it rotting a day${hasCellar(s) ? ' (cellar)' : ': a root cellar would cut that to a fifth'}. Can, dry or ferment it.`, tone: 'warn' });
   const o = overflow(s);
-  if (o > 0.1) out.push({ text: `Stores ${Math.round(o * 100)} % past the shelves (${Math.round(pantryLoad(s) / 1000).toLocaleString('en-US')}k kcal in ${Math.round(pantryRoom(s) / 1000).toLocaleString('en-US')}k of room): cool-kept goods keep worse.`, tone: 'warn' });
+  if (o > 0.1) out.push({ text: `Supplies ${Math.round(o * 100)} % past the shelves (${Math.round(pantryLoad(s) / 1000).toLocaleString('en-US')}k kcal in ${Math.round(pantryRoom(s) / 1000).toLocaleString('en-US')}k of room): cool-kept goods keep worse.`, tone: 'warn' });
   if (cellarKcal(s) > 100_000 && cellarTempC(s) > 9) out.push({ text: `The cellar is ${Math.round(cellarTempC(s))} °C: the bins lose ${shrinkText(cellarTempC(s))} a day. Eat the potatoes first.`, tone: 'warn' });
   for (const r of pantryRows(s, need).filter(x => FOOD[x.id].kcal > 0 && x.left < 90).slice(0, 3)) out.push({ text: `${FOOD[r.id].name.split(',')[0]} ${r.left <= 0 ? 'is past its date' : `keeps ${Math.max(0, Math.round(r.left))} more days`}.`, tone: r.left <= 0 ? 'bad' : 'warn' });
   if (s.stock.frozen > 0.05 && !freezerOn(s)) out.push({ text: 'Frozen meat with no power to the cellar freezer: it thaws and spoils.', tone: 'bad' });
@@ -171,11 +171,11 @@ export function foodPlan(s: GameState): Risk[] {
     if ((cropKcal.potatoes ?? 0) > 0 && !hasCellar(s)) out.push({ text: 'Potatoes with no root cellar rot in the kitchen within weeks. Build a cellar before the harvest.', tone: 'bad' });
   }
   if (hasKitchen(s) && (s.stock.lids ?? 0) >= 1 && !hasCanner(s)) out.push({ text: 'No pressure canner: only tomatoes, fruit and pickles (about a third of a glut) can be put in jars. Vegetables and meat need a pressure canner.', tone: 'warn' });
-  if (hasKitchen(s) && (fields.length || gardensOf(s).length) && (s.stock.lids ?? 0) < 12 && !(s.stock.crocks >= 1) && !(s.stock.dehydrator >= 1)) out.push({ text: 'Nothing to put the harvest up in: lids for jars (canner), a dehydrator, or crocks and salt for ferments.', tone: 'warn' });
+  if (hasKitchen(s) && (fields.length || gardensOf(s).length) && (s.stock.lids ?? 0) < 12 && !(s.stock.crocks >= 1) && !(s.stock.dehydrator >= 1)) out.push({ text: 'Nothing to preserve the harvest in: lids for jars (canner), a dehydrator, or crocks and salt for ferments.', tone: 'warn' });
   const ratio = cookRatio(s);
   if (ratio < 0.6 && hasKitchen(s)) out.push({ text: 'Nobody has been cooking: no canning or drying happens until the Cooking duty is staffed.', tone: 'warn' });
-  if (o.coverage < 0.9 && o.yearNeed > 0) out.push({ text: `What is put by plus a normal year's harvest covers ${Math.round(o.coverage * 100)} % of a year's eating.`, tone: o.coverage < 0.6 ? 'bad' : 'warn' });
-  else if (o.yearNeed > 0 && isFinite(o.coverage)) out.push({ text: `Stores plus a normal harvest cover about ${Math.round(o.coverage * 100)} % of a year.`, tone: 'good' });
+  if (o.coverage < 0.9 && o.yearNeed > 0) out.push({ text: `The food in storage plus a normal year's harvest covers ${Math.round(o.coverage * 100)} % of a year's eating.`, tone: o.coverage < 0.6 ? 'bad' : 'warn' });
+  else if (o.yearNeed > 0 && isFinite(o.coverage)) out.push({ text: `Food on hand plus a normal harvest cover about ${Math.round(o.coverage * 100)} % of a year.`, tone: 'good' });
   if (!hasOven(s) && (s.stock.grain_mill ?? 0) < 1 && (s.pantry?.items.wheat_bucket?.q ?? 0) + (s.pantry?.items.home_dry?.q ?? 0) > 1) out.push({ text: 'Whole wheat boiled again and again: a grain mill and a wood oven would make bread.', tone: 'warn' });
   // the herd, the bees, the sugar bush
   const hd = herdOf(s);
@@ -184,7 +184,7 @@ export function foodPlan(s: GameState): Risk[] {
   for (const st of apiaries(s)) {
     const p = apiaryOf(s, st.id);
     if (p.colonies > 0 && p.mites > 0.5 && p.treated !== calendarOf(s.clock).year && (s.stock.hive_supplies ?? 0) < 1 && doy > 150) out.push({ text: 'The bees will not winter without a mite treatment: buy hive supplies.', tone: 'bad' });
-    if (p.colonies > 0 && p.stores * p.colonies < winterNeed(s) * p.colonies * 0.6 && doy > 270) out.push({ text: 'The hives are light on winter stores: leave them their honey.', tone: 'warn' });
+    if (p.colonies > 0 && p.stores * p.colonies < winterNeed(s) * p.colonies * 0.6 && doy > 270) out.push({ text: 'The hives are short on winter honey: leave them what they have.', tone: 'warn' });
   }
   if (hasMaples(s) && woodsTaps(s) > 30 && tapsOut(s) === 0 && doy > sapSeason(s)[0] - 30 && doy < sapSeason(s)[0] + 5) out.push({ text: `Sugar maples on the place (about ${woodsTaps(s)} taps): tapping sets and a sugar shack would make syrup this spring.`, tone: 'good' });
   return out;

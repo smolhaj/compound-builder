@@ -73,7 +73,7 @@ export function planTerraces(s: GameState, rect: Rect, maxTiers: number = TERRAC
   gx /= n; gz /= n;
   const slope = Math.hypot(gx, gz);
   if (slope < TERRACE.MIN_SLOPE) return none('the ground is too gentle to need terraces', slope);
-  if (slope > TERRACE.MAX_SLOPE) return none('the ground is too steep for a bed on each step: the walls would be over three metres', slope);
+  if (slope > TERRACE.MAX_SLOPE) return none('the ground is too steep for a bed on each step: the walls would be over three meters', slope);
   const axis: 'x' | 'z' = Math.abs(gx) >= Math.abs(gz) ? 'x' : 'z', dir: 1 | -1 = (axis === 'x' ? gx : gz) > 0 ? -1 : 1;   // downhill
   const S = tierSpacing(), L = axis === 'x' ? rect.x1 - rect.x0 : rect.z1 - rect.z0, depth = Math.max(def.cellsX, def.cellsZ) * CELL;
   const count = Math.min(maxTiers, Math.floor((L - depth) / S) + 1);
@@ -96,7 +96,7 @@ export function planTerraces(s: GameState, rect: Rect, maxTiers: number = TERRAC
     tiers.push({ x, z, rot: 0, grade, wallHm: Math.round(plan.maxH * RW.M * 10) / 10, wallLenM: Math.round(plan.lenU * RW.M), pallets: stone, stairs: plan.stairs.length });
     others.push(fp);
   }
-  if (tiers.some(t => t.wallHm > RW.STAIR_MAX_H * RW.M)) return none('the walls would be over three metres', slope);
+  if (tiers.some(t => t.wallHm > RW.STAIR_MAX_H * RW.M)) return none('the walls would be over three meters', slope);
   if (tiers.some(t => t.wallHm < TERRACE.MIN_WALL_M)) return none('the slope is too gentle for terraces to show', slope);
   return { tiers, axis, dir, slopePct: Math.round(slope * 100), pallets, usd: pallets * (MATERIALS.fieldstone.price ?? 0), hours: Math.round(hours), wallM: Math.round(wallM), problem: null };
 }

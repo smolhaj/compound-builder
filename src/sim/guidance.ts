@@ -111,8 +111,8 @@ export function bunkerChecklist(s: GameState): BunkerCheck[] {
   return [
     { id: 'entrance', label: 'A way down', done: has(...BUNKER_ENTRANCES), building: going(...BUNKER_ENTRANCES), kind: 'bunker_hatch', detail: note(going(...BUNKER_ENTRANCES), 'a hatch, a stairwell, or a hatch in the house floor; every room grows from it') },
     { id: 'beds', label: `Beds for ${people}`, done: beds >= people, building: beds < people && bedsStaked > beds, kind: people <= 4 ? 'bunker_container' : 'bunker_dorm', detail: `${beds} of ${people} places built${bedsStaked > beds ? `, ${bedsStaked - beds} more staked out` : ''}` },
-    { id: 'air', label: 'Clean air and power', done: has('bunker_plant'), building: going('bunker_plant'), kind: 'bunker_plant', detail: note(going('bunker_plant'), 'the plant room: NBC filter, batteries, a 2,000 L water tank') },
-    { id: 'food', label: 'Food and water put by', done: has('bunker_stores', 'bunker_galley'), building: going('bunker_stores', 'bunker_galley'), kind: 'bunker_stores', detail: note(going('bunker_stores', 'bunker_galley'), 'a storeroom (or a galley)') },
+    { id: 'air', label: 'Clean air and power', done: has('bunker_plant'), building: going('bunker_plant'), kind: 'bunker_plant', detail: note(going('bunker_plant'), 'the plant room: fallout and gas filter, batteries, a 2,000 L water tank') },
+    { id: 'food', label: 'Food and water stored', done: has('bunker_stores', 'bunker_galley'), building: going('bunker_stores', 'bunker_galley'), kind: 'bunker_stores', detail: note(going('bunker_stores', 'bunker_galley'), 'a storeroom (or a galley)') },
     { id: 'medical', label: 'A medic\'s corner', done: has('bunker_medical'), building: going('bunker_medical'), kind: 'bunker_medical', detail: note(going('bunker_medical'), 'a medical bay, for wounds in a long stay') },
   ];
 }
@@ -205,7 +205,7 @@ export function landSuggestions(s: GameState): Suggestion[] {
       const short = Math.max(0, Math.ceil(extra - Math.max(0, s.stock.fieldstone - 0) - (pending.fieldstone ?? 0)));
       const lines: OrderLine[] = short > 0 ? [{ material: 'fieldstone', qty: short }] : [];
       out.push({ id: 'retaining', kind: '', title: 'This slope needs a retaining wall', urgency: 58,
-        why: `the ${name} is staked on a ${Math.round((cut.grade ?? 0) * 100)} % slope: the pad is cut into the hill and held by a dry-stack wall${wall ? ` (up to ${Math.round(wall.heightM * 10) / 10} m high and ${Math.round(wall.lenM)} m long, with ${wall.stairs ? 'a stair' : 'no stair'} set in it${wall.tall ? '; a wall that tall wants a drainage channel above it' : ''})` : ''}, about ${extra} pallets of fieldstone more than level ground${short > 0 ? '' : ' (you have them)'}. The wall goes up with the foundation and is paid for by those pallets`,
+        why: `the ${name} is staked on a ${Math.round((cut.grade ?? 0) * 100)} % slope: the pad is cut into the hill and held by a dry-stack wall${wall ? ` (up to ${Math.round(wall.heightM * 10) / 10} m high and ${Math.round(wall.lenM)} m long, with ${wall.stairs ? 'a stair' : 'no stair'} set in it${wall.tall ? '; a wall that tall needs a drainage channel above it' : ''})` : ''}, about ${extra} pallets of fieldstone more than level ground${short > 0 ? '' : ' (you have them)'}. The wall goes up with the foundation and is paid for by those pallets`,
         acts: [...(lines.length ? [{ label: `Order ${short} pallet${short > 1 ? 's' : ''} of fieldstone (${usd(orderCost(lines, prices(s)))})`, act: { type: 'order' as const, lines } }] : []), { label: 'Show me', act: { type: 'select', id: cut.id } }] });
     }
     // a retaining wall that let go (sim/retaining.ts): the stone to put it back
@@ -269,18 +269,18 @@ export function suggestions(s: GameState, limit = 3, skip?: ReadonlySet<string>)
         acts: [...(lines.length ? [{ label: `Order the roof materials (${usd(orderCost(lines, prices(s)))})`, act: { type: 'order' as const, lines } }] : []), { label: 'Show me', act: { type: 'select', id: bare.id } }] });
     } }
   const growing = hasKind(s, 'garden', 'field', 'greenhouse', 'orchard');
-  if (!growing) add('food', 'garden', daysOfFood(s) < 90 ? 'little food put by and nothing growing' : 'nothing growing yet', daysOfFood(s) < 90 ? 70 : 45);
+  if (!growing) add('food', 'garden', daysOfFood(s) < 90 ? 'little food stored and nothing growing' : 'nothing growing yet', daysOfFood(s) < 90 ? 70 : 45);
   if (!hasKind(s, 'outhouse', 'septic')) add('toilet', 'outhouse', 'nowhere to go', 50);
   { const ww = worstWell(s);   // a privy or a manure yard too near a well (sim/sanitation.ts)
     if (ww) out.push({ id: 'well_close', kind: '', title: 'Your well is too close to the privy', urgency: ww.risk >= 0.8 ? 38 : 30,   // a slow hazard: below the cards that need doing now (plow 56, caretaker 44-66)
       why: `${sanitationLine(ww)}. Move the ${ww.source!.kind.replace(/_/g, ' ')} (or drill a cased well, or keep a filter and fuel to boil)`,
       acts: [{ label: 'Show me', act: { type: 'select', id: ww.source!.id } }] }); }
   { const f = foodNudge(s);   // a prompt before the warning signs, while there is cash and the trucks run
-    if (f) out.push({ id: 'stock_food', kind: '', title: f.days < 1 ? 'No food put by: stock some' : 'Stock some food', urgency: foodUrgency(s, f.days), why: `${f.days < 1 ? 'No food' : Math.floor(f.days) + ' days'} put by for ${s.people.length}${foodUrgency(s, f.days) >= 60 ? ', and the warning signs are up' : ''}. A month of staples is about ${usd(f.cost)}.`, acts: [{ label: 'Open the food shelf', act: { type: 'shop', tab: 'food' } }] }); }
+    if (f) out.push({ id: 'stock_food', kind: '', title: f.days < 1 ? 'No food stored: stock up' : 'Stock some food', urgency: foodUrgency(s, f.days), why: `${f.days < 1 ? 'No food' : Math.floor(f.days) + (Math.floor(f.days) === 1 ? ' day' : ' days') + ' of food'} on hand for ${s.people.length}${foodUrgency(s, f.days) >= 60 ? ', and the warning signs are up' : ''}. A month of staples is about ${usd(f.cost)}.`, acts: [{ label: 'Open the food shelf', act: { type: 'shop', tab: 'food' } }] }); }
   if (!hasPower(s)) add('power', 'solar_array', 'no power for the pump, lights and the freezer', 40);
   if (growing && !hasKind(s, 'root_cellar')) add('cellar', 'root_cellar', 'nowhere cool to keep what you grow', 30);
   if (hasMaples(s) && woodsTaps(s) >= 60 && hasKind(s, 'timber_cabin', 'log_house', 'farmhouse', 'lodge', 'lodge_plinth', 'lodge_solar', 'stone_house', 'timber_frame') && !hasKind(s, 'sugar_shack')) add('sugar', 'sugar_shack', `the woods have maples for ${woodsTaps(s)} taps: late-winter syrup`, 14);
-  if (hasKind(s, 'field') && hasKind(s, 'root_cellar') && !hasKind(s, 'wood_oven')) add('oven', 'wood_oven', 'the wheat and flour want an oven: bread and roasts without heating the house', 18);
+  if (hasKind(s, 'field') && hasKind(s, 'root_cellar') && !hasKind(s, 'wood_oven')) add('oven', 'wood_oven', 'the wheat and flour need an oven: bread and roasts without heating the house', 18);
 
   // fields with no seed to sow: a weedy forty percent is what they get (sim/crops.ts)
   { const sw = seedWarning(s);
@@ -301,8 +301,8 @@ export function suggestions(s: GameState, limit = 3, skip?: ReadonlySet<string>)
       const cost = orderCost([{ material: 'firewood', qty: n }], prices(s));
       const lines: OrderLine[] = [{ material: 'firewood', qty: n }];
       out.push({ id: 'firewood', kind: '', title: 'Firewood', urgency: w.coldNow && w.have < 1 ? 85 : 55,
-        why: w.have < 1 ? (w.coldNow ? 'out of firewood on a cold night' : 'no firewood put by for the cold months') : `${Math.floor(w.have)} rick${Math.floor(w.have) === 1 ? '' : 's'} put by, about ${Math.ceil(w.need)} needed for the next two months`,
-        acts: [{ label: `Order ${n} rick${n > 1 ? 's' : ''} ($${Math.round(cost).toLocaleString('en-US')})`, act: { type: 'order', lines } }, { label: 'Mark 10 trees', act: { type: 'markTrees', n: 10 } }] });
+        why: w.have < 1 ? (w.coldNow ? 'out of firewood on a cold night' : 'no firewood stored for the cold months') : `${Math.floor(w.have)} face cord${Math.floor(w.have) === 1 ? '' : 's'} on hand, about ${Math.ceil(w.need)} needed for the next two months`,
+        acts: [{ label: `Order ${n} face cord${n > 1 ? 's' : ''} ($${Math.round(cost).toLocaleString('en-US')})`, act: { type: 'order', lines } }, { label: 'Mark 10 trees', act: { type: 'markTrees', n: 10 } }] });
     } }
 
   // finished is not working: wire it, plumb it, join it to the line
@@ -341,9 +341,9 @@ export function suggestions(s: GameState, limit = 3, skip?: ReadonlySet<string>)
   // medical: an illness going round (keep the sick apart?), what the sick are missing, medicines running low
   { const med = medReport(s);
     if (med.epidemic && !med.epidemic.asked && med.epidemic.cases >= 1) {
-      out.push({ id: 'epidemic', kind: '', title: med.epidemic.kind === 'flu' ? 'The flu is going round' : 'Dysentery in the house', urgency: 79,
+      out.push({ id: 'epidemic', kind: '', title: med.epidemic.kind === 'flu' ? 'The flu is going around' : 'Dysentery in the house', urgency: 79,
         why: `${med.epidemic.cases} sick so far. Keeping the sick apart${med.bay ? ' in the medical bay' : ' in a spare room'} slows it a lot, at the cost of the one who nurses them and a lonely few days`,
-        acts: [{ label: 'Keep the sick apart', act: { type: 'quarantine', on: true } }, { label: 'Carry on as we are', act: { type: 'quarantine', on: false } }] });
+        acts: [{ label: 'Keep the sick apart', act: { type: 'quarantine', on: true } }, { label: 'Continue as we are', act: { type: 'quarantine', on: false } }] });
     }
     if (med.needs.length) {
       const lines: OrderLine[] = [];
@@ -368,7 +368,7 @@ export function suggestions(s: GameState, limit = 3, skip?: ReadonlySet<string>)
       if (!gatheringProblem(s, 'service') && s.people.some((p, i) => s.personState[i]?.needs.died == null && faithOf(s, p))) acts.push({ label: 'Hold a service', act: { type: 'gather', kind: 'service' } });
       const lines = moodOrderLines(s, mood);
       if (lines.length && s.disaster.tracks.stores >= 0.5) acts.push({ label: `Order ${lines.map(l => MATERIALS[l.material].name.toLowerCase()).join(' and ')} (${usd(orderCost(lines, prices(s)))})`, act: { type: 'order', lines } });
-      out.push({ id: 'mood', kind: '', title: mood.breaking ? `${names}: not coping` : `${names}: under strain`, urgency: mood.breaking ? 77 : 48,
+      out.push({ id: 'mood', kind: '', title: mood.breaking ? `${names}: not coping` : `${names}: under stress`, urgency: mood.breaking ? 77 : 48,
         why: `${top.why}${ps?.weighs?.length ? `; mostly ${ps.weighs.slice(0, 2).map(w => w[0]).join(' and ')}` : ''}. Rest, company and an evening off help more than pushing on`,
         ...(acts.length ? { acts } : {}) });
     } }
@@ -467,7 +467,7 @@ export function longTerm(s: GameState, drive?: readonly Pt[]): Goal[] {
   const rg = roadGateStatus(s, drive), ring = ringStatus(s), solid = s.perimeter.some(r => canHostWalkway(r.kind));
   const towers = s.structures.filter(st => (st.kind === 'rise_lookout' || st.kind.startsWith('watchtower')) && isFinished(st)).length;
   const enclose: Goal = { id: 'enclose', title: 'Enclose the compound', steps: [
-    { label: 'Wall the property line', done: closed, detail: closed ? 'the line is closed all round' : line.openShare >= 1 ? 'nothing on the line yet' : `${Math.round(line.openShare * 100)}% of the line is open${line.creekOpen ? ' and the creek is unbarred' : ''}` },
+    { label: 'Wall the property line', done: closed, detail: closed ? 'the line is closed all the way around' : line.openShare >= 1 ? 'nothing on the line yet' : `${Math.round(line.openShare * 100)}% of the line is open${line.creekOpen ? ' and the creek is unbarred' : ''}` },
     { label: 'Gate at the road', done: rg.crossing > 0 && rg.missing === 0, detail: rg.crossing === 0 ? 'a gate goes where the driveway meets the wall (laid in with Wall my property or Fortify my ring, or free in a wall you draw)' : rg.missing === 0 ? (rg.garage ? 'the drive runs in through the gate garage' : 'a gate where the driveway comes through the wall') : `${rg.missing} wall${rg.missing > 1 ? 's' : ''} across the driveway with no gate (Defense tab: cut one)` },
     { label: 'Upgrade the walls', done: !!best && PERIMETER[best].blocks.people >= 0.7, detail: best ? `${PERIMETER[best].name.toLowerCase()} now${UPGRADE_NEXT[best] ? `, next: ${PERIMETER[UPGRADE_NEXT[best]!].name.toLowerCase()}` : ', the top of the chain'}` : 'a hard wall stops people far better than wire' },
     { label: 'Watch towers', done: towers > 0, detail: towers ? `${towers} standing${towers < MAX_TOWERS ? `, up to ${MAX_TOWERS} on the corners and mid-spans` : ''}` : `a place to see them coming from: up to ${MAX_TOWERS} on the ring (Fortify my ring)` },
@@ -499,7 +499,7 @@ export function movingIn(s: GameState): Goal {
   return { id: 'moving', title: 'Move in full time', steps: [
     { label: 'A caretaker for the weekdays', done: !!w.caretaker, detail: w.caretaker ? CARETAKER[w.caretaker.kind].name.toLowerCase() : 'the animals, the garden and the doors, five days a week' },
     { label: 'A finished home with a bed for everyone', done: homes > 0 && homeBeds(s) >= s.people.length, detail: homes ? `${homeBeds(s)} of ${s.people.length} beds` : 'a roof you can live under all week' },
-    { label: 'Food put by for 90 days', done: daysOfFood(s) >= 90, detail: `${Math.round(Math.min(daysOfFood(s), 999))} days put by` },
+    { label: 'Food stored for 90 days', done: daysOfFood(s) >= 90, detail: `${Math.round(Math.min(daysOfFood(s), 999))} days of food on hand` },
     { label: 'Water and power that run themselves', done: hasKind(s, 'well_drilled', 'well_hand', 'cistern', 'water_tower') && hasPower(s), detail: 'the pump and the freezers keep running while you are away' },
     { label: 'Decide about the town house', done: w.town.status === 'sold', detail: w.town.status === 'sold' ? 'sold' : `worth ${usd(w.town.value * marketFactor(s))} now, with ${usd(w.town.mortgage)} owed; it sells for less every week the signs grow` },
   ] };
@@ -578,7 +578,7 @@ export function perimeterTiers(): PerimeterTier[] {
   const bucket = (k: PerimeterKind) => cuts.filter(c => cost.get(k)! >= c).length;
   const meta = [
     { id: 'cheap', title: 'Cheap in cash', hint: 'under $1,000 per 100 m: hedges and your own labor' },
-    { id: 'fence', title: 'Fences', hint: '$1,000 to $5,000 per 100 m: they turn people round' },
+    { id: 'fence', title: 'Fences', hint: '$1,000 to $5,000 per 100 m: they turn people around' },
     { id: 'hard', title: 'Hard walls', hint: '$5,000 to $20,000 per 100 m: hard to climb or cut' },
     { id: 'premium', title: 'Premium', hint: 'over $20,000 per 100 m' },
   ];
@@ -607,6 +607,6 @@ export function sparePartsCard(s: GameState): Suggestion | null {
   if (o.days === null || o.days >= 120) return null;
   return { id: 'spare_parts', kind: '', title: o.kits < 1 ? 'No spare parts for the machines' : 'Spare parts are running short',
     urgency: o.days < 30 ? 52 : 36,
-    why: `${o.kits < 1 ? 'there is no service kit left' : `${Math.floor(o.kits)} service kit${Math.floor(o.kits) === 1 ? '' : 's'}, about ${o.days} days at today's use`}, and every year the machines are older: they want service sooner. Send a team to the hardware stores and the interstate (Outside), or trade for kits`,
+    why: `${o.kits < 1 ? 'there is no service kit left' : `${Math.floor(o.kits)} service kit${Math.floor(o.kits) === 1 ? '' : 's'}, about ${o.days} days at today's use`}, and every year the machines are older: they need service sooner. Send a team to the hardware stores and the interstate (Outside), or trade for kits`,
     acts: [] };
 }

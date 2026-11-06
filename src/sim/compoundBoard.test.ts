@@ -45,7 +45,7 @@ describe('the compound board', () => {
     const b = compoundBoard(g);
     expect(b.operational.done).toBeGreaterThanOrEqual(4);
     expect(b.vitals.find(v => v.id === 'water')!.fix).toBeUndefined();
-    expect(b.vitals.find(v => v.id === 'food')!.value).toContain('put by');
+    expect(b.vitals.find(v => v.id === 'food')!.value).toContain('on hand');
     expect(b.vitals.find(v => v.id === 'defense')!.value).toMatch(/of 100/);
     expect(b.gaps.length).toBeGreaterThan(0);
     expect(b.gaps.length).toBeLessThanOrEqual(BOARD.gaps);

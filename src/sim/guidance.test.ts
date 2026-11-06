@@ -93,7 +93,7 @@ describe('the Build list', () => {
     const f = suggestions(g).find(x => x.id === 'firewood');
     expect(f).toBeDefined();
     expect(f!.acts!.map(a => a.act.type)).toEqual(['order', 'markTrees']);
-    expect(f!.acts![0].label).toMatch(/Order \d+ ricks? \(\$[\d,]+\)/);
+    expect(f!.acts![0].label).toMatch(/Order \d+ face cords? \(\$[\d,]+\)/);
     g.stock.firewood = 40;
     expect(suggestions(g).find(x => x.id === 'firewood')).toBeUndefined();
     const summer = newGame(11, 190); summer.stock.firewood = 0;

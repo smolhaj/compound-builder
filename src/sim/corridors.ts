@@ -166,7 +166,7 @@ export function collapseCorridor(s: GameState, id: string, why: 'sappers' | 'own
     ? `Raiders brought the ${PERIMETER[r.kind].name.toLowerCase()} down at the portal${out ? `, and ${out === 1 ? 'a vehicle was' : `${out} vehicles were`} cut off outside` : ''}.`
     : `We brought the ${PERIMETER[r.kind].name.toLowerCase()} down ourselves.`);
   log(s, why === 'sappers'
-    ? `Sappers set a charge in the ${PERIMETER[r.kind].name.toLowerCase()} and brought the portal down. It is choked with rubble: nothing crosses until a contractor clears it ($${clearQuote(r).usd.toLocaleString('en-US')}, about ${CLEAR_DAYS} days).`
+    ? `Raiders set a charge in the ${PERIMETER[r.kind].name.toLowerCase()} and brought the portal down. It is choked with rubble: nothing crosses until a contractor clears it ($${clearQuote(r).usd.toLocaleString('en-US')}, about ${CLEAR_DAYS} days).`
     : `The ${PERIMETER[r.kind].name.toLowerCase()} is down on your own charge. Nothing crosses until a contractor clears it.`);
   return null;
 }
@@ -279,14 +279,14 @@ export function sapperBreach(s: GameState, id: string, charges: number, result: 
   const p = sapperChance(s, id, charges, result);
   if (p <= 0) return [];
   const name = PERIMETER[r.kind].name.toLowerCase();
-  if (rnd() >= p) return collapseGuard(s, r).parts.length > (PERIMETER[r.kind].bore ? 1 : 0) ? [`Their sappers had charges for the ${name}, but they were watched and never got them set.`] : [];
+  if (rnd() >= p) return collapseGuard(s, r).parts.length > (PERIMETER[r.kind].bore ? 1 : 0) ? [`Their demolition team had charges for the ${name}, but they were watched and never got them set.`] : [];
   if (r.kind === 'tunnel_bridge') {
     const out = strandAway(s);
     if (dropBridge(s, id) !== null) return [];
     chronicle(s, 'threat', `Raiders dropped the ${name} into the gorge${out ? `; ${out === 1 ? 'a vehicle was' : `${out} vehicles were`} cut off outside` : ''}.`);
-    return [`Their sappers dropped the ${name} behind them. It is a plan again until rebuilt.`];
+    return [`Their demolition team dropped the ${name} behind them. It is a plan again until rebuilt.`];
   }
-  return collapseCorridor(s, id, 'sappers') === null ? [`Their sappers blew the ${name} behind them: it is choked with rubble.`] : [];
+  return collapseCorridor(s, id, 'sappers') === null ? [`Their demolition team blew the ${name} behind them: it is choked with rubble.`] : [];
 }
 
 // ── stranded vehicles ──

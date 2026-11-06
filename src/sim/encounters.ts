@@ -98,7 +98,7 @@ export const NEIGHBOR_BLURB: Record<NeighborKind, string> = {
   prepper: 'Has a radio mast and a locked gate. Will trade, won\'t share.',
   widow: 'A retired nurse living alone since her husband passed.',
   ranch: 'Cattle and hay on the bench. Good shots, good with stock.',
-  loner: 'Keeps to himself up the draw. Fixes anything with an engine.',
+  loner: 'Keeps to himself up the gully. Fixes anything with an engine.',
 };
 
 /** 4–6 households round the place (user), deterministic per seed. */
@@ -476,7 +476,7 @@ function adaptCrew(s: GameState, e: Encounter, p: Posture, day: number): void {
     g.lastProbe = day;
     e.size = n; e.strength = n * 9; e.armed = true; e.adapt = a;
     e.title = 'Men testing your wire';
-    e.dossier = [`${n} men on foot along your fence line at dusk, looking at the posts, the lights and the windows. Rifles slung.`, 'They are not here for the stores yet. They are here to see what answers, and to go back and say.'];
+    e.dossier = [`${n} men on foot along your fence line at dusk, looking at the posts, the lights and the windows. Rifles slung.`, 'They are not here for your supplies yet. They are here to see what answers, and to go back and say.'];
     log(s, 'Word has gone round that this place holds. Men are walking your fence line, testing it for whoever sent them.');
     return;
   }
@@ -488,7 +488,7 @@ function adaptCrew(s: GameState, e: Encounter, p: Posture, day: number): void {
   }
   const why = whyBigger(a);
   if (why) e.dossier.push(why);
-  if (logGate(s, 'adapt-word', 400)) log(s, 'Hardcore: the crews are learning. A place that holds draws bigger, better-armed crews than one that does not, and they come oftener. Walls and rifles buy time, not immunity.');
+  if (logGate(s, 'adapt-word', 400)) log(s, 'Hardcore: the crews are adapting. A well-defended place draws bigger, better-armed crews than one that is not, and they come more often. Walls and rifles buy time, not immunity.');
 }
 
 /** Once a day after the hit: maybe someone comes. Returns the encounter set as pending (the UI pauses), or null. */
@@ -544,7 +544,7 @@ export function gateDay(s: GameState): Encounter | null {
     if (cb.insider) { e.insiderHelp = cb.insider; e.dossier = [...e.dossier, `${cb.insider}, who stood your gate, sold it to them. They know the hours of the watch and he left the latch off: there is no wall to get over.`]; }
     e.strength = Math.round(cb.size * (kind === 'gang' ? 12 : kind === 'militia' ? 11 : 9));
     e.title = `Back again: ${e.title[0].toLowerCase()}${e.title.slice(1)}`;
-    e.dossier = [cb.probed ? `${cb.size} of them. The men who walked your wire got back to the rest and told them where it is thin: where the posts are, where the lights do not reach, how many guns answered. They are not testing anything this time.` : cb.guide ? `${cb.size} of them. ${cb.guide} told them how the place lies: the posts, the guns, the hours of the watch. They come in knowing where to go: more of them than a crew would send blind, and they will look in the timber, the stores and the hatches.` : `${cb.size} of them: the same ones who went through the place. They know somebody lives here now, and they mean to find them.`, ...e.dossier.slice(1, 2)];
+    e.dossier = [cb.probed ? `${cb.size} of them. The men who walked your wire got back to the rest and told them where it is thin: where the posts are, where the lights do not reach, how many guns answered. They are not testing anything this time.` : cb.guide ? `${cb.size} of them. ${cb.guide} told them how the place lies: the posts, the guns, the hours of the watch. They come in knowing where to go: more of them than a crew would send blind, and they will look in the woods, the storerooms and the hatches.` : `${cb.size} of them: the same ones who went through the place. They know somebody lives here now, and they mean to find them.`, ...e.dossier.slice(1, 2)];
     g.comeBack = null;
   }
   // the difficulty's crew size (the battle counts heads: `strength` is only the dossier's figure for them)
@@ -788,7 +788,7 @@ export function resolve(s: GameState, stance: Stance): Outcome {
     if (stance === 'hide') {
       // everyone underground (or in the timber); they take what's lying about. Nobody gets in by the tunnel: it only opens from inside.
       const found = r() < hideFoundChance(s, e, p);
-      if (e.scouted) lines.push(found ? `${e.scouted} had walked your fence line and told them where you would go to ground. They knew where to look.` : `${e.scouted} told them where you would hide. They looked, and did not find it.`);
+      if (e.scouted) lines.push(found ? `${e.scouted} had walked your fence line and told them where you would hide. They knew where to look.` : `${e.scouted} told them where you would hide. They looked, and did not find it.`);
       const hidden = p.bunker || p.safeRoom;
       // a savage crew doesn't stop at the stores: they hunt for whoever lives here; so does a crew come back for them
       // (a crew of hungry men back for more stores takes them; a hard one back for whoever lives here looks harder)
@@ -800,7 +800,7 @@ export function resolve(s: GameState, stance: Stance): Outcome {
         // (round 4) nobody home to stop them: they go through the place at their leisure, not only for what they came for
         const lost = take(s, e.wants ?? {}, p.bunker ? 1 : 1.5);
         lines.push(...stripEmpty(s, e, p, r, lost));
-        title = 'They took what they found'; text = p.bunker ? 'From the bunker you hear them go through the house and the shop.' : 'From the trees you watch them load your stores into the truck.'; tone = 'bad';
+        title = 'They took what they found'; text = p.bunker ? 'From the bunker you hear them go through the house and the shop.' : 'From the trees you watch them load your supplies into the truck.'; tone = 'bad';
         if (!p.bunker && !p.safeRoom && r() < 0.3) lines.push(wound(s, r, 30, 'hurt running for the timber'));
         if (!p.bunker && p.safeRoom) lines.push('Everyone sat it out behind the safe-room door.');
       }

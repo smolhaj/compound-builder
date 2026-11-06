@@ -45,7 +45,7 @@ describe('carrying capacity readout', () => {
     const c = carryOf(g, e.people!);
     expect(c.extra).toBe(e.people!.length);
     expect(c.daysWith).toBeLessThan(c.days);
-    expect(carryLines(c).join(' ')).toMatch(/Put by: \d+ days of food for 4; with/);
+    expect(carryLines(c).join(' ')).toMatch(/Food on hand for 4: \d+ days; with/);
     // a year of harvest as big as the table needs: nobody starves, however many
     g.stats.days = 365; g.stats.grownYear = 365 * c.need * 3;
     expect(carryOf(g, e.people!).daysWith).toBe(Infinity);
@@ -56,7 +56,7 @@ describe('carrying capacity readout', () => {
     const c = carryOf(g, stranger(g, 2).people!);
     expect(c.level).toBe('over');
     expect(c.headroom).toBe(0);
-    expect(carryLines(c).join(' ')).toMatch(/past what the stores can feed/);
+    expect(carryLines(c).join(' ')).toMatch(/past what your food supply can feed/);
     g.stock.canned = 3000;
     expect(carryOf(g).headroom).toBeGreaterThan(10);
   });

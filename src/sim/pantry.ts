@@ -169,7 +169,7 @@ export const FOOD: Record<FoodItemId, FoodItem> = {
   canned_fruit: F('canned_fruit', 'Canned fruit, case of 12', 'case of 12 × 15 oz (peaches, pears, pineapple)', 'canned', 3400, 5, 0.01, 'fruitveg', 2, 'dry', 30, 'can', 6, 0xe8a030, { dietMax: 0.3 }),
   canned_meat: F('canned_meat', 'Canned meat & tuna, case of 12', 'case of 12 (chicken, tuna, Spam, corned beef)', 'canned', 7200, 120, 0.5, 'protein', 4, 'dry', 48, 'can', 6, 0xb03028),
   canned_soup: F('canned_soup', 'Canned soup & chili, case of 12', 'case of 12 × 19 oz', 'canned', 5400, 45, 0.35, 'meal', 3, 'dry', 30, 'can', 6, 0xc8b040),
-  home_canned: F('home_canned', 'Home-canned jars', 'case of 12 quarts put up in the kitchen (best within two years)', 'canned', 6000, 25, 0.05, 'fruitveg', 2, 'cool', null, 'jar', 12, 0xb84a30),
+  home_canned: F('home_canned', 'Home-canned jars', 'case of 12 quarts canned at home (best within two years)', 'canned', 6000, 25, 0.05, 'fruitveg', 2, 'cool', null, 'jar', 12, 0xb84a30),
   snacks: F('snacks', 'Snacks, case', 'case of granola bars, crackers, trail mix', 'canned', 9000, 20, 0.35, 'snack', 1, 'dry', 38, 'case', 1, 0xc83a6a, { dietMax: 0.12 }),
   freezer_meat: F('freezer_meat', 'Freezer meat, 5 kg', 'box of beef, chicken and pork (a year frozen)', 'frozen', 10000, 150, 0.55, 'protein', 1, 'frozen', 70, 'pack', 3, 0xb04040),
   cellar_roots: F('cellar_roots', 'Potatoes, apples & roots in the cellar', 'wooden bin, about 115 lb (potatoes, apples, squash, cabbage, carrots); keeps through the winter in a cold cellar', 'canned', 40000, 20, 0.01, 'fruitveg', 0.6, 'cool', null, 'crate', 1, 0xb8935a, { dietMax: 0.5 }),

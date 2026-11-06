@@ -56,16 +56,16 @@ export function FortifyRing() {
       <Note tone="good">Laid out. The family builds the wall first, then the deck on top, the garage and the towers, as the materials come in. The Defense tab shows each piece as it goes up.</Note>
       {need.length > 0 && <PlansOrderButton lines={need} />}
     </> : <>
-      <Note>A container-wall ring with a walkway along the top, a gatehouse garage at the gate and towers on the corners. It starts as a compound round the family's buildings (about 5 acres); expand it to the whole property line when you can pay for it. Walls you already have are kept; a container, steel or concrete wall gets a deck.</Note>
+      <Note>A container-wall ring with a walkway along the top, a gatehouse garage at the gate and towers on the corners. It starts as a compound around the family's buildings (about 5 acres); expand it to the whole property line when you can pay for it. Walls you already have are kept; a container, steel or concrete wall gets a deck.</Note>
       {priced && (priced.core.coreIsFull
         ? <Note>Your lot is small: the core compound is the whole lot.</Note>
         : <div style={{ display: 'flex', gap: 4, alignItems: 'stretch', flexWrap: 'wrap', padding: '3px 0' }}>
-          {([['core', 'Core compound', 'about 5 acres round the family', priced.core], ['full', 'Expand to the full property line', `${priced.full.wall.lineM.toLocaleString('en-US')} m of line`, priced.full]] as const).map(([k, label, sub, p]) =>
+          {([['core', 'Core compound', 'about 5 acres around the family', priced.core], ['full', 'Expand to the full property line', `${priced.full.wall.lineM.toLocaleString('en-US')} m of line`, priced.full]] as const).map(([k, label, sub, p]) =>
             <button key={k} style={{ ...btn(opts.scope === k), flex: 1, textAlign: 'left', padding: '4px 7px' }} title={sub} onClick={() => setOpts({ ...opts, scope: k })}>
               <div>{label}</div><div style={{ fontSize: 11, opacity: 0.75 }}>{usd(p.cost)} · {p.hours.toLocaleString('en-US')} h</div>
             </button>)}
         </div>)}
-      <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', padding: '3px 0', opacity: opts.scope === 'full' && !(priced?.core.coreIsFull) ? 0.5 : 1 }} title="The outline of the ring round the core compound. The whole-property wall follows the land's own line.">
+      <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', padding: '3px 0', opacity: opts.scope === 'full' && !(priced?.core.coreIsFull) ? 0.5 : 1 }} title="The outline of the ring around the core compound. The whole-property wall follows the land's own line.">
         <span style={{ flex: 1, color: DIM }}>Shape</span>
         {RING_SHAPES.map(sh => <button key={sh.id} style={{ ...btn(opts.shape === sh.id), padding: '2px 7px' }} title={sh.blurb} disabled={opts.scope === 'full' && !(priced?.core.coreIsFull)} onClick={() => setOpts({ ...opts, shape: sh.id })}>{sh.name}</button>)}
       </div>
@@ -84,7 +84,7 @@ export function FortifyRing() {
       {opts.rings > 1 && <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', padding: '3px 0' }}>
         <span style={{ flex: 1, color: DIM }}>Inner walls</span>
         {RING_WALLS.map(k => <button key={k} style={{ ...btn(opts.ringWall === k), padding: '2px 7px', fontSize: 11.5 }} title={PERIMETER[k].blurb} onClick={() => setOpts({ ...opts, ringWall: k })}>{PERIMETER[k].name.replace('Poured-concrete wall', 'Concrete').replace('Stone-and-timber wall', 'Stone').replace('Container wall', 'Containers').replace('Stacked containers', 'Stacked')}</button>)}
-        <button style={{ ...btn(opts.ringGates === 'alternate'), padding: '2px 7px', fontSize: 11.5 }} title="Gates on opposite sides, ring by ring: a crew has to walk round each" onClick={() => setOpts({ ...opts, ringGates: opts.ringGates === 'alternate' ? 'aligned' : 'alternate' })}>{opts.ringGates === 'alternate' ? 'Gates alternate' : 'Gates aligned'}</button>
+        <button style={{ ...btn(opts.ringGates === 'alternate'), padding: '2px 7px', fontSize: 11.5 }} title="Gates on opposite sides, ring by ring: a crew has to walk around each" onClick={() => setOpts({ ...opts, ringGates: opts.ringGates === 'alternate' ? 'aligned' : 'alternate' })}>{opts.ringGates === 'alternate' ? 'Gates alternate' : 'Gates aligned'}</button>
       </div>}
       {opts.rings > 1 && <div style={{ display: 'flex', gap: 4, alignItems: 'center', padding: '3px 0' }} title="A small man-door in each inner wall, opposite its main gate. A crew finds it and funnels to it (the manned rings hold a few seconds less), and the defenders can sortie from it and catch the crew at the wall from the flank. Costs lumber and hardware per ring.">
         <span style={{ flex: 1, color: DIM }}>Sally ports</span>
@@ -112,7 +112,7 @@ export function FortifyRing() {
       </div>
       {plan && <div style={{ borderTop: `1px solid ${LINE}`, borderBottom: `1px solid ${LINE}`, margin: '6px 0', padding: '6px 0' }}>
         {nothing ? <Note tone="good">Nothing to add: the line is already held and has what this plan would give it.</Note> : <>
-          <div>{PERIMETER[opts.wall].name} <b>{plan.wall.wallM.toLocaleString('en-US')} m</b>{opts.scope === 'core' && !plan.coreIsFull && <span style={{ color: DIM }}> round the compound</span>}{plan.wall.heldM > 0 && <span style={{ color: DIM }}> · {plan.wall.heldM.toLocaleString('en-US')} m already held</span>}</div>
+          <div>{PERIMETER[opts.wall].name} <b>{plan.wall.wallM.toLocaleString('en-US')} m</b>{opts.scope === 'core' && !plan.coreIsFull && <span style={{ color: DIM }}> around the compound</span>}{plan.wall.heldM > 0 && <span style={{ color: DIM }}> · {plan.wall.heldM.toLocaleString('en-US')} m already held</span>}</div>
           {plan.wall.creekCrossings > 0 && <div>Creek bars at <b>{plan.wall.creekCrossings}</b> crossing{plan.wall.creekCrossings > 1 ? 's' : ''}</div>}
           <div>Patrol walkway on top <b>{Math.round(plan.walkwayLen * 6).toLocaleString('en-US')} m</b>{plan.walkwayRuns > 0 && <span style={{ color: DIM }}> · stairs at the gate and every ~80 m</span>}</div>
           <div>{plan.garage ? <>Gate at the road: a gatehouse garage where the driveway crosses the wall <span style={{ color: DIM }}>· 4 bays, a steel drive-through gate</span></> : <span style={{ color: DIM }}>{plan.wall.gateSpot ? 'Gate at the road: an ordinary gate where the driveway crosses (no gate garage)' : 'No gate garage'}</span>}</div>

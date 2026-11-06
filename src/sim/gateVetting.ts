@@ -84,7 +84,7 @@ export function vetDetail(s: GameState): string[] {
   const g = s.gate.vet ?? 'none';
   return [
     `Each gate that looks them over ties up the guards ${VET.HOURS} hours and costs ${VET.ATTENTION} points of the watch's detection that day (at most ${VET.ATTENTION_MAX}).`,
-    'Outer gate: a bad one is turned back before they are inside anything. Inner gate: days under watch show more, but a thief has had the outer ring\'s stores.',
+    'Outer gate: a bad one is turned back before they are inside anything. Inner gate: days under watch show more, but a thief has had the outer ring\'s supplies.',
     ...(g === 'none' ? [] : ['A fever caught is nursed outside the wall; a thief or scout caught is sent on (a scout\'s crew is then expected).']),
   ];
 }

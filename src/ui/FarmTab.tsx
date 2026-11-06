@@ -98,7 +98,7 @@ function FieldsView({ game }: { game: GameState }) {
   const g = useGameStore();
   const rows = fieldRows(game), gardens = gardensOf(game), have = seedOnHand(game), sd = seedsOf(game);
   const [w0, w1] = sowWindow(game);
-  const lines: Array<[StockLine, string, string]> = [['saved', 'Saved', 'Kept back from your own harvest'], ['hybrid', 'Hybrid', 'The Shop\u2019s plain seed, cheap: about 12 % more crop and a third less blight and rust the year it is sown; seed saved from it comes back at about 80 %'], ['heirloom', 'Heirloom', 'Pricier, an ordinary crop the first year, but open-pollinated: the seed you save comes true']];
+  const lines: Array<[StockLine, string, string]> = [['saved', 'Saved', 'Set aside from your own harvest'], ['hybrid', 'Hybrid', 'The Shop\u2019s plain seed, cheap: about 12 % more crop and a third less blight and rust the year it is sown; seed saved from it comes back at about 80 %'], ['heirloom', 'Heirloom', 'Pricier, an ordinary crop the first year, but open-pollinated: the seed you save comes true']];
   return <>
     <Section title="Fields">
       {(() => { const w = seedWarning(game); return w ? <Note tone={w.tone}>{w.text}</Note> : null; })()}
@@ -158,7 +158,7 @@ function KitchenView({ game }: { game: GameState }) {
   const kt = kitchenOf(game), ms = methodLines(game), dl = dishLines(game);
   const cap = cellarCapacity(game), room = pantryRoom(game), load = pantryLoad(game);
   return <>
-    <Section title="Putting the harvest by">
+    <Section title="Preserving the harvest">
       {ms.map(m => <div key={m.method} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, padding: '1px 0' }}>
         <span title={m.why ?? undefined}>{m.name} <span style={{ color: m.why ? TONE.warn : DIM, fontSize: 11 }}>{m.why ? m.why : `${m.per} ${m.unit} a day`}</span></span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -178,7 +178,7 @@ function KitchenView({ game }: { game: GameState }) {
     <Section title="Soap">
       <Row label="Hygiene supplies" value={`${game.stock.hygiene.toFixed(1)} person-months`} title="Soap, paper, toothpaste. Out of soap the house gets sick" />
       {(() => { const why = soapProblem(game); return <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 1 }}>
-        <button style={{ ...btn(!why), opacity: why ? 0.55 : 1 }} disabled={!!why} title={why ?? `A pail of lard and half a rick of firewood make ${SOAP.hygiene}+ person-months of soap`} onClick={() => g.money(d => makeSoap(d))}>Boil a batch of soap</button>
+        <button style={{ ...btn(!why), opacity: why ? 0.55 : 1 }} disabled={!!why} title={why ?? `A pail of lard and half a face cord of firewood make ${SOAP.hygiene}+ person-months of soap`} onClick={() => g.money(d => makeSoap(d))}>Boil a batch of soap</button>
         {why && <span style={{ fontSize: 10.5, color: DIM, maxWidth: 220, lineHeight: 1.25 }}>{why[0].toUpperCase() + why.slice(1)}</span>}
       </span>; })()}
     </Section>
@@ -217,7 +217,7 @@ function AnimalsView({ game }: { game: GameState }) {
           <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
             <span style={{ color: c < 0.5 ? TONE.bad : c < 0.9 ? TONE.warn : undefined }}>{Math.floor(game.stock[a])} head, {Math.round(c * 100)} %</span>
             {sick > 0 && <span style={{ color: TONE.bad, fontSize: 11 }}>{sick} sick</span>}
-            {BUTCHERABLE.includes(a) && act('Butcher', butcherProblem(game, a, 1), () => g.money(d => butcher(d, a, 1)), `Butcher one ${a}: the meat is put up (freezer, smoker, salt, canner); a pig gives lard`)}
+            {BUTCHERABLE.includes(a) && act('Butcher', butcherProblem(game, a, 1), () => g.money(d => butcher(d, a, 1)), `Butcher one ${a}: the meat is preserved (freezer, smoker, salt, canner); a pig gives lard`)}
           </span>
         </div>;
       })}
@@ -237,14 +237,14 @@ function AnimalsView({ game }: { game: GameState }) {
       return <Section key={st.id} title={hives.length > 1 ? `Apiary ${i + 1}` : 'Apiary'}>
         <Row label="Colonies" value={`${r.colonies} of ${HIVES}${r.colonies > 0 ? ` · strength ${Math.round(r.strength * 100)} %` : ''}`} />
         {r.colonies > 0 && <>
-          <Row label="Winter stores" value={<span style={{ color: r.stores < r.need * 0.7 ? TONE.warn : undefined }}>{Math.round(r.stores)} of {Math.round(r.need)} lb</span>} title="Honey the bees need to see out the winter" />
-          <Row label="Honey to take" value={`${Math.floor(r.surplus)} lb`} title="Above their winter stores; taken in late summer (the family does it on day 245 if you do not)" />
+          <Row label="Winter honey reserve" value={<span style={{ color: r.stores < r.need * 0.7 ? TONE.warn : undefined }}>{Math.round(r.stores)} of {Math.round(r.need)} lb</span>} title="Honey the bees need to get through the winter" />
+          <Row label="Honey to take" value={`${Math.floor(r.surplus)} lb`} title="Above what they need for winter; taken in late summer (the family does it on day 245 if you do not)" />
           <Row label="Mites" value={<span style={{ color: r.mites > 0.5 ? TONE.bad : r.mites > 0.3 ? TONE.warn : undefined }}>{Math.round(r.mites * 100)} %{r.treated ? ' · treated this year' : ''}</span>} />
           <Row label="Forage" value={`${Math.round(r.forage * 100)} %`} title="What the garden, orchard, fields and woods give the bees" />
         </>}
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '3px 0' }}>
           {act('Stock a colony', bStockProblem(game, st.id), () => g.money(d => stockApiary(d, st.id)), 'Put a nucleus colony from the Shop in a hive (spring)')}
-          {act('Take honey', harvestProblem(game, st.id), () => g.money(d => harvestHoney(d, st.id)), 'Take the surplus honey; the bees keep their winter stores')}
+          {act('Take honey', harvestProblem(game, st.id), () => g.money(d => harvestHoney(d, st.id)), 'Take the surplus honey; the bees keep what they need for winter')}
         </div>
         {r.notes.map((n, k) => <Note key={k} tone="warn">{n}</Note>)}
         {r.lostWinter > 0 && <Note>{r.lostWinter} colon{r.lostWinter === 1 ? 'y' : 'ies'} lost over the winter.</Note>}
@@ -272,7 +272,7 @@ function PlanView({ game }: { game: GameState }) {
     <Section title="Stores">
       <Row label="Eating" value={`${Math.round(st.needPerDay).toLocaleString('en-US')} kcal a day`} />
       {st.lines.map(l => <Row key={l.id} label={l.label} value={<span style={{ color: l.tone === 'good' ? undefined : TONE[l.tone] }}>{days(l.days)} <span style={{ color: DIM }}>· {k(l.kcal)}</span></span>} title={l.note ?? undefined} />)}
-      <Row label="All put by" value={<b>{days(st.totalDays)}</b>} />
+      <Row label="All food stored" value={<b>{days(st.totalDays)}</b>} />
       {st.lines.filter(l => l.note).map(l => <Note key={l.id} tone={l.tone === 'good' ? undefined : l.tone}>{l.label}: {l.note}.</Note>)}
     </Section>
     <Section title="A year's food">

@@ -169,7 +169,7 @@ export const REGIONS: Record<RegionId, RegionDef> = {
   },
   pnw: {
     id: 'pnw', name: 'Pacific Northwest', where: 'western Oregon and Washington',
-    blurb: 'Big firs and cedars, ferns, rain all winter. Dear land, mild winters, salmon in the rivers, and the Cascadia fault.',
+    blurb: 'Big firs and cedars, ferns, rain all winter. Expensive land, mild winters, salmon in the rivers, and the Cascadia fault.',
     // Cascade / Coast Range foothill acreage $5,000–12,000 an acre
     perAcre: 7500, creekOdds: 0.6, springOdds: 0.35, gwDepth: [6, 80], gwBad: { hard: 0.05, iron: 0.15, arsenic: 0.05 },
     timber: [1.2, 1.6], soil: { thin: 0.2, deep: 0.3 }, frost: [105, 298], zone: '8a–8b', cold: 0.6, rainMm: 1500,
@@ -198,7 +198,7 @@ export const REGIONS: Record<RegionId, RegionDef> = {
   },
   new_england: {
     id: 'new_england', name: 'New England', where: 'Vermont, New Hampshire, western Maine',
-    blurb: 'Stony hill farms gone back to woods, stone walls through the sugarbush, brooks and old capes. Snowy winters, mud season, and dear land.',
+    blurb: 'Stony hill farms gone back to woods, stone walls through the maple woods, brooks and old capes. Snowy winters, mud season, and expensive land.',
     // VT / NH woodland and old hill farms $3,500–8,000 an acre (Act 250 country)
     perAcre: 5500, creekOdds: 0.55, springOdds: 0.35,
     // drilled wells in granite / schist bedrock average 75–150 m; 10–20 % of NH / ME bedrock wells run over the arsenic limit

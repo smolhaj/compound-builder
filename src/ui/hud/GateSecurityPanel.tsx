@@ -6,7 +6,7 @@ import { Group, Hint, Note, Row } from './common';
 import { DIM, btn, usd } from './style';
 
 const WHAT: Record<GateGood, string> = {
-  gate_intercom: `Intercom and camera at the gate post (needs power): +${GATE_SEC.INTERCOM.detection} warning, calmer parleys, you see the drive before it opens.`,
+  gate_intercom: `Intercom and camera at the gate post (needs power): +${GATE_SEC.INTERCOM.detection} warning, calmer talks, you see the drive before it opens.`,
   gate_motor: `Caged, anti-lift motor: +${GATE_SEC.MOTOR.barrier} wall strength at the gate; with power it holds the gate open for less time. No power: opened by hand.`,
   sally_gate: `A second gate and side walls: the outer gate shuts before the inner opens, so a vehicle is never exposed to the road with the gate open (+${GATE_SEC.SALLY.barrier} wall strength, arrival ambushes x${GATE_SEC.SALLY.ambush}).`,
 };

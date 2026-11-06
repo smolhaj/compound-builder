@@ -92,7 +92,7 @@ export function compoundBoard(s: GameState, drive?: readonly Pt[]): CompoundBoar
   { const d = daysOfFood(s), o = op('food'), hungry = !s.food.fromStores && s.food.ateKcal < s.food.needKcal * 0.95;
     const n = Math.round(Math.min(d, 999));
     const growing = o?.done && o.line === 'Growing';
-    const value = `${growing ? 'growing, ' : ''}${days(n)} put by`;
+    const value = `${growing ? 'growing, ' : ''}${days(n)} of food on hand`;
     const tone: BoardTone = hungry || n < BOARD.foodBad ? (growing && !hungry ? 'warn' : 'bad') : n < BOARD.foodWarn && !growing ? 'warn' : 'good';
     vitals.push({ id: 'food', label: 'Food', value, tone, open: open('supplies', 'stores'), fix: fixOf(o) }); }
 

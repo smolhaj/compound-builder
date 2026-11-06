@@ -114,7 +114,7 @@ function mmove(s: GameState, g: MarketGood, qty: number): void {
 // Stalls
 // ─────────────────────────────────────────────────────────────────────────
 
-const VENDORS = ['Earl Pruitt, with a wagon of potatoes', 'two sisters from the LDS ward', 'a Hutterite wagon from the colony', 'Dale, with jerrycans in a horse trailer', 'a man nobody knows, selling ammunition', 'Ruth from the old Grange hall', 'the Delgado boys', 'an old woman with laying hens and salt', 'a trucker who walked off the interstate', 'the vet from Ennis', 'a family from the reservoir camp', 'Pastor Lindgren and his deacons'];
+const VENDORS = ['Earl Pruitt, with a wagon of potatoes', 'two sisters from the LDS church', 'a Hutterite wagon from the colony', 'Dale, with jerrycans in a horse trailer', 'a man nobody knows, selling ammunition', 'Ruth from the old Grange hall', 'the Delgado boys', 'an old woman with laying hens and salt', 'a trucker who walked off the interstate', 'the vet from Ennis', 'a family from the reservoir camp', 'Pastor Lindgren and his deacons'];
 const OFFERS: Array<[MarketGood, number, number]> = [
   ['staples', 1, 2], ['canned', 2, 6], ['fresh', 4, 10], ['meds', 1, 2], ['fuel', 1, 4], ['seed', 1, 2], ['hygiene', 2, 6], ['firewood', 1, 3],
   ['ammo:22lr', 100, 300], ['ammo:12ga', 10, 40], ['ammo:9mm', 20, 60], ['ammo:3030', 10, 30],

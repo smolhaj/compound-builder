@@ -21,6 +21,6 @@ export function HouseHardening() {
       </div>;
     })}
     {emberK(game) < 1 && <Note tone="good">Shutters keep embers out of the house: a wildfire front takes fewer houses.</Note>}
-    <Note>Fitted from the stores in a day. Doors and the safe room trade in at half price; shutters and panels go over what is there. The Shop's Defense shelf sells every tier by the piece.</Note>
+    <Note>Fitted from your own supplies in a day. Doors and the safe room trade in at half price; shutters and panels go over what is there. The Shop's Defense shelf sells every tier by the piece.</Note>
   </Section>;
 }

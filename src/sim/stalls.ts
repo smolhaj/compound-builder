@@ -111,7 +111,7 @@ export function stallsDay(s: GameState): string[] {
     const lines = missLines(s, w.miss, pending);
     if (!lines.length || orderProblem(s, lines)) continue;
     s.stalls![w.key].said = true;
-    out.push(`The ${w.label} has stood still ${Math.floor(days)} days for want of ${linesText(lines)}. Order it (${usd(orderCost(lines, prices(s)))}): the crew cannot go on without.`);
+    out.push(`The ${w.label} has been stuck for ${Math.floor(days)} days waiting on ${linesText(lines)}. Order it (${usd(orderCost(lines, prices(s)))}) so work can continue.`);
   }
   return out;
 }

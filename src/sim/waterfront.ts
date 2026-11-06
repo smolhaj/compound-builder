@@ -5,7 +5,7 @@
  *
  *  Dock        a 3 x 15 m timber pier on piles (`boat_dock`, two slips) or the marina (`marina`, a T-head pier with six slips, a fuel dock and a
  *              boat shed). The footprint must reach from dry land into the water. Boats are goods in the stockpile: a 12 ft aluminum jon boat
- *              with oars ($1,300, three seats) and a 16 ft skiff with a 25 hp outboard ($9,800, five seats, burns petrol); the slips hold them.
+ *              with oars ($1,300, three seats) and a 16 ft skiff with a 25 hp outboard ($9,800, five seats, burns gasoline); the slips hold them.
  *  Fishing     with a boat at a dock and fishing gear, a day on the lake brings in fish at three times the creek's rate (the jon boat), the
  *              skiff reaches the deep water (a better catch, 1.6x); in winter with safe ice, ice fishing at the creek's rate.
  *  Ice         the lake or river skims over when the last two weeks' overnight lows average under 20 F and bears people under 10 F
@@ -114,7 +114,7 @@ export function freezeDayBoats(s: GameState, rnd: number, plantLevel: number): s
   if (!n || hasBubbler(s)) return [];
   // hauled out: the dock chore was kept up (backlog under 50)
   if (plantLevel < 50) return n ? ['The lake skimmed over: the boats were already hauled up on the bank and turned over.'] : [];
-  if (rnd >= 0.5) return ['The lake skimmed over round the boats, but the ice was thin and held off the hulls. They need hauling out before the next freeze.'];
+  if (rnd >= 0.5) return ['The lake skimmed over around the boats, but the ice was thin and held off the hulls. They need hauling out before the next freeze.'];
   const boat: BoatId = have.jon_boat ? 'jon_boat' : 'skiff';
   s.stock[boat] = Math.max(0, (s.stock[boat] ?? 0) - 1);
   return [`The first hard freeze caught a boat in the water: the ice crushed the ${BOATS[boat].name.toLowerCase()}. Haul them out before the lake skims over, or put a bubbler on the dock (the marina has one).`];

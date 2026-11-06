@@ -73,7 +73,7 @@ export const HOUSING_STYLES: Record<string, HousingStyle> = {
     ember: 0.85, keepsWalls: false, cover: 0.9, pf: 25, cellarKcal: 1_500_000, pantry: 5_000_000, permit: 7000,
   },
   stone_house: {
-    kind: 'stone_house', base: 'stone_house', name: 'Stone house', walls: '45 cm fieldstone walls, a slate-grey metal roof', beds: 6,
+    kind: 'stone_house', base: 'stone_house', name: 'Stone house', walls: '45 cm fieldstone walls, a slate-gray metal roof', beds: 6,
     // thermal mass evens out the day and night, and a stone house is slow to chill
     heat: () => 0.85,
     ember: 0.25, keepsWalls: true, cover: 0.7, pf: 10, cellarKcal: 0, pantry: 3_000_000, permit: 4000,
@@ -148,7 +148,7 @@ export function fitOf(site: Pick<Site, 'region' | 'timber' | 'lot' | 'home'>, ki
     }
     case 'stone_house': {
       const rocky = ROCKY.has(site.region);
-      return { off: null, mat: rocky ? 'local' : 'hauled', note: rocky ? `${R.name} has rock at the surface: stone gathered off the land, cheaper but slow` : `no rock here: fieldstone is hauled from a quarry, about a third dearer` };
+      return { off: null, mat: rocky ? 'local' : 'hauled', note: rocky ? `${R.name} has rock at the surface: stone gathered off the land, cheaper but slow` : `no rock here: fieldstone is hauled from a quarry, about a third more expensive` };
     }
     case 'timber_frame': {
       const woods = site.timber >= 0.9;

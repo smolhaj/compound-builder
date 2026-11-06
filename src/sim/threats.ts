@@ -67,7 +67,7 @@ export function winterWindow(clock: GameState['clock'], day: number, r: () => nu
 }
 
 const LINE_ON: Record<ThreatKind, string> = {
-  plague: 'A sickness is going round the county. Fevers, and nobody to see them: keep the sick apart and the medicine close.',
+  plague: 'A sickness is going around the county. Fevers, and nobody to see them: keep the sick apart and the medicine close.',
   famine: 'The harvest is failing across the county. Whatever the fields give this year, it will be less.',
   hard_winter: 'The old-timers say it will be a hard winter. Wood and fuel in before the freeze.',
   warlord: 'A man with trucks and a few dozen guns is taking the county road by road. His scouts have been seen.',
@@ -105,7 +105,7 @@ export function threatsDay(s: GameState, say: (kind: 'threat', text: string) => 
     return out;
   }
   if (threatOn(s, 'plague') > 0 && r() < PLAGUE_PER_DAY * L.threat.k) {
-    const line = infect(s, r, 'the sickness going round the county');
+    const line = infect(s, r, 'the sickness going around the county');
     if (line) out.push(line);
   }
   return out;

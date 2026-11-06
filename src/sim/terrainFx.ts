@@ -180,7 +180,7 @@ export function terrainDefense(s: GameState): TerrainDefense {
   const hard = Math.max(0, Math.min(1, (best.hardness - 1) / 0.6));
   const held = !!best.choke && chokeHeld(s, best.choke);
   if (hard > 0.15) lines.push(`The easiest way in is ${best.hardness.toFixed(1)}× slower than open ground${best.fords ? ' (it fords the creek)' : ''}${best.cliff ? ' (it has a cliff to climb)' : ''}.`);
-  else lines.push('The ground is open all round: nothing slows a crew.');
+  else lines.push('The ground is open all around: nothing slows a crew.');
   if (best.via) lines.push(wayInLine(s.perimeter.find(r => r.id === best.via)?.kind));
   else if (best.choke) lines.push(held ? `The easiest way in narrows to ${Math.round(best.choke.width * 6)} m and you hold it.` : `The easiest way in narrows to ${Math.round(best.choke.width * 6)} m at one place: a wall or tower there would matter.`);
   if (towers.length) lines.push(hs > 0.3 ? `Your towers stand on real high ground (${Math.round(hs * 100)} % of the full advantage).` : 'Your towers stand on the level: a hill would add range.');

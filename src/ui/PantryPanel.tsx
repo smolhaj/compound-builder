@@ -31,7 +31,7 @@ export function PantryPanel({ game }: { game: GameState }): ReactNode {
   return <div style={{ marginBottom: 10 }}>
     <div style={h3}>Pantry</div>
     <div style={{ fontSize: 11.5, lineHeight: 1.35, margin: '0 0 4px' }}><span style={{ color: DIM }}>What we're eating:</span> {eatingLine(game)}</div>
-    {rows.length === 0 && <div style={{ fontSize: 11.5, color: DIM }}>Nothing put by. Buy food in the shop (Food tab).</div>}
+    {rows.length === 0 && <div style={{ fontSize: 11.5, color: DIM }}>No food stored. Buy food in the shop (Food tab).</div>}
     {rows.length > 0 && <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto', columnGap: 8, rowGap: 1, fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>
       <span style={{ color: DIM }}>item</span><span style={{ color: DIM, textAlign: 'right' }}>have</span><span style={{ color: DIM, textAlign: 'right' }}>days</span><span style={{ color: DIM, textAlign: 'right' }}>keeps</span>
       {rows.map(r => <PantryLine key={r.id} r={r} />)}

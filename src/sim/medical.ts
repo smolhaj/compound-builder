@@ -196,8 +196,8 @@ function course(x: Ctx): boolean {
   // the air ambulance, with a helipad on the place (sim/outposts.ts): the bad wounds, burns and broken legs and hips fly out
   if (!c.hosp && airliftReady(s) && airliftCase(c.kind, h.sev, c.bone) && s.money >= airliftBill(s)) {
     const bill = airliftBill(s);
-    s.money -= bill; c.hosp = true; h.sev = Math.min(h.sev, 25); c.care = 'flown to the trauma centre';
-    out.push(`${nameOf} was flown out from the pad to the trauma centre: $${bill.toLocaleString('en-US')}${s.paper.insured ? ' after insurance' : ''}.`);
+    s.money -= bill; c.hosp = true; h.sev = Math.min(h.sev, 25); c.care = 'flown to the trauma center';
+    out.push(`${nameOf} was flown out from the pad to the trauma center: $${bill.toLocaleString('en-US')}${s.paper.insured ? ' after insurance' : ''}.`);
     if (c.kind === 'fracture') c.set = 'good';
     if (c.kind !== 'fracture') return true;
   }
@@ -373,9 +373,9 @@ export function startCase(s: GameState, pid: string, kind: MedKind, sev: number,
 /** Quarantine: keep the sick apart from the rest (a bay, or a spare room). Returns a note. */
 export function setQuarantine(s: GameState, on: boolean): string | null {
   const E = medicalOf(s).epidemic;
-  if (!E) return 'Nobody is going round sick.';
+  if (!E) return 'Nobody is going around sick.';
   E.quarantine = on; E.asked = true;
-  log(s, on ? `The sick are being kept apart${bayOn(s) ? ' in the medical bay' : ' in a spare room'}. Whoever tends them keeps a mask on and washes up.` : 'The family decided to carry on as they were.');
+  log(s, on ? `The sick are being kept apart${bayOn(s) ? ' in the medical bay' : ' in a spare room'}. Whoever tends them keeps a mask on and washes up.` : 'The family decided to continue as they were.');
   return null;
 }
 export function setPolicy(s: GameState, p: Medical['policy']): void { medicalOf(s).policy = p; }
@@ -434,7 +434,7 @@ export function medicalDay(s: GameState): string[] {
     const contacts = outside + (s.disaster.kind && s.clock.t >= s.disaster.hitAt ? 0 : 2);
     if (winter && !M.epidemic && living.length >= 3 && r() < 0.0014 * (1 + 0.25 * contacts)) {
       const p = living[Math.floor(r() * living.length)];
-      if (startCase(s, p.id, 'flu', 40, { src: 'contact' }, 'flu')) { out.push(`${p.first} is down with the flu. It goes round a house in winter.`); M.epidemic = { kind: 'flu', since: day, quarantine: false, asked: false, cases: 1 }; }
+      if (startCase(s, p.id, 'flu', 40, { src: 'contact' }, 'flu')) { out.push(`${p.first} is down with the flu. It goes around a house in winter.`); M.epidemic = { kind: 'flu', since: day, quarantine: false, asked: false, cases: 1 }; }
     } }
   // adopt and run every case
   for (const p of living) {

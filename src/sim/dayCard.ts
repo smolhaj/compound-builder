@@ -24,12 +24,12 @@ const MONTH_START = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
 
 /** What the days after look like, by disaster (the sky matches sim/collapseLook.ts). */
 export const LOOK_LINE: Partial<Record<DisasterKind, string>> = {
-  ash_winter: 'Expect a grey sky, ash falling for days and a dim sun for a year or more. The growing season is cut to a quarter.',
-  wildfire: 'Expect an orange sky and falling ash for days, and smoke for weeks. Keep the ground round the buildings clear.',
+  ash_winter: 'Expect a gray sky, ash falling for days and a dim sun for a year or more. The growing season is cut to a quarter.',
+  wildfire: 'Expect an orange sky and falling ash for days, and smoke for weeks. Keep the ground around the buildings clear.',
   grid_down: 'Expect dark nights: no light from town, no hum from the road. Your own lamps will show for miles.',
   cyberattack: 'Expect dark nights and dead screens: no power, no cards, no phones. Cash and radio, if anyone has them.',
   solar_flare: 'Expect red and green light in the sky for a few nights, and then a dark, quiet grid.',
-  nuclear: 'Expect a sickly haze, grey dust and a long cold. Stay in until the dose drops.',
+  nuclear: 'Expect a sickly haze, gray dust and a long cold. Stay in until the dose drops.',
   drought: 'Expect a dusty, rainless sky and falling wells. Water is the whole game now.',
   pandemic: 'Expect empty roads and a quiet county. Keep your own sick away from the rest.',
   financial: 'Expect closed banks, bare shelves and a county that goes quiet.',

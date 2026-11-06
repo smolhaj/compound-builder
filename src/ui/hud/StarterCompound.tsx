@@ -81,8 +81,8 @@ export function StarterCompound({ first, wanted }: { first: boolean; wanted: boo
         <span style={{ fontVariantNumeric: 'tabular-nums', color: DIM }}>{p.later && p.laterWhy === 'left out by you' ? '' : p.laterWhy === NO_ROOM ? 'no room' : `~${usd(p.usd + p.permit)}`}</span>
         <button style={{ ...btn(), ...miniBtn }} title={p.later && p.laterWhy === 'left out by you' ? 'Put it back in' : 'Leave it out (you can add it by hand later)'} onClick={() => toggle(p.key)}>{p.later && p.laterWhy === 'left out by you' ? '+' : '×'}</button>
       </div>)}
-      {plan.yard && <div title={plan.yard.laterWhy ?? `${PERIMETER[plan.yard.kind].name} round the yard with a gate where the drive comes in: ${plan.yard.plan.wallM} m`} style={{ display: 'flex', gap: 6, alignItems: 'baseline', padding: '1px 0', opacity: plan.yard.later ? 0.55 : 1, fontSize: FS.small }}>
-        <span style={{ flex: 1 }}>{PERIMETER[plan.yard.kind].name.replace(/ \(.*\)/, '')} round the yard{plan.yard.later && <span style={{ color: '#e0b050' }}> · later</span>}</span>
+      {plan.yard && <div title={plan.yard.laterWhy ?? `${PERIMETER[plan.yard.kind].name} around the yard with a gate where the drive comes in: ${plan.yard.plan.wallM} m`} style={{ display: 'flex', gap: 6, alignItems: 'baseline', padding: '1px 0', opacity: plan.yard.later ? 0.55 : 1, fontSize: FS.small }}>
+        <span style={{ flex: 1 }}>{PERIMETER[plan.yard.kind].name.replace(/ \(.*\)/, '')} around the yard{plan.yard.later && <span style={{ color: '#e0b050' }}> · later</span>}</span>
         <span style={{ fontVariantNumeric: 'tabular-nums', color: DIM }}>~{usd(plan.yard.usd)}</span>
         <button style={{ ...btn(), ...miniBtn }} title="Leave the fence out" onClick={() => toggle('yard')}>×</button>
       </div>}

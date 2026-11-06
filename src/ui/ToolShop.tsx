@@ -25,7 +25,7 @@ export function ToolShop({ onMsg }: { onMsg: (m: string | null) => void }) {
     <div style={{ color: open ? C.dim : C.bad, marginBottom: 8, lineHeight: 1.4 }}>
       {open
         ? 'The hardware store: pick it up and pay at the counter. Hand tools are the baseline (cheap grade, or pro grade at 2.5 times the price for twice the life); power tools are 2 to 3.5 times faster but need electricity or gas. Tools wear with use: sharpen and mend them (Supplies → Tools).'
-        : 'The stores are closed. Look for tools in the hardware stores and farm sheds (scavenging), at the crossroads market, or make do with stone and scrap (Supplies → Tools).'}
+        : 'The stores are closed. Look for tools in the hardware stores and farm sheds (scavenging), at the crossroads market, or work with stone and scrap (Supplies → Tools).'}
     </div>
     {GROUPS.map(([title, kinds]) => <div key={title}>
       <div style={{ fontWeight: 600, margin: '12px 0 4px' }}>{title}</div>

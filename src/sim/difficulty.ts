@@ -66,7 +66,7 @@ export function difficultySummary(d: Difficulty): string[] {
   add('time for the outside world to return', pct(k.recovery));
   add('county permit waits', pct(k.permits));
   add('savings after the land', pct(k.money));
-  if (k.adapt >= 1) out.push('after the first year the crews that come for a well-defended place are bigger, better armed and come oftener, and probe the wire first');
+  if (k.adapt >= 1) out.push('after the first year the crews that come for a well-defended place are bigger, better armed and come more often, and probe the wire first');
   else if (k.adapt > 0 && d === 'standard') out.push('after the first year crews are a little bigger against a well-defended place');
   out.push(d === 'cozy' ? 'raiders come in a few small waves, weeks apart' : d === 'hardcore' ? 'raiders come in waves that climb fast, with short quiet between' : 'raiders come in waves that grow over the collapse, with quiet weeks between');
   if (k.winter) out.push('the first winter after the hit brings a deep freeze that burns the woodpile and fuel, then a thaw that spoils fresh and frozen food');

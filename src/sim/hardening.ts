@@ -37,7 +37,7 @@ export const HARDEN: Record<HardenId, HardenDef> = {
     ],
   },
   nbc: {
-    id: 'nbc', name: 'NBC air filtration', tiers: [
+    id: 'nbc', name: 'Air filtration (fallout, gas, germs)', tiers: [
       { name: 'Particulate', blurb: 'HEPA filter and hand crank: keeps fallout dust out', hours: 16, materials: { filter_set: 2, hardware: 1 } },
       { name: 'Gas-tight', blurb: 'HEPA + carbon, blast valves on the vents: keeps out gas and germs', hours: 30, materials: { nbc_filter: 1, blast_valve: 2 } },
       { name: 'Overpressure', blurb: 'Overpressure and an airlock: nothing seeps in', hours: 50, materials: { nbc_filter: 1, blast_valve: 2, hardware: 3 } },

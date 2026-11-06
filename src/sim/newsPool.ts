@@ -31,7 +31,7 @@ export const SEASON_NEWS: Record<Season, readonly string[]> = {
 export const REGION_NEWS: Record<RegionId, readonly string[]> = {
   mountain_west: ['Elk herds are moving down early this year.', 'The ski hill sold more season passes than last year.', 'Wolf sightings reported near the north forest road.', 'Irrigation ditches turn on Monday.', 'Forest Service closes a trailhead for a bear.', 'Ranchers meet about grazing leases.'],
   appalachia: ['Ramps are up early in the hollows.', 'The bluegrass festival adds a second night.', 'Black bears are raiding bird feeders again in the county.', 'Coal truck traffic slows the valley road.', 'Creek flooding closed a low-water bridge.', 'The mountain road department is clearing slides.'],
-  desert: ['A haboob dust wall rolled through the valley Tuesday.', 'Monsoon storms flooded two washes.', 'The well drillers have a three-month waiting list.', 'Javelina are in the orchards again.', 'Triple-digit heat advisory through Thursday.', 'The dry lake road is closed after the storm.'],
+  desert: ['A wall of dust rolled through the valley Tuesday.', 'Monsoon storms flooded two dry creek beds.', 'The well drillers have a three-month waiting list.', 'Javelina are in the orchards again.', 'Triple-digit heat advisory through Thursday.', 'The dry lake road is closed after the storm.'],
   north_woods: ['The ice on the lake is thick enough for trucks.', 'Loons are back on the lake.', 'Black flies are terrible this year.', 'Moose on the highway: slow down after dark.', 'The logging road is open again after thaw.', 'Wild rice harvest opens Saturday.'],
   plains: ['Wheat harvest is two weeks early.', 'A tornado watch is posted until ten tonight.', 'The grain elevator is paying a little more for corn.', 'Center pivots are running day and night.', 'A dust devil took a roof off a shed near the county line.', 'Hail wiped out a field east of town.'],
   pnw: ['Another atmospheric river is lined up for the weekend.', 'Salmon are running early in the river.', 'Slides closed the coast highway again.', 'Mushroom pickers are out in the burn scar.', 'Fog keeps the ferry docked this morning.', 'The timber mill is hiring seasonal crews.'],
@@ -39,7 +39,7 @@ export const REGION_NEWS: Record<RegionId, readonly string[]> = {
   ozarks: ['The spring-fed creek is clear and cold.', 'Chiggers are bad this year; wear boots.', 'Floaters filled the river on the weekend.', 'A cave tour company opens for the season.', 'Ice storm took down lines along the ridge road.', 'The pecan crop looks thin.'],
   hill_country: ['Bluebonnets are out along the ranch road.', 'Cedar fever has the whole county sneezing.', 'A flash flood closed the low-water crossing.', 'Peaches are early at the roadside stands.', 'Wild hogs tore up another hayfield.', 'The deer lease sign-up is open.'],
   rust_belt: ['The old plant shut a second shift again.', 'Soybean prices ticked up at the elevator.', 'The high school marching band wins at state.', 'Lake-effect snow is closing roads east of town.', 'A new warehouse is hiring on the county line.', 'The river rose over the boat ramp.'],
-  upper_midwest: ['The lake effect snow is on the way.', 'Sweet corn and brats at the church fish fry.', 'The dairy co-op voted on its new milk price.', 'Ice fishing shanties are out on the bay.', 'Cranberry harvest begins next week.', 'A derecho knocked out power to the north end.'],
+  upper_midwest: ['The lake effect snow is on the way.', 'Sweet corn and brats at the church fish fry.', 'The dairy co-op voted on its new milk price.', 'Ice fishing shanties are out on the bay.', 'Cranberry harvest begins next week.', 'A violent windstorm knocked out power to the north end.'],
 };
 
 /** Quiet world clues: ordinary news from elsewhere, a little unsettled, never about what is coming. */
@@ -102,8 +102,8 @@ export function seasonReviewLine(f: ReviewFacts): string {
   switch (f.season) {
     case 'spring': return `${head}, in review: ${home}; food for ${days(f.daysOfFood)}; ${wall}. Time to plant.`;
     case 'summer': return `${head}, in review: ${home}; ${wall}; ${usd(f.money)} in the bank. The long days are for building.`;
-    case 'fall': return `${head}, in review: ${f.years < 1 ? 'the first harvest' : `year ${f.years + 1} on the place`}; food put by for ${days(f.daysOfFood)}; ${f.firewood >= 1 ? `${Math.floor(f.firewood)} ricks of firewood` : 'no firewood yet'}; ${wall}.`;
-    case 'winter': return `${head}, in review: ${home}; ${f.firewood >= 1 ? `${Math.floor(f.firewood)} ricks of firewood left` : 'the woodpile is bare'}; food for ${days(f.daysOfFood)}.${f.deaths ? ` ${f.deaths} lost on the place so far.` : ''}`;
+    case 'fall': return `${head}, in review: ${f.years < 1 ? 'the first harvest' : `year ${f.years + 1} on the place`}; food on hand for ${days(f.daysOfFood)}; ${f.firewood >= 1 ? `${Math.floor(f.firewood)} face cords of firewood` : 'no firewood yet'}; ${wall}.`;
+    case 'winter': return `${head}, in review: ${home}; ${f.firewood >= 1 ? `${Math.floor(f.firewood)} face cords of firewood left` : 'the woodpile is bare'}; food for ${days(f.daysOfFood)}.${f.deaths ? ` ${f.deaths} lost on the place so far.` : ''}`;
   }
 }
 
