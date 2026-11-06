@@ -124,6 +124,8 @@ export interface FosterNote { host: string; children: string[]; years: number; t
  */
 export function fosterNote(s: GameState): FosterNote | null {
   if (!nobodyHome(s)) return null;
+  // the run is over when nobody is alive on the place (sim/wipe.ts): the ending screen says where the children are, and nothing is held for them
+  if (s.ending?.kind === 'wipe') return null;
   const wards = wardsOf(s);
   const host = s.neighbors.find(n => n.id === wards[0].by);
   const hostName = host ? house(host) : 'neighbor household';

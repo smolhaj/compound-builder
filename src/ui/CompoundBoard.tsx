@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { useWorldStore } from '../store/worldStore';
 import { boardCache, type BoardAct, type BoardItem, type BoardLine } from '../sim/compoundBoard';
+import { shortestRunway, type RunwayRow } from '../sim/runway';
 import { Clamp, Group, Hint } from './hud/common';
 import { WaveCard } from './WaveClock';
 import { useSpendGuard } from './hud/useSpendGuard';
@@ -17,6 +18,7 @@ export function CompoundBoardPanel({ top, bottom, narrow, onClose, onSide }: { t
   const [cache] = useState(boardCache);
   useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, [onClose]);
   const b = cache(g.game, drive);
+  const tightest = shortestRunway(b.runway);
   const { guard, node: guardNode } = useSpendGuard();
 
   /** The four things a board button can do; then the clipboard goes down so the tab is in view. */
@@ -38,6 +40,12 @@ export function CompoundBoardPanel({ top, bottom, narrow, onClose, onSide }: { t
     {v.fix && <button style={{ ...btn(true), ...miniBtn }} onClick={() => go(v.fix!.act)}>{v.fix.label}</button>}
   </div>;
 
+  const runwayRow = (r: RunwayRow) => <div key={r.id} data-runway={r.id} title={r.detail} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0', borderBottom: `1px solid ${LINE}` }}>
+    {dot(r.tone)}
+    <span style={{ flex: 1, minWidth: 0, display: 'flex', justifyContent: 'space-between', gap: 8 }}><b>{r.label}</b><span style={{ color: r.tone === 'good' ? DIM : TONE[r.tone], textAlign: 'right' }}>{r.value}</span></span>
+    <button style={{ ...btn(r.tone !== 'good'), ...miniBtn }} onClick={() => go(r.fix.act)}>{r.fix.label}</button>
+  </div>;
+
   const item = (x: BoardItem) => <div key={x.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, padding: '3px 0' }}>
     <span style={{ paddingTop: 4 }}>{dot(x.tone)}</span>
     <div style={{ flex: 1, minWidth: 0 }}><Clamp text={x.text}>{x.text}</Clamp></div>
@@ -55,6 +63,10 @@ export function CompoundBoardPanel({ top, bottom, narrow, onClose, onSide }: { t
     {guardNode}
     {b.vitals.map(vital)}
     <WaveCard />
+    <Group id="board.runway" title="Days with no resupply" extra={tightest && tightest.tone !== 'good' ? `${tightest.label}: ${tightest.value}` : undefined}>
+      {b.runway.map(runwayRow)}
+      <div style={{ fontSize: FS.fine, color: DIM, paddingTop: 2 }}>Only what is on the place now: nothing grown, bought or delivered. Hover a row for what it counts.</div>
+    </Group>
     {b.allClear && <Hint more="Power, water, food, defense and morale are all fine, nothing threatens the place and nothing waits on you. The board looks again each day.">Nothing needs you today.</Hint>}
     {b.threats.length > 0 && <Group id="board.threats" title="Threats" extra={String(b.threats.length)}>{b.threats.map(item)}</Group>}
     {b.decisions.length > 0 && <Group id="board.decisions" title="Waiting on you" extra={String(b.decisions.length)}>{b.decisions.map(item)}</Group>}

@@ -46,7 +46,7 @@ import type { QuartersState } from './quarters';
 import type { Evenings } from './evenings';
 import type { Courses } from './courses';
 import { starterKit, type ToolKit } from './tools';
-export const SAVE_VERSION = 83;
+export const SAVE_VERSION = 84;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';

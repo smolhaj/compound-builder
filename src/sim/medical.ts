@@ -191,7 +191,7 @@ function course(x: Ctx): boolean {
   const nameOf = p.first;
   const die = (why: string) => {
     if (cozy(s)) { n.health = Math.max(n.health, 5); h.sev = Math.min(h.sev, 60); return false; }
-    n.health = 0; n.died = Math.floor(s.clock.t); out.push(`${nameOf} died of ${why}.`); return true;
+    n.health = 0; n.died = Math.floor(s.clock.t); n.cause = c.kind === 'frostbite' ? 'cold' : c.kind === 'wound' || c.kind === 'burn' || c.kind === 'fracture' ? 'wound' : 'illness'; out.push(`${nameOf} died of ${why}.`); return true;
   };
   // the air ambulance, with a helipad on the place (sim/outposts.ts): the bad wounds, burns and broken legs and hips fly out
   if (!c.hosp && airliftReady(s) && airliftCase(c.kind, h.sev, c.bone) && s.money >= airliftBill(s)) {

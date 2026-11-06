@@ -1,3 +1,4 @@
+import { wipeEnded } from '../sim/wipe';
 import { planProblem } from '../sim/construction';
 import { unscripted } from '../sim/godMode';
 import { dropBridge, routeProblem } from '../sim/terrainFx';
@@ -385,7 +386,7 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     if (dayIndex(next.clock.t) !== dayIndex(g.clock.t)) void saveGame(AUTOSAVE, next);
   },
   advance: (days) => set(s => { const game = step(s.game, days); return { game, cutscene: s.cutscene ?? promptFor(game) }; }),
-  setSpeed: (speed) => locked() ? undefined : set(s => ({ resumeTo: null, ...(speed > 0 ? { welcome: false } : {}), game: { ...s.game, clock: { ...s.game.clock, speed } } })),
+  setSpeed: (speed) => locked() || (speed > 0 && wipeEnded(get().game)) ? undefined : set(s => ({ resumeTo: null, ...(speed > 0 ? { welcome: false } : {}), game: { ...s.game, clock: { ...s.game.clock, speed } } })),
   order: (lines) => {
     if (locked()) return false;
     const g = structuredClone(get().game);
@@ -783,7 +784,8 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
   },
   playOn: () => {
     const g = structuredClone(get().game);
-    if (g.ending) g.ending.continued = true;
+    if (!g.ending || g.ending.kind === 'wipe') return;   // a wipe cannot be played on: nobody is alive on the place (sim/wipe.ts)
+    g.ending.continued = true;
     set({ game: g });
   },
   fixFried: (id) => {

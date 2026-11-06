@@ -4,6 +4,7 @@ import { step } from './engine';
 import { lineageDay, chronicleUpkeep, gridChanged, winterOffGrid, UPKEEP_NOTES_PER_YEAR } from './lineage';
 import { fosterHome, orphaned, canFoster } from './orphans';
 import { tallyDay } from './report';
+import { wipeSummary } from './wipe';
 import { threatsDay, rollDoy, THREAT_K, brokenWorld } from './threats';
 import { threatOn } from './threatState';
 import { climate } from './effects';
@@ -33,7 +34,7 @@ const broken = (g: GameState, years = 3) => {
 };
 
 describe('orphans', () => {
-  it('a neighbor household takes the kids in, named, and the run is not a wipe', () => {
+  it('a neighbor household takes the kids in, named; nobody is left on the place, so the run ends and says the family lives on elsewhere', () => {
     const g = orphan();
     const kids = g.people.filter(p => p.kid).length;
     expect(kids).toBeGreaterThan(0);
@@ -44,8 +45,9 @@ describe('orphans', () => {
     expect(g.lineage.wards).toHaveLength(kids);
     expect(g.lineage.wards[0].by).toBe(g.neighbors[0].id);
     expect(g.lineage.chronicle.some(e => /Henderson household took in/.test(e.text))).toBe(true);
-    expect(tallyDay(g)).toBeNull();
-    expect(g.ending).toBeNull();
+    expect(tallyDay(g)?.kind).toBe('wipe');
+    expect(wipeSummary(g).elsewhere).toHaveLength(kids);
+    expect(wipeSummary(g).text).toMatch(/family goes on elsewhere/);
   });
 
   it('with no neighbor who can, it is a wipe', () => {
@@ -71,29 +73,18 @@ describe('orphans', () => {
     expect(fosterHome(g)).toBeNull();
   });
 
-  it('the place is held, the eldest comes of age, and the heirs come home to it', () => {
+  it('with the children fostered the run is over: the clock does not move, and nothing goes NaN', () => {
     const g = orphan();
-    const kid = g.people.filter(p => p.kid).sort((a, b) => b.age - a.age)[0];
-    kid.age = 16;
-    const stock = { ...g.stock };
     g.clock.t += 1;
     lineageDay(g);
-    // the sim carries on with nobody home: no crash, nothing goes NaN, no ending is dealt
     let s = g;
     for (let i = 0; i < 30; i++) s = step(s, 1);
-    expect(s.ending).toBeNull();
+    expect(s.ending?.kind).toBe('wipe');
+    const t = s.clock.t;
+    s = step(s, 5);
+    expect(s.clock.t).toBe(t);
     expect(s.lineage.wards.length).toBeGreaterThan(0);
     expect(Object.values(s.stock).every(v => Number.isFinite(v))).toBe(true);
-    live(s, 3 * 365);
-    expect(s.lineage.wards).toHaveLength(0);
-    const back = s.people.find(p => p.id === kid.id)!;
-    expect(back.age).toBeGreaterThanOrEqual(18);
-    expect(back.kid).toBe(false);
-    expect(s.people.length).toBe(s.personState.length);
-    expect(s.personState.find(ps => ps.id === kid.id)!.needs.died).toBeNull();
-    expect(s.lineage.chronicle.some(e => e.kind === 'coming' && /came home to the place/.test(e.text))).toBe(true);
-    expect(s.structures.length).toBe(g.structures.length);
-    expect(stock).toBeTruthy();
   });
 
   it('a host that is wiped out passes them on, or loses them', () => {

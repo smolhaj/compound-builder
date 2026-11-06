@@ -65,7 +65,7 @@ export function operational(s: GameState, drive?: readonly Pt[], report?: Defens
     ...(powerDone || staked(POWER) ? {} : { act: stake('solar_array', 'Stake solar') }) });
 
   // food: something growing, or ninety days put by
-  const days = Math.round(Math.min(daysOfFood(s), 999)), put = `${days} ${days === 1 ? 'day' : 'days'} of food on hand`;
+  const left = daysOfFood(s), days = Math.round(Math.min(left, 999)), put = Number.isFinite(left) ? `${days} ${days === 1 ? 'day' : 'days'} of food on hand` : 'nobody left to feed';
   const foodDone = fin(FOOD) || days >= 90;
   out.push({ id: 'food', label: 'Food', done: foodDone, line: foodDone ? (fin(FOOD) ? 'Growing' : put) : staked(FOOD) ? `Planting; ${put}` : `Nothing growing; ${put}`,
     ...(foodDone ? {} : days < 1 && foodNudge(s) ? { act: { label: 'Stock some food', act: { type: 'shop' as const, tab: 'food' as const } } } : staked(FOOD) ? {} : { act: stake('garden', 'Stake a garden') }) });

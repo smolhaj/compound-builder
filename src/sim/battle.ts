@@ -1063,13 +1063,13 @@ export function applyCasualties(s: GameState, b: Battle): string[] {
       const i = idx(e.unit); if (i < 0) continue;
       const nd = s.personState[i].needs;
       if (nd.died != null) continue;
-      nd.died = day; nd.taken = true;
+      nd.died = day; nd.taken = true; nd.cause = 'raid';
       out.push(`${s.people[i].first} was taken.`);
     } else if (e.kind === 'death' && byUnit.has(e.unit)) {
       const i = idx(e.unit); if (i < 0) continue;
       const nd = s.personState[i].needs;
       if (s.disaster.difficulty === 'cozy') { nd.hurt.push({ what: 'badly wounded in the fight', sev: 80, trauma: true }); nd.health = 5; out.push(`${s.people[i].first} was badly wounded.`); continue; }
-      nd.health = 0; nd.died = day;
+      nd.health = 0; nd.died = day; nd.cause = 'raid';
       out.push(`${s.people[i].first} was killed.`);
     }
   }
