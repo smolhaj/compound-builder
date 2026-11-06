@@ -124,6 +124,10 @@ export interface GameStore {
   hudFocus: HudFocus | null;
   /** The raid cutscene, or null. */
   cutscene: CutsceneState | null;
+  /** "The day it happened": the hit day this session has put up the card for (transient, not saved), until the player continues. */
+  dayCard: number | null;
+  dayCardSeen: number;
+  ackDayCard: () => void;
   /** Pick the stance on the gate card (the cutscene's prompt); Watch then plays it. */
   chooseStance: (s: Stance | null) => void;
   watchRaid: () => void;
@@ -318,6 +322,8 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
   selected: null,
   hudFocus: null,
   cutscene: null,
+  dayCard: null, dayCardSeen: -1,
+  ackDayCard: () => set(s => ({ dayCard: null, dayCardSeen: s.dayCard ?? s.dayCardSeen })),
   chooseStance: (stance) => { const c = get().cutscene; if (c?.phase === 'prompt') set({ cutscene: { ...c, stance } }); },
   watchRaid: () => {
     const c = get().cutscene, g = get().game;
@@ -350,16 +356,18 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
   },
   tick: (realDt) => {
     const g = get().game;
-    const back = resumeSpeed(get().resumeTo, g.clock.speed, decisionOpen(g, get().cutscene));
+    const back = resumeSpeed(get().resumeTo, g.clock.speed, decisionOpen(g, get().cutscene ?? get().dayCard));
     if (back) { set({ game: { ...g, clock: { ...g.clock, speed: back } }, resumeTo: null }); return; }
-    if (get().cutscene || g.clock.speed === 0 || g.gate.pending || g.gate.aftermath || (g.ending && !g.ending.continued)) return;
+    if (get().cutscene || get().dayCard !== null || g.clock.speed === 0 || g.gate.pending || g.gate.aftermath || (g.ending && !g.ending.continued)) return;
     const days = Math.min(realDt, MAX_DT) / SECONDS_PER_DAY[g.clock.speed];
     const next = step(g, days);
     // someone at the gate: stop the clock until the player decides
     // (and when news of a rescue comes in: the card)
     const paused = (next.gate.pending && !g.gate.pending) || (next.gate.card && !g.gate.card) || (next.ending && !g.ending);
-    if (paused) next.clock = { ...next.clock, speed: 0 };
-    set({ game: next, ...(paused ? { resumeTo: g.clock.speed } : {}), ...(next.gate.pending && !g.gate.pending ? { cutscene: promptFor(next), tool: null } : {}) });
+    // the collapse hits: the day-it-happened card, and the clock waits for the player
+    const hitNow = !!next.disaster.kind && g.clock.t < g.disaster.hitAt && next.clock.t >= next.disaster.hitAt && get().dayCardSeen !== next.disaster.hitAt;
+    if (paused || hitNow) next.clock = { ...next.clock, speed: 0 };
+    set({ game: next, ...(hitNow ? { dayCard: next.disaster.hitAt } : {}), ...(paused || hitNow ? { resumeTo: g.clock.speed } : {}), ...(next.gate.pending && !g.gate.pending ? { cutscene: promptFor(next), tool: null } : {}) });
     if (dayIndex(next.clock.t) !== dayIndex(g.clock.t)) void saveGame(AUTOSAVE, next);
   },
   advance: (days) => set(s => { const game = step(s.game, days); return { game, cutscene: s.cutscene ?? promptFor(game) }; }),
@@ -433,7 +441,7 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     return n;
   },
   resumeTo: null,
-  load: (game) => set({ game, selected: null, tool: null, cutscene: promptFor(game), resumeTo: null }),
+  load: (game) => set({ game, selected: null, tool: null, cutscene: promptFor(game), resumeTo: null, dayCard: null }),
   planRun: (kind, pts, gates, offLen = 0) => {
     if (locked()) return;
     if (routeProblem(get().game, kind, pts)) return;   // a tunnel-bridge needs real low ground, a slope tunnel a hillside (the tool says why)

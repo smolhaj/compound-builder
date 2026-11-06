@@ -106,6 +106,9 @@ export class WorldScene {
   private _envScene: THREE.Scene | null = null;
   private _lastEnvUpdateHour = -999;
   private _envBakeCloud = 0;
+  private _envBakeTint = 0;
+  /** The collapse's look (setCollapseLook): sun dim, sky tint, grade cast. Neutral = nothing. */
+  private readonly _collapse = { dim: 1, tint: new THREE.Color(), amt: 0, night: false, cast: new THREE.Color(1, 1, 1), sat: 1, contrast: 0 };
   private readonly _skyState = createSkyPalette();
   private readonly _phase: DayPhase = { day: 1, golden: 0, night: 0 };
   private _quality: Quality = 'high';
@@ -249,6 +252,16 @@ export class WorldScene {
     x.distantStorm = w.distantStorm ?? 0; x.wind = w.wind ?? 0.2; x.haze = w.haze ?? 0.4;
     x.skyFlash = sky?.flash ?? flash; x.bolt = sky?.bolt ?? 0; x.boltAz = sky?.boltAz ?? 0;
     x.boltSeed = sky?.boltSeed ?? 0; x.stormAz = sky?.stormAz ?? x.stormAz;
+  }
+
+  /**
+   * The collapse's look for the next updateDayNight() (sim/collapseLook.ts): the sun dimmed, the sky pulled toward a colour (only
+   * at night for an aurora), and the grade's cast, saturation and contrast. Pass the neutral values to clear it.
+   */
+  setCollapseLook(l: { dim: number; tint: readonly number[]; amt: number; night: boolean; cast: readonly number[]; sat: number; contrast: number }): void {
+    const c = this._collapse;
+    c.dim = l.dim; c.tint.setRGB(l.tint[0], l.tint[1], l.tint[2]); c.amt = l.amt; c.night = l.night;
+    c.cast.setRGB(l.cast[0], l.cast[1], l.cast[2]); c.sat = l.sat; c.contrast = l.contrast;
   }
 
   /** Valley fog bank and low cloud for the next updateDayNight(). Low quality has no fog at all, so it ignores them. */
@@ -454,6 +467,9 @@ export class WorldScene {
     const overcast = Math.min(1, wx.cloud);
     if (overcast > 0.001 || wx.fog > 0.001 || wx.flash > 0.001) this._applyWeatherToSky(sky, overcast, wx.fog, wx.flash);
     sky.glow.multiplyScalar(0.5 + 1.6 * (1 - this._skyDark));
+    const col = this._collapse;
+    const tintAmt = col.amt * (col.night ? Math.max(0, Math.min(1, (wn - 0.3) / 0.5)) : 1 - 0.6 * wn);
+    if (tintAmt > 0.001) this._applyCollapseToSky(sky, tintAmt);
 
     // Moon lags the sun by its phase (full = opposite the sun).
     const moonAng = moonAngle(angle, this._moonPhase);
@@ -493,6 +509,19 @@ export class WorldScene {
     blend(this._rimLight.color, R.day.rimColor, R.golden.rimColor, R.night.rimColor);
 
     this._sunLight.shadow.intensity = wn < 0.5 ? 1 : 0.75;
+    if (col.dim < 0.999) {
+      // the sun is a dim disc: less direct light and a flatter, softer shadow; the sky's own light holds up better than the sun
+      this._sunLight.intensity *= col.dim; this._rimLight.intensity *= col.dim;
+      this._hemiLight.intensity *= 0.55 + 0.45 * col.dim;
+      this._sunLight.shadow.intensity *= 0.35 + 0.65 * col.dim;
+    }
+    if (tintAmt > 0.001 && !col.night) {
+      // the light itself takes the colour (an orange noon lights the yard orange)
+      const m = Math.max(col.tint.r, col.tint.g, col.tint.b, 1e-4);
+      tmp.copy(col.tint).multiplyScalar(1 / m);
+      this._sunLight.color.lerp(tmp, Math.min(0.7, tintAmt * 0.6));
+      this._hemiLight.color.lerp(tmp, Math.min(0.6, tintAmt * 0.5));
+    }
 
     if (overcast > 0.001 || wx.flash > 0.001) {
       const dim = (1 - overcast * 0.8) * (1 - wx.storm * 0.5);
@@ -577,10 +606,11 @@ export class WorldScene {
 
       let dh = Math.abs(timeOfDay - this._lastEnvUpdateHour);
       dh = Math.min(dh, 24 - dh);
-      const cloudMoved = Math.abs(overcast - this._envBakeCloud) > 0.12;
+      const cloudMoved = Math.abs(overcast - this._envBakeCloud) > 0.12 || Math.abs(tintAmt - this._envBakeTint) > 0.12;
       if ((dh >= 0.5 || cloudMoved) && this._pmremGenerator && this._quality !== 'low') {
         this._lastEnvUpdateHour = timeOfDay;
         this._envBakeCloud = overcast;
+        this._envBakeTint = tintAmt;
         this._updateEnvMap();
       }
     }
@@ -609,6 +639,20 @@ export class WorldScene {
     }
     pass.uniforms['uStrength'].value = strength;
     pass.enabled = strength > 0.01;
+  }
+
+  /** The collapse pulls the whole sky toward one colour (ash brown, fire orange, an aurora green) and dulls the sun. */
+  private _applyCollapseToSky(sky: SkyPalette, amt: number): void {
+    const t = this._collapse.tint, tmp = this._c.tmp;
+    const lum = (c: THREE.Color) => c.r * 0.3 + c.g * 0.55 + c.b * 0.15;
+    // the colour keeps each part's own brightness (a zenith stays darker than the horizon)
+    const pull = (c: THREE.Color, k: number) => { const l = Math.max(0.02, lum(c)); tmp.copy(t).multiplyScalar(l / Math.max(0.02, lum(t))); c.lerp(tmp, Math.min(1, amt * k)); };
+    pull(sky.zenith, 0.95); pull(sky.horizonSun, 1); pull(sky.horizonAnti, 1); pull(sky.fog, 1);
+    pull(sky.cloudLit, 0.9); pull(sky.cloudShade, 0.9);
+    if (!this._collapse.night) {
+      sky.sunDisc *= 1 - 0.8 * amt; sky.sunGlow *= 1 - 0.6 * amt;
+      sky.cloudCover += (0.97 - sky.cloudCover) * Math.min(1, amt * 0.8);
+    }
   }
 
   /** Overcast grays the gradient and hides the sun; fog washes the dome toward the fog color. */
@@ -880,6 +924,12 @@ export class WorldScene {
     u['uWarmThreshold'].value = g.threshold - wg * 0.22;
     u['uShadowTintStrength'].value = 0.5 + 0.4 * oc;
     u['uNight'].value = wn;
+    const col = this._collapse;
+    u['uSaturation'].value *= col.sat;
+    u['uContrast'].value += col.contrast;
+    (u['uCast'].value as { r: number; g: number; b: number }).r = col.cast.r;
+    (u['uCast'].value as { r: number; g: number; b: number }).g = col.cast.g;
+    (u['uCast'].value as { r: number; g: number; b: number }).b = col.cast.b;
   }
 
   dispose(): void {

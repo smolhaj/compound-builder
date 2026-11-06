@@ -12,7 +12,7 @@ import { burnedFarms } from '../sim/neighborLife';
 import { useEffect, useRef } from 'react';
 import type { GameState } from '../sim/state';
 import { MushroomCloud } from './fx/MushroomCloud';
-import { disasterSky } from '../sim/nuclear';
+import { collapseLook } from '../sim/collapseLook';
 import * as THREE from 'three';
 import { WorldScene } from '../engine/world/WorldScene';
 import { moonPhase, skyDarkness } from '../engine/world/sky/skyState';
@@ -408,7 +408,7 @@ export function GameCanvas() {
       world.updateRoadLife(dt, game, speedK);
       const speed = game.clock.speed;
       const { timeOfDay: t, dayOfYear, totalDays, seasonMode, weatherMode } = useWorldStore.getState();
-      ws.setNightSky(moonPhase(dayOfYear + t / 24), skyDarkness(world.climate, false));
+      ws.setNightSky(moonPhase(dayOfYear + t / 24), (d0 => d0 + (1 - d0) * collapseLook(useGameStore.getState().game).blackout)(skyDarkness(world.climate, false)));
       Object.assign(world.air, { hour: t, wind: weather.outputs.wind, daylight: 1 - ws.nightFactor * 0.85, viewportH: canvas.clientHeight || 800 });
       world.tick(dt, dayOfYear, totalDays, seasonMode);
       const sp = world.seasons.params;
@@ -437,6 +437,7 @@ export function GameCanvas() {
         valley.update(dt, fogTarget(fn, { campY: fogCampY, floorY: fogCampY - fogPlace.campAboveFloorM / 6 }));
       }
       const vc = valley.cur;
+      const gs = useGameStore.getState().game, look = collapseLook(gs);
       const wx = weather.update({
         dt, speed: speed === 0 ? 1 : 60 / SECONDS_PER_DAY[speed], season: wxSeason, hour: t,
         mode: weatherMode, eventWetness: ws.eventWetness, night: ws.nightFactor,
@@ -444,23 +445,25 @@ export function GameCanvas() {
         snowBase: sp.snow, snowAllow: seasonState.weatherSnow, region: seasonState.climate.id,
         valleyBank: vc.bankDensity > 1e-4 ? { y: vc.bankTopY, amount: Math.min(1, vc.bankDensity * 2.5) } : null,
         mist: valley.nearMist(ws.camera.position.y),
+        ash: weatherMode === 'off' ? 0 : look.ash, ashColor: look.ashColor, ashCover: weatherMode === 'off' ? 0 : look.ashCover,
       });
       valley.applyTo(wx, weatherMode === 'auto');
       ws.setHeightFog(valley.params((renderReq.quality ?? ws.quality) === 'high' ? 0.8 : 0.4));
       // nuclear war: the flash, a mushroom cloud on the northern skyline, a sickly hazed sky, grey dust falling
-      const gs = useGameStore.getState().game, nk = disasterSky(gs);
       if (gs.disaster.kind === 'nuclear' && gs.clock.t >= gs.disaster.hitAt && gs.disaster.variant !== 'exchange') {
         if (!mushroom) { // within the far plane, sized to the angle it would fill: ≈ 6° for the missile fields 100+ km off, ≈ 20° for the base
           mushroom = new MushroomCloud(PARCEL_SIZE * 0.3, -2250, gs.disaster.variant === 'nearby' ? 220 : 70); ws.scene.add(mushroom.group); }
         mushroom.update((gs.clock.t - gs.disaster.hitAt) * 24);
       } else if (mushroom) { ws.scene.remove(mushroom.group); mushroom.dispose(); mushroom = null; }
-      if (nk.haze + nk.dust + nk.flash > 0) {
-        wx.cloud = Math.max(wx.cloud, 0.55 * nk.haze + 0.3 * nk.dust);
-        wx.fog = Math.max(wx.fog, 0.35 * nk.haze + 0.4 * nk.dust);
-        wx.haze = Math.max(wx.haze ?? 0.4, 0.9 * nk.haze);
-        wx.snow = Math.max(wx.snow, 0.6 * nk.dust);
+      // the collapse's look (sim/collapseLook.ts): ash and smoke thicken the sky, the sun dims, the grade takes a cast
+      if (weatherMode !== 'off') {
+        wx.cloud = Math.max(wx.cloud, look.cloud);
+        wx.fog = Math.max(wx.fog, look.fog);
+        wx.haze = Math.max(wx.haze ?? 0.4, look.haze);
+        wx.snow = Math.max(wx.snow, 0.5 * look.ash);
       }
-      ws.setWeather(wx, Math.max(weather.flash, nk.flash), weather.skyLightning);
+      ws.setCollapseLook({ dim: look.dim, tint: look.skyTint, amt: look.skyAmt, night: look.skyNight, cast: look.cast, sat: look.sat, contrast: look.contrast });
+      ws.setWeather(wx, Math.max(weather.flash, look.flash), weather.skyLightning);
       // lamps on inside from dusk (which windows, and how, is the atmosphere's: who's up, power, blackout curtains)
       setWindowGlow(Math.max(0, Math.min(1, (ws.nightFactor - 0.25) / 0.4)), now / 1000);
       world.updateAtmosphere({
