@@ -125,6 +125,8 @@ export class BattleRenderer {
   }
 
   get playing(): boolean { return this.battle !== null; }
+  /** Frozen at time 0: the cutscene's lead-in shows the cast in place before the first shot is fired. */
+  hold = false;
 
   /** Everyone in the fight where they stand now (for the cutscene camera). */
   actors(): Array<{ id: string; side: 'home' | 'raider'; post?: string; x: number; y: number; z: number; dead: boolean; gone: boolean }> {
@@ -154,6 +156,7 @@ export class BattleRenderer {
   play(b: Battle): void {
     this.stop();
     this.battle = b;
+    this.hold = false;
     this.time = 0; this._cursor = 0; this._endAt = -1; this.lines = [];
     const people = this._people();
     const home = b.units.filter(u => u.side === 'home');
@@ -227,6 +230,7 @@ export class BattleRenderer {
   update(dt: number): void {
     const b = this.battle;
     if (!b) return;
+    if (this.hold) { this._moveUnits(0); return; }
     this.time += dt;
     while (this._cursor < b.events.length && b.events[this._cursor].t <= this.time) this._apply(b.events[this._cursor++]);
     for (let i = this._pending.length - 1; i >= 0; i--) if (this._pending[i].at <= this.time) { this._apply(this._pending[i].ev); this._pending.splice(i, 1); }

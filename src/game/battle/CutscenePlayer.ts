@@ -10,7 +10,7 @@ import { useBattleStore } from '../../store/battleStore';
 import { useCutsceneView } from '../../store/cutsceneStore';
 import type { CutsceneState } from '../../store/gameStore';
 import { hourAfter, locate, sceneCaption, sceneWindow } from '../../sim/siege';
-import { Director, poseAt, type V3 } from './director';
+import { Director, auditPose, poseAt, type PoseAudit, type V3, type Box } from './director';
 import type { BattleRenderer } from './BattleRenderer';
 
 export interface PlayerDeps {
@@ -20,6 +20,8 @@ export interface PlayerDeps {
   house: () => V3;
   commit: () => void;
   seed: number;
+  /** Buildings and walls the camera must keep out of (read once per cutscene; the game stands still). */
+  obstacles?: () => Box[];
 }
 
 export class CutscenePlayer {
@@ -36,6 +38,7 @@ export class CutscenePlayer {
   private _view = 0;
   private _done = false;
   private _lastKind = '';
+  private _boxes: Box[] = [];
   /** Wall-clock seconds the player has run (the camera operator's time base). */
   private _time = 0;
   /** Game seconds since the arrival, for the sky and the clock while the scenes play. */
@@ -49,6 +52,8 @@ export class CutscenePlayer {
     this.clockGame = 0; this._offered.clear();
     this._real = 0; this._startedScene = -1; this._done = false; this._time = 0; this._lastKind = '';
     this._dir = new Director(this.d.seed);
+    this._boxes = this.d.obstacles?.() ?? [];
+    this._dir.setObstacles(this._boxes);
     this.active = true;
     this._publish(true);
   }
@@ -97,6 +102,13 @@ export class CutscenePlayer {
     const { battle, ground } = this.d;
     let loc = locate(plan, this._real);
     const seg = loc.segment;
+    // the lead-in shows the cast in place, frozen at the first frame (so the shots have someone to show), then the fight runs from there
+    if (!loc.done && seg.kind === 'lead' && this._startedScene !== seg.scene) {
+      this._startedScene = seg.scene; this._seen = false;
+      useBattleStore.getState().playBattle(c.battles[seg.scene]);
+    }
+    battle.hold = !loc.done && seg.kind === 'lead';
+    if (this._dir.leadIn !== battle.hold) { this._dir.leadIn = battle.hold; this._dir.shot = null; }
     // the fight is driven by the renderer's own clock, so the picture and the timeline agree
     if (!loc.done && seg.kind === 'fight') {
       if (this._startedScene !== seg.scene) {
@@ -118,6 +130,8 @@ export class CutscenePlayer {
       this._real = loc.segment.real0; this.clockGame = loc.segment.game0;
       this._endBattle();
       useGameStore.getState().offerChange(loc.segment.scene - 1);
+      // (read the card back: publishing from the old state would flash the end of the gap for a frame, then fall back to the end of the scene)
+      this._c = useGameStore.getState().cutscene ?? this._c;
       this._publish(true);
       return poseAt(this._dir.shot ?? this._dir.establish(this._time, this.d.house(), this._road, this.d.ground), this._time);
     }
@@ -140,11 +154,18 @@ export class CutscenePlayer {
     if (battle.playing) {
       shot = this._dir.update(this._time, battle.actors(), battle.drainEvents(), house, ground);
     } else {
-      if (this._lastKind !== `est${loc.segment.scene}`) { this._dir.establish(this._time, house, this._road, ground); this._lastKind = `est${loc.segment.scene}`; }
+      if (!this._dir.shot || this._lastKind !== `est${loc.segment.scene}`) { this._dir.establish(this._time, house, this._road, ground); this._lastKind = `est${loc.segment.scene}`; }
       shot = this._dir.shot!;
     }
     this._publish(false);
     return poseAt(shot, this._time);
+  }
+
+  /** QA: where the camera is and what is in front of it right now (independent of how the shot was picked). */
+  audit(): (PoseAudit & { kind: string; eye: V3; look: V3; fallbacks: number; fallbackLog: string[] }) | null {
+    const shot = this._dir.shot; if (!shot) return null;
+    const p = poseAt(shot, this._time);
+    return { ...auditPose(p.eye, p.look, p.fov, this._boxes, this.d.battle.actors(), this.d.ground), kind: shot.kind, eye: p.eye, look: p.look, fallbacks: this._dir.fallbacks, fallbackLog: this._dir.fallbackLog.slice(-4) };
   }
 
   private _publish(force: boolean): void {
