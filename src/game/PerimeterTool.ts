@@ -130,7 +130,7 @@ export class PerimeterTool {
     // an escape tunnel starts at a free wall of a bunker room
     if (this._kind === 'escape_tunnel' && this._pts.length === 0) {
       const s = this._world.tunnelStartAt(x, z);
-      if ('problem' in s) { useGameStore.getState().setToolProblem(s.problem); return; }
+      if ('problem' in s) { useGameStore.getState().setToolProblem(s.problem); useGameStore.getState().showToast(s.problem); return; }
       [x, z] = s.pt;
     }
     const last = this._pts.at(-1);
@@ -153,8 +153,8 @@ export class PerimeterTool {
 
   finish(): void {
     if (!this._kind || this._pts.length < 2) return;
-    if (this._kind === 'escape_tunnel' && this._world.tunnelRouteProblem(this._pts)) return;
-    if (routeProblem(useGameStore.getState().game, this._kind, this._pts)) return;   // a tunnel-bridge needs real low ground, a slope tunnel a hillside
+    const why = this._kind === 'escape_tunnel' ? this._world.tunnelRouteProblem(this._pts) : routeProblem(useGameStore.getState().game, this._kind, this._pts);
+    if (why) { useGameStore.getState().showToast(why); return; }   // a tunnel-bridge needs real low ground, a slope tunnel a hillside
     useGameStore.getState().planRun(this._kind, this._pts.map(p => [p[0], p[1]] as Pt), this._gatesFor(this._pts).gates.map(g => ({ ...g })), this._kind === 'escape_tunnel' ? offParcel(this._pts) : 0);
     this._pts = []; this._gates = [];
     this._redraw();

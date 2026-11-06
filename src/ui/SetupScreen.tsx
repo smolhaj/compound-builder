@@ -137,7 +137,9 @@ export function SetupScreen() {
   const start = () => {
     if (!lot) return;
     const game = newGame(seed, NEW_GAME_START.doy, NEW_GAME_START.year, { site: lot, lifestyle: life, townPlan: plan, mode, peace: mode === 'scenario' ? peace : 'random', kind: mode === 'scenario' ? kind : null, dayJobs: LIFESTYLE[life].jobs, difficulty: diff, grid: true, family, funds, kinAway: pool.filter(p => !kinWith.includes(p.id)), kinOpen });
+    game.clock.speed = 0;   // a new game waits for the player: nothing happens until they press play
     g.load(game);
+    g.setWelcome(true);
     g.openSetup(false);
     void saveGame(AUTOSAVE, game);
   };

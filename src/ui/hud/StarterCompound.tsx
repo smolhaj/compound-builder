@@ -3,11 +3,11 @@
  * lot (sim/starterCompound.ts), shown as a ghost on the map with a one-line total. Place all, place one by one, or cancel; every piece is an
  * ordinary structure once staked. What the cash cannot cover waits as "later".
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { PlansOrderButton } from './SpendConfirm';
 import { useGameStore } from '../../store/gameStore';
 import { useWorldStore } from '../../store/worldStore';
-import { planStarter } from '../../sim/starterCompound';
+import { planStarter, NO_ROOM } from '../../sim/starterCompound';
 import { BLUEPRINTS, totalBill } from '../../sim/blueprints';
 import { MATERIALS, type MaterialId } from '../../sim/materials';
 import { plansNeedLines } from '../../sim/guidance';
@@ -31,6 +31,13 @@ export function StarterCompound({ first, wanted }: { first: boolean; wanted: boo
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [open, query, geo, skip, sig]);
   useEffect(() => { setPreview(plan); }, [plan, setPreview]);
+  // the ghosts are drawn on the ground: bring the camera over them the first time the proposal opens
+  const framed = useRef(false);
+  useEffect(() => {
+    if (!open) { framed.current = false; return; }
+    const pts = plan?.pieces.filter(p => !p.later);
+    if (pts?.length && !framed.current) { framed.current = true; useWorldStore.getState().frameCamera(pts); }
+  }, [open, plan]);
   useEffect(() => () => setPreview(null), [setPreview]);
   if (!query || !geo) return null;
 
@@ -45,12 +52,12 @@ export function StarterCompound({ first, wanted }: { first: boolean; wanted: boo
     const now = plan.pieces.filter(p => !p.later);
     const n = g.layStarter(now, plan.yard && !plan.yard.later ? plan.yard.plan : null, geo);
     close();
-    if (n) afterLay(n, now.map(p => p.kind));
+    if (n) { afterLay(n, now.map(p => p.kind)); useWorldStore.getState().frameCamera(now); }
   };
   const nextPiece = plan?.pieces.find(p => !p.later);
   const placeNext = () => {
     if (!plan) return;
-    if (nextPiece) { const n = g.layStarter([nextPiece], null, geo); if (n) afterLay(n, [nextPiece.kind]); }
+    if (nextPiece) { const n = g.layStarter([nextPiece], null, geo); if (n) { afterLay(n, [nextPiece.kind]); useWorldStore.getState().frameCamera([nextPiece]); } }
     else if (plan.yard && !plan.yard.later) { const n = g.layStarter([], plan.yard.plan, geo); if (n) afterLay(n, []); }
   };
   const need = plansNeedLines(game);
@@ -71,7 +78,7 @@ export function StarterCompound({ first, wanted }: { first: boolean; wanted: boo
       <div title={`Materials (less what you have in stock), permit fees and hours of work. About ${usd(plan.reserve)} of your ${usd(plan.cash)} is kept back for living costs.`} style={{ margin: '3px 0' }}>{plan.line}</div>
       {plan.pieces.map(p => <div key={p.key} title={p.laterWhy ?? p.why} style={{ display: 'flex', gap: 6, alignItems: 'baseline', padding: '1px 0', opacity: p.later ? 0.55 : 1, fontSize: FS.small }}>
         <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}{p.later && <span style={{ color: '#e0b050' }}> · later</span>}</span>
-        <span style={{ fontVariantNumeric: 'tabular-nums', color: DIM }}>{p.later && p.laterWhy === 'left out by you' ? '' : `~${usd(p.usd + p.permit)}`}</span>
+        <span style={{ fontVariantNumeric: 'tabular-nums', color: DIM }}>{p.later && p.laterWhy === 'left out by you' ? '' : p.laterWhy === NO_ROOM ? 'no room' : `~${usd(p.usd + p.permit)}`}</span>
         <button style={{ ...btn(), ...miniBtn }} title={p.later && p.laterWhy === 'left out by you' ? 'Put it back in' : 'Leave it out (you can add it by hand later)'} onClick={() => toggle(p.key)}>{p.later && p.laterWhy === 'left out by you' ? '+' : '×'}</button>
       </div>)}
       {plan.yard && <div title={plan.yard.laterWhy ?? `${PERIMETER[plan.yard.kind].name} round the yard with a gate where the drive comes in: ${plan.yard.plan.wallM} m`} style={{ display: 'flex', gap: 6, alignItems: 'baseline', padding: '1px 0', opacity: plan.yard.later ? 0.55 : 1, fontSize: FS.small }}>
