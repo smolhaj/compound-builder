@@ -64,7 +64,7 @@ function progressLines(s: GameState): string[] {
     if (isFinished(st) || st.unplaced) continue;
     const name = KIT[st.kind]?.name ?? st.kind.replace(/_/g, ' ');
     const hold = holdReason(s, st);
-    out.push(`${name}: ${Math.round(progress(st) * 100)}% built${hold ? `, waiting (${hold})` : ''}`);
+    out.push(`${name}: ${Math.round(progress(st) * 100)}% built.${hold ? ` ${hold[0].toUpperCase()}${hold.slice(1)}` : ''}`);
   }
   for (const r of s.perimeter) if (!runFinished(r)) out.push(`${PERIMETER[r.kind].name}: ${Math.round(runProgress(r) * 100)}% built`);
   const n = s.orders.filter(x => x.status === 'ordered').length;
@@ -82,9 +82,16 @@ function threatOf(s: GameState): Recap['threat'] {
   return null;
 }
 
+/** A line of reason cut at a sentence or about 110 characters, so a long explanation does not fill the card. */
+export const short = (t: string, max = 110): string => {
+  const first = t.split(/(?<=[.!?])\s/)[0];
+  const cut = first.length <= max ? first : first.slice(0, max).replace(/\s+\S*$/, '') + '…';
+  return cut;
+};
+
 export function resumeRecap(s: GameState): Recap {
   const f = familyLine(s);
-  let steps: RecapStep[] = suggestions(s, 3).map(x => ({ title: x.title ?? KIT[x.kind]?.name ?? x.kind, why: x.why }));
+  let steps: RecapStep[] = suggestions(s, 3).map(x => ({ title: x.title ?? KIT[x.kind]?.name ?? x.kind, why: short(x.why) }));
   if (steps.length < 3) {
     for (const o of operational(s)) {
       if (steps.length >= 3) break;

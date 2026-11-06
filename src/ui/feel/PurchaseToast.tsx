@@ -20,7 +20,7 @@ export function MilestoneCard() {
     return () => clearTimeout(id);
   }, [c, dismiss]);
   if (!c) return null;
-  return <div key={c.id} className="cb-slide" role="status" aria-live="polite" data-testid="milestone-card" style={{ position: 'fixed', right: 16, top: 70, zIndex: 26, width: 300, background: '#ece4d0', color: '#1d1b16', borderRadius: 4, padding: '10px 14px 10px', boxShadow: '0 8px 30px rgba(0,0,0,0.55)', border: '1px solid #8a7a52', fontFamily: 'Georgia, "Times New Roman", serif' }}>
+  return <div key={c.id} className="cb-rise" role="status" aria-live="polite" data-testid="milestone-card" style={{ position: 'fixed', left: '50%', transform: 'translateX(-50%)', top: 124, zIndex: 26, width: 320, background: '#ece4d0', color: '#1d1b16', borderRadius: 4, padding: '10px 14px 10px', boxShadow: '0 8px 30px rgba(0,0,0,0.55)', border: '1px solid #8a7a52', fontFamily: 'Georgia, "Times New Roman", serif' }}>
     <div style={{ fontSize: 10.5, letterSpacing: 2, textTransform: 'uppercase', opacity: 0.65, fontFamily: 'system-ui, sans-serif' }}>A milestone</div>
     <div style={{ fontSize: 20, fontWeight: 700, lineHeight: 1.15, margin: '3px 0 4px' }}>{c.title}</div>
     <div style={{ fontSize: 13.5, lineHeight: 1.35 }}>{c.line}</div>

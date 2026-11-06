@@ -14,7 +14,8 @@ describe('where we left off', () => {
     expect(r.dayNumber).toBe(1);
     expect(r.money).toBe(Math.round(g.money));
     expect(r.family).toMatch(/well|need care/);
-    expect(r.inProgress[0]).toMatch(/^Timber cabin: \d+% built/);
+    expect(r.inProgress[0]).toMatch(/^Timber cabin: \d+% built\./);
+    expect(r.nextSteps.every(x => x.why.length <= 112)).toBe(true);
     expect(r.nextSteps.length).toBeGreaterThan(0);
     expect(r.nextSteps.length).toBeLessThanOrEqual(3);
     expect(r.nextSteps.every(x => x.title.length > 0)).toBe(true);
