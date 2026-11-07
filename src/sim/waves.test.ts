@@ -58,9 +58,22 @@ describe('escalation', () => {
     }
     expect(intensity(1)).toBe(0); expect(intensity(WAVE.PEAK)).toBe(1);
   });
-  it('the first wave is the crew as rolled when nothing is defended', () => {
-    expect(crewFactor(1, 0, 1)).toBe(1);
+  it('the first wave is the crew as rolled on Cozy and Hardcore, and a scare on Standard (the opener fades by wave 4)', () => {
+    expect(crewFactor(1, 0, DIFFICULTY.cozy.wave)).toBe(1);
+    expect(crewFactor(1, 0, DIFFICULTY.hardcore.wave)).toBe(1);
+    expect(crewFactor(1, 0, DIFFICULTY.standard.wave)).toBeCloseTo(1 - WAVE.OPEN, 9);
+    expect(crewFactor(1 + WAVE.OPEN_WAVES, 0, 1)).toBe(1 + 0 * WAVE.HEADS_ESC + WAVE.HEADS_ESC * intensity(1 + WAVE.OPEN_WAVES));
     expect(kitLevel(1, 1, 1)).toBe(0);
+  });
+  it('balance invariants: every wave is at least as big on Hardcore as on Standard as on Cozy, and a defended place never draws a smaller crew', () => {
+    for (let n = 1; n <= 14; n++) for (const ds of [0, 0.5, 1]) {
+      // the crew as rolled is also scaled by the difficulty's raid weight (encounters.gateDay), so compare the two together
+      const c = DIFFICULTY.cozy.raid * crewFactor(n, ds, DIFFICULTY.cozy.wave), s = DIFFICULTY.standard.raid * crewFactor(n, ds, DIFFICULTY.standard.wave), h = DIFFICULTY.hardcore.raid * crewFactor(n, ds, DIFFICULTY.hardcore.wave);
+      expect(c).toBeLessThanOrEqual(s + 1e-9); expect(s).toBeLessThanOrEqual(h + 1e-9);
+      expect(crewFactor(n, 1, DIFFICULTY.standard.wave)).toBeGreaterThanOrEqual(crewFactor(n, 0, DIFFICULTY.standard.wave));
+    }
+    // the ladder is real on Standard and Hardcore: the peak crew is at least a third bigger than the first wave's, at any defense
+    for (const d of ['standard', 'hardcore'] as const) for (const ds of [0, 0.5, 1]) expect(crewFactor(WAVE.PEAK, ds, DIFFICULTY[d].wave) / crewFactor(1, ds, DIFFICULTY[d].wave)).toBeGreaterThan(1.33);
   });
   it('difficulty orders the climb: Cozy < Standard < Hardcore, and Cozy stays gentle', () => {
     const f = (d: Difficulty) => crewFactor(WAVE.PEAK, 0.5, DIFFICULTY[d].wave);
