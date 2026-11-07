@@ -288,7 +288,17 @@ export class Director {
   constructor(seed: number) { this._r = mulberry32(seed * 3119 + 11); }
 
   /** The buildings and walls the camera must keep out of. */
-  setObstacles(boxes: readonly Box[]): void { this._boxes = boxes; }
+  setObstacles(boxes: readonly Box[]): void { this._boxes = boxes; this._nightBoxes = null; }
+  private _nightBoxes: { src: readonly Box[]; list: Box[] } | null = null;
+  /**
+   * The obstacles a shot is checked against. By night ground cover is left out (a dark figure in the sage is a silhouette against the moonlit field,
+   * and the night frames the user liked stay as they were); by day a bush right in front of the crew hides it, so it counts.
+   */
+  private _shotBoxes(): readonly Box[] {
+    if (!this.night) return this._boxes;
+    if (this._nightBoxes?.src !== this._boxes) this._nightBoxes = { src: this._boxes, list: this._boxes.filter(b => b.kind !== 'brush') };
+    return this._nightBoxes.list;
+  }
 
   /**
    * The establishing shot for the lead-in, the gaps and the tails: from the yard, toward the road (or at `focus`), high enough
@@ -297,7 +307,7 @@ export class Director {
   establish(time: number, house: V3, roadDir: { x: number; z: number }, ground: Ground, focus?: V3, variant = 0): Shot {
     const px = -roadDir.z, pz = roadDir.x;
     const target = focus ?? { x: house.x + roadDir.x * 12, y: 0, z: house.z + roadDir.z * 12 };
-    const ctx: ShotCtx = { boxes: this._boxes, ground, actors: new Map() };
+    const ctx: ShotCtx = { boxes: this._shotBoxes(), ground, actors: new Map() };
     const mk = (rot: number, k: number, hb: number): Shot => {
       // (each scene's establishing pose takes the other side of the road and another height, so two scenes never open on the same frame)
       const side = variant % 2 ? -1.6 : 1.6, reach = 4.2 + (variant % 3) * 0.8, lift = [0.9, 0.45, 1.3][variant % 3];
@@ -353,7 +363,7 @@ export class Director {
     // the subject walked behind a wall or out of the picture: cut early
     if (!due && cur && held >= 1.2 && time - this._lastCheck >= 0.5) {
       this._lastCheck = time;
-      const ctx: ShotCtx = { boxes: this._boxes, ground, actors: new Map(live.map(a => [a.id, a])) };
+      const ctx: ShotCtx = { boxes: this._shotBoxes(), ground, actors: new Map(live.map(a => [a.id, a])) };
       const now: Shot = { ...cur, since: 0, hold: 0, drift: { x: 0, y: 0, z: 0 }, ...poseAt(cur, time), minPx: cur.minPx ? cur.minPx * 0.5 : undefined };
       if (cur.subjects?.length && shotProblems(now, ctx).length) due = true;   // (a subject that fell or left counts: nobody left to show)
     }
@@ -417,7 +427,7 @@ export class Director {
     const px = -road.z, pz = road.x, r = this._r;
     this._g = ground;
     const everyone = [...home, ...raiders];
-    const ctx: ShotCtx = { boxes: this._boxes, ground, actors: new Map(everyone.map(a => [a.id, a])) };
+    const ctx: ShotCtx = { boxes: this._shotBoxes(), ground, actors: new Map(everyone.map(a => [a.id, a])) };
     const at = (x: number, z: number, h: number): V3 => ({ x, y: ground(x, z) + h, z });
     const chest = (a: Actor): V3 => chestOf(a, ground);
     const base = { since: time, hold };
