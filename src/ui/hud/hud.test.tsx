@@ -88,7 +88,7 @@ describe('the guided HUD (server-rendered)', () => {
     const t = text(renderToStaticMarkup(<ProjectsTab />));
     expect(t).toContain('Finished, but not working yet');
     expect(t).toContain('No power reaches it');
-    expect(t).toContain('Draw the line');
+    expect(t).toContain('Lay the power cable');
   });
 
   it('shows the work queue with "Work on this first" and the focused project marked', () => {

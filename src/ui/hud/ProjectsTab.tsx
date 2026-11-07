@@ -15,7 +15,7 @@ import { FIT, FUEL_UNIT_L, fitProblem, plant, serviceOf, UTILITY, SPARE_FOR } fr
 import { HARDEN, HARDEN_IDS, type TierDef, hardenCost, hardenProblem, isBunkerRoom, protectionOf, tierOf } from '../../sim/hardening';
 import { PERIMETER, runBlocked, runFinished, runGrowth, runProgress } from '../../sim/perimeter';
 import { eta, paceOf, slowHint, totalHoursLeft, weeksFor, weeksUntil } from '../../sim/pace';
-import { hookupsFor, fitRows, needsHookup } from '../../sim/hookups';
+import { hookupsFor, fitRows, needsHookup, drawLabel } from '../../sim/hookups';
 import { projectRows } from '../../sim/priority';
 import { litersText } from '../../sim/format';
 import { setBelt } from '../../sim/weekender';
@@ -77,7 +77,7 @@ export function ProjectsTab() {
             <button style={btn()} onClick={() => g.select(t.id)}>Open</button>
           </div>
           <div style={{ fontSize: 11, color: DIM }}>{t.todo}</div>
-          {t.tool && <button style={{ ...btn(), marginTop: 2 }} onClick={() => g.setTool(t.tool)}>Draw the line</button>}
+          {t.tool && <button style={{ ...btn(), marginTop: 2 }} onClick={() => g.setTool(t.tool)}>{drawLabel(t.tool)}</button>}
         </div>)}
         {todo.length > 6 && <Note>…and {todo.length - 6} more.</Note>}
       </Section>}
@@ -152,7 +152,7 @@ export function ProjectsTab() {
               {hooks.filter(h => h.kind !== 'wire' && h.kind !== 'plumb').map(h => <div key={h.kind} style={{ marginTop: 3 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}><span style={{ color: DIM }}>{h.label}</span><span style={{ color: TONE.bad }}>{h.text}</span></div>
                 <div style={{ fontSize: 11, color: DIM }}>{h.todo}</div>
-                {h.tool && <button style={{ ...btn(), marginTop: 2 }} onClick={() => g.setTool(h.tool)}>Draw the line</button>}
+                {h.tool && <button style={{ ...btn(), marginTop: 2 }} onClick={() => g.setTool(h.tool)}>{drawLabel(h.tool)}</button>}
               </div>)}
               {sel.kind === 'battery_shed' && <Row label="Charge" value={`${Math.round(game.utilities.report.batteryPct * 100)}%`} title="Yesterday's battery state of charge" />}
               {sel.kind === 'generator_shed' && <Row label="Fuel on hand" value={litersText(game.stock.fuel * FUEL_UNIT_L)} />}

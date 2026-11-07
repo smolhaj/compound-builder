@@ -33,6 +33,16 @@ export function yieldOf(kind: FellJob['kind'], scale: number): { logs: number; f
   return { logs: 0, firewood: 2 };
 }
 
+/** Saw logs from the trees already marked (felled or not yet) that are not in the yard. */
+export function queuedLogs(s: GameState): number {
+  return s.forestry.jobs.reduce((a, j) => a + yieldOf(j.kind, j.scale).logs, 0);
+}
+
+/** Logs the family can count on: the yard, the marked trees, and (when the caller knows them) the standing trees on the land. */
+export function logSupply(s: GameState, standing: ReadonlyArray<{ kind: FellJob['kind']; scale: number }> = []): number {
+  return s.stock.logs + queuedLogs(s) + standing.reduce((a, t) => a + yieldOf(t.kind, t.scale).logs, 0);
+}
+
 export function isMarked(s: GameState, treeId: number): boolean {
   return s.forestry.jobs.some(j => j.treeId === treeId);
 }

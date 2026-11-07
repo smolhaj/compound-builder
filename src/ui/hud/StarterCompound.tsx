@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { PlansOrderButton } from './SpendConfirm';
 import { useGameStore } from '../../store/gameStore';
 import { useWorldStore } from '../../store/worldStore';
-import { planStarter, NO_ROOM } from '../../sim/starterCompound';
+import { planStarter, logsFor, NO_ROOM } from '../../sim/starterCompound';
 import { BLUEPRINTS, totalBill } from '../../sim/blueprints';
 import { MATERIALS, type MaterialId } from '../../sim/materials';
 import { plansNeedLines } from '../../sim/guidance';
@@ -20,7 +20,7 @@ const ownLogs = (kind: string) => !!BLUEPRINTS[kind] && Object.keys(totalBill(BL
 
 export function StarterCompound({ first, wanted }: { first: boolean; wanted: boolean }) {
   const g = useGameStore();
-  const query = useWorldStore(w => w.siteQuery), geo = useWorldStore(w => w.siteGeo), markTrees = useWorldStore(w => w.markNearestTrees);
+  const wallTrees = useWorldStore(w => w.wallTrees), query = useWorldStore(w => w.siteQuery), geo = useWorldStore(w => w.siteGeo), markTrees = useWorldStore(w => w.markNearestTrees);
   const setPreview = useWorldStore(w => w.setStarterPreview);
   const [open, setOpen] = useState(false);
   const [skip, setSkip] = useState<string[]>([]);
@@ -28,10 +28,12 @@ export function StarterCompound({ first, wanted }: { first: boolean; wanted: boo
   const [done, setDone] = useState<string | null>(null);
   const game = g.game;
   const sig = `${game.seed}|${game.structures.length}|${game.perimeter.length}|${Math.round(game.money / 2000)}|${game.people.length}`;
-  const plan = useMemo(() => (open && query && geo ? planStarter(game, { query, geo, skip }) : null),
+  const plan = useMemo(() => (open && query && geo ? planStarter(game, { query, geo, skip, trees: wallTrees?.() }) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [open, query, geo, skip, sig]);
+    [open, query, geo, skip, sig, wallTrees]);
   useEffect(() => { setPreview(plan); }, [plan, setPreview]);
+  // the clock holds while the proposal is open
+  useEffect(() => { useGameStore.getState().setPlanOpen(open); return () => useGameStore.getState().setPlanOpen(false); }, [open]);
   // the ghosts are drawn on the ground: bring the camera over them the first time the proposal opens
   const framed = useRef(false);
   useEffect(() => {
@@ -45,7 +47,7 @@ export function StarterCompound({ first, wanted }: { first: boolean; wanted: boo
   const close = () => { setOpen(false); setSkip([]); setOne(false); };
   const toggle = (k: string) => setSkip(s => (s.includes(k) ? s.filter(x => x !== k) : [...s, k]));
   const afterLay = (n: number, kinds: string[]) => {
-    if (kinds.some(ownLogs) && markTrees) markTrees(10);
+    if (kinds.some(ownLogs) && markTrees) { const logs = kinds.reduce((a, k) => a + logsFor(k), 0); markTrees(10, logs > 0 ? Math.max(1, logs - game.stock.logs) : undefined); }
     setDone(`Staked ${n} ${n === 1 ? 'piece' : 'pieces'}. The family starts when the materials are in (Projects tab).`);
   };
   const placeAll = () => {

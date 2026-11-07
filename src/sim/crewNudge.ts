@@ -5,7 +5,7 @@
  * themselves, offer tents so nobody sleeps outside meanwhile. Pure (tested); costs come from `crewQuote`, the
  * same figure the Projects tab and the hire button use.
  */
-import { isFinished } from './construction';
+import { blueprintOf, isFinished } from './construction';
 import { isHome } from './blueprints';
 import { crewProblem, crewQuote } from './crews';
 import { housingShortfall, TENT_PRICE, TENT_SEATS } from './housing';
@@ -39,6 +39,8 @@ export function crewNudge(s: GameState): CrewNudge | null {
   if (s.weekend?.mode === 'split') return null;   // the weekender has its own weekday-crew card (sim/weekendPlan.ts)
   const home = s.structures.find(st => isHome(st.kind) && !isFinished(st) && !st.unplaced && !st.pre && !(s.crews ?? []).some(c => c.target === st.id));
   if (!home) return null;
+  // a crew cannot fell trees: with the logs for the walls still standing in the woods it would only wait on the payroll (the logs card comes first)
+  if (blueprintOf(home).stages.slice(home.supplied ? home.stage + 1 : home.stage).reduce((a, g) => a + (g.materials.logs ?? 0), 0) > s.stock.logs) return null;
   const pace = paceOf(s), familyWeeks = weeksUntil(s, home.id, pace);
   if (familyWeeks !== null && familyWeeks <= CREW_NUDGE_WEEKS) return null;
   const q = crewQuote(home);

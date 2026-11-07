@@ -15,7 +15,7 @@ import { isFinished } from './construction';
 import { isHome } from './blueprints';
 import { dayIndex, type GameState } from './state';
 import { listText, materialCount, pluralize } from './words';
-import { FOOD, type FoodItemId } from './pantry';
+import { FOOD, foodCount, type FoodItemId } from './pantry';
 import { COURSES } from './courses';
 
 const usd = (n: number) => '$' + Math.round(n).toLocaleString('en-US');
@@ -45,7 +45,7 @@ function listNames(names: string[]): string {
 /** Quantities for an order or a purchase: "30 lumber, 4 hardware and 2 more kinds of supplies". Up to three items by name. */
 function linesText(lines: ReadonlyArray<{ material: MaterialId; qty: number; food?: FoodItemId; n?: number }>): string {
   const bits = lines.map(l => {
-    if (l.food && FOOD[l.food]) return `${l.n ?? l.qty} ${FOOD[l.food].name.toLowerCase()}`;
+    if (l.food && FOOD[l.food]) return foodCount(l.food, l.n ?? l.qty);
     const q = qtyText(l.qty);
     return q === null ? null : materialCount(l.material, l.qty, MATERIALS[l.material]?.name ?? l.material, q);
   }).filter((x): x is string => !!x);

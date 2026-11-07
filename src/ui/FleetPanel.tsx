@@ -12,7 +12,7 @@ import { litersText } from '../sim/format';
 import { Group, Note, Row, Section } from './hud/common';
 import { btn, DIM, TONE, usd } from './hud/style';
 import { pluralize } from '../sim/words';
-import { kmText } from '../sim/units';
+import { kmText, poundsText } from '../sim/units';
 
 function statusOf(v: Vehicle, atTown = false): { text: string; tone: keyof typeof TONE | null } {
   if (v.fried) return { text: 'killed by the EMP', tone: 'bad' };
@@ -83,7 +83,7 @@ export function FleetPanel() {
             <select value={bo.dest} onChange={e => setDest(e.target.value as BugDest)} style={{ width: '100%', marginBottom: 4 }} aria-label="Where to">
               {bo.options.map(o => <option key={o.dest} value={o.dest}>{o.name}{o.miles ? ` (${pluralize(o.miles, 'mile')})` : ''}</option>)}
             </select>
-            <Row label="Carrying" value={`${bo.mode === 'foot' ? `${bo.carryKg} kg, ${bo.bags} bug-out bag${bo.bags === 1 ? '' : 's'}` : `${bo.carryKg} kg in ${bo.vehicles.length} vehicle${bo.vehicles.length === 1 ? '' : 's'}`}`} title="Weight the party can carry. A packed bug-out bag (Shop, Defense) is 40 lb of the right things; a snatched pack is 3-13 lb." />
+            <Row label="Carrying" value={`${bo.mode === 'foot' ? `${poundsText(bo.carryKg)}, ${bo.bags} bug-out bag${bo.bags === 1 ? '' : 's'}` : `${poundsText(bo.carryKg)} in ${bo.vehicles.length} vehicle${bo.vehicles.length === 1 ? '' : 's'}`}`} title="Weight the party can carry. A packed bug-out bag (Shop, Defense) is 40 lb of the right things; a snatched pack is 3-13 lb." />
             <Row label="Food and water" value={`${pluralize(bo.foodDays, 'day')}${bo.cacheDays ? ` + ${bo.cacheDays} in the cache` : ''}`} />
             <Row label={bo.mode === 'foot' ? 'Walk' : 'Fuel'} value={`about ${kmText(bo.rangeKm)}`} />
             <Row label="Time to leave" value={`${bo.hours} h${bo.covered ? ', under cover' : bo.mode === 'foot' ? '' : ', in plain view'}`} />

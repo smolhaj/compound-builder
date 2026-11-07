@@ -74,6 +74,14 @@ describe('the day-it-happened card and the chip', () => {
     expect(collapseChip(at('grid_down', 12))!.chip).toBe('Day 13');
   });
 
+  it('the pandemic look is there at impact, not creeping in over days (QA run 6)', () => {
+    const day0 = collapseLook(at('pandemic', 0.5)), day1 = collapseLook(at('pandemic', 1)), day14 = collapseLook(at('pandemic', 14));
+    expect(day0.k).toBeGreaterThan(0.95);
+    expect(day0.sat).toBeLessThan(0.55);
+    expect(Math.abs(day1.k - day14.k)).toBeLessThan(0.02);
+    // the warning days keep the old, slow hint
+    expect(collapseLook(at('pandemic', -10)).k).toBeLessThan(0.3);
+  });
   it('pandemic, lawless and cyberattack each have a presence of their own beyond a red ticker', () => {
     const pan = collapseLook(at('pandemic', 20)), law = collapseLook(at('lawless', 20)), cyb = collapseLook(at('cyberattack', 6));
     // a pandemic: cold and drained, fewer town lights, a hazy still air

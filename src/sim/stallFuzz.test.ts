@@ -17,6 +17,13 @@ describe('stall fuzz: a passive player who only presses what the cards offer', (
       expect(r.violations.map(() => show(r))).toEqual([]);
     }, 120_000);
   }
+  // QA run 6: a log house waited 180 days for logs (not for sale) with $657k and a paid crew; the passive player must be led to mark pines
+  for (const seed of [3, 11, 29]) {
+    it(`log-house seed ${seed}: waiting on logs always has a card and ends`, () => {
+      const r = fuzz(seed, 400, { logHouse: true });
+      expect(r.violations.map(() => show(r))).toEqual([]);
+    }, 120_000);
+  }
   it('a spread of fresh starts across regions, lots, homes, disasters and difficulties', () => {
     const bad: string[] = [];
     for (let seed = 1001; seed <= 1006; seed++) { const r = fuzz(seed); if (r.violations.length) bad.push(show(r)); }

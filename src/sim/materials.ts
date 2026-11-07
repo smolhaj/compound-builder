@@ -137,7 +137,7 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   plate_carrier: { id: 'plate_carrier', name: 'Plate carrier', unit: 'a carrier with a pair of level III plates', price: 600 },
   helmet: { id: 'helmet', name: 'Ballistic helmet', unit: 'a level IIIA helmet (stops pistol rounds and fragments, not a rifle)', price: 450 },
   soft_armor: { id: 'soft_armor', name: 'Soft body armor', unit: 'a level IIIA vest: stops pistol rounds and buckshot, not a rifle', price: 400 },
-  ifak: { id: 'ifak', name: 'IFAK', unit: 'individual first-aid kit: tourniquet, chest seal, pressure dressing', price: 90 },
+  ifak: { id: 'ifak', name: 'First aid kit', unit: 'individual first aid kit (IFAK): tourniquet, chest seal, pressure dressing', price: 90 },
   nvg: { id: 'nvg', name: 'Night vision', unit: 'gen 3 monocular and a head mount', price: 3500 },
   thermal: { id: 'thermal', name: 'Thermal monocular', unit: 'handheld thermal: people and deer in the dark', price: 2200 },
   radios: { id: 'radios', name: 'GMRS radios', unit: 'a pair of handheld radios with chargers', price: 150 },
