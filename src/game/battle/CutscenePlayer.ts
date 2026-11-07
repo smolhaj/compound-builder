@@ -169,6 +169,9 @@ export class CutscenePlayer {
     return poseAt(shot, this._time);
   }
 
+  /** The buildings and walls the camera keeps out of (the name labels test their line of sight against them). */
+  get obstacleBoxes(): readonly Box[] { return this._boxes; }
+
   /** QA: where the camera is and what is in front of it right now (independent of how the shot was picked). */
   audit(): (PoseAudit & { kind: string; eye: V3; look: V3; fallbacks: number; fallbackLog: string[] }) | null {
     const shot = this._dir.shot; if (!shot) return null;
