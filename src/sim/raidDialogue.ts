@@ -69,7 +69,7 @@ export const LINES: Record<Role, Partial<Record<Ctx, Variants>>> = {
     },
     looting: { any: ['Hands up! Stay where you are!', 'Nobody moves. Nobody gets hurt.', 'Check the house. Find the food.', 'Grab the cans and the fuel. Fast.', 'Load it up. Move!', 'That is all we need. Let us go.'] },
     breach: { any: ['We are through! Go, go, go!', 'The wall is down! Everybody in!', 'Inside the fence! Push!', 'Get to the house!'] },
-    ram_run: { any: ['Floor it! Through the wall!', 'Hit it! Hit the wall, go, go!', 'Take it down. Put the truck right through it!', 'Do not slow down! Straight in!', 'Keep your foot down. Do not lift!'] },
+    ram_run: { any: ['Foot to the floor! Through the wall!', 'Hit it! Hit the wall, go, go!', 'Take it down. Put the truck right through it!', 'Do not slow down! Straight in!', 'Keep your foot down. Do not lift!'] },
     ram_hit: { any: ['Go, go, go! Inside!', 'It is open. Push through, push!', 'Through the gap! Spread out!', 'Move up! Take the yard!', 'Fan out. Cover the house!'] },
     charge_set: { any: ['Cover me. Setting the charge.', 'Stay low. I am planting it now.', 'Give me ten seconds on the wall.', 'Bag is on the wall. Wire it.'] },
     charge_call: { any: ['Fire in the hole! Get back!', 'Charge is set. Everybody back, back!', 'Down! Cover your ears!', 'Ten seconds. Get clear of the wall!'] },
