@@ -225,6 +225,13 @@ export class BattleRenderer {
     return [...this._units.values()].filter(u => !u.def.bystander).map(u => ({ id: u.def.id, side: u.def.side, post: u.def.post, x: u.x, y: u.y, z: u.z, dead: u.dead, gone: u.gone }));
   }
 
+  /** What the picture shows of each unit's state now (for the name labels' status pips). */
+  statuses(): Map<string, { wound: number; dead: boolean; lying: boolean; hands: boolean; carried: boolean }> {
+    const m = new Map<string, { wound: number; dead: boolean; lying: boolean; hands: boolean; carried: boolean }>();
+    for (const u of this._units.values()) m.set(u.def.id, { wound: u.wound, dead: u.dead, lying: u.layAt != null, hands: !!u.hands, carried: !!u.carriedBy });
+    return m;
+  }
+
   /** Events applied since the last call (the cutscene camera reacts to them). */
   drainEvents(): BattleEvent[] {
     const e = this._fed; this._fed = [];

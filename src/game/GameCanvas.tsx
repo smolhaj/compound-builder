@@ -43,6 +43,7 @@ import { useBattleStore } from '../store/battleStore';
 import { BattleRenderer } from './battle/BattleRenderer';
 import { demoBattle } from './battle/demoBattle';
 import { CutscenePlayer } from './battle/CutscenePlayer';
+import { NameLabelLayer } from './battle/NameLabelLayer';
 import { RaidDamageRenderer, type GlassHome } from './props/RaidDamageRenderer';
 import { coverBoxes, obstaclesOf, treeBoxes } from './battle/cameraObstacles';
 import { fireBoxesOf } from './battle/lineOfFire';
@@ -363,6 +364,8 @@ export function GameCanvas() {
       return h ? { x: h.x, y: 0, z: h.z } : { x: world.camp.x, y: 0, z: world.camp.z };
     };
     const player = new CutscenePlayer({ battle, ground: world.groundAt, house: homeSpot, commit: () => useGameStore.getState().commitCutscene(), seed: useGameStore.getState().game.seed, obstacles: () => [...obstaclesOf(useGameStore.getState().game), ...treeBoxes(world.treeSpecs, homeSpot(), 70), ...(qa.noCover ? [] : coverBoxes(world.lowCover, homeSpot(), 70))] });
+    const nameLayer = new NameLabelLayer();
+    let nameCache: { battle: unknown; people: unknown; map: Map<string, string> } = { battle: null, people: null, map: new Map() };
     let cineSaved: { fov: number; near: number } | null = null;
     /** Where the player's own camera stood before the raid prompt, and the glide back to it once the cutscene is over (yaw eased by hand: the glide has none). */
     let camBefore: { x: number; y: number; z: number; radius: number; pitch: number; yaw: number } | null = null, camBack = false;
@@ -552,6 +555,20 @@ export function GameCanvas() {
         if (foot) ws.setShadowFocus(foot.x, foot.z, foot.r / 1.1);
         else ws.setShadowFocus(cam.target.x, cam.target.z, cam.radius);
       }
+      // first names (and status pips) over the defenders' heads while the scenes play
+      {
+        const live = cine && battle.playing && cs?.offer == null && useCutsceneView.getState().view?.seg !== 'gap';
+        if (!live) nameLayer.hide();
+        else {
+          const bt = useBattleStore.getState().battle, people = useGameStore.getState().game.people;
+          if (nameCache.battle !== bt || nameCache.people !== people) {
+            const map = new Map<string, string>();
+            for (const u of bt?.units ?? []) if (u.side === 'home' && u.personId) { const f = people.find(p => p.id === u.personId)?.first; if (f) map.set(u.id, f); }
+            nameCache = { battle: bt, people, map };
+          }
+          nameLayer.update(dt, ws.camera, battle.actors(), nameCache.map, battle.statuses(), player.obstacleBoxes, world.groundAt, canvas);
+        }
+      }
       // battle playback: start / skip / tick, camera shake, overlay progress
       const bs = useBattleStore.getState();
       if (bs.battle && bs.battle !== battle.battle) { battle.play(bs.battle); battleView ??= { x: cam.target.x, z: cam.target.z, radius: cam.radius, pitch: cam.pitch }; }
@@ -653,7 +670,7 @@ export function GameCanvas() {
       window.removeEventListener('keyup', onShift);
       player.stop();
       unCamReq();
-      battle.dispose(); unsubDamage(); damageView.dispose();
+      nameLayer.dispose(); battle.dispose(); unsubDamage(); damageView.dispose();
       tour.dispose();
       tool.dispose();
       marker.dispose();
