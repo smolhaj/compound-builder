@@ -27,6 +27,8 @@ export interface CoverPick {
 export const LOW = 0.2;
 /** How far a shooter will go for cover. */
 export const REACH = 1.6;
+/** A bush hides a man but stops nothing: any solid cover in reach is preferred to it. */
+export const SOFT = 1.7;
 /** How far behind the cover's face he stands. */
 export const BEHIND = 0.16;
 
@@ -51,22 +53,22 @@ function blocksLine(c: { x0: number; x1: number; z0: number; z1: number }, a: { 
  */
 export function chooseCover(at: { x: number; z: number }, threat: { x: number; z: number }, boxes: readonly Box[], rounds: readonly Round[], underFire = false): CoverPick {
   const dx = threat.x - at.x, dz = threat.z - at.z, dl = hypot(dx, dz) || 1, ux = dx / dl, uz = dz / dl;
-  type Cand = { cx: number; cz: number; h: number; d: number; box?: Box; round?: Round };
+  type Cand = { cx: number; cz: number; h: number; d: number; /** What the choice is sorted by: concealment (a bush) counts further than something that stops a round. */ rank: number; box?: Box; round?: Round };
   const cands: Cand[] = [];
   for (const b of boxes) {
     if (b.kind !== 'wall' && b.kind !== 'building' && b.kind !== 'tree') continue;
     const cx = (b.x0 + b.x1) / 2, cz = (b.z0 + b.z1) / 2, d = hypot(Math.max(b.x0 - at.x, 0, at.x - b.x1), Math.max(b.z0 - at.z, 0, at.z - b.z1));
     if (d > REACH || !blocksLine(b, at, threat)) continue;
-    cands.push({ cx, cz, h: b.h, d, box: b });
+    cands.push({ cx, cz, h: b.h, d, rank: d, box: b });
   }
   for (const c of rounds) {
     const d = Math.max(0, hypot(c.x - at.x, c.z - at.z) - c.r);
     if (d > REACH) continue;
     if (!blocksLine({ x0: c.x - c.r, x1: c.x + c.r, z0: c.z - c.r, z1: c.z + c.r }, at, threat)) continue;
-    cands.push({ cx: c.x, cz: c.z, h: c.h, d, round: c });
+    cands.push({ cx: c.x, cz: c.z, h: c.h, d, rank: d + SOFT, round: c });
   }
   if (!cands.length) return { x: at.x, z: at.z, stance: underFire ? 'prone' : 'stand', side: 0, walk: 0 };
-  const best = cands.sort((a, b) => a.d - b.d)[0];
+  const best = cands.sort((a, b) => a.rank - b.rank)[0];
   // stand on the far side of it from the threat, on the line through its middle
   const half = best.box ? Math.min((best.box.x1 - best.box.x0), (best.box.z1 - best.box.z0)) / 2 : best.round!.r;
   const px = best.cx - ux * (half + BEHIND), pz = best.cz - uz * (half + BEHIND);

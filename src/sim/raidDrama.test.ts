@@ -47,6 +47,7 @@ describe('the death and the wake', () => {
     for (let i = 1; i < b.events.length; i++) expect(b.events[i].t).toBeGreaterThanOrEqual(b.events[i - 1].t);
     // the tail plays long enough to see it, in playback time; the game clock is untouched
     expect(playbackLengths(st.plan.scenes[d.scene]).tail).toBeGreaterThanOrEqual(d.wake + 3);
+    expect(d.wake).toBeLessThanOrEqual(28);   // about 25 s of quiet, not a minute
     // grief is named for who died, with no pronouns assumed and no gore in the words
     const words = b.events.filter(e => e.kind === 'say').map(e => (e as { text: string }).text).join(' ');
     expect(words).toContain(d.victim.name);

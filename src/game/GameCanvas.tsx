@@ -353,6 +353,7 @@ export function GameCanvas() {
     const battle = new BattleRenderer(ws.scene, world.groundAt, () => useGameStore.getState().game.people);
     battle.coverSource = () => world.lowCover;
     battle.fireSource = () => fireBoxesOf(useGameStore.getState().game);
+    battle.extraCover = () => treeBoxes(world.treeSpecs, homeSpot(), 40).filter(b => b.y0 === undefined);
     battle.onEnd = () => { useBattleStore.getState().endBattle(); world.forceDoor(null); };
     battle.onDoor = (open, x, z) => world.forceDoor(open, x, z);
     let battleSkip = useBattleStore.getState().skipReq, battleSync = 0;

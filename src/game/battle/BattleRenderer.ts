@@ -70,13 +70,13 @@ interface U {
   /** Hands up (surrendered or held at gunpoint). */
   hands?: boolean;
   /** Behind cover: which way they lean out round it (-1, +1; 0 none), when cover was last chosen, and until when they are flat on the ground under fire. */
-  lean?: number; coverAt?: number; proneUntil?: number;
+  lean?: number; coverAt?: number; proneUntil?: number; /** Heads down while rounds crack past (suppression). */ duckUntil?: number;
   /** Drawn size this frame (the figure grows with the camera's distance). */
   gs?: number;
 }
 /** A flat mark on the ground or a wall: pools, spatter. `born`: a pool still spreading (radius `r1` after a few seconds). */
-interface Stain { x: number; y: number; z: number; r: number; stretch: number; rot: number; color: number; wall?: { nx: number; nz: number }; born?: number; r1?: number }
-const WALK = 0.55;
+interface Stain { x: number; y: number; z: number; r: number; stretch: number; rot: number; color: number; wall?: { nx: number; nz: number }; born?: number; r1?: number; /** A prop on the ground (a dropped rifle): drawn in Restrained too. */ prop?: boolean }
+const WALK = 0.8;
 const MAX_STAINS = 200;
 interface Tracer { ttl: number; a: THREE.Vector3; b: THREE.Vector3 }
 interface Puff { mesh: THREE.Sprite; mat: THREE.SpriteMaterial; age: number; life: number; r0: number; r1: number; rise: number; o0: number }
@@ -149,6 +149,9 @@ export class BattleRenderer {
   private _graphic = true;
   /** The walls and buildings that stop a round (set by the canvas), read once per fight. */
   fireSource: () => ReadonlyArray<Box> = () => [];
+  /** More things to take cover behind: tree trunks (set by the canvas). A parked vehicle in the scene is added when the fight starts. */
+  extraCover: () => ReadonlyArray<Box> = () => [];
+  private _extra: Box[] | null = null;
   private _fire: ReadonlyArray<Box> | null = null;
   /** Rounds stopped by a wall or a roof so far, and the last one (QA and the screenshot harness read them). */
   impacts = 0;
@@ -253,7 +256,7 @@ export class BattleRenderer {
     const dark = this.lightNight ?? !!b.night;
     if (dark) this._layer.setRim(0x7f9bd8, 0.3); else this._layer.setRim(0xdfe8f5, 0.45);
     this.time = 0; this._cursor = 0; this._endAt = -1; this.lines = [];
-    this._graphic = getViolence() === 'graphic'; this._fire = null; this._roundCover = null; if (!this._bloodMesh.parent) this._group.add(this._bloodMesh); this._slowUntil = -1; this._rate = 1; this._stains = [];
+    this._graphic = getViolence() === 'graphic'; this._fire = null; this._extra = null; this._roundCover = null; if (!this._bloodMesh.parent) this._group.add(this._bloodMesh); this._slowUntil = -1; this._rate = 1; this._stains = [];
     const people = this._people();
     const home = b.units.filter(u => u.side === 'home' && !u.bystander);
     const src = home.length ? home : b.units;
@@ -367,14 +370,24 @@ export class BattleRenderer {
   private _takeCover(a: U, t: U, e: { hit: boolean }): void {
     if (!a.dead && !a.carriedBy && !a.hands && !a.def.machine && this.time - (a.coverAt ?? -9) > 2 && Math.hypot(a.tx - a.x, a.tz - a.z) < 0.05) {
       a.coverAt = this.time;
-      const pick = chooseCover({ x: a.x, z: a.z }, { x: t.x, z: t.z }, this._fireBoxes(), this._rounds(), false);
+      const pick = chooseCover({ x: a.x, z: a.z }, { x: t.x, z: t.z }, this._coverBoxes(), this._rounds(), false);
       if (pick.stance === 'kneel' || pick.stance === 'lean') {
         if (a.def.side === 'raider' && pick.walk > 0.03) { a.tx = pick.x; a.tz = pick.z; }
         a.crouch = pick.stance === 'kneel'; a.lean = pick.stance === 'lean' ? pick.side : 0;
-      } else a.lean = 0;
+      } else { a.lean = 0; if (a.def.side === 'raider') a.crouch = true; }   // (nothing to get behind: a raider covering the others' advance fires from a knee, and gets up to run)
     }
     const inCover = !!t.lean || t.crouch;
+    if (!e.hit && !t.dead && !t.def.machine && inCover) t.duckUntil = this.time + 1.1;   // rounds cracking past: heads down
     if (!t.dead && !t.carriedBy && !t.def.machine && (t.def.side === 'raider' || e.hit) && dropsProne(inCover, e.hit, !e.hit)) t.proneUntil = this.time + 1.4;
+  }
+  /** What a shooter can get behind: the walls and buildings (low ones kneel, tall ones lean), the trunks of trees, a parked truck. */
+  private _coverBoxes(): ReadonlyArray<Box> {
+    if (!this._extra) {
+      this._extra = [...this.extraCover()];
+      const v = this.battle?.vehicle;
+      if (v) this._extra.push({ x0: v.x - 0.4, x1: v.x + 0.4, z0: v.z - 0.4, z1: v.z + 0.4, h: 0.31, kind: 'building' });
+    }
+    return [...this._fireBoxes(), ...this._extra];
   }
   private _fireBoxes(): ReadonlyArray<Box> { return (this._fire ??= this.fireSource()); }
   /** Where a rifle's muzzle is (the shoulder: SCALE v2, a person is 0.28 tall) and where a round aimed at someone lands (the chest). */
@@ -387,8 +400,9 @@ export class BattleRenderer {
   /** A round stopped by a wall or a roof: dust and a spark where it struck, nothing on the far side. */
   private _impact(at: THREE.Vector3, from?: THREE.Vector3): void {
     this.impacts++; this.lastImpact = { x: at.x, y: at.y, z: at.z, from: from ? { x: from.x, z: from.z } : { x: at.x, z: at.z } };
-    this._puff(at, 0.014, 0.07, 0.4, 0.03, 0xb9aa90, 0.55);
-    this._puff(at, 0.01, 0.04, 0.12, 0, 0xffdca8, 1, true);
+    this._puff(at, 0.016, 0.08, 0.6, 0.03, 0xb9aa90, 0.6);
+    this._puff(at, 0.02, 0.06, 0.3, 0, 0xffdca8, 1, true);
+    this._puff(at, 0.006, 0.02, 0.18, 0, 0xfff4d0, 1, true);
   }
   /** A round that hits: a red mist at the chest, droplets on the ground behind, and on a wall if one stands there (graphic only). */
   private _hit(p1: THREE.Vector3, p0: THREE.Vector3): void {
@@ -421,7 +435,15 @@ export class BattleRenderer {
         if (e.rate && e.secs) { this._rate = e.rate; this._slowUntil = Math.max(this._slowUntil, this.time + e.secs); }
         if (e.role === 'vigil') this._alarmOn = false;   // the shooting is over: the alarm light goes out, and the yard is quiet
         break;
-      case 'surrender': { const u = U_(e.unit); if (u && !u.dead) { u.tx = u.x; u.tz = u.z; u.hands = true; u.crouch = false; } break; }
+      case 'surrender': {
+        const u = U_(e.unit);
+        if (u && !u.dead) {
+          u.tx = u.x; u.tz = u.z; u.hands = true; u.crouch = false;
+          // the weapon goes down at his feet: a dark rifle-length bar on the ground (0.1 units = 60 cm)
+          this._stain({ x: u.x + Math.cos(u.rot) * 0.08, y: this._ground(u.x, u.z) + 0.013, z: u.z - Math.sin(u.rot) * 0.08, r: 0.008, stretch: 11, rot: u.rot + 1.2, color: 0x2b2824, prop: true });
+        }
+        break;
+      }
       case 'lay': { const u = U_(e.unit); if (u && !u.dead && u.layAt == null) { u.tx = u.x; u.tz = u.z; u.layAt = this.time + 0.2; u.crouch = false; if (this._graphic) this._stain({ x: u.x, y: this._ground(u.x, u.z) + 0.01, z: u.z, r: 0.01, stretch: 1.2, rot: u.rot, color: 0x4d0a09, born: this.time + 0.6, r1: 0.05 }); } break; }
       case 'lift': { const v = U_(e.unit), c = U_(e.by); if (v && c) { v.carriedBy = c.def.id; v.crouch = false; } break; }
       case 'lower': { const v = U_(e.unit); if (v?.carriedBy) { const c = U_(v.carriedBy); if (c) { v.x = v.tx = c.x + Math.sin(c.rot) * 0.1; v.z = v.tz = c.z + Math.cos(c.rot) * 0.1; v.rot = c.rot + Math.PI / 2; } v.carriedBy = undefined; if (!v.dead) v.crouch = true; } break; }
@@ -660,7 +682,7 @@ export class BattleRenderer {
       const dv = this.viewer ? Math.hypot(u.x - this.viewer.x, gy - this.viewer.y, u.z - this.viewer.z) : 0;
       const gs = u.scale * Math.min(2.4, Math.max(1, dv / 16));
       this._layer.setPose(n, { x: u.x, y: gy, z: u.z, rot: u.rot, scale: gs,
-        pose: u.hands && !moving ? FIG_POSE.REACH : u.crouch && !moving ? FIG_POSE.KNEEL : FIG_POSE.STAND, phase: u.phase, amp: moving ? 0.6 : 0 });
+        pose: u.hands && !moving ? FIG_POSE.REACH : (u.crouch || (u.duckUntil != null && this.time < u.duckUntil)) && !moving ? FIG_POSE.KNEEL : FIG_POSE.STAND, phase: u.phase, amp: moving ? 0.6 : 0 });
       u.gs = gs;
       const down = u.carriedBy ? 1 : u.dead ? Math.max(0, Math.min(1, (this.time - (u.fallAt ?? 0)) / 0.95)) : u.layAt != null ? Math.max(0, Math.min(1, (this.time - u.layAt) / 0.7)) : -1;
       const flat = u.proneUntil != null && this.time < u.proneUntil && !u.dead && u.layAt == null && !u.carriedBy && !moving && !u.hands;
@@ -670,11 +692,17 @@ export class BattleRenderer {
         this._q.setFromEuler(this._e);
         this._m.compose(this._v.set(u.x, gy + 0.025, u.z), this._q, this._s.setScalar(FIG_SCALE * gs));
         this._m.toArray(this._layer.mesh.instanceMatrix.array as Float32Array, n * 16);
-      } else if (u.lean && !u.dead && u.layAt == null && !u.carriedBy && !moving) {
+      } else if (u.lean && !(u.duckUntil != null && this.time < u.duckUntil) && !u.dead && u.layAt == null && !u.carriedBy && !moving) {
         // standing back from something tall and leaning out round the edge of it to fire
-        this._e.set(0, u.rot, -u.lean * 0.32, 'YXZ');
+        this._e.set(0, u.rot, -u.lean * 0.42, 'YXZ');
         this._q.setFromEuler(this._e);
         this._m.compose(this._v.set(u.x + Math.cos(u.rot) * u.lean * 0.04, gy, u.z - Math.sin(u.rot) * u.lean * 0.04), this._q, this._s.setScalar(FIG_SCALE * gs));
+        this._m.toArray(this._layer.mesh.instanceMatrix.array as Float32Array, n * 16);
+      } else if ((u.crouch || (u.duckUntil != null && this.time < u.duckUntil)) && !moving && !u.hands && !u.dead && u.layAt == null && !u.carriedBy && !(u.lean && !(u.duckUntil != null && this.time < u.duckUntil))) {
+        // down on a knee, hunched forward behind the cover (the figure rig's own knee pose only drops the hips; this reads from across a yard)
+        this._e.set(0.5, u.rot, 0, 'YXZ');
+        this._q.setFromEuler(this._e);
+        this._m.compose(this._v.set(u.x, gy, u.z), this._q, this._s.set(FIG_SCALE * gs, FIG_SCALE * gs * 0.78, FIG_SCALE * gs));
         this._m.toArray(this._layer.mesh.instanceMatrix.array as Float32Array, n * 16);
       } else if (down >= 0 && !(u.dead && down === 0 && !u.carriedBy)) {
         // a hit figure staggers back a step, leans, then goes down along its heading (a lifted one lies across the carrier's arms)
@@ -739,7 +767,6 @@ export class BattleRenderer {
   /** Pools, spatter, wound patches and bandages, into the one instanced mesh. */
   private _drawBlood(): void {
     const m = this._bloodMesh;
-    if (!this._graphic) { m.count = 0; return; }
     let k = 0;
     const put = (x: number, y: number, z: number, rx: number, ry: number, color: number, yaw: number, flat: boolean, pitchYaw = 0) => {
       if (k >= m.instanceMatrix.count) return;
@@ -749,11 +776,13 @@ export class BattleRenderer {
       m.setMatrixAt(k, this._m); m.setColorAt(k, this._c.setHex(color)); k++;
     };
     for (const s of this._stains) {
+      if (!this._graphic && !s.prop) continue;
       const r = s.born != null ? (this.time < s.born ? 0 : Math.max(0.004, poolRadius(this.time - s.born, s.r1 ?? s.r))) : s.r;
       if (r <= 0) continue;
       if (s.wall) put(s.x, s.y, s.z, r, r * s.stretch, s.color, Math.atan2(s.wall.nx, s.wall.nz), false);
       else put(s.x, s.y, s.z, r * s.stretch, r, s.color, 0, true, s.rot);
     }
+    if (!this._graphic) { m.count = k; m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; return; }
     // on the figures: the wound as a dark patch on the shirt, then a pale bandage with the blood coming through
     const vw = this.viewer;
     for (const u of this._units.values()) {
