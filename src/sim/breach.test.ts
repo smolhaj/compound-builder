@@ -140,21 +140,15 @@ describe('house assault: the last act', () => {
     expect(a.events.filter(e => e.kind === 'shot').length).toBeGreaterThan(10);
   });
 
-  it('a crew beaten back is not left standing in a group: the hurt lie down, some surrender, the rest run out through the gap', () => {
-    const { b, a } = setup();
-    void b;
+  it('the crew that won the line is not left standing in a group: the hurt lie down, the family is held hands up, the crew goes out through the gap', () => {
+    const { a } = setup();
     const end = a.events.find(e => e.kind === 'end')!.t;
-    const raiders = ['r0', 'r1', 'r2', 'r3', 'r4'];
-    const fate = (id: string) => {
-      const last = [...a.events].reverse().find(e => e.t <= end && ((e.kind === 'move' || e.kind === 'cover') && e.unit === id || (e.kind === 'down' || e.kind === 'flee') && e.unit === id));
-      return last;
-    };
-    for (const id of raiders) {
-      const f = fate(id)!;
+    for (const id of ['r0', 'r1', 'r2', 'r3', 'r4']) {
+      const f = [...a.events].reverse().find(e => e.t <= end && ((e.kind === 'move' || e.kind === 'cover') && e.unit === id || (e.kind === 'lay' || e.kind === 'flee') && e.unit === id));
       expect(f, id).toBeTruthy();
-      if (f.kind === 'move') expect(Math.abs(f.x) > 10 || Math.abs(f.z) > 10, `${id} ends outside the wall`).toBe(true);
+      if (f!.kind === 'move') expect(Math.abs(f!.x) > 10 || Math.abs(f!.z) > 10, `${id} ends outside the wall`).toBe(true);
     }
-    expect(a.events.some(e => e.kind === 'say' && /Let them go|hold your positions|stay inside/.test(e.text))).toBe(true);
+    expect(a.events.some(e => e.kind === 'surrender' && e.unit.startsWith('h_'))).toBe(true);
   });
 
   it('an overrun scene keeps its result and the crew stays in the house', () => {
@@ -164,7 +158,7 @@ describe('house assault: the last act', () => {
     const a = planHouseAssault(b, { box, blocked: wall, seed: 4 });
     const end = a.events.find(e => e.kind === 'end')!;
     expect(end.kind === 'end' && end.result).toBe('overrun');
-    expect(a.events.some(e => e.kind === 'say' && /Nobody move|On the floor|It's over/.test(e.text))).toBe(true);
+    expect(a.events.some(e => e.kind === 'surrender')).toBe(true);
   });
 });
 

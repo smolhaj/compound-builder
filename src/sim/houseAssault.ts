@@ -13,6 +13,7 @@
  */
 import type { Battle, BattleEvent, BattleUnit } from './battleTypes';
 import { mulberry32 } from './rng';
+import { LineDirector } from './raidDialogue';
 
 /** Seconds added to a scene that breaks the line (the staging adds them to the plan; this planner fills them). */
 export const ASSAULT_EXTRA = 40;
@@ -34,13 +35,7 @@ const HOME_FALL = ['Fall back to the house — everybody inside, now!', 'Inside!
 const HOME_AID = ['Stay with me — look at me — you\'re okay!', 'I\'ve got you — pressure, keep pressure on it!', 'Hang on — hang on, I\'m right here!'];
 const HOME_DRAG = ['I\'ve got you — come on, up — we\'re moving!', 'Easy — easy — back room, we\'re going to the back room!'];
 const RAID_OUT = ['Grab what you can carry — we\'re leaving!', 'That\'s enough — out, out, back to the trucks!', 'We\'re done here — move!'];
-const HOME_LETGO = ['Let them go! Don\'t chase — hold your positions!', 'They\'re running — stay inside, stay down, don\'t follow!', 'Hold fire! They\'re leaving — keep your eyes on the gap!'];
-const HOME_CHECK = ['Is everybody okay? Count off — who\'s hurt?', 'Check the kids — somebody check the kids!'];
-const RAID_HURT = ['I\'m hit — I\'m hit, I can\'t —', 'My leg — I can\'t get up —'];
-const RAID_GIVE = ['Don\'t shoot! I give up — I give up!', 'Okay, okay — I\'m done, don\'t shoot!'];
-const HOME_GUN = ['Drop it! Drop the gun — hands where I can see them!', 'On your knees! Hands on your head — now!'];
 const HOME_YIELD = ['Okay — okay! Take it, just don\'t hurt the kids!', 'I\'m down — I\'m down, please, don\'t shoot!'];
-const RAID_HOLD = ['Nobody move! Stay right there!', 'On the floor — all of you, down!', 'It\'s over. Where\'s the rest of it?'];
 
 function pickOne(r: () => number, list: readonly string[], used: Set<string>): string {
   const pool = list.filter(l => !used.has(l));
@@ -184,30 +179,30 @@ export function planHouseAssault(b: Battle, ctx: AssaultCtx): Battle {
   const near = (p: { x: number; z: number }, list: readonly BattleUnit[]) => [...list].sort((a, c) => Math.hypot(pos.get(a.id)!.x - p.x, pos.get(a.id)!.z - p.z) - Math.hypot(pos.get(c.id)!.x - p.x, pos.get(c.id)!.z - p.z));
   const strip = new Set<string>();   // units whose sim moves after tI are replaced
   let meta = { ...b.invasion };
-  const finish: 'hold' | 'leave' = end.result === 'overrun' ? 'hold' : 'leave';
+  const dir = new LineDirector(ctx.seed);
 
   /**
-   * A crew beaten back does what people do: the ones the sim wounded go down where they stand, about one in four of the rest throws down his gun and
-   * kneels with his hands showing (the family holds him at gunpoint and does not shoot), and the others run for the gap. Nobody stays upright in a group.
+   * How the invasion ends (the same reading as sim/raidEnding.ts: the crew won the line): the raiders the sim wounded lie where they fell, the defenders still
+   * on their feet are held with their hands up while the crew takes what it can carry, and then the crew goes out through the gap, the way it came.
+   * Nobody is left standing in a cluster.
    */
   function routOut(t0: number, l: Layout | null, crew: readonly BattleUnit[]): void {
     const live = raiders.filter(u => !dead.has(u.id));
-    const lead = adults[0], hurtUnits = live.filter(u => hurtT.has(u.id));
-    const rest = live.filter(u => !hurtUnits.includes(u));
+    const hurtUnits = live.filter(u => hurtT.has(u.id)), rest = live.filter(u => !hurtUnits.includes(u));
     const gap = gapEv ?? { x: br!.x, z: br!.z };
     const mid = { x: (ctx.box.x0 + ctx.box.x1) / 2, z: (ctx.box.z0 + ctx.box.z1) / 2 };
-    const outward = { x: gap.x + (gap.x - mid.x) * 0.9, z: gap.z + (gap.z - mid.z) * 0.9 };
-    if (crew[0]) say(t0, pickOne(r, RAID_OUT, used), crew[0]);
-    hurtUnits.forEach((u, i) => { ev.push({ t: r2(t0 + 1.2 + i * 0.7), kind: 'down', unit: u.id }); strip.add(u.id); if (i === 0) say(t0 + 1.3, pickOne(r, RAID_HURT, used), u); });
-    const giveUp = rest.length >= 3 ? rest.filter((_, i) => i % 4 === 3) : [];
-    giveUp.forEach((u, i) => { ev.push({ t: r2(t0 + 2 + i * 0.6), kind: 'cover', unit: u.id, x: r2(pos.get(u.id)!.x), z: r2(pos.get(u.id)!.z) }); strip.add(u.id); say(t0 + 2.2 + i * 0.6, pickOne(r, RAID_GIVE, used), u); });
-    if (giveUp.length && lead) say(t0 + 3, pickOne(r, HOME_GUN, used), lead);
-    rest.filter(u => !giveUp.includes(u)).forEach((u, i) => {
+    const outward = { x: gap.x + (gap.x - mid.x) * 2.2, z: gap.z + (gap.z - mid.z) * 2.2 };
+    const talker = rest[0], held = adults.find(u => !hurtT.has(u.id));
+    hurtUnits.forEach((u, i) => { ev.push({ t: r2(t0 - 1 + i * 0.7), kind: 'lay', unit: u.id }); strip.add(u.id); });
+    adults.filter(u => !hurtT.has(u.id)).forEach((u, i) => { ev.push({ t: r2(t0 - 2 + i * 0.5), kind: 'surrender', unit: u.id }); strip.add(u.id); });
+    if (talker) say(t0 - 1.5, dir.pick('raider', 'looting', { speaker: talker.id }) ?? pickOne(r, RAID_OUT, used), talker);
+    if (held) say(t0 + 0.6, dir.pick('defender', 'held', { speaker: held.id }) ?? pickOne(r, HOME_YIELD, used), held);
+    if (crew[0]) say(t0 + 3, pickOne(r, RAID_OUT, used), crew[0]);
+    rest.forEach((u, i) => {
       strip.add(u.id);
-      const route = l && crew.includes(u) ? [l.door, l.out, gap, outward] : [gap, outward];
-      walk(t0 + 0.8 + i * 0.35, u, route, l && crew.includes(u) ? l.at(l.rooms[0]) : (pos.get(u.id) ?? u));
+      const inside = l && crew.includes(u);
+      walk(t0 + 3.4 + i * 0.35, u, inside ? [l!.door, l!.out, gap, outward] : [gap, outward], inside ? l!.at(l!.rooms[0]) : (pos.get(u.id) ?? u));
     });
-    if (lead) { say(t0 + 3.6, pickOne(r, HOME_LETGO, used), lead); if (adults[1]) say(t0 + 6.5, pickOne(r, HOME_CHECK, used), adults[1]); }
   }
   if (lay && adults.length) {
     meta = { ...meta, house: { ...ctx.box, door: lay.out, inside: lay.inside }, interior: { from: r2(tI + 1.5), to: r2(tI + D - 1) } };
@@ -258,14 +253,8 @@ export function planHouseAssault(b: Battle, ctx: AssaultCtx): Battle {
       const dv = b.events.find(e => e.kind === 'death' && e.t >= tI && e.t <= newEnd && adults.some(u => u.id === e.unit)) as Extract<BattleEvent, { kind: 'death' }> | undefined;
       if (dv) { const bodyOf = adults.find(u => u.id === dv.unit)!; const helper = adults.find(u => u !== bodyOf); if (helper) { move(dv.t + 1.2, helper, pos.get(bodyOf.id)!); ev.push({ t: r2(dv.t + 2), kind: 'aid', unit: bodyOf.id, by: helper.id, what: 'pressure' }); say(dv.t + 2.3, pickOne(r, HOME_AID, used), helper); } }
     }
-    // 6. the end: held by the family, the crew is beaten out (see `routOut`); in an overrun the crew holds the house
-    if (finish === 'leave') routOut(tI + D - 7, lay, breachers);
-    else {
-      say(tI + D - 6, pickOne(r, RAID_HOLD, used), breachers[0]);
-      breachers.forEach((u, i) => move(tI + D - 6 + i * 0.4, u, lay.at(lay.rooms[i % 2])));
-      // outnumbered and out of room, the defenders still on their feet kneel with their hands showing (the sim's casualties and captures stand as they are)
-      adults.filter(u => !hurtT.has(u.id)).forEach((u, i) => { ev.push({ t: r2(tI + D - 3.5 + i * 0.5), kind: 'cover', unit: u.id, x: r2(pos.get(u.id)!.x), z: r2(pos.get(u.id)!.z) }); if (i === 0) say(tI + D - 3.3, pickOne(r, HOME_YIELD, used), u); });
-    }
+    // 6. the end: the crew has the house; the family is held, the crew takes what it can carry and goes
+    routOut(tI + D - 11, lay, breachers);
   } else {
     // no way into the house (it is not built, or its door is not found): the fight goes on at the windows for the extra seconds
     const defenders = homeAll.filter(u => !u.civilian);
@@ -274,10 +263,12 @@ export function planHouseAssault(b: Battle, ctx: AssaultCtx): Battle {
       ev.push({ t: r2(t), kind: 'shot', from: a.id, to: h.id, hit: false });
       if (r() < 0.55) ev.push({ t: r2(t + 0.3 + r() * 0.4), kind: 'shot', from: h.id, to: a.id, hit: false });
     }
-    if (finish === 'leave') routOut(tI + D - 7, null, raiders);
+    routOut(tI + D - 11, null, raiders);
   }
   // the sim's own moves for the choreographed units stop at tI - 3.4
-  const kept = b.events.filter(e => e.kind !== 'end' && !(strip.size && (e.kind === 'move' || e.kind === 'cover') && strip.has(e.unit) && e.t > tI - 3.6) && !(e.kind === 'flee' && strip.has(e.unit) && e.t > tI - 3.6));
+  // the staging's own ending (sim/raidEnding.ts) plays in the sim's last seconds, which are now mid-fight: this act replaces it (hands up, looting, leaving)
+  const mine = (e: BattleEvent) => e.t > tI - 3.6 && (e.kind === 'surrender' || e.kind === 'lay' || (e.kind === 'say' && !!e.ctx && /aftermath|looting|held|prisoner/.test(e.ctx)) || (e.kind === 'move' && e.walk === true) || (e.kind === 'move' && Math.hypot(e.x - (ctx.box.x0 + ctx.box.x1) / 2, e.z - (ctx.box.z0 + ctx.box.z1) / 2) > 25));
+  const kept = b.events.filter(e => !mine(e) && e.kind !== 'end' && !(strip.size && (e.kind === 'move' || e.kind === 'cover') && strip.has(e.unit) && e.t > tI - 3.6) && !(e.kind === 'flee' && strip.has(e.unit) && e.t > tI - 3.6));
   const oldTail = Math.max(0, b.duration - end.t);
   const events = [...kept, ...ev, { t: r2(newEnd), kind: 'end', result: end.result } as BattleEvent].sort((a, c) => a.t - c.t);
   return { ...b, events, duration: r2(newEnd + oldTail), invasion: meta };

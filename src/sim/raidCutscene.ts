@@ -16,6 +16,11 @@ import { newDamage } from './raidDamage';
 import { decorateDefenders } from './defenderMoments';
 import { ASSAULT_EXTRA } from './houseAssault';
 import { decorateRaiders } from './raiderKinds';
+import { LineDirector, voiceCutscene } from './raidDialogue';
+import { dramatize, type DramaInfo } from './raidDrama';
+import { endPoses } from './raidEnding';
+import { isHome } from './blueprints';
+import { isFinished } from './construction';
 import { breakInScene, commitDays, finishPlan, gateScene, planSiege, probeBattle, siegeStrain, type Scene, type SiegePlan } from './siege';
 import { step } from './engine';
 import { hourOf, type GameState } from './state';
@@ -33,6 +38,8 @@ export interface StagedRaid {
   /** The stance that was played (a failed parley or a failed hide turns into a fight). */
   played: Stance;
   report: RaidReport;
+  /** The death and the wake staged in the final scene (sim/raidDrama.ts), or null. */
+  drama: DramaInfo | null;
   /** Game time (days) of the arrival. */
   t0: number;
 }
@@ -98,9 +105,11 @@ export function stageRaid(game: GameState, stance: Stance, keep?: Keep): StagedR
     return deco(gateScene(game, e, stance, outcome.tone, seed), finalScene);
   };
   let scenes: Scene[], battles: Battle[], spent: Array<Record<string, number>>;
+  let voiceFrom = 0;
   if (keep) {
     // a fight still to come leaves the cosmetic scenes in place; anything else ends the siege after the scenes played
     const n = keep.prev.plan.scenes.length, upto = battle ? n - 1 : keep.played;
+    voiceFrom = upto;
     scenes = [...keep.prev.plan.scenes.slice(0, upto), { ...finalScene, gap: keep.prev.plan.scenes[battle ? n - 1 : keep.played].gap }];
     battles = [...keep.prev.battles.slice(0, upto), finalBattle()];
     spent = [...keep.prev.spent.slice(0, upto), {}];
@@ -111,6 +120,23 @@ export function stageRaid(game: GameState, stance: Stance, keep?: Keep): StagedR
       const p = probeBattle(game, sc.kind, e.size, seed + sc.index * 977);
       battles.push(deco(p, sc)); spent.push(p.spent);
     }
+  }
+  // the words: one pass over the whole cutscene, so no line is said twice and a retreat is never called on the way in (sim/raidDialogue.ts)
+  let drama: DramaInfo | null = null;
+  if (e.kind !== 'break_in') {
+    const dir = new LineDirector(seed);
+    battles = voiceCutscene(battles, { dir, seed, temper: e.temper ?? 'desperate', scenes, from: voiceFrom });
+    // the death and the quiet after it (presentation only)
+    const fin = g.structures.filter(isFinished), home = fin.find(st => isHome(st.kind)) ?? fin[0] ?? { x: 0, z: 0 };
+    // how the last fight ends on screen agrees with the sim's result: the crew beaten (down or hands up, never a standing cluster) or the family held (sim/raidEnding.ts)
+    const last = battles.length - 1, temper = e.temper ?? 'desperate';
+    const ep = endPoses({ battle: battles[last], temper, style: scenes[last].style, dir, seed, house: { x: home.x, z: home.z } });
+    battles = battles.map((b, i) => (i === last ? ep.battle : b));
+    const crewWon = ep.ending === 'breached' || ep.ending === 'overrun';
+    const d = dramatize({ before: game, after: g, battles, house: { x: home.x, z: home.z }, raidersWounded: g.gate.aftermath?.wounded ?? 0, temper, style: fresh.style ?? undefined, dir, seed, skipWake: crewWon });
+    battles = d.battles; drama = d.info;
+    scenes = scenes.map((sc, i) => (i === last && ep.ending ? { ...sc, ending: ep.ending, ...(ep.wake > 0 ? { wake: ep.wake } : {}) } : sc));
+    if (drama) scenes = scenes.map((sc, i) => (i === drama!.scene ? { ...sc, wake: drama!.wake } : sc));
   }
   const plan = finishPlan(e.kind, hour, scenes, fresh.style);
   // the scenes before the assault are cosmetic fights that cost rounds, never blood
@@ -131,7 +157,7 @@ export function stageRaid(game: GameState, stance: Stance, keep?: Keep): StagedR
   }
   if (strained && (plan.scenes.length > 1 || strain.morale >= 3)) outcome.lines.push(plan.scenes.length > 1 ? `Nobody slept: about ${pluralize(strain.sleep, 'hour')} owed, and the family is shaken (morale -${strain.morale}).` : `Nobody will sleep after that (morale -${strain.morale}).`);
   g.gate.card = outcome;
-  return { staged: g, plan, battles, spent, outcome, played, report: raidReport(game, g, outcome, rounds), t0 };
+  return { staged: g, plan, battles, spent, outcome, played, report: raidReport(game, g, outcome, rounds), drama, t0 };
 }
 
 /**

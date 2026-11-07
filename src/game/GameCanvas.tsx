@@ -48,6 +48,7 @@ import { coverBoxes, obstaclesOf, treeBoxes } from './battle/cameraObstacles';
 import { liveBreach } from './battle/liveBreach';
 import { decorateBreach } from '../sim/breach';
 import { planHouseAssault } from '../sim/houseAssault';
+import { fireBoxesOf } from './battle/lineOfFire';
 import { useCutsceneView } from '../store/cutsceneStore';
 import { isFinished } from '../sim/construction';
 import { isHome } from '../sim/blueprints';
@@ -354,6 +355,13 @@ export function GameCanvas() {
     const unsubDamage = useGameStore.subscribe(s => `${(s.game.raidDamage ?? []).filter(d => d.done < d.hours).map(d => d.id).join()}|${s.game.structures.filter(st => st.fixes?.some(f => f.part === 'glass' && f.done < f.hours)).map(st => st.id).join()}`, syncDamage);
     const battle = new BattleRenderer(ws.scene, world.groundAt, () => useGameStore.getState().game.people);
     battle.coverSource = () => world.lowCover;
+    battle.fireSource = () => {
+      // rounds pass through the gap the invasion opened, and inside the house the crew is fighting in (its partitions are waist-high in the cutaway view)
+      const g = useGameStore.getState().game, base = fireBoxesOf({ ...g, perimeter: [...liveBreach.apply(g.perimeter)] });
+      const inv = battle.battle?.invasion, h = inv?.house, win = inv?.interior;
+      if (!h || !win || battle.time < win.from || battle.time > win.to) return base;
+      return base.filter(b => !(b.kind === 'building' && b.x0 <= h.x1 + 0.05 && b.x1 >= h.x0 - 0.05 && b.z0 <= h.z1 + 0.05 && b.z1 >= h.z0 - 0.05));
+    };
     battle.onEnd = () => { useBattleStore.getState().endBattle(); world.forceDoor(null); };
     battle.onDoor = (open, x, z) => world.forceDoor(open, x, z);
     battle.onGap = (runId, at, w) => liveBreach.add({ runId, at, w });

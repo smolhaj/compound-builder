@@ -44,7 +44,8 @@ export type BattleEvent =
   | { t: number; kind: 'alarm'; what: 'dog' | 'sensor' | 'tripwire' | 'camera' | 'watch' }
   /** `masts`: floodlights on towers (sim/towers.ts), aimed at `aim`; absent, the yard lights come on round the house. */
   | { t: number; kind: 'lights'; masts?: Array<{ x: number; z: number; y: number }>; aim?: { x: number; z: number } }
-  | { t: number; kind: 'move'; unit: string; x: number; z: number; y?: number }
+  /** `walk`: at a walking pace (the wake). `near`: go to the point `r` away from another unit's place now, at angle `a` (a body that fell where it fell). */
+  | { t: number; kind: 'move'; unit: string; x: number; z: number; y?: number; walk?: boolean; near?: { unit: string; r: number; a: number } }
   | { t: number; kind: 'shot'; from: string; to: string; hit: boolean; auto?: boolean }
   | { t: number; kind: 'mine'; x: number; z: number; hits: string[] }
   /** A raider hurt getting over the wall (the wire, the thorns, the ditch, the sharpened logs): `what` is what caught him. */
@@ -64,11 +65,22 @@ export type BattleEvent =
   | { t: number; kind: 'door'; what: 'hand tools' | 'a ram' | 'a cutting torch' | 'a charge' | 'an open door'; open: boolean; x?: number; z?: number }
   | { t: number; kind: 'flee'; unit: string }
   /** A line spoken in the fight: `who` is the unit speaking (a resident or a raider), absent for narration. */
-  | { t: number; kind: 'say'; text: string; who?: string }
+  | { t: number; kind: 'say'; text: string; who?: string; /** The moment it belongs to (sim/raidDialogue.ts): approach, first_shots, retreat, ... */ ctx?: string }
   | { t: number; kind: 'throw'; from: string; x: number; z: number; what: 'grenade' }
   | { t: number; kind: 'rocket'; from: string; x: number; z: number; y?: number }
   | { t: number; kind: 'explosion'; x: number; z: number; y?: number; radius: number; hits: string[]; wrecks?: 'post' | 'wall' }
-  | { t: number; kind: 'cover'; unit: string; x: number; z: number }
+  | { t: number; kind: 'cover'; unit: string; x: number; z: number; walk?: boolean; near?: { unit: string; r: number; a: number } }
+  /**
+   * Presentation only (sim/raidDrama.ts): a held beat. `aim`/`fall` slow the playback (`rate` for `secs` of battle time) and the camera cuts to `unit`;
+   * `vigil` / `tend` / `prisoner` / `carry` cut to the people gathered round `unit` (`with`) in the quiet after the fight.
+   */
+  | { t: number; kind: 'beat'; role: 'aim' | 'fall' | 'vigil' | 'tend' | 'prisoner' | 'carry'; unit?: string; with?: string[]; rate?: number; secs?: number }
+  /** `by` takes `unit` up in their arms (a wounded friend, or the fallen) and walks; `lower` sets them down where the carrier stands. `lay`: down on the ground, alive. */
+  | { t: number; kind: 'lift'; unit: string; by: string }
+  | { t: number; kind: 'lower'; unit: string }
+  | { t: number; kind: 'lay'; unit: string }
+  /** Hands up, weapon down (a beaten crew's man, or a family held at gunpoint): stands where they are with their hands raised. */
+  | { t: number; kind: 'surrender'; unit: string }
   /** Changing magazines (or thumbing rounds into a tube) / clearing a jam: no shots for `secs`. */
   | { t: number; kind: 'reload'; unit: string; secs: number }
   | { t: number; kind: 'jam'; unit: string; secs: number }
@@ -82,8 +94,6 @@ export type BattleEvent =
   | { t: number; kind: 'ram'; fromX: number; fromZ: number; x: number; z: number; secs: number }
   | { t: number; kind: 'charge'; x: number; z: number; fuse: number }
   /** The wall run is open here from now on (a live gap, drawn until the cutscene ends): run id, distance along it, width. */
-  /** A raider the sim wounded lies down where he is for good (cinematic end pose: nobody hurt stays standing in the open). Not a death. */
-  | { t: number; kind: 'down'; unit: string }
   | { t: number; kind: 'gap'; runId: string; at: number; w: number; x: number; z: number }
   | { t: number; kind: 'end'; result: 'repelled' | 'fled' | 'breached' | 'overrun' };
 

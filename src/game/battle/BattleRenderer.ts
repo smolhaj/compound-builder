@@ -11,7 +11,10 @@ import * as THREE from 'three';
 import { FigureLayer, FIG_POSE, FIG_SCALE } from '../../engine/world/people/figureKit';
 import { pickPersonaWear, type Wear } from '../../engine/world/people/crowdWear';
 import type { Battle, BattleEvent, BattleUnit } from '../../sim/battleTypes';
-import { coverPusher } from './cameraObstacles';
+import { coverPusher, type Box } from './cameraObstacles';
+import { MUZZLE, OWN_BOX, TORSO, WALL_POST, faceNormal, lineOfFire } from './lineOfFire';
+import { chooseCover, dropsProne, type Round } from './coverChoice';
+import { getViolence, poolRadius, spatter, stain, woundSpot } from './bloodFx';
 import { buildVehicle } from '../props/vehicleGeometry';
 import { InvasionFx } from './InvasionFx';
 
@@ -58,7 +61,24 @@ interface U {
   x: number; y: number; z: number; tx: number; ty: number; tz: number;
   rot: number; phase: number; speed: number;
   wear: Wear; wound: number; dead: boolean; crouch: boolean; gone: boolean;
+  /** Battle time the fall began (a body drops after the round has arrived), and when a living one was laid down. */
+  fallAt?: number; layAt?: number;
+  /** Who carries this unit in their arms now. */
+  carriedBy?: string;
+  /** Wounds to draw as patches (graphic only) and when the first-aid bandage went on. */
+  marks?: Array<{ part: 'head' | 'torso' | 'arm' | 'leg' | undefined; sev: number }>;
+  bandagedAt?: number;
+  /** Hands up (surrendered or held at gunpoint). */
+  hands?: boolean;
+  /** Behind cover: which way they lean out round it (-1, +1; 0 none), when cover was last chosen, and until when they are flat on the ground under fire. */
+  lean?: number; coverAt?: number; proneUntil?: number;
+  /** Drawn size this frame (the figure grows with the camera's distance). */
+  gs?: number;
 }
+/** A flat mark on the ground or a wall: pools, spatter. `born`: a pool still spreading (radius `r1` after a few seconds). */
+interface Stain { x: number; y: number; z: number; r: number; stretch: number; rot: number; color: number; wall?: { nx: number; nz: number }; born?: number; r1?: number }
+const WALK = 0.55;
+const MAX_STAINS = 200;
 interface Tracer { ttl: number; a: THREE.Vector3; b: THREE.Vector3 }
 interface Puff { mesh: THREE.Sprite; mat: THREE.SpriteMaterial; age: number; life: number; r0: number; r1: number; rise: number; o0: number }
 interface Proj { mesh: THREE.Mesh; a: THREE.Vector3; b: THREE.Vector3; age: number; dur: number; arc: number; trail: boolean; lastPuff: number }
@@ -127,6 +147,20 @@ export class BattleRenderer {
   private readonly _trGeo = new THREE.BufferGeometry();
   private readonly _trPos = new Float32Array(MAX_TRACERS * 6);
   private readonly _trLines: THREE.LineSegments;
+  /** Blood, wound patches and bandages: flat discs, one instanced mesh (no extra draw call while idle: count 0). */
+  private readonly _bloodMesh: THREE.InstancedMesh;
+  private _stains: Stain[] = [];
+  /** What the picture shows of a wound: graphic (default) or restrained (View menu); read when a fight starts. */
+  private _graphic = true;
+  /** The walls and buildings that stop a round (set by the canvas), read once per fight. */
+  fireSource: () => ReadonlyArray<Box> = () => [];
+  private _fire: ReadonlyArray<Box> | null = null;
+  /** Rounds stopped by a wall or a roof so far, and the last one (QA and the screenshot harness read them). */
+  impacts = 0;
+  lastImpact: { x: number; y: number; z: number; from: { x: number; z: number } } | null = null;
+  /** Slow motion: until this battle time, at this rate (the death scene's held beat). */
+  private _slowUntil = -1;
+  private _rate = 1;
   // fx
   private readonly _puffGeo = new THREE.SphereGeometry(1, 10, 8);
   private readonly _puffs: Puff[] = [];
@@ -164,6 +198,9 @@ export class BattleRenderer {
     this._trLines = new THREE.LineSegments(this._trGeo, new THREE.LineBasicMaterial({ color: 0xffd27a, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
     this._trLines.frustumCulled = false;
     this._group.add(this._trLines);
+    this._bloodMesh = new THREE.InstancedMesh(new THREE.CircleGeometry(1, 14), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.92, depthWrite: false, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3, side: THREE.DoubleSide }), MAX_STAINS + 80);
+    this._bloodMesh.count = 0; this._bloodMesh.frustumCulled = false; this._bloodMesh.userData = { noSSAO: true };
+    // (in the scene graph only while a fight plays, so the idle scene's draw-call census does not grow)
     this._rods = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0xffe08a, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }), MAX_TRACERS);
     this._rods.count = 0; this._rods.frustumCulled = false; this._rods.userData = { noSSAO: true };
     this._group.add(this._rods);
@@ -225,6 +262,7 @@ export class BattleRenderer {
     const dark = this.lightNight ?? !!b.night;
     if (dark) this._layer.setRim(0x7f9bd8, 0.3); else this._layer.setRim(0xdfe8f5, 0.45);
     this.time = 0; this._cursor = 0; this._endAt = -1; this.lines = [];
+    this._graphic = getViolence() === 'graphic'; this._fire = null; this._roundCover = null; if (!this._bloodMesh.parent) this._group.add(this._bloodMesh); this._slowUntil = -1; this._rate = 1; this._stains = [];
     const people = this._people();
     const home = b.units.filter(u => u.side === 'home' && !u.bystander);
     const src = home.length ? home : b.units;
@@ -296,7 +334,7 @@ export class BattleRenderer {
     this._pending = [];
     this._tracers.length = 0;
     this._trGeo.setDrawRange(0, 0);
-    this._rods.count = 0; this._rings.count = 0; this._pips.count = 0;
+    this._rods.count = 0; this._rings.count = 0; this._pips.count = 0; this._bloodMesh.count = 0; this._stains = []; this._slowUntil = -1; this._rate = 1; this._group.remove(this._bloodMesh);
     for (const p of this._puffs) { this._group.remove(p.mesh); p.mat.dispose(); }
     this._puffs.length = 0;
     for (const p of this._projs) { this._group.remove(p.mesh); (p.mesh.material as THREE.Material).dispose(); }
@@ -317,6 +355,7 @@ export class BattleRenderer {
     const b = this.battle;
     if (!b) return;
     if (this.hold) { this._moveUnits(0); return; }
+    if (this.time < this._slowUntil) dt *= this._rate;
     this.time += dt;
     while (this._cursor < b.events.length && b.events[this._cursor].t <= this.time) this._apply(b.events[this._cursor++]);
     for (let i = this._pending.length - 1; i >= 0; i--) if (this._pending[i].at <= this.time) { this._apply(this._pending[i].ev); this._pending.splice(i, 1); }
@@ -334,20 +373,80 @@ export class BattleRenderer {
     return out.set(u.x, this._ground(u.x, u.z) + u.y + (u.crouch ? 0.12 : 0.2), u.z);
   }
 
+  private _roundCover: Round[] | null = null;
+  private _rounds(): Round[] { return (this._roundCover ??= this.coverSource().map(c => ({ x: c.x, z: c.z, r: c.r, h: (c as { h?: number }).h ?? 0.25 }))); }
+  /** The shooter takes cover the way a real one does: the nearest thing that blocks the threat (kneels behind low cover, leans out of a tall one); a raider steps to it. The target in the open goes flat when rounds crack past. */
+  private _takeCover(a: U, t: U, e: { hit: boolean }): void {
+    if (!a.dead && !a.carriedBy && !a.hands && !a.def.machine && this.time - (a.coverAt ?? -9) > 2 && Math.hypot(a.tx - a.x, a.tz - a.z) < 0.05) {
+      a.coverAt = this.time;
+      const pick = chooseCover({ x: a.x, z: a.z }, { x: t.x, z: t.z }, this._fireBoxes(), this._rounds(), false);
+      if (pick.stance === 'kneel' || pick.stance === 'lean') {
+        if (a.def.side === 'raider' && pick.walk > 0.03) { a.tx = pick.x; a.tz = pick.z; }
+        a.crouch = pick.stance === 'kneel'; a.lean = pick.stance === 'lean' ? pick.side : 0;
+      } else a.lean = 0;
+    }
+    const inCover = !!t.lean || t.crouch;
+    if (!t.dead && !t.carriedBy && !t.def.machine && (t.def.side === 'raider' || e.hit) && dropsProne(inCover, e.hit, !e.hit)) t.proneUntil = this.time + 1.4;
+  }
+  private _fireBoxes(): ReadonlyArray<Box> { return (this._fire ??= this.fireSource()); }
+  /** Where a rifle's muzzle is (the shoulder: SCALE v2, a person is 0.28 tall) and where a round aimed at someone lands (the chest). */
+  private _muzzle(u: U, out: THREE.Vector3): THREE.Vector3 { return out.set(u.x, this._ground(u.x, u.z) + u.y + (u.crouch ? MUZZLE.kneel : MUZZLE.stand) * u.scale, u.z); }
+  private _torso(u: U, out: THREE.Vector3): THREE.Vector3 { return out.set(u.x, this._ground(u.x, u.z) + u.y + (u.crouch ? TORSO.kneel : TORSO.stand) * u.scale, u.z); }
+  private _stain(s: Stain): void {
+    if (this._stains.length >= MAX_STAINS) { const i = this._stains.findIndex(x => x.born == null); if (i >= 0) this._stains.splice(i, 1); else this._stains.shift(); }
+    this._stains.push(s);
+  }
+  /** A round stopped by a wall or a roof: dust and a spark where it struck, nothing on the far side. */
+  private _impact(at: THREE.Vector3, from?: THREE.Vector3): void {
+    this.impacts++; this.lastImpact = { x: at.x, y: at.y, z: at.z, from: from ? { x: from.x, z: from.z } : { x: at.x, z: at.z } };
+    this._puff(at, 0.014, 0.07, 0.4, 0.03, 0xb9aa90, 0.55);
+    this._puff(at, 0.01, 0.04, 0.12, 0, 0xffdca8, 1, true);
+  }
+  /** A round that hits: a red mist at the chest, droplets on the ground behind, and on a wall if one stands there (graphic only). */
+  private _hit(p1: THREE.Vector3, p0: THREE.Vector3): void {
+    if (!this._graphic) return;
+    this._puff(p1, 0.01, 0.05, 0.3, 0.015, 0x8c1511, 0.8);
+    const d = { x: p1.x - p0.x, z: p1.z - p0.z }, l = Math.hypot(d.x, d.z) || 1, seed = Math.floor(this.time * 1000) + this._stains.length;
+    for (const b of spatter(seed, p1.x, p1.z, d)) this._stain({ x: b.x, y: this._ground(b.x, b.z) + 0.006, z: b.z, r: b.r, stretch: b.stretch, rot: b.rot, color: 0x5e0d0b });
+    const far = new THREE.Vector3(p1.x + d.x / l * 0.8, p1.y, p1.z + d.z / l * 0.8);
+    const w = lineOfFire(p1, far, this._fireBoxes(), this._ground, 0);
+    if (w.blocked && w.at && w.by) {
+      const n = faceNormal(w.by, w.at);
+      this._stain({ x: w.at.x + n.x * 0.006, y: w.at.y, z: w.at.z + n.z * 0.006, r: 0.03, stretch: 1.5, rot: 0, color: 0x5a0c0a, wall: { nx: n.x, nz: n.z } });
+    }
+  }
+  private _near(e: { x: number; z: number; near?: { unit: string; r: number; a: number } }): { x: number; z: number } {
+    if (!e.near) return e;
+    const o = this._units.get(e.near.unit);
+    return o ? { x: o.x + Math.cos(e.near.a) * e.near.r, z: o.z + Math.sin(e.near.a) * e.near.r } : e;
+  }
+
   private _apply(e: BattleEvent): void {
     if (this._fed.length < 64) this._fed.push(e);
     const U_ = (id: string) => this._units.get(id);
     switch (e.kind) {
       case 'alarm': this._alarmOn = true; break;
       case 'lights': this._lightsOn(e.masts, e.aim); break;
-      case 'move': { const u = U_(e.unit); if (u && !u.dead) { const c = u.def.side === 'raider' ? this._clearOfCover(e.x, e.z) : e; u.tx = c.x; u.tz = c.z; u.ty = e.y ?? 0; u.crouch = false; } break; }
-      case 'cover': { const u = U_(e.unit); if (u && !u.dead) { const c = u.def.side === 'raider' ? this._clearOfCover(e.x, e.z) : e; u.tx = c.x; u.tz = c.z; u.ty = 0; u.crouch = true; } break; }
+      case 'move': { const u = U_(e.unit); if (u && !u.dead) { const n = this._near(e), c = u.def.side === 'raider' ? this._clearOfCover(n.x, n.z) : n; u.tx = c.x; u.tz = c.z; u.ty = e.y ?? 0; u.crouch = false; u.lean = 0; if (e.walk) u.speed = WALK; } break; }
+      case 'cover': { const u = U_(e.unit); if (u && !u.dead) { const n = this._near(e), c = u.def.side === 'raider' ? this._clearOfCover(n.x, n.z) : n; u.tx = c.x; u.tz = c.z; u.ty = 0; u.crouch = true; if (e.walk) u.speed = WALK; } break; }
+      case 'beat':
+        if (e.rate && e.secs) { this._rate = e.rate; this._slowUntil = Math.max(this._slowUntil, this.time + e.secs); }
+        if (e.role === 'vigil') this._alarmOn = false;   // the shooting is over: the alarm light goes out, and the yard is quiet
+        break;
+      case 'surrender': { const u = U_(e.unit); if (u && !u.dead) { u.tx = u.x; u.tz = u.z; u.hands = true; u.crouch = false; } break; }
+      case 'lay': { const u = U_(e.unit); if (u && !u.dead && u.layAt == null) { u.tx = u.x; u.tz = u.z; u.layAt = this.time + 0.2; u.crouch = false; if (this._graphic) this._stain({ x: u.x, y: this._ground(u.x, u.z) + 0.01, z: u.z, r: 0.01, stretch: 1.2, rot: u.rot, color: 0x4d0a09, born: this.time + 0.6, r1: 0.05 }); } break; }
+      case 'lift': { const v = U_(e.unit), c = U_(e.by); if (v && c) { v.carriedBy = c.def.id; v.crouch = false; } break; }
+      case 'lower': { const v = U_(e.unit); if (v?.carriedBy) { const c = U_(v.carriedBy); if (c) { v.x = v.tx = c.x + Math.sin(c.rot) * 0.1; v.z = v.tz = c.z + Math.cos(c.rot) * 0.1; v.rot = c.rot + Math.PI / 2; } v.carriedBy = undefined; if (!v.dead) v.crouch = true; } break; }
       case 'shot': {
         const a = U_(e.from), t = U_(e.to);
         if (!a || !t || a.dead) break;
-        const p0 = this._chest(a, new THREE.Vector3()), p1 = this._chest(t, new THREE.Vector3());
+        const p0 = this._muzzle(a, new THREE.Vector3()), p1 = this._torso(t, new THREE.Vector3());
         if (!e.hit) { p1.x += (Math.random() - 0.5) * 0.6; p1.z += (Math.random() - 0.5) * 0.6; p1.y += (Math.random() - 0.3) * 0.3; }
         a.rot = Math.atan2(p1.x - p0.x, p1.z - p0.z);
+        // a round only crosses a wall or a roof when the line clears its top (a tower, a wall walk): otherwise it stops at the face (lineOfFire.ts)
+        const lof = lineOfFire(p0, p1, this._fireBoxes(), this._ground, { from: a.def.side === 'home' && !a.def.machine ? WALL_POST : OWN_BOX, to: OWN_BOX });
+        if (lof.blocked && lof.at) { p1.set(lof.at.x, lof.at.y, lof.at.z); this._impact(p1, p0); } else if (e.hit) this._hit(p1.clone(), p0);
+        this._takeCover(a, t, e);
         this._tracer(p0, p1);
         this._flash(p0, 3, 0xffc070);
         if (e.auto) for (let k = 1; k <= 3; k++) this._pending.push({ at: this.time + k * 0.09, ev: { ...e, t: e.t, auto: false, hit: false } });
@@ -390,14 +489,30 @@ export class BattleRenderer {
         if (e.wrecks) this._decal(e.x, e.z, e.radius * 0.8);
         break;
       }
-      case 'down': { const u = U_(e.unit); if (u) { u.dead = true; u.wound = Math.max(u.wound, 0.7); u.y = 0; this._tint(u); } break; }   // (laid out hurt: drawn like the fallen, nothing counted)
       case 'ram': case 'charge': case 'gap': this.invasion.onEvent(e); break;
       case 'breach': this._boom(e.x, this._ground(e.x, e.z), e.z, 0.5, true); break;
       case 'door': this.onDoor?.(e.open, e.x, e.z, e.what); break;      // the crew at the tunnel's steel door: shut while they work at it, forced when they are through
       case 'fallback': this.shake = Math.max(this.shake, 0.15); break;
       case 'carry': break;   // the wounded's own move event carries them in
-      case 'wound': { const u = U_(e.unit); if (u && !e.stopped) { u.wound = Math.min(1, u.wound + Math.max(0.3, e.sev)); this._tint(u); } break; }
-      case 'death': { const u = U_(e.unit); if (u) { u.dead = true; u.wound = 1; this._tint(u); u.y = 0; } break; }
+      case 'wound': {
+        const u = U_(e.unit);
+        if (u && !e.stopped) {
+          u.wound = Math.min(1, u.wound + Math.max(0.3, e.sev)); this._tint(u, e.part);
+          if (this._graphic) {
+            (u.marks ??= []).push({ part: e.part, sev: e.sev }); if (u.marks.length > 2) u.marks.shift();
+            this._stain({ x: u.x, y: this._ground(u.x, u.z) + 0.006, z: u.z, r: 0.008 + 0.012 * Math.min(1, e.sev / 60), stretch: 1.3, rot: u.rot, color: 0x5e0d0b });
+          }
+        }
+        break;
+      }
+      case 'death': {
+        const u = U_(e.unit);
+        if (u) {
+          u.dead = true; u.wound = 1; this._tint(u); u.y = 0; u.fallAt = this.time + 0.3;
+          if (this._graphic) this._stain({ x: u.x, y: this._ground(u.x, u.z) + 0.009, z: u.z, r: 0.01, stretch: 1.25, rot: u.rot, color: 0x4a0908, born: this.time + 0.7, r1: u.def.side === 'home' ? 0.115 : 0.095 });
+        }
+        break;
+      }
       case 'taken':
       case 'flee': {
         const u = U_(e.unit); if (!u || u.dead) break;
@@ -410,6 +525,7 @@ export class BattleRenderer {
         const u = U_(e.unit), by = U_(e.by);
         if (by && u && by !== u) { by.tx = u.x + 0.08; by.tz = u.z; by.crouch = true; }
         if (u) {
+          u.bandagedAt = this.time + 2.2;
           this._crossTex ??= crossTexture();
           const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: this._crossTex, depthTest: false, transparent: true }));
           sp.scale.setScalar(0.16);
@@ -423,9 +539,10 @@ export class BattleRenderer {
     }
   }
 
-  private _tint(u: U): void {
-    const c = new THREE.Color(u.wear.shirt).lerp(new THREE.Color(0x8a1010), 0.25 + 0.5 * u.wound);
-    u.wear = { ...u.wear, shirt: c.getHex() };
+  private _tint(u: U, part?: 'head' | 'torso' | 'arm' | 'leg'): void {
+    const k = stain(u.wound, this._graphic);
+    const c = new THREE.Color(u.wear.shirt).lerp(new THREE.Color(this._graphic ? 0x6a0c0c : 0x8a1010), k);
+    u.wear = { ...u.wear, shirt: c.getHex(), ...(this._graphic && part === 'leg' ? { pants: new THREE.Color(u.wear.pants).lerp(new THREE.Color(0x5a0a0a), 0.6).getHex() } : {}) };
   }
 
   private _lightsOn(masts?: Array<{ x: number; z: number; y: number }>, aim?: { x: number; z: number }): void {
@@ -532,7 +649,11 @@ export class BattleRenderer {
     for (const u of this._units.values()) {
       if (u.gone || u.def.machine) continue;
       let moving = false;
-      if (!u.dead) {
+      if (u.carriedBy) {
+        // in someone's arms: across the carrier's forearms, wherever they walk
+        const c = this._units.get(u.carriedBy);
+        if (c) { u.x = c.x + Math.sin(c.rot) * 0.04; u.z = c.z + Math.cos(c.rot) * 0.04; u.rot = c.rot + Math.PI / 2; u.tx = u.x; u.tz = u.z; }
+      } else if (!u.dead && u.layAt == null) {
         const dx = u.tx - u.x, dz = u.tz - u.z, d = Math.hypot(dx, dz);
         if (d > 0.02) {
           const step = Math.min(d, u.speed * (u.wound > 0.5 ? 0.6 : 1) * dt);
@@ -552,11 +673,29 @@ export class BattleRenderer {
       const dv = this.viewer ? Math.hypot(u.x - this.viewer.x, gy - this.viewer.y, u.z - this.viewer.z) : 0;
       const gs = u.scale * Math.min(2.4, Math.max(1, dv / 16));
       this._layer.setPose(n, { x: u.x, y: gy, z: u.z, rot: u.rot, scale: gs,
-        pose: u.crouch && !moving ? FIG_POSE.KNEEL : FIG_POSE.STAND, phase: u.phase, amp: moving ? 0.6 : 0 });
-      if (u.dead) {   // laid down: tip the figure onto its back along its heading
-        this._e.set(-Math.PI / 2, u.rot, 0, 'YXZ');
+        pose: u.hands && !moving ? FIG_POSE.REACH : u.crouch && !moving ? FIG_POSE.KNEEL : FIG_POSE.STAND, phase: u.phase, amp: moving ? 0.6 : 0 });
+      u.gs = gs;
+      const down = u.carriedBy ? 1 : u.dead ? Math.max(0, Math.min(1, (this.time - (u.fallAt ?? 0)) / 0.95)) : u.layAt != null ? Math.max(0, Math.min(1, (this.time - u.layAt) / 0.7)) : -1;
+      const flat = u.proneUntil != null && this.time < u.proneUntil && !u.dead && u.layAt == null && !u.carriedBy && !moving && !u.hands;
+      if (flat) {
+        // flat on the ground under fire: chest down, head toward the threat
+        this._e.set(Math.PI / 2, u.rot + Math.PI, 0, 'YXZ');
         this._q.setFromEuler(this._e);
-        this._m.compose(this._v.set(u.x, gy + 0.03, u.z), this._q, this._s.setScalar(FIG_SCALE * gs));
+        this._m.compose(this._v.set(u.x, gy + 0.025, u.z), this._q, this._s.setScalar(FIG_SCALE * gs));
+        this._m.toArray(this._layer.mesh.instanceMatrix.array as Float32Array, n * 16);
+      } else if (u.lean && !u.dead && u.layAt == null && !u.carriedBy && !moving) {
+        // standing back from something tall and leaning out round the edge of it to fire
+        this._e.set(0, u.rot, -u.lean * 0.32, 'YXZ');
+        this._q.setFromEuler(this._e);
+        this._m.compose(this._v.set(u.x + Math.cos(u.rot) * u.lean * 0.04, gy, u.z - Math.sin(u.rot) * u.lean * 0.04), this._q, this._s.setScalar(FIG_SCALE * gs));
+        this._m.toArray(this._layer.mesh.instanceMatrix.array as Float32Array, n * 16);
+      } else if (down >= 0 && !(u.dead && down === 0 && !u.carriedBy)) {
+        // a hit figure staggers back a step, leans, then goes down along its heading (a lifted one lies across the carrier's arms)
+        const lean = 0.35, tilt = u.carriedBy ? -Math.PI / 2 : down < 0.3 ? -lean * (down / 0.3) * (2 - down / 0.3) : -lean - (Math.PI / 2 - lean) * ((down - 0.3) / 0.7) ** 2;
+        const back = u.carriedBy ? 0 : 0.06 * Math.min(1, down / 0.5);
+        this._e.set(tilt, u.rot, 0, 'YXZ');
+        this._q.setFromEuler(this._e);
+        this._m.compose(this._v.set(u.x - Math.sin(u.rot) * back, gy + (u.carriedBy ? 0.15 : 0.03 * Math.max(0, (down - 0.3) / 0.7)), u.z - Math.cos(u.rot) * back), this._q, this._s.setScalar(FIG_SCALE * gs));
         this._m.toArray(this._layer.mesh.instanceMatrix.array as Float32Array, n * 16);
       }
       n++;
@@ -603,10 +742,49 @@ export class BattleRenderer {
     }
     for (; ln < this._lanternLights.length; ln++) this._lanternLights[ln].intensity = 0;
     this._rings.count = ri; this._pips.count = pn;
+    this._drawBlood();
     for (const m of [this._rings, this._pips]) {
       m.instanceMatrix.needsUpdate = true;
       if (m.instanceColor) m.instanceColor.needsUpdate = true;
     }
+  }
+
+  /** Pools, spatter, wound patches and bandages, into the one instanced mesh. */
+  private _drawBlood(): void {
+    const m = this._bloodMesh;
+    if (!this._graphic) { m.count = 0; return; }
+    let k = 0;
+    const put = (x: number, y: number, z: number, rx: number, ry: number, color: number, yaw: number, flat: boolean, pitchYaw = 0) => {
+      if (k >= m.instanceMatrix.count) return;
+      this._e.set(flat ? -Math.PI / 2 : 0, flat ? pitchYaw : yaw, 0, 'YXZ');
+      this._q.setFromEuler(this._e);
+      this._m.compose(this._v.set(x, y, z), this._q, this._s.set(rx, ry, 1));
+      m.setMatrixAt(k, this._m); m.setColorAt(k, this._c.setHex(color)); k++;
+    };
+    for (const s of this._stains) {
+      const r = s.born != null ? (this.time < s.born ? 0 : Math.max(0.004, poolRadius(this.time - s.born, s.r1 ?? s.r))) : s.r;
+      if (r <= 0) continue;
+      if (s.wall) put(s.x, s.y, s.z, r, r * s.stretch, s.color, Math.atan2(s.wall.nx, s.wall.nz), false);
+      else put(s.x, s.y, s.z, r * s.stretch, r, s.color, 0, true, s.rot);
+    }
+    // on the figures: the wound as a dark patch on the shirt, then a pale bandage with the blood coming through
+    const vw = this.viewer;
+    for (const u of this._units.values()) {
+      if (!u.marks?.length || u.dead || u.gone || u.layAt != null || u.carriedBy || u.def.machine) continue;
+      const gs = u.gs ?? u.scale, gy = this._ground(u.x, u.z) + u.y;
+      const fx0 = vw ? vw.x - u.x : Math.sin(u.rot), fz0 = vw ? vw.z - u.z : Math.cos(u.rot), fl = Math.hypot(fx0, fz0) || 1, fx = fx0 / fl, fz = fz0 / fl;
+      const yaw = Math.atan2(fx, fz);
+      u.marks.forEach((mk, i) => {
+        const w = woundSpot(mk.part, u.crouch), bandaged = u.bandagedAt != null && this.time >= u.bandagedAt && i === u.marks!.length - 1;
+        const x = u.x + fx * 0.04 * gs - fz * 0.035 * gs * w.side, z = u.z + fz * 0.04 * gs + fx * 0.035 * gs * w.side, y = gy + w.h * 0.28 * gs;
+        const r = (0.014 + 0.012 * Math.min(1, mk.sev / 70)) * gs;
+        if (bandaged) { put(x, y, z, r * 1.5, r * 1.15, 0xe7dfcd, yaw, false); put(x + fx * 0.004, y, z + fz * 0.004, r * 0.7, r * 0.55, 0x8a1212, yaw, false); }
+        else put(x, y, z, r, r * 1.2, 0x560808, yaw, false);
+      });
+    }
+    m.count = k;
+    m.instanceMatrix.needsUpdate = true;
+    if (m.instanceColor) m.instanceColor.needsUpdate = true;
   }
 
   private _tickFx(dt: number): void {
@@ -676,6 +854,7 @@ export class BattleRenderer {
     this.stop();
     this._layer.dispose();
     this._trGeo.dispose(); (this._trLines.material as THREE.Material).dispose();
+    this._bloodMesh.geometry.dispose(); (this._bloodMesh.material as THREE.Material).dispose();
     this._rods.geometry.dispose(); (this._rods.material as THREE.Material).dispose();
     this._rings.geometry.dispose(); (this._rings.material as THREE.Material).dispose();
     this._pips.geometry.dispose(); (this._pips.material as THREE.Material).dispose();
