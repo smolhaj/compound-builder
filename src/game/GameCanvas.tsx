@@ -46,6 +46,9 @@ import { CutscenePlayer } from './battle/CutscenePlayer';
 import { NameLabelLayer } from './battle/NameLabelLayer';
 import { RaidDamageRenderer, type GlassHome } from './props/RaidDamageRenderer';
 import { coverBoxes, obstaclesOf, treeBoxes } from './battle/cameraObstacles';
+import { liveBreach } from './battle/liveBreach';
+import { decorateBreach } from '../sim/breach';
+import { planHouseAssault } from '../sim/houseAssault';
 import { fireBoxesOf } from './battle/lineOfFire';
 import { useCutsceneView } from '../store/cutsceneStore';
 import { isFinished } from '../sim/construction';
@@ -353,10 +356,17 @@ export function GameCanvas() {
     const unsubDamage = useGameStore.subscribe(s => `${(s.game.raidDamage ?? []).filter(d => d.done < d.hours).map(d => d.id).join()}|${s.game.structures.filter(st => st.fixes?.some(f => f.part === 'glass' && f.done < f.hours)).map(st => st.id).join()}`, syncDamage);
     const battle = new BattleRenderer(ws.scene, world.groundAt, () => useGameStore.getState().game.people);
     battle.coverSource = () => world.lowCover;
-    battle.fireSource = () => fireBoxesOf(useGameStore.getState().game);
+    battle.fireSource = () => {
+      // rounds pass through the gap the invasion opened, and inside the house the crew is fighting in (its partitions are waist-high in the cutaway view)
+      const g = useGameStore.getState().game, base = fireBoxesOf({ ...g, perimeter: [...liveBreach.apply(g.perimeter)] });
+      const inv = battle.battle?.invasion, h = inv?.house, win = inv?.interior;
+      if (!h || !win || battle.time < win.from || battle.time > win.to) return base;
+      return base.filter(b => !(b.kind === 'building' && b.x0 <= h.x1 + 0.05 && b.x1 >= h.x0 - 0.05 && b.z0 <= h.z1 + 0.05 && b.z1 >= h.z0 - 0.05));
+    };
     battle.extraCover = () => treeBoxes(world.treeSpecs, homeSpot(), 40).filter(b => b.y0 === undefined);
     battle.onEnd = () => { useBattleStore.getState().endBattle(); world.forceDoor(null); };
     battle.onDoor = (open, x, z) => world.forceDoor(open, x, z);
+    battle.onGap = (runId, at, w) => liveBreach.add({ runId, at, w });
     let battleSkip = useBattleStore.getState().skipReq, battleSync = 0;
     // the raid cutscene: plays a staged siege (sim/siege.ts), cutting between wall, house and raiders
     const homeSpot = () => {
@@ -364,7 +374,20 @@ export function GameCanvas() {
       const h = g.structures.find(x => isFinished(x) && isHome(x.kind)) ?? g.structures.find(isFinished);
       return h ? { x: h.x, y: 0, z: h.z } : { x: world.camp.x, y: 0, z: world.camp.z };
     };
-    const player = new CutscenePlayer({ battle, ground: world.groundAt, house: homeSpot, commit: () => useGameStore.getState().commitCutscene(), seed: useGameStore.getState().game.seed, obstacles: () => [...obstaclesOf(useGameStore.getState().game), ...treeBoxes(world.treeSpecs, homeSpot(), 70), ...(qa.noCover ? [] : coverBoxes(world.lowCover, homeSpot(), 70))] });
+    let cutawayBefore: ReturnType<typeof useWorldStore.getState>['buildingView'] | null = null;
+    const player = new CutscenePlayer({ battle, ground: world.groundAt, house: homeSpot, commit: () => useGameStore.getState().commitCutscene(), seed: useGameStore.getState().game.seed, obstacles: () => [...obstaclesOf(useGameStore.getState().game), ...treeBoxes(world.treeSpecs, homeSpot(), 70), ...(qa.noCover ? [] : coverBoxes(world.lowCover, homeSpot(), 70))] ,
+      // the invasion look (sim/breach.ts, sim/houseAssault.ts): how the wall comes down, and the fight inside the house; cinematic, the sim's result is kept
+      prepare: b => {
+        if (!b.events.some(e => e.kind === 'breach')) return b;
+        const g = useGameStore.getState().game, hs = homeSpot();
+        const home = g.structures.find(x => isFinished(x) && isHome(x.kind) && KIT[x.kind]);
+        const seed = g.seed * 131 + Math.round(b.duration * 7);
+        const carries = b.events.some(e => e.kind === 'rocket' || e.kind === 'throw');
+        const d = decorateBreach(b, g.perimeter, hs, seed, carries);
+        if (!home) return d;
+        return planHouseAssault(d, { box: footprint(KIT[home.kind], home.x, home.z, home.rot, false), blocked: (x, z) => world.walkBlocked(x, z, 0.04), seed });
+      },
+      cutaway: on => { const ws2 = useWorldStore.getState(); if (on) { cutawayBefore ??= ws2.buildingView; ws2.setBuildingView('cutaway'); } else if (cutawayBefore) { ws2.setBuildingView(cutawayBefore); cutawayBefore = null; } } });
     const nameLayer = new NameLabelLayer();
     let nameCache: { battle: unknown; people: unknown; map: Map<string, string> } = { battle: null, people: null, map: new Map() };
     let cineSaved: { fov: number; near: number } | null = null;
@@ -372,7 +395,7 @@ export function GameCanvas() {
     let camBefore: { x: number; y: number; z: number; radius: number; pitch: number; yaw: number } | null = null, camBack = false;
     let promptAt = -1, skipScene = useCutsceneView.getState().skipScene, skipAll = useCutsceneView.getState().skipAll;
     let battleView: { x: number; z: number; radius: number; pitch: number } | null = null;
-    const qa: { noCover?: boolean; frames: number; frameMs: number; lowrender?: boolean; weather?: boolean; renderNow?: () => Promise<void>; renderFull?: (q?: QaQuality) => Promise<void>; pose: null | { x: number; y: number; z: number; lx: number; ly: number; lz: number; fov?: number } } = { frames: 0, frameMs: 0, pose: null };
+    const qa: { noCover?: boolean; /** QA: run the frame (sim, camera, effects) without drawing it, to skip ahead cheaply. */ skipDraw?: boolean; frames: number; frameMs: number; lowrender?: boolean; weather?: boolean; renderNow?: () => Promise<void>; renderFull?: (q?: QaQuality) => Promise<void>; pose: null | { x: number; y: number; z: number; lx: number; ly: number; lz: number; fov?: number } } = { frames: 0, frameMs: 0, pose: null };
     // window.__cb.qa.renderNow(): draw one frame (a promise); renderFull('high'|'medium'): one slow full-quality, full-resolution shot
     if (lowRender.on) Object.assign(qa, { lowrender: true, renderNow: () => renderReq.request(), renderFull: (q: QaQuality = 'high') => renderReq.request(q) });
     const budget = new FrameBudget(), loopStart = performance.now();
@@ -448,7 +471,7 @@ export function GameCanvas() {
       world.syncTents(game);
       world.syncForestry(game.forestry);
       world.simTime = game.clock.t;
-      world.syncPerimeter(game.perimeter, game.clock.t, { lit: fenceLive(game) && !blackoutNow(game), sensors: (game.stock.ground_sensor ?? 0) > 0, gateKit: { sally: hasSallyGate(game), intercom: hasIntercom(game), motor: hasGateMotor(game), signs: responseActive(game) }, moats: Object.fromEntries(moatStates(game).map(m => [m.run.id, { level: m.level, frozen: m.frozen }])) });
+      world.syncPerimeter(liveBreach.apply(game.perimeter), game.clock.t, { lit: fenceLive(game) && !blackoutNow(game), sensors: (game.stock.ground_sensor ?? 0) > 0, gateKit: { sally: hasSallyGate(game), intercom: hasIntercom(game), motor: hasGateMotor(game), signs: responseActive(game) }, moats: Object.fromEntries(moatStates(game).map(m => [m.run.id, { level: m.level, frozen: m.frozen }])) });
       const svKey = `${game.structures.filter(x => x.stage >= 5).length}|${game.perimeter.filter(r => r.finishedAt !== null).length}|${game.utilities.fittings.filter(f => f.finishedAt !== null).length}|${goodsKey(houseGoods(game))}`;
       if (svKey !== servicesKey) { servicesKey = svKey; world.syncServices(game); }
       sight.update(6);
@@ -567,7 +590,11 @@ export function GameCanvas() {
             for (const u of bt?.units ?? []) if (u.side === 'home' && u.personId) { const f = people.find(p => p.id === u.personId)?.first; if (f) map.set(u.id, f); }
             nameCache = { battle: bt, people, map };
           }
-          nameLayer.update(dt, ws.camera, battle.actors(), nameCache.map, battle.statuses(), player.obstacleBoxes, world.groundAt, canvas);
+          nameLayer.update(dt, ws.camera, battle.actors(), nameCache.map, battle.statuses(), (() => {
+            // in the cutaway view of the invaded house the roofs are off: its walls do not hide the people inside
+            const inv = battle.battle?.invasion, h = inv?.house, win = inv?.interior;
+            return h && win && battle.time >= win.from && battle.time <= win.to ? player.obstacleBoxes.filter(b => !(b.kind === 'building' && b.x0 <= h.x1 + 0.05 && b.x1 >= h.x0 - 0.05 && b.z0 <= h.z1 + 0.05 && b.z1 >= h.z0 - 0.05)) : player.obstacleBoxes;
+          })(), world.groundAt, canvas);
         }
       }
       // battle playback: start / skip / tick, camera shake, overlay progress
@@ -599,7 +626,7 @@ export function GameCanvas() {
       blueprintOv.update(performance.now());
       if (!lowRender.on) {
         ws.renderer.info.reset();
-        if (!useWorldStore.getState().boot?.hold) ws.renderFrame();
+        if (!useWorldStore.getState().boot?.hold && !qa.skipDraw) ws.renderFrame();
         statFrames++; statCalls += ws.renderer.info.render.calls; statTris += ws.renderer.info.render.triangles;
         if (performance.now() - statSince >= 1000) {
           if (useWorldStore.getState().showPerf) {

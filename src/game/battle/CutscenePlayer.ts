@@ -13,6 +13,10 @@ import { hourAfter, locate, sceneCaption, sceneWindow } from '../../sim/siege';
 import { lightLabel } from './lightLabel';
 import { Director, auditPose, poseAt, type PoseAudit, type V3, type Box } from './director';
 import type { BattleRenderer } from './BattleRenderer';
+import type { Battle } from '../../sim/battleTypes';
+import { interiorShot } from './interiorShot';
+import { breachShot } from './breachShot';
+import { liveBreach } from './liveBreach';
 
 export interface PlayerDeps {
   battle: BattleRenderer;
@@ -23,6 +27,10 @@ export interface PlayerDeps {
   seed: number;
   /** Buildings and walls the camera must keep out of (read once per cutscene; the game stands still). */
   obstacles?: () => Box[];
+  /** Last-minute cinematic work on a scene's battle before it plays (the invasion's break and house fight: sim/breach.ts, sim/houseAssault.ts); cached per battle. */
+  prepare?: (b: Battle) => Battle;
+  /** The roofs off (the cutaway view) while the fight is inside the house, and back after. */
+  cutaway?: (on: boolean) => void;
 }
 
 export class CutscenePlayer {
@@ -40,6 +48,8 @@ export class CutscenePlayer {
   private _done = false;
   private _lastKind = '';
   private _boxes: Box[] = [];
+  private _prepared = new WeakMap<Battle, Battle>();
+  private _inside = false;
   /** Wall-clock seconds the player has run (the camera operator's time base). */
   private _time = 0;
   /** Game seconds since the arrival, for the sky and the clock while the scenes play. */
@@ -56,6 +66,7 @@ export class CutscenePlayer {
     this._boxes = this.d.obstacles?.() ?? [];
     this._dir.setObstacles(this._boxes);
     this.active = true;
+    liveBreach.clear();
     this._publish(true);
   }
 
@@ -63,6 +74,7 @@ export class CutscenePlayer {
     if (this.active && useBattleStore.getState().battle) useBattleStore.getState().endBattle();
     this.active = false; this._c = null;
     this.d.battle.lightNight = null;
+    liveBreach.clear(); this._setInside(false);
     useCutsceneView.getState().set(null);
   }
 
@@ -111,7 +123,7 @@ export class CutscenePlayer {
       this._startedScene = seg.scene; this._seen = false;
       // (dark clothes and moonlight only while the sky is dark: a raid that runs into the dawn is drawn in the dawn's light)
       battle.lightNight = lightLabel(hourAfter(plan, seg.game0 + seg.gameLen / 2)) === 'Night';
-      useBattleStore.getState().playBattle(c.battles[seg.scene]);
+      useBattleStore.getState().playBattle(this._ready(c.battles[seg.scene]));
     }
     battle.hold = !loc.done && seg.kind === 'lead';
     if (this._dir.leadIn !== battle.hold) { this._dir.leadIn = battle.hold; this._dir.shot = null; }
@@ -120,7 +132,7 @@ export class CutscenePlayer {
       if (this._startedScene !== seg.scene) {
         this._startedScene = seg.scene; this._seen = false;
         battle.lightNight = lightLabel(hourAfter(plan, seg.game0 + seg.gameLen / 2)) === 'Night';
-        useBattleStore.getState().playBattle(c.battles[seg.scene]);
+        useBattleStore.getState().playBattle(this._ready(c.battles[seg.scene]));
       }
       if (battle.playing) this._seen = true;
       const bt = battle.playing ? battle.time : this._seen ? seg.realLen : 0;
@@ -159,7 +171,13 @@ export class CutscenePlayer {
     this._dir.night = lightLabel(hourAfter(plan, loc.game)) === 'Night'; this._dir.variant = loc.segment.scene;
     let shot;
     if (battle.playing !== this._wasPlaying) { this._wasPlaying = battle.playing; this._dir.shot = null; this._lastKind = ''; }
-    if (battle.playing) {
+    const inner = battle.playing ? (interiorShot(battle.battle?.invasion, battle.time, ground, this._boxes, this._focusOf(battle)) ?? breachShot(battle.battle?.invasion, battle.time, ground, this._boxes)) : null;
+    this._setInside(inner?.kind === 'house');
+    if (inner) {
+      this._dir.shot = inner; this._lastKind = 'interior';
+      shot = inner;
+    } else if (battle.playing) {
+      if (this._lastKind === 'interior') { this._dir.shot = null; this._lastKind = ''; }
       shot = this._dir.update(this._time, battle.actors(), battle.drainEvents(), house, ground);
     } else {
       if (!this._dir.shot || this._lastKind !== `est${loc.segment.scene}`) { this._dir.establish(this._time, house, this._road, ground, undefined, 2 * loc.segment.scene); this._lastKind = `est${loc.segment.scene}`; }
@@ -167,6 +185,28 @@ export class CutscenePlayer {
     }
     this._publish(false);
     return poseAt(shot, this._time);
+  }
+
+  private _ready(b: Battle): Battle {
+    if (!this.d.prepare) return b;
+    let out = this._prepared.get(b);
+    if (!out) { out = this.d.prepare(b); this._prepared.set(b, out); }
+    return out;
+  }
+
+  /** Cutaway on while the fight is inside the house. */
+  private _setInside(on: boolean): void {
+    if (on === this._inside) return;
+    this._inside = on;
+    this.d.cutaway?.(on);
+  }
+
+  /** Where the action is inside the house: the middle of the live fighters near it. */
+  private _focusOf(battle: BattleRenderer): V3 | undefined {
+    const h = battle.battle?.invasion?.house; if (!h) return undefined;
+    const a = battle.actors().filter(u => !u.dead && !u.gone && u.x > h.x0 && u.x < h.x1 && u.z > h.z0 && u.z < h.z1);
+    if (!a.length) return undefined;
+    return { x: a.reduce((s, u) => s + u.x, 0) / a.length, y: 0, z: a.reduce((s, u) => s + u.z, 0) / a.length };
   }
 
   /** The buildings and walls the camera keeps out of (the name labels test their line of sight against them). */
