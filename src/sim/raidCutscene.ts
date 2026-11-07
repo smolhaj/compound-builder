@@ -12,6 +12,8 @@
  */
 import type { Battle } from './battleTypes';
 import { resolve, type Outcome, type Stance } from './encounters';
+import { decorateDefenders } from './defenderMoments';
+import { decorateRaiders } from './raiderKinds';
 import { breakInScene, commitDays, finishPlan, gateScene, planSiege, probeBattle, siegeStrain, type Scene, type SiegePlan } from './siege';
 import { step } from './engine';
 import { hourOf, type GameState } from './state';
@@ -75,12 +77,18 @@ export function stageRaid(game: GameState, stance: Stance, keep?: Keep): StagedR
   const battle = (g.gate.battle as Battle | undefined) ?? null;
   const seed = game.seed * 131 + e.day * 7 + 1;
   const played: Stance = battle ? 'defend' : stance;
-  const fresh = planSiege({ kind: e.kind, size: e.size, temper: e.temper ?? 'desperate', hour, seed, fought: !!battle, fightSeconds: battle?.duration ?? null });
+  const fresh = planSiege({ kind: e.kind, size: e.size, temper: e.temper ?? 'desperate', hour, seed, fought: !!battle, fightSeconds: battle?.duration ?? null, armed: e.armed });
   const finalScene = fresh.scenes[fresh.scenes.length - 1];
+  const deco = (b: Battle, sc: Scene): Battle => {
+    const style = sc.style ?? fresh.style;
+    if (e.kind === 'break_in') return b;
+    const d = style ? decorateRaiders(b, style, sc.tactic ?? 'rushing', b.night, seed + sc.index * 53) : b;
+    return decorateDefenders(d, game, played, seed + sc.index);
+  };
   const finalBattle = (): Battle => {
-    if (battle) return battle;
+    if (battle) return deco(battle, finalScene);
     if (e.kind === 'break_in') return breakInScene(game, e, stance, outcome.tone, seed);
-    return gateScene(game, e, stance, outcome.tone, seed);
+    return deco(gateScene(game, e, stance, outcome.tone, seed), finalScene);
   };
   let scenes: Scene[], battles: Battle[], spent: Array<Record<string, number>>;
   if (keep) {
@@ -94,10 +102,10 @@ export function stageRaid(game: GameState, stance: Stance, keep?: Keep): StagedR
     for (const sc of scenes) {
       if (sc.index === scenes.length - 1) { battles.push(finalBattle()); spent.push({}); continue; }
       const p = probeBattle(game, sc.kind, e.size, seed + sc.index * 977);
-      battles.push(p); spent.push(p.spent);
+      battles.push(deco(p, sc)); spent.push(p.spent);
     }
   }
-  const plan = finishPlan(e.kind, hour, scenes);
+  const plan = finishPlan(e.kind, hour, scenes, fresh.style);
   // the scenes before the assault are cosmetic fights that cost rounds, never blood
   let rounds = 0;
   for (const sp of spent) for (const [cal, n] of Object.entries(sp)) {

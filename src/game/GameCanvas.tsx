@@ -43,7 +43,8 @@ import { useBattleStore } from '../store/battleStore';
 import { BattleRenderer } from './battle/BattleRenderer';
 import { demoBattle } from './battle/demoBattle';
 import { CutscenePlayer } from './battle/CutscenePlayer';
-import { obstaclesOf, treeBoxes } from './battle/cameraObstacles';
+import { RaidDamageRenderer } from './props/RaidDamageRenderer';
+import { coverBoxes, obstaclesOf, treeBoxes } from './battle/cameraObstacles';
 import { useCutsceneView } from '../store/cutsceneStore';
 import { isFinished } from '../sim/construction';
 import { isHome } from '../sim/blueprints';
@@ -333,6 +334,19 @@ export function GameCanvas() {
     let last = performance.now();
     let raf = 0;
     /** QA hooks: frame counter, and an exact camera pose (eye → look) for interior shots. */
+    // what a raid broke stays broken until it is mended (sim/raidDamage.ts)
+    const damageView = new RaidDamageRenderer(ws.scene, world.groundAt, d => {
+      const run = useGameStore.getState().game.perimeter.find(r => r.id === d.runId);
+      if (!run) return 0;
+      let best = 0, bd = Infinity;
+      for (let i = 1; i < run.pts.length; i++) {
+        const [ax, az] = run.pts[i - 1], [bx, bz] = run.pts[i], dd = Math.hypot((ax + bx) / 2 - d.x, (az + bz) / 2 - d.z);
+        if (dd < bd) { bd = dd; best = -Math.atan2(bz - az, bx - ax); }
+      }
+      return best;
+    });
+    damageView.sync(useGameStore.getState().game.raidDamage);
+    const unsubDamage = useGameStore.subscribe(s => s.game.raidDamage, list => damageView.sync(list));
     const battle = new BattleRenderer(ws.scene, world.groundAt, () => useGameStore.getState().game.people);
     battle.onEnd = () => { useBattleStore.getState().endBattle(); world.forceDoor(null); };
     battle.onDoor = (open, x, z) => world.forceDoor(open, x, z);
@@ -343,7 +357,7 @@ export function GameCanvas() {
       const h = g.structures.find(x => isFinished(x) && isHome(x.kind)) ?? g.structures.find(isFinished);
       return h ? { x: h.x, y: 0, z: h.z } : { x: world.camp.x, y: 0, z: world.camp.z };
     };
-    const player = new CutscenePlayer({ battle, ground: world.groundAt, house: homeSpot, commit: () => useGameStore.getState().commitCutscene(), seed: useGameStore.getState().game.seed, obstacles: () => [...obstaclesOf(useGameStore.getState().game), ...treeBoxes(world.treeSpecs, homeSpot(), 70)] });
+    const player = new CutscenePlayer({ battle, ground: world.groundAt, house: homeSpot, commit: () => useGameStore.getState().commitCutscene(), seed: useGameStore.getState().game.seed, obstacles: () => [...obstaclesOf(useGameStore.getState().game), ...treeBoxes(world.treeSpecs, homeSpot(), 70), ...coverBoxes(world.lowCover, homeSpot(), 70)] });
     let cineSaved: { fov: number; near: number } | null = null;
     /** Where the player's own camera stood before the raid prompt, and the glide back to it once the cutscene is over (yaw eased by hand: the glide has none). */
     let camBefore: { x: number; y: number; z: number; radius: number; pitch: number; yaw: number } | null = null, camBack = false;
@@ -633,7 +647,7 @@ export function GameCanvas() {
       window.removeEventListener('keyup', onShift);
       player.stop();
       unCamReq();
-      battle.dispose();
+      battle.dispose(); unsubDamage(); damageView.dispose();
       tour.dispose();
       tool.dispose();
       marker.dispose();

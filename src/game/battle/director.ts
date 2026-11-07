@@ -80,7 +80,7 @@ function norm3(a: V3): V3 { const l = Math.hypot(a.x, a.y, a.z) || 1; return { x
 export function blockedBetween(eye: V3, p: V3, boxes: readonly Box[], ground: Ground): boolean {
   // (a subject standing on top of a box, on a tower or a wall walk, is not hidden by it; one in its footprint or beside a wall is)
   const up = p.y - ground(p.x, p.z);
-  const own = boxes.filter(b => flatDist(p.x, p.z, b) <= 0.02 && up >= b.h - 0.4);
+  const own = boxes.filter(b => b.kind !== 'brush' && flatDist(p.x, p.z, b) <= 0.02 && up >= b.h - 0.4);
   const len = Math.hypot(p.x - eye.x, p.y - eye.y, p.z - eye.z) || 1;
   let under = 0;
   const buried = up < -0.05;   // (a figure below the surface, as a staged test can have, is not hidden by it)
@@ -88,13 +88,15 @@ export function blockedBetween(eye: V3, p: V3, boxes: readonly Box[], ground: Gr
   for (let i = 1; i < N; i++) {
     const t = i / N;
     // the last stretch beside the subject is not tested: a figure at a wall is seen against it, not through it
-    if ((1 - t) * len < 0.35) break;
+    const tail = (1 - t) * len < 0.35;
     const q = { x: eye.x + (p.x - eye.x) * t, y: eye.y + (p.y - eye.y) * t, z: eye.z + (p.z - eye.z) * t };
+    // (ground cover is the exception: a bush right in front of a figure hides its legs and body, so it counts all the way in)
+    if (tail) { for (const b of boxes) if (b.kind === 'brush' && insideBox(q, b, ground, 0.06)) return true; continue; }
     // (a rise of the ground between the eye and the subject hides it too)
     // (a hill, not a lip: two samples in a row below the surface; a podium's edge or a kerb a hand high does not hide a chest)
     if (!buried && q.y < ground(q.x, q.z) - 0.03) { if (++under >= 2) return true; } else under = 0;
     // a hand's breadth and a half of margin: eaves, foundation courses, posts and rails stand proud of the box
-    for (const b of boxes) if (!own.includes(b) && insideBox(q, b, ground, 0.2)) return true;
+    for (const b of boxes) if (!own.includes(b) && insideBox(q, b, ground, b.kind === 'brush' ? 0.04 : 0.2)) return true;
   }
   return false;
 }

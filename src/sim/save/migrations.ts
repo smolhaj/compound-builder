@@ -65,6 +65,8 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   // 81 → 82: the siege-wave clock (sim/waves.ts). An old run has none: raids stay random, as before
   // 82 → 83: stalled-project clock (sim/stalls.ts)
   // 83 → 84: the wipe ending (sim/wipe.ts) records `Needs.cause` on a new death. An older death has none and is worked out from the body when the ending is shown
+  // 84 → 85: raid damage and the gate talks (sim/raidDamage.ts, sim/negotiation.ts). An old run has none
+  84: s => ({ ...s, version: 85, raidDamage: [], gate: { ...(s.gate as object), talks: { held: 0, settled: 0, ambushed: 0, refused: 0 } } }),
   83: s => ({ ...s, version: 84 }),
   82: s => ({ ...s, version: 83, stalls: {} }),
   81: s => { const g = { ...(s.gate as object) } as Record<string, unknown>; delete g.waves; return { ...s, version: 82, gate: g }; },

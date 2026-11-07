@@ -7,7 +7,7 @@ import { KIT, footprint } from '../buildkit/kit';
 import { PERIMETER } from '../../sim/perimeter';
 import type { GameState } from '../../sim/state';
 
-export interface Box { x0: number; z0: number; x1: number; z1: number; h: number; kind: 'building' | 'wall' | 'tree'; /** Height of the underside above the ground (a tree's crown; default 0). */ y0?: number }
+export interface Box { x0: number; z0: number; x1: number; z1: number; h: number; kind: 'building' | 'wall' | 'tree' | 'brush'; /** Height of the underside above the ground (a tree's crown; default 0). */ y0?: number }
 
 /** Roof line above the pad for a building (storey 0.65 plus the roof); towers are 1 unit (6 m) and a bit. */
 const buildingHeight = (id: string, floorY: number): number => id.startsWith('watchtower') ? 1.25 : floorY + 1.3;
@@ -63,4 +63,19 @@ export function treeBoxes(trees: readonly TreeLike[], around: { x: number; z: nu
     if (crown > trunk * 1.5) out.push({ x0: t.x - crown, x1: t.x + crown, z0: t.z - crown, z1: t.z + crown, h: top, y0: 0.25 * t.scale, kind: 'tree' });
   }
   return out;
+}
+
+/** A clump of ground cover (sagebrush, willow, a rock): crown radius `r`, height `h` (units). */
+export interface CoverLike { x: number; z: number; r: number; h?: number }
+
+/**
+ * Sagebrush, willow clumps and rocks near the house as low boxes. A person standing behind a bush is half hidden, so the framing check
+ * (director.blockedBetween) treats cover between the eye and a subject, or right in front of it, as blocking. Nearest the house first. Pure.
+ */
+export function coverBoxes(cover: readonly CoverLike[], around: { x: number; z: number }, radius: number): Box[] {
+  return cover
+    .filter(c => Math.hypot(c.x - around.x, c.z - around.z) <= radius)
+    .sort((a, b) => Math.hypot(a.x - around.x, a.z - around.z) - Math.hypot(b.x - around.x, b.z - around.z))
+    .slice(0, 1200)
+    .map(c => ({ x0: c.x - c.r, x1: c.x + c.r, z0: c.z - c.r, z1: c.z + c.r, h: c.h ?? 0.25, kind: 'brush' as const }));
 }

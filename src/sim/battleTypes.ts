@@ -7,6 +7,15 @@
  */
 export type Side = 'home' | 'raider';
 
+/** How a raider is drawn in the cutscene (sim/raiderKinds.ts): the crew's style, the part he plays, and whether he carries a light. Cosmetic only. */
+export interface RaiderLook {
+  style: 'scouts' | 'crowd' | 'crew' | 'families' | 'opportunists';
+  role: 'scout' | 'shouter' | 'rabble' | 'leader' | 'soldier' | 'parent' | 'kid' | 'driver' | 'looter';
+  torch: boolean;
+  /** Picks a color from the style's palette. */
+  tone: number;
+}
+
 export interface BattleUnit {
   id: string;
   side: Side;
@@ -23,6 +32,10 @@ export interface BattleUnit {
   armor?: { plate: boolean; soft: boolean; helmet: boolean };
   /** Not a person: a remote turret on a tower (drawn as part of the tower, not as a figure). */
   machine?: 'turret';
+  /** A raider's role and look in the cutscene (set by `decorateRaiders`). */
+  look?: RaiderLook;
+  /** A resident who is not fighting: a child pulled indoors, a hand on the porch (`sim/defenderMoments.ts`). */
+  civilian?: boolean;
 }
 
 export type BattleEvent =

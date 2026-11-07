@@ -17,6 +17,7 @@ import { Clamp, Hint } from './hud/common';
 import { StayPicker } from './StayPicker';
 import { defaultStay, kitDetail, kitLine } from '../sim/joinerHome';
 import { pluralize } from '../sim/words';
+import { isTalk, talkOffer } from '../sim/negotiation';
 
 
 /** The end of a month's trial. */
@@ -154,6 +155,22 @@ export function GateCard() {
           {odds && (() => { const d = doorHoldLine(g.game); return d ? <div style={{ opacity: 0.85 }}>{d}</div> : null; })()}
           {e.stances.includes('hide') && <div>If you hide: they find the place lived in {inTen(hideFoundChance(g.game, e, p))}, and strip it</div>}
         </div>}
+        {cut && e.strength > 0 && e.kind !== 'break_in' && (() => {
+          const offer = talkOffer(g.game, e, p);
+          if (!offer.open) return null;
+          return <div data-testid="talk-card" style={{ margin: '10px 0 2px', padding: '8px 10px', border: '1px solid rgba(216,201,160,0.35)', borderRadius: 8 }}>
+            <div style={{ fontSize: 11, letterSpacing: 1, opacity: 0.6, textTransform: 'uppercase' }}>They may talk</div>
+            <div style={{ fontStyle: 'italic', opacity: 0.85, margin: '2px 0 6px', fontSize: 12.5 }}>{offer.lead}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              {offer.terms.map(t => <button key={t.stance} disabled={!!t.blocked} data-testid={`talk-${t.stance}`} title={t.blurb} style={{ ...button(t.stance === picked), outline: t.stance === picked ? '2px solid #d8c9a0' : undefined, background: t.stance === picked ? '#4a4a3c' : '#2e302a', color: '#eee', opacity: t.blocked ? 0.5 : 1 }} onClick={() => g.chooseStance(t.stance)}>
+                <div style={{ fontWeight: 600 }}>{t.name}</div>
+                <div style={{ fontSize: 11.5, opacity: 0.8 }}>Costs: {t.cost}</div>
+                <div style={{ fontSize: 11.5, opacity: 0.8 }}>{t.blocked ?? `Works: ${t.odds} · ${t.risk}`}</div>
+              </button>)}
+            </div>
+            {picked && isTalk(picked) && <div style={{ fontSize: 11.5, opacity: 0.7, marginTop: 5 }}>If it fails, the fight is on, and a trap means they are through the gate before it starts.</div>}
+          </div>;
+        })()}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
           {e.stances.filter(st => !(e.kind === 'kin' && st === 'build_first')).map((st, i) => (
             <button key={st} style={cut ? { ...button(st === picked), outline: st === picked ? '2px solid #d8c9a0' : undefined, background: st === picked ? '#4a4a3c' : '#2e302a', color: '#eee' } : button(i === 0)} title={label(st)[1]} onClick={() => (cut ? g.chooseStance(st) : g.answer(st))}>

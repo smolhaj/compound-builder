@@ -749,11 +749,13 @@ export class HomesteadWorld {
     this.sage.build(sage, q);
     this.willow.build(willow, q);
     this.rocks.build(rocks, rw.rocks.color, q);
-    this._lowObstacles = [...rocks.map(r => ({ x: r.x, z: r.z, r: 0.7 * r.s })), ...sage.map(r => ({ x: r.x, z: r.z, r: 0.6 * r.s })), ...willow.map(r => ({ x: r.x, z: r.z, r: 0.6 * r.s }))];
+    this._lowObstacles = [...rocks.map(r => ({ x: r.x, z: r.z, r: 0.7 * r.s, h: 0.12 })), ...sage.map(r => ({ x: r.x, z: r.z, r: 0.6 * r.s, h: 0.2 * r.s + 0.06 })), ...willow.map(r => ({ x: r.x, z: r.z, r: 0.6 * r.s, h: 0.5 }))];
   }
 
   /** Rocks and shrubs (crown radius): an eye-level camera must not stand inside one. */
-  private _lowObstacles: Array<{ x: number; z: number; r: number }> = [];
+  private _lowObstacles: Array<{ x: number; z: number; r: number; h?: number }> = [];
+  /** Rocks, sagebrush and willow clumps with their crown radius and height: the cutscene camera treats them as cover that hides a figure behind them. */
+  get lowCover(): ReadonlyArray<{ x: number; z: number; r: number; h?: number }> { return this._lowObstacles; }
   /** Neighbor parcels the family has bought (their trees are planted near and detailed, markable). */
   private _ownedLand: Array<{ x0: number; z0: number; x1: number; z1: number }> = [];
   private _inOwned(x: number, z: number): boolean { return this._ownedLand.some(r => x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1); }

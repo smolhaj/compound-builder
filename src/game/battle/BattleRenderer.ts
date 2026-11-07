@@ -28,7 +28,29 @@ const RAIDER_PANTS_NIGHT = [0x161718, 0x1b1d20, 0x1d1a16];
 const RAIDER_SHIRTS_DAY = [0x4b5240, 0x5b4c3a, 0x3f4a5a, 0x6b6a5a, 0x7a4a3c, 0x38403a, 0x62594a];
 const RAIDER_PANTS_DAY = [0x2f3338, 0x3d3a2e, 0x4a4436, 0x272b31, 0x35383c];
 
+/** A color dimmed for the dark (a mob's bright coats are dark shapes at night; the torch lights them). */
+const dim = (hex: number, k: number): number => ((((hex >> 16) & 255) * k) << 16) | ((((hex >> 8) & 255) * k) << 8) | ((hex & 255) * k) | 0;
+const CROWD_COATS = [0xb0452f, 0x3f6f9c, 0xc9a53a, 0x5a8a4a, 0x8a4f8f, 0xd6d0c0];
+const FAMILY_COATS = [0x7d6a54, 0x5d6b78, 0x806060, 0x6c7a62, 0x8a7a5a, 0x5a5048];
+const KID_COATS = [0xd9a43a, 0x6aa0d0, 0xc65a5a, 0x7ab07a, 0xd08ab0, 0xe0d070];
+const WORK_COATS = [0x8a5a2a, 0x3f5a7a, 0x6a6a4a, 0x7a3a2a, 0x4a5a4a, 0x9a8a5a];
+
+/** Dress a raider by his role (sim/raiderKinds.ts): the crew's style reads at a glance in a wide shot. */
+function dressRaider(w: Wear, look: NonNullable<BattleUnit['look']>, dark: boolean, r: () => number): number {
+  const k = dark ? 0.62 : 1;
+  const pick = <T,>(xs: readonly T[]): T => xs[look.tone % xs.length];
+  switch (look.role) {
+    case 'scout': w.shirt = 0x16181a; w.pants = 0x121315; w.coat = 2; w.hat = 0x101112; w.hasPack = false; return 0.96;
+    case 'shouter': case 'rabble': w.shirt = dim(pick(CROWD_COATS), k); w.pants = dark ? 0x1b1d20 : 0x3d3a2e; w.coat = look.role === 'shouter' ? 2 : 1; w.hat = r() < 0.4 ? dim(0xb04030, k) : -1; return 1.02;
+    case 'leader': case 'soldier': w.shirt = dark ? 0x23281e : 0x4b5240; w.pants = dark ? 0x1a1c16 : 0x3a3d30; w.coat = 1; w.hat = dark ? 0x1c2018 : 0x3d4232; w.hasPack = true; w.pack = dark ? 0x1d1d18 : 0x3a3a30; return look.role === 'leader' ? 1.05 : 1;
+    case 'parent': w.shirt = dim(pick(FAMILY_COATS), k); w.pants = dark ? 0x1b1d20 : 0x4a4436; w.coat = 1; w.hat = r() < 0.5 ? dim(0x6a5a4a, k) : -1; w.hasPack = true; w.pack = dim(0x5a5038, k); return 0.98;
+    case 'kid': w.shirt = dim(pick(KID_COATS), dark ? 0.7 : 1); w.pants = dark ? 0x1d2230 : 0x3b4a66; w.coat = 1; w.hat = r() < 0.5 ? dim(0xc65a5a, k) : -1; w.hasPack = false; return 0.6;
+    default: w.shirt = dim(pick(WORK_COATS), k); w.pants = dark ? 0x1b1d20 : 0x35383c; w.coat = 1; w.hat = dim(look.role === 'driver' ? 0xd9742a : 0x3a3a30, k); w.hasPack = look.role === 'looter'; if (w.hasPack) w.pack = dim(0x3a3a40, k); return 1;
+  }
+}
+
 interface U {
+  scale: number;
   def: BattleUnit;
   x: number; y: number; z: number; tx: number; ty: number; tz: number;
   rot: number; phase: number; speed: number;
@@ -189,11 +211,12 @@ export class BattleRenderer {
     this._center.set(src.reduce((a, u) => a + u.x, 0) / Math.max(1, src.length), 0, src.reduce((a, u) => a + u.z, 0) / Math.max(1, src.length));
     for (const def of b.units) {
       const r = rnd(hashStr(def.personId ?? def.id));
-      let wear: Wear;
+      let wear: Wear, scale = 1;
       if (def.side === 'home') {
         const p = people.find(q => q.id === def.personId);
         wear = pickPersonaWear(r, 'resident', { season: 'fall', team: null });
         if (p) { wear.shirt = p.shirt; wear.longHair = p.body === 'f'; }
+        if (def.civilian) scale = 0.66;
         wear.pants = 0x3b4a66;
       } else {
         wear = pickPersonaWear(r, 'resident', { season: 'winter', team: null });
@@ -201,14 +224,16 @@ export class BattleRenderer {
         const shirts = dark ? RAIDER_SHIRTS_NIGHT : RAIDER_SHIRTS_DAY, pants = dark ? RAIDER_PANTS_NIGHT : RAIDER_PANTS_DAY;
         wear.shirt = shirts[Math.floor(r() * shirts.length)];
         wear.pants = pants[Math.floor(r() * pants.length)]; wear.hat = -1; wear.coat = 1;
+        if (def.look) scale = dressRaider(wear, def.look, dark, r);
       }
-      wear.hasPack = false; wear.shorts = false;
+      if (!def.look) wear.hasPack = false;
+      wear.shorts = false;
       // armor over the clothes: a coyote plate carrier (back panel), a navy soft vest, an olive helmet
       if (def.armor?.plate) { wear.shirt = 0x6e6446; wear.coat = 1; wear.hasPack = true; wear.pack = 0x4b4a3a; }
       else if (def.armor?.soft) { wear.shirt = 0x2d3440; wear.coat = 1; }
       if (def.armor?.helmet) wear.hat = 0x3d4232;
       const y = def.y ?? 0;
-      this._units.set(def.id, { def, x: def.x, y, z: def.z, tx: def.x, ty: y, tz: def.z, rot: def.side === 'raider' ? Math.atan2(this._center.x - def.x, this._center.z - def.z) : 0,
+      this._units.set(def.id, { scale, def, x: def.x, y, z: def.z, tx: def.x, ty: y, tz: def.z, rot: def.side === 'raider' ? Math.atan2(this._center.x - def.x, this._center.z - def.z) : 0,
         phase: r() * 6, speed: RUN, wear, wound: 0, dead: false, crouch: false, gone: false });
     }
     this._alarm = new THREE.PointLight(0xff2020, 0, 14, 1.6);
@@ -487,12 +512,15 @@ export class BattleRenderer {
       if (n >= this._layer.capacity) break;
       this._layer.setWear(n, u.wear);
       const gy = this._ground(u.x, u.z) + u.y;
-      this._layer.setPose(n, { x: u.x, y: gy, z: u.z, rot: u.rot, scale: 1,
+      // from far off the figures grow a little (up to 2.4x), so a crew at the end of the drive is still people, not specks
+      const dv = this.viewer ? Math.hypot(u.x - this.viewer.x, gy - this.viewer.y, u.z - this.viewer.z) : 0;
+      const gs = u.scale * Math.min(2.4, Math.max(1, dv / 16));
+      this._layer.setPose(n, { x: u.x, y: gy, z: u.z, rot: u.rot, scale: gs,
         pose: u.crouch && !moving ? FIG_POSE.KNEEL : FIG_POSE.STAND, phase: u.phase, amp: moving ? 0.6 : 0 });
       if (u.dead) {   // laid down: tip the figure onto its back along its heading
         this._e.set(-Math.PI / 2, u.rot, 0, 'YXZ');
         this._q.setFromEuler(this._e);
-        this._m.compose(this._v.set(u.x, gy + 0.03, u.z), this._q, this._s.setScalar(FIG_SCALE));
+        this._m.compose(this._v.set(u.x, gy + 0.03, u.z), this._q, this._s.setScalar(FIG_SCALE * gs));
         this._m.toArray(this._layer.mesh.instanceMatrix.array as Float32Array, n * 16);
       }
       n++;
@@ -504,12 +532,13 @@ export class BattleRenderer {
       const gy = this._ground(u.x, u.z) + u.y;
       // from afar the markers grow with the distance (a ring 0.22 wide is under a pixel at 30 units, and a sliver at a low angle)
       const d = this.viewer ? Math.hypot(u.x - this.viewer.x, gy - this.viewer.y, u.z - this.viewer.z) : 0;
-      const k = Math.max(1, d / 5);
+      const k = Math.max(1, d / 8);
       const hex = u.def.side === 'raider' ? 0xff3b30 : 0x4aa8ff;
       this._m.compose(this._v.set(u.x, gy + 0.02, u.z), this._q.identity(), this._s.set(k, 1, k));
       this._rings.setMatrixAt(ri, this._m);
       this._rings.setColorAt(ri, this._c.setHex(hex));
-      this._m.compose(this._v.set(u.x, gy + 0.36 + 0.03 * k, u.z), this._q.identity(), this._s.setScalar(k > 1.4 ? k : 0));
+      // (a marker only past 30 units, small: the figures themselves are scaled up by then)
+      this._m.compose(this._v.set(u.x, gy + 0.36 * u.scale * Math.max(1, d / 16) + 0.1, u.z), this._q.identity(), this._s.setScalar(d > 30 ? Math.min(2.2, d / 30) : 0));
       this._pips.setMatrixAt(ri, this._m);
       this._pips.setColorAt(ri, this._c.setHex(hex));
       ri++;
@@ -519,7 +548,8 @@ export class BattleRenderer {
     const dark = this.lightNight ?? !!this.battle?.night;
     for (const u of this._units.values()) {
       if (!dark || u.def.side !== 'raider' || u.gone || u.dead || u.def.machine || pn >= 128) continue;
-      const hsh = hashStr(u.def.id) % 4;   // (0 and 2: a lantern, 1: a flashlight, 3: nothing in hand)
+      const lk = u.def.look;
+      const hsh = lk ? (lk.torch ? 0 : 3) : hashStr(u.def.id) % 4;   // (0 and 2: a lantern, 1: a flashlight, 3: nothing in hand; a styled raider carries a torch or nothing)
       if (hsh > 2) continue;
       const gy = this._ground(u.x, u.z) + u.y, warm = hsh !== 1;
       const hx = u.x + Math.cos(u.rot) * 0.06 + Math.sin(u.rot) * 0.03, hz = u.z - Math.sin(u.rot) * 0.06 + Math.cos(u.rot) * 0.03, hy = gy + 0.12;
