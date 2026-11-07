@@ -18,11 +18,10 @@ import type { Person } from './family';
 import type { RaiderTemper } from './battle';
 import type { CrewStyle } from './raiderKinds';
 import { LineDirector, prisonerVariants, type Role } from './raidDialogue';
-import { mulberry32 } from './rng';
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 const dist = (a: { x: number; z: number }, b: { x: number; z: number }) => Math.hypot(a.x - b.x, a.z - b.z);
-const WALK = 0.55;   // world units a second at a walk (the renderer's RUN is 1.1)
+const WALK = 0.8;   // world units a second at a walk (the renderer's RUN is 1.1)
 
 export interface Victim { unit: string; personId: string; name: string; age: number; kid: boolean; elder: boolean; guard: boolean; scene: number; t: number }
 export interface DramaInfo {
@@ -72,12 +71,12 @@ export function findVictim(before: GameState, after: GameState, battles: readonl
   return best;
 }
 
-/** Raiders the sim left alive on the drive: hit, not dead, not run off. */
+/** Raiders the sim left alive on the drive: hit, not dead, not run off, not surrendered. */
 export function leftBehindRaiders(b: Battle): string[] {
-  const hurt = new Set<string>(), gone = new Set<string>();
+  const hurt = new Set<string>(), gone = new Set<string>(b.surrendered?.raiders ?? []);
   for (const e of b.events) {
     if (e.kind === 'wound' && !e.stopped) hurt.add(e.unit);
-    if (e.kind === 'death' || e.kind === 'flee' || e.kind === 'taken') gone.add(e.unit);
+    if (e.kind === 'death' || e.kind === 'flee' || e.kind === 'taken' || e.kind === 'surrender') gone.add(e.unit);   // (a man who gave up is held, not left on the drive)
   }
   return b.units.filter(u => u.side === 'raider' && !u.machine && hurt.has(u.id) && !gone.has(u.id)).map(u => u.id);
 }
@@ -99,7 +98,6 @@ export function dramatize(inp: DramaInput): { battles: Battle[]; info: DramaInfo
   if (!victim) return { battles: [...inp.battles], info: null };
   const out = [...inp.battles];
   const b = inp.battles[victim.scene];
-  const r = mulberry32(inp.seed * 2609 + 17);
   const person = (u: BattleUnit | undefined) => inp.after.people.find(p => p.id === u?.personId);
   const vPerson = inp.after.people.find(p => p.id === victim.personId)!;
   const events: BattleEvent[] = [...b.events];
@@ -174,61 +172,63 @@ export function dramatize(inp: DramaInput): { battles: Battle[]; info: DramaInfo
     events.push({ t: r2(at), kind: 'cover', unit: m.id, x: vp.x, z: vp.z, walk: true, near: { unit: victim.unit, r: m === kin ? 0.1 : 0.2 + 0.03 * (i % 3), a: m === kin ? 1.6 : slot } });
     arrive = Math.max(arrive, at + dur);
   });
-  arrive = Math.min(arrive, T + 16);
+  arrive = Math.min(arrive, T + 8);
   // once they have come, the camera cuts again to the gathered people
   events.push({ t: r2(arrive + 0.3), kind: 'beat', role: 'vigil', unit: victim.unit, with: mourners.map(m => m.id) });
   // 2. the injured are seen to where they sit, bandaged
   if (helper && tended[0]) {
     const inj = tended[0];
     events.push({ t: r2(T + 0.6), kind: 'cover', unit: inj, x: unitAt(b, inj, W0).x, z: unitAt(b, inj, W0).z });
-    const ta = Math.min(arrive, T + 6) + 0.5;
+    const ta = Math.min(arrive, T + 5) + 0.4;
     events.push({ t: r2(ta), kind: 'beat', role: 'tend', unit: inj, with: [helper.id] });
     events.push({ t: r2(ta + 0.4), kind: 'aid', unit: inj, by: helper.id, what: 'pressure' });
     sayLine(ta + 1.0, 'defender', 'tend', helper.id);
-    sayLine(ta + 3.6, 'defender', 'tended', inj, [], victim.name);
-    caption(ta + 5, 'Somebody is already on their knees beside the wounded, pressing a cloth to the wound.');
+    sayLine(ta + 2.8, 'defender', 'tended', inj, [], victim.name);
+    caption(ta + 4, 'Somebody is already on their knees beside the wounded, pressing a cloth to the wound.');
     if (tended[1]) {
-      events.push({ t: r2(ta + 5.5), kind: 'cover', unit: tended[1], x: unitAt(b, tended[1], W0).x, z: unitAt(b, tended[1], W0).z });
-      events.push({ t: r2(ta + 6), kind: 'aid', unit: tended[1], by: helper.id, what: 'pressure' });
+      events.push({ t: r2(ta + 4.4), kind: 'cover', unit: tended[1], x: unitAt(b, tended[1], W0).x, z: unitAt(b, tended[1], W0).z });
+      events.push({ t: r2(ta + 4.8), kind: 'aid', unit: tended[1], by: helper.id, what: 'pressure' });
     }
-    T = Math.max(T, ta + 6);
+    T = Math.max(T, ta + 5);
     // the worse hurt is helped inside, an arm round the shoulders (at a walk)
     const sev = Math.max(0, ...b.events.filter(e => e.kind === 'wound' && e.unit === inj).map(e => (e as { sev: number }).sev));
     const door = { x: r2(inp.house.x), z: r2(inp.house.z) };
     if (sev >= 45) {
-      events.push({ t: r2(ta + 9), kind: 'lift', unit: inj, by: helper.id });
-      events.push({ t: r2(ta + 9.2), kind: 'move', unit: helper.id, x: door.x, z: door.z, walk: true });
-      events.push({ t: r2(ta + 9.2 + dist(unitAt(b, inj, W0), door) / WALK), kind: 'lower', unit: inj });
+      events.push({ t: r2(ta + 7), kind: 'lift', unit: inj, by: helper.id });
+      events.push({ t: r2(ta + 7.2), kind: 'move', unit: helper.id, x: door.x, z: door.z, walk: true });
+      events.push({ t: r2(ta + 7.2 + dist(unitAt(b, inj, W0), door) / WALK), kind: 'lower', unit: inj });
     } else {
-      events.push({ t: r2(ta + 9), kind: 'move', unit: inj, x: door.x, z: door.z, walk: true });
-      events.push({ t: r2(ta + 9.2), kind: 'move', unit: helper.id, x: door.x, z: door.z, walk: true });
+      events.push({ t: r2(ta + 7), kind: 'move', unit: inj, x: door.x, z: door.z, walk: true });
+      events.push({ t: r2(ta + 7.2), kind: 'move', unit: helper.id, x: door.x, z: door.z, walk: true });
     }
   }
   // 3. what the closest of them says, and one more voice
-  const mt = Math.max(arrive + 0.6, W0 + 4);
+  const mt = Math.max(arrive + 0.5, W0 + 3);
   if (kin) {
     const as = kinOf(kin).as;
     const variants = victim.guard && as === 'any' ? ['guard'] : victim.elder && as === 'any' ? ['elder'] : [as];
     sayLine(mt, 'defender', 'grief', kin.id, variants);
     const other = order.find(m => m !== kin);
-    if (other) sayLine(mt + 3.2, 'defender', 'grief', other.id, [kinOf(other).as === 'kid' ? 'kid' : 'any']);
-    if (r() < 0.8) sayLine(mt + 6.2, 'defender', 'grief', kin.id, variants);
+    if (other) sayLine(mt + 2.2, 'defender', 'grief', other.id, [kinOf(other).as === 'kid' ? 'kid' : 'any']);
   }
-  let end = mt + 8.5;
+  let end = mt + 3.6;
+  let carryAt = -1;
   // 4. two carry the fallen to the house, the rest follow
   const carriers = [kin, ...order.filter(m => m !== kin && !m.civilian)].filter((u): u is BattleUnit => !!u && !u.civilian).slice(0, 2);
   if (carriers.length) {
     const dx = inp.house.x - vp.x, dz = inp.house.z - vp.z, dl = Math.hypot(dx, dz) || 1;
-    const stop = Math.max(0, Math.min(dl - 3.2, dl * 0.8));
+    const stop = Math.max(0, Math.min(dl - 3.2, dl * 0.8, 3.5));
     const to = { x: r2(vp.x + dx / dl * stop), z: r2(vp.z + dz / dl * stop) };
     caption(end, `They carry ${victim.name} to the house.`);
     events.push({ t: r2(end), kind: 'beat', role: 'carry', unit: carriers[0].id, with: carriers.slice(1).map(c => c.id) });
     events.push({ t: r2(end + 0.4), kind: 'lift', unit: victim.unit, by: carriers[0].id });
     carriers.forEach((c, i) => events.push({ t: r2(end + 0.5), kind: 'move', unit: c.id, x: r2(to.x + i * 0.12), z: to.z, walk: true }));
     for (const m of order.filter(x => !carriers.includes(x))) events.push({ t: r2(end + 1.5), kind: 'move', unit: m.id, x: r2(to.x - dx / dl * 0.6), z: r2(to.z - dz / dl * 0.6), walk: true });
+    const carryStart = end;
     end += 0.6 + stop / WALK;
     events.push({ t: r2(end), kind: 'lower', unit: victim.unit });
-    end += 2;
+    end += 1;
+    carryAt = carryStart + 1.5;
   }
   // 5. the raider left on the drive, only if the sim left one
   let raider: string | undefined;
@@ -239,22 +239,23 @@ export function dramatize(inp: DramaInput): { battles: Battle[]; info: DramaInfo
     if (raider && guards.length) {
       const rp = unitAt(b, raider, W0);
       if (!b.events.some(e => e.kind === 'lay' && e.unit === raider)) events.push({ t: r2(W0 + 0.3), kind: 'lay', unit: raider });
-      caption(end, 'One of them was left on the drive, alive. Two of the family walk out to him, rifles up.');
-      events.push({ t: r2(end), kind: 'beat', role: 'prisoner', unit: raider, with: guards.map(g => g.id) });
-      let ar = end;
+      const t1 = carryAt > 0 ? carryAt : end;
+      caption(t1, 'One of them was left on the drive, alive. Two of the family walk out to him, rifles up.');
+      events.push({ t: r2(Math.max(end, t1 + 4)), kind: 'beat', role: 'prisoner', unit: raider, with: guards.map(g => g.id) });
+      let ar = t1;
       guards.forEach((g, i) => {
-        const d = dist(unitAt(b, g.id, end), rp);
-        events.push({ t: r2(end + 0.3 + i * 0.5), kind: 'move', unit: g.id, x: rp.x, z: rp.z, walk: true, near: { unit: raider!, r: 0.6 + i * 0.12, a: 0.5 + i * 1.3 } });
-        ar = Math.max(ar, end + 0.3 + d / WALK);
+        const d = dist(unitAt(b, g.id, t1), rp);
+        events.push({ t: r2(t1 + 0.3 + i * 0.5), kind: 'move', unit: g.id, x: rp.x, z: rp.z, walk: true, near: { unit: raider!, r: 0.6 + i * 0.12, a: 0.5 + i * 1.3 } });
+        ar = Math.max(ar, t1 + 0.3 + d / WALK);
       });
-      ar = Math.min(ar, end + 12);
+      ar = Math.min(ar, t1 + 5);
       events.push({ t: r2(ar + 0.2), kind: 'cover', unit: guards[0].id, x: rp.x, z: rp.z, walk: true, near: { unit: raider, r: 0.3, a: 0.5 } });
       const gs = guards[0].id;
-      sayLine(ar + 0.8, 'defender', 'prisoner', gs);
-      say(ar + 3.4, inp.dir.pick('raider', 'prisoner_reply', { speaker: raider, variants: prisonerVariants(inp.temper, inp.style) }), raider, 'prisoner_reply');
-      sayLine(ar + 6.2, 'defender', 'prisoner', guards[1]?.id ?? gs);
-      caption(ar + 8, 'What happens to him is the family\'s call.');
-      end = ar + 10.5;
+      sayLine(ar + 0.6, 'defender', 'prisoner', gs);
+      say(ar + 2.2, inp.dir.pick('raider', 'prisoner_reply', { speaker: raider, variants: prisonerVariants(inp.temper, inp.style) }), raider, 'prisoner_reply');
+      sayLine(ar + 4, 'defender', 'prisoner', guards[1]?.id ?? gs);
+      caption(ar + 5, 'What happens to him is the family\'s call.');
+      end = Math.max(end, ar + 6.5);
     }
   }
   // the end of the scene moves to the end of the wake

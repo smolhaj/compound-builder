@@ -17,6 +17,10 @@
  *
  * The dead are buried either way (a day's grim work; left out they bring
  * coyotes and sickness).
+ *
+ * Raiders who SURRENDERED (hands up, weapon down: sim/surrender.ts) are not "left hurt on the drive": they are in the family's custody
+ * on their knees at the gate. The same four choices apply, in their words: release them (patched up if hurt), hold them, turn them loose
+ * with nothing (they walk), or finish them, which weighs more on the humanity track than finishing a man who was already down.
  */
 import { log } from './economy';
 import { mulberry32 } from './rng';
@@ -27,7 +31,7 @@ import { prisonerLead } from './rescue';
 import { afterExecution, afterLeaving, afterMercy } from './mind';
 
 export type AftermathChoice = 'treat_release' | 'hold' | 'leave' | 'finish';
-export interface Aftermath { day: number; wounded: number; dead: number }
+export interface Aftermath { day: number; wounded: number; dead: number; /** Raiders who gave up and are held at the gate (save v86; absent in an older save). */ surrendered?: number }
 export interface Prisoner { id: string; name: string; since: number; /** Wound severity (0 healed). */ sev: number; talked: boolean; /** 0–100: how far he's come round. */ trust: number }
 
 export const AFTERMATH_TEXT: Record<AftermathChoice, [string, string]> = {
@@ -37,15 +41,26 @@ export const AFTERMATH_TEXT: Record<AftermathChoice, [string, string]> = {
   finish: ['Finish it', 'Nobody comes back for revenge. Nobody here is the same after.'],
 };
 
+/** The same four choices when the raiders gave up instead of lying hurt on the drive (nobody is bleeding; they are on their knees at the gate). */
+export const SURRENDER_TEXT: Record<AftermathChoice, [string, string]> = {
+  treat_release: ['Disarm them and let them go', 'Searched, then walked to the road. The decent thing; some come back with their friends.'],
+  hold: ['Hold them', 'Prisoners: food and a guard every day. They might talk: where their crew is, where they stashed things.'],
+  leave: ['Send them off with nothing', 'Disarmed, no food, no help. They walk. What happens to them out there is not your doing.'],
+  finish: ['Finish it', 'They gave up and you shot them anyway. Nobody here is the same after.'],
+};
+
 const NAMES = ['Dale', 'Cody', 'Travis', 'Wade', 'Jesse', 'Shane', 'Rusty', 'Kyle', 'Darnell', 'Luis', 'Brent', 'Terry'];
 const living = (s: GameState) => s.personState.filter(ps => ps.needs.died == null);
 const lowerMorale = (s: GameState, by: number) => { for (const ps of living(s)) ps.needs.morale = Math.max(0, ps.needs.morale - by); };
 
 /** Raiders left behind after a fight the family won (from the battle). */
-export function leaveAftermath(s: GameState, wounded: number, dead: number) {
-  if (wounded <= 0 && dead <= 0) return;
-  s.gate.aftermath = { day: Math.floor(s.clock.t), wounded, dead };
+export function leaveAftermath(s: GameState, wounded: number, dead: number, surrendered = 0) {
+  if (wounded <= 0 && dead <= 0 && surrendered <= 0) return;
+  s.gate.aftermath = { day: Math.floor(s.clock.t), wounded, dead, ...(surrendered > 0 ? { surrendered } : {}) };
 }
+
+/** Raiders the family has to decide about: the hurt left on the drive and those who gave up. */
+export const aftermathHeads = (a: Pick<Aftermath, 'wounded' | 'surrendered'>): number => a.wounded + (a.surrendered ?? 0);
 
 /** The family decides. Returns lines for the card / log. */
 export function resolveAftermath(s: GameState, choice: AftermathChoice): string[] {
@@ -54,16 +69,17 @@ export function resolveAftermath(s: GameState, choice: AftermathChoice): string[
   s.gate.aftermath = null;
   const g = s.gate, out: string[] = [];
   const r = mulberry32(s.seed * 4111 + a.day * 7 + choice.length);
-  const n = a.wounded;
+  const sur = a.surrendered ?? 0, n = a.wounded + sur;
   if (n > 0) {
     if (choice === 'treat_release') {
       let treated = 0;
-      for (let i = 0; i < n; i++) {
+      for (let i = 0; i < a.wounded; i++) {
         if (s.stock.meds >= 1) { s.stock.meds -= 1; treated++; } else if (s.stock.ifak >= 1) { s.stock.ifak -= 1; treated++; }
       }
-      g.humanity = Math.min(100, g.humanity + 4 + 2 * treated);
-      out.push(treated === n ? `Dressed ${n === 1 ? 'his wounds' : 'their wounds'} and let ${n === 1 ? 'him' : 'them'} go.` : `Not enough dressings for all of them: ${treated} of ${n} patched up, the rest given water and pointed at the road.`);
-      if (treated < n && r() < 0.5) out.push('One of them didn\'t make it to the road.');
+      g.humanity = Math.min(100, g.humanity + 4 + 2 * treated + sur);
+      if (a.wounded === 0) out.push(`${sur === 1 ? 'He was' : 'They were'} searched, disarmed and walked to the road.`);
+      else out.push(treated === a.wounded ? `Dressed ${a.wounded === 1 ? 'his wounds' : 'their wounds'} and let ${a.wounded === 1 ? 'him' : 'them'} go${sur ? `, along with ${sur === 1 ? 'the one who gave up' : 'the ones who gave up'}` : ''}.` : `Not enough dressings for all of them: ${treated} of ${a.wounded} patched up, the rest given water and pointed at the road.`);
+      if (treated < a.wounded && r() < 0.5) out.push('One of them didn\'t make it to the road.');
       // they know the place now: some come back with friends; word also gets around
       if (r() < 0.35) { g.next = Math.min(g.next, Math.floor(s.clock.t) + 5 + Math.floor(r() * 10)); out.push('One of them looked back at the walls a long time before he went.'); }
       g.mercy = (g.mercy ?? 0) + n;
@@ -71,18 +87,21 @@ export function resolveAftermath(s: GameState, choice: AftermathChoice): string[
     } else if (choice === 'hold') {
       g.prisoners ??= [];
       for (let i = 0; i < n; i++) {
-        const sev = 30 + Math.round(r() * 40);
-        if (s.stock.meds >= 1) s.stock.meds -= 1;
-        g.prisoners.push({ id: `pr${s.nextId++}`, name: NAMES[Math.floor(r() * NAMES.length)], since: a.day, sev, talked: false, trust: 10 + Math.round(r() * 15) });
+        // the ones who gave up are not hurt (much), and they came round before they were taken
+        const gaveUp = i >= a.wounded;
+        const sev = gaveUp ? Math.round(r() * 15) : 30 + Math.round(r() * 40);
+        if (!gaveUp && s.stock.meds >= 1) s.stock.meds -= 1;
+        g.prisoners.push({ id: `pr${s.nextId++}`, name: NAMES[Math.floor(r() * NAMES.length)], since: a.day, sev, talked: false, trust: (gaveUp ? 20 : 10) + Math.round(r() * 15) });
       }
       out.push(`${n === 1 ? 'One prisoner' : `${n} prisoners`}, zip-tied in the shop. Someone has to watch them now.`);
     } else if (choice === 'leave') {
       g.humanity = Math.max(0, g.humanity - 2 - n);
-      out.push(r() < 0.5 ? 'By morning the drive was empty. A blood trail went into the trees.' : 'By morning they had stopped calling for help.');
+      if (a.wounded === 0) out.push('You sent them up the road disarmed, with nothing but what they stood in. They did not look back.');
+      else out.push(r() < 0.5 ? 'By morning the drive was empty. A blood trail went into the trees.' : 'By morning they had stopped calling for help.');
       lowerMorale(s, 4);
       afterLeaving(s);
     } else {
-      g.humanity = Math.max(0, g.humanity - 12 - 4 * n);
+      g.humanity = Math.max(0, g.humanity - 12 - 4 * a.wounded - 6 * sur);   // a man on his knees with his hands up weighs more than one already down
       lowerMorale(s, 15);
       const kids = s.people.some((p, i) => p.kid && s.personState[i]?.needs.died == null);
       out.push(`It was done. Nobody talked at supper.${kids ? ' The kids heard the shots.' : ''}`);

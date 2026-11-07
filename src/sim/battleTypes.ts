@@ -110,11 +110,17 @@ export interface InvasionMeta {
   /** The stretch of the battle played inside the house (s): the camera goes to the cutaway view for it. */
   interior?: { from: number; to: number };
 }
+/** What became of a defender left on the ground when the crew broke the line (sim/breachFates.ts). */
+export type BreachFateKind = 'killed' | 'finished' | 'wounded' | 'taken' | 'held' | 'fled';
 
 export interface Battle {
   invasion?: InvasionMeta;
   /** Night or day (lights matter at night). */
   night: boolean;
+  /** Who gave up (sim/surrender.ts): raiders (the crew, or a hurt man who could not run) and defenders (held at gunpoint at a breach). The picture draws hands up and a dropped weapon. */
+  surrendered?: { raiders: string[]; defenders: string[] };
+  /** Every defender still on the ground when a breach ended, and what became of them (sim/breachFates.ts): never standing unhurt among raiders. */
+  fates?: Array<{ unit: string; fate: BreachFateKind }>;
   /** A parked vehicle (sim/raiderKinds.ts). */
   vehicle?: BattleVehicle;
   units: BattleUnit[];

@@ -362,6 +362,8 @@ export function GameCanvas() {
       if (!h || !win || battle.time < win.from || battle.time > win.to) return base;
       return base.filter(b => !(b.kind === 'building' && b.x0 <= h.x1 + 0.05 && b.x1 >= h.x0 - 0.05 && b.z0 <= h.z1 + 0.05 && b.z1 >= h.z0 - 0.05));
     };
+    battle.fireSource = () => fireBoxesOf(useGameStore.getState().game);
+    battle.extraCover = () => treeBoxes(world.treeSpecs, homeSpot(), 40).filter(b => b.y0 === undefined);
     battle.onEnd = () => { useBattleStore.getState().endBattle(); world.forceDoor(null); };
     battle.onDoor = (open, x, z) => world.forceDoor(open, x, z);
     battle.onGap = (runId, at, w) => liveBreach.add({ runId, at, w });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FIRE_SOLID, MUZZLE, TORSO, WALL_POST, faceNormal, lineOfFire } from './lineOfFire';
+import { lowCoverHeight, FIRE_SOLID, MUZZLE, TORSO, WALL_POST, faceNormal, lineOfFire } from './lineOfFire';
 import { PERIMETER } from '../../sim/perimeter';
 import type { Box } from './cameraObstacles';
 
@@ -61,5 +61,11 @@ describe('line of fire', () => {
     for (const k of FIRE_SOLID) expect(PERIMETER[k]).toBeTruthy();
     for (const k of ['chain_link', 'barbed_wire', 'woven_wire', 'wrought_iron', 'bar_fence', 'split_rail', 'thorn_hedge'] as const) expect(FIRE_SOLID.has(k)).toBe(false);
     for (const k of ['concrete_wall', 'steel_wall', 'stone_wall', 'container_wall', 'container_stack', 'log_palisade', 'earth_berm'] as const) expect(FIRE_SOLID.has(k)).toBe(true);
+  });
+  it('crates, wells, barrels and trucks are low cover; a house is not', () => {
+    expect(lowCoverHeight('wood_crate')).toBeLessThan(0.34);
+    expect(lowCoverHeight('hand_well')).toBeLessThan(0.34);
+    expect(lowCoverHeight('farm_truck')).toBeLessThan(0.34);
+    expect(lowCoverHeight('timber_cabin')).toBeNull();
   });
 });

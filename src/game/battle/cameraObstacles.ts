@@ -7,7 +7,7 @@ import { KIT, footprint } from '../buildkit/kit';
 import { PERIMETER } from '../../sim/perimeter';
 import type { GameState } from '../../sim/state';
 
-export interface Box { x0: number; z0: number; x1: number; z1: number; h: number; kind: 'building' | 'wall' | 'tree' | 'brush'; /** Height of the underside above the ground (a tree's crown; default 0). */ y0?: number }
+export interface Box { x0: number; z0: number; x1: number; z1: number; h: number; kind: 'building' | 'wall' | 'tree' | 'brush'; /** The structure's kind id (a crate, a well, a truck), for the buildings. */ id?: string; /** Height of the underside above the ground (a tree's crown; default 0). */ y0?: number }
 
 /** Roof line above the pad for a building (storey 0.65 plus the roof); towers are 1 unit (6 m) and a bit. */
 const buildingHeight = (id: string, floorY: number): number => id.startsWith('watchtower') ? 1.25 : floorY + 1.3;
@@ -23,7 +23,7 @@ export function obstaclesOf(g: GameState): Box[] {
     // (fields, gardens, ponds and the like are flat: no box to hit)
     if (['field', 'garden', 'pond', 'reservoir', 'orchard', 'orchard_grove', 'terrace_stair', 'terrace_ramp', 'equipment_yard', 'vehicle_yard', 'motor_court'].includes(st.kind)) continue;
     // the body to the roof line; the porch and steps in front of the door as a low deck only (open above: posts and rails do not hide a person)
-    out.push({ ...footprint(def, st.x, st.z, st.rot, false), h: buildingHeight(st.kind, def.floorY), kind: 'building' });
+    out.push({ ...footprint(def, st.x, st.z, st.rot, false), h: buildingHeight(st.kind, def.floorY), kind: 'building', id: st.kind });
     if (def.frontCells > 0) out.push({ ...footprint(def, st.x, st.z, st.rot, true), h: PORCH_HEIGHT, kind: 'building' });
   }
   for (const run of g.perimeter) {

@@ -19,6 +19,7 @@ import { decorateRaiders } from './raiderKinds';
 import { LineDirector, voiceCutscene } from './raidDialogue';
 import { dramatize, type DramaInfo } from './raidDrama';
 import { endPoses } from './raidEnding';
+import { dragTheWounded } from './fightPoses';
 import { isHome } from './blueprints';
 import { isFinished } from './construction';
 import { breakInScene, commitDays, finishPlan, gateScene, planSiege, probeBattle, siegeStrain, type Scene, type SiegePlan } from './siege';
@@ -56,6 +57,10 @@ export interface RaidReport {
   /** Raiders left on the drive after a fight the family won. */
   raidersWounded: number;
   raidersDead: number;
+  /** Raiders who gave up and are held at the gate (sim/surrender.ts). Absent in a report from before save v86. */
+  raidersSurrendered?: number;
+  /** Family members the crew disarmed and held at gunpoint when it broke the line, then left standing in the yard (sim/breachFates.ts). */
+  held?: string[];
   /** What the raid broke and left broken until it is mended (sim/raidDamage.ts): a gap in the fence, the gate, windows, a burned wreck. */
   damage: string[];
   /** Rounds fired by the family in the fight and the scenes before it. */
@@ -130,6 +135,7 @@ export function stageRaid(game: GameState, stance: Stance, keep?: Keep): StagedR
     const fin = g.structures.filter(isFinished), home = fin.find(st => isHome(st.kind)) ?? fin[0] ?? { x: 0, z: 0 };
     // how the last fight ends on screen agrees with the sim's result: the crew beaten (down or hands up, never a standing cluster) or the family held (sim/raidEnding.ts)
     const last = battles.length - 1, temper = e.temper ?? 'desperate';
+    battles = battles.map((b, i) => (i === last ? dragTheWounded(b, { x: home.x, z: home.z }) : b));
     const ep = endPoses({ battle: battles[last], temper, style: scenes[last].style, dir, seed, house: { x: home.x, z: home.z } });
     battles = battles.map((b, i) => (i === last ? ep.battle : b));
     const crewWon = ep.ending === 'breached' || ep.ending === 'overrun';
@@ -188,9 +194,10 @@ export function raidReport(before: GameState, after: GameState, outcome: Outcome
   for (const k of STOCK_LOSSES) { const d = Math.floor((before.stock[k] ?? 0) - (after.stock[k] ?? 0)); if (d > 0) lost.push([LOSS_WORDS[k][d === 1 ? 0 : 1], d]); }
   const am = after.gate.aftermath;
   const b = after.gate.battle;
+  const held = (b?.surrendered?.defenders ?? []).map(id => after.people.find(p => p.id === b!.units.find(u => u.id === id)?.personId)?.first).filter((n): n is string => !!n && !killed.includes(n) && !taken.includes(n));
   const rounds = (b ? b.events.filter(e => e.kind === 'shot' && e.from.startsWith('h_')).length : 0) + extraRounds;
   return {
     title: outcome.title, text: outcome.text, tone: outcome.tone, killed, wounded, taken, lost,
-    damage: newDamage(before, after), raidersWounded: am?.wounded ?? 0, raidersDead: am?.dead ?? 0, rounds, lines: outcome.lines, aftermath: !!am,
+    damage: newDamage(before, after), raidersWounded: am?.wounded ?? 0, raidersDead: am?.dead ?? 0, raidersSurrendered: am?.surrendered ?? 0, held, rounds, lines: outcome.lines, aftermath: !!am,
   };
 }
