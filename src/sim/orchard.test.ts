@@ -272,7 +272,7 @@ describe('the daily log', () => {
         expect(calendarOf(h.clock).doy).toBe(hit + 1);
         const lines = orchardDay(h, 0).filter(l => /frost/.test(l));
         expect(lines.length).toBe(1);
-        expect(lines[0]).toMatch(/cherrys? \(\d+ %\)|cherries \(\d+ %\)/);
+        expect(lines[0]).toMatch(/cherrys? \(\d+%\)|cherries \(\d+%\)/);
         return;
       }
     }

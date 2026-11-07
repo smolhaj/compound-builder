@@ -79,7 +79,7 @@ describe('on the cutbank hillside lot', () => {
     expect(routeProblem(g, 'rock_tunnel', [b!.a, b!.b])).toBeNull();
     expect(b!.stats.grade).toBeLessThanOrEqual(BORE.MAX_GRADE);
     expect(b!.stats.peakCover * 6).toBeGreaterThan(6);
-    expect(boreText(b!.stats)).toMatch(/ft at \d+ %, [\d,]+ ft of rock/);
+    expect(boreText(b!.stats)).toMatch(/ft at \d+%, [\d,]+ ft of rock/);
     expect(perimeterOff(g, 'rock_tunnel')).toBeNull();
     // (the card shares the one-card slot with the gorge and keep cards: on this lot it is the best one)
     const card = terrainCards(g).find(c => c.id === 'land_bore');
