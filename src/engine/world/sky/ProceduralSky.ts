@@ -150,6 +150,12 @@ const FRAG = /* glsl */`
   uniform vec3  uStadDir;
   uniform float uStadGlow;
   uniform float uSmoke;
+  // Events on the skyline (sim/collapseLook.ts): x the far town's lights, y distant gunfire, z the far road's headlights, w fires in an arc
+  uniform vec4  uSkyA;
+  // x a convoy on the road, y twilight (the golden / dawn weight), z an aurora, w a comet
+  uniform vec4  uSkyB;
+  // bearings (radians) of the town, the far road, the fires, the fighting
+  uniform vec4  uAz;
   varying vec3 vDir;
 
   float hash12(vec2 p) {
@@ -226,6 +232,21 @@ const FRAG = /* glsl */`
     sky += horizon * (0.06 + 0.2 * uHaze) * exp(-hp * 24.0);
     // City light pollution / residual twilight glow.
     sky += uGlow * exp(-hp * 7.0);
+    // Twilight (dawn and dusk): layered bands instead of one wash. Toward the sun yellow at the horizon, orange, rose, then violet; away from it a
+    // pink belt over the Earth's blue shadow. Fades to nothing by day and by night (uSkyB.y is the golden weight).
+    if (uSkyB.y > 0.001) {
+      float tw = uSkyB.y;
+      vec3 ramp = mix(vec3(1.0, 0.70, 0.28), vec3(1.0, 0.40, 0.14), smoothstep(0.0, 0.07, hp));
+      ramp = mix(ramp, vec3(0.78, 0.30, 0.40), smoothstep(0.06, 0.18, hp));
+      ramp = mix(ramp, vec3(0.30, 0.22, 0.50), smoothstep(0.16, 0.42, hp));
+      ramp *= 1.0 - 0.7 * smoothstep(0.0, 0.5, hp);
+      sky = mix(sky, ramp, clamp(tw * az * az * exp(-hp * 4.5) * 0.7, 0.0, 0.85));
+      float away = 1.0 - az;
+      float bq = (hp - 0.075) / 0.06;
+      float beltW = exp(-bq * bq);
+      sky = mix(sky, vec3(0.50, 0.27, 0.33), tw * away * 0.5 * beltW);
+      sky = mix(sky, vec3(0.10, 0.14, 0.34), tw * away * 0.38 * smoothstep(0.1, 0.3, hp) * (1.0 - smoothstep(0.4, 0.9, hp)));
+    }
     // Columns of smoke on the skyline (lawless towns, a war, a wildfire): dark leaning plumes that widen as they rise, lit orange from below at night.
     if (uSmoke > 0.001) {
       float azs = atan(d.x, d.z);
@@ -408,6 +429,16 @@ const FRAG = /* glsl */`
         sky += vec3(0.9, 0.93, 1.0) * st * uStars * clearSky;
         sky += mwCol * mwI * 0.045 * clearSky;
       }
+      // Aurora (a solar storm): green curtains of vertical rays with a red crown, rippling slowly
+      if (uSkyB.z > 0.001) {
+        float az3 = atan(d.x, d.z);
+        float wob = fbm3(vec2(az3 * 2.5 + uTime * 0.02, hp * 2.0));
+        float rays = 0.45 + 0.55 * sin(az3 * 46.0 + 7.0 * wob + uTime * 0.5);
+        float bq = (hp - (0.26 + 0.14 * sin(az3 * 1.7 + uTime * 0.04))) / 0.15;
+        float band = exp(-bq * bq);
+        vec3 ac = mix(vec3(0.12, 1.0, 0.42), vec3(0.85, 0.12, 0.38), smoothstep(0.32, 0.62, hp));
+        sky += ac * rays * band * (0.3 + 0.7 * wob) * uSkyB.z * 0.38 * (1.0 - cloudOcc) * smoothstep(0.0, 0.12, h) * (0.35 + 0.65 * uNight);
+      }
       // Moon disc: lit from the sun's side, phase from the terminator, maria.
       vec3 md = normalize(uMoonDir);
       float mR = 0.0125;
@@ -435,6 +466,95 @@ const FRAG = /* glsl */`
     if (uStadGlow > 0.001) {
       float sg = max(dot(d, uStadDir), 0.0);
       sky += vec3(1.0, 0.86, 0.62) * uStadGlow * (0.05 * pow(sg, 90.0) + 0.02 * pow(sg, 12.0)) * smoothstep(-0.02, 0.03, h) * (1.0 + cloudOcc);
+    }
+    // A comet (an asteroid on its way): a hard bright head with a long tail pointing away from the sun
+    if (uSkyB.w > 0.001) {
+      vec3 cd = normalize(vec3(-0.38, 0.5, 0.78));
+      float cc = dot(d, cd);
+      vec3 tdir = normalize(cd + vec3(0.0, 0.5, 0.0) - uSunDir * 0.25);
+      float along = dot(d - cd * cc, tdir);
+      float tl = length(d - cd * cc - tdir * max(along, 0.0)) / (0.004 + 0.02 * max(along, 0.0));
+      float tail = exp(-tl * tl) * smoothstep(0.0, 0.01, along) * exp(-max(along, 0.0) * 9.0);
+      float head = pow(max(cc, 0.0), 2500.0) * 3.0 + pow(max(cc, 0.0), 300.0) * 0.4;
+      sky += vec3(0.85, 0.95, 1.0) * (head + 0.35 * tail) * uSkyB.w * (1.0 - cloudOcc) * (0.25 + 0.75 * clamp(uNight + 0.6 * uSkyB.y, 0.0, 1.0));
+    }
+    // Events on the skyline: fires in an arc, gunfire flashes, the far town's lights going out one by one, the far road's headlights.
+    // (Trees and ridges hide the first degree of sky, so the town sits on a far slope and the road climbs it.)
+    if (h > -0.02 && h < 0.5 && uSkyA.x + uSkyA.y + uSkyA.z + uSkyA.w + uSkyB.x > 0.001) {
+      float az2 = atan(d.x, d.z);
+      float vis = 1.0 - 0.7 * cloudOcc;
+      float dusk = 0.2 + 0.8 * clamp(uNight + 0.7 * uSkyB.y, 0.0, 1.0);
+      float topFade = 1.0 - smoothstep(0.15, 0.5, h);   // (the block ends at 0.5: nothing may be left over at its edge)
+      if (uSkyA.w > 0.001) {
+        float arc = 0.0;
+        for (int i = 0; i < 3; i++) {
+          float fi = float(i);
+          float sgn = mod(fi, 2.0) < 1.0 ? 1.0 : -1.0;
+          float da = atan(sin(az2 - uAz.z - fi * 1.45 * sgn), cos(az2 - uAz.z - fi * 1.45 * sgn));
+          arc += exp(-da * da / (0.2 + 0.12 * fi)) * (1.0 - 0.3 * fi);
+        }
+        arc *= 0.78 + 0.22 * sin(uTime * 1.9 + az2 * 11.0);
+        sky += vec3(1.0, 0.36, 0.08) * uSkyA.w * arc * exp(-hp * 8.0) * (0.06 + 0.9 * dusk) * topFade;
+      }
+      if (uSkyA.y > 0.001) {
+        float slot = floor(uTime * 1.0), ph = fract(uTime * 1.0), fl = 0.0, wash = 0.0;
+        for (int i = 0; i < 3; i++) {
+          float fi = float(i);
+          if (hash12(vec2(slot, fi + 3.1)) > uSkyA.y) continue;
+          float da = atan(sin(az2 - uAz.w), cos(az2 - uAz.w));
+          float a0 = (hash12(vec2(slot, fi + 9.7)) - 0.5) * 1.3;
+          float hh = 0.01 + 0.07 * hash12(vec2(slot, fi + 5.5));
+          float dd = length(vec2(da - a0, (h - hh) * 2.0));
+          float amp = exp(-ph * 4.0) * (0.6 + 0.8 * hash12(vec2(slot + 1.0, fi)));
+          fl += amp * (exp(-dd * dd / 0.0008) + 0.5 * exp(-dd * dd / 0.02));
+          wash += amp * exp(-(da - a0) * (da - a0) / 0.1) * exp(-hp * 5.0);
+        }
+        sky += vec3(1.0, 0.74, 0.42) * (fl * 0.9 + wash * 0.12) * vis * (0.3 + 0.7 * dusk) * topFade;
+      }
+      if (uSkyA.x > 0.001 && h > 0.003 && h < 0.08) {
+        float da = atan(sin(az2 - uAz.x), cos(az2 - uAz.x));
+        if (abs(da) < 0.45) {
+          vec2 g = vec2(da * 180.0, h * 170.0);
+          vec2 ci = floor(g), f = fract(g) - 0.5;
+          float r = hash12(ci), life = hash12(ci + 1.7);
+          float dens = exp(-da * da / 0.05) * (1.0 - h * 11.0);
+          if (r < 0.55 * dens && life < uSkyA.x) {
+            vec2 off = (vec2(hash12(ci + 7.7), hash12(ci + 3.3)) - 0.5) * 0.6;
+            vec2 q = (f - off) * vec2(0.0055, 0.0059);
+            float sg = max(0.0009, px * 1.0);
+            sky += vec3(1.0, 0.74, 0.4) * exp(-dot(q, q) / (sg * sg)) * (0.6 + 0.4 * sin(uTime * (1.2 + 3.0 * r) + r * 60.0)) * vis * dusk * 1.2;
+          }
+        }
+      }
+      if ((uSkyA.z + uSkyB.x) > 0.001 && h > 0.002 && h < 0.07) {
+        float da = atan(sin(az2 - uAz.y), cos(az2 - uAz.y));
+        float db = atan(sin(az2 - 3.14159265 + uAz.y), cos(az2 - 3.14159265 + uAz.y));
+        if (abs(db) < abs(da)) da = db;   // (the road's other end, to the south)
+        if (abs(da) < 0.6) {
+          float sg = max(0.0008, px * 1.0);
+          vec3 lc = vec3(0.0);
+          for (int i = 0; i < 6; i++) {
+            float fi = float(i);
+            if (fi / 6.0 >= uSkyA.z) break;
+            float dir = mod(fi, 2.0) < 1.0 ? 1.0 : -1.0;
+            float pos = (fract(uTime * 0.0045 * dir * (1.0 + 0.3 * fract(fi * 0.618)) + fi * 0.37) - 0.5) * 1.1;
+            float hh = 0.014 + 0.004 * fi + 0.012 * sin(pos * 7.0);
+            float dd = length(vec2(da - pos, h - hh));
+            float e = exp(-dd * dd / (sg * sg));
+            lc += e * (dir > 0.0 ? vec3(1.0, 0.95, 0.8) : vec3(1.0, 0.18, 0.1));
+          }
+          // a convoy: a tight string of lights one behind another, creeping the same way
+          for (int i = 0; i < 8; i++) {
+            float fi = float(i);
+            if (fi / 8.0 >= uSkyB.x) break;
+            float pos = (fract(uTime * 0.0026 + 0.15) - 0.5) * 1.1 - fi * 0.024;
+            float dd = length(vec2(da - pos, h - (0.03 + 0.012 * sin(pos * 6.0))));
+            float e = exp(-dd * dd / (sg * sg * 1.3));
+            lc += e * vec3(1.0, 0.9, 0.65);
+          }
+          sky += lc * vis * (0.15 + 0.85 * dusk) * 1.1;
+        }
+      }
     }
     // Moon halo (thin cloud and haze scatter it), by illumination.
     float mm = max(dot(d, uMoonDir), 0.0);
@@ -544,6 +664,9 @@ export class ProceduralSky {
       uStadDir:     { value: new THREE.Vector3(0, 1, 0) },
       uStadGlow:    { value: 0 },
       uSmoke:       { value: 0 },
+      uSkyA:        { value: new THREE.Vector4() },
+      uSkyB:        { value: new THREE.Vector4() },
+      uAz:          { value: new THREE.Vector4(3.14, 3.09, 3.14, 3.14) },
     };
     SKY_SHARED.uniforms = this.uniforms;
     this._geo = new THREE.SphereGeometry(1, 48, 24);
@@ -605,6 +728,17 @@ export class ProceduralSky {
 
   /** Columns of smoke on the skyline (0 = none). */
   setSmoke(k: number): void { this.uniforms['uSmoke'].value = k; }
+
+  /**
+   * Events on the skyline (sim/collapseLook.ts): the far town's lights, distant gunfire, the far road's headlights, fires, a convoy,
+   * the twilight weight, and the bearings of town / road / fires / fighting. All 0 = nothing drawn (the peacetime sky).
+   */
+  setSkyline(l: { town: number; flashes: number; traffic: number; fire: number; convoy: number; twilight: number; aurora: number; comet: number; az: { town: number; road: number; fire: number; war: number } }): void {
+    const u = this.uniforms;
+    (u['uSkyA'].value as THREE.Vector4).set(l.town, l.flashes, l.traffic, l.fire);
+    (u['uSkyB'].value as THREE.Vector4).set(l.convoy, l.twilight, l.aurora, l.comet);
+    (u['uAz'].value as THREE.Vector4).set(l.az.town, l.az.road, l.az.fire, l.az.war);
+  }
 
   setNight(v: number): void {
     this.uniforms['uNight'].value = v;

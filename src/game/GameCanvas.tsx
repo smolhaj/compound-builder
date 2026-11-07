@@ -12,7 +12,7 @@ import { burnedFarms } from '../sim/neighborLife';
 import { useEffect, useRef } from 'react';
 import type { GameState } from '../sim/state';
 import { MushroomCloud } from './fx/MushroomCloud';
-import { collapseLook } from '../sim/collapseLook';
+import { collapseLook, withWeather } from '../sim/collapseLook';
 import * as THREE from 'three';
 import { WorldScene } from '../engine/world/WorldScene';
 import { moonPhase, skyDarkness } from '../engine/world/sky/skyState';
@@ -484,7 +484,7 @@ export function GameCanvas() {
         valley.update(dt, fogTarget(fn, { campY: fogCampY, floorY: fogCampY - fogPlace.campAboveFloorM / 6 }));
       }
       const vc = valley.cur;
-      const gs = useGameStore.getState().game, look = collapseLook(gs);
+      const gs = useGameStore.getState().game, wo = weather.outputs, look = withWeather(collapseLook(gs), { rain: wo.rain, snow: wo.snow, season: vis });
       const wx = weather.update({
         dt, speed: speed === 0 ? 1 : 60 / SECONDS_PER_DAY[speed], season: wxSeason, hour: t,
         mode: weatherMode, eventWetness: ws.eventWetness, night: ws.nightFactor,
@@ -509,7 +509,8 @@ export function GameCanvas() {
         wx.haze = Math.max(wx.haze ?? 0.4, look.haze);
         wx.snow = Math.max(wx.snow, 0.5 * look.ash);
       }
-      ws.setCollapseLook({ dim: look.dim, tint: look.skyTint, amt: look.skyAmt, night: look.skyNight, cast: look.cast, sat: look.sat, contrast: look.contrast, townGlow: look.townGlow, flicker: look.flicker, fireGlow: look.fireGlow, smoke: look.smoke, nightLift: look.nightLift });
+      ws.setCollapseLook({ dim: look.dim, tint: look.skyTint, amt: look.skyAmt, night: look.skyNight, cast: look.cast, sat: look.sat, contrast: look.contrast, townGlow: look.townGlow, flicker: look.flicker, fireGlow: look.fireGlow, smoke: look.smoke, nightLift: look.nightLift, nightGlow: look.nightGlow,
+        fog: look.fog, haze: look.haze, townLights: look.townLights, traffic: look.traffic, convoy: look.convoy, flashes: look.flashes, aurora: look.aurora, comet: look.comet, az: look.az });
       ws.cutsceneLift = player.active ? 1 : 0;
       ws.setWeather(wx, Math.max(weather.flash, look.flash), weather.skyLightning);
       // lamps on inside from dusk (which windows, and how, is the atmosphere's: who's up, power, blackout curtains)

@@ -108,7 +108,7 @@ export class WorldScene {
   private _envBakeCloud = 0;
   private _envBakeTint = 0;
   /** The collapse's look (setCollapseLook): sun dim, sky tint, grade cast. Neutral = nothing. */
-  private readonly _collapse = { dim: 1, tint: new THREE.Color(), amt: 0, night: false, cast: new THREE.Color(1, 1, 1), sat: 1, contrast: 0, townGlow: 1, flicker: 0, fireGlow: 0, smoke: 0, nightLift: 0 };
+  private readonly _collapse = { dim: 1, tint: new THREE.Color(), amt: 0, night: false, cast: new THREE.Color(1, 1, 1), sat: 1, contrast: 0, townGlow: 1, flicker: 0, fireGlow: 0, smoke: 0, nightLift: 0, nightGlow: new THREE.Color(0, 0, 0), fog: 0, haze: 0, townLights: 0, traffic: 0, convoy: 0, flashes: 0, aurora: 0, comet: 0, az: { town: 3.14, road: 3.09, fire: 3.14, war: 3.14 } };
   private readonly _skyState = createSkyPalette();
   private readonly _phase: DayPhase = { day: 1, golden: 0, night: 0 };
   private _quality: Quality = 'high';
@@ -258,11 +258,15 @@ export class WorldScene {
    * The collapse's look for the next updateDayNight() (sim/collapseLook.ts): the sun dimmed, the sky pulled toward a colour (only
    * at night for an aurora), and the grade's cast, saturation and contrast. Pass the neutral values to clear it.
    */
-  setCollapseLook(l: { dim: number; tint: readonly number[]; amt: number; night: boolean; cast: readonly number[]; sat: number; contrast: number; townGlow?: number; flicker?: number; fireGlow?: number; smoke?: number; nightLift?: number }): void {
+  setCollapseLook(l: { dim: number; tint: readonly number[]; amt: number; night: boolean; cast: readonly number[]; sat: number; contrast: number; townGlow?: number; flicker?: number; fireGlow?: number; smoke?: number; nightLift?: number; nightGlow?: readonly number[];
+    fog?: number; haze?: number; townLights?: number; traffic?: number; convoy?: number; flashes?: number; aurora?: number; comet?: number; az?: { town: number; road: number; fire: number; war: number } }): void {
     const c = this._collapse;
     c.dim = l.dim; c.tint.setRGB(l.tint[0], l.tint[1], l.tint[2]); c.amt = l.amt; c.night = l.night;
     c.cast.setRGB(l.cast[0], l.cast[1], l.cast[2]); c.sat = l.sat; c.contrast = l.contrast;
     c.townGlow = l.townGlow ?? 1; c.flicker = l.flicker ?? 0; c.fireGlow = l.fireGlow ?? 0; c.smoke = l.smoke ?? 0; c.nightLift = l.nightLift ?? 0;
+    if (l.nightGlow) c.nightGlow.setRGB(l.nightGlow[0], l.nightGlow[1], l.nightGlow[2]); else c.nightGlow.setRGB(0, 0, 0);
+    c.fog = l.fog ?? 0; c.haze = l.haze ?? 0; c.townLights = l.townLights ?? 0; c.traffic = l.traffic ?? 0; c.convoy = l.convoy ?? 0; c.flashes = l.flashes ?? 0; c.aurora = l.aurora ?? 0; c.comet = l.comet ?? 0;
+    if (l.az) c.az = l.az;
   }
 
   /** The raid cutscene is playing: at night the eye-level rig gets a moonlit lift (0-1) so terrain and silhouettes read. */
@@ -479,8 +483,9 @@ export class WorldScene {
       const t = this._flickerT;
       const fl = col.flicker > 0.001 ? 1 - col.flicker * (0.55 + 0.45 * Math.sin(t * 17.3) * Math.sin(t * 7.1 + 1.3)) * (Math.sin(t * 3.9) > -0.2 ? 1 : 0.15) : 1;
       sky.glow.multiplyScalar(Math.max(0, col.townGlow * fl));
-      if (col.fireGlow > 0.001) sky.glow.add(this._c.tmp.setRGB(0.22, 0.075, 0.014).multiplyScalar(col.fireGlow * (0.25 + 0.75 * wn + 0.5 * wg)));
+      if (col.fireGlow > 0.001) sky.glow.add(this._c.tmp.setRGB(0.22, 0.075, 0.014).multiplyScalar(0.4 * col.fireGlow * (0.25 + 0.75 * wn + 0.5 * wg)));
     }
+    if (wn > 0.01 && (col.nightGlow.r + col.nightGlow.g + col.nightGlow.b) > 0.0005) sky.glow.add(this._c.tmp.copy(col.nightGlow).multiplyScalar(wn));
     const tintAmt = col.amt * (col.night ? Math.max(0, Math.min(1, (wn - 0.3) / 0.5)) : 1 - 0.6 * wn);
     if (tintAmt > 0.001) this._applyCollapseToSky(sky, tintAmt);
 
@@ -551,11 +556,20 @@ export class WorldScene {
       }
     }
 
+    // Low draws no weather, but the collapse's fog and haze still thicken the air: a fog is added only while the look wants one (the materials
+    // recompile once, as the look comes and goes, not every frame)
+    const low = this._quality === 'low';
+    const fogW = low ? Math.max(wx.fog, col.fog) : wx.fog, hazeW = low ? Math.max(wx.haze, col.haze) : wx.haze;
+    if (low) {
+      const want = col.fog + 0.6 * col.haze > (this.scene.fog ? 0.04 : 0.08);
+      if (want && !this.scene.fog) this.scene.fog = new THREE.FogExp2(sky.fog, this._fogConfig.density);
+      else if (!want && this.scene.fog) this.scene.fog = null;
+    }
     if (this.scene.fog) {
       const fog = this.scene.fog as THREE.FogExp2;
       fog.color.copy(sky.fog);
       fog.density = this._fogConfig.density * (wd + wg * 1.12 + wn * 1.35)
-        * (1 + wx.fog * 6.5 + wx.rain * 1.4 + wx.snow * 2.2) * (0.8 + 0.5 * wx.haze);
+        * (1 + fogW * 6.5 + wx.rain * 1.4 + wx.snow * 2.2) * (0.8 + 0.5 * hazeW);
       const r = this._viewRadius;
       if (r > WorldScene.FOG_FULL_RADIUS) {
         fog.density = Math.min(fog.density * (WorldScene.FOG_FULL_RADIUS / r) ** 2, WorldScene.FOG_OVERVIEW_DEPTH / r);
@@ -587,6 +601,7 @@ export class WorldScene {
       this._sky.setMoonDirection(tmpV);
       this._sky.setNight(wn);
       this._sky.setSmoke(col.smoke * (1 - 0.5 * overcast));
+      this._sky.setSkyline({ town: col.townLights, flashes: col.flashes, traffic: col.traffic, fire: col.fireGlow, convoy: col.convoy, twilight: wg, aurora: col.aurora, comet: col.comet, az: col.az });
       const sw = this._skyWeather;
       const nightSee = Math.max(0, Math.min(1, (wn - 0.35) / 0.65));
       sw.cumulus = wx.cumulus * (1 - overcast * 0.6);
