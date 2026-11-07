@@ -89,14 +89,14 @@ try {
     g.clock.t = Math.round((day - 0.25 + hour0 / 24) / SUB) * SUB; g.clock.ticks = Math.round(g.clock.t / SUB); g.clock.speed = 0;
     g.disaster.tracks = { ...g.disaster.tracks, law: 0, stores: 0, deliveries: 0, banks: 0 };
     g.stock.canned = 20; g.stock.meds = 3; g.stock.sandbags = 3; g.stock.dog = 1; g.armory.ammo['556'] = 2000;
-    for (const [i, p] of g.people.entries()) if (!p.kid || p.age >= 15) { g.armory.guns.push({ id: `g${i}`, model: 'sw_mp15', condition: 1, fired: 0, where: 'house', carrier: p.id }); g.armory.skill[p.id] = 4; }
-    const mk = d => ({ id: 'e9', kind: 'gang', day: d, title: 'An armed crew', dossier: ['10 of them, organized, rifles.', 'They know what they want.'], size: 10, armed: true, strength: 130, wants: { canned: 8, fuel: 4 }, stances: ['hide', 'parley', 'defend', 'trade'], temper: 'hard' });
+    for (const [i, p] of g.people.entries()) if (!p.kid || p.age >= 15) { g.armory.guns.push({ id: `g${i}`, model: 'sw_mp15', condition: 1, fired: 0, where: 'house', carrier: p.id }); g.armory.skill[p.id] = 6; }
+    const mk = d => ({ id: 'e9', kind: 'gang', day: d, title: 'An armed crew', dossier: ['10 of them, organized, rifles.', 'They know what they want.'], size: 9, armed: true, strength: 100, wants: { canned: 8, fuel: 4 }, stances: ['hide', 'parley', 'defend', 'trade'], temper: 'hard' });
     let best = null;
-    for (let d = 1; d < 600; d++) {
+    for (let d = 1; d < 1500; d++) {
       const gg = structuredClone(g); gg.gate.pending = mk(d);
       const st = stageRaid(gg, 'defend');
       const sc = st.plan.scenes.length;
-      if (st.drama && sc >= 2) { const score = (st.drama.raider ? 2 : 0) + (st.drama.injured.length ? 1 : 0); if (!best || score > best.score) best = { d, score }; if (score >= 3) break; }
+      if (st.drama && sc >= 1) { const score = (st.drama.raider ? 2 : 0) + (st.drama.injured.length ? 1 : 0); if (!best || score > best.score) best = { d, score }; if (score >= 3) break; }
     }
     g.gate.pending = mk(best.d);
     const { useBattleStore } = await import('/src/store/battleStore.ts');
