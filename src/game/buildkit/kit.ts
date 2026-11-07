@@ -202,7 +202,7 @@ export const GREENHOUSE_HEATED: KitPieceDef = {
 /** The terraced orchard: forty-eight trees on three dry-stack benches. */
 export const ORCHARD_TERRACED: KitPieceDef = {
   id: 'orchard_terraced', name: 'Terraced orchard', category: 'food',
-  blurb: 'Forty-eight trees (apple, pear, cherry, plum) on three dry-stack stone benches stepping up a slope: the walls let the cold air spill off each bench (a hollow\'s late frost is halved, a bare slope drains), hold the soil and 30 % of the drip water, and the benches take the sun the slope gives them. Needs a slope; a long job in stone.',
+  blurb: 'Forty-eight trees (apple, pear, cherry, plum) on three dry-stack stone benches stepping up a slope: the walls let the cold air spill off each bench (a hollow\'s late frost is halved, a bare slope drains), hold the soil and 30% of the drip water, and the benches take the sun the slope gives them. Needs a slope; a long job in stone.',
   cellsX: 8, cellsZ: 6, frontCells: 0,
   parts: { foundation: 'fieldstone', walls: 'fieldstone', roof: 'metal_roof' },
   maxSlope: 0.5, floorY: 0.0, porch: 0, sleeps: 0, light: null,
@@ -218,7 +218,7 @@ export const CABIN_VILLAGE: KitPieceDef = {
 /** The helipad. */
 export const HELIPAD: KitPieceDef = {
   id: 'helipad', name: 'Helipad', category: 'work',
-  blurb: 'A 40 × 40 ft concrete pad with edge lights and a windsock. While the county works, a bad wound, burn, or a broken leg or hip is flown to a trauma center from it ($38,000, 15 % with insurance). No helicopter of your own. Loud, lit, and a landmark from the air.',
+  blurb: 'A 40 × 40 ft concrete pad with edge lights and a windsock. While the county works, a bad wound, burn, or a broken leg or hip is flown to a trauma center from it ($38,000, 15% with insurance). No helicopter of your own. Loud, lit, and a landmark from the air.',
   cellsX: 4, cellsZ: 4, frontCells: 0,
   parts: { foundation: 'concrete', walls: 'concrete', roof: 'concrete' },
   maxSlope: 0.08, floorY: 0.02, porch: 0, sleeps: 0, light: null,

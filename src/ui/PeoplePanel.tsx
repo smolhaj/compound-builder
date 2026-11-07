@@ -49,7 +49,7 @@ export function PersonInsight({ p }: { p: Person }) {
     </div>}
     {(certsOf(game, p.id).length > 0 || enrollmentOf(game, p.id)) && <div style={{ color: DIM, marginTop: 1 }}>
       {certsOf(game, p.id).map(c => <div key={c.course} title="A certificate on the fridge" style={{ color: '#c9b27a' }}>✓ {certNote(game, c)}</div>)}
-      {(() => { const e = enrollmentOf(game, p.id); return e ? <div>Taking: {COURSES[e.course].name.toLowerCase()}, {Math.round(100 * e.done / COURSES[e.course].hours)} %{e.stalled ? ` (${e.stalled})` : ''}</div> : null; })()}
+      {(() => { const e = enrollmentOf(game, p.id); return e ? <div>Taking: {COURSES[e.course].name.toLowerCase()}, {Math.round(100 * e.done / COURSES[e.course].hours)}%{e.stalled ? ` (${e.stalled})` : ''}</div> : null; })()}
     </div>}
     {open && rd && <div style={{ marginTop: 3, paddingLeft: 6, borderLeft: `2px solid ${LINE}` }}>
       <div style={{ color: DIM }}>{rd.weighs.length ? <>Weighs on them: <span style={{ color: TONE.warn }}>{pts(rd.weighs)}</span></> : 'Nothing weighs on them much.'}</div>
@@ -61,7 +61,7 @@ export function PersonInsight({ p }: { p: Person }) {
           <div key={k} style={{ display: 'flex', gap: 5, alignItems: 'center' }} title={rusting(game, p.id, k) ? 'Rusting: not used in a long while; it comes back quickly with use' : 'Rises with use'}>
             <span style={{ width: 118, color: rusting(game, p.id, k) ? TONE.warn : undefined }}>{SKILL_NAME[k]}</span>
             <span style={{ width: 16, textAlign: 'right' }}>{Math.floor(v)}</span>
-            {bar(progressOf(game, p.id, k) * 100, rusting(game, p.id, k) ? TONE.warn : '#7aa0d0', `${Math.round(progressOf(game, p.id, k) * 100)} % of the way to ${Math.floor(v) + 1}`)}
+            {bar(progressOf(game, p.id, k) * 100, rusting(game, p.id, k) ? TONE.warn : '#7aa0d0', `${Math.round(progressOf(game, p.id, k) * 100)}% of the way to ${Math.floor(v) + 1}`)}
           </div>)}
         {hasGuns(game) && p.age >= 12 && <button style={{ ...btn(), marginTop: 3, padding: '1px 7px', fontSize: 10.5 }} title="An hour at the range: costs ammunition (dry-fire drills with none)" onClick={() => g.daily(d => { const m = rangeTime(d, p.id, 1); d.log.push({ t: d.clock.t, text: m }); return null; })}>An hour at the range</button>}
       </div>
@@ -166,7 +166,7 @@ function Evenings() {
     {rows.length === 0 && <div style={{ fontSize: 11.5, color: DIM }}>Nothing to do with a free evening but sit. Cards, a guitar, paperbacks and toys for the kids take the edge off a hard stretch (Shop → Courses & evenings).</div>}
     {rows.map(r => <div key={r.id} style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 11.5 }} title={`Wears with use; ${r.restockHave > 0 ? 'a restock is on the shelf and goes in by itself when it wears thin' : 'a cheap restock in the Shop makes it good again'}`}>
       <span style={{ width: 128 }}>{r.name}</span>
-      {bar(Math.max(4, r.cond * 100), r.cond > 0.5 ? '#9cc070' : r.cond > 0.2 ? TONE.warn : TONE.bad, `${Math.round(r.cond * 100)} %`)}
+      {bar(Math.max(4, r.cond * 100), r.cond > 0.5 ? '#9cc070' : r.cond > 0.2 ? TONE.warn : TONE.bad, `${Math.round(r.cond * 100)}%`)}
       <span style={{ width: 82, textAlign: 'right', color: r.cond > 0.4 ? DIM : TONE.warn }}>{r.word}{r.restockHave > 0 ? ' · spare' : ''}</span>
     </div>)}
     {rows.length > 0 && <button style={{ ...btn(), marginTop: 3, padding: '1px 7px', fontSize: 10.5 }} onClick={() => g.openShop(true, 'learning')}>Shop: restock the evenings</button>}
@@ -229,7 +229,7 @@ export function ClassesSection() {
         <button style={{ ...btn(D.live), padding: '2px 7px', fontSize: 11 }} title="About 15 rounds an hour each" onClick={() => g.daily(d => { setDrills(d, coursesOf(d).drills.perWeek, true); return null; })}>Live fire</button>
         <button style={{ ...btn(!D.live), padding: '2px 7px', fontSize: 11 }} title="Free, and a third as good" onClick={() => g.daily(d => { setDrills(d, coursesOf(d).drills.perWeek, false); return null; })}>Dry-fire</button>
       </div>
-      <Row label="Ready at the alarm" value={`${ready} %`} title="How practiced the household is: fewer seconds frozen when the alarm sounds. Fades about 1 % a day without drills." />
+      <Row label="Ready at the alarm" value={`${ready}%`} title="How practiced the household is: fewer seconds frozen when the alarm sounds. Fades about 1% a day without drills." />
       {D.perWeek > 0 && D.live && ammo && <Note tone={ammo.have < cost ? 'warn' : undefined}>A session is about {cost} rounds ({ammo.have} on hand{ammo.have < cost ? '; short, so the last of it is dry-fire' : ''}).</Note>}
     </>}
   </Section>;

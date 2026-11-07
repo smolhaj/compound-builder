@@ -104,7 +104,7 @@ export function arrivalCheck(s: GameState): Encounter | null {
 export function clockLabel(hour: number): string {
   const m = Math.round(((hour % 24) + 24) % 24 * 60) % (24 * 60);
   const h24 = Math.floor(m / 60), mm = m % 60;
-  return `${h24 % 12 === 0 ? 12 : h24 % 12}:${String(mm).padStart(2, '0')} ${h24 < 12 ? 'AM' : 'PM'}`;
+  return `${h24% 12 === 0 ? 12 : h24% 12}:${String(mm).padStart(2, '0')} ${h24 < 12 ? 'AM' : 'PM'}`;
 }
 
 /** "40 minutes later", "an hour and 10 minutes later". */

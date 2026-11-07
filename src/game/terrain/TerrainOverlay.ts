@@ -19,7 +19,7 @@ export const TERRAIN_LEGEND: Record<Exclude<TerrainMode, 'off'>, { label: string
   lanes: { label: 'Lanes', tip: 'The ways a crew would come at you', legend: 'Green: easy going. Amber: a scramble. Red: cliff (ladders needed). Blue: the creek (a ford). The bright line is the way a crew takes: the cheapest; rings mark where it narrows to a choke. The road side counts as easy.' },
   water: { label: 'Water', tip: 'Floodplain, mud, frost pockets and reservoir sites', legend: 'Deep blue: the creek\'s floodplain (floods take what stands here; spring mud slows building). Light blue: wet flats and gullies. White: frost pockets where cold air pools. Green ring: a bench that would feed the camp by gravity.' },
   fire: { label: 'Fire', tip: 'How likely each building is to burn in a wildfire', legend: 'A ring around each building: green, cleared or fire-safe walls; amber, trees close in; red, trees hard against it. The ring grows with the chance (the same number the fire front rolls). Cut the trees nearest the red ones.' },
-  sun: { label: 'Sun', tip: 'Which slopes catch the sun', legend: 'Yellow: south-facing ground (up to +25 % solar and warmer beds). Blue: north-facing ground (down to -25 %, frost lingers).' },
+  sun: { label: 'Sun', tip: 'Which slopes catch the sun', legend: 'Yellow: south-facing ground (up to +25% solar and warmer beds). Blue: north-facing ground (down to -25%, frost lingers).' },
 };
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;

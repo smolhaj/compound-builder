@@ -24,6 +24,19 @@ export function hudLayout(vw: number, barW: number, barH: number, br = { w: 570,
   };
 }
 
+/** The notice goes by itself after this long. */
+export const PERF_NOTICE_MS = 8000;
+
+/** Where the notice sits (tested in hudLayout.test.ts-style): right of the left panel and above the bottom toolbars, so it covers neither; on a narrow window, along the very bottom over the news ticker. */
+export function perfNoticePlace(vw: number): { left: number; bottom: number; width: number } {
+  const narrow = vw < 760;
+  return narrow
+    ? { left: EDGE, bottom: 4, width: Math.max(160, vw - 2 * EDGE) }
+    : { left: LEFT_W + 2 * EDGE, bottom: BOTTOM + 40 + 14, width: Math.min(330, vw - LEFT_W - RIGHT_CLEAR - 4 * EDGE) };
+}
+/** What the right panel keeps clear on a wide window (it is 320 wide); the notice never reaches it. */
+const RIGHT_CLEAR = 320;
+
 /** A box's size, kept current (window resize and the element's own changes) along with the window width. */
 export function useBox(ref: RefObject<HTMLElement | null>, mounted: unknown = true): { vw: number; w: number; h: number } {
   const [b, setB] = useState({ vw: typeof window === 'undefined' ? 1280 : window.innerWidth, w: 700, h: 40 });

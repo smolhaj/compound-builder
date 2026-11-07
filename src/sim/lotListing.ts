@@ -181,10 +181,10 @@ export function terrainFacts(site: Pick<Site, 'lot' | 'home'> & Partial<Pick<Sit
   const { stats: s } = lot, spec = site.lot!;
   const out: Fact[] = [];
   out.push({ label: 'Ground', value: `${LOT_NAME[spec.kind]}${spec.outlier ? ', extreme relief' : ''}, ${feetText(spec.elevM)}` });
-  out.push({ label: 'Relief', value: `${feetText(s.dropM)} from low to high · slopes avg ${Math.round(s.meanSlopePct)} %, steepest ${n0(s.maxSlopePct)} %`, tone: s.dropM > 140 ? 'bad' : undefined });
+  out.push({ label: 'Relief', value: `${feetText(s.dropM)} from low to high · slopes avg ${Math.round(s.meanSlopePct)}%, steepest ${n0(s.maxSlopePct)}%`, tone: s.dropM > 140 ? 'bad' : undefined });
   if (spec.cutbank) out.push({ label: 'Rock face', value: 'Rock face above the pad: a cutbank over a level shelf: a compound can be notched into it, and a crew on foot needs ladders to cross it', tone: 'good' });
   const flat = Math.round(s.padFrac * 100);
-  out.push({ label: 'Flat ground', value: `${flat} % buildable${s.padM2 > 0 ? ` · best pad ${acresOfM2(s.padM2)} acre${acresOfM2(s.padM2) === 1 ? '' : 's'}` : ''}`, tone: flat >= 30 ? 'good' : flat < 12 ? 'bad' : undefined });
+  out.push({ label: 'Flat ground', value: `${flat}% buildable${s.padM2 > 0 ? ` · best pad ${acresOfM2(s.padM2)} acre${acresOfM2(s.padM2) === 1 ? '' : 's'}` : ''}`, tone: flat >= 30 ? 'good' : flat < 12 ? 'bad' : undefined });
   // the road in is the planned one (sim/roadPlan.ts): where it winds, switchbacks, bridges and bores
   const rp = listingRoad({ region: site.region ?? 'mountain_west', creek: site.creek ?? false, timber: site.timber ?? 1, home: site.home, lot: site.lot }), words = planWords(rp);
   out.push({ label: 'Road in', value: `${words[0]}${words.length > 1 ? ': ' + words.slice(1).filter(w => !/cattle guard|^\d* ?culverts?$|^a culvert$/.test(w)).join(', ') : ''}`.replace(/: $/, ''), tone: rp.engineer || rp.hairpins.length >= 3 || rp.structures.some(x => x.kind === 'bridge' || x.kind === 'bridge1' || x.kind === 'tunnel') ? 'bad' : rp.maxGradePct <= 8 && !rp.hairpins.length ? 'good' : undefined });
@@ -195,7 +195,7 @@ export function terrainFacts(site: Pick<Site, 'lot' | 'home'> & Partial<Pick<Sit
   if (s.creekDropM >= 3) out.push({ label: 'Creek', value: `Falls ${lengthText(s.creekDropM)} across the place: room for a micro-hydro`, tone: 'good' });
   out.push({ label: 'High ground', value: s.standM >= 5 ? `The pad stands ${lengthText(s.standM)} above the land around it: it sees far` : s.standM <= -5 ? `The pad sits ${lengthText(-s.standM)} down in a bowl: easy to be seen into` : 'Neither high nor low', tone: s.standM >= 5 ? 'good' : s.standM <= -5 ? 'bad' : undefined });
   out.push({ label: 'Approaches', value: s.lanesOpen <= 2 ? `Only ${s.lanesOpen} of 8 ways in on foot are open, easiest from the ${COMPASS[s.easiestLane]}: a natural choke` : `${s.lanesOpen} of 8 ways in on foot are open, easiest from the ${COMPASS[s.easiestLane]}`, tone: s.lanesOpen <= 3 ? 'good' : s.lanesOpen >= 7 ? 'bad' : undefined });
-  if (s.floodFrac > 0.04) out.push({ label: 'Floods', value: `${Math.round(s.floodFrac * 100)} % of the place is creek floor that floods in storms`, tone: 'bad' });
+  if (s.floodFrac > 0.04) out.push({ label: 'Floods', value: `${Math.round(s.floodFrac * 100)}% of the place is creek floor that floods in storms`, tone: 'bad' });
   if (spec.kind === 'island') out.push({ label: 'Access', value: 'Reached by a causeway: one way on, one way out', tone: undefined });
   return out;
 }

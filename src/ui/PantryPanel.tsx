@@ -37,7 +37,7 @@ export function PantryPanel({ game }: { game: GameState }): ReactNode {
       {rows.map(r => <PantryLine key={r.id} r={r} />)}
     </div>}
     {soon.length > 0 && <Hint tone={soon.some(r => r.tone === 'bad') ? 'bad' : 'warn'} more={game.disaster.tracks.stores >= 0.5 ? 'Long-expired food gets thrown out and bought fresh while the stores sell; rotating keeps it young.' : 'Old food is still food: it gives less, and now and then makes someone sick.'}>
-      {soon.slice(0, 3).map(r => `${FOOD[r.id].name.split(',')[0]} ${r.left <= 0 ? `is past its date (worth ${Math.round(r.value * 100)} %)` : `has ${span(r.left)} left`}`).join('; ')}.</Hint>}
+      {soon.slice(0, 3).map(r => `${FOOD[r.id].name.split(',')[0]} ${r.left <= 0 ? `is past its date (worth ${Math.round(r.value * 100)}%)` : `has ${span(r.left)} left`}`).join('; ')}.</Hint>}
     {(() => { const old = rows.filter(r => r.left <= 0 && FOOD[r.id].kcal > 0); return old.length > 0 && <div style={{ fontSize: 11.5, color: DIM }}>Past date: {Math.round(old.reduce((a, r) => a + r.kcal, 0) / 1000)}k kcal, worth about {Math.round(old.reduce((a, r) => a + r.kcal * r.value, 0) / 1000)}k.</div>; })()}
     {diet.notes.length > 0 && <Hint tone={diet.notes.some(n => n.tone === 'bad') ? 'bad' : diet.notes.some(n => n.tone === 'warn') ? 'warn' : undefined} more={diet.notes.map((n, i) => <div key={i} style={{ margin: '2px 0', color: n.tone === 'good' ? DIM : TONE[n.tone] }}>{n.text}</div>)}>{diet.notes[0].text.length > 80 ? diet.notes[0].text.slice(0, 78).replace(/[ ,;:]+\S*$/, '') + '…' : diet.notes[0].text}{diet.notes.length > 1 ? ` (+${diet.notes.length - 1})` : ''}</Hint>}
   </div>;
@@ -49,6 +49,6 @@ function PantryLine({ r }: { r: PantryRow }) {
     <span title={it.unit} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.name.split(',')[0]}</span>
     <span style={{ textAlign: 'right' }}>{amount(r)}</span>
     <span style={{ textAlign: 'right', color: DIM }}>{it.kcal > 0 ? (r.days >= 1 ? Math.round(r.days) : '<1') : r.days < 1e5 ? Math.round(r.days) : '—'}</span>
-    <span style={{ textAlign: 'right', color: TONE[r.tone] }} title={r.left <= 0 ? 'Past its best-by date: still edible, worth less, a small risk of food poisoning' : undefined}>{r.left <= 0 ? `${span(-r.left)} over · ${Math.round(r.value * 100)} %` : span(r.left)}</span>
+    <span style={{ textAlign: 'right', color: TONE[r.tone] }} title={r.left <= 0 ? 'Past its best-by date: still edible, worth less, a small risk of food poisoning' : undefined}>{r.left <= 0 ? `${span(-r.left)} over · ${Math.round(r.value * 100)}%` : span(r.left)}</span>
   </>;
 }

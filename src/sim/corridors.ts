@@ -255,7 +255,7 @@ export function collapseGuard(s: GameState, r: PerimeterRun): CollapseGuard {
   const sets = Math.floor(s.stock.ground_sensor ?? 0);
   if (sets > 0 && powered(s)) {
     const cover = Math.min(1, sets * 120 / Math.max(120, wallMetres(s)));
-    if (cover > 0) { factor *= 1 - GUARD.listening * cover; parts.push(`listening posts (${Math.round(cover * 100)} % of the wall)`); }
+    if (cover > 0) { factor *= 1 - GUARD.listening * cover; parts.push(`listening posts (${Math.round(cover * 100)}% of the wall)`); }
   }
   const ends: Pt[] = r.pts.length ? [r.pts[0], r.pts[r.pts.length - 1]] : [];
   const guards = towerPosts(s).filter(tp => ends.some(e => Math.hypot(tp.st.x - e[0], tp.st.z - e[1]) <= GUARD.reach)).length;
@@ -324,7 +324,7 @@ export function corridorLines(s: GameState): string[] {
     const f = crossing(c, 'family', false, 0), v = crossing(c, 'vehicle', false, 0);
     out.push(`The ${name} is ${lengthText(c.lenM)}: about ${pluralize((Math.round(f.seconds / 6) / 10).toFixed(1), 'minute')} on foot, ${Math.round(v.seconds)} seconds by vehicle. The doors stand open by day and lock from dusk to dawn and on the alarm; the family has keys (${KEY_S} s a door), a crew is held ${DOOR_DELAY} s at the outer one.`);
     const gd = collapseGuard(s, s.perimeter.find(r => r.id === c.id)!);
-    out.push(`If a crew with explosives gets in this way, each charge has about a ${Math.round(SAPPER_P_PER_CHARGE * (c.kind === 'tunnel_bridge' ? SAPPER_BRIDGE_K : 1) * gd.factor * 1000) / 10} % chance to bring it down${gd.parts.length ? `; held down by ${gd.parts.join(', ')}` : '; nothing watches the portal'}.`);
+    out.push(`If a crew with explosives gets in this way, each charge has about a ${Math.round(SAPPER_P_PER_CHARGE * (c.kind === 'tunnel_bridge' ? SAPPER_BRIDGE_K : 1) * gd.factor * 1000) / 10}% chance to bring it down${gd.parts.length ? `; held down by ${gd.parts.join(', ')}` : '; nothing watches the portal'}.`);
   }
   const cut = wayCut(s);
   if (cut) out.push(`Cut off: ${cut}. ${(s.vehicles ?? []).filter(v => v.stranded).length ? 'Some vehicles wait outside.' : 'Nothing with wheels crosses.'}`);

@@ -67,7 +67,7 @@ export function cancelResponse(s: GameState): string | null {
   const r = subOf(s);
   if (!r || r.ended !== null) return 'no subscription';
   r.ended = dayIndex(s.clock.t);
-  log(s, 'The family cancelled the armed-response subscription. The sign comes down off the gate.');
+  log(s, 'The family canceled the armed-response subscription. The sign comes down off the gate.');
   return null;
 }
 

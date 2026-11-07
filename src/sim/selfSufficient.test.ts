@@ -33,7 +33,7 @@ const line = (g: GameState, kind: 'water_pipe' | 'power_cable', pts: Array<[numb
 const wire = (g: GameState, id: string) => g.utilities.fittings.push({ building: id, kind: 'wire', done: 30, hours: 30, supplied: true, finishedAt: 0 });
 const at = (doy: number, years = 0, seed = 1) => { const g = newGame(seed, doy); g.clock.t += years * 365; return g; };
 
-describe('the solar farm and the batteries that stayed at 0 %', () => {
+describe('the solar farm and the batteries that stayed at 0%', () => {
   it('a 20 kW farm makes about 72 kWh on a June day and 40 in December', () => {
     const g = at(172); built(g, 'f', 'solar_farm', 20, 20);
     balanceDay(g, plant(g), 0.5);
@@ -45,7 +45,7 @@ describe('the solar farm and the batteries that stayed at 0 %', () => {
     expect(d.utilities.report.solarKwh).toBeLessThan(48);
   });
 
-  it('REGRESSION: an array and a battery shed standing apart with no cable used to leave the battery at 0 % forever; side by side they now share a bus', () => {
+  it('REGRESSION: an array and a battery shed standing apart with no cable used to leave the battery at 0% forever; side by side they now share a bus', () => {
     const apart = at(172); built(apart, 's', 'solar_array', 10, 10); built(apart, 'b', 'battery_shed', 40, 40);
     for (let i = 0; i < 5; i++) balanceDay(apart, plant(apart), 0.5);
     expect(apart.utilities.batteryKwh).toBe(0);

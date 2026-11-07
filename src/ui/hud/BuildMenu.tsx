@@ -15,6 +15,7 @@ import { orderCost, prices } from '../../sim/economy';
 import { crewQuote, CREW_RATE } from '../../sim/crews';
 import { useSpendGuard } from './useSpendGuard';
 import { drillExtra } from '../../sim/site';
+import { driveQuote, powerQuote } from '../../sim/improvements';
 import { FT_PER_M } from '../../sim/units';
 import { countyWorks, needsPermit, permitFee } from '../../sim/paperwork';
 import { BUNKER_ORDER, GATEHOUSE_ORDER, KIT, POD_ORDER, RIG_ORDER, TERRACE_ORDER, TOWER_ORDER, UTILITY_ORDER } from '../../game/buildkit/kit';
@@ -78,6 +79,7 @@ export function BuildMenu({ showProjects = () => undefined }: { showProjects?: (
     else if (a.type === 'caretaker') { const why = g.money(d => hireCaretaker(d, a.kind)); if (why) setNote(`Could not arrange that: ${why}.`); }
     else if (a.type === 'belt') { const why = g.daily(d => setBelt(d, a.on)); if (why) setNote(why[0].toUpperCase() + why.slice(1) + '.'); }
     else if (a.type === 'crew') { const id = a.id, st = game.structures.find(x => x.id === id); guard(st ? crewQuote(st).usd : 0, () => { const why = g.hire(id); if (why) setNote(`Could not hire them: ${why}.`); }); }
+    else if (a.type === 'hookup') { const q = a.what === 'drive' ? driveQuote(game.site.improvements, game.site, game.seed).usd : powerQuote(game.site.improvements, game.site).usd; guard(q, () => { const why = g.hookup(a.what); if (why) setNote(`Could not arrange that: ${why}.`); }); }
     else if (a.type === 'shop') g.openShop(true, a.tab);
     else if (a.type === 'open') g.focusHud({ right: a.right, ...(a.supplies ? { supplies: a.supplies } : {}) });
     else if (a.type === 'restDay') { const why = g.daily(d => takeRestDay(d)); if (why) setNote(why); }

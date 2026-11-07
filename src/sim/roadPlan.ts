@@ -777,7 +777,7 @@ export function planWords(p: RoadPlan): string[] {
   const out: string[] = [];
   const km = lengthText(p.lengthM);
   const winding = p.lengthM > p.straightM * 1.35;
-  out.push(`${km} of ${p.style}${winding ? `, ${Math.round((p.lengthM / Math.max(1, p.straightM) - 1) * 100)} % longer than a straight line` : ''}, steepest ${Math.round(p.maxGradePct)} %`);
+  out.push(`${km} of ${p.style}${winding ? `, ${Math.round((p.lengthM / Math.max(1, p.straightM) - 1) * 100)}% longer than a straight line` : ''}, steepest ${Math.round(p.maxGradePct)}%`);
   if (p.hairpins.length) out.push(`${p.hairpins.length} hairpin${p.hairpins.length === 1 ? '' : 's'}`);
   const label: Record<StructureKind, string> = { culvert: 'culvert', arch_culvert: 'arch culvert', ford: 'ford', low_water: 'low-water crossing', bridge1: 'one-lane bridge', bridge: 'bridge', tunnel: 'rock bore', cattle_guard: 'cattle guard', pass: 'a pass' };
   const counts = new Map<StructureKind, number>();

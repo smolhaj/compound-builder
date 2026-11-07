@@ -16,6 +16,7 @@ import { incomeOf, kinSavings } from '../sim/kin';
 import { Clamp, Hint } from './hud/common';
 import { StayPicker } from './StayPicker';
 import { defaultStay, kitDetail, kitLine } from '../sim/joinerHome';
+import { pluralize } from '../sim/words';
 
 
 /** The end of a month's trial. */
@@ -131,8 +132,8 @@ export function GateCard() {
         })()}
         {e.ransom && (() => {
           const t = e.ransom, gm = g.game;
-          const have = [...(Object.keys(t.goods) as Array<keyof typeof gm.stock>).map(k => `${Math.floor(gm.stock[k])} ${k}`), ...(Object.keys(t.ammo) as Caliber[]).map(k => `${gm.armory.ammo[k] ?? 0} rounds of ${k}`)].join(', ');
-          return <div style={{ margin: '8px 0', fontSize: 12, opacity: 0.75 }}>You have: {have}{canPay(gm, t) ? '' : ' (not enough for all of it)'} · a double-cross is {e.temper === 'savage' ? 'a real risk with this crew' : e.temper === 'hard' ? 'possible' : 'unlikely'} (about {Math.round(DOUBLE_CROSS[e.temper ?? 'savage'] * 100)} %)</div>;
+          const have = [...(Object.keys(t.goods) as Array<keyof typeof gm.stock>).map(k => `${Math.floor(gm.stock[k])} ${k}`), ...(Object.keys(t.ammo) as Caliber[]).map(k => `${pluralize(gm.armory.ammo[k] ?? 0, 'round')} of ${k}`)].join(', ');
+          return <div style={{ margin: '8px 0', fontSize: 12, opacity: 0.75 }}>You have: {have}{canPay(gm, t) ? '' : ' (not enough for all of it)'} · a double-cross is {e.temper === 'savage' ? 'a real risk with this crew' : e.temper === 'hard' ? 'possible' : 'unlikely'} (about {Math.round(DOUBLE_CROSS[e.temper ?? 'savage'] * 100)}%)</div>;
         })()}
         {e.dig?.phase === 'warning' && e.stances.includes('ambush') && (() => {
           const gm = g.game, able = ambushParty(gm, true), going = chosenParty(gm);
@@ -148,7 +149,7 @@ export function GateCard() {
           <input type="checkbox" checked={!(g.game.weekend?.keepJobs ?? true)} onChange={ev => g.daily(d => setKeepJobs(d, !ev.target.checked))} /> Quit the jobs that could be kept, too (everyone builds all week)
         </label>}
         {e.strength > 0 && e.kind !== 'break_in' && <div style={{ margin: '8px 0', fontSize: 12, opacity: 0.75 }}>
-          <div>{e.size} {e.armed ? 'armed' : 'unarmed'} · walls {Math.round(p.barrier)} % · seen early {Math.round(p.detection)} %{p.bunker ? ' · bunker to hide in' : p.safeRoom ? ' · safe room' : ''}</div>
+          <div>{e.size} {e.armed ? 'armed' : 'unarmed'} · walls {Math.round(p.barrier)}% · {Math.round(p.detection)}% chance we see them coming{p.bunker ? ' · bunker to hide in' : p.safeRoom ? ' · safe room' : ''}</div>
           {odds && <div>If you fight: you hold {inTen(odds.win)} · someone of yours killed or taken {inTen(odds.loseSomeone)}</div>}
           {odds && (() => { const d = doorHoldLine(g.game); return d ? <div style={{ opacity: 0.85 }}>{d}</div> : null; })()}
           {e.stances.includes('hide') && <div>If you hide: they find the place lived in {inTen(hideFoundChance(g.game, e, p))}, and strip it</div>}

@@ -110,7 +110,7 @@ export function crowdDay(s: GameState): string[] {
   if (!s.pantry) return [];
   const o = overflow(s);
   s.pantry.crowd = 0.25 * o;
-  if (o > 0.25 && logGate(s, 'pantry-crowded', 120)) return [`Supplies are stacked in every spare corner (${Math.round(o * 100)} % past the shelves): flour, oil and meal keep worse in a warm loft. A root cellar or a storeroom would give them room.`];
+  if (o > 0.25 && logGate(s, 'pantry-crowded', 120)) return [`Supplies are stacked in every spare corner (${Math.round(o * 100)}% past the shelves): flour, oil and meal keep worse in a warm loft. A root cellar or a storeroom would give them room.`];
   return [];
 }
 

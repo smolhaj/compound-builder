@@ -25,13 +25,13 @@ describe('vehicles and the slope limit', () => {
     expect(r.ok).toBe(true);
     expect(r.route).toHaveLength(3);
   });
-  it('stops at the foot of a pitch over 12 %', () => {
+  it('stops at the foot of a pitch over 12%', () => {
     const r = drivablePrefix(route, (x) => ramp(0.2)(x), false);
     expect(r.ok).toBe(false);
     expect(r.route[r.route.length - 1][0]).toBeLessThan(5.6);
     expect(r.route[r.route.length - 1][0]).toBeGreaterThan(4.4);
   });
-  it('snow lowers the limit to 7 %', () => {
+  it('snow lowers the limit to 7%', () => {
     const g = (x: number) => ramp(0.09)(x);
     expect(drivablePrefix(route, g, false).ok).toBe(true);
     expect(drivablePrefix(route, g, true).ok).toBe(false);

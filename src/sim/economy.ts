@@ -3,7 +3,7 @@
  * truck after a lead time (the county lumber yard / farm store delivers in
  * ~2 days; docs/DECISIONS.md: deliveries come by truck on the county road).
  */
-import { MATERIALS, type Stock } from './materials';
+import { MATERIALS, type MaterialId, type Stock } from './materials';
 import { materialCount, pluralize } from './words';
 import { weatherDelay } from './upkeep';
 import type { GameState, OrderLine } from './state';
@@ -86,9 +86,16 @@ export function deliverOrders(s: GameState): void {
     const what = o.lines.map(l => l.food ? `${l.n} ${FOOD[l.food].name.toLowerCase()}` : materialCount(l.material, l.qty, MATERIALS[l.material].name, String(l.qty))).join(', ');
     // no drive yet, or the bridge on it is down: the truck leaves it at the road (at the creek) and the family carries it in
     if (!s.site.improvements.drive || s.roadBridge?.down || s.perimeter.some(r => r.collapsed || r.dropped)) {      // (no drive, the bridge down, or a tunnel choked with rubble: the truck leaves it at the road)
-      const hours = o.lines.reduce((a, l) => a + (CARRY_H[l.material] ?? 0.2) * l.qty, 0);
-      if (hours > 0.5) {
-        (s.roadside ??= []).push({ lines: o.lines.map(l => ({ ...l })), hours, done: 0 });
+      // each good is its own pile: what needs no carrying (concrete, a septic tank, a rig) is delivered to its place, and
+      // a small item is not stuck behind two hundred hours of lumber (QA stall hunt: a drive-less lot waited weeks on one sack)
+      const piles = o.lines.map(l => ({ l, hours: (CARRY_H[l.material] ?? 0.2) * l.qty }));
+      const heavy = piles.filter(p => p.hours > 0.5);
+      if (heavy.length) {
+        for (const p of piles) {
+          if (p.hours > 0.5) (s.roadside ??= []).push({ lines: [{ ...p.l }], hours: p.hours, done: 0 });
+          else receive(s, p.l);
+        }
+        const hours = heavy.reduce((a, p) => a + p.hours, 0);
         log(s, `The truck left ${what} at the road: about ${pluralize(Math.round(hours), 'hour')} of carrying to get it in.`);
         continue;
       }
@@ -116,8 +123,13 @@ export function log(s: GameState, text: string): void {
 }
 
 /** Carry person-hours of deliveries in from the road (oldest first); returns the hours used. */
-export function addCarryWork(s: GameState, hours: number): number {
+export function addCarryWork(s: GameState, hours: number, wanted?: ReadonlySet<MaterialId>): number {
   let left = hours;
+  // the load a waiting project needs comes in first; otherwise the oldest
+  if (wanted?.size && s.roadside.length > 1) {
+    const i = s.roadside.findIndex(r => r.lines.some(l => wanted.has(l.material)));
+    if (i > 0) s.roadside.unshift(...s.roadside.splice(i, 1));
+  }
   while (left > 1e-9 && s.roadside.length) {
     const r = s.roadside[0];
     const use = Math.min(left, r.hours - r.done);

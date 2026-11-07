@@ -141,14 +141,14 @@ export function* mountainShowcaseSteps(io: ShowcaseIO, opts: ShowcaseOptions = {
   if (terr) {
     const spots = terr.tiers.map(t => [t.x, t.z] as [number, number]);
     const err = io.stakeTerraces(spots);
-    steps.push({ step: 'Terraced garden beds', ok: !err, at: spots[0], note: err ?? `${pluralize(terr.tiers.length, 'bed')} on a ${terr.slopePct} % slope` });
-  } else steps.push({ step: 'Terraced garden beds', ok: false, note: 'terraceSite found no 10-26 % fall near the home on the home block' });
+    steps.push({ step: 'Terraced garden beds', ok: !err, at: spots[0], note: err ?? `${pluralize(terr.tiers.length, 'bed')} on a ${terr.slopePct}% slope` });
+  } else steps.push({ step: 'Terraced garden beds', ok: false, note: 'terraceSite found no 10-26% fall near the home on the home block' });
 
   // ── the ring: wall, towers, gate garage, motor court, inner rings ──
   const concrete = opts.wall === 'concrete';
   yield 'Terraces';
   const fr = io.fortify({ scope: 'core', shape: 'irregular', wall: concrete ? 'concrete_wall' : 'stone_wall', towers: 5, towerKind: concrete ? 'watchtower_hex' : 'watchtower_octagon', passage: false, rings: opts.rings ?? 1, ringWall: 'stone_wall', ringSally: true, motorCourt: true });
-  steps.push({ step: `Fortify my ring (${concrete ? 'concrete wall, hexagon towers' : 'stone wall, octagon towers'}, motor court, ${opts.rings ?? 1} ring${(opts.rings ?? 1) > 1 ? 's' : ''})`, ok: fr.runs + fr.structures > 0, note: `${fr.runs} runs, ${fr.structures} structures` });
+  steps.push({ step: `Fortify my ring (${concrete ? 'concrete wall, hexagon towers' : 'stone wall, octagon towers'}, motor court, ${opts.rings ?? 1} ring${(opts.rings ?? 1) > 1 ? 's' : ''})`, ok: fr.runs + fr.structures > 0, note: `${pluralize(fr.runs, 'run')}, ${pluralize(fr.structures, 'structure')}` });
   io.finishAll();
   yield 'Finishing';
 
@@ -231,14 +231,14 @@ function* benchShowcaseSteps(io: ShowcaseIO, opts: ShowcaseOptions): Generator<s
   if (terr) {
     const spots = terr.tiers.map(t => [t.x, t.z] as [number, number]);
     const err = io.stakeTerraces(spots);
-    steps.push({ step: 'Terraced garden beds', ok: !err, at: spots[0], note: err ?? `${pluralize(terr.tiers.length, 'bed')} on a ${terr.slopePct} % slope` });
-  } else steps.push({ step: 'Terraced garden beds', ok: false, note: 'terraceSite found no 10-26 % fall near the home' });
+    steps.push({ step: 'Terraced garden beds', ok: !err, at: spots[0], note: err ?? `${pluralize(terr.tiers.length, 'bed')} on a ${terr.slopePct}% slope` });
+  } else steps.push({ step: 'Terraced garden beds', ok: false, note: 'terraceSite found no 10-26% fall near the home' });
 
   // the ring round the compound (not the camp): wall, towers, keep ring
   const concrete = opts.wall === 'concrete';
   yield 'Terraces';
   const fr = io.fortify({ scope: 'core', shape: 'irregular', wall: concrete ? 'concrete_wall' : 'stone_wall', towers: 5, towerKind: concrete ? 'watchtower_hex' : 'watchtower_octagon', passage: false, rings: opts.rings ?? 1, ringWall: 'stone_wall', ringSally: true, motorCourt: false, gate: false }, C);
-  steps.push({ step: `Fortify my ring (${concrete ? 'concrete wall, hexagon towers' : 'stone wall, octagon towers'}, around the bench)`, ok: fr.runs + fr.structures > 0, note: `${fr.runs} runs, ${fr.structures} structures` });
+  steps.push({ step: `Fortify my ring (${concrete ? 'concrete wall, hexagon towers' : 'stone wall, octagon towers'}, around the bench)`, ok: fr.runs + fr.structures > 0, note: `${pluralize(fr.runs, 'run')}, ${pluralize(fr.structures, 'structure')}` });
   io.finishAll();
   yield 'Finishing';
   const ring1 = outerRingOf(io.game());
@@ -383,7 +383,7 @@ export function integrationProblems(g: GameState, drive: readonly Pt[], ground?:
   if (ground) for (const r of walls) {
     let n = 0, at: Pt | null = null;
     for (const [a, b] of solidSegments(r)) { const L = Math.hypot(b[0] - a[0], b[1] - a[1]), k = Math.max(1, Math.ceil(L / 0.25)); for (let q = 0; q <= k; q++) { const x = a[0] + (b[0] - a[0]) * q / k, z = a[1] + (b[1] - a[1]) * q / k; if (slopeOf(ground, x, z) > 2.0) { n++; at = at ?? [x, z]; } } }
-    if (n > 8) out.push({ what: 'wall stands on the rock face', detail: `${r.kind} ${r.id}: ${n} samples on ground steeper than 200 % (a cliff, not a riser) near (${at![0].toFixed(1)}, ${at![1].toFixed(1)})` });
+    if (n > 8) out.push({ what: 'wall stands on the rock face', detail: `${r.kind} ${r.id}: ${n} samples on ground steeper than 200% (a cliff, not a riser) near (${at![0].toFixed(1)}, ${at![1].toFixed(1)})` });
   }
   // a wall that crosses the drive with no gate
   for (const u of ungatedCrossings(g, drive)) out.push({ what: 'the drive crosses a wall with no gate', detail: JSON.stringify(u) });

@@ -650,9 +650,9 @@ export function eatingLine(s: GameState): string {
   if (!p || !p.ate.length) return 'Nothing yesterday.';
   const tot = p.ate.reduce((a, [, k]) => a + k, 0);
   const label = (k: string) => k === 'fresh' ? 'fresh from the place' : k === 'grocery' ? 'the food bank' : FOOD[k as FoodItemId].name.split(',')[0].toLowerCase();
-  const top = [...p.ate].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, v]) => `${label(k)} (${Math.round(v / tot * 100)} %)`);
+  const top = [...p.ate].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, v]) => `${label(k)} (${Math.round(v / tot * 100)}%)`);
   const old = p.oldToday ?? 0;
-  return top.join(', ') + '.' + (old > 0.05 ? ` About ${Math.round(old * 100)} % of it past its date.` : '');
+  return top.join(', ') + '.' + (old > 0.05 ? ` About ${Math.round(old * 100)}% of it past its date.` : '');
 }
 
 /** Shop bundles: shares of the calories by item, sized to the household's need for `days`. */

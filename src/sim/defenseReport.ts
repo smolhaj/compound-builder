@@ -81,7 +81,7 @@ function dogRows(s: GameState): Check[] {
   // a big pack is one line (plus the dogs in trouble), not a row each
   if (ds.length > 4) {
     const trouble = ds.filter(d => d.hunger > 60 || d.health < 40 || temperOf(d) === 'aggressive' || temperOf(d) === 'withdrawn');
-    const rows = [chk('dogs', `${ds.length} dogs`, trouble.length === 0 && w.detection > 0, `${w.onPost} on guard, ${ds.length - w.onPost} kept inside${trouble.length ? ` · ${trouble.length} need attention` : ''}`, true)];
+    const rows = [chk('dogs', pluralize(ds.length, 'dog'), trouble.length === 0 && w.detection > 0, `${w.onPost} on guard, ${ds.length - w.onPost} kept inside${trouble.length ? ` · ${trouble.length} need attention` : ''}`, true)];
     return [...rows, ...trouble.slice(0, 3).map(d => chk(`dog:${d.id}`, d.name, false, d.hunger > 60 ? 'hungry' : d.health < 40 ? 'unwell' : temperOf(d), true))];
   }
   return ds.map(d => {
@@ -111,7 +111,7 @@ export function defenseReport(s: GameState, drive?: readonly Pt[]): DefenseRepor
   { const pl = predatorLine(s); walls.push(chk('predators', 'Keeps predators out', pl.ok, pl.detail, predatorSpecies(s).length > 0 && line.openShare < 0.15)); }
   { const rg = roadGateStatus(s, drive);
     if (rg.crossing > 0) walls.push(chk('roadgate', 'Gate at the road', rg.missing === 0, rg.missing === 0 ? (rg.garage ? 'the drive runs in through the gate garage' : 'a gate where the driveway comes through the wall') : `${rg.missing} wall${rg.missing > 1 ? 's' : ''} cross${rg.missing > 1 ? '' : 'es'} the driveway with no gate: trucks and the family’s vehicles cannot get in`)); }
-  if (gates > 0) walls.push(chk('gates', `${gates} gate${gates > 1 ? 's' : ''} in the line`, true, 'a closed gate holds about as well as 60 % of its fence'));
+  if (gates > 0) walls.push(chk('gates', `${gates} gate${gates > 1 ? 's' : ''} in the line`, true, 'a closed gate holds about as well as 60% of its fence'));
   // the fortress ring: a patrol deck on the wall, the gatehouse garage (sim/walkway.ts, sim/garage.ts)
   const hosts = s.perimeter.filter(r => canHostWalkway(r.kind) && !r.replaces);
   if (hosts.length) {

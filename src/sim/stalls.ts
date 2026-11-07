@@ -55,6 +55,13 @@ export function waiters(s: GameState): Waiter[] {
   return out;
 }
 
+/** The materials some waiting project lacks right now (the family carries those loads in from the road first). */
+export function wantedNow(s: GameState): Set<MaterialId> {
+  const out = new Set<MaterialId>();
+  for (const w of waiters(s)) for (const k of Object.keys(w.miss) as MaterialId[]) out.add(k);
+  return out;
+}
+
 /** The buyable part of a shortfall as order lines, less what is already on the way (whole units: any sliver still blocks the crew). */
 export function missLines(s: GameState, miss: Miss, pending: Miss = onOrder(s)): OrderLine[] {
   const lines: OrderLine[] = [];

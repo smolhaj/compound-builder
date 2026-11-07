@@ -215,7 +215,7 @@ describe('facingReaches', () => {
   it('drops short runs and runs that never near the full reach, tapers the ends of the rest, never raises a reach', () => {
     const full = 0.7;
     expect(facingReaches([0, 0.6, 0.65, 0.6, 0], full).every(v => v === 0)).toBe(true);            // 3 stations: a sliver
-    expect(facingReaches([0, 0.35, 0.36, 0.35, 0.36, 0.35, 0], full).every(v => v === 0)).toBe(true); // never reaches 60 % of the full reach
+    expect(facingReaches([0, 0.35, 0.36, 0.35, 0.36, 0.35, 0], full).every(v => v === 0)).toBe(true); // never reaches 60% of the full reach
     const ext = [0, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0];
     const r = facingReaches(ext, full);
     expect(r[1]).toBeCloseTo(0.7 / 3); expect(r[7]).toBeCloseTo(0.7 / 3); expect(r[4]).toBeCloseTo(0.7);

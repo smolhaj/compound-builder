@@ -34,7 +34,7 @@ const Note = ({ tone, children }: { tone?: Tone; children: ReactNode }) => <div 
 const cap = (x: string) => x[0].toUpperCase() + x.slice(1);
 const ago = (day: number, d?: number) => d == null ? 'never' : day - d === 0 ? 'today' : `${day - d} d ago`;
 const RISK_TONE = { low: 'good', some: undefined, high: 'warn', deadly: 'bad' } as const;
-const pct = (x: number) => `${Math.round(x * 100)} %`;
+const pct = (x: number) => `${Math.round(x * 100)}%`;
 
 /** Who can be sent: on their feet, 16 and up, not away. */
 const goers = (g: GameState) => g.people.filter(p => canGo(g, p) && p.age >= 16);
@@ -81,7 +81,7 @@ export function ScavengeSection() {
         style={{ display: 'block', width: '100%', textAlign: 'left', padding: '4px 6px', marginBottom: 2, borderRadius: 6, border: 0, cursor: 'pointer', background: x.id === sel ? 'rgba(216,201,160,0.22)' : 'rgba(255,255,255,0.04)', color: '#eee', fontSize: 12 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}><span>{cap(x.name)}</span><span style={{ color: DIM }}>{kmText(x.km)}</span></div>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6, fontSize: 11 }}>
-          <span style={{ color: DIM }}>{PLACE_KIND_NAME[x.kind]} · {picked >= 0.97 ? 'stripped' : `${Math.round(picked * 100)} % picked over`} · {ago(day, x.visited)}</span>
+          <span style={{ color: DIM }}>{PLACE_KIND_NAME[x.kind]} · {picked >= 0.97 ? 'stripped' : `${Math.round(picked * 100)}% picked over`} · {ago(day, x.visited)}</span>
           <span style={{ color: RISK_TONE[w] ? TONE[RISK_TONE[w]!] : undefined }}>{x.claim?.known ? 'held by a crew' : `risk: ${w}`}</span>
         </div>
       </button>;

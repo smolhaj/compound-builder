@@ -13,7 +13,7 @@ import { guardDay } from './guards';
 import { insiderDay } from './insider';
 import { addWork, canGoOn, isFinished } from './construction';
 import { addCarryWork, deliverOrders } from './economy';
-import { stallsDay } from './stalls';
+import { stallsDay, wantedNow } from './stalls';
 import { addFixWork, nextFix, siteJobsDay } from './improvements';
 import { paperworkDay } from './paperwork';
 import { addFellWork, nextFellJob } from './forestry';
@@ -116,6 +116,7 @@ function subStep(s: GameState): void {
   const fix = target || run || fit || harden ? null : nextFix(s);
   // deliveries at the road come in before anything else gets built
   const carry = s.roadside?.length > 0;
+  const wanted = carry && s.roadside.length > 1 ? wantedNow(s) : undefined;
   const job = nextFellJob(s);
   // with both building and felling to do, the family splits: every other person to the woods
   // the weekender (sim/weekender.ts): the family drives up Friday night and back Sunday afternoon; relatives and anyone taken in stay
@@ -168,7 +169,7 @@ function subStep(s: GameState): void {
           if (wire) practice(s, p.id, 'mechanic', 0.3);
         } else practice(s, p.id, 'builder', task === 'forestry' ? 0.6 : task === 'build' && carry ? 0.2 : 1);
       }
-      if (task === 'build' && carry) addCarryWork(s, hrs * rate);
+      if (task === 'build' && carry) addCarryWork(s, hrs * rate, wanted);
       else if (task === 'build' && target) addWork(s, target, hrs * rate, true);
       else if (task === 'build' && run) addRunWork(s, run, hrs * rate);
       else if (task === 'build' && fit) addFitWork(s, fit, hrs, fit.kind === 'wire' ? Math.max(p.skills.mechanic, levelFor(s, p, 'electrical')) : p.skills.mechanic);

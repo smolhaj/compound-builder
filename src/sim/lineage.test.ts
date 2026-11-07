@@ -30,7 +30,7 @@ describe('the family over the years', () => {
     expect(g.lineage.chronicle.some(e => e.kind === 'coming')).toBe(true);
   });
 
-  it('old age: about 1 % a year at 60, 6 % at 80, double with no doctor', () => {
+  it('old age: about 1% a year at 60, 6% at 80, double with no doctor', () => {
     expect(oldAgeRisk(60, true)).toBeGreaterThan(0.006);
     expect(oldAgeRisk(60, true)).toBeLessThan(0.015);
     expect(oldAgeRisk(80, true)).toBeGreaterThan(0.04);

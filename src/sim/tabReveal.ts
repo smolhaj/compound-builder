@@ -33,7 +33,7 @@ export function tabReason(s: GameState, tab: RightTab): string | null {
     case 'family': return 'always';
     case 'supplies':
       if (s.orders.length > 0) return 'You placed an order';
-      if (s.structures.some(x => !x.pre && isFinished(x) && /garden|field|pantry|cellar|barn|shed|coop/.test(x.kind))) return 'You have stores to keep';
+      if (s.structures.some(x => !x.pre && isFinished(x) && /garden|field|pantry|cellar|barn|shed|coop/.test(x.kind))) return 'You have food to keep';
       if (warned) return 'Trouble is coming: check the food';
       return day >= 3 ? 'The family is eating from the pantry' : null;
     case 'utilities':

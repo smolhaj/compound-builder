@@ -342,7 +342,7 @@ export function ransomTerms(s: GameState, c: Captive, r: () => number): RansomTe
 }
 export const termsText = (t: RansomTerms) => [
   ...(Object.entries(t.goods) as Array<[keyof Stock, number]>).map(([k, n]) => `${n} ${k === 'fuel' ? 'cans of fuel' : k === 'meds' ? 'med kits' : k === 'canned' ? 'cases of canned food' : k}`),
-  ...(Object.entries(t.ammo) as Array<[Caliber, number]>).map(([k, n]) => `${n} rounds of ${k}`),
+  ...(Object.entries(t.ammo) as Array<[Caliber, number]>).map(([k, n]) => `${pluralize(n, 'round')} of ${k}`),
 ].join(', ');
 export function canPay(s: GameState, t: RansomTerms, share = 1): boolean {
   return (Object.entries(t.goods) as Array<[keyof Stock, number]>).every(([k, n]) => (s.stock[k] ?? 0) >= Math.ceil(n * share))
@@ -608,7 +608,7 @@ function tripArrive(s: GameState, raid: RescueRaid): Outcome {
   // the road: roadblocks, a crew working the highway
   if (r() < 0.2) {
     const id = pick(r, raid.team), p = person(s, id), ps = stateOf(s, id);
-    if (p && ps) { const sev = 30 + Math.round(r() * 25); ps.needs.hurt.push({ what: 'shot at a roadblock on the highway', sev, trauma: true }); ps.needs.health = Math.max(1, ps.needs.health - sev * 0.5); lines.push(`They were shot at at a roadblock on the way. ${p.first} was hit.`); }
+    if (p && ps) { const sev = 30 + Math.round(r() * 25); ps.needs.hurt.push({ what: 'shot at a roadblock on the highway', sev, trauma: true }); ps.needs.health = Math.max(1, ps.needs.health - sev * 0.5); lines.push(`They were fired on at a roadblock on the way. ${p.first} was hit.`); }
   }
   if (!l.true || c.status !== 'traded' || l.where !== c.farWhere) {
     l.day = Math.min(l.day, day - FAR_COLD - 1);
@@ -836,7 +836,7 @@ function hitCamp(s: GameState, raid: RescueRaid): Outcome {
   lines.push(...applyCasualties(s, f.battle));
   let rounds = 0;
   for (const [cal, nn] of Object.entries(f.spent) as Array<[Caliber, number]>) { s.armory.ammo[cal] = Math.max(0, (s.armory.ammo[cal] ?? 0) - nn); rounds += nn; }
-  if (rounds) { lines.push(`${rounds} rounds fired.`); for (const g of s.armory.guns) if (raid.team.includes(g.carrier ?? '')) { g.fired += Math.round(rounds / raid.team.length); g.condition = Math.max(0, g.condition - 0.01); } }
+  if (rounds) { lines.push(`${pluralize(rounds, 'round')} fired.`); for (const g of s.armory.guns) if (raid.team.includes(g.carrier ?? '')) { g.fired += Math.round(rounds / raid.team.length); g.condition = Math.max(0, g.condition - 0.01); } }
   lines.push(...alliesAfter(s, raid, f, r));
   const [sh, him] = they(child);
   let title = '', text = '', tone: Outcome['tone'] = 'mixed';

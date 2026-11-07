@@ -238,7 +238,7 @@ export function kitNote(s: GameState, m: MaterialId): { text: string; urgent: bo
       const c = kitCond(s, id);
       return { text: owned ? `${D.name.toLowerCase()}: ${wordFor(c)}${c <= 0.4 ? ' - worth restocking' : ''}; it goes in by itself when the kit wears thin` : `a spare for ${D.name.toLowerCase()}, which you do not own yet`, urgent: owned && c <= 0.4 };
     }
-    if (m === D.base) return owned ? { text: `in use: ${wordFor(kitCond(s, id))} (${Math.round(kitCond(s, id) * 100)} %)${D.restock === D.base ? '; a second one swaps in when it wears out' : ''}`, urgent: kitCond(s, id) <= 0.4 && D.restock === D.base } : null;
+    if (m === D.base) return owned ? { text: `in use: ${wordFor(kitCond(s, id))} (${Math.round(kitCond(s, id) * 100)}%)${D.restock === D.base ? '; a second one swaps in when it wears out' : ''}`, urgent: kitCond(s, id) <= 0.4 && D.restock === D.base } : null;
   }
   return null;
 }

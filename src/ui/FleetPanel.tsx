@@ -18,7 +18,7 @@ function statusOf(v: Vehicle, atTown = false): { text: string; tone: keyof typeo
   if (v.fried) return { text: 'killed by the EMP', tone: 'bad' };
   if (v.condition <= 0) return { text: 'dead', tone: 'bad' };
   if (v.down) return { text: `broken down: ${v.down.part}${v.down.left !== undefined ? `, ${pluralize(v.down.left, 'day')}` : ''}`, tone: 'bad' };
-  if (v.stranded) return { text: 'cut off outside the lost way in: it waits at the outer end', tone: 'warn' };
+  if (v.stranded) return { text: 'stuck outside: the bridge or tunnel in is gone, so it waits at the road until the way is open again', tone: 'warn' };
   if (v.away) return { text: atTown ? 'at the town house' : 'out on a run', tone: null };
   if (overdue(v)) return { text: 'overdue for a service', tone: 'warn' };
   return { text: 'runs', tone: 'good' };
@@ -52,7 +52,7 @@ export function FleetPanel() {
             <span style={{ color: st.tone ? TONE[st.tone] : DIM }}>{st.text}</span>
           </div>
           <div style={{ fontSize: 11, color: DIM }}>
-            {Math.round(v.mileage).toLocaleString('en-US')} mi · {Math.round(v.condition * 100)} %{def.tankL > 0 ? ` · ${litersText(v.fuel)} of ${litersText(def.tankL)}` : ''} · {parkedText(game, v.id)}
+            {Math.round(v.mileage).toLocaleString('en-US')} mi · {Math.round(v.condition * 100)}%{def.tankL > 0 ? ` · ${litersText(v.fuel)} of ${litersText(def.tankL)}` : ''} · {parkedText(game, v.id)}
           </div>
           {def.tankL > 0 && runs(v) && fuelPct < 0.5 && <Note tone={fuelPct < 0.15 ? 'bad' : 'warn'}>Tank low.</Note>}
           {v.down && v.down.left === undefined && <Note tone="warn">Needs a parts kit and someone who knows engines (about {pluralize(repairDays(Math.max(0, ...game.people.map(p => p.skills.mechanic))), 'day')}){shopsOpen ? ', or a tow to the shop' : ''}.</Note>}
@@ -81,15 +81,15 @@ export function FleetPanel() {
               <button style={btn(mode === 'foot')} title="On foot with packs: everyone goes, quick to leave, slow and exposed on the way" onClick={() => setMode('foot')}>On foot</button>
             </div>
             <select value={bo.dest} onChange={e => setDest(e.target.value as BugDest)} style={{ width: '100%', marginBottom: 4 }} aria-label="Where to">
-              {bo.options.map(o => <option key={o.dest} value={o.dest}>{o.name}{o.miles ? ` (${o.miles} miles)` : ''}</option>)}
+              {bo.options.map(o => <option key={o.dest} value={o.dest}>{o.name}{o.miles ? ` (${pluralize(o.miles, 'mile')})` : ''}</option>)}
             </select>
             <Row label="Carrying" value={`${bo.mode === 'foot' ? `${bo.carryKg} kg, ${bo.bags} bug-out bag${bo.bags === 1 ? '' : 's'}` : `${bo.carryKg} kg in ${bo.vehicles.length} vehicle${bo.vehicles.length === 1 ? '' : 's'}`}`} title="Weight the party can carry. A packed bug-out bag (Shop, Defense) is 40 lb of the right things; a snatched pack is 3-13 lb." />
             <Row label="Food and water" value={`${pluralize(bo.foodDays, 'day')}${bo.cacheDays ? ` + ${bo.cacheDays} in the cache` : ''}`} />
             <Row label={bo.mode === 'foot' ? 'Walk' : 'Fuel'} value={`about ${kmText(bo.rangeKm)}`} />
             <Row label="Time to leave" value={`${bo.hours} h${bo.covered ? ', under cover' : bo.mode === 'foot' ? '' : ', in plain view'}`} />
             {bo.miles > 0 && <Row label="Time on the road" value={bo.route.travelHours >= 48 ? `${pluralize(Math.round(bo.route.travelHours / 24), 'day')}` : `${bo.route.travelHours} h`} />}
-            <Row label="Route risk" value={`${Math.round(bo.route.risk * 100)} % · ${bo.route.level}`} tone={bo.route.level === 'high' ? 'bad' : bo.route.level === 'moderate' ? 'warn' : 'good'} title="Chance something goes wrong on the way: a late arrival, a robbery, or worse" />
-            {bo.route.legs.filter(l => l.risk >= 0.03).map(l => <div key={l.id} style={{ fontSize: 11, color: DIM }} title={l.why}>{Math.round(l.risk * 100)} % {l.name}: {l.why}</div>)}
+            <Row label="Route risk" value={`${Math.round(bo.route.risk * 100)}% · ${bo.route.level}`} tone={bo.route.level === 'high' ? 'bad' : bo.route.level === 'moderate' ? 'warn' : 'good'} title="Chance something goes wrong on the way: a late arrival, a robbery, or worse" />
+            {bo.route.legs.filter(l => l.risk >= 0.03).map(l => <div key={l.id} style={{ fontSize: 11, color: DIM }} title={l.why}>{Math.round(l.risk * 100)}% {l.name}: {l.why}</div>)}
             {bo.mode === 'vehicle' && bo.route.vehicleBlocked && <Note tone="bad">No vehicle gets out: {bo.route.vehicleBlocked}. {game.stock.bugout_bag ? 'Go on foot.' : 'A bug-out bag each would let the family walk.'}</Note>}
             <Note tone="bad">Bugging out ends this run. {bo.going.length} go ({bo.going.map(p => p.first).join(', ')}); {bo.left.length ? `${bo.left.map(p => p.first).join(', ')} stay behind. ` : ''}{bo.dest === 'cache' ? 'Two weeks of food and water wait in the cache.' : bo.dest === 'town' ? 'The town house is kept for exactly this.' : 'With nowhere to go the road is the only plan.'}</Note>
             <div style={{ display: 'flex', gap: 6 }}>

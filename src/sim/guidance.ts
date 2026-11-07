@@ -20,7 +20,7 @@ import { onOrder, orderCost, prices } from './economy';
 import { firewoodOutlook } from './heating';
 import { FIT, UTILITY } from './utilities';
 import { stuckProject, stuckAction, linesText } from './stalls';
-import { fixBill, pendingFixes } from './improvements';
+import { driveQuote, fixBill, hookupProblem, pendingFixes } from './improvements';
 import { fmtKw } from './powerReport';
 import { anyBearing } from './orchard';
 import { hookupTone, needsHookup, storageTip } from './hookups';
@@ -161,6 +161,8 @@ export type SuggestionAct =
   | { type: 'caretaker'; kind: CaretakerKind }
   | { type: 'belt'; on: boolean }
   | { type: 'crew'; id: string }
+  /** Hire the contractor for the gravel drive (or the power line). */
+  | { type: 'hookup'; what: 'drive' | 'power' }
   | { type: 'open'; right: 'family' | 'supplies' | 'utilities' | 'land' | 'defense' | 'outside' | 'chronicle'; supplies?: 'stores' | 'farm' }
   | { type: 'moveIn' }
   /** Open the Shop on a shelf (never buys). */
@@ -210,7 +212,7 @@ export function landSuggestions(s: GameState): Suggestion[] {
       const short = Math.max(0, Math.ceil(extra - Math.max(0, s.stock.fieldstone - 0) - (pending.fieldstone ?? 0)));
       const lines: OrderLine[] = short > 0 ? [{ material: 'fieldstone', qty: short }] : [];
       out.push({ id: 'retaining', kind: '', title: 'This slope needs a retaining wall', urgency: 94,
-        why: `the ${name} is staked on a ${Math.round((cut.grade ?? 0) * 100)} % slope: the pad is cut into the hill and held by a dry-stack wall${wall ? ` (up to ${Math.round(wall.heightM * 10) / 10} m high and ${Math.round(wall.lenM)} m long, with ${wall.stairs ? 'a stair' : 'no stair'} set in it${wall.tall ? '; a wall that tall needs a drainage channel above it' : ''})` : ''}, about ${extra} pallets of fieldstone more than level ground${short > 0 ? '' : ' (you have them)'}. The wall goes up with the foundation and is paid for by those pallets`,
+        why: `the ${name} is staked on a ${Math.round((cut.grade ?? 0) * 100)}% slope: the pad is cut into the hill and held by a dry-stack wall${wall ? ` (up to ${Math.round(wall.heightM * 10) / 10} m high and ${Math.round(wall.lenM)} m long, with ${wall.stairs ? 'a stair' : 'no stair'} set in it${wall.tall ? '; a wall that tall needs a drainage channel above it' : ''})` : ''}, about ${extra} pallets of fieldstone more than level ground${short > 0 ? '' : ' (you have them)'}. The wall goes up with the foundation and is paid for by those pallets`,
         acts: [...(lines.length ? [{ label: `Order ${short} pallet${short > 1 ? 's' : ''} of fieldstone (${usd(orderCost(lines, prices(s)))})`, act: { type: 'order' as const, lines } }] : []), { label: 'Show me', act: { type: 'select', id: cut.id } }] });
     }
     // a retaining wall that let go (sim/retaining.ts): the stone to put it back
@@ -261,6 +263,13 @@ export function suggestions(s: GameState, limit = 3, skip?: ReadonlySet<string>)
   if (stuck) out.push({ id: 'stalled', kind: '', title: stuck.escalated ? `Stuck for ${pluralize(stuck.days, 'day')}: waiting on ${linesText(stuck.lines)}` : `Stuck: waiting on ${linesText(stuck.lines)}`, urgency: stuck.escalated ? 100 : 99, ...(stuck.escalated ? { tone: 'alarm' as const } : {}),
     why: `The ${stuck.label} has waited ${pluralize(stuck.days, 'day')} for materials, and you have the money (${usd(s.money)}). Work cannot continue until they are ordered${stuck.others > 0 ? `; ${stuck.others} more project${stuck.others > 1 ? 's wait' : ' waits'} too` : ''}.`,
     acts: [{ label: stuckAction(stuck), act: { type: 'order', lines: stuck.lines } }, { label: 'Show me', act: stuck.at ? { type: 'select', id: stuck.at } : { type: 'open', right: 'defense' } }] });
+  // deliveries pile up at the road because there is no drive in: the family carries every load by hand (sim/economy.ts), so say what ends it
+  { const hours = (s.roadside ?? []).reduce((a, r) => a + r.hours - r.done, 0);
+    if (hours >= 24 && !s.site.improvements.drive && hookupProblem(s, 'drive') === null) {
+      const q = driveQuote(s.site.improvements, s.site, s.seed);
+      out.push({ id: 'road_pile', kind: '', title: `Put in a gravel drive: ${pluralize(Math.round(hours), 'hour')} of deliveries are waiting at the road`, urgency: 92,
+        why: `There is no drive in, so the truck leaves every order at the road and the family carries it in by hand. A contractor puts in the drive in about ${pluralize(q.days, 'day')} for ${usd(q.usd)}; after that the trucks come to the yard. A hired crew also carries the pile in.`,
+        acts: [{ label: `Hire the drive contractor (${usd(q.usd)})`, act: { type: 'hookup', what: 'drive' } }] }); } }
   // the family's own hands would take weeks on the house and the cash covers a crew: say so, with the price and a one-click hire (sim/crewNudge.ts)
   { const n = crewNudge(s);
     if (n) out.push({ id: 'house_crew', kind: '', title: n.title, urgency: 93, why: n.why,
@@ -342,7 +351,7 @@ export function suggestions(s: GameState, limit = 3, skip?: ReadonlySet<string>)
     if (warned) {
       const q = saleQuote(s), blocked = saleBlock(s);
       out.push({ id: 'move_in', kind: '', title: 'Move in now?', urgency: 96,
-        why: `the warning signs are out and the family still lives in town${q && !blocked ? `; the house would sell for about ${usd(q.net)} after the mortgage, at ${Math.round(marketFactor(s) * 100)} % of its worth and falling` : blocked ? `; the house cannot be sold now (${blocked})` : ''}`,
+        why: `the warning signs are out and the family still lives in town${q && !blocked ? `; the house would sell for about ${usd(q.net)} after the mortgage, at ${Math.round(marketFactor(s) * 100)}% of its worth and falling` : blocked ? `; the house cannot be sold now (${blocked})` : ''}`,
         acts: [{ label: 'Decide now', act: { type: 'moveIn' } }] });
     } else if (s.disaster.kind && tension(s.disaster, s.clock.t) > 0 && wk.asked === 0) {
       out.push({ id: 'move_in', kind: '', title: 'Think about moving in', urgency: 50, why: 'the longer they wait the less the town house is worth, and the harder it is to get out', acts: [{ label: 'See the numbers', act: { type: 'moveIn' } }] });

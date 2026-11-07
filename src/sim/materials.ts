@@ -88,7 +88,7 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   canned: { id: 'canned', name: 'Canned food', unit: 'case of 12 (≈ 6,000 Calories)', price: 38 },
   staples: { id: 'staples', name: 'Bulk staples', unit: 'rice, beans, flour, oil (≈ 80,000 Calories, 55 lb)', price: 85 },
   meds: { id: 'meds', name: 'Medical supplies', unit: 'kit: dressings, antibiotics, painkillers', price: 160 },
-  seed: { id: 'seed', name: 'Hybrid field seed', unit: 'a season for a quarter acre of certified hybrid seed potatoes, beans and wheat: about 12 % more crop the year it is sown and a third less hurt by blight and rust, but seed saved from it comes back at only about 80 %', price: 160 },
+  seed: { id: 'seed', name: 'Hybrid field seed', unit: 'a season for a quarter acre of certified hybrid seed potatoes, beans and wheat: about 12% more crop the year it is sown and a third less hurt by blight and rust, but seed saved from it comes back at only about 80%', price: 160 },
   seed_heirloom: { id: 'seed_heirloom', name: 'Heirloom field seed', unit: 'a season for a quarter acre of open-pollinated seed: an ordinary crop the first year, but the seed you save comes true and the line adapts to your place', price: 360 },
   seed_saved: { id: 'seed_saved', name: 'Saved seed', unit: 'a season for a quarter acre, kept back from your own harvest', price: null },
   seed_cover: { id: 'seed_cover', name: 'Cover-crop seed', unit: 'clover and vetch for one resting field: fixes nitrogen and builds the soil', price: 30 },

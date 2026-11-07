@@ -137,7 +137,7 @@ describe('wear and breakage', () => {
 });
 
 describe('sharpen, repair, improvise', () => {
-  it('a whetstone puts back a razor edge, a river rock gets 80 %', () => {
+  it('a whetstone puts back a razor edge, a river rock gets 80%', () => {
     const g = newGame(2);
     g.tools = mk([['hand_saw', 1, 0.1], ['axe', 1, 0.2], 'whetstone']);
     expect(sharpen(g, 't1')).toBeNull();

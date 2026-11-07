@@ -38,10 +38,10 @@ export function roadFactor(site: Pick<Site, 'lot' | 'home'>): RoadFactor {
   if (!lot) return FLAT;
   const g = lot.stats.accessMaxPct, out = site.lot!.outlier;
   if (g <= 8) return { ...FLAT, gradePct: g };
-  if (g <= 12) return { lenMul: 1.1, perFtMul: 1.25, gradePct: g, switchbacks: false, text: `${Math.round(g)} % grade: cut and fill and culverts add a quarter` };
+  if (g <= 12) return { lenMul: 1.1, perFtMul: 1.25, gradePct: g, switchbacks: false, text: `${Math.round(g)}% grade: cut and fill and culverts add a quarter` };
   if (out && site.lot!.kind === 'mesa') return { lenMul: 3.6, perFtMul: 3.4, gradePct: g, switchbacks: true, text: 'a butte with no ramp: the road is a cut zigzag up the cliff, three times the length and expensive per foot (an engineer first)' };
   const lenMul = Math.min(3.6, g / 9) * (out ? 1.2 : 1), perFt = g <= 18 ? 1.5 : g <= 30 ? 2 : 2.6;
-  return { lenMul: Math.round(lenMul * 100) / 100, perFtMul: perFt * (out ? 1.3 : 1), gradePct: g, switchbacks: true, text: `${Math.round(g)} % straight up: the road switchbacks, ${Math.round((lenMul - 1) * 100)} % longer and more expensive per foot` };
+  return { lenMul: Math.round(lenMul * 100) / 100, perFtMul: perFt * (out ? 1.3 : 1), gradePct: g, switchbacks: true, text: `${Math.round(g)}% straight up: the road switchbacks, ${Math.round((lenMul - 1) * 100)}% longer and more expensive per foot` };
 }
 
 /** The power line over rough ground: poles on slopes and rock cost more (1 on level ground, up to 2.6). */
@@ -108,8 +108,8 @@ export function gradeNote(site: Pick<Site, 'lot' | 'home'>, x: number, z: number
   const g = gradeAt(site, x, z), b = gradeBucket(g);
   if (b === 0) return null;
   const pct = Math.round(g * 100), pallets = 2 * b * b;
-  return b === 1 ? `${pct} % slope: grading and a stem wall (about ${pallets} pallets of fieldstone more)`
-    : `${pct} % slope: this needs a retaining wall, about ${pallets} more pallets of fieldstone and ${Math.round(60 * b)} % more time on the pad`;
+  return b === 1 ? `${pct}% slope: grading and a stem wall (about ${pallets} pallets of fieldstone more)`
+    : `${pct}% slope: this needs a retaining wall, about ${pallets} more pallets of fieldstone and ${Math.round(60 * b)}% more time on the pad`;
 }
 
 // ── winter access ──

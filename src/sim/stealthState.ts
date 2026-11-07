@@ -20,7 +20,7 @@ export const BURN_MODES: readonly BurnMode[] = ['normal', 'smokeless', 'dusk'];
 export const BURN_NAME: Record<BurnMode, string> = { normal: 'Burn as needed', smokeless: 'Smokeless (dry hardwood)', dusk: 'Dusk only' };
 export const BURN_HELP: Record<BurnMode, string> = {
   normal: 'The stove runs whenever it is cold, all night: a plume of smoke against the sky.',
-  smokeless: 'Seasoned hardwood, hot and clean: a faint haze instead of a plume, for about 15 % more wood.',
+  smokeless: 'Seasoned hardwood, hot and clean: a faint haze instead of a plume, for about 15% more wood.',
   dusk: 'Fed at dusk and left to die: almost no smoke after midnight and a fifth less wood, but the house is cold by morning when it freezes.',
 };
 /** Smoke at the chimney against a plain burn; wood used against a plain burn. */

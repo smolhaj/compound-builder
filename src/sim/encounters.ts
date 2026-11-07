@@ -489,7 +489,7 @@ function adaptCrew(s: GameState, e: Encounter, p: Posture, day: number): void {
   }
   const why = whyBigger(a);
   if (why) e.dossier.push(why);
-  if (logGate(s, 'adapt-word', 400)) log(s, 'Hardcore: the crews are adapting. A well-defended place draws bigger, better-armed crews than one that is not, and they come more often. Walls and rifles buy time, not immunity.');
+  if (logGate(s, 'adapt-word', 400)) log(s, 'The crews are adapting. A well-defended place draws bigger, better-armed crews than one that is not, and they come more often. Walls and rifles buy time, not immunity.');
 }
 
 /** Once a day after the hit: maybe someone comes. Returns the encounter set as pending (the UI pauses), or null. */

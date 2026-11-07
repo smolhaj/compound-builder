@@ -123,7 +123,7 @@ export const CHORE_NAME: Record<ChoreId, string> = {
 /** What happens when it falls behind (the UI's tooltip). */
 export const CHORE_WHY: Record<ChoreId, string> = {
   weeds: 'Weeds choke the beds: the garden yields less.',
-  sowing: 'The spring work falls behind: the fields go in late and make a shorter crop (up to 40 % less).',
+  sowing: 'The spring work falls behind: the fields go in late and make a shorter crop (up to 40% less).',
   bees: 'Uninspected hives swarm more, the mites build faster and less honey is made.',
   sugaring: 'Sap left in the buckets and the tank sours; the boil falls behind and less syrup is made.',
   harvest: 'The crop stands in the field and spoils: less of it comes in.',
@@ -140,7 +140,7 @@ export const CHORE_WHY: Record<ChoreId, string> = {
   orchard: 'Unpruned trees bear less and the pests get in; fruit left on the tree drops and rots.',
   greenhouse: 'Unvented, unwatered benches scorch and stall: the greenhouses grow less.',
   pond: 'Fish go unfed and the screens clog: they grow slowly and the pond sours.',
-  plant: 'Leaves and silt pack the intake screen and the turbine goes unchecked: the micro-hydro makes up to 40 % less, and bearings go sooner.',
+  plant: 'Leaves and silt pack the intake screen and the turbine goes unchecked: the micro-hydro makes up to 40% less, and bearings go sooner.',
 };
 /** Which duty works which chores (first one that needs it). */
 export const DUTY_CHORES: Partial<Record<Duty, ChoreId[]>> = {

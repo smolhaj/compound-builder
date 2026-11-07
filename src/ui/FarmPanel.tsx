@@ -51,7 +51,7 @@ export function FarmPanel({ game }: { game: GameState }) {
                   {(['electric', 'wood'] as const).map(m => <button key={m} style={btn(care.heat === m)} title={m === 'electric' ? 'Electric heat from the compound\'s power: up to about 34 kWh a day in a hard January. Falls back to wood when the power fails.' : `A wood boiler: about ${GH_WOOD_RICKS} face cord a day at full demand`} onClick={() => g.money(d => { greenhouseCareOf(d, st.id).heat = m; return null; })}>{m === 'electric' ? 'Electric' : 'Wood'}</button>)}
                 </span>
               </div>
-            : isTunnel(st.kind) ? <Note>{tunnelNote(game, st)} {(() => { const p = tunnelPestLoss(game, year); return p.loss > 0 ? `${p.name[0].toUpperCase()}${p.name.slice(1)} this year: up to ${Math.round(p.loss * 100)} % of the greens (tend the vents to halve it).` : 'No outbreak this year.'; })()}</Note>
+            : isTunnel(st.kind) ? <Note>{tunnelNote(game, st)} {(() => { const p = tunnelPestLoss(game, year); return p.loss > 0 ? `${p.name[0].toUpperCase()}${p.name.slice(1)} this year: up to ${Math.round(p.loss * 100)}% of the greens (tend the vents to halve it).` : 'No outbreak this year.'; })()}</Note>
             : <Note>{warm ? 'Heated by the cabin\'s power.' : cold > 1 ? 'Unheated: the winter benches freeze back. Wire it for power.' : 'Unheated.'}</Note>}
         </div>;
       })}
@@ -65,13 +65,13 @@ export function FarmPanel({ game }: { game: GameState }) {
           <Row label={`${r.trees} trees`} value={r.unpruned ? 'unpruned this year' : 'a row each of apple, pear, cherry and plum'} tone={r.unpruned ? 'warn' : undefined} />
           {site && <Note tone={r.site.pocket ? 'warn' : 'good'}>This plot stands {site}.</Note>}
           {r.fruits.map(f => <Row key={f.fruit} label={`${FRUIT[f.fruit].name}s (${f.trees})`}
-            value={f.bearing > 0 ? `bearing ${Math.round(f.bearing * 100)} %${f.lostThisYear >= 0.05 ? ` · frost took ${Math.round(f.lostThisYear * 100)} %` : ''}` : `${Math.max(1, f.yearsToFruit)} ${f.yearsToFruit <= 1 ? 'year' : 'years'} to first fruit`}
-            title={`Blossom ${dayText(f.bloom[0])} to ${dayText(f.bloom[1])}, picked ${dayText(f.pick[0])} to ${dayText(f.pick[1])}. A hard frost in an ordinary year takes about ${Math.round(f.risk * 100)} % of the crop here.${f.kcal > 0 ? ` About ${kcal(f.kcal)} this year.` : ''}`}
+            value={f.bearing > 0 ? `bearing ${Math.round(f.bearing * 100)} %${f.lostThisYear >= 0.05 ? ` · frost took ${Math.round(f.lostThisYear * 100)}%` : ''}` : `${Math.max(1, f.yearsToFruit)} ${f.yearsToFruit <= 1 ? 'year' : 'years'} to first fruit`}
+            title={`Blossom ${dayText(f.bloom[0])} to ${dayText(f.bloom[1])}, picked ${dayText(f.pick[0])} to ${dayText(f.pick[1])}. A hard frost in an ordinary year takes about ${Math.round(f.risk * 100)}% of the crop here.${f.kcal > 0 ? ` About ${kcal(f.kcal)} this year.` : ''}`}
             tone={f.risk >= 0.15 ? 'warn' : undefined} />)}
           <Note>{r.bees ? 'The hives set more of the blossom: cherries and pears most.' : 'No hives: the wild bees carry the usual crop. An apiary adds up to a fifth, the cherries most.'}</Note>
         </div>;
       })}
-      {(() => { const p = orchardPest(game.seed, year); return <Note tone={p.loss > 0 ? 'warn' : undefined}>{p.loss > 0 ? `${p.name[0].toUpperCase()}${p.name.slice(1)} this year (up to ${Math.round(p.loss * 100)} % of the pome and stone fruit it hits); pruning and hens hold it down.` : 'No bad pests this year.'} Prune January to the buds breaking; water the young trees through the dry months: the Garden duty does both.</Note>; })()}
+      {(() => { const p = orchardPest(game.seed, year); return <Note tone={p.loss > 0 ? 'warn' : undefined}>{p.loss > 0 ? `${p.name[0].toUpperCase()}${p.name.slice(1)} this year (up to ${Math.round(p.loss * 100)}% of the pome and stone fruit it hits); pruning and hens hold it down.` : 'No bad pests this year.'} Prune January to the buds breaking; water the young trees through the dry months: the Garden duty does both.</Note>; })()}
     </Section>}
     {bays.map(st => {
       const r = aquaReport(game, st);

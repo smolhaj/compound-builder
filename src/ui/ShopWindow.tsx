@@ -246,7 +246,7 @@ export function ShopWindow() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px 10px', borderBottom: `1px solid ${C.line}` }}>
           <div>
             <div style={{ fontSize: 19, fontWeight: 700 }}>Town & the mail-order catalog</div>
-            <div style={{ color: C.dim, fontSize: 12 }}>Checking {usd(game.money)} · cash in the safe {usd(game.fin.cash)}{k > 1.02 ? ` · prices up ${Math.round((k - 1) * 100)} %` : ''}</div>
+            <div style={{ color: C.dim, fontSize: 12 }}>Checking {usd(game.money)} · cash in the safe {usd(game.fin.cash)}{k > 1.02 ? ` · prices up ${Math.round((k - 1) * 100)}%` : ''}</div>
           </div>
           <button style={btn()} onClick={close}>Close</button>
         </div>
@@ -351,7 +351,7 @@ function Metals({ onMsg }: { onMsg: (m: string | null) => void }) {
           <Icon id={m} />
           <div style={{ flex: 1 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}><b>{METALS[m].name}</b><span style={{ color: C.gold }}>{usd(buyPrice(game, m))}</span></div>
-            <div style={{ fontSize: 11.5, color: C.dim }}>{METALS[m].unit} · {Math.round(METALS[m].premium * 100)} % over spot · buys back at {usd(sellPrice(game, m))}</div>
+            <div style={{ fontSize: 11.5, color: C.dim }}>{METALS[m].unit} · {Math.round(METALS[m].premium * 100)}% over spot · buys back at {usd(sellPrice(game, m))}</div>
             <div style={{ fontSize: 11.5, margin: '3px 0' }}>{held.length ? held.map(h => `${h.units} ${WHERE_NAME[h.where]}`).join(' · ') : <span style={{ color: C.dim }}>none held</span>}</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
               <button style={btn()} onClick={() => setQty({ ...qty, [m]: Math.max(1, n - 1) })}>−</button>
@@ -375,7 +375,7 @@ function Money({ onMsg }: { onMsg: (m: string | null) => void }) {
   const open = banksOpen(game);
   const acct: Array<[Account | 'metals', string, number, string]> = [
     ['checking', 'Checking', game.money, 'bills, orders, crews'],
-    ['savings', 'Savings', f.savings, '4 % a year'],
+    ['savings', 'Savings', f.savings, '4% a year'],
     ['brokerage', 'Brokerage (index fund)', f.brokerage, 'grows, swings, crashes'],
     ['cash', 'Cash in the safe', f.cash, 'spends when the banks don\'t'],
     ['metals', 'Gold & silver', metalsValue(game), 'at spot'],
@@ -398,10 +398,10 @@ function Money({ onMsg }: { onMsg: (m: string | null) => void }) {
     {!open && <div style={{ color: C.bad, marginTop: 8 }}>The banks are shut: checking, savings and the brokerage account are frozen.</div>}
     {(f.debt?.owed ?? 0) > 0.5 && (() => {
       const d = f.debt!;
-      const stage = { none: '', card: 'on the card, current', late: `late: ${d.missed} statement${d.missed > 1 ? 's' : ''} missed (charged off at ${CHARGE_OFF})`, collections: `in collections (a judgment after ${JUDGMENT} missed)`, judgment: `judgment: a $${d.lien.toLocaleString('en-US')} lien on the land, wages garnished 25 %` }[d.stage];
+      const stage = { none: '', card: 'on the card, current', late: `late: ${d.missed} statement${d.missed > 1 ? 's' : ''} missed (charged off at ${CHARGE_OFF})`, collections: `in collections (a judgment after ${JUDGMENT} missed)`, judgment: `judgment: a $${d.lien.toLocaleString('en-US')} lien on the land, wages garnished 25%` }[d.stage];
       return <div style={{ marginTop: 16, maxWidth: 520 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', rowGap: 4, columnGap: 16 }}>
-          <span>Owed <span style={{ color: C.dim, fontSize: 11.5 }}>· {Math.round(CARD_APR * 100)} % APR, {stage}</span></span><b style={{ textAlign: 'right', color: C.bad }}>{usd(d.owed)}</b>
+          <span>Owed <span style={{ color: C.dim, fontSize: 11.5 }}>· {Math.round(CARD_APR * 100)}% APR, {stage}</span></span><b style={{ textAlign: 'right', color: C.bad }}>{usd(d.owed)}</b>
           <span style={{ color: C.dim }}>Minimum due each month</span><span style={{ textAlign: 'right' }}>{usd(minimumDue(d.owed))}</span>
           <span style={{ color: C.dim }}>Interest and fees so far</span><span style={{ textAlign: 'right' }}>{usd(d.interest)}</span>
         </div>
@@ -421,7 +421,7 @@ function Guns({ onMsg }: { onMsg: (m: string | null) => void }) {
   const wait = (readyAt: number) => Math.max(0, Math.ceil(readyAt - game.clock.t));
   const owned = (id: string) => a.guns.filter(x => x.model === id).length + a.pending.filter(x => x.model === id).length;
   return <>
-    <div style={{ color: open ? C.dim : C.bad, marginBottom: 8 }}>{open ? `The gun shop in town: a background check at the counter${game.site.region === 'pnw' ? ', and the state\'s 10-business-day wait' : ''}. Every sale goes on the shop's records.${k > 1.05 ? ` Panic buying: prices up ${Math.round((k - 1) * 100)} %, ammo limited to ${ammoLimit(game)} boxes.` : ''}` : 'The gun shop is shut. Guns and ammo come by trade now.'}</div>
+    <div style={{ color: open ? C.dim : C.bad, marginBottom: 8 }}>{open ? `The gun shop in town: a background check at the counter${game.site.region === 'pnw' ? ', and the state\'s 10-business-day wait' : ''}. Every sale goes on the shop's records.${k > 1.05 ? ` Panic buying: prices up ${Math.round((k - 1) * 100)}%, ammo limited to ${ammoLimit(game)} boxes.` : ''}` : 'The gun shop is shut. Guns and ammo come by trade now.'}</div>
     {(['hunting', 'handgun', 'semi', 'nfa'] as GunGroup[]).map(grp => <div key={grp}>
       <div style={{ fontWeight: 600, margin: '12px 0 4px' }}>{GUN_GROUP[grp]}</div>
       {grp === 'nfa' && <div style={{ fontSize: 11.5, color: C.dim, marginBottom: 6, lineHeight: 1.4 }}>Full auto. Only machine guns registered before May 1986 can be sold to a civilian, so they go at collector prices. Pay the dealer, send ATF Form 4 with fingerprints and a ${NFA_STAMP} tax stamp, and wait four to nine months. At the gate they hit harder and burn three times the ammo.</div>}
@@ -480,7 +480,7 @@ function Guns({ onMsg }: { onMsg: (m: string | null) => void }) {
 function BlackMarket({ onMsg }: { onMsg: (m: string | null) => void }) {
   const g = useGameStore(), game = g.game, b = peekBm(game), after = lawless(game);
   const run = (op: Parameters<typeof g.money>[0]) => onMsg(g.money(op));
-  const pct = (x: number) => `${Math.round(x * 100)} %`;
+  const pct = (x: number) => `${Math.round(x * 100)}%`;
   return <>
     <div style={{ fontWeight: 600, margin: '16px 0 4px' }}>Black market</div>
     <div style={{ fontSize: 11.5, color: C.bad, marginBottom: 6, lineHeight: 1.4 }}>{after ? 'No law to speak of now: traders deal in gold and silver, and some of them cheat.' : 'Illegal: owning these is a federal felony. A sting means seizure, a heavy fine, lawyers and an investigation. Cash only, from the safe.'}</div>

@@ -28,6 +28,7 @@ import { backgroundOf } from './family';
 import { mulberry32 } from './rng';
 import { calendarOf, type GameState } from './state';
 import type { MaterialId } from './materials';
+import { pluralize } from './words';
 
 export type Caliber = '22lr' | '9mm' | '38spl' | '357' | '45acp' | '556' | '762x39' | '308' | '3006' | '3030' | '65cm' | '12ga';
 export const CALIBER: Record<Caliber, { name: string; box: number; price: number; centerfire: boolean }> = {
@@ -264,7 +265,7 @@ export function spendInFight(s: GameState, r: () => number): string | null {
     s.armory.ammo[cal] = have - n; g.fired += n; g.condition = Math.max(0, g.condition - n * 0.0004);
     used += n;
   }
-  return used ? `${used} rounds fired.` : null;
+  return used ? `${pluralize(used, 'round')} fired.` : null;
 }
 
 /** A rifle (or a shotgun with slugs) and rounds for it: who can hunt big game. Spends the rounds when it's used. */

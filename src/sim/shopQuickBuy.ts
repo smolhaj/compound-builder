@@ -285,7 +285,7 @@ export function planQuickBuy(s: GameState, cart: Partial<Record<MaterialId, numb
         }
         const got = kcalOf();
         if (!Object.keys(food).length) skipped.push({ id: 'food', name: 'Food', reason: fits(linesNow()) ?? 'over budget' });
-        else skipped.push({ id: 'food', name: 'Food', reason: `only ${Math.round(100 * got / want)} % of the ${opts.foodDays}-day pantry fits the budget` });
+        else skipped.push({ id: 'food', name: 'Food', reason: `only ${Math.round(100 * got / want)}% of the ${opts.foodDays}-day pantry fits the budget` });
       }
     }
   }

@@ -7,7 +7,8 @@
  * they go home when it's done, when the money runs out, or when the outside
  * world stops working (no banks, no roads, no law and order). Pure.
  */
-import { log } from './economy';
+import { addCarryWork, log } from './economy';
+import { wantedNow } from './stalls';
 import { addWork, blockedReason, blueprintOf, isFinished } from './construction';
 import { addFixWork, fixBlocked, fixHoursLeft, pendingFixes } from './improvements';
 import { dayIndex, hourOf, type GameState, type Structure } from './state';
@@ -79,9 +80,16 @@ export function crewStep(s: GameState, days: number): void {
     if (!st || (isFinished(st) && !pendingFixes(st).length)) { gone(`The crew finished${st ? ` the ${st.kind.replace('_', ' ')}` : ''} and went home ($${Math.round(c.paid).toLocaleString('en-US')} all told).`); continue; }
     if (t.banks < 0.5 || t.law < 0.5 || t.fuel < 0.3) { gone('The crew stopped coming: nobody can pay them or get them here now.'); continue; }
     if (!weekday || h < CREW_HOURS[0] || h >= CREW_HOURS[1]) continue;
-    if (isFinished(st) ? !fix : blockedReason(s, st)) continue;   // waiting on materials: they work elsewhere that day
     const ph = CREW_SIZE * days * 24;
     const bill = ph * CREW_RATE;
+    // a delivery left at the road (no drive in) is carried in by the crew before anything else, on their hours
+    if (s.roadside?.length) {
+      if (s.money < bill) { gone('The crew went home: there was no money to pay them.'); continue; }
+      const carried = addCarryWork(s, ph, wantedNow(s));
+      s.money -= carried * CREW_RATE; c.hours += carried; c.paid += carried * CREW_RATE;
+      continue;
+    }
+    if (isFinished(st) ? !fix : blockedReason(s, st)) continue;   // waiting on materials: they work elsewhere that day
     if (s.money < bill) { gone('The crew went home: there was no money to pay them.'); continue; }
     const used = fix ? addFixWork(s, st, fix, ph) : addWork(s, st, ph);
     s.money -= used * CREW_RATE;

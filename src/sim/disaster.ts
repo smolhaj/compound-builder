@@ -105,7 +105,7 @@ export const DISASTERS: Partial<Record<DisasterKind, DisasterDef>> = {
       { id: 'bank_holiday', name: 'a bank shutdown that never ends', weight: 3, curves: { banks: C(0, 1, 0.05, [90, 300], 60), stores: C(3, 20, 0.3, [60, 200], 60), deliveries: C(5, 25, 0.4, [60, 200], 60), fuel: C(10, 30, 0.4, [60, 220], 60), medical: C(20, 40, 0.4, [90, 300], 60), law: C(20, 40, 0.35, [100, 330], 60) } },
       { id: 'hyperinflation', name: 'hyperinflation', weight: 2, curves: { banks: C(0, 20, 0, [200, 500], 90), stores: C(10, 40, 0.25, [150, 450], 90), deliveries: C(10, 40, 0.3, [150, 450], 90), fuel: C(15, 30, 0.3, [150, 450], 90), medical: C(20, 50, 0.3, [150, 450], 90), law: C(30, 60, 0.3, [150, 450], 90), grid: C(60, 60, 0.5, [150, 450], 60) } },
     ],
-    hints: [['Two regional banks fail in a week; lines outside a branch in the city.', 'Groceries up 4 % again this month.', 'The mill in town lays off a shift.'], ['"Temporary" withdrawal limits at every bank.', 'Gold hits a record; the pawn shop is buying.', 'Eggs and formula rationed at the store.'], ['ATMs read "temporarily unavailable".', 'The governor asks for calm.', 'Neighbors are swapping eggs for diesel.']],
+    hints: [['Two regional banks fail in a week; lines outside a branch in the city.', 'Groceries up 4% again this month.', 'The mill in town lays off a shift.'], ['"Temporary" withdrawal limits at every bank.', 'Gold hits a record; the pawn shop is buying.', 'Eggs and formula rationed at the store.'], ['ATMs read "temporarily unavailable".', 'The governor asks for calm.', 'Neighbors are swapping eggs for diesel.']],
     hit: ['The banks don\'t open: accounts frozen "until further notice".'],
     chain: [{ kind: 'lawless', p: 0.5, after: [45, 120] }],
   },
@@ -114,7 +114,7 @@ export const DISASTERS: Partial<Record<DisasterKind, DisasterDef>> = {
     variants: [
       { id: 'megadrought', name: 'a megadrought', weight: 1, curves: { stores: C(30, 90, 0.6, [400, 800], 120), deliveries: C(60, 90, 0.7, null), law: C(120, 120, 0.6, [500, 900], 90) } },
     ],
-    hints: [['Snowpack 40 % of normal.', 'Hay prices double at the sale barn.', 'Burn ban in effect county-wide.'], ['The well driller is booked out six months.', 'Ranchers selling their herds early.', 'The creek is lower than anyone remembers.'], ['A neighbor\'s well is sucking air.', 'Reservoir at dead pool; irrigation called off.', 'The county starts trucking water to the subdivisions.']],
+    hints: [['Snowpack 40% of normal.', 'Hay prices double at the sale barn.', 'Burn ban in effect county-wide.'], ['The well driller is booked out six months.', 'Ranchers selling their herds early.', 'The creek is lower than anyone remembers.'], ['A neighbor\'s well is sucking air.', 'Reservoir at dead pool; irrigation called off.', 'The county starts trucking water to the subdivisions.']],
     hit: ['The creek has stopped running. Wells across the county are failing.'],
     chain: [{ kind: 'wildfire', p: 0.35, after: [60, 200] }],
   },

@@ -58,7 +58,7 @@ export function ReportCard() {
           {r.facts.map(([k, v]) => <div key={k} style={{ flex: 1 }}><div style={{ opacity: 0.6, textTransform: 'uppercase', letterSpacing: 0.8, fontSize: 10.5 }}>{k}</div><div style={{ fontSize: 16, fontWeight: 600 }}>{v}</div></div>)}
         </div>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center', marginTop: 14, fontFamily: 'system-ui, sans-serif' }}>
-          <span style={{ flex: 1, fontSize: 12, opacity: 0.7 }}>{e.kind === 'bug_out' ? 'The place stands empty behind them. A road, a fallback camp and rally points are not built yet.' : e.kind === 'wipe'
+          <span style={{ flex: 1, fontSize: 12, opacity: 0.7 }}>{e.kind === 'bug_out' ? 'The place stands empty behind them, and the road ahead is theirs to find.' : e.kind === 'wipe'
             ? `The ${g.game.lineage.family} line ran ${Math.max(1, Math.floor(g.game.clock.t / 365))} ${Math.max(1, Math.floor(g.game.clock.t / 365)) === 1 ? 'year' : 'years'}. Dynasty score ${Math.round(g.game.lineage.points + r.score).toLocaleString('en-US')}.`
             : 'The family goes on. The world will turn again.'}</span>
           {e.kind !== 'wipe' && e.kind !== 'bug_out' && <button style={{ padding: '7px 14px', borderRadius: 6, border: '1px solid #1d1b16', background: 'transparent', cursor: 'pointer' }} onClick={() => g.playOn()}>Keep playing: the next era</button>}

@@ -40,9 +40,9 @@ export function WeekenderPanel() {
       {w.town.status === 'sold'
         ? <Row label="Sold" value={usd(w.town.soldFor ?? 0)} title={`The sale cleared ${usd(w.town.net ?? 0)} after the agent and the mortgage`} />
         : <>
-          <Row label="Kept as a fallback" value={`${w.driveMiles} miles away`} title="Somewhere to go if the place falls; the bug-out destination" />
+          <Row label="Kept as a fallback" value={`${pluralize(w.driveMiles, 'mile')} away`} title="Somewhere to go if the place falls; the bug-out destination" />
           <Row label="It costs" value={`${usd(cost)} a month`} tone="warn" title={`Mortgage ${usd(mortgagePayment(w.town))} + upkeep ${usd(townUpkeepNow(w))}, while the banks work`} />
-          {q && <Row label="Would sell for" value={block ? 'no buyers' : `${usd(q.net)} after the mortgage`} tone={block ? 'bad' : undefined} title={block ?? `${Math.round(q.factor * 100)} % of its worth, less the agent and ${usd(q.mortgage)} owed`} />}
+          {q && <Row label="Would sell for" value={block ? 'no buyers' : `${usd(q.net)} after the mortgage`} tone={block ? 'bad' : undefined} title={block ?? `${Math.round(q.factor * 100)}% of its worth, less the agent and ${usd(q.mortgage)} owed`} />}
           <button style={{ ...btn(), width: '100%', marginTop: 3 }} disabled={!!block} title={block ?? 'Sell it now: the mortgage first, the rest to the account'} onClick={() => g.money(d => sellTown(d))}>Sell the town house</button>
         </>}
     </Section>;
@@ -52,7 +52,7 @@ export function WeekenderPanel() {
     <Row label="Right now" value={w.stranded ? <span style={{ color: TONE.bad }}>caught in town</span> : w.here ? 'on the place' : 'in town'} />
     {when && days !== null && <Row label={next!.arriving ? 'Next up the road' : 'Next back to town'} value={`${when}${days >= 1 ? ` (${Math.round(days * 10) / 10} d)` : ` (${Math.max(1, Math.round(days * 24))} h)`}`} />}
     <Row label="On the place" value={`about ${pluralize(Math.round(siteDaysPerWeek(game.clock.startDoy) * 10) / 10, 'day')} a week`} title="Friday night to Sunday afternoon, the holidays, and three vacation weeks a year" />
-    <Row label="The drive" value={`${w.driveMiles} miles · ${hours} h each way`} title={`${cars.length ? cars.length + ' of the fleet' : 'the town car'} makes the trip; fuel, miles and wear are counted`} />
+    <Row label="The drive" value={`${pluralize(w.driveMiles, 'mile')} · ${hours} h each way`} title={`${cars.length ? cars.length + ' of the fleet' : 'the town car'} makes the trip; fuel, miles and wear are counted`} />
     <Row label="Trips so far" value={`${w.tally.trips} · ${w.tally.miles.toLocaleString('en-US')} mi · ${usd(w.tally.spent)} spent`} title="Fuel, the town car, the caretaker, the mortgage and the town house's bills, since the start" />
 
     <div style={{ marginTop: 6, fontSize: 12, color: DIM }}>While you are away</div>
@@ -85,10 +85,10 @@ export function WeekenderPanel() {
       <Row label="Moving in" value="give notice" title="There is no house to sell and none to fall back on" />
     </>}
     {!rented && q && <>
-      <Row label="Worth" value={`${usd(q.value)}`} title={`${Math.round(marketFactor(game) * 100)} % of what it would fetch in a normal market (${usd(w.town.value)}); it falls as the signs grow`} tone={marketFactor(game) < 0.9 ? 'warn' : undefined} />
+      <Row label="Worth" value={`${usd(q.value)}`} title={`${Math.round(marketFactor(game) * 100)}% of what it would fetch in a normal market (${usd(w.town.value)}); it falls as the signs grow`} tone={marketFactor(game) < 0.9 ? 'warn' : undefined} />
       <Row label="Owed" value={usd(q.mortgage)} />
       <Row label="Costs" value={`${usd(cost)} a month`} title={`Mortgage ${usd(mortgagePayment(w.town))} + upkeep ${usd(townUpkeepNow(w))}${w.belt ? ' (tight budget)' : ''} + property tax ${usd(townTaxHalf(w.town))} twice a year`} />
-      <Row label="Sells for" value={block ? 'no buyers' : q.net >= 0 ? `${usd(q.net)} clear` : `${usd(-q.net)} short`} tone={block ? 'bad' : q.net < 0 ? 'warn' : undefined} title={block ?? 'After the agent and closing (6 %) and the mortgage'} />
+      <Row label="Sells for" value={block ? 'no buyers' : q.net >= 0 ? `${usd(q.net)} clear` : `${usd(-q.net)} short`} tone={block ? 'bad' : q.net < 0 ? 'warn' : undefined} title={block ?? 'After the agent and closing (6%) and the mortgage'} />
     </>}
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginTop: 4 }}>
       <span style={{ color: DIM }} title="Cheaper upkeep and groceries on the weekdays; the cost is a little lower mood in town">Belt in town</span>
