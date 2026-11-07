@@ -54,13 +54,15 @@ export const chestOf = (a: Actor, ground: Ground): V3 => ({ x: a.x, y: ground(a.
 
 /** Is a point (world y) within `m` of a box (the box stands `h` tall from the ground under the point)? */
 export function nearBox(p: V3, b: Box, ground: Ground, m: number): boolean {
+  if (b.kind === 'brush') return false;   // (ground cover only hides a figure; a camera may stand among it: see `blockedBetween`)
   if (flatDist(p.x, p.z, b) >= m) return false;
   const up = p.y - ground(p.x, p.z);
   return up < b.h + m && up > (b.y0 ?? 0) - m;
 }
 
 /** Is a view point (x, z at height y) inside a box, with `m` of margin on the plan? */
-const insideBox = (p: V3, b: Box, ground: Ground, m = 0): boolean => flatDist(p.x, p.z, b) <= m && p.y - ground(p.x, p.z) < b.h && p.y - ground(p.x, p.z) >= (b.y0 ?? 0);
+const insideBox = (p: V3, b: Box, ground: Ground, m = 0): boolean => b.kind !== 'brush' && insideAny(p, b, ground, m);
+const insideAny = (p: V3, b: Box, ground: Ground, m = 0): boolean => flatDist(p.x, p.z, b) <= m && p.y - ground(p.x, p.z) < b.h && p.y - ground(p.x, p.z) >= (b.y0 ?? 0);
 
 /** Is `p` inside the picture of a camera at `eye` looking at `look`? Returns the depth too. */
 export function inFrame(eye: V3, look: V3, fov: number, p: V3): boolean {
@@ -91,12 +93,12 @@ export function blockedBetween(eye: V3, p: V3, boxes: readonly Box[], ground: Gr
     const tail = (1 - t) * len < 0.35;
     const q = { x: eye.x + (p.x - eye.x) * t, y: eye.y + (p.y - eye.y) * t, z: eye.z + (p.z - eye.z) * t };
     // (ground cover is the exception: a bush right in front of a figure hides its legs and body, so it counts all the way in)
-    if (tail) { for (const b of boxes) if (b.kind === 'brush' && insideBox(q, b, ground, 0.06)) return true; continue; }
+    if (tail) { for (const b of boxes) if (b.kind === 'brush' && insideAny(q, b, ground, 0.06)) return true; continue; }
     // (a rise of the ground between the eye and the subject hides it too)
     // (a hill, not a lip: two samples in a row below the surface; a podium's edge or a kerb a hand high does not hide a chest)
     if (!buried && q.y < ground(q.x, q.z) - 0.03) { if (++under >= 2) return true; } else under = 0;
     // a hand's breadth and a half of margin: eaves, foundation courses, posts and rails stand proud of the box
-    for (const b of boxes) if (!own.includes(b) && insideBox(q, b, ground, b.kind === 'brush' ? 0.04 : 0.2)) return true;
+    for (const b of boxes) if (!own.includes(b) && insideAny(q, b, ground, b.kind === 'brush' ? 0.04 : 0.2)) return true;
   }
   return false;
 }
@@ -380,7 +382,7 @@ export class Director {
       // a forest lot: when no angle is clear of the trees, the trees stop counting (trunks may stand in the lens, crowns may hide a figure)
       P(false, 1, false, false), P(true, 1, false, false), P(false, 0.55, false, false), P(true, 0.55, false, false), P(false, 0, false, false), P(true, 0, false, false),
     ];
-    const bare: ShotCtx = { ...ctx, boxes: ctx.boxes.filter(b => b.kind !== 'tree') };
+    const bare: ShotCtx = { ...ctx, boxes: ctx.boxes.filter(b => b.kind !== 'tree' && b.kind !== 'brush') };
     for (const pass of freshOnly ? passes.slice(0, 1) : passes) {
       const c = pass.trees ? ctx : bare;
       if (!pass.trees && (strict || bare.boxes.length === ctx.boxes.length)) break;   // (no trees to drop: the same passes again; a strict search tries the next candidate subject first)

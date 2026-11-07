@@ -81,7 +81,7 @@ export function termStock(e: Pick<Encounter, 'wants' | 'size'>, t: TalkStance): 
   return {};
 }
 
-const BASE: Record<TalkStance, number> = { neg_toll: 0.62, neg_aid: 0.7, neg_redirect: 0.5 };
+const BASE: Record<TalkStance, number> = { neg_toll: 0.46, neg_aid: 0.52, neg_redirect: 0.36 };
 const KIND_MOD: Partial<Record<EncounterKind, Record<TalkStance, number>>> = {
   looters: { neg_toll: 0.05, neg_aid: 0.05, neg_redirect: 0.05 },
   gang: { neg_toll: -0.1, neg_aid: -0.1, neg_redirect: -0.05 },
@@ -95,7 +95,7 @@ export function settleChance(s: GameState, e: Pick<Encounter, 'kind' | 'temper' 
   let x = BASE[t] + (KIND_MOD[e.kind]?.[t] ?? 0);
   x += clamp(best(s) * 0.035, 0, 0.3);
   x -= e.temper === 'savage' ? 0.6 : e.temper === 'hard' ? 0.2 : 0;
-  if (t !== 'neg_aid') x += (p.fortress / 100) * 0.12 + (p.armed && p.fighters >= 2 ? 0.05 : 0) - (e.armed ? 0.04 : 0);
+  if (t !== 'neg_aid') x += (p.fortress / 100) * 0.08 + (p.armed && p.fighters >= 2 ? 0.04 : 0) - (e.armed ? 0.04 : 0);
   if ((s.dogs ?? []).some(d => d.health > 20)) x += 0.03;
   x += (s.gate.respect ?? 0) * 0.1;
   if (s.neighbors.some(n => n.radio && n.status === 'home' && n.disposition > 30)) x += 0.04;

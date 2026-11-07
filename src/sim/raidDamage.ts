@@ -141,6 +141,7 @@ export function nextDamage(s: GameState): RaidDamage | null {
   return null;
 }
 
+export const damageNoun = (d: RaidDamage): string => d.kind === 'gate' ? 'gate repair' : d.kind === 'breach' ? 'fence repair' : 'cleanup of the burned wreck';
 export const damageName = (d: RaidDamage): string => d.kind === 'gate' ? 'Hang the gate again' : d.kind === 'breach' ? 'Mend the gap in the fence' : `Clear the burned ${d.what ?? 'ground'}`;
 
 /** Work on a damage job; returns hours used. Finishing it takes the damage off the list. */
@@ -178,3 +179,13 @@ export function damageSummary(s: GameState): string[] {
 
 /** The work left on all open damage, in hours. */
 export const damageHoursLeft = (s: GameState): number => openDamage(s).reduce((a, d) => a + d.hours - d.done, 0);
+
+/** What a raid broke that is new since `before`, in plain words, for the report card. */
+export function newDamage(before: GameState, after: GameState): string[] {
+  const had = new Set((before.raidDamage ?? []).map(d => d.id));
+  const out: string[] = [];
+  for (const d of after.raidDamage ?? []) if (!had.has(d.id)) out.push(d.kind === 'gate' ? 'the gate off its hinges' : d.kind === 'breach' ? 'a gap in the fence' : `the ${d.what ?? 'building'} burned`);
+  const glass = (g: GameState) => g.structures.some(st => isHome(st.kind) && pendingFixes(st).some(f => f.part === 'glass'));
+  if (glass(after) && !glass(before)) out.push('broken windows');
+  return out;
+}

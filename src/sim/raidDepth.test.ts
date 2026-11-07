@@ -156,7 +156,7 @@ describe('raid damage', () => {
       g.gate.pending = enc('gang', { size: 14, strength: 170, stances: ['defend'] });
       const st = stageRaid(g, 'defend');
       const done = commitRaid(st);
-      if (openDamage(done).length) { found = true; expect(JSON.parse(JSON.stringify(done)).raidDamage).toEqual(done.raidDamage); expect(st.report.lines.join(' ')).toMatch(/gap|gate|window/); }
+      if (openDamage(done).length) { found = true; expect(JSON.parse(JSON.stringify(done)).raidDamage).toEqual(done.raidDamage); expect(st.report.lines.join(' ')).toMatch(/gap|gate|window/); expect(st.report.damage.length).toBeGreaterThan(0); }
     }
     expect(found).toBe(true);
   });

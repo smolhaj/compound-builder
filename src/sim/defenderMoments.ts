@@ -21,7 +21,7 @@ import { hourOf, type GameState } from './state';
 const r2 = (n: number) => Math.round(n * 100) / 100;
 const KID_AGE = 15;
 
-export function decorateDefenders(b: Battle, g: GameState, stance: Stance | null, seed: number): Battle {
+export function decorateDefenders(b: Battle, g: GameState, stance: Stance | null, seed: number, scene = 0): Battle {
   const homes = b.units.filter(u => u.side === 'home' && !u.machine);
   const raiders = b.units.filter(u => u.side === 'raider' && !u.machine);
   if (!raiders.length) return b;
@@ -39,12 +39,12 @@ export function decorateDefenders(b: Battle, g: GameState, stance: Stance | null
 
   // the watch
   const watch = homes.find(u => u.post === 'tower' || u.post === 'building' || u.post === 'wall') ?? homes[0];
-  if (watch) say(1.5, ['Somebody on the drive. Wake everyone.', 'Headlights at the mailbox.', 'Movement at the gate, more than one.'][(seed >>> 0) % 3], watch.id);
+  if (watch) say(1.5, (scene === 0 ? ['Somebody on the drive. Wake everyone.', 'Headlights at the mailbox.', 'Movement at the gate, more than one.'] : ['Still out there. Keep your heads down.', 'Nobody has left. I can still see them.', 'Same count as before. Stay on your post.'])[(seed >>> 0) % 3], watch.id);
   // the dogs, by name
   const dogs = (g.dogs ?? []).filter(d => d.health > 20);
-  if (dogs.length) say(0.6, dogs.length === 1 ? `${dogs[0].name} will not stop barking at the gate.` : `${dogs[0].name} and ${dogs[1].name} are at the fence, barking at the dark.`);
+  if (dogs.length && scene === 0) say(0.6, dogs.length === 1 ? `${dogs[0].name} will not stop barking at the gate.` : `${dogs[0].name} and ${dogs[1].name} are at the fence, barking at the dark.`);
   // the children are pulled indoors
-  const kids = alive.filter(p => p.kid || p.age < KID_AGE).filter(p => !used.has(p.id)).slice(0, 4);
+  const kids = scene > 0 ? [] : alive.filter(p => p.kid || p.age < KID_AGE).filter(p => !used.has(p.id)).slice(0, 4);
   const parent = homes.find(u => u.personId && g.people.find(p => p.id === u.personId && !p.kid));
   kids.forEach((k, i) => {
     const id = `h_${k.id}`;

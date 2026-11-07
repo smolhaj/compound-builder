@@ -14,7 +14,8 @@ type Ground = (x: number, z: number) => number;
 function part(geo: THREE.BufferGeometry, color: number, x: number, y: number, z: number, rx = 0, ry = 0, rz = 0): THREE.BufferGeometry {
   const g = geo.index ? geo.toNonIndexed() : geo;
   g.deleteAttribute('uv');
-  g.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz)), new THREE.Vector3(1, 1, 1)));
+  // (1.5x: a palisade stands 0.35 tall at this scale, and the wreck has to read from the diorama camera too)
+  g.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(x * 1.5, y * 1.5, z * 1.5), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz)), new THREE.Vector3(1.5, 1.5, 1.5)));
   const c = new THREE.Color(color), n = g.attributes.position.count, col = new Float32Array(n * 3);
   for (let i = 0; i < n; i++) { col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; }
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
@@ -50,6 +51,22 @@ export function damagePieces(d: Pick<RaidDamage, 'kind' | 'id'>): THREE.BufferGe
   return out;
 }
 
+/** A house with broken windows: glass on the ground along two sides, a few dark broken sashes lying where they fell. `box` is its footprint on the ground. */
+export interface GlassHome { id: string; x0: number; z0: number; x1: number; z1: number }
+export function glassPieces(h: GlassHome, ground: Ground): THREE.BufferGeometry[] {
+  // (positions are world coordinates: `part` scales its offsets 1.5x, so they are divided here)
+  const wpart = (g: THREE.BufferGeometry, c: number, x: number, y: number, z: number, rx = 0, ry = 0, rz = 0) => part(g, c, x / 1.5, y / 1.5, z / 1.5, rx, ry, rz);
+  let seed = 0; for (const ch of h.id) seed = (seed * 31 + ch.charCodeAt(0)) >>> 0;
+  const r = mulberry32(seed + 3), out: THREE.BufferGeometry[] = [];
+  const along = (t: number, side: number): [number, number] => side === 0 ? [h.x0 + (h.x1 - h.x0) * t, h.z1 + 0.04 + r() * 0.22] : [h.x1 + 0.04 + r() * 0.22, h.z0 + (h.z1 - h.z0) * t];
+  for (let i = 0; i < 22; i++) {
+    const [x, z] = along(r(), i % 2), w = 0.025 + r() * 0.05;
+    out.push(wpart(new THREE.BoxGeometry(w, 0.004, w * (0.4 + r() * 0.6)), i % 3 ? 0xdfeaf2 : 0xb9cfdc, x, ground(x, z) + 0.004 + r() * 0.002, z, 0, r() * 3.14, 0));
+  }
+  for (let i = 0; i < 2; i++) { const [x, z] = along(0.25 + i * 0.45, 0); out.push(wpart(new THREE.BoxGeometry(0.16, 0.012, 0.1), 0x2a2a28, x, ground(x, z) + 0.01, z + 0.1, 0, r() * 1.2, 0)); }
+  return out;
+}
+
 /** Local frame to world: rotate by the wall's heading (0 for a burn). */
 function placed(list: THREE.BufferGeometry[], x: number, y: number, z: number, ry: number): THREE.BufferGeometry[] {
   const m = new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), ry), new THREE.Vector3(1, 1, 1));
@@ -57,8 +74,9 @@ function placed(list: THREE.BufferGeometry[], x: number, y: number, z: number, r
 }
 
 /** Build the merged geometry for a list of damage (null: none). `heading` is the wall direction at a damage, in radians. */
-export function buildDamageGeometry(items: readonly RaidDamage[], ground: Ground, heading: (d: RaidDamage) => number): THREE.BufferGeometry | null {
+export function buildDamageGeometry(items: readonly RaidDamage[], ground: Ground, heading: (d: RaidDamage) => number, glass: readonly GlassHome[] = []): THREE.BufferGeometry | null {
   const all: THREE.BufferGeometry[] = [];
+  for (const h of glass) all.push(...glassPieces(h, ground).map(g => g));
   for (const d of items) if (d.done < d.hours) all.push(...placed(damagePieces(d), d.x, ground(d.x, d.z), d.z, d.kind === 'burn' ? 0 : heading(d)));
   return all.length ? mergeGeometries(all) : null;
 }
@@ -72,13 +90,13 @@ export class RaidDamageRenderer {
   private readonly _heading: (d: RaidDamage) => number;
   constructor(scene: THREE.Scene, ground: Ground, heading: (d: RaidDamage) => number) { this._scene = scene; this._ground = ground; this._heading = heading; }
 
-  sync(items: readonly RaidDamage[] | undefined): void {
+  sync(items: readonly RaidDamage[] | undefined, glass: readonly GlassHome[] = []): void {
     const open = (items ?? []).filter(d => d.done < d.hours);
-    const key = open.map(d => d.id).join();
+    const key = open.map(d => d.id).join() + '|' + glass.map(h => h.id).join();
     if (key === this._key) return;
     this._key = key;
     if (this._mesh) { this._scene.remove(this._mesh); this._mesh.geometry.dispose(); this._mesh = null; }
-    const geo = buildDamageGeometry(open, this._ground, this._heading);
+    const geo = buildDamageGeometry(open, this._ground, this._heading, glass);
     if (!geo) return;
     this._mesh = new THREE.Mesh(geo, this._mat);
     this._mesh.name = 'raid-damage';

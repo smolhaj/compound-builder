@@ -146,6 +146,7 @@ function Report() {
       {row('Taken', r.taken.length ? r.taken.join(', ') : none, r.taken.length > 0)}
       {row('Hurt', r.wounded.length ? r.wounded.join(', ') : none)}
       {row('Lost from your supplies', r.lost.length ? r.lost.map(([k, n]) => `${n} ${k}`).join(', ') : 'nothing')}
+      {(r.damage?.length ?? 0) > 0 && row('Broken', r.damage.join(', '), true)}
       {row('Raiders on the drive', r.raidersWounded + r.raidersDead ? `${r.raidersWounded} wounded, ${r.raidersDead} dead` : 'none left')}
       <MoreLines rounds={r.rounds} lines={r.lines.filter(l => !/^Lost:|rounds fired\.$|more rounds went out/.test(l))} />
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>

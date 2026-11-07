@@ -42,7 +42,7 @@ function dressRaider(w: Wear, look: NonNullable<BattleUnit['look']>, dark: boole
   switch (look.role) {
     case 'scout': w.shirt = 0x16181a; w.pants = 0x121315; w.coat = 2; w.hat = 0x101112; w.hasPack = false; return 0.96;
     case 'shouter': case 'rabble': w.shirt = dim(pick(CROWD_COATS), k); w.pants = dark ? 0x1b1d20 : 0x3d3a2e; w.coat = look.role === 'shouter' ? 2 : 1; w.hat = r() < 0.4 ? dim(0xb04030, k) : -1; return 1.02;
-    case 'leader': case 'soldier': w.shirt = dark ? 0x23281e : 0x4b5240; w.pants = dark ? 0x1a1c16 : 0x3a3d30; w.coat = 1; w.hat = dark ? 0x1c2018 : 0x3d4232; w.hasPack = true; w.pack = dark ? 0x1d1d18 : 0x3a3a30; return look.role === 'leader' ? 1.05 : 1;
+    case 'leader': case 'soldier': w.shirt = dark ? 0x23281e : 0x6a6a4a; w.pants = dark ? 0x1a1c16 : 0x4a4a38; w.coat = 1; w.hat = dark ? 0x1c2018 : 0x3d4232; w.hasPack = true; w.pack = dark ? 0x1d1d18 : 0x3a3a30; return look.role === 'leader' ? 1.05 : 1;
     case 'parent': w.shirt = dim(pick(FAMILY_COATS), k); w.pants = dark ? 0x1b1d20 : 0x4a4436; w.coat = 1; w.hat = r() < 0.5 ? dim(0x6a5a4a, k) : -1; w.hasPack = true; w.pack = dim(0x5a5038, k); return 0.98;
     case 'kid': w.shirt = dim(pick(KID_COATS), dark ? 0.7 : 1); w.pants = dark ? 0x1d2230 : 0x3b4a66; w.coat = 1; w.hat = r() < 0.5 ? dim(0xc65a5a, k) : -1; w.hasPack = false; return 0.6;
     default: w.shirt = dim(pick(WORK_COATS), k); w.pants = dark ? 0x1b1d20 : 0x35383c; w.coat = 1; w.hat = dim(look.role === 'driver' ? 0xd9742a : 0x3a3a30, k); w.hasPack = look.role === 'looter'; if (w.hasPack) w.pack = dim(0x3a3a40, k); return 1;

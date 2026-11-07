@@ -179,7 +179,7 @@ export function GateCard() {
             </button>
           ))}
         </div>
-        {cut && <button style={{ ...button(true), marginTop: 12, width: '100%', textAlign: 'center', fontSize: 15, padding: '10px 12px', fontWeight: 700, letterSpacing: 0.5 }} onClick={g.watchRaid}>Watch</button>}
+        {cut && <button style={{ ...button(true), position: 'sticky', bottom: 0, marginTop: 12, width: '100%', textAlign: 'center', fontSize: 15, padding: '10px 12px', fontWeight: 700, letterSpacing: 0.5 }} onClick={g.watchRaid}>Watch</button>}
       </div>
     );
   }

@@ -12,6 +12,7 @@
  */
 import type { Battle } from './battleTypes';
 import { resolve, type Outcome, type Stance } from './encounters';
+import { newDamage } from './raidDamage';
 import { decorateDefenders } from './defenderMoments';
 import { decorateRaiders } from './raiderKinds';
 import { breakInScene, commitDays, finishPlan, gateScene, planSiege, probeBattle, siegeStrain, type Scene, type SiegePlan } from './siege';
@@ -47,6 +48,8 @@ export interface RaidReport {
   /** Raiders left on the drive after a fight the family won. */
   raidersWounded: number;
   raidersDead: number;
+  /** What the raid broke and left broken until it is mended (sim/raidDamage.ts): a gap in the fence, the gate, windows, a burned wreck. */
+  damage: string[];
   /** Rounds fired by the family in the fight and the scenes before it. */
   rounds: number;
   /** The rest of the outcome card's lines (ammunition, mines, recovered explosives, ...). */
@@ -83,7 +86,7 @@ export function stageRaid(game: GameState, stance: Stance, keep?: Keep): StagedR
     const style = sc.style ?? fresh.style;
     if (e.kind === 'break_in') return b;
     const d = style ? decorateRaiders(b, style, sc.tactic ?? 'rushing', b.night, seed + sc.index * 53) : b;
-    return decorateDefenders(d, game, played, seed + sc.index);
+    return decorateDefenders(d, game, played, seed + sc.index, sc.index);
   };
   const finalBattle = (): Battle => {
     if (battle) return deco(battle, finalScene);
@@ -158,6 +161,6 @@ export function raidReport(before: GameState, after: GameState, outcome: Outcome
   const rounds = (b ? b.events.filter(e => e.kind === 'shot' && e.from.startsWith('h_')).length : 0) + extraRounds;
   return {
     title: outcome.title, text: outcome.text, tone: outcome.tone, killed, wounded, taken, lost,
-    raidersWounded: am?.wounded ?? 0, raidersDead: am?.dead ?? 0, rounds, lines: outcome.lines, aftermath: !!am,
+    damage: newDamage(before, after), raidersWounded: am?.wounded ?? 0, raidersDead: am?.dead ?? 0, rounds, lines: outcome.lines, aftermath: !!am,
   };
 }
