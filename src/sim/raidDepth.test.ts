@@ -280,8 +280,17 @@ describe('raiders are not put down in cover', () => {
     const push = coverPusher([{ x: 10, z: 10, r: 0.5 }, { x: 10.6, z: 10, r: 0.5 }]);
     expect(push(2, 2)).toEqual({ x: 2, z: 2 });
     const p = push(10.1, 10);
-    expect(Math.hypot(p.x - 10, p.z - 10)).toBeGreaterThanOrEqual(0.5 + 0.16 - 1e-6);
-    expect(Math.hypot(p.x - 10.6, p.z - 10)).toBeGreaterThanOrEqual(0.5 + 0.16 - 0.05);
+    expect(Math.hypot(p.x - 10, p.z - 10)).toBeGreaterThanOrEqual(0.5 + 0.35 - 1e-6);
+    expect(Math.hypot(p.x - 10.6, p.z - 10)).toBeGreaterThanOrEqual(0.5 + 0.35 - 0.25);
     expect(push(10, 10).x).not.toBe(10);
+  });
+});
+describe('opportunists', () => {
+  it('come with a pickup standing behind them, on the road side', () => {
+    const b: Battle = { night: false, duration: 9, units: [{ id: 'h_a', side: 'home', x: 0, z: 0 }, { id: 'r0', side: 'raider', x: 20, z: 0 }, { id: 'r1', side: 'raider', x: 20, z: 2 }], events: [{ t: 9, kind: 'end', result: 'fled' }] };
+    const d = decorateRaiders(b, 'opportunists', 'rushing', false, 3);
+    expect(d.vehicle!.x).toBeGreaterThan(21);
+    expect(decorateRaiders(b, 'crowd', 'rushing', false, 3).vehicle).toBeUndefined();
+    expect(b.vehicle).toBeUndefined();
   });
 });

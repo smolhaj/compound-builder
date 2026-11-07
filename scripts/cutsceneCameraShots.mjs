@@ -52,6 +52,7 @@ try {
   await page.goto(`http://localhost:${port}/?seed=7${lowrender ? `&lowrender=${lowrender}&looktier=${quality === 'low' ? 'medium' : quality}` : ''}`);
   await page.waitForFunction(() => window.__cb, null, { timeout: 180000 });
   await page.evaluate(q => window.__cb.store.getState().setQuality(q), quality);
+  if (args.includes('--nocover')) await page.evaluate(() => { window.__cb.qa.noCover = true; });   // (QA: leave ground cover out of the camera obstacles, to see what it changes)
   if (lowrender && doy0) await page.evaluate(() => { window.__cb.qa.weather = true; });   // (winter: let the snow layer run)
   if (lowrender) await page.evaluate(() => {
     // the page's own frame loop must not advance the cutscene or the fight: only the harness steps do (the loop gets the last pose back)

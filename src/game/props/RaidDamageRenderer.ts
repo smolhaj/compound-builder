@@ -60,7 +60,7 @@ export function glassPieces(h: GlassHome, ground: Ground): THREE.BufferGeometry[
   const r = mulberry32(seed + 3), out: THREE.BufferGeometry[] = [];
   const along = (t: number, side: number): [number, number] => side === 0 ? [h.x0 + (h.x1 - h.x0) * t, h.z1 + 0.04 + r() * 0.22] : [h.x1 + 0.04 + r() * 0.22, h.z0 + (h.z1 - h.z0) * t];
   for (let i = 0; i < 22; i++) {
-    const [x, z] = along(r(), i % 2), w = 0.025 + r() * 0.05;
+    const [x, z] = along(r(), i % 2), w = 0.05 + r() * 0.08;
     out.push(wpart(new THREE.BoxGeometry(w, 0.004, w * (0.4 + r() * 0.6)), i % 3 ? 0xdfeaf2 : 0xb9cfdc, x, ground(x, z) + 0.004 + r() * 0.002, z, 0, r() * 3.14, 0));
   }
   for (let i = 0; i < 2; i++) { const [x, z] = along(0.25 + i * 0.45, 0); out.push(wpart(new THREE.BoxGeometry(0.16, 0.012, 0.1), 0x2a2a28, x, ground(x, z) + 0.01, z + 0.1, 0, r() * 1.2, 0)); }

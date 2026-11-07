@@ -238,6 +238,7 @@ export interface PoseAudit {
 export function auditPose(eye: V3, look: V3, fov: number, boxes: readonly Box[], actors: readonly Actor[], ground: Ground, viewH = VIEW_H): PoseAudit {
   let inside: string | null = null, nearest = 99;
   for (const b of boxes) {
+    if (b.kind === 'brush') continue;   // (ground cover is not solid: a camera may stand in it)
     if (eye.y - ground(eye.x, eye.z) < b.h) nearest = Math.min(nearest, flatDist(eye.x, eye.z, b));
     if (insideBox(eye, b, ground)) inside = b.kind;
   }

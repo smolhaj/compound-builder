@@ -115,7 +115,14 @@ export function decorateRaiders(b: Battle, style: CrewStyle, tactic: Tactic, nig
     if (e.kind === 'move' || e.kind === 'cover' || e.kind === 'snag') return { ...e, ...swing(e.x, e.z, cx, cz, a) };
     return e;
   }) : b.events;
-  return { ...b, units, events };
+  // opportunists come in a pickup: it stands behind them on the road side, nose toward the house
+  let vehicle = b.vehicle;
+  if (style === 'opportunists' && home.length && !vehicle) {
+    const rx = raiders.reduce((a, u) => a + u.x, 0) / raiders.length, rz = raiders.reduce((a, u) => a + u.z, 0) / raiders.length;
+    const dx = rx - cx, dz = rz - cz, l = Math.hypot(dx, dz) || 1;
+    vehicle = { kind: 'pickup', x: Math.round((rx + (dx / l) * 3) * 100) / 100, z: Math.round((rz + (dz / l) * 3) * 100) / 100, rot: Math.atan2(-dx, -dz) + 0.35 };
+  }
+  return { ...b, units, events, ...(vehicle ? { vehicle } : {}) };
 }
 
 // ─────────────────────────────────────────────────────────────────────────

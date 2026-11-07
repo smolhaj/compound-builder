@@ -76,9 +76,14 @@ export type BattleEvent =
   | { t: number; kind: 'aid'; unit: string; by: string; what: 'tourniquet' | 'chest seal' | 'pressure' }
   | { t: number; kind: 'end'; result: 'repelled' | 'fled' | 'breached' | 'overrun' };
 
+/** A vehicle left standing in the scene (the opportunists' pickup): where, and which way its nose points (radians about +y, front toward +z). */
+export interface BattleVehicle { kind: 'pickup'; x: number; z: number; rot: number }
+
 export interface Battle {
   /** Night or day (lights matter at night). */
   night: boolean;
+  /** A parked vehicle (sim/raiderKinds.ts). */
+  vehicle?: BattleVehicle;
   units: BattleUnit[];
   /** In time order. */
   events: BattleEvent[];

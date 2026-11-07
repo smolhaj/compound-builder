@@ -360,13 +360,13 @@ export function GameCanvas() {
       const h = g.structures.find(x => isFinished(x) && isHome(x.kind)) ?? g.structures.find(isFinished);
       return h ? { x: h.x, y: 0, z: h.z } : { x: world.camp.x, y: 0, z: world.camp.z };
     };
-    const player = new CutscenePlayer({ battle, ground: world.groundAt, house: homeSpot, commit: () => useGameStore.getState().commitCutscene(), seed: useGameStore.getState().game.seed, obstacles: () => [...obstaclesOf(useGameStore.getState().game), ...treeBoxes(world.treeSpecs, homeSpot(), 70), ...coverBoxes(world.lowCover, homeSpot(), 70)] });
+    const player = new CutscenePlayer({ battle, ground: world.groundAt, house: homeSpot, commit: () => useGameStore.getState().commitCutscene(), seed: useGameStore.getState().game.seed, obstacles: () => [...obstaclesOf(useGameStore.getState().game), ...treeBoxes(world.treeSpecs, homeSpot(), 70), ...(qa.noCover ? [] : coverBoxes(world.lowCover, homeSpot(), 70))] });
     let cineSaved: { fov: number; near: number } | null = null;
     /** Where the player's own camera stood before the raid prompt, and the glide back to it once the cutscene is over (yaw eased by hand: the glide has none). */
     let camBefore: { x: number; y: number; z: number; radius: number; pitch: number; yaw: number } | null = null, camBack = false;
     let promptAt = -1, skipScene = useCutsceneView.getState().skipScene, skipAll = useCutsceneView.getState().skipAll;
     let battleView: { x: number; z: number; radius: number; pitch: number } | null = null;
-    const qa: { frames: number; frameMs: number; lowrender?: boolean; weather?: boolean; renderNow?: () => Promise<void>; renderFull?: (q?: QaQuality) => Promise<void>; pose: null | { x: number; y: number; z: number; lx: number; ly: number; lz: number; fov?: number } } = { frames: 0, frameMs: 0, pose: null };
+    const qa: { noCover?: boolean; frames: number; frameMs: number; lowrender?: boolean; weather?: boolean; renderNow?: () => Promise<void>; renderFull?: (q?: QaQuality) => Promise<void>; pose: null | { x: number; y: number; z: number; lx: number; ly: number; lz: number; fov?: number } } = { frames: 0, frameMs: 0, pose: null };
     // window.__cb.qa.renderNow(): draw one frame (a promise); renderFull('high'|'medium'): one slow full-quality, full-resolution shot
     if (lowRender.on) Object.assign(qa, { lowrender: true, renderNow: () => renderReq.request(), renderFull: (q: QaQuality = 'high') => renderReq.request(q) });
     const budget = new FrameBudget(), loopStart = performance.now();

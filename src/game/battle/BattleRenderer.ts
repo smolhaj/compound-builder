@@ -12,6 +12,7 @@ import { FigureLayer, FIG_POSE, FIG_SCALE } from '../../engine/world/people/figu
 import { pickPersonaWear, type Wear } from '../../engine/world/people/crowdWear';
 import type { Battle, BattleEvent, BattleUnit } from '../../sim/battleTypes';
 import { coverPusher } from './cameraObstacles';
+import { buildVehicle } from '../props/vehicleGeometry';
 
 const RUN = 1.1;          // world units / s (≈ 6.5 m/s)
 const FLEE = 1.6;
@@ -247,6 +248,13 @@ export class BattleRenderer {
       this._units.set(def.id, { scale, def, x: start.x, y, z: start.z, tx: start.x, ty: y, tz: start.z, rot: def.side === 'raider' ? Math.atan2(this._center.x - def.x, this._center.z - def.z) : 0,
         phase: r() * 6, speed: RUN, wear, wound: 0, dead: false, crouch: false, gone: false });
     }
+    if (b.vehicle) {
+      // (the opportunists' pickup: one small group of merged parts, only while this scene plays)
+      const v = buildVehicle(b.vehicle.kind);
+      const c = this._clearOfCover(b.vehicle.x, b.vehicle.z);
+      v.position.set(c.x, this._ground(c.x, c.z), c.z); v.rotation.y = b.vehicle.rot;
+      this._group.add(v); this._vehicle = v;
+    }
     this._alarm = new THREE.PointLight(0xff2020, 0, 14, 1.6);
     this._alarm.position.set(this._center.x, this._ground(this._center.x, this._center.z) + 0.8, this._center.z);
     this._group.add(this._alarm);
@@ -265,7 +273,10 @@ export class BattleRenderer {
     this.onEnd?.();
   }
 
+  private _vehicle: THREE.Group | null = null;
+
   stop(): void {
+    if (this._vehicle) { this._group.remove(this._vehicle); this._vehicle.traverse(o => { if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).geometry.dispose(); }); this._vehicle = null; }
     for (const m of this._marks) { this._group.remove(m.sprite); m.sprite.material.dispose(); }
     this._marks.length = 0;
     this.battle = null;

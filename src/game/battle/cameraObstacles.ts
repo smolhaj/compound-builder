@@ -92,7 +92,7 @@ export function coverPusher(cover: readonly CoverLike[]): (x: number, z: number)
     for (let pass = 0; pass < 3; pass++) {
       let moved = false;
       for (let gx = -1; gx <= 1; gx++) for (let gz = -1; gz <= 1; gz++) for (const c of cells.get((Math.floor(px / 4) + gx) * 100003 + Math.floor(pz / 4) + gz) ?? []) {
-        const dx = px - c.x, dz = pz - c.z, d = Math.hypot(dx, dz), lim = c.r + 0.16;
+        const dx = px - c.x, dz = pz - c.z, d = Math.hypot(dx, dz), lim = c.r + 0.35;
         if (d < lim) { if (d > 1e-3) { px = c.x + dx * lim / d; pz = c.z + dz * lim / d; } else px = c.x + lim; moved = true; }
       }
       if (!moved) break;
