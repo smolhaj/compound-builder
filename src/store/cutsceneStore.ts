@@ -15,6 +15,8 @@ export interface CutsceneView {
   gap: string | null;
   /** 0-1 through the whole cutscene. */
   progress: number;
+  /** The tail is a wake (sim/raidDrama.ts): the lines and narration of the people in it show instead of the scene caption. */
+  wake?: boolean;
 }
 
 interface CutsceneViewStore {

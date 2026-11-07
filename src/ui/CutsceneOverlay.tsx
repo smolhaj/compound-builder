@@ -40,6 +40,7 @@ export function CutsceneOverlay() {
   const light = lightLabel(hour);
   const plan = c.plan;
   const multi = !!plan && plan.scenes.length > 1;
+  const talking = !!view && (view.seg === 'fight' || (view.seg === 'tail' && !!view.wake));
   return (
     <>
       <div style={{ ...bar, top: 0, height: BAR, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 clamp(16px, 4vw, 48px)', color: '#efe6d4', fontFamily: FONT }}>
@@ -63,9 +64,9 @@ export function CutsceneOverlay() {
       </div>
       <div style={{ ...bar, bottom: 0, height: BAR, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 clamp(16px, 8vw, 120px)', color: '#efe6d4', fontFamily: FONT, textAlign: 'center' }}>
         {c.phase === 'prompt' && <div style={{ fontSize: 'clamp(14px, 2.5vh, 21px)', fontStyle: 'italic', lineHeight: 1.35 }}>{c.narration}</div>}
-        {playing && view.seg !== 'fight' && view.seg !== 'gap' && view.caption && <div style={{ fontSize: 'clamp(14px, 2.5vh, 21px)', fontStyle: 'italic', lineHeight: 1.35 }}>{view.caption}</div>}
-        {playing && view.seg === 'fight' && lines.length === 0 && view.caption && <div style={{ fontSize: 'clamp(14px, 2.5vh, 21px)', fontStyle: 'italic', lineHeight: 1.35 }}>{view.caption}</div>}
-        {playing && view.seg === 'fight' && lines.length > 0 && (
+        {playing && !talking && view.seg !== 'gap' && view.caption && <div style={{ fontSize: 'clamp(14px, 2.5vh, 21px)', fontStyle: 'italic', lineHeight: 1.35 }}>{view.caption}</div>}
+        {playing && talking && lines.length === 0 && view.caption && <div style={{ fontSize: 'clamp(14px, 2.5vh, 21px)', fontStyle: 'italic', lineHeight: 1.35 }}>{view.caption}</div>}
+        {playing && talking && lines.length > 0 && (
           <div style={{ fontSize: 'clamp(13px, 2.2vh, 19px)', lineHeight: 1.3 }}>
             {lines.slice(-2).map((l, i, a) => {
               const who = speaker(battle, people, l.who);

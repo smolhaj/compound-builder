@@ -13,8 +13,8 @@ import type { Box } from './cameraObstacles';
 export type { Box } from './cameraObstacles';
 export interface Actor { id: string; side: 'home' | 'raider'; post?: string; x: number; y: number; z: number; dead: boolean; gone: boolean }
 export interface V3 { x: number; y: number; z: number }
-export type ShotKind = 'establish' | 'wide' | 'wall' | 'house' | 'raiders' | 'close' | 'gate';
-export interface Shot { kind: ShotKind; subject?: string; eye: V3; look: V3; fov: number; since: number; hold: number; drift: V3; /** Who the shot is about (ids), and how many of them must be in frame. */ subjects?: string[]; need?: number; /** The fewest pixels tall (on a 720-line picture) the subjects must stand in the picture; unset = any. */ minPx?: number; /** The unit the operator pans after (the look eases to it as it moves). */ track?: string }
+export type ShotKind = 'establish' | 'wide' | 'wall' | 'house' | 'raiders' | 'close' | 'gate' | 'vigil';
+export interface Shot { /** A beat holds the shot until this time (the death scene's cuts are not cut away from by the next wound). */ pinUntil?: number; kind: ShotKind; subject?: string; eye: V3; look: V3; fov: number; since: number; hold: number; drift: V3; /** Who the shot is about (ids), and how many of them must be in frame. */ subjects?: string[]; need?: number; /** The fewest pixels tall (on a 720-line picture) the subjects must stand in the picture; unset = any. */ minPx?: number; /** The unit the operator pans after (the look eases to it as it moves). */ track?: string }
 
 const MIN_HOLD = 3.2;
 const ORDER: ShotKind[] = ['wall', 'raiders', 'house', 'wide', 'gate', 'raiders'];
@@ -30,7 +30,7 @@ const spanOf = (s: Pick<Shot, 'kind'>): number => (s.kind === 'establish' ? 30 :
 const FIG_H = 0.28, VIEW_H = 720;
 
 /** The least distance (world units, 1 = 6 m) from the camera to what a shot is about, by shot type. */
-export const STANDOFF: Record<ShotKind, number> = { establish: 3, wide: 3, wall: 0.9, house: 2, raiders: 1.6, close: 0.8, gate: 1.2 };
+export const STANDOFF: Record<ShotKind, number> = { establish: 3, wide: 3, wall: 0.9, house: 2, raiders: 1.6, close: 0.8, gate: 1.2, vigil: 0.6 };
 /** The farthest a subject may be before it is a speck. */
 export const REACH = 30;
 /** The camera stays this far from every wall and roof (the near plane is 0.02, so nothing clips). */
@@ -268,6 +268,8 @@ export class Director {
   private _lastCheck = -99;
   private _t = 0;
   private _g: Ground = () => 0;
+  private _byId: ReadonlyMap<string, Actor> = new Map();
+  private _with: string[] | undefined;
   /** The lead-in (the approach, time-lapsed): the camera shows the raiders coming, whatever the caption says is out there. */
   leadIn = false;
   /** Night scene (the loved look: no pixel rule on the crew). Set by the player per scene. */
@@ -336,8 +338,16 @@ export class Director {
     const road = (() => { const d = sub(rc, house); const l = len2(d); return { x: d.x / l, z: d.z / l }; })();
     const byId = new Map(actors.map(a => [a.id, a]));
     // something happened that the camera should see
-    let want: { kind: ShotKind; subject?: string; hold: number } | null = null;
+    let want: { kind: ShotKind; subject?: string; hold: number; force?: boolean; with?: string[] } | null = null;
+    this._byId = byId;
     for (const e of fresh) {
+      if (e.kind === 'beat' && e.unit) {
+        // the death scene and the wake (sim/raidDrama.ts): the camera is told where to look, and holds there
+        const long = e.role === 'aim' || e.role === 'fall' ? 4.2 : 7.5;
+        want = e.role === 'aim' || e.role === 'fall' ? { kind: 'close', subject: e.unit, hold: long, force: true } : { kind: 'vigil', subject: e.unit, hold: long, force: true, with: e.with };
+        continue;
+      }
+      if (want?.force) continue;
       if ((e.kind === 'wound' && !e.stopped) || e.kind === 'death' || e.kind === 'aid') { const u = byId.get(e.unit); if (u && (u.side === 'home' || this._r() < 0.5)) want = { kind: 'close', subject: e.unit, hold: 3.6 }; }
       else if (e.kind === 'breach' || e.kind === 'fallback' || e.kind === 'explosion' || e.kind === 'mine') want = { kind: 'wide', hold: 4.2 };
       else if (e.kind === 'alarm' && !this.shot) want = { kind: 'house', hold: 5 };
@@ -348,7 +358,9 @@ export class Director {
     }
     const cur = this.shot;
     // the same cut twice running (a second close-up of the same person, a second wide) is no cut at all
-    if (want && cur && want.kind === cur.kind && want.subject === cur.subject) want = null;
+    if (want && !want.force && cur && want.kind === cur.kind && want.subject === cur.subject) want = null;
+    // a held beat is not cut away from by the next wound or line
+    if (want && !want.force && cur?.pinUntil !== undefined && time < cur.pinUntil) want = null;
     // the operator pans after the unit the shot is about (the eye stays where it was cut)
     if (cur?.track) {
       const a = byId.get(cur.track);
@@ -361,13 +373,19 @@ export class Director {
     const held = cur ? time - cur.since : 99;
     let due = !cur || held >= cur.hold || (cur.kind === 'close' && cur.subject !== undefined && (byId.get(cur.subject)?.gone || false));
     // the subject walked behind a wall or out of the picture: cut early
-    if (!due && cur && held >= 1.2 && time - this._lastCheck >= 0.5) {
+    if (cur?.pinUntil !== undefined && time < cur.pinUntil) due = false;
+    if (!due && cur && held >= 1.2 && time - this._lastCheck >= 0.5 && !(cur.pinUntil !== undefined && time < cur.pinUntil)) {
       this._lastCheck = time;
       const ctx: ShotCtx = { boxes: this._shotBoxes(), ground, actors: new Map(live.map(a => [a.id, a])) };
       const now: Shot = { ...cur, since: 0, hold: 0, drift: { x: 0, y: 0, z: 0 }, ...poseAt(cur, time), minPx: cur.minPx ? cur.minPx * 0.5 : undefined };
       if (cur.subjects?.length && shotProblems(now, ctx).length) due = true;   // (a subject that fell or left counts: nobody left to show)
     }
-    if (want && (!cur || held >= MIN_HOLD || (want.kind === 'wide' && held >= 2))) return this._cut(time, want.kind, want.subject, want.hold, home, raiders, hc, rc, road, house, ground);
+    if (want && (!cur || want.force || held >= MIN_HOLD || (want.kind === 'wide' && held >= 2))) {
+      this._with = want.with;
+      const shot = this._cut(time, want.kind, want.subject, want.hold, home, raiders, hc, rc, road, house, ground);
+      if (want.force) shot.pinUntil = time + want.hold;
+      return shot;
+    }
     if (due) {
       // next in the rotation that has something to show
       const order = this.leadIn && raiders.length ? LEAD_ORDER : ORDER;
@@ -431,6 +449,21 @@ export class Director {
     const at = (x: number, z: number, h: number): V3 => ({ x, y: ground(x, z) + h, z });
     const chest = (a: Actor): V3 => chestOf(a, ground);
     const base = { since: time, hold };
+    if (kind === 'vigil' && subject) {
+      // the quiet after: the fallen (or the one being tended, or the raider on the drive) with the people who have come to them, low and close, never
+      // the wound itself. Only those already near are subjects (the others are still walking in); with nobody near it frames the place alone.
+      const f = this._byId.get(subject);
+      if (f) {
+        const folk = (this._with ?? []).map(id => this._byId.get(id)).filter((a): a is Actor => !!a && !a.dead && !a.gone && Math.hypot(a.x - f.x, a.z - f.z) < 1.4);
+        const look = at(f.x, f.z, f.y + 0.08);
+        const track = !f.dead ? f.id : folk[0]?.id;
+        return this._set(this._search((rot, k, hb) => {
+          const o = rotate({ x: -road.x * 1.0 + px * 1.1, z: -road.z * 1.0 + pz * 1.1 }, rot, k);
+          return { ...base, kind: 'vigil', subject, subjects: folk.map(a => a.id), need: folk.length > 1 ? 0.6 : 1, ...(track ? { track } : {}), eye: at(f.x + o.x, f.z + o.z, f.y + 0.4 + hb * 0.7), look, fov: 50, drift: { x: px * 0.015, y: 0, z: pz * 0.015 } };
+        }, ctx));
+      }
+      kind = 'wide';
+    }
     if (kind === 'close' && subject) {
       const u = everyone.find(a => a.id === subject);
       if (u) {

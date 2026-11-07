@@ -88,11 +88,22 @@ import { ProjectsTab } from './hud/ProjectsTab';
 import { DefenseTab } from './hud/DefenseTab';
 import { defenseTabAlert } from './hud/defenseAlert';
 import { CursorHint, LineToolBar, ToastLine, WelcomeCard } from './hud/Feedback';
+import { getViolence, setViolence, type Violence } from '../game/battle/bloodFx';
 import { useFeelStore, saveRevealed, worldId } from '../store/feelStore';
 import { visibleTabs, type RightTab } from '../sim/tabReveal';
 import { caloriesText, feetText, gallonsText, kmText, lengthText } from '../sim/units';
 
 const QUALITIES: Quality[] = ['high', 'medium', 'low'];
+
+/** Raid cutscenes: blood and wounds shown (Graphic, the default) or left out (Restrained). Remembered on this device; the fall and the grief stay either way. */
+function ViolenceSelect() {
+  const [v, setV] = useState<Violence>(getViolence());
+  return (
+    <select value={v} onChange={e => { const x = e.target.value as Violence; setViolence(x); setV(x); }} title="Raid scenes: Graphic shows blood and wounds; Restrained leaves them out (the fall and the grief stay)" aria-label="Violence in raid scenes" data-testid="violence-select">
+      <option value="graphic">Graphic</option><option value="restrained">Restrained</option>
+    </select>
+  );
+}
 const SIGHTS: Array<['off' | 'road' | 'ridge' | 'night' | 'viewshed', string, string]> = [
   ['off', 'Off', 'No sightline overlay'], ['road', 'Road', 'How exposed each spot is to people on the county road'], ['ridge', 'Ridge', 'Seen from the high ground to the west'],
   ['night', 'Night', 'Where your lit windows give you away after dark'], ['viewshed', 'View from…', 'Click a spot to see what can be seen from there (Shift-click: from a 33 ft tower)']];
@@ -631,6 +642,7 @@ export function Hud() {
         <select value={w.quality} onChange={e => { w.setQuality(e.target.value as Quality, true); w.setPerfNotice(null); }} title="Graphics quality (Low: no shadows or post-processing; Medium: soft shadows; High: adds ambient occlusion and a sharper pixel ratio)" aria-label="Graphics quality">
           {QUALITIES.map(x => <option key={x}>{x}</option>)}
         </select>
+        <ViolenceSelect />
         <select value={w.frameCap} onChange={e => w.setFrameCap(Number(e.target.value) as FrameCap)} title="Frame-rate cap: 60 is smooth and halves the work on a 120 Hz display" aria-label="Frame-rate cap">
           <option value={60}>60 fps</option><option value={30}>30 fps</option><option value={0}>uncapped</option>
         </select>
