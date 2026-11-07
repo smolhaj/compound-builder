@@ -49,6 +49,7 @@ import { coverBoxes, obstaclesOf, treeBoxes } from './battle/cameraObstacles';
 import { liveBreach } from './battle/liveBreach';
 import { decorateBreach } from '../sim/breach';
 import { planHouseAssault } from '../sim/houseAssault';
+import { LineDirector } from '../sim/raidDialogue';
 import { fireBoxesOf } from './battle/lineOfFire';
 import { useCutsceneView } from '../store/cutsceneStore';
 import { isFinished } from '../sim/construction';
@@ -383,9 +384,10 @@ export function GameCanvas() {
         const home = g.structures.find(x => isFinished(x) && isHome(x.kind) && KIT[x.kind]);
         const seed = g.seed * 131 + Math.round(b.duration * 7);
         const carries = b.events.some(e => e.kind === 'rocket' || e.kind === 'throw');
-        const d = decorateBreach(b, g.perimeter, hs, seed, carries);
+        const dir = new LineDirector(seed);   // (one picker for the break and the house: no line twice)
+        const d = decorateBreach(b, g.perimeter, hs, seed, carries, dir);
         if (!home) return d;
-        return planHouseAssault(d, { box: footprint(KIT[home.kind], home.x, home.z, home.rot, false), blocked: (x, z) => world.walkBlocked(x, z, 0.04), seed });
+        return planHouseAssault(d, { box: footprint(KIT[home.kind], home.x, home.z, home.rot, false), blocked: (x, z) => world.walkBlocked(x, z, 0.04), seed, dir });
       },
       cutaway: on => { const ws2 = useWorldStore.getState(); if (on) { cutawayBefore ??= ws2.buildingView; ws2.setBuildingView('cutaway'); } else if (cutawayBefore) { ws2.setBuildingView(cutawayBefore); cutawayBefore = null; } } });
     const nameLayer = new NameLabelLayer();

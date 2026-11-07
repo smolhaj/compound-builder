@@ -4,6 +4,7 @@ import { planRun } from './perimeter';
 import type { Battle, BattleUnit } from './battleTypes';
 import { breachMethod, breachOptions, breachSpot, decorateBreach } from './breach';
 import { ASSAULT_EXTRA, planHouseAssault } from './houseAssault';
+import { LineDirector } from './raidDialogue';
 
 function world() {
   const g = newGame(3, 105, 2027, { mode: 'scenario', peace: 'short', kind: 'grid_down' });
@@ -171,4 +172,30 @@ describe('breach camera data', () => {
     expect(ch.invasion!.breach!.from).toBeLessThan(45.8);
     expect(ram.invasion!.breach!.ox).toBeGreaterThan(0.9);
   });
+});
+
+describe('invasion dialogue', () => {
+  const box = { x0: -0.8, z0: -0.6, x1: 0.8, z1: 0.6 };
+  const wall = (x: number, z: number) => {
+    if (!(x > box.x0 - 0.03 && x < box.x1 + 0.03 && z > box.z0 - 0.03 && z < box.z1 + 0.03)) return false;
+    if (x < box.x0 + 0.04 || x > box.x1 - 0.04 || z < box.z0 + 0.04 || z > box.z1 - 0.04) return !(z > box.z1 - 0.06 && Math.abs(x) < 0.12);
+    return Math.abs(x) < 0.03 && Math.abs(z) > 0.12;
+  };
+  for (const style of ['crowd', 'crew'] as const) for (const result of ['breached', 'overrun'] as const) {
+    it(`a whole ${style} invasion ending ${result}: no line twice, no caption stuck for long, new moments each time`, () => {
+      const g = world();
+      const dir = new LineDirector(11);
+      const b0 = battle(style);
+      const b = { ...b0, events: b0.events.map(e => (e.kind === 'end' ? { ...e, result } : e)) };
+      const d = decorateBreach(b, g.perimeter, { x: 0, z: 0 }, 5, false, dir);
+      const a = planHouseAssault(d, { box, blocked: wall, seed: 4, dir });
+      const says = a.events.filter(e => e.kind === 'say');
+      const texts = says.map(e => (e.kind === 'say' ? e.text : ''));
+      expect(new Set(texts).size, 'a line was said twice').toBe(texts.length);
+      for (let i = 1; i < says.length; i++) expect(says[i].t - says[i - 1].t, `quiet stretch before ${texts[i]}`).toBeLessThan(5);
+      const ctxs = new Set(says.map(e => (e.kind === 'say' ? e.ctx : '')));
+      for (const c of ['stack_door', 'clear_room', 'hold_room', 'search', 'leaving']) expect(ctxs.has(c), c).toBe(true);
+      expect(ctxs.has(d.invasion?.method === 'ram' ? 'ram_run' : 'charge_set')).toBe(true);
+    });
+  }
 });

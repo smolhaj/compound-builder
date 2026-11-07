@@ -21,7 +21,9 @@ import type { CrewStyle } from './raiderKinds';
 import { mulberry32 } from './rng';
 
 export type Ctx = 'approach' | 'first_shots' | 'fight' | 'defender_hit' | 'mate_down' | 'raider_down' | 'retreat' | 'fire' | 'breach' | 'aftermath'
-  | 'grief' | 'tend' | 'tended' | 'prisoner' | 'prisoner_reply' | 'looting' | 'held';
+  | 'grief' | 'tend' | 'tended' | 'prisoner' | 'prisoner_reply' | 'looting' | 'held'
+  // the invasion (sim/breach.ts, sim/houseAssault.ts): the truck, the charge, the door, the rooms, the dragging, the search, the leaving
+  | 'ram_run' | 'ram_hit' | 'charge_set' | 'charge_call' | 'stack_door' | 'clear_room' | 'hold_room' | 'drag' | 'search' | 'leaving';
 export type Role = 'raider' | 'defender';
 export const RETREAT_CTX: ReadonlySet<Ctx> = new Set<Ctx>(['retreat', 'aftermath']);
 
@@ -67,6 +69,14 @@ export const LINES: Record<Role, Partial<Record<Ctx, Variants>>> = {
     },
     looting: { any: ['Hands up! Stay where you are!', 'Nobody moves. Nobody gets hurt.', 'Check the house. Find the food.', 'Grab the cans and the fuel. Fast.', 'Load it up. Move!', 'That is all we need. Let us go.'] },
     breach: { any: ['We are through! Go, go, go!', 'The wall is down! Everybody in!', 'Inside the fence! Push!', 'Get to the house!'] },
+    ram_run: { any: ['Floor it! Through the wall!', 'Hit it! Hit the wall, go, go!', 'Take it down. Put the truck right through it!', 'Do not slow down! Straight in!', 'Keep your foot down. Do not lift!'] },
+    ram_hit: { any: ['Go, go, go! Inside!', 'It is open. Push through, push!', 'Through the gap! Spread out!', 'Move up! Take the yard!', 'Fan out. Cover the house!'] },
+    charge_set: { any: ['Cover me. Setting the charge.', 'Stay low. I am planting it now.', 'Give me ten seconds on the wall.', 'Bag is on the wall. Wire it.'] },
+    charge_call: { any: ['Fire in the hole! Get back!', 'Charge is set. Everybody back, back!', 'Down! Cover your ears!', 'Ten seconds. Get clear of the wall!'] },
+    stack_door: { any: ['Door! Stack on the door!', 'Get on the wall by the door. Stay off the front of it.', 'Two on the hinge side, I take the other. On three.', 'Nobody stands in front of that door. Stack up!', 'Wait for it. Wait. Now!'] },
+    clear_room: { any: ['Clear the kitchen!', 'Left side, left side!', 'Check the bedroom. Go!', 'Move up. I have the hall!', 'Corner! Corner on the right!', 'Flush them out of there!', 'Cover the doorway while I cross!', 'Stay off the doorway. It is a funnel!', 'Room on the left, I am going in!', 'Hold the hall. I am checking the back!'] },
+    search: { any: ['Where is the food? Where is it?', 'Pull the cupboards open. Check the pantry!', 'Look under the beds. They hide things there.', 'Kitchen is clean. Try the cellar door.', 'Dump the bags out. See what they have.', 'Check the shelves. Cans, fuel, anything.'] },
+    leaving: { any: ['That is all we can carry. Out, out!', 'Back to the gap. Move!', 'Take it and go. Now!', 'Out the way we came. Do not stop!', 'We are done here. Go!'] },
     prisoner_reply: {
       desperate: ['Please. I only needed food.', 'Water. Please, just some water.', 'Do not shoot. I am done. I am done.', 'It hurts. Please...', 'I did not want this. None of us did.'],
       hard: ['Go on, then. Get it over with.', 'Tell your people to back off. I am not talking.', 'You got lucky. That is all this was.', 'I will not tell you anything.', 'Do what you are going to do.'],
@@ -88,6 +98,10 @@ export const LINES: Record<Role, Partial<Record<Ctx, Variants>>> = {
     retreat: { any: ['They are pulling back!', 'They are running! Hold your fire, hold your spots.', 'They are leaving. Do not follow them.', 'That is the last of them going down the road.', 'Stay up. It could be a trick.', 'They broke. Watch the road.'] },
     fire: { any: ['Fire! Fire behind the barn!', 'Somebody get water on that!', 'Do not leave your posts. That is what they want.', 'Watch the other side! It is a distraction!', 'Keep your eyes on the fence, not the flames.'] },
     breach: { any: ['They are through the fence! Fall back to the house!', 'The wall is gone! Back, back!', 'Get the kids to the shelter!', 'Hold the door! Hold the door!'] },
+    ram_run: { any: ['Truck! They are driving at the wall. Get back!', 'That truck is not stopping. Move, move!', 'Headlights! They are coming through the wall!', 'Everybody off the fence line, now!'] },
+    charge_set: { any: ['What was that? Somebody is at the wall!', 'Somebody is at the wall with a bag. Down!', 'Get away from the fence. They are going to blow it!'] },
+    hold_room: { any: ['Hold the doorway. Shoot anything that comes through!', 'Stay down behind the couch!', 'Keep them out of the hall!', 'Cover the stairs. I have the door!', 'I am reloading. Cover me!', 'Do not cross the doorway. Let them come to you!', 'Keep low. They can only come one at a time!', 'Watch the corner by the kitchen!', 'Get the kids into the back room!', 'Steady. They have to come through that door!'] },
+    drag: { any: ['I have got you. Come on, up. We are moving!', 'Easy, easy. Back room, we are going to the back room!', 'Stay with me. Keep your hand on it!', 'Lean on me. Do not look back!', 'Almost there. Just to the wall!'] },
     aftermath: { any: ['Is everybody alive? Count off.', 'Check the perimeter before anyone relaxes.', 'Medic to the yard, we have wounded.', 'Stay at your posts. Maybe they are not gone.', 'Put the guns down slow. It is over for now.'] },
     held: { any: ['Okay. Okay. Take what you want.', 'Please, there are kids in the house.', 'Do not shoot. We are not fighting anymore.', 'Just take it and go.', 'Easy. Hands are up. Hands are up.'] },
     tend: { any: ['Hold still. This is going to sting.', 'Press here. Harder.', 'Look at me. You are going to be fine.', 'I have the bleeding slowed. Do not move.', 'Hand me the gauze.', 'Breathe. In, out. Good.'] },
