@@ -53,6 +53,7 @@ import { gradeBucket, roadDifficulty, winterRoadLine } from './slope';
 import { terraceSite, terraceText } from './terrace';
 import { restackPallets, slumped, wallOf } from './retaining';
 import { nobodyHome } from './orphans';
+import { damageHoursLeft, damageName, damageNeed, damageSummary, openDamage } from './raidDamage';
 import { lengthText } from './units';
 
 const usd = (n: number) => '$' + Math.round(n).toLocaleString('en-US');
@@ -79,6 +80,7 @@ export function plansNeed(s: GameState): Partial<Record<MaterialId, number>> {
   // repair jobs on a building (glass, plumbing, wiring, a roof patch) and the plumbing / wiring kits: the family waits on these too
   for (const st of s.structures) for (const f of pendingFixes(st)) if (!f.supplied) add(fixBill(f));
   for (const f of s.utilities.fittings) if (f.finishedAt === null && !f.supplied) add(FIT[f.kind].materials);
+  for (const d of openDamage(s)) if (!d.supplied) add(d.bill);
   const pending = onOrder(s);
   const out: Partial<Record<MaterialId, number>> = {};
   for (const k of MATERIAL_IDS) {
@@ -261,6 +263,13 @@ export function suggestions(s: GameState, limit = 3, skip?: ReadonlySet<string>)
     add('kin_home', n > 2 ? 'moms_house' : 'guest_house', `${joinNames(wait.flatMap(w => w.people.map(p => p.first)))} ${n === 1 ? 'is' : 'are'} waiting for a place of their own`, 85);
   }
   if (!hasKind(s, 'well_hand', 'well_drilled', 'cistern', 'water_tower')) add('water', s.site.gwDepth > 9 ? 'well_drilled' : 'well_hand', s.site.gwDepth > 9 ? `no water on the place (it is ${lengthText(s.site.gwDepth)} down: drill)` : 'no water on the place', 90);
+  // what a raid broke and nobody has mended yet (sim/raidDamage.ts)
+  { const sum = damageSummary(s), open = openDamage(s);
+    if (sum.length && (open.length || s.structures.some(st => st.fixes?.some(f => f.part === 'glass' && f.done < f.hours)))) {
+      const miss = damageNeed(s)[0];
+      out.push({ id: 'raid_damage', kind: '', title: `Mend what the raid broke: ${sum.join(', ')}`, urgency: 88, why: `${damageHoursLeft(s) > 0 ? `About ${Math.ceil(damageHoursLeft(s))} hours of work. ` : ''}Until the fence is mended the line is weaker, and the next crew will see it.${miss ? ` Needs ${linesText(Object.entries(miss.miss).map(([material, qty]) => ({ material, qty })) as never)}.` : ''}`,
+        acts: [{ label: open[0] ? damageName(open[0]) : 'Show me the house', act: { type: 'open', right: 'defense' } }] });
+    } }
   // a project that has waited days for materials we could pay for: the loudest card on the list (sim/stalls.ts)
   const stuck = stuckProject(s);
   if (stuck) out.push({ id: 'stalled', kind: '', title: stuck.escalated ? `Stuck for ${pluralize(stuck.days, 'day')}: waiting on ${linesText(stuck.lines)}` : `Stuck: waiting on ${linesText(stuck.lines)}`, urgency: stuck.escalated ? 100 : 99, ...(stuck.escalated ? { tone: 'alarm' as const } : {}),

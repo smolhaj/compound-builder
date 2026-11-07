@@ -25,7 +25,10 @@ const hour0 = Number(opt('--hour', 2.25));   // the arrival hour: 2.25 is the da
 const lowrender = opt('--lowrender', null);
 const doy0 = opt('--doy', null);   // the day of the year on the clock (e.g. 20 for deep winter; unset keeps the game's own date)
 const MIN_RAIDER_PX = 16;
-const only = opt('--only', null);   // probe | fires | assault: just that scene (a shorter run)
+const only = opt('--only', null);
+const wantStyle = opt('--style', null);   // crowd | crew | families | opportunists: pick an encounter day whose crew has that style
+// the crew: --kind gang|looters|militia|patrol, --temper desperate|hard|savage, --crewsize N, --armed 0|1 (raider types: crowd = gang desperate size 10; families = looters desperate unarmed; opportunists = looters armed)
+const crew = { kind: opt('--kind', 'gang'), temper: opt('--temper', 'hard'), size: Number(opt('--crewsize', 10)), armed: opt('--armed', '1') !== '0' };   // probe | fires | assault: just that scene (a shorter run)
 const [vw, vh] = opt('--size', '1280x720').split('x').map(Number);
 const outDir = resolve(opt('--out', 'shots/cutscene-cameras'));
 mkdirSync(outDir, { recursive: true });
@@ -49,6 +52,7 @@ try {
   await page.goto(`http://localhost:${port}/?seed=7${lowrender ? `&lowrender=${lowrender}&looktier=${quality === 'low' ? 'medium' : quality}` : ''}`);
   await page.waitForFunction(() => window.__cb, null, { timeout: 180000 });
   await page.evaluate(q => window.__cb.store.getState().setQuality(q), quality);
+  if (args.includes('--nocover')) await page.evaluate(() => { window.__cb.qa.noCover = true; });   // (QA: leave ground cover out of the camera obstacles, to see what it changes)
   if (lowrender && doy0) await page.evaluate(() => { window.__cb.qa.weather = true; });   // (winter: let the snow layer run)
   if (lowrender) await page.evaluate(() => {
     // the page's own frame loop must not advance the cutscene or the fight: only the harness steps do (the loop gets the last pose back)
@@ -68,7 +72,7 @@ try {
   const stance = opt('--stance', 'Defend');   // Defend = the siege; Hide / Parley = one scene at the gate
   const single = stance !== 'Defend', mode = 'siege';
 
-  const info = await page.evaluate(async ([single, mode, hour0, doy0]) => {
+  const info = await page.evaluate(async ([single, mode, hour0, doy0, crew, wantStyle]) => {
     const cb = window.__cb, G = cb.game, c = cb.world.camp;
     const { planSiege } = await import('/src/sim/siege.ts');
     const sp = cb.tool.findSpot('timber_cabin', c.x, c.z, 0);
@@ -93,11 +97,12 @@ try {
     // an encounter day whose plan is a siege (or a single scene)
     let ed = 0;
     for (let d = 1; d < 3000; d++) {
-      const p = planSiege({ kind: 'gang', size: 10, temper: 'hard', hour: hour0, seed: g.seed * 131 + d * 7 + 1, fought: !single, fightSeconds: single ? null : 90 });
+      const p = planSiege({ kind: crew.kind, size: crew.size, temper: crew.temper, armed: crew.armed, hour: hour0, seed: g.seed * 131 + d * 7 + 1, fought: !single, fightSeconds: single ? null : 90 });
       const night = hour0 < 6 || hour0 >= 20;
+      if (wantStyle && p.style !== wantStyle) continue;
       if (single ? p.scenes.length === 1 : night ? (p.scenes.length >= 4 && p.scenes.some(sc => sc.kind === 'fires')) : p.scenes.length >= 2) { ed = d; break; }
     }
-    g.gate.pending = mode === 'breakin' ? { id: 'e9', kind: 'break_in', day: 5, title: 'Someone is in the house', dossier: ['Two in the morning. The dog is going crazy downstairs.', '2 people, by the voices; no gun that you can see.'], size: 2, armed: false, strength: 10, wants: {}, stances: ['call_911', 'shout', 'confront'] } : { id: 'e9', kind: 'gang', day: ed, title: 'An armed crew', dossier: ['10 of them, organized, rifles. They\'ve been working the farms east of town.', 'They know what they want, and they think you have it.'], size: 10, armed: true, strength: 120, wants: { canned: 8, fuel: 4 }, stances: ['hide', 'parley', 'defend', 'trade'], temper: 'hard' };
+    g.gate.pending = mode === 'breakin' ? { id: 'e9', kind: 'break_in', day: 5, title: 'Someone is in the house', dossier: ['Two in the morning. The dog is going crazy downstairs.', '2 people, by the voices; no gun that you can see.'], size: 2, armed: false, strength: 10, wants: {}, stances: ['call_911', 'shout', 'confront'] } : { id: 'e9', kind: crew.kind, day: ed, title: 'An armed crew', dossier: [`${crew.size} of them, organized.`, 'They know what they want, and they think you have it.'], size: crew.size, armed: crew.armed, strength: crew.size * 12, wants: { canned: 8, fuel: 4 }, stances: ['hide', 'parley', 'defend', 'trade'], temper: crew.temper };
     // stepping the player and the renderer by hand (a software GL frame takes seconds)
     const { useBattleStore } = await import('/src/store/battleStore.ts');
     const { useCutsceneView } = await import('/src/store/cutsceneStore.ts');
@@ -115,8 +120,8 @@ try {
       return false;
     };
     G.getState().load(g);
-    return { day: ed, scenes: planSiege({ kind: 'gang', size: 10, temper: 'hard', hour: hour0, seed: g.seed * 131 + ed * 7 + 1, fought: !single, fightSeconds: single ? null : 90 }).scenes.length };
-  }, [single, mode, hour0, doy0]);
+    return { day: ed, scenes: planSiege({ kind: crew.kind, size: crew.size, temper: crew.temper, armed: crew.armed, hour: hour0, seed: g.seed * 131 + ed * 7 + 1, fought: !single, fightSeconds: single ? null : 90 }).scenes.length };
+  }, [single, mode, hour0, doy0, crew, wantStyle]);
   console.log(JSON.stringify(info));
   await frames(10);
   await page.waitForTimeout(3500);

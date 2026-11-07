@@ -40,6 +40,8 @@ import { PERIMETER, peopleBlock, runFinished, runGrowth, wallLength } from './pe
 import { weakPenalty } from './wallTops';
 import { gatePosture } from './gateSecurity';
 import { enclosure } from './enclosure';
+import { isTalk, talkRoll } from './negotiation';
+import { addBurnScar, applyRaidDamage, damagePenalty } from './raidDamage';
 import { contagion, infect } from './effects';
 import type { Person, SkillId } from './family';
 import { dayIndex, type GameState } from './state';
@@ -170,7 +172,7 @@ export function postureOf(s: GameState): Posture {
   // (balance pass) the ring needs ≈ 40 units of wall to close, and how good it is decides the rest: a ring of woven wire holds 50, a steel one 93,
   // so every tier up the chain raises the number (it used to be held / 40, which any 80 units of woven wire already maxed out)
   const ringQuality = wall > 0 ? held / wall : 0;
-  const barrier = Math.max(Math.min(1, wall / 40) * ringQuality * 100, line.barrier) * fenceHold(s), fortress = Math.min(100, look / 40 * 100);
+  const barrier = Math.max(0, Math.max(Math.min(1, wall / 40) * ringQuality * 100, line.barrier) * fenceHold(s) - damagePenalty(s)), fortress = Math.min(100, look / 40 * 100);
   // anyone away (a rescue, a run, the market) isn't on the line
   const here = (i: number) => s.personState[i]?.needs.died == null && !isAway(s, s.people[i].id);
   const adults = s.people.filter((p, i) => !p.kid && here(i));
@@ -191,7 +193,7 @@ export function postureOf(s: GameState): Posture {
 // ─────────────────────────────────────────────────────────────────────────
 
 export type EncounterKind = 'insider' | 'guard_stay' | 'arrival' | 'looters' | 'gang' | 'refugees' | 'requisition' | 'neighbor_help' | 'trader' | 'horde' | 'patrol' | 'militia' | 'break_in' | 'ransom' | 'trial_end' | 'tunnelers' | 'kin' | 'shelter' | 'move_in' | 'stranded';
-export type Stance = 'hide' | 'parley' | 'warn' | 'defend' | 'trade' | 'take_in' | 'trial' | 'turn_away' | 'call_911' | 'shout' | 'confront' | 'pay' | 'refuse' | 'ambush' | 'flood' | 'collapse' | 'ignore' | 'build_first' | 'move_sell' | 'move_keep' | 'move_lease' | 'hold_on' | 'drive_now' | 'back_roads' | 'resupply' | 'dismiss';
+export type Stance = 'hide' | 'parley' | 'warn' | 'defend' | 'trade' | 'take_in' | 'trial' | 'turn_away' | 'call_911' | 'shout' | 'confront' | 'pay' | 'refuse' | 'ambush' | 'flood' | 'collapse' | 'ignore' | 'build_first' | 'move_sell' | 'move_keep' | 'move_lease' | 'hold_on' | 'drive_now' | 'back_roads' | 'resupply' | 'dismiss' | 'neg_toll' | 'neg_aid' | 'neg_redirect';
 
 export interface Encounter {
   id: string;
@@ -313,6 +315,8 @@ export interface GateState {
   day: number;
   next: number;
   history: Array<{ day: number; kind: EncounterKind; stance: Stance; tone: Outcome['tone'] }>;
+  /** Talks held at the gate (sim/negotiation.ts; save v85): how many, how they ended. */
+  talks?: { held: number; settled: number; ambushed: number; refused: number };
   /** The last fight at the compound, for playback (optional; not migrated). */
   battle?: Battle;
   /** Where the guards look arrivals over when the household holds several rings (sim/gateVetting.ts); absent: nowhere. */
@@ -650,7 +654,7 @@ function stripEmpty(s: GameState, e: Encounter, p: Posture, r: () => number, los
   const burnable = s.structures.filter(st => isFinished(st) && !isHome(st.kind) && !st.kind.startsWith('bunker_') && !st.kind.startsWith('well_') && !['root_cellar', 'field', 'garden', 'septic', 'cistern', 'solar_array'].includes(st.kind));
   if (burnable.length && r() < (e.temper === 'savage' ? 0.4 : e.temper === 'hard' ? 0.2 : 0.08) + torchBonus(e.adapt ?? 0)) {
     const st = pick(r, burnable);
-    if (burnStructure(s, st)) out.push(`They set fire to the ${st.kind.replace(/_/g, ' ')} on the way out. It burned to the ground.`);
+    if (burnStructure(s, st)) { out.push(`They set fire to the ${st.kind.replace(/_/g, ' ')} on the way out. It burned to the ground.`); addBurnScar(s, st.x, st.z, st.kind.replace(/_/g, ' ')); }
   }
   // they'll be back (once: a crew that came back and found nobody again gives the place up)
   const g = s.gate;
@@ -786,6 +790,27 @@ export function resolve(s: GameState, stance: Stance): Outcome {
     // allies on the radio net, pact members and the militia ride over to help when there's shooting (sim/pact.ts)
     const allies = alliesOf(s);
     const help = allies.reduce((a, n) => a + n.members * 6, 0);
+    let talkAmbush = false;
+    if (isTalk(stance)) {
+      // (sim/negotiation.ts) a talk at the gate: paid for in stores or in humanity, never free and never sure
+      const o = talkRoll(s, e, stance, p, r);
+      const tally = (g.talks ??= { held: 0, settled: 0, ambushed: 0, refused: 0 });
+      tally.held++;
+      for (const [k, n] of Object.entries(o.stock) as Array<[keyof Stock, number]>) s.stock[k] = Math.max(0, s.stock[k] - n);
+      lines.push(...o.lines);
+      if (o.result === 'settled') {
+        tally.settled++;
+        title = o.title; text = o.text; tone = o.tone;
+        g.humanity = Math.max(0, Math.min(100, g.humanity + o.humanity));
+        if (o.neighborHit) for (const n of s.neighbors.filter(x => x.status === 'home').sort((a, b) => a.km - b.km).slice(0, 2)) n.disposition = Math.max(-100, n.disposition - 10);
+        if (o.cameBack) { g.comeBack = { kind: e.kind, size: e.size + 1, armed: e.armed, temper: e.temper, until: e.day + 30 }; g.next = Math.min(g.next < 0 ? e.day + 12 : g.next, e.day + 8 + Math.floor(r() * 8)); }
+        g.respect = Math.max(0, (g.respect ?? 0) - 0.05);
+      } else {
+        if (o.result === 'ambush') { tally.ambushed++; talkAmbush = true; } else tally.refused++;
+        stance = 'defend';
+        lines.push(`${o.title}. ${o.text}`);
+      }
+    }
     if (stance === 'hide') {
       // everyone underground (or in the timber); they take what's lying about. Nobody gets in by the tunnel: it only opens from inside.
       const found = r() < hideFoundChance(s, e, p);
@@ -830,7 +855,7 @@ export function resolve(s: GameState, stance: Stance): Outcome {
       if (via && e.scouted) lines.push(`${e.scouted} had marked the hatch on the way in.`);
       if (via) lines.push(via.forced ? 'They found a steel hatch in the leaf litter out in the trees and blew the blast door. They are in the passage.' : 'They found a steel hatch out in the trees, left unbolted. They are in the passage.');
       const raiders = via ? Math.min(raidersAfterHelp(e, help), 4 + Math.floor(e.size / 4)) : raidersAfterHelp(e, help);
-      const b = planBattle(s, raiders, s.seed * 131 + e.day * 7 + 1, battleOpts(e, e.dig || via || e.insiderHelp ? { insideBreach: true } : {}));
+      const b = planBattle(s, raiders, s.seed * 131 + e.day * 7 + 1, battleOpts(e, e.dig || via || e.insiderHelp || talkAmbush ? { insideBreach: true } : {}));
       if (via) { const run = s.perimeter.find(x => x.id === via.runId); if (run) run.revealed = true; }
       g.battle = b;
       const stockBefore = stockTotal(s);
@@ -853,6 +878,7 @@ export function resolve(s: GameState, stance: Stance): Outcome {
         if (e.kind === 'looters' || e.kind === 'gang' || e.kind === 'militia') extra.push(...stealTools(s, 0.3, 2).lines);
         extra.push(...raidTakesVehicles(s, ORGANIZED.has(e.kind)));
         lines.push(...extra);
+        lines.push(...applyRaidDamage(s, b, b.result === 'overrun', r));
         title = 'They got in';
         text = breachText(b.result === 'overrun', { lostStock: stockBefore - stockTotal(s) > 0 || extra.length > 0, harmed: b.events.some(x => x.kind === 'wound' || x.kind === 'death' || x.kind === 'taken'), fought: battleLines.some(l => /rounds fired/.test(l)) });
         tone = 'bad';
@@ -865,7 +891,7 @@ export function resolve(s: GameState, stance: Stance): Outcome {
   }
   // a sickness abroad: anyone you let close may bring it in
   const c = contagion(s);
-  const close = (e.kind === 'arrival' && stance !== 'turn_away') || ((stance === 'trade' || stance === 'parley') && e.kind !== 'horde');
+  const close = (e.kind === 'arrival' && stance !== 'turn_away') || ((stance === 'trade' || stance === 'parley' || stance === 'neg_aid') && e.kind !== 'horde');
   if (c.contact > 0 && close && r() < c.contact) { const l = infect(s, r, e.kind === 'arrival' ? 'they brought it in' : 'from the trade at the gate'); if (l) lines.push(l); }
   // (Hardcore) the men who tested the wire go back and say what they saw: the crew behind them follows within the week
   if (e.probe) {

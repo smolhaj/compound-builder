@@ -46,7 +46,7 @@ import type { QuartersState } from './quarters';
 import type { Evenings } from './evenings';
 import type { Courses } from './courses';
 import { starterKit, type ToolKit } from './tools';
-export const SAVE_VERSION = 84;
+export const SAVE_VERSION = 85;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -308,6 +308,8 @@ export interface GameState {
   digs?: DigState;
   /** The family's dogs, each a named pet with its own health, bonds and moods (sim/pets.ts; save v43). Replaces the old `stock.dog` count. */
   dogs: Dog[];
+  /** Breaks a raid left that are still to be mended: fence gaps, a broken gate, burned wrecks (sim/raidDamage.ts; save v85). Absent: none. */
+  raidDamage?: import('./raidDamage').RaidDamage[];
   /** Extended family: relatives in town, asking to join, waiting for a place, turned away (sim/kin.ts). Save v53; `kinOf` makes it lazily. */
   kin?: Kin;
   /** Neighbors and strangers who joined: loyalty, hidden character, guests sheltering, who left (sim/newcomers.ts). Save v60; `newcomersOf` makes it lazily. */

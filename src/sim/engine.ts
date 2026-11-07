@@ -15,6 +15,7 @@ import { addWork, canGoOn, isFinished } from './construction';
 import { addCarryWork, deliverOrders } from './economy';
 import { stallsDay, wantedNow } from './stalls';
 import { addFixWork, nextFix, siteJobsDay } from './improvements';
+import { addDamageWork, nextDamage } from './raidDamage';
 import { paperworkDay } from './paperwork';
 import { addFellWork, nextFellJob } from './forestry';
 import { burnFirewood, demandNow } from './heating';
@@ -114,6 +115,7 @@ function subStep(s: GameState): void {
   const fit = target || run ? null : nextFit(s);
   const harden = target || run || fit ? null : nextHardenJob(s);
   const fix = target || run || fit || harden ? null : nextFix(s);
+  const dmg = target || run || fit || harden || fix ? null : nextDamage(s);
   // deliveries at the road come in before anything else gets built
   const carry = s.roadside?.length > 0;
   const wanted = carry && s.roadside.length > 1 ? wantedNow(s) : undefined;
@@ -123,7 +125,7 @@ function subStep(s: GameState): void {
   const wk = s.weekend, split = wk?.mode === 'split';
   if (split) for (const line of presenceStep(s)) log(s, line);
   const weekday = split ? workDay(s.clock.startDoy, dayIndex(s.clock.t)) : dayIndex(s.clock.t) % 7 < 5;
-  const canBuild = carry || target !== null || run !== null || fit !== null || harden !== null || fix !== null;
+  const canBuild = carry || target !== null || run !== null || fit !== null || harden !== null || fix !== null || dmg !== null;
   // daily life (sim/daily.ts): the roster, refilled each day on Auto (and when the threat changes, checked hourly)
   // (fatigue and chores are counted once a game hour; building work every sub-step)
   const tk = dailyTick(s, { build: canBuild, fell: job !== null }), rates = tk.rates, hrs = SUBSTEP * 24, hourly = s.clock.ticks % 4 === 0;
@@ -175,6 +177,7 @@ function subStep(s: GameState): void {
       else if (task === 'build' && fit) addFitWork(s, fit, hrs, fit.kind === 'wire' ? Math.max(p.skills.mechanic, levelFor(s, p, 'electrical')) : p.skills.mechanic);
       else if (task === 'build' && harden) addHardenWork(s, harden, hrs * rate);
       else if (task === 'build' && fix) addFixWork(s, fix.st, fix.f, hrs * rate);
+      else if (task === 'build' && dmg) addDamageWork(s, dmg, hrs * rate);
       else if (task === 'forestry' && job) addFellWork(s, job, hrs * rate);
       return;
     }

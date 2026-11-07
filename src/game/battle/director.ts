@@ -54,13 +54,15 @@ export const chestOf = (a: Actor, ground: Ground): V3 => ({ x: a.x, y: ground(a.
 
 /** Is a point (world y) within `m` of a box (the box stands `h` tall from the ground under the point)? */
 export function nearBox(p: V3, b: Box, ground: Ground, m: number): boolean {
+  if (b.kind === 'brush') return false;   // (ground cover only hides a figure; a camera may stand among it: see `blockedBetween`)
   if (flatDist(p.x, p.z, b) >= m) return false;
   const up = p.y - ground(p.x, p.z);
   return up < b.h + m && up > (b.y0 ?? 0) - m;
 }
 
 /** Is a view point (x, z at height y) inside a box, with `m` of margin on the plan? */
-const insideBox = (p: V3, b: Box, ground: Ground, m = 0): boolean => flatDist(p.x, p.z, b) <= m && p.y - ground(p.x, p.z) < b.h && p.y - ground(p.x, p.z) >= (b.y0 ?? 0);
+const insideBox = (p: V3, b: Box, ground: Ground, m = 0): boolean => b.kind !== 'brush' && insideAny(p, b, ground, m);
+const insideAny = (p: V3, b: Box, ground: Ground, m = 0): boolean => flatDist(p.x, p.z, b) <= m && p.y - ground(p.x, p.z) < b.h && p.y - ground(p.x, p.z) >= (b.y0 ?? 0);
 
 /** Is `p` inside the picture of a camera at `eye` looking at `look`? Returns the depth too. */
 export function inFrame(eye: V3, look: V3, fov: number, p: V3): boolean {
@@ -76,11 +78,14 @@ export function inFrame(eye: V3, look: V3, fov: number, p: V3): boolean {
 }
 function norm3(a: V3): V3 { const l = Math.hypot(a.x, a.y, a.z) || 1; return { x: a.x / l, y: a.y / l, z: a.z / l }; }
 
+/** How close to the subject (units) a bush on the ray counts as hiding it. */
+const COVER_NEAR = 0.9;
+
 /** Does something solid stand between the eye and the point? Boxes the point stands in or on (a tower, a wall walk) are skipped. */
 export function blockedBetween(eye: V3, p: V3, boxes: readonly Box[], ground: Ground): boolean {
   // (a subject standing on top of a box, on a tower or a wall walk, is not hidden by it; one in its footprint or beside a wall is)
   const up = p.y - ground(p.x, p.z);
-  const own = boxes.filter(b => flatDist(p.x, p.z, b) <= 0.02 && up >= b.h - 0.4);
+  const own = boxes.filter(b => b.kind !== 'brush' && flatDist(p.x, p.z, b) <= 0.02 && up >= b.h - 0.4);
   const len = Math.hypot(p.x - eye.x, p.y - eye.y, p.z - eye.z) || 1;
   let under = 0;
   const buried = up < -0.05;   // (a figure below the surface, as a staged test can have, is not hidden by it)
@@ -88,13 +93,16 @@ export function blockedBetween(eye: V3, p: V3, boxes: readonly Box[], ground: Gr
   for (let i = 1; i < N; i++) {
     const t = i / N;
     // the last stretch beside the subject is not tested: a figure at a wall is seen against it, not through it
-    if ((1 - t) * len < 0.35) break;
+    const tail = (1 - t) * len < 0.35;
     const q = { x: eye.x + (p.x - eye.x) * t, y: eye.y + (p.y - eye.y) * t, z: eye.z + (p.z - eye.z) * t };
+    // ground cover hides a figure only when it stands right in front of it, down to the figure's feet (the renderer moves a crew out of the brush; a bush far down the ray is not in the way)
+    if ((1 - t) * len < COVER_NEAR) for (const b of boxes) if (b.kind === 'brush' && insideAny(q, b, ground, 0.04)) return true;
+    if (tail) continue;
     // (a rise of the ground between the eye and the subject hides it too)
     // (a hill, not a lip: two samples in a row below the surface; a podium's edge or a kerb a hand high does not hide a chest)
     if (!buried && q.y < ground(q.x, q.z) - 0.03) { if (++under >= 2) return true; } else under = 0;
     // a hand's breadth and a half of margin: eaves, foundation courses, posts and rails stand proud of the box
-    for (const b of boxes) if (!own.includes(b) && insideBox(q, b, ground, 0.2)) return true;
+    for (const b of boxes) if (b.kind !== 'brush' && !own.includes(b) && insideAny(q, b, ground, 0.2)) return true;
   }
   return false;
 }
@@ -230,6 +238,7 @@ export interface PoseAudit {
 export function auditPose(eye: V3, look: V3, fov: number, boxes: readonly Box[], actors: readonly Actor[], ground: Ground, viewH = VIEW_H): PoseAudit {
   let inside: string | null = null, nearest = 99;
   for (const b of boxes) {
+    if (b.kind === 'brush') continue;   // (ground cover is not solid: a camera may stand in it)
     if (eye.y - ground(eye.x, eye.z) < b.h) nearest = Math.min(nearest, flatDist(eye.x, eye.z, b));
     if (insideBox(eye, b, ground)) inside = b.kind;
   }
@@ -279,7 +288,17 @@ export class Director {
   constructor(seed: number) { this._r = mulberry32(seed * 3119 + 11); }
 
   /** The buildings and walls the camera must keep out of. */
-  setObstacles(boxes: readonly Box[]): void { this._boxes = boxes; }
+  setObstacles(boxes: readonly Box[]): void { this._boxes = boxes; this._nightBoxes = null; }
+  private _nightBoxes: { src: readonly Box[]; list: Box[] } | null = null;
+  /**
+   * The obstacles a shot is checked against. By night ground cover is left out (a dark figure in the sage is a silhouette against the moonlit field,
+   * and the night frames the user liked stay as they were); by day a bush right in front of the crew hides it, so it counts.
+   */
+  private _shotBoxes(): readonly Box[] {
+    if (!this.night) return this._boxes;
+    if (this._nightBoxes?.src !== this._boxes) this._nightBoxes = { src: this._boxes, list: this._boxes.filter(b => b.kind !== 'brush') };
+    return this._nightBoxes.list;
+  }
 
   /**
    * The establishing shot for the lead-in, the gaps and the tails: from the yard, toward the road (or at `focus`), high enough
@@ -288,7 +307,7 @@ export class Director {
   establish(time: number, house: V3, roadDir: { x: number; z: number }, ground: Ground, focus?: V3, variant = 0): Shot {
     const px = -roadDir.z, pz = roadDir.x;
     const target = focus ?? { x: house.x + roadDir.x * 12, y: 0, z: house.z + roadDir.z * 12 };
-    const ctx: ShotCtx = { boxes: this._boxes, ground, actors: new Map() };
+    const ctx: ShotCtx = { boxes: this._shotBoxes(), ground, actors: new Map() };
     const mk = (rot: number, k: number, hb: number): Shot => {
       // (each scene's establishing pose takes the other side of the road and another height, so two scenes never open on the same frame)
       const side = variant % 2 ? -1.6 : 1.6, reach = 4.2 + (variant % 3) * 0.8, lift = [0.9, 0.45, 1.3][variant % 3];
@@ -344,7 +363,7 @@ export class Director {
     // the subject walked behind a wall or out of the picture: cut early
     if (!due && cur && held >= 1.2 && time - this._lastCheck >= 0.5) {
       this._lastCheck = time;
-      const ctx: ShotCtx = { boxes: this._boxes, ground, actors: new Map(live.map(a => [a.id, a])) };
+      const ctx: ShotCtx = { boxes: this._shotBoxes(), ground, actors: new Map(live.map(a => [a.id, a])) };
       const now: Shot = { ...cur, since: 0, hold: 0, drift: { x: 0, y: 0, z: 0 }, ...poseAt(cur, time), minPx: cur.minPx ? cur.minPx * 0.5 : undefined };
       if (cur.subjects?.length && shotProblems(now, ctx).length) due = true;   // (a subject that fell or left counts: nobody left to show)
     }
@@ -378,7 +397,7 @@ export class Director {
       // a forest lot: when no angle is clear of the trees, the trees stop counting (trunks may stand in the lens, crowns may hide a figure)
       P(false, 1, false, false), P(true, 1, false, false), P(false, 0.55, false, false), P(true, 0.55, false, false), P(false, 0, false, false), P(true, 0, false, false),
     ];
-    const bare: ShotCtx = { ...ctx, boxes: ctx.boxes.filter(b => b.kind !== 'tree') };
+    const bare: ShotCtx = { ...ctx, boxes: ctx.boxes.filter(b => b.kind !== 'tree' && b.kind !== 'brush') };
     for (const pass of freshOnly ? passes.slice(0, 1) : passes) {
       const c = pass.trees ? ctx : bare;
       if (!pass.trees && (strict || bare.boxes.length === ctx.boxes.length)) break;   // (no trees to drop: the same passes again; a strict search tries the next candidate subject first)
@@ -408,7 +427,7 @@ export class Director {
     const px = -road.z, pz = road.x, r = this._r;
     this._g = ground;
     const everyone = [...home, ...raiders];
-    const ctx: ShotCtx = { boxes: this._boxes, ground, actors: new Map(everyone.map(a => [a.id, a])) };
+    const ctx: ShotCtx = { boxes: this._shotBoxes(), ground, actors: new Map(everyone.map(a => [a.id, a])) };
     const at = (x: number, z: number, h: number): V3 => ({ x, y: ground(x, z) + h, z });
     const chest = (a: Actor): V3 => chestOf(a, ground);
     const base = { since: time, hold };
