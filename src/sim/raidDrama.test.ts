@@ -80,7 +80,7 @@ describe('the death and the wake', () => {
       } else {
         without++;
         expect(approach).toBe(false);
-        expect(b.events.some(e => e.kind === 'lay')).toBe(false);
+        expect(b.events.filter(e => e.kind === 'lay').every(e => b.surrendered?.raiders.includes((e as { unit: string }).unit))).toBe(true);   // (only a hurt man in custody lies down)
       }
     }
     expect(withRaider).toBeGreaterThan(0);

@@ -75,7 +75,7 @@ interface U {
   gs?: number;
 }
 /** A flat mark on the ground or a wall: pools, spatter. `born`: a pool still spreading (radius `r1` after a few seconds). */
-interface Stain { x: number; y: number; z: number; r: number; stretch: number; rot: number; color: number; wall?: { nx: number; nz: number }; born?: number; r1?: number }
+interface Stain { x: number; y: number; z: number; r: number; stretch: number; rot: number; color: number; wall?: { nx: number; nz: number }; born?: number; r1?: number; /** A prop on the ground (a dropped rifle): drawn in Restrained too. */ prop?: boolean }
 const WALK = 0.8;
 const MAX_STAINS = 200;
 interface Tracer { ttl: number; a: THREE.Vector3; b: THREE.Vector3 }
@@ -435,7 +435,15 @@ export class BattleRenderer {
         if (e.rate && e.secs) { this._rate = e.rate; this._slowUntil = Math.max(this._slowUntil, this.time + e.secs); }
         if (e.role === 'vigil') this._alarmOn = false;   // the shooting is over: the alarm light goes out, and the yard is quiet
         break;
-      case 'surrender': { const u = U_(e.unit); if (u && !u.dead) { u.tx = u.x; u.tz = u.z; u.hands = true; u.crouch = false; } break; }
+      case 'surrender': {
+        const u = U_(e.unit);
+        if (u && !u.dead) {
+          u.tx = u.x; u.tz = u.z; u.hands = true; u.crouch = false;
+          // the weapon goes down at his feet: a dark rifle-length bar on the ground (0.1 units = 60 cm)
+          this._stain({ x: u.x + Math.cos(u.rot) * 0.08, y: this._ground(u.x, u.z) + 0.013, z: u.z - Math.sin(u.rot) * 0.08, r: 0.008, stretch: 11, rot: u.rot + 1.2, color: 0x2b2824, prop: true });
+        }
+        break;
+      }
       case 'lay': { const u = U_(e.unit); if (u && !u.dead && u.layAt == null) { u.tx = u.x; u.tz = u.z; u.layAt = this.time + 0.2; u.crouch = false; if (this._graphic) this._stain({ x: u.x, y: this._ground(u.x, u.z) + 0.01, z: u.z, r: 0.01, stretch: 1.2, rot: u.rot, color: 0x4d0a09, born: this.time + 0.6, r1: 0.05 }); } break; }
       case 'lift': { const v = U_(e.unit), c = U_(e.by); if (v && c) { v.carriedBy = c.def.id; v.crouch = false; } break; }
       case 'lower': { const v = U_(e.unit); if (v?.carriedBy) { const c = U_(v.carriedBy); if (c) { v.x = v.tx = c.x + Math.sin(c.rot) * 0.1; v.z = v.tz = c.z + Math.cos(c.rot) * 0.1; v.rot = c.rot + Math.PI / 2; } v.carriedBy = undefined; if (!v.dead) v.crouch = true; } break; }
@@ -759,7 +767,6 @@ export class BattleRenderer {
   /** Pools, spatter, wound patches and bandages, into the one instanced mesh. */
   private _drawBlood(): void {
     const m = this._bloodMesh;
-    if (!this._graphic) { m.count = 0; return; }
     let k = 0;
     const put = (x: number, y: number, z: number, rx: number, ry: number, color: number, yaw: number, flat: boolean, pitchYaw = 0) => {
       if (k >= m.instanceMatrix.count) return;
@@ -769,11 +776,13 @@ export class BattleRenderer {
       m.setMatrixAt(k, this._m); m.setColorAt(k, this._c.setHex(color)); k++;
     };
     for (const s of this._stains) {
+      if (!this._graphic && !s.prop) continue;
       const r = s.born != null ? (this.time < s.born ? 0 : Math.max(0.004, poolRadius(this.time - s.born, s.r1 ?? s.r))) : s.r;
       if (r <= 0) continue;
       if (s.wall) put(s.x, s.y, s.z, r, r * s.stretch, s.color, Math.atan2(s.wall.nx, s.wall.nz), false);
       else put(s.x, s.y, s.z, r * s.stretch, r, s.color, 0, true, s.rot);
     }
+    if (!this._graphic) { m.count = k; m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; return; }
     // on the figures: the wound as a dark patch on the shirt, then a pale bandage with the blood coming through
     const vw = this.viewer;
     for (const u of this._units.values()) {

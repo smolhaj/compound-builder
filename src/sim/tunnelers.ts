@@ -338,7 +338,7 @@ export function ambushOdds(s: GameState, d: { size: number; lead: number; temper
   let win = 0, lost = 0;
   const { surprise, crew } = ambushShape(d.size, d.lead);
   for (let i = 0; i < tries; i++) {
-    const b = planBattle(s, crew, 5_003 + i * 91_009, { armed: true, organized: true, temper: d.temper, ambush: surprise });
+    const b = planBattle(s, crew, 5_003 + i * 91_009, { armed: true, organized: true, temper: d.temper, kind: 'tunnelers', ambush: surprise });
     if (b.result === 'repelled' || b.result === 'fled') win++;
     lost += b.events.filter(x => (x.kind === 'death' || x.kind === 'taken') && x.unit.startsWith('h_')).length;
   }
@@ -362,7 +362,7 @@ export function resolveDigWarning(s: GameState, e: Encounter, stance: Stance, r:
   if (stance === 'ambush') {
     const party = chosenParty(s);
     const { surprise, crew } = ambushShape(d.size, e.dig?.lead ?? 0);
-    const b = planBattle(s, crew, s.seed * 131 + day * 7 + 5, { armed: true, organized: true, temper: d.temper, ambush: surprise });
+    const b = planBattle(s, crew, s.seed * 131 + day * 7 + 5, { armed: true, organized: true, temper: d.temper, kind: 'tunnelers', ambush: surprise });
     g.battle = b;
     const lines = applyBattle(s, b);
     recordBattle(s, b, crew, d.temper);

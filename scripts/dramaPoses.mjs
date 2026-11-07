@@ -124,9 +124,11 @@ try {
     const clear = (x, z) => lc.every(c => Math.hypot(c.x - x, c.z - z) > c.r + 1.3);
     let kx = sx + 3.6, kz = sz + 3.0;
     search: for (let r = 0; r < 7; r += 0.6) for (let a = 0; a < 6.3; a += 0.5) { const x = sx + 3.6 + Math.cos(a) * r, z = sz + 3 + Math.sin(a) * r; if (clear(x, z) && Math.hypot(x - sx, z - sz) < 7) { kx = x; kz = z; break search; } }
+    let rx = sx - 5, rz = sz + 4;
+    search2: for (let r = 0; r < 7; r += 0.6) for (let a = 0; a < 6.3; a += 0.5) { const x = sx - 5 + Math.cos(a) * r, z = sz + 5 + Math.sin(a) * r; if (clear(x, z) && Math.hypot(x - kx, z - kz) > 2 && Math.hypot(x - sx, z - sz) < 8.2 && Math.hypot(x - sx, z - sz) > 4.6) { rx = x; rz = z; break search2; } }
     const U = (id, side, x, z, pid) => ({ id, side, x, z, post: 'open', ...(pid ? { personId: pid } : {}) });
     const units = [U('h0', 'home', sx - 1.5, sz + 7.6, people[0]), U('h1', 'home', sx + 1.5, sz + 6.8, people[1]), U('h2', 'home', sx + 2.4, sz + 6.4, people[2]), U('h3', 'home', sx - 2.2, sz + 2.6, people[3] ?? people[0]), U('h4', 'home', sx - 3.2, sz + 3.0, people[4] ?? people[1]), U('h5', 'home', kx, kz, people[0]), U('h6', 'home', kx + 0.45, kz, people[1]),
-      U('r0', 'raider', wx + 0.2, wz + 1.0), U('r1', 'raider', sx - 14, sz + 20), U('r2', 'raider', sx + 5, sz + 17), U('r3', 'raider', sx + 6.5, sz + 18)];
+      U('r0', 'raider', wx + 0.2, wz + 1.0), U('r1', 'raider', sx - 14, sz + 20), U('r2', 'raider', sx + 5, sz + 17), U('r3', 'raider', sx + 6.5, sz + 18), U('r6', 'raider', rx, rz)];
     const ev = [];
     for (let k = 0; k < 14; k++) {
       const t = 1 + k * 0.7;
@@ -141,6 +143,7 @@ try {
     // r1 flanks round the west side while the others fire
     ev.push({ t: 2, kind: 'move', unit: 'r1', x: sx - 16, z: sz + 12 }); ev.push({ t: 7, kind: 'move', unit: 'r1', x: sx - 14, z: sz + 2 }); ev.push({ t: 12, kind: 'move', unit: 'r1', x: sx - 13, z: sz - 8 });
     ev.push({ t: 0.5, kind: 'cover', unit: 'h5', x: kx, z: kz });   // (a control: kneeling with no cover logic involved)
+    ev.push({ t: 2, kind: 'surrender', unit: 'r6' });
     ev.push({ t: 24, kind: 'end', result: 'repelled' });
     ev.sort((a, c) => a.t - c.t);
     const b = dragTheWounded({ night: true, duration: 26, units, events: ev }, { x: sx, z: sz });
@@ -161,16 +164,17 @@ try {
   const snap = async (name, pred, maxBt, ang, d, h) => { if (!(await find(pred, maxBt))) { console.log('NOT FOUND', name); return; } await aim(ang, d, h); await page.waitForTimeout(700); await shot(name); };
   await snap('01-kneeling-behind-the-well', '(u) => u.def.id === "r0" && u.crouch && Math.hypot(u.tx - u.x, u.tz - u.z) < 0.012 && Math.hypot(u.x - window.__well[0], u.z - window.__well[1]) < 1.2', 12, -1.57, 0.9, 0.45);
   // the round stopped by the wall: the camera beside the last impact
-  const imp = await page.evaluate(() => { const cb = window.__cb, im = cb.battle.lastImpact; if (!im) return null; const dx = im.from.x - im.x, dz = im.from.z - im.z, l = Math.hypot(dx, dz) || 1; cb.player.__pose = { eye: { x: im.x + dx / l * 0.4 - dz / l * 1.5, y: im.y + 0.3, z: im.z + dz / l * 0.4 + dx / l * 1.5 }, look: { x: im.x + dx / l * 0.6, y: im.y, z: im.z + dz / l * 0.6 }, fov: 62 }; return { impacts: cb.battle.impacts, at: im }; });
-  console.log('impact', JSON.stringify(imp));
+  const imp0 = await page.evaluate(() => { const cb = window.__cb, im = cb.battle.lastImpact; if (!im) return null; const dx = im.from.x - im.x, dz = im.from.z - im.z, l = Math.hypot(dx, dz) || 1; cb.player.__pose = { eye: { x: im.x + dx / l * 0.5 - dz / l * 0.9, y: im.y + 0.12, z: im.z + dz / l * 0.5 + dx / l * 0.9 }, look: { x: im.x, y: im.y, z: im.z }, fov: 55 }; return { impacts: cb.battle.impacts, at: im }; });
+  console.log('impact', JSON.stringify(imp0));
   // (a tracer lives 0.3 s: step until one is fresh, then freeze with the camera on it)
-  for (let i = 0; i < 400; i++) { const n0 = await page.evaluate(() => window.__cb.battle.impacts); await page.evaluate(() => window.__adv(() => false, 1, 0.03)); const n1 = await page.evaluate(() => window.__cb.battle.impacts); if (n1 > n0) break; }
-  await page.evaluate(() => { const cb = window.__cb, im = cb.battle.lastImpact; if (!im) return; const dx = im.from.x - im.x, dz = im.from.z - im.z, l = Math.hypot(dx, dz) || 1; cb.player.__pose = { eye: { x: im.x + dx / l * 0.4 - dz / l * 1.5, y: im.y + 0.3, z: im.z + dz / l * 0.4 + dx / l * 1.5 }, look: { x: im.x + dx / l * 0.6, y: im.y, z: im.z + dz / l * 0.6 }, fov: 62 }; });
+  for (let i = 0; i < 400; i++) { const n0 = await page.evaluate(() => window.__cb.battle.impacts); await page.evaluate(() => window.__adv(() => false, 1, 0.03)); const n1 = await page.evaluate(() => window.__cb.battle.impacts); if (n1 > n0) { await page.evaluate(() => window.__adv(() => false, 8, 0.03)); break; } }
+  await page.evaluate(() => { const cb = window.__cb, im = cb.battle.lastImpact; if (!im) return; const dx = im.from.x - im.x, dz = im.from.z - im.z, l = Math.hypot(dx, dz) || 1; cb.player.__pose = { eye: { x: im.x + dx / l * 0.5 - dz / l * 0.9, y: im.y + 0.12, z: im.z + dz / l * 0.5 + dx / l * 0.9 }, look: { x: im.x, y: im.y, z: im.z }, fov: 55 }; });
   await page.waitForTimeout(700); await shot('06-tracer-stops-at-the-wall');
   await snap('00-kneel-beside-standing', '(u) => u.def.id === "h5" && u.crouch', 6, 3.1416, 1.4, 0.2);
   await snap('02-leaning-out-at-the-wall', '(u) => u.def.id === "h0" && u.lean', 14, 0.15, 0.9, 0.3);
-  await snap('03-prone-under-fire', '(u, t) => u.def.side === "raider" && u.proneUntil > t', 14, 1.2, 0.8, 0.3);
+  await snap('03-flat-on-the-ground', '(u, t) => u.def.side === "raider" && u.proneUntil > t + 0.7 && Math.hypot(u.tx - u.x, u.tz - u.z) < 0.012 && u.layAt == null', 14, 1.2, 0.8, 0.3);
   await snap('04-heads-down-suppressed', '(u, t) => u.duckUntil > t', 16, 0.4, 0.9, 0.45);
+  await snap('09-surrendered-raider-dropped-rifle', '(u) => u.def.id === "r6" && u.hands', 6, 0.4, 0.9, 0.55);
   await snap('08-tending-the-injured-bandaged', '(u, t) => u.def.id === "h3" && u.bandagedAt != null && t >= u.bandagedAt + 0.5', 12, 0.3, 1.0, 0.5);
   // a flank: the wide frame of the raider going round the west side
   if (await find('(u) => u.def.id === "r1" && Math.hypot(u.tx - u.x, u.tz - u.z) > 0.05 && u.z < window.__sp[1] + 6', 16)) {
@@ -179,7 +183,7 @@ try {
   }
   // the carry: a man hit hard is lifted and carried back, close enough to read
   if (!(await find('(u) => u.carriedBy', 26))) console.log('NOT FOUND carry'); else { await page.evaluate(() => { const cb = window.__cb, u = cb.battle._units.get(window.__who), c = cb.battle._units.get(u.carriedBy), g = cb.world.groundAt(c.x, c.z); cb.player.__pose = { eye: { x: c.x + 0.55, y: g + 0.26, z: c.z + 0.55 }, look: { x: c.x, y: g + 0.15, z: c.z }, fov: 46 }; }); await page.waitForTimeout(700); await shot('07-carrying-a-wounded-man-out'); }
-  writeFileSync(`${outDir}/log.json`, JSON.stringify({ A, imp }, null, 1));
+  writeFileSync(`${outDir}/log.json`, JSON.stringify({ A }, null, 1));
 } finally {
   await browser.close();
   vite.kill();

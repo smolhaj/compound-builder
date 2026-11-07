@@ -91,9 +91,16 @@ export type BattleEvent =
 /** A vehicle left standing in the scene (the opportunists' pickup): where, and which way its nose points (radians about +y, front toward +z). */
 export interface BattleVehicle { kind: 'pickup'; x: number; z: number; rot: number }
 
+/** What became of a defender left on the ground when the crew broke the line (sim/breachFates.ts). */
+export type BreachFateKind = 'killed' | 'finished' | 'wounded' | 'taken' | 'held' | 'fled';
+
 export interface Battle {
   /** Night or day (lights matter at night). */
   night: boolean;
+  /** Who gave up (sim/surrender.ts): raiders (the crew, or a hurt man who could not run) and defenders (held at gunpoint at a breach). The picture draws hands up and a dropped weapon. */
+  surrendered?: { raiders: string[]; defenders: string[] };
+  /** Every defender still on the ground when a breach ended, and what became of them (sim/breachFates.ts): never standing unhurt among raiders. */
+  fates?: Array<{ unit: string; fate: BreachFateKind }>;
   /** A parked vehicle (sim/raiderKinds.ts). */
   vehicle?: BattleVehicle;
   units: BattleUnit[];
