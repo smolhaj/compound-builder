@@ -142,7 +142,7 @@ export function toastText(t: ToastModel): string {
 
 // ---- celebrations ------------------------------------------------------------------------------------------------------
 
-export interface Celebration { id: string; title: string; line: string; points: number; flash: string[] }
+export interface Celebration { id: string; title: string; line: string; points: number; flash: string[]; /** Small heading in place of "A milestone" (a first-hour goal: "Goal 2 of 6"). */ kicker?: string; /** Foot line in place of the points ("Next: water"). */ footer?: string }
 
 /** One line of why each lineage milestone matters (plain words); others fall back to the points. */
 const MILESTONE_LINE: Record<string, string> = {

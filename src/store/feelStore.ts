@@ -7,6 +7,7 @@ import { create } from 'zustand';
 import type { Recap } from '../sim/resumeRecap';
 import type { Celebration, ToastModel } from '../sim/feedbackDiff';
 import type { RightTab } from '../sim/tabReveal';
+import { EMPTY_MEMORY, type GoalMemory } from '../sim/firstHour';
 import { holdFactor } from '../ui/feel/quiet';
 
 const get = (k: string): string | null => { try { return localStorage.getItem(k); } catch { return null; } };
@@ -19,7 +20,18 @@ export const saveRevealed = (world: string, tabs: Iterable<RightTab>) => put(`cb
 export const loadShown = (world: string): string[] => { try { return JSON.parse(get(`cb.feel.shown.${world}`) ?? '[]') as string[]; } catch { return []; } };
 export const saveShown = (world: string, ids: Iterable<string>) => put(`cb.feel.shown.${world}`, JSON.stringify([...ids]));
 
+export type GoalsClosed = 'set' | 'dismissed' | null;
+export const loadGoals = (world: string): { mem: GoalMemory; closed: GoalsClosed } | null => { try { const v = get(`cb.feel.goals.${world}`); return v ? JSON.parse(v) as { mem: GoalMemory; closed: GoalsClosed } : null; } catch { return null; } };
+export const saveGoals = (world: string, mem: GoalMemory, closed: GoalsClosed) => put(`cb.feel.goals.${world}`, JSON.stringify({ mem, closed }));
+
 export interface FeelStore {
+  /** First-hour goals (sim/firstHour.ts): what was ever open or done, and whether the card is folded away ('set': finished and acknowledged; 'dismissed': hidden by the player). */
+  goalMem: GoalMemory;
+  goalsClosed: GoalsClosed;
+  setGoals: (mem: GoalMemory, closed?: GoalsClosed) => void;
+  /** Bumped by a goal's button to open the starter-compound proposal. */
+  starterAsk: number;
+  askStarter: () => void;
   /** The title screen is up (the world behind it is paused). */
   title: boolean;
   /** Whether a saved game exists (Continue is offered). */
@@ -54,6 +66,11 @@ let flashToken = 0;
 const q = typeof location === 'undefined' ? new URLSearchParams() : new URLSearchParams(location.search);
 
 export const useFeelStore = create<FeelStore>((set, getS) => ({
+  goalMem: EMPTY_MEMORY,
+  goalsClosed: null,
+  setGoals: (goalMem, closed) => set(s => ({ goalMem, goalsClosed: closed === undefined ? s.goalsClosed : closed })),
+  starterAsk: 0,
+  askStarter: () => set(s => ({ starterAsk: s.starterAsk + 1 })),
   title: false,
   hasSave: false,
   setTitle: (title, hasSave) => set(s => ({ title, hasSave: hasSave ?? s.hasSave })),

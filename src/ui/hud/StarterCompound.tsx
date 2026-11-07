@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PlansOrderButton } from './SpendConfirm';
 import { useGameStore } from '../../store/gameStore';
+import { useFeelStore } from '../../store/feelStore';
 import { useWorldStore } from '../../store/worldStore';
 import { planStarter, logsFor, NO_ROOM } from '../../sim/starterCompound';
 import { BLUEPRINTS, totalBill } from '../../sim/blueprints';
@@ -18,7 +19,7 @@ import { lengthText } from '../../sim/units';
 
 const ownLogs = (kind: string) => !!BLUEPRINTS[kind] && Object.keys(totalBill(BLUEPRINTS[kind])).some(m => MATERIALS[m as MaterialId].price === null && m !== 'fieldstone');
 
-export function StarterCompound({ first, wanted }: { first: boolean; wanted: boolean }) {
+export function StarterCompound({ first, wanted, guided = false }: { first: boolean; wanted: boolean; /** The first-hour goals card has its own button for this: hide ours, open on its ask. */ guided?: boolean }) {
   const g = useGameStore();
   const wallTrees = useWorldStore(w => w.wallTrees), query = useWorldStore(w => w.siteQuery), geo = useWorldStore(w => w.siteGeo), markTrees = useWorldStore(w => w.markNearestTrees);
   const setPreview = useWorldStore(w => w.setStarterPreview);
@@ -27,6 +28,8 @@ export function StarterCompound({ first, wanted }: { first: boolean; wanted: boo
   const [one, setOne] = useState(false);
   const [done, setDone] = useState<string | null>(null);
   const game = g.game;
+  const ask = useFeelStore(f => f.starterAsk), seenAsk = useRef(ask);
+  useEffect(() => { if (ask !== seenAsk.current) { seenAsk.current = ask; setDone(null); setOpen(true); } }, [ask]);
   const sig = `${game.seed}|${game.structures.length}|${game.perimeter.length}|${Math.round(game.money / 2000)}|${game.people.length}`;
   const plan = useMemo(() => (open && query && geo ? planStarter(game, { query, geo, skip, trees: wallTrees?.() }) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -69,10 +72,10 @@ export function StarterCompound({ first, wanted }: { first: boolean; wanted: boo
     // nothing left to propose: only the note about what was just staked (and its order button) stays, until the plans are supplied
     if (!wanted && !(done && need.length > 0)) return null;
     return <div style={{ marginTop: 4 }}>
-      {first && wanted && <Note>New here? One click proposes a house, water, power, food and a fence for this lot.</Note>}
-      {wanted && <button style={{ ...btn(first), width: '100%' }} title="A suggested layout for this lot: a ghost preview with the total cost, hours and permit fees first. Nothing is placed until you say so, and every piece stays editable." onClick={() => { setDone(null); setOpen(true); }}>Lay out a starter compound</button>}
+      {first && wanted && !guided && <Note>New here? One click proposes a house, water, power, food and a fence for this lot.</Note>}
+      {wanted && !guided && <button style={{ ...btn(first), width: '100%' }} title="A suggested layout for this lot: a ghost preview with the total cost, hours and permit fees first. Nothing is placed until you say so, and every piece stays editable." onClick={() => { setDone(null); setOpen(true); }}>Lay out a starter compound</button>}
       {done && <Note tone="good">{done}</Note>}
-      {done && need.length > 0 && <PlansOrderButton lines={need} style={{ marginTop: 3 }} />}
+      {done && need.length > 0 && !guided && <PlansOrderButton lines={need} style={{ marginTop: 3 }} />}
     </div>;
   }
   return <div style={{ borderTop: `1px solid ${LINE}`, marginTop: 6, paddingTop: 6 }}>

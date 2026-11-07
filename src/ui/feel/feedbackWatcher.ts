@@ -3,10 +3,12 @@
  * milestone, and the right-hand tab reveals. All of it is UI state (store/feelStore.ts); it never changes the game.
  */
 import { useGameStore } from '../../store/gameStore';
-import { loadRevealed, loadShown, saveRevealed, saveShown, useFeelStore, worldId } from '../../store/feelStore';
+import { loadGoals, loadRevealed, loadShown, saveGoals, saveRevealed, saveShown, useFeelStore, worldId } from '../../store/feelStore';
 import { celebrations, coalesce, diffAction } from '../../sim/feedbackDiff';
 import { revealTabs, type RightTab } from '../../sim/tabReveal';
 import { dayIndex, type GameState } from '../../sim/state';
+import { firstHour, EMPTY_MEMORY } from '../../sim/firstHour';
+import { useWorldStore } from '../../store/worldStore';
 import { holdFactor, takeMute } from './quiet';
 
 const TOAST_MS = 6000;
@@ -21,7 +23,34 @@ export function initWorld(g: GameState): void {
   shown = new Set(loadShown(world));
   const open = revealTabs(new Set(loadRevealed(world)), g);
   saveRevealed(world, open);
-  useFeelStore.setState({ revealed: [...open], fresh: [], toast: null, cards: [] });
+  // first-hour goals: the memory kept for this world, or a first look. A game already well along (a loaded old save) gets no card.
+  const stored = loadGoals(world);
+  const fh = firstHour(g, driveOf(), stored?.mem ?? EMPTY_MEMORY);
+  const closed = stored ? stored.closed : dayIndex(g.clock.t) > 120 || fh.total === 0 ? 'dismissed' : null;
+  saveGoals(world, fh.memory, closed);
+  useFeelStore.setState({ revealed: [...open], fresh: [], toast: null, cards: [], goalMem: fh.memory, goalsClosed: closed });
+}
+
+const driveOf = () => useWorldStore.getState().siteGeo?.drive;
+
+/** Look at the first-hour goals; a goal that just got done gets a reward card (the last one is answered by the "set for now" card in the Build tab instead). */
+function goals(g: GameState): void {
+  const f = useFeelStore.getState();
+  const fh = firstHour(g, driveOf(), f.goalMem);
+  const was = new Set(f.goalMem.done);
+  const fresh = fh.goals.filter(x => x.status === 'done' && !was.has(x.id));
+  const changed = JSON.stringify(fh.memory) !== JSON.stringify(f.goalMem);
+  if (!changed) return;
+  useFeelStore.getState().setGoals(fh.memory);
+  saveGoals(world, fh.memory, f.goalsClosed);
+  if (f.goalsClosed !== null) return;   // folded away: no more cards (no nagging)
+  const cards = (fh.complete ? [] : fresh).map(x => {
+    const next = fh.current;
+    shown.add(x.id === 'roof' ? 'first_roof' : `goal_${x.id}`);
+    if (x.id === 'roof') shown.add('a_home');   // (the same moment: one card, not two)
+    return { id: `goal_${x.id}`, title: x.reward.title, line: x.reward.line, points: 0, flash: [] as string[], kicker: `Goal ${fh.done} of ${fh.total} done`, ...(next ? { footer: `Next: ${next.title.toLowerCase()}` } : {}) };
+  });
+  if (cards.length) { saveShown(world, shown); f.pushCards(cards); }
 }
 
 function reveal(g: GameState): void {
@@ -49,7 +78,7 @@ export function startFeedback(): () => void {
     const acted = prev.clock.t === next.clock.t;
     // the tab reveals are looked at when the player acts and once a day (not every frame)
     const dayRolled = dayIndex(next.clock.t) !== dayIndex(prev.clock.t);
-    if (acted || dayRolled) reveal(next);
+    if (acted || dayRolled) { reveal(next); goals(next); }
     if (acted) {
       const evs = diffAction(prev, next);
       if (evs.length) {
