@@ -154,7 +154,7 @@ export class CutscenePlayer {
     if (battle.playing) {
       shot = this._dir.update(this._time, battle.actors(), battle.drainEvents(), house, ground);
     } else {
-      if (!this._dir.shot || this._lastKind !== `est${loc.segment.scene}`) { this._dir.establish(this._time, house, this._road, ground); this._lastKind = `est${loc.segment.scene}`; }
+      if (!this._dir.shot || this._lastKind !== `est${loc.segment.scene}`) { this._dir.establish(this._time, house, this._road, ground, undefined, loc.segment.scene); this._lastKind = `est${loc.segment.scene}`; }
       shot = this._dir.shot!;
     }
     this._publish(false);

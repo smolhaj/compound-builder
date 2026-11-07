@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { newGame, type GameState } from './state';
 import { triggerDisaster, tracksAt, type DisasterKind } from './disaster';
-import { blackoutOf, collapseLook, envelope, NO_LOOK } from './collapseLook';
+import { blackoutOf, collapseLook, darkness, envelope, NO_LOOK } from './collapseLook';
 import { dayCard } from './dayCard';
 import { collapseChip } from './collapseChip';
 
@@ -72,5 +72,38 @@ describe('the day-it-happened card and the chip', () => {
     expect(w.chip).toBe('Impact in 10 days');
     expect(collapseChip(at('grid_down', -2))!.tone).toBe('bad');
     expect(collapseChip(at('grid_down', 12))!.chip).toBe('Day 13');
+  });
+
+  it('pandemic, lawless and cyberattack each have a presence of their own beyond a red ticker', () => {
+    const pan = collapseLook(at('pandemic', 20)), law = collapseLook(at('lawless', 20)), cyb = collapseLook(at('cyberattack', 6));
+    // a pandemic: cold and drained, fewer town lights, a hazy still air
+    expect(pan.sat).toBeLessThan(0.75);
+    expect(pan.cast[2]).toBeGreaterThan(pan.cast[0]);
+    expect(pan.townGlow).toBeLessThan(0.7);
+    expect(pan.haze + pan.fog).toBeGreaterThan(0.3);
+    expect(pan.smoke).toBe(0);
+    // lawless: warm, smoky, fires on the horizon, dim lights
+    expect(law.cast[0]).toBeGreaterThan(law.cast[2]);
+    expect(law.fireGlow).toBeGreaterThan(0.4);
+    expect(law.smoke).toBeGreaterThan(0.4);
+    expect(law.townGlow).toBeLessThan(0.7);
+    // a dead grid: no town glow, cold muted day, a lifted dark so the night stays readable
+    expect(cyb.townGlow).toBeLessThan(0.3);
+    expect(cyb.flicker).toBeGreaterThan(0.5);   // (a rolling attack: the grid is a third of itself, so the lights stutter rather than die)
+    expect(cyb.sat).toBeLessThan(0.9);
+    expect(cyb.cast[2]).toBeGreaterThan(cyb.cast[0]);
+    expect(cyb.nightLift).toBeGreaterThan(0.3);
+    expect(cyb.nightLift).toBeLessThanOrEqual(0.5);
+  });
+  it('the town glow flickers while the grid fails and is steady before and after', () => {
+    expect(darkness(0)).toEqual({ townGlow: 1, flicker: 0, nightLift: 0 });
+    expect(darkness(1).flicker).toBe(0);
+    expect(darkness(1).townGlow).toBe(0);
+    expect(darkness(0.5).flicker).toBeCloseTo(1, 5);
+  });
+  it('eases in on the disaster timeline: nothing at the start of the warning, the full look after the hit', () => {
+    expect(collapseLook(at('lawless', -12)).smoke).toBeLessThan(collapseLook(at('lawless', 20)).smoke * 0.35);
+    expect(collapseLook(at('lawless', 2000)).smoke).toBeLessThan(0.2);
+    expect(collapseLook(at('grid_down', -5, 'substation')).townGlow).toBe(1);
   });
 });

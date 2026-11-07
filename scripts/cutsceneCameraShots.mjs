@@ -17,6 +17,7 @@ const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
 const port = Number(opt('--port', 5962)), quality = opt('--quality', 'low');
 const every = Number(opt('--every', 6)), maxShots = Number(opt('--max', 18));
+const hour0 = Number(opt('--hour', 2.25));   // the arrival hour: 2.25 is the dark of night, 5.75 is dawn
 const only = opt('--only', null);   // probe | fires | assault: just that scene (a shorter run)
 const [vw, vh] = opt('--size', '1280x720').split('x').map(Number);
 const outDir = resolve(opt('--out', 'shots/cutscene-cameras'));
@@ -42,9 +43,10 @@ try {
   await page.waitForFunction(() => window.__cb, null, { timeout: 180000 });
   await page.evaluate(q => window.__cb.store.getState().setQuality(q), quality);
   const frames = async (k) => { const f0 = await page.evaluate(() => window.__cb.qa.frames); await page.waitForFunction(x => window.__cb.qa.frames >= x, f0 + k, { polling: 200 }); };
-  const single = false, mode = 'siege';
+  const stance = opt('--stance', 'Defend');   // Defend = the siege; Hide / Parley = one scene at the gate
+  const single = stance !== 'Defend', mode = 'siege';
 
-  const info = await page.evaluate(async ([single, mode]) => {
+  const info = await page.evaluate(async ([single, mode, hour0]) => {
     const cb = window.__cb, G = cb.game, c = cb.world.camp;
     const { planSiege } = await import('/src/sim/siege.ts');
     const sp = cb.tool.findSpot('timber_cabin', c.x, c.z, 0);
@@ -60,14 +62,14 @@ try {
     const g = structuredClone(G.getState().game);
     const SUB = 0.25 / 24;
     const day = Math.floor(g.disaster.hitAt + 20);
-    g.clock.t = Math.round((day - 0.25 + 2.25 / 24) / SUB) * SUB; g.clock.ticks = Math.round(g.clock.t / SUB); g.clock.speed = 0;
+    g.clock.t = Math.round((day - 0.25 + hour0 / 24) / SUB) * SUB; g.clock.ticks = Math.round(g.clock.t / SUB); g.clock.speed = 0;
     if (mode !== 'breakin') g.disaster.tracks = { ...g.disaster.tracks, law: 0, stores: 0, deliveries: 0, banks: 0 };
     g.stock.canned = 20; g.stock.meds = 3; g.stock.sandbags = 3; g.stock.dog = 1; g.armory.ammo['556'] = 2000;
     for (const [i, p] of g.people.entries()) if (!p.kid || p.age >= 15) { g.armory.guns.push({ id: `g${i}`, model: 'sw_mp15', condition: 1, fired: 0, where: 'house', carrier: p.id }); g.armory.skill[p.id] = 5; }
     // an encounter day whose plan is a siege (or a single scene)
     let ed = 0;
     for (let d = 1; d < 3000; d++) {
-      const p = planSiege({ kind: 'gang', size: 10, temper: 'hard', hour: 2.25, seed: g.seed * 131 + d * 7 + 1, fought: true, fightSeconds: 90 });
+      const p = planSiege({ kind: 'gang', size: 10, temper: 'hard', hour: hour0, seed: g.seed * 131 + d * 7 + 1, fought: !single, fightSeconds: single ? null : 90 });
       if (single ? p.scenes.length === 1 : (p.scenes.length >= 4 && p.scenes.some(sc => sc.kind === 'fires'))) { ed = d; break; }
     }
     g.gate.pending = mode === 'breakin' ? { id: 'e9', kind: 'break_in', day: 5, title: 'Someone is in the house', dossier: ['Two in the morning. The dog is going crazy downstairs.', '2 people, by the voices; no gun that you can see.'], size: 2, armed: false, strength: 10, wants: {}, stances: ['call_911', 'shout', 'confront'] } : { id: 'e9', kind: 'gang', day: ed, title: 'An armed crew', dossier: ['10 of them, organized, rifles. They\'ve been working the farms east of town.', 'They know what they want, and they think you have it.'], size: 10, armed: true, strength: 120, wants: { canned: 8, fuel: 4 }, stances: ['hide', 'parley', 'defend', 'trade'], temper: 'hard' };
@@ -88,12 +90,12 @@ try {
       return false;
     };
     G.getState().load(g);
-    return { day: ed, scenes: planSiege({ kind: 'gang', size: 10, temper: 'hard', hour: 2.25, seed: g.seed * 131 + ed * 7 + 1, fought: true, fightSeconds: 90 }).scenes.length };
-  }, [single, mode]);
+    return { day: ed, scenes: planSiege({ kind: 'gang', size: 10, temper: 'hard', hour: hour0, seed: g.seed * 131 + ed * 7 + 1, fought: !single, fightSeconds: single ? null : 90 }).scenes.length };
+  }, [single, mode, hour0]);
   console.log(JSON.stringify(info));
   await frames(10);
   await page.waitForTimeout(3500);
-  await page.getByRole('button', { name: /^Defend/ }).click();
+  await page.getByRole('button', { name: new RegExp(`^${stance}`) }).click();
   await page.getByRole('button', { name: 'Watch', exact: true }).click();
   await frames(2);
   // step the player and the renderer by hand (a software GL frame takes seconds): `secs` of playback
