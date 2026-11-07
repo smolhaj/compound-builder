@@ -43,6 +43,7 @@ describe('the crew nudge', () => {
   it('shows the card once the cash covers most of the quote, and says the family finishes the rest', () => {
     const g = fresh(2000);
     const home = planStructure(g, 'log_house', 0, 0, 0), q = crewQuote(home).usd;
+    g.stock.logs = 500;   // the walls' logs are in (a crew does not fell trees)
     g.money = Math.floor(q * CREW_NUDGE_SHARE + CREW_NUDGE_SLACK) - 100;
     expect(crewNudge(g)).toBeNull();
     g.money = Math.ceil(q * CREW_NUDGE_SHARE + CREW_NUDGE_SLACK) + 100;
