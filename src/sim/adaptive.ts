@@ -160,7 +160,7 @@ export function whyBigger(a: number): string | null {
   if (a <= 0) return null;
   if (a < 0.34) return 'Word has gone round that this place is held. They came in a few more than they used to.';
   if (a < 0.67) return 'Word has gone round that this place is held, and the crews that are left have learned from the ones who failed: more of them, better armed.';
-  return 'Everybody in the county knows this place is held. The crews that still come come ready: many hands, plate, and what it takes to get through.';
+  return 'Everybody in the county knows this place is held. The crews that still turn up come ready: many hands, plate, and what it takes to get through.';
 }
 
 // ── the first hard winter ────────────────────────────────────────────────

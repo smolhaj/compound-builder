@@ -8,7 +8,7 @@ import { suggestions } from './guidance';
 const bare = (money: number) => { const g = newGame(7); g.money = money; for (const k of ['staples', 'canned', 'frozen', 'fresh'] as const) g.stock[k] = 0; if (g.pantry) g.pantry = { ...g.pantry, items: {} }; return g; };
 
 describe('spend guard', () => {
-  it('keeps 25 % with a $15k floor', () => {
+  it('keeps 25% with a $15k floor', () => {
     expect(livingReserve(327_000)).toBe(81_750);
     expect(livingReserve(20_000)).toBe(15_000);
   });

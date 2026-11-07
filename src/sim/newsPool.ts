@@ -26,7 +26,7 @@ export const SEASON_NEWS: Record<Season, readonly string[]> = {
   spring: ['Frost expected again tonight; cover your tomatoes.', 'Calving season: the vet is booked solid.', 'The creek is running high with snowmelt.', 'Seed swap at the grange Saturday.', 'Mud season: the county road is posted for weight limits.', 'The first hay fields are being fertilized.', 'Spring cleanup day at the cemetery.', 'Gardeners are warned: the last frost date is a rumor.'],
   summer: ['Haying is in full swing; mind the slow tractors on the road.', 'Fire danger "high"; no burning until further notice.', 'The swimming hole at the bridge is open again.', 'Fourth of July parade lineup announced.', 'Thunderstorms this afternoon; hail possible.', 'Sweet corn at the stand by Friday.', 'Water use advisory in effect for the town.', 'The county fair queen was crowned Saturday.'],
   fall: ['Elk and deer season opens soon; tags on sale at the courthouse.', 'Apple picking at the orchard through the end of October.', 'Farmers are racing the first frost to finish the harvest.', 'School football under the lights Friday.', 'Leaf pickup begins in town next week.', 'Hunters are reminded to wear orange.', 'The first snow dusted the high ridges overnight.', 'Wood-cutting permits are going fast this year.'],
-  winter: ['Snow plows are out; the county road is one lane.', 'Chains required over the pass tonight.', 'The warming center at the church is open nights.', 'Propane deliveries are running a week behind.', 'Sledding on the school hill after three.', 'Pipes froze across town last night; check yours.', 'Holiday bazaar at the grange Saturday.', 'The feed store reminds you to bring stock tanks a heater.'],
+  winter: ['Snow plows are out; the county road is one lane.', 'Chains required over the pass tonight.', 'The warming center at the church is open nights.', 'Propane deliveries are running a week behind.', 'Sledding on the school hill after three.', 'Pipes froze across town last night; check yours.', 'Holiday bazaar at the grange Saturday.', 'The feed store reminds everyone to put a heater in the stock tank.'],
 };
 
 export const REGION_NEWS: Record<RegionId, readonly string[]> = {
@@ -40,7 +40,7 @@ export const REGION_NEWS: Record<RegionId, readonly string[]> = {
   ozarks: ['The spring-fed creek is clear and cold.', 'Chiggers are bad this year; wear boots.', 'Floaters filled the river on the weekend.', 'A cave tour company opens for the season.', 'Ice storm took down lines along the ridge road.', 'The pecan crop looks thin.'],
   hill_country: ['Bluebonnets are out along the ranch road.', 'Cedar fever has the whole county sneezing.', 'A flash flood closed the low-water crossing.', 'Peaches are early at the roadside stands.', 'Wild hogs tore up another hayfield.', 'The deer lease sign-up is open.'],
   rust_belt: ['The old plant shut a second shift again.', 'Soybean prices ticked up at the elevator.', 'The high school marching band wins at state.', 'Lake-effect snow is closing roads east of town.', 'A new warehouse is hiring on the county line.', 'The river rose over the boat ramp.'],
-  upper_midwest: ['The lake effect snow is on the way.', 'Sweet corn and brats at the church fish fry.', 'The dairy co-op voted on its new milk price.', 'Ice fishing shanties are out on the bay.', 'Cranberry harvest begins next week.', 'A violent windstorm knocked out power to the north end.'],
+  upper_midwest: ['Lake-effect snow is on the way.', 'Sweet corn and brats at the church fish fry.', 'The dairy co-op voted on its new milk price.', 'Ice fishing shanties are out on the bay.', 'Cranberry harvest begins next week.', 'A violent windstorm knocked out power to the north end.'],
 };
 
 /** Quiet world clues: ordinary news from elsewhere, a little unsettled, never about what is coming. */
@@ -48,9 +48,9 @@ export const WORLD_NEWS: readonly string[] = [
   'Diesel up eleven cents at the co-op pumps.', 'Shipping delays at a coastal port ripple into the feed store orders.', 'A grid operator in another state asked customers to cut back this evening.',
   'Egg prices bounce around again; the grocery limits two cartons.', 'A heat wave overseas pushes up wheat prices.', 'Two banks in the city raised their minimum balances.',
   'The county asked for volunteers for the emergency preparedness day.', 'Ham radio club reports a good night for long-distance contacts.', 'Fertilizer prices are the talk at the feed store.',
-  'A cyberattack on a hospital chain two states over delayed surgeries.', 'The farm bill stalls in Washington; again.', 'Fuel trucks were late this week; the station posted a limit.',
-  'A solar storm watch has radio operators on alert tonight.', 'Truckers\' strike talk in the news; nothing yet.', 'Insurers are pulling out of more rural counties.',
-  'The airline cancelled flights out of the regional field for the week.', 'A water main break in a nearby city has them boiling water.', 'Some stores in the city are rationing baby formula again.',
+  'A cyberattack on a hospital chain two states over delayed surgeries.', 'The farm bill stalls in Washington again.', 'Fuel trucks were late this week; the station posted a limit.',
+  'A solar storm watch has radio operators on alert tonight.', 'There is talk of a truckers\' strike; nothing yet.', 'Insurers are pulling out of more rural counties.',
+  'The airline canceled flights out of the regional field for the week.', 'A water main break in a nearby city has them boiling water.', 'Some stores in the city are rationing baby formula again.',
   'The paper says the national debt passed another milestone.', 'A neighboring county had a day-long blackout from a transformer fire.',
 ];
 

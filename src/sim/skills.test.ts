@@ -82,7 +82,7 @@ describe('skills from practice', () => {
     expect(progressOf(g, q.id, 'radio')).toBeGreaterThan(progressOf(g, r.id, 'radio') * 1.5);
   });
 
-  it('an average hand (level 3) is exactly as fast as before; each level is 3 %', () => {
+  it('an average hand (level 3) is exactly as fast as before; each level is 3%', () => {
     expect(skillFactor(3)).toBe(1);
     expect(skillFactor(6)).toBeCloseTo(1.09, 5);
     expect(skillFactor(0)).toBeCloseTo(0.91, 5);

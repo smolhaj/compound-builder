@@ -10,7 +10,7 @@ function top(ground: (lx: number, lz: number) => number, spur = 0.8) {
 
 describe('vehicle yard spur', () => {
   const planes: Array<[string, (lx: number, lz: number) => number]> = [
-    ['a plain 8 % fall to the road with a crossfall', (lx, lz) => -0.08 * lz + 0.04 * lx],
+    ['a plain 8% fall to the road with a crossfall', (lx, lz) => -0.08 * lz + 0.04 * lx],
     ['level ground', () => 0.1],
     ['a shallow trough (a road cut shoulder)', (lx, lz) => -0.05 * lz + 0.12 * lx * lx],
   ];

@@ -100,7 +100,7 @@ function FieldsView({ game }: { game: GameState }) {
   const g = useGameStore();
   const rows = fieldRows(game), gardens = gardensOf(game), have = seedOnHand(game), sd = seedsOf(game);
   const [w0, w1] = sowWindow(game);
-  const lines: Array<[StockLine, string, string]> = [['saved', 'Saved', 'Set aside from your own harvest'], ['hybrid', 'Hybrid', 'The Shop\u2019s plain seed, cheap: about 12 % more crop and a third less blight and rust the year it is sown; seed saved from it comes back at about 80 %'], ['heirloom', 'Heirloom', 'Pricier, an ordinary crop the first year, but open-pollinated: the seed you save comes true']];
+  const lines: Array<[StockLine, string, string]> = [['saved', 'Saved', 'Set aside from your own harvest'], ['hybrid', 'Hybrid', 'The Shop\u2019s plain seed, cheap: about 12% more crop and a third less blight and rust the year it is sown; seed saved from it comes back at about 80%'], ['heirloom', 'Heirloom', 'Pricier, an ordinary crop the first year, but open-pollinated: the seed you save comes true']];
   return <>
     <Section title="Fields">
       {(() => { const w = seedWarning(game); return w ? <Note tone={w.tone}>{w.text}</Note> : null; })()}
@@ -115,7 +115,7 @@ function FieldsView({ game }: { game: GameState }) {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
             <span style={{ width: 54, color: DIM, fontSize: 11 }}>soil</span>
-            <Bar v={r.fert / 1.45} color={r.fert < 0.8 ? TONE.bad : r.fert < 0.95 ? TONE.warn : '#9cc070'} title={`Fertility ${Math.round(r.fert * 100)} %`} />
+            <Bar v={r.fert / 1.45} color={r.fert < 0.8 ? TONE.bad : r.fert < 0.95 ? TONE.warn : '#9cc070'} title={`Fertility ${Math.round(r.fert * 100)}%`} />
             <span style={{ fontSize: 11, fontVariantNumeric: 'tabular-nums', width: 82, textAlign: 'right' }} title="This year's crop against an average field">{r.weedy ? `weedy ×${r.factor.total.toFixed(2)}` : r.factor.sown ? `crop ×${r.factor.total.toFixed(2)}` : r.crop === 'rest' ? 'resting' : 'not sown'}</span>
           </div>
           {r.note && <Note tone={r.weedy ? 'bad' : 'warn'}>{r.note}</Note>}
@@ -125,7 +125,7 @@ function FieldsView({ game }: { game: GameState }) {
     </Section>
     <Section title="Seed">
       {lines.map(([line, name, tip]) => <div key={line} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, padding: '1px 0' }}>
-        <span title={tip} style={{ color: DIM }}>{name}{line === 'saved' && have.saved > 0 ? ` (${Math.round(sd.savedVigor * 100)} % vigor)` : ''}</span>
+        <span title={tip} style={{ color: DIM }}>{name}{line === 'saved' && have.saved > 0 ? ` (${Math.round(sd.savedVigor * 100)}% vigor)` : ''}</span>
         <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           <span style={{ fontVariantNumeric: 'tabular-nums' }}>{have[line] >= 10 ? Math.round(have[line]) : have[line].toFixed(1)} units</span>
           <button style={btn(sd.first === line)} title={`Sow ${name.toLowerCase()} seed first`} onClick={() => g.money(d => { setSeedFirst(d, line); return null; })}>{sd.first === line ? 'first' : 'use first'}</button>
@@ -144,8 +144,8 @@ function FieldsView({ game }: { game: GameState }) {
         const p = plotFor(game, gd);
         return <div key={gd.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 0' }}>
           <span style={{ width: 54, color: DIM }}>Garden {i + 1}</span>
-          <Bar v={p.fert / 1.45} color={p.fert < 0.8 ? TONE.bad : '#9cc070'} title={`Fertility ${Math.round(p.fert * 100)} %`} />
-          <span style={{ display: 'flex', gap: 2 }}>{[1, 2, 3].map(n => <button key={n} style={btn((p.succ ?? 1) === n)} title={n === 1 ? 'One sowing' : `${n} sowings, three weeks apart: +${7 * (n - 1)} % crop, ${8 * (n - 1)} more days of season, ${20 * (n - 1)} % more weeding`} onClick={() => g.money(d => setSuccession(d, gd.id, n))}>{n}</button>)}</span>
+          <Bar v={p.fert / 1.45} color={p.fert < 0.8 ? TONE.bad : '#9cc070'} title={`Fertility ${Math.round(p.fert * 100)}%`} />
+          <span style={{ display: 'flex', gap: 2 }}>{[1, 2, 3].map(n => <button key={n} style={btn((p.succ ?? 1) === n)} title={n === 1 ? 'One sowing' : `${n} sowings, three weeks apart: +${7 * (n - 1)}% crop, ${8 * (n - 1)} more days of season, ${20 * (n - 1)}% more weeding`} onClick={() => g.money(d => setSuccession(d, gd.id, n))}>{n}</button>)}</span>
         </div>;
       })}
       <Note>Successions: more sowings through the spring keep the garden producing later. Cost: weeding.</Note>
@@ -172,8 +172,8 @@ function KitchenView({ game }: { game: GameState }) {
       <Note>Jars need lids and a pressure canner for anything but tomatoes, fruit and pickles. Drying, crocks and salt need no lids and (on a sunny day) no power.</Note>
     </Section>
     <Section title="Storage">
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 86, color: DIM }}>Cellar bins</span><Bar v={cap ? cellarKcal(game) / cap : 0} color="#c8a060" title={`${k(cellarKcal(game))} of ${k(cap)}`} /><span style={{ fontSize: 11, width: 70, textAlign: 'right' }}>{cap ? `${Math.round(cellarKcal(game) / cap * 100)} %` : 'no cellar'}</span></div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 86, color: DIM }}>Pantry shelves</span><Bar v={room ? Math.min(1.2, load / room) / 1.2 : 0} color={overflow(game) > 0.05 ? TONE.warn : '#9cc070'} title={`${k(load)} of ${k(room)} of shelf room`} /><span style={{ fontSize: 11, width: 70, textAlign: 'right' }}>{room ? `${Math.round(load / room * 100)} %` : '—'}</span></div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 86, color: DIM }}>Cellar bins</span><Bar v={cap ? cellarKcal(game) / cap : 0} color="#c8a060" title={`${k(cellarKcal(game))} of ${k(cap)}`} /><span style={{ fontSize: 11, width: 70, textAlign: 'right' }}>{cap ? `${Math.round(cellarKcal(game) / cap * 100)}%` : 'no cellar'}</span></div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 86, color: DIM }}>Pantry shelves</span><Bar v={room ? Math.min(1.2, load / room) / 1.2 : 0} color={overflow(game) > 0.05 ? TONE.warn : '#9cc070'} title={`${k(load)} of ${k(room)} of shelf room`} /><span style={{ fontSize: 11, width: 70, textAlign: 'right' }}>{room ? `${Math.round(load / room * 100)}%` : '—'}</span></div>
       {cap > 0 && <Row label="Cellar temperature" value={`${tempText(cellarTempC(game))}`} />}
       <Row label="Jars on the shelf" value={`${foodUnits(game, 'home_canned').toFixed(1)} cases`} />
     </Section>
@@ -185,7 +185,7 @@ function KitchenView({ game }: { game: GameState }) {
       </span>; })()}
     </Section>
     <Section title="The table">
-      <Row label="Quality" value={`${Math.round(kt.quality * 100)} %`} tone={kt.quality >= 0.55 ? 'good' : kt.quality < 0.4 ? 'warn' : undefined} title="Best three dishes the pantry can make, salt, herbs and bread" />
+      <Row label="Quality" value={`${Math.round(kt.quality * 100)}%`} tone={kt.quality >= 0.55 ? 'good' : kt.quality < 0.4 ? 'warn' : undefined} title="Best three dishes the pantry can make, salt, herbs and bread" />
       {kt.dishes.length > 0 && <Note>On the table: {kt.dishes.join(', ')}.</Note>}
       {dl.map(l => <div key={l.dish.id} style={{ fontSize: 11.5, display: 'flex', justifyContent: 'space-between', gap: 6, color: l.ok ? undefined : DIM, opacity: l.ok ? 1 : 0.7 }}>
         <span>{l.ok ? '✓' : '·'} {l.dish.name}</span><span style={{ color: DIM, textAlign: 'right' }}>{l.ok ? '' : `needs ${l.missing}`}</span>
@@ -217,14 +217,14 @@ function AnimalsView({ game }: { game: GameState }) {
         return <div key={a} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, padding: '1px 0' }}>
           <span style={{ color: DIM }}>{MATERIALS[a].name}</span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <span style={{ color: c < 0.5 ? TONE.bad : c < 0.9 ? TONE.warn : undefined }}>{Math.floor(game.stock[a])} head, {Math.round(c * 100)} %</span>
+            <span style={{ color: c < 0.5 ? TONE.bad : c < 0.9 ? TONE.warn : undefined }}>{Math.floor(game.stock[a])} head, {Math.round(c * 100)}%</span>
             {sick > 0 && <span style={{ color: TONE.bad, fontSize: 11 }}>{sick} sick</span>}
             {BUTCHERABLE.includes(a) && act('Butcher', butcherProblem(game, a, 1), () => g.money(d => butcher(d, a, 1)), `Butcher one ${a}: the meat is preserved (freezer, smoker, salt, canner); a pig gives lard`)}
           </span>
         </div>;
       })}
-      <Row label="Roof for the herd" value={`${Math.round(sheltered(game) * 100)} %`} tone={sheltered(game) < 0.6 ? 'warn' : 'good'} title="Animal units under a barn, barnyard or sheep barn: fewer sick animals, no winter wasting" />
-      <Row label="Pasture" value={fb.pastureAcres < 0.1 ? 'none' : `${fb.units.toFixed(1)} of ${fb.carries.toFixed(1)} animal units`} tone={fb.stocking > 1.3 ? 'bad' : fb.stocking > 1 ? 'warn' : undefined} title={`${pluralize(fb.pastureAcres.toFixed(1), 'acre')} of open grass; the grass is at ${Math.round(fb.pasture * 100)} %`} />
+      <Row label="Roof for the herd" value={`${Math.round(sheltered(game) * 100)}%`} tone={sheltered(game) < 0.6 ? 'warn' : 'good'} title="Animal units under a barn, barnyard or sheep barn: fewer sick animals, no winter wasting" />
+      <Row label="Pasture" value={fb.pastureAcres < 0.1 ? 'none' : `${fb.units.toFixed(1)} of ${fb.carries.toFixed(1)} animal units`} tone={fb.stocking > 1.3 ? 'bad' : fb.stocking > 1 ? 'warn' : undefined} title={`${pluralize(fb.pastureAcres.toFixed(1), 'acre')} of open grass; the grass is at ${Math.round(fb.pasture * 100)}%`} />
       <Row label="Hay" value={<span style={{ color: fb.hayBales < fb.hayNeed ? TONE.warn : undefined }}>{fb.hayBales} bales{hayWinterDays > 0 && isFinite(hayWinterDays) ? ` · ${hayWinterDays > 999 ? 'plenty' : `${pluralize(Math.floor(hayWinterDays), 'day')}`}` : ''} <span style={{ color: DIM }}>/ {fb.hayNeed} for winter</span></span>} title="Days of hay at the winter feeding rate (in summer the herd grazes and eats little, so the bales would seem to last forever)" />
       <Row label="Feed" value={<span style={{ color: fb.feedDays < 14 ? TONE.warn : undefined }}>{fb.feedBags} bags{isFinite(fb.feedDays) ? ` · ${fb.feedDays > 999 ? 'plenty' : `${pluralize(Math.floor(fb.feedDays), 'day')}`}` : ''}</span>} />
       {(game.stock.sheep ?? 0) >= 1 && <Note tone={sheepSheltered(game) < 1 ? 'warn' : 'good'}>{sheepSheltered(game) < 1 ? `Roof for ${sheepRoom(game)} of ${Math.floor(game.stock.sheep)} sheep: build a sheep barn (30) before winter.` : 'All the sheep have a roof for the winter.'}</Note>}
@@ -237,12 +237,12 @@ function AnimalsView({ game }: { game: GameState }) {
     {hives.map((st, i) => {
       const r = apiaryReport(game, st.id);
       return <Section key={st.id} title={hives.length > 1 ? `Apiary ${i + 1}` : 'Apiary'}>
-        <Row label="Colonies" value={`${r.colonies} of ${HIVES}${r.colonies > 0 ? ` · strength ${Math.round(r.strength * 100)} %` : ''}`} />
+        <Row label="Colonies" value={`${r.colonies} of ${HIVES}${r.colonies > 0 ? ` · strength ${Math.round(r.strength * 100)}%` : ''}`} />
         {r.colonies > 0 && <>
           <Row label="Winter honey reserve" value={<span style={{ color: r.stores < r.need * 0.7 ? TONE.warn : undefined }}>{Math.round(r.stores)} of {Math.round(r.need)} lb</span>} title="Honey the bees need to get through the winter" />
           <Row label="Honey to take" value={`${Math.floor(r.surplus)} lb`} title="Above what they need for winter; taken in late summer (the family does it on day 245 if you do not)" />
-          <Row label="Mites" value={<span style={{ color: r.mites > 0.5 ? TONE.bad : r.mites > 0.3 ? TONE.warn : undefined }}>{Math.round(r.mites * 100)} %{r.treated ? ' · treated this year' : ''}</span>} />
-          <Row label="Forage" value={`${Math.round(r.forage * 100)} %`} title="What the garden, orchard, fields and woods give the bees" />
+          <Row label="Mites" value={<span style={{ color: r.mites > 0.5 ? TONE.bad : r.mites > 0.3 ? TONE.warn : undefined }}>{Math.round(r.mites * 100)}%{r.treated ? ' · treated this year' : ''}</span>} />
+          <Row label="Forage" value={`${Math.round(r.forage * 100)}%`} title="What the garden, orchard, fields and woods give the bees" />
         </>}
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '3px 0' }}>
           {act('Stock a colony', bStockProblem(game, st.id), () => g.money(d => stockApiary(d, st.id)), 'Put a nucleus colony from the Shop in a hive (spring)')}
@@ -283,7 +283,7 @@ function PlanView({ game }: { game: GameState }) {
       {o.orchardKcal > 0 && <Row label="Orchards" value={k(o.orchardKcal)} />}
       {o.eggsKcal > 0 && <Row label="Hens" value={k(o.eggsKcal)} />}
       <Row label="Need for a year" value={k(o.yearNeed)} />
-      <Row label="Stores + harvest" value={isFinite(o.coverage) ? `${Math.round(o.coverage * 100)} % of a year` : '—'} tone={o.coverage < 0.6 ? 'bad' : o.coverage < 0.9 ? 'warn' : 'good'} />
+      <Row label="Food on hand + harvest" value={isFinite(o.coverage) ? `${Math.round(o.coverage * 100)}% of a year` : '—'} tone={o.coverage < 0.6 ? 'bad' : o.coverage < 0.9 ? 'warn' : 'good'} />
     </Section>
     <Section title="Spoilage risk">
       {risks.length === 0 && <Note tone="good">Nothing is about to go off.</Note>}

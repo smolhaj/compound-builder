@@ -130,7 +130,7 @@ export function roadChokeLines(s: Pick<GameState, 'site' | 'seed'> & Partial<Pic
 export function roadLine(s: Pick<GameState, 'site' | 'seed'>): string {
   const p = planOf(s);
   const km = lengthText(p.lengthM);
-  const bits = [`${km} of ${p.style}`, `steepest ${Math.round(p.maxGradePct)} %`];
+  const bits = [`${km} of ${p.style}`, `steepest ${Math.round(p.maxGradePct)}%`];
   if (p.hairpins.length) bits.push(`${p.hairpins.length} hairpin${p.hairpins.length === 1 ? '' : 's'}`);
   for (const k of ['bridge', 'bridge1', 'tunnel', 'low_water', 'ford'] as const) { const n = p.structures.filter(x => x.kind === k).length; if (n) bits.push(`${n > 1 ? n + ' ' : 'a '}${{ bridge: 'bridge', bridge1: 'one-lane bridge', tunnel: 'rock bore', low_water: 'low-water crossing', ford: 'ford' }[k]}${n > 1 ? 's' : ''}`); }
   return bits.join(', ');

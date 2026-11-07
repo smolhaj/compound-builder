@@ -45,7 +45,7 @@ describe('Classes and drills (server-rendered)', () => {
     expect(t).toContain('Twice a week');
     expect(t).toContain('Ready at the alarm');
     const row = text(renderToStaticMarkup(<PersonInsight p={g.people[1]} />));
-    expect(row).toContain('Taking: first aid and first responder, 40 %');
+    expect(row).toContain('Taking: first aid and first responder, 40%');
     const row0 = text(renderToStaticMarkup(<PersonInsight p={g.people[0]} />));
     expect(row0).toContain('Amateur radio license');
   });

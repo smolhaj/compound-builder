@@ -332,7 +332,7 @@ export function cropsDay(s: GameState): string[] {
       // the planting stage used the plain Shop seed: hybrid (a field finished long ago, in an old save or a test state, was heirloom)
       p.sown = old ? { y, doy, line: 'heirloom', v: 1, late: late * sowDelay(s) } : { y, doy, line: 'hybrid', v: VIGOR.hybrid, late: late * sowDelay(s) };
       if (late <= 0) { p.sown = undefined; p.crop = null; if (logGate(s, `late-plant:${f.id}`, 300)) out.push('A field was planted too late in the year to make a crop: it will be sown properly next spring.'); }
-      else if (late < 0.99 && logGate(s, `late-plant:${f.id}`, 300)) out.push(`The new field went in late: about ${Math.round(late * 100)} % of a crop this year.`);
+      else if (late < 0.99 && logGate(s, `late-plant:${f.id}`, 300)) out.push(`The new field went in late: about ${Math.round(late * 100)}% of a crop this year.`);
     }
   });
   for (const g of gardensOf(s)) P[g.id] ??= newPlot('garden');
@@ -381,8 +381,8 @@ export function cropsDay(s: GameState): string[] {
       const parts = [sown ? `${sown} field${sown === 1 ? '' : 's'} sown` : '', rested ? `${rested} resting under cover` : '', loads ? `${loads} loads of manure and compost spread` : ''].filter(Boolean);
       if (parts.length) out.push(`Spring work: ${parts.join(', ')}.`);
     }
-    if (unsown > 0 && logGate(s, 'no-seed', 20)) out.push(`No seed left for ${unsown} field${unsown === 1 ? '' : 's'}: buy field seed in the Shop, trade for it or find some before the sowing window closes, or ${unsown === 1 ? 'it comes' : 'they come'} up in weeds at about 40 % of a crop.`);
-    if (volunteers > 0 && logGate(s, 'volunteers', 200)) out.push(`No seed came for ${volunteers} field${volunteers === 1 ? '' : 's'}, so ${volunteers === 1 ? 'it was' : 'they were'} left to weeds and volunteers from last year: about 40 % of a crop, and seed saved from it is poor. Seed is bought in the Shop, traded for or found scavenging.`);
+    if (unsown > 0 && logGate(s, 'no-seed', 20)) out.push(`No seed left for ${unsown} field${unsown === 1 ? '' : 's'}: buy field seed in the Shop, trade for it or find some before the sowing window closes, or ${unsown === 1 ? 'it comes' : 'they come'} up in weeds at about 40% of a crop.`);
+    if (volunteers > 0 && logGate(s, 'volunteers', 200)) out.push(`No seed came for ${volunteers} field${volunteers === 1 ? '' : 's'}, so ${volunteers === 1 ? 'it was' : 'they were'} left to weeds and volunteers from last year: about 40% of a crop, and seed saved from it is poor. Seed is bought in the Shop, traded for or found scavenging.`);
   }
   // the season's close (the last day of the harvest window): fertility, rotation, the year's trouble
   if (doy === H[1] % 365) {
@@ -442,12 +442,12 @@ export function seedWarning(s: GameState): { text: string; tone: 'warn' | 'bad';
   if (!fields.length) return null;
   const { doy } = calendarOf(s.clock), [w0, w1] = sowWindow(s), P = plotsOf(s), y = year(s);
   const weedy = fields.filter(f => P[f.id]?.sown?.y === y && P[f.id]?.sown?.line === 'volunteer').length;
-  if (weedy) return { text: `${weedy} field${weedy === 1 ? '' : 's'} came up in weeds and volunteers this year because no seed came: about 40 % of a crop. Buy field seed in the Shop before next spring.`, tone: 'bad', fields: weedy };
+  if (weedy) return { text: `${weedy} field${weedy === 1 ? '' : 's'} came up in weeds and volunteers this year because no seed came: about 40% of a crop. Buy field seed in the Shop before next spring.`, tone: 'bad', fields: weedy };
   if (doy < w0 - 30 || doy > w1 + 28) return null;
   const need = fields.filter(f => { const p = P[f.id]; return p?.pin !== 'rest' && !(p?.sown && p.sown.y === y); }).length, have = seedTotal(s);
   if (need <= 0 || have >= need - 1e-6) return null;
   const left = w1 + 28 - doy;
-  return { text: `${need} field${need === 1 ? '' : 's'} to sow and ${have >= 10 ? Math.round(have) : have.toFixed(1)} unit${have === 1 ? '' : 's'} of seed on hand: buy field seed in the Shop, trade for it or find some${left > 1 ? ` in the next ${pluralize(left, 'day')}` : left >= 0 ? ' today' : ''}, or the rest come up in weeds at about 40 % of a crop.`, tone: doy > w1 ? 'bad' : 'warn', fields: need - Math.floor(have) };
+  return { text: `${need} field${need === 1 ? '' : 's'} to sow and ${have >= 10 ? Math.round(have) : have.toFixed(1)} unit${have === 1 ? '' : 's'} of seed on hand: buy field seed in the Shop, trade for it or find some${left > 1 ? ` in the next ${pluralize(left, 'day')}` : left >= 0 ? ' today' : ''}, or the rest come up in weeds at about 40% of a crop.`, tone: doy > w1 ? 'bad' : 'warn', fields: need - Math.floor(have) };
 }
 
 /** Spreading and sowing in numbers for the Farm tab: the average field's fertility, the worst, and whether the rotation is clean. */
@@ -458,7 +458,7 @@ export function fieldRows(s: GameState): FieldRow[] {
     const crop = p.crop ?? p.pin ?? autoCrop(s, p.prev, i);
     let note: string | null = null;
     const weedy = !!p.sown && p.sown.y === year(s) && p.sown.line === 'volunteer';
-    if (weedy) note = 'No seed came: weeds and volunteers, about 40 % of a crop. Buy field seed in the Shop for next spring';
+    if (weedy) note = 'No seed came: weeds and volunteers, about 40% of a crop. Buy field seed in the Shop for next spring';
     else if (p.fert < 0.8) note = 'Tired soil: rest it under a cover crop or spread manure';
     else if (p.prev === crop && crop !== 'rest') note = `${CROPS[crop].name} after ${CROPS[crop].name.toLowerCase()}: the yield pays for it`;
     else if (p.sown && p.sown.y === year(s) && p.sown.late < 0.8) note = 'Sown late this year';

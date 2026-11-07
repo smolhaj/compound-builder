@@ -410,7 +410,7 @@ export function Hud() {
                 {(() => { const pw = powerSummary(game); return <>
                   {(pw.solarKw > 0 || pw.batteryKwh > 0) && <Row label="Installed" value={`${pw.solarKw > 0 ? `${fmtKw(pw.solarKw)} kW solar` : 'no solar'}${pw.batteryKwh > 0 ? ` · ${Math.round(pw.batteryKwh)} kWh batteries` : ''}`} title="Nameplate: panels in kW (a 20 kW farm is 50 panels), batteries in kWh" />}
                   <Row label="Made / used" value={`${fmtKw(pw.madeKwh)} / ${fmtKw(pw.usedKwh)} kWh`} />
-                  <Row label="Batteries" value={pw.batteryKwh > 0 ? `${Math.round(pw.storedKwh)} of ${Math.round(pw.batteryKwh)} kWh (${pw.batteryPct} %)` : 'none'} tone={pw.batteryKwh > 0 && pw.madeKwh > 0 && pw.storedKwh < 0.5 ? 'warn' : undefined} />
+                  <Row label="Batteries" value={pw.batteryKwh > 0 ? `${Math.round(pw.storedKwh)} of ${Math.round(pw.batteryKwh)} kWh (${pw.batteryPct}%)` : 'none'} tone={pw.batteryKwh > 0 && pw.madeKwh > 0 && pw.storedKwh < 0.5 ? 'warn' : undefined} />
                   {pw.exportKwh >= 0.5 && <Row label="Sold to the grid" value={`${fmtKw(pw.exportKwh)} kWh · $${pw.creditUsd.toFixed(2)}`} title="Surplus solar sent back to the co-op while the grid is up (net metering, 5 cents a kWh)" />}
                   {pw.wastedKwh >= 1 && <Row label="Made, not stored" value={`${fmtKw(pw.wastedKwh)} kWh`} tone="warn" title="Power the sun made yesterday that nobody used and no battery took" />}
                   {pw.headline && <Note tone="warn">{pw.headline}</Note>}
@@ -466,7 +466,7 @@ export function Hud() {
               <Clamp text={`The way in: ${roadLine(game)}.`}>The way in: {roadLine(game)}.{game.site.lot && (() => { const cl = crossingLine(roadPlanOf(game)); return cl ? ` ${cl}` : ''; })()}</Clamp>
               <EntranceCard />
               <PlowNote game={game} />
-              {(game.roadside ?? []).length > 0 && <Note tone="warn">{game.roadside.length} deliver{game.roadside.length > 1 ? 'ies' : 'y'} at the road: about {Math.round(game.roadside.reduce((a, r) => a + r.hours - r.done, 0))} h of carrying before building goes on.</Note>}
+              {(game.roadside ?? []).length > 0 && <Note tone="warn">{game.roadside.length === 1 ? 'A load is' : `${game.roadside.length} loads are`} at the road: about {Math.round(game.roadside.reduce((a, r) => a + r.hours - r.done, 0))} h of carrying before the rest of the building goes on. A gravel drive ends this.</Note>}
               {!game.site.improvements.power && !game.utilities.grid && <Note>No power at the place: run the line, or go solar or a generator.</Note>}
               {game.land.parcels.some(p => p.owner === 'you') && <Row label="Bought since" value={`${pluralize(game.land.parcels.filter(p => p.owner === 'you').reduce((a, p) => a + acresOf(p.rect), 0), 'acre')}`} />}
             </Section>
@@ -528,7 +528,7 @@ export function Hud() {
             {(game.disaster.phase === 'warning' || (game.disaster.kind && game.clock.t >= game.disaster.warnAt)) && (
               <Section title="Outside world">
                 {game.disaster.tracks.deliveries <= 0.25 ? <Note tone="bad">No deliveries: the yard and the stores are shut</Note>
-                  : prices(game) > 1.02 && <Note tone="warn">Prices up {Math.round((prices(game) - 1) * 100)} %</Note>}
+                  : prices(game) > 1.02 && <Note tone="warn">Prices up {Math.round((prices(game) - 1) * 100)}%</Note>}
                 {isNuclear(game) && (() => {
                   const h = (game.clock.t - game.disaster.hitAt) * 24, rate = doseRate(game.disaster.variant, h) * 1000, [pf, where] = bestShelter(game);
                   return <>
@@ -649,7 +649,7 @@ export function Hud() {
         {w.blueprint && w.blueprintReadout && (() => { const r = w.blueprintReadout; return <div data-testid="blueprint-readout" style={{ flexBasis: '100%', fontSize: 11.5, color: '#bcd', display: 'flex', flexWrap: 'wrap', gap: '2px 14px' }}>
           <span title="The Defense tab's score">Defense <b>{r.score}</b> {r.label}</span>
           <span title="How hard the walls, gates and bars stop a crew">Line holds {r.barrierPct}%</span>
-          <span title="How early a crew is seen">Seen coming {r.detectionPct}%</span>
+          <span title="How likely it is that a crew is seen before it reaches the wall">Chance of seeing a crew coming: {r.detectionPct}%</span>
           <span>{r.rings} ring{r.rings === 1 ? '' : 's'} · {r.gates} gate{r.gates === 1 ? '' : 's'} · {r.towers} tower{r.towers === 1 ? '' : 's'}</span>
           <span title="Ways in, from the lay of the land (Terrain: Lanes)">{r.lanes} lane{r.lanes === 1 ? '' : 's'}{r.laneHardness !== null ? ` · best going ×${r.laneHardness}` : ''}{r.chokeHeld ? ' · choke held' : ''}</span>
           <span title="How far each kind of watch sees in today's fog; thermal sees through it">Sight: eye {lengthText(r.sight.eye)} · camera {lengthText(r.sight.camera)} · night vision {lengthText(r.sight.nvg)} · thermal {lengthText(r.sight.thermal)}</span>

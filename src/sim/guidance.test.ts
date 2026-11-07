@@ -209,7 +209,7 @@ describe('seed for the fields', () => {
     g.clock.t = sowWindow(g)[0] + 2 - g.clock.startDoy + 0.3;
     const card = suggestions(g).find(x => x.id === 'seed');
     expect(card).toBeTruthy();
-    expect(card!.why).toMatch(/weeds at about 40 %/);
+    expect(card!.why).toMatch(/weeds at about 40%/);
     const open = card!.acts!.find(a => a.act.type === 'open')!.act;
     expect(open).toEqual({ type: 'open', right: 'supplies', supplies: 'farm' });
     const orders = card!.acts!.filter(a => a.act.type === 'order').map(a => (a.act as { lines: Array<{ material: string; qty: number }> }).lines[0].material);

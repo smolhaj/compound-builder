@@ -384,7 +384,7 @@ export function orchardDay(s: GameState, choreLevel: number): string[] {
     if (doy !== hit + 1) continue;
     const lost = FRUITS.filter(f => treesOf(st.kind, f) > 0 && bearing(f, ageOf(s, st)) > 0).map(f => ({ f, l: blossomLoss(hit, f, m) })).filter(x => x.l >= 0.15);
     if (lost.length && logGate(s, `frost:${st.id}`, 300)) {
-      const list = lost.map(x => `${FRUIT[x.f].name.toLowerCase()}s (${Math.round(x.l * 100)} %)`).join(', ');
+      const list = lost.map(x => `${FRUIT[x.f].name.toLowerCase()}s (${Math.round(x.l * 100)}%)`).join(', ');
       out.push(`A hard frost caught the orchard in blossom: it took the ${list}.${plotSite(s, st).pocket ? ' The cold air pooled in the hollow where it stands.' : ''}`);
     }
   }

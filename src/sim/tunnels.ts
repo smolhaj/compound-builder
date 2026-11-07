@@ -103,5 +103,5 @@ export function tunnelDay(s: GameState): string[] {
 /** Plain words for a tunnel's card. */
 export function tunnelNote(s: GameState, st: Structure): string {
   const age = filmYears(s, st);
-  return age >= FILM_YEARS ? `Film ${pluralize(age.toFixed(1), 'year')} old: chalky, ${Math.round((1 - filmLight(s, st)) * 100)} % less light.` : `Film ${pluralize(age.toFixed(1), 'year')} old; good for ${(FILM_YEARS - age).toFixed(1)} more.`;
+  return age >= FILM_YEARS ? `Film ${pluralize(age.toFixed(1), 'year')} old: chalky, ${Math.round((1 - filmLight(s, st)) * 100)}% less light.` : `Film ${pluralize(age.toFixed(1), 'year')} old; good for ${(FILM_YEARS - age).toFixed(1)} more.`;
 }

@@ -144,8 +144,8 @@ describe('a crew that came by the tunnel', () => {
   it('may blow the portal behind them: more likely with more charges, never past the cap, never a tunnel-bridge', () => {
     const lo = withBore(), hi = withBore();
     expect(sapperBreach(lo, 't1', 0, 'breached', () => 0)).toEqual([]);
-    expect(sapperBreach(lo, 't1', 1, 'breached', () => 0.5)).toEqual([]);            // one grenade: a 10 % chance, 6 % with the blast door
-    expect(sapperBreach(hi, 't1', 3, 'breached', () => 0.1)).toHaveLength(1);        // three: 30 %, 18 % with the blast door
+    expect(sapperBreach(lo, 't1', 1, 'breached', () => 0.5)).toEqual([]);            // one grenade: a 10% chance, 6 % with the blast door
+    expect(sapperBreach(hi, 't1', 3, 'breached', () => 0.1)).toHaveLength(1);        // three: 30%, 18 % with the blast door
     expect(hi.perimeter[0].collapsed).toBeTruthy();
     const capped = withBore();
     expect(sapperBreach(capped, 't1', 99, 'overrun', () => SAPPER_P_CAP + 0.01)).toEqual([]);

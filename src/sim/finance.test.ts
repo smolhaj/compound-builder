@@ -78,7 +78,7 @@ describe('round 4: debt', () => {
   const broke = () => { const g = newGame(5, 105, 2027, { mode: 'scenario', peace: 'long', kind: 'grid_down' }); g.money = 0; for (const ps of g.personState) ps.employed = false; return g; };
   const days = (g: ReturnType<typeof broke>, n: number) => { const d0 = Math.floor(g.clock.t); const lines: string[] = []; for (let d = 1; d <= n; d++) { g.clock.t = d0 + d + 0.5; lines.push(...debtDay(g, d0 + d)); } return lines; };
 
-  it('checking never goes below zero: an overdraft goes on the card at about 24 % a year', () => {
+  it('checking never goes below zero: an overdraft goes on the card at about 24% a year', () => {
     const g = broke();
     g.money = -5000;
     const lines = days(g, 1);

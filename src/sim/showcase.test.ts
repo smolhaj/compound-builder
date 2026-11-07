@@ -173,7 +173,7 @@ describe('the north-star layout: the compound on the bench above the rock face, 
     expect(g.structures.filter(st => st.kind === 'garden').length).toBeGreaterThanOrEqual(2);
   });
 
-  it('the tunnel is long and gentle: a bore the land allows, at most 15 %, its low portal on the shelf, its high portal in the compound', () => {
+  it('the tunnel is long and gentle: a bore the land allows, at most 15%, its low portal on the shelf, its high portal in the compound', () => {
     const [a, b] = [tunnel!.pts[0], tunnel!.pts[tunnel!.pts.length - 1]];
     expect(routeProblem(g, 'rock_tunnel', tunnel!.pts)).toBeNull();
     const s = boreStats(h.io.ground, a, b);

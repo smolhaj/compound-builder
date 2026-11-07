@@ -144,12 +144,12 @@ export function siteNote(s: GameState, kind: string, at: Pick<Structure, 'x' | '
     case 'garden': case 'greenhouse': case 'greenhouse_heated': case 'polytunnel': case 'high_tunnel': {
       if (c.site.pocket) return `A cold-air pocket: this bed starts ${pluralize(MC.GARDEN_POCKET_DAYS, 'day')} later and ends ${MC.GARDEN_POCKET_DAYS} sooner than the region's season (a tunnel or greenhouse gets most of it back).`;
       if (c.site.drained) return `A slope that drains the cold air: this bed starts ${pluralize(MC.GARDEN_DRAIN_DAYS, 'day')} early.`;
-      return c.windy === 'exposed' ? 'Open to the wind: the bed dries and lodges (5 % less); a hedge or a fence on the windward side halves that.' : null;
+      return c.windy === 'exposed' ? 'Open to the wind: the bed dries and lodges (5% less); a hedge or a fence on the windward side halves that.' : null;
     }
-    case 'field': return c.site.pocket ? 'A cold-air pocket: frost in the grain-fill costs this field 8 %.' : c.windy === 'exposed' ? 'Open to the wind: 4 % less; a windbreak halves it.' : null;
-    case 'solar_array': case 'solar_farm': return c.windy === 'exposed' ? 'Exposed: the panels run cooler (+2 %) but a windstorm may strip them. Racks on the lee side of a rise are safer.' : c.sun >= 1.08 ? 'A south-facing slope: more winter sun.' : null;
-    case 'wind_turbine': return `Wind here is ${Math.round(c.wind * 100)} % of an open field's (${wind || 'ordinary exposure'}).`;
-    default: return wind && (kind === 'orchard' || kind === 'orchard_grove' || kind === 'orchard_terraced') ? `Open to the wind: bees stay home above 11 mph, so the fruit sets 8 % less (a windbreak halves it).` : null;
+    case 'field': return c.site.pocket ? 'A cold-air pocket: frost in the grain-fill costs this field 8%.' : c.windy === 'exposed' ? 'Open to the wind: 4% less; a windbreak halves it.' : null;
+    case 'solar_array': case 'solar_farm': return c.windy === 'exposed' ? 'Exposed: the panels run cooler (+2%) but a windstorm may strip them. Racks on the lee side of a rise are safer.' : c.sun >= 1.08 ? 'A south-facing slope: more winter sun.' : null;
+    case 'wind_turbine': return `Wind here is ${Math.round(c.wind * 100)}% of an open field's (${wind || 'ordinary exposure'}).`;
+    default: return wind && (kind === 'orchard' || kind === 'orchard_grove' || kind === 'orchard_terraced') ? `Open to the wind: bees stay home above 11 mph, so the fruit sets 8% less (a windbreak halves it).` : null;
   }
 }
 

@@ -85,7 +85,7 @@ export function entranceOptions(site: Probe, gameSeed: number, ctx: { plow?: boo
     const notes: string[] = [];
     notes.push(`${plan.lengthM >= 1000 ? (plan.lengthM / 1000).toFixed(1) + ' km' : plan.lengthM + ' m'}, steepest ${Math.round(plan.maxGradePct)} %${plan.hairpins.length ? `, ${plan.hairpins.length} hairpin${plan.hairpins.length === 1 ? '' : 's'}` : ''}`);
     notes.push(shutWithout === 0 ? 'open all winter' : `shut about ${shutWithout} day${shutWithout === 1 ? '' : 's'} a winter${shutWith < shutWithout ? ` (${shutWith} with a plow blade)` : ''}`);
-    notes.push(response > 1.05 ? `help takes ${Math.round((response - 1) * 100)} % longer to arrive` : 'help arrives in the usual time');
+    notes.push(response > 1.05 ? `help takes ${Math.round((response - 1) * 100)}% longer to arrive` : 'help arrives in the usual time');
     notes.push(chokes.length ? `a crew's trucks stop at ${chokes.join(' and ')}: the watch sees them ${lengthText(approachM)} longer` : 'no choke: a crew drives straight up');
     out.push({ z, gateZ: plan.gate.z, habitual: Math.abs(z - habitual) < 1e-6, current: false, usd: plan.usd, days: plan.days, lengthM: plan.lengthM, maxGradePct: Math.round(plan.maxGradePct * 10) / 10, hairpins: plan.hairpins.length, shutPerWinter: shutNow, shutWithBlade: shutWith, response, chokes, approachM, notes, plan });
   }

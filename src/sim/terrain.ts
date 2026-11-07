@@ -522,7 +522,7 @@ export function slopeTunnelProblem(src: GroundSource, pts: readonly Pt[]): strin
   let len = 0, rise = 0;
   for (let i = 1; i < pts.length; i++) { len += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); rise += Math.abs(src.h(pts[i][0], pts[i][1]) - src.h(pts[i - 1][0], pts[i - 1][1])); }
   if (len < SPAN.MIN_LEN) return 'too short for a tunnel';
-  if (rise / len < SPAN.MIN_SLOPE) return `no hillside here: the ground falls only ${Math.round(rise / len * 100)} % along this line (a slope tunnel needs 20 % or more)`;
+  if (rise / len < SPAN.MIN_SLOPE) return `no hillside here: the ground falls only ${Math.round(rise / len * 100)}% along this line (a slope tunnel needs 20% or more)`;
   return null;
 }
 
@@ -610,7 +610,7 @@ export function boreProblemOf(s: BoreStats): string | null {
   const len = s.lenU;
   if (len < BORE.MIN_LEN) return `too short for a bore: ${lengthText(len * 6)} (a rock tunnel is at least ${lengthText(BORE.MIN_LEN * 6)}: use a covered walkway or a gate)`;
   if (len > BORE.MAX_LEN) return `too long: ${lengthText(len * 6)} is more than a bore can be driven (${lengthText(BORE.MAX_LEN * 6)} at the most)`;
-  if (s.grade > BORE.MAX_GRADE) return `too steep: the deck would climb ${Math.round(s.grade * 100)} % (a truck can take ${Math.round(BORE.MAX_GRADE * 100)} %). Run the bore along the hill so it gains height gently, or make it longer`;
+  if (s.grade > BORE.MAX_GRADE) return `too steep: the deck would climb ${Math.round(s.grade * 100)}% (a truck can take ${Math.round(BORE.MAX_GRADE * 100)}%). Run the bore along the hill so it gains height gently, or make it longer`;
   if (s.peakCover < BORE.MIN_PEAK) return `no rock over it: at its deepest the ground is only ${lengthText(Math.max(0, Math.round(s.peakCover * 6)))} over the crown. A bore goes through a rock face or a spur at least ${lengthText(BORE.MIN_PEAK * 6)} deep; on a gentle slope use a slope tunnel`;
   if (s.openA > BORE.MAX_OPEN || s.openB > BORE.MAX_OPEN) return `the ground does not close over it soon enough: the cutting at one end would be ${lengthText(Math.max(s.openA, s.openB) * 6)} long (${lengthText(BORE.MAX_OPEN * 6)} at the most)`;
   if (s.minCover < BORE.MIN_COVER) return `daylight in the middle: the ground over the crown falls to ${lengthText(Math.max(0, Math.round(s.minCover * 6)))} somewhere along it (it needs ${lengthText(BORE.MIN_COVER * 6)} everywhere between the cuttings)`;

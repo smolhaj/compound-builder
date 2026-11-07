@@ -137,5 +137,5 @@ export function terraceSite(s: GameState): TerracePlan | null {
 /** Plain words for the plan, for the Next-step card. */
 export function terraceText(p: TerracePlan): string {
   const walls = p.tiers.map(t => `${lengthText(t.wallHm)}`).join(', ');
-  return `a ${p.slopePct} % slope: ${p.tiers.length} garden beds stepped down it, each on its own flat terrace held by a dry-stack wall (${lengthText(p.wallM)} of wall in all, up to ${lengthText(Math.max(...p.tiers.map(t => t.wallHm)))} high, a stair set in each) instead of one bed on the hill. The walls are the foundation's fieldstone: about ${p.pallets} pallets over the price of level ground, and ${p.hours} more hours on the pads (wall heights ${walls}).`;
+  return `a ${p.slopePct}% slope: ${p.tiers.length} garden beds stepped down it, each on its own flat terrace held by a dry-stack wall (${lengthText(p.wallM)} of wall in all, up to ${lengthText(Math.max(...p.tiers.map(t => t.wallHm)))} high, a stair set in each) instead of one bed on the hill. The walls are the foundation's fieldstone: about ${p.pallets} pallets over the price of level ground, and ${p.hours} more hours on the pads (wall heights ${walls}).`;
 }

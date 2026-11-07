@@ -19,7 +19,7 @@ const game = (seed = 3): GameState => { const g = newGame(seed); g.site = { ...g
 
 describe('solar on a slope', () => {
   const south: GroundSource = { h: (_x, z) => -0.15 * z }, north: GroundSource = { h: (_x, z) => 0.15 * z };
-  it('a south-facing slope gives more sun, a north-facing less, the level none either way; capped at ±25 %', () => {
+  it('a south-facing slope gives more sun, a north-facing less, the level none either way; capped at ±25%', () => {
     const g = game(), st = { x: 30, z: 30 };
     setGroundOverride(south); expect(sunFactor(g, st)).toBeCloseTo(1.12, 2);
     setGroundOverride(north); expect(sunFactor(g, st)).toBeCloseTo(0.88, 2);

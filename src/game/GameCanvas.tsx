@@ -354,7 +354,7 @@ export function GameCanvas() {
         const q = useWorldStore.getState().quality, lower = lowerTier(q);
         if (lower) {
           useWorldStore.getState().setQuality(lower);
-          useWorldStore.getState().setPerfNotice(`The game was running slowly on ${q.toUpperCase()}, so graphics were switched to ${lower.toUpperCase()}. You can change this in the Graphics control (bottom left); it will not switch up by itself.`);
+          useWorldStore.getState().setPerfNotice(`Graphics switched to ${lower.toUpperCase()}: the game was running slowly on ${q.toUpperCase()}. Change it in the Graphics control (View, bottom left); it will not switch back up by itself.`);
           budget.reset();
         }
       }
