@@ -374,7 +374,7 @@ export class BattleRenderer {
     if (masts?.length) {
       masts.forEach((m, i) => {
         const a = aim ?? c;
-        const s = new THREE.SpotLight(0xfff6ea, this.battle?.night ? 90 : 12, 40, 0.75, 0.45, 1.2);
+        const s = new THREE.SpotLight(0xfff6ea, this.lightNight ?? this.battle?.night ? 90 : 12, 40, 0.75, 0.45, 1.2);
         s.position.set(m.x, this._ground(m.x, m.z) + m.y, m.z);
         s.target.position.set(a.x, this._ground(a.x, a.z), a.z);
         s.castShadow = i === 0;
@@ -387,7 +387,7 @@ export class BattleRenderer {
     for (let i = 0; i < 3; i++) {
       const a = i * (Math.PI * 2 / 3) + 0.4;
       const x = c.x + Math.cos(a) * 2.5, z = c.z + Math.sin(a) * 2.5;
-      const s = new THREE.SpotLight(0xfff3dd, this.battle?.night ? 40 : 8, 30, 0.6, 0.5, 1.4);
+      const s = new THREE.SpotLight(0xfff3dd, this.lightNight ?? this.battle?.night ? 40 : 8, 30, 0.6, 0.5, 1.4);
       s.position.set(x, this._ground(x, z) + 1.4, z);
       s.target.position.set(c.x + Math.cos(a) * 12, this._ground(c.x, c.z), c.z + Math.sin(a) * 12);
       s.castShadow = i === 0;
@@ -516,7 +516,7 @@ export class BattleRenderer {
     }
     // a lantern or a flashlight in the hand of about every other raider at night: a bright pip (no extra draw: it rides the pips' instances) and, for two of them, a small light
     let pn = ri, ln = 0;
-    const dark = !!this.battle?.night;
+    const dark = this.lightNight ?? !!this.battle?.night;
     for (const u of this._units.values()) {
       if (!dark || u.def.side !== 'raider' || u.gone || u.dead || u.def.machine || pn >= 128) continue;
       const hsh = hashStr(u.def.id) % 4;   // (0 and 2: a lantern, 1: a flashlight, 3: nothing in hand)
