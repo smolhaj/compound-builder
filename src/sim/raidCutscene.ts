@@ -55,6 +55,10 @@ export interface RaidReport {
   /** Raiders left on the drive after a fight the family won. */
   raidersWounded: number;
   raidersDead: number;
+  /** Raiders who gave up and are held at the gate (sim/surrender.ts). Absent in a report from before save v86. */
+  raidersSurrendered?: number;
+  /** Family members the crew disarmed and held at gunpoint when it broke the line, then left standing in the yard (sim/breachFates.ts). */
+  held?: string[];
   /** What the raid broke and left broken until it is mended (sim/raidDamage.ts): a gap in the fence, the gate, windows, a burned wreck. */
   damage: string[];
   /** Rounds fired by the family in the fight and the scenes before it. */
@@ -184,9 +188,10 @@ export function raidReport(before: GameState, after: GameState, outcome: Outcome
   for (const k of STOCK_LOSSES) { const d = Math.floor((before.stock[k] ?? 0) - (after.stock[k] ?? 0)); if (d > 0) lost.push([LOSS_WORDS[k][d === 1 ? 0 : 1], d]); }
   const am = after.gate.aftermath;
   const b = after.gate.battle;
+  const held = (b?.surrendered?.defenders ?? []).map(id => after.people.find(p => p.id === b!.units.find(u => u.id === id)?.personId)?.first).filter((n): n is string => !!n && !killed.includes(n) && !taken.includes(n));
   const rounds = (b ? b.events.filter(e => e.kind === 'shot' && e.from.startsWith('h_')).length : 0) + extraRounds;
   return {
     title: outcome.title, text: outcome.text, tone: outcome.tone, killed, wounded, taken, lost,
-    damage: newDamage(before, after), raidersWounded: am?.wounded ?? 0, raidersDead: am?.dead ?? 0, rounds, lines: outcome.lines, aftermath: !!am,
+    damage: newDamage(before, after), raidersWounded: am?.wounded ?? 0, raidersDead: am?.dead ?? 0, raidersSurrendered: am?.surrendered ?? 0, held, rounds, lines: outcome.lines, aftermath: !!am,
   };
 }

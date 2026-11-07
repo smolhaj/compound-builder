@@ -72,12 +72,12 @@ export function findVictim(before: GameState, after: GameState, battles: readonl
   return best;
 }
 
-/** Raiders the sim left alive on the drive: hit, not dead, not run off. */
+/** Raiders the sim left alive on the drive: hit, not dead, not run off, not surrendered. */
 export function leftBehindRaiders(b: Battle): string[] {
   const hurt = new Set<string>(), gone = new Set<string>();
   for (const e of b.events) {
     if (e.kind === 'wound' && !e.stopped) hurt.add(e.unit);
-    if (e.kind === 'death' || e.kind === 'flee' || e.kind === 'taken') gone.add(e.unit);
+    if (e.kind === 'death' || e.kind === 'flee' || e.kind === 'taken' || e.kind === 'surrender') gone.add(e.unit);   // (a man who gave up is held, not left on the drive)
   }
   return b.units.filter(u => u.side === 'raider' && !u.machine && hurt.has(u.id) && !gone.has(u.id)).map(u => u.id);
 }

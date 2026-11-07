@@ -9,13 +9,14 @@
  *                     he was hit (lay), or, for a crew that is not ruthless and a hurt that is light, drops the gun and puts his hands up (surrender,
  *                     two at most, spread apart). A savage crew never surrenders; a desperate one often does; a hard one rarely.
  *   the rest          raiders who ran are off the field (the sim's `flee`); the dead stay down.
- * The sim has no surrender state of its own: a "left behind" raider is wounded and on the ground; a hands-up man is how the same outcome looks.
+ * The sim now owns surrender (sim/surrender.ts, sim/breachFates.ts): a raider or a defender with a `surrender` event in the battle really gave up
+ * (the crew lost heavily with no way out, a hurt man could not run, a family was held at a breach), and the aftermath treats him as held. This module
+ * draws exactly that, lays the rest of the hurt down, and only falls back to its own roll for a battle with no sim fates (an older save's).
  */
 import type { Battle, BattleEvent } from './battleTypes';
 import type { RaiderTemper } from './battle';
 import type { CrewStyle } from './raiderKinds';
 import { LineDirector } from './raidDialogue';
-import { mulberry32 } from './rng';
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 export type Ending = 'repelled' | 'fled' | 'breached' | 'overrun';
@@ -51,40 +52,37 @@ export interface EndInput { battle: Battle; temper: RaiderTemper; style?: CrewSt
 export function endPoses(inp: EndInput): { battle: Battle; wake: number; ending: Ending | null } {
   const b = inp.battle, ending = endingOf(b);
   if (!ending) return { battle: b, wake: 0, ending };
-  const r = mulberry32(inp.seed * 5821 + 7);
   const events: BattleEvent[] = [...b.events];
   const W0 = Math.max(b.duration, ...b.events.filter(e => e.kind === 'end').map(e => e.t));
   const say = (t: number, text: string | null, who: string | undefined, ctx: string) => { if (text) events.push({ t: r2(t), kind: 'say', text, ...(who ? { who } : {}), ctx }); };
   const caption = (t: number, text: string) => events.push({ t: r2(t), kind: 'say', text, ctx: 'aftermath' });
   const homes = b.units.filter(u => u.side === 'home' && !u.machine && !u.bystander && !u.civilian);
   const dead = new Set(b.events.filter(e => e.kind === 'death' || e.kind === 'taken').map(e => (e as { unit: string }).unit));
-  const standingHome = homes.filter(u => !dead.has(u.id) && !b.events.some(e => e.kind === 'move' && e.unit === u.id && e.x === inp.house.x && e.z === inp.house.z));
+  const simFates = (b as { fates?: unknown }).fates !== undefined;
+  const simHeld = new Set(b.events.filter(e => e.kind === 'surrender').map(e => e.unit));
+  const standingHome = simFates
+    ? homes.filter(u => simHeld.has(u.id) && !dead.has(u.id))
+    : homes.filter(u => !dead.has(u.id) && !b.events.some(e => e.kind === 'move' && e.unit === u.id && e.x === inp.house.x && e.z === inp.house.z));
   const crew = standingRaiders(b);
   let wake = 0;
 
   if (ending === 'repelled' || ending === 'fled') {
-    // the crew that was beaten: no one left standing in a cluster; the hurt are down or have given up
+    // the crew that was beaten: no one left standing in a cluster; the hurt are down, and the ones the sim says gave up have their hands up
     const down = downRaiders(b);
-    let hands = 0;
-    const handsAt: Array<{ x: number; z: number }> = [];
+    const gaveUp = [...new Set(b.events.filter(e => e.kind === 'surrender' && b.units.find(u => u.id === e.unit)?.side === 'raider').map(e => (e as { unit: string }).unit))];
     for (const d of down) {
-      const at = (() => { let p = { x: b.units.find(u => u.id === d.id)!.x, z: b.units.find(u => u.id === d.id)!.z }; for (const e of b.events) if (e.t <= d.t + 1 && (e.kind === 'move' || e.kind === 'cover') && e.unit === d.id && !e.near) p = { x: e.x, z: e.z }; return p; })();
-      const apart = handsAt.every(h => Math.hypot(h.x - at.x, h.z - at.z) > 0.6);
-      if (hands < 2 && apart && r() < surrenderChance(inp.temper, inp.style, d.sev)) {
-        hands++; handsAt.push(at);
-        events.push({ t: r2(Math.min(W0 - 0.5, d.t + 1.4)), kind: 'surrender', unit: d.id });
-      } else if (!b.events.some(e => e.kind === 'lay' && e.unit === d.id)) {
-        events.push({ t: r2(Math.min(W0 - 0.3, d.t + 0.9)), kind: 'lay', unit: d.id });
-      }
+      if (gaveUp.includes(d.id)) continue;
+      if (!b.events.some(e => e.kind === 'lay' && e.unit === d.id)) events.push({ t: r2(Math.min(W0 - 0.3, d.t + 0.9)), kind: 'lay', unit: d.id });
     }
-    if (down.length) {
-      const first = down.find(d => events.some(e => e.kind === 'surrender' && e.unit === d.id));
-      const word = hands ? (hands === 1 ? 'One of them drops his rifle and puts his hands up.' : 'Two of them drop their rifles and put their hands up.') : down.length === 1 ? 'One of them is down and not getting up.' : 'The ones who were hit are down where they fell.';
+    const hands = gaveUp.length;
+    if (down.length || hands) {
+      const word = hands >= 3 ? 'The rest of them drop their rifles and put their hands up.' : hands === 2 ? 'Two of them drop their rifles and put their hands up.' : hands === 1 ? 'One of them drops his rifle and puts his hands up.' : down.length === 1 ? 'One of them is down and not getting up.' : 'The ones who were hit are down where they fell.';
       caption(Math.max(0, W0 - 2.2), `${word} Nobody on the wall relaxes.`);
+      const first = gaveUp[0];
       if (first) {
         const cover = homes.filter(u => !dead.has(u.id)).sort((a, c) => Math.hypot(a.x - 0, a.z - 0) - Math.hypot(c.x - 0, c.z - 0))[0];
         if (cover) say(Math.max(0, W0 - 1.6), inp.dir.pick('defender', 'prisoner', { speaker: cover.id }), cover.id, 'prisoner');
-        say(Math.max(0, W0 - 0.8), inp.dir.pick('raider', 'prisoner_reply', { speaker: first.id, variants: [inp.temper, ...(inp.style === 'families' ? ['families'] : [])] }), first.id, 'prisoner_reply');
+        say(Math.max(0, W0 - 0.8), inp.dir.pick('raider', 'prisoner_reply', { speaker: first, variants: [inp.temper, ...(inp.style === 'families' ? ['families'] : [])] }), first, 'prisoner_reply');
       }
     }
   } else {
@@ -96,7 +94,7 @@ export function endPoses(inp: EndInput): { battle: Battle; wake: number; ending:
       events.push({ t: r2(W0 + 0.4 + i * 0.3), kind: 'move', unit: id, x: r2(hx + away.x * (1.6 + (i % 3) * 0.7) - away.z * lat), z: r2(hz + away.z * (1.6 + (i % 3) * 0.7) + away.x * lat), walk: true });
       void a;
     });
-    standingHome.forEach((u, i) => events.push({ t: r2(W0 + 0.5 + i * 0.4), kind: 'surrender', unit: u.id }));
+    if (!simFates) standingHome.forEach((u, i) => events.push({ t: r2(W0 + 0.5 + i * 0.4), kind: 'surrender', unit: u.id }));
     caption(W0 + 0.8, standingHome.length ? 'They are inside the wire. The ones still on their feet put their hands up while the crew takes what it came for.' : 'They are inside the wire, and there is no one left on the line to stop them.');
     const speaker = crew[0], held = standingHome[0];
     if (speaker) say(W0 + 2.6, inp.dir.pick('raider', 'looting', { speaker }), speaker, 'looting');

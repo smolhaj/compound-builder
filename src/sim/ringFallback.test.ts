@@ -61,7 +61,7 @@ describe('the defenders fall back through the rings in a raid', () => {
     const g = lot(3);
     let falls = 0, checked = 0;
     for (let seed = 1; seed <= 120; seed++) {
-      const b = planBattle(g, 7, seed);
+      const b = planBattle(g, seed % 2 ? 7 : 16, seed);   // (a crew of 16: with solid walls and no one to shoot over them, a small crew is stopped at the first wall)
       const fb = b.events.filter(e => e.kind === 'fallback');
       falls += fb.length;
       if (b.rings) { expect(b.rings.fell).toBe(fb.length); expect(b.rings.losses).toHaveLength(fb.length + 1); }
