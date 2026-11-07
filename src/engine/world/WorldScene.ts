@@ -479,7 +479,7 @@ export class WorldScene {
       const t = this._flickerT;
       const fl = col.flicker > 0.001 ? 1 - col.flicker * (0.55 + 0.45 * Math.sin(t * 17.3) * Math.sin(t * 7.1 + 1.3)) * (Math.sin(t * 3.9) > -0.2 ? 1 : 0.15) : 1;
       sky.glow.multiplyScalar(Math.max(0, col.townGlow * fl));
-      if (col.fireGlow > 0.001) sky.glow.add(this._c.tmp.setRGB(0.10, 0.036, 0.008).multiplyScalar(col.fireGlow * (0.25 + 0.75 * wn + 0.5 * wg)));
+      if (col.fireGlow > 0.001) sky.glow.add(this._c.tmp.setRGB(0.22, 0.075, 0.014).multiplyScalar(col.fireGlow * (0.25 + 0.75 * wn + 0.5 * wg)));
     }
     const tintAmt = col.amt * (col.night ? Math.max(0, Math.min(1, (wn - 0.3) / 0.5)) : 1 - 0.6 * wn);
     if (tintAmt > 0.001) this._applyCollapseToSky(sky, tintAmt);

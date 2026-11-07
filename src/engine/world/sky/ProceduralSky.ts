@@ -226,27 +226,30 @@ const FRAG = /* glsl */`
     sky += horizon * (0.06 + 0.2 * uHaze) * exp(-hp * 24.0);
     // City light pollution / residual twilight glow.
     sky += uGlow * exp(-hp * 7.0);
-    // Columns of smoke on the skyline (lawless towns, a war, a wildfire): dark leaning plumes that widen as they rise, lit orange at the root.
+    // Columns of smoke on the skyline (lawless towns, a war, a wildfire): dark leaning plumes that widen as they rise, lit orange from below at night.
     if (uSmoke > 0.001) {
       float azs = atan(d.x, d.z);
       float dens = 0.0, root = 0.0;
-      for (int i = 0; i < 5; i++) {
+      for (int i = 0; i < 7; i++) {
         float fi = float(i);
-        float a0 = 0.7 + fi * 1.31 + 0.37 * sin(fi * 2.7);
+        // (clusters round the compass: a few columns are always somewhere in view)
+        float a0 = 0.5 + fi * 0.9 + 0.55 * sin(fi * 2.3);
         float da = azs - a0; da = atan(sin(da), cos(da));
-        float top = 0.20 + 0.11 * fract(fi * 0.618);
-        float lean = hp * (0.9 + 0.5 * fi * 0.2) * (fi < 2.5 ? 1.0 : -0.8);
-        float wid = 0.010 + hp * 0.22;
+        float top = 0.30 + 0.16 * fract(fi * 0.618);
+        float lean = hp * (0.7 + 0.15 * fi) * (mod(fi, 2.0) < 1.0 ? 1.0 : -0.8);
+        float wid = 0.016 + hp * 0.34;
         float x = (da - lean) / wid;
-        float col = exp(-x * x) * smoothstep(0.0, 0.012, h) * (1.0 - smoothstep(top * 0.55, top, h));
-        col *= 0.55 + 0.7 * fbm3(vec2(da * 55.0 + fi * 9.0, h * 26.0 - uTime * 0.06));
+        float col = exp(-x * x) * smoothstep(0.0, 0.010, h) * (1.0 - smoothstep(top * 0.5, top, h));
+        col *= 0.6 + 0.8 * fbm3(vec2(da * 48.0 + fi * 9.0, h * 22.0 - uTime * 0.05));
         dens += col;
-        root += exp(-x * x * 0.5) * exp(-hp * 55.0);
+        root += exp(-x * x * 0.4) * exp(-hp * 40.0);
       }
       dens = clamp(dens, 0.0, 1.0) * uSmoke;
-      vec3 smokeCol = mix(horizon, vec3(0.10, 0.085, 0.075), 0.7) * (0.55 + 0.3 * (1.0 - uNight));
-      sky = mix(sky, smokeCol, dens * 0.82);
-      sky += vec3(1.0, 0.42, 0.10) * root * uSmoke * (0.04 + 0.12 * uNight);
+      vec3 smokeCol = mix(horizon, vec3(0.13, 0.095, 0.07), 0.82) * (0.5 + 0.35 * (1.0 - uNight));
+      sky = mix(sky, smokeCol, dens * 0.92);
+      // the fires underneath light the plumes' bellies and the horizon at their feet
+      sky += vec3(1.0, 0.40, 0.09) * dens * exp(-hp * 11.0) * uNight * 0.30;
+      sky += vec3(1.0, 0.42, 0.10) * root * uSmoke * (0.07 + 0.30 * uNight);
     }
 
     // Mie forward scatter around the sun.

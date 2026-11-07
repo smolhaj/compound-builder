@@ -506,9 +506,9 @@ export class BattleRenderer {
     const dark = !!this.battle?.night;
     for (const u of this._units.values()) {
       if (!dark || u.def.side !== 'raider' || u.gone || u.dead || u.def.machine || pn >= 128) continue;
-      const hsh = hashStr(u.def.id) % 4;
-      if (hsh > 1) continue;
-      const gy = this._ground(u.x, u.z) + u.y, warm = hsh === 0;
+      const hsh = hashStr(u.def.id) % 4;   // (0 and 2: a lantern, 1: a flashlight, 3: nothing in hand)
+      if (hsh > 2) continue;
+      const gy = this._ground(u.x, u.z) + u.y, warm = hsh !== 1;
       const hx = u.x + Math.cos(u.rot) * 0.06 + Math.sin(u.rot) * 0.03, hz = u.z - Math.sin(u.rot) * 0.06 + Math.cos(u.rot) * 0.03, hy = gy + 0.12;
       const d = this.viewer ? Math.hypot(hx - this.viewer.x, hy - this.viewer.y, hz - this.viewer.z) : 0;
       const sc = 0.55 + 0.1 * Math.min(6, d / 5);

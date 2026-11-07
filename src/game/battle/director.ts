@@ -363,12 +363,14 @@ export class Director {
     // wide: up behind the house, the whole fight in frame
     const mid = { x: (hc.x + rc.x) / 2, z: (hc.z + rc.z) / 2 };
     const span = Math.hypot(rc.x - hc.x, rc.z - hc.z);
-    const back = 2.4 + Math.min(10, span * 0.25);
-    const look = at(mid.x, mid.z, 0.1);
+    // (in the lead-in the camera sits lower and nearer, so the crew coming on stands against the horizon instead of being a speck on a field seen from above)
+    const back = this.leadIn ? 2 + Math.min(6, span * 0.18) : 2.4 + Math.min(10, span * 0.25);
+    const height = this.leadIn ? 0.6 + Math.min(1.4, span * 0.04) : 1.0 + Math.min(2.8, span * 0.07);
+    const look = at(mid.x, mid.z, 0.3);
     const subjects = everyone.filter(a => Math.hypot(a.x - mid.x, a.z - mid.z) < span / 2 + 6).map(a => a.id);
     return this._set(this._search((rot, k, hb) => {
       const o = rotate({ x: -road.x * back + px * 1.5, z: -road.z * back + pz * 1.5 }, rot, k);
-      return { ...base, kind: 'wide', subjects, need: 0.5, eye: at(hc.x + o.x, hc.z + o.z, 1.5 + Math.min(4, span * 0.1) + hb), look, fov: 52, drift: { x: px * 0.04, y: 0, z: pz * 0.04 } };
+      return { ...base, kind: 'wide', subjects, need: 0.5, eye: at(hc.x + o.x, hc.z + o.z, height + hb), look, fov: 52, drift: { x: px * 0.04, y: 0, z: pz * 0.04 } };
     }, ctx));
   }
 

@@ -93,7 +93,7 @@ describe('the day-it-happened card and the chip', () => {
     expect(cyb.sat).toBeLessThan(0.9);
     expect(cyb.cast[2]).toBeGreaterThan(cyb.cast[0]);
     expect(cyb.nightLift).toBeGreaterThan(0.3);
-    expect(cyb.nightLift).toBeLessThanOrEqual(0.6);
+    expect(cyb.nightLift).toBeLessThanOrEqual(0.5);
   });
   it('the town glow flickers while the grid fails and is steady before and after', () => {
     expect(darkness(0)).toEqual({ townGlow: 1, flicker: 0, nightLift: 0 });

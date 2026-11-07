@@ -93,10 +93,10 @@ const PROFILES: Partial<Record<DisasterKind, Profile>> = {
   // a bleached, dusty, rainless sky for as long as it takes to break
   drought: { warn: 0.5, rise: 20, hold: 330, fade: 360, floor: 0.1, cloud: 0.04, haze: 0.85, fog: 0.12, dim: 0.9, tint: [0.62, 0.5, 0.3], tintAmt: 0.42, cast: [1.06, 0.99, 0.86], sat: 0.8, contrast: 0.02 },
   // a muted, grey-green, closed-in look; nobody about
-  pandemic: { warn: 0.25, rise: 14, hold: 300, fade: 300, floor: 0.1, cloud: 0.45, haze: 0.6, fog: 0.16, dim: 0.86, tint: [0.4, 0.5, 0.54], tintAmt: 0.34, cast: [0.92, 1.0, 1.07], sat: 0.58, contrast: -0.04, town: 0.5 },
+  pandemic: { warn: 0.25, rise: 14, hold: 300, fade: 300, floor: 0.1, cloud: 0.5, haze: 0.8, fog: 0.22, dim: 0.84, tint: [0.42, 0.52, 0.56], tintAmt: 0.5, cast: [0.89, 1.0, 1.09], sat: 0.5, contrast: -0.05, town: 0.4 },
   financial: { warn: 0.3, rise: 20, hold: 300, fade: 300, floor: 0.1, cloud: 0.25, haze: 0.2, dim: 0.92, tint: [0.4, 0.43, 0.5], tintAmt: 0.22, cast: [0.96, 0.98, 1.03], sat: 0.76 },
   // a warm, smoky look: fires out past the edge of town, smoke columns on the skyline, the town's lights thinned and dim
-  lawless: { warn: 0.3, rise: 10, hold: 240, fade: 300, floor: 0.12, haze: 0.7, fog: 0.1, cloud: 0.12, dim: 0.88, tint: [0.56, 0.37, 0.25], tintAmt: 0.32, cast: [1.05, 0.97, 0.89], sat: 0.8, fire: 0.85, smoke: 0.85, town: 0.4 },
+  lawless: { warn: 0.3, rise: 10, hold: 240, fade: 300, floor: 0.12, haze: 0.8, fog: 0.12, cloud: 0.2, dim: 0.84, tint: [0.66, 0.38, 0.19], tintAmt: 0.5, cast: [1.07, 0.96, 0.85], sat: 0.78, fire: 1, smoke: 1, town: 0.3 },
   civil_war: { fire: 0.55, smoke: 0.7, town: 0.5, warn: 0.3, rise: 6, hold: 300, fade: 300, floor: 0.15, cloud: 0.2, haze: 0.6, ash: 0.12, ashColor: GREY_ASH, dim: 0.85, tint: [0.45, 0.38, 0.32], tintAmt: 0.34, cast: [1.02, 0.97, 0.93], sat: 0.78 },
   invasion: { warn: 0.3, rise: 4, hold: 300, fade: 300, floor: 0.15, cloud: 0.3, haze: 0.4, dim: 0.88, tint: [0.36, 0.42, 0.5], tintAmt: 0.3, cast: [0.95, 0.99, 1.04], sat: 0.76 },
   zombies: { warn: 0.3, rise: 4, hold: 300, fade: 300, floor: 0.2, cloud: 0.4, haze: 0.45, fog: 0.2, dim: 0.8, tint: [0.38, 0.32, 0.3], tintAmt: 0.4, cast: [1.0, 0.95, 0.93], sat: 0.7 },
@@ -133,7 +133,7 @@ export function blackoutOf(grid: number): number { return 1 - smooth((grid - 0.1
 /** What a dead grid does to the night: the town glow goes (flickering as it fails), and the moon and stars get a lift so it stays readable. */
 export function darkness(blackout: number): Pick<CollapseLook, 'townGlow' | 'flicker' | 'nightLift'> {
   const b = clamp01(blackout);
-  return { townGlow: 1 - b, flicker: 4 * b * (1 - b), nightLift: 0.6 * b };
+  return { townGlow: 1 - b, flicker: 4 * b * (1 - b), nightLift: 0.5 * b };
 }
 
 const mix = (a: RGB, b: RGB, t: number): RGB => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];

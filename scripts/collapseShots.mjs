@@ -15,6 +15,7 @@ catch { ({ chromium } = await import('/opt/node22/lib/node_modules/playwright/in
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
 const port = Number(opt('--port', 5971)), quality = opt('--quality', 'medium');
+const quickDay = Number(opt('--day', 6));
 const quick = args.includes('--quick');   // day 6 at noon and at night only (eye and air): the look at rest, a fraction of the frames
 const kinds = opt('--kinds', 'ash_winter,grid_down,wildfire').split(',');
 const outDir = resolve(opt('--out', 'shots/collapse'));
@@ -45,12 +46,12 @@ try {
     window.__spot = sp;
   });
   await frames(4);
-  const view = async (mode) => page.evaluate((mode) => {
-    window.__cb.store.setState({ hudHidden: mode === 'eye' });
+  const view = async (mode) => page.evaluate(([mode, quick]) => {
+    window.__cb.store.setState({ hudHidden: mode === 'eye' || quick });
     const cb = window.__cb, sp = window.__spot, gr = cb.world.groundAt;
     if (mode === 'eye') { const x = sp[0] + 2, z = sp[1] + 7; cb.qa.pose = { x, y: gr(x, z) + 0.34, z, lx: sp[0] - 1, ly: gr(sp[0], sp[1]) + 0.9, lz: sp[1] - 8, fov: 66 }; }
     else { cb.qa.pose = null; cb.cam.target.set(sp[0], gr(sp[0], sp[1]), sp[1]); cb.cam.radius = 26; cb.cam.pitch = 0.62; cb.cam.yaw = 0.7; }
-  }, mode);
+  }, [mode, quick]);
   // put the world at a day (days from the hit) and hour; the disaster's phase and tracks follow
   const setDay = (kind, days, hour, variant, exact = false) => page.evaluate(async ([kind, days, hour, variant, exact, kinds]) => {
     const { triggerDisaster, tracksAt } = await import('/src/sim/disaster.ts');
@@ -72,10 +73,10 @@ try {
   for (const kind of kinds) {
     const variant = kind === 'grid_down' ? 'substation' : undefined;
     if (quick) {
-      await setDay(kind, 6, NOON, variant);
-      for (const mode of ['aerial', 'eye']) { await view(mode); await shot(`${kind}-day6-noon-${mode}`, 10); }
-      await setDay(kind, 6, NIGHT, variant);
-      for (const mode of ['eye', 'aerial']) { await view(mode); await shot(`${kind}-day6-night-${mode}`, 10); }
+      await setDay(kind, quickDay, NOON, variant);
+      for (const mode of ['aerial', 'eye']) { await view(mode); await shot(`${kind}-day${quickDay}-noon-${mode}`, 10); }
+      await setDay(kind, quickDay, NIGHT, variant);
+      for (const mode of ['eye', 'aerial']) { await view(mode); await shot(`${kind}-day${quickDay}-night-${mode}`, 10); }
       continue;
     }
     await setDay(kind, -12, NOON, variant);
