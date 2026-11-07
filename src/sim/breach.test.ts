@@ -140,6 +140,23 @@ describe('house assault: the last act', () => {
     expect(a.events.filter(e => e.kind === 'shot').length).toBeGreaterThan(10);
   });
 
+  it('a crew beaten back is not left standing in a group: the hurt lie down, some surrender, the rest run out through the gap', () => {
+    const { b, a } = setup();
+    void b;
+    const end = a.events.find(e => e.kind === 'end')!.t;
+    const raiders = ['r0', 'r1', 'r2', 'r3', 'r4'];
+    const fate = (id: string) => {
+      const last = [...a.events].reverse().find(e => e.t <= end && ((e.kind === 'move' || e.kind === 'cover') && e.unit === id || (e.kind === 'down' || e.kind === 'flee') && e.unit === id));
+      return last;
+    };
+    for (const id of raiders) {
+      const f = fate(id)!;
+      expect(f, id).toBeTruthy();
+      if (f.kind === 'move') expect(Math.abs(f.x) > 10 || Math.abs(f.z) > 10, `${id} ends outside the wall`).toBe(true);
+    }
+    expect(a.events.some(e => e.kind === 'say' && /Let them go|hold your positions|stay inside/.test(e.text))).toBe(true);
+  });
+
   it('an overrun scene keeps its result and the crew stays in the house', () => {
     const g = world();
     const b0 = decorateBreach(battle(), g.perimeter, { x: 0, z: 0 }, 5);

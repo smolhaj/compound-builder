@@ -383,7 +383,7 @@ export function GameCanvas() {
     let camBefore: { x: number; y: number; z: number; radius: number; pitch: number; yaw: number } | null = null, camBack = false;
     let promptAt = -1, skipScene = useCutsceneView.getState().skipScene, skipAll = useCutsceneView.getState().skipAll;
     let battleView: { x: number; z: number; radius: number; pitch: number } | null = null;
-    const qa: { noCover?: boolean; frames: number; frameMs: number; lowrender?: boolean; weather?: boolean; renderNow?: () => Promise<void>; renderFull?: (q?: QaQuality) => Promise<void>; pose: null | { x: number; y: number; z: number; lx: number; ly: number; lz: number; fov?: number } } = { frames: 0, frameMs: 0, pose: null };
+    const qa: { noCover?: boolean; /** QA: run the frame (sim, camera, effects) without drawing it, to skip ahead cheaply. */ skipDraw?: boolean; frames: number; frameMs: number; lowrender?: boolean; weather?: boolean; renderNow?: () => Promise<void>; renderFull?: (q?: QaQuality) => Promise<void>; pose: null | { x: number; y: number; z: number; lx: number; ly: number; lz: number; fov?: number } } = { frames: 0, frameMs: 0, pose: null };
     // window.__cb.qa.renderNow(): draw one frame (a promise); renderFull('high'|'medium'): one slow full-quality, full-resolution shot
     if (lowRender.on) Object.assign(qa, { lowrender: true, renderNow: () => renderReq.request(), renderFull: (q: QaQuality = 'high') => renderReq.request(q) });
     const budget = new FrameBudget(), loopStart = performance.now();
@@ -596,7 +596,7 @@ export function GameCanvas() {
       blueprintOv.update(performance.now());
       if (!lowRender.on) {
         ws.renderer.info.reset();
-        if (!useWorldStore.getState().boot?.hold) ws.renderFrame();
+        if (!useWorldStore.getState().boot?.hold && !qa.skipDraw) ws.renderFrame();
         statFrames++; statCalls += ws.renderer.info.render.calls; statTris += ws.renderer.info.render.triangles;
         if (performance.now() - statSince >= 1000) {
           if (useWorldStore.getState().showPerf) {

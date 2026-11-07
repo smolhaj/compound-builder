@@ -390,6 +390,7 @@ export class BattleRenderer {
         if (e.wrecks) this._decal(e.x, e.z, e.radius * 0.8);
         break;
       }
+      case 'down': { const u = U_(e.unit); if (u) { u.dead = true; u.wound = Math.max(u.wound, 0.7); u.y = 0; this._tint(u); } break; }   // (laid out hurt: drawn like the fallen, nothing counted)
       case 'ram': case 'charge': case 'gap': this.invasion.onEvent(e); break;
       case 'breach': this._boom(e.x, this._ground(e.x, e.z), e.z, 0.5, true); break;
       case 'door': this.onDoor?.(e.open, e.x, e.z, e.what); break;      // the crew at the tunnel's steel door: shut while they work at it, forced when they are through

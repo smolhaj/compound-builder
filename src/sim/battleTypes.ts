@@ -82,6 +82,8 @@ export type BattleEvent =
   | { t: number; kind: 'ram'; fromX: number; fromZ: number; x: number; z: number; secs: number }
   | { t: number; kind: 'charge'; x: number; z: number; fuse: number }
   /** The wall run is open here from now on (a live gap, drawn until the cutscene ends): run id, distance along it, width. */
+  /** A raider the sim wounded lies down where he is for good (cinematic end pose: nobody hurt stays standing in the open). Not a death. */
+  | { t: number; kind: 'down'; unit: string }
   | { t: number; kind: 'gap'; runId: string; at: number; w: number; x: number; z: number }
   | { t: number; kind: 'end'; result: 'repelled' | 'fled' | 'breached' | 'overrun' };
 

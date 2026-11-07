@@ -133,6 +133,16 @@ export function decorateBreach(b: Battle, runs: readonly PerimeterRun[], home: {
     if (lead) say(tb + 1.2, pickLines(r, POUR_RAID)[0], nearest(spot, raiders) ?? lead);
     if (guard) say(tb + 2.6, pickLines(r, POUR_HOME)[0], guard);
   }
-  const events = [...kept, ...ev].sort((a, c) => a.t - c.t);
+  // through the gap the crew bounds: after each advance a man drops to a knee (the next advance is a different man's), nobody walks upright into the yard
+  const bound: BattleEvent[] = [];
+  const lastMove = new Map<string, number>();
+  for (const e of kept) {
+    if (e.kind === 'move' && e.t > tb && e.t < tb + 9 && b.units.find(u => u.id === e.unit)?.side === 'raider') {
+      const prev = lastMove.get(e.unit) ?? -9;
+      if (e.t - prev >= 1.4 && Math.floor(e.t) % 2 === (e.unit.charCodeAt(e.unit.length - 1) % 2)) bound.push({ t: Math.round((e.t + 1.1) * 100) / 100, kind: 'cover', unit: e.unit, x: e.x, z: e.z });
+      lastMove.set(e.unit, e.t);
+    }
+  }
+  const events = [...kept, ...ev, ...bound].sort((a, c) => a.t - c.t);
   return { ...b, events, invasion: { method } };
 }
