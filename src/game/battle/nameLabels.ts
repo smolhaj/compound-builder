@@ -84,7 +84,7 @@ export interface UnitStatus { wound: number; dead: boolean; lying: boolean; hand
 export type PipKind = 'fine' | 'wounded' | 'down' | 'dead' | 'held';
 export interface Pip { kind: PipKind; color: string; cross: boolean; label: string }
 export const PIP_COLORS: Record<PipKind, string> = { fine: '#6fcf6f', wounded: '#f0b43c', down: '#e5473f', dead: '#8a8f96', held: '#a7a7a7' };
-/** The sim's own state (the one that draws the wounded poses) as a pip: green fine, amber wounded, red down, dim cross dead, grey held. */
+/** The sim's own state (the one that draws the wounded poses) as a pip: green fine, amber wounded, red down, dim cross dead, gray held. */
 export function pipFor(s: UnitStatus): Pip {
   const kind: PipKind = s.dead ? 'dead' : s.hands ? 'held' : (s.lying || s.carried || s.wound >= 0.7) ? 'down' : s.wound > 0.05 ? 'wounded' : 'fine';
   return { kind, color: PIP_COLORS[kind], cross: kind === 'dead', label: kind };

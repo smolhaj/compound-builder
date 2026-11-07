@@ -112,7 +112,7 @@ function NamesSelect() {
     <select value={n ? 'on' : 'off'} onChange={e => { const on = e.target.value === 'on'; setNames(on); setN(on); }} title="Raid scenes: show each defender's first name over their head" aria-label="Names in raid scenes" data-testid="names-select">
       <option value="on">Names on</option><option value="off">Names off</option>
     </select>
-    <select value={p ? 'on' : 'off'} onChange={e => { const on = e.target.value === 'on'; setPips(on); setP(on); }} title="Raid scenes: a small dot beside each name (green fine, amber wounded, red down, cross dead, grey held)" aria-label="Status pips in raid scenes" data-testid="pips-select">
+    <select value={p ? 'on' : 'off'} onChange={e => { const on = e.target.value === 'on'; setPips(on); setP(on); }} title="Raid scenes: a small dot beside each name (green fine, amber wounded, red down, cross dead, gray held)" aria-label="Status pips in raid scenes" data-testid="pips-select">
       <option value="on">Status pips on</option><option value="off">Status pips off</option>
     </select>
   </>);
