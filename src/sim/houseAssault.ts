@@ -13,7 +13,7 @@
  */
 import type { Battle, BattleEvent, BattleUnit } from './battleTypes';
 import { mulberry32 } from './rng';
-import { LineDirector } from './raidDialogue';
+import { LineDirector, type Ctx } from './raidDialogue';
 
 /** Seconds added to a scene that breaks the line (the staging adds them to the plan; this planner fills them). */
 export const ASSAULT_EXTRA = 40;
@@ -23,27 +23,12 @@ export interface AssaultCtx {
   /** Can a body (radius ~0.04) not stand at (x, z)? The walk-mode collision of the world. */
   blocked: (x: number, z: number) => boolean;
   seed: number;
+  /** The scene's line picker (one for the whole cutscene, so no line is said twice): the invasion's own if absent. */
+  dir?: LineDirector;
 }
 
 const CELL = 0.06, RUN = 1.1, PAD = 0.7;
 const r2 = (n: number) => Math.round(n * 100) / 100;
-
-const RAID_IN = ['Door! Stack on the door!', 'Kick it in — go, go!', 'Breach it — I\'ve got the left!'];
-const RAID_ROOM = ['Clear the kitchen!', 'Left side — left side!', 'Hands! Show me your hands!', 'Where\'s the food? WHERE IS IT?', 'Move up — I\'ve got the hall!', 'Flush them out of there!', 'Check the bedroom — go!'];
-const HOME_ROOM = ['Hold the doorway — shoot anything that comes through!', 'Stay down behind the couch!', 'Keep them out of the hall!', 'Cover the stairs — I\'ve got the door!', 'I\'m reloading — cover me!', 'Back room — get the kids in the back room!'];
-const HOME_FALL = ['Fall back to the house — everybody inside, now!', 'Inside! Get inside, lock it!'];
-const HOME_AID = ['Stay with me — look at me — you\'re okay!', 'I\'ve got you — pressure, keep pressure on it!', 'Hang on — hang on, I\'m right here!'];
-const HOME_DRAG = ['I\'ve got you — come on, up — we\'re moving!', 'Easy — easy — back room, we\'re going to the back room!'];
-const RAID_OUT = ['Grab what you can carry — we\'re leaving!', 'That\'s enough — out, out, back to the trucks!', 'We\'re done here — move!'];
-const HOME_YIELD = ['Okay — okay! Take it, just don\'t hurt the kids!', 'I\'m down — I\'m down, please, don\'t shoot!'];
-
-function pickOne(r: () => number, list: readonly string[], used: Set<string>): string {
-  const pool = list.filter(l => !used.has(l));
-  const pickFrom = pool.length ? pool : list;
-  const t = pickFrom[Math.floor(r() * pickFrom.length)];
-  used.add(t);
-  return t;
-}
 
 interface Grid { x0: number; z0: number; nx: number; nz: number; free: Uint8Array; inside: Uint8Array; reach: Uint8Array }
 const cx = (g: Grid, i: number) => g.x0 + (i + 0.5) * CELL, cz = (g: Grid, j: number) => g.z0 + (j + 0.5) * CELL;
@@ -153,7 +138,7 @@ export function planHouseAssault(b: Battle, ctx: AssaultCtx): Battle {
   const br = b.events.find(e => e.kind === 'breach') as Extract<BattleEvent, { kind: 'breach' }> | undefined;
   const end = b.events.find(e => e.kind === 'end') as Extract<BattleEvent, { kind: 'end' }> | undefined;
   if (!br || !end || !b.invasion || b.invasion.interior) return b;
-  const r = mulberry32(ctx.seed * 6007 + 19), used = new Set<string>();
+  const r = mulberry32(ctx.seed * 6007 + 19), dir = ctx.dir ?? new LineDirector(ctx.seed);
   const tb = br.t, tI = tb + 9;
   const D = Math.max(32, ASSAULT_EXTRA - 6 + (end.t - (tb + 9)));
   const newEnd = tI + D + 6;
@@ -169,7 +154,7 @@ export function planHouseAssault(b: Battle, ctx: AssaultCtx): Battle {
   const adults = homeAll.filter(u => !u.civilian), kids = homeAll.filter(u => u.civilian);
   if (!raiders.length) return b;
   const ev: BattleEvent[] = [];
-  const say = (t: number, text: string, who?: BattleUnit) => ev.push({ t: r2(t), kind: 'say', text, ...(who ? { who: who.id } : {}) });
+  const say = (t: number, role: 'raider' | 'defender', c: Ctx, who?: BattleUnit) => { const text = dir.pick(role, c, { speaker: who?.id }); if (text) ev.push({ t: r2(t), kind: 'say', text, ctx: c, ...(who ? { who: who.id } : {}) }); };
   const move = (t: number, u: BattleUnit, p: { x: number; z: number }) => ev.push({ t: r2(t), kind: 'move', unit: u.id, x: r2(p.x), z: r2(p.z) });
   const walk = (t0: number, u: BattleUnit, pts: Array<{ x: number; z: number }>, from: { x: number; z: number }): number => {
     let t = t0, cur = from;
@@ -179,7 +164,6 @@ export function planHouseAssault(b: Battle, ctx: AssaultCtx): Battle {
   const near = (p: { x: number; z: number }, list: readonly BattleUnit[]) => [...list].sort((a, c) => Math.hypot(pos.get(a.id)!.x - p.x, pos.get(a.id)!.z - p.z) - Math.hypot(pos.get(c.id)!.x - p.x, pos.get(c.id)!.z - p.z));
   const strip = new Set<string>();   // units whose sim moves after tI are replaced
   let meta = { ...b.invasion };
-  const dir = new LineDirector(ctx.seed);
 
   /**
    * How the invasion ends (the same reading as sim/raidEnding.ts: the crew won the line): the raiders the sim wounded lie where they fell, the defenders still
@@ -195,9 +179,9 @@ export function planHouseAssault(b: Battle, ctx: AssaultCtx): Battle {
     const talker = rest[0], held = adults.find(u => !hurtT.has(u.id));
     hurtUnits.forEach((u, i) => { ev.push({ t: r2(t0 - 1 + i * 0.7), kind: 'lay', unit: u.id }); strip.add(u.id); });
     adults.filter(u => !hurtT.has(u.id)).forEach((u, i) => { ev.push({ t: r2(t0 - 2 + i * 0.5), kind: 'surrender', unit: u.id }); strip.add(u.id); });
-    if (talker) say(t0 - 1.5, dir.pick('raider', 'looting', { speaker: talker.id }) ?? pickOne(r, RAID_OUT, used), talker);
-    if (held) say(t0 + 0.6, dir.pick('defender', 'held', { speaker: held.id }) ?? pickOne(r, HOME_YIELD, used), held);
-    if (crew[0]) say(t0 + 3, pickOne(r, RAID_OUT, used), crew[0]);
+    if (talker) say(t0 - 1.5, 'raider', 'search', talker);
+    if (held) say(t0 + 0.6, 'defender', 'held', held);
+    if (crew[0]) say(t0 + 3, 'raider', 'leaving', crew[0]);
     rest.forEach((u, i) => {
       strip.add(u.id);
       const inside = l && crew.includes(u);
@@ -210,7 +194,7 @@ export function planHouseAssault(b: Battle, ctx: AssaultCtx): Battle {
     for (const u of [...homeAll, ...breachers]) strip.add(u.id);
     // 1. the family falls back inside (the sim's own "fall back to the house")
     const lead = adults[0];
-    say(tI - 3.2, pickOne(r, HOME_FALL, used), lead);
+    say(tI - 3.2, 'defender', 'breach', lead);
     const slots = [lay.rooms[0], lay.hall, lay.rooms[1], lay.back];
     adults.forEach((u, i) => {
       const slot = slots[i % 3];
@@ -220,7 +204,8 @@ export function planHouseAssault(b: Battle, ctx: AssaultCtx): Battle {
     kids.forEach((u, i) => { walk(tI - 3.4 + i * 0.4, u, [lay.out, lay.door, ...lay.path(lay.back)], pos.get(u.id)!); });
     // 2. the crew stacks on the door and goes in
     breachers.forEach((u, i) => { const side = i % 2 ? 1 : -1; move(tI - 0.5 + i * 0.3, u, { x: lay.out.x + side * 0.12 + (lay.out.x - lay.door.x) * 0.9, z: lay.out.z + (lay.out.z - lay.door.z) * 0.9 }); });
-    say(tI + 0.8, pickOne(r, RAID_IN, used), breachers[0]);
+    say(tI + 0.8, 'raider', 'stack_door', breachers[0]);
+    say(tI + 3.4, 'raider', 'clear_room', breachers[1] ?? breachers[0]);
     breachers.forEach((u, i) => {
       const room = lay.rooms[i % 2];
       walk(tI + 2.6 + i * 0.7, u, [lay.door, ...lay.path(i < 2 ? lay.hall : room).slice(0, 4)], pos.get(u.id)!);
@@ -234,7 +219,11 @@ export function planHouseAssault(b: Battle, ctx: AssaultCtx): Battle {
       if (r() < 0.5) ev.push({ t: r2(t + 0.35 + r() * 0.4), kind: 'shot', from: h.id, to: a.id, hit: false });
     }
     // 4. the callouts
-    for (let k = 0; k < 4; k++) say(tI + 6 + k * 4.8, pickOne(r, k % 2 ? HOME_ROOM : RAID_ROOM, used), k % 2 ? adults[k % nHome] : breachers[k % breachers.length]);
+    // a new line every two or three seconds, never one repeated: the rooms are cleared, the doorways held, the house searched
+    for (let t = tI + 6, k = 0; t < tI + D - 13; t += 2.4 + r() * 0.6, k++) {
+      if (k % 3 === 1) say(t, 'defender', 'hold_room', adults[k % nHome]);
+      else say(t, 'raider', k % 3 === 2 ? 'search' : 'clear_room', breachers[k % breachers.length]);
+    }
     // 5. a wounded defender (the sim's wound, kept at its time) is dragged to the back room
     const casualty = adults.find(u => hurtT.has(u.id) && !b.events.some(e => e.kind === 'death' && e.unit === u.id));
     const carrier = casualty ? adults.find(u => u !== casualty) : undefined;
@@ -243,15 +232,15 @@ export function planHouseAssault(b: Battle, ctx: AssaultCtx): Battle {
       const cp = lay.at(lay.rooms[0]);
       move(tc, carrier, cp);
       ev.push({ t: r2(tc + 0.5), kind: 'aid', unit: casualty.id, by: carrier.id, what: 'pressure' });
-      say(tc + 0.8, pickOne(r, HOME_AID, used), carrier);
+      say(tc + 0.8, 'defender', 'tend', carrier);
       const route = lay.path(lay.back);
       let t = tc + 4.2;
-      say(t - 0.2, pickOne(r, HOME_DRAG, used), carrier);
+      say(t - 0.2, 'defender', 'drag', carrier);
       for (const p of route.slice(-3)) { move(t, carrier, { x: p.x - 0.07, z: p.z }); move(t + 0.1, casualty, p); t += 1.1; }
     } else {
       // a defender the sim kills in the house is attended by the next nearest
       const dv = b.events.find(e => e.kind === 'death' && e.t >= tI && e.t <= newEnd && adults.some(u => u.id === e.unit)) as Extract<BattleEvent, { kind: 'death' }> | undefined;
-      if (dv) { const bodyOf = adults.find(u => u.id === dv.unit)!; const helper = adults.find(u => u !== bodyOf); if (helper) { move(dv.t + 1.2, helper, pos.get(bodyOf.id)!); ev.push({ t: r2(dv.t + 2), kind: 'aid', unit: bodyOf.id, by: helper.id, what: 'pressure' }); say(dv.t + 2.3, pickOne(r, HOME_AID, used), helper); } }
+      if (dv) { const bodyOf = adults.find(u => u.id === dv.unit)!; const helper = adults.find(u => u !== bodyOf); if (helper) { move(dv.t + 1.2, helper, pos.get(bodyOf.id)!); ev.push({ t: r2(dv.t + 2), kind: 'aid', unit: bodyOf.id, by: helper.id, what: 'pressure' }); say(dv.t + 2.3, 'defender', 'tend', helper); } }
     }
     // 6. the end: the crew has the house; the family is held, the crew takes what it can carry and goes
     routOut(tI + D - 11, lay, breachers);

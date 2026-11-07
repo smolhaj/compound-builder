@@ -13,6 +13,7 @@ import type { Battle, BattleEvent, BattleUnit } from './battleTypes';
 import { PERIMETER, runFinished, type PerimeterRun, type Pt } from './perimeter';
 import type { CrewStyle } from './raiderKinds';
 import { mulberry32 } from './rng';
+import { LineDirector, type Ctx } from './raidDialogue';
 
 export type BreachMethod = 'ram' | 'charge';
 
@@ -84,38 +85,20 @@ export function breachMethod(units: readonly Pick<BattleUnit, 'side' | 'look'>[]
   return mulberry32(seed * 313 + 5)() < 0.5 ? 'ram' : 'charge';
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// The words (plain American, short; no line is used twice in one scene)
-// ─────────────────────────────────────────────────────────────────────────
-const RAM_RAIDER = ['Floor it! Through the wall!', 'Hit it! Hit the wall, go, go!', 'Take it down — put the truck right through it!', 'Don\'t slow down! Straight in!'];
-const RAM_HOME = ['Truck! They\'re driving at the wall — GET BACK!', 'That\'s a truck — it\'s not stopping — move, MOVE!', 'Headlights — they\'re coming through the wall!', 'Everybody off the fence line — NOW!'];
-const POUR_RAID = ['Go, go, go! Inside!', 'It\'s open — push through, push!', 'Through the gap! Spread out!', 'Move up! Take the yard!', 'Fan out — cover the house!'];
-const POUR_HOME = ['They\'re in the yard! Fall back to the house!', 'The wall\'s gone — everybody inside, inside!', 'Back to the porch — cover each other!', 'They\'re through! Get the kids down!'];
-const CHARGE_SET = ['Cover me. Setting the charge.', 'Stay low — I\'m planting it now.', 'Give me ten seconds on the wall.'];
-const CHARGE_CALL = ['Fire in the hole! Get back!', 'Charge is set — everybody back, back!', 'Down! Cover your ears!'];
-const CHARGE_HOME = ['What was that — they\'re at the wall!', 'Somebody\'s at the wall with a bag — DOWN!', 'Get away from the fence — they\'re going to blow it!'];
-
-function pickLines(r: () => number, list: readonly string[], n = 1): string[] {
-  const pool = [...list], out: string[] = [];
-  while (out.length < n && pool.length) out.push(pool.splice(Math.floor(r() * pool.length), 1)[0]);
-  return out;
-}
-
 /** Add the break to a battle that has a sim `breach` event. Returns the battle untouched when there is nothing to show (no breach, no wall near it). */
-export function decorateBreach(b: Battle, runs: readonly PerimeterRun[], home: { x: number; z: number }, seed: number, carriesCharges = false): Battle {
+export function decorateBreach(b: Battle, runs: readonly PerimeterRun[], home: { x: number; z: number }, seed: number, carriesCharges = false, dir: LineDirector = new LineDirector(seed)): Battle {
   const br = b.events.find(e => e.kind === 'breach') as Extract<BattleEvent, { kind: 'breach' }> | undefined;
   if (!br || b.invasion) { breachOptions.note = br ? 'already decorated' : 'no breach event'; return b; }
   const method = breachMethod(b.units, seed, carriesCharges);
   const spot = breachSpot(runs, br.x, br.z, home, method);
   if (!spot) { breachOptions.note = `no wall spot near the breach at ${br.x},${br.z} (runs ${runs.map(r => r.kind + ':' + (runFinished(r) ? 'done' : 'open')).join(',')})`; return b; }
   breachOptions.note = `${method} at ${spot.x.toFixed(1)},${spot.z.toFixed(1)} on ${spot.runId}`;
-  const r = mulberry32(seed * 8191 + 41);
   const tb = br.t;
   const raiders = b.units.filter(u => u.side === 'raider' && !u.machine);
   const defenders = b.units.filter(u => u.side === 'home' && !u.machine && !u.civilian && !u.bystander);
   const drop = (m: number) => ({ x: spot.x + spot.out.x * m, z: spot.z + spot.out.z * m });
   const ev: BattleEvent[] = [];
-  const say = (t: number, text: string, who?: BattleUnit) => ev.push({ t: Math.round(t * 100) / 100, kind: 'say', text, ...(who ? { who: who.id } : {}) });
+  const say = (t: number, role: 'raider' | 'defender', ctx: Ctx, who?: BattleUnit) => { const text = dir.pick(role, ctx, { speaker: who?.id }); if (text) ev.push({ t: Math.round(t * 100) / 100, kind: 'say', text, ctx, ...(who ? { who: who.id } : {}) }); };
   const nearest = (p: { x: number; z: number }, list: readonly BattleUnit[]) => [...list].sort((a, c) => Math.hypot(a.x - p.x, a.z - p.z) - Math.hypot(c.x - p.x, c.z - p.z))[0];
   const lead = raiders[0], guard = nearest(spot, defenders) ?? defenders[0];
   let kept = b.events;
@@ -130,12 +113,12 @@ export function decorateBreach(b: Battle, runs: readonly PerimeterRun[], home: {
     const standing = new Map<string, { x: number; z: number }>();
     for (const e of b.events) if (e.t <= t0 && (e.kind === 'move' || e.kind === 'cover')) standing.set(e.unit, { x: e.x, z: e.z });
     for (const u of raiders) { const p = standing.get(u.id) ?? u; if (lane(p.x, p.z)) ev.push({ t: Math.round((t0 - 0.8) * 100) / 100, kind: 'move', unit: u.id, ...aside(p.x, p.z) }); }
-    if (lead) say(t0 - 1.6, pickLines(r, RAM_RAIDER)[0], lead);
+    if (lead) say(t0 - 1.6, 'raider', 'ram_run', lead);
     ev.push({ t: t0, kind: 'ram', fromX: Math.round(from.x * 100) / 100, fromZ: Math.round(from.z * 100) / 100, x: Math.round(spot.x * 100) / 100, z: Math.round(spot.z * 100) / 100, secs });
-    if (guard) say(t0 + 0.7, pickLines(r, RAM_HOME)[0], guard);
+    if (guard) say(t0 + 0.7, 'defender', 'ram_run', guard);
     ev.push({ t: tb, kind: 'gap', runId: spot.runId, at: spot.at, w: spot.w, x: spot.x, z: spot.z });
-    if (lead) say(tb + 0.9, pickLines(r, POUR_RAID)[0], nearest(spot, raiders) ?? lead);
-    if (guard) say(tb + 2.2, pickLines(r, POUR_HOME)[0], guard);
+    if (lead) say(tb + 0.9, 'raider', 'ram_hit', nearest(spot, raiders) ?? lead);
+    if (guard) say(tb + 2.2, 'defender', 'breach', guard);
   } else {
     const fuse = 4.2;
     const sapper = nearest(spot, raiders) ?? lead;
@@ -143,17 +126,17 @@ export function decorateBreach(b: Battle, runs: readonly PerimeterRun[], home: {
     const pad = drop(0.12), back = drop(1.4);
     if (sapper) {
       ev.push({ t: Math.round(tp * 100) / 100, kind: 'move', unit: sapper.id, x: Math.round(pad.x * 100) / 100, z: Math.round(pad.z * 100) / 100 });
-      say(tp + 0.4, pickLines(r, CHARGE_SET)[0], sapper);
+      say(tp + 0.4, 'raider', 'charge_set', sapper);
     }
     ev.push({ t: Math.round((tb - fuse) * 100) / 100, kind: 'charge', x: Math.round(pad.x * 100) / 100, z: Math.round(pad.z * 100) / 100, fuse });
-    if (sapper) { say(tb - fuse + 0.3, pickLines(r, CHARGE_CALL)[0], sapper); ev.push({ t: Math.round((tb - fuse + 0.6) * 100) / 100, kind: 'cover', unit: sapper.id, x: Math.round(back.x * 100) / 100, z: Math.round(back.z * 100) / 100 }); }
+    if (sapper) { say(tb - fuse + 0.3, 'raider', 'charge_call', sapper); ev.push({ t: Math.round((tb - fuse + 0.6) * 100) / 100, kind: 'cover', unit: sapper.id, x: Math.round(back.x * 100) / 100, z: Math.round(back.z * 100) / 100 }); }
     // the others back off the wall for the blast
     raiders.filter(u => u !== sapper).slice(0, 5).forEach((u, i) => { const p = drop(2.2 + i * 0.35); ev.push({ t: Math.round((tb - fuse + 0.9 + i * 0.15) * 100) / 100, kind: 'cover', unit: u.id, x: Math.round((p.x + -spot.out.z * (i - 2) * 0.35) * 100) / 100, z: Math.round((p.z + spot.out.x * (i - 2) * 0.35) * 100) / 100 }); });
-    if (guard) say(tb - fuse + 1.4, pickLines(r, CHARGE_HOME)[0], guard);
+    if (guard) say(tb - fuse + 1.4, 'defender', 'charge_set', guard);
     ev.push({ t: tb, kind: 'explosion', x: Math.round(spot.x * 100) / 100, z: Math.round(spot.z * 100) / 100, radius: 0.8, hits: [], wrecks: 'wall' });
     ev.push({ t: tb, kind: 'gap', runId: spot.runId, at: spot.at, w: spot.w, x: spot.x, z: spot.z });
-    if (lead) say(tb + 1.2, pickLines(r, POUR_RAID)[0], nearest(spot, raiders) ?? lead);
-    if (guard) say(tb + 2.6, pickLines(r, POUR_HOME)[0], guard);
+    if (lead) say(tb + 1.2, 'raider', 'ram_hit', nearest(spot, raiders) ?? lead);
+    if (guard) say(tb + 2.6, 'defender', 'breach', guard);
   }
   // through the gap the crew bounds: after each advance a man drops to a knee (the next advance is a different man's), nobody walks upright into the yard
   const bound: BattleEvent[] = [];
