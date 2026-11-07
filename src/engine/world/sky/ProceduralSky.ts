@@ -484,6 +484,7 @@ const FRAG = /* glsl */`
       float az2 = atan(d.x, d.z);
       float vis = 1.0 - 0.7 * cloudOcc;
       float dusk = 0.2 + 0.8 * clamp(uNight + 0.7 * uSkyB.y, 0.0, 1.0);
+      float topFade = 1.0 - smoothstep(0.15, 0.5, h);   // (the block ends at 0.5: nothing may be left over at its edge)
       if (uSkyA.w > 0.001) {
         float arc = 0.0;
         for (int i = 0; i < 3; i++) {
@@ -493,7 +494,7 @@ const FRAG = /* glsl */`
           arc += exp(-da * da / (0.2 + 0.12 * fi)) * (1.0 - 0.3 * fi);
         }
         arc *= 0.78 + 0.22 * sin(uTime * 1.9 + az2 * 11.0);
-        sky += vec3(1.0, 0.36, 0.08) * uSkyA.w * arc * exp(-hp * 8.0) * (0.06 + 0.9 * dusk);
+        sky += vec3(1.0, 0.36, 0.08) * uSkyA.w * arc * exp(-hp * 8.0) * (0.06 + 0.9 * dusk) * topFade;
       }
       if (uSkyA.y > 0.001) {
         float slot = floor(uTime * 1.0), ph = fract(uTime * 1.0), fl = 0.0, wash = 0.0;
@@ -508,7 +509,7 @@ const FRAG = /* glsl */`
           fl += amp * (exp(-dd * dd / 0.0008) + 0.5 * exp(-dd * dd / 0.02));
           wash += amp * exp(-(da - a0) * (da - a0) / 0.1) * exp(-hp * 5.0);
         }
-        sky += vec3(1.0, 0.74, 0.42) * (fl * 0.9 + wash * 0.12) * vis * (0.3 + 0.7 * dusk);
+        sky += vec3(1.0, 0.74, 0.42) * (fl * 0.9 + wash * 0.12) * vis * (0.3 + 0.7 * dusk) * topFade;
       }
       if (uSkyA.x > 0.001 && h > 0.003 && h < 0.08) {
         float da = atan(sin(az2 - uAz.x), cos(az2 - uAz.x));

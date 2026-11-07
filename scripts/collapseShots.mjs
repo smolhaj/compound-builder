@@ -20,6 +20,7 @@ const quickDays = opt('--days', String(quickDay)).split(',').map(Number);   // (
 const quick = args.includes('--quick');   // day 6 at noon and at night only (eye and air): the look at rest, a fraction of the frames
 const ALL = 'grid_down,cyberattack,financial,lawless,drought,pandemic,solar_flare,wildfire,ash_winter,nuclear,zombies,invasion,civil_war,bioweapon,asteroid,unknown';
 const kinds = (opt('--kinds', 'ash_winter,grid_down,wildfire') === 'all' ? ALL : opt('--kinds', 'ash_winter,grid_down,wildfire')).split(',');
+const only = opt('--only', '');   // shoot just these of --kinds (the date of each kind still follows its place in --kinds, so a partial run matches a full one)
 const region = opt('--region', '');   // a region id (desert, pnw, plains, north_woods ...): the world is built there
 // --hours 12,23 or dawn,noon,dusk,night (quick mode); --views eye,aerial
 const HOURS = { dawn: 6.4, noon: 12, dusk: 18.6, night: 23, late: 2 };
@@ -84,6 +85,7 @@ try {
   }, [kind, days, hour, variant, exact, kinds]);
   const NOON = 12, NIGHT = 23;
   for (const kind of kinds) {
+    if (only && !only.split(',').includes(kind)) continue;
     const variant = kind === 'grid_down' ? 'substation' : undefined;
     if (quick) {
       for (const qd of quickDays) for (const [hn, hh] of hours) {
