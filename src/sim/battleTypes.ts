@@ -93,6 +93,8 @@ export interface BattleVehicle { kind: 'pickup'; x: number; z: number; rot: numb
 /** What the invasion presentation decided for a scene (sim/breach.ts, sim/houseAssault.ts). Cinematic only. */
 export interface InvasionMeta {
   method: 'ram' | 'charge';
+  /** The break, for the camera: where the wall falls, which way is out, and the stretch of the scene it is shown in (s). */
+  breach?: { x: number; z: number; ox: number; oz: number; from: number; to: number; at: number };
   /** The house the crew fights in, if it was found: its footprint box (world units), the door and the inside point just past it. */
   house?: { x0: number; z0: number; x1: number; z1: number; door: { x: number; z: number }; inside: { x: number; z: number } };
   /** The stretch of the battle played inside the house (s): the camera goes to the cutaway view for it. */

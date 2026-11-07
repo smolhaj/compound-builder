@@ -26,12 +26,12 @@ export function interiorShot(meta: InvasionMeta | undefined, t: number, ground: 
   const tries: V3[] = [];
   for (let attempt = 0; attempt < 3; attempt++) {
     const a = base + angles[(k + attempt) % angles.length];
-    const dist = reach + 0.95 + attempt * 0.35, up = 1.25 + attempt * 0.35;
+    const dist = reach + 0.55 + attempt * 0.35, up = 1.0 + attempt * 0.3;
     const x = cx + Math.sin(a) * dist, z = cz + Math.cos(a) * dist;
     tries.push({ x, y: ground(x, z) + up, z });
   }
   const eye = tries.find(p => !boxes.some(b => nearBox(p, b, ground, 0.3))) ?? tries[tries.length - 1];
-  return { kind: 'house', eye, look, fov: 40, since, hold: HOLD, drift: { x: 0.02 * Math.cos(base), y: 0, z: -0.02 * Math.sin(base) } };
+  return { kind: 'house', eye, look, fov: 36, since, hold: HOLD, drift: { x: 0.02 * Math.cos(base), y: 0, z: -0.02 * Math.sin(base) } };
 }
 
 export type { House };

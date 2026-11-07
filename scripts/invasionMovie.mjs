@@ -39,6 +39,7 @@ try {
   await page.waitForFunction(() => window.__cb, null, { timeout: 180000 });
   if (lowrender) await page.evaluate(() => { window.__cb.qa.weather = true; });
   if (quality) await page.evaluate(q => window.__cb.store.getState().setQuality(q), quality);
+  await page.evaluate(async () => { window.__breach = (await import('/src/sim/breach.ts')).breachOptions; });
   if (opt('--method', null)) await page.evaluate(async m => { (await import('/src/sim/breach.ts')).breachOptions.force = m; }, opt('--method', null));
   console.log('quality', await page.evaluate(() => window.__cb.store.getState().quality));
   const frames = async (k) => { const f0 = await page.evaluate(() => window.__cb.qa.frames); await page.waitForFunction(x => window.__cb.qa.frames >= x, f0 + k, { polling: 200 }); };
@@ -101,7 +102,7 @@ try {
   while (n < maxF) {
     // dense windows are captured every pump; the rest every `sparse`-th (a time-lapse); before --from nothing is drawn at all
     const secs = p / FPS;
-    const dense = dr.length === 0 || dr.some(([a, b]) => secs >= a && secs < b);
+    const dense = dr.length > 0 && dr.some(([a, b]) => secs >= a && secs < b);
     const grab = secs >= fromS && (dense || p % sparse === 0);
     const st = await page.evaluate(async ([q0, FPS, grab, lowrender]) => {
       const cb = window.__cb, gs = cb.game.getState();
@@ -112,10 +113,12 @@ try {
       const w = cb.store.getState(); if (w.quality !== q0) w.setQuality(q0); w.setPerfNotice(null);
       const c = gs.cutscene;
       const b = cb.battle;
-      return { phase: c?.phase, offer: c?.offer ?? null, bt: b?.playing ? +b.time.toFixed(2) : null, ev: b?.playing ? b.battle.events.filter(e => ['ram', 'charge', 'gap', 'breach', 'end', 'down'].includes(e.kind)).map(e => e.kind + '@' + e.t) : null };
+      const note = window.__breach?.note;
+      return { note, phase: c?.phase, offer: c?.offer ?? null, bt: b?.playing ? +b.time.toFixed(2) : null, ev: b?.playing ? b.battle.events.filter(e => ['ram', 'charge', 'gap', 'breach', 'end', 'down'].includes(e.kind)).map(e => e.kind + '@' + e.t) : null };
     }, [q0, FPS, grab, lowrender]);
     p++;
     if (st.bt != null && Math.round(st.bt * 10) % 50 === 0) tl.push(`p${p} t${(p / FPS).toFixed(1)} bt${st.bt}`);
+    if (st.ev && st.bt < 0.5 && st.note) console.log('breach note:', st.note);
     if (st.ev && st.bt < 0.5 && tl.evAt !== st.ev.join()) { tl.evAt = st.ev.join(); console.log('events', st.ev.join(' ')); }
     if (grab) {
       const meta = await page.evaluate(async () => {

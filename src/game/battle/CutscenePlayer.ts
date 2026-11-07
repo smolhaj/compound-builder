@@ -15,6 +15,7 @@ import { Director, auditPose, poseAt, type PoseAudit, type V3, type Box } from '
 import type { BattleRenderer } from './BattleRenderer';
 import type { Battle } from '../../sim/battleTypes';
 import { interiorShot } from './interiorShot';
+import { breachShot } from './breachShot';
 import { liveBreach } from './liveBreach';
 
 export interface PlayerDeps {
@@ -170,8 +171,8 @@ export class CutscenePlayer {
     this._dir.night = lightLabel(hourAfter(plan, loc.game)) === 'Night'; this._dir.variant = loc.segment.scene;
     let shot;
     if (battle.playing !== this._wasPlaying) { this._wasPlaying = battle.playing; this._dir.shot = null; this._lastKind = ''; }
-    const inner = battle.playing ? interiorShot(battle.battle?.invasion, battle.time, ground, this._boxes, this._focusOf(battle)) : null;
-    this._setInside(!!inner);
+    const inner = battle.playing ? (interiorShot(battle.battle?.invasion, battle.time, ground, this._boxes, this._focusOf(battle)) ?? breachShot(battle.battle?.invasion, battle.time, ground, this._boxes)) : null;
+    this._setInside(inner?.kind === 'house');
     if (inner) {
       this._dir.shot = inner; this._lastKind = 'interior';
       shot = inner;

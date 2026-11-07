@@ -20,7 +20,7 @@ export type BreachMethod = 'ram' | 'charge';
 export interface BreachSpot { runId: string; /** Where the break is (the wall's nearest point to the sim's breach). */ x: number; z: number; /** Distance along the run. */ at: number; /** Width of the opening (world units). */ w: number; /** Direction of the wall there. */ heading: number; /** Unit vector pointing from inside the compound out, across the wall. */ out: { x: number; z: number } }
 
 /** QA override: force a method (the movie script sets it; never saved). */
-export const breachOptions: { force: BreachMethod | null } = { force: null };
+export const breachOptions: { force: BreachMethod | null; /** QA: why the last scene was or was not decorated. */ note: string } = { force: null, note: '' };
 
 const WIDTH: Record<BreachMethod, number> = { ram: 0.78, charge: 0.62 };
 
@@ -40,7 +40,28 @@ export function breachSpot(runs: readonly PerimeterRun[], x: number, z: number, 
       acc += len;
     }
   }
-  if (!best || best.d > maxD) return null;
+  // the sim's breach point is where it puts "the line", not always on the drawn wall: where the crew's approach (house to breach point, carried on) crosses a wall is the better place
+  const dx0 = x - home.x, dz0 = z - home.z, len0 = Math.hypot(dx0, dz0);
+  if (len0 > 1e-6 && (!best || best.d > 0.6)) {
+    for (const run of runs) {
+      const def = PERIMETER[run.kind];
+      if (!def || !runFinished(run) || def.blocks.people < 0.5 || def.height < 0.3 || run.pts.length < 2) continue;
+      let acc = 0;
+      for (let i = 1; i < run.pts.length; i++) {
+        const [ax, az] = run.pts[i - 1] as Pt, [bx, bz] = run.pts[i] as Pt;
+        const ex = bx - ax, ez = bz - az, len = Math.hypot(ex, ez), den = dx0 * ez - dz0 * ex;
+        if (Math.abs(den) > 1e-9) {
+          const t = ((ax - home.x) * ez - (az - home.z) * ex) / den, u = ((ax - home.x) * dz0 - (az - home.z) * dx0) / den;   // along the approach, along the wall piece
+          if (t > 0.2 && t < 2.2 && u >= 0 && u <= 1) {
+            const d = Math.abs(t - 1) * len0;
+            if (!best || d < best.d - 1e-9 || (best.d > 0.6 && d < best.d)) best = { run, d, px: ax + ex * u, pz: az + ez * u, at: acc + u * len, hx: ex / len, hz: ez / len };
+          }
+        }
+        acc += len;
+      }
+    }
+  }
+  if (!best || best.d > Math.max(maxD, 20)) return null;
   // keep the opening clear of the run's ends and of a gate (a gate span is already open)
   const w = WIDTH[method];
   let total = 0;
@@ -83,10 +104,11 @@ function pickLines(r: () => number, list: readonly string[], n = 1): string[] {
 /** Add the break to a battle that has a sim `breach` event. Returns the battle untouched when there is nothing to show (no breach, no wall near it). */
 export function decorateBreach(b: Battle, runs: readonly PerimeterRun[], home: { x: number; z: number }, seed: number, carriesCharges = false): Battle {
   const br = b.events.find(e => e.kind === 'breach') as Extract<BattleEvent, { kind: 'breach' }> | undefined;
-  if (!br || b.invasion) return b;
+  if (!br || b.invasion) { breachOptions.note = br ? 'already decorated' : 'no breach event'; return b; }
   const method = breachMethod(b.units, seed, carriesCharges);
   const spot = breachSpot(runs, br.x, br.z, home, method);
-  if (!spot) return b;
+  if (!spot) { breachOptions.note = `no wall spot near the breach at ${br.x},${br.z} (runs ${runs.map(r => r.kind + ':' + (runFinished(r) ? 'done' : 'open')).join(',')})`; return b; }
+  breachOptions.note = `${method} at ${spot.x.toFixed(1)},${spot.z.toFixed(1)} on ${spot.runId}`;
   const r = mulberry32(seed * 8191 + 41);
   const tb = br.t;
   const raiders = b.units.filter(u => u.side === 'raider' && !u.machine);
@@ -144,5 +166,6 @@ export function decorateBreach(b: Battle, runs: readonly PerimeterRun[], home: {
     }
   }
   const events = [...kept, ...ev, ...bound].sort((a, c) => a.t - c.t);
-  return { ...b, events, invasion: { method } };
+  const shownFrom = method === 'ram' ? tb - 3.4 - 1.2 : tb - 4.2 - 1.2;
+  return { ...b, events, invasion: { method, breach: { x: spot.x, z: spot.z, ox: spot.out.x, oz: spot.out.z, from: Math.round(shownFrom * 10) / 10, to: Math.round((tb + 5.5) * 10) / 10, at: tb } } };
 }

@@ -167,3 +167,14 @@ describe('house assault: the last act', () => {
     expect(a.events.some(e => e.kind === 'say' && /Nobody move|On the floor|It's over/.test(e.text))).toBe(true);
   });
 });
+
+describe('breach camera data', () => {
+  it('the scene says where the wall falls and when it is shown', () => {
+    const g = world();
+    const ram = decorateBreach(battle('crowd'), g.perimeter, { x: 0, z: 0 }, 5), ch = decorateBreach(battle('crew'), g.perimeter, { x: 0, z: 0 }, 5);
+    expect(ram.invasion?.breach?.at).toBe(50);
+    expect(ram.invasion!.breach!.from).toBeLessThan(46.6);
+    expect(ch.invasion!.breach!.from).toBeLessThan(45.8);
+    expect(ram.invasion!.breach!.ox).toBeGreaterThan(0.9);
+  });
+});
