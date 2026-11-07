@@ -42,6 +42,12 @@ export const WAVE = {
   KIT: 0.7,
   /** Waves stop once the county has order again (law track at or above this): there is nobody left to send them. */
   LAW_END: 0.75,
+  /**
+   * An opener: the first waves are smaller than the crew as rolled, so the first raid is a scare and not a wipe. The crew is cut by this share on wave 1,
+   * fading to nothing by wave OPEN_WAVES + 1, for Standard only (Cozy's waves are already small, Hardcore's are the design: no opener).
+   */
+  OPEN: 0.25,
+  OPEN_WAVES: 3,
   /** The Hardcore weight caps the heads multiplier here, so a wave never more than doubles a crew. */
   HEADS_CAP: 2.1,
 } as const;
@@ -76,9 +82,15 @@ export function nextWaveDay(seed: number, hitDay: number, w: WaveState, lull: nu
   return w.last === undefined ? due : Math.max(due, w.last + WAVE.LULL_MIN);
 }
 
+/** The opener's cut on wave `n` (1 = none): see WAVE.OPEN. */
+export function openerFactor(n: number, weight: number): number {
+  const fade = clamp01(1 - (n - 1) / WAVE.OPEN_WAVES), scale = weight >= 1 ? clamp01((1.4 - weight) / 0.4) : 0;
+  return 1 - WAVE.OPEN * fade * scale;
+}
+
 /** Crew-size factor for wave `n` against a place of defensive strength `ds` (0-1), at the difficulty's wave weight. 1 = the crew as rolled. */
 export function crewFactor(n: number, ds: number, weight: number): number {
-  return Math.min(WAVE.HEADS_CAP, (1 + WAVE.HEADS_ESC * weight * intensity(n)) * (1 + WAVE.HEADS_DEF * clamp01(ds) * Math.min(1, weight)));
+  return openerFactor(n, weight) * Math.min(WAVE.HEADS_CAP, (1 + WAVE.HEADS_ESC * weight * intensity(n)) * (1 + WAVE.HEADS_DEF * clamp01(ds) * Math.min(1, weight)));
 }
 
 /** The `adapt` number (0-1) a wave carries into the battle: it decides grenades, plate, automatic rifles and a rocket. */

@@ -36,7 +36,8 @@ import { orderHardenAll } from '../src/sim/hardening';
 import { defenseOf, fightOdds, hideFoundChance, postureOf, resolve, type Stance } from '../src/sim/encounters';
 import { resolveAftermath, type AftermathChoice } from '../src/sim/aftermath';
 import type { PlannedBattle } from '../src/sim/battle';
-const AFTER: Record<string, AftermathChoice> = { idle: 'leave', homestead: 'treat_release', prepper: 'hold', fortress: 'leave' };
+const AFTER: Record<string, AftermathChoice> = { passive: 'leave', careless: 'leave', idle: 'leave', homestead: 'treat_release', prepper: 'hold', fortress: 'leave' };
+import { botTurn } from '../src/sim/fuzz/passiveBot';
 import { reportCard } from '../src/sim/report';
 import { setBelt } from '../src/sim/weekender';
 import { weekendBudget } from '../src/sim/weekendPlan';
@@ -60,11 +61,16 @@ interface JoinerTally { admitted: number; fellBack: number; quarters: number }
 /** (GATES=<file>) append a debug line to a file (vitest swallows console output). */
 const dbg = (m: string) => appendFileSync(process.env.GATES!, m + '\n');
 
-type Strategy = 'idle' | 'homestead' | 'prepper' | 'fortress';
+export type Strategy = 'idle' | 'homestead' | 'prepper' | 'fortress' | 'careless' | 'passive';
+/** The two bots that build nothing themselves (passive presses only what the on-screen cards offer, src/sim/fuzz/passiveBot.ts). */
+const LAZY = (st: Strategy): boolean => st === 'idle' || st === 'passive';
 
 /** What a strategy builds, in order (x, z in the 67-unit parcel). */
 const PLANS: Record<Strategy, Array<[string, number, number]>> = {
   idle: [],
+  passive: [],
+  // careless: a house, a well and a garden, then whatever; no guns, no reserve, no stockpile, whatever the first button says
+  careless: [['timber_cabin', 30, 30], ['outhouse', 36, 26], ['well_hand', 26, 34], ['garden', 22, 28]],
   homestead: [['timber_cabin', 30, 30], ['outhouse', 36, 26], ['well_hand', 26, 34], ['garden', 22, 28], ['field', 10, 12], ['field', 17, 12], ['field', 24, 12], ['chicken_coop', 24, 22], ['root_cellar', 34, 36], ['cistern', 28, 38]],
   prepper: [['timber_cabin', 30, 30], ['outhouse', 36, 26], ['well_drilled', 26, 34], ['garden', 22, 28], ['field', 10, 12], ['field', 17, 12], ['field', 24, 12], ['field', 10, 19], ['chicken_coop', 24, 22], ['root_cellar', 34, 36], ['cistern', 28, 38], ['solar_array', 40, 30], ['battery_shed', 40, 34], ['generator_shed', 42, 36],
     ['bunker_hatch', 20, 40], ['bunker_corridor', 20.75, 40], ['bunker_dorm', 21.75, 40.25], ['bunker_stores', 21.75, 41.25], ['bunker_plant', 22.75, 40.25], ['bunker_medical', 22.75, 41.25], ['bunker_comms', 20.5, 41]],
@@ -113,10 +119,12 @@ const foodCovers = (s: GameState, size: number, margin: number) => {
   return stored >= day * toHarvest(s) * margin && yearGrown(s) >= year * margin;
 };
 /** (round 4) The end of a month's trial: take them in if the food covers them, as for an arrival (the idle family and the fortress send them on). */
-const MARGIN: Record<Strategy, number> = { idle: 0, homestead: 1.1, prepper: 1.25, fortress: 1.25 };
+const MARGIN: Record<Strategy, number> = { idle: 0, passive: 0, careless: 0, homestead: 1.1, prepper: 1.25, fortress: 1.25 };
 const trialEnd = (strat: Strategy, s: GameState, n: number): Stance => MARGIN[strat] && foodCovers(s, n, MARGIN[strat]) ? 'take_in' : 'turn_away';
 const STANCE: Record<Strategy, (kinds: Stance[], kind: string, s: GameState, size: number) => Stance> = {
   idle: k => k.includes('turn_away') ? 'turn_away' : k.includes('hide') ? 'hide' : k[0],
+  passive: k => k.includes('turn_away') ? 'turn_away' : k.includes('hide') ? 'hide' : k[0],
+  careless: k => k[0],
   // a sensible family: talk first, and if they're clearly outgunned, hide rather than fight
   // (v2: only take people in when the stores and the year's harvest cover them too; before, anyone was taken in while the shops were open)
   homestead: (k, kind, s, n) => kind === 'arrival' ? (foodCovers(s, n, 1.1) && roomFor(s, n) > 120 ? 'take_in' : 'trade') : outgunned(s) && k.includes('hide') ? 'hide' : k.includes('parley') ? 'parley' : k[0],
@@ -155,12 +163,12 @@ function orderNeeds(s: GameState, strat: Strategy): void {
   if (jars > 0 && s.stock.canner + (pending.canner ?? 0) < 1) lines.push({ material: 'canner', qty: 1 });
   if (jars > 0 && s.stock.crocks + (pending.crocks ?? 0) < 1) lines.push({ material: 'crocks', qty: 1 });
   // a winter's firewood (about 4 cords) in by fall
-  if (strat !== 'idle' && s.stock.firewood + (pending.firewood ?? 0) < 12) lines.push({ material: 'firewood', qty: 12 });
+  if (!LAZY(strat) && s.stock.firewood + (pending.firewood ?? 0) < 12) lines.push({ material: 'firewood', qty: 12 });
   // soap and paper for when the stores close: a year (prepper) or three months (homestead) a head
   const heads = s.people.length, hyg = strat === 'prepper' ? 12 * heads : strat === 'homestead' ? 3 * heads : 0;
   if (s.stock.hygiene + (pending.hygiene ?? 0) < hyg / 2) lines.push({ material: 'hygiene', qty: hyg });
   // traps in the stores, stabilizer in the gas
-  if (strat !== 'idle' && s.stock.traps + (pending.traps ?? 0) < 1) lines.push({ material: 'traps', qty: 3 });
+  if (!LAZY(strat) && s.stock.traps + (pending.traps ?? 0) < 1) lines.push({ material: 'traps', qty: 3 });
   if (strat === 'prepper' && s.stock.stabilizer + (pending.stabilizer ?? 0) < Math.ceil((s.stock.fuel + (pending.fuel ?? 0)) / 10)) lines.push({ material: 'stabilizer', qty: 2 });
   if (strat === 'prepper' && s.stock.meds + (pending.meds ?? 0) < 4) lines.push({ material: 'meds', qty: 2 });
   if (strat === 'prepper' && s.stock.fuel + (pending.fuel ?? 0) < 20) lines.push({ material: 'fuel', qty: 10 });
@@ -210,7 +218,7 @@ function orderStages(s: GameState, reserve: number): void {
 }
 
 /** Fields put by for after the collapse, beyond what today's mouths need (arrivals, lost crops). */
-const FIELD_SPARE: Record<Strategy, number> = { idle: 0, homestead: 3, prepper: 6, fortress: 3 };
+const FIELD_SPARE: Record<Strategy, number> = { idle: 0, passive: 0, careless: 0, homestead: 3, prepper: 6, fortress: 3 };
 /** Fields to keep for the mouths here: a year of eating over an ordinary year's field (less the garden and the hens), at least one per 1.5 mouths, 16 at most. */
 function fieldsWanted(s: GameState): number {
   const fin = s.structures.filter(isFinished);
@@ -241,7 +249,7 @@ function fieldSpot(s: GameState, M: (x: number, z: number) => [number, number]):
  * (weekender, round 5) The weekend family's own budget, not the full-time one, and a lot that leaves at least a third of it to build with:
  * the bot used to buy the full-time family's lot with the weekend family's money and start the game at zero.
  */
-function siteFor(seed: number, region?: RegionId): Site {
+export function siteFor(seed: number, region?: RegionId): Site {
   const life = (process.env.LIFESTYLE as Lifestyle | undefined) ?? 'fulltime';
   const budget = startFunds(generateFamily(seed), life, seed, 0, process.env.TOWN === 'rent' ? 'rent' : 'own').budget;
   // LOTKIND=gorge plays the first affordable listing of that lot archetype (sim/lots.ts) in the search for this seed; LOTKIND=none plays an
@@ -267,9 +275,13 @@ const newcomerNote = (s: GameState): string => {
   const gone = N.departed.filter(d => d.kind !== 'guest');
   return came || stays ? `joined ${came} (${gone.length} left${gone.some(d => /stole|night/.test(d.why)) ? ', incl. thief/scout' : ''}), ${stays} shelter stays` : '';
 };
-interface RunResult { causes: string; often: Array<[string, number]>; minMoney: number; site: string; strat: Strategy; kind: DisasterKind; variant: string; ending: string; grade: string; alive: string; hungry: number; days: number; moneyAtHit: number; builtAtHit: number; bugs: string[]; lines: string[]; fights: string[]; prisoners: number; hides: number; hidFound: number; owed: number; debtStage: string; trials: string; stripped: number; burned: number; joiners: string }
+export interface RunResult { causes: string; often: Array<[string, number]>; minMoney: number; site: string; strat: Strategy; kind: DisasterKind; variant: string; ending: string; grade: string; alive: string; hungry: number; days: number; moneyAtHit: number; builtAtHit: number; bugs: string[]; lines: string[]; fights: string[]; prisoners: number; hides: number; hidFound: number; owed: number; debtStage: string; trials: string; stripped: number; burned: number; joiners: string }
 
-function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' | 'medium', site: Site = CLASSIC, years = 0): RunResult & { s: GameState } {
+/** Telemetry for the balance harness (src/sim/fuzz/balanceHarness.test.ts); unset in the ordinary playtest. */
+export const HOOKS: { day?: (s: GameState, day: number) => void; gate?: (s: GameState, e: NonNullable<GameState['gate']['pending']>, stance: string, def: number) => void; after?: (s: GameState, e: NonNullable<GameState['gate']['pending']>) => void; halt?: (s: GameState) => boolean } = {};
+const passiveLog = { placed: 0, orders: 0, crews: 0 };
+
+export function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' | 'medium', site: Site = CLASSIC, years = 0, afterHit = 0): RunResult & { s: GameState } {
   // (LIFESTYLE=weekend plays the weekender: the family in town on weekdays, the move-in card, the road home; TOWN=rent sells the town house at setup and rents; BELT=1 tightens the belt from day one)
   const life = process.env.LIFESTYLE as Lifestyle | undefined;
   let s = newGame(seed, 105, 2027, { site: site === CLASSIC && !life ? undefined : site, lifestyle: life, townPlan: process.env.TOWN === 'rent' ? 'rent' : 'own', mode: 'scenario', peace, kind, dayJobs: true, grid: true, difficulty: process.env.DIFF as Difficulty | undefined });
@@ -322,8 +334,10 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
     const why = n.taken ? 'taken' : fought ? 'killed in a fight' : n.hunger > 5000 ? 'hunger' : n.hurt.some(h => h.trauma) ? 'wounds' : n.dose > 1 ? 'radiation' : s.utilities.report.shortL > s.utilities.report.useL * 0.5 ? 'thirst' : n.hurt.some(h => h.what === 'fever') ? 'sickness' : (p?.age ?? 0) >= 65 ? 'old age' : 'other';
     causes.set(why, (causes.get(why) ?? 0) + 1);
   });
-  const maxDays = years ? years * 365 : s.disaster.hitAt + 730;
+  const maxDays = afterHit ? s.disaster.hitAt + afterHit : years ? years * 365 : s.disaster.hitAt + 730;
+  passiveLog.placed = passiveLog.orders = passiveLog.crews = 0;
   for (let day = 0; day < maxDays; day++) {
+    if (strat === 'passive' && day % 2 === 0) botTurn(s, passiveLog);
     // build: one new plan when there's money for it (keep a reserve)
     const plans = PLANS[strat];
     while (planned < plans.length && ['timber_cabin', 'well_hand', 'well_drilled', 'septic'].includes(plans[planned][0]) && has(plans[planned][0])) planned++;
@@ -345,19 +359,19 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
       if (b && !b.belt && b.beltSaves > 600 && b.net < 4000 && s.money < 200_000) setBelt(s, true);
     }
     // (weekender, round 5) a crew builds on the weekdays the family is in town: when the stage is supplied and a month of crew is in the account
-    if (s.weekend?.mode === 'split' && strat !== 'idle' && day % 7 === 0 && s.money > 55_000 && !(s.crews ?? []).length) {
+    if (s.weekend?.mode === 'split' && !LAZY(strat) && day % 7 === 0 && s.money > 55_000 && !(s.crews ?? []).length) {
       const st = s.structures.find(x => !isFinished(x) && x.supplied && hoursLeft(x) > 200);
       if (st) hireCrew(s, st.id);
     }
     // fields for the mouths here (v2: before and after the collapse, from the seed and fence put by; before, no field was ever added once it hit)
-    if (strat !== 'idle' && day % 10 === 0 && s.structures.some(x => x.kind === 'field')) {
+    if (!LAZY(strat) && day % 10 === 0 && s.structures.some(x => x.kind === 'field')) {
       const fields = s.structures.filter(x => x.kind === 'field'), open = fields.filter(x => !isFinished(x)).length;
       const busy = s.structures.filter(x => !isFinished(x)).length;
       const spot = fields.length < fieldsWanted(s) && open < 2 && busy < 4 && fieldStock(s) ? fieldSpot(s, M) : null;
       if (spot) applyForPermit(s, planStructure(s, 'field', spot[0], spot[1], 0));
     }
     // firewood for next winter once the yard can't sell it: mark a few trees in the woodlot (the world's trees stand in as numbered ones)
-    if (strat !== 'idle' && day % 10 === 0 && s.disaster.tracks.stores < 0.5 && s.stock.firewood + s.upkeep.green.reduce((a, g) => a + g.ricks, 0) < 15 && s.forestry.jobs.length < 3) {
+    if (!LAZY(strat) && day % 10 === 0 && s.disaster.tracks.stores < 0.5 && s.stock.firewood + s.upkeep.green.reduce((a, g) => a + g.ricks, 0) < 15 && s.forestry.jobs.length < 3) {
       for (let k = 0; k < 3; k++) { const id = 1_000_000 + s.nextId; const [x, z] = M(4 + (id % 9) * 7, 64); markTree(s, { id, x, z, kind: 'broad', scale: 1 }, 20); }
     }
     if (strat === 'fortress') {
@@ -380,25 +394,25 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
       } else orderNeeds(s, strat);
     }
     // (v2) someone taken: send word that the family will pay, whenever there's a lead to carry it
-    if (strat !== 'idle' && day % 10 === 0) for (const c of openCaptives(s)) askRansom(s, c.pid);
+    if (!LAZY(strat) && day % 10 === 0) for (const c of openCaptives(s)) askRansom(s, c.pid);
     // (v2) a dead pump gets a hardware kit, an EMP-fried one its spare, as the HUD's buttons would
-    if (strat !== 'idle') {
+    if (!LAZY(strat)) {
       for (const id of [...s.utilities.broken]) repairPump(s, id);
       for (const id of [...s.utilities.fried]) replaceFried(s, id);
     }
     // the prescriptions, three months ahead, once the news turns
-    if (strat !== 'idle' && s.disaster.phase === 'warning' && day % 30 === 0) stockUpRx(s);
+    if (!LAZY(strat) && s.disaster.phase === 'warning' && day % 30 === 0) stockUpRx(s);
     // (SINKS=noop: a control that buys one $25 hygiene pack at the same moment, to show a purchase alone moves a run)
-    if (process.env.SINKS === 'noop' && strat !== 'idle' && s.disaster.phase === 'warning' && day % 30 === 15 && s.structures.some(x => isHome(x.kind) && isFinished(x)) && !s.stock.__noop) { (s.stock as Record<string, number>).__noop = 1; placeOrder(s, [{ material: 'hygiene', qty: 1 }]); }
+    if (process.env.SINKS === 'noop' && !LAZY(strat) && s.disaster.phase === 'warning' && day % 30 === 15 && s.structures.some(x => isHome(x.kind) && isFinished(x)) && !s.stock.__noop) { (s.stock as Record<string, number>).__noop = 1; placeOrder(s, [{ material: 'hygiene', qty: 1 }]); }
     // (money sinks, optional: SINKS=1) a family with spare money fits the clinic, the radio mast and the gate house once the warning is out (sim/richSinks.ts)
-    if (process.env.SINKS && strat !== 'idle' && s.disaster.phase === 'warning' && day % 30 === 15 && s.structures.some(x => isHome(x.kind) && isFinished(x))) {
+    if (process.env.SINKS && !LAZY(strat) && s.disaster.phase === 'warning' && day % 30 === 15 && s.structures.some(x => isHome(x.kind) && isFinished(x))) {
       for (const m of ['clinic_suite', 'radio_mast', 'gate_house'] as const) if ((process.env.SINKS === '1' || (process.env.SINKS === 'noop' ? [] : process.env.SINKS!.split(',')).some(w => m.startsWith(w))) && (s.stock[m] ?? 0) < 1 && s.money > MATERIALS[m].price! + 120_000) placeOrder(s, [{ material: m, qty: 1 }]);
     }
     // the armory, bought early (a deer rifle and a .22; more for the preppers and the fortress)
     // (weekender, round 5) the guns wait for the roof: bought on day 10 they took the cash the cabin's first stages needed. Bought when the house is up and
     // there is money, or once the warning is out
     const armoryDue = s.weekend?.mode === 'split' ? !armed && (s.disaster.phase === 'warning' || (s.structures.some(x => isHome(x.kind) && isFinished(x)) && s.money > 60_000)) : day === 10;
-    if (armoryDue && strat !== 'idle') {
+    if (armoryDue && !LAZY(strat) && strat !== 'careless') {
       armed = true;
       const kit: Record<string, string[]> = { homestead: ['marlin_336', 'ruger_1022'], prepper: ['rem_700', 'sw_mp15', 'sw_mp15', 'mossberg_500', 'glock_19', 'ruger_1022'], fortress: ['sw_mp15', 'sw_mp15', 'ruger_mini14', 'mossberg_500', 'rem_700'] };
       for (const m of kit[strat] ?? []) buyGun(s, m);
@@ -411,9 +425,9 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
       placeOrder(s, (Object.entries(gear) as Array<[MaterialId, number]>).map(([material, qty]) => ({ material, qty })));
     }
     // the year's tags and licenses
-    if (strat !== 'idle' && calendarOf(s.clock).doy === 240) for (const l of ['deer', 'elk', 'fishing', 'small'] as const) buyLicense(s, l);
+    if (!LAZY(strat) && calendarOf(s.clock).doy === 240) for (const l of ['deer', 'elk', 'fishing', 'small'] as const) buyLicense(s, l);
     // sweep the chimney each fall
-    if (strat !== 'idle' && calendarOf(s.clock).doy === 260) sweepChimney(s);
+    if (!LAZY(strat) && calendarOf(s.clock).doy === 260) sweepChimney(s);
     // wire and plumb the house once it can be; order what its repairs need
     const cabin = s.structures.find(x => isHome(x.kind) && isFinished(x));
     if (cabin && day % 5 === 0) for (const f of pendingFixes(cabin)) if (fixBlocked(s, f) && !orderProblem(s, Object.entries(fixBill(f)).map(([material, qty]) => ({ material: material as MaterialId, qty: qty as number })))) { placeOrder(s, Object.entries(fixBill(f)).map(([material, qty]) => ({ material: material as MaterialId, qty: qty as number }))); break; }
@@ -438,6 +452,8 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
     minMoney = Math.min(minMoney, s.money);
     watchHarvest(s);
     tallyDeaths(false);
+    HOOKS.day?.(s, day);
+    if (HOOKS.halt?.(s)) break;
     // (checked after the day's tally; a death at the gate is tallied the next midnight)
     // (a line whose children were fostered by a neighbor (sim/orphans.ts) has an empty roster but is alive: that is an outcome, not a bug)
     if (livingCount(s) === 0 && !s.ending && (s.lineage.wards?.length ?? 0) > 0) { if (!nobodyHome) { nobodyHome = true; trial.fostered = day; } }
@@ -462,11 +478,11 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
       // (v2: compare with the battle on file before this answer: the day's step clones the state, so the last fight used to be counted again at every later gate)
       const e = s.gate.pending, before = s.gate.battle, def = Math.round(defenseOf(postureOf(s)));
       // word from a crew holding one of ours: pay it if it can be paid, talk it down if six in ten can, else no deal (the idle family never pays)
-      const ransom = e.kind === 'ransom' && e.ransom ? (strat === 'idle' ? 'refuse' : canPay(s, e.ransom) ? 'pay' : canPay(s, e.ransom, 0.6) ? 'parley' : 'refuse') : null;
+      const ransom = e.kind === 'ransom' && e.ransom ? (LAZY(strat) ? 'refuse' : canPay(s, e.ransom) ? 'pay' : canPay(s, e.ransom, 0.6) ? 'parley' : 'refuse') : null;
       if (process.env.GATES) { const q = postureOf(s); dbg(`  posture d${Math.floor(s.clock.t - s.disaster.hitAt)}: barrier ${Math.round(q.barrier)} fighters ${q.fighters} fire ${(q.firepower ?? 0).toFixed(2)} det ${Math.round(q.detection)} towers ${s.structures.filter(x => x.kind.startsWith('watchtower') && isFinished(x)).length} built ${s.structures.filter(isFinished).length} runs ${s.perimeter.filter(runFinished).map(r => r.kind).join('+')} fields ${s.structures.filter(x => x.kind === 'field' && isFinished(x)).length} food ${Math.round(daysOfFood(s))}d people ${livingCount(s)}`); }
       const oddsNow = process.env.GATES && e.stances.includes('defend') ? odds(s) : null, foundNow = e.stances.includes('hide') ? hideFoundChance(s, e) : 0;
       // (the weekender's cards: the idle family holds on; the others move in as soon as it is asked, selling while the market is open; caught in town, they drive straight home)
-      const weekender = e.kind === 'move_in' ? (strat === 'idle' ? 'hold_on' : e.stances.includes('move_sell') ? 'move_sell' : 'move_keep') : e.kind === 'stranded' ? 'drive_now' : null;
+      const weekender = e.kind === 'move_in' ? (LAZY(strat) ? 'hold_on' : e.stances.includes('move_sell') ? 'move_sell' : 'move_keep') : e.kind === 'stranded' ? 'drive_now' : null;
       const welcome = process.env.WELCOME && e.stances.includes('take_in') && ['arrival', 'kin', 'shelter', 'trial_end'].includes(e.kind) ? 'take_in' : null;
       // (STAY / ADMIT) admit a fraction of arrivals and kin and pick where they sleep: the StayPicker's setStay, then the same take_in
       let admit: string | null = null;
@@ -480,7 +496,9 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
       const stance = ransom ?? weekender ?? admit ?? welcome ?? (e.kind === 'trial_end' ? trialEnd(strat, s, e.size) : e.kind === 'shelter' ? (MARGIN[strat] && foodCovers(s, e.size, MARGIN[strat]) ? 'take_in' : 'turn_away') : STANCE[strat](e.stances, e.kind, s, e.size));
 
       const hidBefore = s.gate.history.length;
+      HOOKS.gate?.(s, e, stance, def);
       const out = resolve(s, stance); s.gate.card = null;
+      HOOKS.after?.(s, e);
       if (out.lines.some(l => l.includes('set fire'))) burned++;
       if (stance === 'hide' && out.lines.some(l => l.startsWith('Lost:'))) stripped++;
       if (stance === 'hide') { hides++; const h = s.gate.history[hidBefore]; if (h && h.stance === 'hide' && h.tone === 'bad') hidFound++; }
@@ -510,7 +528,7 @@ function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' 
     for (const ps of s.personState) if (!Number.isFinite(ps.needs.health) || !Number.isFinite(ps.needs.dose)) bugs.push(`needs NaN on day ${day}`);
     if (bugs.length > 5) break;
     // the long game: play on through the eras until the line ends
-    if (s.ending && years && s.ending.kind !== 'wipe') s.ending.continued = true;
+    if (s.ending && (years || afterHit) && s.ending.kind !== 'wipe') s.ending.continued = true;
     else if (s.ending) break;
   }
   const r = reportCard(s);
