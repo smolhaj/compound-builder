@@ -35,4 +35,8 @@ describe('overlay queue', () => {
   it('no recap or milestone over the new-game screen', () => {
     expect(up(overlayPlan({ ...none, setup: true, recap: true, milestones: 1 }))).toEqual([]);
   });
+  it('a goal or milestone card waits while a tool or the starter proposal is open, then comes up', () => {
+    expect(up(overlayPlan({ ...none, milestones: 2, planning: true }))).toEqual([]);
+    expect(up(overlayPlan({ ...none, milestones: 2, planning: false }))).toEqual(['milestone']);
+  });
 });
