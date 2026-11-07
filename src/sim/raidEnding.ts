@@ -70,6 +70,7 @@ export function endPoses(inp: EndInput): { battle: Battle; wake: number; ending:
     // the crew that was beaten: no one left standing in a cluster; the hurt are down, and the ones the sim says gave up have their hands up
     const down = downRaiders(b);
     const gaveUp = [...new Set(b.events.filter(e => e.kind === 'surrender' && b.units.find(u => u.id === e.unit)?.side === 'raider').map(e => (e as { unit: string }).unit))];
+    // (a badly hurt man in custody has no hands-up event: he lies where he fell, and is not "left on the drive" in the sim's count)
     for (const d of down) {
       if (gaveUp.includes(d.id)) continue;
       if (!b.events.some(e => e.kind === 'lay' && e.unit === d.id)) events.push({ t: r2(Math.min(W0 - 0.3, d.t + 0.9)), kind: 'lay', unit: d.id });

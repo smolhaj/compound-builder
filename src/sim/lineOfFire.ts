@@ -38,6 +38,17 @@ export const FIRE_SOLID: ReadonlySet<PerimeterKind> = new Set<PerimeterKind>(['l
 
 const WALL_THICK = 0.1;
 
+/**
+ * Walls that come with a firing step (a palisade's catwalk, a stone wall's banquette, a bench or stack of crates behind a container wall): a
+ * defender standing behind one fires over the top. A per-wall-type property; steel and concrete are plain faces (a wall walk or a tower does it there).
+ */
+export const FIRING_STEP: ReadonlySet<PerimeterKind> = new Set<PerimeterKind>(['log_palisade', 'stone_wall', 'container_wall']);
+
+/** How high a defender stands on the step so the muzzle just clears the top of a wall of height `h` (0 where the wall has no step). */
+export function stepHeight(kind: PerimeterKind | string, h: number): number {
+  return FIRING_STEP.has(kind as PerimeterKind) ? Math.max(0, h - MUZZLE.stand + 0.05) : 0;
+}
+
 /** Roof line above the pad for a building (a storey 0.65 plus the roof); a watchtower is a bit over 1 unit (6 m). Same as the camera's boxes. */
 const buildingHeight = (id: string, floorY: number): number => id.startsWith('watchtower') ? 1.25 : floorY + 1.3;
 const PORCH_HEIGHT = 0.3;

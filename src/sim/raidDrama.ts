@@ -74,7 +74,7 @@ export function findVictim(before: GameState, after: GameState, battles: readonl
 
 /** Raiders the sim left alive on the drive: hit, not dead, not run off, not surrendered. */
 export function leftBehindRaiders(b: Battle): string[] {
-  const hurt = new Set<string>(), gone = new Set<string>();
+  const hurt = new Set<string>(), gone = new Set<string>(b.surrendered?.raiders ?? []);
   for (const e of b.events) {
     if (e.kind === 'wound' && !e.stopped) hurt.add(e.unit);
     if (e.kind === 'death' || e.kind === 'flee' || e.kind === 'taken' || e.kind === 'surrender') gone.add(e.unit);   // (a man who gave up is held, not left on the drive)

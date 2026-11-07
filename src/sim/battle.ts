@@ -58,7 +58,7 @@ import { peopleAfterFight } from './people';
 import { fightNerves } from './mind';
 import { hourOf, type GameState } from './state';
 import { pluralize } from './words';
-import { FireMap, PARTIAL_HIT, fireBoxesOf, fireLine, FIRE_SOLID, type Sight, type Stance } from './lineOfFire';
+import { FireMap, PARTIAL_HIT, fireBoxesOf, fireLine, FIRE_SOLID, stepHeight, type Sight, type Stance } from './lineOfFire';
 import { breachFates, type Fate } from './breachFates';
 import { crewKindOf, crewSurrenders, downedSurrenderOdds, type CrewKind } from './surrender';
 
@@ -370,7 +370,12 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
   const deck = deckPosts.length > 0;
   if (wallR) {
     if (deck) for (const p of deckPosts) posts.push({ kind: 'wall', x: p.x, z: p.z, y: p.y, cover: WALK_POST.cover, value: WALK_POST.value, cap: 1, wrecked: false, fire: 0, reach: WALK_POST.reach, acc: WALK_POST.acc });
-    else for (let i = 0; i < 3; i++) { const p = behindWall(at(wallR, (i - 1) * 4)); posts.push({ kind: 'wall', ...p, y: 0, cover: 0.22, value: 2, cap: 1, wrecked: false, fire: 0 }); }
+    else for (let i = 0; i < 3; i++) { const p = behindWall(at(wallR, (i - 1) * 4)); posts.push({ kind: 'wall', ...p, y: stepHeight(wallKind, PERIMETER[wallKind as keyof typeof PERIMETER]?.height ?? 0), cover: 0.22, value: 2, cap: 1, wrecked: false, fire: 0 }); }
+  }
+  // sandbags are laid on the firing step behind a wall that has one (that is where the cover is), not out in the yard where the wall hides what they could shoot at
+  if (wallR && !deck && stepHeight(wallKind, 1) > 0) {
+    const sy = stepHeight(wallKind, PERIMETER[wallKind as keyof typeof PERIMETER]?.height ?? 0);
+    posts.filter(p => p.kind === 'sandbags').forEach((sp, i) => { const q = behindWall(at(wallR, (i - 1) * 4 + 2)); sp.x = q.x; sp.z = q.z; sp.y = sy; });
   }
   const bars = n('window_bars') > 0 ? 0.28 : 0.35;
   for (const st of fin) if (!st.kind.startsWith('bunker_') && !isPostKind(st.kind) && dist(st, C) < 25) posts.push({ kind: 'building', x: st.x + ax * 0.5, z: st.z + az * 0.5, y: 0.3, cover: bars * coverFactor(st.kind) * houseCoverK(s), value: 1, cap: isHome(st.kind) ? 2 : 1, wrecked: false, fire: 0 });
@@ -750,7 +755,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
     ev.push({ t, kind: 'fallback', ring: ringK, of: ringRs.length, x: r2(here.x), z: r2(here.z) });
     say(t, v(lead(), ['Fall back! Fall back to the inner wall — go, go!', 'They\'re over the outer wall — back, BACK to the next gate!'], ['Outer line is gone. Fall back to the inner ring.']), lead());
     for (const p of posts) if (p.kind === 'wall') p.wrecked = true;
-    for (let i = 0; i < 3; i++) { const p = behindWall(at(Math.max(1.5, lineR - 0.4), (i - 1) * Math.min(3, lineR * 0.6))); posts.push({ kind: 'wall', ...p, y: 0, cover: 0.22, value: 2, cap: 1, wrecked: false, fire: 0 }); }
+    for (let i = 0; i < 3; i++) { const p = behindWall(at(Math.max(1.5, lineR - 0.4), (i - 1) * Math.min(3, lineR * 0.6))); posts.push({ kind: 'wall', ...p, y: stepHeight(wallKind, PERIMETER[wallKind as keyof typeof PERIMETER]?.height ?? 0), cover: 0.22, value: 2, cap: 1, wrecked: false, fire: 0 }); }
     for (const p of posts) if (!p.wrecked) p.view = viewOf(p);
     posts.sort((a, b) => rankOf(b) - rankOf(a));
     for (const f of R) if (!f.out) f.y = 0;   // across the old line: off the wall

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FIRE_SOLID, FireMap, HEAD, MUZZLE, PARTIAL_HIT, TORSO, fireBoxesOf, fireLine, lineOfFire, type Box } from './lineOfFire';
+import { FIRE_SOLID, FIRING_STEP, stepHeight, FireMap, HEAD, MUZZLE, PARTIAL_HIT, TORSO, fireBoxesOf, fireLine, lineOfFire, type Box } from './lineOfFire';
 import { newGame } from './state';
 import { planRun } from './perimeter';
 
@@ -89,5 +89,19 @@ describe('line of fire (the sim\'s question: can this shooter hit that target?)'
     }
     expect(n).toBeGreaterThan(20);
     expect(MUZZLE.stand).toBeGreaterThan(TORSO.stand);
+  });
+  it('a firing step is a per-wall-type property: palisade, stone and container walls have one, steel and concrete do not', () => {
+    for (const k of ['log_palisade', 'stone_wall', 'container_wall'] as const) expect(FIRING_STEP.has(k)).toBe(true);
+    for (const k of ['steel_wall', 'concrete_wall', 'earth_berm', 'chain_link'] as const) expect(FIRING_STEP.has(k)).toBe(false);
+    expect(stepHeight('container_wall', 0.43)).toBeGreaterThan(0.2); expect(stepHeight('concrete_wall', 0.58)).toBe(0);
+  });
+  it('a defender on the step fires over his wall; a raider on the ground outside still cannot hit through it', () => {
+    for (const [kind, h] of [['container_wall', 0.43], ['log_palisade', 0.5], ['stone_wall', 0.55]] as const) {
+      const m = new FireMap([wall(h)]), y = stepHeight(kind, h);
+      expect(fireLine(m, at(0, -0.4, y), at(0, 8))).toBe('clear');
+      const back = fireLine(m, at(0, 8), at(0, -0.4, y));
+      expect(back).not.toBe('clear');
+      expect(fireLine(m, at(0, 8), at(0, -3, 0))).toBe('blocked');   // and a defender standing in the yard is untouched
+    }
   });
 });
