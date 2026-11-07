@@ -110,7 +110,7 @@ export function decorateRaiders(b: Battle, style: CrewStyle, tactic: Tactic, nig
     return { ...u, ...(p ?? {}), look };
   });
   const events: BattleEvent[] = side.size ? b.events.map(e => {
-    const a = 'unit' in e ? side.get(e.unit) : undefined;
+    const a = 'unit' in e && e.unit ? side.get(e.unit) : undefined;
     if (!a) return e;
     if (e.kind === 'move' || e.kind === 'cover' || e.kind === 'snag') return { ...e, ...swing(e.x, e.z, cx, cz, a) };
     return e;

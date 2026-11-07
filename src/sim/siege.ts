@@ -140,6 +140,10 @@ export interface Scene {
   /** Who is drawn and how the scene is played (sim/raiderKinds.ts); absent on a scene from before. */
   style?: CrewStyle;
   tactic?: Tactic;
+  /** Battle seconds of a wake after the fight (sim/raidDrama.ts): the tail plays at least that long, in real time. Cosmetic: the game clock is untouched. */
+  wake?: number;
+  /** How the fight ended (the battle's own result): the tail's words and the poses at the end agree with it (sim/raidEnding.ts). */
+  ending?: 'repelled' | 'fled' | 'breached' | 'overrun';
 }
 
 export interface SiegePlan {
@@ -178,7 +182,7 @@ export function playbackLengths(sc: Scene): { lead: number; fight: number; tail:
   return {
     lead: sc.lead > 0 ? Math.min(9, Math.max(3, sc.lead / 22)) : 0,
     fight: sc.fight,
-    tail: sc.tail > 0 ? Math.min(6, Math.max(2, sc.tail / 18)) : 0,
+    tail: Math.max(sc.tail > 0 ? Math.min(6, Math.max(2, sc.tail / 18)) : 0, sc.wake ? sc.wake + 3 : 0),
   };
 }
 /** The card shown over a skipped gap, in playback seconds. */
@@ -401,6 +405,11 @@ export function sceneCaption(plan: SiegePlan, scene: Scene, part: 'lead' | 'tail
     }
   }
   if (plan.crew === 'break_in') return part === 'lead' ? pickOf(r, ['A step on the stairs. A beam of light under the door.', 'Glass crunches in the kitchen. Then silence. Then a drawer.']) : pickOf(r, ['The back door bangs. A car starts on the county road.', 'Quiet. Then the first thing you hear is your own heart.']);
+  // the tail agrees with how the fight ended (sim/raidEnding.ts): a crew that broke the line is inside, a beaten one is running or down
+  if (part === 'tail' && scene.ending && scene.kind === 'assault') {
+    if (scene.ending === 'breached' || scene.ending === 'overrun') return pickOf(r, ['They are inside the wire. The crew takes what it came for, and the family can only watch.', 'The line is gone. Men go through the house and the sheds with their rifles up.']);
+    if (scene.ending === 'fled') return pickOf(r, ['The crew is running for the road. Nobody on the wall relaxes.', 'Boots on gravel, going away. Somebody counts what is left.']);
+  }
   if (part === 'lead') {
     switch (scene.kind) {
       case 'gate': return pickOf(r, ['They stand at the gate and look at the house.', 'Boots on the gravel. Someone walks the fence line and tries the latch.']);

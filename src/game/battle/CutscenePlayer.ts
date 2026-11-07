@@ -189,6 +189,7 @@ export class CutscenePlayer {
       hour: hourAfter(plan, kind === 'gap' && c.offer == null ? loc.segment.game0 + loc.segment.gameLen : loc.game), game: loc.game, caption,
       gap: kind === 'gap' ? sceneCaption(plan, sc, 'gap', this.d.seed) : null,
       progress: Math.min(1, this._real / Math.max(1, plan.totalReal)),
+      wake: kind === 'tail' && !!sc.wake,
     });
   }
 }
