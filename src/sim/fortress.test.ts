@@ -130,7 +130,7 @@ describe('wall-top walkway', () => {
     // standing on the wall line (the ring is 12 units out), not floating over the yard
     for (const e of up) expect(Math.max(Math.abs((e as { x: number }).x), Math.abs((e as { z: number }).z))).toBeGreaterThan(10.5);
     const plain = planBattle(raidGame(false), 6, 3);
-    expect(plain.events.some(e => e.kind === 'move' && (e.y ?? 0) > 0.4)).toBe(false);
+    expect(plain.events.some(e => e.kind === 'move' && Math.abs((e.y ?? 0) - (PERIMETER.container_wall.height + 0.02)) < 1e-6)).toBe(false);   // (an upper-floor window is higher, but it is not the deck)
   });
 
   it('with a guard deck fewer crews get over the wall than without', () => {

@@ -429,7 +429,7 @@ export function resolveRansom(s: GameState, e: Encounter, stance: Stance): Outco
     return { title: 'Nobody came', text: `You stood at the gate until noon. The goods are gone, and so are they.${c.status !== 'held' ? ` Maybe they never had ${him} to give.` : ''}`, tone: 'bad', lines: lines.filter(Boolean) };
   }
   const n = Math.min(c.camp, 3 + Math.floor(r() * 4));
-  const b = planBattle(s, n, s.seed * 977 + day * 3 + 7, { armed: true, temper: c.temper });
+  const b = planBattle(s, n, s.seed * 977 + day * 3 + 7, { armed: true, temper: c.temper, kind: 'gang' });
   s.gate.battle = b;
   lines.push('A truck at first light. The tailgate drops — and there are men in the back with rifles.');
   lines.push(...applyBattle(s, b));

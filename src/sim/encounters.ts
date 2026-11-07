@@ -374,7 +374,7 @@ export function strengthOf(s: GameState, p: Posture = postureOf(s)): number {
 }
 
 /** What the battle sim is told about a crew: how they fight and how well they have learned this place. */
-const battleOpts = (e: Encounter, extra: { insideBreach?: boolean } = {}) => ({ armed: e.armed, temper: e.temper, organized: ORGANIZED.has(e.kind), ...(e.adapt ? { adapt: e.adapt } : {}), ...extra });
+const battleOpts = (e: Encounter, extra: { insideBreach?: boolean } = {}) => ({ armed: e.armed, temper: e.temper, kind: e.kind, organized: ORGANIZED.has(e.kind), ...(e.adapt ? { adapt: e.adapt } : {}), ...extra });
 
 /**
  * The threat matrix: who comes. Opportunists (looters) are put off by a
@@ -869,7 +869,7 @@ export function resolve(s: GameState, stance: Stance): Outcome {
         title = hurtNew > 0 ? `The fence held, but ${hurtNew} hurt` : 'The fence held'; text = `${help ? `${allies.map(a => a.name).join(' and ')} came over the ridge when they heard the shooting. ` : ''}${b.result === 'fled' ? 'They broke off and ran.' : 'None of them got past the fence.'}${hurtNew > 0 ? ` ${pluralize(hurtNew, 'person', 'people')} on the place ${hurtNew === 1 ? 'was' : 'were'} hurt in the fight.` : ''}`; tone = hurtNew > 0 ? 'mixed' : 'good';
         for (const n of allies) n.disposition = Math.min(100, n.disposition + 5);
         // word gets around: this place shoots back (more so if they left people on the drive)
-        const downed = (b.leftBehind?.wounded ?? 0) + (b.leftBehind?.dead ?? 0);
+        const downed = (b.leftBehind?.wounded ?? 0) + (b.leftBehind?.dead ?? 0) + (b.leftBehind?.surrendered ?? 0);
         g.respect = Math.min(1, (g.respect ?? 0) + 0.25 + 0.1 * downed);
         g.next = Math.max(g.next, e.day + Math.round(15 + 35 * g.respect));
       } else {

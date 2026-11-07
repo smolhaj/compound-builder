@@ -148,7 +148,8 @@ function Report() {
       {row('Hurt', r.wounded.length ? r.wounded.join(', ') : none)}
       {row('Lost from your supplies', r.lost.length ? r.lost.map(([k, n]) => `${n} ${k}`).join(', ') : 'nothing')}
       {(r.damage?.length ?? 0) > 0 && row('Broken', r.damage.join(', '), true)}
-      {row('Raiders on the drive', r.raidersWounded + r.raidersDead ? `${r.raidersWounded} wounded, ${r.raidersDead} dead` : 'none left')}
+      {(r.held?.length ?? 0) > 0 && row('Held at gunpoint', r.held!.join(', '))}
+      {row('Raiders on the drive', r.raidersWounded + r.raidersDead + (r.raidersSurrendered ?? 0) ? [(r.raidersSurrendered ?? 0) > 0 ? `${r.raidersSurrendered} surrendered` : '', r.raidersWounded > 0 ? `${r.raidersWounded} wounded` : '', r.raidersDead > 0 ? `${r.raidersDead} dead` : ''].filter(Boolean).join(', ') : 'none left')}
       <MoreLines rounds={r.rounds} lines={r.lines.filter(l => !/^Lost:|rounds fired\.$|more rounds went out/.test(l))} />
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
         <button style={{ ...btn, background: '#d8c9a0', color: '#1c1d18', border: 0, padding: '8px 16px', fontSize: 14 }} onClick={end}>{r.aftermath ? 'Check the drive' : 'Pick up the pieces'}</button>
