@@ -41,6 +41,20 @@ export function listText(items: readonly string[]): string {
   return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
 }
 
+/** How long something lasted, in the unit that reads right: "40 days", "18 months", "3 years" (never "1 year" for a year and a half). */
+export function spanText(days: number): string {
+  const d = Math.max(1, Math.round(days));
+  if (d < 90) return pluralize(d, 'day');
+  if (d < 730) return pluralize(Math.round(d / 30.4), 'month');
+  return pluralize(Math.floor(d / 365), 'year');
+}
+
+/** "a, b and c", and past `cap` items "a, b, c and 4 more" (a long order reads as a sentence, not a comma salad). */
+export function listCapped(items: readonly string[], cap = 3): string {
+  if (items.length <= cap) return listText(items);
+  return `${items.slice(0, cap).join(', ')} and ${items.length - cap} more`;
+}
+
 /**
  * How a material reads after a count: [one, many]. Only the ones whose store name is a plural, a mass of parts or an
  * acronym need an entry; the rest ("lumber", "concrete", "metal roofing") read the same either way.
@@ -59,6 +73,7 @@ export const MATERIAL_WORDS: Partial<Record<MaterialId, readonly [string, string
   logs: ['log', 'logs'],
   staples: ['bag of bulk staples', 'bags of bulk staples'],
   meds: ['medical kit', 'medical kits'],
+  ifak: ['first aid kit', 'first aid kits'],
   canned: ['case of canned food', 'cases of canned food'],
   cameras: ['security camera', 'security cameras'],
   radios: ['GMRS radio', 'GMRS radios'],

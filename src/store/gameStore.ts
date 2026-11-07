@@ -56,7 +56,7 @@ import { log } from '../sim/economy';
 import { opsecOf } from '../sim/opsec';
 import { hardenProblem, orderHarden, orderHardenAll, tierOf, type HardenId } from '../sim/hardening';
 import { saveGame, AUTOSAVE } from '../sim/save/saveSystem';
-import { decisionOpen, resumeSpeed } from '../sim/clockResume';
+import { decisionOpen, planningHold, resumeSpeed } from '../sim/clockResume';
 import { useFeelStore } from './feelStore';
 import { muteFeedback } from '../ui/feel/quiet';
 
@@ -112,6 +112,9 @@ export interface GameStore {
   game: GameState;
   /** Build tool: the kit piece being placed, 'fell' for marking trees (null = no tool). */
   tool: string | null;
+  /** The starter-compound proposal is open (set by its card): the clock holds while it is. Not saved. */
+  planOpen: boolean;
+  setPlanOpen: (on: boolean) => void;
   /** Placement feedback for the HUD (null = valid or no tool). */
   toolProblem: string | null;
   /** A one-line notice that fades by itself (a refused click: why). Not saved. */
@@ -314,6 +317,8 @@ const MAX_DT = 0.25;
 export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get) => ({
   game: newGame(1),
   tool: null,
+  planOpen: false,
+  setPlanOpen: (planOpen) => set({ planOpen }),
   toolProblem: null,
   toast: null,
   showToast: (text) => {
@@ -378,6 +383,7 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     // the title screen and the "where we left off" card hold the clock until they are answered
     const feel = useFeelStore.getState();
     if (feel.title || feel.recap) return;
+    if (planningHold(get().tool, get().planOpen)) return;   // drawing or placing, or the starter proposal is open: the clock waits (speed kept)
     if (get().cutscene || get().dayCard !== null || g.clock.speed === 0 || g.gate.pending || g.gate.aftermath || (g.ending && !g.ending.continued)) return;
     const days = Math.min(realDt, MAX_DT) / SECONDS_PER_DAY[g.clock.speed];
     const next = step(g, days);
@@ -388,7 +394,12 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     const hitNow = !!next.disaster.kind && g.clock.t < g.disaster.hitAt && next.clock.t >= next.disaster.hitAt && get().dayCardSeen !== next.disaster.hitAt;
     if (paused || hitNow) next.clock = { ...next.clock, speed: 0 };
     set({ game: next, ...(hitNow ? { dayCard: next.disaster.hitAt } : {}), ...(paused || hitNow ? { resumeTo: g.clock.speed } : {}), ...(next.gate.pending && !g.gate.pending ? { cutscene: promptFor(next), tool: null } : {}) });
-    if (dayIndex(next.clock.t) !== dayIndex(g.clock.t)) void saveGame(AUTOSAVE, next);
+    if (dayIndex(next.clock.t) !== dayIndex(g.clock.t)) {
+      void saveGame(AUTOSAVE, next);
+      // a project or a need has just become "stuck": its card is on the Build tab, and a one-line toast says so
+      const saidNow = Object.values(next.stalls ?? {}).filter(x => x.said).length;
+      if (saidNow > Object.values(g.stalls ?? {}).filter(x => x.said).length) { const line = next.disaster.news[next.disaster.news.length - 1]?.text; if (line) get().showToast(line); }
+    }
   },
   advance: (days) => set(s => { const game = step(s.game, days); return { game, cutscene: s.cutscene ?? promptFor(game) }; }),
   setSpeed: (speed) => locked() || (speed > 0 && wipeEnded(get().game)) ? undefined : set(s => ({ resumeTo: null, ...(speed > 0 ? { welcome: false } : {}), game: { ...s.game, clock: { ...s.game.clock, speed } } })),

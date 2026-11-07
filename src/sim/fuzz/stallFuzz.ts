@@ -6,7 +6,10 @@ import { DIFFICULTY, type Difficulty } from '../difficulty';
 import { SURPRISE_POOL, type DisasterKind } from '../disaster';
 import { waiters, missLines, stuckProject, STALL_DAYS } from '../stalls';
 import { orderCost, orderProblem, prices, onOrder } from '../economy';
-import { plansNeedLines } from '../guidance';
+import { plansNeedLines, suggestions } from '../guidance';
+import { logWait } from '../stalls';
+import { planStructure } from '../construction';
+import { applyForPermit } from '../paperwork';
 import { housingShortfall } from '../housing';
 import { crewQuote } from '../crews';
 import { isHome } from '../blueprints';
@@ -39,9 +42,20 @@ export function startFor(seed: number): { g: GameState; setup: string } {
 
 const DAYS = 400, STEP = 2, WAIT_LIMIT = 21, SHELTER_LIMIT = 200;
 
-export function fuzz(seed: number, days = DAYS): FuzzRun {
+export interface FuzzOpts {
+  /** Stake a log house by hand before the first day (the stall QA run 6 found): the passive player must be led to mark trees for logs. */
+  logHouse?: boolean;
+}
+
+export function fuzz(seed: number, days = DAYS, opts: FuzzOpts = {}): FuzzRun {
   const start = startFor(seed);
   let g = start.g;
+  if (opts.logHouse) {
+    const h = g.site.home;
+    const st = planStructure(g, 'log_house', (h.x0 + h.x1) / 2 - 6, (h.z0 + h.z1) / 2, 0);
+    applyForPermit(g, st);
+    g.money = Math.max(g.money, 250_000);
+  }
   const log: BotLog = { placed: 0, orders: 0, crews: 0 }, out: Violation[] = [];
   const waitSince: Record<string, number> = {}, seen = new Set<string>();
   const add = (kind: string, day: number, detail: string, key = kind) => { if (!seen.has(key)) { seen.add(key); out.push({ seed, kind, day, detail }); } };
@@ -59,6 +73,12 @@ export function fuzz(seed: number, days = DAYS): FuzzRun {
       if (waited > WAIT_LIMIT && canBuy) add('waits-with-cash', day, `${w.label} (${w.key}) waited ${Math.floor(waited)}d for ${JSON.stringify(lines)} with $${Math.round(g.money)}; pending ${JSON.stringify(onOrder(g))}`, `w:${w.key}`);
       if (waited > STALL_DAYS + 1 && canBuy && !stuckProject(g)) add('stuck-without-card', day, `${w.label} (${w.key}) waited ${Math.floor(waited)}d, buyable, no stuck card`, `c:${w.key}`);
     }
+    // a project waiting on a material that cannot be bought (logs): there must be a Next-steps card that says what to do, or marked trees that will cover it
+    { const lw = logWait(g);
+      if (lw) { waitSince['L:' + lw.key] ??= now; }
+      for (const k of Object.keys(waitSince)) if (k.startsWith('L:') && (!lw || k !== 'L:' + lw.key)) delete waitSince[k];
+      if (lw && now - waitSince['L:' + lw.key] > STALL_DAYS + 1 && lw.need > 0 && !suggestions(g, 12).some(x => x.id === 'logs')) add('unbuyable-without-card', day, `${lw.label} waits ${Math.floor(now - waitSince['L:' + lw.key])}d for ${lw.short} logs (not for sale), ${lw.queued} marked, no Next-steps card`, 'ub:' + lw.key);
+      if (lw && now - waitSince['L:' + lw.key] > 150) add('unbuyable-stall', day, `${lw.label} waits ${Math.floor(now - waitSince['L:' + lw.key])}d for ${lw.short} logs with ${lw.queued} marked`, 'us:' + lw.key); }
     // shelter: after SHELTER_LIMIT days, with the crew and the order affordable (plus a margin) for two weeks running, somebody is still outside
     const sh = housingShortfall(g), homes = g.structures.filter(st => isHome(st.kind) && !st.unplaced);
     const open = homes.filter(h => !isFinished(h));

@@ -54,6 +54,12 @@ export interface RaidReport {
 }
 
 const STOCK_LOSSES = ['fresh', 'frozen', 'canned', 'staples', 'fuel', 'meds', 'ifak'] as const;
+/** What a loss reads as after its count ("3 first aid kits", "1 can of fuel"): [one, many]. */
+const LOSS_WORDS: Record<(typeof STOCK_LOSSES)[number], readonly [string, string]> = {
+  fresh: ['basket of fresh food', 'baskets of fresh food'], frozen: ['bag of frozen food', 'bags of frozen food'],
+  canned: ['case of canned food', 'cases of canned food'], staples: ['bag of bulk staples', 'bags of bulk staples'],
+  fuel: ['can of fuel', 'cans of fuel'], meds: ['medical kit', 'medical kits'], ifak: ['first aid kit', 'first aid kits'],
+};
 
 /** Scenes already settled when the stance changes mid-siege (the ones played, and any cosmetic ones still to come). */
 interface Keep { prev: StagedRaid; played: number }
@@ -138,7 +144,7 @@ export function raidReport(before: GameState, after: GameState, outcome: Outcome
     else if (a.died == null && a.hurt.length > b.hurt.length) wounded.push(p.first);
   });
   const lost: Array<[string, number]> = [];
-  for (const k of STOCK_LOSSES) { const d = Math.floor((before.stock[k] ?? 0) - (after.stock[k] ?? 0)); if (d > 0) lost.push([k, d]); }
+  for (const k of STOCK_LOSSES) { const d = Math.floor((before.stock[k] ?? 0) - (after.stock[k] ?? 0)); if (d > 0) lost.push([LOSS_WORDS[k][d === 1 ? 0 : 1], d]); }
   const am = after.gate.aftermath;
   const b = after.gate.battle;
   const rounds = (b ? b.events.filter(e => e.kind === 'shot' && e.from.startsWith('h_')).length : 0) + extraRounds;

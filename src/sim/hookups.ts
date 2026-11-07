@@ -171,3 +171,7 @@ export function hookupTone(s: GameState, todo: ReadonlyArray<{ id: string; kind:
   const otherWired = s.structures.some(st => st.id !== first.id && isHome(st.kind) && isFinished(st) && !todo.some(x => x.id === st.id && x.kind === 'wire') && serviceOf(s, p, st.id).wired);
   return { optional: powerOnPlace(s) && otherWired };
 }
+
+/** The button for a hookup's drawing tool, in plain words ("Lay the power cable", "Lay the water pipe"). */
+export const drawLabel = (tool: string | null | undefined): string =>
+  tool === 'fence:power_cable' ? 'Lay the power cable' : tool === 'fence:water_pipe' ? 'Lay the water pipe' : 'Draw it on the map';

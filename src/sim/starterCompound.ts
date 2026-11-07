@@ -10,7 +10,7 @@
 import { CELL, KIT, footprint, snapCenter, type SiteQuery } from '../game/buildkit/kit';
 import { siteProblem } from '../game/buildkit/underground';
 import { padClash } from '../game/buildkit/padRules';
-import { HOME_BEDS, isHome, totalBill } from './blueprints';
+import { BLUEPRINTS, HOME_BEDS, isHome, totalBill } from './blueprints';
 import { blueprintOf } from './construction';
 import { stampGrade } from './slope';
 import { stampStyle } from './housingStyles';
@@ -25,6 +25,7 @@ import { mulberry32 } from './rng';
 import type { Rect } from './land';
 import type { GameState, Structure } from './state';
 import { pluralize } from './words';
+import { logSupply } from './forestry';
 import { lengthText } from './units';
 
 export type StarterRole = 'shelter' | 'water' | 'power' | 'sanitation' | 'food' | 'defense';
@@ -73,6 +74,8 @@ export interface StarterOpts {
   geo: PropertyGeometry;
   /** Piece keys the player dropped from the proposal ("yard" drops the fence). */
   skip?: readonly string[];
+  /** The standing trees on the land that could be felled (kind and size). A log house is proposed only when these, the yard and the marked trees add up to its logs; omitted: none are known. */
+  trees?: ReadonlyArray<{ kind: 'conifer' | 'oval' | 'broad'; scale: number }>;
 }
 
 /** The reason a piece has no spot (it is not a cash matter). */
@@ -112,13 +115,17 @@ function gradeOver(h: SiteQuery['height'], fp: Rect): number {
 }
 
 /** The smallest home that gives the missing beds, or two of the biggest when the family is large. */
-export function homeKinds(missing: number): string[] {
+export function homeKinds(missing: number, logs = true): string[] {
   if (missing <= 0) return [];
-  const opts = ['cottage', 'timber_cabin', 'log_house'];
+  const opts = logs ? ['cottage', 'timber_cabin', 'log_house'] : ['cottage', 'timber_cabin'];
   const fit = opts.find(k => HOME_BEDS[k] >= missing);
   if (fit) return [fit];
-  return ['log_house', ...homeKinds(missing - HOME_BEDS.log_house)];
+  const big = opts[opts.length - 1];
+  return [big, ...homeKinds(missing - HOME_BEDS[big], logs)];
 }
+
+/** Saw logs a kind's blueprint takes (logs cannot be bought: they come from the family's own trees). */
+export const logsFor = (kind: string): number => (BLUEPRINTS[kind] ? totalBill(BLUEPRINTS[kind]).logs ?? 0 : 0);
 
 const WATER = ['well_hand', 'well_drilled', 'cistern', 'water_tower'];
 const POWER = ['solar_array', 'solar_farm', 'garage_solar', 'lodge_solar', 'generator_shed', 'battery_shed', 'battery_bank', 'micro_hydro', 'wind_turbine'];
@@ -203,7 +210,8 @@ export function planStarter(s: GameState, o: StarterOpts): StarterPlan {
 
   // 1. the home: beds for everyone, counting homes already staked
   const people = s.people.length, beds = standing.reduce((a, st) => a + (HOME_BEDS[st.kind] ?? 0), 0);
-  const homes = homeKinds(people - beds);
+  const logsOk = logSupply(s, o.trees ?? []) >= logsFor('log_house') * 1.15;   // (a little to spare: a tree is a handful of logs)
+  const homes = homeKinds(people - beds, logsOk);
   homes.forEach((kind, i) => {
     const key = i === 0 ? 'home' : `home${i + 1}`;
     const c = i === 0 ? (spots.get('home') ?? { x: camp[0], z: camp[1] }) : spots.get('home')!;

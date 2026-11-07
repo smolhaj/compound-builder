@@ -31,7 +31,7 @@ import { onOrder, orderCost, orderProblem, prices } from '../sim/economy';
 import { holdReason, isFinished } from '../sim/construction';
 import { REGIONS } from '../sim/regions';
 import { keeping, KEPT } from '../sim/shelf';
-import { CONDITION, pharmacyOpen } from '../sim/body';
+import { CONDITION, pharmacyOpen, rxDaysOf } from '../sim/body';
 import { netWorth } from '../sim/finance';
 import { campNeed, trialCamps } from '../sim/trial';
 import { JUG_L, orderTanker } from '../sim/water';
@@ -81,6 +81,8 @@ import { ToolsPanel } from './ToolsPanel';
 import { pluralize } from '../sim/words';
 import { Clamp, Group, Hint, Note, Row, Section, Tabs } from './hud/common';
 import { DIM, FS, LINE, TONE, btn, panel, usd, type Tone } from './hud/style';
+import { planningHold } from '../sim/clockResume';
+import { runOver } from '../sim/wipe';
 import { BuildMenu } from './hud/BuildMenu';
 import { ProjectsTab } from './hud/ProjectsTab';
 import { DefenseTab } from './hud/DefenseTab';
@@ -209,6 +211,7 @@ export function Hud() {
         <span style={{ display: 'flex', gap: 3 }}>
           {SPEEDS.map(([s, label]) => <button key={s} style={btn(game.clock.speed === s)} onClick={() => g.setSpeed(s)}>{label}</button>)}
         </span>
+        {game.clock.speed > 0 && planningHold(g.tool, g.planOpen) && <span data-testid="planning-hint" style={{ position: 'absolute', top: 'calc(100% + 4px)', left: '50%', transform: 'translateX(-50%)', color: '#e8e0c8', background: 'rgba(20,22,18,0.8)', borderRadius: 4, padding: '1px 8px', fontSize: 12, whiteSpace: 'nowrap', pointerEvents: 'none' }} title="The clock holds while you place or draw something, or look over the starter plan. It picks up at the same speed when you put the tool away.">Paused while planning</span>}
       </div>
 
       {/* Left: build menu (groups) · projects under way · the log */}
@@ -265,7 +268,7 @@ export function Hud() {
                 {n && n.died == null && game.disaster.difficulty === 'cozy' && starveWarning(p.first, n.starved ?? 0) && <Note tone="bad">{starveWarning(p.first, n.starved ?? 0)}.</Note>}
                 <PersonInsight p={p} />
                 {n && n.died == null && (p.conditions?.length ?? 0) > 0 && (() => {
-                  const days = Math.floor(game.body.rx[p.id] ?? 30);
+                  const days = rxDaysOf(game, p);
                   return <div style={{ fontSize: 11, color: days < 14 ? TONE.bad : days < 45 ? TONE.warn : DIM, marginTop: 2 }}>{p.conditions!.map(c => CONDITION[c].name).join(', ')}: {days > 0 ? `${pluralize(days, 'day')} of ${p.conditions!.map(c => CONDITION[c].rx).join(' and ')}` : 'out of medicine'}</div>;
                 })()}
               </div>;
@@ -277,9 +280,9 @@ export function Hud() {
             <HousingPanel />
             <QuartersPanel />
             <PeopleSection />
-            <MedicalSection />
+            {!runOver(game) && <MedicalSection />}
             <ClassesSection />
-            <DailySection />
+            {!runOver(game) && <DailySection />}
             {trialCamps(game).map(c => <Section key={c.id} title={`Camp outside the wall: ${c.title}`}>
               <Row label="On trial" value={`day ${Math.max(0, dayIndex(game.clock.t) - c.from)} of ${c.until - c.from}`} />
               <Row label="People" value={c.people.map(p => `${p.first}${p.kid ? ` (${p.age})` : ''}`).join(', ')} />
@@ -288,7 +291,7 @@ export function Hud() {
               {c.learned.map((l, k) => <Note key={k} tone="warn">{l}</Note>)}
               {!c.learned.length && <div style={{ fontSize: 11, color: DIM }}>Not family yet. You'll know them better by the end of the month.</div>}
             </Section>)}
-            {game.people.some(p => p.conditions?.length) && <Section title="Medicine & household">
+            {!runOver(game) && game.people.some(p => p.conditions?.length) && <Section title="Medicine & household">
               {pharmacyOpen(game) ? <button style={{ ...btn(), width: '100%' }} title="Fill everyone's prescriptions three months beyond the current month (as far ahead as insurance covers)" onClick={() => g.stockUpRx()}>Fill prescriptions 90 days ahead</button>
                 : <Note tone="warn">The pharmacy is shut: what's on hand is all there is.</Note>}
               <Row label="Hygiene supplies" value={game.disaster.tracks.stores >= 0.5 ? `bought with groceries · ${Math.floor(game.stock.hygiene)} on hand` : `${Math.floor(game.stock.hygiene)} person-months left`} />

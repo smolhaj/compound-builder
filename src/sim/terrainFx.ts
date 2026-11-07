@@ -292,7 +292,7 @@ export const boreSite = boreOf;
 
 /** Plain words for a bore's numbers: "190 m at 14 %, 12 m of rock over it at the deepest". */
 export function boreText(b: BoreStats): string {
-  return `${lengthText(b.lenU * 6)} at ${Math.round(b.grade * 100)}%, ${lengthText(b.peakCover * 6)} of rock over the crown at the deepest${b.openA + b.openB > 0.3 ? `, with a cutting of ${Math.round(Math.max(b.openA, b.openB) * 6)} m at one end` : ''}`;
+  return `${lengthText(b.lenU * 6)} at ${Math.round(b.grade * 100)}%, ${lengthText(b.peakCover * 6)} of rock over the crown at the deepest${b.openA + b.openB > 0.3 ? `, with a cutting of ${lengthText(Math.max(b.openA, b.openB) * 6)} at one end` : ''}`;
 }
 export const BORE_CROWN_M = BORE.CROWN * 6;
 

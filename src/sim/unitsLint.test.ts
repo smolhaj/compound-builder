@@ -26,8 +26,35 @@ const ALLOW: Array<{ re: RegExp; why: string }> = [
   { re: /^[`'"][^`'"]*\bl-?\d+ -?\d+[^`'"]*[`'"]$/, why: 'SVG path data' },
 ];
 
+/** The string literals of a line; a template literal is taken whole, its `${...}` placeholders (and any template inside them) included. */
 function literals(line: string): string[] {
-  return line.match(/'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`/g) ?? [];
+  const out: string[] = [];
+  const tpl = (i: number): number => {   // i at an opening backtick; returns the index just past its closing one
+    let j = i + 1;
+    while (j < line.length && line[j] !== '`') {
+      if (line[j] === '\\') { j += 2; continue; }
+      if (line.startsWith('${', j)) {
+        let d = 0; j++;
+        for (; j < line.length; j++) {
+          if (line[j] === '`') { j = tpl(j) - 1; continue; }
+          if (line[j] === '{') d++; else if (line[j] === '}' && --d === 0) break;
+        }
+      }
+      j++;
+    }
+    return j + 1;
+  };
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '/' && line[i + 1] === '/') break;   // a trailing comment
+    if (c === '`') { const e = tpl(i); out.push(line.slice(i, e)); i = e - 1; }
+    else if (c === "'" || c === '"') {
+      let j = i + 1;
+      while (j < line.length && line[j] !== c) j += line[j] === '\\' ? 2 : 1;
+      out.push(line.slice(i, j + 1)); i = j;
+    }
+  }
+  return out;
 }
 
 /** Placeholders `${...}` (with nested braces) collapsed to §. */
@@ -43,11 +70,25 @@ function mask(lit: string): string {
   return out;
 }
 
+/** String literals written inside the `${...}` placeholders of a template ("${ok ? ` water at ${d} m` : ''}"): mask() hides them, so scan them on their own. */
+function nestedLiterals(lit: string): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < lit.length; i++) {
+    if (!lit.startsWith('${', i)) continue;
+    let d = 0, j = i + 1;
+    for (; j < lit.length; j++) { if (lit[j] === '{') d++; else if (lit[j] === '}' && --d === 0) break; }
+    const inner = lit.slice(i + 2, j);
+    for (const l of literals(inner)) { out.push(l, ...nestedLiterals(l)); }
+    i = j;
+  }
+  return out;
+}
+
 export function metricHits(src: string): Array<{ line: number; text: string }> {
   const hits: Array<{ line: number; text: string }> = [];
   src.split('\n').forEach((ln, i) => {
     if (/^\s*(\/\/|\*|\/\*)/.test(ln)) return;
-    for (const lit of literals(ln)) {
+    for (const lit of literals(ln).flatMap(l => [l, ...nestedLiterals(l)])) {
       const m = mask(lit);
       if ((NUM_UNIT.test(m) || WORDS.test(m)) && !ALLOW.some(a => a.re.test(lit) || a.re.test(m))) { hits.push({ line: i + 1, text: lit.slice(0, 120) }); break; }
     }
@@ -68,6 +109,7 @@ describe('no metric units in player-facing text', () => {
     expect(metricHits("const a = '12 liters';").length).toBe(1);
     expect(metricHits('<b>{len} m</b>').length).toBe(1);
     expect(metricHits("const a = '30 ft and 2 gal and 40 lb and 72°F';").length).toBe(0);
+    expect(metricHits("const a = `x ${ok ? ` water at ${d} m` : ''}`;").length).toBe(1);   // (QA run 6: the nested template hid it)
     expect(metricHits("const a = 'ammo:9mm';").length).toBe(0);
     expect(metricHits("const a = 'M10 5 l-3 4 z';").length).toBe(0);
   });

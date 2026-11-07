@@ -11,6 +11,11 @@ describe('hud layout', () => {
     const l = hudLayout(1280, 760, 40);
     expect(l.panelTop).toBeGreaterThanOrEqual(10 + 40);
   });
+  it('a centered bar that reaches the right panel (664 px at 1280, the QA run 6 overlap) drops the panels below it', () => {
+    const l = hudLayout(1280, 664, 40);
+    expect(l.panelTop).toBeGreaterThanOrEqual(10 + 40);
+    expect(hudLayout(1280, 580, 40).panelTop).toBe(10);
+  });
   it('shows one panel at a time at phone widths, under the bar and the switch', () => {
     const l = hudLayout(420, 400, 90, { w: 400, h: 70 }, { w: 400, h: 110 });
     expect(l.narrow).toBe(true);

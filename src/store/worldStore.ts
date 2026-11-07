@@ -93,7 +93,7 @@ export interface WorldState {
   hudHidden: boolean;
   setHudHidden: (on: boolean) => void;
   /** Marks the n nearest trees to the yard for felling (set by the canvas; returns how many were marked). */
-  markNearestTrees: ((n: number) => number) | null;
+  markNearestTrees: ((n: number, logs?: number) => number) | null;
   /** What the placement rules ask of the ground (height, owned, water, camp and road): the starter-compound planner reads it. Set by the canvas. */
   siteQuery: SiteQuery | null;
   setSiteQuery: (q: SiteQuery | null) => void;
@@ -107,7 +107,7 @@ export interface WorldState {
   /** The starter compound shown as a ghost preview (null: none). */
   starterPreview: StarterPlan | null;
   setStarterPreview: (p: StarterPlan | null) => void;
-  setMarkNearestTrees: (f: ((n: number) => number) | null) => void;
+  setMarkNearestTrees: (f: ((n: number, logs?: number) => number) | null) => void;
   setSightMode: (m: WorldState['sightMode']) => void;
   setBuildingView: (v: BuildingView) => void;
   /** Cinematic tour caption card (null = none). */

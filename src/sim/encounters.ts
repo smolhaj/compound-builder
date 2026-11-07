@@ -834,11 +834,14 @@ export function resolve(s: GameState, stance: Stance): Outcome {
       if (via) { const run = s.perimeter.find(x => x.id === via.runId); if (run) run.revealed = true; }
       g.battle = b;
       const stockBefore = stockTotal(s);
+      const hurtBefore = new Set(s.personState.filter(ps => ps.needs.died == null && ps.needs.hurt.length > 0).map(ps => ps.id));
       const battleLines = applyBattle(s, b);
       lines.push(...battleLines);
       recordBattle(s, b, e.size, e.temper);
       if (b.result === 'repelled' || b.result === 'fled') {
-        title = 'The line held'; text = `${help ? `${allies.map(a => a.name).join(' and ')} came over the ridge when they heard the shooting. ` : ''}${b.result === 'fled' ? 'They broke off and ran.' : 'None of them got past the line.'}`; tone = 'good';
+        // honest about the cost: the fence held, but not everyone on the place walked away whole
+        const hurtNew = s.personState.filter(ps => ps.needs.died == null && ps.needs.hurt.length > 0 && !hurtBefore.has(ps.id)).length;
+        title = hurtNew > 0 ? `The fence held, but ${hurtNew} hurt` : 'The fence held'; text = `${help ? `${allies.map(a => a.name).join(' and ')} came over the ridge when they heard the shooting. ` : ''}${b.result === 'fled' ? 'They broke off and ran.' : 'None of them got past the fence.'}${hurtNew > 0 ? ` ${pluralize(hurtNew, 'person', 'people')} on the place ${hurtNew === 1 ? 'was' : 'were'} hurt in the fight.` : ''}`; tone = hurtNew > 0 ? 'mixed' : 'good';
         for (const n of allies) n.disposition = Math.min(100, n.disposition + 5);
         // word gets around: this place shoots back (more so if they left people on the drive)
         const downed = (b.leftBehind?.wounded ?? 0) + (b.leftBehind?.dead ?? 0);

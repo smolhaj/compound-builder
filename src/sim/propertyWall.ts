@@ -365,6 +365,6 @@ export function layPropertyWall(s: GameState, plan: WallPlan, geo: PropertyGeome
   for (const r of plan.runs) { const run = planRun(s, r.kind, r.pts.map(p => [p[0], p[1]] as Pt), r.gates.map(g => ({ ...g })), 0, true); if (r.look) run.look = r.look; }
   // a wall already standing across the drive gets its gate too
   cutRoadGates(s, geo.drive);
-  if (plan.runs.length) log(s, `Laid out the property wall: ${lengthText(plan.wallM)} of ${PERIMETER[plan.kind].name.toLowerCase()}${plan.barsM ? `, ${plan.barsM} m of creek bars` : ''}${plan.gates ? ', a gate on the road' : ''}.`);
+  if (plan.runs.length) log(s, `Laid out the property wall: ${lengthText(plan.wallM)} of ${PERIMETER[plan.kind].name.toLowerCase()}${plan.barsM ? `, ${lengthText(plan.barsM)} of creek bars` : ''}${plan.gates ? ', a gate on the road' : ''}.`);
   return plan.runs.length;
 }
