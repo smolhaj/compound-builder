@@ -45,8 +45,8 @@ export function ToastLine() {
 export function WelcomeCard() {
   const on = useGameStore(g => g.welcome), setWelcome = useGameStore(g => g.setWelcome), setSpeed = useGameStore(g => g.setSpeed);
   if (!on) return null;
-  return <div data-testid="welcome" style={{ ...panel, position: 'fixed', left: '50%', top: 62, transform: 'translateX(-50%)', zIndex: 15, display: 'flex', gap: 10, alignItems: 'center', border: '1px solid #b9a36a', maxWidth: 'min(560px, calc(100vw - 40px))' }}>
-    <span>Welcome. The clock is paused: look around, then work down the <b>Get operational</b> list on the left. Press play when you are ready.</span>
+  return <div data-testid="welcome" style={{ ...panel, position: 'fixed', left: '50%', ...(typeof window !== 'undefined' && window.innerWidth < 800 ? { bottom: 70 } : { top: 62 }), transform: 'translateX(-50%)', zIndex: 15, display: 'flex', gap: 10, alignItems: 'center', border: '1px solid #b9a36a', maxWidth: 'min(560px, calc(100vw - 40px))' }}>
+    <span>Welcome. The clock is paused: look around, then follow the <b>Get operational</b> goals on the left, one at a time. Press play when you are ready.</span>
     <button style={{ cursor: 'pointer' }} onClick={() => setSpeed(1)}>Start</button>
     <button style={{ cursor: 'pointer' }} title="Close this and keep the clock paused" onClick={() => setWelcome(false)}>×</button>
   </div>;

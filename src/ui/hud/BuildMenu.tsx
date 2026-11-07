@@ -27,7 +27,10 @@ import { hireCaretaker, openMoveIn, setBelt } from '../../sim/weekender';
 import { inFirstHour } from '../../sim/tabReveal';
 import { Clamp, Group, Hint, Item, Note, Tick } from './common';
 import { btn, card, DIM, FS, miniBtn, TONE, usd } from './style';
-import { OP_COVERED, operational, operationalCount } from '../../sim/operational';
+import { OP_COVERED, operational } from '../../sim/operational';
+import { firstHour } from '../../sim/firstHour';
+import { GoalsCard } from '../feel/GoalsCard';
+import { useFeelStore } from '../../store/feelStore';
 import { StarterCompound } from './StarterCompound';
 import { starterWanted } from '../../sim/starterCompound';
 import { WallProperty } from './WallProperty';
@@ -55,6 +58,9 @@ const toBuy = (bill: Partial<Record<MaterialId, number>>) => Object.entries(bill
 const ownNeeds = (kind: string) => billText(Object.fromEntries(Object.entries(totalBill(BLUEPRINTS[kind])).filter(([m]) => MATERIALS[m as MaterialId].price === null)));
 const costOf = (kind: string) => orderCost(toBuy(totalBill(BLUEPRINTS[kind])));
 
+/** While the first-hour goals card is up, a Next-steps card shows only at or above this urgency. */
+const GUIDED_URGENT = 90;
+
 export function BuildMenu({ showProjects = () => undefined }: { showProjects?: () => void }) {
   const g = useGameStore();
   const markTrees = useWorldStore(w => w.markNearestTrees);
@@ -63,9 +69,14 @@ export function BuildMenu({ showProjects = () => undefined }: { showProjects?: (
   const game = g.game;
   const shelters = game.structures.filter(s => s.finishedAt !== null).reduce((a, s) => a + (KIT[s.kind]?.shelters ?? 0), 0);
   const arm = (tool: string) => g.setTool(g.tool === tool ? null : tool);
-  const ops = operational(game, useWorldStore(w => w.siteGeo)?.drive), opn = operationalCount(ops);
+  const siteDrive = useWorldStore(w => w.siteGeo)?.drive;
+  const ops = operational(game, siteDrive);
+  const goalMem = useFeelStore(f => f.goalMem), closed = useFeelStore(f => f.goalsClosed);
+  const fh = firstHour(game, siteDrive, goalMem);
   // the checklist covers shelter, water, power and food; the next steps are what else is pressing
-  const sug = suggestions(game, 3, OP_COVERED);
+  const guidedOpen = closed === null && !fh.complete && fh.goals.length > 0;
+  // while the goals card is up it is the one list: only what cannot wait (a stuck project, a lost roof, logs) shows below it
+  const sug = suggestions(game, 3, guidedOpen ? new Set([...OP_COVERED, 'house_crew', 'road_pile']) : OP_COVERED).filter(x => !guidedOpen || x.urgency >= GUIDED_URGENT || x.tone === 'alarm');
   const drive = useWorldStore(w => w.siteGeo)?.drive;
   const goals = longTerm(game, drive);
   const bunker = bunkerChecklist(game);
@@ -130,16 +141,13 @@ export function BuildMenu({ showProjects = () => undefined }: { showProjects?: (
       <div style={{ fontSize: FS.h, textTransform: 'uppercase', letterSpacing: 0.6, color: DIM, fontWeight: 600 }}>The place is held</div>
       <Note tone="warn">{foster.text}</Note>
     </div>}
-    {!g.tool && !foster && <div style={card(opn.done < opn.total)}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }} title="What a place needs to run: a suggestion list, nothing is locked">
-        <span style={{ fontSize: FS.h, textTransform: 'uppercase', letterSpacing: 0.6, color: DIM, fontWeight: 600 }}>Get operational</span>
-        <span style={{ color: opn.done === opn.total ? '#a8d080' : DIM, fontWeight: 600 }}>{opn.done === opn.total ? 'Operational' : `${opn.done} of ${opn.total}`}</span>
-      </div>
-      {ops.map(o => <Tick key={o.id} done={o.done} label={o.label} line={o.line}
-        act={o.act ? { label: o.act.label, run: () => run(o.act!.act), off: o.act.act.type === 'order' ? (orderProblem(g.game, o.act.act.lines) ? 'Cannot order that now' : null) : null } : undefined} />)}
-      {note && <Note>{note}</Note>}
-      {guardNode}
-      <StarterCompound wanted={starterWanted(game)} first={!game.structures.some(s => !s.unplaced)} />
+    {!g.tool && !foster && <div style={card(!fh.complete && closed === null)}>
+      <GoalsCard fh={fh} run={run} ticks={ops.map(o => <Tick key={o.id} done={o.done} label={o.label} line={o.line}
+        act={o.act ? { label: o.act.label, run: () => run(o.act!.act), off: o.act.act.type === 'order' ? (orderProblem(g.game, o.act.act.lines) ? 'Cannot order that now' : null) : null } : undefined} />)}>
+        {note && <Note>{note}</Note>}
+        {guardNode}
+        <StarterCompound wanted={starterWanted(game)} first={!game.structures.some(s => !s.unplaced)} guided={closed === null && !fh.complete && fh.goals.length > 0} />
+      </GoalsCard>
     </div>}
     {sug.length > 0 && !g.tool && <div style={card()}>
       <div style={{ fontSize: FS.h, textTransform: 'uppercase', letterSpacing: 0.6, color: DIM, fontWeight: 600 }} title="Suggestions from what the place lacks; nothing is locked">Next steps</div>
@@ -154,7 +162,7 @@ export function BuildMenu({ showProjects = () => undefined }: { showProjects?: (
         </div>}
       </div>)}
     </div>}
-    <Group id="longterm" title="Long-term goals" defaultOpen={inFirstHour(game)} extra={goals.map(x => `${x.steps.filter(y => y.done).length}/${x.steps.length}`).join(' · ')}>
+    <Group id="longterm" title="Long-term goals" defaultOpen={inFirstHour(game) && !guidedOpen} extra={goals.map(x => `${x.steps.filter(y => y.done).length}/${x.steps.length}`).join(' · ')}>
       {goals.map(goal => {
         const done = goal.steps.filter(x => x.done).length;
         return <div key={goal.id} style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '5px 8px', marginBottom: 4 }}>

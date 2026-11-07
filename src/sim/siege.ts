@@ -30,6 +30,7 @@ import { ORGANIZED, type Encounter, type EncounterKind, type Stance } from './en
 import { isFinished } from './construction';
 import { isHome } from './blueprints';
 import { mulberry32 } from './rng';
+import { crewStyle, sceneStyle, sceneTactic, styleCaption, type CrewStyle, type Tactic } from './raiderKinds';
 import { dayIndex, hourOf, type GameState } from './state';
 import { pluralize } from './words';
 
@@ -136,6 +137,9 @@ export interface Scene {
   fight: number;
   /** Game seconds of the lull after, time-lapsed. */
   tail: number;
+  /** Who is drawn and how the scene is played (sim/raiderKinds.ts); absent on a scene from before. */
+  style?: CrewStyle;
+  tactic?: Tactic;
 }
 
 export interface SiegePlan {
@@ -149,6 +153,8 @@ export interface SiegePlan {
   totalGame: number;
   /** Playback seconds if nothing is skipped (gaps shown as a 3-second card each). */
   totalReal: number;
+  /** The crew's style (null: the dead, or a plan from before). */
+  style?: CrewStyle | null;
 }
 
 export interface SiegeInput {
@@ -163,6 +169,8 @@ export interface SiegeInput {
   fightSeconds: number | null;
   /** Hunted for the family in the dark (organized crews with a taste for it); default from kind. */
   organized?: boolean;
+  /** Whether the crew is armed (decides families vs opportunists). */
+  armed?: boolean;
 }
 
 /** How long a scene's lead-in, fight and tail take in the playback (real seconds). */
@@ -201,6 +209,7 @@ export function planSiege(inp: SiegeInput): SiegePlan {
   const night = isNight(inp.hour);
   const organized = inp.organized ?? ORGANIZED.has(inp.kind);
   const rabble = !organized && inp.size < 5;
+  const crew = crewStyle(inp.kind, inp.size, inp.temper, inp.armed ?? true, inp.seed);
   const leadOf = () => (rabble ? 25 + r() * 80 : organized ? 110 + r() * 190 : 55 + r() * 130);
   const tailOf = () => 35 + r() * 85;
   const scenes: Scene[] = [];
@@ -211,7 +220,8 @@ export function planSiege(inp: SiegeInput): SiegePlan {
     const total0 = lead + fight + tail, cap = house ? 240 : 480;
     if (total0 < 120) lead += 120 - total0;
     else if (total0 > cap) { const cut = Math.min(total0 - cap, lead + tail - 40); const k = (lead + tail - cut) / (lead + tail); lead *= k; tail *= k; }
-    return { index: scenes.length, kind, label: SCENE_LABEL[kind], gap: Math.round(gap), lead: Math.round(lead), fight: Math.round(fight), tail: Math.round(tail) };
+    const base = { index: scenes.length, kind, label: SCENE_LABEL[kind], gap: Math.round(gap), lead: Math.round(lead), fight: Math.round(fight), tail: Math.round(tail) };
+    return crew ? { ...base, style: sceneStyle(crew, kind), tactic: sceneTactic(crew, kind, inp.seed * 31 + scenes.length) } : base;
   };
   const finalFight = Math.max(20, Math.round(inp.fightSeconds ?? 45 + r() * 60));
   const siege = inp.fought && r() < siegeChance(inp.kind, inp.size, night, inp.temper);
@@ -238,15 +248,15 @@ export function planSiege(inp: SiegeInput): SiegePlan {
       for (const sc of scenes) if (sc.gap > 0) sc.gap = Math.max(600, Math.round(sc.gap * k));
     }
   }
-  return finishPlan(inp.kind, inp.hour, scenes);
+  return finishPlan(inp.kind, inp.hour, scenes, crew);
 }
 
 /** Totals for a list of scenes (also used to splice a plan after a mid-siege change of stance). */
-export function finishPlan(crew: EncounterKind, startHour: number, list: Scene[]): SiegePlan {
+export function finishPlan(crew: EncounterKind, startHour: number, list: Scene[], style?: CrewStyle | null): SiegePlan {
   const scenes = list.map((sc, i) => ({ ...sc, index: i, gap: i === 0 ? 0 : sc.gap }));
   const totalGame = scenes.reduce((a, sc) => a + sc.gap + sceneGame(sc), 0);
   const totalReal = scenes.reduce((a, sc) => { const p = playbackLengths(sc); return a + (sc.gap > 0 ? GAP_CARD_SECONDS : 0) + p.lead + p.fight + p.tail; }, 0);
-  return { scenes, crew, startHour, night: isNight(startHour), totalGame, totalReal };
+  return { scenes, crew, startHour, night: isNight(startHour), totalGame, totalReal, ...(style !== undefined ? { style } : {}) };
 }
 
 /**
@@ -363,10 +373,33 @@ export function promptNarration(s: GameState, e: Pick<Encounter, 'kind' | 'size'
 }
 
 /** Captions for the time-lapsed lead-in and tail of a scene. */
-export function sceneCaption(plan: SiegePlan, scene: Scene, part: 'lead' | 'tail' | 'gap', seed: number): string {
-  const r = mulberry32(seed * 53 + scene.index * 7 + (part === 'lead' ? 1 : part === 'tail' ? 2 : 3));
-  const night = isNight(hourAfter(plan, 0));
+export function sceneCaption(plan: SiegePlan, scene: Scene, part: 'lead' | 'tail' | 'gap' | 'fight', seed: number): string {
+  const r = mulberry32(seed * 53 + scene.index * 7 + (part === 'lead' ? 1 : part === 'tail' ? 2 : part === 'fight' ? 4 : 3));
   if (part === 'gap') return gapLabel(scene.gap);
+  // (dark or light by the hour the part is on screen at, not the hour the raid began: a siege that starts at 3 AM ends in daylight)
+  const seg = segments(plan).find(sg => sg.scene === scene.index && sg.kind === part);
+  const night = isNight(hourAfter(plan, seg ? seg.game0 + seg.gameLen / 2 : 0));
+  if (plan.crew !== 'break_in' && scene.style) {
+    const sl = styleCaption(scene.style, scene.tactic ?? 'rushing', part, night, seed * 53 + scene.index);
+    if (sl) return sl;
+  }
+  if (part === 'fight') {
+    // (the one line under the picture while nobody in the fight is speaking)
+    if (plan.crew === 'break_in') return pickOf(r, ['Boots in the hall. A flashlight beam swings across the ceiling.', 'Somebody is shouting downstairs, and nobody is answering.']);
+    switch (scene.kind) {
+      case 'gate': return pickOf(r, ['They call up to the house, rifles low, waiting to see who answers.', 'Words at the gate, carried on the wind. Nobody lowers a weapon.']);
+      case 'probe': return pickOf(r, night
+        ? ['Two shapes against the fence, testing the line. A flashlight crosses the wire and goes out.', 'Something moves at the edge of the light, and the watch holds still.']
+        : ['Two men work along the fence, looking for the weak spot and watching who answers.', 'A pair of scouts at the ditch, close enough to count the people on the place.']);
+      case 'harass': return pickOf(r, night
+        ? ['Shots out of the dark, none of them aimed. The family stays low and keeps count.', 'A voice from the treeline, and a muzzle flash that is gone before anyone can answer.']
+        : ['Single shots from the treeline, meant to keep everyone pinned down.', 'Fire from the ditch, then silence. They are waiting for someone to show himself.']);
+      case 'fires': return pickOf(r, ['Fire in the ditch, and smoke across the drive. The watch cannot tell where they went.', 'Flames behind the barn. Somebody wants every eye on the wrong side of the place.']);
+      default: return pickOf(r, night
+        ? ['The crew comes out of the dark at the fence, all at once.', 'Muzzle flashes along the treeline. The whole line opens up.']
+        : ['The crew rushes the fence, shooting as they come.', 'Men break from the treeline and run for the wall, with rifles up.']);
+    }
+  }
   if (plan.crew === 'break_in') return part === 'lead' ? pickOf(r, ['A step on the stairs. A beam of light under the door.', 'Glass crunches in the kitchen. Then silence. Then a drawer.']) : pickOf(r, ['The back door bangs. A car starts on the county road.', 'Quiet. Then the first thing you hear is your own heart.']);
   if (part === 'lead') {
     switch (scene.kind) {
@@ -482,10 +515,15 @@ export function gateScene(s: GameState, e: Pick<Encounter, 'size' | 'kind' | 'id
     }
   } else {
     const who = faces[0] ? `h_${faces[0].id}` : undefined;
-    const line = stance === 'warn' ? 'This is private property. Turn around.' : stance === 'trade' ? 'We can make a trade. Nobody has to get hurt.' : stance === 'parley' ? 'Say what you came to say. From there.' : 'Stay where you are.';
+    const line = stance === 'neg_toll' ? 'Here. This is what we can spare. Take it and go.' : stance === 'neg_aid' ? 'There is food on the fence post. Eat, and then move on.' : stance === 'neg_redirect' ? 'The next place up the road has a lot more than we do. Go see.' : stance === 'warn' ? 'This is private property. Turn around.' : stance === 'trade' ? 'We can make a trade. Nobody has to get hurt.' : stance === 'parley' ? 'Say what you came to say. From there.' : 'Stay where you are.';
     say(18, line, who);
+    if (stance === 'neg_toll' || stance === 'neg_aid' || stance === 'neg_redirect') {
+      say(21, stance === 'neg_aid' ? 'Thank you. God, thank you.' : stance === 'neg_toll' ? 'That will do. We were never here.' : 'Up the road, you say? How far?', 'r0');
+      say(27, stance === 'neg_redirect' ? 'Come on. Back in the truck.' : 'Let\'s go. Nobody says a word about this.', 'r0');
+    } else {
     say(21, tone === 'bad' ? 'Open the gate or we take it.' : pickOf(r, ['We\'re not looking for trouble. Just what you can spare.', 'Easy. We can talk about this.']), 'r0');
     say(27, tone === 'good' ? pickOf(r, ['Forget it. Not worth it. Come on.', 'They\'re ready for us. Back to the truck.']) : 'Put it by the gate and we go. Slowly.', 'r0');
+    }
     for (let i = 0; i < n; i++) { const p = at(start, (i - 3) * 1.8); ev.push({ t: r2(32 + r() * 6), kind: 'move', unit: `r${i}`, x: r2(p.x), z: r2(p.z) }); }
   }
   const duration = 64;

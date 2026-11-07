@@ -21,6 +21,8 @@ export interface OverlayInputs {
   recap: boolean;
   /** Milestone cards waiting. */
   milestones: number;
+  /** A placing tool or the starter proposal is open (the planning pause): a card would cover the ghosts, so it waits. */
+  planning?: boolean;
 }
 
 export interface OverlayPlan {
@@ -42,6 +44,6 @@ export function overlayPlan(i: OverlayInputs): OverlayPlan {
   const gate = i.decision;
   const dayCard = !gate && i.dayCard;
   const recap = !gate && !dayCard && !i.setup && i.recap;
-  const milestone = !gate && !dayCard && !recap && !i.setup && i.milestones > 0;
+  const milestone = !gate && !dayCard && !recap && !i.setup && !i.planning && i.milestones > 0;
   return { gate, ending: false, dayCard, recap, milestone, decisionWaiting: gate };
 }

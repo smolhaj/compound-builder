@@ -38,12 +38,14 @@ export interface DifficultyDef {
   wave: number;
   /** Multiplier on the quiet days between waves (sim/waves.ts): longer is gentler. */
   lull: number;
+  /** Multiplier on how willing a crew at the gate is to settle by talk (sim/negotiation.ts): Cozy kinder, Hardcore less, and a trap is likelier on Hardcore. */
+  talk: number;
 }
 
 export const DIFFICULTY: Record<Difficulty, DifficultyDef> = {
-  cozy: { hunt: -8, warn: 1.6, raid: 0.7, cadence: 1.35, wound: 0.7, storms: 0.5, price: 0.6, recovery: 0.75, permits: 0.5, money: 1.15, adapt: 0.1, winter: 0, wave: 0.35, lull: 1.5 },
-  standard: { hunt: 0, warn: 1, raid: 1, cadence: 1, wound: 1, storms: 1, price: 1, recovery: 1, permits: 1, money: 1, adapt: 0.3, winter: 0, wave: 1, lull: 1 },
-  hardcore: { hunt: 12, warn: 0.4, raid: 1.3, cadence: 0.65, wound: 1.5, storms: 1.5, price: 1, recovery: 1.6, permits: 1, money: 1, adapt: 1, winter: 1, wave: 1.4, lull: 0.75 },
+  cozy: { hunt: -8, warn: 1.6, raid: 0.7, cadence: 1.35, wound: 0.7, storms: 0.5, price: 0.6, recovery: 0.75, permits: 0.5, money: 1.15, adapt: 0.1, winter: 0, wave: 0.35, lull: 1.5, talk: 1.12 },
+  standard: { hunt: 0, warn: 1, raid: 1, cadence: 1, wound: 1, storms: 1, price: 1, recovery: 1, permits: 1, money: 1, adapt: 0.3, winter: 0, wave: 1, lull: 1, talk: 1 },
+  hardcore: { hunt: 12, warn: 0.4, raid: 1.3, cadence: 0.65, wound: 1.5, storms: 1.5, price: 1, recovery: 1.6, permits: 1, money: 1, adapt: 1, winter: 1, wave: 1.4, lull: 0.75, talk: 0.85 },
 };
 
 /** The table row for a run (a save from before the table has none: Standard). */

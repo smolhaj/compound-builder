@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { useGameStore } from '../../store/gameStore';
 import { newGame } from '../../sim/state';
@@ -34,6 +34,9 @@ const withFoldsOpen = <T,>(fn: () => T): T => {
 };
 
 describe('the guided HUD (server-rendered)', () => {
+  // (these check the Next-steps cards, which wait behind the first-hour goals card while it is up: fold it away first; the goals card has its own tests below)
+  beforeEach(() => { Object.assign(useFeelStore.getInitialState(), { goalsClosed: 'dismissed' }); });
+  afterEach(() => { Object.assign(useFeelStore.getInitialState(), { goalsClosed: null }); });
   it('greys the bunker rooms with a reason, highlights the next step and lists what the bunker needs', () => {
     withGame(() => undefined);
     const t = text(withFoldsOpen(() => renderToStaticMarkup(<BuildMenu />)));
@@ -256,11 +259,38 @@ describe('the first-hour HUD', () => {
     Object.assign(useFeelStore.getInitialState(), { firstHourHud: false, showAll: false, revealed: ['family'], fresh: [] });
   });
 
-  it('opens Long-term goals in the first hour and folds them after', () => {
+  it('opens Long-term goals in the first hour once the first-hour goals are folded away, and folds them after', () => {
+    // (one list at a time: while the guided goals card is up, the long-term goals wait)
+    Object.assign(useFeelStore.getInitialState(), { goalsClosed: null });
     withGame(() => undefined);
-    const open = text(renderToStaticMarkup(<BuildMenu />));
-    expect(open).toMatch(/▾ Long-term goals/);
+    expect(text(renderToStaticMarkup(<BuildMenu />))).toMatch(/Why this matters|Lay out a starter compound/);
+    expect(text(renderToStaticMarkup(<BuildMenu />))).toMatch(/▸ Long-term goals/);
+    Object.assign(useFeelStore.getInitialState(), { goalsClosed: 'dismissed' });
+    try { localStorage.removeItem('cb.fold.longterm'); } catch { /* none */ }
+    expect(text(renderToStaticMarkup(<BuildMenu />))).toMatch(/▾ Long-term goals/);
     withGame(g => { g.clock.t = 200; });
     expect(text(renderToStaticMarkup(<BuildMenu />))).toMatch(/▸ Long-term goals/);
+    Object.assign(useFeelStore.getInitialState(), { goalsClosed: null });
+  });
+});
+
+describe('the first-hour goals card (server-rendered)', () => {
+  it('shows one goal, the count, the primary button and the why link; Next steps wait behind it', () => {
+    Object.assign(useFeelStore.getInitialState(), { goalsClosed: null });
+    withGame(() => undefined);
+    const t = text(renderToStaticMarkup(<BuildMenu />));
+    expect(t).toMatch(/Get operational\s*0 of \d/);
+    expect(t).toContain('A roof for the family');
+    expect(t).toMatch(/Lay out a starter compound|tent/);
+    expect(t).toContain('Why this matters');
+    expect(t).not.toContain('Next steps');   // (nothing urgent yet: one list, not two)
+  });
+  it('folds to a single quiet row when hidden, with a way back', () => {
+    Object.assign(useFeelStore.getInitialState(), { goalsClosed: 'dismissed' });
+    withGame(() => undefined);
+    const t = text(renderToStaticMarkup(<BuildMenu />));
+    expect(t).toContain('Show goals');
+    expect(t).not.toContain('Why this matters');
+    Object.assign(useFeelStore.getInitialState(), { goalsClosed: null });
   });
 });

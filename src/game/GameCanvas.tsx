@@ -43,7 +43,8 @@ import { useBattleStore } from '../store/battleStore';
 import { BattleRenderer } from './battle/BattleRenderer';
 import { demoBattle } from './battle/demoBattle';
 import { CutscenePlayer } from './battle/CutscenePlayer';
-import { obstaclesOf } from './battle/cameraObstacles';
+import { RaidDamageRenderer, type GlassHome } from './props/RaidDamageRenderer';
+import { coverBoxes, obstaclesOf, treeBoxes } from './battle/cameraObstacles';
 import { useCutsceneView } from '../store/cutsceneStore';
 import { isFinished } from '../sim/construction';
 import { isHome } from '../sim/blueprints';
@@ -53,7 +54,7 @@ import { homeOutsideForty } from '../sim/site';
 import { anchorOf } from '../sim/joinerHome';
 import { ownsAt } from '../sim/land';
 import { isMarked, yieldOf } from '../sim/forestry';
-import { KIT } from './buildkit/kit';
+import { KIT, footprint } from './buildkit/kit';
 import { isUnderground } from './buildkit/underground';
 import type { SiteQuery } from './buildkit/kit';
 import { FrameBudget, capGapMs, lowerTier } from '../engine/perf/qualityAuto';
@@ -333,7 +334,23 @@ export function GameCanvas() {
     let last = performance.now();
     let raf = 0;
     /** QA hooks: frame counter, and an exact camera pose (eye → look) for interior shots. */
+    // what a raid broke stays broken until it is mended (sim/raidDamage.ts)
+    const damageView = new RaidDamageRenderer(ws.scene, world.groundAt, d => {
+      const run = useGameStore.getState().game.perimeter.find(r => r.id === d.runId);
+      if (!run) return 0;
+      let best = 0, bd = Infinity;
+      for (let i = 1; i < run.pts.length; i++) {
+        const [ax, az] = run.pts[i - 1], [bx, bz] = run.pts[i], dd = Math.hypot((ax + bx) / 2 - d.x, (az + bz) / 2 - d.z);
+        if (dd < bd) { bd = dd; best = -Math.atan2(bz - az, bx - ax); }
+      }
+      return best;
+    });
+    const glassHomes = (): GlassHome[] => useGameStore.getState().game.structures.filter(st => isFinished(st) && isHome(st.kind) && st.fixes?.some(f => f.part === 'glass' && f.done < f.hours) && KIT[st.kind]).map(st => ({ id: st.id, ...footprint(KIT[st.kind], st.x, st.z, st.rot, false) }));
+    const syncDamage = () => damageView.sync(useGameStore.getState().game.raidDamage, glassHomes());
+    syncDamage();
+    const unsubDamage = useGameStore.subscribe(s => `${(s.game.raidDamage ?? []).filter(d => d.done < d.hours).map(d => d.id).join()}|${s.game.structures.filter(st => st.fixes?.some(f => f.part === 'glass' && f.done < f.hours)).map(st => st.id).join()}`, syncDamage);
     const battle = new BattleRenderer(ws.scene, world.groundAt, () => useGameStore.getState().game.people);
+    battle.coverSource = () => world.lowCover;
     battle.onEnd = () => { useBattleStore.getState().endBattle(); world.forceDoor(null); };
     battle.onDoor = (open, x, z) => world.forceDoor(open, x, z);
     let battleSkip = useBattleStore.getState().skipReq, battleSync = 0;
@@ -343,11 +360,13 @@ export function GameCanvas() {
       const h = g.structures.find(x => isFinished(x) && isHome(x.kind)) ?? g.structures.find(isFinished);
       return h ? { x: h.x, y: 0, z: h.z } : { x: world.camp.x, y: 0, z: world.camp.z };
     };
-    const player = new CutscenePlayer({ battle, ground: world.groundAt, house: homeSpot, commit: () => useGameStore.getState().commitCutscene(), seed: useGameStore.getState().game.seed, obstacles: () => obstaclesOf(useGameStore.getState().game) });
+    const player = new CutscenePlayer({ battle, ground: world.groundAt, house: homeSpot, commit: () => useGameStore.getState().commitCutscene(), seed: useGameStore.getState().game.seed, obstacles: () => [...obstaclesOf(useGameStore.getState().game), ...treeBoxes(world.treeSpecs, homeSpot(), 70), ...(qa.noCover ? [] : coverBoxes(world.lowCover, homeSpot(), 70))] });
     let cineSaved: { fov: number; near: number } | null = null;
+    /** Where the player's own camera stood before the raid prompt, and the glide back to it once the cutscene is over (yaw eased by hand: the glide has none). */
+    let camBefore: { x: number; y: number; z: number; radius: number; pitch: number; yaw: number } | null = null, camBack = false;
     let promptAt = -1, skipScene = useCutsceneView.getState().skipScene, skipAll = useCutsceneView.getState().skipAll;
     let battleView: { x: number; z: number; radius: number; pitch: number } | null = null;
-    const qa: { frames: number; frameMs: number; lowrender?: boolean; weather?: boolean; renderNow?: () => Promise<void>; renderFull?: (q?: QaQuality) => Promise<void>; pose: null | { x: number; y: number; z: number; lx: number; ly: number; lz: number; fov?: number } } = { frames: 0, frameMs: 0, pose: null };
+    const qa: { noCover?: boolean; frames: number; frameMs: number; lowrender?: boolean; weather?: boolean; renderNow?: () => Promise<void>; renderFull?: (q?: QaQuality) => Promise<void>; pose: null | { x: number; y: number; z: number; lx: number; ly: number; lz: number; fov?: number } } = { frames: 0, frameMs: 0, pose: null };
     // window.__cb.qa.renderNow(): draw one frame (a promise); renderFull('high'|'medium'): one slow full-quality, full-resolution shot
     if (lowRender.on) Object.assign(qa, { lowrender: true, renderNow: () => renderReq.request(), renderFull: (q: QaQuality = 'high') => renderReq.request(q) });
     const budget = new FrameBudget(), loopStart = performance.now();
@@ -377,6 +396,15 @@ export function GameCanvas() {
       const game = useGameStore.getState().game;
       // the raid cutscene: start / stop the player, and read the clock off its timeline while it plays
       const cs = useGameStore.getState().cutscene;
+      // the raid takes the camera (the prompt settles it low in the yard, the scenes fly it): remember where it was, and put it back afterwards
+      if (cs && !camBefore) { camBefore = { x: cam.target.x, y: cam.target.y, z: cam.target.z, radius: cam.radius, pitch: cam.pitch, yaw: cam.yaw }; camBack = false; }
+      else if ((!cs || cs.phase === 'aftermath') && camBefore && !camBack) { cam.glideTo(camBefore.x, camBefore.z, camBefore.radius, camBefore.pitch, 1.4); camBack = true; }
+      if (camBack && camBefore) {
+        let dy = camBefore.yaw - cam.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+        cam.yaw += dy * Math.min(1, dt * 3);
+        cam.target.y += (camBefore.y - cam.target.y) * Math.min(1, dt * 3);
+        if (!cam.gliding && Math.abs(dy) < 0.01) { camBefore = null; camBack = false; }
+      }
       if (cs?.phase === 'playing' && !player.active) {
         cineSaved = { fov: ws.camera.fov, near: ws.camera.near };
         cam.enabled = false;
@@ -623,7 +651,7 @@ export function GameCanvas() {
       window.removeEventListener('keyup', onShift);
       player.stop();
       unCamReq();
-      battle.dispose();
+      battle.dispose(); unsubDamage(); damageView.dispose();
       tour.dispose();
       tool.dispose();
       marker.dispose();

@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { Director, STANDOFF, auditPose, poseAt, shotProblems, type Actor, type Box, type Shot } from './director';
-import { obstaclesOf } from './cameraObstacles';
+import { Director, STANDOFF, auditPose, figurePx, lensProblem, poseAt, shotProblems, type Actor, type Box, type Shot } from './director';
+import { obstaclesOf, treeBoxes } from './cameraObstacles';
+import { lightLabel } from './lightLabel';
+import { planSiege, sceneCaption, segments, type SceneKind } from '../../sim/siege';
+import type { EncounterKind } from '../../sim/encounters';
 import { newGame } from '../../sim/state';
 import { mulberry32 } from '../../sim/rng';
 import type { BattleEvent } from '../../sim/battleTypes';
@@ -199,5 +202,175 @@ describe('obstaclesOf reads the buildings and the walls off a game', () => {
     expect(walls.length).toBeGreaterThanOrEqual(7);
     expect(Math.min(...walls.map(w => w.x0))).toBeLessThan(0.01);
     expect(Math.max(...walls.map(w => w.x1))).toBeGreaterThan(5.99);
+  });
+});
+
+/** A pine at (x, z): trunk and crown, as the camera sees it. */
+const pine = (x: number, z: number, scale = 1.6) => treeBoxes([{ x, z, y: 0, scale, kind: 'conifer', sx: 1, sy: 1 }], { x, z }, 5);
+
+describe('the daylight lead-in puts the crew in the picture, large, and varies its frames', () => {
+  const bx = boxes();
+  /** Every lead-in cut of a staged daylight approach, one director per scene index. */
+  function leadCuts(seed: number, scene: number, night: boolean) {
+    const r = mulberry32(seed * 11 + 5);
+    const d = new Director(seed);
+    d.setObstacles(bx); d.leadIn = true; d.night = night; d.variant = scene;
+    const actors = cast(r);
+    const out: Array<{ s: Shot; actors: Actor[] }> = [];
+    let last: Shot | null = null;
+    for (let t = 0; t < 30; t += 0.25) {
+      const s = d.update(t, actors, [], house, ground);
+      if (s !== last) { out.push({ s: structuredClone(s), actors: actors.map(a => ({ ...a })) }); last = s; }
+    }
+    return { out, d };
+  }
+
+  it('framing audit: by day every lead-in cut shows raiders at least 20 px tall (a 720-line picture), unblocked, with no fallback cut', () => {
+    let n = 0;
+    for (let seed = 1; seed <= 20; seed++) for (let scene = 0; scene < 4; scene++) {
+      const { out, d } = leadCuts(seed, scene, false);
+      expect(d.fallbacks, `seed ${seed} scene ${scene}`).toBe(0);
+      expect(d.softened, `seed ${seed} scene ${scene}: the pixel rule had to be relaxed`).toBe(0);
+      for (const { s, actors } of out) {
+        n++;
+        const p = poseAt(s, s.since), au = auditPose(p.eye, p.look, p.fov, bx, actors, ground);
+        expect(au.raiderPx, `seed ${seed} scene ${scene} ${s.kind}: crew size in the frame`).toBeGreaterThanOrEqual(20);
+        expect(au.visible).toBeGreaterThan(0);
+        expect(shotProblems(s, { boxes: bx, ground, actors: new Map(actors.map(a => [a.id, a])) })).toEqual([]);
+      }
+    }
+    expect(n).toBeGreaterThan(100);
+  });
+
+  it('by day a wide cut on a crew still far from the house shows the crew at least 14 px tall', () => {
+    let n = 0;
+    for (let seed = 1; seed <= 16; seed++) {
+      const d = new Director(seed);
+      d.setObstacles(bx); d.night = false; d.variant = seed % 3;
+      const actors = cast(mulberry32(seed * 3 + 1));
+      d.update(0, actors, [], house, ground);
+      const s = d.update(4, actors, [{ t: 4, kind: 'breach' } as never], house, ground);
+      expect(s.kind).toBe('wide');
+      expect(d.fallbacks).toBe(0);
+      const p = poseAt(s, s.since), au = auditPose(p.eye, p.look, p.fov, bx, actors, ground);
+      expect(au.raiderPx, `seed ${seed}`).toBeGreaterThanOrEqual(14);
+      n++;
+    }
+    expect(n).toBe(16);
+  });
+
+  it('two scenes never open on the same frame, and a scene never repeats its own', () => {
+    for (let seed = 1; seed <= 12; seed++) {
+      // one director for the whole raid, as the player has: each scene starts afresh (no shot yet) with the lead-in on
+      const d = new Director(seed);
+      d.setObstacles(bx); d.night = false;
+      const actors = cast(mulberry32(seed * 11 + 5));
+      const firsts: Shot[] = [];
+      for (let scene = 0; scene < 4; scene++) {   // (a day raid has two scenes at most, a night siege five; the daylight opener is the tight one)
+        d.variant = scene; d.leadIn = true; d.shot = null;
+        const cuts: Shot[] = [];
+        let last: Shot | null = null;
+        for (let t = scene * 40; t < scene * 40 + 30; t += 0.25) {
+          const s = d.update(t, actors, [], house, ground);
+          if (s !== last) { cuts.push(structuredClone(s)); last = s; }
+        }
+        firsts.push(cuts[0]);
+        for (let i = 1; i < cuts.length; i++) expect(cuts[i].kind === cuts[i - 1].kind && Math.hypot(cuts[i].eye.x - cuts[i - 1].eye.x, cuts[i].eye.z - cuts[i - 1].eye.z) < 1.8, `seed ${seed} scene ${scene} repeats itself`).toBe(false);
+      }
+      for (let i = 0; i < firsts.length; i++) for (let j = i + 1; j < firsts.length; j++) {
+        const a = firsts[i], b = firsts[j];
+        const same = Math.abs(a.fov - b.fov) < 3 && Math.hypot(a.eye.x - b.eye.x, a.eye.z - b.eye.z) < 1.8 && Math.abs(Math.atan2(a.look.x - a.eye.x, a.look.z - a.eye.z) - Math.atan2(b.look.x - b.eye.x, b.look.z - b.eye.z)) < 0.45;
+        expect(same, `seed ${seed}: scenes ${i} and ${j} open on one frame`).toBe(false);
+      }
+    }
+  });
+
+  it('the night lead-in keeps its own wide (no pixel rule on the crew)', () => {
+    const { out, d } = leadCuts(3, 0, true);
+    expect(d.fallbacks).toBe(0);
+    expect(out.every(c => c.s.minPx === undefined)).toBe(true);
+  });
+
+  it('measures a figure the way the picture draws it', () => {
+    // 0.28 tall, 6 units away, a 54 degree lens, 720 lines: about 0.28 / (2 * 6 * 0.51) * 720
+    expect(figurePx({ x: 0, y: 0.17, z: 0 }, { x: 0, y: 0.17, z: 6 }, 54)).toBeCloseTo(0.28 * 720 / (2 * 6 * Math.tan(27 * Math.PI / 180)), 3);
+  });
+});
+
+describe('the lens stays clear of trees and hillsides', () => {
+  it('refuses a trunk across the lens, a wall of trees, and a hillside, and passes open ground and a tree seen past a subject', () => {
+    const eye = { x: 0, y: 0.5, z: 0 }, look = { x: 0, y: 0.4, z: 8 };
+    expect(lensProblem(eye, look, 54, pine(0.2, 2), ground)).toMatch(/lens/);                       // a pine 2 units out, a little off the axis
+    expect(lensProblem(eye, look, 54, pine(-2.6, 1.9, 0.5), ground)).toBeNull();                       // (a sapling beside the frame: it is out of the picture)
+    const wall = [-2.4, -1.2, 0, 1.2, 2.4].flatMap(tx => pine(tx, 4.2));
+    expect(lensProblem(eye, look, 54, wall, ground)).not.toBeNull();
+    expect(lensProblem(eye, look, 54, [], (_x, z) => (z > 1.5 ? (z - 1.5) * 0.6 : 0))).toMatch(/hillside/);   // a slope rising 0.6 per unit ahead
+    expect(lensProblem(eye, look, 54, [], () => 0)).toBeNull();
+    expect(lensProblem(eye, look, 54, pine(0, 7), ground)).toBeNull();                                // a tree at the far end of the lens is scenery
+  });
+
+  it('the director cuts clear of a grove between the camera and the crew', () => {
+    const bx = [...boxes()];
+    // a grove around the yard, so the first angles are cluttered
+    for (let a = 0; a < 14; a++) bx.push(...pine(Math.cos(a) * 11 + 1, Math.sin(a) * 11 + 12, 1.4 + (a % 3) * 0.4));
+    for (let seed = 1; seed <= 10; seed++) {
+      const r = mulberry32(seed), d = new Director(seed);
+      d.setObstacles(bx); d.leadIn = true; d.night = false; d.variant = seed;
+      const actors = cast(r);
+      let last: Shot | null = null;
+      for (let t = 0; t < 20; t += 0.25) {
+        const s = d.update(t, actors, [], house, ground);
+        if (s === last) continue;
+        last = s;   // (judged as cut: the operator pans after the unit afterwards, and re-checks the lens every half second)
+        const trees = bx.filter(b => b.kind === 'tree');
+        for (const k of [0, Math.min(s.hold, 12) / 2, Math.min(s.hold, 12)]) { const p = poseAt(s, s.since + k); expect(lensProblem(p.eye, p.look, p.fov, trees, ground), `seed ${seed} ${s.kind}`).toBeNull(); }
+      }
+      expect(d.fallbacks, `seed ${seed}`).toBe(0);
+    }
+  });
+
+  it('treeBoxes gives each tree a trunk and a floating crown, nearest first, and skips shrubs', () => {
+    const t = (x: number, z: number, scale: number) => ({ x, z, y: 0, scale, kind: 'conifer', sx: 1, sy: 1 });
+    const out = treeBoxes([t(30, 0, 1), t(3, 0, 1.5), t(2, 0, 0.2), t(200, 0, 1)], { x: 0, z: 0 }, 70);
+    expect(out.length).toBe(4);                      // two trees x (trunk + crown); the shrub and the far tree are out
+    expect(out[0].x0).toBeGreaterThan(1);            // the near one first
+    expect(out.every(b => b.kind === 'tree')).toBe(true);
+    expect(out.filter(b => b.y0 !== undefined).length).toBe(2);
+  });
+});
+
+describe('the light word follows the sky, not the hour the raid began', () => {
+  it('names night, dawn, day and dusk by the day phase', () => {
+    expect(lightLabel(2.25)).toBe('Night');
+    expect(lightLabel(5.0)).toBe('Night');
+    expect(lightLabel(5.4)).toBe('Night');
+    expect(lightLabel(5.9)).toBe('Dawn');           // 'NIGHT 5:46 AM' in the QA run, with the sky already lifting
+    expect(lightLabel(6.2)).toBe('Dawn');
+    expect(lightLabel(6.13)).toBe('Dawn');          // the "NIGHT 6:08 AM" over a bright dawn
+    expect(lightLabel(7.3)).toBe('Dawn');
+    expect(lightLabel(10)).toBe('Day');
+    expect(lightLabel(14)).toBe('Day');
+    expect(lightLabel(18.4)).toBe('Dusk');
+    expect(lightLabel(19.9)).toBe('Dusk');
+    expect(lightLabel(20.6)).toBe('Night');
+    expect(lightLabel(23.9)).toBe('Night');
+    expect(lightLabel(30)).toBe('Dawn');              // wraps
+  });
+});
+
+describe('every scene of every raid has a caption for each part', () => {
+  const crews: EncounterKind[] = ['gang', 'militia', 'patrol', 'requisition', 'looters', 'break_in', 'horde'];
+  it('lead, fight and tail are never empty, by day or by night, for any crew', () => {
+    const kinds = new Set<SceneKind>();
+    for (const crew of crews) for (const hour of [2.25, 5.75, 9, 14, 18.5, 21]) for (const fought of [true, false]) for (let seed = 1; seed <= 12; seed++) {
+      const plan = planSiege({ kind: crew, size: 4 + (seed % 7), temper: seed % 2 ? 'hard' as const : 'savage' as const, hour, seed, fought, fightSeconds: fought ? 60 : null });
+      for (const sc of plan.scenes) {
+        kinds.add(sc.kind);
+        for (const part of ['lead', 'fight', 'tail'] as const) expect(sceneCaption(plan, sc, part, seed).trim().length, `${crew} ${sc.kind} ${part} @${hour}`).toBeGreaterThan(8);
+        if (sc.gap > 0) expect(sceneCaption(plan, sc, 'gap', seed)).toMatch(/later/);
+      }
+      expect(segments(plan).length).toBeGreaterThan(0);
+    }
+    for (const k of ['gate', 'probe', 'harass', 'fires', 'assault'] as const) expect(kinds.has(k), k).toBe(true);
   });
 });

@@ -19,6 +19,7 @@ import { KIT } from '../game/buildkit/kit';
 import type { GameState, OrderLine } from './state';
 import { pluralize } from './words';
 import { queuedLogs } from './forestry';
+import { damageNoun, openDamage } from './raidDamage';
 import { NEED_KEYS, activeNeeds, needDays, type NeedKey } from './needsStuck';
 
 /** Days a project waits for materials, with the cash to buy them, before the game makes noise about it. */
@@ -45,6 +46,7 @@ export function waiters(s: GameState): Waiter[] {
     }
     for (const f of pendingFixes(st)) if (!f.supplied) push(`f:${st.id}:${f.part}`, `${nameOf(st.kind)} (${f.part} repair)`, isHome(st.kind), fixBill(f), st.id);
   }
+  for (const d of openDamage(s)) if (!d.supplied) push(`d:${d.id}`, damageNoun(d), false, d.bill, null);
   for (const r of s.perimeter) if (!runFinished(r) && !r.supplied) push(`r:${r.id}`, 'the wall', false, runBill(r.kind, wallLength(r)), null);
   for (const j of s.hardenJobs) {
     const st = s.structures.find(x => x.id === j.building);

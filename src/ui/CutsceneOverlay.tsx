@@ -7,6 +7,7 @@ import { afterLabel } from '../sim/aftermathLabel';
 import type { Battle } from '../sim/battleTypes';
 import { STANCE } from './stanceText';
 import { pluralize } from '../sim/words';
+import { lightLabel } from '../game/battle/lightLabel';
 
 const BAR = 'clamp(54px, 12vh, 120px)';
 const FONT = '"Iowan Old Style", "Palatino Linotype", Georgia, serif';
@@ -34,16 +35,16 @@ export function CutsceneOverlay() {
   const skipScene = useCutsceneView(s => s.requestSkipScene);
   const skipAll = useCutsceneView(s => s.requestSkipAll);
   if (!c) return null;
-  const night = c.hour < 6 || c.hour >= 20;
   const playing = c.phase === 'playing' && view;
   const hour = playing ? view.hour : c.phase === 'aftermath' && c.plan ? (c.hour + c.plan.totalGame / 3600) % 24 : c.hour;
+  const light = lightLabel(hour);
   const plan = c.plan;
   const multi = !!plan && plan.scenes.length > 1;
   return (
     <>
       <div style={{ ...bar, top: 0, height: BAR, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 clamp(16px, 4vw, 48px)', color: '#efe6d4', fontFamily: FONT }}>
         <div>
-          <div style={label}>{c.phase === 'prompt' ? (night ? 'Night' : 'Day') + ' · someone is at the gate' : c.phase === 'aftermath' ? 'After' : (night ? 'Night' : 'Day')}</div>
+          <div style={label} data-light={light}>{c.phase === 'prompt' ? light + ' · someone is at the gate' : c.phase === 'aftermath' ? 'After' : light}</div>
           <div style={{ fontSize: 'clamp(22px, 4.2vh, 38px)', letterSpacing: 1, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>{clockLabel(hour)}</div>
         </div>
         {playing && (
@@ -63,7 +64,8 @@ export function CutsceneOverlay() {
       <div style={{ ...bar, bottom: 0, height: BAR, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 clamp(16px, 8vw, 120px)', color: '#efe6d4', fontFamily: FONT, textAlign: 'center' }}>
         {c.phase === 'prompt' && <div style={{ fontSize: 'clamp(14px, 2.5vh, 21px)', fontStyle: 'italic', lineHeight: 1.35 }}>{c.narration}</div>}
         {playing && view.seg !== 'fight' && view.seg !== 'gap' && view.caption && <div style={{ fontSize: 'clamp(14px, 2.5vh, 21px)', fontStyle: 'italic', lineHeight: 1.35 }}>{view.caption}</div>}
-        {playing && view.seg === 'fight' && (
+        {playing && view.seg === 'fight' && lines.length === 0 && view.caption && <div style={{ fontSize: 'clamp(14px, 2.5vh, 21px)', fontStyle: 'italic', lineHeight: 1.35 }}>{view.caption}</div>}
+        {playing && view.seg === 'fight' && lines.length > 0 && (
           <div style={{ fontSize: 'clamp(13px, 2.2vh, 19px)', lineHeight: 1.3 }}>
             {lines.slice(-2).map((l, i, a) => {
               const who = speaker(battle, people, l.who);
@@ -144,6 +146,7 @@ function Report() {
       {row('Taken', r.taken.length ? r.taken.join(', ') : none, r.taken.length > 0)}
       {row('Hurt', r.wounded.length ? r.wounded.join(', ') : none)}
       {row('Lost from your supplies', r.lost.length ? r.lost.map(([k, n]) => `${n} ${k}`).join(', ') : 'nothing')}
+      {(r.damage?.length ?? 0) > 0 && row('Broken', r.damage.join(', '), true)}
       {row('Raiders on the drive', r.raidersWounded + r.raidersDead ? `${r.raidersWounded} wounded, ${r.raidersDead} dead` : 'none left')}
       <MoreLines rounds={r.rounds} lines={r.lines.filter(l => !/^Lost:|rounds fired\.$|more rounds went out/.test(l))} />
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
