@@ -173,7 +173,7 @@ export class CutscenePlayer {
   audit(): (PoseAudit & { kind: string; eye: V3; look: V3; fallbacks: number; fallbackLog: string[] }) | null {
     const shot = this._dir.shot; if (!shot) return null;
     const p = poseAt(shot, this._time);
-    return { ...auditPose(p.eye, p.look, p.fov, this._boxes, this.d.battle.actors(), this.d.ground), kind: shot.kind, eye: p.eye, look: p.look, fallbacks: this._dir.fallbacks, fallbackLog: this._dir.fallbackLog.slice(-4) };
+    return { ...auditPose(p.eye, p.look, p.fov, this._dir.night ? this._boxes.filter(b => b.kind !== 'brush') : this._boxes, this.d.battle.actors(), this.d.ground), kind: shot.kind, eye: p.eye, look: p.look, fallbacks: this._dir.fallbacks, fallbackLog: this._dir.fallbackLog.slice(-4) };
   }
 
   private _publish(force: boolean): void {
