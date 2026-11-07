@@ -43,6 +43,7 @@ import { useBattleStore } from '../store/battleStore';
 import { BattleRenderer } from './battle/BattleRenderer';
 import { demoBattle } from './battle/demoBattle';
 import { CutscenePlayer } from './battle/CutscenePlayer';
+import { NameLabelLayer } from './battle/NameLabelLayer';
 import { RaidDamageRenderer, type GlassHome } from './props/RaidDamageRenderer';
 import { coverBoxes, obstaclesOf, treeBoxes } from './battle/cameraObstacles';
 import { liveBreach } from './battle/liveBreach';
@@ -374,7 +375,7 @@ export function GameCanvas() {
       return h ? { x: h.x, y: 0, z: h.z } : { x: world.camp.x, y: 0, z: world.camp.z };
     };
     let cutawayBefore: ReturnType<typeof useWorldStore.getState>['buildingView'] | null = null;
-    const player = new CutscenePlayer({ battle, ground: world.groundAt, house: homeSpot, commit: () => useGameStore.getState().commitCutscene(), seed: useGameStore.getState().game.seed, obstacles: () => [...obstaclesOf(useGameStore.getState().game), ...treeBoxes(world.treeSpecs, homeSpot(), 70), ...(qa.noCover ? [] : coverBoxes(world.lowCover, homeSpot(), 70))],
+    const player = new CutscenePlayer({ battle, ground: world.groundAt, house: homeSpot, commit: () => useGameStore.getState().commitCutscene(), seed: useGameStore.getState().game.seed, obstacles: () => [...obstaclesOf(useGameStore.getState().game), ...treeBoxes(world.treeSpecs, homeSpot(), 70), ...(qa.noCover ? [] : coverBoxes(world.lowCover, homeSpot(), 70))] ,
       // the invasion look (sim/breach.ts, sim/houseAssault.ts): how the wall comes down, and the fight inside the house; cinematic, the sim's result is kept
       prepare: b => {
         if (!b.events.some(e => e.kind === 'breach')) return b;
@@ -387,6 +388,8 @@ export function GameCanvas() {
         return planHouseAssault(d, { box: footprint(KIT[home.kind], home.x, home.z, home.rot, false), blocked: (x, z) => world.walkBlocked(x, z, 0.04), seed });
       },
       cutaway: on => { const ws2 = useWorldStore.getState(); if (on) { cutawayBefore ??= ws2.buildingView; ws2.setBuildingView('cutaway'); } else if (cutawayBefore) { ws2.setBuildingView(cutawayBefore); cutawayBefore = null; } } });
+    const nameLayer = new NameLabelLayer();
+    let nameCache: { battle: unknown; people: unknown; map: Map<string, string> } = { battle: null, people: null, map: new Map() };
     let cineSaved: { fov: number; near: number } | null = null;
     /** Where the player's own camera stood before the raid prompt, and the glide back to it once the cutscene is over (yaw eased by hand: the glide has none). */
     let camBefore: { x: number; y: number; z: number; radius: number; pitch: number; yaw: number } | null = null, camBack = false;
@@ -576,6 +579,24 @@ export function GameCanvas() {
         if (foot) ws.setShadowFocus(foot.x, foot.z, foot.r / 1.1);
         else ws.setShadowFocus(cam.target.x, cam.target.z, cam.radius);
       }
+      // first names (and status pips) over the defenders' heads while the scenes play
+      {
+        const live = cine && battle.playing && cs?.offer == null && useCutsceneView.getState().view?.seg !== 'gap';
+        if (!live) nameLayer.hide();
+        else {
+          const bt = useBattleStore.getState().battle, people = useGameStore.getState().game.people;
+          if (nameCache.battle !== bt || nameCache.people !== people) {
+            const map = new Map<string, string>();
+            for (const u of bt?.units ?? []) if (u.side === 'home' && u.personId) { const f = people.find(p => p.id === u.personId)?.first; if (f) map.set(u.id, f); }
+            nameCache = { battle: bt, people, map };
+          }
+          nameLayer.update(dt, ws.camera, battle.actors(), nameCache.map, battle.statuses(), (() => {
+            // in the cutaway view of the invaded house the roofs are off: its walls do not hide the people inside
+            const inv = battle.battle?.invasion, h = inv?.house, win = inv?.interior;
+            return h && win && battle.time >= win.from && battle.time <= win.to ? player.obstacleBoxes.filter(b => !(b.kind === 'building' && b.x0 <= h.x1 + 0.05 && b.x1 >= h.x0 - 0.05 && b.z0 <= h.z1 + 0.05 && b.z1 >= h.z0 - 0.05)) : player.obstacleBoxes;
+          })(), world.groundAt, canvas);
+        }
+      }
       // battle playback: start / skip / tick, camera shake, overlay progress
       const bs = useBattleStore.getState();
       if (bs.battle && bs.battle !== battle.battle) { battle.play(bs.battle); battleView ??= { x: cam.target.x, z: cam.target.z, radius: cam.radius, pitch: cam.pitch }; }
@@ -677,7 +698,7 @@ export function GameCanvas() {
       window.removeEventListener('keyup', onShift);
       player.stop();
       unCamReq();
-      battle.dispose(); unsubDamage(); damageView.dispose();
+      nameLayer.dispose(); battle.dispose(); unsubDamage(); damageView.dispose();
       tour.dispose();
       tool.dispose();
       marker.dispose();

@@ -89,6 +89,7 @@ import { DefenseTab } from './hud/DefenseTab';
 import { defenseTabAlert } from './hud/defenseAlert';
 import { CursorHint, LineToolBar, ToastLine, WelcomeCard } from './hud/Feedback';
 import { getViolence, setViolence, type Violence } from '../game/battle/bloodFx';
+import { getNames, setNames, getPips, setPips } from '../game/battle/nameLabels';
 import { useFeelStore, saveRevealed, worldId } from '../store/feelStore';
 import { visibleTabs, type RightTab } from '../sim/tabReveal';
 import { caloriesText, feetText, gallonsText, kmText, lengthText } from '../sim/units';
@@ -103,6 +104,18 @@ function ViolenceSelect() {
       <option value="graphic">Graphic</option><option value="restrained">Restrained</option>
     </select>
   );
+}
+/** Raid cutscenes: defenders' first names over their heads, and a small status pip beside each. Remembered on this device. */
+function NamesSelect() {
+  const [n, setN] = useState(getNames()), [p, setP] = useState(getPips());
+  return (<>
+    <select value={n ? 'on' : 'off'} onChange={e => { const on = e.target.value === 'on'; setNames(on); setN(on); }} title="Raid scenes: show each defender's first name over their head" aria-label="Names in raid scenes" data-testid="names-select">
+      <option value="on">Names on</option><option value="off">Names off</option>
+    </select>
+    <select value={p ? 'on' : 'off'} onChange={e => { const on = e.target.value === 'on'; setPips(on); setP(on); }} title="Raid scenes: a small dot beside each name (green fine, amber wounded, red down, cross dead, gray held)" aria-label="Status pips in raid scenes" data-testid="pips-select">
+      <option value="on">Status pips on</option><option value="off">Status pips off</option>
+    </select>
+  </>);
 }
 const SIGHTS: Array<['off' | 'road' | 'ridge' | 'night' | 'viewshed', string, string]> = [
   ['off', 'Off', 'No sightline overlay'], ['road', 'Road', 'How exposed each spot is to people on the county road'], ['ridge', 'Ridge', 'Seen from the high ground to the west'],
@@ -643,6 +656,7 @@ export function Hud() {
           {QUALITIES.map(x => <option key={x}>{x}</option>)}
         </select>
         <ViolenceSelect />
+        <NamesSelect />
         <select value={w.frameCap} onChange={e => w.setFrameCap(Number(e.target.value) as FrameCap)} title="Frame-rate cap: 60 is smooth and halves the work on a 120 Hz display" aria-label="Frame-rate cap">
           <option value={60}>60 fps</option><option value={30}>30 fps</option><option value={0}>uncapped</option>
         </select>
