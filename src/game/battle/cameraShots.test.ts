@@ -115,14 +115,24 @@ describe('every raid-cutscene shot frames its subject and stays out of the geome
     }
   });
 
-  it('in the lead-in it shows the raiders coming (the caption talks about them), never a defender at the wall', () => {
+  it('in the lead-in it varies its cuts (wide, the crew from the side, low at the gate), each held a few seconds and never the same twice running, and never a defender at the wall', () => {
     const d = new Director(4);
     d.setObstacles(bx);
     d.leadIn = true;
     const actors = cast(mulberry32(3));
-    const kinds = new Set<string>();
-    for (let t = 0; t < 40; t += 0.5) kinds.add(d.update(t, actors, [], house, ground).kind);
-    expect([...kinds]).toEqual(['raiders']);
+    const cuts: Array<{ kind: string; at: number }> = [];
+    let last = null as unknown;
+    for (let t = 0; t < 40; t += 0.25) {
+      const s = d.update(t, actors, [], house, ground);
+      if (s !== last) { cuts.push({ kind: s.kind, at: t }); last = s; }
+    }
+    const kinds = new Set(cuts.map(c => c.kind));
+    expect([...kinds].every(k => ['wide', 'raiders', 'gate'].includes(k))).toBe(true);
+    expect(kinds.size).toBeGreaterThanOrEqual(3);
+    for (let i = 1; i < cuts.length; i++) {
+      expect(cuts[i].kind).not.toBe(cuts[i - 1].kind);
+      expect(cuts[i].at - cuts[i - 1].at).toBeGreaterThanOrEqual(3);
+    }
   });
 
   it('pans after the unit it is about, and cuts away when that unit leaves the picture', () => {

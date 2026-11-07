@@ -89,6 +89,7 @@ export class BattleRenderer {
   private readonly _projs: Proj[] = [];
   private readonly _decals: THREE.Mesh[] = [];
   private readonly _flashes: THREE.PointLight[] = [];
+  private readonly _lanternLights: THREE.PointLight[] = [];
   private _flashI = 0;
   private _alarm: THREE.PointLight | null = null;
   private _alarmOn = false;
@@ -121,9 +122,15 @@ export class BattleRenderer {
     this._rings = new THREE.InstancedMesh(new THREE.RingGeometry(0.16, 0.22, 20).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.85, depthWrite: false, toneMapped: false }), 64);
     this._rings.count = 0; this._rings.frustumCulled = false; this._rings.userData = { noSSAO: true };
     this._group.add(this._rings);
-    this._pips = new THREE.InstancedMesh(new THREE.OctahedronGeometry(0.05), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.95, depthWrite: false, toneMapped: false }), 64);
+    this._pips = new THREE.InstancedMesh(new THREE.OctahedronGeometry(0.05), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.95, depthWrite: false, toneMapped: false }), 128);
     this._pips.count = 0; this._pips.frustumCulled = false; this._pips.userData = { noSSAO: true };
     this._group.add(this._pips);
+    // the lanterns raiders carry at night: two small warm lights (a fixed count, so the shaders never recompile), flickering
+    for (let i = 0; i < 2; i++) {
+      const l = new THREE.PointLight(0xffa24a, 0, 2.6, 2);
+      l.castShadow = false;
+      this._lanternLights.push(l); this._group.add(l);
+    }
     for (let i = 0; i < 4; i++) {
       const l = new THREE.PointLight(0xffc070, 0, 4, 2);
       l.castShadow = false;
@@ -230,6 +237,7 @@ export class BattleRenderer {
     if (this._alarm) { this._group.remove(this._alarm); this._alarm.dispose(); this._alarm = null; }
     this._alarmOn = false;
     for (const f of this._flashes) f.intensity = 0;
+    for (const l of this._lanternLights) l.intensity = 0;
     this.shake = 0;
     this._layer.commit(0, false);
   }
@@ -493,7 +501,29 @@ export class BattleRenderer {
       this._pips.setColorAt(ri, this._c.setHex(hex));
       ri++;
     }
-    this._rings.count = ri; this._pips.count = ri;
+    // a lantern or a flashlight in the hand of about every other raider at night: a bright pip (no extra draw: it rides the pips' instances) and, for two of them, a small light
+    let pn = ri, ln = 0;
+    const dark = !!this.battle?.night;
+    for (const u of this._units.values()) {
+      if (!dark || u.def.side !== 'raider' || u.gone || u.dead || u.def.machine || pn >= 128) continue;
+      const hsh = hashStr(u.def.id) % 4;
+      if (hsh > 1) continue;
+      const gy = this._ground(u.x, u.z) + u.y, warm = hsh === 0;
+      const hx = u.x + Math.cos(u.rot) * 0.06 + Math.sin(u.rot) * 0.03, hz = u.z - Math.sin(u.rot) * 0.06 + Math.cos(u.rot) * 0.03, hy = gy + 0.12;
+      const d = this.viewer ? Math.hypot(hx - this.viewer.x, hy - this.viewer.y, hz - this.viewer.z) : 0;
+      const sc = 0.55 + 0.1 * Math.min(6, d / 5);
+      this._m.compose(this._v.set(hx, hy, hz), this._q.identity(), this._s.setScalar(sc));
+      this._pips.setMatrixAt(pn, this._m);
+      this._pips.setColorAt(pn, this._c.setHex(warm ? 0xffb347 : 0xdff0ff));
+      pn++;
+      if (warm && ln < this._lanternLights.length) {
+        const l = this._lanternLights[ln++];
+        l.position.set(hx, hy + 0.04, hz);
+        l.intensity = 0.55 + 0.2 * Math.sin(performance.now() / 1000 * 9 + ln * 2.1) + 0.1 * Math.sin(performance.now() / 1000 * 23 + ln);
+      }
+    }
+    for (; ln < this._lanternLights.length; ln++) this._lanternLights[ln].intensity = 0;
+    this._rings.count = ri; this._pips.count = pn;
     for (const m of [this._rings, this._pips]) {
       m.instanceMatrix.needsUpdate = true;
       if (m.instanceColor) m.instanceColor.needsUpdate = true;

@@ -149,6 +149,7 @@ const FRAG = /* glsl */`
   uniform float uMoonBright;
   uniform vec3  uStadDir;
   uniform float uStadGlow;
+  uniform float uSmoke;
   varying vec3 vDir;
 
   float hash12(vec2 p) {
@@ -225,6 +226,28 @@ const FRAG = /* glsl */`
     sky += horizon * (0.06 + 0.2 * uHaze) * exp(-hp * 24.0);
     // City light pollution / residual twilight glow.
     sky += uGlow * exp(-hp * 7.0);
+    // Columns of smoke on the skyline (lawless towns, a war, a wildfire): dark leaning plumes that widen as they rise, lit orange at the root.
+    if (uSmoke > 0.001) {
+      float azs = atan(d.x, d.z);
+      float dens = 0.0, root = 0.0;
+      for (int i = 0; i < 5; i++) {
+        float fi = float(i);
+        float a0 = 0.7 + fi * 1.31 + 0.37 * sin(fi * 2.7);
+        float da = azs - a0; da = atan(sin(da), cos(da));
+        float top = 0.20 + 0.11 * fract(fi * 0.618);
+        float lean = hp * (0.9 + 0.5 * fi * 0.2) * (fi < 2.5 ? 1.0 : -0.8);
+        float wid = 0.010 + hp * 0.22;
+        float x = (da - lean) / wid;
+        float col = exp(-x * x) * smoothstep(0.0, 0.012, h) * (1.0 - smoothstep(top * 0.55, top, h));
+        col *= 0.55 + 0.7 * fbm3(vec2(da * 55.0 + fi * 9.0, h * 26.0 - uTime * 0.06));
+        dens += col;
+        root += exp(-x * x * 0.5) * exp(-hp * 55.0);
+      }
+      dens = clamp(dens, 0.0, 1.0) * uSmoke;
+      vec3 smokeCol = mix(horizon, vec3(0.10, 0.085, 0.075), 0.7) * (0.55 + 0.3 * (1.0 - uNight));
+      sky = mix(sky, smokeCol, dens * 0.82);
+      sky += vec3(1.0, 0.42, 0.10) * root * uSmoke * (0.04 + 0.12 * uNight);
+    }
 
     // Mie forward scatter around the sun.
     float cosS = dot(d, uSunDir);
@@ -517,6 +540,7 @@ export class ProceduralSky {
       uMoonBright:  { value: 0 },
       uStadDir:     { value: new THREE.Vector3(0, 1, 0) },
       uStadGlow:    { value: 0 },
+      uSmoke:       { value: 0 },
     };
     SKY_SHARED.uniforms = this.uniforms;
     this._geo = new THREE.SphereGeometry(1, 48, 24);
@@ -575,6 +599,9 @@ export class ProceduralSky {
   setMoonDirection(dir: THREE.Vector3): void {
     (this.uniforms['uMoonDir'].value as THREE.Vector3).copy(dir);
   }
+
+  /** Columns of smoke on the skyline (0 = none). */
+  setSmoke(k: number): void { this.uniforms['uSmoke'].value = k; }
 
   setNight(v: number): void {
     this.uniforms['uNight'].value = v;

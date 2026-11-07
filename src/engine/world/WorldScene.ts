@@ -108,7 +108,7 @@ export class WorldScene {
   private _envBakeCloud = 0;
   private _envBakeTint = 0;
   /** The collapse's look (setCollapseLook): sun dim, sky tint, grade cast. Neutral = nothing. */
-  private readonly _collapse = { dim: 1, tint: new THREE.Color(), amt: 0, night: false, cast: new THREE.Color(1, 1, 1), sat: 1, contrast: 0 };
+  private readonly _collapse = { dim: 1, tint: new THREE.Color(), amt: 0, night: false, cast: new THREE.Color(1, 1, 1), sat: 1, contrast: 0, townGlow: 1, flicker: 0, fireGlow: 0, smoke: 0, nightLift: 0 };
   private readonly _skyState = createSkyPalette();
   private readonly _phase: DayPhase = { day: 1, golden: 0, night: 0 };
   private _quality: Quality = 'high';
@@ -258,11 +258,16 @@ export class WorldScene {
    * The collapse's look for the next updateDayNight() (sim/collapseLook.ts): the sun dimmed, the sky pulled toward a colour (only
    * at night for an aurora), and the grade's cast, saturation and contrast. Pass the neutral values to clear it.
    */
-  setCollapseLook(l: { dim: number; tint: readonly number[]; amt: number; night: boolean; cast: readonly number[]; sat: number; contrast: number }): void {
+  setCollapseLook(l: { dim: number; tint: readonly number[]; amt: number; night: boolean; cast: readonly number[]; sat: number; contrast: number; townGlow?: number; flicker?: number; fireGlow?: number; smoke?: number; nightLift?: number }): void {
     const c = this._collapse;
     c.dim = l.dim; c.tint.setRGB(l.tint[0], l.tint[1], l.tint[2]); c.amt = l.amt; c.night = l.night;
     c.cast.setRGB(l.cast[0], l.cast[1], l.cast[2]); c.sat = l.sat; c.contrast = l.contrast;
+    c.townGlow = l.townGlow ?? 1; c.flicker = l.flicker ?? 0; c.fireGlow = l.fireGlow ?? 0; c.smoke = l.smoke ?? 0; c.nightLift = l.nightLift ?? 0;
   }
+
+  /** The raid cutscene is playing: at night the eye-level rig gets a moonlit lift (0-1) so terrain and silhouettes read. */
+  cutsceneLift = 0;
+  private _flickerT = 0;
 
   /** Valley fog bank and low cloud for the next updateDayNight(). Low quality has no fog at all, so it ignores them. */
   setHeightFog(p: HeightFogParams): void { this._hfog = p; }
@@ -365,6 +370,7 @@ export class WorldScene {
     if (this._wetnessTarget > 0) this._wetnessTarget = Math.max(0, this._wetnessTarget - dt / 45);
 
     this._sky?.tick(dt);
+    this._flickerT = (this._flickerT + dt) % 1000;
 
     if (this._particleSystem && this._particleVelocities) {
       const s = this._site;
@@ -468,6 +474,13 @@ export class WorldScene {
     if (overcast > 0.001 || wx.fog > 0.001 || wx.flash > 0.001) this._applyWeatherToSky(sky, overcast, wx.fog, wx.flash);
     sky.glow.multiplyScalar(0.5 + 1.6 * (1 - this._skyDark));
     const col = this._collapse;
+    if (col.townGlow < 0.999 || col.fireGlow > 0.001) {
+      // fewer town lights (a quiet county, a dead grid: it flickers as it fails), and fires out past the edge of town
+      const t = this._flickerT;
+      const fl = col.flicker > 0.001 ? 1 - col.flicker * (0.55 + 0.45 * Math.sin(t * 17.3) * Math.sin(t * 7.1 + 1.3)) * (Math.sin(t * 3.9) > -0.2 ? 1 : 0.15) : 1;
+      sky.glow.multiplyScalar(Math.max(0, col.townGlow * fl));
+      if (col.fireGlow > 0.001) sky.glow.add(this._c.tmp.setRGB(0.10, 0.036, 0.008).multiplyScalar(col.fireGlow * (0.25 + 0.75 * wn + 0.5 * wg)));
+    }
     const tintAmt = col.amt * (col.night ? Math.max(0, Math.min(1, (wn - 0.3) / 0.5)) : 1 - 0.6 * wn);
     if (tintAmt > 0.001) this._applyCollapseToSky(sky, tintAmt);
 
@@ -562,7 +575,7 @@ export class WorldScene {
     this._applyGradeForTime();
     // the rig as the clock and weather set it; renderFrame lifts it from there when the camera is high at night
     const ab = this._aerialBase;
-    ab.hemi = this._hemiLight.intensity; ab.fill = this._fillLight.intensity; ab.sun = this._sunLight.intensity; ab.env = this.scene.environmentIntensity;
+    ab.rim = this._rimLight.intensity; ab.hemi = this._hemiLight.intensity; ab.fill = this._fillLight.intensity; ab.sun = this._sunLight.intensity; ab.env = this.scene.environmentIntensity;
     this._aerialLift = -1;
 
     if (this._particleSystem) this._particleSystem.visible = wn < 0.5 && this._quality !== 'low';
@@ -573,6 +586,7 @@ export class WorldScene {
       tmpV.set(mx, myTrue, mz).normalize();
       this._sky.setMoonDirection(tmpV);
       this._sky.setNight(wn);
+      this._sky.setSmoke(col.smoke * (1 - 0.5 * overcast));
       const sw = this._skyWeather;
       const nightSee = Math.max(0, Math.min(1, (wn - 0.35) / 0.65));
       sw.cumulus = wx.cumulus * (1 - overcast * 0.6);
@@ -602,7 +616,7 @@ export class WorldScene {
       tmp.copy(this._hemiLight.groundColor).multiplyScalar(0.18 * this._hemiLight.intensity);
       this._sky.apply(sky, tmp);
       if (this._quality !== 'low') this.scene.background = null;
-      else this._applyLowBackground(wd, wg, wn);
+      else this._applyLowBackground(wd, wg, wn, tintAmt);
 
       let dh = Math.abs(timeOfDay - this._lastEnvUpdateHour);
       dh = Math.min(dh, 24 - dh);
@@ -690,12 +704,19 @@ export class WorldScene {
     }
   }
 
-  private _applyLowBackground(wd: number, wg: number, wn: number): void {
+  private _applyLowBackground(wd: number, wg: number, wn: number, tintAmt = 0): void {
     const bg = this.scene.background instanceof THREE.Color ? this.scene.background : new THREE.Color();
     const c = this._c.tmp;
     bg.set(this._daySkyColor).multiplyScalar(wd)
       .add(c.set(0xd98b62).multiplyScalar(wg))
       .add(c.set(0x0a1024).multiplyScalar(wn));
+    if (tintAmt > 0.001) {
+      // the collapse's tint reaches Low too (ash brown, fire orange, a pandemic's cold grey), at the background's own brightness
+      const t = this._collapse.tint, l = (x: THREE.Color) => x.r * 0.3 + x.g * 0.55 + x.b * 0.15;
+      c.copy(t).multiplyScalar(Math.max(0.02, l(bg)) / Math.max(0.02, l(t)));
+      bg.lerp(c, Math.min(1, tintAmt * 0.95));
+      if (!this._collapse.night) bg.multiplyScalar(1 - 0.25 * Math.min(1, tintAmt) * (1 - this._collapse.dim) * 2);
+    }
     this.scene.background = bg;
   }
 
@@ -845,9 +866,10 @@ export class WorldScene {
   aerialLiftOn = true;
   /** QA: scale the lift while tuning it (1 = as shipped). */
   aerialLiftGain = 1;
-  private readonly _aerialBase = { hemi: 0, fill: 0, sun: 0, env: 0 };
+  private readonly _aerialBase = { hemi: 0, fill: 0, sun: 0, env: 0, rim: 0 };
   private _aerialLift = 0;
   private _gainSeen = 1;
+  private _rimSeen = 0;
 
   /**
    * Seen from high up at night the compound is near-black: the hemisphere and moon light are tuned for eye level, where lamps and
@@ -859,15 +881,19 @@ export class WorldScene {
     const wn = this._phase.night;
     const h = this.camera.position.y;
     const t = Math.min(1, Math.max(0, (h - 14) / 34));
-    const lift = this.aerialLiftOn && wn > 0.001 ? t * t * (3 - 2 * t) * wn : 0;
-    if (Math.abs(lift - this._aerialLift) < 0.004 && this.aerialLiftGain === this._gainSeen && !(lift === 0 && this._aerialLift !== 0)) return;
-    this._aerialLift = lift; this._gainSeen = this.aerialLiftGain;
+    const aerial = this.aerialLiftOn ? t * t * (3 - 2 * t) : 0;
+    // (a raid cutscene at night and a blacked-out county lift the eye-level rig too: the moon and the stars are all the light there is)
+    const lift = wn > 0.001 ? Math.max(aerial, this.cutsceneLift * 0.85, this._collapse.nightLift) * wn : 0;
+    const rimUp = this.cutsceneLift * this._phase.night;
+    if (Math.abs(lift - this._aerialLift) < 0.004 && Math.abs(rimUp - this._rimSeen) < 0.004 && this.aerialLiftGain === this._gainSeen && !(lift === 0 && this._aerialLift !== 0)) return;
+    this._aerialLift = lift; this._gainSeen = this.aerialLiftGain; this._rimSeen = rimUp;
     const b = this._aerialBase, dark = 1 - 0.4 * moonIllumination(this._moonPhase) * this._moonUp;
     const k = lift * dark * this.aerialLiftGain;
     this._hemiLight.intensity = b.hemi * (1 + 2.4 * k);
     this._fillLight.intensity = b.fill * (1 + 4.5 * k);
     this._sunLight.intensity = b.sun * (1 + 0.8 * k);
     this.scene.environmentIntensity = b.env + 0.24 * k;
+    this._rimLight.intensity = b.rim + 0.55 * rimUp;
   }
 
   /** Render one frame (EffectComposer when available and enabled). */

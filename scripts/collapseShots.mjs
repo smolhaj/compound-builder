@@ -15,6 +15,7 @@ catch { ({ chromium } = await import('/opt/node22/lib/node_modules/playwright/in
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
 const port = Number(opt('--port', 5971)), quality = opt('--quality', 'medium');
+const quick = args.includes('--quick');   // day 6 at noon and at night only (eye and air): the look at rest, a fraction of the frames
 const kinds = opt('--kinds', 'ash_winter,grid_down,wildfire').split(',');
 const outDir = resolve(opt('--out', 'shots/collapse'));
 mkdirSync(outDir, { recursive: true });
@@ -70,6 +71,13 @@ try {
   const NOON = 12, NIGHT = 23;
   for (const kind of kinds) {
     const variant = kind === 'grid_down' ? 'substation' : undefined;
+    if (quick) {
+      await setDay(kind, 6, NOON, variant);
+      for (const mode of ['aerial', 'eye']) { await view(mode); await shot(`${kind}-day6-noon-${mode}`, 10); }
+      await setDay(kind, 6, NIGHT, variant);
+      for (const mode of ['eye', 'aerial']) { await view(mode); await shot(`${kind}-day6-night-${mode}`, 10); }
+      continue;
+    }
     await setDay(kind, -12, NOON, variant);
     for (const mode of ['aerial', 'eye']) { await view(mode); await shot(`${kind}-1-warning-${mode}`, 8); }
     // the card: the clock running through the hit

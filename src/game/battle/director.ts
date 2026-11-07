@@ -13,17 +13,20 @@ import type { Box } from './cameraObstacles';
 export type { Box } from './cameraObstacles';
 export interface Actor { id: string; side: 'home' | 'raider'; post?: string; x: number; y: number; z: number; dead: boolean; gone: boolean }
 export interface V3 { x: number; y: number; z: number }
-export type ShotKind = 'establish' | 'wide' | 'wall' | 'house' | 'raiders' | 'close';
+export type ShotKind = 'establish' | 'wide' | 'wall' | 'house' | 'raiders' | 'close' | 'gate';
 export interface Shot { kind: ShotKind; subject?: string; eye: V3; look: V3; fov: number; since: number; hold: number; drift: V3; /** Who the shot is about (ids), and how many of them must be in frame. */ subjects?: string[]; need?: number; /** The unit the operator pans after (the look eases to it as it moves). */ track?: string }
 
 const MIN_HOLD = 3.2;
-const ORDER: ShotKind[] = ['wall', 'raiders', 'house', 'wide', 'wall', 'raiders'];
-const LEAD_ORDER: ShotKind[] = ['raiders'];
+const ORDER: ShotKind[] = ['wall', 'raiders', 'house', 'wide', 'gate', 'raiders'];
+/** The lead-in is only 3-9 s of playback: a wide pose, the crew from the side, a low shot out through the gate from the defenders' side (the caption is about the raiders, so never a defender's close-up), each held a few seconds and never twice running. */
+const LEAD_ORDER: ShotKind[] = ['wide', 'raiders', 'gate'];
+/** The shortest a scheduled shot is held in the lead-in (s). */
+const LEAD_HOLD = 3.1;
 const EYE_MIN = 0.12;
 const POSE_SPAN = 12;
 
 /** The least distance (world units, 1 = 6 m) from the camera to what a shot is about, by shot type. */
-export const STANDOFF: Record<ShotKind, number> = { establish: 3, wide: 3, wall: 0.9, house: 2, raiders: 1.6, close: 0.8 };
+export const STANDOFF: Record<ShotKind, number> = { establish: 3, wide: 3, wall: 0.9, house: 2, raiders: 1.6, close: 0.8, gate: 1.2 };
 /** The farthest a subject may be before it is a speck. */
 export const REACH = 30;
 /** The camera stays this far from every wall and roof (the near plane is 0.02, so nothing clips). */
@@ -194,14 +197,16 @@ export class Director {
    * The establishing shot for the lead-in, the gaps and the tails: from the yard, toward the road (or at `focus`), high enough
    * to read the ground, never against the house.
    */
-  establish(time: number, house: V3, roadDir: { x: number; z: number }, ground: Ground, focus?: V3): Shot {
+  establish(time: number, house: V3, roadDir: { x: number; z: number }, ground: Ground, focus?: V3, variant = 0): Shot {
     const px = -roadDir.z, pz = roadDir.x;
     const target = focus ?? { x: house.x + roadDir.x * 12, y: 0, z: house.z + roadDir.z * 12 };
     const ctx: ShotCtx = { boxes: this._boxes, ground, actors: new Map() };
     const mk = (rot: number, k: number, hb: number): Shot => {
-      const o = rotate({ x: roadDir.x * 4.2 + px * 1.6, z: roadDir.z * 4.2 + pz * 1.6 }, rot, k);
+      // (each scene's establishing pose takes the other side of the road and another height, so two scenes never open on the same frame)
+      const side = variant % 2 ? -1.6 : 1.6, reach = 4.2 + (variant % 3) * 0.8, lift = [0.9, 0.45, 1.3][variant % 3];
+      const o = rotate({ x: roadDir.x * reach + px * side, z: roadDir.z * reach + pz * side }, rot, k);
       const ex = house.x + o.x, ez = house.z + o.z;
-      return { kind: 'establish', since: time, hold: 99, fov: 54, eye: { x: ex, y: ground(ex, ez) + 0.9 + hb, z: ez }, look: { x: target.x, y: ground(target.x, target.z) + 0.15, z: target.z }, drift: { x: -px * 0.025, y: 0, z: -pz * 0.025 } };
+      return { kind: 'establish', since: time, hold: 99, fov: 54 - (variant % 2) * 6, eye: { x: ex, y: ground(ex, ez) + lift + hb, z: ez }, look: { x: target.x, y: ground(target.x, target.z) + 0.15, z: target.z }, drift: { x: -px * 0.025, y: 0, z: -pz * 0.025 } };
     };
     const s = this._search(mk, ctx) ?? mk(0, 1, 2);
     this.shot = s;
@@ -233,6 +238,8 @@ export class Director {
       }
     }
     const cur = this.shot;
+    // the same cut twice running (a second close-up of the same person, a second wide) is no cut at all
+    if (want && cur && want.kind === cur.kind && want.subject === cur.subject) want = null;
     // the operator pans after the unit the shot is about (the eye stays where it was cut)
     if (cur?.track) {
       const a = byId.get(cur.track);
@@ -251,16 +258,16 @@ export class Director {
       const now: Shot = { ...cur, since: 0, hold: 0, drift: { x: 0, y: 0, z: 0 }, ...poseAt(cur, time) };
       if (cur.subjects?.length && shotProblems(now, ctx).length) due = true;   // (a subject that fell or left counts: nobody left to show)
     }
-    if (want && (!cur || held >= MIN_HOLD || want.kind === 'wide')) return this._cut(time, want.kind, want.subject, want.hold, home, raiders, hc, rc, road, house, ground);
+    if (want && (!cur || held >= MIN_HOLD || (want.kind === 'wide' && held >= 2))) return this._cut(time, want.kind, want.subject, want.hold, home, raiders, hc, rc, road, house, ground);
     if (due) {
       // next in the rotation that has something to show
       const order = this.leadIn && raiders.length ? LEAD_ORDER : ORDER;
       for (let k = 0; k < order.length; k++) {
         const kind = order[(this._cycle + k) % order.length];
         if (kind === cur?.kind) continue;
-        if ((kind === 'wall' && !home.length) || (kind === 'raiders' && !raiders.length) || (kind === 'house' && !home.length)) continue;
+        if ((kind === 'wall' && !home.length) || ((kind === 'raiders' || kind === 'gate') && !raiders.length) || (kind === 'house' && !home.length)) continue;
         this._cycle = (this._cycle + k + 1) % order.length;
-        return this._cut(time, kind, undefined, 5 + this._r() * 4, home, raiders, hc, rc, road, house, ground);
+        return this._cut(time, kind, undefined, this.leadIn ? LEAD_HOLD + this._r() * 0.6 : 5 + this._r() * 4, home, raiders, hc, rc, road, house, ground);
       }
     }
     return cur ?? this._cut(time, 'wide', undefined, 6, home, raiders, hc, rc, road, house, ground);
@@ -329,6 +336,17 @@ export class Director {
       return this._set(this._search((rot, k, hb) => {
         const o = rotate({ x: road.x * 1.6 + px * 1.5, z: road.z * 1.6 + pz * 1.5 }, rot, k);
         return { ...base, kind: 'raiders', subject: front.id, track: front.id, subjects: crew.map(a => a.id), need: 0.6, eye: at(front.x + o.x, front.z + o.z, 0.5 + hb), look, fov: 56, drift: { x: -px * 0.03, y: 0, z: -pz * 0.03 } };
+      }, ctx));
+    }
+    if (kind === 'gate' && raiders.length) {
+      // low, on the defenders' side of the gate, looking out at the crew against the sky: silhouettes, lanterns, the road beyond
+      const front = raiders.reduce((a, b) => (Math.hypot(b.x - house.x, b.z - house.z) < Math.hypot(a.x - house.x, a.z - house.z) ? b : a));
+      const crew = raiders.filter(a => Math.hypot(a.x - front.x, a.z - front.z) < 5).slice(0, 6);
+      const cc = centroid(crew);
+      const look = at(cc.x, cc.z, cc.y + 0.2);
+      return this._set(this._search((rot, k, hb) => {
+        const o = rotate({ x: -road.x * 1.7 + px * 0.55, z: -road.z * 1.7 + pz * 0.55 }, rot, k);
+        return { ...base, kind: 'gate', subject: front.id, subjects: crew.map(a => a.id), need: 0.5, eye: at(cc.x + o.x, cc.z + o.z, 0.15 + hb * 0.6), look, fov: 46, drift: { x: road.x * 0.03, y: 0, z: road.z * 0.03 } };
       }, ctx));
     }
     if (kind === 'house' && home.length) {
