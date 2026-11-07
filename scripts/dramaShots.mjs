@@ -90,14 +90,17 @@ try {
     g.disaster.tracks = { ...g.disaster.tracks, law: 0, stores: 0, deliveries: 0, banks: 0 };
     g.stock.canned = 20; g.stock.meds = 3; g.stock.sandbags = 3; g.stock.dog = 1; g.armory.ammo['556'] = 2000;
     for (const [i, p] of g.people.entries()) if (!p.kid || p.age >= 15) { g.armory.guns.push({ id: `g${i}`, model: 'sw_mp15', condition: 1, fired: 0, where: 'house', carrier: p.id }); g.armory.skill[p.id] = 4; }
-    const mk = d => ({ id: 'e9', kind: 'gang', day: d, title: 'An armed crew', dossier: ['10 of them, organized, rifles.', 'They know what they want.'], size: 10, armed: true, strength: 130, wants: { canned: 8, fuel: 4 }, stances: ['hide', 'parley', 'defend', 'trade'], temper: 'hard' });
-    let best = null;
-    for (let d = 1; d < 600; d++) {
-      const gg = structuredClone(g); gg.gate.pending = mk(d);
-      const st = stageRaid(gg, 'defend');
-      const sc = st.plan.scenes.length;
-      if (st.drama && sc >= 2) { const score = (st.drama.raider ? 2 : 0) + (st.drama.injured.length ? 1 : 0); if (!best || score > best.score) best = { d, score }; if (score >= 3) break; }
+    const mkf = (d, size, strength) => ({ id: 'e9', kind: 'gang', day: d, title: 'An armed crew', dossier: ['A crew, organized, rifles.', 'They know what they want.'], size, armed: true, strength, wants: { canned: 8, fuel: 4 }, stances: ['hide', 'parley', 'defend', 'trade'], temper: 'hard' });
+    let best = null, mk = null;
+    for (const [size, strength] of [[9, 100], [7, 80], [6, 60], [5, 45]]) {
+      for (let d = 1; d < 500 && !best; d++) {
+        const gg = structuredClone(g); gg.gate.pending = mkf(d, size, strength);
+        const st = stageRaid(gg, 'defend');
+        if (st.drama) { const score = (st.drama.raider ? 2 : 0) + (st.drama.injured.length ? 1 : 0); if (!best || score > best.score) best = { d, score, size, strength }; if (score >= 3) break; }
+      }
+      if (best) break;
     }
+    mk = d => mkf(d, best.size, best.strength);
     g.gate.pending = mk(best.d);
     const { useBattleStore } = await import('/src/store/battleStore.ts');
     const { useCutsceneView } = await import('/src/store/cutsceneStore.ts');
@@ -161,7 +164,8 @@ try {
     const first = (f) => ev.find(f)?.t;
     const fall = ev.find(e => e.kind === 'beat' && e.role === 'fall'), death = ev.find(e => e.kind === 'death' && e.unit === fall.unit);
     const vigil = ev.find(e => e.kind === 'beat' && e.role === 'vigil');
-    return { aim: first(e => e.kind === 'beat' && e.role === 'aim'), fall: fall.t, death: death.t, vigil: vigil.t,
+    const vigil2 = [...ev].reverse().find(e => e.kind === 'beat' && e.role === 'vigil');
+    return { aim: first(e => e.kind === 'beat' && e.role === 'aim'), fall: fall.t, death: death.t, vigil: vigil.t, vigil2: vigil2.t,
       grief: first(e => e.kind === 'say' && e.ctx === 'grief'), tend: first(e => e.kind === 'beat' && e.role === 'tend'), carry: first(e => e.kind === 'beat' && e.role === 'carry'),
       prisoner: first(e => e.kind === 'say' && e.ctx === 'prisoner_reply'), prisonerBeat: first(e => e.kind === 'beat' && e.role === 'prisoner'), end: first(e => e.kind === 'end') };
   });
@@ -186,7 +190,7 @@ try {
   const at = async (t) => { await page.evaluate(t => window.__adv((v, bt) => (v.seg === 'fight' || v.seg === 'tail') && bt >= t - 3, 40000, 0.25), t); await page.evaluate(t => window.__adv((v, bt) => (v.seg === 'fight' || v.seg === 'tail') && bt >= t, 40000, 0.05), t); };
   const plan = [
     ['02-shooter-aims', T.aim + 0.3], ['03-the-hit', T.fall + 0.12], ['04-the-fall', T.fall + 0.85], ['05-down', T.death + 2.2],
-    ['06-pool-spreading', T.vigil + 6], ['08-mourning', (T.grief ?? T.vigil + 14) + 1.5], ['09-tending-the-injured', T.tend != null ? T.tend + 3.5 : null],
+    ['06-pool-spreading', T.vigil + 6], ['08-mourning', T.vigil2 + 2.4], ['09-tending-the-injured', T.tend != null ? T.tend + 3.5 : null],
     ['10-carrying-her-in', T.carry != null ? T.carry + 5 : null], ['11-the-raider-left-behind', T.prisoner != null ? T.prisoner + 0.8 : null], ['15-the-end', T.end - 1.2],
   ];
   for (const [name, t] of plan) { if (t == null) { console.log('skip', name); continue; } await at(t); await shot(name); }

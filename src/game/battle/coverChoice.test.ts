@@ -45,4 +45,9 @@ describe('cover choice', () => {
     expect(dropsProne(true, false, true)).toBe(false);
     expect(dropsProne(true, true, false)).toBe(true);
   });
+  it('prefers a wall to a bush when both block the line (a bush hides a man, it does not stop a round)', () => {
+    const bush = { x: 0, z: 4.3, r: 0.15, h: 0.25 };
+    expect(chooseCover({ x: 0, z: 4 }, { x: 0, z: 20 }, [wall], [bush]).stance).toBe('lean');
+    expect(chooseCover({ x: 0, z: 4 }, { x: 0, z: 20 }, [], [bush]).stance).toBe('kneel');   // (with no wall, the bush will do)
+  });
 });

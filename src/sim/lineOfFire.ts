@@ -54,13 +54,23 @@ const buildingHeight = (id: string, floorY: number): number => id.startsWith('wa
 const PORCH_HEIGHT = 0.3;
 const NOT_SOLID = new Set(['field', 'garden', 'pond', 'reservoir', 'orchard', 'orchard_grove', 'terrace_stair', 'terrace_ramp', 'equipment_yard', 'vehicle_yard', 'motor_court']);
 
+/**
+ * Things a person kneels behind (a crate, a barrel, a well curb, a woodpile, a truck or a tractor), by the structure's kind id: about hip high
+ * (0.1 to 0.3), so they stop a round for a kneeling shooter but a standing one fires over them. Null for anything else (a building: roof high).
+ */
+export function lowCoverHeight(id: string): number | null {
+  if (/vehicle|truck|car_|pickup|tractor|trailer|cart/.test(id)) return 0.3;
+  if (/crate|barrel|well|woodpile|wood_stack|log_pile|stack|trough|planter|generator|mower|hay|bale|sandbag/.test(id)) return /hay|bale|sandbag|well|trough|planter/.test(id) ? 0.2 : 0.26;
+  return null;
+}
+
 /** What stops a round: the buildings (to the roof line) and the solid runs of wall, off the game. */
 export function fireBoxesOf(g: Pick<GameState, 'structures' | 'perimeter'>): Box[] {
   const out: Box[] = [];
   for (const st of g.structures) {
     const def = KIT[st.kind];
     if (!def || st.unplaced || def.level === 'underground' || NOT_SOLID.has(st.kind) || !isFinished(st)) continue;
-    out.push({ ...footprint(def, st.x, st.z, st.rot, false), h: buildingHeight(st.kind, def.floorY), kind: 'building' });
+    out.push({ ...footprint(def, st.x, st.z, st.rot, false), h: lowCoverHeight(st.kind) ?? buildingHeight(st.kind, def.floorY), kind: 'building' });
     if (def.frontCells > 0) out.push({ ...footprint(def, st.x, st.z, st.rot, true), h: PORCH_HEIGHT, kind: 'building' });
   }
   for (const run of g.perimeter) {
