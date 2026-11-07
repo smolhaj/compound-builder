@@ -204,6 +204,8 @@ export function injectFigureShader(mat: THREE.MeshStandardMaterial): void {
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uRain = FIGURE_UNIFORMS.uRain;
     shader.uniforms.uTime = FIGURE_UNIFORMS.uTime;
+    // (a rim of light along the silhouette, per material: colour x strength, zero unless a layer asks for it, so crowds are untouched)
+    shader.uniforms.uRim = (mat.userData.rim ??= { value: new THREE.Vector3(0, 0, 0) });
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>
         uniform float uRain;
@@ -221,6 +223,7 @@ export function injectFigureShader(mat: THREE.MeshStandardMaterial): void {
         varying vec3 vAgAlt;
         varying vec2 vAgCut;
         varying float vAgY;
+        varying float vAgHash;
         vec3 agRot(vec3 p, float a) {
           float c = cos(a), s = sin(a);
           return vec3(p.x, p.y * c - p.z * s, p.y * s + p.z * c);
@@ -312,6 +315,7 @@ export function injectFigureShader(mat: THREE.MeshStandardMaterial): void {
         objectNormal = agYaw(agRot(objectNormal, agAng), agYawA);`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>
         vAgY = position.y;
+        vAgHash = fract(aWear.w * 5.31 + dot(aShirt, vec3(3.1, 1.7, 2.3)));
         // cross-legged: shins tucked under (half-length legs), knees out to the sides
         if (agCross > 0.5 && agIsLeg > 0.5) {
           transformed.y = ${f(HIP_Y)} - (${f(HIP_Y)} - transformed.y) * 0.5;
@@ -376,11 +380,19 @@ export function injectFigureShader(mat: THREE.MeshStandardMaterial): void {
         varying vec3 vAgCol;
         varying vec3 vAgAlt;
         varying vec2 vAgCut;
-        varying float vAgY;`)
+        varying float vAgY;
+        varying float vAgHash;
+        uniform vec3 uRim;`)
+      .replace('#include <opaque_fragment>', `
+        {
+          float agRimF = pow(1.0 - clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0), 2.2);
+          outgoingLight += uRim * agRimF * (0.65 + 0.7 * vAgHash);
+        }
+        #include <opaque_fragment>`)
       .replace('#include <color_fragment>', `#include <color_fragment>
         diffuseColor.rgb *= (vAgY > vAgCut.x || (vAgY < vAgCut.y && vAgY > 0.024)) ? vAgAlt : vAgCol;`);
   };
-  mat.customProgramCacheKey = () => 'agent-figure-v6';
+  mat.customProgramCacheKey = () => 'agent-figure-v7';
 }
 
 export function makeFigureMaterial(): THREE.MeshStandardMaterial {
@@ -447,6 +459,13 @@ export class FigureLayer {
     this.mesh.name = name;
     this.mesh.userData = { type: name, noSSAO: true };
     scene.add(this.mesh);
+  }
+
+  /** A rim of light along every figure's edge, colour x strength (sRGB hex scaled; strength 0 turns it off). Per layer: other layers keep their look. */
+  setRim(hex: number, strength: number): void {
+    const u = (this._mat.userData.rim ??= { value: new THREE.Vector3(0, 0, 0) }) as { value: THREE.Vector3 };
+    this._c.setHex(hex);
+    u.value.set(this._c.r * strength, this._c.g * strength, this._c.b * strength);
   }
 
   /** Dress instance i. */

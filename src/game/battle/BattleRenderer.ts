@@ -22,6 +22,12 @@ const TRACER_LIFE = 0.3;
 const STREAK = 1.2;
 const END_HOLD = 3.5;
 
+/** Raider clothing by light: dark and varied at night (the look stays), mid-dark work tones by day. */
+const RAIDER_SHIRTS_NIGHT = [0x1a1c1e, 0x23261f, 0x2a2622, 0x20252e, 0x2b2d24];
+const RAIDER_PANTS_NIGHT = [0x161718, 0x1b1d20, 0x1d1a16];
+const RAIDER_SHIRTS_DAY = [0x4b5240, 0x5b4c3a, 0x3f4a5a, 0x6b6a5a, 0x7a4a3c, 0x38403a, 0x62594a];
+const RAIDER_PANTS_DAY = [0x2f3338, 0x3d3a2e, 0x4a4436, 0x272b31, 0x35383c];
+
 interface U {
   def: BattleUnit;
   x: number; y: number; z: number; tx: number; ty: number; tz: number;
@@ -141,6 +147,8 @@ export class BattleRenderer {
   get playing(): boolean { return this.battle !== null; }
   /** Frozen at time 0: the cutscene's lead-in shows the cast in place before the first shot is fired. */
   hold = false;
+  /** Whether the sky is dark for this fight (the player sets it from the clock before `play`): decides the clothes and the rim. Unset: the battle's own night flag. */
+  lightNight: boolean | null = null;
 
   /** Everyone in the fight where they stand now (for the cutscene camera). */
   actors(): Array<{ id: string; side: 'home' | 'raider'; post?: string; x: number; y: number; z: number; dead: boolean; gone: boolean }> {
@@ -171,6 +179,9 @@ export class BattleRenderer {
     this.stop();
     this.battle = b;
     this.hold = false;
+    // a thin rim of sky light (day) or moonlight (night) along each figure's edge, so a dark coat still has a silhouette
+    const dark = this.lightNight ?? !!b.night;
+    if (dark) this._layer.setRim(0x7f9bd8, 0.3); else this._layer.setRim(0xdfe8f5, 0.45);
     this.time = 0; this._cursor = 0; this._endAt = -1; this.lines = [];
     const people = this._people();
     const home = b.units.filter(u => u.side === 'home');
@@ -186,8 +197,10 @@ export class BattleRenderer {
         wear.pants = 0x3b4a66;
       } else {
         wear = pickPersonaWear(r, 'resident', { season: 'winter', team: null });
-        wear.shirt = [0x1a1c1e, 0x23261f, 0x2a2622][Math.floor(r() * 3)];
-        wear.pants = 0x161718; wear.hat = -1; wear.coat = 1;
+        // (work clothes and old surplus, not one black: by day the tones read against snow and grass, at night they stay near-black)
+        const shirts = dark ? RAIDER_SHIRTS_NIGHT : RAIDER_SHIRTS_DAY, pants = dark ? RAIDER_PANTS_NIGHT : RAIDER_PANTS_DAY;
+        wear.shirt = shirts[Math.floor(r() * shirts.length)];
+        wear.pants = pants[Math.floor(r() * pants.length)]; wear.hat = -1; wear.coat = 1;
       }
       wear.hasPack = false; wear.shorts = false;
       // armor over the clothes: a coyote plate carrier (back panel), a navy soft vest, an olive helmet

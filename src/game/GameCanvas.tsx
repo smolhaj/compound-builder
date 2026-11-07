@@ -43,7 +43,7 @@ import { useBattleStore } from '../store/battleStore';
 import { BattleRenderer } from './battle/BattleRenderer';
 import { demoBattle } from './battle/demoBattle';
 import { CutscenePlayer } from './battle/CutscenePlayer';
-import { obstaclesOf } from './battle/cameraObstacles';
+import { obstaclesOf, treeBoxes } from './battle/cameraObstacles';
 import { useCutsceneView } from '../store/cutsceneStore';
 import { isFinished } from '../sim/construction';
 import { isHome } from '../sim/blueprints';
@@ -331,8 +331,10 @@ export function GameCanvas() {
       const h = g.structures.find(x => isFinished(x) && isHome(x.kind)) ?? g.structures.find(isFinished);
       return h ? { x: h.x, y: 0, z: h.z } : { x: world.camp.x, y: 0, z: world.camp.z };
     };
-    const player = new CutscenePlayer({ battle, ground: world.groundAt, house: homeSpot, commit: () => useGameStore.getState().commitCutscene(), seed: useGameStore.getState().game.seed, obstacles: () => obstaclesOf(useGameStore.getState().game) });
+    const player = new CutscenePlayer({ battle, ground: world.groundAt, house: homeSpot, commit: () => useGameStore.getState().commitCutscene(), seed: useGameStore.getState().game.seed, obstacles: () => [...obstaclesOf(useGameStore.getState().game), ...treeBoxes(world.treeSpecs, homeSpot(), 70)] });
     let cineSaved: { fov: number; near: number } | null = null;
+    /** Where the player's own camera stood before the raid prompt, and the glide back to it once the cutscene is over (yaw eased by hand: the glide has none). */
+    let camBefore: { x: number; y: number; z: number; radius: number; pitch: number; yaw: number } | null = null, camBack = false;
     let promptAt = -1, skipScene = useCutsceneView.getState().skipScene, skipAll = useCutsceneView.getState().skipAll;
     let battleView: { x: number; z: number; radius: number; pitch: number } | null = null;
     const qa: { frames: number; frameMs: number; lowrender?: boolean; weather?: boolean; renderNow?: () => Promise<void>; renderFull?: (q?: QaQuality) => Promise<void>; pose: null | { x: number; y: number; z: number; lx: number; ly: number; lz: number; fov?: number } } = { frames: 0, frameMs: 0, pose: null };
@@ -365,6 +367,15 @@ export function GameCanvas() {
       const game = useGameStore.getState().game;
       // the raid cutscene: start / stop the player, and read the clock off its timeline while it plays
       const cs = useGameStore.getState().cutscene;
+      // the raid takes the camera (the prompt settles it low in the yard, the scenes fly it): remember where it was, and put it back afterwards
+      if (cs && !camBefore) { camBefore = { x: cam.target.x, y: cam.target.y, z: cam.target.z, radius: cam.radius, pitch: cam.pitch, yaw: cam.yaw }; camBack = false; }
+      else if ((!cs || cs.phase === 'aftermath') && camBefore && !camBack) { cam.glideTo(camBefore.x, camBefore.z, camBefore.radius, camBefore.pitch, 1.4); camBack = true; }
+      if (camBack && camBefore) {
+        let dy = camBefore.yaw - cam.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+        cam.yaw += dy * Math.min(1, dt * 3);
+        cam.target.y += (camBefore.y - cam.target.y) * Math.min(1, dt * 3);
+        if (!cam.gliding && Math.abs(dy) < 0.01) { camBefore = null; camBack = false; }
+      }
       if (cs?.phase === 'playing' && !player.active) {
         cineSaved = { fov: ws.camera.fov, near: ws.camera.near };
         cam.enabled = false;

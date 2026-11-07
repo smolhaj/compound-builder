@@ -7,7 +7,7 @@ import { KIT, footprint } from '../buildkit/kit';
 import { PERIMETER } from '../../sim/perimeter';
 import type { GameState } from '../../sim/state';
 
-export interface Box { x0: number; z0: number; x1: number; z1: number; h: number; kind: 'building' | 'wall' }
+export interface Box { x0: number; z0: number; x1: number; z1: number; h: number; kind: 'building' | 'wall' | 'tree'; /** Height of the underside above the ground (a tree's crown; default 0). */ y0?: number }
 
 /** Roof line above the pad for a building (storey 0.65 plus the roof); towers are 1 unit (6 m) and a bit. */
 const buildingHeight = (id: string, floorY: number): number => id.startsWith('watchtower') ? 1.25 : floorY + 1.3;
@@ -38,6 +38,29 @@ export function obstaclesOf(g: GameState): Box[] {
         out.push({ x0: Math.min(x0, x1) - WALL_THICK, x1: Math.max(x0, x1) + WALL_THICK, z0: Math.min(z0, z1) - WALL_THICK, z1: Math.max(z0, z1) + WALL_THICK, h: def.height, kind: 'wall' });
       }
     }
+  }
+  return out;
+}
+
+/** The parts of a tree the camera needs (a parcel tree spec). */
+export interface TreeLike { x: number; z: number; y: number; scale: number; kind: string; sx: number; sy: number }
+
+const MAX_TREE_BOXES = 900;
+
+/**
+ * Trunks and crowns of the standing trees near the house as boxes, so the cutscene camera keeps out of them and never frames a subject
+ * through one (the same sizes the free camera's crown test uses). Nearest the house first; small shrubs are skipped. Pure.
+ */
+export function treeBoxes(trees: readonly TreeLike[], around: { x: number; z: number }, radius: number): Box[] {
+  const near = trees
+    .filter(t => t.scale >= 0.4 && Math.hypot(t.x - around.x, t.z - around.z) <= radius)
+    .sort((a, b) => Math.hypot(a.x - around.x, a.z - around.z) - Math.hypot(b.x - around.x, b.z - around.z))
+    .slice(0, MAX_TREE_BOXES / 2);
+  const out: Box[] = [];
+  for (const t of near) {
+    const top = 3 * t.scale * t.sy, trunk = 0.08 * t.scale, crown = (t.kind === 'conifer' ? 0.62 : 0.72) * t.scale * t.sx;
+    out.push({ x0: t.x - trunk, x1: t.x + trunk, z0: t.z - trunk, z1: t.z + trunk, h: top, kind: 'tree' });
+    if (crown > trunk * 1.5) out.push({ x0: t.x - crown, x1: t.x + crown, z0: t.z - crown, z1: t.z + crown, h: top, y0: 0.25 * t.scale, kind: 'tree' });
   }
   return out;
 }
