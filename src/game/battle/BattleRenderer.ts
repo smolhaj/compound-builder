@@ -174,7 +174,7 @@ export class BattleRenderer {
 
   /** Everyone in the fight where they stand now (for the cutscene camera). */
   actors(): Array<{ id: string; side: 'home' | 'raider'; post?: string; x: number; y: number; z: number; dead: boolean; gone: boolean }> {
-    return [...this._units.values()].map(u => ({ id: u.def.id, side: u.def.side, post: u.def.post, x: u.x, y: u.y, z: u.z, dead: u.dead, gone: u.gone }));
+    return [...this._units.values()].filter(u => !u.def.bystander).map(u => ({ id: u.def.id, side: u.def.side, post: u.def.post, x: u.x, y: u.y, z: u.z, dead: u.dead, gone: u.gone }));
   }
 
   /** Events applied since the last call (the cutscene camera reacts to them). */
@@ -186,7 +186,7 @@ export class BattleRenderer {
 
   /** Where the fight is: between the defenders and the nearest raiders still in it (for the camera), and how far apart they are. */
   focus(): { x: number; z: number; spread: number } | null {
-    const live = [...this._units.values()].filter(u => !u.gone && !u.dead);
+    const live = [...this._units.values()].filter(u => !u.gone && !u.dead && !u.def.bystander);
     const home = live.filter(u => u.def.side === 'home' && !u.def.machine), raiders = live.filter(u => u.def.side === 'raider');
     if (!home.length && !raiders.length) return null;
     const pick = home.length ? home : raiders;
@@ -206,7 +206,7 @@ export class BattleRenderer {
     if (dark) this._layer.setRim(0x7f9bd8, 0.3); else this._layer.setRim(0xdfe8f5, 0.45);
     this.time = 0; this._cursor = 0; this._endAt = -1; this.lines = [];
     const people = this._people();
-    const home = b.units.filter(u => u.side === 'home');
+    const home = b.units.filter(u => u.side === 'home' && !u.bystander);
     const src = home.length ? home : b.units;
     this._center.set(src.reduce((a, u) => a + u.x, 0) / Math.max(1, src.length), 0, src.reduce((a, u) => a + u.z, 0) / Math.max(1, src.length));
     for (const def of b.units) {

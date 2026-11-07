@@ -36,6 +36,8 @@ export interface BattleUnit {
   look?: RaiderLook;
   /** A resident who is not fighting: a child pulled indoors, a hand on the porch (`sim/defenderMoments.ts`). */
   civilian?: boolean;
+  /** Drawn but not part of the fight, so the cutscene camera never frames it (a guard at the post, a child in the yard). */
+  bystander?: boolean;
 }
 
 export type BattleEvent =

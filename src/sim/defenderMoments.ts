@@ -49,7 +49,7 @@ export function decorateDefenders(b: Battle, g: GameState, stance: Stance | null
   kids.forEach((k, i) => {
     const id = `h_${k.id}`;
     const p = at(-1.2 - i * 0.5, (i - 1.5) * 0.7);
-    units.push({ id, side: 'home', personId: k.id, x: p.x, z: p.z, post: 'open', civilian: true });
+    units.push({ id, side: 'home', personId: k.id, x: p.x, z: p.z, post: 'open', civilian: true, bystander: true });
     const door = at(-2.4, (i - 1.5) * 0.2);
     ev.push({ t: r2(2.5 + i * 0.7), kind: 'move', unit: id, x: door.x, z: door.z });
   });
@@ -61,7 +61,7 @@ export function decorateDefenders(b: Battle, g: GameState, stance: Stance | null
     const id = `h_${guard.person.id}`;
     if (units.some(u => u.id === id)) continue;
     const p = at(4.2, 1.4 + gi * 1.2);
-    units.push({ id, side: 'home', personId: guard.person.id, x: r2(p.x - ax * 3), z: r2(p.z - az * 3), post: 'open' });
+    units.push({ id, side: 'home', personId: guard.person.id, x: r2(p.x - ax * 3), z: r2(p.z - az * 3), post: 'open', bystander: true });
     ev.push({ t: 1 + gi, kind: 'move', unit: id, x: p.x, z: p.z });
     if (gi === 0) say(5, `${guard.name} is at the gate post, rifle ready.`);
     gi++;
