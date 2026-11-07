@@ -92,7 +92,7 @@ export function diffAction(prev: GameState, next: GameState): FeedbackEvent[] {
   const newCrews = next.crews.filter(c => !crewsBefore.has(c.id));
   if (newCrews.length) {
     const target = next.structures.find(x => x.id === newCrews[0].target);
-    out.push({ kind: 'hire', title: `Hired ${newCrews.length === 1 ? `a crew of ${CREW_SIZE}` : `${newCrews.length} crews`}${target ? ` for the ${kitName(target.kind)}` : ''}`, cost: Math.max(0, spent), note: 'They are paid for the hours they work.', flash: ['tab:projects', ...newCrews.map(c => `struct:${c.target}`)] });
+    out.push({ kind: 'hire', title: `Hired ${newCrews.length === 1 ? `a crew of ${CREW_SIZE}` : pluralize(newCrews.length, 'crew')}${target ? ` for the ${kitName(target.kind)}` : ''}`, cost: Math.max(0, spent), note: 'They are paid for the hours they work.', flash: ['tab:projects', ...newCrews.map(c => `struct:${c.target}`)] });
   }
   const guardsBefore = prev.guards?.staff.length ?? 0, guardsNow = next.guards?.staff.length ?? 0;
   if (guardsNow > guardsBefore) out.push({ kind: 'hire', title: `Hired a guard (${plural(guardsNow, 'guard')} on staff)`, cost: Math.max(0, spent), note: 'Paid by the month.', flash: ['tab:defense'] });

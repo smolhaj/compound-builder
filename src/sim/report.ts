@@ -137,7 +137,7 @@ export function reportCard(s: GameState): ReportCard {
     if (bo.mode === 'foot') lines.push(`${bo.going} left on foot${bo.bags ? `, ${bo.bags} with a packed bug-out bag` : ', with whatever they could snatch'}.`);
     else lines.push(`${bo.going} aboard ${bo.vehicles.length} vehicle${bo.vehicles.length === 1 ? '' : 's'} (${bo.vehicles.map(k => VEHICLES[k as keyof typeof VEHICLES]?.name.toLowerCase() ?? k).join(', ')}), loaded ${bo.covered ? 'under cover, by the passage from the house to the garage' : 'in the open, in plain view of the road'}.`);
     lines.push(`${pluralize(bo.foodDays, 'day')} of food and water ${bo.mode === 'foot' ? 'on their backs' : 'aboard'} and ${bo.mode === 'foot' ? 'a walk of' : 'fuel for'} about ${kmText(bo.rangeKm)}.`);
-    if (bo.destName) lines.push(`Bound for ${bo.destName}${bo.miles ? `, ${bo.miles} miles; the way carried a ${Math.round((bo.risk ?? 0) * 100)} % chance of trouble` : ''}. ${bo.outcome === 'robbed' ? 'They were stopped on the road and lost half of what they carried.' : bo.outcome === 'late' ? 'It took longer than planned and some of the food was gone.' : bo.outcome === 'lost_one' ? 'The trip took one of them.' : 'The way was clear.'}${bo.arrivedFoodDays !== undefined ? ` They arrived with ${pluralize(bo.arrivedFoodDays, 'day')} of food${bo.dest === 'cache' ? ' (the cache included)' : ''}.` : ''}`);
+    if (bo.destName) lines.push(`Bound for ${bo.destName}${bo.miles ? `, ${pluralize(bo.miles, 'mile')}; the way carried a ${Math.round((bo.risk ?? 0) * 100)}% chance of trouble` : ''}. ${bo.outcome === 'robbed' ? 'They were stopped on the road and lost half of what they carried.' : bo.outcome === 'late' ? 'It took longer than planned and some of the food was gone.' : bo.outcome === 'lost_one' ? 'The trip took one of them.' : 'The way was clear.'}${bo.arrivedFoodDays !== undefined ? ` They arrived with ${pluralize(bo.arrivedFoodDays, 'day')} of food${bo.dest === 'cache' ? ' (the cache included)' : ''}.` : ''}`);
     if (bo.left) lines.push(`${bo.left} had no seat and stayed behind to hold the place.`);
     if (bo.fallback) lines.push(`They had somewhere to go: ${bo.fallback} was kept for this, with the lights still paid for.`);
   }
@@ -151,23 +151,23 @@ export function reportCard(s: GameState): ReportCard {
   if (d.kind === 'grid_down' || d.kind === 'nuclear') {
     if (solar && !battery && s.utilities.grid) lines.push('The solar was grid-tied: when the grid died, so did the panels.');
     else if (st.darkDays === 0 && solar && battery) lines.push('The batteries kept the lights and the freezer on.');
-    else if (st.darkDays > 30) lines.push(`${st.darkDays} nights by lamplight.`);
+    else if (st.darkDays > 30) lines.push(`${pluralize(st.darkDays, 'night')} by lamplight.`);
   }
   // shelter and fallout
   if (d.kind === 'nuclear') {
-    if (st.maxDose < 0.1) lines.push('The shelter held: nobody took more than a chest X-ray\'s worth of fallout in a year of them.');
-    else if (st.maxDose > 1) lines.push(`Radiation sickness: the worst dose was ${st.maxDose.toFixed(1)} Sv.`);
+    if (st.maxDose < 0.1) lines.push('The shelter held: nobody took more than a chest X-ray\'s worth of radiation.');
+    else if (st.maxDose > 1) lines.push(`Radiation sickness: the worst dose was ${st.maxDose.toFixed(1)} sieverts.`);
     if (s.utilities.fried.length) lines.push('The EMP fried the electronics and there were no spares to put in.');
   }
   // food
   const grown = st.kcalNeed ? st.kcalGrown / st.kcalNeed : 0;
   if (end === 'wipe' && starved > 0 && st.hungryDays === 0) lines.push(`${starved} ${starved === 1 ? 'person' : 'people'} died for lack of food or water.`);
   else if (st.hungryDays === 0) lines.push('Nobody went hungry.');
-  else lines.push(`${st.hungryDays} hungry days.`);
+  else lines.push(`${pluralize(st.hungryDays, 'hungry day')}.`);
   if (grown > 0.05) {
     const src = [has('field') && 'the fields', has('garden') && 'the garden', has('chicken_coop') && 'the hens'].filter(Boolean) as string[];
     const what = src.length ? src.slice(0, -1).join(', ') + (src.length > 1 ? ' and ' : '') + src[src.length - 1] : 'what the place grew';
-    lines.push(`${what[0].toUpperCase() + what.slice(1)} covered ${Math.round(grown * 100)} % of what everyone ate.`);
+    lines.push(`${what[0].toUpperCase() + what.slice(1)} covered ${Math.round(grown * 100)}% of what everyone ate.`);
   }
   // people
   const medic = Math.max(0, ...s.people.filter((_, i) => s.personState[i]?.needs.died == null).map(p => p.skills.medic));
@@ -193,6 +193,6 @@ export function reportCard(s: GameState): ReportCard {
   return {
     masthead: mastheadOf(s.site?.region), date: end === 'wipe' && !hit ? 'Before the collapse' : `Day ${days} after ${name.toLowerCase()}`,
     headline, sub, grade, score, lines,
-    facts: [[end === 'wipe' ? 'Alive on the place' : 'Survived', `${alive} of ${total}`], ['Humanity', `${Math.round(g.humanity)}`], ['Days of it', `${days}`], end === 'wipe' && away.length ? ['Alive elsewhere', `${away.length}`] : ['Hungry days', `${st.hungryDays}`]],
+    facts: [[end === 'wipe' ? 'Alive on the place' : 'Survived', `${alive} of ${total}`], ['Humanity', `${Math.round(g.humanity)}`], ['Days since the hit', `${days}`], end === 'wipe' && away.length ? ['Alive elsewhere', `${away.length}`] : ['Hungry days', `${st.hungryDays}`]],
   };
 }

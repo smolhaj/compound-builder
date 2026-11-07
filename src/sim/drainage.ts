@@ -67,7 +67,7 @@ export function drainageLines(s: GameState): string[] {
   const cut = cutSites(s), open = undrained(s), d = drains(s);
   if (!cut.length && !d.length) return [];
   const out: string[] = [];
-  if (cut.length) out.push(open.length ? `${open.length} of ${cut.length} building${cut.length > 1 ? 's' : ''} cut into a slope have nothing to turn the runoff: the work on them bogs down in the thaw and in storms (a drainage channel above each takes ${Math.round(DRAIN.MUD_CUT * 100)} % of that away).` : `All ${cut.length} building${cut.length > 1 ? 's' : ''} cut into a slope are drained.`);
+  if (cut.length) out.push(open.length ? `${open.length} of ${cut.length} building${cut.length > 1 ? 's' : ''} cut into a slope have nothing to turn the runoff: the work on them bogs down in the thaw and in storms (a drainage channel above each takes ${Math.round(DRAIN.MUD_CUT * 100)}% of that away).` : `All ${cut.length} building${cut.length > 1 ? 's' : ''} cut into a slope are drained.`);
   if (d.length) out.push(`${d.length} drainage channel${d.length > 1 ? 's' : ''} standing (${PERIMETER[DRAIN_KIND].name.toLowerCase()}).`);
   return out;
 }

@@ -37,7 +37,7 @@ describe('the terraced orchard', () => {
     expect(flat.shift).toBe(DRAIN_DAYS);
   });
 
-  it('drip water is 30 % lower, and the benches take the slope\'s aspect: a south face gains, a north face loses, at most 6 %', () => {
+  it('drip water is 30% lower, and the benches take the slope\'s aspect: a south face gains, a north face loses, at most 6%', () => {
     const g = game(); const a = built(g, 't', 'orchard_terraced', 62, 8);
     const w1 = (g.clock.t = 160, orchardWaterL(g));
     g.structures = []; built(g, 'g', 'orchard_grove', 62, 8);

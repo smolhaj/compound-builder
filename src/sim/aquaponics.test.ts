@@ -94,7 +94,7 @@ describe('aquaponics', () => {
     expect(g.utilities.report.useL).toBeGreaterThan(AQUA.WATER_L);
   });
 
-  it('fish water feeds the nearby beds (+3 %), the report says what is wrong, and the greens reach the table', () => {
+  it('fish water feeds the nearby beds (+3%), the report says what is wrong, and the greens reach the table', () => {
     const g = game(); built(g, 'a', 'aquaponics', 30, 30); built(g, 'g1', 'garden', 34, 30); built(g, 'g2', 'garden', 60, 60); at(g, 200); power(g, 'a');
     const a = aquaOf(g, 'a'); a.fish = 100; a.fishG = 150; a.tempC = 26;
     expect(fertigationK(g, { x: 34, z: 30 })).toBeCloseTo(1.03, 5);

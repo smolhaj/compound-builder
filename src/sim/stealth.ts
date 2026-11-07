@@ -104,9 +104,9 @@ export function giveAways(s: GameState, lines: readonly LightLine[], cook: numbe
 export function stealthCosts(s: GameState): string[] {
   const out: string[] = [];
   const m: BurnMode = burnMode(s);
-  if (m === 'smokeless') out.push('Smokeless burn: about 15 % more firewood.');
-  if (m === 'dusk') out.push(chill(s) > 0 ? `Dusk-only stove: a cold house by morning (morale ${Math.round(chillMorale(s))}, some frostbite risk for children and the old); about 20 % less wood.` : 'Dusk-only stove: about 20 % less wood (the nights are mild, so no chill yet).');
-  if (quietHours(s)) out.push(`Quiet hours: night work at ${Math.round(STEALTH.QUIET_WORK * 100)} % between 21:00 and 05:00.`);
+  if (m === 'smokeless') out.push('Smokeless burn: about 15% more firewood.');
+  if (m === 'dusk') out.push(chill(s) > 0 ? `Dusk-only stove: a cold house by morning (morale ${Math.round(chillMorale(s))}, some frostbite risk for children and the old); about 20% less wood.` : 'Dusk-only stove: about 20% less wood (the nights are mild, so no chill yet).');
+  if (quietHours(s)) out.push(`Quiet hours: night work at ${Math.round(STEALTH.QUIET_WORK * 100)}% between 21:00 and 05:00.`);
   const dark = stealthOf(s).full || s.opsec?.blackout;
   if (dark) out.push('Lights out: dark rooms without blackout curtains (slower night work, a worse mood).');
   return out;

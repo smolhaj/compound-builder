@@ -653,7 +653,7 @@ export function moveIn(s: GameState, opts: MoveOpts): string[] {
   } else if (opts.sell && q && !saleBlock(s)) {
     s.money += q.net;
     w.town.status = 'sold'; w.town.soldFor = q.value; w.town.net = q.net; w.town.soldDay = dayIndex(s.clock.t);
-    out.push(`The town house sold for ${money(q.value)} (${Math.round(q.factor * 100)} % of what it was worth): the agent and closing took ${money(q.fees)}, the mortgage ${money(q.mortgage)}, and ${q.net >= 0 ? `${money(q.net)} went into the account` : `${money(-q.net)} came out of it`}.`);
+    out.push(`The town house sold for ${money(q.value)} (${Math.round(q.factor * 100)}% of what it was worth): the agent and closing took ${money(q.fees)}, the mortgage ${money(q.mortgage)}, and ${q.net >= 0 ? `${money(q.net)} went into the account` : `${money(-q.net)} came out of it`}.`);
     if (s.startFunds) { s.startFunds.lines.push({ label: 'Town house sold (after the mortgage)', usd: q.net }); s.startFunds.budget += q.net; }
     w.town.mortgage = 0;
   } else {
@@ -738,9 +738,9 @@ export function moveInCard(s: GameState, id: string, voluntary = false): Encount
     voluntary ? 'You decide to settle the question: is it time to live on the place?' : (news.length ? `The signs are everywhere. ${news.join(' ')}` : 'The talk in town has changed. People are stocking up and watching the news.'),
     rented
       ? `The place in town is rented, ${money(w.town.rent!)} a month. Nothing to sell and no market to fall: give notice and the deposit comes back. The rent is the cost of every week they wait.`
-      : q ? `The town house: worth about ${money(w.town.value)} in a normal market, ${money(q.value)} now (${Math.round(q.factor * 100)} %) with ${money(q.mortgage)} still owed. ${block ? `You cannot sell: ${block}.` : q.net >= 0 ? `Sold today it would clear ${money(q.net)} after the agent and the mortgage. Next month it will be worth less, and soon it will not sell at all.` : `Sold today it would leave ${money(-q.net)} owed on the mortgage, which you would have to cover. Next month it will be worth less, and soon it will not sell at all.`}` : 'The town house is already sold.',
+      : q ? `The town house: worth about ${money(w.town.value)} in a normal market, ${money(q.value)} now (${Math.round(q.factor * 100)}%) with ${money(q.mortgage)} still owed. ${block ? `You cannot sell: ${block}.` : q.net >= 0 ? `Sold today it would clear ${money(q.net)} after the agent and the mortgage. Next month it will be worth less, and soon it will not sell at all.` : `Sold today it would leave ${money(-q.net)} owed on the mortgage, which you would have to cover. Next month it will be worth less, and soon it will not sell at all.`}` : 'The town house is already sold.',
     jobs.length ? `Jobs: ${jobs.map(j => `${j.person.first} (${j.person.job!.title.toLowerCase()}) ${j.remote ? (w.keepJobs ? 'can keep working from the place' : 'would quit (you chose to quit them all)') : 'would have to quit: the drive is ' + Math.round(w.driveMiles / 55 * 60) + ' minutes each way'}`).join('; ')}.` : 'Nobody has a job left to give up.',
-    `The place is ${w.driveMiles} miles up the road: about ${pluralize(Math.round(w.driveMiles / 55 * 10) / 10, 'hour')} each way. Every week in town is a week not building, and the day the roads close they are on the wrong end.`,
+    `The place is ${pluralize(w.driveMiles, 'mile')} up the road: about ${pluralize(Math.round(w.driveMiles / 55 * 10) / 10, 'hour')} each way. Every week in town is a week not building, and the day the roads close they are on the wrong end.`,
   ];
   return {
     id, kind: 'move_in', day,
@@ -791,7 +791,7 @@ function strandedCard(s: GameState, id: string): Encounter {
   return {
     id, kind: 'stranded', day, title: 'Caught in town',
     dossier: [
-      `${s.disaster.phase === 'impact' ? 'It has happened' : 'It has hit'} and the family is at the town house, ${w.driveMiles} miles from the place, with the kids at school and two jobs to leave. The compound stands empty${w.caretaker ? `, except for the ${CARETAKER[w.caretaker.kind].name.toLowerCase().replace(/^a /, '')}` : ''}.`,
+      `${s.disaster.phase === 'impact' ? 'It has happened' : 'It has hit'} and the family is at the town house, ${pluralize(w.driveMiles, 'mile')} from the place, with the kids at school and two jobs to leave. The compound stands empty${w.caretaker ? `, except for the ${CARETAKER[w.caretaker.kind].name.toLowerCase().replace(/^a /, '')}` : ''}.`,
       running ? `${running} vehicle${running === 1 ? '' : 's'} ${running === 1 ? 'runs' : 'run'} with ${gallonsText(cars.reduce((a, v) => a + (runs(v) ? v.fuel : 0), 0))} between them. Traffic out of the city is ${jam > 0.65 ? 'at a standstill' : jam > 0.4 ? 'heavy, with checkpoints reported' : 'thick but moving'}.` : 'Nothing runs. The place is a long walk up the road.',
       'Behind them the place keeps going without anybody: the animals, the garden, the doors. Every hour you lose it is open.',
     ],
@@ -836,7 +836,7 @@ export function resolveStranded(s: GameState, stance: Stance): Outcome {
   const driveDays = Math.max(1, Math.ceil(0.4 + 2.4 * jam));
   const days = walking ? Math.ceil(w.driveMiles / 14) : Math.ceil(driveDays * (how === 'back_roads' ? 1.6 : 1) + (how === 'resupply' ? 1 : 0));
   const pDay = (how === 'back_roads' ? 0.07 : how === 'resupply' ? 0.16 : 0.12) + 0.35 * jam * (walking ? 1.4 : 1);
-  const notes: string[] = [walking ? `On foot: ${w.driveMiles} miles at fourteen a day with the kids.` : `${how === 'back_roads' ? 'Back roads' : 'The highway'}: ${driveDays === 1 ? 'a day' : driveDays + ' days'} in the traffic.`];
+  const notes: string[] = [walking ? `On foot: ${pluralize(w.driveMiles, 'mile')} at fourteen a day with the kids.` : `${how === 'back_roads' ? 'Back roads' : 'The highway'}: ${driveDays === 1 ? 'a day' : driveDays + ' days'} in the traffic.`];
   const hurt: NonNullable<Stranded['hurt']> = [];
   const lost: string[] = [];
   let extra = 0;

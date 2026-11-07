@@ -6,6 +6,7 @@ import { clockLabel, gapLabel } from '../sim/siege';
 import { afterLabel } from '../sim/aftermathLabel';
 import type { Battle } from '../sim/battleTypes';
 import { STANCE } from './stanceText';
+import { pluralize } from '../sim/words';
 
 const BAR = 'clamp(54px, 12vh, 120px)';
 const FONT = '"Iowan Old Style", "Palatino Linotype", Georgia, serif';
@@ -119,7 +120,7 @@ function Offer() {
 function MoreLines({ rounds, lines }: { rounds: number; lines: string[] }) {
   const [open, setOpen] = useState(false);
   return <div style={{ marginTop: 5, fontSize: 12.5 }}>
-    <button onClick={() => setOpen(!open)} style={{ background: 'transparent', border: 0, padding: 0, color: '#d8c9a0', cursor: 'pointer', fontSize: 12.5, fontFamily: 'inherit' }}>{open ? '\u25BE less' : `\u25B8 more (${rounds} rounds fired${lines.length ? `, ${lines.length} notes` : ''})`}</button>
+    <button onClick={() => setOpen(!open)} style={{ background: 'transparent', border: 0, padding: 0, color: '#d8c9a0', cursor: 'pointer', fontSize: 12.5, fontFamily: 'inherit' }}>{open ? '\u25BE less' : `\u25B8 more (${pluralize(rounds, 'round')} fired${lines.length ? `, ${pluralize(lines.length, 'note')}` : ''})`}</button>
     {open && <div style={{ opacity: 0.8 }}><div style={{ marginTop: 4 }}>Rounds fired: {rounds}</div>{lines.map((l, i) => <div key={i} style={{ marginTop: 4 }}>{l}</div>)}</div>}
   </div>;
 }

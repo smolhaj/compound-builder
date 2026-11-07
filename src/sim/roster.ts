@@ -44,7 +44,7 @@ export function whoShouldDo(s: GameState, n = 6): DutyAdvice[] {
     const best: Suitor[] = [];
     for (const { e, teacher } of slots.slice(0, 2)) {
       const st = s.people.find(p => p.id === e.pid), def = COURSES[e.course];
-      if (st) best.push({ p: st, fit: 1, level: levelFor(s, st, def.skill), why: `studying ${def.name.toLowerCase()}, ${Math.round(100 * e.done / def.hours)} % of the way` });
+      if (st) best.push({ p: st, fit: 1, level: levelFor(s, st, def.skill), why: `studying ${def.name.toLowerCase()}, ${Math.round(100 * e.done / def.hours)}% of the way` });
       const t = teacher ? s.people.find(p => p.id === teacher) : null;
       if (t) best.push({ p: t, fit: 1, level: levelFor(s, t, def.skill), why: `teaching ${st?.first ?? 'the course'}` });
     }
@@ -52,7 +52,7 @@ export function whoShouldDo(s: GameState, n = 6): DutyAdvice[] {
   }
   if (drillDay(s)) {
     const call = s.people.filter(p => drillable(s, p)).sort((a, b) => drilledOf(s, a.id) - drilledOf(s, b.id)).slice(0, 2);
-    if (call.length) extra.push({ duty: 'drill', hours: call.length, best: call.map(p => ({ p, fit: 1, level: levelFor(s, p, 'shooting'), why: `shooting ${Math.floor(levelFor(s, p, 'shooting'))}, ${Math.round(100 * drilledOf(s, p.id))} % ready at the alarm` })) });
+    if (call.length) extra.push({ duty: 'drill', hours: call.length, best: call.map(p => ({ p, fit: 1, level: levelFor(s, p, 'shooting'), why: `shooting ${Math.floor(levelFor(s, p, 'shooting'))}, ${Math.round(100 * drilledOf(s, p.id))}% ready at the alarm` })) });
   }
   return [...base, ...extra];
 }

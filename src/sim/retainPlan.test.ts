@@ -14,7 +14,7 @@ describe('retaining wall plan', () => {
     expect(blocksWalk(p, 0, -0.9)).toBe(false);
   });
 
-  it('a 25 % slope cuts the uphill side (north) and fills the downhill side (south), tapering to nothing along the east and west sides', () => {
+  it('a 25% slope cuts the uphill side (north) and fills the downhill side (south), tapering to nothing along the east and west sides', () => {
     const p = planPad(fp, slope(0.25));
     expect(p.skirt).toBe(RW.SKIRT);
     const [n, e, s, w] = p.runs;

@@ -38,6 +38,7 @@ import { findTool, TOOLS } from './tools';
 import { diffOf } from './difficulty';
 import { cargoKg, driveTrip, roadTrouble } from './vehicles';
 import { gallonsText } from './units';
+import { pluralize } from './words';
 
 // ─────────────────────────────────────────────────────────────────────────
 // State
@@ -361,7 +362,7 @@ export function resolveRun(s: GameState, run: Run): RunResult {
     lines.push(...applyCasualties(s, f.battle));
     let rounds = 0;
     for (const [cal, n] of Object.entries(f.spent) as Array<[Caliber, number]>) { s.armory.ammo[cal] = Math.max(0, (s.armory.ammo[cal] ?? 0) - n); rounds += n; }
-    if (rounds) lines.push(`${rounds} rounds fired.`);
+    if (rounds) lines.push(`${pluralize(rounds, 'round')} fired.`);
     return f.result === 'wiped' || f.result === 'routed' ? 'won' : 'lost';
   };
 

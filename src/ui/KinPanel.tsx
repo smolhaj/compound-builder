@@ -36,10 +36,10 @@ export function KinPanel() {
         const st = w.build ? game.structures.find(x => x.id === w.build) : undefined;
         const bp = st ? BLUEPRINTS[st.kind] : undefined;
         const pct = st && bp ? Math.round(Math.min(1, (bp.stages.slice(0, st.stage).reduce((a, x) => a + x.hours, 0) + st.done) / bp.stages.reduce((a, x) => a + x.hours, 0)) * 100) : 0;
-        return <Note key={w.ids.join()} tone="warn">{w.people.map(fullName).join(' and ')} wait for {st ? `the ${st.kind.replace(/_/g, ' ')} you staked (${pct} % built)` : 'a place of their own: stake one in Build → Home & work'}: day {Math.max(0, day - w.since)} of {w.until - w.since}.</Note>;
+        return <Note key={w.ids.join()} tone="warn">{w.people.map(fullName).join(' and ')} wait for {st ? `the ${st.kind.replace(/_/g, ' ')} you staked (${pct}% built)` : 'a place of their own: stake one in Build → Home & work'}: day {Math.max(0, day - w.since)} of {w.until - w.since}.</Note>;
       })}
       {rigs.map(w => <Note key={w.id} tone="warn">{w.owners.map(id => game.people.find(p => p.id === id)?.first).filter(Boolean).join(' and ')}{'\u2019'}s {w.kind === 'rv_camper' ? 'RV' : 'travel trailer'} waits for a pad: Build → Home &amp; work.</Note>)}
-      {pending.map(p => <Note key={p.names + p.what} tone="warn">{p.names}: {p.kind === 'modular' ? 'their modular home' : p.kind === 'own_build' ? 'the cabin they are building' : 'a place'} ({p.what}), {p.pct} % done; they sleep in tents till then.</Note>)}
+      {pending.map(p => <Note key={p.names + p.what} tone="warn">{p.names}: {p.kind === 'modular' ? 'their modular home' : p.kind === 'own_build' ? 'the cabin they are building' : 'a place'} ({p.what}), {p.pct}% done; they sleep in tents till then.</Note>)}
       {kin && kin.away.length > 0 && <Hint more={<>{kin.away.map(p => `${p.first} (${kinTitle(p, game.people)})`).join(', ')}{kin.open ? '; they may ask to come.' : '.'}</>}>{kin.away.length} still in town{kin.open ? ', may ask to come' : ''}.</Hint>}
     </Section>
   );

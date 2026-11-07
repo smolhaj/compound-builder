@@ -29,7 +29,7 @@ describe('frost and wind at a spot', () => {
     expect(gardenSeasonK(g, { x: 50, z: 50 }, g1 - 2, g0, g1)).toBeLessThan(gardenSeasonK(g, { x: 60, z: 8 }, g1 - 2, g0, g1));
   });
 
-  it('the exposed knoll costs fields, gardens and orchards a few percent; a hedge or fence on it halves that; the hollow costs the field 8 %', () => {
+  it('the exposed knoll costs fields, gardens and orchards a few percent; a hedge or fence on it halves that; the hollow costs the field 8%', () => {
     const g = game();
     const knoll = { x: 20, z: 20 }, open = { x: 60, z: 8 }, hollow = { x: 50, z: 50 };
     expect(siteClimate(g, knoll).windy).toBe('exposed');

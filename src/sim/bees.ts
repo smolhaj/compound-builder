@@ -107,7 +107,7 @@ export function stockProblem(s: GameState, id: string): string | null {
   if (stock(s, 'bee_nuc') < 1) return 'no colony: buy a nucleus in the Shop (Food & farm)';
   if (apiaryOf(s, id).colonies >= HIVES) return `the apiary holds ${HIVES} hives`;
   const { doy } = calendarOf(s.clock), [a, b] = flightDays(s);
-  if (doy < a - 10 || doy > b - 60) return 'bees go in in spring, when the first flowers are out';
+  if (doy < a - 10 || doy > b - 60) return 'bees go in during spring, when the first flowers are out';
   return null;
 }
 export function stockApiary(s: GameState, id: string): string | null {

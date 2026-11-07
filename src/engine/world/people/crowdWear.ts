@@ -65,7 +65,7 @@ export interface WearOptions {
  * when `keep` is supplied.
  */
 export function pickWear(rnd: () => number, opt: WearOptions, keep?: Pick<Wear, 'skin' | 'hair' | 'longHair' | 'pack'>): Wear {
-  const pick = (a: number[]) => a[Math.floor(rnd() * a.length) % a.length];
+  const pick = (a: number[]) => a[Math.floor(rnd() * a.length)% a.length];
   const s = opt.season;
   let shirt = pick(SHIRTS[s]);
   let pants = pick(PANTS[s]);
@@ -140,7 +140,7 @@ export interface PersonaOptions extends WearOptions {
 
 /** Outfit for a persona (see Persona). Skin / hair stay with `keep` when given. */
 export function pickPersonaWear(rnd: () => number, persona: Persona, opt: PersonaOptions, keep?: Pick<Wear, 'skin' | 'hair' | 'longHair' | 'pack'>): Wear {
-  const pick = (a: number[]) => a[Math.floor(rnd() * a.length) % a.length];
+  const pick = (a: number[]) => a[Math.floor(rnd() * a.length)% a.length];
   if (persona === 'student') return pickWear(rnd, opt, keep);
   const fanOk = persona === 'kid' || persona === 'resident' || persona === 'parent';
   const base = pickWear(rnd, { ...opt, team: fanOk ? opt.team : null, teamShare: (opt.teamShare ?? 0.5) * 0.8 }, keep);

@@ -63,5 +63,5 @@ export function crossingLine(plan: Pick<RoadPlan, 'structures'>): string | null 
   if (n('all')) bits.push(`${n('all')} for everything (under a bridge or over a ford)`);
   if (n('deer')) bits.push(`${n('deer')} arch culvert${n('deer') === 1 ? '' : 's'} for deer`);
   if (n('small')) bits.push(`${n('small')} pipe culvert${n('small') === 1 ? '' : 's'} for the small animals`);
-  return `Wildlife crossings on the road: ${bits.join(', ')}. Signs stand at the ones deer use; ${Math.round(crossingRelief(plan) * 100)} % fewer animals on the road.`;
+  return `Wildlife crossings on the road: ${bits.join(', ')}. Signs stand at the ones deer use; ${Math.round(crossingRelief(plan) * 100)}% fewer animals on the road.`;
 }

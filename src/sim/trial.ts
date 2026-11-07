@@ -198,7 +198,7 @@ function trialEnd(s: GameState, c: TrialCamp): Encounter {
   return {
     id: `e${s.nextId++}`, kind: 'trial_end', day: dayIndex(s.clock.t), title: `${c.title}: the month is up`,
     dossier: [
-      `${n} ${n === 1 ? 'person' : 'people'} in the camp${c.people.some(p => p.kid) ? `, ${c.people.filter(p => p.kid).length} kids` : ''}. They put in ${pluralize(Math.round(c.worked), 'hour')} on the place.`,
+      `${n} ${n === 1 ? 'person' : 'people'} in the camp${c.people.some(p => p.kid) ? `, ${pluralize(c.people.filter(p => p.kid).length, 'kid')}` : ''}. They put in ${pluralize(Math.round(c.worked), 'hour')} on the place.`,
       ...(c.extras || Object.keys(c.brings ?? {}).length ? [`Brings: ${kitLine(c.brings, c.extras, c.people)}.`] : []),
       ...(c.learned.length ? c.learned : ['Quiet, polite, kept to themselves. You don\'t know them much better than the day they came.']),
       c.hungry ? `The camp went short ${c.hungry} day${c.hungry > 1 ? 's' : ''} this month.` : `You fed them ${caloriesShort(c.fed)} this month.`,

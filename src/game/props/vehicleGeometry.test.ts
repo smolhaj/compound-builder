@@ -13,7 +13,7 @@ const PERSON_H = 0.28;
 const box = (k: Parameters<typeof buildVehicle>[0]) => new THREE.Box3().setFromObject(buildVehicle(k));
 
 describe('vehicles are at real scale (1 unit ≈ 6 m, a person 0.28)', () => {
-  it('the measured size matches the declared size, within 12 %', () => {
+  it('the measured size matches the declared size, within 12%', () => {
     for (const k of VEHICLE_KINDS) {
       const s = box(k).getSize(new THREE.Vector3()), d = VEHICLE_SIZE[k];
       expect(s.z).toBeGreaterThan(d.l * 0.85); expect(s.z).toBeLessThan(d.l * 1.15);

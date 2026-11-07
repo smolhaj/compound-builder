@@ -23,6 +23,7 @@ import { addFood } from './pantry';
 import { farmOf } from './farm';
 import { burnRick, greenRicks } from './upkeep';
 import { regionFor } from './climate';
+import { pluralize } from './words';
 
 /** Share of the woods in sugar maple, by region (absent: none). */
 export const MAPLE_SHARE: Partial<Record<RegionId, number>> = { new_england: 0.45, upper_midwest: 0.3, north_woods: 0.2, rust_belt: 0.2, appalachia: 0.15 };
@@ -113,7 +114,7 @@ export function mapleDay(s: GameState): string[] {
   const [, b1] = sapSeason(s);
   if (doy === b1 + 3 && m.told !== year && m.gathered > 0) {
     m.told = year;
-    out.push(`The sap stopped running. The season's boil: ${m.syrup.toFixed(1)} gallons of syrup from ${taps} taps (${Math.round(m.gathered)} gallons of sap, ${m.runDays} run days).`);
+    out.push(`The sap stopped running. The season's boil: ${m.syrup.toFixed(1)} gallons of syrup from ${pluralize(taps, 'tap')} (${Math.round(m.gathered)} gallons of sap, ${pluralize(m.runDays, 'run day')}).`);
   }
   if (season && doy === sapSeason(s)[0] && taps === 0 && logGate(s, 'maple-start', 300)) out.push(`The sap is about to run. ${woodsTaps(s) > 0 ? 'There is maple on the place: tapping sets (Shop) and a sugar shack would make syrup.' : 'The woods here are too thin in maple to tap.'}`);
   return out;

@@ -29,7 +29,7 @@ describe('the shared harvest', () => {
     pactWith(g, 2);
     g.clock.startDoy = 20; expect(inWindow(g)).toBe(false); expect(harvestHelpers(g)).toEqual([]);
   });
-  it('pact households send up to three hands each, and take 8 % apiece up to 16 %', () => {
+  it('pact households send up to three hands each, and take 8% apiece up to 16%', () => {
     const g = inHarvest(); pactWith(g, 3);
     expect(harvestHelpers(g).length).toBe(3);
     expect(helpHands(g)).toBe(9);

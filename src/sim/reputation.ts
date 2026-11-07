@@ -42,7 +42,7 @@ export function hardness(s: GameState, p: Look): { hard: number; drivers: Driver
   const guards = Math.min(1, guardCount(s) / 2);
   const signs = (p.signs ?? 0) > 0 ? 1 : 0;
   const drivers: Driver[] = [
-    { id: 'look', label: 'The look of the walls', points: 100 * REP.W_LOOK * look, note: look < 0.05 ? 'nothing to see from the road' : `${Math.round(look * 100)} % of a fortress` },
+    { id: 'look', label: 'The look of the walls', points: 100 * REP.W_LOOK * look, note: look < 0.05 ? 'nothing to see from the road' : `${Math.round(look * 100)}% of a fortress` },
     { id: 'word', label: 'Word that this place shoots back', points: 100 * REP.W_WORD * word, note: word < 0.05 ? 'nobody has been turned back here yet' : 'raids that were beaten; fades over months' },
     { id: 'guards', label: 'Guards at the gate', points: 100 * REP.W_GUARDS * guards, note: guards ? `${guardCount(s)} contract guard${guardCount(s) > 1 ? 's' : ''}` : 'none' },
     { id: 'signs', label: 'Warning signs', points: 100 * REP.W_SIGNS * signs, note: signs ? 'a live electric fence, posted' : 'none posted' },
@@ -85,7 +85,7 @@ export function reputation(s: GameState, p: Look): Reputation {
   const home = s.neighbors.filter(n => n.status === 'home' && n.members > 0);
   const goodwill = home.length ? Math.round(home.reduce((a, n) => a + n.disposition, 0) / home.length) : null;
   const lines: string[] = [];
-  lines.push(`Opportunists: ${Math.round(REP.LOOT * hard * 100)} % fewer looters and ${Math.round(REP.BREAKIN * hard * 100)} % fewer burglaries. A gang or a militia plans around a wall and is not put off.`);
+  lines.push(`Opportunists: ${Math.round(REP.LOOT * hard * 100)}% fewer looters and ${Math.round(REP.BREAKIN * hard * 100)}% fewer burglaries. A gang or a militia plans around a wall and is not put off.`);
   if (closed > 0 && record < REP.GOOD_RECORD) lines.push('Neighbors who do not know you yet read the wall as a closed door: their goodwill cools (allies are never cooled).');
   else if (closed > 0) lines.push('Behind a high wall, but a good-neighbor record outweighs it: goodwill still warms, more slowly.');
   if (record >= 0.05) lines.push('A good-neighbor record (people taken in, kindness kept) warms the neighbors a little each day.');

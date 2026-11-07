@@ -43,7 +43,7 @@ describe('hardness and its drivers', () => {
     const adds: Array<(g: GameState) => void> = [g => walls(g), g => walls(g, 'container_wall'), g => { g.gate.respect = 0.5; }, g => peaceHire(g, 1), g => peaceHire(g, 3), g => { g.stock.floodlights = 3; g.stock.window_bars = 1; g.stock.sandbags = 3; }];
     for (const add of adds) { const a = lot(), b = lot(); add(b); expect(hardness(b, postureOf(b)).hard).toBeGreaterThanOrEqual(hardness(a, postureOf(a)).hard); }
   });
-  it('the effects are bounded: never an increase, at most 35 % fewer looters and 30 % fewer burglaries', () => {
+  it('the effects are bounded: never an increase, at most 35% fewer looters and 30% fewer burglaries', () => {
     for (const h of [0, 0.2, 0.5, 1]) { expect(opportunistK(h)).toBeLessThanOrEqual(1); expect(opportunistK(h)).toBeGreaterThanOrEqual(1 - REP.LOOT); expect(burglarK(h)).toBeLessThanOrEqual(1); expect(burglarK(h)).toBeGreaterThanOrEqual(1 - REP.BREAKIN); }
   });
 });

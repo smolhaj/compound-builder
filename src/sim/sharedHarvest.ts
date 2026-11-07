@@ -47,5 +47,5 @@ export function sharedHarvestDay(s: GameState): string[] {
   for (const n of help) n.disposition = Math.min(100, n.disposition + 0.2);
   const H = seasons(regionFor(s.site)).harvest, day = calendarOf(s.clock).doy - H[0];
   if (day % 14 !== 0) return [];
-  return [`${help.map(n => `The ${n.name}s`).join(' and ')} came to help bring the harvest in: ${helpHands(s)} pairs of hands. They take ${Math.round(harvestShare(s) * 100)} % of the crop home.`];
+  return [`${help.map(n => `The ${n.name}s`).join(' and ')} came to help bring the harvest in: ${helpHands(s)} pairs of hands. They take ${Math.round(harvestShare(s) * 100)}% of the crop home.`];
 }

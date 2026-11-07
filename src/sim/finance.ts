@@ -188,7 +188,7 @@ export function financeDay(s: GameState): string[] {
   if (d.kind && s.clock.t >= d.hitAt && !f.crashed) {
     f.crashed = true;
     const c = CRASH[d.kind] ?? 0.2;
-    if (f.brokerage > 0 && c > 0.05) { f.brokerage *= 1 - c; out.push(`The market fell ${Math.round(c * 100)} % the day it hit.`); }
+    if (f.brokerage > 0 && c > 0.05) { f.brokerage *= 1 - c; out.push(`The market fell ${Math.round(c * 100)}% the day it hit.`); }
   }
   // the bail-in: a financial collapse that doesn't fully come back
   if (d.kind === 'financial' && d.fate !== 'full' && s.clock.t >= d.hitAt + 30 && !f.bailedIn) {
@@ -197,7 +197,7 @@ export function financeDay(s: GameState): string[] {
     if (over > 0) {
       const cut = over * 0.3, share = s.money / Math.max(1, s.money + f.savings);
       s.money -= cut * share; f.savings -= cut * (1 - share);
-      out.push(`Bail-in: the bank took 30 % of everything over the insured $250,000 ($${Math.round(cut).toLocaleString('en-US')}).`);
+      out.push(`Bail-in: the bank took 30% of everything over the insured $250,000 ($${Math.round(cut).toLocaleString('en-US')}).`);
     }
   }
   // the dealer's parcels arrive (if the post still runs)
@@ -225,7 +225,7 @@ export function debtDay(s: GameState, day: number): string[] {
   const d = debtOf(s);
   // checking doesn't go below zero: whatever was charged past it went on the card
   if (s.money < 0) {
-    if (d.owed <= 0 && d.stage === 'none') out.push(`Checking ran dry: $${Math.round(-s.money).toLocaleString('en-US')} in bills went on the credit card (24 % APR).`);
+    if (d.owed <= 0 && d.stage === 'none') out.push(`Checking ran dry: $${Math.round(-s.money).toLocaleString('en-US')} in bills went on the credit card (24% APR).`);
     d.owed += -s.money; s.money = 0;
     if (d.stage === 'none') d.stage = 'card';
   }
@@ -258,7 +258,7 @@ export function debtDay(s: GameState, day: number): string[] {
     out.push(`Six months behind: the card company charged off the $${Math.round(d.owed).toLocaleString('en-US')} and sold it to a collection agency. The calls start the next morning.`);
   } else if (d.stage === 'card') {
     d.stage = 'late';
-    out.push(`Missed the minimum on the card ($${Math.round(due).toLocaleString('en-US')}): a $${LATE_FEE} late fee. $${Math.round(d.owed).toLocaleString('en-US')} owed at 24 %.`);
+    out.push(`Missed the minimum on the card ($${Math.round(due).toLocaleString('en-US')}): a $${LATE_FEE} late fee. $${Math.round(d.owed).toLocaleString('en-US')} owed at 24%.`);
   } else if (d.stage === 'collections' && d.missed % 3 === 0) {
     out.push(`Another letter from the collection agency: $${Math.round(d.owed).toLocaleString('en-US')}, "final notice before legal action".`);
   }

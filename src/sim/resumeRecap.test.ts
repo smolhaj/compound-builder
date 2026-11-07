@@ -48,7 +48,7 @@ import { short } from './resumeRecap';
 describe('short reasons', () => {
   it('keeps one short sentence and cuts long ones cleanly', () => {
     expect(short('No roof yet.')).toBe('No roof yet');
-    const t = short('the timber cabin is staked on a 34 % slope: the pad is cut into the hill and held by a dry-stack wall');
+    const t = short('the timber cabin is staked on a 34% slope: the pad is cut into the hill and held by a dry-stack wall');
     expect(t.endsWith('…')).toBe(true);
     expect(t.split(/\s+/).length).toBeLessThanOrEqual(12);
   });

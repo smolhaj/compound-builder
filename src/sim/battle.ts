@@ -57,6 +57,7 @@ import { leaveAftermath } from './aftermath';
 import { peopleAfterFight } from './people';
 import { fightNerves } from './mind';
 import { hourOf, type GameState } from './state';
+import { pluralize } from './words';
 
 type Post = NonNullable<BattleUnit['post']>;
 interface PostSpot {
@@ -1001,7 +1002,7 @@ export function applyBattle(s: GameState, b: Battle): string[] {
   let rounds = 0;
   for (const [cal, nn] of Object.entries(pb.spent ?? {}) as Array<[Caliber, number]>) { s.armory.ammo[cal] = Math.max(0, (s.armory.ammo[cal] ?? 0) - nn); rounds += nn; }
   if (rounds) {
-    out.push(`${rounds} rounds fired.`);
+    out.push(`${pluralize(rounds, 'round')} fired.`);
     for (const gun of s.armory.guns) { gun.fired += Math.round(rounds / Math.max(1, s.armory.guns.length)); gun.condition = Math.max(0, gun.condition - 0.01); }
   }
   if (pb.minesUsed) { s.stock.mines = Math.max(0, (s.stock.mines ?? 0) - pb.minesUsed); out.push(`${pb.minesUsed} mine${pb.minesUsed > 1 ? 's' : ''} went off.`); }

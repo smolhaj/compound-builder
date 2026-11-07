@@ -68,7 +68,7 @@ describe('crops', () => {
     expect(plotsOf(g).f2.sown).toBeUndefined();                // still time: seed may turn up
     expect(g.stock.seed).toBe(0);
     expect(lines.join(' ')).toMatch(/No seed left for 1 field/);
-    expect(lines.join(' ')).toMatch(/weeds at about 40 %/);
+    expect(lines.join(' ')).toMatch(/weeds at about 40%/);
     expect(seedWarning(g)?.tone).toBe('warn');
     // the window closes with no seed: weeds and volunteers, not a bare field
     atDoy(g, w1 + 28);

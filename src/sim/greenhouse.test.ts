@@ -33,7 +33,7 @@ describe('greenhouse', () => {
     expect(produce(b)).toBeGreaterThan(0);
   });
 
-  it('seedlings raise the garden peak about 15 %', () => {
+  it('seedlings raise the garden peak about 15%', () => {
     const a = at(220), b = at(220);
     built(a, 'g', 'garden'); built(b, 'g', 'garden'); built(b, 'h', 'greenhouse');
     expect(produce(b) / produce(a)).toBeCloseTo(1.15, 2);

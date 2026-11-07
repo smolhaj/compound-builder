@@ -150,7 +150,7 @@ export function bugOut(s: GameState, opts: { mode?: BugMode; dest?: BugDest } = 
   s.ending = { kind: 'bug_out', day, continued: false };
   s.clock.speed = 0;
   const how = plan.mode === 'foot' ? 'on foot' : `in ${plan.vehicles.length} vehicle${plan.vehicles.length === 1 ? '' : 's'}`;
-  log(s, `The ${s.people[0]?.last ?? ''} family bugged out ${how}: ${plan.going.length} of ${plan.going.length + plan.left.length}, ${pluralize(plan.foodDays, 'day')} of food, bound for ${plan.destName}${plan.miles ? ` (${plan.miles} miles)` : ''}.`);
+  log(s, `The ${s.people[0]?.last ?? ''} family bugged out ${how}: ${plan.going.length} of ${plan.going.length + plan.left.length}, ${pluralize(plan.foodDays, 'day')} of food, bound for ${plan.destName}${plan.miles ? ` (${pluralize(plan.miles, 'mile')})` : ''}.`);
   return null;
 }
 

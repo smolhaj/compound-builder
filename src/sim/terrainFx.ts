@@ -184,7 +184,7 @@ export function terrainDefense(s: GameState): TerrainDefense {
   else lines.push('The ground is open all around: nothing slows a crew.');
   if (best.via) lines.push(wayInLine(s.perimeter.find(r => r.id === best.via)?.kind));
   else if (best.choke) lines.push(held ? `The easiest way in narrows to ${lengthText(best.choke.width * 6)} and you hold it.` : `The easiest way in narrows to ${lengthText(best.choke.width * 6)} at one place: a wall or tower there would matter.`);
-  if (towers.length) lines.push(hs > 0.3 ? `Your towers stand on real high ground (${Math.round(hs * 100)} % of the full advantage).` : 'Your towers stand on the level: a hill would add range.');
+  if (towers.length) lines.push(hs > 0.3 ? `Your towers stand on real high ground (${Math.round(hs * 100)}% of the full advantage).` : 'Your towers stand on the level: a hill would add range.');
   return { score: Math.max(0, Math.min(1, 0.5 * hard + 0.3 * hs + 0.2 * (held ? 1 : 0) + RFX.DEFENSE_SHARE * roadScore)), lines, lane: best, held, highShare: hs };
 }
 
@@ -262,8 +262,8 @@ export function routeProblem(s: GameState, kind: PerimeterKind, pts: readonly Pt
 export function terrainOff(s: GameState, kind: PerimeterKind): string | null {
   if (kind === 'covered_bridge') return bridgeOff(s);
   if (kind === 'tunnel_bridge') return sitesOf(s).some(c => c.kind === 'gorge') ? null : 'no gorge, ravine or deep creek bed on this land to span: a tunnel-bridge needs real low ground';
-  if (kind === 'rock_tunnel') return boreSite(s) ? null : 'no rock face or spur on this land that a vehicle tunnel could be driven through: a bore needs hill over it (6.5 ft over the crown, 20 ft somewhere) and a gentle enough way up (15 %)';
-  if (kind === 'slope_tunnel') { const t = terrainOf(s); return t && hasHillside(t, s.site.home) ? null : 'no hillside steep enough (20 % or more) on this land: a slope tunnel needs a slope to go down'; }
+  if (kind === 'rock_tunnel') return boreSite(s) ? null : 'no rock face or spur on this land that a vehicle tunnel could be driven through: a bore needs hill over it (6.5 ft over the crown, 20 ft somewhere) and a gentle enough way up (15%)';
+  if (kind === 'slope_tunnel') { const t = terrainOf(s); return t && hasHillside(t, s.site.home) ? null : 'no hillside steep enough (20% or more) on this land: a slope tunnel needs a slope to go down'; }
   return null;
 }
 
@@ -292,7 +292,7 @@ export const boreSite = boreOf;
 
 /** Plain words for a bore's numbers: "190 m at 14 %, 12 m of rock over it at the deepest". */
 export function boreText(b: BoreStats): string {
-  return `${lengthText(b.lenU * 6)} at ${Math.round(b.grade * 100)} %, ${lengthText(b.peakCover * 6)} of rock over the crown at the deepest${b.openA + b.openB > 0.3 ? `, with a cutting of ${Math.round(Math.max(b.openA, b.openB) * 6)} m at one end` : ''}`;
+  return `${lengthText(b.lenU * 6)} at ${Math.round(b.grade * 100)}%, ${lengthText(b.peakCover * 6)} of rock over the crown at the deepest${b.openA + b.openB > 0.3 ? `, with a cutting of ${Math.round(Math.max(b.openA, b.openB) * 6)} m at one end` : ''}`;
 }
 export const BORE_CROWN_M = BORE.CROWN * 6;
 

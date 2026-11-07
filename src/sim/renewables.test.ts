@@ -83,7 +83,7 @@ describe('micro-hydro', () => {
     expect(hydroDay(cold, st).kwh).toBe(0);
   });
 
-  it('a screen packed with leaves costs up to 40 %', () => {
+  it('a screen packed with leaves costs up to 40%', () => {
     expect(intakeCare(0)).toBe(1);
     expect(intakeCare(100)).toBeCloseTo(0.6, 5);
     setGroundOverride(FALLING);
@@ -117,7 +117,7 @@ describe('the wind turbine', () => {
     expect(powerKw(26)).toBe(0);
   });
 
-  it('a Rayleigh day: capacity factor is realistic (about 10-30 % at 5-6 m/s hub wind) and grows with the wind', () => {
+  it('a Rayleigh day: capacity factor is realistic (about 10-30% at 5-6 m/s hub wind) and grows with the wind', () => {
     const cf = (v: number) => meanKw(v) / TURBINE.RATED_KW;
     expect(cf(3)).toBeLessThan(0.06);
     expect(cf(5.5)).toBeGreaterThan(0.1);

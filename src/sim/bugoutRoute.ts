@@ -17,6 +17,7 @@ import { fogNow } from './fogFx';
 import { lanesOf } from './terrainState';
 import { mulberry32 } from './rng';
 import { kmText, lengthText } from './units';
+import { pluralize } from './words';
 
 export type BugMode = 'vehicle' | 'foot';
 export type BugDest = 'cache' | 'town' | 'open';
@@ -74,7 +75,7 @@ export function routeRisk(s: GameState, mode: BugMode, miles: number, rangeKm: n
   // distance and the world
   const lawDown = clamp(1 - s.disaster.tracks.law, 0, 1);
   const trouble = miles * PER_MILE[mode] * (1 + lawDown);
-  if (miles > 0) legs.push({ id: 'miles', name: `${miles} miles`, risk: clamp(trouble, 0, 0.5), why: lawDown > 0.5 ? 'no law on the roads: checkpoints, tolls, men with a rifle on an overpass' : 'roadblocks, breakdowns and strangers' });
+  if (miles > 0) legs.push({ id: 'miles', name: pluralize(miles, 'mile'), risk: clamp(trouble, 0, 0.5), why: lawDown > 0.5 ? 'no law on the roads: checkpoints, tolls, men with a rifle on an overpass' : 'roadblocks, breakdowns and strangers' });
   else legs.push({ id: 'miles', name: 'Nowhere in particular', risk: foot ? 0.25 : 0.2, why: 'no place to go to: nowhere to sleep, nobody expecting them' });
   if (!foot && miles * MILE_KM > rangeKm) legs.push({ id: 'fuel', name: 'Fuel', risk: 0.35, why: `the fuel is good for about ${kmText(rangeKm)}: the rest on foot` });
   const risk = 1 - legs.reduce((a, l) => a * (1 - l.risk), 1);
