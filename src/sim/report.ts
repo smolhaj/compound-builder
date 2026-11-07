@@ -104,7 +104,7 @@ export function reportCard(s: GameState): ReportCard {
   const d = s.disaster, st = s.stats, g = s.gate;
   const fin = s.structures.filter(isFinished);
   const has = (k: string) => fin.some(x => x.kind === k);
-  const alive = living(s), total = s.personState.filter(p => !p.needs.left).length;
+  const alive = living(s), total = s.personState.filter(p => !p.needs.left).length + (s.lineage?.wards?.length ?? 0);   // (children fostered out are still of the family)
   const lost = s.people.filter((_, i) => s.personState[i]?.needs.died != null && !s.personState[i]?.needs.left);
   const def = d.kind ? DISASTERS[d.kind] : undefined;
   const name = def?.name ?? 'The collapse';

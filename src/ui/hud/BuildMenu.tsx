@@ -37,6 +37,8 @@ import { takeRestDay } from '../../sim/mind';
 import { enroll, setDrills } from '../../sim/courses';
 import { setQuarantine } from '../../sim/medical';
 import { callGathering } from '../../sim/gatherings';
+import { pluralize } from '../../sim/words';
+import { lengthText } from '../../sim/units';
 import { HousingStyleCards } from './HousingStyles';
 
 /** The build menu's groups (kit pieces by what they are for). */
@@ -75,7 +77,7 @@ export function BuildMenu({ showProjects = () => undefined }: { showProjects?: (
     if (a.type === 'stake') arm(a.kind);
     else if (a.type === 'tool') g.setTool(a.tool);
     else if (a.type === 'order') { const lines = a.lines; guard(orderCost(lines, prices(game)), () => { if (!g.order(lines)) setNote('Could not place that order.'); }); }
-    else if (a.type === 'markTrees') { const n = markTrees?.(a.n) ?? 0; setNote(n ? `Marked ${n} trees: the family fells them in work hours.` : 'No more trees to mark near the yard.'); }
+    else if (a.type === 'markTrees') { const n = markTrees?.(a.n, a.logs) ?? 0; setNote(n ? `Marked ${pluralize(n, 'tree')}: the family fells ${n === 1 ? 'it' : 'them'} in work hours.` : a.logs ? 'There are no more pines or aspens to mark on your land. Logs are not for sale: buy a different kind of house instead.' : 'No more trees to mark near the yard.'); }
     else if (a.type === 'caretaker') { const why = g.money(d => hireCaretaker(d, a.kind)); if (why) setNote(`Could not arrange that: ${why}.`); }
     else if (a.type === 'belt') { const why = g.daily(d => setBelt(d, a.on)); if (why) setNote(why[0].toUpperCase() + why.slice(1) + '.'); }
     else if (a.type === 'crew') { const id = a.id, st = game.structures.find(x => x.id === id); guard(st ? crewQuote(st).usd : 0, () => { const why = g.hire(id); if (why) setNote(`Could not hire them: ${why}.`); }); }
@@ -101,7 +103,7 @@ export function BuildMenu({ showProjects = () => undefined }: { showProjects?: (
     const a = buildAdvice(game, kind), own = ownNeeds(kind), extra = kind === 'well_drilled' ? drillExtra(game.site) : 0;
     const permit = needsPermit(kind) && game.paper.permits && countyWorks(game) ? ` · permit ${usd(permitFee(game, kind))}` : '';
     return <Item key={kind} flashKey={`kit:${kind}`} name={KIT[kind].name} cost={`~${usd(costOf(kind) + extra)}`}
-      sub={`${totalHours(BLUEPRINTS[kind])} h · crew adds ~${usd(Math.round(totalHours(BLUEPRINTS[kind]) * CREW_RATE / 100) * 100)}${kind === 'well_drilled' ? ` · water at ${game.site.gwDepth} m` : ''}${permit}`}
+      sub={`${totalHours(BLUEPRINTS[kind])} h · crew adds ~${usd(Math.round(totalHours(BLUEPRINTS[kind]) * CREW_RATE / 100) * 100)}${kind === 'well_drilled' ? ` · water at ${lengthText(game.site.gwDepth)}` : ''}${permit}`}
       on={g.tool === kind} off={a.off} next={a.next ? a.note : null} title={`${KIT[kind].blurb}${own ? ` Needs from your own land: ${own}.` : ''}`} click={() => arm(kind)} />;
   };
 
@@ -172,6 +174,10 @@ export function BuildMenu({ showProjects = () => undefined }: { showProjects?: (
     {BUILD_GROUPS.map(([gid, title, kinds]) => (
       <Fragment key={gid}>
         <Group id={gid} title={title} extra={gid === 'home' ? housingSummary(game) : undefined} defaultOpen={gid !== 'defense'}>
+          {gid === 'home' && <>
+            <Item name="Mark trees to fell" cost="" sub="logs and firewood" title="Logs for building (pines and aspens), firewood for the stove (green wood seasons for about nine months)" on={g.tool === 'fell'} click={() => g.setTool(g.tool === 'fell' ? null : 'fell')} />
+            <button style={{ ...btn(), width: '100%', marginBottom: 2 }} disabled={!markTrees} title="Marks the ten standing trees nearest the yard on your land" onClick={() => run({ type: 'markTrees', n: 10 })}>Mark the 10 nearest trees</button>
+          </>}
           {kinds.map(kit)}
         </Group>
         {gid === 'home' && <Group id="housing" title="Housing styles" extra="by what is local" defaultOpen={false}>
@@ -212,10 +218,6 @@ export function BuildMenu({ showProjects = () => undefined }: { showProjects?: (
         <div style={{ fontSize: 11, color: DIM, margin: '4px 2px 2px' }} title={t.hint}>{t.title} <span style={{ opacity: 0.7 }}>· {t.hint}</span></div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>{t.kinds.map(k => lineItem(k, 100 / FT_PER_M, '100 ft'))}</div>
       </div>)}
-    </Group>
-    <Group id="woods" title="Woods" defaultOpen={false}>
-      <Item name="Mark trees to fell" cost="" sub="logs and firewood" title="Logs for building, firewood for the stove (green wood seasons for about nine months)" on={g.tool === 'fell'} click={() => g.setTool(g.tool === 'fell' ? null : 'fell')} />
-      <button style={{ ...btn(), width: '100%', marginTop: 2 }} disabled={!markTrees} title="Marks the ten standing trees nearest the yard on your land" onClick={() => run({ type: 'markTrees', n: 10 })}>Mark the 10 nearest trees</button>
     </Group>
   </>;
 }

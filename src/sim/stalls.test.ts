@@ -179,3 +179,100 @@ describe('stalls: roadside piles, pre-built repairs, escalation', () => {
     expect(stallsDay(g).some(l => l.startsWith('STILL STUCK'))).toBe(false);
   });
 });
+
+describe('waiting on logs (not for sale)', () => {
+  const logHouse = (): GameState => {
+    const g = fresh(5);
+    const st = planStructure(g, 'log_house', 0, 0, 0);
+    st.stage = 2; st.supplied = false;   // the foundation is in; the walls want 40 logs
+    g.stock.lumber = 999; g.stock.concrete = 999; g.money = 600_000;
+    return g;
+  };
+  it('a Next-steps card says "Mark trees for logs" with a one-click mark that carries the shortfall', async () => {
+    const g = logHouse();
+    const { logWait } = await import('./stalls');
+    const w = logWait(g)!;
+    expect(w.short).toBeGreaterThan(0);
+    expect(w.need).toBe(w.short);
+    const card = suggestions(g, 12).find(x => x.id === 'logs')!;
+    expect(card.title).toMatch(/^Mark trees for logs/);
+    const act = card.acts![0].act;
+    expect(act.type).toBe('markTrees');
+    if (act.type === 'markTrees') expect(act.logs).toBe(w.need);
+  });
+  it('once enough pines are marked the card changes to a waiting note, and a crew is named as idle', async () => {
+    const g = logHouse();
+    const { markTree } = await import('./forestry');
+    for (let i = 0; i < 20; i++) markTree(g, { id: i + 1, x: 4, z: 4, kind: 'conifer', scale: 1 }, 3);
+    g.clock.t = 10;
+    g.stalls = { ['s:' + g.structures[0].id]: { since: 0 } };
+    g.crews = [{ target: g.structures[0].id } as never];
+    const card = suggestions(g, 12).find(x => x.id === 'logs')!;
+    expect(card.title).toMatch(/marked trees are being felled/);
+    expect(card.tone).toBe('alarm');
+    expect(card.why).toMatch(/crew stands idle/);
+  });
+  it('no crew nudge while the walls wait on logs', async () => {
+    const { crewNudge } = await import('./crewNudge');
+    const g = logHouse();
+    expect(crewNudge(g)).toBeNull();
+  });
+  it('the starter proposes a log house only when the land has the logs', async () => {
+    const { homeKinds, planStarter } = await import('./starterCompound');
+    expect(homeKinds(6, false)).toEqual(['timber_cabin', 'cottage']);
+    expect(homeKinds(6)).toEqual(['log_house']);
+    const g = newGame(7);
+    g.people = g.people.slice(0, 1);
+    while (g.people.length < 6) g.people.push({ ...g.people[0], id: 'x' + g.people.length });
+    const h = g.site.home;
+    const query = { height: () => 0, owned: (x: number, z: number) => x >= h.x0 && x <= h.x1 && z >= h.z0 && z <= h.z1, water: () => false };
+    const geo = { center: [(h.x0 + h.x1) / 2, (h.z0 + h.z1) / 2] as [number, number], drive: [] as Array<[number, number]> };
+    const none = planStarter(g, { query, geo });
+    expect(none.pieces.some(p => p.kind === 'log_house')).toBe(false);
+    const pines = Array.from({ length: 30 }, () => ({ kind: 'conifer' as const, scale: 1 }));
+    const some = planStarter(g, { query, geo, trees: pines });
+    expect(some.pieces.some(p => p.kind === 'log_house')).toBe(true);
+    const cottonwoods = Array.from({ length: 60 }, () => ({ kind: 'broad' as const, scale: 1 }));
+    expect(planStarter(g, { query, geo, trees: cottonwoods }).pieces.some(p => p.kind === 'log_house')).toBe(false);
+  });
+});
+
+describe('food, beds and medicine escalate like a stuck project', () => {
+  const sick = (): GameState => {
+    const g = fresh(9);
+    g.people[0].conditions = ['blood_pressure'];
+    g.body.rx[g.people[0].id] = 0;
+    g.stock.meds = 0;
+    return g;
+  };
+  it('a person out of pills gets a Next-steps card, red with the days after three days', async () => {
+    const g = sick();
+    const { rxDaysOf } = await import('./body');
+    expect(rxDaysOf(g, g.people[0])).toBe(0);
+    g.clock.t = 1;
+    noteStalls(g);
+    let card = suggestions(g, 12).find(x => x.id === 'rx_out')!;
+    expect(card.title).toMatch(/out of medicine/);
+    expect(card.tone).toBeUndefined();
+    g.clock.t = 6;
+    noteStalls(g);
+    card = suggestions(g, 12).find(x => x.id === 'rx_out')!;
+    expect(card.title).toMatch(/Out of medicine for 5 days/);
+    expect(card.tone).toBe('alarm');
+    const lines = stallsDay(g);
+    expect(lines.some(l => /out of their medicine for 5 days/.test(l))).toBe(true);
+    expect(stallsDay(g).some(l => /out of their medicine/.test(l))).toBe(false);   // said once
+  });
+  it('the Board row and the Family tab read the same pills', async () => {
+    const { runway } = await import('./runway');
+    const g = sick();
+    g.clock.t = 5;
+    g.body.rx[g.people[0].id] = 29;
+    const row = runway(g).find(r => r.id === 'medicine')!;
+    expect(row.value).toMatch(/pills 29 days/);
+    g.body.rx[g.people[0].id] = 0;
+    const out = runway(g).find(r => r.id === 'medicine')!;
+    expect(out.value).toMatch(/out of pills/);
+    expect(out.tone).toBe('bad');
+  });
+});

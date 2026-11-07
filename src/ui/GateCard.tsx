@@ -176,7 +176,7 @@ export function GateCard() {
         <div style={{ fontSize: 19, fontWeight: 700, margin: '2px 0 8px' }}>{a.wounded ? `${a.wounded === 1 ? 'One of them is' : `${a.wounded} of them are`} still out there` : 'The bodies'}</div>
         {a.wounded > 0 && <div style={{ marginBottom: 4, opacity: 0.9 }}>{a.wounded === 1 ? 'He\'s down on the drive, hurt, calling for help.' : 'They\'re down on the drive, hurt. One of them is calling for his mother.'}</div>}
         {a.dead > 0 && <div style={{ marginBottom: 4, opacity: 0.9 }}>{a.dead === 1 ? 'One didn\'t get up.' : `${a.dead} didn't get up.`} They'll have to be buried.</div>}
-        {a.wounded > 0 && <div style={{ margin: '8px 0', fontSize: 12, opacity: 0.75 }}>Dressings on hand: {meds} (meds and IFAKs) · humanity {Math.round(gate.humanity)}</div>}
+        {a.wounded > 0 && <div style={{ margin: '8px 0', fontSize: 12, opacity: 0.75 }}>Dressings on hand: {meds} (medical kits and first aid kits) · humanity {Math.round(gate.humanity)}</div>}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
           {(a.wounded > 0 ? (['treat_release', 'hold', 'leave', 'finish'] as const) : (['leave'] as const)).map((ch, i) => (
             <button key={ch} style={button(i === 0)} onClick={() => g.decideAftermath(ch)}>

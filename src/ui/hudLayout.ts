@@ -11,7 +11,7 @@ export const LEFT_W = 244, RIGHT_W = 320, EDGE = 10, BOTTOM = 34;
  */
 export function hudLayout(vw: number, barW: number, barH: number, br = { w: 570, h: 40 }, bl = { w: 560, h: 40 }): { narrow: boolean; panelTop: number; leftW: number; rightW: number; switchTop: number; bottomReserve: number; viewBottom: number } {
   const narrow = vw < 760;
-  const fits = !narrow && barH < 60 && barW <= vw - (LEFT_W + RIGHT_W + 2 * EDGE + 2 * 16);
+  const fits = !narrow && barH < 60 && barW <= vw - 2 * (Math.max(LEFT_W, RIGHT_W) + EDGE + 16);   // (the bar is centered, so the wider panel decides)
   const below = EDGE + barH + 8;
   const stacked = vw < br.w + bl.w + 3 * EDGE;   // the two bottom panels would meet: stack them
   const viewBottom = stacked ? BOTTOM + br.h + 6 : BOTTOM;

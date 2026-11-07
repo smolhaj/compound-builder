@@ -4,19 +4,19 @@
  * ~2 days; docs/DECISIONS.md: deliveries come by truck on the county road).
  */
 import { MATERIALS, type MaterialId, type Stock } from './materials';
-import { materialCount, pluralize } from './words';
+import { listCapped, materialCount, pluralize } from './words';
 import { weatherDelay } from './upkeep';
 import type { GameState, OrderLine } from './state';
 import { canOrder, priceFactor } from './disaster';
 import { CARRY_H } from './improvements';
 import { adoptDog, coatName } from './pets';
-import { addFood, CAT_KCAL, FOOD, type FoodItemId } from './pantry';
+import { addFood, CAT_KCAL, FOOD, foodCount, type FoodItemId } from './pantry';
 
 /** A line's price at list (a named food at its own price). */
 const linePrice = (l: OrderLine) => l.food ? (FOOD[l.food].price ?? 0) * (l.n ?? 0) : (MATERIALS[l.material].price ?? 0) * l.qty;
 const isReal = (l: OrderLine) => l.qty > 0 || (l.food !== undefined && (l.n ?? 0) > 0);
 /** A line's name in the log. */
-const lineName = (l: OrderLine) => l.food ? `${l.n} × ${FOOD[l.food].name.toLowerCase()}` : materialCount(l.material, l.qty, MATERIALS[l.material].name, String(l.qty));
+const lineName = (l: OrderLine) => l.food ? foodCount(l.food, l.n ?? 0) : materialCount(l.material, l.qty, MATERIALS[l.material].name, String(l.qty));
 
 /** An order line for `n` units of a named food. */
 export function foodLine(id: FoodItemId, n: number): OrderLine {
@@ -74,7 +74,7 @@ export function placeOrder(s: GameState, lines: readonly OrderLine[]): string | 
   if (payWith(s) === 'cash') s.fin.cash -= cost; else s.money -= cost;
   const wx = weatherDelay(s, real.map(l => l.material));
   s.orders.push({ id, lines: real, cost, placedAt: s.clock.t, dueAt: s.clock.t + LEAD_TIME_DAYS + Math.floor(s.site.miles / 15) + wx.days, status: 'ordered' });
-  log(s, `Ordered ${real.map(lineName).join(', ')} — $${cost.toLocaleString('en-US')}.${wx.why ? ` It'll be ${pluralize(wx.days, 'day')} late (${wx.why}).` : ''}`);
+  log(s, `Ordered ${listCapped(real.map(lineName))} — $${cost.toLocaleString('en-US')}.${wx.why ? ` It'll be ${pluralize(wx.days, 'day')} late (${wx.why}).` : ''}`);
   return id;
 }
 
@@ -83,7 +83,7 @@ export function deliverOrders(s: GameState): void {
   for (const o of s.orders) {
     if (o.status !== 'ordered' || s.clock.t < o.dueAt) continue;
     o.status = 'delivered';
-    const what = o.lines.map(l => l.food ? `${l.n} ${FOOD[l.food].name.toLowerCase()}` : materialCount(l.material, l.qty, MATERIALS[l.material].name, String(l.qty))).join(', ');
+    const what = listCapped(o.lines.map(l => l.food ? foodCount(l.food, l.n ?? 0) : materialCount(l.material, l.qty, MATERIALS[l.material].name, String(l.qty))));
     // no drive yet, or the bridge on it is down: the truck leaves it at the road (at the creek) and the family carries it in
     if (!s.site.improvements.drive || s.roadBridge?.down || s.perimeter.some(r => r.collapsed || r.dropped)) {      // (no drive, the bridge down, or a tunnel choked with rubble: the truck leaves it at the road)
       // each good is its own pile: what needs no carrying (concrete, a septic tank, a rig) is delivered to its place, and

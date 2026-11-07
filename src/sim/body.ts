@@ -65,6 +65,15 @@ export const newBody = (): Body => ({ rx: {}, without: {} });
 export const pharmacyOpen = (s: GameState) => s.disaster.tracks.medical >= 0.5 && s.disaster.tracks.banks >= 0.5;
 export const monthlyRx = (p: Person) => (p.conditions ?? []).reduce((a, c) => a + CONDITION[c].monthly, 0);
 
+/** Whole days of prescription medicine a person has left (30 when nothing has been counted yet). The Family tab, the Board and the Next steps all read this one figure. */
+export const rxDaysOf = (s: GameState, p: Person): number => Math.max(0, Math.floor(s.body.rx[p.id] ?? 30));
+
+/** Everyone alive who takes a daily medicine, with the days they have and the days they have already gone without. */
+export function rxStatus(s: GameState): Array<{ p: Person; days: number; without: number }> {
+  return s.people.flatMap((p, i) => p.conditions?.length && s.personState[i]?.needs.died == null
+    ? [{ p, days: rxDaysOf(s, p), without: Math.floor(s.body.without[p.id] ?? 0) }] : []);
+}
+
 /** Buy ahead: fill everyone up to 90 days past the month in hand. Returns the cost (0 if nothing to buy). */
 export function stockUpRx(s: GameState): number {
   if (!pharmacyOpen(s)) return 0;

@@ -22,6 +22,7 @@ import { prices } from '../sim/economy';
 import { Note, Row, Section } from './hud/common';
 import { closeRows } from '../sim/bonds';
 import { pluralize } from '../sim/words';
+import { runOver } from '../sim/wipe';
 
 const strainColor = (v: number) => (v >= 65 ? TONE.bad : v >= 40 ? TONE.warn : '#9cc070');
 const bar = (v: number, c: string, t: string) => <div title={t} style={{ flex: 1, height: 4, background: '#333', borderRadius: 2 }}><div style={{ width: `${Math.max(0, Math.min(100, v))}%`, height: '100%', background: c, borderRadius: 2 }} /></div>;
@@ -95,20 +96,21 @@ export function PeopleSection() {
   const struggling = sum.struggling.slice(0, 4);
   // (QA matrix 4: with the whole household dead and the children fostered, the panel still said "Everyone is holding up")
   const nobodyHome = !game.personState.some(ps => ps.needs.died == null && !ps.needs.left);
+  const over = runOver(game);   // a wiped family has no rest day, campfire or service to call
   return <Section title="How everyone is">
     {nobodyHome && <Note tone="warn">{game.ending?.kind === 'wipe' ? 'Nobody is left on the place. This run is over.' : <>Nobody is home.{(game.lineage?.wards ?? []).length > 0 ? ' The children are with a neighbor household; the place is held for them.' : ''}</>}</Note>}
     {!nobodyHome && struggling.length === 0 && <Note tone="good">Everyone is holding up.{game.stock.games >= 1 || game.stock.instrument >= 1 ? ' The evenings help.' : ''}</Note>}
     {struggling.map(x => <Row key={x.p.id} label={x.p.first} value={<span style={{ color: x.kind === 'break' ? TONE.bad : TONE.warn }}>{x.why}</span>} title={(game.mind?.psyche[x.p.id]?.weighs ?? []).slice(0, 3).map(w => `${w[0]} ${w[1]}`).join(', ')} />)}
     {M?.rift && <Note tone="warn">{game.people.find(p => p.id === M.rift!.a)?.first} and {game.people.find(p => p.id === M.rift!.b)?.first} are not speaking.</Note>}
     {hardened(game) && <Note tone="warn">The house has gone hard since what was done at the gate. The kids feel it.</Note>}
-    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
+    {!over && <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
       <button style={btn(rest)} disabled={rest} title="Everyone off everything that can wait until midnight: the animals, the kitchen, the dogs, the watch and the sick are still tended. Lowers stress; the backlog grows." onClick={() => g.daily(d => takeRestDay(d))}>{rest ? 'Resting today' : 'Take a rest day'}</button>
       <button style={btn()} disabled={!!camp} title={camp ?? 'A fire and stories tonight: lifts spirits (and costs a little firewood)'} onClick={() => g.daily(d => callGathering(d, 'campfire'))}>Campfire tonight</button>
       <button style={btn()} disabled={!!service} title={service ?? 'A reading, a hymn or two and a few words about the week, at six. Lifts people of faith a lot and the rest a little for a week; costs nothing.'} onClick={() => g.daily(d => callGathering(d, 'service'))}>Hold a service</button>
-    </div>
+    </div>}
     <CloseRows />
-    <Evenings />
-    <div style={{ fontSize: 11, color: DIM, marginTop: 4 }}>A rest day, a gathering or a service, faith and someone close lower stress too. Stress costs morale and work only once it is real.</div>
+    {!over && <Evenings />}
+    {!over && <div style={{ fontSize: 11, color: DIM, marginTop: 4 }}>A rest day, a gathering or a service, faith and someone close lower stress too. Stress costs morale and work only once it is real.</div>}
     <div style={{ marginTop: 5 }}>
       <button style={{ ...btn(skillsOpen), padding: '1px 8px', fontSize: 11 }} onClick={() => setSkillsOpen(!skillsOpen)}>{skillsOpen ? 'Hide skills' : 'Who is best at what'}</button>
       {skillsOpen && <div style={{ marginTop: 4 }}>
@@ -176,6 +178,10 @@ function Evenings() {
 
 /** Classes and drills: who is taking what, certificates, starting a course, and the defense drill schedule. */
 export function ClassesSection() {
+  const over = useGameStore(s => runOver(s.game));
+  return over ? null : <ClassesBody />;
+}
+function ClassesBody() {
   const game = useGameStore(s => s.game), g = useGameStore();
   const C = game.courses ?? newCourses();
   const students = game.people.filter((p, i) => game.personState[i]?.needs.died == null && !game.personState[i]?.needs.taken && !game.personState[i]?.needs.left && p.age >= 10);

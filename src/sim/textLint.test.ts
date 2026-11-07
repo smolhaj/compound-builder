@@ -47,6 +47,12 @@ export function textHits(file: string, src: string): TextHit[] {
       }
       const one = /(?:^|[\s(])1 (?!of\b)(?!(?:in|out|to|per|day|hr|h)\b)([a-z]{3,}s)\b/.exec(m);
       if (one && !/\b(?:diabetes|series|news|species|sets?|lbs?|yards?|ounces?|pounds?)\b/i.test(one[1]) && !/^1 (?:bus|gas|glass|grass|class|dress|cross|loss|mass|boss|moss)$/.test(one[0].trim())) add(`"${one[0].trim()}"`);
+      // a count placeholder followed by a fixed "are"/"were" ("${n} more buildings are not working": 1 more building are); say isAre(n)
+      const agree = /§ more [a-z§ ]+? (?:are|were)\b/.exec(m);
+      if (agree) add(`fixed verb after a count: "${agree[0]}"`);
+      // jargon and shorthand a new player should not meet
+      const jargon = /\bLDS-style\b|\bDraw the line\b|\bifaks?\b|\bGMRS-style\b/.exec(m);
+      if (jargon) add(`jargon "${jargon[0]}"`);
       const brit = /\b(colour\w*|metre\w*|litre\w*|neighbour\w*|grey\w*|tyre\w*|programme\w*|favour\w*|honour\w*|harbour\w*|defence\w*|licence\w*|organis\w*|realis\w*|centre\w*|practise\w*|judgement|whilst|storey\w*|armour\w*|labour\w*|behaviour\w*|plough\w*|kerb|petrol|lorry|fibre|theatre|cosy|cheque|mould\w*|sceptic\w*|amongst|pavement|rubbish|tonne\w*|cancell\w+|fortnight|towards|levell\w+|analys\w+|catalogue\w*|labell\w+|aluminium|ageing|learnt|dreamt|spelt)\b/i.exec(m);
       if (brit) add(`British "${brit[1]}"`);
     }
@@ -60,6 +66,8 @@ describe('player-facing text', () => {
     expect(textHits('x', 'const a = "Take a umbrella with you";').length).toBe(1);
     expect(textHits('x', 'const a = "Wait an day or two now";').length).toBe(1);
     expect(textHits('x', 'const a = "Order 1 doors, windows and hardware";').length).toBe(1);
+    expect(textHits('x', 'const a = `${n} more buildings are not working yet`;').length).toBe(1);
+    expect(textHits('x', 'const a = "Order 8 ifak for the post";').length).toBe(1);
     expect(textHits('x', 'const a = "A unit of an hour in a ewe barn, an 11 ft wall";').length).toBe(0);
   });
   it('has no doubled word, a/an slip, "1 plurals" or British spelling in any string', () => {

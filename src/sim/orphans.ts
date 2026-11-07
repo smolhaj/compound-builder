@@ -10,7 +10,6 @@ import type { Person } from './family';
 import { dayJob } from './family';
 import { freshNeeds } from './needs';
 import type { Neighbor } from './encounters';
-import { log } from './economy';
 
 export interface Ward {
   person: Person;
@@ -56,7 +55,7 @@ export function fosterOut(s: GameState, say: Say, day: number): boolean {
     // no household can take them: the line ends here (they leave to look for someone, and are not heard from again)
     for (const k of kids) { const n = s.personState.find(x => x.id === k.id)!.needs; n.died = Math.floor(s.clock.t); n.left = true; }
     const line = `With no grown person left and no neighbor who could take them in, ${names(kids)} left the place to look for someone, and were not heard from again.`;
-    say('death', line); log(s, line);
+    say('death', line);
     return false;
   }
   for (const k of kids) {
@@ -68,7 +67,7 @@ export function fosterOut(s: GameState, say: Say, day: number): boolean {
   host.members += kids.length;
   const eldest = Math.max(...kids.map(k => k.age));
   const line = `With no grown person left on the place, the ${house(host)} took in ${names(kids)}. The place is held for them until the ${kids.length === 1 ? 'child' : 'eldest'} is 18 (${Math.max(0, 18 - eldest)} year${18 - eldest === 1 ? '' : 's'}).`;
-  say('death', line); log(s, line);
+  say('death', line);
   return true;
 }
 

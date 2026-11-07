@@ -33,6 +33,8 @@ import { regionFor } from './climate';
 import type { SuggestionAct } from './guidance';
 import { pluralize } from './words';
 import { gallonsText } from './units';
+import { rxStatus } from './body';
+import { joinNames } from './kin';
 
 export type RunwayId = 'food' | 'water' | 'power' | 'heat' | 'medicine' | 'defense' | 'fuel';
 export type RunwayAct = Extract<SuggestionAct, { type: 'open' | 'shop' }>;
@@ -105,8 +107,15 @@ function heatRow(s: GameState): RunwayRow {
 
 function medicineRow(s: GameState): RunwayRow {
   const cases = s.personState.reduce((a, ps) => a + (ps.needs.died == null ? ps.needs.hurt.length : 0), 0);
-  const d = (Math.max(0, s.stock.meds) * RUNWAY.kitDays) / Math.max(1, cases);
-  return { id: 'medicine', label: 'Medicine', days: Math.floor(d), value: daysText(d), tone: toneOf(d, RUNWAY.medicine), detail: `Medical kits: one lasts about ${pluralize(RUNWAY.kitDays, 'day')} for one person who is hurt or ill${cases > 1 ? `; ${cases} are being treated now` : ''}. Antibiotics and first-aid kits are extra.`, fix: { label: 'Medical shelf', act: shop('household') } };
+  const kitD = (Math.max(0, s.stock.meds) * RUNWAY.kitDays) / Math.max(1, cases);
+  // prescriptions (blood pressure, thyroid, asthma, insulin) are medicine too: the same days the Family tab shows
+  const rx = rxStatus(s), out = rx.filter(x => x.days <= 0), rxMin = rx.length ? Math.min(...rx.map(x => x.days)) : Infinity;
+  const d = Math.min(kitD, rxMin);
+  const pills = rx.length ? `pills ${daysText(rxMin)}` : '';
+  const value = out.length ? `${joinNames(out.map(x => x.p.first))} out of pills` : pills ? `${pills}, ${s.stock.meds >= 1 ? daysText(kitD) + ' of kits' : 'no kits'}` : daysText(kitD);
+  return { id: 'medicine', label: 'Medicine', days: Math.floor(d), value, tone: out.length ? 'bad' : toneOf(d, RUNWAY.medicine),
+    detail: `Medical kits: one lasts about ${pluralize(RUNWAY.kitDays, 'day')} for one person who is hurt or ill${cases > 1 ? `; ${cases} are being treated now` : ''}. Antibiotics and first-aid kits are extra.${rx.length ? ` Daily pills (${rx.map(x => `${x.p.first} ${x.days > 0 ? pluralize(x.days, 'day') : 'none left'}`).join(', ')}) are counted too; the Family tab shows the same figures.` : ''}`,
+    fix: { label: 'Medical shelf', act: shop('household') } };
 }
 
 function defenseRow(s: GameState): RunwayRow {

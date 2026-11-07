@@ -19,13 +19,15 @@ import { countyWorks, needsPermit, permitFee, reviewDays } from './paperwork';
 import { onOrder, orderCost, prices } from './economy';
 import { firewoodOutlook } from './heating';
 import { FIT, UTILITY } from './utilities';
-import { stuckProject, stuckAction, linesText } from './stalls';
+import { stuckProject, stuckAction, linesText, logWait, ESCALATE_DAYS, STALL_DAYS } from './stalls';
+import { activeNeeds, needDays } from './needsStuck';
+import { rxStatus } from './body';
 import { driveQuote, fixBill, hookupProblem, pendingFixes } from './improvements';
 import { fmtKw } from './powerReport';
 import { anyBearing } from './orchard';
-import { hookupTone, needsHookup, storageTip } from './hookups';
+import { drawLabel, hookupTone, needsHookup, storageTip } from './hookups';
 import { MATERIAL_IDS, MATERIALS, type MaterialId } from './materials';
-import { materialCount, pluralize } from './words';
+import { isAre, materialCount, pluralize } from './words';
 import { crewNudge } from './crewNudge';
 import { PERIMETER, PERIMETER_ORDER, UPGRADE_NEXT, fenceLive, runBill, runFinished, wallLength, type PerimeterKind, type Pt } from './perimeter';
 import { MAX_TOWERS, ringStatus } from './fortress';
@@ -155,7 +157,8 @@ export function moodOrderLines(s: GameState, mood: ReturnType<typeof moodSummary
 export type SuggestionAct =
   | { type: 'stake'; kind: string }
   | { type: 'order'; lines: OrderLine[] }
-  | { type: 'markTrees'; n: number }
+  /** Mark trees to fell: the `n` nearest, or (with `logs`) the nearest pines and aspens that add up to that many saw logs. */
+  | { type: 'markTrees'; n: number; logs?: number }
   | { type: 'select'; id: string }
   | { type: 'tool'; tool: string }
   | { type: 'caretaker'; kind: CaretakerKind }
@@ -212,7 +215,7 @@ export function landSuggestions(s: GameState): Suggestion[] {
       const short = Math.max(0, Math.ceil(extra - Math.max(0, s.stock.fieldstone - 0) - (pending.fieldstone ?? 0)));
       const lines: OrderLine[] = short > 0 ? [{ material: 'fieldstone', qty: short }] : [];
       out.push({ id: 'retaining', kind: '', title: 'This slope needs a retaining wall', urgency: 94,
-        why: `the ${name} is staked on a ${Math.round((cut.grade ?? 0) * 100)}% slope: the pad is cut into the hill and held by a dry-stack wall${wall ? ` (up to ${Math.round(wall.heightM * 10) / 10} m high and ${Math.round(wall.lenM)} m long, with ${wall.stairs ? 'a stair' : 'no stair'} set in it${wall.tall ? '; a wall that tall needs a drainage channel above it' : ''})` : ''}, about ${extra} pallets of fieldstone more than level ground${short > 0 ? '' : ' (you have them)'}. The wall goes up with the foundation and is paid for by those pallets`,
+        why: `the ${name} is staked on a ${Math.round((cut.grade ?? 0) * 100)}% slope: the pad is cut into the hill and held by a dry-stack wall${wall ? ` (up to ${lengthText(wall.heightM)} high and ${lengthText(wall.lenM)} long, with ${wall.stairs ? 'a stair' : 'no stair'} set in it${wall.tall ? '; a wall that tall needs a drainage channel above it' : ''})` : ''}, about ${extra} pallets of fieldstone more than level ground${short > 0 ? '' : ' (you have them)'}. The wall goes up with the foundation and is paid for by those pallets`,
         acts: [...(lines.length ? [{ label: `Order ${short} pallet${short > 1 ? 's' : ''} of fieldstone (${usd(orderCost(lines, prices(s)))})`, act: { type: 'order' as const, lines } }] : []), { label: 'Show me', act: { type: 'select', id: cut.id } }] });
     }
     // a retaining wall that let go (sim/retaining.ts): the stone to put it back
@@ -263,6 +266,18 @@ export function suggestions(s: GameState, limit = 3, skip?: ReadonlySet<string>)
   if (stuck) out.push({ id: 'stalled', kind: '', title: stuck.escalated ? `Stuck for ${pluralize(stuck.days, 'day')}: waiting on ${linesText(stuck.lines)}` : `Stuck: waiting on ${linesText(stuck.lines)}`, urgency: stuck.escalated ? 100 : 99, ...(stuck.escalated ? { tone: 'alarm' as const } : {}),
     why: `The ${stuck.label} has waited ${pluralize(stuck.days, 'day')} for materials, and you have the money (${usd(s.money)}). Work cannot continue until they are ordered${stuck.others > 0 ? `; ${stuck.others} more project${stuck.others > 1 ? 's wait' : ' waits'} too` : ''}.`,
     acts: [{ label: stuckAction(stuck), act: { type: 'order', lines: stuck.lines } }, { label: 'Show me', act: stuck.at ? { type: 'select', id: stuck.at } : { type: 'open', right: 'defense' } }] });
+  // a project waits on logs: they cannot be bought, only felled from the family's own trees, so the card says so and marks them (sim/stalls.ts logWait)
+  { const lw = logWait(s);
+    if (lw && (lw.need > 0 || lw.days >= STALL_DAYS || lw.crewed)) {
+      const loud = lw.days >= ESCALATE_DAYS || (lw.crewed && lw.days >= STALL_DAYS);
+      const idle = lw.crewed ? ' The hired crew stands idle until the logs are in.' : '';
+      out.push(lw.need > 0
+        ? { id: 'logs', kind: '', title: `Mark trees for logs: the ${lw.label.toLowerCase()} needs ${pluralize(lw.need, 'more log')}`, urgency: loud ? 99 : 98, ...(loud ? { tone: 'alarm' as const } : {}),
+            why: `Logs are not for sale; they come from your own trees. Only pines and aspens give logs (cottonwoods are firewood), and about ${pluralize(Math.max(1, Math.ceil(lw.need / 3)), 'tree')} will do. The family fells what you mark in work hours.${lw.queued > 0 ? ` ${pluralize(lw.queued, 'log')} from trees already marked ${lw.queued === 1 ? 'is' : 'are'} on the way.` : ''}${idle}`,
+            acts: [{ label: `Mark trees for ${pluralize(lw.need, 'log')}`, act: { type: 'markTrees' as const, n: 10, logs: lw.need } }, ...(lw.at ? [{ label: 'Show me', act: { type: 'select' as const, id: lw.at } }] : [])] }
+        : { id: 'logs', kind: '', title: `Waiting for ${pluralize(lw.short, 'log')}: the marked trees are being felled`, urgency: loud ? 99 : 60, ...(loud ? { tone: 'alarm' as const } : {}),
+            why: `The trees you marked will cover it (${pluralize(lw.queued, 'log')} coming). The family fells them in work hours, so keep someone on wood.${idle}`,
+            acts: lw.at ? [{ label: 'Show me', act: { type: 'select' as const, id: lw.at } }] : [] }); } }
   // deliveries pile up at the road because there is no drive in: the family carries every load by hand (sim/economy.ts), so say what ends it
   { const hours = (s.roadside ?? []).reduce((a, r) => a + r.hours - r.done, 0);
     if (hours >= 24 && !s.site.improvements.drive && hookupProblem(s, 'drive') === null) {
@@ -330,8 +345,8 @@ export function suggestions(s: GameState, limit = 3, skip?: ReadonlySet<string>)
       const first = todo[0], name = first.name.replace(/_/g, ' ');
       const o = hookupTone(s, todo);
       out.push({ id: 'hookup', kind: '', title: o.optional ? `Run power to the ${name} (optional)` : `Finish the ${name}`, urgency: o.optional ? 30 : first.kind === 'wire' || first.kind === 'plumb' ? 75 : 62,
-        why: `${first.text.toLowerCase()}${todo.length > 1 ? `; ${todo.length - 1} more building${todo.length > 2 ? 's' : ''} are not working yet either` : ''}`,
-        acts: [{ label: 'Show me', act: { type: 'select', id: first.id } }, ...(first.tool ? [{ label: 'Draw the line', act: { type: 'tool' as const, tool: first.tool } }] : first.stake && !buildOff(s, first.stake) ? [{ label: 'Stake solar', act: { type: 'stake' as const, kind: first.stake } }] : [])] });
+        why: `${first.text.toLowerCase()}${todo.length > 1 ? `; ${pluralize(todo.length - 1, 'more building')} ${isAre(todo.length - 1)} not working yet either` : ''}`,
+        acts: [{ label: 'Show me', act: { type: 'select', id: first.id } }, ...(first.tool ? [{ label: drawLabel(first.tool), act: { type: 'tool' as const, tool: first.tool } }] : first.stake && !buildOff(s, first.stake) ? [{ label: 'Stake solar', act: { type: 'stake' as const, kind: first.stake } }] : [])] });
     } }
   { const tip = storageTip(s);
     if (tip && !buildOff(s, tip.kind)) add('storage', tip.kind, tip.why, 58); }
@@ -396,6 +411,7 @@ export function suggestions(s: GameState, limit = 3, skip?: ReadonlySet<string>)
   { const t = terraceSuggestion(s); if (t) out.push(t); }   // a slope that suits terraced beds: offered, never staked unasked
   { const c = courseSuggestion(s); if (c) out.push(c); }
   { const d = drillsSuggestion(s); if (d) out.push(d); }
+  escalateNeeds(s, out);
   return out.filter(x => !skip?.has(x.id)).sort((x, y) => y.urgency - x.urgency).slice(0, limit);
 }
 
@@ -628,4 +644,32 @@ export function sparePartsCard(s: GameState): Suggestion | null {
     urgency: o.days < 30 ? 52 : 36,
     why: `${o.kits < 1 ? 'there is no service kit left' : `${Math.floor(o.kits)} service kit${Math.floor(o.kits) === 1 ? '' : 's'}, about ${pluralize(o.days, 'day')} at today's use`}, and every year the machines are older: they need service sooner. Send a team to the hardware stores and the interstate (Outside), or trade for kits`,
     acts: [] };
+}
+
+
+/**
+ * Food, beds and medicine that stay short are stuck like a waiting project: after three days the card says "for N days", and it is
+ * red and on top (sim/needsStuck.ts keeps the first day in the stalls table). A card that does not exist yet is made here.
+ */
+function escalateNeeds(s: GameState, out: Suggestion[]): void {
+  const on = activeNeeds(s);
+  const raise = (id: string, key: 'need:food' | 'need:beds' | 'need:meds', title: (d: number) => string, make: () => Suggestion) => {
+    if (!on.includes(key)) return;
+    const d = needDays(s, key);
+    if (d < STALL_DAYS) return;   // (a young need keeps the card it already has; only a stuck one is raised)
+    let c = out.find(x => x.id === id);
+    if (!c) { c = make(); out.push(c); }
+    c.title = title(d); c.tone = 'alarm'; c.urgency = Math.max(c.urgency, d >= ESCALATE_DAYS ? 99 : 97);
+  };
+  raise('stock_food', 'need:food', d => `Out of food for ${pluralize(d, 'day')}`, () => ({ id: 'stock_food', kind: '', title: 'No food stored: stock up', urgency: 70, why: `No food on hand for ${s.people.length}. Open the food shelf: a month of staples is the fastest fix.`, acts: [{ label: 'Open the food shelf', act: { type: 'shop', tab: 'food' } }] }));
+  raise('beds', 'need:beds', d => `${pluralize(housingShortfall(s).outside, 'person', 'people')} without a bed for ${pluralize(d, 'day')}`, () => ({ id: 'beds', kind: 'cottage', why: `${housingShortfall(s).outside} of ${s.people.length} have no bed`, urgency: 80 }));
+  if (on.includes('need:meds')) {
+    const out0 = rxStatus(s).filter(x => x.days <= 0), d = needDays(s, 'need:meds'), names = joinNames(out0.map(x => x.p.first));
+    const open = pharmacyOpen(s);
+    out.push({ id: 'rx_out', kind: '', title: d >= STALL_DAYS ? `Out of medicine for ${pluralize(d, 'day')}: ${names}` : `${names} ${out0.length === 1 ? 'is' : 'are'} out of medicine`,
+      urgency: d >= ESCALATE_DAYS ? 99 : d >= STALL_DAYS ? 97 : 72, ...(d >= STALL_DAYS ? { tone: 'alarm' as const } : {}),
+      why: open ? `${names} ${out0.length === 1 ? 'has' : 'have'} no pills left, and the pharmacy is still open. Without them blood pressure, thyroid and asthma wear on a person, and insulin cannot wait.`
+        : `${names} ${out0.length === 1 ? 'has' : 'have'} no pills left and the pharmacy is closed. Check the medical shelf for substitutes, or trade for some.`,
+      acts: open ? [{ label: 'Fill prescriptions 90 days ahead', act: { type: 'rx' } }, { label: 'Medical shelf', act: { type: 'shop', tab: 'household' } }] : [{ label: 'Medical shelf', act: { type: 'shop', tab: 'household' } }] });
+  }
 }

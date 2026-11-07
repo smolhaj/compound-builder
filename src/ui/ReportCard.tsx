@@ -6,6 +6,7 @@ import { saveGame, AUTOSAVE } from '../sim/save/saveSystem';
 import { reportCard } from '../sim/report';
 import { roman } from '../sim/eras';
 import { useWorldStore } from '../store/worldStore';
+import { spanText } from '../sim/words';
 
 const serif = 'Georgia, "Times New Roman", serif';
 
@@ -22,9 +23,11 @@ export function ReportCard() {
   /** Load a save file (the same reader as the Save menu's Import). */
   const onFile = async (f: File | undefined) => {
     if (!f) return;
+    setLoadMsg(`Loading ${f.name}…`);
     const res = readSaveFile(await f.text(), f.size);
     if (!res.ok) { setLoadMsg(res.message); return; }
     g.load(res.state); g.openSetup(false); void saveGame(AUTOSAVE, res.state);
+    setLoadMsg(null);
   };
   // finishing a run unlocks the pulpy scenarios (GDS: zombies, invasion … as unlockables)
   try { localStorage.setItem('cb.unlocked', '1'); } catch { /* storage blocked: stays locked */ }
@@ -59,16 +62,16 @@ export function ReportCard() {
         </div>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center', marginTop: 14, fontFamily: 'system-ui, sans-serif' }}>
           <span style={{ flex: 1, fontSize: 12, opacity: 0.7 }}>{e.kind === 'bug_out' ? 'The place stands empty behind them, and the road ahead is theirs to find.' : e.kind === 'wipe'
-            ? `The ${g.game.lineage.family} line ran ${Math.max(1, Math.floor(g.game.clock.t / 365))} ${Math.max(1, Math.floor(g.game.clock.t / 365)) === 1 ? 'year' : 'years'}. Dynasty score ${Math.round(g.game.lineage.points + r.score).toLocaleString('en-US')}.`
+            ? `The ${g.game.lineage.family} line ran ${spanText(g.game.clock.t)}. Dynasty score ${Math.round(g.game.lineage.points + r.score).toLocaleString('en-US')}.`
             : 'The family goes on. The world will turn again.'}</span>
           {e.kind !== 'wipe' && e.kind !== 'bug_out' && <button style={{ padding: '7px 14px', borderRadius: 6, border: '1px solid #1d1b16', background: 'transparent', cursor: 'pointer' }} onClick={() => g.playOn()}>Keep playing: the next era</button>}
           {e.kind === 'wipe' && <>
-            <button style={{ padding: '7px 14px', borderRadius: 6, border: '1px solid #1d1b16', background: 'transparent', cursor: 'pointer' }} title="Open a save file" onClick={() => file.current?.click()}>Load a save</button>
+            <button style={{ padding: '7px 14px', borderRadius: 6, border: '1px solid #1d1b16', background: 'transparent', cursor: 'pointer' }} title="Open a save file you exported earlier (Save menu, then Export save)" onClick={() => { setLoadMsg('Choose a save file (.json) in the window that opens. If you have none, start a new game.'); file.current?.click(); }}>Load a save</button>
             <input ref={file} type="file" accept=".json,application/json" style={{ display: 'none' }} onChange={ev => { void onFile(ev.target.files?.[0]); ev.target.value = ''; }} />
           </>}
           <button style={{ padding: '7px 16px', borderRadius: 6, border: 0, background: '#1d1b16', color: '#f2ecdc', cursor: 'pointer', fontWeight: 600 }} onClick={() => g.openSetup(true)}>New game</button>
         </div>
-        {loadMsg && <div role="alert" style={{ marginTop: 6, textAlign: 'right', fontFamily: 'system-ui, sans-serif', fontSize: 12, color: '#8a2f22' }}>{loadMsg}</div>}
+        {loadMsg && <div role="alert" data-testid="load-msg" style={{ marginTop: 6, textAlign: 'right', fontFamily: 'system-ui, sans-serif', fontSize: 12, color: /^(Choose|Loading)/.test(loadMsg) ? '#4a4635' : '#8a2f22' }}>{loadMsg}</div>}
       </div>
     </div>
   );

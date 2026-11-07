@@ -166,7 +166,7 @@ describe('the cards', () => {
     const st = stake(g, ...spot);
     g.stock.fieldstone = 0;
     const card = landSuggestions(g).find(c => c.id === 'retaining');
-    expect(card?.why).toMatch(/dry-stack wall \(up to [\d.]+ m high/);
+    expect(card?.why).toMatch(/dry-stack wall \(up to [\d,.]+ ft high/);
     expect(card?.why).toMatch(/paid for by those pallets/);
     st.stage = 99;
     st.slumpedAt = dayIndex(g.clock.t);
