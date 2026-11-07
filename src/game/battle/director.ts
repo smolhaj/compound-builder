@@ -78,6 +78,9 @@ export function inFrame(eye: V3, look: V3, fov: number, p: V3): boolean {
 }
 function norm3(a: V3): V3 { const l = Math.hypot(a.x, a.y, a.z) || 1; return { x: a.x / l, y: a.y / l, z: a.z / l }; }
 
+/** How close to the subject (units) a bush on the ray counts as hiding it. */
+const COVER_NEAR = 0.9;
+
 /** Does something solid stand between the eye and the point? Boxes the point stands in or on (a tower, a wall walk) are skipped. */
 export function blockedBetween(eye: V3, p: V3, boxes: readonly Box[], ground: Ground): boolean {
   // (a subject standing on top of a box, on a tower or a wall walk, is not hidden by it; one in its footprint or beside a wall is)
@@ -92,13 +95,14 @@ export function blockedBetween(eye: V3, p: V3, boxes: readonly Box[], ground: Gr
     // the last stretch beside the subject is not tested: a figure at a wall is seen against it, not through it
     const tail = (1 - t) * len < 0.35;
     const q = { x: eye.x + (p.x - eye.x) * t, y: eye.y + (p.y - eye.y) * t, z: eye.z + (p.z - eye.z) * t };
-    // (ground cover is the exception: a bush right in front of a figure hides its legs and body, so it counts all the way in)
-    if (tail) { for (const b of boxes) if (b.kind === 'brush' && insideAny(q, b, ground, 0.06)) return true; continue; }
+    // ground cover hides a figure only when it stands right in front of it, down to the figure's feet (the renderer moves a crew out of the brush; a bush far down the ray is not in the way)
+    if ((1 - t) * len < COVER_NEAR) for (const b of boxes) if (b.kind === 'brush' && insideAny(q, b, ground, 0.04)) return true;
+    if (tail) continue;
     // (a rise of the ground between the eye and the subject hides it too)
     // (a hill, not a lip: two samples in a row below the surface; a podium's edge or a kerb a hand high does not hide a chest)
     if (!buried && q.y < ground(q.x, q.z) - 0.03) { if (++under >= 2) return true; } else under = 0;
     // a hand's breadth and a half of margin: eaves, foundation courses, posts and rails stand proud of the box
-    for (const b of boxes) if (!own.includes(b) && insideAny(q, b, ground, b.kind === 'brush' ? 0.04 : 0.2)) return true;
+    for (const b of boxes) if (b.kind !== 'brush' && !own.includes(b) && insideAny(q, b, ground, 0.2)) return true;
   }
   return false;
 }

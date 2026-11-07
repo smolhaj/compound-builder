@@ -257,12 +257,31 @@ import { coverBoxes } from '../game/battle/cameraObstacles';
 describe('ground cover in the framing check', () => {
   const flat = () => 0;
   const bush = coverBoxes([{ x: 5, z: 0, r: 0.5, h: 0.3 }], { x: 0, z: 0 }, 70);
-  it('a bush between the eye and a figure, or right in front of it, blocks the view; one off to the side does not', () => {
+  it('a bush right in front of a figure blocks the view; one far down the ray, off to the side, or under a high camera does not', () => {
     const eye = { x: 0, y: 0.2, z: 0 };
-    expect(blockedBetween(eye, { x: 8, y: 0.17, z: 0 }, bush, flat)).toBe(true);
+    expect(blockedBetween(eye, { x: 8, y: 0.17, z: 0 }, bush, flat)).toBe(false);
     expect(blockedBetween(eye, { x: 5.6, y: 0.17, z: 0 }, bush, flat)).toBe(true);
     expect(blockedBetween(eye, { x: 5, y: 0.17, z: 0.9 }, bush, flat)).toBe(false);
     expect(blockedBetween(eye, { x: 8, y: 0.17, z: 3 }, bush, flat)).toBe(false);
     expect(blockedBetween({ x: 0, y: 1.5, z: 0 }, { x: 8, y: 0.17, z: 0 }, bush, flat)).toBe(false);
+  });
+});
+describe('cover only counts right in front of a figure', () => {
+  it('a bush a metre in front of the subject blocks; one far down the ray does not', () => {
+    const flat = () => 0, eye = { x: 0, y: 0.2, z: 0 };
+    const nearB = coverBoxes([{ x: 7.4, z: 0, r: 0.3, h: 0.3 }], { x: 0, z: 0 }, 70), farB = coverBoxes([{ x: 3, z: 0, r: 0.3, h: 0.3 }], { x: 0, z: 0 }, 70);
+    expect(blockedBetween(eye, { x: 8, y: 0.17, z: 0 }, nearB, flat)).toBe(true);
+    expect(blockedBetween(eye, { x: 8, y: 0.17, z: 0 }, farB, flat)).toBe(false);
+  });
+});
+import { coverPusher } from '../game/battle/cameraObstacles';
+describe('raiders are not put down in cover', () => {
+  it('moves a point out of a bush, leaves a clear one alone, and settles among overlapping bushes', () => {
+    const push = coverPusher([{ x: 10, z: 10, r: 0.5 }, { x: 10.6, z: 10, r: 0.5 }]);
+    expect(push(2, 2)).toEqual({ x: 2, z: 2 });
+    const p = push(10.1, 10);
+    expect(Math.hypot(p.x - 10, p.z - 10)).toBeGreaterThanOrEqual(0.5 + 0.16 - 1e-6);
+    expect(Math.hypot(p.x - 10.6, p.z - 10)).toBeGreaterThanOrEqual(0.5 + 0.16 - 0.05);
+    expect(push(10, 10).x).not.toBe(10);
   });
 });

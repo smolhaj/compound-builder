@@ -11,6 +11,7 @@ import * as THREE from 'three';
 import { FigureLayer, FIG_POSE, FIG_SCALE } from '../../engine/world/people/figureKit';
 import { pickPersonaWear, type Wear } from '../../engine/world/people/crowdWear';
 import type { Battle, BattleEvent, BattleUnit } from '../../sim/battleTypes';
+import { coverPusher } from './cameraObstacles';
 
 const RUN = 1.1;          // world units / s (≈ 6.5 m/s)
 const FLEE = 1.6;
@@ -88,6 +89,15 @@ export class BattleRenderer {
   /** The crew at a tunnel door: working at it (open false) or through it (open true), where (x, z) and how. */
   onDoor: ((open: boolean, x: number | undefined, z: number | undefined, what: string) => void) | null = null;
   battle: Battle | null = null;
+  /** Sagebrush, willow and rocks (set by the canvas): a raider is never put down inside a bush, so a crew is not half hidden behind one. */
+  coverSource: () => ReadonlyArray<{ x: number; z: number; r: number }> = () => [];
+  private _coverIdx: { src: unknown; push: (x: number, z: number) => { x: number; z: number } } | null = null;
+  private _clearOfCover(x: number, z: number): { x: number; z: number } {
+    const cover = this.coverSource();
+    if (!cover.length) return { x, z };
+    if (this._coverIdx?.src !== cover) this._coverIdx = { src: cover, push: coverPusher(cover) };
+    return this._coverIdx.push(x, z);
+  }
 
   private readonly _scene: THREE.Scene;
   private readonly _ground: (x: number, z: number) => number;
@@ -233,7 +243,8 @@ export class BattleRenderer {
       else if (def.armor?.soft) { wear.shirt = 0x2d3440; wear.coat = 1; }
       if (def.armor?.helmet) wear.hat = 0x3d4232;
       const y = def.y ?? 0;
-      this._units.set(def.id, { scale, def, x: def.x, y, z: def.z, tx: def.x, ty: y, tz: def.z, rot: def.side === 'raider' ? Math.atan2(this._center.x - def.x, this._center.z - def.z) : 0,
+      const start = def.side === 'raider' && !def.machine ? this._clearOfCover(def.x, def.z) : { x: def.x, z: def.z };
+      this._units.set(def.id, { scale, def, x: start.x, y, z: start.z, tx: start.x, ty: y, tz: start.z, rot: def.side === 'raider' ? Math.atan2(this._center.x - def.x, this._center.z - def.z) : 0,
         phase: r() * 6, speed: RUN, wear, wound: 0, dead: false, crouch: false, gone: false });
     }
     this._alarm = new THREE.PointLight(0xff2020, 0, 14, 1.6);
@@ -306,8 +317,8 @@ export class BattleRenderer {
     switch (e.kind) {
       case 'alarm': this._alarmOn = true; break;
       case 'lights': this._lightsOn(e.masts, e.aim); break;
-      case 'move': { const u = U_(e.unit); if (u && !u.dead) { u.tx = e.x; u.tz = e.z; u.ty = e.y ?? 0; u.crouch = false; } break; }
-      case 'cover': { const u = U_(e.unit); if (u && !u.dead) { u.tx = e.x; u.tz = e.z; u.ty = 0; u.crouch = true; } break; }
+      case 'move': { const u = U_(e.unit); if (u && !u.dead) { const c = u.def.side === 'raider' ? this._clearOfCover(e.x, e.z) : e; u.tx = c.x; u.tz = c.z; u.ty = e.y ?? 0; u.crouch = false; } break; }
+      case 'cover': { const u = U_(e.unit); if (u && !u.dead) { const c = u.def.side === 'raider' ? this._clearOfCover(e.x, e.z) : e; u.tx = c.x; u.tz = c.z; u.ty = 0; u.crouch = true; } break; }
       case 'shot': {
         const a = U_(e.from), t = U_(e.to);
         if (!a || !t || a.dead) break;

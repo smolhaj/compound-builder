@@ -79,3 +79,24 @@ export function coverBoxes(cover: readonly CoverLike[], around: { x: number; z: 
     .slice(0, 1200)
     .map(c => ({ x0: c.x - c.r, x1: c.x + c.r, z0: c.z - c.r, z1: c.z + c.r, h: c.h ?? 0.25, kind: 'brush' as const }));
 }
+
+/**
+ * A function that moves a point out of any bush, rock or willow clump it stands in (to just outside the crown), so a raider is never
+ * put down half hidden in cover. Indexed once per list (4-unit cells); pure.
+ */
+export function coverPusher(cover: readonly CoverLike[]): (x: number, z: number) => { x: number; z: number } {
+  const cells = new Map<number, CoverLike[]>();
+  for (const c of cover) { const k = Math.floor(c.x / 4) * 100003 + Math.floor(c.z / 4); (cells.get(k) ?? cells.set(k, []).get(k)!).push(c); }
+  return (x, z) => {
+    let px = x, pz = z;
+    for (let pass = 0; pass < 3; pass++) {
+      let moved = false;
+      for (let gx = -1; gx <= 1; gx++) for (let gz = -1; gz <= 1; gz++) for (const c of cells.get((Math.floor(px / 4) + gx) * 100003 + Math.floor(pz / 4) + gz) ?? []) {
+        const dx = px - c.x, dz = pz - c.z, d = Math.hypot(dx, dz), lim = c.r + 0.16;
+        if (d < lim) { if (d > 1e-3) { px = c.x + dx * lim / d; pz = c.z + dz * lim / d; } else px = c.x + lim; moved = true; }
+      }
+      if (!moved) break;
+    }
+    return { x: px, z: pz };
+  };
+}
