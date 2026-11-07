@@ -18,6 +18,8 @@ import { isHome } from './blueprints';
 import { KIT } from '../game/buildkit/kit';
 import type { GameState, OrderLine } from './state';
 import { pluralize } from './words';
+import { queuedLogs } from './forestry';
+import { NEED_KEYS, activeNeeds, needDays, type NeedKey } from './needsStuck';
 
 /** Days a project waits for materials, with the cash to buy them, before the game makes noise about it. */
 export const STALL_DAYS = 3;
@@ -86,6 +88,8 @@ export function noteStalls(s: GameState): Array<{ w: Waiter; days: number }> {
     const days = now - next[w.key].since;
     if (days >= STALL_DAYS && !next[w.key].said) fresh.push({ w, days });
   }
+  // food, beds and medicine are tracked in the same table once they are short (sim/needsStuck.ts)
+  for (const k of activeNeeds(s)) next[k] = old[k] ?? { since: now };
   s.stalls = next;
   return fresh;
 }
@@ -108,6 +112,28 @@ export function stuckProject(s: GameState): Stuck | null {
   return null;
 }
 
+/** A project that waits on logs: they cannot be bought, only felled from the family's own trees (sim/forestry.ts). */
+export interface LogWait {
+  key: string; at: string | null; label: string; home: boolean; days: number;
+  /** Logs the project lacks, the logs already coming from marked trees, and the logs still to be marked. */
+  short: number; queued: number; need: number;
+  /** A hired crew is on this project (it stands idle until the logs are in). */
+  crewed: boolean;
+}
+
+/** The project to nag about for want of logs: a home first, then the longest wait. Null when nothing waits on logs. */
+export function logWait(s: GameState): LogWait | null {
+  const marks = s.stalls ?? {}, queued = queuedLogs(s);
+  const cands = waiters(s).filter(w => (w.miss.logs ?? 0) > 0)
+    .map(w => ({ w, days: Math.max(0, s.clock.t - (marks[w.key]?.since ?? s.clock.t)) }))
+    .sort((a, b) => Number(b.w.home) - Number(a.w.home) || b.days - a.days);
+  const c = cands[0];
+  if (!c) return null;
+  const short = Math.ceil(c.w.miss.logs ?? 0);
+  return { key: c.w.key, at: c.w.at, label: c.w.label, home: c.w.home, days: Math.floor(c.days), short, queued, need: Math.max(0, Math.ceil(short - queued)),
+    crewed: !!c.w.at && (s.crews ?? []).some(x => x.target === c.w.at) };
+}
+
 const usd = (n: number) => '$' + Math.round(n).toLocaleString('en-US');
 /** "1 metal roofing" for order lines. */
 export const linesText = (lines: readonly OrderLine[]): string => billText(Object.fromEntries(lines.map(l => [l.material, l.qty])));
@@ -124,6 +150,26 @@ export function stallsDay(s: GameState): string[] {
     if (!lines.length || orderProblem(s, lines)) continue;
     s.stalls![w.key].said = true;
     out.push(`The ${w.label} has been stuck for ${pluralize(Math.floor(days), 'day')} waiting on ${linesText(lines)}. Order it (${usd(orderCost(lines, prices(s)))}) so work can continue.`);
+  }
+  // food, beds and medicine that stay short get the same loud line when they cross the limit
+  const NEED_LINE: Record<NeedKey, (d: number) => string> = {
+    'need:food': d => `Out of food for ${pluralize(d, 'day')}. Open the food shelf and order staples or add everything missing.`,
+    'need:beds': d => `Somebody has had no bed for ${pluralize(d, 'day')}. Stake a home or buy tents (Build tab).`,
+    'need:meds': d => `Somebody has been out of their medicine for ${pluralize(d, 'day')}. Fill the prescriptions or open the medical shelf.`,
+  };
+  for (const k of NEED_KEYS) {
+    const m = s.stalls![k];
+    if (!m || m.said) continue;
+    const d = needDays(s, k);
+    if (d >= STALL_DAYS) { m.said = true; out.push(NEED_LINE[k](d)); }
+  }
+  // waiting on logs (not for sale): say what to do once, with the crew named if one stands idle
+  const lw = logWait(s);
+  if (lw && lw.days >= 1 && !s.stalls![lw.key].said) {
+    s.stalls![lw.key].said = true;
+    out.push(lw.need > 0
+      ? `The ${lw.label.toLowerCase()} is waiting for ${pluralize(lw.short, 'log')}, and logs are not for sale. Mark trees to fell (Build tab, Next steps): pines and aspens give logs, cottonwoods only firewood.${lw.crewed ? ' The hired crew stands idle until the logs are in.' : ''}`
+      : `The ${lw.label.toLowerCase()} is waiting for ${pluralize(lw.short, 'log')}. The marked trees will cover it once the family has felled them.${lw.crewed ? ' The hired crew stands idle until then.' : ''}`);
   }
   // still there two weeks on, with the cash in hand: a louder second line (nothing stored; it fires on the day it crosses)
   for (const w of waiters(s)) {

@@ -16,6 +16,7 @@ describe('the crew nudge', () => {
   it('offers a priced crew when the family would take more than a few weeks on the house', () => {
     const g = fresh();
     const home = planStructure(g, 'log_house', 0, 0, 0);
+    g.stock.logs = 60;   // (a crew cannot fell: with the logs still standing the nudge waits, see stalls.test.ts)
     const n = crewNudge(g)!;
     expect(n).not.toBeNull();
     expect(n.id).toBe(home.id);
@@ -31,6 +32,7 @@ describe('the crew nudge', () => {
   it('stays quiet without the cash, with a crew already hired, or when the family is quick', () => {
     const g = fresh(2000);
     const home = planStructure(g, 'log_house', 0, 0, 0);
+    g.stock.logs = 60;
     expect(crewNudge(g)).toBeNull();
     g.money = crewQuote(home).usd + CREW_NUDGE_SLACK + 50_000;
     expect(crewNudge(g)).not.toBeNull();

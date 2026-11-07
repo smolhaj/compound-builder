@@ -53,7 +53,7 @@ export function padClash(def: KitPieceDef, x: number, z: number, rot: number, h:
 export function clashText(c: PadClash, snapM: number | null): string {
   const name = (KIT[c.other.kind]?.name ?? c.other.kind).toLowerCase();
   const m = Math.round(Math.abs(c.dy) * RW.M * 10) / 10;
-  return `Its graded pad would cut into the pad of the ${name}, which stands ${lengthText(m)} ${c.dy > 0 ? 'higher' : 'lower'}.${snapM === null ? ' Move it clear, up or down the slope.' : ` Press S to snap to the nearest clear spot (${Math.round(snapM)} m away).`}`;
+  return `Its graded pad would cut into the pad of the ${name}, which stands ${lengthText(m)} ${c.dy > 0 ? 'higher' : 'lower'}.${snapM === null ? ' Move it clear, up or down the slope.' : ` Press S to snap to the nearest clear spot (${lengthText(snapM)} away).`}`;
 }
 
 /**

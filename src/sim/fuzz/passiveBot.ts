@@ -13,6 +13,7 @@ import { placeOrder, orderProblem } from '../economy';
 import { stuckProject } from '../stalls';
 import { crewNudge } from '../crewNudge';
 import { hireCrew } from '../crews';
+import { markTree } from '../forestry';
 import { hookupProblem, orderHookup } from '../improvements';
 import { siteLot } from '../lotListing';
 import type { SiteQuery } from '../../game/buildkit/kit';
@@ -24,7 +25,10 @@ const queryOf = (g: GameState): SiteQuery => {
 };
 const geoOf = (g: GameState) => { const h = g.site.home; return { center: [(h.x0 + h.x1) / 2, (h.z0 + h.z1) / 2] as [number, number], drive: [[h.x1, (h.z0 + h.z1) / 2], [(h.x0 + h.x1) / 2 + 3, (h.z0 + h.z1) / 2]] as Array<[number, number]> }; };
 
-export interface BotLog { placed: number; orders: number; crews: number }
+export interface BotLog { placed: number; orders: number; crews: number; marked?: number }
+
+/** Pines standing on the land for "Mark trees for logs" to find (the headless bot has no map): each is a 3-log tree. */
+const PINES = 80;
 
 /** "Place all": the same loop as the store's `layStarter`. */
 export function placeAll(g: GameState): number {
@@ -55,7 +59,11 @@ export function botTurn(g: GameState, log: BotLog): void {
   for (const sg of suggestions(g, 6)) {
     const act = sg.acts?.[0]?.act;
     if (!act) continue;
-    if (act.type === 'order' && !orderProblem(g, act.lines) && placeOrder(g, act.lines) !== null) log.orders++;
+    if (act.type === 'markTrees') {
+      // the nearest pines until their logs add up (what the canvas does); firewood-only marks (no `logs`) are not a way to get logs
+      let got = 0;
+      while (act.logs && got < act.logs && (log.marked ?? 0) < PINES) { const id = 700_000 + (log.marked = (log.marked ?? 0) + 1); if (markTree(g, { id, x: 20, z: 20, kind: 'conifer', scale: 1 }, 4)) got += 3; }
+    } else if (act.type === 'order' && !orderProblem(g, act.lines) && placeOrder(g, act.lines) !== null) log.orders++;
     else if (act.type === 'crew' && !hireCrew(g, act.id)) log.crews++;
     else if (act.type === 'hookup' && hookupProblem(g, act.what) === null && orderHookup(g, act.what) === null) log.orders++;
   }

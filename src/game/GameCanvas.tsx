@@ -43,7 +43,7 @@ import { useBattleStore } from '../store/battleStore';
 import { BattleRenderer } from './battle/BattleRenderer';
 import { demoBattle } from './battle/demoBattle';
 import { CutscenePlayer } from './battle/CutscenePlayer';
-import { obstaclesOf } from './battle/cameraObstacles';
+import { obstaclesOf, treeBoxes } from './battle/cameraObstacles';
 import { useCutsceneView } from '../store/cutsceneStore';
 import { isFinished } from '../sim/construction';
 import { isHome } from '../sim/blueprints';
@@ -52,7 +52,7 @@ import { setWindowGlow } from './buildkit/materials';
 import { homeOutsideForty } from '../sim/site';
 import { anchorOf } from '../sim/joinerHome';
 import { ownsAt } from '../sim/land';
-import { isMarked } from '../sim/forestry';
+import { isMarked, yieldOf } from '../sim/forestry';
 import { KIT } from './buildkit/kit';
 import { isUnderground } from './buildkit/underground';
 import type { SiteQuery } from './buildkit/kit';
@@ -151,12 +151,24 @@ export function GameCanvas() {
     const marker = new MarkTool(ws.scene, ws.camera, canvas, world);
     const fence = new PerimeterTool(ws.scene, ws.camera, canvas, world);
     // the HUD's "Mark 10 trees": the nearest standing trees on our land, nearest the yard first
-    useWorldStore.getState().setMarkNearestTrees(n => {
+    // (with `logs`: the nearest pines and aspens until their saw logs add up to that many, since cottonwoods are firewood only)
+    useWorldStore.getState().setMarkNearestTrees((n, logs) => {
       const st = useGameStore.getState(), g = st.game, y = world.access.yard;
-      const near = world.treeSpecs
+      const all = world.treeSpecs
         .filter(t => t.x > -0.5 && t.z > -0.5 && t.x < PARCEL_SIZE + 0.5 && t.z < PARCEL_SIZE + 0.5 && t.scale >= 0.6 && ownsAt(g, t.x, t.z) && !isMarked(g, t.id) && !g.forestry.cleared.includes(t.id))
         .map(t => ({ t, d: Math.hypot(t.x - y.x, t.z - y.z) }))
-        .sort((a, b) => a.d - b.d).slice(0, n);
+        .sort((a, b) => a.d - b.d);
+      let near = all.slice(0, n);
+      if (logs !== undefined) {
+        near = [];
+        let got = 0;
+        for (const c of all) {
+          const lg = yieldOf(c.t.kind as 'conifer' | 'oval' | 'broad', c.t.scale).logs;
+          if (lg <= 0) continue;
+          near.push(c); got += lg;
+          if (got >= logs) break;
+        }
+      }
       return st.markTrees(near.map(({ t, d }) => ({ tree: { id: t.id, x: t.x, z: t.z, kind: t.kind as 'conifer' | 'oval' | 'broad', scale: t.scale }, haulDist: d })));
     });
     // the weak-spots overlay (sim/wallTops.ts): trees on our land feed the scan, the markers show where a climber bypasses a wall
@@ -331,8 +343,10 @@ export function GameCanvas() {
       const h = g.structures.find(x => isFinished(x) && isHome(x.kind)) ?? g.structures.find(isFinished);
       return h ? { x: h.x, y: 0, z: h.z } : { x: world.camp.x, y: 0, z: world.camp.z };
     };
-    const player = new CutscenePlayer({ battle, ground: world.groundAt, house: homeSpot, commit: () => useGameStore.getState().commitCutscene(), seed: useGameStore.getState().game.seed, obstacles: () => obstaclesOf(useGameStore.getState().game) });
+    const player = new CutscenePlayer({ battle, ground: world.groundAt, house: homeSpot, commit: () => useGameStore.getState().commitCutscene(), seed: useGameStore.getState().game.seed, obstacles: () => [...obstaclesOf(useGameStore.getState().game), ...treeBoxes(world.treeSpecs, homeSpot(), 70)] });
     let cineSaved: { fov: number; near: number } | null = null;
+    /** Where the player's own camera stood before the raid prompt, and the glide back to it once the cutscene is over (yaw eased by hand: the glide has none). */
+    let camBefore: { x: number; y: number; z: number; radius: number; pitch: number; yaw: number } | null = null, camBack = false;
     let promptAt = -1, skipScene = useCutsceneView.getState().skipScene, skipAll = useCutsceneView.getState().skipAll;
     let battleView: { x: number; z: number; radius: number; pitch: number } | null = null;
     const qa: { frames: number; frameMs: number; lowrender?: boolean; weather?: boolean; renderNow?: () => Promise<void>; renderFull?: (q?: QaQuality) => Promise<void>; pose: null | { x: number; y: number; z: number; lx: number; ly: number; lz: number; fov?: number } } = { frames: 0, frameMs: 0, pose: null };
@@ -365,6 +379,15 @@ export function GameCanvas() {
       const game = useGameStore.getState().game;
       // the raid cutscene: start / stop the player, and read the clock off its timeline while it plays
       const cs = useGameStore.getState().cutscene;
+      // the raid takes the camera (the prompt settles it low in the yard, the scenes fly it): remember where it was, and put it back afterwards
+      if (cs && !camBefore) { camBefore = { x: cam.target.x, y: cam.target.y, z: cam.target.z, radius: cam.radius, pitch: cam.pitch, yaw: cam.yaw }; camBack = false; }
+      else if ((!cs || cs.phase === 'aftermath') && camBefore && !camBack) { cam.glideTo(camBefore.x, camBefore.z, camBefore.radius, camBefore.pitch, 1.4); camBack = true; }
+      if (camBack && camBefore) {
+        let dy = camBefore.yaw - cam.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+        cam.yaw += dy * Math.min(1, dt * 3);
+        cam.target.y += (camBefore.y - cam.target.y) * Math.min(1, dt * 3);
+        if (!cam.gliding && Math.abs(dy) < 0.01) { camBefore = null; camBack = false; }
+      }
       if (cs?.phase === 'playing' && !player.active) {
         cineSaved = { fov: ws.camera.fov, near: ws.camera.near };
         cam.enabled = false;

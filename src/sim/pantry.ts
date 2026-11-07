@@ -192,6 +192,9 @@ export const SHOP_FOOD: Record<'long' | 'bulk' | 'cans' | 'freezer', FoodItemId[
   freezer: ['freezer_meat'],
 };
 
+/** "33 white rice": a count of a named food as a person says it (the shelf name's detail after its comma, "sealed bucket", is left off). */
+export const foodCount = (id: FoodItemId, n: number): string => `${n} ${FOOD[id].name.split(',')[0].toLowerCase()}`;
+
 /** Default mixes (share of the calories) for food that comes in without a name: a generic order, a gift, a trade, an old save. */
 export const DEFAULT_MIX: Record<FoodCat, Partial<Record<FoodItemId, number>>> = {
   // the shop's old "bulk staples: rice, beans, flour, oil"
@@ -659,7 +662,7 @@ export function eatingLine(s: GameState): string {
 export const KITS: Array<{ id: string; name: string; text: string; days: number; mix: Partial<Record<FoodItemId, number>>; extra: Partial<Record<FoodItemId, number>> }> = [
   {
     id: 'year', name: 'One-year food kit', days: 365,
-    text: 'The LDS-style basics for the household: rice, beans and wheat in sealed buckets, oats, oil, honey, sugar, powdered milk, salt and some freeze-dried meals.',
+    text: 'The basics for the household, the way church food-storage programs stock them: rice, beans and wheat in sealed buckets, oats, oil, honey, sugar, powdered milk, salt and some freeze-dried meals.',
     mix: { rice_bucket: 0.3, beans_bucket: 0.2, wheat_bucket: 0.15, oats: 0.07, oil: 0.1, honey: 0.03, sugar: 0.04, milk_powder: 0.04, peanut_butter: 0.03, freeze_dried: 0.04 },
     extra: { salt: 1, coffee: 6 },
   },

@@ -92,8 +92,8 @@ const PROFILES: Partial<Record<DisasterKind, Profile>> = {
   solar_flare: { warn: 0.45, rise: 0, hold: 3, fade: 10, floor: 0.02, tint: [0.2, 0.62, 0.36], tintAmt: 0.6, tintNight: true, cast: [1, 1, 1], sat: 1 },
   // a bleached, dusty, rainless sky for as long as it takes to break
   drought: { warn: 0.5, rise: 20, hold: 330, fade: 360, floor: 0.1, cloud: 0.04, haze: 0.85, fog: 0.12, dim: 0.9, tint: [0.62, 0.5, 0.3], tintAmt: 0.42, cast: [1.06, 0.99, 0.86], sat: 0.8, contrast: 0.02 },
-  // a muted, grey-green, closed-in look; nobody about
-  pandemic: { warn: 0.25, rise: 14, hold: 300, fade: 300, floor: 0.1, cloud: 0.5, haze: 0.8, fog: 0.22, dim: 0.84, tint: [0.42, 0.52, 0.56], tintAmt: 0.5, cast: [0.89, 1.0, 1.09], sat: 0.5, contrast: -0.05, town: 0.4 },
+  // a muted, grey-green, closed-in look; nobody about. It arrives with the news (QA run 6: over 14 days the first week looked like peacetime), so the rise is hours, not weeks
+  pandemic: { warn: 0.25, rise: 0.25, hold: 300, fade: 300, floor: 0.1, cloud: 0.5, haze: 0.8, fog: 0.22, dim: 0.84, tint: [0.42, 0.52, 0.56], tintAmt: 0.5, cast: [0.89, 1.0, 1.09], sat: 0.5, contrast: -0.05, town: 0.4 },
   financial: { warn: 0.3, rise: 20, hold: 300, fade: 300, floor: 0.1, cloud: 0.25, haze: 0.2, dim: 0.92, tint: [0.4, 0.43, 0.5], tintAmt: 0.22, cast: [0.96, 0.98, 1.03], sat: 0.76 },
   // a warm, smoky look: fires out past the edge of town, smoke columns on the skyline, the town's lights thinned and dim
   lawless: { warn: 0.3, rise: 10, hold: 240, fade: 300, floor: 0.12, haze: 0.8, fog: 0.12, cloud: 0.2, dim: 0.84, tint: [0.66, 0.38, 0.19], tintAmt: 0.5, cast: [1.07, 0.96, 0.85], sat: 0.78, fire: 1, smoke: 1, town: 0.3 },

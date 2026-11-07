@@ -10,6 +10,7 @@ import { useBattleStore } from '../../store/battleStore';
 import { useCutsceneView } from '../../store/cutsceneStore';
 import type { CutsceneState } from '../../store/gameStore';
 import { hourAfter, locate, sceneCaption, sceneWindow } from '../../sim/siege';
+import { lightLabel } from './lightLabel';
 import { Director, auditPose, poseAt, type PoseAudit, type V3, type Box } from './director';
 import type { BattleRenderer } from './BattleRenderer';
 
@@ -61,6 +62,7 @@ export class CutscenePlayer {
   stop(): void {
     if (this.active && useBattleStore.getState().battle) useBattleStore.getState().endBattle();
     this.active = false; this._c = null;
+    this.d.battle.lightNight = null;
     useCutsceneView.getState().set(null);
   }
 
@@ -94,9 +96,11 @@ export class CutscenePlayer {
     if (c.offer != null) {
       this._time += dt;
       this._endBattle();
-      const shot0 = this._dir.shot ?? this._dir.establish(this._time, this.d.house(), this._road, this.d.ground);
+      // (the picture behind the card is its own frame, from the compound's own side, not the last shot of the scene before: the card can stay up a while)
+      const house = this.d.house(), k = c.offer;
+      if (this._lastKind !== `offer${k}`) { this._dir.variant = 2 * (k + 1) + 1; this._dir.establish(this._time, house, this._road, this.d.ground, { x: house.x, y: 0, z: house.z }, 2 * (k + 1) + 1); this._lastKind = `offer${k}`; }
       this._publish(true);
-      return poseAt(shot0, this._time);
+      return poseAt(this._dir.shot!, this._time);
     }
     this._time += dt;
     const { battle, ground } = this.d;
@@ -105,6 +109,8 @@ export class CutscenePlayer {
     // the lead-in shows the cast in place, frozen at the first frame (so the shots have someone to show), then the fight runs from there
     if (!loc.done && seg.kind === 'lead' && this._startedScene !== seg.scene) {
       this._startedScene = seg.scene; this._seen = false;
+      // (dark clothes and moonlight only while the sky is dark: a raid that runs into the dawn is drawn in the dawn's light)
+      battle.lightNight = lightLabel(hourAfter(plan, seg.game0 + seg.gameLen / 2)) === 'Night';
       useBattleStore.getState().playBattle(c.battles[seg.scene]);
     }
     battle.hold = !loc.done && seg.kind === 'lead';
@@ -113,6 +119,7 @@ export class CutscenePlayer {
     if (!loc.done && seg.kind === 'fight') {
       if (this._startedScene !== seg.scene) {
         this._startedScene = seg.scene; this._seen = false;
+        battle.lightNight = lightLabel(hourAfter(plan, seg.game0 + seg.gameLen / 2)) === 'Night';
         useBattleStore.getState().playBattle(c.battles[seg.scene]);
       }
       if (battle.playing) this._seen = true;
@@ -133,7 +140,7 @@ export class CutscenePlayer {
       // (read the card back: publishing from the old state would flash the end of the gap for a frame, then fall back to the end of the scene)
       this._c = useGameStore.getState().cutscene ?? this._c;
       this._publish(true);
-      return poseAt(this._dir.shot ?? this._dir.establish(this._time, this.d.house(), this._road, this.d.ground), this._time);
+      return this.update(0);
     }
     // a fight ends with its tail (bodies stay down, the alarm dies); the next scene starts clean
     if (loc.segment.scene !== seg.scene || loc.done) this._endBattle();
@@ -149,12 +156,13 @@ export class CutscenePlayer {
       const rx = raiders.reduce((a, u) => a + u.x, 0) / raiders.length - house.x, rz = raiders.reduce((a, u) => a + u.z, 0) / raiders.length - house.z, l = Math.hypot(rx, rz) || 1;
       this._road = { x: rx / l, z: rz / l };
     }
+    this._dir.night = lightLabel(hourAfter(plan, loc.game)) === 'Night'; this._dir.variant = loc.segment.scene;
     let shot;
     if (battle.playing !== this._wasPlaying) { this._wasPlaying = battle.playing; this._dir.shot = null; this._lastKind = ''; }
     if (battle.playing) {
       shot = this._dir.update(this._time, battle.actors(), battle.drainEvents(), house, ground);
     } else {
-      if (!this._dir.shot || this._lastKind !== `est${loc.segment.scene}`) { this._dir.establish(this._time, house, this._road, ground, undefined, loc.segment.scene); this._lastKind = `est${loc.segment.scene}`; }
+      if (!this._dir.shot || this._lastKind !== `est${loc.segment.scene}`) { this._dir.establish(this._time, house, this._road, ground, undefined, 2 * loc.segment.scene); this._lastKind = `est${loc.segment.scene}`; }
       shot = this._dir.shot!;
     }
     this._publish(false);
@@ -175,7 +183,7 @@ export class CutscenePlayer {
     const plan = c.plan, loc = locate(plan, this._real), sc = plan.scenes[loc.segment.scene];
     const kind = loc.segment.kind;
     const part = kind === 'gap' ? 'gap' : kind === 'tail' ? 'tail' : 'lead';
-    const caption = kind === 'fight' ? '' : sceneCaption(plan, sc, part, this.d.seed);
+    const caption = sceneCaption(plan, sc, kind === 'fight' ? 'fight' : part, this.d.seed);
     useCutsceneView.getState().set({
       scene: sc.index, scenes: plan.scenes.length, sceneLabel: sc.label, seg: kind,
       hour: hourAfter(plan, kind === 'gap' && c.offer == null ? loc.segment.game0 + loc.segment.gameLen : loc.game), game: loc.game, caption,
