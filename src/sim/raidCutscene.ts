@@ -18,6 +18,7 @@ import { decorateRaiders } from './raiderKinds';
 import { LineDirector, voiceCutscene } from './raidDialogue';
 import { dramatize, type DramaInfo } from './raidDrama';
 import { endPoses } from './raidEnding';
+import { dragTheWounded } from './fightPoses';
 import { isHome } from './blueprints';
 import { isFinished } from './construction';
 import { breakInScene, commitDays, finishPlan, gateScene, planSiege, probeBattle, siegeStrain, type Scene, type SiegePlan } from './siege';
@@ -126,6 +127,7 @@ export function stageRaid(game: GameState, stance: Stance, keep?: Keep): StagedR
     const fin = g.structures.filter(isFinished), home = fin.find(st => isHome(st.kind)) ?? fin[0] ?? { x: 0, z: 0 };
     // how the last fight ends on screen agrees with the sim's result: the crew beaten (down or hands up, never a standing cluster) or the family held (sim/raidEnding.ts)
     const last = battles.length - 1, temper = e.temper ?? 'desperate';
+    battles = battles.map((b, i) => (i === last ? dragTheWounded(b, { x: home.x, z: home.z }) : b));
     const ep = endPoses({ battle: battles[last], temper, style: scenes[last].style, dir, seed, house: { x: home.x, z: home.z } });
     battles = battles.map((b, i) => (i === last ? ep.battle : b));
     const crewWon = ep.ending === 'breached' || ep.ending === 'overrun';

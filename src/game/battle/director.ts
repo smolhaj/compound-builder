@@ -290,14 +290,16 @@ export class Director {
   constructor(seed: number) { this._r = mulberry32(seed * 3119 + 11); }
 
   /** The buildings and walls the camera must keep out of. */
-  setObstacles(boxes: readonly Box[]): void { this._boxes = boxes; this._nightBoxes = null; }
+  setObstacles(boxes: readonly Box[]): void { this._boxes = boxes; this._nightBoxes = null; this._quiet = false; }
+  /** The quiet after the fight: ground cover counts at night too (a bush in front of the people being shown hides them). */
+  private _quiet = false;
   private _nightBoxes: { src: readonly Box[]; list: Box[] } | null = null;
   /**
    * The obstacles a shot is checked against. By night ground cover is left out (a dark figure in the sage is a silhouette against the moonlit field,
    * and the night frames the user liked stay as they were); by day a bush right in front of the crew hides it, so it counts.
    */
   private _shotBoxes(): readonly Box[] {
-    if (!this.night) return this._boxes;
+    if (!this.night || this._quiet) return this._boxes;
     if (this._nightBoxes?.src !== this._boxes) this._nightBoxes = { src: this._boxes, list: this._boxes.filter(b => b.kind !== 'brush') };
     return this._nightBoxes.list;
   }
@@ -344,6 +346,7 @@ export class Director {
       if (e.kind === 'beat' && e.unit) {
         // the death scene and the wake (sim/raidDrama.ts): the camera is told where to look, and holds there
         const long = e.role === 'aim' || e.role === 'fall' ? 4.2 : 7.5;
+        if (e.role !== 'aim' && e.role !== 'fall') this._quiet = true;
         want = e.role === 'aim' || e.role === 'fall' ? { kind: 'close', subject: e.unit, hold: long, force: true } : { kind: 'vigil', subject: e.unit, hold: long, force: true, with: e.with };
         continue;
       }
@@ -457,10 +460,18 @@ export class Director {
         const folk = (this._with ?? []).map(id => this._byId.get(id)).filter((a): a is Actor => !!a && !a.dead && !a.gone && Math.hypot(a.x - f.x, a.z - f.z) < 1.4);
         const look = at(f.x, f.z, f.y + 0.08);
         const track = !f.dead ? f.id : folk[0]?.id;
-        return this._set(this._search((rot, k, hb) => {
+        const mk = (rot: number, k: number, hb: number): Shot => {
           const o = rotate({ x: -road.x * 1.0 + px * 1.1, z: -road.z * 1.0 + pz * 1.1 }, rot, k);
           return { ...base, kind: 'vigil', subject, subjects: folk.map(a => a.id), need: folk.length > 1 ? 0.6 : 1, ...(track ? { track } : {}), eye: at(f.x + o.x, f.z + o.z, f.y + 0.4 + hb * 0.7), look, fov: 50, drift: { x: px * 0.015, y: 0, z: pz * 0.015 } };
-        }, ctx));
+        };
+        // the place itself must be in view: no bush, rock or wall between the eye and the people (the body is not a subject, so it is checked here)
+        const focus = at(f.x, f.z, f.y + 0.1);
+        for (const k of [1, 1.3, 1.7]) for (const hb of [0, 0.3, 0.7]) for (const rot of SWING) {
+          const s = mk(rot, k, hb);
+          if (blockedBetween(s.eye, focus, ctx.boxes, ground) || shotProblems(s, ctx).length) continue;
+          return this._set(s);
+        }
+        return this._set(this._search(mk, ctx));
       }
       kind = 'wide';
     }

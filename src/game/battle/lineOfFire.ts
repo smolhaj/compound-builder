@@ -30,9 +30,19 @@ export const FIRE_SOLID: ReadonlySet<PerimeterKind> = new Set<PerimeterKind>(['l
 
 const WALL_THICK = 0.1;
 
+/**
+ * Things a person kneels behind (a crate, a barrel, a well curb, a woodpile, a tank, a truck or a tractor), by the structure's kind id: low, about a
+ * hip high (0.1 to 0.3), so they stop a round for a kneeling shooter but a standing one fires over them. Null for anything else (a building: roof high).
+ */
+export function lowCoverHeight(id: string): number | null {
+  if (/vehicle|truck|car_|pickup|tractor|trailer|cart/.test(id)) return 0.3;
+  if (/crate|barrel|well|woodpile|wood_stack|log_pile|stack|trough|planter|generator|mower|hay|bale|sandbag/.test(id)) return /hay|bale|sandbag|well|trough|planter/.test(id) ? 0.2 : 0.26;
+  return null;
+}
+
 /** What stops a round: the buildings (to the roof line) and the solid runs of wall, off the game. */
 export function fireBoxesOf(g: GameState): Box[] {
-  const out: Box[] = obstaclesOf(g).filter(b => b.kind === 'building');
+  const out: Box[] = obstaclesOf(g).filter(b => b.kind === 'building').map(b => (b.id && lowCoverHeight(b.id) ? { ...b, h: lowCoverHeight(b.id)! } : b));
   for (const run of g.perimeter) {
     const def = PERIMETER[run.kind];
     if (!def || !FIRE_SOLID.has(run.kind) || run.pts.length < 2) continue;
