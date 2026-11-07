@@ -45,6 +45,9 @@ import { demoBattle } from './battle/demoBattle';
 import { CutscenePlayer } from './battle/CutscenePlayer';
 import { RaidDamageRenderer, type GlassHome } from './props/RaidDamageRenderer';
 import { coverBoxes, obstaclesOf, treeBoxes } from './battle/cameraObstacles';
+import { liveBreach } from './battle/liveBreach';
+import { decorateBreach } from '../sim/breach';
+import { planHouseAssault } from '../sim/houseAssault';
 import { useCutsceneView } from '../store/cutsceneStore';
 import { isFinished } from '../sim/construction';
 import { isHome } from '../sim/blueprints';
@@ -353,6 +356,7 @@ export function GameCanvas() {
     battle.coverSource = () => world.lowCover;
     battle.onEnd = () => { useBattleStore.getState().endBattle(); world.forceDoor(null); };
     battle.onDoor = (open, x, z) => world.forceDoor(open, x, z);
+    battle.onGap = (runId, at, w) => liveBreach.add({ runId, at, w });
     let battleSkip = useBattleStore.getState().skipReq, battleSync = 0;
     // the raid cutscene: plays a staged siege (sim/siege.ts), cutting between wall, house and raiders
     const homeSpot = () => {
@@ -360,7 +364,20 @@ export function GameCanvas() {
       const h = g.structures.find(x => isFinished(x) && isHome(x.kind)) ?? g.structures.find(isFinished);
       return h ? { x: h.x, y: 0, z: h.z } : { x: world.camp.x, y: 0, z: world.camp.z };
     };
-    const player = new CutscenePlayer({ battle, ground: world.groundAt, house: homeSpot, commit: () => useGameStore.getState().commitCutscene(), seed: useGameStore.getState().game.seed, obstacles: () => [...obstaclesOf(useGameStore.getState().game), ...treeBoxes(world.treeSpecs, homeSpot(), 70), ...(qa.noCover ? [] : coverBoxes(world.lowCover, homeSpot(), 70))] });
+    let cutawayBefore: ReturnType<typeof useWorldStore.getState>['buildingView'] | null = null;
+    const player = new CutscenePlayer({ battle, ground: world.groundAt, house: homeSpot, commit: () => useGameStore.getState().commitCutscene(), seed: useGameStore.getState().game.seed, obstacles: () => [...obstaclesOf(useGameStore.getState().game), ...treeBoxes(world.treeSpecs, homeSpot(), 70), ...(qa.noCover ? [] : coverBoxes(world.lowCover, homeSpot(), 70))],
+      // the invasion look (sim/breach.ts, sim/houseAssault.ts): how the wall comes down, and the fight inside the house; cinematic, the sim's result is kept
+      prepare: b => {
+        if (!b.events.some(e => e.kind === 'breach')) return b;
+        const g = useGameStore.getState().game, hs = homeSpot();
+        const home = g.structures.find(x => isFinished(x) && isHome(x.kind) && KIT[x.kind]);
+        const seed = g.seed * 131 + Math.round(b.duration * 7);
+        const carries = b.events.some(e => e.kind === 'rocket' || e.kind === 'throw');
+        const d = decorateBreach(b, g.perimeter, hs, seed, carries);
+        if (!home) return d;
+        return planHouseAssault(d, { box: footprint(KIT[home.kind], home.x, home.z, home.rot, false), blocked: (x, z) => world.walkBlocked(x, z, 0.04), seed });
+      },
+      cutaway: on => { const ws2 = useWorldStore.getState(); if (on) { cutawayBefore ??= ws2.buildingView; ws2.setBuildingView('cutaway'); } else if (cutawayBefore) { ws2.setBuildingView(cutawayBefore); cutawayBefore = null; } } });
     let cineSaved: { fov: number; near: number } | null = null;
     /** Where the player's own camera stood before the raid prompt, and the glide back to it once the cutscene is over (yaw eased by hand: the glide has none). */
     let camBefore: { x: number; y: number; z: number; radius: number; pitch: number; yaw: number } | null = null, camBack = false;
@@ -442,7 +459,7 @@ export function GameCanvas() {
       world.syncTents(game);
       world.syncForestry(game.forestry);
       world.simTime = game.clock.t;
-      world.syncPerimeter(game.perimeter, game.clock.t, { lit: fenceLive(game) && !blackoutNow(game), sensors: (game.stock.ground_sensor ?? 0) > 0, gateKit: { sally: hasSallyGate(game), intercom: hasIntercom(game), motor: hasGateMotor(game), signs: responseActive(game) }, moats: Object.fromEntries(moatStates(game).map(m => [m.run.id, { level: m.level, frozen: m.frozen }])) });
+      world.syncPerimeter(liveBreach.apply(game.perimeter), game.clock.t, { lit: fenceLive(game) && !blackoutNow(game), sensors: (game.stock.ground_sensor ?? 0) > 0, gateKit: { sally: hasSallyGate(game), intercom: hasIntercom(game), motor: hasGateMotor(game), signs: responseActive(game) }, moats: Object.fromEntries(moatStates(game).map(m => [m.run.id, { level: m.level, frozen: m.frozen }])) });
       const svKey = `${game.structures.filter(x => x.stage >= 5).length}|${game.perimeter.filter(r => r.finishedAt !== null).length}|${game.utilities.fittings.filter(f => f.finishedAt !== null).length}|${goodsKey(houseGoods(game))}`;
       if (svKey !== servicesKey) { servicesKey = svKey; world.syncServices(game); }
       sight.update(6);

@@ -14,6 +14,7 @@ import type { Battle } from './battleTypes';
 import { resolve, type Outcome, type Stance } from './encounters';
 import { newDamage } from './raidDamage';
 import { decorateDefenders } from './defenderMoments';
+import { ASSAULT_EXTRA } from './houseAssault';
 import { decorateRaiders } from './raiderKinds';
 import { breakInScene, commitDays, finishPlan, gateScene, planSiege, probeBattle, siegeStrain, type Scene, type SiegePlan } from './siege';
 import { step } from './engine';
@@ -82,6 +83,9 @@ export function stageRaid(game: GameState, stance: Stance, keep?: Keep): StagedR
   const played: Stance = battle ? 'defend' : stance;
   const fresh = planSiege({ kind: e.kind, size: e.size, temper: e.temper ?? 'desperate', hour, seed, fought: !!battle, fightSeconds: battle?.duration ?? null, armed: e.armed });
   const finalScene = fresh.scenes[fresh.scenes.length - 1];
+  // a fight that ends with the line broken gets the invasion's last act (the crew in the house, sim/houseAssault.ts): the scene runs ASSAULT_EXTRA seconds longer,
+  // cinematic only (the sim's result, wounds and deaths are what they were)
+  if (battle && battle.events.some(e => e.kind === 'breach') && battle.events.some(e => e.kind === 'end' && (e.result === 'breached' || e.result === 'overrun'))) finalScene.fight += ASSAULT_EXTRA;
   const deco = (b: Battle, sc: Scene): Battle => {
     const style = sc.style ?? fresh.style;
     if (e.kind === 'break_in') return b;

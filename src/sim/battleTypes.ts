@@ -74,12 +74,31 @@ export type BattleEvent =
   | { t: number; kind: 'jam'; unit: string; secs: number }
   /** First aid under fire: a tourniquet, a chest seal, or just hands pressing on it. */
   | { t: number; kind: 'aid'; unit: string; by: string; what: 'tourniquet' | 'chest seal' | 'pressure' }
+  /**
+   * Invasion presentation (cinematic only; sim/breach.ts): a raiders' truck runs at the wall from (fromX, fromZ) and hits it at (x, z) `secs` later
+   * (this event's `t` is the start of the run), or a charge is planted at (x, z) and goes off `fuse` seconds later. The sim's own `breach` event
+   * is what lets the crew in; these only show how the wall came down.
+   */
+  | { t: number; kind: 'ram'; fromX: number; fromZ: number; x: number; z: number; secs: number }
+  | { t: number; kind: 'charge'; x: number; z: number; fuse: number }
+  /** The wall run is open here from now on (a live gap, drawn until the cutscene ends): run id, distance along it, width. */
+  | { t: number; kind: 'gap'; runId: string; at: number; w: number; x: number; z: number }
   | { t: number; kind: 'end'; result: 'repelled' | 'fled' | 'breached' | 'overrun' };
 
 /** A vehicle left standing in the scene (the opportunists' pickup): where, and which way its nose points (radians about +y, front toward +z). */
 export interface BattleVehicle { kind: 'pickup'; x: number; z: number; rot: number }
 
+/** What the invasion presentation decided for a scene (sim/breach.ts, sim/houseAssault.ts). Cinematic only. */
+export interface InvasionMeta {
+  method: 'ram' | 'charge';
+  /** The house the crew fights in, if it was found: its footprint box (world units), the door and the inside point just past it. */
+  house?: { x0: number; z0: number; x1: number; z1: number; door: { x: number; z: number }; inside: { x: number; z: number } };
+  /** The stretch of the battle played inside the house (s): the camera goes to the cutaway view for it. */
+  interior?: { from: number; to: number };
+}
+
 export interface Battle {
+  invasion?: InvasionMeta;
   /** Night or day (lights matter at night). */
   night: boolean;
   /** A parked vehicle (sim/raiderKinds.ts). */

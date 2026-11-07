@@ -13,6 +13,7 @@ import { pickPersonaWear, type Wear } from '../../engine/world/people/crowdWear'
 import type { Battle, BattleEvent, BattleUnit } from '../../sim/battleTypes';
 import { coverPusher } from './cameraObstacles';
 import { buildVehicle } from '../props/vehicleGeometry';
+import { InvasionFx } from './InvasionFx';
 
 const RUN = 1.1;          // world units / s (≈ 6.5 m/s)
 const FLEE = 1.6;
@@ -89,6 +90,10 @@ export class BattleRenderer {
   onEnd: (() => void) | null = null;
   /** The crew at a tunnel door: working at it (open false) or through it (open true), where (x, z) and how. */
   onDoor: ((open: boolean, x: number | undefined, z: number | undefined, what: string) => void) | null = null;
+  /** A wall run opens at a breach (the live gap): run id, distance along it, width. */
+  onGap: ((runId: string, at: number, w: number) => void) | null = null;
+  /** The invasion look: the ramming truck, the charge, the debris (game/battle/InvasionFx.ts). */
+  readonly invasion: InvasionFx;
   battle: Battle | null = null;
   /** Sagebrush, willow and rocks (set by the canvas): a raider is never put down inside a bush, so a crew is not half hidden behind one. */
   coverSource: () => ReadonlyArray<{ x: number; z: number; r: number }> = () => [];
@@ -150,6 +155,10 @@ export class BattleRenderer {
     this._layer = new FigureLayer(scene, 64, 'battle');
     this._group.name = 'battle-fx';
     scene.add(this._group);
+    this.invasion = new InvasionFx(this._group, {
+      ground, puff: (p, r0, r1, life, rise, color, o0, glow) => this._puff(p, r0, r1, life, rise, color, o0, glow), flash: (p, k, c) => this._flash(p, k, c),
+      boom: (x, y, z, r, dust) => this._boom(x, y, z, r, dust), shake: v => { this.shake = Math.max(this.shake, v); }, gap: (id, at, w) => this.onGap?.(id, at, w),
+    });
     this._trGeo.setAttribute('position', new THREE.BufferAttribute(this._trPos, 3).setUsage(THREE.DynamicDrawUsage));
     this._trGeo.setDrawRange(0, 0);
     this._trLines = new THREE.LineSegments(this._trGeo, new THREE.LineBasicMaterial({ color: 0xffd27a, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
@@ -255,6 +264,7 @@ export class BattleRenderer {
       v.position.set(c.x, this._ground(c.x, c.z), c.z); v.rotation.y = b.vehicle.rot;
       this._group.add(v); this._vehicle = v;
     }
+    this.invasion.begin(b);
     this._alarm = new THREE.PointLight(0xff2020, 0, 14, 1.6);
     this._alarm.position.set(this._center.x, this._ground(this._center.x, this._center.z) + 0.8, this._center.z);
     this._group.add(this._alarm);
@@ -276,6 +286,7 @@ export class BattleRenderer {
   private _vehicle: THREE.Group | null = null;
 
   stop(): void {
+    this.invasion.end();
     if (this._vehicle) { this._group.remove(this._vehicle); this._vehicle.traverse(o => { if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).geometry.dispose(); }); this._vehicle = null; }
     for (const m of this._marks) { this._group.remove(m.sprite); m.sprite.material.dispose(); }
     this._marks.length = 0;
@@ -312,6 +323,7 @@ export class BattleRenderer {
     if (this._endAt < 0 && this.time > b.duration + 1) this._endAt = this.time;
     if (this._endAt >= 0 && this.time - this._endAt > END_HOLD) { this.stop(); this.onEnd?.(); return; }
     this._moveUnits(dt);
+    this.invasion.update(dt);
     this._tickFx(dt);
     if (this._alarm) this._alarm.intensity = this._alarmOn ? (0.5 + 0.5 * Math.sin(this.time * 9)) * 6 : 0;
     this.shake = Math.max(0, this.shake - dt * 1.5);
@@ -378,6 +390,7 @@ export class BattleRenderer {
         if (e.wrecks) this._decal(e.x, e.z, e.radius * 0.8);
         break;
       }
+      case 'ram': case 'charge': case 'gap': this.invasion.onEvent(e); break;
       case 'breach': this._boom(e.x, this._ground(e.x, e.z), e.z, 0.5, true); break;
       case 'door': this.onDoor?.(e.open, e.x, e.z, e.what); break;      // the crew at the tunnel's steel door: shut while they work at it, forced when they are through
       case 'fallback': this.shake = Math.max(this.shake, 0.15); break;

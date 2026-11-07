@@ -115,6 +115,8 @@ export interface Gate {
   garage?: boolean;
   /** A sally port: a small side door in a ring wall (sim/rings.ts SALLY): a weak spot a crew funnels to, and a way for the defenders to sortie. */
   sally?: boolean;
+  /** A gap knocked through the wall for the cutscene (game/battle/liveBreach.ts): drawn as bare open ground, never saved. */
+  breach?: boolean;
 }
 
 /** How a container wall looks (cosmetic: the same wall, price and strength). `mixed` is the old four-color cycle. */

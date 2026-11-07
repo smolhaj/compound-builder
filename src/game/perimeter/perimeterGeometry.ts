@@ -901,7 +901,7 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
   // gates: posts each side and a leaf swung open (wire / rail fences: tube gate; walls: plank or steel gates)
   if (run.finishedAt !== null && run.kind !== 'ditch') {
     for (const g of run.gates) {
-      if (g.garage) continue;   // a gatehouse garage fills this gap
+      if (g.garage || g.breach) continue;   // a gatehouse garage fills this gap; a breach is bare
       const p0 = along(run.pts, g.at - g.w / 2), p1 = along(run.pts, g.at + g.w / 2);
       // the drive through this gate: the leaves open along it, and the entry gate's kit (sim/gateSecurity.ts) is laid out in its frame (gateKitLayout.ts)
       const dc = driveCrossing(run, g, opts.drive);
