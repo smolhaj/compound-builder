@@ -38,7 +38,7 @@ import { sleepSpotFor } from './housing';
 import { gatePoint, raidDelta } from './quarters';
 import { houseCoverK } from './houseHardening';
 import { isFinished } from './construction';
-import { PERIMETER, fenceLive, runFinished, type PerimeterRun } from './perimeter';
+import { PERIMETER, fenceLive, runFinished, withKnownWalls, type PerimeterRun } from './perimeter';
 import { climbPenaltyK, topClimb } from './wallTops';
 import { ARMORY_LIGHTS, floodlightLit } from './lights';
 import { DOOR_DELAY, doorsLocked, raidAngle } from './terrainFx';
@@ -309,7 +309,8 @@ export function hitRoll(r: () => number, covered: boolean, rifle: boolean, armor
   return { kind: 'wound', part, sev: (part === 'arm' ? 20 : 25) + r() * 28 };
 }
 
-export function planBattle(s: GameState, raiders: number, seed: number, opts: BattleOptions = {}): PlannedBattle {
+export function planBattle(state: GameState, raiders: number, seed: number, opts: BattleOptions = {}): PlannedBattle {
+  const s = withKnownWalls(state);   // a run of a wall kind this build does not know reads as the weakest known one: odd data never throws
   // no crew, or nonsense for one: nobody came (a plain, harmless result rather than a throw)
   if (!Number.isFinite(raiders) || raiders < 1) return { night: false, units: [], events: [{ t: 0, kind: 'end', result: 'repelled' }], duration: 1, spent: {}, minesUsed: 0, dropped: { grenades: 0, rpg_rounds: 0 }, result: 'repelled', leftBehind: { wounded: 0, dead: 0, surrendered: 0 } };
   raiders = Math.min(400, Math.floor(raiders));

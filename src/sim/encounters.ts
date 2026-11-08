@@ -13,6 +13,7 @@
  * The escape tunnel is never a way in (perimeter.canEnter): no outcome here
  * ever reaches the family through it. Pure and seeded.
  */
+import { withKnownWalls } from './perimeter';
 import { nobodyHome } from './orphans';
 import { ringPoints } from './rings';
 import { terrainPoints } from './terrainFx';
@@ -708,6 +709,7 @@ export function fightOdds(s: GameState, e: Encounter, tries = Math.max(10, Math.
 
 /** Apply the player's stance. Returns the vignette card. */
 export function resolve(s: GameState, stance: Stance): Outcome {
+  s.perimeter = withKnownWalls(s).perimeter;   // odd wall data (an unknown kind) reads as the weakest known one, never throws
   const e = s.gate.pending;
   if (e && stance === 'take_in' && nobodyHome(s)) return { title: 'Nobody home', text: 'There is no one at the place to take anyone in.', tone: 'mixed', lines: [] };
   if (!e) return { title: '', text: '', tone: 'mixed', lines: [] };

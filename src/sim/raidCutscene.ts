@@ -10,6 +10,7 @@
  *  raidReport  what the aftermath card says: who was hurt, killed or taken, what
  *              was lost, how many raiders are left on the drive.
  */
+import { withKnownWalls } from './perimeter';
 import type { Battle, RaidFacts } from './battleTypes';
 import type { RaidOrder } from './raidOrders';
 import { resolve, type Outcome, type Stance } from './encounters';
@@ -90,6 +91,7 @@ export function stageRaid(game: GameState, stance: Stance, keep?: Keep, orders?:
   const e = game.gate.pending;
   if (!e) throw new Error('no one at the gate');
   const g = structuredClone(game);
+  g.perimeter = withKnownWalls(g).perimeter;
   const t0 = g.clock.t, hour = hourOf(t0);
   g.gate.battle = undefined;
   if (orders?.length) g.gate.orders = orders.map(o => ({ ...o }));   // (the family's orders for the fight; `resolve` reads them and clears them, so they are never saved)

@@ -3,6 +3,7 @@
  * adds a step here that upgrades the previous version's JSON (CLAUDE.md
  * rule 5). Pure — tested in migrations.test.ts.
  */
+import { withKnownWalls } from '../perimeter';
 import { foundLineage, newLineage } from '../lineage';
 import { SAVE_VERSION, startingBedding, type GameState } from '../state';
 import { emptyUtilities } from '../utilities';
@@ -301,6 +302,8 @@ export function migrate(raw: unknown): GameState {
   }
   // goods added since the save was made start at zero (a new material needs no migration step)
   s = { ...s, stock: { ...emptyStock(), ...(s.stock as object) } };
+  // a wall run of a kind this build does not know reads as the weakest known kind (the raid code looks each kind up)
+  s = { ...s, perimeter: withKnownWalls({ perimeter: (s.perimeter ?? []) as never }).perimeter };
   return s as unknown as GameState;
 }
 

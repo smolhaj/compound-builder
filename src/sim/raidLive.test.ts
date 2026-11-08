@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { newGame, SAVE_VERSION, type GameState } from './state';
-import { planRun, PERIMETER, type PerimeterKind, type PerimeterRun } from './perimeter';
+import { planRun, PERIMETER, WEAKEST_WALL, withKnownWalls, type PerimeterKind, type PerimeterRun } from './perimeter';
 import { applyBattle, planBattle, type BattleOptions, type PlannedBattle } from './battle';
 import { resolve, type Encounter, type EncounterKind } from './encounters';
 import { stageRaid } from './raidCutscene';
@@ -130,7 +130,7 @@ describe('the raid sim in the live path', () => {
       for (const [key, v] of Object.entries(gg.stock)) if (typeof v === 'number' && (!Number.isFinite(v) || v < 0)) all.push(`${diff}/${layout}/#${i}: stock ${key} = ${v}`);
       if (!Array.isArray(lines)) all.push('applyBattle returned no lines');
       const r = b.raid!; stats.n++; stats.results[b.result]++;
-      if (r.breach) { stats.breaches++; stats[r.breach.method]++; if (r.breach.where?.gate) stats.gate++; for (const at of r.breach.attempts) if (!at.ok) at.how === 'ram' ? stats.failedRam++ : stats.failedCharge++; }
+      if (r.breach) { stats.breaches++; stats[r.breach.method]++; if (r.breach.where?.gate) stats.gate++; for (const at of r.breach.attempts) if (!at.ok) { if (at.how === 'ram') stats.failedRam++; else stats.failedCharge++; } }
       if (r.beatenBack) stats.beaten++;
       if (r.ending?.kind === 'tribute') stats.tribute++; if (r.ending?.kind === 'passage') stats.passage++;
       stats.fires += r.fires.length; stats.loot += r.loot.length; stats.hostages += r.hostages.length; stats.spared += r.loss.people.spared; stats.snaps += r.snaps.length; stats.orders += r.orders.length;
@@ -138,7 +138,6 @@ describe('the raid sim in the live path', () => {
     }
     ms.sort((a, b) => a - b);
     const total = performance.now() - t0;
-    // eslint-disable-next-line no-console
     console.log(`raidLive: ${stats.n} raids in ${(total / 1000).toFixed(1)} s; planBattle median ${ms[Math.floor(ms.length / 2)].toFixed(1)} ms, p99 ${ms[Math.floor(ms.length * 0.99)].toFixed(1)} ms, max ${ms[ms.length - 1].toFixed(1)} ms`, JSON.stringify(stats));
     expect(all.slice(0, 12)).toEqual([]);
     // the new mechanics really happen in live fights (not only in unit tests)
@@ -197,7 +196,8 @@ describe('the raid sim in the live path', () => {
   });
 
   it('through the cutscene (stageRaid -> resolve -> applyBattle): the report carries the facts, the outcome card says them, the clock is untouched', () => {
-    let staged = 0, kinds = new Set<string>();
+    let staged = 0;
+    const kinds = new Set<string>();
     for (let s = 0; s < 24; s++) {
       const g = place(1 + (s % 8), (['cozy', 'standard', 'hardcore'] as const)[s % 3], LAYOUTS[s % LAYOUTS.length]);
       const c = CREWS[s % CREWS.length];
@@ -226,6 +226,24 @@ describe('degrades instead of throwing', () => {
     const noRaidFields = place(3, 'standard', 'armed'); delete (noRaidFields as { raidFires?: unknown }).raidFires;
     expect(() => step(noRaidFields, 3)).not.toThrow();
   });
+  it('a wall run of a kind this build does not know reads as the weakest known kind: planBattle, applyBattle, resolve and stageRaid never throw', () => {
+    for (const diff of ['cozy', 'standard', 'hardcore'] as Difficulty[]) for (let k = 0; k < 6; k++) {
+      const g = place(1 + k, diff, k % 2 ? 'container' : 'armed');
+      g.perimeter.push({ id: 'weird', kind: 'not_a_kind' as never, pts: [[-14, 14], [14, 14]], gates: [], done: 1, hours: 1, supplied: true, finishedAt: 0 });
+      g.perimeter.push({ id: 'broken', kind: 'also_unknown' as never, pts: undefined as never, gates: undefined as never, done: 1, hours: 1, supplied: true, finishedAt: 0 });
+      const b = planBattle(g, 7, 30 + k, opts(CREWS[1]));
+      expect(['repelled', 'fled', 'breached', 'overrun']).toContain(b.result);
+      expect(() => applyBattle(structuredClone(g), b)).not.toThrow();
+      g.gate.pending = { id: `w${k}`, kind: 'gang', day: 5, title: 'A crew', dossier: [], size: 8, armed: true, strength: 90, wants: { canned: 5 }, stances: ['defend'], temper: 'hard' } as Encounter;
+      expect(() => stageRaid(g, 'defend')).not.toThrow();
+    }
+    // the weakest known kind is what it is read as
+    const g = place(2, 'standard', 'armed');
+    g.perimeter.push({ id: 'w', kind: 'not_a_kind' as never, pts: [[-15, 15], [15, 15]], gates: [], done: 1, hours: 1, supplied: true, finishedAt: 0 });
+    expect(withKnownWalls(g).perimeter[0].kind).toBe(WEAKEST_WALL);
+    const known = place(3, 'standard', 'container');
+    expect(withKnownWalls(known)).toBe(known);   // all known: the same object, no copy
+  });
   it('an old save (v86) migrates to the current version, with no raid fires, and plays a raid', () => {
     const old = JSON.parse(JSON.stringify(place(4, 'standard', 'container'))); old.version = 86; delete old.raidFires;
     const g = migrate(old);
@@ -242,7 +260,8 @@ describe('degrades instead of throwing', () => {
 describe('long runs stay bounded', () => {
   it('thousands of random raids: none throws, state does not grow', () => {
     const r = mulberry32(99);
-    let count = 0, worst = 0, sizes: number[] = [];
+    let count = 0, worst = 0;
+    const sizes: number[] = [];
     const g = place(7, 'hardcore', 'container_gate');
     for (let i = 0; i < 1500; i++) {
       const c = CREWS[Math.floor(r() * CREWS.length)], diff = (['cozy', 'standard', 'hardcore'] as const)[i % 3];
@@ -255,7 +274,6 @@ describe('long runs stay bounded', () => {
       sizes.push(JSON.stringify(b).length);
       applyBattle(gg, b);
     }
-    // eslint-disable-next-line no-console
     console.log(`fuzz: ${count} raids, worst ${worst.toFixed(0)} ms, battle json max ${Math.max(...sizes)} bytes`);
     expect(worst).toBeLessThan(3000);
     expect(Math.max(...sizes)).toBeLessThan(600_000);
@@ -276,7 +294,6 @@ describe('long runs stay bounded', () => {
       maxFires = Math.max(maxFires, g.raidFires?.length ?? 0); maxDamage = Math.max(maxDamage, g.raidDamage?.length ?? 0);
     }
     const grown = JSON.stringify(g).length / base;
-    // eslint-disable-next-line no-console
     console.log(`year: ${raids} raids, ${((performance.now() - t0) / 1000).toFixed(1)} s, state x${grown.toFixed(2)}, max fires ${maxFires}, max damage records ${maxDamage}`);
     expect(maxFires).toBeLessThanOrEqual(8); expect(maxDamage).toBeLessThanOrEqual(40);
     expect(g.log.length).toBeLessThanOrEqual(60);
