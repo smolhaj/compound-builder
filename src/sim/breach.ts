@@ -127,10 +127,10 @@ export function decorateBreach(b: Battle, runs: readonly PerimeterRun[], home: {
     const fuse = 4.2;
     const sapper = nearest(spot, raiders) ?? lead;
     const tp = tb - fuse - 3.2;
-    const pad = drop(0.12), back = drop(1.4);
+    const pad = drop(0.12), stand = drop(0.4), back = drop(1.5);   // (the charge hangs on the wall; the sapper stands off the wall face, not in it)
     if (!simShown) {
     if (sapper) {
-      ev.push({ t: Math.round(tp * 100) / 100, kind: 'move', unit: sapper.id, x: Math.round(pad.x * 100) / 100, z: Math.round(pad.z * 100) / 100 });
+      ev.push({ t: Math.round(tp * 100) / 100, kind: 'move', unit: sapper.id, x: Math.round(stand.x * 100) / 100, z: Math.round(stand.z * 100) / 100 });
       say(tp + 0.4, 'raider', 'charge_set', sapper);
     }
     ev.push({ t: Math.round((tb - fuse) * 100) / 100, kind: 'charge', x: Math.round(pad.x * 100) / 100, z: Math.round(pad.z * 100) / 100, fuse });

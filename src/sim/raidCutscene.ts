@@ -18,7 +18,7 @@ import { newDamage } from './raidDamage';
 import { decorateDefenders } from './defenderMoments';
 import { ASSAULT_EXTRA } from './houseAssault';
 import { decorateRaiders } from './raiderKinds';
-import { LineDirector, voiceCutscene } from './raidDialogue';
+import { LineDirector, voiceCutscene, rotateRaidMemory } from './raidDialogue';
 import { dramatize, type DramaInfo } from './raidDrama';
 import { endPoses } from './raidEnding';
 import { dragTheWounded } from './fightPoses';
@@ -99,6 +99,7 @@ export function stageRaid(game: GameState, stance: Stance, keep?: Keep, orders?:
   delete g.gate.orders;
   const battle = (g.gate.battle as Battle | undefined) ?? null;
   const seed = game.seed * 131 + e.day * 7 + 1;
+  rotateRaidMemory(seed);   // (this raid's words count against the next raid's)
   const played: Stance = battle ? 'defend' : stance;
   const fresh = planSiege({ kind: e.kind, size: e.size, temper: e.temper ?? 'desperate', hour, seed, fought: !!battle, fightSeconds: battle?.duration ?? null, armed: e.armed });
   const finalScene = fresh.scenes[fresh.scenes.length - 1];

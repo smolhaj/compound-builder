@@ -94,7 +94,7 @@ export type BattleEvent =
   | { t: number; kind: 'reload'; unit: string; secs: number }
   | { t: number; kind: 'jam'; unit: string; secs: number }
   /** First aid under fire: a tourniquet, a chest seal, or just hands pressing on it. */
-  | { t: number; kind: 'aid'; unit: string; by: string; what: 'tourniquet' | 'chest seal' | 'pressure' }
+  | { t: number; kind: 'aid'; unit: string; by: string; what: 'tourniquet' | 'chest seal' | 'pressure'; /** The helper is already in place (the cutscene router walked them there): do not move them. */ still?: boolean }
   /**
    * Invasion presentation (cinematic only; sim/breach.ts): a raiders' truck runs at the wall from (fromX, fromZ) and hits it at (x, z) `secs` later
    * (this event's `t` is the start of the run), or a charge is planted at (x, z) and goes off `fuse` seconds later. The sim's own `breach` event
@@ -104,6 +104,19 @@ export type BattleEvent =
   | { t: number; kind: 'charge'; x: number; z: number; fuse: number; /** false: the charge went off and the wall held (or the carrier was down before it was planted: then it never goes off). */ ok?: boolean; why?: string; carrier?: string }
   /** The wall run is open here from now on (a live gap, drawn until the cutscene ends): run id, distance along it, width. */
   | { t: number; kind: 'gap'; runId: string; at: number; w: number; x: number; z: number }
+  /**
+   * The house door (cutscene only): `open` by hand, `close` / bar behind the family, `kick` / `shoot` / `charge` by the crew (`ok` false: it holds, the leaf only shudders).
+   * (x, z) is the doorway and (nx, nz) the way out of the house through it. Closed means nobody passes (sim/cutNav.ts barriers).
+   */
+  | { t: number; kind: 'house_door'; x: number; z: number; nx: number; nz: number; action: 'open' | 'close' | 'kick' | 'shoot' | 'charge'; ok: boolean; by?: string }
+  /** Goes to ground at (x, z): a closet or the cellar hatch (not drawn until found), a corner, under a bed. */
+  | { t: number; kind: 'hide'; unit: string; x: number; z: number; how: 'closet' | 'cellar' | 'corner' | 'under_bed' }
+  /** Rooted to the spot, hands to the face. */
+  | { t: number; kind: 'freeze'; unit: string }
+  /** Covers another with their own body. */
+  | { t: number; kind: 'shield'; unit: string; over: string }
+  /** Pulled out of hiding by a raider (`kick`: the door gave, `order`: told to come out with their hands up). */
+  | { t: number; kind: 'found'; unit: string; by: string; how: 'kick' | 'order' }
   /** Raid depth (save v87, sim/raidOrders.ts): the family's order takes effect; the stage the defenders now hold. */
   | { t: number; kind: 'order'; order: RaidOrderKind; stage: RaidStage; units: string[] }
   /** A raid's extra outcomes (sim/raidOutcomes.ts). */
@@ -144,7 +157,8 @@ export interface BattleVehicle { kind: 'pickup'; x: number; z: number; rot: numb
 
 /** What the invasion presentation decided for a scene (sim/breach.ts, sim/houseAssault.ts). Cinematic only. */
 export interface InvasionMeta {
-  method: 'ram' | 'charge';
+  /** `climb`: the crew went over the wall (no truck, no blast): only the house fight is staged. */
+  method: 'ram' | 'charge' | 'climb';
   /** The break, for the camera: where the wall falls, which way is out, and the stretch of the scene it is shown in (s). */
   breach?: { x: number; z: number; ox: number; oz: number; from: number; to: number; at: number };
   /** The house the crew fights in, if it was found: its footprint box (world units), the door and the inside point just past it. */
@@ -196,7 +210,37 @@ export interface RaidFacts {
   text: string;
 }
 
+/**
+ * How the crew behaves toward people it finds (sim/mercy.ts reads it). The sim agent fills it from the crew's temper; until then the scene derives a
+ * plain reading from the crew's style, and fixtures carry explicit data in tests.
+ */
+export interface MercyData {
+  /** Hostile crews kill everyone they find (and sometimes take a few captives); merciful crews spare children and unarmed adults who comply, never armed ones. */
+  temper: 'hostile' | 'merciful';
+  /** Hostile: the chance a found person is taken alive instead of killed (the crew takes "a few"). */
+  captiveChance?: number;
+  /** Merciful: the chance an unarmed adult who complies is spared (default 0.85). */
+  spareChance?: number;
+  /** Per defender (unit id): what kind of person they are when a raider surrenders to them. */
+  defenders?: Record<string, { grieving?: boolean; angry?: boolean }>;
+}
+/** What the crew does at the end of the scene (the ending beats the picture can show). Absent = the plain ending. */
+export interface Aftermath {
+  /** Specific things carried off: item ids ('food', 'fuel', 'meds', 'guns', 'radio', ...). */
+  loot?: string[];
+  /** A hostile crew sets a fire as it leaves. */
+  arson?: 'house' | 'barn' | 'both';
+  /** Unit ids dragged off as captives (a hostile crew's "few"). */
+  captives?: string[];
+  /** A negotiated end instead of a fight to the finish: the family pays `item` (tribute) or the crew is let through (passage). */
+  terms?: { kind: 'tribute' | 'passage'; item?: string };
+}
+
 export interface Battle {
+  /** Crew temper toward the people it finds (see MercyData): a fixture override; the live sim's is `raid.disposition`. */
+  mercy?: MercyData;
+  /** The scene's ending beats. */
+  aftermath?: Aftermath;
   /** The live raid facts (save v87). */
   raid?: RaidFacts;
   invasion?: InvasionMeta;

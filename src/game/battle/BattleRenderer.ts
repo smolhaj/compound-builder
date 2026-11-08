@@ -17,6 +17,7 @@ import { chooseCover, dropsProne, type Round } from './coverChoice';
 import { getViolence, poolRadius, spatter, stain, woundSpot } from './bloodFx';
 import { buildVehicle } from '../props/vehicleGeometry';
 import { InvasionFx } from './InvasionFx';
+import { SceneProps } from './SceneProps';
 
 const RUN = 1.1;          // world units / s (≈ 6.5 m/s)
 const FLEE = 1.6;
@@ -70,6 +71,8 @@ interface U {
   bandagedAt?: number;
   /** Hands up (surrendered or held at gunpoint). */
   hands?: boolean;
+  /** Gone to ground in a closet or the cellar (not drawn until found), and who leads this unit by the arm (a hostage). */
+  hidden?: boolean; hideHow?: string; ledBy?: string;
   /** Behind cover: which way they lean out round it (-1, +1; 0 none), when cover was last chosen, and until when they are flat on the ground under fire. */
   lean?: number; coverAt?: number; proneUntil?: number; /** Heads down while rounds crack past (suppression). */ duckUntil?: number;
   /** Drawn size this frame (the figure grows with the camera's distance). */
@@ -114,15 +117,21 @@ export class BattleRenderer {
   onGap: ((runId: string, at: number, w: number) => void) | null = null;
   /** The invasion look: the ramming truck, the charge, the debris (game/battle/InvasionFx.ts). */
   readonly invasion: InvasionFx;
+  /** The door leaf, the loot packs and the set fires (game/battle/SceneProps.ts). */
+  readonly props: SceneProps;
   battle: Battle | null = null;
   /** Sagebrush, willow and rocks (set by the canvas): a raider is never put down inside a bush, so a crew is not half hidden behind one. */
   coverSource: () => ReadonlyArray<{ x: number; z: number; r: number }> = () => [];
+  /** Is the spot inside a wall, a building or furniture (set by the canvas: the world's walk collision)? A raider is never nudged out of a bush into one. */
+  walkSolid: (x: number, z: number) => boolean = () => false;
   private _coverIdx: { src: unknown; push: (x: number, z: number) => { x: number; z: number } } | null = null;
   private _clearOfCover(x: number, z: number): { x: number; z: number } {
     const cover = this.coverSource();
     if (!cover.length) return { x, z };
     if (this._coverIdx?.src !== cover) this._coverIdx = { src: cover, push: coverPusher(cover) };
-    return this._coverIdx.push(x, z);
+    const p = this._coverIdx.push(x, z);
+    // (the push out of a bush must not end inside something solid: then he stays where the plan put him)
+    return (p.x !== x || p.z !== z) && this.walkSolid(p.x, p.z) && !this.walkSolid(x, z) ? { x, z } : p;
   }
 
   private readonly _scene: THREE.Scene;
@@ -196,6 +205,7 @@ export class BattleRenderer {
       ground, puff: (p, r0, r1, life, rise, color, o0, glow) => this._puff(p, r0, r1, life, rise, color, o0, glow), flash: (p, k, c) => this._flash(p, k, c),
       boom: (x, y, z, r, dust) => this._boom(x, y, z, r, dust), shake: v => { this.shake = Math.max(this.shake, v); }, gap: (id, at, w) => this.onGap?.(id, at, w),
     });
+    this.props = new SceneProps(this._group, { ground, puff: (p, r0, r1, life, rise, color, o0, glow) => this._puff(p, r0, r1, life, rise, color, o0, glow), flash: (p, k, c) => this._flash(p, k, c), shake: v => { this.shake = Math.max(this.shake, v); } });
     this._trGeo.setAttribute('position', new THREE.BufferAttribute(this._trPos, 3).setUsage(THREE.DynamicDrawUsage));
     this._trGeo.setDrawRange(0, 0);
     this._trLines = new THREE.LineSegments(this._trGeo, new THREE.LineBasicMaterial({ color: 0xffd27a, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
@@ -234,7 +244,7 @@ export class BattleRenderer {
 
   /** Everyone in the fight where they stand now (for the cutscene camera). */
   actors(): Array<{ id: string; side: 'home' | 'raider'; post?: string; x: number; y: number; z: number; dead: boolean; gone: boolean }> {
-    return [...this._units.values()].filter(u => !u.def.bystander).map(u => ({ id: u.def.id, side: u.def.side, post: u.def.post, x: u.x, y: u.y, z: u.z, dead: u.dead, gone: u.gone }));
+    return [...this._units.values()].filter(u => !u.def.bystander).map(u => ({ id: u.def.id, side: u.def.side, post: u.def.post, x: u.x, y: u.y, z: u.z, dead: u.dead, gone: u.gone || !!u.hidden }));
   }
 
   /** What the picture shows of each unit's state now (for the name labels' status pips). */
@@ -313,6 +323,7 @@ export class BattleRenderer {
       this._group.add(v); this._vehicle = v;
     }
     this.invasion.begin(b);
+    this.props.end();
     this._alarm = new THREE.PointLight(0xff2020, 0, 14, 1.6);
     this._alarm.position.set(this._center.x, this._ground(this._center.x, this._center.z) + 0.8, this._center.z);
     this._group.add(this._alarm);
@@ -335,6 +346,7 @@ export class BattleRenderer {
 
   stop(): void {
     this.invasion.end();
+    this.props.end();
     if (this._vehicle) { this._group.remove(this._vehicle); this._vehicle.traverse(o => { if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).geometry.dispose(); }); this._vehicle = null; }
     for (const m of this._marks) { this._group.remove(m.sprite); m.sprite.material.dispose(); }
     this._marks.length = 0;
@@ -373,6 +385,7 @@ export class BattleRenderer {
     if (this._endAt >= 0 && this.time - this._endAt > END_HOLD) { this.stop(); this.onEnd?.(); return; }
     this._moveUnits(dt);
     this.invasion.update(dt);
+    this.props.update(dt, id => { const u = this._units.get(id); return u ? { x: u.x, y: u.y, z: u.z, rot: u.rot, dead: u.dead, gone: u.gone } : null; });
     this._tickFx(dt);
     if (this._alarm) this._alarm.intensity = this._alarmOn ? (0.5 + 0.5 * Math.sin(this.time * 9)) * 6 : 0;
     this.shake = Math.max(0, this.shake - dt * 1.5);
@@ -464,6 +477,12 @@ export class BattleRenderer {
         break;
       }
       case 'lay': { const u = U_(e.unit); if (u && !u.dead && u.layAt == null) { u.tx = u.x; u.tz = u.z; u.layAt = this.time + 0.2; u.crouch = false; if (this._graphic) this._stain({ x: u.x, y: this._ground(u.x, u.z) + 0.01, z: u.z, r: 0.01, stretch: 1.2, rot: u.rot, color: 0x4d0a09, born: this.time + 0.6, r1: 0.05 }); } break; }
+      case 'hide': { const u = U_(e.unit); if (u && !u.dead) { u.tx = e.x; u.tz = e.z; u.ty = 0; u.crouch = true; u.lean = 0; u.hideHow = e.how; } break; }
+      case 'freeze': { const u = U_(e.unit); if (u && !u.dead) { u.tx = u.x; u.tz = u.z; u.hands = true; u.crouch = false; } break; }
+      case 'shield': { const u = U_(e.unit), o = U_(e.over); if (u && o && !u.dead) { u.crouch = true; o.crouch = true; u.rot = Math.atan2(o.x - u.x, o.z - u.z); } break; }   // (the planner walks the shielder to a free spot beside the other)
+      case 'found': { const u = U_(e.unit); if (u && !u.dead) { u.hidden = false; u.hideHow = undefined; u.hands = true; u.crouch = false; u.tx = u.x; u.tz = u.z; } break; }
+      case 'hostage': { const u = U_(e.unit); if (u && !u.dead) { u.ledBy = e.by; u.hands = true; u.crouch = false; u.hidden = false; u.hideHow = undefined; } break; }
+      case 'spare': { const u = U_(e.unit); if (u && !u.dead) { u.hidden = false; u.hideHow = undefined; u.hands = true; u.crouch = false; u.tx = u.x; u.tz = u.z; } break; }
       case 'lift': { const v = U_(e.unit), c = U_(e.by); if (v && c) { v.carriedBy = c.def.id; v.crouch = false; } break; }
       case 'lower': { const v = U_(e.unit); if (v?.carriedBy) { const c = U_(v.carriedBy); if (c) { v.x = v.tx = c.x + Math.sin(c.rot) * 0.1; v.z = v.tz = c.z + Math.cos(c.rot) * 0.1; v.rot = c.rot + Math.PI / 2; } v.carriedBy = undefined; if (!v.dead) v.crouch = true; } break; }
       case 'shot': {
@@ -519,6 +538,7 @@ export class BattleRenderer {
         break;
       }
       case 'ram': case 'charge': case 'gap': this.invasion.onEvent(e); break;
+      case 'house_door': case 'loot': case 'fire': this.props.onEvent(e); break;
       case 'breach': this._boom(e.x, this._ground(e.x, e.z), e.z, 0.5, true); break;
       case 'door': this.onDoor?.(e.open, e.x, e.z, e.what); break;      // the crew at the tunnel's steel door: shut while they work at it, forced when they are through
       case 'fallback': this.shake = Math.max(this.shake, 0.15); break;
@@ -552,7 +572,7 @@ export class BattleRenderer {
       case 'reload': case 'jam': { const u = U_(e.unit); if (u && !u.dead) u.crouch = true; break; }   // down behind cover to fix the gun
       case 'aid': {
         const u = U_(e.unit), by = U_(e.by);
-        if (by && u && by !== u) { by.tx = u.x + 0.08; by.tz = u.z; by.crouch = true; }
+        if (by && u && by !== u) { if (!e.still && Math.hypot(by.x - u.x, by.z - u.z) > 0.16) { by.tx = u.x + 0.08; by.tz = u.z; } by.crouch = true; }
         if (u) {
           u.bandagedAt = this.time + 2.2;
           this._crossTex ??= crossTexture();
@@ -678,7 +698,13 @@ export class BattleRenderer {
     for (const u of this._units.values()) {
       if (u.gone || u.def.machine) continue;
       let moving = false;
-      if (u.carriedBy) {
+      if (u.hideHow && !u.hidden && (u.hideHow === 'closet' || u.hideHow === 'cellar') && Math.hypot(u.tx - u.x, u.tz - u.z) <= 0.03) u.hidden = true;
+      if (u.hidden) continue;
+      if (u.ledBy && !u.dead) {
+        // led by the arm: a step behind the captor, wherever they go
+        const c = this._units.get(u.ledBy);
+        if (c && !c.dead) { const k = Math.min(1, dt * 5); u.x += (c.x - Math.sin(c.rot) * 0.08 - u.x) * k; u.z += (c.z - Math.cos(c.rot) * 0.08 - u.z) * k; u.rot = c.rot; moving = Math.hypot(c.x - u.x, c.z - u.z) > 0.12; u.tx = u.x; u.tz = u.z; }
+      } else if (u.carriedBy) {
         // in someone's arms: across the carrier's forearms, wherever they walk
         const c = this._units.get(u.carriedBy);
         if (c) { u.x = c.x + Math.sin(c.rot) * 0.04; u.z = c.z + Math.cos(c.rot) * 0.04; u.rot = c.rot + Math.PI / 2; u.tx = u.x; u.tz = u.z; }

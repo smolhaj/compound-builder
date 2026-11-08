@@ -49,6 +49,7 @@ import { coverBoxes, obstaclesOf, treeBoxes } from './battle/cameraObstacles';
 import { liveBreach } from './battle/liveBreach';
 import { decorateBreach } from '../sim/breach';
 import { planHouseAssault } from '../sim/houseAssault';
+import { routeScene } from '../sim/cutLive';
 import { LineDirector } from '../sim/raidDialogue';
 import { fireBoxesOf } from './battle/lineOfFire';
 import { useCutsceneView } from '../store/cutsceneStore';
@@ -357,6 +358,7 @@ export function GameCanvas() {
     const unsubDamage = useGameStore.subscribe(s => `${(s.game.raidDamage ?? []).filter(d => d.done < d.hours).map(d => d.id).join()}|${s.game.structures.filter(st => st.fixes?.some(f => f.part === 'glass' && f.done < f.hours)).map(st => st.id).join()}`, syncDamage);
     const battle = new BattleRenderer(ws.scene, world.groundAt, () => useGameStore.getState().game.people);
     battle.coverSource = () => world.lowCover;
+    battle.walkSolid = (x, z) => world.walkBlocked(x, z, 0.04);
     battle.fireSource = () => {
       // rounds pass through the gap the invasion opened, and inside the house the crew is fighting in (its partitions are waist-high in the cutaway view)
       const g = useGameStore.getState().game, base = fireBoxesOf({ ...g, perimeter: [...liveBreach.apply(g.perimeter)] });
@@ -378,16 +380,25 @@ export function GameCanvas() {
     let cutawayBefore: ReturnType<typeof useWorldStore.getState>['buildingView'] | null = null;
     const player = new CutscenePlayer({ battle, ground: world.groundAt, house: homeSpot, commit: () => useGameStore.getState().commitCutscene(), seed: useGameStore.getState().game.seed, obstacles: () => [...obstaclesOf(useGameStore.getState().game), ...treeBoxes(world.treeSpecs, homeSpot(), 70), ...(qa.noCover ? [] : coverBoxes(world.lowCover, homeSpot(), 70))] ,
       // the invasion look (sim/breach.ts, sim/houseAssault.ts): how the wall comes down, and the fight inside the house; cinematic, the sim's result is kept
-      prepare: b => {
-        if (!b.events.some(e => e.kind === 'breach')) return b;
-        const g = useGameStore.getState().game, hs = homeSpot();
-        const home = g.structures.find(x => isFinished(x) && isHome(x.kind) && KIT[x.kind]);
-        const seed = g.seed * 131 + Math.round(b.duration * 7);
-        const carries = b.events.some(e => e.kind === 'rocket' || e.kind === 'throw');
-        const dir = new LineDirector(seed);   // (one picker for the break and the house: no line twice)
-        const d = decorateBreach(b, g.perimeter, hs, seed, carries, dir);
-        if (!home) return d;
-        return planHouseAssault(d, { box: footprint(KIT[home.kind], home.x, home.z, home.rot, false), blocked: (x, z) => world.walkBlocked(x, z, 0.04), seed, dir });
+      prepare: b0 => {
+        // 1. the invasion look (cinematic; the sim's result is kept); 2. the movement rule: every leg goes through a real opening (sim/cutNav.ts).
+        // Any failure leaves the scene as the sim staged it: a cutscene must never take the game down.
+        let b = b0;
+        const solid = (x: number, z: number) => world.walkBlocked(x, z, 0.04);
+        try {
+          if (b0.events.some(e => e.kind === 'breach')) {
+            const g = useGameStore.getState().game, hs = homeSpot();
+            const home = g.structures.find(x => isFinished(x) && isHome(x.kind) && KIT[x.kind]);
+            const seed = g.seed * 131 + Math.round(b0.duration * 7);
+            const carries = b0.events.some(e => e.kind === 'rocket' || e.kind === 'throw');
+            const dir = new LineDirector(seed);   // (one picker for the break and the house: no line twice, and none the earlier scenes of this cutscene said)
+            for (const other of useGameStore.getState().cutscene?.battles ?? []) if (other !== b0) dir.noteAll(other);
+            b = decorateBreach(b0, g.perimeter, hs, seed, carries, dir);
+            const nameOf = (id: string) => { const pid = b0.units.find(u => u.id === id)?.personId; const p = pid ? g.people.find(q => q.id === pid) : undefined; return (p as { first?: string } | undefined)?.first; };
+            if (home) b = planHouseAssault(b, { box: footprint(KIT[home.kind], home.x, home.z, home.rot, false), blocked: solid, seed, dir, nameOf });
+          }
+        } catch (err) { console.warn('cutscene staging failed; playing the plain scene', err); b = b0; }
+        return routeScene(b, solid).battle;
       },
       cutaway: on => { const ws2 = useWorldStore.getState(); if (on) { cutawayBefore ??= ws2.buildingView; ws2.setBuildingView('cutaway'); } else if (cutawayBefore) { ws2.setBuildingView(cutawayBefore); cutawayBefore = null; } } });
     const nameLayer = new NameLabelLayer();
@@ -450,7 +461,12 @@ export function GameCanvas() {
       const cv = useCutsceneView.getState();
       if (cv.skipScene !== skipScene) { skipScene = cv.skipScene; player.skipScene(); }
       if (cv.skipAll !== skipAll) { skipAll = cv.skipAll; player.skipAll(); }
-      const cine = player.active ? player.update(dt) : null;
+      // a cutscene must never take the game down: a failure in a frame skips to the aftermath (the staged result is committed as if it were skipped)
+      let cine: ReturnType<typeof player.update> | null = null;
+      try { cine = player.active ? player.update(dt) : null; } catch (err) {
+        console.error('cutscene failed; skipping to the aftermath', err);
+        try { player.skipAll(); } catch { try { useGameStore.getState().commitCutscene(); } catch { /* nothing more to do */ } }
+      }
       if (!useWorldStore.getState().photo) {
         const t = player.active && cs?.t0 != null ? cs.t0 + player.clockGame / 86400 : game.clock.t;
         const cal = calendarOf(game.clock, t);
@@ -618,7 +634,10 @@ export function GameCanvas() {
       world.doorLock = battle.playing ? true : null;      // (the alarm is up: the tunnel doors are shut for the fight)
       if (battle.playing) {
         battle.viewer = ws.camera.position;
-        battle.update(dt);
+        try { battle.update(dt); } catch (err) {
+          console.error('battle playback failed; ending the scene', err);
+          battle.stop(); useBattleStore.getState().endBattle();
+        }
         if (battle.shake > 0) ws.camera.position.add(new THREE.Vector3((Math.random() - 0.5) * battle.shake, (Math.random() - 0.5) * battle.shake, (Math.random() - 0.5) * battle.shake));
         battleSync += dt;
         if (battleSync > 0.2 && battle.playing) { battleSync = 0; bs.setProgress(battle.time, battle.lines); }
