@@ -38,6 +38,8 @@ export interface BattleUnit {
   inVehicle?: boolean;
   /** The crew's named leader (the first raider, `r0`): `name` is what the scene and the card call him. */
   leader?: boolean;
+  /** A defender's makeup (sim/defenderTraits.ts): what the sim used for panic, heroics and last words, so the scene can draw the same person. Home units with a person only. */
+  traits?: { trauma: number; stress: number; grief: number; experience: number; veteran: boolean; firstFight: boolean; courage: 'freezes' | 'steady' | 'heroic'; kin: Array<{ id: string; name: string; rel: string; unit?: string }>; history: string[] };
   /** A raider's role and look in the cutscene (set by `decorateRaiders`). */
   look?: RaiderLook;
   /** A resident who is not fighting: a child pulled indoors, a hand on the porch (`sim/defenderMoments.ts`). */
@@ -133,6 +135,10 @@ export type BattleEvent =
   | { t: number; kind: 'diversion'; decoys: string[]; from: { x: number; z: number }; until: number; pulled: string[] }
   /** The crew takes a person at work outside the wall: `ran` got in, the others were hurt, taken or killed. */
   | { t: number; kind: 'ambush'; unit: string; by: string; fate: 'ran' | 'hurt' | 'taken' | 'killed' }
+  /** A defender locks up (`freeze`: stands frozen for `secs`) or bolts for the shelter, because someone fell near them (sim/defenderTraits.ts). `kin`: it was one of their own. */
+  | { t: number; kind: 'panic'; unit: string; how: 'freeze' | 'shelter'; secs: number; kin: boolean }
+  /** A defender steps in: `cover` shields someone hurt while they are dragged in, `drag` carries them, `avenge` goes at the one who shot their own. */
+  | { t: number; kind: 'heroic'; unit: string; act: 'cover' | 'drag' | 'avenge'; for?: string }
   /** A flare goes up and lights the yard for `secs`. */
   | { t: number; kind: 'flare'; x: number; z: number; by: string; secs: number }
   | { t: number; kind: 'end'; result: 'repelled' | 'fled' | 'breached' | 'overrun' };
@@ -217,6 +223,8 @@ export interface RaidFacts {
   /** How the raid began and the air it was fought in (sim/raidOpeners.ts, sim/raidConditions.ts). */
   opener?: { kind: 'scouts' | 'demand' | 'worker_ambush' | 'diversion'; spotted?: boolean; intel?: boolean; victims?: Array<{ unit: string; fate: 'ran' | 'hurt' | 'taken' | 'killed' }>; decoys?: string[]; pulled?: string[] };
   env?: { storm: string | null; flares: number; smoke: boolean };
+  /** The human moments of the fight (panic, heroics, last words), for the report. */
+  moments?: Array<{ t: number; kind: 'panic' | 'heroic' | 'last_words'; unit: string; text?: string }>;
   /** A talked end in the middle of the fight, or a part of the crew pulling out. */
   ending?: { kind: 'tribute' | 'passage' | 'partial_retreat' | 'rout'; at: number; what?: string; units?: string[] };
   /** The result in plain words, for the card. */

@@ -17,6 +17,8 @@ import type { Difficulty } from './difficulty';
 export type OpenerKind = 'scouts' | 'demand' | 'worker_ambush' | 'diversion';
 export interface Opener {
   kind: OpenerKind;
+  /** Scouts: the watch spotted them (rolled when the raid is made, so the card can offer the plans in `sim/scoutPlans.ts`). */
+  spotted?: boolean;
   /** Diversion: the share of the crew that makes the noise, and the seconds before the main body shows and the decoys give up. */
   decoy?: { share: number; delay: number; until: number };
 }

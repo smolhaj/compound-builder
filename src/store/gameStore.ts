@@ -4,6 +4,7 @@ import { unscripted } from '../sim/godMode';
 import { dropBridge, routeProblem } from '../sim/terrainFx';
 import { clearCollapse, strandAway } from '../sim/corridors';
 import { dropRoadBridge, rebuildRoadBridge } from '../sim/roadFx';
+import { interrogate, type Approach, type Question } from '../sim/interrogation';
 import { AFTERMATH_TEXT, joinPrisoner, releasePrisoner, resolveAftermath, type AftermathChoice } from '../sim/aftermath';
 import { dismissCrew, hireCrew } from '../sim/crews';
 import { dismissGuard, hireGuard } from '../sim/guards';
@@ -20,6 +21,7 @@ import { askRansom, giveUp, startRescue, startTrip } from '../sim/rescue';
 import { hasCutscene, promptNarration } from '../sim/siege';
 import { commitRaid, restageRaid, stageRaid, type RaidReport, type StagedRaid } from '../sim/raidCutscene';
 import type { RaidOrder } from '../sim/raidOrders';
+import type { ScoutPlan } from '../sim/scoutPlans';
 import { fightClock } from '../sim/siege';
 import { useCutsceneView } from './cutsceneStore';
 import type { RaidOrderKind } from '../sim/battleTypes';
@@ -94,6 +96,8 @@ export interface CutsceneState {
   changed?: boolean;
   /** The family's orders for the fight (sim/raidOrders.ts); empty: hold the line. */
   orders?: RaidOrder[];
+  /** The plan for scouts the watch spotted (sim/scoutPlans.ts); none: ignore them. */
+  scoutPlan?: ScoutPlan;
   /** An order was given on the live playhead: the player swaps in the replanned battle of this scene and seeks to `t` (battle seconds), then clears it. */
   swap?: { scene: number; t: number } | null;
 }
@@ -154,6 +158,8 @@ export interface GameStore {
   watchRaid: () => void;
   /** The family's standing order for the fight (sim/raidOrders.ts): hold the line, fall back to the house, counterattack. Taken at the gate card and between scenes. */
   setRaidOrder: (order: RaidOrderKind) => void;
+  /** The plan for scouts the watch spotted (sim/scoutPlans.ts), chosen on the gate card. */
+  setScoutPlan: (plan: ScoutPlan) => void;
   /** Fire fighting (sim/raidFire.ts): all hands on the fires a raid set, or back to the usual share. */
   fireAllHands: (on: boolean) => void;
   /** An order on the live playhead (sim/raidOrders.ts, sim/siege.ts `fightClock`): replans the fight from this second on with the same seeded stream. */
@@ -265,6 +271,8 @@ export interface GameStore {
   dismissCard: () => void;
   decideAftermath: (choice: AftermathChoice) => void;
   releasePrisoner: (id: string) => void;
+  /** Put a question to a prisoner, kindly or harshly (sim/interrogation.ts). Returns the lines (or why not). */
+  askPrisoner: (id: string, q: Question, approach: Approach) => string[];
   joinPrisoner: (id: string) => void;
   /** The taken (sim/rescue.ts): send armed adults to the camp, send word you'll pay, stop looking. Return why not, or null. */
   rescue: (pid: string, team: string[], allies?: boolean) => string | null;
@@ -367,7 +375,7 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     const c = get().cutscene, g = get().game;
     if (c?.phase !== 'prompt' || !g.gate.pending) return;
     const stance = c.stance ?? g.gate.pending.stances[0];
-    const st = stageRaid(g, stance, undefined, c.orders);
+    const st = stageRaid(g, stance, undefined, c.orders, c.scoutPlan);
     set({ tool: null, toolProblem: null, shopOpen: false, selected: null, cutscene: { ...c, phase: 'playing', stance, ...fromRaid(st), offer: null, changed: false } });
   },
   setRaidOrder: (order) => {
@@ -384,17 +392,18 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     const fc = fightClock(c.plan, v.game);
     if (!fc || fc.scene !== c.plan.scenes.length - 1 || !c.raid.staged.gate.battle) return;   // only the last scene is the real fight
     const orders = [...(c.orders ?? []).filter(o => o.t < fc.t - 0.5), { t: fc.t, order }];
-    const next = restageRaid(g, c.raid, fc.scene, c.stance, orders);
+    const next = restageRaid(g, c.raid, fc.scene, c.stance, orders, c.scoutPlan);
     set({ cutscene: { ...c, ...fromRaid(next), orders, swap: { scene: fc.scene, t: fc.t } } });
   },
   clearSwap: () => { const c = get().cutscene; if (c?.swap) set({ cutscene: { ...c, swap: null } }); },
+  setScoutPlan: (plan) => { const c = get().cutscene; if (c?.phase === 'prompt') set({ cutscene: { ...c, scoutPlan: plan } }); },
   fireAllHands: (on) => { const g = structuredClone(get().game); setAllHands(g, on); set({ game: g }); },
   offerChange: (scene) => { const c = get().cutscene; if (c?.phase === 'playing' && !c.changed) set({ cutscene: { ...c, offer: scene } }); },
   midStance: (stance) => {
     const c = get().cutscene, g = get().game;
     if (c?.phase !== 'playing' || c.offer == null || !c.raid) return;
     if (!stance || stance === c.stance || c.changed) { set({ cutscene: { ...c, offer: null } }); return; }
-    const next = restageRaid(g, c.raid, c.offer + 1, stance, c.orders);
+    const next = restageRaid(g, c.raid, c.offer + 1, stance, c.orders, c.scoutPlan);
     set({ cutscene: { ...c, ...fromRaid(next), stance, changed: true, offer: null } });
   },
   commitCutscene: () => {
@@ -860,6 +869,13 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     g.gate.card = { title: onlyDead ? 'Buried' : AFTERMATH_TEXT[choice][0], text: lines[0] ?? '', tone: choice === 'treat_release' ? 'good' : choice === 'finish' ? 'bad' : 'mixed', lines: lines.slice(1) };
     set({ game: g });
     void saveGame(AUTOSAVE, g);
+  },
+  askPrisoner: (id, q, approach) => {
+    if (locked()) return [];
+    const g = structuredClone(get().game), res = interrogate(g, id, q, approach);
+    if (res.refused) return [res.refused];
+    set({ game: g });
+    return res.lines;
   },
   releasePrisoner: (id) => {
     if (locked()) return;

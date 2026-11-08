@@ -59,8 +59,7 @@ describe('scouts', () => {
       const sc = evs(b, 'scout')[0];
       expect(sc).toBeDefined(); expect(sc.units).toEqual(['r1', 'r2']);
       expect(b.raid!.opener).toMatchObject({ kind: 'scouts', spotted: sc.spotted, intel: sc.intel });
-      expect(sc.intel).toBe(!sc.spotted && sc.intel);   // intel only when unseen
-      if (sc.spotted) { seen++; expect(sc.intel).toBe(false); } else unseen++;
+      if (sc.spotted) { seen++; expect(sc.intel).toBe(false); } else { unseen++; expect(sc.intel).toBe(true); }
       const br = b.raid!.breach;
       if (br?.where) { if (sc.spotted) { seenWithBreach++; if (br.where.gate) gateSeen++; } else { unseenWithBreach++; if (br.where.gate) gateUnseen++; } }
     }
