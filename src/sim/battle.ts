@@ -681,6 +681,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
   let shaken = false, heldUp = false;
   let wallDown = !!opts.insideBreach, breached = false, fled = false, end: PlannedBattle['result'] | null = null, endT = 0;
   let breachT = 0, lineSince = -1, houseT = -1;
+  let gapOnly = false, pendingHow: BreachHow = 'climb';
   let breachInfo: { method: BreachHow; where: BreachWhere | null; t: number } | null = null;
   let reachedStage: RaidStage = 'wall';
 
@@ -819,7 +820,6 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
     breachInfo = { method: hw, where: w, t };
     ev.push({ t, kind: 'breach', x: r2(p.x), z: r2(p.z), method: hw, ...(w ? { where: { ...w, x: r2(w.x), z: r2(w.z) } } : {}) });
     reachedStage = 'yard';
-    if (hw !== 'climb' && w) ev.push({ t: r2(t), kind: 'gap', runId: w.runId, at: w.at, w: w.w, x: r2(w.x), z: r2(w.z) });
       // the dogs posted inside at the inner gate go for the first men through (sim/laneWalk.ts)
       const gd = guardDogs(livingDogs(s));
       if (gd.n) for (const f of rUp.sort((a, b) => dist(a, C) - dist(b, C)).slice(0, gd.n)) {
@@ -837,17 +837,18 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
         for (const h of fleeing) { h.escaped = true; h.x = out[0]; h.z = out[1]; ev.push({ t: r2(t + 2 + r()), kind: 'move', unit: h.id, x: r2(out[0]), z: r2(out[1]) }); }
       }
   };
-  /** A truck or a charge opened the wall: the line falls, or (with manned inner rings) the family falls back to the next ring. */
-  const breakThrough = (t: number, hw: BreachHow, rUp: Fighter[]) => {
-    if (ringK < ringRs.length) {
-      if (target && ringK === 0) ev.push({ t: r2(t), kind: 'gap', runId: target.runId, at: target.at, w: target.w, x: r2(target.x), z: r2(target.z) });
-      fallBack(t);
-    } else openLine(t, hw, rUp);
+  /**
+   * A truck or a charge opened the wall: the gap is there from now on (no ladder, no wire, no ten seconds at the foot of the wall), but the crew still has to
+   * come through it under fire and win the fight at the line (the same rule as for a wall they climb), so a stronger lot is never an easier one.
+   */
+  const breakThrough = (t: number, hw: BreachHow) => {
+    wallDown = true; gapOnly = true; pendingHow = hw;
+    if (target && ringK === 0) ev.push({ t: r2(t), kind: 'gap', runId: target.runId, at: target.at, w: target.w, x: r2(target.x), z: r2(target.z) });
   };
   /** The crew has broken the line and there is another ring behind it: the defenders fall back, carrying the wounded in to the sickbay. */
   const fallBack = (t: number) => {
     const ring = ringRs[ringK]; ringK++; fallTimes.push(t);
-    lineR = ring.r; wallKind = ring.kind; wallDown = false; lineSince = -1;
+    lineR = ring.r; wallKind = ring.kind; wallDown = false; gapOnly = false; pendingHow = 'climb'; lineSince = -1;
     const here = at(lineR, 0);
     ev.push({ t, kind: 'fallback', ring: ringK, of: ringRs.length, x: r2(here.x), z: r2(here.z) });
     say(t, v(lead(), ['Fall back! Fall back to the inner wall — go, go!', 'They\'re over the outer wall — back, BACK to the next gate!'], ['Outer line is gone. Fall back to the inner ring.']), lead());
@@ -917,7 +918,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
   const fallToStage = (t: number, st: RaidStage) => {
     stageT = t;
     if (ringK < ringRs.length) { fallBack(t); stage = nextStage(stage); return; }
-    stage = st; synth = true; lineR = stageRadius(st, wallR0); wallKind = ''; wallDown = false; lineSince = -1;
+    stage = st; synth = true; lineR = stageRadius(st, wallR0); wallKind = ''; wallDown = false; gapOnly = false; pendingHow = 'climb'; lineSince = -1;
     const here = at(lineR, 0);
     ev.push({ t, kind: 'fallback', ring: st === 'yard' ? 1 : 2, of: 2, x: r2(here.x), z: r2(here.z) });
     say(t, st === 'yard' ? v(lead(), ['Back to the yard — behind the cars, the woodpile, GO!', 'Leave the wall — fall back to the yard cover!'], ['Fall back to the yard cover. Keep your lanes.']) : v(lead(), ['Everybody in the house! Bar the doors — NOW!', 'Into the house! Furniture against the doors!'], ['Final line is the house. Barricade the doors.']), lead());
@@ -958,7 +959,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
         ev.push({ t: 0, kind: 'ram', fromX: r2(tk.from.x), fromZ: r2(tk.from.z), x: r2(target!.x), z: r2(target!.z), secs: secs(tk.arriveT), ...(ok ? {} : { ok: false, why, stopX: r2(at0.x), stopZ: r2(at0.z) }), driver: dr.id });
         attempts.push({ how: 'ram', ok, why, t, odds: tk.odds });
         ev.push({ t: r2(t), kind: 'move', unit: dr.id, x: r2(dr.x), z: r2(dr.z) });
-        if (ok) breakThrough(t, 'ram', rUp);
+        if (ok) breakThrough(t, 'ram');
         else { hurt(dr, 12 + r() * 25, t + 0.2, undefined, 'arm'); say(t + 0.5, pick(['It didn\'t go — the truck\'s wedged!', 'We\'re stuck on it — get out, get OUT!']), dr); }
       } else { dr.x = at0.x; dr.z = at0.z; }
     }
@@ -983,7 +984,7 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
       const a = attempts[attempts.length - 1], ok = !!a && a.how === 'charge' && a.ok;
       blowAt = -3;
       ev.push({ t: r2(t), kind: 'explosion', x: r2(target!.x), z: r2(target!.z), radius: 0.8, hits: [], ...(ok ? { wrecks: 'wall' as const } : {}) });
-      if (ok && !breached) breakThrough(t, 'charge', rUp);
+      if (ok && !breached) breakThrough(t, 'charge');
     }
     // ── the family's orders ──
     {
@@ -1297,9 +1298,9 @@ export function planBattle(s: GameState, raiders: number, seed: number, opts: Ba
     // (round 4) clubs against rifles need far more of them to rush the line; going over a wall, every rifle at a post on it slows them
     const outnumber = armedR ? 2 : 4;
     const onWall = H.filter(f => !f.out && !f.shelter && f.arm !== FISTS && t >= f.readyAt && f.post?.kind !== 'open' && atLine.some(x => sight(f, x) !== 'blocked')).length;   // (every rifle that bears on the climbers)
-    if (!breached && !peace && atLine.length && (wallDown || hNow === 0 || rUp.length > hNow * outnumber) && (opts.ambush === undefined || hNow === 0 || t - lineSince >= 12 + opts.ambush) && (hNow === 0 || t - lineSince >= (synth ? STAGE_HOLD[stage] : ringK === 0 ? ringHold : ringStay)) && (!climbing || (t - lineSince >= 10 + (moat && ringK === 0 ? moat.holdS : 0) && r() < 0.02 * atLine.length * (deck ? WALK_CLIMB_FACTOR : 1) * wallTop.climb * climbWeak / (1 + onWall)))) {
+    if (!breached && !peace && atLine.length && ((wallDown && !gapOnly) || hNow === 0 || rUp.length > hNow * outnumber) && (opts.ambush === undefined || hNow === 0 || t - lineSince >= 12 + opts.ambush) && (hNow === 0 || t - lineSince >= (synth ? STAGE_HOLD[stage] : ringK === 0 ? ringHold : ringStay)) && (!climbing || (t - lineSince >= 10 + (moat && ringK === 0 ? moat.holdS : 0) && r() < 0.02 * atLine.length * (deck ? WALK_CLIMB_FACTOR : 1) * wallTop.climb * climbWeak / (1 + onWall)))) {
       if (ringK < ringRs.length) fallBack(t);
-      else openLine(t, 'climb', rUp);
+      else openLine(t, pendingHow, rUp);
     }
     if (breached) {
       // yard or house? the crew at the door of the house has reached the last stage; a barricaded door buys the family time (sim/crewMercy.ts doorSeconds)

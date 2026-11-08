@@ -79,7 +79,7 @@ export function problems(g: GameState, b: PlannedBattle, o: BattleOptions): stri
       if (!run) bad.push('breach on a run that does not exist');
       else if (toRun(run, breach.x, breach.z) > 0.06) bad.push(`breach point is ${toRun(run, breach.x, breach.z).toFixed(2)} off the drawn wall`);
       if (Math.abs(breach.where.x - breach.x) > 0.011 || Math.abs(breach.where.z - breach.z) > 0.011) bad.push('breach point differs from its where');
-      if (!ev.some(e => e.kind === 'gap' && e.runId === breach.where!.runId && Math.abs(e.t - breach.t) < 1.01) && (m === 'ram' || m === 'charge') && raid.breach!.attempts.some(a => a.ok)) bad.push('a ram / charge breach with no gap event');
+      if (!ev.some(e => e.kind === 'gap' && e.runId === breach.where!.runId && e.t <= breach.t + 0.01) && (m === 'ram' || m === 'charge')) bad.push('a ram / charge breach with no gap event before it');
     }
     if (m === 'ram' && !ev.some(e => e.kind === 'ram' && e.ok !== false)) bad.push('a ram breach with no successful ram event');
     if (m === 'charge' && !ev.some(e => e.kind === 'explosion' && e.wrecks === 'wall')) bad.push('a charge breach with no wall-wrecking blast');
