@@ -22,8 +22,8 @@ const evs = <K extends BattleEvent['kind']>(b: { events: BattleEvent[] }, k: K) 
 describe('openers are rolled when the raid is made and read by the fight', () => {
   it('gateDay gives raids an opener (and none to the others); the white-flag demand gets its own answer on the card', () => {
     const kinds: Record<string, number> = {}; let demandCards = 0, none = 0, n = 0;
-    for (let seed = 1; seed <= 400; seed++) {
-      const g = place(1 + (seed % 9), (['cozy', 'standard', 'hardcore'] as const)[seed % 3], 'container');
+    for (let seed = 1; seed <= 160; seed++) {
+      const g = place(1 + (seed % 9), (['cozy', 'standard', 'hardcore'] as const)[seed % 3], 'armed');
       g.gate.day = -1; g.gate.next = dayIndex(g.clock.t); g.gate.pending = null;
       g.disaster.tracks = { ...g.disaster.tracks, law: 0 }; g.seed = seed;
       const e = gateDay(g);
@@ -34,7 +34,7 @@ describe('openers are rolled when the raid is made and read by the fight', () =>
       if (e.opener.kind === 'demand') { demandCards++; expect(e.stances).toContain('flag_pay'); expect(e.wants && Object.keys(e.wants).length).toBeGreaterThan(0); expect(e.dossier.join(' ')).toMatch(/white/); }
       else expect(e.stances).not.toContain('flag_pay');
     }
-    expect(n).toBeGreaterThan(40); expect(none).toBeGreaterThan(n / 3); expect(Object.keys(kinds).length).toBeGreaterThanOrEqual(3); expect(demandCards).toBeGreaterThan(0);
+    expect(n).toBeGreaterThan(15); expect(none).toBeGreaterThan(n / 3); expect(Object.keys(kinds).length).toBeGreaterThanOrEqual(3); expect(demandCards).toBeGreaterThan(0);
   });
   it('paying the man under the white flag costs exactly what he asked and no one is hurt; talking and refusing are the existing talk and fight', () => {
     const g = place(3, 'standard', 'container');

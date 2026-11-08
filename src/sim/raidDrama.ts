@@ -77,6 +77,7 @@ export function leftBehindRaiders(b: Battle): string[] {
   for (const e of b.events) {
     if (e.kind === 'wound' && !e.stopped) hurt.add(e.unit);
     if (e.kind === 'death' || e.kind === 'flee' || e.kind === 'taken' || e.kind === 'surrender') gone.add(e.unit);   // (a man who gave up is held, not left on the drive)
+    if (e.kind === 'withdraw') for (const id of e.carrying) gone.add(id);   // (a man his own side carried off is not left on the drive either)
   }
   return b.units.filter(u => u.side === 'raider' && !u.machine && hurt.has(u.id) && !gone.has(u.id)).map(u => u.id);
 }
