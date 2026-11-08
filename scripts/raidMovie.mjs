@@ -61,8 +61,9 @@ try {
   console.log(JSON.stringify(info));
   await frames(10);
   await page.waitForTimeout(3500);
-  await page.getByRole('button', { name: /^Defend/ }).click();
-  await page.getByRole('button', { name: 'Watch', exact: true }).click();
+  await page.evaluate(() => [...document.querySelectorAll('button')].find(b => /^Defend/.test(b.textContent ?? ''))?.click());   // (a DOM click: Playwright's actionability wait can hang under a loaded machine)
+  await page.waitForTimeout(1500);
+  await page.evaluate(() => [...document.querySelectorAll('button')].find(b => b.textContent === 'Watch')?.click());
   await frames(3);
   const q0 = await page.evaluate(() => window.__cb.store.getState().quality);
   await page.evaluate(() => { window.__manual = true; });
