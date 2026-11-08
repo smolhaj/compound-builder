@@ -32,6 +32,12 @@ export interface BattleUnit {
   armor?: { plate: boolean; soft: boolean; helmet: boolean };
   /** Not a person: a remote turret on a tower (drawn as part of the tower, not as a figure). */
   machine?: 'turret';
+  /** A raider's job in the breach (sim/breachMeans.ts): the one at the wheel of the truck, the one carrying the satchel charge. Set on the sim's own units. */
+  job?: 'driver' | 'sapper';
+  /** The raider is in the truck until it arrives (or is stopped): draw him in the cab, not as a walker. */
+  inVehicle?: boolean;
+  /** The crew's named leader (the first raider, `r0`): `name` is what the scene and the card call him. */
+  leader?: boolean;
   /** A raider's role and look in the cutscene (set by `decorateRaiders`). */
   look?: RaiderLook;
   /** A resident who is not fighting: a child pulled indoors, a hand on the porch (`sim/defenderMoments.ts`). */
@@ -56,7 +62,10 @@ export type BattleEvent =
   | { t: number; kind: 'death'; unit: string; executed?: boolean }
   /** Carried off by the raiders (a ruthless crew takes the children). */
   | { t: number; kind: 'taken'; unit: string; by: string }
-  | { t: number; kind: 'breach'; x: number; z: number }
+  /**
+   * The line is broken. `x`/`z` is the real break point: on the drawn wall segment or gate (`where`), not a radius. `method`: how (sim/breachMeans.ts);
+   * absent on a battle from before save v87 (then the point is the old abstract line). */
+  | { t: number; kind: 'breach'; x: number; z: number; method?: 'climb' | 'ram' | 'charge'; where?: BreachWhere }
   /** The defenders fall back to the `ring`-th inner ring (of `of`): the crew has broken the line before it. */
   | { t: number; kind: 'fallback'; ring: number; of: number; x: number; z: number }
   /** A wounded defender carried in to the sickbay by `by`. */
@@ -91,11 +100,44 @@ export type BattleEvent =
    * (this event's `t` is the start of the run), or a charge is planted at (x, z) and goes off `fuse` seconds later. The sim's own `breach` event
    * is what lets the crew in; these only show how the wall came down.
    */
-  | { t: number; kind: 'ram'; fromX: number; fromZ: number; x: number; z: number; secs: number }
-  | { t: number; kind: 'charge'; x: number; z: number; fuse: number }
+  | { t: number; kind: 'ram'; fromX: number; fromZ: number; x: number; z: number; secs: number; /** false: the truck did not get through (see `why`); it stops at (stopX, stopZ). Absent = it did. */ ok?: boolean; why?: string; stopX?: number; stopZ?: number; driver?: string }
+  | { t: number; kind: 'charge'; x: number; z: number; fuse: number; /** false: the charge went off and the wall held (or the carrier was down before it was planted: then it never goes off). */ ok?: boolean; why?: string; carrier?: string }
   /** The wall run is open here from now on (a live gap, drawn until the cutscene ends): run id, distance along it, width. */
   | { t: number; kind: 'gap'; runId: string; at: number; w: number; x: number; z: number }
+  /** Raid depth (save v87, sim/raidOrders.ts): the family's order takes effect; the stage the defenders now hold. */
+  | { t: number; kind: 'order'; order: RaidOrderKind; stage: RaidStage; units: string[] }
+  /** A raid's extra outcomes (sim/raidOutcomes.ts). */
+  | { t: number; kind: 'hostage'; unit: string; by: string; demand?: string }
+  | { t: number; kind: 'spare'; unit: string; by: string; why: 'child' | 'complied' | 'unfound' }
+  | { t: number; kind: 'fire'; structure: string; x: number; z: number; by?: string }
+  | { t: number; kind: 'loot'; by: string; what: string; n: number; from: 'yard' | 'house' }
+  | { t: number; kind: 'parley'; offer: 'tribute' | 'passage'; accepted: boolean; what?: string }
+  | { t: number; kind: 'withdraw'; units: string[]; carrying: string[]; why: 'leader_down' | 'greed' | 'losses' | 'tribute' }
+  | { t: number; kind: 'rally'; unit: string }
   | { t: number; kind: 'end'; result: 'repelled' | 'fled' | 'breached' | 'overrun' };
+
+export type RaidOrderKind = 'hold' | 'fallback' | 'counter';
+/** Where the defenders make their stand: the wall, the cover in the yard, the main house. */
+export type RaidStage = 'wall' | 'yard' | 'house';
+
+/** The drawn wall segment or gate that gives way (sim/breachMeans.ts `wallTarget`). */
+export interface BreachWhere {
+  runId: string;
+  /** The wall kind (a PerimeterKind). */
+  kind: string;
+  /** A gate: the leaves went, not the wall. */
+  gate: boolean;
+  /** Distance along the run, and the width of the opening (world units). */
+  at: number;
+  w: number;
+  x: number;
+  z: number;
+  /** Direction of the wall there (radians about +y), and the unit vector pointing from inside to outside. */
+  heading: number;
+  out: { x: number; z: number };
+  /** Distance from the house. */
+  dist: number;
+}
 
 /** A vehicle left standing in the scene (the opportunists' pickup): where, and which way its nose points (radians about +y, front toward +z). */
 export interface BattleVehicle { kind: 'pickup'; x: number; z: number; rot: number }
@@ -111,9 +153,52 @@ export interface InvasionMeta {
   interior?: { from: number; to: number };
 }
 /** What became of a defender left on the ground when the crew broke the line (sim/breachFates.ts). */
-export type BreachFateKind = 'killed' | 'finished' | 'wounded' | 'taken' | 'held' | 'fled';
+export type BreachFateKind = 'killed' | 'finished' | 'wounded' | 'taken' | 'held' | 'fled'
+  /** Found and left alone (a child, or an unarmed adult who complied, by a merciful crew; sim/crewMercy.ts). */
+  | 'spared'
+  /** Never found: a hiding family the crew did not break in to (a barricaded room, or they left first). */
+  | 'hid';
+
+/**
+ * The explicit data of a fought raid (save v87): every number the result card, the scene and the aftermath read, from the live sim (sim/battle.ts),
+ * never invented by the scene. Absent on a battle made before v87 and on a peacetime break-in.
+ */
+export interface RaidFacts {
+  /** `breached`: raiders in the yard (still beatable); `overrun`: the houses fell. `repelled`/`fled`: never past the line, or beaten back out of it. */
+  result: 'repelled' | 'fled' | 'breached' | 'overrun';
+  /** The crew got through the line at some point (even if it was then beaten back out of the yard). */
+  linePassed: boolean;
+  /** Raiders in the yard were driven back out (result `repelled` or `fled` after the line was passed). */
+  beatenBack: boolean;
+  /** The furthest stage the crew reached: the wall, the yard, the main house. */
+  reached: RaidStage;
+  /** How the line was broken and where, with every attempt (a failed ram, a charge that did not go). */
+  breach?: { method: 'climb' | 'ram' | 'charge'; where: BreachWhere | null; t: number; attempts: Array<{ how: 'ram' | 'charge'; ok: boolean; why: string; t: number; odds: number }>; crewHad: { truck: boolean; satchels: number } };
+  /** The family's orders as they took effect, and the stage they held at the end. */
+  orders: Array<{ t: number; order: RaidOrderKind; stage: RaidStage }>;
+  stage: RaidStage;
+  /** The crew's temper, its disposition (`hostile` kills everyone it finds and sometimes takes captives; `merciful` spares children and the unarmed who comply) and its leader. */
+  temper: 'desperate' | 'hard' | 'savage';
+  disposition: 'hostile' | 'merciful';
+  leader: { unit: string; name: string; down: boolean; downAt?: number } | null;
+  /** The outer wall's distance from the house (world units), for what stands beyond each stage. */
+  wallR: number;
+  /** A defender who shot a man with his hands up (sim/crewMercy.ts `snapOdds`). */
+  snaps: Array<{ shooter: string; victim: string }>;
+  /** Explicit losses, by kind: what the yard cost and what the houses cost. */
+  loss: { yard: string[]; house: string[]; people: { killed: number; wounded: number; taken: number; held: number; spared: number } };
+  loot: Array<{ what: string; n: number; from: 'yard' | 'house' }>;
+  hostages: Array<{ unit: string; by: string; demand?: string }>;
+  fires: Array<{ structure: string; x: number; z: number }>;
+  /** A talked end in the middle of the fight, or a part of the crew pulling out. */
+  ending?: { kind: 'tribute' | 'passage' | 'partial_retreat' | 'rout'; at: number; what?: string; units?: string[] };
+  /** The result in plain words, for the card. */
+  text: string;
+}
 
 export interface Battle {
+  /** The live raid facts (save v87). */
+  raid?: RaidFacts;
   invasion?: InvasionMeta;
   /** Night or day (lights matter at night). */
   night: boolean;

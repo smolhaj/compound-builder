@@ -461,3 +461,15 @@ export function nextRun(s: GameState): PerimeterRun | null {
   for (const r of s.perimeter) if (!runFinished(r) && runBlocked(s, r) === null) return r;
   return null;
 }
+
+
+/** The weakest known wall kind: what a run of a kind this build does not know (an old or hand-edited save) is treated as. */
+export const WEAKEST_WALL: PerimeterKind = 'split_rail';
+/**
+ * The game with every run of an unknown kind read as the weakest known one, so the raid code (which looks each kind up in `PERIMETER`) can never
+ * throw on odd data. Returns the same object when every kind is known (no copy, no cost).
+ */
+export function withKnownWalls<T extends { perimeter: PerimeterRun[] }>(s: T): T {
+  if (!Array.isArray(s.perimeter) || s.perimeter.every(r => r && r.kind in PERIMETER && Array.isArray(r.pts) && Array.isArray(r.gates))) return s;
+  return { ...s, perimeter: s.perimeter.filter(r => !!r).map(r => ({ ...r, kind: r.kind in PERIMETER ? r.kind : WEAKEST_WALL, pts: Array.isArray(r.pts) ? r.pts : [], gates: Array.isArray(r.gates) ? r.gates : [] })) };
+}

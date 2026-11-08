@@ -70,6 +70,7 @@ const ELEMENTS: Array<[string, (g: GameState) => void]> = [
   ['an intercom and gate camera (lit)', g => { g.utilities.lit = ['h']; g.stock.gate_intercom = 1; }],
   ['a caged gate motor', g => { g.stock.gate_motor = 1; }],
   ['a double gate (vehicle sally port)', g => { g.stock.sally_gate = 1; }],
+  ['steel bollards across the approach (turn a ram truck)', g => { g.stock.bollards = 1; }],
   ['the whole gate kit with a gate house, lit', g => { g.utilities.lit = ['h']; g.stock.gate_intercom = 1; g.stock.gate_motor = 1; g.stock.sally_gate = 1; g.stock.trellis_gates = 1; g.stock.gate_house = 1; }],
   ['an armed-response subscription (the law is gone: nothing answers)', g => { g.money = 9999; g.disaster.tracks.banks = 1; g.disaster.tracks.law = 1; subscribe(g); g.disaster.tracks.banks = 0; g.disaster.tracks.law = 0; }],
   ['a road watch with the neighbors', g => { g.money = 9999; for (const n of g.neighbors) { n.disposition = 40; n.status = 'home'; n.members = Math.max(1, n.members); n.km = 1.5; } foundWatch(g); }],

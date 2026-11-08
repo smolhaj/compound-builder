@@ -216,7 +216,7 @@ describe('a lost fight and the yard', () => {
       g.clock.t = g.disaster.hitAt + 20; g.disaster.phase = 'survival';
       g.gate.pending = { id: 'e1', kind: 'gang', day: 1, title: 'A gang', dossier: [], size: 40, armed: true, strength: 500, stances: ['defend'], temper: 'hard' } as never;
       const o = resolve(g, 'defend');
-      if (o.title === 'They got in' && o.lines.some(l => /drove off/.test(l))) seen = true;
+      if (/^They (got in|broke through|overran)/.test(o.title) && o.lines.some(l => /drove off/.test(l))) seen = true;
     }
     expect(seen).toBe(true);
   });

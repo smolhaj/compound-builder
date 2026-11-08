@@ -3,6 +3,7 @@
  * quarter-hour sub-step (deterministic regardless of frame rate or speed).
  * Systems mutate a draft; `step` returns a fresh state object.
  */
+import { tickRaidFires } from './raidFire';
 import { topUp } from './godMode';
 import { sharedHarvestDay } from './sharedHarvest';
 import { hasBasement } from './housingStyles';
@@ -130,6 +131,8 @@ function subStep(s: GameState): void {
   // (fatigue and chores are counted once a game hour; building work every sub-step)
   const tk = dailyTick(s, { build: canBuild, fell: job !== null }), rates = tk.rates, hrs = SUBSTEP * 24, hourly = s.clock.ticks % 4 === 0;
   const party = gatheringStep(s);
+  // fires a raid set grow, spread and are fought by the hour (sim/raidFire.ts)
+  if (hourly && s.raidFires?.length) for (const l of tickRaidFires(s)) log(s, l);
   s.people.forEach((p, i) => {
     const ps = s.personState.find(x => x.id === p.id)!;
     if (ps.needs.died != null) { ps.task = 'gone'; ps.target = null; return; }

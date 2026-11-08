@@ -139,9 +139,10 @@ describe('round 4: honest odds, hiding has a cost, no double take', () => {
       if (card.tone !== 'bad') continue;
       checked++;
       const b = g.gate.battle!;
-      const savage = b.events.some(e => e.kind === 'taken' || (e.kind === 'death' && e.executed));
-      const share = savage ? 0.9 : b.events.find(e => e.kind === 'end' && e.result === 'overrun') ? 0.6 : 0.3;
-      expect(g.stock.canned).toBe(20 - Math.floor(20 * share));
+      // (raid depth, save v87: the loss is the crew's itemized loot, planned from what it wanted, reached and could carry: sim/raidOutcomes.ts)
+      const took = b.raid!.loot.filter(l => l.what === 'canned').reduce((a, l) => a + l.n, 0);
+      expect(g.stock.canned).toBe(20 - took);
+      expect(took).toBeLessThanOrEqual(Math.floor(20 * 0.9));
     }
     expect(checked).toBeGreaterThan(0);
   });

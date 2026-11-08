@@ -165,6 +165,8 @@ export type SuggestionAct =
   | { type: 'tool'; tool: string }
   | { type: 'caretaker'; kind: CaretakerKind }
   | { type: 'belt'; on: boolean }
+  /** All hands on the fires a raid set (sim/raidFire.ts), or back to the usual share. */
+  | { type: 'fire'; on: boolean }
   | { type: 'crew'; id: string }
   /** Hire the contractor for the gravel drive (or the power line). */
   | { type: 'hookup'; what: 'drive' | 'power' }
@@ -263,6 +265,12 @@ export function suggestions(s: GameState, limit = 3, skip?: ReadonlySet<string>)
     add('kin_home', n > 2 ? 'moms_house' : 'guest_house', `${joinNames(wait.flatMap(w => w.people.map(p => p.first)))} ${n === 1 ? 'is' : 'are'} waiting for a place of their own`, 85);
   }
   if (!hasKind(s, 'well_hand', 'well_drilled', 'cistern', 'water_tower')) add('water', s.site.gwDepth > 9 ? 'well_drilled' : 'well_hand', s.site.gwDepth > 9 ? `no water on the place (it is ${lengthText(s.site.gwDepth)} down: drill)` : 'no water on the place', 90);
+  // a fire a raid set is burning: it spreads by the hour unless it is fought (sim/raidFire.ts)
+  if (s.raidFires?.length) {
+    const all = s.raidFires.some(f => f.allHands);
+    out.push({ id: 'raid_fire', kind: '', title: s.raidFires.length === 1 ? 'A fire is burning on the place' : `${s.raidFires.length} fires are burning on the place`, urgency: 99, tone: 'alarm', why: 'Raiders set it. It grows every hour and jumps to wooden buildings next to it. Able adults fight it on their own; putting everyone on it is faster and costs the day\'s work.',
+      acts: [{ label: all ? 'Back to the usual share' : 'All hands on the fire', act: { type: 'fire', on: !all } }] });
+  }
   // what a raid broke and nobody has mended yet (sim/raidDamage.ts)
   { const sum = damageSummary(s), open = openDamage(s);
     if (sum.length && (open.length || s.structures.some(st => st.fixes?.some(f => f.part === 'glass' && f.done < f.hours)))) {
