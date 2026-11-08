@@ -387,6 +387,8 @@ export function findClips(b: Battle, w: NavWorld, center?: Pt): Clip[] {
       let was = blockedAt(w, a.x, a.z, t);
       for (let i = 1; i <= n; i++) {
         const f = i / n, x = a.x + (c.x - a.x) * f, z = a.z + (c.z - a.z) * f, now = blockedAt(w, x, z, t);
+        // (a graze: sliding along a wall's clearance edge can cross it by a millionth of a unit; if a point 2 mm to either side is clear, it is not a clip)
+        if (now && !was && ([[0.002, 0], [-0.002, 0], [0, 0.002], [0, -0.002]] as const).some(([ox, oz]) => !blockedAt(w, x + ox, z + oz, t))) { was = now; continue; }
         if (now && !was) { if (clips.length < 500) clips.push({ unit: id, t: Math.round(t * 100) / 100, from: a, to: { x, z } }); return; }
         was = now;
       }

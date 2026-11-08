@@ -135,7 +135,7 @@ describe('wall-top walkway', () => {
 
   it('with a guard deck fewer crews get over the wall than without', () => {
     let withDeck = 0, without = 0;
-    for (let seed = 1; seed <= 40; seed++) {
+    for (let seed = 1; seed <= 160; seed++) {
       if (planBattle(raidGame(true), 6, seed).result === 'breached') withDeck++;
       if (planBattle(raidGame(false), 6, seed).result === 'breached') without++;
     }
