@@ -29,13 +29,14 @@ export function downRaiders(b: Battle): Array<{ id: string; t: number; sev: numb
   for (const e of b.events) {
     if (e.kind === 'wound' && !e.stopped) { const h = hurt.get(e.unit); hurt.set(e.unit, { t: e.t, sev: (h?.sev ?? 0) + e.sev }); }
     if (e.kind === 'death' || e.kind === 'flee' || e.kind === 'taken') gone.add(e.unit);
+    if (e.kind === 'withdraw') for (const id of e.carrying) gone.add(id);   // carried off by their own side: not left on the drive
   }
   return b.units.filter(u => u.side === 'raider' && !u.machine && hurt.has(u.id) && !gone.has(u.id)).map(u => ({ id: u.id, ...hurt.get(u.id)! }));
 }
 
 /** Raiders standing and fighting when the last shot is fired (not down, dead or run off): what the crew has left. */
 export function standingRaiders(b: Battle): string[] {
-  const down = new Set(downRaiders(b).map(d => d.id)), gone = new Set(b.events.filter(e => e.kind === 'death' || e.kind === 'flee' || e.kind === 'taken').map(e => (e as { unit: string }).unit));
+  const down = new Set(downRaiders(b).map(d => d.id)), gone = new Set([...b.events.filter(e => e.kind === 'death' || e.kind === 'flee' || e.kind === 'taken').map(e => (e as { unit: string }).unit), ...b.events.flatMap(e => (e.kind === 'withdraw' ? e.carrying : []))]);
   return b.units.filter(u => u.side === 'raider' && !u.machine && !down.has(u.id) && !gone.has(u.id)).map(u => u.id);
 }
 

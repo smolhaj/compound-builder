@@ -27,7 +27,9 @@ const kinds = (b: Battle) => b.events.map(e => e.kind);
 
 describe('the death and the wake', () => {
   it('stages the fall and the wake for the person the sim really killed', () => {
-    const f = find(st => !!st.drama);
+    // (a victim shot dead: one who bled out has no killing shot to aim at, and a wake is staged for him too)
+    const shotDead = (st: StagedRaid) => { const b = st.battles[st.drama!.scene], de = b.events.find(e => e.kind === 'death' && e.unit === st.drama!.victim.unit); return !!de && b.events.some(e => e.kind === 'shot' && e.to === st.drama!.victim.unit && e.hit && e.t <= de.t + 0.01 && e.t >= de.t - 0.4); };
+    const f = find(st => !!st.drama && shotDead(st));
     expect(f).not.toBeNull();
     const { st } = f!, d = st.drama!;
     expect(st.report.killed).toContain(d.victim.name);

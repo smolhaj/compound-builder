@@ -327,6 +327,12 @@ export function locate(plan: SiegePlan, real: number): Located {
   return { segment: seg, f, game: seg.game0 + seg.gameLen * f, done: false };
 }
 
+/** Where game second `game` since the arrival falls in a scene's fight, as battle seconds (the fight is played 1:1), or null when it is not in a fight. */
+export function fightClock(plan: SiegePlan, game: number): { scene: number; t: number } | null {
+  for (const sg of segments(plan)) if (sg.kind === 'fight' && game >= sg.game0 - 1e-6 && game <= sg.game0 + sg.gameLen + 1e-6) return { scene: sg.scene, t: Math.max(0, Math.round((game - sg.game0) * 2) / 2) };
+  return null;
+}
+
 /** Playback second at which a scene starts (its gap card, if any, first), and the second at which it ends. */
 export function sceneWindow(plan: SiegePlan, scene: number): { start: number; end: number } {
   const segs = segments(plan).filter(sg => sg.scene === scene);

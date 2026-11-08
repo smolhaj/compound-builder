@@ -23,6 +23,8 @@
  * with nothing (they walk), or finish them, which weighs more on the humanity track than finishing a man who was already down.
  */
 import { log } from './economy';
+import { addStory, makeStory } from './raiderStory';
+import { crewKindOf, type CrewKind } from './surrender';
 import { mulberry32 } from './rng';
 import type { GameState } from './state';
 import { SKILL_IDS, type Person, type SkillId } from './family';
@@ -63,6 +65,9 @@ export function leaveAftermath(s: GameState, wounded: number, dead: number, surr
 export const aftermathHeads = (a: Pick<Aftermath, 'wounded' | 'surrendered'>): number => a.wounded + (a.surrendered ?? 0);
 
 /** The family decides. Returns lines for the card / log. */
+/** The kind of crew the last fight was against (for the story of a man who comes back). */
+const crewOf = (s: GameState): CrewKind => crewKindOf((s.gate.battle as { raid?: { crew?: string } } | undefined)?.raid?.crew);
+
 export function resolveAftermath(s: GameState, choice: AftermathChoice): string[] {
   const a = s.gate.aftermath;
   if (!a) return [];
@@ -84,6 +89,7 @@ export function resolveAftermath(s: GameState, choice: AftermathChoice): string[
       if (r() < 0.35) { g.next = Math.min(g.next, Math.floor(s.clock.t) + 5 + Math.floor(r() * 10)); out.push('One of them looked back at the walls a long time before he went.'); }
       g.mercy = (g.mercy ?? 0) + n;
       afterMercy(s);
+      addStory(s, makeStory(s, { treated: 'released', crew: crewOf(s), men: 5 }, 1));   // one of them is remembered (sim/raiderStory.ts)
     } else if (choice === 'hold') {
       g.prisoners ??= [];
       for (let i = 0; i < n; i++) {
@@ -100,6 +106,7 @@ export function resolveAftermath(s: GameState, choice: AftermathChoice): string[
       else out.push(r() < 0.5 ? 'By morning the drive was empty. A blood trail went into the trees.' : 'By morning they had stopped calling for help.');
       lowerMorale(s, 4);
       afterLeaving(s);
+      if (a.wounded > 0) addStory(s, makeStory(s, { treated: 'left', crew: crewOf(s), men: 5 }, 2));
     } else {
       g.humanity = Math.max(0, g.humanity - 12 - 4 * a.wounded - 6 * sur);   // a man on his knees with his hands up weighs more than one already down
       lowerMorale(s, 15);

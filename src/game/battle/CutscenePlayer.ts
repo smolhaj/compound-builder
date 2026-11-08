@@ -40,6 +40,8 @@ export class CutscenePlayer {
   private _seen = false;
   /** Scenes whose between-scenes card has been shown. */
   private _offered = new Set<number>();
+  /** Battle seconds to run the freshly swapped fight forward to (an order on the live playhead). */
+  private _seekTo: number | null = null;
   private _wasPlaying = false;
   private _startedScene = -1;
   private _dir: Director;
@@ -134,6 +136,15 @@ export class CutscenePlayer {
         battle.lightNight = lightLabel(hourAfter(plan, seg.game0 + seg.gameLen / 2)) === 'Night';
         useBattleStore.getState().playBattle(this._ready(c.battles[seg.scene]));
       }
+      // an order given on the live playhead (store.giveRaidOrderNow): the fight was replanned from that second with the same seeded stream, so the part already
+      // shown is identical; play the new one and run it forward to where the picture was
+      if (c.swap && c.swap.scene === seg.scene && this._startedScene === seg.scene) {
+        const at = c.swap.t;
+        useGameStore.getState().clearSwap();
+        useBattleStore.getState().playBattle(this._ready(c.battles[seg.scene]));
+        this._seekTo = at;
+      }
+      if (this._seekTo !== null && battle.playing) { battle.seek(this._seekTo); this._seekTo = null; }
       if (battle.playing) this._seen = true;
       const bt = battle.playing ? battle.time : this._seen ? seg.realLen : 0;
       this._real = Math.max(this._real, seg.real0 + Math.min(seg.realLen, bt));

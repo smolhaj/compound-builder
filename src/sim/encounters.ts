@@ -14,6 +14,8 @@
  * ever reaches the family through it. Pure and seeded.
  */
 import { withKnownWalls } from './perimeter';
+import { planOpener } from './raidOpeners';
+import { crewKindOf } from './surrender';
 import { nobodyHome } from './orphans';
 import { ringPoints } from './rings';
 import { terrainPoints } from './terrainFx';
@@ -194,7 +196,7 @@ export function postureOf(s: GameState): Posture {
 // ─────────────────────────────────────────────────────────────────────────
 
 export type EncounterKind = 'insider' | 'guard_stay' | 'arrival' | 'looters' | 'gang' | 'refugees' | 'requisition' | 'neighbor_help' | 'trader' | 'horde' | 'patrol' | 'militia' | 'break_in' | 'ransom' | 'trial_end' | 'tunnelers' | 'kin' | 'shelter' | 'move_in' | 'stranded';
-export type Stance = 'hide' | 'parley' | 'warn' | 'defend' | 'trade' | 'take_in' | 'trial' | 'turn_away' | 'call_911' | 'shout' | 'confront' | 'pay' | 'refuse' | 'ambush' | 'flood' | 'collapse' | 'ignore' | 'build_first' | 'move_sell' | 'move_keep' | 'move_lease' | 'hold_on' | 'drive_now' | 'back_roads' | 'resupply' | 'dismiss' | 'neg_toll' | 'neg_aid' | 'neg_redirect';
+export type Stance = 'hide' | 'parley' | 'warn' | 'defend' | 'trade' | 'take_in' | 'trial' | 'turn_away' | 'call_911' | 'shout' | 'confront' | 'pay' | 'refuse' | 'ambush' | 'flood' | 'collapse' | 'ignore' | 'build_first' | 'move_sell' | 'move_keep' | 'move_lease' | 'hold_on' | 'drive_now' | 'back_roads' | 'resupply' | 'dismiss' | 'neg_toll' | 'neg_aid' | 'neg_redirect' | 'flag_pay';
 
 export interface Encounter {
   id: string;
@@ -218,6 +220,8 @@ export interface Encounter {
   stances: Stance[];
   /** Raiders: what kind of people they are (battle.ts RaiderTemper); the dossier may or may not say. */
   temper?: RaiderTemper;
+  /** How the raid begins (sim/raidOpeners.ts: scouts, a white-flag demand, an ambush of the people at work outside, a diversion). Rolled once when the raid is made; save v88. Absent: the plain way. */
+  opener?: import('./raidOpeners').Opener;
   /** A crew's terms for a taken child (sim/rescue.ts). */
   ransom?: RansomTerms;
   /** The end of a month's trial: which camp (sim/trial.ts). */
@@ -377,7 +381,7 @@ export function strengthOf(s: GameState, p: Posture = postureOf(s)): number {
 }
 
 /** What the battle sim is told about a crew: how they fight and how well they have learned this place. */
-const battleOpts = (e: Encounter, extra: { insideBreach?: boolean; orders?: import('./raidOrders').RaidOrder[] } = {}) => ({ armed: e.armed, temper: e.temper, kind: e.kind, organized: ORGANIZED.has(e.kind), ...(e.adapt ? { adapt: e.adapt } : {}), ...extra });
+const battleOpts = (e: Encounter, extra: { insideBreach?: boolean; orders?: import('./raidOrders').RaidOrder[] } = {}) => ({ armed: e.armed, temper: e.temper, kind: e.kind, organized: ORGANIZED.has(e.kind), ...(e.opener ? { opener: e.opener } : {}), ...(e.adapt ? { adapt: e.adapt } : {}), ...extra });
 
 /**
  * The threat matrix: who comes. Opportunists (looters) are put off by a
@@ -574,6 +578,18 @@ export function gateDay(s: GameState): Encounter | null {
   }
   // (Hardcore) the world learns a defended place: a probing raid first, then bigger, better-equipped crews (sim/adaptive.ts)
   else if (e.strength && ['looters', 'gang', 'militia'].includes(e.kind)) adaptCrew(s, e, p, day);
+  // how the raid begins: scouts ahead of it, a man under a white flag, an ambush of the people at work, a diversion (sim/raidOpeners.ts; its own random stream)
+  if (['looters', 'gang', 'militia', 'patrol', 'requisition'].includes(e.kind) && !e.back && !e.dig && !e.insiderHelp) {
+    const op = planOpener({ kind: crewKindOf(e.kind), temper: e.temper ?? 'desperate', size: e.size, armed: e.armed, difficulty: d.difficulty ?? 'standard' }, mulberry32(s.seed * 977 + day * 13 + 5));
+    if (op) {
+      e.opener = op;
+      if (op.kind === 'demand') {
+        e.wants = e.wants && Object.keys(e.wants).length ? e.wants : { canned: Math.max(3, e.size), fuel: 1 };
+        e.stances = [...e.stances.filter(st => st !== 'flag_pay'), 'flag_pay'];
+        e.dossier = [...e.dossier, 'A man walks up the drive alone with a white rag on a stick. He wants a toll, and says nobody has to get hurt.'];
+      } else if (op.kind === 'scouts') e.dossier = [...e.dossier, 'Two men were seen on the ridge, glassing the place, a while before the rest came.'];
+    }
+  }
   // an alarm: the passage hatches bolt themselves
   if (!['arrival', 'trader', 'neighbor_help'].includes(e.kind)) boltPassages(s);
   g.pending = e;
@@ -814,6 +830,14 @@ export function resolve(s: GameState, stance: Stance): Outcome {
         stance = 'defend';
         lines.push(`${o.title}. ${o.text}`);
       }
+    }
+    if (stance === 'flag_pay') {
+      // the man under the white flag is paid what he asked: certain, and the crew goes (it knows the place pays)
+      const paid = take(s, e.wants ?? {}, 1);
+      title = 'The toll is paid'; text = `The man with the white rag took ${paid.length ? paid.join(', ') : 'what little there was'} and walked back down the drive. Nobody fired a shot.`; tone = 'mixed';
+      if (paid.length) lines.push(`Paid: ${paid.join(', ')}`);
+      g.respect = Math.max(0, (g.respect ?? 0) - 0.15);
+      if (r() < 0.4) { g.comeBack = { kind: e.kind, size: e.size + 1, armed: e.armed, temper: e.temper, until: e.day + 30 }; g.next = Math.min(g.next < 0 ? e.day + 12 : g.next, e.day + 8 + Math.floor(r() * 8)); lines.push('A place that pays is a place that gets asked again.'); }
     }
     if (stance === 'hide') {
       // everyone underground (or in the timber); they take what's lying about. Nobody gets in by the tunnel: it only opens from inside.

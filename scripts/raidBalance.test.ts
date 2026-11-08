@@ -8,6 +8,7 @@ import { newGame, type GameState } from '../src/sim/state';
 import { planRun } from '../src/sim/perimeter';
 import { planBattle, type BattleOptions } from '../src/sim/battle';
 import type { Difficulty } from '../src/sim/difficulty';
+import { MEANS_DIFF } from '../src/sim/breachMeans';
 
 const N = Number(process.env.RAID_BALANCE ?? 0);
 function afterHit(seed: number, diff: Difficulty): GameState {
@@ -33,12 +34,14 @@ const CREWS: Record<string, { n: number; o: BattleOptions }> = {
 };
 describe.skipIf(!N)('raid balance', () => {
   it('reports', () => {
+    // QA: RAID_HC=odds,truck,satchel overrides the Hardcore means row (to try a softer Hardcore)
+    if (process.env.RAID_HC) { const [o, t, c] = process.env.RAID_HC.split(',').map(Number); Object.assign(MEANS_DIFF.hardcore, { odds: o, truck: t, satchel: c }); }
     const out: Record<string, Record<string, number>> = {};
     for (const diff of ['cozy', 'standard', 'hardcore'] as Difficulty[]) for (const [sn, site] of Object.entries(SITES)) for (const [cn, crew] of Object.entries(CREWS)) {
       const c: Record<string, number> = { repelled: 0, fled: 0, breached: 0, overrun: 0, homeDead: 0, homeWounded: 0 };
       for (let i = 0; i < N; i++) {
         const g = afterHit(1 + (i % 8), diff); site(g);
-        const b = planBattle(g, Math.round(crew.n * (diff === 'hardcore' ? 1.3 : diff === 'cozy' ? 0.7 : 1)), 100 + i, { ...crew.o, ...(process.env.RAID_ORDER ? { orders: [{ t: 0, order: process.env.RAID_ORDER as 'hold' | 'fallback' | 'counter' }] } : {}) });
+        const b = planBattle(g, Math.round(crew.n * (diff === 'hardcore' ? 1.3 : diff === 'cozy' ? 0.7 : 1)), 100 + i, { ...crew.o, ...(process.env.RAID_OPENER ? { opener: { kind: process.env.RAID_OPENER as 'scouts' | 'diversion' | 'worker_ambush' | 'demand', ...(process.env.RAID_OPENER === 'diversion' ? { decoy: { share: 0.3, delay: 16, until: 30 } } : {}) } } : {}), ...(process.env.RAID_ORDER ? { orders: [{ t: 0, order: process.env.RAID_ORDER as 'hold' | 'fallback' | 'counter' }] } : {}) });
         c[b.result]++;
         c.homeDead += b.events.filter(e => e.kind === 'death' && e.unit.startsWith('h_')).length;
         c.homeWounded += b.events.filter(e => e.kind === 'wound' && !e.stopped && e.unit.startsWith('h_')).length;

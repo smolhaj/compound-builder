@@ -9,6 +9,7 @@ import { STANCE } from './stanceText';
 import { pluralize } from '../sim/words';
 import { lightLabel } from '../game/battle/lightLabel';
 import { RaidOrders } from './GateCard';
+import { ORDERS, ORDER_HINT, ORDER_NAME } from '../sim/raidOrders';
 import { lootLines } from '../sim/raidFacts';
 
 const BAR = 'clamp(54px, 12vh, 120px)';
@@ -84,6 +85,7 @@ export function CutsceneOverlay() {
           <div style={{ fontSize: 'clamp(18px, 3.4vh, 30px)', fontVariantNumeric: 'tabular-nums', opacity: 0.85 }}>{clockLabel(view.hour)}</div>
         </div>
       )}
+      {playing && view.seg === 'fight' && c.offer == null && plan && view.scene === plan.scenes.length - 1 && c.raid?.staged.gate.battle && <LiveOrders />}
       {c.phase === 'playing' && c.offer != null && <Offer />}
       {c.phase === 'aftermath' && c.report && <Report />}
     </>
@@ -175,4 +177,14 @@ function FireButton() {
   const set = useGameStore(s => s.fireAllHands);
   if (!fires) return null;
   return <button style={{ ...btn, width: '100%', margin: '6px 0' }} data-testid="fire-all-hands" onClick={() => set(!all)}>{all ? 'Back to the usual share' : 'All hands on the fire'}</button>;
+}
+
+/** Orders on the live playhead: three small buttons while the last fight plays. The fight is replanned from this second on (same seeded stream, so nothing already shown changes). */
+function LiveOrders() {
+  const give = useGameStore(s => s.giveRaidOrderNow);
+  const now = useGameStore(s => s.cutscene?.orders?.slice(-1)[0]?.order ?? 'hold');
+  return <div data-testid="live-orders" style={{ position: 'fixed', left: 'clamp(12px, 3vw, 40px)', bottom: `calc(${BAR} + 12px)`, zIndex: 39, display: 'flex', gap: 6, alignItems: 'center', background: 'rgba(16,14,11,0.82)', padding: '6px 8px', borderRadius: 6, pointerEvents: 'auto' }}>
+    <span style={{ ...label, marginRight: 4 }}>Orders</span>
+    {ORDERS.map(o => <button key={o} data-testid={`live-order-${o}`} title={ORDER_HINT[o]} onClick={() => give(o)} style={{ ...btn, background: o === now ? '#d8c9a0' : 'rgba(30,26,22,0.9)', color: o === now ? '#1c1d18' : '#efe6d4' }}>{ORDER_NAME[o]}</button>)}
+  </div>;
 }
