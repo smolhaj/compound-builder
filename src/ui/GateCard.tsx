@@ -19,6 +19,7 @@ import { defaultStay, kitDetail, kitLine } from '../sim/joinerHome';
 import { pluralize } from '../sim/words';
 import { isTalk, talkOffer } from '../sim/negotiation';
 import { ORDERS, ORDER_HINT, ORDER_NAME } from '../sim/raidOrders';
+import { SCOUT_HINT, SCOUT_NAME, SCOUT_PLANS } from '../sim/scoutPlans';
 
 
 /** The end of a month's trial. */
@@ -180,6 +181,7 @@ export function GateCard() {
             </button>
           ))}
         </div>
+        {cut && (picked === 'defend' || picked === 'warn') && e.opener?.kind === 'scouts' && e.opener.spotted && <ScoutChoices />}
         {cut && picked === 'defend' && <RaidOrders />}
         {cut && <button style={{ ...button(true), position: 'sticky', bottom: 0, marginTop: 12, width: '100%', textAlign: 'center', fontSize: 15, padding: '10px 12px', fontWeight: 700, letterSpacing: 0.5 }} onClick={g.watchRaid}>Watch</button>}
       </div>
@@ -239,5 +241,19 @@ export function RaidOrders() {
       {ORDERS.map(o => <button key={o} data-testid={`order-${o}`} title={ORDER_HINT[o]} onClick={() => set(o)} style={{ flex: '1 1 30%', padding: '6px 8px', borderRadius: 4, cursor: 'pointer', font: '12.5px system-ui, sans-serif', border: '1px solid rgba(239,230,212,0.3)', background: o === now ? '#4a4a3c' : '#2e302a', color: '#eee', outline: o === now ? '2px solid #d8c9a0' : undefined }}>{ORDER_NAME[o]}</button>)}
     </div>
     <div style={{ fontSize: 11.5, opacity: 0.75, marginTop: 4 }}>{ORDER_HINT[now]}</div>
+  </div>;
+}
+
+/** Scouts the watch spotted: four plans (sim/scoutPlans.ts). The default is to ignore them, which leaves the crew knowing the weak side. */
+export function ScoutChoices() {
+  const cut = useGameStore(s => s.cutscene);
+  const set = useGameStore(s => s.setScoutPlan);
+  const now = cut?.scoutPlan ?? 'ignore';
+  return <div style={{ marginTop: 10 }} data-testid="scout-choices">
+    <div style={{ fontSize: 11, letterSpacing: 1.6, textTransform: 'uppercase', opacity: 0.6, marginBottom: 4 }}>The watch saw two men on the ridge</div>
+    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+      {SCOUT_PLANS.map(o => <button key={o} data-testid={`scout-${o}`} title={SCOUT_HINT[o]} onClick={() => set(o)} style={{ flex: '1 1 45%', padding: '6px 8px', borderRadius: 4, cursor: 'pointer', font: '12.5px system-ui, sans-serif', border: '1px solid rgba(239,230,212,0.3)', background: o === now ? '#4a4a3c' : '#2e302a', color: '#eee', outline: o === now ? '2px solid #d8c9a0' : undefined }}>{SCOUT_NAME[o]}</button>)}
+    </div>
+    <div style={{ fontSize: 11.5, opacity: 0.75, marginTop: 4 }}>{SCOUT_HINT[now]}</div>
   </div>;
 }

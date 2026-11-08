@@ -34,7 +34,7 @@ import { afterExecution, afterLeaving, afterMercy } from './mind';
 
 export type AftermathChoice = 'treat_release' | 'hold' | 'leave' | 'finish';
 export interface Aftermath { day: number; wounded: number; dead: number; /** Raiders who gave up and are held at the gate (save v86; absent in an older save). */ surrendered?: number }
-export interface Prisoner { id: string; name: string; since: number; /** Wound severity (0 healed). */ sev: number; talked: boolean; /** 0–100: how far he's come round. */ trust: number }
+export interface Prisoner { id: string; name: string; since: number; /** Wound severity (0 healed). */ sev: number; talked: boolean; /** 0–100: how far he's come round. */ trust: number; /** The questions already put to him (sim/interrogation.ts; save v89). */ asked?: Array<'next_crew' | 'who_sent' | 'stash'>; /** Hurt too badly to tell you anything you could believe. */ hurtTwice?: boolean }
 
 export const AFTERMATH_TEXT: Record<AftermathChoice, [string, string]> = {
   treat_release: ['Patch them up and let them go', 'Dressings and antibiotics, then they walk. The decent thing; some come back with their friends.'],

@@ -13,6 +13,7 @@
 import { withKnownWalls } from './perimeter';
 import type { Battle, RaidFacts } from './battleTypes';
 import type { RaidOrder } from './raidOrders';
+import type { ScoutPlan } from './scoutPlans';
 import { resolve, type Outcome, type Stance } from './encounters';
 import { newDamage } from './raidDamage';
 import { decorateDefenders } from './defenderMoments';
@@ -87,7 +88,7 @@ const LOSS_WORDS: Record<(typeof STOCK_LOSSES)[number], readonly [string, string
 interface Keep { prev: StagedRaid; played: number }
 
 /** Resolve the player's stance on a copy and lay out the cutscene. */
-export function stageRaid(game: GameState, stance: Stance, keep?: Keep, orders?: readonly RaidOrder[]): StagedRaid {
+export function stageRaid(game: GameState, stance: Stance, keep?: Keep, orders?: readonly RaidOrder[], scoutPlan?: ScoutPlan): StagedRaid {
   const e = game.gate.pending;
   if (!e) throw new Error('no one at the gate');
   const g = structuredClone(game);
@@ -95,8 +96,10 @@ export function stageRaid(game: GameState, stance: Stance, keep?: Keep, orders?:
   const t0 = g.clock.t, hour = hourOf(t0);
   g.gate.battle = undefined;
   if (orders?.length) g.gate.orders = orders.map(o => ({ ...o }));   // (the family's orders for the fight; `resolve` reads them and clears them, so they are never saved)
+  if (scoutPlan && g.gate.pending) g.gate.pending.scoutPlan = scoutPlan;   // (read and cleared by `resolve`: never saved)
   const outcome = resolve(g, stance);
   delete g.gate.orders;
+  if (g.gate.pending) delete g.gate.pending.scoutPlan;
   const battle = (g.gate.battle as Battle | undefined) ?? null;
   const seed = game.seed * 131 + e.day * 7 + 1;
   const played: Stance = battle ? 'defend' : stance;
@@ -179,8 +182,8 @@ export function stageRaid(game: GameState, stance: Stance, keep?: Keep, orders?:
  * if the new stance is still a fight, the cosmetic scenes still to come). The clock timeline up
  * to now is identical, so the virtual clock does not jump; only what follows changes.
  */
-export function restageRaid(game: GameState, prev: StagedRaid, played: number, stance: Stance, orders?: readonly RaidOrder[]): StagedRaid {
-  return stageRaid(game, stance, { prev, played }, orders);
+export function restageRaid(game: GameState, prev: StagedRaid, played: number, stance: Stance, orders?: readonly RaidOrder[], scoutPlan?: ScoutPlan): StagedRaid {
+  return stageRaid(game, stance, { prev, played }, orders, scoutPlan);
 }
 
 /** Put the staged result on the clock: the siege's length, once. */

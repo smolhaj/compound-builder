@@ -63,8 +63,10 @@ import { breachFates, takeCap, type Fate } from './breachFates';
 import { crewKindOf, crewSurrenders, downedSurrenderOdds, type CrewKind } from './surrender';
 import { FUSE_S, blastOdds, chooseHow, countersOf, crewMeans, ramOdds, truckSeconds, wallTarget, whyRamFailed, type BreachHow, type CrewMeans } from './breachMeans';
 import { nervesAim, woundFx } from './lingering';
+import { freezeSecs, heroOdds, lastWords, panicOdds, traitsOf, type DefenderTraits } from './defenderTraits';
 import { WALL_RESIST } from './breachMeans';
 import { envOf, FLARE, SMOKE_ACC } from './raidConditions';
+import { PREPARED_GATE, crewKeepsIntel } from './scoutPlans';
 import { scoutSpotted, weakestApproach, workerAmbush, OUTDOOR_TASKS } from './raidOpeners';
 import { dispositionOf, doorSeconds, hidingFate, snapOdds, temperamentOf } from './crewMercy';
 import { ORDER_FX, STAGE_COVER, STAGE_HOLD, nextStage, orderAt, stageRadius, type RaidOrder } from './raidOrders';
@@ -177,6 +179,9 @@ export interface BattleOptions {
   ambush?: number;
   /** How the raid begins (sim/raidOpeners.ts). */
   opener?: import('./raidOpeners').Opener;
+  /** The plan chosen for scouts the watch spotted (sim/scoutPlans.ts), and a crew that is angrier because the flag was refused, bluffed or shot at (sim/parleyChoices.ts). */
+  scoutPlan?: import('./scoutPlans').ScoutPlan;
+  angry?: boolean;
   /** The family's orders as a timeline (sim/raidOrders.ts); none: hold the line. A standing order is one at t 0. */
   orders?: RaidOrder[];
   /** QA: force what the crew brought (never saved). */
@@ -235,6 +240,8 @@ interface Fighter {
   /** Raid depth (save v87): the one at the wheel of the truck (in the cab until it arrives), the one carrying a satchel (charge > 0 until planted), a raider carried off by his own side, one stopped to loot. */
   /** A wound from an earlier fight that has not healed: the time to a post is multiplied by this (sim/lingering.ts). */
   limp?: number;
+  /** A defender's makeup (sim/defenderTraits.ts), and the second until which grief at a fallen kinsman steadies his aim. */
+  traits?: DefenderTraits; rage?: number;
   decoy?: boolean; veh?: boolean; charge?: number; carriedOff?: boolean; lootingUntil?: number;
   movedAt?: number; aided?: boolean; taken?: boolean; bleedAt?: number; bleedPart?: 'head' | 'torso' | 'arm' | 'leg' | 'frag'; saidAt?: number;
 }
@@ -352,13 +359,16 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
   const env = envOf(s);
   // ── how the raid begins (sim/raidOpeners.ts): scouts who are or are not spotted, a diversion, an ambush of the people at work outside ──
   const opener = peace || opts.insideBreach || opts.ambush !== undefined || !armedR ? undefined : opts.opener;
-  const scoutsSeen = opener?.kind === 'scouts' ? mulberry32(seed * 3301 + 17)() < scoutSpotted(detection, night) : false;
+  const scoutsSeen = opener?.kind === 'scouts' ? opener.spotted ?? mulberry32(seed * 3301 + 17)() < scoutSpotted(detection, night) : false;
+  // the crew keeps what its scouts learned unless the family saw them AND did something about it (ignoring them, or only preparing, leaves it)
+  const crewIntel = opener?.kind === 'scouts' && (!scoutsSeen || crewKeepsIntel(opts.scoutPlan, mulberry32(seed * 911 + 3)));
+  const prepared = opts.scoutPlan === 'prepare';
   // the road side: raiders come up from +z, give or take; a way in that is much easier than the road (terrain: sim/terrainFx.ts) draws them round to it
   const lane = opts.terrain === false ? null : raidAngle(s, r);
   const ang0 = lane ? lane.ang : Math.PI / 2 + (r() - 0.5) * 0.8;
   // scouts the watch did not see: the crew knows how the place lies and comes at its weakest wall or its gate, not the near side
   let ang = ang0;
-  if (opener?.kind === 'scouts' && !scoutsSeen && !lane?.via) {
+  if (opener?.kind === 'scouts' && crewIntel && !lane?.via) {
     const cand: Array<{ ang: number; score: number }> = [];
     for (let k = -3; k <= 4; k++) {
       const a = ang0 + k * Math.PI / 4, w = wallTarget(s.perimeter, C, { x: Math.cos(a), z: Math.sin(a) }, { width: 0.7, preferGate: true });
@@ -406,8 +416,8 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
   const dir = { x: ax, z: az };
   const tWall = noWall ? null : wallTarget(s.perimeter, C, dir, { width: 0.7, preferGate: false });
   const tGate = noWall ? null : wallTarget(s.perimeter, C, dir, { width: 0.7, preferGate: true });
-  const ramAt = (t: BreachWhere | null) => (t ? ramOdds({ wallKind: t.kind, gate: t.gate, difficulty, ...countersOf(s, t, C, t.runId) }) : 0);
-  const blastAt = (t: BreachWhere | null) => (t ? blastOdds({ wallKind: t.kind, gate: t.gate, difficulty, gateBarrier: countersOf(s, t, C, t.runId).gateBarrier }) : 0);
+  const ramAt = (t: BreachWhere | null) => (t ? ramOdds({ wallKind: t.kind, gate: t.gate, difficulty, ...countersOf(s, t, C, t.runId) }) * (opts.scoutPlan === 'prepare' && t.gate ? PREPARED_GATE : 1) : 0);   // (a gate shut and chained on the scouts' warning)
+  const blastAt = (t: BreachWhere | null) => (t ? blastOdds({ wallKind: t.kind, gate: t.gate, difficulty, gateBarrier: countersOf(s, t, C, t.runId).gateBarrier }) * (opts.scoutPlan === 'prepare' && t.gate ? PREPARED_GATE : 1) : 0);
   const ramBest = tGate && tGate.gate && ramAt(tGate) > ramAt(tWall) ? tGate : tWall;
   const how: BreachHow = noWall || !tWall ? 'climb' : chooseHow(means, ramAt(ramBest), blastAt(tWall));
   const target: BreachWhere | null = how === 'ram' ? ramBest : tWall;
@@ -506,7 +516,8 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
     const lw = woundFx(s.personState.find(q => q.id === p.id)?.needs.hurt), shaken0 = nervesAim(s.mind?.psyche[p.id]);
     if (lw.acc < 1) arm = { ...arm, acc: arm.acc * lw.acc };
     const f: Fighter = { id: `h_${p.id}`, side: 'home', pid: p.id, x, z, y: 0, hp: hp0, out: false, dead: false, arm, skill: Math.max(1, skillOf(s, p.id) - shaken0), ...(lw.limp > 1 ? { limp: lw.limp } : {}), readyAt: Infinity, post: null, cover: 0.8, moving: false, nextMove: 0, shelter: !fights, grenades: n('grenades') && fights ? 1 : 0, rockets: 0, medic: p.id === medicId, kid: p.kid, armor: { plate: false, soft: false, helmet: false }, vet, inGun: arm.mag, spare: arm.feed === 'tube' ? 4 : 2, bleed: 0, supp: 0, nvg: false, wear };
-    F.push(f); units.push({ id: f.id, side: 'home', personId: p.id, x: r2(x), z: r2(z), post: 'open' });
+    f.traits = traitsOf(s, p, pid => (alive.some(a => a.p.id === pid) ? `h_${pid}` : undefined));
+    F.push(f); units.push({ id: f.id, side: 'home', personId: p.id, x: r2(x), z: r2(z), post: 'open', traits: { trauma: f.traits.trauma, stress: f.traits.stress, grief: f.traits.grief, experience: f.traits.experience, veteran: f.traits.veteran, firstFight: f.traits.firstFight, courage: f.traits.courage, kin: f.traits.kin.map(k => ({ ...k })), history: [...f.traits.history] } });
   }
   // explosives are rare in an American collapse: a looted Guard armory, a veteran's souvenir. An organized crew may carry
   // a few grenades and, late, a rocket; a pickup of desperate men a grenade now and then, never a rocket
@@ -518,6 +529,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
   let rLeft = opts.rockets ?? (armedR && !peace && organized && daysAfter > 120 && r() < late * 0.3 ? 1 : 0);
   // (Hardcore) a crew that has learned the place brings more of it (sim/adaptive.ts; nothing at adapt 0)
   const kit = extraKit(raiders, opts.adapt ?? 0, organized);
+  if (armedR && !peace && opts.angry && organized) gLeft += 1;   // an angry organized crew comes readier
   if (armedR && !peace) { gLeft += kit.grenades; if (kit.rocket && daysAfter > 120) rLeft = Math.max(rLeft, 1); }
   // they come up from out of sight, well beyond the line (round 4: they used to start 30–34 out whatever the wall, so a wide palisade had them at it before anyone was up)
   const start = Math.max(30, Math.max(lineR, farR) + 22) + (opts.terrain === false || lane ? 0 : roadStart(s));   // up the road: single file at a bridge, a bore or a ford, they dismount further out (sim/roadFx.ts)
@@ -559,7 +571,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
     const un = units.find(u => u.id === sapper!.id); if (un) un.job = 'sapper';
   }
   { const un = units.find(u => u.id === 'r0'); if (un && !peace) un.leader = true; }
-  if (opener?.kind === 'scouts' && raiders >= 4) ev.push({ t: 0, kind: 'scout', units: ['r1', 'r2'], spotted: scoutsSeen, intel });
+  if (opener?.kind === 'scouts' && raiders >= 4) ev.push({ t: 0, kind: 'scout', units: ['r1', 'r2'], spotted: scoutsSeen, intel: crewIntel });
   const decoys = R.filter(f => f.decoy);
   const charges0 = R.reduce((a, f) => a + f.grenades + f.rockets * 2, 0);      // (what the crew carries in: sim/corridors `sapperBreach`)
   // automated turrets (towers.ts): powered, fed from the armory, nobody on them; never in F (they are not people, nobody hits back at them)
@@ -666,6 +678,24 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
     const mate = () => H.find(h => h !== f && !h.out && !h.shelter);
     if (f.hp <= 0) {
       f.dead = true; f.out = true; ev.push({ t: r2(t + 0.05), kind: 'death', unit: f.id });
+      // the human moments (sim/defenderTraits.ts): what a person says last, and who locks up at the sight of it
+      if (f.side === 'home' && f.traits && f.pid) {
+        if (mr() < 0.75) {
+          const lost = (s.losses ?? []).map(l => s.people.find(q => q.id === l.id)?.first).filter((x): x is string => !!x)[0];
+          const text = lastWords(f.traits, { first: nameOf(f), lostName: lost }, mr);
+          if (text) { say(t + 0.15, text, f); const e0 = ev[ev.length - 1]; if (e0.kind === 'say') e0.ctx = 'last_words'; moments.push({ t: r2(t + 0.15), kind: 'last_words', unit: f.id, text }); }
+        }
+        for (const o of H) {
+          if (o === f || o.out || o.shelter || o.dead || !o.traits || dist(o, f) > 9) continue;
+          const kinFell = o.traits.kin.some(k => k.unit === f.id), p0 = panicOdds(o.traits, { kinFell, allyFell: true });
+          if (mr() < p0) {
+            if (o.traits.courage === 'freezes' && mr() < 0.25) { toShelter(o, t + 0.5); ev.push({ t: r2(t + 0.6), kind: 'panic', unit: o.id, how: 'shelter', secs: 0, kin: kinFell }); moments.push({ t: r2(t + 0.6), kind: 'panic', unit: o.id }); }
+            else { const secs = freezeSecs(o.traits, mr); o.readyAt = Math.max(o.readyAt, t + secs); ev.push({ t: r2(t + 0.3), kind: 'panic', unit: o.id, how: 'freeze', secs: r2(secs), kin: kinFell }); moments.push({ t: r2(t + 0.3), kind: 'panic', unit: o.id }); }
+          } else if (kinFell && o.traits.courage !== 'freezes') {
+            o.rage = t + 15; ev.push({ t: r2(t + 0.4), kind: 'heroic', unit: o.id, act: 'avenge', for: f.id }); moments.push({ t: r2(t + 0.4), kind: 'heroic', unit: o.id });
+          }
+        }
+      }
       const m = mate();
       if (f.side === 'home' && m) say(t + 0.4, v(m, [`No! ${nameOf(f)}! NO!`, `Oh God — ${nameOf(f)}! ${nameOf(f)}, get up!`, `They shot ${nameOf(f)} — fuck, fuck, FUCK!`], [`${nameOf(f)}'s down. Keep firing.`, `Man down — ${nameOf(f)}.`]), m);
       else if (f.side === 'raider' && by?.side === 'home' && !by.machine && r() < 0.5) say(t + 0.3, v(by, ['I got one — oh God, I got one.', 'He\'s down! Holy shit, he\'s down!', 'Did I — I think I hit him!'], ['One down.', 'Got him. Next.']), by);
@@ -801,7 +831,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
     if (a.side === 'home' && a.moving) p *= 0.5;
     if (b.side === 'home' && b.post?.kind === 'tower') p *= TOWER_PARAPET;   // up a tower behind the parapet, shot at from below at a steep angle: fewer rounds find the cab
     if (sortie > 1 && a.side === 'home' && b.side === 'raider' && dist(b, C) <= lineR + 2) p *= sortie;
-    if (a.side === 'home') p *= ordFx.acc; else if (b.side === 'home' && !b.machine) p *= ordFx.hit * STAGE_COVER[stage];
+    if (a.side === 'home') p *= ordFx.acc * (a.rage !== undefined && t < a.rage ? 1.15 : 1); else if (b.side === 'home' && !b.machine) p *= ordFx.hit * STAGE_COVER[stage];
     if (a.arm.auto) p *= 1.6;
     p *= env.acc * (t >= smokeFrom ? SMOKE_ACC : 1);   // a storm on the place; smoke from what is burning (sim/raidConditions.ts)
     p *= eff(a);                                   // a wounded shooter shoots worse
@@ -961,6 +991,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
   let parleyEnd: RaidFacts['ending'] | undefined;
   const snaps: Array<{ shooter: string; victim: string }> = [];
   const spareSaid = new Set<string>();
+  const moments: NonNullable<RaidFacts['moments']> = [];
   const ammo0 = Object.values(ammo).reduce<number>((a, v) => a + (v ?? 0), 0);
   const ammoLeft = () => (ammo0 > 0 ? Object.values(ammo).reduce<number>((a, v) => a + (v ?? 0), 0) / ammo0 : 0);
   /** The family gives up the line and stands at the next place (sim/raidOrders.ts): the wall, then the cover in the yard, then the house. */
@@ -1128,7 +1159,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
       };
       for (const f of H) if (f.shelter) toShelter(f, t + Math.max(0, qDelta(f))); else { assignPost(f, t); if (!f.vet && opts.ambush === undefined) f.readyAt += 1 + r() * 3 + (f.pid ? fightNerves(s, s.people.find(q => q.id === f.pid)!).freeze : 0); if (opts.ambush === undefined && f.readyAt < Infinity) f.readyAt = Math.max(t, f.readyAt + qDelta(f)); }   // civilians freeze a moment; those who served go straight to it
       // scouts the watch saw: the family is warned and stands ready sooner
-      if (scoutsSeen) for (const f of H) if (!f.shelter && f.readyAt < Infinity) f.readyAt = Math.max(t, f.readyAt - 2);
+      if (scoutsSeen) for (const f of H) if (!f.shelter && f.readyAt < Infinity) f.readyAt = Math.max(t, f.readyAt - (prepared ? 6 : 2));
       // a diversion: half the defenders run to the noise on the wrong side (sim/raidOpeners.ts)
       if (decoyN && decoys.length) {
         const cand = H.filter(f => !f.shelter && !f.out && f.arm !== FISTS && f.post?.kind !== 'tower'), k = Math.ceil(cand.length * 0.6);
@@ -1200,9 +1231,11 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
     const down = H.find(f => f.out && !f.dead && !f.shelter && !f.rescued);
     const helpers = H.filter(f => !f.out && !f.shelter && t >= f.readyAt);
     // the medic goes; without one, whoever's closest (only if it doesn't leave the line empty)
-    const med = helpers.find(f => f.medic) ?? (down && helpers.length > 1 ? helpers.sort((a, b) => dist(a, down) - dist(b, down))[0] : undefined);
+    const hero = down ? helpers.find(f => f !== down && !f.medic && f.traits && mr() < heroOdds(f.traits, f.traits.kin.some(k => k.unit === down.id)) * 0.3) : undefined;   // a veteran or a kinsman steps in (once per second at most, 30% of the odds)
+    const med = helpers.find(f => f.medic) ?? hero ?? (down && helpers.length > 1 ? helpers.sort((a, b) => dist(a, down) - dist(b, down))[0] : undefined);
     if (alarmed && med && down && !breached && !med.medic) {
       down.rescued = true;
+      if (med === hero) { ev.push({ t: r2(t + 0.3), kind: 'heroic', unit: med.id, act: med.supp > 1 ? 'cover' : 'drag', for: down.id }); moments.push({ t: r2(t + 0.3), kind: 'heroic', unit: med.id }); }
       ev.push({ t: r2(t + 0.4), kind: 'move', unit: med.id, x: r2(down.x), z: r2(down.z) });
       say(t + 0.5, v(med, [`${nameOf(down)}!! Oh God — hold on, I'm coming! Somebody shoot!`, `I've got ${nameOf(down)} — I don't know what I'm doing — just keep them back!`], [`Cover me. Getting ${nameOf(down)}.`]), med);
       say(t + 4, v(med, [`Where's it coming from — oh God — I'm pressing, I'm pressing —`, `You're okay, you're okay — look at me — LOOK AT ME —`], [`Pressure's on. You're going to be fine.`]), med);
@@ -1231,7 +1264,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
     // a savage crew doesn't scare: they take more losses before they quit
     // the post-breach fight: a crew in the yard is winning, so it takes more to break it, but a family that holds (or counterattacks) can still beat it back out
     const upArmed = hUp.filter(h => h.arm !== FISTS).length;
-    const lossLimit = Math.max(1, raiders * (0.25 + 0.3 * org + (temper === 'savage' ? 0.2 : 0) + (breached ? 0.2 : 0)) * ordFx.morale);
+    const lossLimit = Math.max(1, raiders * (0.25 + 0.3 * org + (temper === 'savage' ? 0.2 : 0) + (breached ? 0.2 : 0) + (opts.angry ? 0.15 : 0)) * ordFx.morale);
     const leaderBreak = R[0].out && temper !== 'savage' && (!breached || losses >= Math.ceil(raiders * 0.3));
     let rallied = false;
     if (leaderBreak && !leaderRallied && !fled && org > 0.3 && mr() < 0.3 + 0.3 * org) { leaderRallied = true; rallied = true; const lt = rUp.find(f => f !== R[0]); if (lt) { ev.push({ t, kind: 'rally', unit: lt.id }); say(t + 0.3, pick(['I\'ve got them! Hold, HOLD — we\'re not leaving!', 'Stay on it! He\'s down, I\'m in charge — keep moving!']), lt); } }
@@ -1544,9 +1577,10 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
     const partial = { result: end, linePassed, beatenBack: beatenBack && (end === 'fled' || end === 'repelled'), reached, breach: bi ? { method: bi.method, where: bi.where, t: bi.t, attempts, crewHad: { truck: means.truck, satchels: means.satchels } } : attempts.length ? { method: 'climb' as const, where: target, t: -1, attempts, crewHad: { truck: means.truck, satchels: means.satchels } } : undefined, ending: parleyEnd, loot: lootList, fires: fireList, hostages, disposition };
     raid = {
       ...partial,
-      ...(opener || opts.opener ? { opener: { kind: (opener ?? opts.opener)!.kind, ...(opener?.kind === 'scouts' ? { spotted: scoutsSeen, intel } : {}), ...(ambushVictims.length ? { victims: ambushVictims } : {}), ...(decoys.length ? { decoys: decoys.map(d => d.id), pulled: pulled.map(f => f.id) } : {}) } } : {}),
+      ...(opener || opts.opener ? { opener: { kind: (opener ?? opts.opener)!.kind, ...(opener?.kind === 'scouts' ? { spotted: scoutsSeen, intel: crewIntel } : {}), ...(ambushVictims.length ? { victims: ambushVictims } : {}), ...(decoys.length ? { decoys: decoys.map(d => d.id), pulled: pulled.map(f => f.id) } : {}) } } : {}),
       crew: crewKind,
       env: { storm: env.storm, flares: flaresUsed, smoke: smokeFrom < Infinity },
+      ...(moments.length ? { moments } : {}),
       orders: orderLog, stage, temper, wallR: r2(wallR0),
       leader: { unit: 'r0', name: leaderNameOf(seed, opts.kind), down: R[0].out || R[0].dead, ...(R[0].out ? { downAt: ev.find(e => (e.kind === 'death' || e.kind === 'wound') && e.unit === 'r0')?.t } : {}) },
       snaps,
