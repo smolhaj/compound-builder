@@ -1,5 +1,6 @@
 // Deterministic raid-cutscene movie: the page's rAF is replaced by a manual pump (1/24 s of cutscene time per frame), a JPEG per frame.
-//   node scripts/raidMovie.mjs --hour 2.25 --out /tmp/claude-0/movie/night [--max N] [--quality high]
+//   node scripts/raidMovie.mjs --hour 2.25 --out /tmp/claude-0/movie/night [--max N] [--quality high] [--day N] [--fps 10] [--mp4 night.mp4]
+//   --day N stages that encounter day (default: the first day whose siege has 4+ scenes with fires); --mp4 encodes 24 fps H.264 (crf 30, faststart) at the end
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -12,7 +13,7 @@ const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] :
 const port = Number(opt('--port', 5971)), hour0 = Number(opt('--hour', 2.25)), maxF = Number(opt('--max', 100000));
 const quality = opt('--quality', null), outDir = resolve(opt('--out', '/tmp/claude-0/movie/night'));
 const FPS = Number(opt('--fps', 12));
-const afterSecs = Number(opt('--after', 4));
+const afterSecs = Number(opt('--after', 4)), wantDay = Number(opt('--day', 0));
 mkdirSync(outDir, { recursive: true });
 const vite = spawn('node', ['node_modules/vite/bin/vite.js', '--config', 'scripts/vite.shots.config.ts', '--port', String(port), '--strictPort'], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise((ok, fail) => { vite.stdout.on('data', d => { if (/localhost:\d+/.test(String(d).replace(/\x1b\[[0-9;]*m/g, ''))) ok(); }); vite.on('exit', c => fail(new Error('vite exited ' + c))); });
@@ -33,7 +34,7 @@ try {
   if (quality) await page.evaluate(q => window.__cb.store.getState().setQuality(q), quality);
   console.log('quality', await page.evaluate(() => window.__cb.store.getState().quality));
   const frames = async (k) => { const f0 = await page.evaluate(() => window.__cb.qa.frames); await page.waitForFunction(x => window.__cb.qa.frames >= x, f0 + k, { polling: 200 }); };
-  const info = await page.evaluate(async (hour0) => {
+  const info = await page.evaluate(async ([hour0, wantDay]) => {
     const cb = window.__cb, G = cb.game, c = cb.world.camp;
     const { planSiege } = await import('/src/sim/siege.ts');
     const sp = cb.tool.findSpot('timber_cabin', c.x, c.z, 0);
@@ -48,15 +49,15 @@ try {
     g.disaster.tracks = { ...g.disaster.tracks, law: 0, stores: 0, deliveries: 0, banks: 0 };
     g.stock.canned = 20; g.stock.meds = 3; g.stock.sandbags = 3; g.stock.dog = 1; g.armory.ammo['556'] = 2000;
     for (const [i, p] of g.people.entries()) if (!p.kid || p.age >= 15) { g.armory.guns.push({ id: `g${i}`, model: 'sw_mp15', condition: 1, fired: 0, where: 'house', carrier: p.id }); g.armory.skill[p.id] = 5; }
-    let ed = 0;
-    for (let d = 1; d < 3000; d++) {
+    let ed = wantDay;
+    for (let d = 1; d < 3000 && !ed; d++) {
       const p = planSiege({ kind: 'gang', size: 10, temper: 'hard', hour: hour0, seed: g.seed * 131 + d * 7 + 1, fought: true, fightSeconds: 90 });
       if (p.scenes.length >= 4 && p.scenes.some(sc => sc.kind === 'fires')) { ed = d; break; }
     }
     g.gate.pending = { id: 'e9', kind: 'gang', day: ed, title: 'An armed crew', dossier: ["10 of them, organized, rifles. They've been working the farms east of town.", 'They know what they want, and they think you have it.'], size: 10, armed: true, strength: 120, wants: { canned: 8, fuel: 4 }, stances: ['hide', 'parley', 'defend', 'trade'], temper: 'hard' };
     G.getState().load(g);
     return { day: ed };
-  }, hour0);
+  }, [hour0, wantDay]);
   console.log(JSON.stringify(info));
   await frames(10);
   await page.waitForTimeout(3500);
@@ -100,5 +101,10 @@ try {
     else if (st.phase !== 'playing' && st.phase !== 'prompt') { console.log('phase', st.phase); if (++tAfter > 2 * FPS) break; }
   }
   writeFileSync(`${outDir}/log.json`, JSON.stringify(log));
+  const mp4 = opt('--mp4', null);
+  if (mp4) {
+    await new Promise((ok, fail) => spawn('ffmpeg', ['-y', '-loglevel', 'error', '-framerate', String(FPS), '-i', `${outDir}/f%05d.jpg`, '-r', '24', '-c:v', 'libx264', '-crf', '30', '-preset', 'medium', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', mp4], { stdio: 'inherit' }).on('exit', c => (c === 0 ? ok() : fail(new Error('ffmpeg ' + c)))));
+    console.log('wrote', mp4);
+  }
   console.log('done frames', n, 'secs', (n / FPS).toFixed(1), 'wall min', ((Date.now() - t0) / 60000).toFixed(1));
 } finally { await browser.close(); vite.kill(); setTimeout(() => process.exit(0), 200); }
