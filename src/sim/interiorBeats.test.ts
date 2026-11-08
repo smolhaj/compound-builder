@@ -128,7 +128,7 @@ describe('mercy by crew temper (fixture data behind the MercyData interface)', (
       const m = play('families', seed, { mercy: { temper: 'merciful' } as MercyData }).out;
       expect(m.events.filter(e => e.kind === 'death' && ['h_k', 'h_k2', 'h_k3'].includes(e.unit)).length, `merciful s${seed}`).toBe(0);
       const h = play('crew', seed, { mercy: { temper: 'hostile', captiveChance: 0.5 } as MercyData });
-      const dead = h.out.events.filter(e => e.kind === 'death' && ['h_k', 'h_k2', 'h_k3'].includes(e.unit)), cap = kinds(h.out, 'captive');
+      const dead = h.out.events.filter(e => e.kind === 'death' && ['h_k', 'h_k2', 'h_k3'].includes(e.unit)), cap = kinds(h.out, 'hostage');
       expect(dead.length + cap.length, `hostile s${seed}`).toBe(3);
       expect(cap.length).toBeLessThanOrEqual(1);
       // each killing is a hit round first (the same blood and fall as any other death)
@@ -142,28 +142,28 @@ describe('endings: hostages, loot, fire, and a deal', () => {
   const ending = (a: Aftermath, style: 'crew' | 'crowd' | 'families' = 'crew') => play(style, 2, { aftermath: a });
   it('hostages are led off with the crew (and the sim\'s own "taken" does not make them run away alone)', () => {
     const { out, clips } = ending({ captives: ['h_a'] });
-    const cap = kinds(out, 'captive');
+    const cap = kinds(out, 'hostage');
     expect(cap.some(e => (e as { unit: string }).unit === 'h_a')).toBe(true);
     expect(clips).toBe(0);
   });
   it('specific items are carried off, named in the words', () => {
     const { out } = ending({ loot: ['fuel', 'food', 'meds'] });
     const loot = kinds(out, 'loot');
-    expect(loot.map(e => (e as { item: string }).item)).toEqual(['fuel', 'food', 'meds']);
+    expect(loot.map(e => (e as { what: string }).what)).toEqual(['fuel', 'food', 'meds']);
     expect(out.events.some(e => e.kind === 'say' && e.ctx === 'loot_item' && /fuel|food|meds/.test(e.text))).toBe(true);
   });
   it('a hostile crew sets a fire as it leaves', () => {
     const { out } = ending({ arson: 'both' });
-    expect(kinds(out, 'arson').length).toBe(2);
+    expect(kinds(out, 'fire').length).toBe(2);
     expect(out.events.some(e => e.kind === 'say' && e.ctx === 'arson')).toBe(true);
   });
   it('a negotiated end: tribute handed over (or passage given), nobody laid out or held at gunpoint', () => {
     const { out, clips } = ending({ terms: { kind: 'tribute', item: 'fuel' } });
-    expect(kinds(out, 'terms').length).toBe(1);
+    expect(kinds(out, 'parley').length).toBe(1);
     expect(kinds(out, 'surrender').filter(e => e.t > 60).length).toBe(0);
     expect(out.events.some(e => e.kind === 'say' && e.ctx === 'tribute')).toBe(true);
     const p = ending({ terms: { kind: 'passage' } }).out;
-    expect(kinds(p, 'terms')[0]).toMatchObject({ what: 'passage' });
+    expect(kinds(p, 'parley')[0]).toMatchObject({ offer: 'passage' });
     expect(clips).toBe(0);
   });
   it('every ending still clips nothing', () => {

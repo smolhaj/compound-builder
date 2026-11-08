@@ -87,7 +87,8 @@ describe('line of fire in the fight', () => {
       }
     }
     expect(total).toBeGreaterThan(0);
-    expect(climbers / total).toBeGreaterThan(0.6);
+    // (the line is now the drawn wall itself, not the radius of its farthest corner: the crew comes up to the wall, so more of the fight is at the foot of it)
+    expect(climbers / total).toBeGreaterThan(0.35);
   });
   it('raiders look for a line instead of shooting a wall: they sidestep along it', () => {
     let moved = 0;
@@ -151,7 +152,7 @@ describe('a breach ends with a fate for every defender on the ground', () => {
     };
     const sv = tally('savage', 'gang'), ds = tally('desperate', 'looters');
     expect((sv.killed ?? 0) + (sv.finished ?? 0)).toBeGreaterThan((ds.killed ?? 0) + (ds.finished ?? 0));
-    expect((ds.held ?? 0) + (ds.fled ?? 0)).toBeGreaterThan(((sv.held ?? 0) + (sv.fled ?? 0)) * 0.6);
+    expect((ds.held ?? 0) + (ds.fled ?? 0) + (ds.spared ?? 0)).toBeGreaterThan(((sv.held ?? 0) + (sv.fled ?? 0) + (sv.spared ?? 0)) * 0.6);   // (a merciful crew spares the unarmed and the children rather than holding them)
     expect(ds.taken ?? 0).toBe(0);
   });
 });

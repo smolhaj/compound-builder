@@ -57,7 +57,7 @@ export interface WalkOpts {
   /** Called after every step for every unit that moved: previous and new position. */
   onStep?: (id: string, t: number, a: Pt, b: Pt) => void;
 }
-export interface WalkResult { events: BattleEvent[]; units: Battle['units']; /** Legs that had no way through (left straight). */ unrouted: number; /** Units that started inside something solid (moved to the nearest free spot when routing). */ nudged: string[] }
+export interface WalkResult { events: BattleEvent[]; units: Battle['units']; /** Legs that had no way through (left straight). */ unrouted: number; /** Which ones (for the tests' messages). */ lost: Array<{ unit: string; t: number; from: Pt; to: Pt }>; /** Units that started inside something solid (moved to the nearest free spot when routing). */ nudged: string[] }
 
 // ─── search ──────────────────────────────────────────────────────────────
 
@@ -85,6 +85,20 @@ export function nearestFree(w: NavWorld, x: number, z: number, t: number, r = 1.
 
 /** A path from a to b through the open ground at time t, as waypoints (b last), or null. */
 export function findPath(w: NavWorld, a: Pt, b: Pt, t: number, speed = RUN): Pt[] | null {
+  const r = findPathCore(w, a, b, t, speed);
+  if (r) return r;
+  // a start or a goal pressed into a corner: step to a nearby open spot (a clear line away) and search from there
+  for (const d of [0.08, 0.15, 0.25, 0.4]) for (let k = 0; k < 8; k++) {
+    const dx = Math.cos(k * 0.785) * d, dz = Math.sin(k * 0.785) * d;
+    const a2 = { x: a.x + dx, z: a.z + dz };
+    if (!blockedAt(w, a2.x, a2.z, t) && lineClear(w, a, a2, t, speed)) { const r2 = findPathCore(w, a2, b, t, speed); if (r2) return [a2, ...r2]; }
+    const b2 = { x: b.x + dx, z: b.z + dz };
+    if (!blockedAt(w, b2.x, b2.z, t) && lineClear(w, b2, b, t, speed)) { const r2 = findPathCore(w, a, b2, t, speed); if (r2) return [...r2, b]; }
+  }
+  return null;
+}
+
+function findPathCore(w: NavWorld, a: Pt, b: Pt, t: number, speed: number): Pt[] | null {
   if (lineClear(w, a, b, t, speed)) return [b];
   for (const pad of [3, 8, 24]) {
     const x0 = Math.min(a.x, b.x) - pad, x1 = Math.max(a.x, b.x) + pad, z0 = Math.min(a.z, b.z) - pad, z1 = Math.max(a.z, b.z) + pad;
@@ -94,13 +108,12 @@ export function findPath(w: NavWorld, a: Pt, b: Pt, t: number, speed = RUN): Pt[
     const idx = (i: number, j: number) => j * nx + i;
     const gi = (v: number) => Math.min(nx - 1, Math.max(0, Math.floor((v - x0) / cell)));
     const gj = (v: number) => Math.min(nz - 1, Math.max(0, Math.floor((v - z0) / cell)));
-    const si = gi(a.x), sj = gj(a.z), ti = gi(b.x), tj = gj(b.z);
+    let si = gi(a.x), sj = gj(a.z), ti = gi(b.x), tj = gj(b.z);
+    let s = idx(si, sj), goal = idx(ti, tj);
     const g = new Float32Array(nx * nz).fill(Infinity), from = new Int32Array(nx * nz).fill(-1), closed = new Uint8Array(nx * nz);
     const heap: Array<[number, number]> = [];   // [f, node]
     const push = (f: number, n: number) => { heap.push([f, n]); let i = heap.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (heap[p][0] <= heap[i][0]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p; } };
     const pop = (): [number, number] => { const top = heap[0], last = heap.pop()!; if (heap.length) { heap[0] = last; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let m = i; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; i = m; } } return top; };
-    const s = idx(si, sj), goal = idx(ti, tj);
-    g[s] = 0; push(Math.hypot(cx(ti) - cx(si), cz(tj) - cz(sj)), s);
     const memo = new Map<number, boolean>();
     const free = (i: number, j: number, te: number) => {
       // (the start and goal cells are always allowed: the caller has already put both on open ground)
@@ -114,6 +127,27 @@ export function findPath(w: NavWorld, a: Pt, b: Pt, t: number, speed = RUN): Pt[
       for (const c of w.carves) if (te >= c.from + SLACK && inRect(c, cx(i), cz(j))) return true;
       return false;
     };
+    // (a start or goal tight against a corner can sit in a grid cell whose neighbours are all solid: snap it to the nearest open cell with a clear straight line)
+    const snapped: { a: Pt | null; b: Pt | null } = { a: null, b: null };
+    const snap = (p: Pt, i0: number, j0: number): { i: number; j: number; p: Pt } | null => {
+      const open = (i: number, j: number) => { if (i < 0 || j < 0 || i >= nx || j >= nz) return false; const st2 = w.solid(cx(i), cz(j)); return !st2 || w.carves.some(c => t >= c.from + SLACK && inRect(c, cx(i), cz(j))); };
+      for (let r = 0; r <= 8; r++) for (let dj = -r; dj <= r; dj++) for (let di = -r; di <= r; di++) {
+        if (Math.max(Math.abs(di), Math.abs(dj)) !== r) continue;
+        const i = i0 + di, j = j0 + dj;
+        if (!open(i, j)) continue;
+        // it must have an open neighbour (not itself a pocket) and a clear line from the point
+        let nb = 0; for (let dj2 = -1; dj2 <= 1; dj2++) for (let di2 = -1; di2 <= 1; di2++) if ((di2 || dj2) && open(i + di2, j + dj2)) nb++;
+        if (nb < 3) continue;
+        const q = { x: cx(i), z: cz(j) };
+        if (lineClear(w, p, q, t, speed)) return { i, j, p: q };
+      }
+      return null;
+    };
+    const stuck = (i: number, j: number) => { let n = 0; for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) { if (!di && !dj) continue; const ni = i + di, nj = j + dj; if (ni >= 0 && nj >= 0 && ni < nx && nj < nz && free(ni, nj, t)) n++; } return n < 3; };
+    if (stuck(si, sj) || !lineClear(w, a, { x: cx(si), z: cz(sj) }, t, speed)) { const q = snap(a, si, sj); if (q) { si = q.i; sj = q.j; snapped.a = q.p; } }
+    if (stuck(ti, tj) || !lineClear(w, { x: cx(ti), z: cz(tj) }, b, t, speed)) { const q = snap(b, ti, tj); if (q) { ti = q.i; tj = q.j; snapped.b = q.p; } }
+    s = idx(si, sj); goal = idx(ti, tj);
+    g.fill(Infinity); heap.length = 0; g[s] = 0; push(Math.hypot(cx(ti) - cx(si), cz(tj) - cz(sj)), s);
     let found = false;
     while (heap.length) {
       const [, n] = pop();
@@ -137,7 +171,9 @@ export function findPath(w: NavWorld, a: Pt, b: Pt, t: number, speed = RUN): Pt[
     const raw: Pt[] = [];
     for (let n = goal; n >= 0; n = from[n]) raw.push({ x: cx(n % nx), z: cz(Math.floor(n / nx)) });
     raw.reverse();
-    raw[0] = a; raw[raw.length - 1] = b;
+    raw[0] = snapped.a ?? a; raw[raw.length - 1] = snapped.b ?? b;
+    if (snapped.a) raw.unshift(a);
+    if (snapped.b) raw.push(b);
     // string-pull: from each anchor, the farthest point with a clear line
     const out: Pt[] = [];
     let anchor = a, tt = t, k = 0;
@@ -181,13 +217,14 @@ export function walkBattle(b: Battle, w: NavWorld, o: WalkOpts): WalkResult {
   });
   const out: BattleEvent[] = [];
   let unrouted = 0;
+  const lost: WalkResult['lost'] = [];
   const events = b.events;
   let cur = 0;
   const end = b.duration + 1;
   const side = new Map(b.units.map(u => [u.id, u.side]));
 
   /** Send a unit toward (x, z): straight when that is clear, else through the openings. */
-  const lifts: Array<{ e: Extract<BattleEvent, { kind: 'lift' | 'captive' }>; v: K; c: K; until: number }> = [];
+  const lifts: Array<{ e: Extract<BattleEvent, { kind: 'lift' | 'hostage' }>; v: K; c: K; until: number }> = [];
   const pending: Array<{ at: number; k: K; x: number; z: number; kind: 'move' | 'cover' | 'hide'; walk?: boolean; y?: number; how?: string }> = [];
   const issue = (k: K, t: number, x: number, z: number, kind: 'move' | 'cover' | 'hide', walk: boolean | undefined, y?: number, how?: string) => {
     k.queue = []; k.heldFor = undefined;
@@ -211,7 +248,7 @@ export function walkBattle(b: Battle, w: NavWorld, o: WalkOpts): WalkResult {
         return;
       }
     }
-    if (!path) { unrouted++; k.tx = goal.x; k.tz = goal.z; out.push({ t: r2(t), kind, unit: k.id, x: r2(goal.x), z: r2(goal.z), ...(walk ? { walk: true } : {}), ...(y ? { y } : {}), ...(how ? { how } : {}) } as BattleEvent); return; }
+    if (!path) { unrouted++; lost.push({ unit: k.id, t: r2(t), from: { x: r2(k.x), z: r2(k.z) }, to: { x: r2(goal.x), z: r2(goal.z) } }); k.tx = goal.x; k.tz = goal.z; out.push({ t: r2(t), kind, unit: k.id, x: r2(goal.x), z: r2(goal.z), ...(walk ? { walk: true } : {}), ...(y ? { y } : {}), ...(how ? { how } : {}) } as BattleEvent); return; }
     // (a first leg that the clock says is shut right now - a breach not yet open - waits where the unit stands, and goes when it clears)
     if (shutNow(w, here, path[0], t, speed)) {
       k.tx = k.x; k.tz = k.z;
@@ -263,7 +300,7 @@ export function walkBattle(b: Battle, w: NavWorld, o: WalkOpts): WalkResult {
         }
         case 'death': if (k) { k.dead = true; k.queue = []; } out.push(e); break;
         case 'lay': case 'surrender': if (k) { k.tx = k.x; k.tz = k.z; k.queue = []; if (e.kind === 'lay') k.frozen = true; } out.push(e); break;
-        case 'captive': {
+        case 'hostage': {
           const c = ks.get(e.by), v = ks.get(e.unit);
           if (!v || !c) { out.push(e); break; }
           // (the captor walks to the captive first; being led off snaps nobody through a wall)
@@ -327,13 +364,13 @@ export function walkBattle(b: Battle, w: NavWorld, o: WalkOpts): WalkResult {
   }
   void side;
   out.sort((p, q) => p.t - q.t);
-  return { events: out, units, unrouted, nudged };
+  return { events: out, units, unrouted, lost, nudged };
 }
 
 /** Rewrite a battle so that every leg goes through openings. */
-export function routeBattle(b: Battle, w: NavWorld, center?: Pt): { battle: Battle; unrouted: number; nudged: string[] } {
+export function routeBattle(b: Battle, w: NavWorld, center?: Pt): { battle: Battle; unrouted: number; lost: WalkResult['lost']; nudged: string[] } {
   const r = walkBattle(b, w, { route: true, center });
-  return { battle: { ...b, units: r.units, events: r.events }, unrouted: r.unrouted, nudged: r.nudged };
+  return { battle: { ...b, units: r.units, events: r.events }, unrouted: r.unrouted, lost: r.lost, nudged: r.nudged };
 }
 
 /** Every step in a battle's replay that goes through something solid. */

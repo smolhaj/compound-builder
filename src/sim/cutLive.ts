@@ -25,6 +25,13 @@ export function navFor(b: Battle, solid: (x: number, z: number) => boolean, pad 
   if (closedFrom !== null && last) barriers.push({ id: `door${barriers.length}`, ...rect(last), from: closedFrom, openAt: Infinity });
   // the opening is only as wide as the gap the picture draws (w along the wall), and a little deeper than the wall is thick; the wall's direction is across the breach's "out" vector
   const out = b.invasion?.breach;
+  // a wall the crew climbed (no truck, no blast, no drawn gap): the spot they go over is an opening from the moment the sim's breach lands
+  const climb = b.raid?.breach;
+  if (climb && climb.method === 'climb' && !b.events.some(e => e.kind === 'gap')) {
+    const spot = climb.where as ({ x?: number; z?: number; w: number } | null), br = b.events.find(e => e.kind === 'breach') as { t: number; x: number; z: number } | undefined;
+    const cx = spot?.x ?? br?.x, cz = spot?.z ?? br?.z;
+    if (cx !== undefined && cz !== undefined) { const h = 0.6 - pad; carves.push({ x0: cx - h - 0.3, x1: cx + h + 0.3, z0: cz - h - 0.3, z1: cz + h + 0.3, from: (br?.t ?? climb.t) - 1.5 }); }
+  }
   for (const e of b.events) if (e.kind === 'gap') {
     const along = Math.max(0.06, e.w / 2 - 0.04 - pad), across = 0.32, acrossX = out ? Math.abs(out.ox) > Math.abs(out.oz) : null;
     if (acrossX === null) carves.push({ x0: e.x - along, x1: e.x + along, z0: e.z - along, z1: e.z + along, from: e.t });
@@ -35,11 +42,11 @@ export function navFor(b: Battle, solid: (x: number, z: number) => boolean, pad 
 }
 
 /** Route a whole staged scene. Anything that goes wrong leaves the scene as it was (a cutscene must never take the game down). */
-export function routeScene(b: Battle, solid: (x: number, z: number) => boolean, center?: Pt): { battle: Battle; unrouted: number; nudged: string[]; ok: boolean } {
+export function routeScene(b: Battle, solid: (x: number, z: number) => boolean, center?: Pt): { battle: Battle; unrouted: number; lost: Array<{ unit: string; t: number; from: Pt; to: Pt }>; nudged: string[]; ok: boolean } {
   try {
     const r = routeBattle(b, navFor(b, solid, 0.06), center);
     return { ...r, ok: true };
   } catch {
-    return { battle: b, unrouted: 0, nudged: [], ok: false };
+    return { battle: b, unrouted: 0, lost: [], nudged: [], ok: false };
   }
 }

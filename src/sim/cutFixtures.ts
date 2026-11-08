@@ -76,7 +76,7 @@ export function prepared(b: Battle, g: GameState, seed: number): Battle {
     out = planHouseAssault(out, { box: HOUSE, blocked: solid, seed, dir, nameOf: id => id });
   }
   const r = routeScene(out, solid);
-  if (!r.ok || r.unrouted) throw new Error(`routing failed: ok ${r.ok}, unrouted ${r.unrouted}`);
+  if (!r.ok || r.unrouted) throw new Error(`routing failed: ok ${r.ok}, unrouted ${r.unrouted} ${JSON.stringify(r.lost.slice(0, 3))}`);
   return r.battle;
 }
 

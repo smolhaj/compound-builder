@@ -19,6 +19,8 @@ const MAX_PACKS = 12, MAX_FIRES = 4;
 const DOOR_W = 0.17, DOOR_H = 0.37;
 /** What a pack looks like by item (colors only: one box shape). */
 const ITEM_COLOR: Record<string, number> = { food: 0x8a6a3a, canned: 0x7a5a2c, fuel: 0xa8321e, meds: 0xd9d9d0, ammo: 0x3d4a2a, tools: 0x555a60, guns: 0x222426, radio: 0x2c3a44, bedding: 0x6a5a7a, default: 0x6a5238 };
+/** The pack color for what the sim says was taken ("3 cans of fuel", "canned food", ...). */
+export const lootKind = (what: string): string => /fuel|gas|diesel/i.test(what) ? 'fuel' : /med|first aid|ifak/i.test(what) ? 'meds' : /ammo|round/i.test(what) ? 'ammo' : /gun|rifle|weapon/i.test(what) ? 'guns' : /tool/i.test(what) ? 'tools' : /radio/i.test(what) ? 'radio' : /food|can|flour|rice|meat|egg|bean|stap/i.test(what) ? 'food' : 'default';
 export const itemColor = (item: string): number => ITEM_COLOR[item] ?? ITEM_COLOR.default;
 
 interface Door { pivot: THREE.Group; leaf: THREE.Mesh; nx: number; nz: number; open: number; target: number; speed: number; shudder: number }
@@ -54,10 +56,10 @@ export class SceneProps {
   onEvent(e: BattleEvent): void {
     if (e.kind === 'house_door') this._doorEvent(e);
     else if (e.kind === 'loot') {
-      if (this._packOf.length < MAX_PACKS && !this._packOf.some(p => p.unit === e.unit)) this._packOf.push({ unit: e.unit, color: itemColor(e.item) });
+      if (this._packOf.length < MAX_PACKS && !this._packOf.some(p => p.unit === e.by)) this._packOf.push({ unit: e.by, color: itemColor(lootKind(e.what)) });
       this._ensurePacks();
-    } else if (e.kind === 'arson') {
-      if (this._fires.length < MAX_FIRES) this._fires.push({ x: e.x, z: e.z, big: !!e.big, age: 0, acc: 0 });
+    } else if (e.kind === 'fire') {
+      if (this._fires.length < MAX_FIRES) this._fires.push({ x: e.x, z: e.z, big: true, age: 0, acc: 0 });
     }
   }
 

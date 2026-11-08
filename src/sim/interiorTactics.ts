@@ -31,7 +31,7 @@ export interface InteriorArgs {
   pos: ReadonlyMap<string, Pt>;
   /** Sim wounds on the family (first time) and on the crew; the sim's kills with their times (events kept where they are). */
   hurtT: ReadonlyMap<string, number>; wounds: ReadonlyArray<Extract<BattleEvent, { kind: 'wound' }>>; deaths: ReadonlyMap<string, number>; takenIds: ReadonlySet<string>;
-  style?: CrewStyle; mercy: MercyData; /** The battle carries its own mercy data (a fixture, or the sim later): fates not in the sim's events follow it. */ explicitMercy?: boolean; seed: number; rng: () => number;
+  style?: CrewStyle; mercy: MercyData; /** The battle carries its own mercy data (a fixture, or the sim later): fates not in the sim's events follow it. */ explicitMercy?: boolean; /** Units the sim already led off (its own `hostage` events): the scene adds none. */ realHostage?: ReadonlySet<string>; seed: number; rng: () => number;
   say: (t: number, role: 'raider' | 'defender', c: Ctx, who?: BattleUnit, vars?: Record<string, string>) => void;
   nameOf: (id: string) => string | undefined;
   ev: BattleEvent[];
@@ -285,14 +285,14 @@ export function planInterior(a: InteriorArgs): InteriorOut | null {
       say(tk + 1.0, 'defender', 'kill', fighters[0] ?? h.u);
     } else if (a.takenIds.has(h.u.id) || fate.get(h.u.id) === 'captured') {
       const tc = prevStageEnd - 3;
-      ev.push({ t: r2(tc), kind: 'captive', unit: h.u.id, by: searcher.id });
+      if (!a.realHostage?.has(h.u.id)) ev.push({ t: r2(tc), kind: 'hostage', unit: h.u.id, by: searcher.id });
       say(tc + 0.4, 'raider', 'captive', searcher);
       say(tc + 1.2, 'defender', 'captive', fighters[0] ?? h.u);
       dragged.push(h.u.id);
     }
   }
   for (const f of fighters) {
-    if (a.takenIds.has(f.id) && !dragged.includes(f.id)) { dragged.push(f.id); ev.push({ t: r2(prevStageEnd - 2.5), kind: 'captive', unit: f.id, by: insideCrew[0].id }); say(prevStageEnd - 2.1, 'raider', 'captive', insideCrew[0]); }
+    if (a.takenIds.has(f.id) && !dragged.includes(f.id)) { dragged.push(f.id); if (!a.realHostage?.has(f.id)) ev.push({ t: r2(prevStageEnd - 2.5), kind: 'hostage', unit: f.id, by: insideCrew[0].id }); say(prevStageEnd - 2.1, 'raider', 'captive', insideCrew[0]); }
   }
   return { strip, doneAt: prevStageEnd, captives: dragged, insideCrew, rooms: m };
 }

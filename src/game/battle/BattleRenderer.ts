@@ -481,7 +481,8 @@ export class BattleRenderer {
       case 'freeze': { const u = U_(e.unit); if (u && !u.dead) { u.tx = u.x; u.tz = u.z; u.hands = true; u.crouch = false; } break; }
       case 'shield': { const u = U_(e.unit), o = U_(e.over); if (u && o && !u.dead) { u.crouch = true; o.crouch = true; u.rot = Math.atan2(o.x - u.x, o.z - u.z); } break; }   // (the planner walks the shielder to a free spot beside the other)
       case 'found': { const u = U_(e.unit); if (u && !u.dead) { u.hidden = false; u.hideHow = undefined; u.hands = true; u.crouch = false; u.tx = u.x; u.tz = u.z; } break; }
-      case 'captive': { const u = U_(e.unit); if (u && !u.dead) { u.ledBy = e.by; u.hands = true; u.crouch = false; } break; }
+      case 'hostage': { const u = U_(e.unit); if (u && !u.dead) { u.ledBy = e.by; u.hands = true; u.crouch = false; u.hidden = false; u.hideHow = undefined; } break; }
+      case 'spare': { const u = U_(e.unit); if (u && !u.dead) { u.hidden = false; u.hideHow = undefined; u.hands = true; u.crouch = false; u.tx = u.x; u.tz = u.z; } break; }
       case 'lift': { const v = U_(e.unit), c = U_(e.by); if (v && c) { v.carriedBy = c.def.id; v.crouch = false; } break; }
       case 'lower': { const v = U_(e.unit); if (v?.carriedBy) { const c = U_(v.carriedBy); if (c) { v.x = v.tx = c.x + Math.sin(c.rot) * 0.1; v.z = v.tz = c.z + Math.cos(c.rot) * 0.1; v.rot = c.rot + Math.PI / 2; } v.carriedBy = undefined; if (!v.dead) v.crouch = true; } break; }
       case 'shot': {
@@ -537,7 +538,7 @@ export class BattleRenderer {
         break;
       }
       case 'ram': case 'charge': case 'gap': this.invasion.onEvent(e); break;
-      case 'house_door': case 'loot': case 'arson': this.props.onEvent(e); break;
+      case 'house_door': case 'loot': case 'fire': this.props.onEvent(e); break;
       case 'breach': this._boom(e.x, this._ground(e.x, e.z), e.z, 0.5, true); break;
       case 'door': this.onDoor?.(e.open, e.x, e.z, e.what); break;      // the crew at the tunnel's steel door: shut while they work at it, forced when they are through
       case 'fallback': this.shake = Math.max(this.shake, 0.15); break;

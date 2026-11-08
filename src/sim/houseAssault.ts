@@ -142,7 +142,8 @@ function positionsAt(b: Battle, t: number): Pos {
 export function planHouseAssault(b: Battle, ctx: AssaultCtx): Battle {
   const br = b.events.find(e => e.kind === 'breach') as Extract<BattleEvent, { kind: 'breach' }> | undefined;
   const end = b.events.find(e => e.kind === 'end') as Extract<BattleEvent, { kind: 'end' }> | undefined;
-  if (!br || !end || !b.invasion || b.invasion.interior) return b;
+  const inv0 = b.invasion ?? (b.raid && (end?.result === 'breached' || end?.result === 'overrun') ? { method: 'climb' as const } : undefined);
+  if (!br || !end || !inv0 || inv0.interior) return b;
   const r = mulberry32(ctx.seed * 6007 + 19), dir = ctx.dir ?? new LineDirector(ctx.seed);
   dir.noteAll(b);   // (what the scene already said counts as said)
   const tb = br.t, tI = tb + 9;
@@ -170,15 +171,17 @@ export function planHouseAssault(b: Battle, ctx: AssaultCtx): Battle {
   };
   const near = (p: { x: number; z: number }, list: readonly BattleUnit[]) => [...list].sort((a, c) => Math.hypot(pos.get(a.id)!.x - p.x, pos.get(a.id)!.z - p.z) - Math.hypot(pos.get(c.id)!.x - p.x, pos.get(c.id)!.z - p.z));
   const strip = new Set<string>();   // units whose sim moves after tI are replaced
-  let meta = { ...b.invasion };
+  let meta = { ...inv0 };
 
   /**
    * How the invasion ends (the same reading as sim/raidEnding.ts: the crew won the line): the raiders the sim wounded lie where they fell, the defenders still
    * on their feet are held with their hands up while the crew takes what it can carry, and then the crew goes out through the gap, the way it came.
    * Nobody is left standing in a cluster.
    */
-  const after = b.aftermath;
-  const temper = b.mercy?.temper ?? styleMercy(style).temper;
+  const temper = b.mercy?.temper ?? b.raid?.disposition ?? styleMercy(style).temper;
+  /** The sim wrote the ending beats itself (loot, fires, hostages, the parley: save v87): the scene only places people for them and never adds its own. */
+  const real = !!b.raid;
+  const after: typeof b.aftermath = real ? { captives: b.raid!.hostages.map(h => h.unit), ...(b.raid!.ending && (b.raid!.ending.kind === 'tribute' || b.raid!.ending.kind === 'passage') ? { terms: { kind: b.raid!.ending.kind, ...(b.raid!.ending.what ? { item: b.raid!.ending.what } : {}) } } : {}) } : b.aftermath;
   const captiveIds = new Set<string>();
   function routOut(t0: number, l: Layout | null, crew: readonly BattleUnit[]): void {
     const live = raiders.filter(u => !dead.has(u.id));
@@ -204,10 +207,10 @@ export function planHouseAssault(b: Battle, ctx: AssaultCtx): Battle {
       if (payer && taker) {
         const item = terms.item ?? 'food';
         ev.push({ t: r2(t0 - 1), kind: 'move', unit: payer.id, x: r2(l ? l.out.x : gap.x), z: r2(l ? l.out.z : gap.z) });
-        ev.push({ t: r2(t0 + 1), kind: 'terms', what: terms.kind, from: payer.id, to: taker.id, ...(terms.kind === 'tribute' ? { item } : {}) });
+        if (!real) ev.push({ t: r2(t0 + 1), kind: 'parley', offer: terms.kind, accepted: true, what: item });
         say(t0 + 1.2, 'defender', terms.kind, payer, { item });
         say(t0 + 2.6, 'raider', terms.kind, taker, { item });
-        if (terms.kind === 'tribute') ev.push({ t: r2(t0 + 2.2), kind: 'loot', unit: taker.id, item });
+        
       }
     } else {
       adults.filter(u => !hurtT.has(u.id) && !captiveIds.has(u.id)).forEach((u, i) => { ev.push({ t: r2(t0 - 2 + i * 0.5), kind: 'surrender', unit: u.id }); strip.add(u.id); });
@@ -216,7 +219,7 @@ export function planHouseAssault(b: Battle, ctx: AssaultCtx): Battle {
       // what the crew carries off (the sim's list, a named thing each), and the fire a hostile crew leaves
       (after?.loot ?? []).slice(0, 6).forEach((item, i) => {
         const who = rest[i % Math.max(1, rest.length)]; if (!who) return;
-        ev.push({ t: r2(t0 + 1.2 + i * 0.5), kind: 'loot', unit: who.id, item });
+        if (!real) ev.push({ t: r2(t0 + 1.2 + i * 0.5), kind: 'loot', by: who.id, what: item, n: 1, from: 'house' });
         if (i < 3) { say(t0 + 1.4 + i * 0.5, 'raider', 'loot_item', who, { item }); if (held && i === 0) say(t0 + 2.0, 'defender', 'loot_item', held, { item }); }
       });
       if (after?.arson) {
@@ -224,7 +227,7 @@ export function planHouseAssault(b: Battle, ctx: AssaultCtx): Battle {
         const spots: Array<{ x: number; z: number; big: boolean }> = [];
         if (after.arson === 'house' || after.arson === 'both') spots.push({ x: ctx.box.x0 + (ctx.box.x1 - ctx.box.x0) * 0.3, z: ctx.box.z1 + 0.05, big: true });
         if (after.arson === 'barn' || after.arson === 'both') spots.push({ x: hx + (ctx.box.x1 - ctx.box.x0) * 1.4, z: hz, big: true });
-        spots.forEach((p, i) => ev.push({ t: r2(t0 + 2.6 + i * 0.8), kind: 'arson', x: r2(p.x), z: r2(p.z), big: p.big }));
+        if (!real) spots.forEach((p, i) => ev.push({ t: r2(t0 + 2.6 + i * 0.8), kind: 'fire', structure: i ? 'barn' : 'house', x: r2(p.x), z: r2(p.z) }));
         if (rest[1]) say(t0 + 2.4, 'raider', 'arson', rest[1]);
         if (held) say(t0 + 4.2, 'defender', 'arson', held);
       }
@@ -237,7 +240,8 @@ export function planHouseAssault(b: Battle, ctx: AssaultCtx): Battle {
     });
   }
   let planned: InteriorOut | null = null;
-  const takenIds = new Set<string>([...b.events.filter(e => e.kind === 'taken').map(e => (e as { unit: string }).unit), ...(b.fates ?? []).filter(f => f.fate === 'taken').map(f => f.unit), ...(after?.captives ?? [])]);
+  const simHostage = new Set<string>(b.events.filter(e => e.kind === 'hostage').map(e => (e as { unit: string }).unit));
+  const takenIds = new Set<string>([...b.events.filter(e => e.kind === 'taken').map(e => (e as { unit: string }).unit), ...(b.fates ?? []).filter(f => f.fate === 'taken').map(f => f.unit), ...(after?.captives ?? []), ...simHostage]);
   if (lay && grid && (adults.length || kids.length)) {
     const H = analyzeHouse(grid);
     if (H && H.rooms.length >= 2) {
@@ -245,8 +249,8 @@ export function planHouseAssault(b: Battle, ctx: AssaultCtx): Battle {
       for (const e of b.events) if (e.kind === 'death' && e.t >= tI - 3.6) deaths.set(e.unit, e.t);
       const bs = near(lay.out, raiders).slice(0, Math.min(6, raiders.length));
       meta = { ...meta, house: { ...ctx.box, door: lay.out, inside: lay.inside }, interior: { from: r2(tI + 1.5), to: r2(tI + D - 1) } };
-      planned = planInterior({ H, out: lay.out, door: lay.door, tI, D, adults, kids, crew: bs, pos, hurtT, wounds: b.events.filter((e): e is Extract<BattleEvent, { kind: 'wound' }> => e.kind === 'wound'), deaths, takenIds, style, mercy: b.mercy ?? styleMercy(style), explicitMercy: !!b.mercy, seed: ctx.seed, rng: r, say, nameOf: id => ctx.nameOf?.(id), ev });
-      if (planned) { for (const id of planned.strip) strip.add(id); for (const id of planned.captives) captiveIds.add(id); for (const u of homeAll) strip.add(u.id); }
+      planned = planInterior({ H, out: lay.out, door: lay.door, tI, D, adults, kids, crew: bs, pos, hurtT, wounds: b.events.filter((e): e is Extract<BattleEvent, { kind: 'wound' }> => e.kind === 'wound'), deaths, takenIds, style, mercy: b.mercy ?? (b.raid ? { temper: b.raid.disposition } : styleMercy(style)), explicitMercy: !!b.mercy, realHostage: simHostage, seed: ctx.seed, rng: r, say, nameOf: id => ctx.nameOf?.(id), ev });
+      if (planned) { for (const id of planned.strip) strip.add(id); for (const id of planned.captives) captiveIds.add(id); for (const id of simHostage) captiveIds.add(id); for (const u of homeAll) strip.add(u.id); }
     }
   }
   if (planned) {
@@ -317,9 +321,13 @@ export function planHouseAssault(b: Battle, ctx: AssaultCtx): Battle {
     }
     routOut(tI + D - 11, null, raiders);
   }
+  // the sim's own moves for the choreographed units stop at tI - 3.4
+  // the staging's own ending (sim/raidEnding.ts) plays in the sim's last seconds, which are now mid-fight: this act replaces it (hands up, looting, leaving)
+  const mine = (e: BattleEvent) => e.t > tI - 3.6 && (e.kind === 'surrender' || e.kind === 'lay' || (e.kind === 'say' && !!e.ctx && /aftermath|looting|held|prisoner/.test(e.ctx)) || (e.kind === 'move' && e.walk === true) || (e.kind === 'move' && Math.hypot(e.x - (ctx.box.x0 + ctx.box.x1) / 2, e.z - (ctx.box.z0 + ctx.box.z1) / 2) > 25));
+  const kept = b.events.filter(e => !mine(e) && e.kind !== 'end' && !(e.kind === 'taken' && captiveIds.has(e.unit)) && !(strip.size && (e.kind === 'move' || e.kind === 'cover') && strip.has(e.unit) && e.t > tI - 3.6) && !(e.kind === 'flee' && strip.has(e.unit) && e.t > tI - 3.6));
   // no quiet stretch in the fight: a callout whenever four and a half seconds pass without one (the crew clearing and searching, the family holding)
   if (planned) {
-    const said = [...b.events.filter(e => e.kind === 'say' && e.t >= tI - 3).map(e => e.t), ...ev.filter(e => e.kind === 'say').map(e => e.t)].sort((x, y) => x - y);
+    const said = [...kept.filter(e => e.kind === 'say' && e.t >= tI - 3).map(e => e.t), ...ev.filter(e => e.kind === 'say').map(e => e.t)].sort((x, y) => x - y);
     const crewNow = planned.insideCrew, from = tI - 3, to = newEnd - 1.5, outroAt = tI + D - 11;
     let prev = from, k = 0;
     for (const t of [...said, to]) {
@@ -334,10 +342,6 @@ export function planHouseAssault(b: Battle, ctx: AssaultCtx): Battle {
       prev = Math.max(prev, t);
     }
   }
-  // the sim's own moves for the choreographed units stop at tI - 3.4
-  // the staging's own ending (sim/raidEnding.ts) plays in the sim's last seconds, which are now mid-fight: this act replaces it (hands up, looting, leaving)
-  const mine = (e: BattleEvent) => e.t > tI - 3.6 && (e.kind === 'surrender' || e.kind === 'lay' || (e.kind === 'say' && !!e.ctx && /aftermath|looting|held|prisoner/.test(e.ctx)) || (e.kind === 'move' && e.walk === true) || (e.kind === 'move' && Math.hypot(e.x - (ctx.box.x0 + ctx.box.x1) / 2, e.z - (ctx.box.z0 + ctx.box.z1) / 2) > 25));
-  const kept = b.events.filter(e => !mine(e) && e.kind !== 'end' && !(e.kind === 'taken' && captiveIds.has(e.unit)) && !(strip.size && (e.kind === 'move' || e.kind === 'cover') && strip.has(e.unit) && e.t > tI - 3.6) && !(e.kind === 'flee' && strip.has(e.unit) && e.t > tI - 3.6));
   const oldTail = Math.max(0, b.duration - end.t);
   const events = [...kept, ...ev, { t: r2(newEnd), kind: 'end', result: end.result } as BattleEvent].sort((a, c) => a.t - c.t);
   return { ...b, events, duration: r2(newEnd + oldTail), invasion: meta };

@@ -10,7 +10,9 @@
  *  raidReport  what the aftermath card says: who was hurt, killed or taken, what
  *              was lost, how many raiders are left on the drive.
  */
-import type { Battle } from './battleTypes';
+import { withKnownWalls } from './perimeter';
+import type { Battle, RaidFacts } from './battleTypes';
+import type { RaidOrder } from './raidOrders';
 import { resolve, type Outcome, type Stance } from './encounters';
 import { newDamage } from './raidDamage';
 import { decorateDefenders } from './defenderMoments';
@@ -57,6 +59,8 @@ export interface RaidReport {
   /** Raiders left on the drive after a fight the family won. */
   raidersWounded: number;
   raidersDead: number;
+  /** The explicit data of the fight (sim/battleTypes.ts `RaidFacts`): how the wall fell, the stage reached, fates, loot, fires, hostages, the leader. Absent when there was no fight or on a report from before save v87. */
+  facts?: RaidFacts;
   /** Raiders who gave up and are held at the gate (sim/surrender.ts). Absent in a report from before save v86. */
   raidersSurrendered?: number;
   /** Family members the crew disarmed and held at gunpoint when it broke the line, then left standing in the yard (sim/breachFates.ts). */
@@ -83,13 +87,16 @@ const LOSS_WORDS: Record<(typeof STOCK_LOSSES)[number], readonly [string, string
 interface Keep { prev: StagedRaid; played: number }
 
 /** Resolve the player's stance on a copy and lay out the cutscene. */
-export function stageRaid(game: GameState, stance: Stance, keep?: Keep): StagedRaid {
+export function stageRaid(game: GameState, stance: Stance, keep?: Keep, orders?: readonly RaidOrder[]): StagedRaid {
   const e = game.gate.pending;
   if (!e) throw new Error('no one at the gate');
   const g = structuredClone(game);
+  g.perimeter = withKnownWalls(g).perimeter;
   const t0 = g.clock.t, hour = hourOf(t0);
   g.gate.battle = undefined;
+  if (orders?.length) g.gate.orders = orders.map(o => ({ ...o }));   // (the family's orders for the fight; `resolve` reads them and clears them, so they are never saved)
   const outcome = resolve(g, stance);
+  delete g.gate.orders;
   const battle = (g.gate.battle as Battle | undefined) ?? null;
   const seed = game.seed * 131 + e.day * 7 + 1;
   rotateRaidMemory(seed);   // (this raid's words count against the next raid's)
@@ -142,8 +149,6 @@ export function stageRaid(game: GameState, stance: Stance, keep?: Keep): StagedR
     const crewWon = ep.ending === 'breached' || ep.ending === 'overrun';
     const d = dramatize({ before: game, after: g, battles, house: { x: home.x, z: home.z }, raidersWounded: g.gate.aftermath?.wounded ?? 0, temper, style: fresh.style ?? undefined, dir, seed, skipWake: crewWon });
     battles = d.battles; drama = d.info;
-    // the ending beats the sim's own result supports (real data): the stock the crew took, a fire it set, the family it led away
-    if (crewWon) battles = battles.map((b, i) => (i === last ? { ...b, aftermath: aftermathOf(game, g, b) } : b));
     scenes = scenes.map((sc, i) => (i === last && ep.ending ? { ...sc, ending: ep.ending, ...(ep.wake > 0 ? { wake: ep.wake } : {}) } : sc));
     if (drama) scenes = scenes.map((sc, i) => (i === drama!.scene ? { ...sc, wake: drama!.wake } : sc));
   }
@@ -175,26 +180,13 @@ export function stageRaid(game: GameState, stance: Stance, keep?: Keep): StagedR
  * if the new stance is still a fight, the cosmetic scenes still to come). The clock timeline up
  * to now is identical, so the virtual clock does not jump; only what follows changes.
  */
-export function restageRaid(game: GameState, prev: StagedRaid, played: number, stance: Stance): StagedRaid {
-  return stageRaid(game, stance, { prev, played });
+export function restageRaid(game: GameState, prev: StagedRaid, played: number, stance: Stance, orders?: readonly RaidOrder[]): StagedRaid {
+  return stageRaid(game, stance, { prev, played }, orders);
 }
 
 /** Put the staged result on the clock: the siege's length, once. */
 export function commitRaid(st: Pick<StagedRaid, 'staged' | 'plan'>): GameState {
   return step(st.staged, commitDays(st.plan));
-}
-
-/** The ending beats a lost fight shows, read off what the sim really took: stock, new burn damage, people led away. */
-export function aftermathOf(before: GameState, after: GameState, b: Battle): NonNullable<Battle['aftermath']> {
-  const item: Record<(typeof STOCK_LOSSES)[number], string> = { fresh: 'food', frozen: 'food', canned: 'food', staples: 'food', fuel: 'fuel', meds: 'meds', ifak: 'meds' };
-  const loot: string[] = [];
-  for (const k of STOCK_LOSSES) if ((before.stock[k] ?? 0) - (after.stock[k] ?? 0) >= 1 && !loot.includes(item[k])) loot.push(item[k]);
-  const had = new Set((before.raidDamage ?? []).map(d => d.id));
-  const burns = (after.raidDamage ?? []).filter(d => d.kind === 'burn' && !had.has(d.id));
-  const arson = burns.length ? (burns.some(d => /house|cabin|home|farmhouse/i.test(d.what ?? '')) ? (burns.length > 1 ? 'both' : 'house') : 'barn') as 'house' | 'barn' | 'both' : undefined;
-  const captives: string[] = [];
-  after.people.forEach((p, i) => { const n = after.personState[i]?.needs, was = before.personState.find(x => x.id === p.id)?.needs; if (n?.taken && was && was.died == null) { const u = b.units.find(x => x.personId === p.id); if (u) captives.push(u.id); } });
-  return { ...(loot.length ? { loot } : {}), ...(arson ? { arson } : {}), ...(captives.length ? { captives } : {}) };
 }
 
 /** What changed for the family and the stores between `before` and `after`, in the card's words. */
@@ -214,6 +206,6 @@ export function raidReport(before: GameState, after: GameState, outcome: Outcome
   const rounds = (b ? b.events.filter(e => e.kind === 'shot' && e.from.startsWith('h_')).length : 0) + extraRounds;
   return {
     title: outcome.title, text: outcome.text, tone: outcome.tone, killed, wounded, taken, lost,
-    damage: newDamage(before, after), raidersWounded: am?.wounded ?? 0, raidersDead: am?.dead ?? 0, raidersSurrendered: am?.surrendered ?? 0, held, rounds, lines: outcome.lines, aftermath: !!am,
+    ...(b?.raid ? { facts: b.raid } : {}), damage: newDamage(before, after), raidersWounded: am?.wounded ?? 0, raidersDead: am?.dead ?? 0, raidersSurrendered: am?.surrendered ?? 0, held, rounds, lines: outcome.lines, aftermath: !!am,
   };
 }

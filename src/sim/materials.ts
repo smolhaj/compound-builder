@@ -18,7 +18,7 @@ export type MaterialId = 'lumber' | 'logs' | 'firewood' | 'fieldstone' | 'concre
   | 'mines' | 'greenhouse_kit' | 'fruit_trees' | 'ground_sensor' | 'passage_hatch' | 'vehicle_parts'
   | 'bugout_bag' | 'bugout_cache' | 'security_door' | 'window_shutters' | 'ballistic_panels' | 'safe_room_hardened'
   | 'gun_mount' | 'turret_head' | 'ai_sensor_module' | 'clinic_suite' | 'radio_mast' | 'gate_house'
-  | 'gate_intercom' | 'gate_motor' | 'sally_gate' | 'trellis_gates'
+  | 'gate_intercom' | 'gate_motor' | 'sally_gate' | 'trellis_gates' | 'bollards'
   | 'tent' | 'sleeping_bag'
   | 'jon_boat' | 'skiff'
   | 'poly_film' | 'tunnel_kit_small' | 'tunnel_kit_high' | 'aqua_kit' | 'tilapia_fry'
@@ -172,6 +172,7 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   gate_house: { id: 'gate_house', name: 'Hardened gate house', unit: 'a prefab steel guard house at the drive: ballistic glass, a rising vehicle barrier, an intercom and a camera pole', price: 68000 },
   gate_intercom: { id: 'gate_intercom', name: 'Gate intercom and camera', unit: 'a weatherproof intercom with a camera on the gate post: you see and speak to whoever is at the gate before it opens (needs power)', price: 1800 },
   gate_motor: { id: 'gate_motor', name: 'Caged gate motor', unit: 'a sliding-gate motor inside a welded steel cage with anti-lift brackets, so it cannot be lifted off its rack (needs power to run; a manual release opens the gate by hand without it)', price: 3500 },
+  bollards: { id: 'bollards', name: 'Steel bollards', unit: 'a row of steel posts set in concrete across the gate and the approach: a truck cannot run the wall or the gate at speed (it does nothing against a charge, and a man walks round it)', price: 4500 },
   sally_gate: { id: 'sally_gate', name: 'Double gate (vehicle sally port)', unit: 'a second gate and two steel side walls inside the first: the outer gate shuts behind a vehicle before the inner one opens, so it is never exposed to the road with a gate open', price: 16000 },
   trellis_gates: { id: 'trellis_gates', name: 'Security (trellis) gates', unit: 'a steel trellis gate with a sturdy lock in front of every access door of the house, welded to the frame, fixed on the outside (a second door to get through)', price: 3200 },
   safe_room_hardened: { id: 'safe_room_hardened', name: 'Hardened safe room', unit: 'a poured safe room: ballistic lining, a vault door, a filtered air vent, a water drum and a bunk (replaces the safe room)', price: 24000 },
